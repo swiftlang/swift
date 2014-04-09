@@ -176,7 +176,7 @@ public:
   }
 
   void visitVarDecl(VarDecl *prop) {
-    if (!requiresObjCPropertyDescriptor(prop)) return;
+    if (!requiresObjCPropertyDescriptor(IGF.IGM, prop)) return;
     
     llvm::Constant *name, *imp, *types;
     emitObjCGetterDescriptorParts(IGF.IGM, prop,
@@ -202,7 +202,7 @@ public:
   }
 
   void visitSubscriptDecl(SubscriptDecl *subscript) {
-    if (!requiresObjCSubscriptDescriptor(subscript)) return;
+    if (!requiresObjCSubscriptDescriptor(IGF.IGM, subscript)) return;
     
     llvm::Constant *name, *imp, *types;
     emitObjCGetterDescriptorParts(IGF.IGM, subscript,
@@ -307,8 +307,8 @@ void IRGenModule::emitSourceFile(SourceFile &SF, unsigned StartElem) {
     SILResultInfo retTy(TupleType::getEmpty(Context),
                         ResultConvention::Unowned);
     auto extInfo = SILFunctionType::ExtInfo(AbstractCC::Freestanding,
-                                            /*thin*/ true,
-                                            /*noreturn*/ false);
+                                        SILFunctionType::Representation::Thin,
+                                        /*noreturn*/ false);
     auto fnTy = SILFunctionType::get(nullptr, extInfo,
                                      ParameterConvention::Direct_Unowned,
                                      paramTy, retTy,
@@ -1487,7 +1487,7 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
       }
 
       if (auto var = dyn_cast<VarDecl>(member)) {
-        if (requiresObjCPropertyDescriptor(var)) {
+        if (requiresObjCPropertyDescriptor(*this, var)) {
           needsCategory = true;
           break;
         }
@@ -1495,7 +1495,7 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
       }
 
       if (auto subscript = dyn_cast<SubscriptDecl>(member)) {
-        if (requiresObjCSubscriptDescriptor(subscript)) {
+        if (requiresObjCSubscriptDescriptor(*this, subscript)) {
           needsCategory = true;
           break;
         }

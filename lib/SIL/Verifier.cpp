@@ -407,7 +407,7 @@ public:
   void checkPartialApplyInst(PartialApplyInst *PAI) {
     auto resultInfo = requireObjectType(SILFunctionType, PAI,
                                         "result of partial_apply");
-    require(!resultInfo->isThin(),
+    require(resultInfo->getExtInfo().hasContext(),
             "result of closure cannot have a thin function type");
 
     auto substTy = checkApplySubstitutions(PAI->getSubstitutions(),
@@ -454,7 +454,8 @@ public:
   void checkBuiltinFunctionRefInst(BuiltinFunctionRefInst *BFI) {
     auto fnType = requireObjectType(SILFunctionType, BFI,
                                     "result of builtin_function_ref");
-    require(fnType->isThin(),
+    require(fnType->getRepresentation()
+              == FunctionType::Representation::Thin,
             "builtin_function_ref should have a thin function result");
   }
 
@@ -476,7 +477,8 @@ public:
   void checkFunctionRefInst(FunctionRefInst *FRI) {
     auto fnType = requireObjectType(SILFunctionType, FRI,
                                     "result of function_ref");
-    require(fnType->isThin(),
+    require(fnType->getRepresentation()
+              == FunctionType::Representation::Thin,
             "function_ref should have a thin function result");
     if (F.isTransparent()) {
       require(isValidLinkageForTransparentRef(
@@ -579,7 +581,8 @@ public:
   
   void checkCopyBlockInst(CopyBlockInst *I) {
     auto fnTy = I->getOperand().getType().getAs<SILFunctionType>();
-    require(fnTy && fnTy->isBlock(),
+    require(fnTy
+            && fnTy->getRepresentation() == FunctionType::Representation::Block,
             "operand of copy_block should be a block");
     require(I->getOperand().getType() == I->getType(),
             "result of copy_block should be same type as operand");
@@ -895,7 +898,7 @@ public:
     require(protocol,
             "witness_method method must be a protocol method");
 
-    require(methodType->isThin(),
+    require(methodType->getRepresentation() == FunctionType::Representation::Thin,
             "result of witness_method must be thin function");
 
     require(methodType->getAbstractCC()
@@ -974,9 +977,15 @@ public:
     require(methodType->getAbstractCC()
               == F.getModule().Types.getProtocolWitnessCC(proto),
             "result of protocol_method must have correct @cc for protocol");
-    require(methodType->isThin() == EMI->getMember().isForeign,
-            "result of protocol_method must be thick unless foreign");
-
+    
+    if (EMI->getMember().isForeign) {
+      require(methodType->getRepresentation() == FunctionType::Representation::Thin,
+              "result of foreign protocol_method must be thin");
+    } else {
+      require(methodType->getRepresentation() == FunctionType::Representation::Thick,
+              "result of native protocol_method must be thick");
+    }
+    
     if (EMI->getMember().getDecl()->isInstanceMember()) {
       require(operandType.isExistentialType(),
               "instance protocol_method must apply to an existential");
@@ -1040,7 +1049,7 @@ public:
             "result type of class_method must match type of method");
     auto methodType = requireObjectType(SILFunctionType, CMI,
                                         "result of class_method");
-    require(methodType->isThin(),
+    require(methodType->getRepresentation() == FunctionType::Representation::Thin,
             "result method must be of a thin function type");
     SILType operandType = CMI->getOperand().getType();
     require(isClassOrClassMetatype(operandType.getSwiftType()),
@@ -1054,7 +1063,7 @@ public:
             "result type of super_method must match type of method");
     auto methodType = requireObjectType(SILFunctionType, CMI,
                                         "result of super_method");
-    require(methodType->isThin(),
+    require(methodType->getRepresentation() == FunctionType::Representation::Thin,
             "result method must be of a thin function type");
     SILType operandType = CMI->getOperand().getType();
     require(isClassOrClassMetatype(operandType.getSwiftType()),
@@ -1320,9 +1329,9 @@ public:
     auto resultFTy = requireObjectType(SILFunctionType, BBI,
                                        "bridge_to_block result");
 
-    require(!operandFTy->isBlock(),
+    require(operandFTy->getRepresentation() != FunctionType::Representation::Block,
             "bridge_to_block operand cannot be @objc_block");
-    require(resultFTy->isBlock(),
+    require(resultFTy->getRepresentation() != FunctionType::Representation::Block,
             "bridge_to_block result must be @objc_block");
 
     // FIXME: The mapping from a native function type to a block type is no
@@ -1351,10 +1360,13 @@ public:
     requireSameFunctionComponents(opFTy, resFTy,
                                   "thin_to_thick_function operand and result");
 
-    require(opFTy->isThin(), "operand of thin_to_thick_function must be thin");
-    require(!resFTy->isThin(), "result of thin_to_thick_function must be thick");
+    require(opFTy->getRepresentation() == FunctionType::Representation::Thin,
+            "operand of thin_to_thick_function must be thin");
+    require(resFTy->getRepresentation() == FunctionType::Representation::Thick,
+            "result of thin_to_thick_function must be thick");
 
-    auto adjustedOperandExtInfo = opFTy->getExtInfo().withIsThin(false);
+    auto adjustedOperandExtInfo = opFTy->getExtInfo().withRepresentation(
+                                           FunctionType::Representation::Thick);
     require(adjustedOperandExtInfo == resFTy->getExtInfo(),
             "operand and result of thin_to_think_function must agree in particulars");
   }
@@ -1507,7 +1519,7 @@ public:
 
     require(opTI->getAbstractCC() == resTI->getAbstractCC(),
             "convert_function cannot change function cc");
-    require(opTI->isThin() == resTI->isThin(),
+    require(opTI->getRepresentation() == resTI->getRepresentation(),
             "convert_function cannot change function thinness");
   }
 

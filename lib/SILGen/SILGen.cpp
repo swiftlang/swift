@@ -299,7 +299,8 @@ SILDeclRef SILGenModule::getUnsafePointerToObjCMutablePointerFn() {
 
 SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
   ASTContext &C = M.getASTContext();
-  auto extInfo = FunctionType::ExtInfo().withIsThin(true);
+  auto extInfo = FunctionType::ExtInfo()
+    .withRepresentation(FunctionType::Representation::Thin);
   Type topLevelType = FunctionType::get(TupleType::getEmpty(C),
                                         TupleType::getEmpty(C),
                                         extInfo);
@@ -633,9 +634,10 @@ void SILGenModule::emitDefaultArgGenerator(SILDeclRef constant, Expr *arg) {
 SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
                                                  PatternBindingDecl *binding) {
   ASTContext &C = M.getASTContext();
-  Type initType = FunctionType::get(TupleType::getEmpty(C),
-                                    TupleType::getEmpty(C),
-                                    FunctionType::ExtInfo().withIsThin(true));
+  Type initType = FunctionType::get(
+                    TupleType::getEmpty(C), TupleType::getEmpty(C),
+                    FunctionType::ExtInfo()
+                      .withRepresentation(FunctionType::Representation::Thin));
   auto initSILType = getLoweredType(initType).castTo<SILFunctionType>();
   
   auto *f = 

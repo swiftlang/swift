@@ -1779,7 +1779,7 @@ bool AbstractStorageDecl::usesObjCGetterAndSetter() const {
   // blocks.
   if (isa<VarDecl>(this)) {
     if (auto ft = getType()->getAs<AnyFunctionType>())
-      return ft->isBlock();
+      return ft->getRepresentation() == AnyFunctionType::Representation::Block;
   }
 
   return true;

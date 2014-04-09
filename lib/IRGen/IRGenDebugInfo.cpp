@@ -526,7 +526,7 @@ void IRGenDebugInfo::emitFunction(SILModule &SILMod, SILDebugScope *DS,
       && !isExplicitClosure(DS))
     Flags |= llvm::DIDescriptor::FlagArtificial;
 
-  if (FnTy && FnTy->isBlock())
+  if (FnTy && FnTy->getRepresentation() == FunctionType::Representation::Block)
     Flags |= llvm::DIDescriptor::FlagAppleBlock;
 
   switch (CC) {

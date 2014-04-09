@@ -710,10 +710,9 @@ public:
     ASTContext &AST = F.getModule().getASTContext();
     // builtin_function_ref "int_trap" : $@thin @noreturn () -> ()
     auto bfrInfo = SILFunctionType::ExtInfo(AbstractCC::Freestanding,
-                                            /*thin*/ true,
-                                            /*noreturn*/ true,
-                                            /*autoclosure*/ false,
-                                            /*block*/ false);
+                                          SILFunctionType::Representation::Thin,
+                                          /*noreturn*/ true,
+                                          /*autoclosure*/ false);
     SILResultInfo Result(TupleType::getEmpty(AST), ResultConvention::Unowned);
     auto bfrFnType = SILFunctionType::get(nullptr, bfrInfo,
                                           ParameterConvention::Direct_Owned,

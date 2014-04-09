@@ -2999,10 +2999,16 @@ namespace {
         // If the type is thick, the metadata is derived from the extra data
         // in the function value. Otherwise, it's provided from the type of the
         // self argument.
-        if (fnType->isThin())
+        switch (fnType->getRepresentation()) {
+        case AnyFunctionType::Representation::Thin:
           TheSourceKind = SourceKind::WitnessSelf;
-        else
+          break;
+        case AnyFunctionType::Representation::Thick:
           TheSourceKind = SourceKind::WitnessExtraData;
+          break;
+        case AnyFunctionType::Representation::Block:
+          llvm_unreachable("witnesses cannot be blocks");
+        }
           
         // Testify to generic parameters in the Self type.
         auto params = fnType->getInterfaceParameters();
@@ -3070,7 +3076,7 @@ namespace {
     static CanSILFunctionType getNotionalFunctionType(NominalTypeDecl *D) {
       ASTContext &ctx = D->getASTContext();
       SILFunctionType::ExtInfo extInfo(AbstractCC::Method,
-                                       /*thin*/ true,
+                                       FunctionType::Representation::Thin,
                                        /*noreturn*/ false);
       SILResultInfo result(TupleType::getEmpty(ctx),
                            ResultConvention::Unowned);

@@ -580,7 +580,16 @@ namespace {
     void visitSILFunctionType(CanSILFunctionType origTy,
                               CanSILFunctionType substTy) {
       checkFunctionsAreCompatible(IGF.IGM, origTy, substTy);
-      In.transferInto(Out, 1 + (origTy->isThin() ? 0 : 1));
+      
+      switch (origTy->getRepresentation()) {
+      case AnyFunctionType::Representation::Block:
+      case AnyFunctionType::Representation::Thin:
+        In.transferInto(Out, 1);
+        break;
+      case AnyFunctionType::Representation::Thick:
+        In.transferInto(Out, 2);
+        break;
+      }
     }
 
     void visitLValueType(CanLValueType origTy, CanLValueType substTy) {

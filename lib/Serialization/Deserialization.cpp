@@ -2471,6 +2471,18 @@ Optional<swift::ResultConvention> getActualResultConvention(uint8_t raw) {
   return Nothing;
 }
 
+static AnyFunctionType::Representation
+getFunctionRepresentation(bool thin, bool blockCompatible) {
+  // A type cannot be both thin and block-compatible.
+  assert(!thin || !blockCompatible);
+  if (thin)
+    return AnyFunctionType::Representation::Thin;
+  else if (blockCompatible)
+    return AnyFunctionType::Representation::Block;
+  else
+    return AnyFunctionType::Representation::Thick;
+}
+
 Type ModuleFile::getType(TypeID TID) {
   if (TID == 0)
     return Type();
@@ -2593,13 +2605,12 @@ Type ModuleFile::getType(TypeID TID) {
       error();
       return nullptr;
     }
-
+    
     auto Info = FunctionType::ExtInfo(callingConvention.getValue(),
-                                      thin,
-                                      noreturn,
-                                      autoClosure,
-                                      blockCompatible);
-
+                                getFunctionRepresentation(thin, blockCompatible),
+                                noreturn,
+                                autoClosure);
+    
     typeOrOffset = FunctionType::get(getType(inputID), getType(resultID),
                                      Info);
     break;
@@ -2960,9 +2971,13 @@ Type ModuleFile::getType(TypeID TID) {
     GenericParamList *paramList =
       maybeGetOrReadGenericParams(genericContextID, FileContext, DeclTypeCursor);
     assert(paramList && "missing generic params for polymorphic function");
-
+    
+    auto rep = thin
+      ? AnyFunctionType::Representation::Thin
+      : AnyFunctionType::Representation::Thick;
+    
     auto Info = PolymorphicFunctionType::ExtInfo(callingConvention.getValue(),
-                                                 thin,
+                                                 rep,
                                                  noreturn);
 
     typeOrOffset = PolymorphicFunctionType::get(getType(inputID),
@@ -3005,13 +3020,16 @@ Type ModuleFile::getType(TypeID TID) {
 
       genericParams.push_back(param);
     }
-
+    
+    auto rep = thin
+      ? AnyFunctionType::Representation::Thin
+      : AnyFunctionType::Representation::Thick;
+    
     // Read the generic requirements.
     SmallVector<Requirement, 4> requirements;
     readGenericRequirements(requirements);
     auto info = GenericFunctionType::ExtInfo(callingConvention.getValue(),
-                                             thin,
-                                             noreturn);
+                                             rep, noreturn);
 
     auto sig = GenericSignature::get(genericParams, requirements);
     typeOrOffset = GenericFunctionType::get(sig,
@@ -3026,7 +3044,7 @@ Type ModuleFile::getType(TypeID TID) {
     uint8_t rawInterfaceResultConvention;
     uint8_t rawCallingConvention;
     uint8_t rawCalleeConvention;
-    bool thin;
+    bool thin, block;
     bool noreturn = false;
     unsigned numGenericParams;
     ArrayRef<uint64_t> paramIDs;
@@ -3037,6 +3055,7 @@ Type ModuleFile::getType(TypeID TID) {
                                                    rawCalleeConvention,
                                                    rawCallingConvention,
                                                    thin,
+                                                   block,
                                                    noreturn,
                                                    numGenericParams,
                                                    paramIDs);
@@ -3048,7 +3067,8 @@ Type ModuleFile::getType(TypeID TID) {
       return nullptr;
     }
     SILFunctionType::ExtInfo extInfo(callingConvention.getValue(),
-                                     thin, noreturn);
+                                     getFunctionRepresentation(thin, block),
+                                     noreturn);
 
     // Process the result.
     auto interfaceResultConvention

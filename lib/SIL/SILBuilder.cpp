@@ -30,11 +30,10 @@ SILType SILBuilder::getPartialApplyResultType(SILType origTy, unsigned argCount,
   auto newParams = params.slice(0, params.size() - argCount);
 
   auto extInfo = SILFunctionType::ExtInfo(AbstractCC::Freestanding,
-                                          /*thin*/ false,
-                                          /*noreturn*/ FTI->isNoReturn(),
-                                          /*autoclosure*/ false,
-                                          /*block*/ false);
-
+                                        SILFunctionType::Representation::Thick,
+                                        /*noreturn*/ FTI->isNoReturn(),
+                                        /*autoclosure*/ false);
+  
   auto appliedFnType = SILFunctionType::get(nullptr, extInfo,
                                             ParameterConvention::Direct_Owned,
                                             newParams,

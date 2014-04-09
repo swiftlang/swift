@@ -911,10 +911,9 @@ static SILValue emitOptionalToRef(SILGenFunction &gen, SILLocation loc,
 
   // %2 = builtin_function_ref "inttoptr_Word" : $@thin (Word) -> RawPointer
   auto bfrInfo = SILFunctionType::ExtInfo(AbstractCC::Freestanding,
-                                          /*thin*/ true,
+                                          FunctionType::Representation::Thin,
                                           /*noreturn*/ false,
-                                          /*autoclosure*/ false,
-                                          /*block*/ false);
+                                          /*autoclosure*/ false);
   SILParameterInfo Param(WordTy.getSwiftRValueType(),
                          ParameterConvention::Direct_Unowned);
   SILResultInfo Result(gen.getASTContext().TheRawPointerType,

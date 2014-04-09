@@ -1121,9 +1121,7 @@ bool TypeBase::isSpelledLike(Type other) {
     auto fThem = cast<FunctionType>(them);
     if (fMe->isAutoClosure() != fThem->isAutoClosure())
       return false;
-    if (fMe->isBlock() != fThem->isBlock())
-      return false;
-    if (fMe->isThin() != fThem->isThin())
+    if (fMe->getRepresentation() != fThem->getRepresentation())
       return false;
     if (fMe->isNoReturn() != fThem->isNoReturn())
       return false;
@@ -1285,9 +1283,11 @@ static bool hasRetainablePointerRepresentation(CanType type) {
 
   // Blocks.
   if (auto fnType = dyn_cast<AnyFunctionType>(type)) {
-    return fnType->isBlock();
+    return fnType->getRepresentation()
+      == AnyFunctionType::Representation::Block;
   } else if (auto fnType = dyn_cast<SILFunctionType>(type)) {
-    return fnType->isBlock();
+    return fnType->getRepresentation()
+      == AnyFunctionType::Representation::Block;
   }
 
   // Class metatypes.

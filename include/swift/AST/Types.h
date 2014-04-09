@@ -1702,6 +1702,19 @@ class AnyFunctionType : public TypeBase {
   const Type Output;
 
 public:
+  /// \brief The representation form of a function.
+  enum class Representation {
+    // A "thick" function that carries a context pointer to reference captured
+    // state. The default.
+    Thick = 0,
+    
+    // A thick function that is represented as an Objective-C block.
+    Block,
+    
+    // A "thin" function that needs no context.
+    Thin,
+  };
+  
   /// \brief A class which abstracts out some details necessary for
   /// making a call.
   class ExtInfo {
@@ -1709,14 +1722,13 @@ public:
     // you'll need to adjust both the Bits field below and
     // BaseType::AnyFunctionTypeBits.
 
-    //   |  CC  |isThin|isAutoClosure|isBlock|noReturn|
-    //   |0 .. 3|   4  |      5      |   6   |   7    |
+    //   |  CC  |representation|isAutoClosure|noReturn|
+    //   |0 .. 3|    4 .. 5    |      6      |   7    |
     //
-    enum { CallConvMask = 0xF };
-    enum { ThinMask = 0x10 };
-    enum { AutoClosureMask = 0x20 };
-    enum { BlockMask = 0x40 };
-    enum { NoReturnMask = 0x80 };
+    enum : uint16_t { CallConvMask = 0xF };
+    enum : uint16_t { RepresentationMask = 0x30, RepresentationShift = 4 };
+    enum : uint16_t { AutoClosureMask = 0x40 };
+    enum : uint16_t { NoReturnMask = 0x80 };
 
     uint16_t Bits;
 
@@ -1732,18 +1744,17 @@ public:
     }
 
     // Constructor for polymorphic type.
-    ExtInfo(AbstractCC CC, bool IsThin, bool IsNoReturn) {
+    ExtInfo(AbstractCC CC, Representation Rep, bool IsNoReturn) {
       Bits = ((unsigned) CC) |
-             (IsThin ? ThinMask : 0) |
+             ((unsigned) Rep << RepresentationShift) |
              (IsNoReturn ? NoReturnMask : 0);
     }
 
     // Constructor with no defaults.
-    ExtInfo(AbstractCC CC, bool IsThin, bool IsNoReturn,
-            bool IsAutoClosure, bool IsBlock) : ExtInfo(CC, IsThin, IsNoReturn){
+    ExtInfo(AbstractCC CC, Representation Rep, bool IsNoReturn,
+            bool IsAutoClosure) : ExtInfo(CC, Rep, IsNoReturn){
       Bits = Bits |
-             (IsAutoClosure ? AutoClosureMask : 0) |
-             (IsBlock ? BlockMask : 0);
+             (IsAutoClosure ? AutoClosureMask : 0);
     }
 
     explicit ExtInfo(AbstractCC CC) : Bits(0) {
@@ -1751,21 +1762,31 @@ public:
     }
 
     AbstractCC getCC() const { return AbstractCC(Bits & CallConvMask); }
-    bool isThin() const { return Bits & ThinMask; }
     bool isNoReturn() const { return Bits & NoReturnMask; }
     bool isAutoClosure() const { return Bits & AutoClosureMask; }
-    bool isBlock() const { return Bits & BlockMask; }
-
+    Representation getRepresentation() const {
+      return Representation((Bits & RepresentationMask) >> RepresentationShift);
+    }
+    
+    /// True if the function representation carries context.
+    bool hasContext() const {
+      switch (getRepresentation()) {
+      case Representation::Thick:
+      case Representation::Block:
+        return true;
+      case Representation::Thin:
+        return false;
+      }
+    }
+    
     // Note that we don't have setters. That is by design, use
     // the following with methods instead of mutating these objects.
     ExtInfo withCallingConv(AbstractCC CC) const {
       return ExtInfo((Bits & ~CallConvMask) | (unsigned) CC);
     }
-    ExtInfo withIsThin(bool IsThin) const {
-      if (IsThin)
-        return ExtInfo(Bits | ThinMask);
-      else
-        return ExtInfo(Bits & ~ThinMask);
+    ExtInfo withRepresentation(Representation Rep) const {
+      return ExtInfo((Bits & ~RepresentationMask)
+                     | (unsigned)Rep << RepresentationShift);
     }
     ExtInfo withIsNoReturn(bool IsNoReturn) const {
       if (IsNoReturn)
@@ -1779,13 +1800,7 @@ public:
       else
         return ExtInfo(Bits & ~AutoClosureMask);
     }
-    ExtInfo withIsBlock(bool IsBlock) const {
-      if (IsBlock)
-        return ExtInfo(Bits | BlockMask);
-      else
-        return ExtInfo(Bits & ~BlockMask);
-    }
-
+    
     char getFuncAttrKey() const {
       return Bits;
     }
@@ -1820,12 +1835,11 @@ public:
     return getExtInfo().getCC();
   }
   
-  /// \brief True if the function type is "thin", meaning values of the type can
-  /// be represented as simple function pointers without context.
-  bool isThin() const {
-    return getExtInfo().isThin();
+  /// \brief Get the representation of the function type.
+  Representation getRepresentation() const {
+    return getExtInfo().getRepresentation();
   }
-
+  
   bool isNoReturn() const {
     return getExtInfo().isNoReturn();
   }
@@ -1836,11 +1850,6 @@ public:
     return getExtInfo().isAutoClosure();
   }
   
-  /// \brief True if this type is an Objective-C-compatible block type.
-  bool isBlock() const {
-    return getExtInfo().isBlock();
-  }
-
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() >= TypeKind::First_AnyFunctionType &&
@@ -2263,7 +2272,8 @@ typedef CanTypeWrapper<SILFunctionType> CanSILFunctionType;
 class SILFunctionType : public TypeBase, public llvm::FoldingSetNode {
 public:
   typedef AnyFunctionType::ExtInfo ExtInfo;
-
+  typedef AnyFunctionType::Representation Representation;
+  
 private:
   CanGenericSignature GenericSig;
 
@@ -2360,17 +2370,11 @@ public:
     return getExtInfo().getCC();
   }
 
-  /// \brief True if this type is an Objective-C-compatible block type.
-  bool isBlock() const {
-    return getExtInfo().isBlock();
+  /// \brief Get the representation of the function type.
+  Representation getRepresentation() const {
+    return getExtInfo().getRepresentation();
   }
   
-  /// \brief True if the function type is "thin", meaning values of the type can
-  /// be represented as simple function pointers without context.
-  bool isThin() const {
-    return getExtInfo().isThin();
-  }
-
   bool isNoReturn() const {
     return getExtInfo().isNoReturn();
   }

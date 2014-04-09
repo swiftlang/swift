@@ -570,7 +570,7 @@ static CanSILFunctionType getAllocObjectFormalType(ASTContext &ctx,
   };
   auto result = SILResultInfo(classType, ResultConvention::Owned);
   auto extInfo = SILFunctionType::ExtInfo(AbstractCC::ObjCMethod,
-                                          /*thin*/ true,
+                                          FunctionType::Representation::Thin,
                                           /*noreturn*/ false);
 
   return SILFunctionType::get(nullptr, extInfo,
@@ -1245,42 +1245,60 @@ bool irgen::requiresObjCMethodDescriptor(ConstructorDecl *constructor) {
   return constructor->isObjC();
 }
 
-bool irgen::requiresObjCPropertyDescriptor(VarDecl *property) {
+bool irgen::requiresObjCPropertyDescriptor(IRGenModule &IGM,
+                                           VarDecl *property) {
   // We don't export generic methods or subclasses to IRGen yet.
   if (property->getDeclContext()->getDeclaredTypeInContext()
           ->is<BoundGenericType>())
     return false;
 
   if (auto override = property->getOverriddenDecl())
-    return requiresObjCPropertyDescriptor(override);
+    return requiresObjCPropertyDescriptor(IGM, override);
 
   if (!property->isObjC())
     return false;
   
-  // Don't expose objc properties for non-block function types. We can't
-  // autorelease them, and eventually we want to map them back to blocks.
+  // Don't expose objc properties for function types we can't bridge.
   if (auto ft = property->getType()->getAs<AnyFunctionType>())
-    return ft->isBlock();
+    switch (ft->getRepresentation()) {
+    case FunctionType::Representation::Thin:
+      // We can't bridge thin types at all.
+      return false;
+    case FunctionType::Representation::Thick:
+      // TODO: Only if we enabled block bridging.
+      return IGM.Context.LangOpts.EnableBlockBridging;
+    case FunctionType::Representation::Block:
+      return true;
+    }
   
   return true;
 }
 
-bool irgen::requiresObjCSubscriptDescriptor(SubscriptDecl *subscript) {
+bool irgen::requiresObjCSubscriptDescriptor(IRGenModule &IGM,
+                                            SubscriptDecl *subscript) {
   // We don't export generic methods or subclasses to IRGen yet.
   if (subscript->getDeclContext()->getDeclaredTypeInContext()
           ->is<BoundGenericType>())
     return false;
 
   if (auto override = subscript->getOverriddenDecl())
-    return requiresObjCSubscriptDescriptor(override);
+    return requiresObjCSubscriptDescriptor(IGM, override);
 
   if (!subscript->isObjC())
     return false;
   
-  // Don't expose objc properties for function types. We can't autorelease them,
-  // and eventually we want to map them back to blocks.
+  // Don't expose objc properties for function types we can't bridge.
   if (auto ft = subscript->getElementType()->getAs<AnyFunctionType>())
-    return ft->isBlock();
+    switch (ft->getRepresentation()) {
+    case FunctionType::Representation::Thin:
+      // We can't bridge thin types at all.
+      return false;
+    case FunctionType::Representation::Thick:
+      // TODO: Only if we enabled block bridging.
+      return IGM.Context.LangOpts.EnableBlockBridging;
+    case FunctionType::Representation::Block:
+      return true;
+    }
   
   return true;
 }

@@ -1695,11 +1695,18 @@ public:
       Printer << "@cc(witness_method) ";
       break;
     }
-
-    if (info.isBlock())
-      Printer << "@objc_block ";
-    if (info.isThin())
+    
+    switch (info.getRepresentation()) {
+    case AnyFunctionType::Representation::Thick:
+      break;
+    case AnyFunctionType::Representation::Thin:
       Printer << "@thin ";
+      break;
+    case AnyFunctionType::Representation::Block:
+      Printer << "@objc_block ";
+      break;
+    }
+
     if (info.isNoReturn())
       Printer << "@noreturn ";
   }

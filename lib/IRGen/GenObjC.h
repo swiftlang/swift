@@ -156,10 +156,12 @@ namespace irgen {
 
   /// True if the VarDecl requires ObjC accessor methods and a property
   /// descriptor.
-  bool requiresObjCPropertyDescriptor(VarDecl *property);
+  bool requiresObjCPropertyDescriptor(IRGenModule &IGM,
+                                      VarDecl *property);
 
   /// True if the SubscriptDecl requires ObjC accessor methods.
-  bool requiresObjCSubscriptDescriptor(SubscriptDecl *subscript);
+  bool requiresObjCSubscriptDescriptor(IRGenModule &IGM,
+                                       SubscriptDecl *subscript);
 
   /// Allocate an Objective-C object.
   llvm::Value *emitObjCAllocObjectCall(IRGenFunction &IGF,

@@ -1479,21 +1479,27 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
   case LoweredValue::Kind::Explosion: {
     Explosion calleeValues = lv.getExplosion(IGF);
     
-    if (origCalleeType->isBlock()) {
+    switch (origCalleeType->getRepresentation()) {
+    case AnyFunctionType::Representation::Block: {
       // Extract the invocation pointer for blocks.
       calleeData = calleeValues.claimNext();
       calleeData = IGF.Builder.CreateBitCast(calleeData, IGF.IGM.ObjCBlockPtrTy);
       llvm::Value *invokeAddr = IGF.Builder.CreateStructGEP(calleeData, 3);
       calleeFn = IGF.Builder.CreateLoad(invokeAddr, IGF.IGM.getPointerAlignment());
       extraData = ExtraData::Block;
-    } else {
+      break;
+    }
+        
+    case AnyFunctionType::Representation::Thin:
+    case AnyFunctionType::Representation::Thick: {
       calleeFn = calleeValues.claimNext();
-      
-      if (origCalleeType->isThin())
-        calleeData = nullptr;
-      else
+        
+      if (origCalleeType->getRepresentation()
+            == AnyFunctionType::Representation::Thick)
         calleeData = calleeValues.claimNext();
-      
+      else
+        calleeData = nullptr;
+        
       // Guess the "ExtraData" kind from the type of CalleeData.
       // FIXME: Should get from the type info.
       if (!calleeData)
@@ -1504,6 +1510,9 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
         extraData = ExtraData::Metatype;
       else
         llvm_unreachable("unexpected extra data for function value");
+        
+      break;
+    }
     }
 
     // Indirect functions are always minimal.
@@ -1720,9 +1729,17 @@ getPartialApplicationFunction(IRGenSILFunction &IGF,
     llvm::Value *fn = ex.claimNext();
     llvm::Value *context = nullptr;
     auto fnType = v.getType().castTo<SILFunctionType>();
-    if (!fnType->isThin())
+    
+    switch (fnType->getRepresentation()) {
+    case AnyFunctionType::Representation::Thin:
+      break;
+    case AnyFunctionType::Representation::Thick:
       context = ex.claimNext();
-
+      break;
+    case AnyFunctionType::Representation::Block:
+      llvm_unreachable("partial application of block not implemented");
+    }
+    
     return std::make_tuple(fn, context, fnType);
   }
   }

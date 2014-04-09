@@ -823,14 +823,14 @@ void Mangler::mangleType(CanType type, ResilienceExpansion explosion,
     };
 
     // <impl-callee-convention>
-    if (fn->isThin()) {
+    if (fn->getRepresentation() == AnyFunctionType::Representation::Thin) {
       Buffer << 't';
     } else {
       Buffer << mangleParameterConvention(fn->getCalleeConvention());
     }
 
     // <impl-function-attribute>*
-    if (fn->isBlock()) {
+    if (fn->getRepresentation() == AnyFunctionType::Representation::Block) {
       Buffer << "Cb";
     } else {
       switch (fn->getAbstractCC()) {
@@ -1149,7 +1149,7 @@ void Mangler::mangleFunctionType(CanAnyFunctionType fn,
   // type ::= 'f' type type (uncurried)
   // type ::= 'b' type type (objc block)
   // type ::= 'K' type type (auto closure)
-  if (fn->isBlock())
+  if (fn->getRepresentation() == AnyFunctionType::Representation::Block)
     Buffer << 'b';
   else if (fn->isAutoClosure())
     Buffer << 'K';

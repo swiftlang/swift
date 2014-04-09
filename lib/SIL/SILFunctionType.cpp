@@ -365,8 +365,9 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
   }
   
   auto calleeConvention = ParameterConvention::Direct_Unowned;
-  if (!extInfo.isThin()) calleeConvention = conventions.getCallee();
-
+  if (extInfo.hasContext())
+    calleeConvention = conventions.getCallee();
+  
   // Always strip the auto-closure bit.
   extInfo = extInfo.withIsAutoClosure(false);
 
@@ -419,12 +420,16 @@ static CanSILFunctionType getNativeSILFunctionType(SILModule &M,
                                            CanAnyFunctionType substType,
                                            CanAnyFunctionType substInterfaceType,
                                            AnyFunctionType::ExtInfo extInfo) {
-  if (extInfo.isBlock())
+  switch (extInfo.getRepresentation()) {
+  case AnyFunctionType::Representation::Block:
     return getSILFunctionType(M, origType, substType, substInterfaceType,
                               extInfo, DefaultBlockConventions());
-  
-  return getSILFunctionType(M, origType, substType, substInterfaceType,
-                            extInfo, DefaultConventions());
+      
+  case AnyFunctionType::Representation::Thin:
+  case AnyFunctionType::Representation::Thick:
+    return getSILFunctionType(M, origType, substType, substInterfaceType,
+                              extInfo, DefaultConventions());
+  }
 }
 
 CanSILFunctionType swift::getNativeSILFunctionType(SILModule &M,
@@ -776,11 +781,12 @@ getUncachedSILFunctionTypeForConstant(SILModule &M, SILDeclRef constant,
                                   CanAnyFunctionType origLoweredInterfaceType,
                                   CanAnyFunctionType substFormalType,
                                   CanAnyFunctionType substInterfaceType,
-                                  bool thin) {
-  assert(origLoweredType->isThin());
-
-  auto extInfo = origLoweredType->getExtInfo().withIsThin(thin);
-
+                                  AnyFunctionType::Representation rep) {
+  assert(origLoweredType->getRepresentation()
+           == FunctionType::Representation::Thin);
+  
+  auto extInfo = origLoweredType->getExtInfo().withRepresentation(rep);
+  
   CanAnyFunctionType substLoweredType;
   CanAnyFunctionType substLoweredInterfaceType;
   if (substFormalType) {
@@ -871,13 +877,14 @@ AbstractCC TypeConverter::getAbstractCC(SILDeclRef c) {
 CanSILFunctionType TypeConverter::getConstantFunctionType(SILDeclRef constant,
                                    CanAnyFunctionType substFormalType,
                                    CanAnyFunctionType substFormalInterfaceType,
-                                   bool thin) {
+                                   AnyFunctionType::Representation rep) {
   auto cachedInfo = getConstantInfo(constant);
   if (!substFormalType || substFormalType == cachedInfo.FormalType) {
     assert(bool(substFormalType) == bool(substFormalInterfaceType)
            && (!substFormalInterfaceType
                || substFormalInterfaceType == cachedInfo.FormalInterfaceType));
-    auto extInfo = cachedInfo.SILFnType->getExtInfo().withIsThin(thin);
+    auto extInfo = cachedInfo.SILFnType->getExtInfo()
+      .withRepresentation(FunctionType::Representation::Thin);
     return adjustFunctionType(cachedInfo.SILFnType, extInfo);
   }
 
@@ -886,7 +893,7 @@ CanSILFunctionType TypeConverter::getConstantFunctionType(SILDeclRef constant,
                                                cachedInfo.LoweredInterfaceType,
                                                substFormalType,
                                                substFormalInterfaceType,
-                                               thin);
+                                               rep);
 }
 
 SILConstantInfo TypeConverter::getConstantInfo(SILDeclRef constant) {
@@ -905,9 +912,10 @@ SILConstantInfo TypeConverter::getConstantInfo(SILDeclRef constant) {
   
   // The formal type is just that with the right CC and thin-ness.
   AbstractCC cc = getAbstractCC(constant);
-  formalType = getThinFunctionType(formalType, cc);
-  formalInterfaceType = getThinFunctionType(formalInterfaceType, cc);
-
+  formalType = adjustFunctionType(formalType, cc,
+                                  AnyFunctionType::Representation::Thin);
+  formalInterfaceType = adjustFunctionType(formalInterfaceType, cc,
+                                         AnyFunctionType::Representation::Thin);
   // The lowered type is the formal type, but uncurried and with
   // parameters automatically turned into their bridged equivalents.
   auto loweredType =
@@ -921,7 +929,7 @@ SILConstantInfo TypeConverter::getConstantInfo(SILDeclRef constant) {
                                           loweredInterfaceType,
                                           CanAnyFunctionType(),
                                           CanAnyFunctionType(),
-                                          /*thin*/ true);
+                                          FunctionType::Representation::Thin);
   
   DEBUG(llvm::dbgs() << "lowering type for constant ";
         constant.print(llvm::dbgs());
@@ -1001,7 +1009,7 @@ static CanAnyFunctionType getBridgedFunctionType(TypeConverter &tc,
                                             AnyFunctionType::ExtInfo extInfo) {
   // Blocks are always cdecl.
   AbstractCC effectiveCC = t->getAbstractCC();
-  if (t->isBlock()) {
+  if (t->getRepresentation() == FunctionType::Representation::Block) {
     effectiveCC = AbstractCC::C;
     extInfo = extInfo.withCallingConv(AbstractCC::C);
   }
@@ -1068,7 +1076,8 @@ TypeConverter::getLoweredASTFunctionType(CanAnyFunctionType t,
 
   AbstractCC cc = extInfo.getCC();
   assert(!extInfo.isAutoClosure() && "auto_closures cannot be curried");
-  assert(!extInfo.isBlock() && "objc blocks cannot be curried");
+  assert(extInfo.getRepresentation() != FunctionType::Representation::Block
+         && "objc blocks cannot be curried");
   
   // The uncurried input types.
   SmallVector<TupleTypeElt, 4> inputs;
@@ -1334,9 +1343,11 @@ TypeConverter::substFunctionType(CanSILFunctionType origFnType,
                           substLoweredInterfaceType.getInput());
 
   // Allow the substituted type to add thick-ness, but not remove it.
-  assert(origFnType->isThin() || !substLoweredType->isThin());
-  assert(substLoweredType->isThin() == substLoweredInterfaceType->isThin());
-
+  assert(!origFnType->getExtInfo().hasContext()
+           || substLoweredType->getExtInfo().hasContext());
+  assert(substLoweredType->getRepresentation()
+           == substLoweredInterfaceType->getRepresentation());
+  
   // FIXME: Map into archetype context.
   return SILFunctionType::get(genericSig,
                               substLoweredType->getExtInfo(),

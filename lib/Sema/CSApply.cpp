@@ -3443,7 +3443,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
     // Coercion to a block function type from non-block function type.
     auto fromFunc = fromType->getAs<FunctionType>();
-    if (toFunc->isBlock() && (!fromFunc || !fromFunc->isBlock())) {
+    if (toFunc->getRepresentation() == FunctionType::Representation::Block
+        && (!fromFunc || fromFunc->getRepresentation() != FunctionType::Representation::Block)) {
       // Coerce the expression to the non-block form of the function type.
       auto toNonBlockTy = FunctionType::get(toFunc->getInput(),
                                             toFunc->getResult());

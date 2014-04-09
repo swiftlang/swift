@@ -41,7 +41,7 @@ static CanAnyFunctionType getDynamicMethodType(SILGenModule &SGM,
   }
   auto extInfo = FunctionType::ExtInfo()
                    .withCallingConv(SGM.getConstantCC(methodName))
-                   .withIsThin(true);
+                   .withRepresentation(FunctionType::Representation::Thin);
 
   return CanFunctionType::get(selfTy, memberType->getCanonicalType(),
                               extInfo);
@@ -273,8 +273,10 @@ private:
 
     // Existential witnesses are always "thick" with the polymorphic info,
     // unless @objc.
-    bool isThin = name.isForeign;
-    auto extInfo = FunctionType::ExtInfo(AbstractCC::Method, isThin,
+    auto rep = name.isForeign
+      ? FunctionType::Representation::Thin
+      : FunctionType::Representation::Thick;
+    auto extInfo = FunctionType::ExtInfo(AbstractCC::Method, rep,
                                          /*noreturn*/ false);
 
     SubstFormalType = CanFunctionType::get(substSelfType, SubstFormalType,
@@ -294,15 +296,15 @@ private:
 
     // addProtocolSelfToFormalType initializes SubstFormalType->isThin()
     // appropriately for the archetype kind.
-    bool isThin = /*thin*/ SubstFormalType->isThin();
+    FunctionType::Representation rep = SubstFormalType->getRepresentation();
 
     // We may need to make the OrigLoweredType thick so that
     // computing the substFnType below preserves this information.
-    if (!isThin) {
+    if (rep != FunctionType::Representation::Thin) {
       constantInfo.LoweredType =
-        getThickFunctionType(constantInfo.LoweredType);
+        adjustFunctionType(constantInfo.LoweredType, rep);
       constantInfo.LoweredInterfaceType =
-        getThickFunctionType(constantInfo.LoweredInterfaceType);
+        adjustFunctionType(constantInfo.LoweredInterfaceType, rep);
     }
 
     // The expected result of witness_method is a partial application
@@ -341,7 +343,7 @@ private:
     auto partialSubstUncurriedType =
       SGM.Types.getConstantFunctionType(constant, partialSubstFormalType,
                                         partialSubstInterfaceType,
-                                        isThin);
+                                        rep);
     return SILType::getPrimitiveObjectType(partialSubstUncurriedType);
   }
 
@@ -2390,7 +2392,8 @@ namespace {
     auto boolTy = BuiltinIntegerType::get(1, C)
       ->getCanonicalType();
     auto fnTy = SILFunctionType::get(sig,
-                 AnyFunctionType::ExtInfo().withIsThin(true),
+                 AnyFunctionType::ExtInfo()
+                   .withRepresentation(FunctionType::Representation::Thin),
                  ParameterConvention::Direct_Unowned,
                  SILParameterInfo(metaTy, ParameterConvention::Direct_Unowned),
                  SILResultInfo(boolTy, ResultConvention::Unowned), C);

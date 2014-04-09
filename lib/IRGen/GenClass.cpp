@@ -1393,7 +1393,7 @@ namespace {
 
     /// Properties need to be collected in the properties list.
     void visitProperty(VarDecl *var) {
-      if (requiresObjCPropertyDescriptor(var)) {
+      if (requiresObjCPropertyDescriptor(IGM, var)) {
         if (llvm::Constant *prop = buildProperty(var))
           Properties.push_back(prop);
         auto getter_setter = emitObjCPropertyMethodDescriptors(IGM, var);
@@ -1561,7 +1561,7 @@ namespace {
 
     /// Subscripts should probably be collected in extended metadata.
     void visitSubscriptDecl(SubscriptDecl *subscript) {
-      if (!requiresObjCSubscriptDescriptor(subscript)) return;
+      if (!requiresObjCSubscriptDescriptor(IGM, subscript)) return;
       auto getter_setter = emitObjCSubscriptMethodDescriptors(IGM, subscript);
       if (subscript->getAttrs().isOptional())
         OptInstanceMethods.push_back(getter_setter.first);

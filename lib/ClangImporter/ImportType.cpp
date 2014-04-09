@@ -231,7 +231,8 @@ namespace {
         return Type();
       FunctionType *fTy = pointeeType->castTo<FunctionType>();
       return FunctionType::get(fTy->getInput(), fTy->getResult(),
-                               fTy->getExtInfo().withIsBlock(true));
+                 fTy->getExtInfo()
+                   .withRepresentation(AnyFunctionType::Representation::Block));
     }
 
     Type VisitReferenceType(const clang::ReferenceType *type) {

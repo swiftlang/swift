@@ -1060,15 +1060,32 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
           .highlight(input->getSourceRange());
       }
     }
-
+    
+    // Functions cannot be both @thin and @objc_block.
+    bool thin = attrs.has(TAK_thin);
+    bool block = attrs.has(TAK_objc_block);
+    if (thin && block) {
+      TC.diagnose(attrs.getLoc(TAK_objc_block),
+                  diag::objc_block_cannot_be_thin)
+        .highlight(attrs.getLoc(TAK_thin));
+      thin = false;
+    }
+    
+    FunctionType::Representation rep;
+    if (thin)
+      rep = FunctionType::Representation::Thin;
+    else if (block)
+      rep = FunctionType::Representation::Block;
+    else
+      rep = FunctionType::Representation::Thick;
+    
     // Resolve the function type directly with these attributes.
     FunctionType::ExtInfo extInfo(attrs.hasCC()
                                     ? attrs.getAbstractCC()
                                     : AbstractCC::Freestanding,
-                                  attrs.has(TAK_thin),
+                                  rep,
                                   attrs.has(TAK_noreturn),
-                                  attrs.has(TAK_auto_closure),
-                                  attrs.has(TAK_objc_block));
+                                  attrs.has(TAK_auto_closure));
 
     auto calleeConvention = ParameterConvention::Direct_Unowned;
     if (attrs.has(TAK_callee_owned)) {
@@ -1953,8 +1970,20 @@ bool TypeChecker::isRepresentableInObjC(const DeclContext *DC, Type T) {
   }
 
   if (auto FT = T->getAs<FunctionType>()) {
-    if (!FT->isBlock())
+    switch (FT->getRepresentation()) {
+    case AnyFunctionType::Representation::Thin:
+      // TODO: Could be representable if we know the function is cdecl (or
+      // we can statically produce a cdecl thunk for it).
       return false;
+    case AnyFunctionType::Representation::Thick:
+      // TODO: Only when block bridging is enabled
+      if (!Context.LangOpts.EnableBlockBridging)
+        return false;
+      break;
+    case AnyFunctionType::Representation::Block:
+      break;
+    }
+    
     Type Input = FT->getInput();
     if (auto InputTuple = Input->getAs<TupleType>()) {
       for (auto &Elt : InputTuple->getFields()) {

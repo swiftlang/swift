@@ -519,7 +519,8 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
     auto substFnType = origFnType->substInterfaceGenericArgs(
                                                     SGM.M, SGM.SwiftModule,
                                                     declRef.getSubstitutions());
-    auto closureType = getThickFunctionType(substFnType);
+    auto closureType = adjustFunctionType(substFnType,
+                                          FunctionType::Representation::Thick);
 
     SILValue spec = B.createPartialApply(loc, result.forward(*this),
                                 SILType::getPrimitiveObjectType(substFnType),
@@ -906,8 +907,9 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
   // Retain the thinness of the original function type.
   CanAnyFunctionType destTy =
     cast<AnyFunctionType>(e->getType()->getCanonicalType());
-  if (original.getType().castTo<SILFunctionType>()->isThin())
-    destTy = getThinFunctionType(destTy);
+  auto origRep = original.getType().castTo<SILFunctionType>()->getRepresentation();
+  if (origRep != destTy->getRepresentation())
+    destTy = adjustFunctionType(destTy, origRep);
 
   SILType resultType = SGF.getLoweredType(destTy);
   ManagedValue result;
@@ -3246,7 +3248,8 @@ void SILGenFunction::emitGlobalAccessor(VarDecl *global,
   // that reference as Builtin.once expects.
   SILValue onceFuncRef = B.createFunctionRef(global, onceFunc);
   auto onceFuncThickTy
-    = getThickFunctionType(onceFunc->getLoweredFunctionType());
+    = adjustFunctionType(onceFunc->getLoweredFunctionType(),
+                         FunctionType::Representation::Thick);
   auto onceFuncThickSILTy = SILType::getPrimitiveObjectType(onceFuncThickTy);
   onceFuncRef = B.createThinToThickFunction(global, onceFuncRef,
                                             onceFuncThickSILTy);
@@ -3795,13 +3798,14 @@ static ManagedValue emitBridgeCPointerToUnsafePointer(SILGenFunction &gen,
     : ParameterConvention::Direct_Owned;
   
   auto substFnTy = SILFunctionType::get(nullptr,
-                            AnyFunctionType::ExtInfo().withIsThin(true),
-                            ParameterConvention::Direct_Unowned,
-                            SILParameterInfo(v.getType().getSwiftRValueType(),
-                                             convention),
-                            SILResultInfo(unsafePtrTy,
-                                          ResultConvention::Unowned),
-                            gen.getASTContext());
+                      AnyFunctionType::ExtInfo()
+                        .withRepresentation(FunctionType::Representation::Thin),
+                      ParameterConvention::Direct_Unowned,
+                      SILParameterInfo(v.getType().getSwiftRValueType(),
+                                       convention),
+                      SILResultInfo(unsafePtrTy,
+                                    ResultConvention::Unowned),
+                      gen.getASTContext());
   
   auto ptr = gen.B.createApply(loc, cToUnsafePointer,
                                SILType::getPrimitiveObjectType(substFnTy),
@@ -3914,7 +3918,8 @@ static ManagedValue emitBridgeUnsafePointerToCPointer(SILGenFunction &gen,
     : ResultConvention::Owned;
   
   auto substFnTy = SILFunctionType::get(nullptr,
-                            AnyFunctionType::ExtInfo().withIsThin(true),
+                            AnyFunctionType::ExtInfo()
+                              .withRepresentation(FunctionType::Representation::Thin),
                             ParameterConvention::Direct_Unowned,
                             SILParameterInfo(v.getType().getSwiftRValueType(),
                                              ParameterConvention::Direct_Unowned),

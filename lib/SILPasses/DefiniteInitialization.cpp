@@ -973,10 +973,9 @@ static SILValue getBinaryFunction(StringRef Name, SILType IntSILTy,
   
   // Woo, boilerplate to produce a function type.
   auto extInfo = SILFunctionType::ExtInfo(AbstractCC::Freestanding,
-                                          /*thin*/ true,
+                                          FunctionType::Representation::Thin,
                                           /*noreturn*/ false,
-                                          /*autoclosure*/ false,
-                                          /*block*/ false);
+                                          /*autoclosure*/ false);
   
   SILParameterInfo Params[] = {
     SILParameterInfo(IntTy, ParameterConvention::Direct_Unowned),
@@ -1002,10 +1001,9 @@ static SILValue getTruncateToI1Function(SILType IntSILTy, SILLocation Loc,
 
   // Woo, boilerplate to produce a function type.
   auto extInfo = SILFunctionType::ExtInfo(AbstractCC::Freestanding,
-                                          /*thin*/ true,
+                                          FunctionType::Representation::Thin,
                                           /*noreturn*/ false,
-                                          /*autoclosure*/ false,
-                                          /*block*/ false);
+                                          /*autoclosure*/ false);
   
   SILParameterInfo Param(IntTy, ParameterConvention::Direct_Unowned);
   Type Int1Ty = BuiltinIntegerType::get(1, B.getASTContext());

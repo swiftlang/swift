@@ -41,30 +41,20 @@ const ParameterConvention DefaultThickCalleeConvention =
 CanAnyFunctionType adjustFunctionType(CanAnyFunctionType type,
                                       AnyFunctionType::ExtInfo extInfo);
 
-/// Make the given function type @thin and change its CC.
-inline CanAnyFunctionType getThinFunctionType(CanAnyFunctionType t,
-                                              AbstractCC cc) {
-  auto extInfo = t->getExtInfo().withIsThin(true).withCallingConv(cc);
+/// Change the given function type's representation and CC.
+inline CanAnyFunctionType adjustFunctionType(CanAnyFunctionType t,
+                                          AbstractCC cc,
+                                          AnyFunctionType::Representation rep) {
+  auto extInfo = t->getExtInfo().withRepresentation(rep).withCallingConv(cc);
   return adjustFunctionType(t, extInfo);
 }
-/// Make the given function type @thin.
-inline CanAnyFunctionType getThinFunctionType(CanAnyFunctionType t) {
-  auto extInfo = t->getExtInfo().withIsThin(true);
+/// Change the given function type's representation.
+inline CanAnyFunctionType adjustFunctionType(CanAnyFunctionType t,
+                                          AnyFunctionType::Representation rep) {
+  auto extInfo = t->getExtInfo().withRepresentation(rep);
   return adjustFunctionType(t, extInfo);  
 }
-
-/// Make the given function type no longer @thin and change its CC.
-inline CanAnyFunctionType getThickFunctionType(CanAnyFunctionType t,
-                                               AbstractCC cc) {
-  auto extInfo = t->getExtInfo().withIsThin(false).withCallingConv(cc);
-  return adjustFunctionType(t, extInfo);
-}
-/// Make the given function type no longer @thin.
-inline CanAnyFunctionType getThickFunctionType(CanAnyFunctionType t) {
-  auto extInfo = t->getExtInfo().withIsThin(false);
-  return adjustFunctionType(t, extInfo);
-}
-
+  
 /// Given a SIL function type, return a type that is identical except
 /// for using the given ExtInfo.
 CanSILFunctionType adjustFunctionType(CanSILFunctionType type,
@@ -74,17 +64,16 @@ inline CanSILFunctionType adjustFunctionType(CanSILFunctionType type,
                                       SILFunctionType::ExtInfo extInfo) {
   return adjustFunctionType(type, extInfo, type->getCalleeConvention());
 }
-inline CanSILFunctionType getThinFunctionType(CanSILFunctionType t) {
-  if (t->isThin()) return t;
-  return adjustFunctionType(t, t->getExtInfo().withIsThin(true),
-                            ParameterConvention::Direct_Unowned);
+inline CanSILFunctionType adjustFunctionType(CanSILFunctionType t,
+                                         SILFunctionType::Representation rep) {
+  if (t->getRepresentation() == rep) return t;
+  auto extInfo = t->getExtInfo().withRepresentation(rep);
+  
+  return adjustFunctionType(t, extInfo,
+                    extInfo.hasContext() ? DefaultThickCalleeConvention
+                                         : ParameterConvention::Direct_Unowned);
 }
-inline CanSILFunctionType getThickFunctionType(CanSILFunctionType t) {
-  if (!t->isThin()) return t;
-  return adjustFunctionType(t, t->getExtInfo().withIsThin(false),
-                            DefaultThickCalleeConvention);
-}
-
+  
 /// Different ways in which a function can capture context.
 enum class CaptureKind {
   /// No context arguments are necessary.
@@ -618,7 +607,7 @@ public:
   CanSILFunctionType getConstantFunctionType(SILDeclRef constant,
                                    CanAnyFunctionType substFormalType,
                                    CanAnyFunctionType substFormalInterfaceType,
-                                   bool thin);
+                                   AnyFunctionType::Representation rep);
 
   /// Substitute the given function type so that it implements the
   /// given substituted type.

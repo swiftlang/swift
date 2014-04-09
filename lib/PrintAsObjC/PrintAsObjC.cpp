@@ -705,10 +705,17 @@ private:
   }
 
   void visitFunctionType(FunctionType *FT) {
-    assert(!FT->isThin() && "can't handle bare function pointers");
-    visitPart(FT->getResult());
-    os << " (^";
-    openFunctionTypes.push_back(FT);
+    switch (FT->getRepresentation()) {
+    case AnyFunctionType::Representation::Thin:
+      assert(false && "can't handle thin functions yet");
+    // Native Swift function types bridge to block types.
+    case AnyFunctionType::Representation::Thick:
+    case AnyFunctionType::Representation::Block:
+      visitPart(FT->getResult());
+      os << " (^";
+      openFunctionTypes.push_back(FT);
+      break;
+    }
   }
 
   /// Print the part of a function type that appears after where the variable

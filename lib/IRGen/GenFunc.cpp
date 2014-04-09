@@ -285,32 +285,37 @@ namespace {
   /// Calculate the extra data kind for a function type.
   static ExtraData getExtraDataKind(IRGenModule &IGM,
                                     CanSILFunctionType formalType) {
-    // If the type is thin, there is no extra data.
-    if (formalType->isThin())
+    switch (formalType->getRepresentation()) {
+    case AnyFunctionType::Representation::Thin:
       return ExtraData::None;
-    
-    // Otherwise, the extra data depends on the calling convention.
-    switch (formalType->getAbstractCC()) {
-    case AbstractCC::Freestanding:
-    case AbstractCC::Method:
-      // For non-witness methods, 'thick' always indicates a retainable context
-      // pointer.
-      return ExtraData::Retainable;
+        
+    case AnyFunctionType::Representation::Block:
+      return ExtraData::Block;
+        
+    case AnyFunctionType::Representation::Thick:
+      // The extra data for native functions depends on the calling convention.
+      switch (formalType->getAbstractCC()) {
+      case AbstractCC::Freestanding:
+      case AbstractCC::Method:
+        // For non-witness methods, 'thick' always indicates a retainable context
+        // pointer.
+        return ExtraData::Retainable;
 
-    case AbstractCC::WitnessMethod:
-      // A 'thick' witness is partially applied to its Self archetype binding.
-      //
-      // TODO: This requires extra data only if the necessary metadata is not
-      // already available through a metatype or class 'self' parameter.
-      //
-      // TODO: For default implementations, the witness table needs to be
-      // supplied too.
-      return ExtraData::Metatype;
-    
-    case AbstractCC::C:
-    case AbstractCC::ObjCMethod:
-      llvm_unreachable("thick foreign functions should be lowered to a "
-                       "block type");
+      case AbstractCC::WitnessMethod:
+        // A 'thick' witness is partially applied to its Self archetype binding.
+        //
+        // TODO: This requires extra data only if the necessary metadata is not
+        // already available through a metatype or class 'self' parameter.
+        //
+        // TODO: For default implementations, the witness table needs to be
+        // supplied too.
+        return ExtraData::Metatype;
+      
+      case AbstractCC::C:
+      case AbstractCC::ObjCMethod:
+        llvm_unreachable("thick foreign functions should be lowered to a "
+                         "block type");
+      }
     }
   }
   
@@ -690,34 +695,38 @@ namespace {
 }
 
 const TypeInfo *TypeConverter::convertFunctionType(SILFunctionType *T) {
-  if (T->isBlock())
+  switch (T->getRepresentation()) {
+  case AnyFunctionType::Representation::Block:
     return new BlockTypeInfo(CanSILFunctionType(T),
                              IGM.ObjCBlockPtrTy,
                              IGM.getPointerSize(),
                              IGM.getHeapObjectSpareBits(),
                              IGM.getPointerAlignment());
-  
-  CanSILFunctionType ct(T);
-  auto extraDataKind = getExtraDataKind(IGM, ct);
-  llvm::Type *ty;
-  switch (extraDataKind) {
-  case ExtraData::None:
-    ty = IGM.FunctionPtrTy;
-    break;
-  case ExtraData::Retainable:
-    ty = IGM.FunctionPairTy;
-    break;
-  case ExtraData::Metatype:
-    ty = IGM.WitnessFunctionPairTy;
-    break;
-    case ExtraData::Block:
-      llvm_unreachable("blocks can't be lowered to FuncTypeInfo");
+      
+  case AnyFunctionType::Representation::Thin:
+  case AnyFunctionType::Representation::Thick:
+    CanSILFunctionType ct(T);
+    auto extraDataKind = getExtraDataKind(IGM, ct);
+    llvm::Type *ty;
+    switch (extraDataKind) {
+    case ExtraData::None:
+      ty = IGM.FunctionPtrTy;
+      break;
+    case ExtraData::Retainable:
+      ty = IGM.FunctionPairTy;
+      break;
+    case ExtraData::Metatype:
+      ty = IGM.WitnessFunctionPairTy;
+      break;
+      case ExtraData::Block:
+        llvm_unreachable("blocks can't be lowered to FuncTypeInfo");
+    }
+    
+    return FuncTypeInfo::create(ct, ty,
+                                IGM.getPointerSize() * 2,
+                                IGM.getPointerAlignment(),
+                                extraDataKind);
   }
-  
-  return FuncTypeInfo::create(ct, ty,
-                              IGM.getPointerSize() * 2,
-                              IGM.getPointerAlignment(),
-                              extraDataKind);
 }
 
 void irgen::addIndirectReturnAttributes(IRGenModule &IGM,
@@ -873,8 +882,9 @@ llvm::Type *SignatureExpansion::expandExternalSignatureTypes() {
 
   // We shouldn't have any LLVM parameter types yet, aside from a block context
   // pointer.
-  assert((FnType->isBlock() ? ParamIRTypes.size() == 1
-                            : ParamIRTypes.empty())
+  assert((FnType->getRepresentation() == FunctionType::Representation::Block
+            ? ParamIRTypes.size() == 1
+            : ParamIRTypes.empty())
          && "Expected empty ParamIRTypes");
 
   // Generate function info for this signature.
@@ -1054,7 +1064,7 @@ Signature FuncSignatureInfo::getSignature(IRGenModule &IGM,
   SignatureExpansion expansion(IGM, FormalType, explosionLevel);
   
   // Blocks are passed into themselves as their first argument.
-  if (FormalType->isBlock())
+  if (FormalType->getRepresentation() == FunctionType::Representation::Block)
     expansion.ParamIRTypes.push_back(IGM.ObjCBlockPtrTy);
   
   llvm::Type *resultType = expansion.expandSignatureTypes();
@@ -1086,9 +1096,13 @@ Signature FuncSignatureInfo::getSignature(IRGenModule &IGM,
 static const FuncSignatureInfo &
 getFuncSignatureInfoForLowered(IRGenModule &IGM, CanSILFunctionType type) {
   auto &ti = IGM.getTypeInfoForLowered(type);
-  if (type->isBlock())
+  switch (type->getRepresentation()) {
+  case AnyFunctionType::Representation::Block:
     return ti.as<BlockTypeInfo>();
-  return ti.as<FuncTypeInfo>();
+  case AnyFunctionType::Representation::Thin:
+  case AnyFunctionType::Representation::Thick:
+    return ti.as<FuncTypeInfo>();
+  }
 }
 
 llvm::FunctionType *
@@ -2028,7 +2042,8 @@ void CallEmission::setFromCallee() {
 
   // Add the data pointer if we have one.
   // For blocks we emit this after all the arguments have been applied.
-  if (!CurCallee.getOrigFunctionType()->isBlock()
+  if (CurCallee.getOrigFunctionType()->getRepresentation()
+        != FunctionType::Representation::Block
       && CurCallee.hasDataPointer()) {
     assert(LastArgWritten > 0);
     Args[--LastArgWritten] = CurCallee.getDataPointer(IGF);
@@ -2220,7 +2235,8 @@ void CallEmission::addArg(Explosion &arg) {
   LastArgWritten = targetIndex;
   
   // If this is a block, add the block pointer before the written arguments.
-  if (CurCallee.getOrigFunctionType()->isBlock()) {
+  if (CurCallee.getOrigFunctionType()->getRepresentation()
+        == FunctionType::Representation::Block) {
     assert(CurCallee.hasDataPointer());
     Args[--LastArgWritten] = CurCallee.getDataPointer(IGF);
   }

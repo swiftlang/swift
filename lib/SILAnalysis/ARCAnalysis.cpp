@@ -53,7 +53,7 @@ bool swift::arc::canDecrementRefCount(SILInstruction *User,
     // Ignore any thick functions for now due to us not handling the ref-counted
     // nature of its context.
     if (auto FTy = AI->getCallee().getType().getAs<SILFunctionType>())
-      if (!FTy->isThin())
+      if (FTy->getExtInfo().hasContext())
         return true;
 
     // If we have a builtin that is side effect free, we can commute the

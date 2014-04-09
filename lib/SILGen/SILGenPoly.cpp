@@ -837,7 +837,9 @@ static CanSILFunctionType buildThunkType(SILGenFunction &gen,
 
   assert(!expectedType->isPolymorphic());
   assert(!sourceType->isPolymorphic());
-  assert(!expectedType->isThin());
+  // Can't build a thunk without context, so we require ownership semantics
+  // on the result type.
+  assert(expectedType->getExtInfo().hasContext());
 
   // Just use the generic signature from the context.
   // This isn't necessarily optimal.
@@ -853,11 +855,13 @@ static CanSILFunctionType buildThunkType(SILGenFunction &gen,
   params.append(expectedType->getInterfaceParameters().begin(),
                 expectedType->getInterfaceParameters().end());
   params.push_back({sourceType,
-                    sourceType->isThin() ? ParameterConvention::Direct_Unowned
-                                         : DefaultThickCalleeConvention});
-
-  auto extInfo = expectedType->getExtInfo().withIsThin(true);
-
+                    sourceType->getExtInfo().hasContext()
+                      ? DefaultThickCalleeConvention
+                      : ParameterConvention::Direct_Unowned});
+  
+  auto extInfo = expectedType->getExtInfo()
+    .withRepresentation(FunctionType::Representation::Thin);
+  
   // Map the parameter and expected types out of context to get the interface
   // type of the thunk.
   SmallVector<SILParameterInfo, 4> interfaceParams;
@@ -954,7 +958,8 @@ SILGenFunction::emitGeneralizedFunctionValue(SILLocation loc,
   auto expectedFnType = expectedTL.getLoweredType().castTo<SILFunctionType>();
 
   auto fnType = fn.getType().castTo<SILFunctionType>();
-  assert(!expectedFnType->isThin() || fnType->isThin());
+  assert(expectedFnType->getExtInfo().hasContext()
+         || !fnType->getExtInfo().hasContext());
 
   // If there's no abstraction difference, we're done.
   if (fnType == expectedFnType) {
@@ -964,10 +969,11 @@ SILGenFunction::emitGeneralizedFunctionValue(SILLocation loc,
   // Any of these changes requires a conversion thunk.
   if (fnType->getInterfaceResult() != expectedFnType->getInterfaceResult() ||
       fnType->getInterfaceParameters() != expectedFnType->getInterfaceParameters() ||
-      (!fnType->isThin() &&
+      (fnType->getExtInfo().hasContext() &&
        fnType->getCalleeConvention() != expectedFnType->getCalleeConvention()) ||
       fnType->getAbstractCC() != expectedFnType->getAbstractCC()) {
-    assert(!expectedFnType->isThin() && "conversion thunk will not be thin!");
+    assert(expectedFnType->getExtInfo().hasContext()
+           && "conversion thunk will not be thin!");
     return emitGeneralizeFunctionWithThunk(*this, loc, fn,
                                            origFormalType, substFormalType,
                                            expectedTL);
@@ -999,7 +1005,7 @@ SILGenFunction::emitGeneralizedFunctionValue(SILLocation loc,
   };
 
   // Apply any trivial conversions before doing thin-to-thick.
-  emitConversion(expectedEI.withIsThin(fnEI.isThin()),
+  emitConversion(expectedEI.withRepresentation(fnEI.getRepresentation()),
                  fnType->getCalleeConvention(),
                  ValueKind::ConvertFunctionInst);
 

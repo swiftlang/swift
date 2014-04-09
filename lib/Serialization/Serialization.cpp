@@ -2104,13 +2104,13 @@ void Serializer::writeType(Type ty) {
 
     unsigned abbrCode = DeclTypeAbbrCodes[FunctionTypeLayout::Code];
     FunctionTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                   addTypeRef(fnTy->getInput()),
-                                   addTypeRef(fnTy->getResult()),
-                                   getRawStableCC(fnTy->getAbstractCC()),
-                                   fnTy->isAutoClosure(),
-                                   fnTy->isThin(),
-                                   fnTy->isNoReturn(),
-                                   fnTy->isBlock());
+           addTypeRef(fnTy->getInput()),
+           addTypeRef(fnTy->getResult()),
+           getRawStableCC(fnTy->getAbstractCC()),
+           fnTy->isAutoClosure(),
+           fnTy->getRepresentation() == AnyFunctionType::Representation::Thin,
+           fnTy->isNoReturn(),
+           fnTy->getRepresentation() == AnyFunctionType::Representation::Block);
     break;
   }
 
@@ -2122,12 +2122,12 @@ void Serializer::writeType(Type ty) {
 
     unsigned abbrCode = DeclTypeAbbrCodes[PolymorphicFunctionTypeLayout::Code];
     PolymorphicFunctionTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                              addTypeRef(fnTy->getInput()),
-                                              addTypeRef(fnTy->getResult()),
-                                              dID,
-                                              getRawStableCC(callingConvention),
-                                              fnTy->isThin(),
-                                              fnTy->isNoReturn());
+            addTypeRef(fnTy->getInput()),
+            addTypeRef(fnTy->getResult()),
+            dID,
+            getRawStableCC(callingConvention),
+            fnTy->getRepresentation() == AnyFunctionType::Representation::Thin,
+            fnTy->isNoReturn());
     if (!genericContext)
       writeGenericParams(&fnTy->getGenericParams(), DeclTypeAbbrCodes);
     break;
@@ -2141,13 +2141,13 @@ void Serializer::writeType(Type ty) {
     for (auto param : fnTy->getGenericParams())
       genericParams.push_back(addTypeRef(param));
     GenericFunctionTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                          addTypeRef(fnTy->getInput()),
-                                          addTypeRef(fnTy->getResult()),
-                                          getRawStableCC(callingConvention),
-                                          fnTy->isThin(),
-                                          fnTy->isNoReturn(),
-                                          genericParams);
-
+            addTypeRef(fnTy->getInput()),
+            addTypeRef(fnTy->getResult()),
+            getRawStableCC(callingConvention),
+            fnTy->getRepresentation() == AnyFunctionType::Representation::Thin,
+            fnTy->isNoReturn(),
+            genericParams);
+    
     // Write requirements.
     writeRequirements(fnTy->getRequirements());
     break;
@@ -2179,14 +2179,15 @@ void Serializer::writeType(Type ty) {
 
     unsigned abbrCode = DeclTypeAbbrCodes[SILFunctionTypeLayout::Code];
     SILFunctionTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                      addTypeRef(interfaceResult.getType()),
-                                      stableInterfaceResultConvention,
-                                      stableCalleeConvention,
-                                      getRawStableCC(callingConvention),
-                                      fnTy->isThin(),
-                                      fnTy->isNoReturn(),
-                                      sig ? sig->getGenericParams().size() : 0,
-                                      paramTypes);
+          addTypeRef(interfaceResult.getType()),
+          stableInterfaceResultConvention,
+          stableCalleeConvention,
+          getRawStableCC(callingConvention),
+          fnTy->getRepresentation() == AnyFunctionType::Representation::Thin,
+          fnTy->getRepresentation() == AnyFunctionType::Representation::Block,
+          fnTy->isNoReturn(),
+          sig ? sig->getGenericParams().size() : 0,
+          paramTypes);
     if (sig)
       writeRequirements(sig->getRequirements());
     else
