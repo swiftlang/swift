@@ -40,7 +40,7 @@ At a high level, the Swift compiler follows a strict pipeline architecture:
   language-specific diagnostics.  These are always run, even at -O0, and produce
   *canonical SIL*.
 - General SIL *Optimization Passes* optionally run over the canonical SIL to
-  improve performance of the resultant executable.  These are enabled and
+  improve performance of the resulting executable.  These are enabled and
   controlled by the optimization level and are not run at -O0.
 - *IRGen* lowers canonical SIL to LLVM IR.
 - The LLVM backend (optionally) applies LLVM optimizations, runs the LLVM code
@@ -1998,6 +1998,18 @@ Acts as a use of a value operand, or of the value in memory referenced by an
 address operand. Optimizations may not move operations that would destroy the
 value, such as ``release_value``, ``strong_release``, ``copy_addr [take]``, or
 ``destroy_addr``, past this instruction.
+
+copy_block
+``````````
+::
+
+  sil-instruction :: 'copy_block' sil-operand
+
+  %1 = copy_block %0 : $@objc_block T -> U
+
+Performs a copy of an Objective-C block. Unlike retains of other
+reference-counted types, this can produce a different value from the operand
+if the block is copied from the stack to the heap.
 
 Literals
 ~~~~~~~~
