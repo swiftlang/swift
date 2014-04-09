@@ -3033,6 +3033,9 @@ public:
     OverriddenDecl.setPointer(over);
   }
 
+  /// Returns the location of 'override' keyword, if any.
+  SourceLoc getOverrideLoc() const;
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_AbstractStorageDecl &&

@@ -1334,8 +1334,9 @@ getActualStaticSpellingKind(uint8_t raw) {
 static bool isDeclAttrRecord(unsigned ID) {
   using namespace decls_block;
   switch (ID) {
-#define DECL_ATTR(NAME, CLASS, ...)\
+#define DECL_ATTR(NAME, CLASS, ...) \
   case CLASS##_DECL_ATTR: return true;
+#define VIRTUAL_DECL_ATTR(NAME, CLASS, ...)
 #include "swift/Serialization/DeclTypeRecordNodes.def"
   default: return false;
   }
@@ -1368,6 +1369,11 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   // Read the attributes (if any).
   DeclAttribute *DAttrs = nullptr;
   DeclAttribute **AttrsNext = &DAttrs;
+  auto AddAttribute = [&](DeclAttribute *Attr) {
+    // Advance the linked list.
+    *AttrsNext = Attr;
+    AttrsNext = Attr->getMutableNext();
+  };
   unsigned recordID;
 
   while (true) {
@@ -1452,9 +1458,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       if (!Attr)
         return nullptr;
 
-      // Advance the linked list.
-      *AttrsNext = Attr;
-      AttrsNext = Attr->getMutableNext();
+      AddAttribute(Attr);
 
       // Advance bitstream cursor to the next record.
       entry = DeclTypeCursor.advance();
@@ -1802,7 +1806,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     if (auto overridden = cast_or_null<VarDecl>(getDecl(overriddenID))) {
       var->setOverriddenDecl(overridden);
-      var->getMutableAttrs().setAttr(AK_override, SourceLoc());
+      AddAttribute(new (ctx) OverrideAttr(SourceLoc()));
     }
 
     break;
@@ -1911,7 +1915,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     if (auto overridden = cast_or_null<FuncDecl>(getDecl(overriddenID))) {
       fn->setOverriddenDecl(overridden);
-      fn->getMutableAttrs().setAttr(AK_override, SourceLoc());
+      AddAttribute(new (ctx) OverrideAttr(SourceLoc()));
     }
 
     fn->setStatic(isStatic);
@@ -2286,7 +2290,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       subscript->getMutableAttrs().setAttr(AK_optional, SourceLoc());
     if (auto overridden = cast_or_null<SubscriptDecl>(getDecl(overriddenID))) {
       subscript->setOverriddenDecl(overridden);
-      subscript->getMutableAttrs().setAttr(AK_override, SourceLoc());
+      AddAttribute(new (ctx) OverrideAttr(SourceLoc()));
     }
     break;
   }
@@ -2360,6 +2364,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   }
 
   case decls_block::XREF: {
+    assert(DAttrs == nullptr);
     ModuleID baseModuleID;
     uint32_t pathLen;
     decls_block::XRefLayout::readRecord(scratch, baseModuleID, pathLen);

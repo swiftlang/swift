@@ -11,6 +11,19 @@
     ;
   }
 
+* 'override' is now a keyword:
+
+  class Base {
+    var property: Int { return 0 }
+    func instanceFunc() {}
+    class func classFunc() {}
+  }
+  class Derived : Base {
+    override var property: Int { return 1 }
+    override func instanceFunc() {}
+    override class func classFunc() {}
+  }
+
 2014-04-02
 ----------
 

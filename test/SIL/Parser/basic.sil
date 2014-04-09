@@ -197,7 +197,7 @@ class C {
 }
 
 class D : C {
-  @override func doIt() {
+  override func doIt() {
     super.doIt()
   }
 }

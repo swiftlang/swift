@@ -291,12 +291,11 @@ protected:
     ObjCAttrBitFields ObjCAttrBits;
   };
 
-  DeclAttribute *Next;
+  DeclAttribute *Next = nullptr;
 
   DeclAttribute(DeclAttrKind DK, SourceLoc AtLoc, SourceRange Range,
                 bool Implicit) :
-    AttributeBase(AtLoc, Range),
-    Next(nullptr)
+    AttributeBase(AtLoc, Range)
   {
     DeclAttrBits.Kind = static_cast<unsigned>(DK);
     DeclAttrBits.Implicit = Implicit;
@@ -624,6 +623,18 @@ public:
   }
 };
 
+/// Defines the attribute that we use to model the 'override' keyword.
+class OverrideAttr : public DeclAttribute {
+public:
+  OverrideAttr(SourceLoc OverrideLoc)
+      : DeclAttribute(DAK_override, SourceLoc(), OverrideLoc,
+                      /*Implicit=*/false) {}
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_override;
+  }
+};
+
 /// \brief Attributes that may be applied to declarations.
 class DeclAttributes {
   /// Source locations for every possible attribute that can be parsed in
@@ -767,7 +778,6 @@ public:
   // FIXME: eventually take a platform argument.
   const AvailabilityAttr *getUnavailable() const;
 
-  bool isOverride() const { return has(AK_override); }
   bool requiresStoredPropertyInits() const {
     return has(AK_requires_stored_property_inits);
   }
@@ -799,14 +809,14 @@ public:
   void print(ASTPrinter &Printer, const PrintOptions &Options) const;
 
   template <typename T, typename DERIVED> class iterator_base {
-    T* Impl;
+    T *Impl;
   public:
-    iterator_base(T* Impl) : Impl(Impl) {}
+    explicit iterator_base(T *Impl) : Impl(Impl) {}
     DERIVED &operator++() { Impl = Impl->Next; return (DERIVED&)*this; }
     bool operator==(const iterator_base &X) const { return X.Impl == Impl; }
     bool operator!=(const iterator_base &X) const { return X.Impl != Impl; }
-    T* operator*() const { return Impl; }
-    T& operator->() const { return *Impl; }
+    T *operator*() const { return Impl; }
+    T &operator->() const { return *Impl; }
   };
 
   /// Add a constructed DeclAttribute to this list.
@@ -818,25 +828,31 @@ public:
   // Iterator interface over DeclAttribute objects.
   class iterator : public iterator_base<DeclAttribute, iterator> {
   public:
-    iterator(DeclAttribute *Impl) : iterator_base(Impl) {}
+    explicit iterator(DeclAttribute *Impl) : iterator_base(Impl) {}
   };
 
   class const_iterator : public iterator_base<const DeclAttribute,
                                               const_iterator> {
   public:
-    const_iterator(const DeclAttribute *Impl) : iterator_base(Impl) {}
+    explicit const_iterator(const DeclAttribute *Impl)
+        : iterator_base(Impl) {}
   };
 
-  iterator begin() { return DeclAttrs; }
-  iterator end() { return nullptr; }
-  const_iterator begin() const { return DeclAttrs; }
-  const_iterator end() const { return nullptr; }
+  iterator begin() { return iterator(DeclAttrs); }
+  iterator end() { return iterator(nullptr); }
+  const_iterator begin() const { return const_iterator(DeclAttrs); }
+  const_iterator end() const { return const_iterator(nullptr); }
 
   /// Retrieve the first attribute of the given attribute class.
   template <typename ATTR>
   const ATTR *getAttribute(bool AllowInvalid = false) const {
+    return const_cast<DeclAttributes *>(this)->getAttribute<ATTR>();
+  }
+
+  template <typename ATTR>
+  ATTR *getAttribute(bool AllowInvalid = false) {
     for (auto Attr : *this)
-      if (const ATTR *SpecificAttr = dyn_cast<ATTR>(Attr))
+      if (ATTR *SpecificAttr = dyn_cast<ATTR>(Attr))
         if (SpecificAttr->isValid() || AllowInvalid)
           return SpecificAttr;
     return nullptr;

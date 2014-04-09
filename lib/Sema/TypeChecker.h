@@ -241,7 +241,7 @@ public:
 
   /// The list of nominal type declarations that have been validated
   /// during type checking.
-  llvm::SmallVector<NominalTypeDecl *, 4> ValidatedTypes;
+  llvm::SetVector<NominalTypeDecl *> ValidatedTypes;
 
 private:
   Type IntLiteralType;
@@ -467,10 +467,10 @@ public:
   Identifier getNextResponseVariableName(DeclContext *DC);
 
   void typeCheckDecl(Decl *D, bool isFirstPass);
-  
-  
+
+  void checkDeclAttributesEarly(Decl *D);
   void checkDeclAttributes(Decl *D);
-  
+
   virtual void resolveDeclSignature(ValueDecl *VD) override {
     validateDecl(VD, true);
   }

@@ -233,7 +233,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
 
     // Parse the decl, stmt, or expression.
     PreviousHadSemi = false;
-    if (isStartOfDecl(Tok, peekToken()) && Tok.isNot(tok::pound_if)) {
+    if (isStartOfDecl() && Tok.isNot(tok::pound_if)) {
       ParserStatus Status =
           parseDecl(TmpDecls, IsTopLevel ? PD_AllowTopLevel : PD_Default);
       if (Status.isError()) {
@@ -532,7 +532,7 @@ ParserResult<Stmt> Parser::parseStmtReturn() {
   // enclosing stmt-brace to get it by eagerly eating it unless the return is
   // followed by a '}', ';', statement or decl start keyword sequence.
   if (Tok.isNot(tok::r_brace) && Tok.isNot(tok::semi) &&
-      !isStartOfStmt(Tok) && !isStartOfDecl(Tok, peekToken())) {
+      !isStartOfStmt(Tok) && !isStartOfDecl()) {
     SourceLoc ExprLoc;
     if (Tok.isNot(tok::eof))
       ExprLoc = Tok.getLoc();
@@ -1032,7 +1032,8 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
     DeclAttributes Attributes;
     parseDeclAttributeList(Attributes);
     ParserStatus VarDeclStatus = parseDeclVar(
-        None, Attributes, FirstDecls, SourceLoc(), StaticSpellingKind::None);
+        None, Attributes, FirstDecls, SourceLoc(), StaticSpellingKind::None,
+        SourceLoc());
     if (VarDeclStatus.isError())
       return VarDeclStatus; // FIXME: better recovery
   } else if (Tok.isNot(tok::semi)) {

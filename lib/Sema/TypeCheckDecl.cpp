@@ -1617,7 +1617,7 @@ public:
 
   void visitImportDecl(ImportDecl *ID) {
     // Nothing to do.
-    
+    TC.checkDeclAttributesEarly(ID);
     TC.checkDeclAttributes(ID);
   }
 
@@ -1630,6 +1630,7 @@ public:
     }
 
     validateAttributes(TC, VD);
+    TC.checkDeclAttributesEarly(VD);
 
     // The instance var requires ObjC interop if it has an @objc or @iboutlet
     // attribute or if it's a member of an ObjC class or protocol.
@@ -1658,10 +1659,12 @@ public:
     if (IsFirstPass && !checkOverrides(VD)) {
       // If a property has an override attribute but does not override
       // anything, complain.
-      if (VD->getAttrs().isOverride() && !VD->getOverriddenDecl()) {
-        TC.diagnose(VD, diag::property_does_not_override)
-        .highlight(VD->getAttrs().getLoc(AK_override));
-        VD->getMutableAttrs().clearAttribute(AK_override);
+      if (auto *OA = VD->getMutableAttrs().getAttribute<OverrideAttr>()) {
+        if (!VD->getOverriddenDecl()) {
+          TC.diagnose(VD, diag::property_does_not_override)
+              .highlight(OA->getLocation());
+          OA->setInvalid();
+        }
       }
     }
 
@@ -1736,6 +1739,8 @@ public:
       }
     }
 
+    TC.checkDeclAttributesEarly(PBD);
+
     bool isInSILMode = false;
     if (auto sourceFile = PBD->getDeclContext()->getParentSourceFile())
       isInSILMode = sourceFile->Kind == SourceFileKind::SIL;
@@ -1803,8 +1808,10 @@ public:
     if (IsSecondPass || SD->hasType())
       return;
 
-    assert(SD->getDeclContext()->isTypeContext()
-           && "Decl parsing must prevent subscripts outside of types!");
+    assert(SD->getDeclContext()->isTypeContext() &&
+           "Decl parsing must prevent subscripts outside of types!");
+
+    TC.checkDeclAttributesEarly(SD);
 
     auto dc = SD->getDeclContext();
     bool isInvalid = TC.validateType(SD->getElementTypeLoc(), dc);
@@ -1870,10 +1877,12 @@ public:
     if (!checkOverrides(SD)) {
       // If a subscript has an override attribute but does not override
       // anything, complain.
-      if (SD->getAttrs().isOverride() && !SD->getOverriddenDecl()) {
-        TC.diagnose(SD, diag::subscript_does_not_override)
-          .highlight(SD->getAttrs().getLoc(AK_override));
-        SD->getMutableAttrs().clearAttribute(AK_override);
+      if (auto *OA = SD->getMutableAttrs().getAttribute<OverrideAttr>()) {
+        if (!SD->getOverriddenDecl()) {
+          TC.diagnose(SD, diag::subscript_does_not_override)
+              .highlight(OA->getLocation());
+          OA->setInvalid();
+        }
       }
     }
 
@@ -1881,6 +1890,7 @@ public:
   }
 
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
+    TC.checkDeclAttributesEarly(TAD);
     if (!IsSecondPass) {
       if (TC.validateType(TAD->getUnderlyingTypeLoc(), TAD->getDeclContext())) {
         TAD->setInvalid();
@@ -1905,6 +1915,7 @@ public:
   }
   
   void visitAssociatedTypeDecl(AssociatedTypeDecl *assocType) {
+    TC.checkDeclAttributesEarly(assocType);
     // Check the default definition, if there is one.
     TypeLoc &defaultDefinition = assocType->getDefaultDefinitionLoc();
     if (!defaultDefinition.isNull() &&
@@ -1963,12 +1974,13 @@ public:
     // check.
     if (isa<ProtocolDecl>(ED->getParent()))
       return;
-    
+
+    TC.checkDeclAttributesEarly(ED);
+
     if (!IsSecondPass) {
       TC.validateDecl(ED);
 
-      if (!TC.ValidatedTypes.empty() && ED == TC.ValidatedTypes.back())
-        TC.ValidatedTypes.pop_back();
+      TC.ValidatedTypes.remove(ED);
 
       {
         // Check for circular inheritance of the raw type.
@@ -2118,16 +2130,16 @@ public:
   }
 
   void visitStructDecl(StructDecl *SD) {
-    
     // This struct declaration is technically a parse error, so do not type
     // check.
     if (isa<ProtocolDecl>(SD->getParent()))
       return;
-    
+
+    TC.checkDeclAttributesEarly(SD);
+
     if (!IsSecondPass) {
       TC.validateDecl(SD);
-      if (!TC.ValidatedTypes.empty() && SD == TC.ValidatedTypes.back())
-        TC.ValidatedTypes.pop_back();
+      TC.ValidatedTypes.remove(SD);
     }
 
     if (!IsSecondPass)
@@ -2244,17 +2256,17 @@ public:
   }
 
   void visitClassDecl(ClassDecl *CD) {
-    
     // This class declaration is technically a parse error, so do not type
     // check.
     if (isa<ProtocolDecl>(CD->getParent()))
       return;
-    
+
+    TC.checkDeclAttributesEarly(CD);
+
     if (!IsSecondPass) {
       TC.validateDecl(CD);
 
-      if (!TC.ValidatedTypes.empty() && CD == TC.ValidatedTypes.back())
-        TC.ValidatedTypes.pop_back();
+      TC.ValidatedTypes.remove(CD);
 
       {
         // Check for circular inheritance.
@@ -2387,16 +2399,18 @@ public:
       checkExplicitConformance(CD, CD->getDeclaredTypeInContext());
       checkObjCConformances(CD->getProtocols(), CD->getConformances());
     }
-    
+
     TC.checkDeclAttributes(CD);
   }
-  
+
   void visitProtocolDecl(ProtocolDecl *PD) {
     // This protocol declaration is technically a parse error, so do not type
     // check.
     if (isa<ProtocolDecl>(PD->getParent()))
       return;
-    
+
+    TC.checkDeclAttributesEarly(PD);
+
     if (IsSecondPass) {
       return;
     }
@@ -2778,6 +2792,8 @@ public:
       }
     }
 
+    TC.checkDeclAttributesEarly(FD);
+
     if (IsSecondPass || FD->hasType())
       return;
 
@@ -2926,12 +2942,14 @@ public:
     }
 
     if (!checkOverrides(FD)) {
-      // If a method has an override attribute but does not override
-      // anything, complain.
-      if (FD->getAttrs().isOverride() && !FD->getOverriddenDecl()) {
-        TC.diagnose(FD, diag::method_does_not_override)
-          .highlight(FD->getAttrs().getLoc(AK_override));
-        FD->getMutableAttrs().clearAttribute(AK_override);
+      // If a method has an 'override' keyword but does not override anything,
+      // complain.
+      if (auto *OA = FD->getMutableAttrs().getAttribute<OverrideAttr>()) {
+        if (!FD->getOverriddenDecl()) {
+          TC.diagnose(FD, diag::method_does_not_override)
+              .highlight(OA->getLocation());
+          OA->setInvalid();
+        }
       }
     }
     
@@ -3232,6 +3250,7 @@ public:
 
     UNINTERESTING_ATTR(Asmname)
     UNINTERESTING_ATTR(ClassProtocol)
+    UNINTERESTING_ATTR(Override)
     UNINTERESTING_ATTR(Required)
 
 #undef UNINTERESTING_ATTR
@@ -3301,19 +3320,17 @@ public:
       Override->getMutableAttrs().add(attr->clone(TC.Context));
       return;
     }
-
   };
 
-  /// Record that the \c overriding declarations overrides the \c
-  /// overridden declaration.
+  /// Record that the \c overriding declarations overrides the
+  /// \c overridden declaration.
   ///
   /// \returns true if an error occurred.
   bool recordOverride(ValueDecl *override, ValueDecl *base) {
-    
     // Check property and subscript overriding.
     if (auto *baseASD = dyn_cast<AbstractStorageDecl>(base)) {
       auto *overrideASD = cast<AbstractStorageDecl>(override);
-      
+
       // Make sure that the parent property is actually overridable.
       // FIXME: This should be a check for @final, not something specific to
       // properties.
@@ -3358,17 +3375,19 @@ public:
     
     // If the overriding declaration does not have the @override
     // attribute on it, complain.
-    if (!override->getAttrs().isOverride() &&
+    if (!override->getAttrs().hasAttribute<OverrideAttr>() &&
         !isa<ConstructorDecl>(override)) {
       // FIXME: rdar://16320042 - For properties, we don't have a useful
       // location for the 'var' token.  Instead of emitting a bogus fixit, only
       // emit the fixit for 'func's.
       if (!isa<VarDecl>(override))
         TC.diagnose(override, diag::missing_override)
-          .fixItInsert(override->getStartLoc(), "@override ");
+            .fixItInsert(override->getStartLoc(), "override ");
       else
         TC.diagnose(override, diag::missing_override);
       TC.diagnose(base, diag::overridden_here);
+      override->getMutableAttrs().add(
+          new (TC.Context) OverrideAttr(SourceLoc()));
     }
 
     // FIXME: Possibly should extend to more availability checking.
@@ -3396,26 +3415,22 @@ public:
       // dispatched (they are a local implementation detail of a property).
       if (baseASD->getGetter() && overridingASD->getGetter()) {
         auto overridingGetter = overridingASD->getGetter();
-        if (!overridingGetter->getAttrs().isOverride()) {
-          // FIXME: Egregious hack to set @override.
-          auto loc = overridingASD->getAttrs().getLoc(AK_override);
-          if (loc.isInvalid())
-            loc = overridingASD->getLoc();
-
-          overridingGetter->getMutableAttrs().setAttr(AK_override, loc);
+        if (!overridingGetter->getAttrs().hasAttribute<OverrideAttr>()) {
+          // FIXME: Egregious hack to set 'override'.
+          auto loc = overridingASD->getOverrideLoc();
+          overridingGetter->getMutableAttrs().add(
+              new (TC.Context) OverrideAttr(loc));
         }
           
         recordOverride(overridingGetter, baseASD->getGetter());
       }
       if (baseASD->getSetter() && overridingASD->getSetter()) {
         auto overridingSetter = overridingASD->getSetter();
-        if (!overridingSetter->getAttrs().isOverride()) {
-          // FIXME: Egregious hack to set @override.
-          auto loc = overridingASD->getAttrs().getLoc(AK_override);
-          if (loc.isInvalid())
-            loc = overridingASD->getLoc();
-
-          overridingSetter->getMutableAttrs().setAttr(AK_override, loc);
+        if (!overridingSetter->getAttrs().hasAttribute<OverrideAttr>()) {
+          // FIXME: Egregious hack to set 'override'.
+          auto loc = overridingASD->getOverrideLoc();
+          overridingSetter->getMutableAttrs().add(
+              new (TC.Context) OverrideAttr(loc));
         }
         recordOverride(overridingASD->getSetter(), baseASD->getSetter());
       }
@@ -3449,6 +3464,8 @@ public:
   void visitEnumElementDecl(EnumElementDecl *EED) {
     if (IsSecondPass || EED->hasType())
       return;
+
+    TC.checkDeclAttributesEarly(EED);
 
     EnumDecl *ED = EED->getParentEnum();
     Type ElemTy = ED->getDeclaredTypeInContext();
@@ -3538,6 +3555,8 @@ public:
       return;
     }
 
+    TC.checkDeclAttributesEarly(ED);
+
     if (!IsSecondPass) {
       CanType ExtendedTy = DeclContext::getExtendedType(ED);
 
@@ -3580,6 +3599,7 @@ public:
   void visitIfConfigDecl(IfConfigDecl *ICD) {
     // The active members of the #if block will be type checked along with
     // their enclosing declaration.
+    TC.checkDeclAttributesEarly(ICD);
     TC.checkDeclAttributes(ICD);
   }
 
@@ -3601,6 +3621,8 @@ public:
     if (IsSecondPass || CD->hasType()) {
       return;
     }
+
+    TC.checkDeclAttributesEarly(CD);
 
     assert(CD->getDeclContext()->isTypeContext()
            && "Decl parsing must prevent constructors outside of types!");
@@ -3739,6 +3761,8 @@ public:
     if (IsSecondPass || DD->hasType()) {
       return;
     }
+
+    TC.checkDeclAttributesEarly(DD);
 
     assert(DD->getDeclContext()->isTypeContext()
            && "Decl parsing must prevent destructors outside of types!");
@@ -3893,7 +3917,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
         CD->setRequiresStoredPropertyInits(true);
     }
 
-    ValidatedTypes.push_back(nominal);
+    ValidatedTypes.insert(nominal);
     break;
   }
 
@@ -5233,34 +5257,6 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     TC.diagnose(Attrs.getLoc(AK_requires_stored_property_inits),
                 diag::requires_stored_property_inits_nonclass);
     D->getMutableAttrs().clearAttribute(AK_requires_stored_property_inits);
-  }
-
-  if (Attrs.isOverride()) {
-    if (auto contextTy = D->getDeclContext()->getDeclaredTypeOfContext()) {
-      if (auto nominal = contextTy->getAnyNominal()) {
-        if (isa<ClassDecl>(nominal)) {
-          // we're in a class; check the kind of member.
-          if (isa<FuncDecl>(D) || isa<VarDecl>(D) || isa<SubscriptDecl>(D)) {
-            // okay
-          } else {
-            TC.diagnose(D, diag::override_nonoverridable_decl)
-              .highlight(D->getAttrs().getLoc(AK_override));
-            D->getMutableAttrs().clearAttribute(AK_override);
-          }
-        } else {
-          TC.diagnose(D, diag::override_nonclass_decl)
-            .highlight(D->getAttrs().getLoc(AK_override));
-          D->getMutableAttrs().clearAttribute(AK_override);
-        }
-      } else {
-        // Error case: just ignore the @override attribute.
-        D->getMutableAttrs().clearAttribute(AK_override);
-      }
-    } else {
-      TC.diagnose(D, diag::override_nonclass_decl)
-        .highlight(D->getAttrs().getLoc(AK_override));
-      D->getMutableAttrs().clearAttribute(AK_override);
-    }
   }
 
   static const AttrKind InvalidAttrs[] = {

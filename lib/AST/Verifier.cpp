@@ -313,6 +313,13 @@ struct ASTNodeBase {};
         Out << "every Decl should have a DeclContext";
         abort();
       }
+      if (D->getAttrs().hasAttribute<OverrideAttr>()) {
+        if (!isa<FuncDecl>(D) && !isa<VarDecl>(D) && !isa<SubscriptDecl>(D)) {
+          Out << "'override' attribute on a non-overridable member\n";
+          D->dump(Out);
+          abort();
+        }
+      }
     }
     template<typename T>
     void verifyParsedBase(T ASTNode) {
@@ -330,7 +337,16 @@ struct ASTNodeBase {};
     void verifyCheckedAlways(Expr *E) {}
     void verifyCheckedAlways(Stmt *S) {}
     void verifyCheckedAlways(Pattern *P) {}
-    void verifyCheckedAlways(Decl *D) {}
+    void verifyCheckedAlways(Decl *D) {
+      if (D->getAttrs().hasAttribute<OverrideAttr>()) {
+        if (!isa<ClassDecl>(D->getDeclContext()) &&
+            !isa<ExtensionDecl>(D->getDeclContext())) {
+          Out << "'override' attribute outside of a class\n";
+          D->dump(Out);
+          abort();
+        }
+      }
+    }
 
     template<typename T>
     void verifyCheckedAlwaysBase(T ASTNode) {

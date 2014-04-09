@@ -96,8 +96,6 @@ void DeclAttributes::print(ASTPrinter &Printer,
     Printer << "@mutating ";
   if (MutatingAttr && !MutatingAttr.getValue())
     Printer << "@!mutating ";
-  if (isOverride())
-    Printer << "@override ";
 }
 
 void DeclAttribute::print(ASTPrinter &Printer) const {
@@ -162,6 +160,9 @@ void DeclAttribute::print(ASTPrinter &Printer) const {
     }
     break;
   }
+  case DAK_override:
+    // A virtual attribute should be handled elsewhere.
+    return;
   case DAK_required:
     if (isImplicit())
       Printer << "/* @required(inferred) */";

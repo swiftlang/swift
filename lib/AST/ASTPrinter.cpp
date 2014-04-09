@@ -221,6 +221,11 @@ namespace {
       }
     }
 
+    void printOverrideKeyword(Decl *D) {
+      if (D->getAttrs().hasAttribute<OverrideAttr>())
+        Printer << "override ";
+    }
+
     void printTypeLoc(const TypeLoc &TL) {
       // Print a TypeRepr if instructed to do so by options, or if the type
       // is null.
@@ -832,6 +837,7 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl->getAttrs());
   printImplicitObjCNote(decl);
+  printOverrideKeyword(decl);
   if (decl->isStatic())
     printStaticKeyword(decl->getCorrectStaticSpelling());
   Printer << (decl->isLet() ? "let " : "var ");
@@ -977,6 +983,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
     printDocumentationComment(decl);
     printAttributes(decl->getAttrs());
     printImplicitObjCNote(decl);
+    printOverrideKeyword(decl);
     if (decl->isStatic() && !decl->isOperator())
       printStaticKeyword(decl->getCorrectStaticSpelling());
     Printer << "func ";
@@ -1040,6 +1047,7 @@ void PrintAST::visitEnumElementDecl(EnumElementDecl *decl) {
 void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
   recordDeclLoc(decl);
   printAttributes(decl->getAttrs());
+  printOverrideKeyword(decl);
   Printer << "subscript ";
   printPattern(decl->getIndices());
   Printer << " -> ";

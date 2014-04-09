@@ -822,7 +822,7 @@ bool Parser::canParseAttributes() {
 
 bool Parser::canParseTypeTupleBody() {
   if (Tok.isNot(tok::r_paren) && Tok.isNot(tok::r_brace) &&
-      Tok.isNotEllipsis() && !isStartOfDecl(Tok, peekToken())) {
+      Tok.isNotEllipsis() && !isStartOfDecl()) {
     do {
       // The contextual inout marker is part of argument lists.
       if (Tok.isContextualKeyword("inout"))
@@ -845,7 +845,7 @@ bool Parser::canParseTypeTupleBody() {
           while (Tok.isNot(tok::eof) && Tok.isNot(tok::r_paren) &&
                  Tok.isNot(tok::r_brace) && Tok.isNotEllipsis() &&
                  Tok.isNot(tok::comma) &&
-                 !isStartOfDecl(Tok, peekToken())) {
+                 !isStartOfDecl()) {
             skipSingle();
           }
         }

@@ -1720,6 +1720,11 @@ StringRef AbstractStorageDecl::getObjCSetterSelector(SmallVectorImpl<char> &buff
   return out.str();
 }
 
+SourceLoc AbstractStorageDecl::getOverrideLoc() const {
+  if (auto *Override = getAttrs().getAttribute<OverrideAttr>())
+    return Override->getLocation();
+  return SourceLoc();
+}
 
 /// \brief Returns whether the var is settable in the specified context: this
 /// is either because it is a stored var, because it has a custom setter, or

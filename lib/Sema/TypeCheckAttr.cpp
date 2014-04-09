@@ -16,7 +16,56 @@
 
 #include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
+
 using namespace swift;
+
+namespace {
+class AttributeEarlyChecker : public AttributeVisitor<AttributeEarlyChecker> {
+  TypeChecker &TC;
+  Decl *D;
+
+public:
+  AttributeEarlyChecker(TypeChecker &TC, Decl *D) : TC(TC), D(D) {}
+
+  /// Deleting this ensures that all attributes are covered by the visitor
+  /// below.
+  void visitDeclAttribute(DeclAttribute *A) = delete;
+
+  void visitAsmnameAttr(AsmnameAttr *attr) {}
+
+  void visitAvailabilityAttr(AvailabilityAttr *attr) {}
+
+  void visitClassProtocolAttr(ClassProtocolAttr *attr) {}
+
+  void visitFinalAttr(FinalAttr *attr) {}
+
+  void visitNoReturnAttr(NoReturnAttr *attr) {}
+
+  void visitObjCAttr(ObjCAttr *attr) {}
+
+  void visitOverrideAttr(OverrideAttr *attr);
+
+  void visitRequiredAttr(RequiredAttr *attr) {}
+};
+} // end anonymous namespace
+
+void AttributeEarlyChecker::visitOverrideAttr(OverrideAttr *attr) {
+  if (!isa<ClassDecl>(D->getDeclContext()) &&
+      !isa<ExtensionDecl>(D->getDeclContext())) {
+    TC.diagnose(D, diag::override_nonclass_decl)
+        .fixItRemove(attr->getLocation());
+    attr->setInvalid();
+  }
+}
+
+void TypeChecker::checkDeclAttributesEarly(Decl *D) {
+  AttributeEarlyChecker Checker(*this, D);
+
+  for (auto attr : D->getMutableAttrs()) {
+    if (attr->isValid())
+      Checker.visit(attr);
+  }
+}
 
 namespace {
 class AttributeChecker : public AttributeVisitor<AttributeChecker> {
@@ -44,6 +93,8 @@ public:
   void visitNoReturnAttr(NoReturnAttr *attr);
 
   void visitObjCAttr(ObjCAttr *attr) {}
+
+  void visitOverrideAttr(OverrideAttr *attr) {}
 
   void visitRequiredAttr(RequiredAttr *attr);
 };

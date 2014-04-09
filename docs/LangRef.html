@@ -203,48 +203,14 @@
   rocket = Rocket()   <i>// error, cannot change a let binding</i>
 </pre>
 
-  <!-- "var Declarations" converted to ReST -->
+  <!-- "var Declarations" was converted to ReST -->
 
   <!-- ===================================================================== -->
   <h3 id="decl-func">func Declarations</h3>
   <!-- ===================================================================== -->
 
-  <pre class="grammar">
-    decl-func        ::= <a href="#attribute-list">attribute-list</a> ('static' | 'class')? 'func' <a href="#any-identifier">any-identifier</a> <a href="#generic-params">generic-params</a>? <a href="#func-signature">func-signature</a> <a href="#brace-item-list">brace-item-list</a>?
-  </pre>
-  
-  <p>'func' is a declaration for a function.  The argument list and
-  optional return value are specified by the type production of the function,
-  and the body is either a brace expression or elided.  Like all other
-  declarations, functions are can have attributes.</p>
-  
-  <p>If the type is not syntactically a function type (i.e., has no -&gt; in it
-  at top-level), then the return value is implicitly inferred to be
-  "<tt>()</tt>".  All of the argument and return value names are injected into
-  the <a href="#namebind_scope">scope</a> of the function body.</p>
-  
-  <p>A function in an <a  href="#decl-extension">extension</a> of some type (or
-  in other places that are semantically equivalent to an extension) implicitly
-  get a 'self' argument with these rules ... [todo]</p>
-  
-  <p>'static' and 'class' functions are only allowed in an <a 
-     href="#decl-extension">extension</a> of some type (or in other places
-     that are semantically equivalent to an extension).  They indicate that
-     the function is actually defined on the <a href="#metatype">metatype</a>
-     for the type, not on the 
-     type itself.  Thus its implicit 'self' argument is actually of
-     metatype type.</p>
+  <!-- "func Declarations" was converted to ReST -->
 
-  <p>'static' keyword is allowed inside structs and enums, and extensions of those.</p>
-
-  <p>'class' keyword is allowed inside classes, class extensions, and protocols.</p>
-  
-  <p>TODO: Func should be an immutable name binding, it should implicitly add
-     an attribute immutable when it exists.</p>
-
-  <p>TODO: Incoming arguments should be readonly, result should be implicitly
-     writeonly when we have these attributes.</p>
-  
   <!-- _____________________________________________________________________ -->
   <h4 id="func-signature">Function signatures</h4>
 

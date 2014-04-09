@@ -284,11 +284,12 @@ contextual keywords within the language:
 
   get
   infix
+  mutating
   operator
+  override
   postfix
   prefix
   set
-  type
 
 .. _langref.lexical.integer_literal:
 
@@ -619,7 +620,10 @@ Import Declarations
 
 .. code-block:: none
 
-  decl-var-head  ::= attribute-list ('static' | 'class')? 'var'
+  decl-var-head-kw ::= ('static' | 'class')? 'override'?
+  decl-var-head-kw ::= 'override'? ('static' | 'class')?
+
+  decl-var-head  ::= attribute-list decl-var-head-kw? 'var'
 
   decl-var       ::= decl-var-head pattern initializer?  (',' pattern initializer?)*
 
@@ -788,7 +792,43 @@ protocols.
 ``func`` Declarations
 ---------------------
 
-...
+.. code-block:: none
+
+  // Keywords can be specified in any order.
+  decl-func-head-kw ::= ('static' | 'class')? 'override'? 'mutating'?
+
+  decl-func        ::= attribute-list decl-func-head-kw? 'func' any-identifier generic-params? func-signature brace-item-list?
+
+``func`` is a declaration for a function.  The argument list and optional
+return value are specified by the type production of the function, and the body
+is either a brace expression or elided.  Like all other declarations, functions
+are can have attributes.
+
+If the type is not syntactically a function type (i.e., has no ``->`` in it at
+top-level), then the return value is implicitly inferred to be ``()``.  All of
+the argument and return value names are injected into the <a
+href="#namebind_scope">scope</a> of the function body.</p>
+
+A function in an <a href="#decl-extension">extension</a> of some type (or
+in other places that are semantically equivalent to an extension) implicitly
+get a ``self`` argument with these rules ... [todo]
+
+``static`` and ``class`` functions are only allowed in an <a
+href="#decl-extension">extension</a> of some type (or in other places that are
+semantically equivalent to an extension).  They indicate that the function is
+actually defined on the <a href="#metatype">metatype</a> for the type, not on
+the type itself.  Thus its implicit ``self`` argument is actually of
+metatype type.
+
+``static`` keyword is allowed inside structs and enums, and extensions of those.
+
+``class`` keyword is allowed inside classes, class extensions, and protocols.
+
+TODO: Func should be an immutable name binding, it should implicitly add an
+attribute immutable when it exists.
+
+TODO: Incoming arguments should be readonly, result should be implicitly
+writeonly when we have these attributes.
 
 .. _langref.decl.func.signature:
 
@@ -805,6 +845,8 @@ Function signatures
 
 .. code-block:: none
 
+  subscript-head ::= attribute-list 'override'? 'subscript' pattern-tuple '->' type
+
   decl-subscript ::= subscript-head '{' get-set '}'
 
   // 'get' is implicit in this syntax.
@@ -812,8 +854,6 @@ Function signatures
 
   // For use in protocols.
   decl-subscript ::= subscript-head '{' get-set-kw '}'
-
-  subscript-head ::= attribute-list 'subscript' pattern-tuple '->' type
 
 A subscript declaration provides support for <a href="#expr-subscript">
 subscripting</a> an object of a particular type via a getter and (optional)

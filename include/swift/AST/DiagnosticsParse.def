@@ -179,6 +179,15 @@ ERROR(decl_not_static,decl_parsing,none,
       "declaration cannot be marked %0", (StaticSpellingKind))
 ERROR(mutating_invalid,sema_tcd,none,
       "'mutating' is not valid on this declaration", ())
+ERROR(override_invalid,sema_tcd,none,
+      "'override' is not valid on this declaration", ())
+
+ERROR(decl_already_static,decl_parsing,none,
+      "%0 specified twice", (StaticSpellingKind))
+ERROR(decl_already_mutating,decl_parsing,none,
+      "'mutating' specified twice", ())
+ERROR(decl_already_override,decl_parsing,none,
+      "'override' specified twice", ())
 
 // Variable getters/setters
 ERROR(static_var_decl_global_scope,decl_parsing,none,

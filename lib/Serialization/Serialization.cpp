@@ -1170,9 +1170,6 @@ static void checkAllowedAttributes(const Decl *D) {
 #ifndef NDEBUG
   DeclAttributes attrs = D->getAttrs();
 
-  // We never need to record @override.
-  attrs.clearAttribute(AK_override);
-
   for (AttrKind AK : {
 #define ATTR(X)
 #define VIRTUAL_ATTR(X) AK_ ## X,
@@ -1294,6 +1291,9 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
         getRawStableObjCDeclAttrKind(theAttr->getKind()), names);
     return;
   }
+  case DAK_override:
+    // No need to serialize 'override'.
+    return;
   }
 }
 
@@ -2398,6 +2398,7 @@ void Serializer::writeAllDeclsAndTypes() {
 
 #define DECL_ATTR(X, NAME, ...) \
     registerDeclTypeAbbr<NAME##DeclAttrLayout>();
+#define VIRTUAL_DECL_ATTR(X, NAME, ...)
 #include "swift/AST/Attr.def"
   }
 

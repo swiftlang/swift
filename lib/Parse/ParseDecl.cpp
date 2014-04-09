@@ -157,6 +157,7 @@ static TypeAttrKind getTypeAttrFromString(StringRef Str) {
 static DeclAttrKind getDeclAttrFromString(StringRef Str) {
   return llvm::StringSwitch<DeclAttrKind>(Str)
 #define DECL_ATTR(X, ...) .Case(#X, DAK_##X)
+#define VIRTUAL_DECL_ATTR(X, ...)
 #include "swift/AST/Attr.def"
   .Default(DAK_Count);
 }
@@ -206,6 +207,12 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
   switch (DK) {
   case DAK_Count:
     llvm_unreachable("DAK_Count should not appear in parsing switch");
+
+#define VIRTUAL_DECL_ATTR(X, ...) case DAK_##X:
+#include "swift/AST/Attr.def"
+    llvm_unreachable("virtual attributes should not be parsed "
+                     "by attribute parsing code");
+
   case DAK_asmname: {
     if (!consumeIf(tok::l_paren)) {
       diagnose(Loc, diag::attr_expected_lparen, AttrName);
@@ -837,68 +844,130 @@ bool Parser::parseTypeAttributeListPresent(TypeAttributes &Attributes) {
 }
 
 static bool isStartOfOperatorDecl(const Token &Tok, const Token &Tok2) {
-  return Tok.isContextualKeyword("operator")
-    && (Tok2.isContextualKeyword("prefix")
-        || Tok2.isContextualKeyword("postfix")
-        || Tok2.isContextualKeyword("infix"));
+  return Tok.isContextualKeyword("operator") &&
+         (Tok2.isContextualKeyword("prefix") ||
+          Tok2.isContextualKeyword("postfix") ||
+          Tok2.isContextualKeyword("infix"));
 }
 
-static bool isStartOfModifiedDecl(const Token &Tok, const Token &Tok2,
-                                  bool &IsMutating) {
-  if (Tok.is(tok::kw_static)) {
-    IsMutating = false;
-    // Declarations beginning with 'static' are always modified decls.
-    return true;
+static unsigned getNumDeclModifierKeywords(Parser &P) {
+  Parser::ParserPosition DeclBegin = P.getParserPosition();
+  unsigned NumConsumedTokens = 0;
+  unsigned NumConfirmedModifiers = 0;
+  while (true) {
+    switch (P.Tok.getKind()) {
+    case tok::kw_class:
+      // We have arrived at the keyword that might be a modifier or it might
+      // start a declaration.
+      P.consumeToken(tok::kw_class);
+      NumConfirmedModifiers = NumConsumedTokens;
+      NumConsumedTokens++;
+      continue;
+
+    case tok::kw_static:
+      // This is definitely a modified decl.
+      P.consumeToken(tok::kw_static);
+      NumConsumedTokens++;
+      NumConfirmedModifiers = NumConsumedTokens;
+      continue;
+
+    case tok::kw_case:
+    case tok::kw_deinit:
+    case tok::kw_destructor:
+    case tok::kw_enum:
+    case tok::kw_extension:
+    case tok::kw_func:
+    case tok::kw_import:
+    case tok::kw_init:
+    case tok::kw_let:
+    case tok::kw_struct:
+    case tok::kw_subscript:
+    case tok::kw_typealias:
+    case tok::kw_var:
+      // We have arrived at the keyword that starts a declaration.
+      if (NumConsumedTokens)
+        P.backtrackToPosition(DeclBegin);
+
+      // The declaration was modified if we consumed some tokens previously.
+      return NumConsumedTokens;
+
+    case tok::identifier:
+      if (P.Tok.isContextualKeyword("mutating") ||
+          P.Tok.isContextualKeyword("override")) {
+        P.consumeToken(tok::identifier);
+        NumConsumedTokens++;
+        continue;
+      }
+
+      // This identifier is a name for the declaration.
+      if (NumConsumedTokens)
+        P.backtrackToPosition(DeclBegin);
+
+      return NumConfirmedModifiers;
+
+    default: {
+      if (NumConsumedTokens)
+        P.backtrackToPosition(DeclBegin);
+      return NumConfirmedModifiers;
+    }
+    }
   }
-  if (Tok.is(tok::kw_class)) {
-    IsMutating = false;
-    // By looking at 'Tok' only, we don't know yet if it is a class function or
-    // property, or a class decl.
-  } else if (Tok.isContextualKeyword("mutating"))
-    IsMutating = true;
-  else
-    return false;
-  
-  return
-       (Tok2.is(tok::kw_func) || Tok2.is(tok::kw_let) || Tok2.is(tok::kw_var) ||
-        Tok2.is(tok::kw_init) || Tok2.is(tok::kw_destructor) ||
-        Tok2.is(tok::kw_deinit) ||
-        Tok2.is(tok::kw_subscript) || Tok2.is(tok::kw_struct) ||
-        Tok2.is(tok::kw_enum) || Tok2.is(tok::kw_class) ||
-        Tok2.is(tok::kw_protocol) || Tok2.is(tok::kw_typealias));
 }
 
-/// isStartOfDecl - Return true if this is the start of a decl or decl-import.
-bool Parser::isStartOfDecl(const Token &Tok, const Token &Tok2) {
+static bool isStartOfModifiedDeclFast(const Token &Tok, const Token &Tok2) {
+  if (!Tok.isContextualKeyword("mutating") &&
+      !Tok.isContextualKeyword("override"))
+    return false;
+
+  switch (Tok2.getKind()) {
+  case tok::kw_class:
+  case tok::kw_func:
+  case tok::kw_let:
+  case tok::kw_static:
+  case tok::kw_subscript:
+  case tok::kw_var:
+    return true;
+
+  default: {
+    return Tok2.isContextualKeyword("mutating") ||
+           Tok2.isContextualKeyword("override");
+  }
+  }
+}
+
+bool Parser::isStartOfDecl() {
   switch (Tok.getKind()) {
   case tok::at_sign:
-  case tok::kw_static:
-  case tok::kw_extension:
-  case tok::kw_let:
-  case tok::kw_var:
-  case tok::kw_typealias:
-  case tok::kw_enum:
   case tok::kw_case:
-  case tok::kw_struct:
   case tok::kw_class:
-  case tok::kw_import:
-  case tok::kw_subscript:
-  case tok::kw_init:
   case tok::kw_deinit:
   case tok::kw_destructor:
+  case tok::kw_enum:
+  case tok::kw_extension:
   case tok::kw_func:
+  case tok::kw_import:
+  case tok::kw_init:
+  case tok::kw_let:
+  case tok::kw_static:
+  case tok::kw_struct:
+  case tok::kw_subscript:
+  case tok::kw_typealias:
+  case tok::kw_var:
   case tok::pound_if:
     return true;
-  case tok::kw_protocol:
+  case tok::kw_protocol: {
+    const Token &Tok2 = peekToken();
     return !Tok2.isAnyOperator() || !Tok2.getText().equals("<");
-  default:
-    if (isStartOfOperatorDecl(Tok, Tok2)) return true;
-      
-    bool isMutating = false;
-    return isStartOfModifiedDecl(Tok, Tok2, isMutating);
+  }
+  default: {
+    const Token &Tok2 = peekToken();
+    if (isStartOfOperatorDecl(Tok, Tok2))
+      return true;
+
+    return isStartOfModifiedDeclFast(Tok, Tok2);
+  }
   }
 }
-
 
 void Parser::consumeDecl(ParserPosition BeginParserPosition,
                          ParseDeclOptions Flags,
@@ -969,23 +1038,68 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
 
   // If we see the 'static', 'class' or 'mutating' followed by a declaration
   // keyword, parse it now.
-  SourceLoc StaticLoc, MutatingLoc;
-  bool UnhandledStatic = false, UnhandledMutating = false;
+  SourceLoc StaticLoc, MutatingLoc, OverrideLoc;
+  bool UnhandledStatic = false;
+  bool UnhandledMutating = false;
+  bool UnhandledOverride = false;
   StaticSpellingKind StaticSpelling = StaticSpellingKind::None;
-  bool IsMutating = false;
-  if (isStartOfModifiedDecl(Tok, peekToken(), IsMutating)) {
-    if (IsMutating) {
-      MutatingLoc = consumeToken(tok::identifier);
-      UnhandledMutating = true;
-    } else {
-      assert(Tok.is(tok::kw_static) || Tok.is(tok::kw_class));
-      if (Tok.is(tok::kw_static))
-        StaticSpelling = StaticSpellingKind::KeywordStatic;
-      else
+  for (unsigned i = 0, e = getNumDeclModifierKeywords(*this); i != e; ++i) {
+    switch (Tok.getKind()) {
+    case tok::kw_class:
+      if (StaticLoc.isValid()) {
+        diagnose(Tok, diag::decl_already_static,
+                 StaticSpellingKind::KeywordClass)
+            .highlight(StaticLoc)
+            .fixItRemove(Tok.getLoc());
+      } else {
+        StaticLoc = Tok.getLoc();
         StaticSpelling = StaticSpellingKind::KeywordClass;
-
-      StaticLoc = consumeToken();
-      UnhandledStatic = true;
+        UnhandledStatic = true;
+      }
+      consumeToken(tok::kw_class);
+      break;
+    case tok::kw_static:
+      if (StaticLoc.isValid()) {
+        diagnose(Tok, diag::decl_already_static,
+                 StaticSpellingKind::KeywordStatic)
+            .highlight(StaticLoc)
+            .fixItRemove(Tok.getLoc());
+      } else {
+        StaticLoc = Tok.getLoc();
+        StaticSpelling = StaticSpellingKind::KeywordStatic;
+        UnhandledStatic = true;
+      }
+      consumeToken(tok::kw_static);
+      break;
+    case tok::identifier: {
+      if (Tok.isContextualKeyword("mutating")) {
+        if (MutatingLoc.isValid()) {
+          diagnose(Tok, diag::decl_already_mutating)
+              .highlight(MutatingLoc)
+              .fixItRemove(Tok.getLoc());
+        } else {
+          MutatingLoc = Tok.getLoc();
+          UnhandledMutating = true;
+        }
+        consumeToken(tok::identifier);
+        break;
+      }
+      if (Tok.isContextualKeyword("override")) {
+        if (OverrideLoc.isValid()) {
+          diagnose(Tok, diag::decl_already_override)
+              .highlight(OverrideLoc)
+              .fixItRemove(Tok.getLoc());
+        } else {
+          OverrideLoc = Tok.getLoc();
+          UnhandledOverride = true;
+        }
+        consumeToken(tok::identifier);
+        break;
+      }
+      llvm_unreachable("unknown modifier");
+    }
+    default:
+      llvm_unreachable("unknown modifier");
     }
   }
 
@@ -1003,8 +1117,9 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
   case tok::kw_let:
   case tok::kw_var:
     Status = parseDeclVar(Flags, Attributes, Entries, StaticLoc,
-                          StaticSpelling);
+                          StaticSpelling, OverrideLoc);
     UnhandledStatic = false;
+    UnhandledOverride = false;
     break;
   case tok::kw_typealias:
     DeclResult = parseDeclTypeAlias(!(Flags & PD_DisallowTypeAliasDef),
@@ -1055,11 +1170,12 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
     break;
 
   case tok::kw_func:
-    DeclResult = parseDeclFunc(StaticLoc, StaticSpelling, MutatingLoc, Flags,
-                               Attributes);
+    DeclResult = parseDeclFunc(StaticLoc, StaticSpelling, MutatingLoc,
+                               OverrideLoc, Flags, Attributes);
     Status = DeclResult;
     UnhandledStatic = false;
     UnhandledMutating = false;
+    UnhandledOverride = false;
     break;
 
   case tok::kw_subscript:
@@ -1068,7 +1184,8 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
         .fixItRemove(SourceRange(StaticLoc));
       UnhandledStatic = false;
     }
-    Status = parseDeclSubscript(Flags, Attributes, Entries);
+    Status = parseDeclSubscript(OverrideLoc, Flags, Attributes, Entries);
+    UnhandledOverride = false;
     break;
   
   case tok::identifier:
@@ -1107,11 +1224,15 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
     if (UnhandledStatic)
       diagnose(Entries.back()->getLoc(), diag::decl_not_static,
                StaticSpelling)
-        .fixItRemove(SourceRange(StaticLoc));
+          .fixItRemove(SourceRange(StaticLoc));
     // If we parsed 'mutating' but didn't handle it above, complain about it.
     if (UnhandledMutating)
       diagnose(Entries.back()->getLoc(), diag::mutating_invalid)
-        .fixItRemove(SourceRange(MutatingLoc));
+          .fixItRemove(SourceRange(MutatingLoc));
+    // If we parsed 'override' but didn't handle it above, complain about it.
+    if (UnhandledOverride)
+      diagnose(Entries.back()->getLoc(), diag::override_invalid)
+          .fixItRemove(SourceRange(OverrideLoc));
   }
 
   return Status;
@@ -2130,18 +2251,19 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
   return nullptr;
 }
 
-/// \brief Parse a 'var' or 'val' declaration, doing no token skipping on error.
+/// \brief Parse a 'var' or 'let' declaration, doing no token skipping on error.
 ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
                                   DeclAttributes &Attributes,
                                   SmallVectorImpl<Decl *> &Decls,
                                   SourceLoc StaticLoc,
-                                  StaticSpellingKind StaticSpelling) {
+                                  StaticSpellingKind StaticSpelling,
+                                  SourceLoc OverrideLoc) {
   assert(StaticLoc.isInvalid() || StaticSpelling != StaticSpellingKind::None);
 
   if (StaticLoc.isValid()) {
     if (!Flags.contains(PD_HasContainerType)) {
       diagnose(Tok, diag::static_var_decl_global_scope, StaticSpelling)
-          .fixItRemoveChars(StaticLoc, Tok.getLoc());
+          .fixItRemove(StaticLoc);
       StaticLoc = SourceLoc();
     } else if (Flags.contains(PD_InProtocol) || Flags.contains(PD_InClass)) {
       if (StaticSpelling == StaticSpellingKind::KeywordStatic)
@@ -2153,6 +2275,9 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
             .fixItReplace(StaticLoc, "static");
     }
   }
+
+  if (OverrideLoc.isValid())
+    Attributes.add(new (Context) OverrideAttr(OverrideLoc));
 
   bool isLet = Tok.is(tok::kw_let);
   assert(Tok.getKind() == tok::kw_let || Tok.getKind() == tok::kw_var);
@@ -2302,7 +2427,7 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
       VD->setParentPattern(PBD);
       if (Attributes.shouldSaveInAST())
         VD->getMutableAttrs() = Attributes;
-      
+
       Decls.push_back(VD);
     });
     
@@ -2359,7 +2484,7 @@ void Parser::consumeAbstractFunctionBody(AbstractFunctionDecl *AFD,
     backtrackToPosition(BeginParserPosition);
     consumeToken(tok::l_brace);
     while (Tok.is(tok::kw_var) || Tok.is(tok::kw_let) ||
-           (Tok.isNot(tok::eof) && !isStartOfDecl(Tok, peekToken()))) {
+           (Tok.isNot(tok::eof) && !isStartOfDecl())) {
       consumeToken();
     }
   }
@@ -2388,7 +2513,7 @@ void Parser::consumeAbstractFunctionBody(AbstractFunctionDecl *AFD,
 /// \note The caller of this method must ensure that the next token is 'func'.
 ParserResult<FuncDecl>
 Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
-                      SourceLoc MutatingLoc,
+                      SourceLoc MutatingLoc, SourceLoc OverrideLoc,
                       ParseDeclOptions Flags, DeclAttributes &Attributes) {
   assert((StaticLoc.isInvalid() || MutatingLoc.isInvalid()) &&
          "Parser should only parse one of 'mutating' or 'class'/'static'");
@@ -2400,7 +2525,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
     if (!HasContainerType) {
       // Reject static functions at global scope.
       diagnose(Tok, diag::static_func_decl_global_scope, StaticSpelling)
-          .fixItRemoveChars(StaticLoc, Tok.getLoc());
+          .fixItRemove(StaticLoc);
       StaticLoc = SourceLoc();
     } else if (Flags.contains(PD_InProtocol) || Flags.contains(PD_InClass)) {
       if (StaticSpelling == StaticSpellingKind::KeywordStatic)
@@ -2425,6 +2550,9 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
     diagnose(Tok, diag::static_functions_not_mutating);
     Attributes.clearAttribute(AK_mutating);
   }
+
+  if (OverrideLoc.isValid())
+    Attributes.add(new (Context) OverrideAttr(OverrideLoc));
 
   SourceLoc FuncLoc = consumeToken(tok::kw_func);
 
@@ -3106,9 +3234,13 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 ///   subscript-head
 ///     'subscript' attribute-list pattern-tuple '->' type
 /// \endverbatim
-ParserStatus Parser::parseDeclSubscript(ParseDeclOptions Flags,
+ParserStatus Parser::parseDeclSubscript(SourceLoc OverrideLoc,
+                                        ParseDeclOptions Flags,
                                         DeclAttributes &Attributes,
                                         SmallVectorImpl<Decl *> &Decls) {
+  if (OverrideLoc.isValid())
+    Attributes.add(new (Context) OverrideAttr(OverrideLoc));
+
   ParserStatus Status;
   SourceLoc SubscriptLoc = consumeToken(tok::kw_subscript);
 
@@ -3252,7 +3384,7 @@ Parser::parseDeclConstructor(ParseDeclOptions Flags,
     } else {
       diagnose(Tok, diag::init_expected_self);
       while (!Tok.is(tok::eof) && !Tok.is(tok::l_brace) &&
-             !isStartOfDecl(Tok, peekToken()))
+             !isStartOfDecl())
         skipSingle();
     }
   }

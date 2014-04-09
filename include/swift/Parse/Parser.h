@@ -571,7 +571,9 @@ public:
 
   //===--------------------------------------------------------------------===//
   // Decl Parsing
-  static bool isStartOfDecl(const Token &Tok, const Token &Tok2);
+
+  /// Return true if parser is at the start of a decl or decl-import.
+  bool isStartOfDecl();
 
   bool parseTopLevel();
 
@@ -651,7 +653,8 @@ public:
   ParserStatus parseDeclVar(ParseDeclOptions Flags, DeclAttributes &Attributes,
                             SmallVectorImpl<Decl *> &Decls,
                             SourceLoc StaticLoc,
-                            StaticSpellingKind StaticSpelling);
+                            StaticSpellingKind StaticSpelling,
+                            SourceLoc OverrideLoc);
 
   void consumeGetSetBody(AbstractFunctionDecl *AFD, SourceLoc LBLoc);
   bool parseGetSetImpl(ParseDeclOptions Flags,
@@ -674,13 +677,15 @@ public:
   ParserResult<FuncDecl> parseDeclFunc(SourceLoc StaticLoc,
                                        StaticSpellingKind StaticSpelling,
                                        SourceLoc MutatingLoc,
+                                       SourceLoc OverrideLoc,
                                        ParseDeclOptions Flags,
                                        DeclAttributes &Attributes);
   bool parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD);
   ParserResult<ProtocolDecl> parseDeclProtocol(ParseDeclOptions Flags,
                                                DeclAttributes &Attributes);
-  
-  ParserStatus parseDeclSubscript(ParseDeclOptions Flags,
+
+  ParserStatus parseDeclSubscript(SourceLoc OverrideLoc,
+                                  ParseDeclOptions Flags,
                                   DeclAttributes &Attributes,
                                   SmallVectorImpl<Decl *> &Decls);
 

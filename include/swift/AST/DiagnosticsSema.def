@@ -491,9 +491,7 @@ NOTE(property_override_here,sema_tcd,none,
 NOTE(subscript_override_here,sema_tcd,none,
      "attempt to override subscript here", ())
 ERROR(override_nonclass_decl,sema_tcd,none,
-      "'override' attribute is only available on class members", ())
-ERROR(override_nonoverridable_decl,sema_tcd,none,
-      "'override' attribute on a non-overridable declaration", ())
+      "'override' can only be specified on class members", ())
 ERROR(override_property_type_mismatch,sema_tcd,none,
       "property %0 with type %1 cannot override a property with type %2",
       (Identifier, Type, Type))

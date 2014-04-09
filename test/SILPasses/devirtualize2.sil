@@ -11,7 +11,7 @@ class Bar {
 
 class Foo : Bar {
   init()
-  @override func ping()
+  override func ping()
 }
 
 var x: Bar

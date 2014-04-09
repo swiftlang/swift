@@ -47,7 +47,7 @@ static void recoverFromBadSelectorArgument(Parser &P) {
   while (P.Tok.isNot(tok::eof) && P.Tok.isNot(tok::r_paren) &&
          P.Tok.isNot(tok::l_brace) && P.Tok.isNot(tok::r_brace) &&
          !P.isStartOfStmt(P.Tok) &&
-         !P.isStartOfDecl(P.Tok, P.peekToken())) {
+         !P.isStartOfDecl()) {
     P.skipSingle();
   }
   P.consumeIf(tok::r_paren);
@@ -927,8 +927,7 @@ ParserResult<Pattern> Parser::parsePatternVarOrLet() {
 /// \brief Determine whether this token can start a binding name, whether an
 /// identifier or the special discard-value binding '_'.
 bool Parser::isAtStartOfBindingName() {
-  return Tok.is(tok::kw__)
-    || (Tok.is(tok::identifier) && !isStartOfDecl(Tok, peekToken()));
+  return Tok.is(tok::kw__) || (Tok.is(tok::identifier) && !isStartOfDecl());
 }
 
 Pattern *Parser::createBindingFromPattern(SourceLoc loc, Identifier name,
@@ -1243,7 +1242,7 @@ bool Parser::canParsePatternTuple() {
         while (Tok.isNot(tok::eof) && Tok.isNot(tok::r_paren) &&
                Tok.isNot(tok::r_brace) && Tok.isNotEllipsis() &&
                Tok.isNot(tok::comma) &&
-               !isStartOfDecl(Tok, peekToken())) {
+               !isStartOfDecl()) {
           skipSingle();
         }
       }

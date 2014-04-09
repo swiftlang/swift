@@ -288,7 +288,6 @@ Parser::~Parser() {
   delete L;
 }
 
-/// peekToken - Return the next token that will be installed by consumeToken.
 const Token &Parser::peekToken() {
   return L->peekNextToken();
 }
@@ -378,7 +377,7 @@ void Parser::skipUntilGreaterInTypeList() {
     // 'Self' can appear in types, skip it.
     if (Tok.is(tok::kw_Self))
       break;
-    if (isStartOfStmt(Tok) || isStartOfDecl(Tok, peekToken()))
+    if (isStartOfStmt(Tok) || isStartOfDecl())
       return;
     break;
 
@@ -394,14 +393,14 @@ void Parser::skipUntilGreaterInTypeList() {
 
 void Parser::skipUntilDeclRBrace() {
   while (Tok.isNot(tok::eof) && Tok.isNot(tok::r_brace) &&
-         !isStartOfDecl(Tok, peekToken()))
+         !isStartOfDecl())
     skipSingle();
 }
 
 void Parser::skipUntilDeclStmtRBrace(tok T1) {
   while (Tok.isNot(T1) && Tok.isNot(tok::eof) && Tok.isNot(tok::r_brace) &&
          !isStartOfStmt(Tok) &&
-         !isStartOfDecl(Tok, peekToken())) {
+         !isStartOfDecl()) {
     skipSingle();
   }
 }
@@ -409,7 +408,7 @@ void Parser::skipUntilDeclStmtRBrace(tok T1) {
 void Parser::skipUntilDeclRBrace(tok T1, tok T2) {
   while (Tok.isNot(T1) && Tok.isNot(T2) &&
          Tok.isNot(tok::eof) && Tok.isNot(tok::r_brace) &&
-         !isStartOfDecl(Tok, peekToken())) {
+         !isStartOfDecl()) {
     skipSingle();
   }
 }
