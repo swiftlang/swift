@@ -185,6 +185,10 @@ static bool isSignToken(const clang::Token &tok) {
 static ValueDecl *importMacro(ClangImporter::Implementation &impl,
                               DeclContext *DC,
                               Identifier name, clang::MacroInfo *macro) {
+  // Ignore include guards.
+  if (macro->isUsedForHeaderGuard())
+    return nullptr;
+
   // Currently we only convert non-function-like macros.
   if (macro->isFunctionLike())
     return nullptr;

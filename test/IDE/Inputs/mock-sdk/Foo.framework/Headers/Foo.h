@@ -1,3 +1,6 @@
+#if !defined(__FOO_H__)
+#define __FOO_H__ 1
+
 #import <FooSub/FooSub.h>
 #import <FooHelper/FooHelper.h>
 
@@ -165,3 +168,4 @@ enum BarforwardDeclaredEnum;
 
 void theLastDeclInFoo();
 
+#endif /* ! __FOO_H__ */
