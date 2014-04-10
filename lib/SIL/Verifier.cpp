@@ -1884,9 +1884,8 @@ public:
 void SILFunction::verify() const {
 #ifndef NDEBUG
   if (isExternalDeclaration()) {
-    #warning ""
-    //assert(isAvailableExternally() &&
-    //       "external declaration of internal SILFunction not allowed");
+    assert(isAvailableExternally() &&
+           "external declaration of internal SILFunction not allowed");
     return;
   }
   SILVerifier(*this).verify();
