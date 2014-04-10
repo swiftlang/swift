@@ -129,8 +129,8 @@ func redeclaredInMultipleModulesFunc1(_: CInt) -> CInt
 @objc class FooClassBase {
   class func fooBaseInstanceFunc0()
   func fooBaseInstanceFunc0()
-  class func fooBaseInstanceFunc1(anObject: @unchecked AnyObject?) -> @unchecked FooClassBase?
-  func fooBaseInstanceFunc1(anObject: @unchecked AnyObject?) -> @unchecked FooClassBase?
+  class func fooBaseInstanceFunc1(anObject: AnyObject) -> FooClassBase
+  func fooBaseInstanceFunc1(anObject: AnyObject) -> FooClassBase
   class func fooBaseClassFunc0()
 }
 

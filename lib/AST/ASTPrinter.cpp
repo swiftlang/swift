@@ -32,6 +32,7 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/SaveAndRestore.h"
 #include <algorithm>
 
 using namespace swift;
@@ -78,7 +79,7 @@ namespace {
 /// \brief AST pretty-printer.
 class PrintAST : public ASTVisitor<PrintAST> {
   ASTPrinter &Printer;
-  const PrintOptions &Options;
+  PrintOptions Options;
   unsigned IndentLevel = 0;
 
   friend DeclVisitor<PrintAST>;
@@ -288,11 +289,15 @@ private:
 
 public:
   PrintAST(ASTPrinter &Printer, const PrintOptions &Options)
-    : Printer(Printer), Options(Options) { }
+      : Printer(Printer), Options(Options) {}
 
   using ASTVisitor::visit;
 
   void visit(Decl *D) {
+    llvm::SaveAndRestore<bool> SavePrintUncheckedOptional(Options.PrintUncheckedOptional);
+    if (!Options.PrintUncheckedOptionalInImportedDecls && D->hasClangNode())
+      Options.PrintUncheckedOptional = false;
+
     Printer.callPrintDeclPre(D);
     ASTVisitor::visit(D);
     Printer.printDeclPost(D);
@@ -1607,9 +1612,13 @@ public:
         return;
       }
       if (NT == Ctx.getUncheckedOptionalDecl()) {
-        Printer << "@unchecked ";
-        printWithParensIfNotSimple(T->getGenericArgs()[0]);
-        Printer << "?";
+        if (Options.PrintUncheckedOptional) {
+          Printer << "@unchecked ";
+          printWithParensIfNotSimple(T->getGenericArgs()[0]);
+          Printer << "?";
+        } else {
+          visit(T->getGenericArgs()[0]);
+        }
         return;
       }
     }
@@ -1846,9 +1855,13 @@ public:
   }
 
   void visitUncheckedOptionalType(UncheckedOptionalType *T) {
-    Printer << "@unchecked ";
-    printWithParensIfNotSimple(T->getBaseType());
-    Printer << "?";
+    if (Options.PrintUncheckedOptional) {
+      Printer << "@unchecked ";
+      printWithParensIfNotSimple(T->getBaseType());
+      Printer << "?";
+    } else {
+      visit(T->getBaseType());
+    }
   }
 
   void visitProtocolType(ProtocolType *T) {

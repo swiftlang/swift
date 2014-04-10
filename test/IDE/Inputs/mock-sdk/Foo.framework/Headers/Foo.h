@@ -125,6 +125,7 @@ int redeclaredInMultipleModulesFunc1(int a);
 
 @interface FooClassBase
 - (void) fooBaseInstanceFunc0;
+- (FooClassBase *) fooBaseInstanceFunc1:(id)anObject;
 
 + (void) fooBaseClassFunc0;
 @end

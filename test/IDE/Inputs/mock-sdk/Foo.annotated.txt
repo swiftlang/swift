@@ -129,6 +129,8 @@ func redeclaredInMultipleModulesFunc1(_: <ref:TypeAlias>CInt</ref>) -> <ref:Type
 <decl:Class>@objc class FooClassBase {
   <decl:Func>class func fooBaseInstanceFunc0()</decl>
   <decl:Func>func fooBaseInstanceFunc0()</decl>
+  <decl:Func>class func fooBaseInstanceFunc1(anObject: @unchecked <ref:Protocol>AnyObject</ref>?) -> @unchecked <ref:Class>FooClassBase</ref>?</decl>
+  <decl:Func>func fooBaseInstanceFunc1(anObject: @unchecked <ref:Protocol>AnyObject</ref>?) -> @unchecked <ref:Class>FooClassBase</ref>?</decl>
   <decl:Func>class func fooBaseClassFunc0()</decl>
 }</decl>
 
