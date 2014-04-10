@@ -1,3 +1,17 @@
+2014-04-16
+----------
+
+* @IBOutlet has been improved in a few ways:
+
+  - IBOutlets can now be @unchecked optional
+
+  - An IBOutlet declared as non-optional, i.e.,
+
+      @IBOutlet var button: NSButton
+
+    will be treated as an @unchecked optional
+
+
 2014-04-09
 ----------
 
