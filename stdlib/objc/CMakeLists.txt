@@ -22,6 +22,7 @@ add_swift_library(swiftObjectiveC INSTALL
   ${SWIFTOBJC_SOURCES}
   DEPENDS swift_stdlib_core)
 
+add_subdirectory(Darwin)
 add_subdirectory(CoreGraphics)
 add_subdirectory(Foundation)
 add_subdirectory(SpriteKit)
