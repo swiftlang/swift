@@ -259,7 +259,8 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
   // checking.
   performNameBinding(SF, StartElem);
 
-  TypeChecker TC(SF.getASTContext());
+  auto &Ctx = SF.getASTContext();
+  TypeChecker TC(Ctx);
   auto &DefinedFunctions = TC.definedFunctions;
   
   // Lookup the swift module.  This ensures that we record all known protocols
@@ -273,7 +274,11 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
   // extensions, so we'll need to be smarter here.
   // FIXME: The current source file needs to be handled specially, because of
   // private extensions.
+  bool ImportsObjCModule = false;
   SF.forAllVisibleModules([&](Module::ImportedModule import) {
+    if (import.second->getName() == Ctx.ObjCModuleName)
+      ImportsObjCModule = true;
+
     // FIXME: Respect the access path?
     for (auto file : import.second->getFiles()) {
       auto SF = dyn_cast<SourceFile>(file);
@@ -443,6 +448,20 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
 
   // Verify that we've checked types correctly.
   SF.ASTStage = SourceFile::TypeChecked;
+
+  // Emit an error if there is a declaration with the @objc attribute
+  // but we have not imported the ObjectiveC module.
+  if (Ctx.LangOpts.EnableObjCAttrRequiresObjCModule &&
+      SF.Kind == SourceFileKind::Main &&
+      StartElem == 0 &&
+      SF.FirstObjCAttrLoc && !ImportsObjCModule) {
+    auto L = SF.FirstObjCAttrLoc.getValue();
+    Ctx.Diags.diagnose(L, diag::objc_decl_used_without_objc_module,
+                       Ctx.ObjCModuleName)
+    .highlight(SourceRange(L));
+  }
+
+  // Verify the SourceFile.
   verify(SF);
 
   // Verify modules imported by Clang importer.

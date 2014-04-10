@@ -250,6 +250,9 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
   }
   }
 
+  if (!Args.hasArg(options::OPT_parse_stdlib))
+    Arguments.push_back("-enable-objc-attr-requires-objc-module");
+
   addCommonFrontendArgs(getToolChain(), OI, Output.get(), Args, Arguments);
 
   Args.AddLastArg(Arguments, options::OPT_module_link_name);

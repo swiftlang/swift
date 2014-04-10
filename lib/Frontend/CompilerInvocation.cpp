@@ -526,6 +526,12 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.DebuggerSupport = true;
   }
 
+  if (auto A = Args.getLastArg(OPT_enable_objc_attr_requires_objc_module,
+                               OPT_disable_objc_attr_requires_objc_module)) {
+    Opts.EnableObjCAttrRequiresObjCModule
+      = A->getOption().matches(OPT_enable_objc_attr_requires_objc_module);
+  }
+
   if (const Arg *A = Args.getLastArg(OPT_debug_constraints_attempt)) {
     unsigned attempt;
     if (StringRef(A->getValue()).getAsInteger(10, attempt)) {

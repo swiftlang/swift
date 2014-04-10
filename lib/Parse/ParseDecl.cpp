@@ -180,6 +180,12 @@ static StringRef getStringLiteralIfNotInterpolated(Parser &P,
               Segments.front().Length);
 }
 
+void Parser::setFirstObjCAttributeLocation(SourceLoc L) {
+  if (auto SF = CurDeclContext->getParentSourceFile())
+    if (!SF->FirstObjCAttrLoc)
+      SF->FirstObjCAttrLoc = L;
+}
+
 bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
                                    SourceLoc AtLoc,
                                    SourceLoc InversionLoc,
@@ -365,6 +371,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     // Unnamed @objc attribute.
     if (Tok.isNot(tok::l_paren)) {
       Attributes.add(ObjCAttr::createUnnamed(Context, AtLoc, Loc));
+      setFirstObjCAttributeLocation(Loc);
       break;
     }
 
@@ -458,6 +465,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
                                               LParenLoc, NameLocs, Names,
                                               RParenLoc));
     }
+    setFirstObjCAttributeLocation(Loc);
     break;
   }
   case DAK_required:

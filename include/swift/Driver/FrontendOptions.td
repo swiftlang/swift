@@ -47,6 +47,16 @@ def verify : Flag<["-"], "verify">,
   HelpText<"Verify diagnostics against expected-{error|warning|note} "
            "annotations">;
 
+def enable_objc_attr_requires_objc_module :
+  Flag<["-"], "enable-objc-attr-requires-objc-module">,
+  HelpText<"Enable requiring uses of @objc require importing the "
+           "ObjectiveC module">;
+
+def disable_objc_attr_requires_objc_module :
+  Flag<["-"], "disable-objc-attr-requires-objc-module">,
+  HelpText<"Disable requiring uses of @objc require importing the "
+           "ObjectiveC module">;
+
 } // end let Flags = [FrontendOption, NoDriverOption]
 
 def debug_crash_Group : OptionGroup<"<automatic crashing options>">;

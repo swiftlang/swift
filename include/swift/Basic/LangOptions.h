@@ -68,6 +68,10 @@ namespace swift {
     /// Enable native bridging of Swift functions to Objective-C blocks.
     /// FIXME: Will eventually default to 'true' and go away.
     bool EnableBlockBridging = false;
+
+    /// Enables checking that uses of @objc require importing
+    /// the ObjectiveC module.
+    bool EnableObjCAttrRequiresObjCModule = false;
     
     /// Implicit target configuration options.  There are currently two
     ///   supported target configuration values:
