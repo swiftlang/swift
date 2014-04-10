@@ -20,6 +20,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Mangle.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/Basic/SourceManager.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/Support/raw_ostream.h"
@@ -311,10 +312,12 @@ struct ASTNodeBase {};
     void verifyParsed(Decl *D) {
       if (!D->getDeclContext()) {
         Out << "every Decl should have a DeclContext";
+        PrettyStackTraceDecl debugStack("verifying DeclContext", D);
         abort();
       }
       if (D->getAttrs().hasAttribute<OverrideAttr>()) {
         if (!isa<FuncDecl>(D) && !isa<VarDecl>(D) && !isa<SubscriptDecl>(D)) {
+          PrettyStackTraceDecl debugStack("verifying override", D);
           Out << "'override' attribute on a non-overridable member\n";
           D->dump(Out);
           abort();
@@ -341,6 +344,7 @@ struct ASTNodeBase {};
       if (D->getAttrs().hasAttribute<OverrideAttr>()) {
         if (!isa<ClassDecl>(D->getDeclContext()) &&
             !isa<ExtensionDecl>(D->getDeclContext())) {
+          PrettyStackTraceDecl debugStack("verifying override", D);
           Out << "'override' attribute outside of a class\n";
           D->dump(Out);
           abort();
@@ -507,12 +511,14 @@ struct ASTNodeBase {};
         checkMangling(D);
 
       if (D->hasType() && D->getType()->hasTypeVariable()) {
+        PrettyStackTraceDecl debugStack("verifying type variable", D);
         Out << "a type variable escaped the type checker";
         D->dump(Out);
         abort();
       }
       if (auto Overridden = D->getOverriddenDecl()) {
         if (D->getDeclContext() == Overridden->getDeclContext()) {
+          PrettyStackTraceDecl debugStack("verifying overriden", D);
           Out << "can not override a decl in the same DeclContext";
           D->dump(Out);
           Overridden->dump(Out);
@@ -521,6 +527,7 @@ struct ASTNodeBase {};
       }
       if (D->conformsToProtocolRequirement()) {
         if (D->getConformances().empty()) {
+          PrettyStackTraceDecl debugStack("checking conformances", D);
           Out << "conforms bit set but no conformances found\n";
           D->dump(Out);
           abort();
@@ -565,6 +572,7 @@ struct ASTNodeBase {};
         return;
       }
       if (auto CB = C.dyn_cast<PatternBindingDecl*>()) {
+        PrettyStackTraceDecl debugStack("verifying condition binding", CB);
         if (!CB->isConditional()) {
           Out << "condition binding is not conditional\n";
           CB->print(Out);
@@ -611,6 +619,7 @@ struct ASTNodeBase {};
 
     void verifyChecked(DeclRefExpr *E) {
       if (E->getType()->is<PolymorphicFunctionType>()) {
+        PrettyStackTraceExpr debugStack(Ctx, "verifying decl reference", E);
         Out << "unspecialized reference with polymorphic type "
           << E->getType().getString() << "\n";
         E->dump(Out);
@@ -641,6 +650,7 @@ struct ASTNodeBase {};
       if (Ty->is<ErrorType>())
         return;
       if (!Ty->is<FunctionType>()) {
+        PrettyStackTraceExpr debugStack(Ctx, "verifying closure", E);
         Out << "a closure should have a function type";
         E->print(Out);
         Out << "\n";
@@ -650,6 +660,8 @@ struct ASTNodeBase {};
     }
 
     void verifyChecked(AbstractClosureExpr *E) {
+      PrettyStackTraceExpr debugStack(Ctx, "verifying closure", E);
+
       assert(Scopes.back().get<DeclContext*>() == E);
       assert(E->getParent()->isLocalContext() &&
              "closure expression was not in local context!");
@@ -709,6 +721,8 @@ struct ASTNodeBase {};
     }
 
     void verifyChecked(MetatypeConversionExpr *E) {
+      PrettyStackTraceExpr debugStack(Ctx, "verifying MetatypeConversion", E);
+
       auto destTy = checkMetatypeType(E->getType(),
                                       "result of MetatypeConversionExpr");
       auto srcTy = checkMetatypeType(E->getSubExpr()->getType(),
@@ -726,6 +740,8 @@ struct ASTNodeBase {};
     }
 
     void verifyChecked(DerivedToBaseExpr *E) {
+      PrettyStackTraceExpr debugStack(Ctx, "verifying DerivedToBaseExpr", E);
+
       auto destTy = E->getType();
       auto srcTy = E->getSubExpr()->getType();
       if (destTy->isEqual(srcTy)) {
@@ -749,6 +765,8 @@ struct ASTNodeBase {};
     }
 
     void verifyChecked(TupleElementExpr *E) {
+      PrettyStackTraceExpr debugStack(Ctx, "verifying TupleElementExpr", E);
+
       Type resultType = E->getType();
       Type baseType = E->getBase()->getType();
       checkSameLValueness(baseType, resultType,
@@ -775,6 +793,8 @@ struct ASTNodeBase {};
     }
 
     void verifyChecked(ApplyExpr *E) {
+      PrettyStackTraceExpr debugStack(Ctx, "verifying ApplyExpr", E);
+
       FunctionType *FT = E->getFn()->getType()->getAs<FunctionType>();
       if (!FT) {
         Out << "callee of apply expression does not have function type:";
@@ -829,6 +849,8 @@ struct ASTNodeBase {};
     }
 
     void verifyChecked(MemberRefExpr *E) {
+      PrettyStackTraceExpr debugStack(Ctx, "verifying MemberRefExpr", E);
+
       if (!E->getMember()) {
         Out << "Member reference is missing declaration\n";
         E->dump(Out);
@@ -855,6 +877,8 @@ struct ASTNodeBase {};
     }
 
     void verifyChecked(DynamicMemberRefExpr *E) {
+      PrettyStackTraceExpr debugStack(Ctx, "verifying DynamicMemberRefExpr", E);
+
       // The base type must be AnyObject.
       auto baseTy = E->getBase()->getType();
 
@@ -883,6 +907,8 @@ struct ASTNodeBase {};
     }
 
     void verifyChecked(SubscriptExpr *E) {
+      PrettyStackTraceExpr debugStack(Ctx, "verifying SubscriptExpr", E);
+
       if (!E->getDecl()) {
         Out << "Subscript expression is missing subscript declaration";
         abort();
@@ -894,6 +920,8 @@ struct ASTNodeBase {};
     }
 
     void verifyChecked(BindOptionalExpr *E) {
+      PrettyStackTraceExpr debugStack(Ctx, "verifying BindOptionalExpr", E);
+
       if (E->getDepth() >= OptionalEvaluations.size()) {
         Out << "BindOptional expression is out of its depth";
         abort();
@@ -902,6 +930,8 @@ struct ASTNodeBase {};
     }
 
     void verifyChecked(CheckedCastExpr *E) {
+      PrettyStackTraceExpr debugStack(Ctx, "verifying CheckCastExpr", E);
+
       if (!E->isResolved()) {
         Out << "CheckedCast kind not resolved\n";
         abort();
@@ -911,6 +941,8 @@ struct ASTNodeBase {};
     }
 
     void verifyChecked(CoerceExpr *E) {
+      PrettyStackTraceExpr debugStack(Ctx, "verifying CoerceExpr", E);
+
       checkSameType(E->getType(), E->getSubExpr()->getType(),
                     "coercion type and subexpression type");
 
@@ -918,6 +950,8 @@ struct ASTNodeBase {};
     }
 
     void verifyChecked(TupleShuffleExpr *E) {
+      PrettyStackTraceExpr debugStack(Ctx, "verifying TupleShuffleExpr", E);
+
       TupleType *TT = E->getType()->getAs<TupleType>();
       TupleType *SubTT = E->getSubExpr()->getType()->getAs<TupleType>();
       if (!TT || !SubTT) {
@@ -964,6 +998,8 @@ struct ASTNodeBase {};
     }
     
     void verifyChecked(LValueConversionExpr *E) {
+      PrettyStackTraceExpr debugStack(Ctx, "verifying LValueConversionExpr", E);
+
       if (!E->getSubExpr()->getType()->is<LValueType>()) {
         Out << "LValueConversion subexpression must be an lvalue\n";
         abort();
@@ -1031,6 +1067,8 @@ struct ASTNodeBase {};
     }
     
     void verifyChecked(LValueToPointerExpr *E) {
+      PrettyStackTraceExpr debugStack(Ctx, "verifying LValueToPointerExpr", E);
+
       if (!E->getSubExpr()->getType()->is<LValueType>()) {
         Out << "LValueToPointerExpr subexpression must be an lvalue\n";
         abort();
@@ -1045,6 +1083,8 @@ struct ASTNodeBase {};
     }
     
     void verifyChecked(InOutConversionExpr *E) {
+      PrettyStackTraceExpr debugStack(Ctx, "verifying InOutConversionExpr", E);
+
       if (!E->getSubExpr()->getType()->isEqual(E->getType())) {
         Out << "InOutConversionExpr must have the same type as its subexpression\n";
         abort();
@@ -1053,6 +1093,8 @@ struct ASTNodeBase {};
     }
 
     void verifyChecked(MetatypeExpr *E) {
+      PrettyStackTraceExpr debugStack(Ctx, "verifying MetatypeExpr", E);
+
       auto metatype = E->getType()->getAs<AnyMetatypeType>();
       if (!metatype) {
         Out << "MetatypeExpr must have metatype type\n";
@@ -1068,6 +1110,8 @@ struct ASTNodeBase {};
     }
 
     void verifyParsed(NewArrayExpr *E) {
+      PrettyStackTraceExpr debugStack(Ctx, "verifying NewArrayExpr", E);
+
       if (E->getBounds().empty()) {
         Out << "NewArrayExpr has an empty bounds list\n";
         abort();
@@ -1080,6 +1124,8 @@ struct ASTNodeBase {};
     }
 
     void verifyChecked(NewArrayExpr *E) {
+      PrettyStackTraceExpr debugStack(Ctx, "verifying NewArrayExpr", E);
+
       if (!E->hasElementType()) {
         Out << "NewArrayExpr is missing its element type";
         abort();
@@ -1092,32 +1138,37 @@ struct ASTNodeBase {};
       verifyCheckedBase(E);
     }
 
-    void verifyChecked(InjectIntoOptionalExpr *expr) {
-      auto valueType = expr->getType()->getAnyOptionalObjectType();
+    void verifyChecked(InjectIntoOptionalExpr *E) {
+      PrettyStackTraceExpr debugStack(Ctx, "verifying InjectIntoOptionalExpr",
+                                      E);
+
+      auto valueType = E->getType()->getAnyOptionalObjectType();
       if (!valueType) {
         Out << "InjectIntoOptionalExpr is not of Optional type";
         abort();
       }
 
-      if (!expr->getSubExpr()->getType()->isEqual(valueType)) {
+      if (!E->getSubExpr()->getType()->isEqual(valueType)) {
         Out << "InjectIntoOptionalExpr operand is not of the value type";
         abort();
       }
-      verifyCheckedBase(expr);
+      verifyCheckedBase(E);
     }
 
-    void verifyChecked(IfExpr *expr) {
+    void verifyChecked(IfExpr *E) {
+      PrettyStackTraceExpr debugStack(Ctx, "verifying IfExpr", E);
+
       auto condTy
-        = expr->getCondExpr()->getType()->getAs<BuiltinIntegerType>();
+        = E->getCondExpr()->getType()->getAs<BuiltinIntegerType>();
       if (!condTy || !condTy->isFixedWidth() || condTy->getFixedWidth() != 1) {
         Out << "IfExpr condition is not an i1\n";
         abort();
       }
 
-      checkSameType(expr->getThenExpr()->getType(),
-                    expr->getElseExpr()->getType(),
+      checkSameType(E->getThenExpr()->getType(),
+                    E->getElseExpr()->getType(),
                     "then and else branches of an if-expr");
-      verifyCheckedBase(expr);
+      verifyCheckedBase(E);
     }
     
     void verifyChecked(SuperRefExpr *expr) {
@@ -1132,26 +1183,30 @@ struct ASTNodeBase {};
       verifyCheckedBase(E);
     }
 
-    void verifyChecked(OpaqueValueExpr *expr) {
-      if (!OpaqueValues.count(expr)) {
+    void verifyChecked(OpaqueValueExpr *E) {
+      PrettyStackTraceExpr debugStack(Ctx, "verifying OpaqueValueExpr", E);
+
+      if (!OpaqueValues.count(E)) {
         Out << "OpaqueValueExpr not introduced at this point in AST\n";
         abort();
       }
 
-      ++OpaqueValues[expr];
+      ++OpaqueValues[E];
 
       // Make sure "uniquely-referenced" actually is.
-      if (expr->isUniquelyReferenced() && OpaqueValues[expr] > 1) {
+      if (E->isUniquelyReferenced() && OpaqueValues[E] > 1) {
         Out << "Multiple references to unique OpaqueValueExpr\n";
         abort();
       }
-      verifyCheckedBase(expr);
+      verifyCheckedBase(E);
     }
 
     void verifyChecked(PatternBindingDecl *binding) {
     }
 
     void verifyChecked(VarDecl *var) {
+      PrettyStackTraceDecl debugStack("verifying VarDecl", var);
+
       // The fact that this is *directly* be a reference storage type
       // cuts the code down quite a bit in getTypeOfReference.
       if (var->getAttrs().hasOwnership() !=
@@ -1182,6 +1237,8 @@ struct ASTNodeBase {};
 
     /// Check the given list of protocols.
     void verifyProtocolList(Decl *decl, ArrayRef<ProtocolDecl *> protocols) {
+      PrettyStackTraceDecl debugStack("verifying ProtocolList", decl);
+
       // Make sure that the protocol list is fully expanded.
       SmallVector<ProtocolDecl *, 4> nominalProtocols(protocols.begin(),
                                                       protocols.end());
@@ -1202,6 +1259,8 @@ struct ASTNodeBase {};
 
     /// Check the given explicit protocol conformance.
     void verifyConformance(Decl *decl, ProtocolConformance *conformance) {
+      PrettyStackTraceDecl debugStack("verifying protocol conformance", decl);
+
       if (!conformance) {
         // FIXME: Eventually, this should itself be a verification
         // failure.
@@ -1284,6 +1343,8 @@ struct ASTNodeBase {};
     }
 
     void verifyParsed(EnumElementDecl *UED) {
+      PrettyStackTraceDecl debugStack("verifying EnumElementDecl", UED);
+
       if (!isa<EnumDecl>(UED->getDeclContext())) {
         Out << "EnumElementDecl has wrong DeclContext";
         abort();
@@ -1293,6 +1354,8 @@ struct ASTNodeBase {};
     }
 
     void verifyParsed(AbstractFunctionDecl *AFD) {
+      PrettyStackTraceDecl debugStack("verifying AbstractFunctionDecl", AFD);
+
       if (AFD->getArgParamPatterns().size() !=
           AFD->getBodyParamPatterns().size()) {
         Out << "number of arg and body parameter patterns should be equal";
@@ -1314,6 +1377,8 @@ struct ASTNodeBase {};
     }
 
     void verifyParsed(ConstructorDecl *CD) {
+      PrettyStackTraceDecl debugStack("verifying ConstructorDecl", CD);
+
       if (CD->getArgParamPatterns().size() != 2 ||
           CD->getBodyParamPatterns().size() != 2) {
         Out << "ConstructorDecl should have exactly two parameter patterns";
@@ -1332,6 +1397,8 @@ struct ASTNodeBase {};
     }
 
     void verifyChecked(ProtocolDecl *PD) {
+      PrettyStackTraceDecl debugStack("verifying ProtocolDecl", PD);
+
       if (PD->isObjC() && !PD->requiresClass()) {
         Out << "@objc protocols should be class protocols as well";
         abort();
@@ -1340,6 +1407,8 @@ struct ASTNodeBase {};
     }
 
     void verifyChecked(ConstructorDecl *CD) {
+      PrettyStackTraceDecl debugStack("verifying ConstructorDecl", CD);
+
       auto *ND = CD->getExtensionType()->getNominalOrBoundGenericNominal();
       if (!isa<ClassDecl>(ND) && !isa<StructDecl>(ND) && !isa<EnumDecl>(ND) &&
           !isa<ProtocolDecl>(ND) && !CD->isInvalid()) {
@@ -1351,6 +1420,8 @@ struct ASTNodeBase {};
     }
 
     void verifyParsed(DestructorDecl *DD) {
+      PrettyStackTraceDecl debugStack("verifying DestructorDecl", DD);
+
       if (DD->isGeneric()) {
         Out << "DestructorDecl can not be generic";
         abort();
@@ -1392,6 +1463,8 @@ struct ASTNodeBase {};
     void checkGenericRequirements(Decl *decl,
                                   DeclContext *dc,
                                   GenericFunctionType *genericTy) {
+
+      PrettyStackTraceDecl debugStack("verifying generic requirements", decl);
 
       // We need to have generic parameters here.
       auto genericParams = dc->getGenericParamsOfContext();
@@ -1564,6 +1637,8 @@ struct ASTNodeBase {};
     }
 
     void verifyChecked(AbstractFunctionDecl *AFD) {
+      PrettyStackTraceDecl debugStack("verifying AbstractFunctionDecl", AFD);
+
       // If this function is generic or is within a generic type, it should
       // have an interface type.
       if ((AFD->getGenericParams() ||
@@ -1606,6 +1681,8 @@ struct ASTNodeBase {};
     }
 
     void verifyChecked(DestructorDecl *DD) {
+      PrettyStackTraceDecl debugStack("verifying DestructorDecl", DD);
+
       auto *ND = DD->getExtensionType()->getNominalOrBoundGenericNominal();
       if (!isa<ClassDecl>(ND) && !DD->isInvalid()) {
         Out << "DestructorDecls outside classes should be marked invalid";
@@ -1619,6 +1696,8 @@ struct ASTNodeBase {};
     }
 
     void verifyParsed(FuncDecl *FD) {
+      PrettyStackTraceDecl debugStack("verifying FuncDecl", FD);
+
       unsigned MinParamPatterns = FD->getImplicitSelfDecl() ? 2 : 1;
       if (FD->getArgParamPatterns().size() < MinParamPatterns ||
           FD->getBodyParamPatterns().size() < MinParamPatterns) {
@@ -1649,6 +1728,8 @@ struct ASTNodeBase {};
     }
 
     void verifyChecked(ClassDecl *CD) {
+      PrettyStackTraceDecl debugStack("verifying ClassDecl", CD);
+
       if (!CD->hasLazyMembers()) {
         unsigned NumDestructors = 0;
         for (auto Member : CD->getMembers()) {
@@ -1667,6 +1748,8 @@ struct ASTNodeBase {};
     }
 
     void verifyParsed(AssociatedTypeDecl *ATD) {
+      PrettyStackTraceDecl debugStack("verifying AssociatedTypeDecl", ATD);
+
       auto *DC = ATD->getDeclContext();
       if (!isa<NominalTypeDecl>(DC) ||
           !isa<ProtocolDecl>(cast<NominalTypeDecl>(DC))) {
@@ -1677,6 +1760,8 @@ struct ASTNodeBase {};
     }
 
     void verifyParsed(TuplePattern *TP) {
+      PrettyStackTracePattern debugStack(Ctx, "verifying TuplePattern", TP);
+
       if (TP->hasVararg()) {
         auto *LastPattern = TP->getFields().back().getPattern();
         if (!isa<TypedPattern>(LastPattern)) {
@@ -1689,6 +1774,8 @@ struct ASTNodeBase {};
     }
 
     void verifyChecked(TuplePattern *TP) {
+      PrettyStackTracePattern debugStack(Ctx, "verifying TuplePattern", TP);
+
       if (TP->hasVararg()) {
         auto *LastPattern = TP->getFields().back().getPattern();
         Type T = cast<TypedPattern>(LastPattern)->getType()->getCanonicalType();
@@ -1874,6 +1961,8 @@ struct ASTNodeBase {};
     }
 
     void checkSourceRanges(Expr *E) {
+      PrettyStackTraceExpr debugStack(Ctx, "verifying ranges", E);
+
       if (!E->getSourceRange().isValid()) {
         // We don't care about source ranges on implicitly-generated
         // expressions.
@@ -1898,6 +1987,8 @@ struct ASTNodeBase {};
     }
 
     void checkSourceRanges(Stmt *S) {
+      PrettyStackTraceStmt debugStack(Ctx, "verifying ranges", S);
+
       if (!S->getSourceRange().isValid()) {
         // We don't care about source ranges on implicitly-generated
         // statements.
@@ -1920,6 +2011,8 @@ struct ASTNodeBase {};
     }
 
     void checkSourceRanges(Pattern *P) {
+      PrettyStackTracePattern debugStack(Ctx, "verifying ranges", P);
+
       if (!P->getSourceRange().isValid()) {
         // We don't care about source ranges on implicitly-generated
         // patterns.
@@ -1942,6 +2035,8 @@ struct ASTNodeBase {};
     }
 
     void checkSourceRanges(Decl *D) {
+      PrettyStackTraceDecl debugStack("verifying ranges", D);
+
       if (!D->getSourceRange().isValid()) {
         // We don't care about source ranges on implicitly-generated
         // decls.
@@ -2025,6 +2120,8 @@ struct ASTNodeBase {};
     void checkErrors(Pattern *P) {}
     void checkErrors(Decl *D) {}
     void checkErrors(ValueDecl *D) {
+      PrettyStackTraceDecl debugStack("verifying errors", D);
+
       if (!D->hasType())
         return;
       if (D->isInvalid() && !D->getType()->is<ErrorType>()) {
