@@ -3182,14 +3182,25 @@ void SILGenFunction::emitForeignThunk(SILDeclRef thunk) {
     CleanupLocation cleanupLoc(fd);
     Scope scope(Cleanups, fd);
     
-    // Set up cleanups on all the arguments, which should be at +1 now.
-    SmallVector<ManagedValue, 8> managedArgs;
-    for (auto arg : args)
-      managedArgs.push_back(emitManagedRValueWithCleanup(arg));
-
-    // Call the original.
     SILDeclRef original = thunk.asForeign(!thunk.isForeign);
     auto originalInfo = getConstantInfo(original);
+    auto originalFnTy = originalInfo.getSILType().castTo<SILFunctionType>();
+    
+    // Bridge all the arguments, which should be at +1 now.
+    SmallVector<ManagedValue, 8> managedArgs;
+    for (unsigned i : indices(args)) {
+      auto arg = args[i];
+      auto mv = emitManagedRValueWithCleanup(arg);
+      
+      auto origArg = originalFnTy->getInterfaceParameters()[i].getSILType();
+      
+      managedArgs.push_back(emitNativeToBridgedValue(fd, mv, AbstractCC::C,
+                                                 mv.getSwiftType(),
+                                                 mv.getSwiftType(),
+                                                 origArg.getSwiftRValueType()));
+    }
+
+    // Call the original.
     auto fn = emitGlobalFunctionRef(fd, original, originalInfo);
     result = emitMonomorphicApply(fd, ManagedValue::forUnmanaged(fn),
                                   managedArgs,
