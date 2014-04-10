@@ -173,6 +173,31 @@ extern "C" void *swift_slowAlloc(size_t bytes, uintptr_t flags);
 // return swift_alloc(tinyIndex);
 typedef unsigned long AllocIndex;
 
+/// The largest size which can have an AllocIndex.
+constexpr size_t MaxSizeForAllocIndex = 0x1000;
+
+/// Given that a size can have an AllocIndex, return that index.
+constexpr AllocIndex getAllocIndexForSize(size_t bytes) {
+#ifdef __LP64__
+  return (bytes ==     0 ? 0 :
+          bytes <=  0x80 ? ((bytes - 1) >> 3) + 0x0  :
+          bytes <= 0x100 ? ((bytes - 1) >> 4) + 0x8  :
+          bytes <= 0x200 ? ((bytes - 1) >> 5) + 0x10 :
+          bytes <= 0x400 ? ((bytes - 1) >> 6) + 0x18 :
+          bytes <= 0x800 ? ((bytes - 1) >> 7) + 0x20 :
+                           ((bytes - 1) >> 8) + 0x28);
+#else
+  return (bytes ==     0 ? 0 :
+          bytes <=  0x40 ? ((bytes - 1) >> 2) + 0x0  :
+          bytes <=  0x80 ? ((bytes - 1) >> 3) + 0x8  :
+          bytes <= 0x100 ? ((bytes - 1) >> 4) + 0x10 :
+          bytes <= 0x200 ? ((bytes - 1) >> 5) + 0x18 :
+          bytes <= 0x400 ? ((bytes - 1) >> 6) + 0x20 :
+          bytes <= 0x800 ? ((bytes - 1) >> 7) + 0x28 :
+                           ((bytes - 1) >> 8) + 0x30);
+#endif
+}
+
 extern "C" void *swift_alloc(AllocIndex idx);
 extern "C" void *swift_tryAlloc(AllocIndex idx);
 

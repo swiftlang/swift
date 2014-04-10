@@ -68,6 +68,16 @@ struct ValueBuffer {
   void *PrivateData[3];
 };
 
+/// Can a value with the given size and alignment be allocated inline?
+constexpr inline bool canBeInline(size_t size, size_t alignment) {
+  return size <= sizeof(ValueBuffer) && alignment <= alignof(ValueBuffer);
+}
+
+template <class T>
+constexpr inline bool canBeInline() {
+  return canBeInline(sizeof(T), alignof(T));
+}
+
 struct ValueWitnessTable;
 
 /// Types stored in the value-witness table.
@@ -1016,7 +1026,7 @@ struct FunctionTypeMetadata : public Metadata {
   const Metadata *ResultType;
 };
 
-/// The structure of metadata for metatypes and existential metatypes.
+/// The structure of metadata for metatypes.
 struct MetatypeMetadata : public Metadata {
   /// The type metadata for the element.
   const Metadata *InstanceType;
@@ -1246,6 +1256,16 @@ struct ExistentialTypeMetadata : public Metadata {
                                       unsigned i) const;
 };
 
+/// The structure of metadata for existential metatypes.
+struct ExistentialMetatypeMetadata : public Metadata {
+  /// The type metadata for the element.
+  const Metadata *InstanceType;
+
+  /// The number of witness tables and class-constrained-ness of the
+  /// underlying type.
+  ExistentialTypeFlags Flags;
+};
+
 /// \brief The header in front of a generic metadata template.
 ///
 /// This is optimized so that the code generation pattern
@@ -1402,7 +1422,7 @@ extern "C" const MetatypeMetadata *
 swift_getMetatypeMetadata(const Metadata *instanceType);
 
 /// \brief Fetch a uniqued metadata for an existential metatype type.
-extern "C" const MetatypeMetadata *
+extern "C" const ExistentialMetatypeMetadata *
 swift_getExistentialMetatypeMetadata(const Metadata *instanceType);
 
 /// \brief Fetch a uniqued metadata for an existential type. The array
@@ -1570,16 +1590,13 @@ OpaqueValue *swift_assignExistentialWithCopy1(OpaqueValue *dest,
 extern "C"
 const Metadata *swift_unknownTypeOf(HeapObject *obj);
 
-/// Standard value witness for calculating the numeric index of an extra
-/// inhabitant in memory.
-int swift_getHeapObjectExtraInhabitantIndex(HeapObject * const* src,
-                                            const Metadata *self);
+/// Calculate the numeric index of an extra inhabitant of a heap object
+/// pointer in memory.
+int swift_getHeapObjectExtraInhabitantIndex(HeapObject * const* src);
   
-/// Standard value witness for storing an extra inhabitant of a heap object
-/// pointer to memory.
-void swift_storeHeapObjectExtraInhabitant(HeapObject **dest,
-                                          int index,
-                                          const Metadata *self);
+/// Store an extra inhabitant of a heap object pointer to memory,
+/// in the style of a value witness.
+void swift_storeHeapObjectExtraInhabitant(HeapObject **dest, int index);
   
   
 /// \brief Check whether a type conforms to a given native Swift protocol,

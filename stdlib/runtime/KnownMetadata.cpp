@@ -16,24 +16,18 @@
 
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/HeapObject.h"
+#include "MetadataImpl.h"
 #include <cstring>
 #include <climits>
 
 using namespace swift;
+using namespace metadataimpl;
 
 /// Copy a value from one object to another based on the size in the
 /// given type metadata.
 OpaqueValue *swift::swift_copyPOD(OpaqueValue *dest, OpaqueValue *src,
                                   const Metadata *type) {
   return (OpaqueValue*) memcpy(dest, src, type->getValueWitnesses()->size);
-}
-
-/// A function which helpfully does nothing.
-static void doNothing(void *ptr, const void *self) {}
-
-/// A projectBuffer implementation which just reinterprets the buffer.
-static OpaqueValue *projectBuffer(ValueBuffer *dest, const Metadata *self) {
-  return reinterpret_cast<OpaqueValue*>(dest);
 }
 
 /// A function which does a naive copy.
@@ -88,46 +82,18 @@ namespace {
   };
 }
 
-const ValueWitnessTable swift::_TWVBi8_ = POD_VALUE_WITNESS_TABLE(uint8_t, 1);
-const ValueWitnessTable swift::_TWVBi16_ = POD_VALUE_WITNESS_TABLE(uint16_t, 2);
-const ValueWitnessTable swift::_TWVBi32_ = POD_VALUE_WITNESS_TABLE(uint32_t, 4);
-const ValueWitnessTable swift::_TWVBi64_ = POD_VALUE_WITNESS_TABLE(uint64_t, 8);
-const ValueWitnessTable swift::_TWVBi128_
-  = POD_VALUE_WITNESS_TABLE(int128_like, 16);
-
-/// A function to initialize a buffer/variable by retaining the given
-/// pointer and then assigning it.
-static HeapObject **initWithRetain(HeapObject **dest,
-                                   HeapObject **src,
-                                   const Metadata *self) {
-  *dest = swift_retain(*src);
-  return dest;
-}
-
-/// A function to destroy a buffer/variable by releasing the value in it.
-static void destroyWithRelease(HeapObject **var, const Metadata *self) {
-  swift_release(*var);
-}
-
-/// A function to assign to a variable by copying from an existing one.
-static HeapObject **assignWithRetain(HeapObject **dest,
-                                     HeapObject **src,
-                                     const Metadata *self) {
-  HeapObject *newValue = swift_retain(*src);
-  swift_release(*dest);
-  *dest = newValue;
-  return dest;
-}
-
-/// A function to assign to a variable by taking from an existing one.
-static HeapObject **assignWithoutRetain(HeapObject **dest,
-                                        HeapObject **src,
-                                        const Metadata *self) {
-  HeapObject *newValue = *src;
-  swift_release(*dest);
-  *dest = newValue;
-  return dest;
-}
+// We use explicit sizes and alignments here just in case the C ABI
+// under-aligns any or all of them.
+const ValueWitnessTable swift::_TWVBi8_ =
+  ValueWitnessTableForBox<NativeBox<uint8_t, 1>>::table;
+const ValueWitnessTable swift::_TWVBi16_ =
+  ValueWitnessTableForBox<NativeBox<uint16_t, 2>>::table;
+const ValueWitnessTable swift::_TWVBi32_ =
+  ValueWitnessTableForBox<NativeBox<uint32_t, 4>>::table;
+const ValueWitnessTable swift::_TWVBi64_ =
+  ValueWitnessTableForBox<NativeBox<uint64_t, 8>>::table;
+const ValueWitnessTable swift::_TWVBi128_ =
+  ValueWitnessTableForBox<NativeBox<int128_like, 16>>::table;
 
 /// A function to get the dynamic class type of a Swift heap object.
 const Metadata *swift::swift_objectTypeof(OpaqueValue *obj,
@@ -143,8 +109,7 @@ const Metadata *swift::swift_objectTypeof(OpaqueValue *obj,
 
 /// Store an invalid pointer value as an extra inhabitant of a heap object.
 void swift::swift_storeHeapObjectExtraInhabitant(HeapObject **dest,
-                                                 int index,
-                                                 const Metadata *self) {
+                                                 int index) {
   using namespace heap_object_abi;
   
   // This must be consistent with the storeHeapObjectExtraInhabitant
@@ -157,8 +122,7 @@ void swift::swift_storeHeapObjectExtraInhabitant(HeapObject **dest,
 
 /// Return the extra inhabitant index for an invalid pointer value, or -1 if
 /// the pointer is valid.
-int swift::swift_getHeapObjectExtraInhabitantIndex(HeapObject * const* src,
-                                                   const Metadata *self) {
+int swift::swift_getHeapObjectExtraInhabitantIndex(HeapObject * const* src) {
   using namespace heap_object_abi;
 
   // This must be consistent with the getHeapObjectExtraInhabitant
@@ -182,89 +146,20 @@ int swift::swift_getHeapObjectExtraInhabitantIndex(HeapObject * const* src,
 
 
 /// The basic value-witness table for Swift object pointers.
-const ExtraInhabitantsValueWitnessTable swift::_TWVBo = {
-  {
-    (value_witness_types::destroyBuffer*) &destroyWithRelease,
-    (value_witness_types::initializeBufferWithCopyOfBuffer*) &initWithRetain,
-    (value_witness_types::projectBuffer*) &projectBuffer,
-    (value_witness_types::deallocateBuffer*) &doNothing,
-    (value_witness_types::destroy*) &destroyWithRelease,
-    (value_witness_types::initializeBufferWithCopy*) &initWithRetain,
-    (value_witness_types::initializeWithCopy*) &initWithRetain,
-    (value_witness_types::assignWithCopy*) &assignWithRetain,
-    (value_witness_types::initializeBufferWithTake*) &copy<uintptr_t>,
-    (value_witness_types::initializeWithTake*) &copy<uintptr_t>,
-    (value_witness_types::assignWithTake*) &assignWithoutRetain,
-    (value_witness_types::allocateBuffer*) &projectBuffer,
-    (value_witness_types::typeOf*) &swift_objectTypeof,
-    (value_witness_types::size) sizeof(void*),
-    ValueWitnessFlags().withAlignment(alignof(void*))
-                       .withPOD(false)
-                       .withExtraInhabitants(true)
-                       .withInlineStorage(true),
-    (value_witness_types::stride) sizeof(void*),
-  },
-  (value_witness_types::storeExtraInhabitant*)
-    &swift_storeHeapObjectExtraInhabitant,
-  (value_witness_types::getExtraInhabitantIndex*)
-    &swift_getHeapObjectExtraInhabitantIndex,
-  ExtraInhabitantFlags()
-    .withNumExtraInhabitants(swift_getHeapObjectExtraInhabitantCount())
-};
+const ExtraInhabitantsValueWitnessTable swift::_TWVBo =
+  ValueWitnessTableForBox<SwiftRetainableBox>::table;
 
 /// The value-witness table for pointer-aligned unmanaged pointer types.
-const ExtraInhabitantsValueWitnessTable swift::_TWVMBo = {
-  POD_VALUE_WITNESS_TABLE(uintptr_t, sizeof(void*)),
-  (value_witness_types::storeExtraInhabitant*)
-    &swift_storeHeapObjectExtraInhabitant,
-  (value_witness_types::getExtraInhabitantIndex*)
-    &swift_getHeapObjectExtraInhabitantIndex,
-  ExtraInhabitantFlags()
-    .withNumExtraInhabitants(swift_getHeapObjectExtraInhabitantCount())
-};
+const ExtraInhabitantsValueWitnessTable swift::_TWVMBo =
+  ValueWitnessTableForBox<PointerPointerBox>::table;
 
 /*** Objective-C pointers ****************************************************/
 
 // This section can reasonably be suppressed in builds that don't
 // need to support Objective-C.
 
-// ARC entrypoints.
-extern "C" void *objc_retain(void *);
-extern "C" void objc_release(void *);
-
 // ObjC runtime entrypoints.
 extern "C" const void *object_getClass(void *);
-
-/// A function to initialize a buffer/variable by retaining the given
-/// pointer and then assigning it.
-static void **initWithObjCRetain(void **dest, void **src,
-                                 const Metadata *self) {
-  *dest = objc_retain(*src);
-  return dest;
-}
-
-/// A function to destroy a buffer/variable by releasing the value in it.
-static void destroyWithObjCRelease(void **var, const Metadata *self) {
-  objc_release(*var);
-}
-
-/// A function to assign to a variable by copying from an existing one.
-static void **assignWithObjCRetain(void **dest, void **src,
-                                   const Metadata *self) {
-  void *newValue = objc_retain(*src);
-  objc_release(*dest);
-  *dest = newValue;
-  return dest;
-}
-
-/// A function to assign to a variable by taking from an existing one.
-static void **assignWithoutObjCRetain(void **dest, void **src,
-                                      const Metadata *self) {
-  void *newValue = *src;
-  objc_release(*dest);
-  *dest = newValue;
-  return dest;
-}
 
 /// A function to get the Swift type metadata wrapper for an ObjC object's
 /// dynamic type.
@@ -285,133 +180,21 @@ const Metadata *swift::swift_unknownTypeOf(HeapObject *object)
 }
 
 /// The basic value-witness table for ObjC object pointers.
-const ExtraInhabitantsValueWitnessTable swift::_TWVBO = {
-  {
-    (value_witness_types::destroyBuffer*) &destroyWithObjCRelease,
-    (value_witness_types::initializeBufferWithCopyOfBuffer*) &initWithObjCRetain,
-    (value_witness_types::projectBuffer*) &projectBuffer,
-    (value_witness_types::deallocateBuffer*) &doNothing,
-    (value_witness_types::destroy*) &destroyWithObjCRelease,
-    (value_witness_types::initializeBufferWithCopy*) &initWithObjCRetain,
-    (value_witness_types::initializeWithCopy*) &initWithObjCRetain,
-    (value_witness_types::assignWithCopy*) &assignWithObjCRetain,
-    (value_witness_types::initializeBufferWithTake*) &copy<uintptr_t>,
-    (value_witness_types::initializeWithTake*) &copy<uintptr_t>,
-    (value_witness_types::assignWithTake*) &assignWithoutObjCRetain,
-    (value_witness_types::allocateBuffer*) &projectBuffer,
-    (value_witness_types::typeOf*) &swift_objcTypeof,
-    (value_witness_types::size) sizeof(void*),
-    ValueWitnessFlags().withAlignment(alignof(void*)).withPOD(false)
-                       .withInlineStorage(true)
-                       .withExtraInhabitants(true),
-    (value_witness_types::stride) sizeof(void*)
-  },
-  (value_witness_types::storeExtraInhabitant*)
-    &swift_storeHeapObjectExtraInhabitant,
-  (value_witness_types::getExtraInhabitantIndex*)
-    &swift_getHeapObjectExtraInhabitantIndex,
-  ExtraInhabitantFlags()
-    .withNumExtraInhabitants(swift_getHeapObjectExtraInhabitantCount())
-};
+const ExtraInhabitantsValueWitnessTable swift::_TWVBO =
+  ValueWitnessTableForBox<ObjCRetainableBox>::table;
 
 /*** Functions ***************************************************************/
 
-namespace {
-  struct Function {
-    void *FnPtr;
-    HeapObject *Data;
-  };
-}
-
-// Assert what we consider to be a reasonable property of ValueBuffer.
-static_assert(sizeof(Function) <= sizeof(ValueBuffer),
-              "function values don't fit inline in a value buffer");
-
-static void function_destroy(Function *fn, const Metadata *self) {
-  swift_release(fn->Data);
-}
-
-static Function *function_initWithRetain(Function *dest, Function *src,
-                                         const Metadata *self) {
-  dest->FnPtr = src->FnPtr;
-  dest->Data = swift_retain(src->Data);
-  return dest;
-}
-
-static Function *function_initWithoutRetain(Function *dest, Function *src,
-                                            const Metadata *self) {
-  dest->FnPtr = src->FnPtr;
-  dest->Data = src->Data;
-  return dest;
-}
-
-static Function *function_assignWithRetain(Function *dest, Function *src,
-                                           const Metadata *self) {
-  dest->FnPtr = src->FnPtr;
-  if (dest->Data != src->Data) {
-    HeapObject *oldData = dest->Data;
-    dest->Data = swift_retain(src->Data);
-    swift_release(oldData);
-  }
-  return dest;
-}
-
-static Function *function_assignWithoutRetain(Function *dest, Function *src,
-                                              const Metadata *self) {
-  dest->FnPtr = src->FnPtr;
-  HeapObject *oldData = dest->Data;
-  dest->Data = src->Data;
-  swift_release(oldData);
-  return dest;
-}
-
 /// The basic value-witness table for function types.
-const ValueWitnessTable swift::_TWVFT_T_ = {
-  (value_witness_types::destroyBuffer*) &function_destroy,
-  (value_witness_types::initializeBufferWithCopyOfBuffer*) &function_initWithRetain,
-  (value_witness_types::projectBuffer*) &projectBuffer,
-  (value_witness_types::deallocateBuffer*) &doNothing,
-  (value_witness_types::destroy*) &function_destroy,
-  (value_witness_types::initializeBufferWithCopy*) &function_initWithRetain,
-  (value_witness_types::initializeWithCopy*) &function_initWithRetain,
-  (value_witness_types::assignWithCopy*) &function_assignWithRetain,
-  (value_witness_types::initializeBufferWithTake*) &function_initWithoutRetain,
-  (value_witness_types::initializeWithTake*) &function_initWithoutRetain,
-  (value_witness_types::assignWithTake*) &function_assignWithoutRetain,
-  (value_witness_types::allocateBuffer*) &projectBuffer,
-  (value_witness_types::typeOf*) &swift_staticTypeof,
-  (value_witness_types::size) sizeof(Function),
-  ValueWitnessFlags().withAlignment(alignof(Function)).withPOD(false)
-                     .withInlineStorage(true),
-  (value_witness_types::stride) sizeof(Function)
-};
+const ValueWitnessTable swift::_TWVFT_T_ =
+  ValueWitnessTableForBox<AggregateBox<NativeBox<void*>,
+                                       SwiftRetainableBox>>::table;
 
 /*** Empty tuples ************************************************************/
 
-// A function which does nothing and returns its first argument.
-static void *doNothing3(void *dest, void *src, void *self) {
-  return dest;
-}
-
 /// The basic value-witness table for empty types.
-const ValueWitnessTable swift::_TWVT_ = {
-  (value_witness_types::destroyBuffer*) &doNothing,
-  (value_witness_types::initializeBufferWithCopyOfBuffer*) &doNothing3,
-  (value_witness_types::projectBuffer*) &projectBuffer,
-  (value_witness_types::deallocateBuffer*) &doNothing,
-  (value_witness_types::destroy*) &doNothing,
-  (value_witness_types::initializeBufferWithCopy*) &doNothing3,
-  (value_witness_types::initializeWithCopy*) &doNothing3,
-  (value_witness_types::assignWithCopy*) &doNothing3,
-  (value_witness_types::initializeBufferWithTake*) &doNothing3,
-  (value_witness_types::initializeWithTake*) &doNothing3,
-  (value_witness_types::assignWithTake*) &doNothing3,
-  (value_witness_types::allocateBuffer*) &projectBuffer,
-  (value_witness_types::typeOf*) &swift_staticTypeof,
-  (value_witness_types::size) 0,
-  ValueWitnessFlags().withAlignment(1).withPOD(true).withInlineStorage(true),
-  (value_witness_types::stride) 0
-};
+const ValueWitnessTable swift::_TWVT_ =
+  ValueWitnessTableForBox<AggregateBox<>>::table;
 
 /*** Known metadata **********************************************************/
 

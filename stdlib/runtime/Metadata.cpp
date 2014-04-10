@@ -1143,9 +1143,6 @@ namespace {
 /// The uniquing structure for metatype type metadata.
 static MetadataCache<MetatypeCacheEntry> MetatypeTypes;
 
-/// The uniquing structure for existential metatype type metadata.
-static MetadataCache<MetatypeCacheEntry> ExistentialMetatypeTypes;
-
 /// \brief Find the appropriate value witness table for the given type.
 static const ValueWitnessTable *
 getMetatypeValueWitnesses(const Metadata *instanceType) {
@@ -1186,8 +1183,37 @@ swift::swift_getMetatypeMetadata(const Metadata *instanceMetadata) {
   return MetatypeTypes.add(entry)->getData();
 }
 
+/*** Existential Metatypes *************************************************/
+
+namespace {
+  class ExistentialMetatypeCacheEntry :
+      public CacheEntry<ExistentialMetatypeCacheEntry> {
+    FullMetadata<ExistentialMetatypeMetadata> Metadata;
+
+  public:
+    ExistentialMetatypeCacheEntry(size_t numArguments) : CacheEntry(numArguments) {}
+
+    FullMetadata<ExistentialMetatypeMetadata> *getData() {
+      return &Metadata;
+    }
+    const FullMetadata<ExistentialMetatypeMetadata> *getData() const {
+      return &Metadata;
+    }
+  };
+}
+
+/// The uniquing structure for existential metatype type metadata.
+static MetadataCache<ExistentialMetatypeCacheEntry> ExistentialMetatypeTypes;
+
+/// \brief Find the appropriate value witness table for the given type.
+static const ValueWitnessTable *
+getExistentialMetatypeValueWitnesses(unsigned numWitnessTables) {
+  // FIXME
+  return &getUnmanagedPointerPointerValueWitnesses();
+}
+
 /// \brief Fetch a uniqued metadata for a metatype type.
-extern "C" const MetatypeMetadata *
+extern "C" const ExistentialMetatypeMetadata *
 swift::swift_getExistentialMetatypeMetadata(const Metadata *instanceMetadata) {
   const size_t numGenericArgs = 1;
 
@@ -1196,15 +1222,24 @@ swift::swift_getExistentialMetatypeMetadata(const Metadata *instanceMetadata) {
     return entry->getData();
   }
 
-  auto entry = MetatypeCacheEntry::allocate(args, numGenericArgs, 0);
+  auto entry = ExistentialMetatypeCacheEntry::allocate(args, numGenericArgs, 0);
 
   // FIXME: the value witnesses should probably account for room for
   // protocol witness tables
 
+  ExistentialTypeFlags flags;
+  if (instanceMetadata->getKind() == MetadataKind::Existential) {
+    flags = static_cast<const ExistentialTypeMetadata*>(instanceMetadata)->Flags;
+  } else {
+    assert(instanceMetadata->getKind() == MetadataKind::ExistentialMetatype);
+    flags = static_cast<const ExistentialMetatypeMetadata*>(instanceMetadata)->Flags;
+  }
+
   auto metadata = entry->getData();
   metadata->setKind(MetadataKind::ExistentialMetatype);
-  metadata->ValueWitnesses = &getUnmanagedPointerPointerValueWitnesses();
+  metadata->ValueWitnesses = getExistentialMetatypeValueWitnesses(flags.getNumWitnessTables());
   metadata->InstanceType = instanceMetadata;
+  metadata->Flags = flags;
 
   return ExistentialMetatypeTypes.add(entry)->getData();
 }
@@ -1693,12 +1728,12 @@ struct ClassExistentialValueWitnesses {
   
   static void storeExtraInhabitant(Container *obj, int index,
                                    const Metadata *self) {
-    swift_storeHeapObjectExtraInhabitant(&obj->getValue(self), index, self);
+    swift_storeHeapObjectExtraInhabitant(&obj->getValue(self), index);
   }
   
   static int getExtraInhabitantIndex(Container *obj,
                                      const Metadata *self) {
-    return swift_getHeapObjectExtraInhabitantIndex(&obj->getValue(self), self);
+    return swift_getHeapObjectExtraInhabitantIndex(&obj->getValue(self));
   }
   
   static const ExtraInhabitantsValueWitnessTable ValueWitnessTable;
