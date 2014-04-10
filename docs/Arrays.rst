@@ -107,11 +107,11 @@ Bridging Rules and Terminology for all Types
   type that does not conform to ``BridgedToObjectiveC``
 
 * A value ``x`` of type AnyObject **bridges** to ``T`` if ``T`` is
-  *bridged* and::
+  *bridged* and ::
 
-    (x as T.ObjectiveCType).map{ T.bridgeFromObjectiveC($0) }
+     T.bridgeFromObjectiveC((x as T.ObjectiveCType)!)
 
-  is non-nil.
+  is valid and non-nil.
 
 Bridging To Objective-C
 -----------------------
