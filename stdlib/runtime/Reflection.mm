@@ -308,7 +308,7 @@ StringMirrorTuple swift_StructMirror_subscript(intptr_t i,
   
   // Get the field name from the doubly-null-terminated list.
   const char *fieldName = Struct->Description->Struct.FieldNames;
-  for (unsigned j = 0; j < i; ++j) {
+  for (size_t j = 0; j < (size_t)i; ++j) {
     while (*fieldName++);
   }
   
@@ -381,7 +381,7 @@ StringMirrorTuple swift_ClassMirror_subscript(intptr_t i,
   
   // Get the field name from the doubly-null-terminated list.
   const char *fieldName = Clas->Description->Class.FieldNames;
-  for (unsigned j = 0; j < i; ++j) {
+  for (size_t j = 0; j < (size_t)i; ++j) {
     while (*fieldName++);
   }
   
