@@ -1260,7 +1260,26 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
       getLoweredASTFunctionType(substFnType, uncurryLevel);
 
     AbstractionPattern origLoweredType;
-    if (substType == origType.getAsType()) {
+    
+    bool canReabstract;
+    switch (substLoweredType->getAbstractCC()) {
+    case AbstractCC::C:
+    case AbstractCC::ObjCMethod:
+      // C functions cannot be reabstracted; if we were to call them
+      // generically, we'd have to dynamically form an invocation in their
+      // original calling convention.
+      canReabstract = false;
+      break;
+        
+    case AbstractCC::Freestanding:
+    case AbstractCC::Method:
+    case AbstractCC::WitnessMethod:
+      // Native functions can be reabstracted freely.
+      canReabstract = true;
+      break;
+    }
+    
+    if (!canReabstract || substType == origType.getAsType()) {
       origLoweredType = AbstractionPattern(substLoweredType);
     } else if (origType.isOpaque()) {
       origLoweredType = origType;
