@@ -285,16 +285,11 @@ static void emitArrayDestroy(IRGenFunction &IGF,
 
   // 'prev' points one past the end of the valid array; make something
   // that points at the end.
-  llvm::Value *cur;
-  if (elementTI.StorageType->isSized()) {
-    cur = IGF.Builder.CreateInBoundsGEP(prev, getSizeMax(IGF), "cur");
-  } else {
-    cur = IGF.Builder.CreateBitCast(prev, IGF.IGM.Int8PtrTy);
-    llvm::Value *strideBytes = IGF.Builder.CreateNeg(elementSize);
-    cur = IGF.Builder.CreateInBoundsGEP(cur, strideBytes);
-    cur = IGF.Builder.CreateBitCast(cur, prev->getType());
-  }
-
+  llvm::Value *cur = IGF.Builder.CreateBitCast(prev, IGF.IGM.Int8PtrTy);
+  llvm::Value *strideBytes = IGF.Builder.CreateNeg(elementSize);
+  cur = IGF.Builder.CreateInBoundsGEP(cur, strideBytes);
+  cur = IGF.Builder.CreateBitCast(cur, prev->getType());
+  
   // Destroy this element.
   elementTI.destroy(IGF, elementTI.getAddressForPointer(cur), elementType);
 
