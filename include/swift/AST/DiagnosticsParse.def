@@ -883,6 +883,10 @@ ERROR(attr_expected_string_literal,attribute_parsing,none,
 ERROR(attr_interpolated_string,attribute_parsing,none,
 "%0 cannot be an interpolated string literal", (StringRef))
 
+// @asmname
+ERROR(attr_asmname_only_at_non_local_scope, attribute_parsing, none,
+"attribute '%0' can only be used in a non-local scope", (StringRef))
+
 // availability
 ERROR(attr_availability_platform,attribute_parsing,none,
 "expected platform name or '*' for '%0' attribute", (StringRef))

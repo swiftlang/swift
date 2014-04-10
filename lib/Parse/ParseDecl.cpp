@@ -231,7 +231,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     }
 
     StringRef AsmName =
-      getStringLiteralIfNotInterpolated(*this, Loc, Tok, "asmname");
+      getStringLiteralIfNotInterpolated(*this, Loc, Tok, AttrName);
 
     if (!AsmName.empty())
       AttrRange = SourceRange(Loc, Tok.getRange().getStart());
@@ -243,6 +243,14 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     if (!consumeIf(tok::r_paren)) {
       diagnose(Loc, diag::attr_expected_rparen, AttrName);
       return false;
+    }
+
+    // Diagnose using @asmname in a local scope.  These don't
+    // actually work.
+    if (CurDeclContext->isLocalContext()) {
+      // Emit an error, but do not discard the attribute.  This enables
+      // better recovery in the parser.
+      diagnose(Loc, diag::attr_asmname_only_at_non_local_scope, AttrName);
     }
 
     if (!DiscardAttribute)
