@@ -876,6 +876,20 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
                                 ConstraintLocator::ArrayElementType));
     }
   }
+
+  // For a subtyping relation involving a conversion to an existential
+  // metatype, match the child types.
+  if (concrete && kind >= TypeMatchKind::Subtype) {
+    if (auto meta1 = type1->getAs<MetatypeType>()) {
+      if (auto meta2 = type2->getAs<ExistentialMetatypeType>()) {
+        return matchTypes(meta1->getInstanceType(),
+                          meta2->getInstanceType(),
+                          TypeMatchKind::Subtype, subFlags,
+                          locator.withPathElement(
+                                  ConstraintLocator::InstanceType));
+      }
+    }
+  }
   
   // For a subtyping relation involving two existential types or subtyping of
   // a class existential type, or a conversion from any type to an
