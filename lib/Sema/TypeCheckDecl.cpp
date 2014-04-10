@@ -5010,9 +5010,10 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
 
     Type type = VarD->getType();
 
-    // A [weak] variable must have type R? for some ownership-capable type R.
+    // A [weak] variable must have type R?, possibly @unchecked, for
+    // some ownership-capable type R.
     if (Attrs.isWeak()) {
-      Type objType = type->getOptionalObjectType();
+      Type objType = type->getAnyOptionalObjectType();
 
       // Use this special diagnostic if it's actually a reference type
       // but just isn't Optional.
