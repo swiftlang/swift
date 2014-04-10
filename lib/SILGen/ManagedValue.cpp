@@ -88,30 +88,6 @@ SILValue ManagedValue::forward(SILGenFunction &gen) const {
   return getValue();
 }
 
-/// Forward this value as an argument.
-SILValue ManagedValue::forwardArgument(SILGenFunction &gen, SILLocation loc,
-                                       AbstractCC cc, CanType origNativeTy,
-                                       CanType substNativeTy,
-                                       CanType bridgedTy) {
-  // Bridge the value to the current calling convention.
-  ManagedValue v = gen.emitNativeToBridgedValue(loc, *this, cc,
-                                                origNativeTy, substNativeTy,
-                                                bridgedTy);
-  return v.forward(gen);
-}
-
-/// Get this value as an argument without consuming it.
-SILValue ManagedValue::getArgumentValue(SILGenFunction &gen, SILLocation loc,
-                                        AbstractCC cc, CanType origNativeTy,
-                                        CanType substNativeTy,
-                                        CanType bridgedTy) {
-  // Bridge the value to the current calling convention.
-  ManagedValue v = gen.emitNativeToBridgedValue(loc, *this, cc,
-                                                origNativeTy, substNativeTy,
-                                                bridgedTy);
-  return v.getValue();
-}
-
 void ManagedValue::forwardInto(SILGenFunction &gen, SILLocation loc,
                                SILValue address) {
   if (hasCleanup())

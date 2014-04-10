@@ -146,17 +146,6 @@ public:
   /// underlying value.
   SILValue forward(SILGenFunction &gen) const;
   
-  /// Forward this value as an argument.
-  SILValue forwardArgument(SILGenFunction &gen, SILLocation loc,
-                           AbstractCC cc, CanType origNativeTy,
-                           CanType substNativeTy, CanType bridgedTy);
-  
-  /// Get this value as an argument without consuming it.
-  SILValue getArgumentValue(SILGenFunction &gen, SILLocation loc,
-                            AbstractCC cc,
-                            CanType origNativeTy, CanType substNativeTy,
-                            CanType bridgedTy);
-  
   /// Forward this value into memory by storing it to the given address.
   ///
   /// \param gen - The SILGenFunction.
