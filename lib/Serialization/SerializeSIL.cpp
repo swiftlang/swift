@@ -1370,9 +1370,10 @@ static bool canAlwaysSerializeLinkage(SILLinkage linkage) {
   case SILLinkage::PublicExternal:
   case SILLinkage::Hidden:
   case SILLinkage::HiddenExternal:
-    return true;
-  // We only serialize shared functions if they are in FuncsToDeclare.
+  // We always serialize shared linkage items since we leave elimination of them
+  // as a responsibility of the optimizer.
   case SILLinkage::Shared:
+    return true;
   // We never serialize anything with private linkage.
   case SILLinkage::Private:
     return false;
@@ -1409,12 +1410,6 @@ bool SILSerializer::shouldEmitFunctionBody(const SILFunction &F) {
 
   // If F is transparent, we should always emit its body.
   if (F.isTransparent())
-    return true;
-
-  // Emit the function body if F is a shared function referenced in this
-  // module. This is needed specifically to handle the bodies of closures.
-  // FIXME: This is order-dependent.
-  if (F.getLinkage() == SILLinkage::Shared && FuncsToDeclare.count(&F))
     return true;
 
   // If F has private linkage or transitively references a global, function,
