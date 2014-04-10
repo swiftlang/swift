@@ -125,6 +125,18 @@ public:
     return FES;
   }
 
+  std::pair<DeclRefExpr *, VarDecl *> digForVariable(Expr *E) {
+    if (DeclRefExpr *DRE = llvm::dyn_cast<DeclRefExpr>(E)) {
+      return std::make_pair(DRE, llvm::dyn_cast<VarDecl>(DRE->getDecl()));
+    } else if (LoadExpr *LE = llvm::dyn_cast<LoadExpr>(E)) {
+      return digForVariable(LE->getSubExpr());
+    } else if (ForceValueExpr *FVE = llvm::dyn_cast<ForceValueExpr>(E)) {
+      return digForVariable(FVE->getSubExpr());
+    } else {
+      return std::make_pair(nullptr, nullptr);
+    }
+  }
+
   BraceStmt *transformBraceStmt(BraceStmt *BS) {
     llvm::ArrayRef<ASTNode> OriginalElements = BS->getElements();
     typedef llvm::SmallVector<swift::ASTNode, 3> ElementVector;
@@ -175,15 +187,7 @@ public:
               DeclRefExpr *TargetDRE = nullptr;
               VarDecl *TargetVD = nullptr;
 
-              if ((TargetDRE = llvm::dyn_cast<DeclRefExpr>(TargetExpr))) {
-                TargetVD = llvm::dyn_cast<VarDecl>(TargetDRE->getDecl());
-              }
-              else if (LoadExpr *LE = llvm::dyn_cast<LoadExpr>(TargetExpr)) {
-                if ((TargetDRE =
-                     llvm::dyn_cast<DeclRefExpr>(LE->getSubExpr()))) {
-                  TargetVD = llvm::dyn_cast<VarDecl>(TargetDRE->getDecl());
-                }
-              }
+              std::tie(TargetDRE, TargetVD) = digForVariable(TargetExpr);
 
               if (TargetVD) {
                 Expr *Log = logDeclRef(TargetDRE);
