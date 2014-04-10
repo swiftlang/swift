@@ -827,8 +827,8 @@ static void buildThunkBody(SILGenFunction &gen, SILLocation loc,
   gen.B.createReturn(loc, outerResultValue);
 }
 
-/// Build the type of a transformation thunk.
-static CanSILFunctionType buildThunkType(SILGenFunction &gen,
+/// Build the type of a function transformation thunk.
+CanSILFunctionType SILGenFunction::buildThunkType(
                                          ManagedValue fn,
                                          CanSILFunctionType expectedType,
                                          CanSILFunctionType &substFnType,
@@ -843,8 +843,8 @@ static CanSILFunctionType buildThunkType(SILGenFunction &gen,
 
   // Just use the generic signature from the context.
   // This isn't necessarily optimal.
-  auto generics = gen.F.getContextGenericParams();
-  auto genericSig = gen.F.getLoweredFunctionType()->getGenericSignature();
+  auto generics = F.getContextGenericParams();
+  auto genericSig = F.getLoweredFunctionType()->getGenericSignature();
   if (generics) {
     for (auto archetype : generics->getAllNestedArchetypes())
       subs.push_back({ archetype, archetype, { }});
@@ -866,7 +866,7 @@ static CanSILFunctionType buildThunkType(SILGenFunction &gen,
   // type of the thunk.
   SmallVector<SILParameterInfo, 4> interfaceParams;
   interfaceParams.reserve(params.size());
-  auto &Types = gen.SGM.M.Types;
+  auto &Types = SGM.M.Types;
   for (auto &param : params) {
     interfaceParams.push_back(
       SILParameterInfo(Types.getInterfaceTypeInContext(param.getType(), generics),
@@ -881,7 +881,7 @@ static CanSILFunctionType buildThunkType(SILGenFunction &gen,
   auto thunkType = SILFunctionType::get(genericSig, extInfo,
                                         ParameterConvention::Direct_Unowned,
                                         interfaceParams, interfaceResult,
-                                        gen.getASTContext());
+                                        getASTContext());
 
   // Define the substituted function type for partial_apply's purposes.
   if (!generics) {
@@ -891,7 +891,7 @@ static CanSILFunctionType buildThunkType(SILGenFunction &gen,
                                        ParameterConvention::Direct_Unowned,
                                        params,
                                        expectedType->getInterfaceResult(),
-                                       gen.getASTContext());
+                                       getASTContext());
   }
 
   return thunkType;
@@ -910,7 +910,7 @@ static ManagedValue createThunk(SILGenFunction &gen,
   // Declare the thunk.
   SmallVector<Substitution, 4> substitutions;
   CanSILFunctionType substFnType;
-  auto thunkType = buildThunkType(gen, fn, expectedType,
+  auto thunkType = gen.buildThunkType(fn, expectedType,
                                   substFnType, substitutions);
   auto thunk = gen.SGM.getOrCreateReabstractionThunk(loc,
                                        gen.F.getContextGenericParams(),

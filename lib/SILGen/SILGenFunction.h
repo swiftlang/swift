@@ -855,7 +855,13 @@ public:
                                       ManagedValue input,
                                       SILType loweredResultTy,
                                       const ValueTransform &transform);
-
+  
+  /// Build the type of a function transformation thunk.
+  CanSILFunctionType buildThunkType(ManagedValue fn,
+                                    CanSILFunctionType expectedType,
+                                    CanSILFunctionType &substFnType,
+                                    SmallVectorImpl<Substitution> &subs);
+  
   //===--------------------------------------------------------------------===//
   // Declarations
   //===--------------------------------------------------------------------===//

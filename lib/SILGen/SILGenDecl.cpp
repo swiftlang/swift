@@ -1560,9 +1560,18 @@ static SILFunctionType *emitObjCThunkArguments(SILGenFunction &gen,
   for (unsigned i = 0, e = inputs.size(); i < e; ++i) {
     SILType argTy = gen.F.mapTypeIntoContext(inputs[i].getSILType());
     SILValue arg = new(gen.F.getModule()) SILArgument(argTy, gen.F.begin());
-
+    
+    // If the argument is a block, copy it.
+    if (argTy.isBlockPointerCompatible()) {
+      auto copy = gen.B.createCopyBlock(Loc, arg);
+      // If the argument is consumed, we're still responsible for releasing the
+      // original.
+      if (inputs[i].isConsumed())
+        gen.emitManagedRValueWithCleanup(arg);
+      arg = copy;
+    }
     // Convert the argument to +1 if necessary.
-    if (!inputs[i].isConsumed()) {
+    else if (!inputs[i].isConsumed()) {
       arg = emitObjCUnconsumedArgument(gen, Loc, arg);
     }
 
