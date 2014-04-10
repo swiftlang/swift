@@ -72,6 +72,9 @@ struct PrintOptions {
 
   bool PrintImplicitAttrs = true;
 
+  /// \brief Whether to print '@exported' on exported imports.
+  bool PrintAttrExported = true;
+
   /// Whether to print '@unchecked' inside declarations imported from
   /// Objective-C.  If false, print @unchecked optionals as non-optionals.
   bool PrintUncheckedOptionalInImportedDecls = true;

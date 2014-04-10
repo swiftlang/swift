@@ -59,13 +59,15 @@ void DeclAttributes::print(llvm::raw_ostream &OS) const {
   print(P, PO);
 }
 
-void DeclAttributes::print(ASTPrinter &Printer, 
+void DeclAttributes::print(ASTPrinter &Printer,
                            const PrintOptions &Options) const {
   if (NumAttrsSet == 0 && !DeclAttrs)
     return;
 
   for (auto DA : *this) {
     if (!Options.PrintImplicitAttrs && DA->isImplicit())
+      continue;
+    if (!Options.PrintAttrExported && isa<ExportedAttr>(DA))
       continue;
 
     DA->print(Printer);

@@ -678,9 +678,7 @@ void PrintAST::printInherited(const GenericTypeParamDecl *D) {
 }
 
 void PrintAST::visitImportDecl(ImportDecl *decl) {
-  if (decl->isExported())
-    Printer << "@exported ";
-
+  printAttributes(decl->getAttrs());
   Printer << "import ";
 
   switch (decl->getImportKind()) {
