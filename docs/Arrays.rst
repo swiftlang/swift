@@ -52,7 +52,7 @@ components.
 Array Casts
 -----------
 
-* *ArrayType*\ ``<T>`` implicitly converts to *ArrayType*\ ``U`` if
+* *ArrayType*\ ``<T>`` implicitly converts to *ArrayType*\ ``<U>`` if
   ``T`` is a trivial subtype of ``U`` (or if ``U`` is ``AnyObject``\
   —see below).  [Implementation note: when accessed as *ArrayType*\
   ``<U>``, the underlying buffer of ``T``\ s is treated as immutable,
