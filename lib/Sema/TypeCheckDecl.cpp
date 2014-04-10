@@ -4990,6 +4990,24 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     }
   }
 
+  if (Attrs.isIBOutlet()) {
+    // Only instance properties can be IBOutlets.
+    auto *VD = dyn_cast<VarDecl>(D);
+    if (!VD || !isInClassContext(VD) || VD->isStatic()) {
+      TC.diagnose(Attrs.getLoc(AK_IBOutlet), diag::invalid_iboutlet);
+      D->getMutableAttrs().clearAttribute(AK_IBOutlet);
+      return;
+    }
+
+    // FIXME: This could do some type validation as well (all IBOutlets refer
+    // to objects).
+    auto type = VD->getType();
+    auto optObjectType = type->getAnyOptionalObjectType();
+    if (!optObjectType) {
+      VD->overwriteType(UncheckedOptionalType::get(type));
+    }
+  }
+
   // Ownership attributes (weak, unowned).
   if (Attrs.hasOwnership()) {
     // Diagnostics expect:
@@ -5046,18 +5064,6 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     VarD->overwriteType(ReferenceStorageType::get(type,
                                                 Attrs.getOwnership(),
                                                 TC.Context));
-  }
-
-  if (Attrs.isIBOutlet()) {
-    // Only instance properties can be IBOutlets.
-    // FIXME: This could do some type validation as well (all IBOutlets refer
-    // to objects).
-    auto *VD = dyn_cast<VarDecl>(D);
-    if (!VD || !isInClassContext(VD) || VD->isStatic()) {
-      TC.diagnose(Attrs.getLoc(AK_IBOutlet), diag::invalid_iboutlet);
-      D->getMutableAttrs().clearAttribute(AK_IBOutlet);
-      return;
-    }
   }
 
   if (Attrs.isIBInspectable()) {
