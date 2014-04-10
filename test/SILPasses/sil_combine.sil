@@ -857,3 +857,33 @@ bb0(%0 : $MyClass):
 // CHECK: return [[RESULT]] : $Bool
   return %4 : $Bool                               // id: %6
 }
+
+// CHECK-LABEL: sil @constant_expect_hint
+// CHECK: bb0:
+// CHECK-NEXT: [[INT1:%[0-9]+]] = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: [[INT2:%[0-9]+]] = integer_literal $Builtin.Int32, 5
+// CHECK-NEXT: [[INT3:%[0-9]+]] = integer_literal $Builtin.Int64, 32
+// CHECK-NEXT: [[TUPLE:%[0-9]+]] = tuple ([[INT1]] : $Builtin.Int1, [[INT2]] : $Builtin.Int32, [[INT3]] : $Builtin.Int64)
+// CHECK-NEXT: return [[TUPLE]]
+// CHECK-NEXT: }
+sil @constant_expect_hint : $@thin () -> (Builtin.Int1, Builtin.Int32, Builtin.Int64) {
+bb0:
+  %0 = integer_literal $Builtin.Int1, 0
+  %1 = integer_literal $Builtin.Int32, 5
+  %2 = integer_literal $Builtin.Int64, 32
+
+  %3 = integer_literal $Builtin.Int1, 1
+  %4 = integer_literal $Builtin.Int32, 400
+  %5 = integer_literal $Builtin.Int64, 5000
+
+  %6 = builtin_function_ref "int_expect_Int1" : $@thin (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
+  %7 = builtin_function_ref "int_expect_Int32" : $@thin (Builtin.Int32, Builtin.Int32) -> Builtin.Int32
+  %8 = builtin_function_ref "int_expect_Int64" : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
+
+  %9 = apply %6(%0, %3) : $@thin (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
+  %10 = apply %7(%1, %4) : $@thin (Builtin.Int32, Builtin.Int32) -> Builtin.Int32
+  %11 = apply %8(%2, %5) : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
+
+  %12 = tuple (%9 : $Builtin.Int1, %10 : $Builtin.Int32, %11 : $Builtin.Int64)
+  return %12 : $(Builtin.Int1, Builtin.Int32, Builtin.Int64)
+}

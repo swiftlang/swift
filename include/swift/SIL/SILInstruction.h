@@ -452,6 +452,9 @@ public:
     return Operands.getDynamicValuesAsArray();
   }
 
+  /// Return the ith argument passed to this instruction.
+  SILValue getArgument(unsigned i) const { return getArguments()[i]; }
+
   bool isTransparent() const { return Transparent; }
 
   bool hasIndirectResult() const {

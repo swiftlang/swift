@@ -232,13 +232,7 @@ visitObjectPointerToRefInst(ObjectPointerToRefInst *OPRI) {
   return SILValue();
 }
 
-/// Simplify an apply of the builtin canBeObjCClass to either 0 or 1
-/// when we can statically determine the result.
-SILValue InstSimplifier::visitApplyInst(ApplyInst *AI) {
-  auto *BFRI = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee());
-  if (!BFRI || (BFRI->getBuiltinInfo().ID != BuiltinValueKind::CanBeObjCClass))
-    return SILValue();
-
+static SILValue optimizeBuiltinCanBeObjCClass(ApplyInst *AI) {
   assert(AI->hasSubstitutions() && "Expected substitutions for canBeObjCClass");
 
   auto const &Subs = AI->getSubstitutions();
@@ -256,6 +250,29 @@ SILValue InstSimplifier::visitApplyInst(ApplyInst *AI) {
   case TypeTraitResult::CanBe:
     return SILValue();
   }
+}
+
+/// Simplify an apply of the builtin canBeObjCClass to either 0 or 1
+/// when we can statically determine the result.
+SILValue InstSimplifier::visitApplyInst(ApplyInst *AI) {
+  auto *BFRI = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee());
+  if (!BFRI)
+    return SILValue();
+
+  if (BFRI->getBuiltinInfo().ID == BuiltinValueKind::CanBeObjCClass)
+    return optimizeBuiltinCanBeObjCClass(AI);
+
+  // If we have an expect optimizer hint with a constant value input, there is
+  // nothing left to expect so propagate the input, i.e.,
+  //
+  // apply(expect, constant, _) -> constant.
+  if (BFRI->getIntrinsicInfo().ID == llvm::Intrinsic::expect) {
+    SILValue Op = AI->getOperand(1);
+    IntegerLiteralInst *I = dyn_cast<IntegerLiteralInst>(Op.getDef());
+    return I? SILValue(I) : SILValue();
+  }
+
+  return SILValue();
 }
 
 /// \brief Try to simplify the specified instruction, performing local
