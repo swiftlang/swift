@@ -300,7 +300,7 @@ static void emitArrayDestroy(IRGenFunction &IGF,
 
   // Loop if we haven't reached the end.
   prev->addIncoming(cur, IGF.Builder.GetInsertBlock());
-  llvm::Value *done = IGF.Builder.CreateICmpEQ(cur, end, "done");
+  llvm::Value *done = IGF.Builder.CreateICmpEQ(cur, begin, "done");
   IGF.Builder.CreateCondBr(done, endBB, bodyBB);
 
   // Done.
@@ -539,7 +539,11 @@ llvm::Value *HeapArrayInfo::emitUnmanagedAlloc(IRGenFunction &IGF,
   // Store the length pointer to the array.
   Address lengthPtr = getLengthPointer(IGF, layout, alloc);
   // FIXME: storing the actual length here doesn't seem to work.
-  IGF.Builder.CreateStore(IGF.IGM.getSize(Size(0)), lengthPtr);
+  if (length->getType()->getPointerTo() != lengthPtr.getType()) {
+    length = IGF.Builder.CreateZExtOrTrunc(length,
+                                         lengthPtr.getType()->getElementType());
+  }
+  IGF.Builder.CreateStore(length, lengthPtr);
 
   // Find the begin pointer.
   llvm::Value *beginPtr = getBeginPointer(IGF, layout, alloc);
