@@ -167,6 +167,10 @@ namespace {
     void writeSILBlock(const SILModule *SILMod);
     void writeIndexTables();
 
+    /// Helper function to determine if given the current state of the
+    /// deserialization if the function body for F should be deserialized.
+    bool shouldEmitFunctionBody(const SILFunction &F);
+
   public:
     SILSerializer(Serializer &S, ASTContext &Ctx,
                   llvm::BitstreamWriter &Out, bool serializeAll)
@@ -1396,6 +1400,37 @@ transitivelyReferencesPotentiallyUnserializableLinkage(const SILFunction &F) {
   return false;
 }
 
+
+/// Helper function for whether to emit a function body.
+bool SILSerializer::shouldEmitFunctionBody(const SILFunction &F) {
+  // If F is a declaration, it has no body to emit...
+  if (F.empty())
+    return false;
+
+  // If F is transparent, we should always emit its body.
+  if (F.isTransparent())
+    return true;
+
+  // Emit the function body if F is a shared function referenced in this
+  // module. This is needed specifically to handle the bodies of closures.
+  // FIXME: This is order-dependent.
+  if (F.getLinkage() == SILLinkage::Shared && FuncsToDeclare.count(&F))
+    return true;
+
+  // If F has private linkage or transitively references a global, function,
+  // vtable, or witnesstable with private linkage, do not serialize it.
+  //
+  // FIXME: *NOTE* vtables and witness tables do not have linkage currently,
+  // but will at some point in the near future.
+  if (!canAlwaysSerializeLinkage(F.getLinkage()) ||
+      transitivelyReferencesPotentiallyUnserializableLinkage(F))
+    return false;
+
+  // Otherwise serialize the body of the function only if we are asked to
+  // serialize everything.
+  return ShouldSerializeAll;
+}
+
 void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   BCBlockRAII subBlock(Out, SIL_BLOCK_ID, 6);
 
@@ -1455,36 +1490,6 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
     if (ShouldSerializeAll)
       writeSILWitnessTable(wt);
   }
-
-  // Helper function for whether to emit a function body.
-  auto shouldEmitFunctionBody = [&](const SILFunction &F) {
-    // If F is a declaration, it has no body to emit...
-    if (F.empty())
-      return false;
-
-    // If F is transparent, we should always emit its body.
-    if (F.isTransparent())
-      return true;
-
-    // Emit the function body if F is a shared function referenced in this
-    // module. This is needed specifically to handle the bodies of closures.
-    // FIXME: This is order-dependent.
-    if (F.getLinkage() == SILLinkage::Shared && FuncsToDeclare.count(&F))
-      return true;
-
-    // If F has private linkage or transitively references a global, function,
-    // vtable, or witnesstable with private linkage, do not serialize it.
-    //
-    // FIXME: *NOTE* vtables and witness tables do not have linkage currently,
-    // but will at some point in the near future.
-    if (!canAlwaysSerializeLinkage(F.getLinkage()) ||
-        transitivelyReferencesPotentiallyUnserializableLinkage(F))
-      return false;
-
-    // Otherwise serialize the body of the function only if we are asked to
-    // serialize everything.
-    return ShouldSerializeAll;
-  };
 
   // Go through all the SILFunctions in SILMod and write out any
   // mandatory function bodies.
