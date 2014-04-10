@@ -1380,9 +1380,8 @@ static bool canAlwaysSerializeLinkage(SILLinkage linkage) {
   }
 }
 
-/// Check if F transitively references a global, function, vtable, or witness
-/// table with linkage that we can not always serialize (i.e. might be
-/// conditionally or even never serializable).
+/// If a Global/Function referenced by one of F's instructions has private
+/// linkage return true.
 ///
 /// SILWitnessTables do not need to be checked here since WitnessMethodInst
 /// always looks up the relevant witness method indirectly from a table in the
@@ -1412,11 +1411,8 @@ bool SILSerializer::shouldEmitFunctionBody(const SILFunction &F) {
   if (F.isTransparent())
     return true;
 
-  // If F has private linkage or transitively references a global, function,
-  // vtable, or witnesstable with private linkage, do not serialize it.
-  //
-  // FIXME: *NOTE* vtables and witness tables do not have linkage currently,
-  // but will at some point in the near future.
+  // If F or a Global/Function referenced by one of F's instructions has private
+  // linkage, we should not emit a body and potentially expose it.
   if (!canAlwaysSerializeLinkage(F.getLinkage()) ||
       transitivelyReferencesPotentiallyUnserializableLinkage(F))
     return false;
