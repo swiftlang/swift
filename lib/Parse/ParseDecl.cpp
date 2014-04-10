@@ -2527,7 +2527,7 @@ void Parser::consumeAbstractFunctionBody(AbstractFunctionDecl *AFD,
 ///
 /// \verbatim
 ///   decl-func:
-///     ('static' | 'class')? 'mutating'? 'func' attribute-list
+///     attribute-list? ('static' | 'class')? 'mutating'? 'func' 
 ///               any-identifier generic-params? func-signature stmt-brace?
 /// \endverbatim
 ///
