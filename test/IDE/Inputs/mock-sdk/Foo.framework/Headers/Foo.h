@@ -127,6 +127,8 @@ int redeclaredInMultipleModulesFunc1(int a);
 - (void) fooBaseInstanceFunc0;
 - (FooClassBase *) fooBaseInstanceFunc1:(id)anObject;
 
+- (void) fooBaseInstanceFuncOverridden;
+
 + (void) fooBaseClassFunc0;
 @end
 
@@ -142,6 +144,8 @@ int redeclaredInMultipleModulesFunc1(int a);
 - (void) fooInstanceFunc0;
 - (void) fooInstanceFunc1:(int)a;
 - (void) fooInstanceFunc2:(int)a withB:(int)b;
+
+- (void) fooBaseInstanceFuncOverridden;
 
 + (void) fooClassFunc0;
 @end

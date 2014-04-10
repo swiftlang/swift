@@ -223,7 +223,8 @@ class PrintAST : public ASTVisitor<PrintAST> {
   }
 
   void printOverrideKeyword(Decl *D) {
-    if (D->getAttrs().hasAttribute<OverrideAttr>())
+    if (Options.PrintOverrideKeyword &&
+        D->getAttrs().hasAttribute<OverrideAttr>())
       Printer << "override ";
   }
 

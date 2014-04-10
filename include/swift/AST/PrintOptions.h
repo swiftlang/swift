@@ -79,6 +79,9 @@ struct PrintOptions {
   /// Whether to print '@unchecked' at all.
   bool PrintUncheckedOptional = true;
 
+  /// Whether to print 'override' keyword on overridden decls.
+  bool PrintOverrideKeyword = true;
+
   /// \brief Whether to print documentation comments attached to declarations.
   bool PrintDocumentationComments = false;
 
