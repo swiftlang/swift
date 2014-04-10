@@ -109,7 +109,7 @@ public:
   SILVTable *provideInitialHead() const { return createSentinel(); }
   SILVTable *ensureHead(SILVTable*) const { return createSentinel(); }
   static void noteHead(SILVTable*, SILVTable*) {}
-  static void deleteNode(SILVTable *V) {}
+  static void deleteNode(SILVTable *VT) { VT->~SILVTable(); }
 
 private:
   void createNode(const SILVTable &);

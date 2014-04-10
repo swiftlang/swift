@@ -247,7 +247,7 @@ public:
   SILWitnessTable *provideInitialHead() const { return createSentinel(); }
   SILWitnessTable *ensureHead(SILWitnessTable*) const { return createSentinel(); }
   static void noteHead(SILWitnessTable*, SILWitnessTable*) {}
-  static void deleteNode(SILWitnessTable *V) {}
+  static void deleteNode(SILWitnessTable *WT) { WT->~SILWitnessTable(); }
   
 private:
   void createNode(const SILWitnessTable &);
