@@ -4999,11 +4999,37 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
       return;
     }
 
-    // FIXME: This could do some type validation as well (all IBOutlets refer
-    // to objects).
+    // Validate the type of the @IBOutlet.
     auto type = VD->getType();
-    auto optObjectType = type->getAnyOptionalObjectType();
-    if (!optObjectType) {
+    bool isOptional = false;
+    if (auto optObjectType = type->getAnyOptionalObjectType()) {
+      isOptional = true;
+      type = optObjectType;
+    }
+
+    if (auto classDecl = type->getClassOrBoundGenericClass()) {
+      // @objc class types are okay.
+      if (!classDecl->isObjC()) {
+        TC.diagnose(VD->getLoc(), diag::iboutlet_nonobjc_class, type);
+        D->getMutableAttrs().clearAttribute(AK_IBOutlet);
+        return;
+      }
+    } else if (type->isObjCExistentialType()) {
+      // @objc existential types are okay
+      // Nothing to do.
+    } else if (type->getAnyNominal() == TC.Context.getStringDecl()) {
+      // String is okay because it is bridged to NSString.
+      // FIXME: BridgesTypes.def is almost sufficient for this.
+    } else {
+      // No other types are permitted.
+      TC.diagnose(VD->getLoc(), diag::iboutlet_nonobject_type, type);
+      D->getMutableAttrs().clearAttribute(AK_IBOutlet);
+      return;
+    }
+
+    // If the type wasn't optional before, turn it into an @unchecked optional
+    // now.
+    if (!isOptional) {
       VD->overwriteType(UncheckedOptionalType::get(type));
     }
   }

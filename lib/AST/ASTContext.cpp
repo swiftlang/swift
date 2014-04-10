@@ -58,6 +58,9 @@ struct ASTContext::Implementation {
 
   llvm::StringMap<char, llvm::BumpPtrAllocator&> IdentifierTable;
 
+  /// The declaration of Swift.String.
+  NominalTypeDecl *StringDecl = nullptr;
+
   /// The declaration of Swift.Array<T>.
   NominalTypeDecl *ArrayDecl = nullptr;
 
@@ -357,6 +360,19 @@ NominalTypeDecl *ASTContext::getIntDecl() const {
   return nullptr;
 }
 
+NominalTypeDecl *ASTContext::getStringDecl() const {
+  if (Impl.StringDecl) return Impl.StringDecl;
+
+  SmallVector<ValueDecl*, 1> results;
+  lookupInSwiftModule("String", results);
+  for (auto result : results) {
+    if (auto nominal = dyn_cast<NominalTypeDecl>(result)) {
+      Impl.StringDecl = nominal;
+      return Impl.StringDecl;
+    }
+  }
+  return nullptr;
+}
 ValueDecl *ASTContext::getTrueDecl() const {
   auto boolDecl = getBoolDecl();
   if (!boolDecl) return nullptr;
