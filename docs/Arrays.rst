@@ -12,6 +12,12 @@ The Swift Array Design
    tt {
      background-color: #f2f2f2;
    }
+   div.content ul > li {
+    background: none;
+    padding: 0 0 0 0.5em;
+    list-style-image: none;
+    list-style-type: disc;
+    }
    </style>
 
 Introductory Blather
@@ -139,7 +145,9 @@ Bridging From Objective-C
 -------------------------
 
 * ``NSArray`` can be implicitly converted to ``Array<AnyObject>`` in
-  O(1) [What about ``Array<Any>``?  Do we care?]
+  O(1)
+
+.. What about ``Array<Any>``?  Do we care?
 
 * ``NSArray`` and ``Array<AnyObject>`` can be *explicitly* converted
   to ``Array<T>?`` using ``a as Array<T>``.  There are several cases:
