@@ -2067,7 +2067,24 @@ Type TypeConverter::getLoweredCBridgedType(Type t) {
                                  Type(), args);
   }
 
-  // Blocks?
+  if (auto funTy = t->getAs<FunctionType>()) {
+    switch (funTy->getRepresentation()) {
+    case AnyFunctionType::Representation::Block:
+      // Functions that are already represented as blocks don't need bridging.
+      return t;
+    case AnyFunctionType::Representation::Thin:
+      // TODO: Bridge thin functions to C function pointers?
+      return t;
+    case AnyFunctionType::Representation::Thick:
+      // Thick functions (TODO: conditionally) get bridged to blocks.
+      if (M.getASTContext().LangOpts.EnableBlockBridging) {
+        return FunctionType::get(funTy->getInput(), funTy->getResult(),
+                                 funTy->getExtInfo().withRepresentation(
+                                          FunctionType::Representation::Block));
+      }
+      return t;
+    }
+  }
 
   return t;
 }

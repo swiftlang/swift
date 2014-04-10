@@ -3972,6 +3972,18 @@ static ManagedValue emitNativeToCBridgedValue(SILGenFunction &gen,
       && isCPointerType(gen, loweredNativeTy)) {
     return emitBridgeCPointerToUnsafePointer(gen, loc, v);
   }
+  
+  // Bridge native functions to blocks.
+  auto bridgedFTy = dyn_cast<SILFunctionType>(loweredBridgedTy);
+  if (bridgedFTy
+      && bridgedFTy->getRepresentation() == FunctionType::Representation::Block){
+    auto nativeFTy = cast<SILFunctionType>(loweredNativeTy);
+    
+    if (nativeFTy->getRepresentation() != FunctionType::Representation::Block) {
+      gen.SGM.diagnose(loc, diag::not_implemented, "block bridging");
+      return ManagedValue::forUnmanaged(SILUndef::get(bridgedTy, gen.SGM.M));
+    }
+  }
       
   return v;
 }
@@ -4031,6 +4043,18 @@ static ManagedValue emitCBridgedToNativeValue(SILGenFunction &gen,
   if (isUnsafePointerType(gen, loweredBridgedTy)
       && isCPointerType(gen, loweredNativeTy)) {
     return emitBridgeUnsafePointerToCPointer(gen, loc, v, loweredNativeTy);
+  }
+  
+    // Bridge blocks back into native function types.
+  auto bridgedFTy = dyn_cast<SILFunctionType>(loweredBridgedTy);
+  if (bridgedFTy
+      && bridgedFTy->getRepresentation() == FunctionType::Representation::Block){
+    auto nativeFTy = cast<SILFunctionType>(loweredNativeTy);
+    
+    if (nativeFTy->getRepresentation() != FunctionType::Representation::Block) {
+      gen.SGM.diagnose(loc, diag::not_implemented, "block bridging");
+      return ManagedValue::forUnmanaged(SILUndef::get(nativeTy, gen.SGM.M));
+    }
   }
   
   return v;
