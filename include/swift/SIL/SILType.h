@@ -286,6 +286,24 @@ public:
   const ASTContext &getASTContext() const {
     return getSwiftRValueType()->getASTContext();
   }
+  
+  /// True if the type is block-pointer-compatible, meaning it either is a block
+  /// or is an Optional or UncheckedOptional with a block payload.
+  bool isBlockPointerCompatible() const {
+    CanType ty = getSwiftRValueType();
+    if (auto optPayload = ty->getAnyOptionalObjectType()) {
+      // The object type of Optional<T> is an unlowered AST type.
+      auto fTy = optPayload->getAs<FunctionType>();
+      if (!fTy)
+        return false;
+      return fTy->getRepresentation() == FunctionType::Representation::Block;
+    }
+      
+    auto fTy = dyn_cast<SILFunctionType>(ty);
+    if (!fTy)
+      return false;
+    return fTy->getRepresentation() == FunctionType::Representation::Block;
+  }
 
   /// Given that this is a nominal type, return the lowered type of
   /// the given field.  Applies substitutions as necessary.  The
