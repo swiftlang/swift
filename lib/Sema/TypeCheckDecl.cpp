@@ -1616,7 +1616,6 @@ public:
   //===--------------------------------------------------------------------===//
 
   void visitImportDecl(ImportDecl *ID) {
-    // Nothing to do.
     TC.checkDeclAttributesEarly(ID);
     TC.checkDeclAttributes(ID);
   }
@@ -3245,11 +3244,12 @@ public:
     /// below.
     void visitDeclAttribute(DeclAttribute *A) = delete;
 
-#define UNINTERESTING_ATTR(CLASS)                               \
-    void visit##CLASS##Attr(CLASS##Attr *attr) { }
+#define UNINTERESTING_ATTR(CLASS)                                              \
+    void visit##CLASS##Attr(CLASS##Attr *) {}
 
     UNINTERESTING_ATTR(Asmname)
     UNINTERESTING_ATTR(ClassProtocol)
+    UNINTERESTING_ATTR(Exported)
     UNINTERESTING_ATTR(Override)
     UNINTERESTING_ATTR(Required)
 
@@ -5154,7 +5154,8 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     // Only function declarations can be assignments.
     FuncDecl *FD = dyn_cast<FuncDecl>(D);
     if (!FD || !FD->isOperator()) {
-      TC.diagnose(Attrs.getLoc(AK_assignment), diag::invalid_decl_attribute);
+      TC.diagnose(Attrs.getLoc(AK_assignment),
+                  diag::invalid_decl_attribute_simple);
       D->getMutableAttrs().clearAttribute(AK_assignment);
     } else if (NumArguments < 1) {
       TC.diagnose(Attrs.getLoc(AK_assignment),diag::assignment_without_inout);
@@ -5257,17 +5258,6 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     TC.diagnose(Attrs.getLoc(AK_requires_stored_property_inits),
                 diag::requires_stored_property_inits_nonclass);
     D->getMutableAttrs().clearAttribute(AK_requires_stored_property_inits);
-  }
-
-  static const AttrKind InvalidAttrs[] = {
-    AK_exported
-  };
-
-  for (AttrKind K : InvalidAttrs) {
-    if (Attrs.has(K)) {
-      TC.diagnose(Attrs.getLoc(K), diag::invalid_decl_attribute);
-      D->getMutableAttrs().clearAttribute(K);
-    }
   }
 
   // Only protocol members can be @optional.

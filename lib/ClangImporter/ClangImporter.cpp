@@ -1106,8 +1106,7 @@ void ClangModuleUnit::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
   owner.lookupVisibleDecls(FilterConsumer);
 }
 
-static void getImportDecls(ClangModuleUnit *ClangUnit,
-                           clang::Module *M,
+static void getImportDecls(ClangModuleUnit *ClangUnit, clang::Module *M,
                            SmallVectorImpl<Decl *> &Results) {
   SmallVector<clang::Module *, 1> Exported;
   M->getExportedModules(Exported);
@@ -1115,8 +1114,7 @@ static void getImportDecls(ClangModuleUnit *ClangUnit,
   ASTContext &Ctx = ClangUnit->getASTContext();
 
   for (auto *ImportedMod : M->Imports) {
-    SmallVector<std::pair<swift::Identifier, swift::SourceLoc>, 4>
-        AccessPath;
+    SmallVector<std::pair<swift::Identifier, swift::SourceLoc>, 4> AccessPath;
     auto *TmpMod = ImportedMod;
     while (TmpMod) {
       AccessPath.push_back({ Ctx.getIdentifier(TmpMod->Name), SourceLoc() });
@@ -1132,9 +1130,11 @@ static void getImportDecls(ClangModuleUnit *ClangUnit,
       }
     }
 
-    Results.push_back(ImportDecl::create(
-        Ctx, ClangUnit, SourceLoc(), ImportKind::Module, SourceLoc(),
-        IsExported, AccessPath));
+    auto *ID = ImportDecl::create(Ctx, ClangUnit, SourceLoc(),
+                                  ImportKind::Module, SourceLoc(), AccessPath);
+    if (IsExported)
+      ID->getMutableAttrs().add(new (Ctx) ExportedAttr(/*IsImplicit=*/false));
+    Results.push_back(ID);
   }
 }
 

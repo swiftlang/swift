@@ -283,8 +283,10 @@ ERROR(invalid_ibdesignable_decl,sema_tcd,none,
 ERROR(class_protocol_not_protocol,sema_tcd,none,
       "'class_protocol' attribute can only be applied to protocols", ())
 
-ERROR(invalid_decl_attribute,sema_tcd,none,
+ERROR(invalid_decl_attribute_simple,sema_tcd,none,
       "attribute cannot be applied to declaration", ())
+ERROR(invalid_decl_attribute,sema_tcd,none,
+      "%0 attribute cannot be applied to this declaration", (DeclAttrKind))
 ERROR(attribute_does_not_apply_to_type,type_parsing,none,
       "attribute does not apply to type", ())
 ERROR(optional_attribute_non_protocol,sema_tcd,none,

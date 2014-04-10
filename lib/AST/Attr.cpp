@@ -87,8 +87,6 @@ void DeclAttributes::print(ASTPrinter &Printer,
     Printer << "@IBOutlet ";
   if (isIBAction())
     Printer << "@IBAction ";
-  if (isExported())
-    Printer << "@exported ";
   if (isOptional())
     Printer << "@optional ";
   Optional<bool> MutatingAttr = getMutating();
@@ -121,6 +119,9 @@ void DeclAttribute::print(ASTPrinter &Printer) const {
   }
   case DAK_class_protocol:
     Printer << "@class_protocol";
+    break;
+  case DAK_exported:
+    Printer << "@exported";
     break;
   case DAK_final:
     Printer << "@final";
@@ -189,7 +190,17 @@ unsigned DeclAttribute::getOptions(DeclAttrKind DK) {
   case DAK_##NAME: return OPTIONS;
 #include "swift/AST/Attr.def"
   }
-  return 0;
+}
+
+StringRef DeclAttribute::getAttrName(DeclAttrKind DK) {
+  switch (DK) {
+  case DAK_Count:
+    llvm_unreachable("getAttrName needs a valid attribute");
+    break;
+#define DECL_ATTR(NAME, CLASS, OPTIONS, ...)\
+  case DAK_##NAME: return #NAME;
+#include "swift/AST/Attr.def"
+  }
 }
 
 namespace {

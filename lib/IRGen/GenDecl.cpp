@@ -481,7 +481,7 @@ void IRGenModule::emitGlobalTopLevel() {
                                   SILMod->getSwiftModule(),
                                   SourceLoc(),
                                   ImportKind::Module, SourceLoc(),
-                                  false, AccessPath);
+                                  AccessPath);
     DebugInfo->emitImport(Imp);
   }
 

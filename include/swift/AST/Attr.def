@@ -96,6 +96,10 @@ SIMPLE_DECL_ATTR(class_protocol, ClassProtocol,
                  OnProtocol,
                  5)
 
+SIMPLE_DECL_ATTR(exported, Exported,
+                 OnImport,
+                 7)
+
 SIMPLE_DECL_ATTR(final, Final,
                  OnClass | OnFunc | OnVar | OnSubscript,
                  2)
@@ -117,7 +121,6 @@ SIMPLE_DECL_ATTR(required, Required, OnConstructor, 4)
 
 ATTR(assignment)
 ATTR(conversion)
-ATTR(exported)
 ATTR(infix)
 ATTR(mutating)
 ATTR(prefix)

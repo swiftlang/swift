@@ -932,9 +932,12 @@ void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
         AccessPath.push_back({ ScopeID, SourceLoc() });
       }
 
-      ImportDecls.push_back(ImportDecl::create(
-          Ctx, FileContext, SourceLoc(), Kind, SourceLoc(), Dep.IsExported,
-          AccessPath));
+      auto *ID = ImportDecl::create(Ctx, FileContext, SourceLoc(), Kind,
+                                    SourceLoc(), AccessPath);
+      if (Dep.IsExported)
+        ID->getMutableAttrs().add(
+            new (Ctx) ExportedAttr(/*IsImplicit=*/false));
+      ImportDecls.push_back(ID);
     }
     Bits.ComputedImportDecls = true;
   }

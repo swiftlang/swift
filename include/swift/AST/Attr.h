@@ -317,7 +317,8 @@ protected:
     OnSubscript = 1 << 12,
     OnConstructor = 1 << 13,
     OnDestructor = 1 << 14,
-    AllowMultipleAttributes = 1 << 15
+    OnImport = 1 << 15,
+    AllowMultipleAttributes = 1 << 16
   };
 
   static unsigned getOptions(DeclAttrKind DK);
@@ -327,7 +328,6 @@ protected:
   }
 
 public:
-
   DeclAttrKind getKind() const {
     return static_cast<DeclAttrKind>(DeclAttrBits.Kind);
   }
@@ -437,6 +437,9 @@ public:
   static bool allowMultipleAttributes(DeclAttrKind DK) {
     return getOptions(DK) & AllowMultipleAttributes;
   }
+
+  /// Returns the name of the given attribute kind.
+  static StringRef getAttrName(DeclAttrKind DK);
 };
 
 /// Describes a "simple" declaration attribute that carries no data.
@@ -444,10 +447,11 @@ template<DeclAttrKind Kind>
 class SimpleDeclAttr : public DeclAttribute {
 public:
   SimpleDeclAttr(bool IsImplicit)
-    : DeclAttribute(Kind, SourceLoc(), SourceLoc(), IsImplicit) { }
+      : DeclAttribute(Kind, SourceLoc(), SourceLoc(), IsImplicit) {}
 
   SimpleDeclAttr(SourceLoc AtLoc, SourceLoc NameLoc)
-    : DeclAttribute(Kind, AtLoc, NameLoc, /*isImplicit=*/false) { }
+      : DeclAttribute(Kind, AtLoc, SourceRange(AtLoc, NameLoc),
+                      /*Implicit=*/false) { }
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == Kind;
@@ -458,7 +462,7 @@ public:
 #define SIMPLE_DECL_ATTR(NAME, CLASS, ...) \
  typedef SimpleDeclAttr<DAK_##NAME> CLASS##Attr;
 #include "swift/AST/Attr.def"
-  
+
 /// Defines the @asmname attribute.
 class AsmnameAttr : public DeclAttribute {
 public:
@@ -766,7 +770,6 @@ public:
   bool isIBInspectable() const { return has(AK_IBInspectable); }
   bool isWeak() const { return has(AK_weak); }
   bool isUnowned() const { return has(AK_unowned); }
-  bool isExported() const { return has(AK_exported); }
   bool isOptional() const { return has(AK_optional); }
 
   // FIXME: eventually take a platform argument.

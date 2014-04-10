@@ -359,6 +359,10 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     if (!DiscardAttribute)
       Attributes.add(new (Context) ClassProtocolAttr(AtLoc, Loc));
     break;
+  case DAK_exported:
+    if (!DiscardAttribute)
+      Attributes.add(new (Context) ExportedAttr(AtLoc, Loc));
+    break;
   case DAK_final:
     if (!DiscardAttribute)
       Attributes.add(new (Context) FinalAttr(AtLoc, Loc));
@@ -1296,17 +1300,15 @@ void Parser::parseDeclDelayed() {
 ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
                                                  DeclAttributes &Attributes) {
   SourceLoc ImportLoc = consumeToken(tok::kw_import);
-  
-  bool Exported = Attributes.isExported();
-  Attributes.clearAttribute(AK_exported);
+
   if (Attributes.hasNonVirtualAttributes())
     diagnose(Attributes.AtLoc, diag::import_attributes);
-    
+
   if (!Context.LangOpts.DebuggerSupport && !(Flags & PD_AllowTopLevel)) {
     diagnose(ImportLoc, diag::decl_inner_scope);
     return nullptr;
   }
-    
+
   ImportKind Kind = ImportKind::Module;
   SourceLoc KindLoc;
   if (Tok.isKeyword()) {
@@ -1344,7 +1346,7 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
   do {
     ImportPath.push_back(std::make_pair(Identifier(), Tok.getLoc()));
     if (parseAnyIdentifier(ImportPath.back().first,
-                        diag::expected_identifier_in_decl, "import"))
+                           diag::expected_identifier_in_decl, "import"))
       return nullptr;
   } while (consumeIf(tok::period));
 
@@ -1353,8 +1355,11 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
     return nullptr;
   }
 
-  return makeParserResult(ImportDecl::create(
-      Context, CurDeclContext, ImportLoc, Kind, KindLoc, Exported, ImportPath));
+  auto *ID = ImportDecl::create(Context, CurDeclContext, ImportLoc, Kind,
+                                KindLoc, ImportPath);
+  if (Attributes.shouldSaveInAST())
+    ID->getMutableAttrs() = Attributes;
+  return makeParserResult(ID);
 }
 
 /// \brief Parse an inheritance clause.

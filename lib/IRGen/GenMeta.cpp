@@ -2076,16 +2076,19 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
     // pointer again.
     auto metadata =
       IGM.getAddrOfTypeMetadata(declaredType, isIndirect, isPattern);
-    
+
     // Emit the ObjC class symbol to make the class visible to ObjC.
-    if (classDecl->isObjC()) {
+    if (classDecl->isObjC() &&
+        // FIXME: Don't check this in, this is to workaround lack of patch in
+        // mainline.
+        0) {
       // FIXME: Put the variable in a no_dead_strip section, as a workaround to
       // avoid linker transformations that may break up the symbol.
       var->setSection("__DATA,__objc_data, regular, no_dead_strip");
       
       emitObjCClassSymbol(IGM, classDecl, var);
     }
-    
+
     IGM.addObjCClass(metadata);
   }
 }

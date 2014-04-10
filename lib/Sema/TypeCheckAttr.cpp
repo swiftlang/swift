@@ -37,6 +37,8 @@ public:
 
   void visitClassProtocolAttr(ClassProtocolAttr *attr) {}
 
+  void visitExportedAttr(ExportedAttr *attr);
+
   void visitFinalAttr(FinalAttr *attr) {}
 
   void visitNoReturnAttr(NoReturnAttr *attr) {}
@@ -49,11 +51,20 @@ public:
 };
 } // end anonymous namespace
 
+void AttributeEarlyChecker::visitExportedAttr(ExportedAttr *attr) {
+  if (!isa<ImportDecl>(D)) {
+    TC.diagnose(attr->getLocation(), diag::invalid_decl_attribute,
+                attr->getKind())
+        .fixItRemove(attr->getRange());
+    attr->setInvalid();
+  }
+}
+
 void AttributeEarlyChecker::visitOverrideAttr(OverrideAttr *attr) {
   if (!isa<ClassDecl>(D->getDeclContext()) &&
       !isa<ExtensionDecl>(D->getDeclContext())) {
     TC.diagnose(D, diag::override_nonclass_decl)
-        .fixItRemove(attr->getLocation());
+        .fixItRemove(attr->getRange());
     attr->setInvalid();
   }
 }
@@ -79,7 +90,15 @@ public:
   /// below.
   void visitDeclAttribute(DeclAttribute *A) = delete;
 
-  void visitAsmnameAttr(AsmnameAttr *attr) { }
+#define UNINTERESTING_ATTR(CLASS)                                              \
+    void visit##CLASS##Attr(CLASS##Attr *) {}
+
+    UNINTERESTING_ATTR(Asmname)
+    UNINTERESTING_ATTR(Exported)
+    UNINTERESTING_ATTR(ObjC)
+    UNINTERESTING_ATTR(Override)
+
+#undef UNINTERESTING_ATTR
 
   void visitAvailabilityAttr(AvailabilityAttr *attr) {
     // FIXME: Check that this declaration is at least as available as the
@@ -91,10 +110,6 @@ public:
   void visitFinalAttr(FinalAttr *attr);
 
   void visitNoReturnAttr(NoReturnAttr *attr);
-
-  void visitObjCAttr(ObjCAttr *attr) {}
-
-  void visitOverrideAttr(OverrideAttr *attr) {}
 
   void visitRequiredAttr(RequiredAttr *attr);
 };
@@ -145,7 +160,9 @@ void AttributeChecker::visitFinalAttr(FinalAttr *attr) {
 void AttributeChecker::visitNoReturnAttr(NoReturnAttr *attr) {
   auto *FD = dyn_cast<FuncDecl>(D);
   if (!FD) {
-    TC.diagnose(attr->getLocation(), diag::invalid_decl_attribute);
+    TC.diagnose(attr->getLocation(), diag::invalid_decl_attribute,
+                attr->getKind())
+        .fixItRemove(attr->getRange());
     attr->setInvalid();
     return;
   }
