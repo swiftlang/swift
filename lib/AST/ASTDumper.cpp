@@ -336,14 +336,22 @@ namespace {
       OS << "')";
     }
 
+    void printAbstractTypeParamCommon(AbstractTypeParamDecl *decl,
+                                      const char *name) {
+      printCommon(decl, name);
+      if (auto superclassTy = decl->getSuperclass()) {
+        OS << " superclass='" << superclassTy->getString() << "'";
+      }
+    }
+
     void visitGenericTypeParamDecl(GenericTypeParamDecl *decl) {
-      printCommon(decl, "generic_type_param");
+      printAbstractTypeParamCommon(decl, "generic_type_param");
       OS << " depth=" << decl->getDepth() << " index=" << decl->getIndex();
       OS << ")";
     }
 
     void visitAssociatedTypeDecl(AssociatedTypeDecl *decl) {
-      printCommon(decl, "associated_type_decl");
+      printAbstractTypeParamCommon(decl, "associated_type_decl");
       if (auto defaultDef = decl->getDefaultDefinitionType()) {
         OS << " default=";
         defaultDef.print(OS);

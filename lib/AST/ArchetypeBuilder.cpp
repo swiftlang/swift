@@ -165,6 +165,7 @@ ArchetypeBuilder::PotentialArchetype::getType(ProtocolDecl *rootProtocol,
     = ArchetypeType::getNew(mod.getASTContext(), ParentArchetype,
                             assocTypeOrProto, Name, Protos,
                             Superclass, Index);
+
   ArchetypeOrConcreteType = arch;
   
   // Collect the set of nested types of this archetype, and put them into
@@ -276,8 +277,7 @@ struct DenseMapInfo<GenericTypeParamKey> {
 
 struct ArchetypeBuilder::Implementation {
   std::function<ArrayRef<ProtocolDecl *>(ProtocolDecl *)> getInheritedProtocols;
-  std::function<ArrayRef<ProtocolDecl *>(AbstractTypeParamDecl *)>
-    getConformsTo;
+  GetConformsToCallback getConformsTo;
   std::function<ProtocolConformance *(Module &, Type, ProtocolDecl*)>
     conformsToProtocol;
   SmallVector<GenericTypeParamKey, 4> GenericParams;
@@ -298,7 +298,8 @@ ArchetypeBuilder::ArchetypeBuilder(Module &mod, DiagnosticEngine &diags)
     return protocol->getProtocols();
   };
   Impl->getConformsTo = [](AbstractTypeParamDecl *assocType) {
-    return assocType->getProtocols();
+    return std::make_pair(assocType->getSuperclass(), 
+                          assocType->getProtocols());
   };
   Impl->conformsToProtocol = [](Module &M, Type t, ProtocolDecl *protocol)
   -> ProtocolConformance* {
@@ -312,7 +313,7 @@ ArchetypeBuilder::ArchetypeBuilder(Module &mod, DiagnosticEngine &diags)
 ArchetypeBuilder::ArchetypeBuilder(
   Module &mod, DiagnosticEngine &diags,
   std::function<ArrayRef<ProtocolDecl *>(ProtocolDecl *)> getInheritedProtocols,
-  std::function<ArrayRef<ProtocolDecl *>(AbstractTypeParamDecl*)> getConformsTo,
+  GetConformsToCallback getConformsTo,
   std::function<ProtocolConformance * (Module &, Type, ProtocolDecl*)>
     conformsToProtocol)
   : Mod(mod), Context(mod.getASTContext()), Diags(diags),
@@ -438,7 +439,13 @@ bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *PAT,
                                       &parentName);
       
       if (AssocPA != T) {
-        for (auto InheritedProto : Impl->getConformsTo(AssocType)) {
+        auto superclassAndConformsTo = Impl->getConformsTo(AssocType);
+        if (auto superclassTy = superclassAndConformsTo.first) {
+          // FIXME: Poor location info.
+          addSuperclassRequirement(AssocPA, AssocType->getLoc(), superclassTy);
+        }
+
+        for (auto InheritedProto : superclassAndConformsTo.second) {
           if (Proto == InheritedProto)
             continue;
           

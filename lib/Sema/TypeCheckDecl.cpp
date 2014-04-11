@@ -201,11 +201,13 @@ static bool canInheritClass(Decl *decl) {
     return true;
 
   // Generic type parameters can inherit a class.
-  // FIXME: Associated types.
   if (isa<GenericTypeParamDecl>(decl))
     return true;
 
-  // FIXME: Can any typealias declare inheritance from a class?
+  // Associated types can inherit a class.
+  if (isa<AssociatedTypeDecl>(decl))
+    return true;
+
   return false;
 }
 
@@ -393,9 +395,6 @@ void TypeChecker::checkInheritanceClause(Decl *decl, DeclContext *DC,
 
       // If the declaration we're looking at doesn't allow a superclass,
       // complain.
-      //
-      // FIXME: Allow type aliases to 'inherit' from classes, as an additional
-      // kind of requirement?
       if (!canInheritClass(decl)) {
         diagnose(decl->getLoc(),
                  isa<ExtensionDecl>(decl)
@@ -610,9 +609,11 @@ ArchetypeBuilder TypeChecker::createArchetypeBuilder(Module *mod) {
            [=](ProtocolDecl *protocol) -> ArrayRef<ProtocolDecl *> {
              return getDirectConformsTo(protocol);
            },
-           [=](AbstractTypeParamDecl *assocType) -> ArrayRef<ProtocolDecl *> {
+           [=](AbstractTypeParamDecl *assocType) -> 
+                 std::pair<Type, ArrayRef<ProtocolDecl *>> {
              checkInheritanceClause(assocType);
-             return assocType->getProtocols();
+             return std::make_pair(assocType->getSuperclass(),
+                                   assocType->getProtocols());
            },
            [=](Module &M, Type T, ProtocolDecl *Protocol)
            -> ProtocolConformance* {

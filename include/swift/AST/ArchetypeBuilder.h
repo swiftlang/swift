@@ -103,6 +103,13 @@ private:
 public:
   ArchetypeBuilder(Module &mod, DiagnosticEngine &diags);
 
+  /// The type of a callback used to retrieve the superclass and
+  /// protocol requirements placed on
+  /// the given generic type parameter or associated type.
+  typedef std::function<std::pair<Type, ArrayRef<ProtocolDecl *>>(
+                          AbstractTypeParamDecl *)>
+    GetConformsToCallback;
+
   /// Construct a new archtype builder.
   ///
   /// \param mod The module in which the builder will create archetypes.
@@ -120,8 +127,7 @@ public:
     Module &mod, DiagnosticEngine &diags,
     std::function<ArrayRef<ProtocolDecl *>(ProtocolDecl *)>
       getInheritedProtocols,
-    std::function<ArrayRef<ProtocolDecl *>(AbstractTypeParamDecl *)>
-      getConformsTo,
+    GetConformsToCallback getConformsTo,
     std::function<ProtocolConformance * (Module &M, Type T, ProtocolDecl* P)>
       conformsToProtocol);
   ArchetypeBuilder(ArchetypeBuilder &&);
