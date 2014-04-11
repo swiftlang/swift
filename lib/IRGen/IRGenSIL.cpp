@@ -758,7 +758,8 @@ emitPHINodesForBBArgs(IRGenSILFunction &IGF,
       }
       
       Explosion argValue(ResilienceExpansion::Maximal);
-      for (llvm::PHINode *phi : make_range(phis.begin()+first, phis.end()))
+      for (llvm::PHINode *phi :
+               swift::make_range(phis.begin()+first, phis.end()))
         argValue.add(phi);
       IGF.setLoweredExplosion(SILValue(arg,0), argValue);
     }
