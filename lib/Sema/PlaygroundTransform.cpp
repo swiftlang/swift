@@ -290,6 +290,11 @@ public:
       }
     }
 
+    Modified = true;
+
+    Elements.insert(Elements.begin(), buildScopeEntry(BS->getSourceRange()));
+    Elements.insert(Elements.end(), buildScopeExit(BS->getSourceRange()));
+
     if (Modified) {
       return swift::BraceStmt::create(Context, BS->getLBraceLoc(),
                                       Context.AllocateCopy(Elements),
@@ -367,9 +372,34 @@ public:
         Name
       };
 
+    return buildLoggerCallWithArgs("playground_log", 
+                                   MutableArrayRef<Expr *>(LoggerArgExprs),
+                                   SR);
+  }
+
+  Expr *buildScopeEntry(SourceRange SR) {
+    return buildScopeCall(SR, false);
+  }
+
+  Expr *buildScopeExit(SourceRange SR) {
+    return buildScopeCall(SR, true);
+  }
+
+  Expr *buildScopeCall(SourceRange SR, bool IsExit) {
+    const char *LoggerName = IsExit ? "playground_log_scope_exit"
+                                    : "playground_log_scope_entry";
+
+    return buildLoggerCallWithArgs(LoggerName,
+                                   MutableArrayRef<Expr *>(),
+                                   SR);
+  }
+
+  Expr *buildLoggerCallWithArgs(const char *LoggerName,
+                                MutableArrayRef<Expr *> Args,
+                                SourceRange SR) {
     TupleExpr *LoggerArgs = new (Context) TupleExpr(
       SourceLoc(),
-      Context.AllocateCopy(LoggerArgExprs),
+      Context.AllocateCopy(Args),
       (Identifier*)nullptr,
       SourceLoc(),
       false, // hasTrailingClosure
@@ -378,7 +408,7 @@ public:
 
     UnresolvedDeclRefExpr *LoggerRef =
       new (Context) UnresolvedDeclRefExpr(
-        Context.getIdentifier("playground_log"),
+        Context.getIdentifier(LoggerName),
         DeclRefKind::Ordinary,
         SourceLoc());
 
@@ -400,9 +430,11 @@ public:
     char *start_column_buf = (char*)Context.Allocate(buf_size, 1);
     char *end_column_buf = (char*)Context.Allocate(buf_size, 1);
 
-    ::snprintf(start_line_buf, buf_size, "%d", StartLC.first - 5);
+    ::snprintf(start_line_buf, buf_size, "%d",
+               (StartLC.first < 5) ? 0 : (StartLC.first - 5));
     ::snprintf(start_column_buf, buf_size, "%d", StartLC.second - 1);
-    ::snprintf(end_line_buf, buf_size, "%d", EndLC.first - 5);
+    ::snprintf(end_line_buf, buf_size, "%d",
+               (EndLC.first < 5) ?  0 : (EndLC.first - 5));
     ::snprintf(end_column_buf, buf_size, "%d", EndLC.second - 1);
 
     Expr *StartLine = new (Context) IntegerLiteralExpr(start_line_buf, 
@@ -449,6 +481,20 @@ public:
     return SendDataCall;
   }
 };
+
+static bool moduleHasFunction(Module *M, const char *N)
+{
+  ASTContext &Context(M->getASTContext());
+
+  SmallVector<ValueDecl*, 1> Decls;
+
+  M->lookupValue(Module::AccessPathTy(),
+                 Context.getIdentifier(N),
+                 NLKind::UnqualifiedLookup,
+                 Decls);
+
+  return (Decls.size() != 0);
+}
 
 void swift::performPlaygroundTransform(SourceFile &SF) {
   class ExpressionFinder : public ASTWalker {
@@ -498,24 +544,12 @@ void swift::performPlaygroundTransform(SourceFile &SF) {
 
         bool OK = true;
 
-        LoggerModule->lookupValue(Module::AccessPathTy(),
-                                  Context.getIdentifier("playground_log"),
-                                  NLKind::UnqualifiedLookup,
-                                  Decls);
-
-        if (Decls.size() == 0)
+        if (!moduleHasFunction(LoggerModule, "playground_log") ||
+            !moduleHasFunction(LoggerModule, "playground_log_scope_entry") ||
+            !moduleHasFunction(LoggerModule, "playground_log_scope_exit") ||
+            !moduleHasFunction(CommModule, "DVTSendPlaygroundLogDataToHost")) {
           OK = false;
-
-        Decls.clear();
-
-        CommModule->lookupValue(
-          Module::AccessPathTy(),
-          Context.getIdentifier("DVTSendPlaygroundLogDataToHost"),
-          NLKind::UnqualifiedLookup,
-          Decls);
-
-        if (Decls.size() == 0)
-          OK = false;
+        }
 
         if (OK) {
           Instrumenter I(Context, FuncToTransform);
