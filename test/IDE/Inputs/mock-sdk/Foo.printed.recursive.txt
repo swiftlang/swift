@@ -104,7 +104,7 @@ func fooFuncWithComment5()
 func redeclaredInMultipleModulesFunc1(_: CInt) -> CInt
 
 /// Aaa.  FooProtocolBase.  Bbb.
-@objc protocol FooProtocolBase {
+protocol FooProtocolBase {
 
   /// Aaa.  fooProtoFunc.  Bbb.
   /// Ccc.
@@ -124,9 +124,9 @@ func redeclaredInMultipleModulesFunc1(_: CInt) -> CInt
   var fooProperty2: CInt { get set }
   var fooProperty3: CInt { get }
 }
-@objc protocol FooProtocolDerived : FooProtocolBase {
+protocol FooProtocolDerived : FooProtocolBase {
 }
-@objc class FooClassBase {
+class FooClassBase {
   class func fooBaseInstanceFunc0()
   func fooBaseInstanceFunc0()
   class func fooBaseInstanceFunc1(anObject: @unchecked AnyObject?) -> @unchecked FooClassBase?
@@ -137,7 +137,7 @@ func redeclaredInMultipleModulesFunc1(_: CInt) -> CInt
 }
 
 /// Aaa.  FooClassDerived.  Bbb.
-@objc class FooClassDerived : FooClassBase, FooProtocolDerived, FooProtocolBase {
+class FooClassDerived : FooClassBase, FooProtocolDerived, FooProtocolBase {
   var fooProperty1: CInt
   var fooProperty2: CInt
   var fooProperty3: CInt { get }

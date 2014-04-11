@@ -104,7 +104,7 @@ func fooFuncWithComment5()</decl>
 func redeclaredInMultipleModulesFunc1(_: <ref:TypeAlias>CInt</ref>) -> <ref:TypeAlias>CInt</ref></decl>
 
 <decl:Protocol>/// Aaa.  FooProtocolBase.  Bbb.
-@objc protocol FooProtocolBase {
+protocol FooProtocolBase {
 
   <decl:Func>/// Aaa.  fooProtoFunc.  Bbb.
   /// Ccc.
@@ -124,9 +124,9 @@ func redeclaredInMultipleModulesFunc1(_: <ref:TypeAlias>CInt</ref>) -> <ref:Type
   <decl:Var>var fooProperty2: <ref:TypeAlias>CInt</ref> { get set }</decl>
   <decl:Var>var fooProperty3: <ref:TypeAlias>CInt</ref> { get }</decl>
 }</decl>
-<decl:Protocol>@objc protocol FooProtocolDerived : <ref:Protocol>FooProtocolBase</ref> {
+<decl:Protocol>protocol FooProtocolDerived : <ref:Protocol>FooProtocolBase</ref> {
 }</decl>
-<decl:Class>@objc class FooClassBase {
+<decl:Class>class FooClassBase {
   <decl:Func>class func fooBaseInstanceFunc0()</decl>
   <decl:Func>func fooBaseInstanceFunc0()</decl>
   <decl:Func>class func fooBaseInstanceFunc1(anObject: @unchecked <ref:Protocol>AnyObject</ref>?) -> @unchecked <ref:Class>FooClassBase</ref>?</decl>
@@ -137,7 +137,7 @@ func redeclaredInMultipleModulesFunc1(_: <ref:TypeAlias>CInt</ref>) -> <ref:Type
 }</decl>
 
 <decl:Class>/// Aaa.  FooClassDerived.  Bbb.
-@objc class FooClassDerived : <ref:Class>FooClassBase</ref>, <ref:Protocol>FooProtocolDerived</ref>, <ref:Protocol>FooProtocolBase</ref> {
+class FooClassDerived : <ref:Class>FooClassBase</ref>, <ref:Protocol>FooProtocolDerived</ref>, <ref:Protocol>FooProtocolBase</ref> {
   <decl:Var>var fooProperty1: <ref:TypeAlias>CInt</ref></decl>
   <decl:Var>var fooProperty2: <ref:TypeAlias>CInt</ref></decl>
   <decl:Var>var fooProperty3: <ref:TypeAlias>CInt</ref> { get }</decl>

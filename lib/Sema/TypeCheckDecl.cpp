@@ -4912,6 +4912,8 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
       }
     } else if (isa<ConstructorDecl>(D) && isInClassOrProtocolContext(D)) {
       /* ok */
+    } else if (isa<DestructorDecl>(D)) {
+      /* ok */
     } else if (isa<SubscriptDecl>(D) && isInClassOrProtocolContext(D)) {
       /* ok */
     } else if (auto *VD = dyn_cast<VarDecl>(D)) {

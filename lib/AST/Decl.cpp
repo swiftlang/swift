@@ -877,6 +877,21 @@ ValueDecl *ValueDecl::getOverriddenDecl() const {
   return nullptr;
 }
 
+void ValueDecl::setIsObjC(bool Value) {
+  bool CurrentValue = isObjC();
+  if (CurrentValue == Value)
+    return;
+
+  if (!Value) {
+    for (auto *Attr : getMutableAttrs()) {
+      if (auto *OA = dyn_cast<ObjCAttr>(Attr))
+        OA->setInvalid();
+    }
+  } else {
+    getMutableAttrs().add(ObjCAttr::createUnnamedImplicit(getASTContext()));
+  }
+}
+
 bool ValueDecl::canBeAccessedByDynamicLookup() const {
   if (!hasName())
     return false;

@@ -182,33 +182,6 @@ class PrintAST : public ASTVisitor<PrintAST> {
     // FIXME: print native Swift documentation comments.
   }
 
-  void printImplicitObjCNote(Decl *D) {
-    if (Options.SkipImplicit)
-      return;
-
-    if (auto objcAttr = D->getAttrs().getAttribute<ObjCAttr>()) {
-      if (!objcAttr->isImplicit())
-        return;
-    }
-
-    auto *VD = dyn_cast<ValueDecl>(D);
-    if (!VD)
-      return;
-
-    if (!VD->isObjC())
-      return;
-
-    // When printing imported declarations, print an explicit @objc attribute
-    // only on top-level decls and imply that we infer it for members.
-    if (VD->hasClangNode()) {
-      if (VD->getDeclContext()->isModuleScopeContext())
-        Printer << "@objc ";
-      return;
-    }
-
-    Printer << "/* @objc(inferred) */ ";
-  }
-
   void printStaticKeyword(StaticSpellingKind StaticSpelling) {
     switch (StaticSpelling) {
     case StaticSpellingKind::None:
@@ -239,7 +212,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
     TL.getType().print(Printer, Options);
   }
 
-  void printAttributes(const DeclAttributes &attrs);
+  void printAttributes(const Decl *D);
   void printTypedPattern(const TypedPattern *TP,
                          bool StripOuterSliceType = false);
 
@@ -306,8 +279,8 @@ public:
 };
 } // unnamed namespace
 
-void PrintAST::printAttributes(const DeclAttributes &Attrs) {
-  Attrs.print(Printer, Options);
+void PrintAST::printAttributes(const Decl *D) {
+  D->getAttrs().print(Printer, Options);
 }
 
 void PrintAST::printTypedPattern(const TypedPattern *TP,
@@ -368,7 +341,6 @@ void PrintAST::printPattern(const Pattern *pattern) {
   case PatternKind::Named: {
     auto named = cast<NamedPattern>(pattern);
     recordDeclLoc(named->getDecl());
-    printImplicitObjCNote(named->getDecl());
     Printer << named->getBoundName().str();
     break;
   }
@@ -678,7 +650,7 @@ void PrintAST::printInherited(const GenericTypeParamDecl *D) {
 }
 
 void PrintAST::visitImportDecl(ImportDecl *decl) {
-  printAttributes(decl->getAttrs());
+  printAttributes(decl);
   Printer << "import ";
 
   switch (decl->getImportKind()) {
@@ -739,7 +711,7 @@ void PrintAST::visitPatternBindingDecl(PatternBindingDecl *decl) {
       isMutable = false;
   });
 
-  printAttributes(decl->getAttrs());
+  printAttributes(decl);
   Printer << (isMutable ? "var " : "let ");
   printPattern(decl->getPattern());
   if (Options.VarInitializers) {
@@ -757,7 +729,7 @@ void PrintAST::visitIfConfigDecl(IfConfigDecl *ICD) {
 
 void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
   printDocumentationComment(decl);
-  printAttributes(decl->getAttrs());
+  printAttributes(decl);
   Printer << "typealias ";
   recordDeclLoc(decl);
   Printer << decl->getName().str();
@@ -775,7 +747,7 @@ void PrintAST::visitGenericTypeParamDecl(GenericTypeParamDecl *decl) {
 
 void PrintAST::visitAssociatedTypeDecl(AssociatedTypeDecl *decl) {
   printDocumentationComment(decl);
-  printAttributes(decl->getAttrs());
+  printAttributes(decl);
   Printer << "typealias ";
   recordDeclLoc(decl);
   Printer << decl->getName().str();
@@ -789,7 +761,7 @@ void PrintAST::visitAssociatedTypeDecl(AssociatedTypeDecl *decl) {
 
 void PrintAST::visitEnumDecl(EnumDecl *decl) {
   printDocumentationComment(decl);
-  printAttributes(decl->getAttrs());
+  printAttributes(decl);
   Printer << "enum ";
   recordDeclLoc(decl);
   printNominalDeclName(decl);
@@ -801,7 +773,7 @@ void PrintAST::visitEnumDecl(EnumDecl *decl) {
 
 void PrintAST::visitStructDecl(StructDecl *decl) {
   printDocumentationComment(decl);
-  printAttributes(decl->getAttrs());
+  printAttributes(decl);
   Printer << "struct ";
   recordDeclLoc(decl);
   printNominalDeclName(decl);
@@ -813,8 +785,7 @@ void PrintAST::visitStructDecl(StructDecl *decl) {
 
 void PrintAST::visitClassDecl(ClassDecl *decl) {
   printDocumentationComment(decl);
-  printAttributes(decl->getAttrs());
-  printImplicitObjCNote(decl);
+  printAttributes(decl);
   Printer << "class ";
   recordDeclLoc(decl);
   printNominalDeclName(decl);
@@ -826,8 +797,7 @@ void PrintAST::visitClassDecl(ClassDecl *decl) {
 
 void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
   printDocumentationComment(decl);
-  printAttributes(decl->getAttrs());
-  printImplicitObjCNote(decl);
+  printAttributes(decl);
   Printer << "protocol ";
   recordDeclLoc(decl);
   printNominalDeclName(decl);
@@ -839,8 +809,7 @@ void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
 
 void PrintAST::visitVarDecl(VarDecl *decl) {
   printDocumentationComment(decl);
-  printAttributes(decl->getAttrs());
-  printImplicitObjCNote(decl);
+  printAttributes(decl);
   printOverrideKeyword(decl);
   if (decl->isStatic())
     printStaticKeyword(decl->getCorrectStaticSpelling());
@@ -946,8 +915,7 @@ bool PrintAST::printBraceStmtElements(BraceStmt *stmt, bool NeedIndent) {
 void PrintAST::visitFuncDecl(FuncDecl *decl) {
   if (decl->isAccessor()) {
     printDocumentationComment(decl);
-    // FIXME: Attributes
-    printImplicitObjCNote(decl);
+    printAttributes(decl);
     recordDeclLoc(decl);
     switch (decl->getAccessorKind()) {
     case AccessorKind::NotAccessor: break;
@@ -985,8 +953,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
     Printer << "}";
   } else {
     printDocumentationComment(decl);
-    printAttributes(decl->getAttrs());
-    printImplicitObjCNote(decl);
+    printAttributes(decl);
     printOverrideKeyword(decl);
     if (decl->isStatic() && !decl->isOperator())
       printStaticKeyword(decl->getCorrectStaticSpelling());
@@ -1050,7 +1017,7 @@ void PrintAST::visitEnumElementDecl(EnumElementDecl *decl) {
 
 void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
   recordDeclLoc(decl);
-  printAttributes(decl->getAttrs());
+  printAttributes(decl);
   printOverrideKeyword(decl);
   Printer << "subscript ";
   printPattern(decl->getIndices());
@@ -1063,8 +1030,7 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
 void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
   printDocumentationComment(decl);
   recordDeclLoc(decl);
-  printAttributes(decl->getAttrs());
-  printImplicitObjCNote(decl);
+  printAttributes(decl);
 
   Printer << "init";
   if (decl->isGeneric()) {
@@ -1084,8 +1050,7 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
 void PrintAST::visitDestructorDecl(DestructorDecl *decl) {
   printDocumentationComment(decl);
   recordDeclLoc(decl);
-  printAttributes(decl->getAttrs());
-  printImplicitObjCNote(decl);
+  printAttributes(decl);
   Printer << "deinit ";
 
   if (!Options.FunctionDefinitions || !decl->getBody()) {

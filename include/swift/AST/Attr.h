@@ -549,6 +549,8 @@ public:
   static ObjCAttr *createUnnamed(ASTContext &Ctx, SourceLoc AtLoc, 
                                  SourceLoc ObjCLoc);
 
+  static ObjCAttr *createUnnamedImplicit(ASTContext &Ctx);
+
   /// Create a nullary Objective-C attribute, which has a single name
   /// with no colon following it.
   ///

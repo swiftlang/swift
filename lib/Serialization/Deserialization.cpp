@@ -1731,7 +1731,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       ctor->setImplicit();
     if (hasSelectorStyleSignature)
       ctor->setHasSelectorStyleSignature();
-    ctor->setIsObjC(isObjC);
     if (isTransparent)
       ctor->getMutableAttrs().setAttr(AK_transparent, SourceLoc());
     if (isCompleteObjectInit)
@@ -1798,7 +1797,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     if (isImplicit)
       var->setImplicit();
-    var->setIsObjC(isObjC);
     if (isIBOutlet)
       var->getMutableAttrs().setAttr(AK_IBOutlet, SourceLoc());
     if (isOptional)
@@ -1929,7 +1927,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       else
         fn->getMutableAttrs().setAttr(AK_conversion, SourceLoc());
     }
-    fn->setIsObjC(isObjC);
     if (isIBAction)
       fn->getMutableAttrs().setAttr(AK_IBAction, SourceLoc());
     if (isTransparent)
@@ -2014,7 +2011,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     if (isImplicit)
       proto->setImplicit();
-    proto->setIsObjC(isObjC);
     proto->computeType();
 
     // Deserialize the list of protocols.
@@ -2132,7 +2128,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       GenericSignature *sig = GenericSignature::get(paramTypes, requirements);
       theClass->setGenericSignature(sig);
     }
-    theClass->setIsObjC(isObjC);
     if (isIBDesignable)
       theClass->getMutableAttrs().setAttr(AK_IBDesignable, SourceLoc());
     theClass->computeType();
@@ -2285,7 +2280,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       subscript->setInterfaceType(interfaceType);
     if (isImplicit)
       subscript->setImplicit();
-    subscript->setIsObjC(isObjC);
     if (isOptional)
       subscript->getMutableAttrs().setAttr(AK_optional, SourceLoc());
     if (auto overridden = cast_or_null<SubscriptDecl>(getDecl(overriddenID))) {
@@ -2358,7 +2352,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     dtor->setType(getType(signatureID));
     if (isImplicit)
       dtor->setImplicit();
-    dtor->setIsObjC(isObjC);
 
     break;
   }

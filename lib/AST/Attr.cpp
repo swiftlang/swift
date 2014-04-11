@@ -37,8 +37,7 @@ const DeclAttributes Decl::EmptyAttrs;
 DeclAttributes &Decl::getMutableAttrs() {
   // If we don't have mutable attribute storage yet, allocate some.
   if (&getAttrs() == &EmptyAttrs)
-    AttrsAndIsObjC = {getASTContext().Allocate<DeclAttributes>(),
-                      AttrsAndIsObjC.getInt()};
+    Attrs = getASTContext().Allocate<DeclAttributes>();
   return *const_cast<DeclAttributes*>(&getAttrs());
 }
 
@@ -284,6 +283,11 @@ ObjCAttr *ObjCAttr::createUnnamed(ASTContext &Ctx, SourceLoc AtLoc,
                                   SourceLoc ObjCLoc) {
   return new (Ctx) ObjCAttr(AtLoc, SourceRange(ObjCLoc), /*Arity=*/0,
                             /*Implicit=*/false);
+}
+
+ObjCAttr *ObjCAttr::createUnnamedImplicit(ASTContext &Ctx) {
+  return new (Ctx) ObjCAttr(SourceLoc(), SourceRange(), /*Arity=*/0,
+                            /*Implicit=*/true);
 }
 
 ObjCAttr *ObjCAttr::createNullary(ASTContext &Ctx, SourceLoc AtLoc, 

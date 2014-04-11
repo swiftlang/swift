@@ -486,12 +486,11 @@ private:
 
 protected:
   // Storage for the declaration attributes.
-  llvm::PointerIntPair<const DeclAttributes *, 1, bool> AttrsAndIsObjC;
+  const DeclAttributes *Attrs;
   static const DeclAttributes EmptyAttrs;
 
   Decl(DeclKind kind, DeclContext *DC)
-    : Context(DC),
-      AttrsAndIsObjC(&EmptyAttrs, false) {
+      : Context(DC), Attrs(&EmptyAttrs) {
     DeclBits.Kind = unsigned(kind);
     DeclBits.Invalid = false;
     DeclBits.Implicit = false;
@@ -537,7 +536,7 @@ public:
   DeclAttributes &getMutableAttrs();
 
   const DeclAttributes &getAttrs() const {
-    return *AttrsAndIsObjC.getPointer();
+    return *Attrs;
   }
 
   /// Returns the starting location of the entire declaration.
@@ -1696,11 +1695,11 @@ public:
   ///
   /// This can be true even if there is no 'objc' attribute on the declaration.
   /// In that case it was inferred by the type checker.
-  bool isObjC() const { return AttrsAndIsObjC.getInt(); }
-
-  void setIsObjC(bool value) {
-    AttrsAndIsObjC.setInt(value);
+  bool isObjC() const {
+    return getAttrs().hasAttribute<ObjCAttr>();
   }
+
+  void setIsObjC(bool Value);
 
   /// Is this declaration marked with the @final attribute?
   bool isFinal() const {
