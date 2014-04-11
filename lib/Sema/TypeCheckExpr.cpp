@@ -134,6 +134,17 @@ Expr *TypeChecker::buildArrayInjectionFnRef(DeclContext *dc,
   return injectionFn;
 }
 
+/// Precedences for intrinsic operators.
+namespace {
+  namespace IntrinsicPrecedences {
+    enum : unsigned char {
+      IfExpr = 100, // ?:
+      AssignExpr = 90, // =
+      ExplicitCastExpr = 132, // 'is' and 'as'
+    };
+  }
+}
+
 /// getInfixData - If the specified expression is an infix binary
 /// operator, return its infix operator attributes.
 static InfixData getInfixData(TypeChecker &TC, DeclContext *DC, Expr *E) {
@@ -141,19 +152,22 @@ static InfixData getInfixData(TypeChecker &TC, DeclContext *DC, Expr *E) {
     // Ternary has fixed precedence.
     assert(!ifExpr->isFolded() && "already folded if expr in sequence?!");
     (void)ifExpr;
-    return InfixData(100, Associativity::Right);
+    return InfixData(IntrinsicPrecedences::IfExpr,
+                     Associativity::Right);
 
   } else if (auto *assign = dyn_cast<AssignExpr>(E)) {
     // Assignment has fixed precedence.
     assert(!assign->isFolded() && "already folded assign expr in sequence?!");
     (void)assign;
-    return InfixData(90, Associativity::Right);
+    return InfixData(IntrinsicPrecedences::AssignExpr,
+                     Associativity::Right);
 
   } else if (auto *as = dyn_cast<ExplicitCastExpr>(E)) {
     // 'as' and 'is' casts have fixed precedence.
     assert(!as->isFolded() && "already folded 'as' expr in sequence?!");
     (void)as;
-    return InfixData(95, Associativity::None);
+    return InfixData(IntrinsicPrecedences::ExplicitCastExpr,
+                     Associativity::None);
 
   } else if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
     SourceFile *SF = DC->getParentSourceFile();
