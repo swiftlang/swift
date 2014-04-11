@@ -3,13 +3,15 @@
 
 * @IBOutlet has been improved in a few ways:
 
-  - IBOutlets can now be @unchecked optional
+  - IBOutlets can now be @unchecked optional.
 
   - An IBOutlet declared as non-optional, i.e.,
 
       @IBOutlet var button: NSButton
 
-    will be treated as an @unchecked optional
+    will be treated as an @unchecked optional.  This is considered to
+    be the best practice way to write an outlet, unless you want to explicitly
+    handle the null case - in which case, use "NSButton?" as the type.
 
 
 2014-04-09
