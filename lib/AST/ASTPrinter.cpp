@@ -1611,13 +1611,11 @@ public:
         return;
       }
       if (NT == Ctx.getUncheckedOptionalDecl()) {
-        if (Options.PrintUncheckedOptional) {
+        if (Options.PrintUncheckedOptional)
           Printer << "@unchecked ";
-          printWithParensIfNotSimple(T->getGenericArgs()[0]);
-          Printer << "?";
-        } else {
-          visit(T->getGenericArgs()[0]);
-        }
+
+        printWithParensIfNotSimple(T->getGenericArgs()[0]);
+        Printer << "?";
         return;
       }
     }
@@ -1856,13 +1854,11 @@ public:
   }
 
   void visitUncheckedOptionalType(UncheckedOptionalType *T) {
-    if (Options.PrintUncheckedOptional) {
+    if (Options.PrintUncheckedOptional)
       Printer << "@unchecked ";
-      printWithParensIfNotSimple(T->getBaseType());
-      Printer << "?";
-    } else {
-      visit(T->getBaseType());
-    }
+
+    printWithParensIfNotSimple(T->getBaseType());
+    Printer << "?";
   }
 
   void visitProtocolType(ProtocolType *T) {
