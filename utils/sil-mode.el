@@ -42,17 +42,21 @@
    ;; SIL Function
    `(,(regexp-opt '("sil" "internal" "thunk")
                   'words) . font-lock-keyword-face)
+   ;; SIL Linkage
+   `(,(regexp-opt '("public" "hidden" "private" "shared" "public_external"
+                    "hidden_external")
+                  'words) . font-lock-keyword-face)
    ;; SIL Declaration
    `(,(regexp-opt '("getter" "setter" "allocator" "initializer" "enumelt"
                     "destroyer" "globalaccessor" "objc") 'words) .
 		    font-lock-keyword-face)
-   ;; Expressions
-   `(,(regexp-opt '("new") 'words) . font-lock-keyword-face)
    ;; SIL Instructions - Allocation/Deallocation.
-   `(,(regexp-opt '("alloc_stack" "alloc_ref" "alloc_box" "alloc_array"
-                    "dealloc_stack" "dealloc_box" "dealloc_ref"
-                    "debug_value" "debug_value_addr")
+   `(,(regexp-opt '("alloc_stack" "alloc_ref" "alloc_ref_dynamic" "alloc_box"
+                    "alloc_array" "dealloc_stack" "dealloc_box" "dealloc_ref")
 		  'words) . font-lock-keyword-face)
+   ;; SIL Instructions - Debug Information.
+   `(,(regexp-opt '("debug_value" "debug_value_addr")
+                  'words) . font-lock-keyword-face)
    ;; SIL Instructions - Accessing Memory.
    `(,(regexp-opt '("load" "store" "assign"  "mark_uninitialized"
                     "mark_function_escape" "copy_addr" "destroy_addr"
@@ -62,7 +66,7 @@
    `(,(regexp-opt '("strong_retain" "strong_retain_autoreleased"
                     "strong_release" "strong_retain_unowned" "ref_to_unowned"
                     "unowned_to_ref" "unowned_retain" "unowned_release"
-                    "load_weak" "store_weak")
+                    "load_weak" "store_weak" "fix_lifetime")
 		  'words) . font-lock-keyword-face)
    ;; Literals
    `(,(regexp-opt '("function_ref" "builtin_function_ref" "global_addr"
@@ -80,7 +84,7 @@
    `(,(regexp-opt '("metatype" "value_metatype"
                     "existential_metatype") 'words) . font-lock-keyword-face)
    ;; Aggregate Types
-   `(,(regexp-opt '("copy_value" "destroy_value" "tuple" "tuple_extract"
+   `(,(regexp-opt '("retain_value" "release_value" "tuple" "tuple_extract"
                     "tuple_element_addr" "struct" "struct_extract"
                     "struct_element_addr" "ref_element_addr")
                   'words) . font-lock-keyword-face)
@@ -90,15 +94,17 @@
                   'words) . font-lock-keyword-face)
    ;; Protocol and Protocol Composition Types
    `(,(regexp-opt '("init_existential" "upcast_existential" "deinit_existential"
-                    "project_existential" "init_existential_ref"
-                    "upcast_existential_ref" "project_existential_ref")
+                    "project_existential" "open_existential"
+                    "init_existential_ref" "upcast_existential_ref"
+                    "project_existential_ref" "open_existential_ref")
 		  'words) . font-lock-keyword-face)
    ;; Unchecked Conversions
-   `(,(regexp-opt '("coerce" "upcast"
+   `(,(regexp-opt '("upcast"
                     "address_to_pointer" "pointer_to_address"
                     "ref_to_object_pointer" "object_pointer_to_ref"
                     "ref_to_raw_pointer" "raw_pointer_to_ref"
                     "convert_function" "bridge_to_block"
+                    "thick_to_objc_metatype" "objc_to_thick_metatype"
                     "thin_to_thick_function" "is_nonnull")
                   'words) . font-lock-keyword-face)
    ;; Checked Conversions
