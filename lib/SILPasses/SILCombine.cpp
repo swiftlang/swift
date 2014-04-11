@@ -37,7 +37,6 @@ using namespace swift::PatternMatch;
 STATISTIC(NumSimplified, "Number of instructions simplified");
 STATISTIC(NumCombined, "Number of instructions combined");
 STATISTIC(NumDeadInst, "Number of dead insts eliminated");
-STATISTIC(NumDeadFunc, "Number of dead functions eliminated");
 
 //===----------------------------------------------------------------------===//
 //                             SILCombineWorklist
@@ -772,38 +771,6 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
   return nullptr;
 }
 
-bool tryToRemoveFunction(SILFunction *F) {
-  // Remove internal functions that are not referenced by anything.
-  // TODO: top_level_code is currently marked as internal so we explicitly check
-  // for functions with this name and keep them around.
-  if (isPossiblyUsedExternally(F->getLinkage()) || F->getRefCount() ||
-      F->getName() == SWIFT_ENTRY_POINT_FUNCTION)
-    return false;
-
-  DEBUG(llvm::dbgs() << "SC: Erasing:" << F->getName() << "\n");
-  F->getModule().eraseFunction(F);
-  NumDeadFunc++;
-  return true;
-}
-
-/// Removes internal functions that no other function calls.
-void deleteDeadFunctions(SILModule *M) {
-  // Erase trivially dead functions that may not be a part of the call graph.
-  for (auto FI = M->begin(), EI = M->end(); FI != EI;) {
-    SILFunction *F = FI++;
-    tryToRemoveFunction(F);
-  }
-
-  std::vector<SILFunction*> Order;
-  // returns a bottom-up list of functions, leafs first.
-  bottomUpCallGraphOrder(M, Order);
-
-  // Scan the call graph top-down (caller first) because eliminating functions
-  // can generate more opportunities.
-  for (int i = Order.size() - 1; i >= 0; i--)
-    tryToRemoveFunction(Order[i]);
-}
-
 SILInstruction *SILCombiner::visitCondFailInst(CondFailInst *CFI) {
   // Remove runtime asserts such as overflow checks and bounds checks.
   if (RemoveCondFails)
@@ -891,49 +858,6 @@ class SILCombine : public SILFunctionTransform {
 };
 } // end anonymous namespace
 
-
-namespace {
-class SILDeadFuncElimination : public SILModuleTransform {
-
-  void run() override {
-    CallGraphAnalysis* CGA = PM->getAnalysis<CallGraphAnalysis>();
-    SILModule *M = getModule();
-    bool Changed = false;
-
-    // Erase trivially dead functions that may not be a part of the call graph.
-    for (auto FI = M->begin(), EI = M->end(); FI != EI;) {
-      SILFunction *F = FI++;
-      Changed |= tryToRemoveFunction(F);
-    }
-
-    if (Changed)
-      CGA->invalidate(SILAnalysis::InvalidationKind::CallGraph);
-
-    // If we are debugging serialization, don't eliminate any dead functions.
-    if (getOptions().DebugSerialization)
-      return;
-
-    // A bottom-up list of functions, leafs first.
-    const std::vector<SILFunction*> &Order = CGA->bottomUpCallGraphOrder();
-
-    // Scan the call graph top-down (caller first) because eliminating functions
-    // can generate more opportunities.
-    for (int i = Order.size() - 1; i >= 0; i--)
-      Changed |= tryToRemoveFunction(Order[i]);
-
-    // Invalidate the call graph.
-    if (Changed)
-      invalidateAnalysis(SILAnalysis::InvalidationKind::CallGraph);
-  }
-
-  StringRef getName() override { return "Dead Function Elimination"; }
-};
-} // end anonymous namespace
-
 SILTransform *swift::createSILCombine() {
   return new SILCombine();
-}
-
-SILTransform *swift::createDeadFunctionElimination() {
-  return new SILDeadFuncElimination();
 }

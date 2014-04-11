@@ -30,5 +30,6 @@ add_swift_library(swiftSILPasses
   InstCount.cpp
   AADumper.cpp
   LoadStoreOpts.cpp
+  DeadFunctionElimination.cpp
   DEPENDS swiftSILPassesUtils swiftSILAnalysis)
 
