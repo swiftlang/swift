@@ -22,6 +22,8 @@
 //     using objc_{retain,release}.
 //   - UnknownRetainableBox is a box for void* using
 //     swift_unknown{Retain,Release}.
+//   - AggregateBox<T...> is a box which uses swift layout rules to
+//     combine a number of different boxes.
 //
 // ValueWitnesses<T> takes a box class and defines all the necessary
 // values and functions necessary to build a value witness table.
@@ -483,6 +485,39 @@ struct BufferValueWitnesses<Impl, Size, Alignment, FixedPacking::Allocate>
   }
 };
 
+/// A class which provides BufferValueWitnesses for types that are not
+/// fixed in size.
+template <class Impl, bool IsKnownAllocated>
+struct NonFixedBufferValueWitnesses : BufferValueWitnessesBase<Impl> {
+  static OpaqueValue *allocateBuffer(ValueBuffer *buffer, const Metadata *self) {
+    auto vwtable = self->getValueWitnesses();
+    if (!IsKnownAllocated && vwtable->isValueInline()) {
+      return reinterpret_cast<OpaqueValue*>(buffer);
+    } else {
+      OpaqueValue *value =
+        static_cast<OpaqueValue*>(swift_slowAlloc(vwtable->size, 0));
+      buffer->PrivateData[0] = value;
+      return value;
+    }
+  }
+
+  static OpaqueValue *projectBuffer(ValueBuffer *buffer, const Metadata *self) {
+    auto vwtable = self->getValueWitnesses();
+    if (!IsKnownAllocated && vwtable->isValueInline()) {
+      return reinterpret_cast<OpaqueValue*>(buffer);
+    } else {
+      return reinterpret_cast<OpaqueValue*>(buffer->PrivateData[0]);
+    }
+  }
+
+  static void deallocateBuffer(ValueBuffer *buffer, const Metadata *self) {
+    auto vwtable = self->getValueWitnesses();
+    if (IsKnownAllocated || !vwtable->isValueInline()) {
+      swift_slowDealloc(buffer->PrivateData[0], vwtable->size);
+    }
+  }
+};
+
 /// A class which provides default implementations of various value
 /// witnesses based on a box's value operations.
 ///
@@ -551,6 +586,77 @@ struct ValueWitnesses : BufferValueWitnesses<ValueWitnesses<Box>,
   static int getExtraInhabitantIndex(const OpaqueValue *src,
                                      const Metadata *self) {
     return Box::getExtraInhabitantIndex((typename Box::type const *) src);
+  }
+};
+
+/// A class which provides basic implementations of various function
+/// value witnesses based on a type that is not fixed in size.
+///
+/// The 'Box' concept here is slightly different from the one for
+/// fixed-size types: it does not need to provide size/alignment/isPOD
+/// members, and its functions all take an extra 'const Metadata *self'
+/// argument.
+///
+/// \tparam IsKnownAllocated - whether the type is known to not fit in
+/// a fixed-size buffer
+template <class Box, bool IsKnownAllocated>
+struct NonFixedValueWitnesses :
+  NonFixedBufferValueWitnesses<NonFixedValueWitnesses<Box, IsKnownAllocated>,
+                               IsKnownAllocated> {
+
+  static constexpr unsigned numExtraInhabitants = Box::numExtraInhabitants;
+  static constexpr bool hasExtraInhabitants = (numExtraInhabitants != 0);
+  static constexpr ExtraInhabitantFlags extraInhabitantFlags =
+    ExtraInhabitantFlags().withNumExtraInhabitants(numExtraInhabitants);
+
+  static void destroy(OpaqueValue *value, const Metadata *self) {
+    return Box::destroy((typename Box::type*) value, self);
+  }
+
+  static OpaqueValue *initializeWithCopy(OpaqueValue *dest, OpaqueValue *src,
+                                         const Metadata *self) {
+    return (OpaqueValue*) Box::initializeWithCopy((typename Box::type*) dest,
+                                                  (typename Box::type*) src,
+                                                  self);
+  }
+
+  static OpaqueValue *initializeWithTake(OpaqueValue *dest, OpaqueValue *src,
+                                         const Metadata *self) {
+    return (OpaqueValue*) Box::initializeWithTake((typename Box::type*) dest,
+                                                  (typename Box::type*) src,
+                                                  self);
+  }
+
+  static OpaqueValue *assignWithCopy(OpaqueValue *dest, OpaqueValue *src,
+                                     const Metadata *self) {
+    return (OpaqueValue*) Box::assignWithCopy((typename Box::type*) dest,
+                                              (typename Box::type*) src,
+                                              self);
+  }
+
+  static OpaqueValue *assignWithTake(OpaqueValue *dest, OpaqueValue *src,
+                                     const Metadata *self) {
+    return (OpaqueValue*) Box::assignWithTake((typename Box::type*) dest,
+                                              (typename Box::type*) src,
+                                              self);
+  }
+
+  static const Metadata *typeOf(OpaqueValue *src, const Metadata *self) {
+    return Box::typeOf((typename Box::type*) src, self);
+  }
+
+  // These should not get instantiated if the type doesn't have extra
+  // inhabitants.
+
+  static void storeExtraInhabitant(OpaqueValue *dest, int index,
+                                   const Metadata *self) {
+    Box::storeExtraInhabitant((typename Box::type*) dest, index, self);
+  }
+
+  static int getExtraInhabitantIndex(const OpaqueValue *src,
+                                     const Metadata *self) {
+    return Box::getExtraInhabitantIndex((typename Box::type const *) src,
+                                        self);
   }
 };
 
