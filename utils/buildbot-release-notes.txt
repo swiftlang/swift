@@ -1,6 +1,12 @@
 2014-04-16
 ----------
 
+* Optional variables and properties are now default-initialized to nil:
+
+    class MyClass {
+      var cachedTitle: String?       // "= nil" is implied
+    }
+
 * @IBOutlet has been improved in a few ways:
 
   - IBOutlets can now be @unchecked optional.
@@ -11,9 +17,10 @@
 
     will be treated as an @unchecked optional.  This is considered to
     be the best practice way to write an outlet, unless you want to explicitly
-    handle the null case - in which case, use "NSButton?" as the type.
+    handle the null case - in which case, use "NSButton?" as the type. Either 
+    way, the "= nil" that was formerly required is now implicit.
 
-- The precedence of 'is' and 'as' is now higher than comparisons, allowing the
+* The precedence of 'is' and 'as' is now higher than comparisons, allowing the
   following sorts of things to be written without parens:
 
     if x is NSButton && y is NSButtonCell { ... }
