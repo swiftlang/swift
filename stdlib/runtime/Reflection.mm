@@ -446,17 +446,31 @@ static const Metadata *getMetadataForEncoding(const char *encoding) {
   }
 }
   
+// Some classes totally lie about their runtime layout, and we can't mirror
+// them without crashing.
+static bool objcClassLiesAboutLayout(Class c) {
+  const char *name = class_getName(c);
+  if (strcmp(name, "NSURL") == 0)
+    return true;
+  return false;
+}
+  
 extern "C"
 intptr_t swift_ObjCMirror_count(HeapObject *owner,
                                 const OpaqueValue *value,
                                 const Metadata *type) {
-  // Copying the ivar list just to free it is lame, but we have
-  // nowhere to save it.
   auto isa = (Class)type;
   
   unsigned count;
-  Ivar *ivars = class_copyIvarList(isa, &count);
-  free(ivars);
+  // Don't reflect ivars of classes that lie about their layout.
+  if (objcClassLiesAboutLayout(isa)) {
+    count = 0;
+  } else {
+    // Copying the ivar list just to free it is lame, but we have
+    // nowhere to save it.
+    Ivar *ivars = class_copyIvarList(isa, &count);
+    free(ivars);
+  }
   
   // The superobject counts as a child.
   if (class_getSuperclass(isa))
@@ -494,7 +508,16 @@ StringMirrorTuple swift_ObjCMirror_subscript(intptr_t i,
   // Copying the ivar list just to free it is lame, but we have
   // no room to save it.
   unsigned count;
-  Ivar *ivars = class_copyIvarList(isa, &count);
+  Ivar *ivars;
+  // Don't reflect ivars of classes that lie about their layout.
+  if (objcClassLiesAboutLayout(isa)) {
+    count = 0;
+    ivars = nullptr;
+  } else {
+    // Copying the ivar list just to free it is lame, but we have
+    // nowhere to save it.
+    ivars = class_copyIvarList(isa, &count);
+  }
   
   if (i < 0 || (uintptr_t)i >= (uintptr_t)count)
     abort();
