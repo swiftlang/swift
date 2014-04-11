@@ -3188,6 +3188,18 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
 
     case ConversionRestrictionKind::TupleToScalar: {
+      // If this was a single-element tuple expression, reach into that
+      // subexpression.
+      // FIXME: This is a hack to deal with @lvalue-ness issues. It loses
+      // source information.
+      if (auto fromTupleExpr = dyn_cast<TupleExpr>(expr)) {
+        if (fromTupleExpr->getNumElements() == 1) {
+          return coerceToType(fromTupleExpr->getElement(0), toType,
+                              locator.withPathElement(
+                                LocatorPathElt::getTupleElement(0)));
+        }
+      }
+
       // Extract the element.
       auto fromTuple = fromType->castTo<TupleType>();
       expr = new (cs.getASTContext()) TupleElementExpr(
