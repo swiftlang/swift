@@ -58,6 +58,7 @@ int fooFunc1(int a);
 int fooFunc1AnonymousParam(int);
 int fooFunc3(int a, float b, double c, int *d);
 void fooFuncWithBlock(int (^blk)(float x));
+void fooFuncWithFunctionPointer(int (*fptr)(float x));
 
 /**
  * Aaa.  fooFuncWithComment1.  Bbb.
