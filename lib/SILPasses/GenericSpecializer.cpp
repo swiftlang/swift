@@ -668,7 +668,7 @@ GenericSpecializer::specializeApplyInstGroup(SILFunction *F, AIList &List) {
       // Create a new function.
       NewF = TypeSubCloner::cloneFunction(F, InterfaceSubs, ContextSubs,
                                           ClonedName, Bucket[0]);
-      createdFunction = false;
+      createdFunction = true;
     }
 
     // Replace all of the AI functions with the new function.
