@@ -98,10 +98,20 @@ General Optimization Passes
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 SIL captures language-specific type information, making it possible to
-perform high-level optimizations—such as specialization of
-generics—that are difficult to perform on LLVM IR.  The details of
-these high-level optimizations have not been fully nailed down, but we
-expect them to be important.
+perform high-level optimizations that are difficult to perform on LLVM
+IR.
+
+- **Generic Specialization** analyzes specialized calls to generic
+  functions and generates new specialized version of the
+  functions. Then it rewrites all specialized usages of the gener ic
+  to a direct call of the appropriate specialized function.
+- **Witness and VTable Devirtualization** for a given type looks up
+  the associated method from a class's vtable or a types witness table
+  and replaces the indirect virtual call with a call to the mapped
+  function.
+- **Performance Inlining**
+- **Reference Counting Optimizations**
+- **Memory Promotion/Optimizations**
 
 Syntax
 ------
