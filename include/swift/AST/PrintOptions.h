@@ -82,6 +82,10 @@ struct PrintOptions {
   /// Whether to print '@unchecked' at all.
   bool PrintUncheckedOptional = true;
 
+  /// Whether to print function representation attributes on function types:
+  /// '@thin' or '@objc_block'.
+  bool PrintFunctionRepresentationAttrs = true;
+
   /// Whether to print 'override' keyword on overridden decls.
   bool PrintOverrideKeyword = true;
 

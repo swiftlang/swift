@@ -1711,16 +1711,18 @@ public:
       Printer << "@cc(witness_method) ";
       break;
     }
-    
-    switch (info.getRepresentation()) {
-    case AnyFunctionType::Representation::Thick:
-      break;
-    case AnyFunctionType::Representation::Thin:
-      Printer << "@thin ";
-      break;
-    case AnyFunctionType::Representation::Block:
-      Printer << "@objc_block ";
-      break;
+
+    if (Options.PrintFunctionRepresentationAttrs) {
+      switch (info.getRepresentation()) {
+      case AnyFunctionType::Representation::Thick:
+        break;
+      case AnyFunctionType::Representation::Thin:
+        Printer << "@thin ";
+        break;
+      case AnyFunctionType::Representation::Block:
+        Printer << "@objc_block ";
+        break;
+      }
     }
 
     if (info.isNoReturn())
