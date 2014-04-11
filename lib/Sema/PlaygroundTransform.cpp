@@ -200,21 +200,39 @@ public:
             }
           } else {
             // do the same as for all other expressions
-            Expr *Log = logExpr(E);
-            if (Log) {
-              Modified = true;
-              Elements[EI] = Log;
-            }
+            std::pair<PatternBindingDecl *, VarDecl *> PV =
+              buildPatternAndVariable(E);
+            Expr *Log = buildLoggerCall(
+              new (Context) DeclRefExpr(ConcreteDeclRef(PV.second),
+                                        SourceLoc(),
+                                        true, // implicit
+                                        false, // uses direct property access
+                                        E->getType()),
+              E->getSourceRange());
+            Modified = true;
+            Elements[EI] = PV.first;
+            Elements.insert(Elements.begin() + (EI + 1), PV.second);
+            Elements.insert(Elements.begin() + (EI + 2), Log);
+            EI += 2;
           }
         }
         else {
           if (E->getType()->getCanonicalType() !=
               Context.TheEmptyTupleType) {
-            Expr *Log = logExpr(E);
-            if (Log) {
-              Modified = true;
-              Elements[EI] = Log;
-            }
+            std::pair<PatternBindingDecl *, VarDecl *> PV =
+              buildPatternAndVariable(E);
+            Expr *Log = buildLoggerCall(
+              new (Context) DeclRefExpr(ConcreteDeclRef(PV.second),
+                                        SourceLoc(),
+                                        true, // implicit
+                                        false, // uses direct property access
+                                        E->getType()),
+              E->getSourceRange());
+            Modified = true;
+            Elements[EI] = PV.first;
+            Elements.insert(Elements.begin() + (EI + 1), PV.second);
+            Elements.insert(Elements.begin() + (EI + 2), Log);
+            EI += 2;
           }
         }
       } else if (Stmt *S = Element.dyn_cast<Stmt*>()) {
