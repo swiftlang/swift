@@ -357,6 +357,9 @@ public:
   /// Retrieve the declaration of Swift.false.
   ValueDecl *getFalseDecl() const;
 
+  /// Retrieve the declaration of Swift.nil.
+  VarDecl *getNilDecl() const;
+
   /// Retrieve the declaration of Swift.Array<T>.
   NominalTypeDecl *getArrayDecl() const;
 

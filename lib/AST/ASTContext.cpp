@@ -91,6 +91,9 @@ struct ASTContext::Implementation {
   /// func _getBool(Builtin.Int1) -> Bool
   FuncDecl *GetBoolDecl = nullptr;
 
+  /// The declaration of Swift.nil.
+  VarDecl *NilDecl = nullptr;
+
   /// func _unimplemented_initializer(className: StaticString).
   FuncDecl *UnimplementedInitializerDecl = nullptr;
 
@@ -373,6 +376,7 @@ NominalTypeDecl *ASTContext::getStringDecl() const {
   }
   return nullptr;
 }
+
 ValueDecl *ASTContext::getTrueDecl() const {
   auto boolDecl = getBoolDecl();
   if (!boolDecl) return nullptr;
@@ -401,6 +405,21 @@ ValueDecl *ASTContext::getFalseDecl() const {
   }
   return nullptr;
 
+}
+
+VarDecl *ASTContext::getNilDecl() const {
+  if (Impl.NilDecl) return Impl.NilDecl;
+
+  SmallVector<ValueDecl*, 1> results;
+  lookupInSwiftModule("nil", results);
+  for (auto result : results) {
+    if (auto var = dyn_cast<VarDecl>(result)) {
+      Impl.NilDecl = var;
+      return Impl.NilDecl;
+    }
+  }
+
+  return nullptr;
 }
 
 /// Find the generic implementation declaration for the named syntactic-sugar

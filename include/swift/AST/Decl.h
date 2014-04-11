@@ -363,8 +363,12 @@ class alignas(8) Decl {
     /// Whether or not the nominal type decl has delayed protocol or member
     /// declarations.
     unsigned HasDelayedMembers : 1;
+
+    /// Whether we have already added implicitly-defined initializers
+    /// to this declaration.
+    unsigned AddedImplicitInitializers : 1;
   };
-  enum { NumNominalTypeDeclBits = NumTypeDeclBits + 1 };
+  enum { NumNominalTypeDeclBits = NumTypeDeclBits + 2 };
   static_assert(NumNominalTypeDeclBits <= 32, "fits in an unsigned");
 
   class ProtocolDeclBitfields {
@@ -409,12 +413,8 @@ class alignas(8) Decl {
     ///
     /// This is a value of \c StoredInheritsSuperclassInits.
     unsigned InheritsSuperclassInits : 2;
-
-    /// Whether we have already added implicitly-defined initializers
-    /// to this class.
-    unsigned AddedImplicitInitializers : 1;
   };
-  enum { NumClassDeclBits = NumNominalTypeDeclBits + 6 };
+  enum { NumClassDeclBits = NumNominalTypeDeclBits + 5 };
   static_assert(NumClassDeclBits <= 32, "fits in an unsigned");
 
   class EnumDeclBitfields {
@@ -2358,9 +2358,11 @@ protected:
                   GenericParamList *GenericParams) :
     TypeDecl(K, DC, name, NameLoc, inherited),
     DeclContext(DeclContextKind::NominalTypeDecl, DC),
-    GenericParams(nullptr), DeclaredTy(nullptr) {
+    GenericParams(nullptr), DeclaredTy(nullptr)
+  {
     setGenericParams(GenericParams);
     NominalTypeDeclBits.HasDelayedMembers = false;
+    NominalTypeDeclBits.AddedImplicitInitializers = false;
   }
 
   friend class ProtocolType;
@@ -2386,7 +2388,18 @@ public:
   void setHasDelayedMembers(bool hasDelayedMembers = true) {
     NominalTypeDeclBits.HasDelayedMembers = hasDelayedMembers;
   }
-  
+
+  /// Determine whether we have already attempted to add any
+  /// implicitly-defined initializers to this declaration.
+  bool addedImplicitInitializers() const {
+    return NominalTypeDeclBits.AddedImplicitInitializers;
+  }
+
+  /// Note that we have attempted to
+  void setAddedImplicitInitializers() {
+    NominalTypeDeclBits.AddedImplicitInitializers = true;
+  }
+
   GenericParamList *getGenericParams() const { return GenericParams; }
 
   /// Provide the set of parameters to a generic type, or null if
@@ -2722,17 +2735,6 @@ public:
   /// \param resolver Used to resolve the signatures of initializers, which is
   /// required for name lookup.
   bool inheritsSuperclassInitializers(LazyResolver *resolver);
-
-  /// Determine whether we have already attempted to add any
-  /// implicitly-defined initializers to this class.
-  bool addedImplicitInitializers() const { 
-    return ClassDeclBits.AddedImplicitInitializers; 
-  }
-
-  /// Note that we have attempted
-  void setAddedImplicitInitializers() {
-    ClassDeclBits.AddedImplicitInitializers = true;
-  }
 
   /// Retrieve the name to use for this class when interoperating with
   /// the Objective-C runtime.

@@ -988,6 +988,118 @@ void TypeChecker::revertGenericFuncSignature(AbstractFunctionDecl *func) {
     func->overwriteType(Type());
 }
 
+/// Check whether the given type representation will be
+/// default-initializable.
+static bool isDefaultInitializable(TypeRepr *typeRepr) {
+  // Look through most attributes.
+  if (auto attributed = dyn_cast<AttributedTypeRepr>(typeRepr)) {
+    // FIXME: 'weak' attribute currently causes problems.
+    if (attributed->getAttrs().getOwnership() == Ownership::Weak)
+      return false;
+    
+    return isDefaultInitializable(attributed->getTypeRepr());
+  }
+
+  // Look through named types.
+  if (auto named = dyn_cast<NamedTypeRepr>(typeRepr))
+    return isDefaultInitializable(named->getTypeRepr());
+  
+  // Optional types are default-initializable.
+  if (isa<OptionalTypeRepr>(typeRepr))
+    return true;
+
+  // Tuple types are default-initializable if all of their element
+  // types are.
+  if (auto tuple = dyn_cast<TupleTypeRepr>(typeRepr)) {
+    // ... but not variadic ones.
+    if (tuple->hasEllipsis())
+      return false;
+
+    for (auto elt : tuple->getElements()) {
+      if (!isDefaultInitializable(elt))
+        return false;
+    }
+
+    return true;
+  }
+
+  // Not default initializable.
+  return false;
+}
+
+/// Determine whether the given pattern binding declaration either has
+/// or will have a default initializer, without performing any type
+/// checking on it.
+static bool isDefaultInitializable(PatternBindingDecl *pbd) {
+  // If it has an initializer, this is trivially true.
+  if (pbd->hasInit())
+    return true;
+
+  // If any variable is @weak, we're not default-initializable.
+  // A 'let' variable is not default-initializable, because it cannot change.
+  // FIXME: This is a hack to avoid tripping over problems with @weak.
+  bool isWeak = false;
+  bool isLet = false;
+  pbd->getPattern()->forEachVariable([&](VarDecl *var) {
+      if (var->getAttrs().isWeak())
+        isWeak = true;
+      if (var->isLet())
+        isLet = true;
+    });
+  if (isWeak || isLet)
+    return false;
+
+  // If it is an IBOutlet, it is trivially true.
+  if (auto var = pbd->getSingleVar()) {
+    if (var->getAttrs().isIBOutlet())
+      return true;
+  }
+    
+  // If the pattern is typed with optionals, it is true.
+  if (auto typedPattern = dyn_cast<TypedPattern>(pbd->getPattern())) {
+    if (auto typeRepr = typedPattern->getTypeLoc().getTypeRepr()) {
+      return isDefaultInitializable(typeRepr);
+    }
+  }
+
+  return false;
+}
+
+/// Build a default initializer for the given type.
+static Expr *buildDefaultInitializer(TypeChecker &tc, Type type) {
+  // Default-initialize optional types to 'nil'.
+  if (type->getAnyOptionalObjectType()) {
+    auto nilDecl = tc.Context.getNilDecl();
+    return new (tc.Context) DeclRefExpr(nilDecl, SourceLoc(), /*implicit=*/true,
+                                        /*direct access=*/false,
+                                        nilDecl->getType());
+  }
+
+  // Build tuple literals for tuple types.
+  if (auto tupleType = type->getAs<TupleType>()) {
+    SmallVector<Expr *, 2> inits;
+    for (const auto &elt : tupleType->getFields()) {
+      if (elt.isVararg())
+        return nullptr;
+
+      auto eltInit = buildDefaultInitializer(tc, elt.getType());
+      if (!eltInit)
+        return nullptr;
+
+      inits.push_back(eltInit);
+    }
+
+    return new (tc.Context) TupleExpr(SourceLoc(),
+                                      tc.Context.AllocateCopy(inits),
+                                      nullptr, SourceLoc(),
+                                      /*hasTrailingClosure=*/false,
+                                      /*Implicit=*/true);
+  }
+
+  // We don't default-initialize anything else.
+  return nullptr;
+}
+
 /// Validate the given pattern binding declaration.
 static void validatePatternBindingDecl(TypeChecker &tc,
                                        PatternBindingDecl *binding) {
@@ -1030,6 +1142,39 @@ static void validatePatternBindingDecl(TypeChecker &tc,
     binding->setInvalid();
     binding->getPattern()->setType(ErrorType::get(tc.Context));
     return;
+  }
+
+  // If we have a type but no initializer on an @IBOutlet, check
+  // whether the type is default-initializable. If so, do it.
+  if (binding->getPattern()->hasType() && binding->hasStorage() &&
+      !binding->hasInit()) {
+    auto type = binding->getPattern()->getType();
+    if (!type->is<ErrorType>()) {
+
+      // If we have the @IBOutlet attribute, use it to adjust our type.
+      if (binding->getPattern()->hasType()) {
+        if (auto var = binding->getSingleVar())
+          if (var->getAttrs().isIBOutlet())
+            tc.checkIBOutlet(var);
+      }
+
+      // Make sure we aren't @weak or have a 'let'.
+      // FIXME: Should be able to handle @weak.
+      bool isWeak = false;
+      bool isLet = false;
+      binding->getPattern()->forEachVariable([&](VarDecl *var) {
+          if (var->getAttrs().isWeak())
+            isWeak = true;
+          if (var->isLet())
+            isLet = true;
+        });
+
+      if (!isWeak && !isLet) {
+        if (auto defaultInit = buildDefaultInitializer(tc, type)) {
+          binding->setInit(defaultInit, /*checked=*/false);
+        }
+      }
+    }
   }
 
   // If the pattern didn't get a type, it's because we ran into some
@@ -2198,8 +2343,11 @@ public:
     ClassDecl *source = nullptr;
     for (auto member : cd->getMembers()) {
       auto pbd = dyn_cast<PatternBindingDecl>(member);
-      if (!pbd || pbd->isStatic() || !pbd->hasStorage() || pbd->hasInit() ||
-          pbd->isInvalid())
+      if (!pbd)
+        continue;
+
+      if (pbd->isStatic() || !pbd->hasStorage() || 
+          isDefaultInitializable(pbd) || pbd->isInvalid())
         continue;
 
       // The variables in this pattern have not been
@@ -4521,7 +4669,10 @@ static void diagnoseClassWithoutInitializers(TypeChecker &tc,
   SourceLoc lastLoc;
   for (auto member : classDecl->getMembers()) {
     auto pbd = dyn_cast<PatternBindingDecl>(member);
-    if (!pbd || pbd->isStatic() || !pbd->hasStorage() || pbd->hasInit() ||
+    if (!pbd)
+      continue;
+
+    if (pbd->isStatic() || !pbd->hasStorage() || isDefaultInitializable(pbd) ||
         pbd->isInvalid())
       continue;
 
@@ -4581,9 +4732,8 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   if (!isa<ClassDecl>(decl) && !isa<StructDecl>(decl))
     return;
 
-  // If we already added implicit initializers to the class, we're done.
-  auto classDecl = dyn_cast<ClassDecl>(decl);
-  if (classDecl && classDecl->addedImplicitInitializers())
+  // If we already added implicit initializers, we're done.
+  if (decl->addedImplicitInitializers())
     return;
 
   // Check whether there is a user-declared constructor or an instance
@@ -4591,7 +4741,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   bool FoundInstanceVar = false;
   bool FoundUninitializedVars = false;
   bool FoundSubobjectInit = false;
-
+  decl->setAddedImplicitInitializers();
   for (auto member : decl->getMembers()) {
     if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
       if (ctor->isSubobjectInit()) {
@@ -4608,7 +4758,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
     }
 
     if (auto pbd = dyn_cast<PatternBindingDecl>(member)) {
-      if (pbd->hasStorage() && !pbd->isStatic() && !pbd->hasInit())
+      if (pbd->hasStorage() && !pbd->isStatic() && !isDefaultInitializable(pbd))
         FoundUninitializedVars = true;
       continue;
     }
@@ -4637,8 +4787,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   // For a class with a superclass, automatically define overrides
   // for all of the superclass's subobject initializers.
   // FIXME: Currently skipping generic classes.
-  assert(classDecl && "We have a class here");
-  classDecl->setAddedImplicitInitializers();
+  auto classDecl = cast<ClassDecl>(decl);
   if (classDecl->hasSuperclass() && !classDecl->isGenericContext() &&
       !classDecl->getSuperclass()->isSpecialized()) {
     // We can't define these overrides if we have any uninitialized
