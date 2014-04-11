@@ -155,6 +155,12 @@ public:
         getLastChunk().setIsAnnotation();
     }
 
+    // Print non-inout '@unchecked' optional arguments as normal optionals,
+    // because the difference is not important for the caller.
+    if (Type ObjectType = Ty->getUncheckedOptionalObjectType()) {
+      Ty = OptionalType::get(ObjectType);
+    }
+
     // 'inout' arguments are printed specially.
     if (auto *IOT = Ty->getAs<InOutType>()) {
       addChunkWithTextNoCopy(
