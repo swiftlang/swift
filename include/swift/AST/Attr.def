@@ -86,6 +86,10 @@ DECL_ATTR(asmname, Asmname,
           OnFunc | OnConstructor | OnDestructor,
           0)
 
+SIMPLE_DECL_ATTR(assignment, Assignment,
+                 OnFunc,
+                 8)
+
 DECL_ATTR(availability, Availability,
           OnFunc | OnStruct | OnEnum | OnClass | OnProtocol | OnVar |
           OnConstructor | OnDestructor |
@@ -119,7 +123,6 @@ VIRTUAL_DECL_ATTR(override, Override,
 
 SIMPLE_DECL_ATTR(required, Required, OnConstructor, 4)
 
-ATTR(assignment)
 ATTR(conversion)
 ATTR(infix)
 ATTR(mutating)

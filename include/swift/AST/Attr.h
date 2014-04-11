@@ -760,7 +760,6 @@ public:
     }
   }
 
-  bool isAssignment() const { return has(AK_assignment); }
   bool isConversion() const { return has(AK_conversion); }
   bool isTransparent() const {return has(AK_transparent);}
   bool isPrefix() const { return has(AK_prefix); }

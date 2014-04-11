@@ -259,6 +259,10 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
     break;
   }
+  case DAK_assignment:
+    if (!DiscardAttribute)
+      Attributes.add(new (Context) AssignmentAttr(AtLoc, Loc));
+    break;
   case DAK_availability: {
     if (!consumeIf(tok::l_paren)) {
       diagnose(Loc, diag::attr_expected_lparen, AttrName);

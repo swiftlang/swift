@@ -33,6 +33,8 @@ public:
 
   void visitAsmnameAttr(AsmnameAttr *attr) {}
 
+  void visitAssignmentAttr(AssignmentAttr *attr);
+
   void visitAvailabilityAttr(AvailabilityAttr *attr) {}
 
   void visitClassProtocolAttr(ClassProtocolAttr *attr) {}
@@ -50,6 +52,18 @@ public:
   void visitRequiredAttr(RequiredAttr *attr) {}
 };
 } // end anonymous namespace
+
+void AttributeEarlyChecker::visitAssignmentAttr(AssignmentAttr *attr) {
+  // Only function declarations can be assignments.
+  auto *FD = dyn_cast<FuncDecl>(D);
+  if (!FD || !FD->isOperator()) {
+    TC.diagnose(attr->getLocation(), diag::invalid_decl_attribute,
+                attr->getKind())
+        .fixItRemove(attr->getRange());
+    attr->setInvalid();
+    return;
+  }
+}
 
 void AttributeEarlyChecker::visitExportedAttr(ExportedAttr *attr) {
   if (!isa<ImportDecl>(D)) {
@@ -105,6 +119,8 @@ public:
     // one it overrides.
   }
 
+  void visitAssignmentAttr(AssignmentAttr *attr);
+
   void visitClassProtocolAttr(ClassProtocolAttr *attr);
 
   void visitFinalAttr(FinalAttr *attr);
@@ -114,6 +130,33 @@ public:
   void visitRequiredAttr(RequiredAttr *attr);
 };
 } // end anonymous namespace
+
+void AttributeChecker::visitAssignmentAttr(AssignmentAttr *attr) {
+  auto *FD = cast<FuncDecl>(D);
+  auto *FT = FD->getType()->castTo<AnyFunctionType>();
+
+  int NumArguments = -1;
+  if (FD->getDeclContext()->isTypeContext() && FD->isStatic())
+    FT = FT->getResult()->castTo<AnyFunctionType>();
+  if (auto *TT = FT->getInput()->getAs<TupleType>())
+    NumArguments = TT->getFields().size();
+
+  if (NumArguments < 1) {
+    TC.diagnose(attr->getLocation(), diag::assignment_without_inout);
+    attr->setInvalid();
+    return;
+  }
+
+  Type ParamType = FT->getInput();
+  TupleType *ParamTT = ParamType->getAs<TupleType>();
+  if (ParamTT)
+    ParamType = ParamTT->getElementType(0);
+
+  if (!ParamType->is<InOutType>()) {
+    TC.diagnose(attr->getLocation(), diag::assignment_without_inout);
+    attr->setInvalid();
+  }
+}
 
 void AttributeChecker::visitClassProtocolAttr(ClassProtocolAttr *attr) {
   // Only protocols can have the @class_protocol attribute.

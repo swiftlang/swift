@@ -1667,7 +1667,7 @@ void Serializer::writeDecl(const Decl *D) {
   case DeclKind::Func: {
     auto fn = cast<FuncDecl>(D);
     checkAllowedAttributes<
-      AK_assignment, AK_conversion, AK_IBAction, AK_infix,
+      AK_conversion, AK_IBAction, AK_infix,
       AK_optional, AK_postfix, AK_prefix, AK_transparent,
       AK_mutating
     >(fn);
@@ -1687,8 +1687,7 @@ void Serializer::writeDecl(const Decl *D) {
                            fn->hasSelectorStyleSignature(),
                            fn->isStatic(),
                            uint8_t(getStableStaticSpelling(fn->getStaticSpelling())),
-                           fn->getAttrs().isAssignment() ||
-                             fn->getAttrs().isConversion(),
+                           fn->getAttrs().isConversion(),
                            fn->isObjC(),
                            fn->getAttrs().isIBAction(),
                            fn->isTransparent(),

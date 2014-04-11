@@ -72,8 +72,6 @@ void DeclAttributes::print(ASTPrinter &Printer,
     DA->print(Printer);
   }
 
-  if (isAssignment())
-    Printer << "@assignment ";
   if (isConversion())
     Printer << "@conversion ";
   if (isTransparent())
@@ -101,6 +99,9 @@ void DeclAttribute::print(ASTPrinter &Printer) const {
   switch (getKind()) {
   case DAK_asmname:
     Printer << "@asmname(\"" << cast<AsmnameAttr>(this)->Name << "\")";
+    break;
+  case DAK_assignment:
+    Printer << "@assignment";
     break;
   case DAK_availability: {
     Printer << "@availability(";

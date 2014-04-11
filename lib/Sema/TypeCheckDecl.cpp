@@ -3255,6 +3255,7 @@ public:
     void visit##CLASS##Attr(CLASS##Attr *) {}
 
     UNINTERESTING_ATTR(Asmname)
+    UNINTERESTING_ATTR(Assignment)
     UNINTERESTING_ATTR(ClassProtocol)
     UNINTERESTING_ATTR(Exported)
     UNINTERESTING_ATTR(Override)
@@ -4838,19 +4839,7 @@ static bool isDeclOfOperator(const Decl *D) {
 
 static void validateAttributes(TypeChecker &TC, Decl *D) {
   const DeclAttributes &Attrs = D->getAttrs();
-
-  // Get the number of lexical arguments, for semantic checks below.
-  int NumArguments = -1;
-  FuncDecl *FDOrNull = dyn_cast<FuncDecl>(D);
-  if (FDOrNull) {
-    Type Ty = FDOrNull->getType();
-    if (AnyFunctionType *FT = Ty->getAs<AnyFunctionType>()) {
-      if (FDOrNull->getDeclContext()->isTypeContext() && FDOrNull->isStatic())
-        FT = FT->getResult()->castTo<AnyFunctionType>();
-      if (TupleType *TT = FT->getInput()->getAs<TupleType>())
-        NumArguments = TT->getFields().size();
-    }
-  }
+  auto *FDOrNull = dyn_cast<FuncDecl>(D);
 
   // Determine if VD is an operator declaration.
   bool isOperator = isDeclOfOperator(D);
@@ -5154,31 +5143,6 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
       D->getMutableAttrs().clearAttribute(AK_prefix);
       // FIXME: Set the 'isError' bit on the decl.
       return;
-    }
-  }
-
-  if (Attrs.isAssignment()) {
-    // Only function declarations can be assignments.
-    FuncDecl *FD = dyn_cast<FuncDecl>(D);
-    if (!FD || !FD->isOperator()) {
-      TC.diagnose(Attrs.getLoc(AK_assignment),
-                  diag::invalid_decl_attribute_simple);
-      D->getMutableAttrs().clearAttribute(AK_assignment);
-    } else if (NumArguments < 1) {
-      TC.diagnose(Attrs.getLoc(AK_assignment),diag::assignment_without_inout);
-      D->getMutableAttrs().clearAttribute(AK_assignment);
-    } else {
-      auto FT = FD->getType()->castTo<AnyFunctionType>();
-      Type ParamType = FT->getInput();
-      TupleType *ParamTT = ParamType->getAs<TupleType>();
-      if (ParamTT)
-        ParamType = ParamTT->getElementType(0);
-
-      if (!ParamType->is<InOutType>()) {
-        TC.diagnose(Attrs.getLoc(AK_assignment),
-                    diag::assignment_without_inout);
-        D->getMutableAttrs().clearAttribute(AK_assignment);
-      }
     }
   }
 

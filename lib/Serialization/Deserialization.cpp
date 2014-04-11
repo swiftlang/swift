@@ -1922,10 +1922,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (hasSelectorStyleSignature)
       fn->setHasSelectorStyleSignature();
     if (isAssignmentOrConversion) {
-      if (fn->isOperator())
-        fn->getMutableAttrs().setAttr(AK_assignment, SourceLoc());
-      else
-        fn->getMutableAttrs().setAttr(AK_conversion, SourceLoc());
+      assert(!fn->isOperator());
+      fn->getMutableAttrs().setAttr(AK_conversion, SourceLoc());
     }
     if (isIBAction)
       fn->getMutableAttrs().setAttr(AK_IBAction, SourceLoc());
