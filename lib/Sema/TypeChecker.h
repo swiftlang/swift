@@ -468,6 +468,8 @@ public:
 
   void typeCheckDecl(Decl *D, bool isFirstPass);
 
+  void checkIBOutlet(VarDecl *D);
+  bool isIBOutlet(PatternBindingDecl *PBD);
   void checkDeclAttributesEarly(Decl *D);
   void checkDeclAttributes(Decl *D);
 

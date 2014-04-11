@@ -1042,6 +1042,13 @@ static void validatePatternBindingDecl(TypeChecker &tc,
     }
   }
 
+  // If we have the @IBOutlet attribute, use it to adjust our type.
+  if (binding->getPattern()->hasType()) {
+    if (auto var = binding->getSingleVar())
+      if (var->getAttrs().isIBOutlet())
+        tc.checkIBOutlet(var);
+  }
+
   // If we're in a generic type context, provide interface types for all of
   // the variables.
   auto dc = binding->getDeclContext();
@@ -4991,47 +4998,12 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
   }
 
   if (Attrs.isIBOutlet()) {
-    // Only instance properties can be IBOutlets.
-    auto *VD = dyn_cast<VarDecl>(D);
-    if (!VD || !isInClassContext(VD) || VD->isStatic()) {
+    if (auto var = dyn_cast<VarDecl>(D)) {
+      TC.checkIBOutlet(var);
+    } else {
       TC.diagnose(Attrs.getLoc(AK_IBOutlet), diag::invalid_iboutlet);
       D->getMutableAttrs().clearAttribute(AK_IBOutlet);
-      return;
-    }
-
-    // Validate the type of the @IBOutlet.
-    auto type = VD->getType();
-    bool isOptional = false;
-    if (auto optObjectType = type->getAnyOptionalObjectType()) {
-      isOptional = true;
-      type = optObjectType;
-    }
-
-    if (auto classDecl = type->getClassOrBoundGenericClass()) {
-      // @objc class types are okay.
-      if (!classDecl->isObjC()) {
-        TC.diagnose(VD->getLoc(), diag::iboutlet_nonobjc_class, type);
-        D->getMutableAttrs().clearAttribute(AK_IBOutlet);
-        return;
-      }
-    } else if (type->isObjCExistentialType()) {
-      // @objc existential types are okay
-      // Nothing to do.
-    } else if (type->getAnyNominal() == TC.Context.getStringDecl()) {
-      // String is okay because it is bridged to NSString.
-      // FIXME: BridgesTypes.def is almost sufficient for this.
-    } else {
-      // No other types are permitted.
-      TC.diagnose(VD->getLoc(), diag::iboutlet_nonobject_type, type);
-      D->getMutableAttrs().clearAttribute(AK_IBOutlet);
-      return;
-    }
-
-    // If the type wasn't optional before, turn it into an @unchecked optional
-    // now.
-    if (!isOptional) {
-      VD->overwriteType(UncheckedOptionalType::get(type));
-    }
+    }      
   }
 
   // Ownership attributes (weak, unowned).

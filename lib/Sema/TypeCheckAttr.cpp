@@ -212,3 +212,71 @@ void TypeChecker::checkDeclAttributes(Decl *D) {
   }
 }
 
+void TypeChecker::checkIBOutlet(VarDecl *VD) {
+  const DeclAttributes &Attrs = VD->getAttrs();
+  assert(Attrs.isIBOutlet() && "Only call when @IBOutlet is set");
+
+  auto isInClassContext = [](Decl *vd) {
+   Type ContextTy = vd->getDeclContext()->getDeclaredTypeInContext();
+    if (!ContextTy)
+      return false;
+    return bool(ContextTy->getClassOrBoundGenericClass());
+  };
+
+  // Only instance properties can be IBOutlets.
+  if (!isInClassContext(VD) || VD->isStatic()) {
+    diagnose(Attrs.getLoc(AK_IBOutlet), diag::invalid_iboutlet);
+    VD->getMutableAttrs().clearAttribute(AK_IBOutlet);
+    return;
+  }
+  
+  // If the variable has no type yet, we can't perform any validation.
+  if (!VD->hasType())
+    return;
+    
+  // Validate the type of the @IBOutlet.
+  auto type = VD->getType();
+  bool isOptional = false;
+  if (auto optObjectType = type->getAnyOptionalObjectType()) {
+    isOptional = true;
+    type = optObjectType;
+  }
+  
+  if (auto classDecl = type->getClassOrBoundGenericClass()) {
+    // @objc class types are okay.
+    if (!classDecl->isObjC()) {
+      diagnose(VD->getLoc(), diag::iboutlet_nonobjc_class, type);
+      VD->getMutableAttrs().clearAttribute(AK_IBOutlet);
+      return;
+    }
+  } else if (type->isObjCExistentialType()) {
+    // @objc existential types are okay
+    // Nothing to do.
+  } else if (type->getAnyNominal() == Context.getStringDecl()) {
+    // String is okay because it is bridged to NSString.
+    // FIXME: BridgesTypes.def is almost sufficient for this.
+  } else {
+    // No other types are permitted.
+    diagnose(VD->getLoc(), diag::iboutlet_nonobject_type, type);
+    VD->getMutableAttrs().clearAttribute(AK_IBOutlet);
+    return;
+  }
+  
+  // If the type wasn't optional before, turn it into an @unchecked optional
+  // now.
+  if (!isOptional) {
+    VD->overwriteType(UncheckedOptionalType::get(type));
+  }
+}
+
+bool TypeChecker::isIBOutlet(PatternBindingDecl *PBD) {
+  if (auto var = PBD->getSingleVar()) {
+    // FIXME: Some redundant checking here.
+    if (var->getAttrs().isIBOutlet()) {
+      checkIBOutlet(var);
+      return var->getAttrs().isIBOutlet();
+    }
+  }
+
+  return false;
+}

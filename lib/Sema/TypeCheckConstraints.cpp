@@ -854,6 +854,8 @@ bool TypeChecker::typeCheckBinding(PatternBindingDecl *binding) {
       // value inside an Optional on the right-hand side.
       if (Binding->isConditional()) {
         InitType = OptionalType::get(InitType);
+      } else if (cs.getTypeChecker().isIBOutlet(Binding)) {
+        InitType = UncheckedOptionalType::get(InitType);
       }
 
       // Add a conversion constraint between the types.
