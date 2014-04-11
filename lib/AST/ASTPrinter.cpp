@@ -1639,7 +1639,7 @@ public:
     printWithParensIfNotSimple(T->getInstanceType());
 
     // We spell normal metatypes of existential types as .Protocol.
-    if (isa<MetatypeType>(T) && T->getInstanceType()->isExistentialType()) {
+    if (isa<MetatypeType>(T) && T->getInstanceType()->isAnyExistentialType()) {
       Printer << ".Protocol";
     } else {
       Printer << ".Type";

@@ -391,10 +391,7 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
                                         TypeMatchKind kind, unsigned flags,
                                         ConstraintLocatorBuilder locator) {
   SmallVector<ProtocolDecl *, 4> protocols;
-
-  bool existential = type2->isExistentialType(protocols);
-  assert(existential && "Bogus existential match");
-  (void)existential;
+  type2->getAnyExistentialTypeProtocols(protocols);
 
   for (auto proto : protocols) {
     switch (simplifyConformsToConstraint(type1, proto, locator, false)) {
@@ -1147,9 +1144,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   // contain the protocol), check that separately.
   if (allowNonConformingExistential && type->isExistentialType()) {
     SmallVector<ProtocolDecl *, 4> protocols;
-    bool isExistential = type->isExistentialType(protocols);
-    assert(isExistential && "Not existential?");
-    (void)isExistential;
+    type->getAnyExistentialTypeProtocols(protocols);
 
     for (auto ap : protocols) {
       // If this isn't the protocol we're looking for, continue looking.
@@ -1690,7 +1685,7 @@ ConstraintSystem::simplifyDynamicTypeOfConstraint(const Constraint &constraint) 
                                      /*wantRValue=*/ true);
   if (!typeVar2) {
     Type dynamicType2;
-    if (type2->isExistentialType()) {
+    if (type2->isAnyExistentialType()) {
       dynamicType2 = ExistentialMetatypeType::get(type2);
     } else {
       dynamicType2 = MetatypeType::get(type2);

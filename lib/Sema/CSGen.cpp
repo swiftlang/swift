@@ -984,7 +984,7 @@ namespace {
       if (auto baseTyR = expr->getBaseTypeRepr()) {
         auto type = CS.TC.resolveType(baseTyR, CS.DC, None);
         if (!type) return Type();
-        if (type->isExistentialType()) {
+        if (type->isAnyExistentialType()) {
           return ExistentialMetatypeType::get(type);
         } else {
           return MetatypeType::get(type);

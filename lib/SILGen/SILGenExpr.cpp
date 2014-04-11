@@ -561,7 +561,7 @@ emitRValueForPropertyLoad(SILLocation loc, ManagedValue base,
     // retain_value to bring it to +1 since getters always take the base object
     // at +1.
     if (base.isPlusZeroRValueOrTrivial() &&
-        !base.getType().getSwiftRValueType()->isExistentialType() &&
+        !base.getType().getSwiftRValueType().isExistentialType() &&
         !base.getType().getSwiftRValueType()->is<ArchetypeType>())
       base = base.copyUnmanaged(*this, loc);
     
@@ -1717,7 +1717,7 @@ RValue RValueEmitter::visitNewArrayExpr(NewArrayExpr *E, SGFContext C) {
 SILValue SILGenFunction::emitMetatypeOfValue(SILLocation loc, SILValue base) {
   CanType baseTy = base.getType().getSwiftRValueType();
   // For class, archetype, and protocol types, look up the dynamic metatype.
-  if (baseTy.isExistentialType()) {
+  if (baseTy.isAnyExistentialType()) {
     SILType metaTy = getLoweredLoadableType(CanExistentialMetatypeType::get(baseTy));
     return B.createExistentialMetatype(loc, metaTy, base);
   }
@@ -1738,7 +1738,7 @@ RValue RValueEmitter::visitMetatypeExpr(MetatypeExpr *E, SGFContext C) {
     // We can get the metatype for an existential or archetype without
     // materializing it as a +1 value.
     SGFContext Ctx;
-    if (base->getType()->isExistentialType() ||
+    if (base->getType()->isAnyExistentialType() ||
         base->getType()->is<ArchetypeType>())
       Ctx = SGFContext::AllowPlusZero;
 

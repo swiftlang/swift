@@ -2305,7 +2305,7 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
       if (hasKnownSwiftMetadata(IGM, cd))
         return asOpaquePtr(IGM, IGM.getObjectTypeofFn());
       return asOpaquePtr(IGM, IGM.getObjCTypeofFn());
-    } else if (!concreteType->isExistentialType()) {
+    } else if (!concreteType.isAnyExistentialType()) {
       // Other non-existential types have static metadata.
       return asOpaquePtr(IGM, IGM.getStaticTypeofFn());
     }
@@ -2815,8 +2815,7 @@ TypeConverter::convertProtocolCompositionType(ProtocolCompositionType *T) {
 
   // Find the canonical protocols.  There might not be any.
   SmallVector<ProtocolDecl*, 4> protocols;
-  bool isExistential = T->isExistentialType(protocols);
-  assert(isExistential); (void) isExistential;
+  T->getAnyExistentialTypeProtocols(protocols);
 
   return createExistentialTypeInfo(IGM, type, protocols);
 }
@@ -3904,11 +3903,7 @@ static void forEachProtocolWitnessTable(IRGenFunction &IGF,
                           std::function<void (unsigned, llvm::Value*)> body) {
   // Collect the conformances that need witness tables.
   SmallVector<ProtocolDecl*, 2> destProtocols;
-  bool isExistential
-    = destType.getSwiftRValueType()->isExistentialType(destProtocols);
-  
-  assert(isExistential);
-  (void)isExistential;
+  destType.getSwiftRValueType().getAnyExistentialTypeProtocols(destProtocols);
 
   SmallVector<ProtocolConformance*, 2> witnessConformances;
   assert(destProtocols.size() == conformances.size() &&
@@ -4266,7 +4261,7 @@ irgen::emitTypeMetadataRefForClassExistential(IRGenFunction &IGF,
 llvm::Value *
 irgen::emitTypeMetadataRefForOpaqueExistential(IRGenFunction &IGF, Address addr,
                                                CanType type) {
-  assert(type->isExistentialType());
+  assert(type.isExistentialType());
   assert(!type->isClassExistentialType());
   auto &baseTI = IGF.getTypeInfoForLowered(type).as<OpaqueExistentialTypeInfo>();
 
@@ -4467,8 +4462,7 @@ llvm::Value *irgen::emitObjCExistentialDowncast(IRGenFunction &IGF,
                                                 CheckedCastMode mode) {
   orig = IGF.Builder.CreateBitCast(orig, IGF.IGM.ObjCPtrTy);
   SmallVector<ProtocolDecl*, 4> protos;
-  bool isProtocol = destType.getSwiftRValueType()->isExistentialType(protos);
-  assert(isProtocol); (void)isProtocol;
+  destType.getSwiftRValueType().getAnyExistentialTypeProtocols(protos);
   
   // Get references to the ObjC Protocol* values for each protocol.
   Address protoRefsBuf = IGF.createAlloca(llvm::ArrayType::get(IGF.IGM.Int8PtrTy,

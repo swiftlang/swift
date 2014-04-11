@@ -270,7 +270,11 @@ public:
   }
   /// Returns true if the referenced type is an existential type.
   bool isExistentialType() const {
-    return getSwiftRValueType()->isExistentialType();
+    return getSwiftRValueType().isExistentialType();
+  }
+  /// Returns true if the referenced type is any kind of existential type.
+  bool isAnyExistentialType() const {
+    return getSwiftRValueType().isAnyExistentialType();
   }
   /// Returns true if the referenced type is a class existential type.
   bool isClassExistentialType() const {

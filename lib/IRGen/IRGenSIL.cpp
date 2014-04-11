@@ -1129,7 +1129,7 @@ void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
     if (Arg->getType().isExistentialType() ||
         Arg->getType().getSwiftRValueType()->isDependentType() ||
         // FIXME: Why is this condition not a subset of isDependentType()?
-        Arg->getType().getSwiftRValueType()->getKind() == TypeKind::Archetype)
+        Arg->getType().is<ArchetypeType>())
       continue;
 
     auto Name = Arg->getDecl()->getName().str();

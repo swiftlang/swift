@@ -706,7 +706,7 @@ LookupConformanceResult Module::lookupConformance(Type type,
     return { nullptr, ConformanceKind::DoesNotConform };
   }
 
-  // An archetype conforms to a protocol if the protocol is listed in the
+  // An existential conforms to a protocol if the protocol is listed in the
   // existential's list of conformances and the existential conforms to
   // itself.
   if (type->isExistentialType()) {
@@ -724,7 +724,7 @@ LookupConformanceResult Module::lookupConformance(Type type,
 
     // Look for this protocol within the existential's list of conformances.
     SmallVector<ProtocolDecl *, 4> protocols;
-    type->isExistentialType(protocols);
+    type->getAnyExistentialTypeProtocols(protocols);
     for (auto ap : protocols) {
       if (ap == protocol || ap->inheritsFrom(protocol)) {
         return { nullptr,

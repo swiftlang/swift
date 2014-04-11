@@ -442,12 +442,12 @@ namespace {
         isMetatype = true;
         baseTy = metaTy->getInstanceType();
       }
-      assert(baseTy->isExistentialType() && "Type must be existential");
+      assert(baseTy->isAnyExistentialType() && "Type must be existential");
 
       // Create the archetype.
       SmallVector<ProtocolDecl *, 4> protocols;
       auto &ctx = tc.Context;
-      (void)baseTy->isExistentialType(protocols);
+      baseTy->getAnyExistentialTypeProtocols(protocols);
       auto archetype = ArchetypeType::getOpened(baseTy);
 
       // Create the opaque opened value. If we started with a
@@ -554,7 +554,7 @@ namespace {
           // For a DynamicSelf method on an existential, open up the
           // existential.
           if (func->getExtensionType()->is<ProtocolType>() &&
-              baseTy->isExistentialType()) {
+              baseTy->isAnyExistentialType()) {
             std::tie(base, baseTy) = openExistentialReference(base);
             containerTy = baseTy;
             openedType = openedType->replaceCovariantResultType(
@@ -614,7 +614,7 @@ namespace {
       // Is it an archetype or existential member?
       bool isArchetypeOrExistentialRef
             = isa<ProtocolDecl>(member->getDeclContext()) &&
-              (baseTy->is<ArchetypeType>() || baseTy->isExistentialType());
+              (baseTy->is<ArchetypeType>() || baseTy->isAnyExistentialType());
 
       // If we are referring to an optional member of a protocol.
       if (isArchetypeOrExistentialRef && member->getAttrs().isOptional()) {
@@ -1681,7 +1681,7 @@ namespace {
           auto baseTy = pmRef->getBase()->getType();
           if (baseTy->hasReferenceSemantics())
             goto not_value_type_member;
-          if (baseTy->isExistentialType()) {
+          if (baseTy->isAnyExistentialType()) {
             kind = MemberPartialApplication::Protocol;
           } else if (isa<FuncDecl>(pmRef->getMember().getDecl()))
             kind = MemberPartialApplication::Archetype;
@@ -3007,9 +3007,7 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
   // Compute the conformances for each of the protocols in the existential
   // type.
   SmallVector<ProtocolDecl *, 4> protocols;
-  bool isExistential = toType->isExistentialType(protocols);
-  assert(isExistential && "Not converting to existential?");
-  (void)isExistential;
+  toType->getAnyExistentialTypeProtocols(protocols);
   SmallVector<ProtocolConformance *, 4> conformances;
   for (auto proto : protocols) {
     ProtocolConformance *conformance = nullptr;

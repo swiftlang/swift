@@ -2239,7 +2239,7 @@ namespace {
     // If the argument is existential, project it.
     if (substitutions[0].Replacement->isClassExistentialType()) {
       SmallVector<ProtocolDecl *, 4> protocols;
-      substitutions[0].Replacement->isExistentialType(protocols);
+      substitutions[0].Replacement->getAnyExistentialTypeProtocols(protocols);
       ProtocolDecl *proto = *std::find_if(protocols.begin(), protocols.end(),
                                           [](ProtocolDecl *proto) {
                                             return proto->requiresClass();
@@ -2609,7 +2609,7 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &gen,
                                            ->castTo<AnyFunctionType>());
 
     // If this is an archetype case, construct an archetype call.
-    if (!selfValue.getSubstType()->getInOutObjectType()->isExistentialType()) {
+    if (!selfValue.getSubstType()->getInOutObjectType()->isAnyExistentialType()) {
       SILValue baseVal =
         selfValue.forceAndPeekRValue(gen).peekScalarValue();
     

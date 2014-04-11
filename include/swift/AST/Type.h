@@ -35,6 +35,7 @@ class GenericSignature;
 class LazyResolver;
 class Module;
 class NominalTypeDecl;
+class ProtocolDecl;
 class StructDecl;
 class SubstitutableType;
 class TypeBase;
@@ -148,6 +149,13 @@ class CanType : public Type {
 
   static bool hasReferenceSemanticsImpl(CanType type);
   static bool isExistentialTypeImpl(CanType type);
+  static bool isAnyExistentialTypeImpl(CanType type);
+  static bool isExistentialTypeImpl(CanType type,
+                                    SmallVectorImpl<ProtocolDecl*> &protocols);
+  static bool isAnyExistentialTypeImpl(CanType type,
+                                    SmallVectorImpl<ProtocolDecl*> &protocols);
+  static void getAnyExistentialTypeProtocolsImpl(CanType type,
+                                    SmallVectorImpl<ProtocolDecl*> &protocols);
   static bool isObjCExistentialTypeImpl(CanType type);
   static CanType getAnyOptionalObjectTypeImpl(CanType type);
 
@@ -171,6 +179,28 @@ public:
   /// Is this type existential?
   bool isExistentialType() const {
     return isExistentialTypeImpl(*this);
+  }
+
+  /// Is this type existential?
+  bool isExistentialType(SmallVectorImpl<ProtocolDecl *> &protocols) {
+    return isExistentialTypeImpl(*this, protocols);
+  }
+
+  /// Is this type any kind of existential?
+  bool isAnyExistentialType() const {
+    return isAnyExistentialTypeImpl(*this);
+  }
+
+  /// Is this type any kind of existential?
+  bool isAnyExistentialType(SmallVectorImpl<ProtocolDecl *> &protocols) {
+    return isAnyExistentialTypeImpl(*this, protocols);
+  }
+
+  /// Given that this type is any kind of existential, return its
+  /// protocols in a canonical order.
+  void getAnyExistentialTypeProtocols(
+                                SmallVectorImpl<ProtocolDecl *> &protocols) {
+    return getAnyExistentialTypeProtocolsImpl(*this, protocols);
   }
 
   /// Is this an ObjC-compatible existential type?

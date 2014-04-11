@@ -1245,7 +1245,7 @@ IRGenModule::createNominalType(ProtocolCompositionType *type) {
   llvm::SmallString<32> typeName;
 
   SmallVector<ProtocolDecl *, 4> protocols;
-  type->isExistentialType(protocols);
+  type->getAnyExistentialTypeProtocols(protocols);
 
   typeName.append("protocol<");
   for (unsigned i = 0, e = protocols.size(); i != e; ++i) {

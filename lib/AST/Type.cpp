@@ -146,26 +146,55 @@ bool TypeBase::allowsOwnership() {
           && canonical.hasReferenceSemantics());
 }
 
-bool CanType::isExistentialTypeImpl(CanType type) {
-  return isa<ProtocolType>(type) || isa<ProtocolCompositionType>(type);
+bool TypeBase::isAnyExistentialType(SmallVectorImpl<ProtocolDecl*> &protocols) {
+  return getCanonicalType().isAnyExistentialType(protocols);
 }
 
-bool TypeBase::isExistentialType(SmallVectorImpl<ProtocolDecl *> &Protocols) {
-  CanType T = getCanonicalType();
-  if (auto Proto = dyn_cast<ProtocolType>(T)) {
-    Protocols.push_back(Proto->getDecl());
+bool CanType::isAnyExistentialTypeImpl(CanType type,
+                                       SmallVectorImpl<ProtocolDecl*> &protocols) {
+  if (auto metatype = dyn_cast<ExistentialMetatypeType>(type)) {
+    metatype.getInstanceType().getAnyExistentialTypeProtocols(protocols);
+    return true;
+  }
+  return isExistentialTypeImpl(type, protocols);
+}
+
+bool TypeBase::isExistentialType(SmallVectorImpl<ProtocolDecl *> &protocols) {
+  return getCanonicalType().isExistentialType(protocols);
+}
+
+bool CanType::isExistentialTypeImpl(CanType type,
+                                    SmallVectorImpl<ProtocolDecl*> &protocols) {
+  if (auto proto = dyn_cast<ProtocolType>(type)) {
+    proto.getAnyExistentialTypeProtocols(protocols);
     return true;
   }
   
-  if (auto PC = dyn_cast<ProtocolCompositionType>(T)) {
-    std::transform(PC->getProtocols().begin(), PC->getProtocols().end(),
-                   std::back_inserter(Protocols),
-                   [](Type T) { return T->castTo<ProtocolType>()->getDecl(); });
+  if (auto comp = dyn_cast<ProtocolCompositionType>(type)) {
+    comp.getAnyExistentialTypeProtocols(protocols);
     return true;
   }
 
-  assert(!T.isExistentialType());
+  assert(!type.isExistentialType());
   return false;
+}
+
+void TypeBase::getAnyExistentialTypeProtocols(
+                                   SmallVectorImpl<ProtocolDecl*> &protocols) {
+  getCanonicalType().getAnyExistentialTypeProtocols(protocols);
+}
+
+void CanType::getAnyExistentialTypeProtocolsImpl(CanType type,
+                                   SmallVectorImpl<ProtocolDecl*> &protocols) {
+  if (auto proto = dyn_cast<ProtocolType>(type)) {
+    proto.getAnyExistentialTypeProtocols(protocols);
+  } else if (auto comp = dyn_cast<ProtocolCompositionType>(type)) {
+    comp.getAnyExistentialTypeProtocols(protocols);
+  } else if (auto metatype = dyn_cast<ExistentialMetatypeType>(type)) {
+    metatype.getAnyExistentialTypeProtocols(protocols);
+  } else {
+    llvm_unreachable("type was not any kind of existential type!");
+  }
 }
 
 bool TypeBase::isObjCExistentialType() {
@@ -176,7 +205,7 @@ bool CanType::isObjCExistentialTypeImpl(CanType type) {
   if (!type.isExistentialType()) return false;
 
   SmallVector<ProtocolDecl *, 4> protocols;
-  (void) type->isExistentialType(protocols);
+  type.getAnyExistentialTypeProtocols(protocols);
 
   // Must have at least one protocol to be class-bounded.
   if (protocols.empty())
@@ -1566,13 +1595,23 @@ bool ProtocolType::requiresClass() const {
   return getDecl()->requiresClass();
 }
 
+void ProtocolCompositionType::getAnyExistentialTypeProtocols(
+                                   SmallVectorImpl<ProtocolDecl *> &protos) {
+  // The canonical type for a protocol composition canonicalizes the
+  // order of the protocols.
+  auto canonical = cast<ProtocolCompositionType>(getCanonicalType());
+  canonical.getAnyExistentialTypeProtocols(protos);
+}
+
 bool ProtocolCompositionType::requiresClass() const {
   for (Type t : getProtocols()) {
-    SmallVector<ProtocolDecl*, 2> protocols;
-    if (t->isExistentialType(protocols))
-      for (auto *proto : protocols)
-        if (proto->requiresClass())
-          return true;
+    if (const ProtocolType *proto = t->getAs<ProtocolType>()) {
+      if (proto->requiresClass())
+        return true;
+    } else {
+      if (t->castTo<ProtocolCompositionType>()->requiresClass())
+        return true;
+    }
   }
   return false;
 }
@@ -2574,7 +2613,7 @@ Substitution Substitution::subst(Module *module,
   // conformances.
   if (auto replacementArch = Replacement->getAs<ArchetypeType>()) {
     if (!substReplacement->is<ArchetypeType>()
-        && !substReplacement->isExistentialType()) {
+        && !substReplacement->isAnyExistentialType()) {
       conformancesChanged = true;
       // Find the conformances mapped to the archetype.
       auto foundConformances = conformanceMap.find(replacementArch);
@@ -2629,14 +2668,8 @@ TypeTraitResult TypeBase::canBeObjCClass() {
     return c->isObjC() ? TypeTraitResult::Is : TypeTraitResult::IsNot;
   }
   // Protocol types are objc if all their protocols are.
-  SmallVector<ProtocolDecl*, 2> protocols;
-  if (self->isExistentialType(protocols)) {
-    for (auto p : protocols) {
-      if (!p->isObjC())
-        return TypeTraitResult::IsNot;
-    }
+  if (self->isObjCExistentialType())
     return TypeTraitResult::Is;
-  }
   
   // Dependent types might be bound to @objc classes.
   if (isa<SubstitutableType>(self))

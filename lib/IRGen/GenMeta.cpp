@@ -538,8 +538,7 @@ namespace {
       
     llvm::Value *emitExistentialTypeMetadata(CanType type) {
       SmallVector<ProtocolDecl*, 2> protocols;
-      bool isExistential = type->isExistentialType(protocols);
-      assert(isExistential); (void)isExistential;
+      type.getAnyExistentialTypeProtocols(protocols);
       
       // Collect references to the protocol descriptors.
       auto descriptorArrayTy
@@ -675,10 +674,9 @@ namespace {
       return visit(type.getInstanceType());
     }
 
-    /// Existential metatypes have non-trivial representation because
-    /// they can refer to an arbitrary metatype. Everything else is trivial.
+    /// Everything else is trivial.
     bool visitType(CanType type) {
-      return !type->isExistentialType();
+      return false;
     }
   };
 }

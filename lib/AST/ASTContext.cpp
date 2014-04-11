@@ -2025,9 +2025,8 @@ ArchetypeType *ArchetypeType::getOpened(Type existential,
 
   auto arena = AllocationArena::Permanent;
   llvm::SmallVector<ProtocolDecl *, 4> conformsTo;
-  assert(existential->isExistentialType() && "Not an existential type?");
-  existential->isExistentialType(conformsTo);
-  ProtocolType::canonicalizeProtocols(conformsTo);
+  assert(existential->isExistentialType());
+  existential->getAnyExistentialTypeProtocols(conformsTo);
 
   auto result = new (ctx, arena) ArchetypeType(ctx, existential, *knownID,
                                                ctx.AllocateCopy(conformsTo),

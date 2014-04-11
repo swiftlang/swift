@@ -347,6 +347,11 @@ public:
   /// existential types.
   bool isExistentialType();
 
+  /// isAnyExistentialType - Determines whether this type is any kind of
+  /// existential type: a protocol type, a protocol composition type, or
+  /// an existential metatype.
+  bool isAnyExistentialType();
+
   /// isObjCExistentialType - Determines whether this type is an
   /// class-bounded existential type whose required conformances are
   /// all @objc.  Such types are compatible with ObjC.
@@ -364,6 +369,18 @@ public:
   /// \param Protocols If the type is an existential type, this vector is
   /// populated with the set of protocols
   bool isExistentialType(SmallVectorImpl<ProtocolDecl *> &Protocols);
+
+  /// isAnyExistentialType - Determines whether this type is any kind of
+  /// existential type: a protocol type, a protocol composition type, or
+  /// an existential metatype.
+  ///
+  /// \param protocols If the type is an existential type, this vector is
+  /// populated with the set of protocols.
+  bool isAnyExistentialType(SmallVectorImpl<ProtocolDecl *> &protocols);
+
+  /// Given that this type is any kind of existential type, produce
+  /// its list of protocols.
+  void getAnyExistentialTypeProtocols(SmallVectorImpl<ProtocolDecl *> &protocols);
 
   /// \brief Determine whether the given type is "specialized", meaning that
   /// it involves generic types for which generic arguments have been provided.
@@ -1574,6 +1591,11 @@ public:
     return get(T, repr, T->getASTContext());
   }
 
+  /// Return the canonicalized list of protocols.
+  void getAnyExistentialTypeProtocols(SmallVectorImpl<ProtocolDecl *> &protos) {
+    getInstanceType()->getAnyExistentialTypeProtocols(protos);
+  }
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::ExistentialMetatype;
@@ -1592,6 +1614,9 @@ BEGIN_CAN_TYPE_WRAPPER(ExistentialMetatypeType, AnyMetatypeType)
   static CanExistentialMetatypeType get(CanType type,
                                         MetatypeRepresentation repr) {
     return CanExistentialMetatypeType(ExistentialMetatypeType::get(type, repr));
+  }
+  void getAnyExistentialTypeProtocols(SmallVectorImpl<ProtocolDecl *> &protocols) {
+    getInstanceType().getAnyExistentialTypeProtocols(protocols);
   }
 END_CAN_TYPE_WRAPPER(ExistentialMetatypeType, AnyMetatypeType)
   
@@ -2529,6 +2554,10 @@ public:
 
   /// True if only classes may conform to the protocol.
   bool requiresClass() const;
+
+  void getAnyExistentialTypeProtocols(SmallVectorImpl<ProtocolDecl *> &protos) {
+    protos.push_back(getDecl());
+  }
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -2544,7 +2573,11 @@ private:
   friend class NominalTypeDecl;
   ProtocolType(ProtocolDecl *TheDecl, const ASTContext &Ctx);
 };
-DEFINE_EMPTY_CAN_TYPE_WRAPPER(ProtocolType, NominalType)
+BEGIN_CAN_TYPE_WRAPPER(ProtocolType, NominalType)
+  void getAnyExistentialTypeProtocols(SmallVectorImpl<ProtocolDecl *> &protos) {
+    getPointer()->getAnyExistentialTypeProtocols(protos);
+  }
+END_CAN_TYPE_WRAPPER(ProtocolType, NominalType)
 
 /// ProtocolCompositionType - A type that composes some number of protocols
 /// together to represent types that conform to all of the named protocols.
@@ -2573,6 +2606,9 @@ public:
   /// \brief Retrieve the set of protocols composed to create this type.
   ArrayRef<Type> getProtocols() const { return Protocols; }
 
+  /// \brief Return the protocols of this type in canonical order.
+  void getAnyExistentialTypeProtocols(SmallVectorImpl<ProtocolDecl *> &protos);
+
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, Protocols);
   }
@@ -2595,7 +2631,17 @@ private:
                RecursiveTypeProperties()),
       Protocols(Protocols) { }
 };
-DEFINE_EMPTY_CAN_TYPE_WRAPPER(ProtocolCompositionType, Type)
+BEGIN_CAN_TYPE_WRAPPER(ProtocolCompositionType, Type)
+  /// In the canonical representation, these are all ProtocolTypes.
+  CanTypeArrayRef getProtocols() const {
+    return CanTypeArrayRef(getPointer()->getProtocols());
+  }
+  void getAnyExistentialTypeProtocols(SmallVectorImpl<ProtocolDecl *> &protos) {
+    for (CanType proto : getProtocols()) {
+      cast<ProtocolType>(proto).getAnyExistentialTypeProtocols(protos);
+    }
+  }
+END_CAN_TYPE_WRAPPER(ProtocolCompositionType, Type)
 
 /// LValueType - An l-value is a handle to a physical object.  The
 /// type of that object uniquely determines the type of an l-value
@@ -3252,9 +3298,19 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(TypeVariableType, Type)
 
 
 inline bool TypeBase::isExistentialType() {
-  CanType T = getCanonicalType();
-  return T->getKind() == TypeKind::Protocol
-         || T->getKind() == TypeKind::ProtocolComposition;
+  return getCanonicalType().isExistentialType();
+}
+
+inline bool TypeBase::isAnyExistentialType() {
+  return getCanonicalType().isAnyExistentialType();
+}
+
+inline bool CanType::isExistentialTypeImpl(CanType type) {
+  return isa<ProtocolType>(type) || isa<ProtocolCompositionType>(type);
+}
+
+inline bool CanType::isAnyExistentialTypeImpl(CanType type) {
+  return isExistentialTypeImpl(type) || isa<ExistentialMetatypeType>(type);
 }
 
 inline bool TypeBase::isClassExistentialType() {

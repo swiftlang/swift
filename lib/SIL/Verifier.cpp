@@ -708,10 +708,10 @@ public:
             "existential_metatype instruction must be of metatype type");
     require(MI->getType().castTo<ExistentialMetatypeType>()->hasRepresentation(),
             "value_metatype instruction must have a metatype representation");
-    require(MI->getOperand().getType().getSwiftRValueType()->isExistentialType(),
+    require(MI->getOperand().getType().isAnyExistentialType(),
             "existential_metatype operand must be of protocol type");
     require(MI->getOperand().getType().getSwiftRValueType() ==
-            CanType(MI->getType().castTo<ExistentialMetatypeType>()->getInstanceType()),
+            MI->getType().castTo<ExistentialMetatypeType>().getInstanceType(),
             "existential_metatype result must be metatype of operand type");
   }
 
@@ -1002,7 +1002,7 @@ public:
       require(operandType.is<ExistentialMetatypeType>(),
               "static protocol_method must apply to an existential metatype");
       require(operandType.castTo<ExistentialMetatypeType>()
-                ->getInstanceType()->isExistentialType(),
+                .getInstanceType().isExistentialType(),
               "static protocol_method must apply to an existential metatype");
       require(getMethodSelfType(methodType) == EMI->getOperand().getType(),
               "result must be a method of the existential metatype");
@@ -1089,7 +1089,7 @@ public:
             "project_existential must be applied to address");
 
     SmallVector<ProtocolDecl*, 4> protocols;
-    require(operandType.getSwiftRValueType()->isExistentialType(protocols),
+    require(operandType.getSwiftRValueType().isExistentialType(protocols),
             "project_existential must be applied to address of existential");
     require(PEI->getType().isAddress(),
             "project_existential result must be an address");
@@ -1104,7 +1104,7 @@ public:
     require(operandType.isObject(),
             "project_existential_ref operand must not be address");
     SmallVector<ProtocolDecl*, 4> protocols;
-    require(operandType.getSwiftType()->isExistentialType(protocols),
+    require(operandType.getSwiftRValueType().isExistentialType(protocols),
             "project_existential must be applied to existential");
     require(operandType.isClassExistentialType(),
             "project_existential_ref operand must be class existential");
@@ -1120,7 +1120,7 @@ public:
             "open_existential must be applied to address");
 
     SmallVector<ProtocolDecl*, 4> protocols;
-    require(operandType.getSwiftRValueType()->isExistentialType(protocols),
+    require(operandType.getSwiftRValueType().isExistentialType(protocols),
             "open_existential must be applied to address of existential");
     require(OEI->getType().isAddress(),
             "open_existential result must be an address");
@@ -1141,7 +1141,7 @@ public:
       isOperandMetatype = true;
     }
 
-    require(instanceTy->isExistentialType(),
+    require(instanceTy.isExistentialType(),
             "open_existential_ref must be applied to existential or metatype "
             "thereof");
     require(isOperandMetatype || instanceTy->isClassExistentialType(),

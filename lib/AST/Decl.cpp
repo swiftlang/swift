@@ -1847,22 +1847,20 @@ static bool isObjCObjectOrBridgedType(Type type) {
   }
 
   // Unwrap metatypes for remaining checks.
-  if (auto metaTy = type->getAs<AnyMetatypeType>())
+  bool allowExistential = true;
+  if (auto metaTy = type->getAs<AnyMetatypeType>()) {
+    // Foo.Protocol is not an @objc type.
+    allowExistential = !isa<MetatypeType>(metaTy);
     type = metaTy->getInstanceType();
+  }
 
   // Class types are Objective-C object types.
   if (type->is<ClassType>())
     return true;
 
-  // [objc] protocols
-  SmallVector<ProtocolDecl *, 2> protocols;
-  if (type->isExistentialType(protocols)) {
-    for (auto proto : protocols) {
-      if (!proto->requiresClass() || !proto->isObjC())
-        return false;
-    }
+  // @objc protocols
+  if (allowExistential && type->isObjCExistentialType())
     return true;
-  }
   
   return false;
 }
