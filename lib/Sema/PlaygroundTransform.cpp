@@ -27,17 +27,83 @@
 #include "swift/Sema/CodeCompletionTypeChecking.h"
 #include "swift/Subsystems.h"
 
+#include <forward_list>
+
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
 // performPlaygroundTransform
 //===----------------------------------------------------------------------===//
 
+namespace {
+
 class Instrumenter {
 private:
   ASTContext &Context;
   DeclContext *TypeCheckDC;
   unsigned TmpNameIndex = 0;
+
+  struct BracePair {
+  public:
+    SourceRange BraceRange;
+    enum class TargetKinds {
+      None = 0,
+      Break,
+      Return
+    };
+    TargetKinds TargetKind = TargetKinds::None;
+
+    BracePair(const SourceRange &BR) : 
+      BraceRange(BR) { }
+  };
+
+  typedef std::forward_list<BracePair> BracePairStack;
+
+  BracePairStack BracePairs;
+
+  class BracePairPusher {
+    BracePairStack &BracePairs;
+  public:
+    BracePairPusher(BracePairStack &BPS, const SourceRange &BR) : 
+      BracePairs(BPS) {
+      BracePairs.push_front(BracePair(BR));
+    }
+    ~BracePairPusher() {
+      BracePairs.pop_front();
+    }
+  };
+
+  class TargetKindSetter {
+    BracePairStack &BracePairs;
+  public:
+    TargetKindSetter(BracePairStack &BPS, BracePair::TargetKinds Kind) :
+      BracePairs(BPS) {
+      assert(!BracePairs.empty());
+      assert(BracePairs.front().TargetKind == BracePair::TargetKinds::None);
+      BracePairs.front().TargetKind = Kind;
+    }
+    ~TargetKindSetter() {
+      BracePairs.front().TargetKind = BracePair::TargetKinds::None;
+    }
+  };
+
+  typedef llvm::SmallVector<swift::ASTNode, 3> ElementVector;
+
+  // Before a "return," "continue" or similar statement, emit pops of
+  // all the braces up to its target.
+  size_t escapeToTarget(BracePair::TargetKinds TargetKind,
+                        ElementVector &Elements, size_t EI) {
+    for (const BracePair &BP : BracePairs) {
+      if (BP.TargetKind == TargetKind) {
+        break;
+      }
+      Elements.insert(Elements.begin() + EI,
+                      buildScopeExit(BP.BraceRange));
+      ++EI;
+    }
+    return EI;
+  }
+
 public:
   Instrumenter (ASTContext &C, DeclContext *DC) :
     Context(C), TypeCheckDC(DC) { }
@@ -50,14 +116,22 @@ public:
       return transformBraceStmt(llvm::cast<BraceStmt>(S));
     case StmtKind::If:
       return transformIfStmt(llvm::cast<IfStmt>(S));
-    case StmtKind::While:
-      return transformWhileStmt(llvm::cast<WhileStmt>(S));
-    case StmtKind::DoWhile:
-      return transformDoWhileStmt(llvm::cast<DoWhileStmt>(S));
-    case StmtKind::For:
-      return transformForStmt(llvm::cast<ForStmt>(S));
-    case StmtKind::ForEach:
-      return transformForEachStmt(llvm::cast<ForEachStmt>(S));
+    case StmtKind::While: {
+        TargetKindSetter TKS(BracePairs, BracePair::TargetKinds::Break);
+        return transformWhileStmt(llvm::cast<WhileStmt>(S));
+      }
+    case StmtKind::DoWhile: {
+        TargetKindSetter TKS(BracePairs, BracePair::TargetKinds::Break);
+        return transformDoWhileStmt(llvm::cast<DoWhileStmt>(S));
+      }
+    case StmtKind::For: {
+        TargetKindSetter TKS(BracePairs, BracePair::TargetKinds::Break);
+        return transformForStmt(llvm::cast<ForStmt>(S));
+      }
+    case StmtKind::ForEach: {
+        TargetKindSetter TKS(BracePairs, BracePair::TargetKinds::Break);
+        return transformForEachStmt(llvm::cast<ForEachStmt>(S));
+      }
     }
   }
     
@@ -143,7 +217,7 @@ public:
     ElementVector Elements(OriginalElements.begin(),
                            OriginalElements.end());
 
-    bool Modified = false;
+    BracePairPusher BPP(BracePairs, BS->getSourceRange());
 
     for (size_t EI = 0;
          EI != Elements.size();
@@ -171,7 +245,6 @@ public:
                                       false, // uses direct property access
                                       AE->getSrc()->getType()),
             AE->getSrc()->getSourceRange());
-          Modified = true;
           Elements[EI] = PV.first;
           Elements.insert(Elements.begin() + (EI + 1), PV.second);
           Elements.insert(Elements.begin() + (EI + 2), Log);
@@ -192,7 +265,6 @@ public:
               if (TargetVD) {
                 Expr *Log = logDeclRef(TargetDRE);
                 if (Log) {
-                  Modified = true;
                   Elements.insert(Elements.begin() + (EI + 1), Log);
                   ++EI;
                 }
@@ -209,7 +281,6 @@ public:
                                         false, // uses direct property access
                                         E->getType()),
               E->getSourceRange());
-            Modified = true;
             Elements[EI] = PV.first;
             Elements.insert(Elements.begin() + (EI + 1), PV.second);
             Elements.insert(Elements.begin() + (EI + 2), Log);
@@ -228,7 +299,6 @@ public:
                                         false, // uses direct property access
                                         E->getType()),
               E->getSourceRange());
-            Modified = true;
             Elements[EI] = PV.first;
             Elements.insert(Elements.begin() + (EI + 1), PV.second);
             Elements.insert(Elements.begin() + (EI + 2), Log);
@@ -237,6 +307,7 @@ public:
         }
       } else if (Stmt *S = Element.dyn_cast<Stmt*>()) {
         if (ReturnStmt *RS = llvm::dyn_cast<ReturnStmt>(S)) {
+          EI = escapeToTarget(BracePair::TargetKinds::Return, Elements, EI);
           if (RS->hasResult()) {
             std::pair<PatternBindingDecl *, VarDecl *> PV =
               buildPatternAndVariable(RS->getResult());
@@ -256,7 +327,6 @@ public:
                                         false, // uses direct property access
                                         RS->getResult()->getType()),
               RS->getResult()->getSourceRange());
-            Modified = true;
             Elements[EI] = PV.first;
             Elements.insert(Elements.begin() + (EI + 1), PV.second);
             Elements.insert(Elements.begin() + (EI + 2), Log);
@@ -264,9 +334,12 @@ public:
             EI += 3;
           }
         } else {
+          if (llvm::isa<BreakStmt>(S) ||
+              llvm::isa<ContinueStmt>(S)) {
+            EI = escapeToTarget(BracePair::TargetKinds::Break, Elements, EI);
+          }
           Stmt *NS = transformStmt(S);
           if (NS != S) {
-            Modified = true;
             Elements[EI] = NS;
           }
         }
@@ -274,13 +347,13 @@ public:
         if (VarDecl *VD = llvm::dyn_cast<VarDecl>(D)) {
           Expr *Log = logVarDecl(VD);
           if (Log) {
-            Modified = true;
             Elements.insert(Elements.begin() + (EI + 1), Log);
             ++EI;
           }
         }
         else if (FuncDecl *FD = llvm::dyn_cast<FuncDecl>(D)) {
           if (BraceStmt *B = FD->getBody()) {
+            TargetKindSetter TKS(BracePairs, BracePair::TargetKinds::Return);
             BraceStmt *NB = transformBraceStmt(B);
             if (NB != B) {
               FD->setBody(NB);
@@ -290,18 +363,12 @@ public:
       }
     }
 
-    Modified = true;
-
     Elements.insert(Elements.begin(), buildScopeEntry(BS->getSourceRange()));
     Elements.insert(Elements.end(), buildScopeExit(BS->getSourceRange()));
 
-    if (Modified) {
-      return swift::BraceStmt::create(Context, BS->getLBraceLoc(),
-                                      Context.AllocateCopy(Elements),
-                                      BS->getRBraceLoc());
-    } else {
-      return BS;
-    }
+    return swift::BraceStmt::create(Context, BS->getLBraceLoc(),
+                                    Context.AllocateCopy(Elements),
+                                    BS->getRBraceLoc());
   }
 
   // log*() functions return a newly-created log expression to be inserted
@@ -481,6 +548,8 @@ public:
     return SendDataCall;
   }
 };
+
+}
 
 static bool moduleHasFunction(Module *M, const char *N)
 {
