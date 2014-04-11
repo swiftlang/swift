@@ -345,10 +345,13 @@ public:
         }
       } else if (Decl *D = Element.dyn_cast<Decl*>()) {
         if (VarDecl *VD = llvm::dyn_cast<VarDecl>(D)) {
-          Expr *Log = logVarDecl(VD);
-          if (Log) {
-            Elements.insert(Elements.begin() + (EI + 1), Log);
-            ++EI;
+          PatternBindingDecl *PBD = VD->getParentPattern();
+          if (PBD && PBD->getInit()) {
+            Expr *Log = logVarDecl(VD);
+            if (Log) {
+              Elements.insert(Elements.begin() + (EI + 1), Log);
+              ++EI;
+            }
           }
         }
         else if (FuncDecl *FD = llvm::dyn_cast<FuncDecl>(D)) {
