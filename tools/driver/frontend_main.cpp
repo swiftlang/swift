@@ -271,6 +271,11 @@ int frontend_main(ArrayRef<const char *>Args,
   CompilerInstance Instance;
   PrintingDiagnosticConsumer PDC;
   Instance.addDiagnosticConsumer(&PDC);
+
+  if (Args.empty()) {
+    Instance.getDiags().diagnose(SourceLoc(), diag::error_no_frontend_args);
+    return 1;
+  }
   
   CompilerInvocation Invocation;
   std::string MainExecutablePath = llvm::sys::fs::getMainExecutable(Argv0,

@@ -40,6 +40,9 @@
 WARNING(warning_no_such_sdk,frontend,none,
   "no such SDK: '%0'", (StringRef))
 
+ERROR(error_no_frontend_args, frontend, none,
+  "no arguments provided to '-frontend'", ())
+
 ERROR(error_no_such_file_or_directory,frontend,none,
   "no such file or directory: '%0'", (StringRef))
 
