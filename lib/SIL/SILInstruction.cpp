@@ -114,6 +114,14 @@ void SILInstruction::dropAllReferences() {
             OpE = PossiblyDeadOps.end(); OpI != OpE; ++OpI) {
     OpI->drop();
   }
+
+  // If we have a function ref inst, we need to especially drop its function
+  // argument so that it gets a proper ref decement.
+  auto *FRI = dyn_cast<FunctionRefInst>(this);
+  if (!FRI || !FRI->getReferencedFunction())
+    return;
+
+  FRI->dropReferencedFunction();
 }
 
 namespace {
@@ -624,7 +632,14 @@ FunctionRefInst::FunctionRefInst(SILLocation Loc, SILFunction *F)
 }
 
 FunctionRefInst::~FunctionRefInst() {
-  Function->decrementRefCount();
+  if (Function)
+    Function->decrementRefCount();
+}
+
+void FunctionRefInst::dropReferencedFunction() {
+  if (Function)
+    Function->decrementRefCount();
+  Function = nullptr;
 }
 
 SILGlobalAddrInst::SILGlobalAddrInst(SILLocation Loc, SILGlobalVariable *Global)

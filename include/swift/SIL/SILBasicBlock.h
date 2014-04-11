@@ -134,6 +134,13 @@ public:
   /// \brief Remove all block arguments.
   void dropAllArgs() { BBArgList.clear(); }
 
+  /// \brief Drops all uses that belong to this basic block.
+  void dropAllReferences() {
+    dropAllArgs();
+    for (SILInstruction &I : *this)
+      I.dropAllReferences();
+  }
+
   //===--------------------------------------------------------------------===//
   // Predecessors and Successors
   //===--------------------------------------------------------------------===//

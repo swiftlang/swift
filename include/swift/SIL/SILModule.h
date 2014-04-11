@@ -98,14 +98,28 @@ private:
   /// The swift Module associated with this SILModule.
   Module *TheSwiftModule;
 
+  /// Lookup table for SIL functions. This needs to be declared before \p
+  /// functions so that the destructor of \p functions is called first.
+  llvm::StringMap<SILFunction *> FunctionTable;
+
   /// The list of SILFunctions in the module.
   FunctionListType functions;
+
+  /// Lookup table for SIL vtables from class decls.
+  llvm::DenseMap<const ClassDecl *, SILVTable *> VTableLookupTable;
 
   /// The list of SILVTables in the module.
   VTableListType vtables;
 
+  /// Lookup table for SIL witness tables from conformances.
+  llvm::DenseMap<const NormalProtocolConformance *, SILWitnessTable *>
+  WitnessTableLookupCache;
+
   /// The list of SILWitnessTables in the module.
   WitnessTableListType witnessTables;
+
+  /// Lookup table for SIL Global Variables.
+  llvm::StringMap<SILGlobalVariable *> GlobalVariableTable;
 
   /// The list of SILGlobalVariables in the module.
   /// FIXME: Merge with 'globals'.
@@ -114,19 +128,6 @@ private:
   /// The collection of global variables used in the module.
   /// FIXME: Remove this when SILGlobalVariable is ready.
   llvm::SetVector<VarDecl*> globals;
-
-  /// Lookup table for SIL functions.
-  llvm::StringMap<SILFunction*> FunctionTable;
-
-  /// Lookup table for SIL global variables.
-  llvm::StringMap<SILGlobalVariable*> GlobalVariableTable;
-
-  /// Lookup table for SIL witness tables from conformances.
-  llvm::DenseMap<const NormalProtocolConformance *, SILWitnessTable *>
-  WitnessTableLookupCache;
-
-  /// Lookup table for SIL vtables from class decls.
-  llvm::DenseMap<const ClassDecl *, SILVTable *> VTableLookupTable;
 
   /// This is a cache of intrinsic Function declarations to numeric ID mappings.
   llvm::DenseMap<Identifier, IntrinsicInfo> IntrinsicIDCache;
@@ -181,7 +182,6 @@ public:
 
   /// Erase a function from the module.
   void eraseFunction(SILFunction *F) {
-    FunctionTable.erase(F->getName());
     getFunctionList().erase(F);
   }
 

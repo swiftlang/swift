@@ -597,6 +597,8 @@ public:
   /// Return the referenced function.
   SILFunction *getReferencedFunction() const { return Function; }
 
+  void dropReferencedFunction();
+
   /// getType() is ok since this is known to only have one type.
   SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
 

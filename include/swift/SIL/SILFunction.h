@@ -123,6 +123,14 @@ public:
   /// Increase the reference count.
   void incrementRefCount() { RefCount++; }
   void decrementRefCount() { RefCount--; }
+
+  /// Drops all uses belonging to instructions in this function. The only valid
+  /// operation performable on this object after this is called is called the
+  /// destructor or deallocation.
+  void dropAllReferences() {
+    for (SILBasicBlock &BB : *this)
+      BB.dropAllReferences();
+  }
   
   /// Returns the calling convention used by this entry point.
   AbstractCC getAbstractCC() const {
@@ -281,7 +289,7 @@ public:
   SILFunction *provideInitialHead() const { return createSentinel(); }
   SILFunction *ensureHead(SILFunction*) const { return createSentinel(); }
   static void noteHead(SILFunction*, SILFunction*) {}
-  static void deleteNode(SILFunction *V) {}
+  static void deleteNode(SILFunction *V) { V->~SILFunction(); }
   
 private:
   void createNode(const SILFunction &);

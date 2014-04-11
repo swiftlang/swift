@@ -91,6 +91,15 @@ SILModule::SILModule(Module *SwiftModule)
 }
 
 SILModule::~SILModule() {
+  // Drop everything functions in this module reference.
+  //
+  // This is necessary since the functions may reference each other.  We don't
+  // need to worry about sil_witness_tables since witness tables reference each
+  // other via protocol conformances and sil_vtables don't reference each other
+  // at all.
+  for (SILFunction &F : *this)
+    F.dropAllReferences();
+
   delete (SILTypeListUniquingType*)TypeListUniquing;
 }
 

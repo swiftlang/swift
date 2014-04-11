@@ -72,8 +72,15 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage,
 }
 
 SILFunction::~SILFunction() {
+#ifndef NDEBUG
+  // If the function is recursive, a function_ref inst inside of the function
+  // will give the function a non-zero ref count triggering the assertion. Thus
+  // we drop all instruction references before we erase.
+  dropAllReferences();
   assert(RefCount == 0 &&
          "Function cannot be deleted while function_ref's still exist");
+#endif
+
   getModule().FunctionTable.erase(Name);
 }
 
