@@ -226,8 +226,7 @@ std::pair<bool, Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
     SN.BodyRange = innerCharSourceRangeFromSourceRange(SM,
                                                        S->getSourceRange());
     pushStructureNode(SN);
-  }
-  else if (SwitchStmt *SW = dyn_cast<SwitchStmt>(S)) {
+  } else if (auto *SW = dyn_cast<SwitchStmt>(S)) {
     if (SW->getLBraceLoc().isValid() && SW->getRBraceLoc().isValid()) {
       SourceRange BraceRange(SW->getLBraceLoc(), SW->getRBraceLoc());
       SyntaxStructureNode SN;
@@ -267,7 +266,7 @@ std::pair<bool, Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
 Stmt *ModelASTWalker::walkToStmtPost(Stmt *S) {
   if (isa<BraceStmt>(S) && shouldPassBraceStructureNode(cast<BraceStmt>(S)))
     popStructureNode();
-  else if (SwitchStmt *SW = dyn_cast<SwitchStmt>(S)) {
+  else if (auto *SW = dyn_cast<SwitchStmt>(S)) {
     if (SW->getLBraceLoc().isValid() && SW->getRBraceLoc().isValid())
       popStructureNode();
   }
@@ -282,7 +281,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
   if (!handleAttrs(D->getAttrs()))
     return false;
 
-  if (AbstractFunctionDecl *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
+  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
     FuncDecl *FD = dyn_cast<FuncDecl>(AFD);
     if (FD && FD->isAccessor()) {
       // Pass context sensitive keyword token.
@@ -299,11 +298,10 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
           case AccessorKind::IsDidSet: TokLen = 6; break;
         }
         if (!passNonTokenNode({ SyntaxNodeKind::Keyword,
-          CharSourceRange(SL, TokLen)}))
+                                CharSourceRange(SL, TokLen)}))
           return false;
       }
-    }
-    else {
+    } else {
       // Pass Function / Method structure node.
       SyntaxStructureNode SN;
       const DeclContext *DC = AFD->getDeclContext();
@@ -324,8 +322,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
       SN.Attrs = AFD->getAttrs();
       pushStructureNode(SN);
     }
-  }
-  else if (NominalTypeDecl *NTD = dyn_cast<NominalTypeDecl>(D)) {
+  } else if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
     SyntaxStructureNode SN;
     SN.Kind = syntaxStructureKindFromNominalTypeDecl(NTD);
     SN.Range = charSourceRangeFromSourceRange(SM, NTD->getSourceRange());
@@ -342,8 +339,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
 
     SN.Attrs = NTD->getAttrs();
     pushStructureNode(SN);
-  }
-  else if (VarDecl *VD = dyn_cast<VarDecl>(D)) {
+  } else if (auto *VD = dyn_cast<VarDecl>(D)) {
     const DeclContext *DC = VD->getDeclContext();
     if (DC->isTypeContext()) {
       SyntaxStructureNode SN;
@@ -367,7 +363,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
       pushStructureNode(SN);
     }
 
-  } else if (auto ConfigD = dyn_cast<IfConfigDecl>(D)) {
+  } else if (auto *ConfigD = dyn_cast<IfConfigDecl>(D)) {
     if (!passNonTokenNode({ SyntaxNodeKind::BuildConfigKeyword,
           CharSourceRange(ConfigD->getIfLoc(), 3/*'#if'*/) }))
       return false;
@@ -399,14 +395,12 @@ bool ModelASTWalker::walkToDeclPost(swift::Decl *D) {
     if (!(FD && FD->isAccessor())) {
       popStructureNode();
     }
-  }
-  else if (VarDecl *VD = dyn_cast<VarDecl>(D)) {
+  } else if (VarDecl *VD = dyn_cast<VarDecl>(D)) {
     const DeclContext *DC = VD->getDeclContext();
     if (DC->isTypeContext()) {
       popStructureNode();
     }
-  }
-  else if (isa<NominalTypeDecl>(D)) {
+  } else if (isa<NominalTypeDecl>(D)) {
     popStructureNode();
   }
   return true;
@@ -486,6 +480,7 @@ bool ModelASTWalker::handleAttrs(const TypeAttributes &Attrs) {
 
   return handleAttrLocs(Attrs.AtLoc, Locs);
 }
+
 bool ModelASTWalker::handleAttrLocs(SourceLoc BeginLoc,
                                     ArrayRef<SourceLoc> Locs) {
   if (Locs.empty())
