@@ -63,8 +63,8 @@ namespace swift {
   
   template<typename T>
   inline auto reversed(T &&container)
-  -> decltype(make_range(container.rbegin(), container.rend())) {
-    return make_range(container.rbegin(), container.rend());
+  -> decltype(swift::make_range(container.rbegin(), container.rend())) {
+    return swift::make_range(container.rbegin(), container.rend());
   }
   
   // Wrapper for std::transform that creates a new back-insertable container
@@ -177,6 +177,6 @@ typename std::enable_if<sizeof(std::declval<T>()[size_t(1)]) != 0,
 indices(const T &collection) {
   return IntRange<decltype(std::declval<T>().size())>(0, collection.size());
 }
-}
+} // namespace swift
 
 #endif
