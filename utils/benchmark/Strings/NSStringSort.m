@@ -2,13 +2,11 @@
 #include <mach/mach_time.h>
 #include <stdio.h>
 // NOTE: compile with ARC enabled
-// clang -fobjc-arc -O3 NSStringBench.m -o NSStringBench.bin
+// clang -fobjc-arc -O3 NSStringBench.m -o NSStringBench.bin -framework Foundation
 #define LAPS 50
 
 int
 main(void) {
-  NSArray *myArray2;
-
   NSArray *myArray = @[
     @"woodshed",
     @"lakism",
@@ -1012,13 +1010,10 @@ main(void) {
     @"overpresumptuous"
       ];
 
-  NSSortDescriptor *sortDesc = [[NSSortDescriptor alloc] initWithKey:nil ascending:YES];
-
   uint64_t count = 0;
   uint64_t start = mach_absolute_time();
   for (unsigned i = 0; i < LAPS; i++) {
-    myArray2 = [myArray copy];
-    myArray2 = [myArray2 sortedArrayUsingDescriptors:@[sortDesc]];
+    [[myArray mutableCopy] sortUsingSelector: @selector(compare:)];
   }
   uint64_t delta = mach_absolute_time() - start;
   printf("%f ns\n",
