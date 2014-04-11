@@ -97,9 +97,10 @@ public:
     return Found;
   }
 };
+} // unnamed namespace
 
-Stmt *findNearestStmt(const AbstractFunctionDecl *AFD, SourceLoc Loc,
-                      StmtKind Kind) {
+static Stmt *findNearestStmt(const AbstractFunctionDecl *AFD, SourceLoc Loc,
+                             StmtKind Kind) {
   auto &SM = AFD->getASTContext().SourceMgr;
   assert(SM.rangeContainsTokenLoc(AFD->getSourceRange(), Loc));
   StmtFinder Finder(SM, Loc, Kind);
@@ -107,7 +108,6 @@ Stmt *findNearestStmt(const AbstractFunctionDecl *AFD, SourceLoc Loc,
   const_cast<AbstractFunctionDecl *>(AFD)->walk(Finder);
   return Finder.getFoundStmt();
 }
-} // unnamed namespace
 
 CodeCompletionString::CodeCompletionString(ArrayRef<Chunk> Chunks) {
   Chunk *TailChunks = reinterpret_cast<Chunk *>(this + 1);
@@ -1018,7 +1018,7 @@ public:
         if (NeedComma)
           Builder.addComma();
         NeedComma = true;
-        
+
         Builder.addCallParameter(TupleElt.getPattern()->getBoundName(),
                                  TupleElt.getPattern()->getType());
       }
@@ -1058,7 +1058,7 @@ public:
 
     if (IsTopLevel)
       Builder.addLeftParen();
-    
+
     Builder.addCallParameter(Label, T);
     if (IsTopLevel)
       Builder.addRightParen();
