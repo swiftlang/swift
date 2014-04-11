@@ -400,7 +400,7 @@ public:
   bool visitApplyInst(ApplyInst *AI) {
     // If we don't have a function ref inst, just return false. We do not have
     // interesting callees.
-    auto *FRI = dyn_cast<FunctionRefInst>(AI->getCallee().getDef());
+    auto *FRI = dyn_cast<FunctionRefInst>(AI->getCallee());
     if (!FRI)
       return false;
 
@@ -420,7 +420,7 @@ public:
   }
 
   bool visitPartialApplyInst(PartialApplyInst *PAI) {
-    auto *FRI = dyn_cast<FunctionRefInst>(PAI->getCallee().getDef());
+    auto *FRI = dyn_cast<FunctionRefInst>(PAI->getCallee());
     if (!FRI)
       return false;
 

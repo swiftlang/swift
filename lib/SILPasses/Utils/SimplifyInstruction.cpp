@@ -180,7 +180,7 @@ SILValue InstSimplifier::visitEnumInst(EnumInst *EI) {
 
 SILValue InstSimplifier::visitAddressToPointerInst(AddressToPointerInst *ATPI) {
   // (address_to_pointer (pointer_to_address x)) -> x
-  if (auto *PTAI = dyn_cast<PointerToAddressInst>(ATPI->getOperand().getDef()))
+  if (auto *PTAI = dyn_cast<PointerToAddressInst>(ATPI->getOperand()))
     if (PTAI->getType() == ATPI->getOperand().getType())
       return PTAI->getOperand();
 
@@ -189,7 +189,7 @@ SILValue InstSimplifier::visitAddressToPointerInst(AddressToPointerInst *ATPI) {
 
 SILValue InstSimplifier::visitPointerToAddressInst(PointerToAddressInst *PTAI) {
   // (pointer_to_address (address_to_pointer x)) -> x
-  if (auto *ATPI = dyn_cast<AddressToPointerInst>(PTAI->getOperand().getDef()))
+  if (auto *ATPI = dyn_cast<AddressToPointerInst>(PTAI->getOperand()))
     if (ATPI->getOperand().getType() == PTAI->getType())
       return ATPI->getOperand();
 
@@ -213,7 +213,7 @@ InstSimplifier::
 visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *UCCI) {
   // (UCCI downcast (upcast x #type1 to #type2) #type2 to #type1) -> x
   if (UCCI->getCastKind() == CheckedCastKind::Downcast)
-    if (auto *Upcast = dyn_cast<UpcastInst>(UCCI->getOperand().getDef()))
+    if (auto *Upcast = dyn_cast<UpcastInst>(UCCI->getOperand()))
       if (UCCI->getOperand().getType() == Upcast->getType() &&
           UCCI->getType() == Upcast->getOperand().getType())
       return Upcast->getOperand();
@@ -268,7 +268,7 @@ SILValue InstSimplifier::visitApplyInst(ApplyInst *AI) {
   // apply(expect, constant, _) -> constant.
   if (BFRI->getIntrinsicInfo().ID == llvm::Intrinsic::expect) {
     SILValue Op = AI->getOperand(1);
-    IntegerLiteralInst *I = dyn_cast<IntegerLiteralInst>(Op.getDef());
+    IntegerLiteralInst *I = dyn_cast<IntegerLiteralInst>(Op);
     return I? SILValue(I) : SILValue();
   }
 

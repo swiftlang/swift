@@ -124,7 +124,7 @@ bool performLoadStoreOptimizations(SILBasicBlock *BB, AliasAnalysis *AA) {
       // If we are storing a value that is available in the load list then we
       // know that no one clobbered that address and the current store is
       // redundant and we can remove it.
-      if (LoadInst *LdSrc = dyn_cast<LoadInst>(SI->getSrc().getDef())) {
+      if (LoadInst *LdSrc = dyn_cast<LoadInst>(SI->getSrc())) {
         // Check that the loaded value is live and that the destination address
         // is the same as the loaded address.
         if (Loads.count(LdSrc) && LdSrc->getOperand() == SI->getDest()) {

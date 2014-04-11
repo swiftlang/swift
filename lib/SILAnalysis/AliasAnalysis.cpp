@@ -69,7 +69,7 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS,
 /// Return true if the given SILArgument is an argument to the first BB of a
 /// function.
 static bool isFunctionArgument(SILValue V) {
-  auto *Arg = dyn_cast<SILArgument>(V.getDef());
+  auto *Arg = dyn_cast<SILArgument>(V);
   if (!Arg)
     return false;
   return Arg->isFunctionArg();
@@ -111,7 +111,7 @@ static bool isIdentifiedFunctionLocal(SILValue V) {
 /// Returns true if the ValueBase inside V is an apply whose callee is a no read
 /// builtin_function_ref.
 static bool isNoReadApplyInst(SILValue V) {
-  auto *AI = dyn_cast<ApplyInst>(V.getDef());
+  auto *AI = dyn_cast<ApplyInst>(V);
   if (!AI)
     return false;
 
@@ -375,7 +375,7 @@ static bool isAliasingFunctionArgument(SILValue V) {
 
 /// Returns true if V is an apply inst that may read or write to memory.
 static bool isReadWriteApplyInst(SILValue V) {
-  return isa<ApplyInst>(*V) && !isNoReadApplyInst(V.getDef());
+  return isa<ApplyInst>(*V) && !isNoReadApplyInst(V);
 }
 
 /// Return true if the pointer is one which would have been considered an escape
@@ -411,8 +411,8 @@ static bool aliasUnequalObjects(SILValue O1, SILValue O2) {
 
   // Function arguments can't alias with things that are known to be
   // unambigously identified at the function level.
-  if ((isFunctionArgument(O1.getDef()) && isIdentifiedFunctionLocal(O2)) ||
-      (isFunctionArgument(O2.getDef()) && isIdentifiedFunctionLocal(O1))) {
+  if ((isFunctionArgument(O1) && isIdentifiedFunctionLocal(O2)) ||
+      (isFunctionArgument(O2) && isIdentifiedFunctionLocal(O1))) {
     DEBUG(llvm::dbgs() << "            Found unequal function arg and "
           "identified function local!\n");
     return true;
@@ -734,7 +734,7 @@ AliasAnalysis::getMemoryBehavior(SILInstruction *Inst, SILValue V) {
     // If the ApplyInst is from a no-read builtin it can not read or write and
     // if it comes from a no-side effect builtin, it can only read.
     auto *AI = cast<ApplyInst>(Inst);
-    auto *BFR = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee().getDef());
+    auto *BFR = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee());
 
     // If our callee is not a builtin, be conservative and return may have side
     // effects.

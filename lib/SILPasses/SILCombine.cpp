@@ -632,7 +632,7 @@ SILInstruction *SILCombiner::visitReleaseValueInst(ReleaseValueInst *DI) {
   SILType OperandTy = Operand.getType();
 
   // Destroy value of an enum with a trivial payload or no-payload is a no-op.
-  if (auto *EI = dyn_cast<EnumInst>(Operand.getDef()))
+  if (auto *EI = dyn_cast<EnumInst>(Operand))
     if (!EI->hasOperand() ||
         EI->getOperand().getType().isTrivial(EI->getModule()))
       return eraseInstFromFunction(*DI);
@@ -655,7 +655,7 @@ SILInstruction *SILCombiner::visitRetainValueInst(RetainValueInst *CI) {
 
   // retain_value of an enum with a trivial payload or no-payload is a no-op +
   // RAUW.
-  if (auto *EI = dyn_cast<EnumInst>(Operand.getDef()))
+  if (auto *EI = dyn_cast<EnumInst>(Operand))
     if (!EI->hasOperand() ||
         EI->getOperand().getType().isTrivial(CI->getModule())) {
       return eraseInstFromFunction(*CI);

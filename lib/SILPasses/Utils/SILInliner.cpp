@@ -322,7 +322,7 @@ static InlineCost instructionInlineCost(SILInstruction &I,
     case ValueKind::ApplyInst: {
       // Don't inline functions that contain recursions.
       ApplyInst *AI = cast<ApplyInst>(&I);
-      auto *FRI = dyn_cast<FunctionRefInst>(AI->getCallee().getDef());
+      auto *FRI = dyn_cast<FunctionRefInst>(AI->getCallee());
       if (FRI && FRI->getReferencedFunction() == AI->getFunction())
         return InlineCost::CannotBeInlined;
  

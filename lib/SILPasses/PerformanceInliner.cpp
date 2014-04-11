@@ -52,7 +52,7 @@ static SILFunction *getInlinableFunction(ApplyInst *AI,
   if (AI->hasSubstitutions())
     return nullptr;
 
-  auto *FRI = dyn_cast<FunctionRefInst>(AI->getCallee().getDef());
+  auto *FRI = dyn_cast<FunctionRefInst>(AI->getCallee());
   if (!FRI)
     return nullptr;
 
@@ -140,7 +140,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
     // Check if the function takes a closure.
     bool HasClosure = false;
     for (auto &Op : AI->getAllOperands()) {
-      if (isa<PartialApplyInst>(Op.get().getDef())) {
+      if (isa<PartialApplyInst>(Op.get())) {
         HasClosure = true;
         break;
       }

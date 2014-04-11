@@ -67,7 +67,7 @@ swift::isInstructionTriviallyDead(SILInstruction *I) {
   // We know that some calls do not have side effects.
   if (const ApplyInst *AI = dyn_cast<ApplyInst>(I)) {
     if (BuiltinFunctionRefInst *FR =
-        dyn_cast<BuiltinFunctionRefInst>(AI->getCallee().getDef())) {
+        dyn_cast<BuiltinFunctionRefInst>(AI->getCallee())) {
       return isSideEffectFree(FR);
     }
   }
@@ -164,7 +164,7 @@ void swift::eraseUsesOfInstruction(SILInstruction *Inst) {
     // will become trivially dead when this instruction is removed.
 
     for (auto &Op : User->getAllOperands()) {
-      if (auto *OpI = dyn_cast<SILInstruction>(Op.get().getDef())) {
+      if (auto *OpI = dyn_cast<SILInstruction>(Op.get())) {
         // Don't recursively delete the pointer we're getting in.
         if (OpI != Inst) {
           Op.drop();

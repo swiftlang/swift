@@ -132,7 +132,7 @@ SILCloner<ImplClass>::remapValue(SILValue Value) {
   if (VI != ValueMap.end())
     return VI->second;
 
-  if (SILInstruction* I = dyn_cast<SILInstruction>(Value.getDef())) {
+  if (SILInstruction* I = dyn_cast<SILInstruction>(Value)) {
     auto II = InstructionMap.find(I);
     if (II != InstructionMap.end())
       return SILValue(II->second, Value.getResultNumber());
@@ -140,7 +140,7 @@ SILCloner<ImplClass>::remapValue(SILValue Value) {
   }
 
   // If we have undef, just copy it.
-  if (SILUndef *U = dyn_cast<SILUndef>(Value.getDef()))
+  if (SILUndef *U = dyn_cast<SILUndef>(Value))
     return SILValue(U, Value.getResultNumber());
 
   llvm_unreachable("Unmapped value while cloning?");

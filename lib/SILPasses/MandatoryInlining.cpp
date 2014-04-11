@@ -70,7 +70,7 @@ cleanupCalleeValue(SILValue CalleeValue, ArrayRef<SILValue> CaptureArgs,
                    ArrayRef<SILValue> FullArgs) {
   SmallVector<SILInstruction*, 16> InstsToDelete;
   for (SILValue V : FullArgs) {
-    if (SILInstruction *I = dyn_cast<SILInstruction>(V.getDef()))
+    if (SILInstruction *I = dyn_cast<SILInstruction>(V))
       if (I != CalleeValue.getDef() &&
           isInstructionTriviallyDead(I))
         InstsToDelete.push_back(I);
@@ -78,9 +78,9 @@ cleanupCalleeValue(SILValue CalleeValue, ArrayRef<SILValue> CaptureArgs,
   recursivelyDeleteTriviallyDeadInstructions(InstsToDelete, true);
 
   // Handle the case where the callee of the apply is a load instruction.
-  if (LoadInst *LI = dyn_cast<LoadInst>(CalleeValue.getDef())) {
+  if (LoadInst *LI = dyn_cast<LoadInst>(CalleeValue)) {
     assert(CalleeValue.getResultNumber() == 0);
-    SILInstruction *ABI = dyn_cast<AllocBoxInst>(LI->getOperand().getDef());
+    SILInstruction *ABI = dyn_cast<AllocBoxInst>(LI->getOperand());
     assert(ABI && LI->getOperand().getResultNumber() == 1);
 
     // The load instruction must have no more uses left to erase it.
@@ -125,7 +125,7 @@ cleanupCalleeValue(SILValue CalleeValue, ArrayRef<SILValue> CaptureArgs,
       return;
   }
 
-  if (auto *PAI = dyn_cast<PartialApplyInst>(CalleeValue.getDef())) {
+  if (auto *PAI = dyn_cast<PartialApplyInst>(CalleeValue)) {
     assert(CalleeValue.getResultNumber() == 0);
 
     // Look through remaining uses of the partial apply inst to find at most one
@@ -160,7 +160,7 @@ cleanupCalleeValue(SILValue CalleeValue, ArrayRef<SILValue> CaptureArgs,
     assert(PAI->use_empty());
     PAI->eraseFromParent();
   } else if (auto *TTTFI =
-               dyn_cast<ThinToThickFunctionInst>(CalleeValue.getDef())) {
+               dyn_cast<ThinToThickFunctionInst>(CalleeValue)) {
     assert(CalleeValue.getResultNumber() == 0);
 
     // Look through remaining uses of the thin-to-thick inst to find at most one
@@ -214,11 +214,11 @@ getCalleeFunction(ApplyInst* AI, bool &IsThick,
     FullArgs.push_back(Arg);
   SILValue CalleeValue = AI->getCallee();
 
-  if (LoadInst *LI = dyn_cast<LoadInst>(CalleeValue.getDef())) {
+  if (LoadInst *LI = dyn_cast<LoadInst>(CalleeValue)) {
     assert(CalleeValue.getResultNumber() == 0);
     // Conservatively only see through alloc_box; we assume this pass is run
     // immediately after SILGen
-    SILInstruction *ABI = dyn_cast<AllocBoxInst>(LI->getOperand().getDef());
+    SILInstruction *ABI = dyn_cast<AllocBoxInst>(LI->getOperand());
     if (!ABI)
       return nullptr;
     assert(LI->getOperand().getResultNumber() == 1);
@@ -256,7 +256,7 @@ getCalleeFunction(ApplyInst* AI, bool &IsThick,
   // one "thin to thick function" instructions, since those are the patterns
   // generated when using auto closures.
   if (PartialApplyInst *PAI =
-        dyn_cast<PartialApplyInst>(CalleeValue.getDef())) {
+        dyn_cast<PartialApplyInst>(CalleeValue)) {
     assert(CalleeValue.getResultNumber() == 0);
 
     for (const auto &Arg : PAI->getArguments()) {
@@ -267,13 +267,13 @@ getCalleeFunction(ApplyInst* AI, bool &IsThick,
     CalleeValue = PAI->getCallee();
     IsThick = true;
   } else if (ThinToThickFunctionInst *TTTFI =
-               dyn_cast<ThinToThickFunctionInst>(CalleeValue.getDef())) {
+               dyn_cast<ThinToThickFunctionInst>(CalleeValue)) {
     assert(CalleeValue.getResultNumber() == 0);
     CalleeValue = TTTFI->getOperand();
     IsThick = true;
   }
 
-  FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(CalleeValue.getDef());
+  FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(CalleeValue);
   if (!FRI)
     return nullptr;
   assert(CalleeValue.getResultNumber() == 0);

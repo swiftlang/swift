@@ -35,7 +35,7 @@ static void cleanFunction(SILFunction &Fn) {
       // Remove calls to Builtin.staticReport().
       if (ApplyInst *AI = dyn_cast<ApplyInst>(Inst))
         if (BuiltinFunctionRefInst *FR =
-            dyn_cast<BuiltinFunctionRefInst>(AI->getCallee().getDef())) {
+            dyn_cast<BuiltinFunctionRefInst>(AI->getCallee())) {
           const BuiltinInfo &B = FR->getBuiltinInfo();
           if (B.ID == BuiltinValueKind::StaticReport) {
             // The call to the builtin should get removed before we reach

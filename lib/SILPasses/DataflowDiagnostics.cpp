@@ -130,7 +130,7 @@ static void diagnoseStaticReports(const SILInstruction *I,
   // Find out if we are dealing with Builtin.staticReport().
   if (const ApplyInst *AI = dyn_cast<ApplyInst>(I)) {
     if (const BuiltinFunctionRefInst *FR =
-        dyn_cast<BuiltinFunctionRefInst>(AI->getCallee().getDef())) {
+        dyn_cast<BuiltinFunctionRefInst>(AI->getCallee())) {
       const BuiltinInfo &B = FR->getBuiltinInfo();
       if (B.ID == BuiltinValueKind::StaticReport) {
 

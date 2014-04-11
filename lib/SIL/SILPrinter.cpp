@@ -434,7 +434,7 @@ public:
 
     // Print SIL location.
     if (Verbose) {
-      if (SILInstruction *I = dyn_cast<SILInstruction>(V.getDef())) {
+      if (SILInstruction *I = dyn_cast<SILInstruction>(V)) {
         SILLocation L = I->getLoc();
         SILModule &M = I->getModule();
         if (!L.isNull()) {

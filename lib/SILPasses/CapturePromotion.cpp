@@ -378,7 +378,7 @@ ClosureCloner::populateCloned() {
 void
 ClosureCloner::visitStrongReleaseInst(StrongReleaseInst *Inst) {
   SILValue Operand = Inst->getOperand();
-  if (SILArgument *A = dyn_cast<SILArgument>(Operand.getDef())) {
+  if (SILArgument *A = dyn_cast<SILArgument>(Operand)) {
     assert(Operand.getResultNumber() == 0);
     auto I = BoxArgumentMap.find(A);
     if (I != BoxArgumentMap.end()) {
@@ -400,7 +400,7 @@ ClosureCloner::visitStrongReleaseInst(StrongReleaseInst *Inst) {
 void
 ClosureCloner::visitStructElementAddrInst(StructElementAddrInst *Inst) {
   SILValue Operand = Inst->getOperand();
-  if (SILArgument *A = dyn_cast<SILArgument>(Operand.getDef())) {
+  if (SILArgument *A = dyn_cast<SILArgument>(Operand)) {
     assert(Operand.getResultNumber() == 0);
     auto I = AddrArgumentMap.find(A);
     if (I != AddrArgumentMap.end())
@@ -416,7 +416,7 @@ ClosureCloner::visitStructElementAddrInst(StructElementAddrInst *Inst) {
 void
 ClosureCloner::visitLoadInst(LoadInst *Inst) {
   SILValue Operand = Inst->getOperand();
-  if (auto *A = dyn_cast<SILArgument>(Operand.getDef())) {
+  if (auto *A = dyn_cast<SILArgument>(Operand)) {
     assert(Operand.getResultNumber() == 0);
     auto I = AddrArgumentMap.find(A);
     if (I != AddrArgumentMap.end()) {
@@ -425,9 +425,9 @@ ClosureCloner::visitLoadInst(LoadInst *Inst) {
       ValueMap.insert(std::make_pair(Inst, I->second));
       return;
     }
-  } else if (auto *SEAI = dyn_cast<StructElementAddrInst>(Operand.getDef())) {
+  } else if (auto *SEAI = dyn_cast<StructElementAddrInst>(Operand)) {
     assert(Operand.getResultNumber() == 0);
-    if (auto *A = dyn_cast<SILArgument>(SEAI->getOperand().getDef())) {
+    if (auto *A = dyn_cast<SILArgument>(SEAI->getOperand())) {
       assert(SEAI->getOperand().getResultNumber() == 0);
       auto I = AddrArgumentMap.find(A);
       if (I != AddrArgumentMap.end()) {
@@ -452,7 +452,7 @@ ClosureCloner::visitLoadInst(LoadInst *Inst) {
 static bool
 isNonmutatingCapture(PartialApplyInst *PAI, unsigned Index) {
   // Return false if the callee is not a function with accessible contents.
-  auto *FRI = dyn_cast<FunctionRefInst>(PAI->getCallee().getDef());
+  auto *FRI = dyn_cast<FunctionRefInst>(PAI->getCallee());
   if (!FRI)
     return false;
   assert(PAI->getCallee().getResultNumber() == 0);
@@ -663,7 +663,7 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
                         SmallVectorImpl<SILFunction*> &Worklist) {
   SILModule &M = PAI->getModule();
 
-  auto *FRI = dyn_cast<FunctionRefInst>(PAI->getCallee().getDef());
+  auto *FRI = dyn_cast<FunctionRefInst>(PAI->getCallee());
   assert(FRI && PAI->getCallee().getResultNumber() == 0);
 
   // Clone the closure with the given promoted captures.

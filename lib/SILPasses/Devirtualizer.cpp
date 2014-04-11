@@ -348,7 +348,7 @@ static SILValue findOrigin(SILValue S) {
       case ValueKind::ApplyInst: {
         ApplyInst *AI = cast<ApplyInst>(Origin);
         FunctionRefInst *FR =
-          dyn_cast<FunctionRefInst>(AI->getCallee().getDef());
+          dyn_cast<FunctionRefInst>(AI->getCallee());
         if (!FR)
           break;
 
@@ -403,7 +403,7 @@ addPolyArg(SILArgument *Arg, SILDevirtualizer::PolyArgList &PolyArgs,
 /// passed directly to this call site.
 void SILDevirtualizer::collectPolyArgs(ApplyInst *AI) {
   SILValue CalleeVal = AI->getCallee();
-  FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(CalleeVal.getDef());
+  FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(CalleeVal);
   if (!FRI)
     return;
 
@@ -491,7 +491,7 @@ struct ResOperType {
 /// found them to be profitable.
 bool SILDevirtualizer::resolveArgs(ApplyInst *AI) {
   SILValue CalleeVal = AI->getCallee();
-  FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(CalleeVal.getDef());
+  FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(CalleeVal);
   if (!FRI)
     return false;
 
