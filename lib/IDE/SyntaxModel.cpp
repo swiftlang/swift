@@ -488,7 +488,7 @@ bool ModelASTWalker::handleAttrs(const TypeAttributes &Attrs) {
 }
 bool ModelASTWalker::handleAttrLocs(SourceLoc BeginLoc,
                                     ArrayRef<SourceLoc> Locs) {
-  if (BeginLoc.isInvalid() || Locs.empty())
+  if (Locs.empty())
     return true;
 
   SmallVector<SourceLoc, 6> SortedLocs(Locs.begin(), Locs.end());
@@ -498,6 +498,12 @@ bool ModelASTWalker::handleAttrLocs(SourceLoc BeginLoc,
       }
   );
   Locs = SortedLocs;
+
+  // The BeginLoc is invalid if there's no leading '@', which happens if there
+  // are only virtual attributes. In that case we'll use the location of the
+  // first attribute.
+  if (BeginLoc.isInvalid())
+    BeginLoc = Locs.front();
 
   std::vector<Token> Toks =
       swift::tokenize(LangOpts, SM, BufferID,
