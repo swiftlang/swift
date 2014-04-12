@@ -41,6 +41,7 @@
 namespace clang {
   class Decl;
   class MacroInfo;
+  class Module;
   class SourceLocation;
 }
 
@@ -78,14 +79,16 @@ namespace swift {
   class ValueDecl;
   class VarDecl;
 
-/// Represents a clang declaration or a macro.
+/// Represents a clang declaration, macro, or module.
 class ClangNode {
-  llvm::PointerUnion<const clang::Decl *, clang::MacroInfo *> Ptr;
+  llvm::PointerUnion3<const clang::Decl *, clang::MacroInfo *,
+                      const clang::Module *> Ptr;
 
 public:
   ClangNode() = default;
   ClangNode(const clang::Decl *D) : Ptr(D) {}
   ClangNode(clang::MacroInfo *MI) : Ptr(MI) {}
+  ClangNode(const clang::Module *Mod) : Ptr(Mod) {}
 
   bool isNull() const { return Ptr.isNull(); }
   explicit operator bool() const { return !isNull(); }
@@ -95,6 +98,19 @@ public:
   }
   clang::MacroInfo *getAsMacro() const {
     return Ptr.dyn_cast<clang::MacroInfo *>();
+  }
+  const clang::Module *getAsModule() const {
+    return Ptr.dyn_cast<const clang::Module *>();
+  }
+
+  const clang::Decl *castAsDecl() const {
+    return Ptr.get<const clang::Decl *>();
+  }
+  clang::MacroInfo *castAsMacro() const {
+    return Ptr.get<clang::MacroInfo *>();
+  }
+  const clang::Module *castAsModule() const {
+    return Ptr.get<const clang::Module *>();
   }
 
   clang::SourceLocation getLocation() const;
@@ -1248,6 +1264,12 @@ public:
 
   bool isExported() const {
     return getAttrs().hasAttribute<ExportedAttr>();
+  }
+
+  const clang::Module *getClangModule() const {
+    if (ClangNode ClangN = getClangNode())
+      return ClangN.castAsModule();
+    return nullptr;
   }
 
   SourceLoc getStartLoc() const { return ImportLoc; }

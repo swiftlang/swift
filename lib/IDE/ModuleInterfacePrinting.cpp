@@ -190,8 +190,24 @@ void swift::ide::printSubmoduleInterface(
     if (Options.SkipUnavailable && D->getAttrs().isUnavailable())
       continue;
 
+    auto ShouldPrintImport = [&](ImportDecl *ImportD) -> bool {
+      if (!InterestingClangModule)
+        return true;
+      auto ClangMod = ImportD->getClangModule();
+      if (!ClangMod)
+        return true;
+      if (!ClangMod->isSubModule())
+        return true;
+      if (ClangMod == InterestingClangModule)
+        return false;
+      // FIXME: const-ness on the clang API.
+      return ClangMod->isSubModuleOf(
+                          const_cast<clang::Module*>(InterestingClangModule));
+    };
+
     if (auto ID = dyn_cast<ImportDecl>(D)) {
-      ImportDecls.push_back(ID);
+      if (ShouldPrintImport(ID))
+        ImportDecls.push_back(ID);
       continue;
     }
     if (auto CN = D->getClangNode()) {

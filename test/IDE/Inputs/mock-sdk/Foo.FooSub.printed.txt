@@ -1,4 +1,3 @@
-@exported import Foo.FooSub
 @exported import FooHelper
 func fooSubFunc1(_ a: CInt) -> CInt
 struct FooSubEnum1 {
