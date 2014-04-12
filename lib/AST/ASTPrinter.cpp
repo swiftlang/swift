@@ -39,6 +39,14 @@ using namespace swift;
 
 void ASTPrinter::anchor() {}
 
+void ASTPrinter::printIndent() {
+  llvm::SmallString<16> Str;
+  for (unsigned i = 0; i != CurrentIndentation; ++i)
+    Str += ' ';
+  
+  printText(Str);
+}
+
 void ASTPrinter::printTextImpl(StringRef Text) {
   if (PendingNewlines != 0) {
     llvm::SmallString<16> Str;
@@ -46,18 +54,20 @@ void ASTPrinter::printTextImpl(StringRef Text) {
       Str += '\n';
     PendingNewlines = 0;
 
-    for (unsigned i = 0; i != CurrentIndentation; ++i)
-      Str += ' ';
-
     printText(Str);
+    printIndent();
   }
-  if (PendingDeclPreCallback) {
-    printDeclPre(PendingDeclPreCallback);
-    PendingDeclPreCallback = 0;
+  
+  const Decl *PreD = PendingDeclPreCallback;
+  const Decl *LocD = PendingDeclLocCallback;
+  PendingDeclPreCallback = nullptr;
+  PendingDeclLocCallback = nullptr;
+  
+  if (PreD) {
+    printDeclPre(PreD);
   }
-  if (PendingDeclLocCallback) {
-    printDeclLoc(PendingDeclLocCallback);
-    PendingDeclLocCallback = 0;
+  if (LocD) {
+    printDeclLoc(LocD);
   }
 
   printText(Text);
@@ -104,7 +114,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
 
   /// \brief Indent the current number of indentation spaces.
   void indent() {
-    Printer.printIndent(IndentLevel);
+    Printer.setIndent(IndentLevel);
   }
 
   /// \brief Record the location of this declaration, which is about to

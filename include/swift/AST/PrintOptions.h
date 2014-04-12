@@ -91,7 +91,12 @@ struct PrintOptions {
   bool PrintOverrideKeyword = true;
 
   /// \brief Whether to print documentation comments attached to declarations.
+  /// Note that this may print documentation comments from related declarations
+  /// (e.g. the overridden method in the superclass) if such comment is found.
   bool PrintDocumentationComments = false;
+
+  /// \brief Whether to print regular comments from clang module headers.
+  bool PrintRegularClangComments = false;
 
   /// \brief Print dependent types as references into this generic parameter
   /// list.
@@ -107,6 +112,7 @@ struct PrintOptions {
     result.SkipImplicit = false;
     result.PrintImplicitAttrs = true;
     result.PrintDocumentationComments = true;
+    result.PrintRegularClangComments = true;
     return result;
   }
 };

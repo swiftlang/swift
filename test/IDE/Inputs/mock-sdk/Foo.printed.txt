@@ -1,6 +1,15 @@
 @exported import Foo.FooSub
 @exported import FooHelper
 
+/*  Foo.h
+  Copyright (c) 1815, Napoleon Bonaparte. All rights reserved.
+*/
+
+// Types.
+
+// and stuff.
+// Yo.
+
 /// Aaa.  FooEnum1.  Bbb.
 struct FooEnum1 {
   init(value: CUnsignedInt)
@@ -24,8 +33,9 @@ var FooEnum3Y: FooEnum3 { get }
 
 /// Aaa.  FooComparisonResult.  Bbb.
 enum FooComparisonResult : CLong {
+  // This is ascending
   case OrderedAscending
-  case OrderedSame
+  case OrderedSame // But this is the same.
   case OrderedDescending
 }
 
@@ -34,8 +44,9 @@ struct FooRuncingOptions {
   init()
   init(value: CLong)
   var value: CLong
+  // This is mince.
   static var EnableMince: FooRuncingOptions { get }
-  static var EnableQuince: FooRuncingOptions { get }
+  static var EnableQuince: FooRuncingOptions { get } /* But this is quince */
   static func fromMask(raw: CLong) -> FooRuncingOptions
   static func fromRaw(raw: CLong) -> FooRuncingOptions?
   func toRaw() -> CLong
@@ -162,9 +173,10 @@ class FooClassDerived : FooClassBase, FooProtocolDerived, FooProtocolBase {
   func fooProtoFuncWithExtraIndentation2()
   class func fooProtoClassFunc()
 }
+/* FOO_MACRO_1 is the answer */
 var FOO_MACRO_1: CInt { get }
 var FOO_MACRO_2: CInt { get }
-var FOO_MACRO_3: CInt { get }
+var FOO_MACRO_3: CInt { get } // Don't use FOO_MACRO_3 on Saturdays.
 var FOO_MACRO_4: CUnsignedInt { get }
 var FOO_MACRO_5: CUnsignedLongLong { get }
 var FOO_MACRO_REDEF_1: CInt { get }

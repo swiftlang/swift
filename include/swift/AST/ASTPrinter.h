@@ -61,13 +61,15 @@ public:
 
   ASTPrinter &operator<<(unsigned long long N);
 
-  void printIndent(unsigned NumSpaces) {
+  void setIndent(unsigned NumSpaces) {
     CurrentIndentation = NumSpaces;
   }
 
   void printNewline() {
     PendingNewlines++;
   }
+
+  void printIndent();
 
   /// Schedule a \c printDeclPre callback to be called as soon as a
   /// non-whitespace character is printed.

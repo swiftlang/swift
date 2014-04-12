@@ -1,3 +1,6 @@
+/*  Foo.h
+  Copyright (c) 1815, Napoleon Bonaparte. All rights reserved.
+*/
 #if !defined(__FOO_H__)
 #define __FOO_H__ 1
 
@@ -5,6 +8,9 @@
 #import <FooHelper/FooHelper.h>
 
 // Types.
+
+// and stuff.
+// Yo.
 
 /// Aaa.  FooEnum1.  Bbb.
 enum FooEnum1 {
@@ -21,15 +27,17 @@ enum FooEnum3 { FooEnum3X = 10, FooEnum3Y = 20 };
 
 /// Aaa.  FooComparisonResult.  Bbb.
 typedef NS_ENUM(long, FooComparisonResult) {
+  // This is ascending
   FooOrderedAscending = -1L,
-  FooOrderedSame,
+  FooOrderedSame, // But this is the same.
   FooOrderedDescending
 };
 
 /// Aaa.  FooRuncingOptions.  Bbb.
 typedef NS_OPTIONS(long, FooRuncingOptions) {
+  // This is mince.
   FooRuncingEnableMince = 1,
-  FooRuncingEnableQuince = 2,
+  FooRuncingEnableQuince = 2, /* But this is quince */
 };
 
 struct FooStruct1 {
@@ -154,9 +162,10 @@ int redeclaredInMultipleModulesFunc1(int a);
 @class BarForwardDeclaredClass;
 enum BarforwardDeclaredEnum;
 
+/* FOO_MACRO_1 is the answer */
 #define FOO_MACRO_1 0
 #define FOO_MACRO_2 1
-#define FOO_MACRO_3 (-1)
+#define FOO_MACRO_3 (-1) // Don't use FOO_MACRO_3 on Saturdays.
 #define FOO_MACRO_4 0xffffffffu
 #define FOO_MACRO_5 0xffffffffffffffffull
 

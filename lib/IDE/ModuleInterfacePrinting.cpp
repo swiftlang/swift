@@ -23,10 +23,65 @@
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/Basic/Module.h"
+#include "clang/Lex/Lexer.h"
 #include "clang/Lex/MacroInfo.h"
 #include <utility>
 
 using namespace swift;
+
+namespace {
+/// Prints regular comments from clang module headers.
+class ClangCommentPrinter : public ASTPrinter {
+public:
+  ClangCommentPrinter(ASTPrinter &OtherPrinter, ClangModuleLoader &ClangLoader)
+    : OtherPrinter(OtherPrinter),
+      ClangLoader(ClangLoader) {}
+
+private:
+  void printDeclPre(const Decl *D) override;
+  void printDeclPost(const Decl *D) override;
+
+  // Forwarding implementations.
+
+  void printText(StringRef Text) override {
+    return OtherPrinter.printText(Text);
+  }
+  void printDeclLoc(const Decl *D) override {
+    return OtherPrinter.printDeclLoc(D);
+  }
+  void printTypeRef(const TypeDecl *TD, StringRef Text) override {
+    return OtherPrinter.printTypeRef(TD, Text);
+  }
+  void printModuleRef(const Module *Mod, StringRef Text) override {
+    return OtherPrinter.printModuleRef(Mod, Text);
+  }
+
+  // Prints regular comments of the header the clang node comes from, until
+  // the location of the node. Keeps track of the comments that were printed
+  // from the file and resumes printing for the next node from the same file.
+  // This expects to get passed clang nodes in source-order (at least within the
+  // same header).
+  void printCommentsUntil(ClangNode Node);
+
+  bool isDocumentationComment(clang::SourceLocation CommentLoc,
+                              ClangNode Node) const;
+
+  unsigned getResumeOffset(clang::FileID FID) const {
+    auto OffsI = ResumeOffsets.find(FID);
+    if (OffsI != ResumeOffsets.end())
+      return OffsI->second;
+    return 0;
+  }
+  void setResumeOffset(clang::FileID FID, unsigned Offset) {
+    ResumeOffsets[FID] = Offset;
+  }
+
+  ASTPrinter &OtherPrinter;
+  ClangModuleLoader &ClangLoader;
+  llvm::DenseMap<clang::FileID, unsigned> ResumeOffsets;
+  SmallVector<StringRef, 2> PendingComments;
+};
+}
 
 static const clang::Module *findTopLevelClangModule(const Module *M) {
   const ClangModuleUnit *CMU = nullptr;
@@ -202,10 +257,17 @@ void swift::ide::printSubmoduleInterface(
     return LHS->getKind() < RHS->getKind();
   });
 
+  ASTPrinter *PrinterToUse = &Printer;
+
+  ClangCommentPrinter RegularCommentPrinter(Printer, Importer);
+  if (Options.PrintRegularClangComments)
+    PrinterToUse = &RegularCommentPrinter;
+
   auto PrintDecl = [&](Decl *D) {
     if (isa<ExtensionDecl>(D))
       return;
 
+    ASTPrinter &Printer = *PrinterToUse;
     D->print(Printer, AdjustedOptions);
     Printer << "\n";
     if (auto NTD = dyn_cast<NominalTypeDecl>(D)) {
@@ -245,3 +307,114 @@ void swift::ide::printSubmoduleInterface(
   }
 }
 
+void ClangCommentPrinter::printDeclPre(const Decl *D) {
+  if (auto ClangN = D->getClangNode())
+    printCommentsUntil(ClangN);
+  return OtherPrinter.printDeclPre(D);
+}
+
+void ClangCommentPrinter::printDeclPost(const Decl *D) {
+  OtherPrinter.printDeclPost(D);
+  for (auto CommentText : PendingComments) {
+    *this << " " << CommentText;
+  }
+  PendingComments.clear();
+}
+
+void ClangCommentPrinter::printCommentsUntil(ClangNode Node) {
+  const auto &Ctx = ClangLoader.getClangASTContext();
+  const auto &SM = Ctx.getSourceManager();
+
+  clang::SourceLocation NodeLoc = SM.getFileLoc(Node.getLocation());
+  if (NodeLoc.isInvalid())
+    return;
+  unsigned NodeLineNo = SM.getSpellingLineNumber(NodeLoc);
+  clang::FileID FID = SM.getFileID(NodeLoc);
+  if (FID.isInvalid())
+    return;
+  clang::SourceLocation FileLoc = SM.getLocForStartOfFile(FID);
+  StringRef Text = SM.getBufferData(FID);
+  if (Text.empty())
+    return;
+
+  const char *BufStart = Text.data();
+  const char *BufPtr = BufStart + getResumeOffset(FID);
+  const char *BufEnd = BufStart + Text.size();
+  assert(BufPtr <= BufEnd);
+  if (BufPtr == BufEnd)
+    return; // nothing left.
+
+  clang::Lexer Lex(FileLoc, Ctx.getLangOpts(), BufStart, BufPtr, BufEnd);
+  Lex.SetCommentRetentionState(true);
+
+  unsigned LastPrintedCommentLineNo = 0;
+  clang::Token Tok;
+  do {
+    BufPtr = Lex.getBufferLocation();
+    Lex.LexFromRawLexer(Tok);
+    if (Tok.is(clang::tok::eof))
+      break;
+    if (Tok.isNot(clang::tok::comment))
+      continue;
+
+    // Reached a comment.
+
+    clang::SourceLocation CommentLoc = Tok.getLocation();
+    if (isDocumentationComment(CommentLoc, Node))
+      continue;
+
+    std::pair<clang::FileID, unsigned> LocInfo =
+      SM.getDecomposedSpellingLoc(CommentLoc);
+    assert(LocInfo.first == FID);
+    unsigned LineNo = SM.getLineNumber(LocInfo.first, LocInfo.second);
+    if (LineNo > NodeLineNo)
+      break; // Comment is past the clang node.
+
+    // Print out the comment.
+
+    StringRef CommentText(BufStart + LocInfo.second, Tok.getLength());
+
+    // Check if comment is on same line but after the declaration.
+    if (SM.isBeforeInTranslationUnit(NodeLoc, Tok.getLocation())) {
+      PendingComments.push_back(CommentText);
+      LastPrintedCommentLineNo = 0;
+      continue;
+    }
+
+    if (LastPrintedCommentLineNo && LineNo - LastPrintedCommentLineNo > 1) {
+      *this << "\n";
+      printIndent();
+    }
+    *this << CommentText << "\n";
+    printIndent();
+    LastPrintedCommentLineNo = LineNo;
+
+  } while (true);
+
+  if (LastPrintedCommentLineNo && NodeLineNo - LastPrintedCommentLineNo > 1) {
+    *this << "\n";
+    printIndent();
+  }
+
+  // Resume printing comments from this point.
+  setResumeOffset(FID, BufPtr - BufStart);
+}
+
+bool ClangCommentPrinter::isDocumentationComment(
+      clang::SourceLocation CommentLoc, ClangNode Node) const {
+  const clang::Decl *D = Node.getAsDecl();
+  if (!D)
+    return false;
+
+  const auto &Ctx = ClangLoader.getClangASTContext();
+  const auto &SM = Ctx.getSourceManager();
+  const clang::RawComment *RC = Ctx.getRawCommentForAnyRedecl(D);
+  if (!RC)
+    return false;
+
+  clang::SourceRange DocRange = RC->getSourceRange();
+  if (SM.isBeforeInTranslationUnit(CommentLoc, DocRange.getBegin()) ||
+      SM.isBeforeInTranslationUnit(DocRange.getEnd(), CommentLoc))
+    return false;
+  return true;
+}
