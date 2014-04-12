@@ -223,16 +223,25 @@ namespace {
 
     Type VisitBlockPointerType(const clang::BlockPointerType *type) {
       // Block pointer types are mapped to function types.
-      // FIXME: As a temporary hack, block function types are annotated with
-      // an [objc_block] attribute.
       Type pointeeType = Impl.importType(type->getPointeeType(),
                                          ImportTypeKind::Normal);
       if (!pointeeType)
         return Type();
       FunctionType *fTy = pointeeType->castTo<FunctionType>();
+      
+      FunctionType::Representation rep;
+      // If the block is a parameter, result, or property, we can bridge it to
+      // a native thick Swift function type.
+      if (Impl.SwiftContext.LangOpts.EnableBlockBridging
+          && canBridgeTypes())
+        rep = FunctionType::Representation::Thick;
+      // Otherwise, it keeps its block representation.
+      else
+        rep = FunctionType::Representation::Block;
+      
       return FunctionType::get(fTy->getInput(), fTy->getResult(),
                  fTy->getExtInfo()
-                   .withRepresentation(AnyFunctionType::Representation::Block));
+                   .withRepresentation(rep));
     }
 
     Type VisitReferenceType(const clang::ReferenceType *type) {
