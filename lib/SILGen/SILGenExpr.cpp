@@ -3565,9 +3565,11 @@ static ManagedValue emitBridgeFuncToBlock(SILGenFunction &gen,
                                           SILLocation loc,
                                           ManagedValue fn,
                                           CanSILFunctionType blockTy) {
-  gen.SGM.diagnose(loc, diag::not_implemented, "func-to-block bridging");
-  return ManagedValue::forUnmanaged(
-            SILUndef::get(SILType::getPrimitiveObjectType(blockTy), gen.SGM.M));
+  // FIXME: Use the old bridge_to_block instruction as a stopgap to produce the
+  // block until we can natively construct them.
+  auto block = gen.B.createBridgeToBlock(loc, fn.forward(gen),
+                                   SILType::getPrimitiveObjectType(blockTy));
+  return gen.emitManagedRValueWithCleanup(block);
 }
 
 static void buildBlockToFuncThunkBody(SILGenFunction &gen,
