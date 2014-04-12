@@ -36,6 +36,10 @@ namespace swift {
   /// ignoring case.
   PrepositionKind getPrepositionKind(StringRef word);
 
+  /// Determine whether this is a linking verb, which does not express an 
+  /// action, but links a subject to more information about the subject.
+  bool isLinkingVerb(StringRef word);
+
   namespace camel_case {
     class WordIterator;
 
@@ -221,46 +225,6 @@ namespace swift {
     /// \returns the result of dropping the prefix from \p string, or the
     /// whole string if it has no prefix.
     StringRef dropPrefix(StringRef string);
-
-    /// Data structures that stores a set of multi-words, which are camelCase
-    /// word sequences that should be kept together by an algorithm that splits
-    /// up camelCase names.
-    ///
-    /// This data structure stores the multiwords backwards. The key is the last
-    /// word in the multi-word. The element is a vector of multi-words, where
-    /// each element in the vector is a multi-word stored backwards with the
-    /// last word removed.
-    ///
-    /// FIXME: This is a crummy data structure. We should optimize this to avoid
-    /// redundant storage and provide faster lookup.
-    class MultiWordMap {
-      llvm::StringMap<SmallVector<SmallVector<std::string, 1>, 1>> Data;
-
-    public:
-      /// Whether the map is empty.
-      bool empty() const { return Data.empty(); }
-
-      // Basis case: add an entry in multi-word map with \p last as the last word.
-      SmallVectorImpl<std::string> &insert(StringRef last) {
-        auto &words = Data[last];
-        words.push_back({});
-        return words.back();
-      }
-
-      // Recursive case: add the current word to the end of the current
-      // multiword.
-      template<typename ...Args>
-      SmallVectorImpl<std::string> &insert(StringRef current, Args... args) {
-        auto &multiWord = insert(args...);
-        multiWord.push_back(current.str());
-        return multiWord;
-      }
-
-      /// Match the longest (multi-)word possible, advancing the reverse
-      /// iterator to point at the beginning of the longest (multi-)word match.
-      Words::reverse_iterator match(Words::reverse_iterator first,
-                                    Words::reverse_iterator last) const;
-    };
   } // end namespace camel_case
 }
 

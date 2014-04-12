@@ -234,12 +234,6 @@ public:
   /// Mapping from Objective-C selectors to method names.
   llvm::DenseMap<std::pair<clang::Selector, char>, DeclName> SelectorMappings;
 
-  /// Multiwords used for selector splitting.
-  camel_case::MultiWordMap MultiWords;
-
-  /// Populate the MultiWords map from \c MultiWords.def.
-  void populateMultiWords();
-
   /// Mapping that describes the designated initializers of
   /// Objective-C classes.
   ///

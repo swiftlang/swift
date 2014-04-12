@@ -59,17 +59,15 @@ STATISTIC(NumMultiMethodNames,
 STATISTIC(NumPrepositionSplitMethodNames,
           "selectors where the first selector piece was split on a "
           "preposition");
-STATISTIC(NumSetSplitMethodNames,
-          "selectors where the first selector piece was split after the "
-          "leading 'set'");
-STATISTIC(NumWordSplitMethodNames,
-          "selectors where the first selector piece was split on the last "
-          "word");
-STATISTIC(NumMultiWordSplitMethodNames,
-          "selectors where the first selector piece was split on the last "
-          "multiword");
+STATISTIC(NumLinkingVerbNonSplits,
+          "selectors where splitting was prevented by a linking verb ");
+STATISTIC(NumLinkingVerbNonSplitsPreposition,
+          "selectors where preposition splitting was prevented by a linking "
+          "verb ");
 STATISTIC(NumPrepositionTrailingFirstPiece,
           "selectors where the first piece ends in a preposition");
+STATISTIC(NumSelectorsNotSplit,
+          "selectors that were not split (for any reason)");
 STATISTIC(NumMethodsMissingFirstArgName,
           "selectors where the first argument name is missing");
 
@@ -550,7 +548,6 @@ splitSelectorPieceAt(StringRef selector, unsigned index,
 /// selector and the parameter name will be empty.
 static std::pair<StringRef, StringRef> 
 splitFirstSelectorPiece(StringRef selector,
-                        const camel_case::MultiWordMap &multiWords,
                         SmallVectorImpl<char> &scratch) {
   // Get the camelCase words in this selector.
   auto words = camel_case::getWords(selector);
@@ -564,49 +561,42 @@ splitFirstSelectorPiece(StringRef selector,
 
   // Scan words from the back of the selector looking for a
   // preposition.
-  auto lastPrep = std::find_if(words.rbegin(), words.rend(),
-                               [&](StringRef word) -> bool {
-    return getPrepositionKind(word) != PK_None;
-  });
+  auto lastPrep = words.rbegin();
+  auto end = words.rend();
+  for (; lastPrep != end; ++lastPrep) {
+    // If we found a linking verb, don't split.
+    if (isLinkingVerb(*lastPrep)) {
+      ++NumLinkingVerbNonSplits;
+      return { selector, "" };
+    }
+
+    if (getPrepositionKind(*lastPrep) != PK_None) {
+      // Found a preposition.
+      break;
+    }
+  }
 
   // If we found a preposition, split here.
-  if (lastPrep != words.rend()) {
-    if (getPrepositionKind(*lastPrep)) {
-      ++NumPrepositionSplitMethodNames;
-      if (lastPrep == words.rbegin())
-        ++NumPrepositionTrailingFirstPiece;
-      return splitSelectorPieceAt(selector,
-                                  std::prev(lastPrep.base()).getPosition(),
-                                  scratch);
+  if (lastPrep != end) {
+    // .. unless there is a linking verb.
+    for (auto i = std::next(lastPrep); i != end; ++i) {
+      // If we found a linking verb, don't split.
+      if (isLinkingVerb(*i)) {
+        ++NumLinkingVerbNonSplitsPreposition;
+        return { selector, "" };
+      }
     }
+
+    ++NumPrepositionSplitMethodNames;
+    if (lastPrep == words.rbegin())
+      ++NumPrepositionTrailingFirstPiece;
+    return splitSelectorPieceAt(selector,
+                                std::prev(lastPrep.base()).getPosition(),
+                                scratch);
   }
 
-  // We did not find a preposition.
-
-  // If the first word is "get" or "set", split after it.
-  if (*words.begin() == "set" || *words.begin() == "get") {
-    ++NumSetSplitMethodNames;
-    return splitSelectorPieceAt(selector, 3, scratch);
-  }
-
-  // If there is more than one word, split off the last word, taking care
-  // to avoid splitting in the middle of a multi-word.
-  auto last = words.rbegin();
-  if (std::next(last) != words.rend()) {
-    auto splitPoint = multiWords.match(last, words.rend());
-    auto beforeSplitPoint = std::next(splitPoint);
-    if (beforeSplitPoint != words.rend()) {
-      if (splitPoint == last)
-        ++NumWordSplitMethodNames;
-      else
-        ++NumMultiWordSplitMethodNames;
-      return splitSelectorPieceAt(selector,
-                                  std::prev(splitPoint.base()).getPosition(),
-                                  scratch);
-    }
-  }
-
-  // Nothing to split.
+  // We did not find a preposition. Nothing to split.
+  ++NumSelectorsNotSplit;
   return { selector, "" };
 }
 
@@ -637,8 +627,7 @@ static Identifier importArgName(ASTContext &ctx, StringRef name) {
 /// Map an Objective-C selector name to a Swift method name.
 static DeclName mapSelectorName(ASTContext &ctx,
                                 clang::Selector selector,
-                                bool isInitializer,
-                                const camel_case::MultiWordMap &multiWords) {
+                                bool isInitializer) {
   assert(!selector.isNull() && "Null selector?");
 
   // Zero-argument selectors.
@@ -673,7 +662,6 @@ static DeclName mapSelectorName(ASTContext &ctx,
     llvm::SmallString<16> scratch;
     StringRef funcName, firstArgName;
     std::tie(funcName, firstArgName) = splitFirstSelectorPiece(firstPiece,
-                                                               multiWords,
                                                                scratch);
     baseName = ctx.getIdentifier(funcName);
     argumentNames.push_back(importArgName(ctx, firstArgName));
@@ -774,21 +762,11 @@ DeclName ClangImporter::Implementation::importName(clang::Selector selector,
     return known->second;
 
   // Map the selector.
-  populateMultiWords();
-  auto result = mapSelectorName(SwiftContext, selector, isInitializer,
-                                MultiWords);
+  auto result = mapSelectorName(SwiftContext, selector, isInitializer);
 
   // Cache the result and return.
   SelectorMappings[{selector, isInitializer}] = result;
   return result;
-}
-
-void ClangImporter::Implementation::populateMultiWords() {
-  if (!MultiWords.empty())
-    return;
-
-#define MULTI_WORD(...) MultiWords.insert(__VA_ARGS__);
-#include "MultiWords.def"
 }
 
 void ClangImporter::Implementation::populateKnownDesignatedInits() {

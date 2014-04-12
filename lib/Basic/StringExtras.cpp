@@ -36,6 +36,15 @@ PrepositionKind swift::getPrepositionKind(StringRef word) {
   return PK_None;
 }
 
+bool swift::isLinkingVerb(StringRef word) {
+#define LINKING_VERB(Word)                      \
+  if (word.equals_lower(#Word))                 \
+    return true;
+#include "LinkingVerbs.def"
+
+  return false;
+}
+
 void WordIterator::computeNextPosition() const {
   assert(Position < String.size() && "Already at end of string");
 
@@ -180,42 +189,4 @@ StringRef camel_case::dropPrefix(StringRef string) {
     return string.substr(firstLower - 1);
 
   return string;
-}
-
-Words::reverse_iterator MultiWordMap::match(Words::reverse_iterator first,
-                                            Words::reverse_iterator last) const{
-  assert(first != last && "Empty sequence cannot be matched");
-
-  // If the current word isn't at the start of the sequence, we're done.
-  llvm::SmallString<32> scratch;
-  auto known = Data.find(toLowercaseWord(*first, scratch));
-  if (known == Data.end())
-    return first;
-
-  /// The best result (if we found anything) and the length of the match.
-  Optional<std::pair<Words::reverse_iterator, unsigned>> bestResult;
-  for (const auto &multiword : known->second) {
-    // Match the words in the sequence to the words in this multiword.
-    auto matchNext = first;
-    ++matchNext;
-
-    bool matched = true;
-    for (const auto &word : multiword) {
-      if (matchNext == last || !sameWordIgnoreFirstCase(word, *matchNext++)) {
-        matched = false;
-        break;
-      }
-    }
-
-    if (!matched)
-      continue;
-
-    // If this is the first result, or the previous result was a shorter match,
-    // we just found a better result.
-    if (!bestResult || bestResult->second < multiword.size()) {
-      bestResult = { std::prev(matchNext), multiword.size() };
-    }
-  }
-
-  return bestResult ? bestResult->first : first;
 }

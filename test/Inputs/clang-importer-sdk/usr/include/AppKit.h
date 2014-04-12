@@ -43,3 +43,6 @@
 @property double constant;
 @end
 
+@protocol MyDelegate
+  -(BOOL)receiverShouldJumpOnTable:(NSObject *)table;
+@end
