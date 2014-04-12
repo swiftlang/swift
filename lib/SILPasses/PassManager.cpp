@@ -52,7 +52,7 @@ runFunctionPasses(llvm::ArrayRef<SILFunctionTransform*> FuncTransforms) {
           F.dump();
         }
         if (Options.VerifyAll) {
-          DEBUG(F.verify());
+          F.verify();
         }
       }
     }
@@ -100,7 +100,7 @@ void SILPassManager::runOneIteration() {
           Mod->dump();
         }
         if (Options.VerifyAll) {
-          DEBUG(Mod->verify());
+          Mod->verify();
         }
       }
       
