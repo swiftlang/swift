@@ -195,12 +195,7 @@ void swift::ide::printSubmoduleInterface(
       continue;
     }
     if (auto CN = D->getClangNode()) {
-      clang::SourceLocation Loc;
-      if (auto *CD = CN.getAsDecl()) {
-        Loc = CD->getLocation();
-      } else {
-        Loc = CN.getAsMacro()->getDefinitionLoc();
-      }
+      clang::SourceLocation Loc = CN.getLocation();
 
       auto *OwningModule = Importer.getClangOwningModule(CN);
       auto I = ClangDecls.find(OwningModule);
