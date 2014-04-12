@@ -266,6 +266,7 @@ public:
   SILInstruction *visitLoadInst(LoadInst *LI);
   SILInstruction *visitAllocStackInst(AllocStackInst *AS);
   SILInstruction *visitSwitchEnumAddrInst(SwitchEnumAddrInst *SEAI);
+  SILInstruction *visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI);
 
 private:
   /// Perform one SILCombine iteration.
@@ -448,6 +449,7 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
 //===----------------------------------------------------------------------===//
 //                                  Visitors
 //===----------------------------------------------------------------------===//
+
 SILInstruction *SILCombiner::visitSwitchEnumAddrInst(SwitchEnumAddrInst *SEAI) {
   // Promote switch_enum_addr to switch_enum. Detect the pattern:
   //store %X to %Y#1 : $*Optional<SomeClass>
@@ -831,6 +833,28 @@ SILCombiner::visitRefToRawPointerInst(RefToRawPointerInst *RRPI) {
   return nullptr;
 }
 
+SILInstruction *
+SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
+  // Given an inject_enum_addr of a concrete type without payload, promote it to
+  // a store of an enum. Mem2reg/load forwarding will clean things up for us. We
+  // can't handle the payload case here due to the flow problems caused by the
+  // dependency in between the enum and its data.
+
+  assert(IEAI->getOperand().getType().isAddress() && "Must be an address");
+  if (IEAI->getOperand().getType().isAddressOnly(IEAI->getModule()))
+    return nullptr;
+
+  // If the enum does have a payload, we peephole from the init_enum_data_addr.
+  if (IEAI->getElement()->hasArgumentType())
+    return nullptr;
+
+  EnumInst *E =
+    Builder->createEnum(IEAI->getLoc(), SILValue(), IEAI->getElement(),
+                        IEAI->getOperand().getType().getObjectType());
+  Builder->createStore(IEAI->getLoc(), E, IEAI->getOperand());
+  return eraseInstFromFunction(*IEAI);
+}
+
 SILInstruction *SILCombiner::visitUpcastInst(UpcastInst *UCI) {
   // Ref to raw pointer consumption of other ref casts.
   //
@@ -843,7 +867,12 @@ SILInstruction *SILCombiner::visitUpcastInst(UpcastInst *UCI) {
   return nullptr;
 }
 
+//===----------------------------------------------------------------------===//
+//                                Entry Points
+//===----------------------------------------------------------------------===//
+
 namespace {
+
 class SILCombine : public SILFunctionTransform {
 
   /// The entry point to the transformation.
@@ -856,6 +885,7 @@ class SILCombine : public SILFunctionTransform {
 
   StringRef getName() override { return "SIL Combine"; }
 };
+
 } // end anonymous namespace
 
 SILTransform *swift::createSILCombine() {

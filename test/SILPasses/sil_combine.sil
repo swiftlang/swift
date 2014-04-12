@@ -390,7 +390,7 @@ bb0(%0 : $Builtin.Int8, %1 : $Builtin.ObjectPointer):
 sil @a2p_p2a_test : $@thin (@inout Builtin.Word, Builtin.RawPointer) -> (Builtin.Word, Builtin.RawPointer) {
 bb0(%0 : $*Builtin.Word, %1 : $Builtin.RawPointer):
   %2 = address_to_pointer %0 : $*Builtin.Word to $Builtin.RawPointer
-  %3 = pointer_to_address %1 : $Builtin.RawPointer to $*Builtin.Word 
+  %3 = pointer_to_address %1 : $Builtin.RawPointer to $*Builtin.Word
   %4 = pointer_to_address %2 : $Builtin.RawPointer to $*Builtin.Word
   %5 = address_to_pointer %3 : $*Builtin.Word to $Builtin.RawPointer
   %6 = load %4 : $*Builtin.Word
@@ -460,7 +460,7 @@ bb0(%0 : $@thin U.Type, %1 : $C):
   release_value %4 : $U
   %5 = enum $U, #U.Z!enumelt.1, %1 : $C
   release_value %5 : $U
-  %6 = tuple(%2 : $U, %4 : $U, %5 : $U)  
+  %6 = tuple(%2 : $U, %4 : $U, %5 : $U)
   return %6 : $(U, U, U)
 }
 
@@ -511,7 +511,7 @@ bb0(%0 : $C):
 // CHECK-NEXT: return
 sil @downcast_upcast_roundtrip : $@thin <T_0_0, T_0_1> (HeapBufferStorage<T_0_0, T_0_1>) -> HeapBufferStorage<T_0_0, T_0_1> {
 bb0(%0 : $HeapBufferStorage<T_0_0, T_0_1>):
-  %2 = upcast %0 : $HeapBufferStorage<T_0_0, T_0_1> to $RawBuffer // user: %3                                                                                     
+  %2 = upcast %0 : $HeapBufferStorage<T_0_0, T_0_1> to $RawBuffer // user: %3
   %3 = unconditional_checked_cast downcast %2 : $RawBuffer to $HeapBufferStorage<T_0_0, T_0_1>
   return %3 : $HeapBufferStorage<T_0_0, T_0_1>
 }
@@ -577,8 +577,8 @@ struct X {
   var t : (Builtin.ObjectPointer, Y)
 }
 
-sil @mix1 : $@thin (Builtin.Int64, Builtin.ObjectPointer, Builtin.Int32, Builtin.Int1) -> () 
-sil @mix2 : $@thin (Builtin.ObjectPointer, Builtin.Int64, Builtin.ObjectPointer, Builtin.Int32, Builtin.Int1) -> () 
+sil @mix1 : $@thin (Builtin.Int64, Builtin.ObjectPointer, Builtin.Int32, Builtin.Int1) -> ()
+sil @mix2 : $@thin (Builtin.ObjectPointer, Builtin.Int64, Builtin.ObjectPointer, Builtin.Int32, Builtin.Int1) -> ()
 
 // CHECK-LABEL: sil @load_proj_to_gep_load_canonicalization_no_rep_no_other_use_test : $@thin (@inout X) -> ()
 // CHECK-NOT: struct_extract
@@ -886,4 +886,72 @@ bb0:
 
   %12 = tuple (%9 : $Builtin.Int1, %10 : $Builtin.Int32, %11 : $Builtin.Int64)
   return %12 : $(Builtin.Int1, Builtin.Int32, Builtin.Int64)
+}
+
+enum FakeOptional<T> {
+  case None
+  case Some(T)
+}
+
+// CHECK-LABEL: sil @enum_promotion_of_concrete_types
+// CHECK: bb0:
+// CHECK-NEXT: [[ALLOCA1:%[0-9]+]] = alloc_stack $FakeOptional<Builtin.Int1>
+// CHECK-NEXT: [[ENUM1:%[0-9]+]] = enum $FakeOptional<Builtin.Int1>, #FakeOptional.None!enumelt
+// CHECK-NEXT: store [[ENUM1]] to [[ALLOCA1]]#1
+// CHECK-NEXT: [[RESULT1:%[0-9]+]] = load [[ALLOCA1:%[0-9]+]]#1
+// CHECK-NEXT: [[RESULT:%[0-9]+]] = tuple ([[RESULT1]] : $FakeOptional<Builtin.Int1>, [[RESULT1]] : $FakeOptional<Builtin.Int1>)
+// CHECK-NEXT: dealloc_stack
+// CHECK-NEXT: return [[RESULT]]
+sil @enum_promotion_of_concrete_types : $@thin () -> (FakeOptional<Builtin.Int1>, FakeOptional<Builtin.Int1>) {
+bb0:
+  %0 = alloc_stack $FakeOptional<Builtin.Int1>
+  inject_enum_addr %0#1 : $*FakeOptional<Builtin.Int1>, #FakeOptional.None!enumelt
+  %4 = load %0#1 : $*FakeOptional<Builtin.Int1>
+  %6 = tuple(%4 : $FakeOptional<Builtin.Int1>, %4 : $FakeOptional<Builtin.Int1>)
+  dealloc_stack %0#0 : $*@local_storage FakeOptional<Builtin.Int1>
+  return %6 : $(FakeOptional<Builtin.Int1>, FakeOptional<Builtin.Int1>)
+}
+
+// Negative test corresponding to the previous test.
+// CHECK-LABEL: sil @no_enum_promotion_of_non_concrete_types
+// CHECK: bb0
+// CHECK-NEXT: alloc_stack $FakeOptional<T>
+// CHECK-NEXT: inject_enum_addr {{%[0-9]+}}#1 : $*FakeOptional<T>, #FakeOptional.None!enumelt
+// CHECK-NEXT: alloc_stack $FakeOptional<T>
+// CHECK-NEXT: init_enum_data_addr {{%[0-9]+}}#1 : $*FakeOptional<T>, #FakeOptional.Some!enumelt.1
+// CHECK-NEXT: copy_addr
+// CHECK-NEXT:  inject_enum_addr
+// CHECK-NEXT: cond_br
+// CHECK: bb1:
+// CHECK-NEXT: br bb3
+// CHECK: bb2:
+// CHECK-NEXT: br bb3
+// CHECK: bb3
+// CHECK-NEXT: copy_addr
+// CHECK-NEXT: tuple
+// CHECK-NEXT: dealloc_stack
+// CHECK-NEXT: dealloc_stack
+// CHECK-NEXT: return
+sil @no_enum_promotion_of_non_concrete_types : $@thin <T> (@out FakeOptional<T>, @inout T, Builtin.Int1) -> () {
+bb0(%0 : $*FakeOptional<T>, %1 : $*T, %2 : $Builtin.Int1):
+  %3 = alloc_stack $FakeOptional<T>
+  inject_enum_addr %3#1 : $*FakeOptional<T>, #FakeOptional.None!enumelt
+  %4 = alloc_stack $FakeOptional<T>
+  %5 = init_enum_data_addr %4#1 : $*FakeOptional<T>, #FakeOptional.Some!enumelt.1
+  copy_addr [take] %1 to [initialization] %5 : $*T
+  inject_enum_addr %4#1 : $*FakeOptional<T>, #FakeOptional.Some!enumelt.1
+  cond_br %2, bb1, bb2
+
+bb1:
+  br bb3(%3#1 : $*FakeOptional<T>)
+
+bb2:
+  br bb3(%4#1 : $*FakeOptional<T>)
+
+bb3(%6 : $*FakeOptional<T>):
+  copy_addr [take] %6 to [initialization] %0 : $*FakeOptional<T>
+  %7 = tuple()
+  dealloc_stack %4#0 : $*@local_storage FakeOptional<T>
+  dealloc_stack %3#0 : $*@local_storage FakeOptional<T>
+  return %7 : $()
 }
