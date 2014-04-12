@@ -1243,7 +1243,7 @@ struct ExistentialTypeMetadata : public Metadata {
   const OpaqueValue *projectValue(const OpaqueValue *container) const;
   
   OpaqueValue *projectValue(OpaqueValue *container) const {
-    return const_cast<OpaqueValue *>(container);
+    return const_cast<OpaqueValue *>(projectValue((const OpaqueValue*) container));
   }
   
   /// Get the dynamic type from an existential container of the type described

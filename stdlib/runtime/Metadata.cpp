@@ -1541,8 +1541,8 @@ struct ClassExistentialBoxBase {
 template <unsigned NumWitnessTables>
 struct ClassExistentialBox : ClassExistentialBoxBase {
   struct Container {
-    const void *TypeInfo[NumWitnessTables];
     void *Value;
+    const void *TypeInfo[NumWitnessTables];
 
     void copyTypeInto(Container *dest) const {
       for (unsigned i = 0; i != NumWitnessTables; ++i)
@@ -1572,11 +1572,13 @@ struct ClassExistentialBox : ClassExistentialBoxBase {
 /// type with a dynamic number of witness tables.
 struct NonFixedClassExistentialBox : ClassExistentialBoxBase {
   struct Container {
+    void *Value;
+
     const void **getWitnessTables() {
-      return reinterpret_cast<const void **>(this);
+      return reinterpret_cast<const void **>(this + 1);
     }
     const void * const *getWitnessTables() const {
-      return reinterpret_cast<const void * const *>(this);
+      return reinterpret_cast<const void * const *>(this + 1);
     }
 
     static unsigned getNumWitnessTables(const Metadata *self) {
@@ -1590,12 +1592,10 @@ struct NonFixedClassExistentialBox : ClassExistentialBoxBase {
     }
 
     void **getValueSlot(const Metadata *self) {
-      return const_cast<void**>(getWitnessTables()
-                                + getNumWitnessTables(self));
+      return &Value;
     }
     void * const *getValueSlot(const Metadata *self) const {
-      return const_cast<void * const *>(getWitnessTables()
-                                        + getNumWitnessTables(self));
+      return &Value;
     }
 
     static size_t getAlignment(unsigned numWitnessTables) {
@@ -1684,10 +1684,8 @@ ExistentialTypeMetadata::projectValue(const OpaqueValue *container) const {
   
   // The layout of the container depends on whether it's class-constrained.
   if (Flags.getClassConstraint() == ProtocolClassConstraint::Class) {
-    // The value is a single class reference positioned after the witness table
-    // vector.
-    return reinterpret_cast<const OpaqueValue *>(
-                                           words + Flags.getNumWitnessTables());
+    // The value is a single class reference at the beginning of the container.
+    return reinterpret_cast<const OpaqueValue *>(words);
   }
   
   // The value is placed in a fixed-size buffer positioned after the metadata
@@ -1721,8 +1719,9 @@ ExistentialTypeMetadata::getWitnessTable(const OpaqueValue *container,
   
   // The layout of the container depends on whether it's class-constrained.
   if (Flags.getClassConstraint() == ProtocolClassConstraint::Class)
-    // The witness tables come first in a class existential.
-    return *reinterpret_cast<const void * const * const *>(words + i);
+    // The witness tables come after the class pointer in a class existential.
+    return *reinterpret_cast<const void * const * const *>(words + 1 + i);
+
   // The witness tables come after the metadata pointer in an opaque existential.
   return *reinterpret_cast<const void * const * const *>(words + 1 + i);
 }

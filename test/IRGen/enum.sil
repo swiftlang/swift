@@ -992,9 +992,9 @@ enum SinglePayloadObjCProtocol {
 // CHECK:   switch i128 %0, label {{%.*}} [
 // CHECK:     i128 0, label {{%.*}}
 // --           0x2_0000_0000_0000_0000
-// CHECK:     i128 36893488147419103232, label {{%.*}}
+// CHECK:     i128 2, label {{%.*}}
 // --           0x4_0000_0000_0000_0000
-// CHECK:     i128 73786976294838206464, label {{%.*}}
+// CHECK:     i128 4, label {{%.*}}
 // CHECK:   ]
 
 // CHECK:   [[WITNESS_INT:%.*]] = trunc i128 %0 to i64

@@ -62,9 +62,18 @@ public:
   /// Insert a value into the packed value after the previously inserted value,
   /// or at offset zero if this is the first value.
   void add(llvm::Value *v);
+
+  /// Make further insertions with 'add' start at the given offset.
+  void moveToOffset(unsigned bitOffset) {
+    assert(bitOffset < bitSize);
+    packedBits = bitOffset;
+  }
   
   /// Insert a value into the packed value at a specific offset.
-  void addAtOffset(llvm::Value *v, unsigned bitOffset);
+  void addAtOffset(llvm::Value *v, unsigned bitOffset) {
+    moveToOffset(bitOffset);
+    add(v);
+  }
   
   /// Combine a partially packed payload at a different offset into our packing.
   void combine(llvm::Value *v);
@@ -91,9 +100,17 @@ public:
   /// Extract a value of the given type that was packed after the previously
   /// claimed value, or at offset zero if this is the first claimed value.
   llvm::Value *claim(llvm::Type *ty);
+
+  /// Extract further values from the given offset.
+  void moveToOffset(unsigned bitOffset) {
+    unpackedBits = bitOffset;
+  }
   
   /// Claim a value at a specific offset inside the value.
-  llvm::Value *claimAtOffset(llvm::Type *ty, unsigned bitOffset);
+  llvm::Value *claimAtOffset(llvm::Type *ty, unsigned bitOffset) {
+    moveToOffset(bitOffset);
+    return claim(ty);
+  }
 };
 
 /// \brief Emit the dispatch branch(es) for a loadable enum.

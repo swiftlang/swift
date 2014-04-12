@@ -3880,11 +3880,6 @@ void PackEnumPayload::add(llvm::Value *v) {
   packedValue = IGF.Builder.CreateOr(packedValue, v);
 }
 
-void PackEnumPayload::addAtOffset(llvm::Value *v, unsigned bitOffset) {
-  packedBits = bitOffset;
-  add(v);
-}
-
 void PackEnumPayload::combine(llvm::Value *v) {
   if (!packedValue)
     packedValue = v;
@@ -3923,12 +3918,6 @@ llvm::Value *UnpackEnumPayload::claim(llvm::Type *ty) {
   if (isa<llvm::PointerType>(ty))
     return IGF.Builder.CreateIntToPtr(unpacked, ty);
   return IGF.Builder.CreateBitCast(unpacked, ty);
-}
-
-llvm::Value *UnpackEnumPayload::claimAtOffset(llvm::Type *ty,
-                                               unsigned bitOffset) {
-  unpackedBits = bitOffset;
-  return claim(ty);
 }
 
 void irgen::emitSwitchLoadableEnumDispatch(IRGenFunction &IGF,
