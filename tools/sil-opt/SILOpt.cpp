@@ -82,6 +82,12 @@ ModuleName("module-name", llvm::cl::desc("The name of the module if processing"
                                          " a module. Necessary for processing "
                                          "stdin."));
 
+static llvm::cl::opt<std::string>
+SDKPath("sdk", llvm::cl::desc("The path to the SDK for use with the clang "
+                              "importer."),
+        llvm::cl::init(""));
+
+
 static llvm::cl::list<PassKind>
 Passes(llvm::cl::desc("Passes:"),
        llvm::cl::values(clEnumValN(PassKind::AllocBoxToStack,
@@ -250,6 +256,11 @@ int main(int argc, char **argv) {
 
   // Give the context the list of search paths to use for modules.
   Invocation.setImportSearchPaths(ImportPaths);
+  // Set the SDK path if we are passed in one.
+  if (SDKPath.size())
+    Invocation.setSDKPath(SDKPath);
+  // Set the module cache path. If not passed in we use the default swift module
+  // cache.
   Invocation.getClangImporterOptions().ModuleCachePath = ModuleCachePath;
 
   // Load the input file.
