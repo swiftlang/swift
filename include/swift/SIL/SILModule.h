@@ -228,6 +228,7 @@ public:
   using iterator = FunctionListType::iterator;
   using const_iterator = FunctionListType::const_iterator;
   FunctionListType &getFunctionList() { return functions; }
+  const FunctionListType &getFunctionList() const { return functions; }
   iterator begin() { return functions.begin(); }
   iterator end() { return functions.end(); }
   const_iterator begin() const { return functions.begin(); }
@@ -242,6 +243,7 @@ public:
   using vtable_iterator = VTableListType::iterator;
   using vtable_const_iterator = VTableListType::const_iterator;
   VTableListType &getVTableList() { return vtables; }
+  const VTableListType &getVTableList() const { return vtables; }
   vtable_iterator vtable_begin() { return vtables.begin(); }
   vtable_iterator vtable_end() { return vtables.end(); }
   vtable_const_iterator vtable_begin() const { return vtables.begin(); }
@@ -256,6 +258,7 @@ public:
   using witness_table_iterator = WitnessTableListType::iterator;
   using witness_table_const_iterator = WitnessTableListType::const_iterator;
   WitnessTableListType &getWitnessTableList() { return witnessTables; }
+  const WitnessTableListType &getWitnessTableList() const { return witnessTables; }
   witness_table_iterator witness_table_begin() { return witnessTables.begin(); }
   witness_table_iterator witness_table_end() { return witnessTables.end(); }
   witness_table_const_iterator witness_table_begin() const { return witnessTables.begin(); }
@@ -270,6 +273,7 @@ public:
   using sil_global_iterator = GlobalListType::iterator;
   using sil_global_const_iterator = GlobalListType::const_iterator;
   GlobalListType &getSILGlobalList() { return silGlobals; }
+  const GlobalListType &getSILGlobalList() const { return silGlobals; }
   sil_global_iterator sil_global_begin() { return silGlobals.begin(); }
   sil_global_iterator sil_global_end() { return silGlobals.end(); }
   sil_global_const_iterator sil_global_begin() const {
