@@ -1803,8 +1803,16 @@ bool AbstractStorageDecl::usesObjCGetterAndSetter() const {
   // We can't autorelease them, and eventually we want to map them back to
   // blocks.
   if (isa<VarDecl>(this)) {
-    if (auto ft = getType()->getAs<AnyFunctionType>())
-      return ft->getRepresentation() == AnyFunctionType::Representation::Block;
+    if (auto ft = getType()->getAs<AnyFunctionType>()) {
+      switch (ft->getRepresentation()) {
+      case AnyFunctionType::Representation::Block:
+        return true;
+      case AnyFunctionType::Representation::Thin:
+        return false;
+      case AnyFunctionType::Representation::Thick:
+        return getASTContext().LangOpts.EnableBlockBridging;
+      }
+    }
   }
 
   return true;
