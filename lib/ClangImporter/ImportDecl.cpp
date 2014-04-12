@@ -3694,8 +3694,8 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
       assert(ImportedCorrectly);
     }
 #endif
-    (void) SkippedOverTypedef;
-    Result->setClangNode(ClangDecl);
+    if (SkippedOverTypedef || !Result->getClangDecl())
+      Result->setClangNode(ClangDecl);
   }
   return Result;
 }
