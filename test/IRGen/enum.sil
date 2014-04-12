@@ -997,11 +997,11 @@ enum SinglePayloadObjCProtocol {
 // CHECK:     i128 4, label {{%.*}}
 // CHECK:   ]
 
-// CHECK:   [[WITNESS_INT:%.*]] = trunc i128 %0 to i64
-// CHECK:   inttoptr i64 [[WITNESS_INT]] to i8**
-// CHECK:   [[OBJECT_SHR:%.*]] = lshr i128 %0, 64
-// CHECK:   [[OBJECT_INT:%.*]] = trunc i128 [[OBJECT_SHR]] to i64
+// CHECK:   [[OBJECT_INT:%.*]] = trunc i128 %0 to i64
 // CHECK:   inttoptr i64 [[OBJECT_INT]] to %objc_object*
+// CHECK:   [[WITNESS_SHR:%.*]] = lshr i128 %0, 64
+// CHECK:   [[WITNESS_INT:%.*]] = trunc i128 [[WITNESS_SHR]] to i64
+// CHECK:   inttoptr i64 [[WITNESS_INT]] to i8**
 
 sil @single_payload_class_protocol_switch : $(SinglePayloadClassProtocol) -> () {
 entry(%c : $SinglePayloadClassProtocol):
