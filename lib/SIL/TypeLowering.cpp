@@ -2096,12 +2096,9 @@ Type TypeConverter::getLoweredCBridgedType(Type t) {
       return t;
     case AnyFunctionType::Representation::Thick:
       // Thick functions (TODO: conditionally) get bridged to blocks.
-      if (M.getASTContext().LangOpts.EnableBlockBridging) {
-        return FunctionType::get(funTy->getInput(), funTy->getResult(),
-                                 funTy->getExtInfo().withRepresentation(
-                                          FunctionType::Representation::Block));
-      }
-      return t;
+      return FunctionType::get(funTy->getInput(), funTy->getResult(),
+                               funTy->getExtInfo().withRepresentation(
+                                        FunctionType::Representation::Block));
     }
   }
 

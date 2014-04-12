@@ -65,7 +65,7 @@ var fooIntVar: <ref:TypeAlias>CInt</ref></decl>
 func fooFunc1(_: <ref:TypeAlias>CInt</ref>) -> <ref:TypeAlias>CInt</ref></decl>
 <decl:Func>func fooFunc1AnonymousParam(_: <ref:TypeAlias>CInt</ref>) -> <ref:TypeAlias>CInt</ref></decl>
 <decl:Func>func fooFunc3(_: <ref:TypeAlias>CInt</ref>, _: <ref:TypeAlias>CFloat</ref>, _: <ref:TypeAlias>CDouble</ref>, _: <ref:Struct>CMutablePointer</ref><<ref:TypeAlias>CInt</ref>>) -> <ref:TypeAlias>CInt</ref></decl>
-<decl:Func>func fooFuncWithBlock(_: @objc_block (<ref:TypeAlias>CFloat</ref>) -> <ref:TypeAlias>CInt</ref>)</decl>
+<decl:Func>func fooFuncWithBlock(_: (<ref:TypeAlias>CFloat</ref>) -> <ref:TypeAlias>CInt</ref>)</decl>
 
 <decl:Func>/**
  * Aaa.  fooFuncWithComment1.  Bbb.

@@ -1799,18 +1799,16 @@ bool AbstractStorageDecl::usesObjCGetterAndSetter() const {
   if (!isObjC())
     return false;
 
-  // Don't expose objc properties for variables with non-block function type.
-  // We can't autorelease them, and eventually we want to map them back to
-  // blocks.
+  // Don't expose objc properties for variables with thin function type.
+  // We can't bridge them.
   if (isa<VarDecl>(this)) {
     if (auto ft = getType()->getAs<AnyFunctionType>()) {
       switch (ft->getRepresentation()) {
+      case AnyFunctionType::Representation::Thick:
       case AnyFunctionType::Representation::Block:
         return true;
       case AnyFunctionType::Representation::Thin:
         return false;
-      case AnyFunctionType::Representation::Thick:
-        return getASTContext().LangOpts.EnableBlockBridging;
       }
     }
   }

@@ -27,6 +27,9 @@
 
     if 3/4 as Float == 6/8 as Float { ... }
 
+* Objective-C blocks are now transparently bridged to Swift closures. You never
+  have to write @objc_block when writing Objective-C-compatible methods anymore.
+
 2014-04-09
 ----------
 

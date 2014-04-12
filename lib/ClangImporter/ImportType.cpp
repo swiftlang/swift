@@ -232,8 +232,7 @@ namespace {
       FunctionType::Representation rep;
       // If the block is a parameter, result, or property, we can bridge it to
       // a native thick Swift function type.
-      if (Impl.SwiftContext.LangOpts.EnableBlockBridging
-          && canBridgeTypes())
+      if (canBridgeTypes())
         rep = FunctionType::Representation::Thick;
       // Otherwise, it keeps its block representation.
       else

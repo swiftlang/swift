@@ -1976,10 +1976,6 @@ bool TypeChecker::isRepresentableInObjC(const DeclContext *DC, Type T) {
       // we can statically produce a cdecl thunk for it).
       return false;
     case AnyFunctionType::Representation::Thick:
-      // TODO: Only when block bridging is enabled
-      if (!Context.LangOpts.EnableBlockBridging)
-        return false;
-      break;
     case AnyFunctionType::Representation::Block:
       break;
     }

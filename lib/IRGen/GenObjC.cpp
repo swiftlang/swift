@@ -1265,8 +1265,6 @@ bool irgen::requiresObjCPropertyDescriptor(IRGenModule &IGM,
       // We can't bridge thin types at all.
       return false;
     case FunctionType::Representation::Thick:
-      // TODO: Only if we enabled block bridging.
-      return IGM.Context.LangOpts.EnableBlockBridging;
     case FunctionType::Representation::Block:
       return true;
     }
@@ -1294,8 +1292,6 @@ bool irgen::requiresObjCSubscriptDescriptor(IRGenModule &IGM,
       // We can't bridge thin types at all.
       return false;
     case FunctionType::Representation::Thick:
-      // TODO: Only if we enabled block bridging.
-      return IGM.Context.LangOpts.EnableBlockBridging;
     case FunctionType::Representation::Block:
       return true;
     }

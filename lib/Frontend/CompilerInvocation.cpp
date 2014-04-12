@@ -508,10 +508,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.EnableExperimentalPatterns = true;
   }
 
-  if (Args.hasArg(OPT_enable_block_bridging)) {
-    Opts.EnableBlockBridging = true;
-  }
-  
   if (const Arg *A = Args.getLastArg(OPT_enable_objc_mangling,
                                      OPT_disable_objc_mangling)) {
     Opts.MangleObjCClassProtocolNames 
