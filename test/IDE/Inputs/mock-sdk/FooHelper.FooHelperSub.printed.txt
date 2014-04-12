@@ -1,6 +1,6 @@
 import FooHelper.FooHelperExplicit
 @exported import FooHelper.FooHelperSub
-func fooHelperSubFunc1(_: CInt) -> CInt
+func fooHelperSubFunc1(_ a: CInt) -> CInt
 struct FooHelperSubEnum1 {
   init(value: CUnsignedInt)
   var value: CUnsignedInt

@@ -259,6 +259,10 @@ private:
   /// \returns true if anything was printed.
   bool printBraceStmtElements(BraceStmt *stmt, bool NeedIndent = true);
 
+  void printOneParameter(const Pattern *ArgPattern,
+                         const Pattern *BodyPattern,
+                         bool StripOuterSliceType);
+
   /// \brief Print the function parameters in curried or selector style,
   /// to match the original function declaration.
   void printFunctionParameters(AbstractFunctionDecl *AFD);
@@ -834,6 +838,56 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
   printAccessors(decl);
 }
 
+void PrintAST::printOneParameter(const Pattern *ArgPattern,
+                                 const Pattern *BodyPattern,
+                                 bool StripOuterSliceType) {
+  if (auto *VP = dyn_cast<VarPattern>(ArgPattern))
+    ArgPattern = VP->getSubPattern();
+  auto *TypedArgPattern = cast<TypedPattern>(ArgPattern);
+  auto TheTypeLoc = TypedArgPattern->getTypeLoc();
+  if (TheTypeLoc.hasLocation()) {
+    // If the outer typeloc is an InOutTypeRepr, print the 'inout' before the
+    // subpattern.
+    if (auto *IOTR = dyn_cast<InOutTypeRepr>(TheTypeLoc.getTypeRepr())) {
+      TheTypeLoc = TypeLoc(IOTR->getBase());
+      if (Type T = TheTypeLoc.getType()) {
+        if (auto *IOT = T->getAs<InOutType>()) {
+          TheTypeLoc.setType(IOT->getObjectType());
+        }
+      }
+
+      Printer << "inout ";
+    }
+  } else {
+    if (Type T = TheTypeLoc.getType()) {
+      if (auto *IOT = T->getAs<InOutType>()) {
+        Printer << "inout ";
+        TheTypeLoc.setType(IOT->getObjectType());
+      }
+    }
+  }
+
+  // Print argument name.
+  auto ArgName = ArgPattern->getBoundName();
+  auto BodyName = BodyPattern->getBoundName();
+  printName(ArgName);
+
+  // If the parameter name is different, print it.
+  if (BodyName != ArgName) {
+    Printer << " ";
+    printName(BodyName);
+  }
+
+  Printer << ": ";
+  if (StripOuterSliceType && !TheTypeLoc.hasLocation()) {
+    if (auto *BGT = TypedArgPattern->getType()->getAs<BoundGenericType>()) {
+      BGT->getGenericArgs()[0].print(Printer, Options);
+      return;
+    }
+  }
+  printTypeLoc(TheTypeLoc);
+}
+
 void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
   ArrayRef<Pattern *> ArgPatterns = AFD->getArgParamPatterns();
   ArrayRef<Pattern *> BodyPatterns = AFD->getBodyParamPatterns();
@@ -844,60 +898,34 @@ void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
     BodyPatterns = BodyPatterns.slice(1);
   }
 
-  if (!AFD->hasSelectorStyleSignature()) {
-    for (auto Pat : ArgPatterns) {
-      printPattern(Pat);
-    }
-    return;
-  }
-
-  auto ArgTuple = cast<TuplePattern>(ArgPatterns[0]);
-  auto BodyTuple = cast<TuplePattern>(BodyPatterns[0]);
-
-  // If we're doing selector splitting, print with the new syntax.
-  if (AFD->getASTContext().LangOpts.SplitPrepositions ) {
-    Printer << "(";
-    for (unsigned i = 0, e = ArgTuple->getFields().size(); i != e; ++i) {
-      if (i > 0)
-        Printer << ", ";
-
-      // Print argument name.
-      auto argPattern = ArgTuple->getFields()[i].getPattern();
-      auto argName = argPattern->getBoundName();
-      auto bodyName = BodyTuple->getFields()[i].getPattern()->getBoundName();
-      printName(argName);
-
-      // If the parameter name is different, print it.
-      if (bodyName != argName) {
-        Printer << " ";
-        printName(bodyName);
+  for (unsigned CurrPattern = 0, NumPatterns = ArgPatterns.size();
+       CurrPattern != NumPatterns; ++CurrPattern) {
+    auto *ArgTuple = dyn_cast<TuplePattern>(ArgPatterns[CurrPattern]);
+    auto *BodyTuple = dyn_cast<TuplePattern>(BodyPatterns[CurrPattern]);
+    if (ArgTuple) {
+      Printer << "(";
+      for (unsigned i = 0, e = ArgTuple->getFields().size(); i != e; ++i) {
+        if (i > 0)
+          Printer << ", ";
+        printOneParameter(ArgTuple->getFields()[i].getPattern(),
+                          BodyTuple->getFields()[i].getPattern(),
+                          /*StripOuterSliceType=*/i == e - 1 &&
+                              ArgTuple->hasVararg());
+        if (Options.PrintDefaultParameterPlaceholder &&
+            ArgTuple->getFields()[i].getDefaultArgKind() !=
+                DefaultArgumentKind::None)
+          Printer << " = default";
       }
-
-      Printer << ": ";
-      // FIXME: inout is in the wrong place
-      if (auto typedArgPattern = dyn_cast<TypedPattern>(argPattern)) {
-        printTypeLoc(typedArgPattern->getTypeLoc());
-      } else if (auto type = typedArgPattern->getType()) {
-        type.print(Printer, Options);
-      }
+      if (ArgTuple->hasVararg())
+        Printer << "...";
+      Printer << ")";
+      continue;
     }
-    Printer << ")";
-    return;
-  }
-
-  // Print in selector style.
-  for (unsigned i = 0, e = ArgTuple->getFields().size(); i != e; ++i) {
-    if (isa<ConstructorDecl>(AFD) || (isa<FuncDecl>(AFD) && i != 0)) {
-      Printer << " ";
-      auto ArgName = ArgTuple->getFields()[i].getPattern()->getBoundName();
-      if (ArgName.empty())
-        Printer << "_";
-      else
-        Printer << ArgName.str();
-    }
-
+    auto *ArgParen = cast<ParenPattern>(ArgPatterns[CurrPattern]);
+    auto *BodyParen = cast<ParenPattern>(BodyPatterns[CurrPattern]);
     Printer << "(";
-    printPattern(BodyTuple->getFields()[i].getPattern());
+    printOneParameter(ArgParen->getSubPattern(), BodyParen->getSubPattern(),
+                      /*StripOuterSliceType=*/false);
     Printer << ")";
   }
 }

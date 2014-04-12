@@ -62,10 +62,10 @@ typealias FooTypedef1 = <ref:TypeAlias>CInt</ref></decl>
 var fooIntVar: <ref:TypeAlias>CInt</ref></decl>
 
 <decl:Func>/// Aaa.  fooFunc1.  Bbb.
-func fooFunc1(_: <ref:TypeAlias>CInt</ref>) -> <ref:TypeAlias>CInt</ref></decl>
+func fooFunc1(_ a: <ref:TypeAlias>CInt</ref>) -> <ref:TypeAlias>CInt</ref></decl>
 <decl:Func>func fooFunc1AnonymousParam(_: <ref:TypeAlias>CInt</ref>) -> <ref:TypeAlias>CInt</ref></decl>
-<decl:Func>func fooFunc3(_: <ref:TypeAlias>CInt</ref>, _: <ref:TypeAlias>CFloat</ref>, _: <ref:TypeAlias>CDouble</ref>, _: <ref:Struct>CMutablePointer</ref><<ref:TypeAlias>CInt</ref>>) -> <ref:TypeAlias>CInt</ref></decl>
-<decl:Func>func fooFuncWithBlock(_: (<ref:TypeAlias>CFloat</ref>) -> <ref:TypeAlias>CInt</ref>)</decl>
+<decl:Func>func fooFunc3(_ a: <ref:TypeAlias>CInt</ref>, _ b: <ref:TypeAlias>CFloat</ref>, _ c: <ref:TypeAlias>CDouble</ref>, _ d: <ref:Struct>CMutablePointer</ref><<ref:TypeAlias>CInt</ref>>) -> <ref:TypeAlias>CInt</ref></decl>
+<decl:Func>func fooFuncWithBlock(_ blk: (<ref:TypeAlias>CFloat</ref>) -> <ref:TypeAlias>CInt</ref>)</decl>
 
 <decl:Func>/**
  * Aaa.  fooFuncWithComment1.  Bbb.
@@ -101,7 +101,7 @@ func fooFuncWithComment4()</decl>
 func fooFuncWithComment5()</decl>
 
 <decl:Func>/// Aaa.  redeclaredInMultipleModulesFunc1.  Bbb.
-func redeclaredInMultipleModulesFunc1(_: <ref:TypeAlias>CInt</ref>) -> <ref:TypeAlias>CInt</ref></decl>
+func redeclaredInMultipleModulesFunc1(_ a: <ref:TypeAlias>CInt</ref>) -> <ref:TypeAlias>CInt</ref></decl>
 
 <decl:Protocol>/// Aaa.  FooProtocolBase.  Bbb.
 protocol FooProtocolBase {
@@ -129,8 +129,8 @@ protocol FooProtocolBase {
 <decl:Class>class FooClassBase {
   <decl:Func>class func fooBaseInstanceFunc0()</decl>
   <decl:Func>func fooBaseInstanceFunc0()</decl>
-  <decl:Func>class func fooBaseInstanceFunc1(anObject: @unchecked <ref:Protocol>AnyObject</ref>?) -> @unchecked <ref:Class>FooClassBase</ref>?</decl>
-  <decl:Func>func fooBaseInstanceFunc1(anObject: @unchecked <ref:Protocol>AnyObject</ref>?) -> @unchecked <ref:Class>FooClassBase</ref>?</decl>
+  <decl:Func>class func fooBaseInstanceFunc1(_ anObject: @unchecked <ref:Protocol>AnyObject</ref>?) -> @unchecked <ref:Class>FooClassBase</ref>?</decl>
+  <decl:Func>func fooBaseInstanceFunc1(_ anObject: @unchecked <ref:Protocol>AnyObject</ref>?) -> @unchecked <ref:Class>FooClassBase</ref>?</decl>
   <decl:Func>class func fooBaseInstanceFuncOverridden()</decl>
   <decl:Func>func fooBaseInstanceFuncOverridden()</decl>
   <decl:Func>class func fooBaseClassFunc0()</decl>
@@ -142,8 +142,8 @@ class FooClassDerived : <ref:Class>FooClassBase</ref>, <ref:Protocol>FooProtocol
   <decl:Var>var fooProperty2: <ref:TypeAlias>CInt</ref></decl>
   <decl:Var>var fooProperty3: <ref:TypeAlias>CInt</ref> { get }</decl>
   <decl:Func>func fooInstanceFunc0()</decl>
-  <decl:Func>func fooInstanceFunc1(a: <ref:TypeAlias>CInt</ref>)</decl>
-  <decl:Func>func fooInstanceFunc2(a: <ref:TypeAlias>CInt</ref>) withB(b: <ref:TypeAlias>CInt</ref>)</decl>
+  <decl:Func>func fooInstanceFunc1(_ a: <ref:TypeAlias>CInt</ref>)</decl>
+  <decl:Func>func fooInstanceFunc2(_ a: <ref:TypeAlias>CInt</ref>, withB b: <ref:TypeAlias>CInt</ref>)</decl>
   <decl:Func>func fooBaseInstanceFuncOverridden()</decl>
   <decl:Func>class func fooClassFunc0()</decl>
 
