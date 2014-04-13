@@ -1335,22 +1335,34 @@ struct OpaqueExistentialBoxBase {
   }
 };
 
+/// The basic layout of an opaque existential with a fixed number of
+/// witness tables.  Note that the WitnessTables field is accessed via
+/// spooky action from Header.
+template <unsigned NumWitnessTables>
+struct FixedOpaqueExistentialContainer {
+  OpaqueExistentialContainer Header;
+  const void *WitnessTables[NumWitnessTables];
+};
+// We need to be able to instantiate for NumWitnessTables==0, which
+// requires an explicit specialization.
+template <>
+struct FixedOpaqueExistentialContainer<0> {
+  OpaqueExistentialContainer Header;
+};
+
 /// A box implementation class for an opaque existential type with
 /// a fixed number of witness tables.
 template <unsigned NumWitnessTables>
 struct OpaqueExistentialBox : OpaqueExistentialBoxBase {
-  struct Container {
-    const void *TypeInfo[NumWitnessTables+1];
-    ValueBuffer Buffer;
+  struct Container : FixedOpaqueExistentialContainer<NumWitnessTables> {
     const Metadata *getType() const {
-      return reinterpret_cast<const Metadata*>(TypeInfo[0]);
-    }
-    void copyTypeInto(Container *dest) const {
-      for (unsigned i = 0; i != NumWitnessTables + 1; ++i)
-        dest->TypeInfo[i] = TypeInfo[i];
+      return this->Header.Type;
     }
     ValueBuffer *getBuffer() {
-      return &Buffer;
+      return &this->Header.Buffer;
+    }
+    void copyTypeInto(Container *dest) const {
+      this->Header.copyTypeInto(&dest->Header, NumWitnessTables);
     }
   };
   using type = Container;
@@ -1371,35 +1383,28 @@ struct OpaqueExistentialBox : OpaqueExistentialBoxBase {
 /// type with a dynamic number of witness tables.
 struct NonFixedOpaqueExistentialBox : OpaqueExistentialBoxBase {
   struct Container {
-    const Metadata *Type;
-    const void **getWitnessTables() {
-      return reinterpret_cast<const void**>(this + 1);
-    }
+    OpaqueExistentialContainer Header;
 
-    const Metadata *getType() { return Type; }
+    const Metadata *getType() {
+      return Header.Type;
+    }
+    ValueBuffer *getBuffer(const Metadata *self) {
+      return &Header.Buffer;
+    }
+    void copyTypeInto(Container *dest, const Metadata *self) {
+      Header.copyTypeInto(&dest->Header, getNumWitnessTables(self));
+    }
 
     static unsigned getNumWitnessTables(const Metadata *self) {
       auto castSelf = static_cast<const ExistentialTypeMetadata*>(self);
       return castSelf->Flags.getNumWitnessTables();
     }
 
-    void copyTypeInto(Container *dest, const Metadata *self) {
-      dest->Type = Type;
-      for (unsigned i = 0, e = getNumWitnessTables(self); i != e; ++i)
-        dest->getWitnessTables()[i] = getWitnessTables()[i];
-    }
-
-    ValueBuffer *getBuffer(const Metadata *self) {
-      return reinterpret_cast<ValueBuffer*>(getWitnessTables() +
-                                            getNumWitnessTables(self));
-    }
-
     static size_t getAlignment(unsigned numWitnessTables) {
       return std::max(alignof(void*), alignof(ValueBuffer));
     }
     static size_t getSize(unsigned numWitnessTables) {
-      return sizeof(ValueBuffer)
-           + sizeof(const Metadata*)
+      return sizeof(OpaqueExistentialContainer)
            + numWitnessTables * sizeof(void*);
     }
     static size_t getStride(unsigned numWitnessTables) {
@@ -1470,15 +1475,15 @@ struct ClassExistentialBoxBase {
 
   template <class Container, class... A>
   static void destroy(Container *value, A... args) {
-    swift_unknownRelease(*value->getValueSlot(args...));
+    swift_unknownRelease(*value->getValueSlot());
   }
 
   template <class Container, class... A>
   static Container *initializeWithCopy(Container *dest, Container *src,
                                        A... args) {
     src->copyTypeInto(dest, args...);
-    auto newValue = *src->getValueSlot(args...);
-    *dest->getValueSlot(args...) = newValue;
+    auto newValue = *src->getValueSlot();
+    *dest->getValueSlot() = newValue;
     swift_unknownRetain(newValue);
     return dest;  
   }
@@ -1487,7 +1492,7 @@ struct ClassExistentialBoxBase {
   static Container *initializeWithTake(Container *dest, Container *src,
                                        A... args) {
     src->copyTypeInto(dest, args...);
-    *dest->getValueSlot(args...) = *src->getValueSlot(args...);
+    *dest->getValueSlot() = *src->getValueSlot();
     return dest;
   }
 
@@ -1495,10 +1500,9 @@ struct ClassExistentialBoxBase {
   static Container *assignWithCopy(Container *dest, Container *src,
                                    A... args) {
     src->copyTypeInto(dest, args...);
-    auto newValue = *src->getValueSlot(args...);
-    auto oldValueSlot = dest->getValueSlot(args...);
-    auto oldValue = *oldValueSlot;
-    *oldValueSlot = newValue;
+    auto newValue = *src->getValueSlot();
+    auto oldValue = *dest->getValueSlot();
+    *dest->getValueSlot() = newValue;
     swift_unknownRetain(newValue);
     swift_unknownRelease(oldValue);
     return dest;
@@ -1508,30 +1512,28 @@ struct ClassExistentialBoxBase {
   static Container *assignWithTake(Container *dest, Container *src,
                                    A... args) {
     src->copyTypeInto(dest, args...);
-    auto newValue = *src->getValueSlot(args...);
-    auto oldValueSlot = dest->getValueSlot(args...);
-    auto oldValue = *oldValueSlot;
-    *oldValueSlot = newValue;
+    auto newValue = *src->getValueSlot();
+    auto oldValue = *dest->getValueSlot();
+    *dest->getValueSlot() = newValue;
     swift_unknownRelease(oldValue);
     return dest;
   }
 
   template <class Container, class... A>
   static const Metadata *typeOf(Container *value,  A... args) {
-    return swift_unknownTypeOf((HeapObject*) *value->getValueSlot(args...));
+    return swift_unknownTypeOf((HeapObject*) value->getValueSlot());
   }
 
   template <class Container, class... A>
   static void storeExtraInhabitant(Container *dest, int index, A... args) {
-    swift_storeHeapObjectExtraInhabitant(
-                                  (HeapObject**) dest->getValueSlot(args...),
+    swift_storeHeapObjectExtraInhabitant((HeapObject**) dest->getValueSlot(),
                                          index);
   }
 
   template <class Container, class... A>
   static int getExtraInhabitantIndex(const Container *src, A... args) {
     return swift_getHeapObjectExtraInhabitantIndex(
-                           (HeapObject* const *) src->getValueSlot(args...));
+                                  (HeapObject* const *) src->getValueSlot());
   }
   
 };
@@ -1541,19 +1543,15 @@ struct ClassExistentialBoxBase {
 template <unsigned NumWitnessTables>
 struct ClassExistentialBox : ClassExistentialBoxBase {
   struct Container {
-    void *Value;
+    ClassExistentialContainer Header;
     const void *TypeInfo[NumWitnessTables];
 
     void copyTypeInto(Container *dest) const {
       for (unsigned i = 0; i != NumWitnessTables; ++i)
         dest->TypeInfo[i] = TypeInfo[i];
     }
-    void **getValueSlot() {
-      return &Value;
-    }
-    void * const *getValueSlot() const {
-      return &Value;
-    }
+    void **getValueSlot() { return &Header.Value; }
+    void * const *getValueSlot() const { return &Header.Value; }
   };
 
   using type = Container;
@@ -1572,14 +1570,7 @@ struct ClassExistentialBox : ClassExistentialBoxBase {
 /// type with a dynamic number of witness tables.
 struct NonFixedClassExistentialBox : ClassExistentialBoxBase {
   struct Container {
-    void *Value;
-
-    const void **getWitnessTables() {
-      return reinterpret_cast<const void **>(this + 1);
-    }
-    const void * const *getWitnessTables() const {
-      return reinterpret_cast<const void * const *>(this + 1);
-    }
+    ClassExistentialContainer Header;
 
     static unsigned getNumWitnessTables(const Metadata *self) {
       auto castSelf = static_cast<const ExistentialTypeMetadata*>(self); 
@@ -1587,22 +1578,18 @@ struct NonFixedClassExistentialBox : ClassExistentialBoxBase {
     }
 
     void copyTypeInto(Container *dest, const Metadata *self) {
-      for (unsigned i = 0, e = getNumWitnessTables(self); i != e; ++i)
-        dest->getWitnessTables()[i] = getWitnessTables()[i];
+      Header.copyTypeInto(&dest->Header, getNumWitnessTables(self));
     }
 
-    void **getValueSlot(const Metadata *self) {
-      return &Value;
-    }
-    void * const *getValueSlot(const Metadata *self) const {
-      return &Value;
-    }
+    void **getValueSlot() { return &Header.Value; }
+    void * const *getValueSlot() const { return &Header.Value; }
 
     static size_t getAlignment(unsigned numWitnessTables) {
       return alignof(void*);
     }
     static size_t getSize(unsigned numWitnessTables) {
-      return sizeof(void*) + numWitnessTables * sizeof(void*);
+      return sizeof(ClassExistentialContainer)
+             + numWitnessTables * sizeof(void*);
     }
     static size_t getStride(unsigned numWitnessTables) {
       return getSize(numWitnessTables);
@@ -1680,50 +1667,55 @@ getExistentialValueWitnesses(ProtocolClassConstraint classConstraint,
 
 const OpaqueValue *
 ExistentialTypeMetadata::projectValue(const OpaqueValue *container) const {
-  auto words = reinterpret_cast<const void * const *>(container);
-  
   // The layout of the container depends on whether it's class-constrained.
   if (Flags.getClassConstraint() == ProtocolClassConstraint::Class) {
-    // The value is a single class reference at the beginning of the container.
-    return reinterpret_cast<const OpaqueValue *>(words);
-  }
-  
-  // The value is placed in a fixed-size buffer positioned after the metadata
-  // and witness tables. We need to project it using the projectBuffer value
-  // witness for the type.
-  auto metadata = *reinterpret_cast<const Metadata * const *>(container);
-  auto buffer = reinterpret_cast<const ValueBuffer *>(
-                                    // 1 word for metadata, N for witness tables
-                                    words + 1 + Flags.getNumWitnessTables());
-  return metadata->vw_projectBuffer(const_cast<ValueBuffer*>(buffer));
+    auto classContainer =
+      reinterpret_cast<const ClassExistentialContainer*>(container);
+    return reinterpret_cast<const OpaqueValue *>(&classContainer->Value);
+  } else {
+    auto opaqueContainer =
+      reinterpret_cast<const OpaqueExistentialContainer*>(container);
+    return opaqueContainer->Type->vw_projectBuffer(
+                         const_cast<ValueBuffer*>(&opaqueContainer->Buffer));
+  }  
 }
 
 const Metadata *
 ExistentialTypeMetadata::getDynamicType(const OpaqueValue *container) const {
   // The layout of the container depends on whether it's class-constrained.
   if (Flags.getClassConstraint() == ProtocolClassConstraint::Class) {
-    // The metadata can be gotten from the class reference in class existentials.
-    auto obj
-      = *reinterpret_cast<HeapObject * const *>(projectValue(container));
-    return swift_unknownTypeOf(obj);
+    auto classContainer =
+      reinterpret_cast<const ClassExistentialContainer*>(container);
+    void *obj = classContainer->Value;
+    return swift_unknownTypeOf(reinterpret_cast<HeapObject*>(obj));
+  } else {
+    auto opaqueContainer =
+      reinterpret_cast<const OpaqueExistentialContainer*>(container);
+    return opaqueContainer->Type;
   }
-  
-  // The metadata is stored in the first word of opaque existentials.
-  return *reinterpret_cast<const Metadata * const *>(container);
 }
 
 const void * const *
 ExistentialTypeMetadata::getWitnessTable(const OpaqueValue *container,
                                          unsigned i) const {
-  auto words = reinterpret_cast<const void * const *>(container);
-  
-  // The layout of the container depends on whether it's class-constrained.
-  if (Flags.getClassConstraint() == ProtocolClassConstraint::Class)
-    // The witness tables come after the class pointer in a class existential.
-    return *reinterpret_cast<const void * const * const *>(words + 1 + i);
+  assert(i < Flags.getNumWitnessTables());
 
-  // The witness tables come after the metadata pointer in an opaque existential.
-  return *reinterpret_cast<const void * const * const *>(words + 1 + i);
+  // The layout of the container depends on whether it's class-constrained.
+  const void * const * witnessTables;
+  if (Flags.getClassConstraint() == ProtocolClassConstraint::Class) {
+    auto classContainer =
+      reinterpret_cast<const ClassExistentialContainer*>(container);
+    witnessTables = classContainer->getWitnessTables();
+  } else {
+    auto opaqueContainer =
+      reinterpret_cast<const OpaqueExistentialContainer*>(container);
+    witnessTables = opaqueContainer->getWitnessTables();
+  }
+
+  // The return type here describes extra structure for the protocol
+  // witness table for some reason.  We should probaby have a nominal
+  // type for these, just for type safety reasons.
+  return reinterpret_cast<const void * const *>(witnessTables[i]);
 }
 
 /// \brief Fetch a uniqued metadata for an existential type. The array

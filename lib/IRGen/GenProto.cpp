@@ -86,21 +86,25 @@ namespace {
 
     unsigned getNumTables() const { return NumTables; }
 
+    Size getSize(IRGenModule &IGM) const {
+      return getFixedBufferSize(IGM)
+           + IGM.getPointerSize() * (getNumTables() + 1);
+    }
+
+    Alignment getAlignment(IRGenModule &IGM) const {
+      return getFixedBufferAlignment(IGM);
+    }
+
     /*
     friend bool operator==(ExistentialLayout a, ExistentialLayout b) {
       return a.NumTables == b.NumTables;
     }*/
 
-    /// Given the offset of the buffer within an existential type.
-    Size getBufferOffset(IRGenModule &IGM) const {
-      return IGM.getPointerSize() * (NumTables + 1);
-    }
-
     /// Given the address of an existential object, drill down to the
     /// buffer.
     Address projectExistentialBuffer(IRGenFunction &IGF, Address addr) const {
-      return IGF.Builder.CreateStructGEP(addr, getNumTables() + 1,
-                                         getBufferOffset(IGF.IGM));
+      return IGF.Builder.CreateStructGEP(addr, 0, Size(0));
+
     }
     
     /// Given the address of an existential object, drill down to the
@@ -108,8 +112,9 @@ namespace {
     Address projectWitnessTable(IRGenFunction &IGF, Address addr,
                                 unsigned which) const {
       assert(which < getNumTables());
-      return IGF.Builder.CreateStructGEP(addr, which + 1,
-                                         IGF.IGM.getPointerSize() * (which + 1));
+      return IGF.Builder.CreateStructGEP(addr, which + 2,
+                                         getFixedBufferSize(IGF.IGM)
+                                         + IGF.IGM.getPointerSize() * (which + 1));
     }
 
     /// Given the address of an existential object, load its witness table.
@@ -122,7 +127,7 @@ namespace {
     /// Given the address of an existential object, drill down to the
     /// metadata field.
     Address projectMetadataRef(IRGenFunction &IGF, Address addr) {
-      return IGF.Builder.CreateStructGEP(addr, 0, Size(0));
+      return IGF.Builder.CreateStructGEP(addr, 1, getFixedBufferSize(IGF.IGM));
     }
 
     /// Given the address of an existential object, load its metadata
@@ -2728,8 +2733,13 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM,
   SmallVector<llvm::Type*, 5> fields;
   SmallVector<ProtocolEntry, 4> entries;
 
-  // The first field is the metadata reference.
-  fields.push_back(IGM.TypeMetadataPtrTy);
+  // In an opaque metadata, the first two fields are the fixed buffer
+  // followed by the metadata reference.  In a class metadata, the
+  // first field is the class instance.
+  //
+  // Leave space in the buffer for both, but make sure we set it up later.
+  fields.push_back(nullptr);
+  fields.push_back(nullptr);
 
   bool requiresClass = false;
   
@@ -2755,11 +2765,12 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM,
   // existential representation.
   if (requiresClass) {
     // Replace the type metadata pointer with the class instance.
-    fields[0] = IGM.UnknownRefCountedPtrTy;
-    type->setBody(fields);
+    fields[1] = IGM.UnknownRefCountedPtrTy;
+    auto classFields = llvm::makeArrayRef(fields).slice(1);
+    type->setBody(classFields);
     
     Alignment align = IGM.getPointerAlignment();
-    Size size = fields.size() * IGM.getPointerSize();
+    Size size = classFields.size() * IGM.getPointerSize();
     
     llvm::BitVector spareBits;
     // BitVector doesn't have an append method...
@@ -2777,7 +2788,7 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM,
     append(spareBits, IGM.getHeapObjectSpareBits());
     
     // The witness table fields are pointers and have pointer spare bits.
-    for (unsigned i = 1, e = fields.size(); i < e; ++i) {
+    for (unsigned i = 1, e = classFields.size(); i < e; ++i) {
       append(spareBits, IGM.TargetInfo.PointerSpareBits);
     }
     
@@ -2786,19 +2797,14 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM,
                                             entries);
   }
 
-  OpaqueExistentialLayout layout(entries.size());
-
-  // Add the value buffer to the fields.
-  fields.push_back(IGM.getFixedBufferTy());
+  // Set up the first two fields.
+  fields[0] = IGM.getFixedBufferTy();
+  fields[1] = IGM.TypeMetadataPtrTy;
   type->setBody(fields);
 
-  Alignment align = getFixedBufferAlignment(IGM);
-  assert(align >= IGM.getPointerAlignment());
-
-  Size size = layout.getBufferOffset(IGM);
-  assert(size.roundUpToAlignment(align) == size);
-  size += getFixedBufferSize(IGM);
-
+  OpaqueExistentialLayout layout(entries.size());
+  Alignment align = layout.getAlignment(IGM);
+  Size size = layout.getSize(IGM);
   return OpaqueExistentialTypeInfo::create(type, size, align, entries);
 }
 

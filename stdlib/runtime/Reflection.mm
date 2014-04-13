@@ -38,10 +38,7 @@ using namespace swift;
 namespace {
   
 /// The layout of protocol<>.
-struct Any {
-  const Metadata *Self;
-  ValueBuffer Value;
-};
+using Any = OpaqueExistentialContainer;
   
 /// A Reflectable witness table.
 struct ReflectableWitnessTable {
@@ -158,6 +155,8 @@ struct MagicMirrorData {
   /// the ObjC class.
   const Metadata *Type;
 };
+static_assert(sizeof(MagicMirrorData) == sizeof(ValueBuffer),
+              "MagicMirrorData doesn't exactly fill a ValueBuffer");
   
 /// A magic implementation of Mirror that can^Wwill be able to look at runtime
 /// metadata to walk an arbitrary object.
@@ -166,12 +165,12 @@ struct MagicMirrorData {
 /// container for the Mirror protocol.
 class MagicMirror {
 public:
+  // The data for the mirror.
+  MagicMirrorData Data;
+
   // The existential header.
   const Metadata *Self;
   const MirrorWitnessTable *MirrorWitness;
-  
-  // The data for the mirror.
-  MagicMirrorData Data;
   
   MagicMirror() = default;
   
@@ -188,6 +187,13 @@ static_assert(alignof(MagicMirror) == alignof(Mirror),
               "MagicMirror layout does not match existential container");
 static_assert(sizeof(MagicMirror) == sizeof(Mirror),
               "MagicMirror layout does not match existential container");
+static_assert(offsetof(MagicMirror, Data) == offsetof(OpaqueExistentialContainer, Buffer),
+              "MagicMirror layout does not match existential container");
+static_assert(offsetof(MagicMirror, Self) == offsetof(OpaqueExistentialContainer, Type),
+              "MagicMirror layout does not match existential container");
+static_assert(offsetof(MagicMirror, MirrorWitness) ==
+              offsetof(Mirror, MirrorWitness),
+              "MagicMirror layout does not match existential container");
   
 // -- Build an Any from an arbitrary value unowned-referenced by a mirror.
   
@@ -197,8 +203,8 @@ Any swift_MagicMirrorData_value(HeapObject *owner,
                                 const Metadata *type) {
   Any result;
   
-  result.Self = type;
-  type->vw_initializeBufferWithCopy(&result.Value,
+  result.Type = type;
+  type->vw_initializeBufferWithCopy(&result.Buffer,
                                     const_cast<OpaqueValue*>(value));
   
   swift_release(owner);
@@ -222,8 +228,8 @@ Any swift_MagicMirrorData_objcValue(HeapObject *owner,
     
   id object = *reinterpret_cast<const id *>(value);
   auto isa = reinterpret_cast<const ClassMetadata *>(object_getClass(object));
-  result.Self = swift_getObjCClassMetadata(isa);
-  *reinterpret_cast<id *>(&result.Value) = [object retain];
+  result.Type = swift_getObjCClassMetadata(isa);
+  *reinterpret_cast<id *>(&result.Buffer) = [object retain];
   swift_release(owner);
   return result;
 }
@@ -590,9 +596,9 @@ OptionalQuickLookObject swift_ObjCMirror_quickLookObject(HeapObject *owner,
   
   /// Store an ObjC reference into an Any.
   auto setAnyToObject = [](Any &any, id obj) {
-    any.Self = swift_getObjCClassMetadata(
+    any.Type = swift_getObjCClassMetadata(
                   reinterpret_cast<const ClassMetadata*>(object_getClass(obj)));
-    *reinterpret_cast<id *>(&any.Value) = [obj retain];
+    *reinterpret_cast<id *>(&any.Buffer) = [obj retain];
   };
   
   if ([object isKindOfClass:NSClassFromString(@"NSAttributedString")]) {

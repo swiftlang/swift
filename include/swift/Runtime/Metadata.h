@@ -1225,6 +1225,43 @@ public:
   }
 };
 
+/// The basic layout of an opaque (non-class-bounded) existential type.
+struct OpaqueExistentialContainer {
+  ValueBuffer Buffer;
+  const Metadata *Type;
+  // const void *WitnessTables[];
+
+  const void **getWitnessTables() {
+    return reinterpret_cast<const void**>(this + 1);
+  }
+  const void * const *getWitnessTables() const {
+    return reinterpret_cast<const void* const *>(this + 1);
+  }
+
+  void copyTypeInto(OpaqueExistentialContainer *dest, unsigned numTables) const {
+    dest->Type = Type;
+    for (unsigned i = 0; i != numTables; ++i)
+      dest->getWitnessTables()[i] = getWitnessTables()[i];
+  }
+};
+
+/// The basic layout of a class-bounded existential type.
+struct ClassExistentialContainer {
+  void *Value;
+
+  const void **getWitnessTables() {
+    return reinterpret_cast<const void**>(this + 1);
+  }
+  const void * const *getWitnessTables() const {
+    return reinterpret_cast<const void* const *>(this + 1);
+  }
+
+  void copyTypeInto(ClassExistentialContainer *dest, unsigned numTables) const {
+    for (unsigned i = 0; i != numTables; ++i)
+      dest->getWitnessTables()[i] = getWitnessTables()[i];
+  }
+};
+
 /// The structure of existential type metadata.
 struct ExistentialTypeMetadata : public Metadata {
   /// The number of witness tables and class-constrained-ness of the type.

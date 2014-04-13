@@ -23,9 +23,8 @@ struct MirrorWitnessTable;
   
 /// The layout of protocol<Mirror>.
 struct Mirror {
-  const Metadata *Self;
+  OpaqueExistentialContainer Header;
   const MirrorWitnessTable *MirrorWitness;
-  ValueBuffer Value;
 };
   
 /// func reflect<T>(x: T) -> Mirror
