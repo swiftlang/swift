@@ -21,6 +21,7 @@
 #include <algorithm>
 #include <dlfcn.h>
 #include <new>
+#include <sstream>
 #include <string.h>
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
@@ -1814,6 +1815,8 @@ Metadata::getNominalTypeDescriptor() const {
   }
 }
 
+extern "C" const char* class_getName(const void*);
+
 /// \brief Check whether a type conforms to a given native Swift protocol,
 /// visible from the named module.
 ///
@@ -1837,18 +1840,33 @@ const void *swift::swift_conformsToProtocol(const Metadata *type,
   // - all conformances are public, and defined in the same module as the
   //   conforming type
   // - only nominal types conform to protocols
-  
-  // FIXME: Only check nominal types for now.
-  auto *descriptor = type->getNominalTypeDescriptor();
-  if (!descriptor)
-    return nullptr;
+
+  std::string TypeName;
+
+  switch (type->getKind()) {
+  case MetadataKind::ObjCClassWrapper: {
+    std::stringstream ostream;
+    const char* objc_class_name = class_getName(*reinterpret_cast<const void* const *>(type+1));
+    ostream << "CSo" << strlen(objc_class_name) << objc_class_name;
+    ostream.flush();
+    TypeName = ostream.str();
+  }
+    break;
+  default:
+    // FIXME: Only check nominal types for now.
+    auto *descriptor = type->getNominalTypeDescriptor();
+    if (!descriptor)
+      return nullptr;
+    TypeName = std::string(descriptor->Name);
+    break;
+  }
   
   // Derive the symbol name that the witness table ought to have.
   // _TWP <protocol conformance>
   // protocol conformance ::= <type> <protocol> <module>
   
   std::string mangledName = "_TWP";
-  mangledName += descriptor->Name;
+  mangledName += TypeName;
   // The name in the protocol descriptor gets mangled as a protocol type
   // P <name> _
   const char *begin = protocol->Name + 1;
@@ -1858,8 +1876,8 @@ const void *swift::swift_conformsToProtocol(const Metadata *type,
   // FIXME: Assume the conformance was declared in the same module as the type,
   // so it will be mangled either as the stdlib module 'Ss' or the first
   // substitution 'S_'.
-  if (descriptor->Name[0] == 'S'
-      || (descriptor->Name[1] == 'S' && descriptor->Name[2] == 's'))
+  if (TypeName[0] == 'S'
+      || (TypeName[1] == 'S' && TypeName[2] == 's'))
     mangledName += "Ss";
   else
     mangledName += "S_";
@@ -1873,6 +1891,12 @@ const void *swift::swift_conformsToProtocol(const Metadata *type,
   // FIXME: Egregious hack.
   mangledName.erase(mangledName.end() - 2, mangledName.end());
   mangledName += "10Foundation";
+  if (const void * result = dlsym(RTLD_DEFAULT, mangledName.c_str())) {
+    return result;
+  }
+  // Otherwise, try looking in AppKit.
+  mangledName.erase(mangledName.end() - 12, mangledName.end());
+  mangledName += "6AppKit";
   return dlsym(RTLD_DEFAULT, mangledName.c_str());
 }
 
