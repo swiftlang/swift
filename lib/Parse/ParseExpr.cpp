@@ -918,6 +918,10 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     
   // Handle suffix expressions.
   while (1) {
+    // FIXME: Better recovery.
+    if (Result.isNull())
+      return nullptr;
+
     // Check for a .foo suffix.
     SourceLoc TokLoc = Tok.getLoc();
     bool IsPeriod = false;
