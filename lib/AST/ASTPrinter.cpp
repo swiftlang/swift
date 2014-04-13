@@ -239,6 +239,7 @@ public:
   void printGenericParams(GenericParamList *params);
 
 private:
+  bool shouldPrint(const Decl *D);
   void printAccessors(AbstractStorageDecl *ASD);
   void printMembers(ArrayRef<Decl *> members, bool needComma = false);
   void printNominalDeclName(NominalTypeDecl *decl);
@@ -282,6 +283,9 @@ public:
   using ASTVisitor::visit;
 
   void visit(Decl *D) {
+    if (!shouldPrint(D))
+      return;
+
     llvm::SaveAndRestore<bool> SavePrintUncheckedOptional(Options.PrintUncheckedOptional);
     if (!Options.PrintUncheckedOptionalInImportedDecls && D->hasClangNode())
       Options.PrintUncheckedOptional = false;
@@ -489,6 +493,16 @@ void PrintAST::printGenericParams(GenericParamList *Params) {
   Printer << ">";
 }
 
+bool PrintAST::shouldPrint(const Decl *D) {
+  if (Options.SkipImplicit && D->isImplicit())
+    return false;
+
+  if (Options.SkipUnavailable && D->getAttrs().isUnavailable())
+    return false;
+
+  return true;
+}
+
 void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
   if (!ASD->hasAccessorFunctions()) {
     // If this is a 'let' vardecl, we print { get } since it is part of the
@@ -544,13 +558,10 @@ void PrintAST::printMembers(ArrayRef<Decl *> members, bool needComma) {
   {
     IndentRAII indentMore(*this);
     for (auto member : members) {
+      if (!shouldPrint(member))
+        continue;
+
       if (!member->shouldPrintInContext(Options))
-        continue;
-
-      if (Options.SkipImplicit && member->isImplicit())
-        continue;
-
-      if (Options.SkipUnavailable && member->getAttrs().isUnavailable())
         continue;
 
       indent();
