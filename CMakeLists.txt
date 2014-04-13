@@ -183,6 +183,7 @@ set(SWIFT_INCLUDE_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/include)
 option(SWIFT_OPTIMIZED "Enable optimization for Swift source files" YES)
 option(SWIFT_ASSERTS "Enable assertions for the Swift standard library" YES)
 option(SWIFT_RUNTIME_CHECKS "Enable overflow checks for the Swift standard library" YES)
+option(SWIFT_VERIFY_ALL "Run SIL verification after each transform when building Swift files in the build process" NO)
 set(SWIFT_MODULE_CACHE_PATH "" CACHE PATH
   "Directory to use as the Clang module cache when building Swift source files")
 option(SWIFT_NEW_DRIVER "Enable the new Swift driver" ON)
@@ -330,6 +331,10 @@ function(compile_swift_files)
   if(NOT SWIFT_RUNTIME_CHECKS)
     # FIXME: Should this be exposed at the driver level?
     list(APPEND swift_flags "-Xfrontend" "-disable-all-runtime-checks")
+  endif()
+
+  if(SWIFT_VERIFY_ALL)
+    list(APPEND swift_flags "-Xfrontend" "-sil-verify-all")
   endif()
 
   # Allow import of other Swift modules we just built.
