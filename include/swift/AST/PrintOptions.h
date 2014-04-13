@@ -70,6 +70,9 @@ struct PrintOptions {
   /// \brief Whether to print unavailable parts of the AST.
   bool SkipUnavailable = false;
 
+  /// Whether to skip declarations that start with '_'.
+  bool SkipLeadingUnderscoreDecls = false;
+
   bool PrintImplicitAttrs = true;
 
   /// \brief Whether to print '@exported' on exported imports.
@@ -110,6 +113,7 @@ struct PrintOptions {
     result.VarInitializers = true;
     result.PrintDefaultParameterPlaceholder = true;
     result.SkipImplicit = false;
+    result.SkipLeadingUnderscoreDecls = false;
     result.PrintImplicitAttrs = true;
     result.PrintDocumentationComments = true;
     result.PrintRegularClangComments = true;

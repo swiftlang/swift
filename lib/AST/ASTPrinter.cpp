@@ -282,9 +282,9 @@ public:
 
   using ASTVisitor::visit;
 
-  void visit(Decl *D) {
+  bool visit(Decl *D) {
     if (!shouldPrint(D))
-      return;
+      return false;
 
     llvm::SaveAndRestore<bool> SavePrintUncheckedOptional(Options.PrintUncheckedOptional);
     if (!Options.PrintUncheckedOptionalInImportedDecls && D->hasClangNode())
@@ -293,6 +293,7 @@ public:
     Printer.callPrintDeclPre(D);
     ASTVisitor::visit(D);
     Printer.printDeclPost(D);
+    return true;
   }
 };
 } // unnamed namespace
@@ -500,6 +501,28 @@ bool PrintAST::shouldPrint(const Decl *D) {
   if (Options.SkipUnavailable && D->getAttrs().isUnavailable())
     return false;
 
+  if (Options.SkipLeadingUnderscoreDecls) {
+    if (auto VD = dyn_cast<ValueDecl>(D)) {
+      if (VD->hasName() && VD->getFullName().getBaseName().str().startswith("_"))
+        return false;
+    }
+  }
+
+  if (auto Ext = dyn_cast<ExtensionDecl>(D)) {
+    // If the extension doesn't add protocols or has no members that we should
+    // print then skip printing it.
+    if (Ext->getProtocols().empty()) {
+      bool HasMemberToPrint = false;
+      for (auto Member : Ext->getMembers()) {
+        if (shouldPrint(Member)) {
+          HasMemberToPrint = true;
+          break;
+        }
+      }
+      if (!HasMemberToPrint)
+        return false;
+    }
+  }
   return true;
 }
 
@@ -1293,9 +1316,9 @@ void Decl::print(raw_ostream &OS, const PrintOptions &Opts) const {
   print(Printer, Opts);
 }
 
-void Decl::print(ASTPrinter &Printer, const PrintOptions &Opts) const {
+bool Decl::print(ASTPrinter &Printer, const PrintOptions &Opts) const {
   PrintAST printer(Printer, Opts);
-  printer.visit(const_cast<Decl *>(this));
+  return printer.visit(const_cast<Decl *>(this));
 }
 
 bool Decl::shouldPrintInContext(const PrintOptions &PO) const {

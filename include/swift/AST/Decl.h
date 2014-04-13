@@ -586,7 +586,10 @@ public:
   /// \param Printer ASTPrinter object.
   ///
   /// \param Opts Options to control how pretty-printing is performed.
-  void print(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  ///
+  /// \returns true if the declaration was printed or false if the print options
+  /// required the declaration to be skipped from printing.
+  bool print(ASTPrinter &Printer, const PrintOptions &Opts) const;
 
   /// \brief Determine whether this declaration should be printed when
   /// encountered in its declaration context's list of members.

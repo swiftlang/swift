@@ -302,14 +302,15 @@ void swift::ide::printSubmoduleInterface(
     }
 
     ASTPrinter &Printer = *PrinterToUse;
-    D->print(Printer, AdjustedOptions);
-    Printer << "\n";
-    if (auto NTD = dyn_cast<NominalTypeDecl>(D)) {
-      for (auto Ext : NTD->getExtensions()) {
-        if (Options.PrintRegularClangComments && Ext->hasClangNode())
-          continue; // will be printed in its source location, see above.
-        Ext->print(Printer, AdjustedOptions);
-        Printer << "\n";
+    if (D->print(Printer, AdjustedOptions)) {
+      Printer << "\n";
+      if (auto NTD = dyn_cast<NominalTypeDecl>(D)) {
+        for (auto Ext : NTD->getExtensions()) {
+          if (Options.PrintRegularClangComments && Ext->hasClangNode())
+            continue; // will be printed in its source location, see above.
+          Ext->print(Printer, AdjustedOptions);
+          Printer << "\n";
+        }
       }
     }
   };
