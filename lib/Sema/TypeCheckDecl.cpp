@@ -1732,11 +1732,17 @@ public:
   // scope.  These booleans indicate whether this is currently the first or
   // second pass over the global scope (or neither, if we're in a context where
   // we only visit each decl once).
-  bool IsFirstPass;
-  bool IsSecondPass;
+  unsigned IsFirstPass : 1;
+  unsigned IsSecondPass : 1;
+  
+  // We delay validation of C and Objective-C type-bridging functions in the
+  // standard library until we encounter a declaration that requires one. This
+  // flag is set to 'true' once the bridge functions have been checked.
+  unsigned HasCheckedBridgeFunctions : 1;
 
   DeclChecker(TypeChecker &TC, bool IsFirstPass, bool IsSecondPass)
-      : TC(TC), IsFirstPass(IsFirstPass), IsSecondPass(IsSecondPass) {}
+      : TC(TC), IsFirstPass(IsFirstPass), IsSecondPass(IsSecondPass),
+        HasCheckedBridgeFunctions(false) {}
 
   //===--------------------------------------------------------------------===//
   // Helper Functions.
@@ -1763,11 +1769,66 @@ public:
 
     D->setConformances(D->getASTContext().AllocateCopy(conformances));
   }
+  
+  /// Check runtime functions responsible for implicit bridging of Objective-C
+  /// types.
+  void checkObjCBridgingFunctions(Module *mod,
+                              StringRef bridgedTypeName,
+                              StringRef forwardConversion,
+                              StringRef reverseConversion) {
+    assert(mod);
+    Module::AccessPathTy unscopedAccess = {};
+    SmallVector<ValueDecl *, 4> results;
+    
+    mod->lookupValue(unscopedAccess, mod->Ctx.getIdentifier(bridgedTypeName),
+                     NLKind::QualifiedLookup, results);
+    mod->lookupValue(unscopedAccess, mod->Ctx.getIdentifier(forwardConversion),
+                     NLKind::QualifiedLookup, results);
+    mod->lookupValue(unscopedAccess, mod->Ctx.getIdentifier(reverseConversion),
+                     NLKind::QualifiedLookup, results);
+    
+    for (auto D : results)
+      TC.validateDecl(D);
+  }
+  
+  void checkBridgedFunctions() {
+    if (HasCheckedBridgeFunctions)
+      return;
+    
+    #define BRIDGE_TYPE(BRIDGED_MOD, BRIDGED_TYPE, _, NATIVE_TYPE, OPT) \
+    if (Module *module = TC.Context.LoadedModules.lookup(#BRIDGED_MOD)) {\
+      checkObjCBridgingFunctions(module, #BRIDGED_TYPE, \
+      "convert" #BRIDGED_TYPE "To" #NATIVE_TYPE, \
+      "convert" #NATIVE_TYPE "To" #BRIDGED_TYPE); \
+    }
+    #include "swift/SIL/BridgedTypes.def"
+    
+    if (Module *module = TC.Context.LoadedModules.lookup("Swift")) {
+      checkObjCBridgingFunctions(module, "ObjCMutablePointer",
+                                 "convertUnsafePointerToObjCMutablePointer",
+                                 "convertObjCMutablePointerToUnsafePointer");
+      checkObjCBridgingFunctions(module, "CMutablePointer",
+                                 "convertUnsafePointerToCMutablePointer",
+                                 "convertCMutablePointerToUnsafePointer");
+      checkObjCBridgingFunctions(module, "CConstPointer",
+                                 "convertUnsafePointerToCConstPointer",
+                                 "convertCConstPointerToUnsafePointer");
+    }
+    
+    HasCheckedBridgeFunctions = true;
+  }
+  
+  void markAsObjC(ValueDecl *D, bool isObjC) {
+    D->setIsObjC(isObjC);
+    
+    if (isObjC)
+      checkBridgedFunctions();
+  }
 
   //===--------------------------------------------------------------------===//
   // Visit Methods.
   //===--------------------------------------------------------------------===//
-
+  
   void visitImportDecl(ImportDecl *ID) {
     TC.checkDeclAttributesEarly(ID);
     TC.checkDeclAttributes(ID);
@@ -1805,7 +1866,8 @@ public:
                     (classContext && classContext->isObjC());
       if (isObjC && !TC.isRepresentableInObjC(VD, reason))
         isObjC = false;
-      VD->setIsObjC(isObjC);
+      
+      markAsObjC(VD, isObjC);
     }
 
     if (IsFirstPass && !checkOverrides(VD)) {
@@ -2016,7 +2078,8 @@ public:
                     (classContext && classContext->isObjC());
       if (isObjC && !TC.isRepresentableInObjC(SD, reason))
         isObjC = false;
-      SD->setIsObjC(isObjC);
+      
+      markAsObjC(SD, isObjC);
     }
 
     // Make sure the getter and setter have valid types, since they will be
@@ -2319,7 +2382,7 @@ public:
                                        [&](ValueDecl *req,
                                            ConcreteDeclRef witness) {
         if (req->isObjC() && witness)
-          witness.getDecl()->setIsObjC(true);
+          markAsObjC(witness.getDecl(), true);
       });
     }
 
@@ -3067,6 +3130,7 @@ public:
         reason = ObjCReason::MemberOfObjCProtocol;
       bool isObjC = (reason != ObjCReason::DontDiagnose) ||
                     (classContext && classContext->isObjC());
+      
       if (protocolContext && FD->isGetterOrSetter()) {
         // Don't complain about accessors in protocols.  We will emit a
         // diagnostic about the property itself.
@@ -3093,9 +3157,9 @@ public:
       if (isObjC &&
           (FD->isInvalid() || !TC.isRepresentableInObjC(FD, reason)))
         isObjC = false;
-      FD->setIsObjC(isObjC);
+      markAsObjC(FD, isObjC);
     }
-
+    
     if (!checkOverrides(FD)) {
       // If a method has an 'override' keyword but does not override anything,
       // complain.
@@ -3887,7 +3951,7 @@ public:
       if (isObjC &&
           (CD->isInvalid() || !TC.isRepresentableInObjC(CD, reason)))
         isObjC = false;
-      CD->setIsObjC(isObjC);
+      markAsObjC(CD, isObjC);
     }
 
     // Check whether this constructor overrides a constructor in its base class.
@@ -3947,7 +4011,7 @@ public:
 
     // Destructors are always @objc, because their Objective-C entry point is
     // -dealloc.
-    DD->setIsObjC(true);
+    markAsObjC(DD, true);
 
     validateAttributes(TC, DD);
     TC.checkDeclAttributes(DD);
