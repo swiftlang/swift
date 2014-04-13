@@ -96,8 +96,8 @@ import gizmo
 // CHECK: }
 
 // CHECK: @_TMPdC15generic_classes25GenericInheritsNonGeneric
-// CHECK: @_TMPdCSo19GenericInheritsObjC
-// CHECK: @_TMPdCSo20GenericInheritsObjC2
+// CHECK: @_TMPdC15generic_classes19GenericInheritsObjC
+// CHECK: @_TMPdC15generic_classes20GenericInheritsObjC2
 
 class RootGeneric<T> {
   var x : UInt8
@@ -159,7 +159,7 @@ class GenericInheritsObjC<D> : Gizmo {
 
   init()
 }
-sil @_TFCSo19GenericInheritsObjCD : $@cc(method) @thin <T> (GenericInheritsObjC<T>) -> ()
+sil @_TFC15generic_classes19GenericInheritsObjCD : $@cc(method) @thin <T> (GenericInheritsObjC<T>) -> ()
 
 class GenericInheritsObjC2<E> : Gizmo {
   var x : UInt8
@@ -168,7 +168,7 @@ class GenericInheritsObjC2<E> : Gizmo {
 
   init()
 }
-sil @_TFCSo20GenericInheritsObjC2D : $@cc(method) @thin <T> (GenericInheritsObjC2<T>) -> ()
+sil @_TFC15generic_classes20GenericInheritsObjC2D : $@cc(method) @thin <T> (GenericInheritsObjC2<T>) -> ()
 
 // CHECK: define [[ROOTGENERIC]]* @RootGeneric_fragile_dependent_alloc
 // CHECK:   [[METADATA_ARRAY:%.*]] = bitcast %swift.type* [[METADATA:%.*]] to i8***

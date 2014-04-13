@@ -1,7 +1,7 @@
 // RUN: rm -rf %t/clang-module-cache
 // RUN: %swift -target x86_64-apple-darwin10 -module-cache-path %t/clang-module-cache -sdk %S/Inputs -I=%S/Inputs -enable-source-import %s -emit-ir | FileCheck %s
 
-// CHECK: [[SGIZMO:%CSo10SwiftGizmo]] = type
+// CHECK: [[SGIZMO:%C12objc_dealloc10SwiftGizmo]] = type
 // CHECK: [[GIZMO:%CSo5Gizmo]] = type opaque
 
 sil_stage raw
@@ -20,7 +20,7 @@ class SwiftGizmo : Gizmo {
   init()
   deinit
 }
-sil @_TFCSo10SwiftGizmoD : $@cc(method) @thin (SwiftGizmo) -> ()
+sil @_TFC12objc_dealloc10SwiftGizmoD : $@cc(method) @thin (SwiftGizmo) -> ()
 
 sil @_TF12objc_dealloc10onDestructFT_T_ : $@thin () -> () {
 bb0:
@@ -29,7 +29,7 @@ bb0:
   return %1 : $()                                 // id: %2
 }
 
-sil @_TFCSo10SwiftGizmod : $@thin (@owned SwiftGizmo) -> @owned Builtin.ObjectPointer {
+sil @_TFC12objc_dealloc10SwiftGizmod : $@thin (@owned SwiftGizmo) -> @owned Builtin.ObjectPointer {
 bb0(%0 : $SwiftGizmo):
   // function_ref objc_dealloc.onDestruct () -> ()
   %1 = function_ref @_TF12objc_dealloc10onDestructFT_T_ : $@thin () -> () // user: %2
@@ -40,7 +40,7 @@ bb0(%0 : $SwiftGizmo):
   return %5 : $Builtin.ObjectPointer              // id: %6
 }
 
-sil @_TToFCSo10SwiftGizmog1xC12objc_dealloc1X : $@cc(objc_method) @thin (SwiftGizmo) -> @autoreleased X {
+sil @_TToFC12objc_dealloc10SwiftGizmog1xC12objc_dealloc1X : $@cc(objc_method) @thin (SwiftGizmo) -> @autoreleased X {
 bb0(%0 : $SwiftGizmo):
   %1 = ref_element_addr %0 : $SwiftGizmo, #SwiftGizmo.x      // user: %2
   %2 = load %1 : $*X                              // users: %4, %3
@@ -48,7 +48,7 @@ bb0(%0 : $SwiftGizmo):
   autorelease_return %2 : $X                      // id: %4
 }
 
-sil @_TToFCSo10SwiftGizmos1xC12objc_dealloc1X : $@cc(objc_method) @thin (X, SwiftGizmo) -> () {
+sil @_TToFC12objc_dealloc10SwiftGizmos1xC12objc_dealloc1X : $@cc(objc_method) @thin (X, SwiftGizmo) -> () {
 bb0(%0 : $X, %1 : $SwiftGizmo):
   strong_retain %0 : $X                           // id: %2
   strong_retain %1 : $SwiftGizmo                  // id: %3
@@ -59,8 +59,8 @@ bb0(%0 : $X, %1 : $SwiftGizmo):
   return %7 : $()                                 // id: %8
 }
 
-// CHECK: define internal void @_TToFCSo10SwiftGizmoD([[OPAQUE:%.*]]*, i8*) unnamed_addr
-sil @_TToFCSo10SwiftGizmoD : $@cc(objc_method) @thin (SwiftGizmo) -> () {
+// CHECK: define internal void @_TToFC12objc_dealloc10SwiftGizmoD([[OPAQUE:%.*]]*, i8*) unnamed_addr
+sil @_TToFC12objc_dealloc10SwiftGizmoD : $@cc(objc_method) @thin (SwiftGizmo) -> () {
 bb0(%0 : $SwiftGizmo):
   // CHECK-NEXT: entry
   // CHECK-NEXT: [[OBJC_SUPER:%[a-zA-Z0-9_]+]] = alloca %objc_super, align 8
@@ -75,7 +75,7 @@ bb0(%0 : $SwiftGizmo):
 
   // Destroy instance variables
   // FIXME: This should move to .cxx_destruct
-  // CHECK: [[XOFFSET:%[a-zA-Z0-9]+]] = load i64* @_TWvdvCSo10SwiftGizmo1xC12objc_dealloc1X, align 8
+  // CHECK: [[XOFFSET:%[a-zA-Z0-9]+]] = load i64* @_TWvdvC12objc_dealloc10SwiftGizmo1xCS_1X, align 8
   // CHECK-NEXT: bitcast
   // CHECK-NEXT: [[IVAR_ADDR:%[a-zA-Z0-9]+]] = getelementptr inbounds i8* {{.*}}, i64 [[XOFFSET]]
   // CHECK-NEXT: [[XADDR:%[.a-zA-Z0-9]+]] = bitcast i8* [[IVAR_ADDR]] to %C12objc_dealloc1X**
@@ -90,7 +90,7 @@ bb0(%0 : $SwiftGizmo):
   // CHECK-NEXT: [[OBJC_SUPER_RECEIVER:%[a-zA-Z0-9]+]] = getelementptr %objc_super* [[OBJC_SUPER]], i32 0, i32 0
   // CHECK-NEXT: store %objc_object* [[SUPER_OBJ]], %objc_object** [[OBJC_SUPER_RECEIVER]], align 8
   // CHECK-NEXT: [[OBJC_SUPER_CLASS:%[a-zA-Z0-9]+]] = getelementptr %objc_super* [[OBJC_SUPER]], i32 0, i32 1
-  // CHECK-NEXT: store %objc_class* bitcast (%swift.type* getelementptr inbounds (%swift.full_heapmetadata* bitcast ({{.*}}* @_TMdCSo10SwiftGizmo to %swift.full_heapmetadata*), i32 0, i32 2) to %objc_class*), %objc_class** [[OBJC_SUPER_CLASS]], align 8
+  // CHECK-NEXT: store %objc_class* bitcast (%swift.type* getelementptr inbounds (%swift.full_heapmetadata* bitcast ({{.*}}* @_TMdC12objc_dealloc10SwiftGizmo to %swift.full_heapmetadata*), i32 0, i32 2) to %objc_class*), %objc_class** [[OBJC_SUPER_CLASS]], align 8
   // CHECK-NEXT: [[DEALLOC_SEL:%[a-zA-Z0-9]+]] = load i8** @"\01L_selector(dealloc)", align 8
   // CHECK-NEXT: call void bitcast (void ()* @objc_msgSendSuper2 to void (%objc_super*, i8*)*)(%objc_super* [[OBJC_SUPER]], i8* [[DEALLOC_SEL]])
   %5 = super_method %0 : $SwiftGizmo, #Gizmo.deinit!deallocator.foreign : Gizmo -> () , $@cc(objc_method) @thin (Gizmo) -> () // user: %7
@@ -103,18 +103,18 @@ bb0(%0 : $SwiftGizmo):
 }
 
 // @objc ObjectiveC.SwiftGizmo.__ivar_destroyer
-sil @_TToFCSo10SwiftGizmoE : $@cc(objc_method) @thin (SwiftGizmo) -> () {
+sil @_TToFC12objc_dealloc10SwiftGizmoE : $@cc(objc_method) @thin (SwiftGizmo) -> () {
 bb0(%0 : $SwiftGizmo):
   %3 = tuple ()
   return %3 : $()                                 // id: %4
 }
 
-sil @_TToFCSo10SwiftGizmocfMS_FT_S_ : $@cc(objc_method) @thin (@owned SwiftGizmo) -> @owned SwiftGizmo {
+sil @_TToFC12objc_dealloc10SwiftGizmocfMS0_FT_S0_ : $@cc(objc_method) @thin (@owned SwiftGizmo) -> @owned SwiftGizmo {
 bb0(%0 : $SwiftGizmo):
   return %0 : $SwiftGizmo
 }
 
-sil @_TToFCSo10SwiftGizmocfMS_FT11withBellsOnSi_S_ : $@cc(objc_method) @thin (Int, @owned SwiftGizmo) -> @owned SwiftGizmo {
+sil @_TToFC12objc_dealloc10SwiftGizmocfMS0_FT11withBellsOnSi_S0_ : $@cc(objc_method) @thin (Int, @owned SwiftGizmo) -> @owned SwiftGizmo {
 bb0(%0 : $Int, %1 : $SwiftGizmo):
   return %1 : $SwiftGizmo
 }

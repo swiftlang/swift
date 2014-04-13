@@ -87,9 +87,21 @@ MAKE_BLOCK_SHIM(FUNC(CAT3(DIRECT(OBJCPTR(PSo9AnyObject_)),
                      VOID),
                 void(id, id, BOOL *));
 
+MAKE_BLOCK_SHIM(FUNC(CAT3(DIRECT(OBJCPTR(PSs9AnyObject_)),
+                          DIRECT(OBJCPTR(PS__)),
+                          DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool_)),
+                     VOID),
+                void(id, id, BOOL *));
+
 /// NSDictionary predicate
 /// (id, id, UnsafePointer<BOOL>) -> Bool
 MAKE_BLOCK_SHIM(FUNC(CAT3(DIRECT(OBJCPTR(PSo9AnyObject_)),
+                          DIRECT(OBJCPTR(PS__)),
+                          DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool_)),
+                     DIRECT(S2_)),
+                BOOL(id, id, BOOL *));
+
+MAKE_BLOCK_SHIM(FUNC(CAT3(DIRECT(OBJCPTR(PSs9AnyObject_)),
                           DIRECT(OBJCPTR(PS__)),
                           DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool_)),
                      DIRECT(S2_)),
@@ -103,9 +115,21 @@ MAKE_BLOCK_SHIM(FUNC(CAT3(DIRECT(OBJCPTR(PSo9AnyObject_)),
                      VOID),
                 void(id, NSUInteger, BOOL *));
 
+MAKE_BLOCK_SHIM(FUNC(CAT3(DIRECT(OBJCPTR(PSs9AnyObject_)),
+                          DIRECT(Si),
+                          DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool_)),
+                     VOID),
+                void(id, NSUInteger, BOOL *));
+
 /// NSArray predicate
 /// (id, NSUInteger, UnsafePointer<BOOL>) -> Bool
 MAKE_BLOCK_SHIM(FUNC(CAT3(DIRECT(OBJCPTR(PSo9AnyObject_)),
+                          DIRECT(Si),
+                          DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool_)),
+                     DIRECT(S2_)),
+                BOOL(id, NSUInteger, BOOL *));
+
+MAKE_BLOCK_SHIM(FUNC(CAT3(DIRECT(OBJCPTR(PSs9AnyObject_)),
                           DIRECT(Si),
                           DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool_)),
                      DIRECT(S2_)),
@@ -120,6 +144,12 @@ MAKE_BLOCK_SHIM(FUNC(DIRECT(OBJCPTR(CSo18NSAnimationContext)),
 /// NSAttributedString enumerator
 /// (id, NSRange, UnsafePointer<BOOL>) -> Void  aka attribute string enumerator
 MAKE_BLOCK_SHIM(FUNC(CAT3(DIRECT(OBJCPTR(PSo9AnyObject_)),
+                          DIRECT(VSC8_NSRange),
+                          DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool_)),
+                     VOID),
+                void(id, NSRange, BOOL *));
+
+MAKE_BLOCK_SHIM(FUNC(CAT3(DIRECT(OBJCPTR(PSs9AnyObject_)),
                           DIRECT(VSC8_NSRange),
                           DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool_)),
                      VOID),
@@ -242,9 +272,19 @@ MAKE_BLOCK_SHIM(FUNC(CAT2(DIRECT(OBJCPTR(PSo9AnyObject_)),
                      VOID),
                 void(id, BOOL *));
 
+MAKE_BLOCK_SHIM(FUNC(CAT2(DIRECT(OBJCPTR(PSs9AnyObject_)),
+                          DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool_)),
+                     VOID),
+                void(id, BOOL *));
+
 /// NSSet predicate
 /// (id, UnsafePointer<BOOL>) -> BOOL
 MAKE_BLOCK_SHIM(FUNC(CAT2(DIRECT(OBJCPTR(PSo9AnyObject_)),
+                          DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool_)),
+                     DIRECT(S2_)),
+                BOOL(id, BOOL *));
+
+MAKE_BLOCK_SHIM(FUNC(CAT2(DIRECT(OBJCPTR(PSs9AnyObject_)),
                           DIRECT(GVSs13UnsafePointerV10ObjectiveC8ObjCBool_)),
                      DIRECT(S2_)),
                 BOOL(id, BOOL *));

@@ -59,8 +59,8 @@ namespace swift {
     // Mangle @objc class and protocol names?
     // Note: this is *almost* an IRGen-only option, except that it affects
     // the headers we generate for Objective-C interoperability. 
-    // FIXME: This option will eventually default to 'true' and go away.
-    bool MangleObjCClassProtocolNames = false;
+    // FIXME: This option will eventually go away.
+    bool MangleObjCClassProtocolNames = true;
 
     /// Whether to split imported Objective-C selectors into Swift method names.
     bool SplitPrepositions = false;

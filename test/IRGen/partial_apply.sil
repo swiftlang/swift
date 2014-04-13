@@ -11,28 +11,28 @@ import gizmo
   
   func initFamily() -> ObjCClass { return self }
 }
-sil @_TFCSo9ObjCClassD : $@cc(method) @thin (ObjCClass) -> ()
+sil @_TFC13partial_apply9ObjCClassD : $@cc(method) @thin (ObjCClass) -> ()
 
-sil @_TFCSo9ObjCClasscfMS_FT_S_ : $@cc(method) @thin (ObjCClass) -> ObjCClass {
+sil @_TFC13partial_apply9ObjCClasscfMS_FT_S_ : $@cc(method) @thin (ObjCClass) -> ObjCClass {
 bb0(%0 : $ObjCClass):
   return %0 : $ObjCClass
 }
 
-sil @_TToFCSo9ObjCClasscfMS_FT_S_ : $@cc(objc_method) @thin (ObjCClass) -> ObjCClass {
+sil @_TToFC13partial_apply9ObjCClasscfMS0_FT_S0_ : $@cc(objc_method) @thin (ObjCClass) -> ObjCClass {
 bb0(%0 : $ObjCClass):
   // function_ref ObjectiveC.ObjCClass.constructor (ObjectiveC.ObjCClass.Type)() -> ObjectiveC.ObjCClass
-  %1 = function_ref @_TFCSo9ObjCClasscfMS_FT_S_ : $@cc(method) @thin (ObjCClass) -> ObjCClass // user: %2
+  %1 = function_ref @_TFC13partial_apply9ObjCClasscfMS_FT_S_ : $@cc(method) @thin (ObjCClass) -> ObjCClass // user: %2
   %2 = apply %1(%0) : $@cc(method) @thin (ObjCClass) -> ObjCClass // user: %3
   return %2 : $ObjCClass
 }
 
-sil @_TToFCSo9ObjCClass6methodfS_FT1xSi_T_ : $@cc(objc_method) @thin (Int, ObjCClass) -> () {
+sil @_TToFC13partial_apply9ObjCClass6methodfS0_FT1xSi_T_ : $@cc(objc_method) @thin (Int, ObjCClass) -> () {
 bb0(%0 : $Int, %1 : $ObjCClass):
   %v = tuple()
   return %v : $()
 }
 
-sil @_TToFCSo9ObjCClass10initFamilyfS_FT_S_ : $@cc(objc_method) @thin (@owned ObjCClass) -> @owned ObjCClass {
+sil @_TToFC13partial_apply9ObjCClass10initFamilyfS0_FT_S0_ : $@cc(objc_method) @thin (@owned ObjCClass) -> @owned ObjCClass {
 bb0(%0 : $ObjCClass):
   return %0 : $ObjCClass
 }
@@ -70,12 +70,12 @@ entry(%f : $(Builtin.Word) -> (), %x : $Builtin.Word):
   return %p : $@callee_owned () -> ()
 }
 
-// CHECK-LABEL: define { i8*, %swift.refcounted* } @objc_partial_apply(%CSo9ObjCClass*) {
+// CHECK-LABEL: define { i8*, %swift.refcounted* } @objc_partial_apply(%C13partial_apply9ObjCClass*) {
 // CHECK: entry:
 // CHECK:   [[OBJ:%.*]] = call noalias %swift.refcounted* @swift_allocObject(%swift.type* getelementptr inbounds (%swift.full_heapmetadata* @metadata2, i32 0, i32 2), i64 24, i64 7) #0
-// CHECK:   [[DATA_ADDR:%.*]] = bitcast %swift.refcounted* [[OBJ]] to [[DATA_TYPE:<{ %swift.refcounted, %CSo9ObjCClass\* }>]]*
+// CHECK:   [[DATA_ADDR:%.*]] = bitcast %swift.refcounted* [[OBJ]] to [[DATA_TYPE:<{ %swift.refcounted, %C13partial_apply9ObjCClass\* }>]]*
 // CHECK:   [[X_ADDR:%.*]] = getelementptr inbounds [[DATA_TYPE]]* [[DATA_ADDR]], i32 0, i32 1
-// CHECK:   store %CSo9ObjCClass* %0, %CSo9ObjCClass** [[X_ADDR]], align 8
+// CHECK:   store %C13partial_apply9ObjCClass* %0, %C13partial_apply9ObjCClass** [[X_ADDR]], align 8
 // CHECK:   [[RET:%.*]] = insertvalue { i8*, %swift.refcounted* } { i8* bitcast (void (i64, %swift.refcounted*)* [[OBJC_PARTIAL_APPLY_STUB:@_TPA[A-Za-z0-9_]*]] to i8*), %swift.refcounted* undef }, %swift.refcounted* [[OBJ]], 1
 // CHECK:   ret { i8*, %swift.refcounted* } [[RET]]
 // CHECK: }
@@ -86,10 +86,10 @@ entry(%f : $(Builtin.Word) -> (), %x : $Builtin.Word):
 // CHECK-NOT: swift_retain
 // CHECK:   [[X_ADDR:%.*]] = getelementptr inbounds [[DATA_TYPE]]* [[DATA_ADDR]], i32 0, i32 1
 // CHECK-NOT: swift_retain
-// CHECK:   [[SELF:%.*]] = load %CSo9ObjCClass** [[X_ADDR]], align 8
+// CHECK:   [[SELF:%.*]] = load %C13partial_apply9ObjCClass** [[X_ADDR]], align 8
 // CHECK-NOT: swift_retain
 // CHECK:   [[CMD:%.*]] = load i8** @"\01L_selector(method:)", align 8
-// CHECK:   [[I8PTRSELF:%.*]] = bitcast %CSo9ObjCClass* [[SELF]] to [[OPAQUE0:%.*]]*
+// CHECK:   [[I8PTRSELF:%.*]] = bitcast %C13partial_apply9ObjCClass* [[SELF]] to [[OPAQUE0:%.*]]*
 // CHECK-NOT: swift_retain
 // CHECK:   call void bitcast (void ()* @objc_msgSend to void ([[OPAQUE2:%.*]]*, i8*, i64)*)([[OPAQUE2]]* [[I8PTRSELF]], i8* [[CMD]], i64 %0)
 // CHECK:   ret void
@@ -102,16 +102,16 @@ entry(%c : $ObjCClass):
   return %p : $@callee_owned Int -> ()
 }
 
-// CHECK-LABEL: define { i8*, %swift.refcounted* } @objc_partial_apply_consumes_self(%CSo9ObjCClass*) {
-// CHECK:         bitcast %swift.refcounted* {{%.*}} to [[DATA_TYPE:<{ %swift.refcounted, %CSo9ObjCClass\* }>]]*
+// CHECK-LABEL: define { i8*, %swift.refcounted* } @objc_partial_apply_consumes_self(%C13partial_apply9ObjCClass*) {
+// CHECK:         bitcast %swift.refcounted* {{%.*}} to [[DATA_TYPE:<{ %swift.refcounted, %C13partial_apply9ObjCClass\* }>]]*
 // CHECK:         insertvalue {{.*}} [[OBJC_CONSUMES_SELF_PARTIAL_APPLY_STUB:@_TPA[A-Za-z0-9_]*]]
-// CHECK: define internal %CSo9ObjCClass* [[OBJC_CONSUMES_SELF_PARTIAL_APPLY_STUB]](%swift.refcounted*) {
+// CHECK: define internal %C13partial_apply9ObjCClass* [[OBJC_CONSUMES_SELF_PARTIAL_APPLY_STUB]](%swift.refcounted*) {
 // CHECK:   [[DATA_ADDR:%.*]] = bitcast %swift.refcounted* %0 to [[DATA_TYPE]]*
 // CHECK:   [[X_ADDR:%.*]] = getelementptr inbounds [[DATA_TYPE]]* [[DATA_ADDR]], i32 0, i32 1
-// CHECK:   [[SELF:%.*]] = load %CSo9ObjCClass** [[X_ADDR]], align 8
+// CHECK:   [[SELF:%.*]] = load %C13partial_apply9ObjCClass** [[X_ADDR]], align 8
 // CHECK:   call void @swift_retain_noresult(%swift.refcounted* %4) #0
 // CHECK:   [[CMD:%.*]] = load i8** @"\01L_selector(initFamily)", align 8
-// CHECK:   [[I8PTRSELF:%.*]] = bitcast %CSo9ObjCClass* [[SELF]] to [[OPAQUE4:%.*]]*
+// CHECK:   [[I8PTRSELF:%.*]] = bitcast %C13partial_apply9ObjCClass* [[SELF]] to [[OPAQUE4:%.*]]*
 // CHECK:   call [[OPAQUE3:%.*]]* bitcast (void ()* @objc_msgSend to [[OPAQUE3]]* ([[OPAQUE4:%.*]]*, i8*)*)([[OPAQUE4]]* [[I8PTRSELF]], i8* [[CMD]])
 // CHECK:   ret void
 // CHECK: }
