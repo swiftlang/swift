@@ -73,10 +73,10 @@ typealias FooTypedef1 = CInt
 var fooIntVar: CInt
 
 /// Aaa.  fooFunc1.  Bbb.
-func fooFunc1(_ a: CInt) -> CInt
-func fooFunc1AnonymousParam(_: CInt) -> CInt
-func fooFunc3(_ a: CInt, _ b: CFloat, _ c: CDouble, _ d: CMutablePointer<CInt>) -> CInt
-func fooFuncWithBlock(_ blk: (CFloat) -> CInt)
+func fooFunc1(CInt) -> CInt
+func fooFunc1AnonymousParam(CInt) -> CInt
+func fooFunc3(CInt, CFloat, CDouble, CMutablePointer<CInt>) -> CInt
+func fooFuncWithBlock((CFloat) -> CInt)
 
 /**
  * Aaa.  fooFuncWithComment1.  Bbb.
@@ -112,7 +112,7 @@ func fooFuncWithComment4()
 func fooFuncWithComment5()
 
 /// Aaa.  redeclaredInMultipleModulesFunc1.  Bbb.
-func redeclaredInMultipleModulesFunc1(_ a: CInt) -> CInt
+func redeclaredInMultipleModulesFunc1(CInt) -> CInt
 
 /// Aaa.  FooProtocolBase.  Bbb.
 protocol FooProtocolBase {
@@ -140,8 +140,8 @@ protocol FooProtocolDerived : FooProtocolBase {
 class FooClassBase {
   class func fooBaseInstanceFunc0()
   func fooBaseInstanceFunc0()
-  class func fooBaseInstanceFunc1(_ anObject: @unchecked AnyObject?) -> @unchecked FooClassBase?
-  func fooBaseInstanceFunc1(_ anObject: @unchecked AnyObject?) -> @unchecked FooClassBase?
+  class func fooBaseInstanceFunc1(@unchecked AnyObject?) -> @unchecked FooClassBase?
+  func fooBaseInstanceFunc1(@unchecked AnyObject?) -> @unchecked FooClassBase?
   class func fooBaseInstanceFuncOverridden()
   func fooBaseInstanceFuncOverridden()
   class func fooBaseClassFunc0()
@@ -153,8 +153,8 @@ class FooClassDerived : FooClassBase, FooProtocolDerived, FooProtocolBase {
   var fooProperty2: CInt
   var fooProperty3: CInt { get }
   func fooInstanceFunc0()
-  func fooInstanceFunc1(_ a: CInt)
-  func fooInstanceFunc2(_ a: CInt, withB b: CInt)
+  func fooInstanceFunc1(CInt)
+  func fooInstanceFunc2(CInt, withB: CInt)
   func fooBaseInstanceFuncOverridden()
   class func fooClassFunc0()
 

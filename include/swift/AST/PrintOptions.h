@@ -93,6 +93,9 @@ struct PrintOptions {
   /// Whether to print 'override' keyword on overridden decls.
   bool PrintOverrideKeyword = true;
 
+  /// Whether to print parameter names in function declarations.
+  bool PrintParameterNames = true;
+
   /// \brief Whether to print documentation comments attached to declarations.
   /// Note that this may print documentation comments from related declarations
   /// (e.g. the overridden method in the superclass) if such comment is found.
@@ -115,6 +118,7 @@ struct PrintOptions {
     result.SkipImplicit = false;
     result.SkipLeadingUnderscoreDecls = false;
     result.PrintImplicitAttrs = true;
+    result.PrintParameterNames = true;
     result.PrintDocumentationComments = true;
     result.PrintRegularClangComments = true;
     return result;

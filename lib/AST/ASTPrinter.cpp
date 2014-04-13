@@ -904,15 +904,17 @@ void PrintAST::printOneParameter(const Pattern *ArgPattern,
   // Print argument name.
   auto ArgName = ArgPattern->getBoundName();
   auto BodyName = BodyPattern->getBoundName();
-  printName(ArgName);
+  if (!ArgName.empty() || Options.PrintParameterNames) {
+    printName(ArgName);
 
-  // If the parameter name is different, print it.
-  if (BodyName != ArgName) {
-    Printer << " ";
-    printName(BodyName);
+    // If the parameter name is different, print it.
+    if (BodyName != ArgName && Options.PrintParameterNames) {
+      Printer << " ";
+      printName(BodyName);
+    }
+
+    Printer << ": ";
   }
-
-  Printer << ": ";
   if (StripOuterSliceType && !TheTypeLoc.hasLocation()) {
     if (auto *BGT = TypedArgPattern->getType()->getAs<BoundGenericType>()) {
       BGT->getGenericArgs()[0].print(Printer, Options);
