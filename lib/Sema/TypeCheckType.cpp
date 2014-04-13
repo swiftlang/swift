@@ -1039,7 +1039,22 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     TAK_auto_closure, TAK_objc_block, TAK_cc, TAK_thin, TAK_noreturn,
     TAK_callee_owned, TAK_callee_guaranteed
   };
-
+  
+  // Function representation attributes other than @objc_block are not yet
+  // supported at source level; only SIL currently knows how to handle them.
+  if (!(options & TR_SILType)) {
+    for (auto silOnlyAttr : {TAK_cc, TAK_thin, TAK_thick,
+                             TAK_callee_owned, TAK_callee_guaranteed})
+    {
+      if (attrs.has(silOnlyAttr)) {
+        TC.diagnose(attrs.getLoc(silOnlyAttr),
+                    diag::attribute_not_supported);
+        attrs.clearAttribute(silOnlyAttr);
+      }
+    }
+  }
+  
+  
   bool hasFunctionAttr = false;
   for (auto i : FunctionAttrs)
     if (attrs.has(i)) {

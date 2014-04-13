@@ -3,7 +3,7 @@
 import Builtin
 
 struct A {
-  var f : @callee_owned () -> ()
+  var f : () -> ()
 }
 
 sil @callee_check : $@thin (@callee_owned () -> ()) -> ()
@@ -20,7 +20,7 @@ bb0(%0 : $*A):
 }
 
 class B {
-  var f : @callee_owned () -> ()
+  var f : () -> ()
   init()
 }
 
