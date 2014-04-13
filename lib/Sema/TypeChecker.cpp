@@ -216,6 +216,25 @@ static bool mayConformToKnownProtocol(const DeclTy *D) {
   return false;
 }
 
+static void checkBridgingFunctions(TypeChecker &tc, Module *mod,
+                                   StringRef bridgedTypeName,
+                                   StringRef forwardConversion,
+                                   StringRef reverseConversion) {
+  assert(mod);
+  Module::AccessPathTy unscopedAccess = {};
+  SmallVector<ValueDecl *, 4> results;
+
+  mod->lookupValue(unscopedAccess, mod->Ctx.getIdentifier(bridgedTypeName),
+                   NLKind::QualifiedLookup, results);
+  mod->lookupValue(unscopedAccess, mod->Ctx.getIdentifier(forwardConversion),
+                   NLKind::QualifiedLookup, results);
+  mod->lookupValue(unscopedAccess, mod->Ctx.getIdentifier(reverseConversion),
+                   NLKind::QualifiedLookup, results);
+
+  for (auto D : results)
+    tc.validateDecl(D);
+}
+
 static bool haveDifferentFixity(const ValueDecl *lhs, const ValueDecl *rhs) {
   auto lhsFn = dyn_cast<FuncDecl>(lhs);
   auto rhsFn = dyn_cast<FuncDecl>(rhs);
@@ -311,7 +330,26 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
     TC.contextualizeTopLevelCode(TLC,
                            llvm::makeArrayRef(SF.Decls).slice(StartElem));
   }
-  
+
+#define BRIDGE_TYPE(BRIDGED_MOD, BRIDGED_TYPE, _, NATIVE_TYPE, OPT) \
+  if (Module *module = SF.getASTContext().LoadedModules.lookup(#BRIDGED_MOD)) {\
+    checkBridgingFunctions(TC, module, #BRIDGED_TYPE, \
+                           "convert" #BRIDGED_TYPE "To" #NATIVE_TYPE, \
+                           "convert" #NATIVE_TYPE "To" #BRIDGED_TYPE); \
+  }
+#include "swift/SIL/BridgedTypes.def"
+  if (Module *module = SF.getASTContext().LoadedModules.lookup("Swift")) {
+    checkBridgingFunctions(TC, module, "ObjCMutablePointer",
+                           "convertUnsafePointerToObjCMutablePointer",
+                           "convertObjCMutablePointerToUnsafePointer");
+    checkBridgingFunctions(TC, module, "CMutablePointer",
+                           "convertUnsafePointerToCMutablePointer",
+                           "convertCMutablePointerToUnsafePointer");
+    checkBridgingFunctions(TC, module, "CConstPointer",
+                           "convertUnsafePointerToCConstPointer",
+                           "convertCConstPointerToUnsafePointer");
+  }
+
   DefinedFunctions.insert(DefinedFunctions.end(),
                           TC.implicitlyDefinedFunctions.begin(),
                           TC.implicitlyDefinedFunctions.end());
