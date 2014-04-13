@@ -183,4 +183,24 @@ enum BarforwardDeclaredEnum;
 
 void theLastDeclInFoo();
 
+void _internalTopLevelFunc();
+
+struct _InternalStruct {
+  int x;
+};
+
+@interface FooClassBase(Cat1)
+-(id) _internalMeth1;
+@end
+
+/* Extending FooClassBase with cool stuff */
+@interface FooClassBase(Cat2)
+-(id) _internalMeth2;
+-(id) nonInternalMeth;
+@end
+
+@interface FooClassBase(Cat3)
+-(id) _internalMeth3;
+@end
+
 #endif /* ! __FOO_H__ */

@@ -210,13 +210,31 @@ void swift::ide::printSubmoduleInterface(
         ImportDecls.push_back(ID);
       continue;
     }
-    if (auto CN = D->getClangNode()) {
+
+    auto addToClangDecls = [&](Decl *D) {
+      assert(D->hasClangNode());
+      auto CN = D->getClangNode();
       clang::SourceLocation Loc = CN.getLocation();
 
       auto *OwningModule = Importer.getClangOwningModule(CN);
       auto I = ClangDecls.find(OwningModule);
       if (I != ClangDecls.end()) {
         I->second.push_back({ D, Loc });
+      }
+    };
+
+    if (D->hasClangNode()) {
+      addToClangDecls(D);
+      // When picking regular comments from clang headers, make sure that
+      // extensions/categories are printed in the right source location
+      // otherwise the comments will be out-of-place.
+      if (Options.PrintRegularClangComments) {
+        if (auto NTD = dyn_cast<NominalTypeDecl>(D)) {
+          for (auto Ext : NTD->getExtensions()) {
+            if (Ext->hasClangNode())
+              addToClangDecls(Ext);
+          }
+        }
       }
       continue;
     }
@@ -275,14 +293,21 @@ void swift::ide::printSubmoduleInterface(
     PrinterToUse = &RegularCommentPrinter;
 
   auto PrintDecl = [&](Decl *D) {
-    if (isa<ExtensionDecl>(D))
-      return;
+    if (auto Ext = dyn_cast<ExtensionDecl>(D)) {
+      // When picking regular comments from clang headers, make sure that
+      // extensions/categories are printed in the right source location
+      // otherwise the comments will be out-of-place.
+      if (!(Options.PrintRegularClangComments && Ext->hasClangNode()))
+        return;
+    }
 
     ASTPrinter &Printer = *PrinterToUse;
     D->print(Printer, AdjustedOptions);
     Printer << "\n";
     if (auto NTD = dyn_cast<NominalTypeDecl>(D)) {
       for (auto Ext : NTD->getExtensions()) {
+        if (Options.PrintRegularClangComments && Ext->hasClangNode())
+          continue; // will be printed in its source location, see above.
         Ext->print(Printer, AdjustedOptions);
         Printer << "\n";
       }

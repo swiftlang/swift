@@ -182,3 +182,22 @@ var FOO_MACRO_5: CUnsignedLongLong { get }
 var FOO_MACRO_REDEF_1: CInt { get }
 var FOO_MACRO_REDEF_2: CInt { get }
 func theLastDeclInFoo()
+func _internalTopLevelFunc()
+struct _InternalStruct {
+  var x: CInt
+}
+extension FooClassBase {
+  class func _internalMeth1() -> @unchecked AnyObject?
+  func _internalMeth1() -> @unchecked AnyObject?
+}
+/* Extending FooClassBase with cool stuff */
+extension FooClassBase {
+  class func _internalMeth2() -> @unchecked AnyObject?
+  func _internalMeth2() -> @unchecked AnyObject?
+  class func nonInternalMeth() -> @unchecked AnyObject?
+  func nonInternalMeth() -> @unchecked AnyObject?
+}
+extension FooClassBase {
+  class func _internalMeth3() -> @unchecked AnyObject?
+  func _internalMeth3() -> @unchecked AnyObject?
+}

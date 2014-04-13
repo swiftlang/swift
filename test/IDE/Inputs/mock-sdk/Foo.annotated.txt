@@ -135,6 +135,20 @@ protocol FooProtocolBase {
   <decl:Func>func fooBaseInstanceFuncOverridden()</decl>
   <decl:Func>class func fooBaseClassFunc0()</decl>
 }</decl>
+<decl:Extension>extension <ref:Class>FooClassBase</ref> {
+  <decl:Func>class func _internalMeth3() -> @unchecked <ref:Protocol>AnyObject</ref>?</decl>
+  <decl:Func>func _internalMeth3() -> @unchecked <ref:Protocol>AnyObject</ref>?</decl>
+}</decl>
+<decl:Extension>extension <ref:Class>FooClassBase</ref> {
+  <decl:Func>class func _internalMeth2() -> @unchecked <ref:Protocol>AnyObject</ref>?</decl>
+  <decl:Func>func _internalMeth2() -> @unchecked <ref:Protocol>AnyObject</ref>?</decl>
+  <decl:Func>class func nonInternalMeth() -> @unchecked <ref:Protocol>AnyObject</ref>?</decl>
+  <decl:Func>func nonInternalMeth() -> @unchecked <ref:Protocol>AnyObject</ref>?</decl>
+}</decl>
+<decl:Extension>extension <ref:Class>FooClassBase</ref> {
+  <decl:Func>class func _internalMeth1() -> @unchecked <ref:Protocol>AnyObject</ref>?</decl>
+  <decl:Func>func _internalMeth1() -> @unchecked <ref:Protocol>AnyObject</ref>?</decl>
+}</decl>
 
 <decl:Class>/// Aaa.  FooClassDerived.  Bbb.
 class FooClassDerived : <ref:Class>FooClassBase</ref>, <ref:Protocol>FooProtocolDerived</ref>, <ref:Protocol>FooProtocolBase</ref> {
@@ -170,3 +184,7 @@ class FooClassDerived : <ref:Class>FooClassBase</ref>, <ref:Protocol>FooProtocol
 <decl:Var>var FOO_MACRO_REDEF_1: <ref:TypeAlias>CInt</ref> { get }</decl>
 <decl:Var>var FOO_MACRO_REDEF_2: <ref:TypeAlias>CInt</ref> { get }</decl>
 <decl:Func>func theLastDeclInFoo()</decl>
+<decl:Func>func _internalTopLevelFunc()</decl>
+<decl:Struct>struct _InternalStruct {
+  <decl:Var>var x: <ref:TypeAlias>CInt</ref></decl>
+}</decl>
