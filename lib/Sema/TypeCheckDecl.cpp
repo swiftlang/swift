@@ -1734,15 +1734,9 @@ public:
   // we only visit each decl once).
   unsigned IsFirstPass : 1;
   unsigned IsSecondPass : 1;
-  
-  // We delay validation of C and Objective-C type-bridging functions in the
-  // standard library until we encounter a declaration that requires one. This
-  // flag is set to 'true' once the bridge functions have been checked.
-  unsigned HasCheckedBridgeFunctions : 1;
 
   DeclChecker(TypeChecker &TC, bool IsFirstPass, bool IsSecondPass)
-      : TC(TC), IsFirstPass(IsFirstPass), IsSecondPass(IsSecondPass),
-        HasCheckedBridgeFunctions(false) {}
+      : TC(TC), IsFirstPass(IsFirstPass), IsSecondPass(IsSecondPass) {}
 
   //===--------------------------------------------------------------------===//
   // Helper Functions.
@@ -1792,8 +1786,10 @@ public:
   }
   
   void checkBridgedFunctions() {
-    if (HasCheckedBridgeFunctions)
+    if (TC.HasCheckedBridgeFunctions)
       return;
+    
+    TC.HasCheckedBridgeFunctions = true;
     
     #define BRIDGE_TYPE(BRIDGED_MOD, BRIDGED_TYPE, _, NATIVE_TYPE, OPT) \
     if (Module *module = TC.Context.LoadedModules.lookup(#BRIDGED_MOD)) {\
@@ -1814,8 +1810,6 @@ public:
                                  "convertUnsafePointerToCConstPointer",
                                  "convertCConstPointerToUnsafePointer");
     }
-    
-    HasCheckedBridgeFunctions = true;
   }
   
   void markAsObjC(ValueDecl *D, bool isObjC) {

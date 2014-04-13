@@ -242,6 +242,11 @@ public:
   /// The list of nominal type declarations that have been validated
   /// during type checking.
   llvm::SetVector<NominalTypeDecl *> ValidatedTypes;
+  
+  // We delay validation of C and Objective-C type-bridging functions in the
+  // standard library until we encounter a declaration that requires one. This
+  // flag is set to 'true' once the bridge functions have been checked.
+  bool HasCheckedBridgeFunctions = false;
 
 private:
   Type IntLiteralType;
