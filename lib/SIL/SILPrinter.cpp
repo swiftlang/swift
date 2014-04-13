@@ -1274,69 +1274,6 @@ void SILModule::dump() const {
   print(llvm::errs());
 }
 
-static void printSILGlobals(llvm::raw_ostream &OS, bool Verbose,
-                            const SILModule::GlobalListType &Globals) {
-  std::vector<const SILGlobalVariable *> globals;
-  globals.reserve(Globals.size());
-  for (const SILGlobalVariable &g : Globals)
-    globals.push_back(&g);
-  std::sort(globals.begin(), globals.end(),
-    [] (const SILGlobalVariable *g1, const SILGlobalVariable *g2) -> bool {
-      return g1->getName().compare(g2->getName()) == -1;
-    }
-  );
-  for (const SILGlobalVariable *g : globals)
-    g->print(OS, Verbose);
-}
-
-static void printSILFunctions(llvm::raw_ostream &OS, bool Verbose,
-                              const SILModule::FunctionListType &Functions) {
-  std::vector<const SILFunction *> functions;
-  functions.reserve(Functions.size());
-  for (const SILFunction &f : Functions)
-    functions.push_back(&f);
-  std::sort(functions.begin(), functions.end(),
-    [] (const SILFunction *f1, const SILFunction *f2) -> bool {
-      return f1->getName().compare(f2->getName()) == -1;
-    }
-  );
-  for (const SILFunction *f : functions)
-    f->print(OS, Verbose);
-}
-
-static void printSILVTables(llvm::raw_ostream &OS, bool Verbose,
-                            const SILModule::VTableListType &VTables) {
-  std::vector<const SILVTable *> vtables;
-  vtables.reserve(VTables.size());
-  for (const SILVTable &vt : VTables)
-    vtables.push_back(&vt);
-  std::sort(vtables.begin(), vtables.end(),
-    [] (const SILVTable *v1, const SILVTable *v2) -> bool {
-      StringRef Name1 = v1->getClass()->getName().str();
-      StringRef Name2 = v2->getClass()->getName().str();
-      return Name1.compare(Name2) == -1;
-    }
-  );
-  for (const SILVTable *vt : vtables)
-    vt->print(OS, Verbose);
-}
-
-static void
-printSILWitnessTables(llvm::raw_ostream &OS, bool Verbose,
-                      const SILModule::WitnessTableListType &WTables) {
-  std::vector<const SILWitnessTable *> witnesstables;
-  witnesstables.reserve(WTables.size());
-  for (const SILWitnessTable &wt : WTables)
-    witnesstables.push_back(&wt);
-  std::sort(witnesstables.begin(), witnesstables.end(),
-    [] (const SILWitnessTable *w1, const SILWitnessTable *w2) -> bool {
-      return w1->getName().compare(w2->getName()) == -1;
-    }
-  );
-  for (const SILWitnessTable *wt : witnesstables)
-    wt->print(OS, Verbose);
-}
-
 /// Pretty-print the SILModule to the designated stream.
 void SILModule::print(llvm::raw_ostream &OS, bool Verbose,
                       Module *M) const {
@@ -1380,10 +1317,17 @@ void SILModule::print(llvm::raw_ostream &OS, bool Verbose,
     }
   }
 
-  printSILGlobals(OS, Verbose, getSILGlobalList());
-  printSILFunctions(OS, Verbose, getFunctionList());
-  printSILVTables(OS, Verbose, getVTableList());
-  printSILWitnessTables(OS, Verbose, getWitnessTableList());
+  for (const SILGlobalVariable &g : getSILGlobals())
+    g.print(OS, Verbose);
+    
+  for (const SILFunction &f : *this)
+    f.print(OS, Verbose);
+
+  for (const SILVTable &vt : getVTables())
+    vt.print(OS, Verbose);
+  
+  for (const SILWitnessTable &wt : getWitnessTables())
+    wt.print(OS, Verbose);
   
   OS << "\n\n";
 }
