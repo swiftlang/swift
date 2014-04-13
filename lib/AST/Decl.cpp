@@ -1451,12 +1451,6 @@ StringRef ClassDecl::getObjCRuntimeName(
       return objc->getNames().front().str();
   }
 
-  // If we aren't mangling Objective-C class and protocol names, there's nothing
-  // special to do here.
-  auto &ctx = getASTContext();
-  if (isObjC() && !ctx.LangOpts.MangleObjCClassProtocolNames)
-    return getName().str();
-
   // Produce the mangled name for this class.
   return mangleObjCRuntimeName(this, buffer);
 }
@@ -1581,12 +1575,6 @@ StringRef ProtocolDecl::getObjCRuntimeName(
     if (objc->getKind() == ObjCAttr::Nullary)
       return objc->getNames().front().str();
   }
-
-  // If we aren't mangling Objective-C class and protocol names, just
-  // return the protocol name.
-  auto &ctx = getASTContext();
-  if (isObjC() && !ctx.LangOpts.MangleObjCClassProtocolNames)
-    return getName().str();
 
   // Produce the mangled name for this protocol.
   return mangleObjCRuntimeName(this, buffer);

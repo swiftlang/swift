@@ -56,12 +56,6 @@ namespace swift {
     /// Enable 'availability' restrictions for App Extensions.
     bool EnableAppExtensionRestrictions = false;
 
-    // Mangle @objc class and protocol names?
-    // Note: this is *almost* an IRGen-only option, except that it affects
-    // the headers we generate for Objective-C interoperability. 
-    // FIXME: This option will eventually go away.
-    bool MangleObjCClassProtocolNames = true;
-
     /// Whether to split imported Objective-C selectors into Swift method names.
     bool SplitPrepositions = false;
     

@@ -508,12 +508,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.EnableExperimentalPatterns = true;
   }
 
-  if (const Arg *A = Args.getLastArg(OPT_enable_objc_mangling,
-                                     OPT_disable_objc_mangling)) {
-    Opts.MangleObjCClassProtocolNames 
-      = A->getOption().matches(OPT_enable_objc_mangling);
-  }
-
   if (Args.hasArg(OPT_debug_constraints)) {
     Opts.DebugConstraintSolver = true;
   }

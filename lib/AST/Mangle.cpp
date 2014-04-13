@@ -156,23 +156,17 @@ void Mangler::addSubstitution(void *ptr) {
 void Mangler::mangleContextOf(ValueDecl *decl, BindGenerics shouldBind) {
   auto clangDecl = decl->getClangDecl();
 
-  // Classes and protocols published to Objective-C have a special context
+  // Classes and protocols implemented in Objective-C have a special context
   // mangling.
   //   known-context ::= 'So'
-  if (isa<ClassDecl>(decl) && 
-      (clangDecl || 
-       (decl->isObjC() &&
-        !decl->getASTContext().LangOpts.MangleObjCClassProtocolNames))) {
-    assert(!clangDecl || isa<clang::ObjCInterfaceDecl>(clangDecl));
+  if (isa<ClassDecl>(decl) && clangDecl) {
+    assert(isa<clang::ObjCInterfaceDecl>(clangDecl));
     Buffer << "So";
     return;
   }
   
-  if (isa<ProtocolDecl>(decl) && 
-      (clangDecl || 
-       (decl->isObjC() &&
-        !decl->getASTContext().LangOpts.MangleObjCClassProtocolNames))) {
-    assert(!clangDecl || isa<clang::ObjCProtocolDecl>(clangDecl));
+  if (isa<ProtocolDecl>(decl) && clangDecl) {
+    assert(isa<clang::ObjCProtocolDecl>(clangDecl));
     Buffer << "So";
     return; 
   }
