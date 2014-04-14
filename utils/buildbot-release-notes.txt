@@ -29,6 +29,8 @@
 
 * Objective-C blocks are now transparently bridged to Swift closures. You never
   have to write @objc_block when writing Objective-C-compatible methods anymore.
+  Block parameters are now imported as unchecked optional closure types,
+  allowing 'nil' to be passed.
 
 2014-04-09
 ----------
