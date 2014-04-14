@@ -46,3 +46,7 @@
 @protocol MyDelegate
   -(BOOL)receiverShouldJumpOnTable:(NSObject *)table;
 @end
+
+@interface NSScrollView : NSObject
+- (void)scrollItemAtIndexToTop:(int)index;
+@end
