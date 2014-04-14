@@ -529,12 +529,22 @@ bool PrintAST::shouldPrint(const Decl *D) {
 }
 
 void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
-  if (!ASD->hasAccessorFunctions()) {
+  if (!ASD->hasAccessorFunctions() ||
+      ASD->getStorageKind() == AbstractStorageDecl::StoredWithTrivialAccessors){
     // If this is a 'let' vardecl, we print { get } since it is part of the
     // contract that it isn't mutable.
     if (!ASD->isSettable(ASD->getDeclContext()))
       Printer << " { get }";
 
+    return;
+  }
+  
+  if (Options.PrintGetSetOnRWProperties && !Options.FunctionDefinitions &&
+      (ASD->getGetter() || ASD->getSetter())) {
+    Printer << " {";
+    if (ASD->getGetter()) Printer << " get";
+    if (ASD->getSetter()) Printer << " set";
+    Printer << " }";
     return;
   }
 

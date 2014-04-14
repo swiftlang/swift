@@ -501,8 +501,6 @@ ERROR(override_nonclass_decl,sema_tcd,none,
 ERROR(override_property_type_mismatch,sema_tcd,none,
       "property %0 with type %1 cannot override a property with type %2",
       (Identifier, Type, Type))
-ERROR(override_stored_property,sema_tcd,none,
-      "cannot override a stored property %0", (Identifier))
 ERROR(override_with_stored_property,sema_tcd,none,
       "cannot override with a stored property %0", (Identifier))
 ERROR(observing_readonly_property,sema_tcd,none,

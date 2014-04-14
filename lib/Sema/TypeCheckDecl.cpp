@@ -1887,17 +1887,35 @@ public:
 
       // Type check the getter declaration.
       TC.typeCheckDecl(VD->getGetter(), true);
+      TC.typeCheckDecl(VD->getGetter(), false);
     }
 
-    // If this is a stored ObjC property and should have an objc getter and
-    // setter, then synthesize the accessors and change its storage kind.
+    // If this is a non-final stored property in a class, then synthesize getter
+    // and setter accessors and change its storage kind.  This allows it to be
+    // overriden and provide objc entrypoints if needed.
     if (VD->getStorageKind() == VarDecl::Stored &&
-        VD->usesObjCGetterAndSetter()) {
-      addTrivialAccessorsToStoredVar(VD, TC);
+        !VD->isStatic() && !VD->isFinal()) {
+      
+      bool isClassMember = false;
+      if (auto ctx = VD->getDeclContext()->getDeclaredTypeOfContext())
+        isClassMember = ctx->getClassOrBoundGenericClass();
 
-      // Type check the body of the getter and setter.
-      TC.typeCheckDecl(VD->getGetter(), true);
-      if (VD->getSetter()) TC.typeCheckDecl(VD->getSetter(), true);
+             // Variables in SIL mode don't get auto-synthesized getters.
+      bool isInSILMode = false;
+      if (auto sourceFile = VD->getDeclContext()->getParentSourceFile())
+        isInSILMode = sourceFile->Kind == SourceFileKind::SIL;
+
+      if (isClassMember && !isInSILMode) {
+        addTrivialAccessorsToStoredVar(VD, TC);
+
+        // Type check the body of the getter and setter.
+        TC.typeCheckDecl(VD->getGetter(), true);
+        TC.typeCheckDecl(VD->getGetter(), false);
+        if (VD->getSetter()) {
+          TC.typeCheckDecl(VD->getSetter(), true);
+          TC.typeCheckDecl(VD->getSetter(), false);
+        }
+      }
     }
 
     // If this is a willSet/didSet property, synthesize the getter and setter
@@ -3545,16 +3563,6 @@ public:
     // Check property and subscript overriding.
     if (auto *baseASD = dyn_cast<AbstractStorageDecl>(base)) {
       auto *overrideASD = cast<AbstractStorageDecl>(override);
-
-      // Make sure that the parent property is actually overridable.
-      // FIXME: This should be a check for @final, not something specific to
-      // properties.
-      if (!baseASD->isOverridable()) {
-        TC.diagnose(overrideASD, diag::override_stored_property,
-                    overrideASD->getName());
-        TC.diagnose(baseASD, diag::property_override_here);
-        return true;
-      }
 
       // Make sure that the overriding property doesn't have storage.
       if (overrideASD->hasStorage() &&

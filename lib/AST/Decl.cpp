@@ -764,15 +764,19 @@ bool ValueDecl::isUseFromContextDirect(const DeclContext *UseDC) const {
       if (var->hasStorage() && var->hasAccessorFunctions() &&
           UseFD->getAccessorStorageDecl() == var)
         return true;
-  
-    // "StoredWithTrivialAccessors" are generally always accessed directly
-    // (except by the trivial accessors themselves which are specially handled),
-    // however, @objc properties always go through their accessors since they
-    // can be overridden.
-    if (var->getStorageKind() == VarDecl::StoredWithTrivialAccessors &&
-        // FIXME: This is probably not the right predicate.
-        !isObjC())
-      return true;
+    
+    // "StoredWithTrivialAccessors" are generally always accessed indirectly,
+    // but if we know that the trivial accessor will always produce the same
+    // thing as the getter/setter (i.e., it can't be overriden), then just do a
+    // direct access.
+    //
+    // This is true in structs and for @final properties.
+    // TODO: What about static properties?
+    if (var->getStorageKind() == VarDecl::StoredWithTrivialAccessors ||
+        var->getStorageKind() == VarDecl::Stored)
+      if (auto ctx = var->getDeclContext()->getDeclaredTypeOfContext())
+        if (ctx->getStructOrBoundGenericStruct())
+          return true;
   }
 
   return false;

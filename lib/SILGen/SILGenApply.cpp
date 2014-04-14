@@ -2337,7 +2337,8 @@ namespace {
     
     // Take the address argument and cast it to RawPointer.
     SILType rawPointerType = SILType::getRawPointerType(gen.F.getASTContext());
-    SILValue result = gen.B.createAddressToPointer(loc, args[0].getUnmanagedValue(),
+    SILValue result = gen.B.createAddressToPointer(loc,
+                                                   args[0].getUnmanagedValue(),
                                                    rawPointerType);
     return ManagedValue::forUnmanaged(result);
   }
