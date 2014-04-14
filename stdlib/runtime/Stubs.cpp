@@ -94,7 +94,7 @@ print_uint(char* TmpBuffer, intptr_t buf_len, uint64_t Y, intptr_t Radix,
 extern "C"
 uint64_t
 print_double(char* Buffer, double X) {
-  long long i = sprintf(Buffer, "%g", X);
+  long long i = sprintf(Buffer, "%.15g", X);
   // Add ".0" to a float that (a) is not in scientific notation, (b) does not
   // already have a fractional part, (c) is not infinite, and (d) is not a NaN
   // value.
