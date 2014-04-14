@@ -23,6 +23,7 @@
 #include "clang/AST/Decl.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Path.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace llvm::rest;
@@ -301,7 +302,16 @@ private:
 
     os << " <";
     interleave(protosToPrint,
-               [this](const ProtocolDecl *PD) { os << PD->getName(); },
+               [this](const ProtocolDecl *PD) {
+                 auto Name = PD->getName().str();
+                 // Remap back to the original protocol name that may
+                 // have been changed during import.
+                 Name = llvm::StringSwitch<StringRef>(Name)
+#define RENAMED_PROTOCOL(ObjCName, SwiftName) .Case(#SwiftName, #ObjCName)
+#include "swift/ClangImporter/RenamedProtocols.def"
+                  .Default(Name);
+                 os << Name;
+               },
                [this] { os << ", "; });
     os << ">";
   }
@@ -869,6 +879,7 @@ class ModuleWriter {
   llvm::DenseMap<const TypeDecl *, std::pair<EmissionState, bool>> seenTypes;
   std::vector<const Decl *> declsToWrite;
   llvm::SmallSetVector<Module *, 8> imports;
+  llvm::StringSet<> seenImports;
 
   std::string bodyBuffer;
   llvm::raw_string_ostream os{bodyBuffer};
@@ -1092,11 +1103,17 @@ public:
            "# endif\n"
            "#endif\n"
            "\n";
+    seenImports.insert("ObjectiveC");
   }
 
   void writeImports(raw_ostream &out) {
-    for (auto import : imports)
-      out << "@import " << import->Name << ";\n";
+    for (auto import : imports) {
+      auto Name = import->Name.str();
+      if (seenImports.find(Name) == seenImports.end()) {
+        seenImports.insert(Name);
+        out << "@import " << Name << ";\n";
+      }
+    }
     os << '\n';
   }
 

@@ -822,7 +822,7 @@ void ClangImporter::lookupValue(Identifier name, VisibleDeclConsumer &consumer){
     name = Impl.SwiftContext.getIdentifier(#ObjCName);    \
     lookupNameKind = clang::Sema::LookupObjCProtocolName; \
   }
-#include "RenamedProtocols.def"
+#include "swift/ClangImporter/RenamedProtocols.def"
 
   // Map the name. If we can't represent the Swift name in Clang, bail out now.
   auto clangName = Impl.importName(name);

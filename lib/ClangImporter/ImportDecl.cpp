@@ -3139,7 +3139,7 @@ namespace {
       else if (decl->getName().equals(#ObjCName)) {            \
         name = Impl.SwiftContext.getIdentifier(#SwiftName);    \
       }
-#include "RenamedProtocols.def"
+#include "swift/ClangImporter/RenamedProtocols.def"
       else {
         name = origName;
       }
