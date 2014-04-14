@@ -140,21 +140,25 @@ private:
                                       Inst->isVolatile()));
   }
 
-  // If we are performing an archetype to archetype cast, since we don't do
-  // partial specialization, we know both must types must now be
-  // concrete. Modify the checked cast appropriately.
+  // If we are performing one of the following checked casts:
+  //
+  //   1. Archetype to Archetype.
+  //   2. Archetype to Concrete.
+  //   3. Concrete to Archetype
+  //
+  // since we don't do partial specialization, we know both must types must now
+  // be concrete. Modify the checked cast appropriately.
   //
   // If the two types are non-classes, we enforce that after specialization they
   // must both either be trivially equal (in which case we just propagate the
   // operand) or trivially different implying we insert a trap + undef propagate
   // of uses.
   //
-  //
   // If the two types are classes, we allow for additionally down/upcast
   // relationships. Casting in between two unrelated classes means we insert a
   // runtime trap to match the semantics of the instruction.
   void
-  visitUncondCheckedArchToArchCast(UnconditionalCheckedCastInst *Inst) {
+  convertArchetypeConcreteCastToConcreteCast(UnconditionalCheckedCastInst *Inst) {
     // Grab both the from and to types.
     SILType OpFromTy = getOpType(Inst->getOperand().getType());
     SILType OpToTy = getOpType(Inst->getType());
@@ -234,17 +238,11 @@ private:
       SILCloner<TypeSubCloner>::visitUnconditionalCheckedCastInst(Inst);
       return;
     case CheckedCastKind::ArchetypeToArchetype:
-      visitUncondCheckedArchToArchCast(Inst);
-      return;
     case CheckedCastKind::ArchetypeToConcrete:
-      // Stub implementation.
-      SILCloner<TypeSubCloner>::visitUnconditionalCheckedCastInst(Inst);
+    case CheckedCastKind::ConcreteToArchetype:
+      convertArchetypeConcreteCastToConcreteCast(Inst);
       return;
     case CheckedCastKind::ExistentialToArchetype:
-      // Stub implementation.
-      SILCloner<TypeSubCloner>::visitUnconditionalCheckedCastInst(Inst);
-      return;
-    case CheckedCastKind::ConcreteToArchetype:
       // Stub implementation.
       SILCloner<TypeSubCloner>::visitUnconditionalCheckedCastInst(Inst);
       return;
