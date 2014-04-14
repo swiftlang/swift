@@ -266,11 +266,9 @@ SILValue InstSimplifier::visitApplyInst(ApplyInst *AI) {
   // nothing left to expect so propagate the input, i.e.,
   //
   // apply(expect, constant, _) -> constant.
-  if (BFRI->getIntrinsicInfo().ID == llvm::Intrinsic::expect) {
-    SILValue Op = AI->getOperand(1);
-    IntegerLiteralInst *I = dyn_cast<IntegerLiteralInst>(Op);
-    return I? SILValue(I) : SILValue();
-  }
+  if (BFRI->getIntrinsicInfo().ID == llvm::Intrinsic::expect)
+    if (auto *Literal = dyn_cast<IntegerLiteralInst>(AI->getArgument(0)))
+      return Literal;
 
   return SILValue();
 }
