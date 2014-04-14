@@ -638,7 +638,7 @@ static DeclName mapSelectorName(ASTContext &ctx,
 
     // Simple case.
     if (!isInitializer || name.size() == 4)
-      return ctx.getIdentifier(name);
+      return DeclName(ctx, ctx.getIdentifier(name), { });
 
     // This is an initializer with no parameters but a name that
     // contains more than 'init', so synthesize an argument to capture

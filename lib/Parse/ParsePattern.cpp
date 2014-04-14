@@ -743,11 +743,14 @@ Parser::parseFunctionSignature(Identifier SimpleName,
   if (Tok.is(tok::l_paren)) {
     Status = parseFunctionArguments(NamePieces, argPatterns, bodyPatterns,
                                     defaultArgs, HasSelectorStyleSignature);
-    
-    FullName = DeclName(Context, NamePieces[0],
-                        llvm::makeArrayRef(NamePieces.begin() + 1,
-                                           NamePieces.end()));
-    
+    // FIXME: Tying compound names to selector-style signatures is bogus.
+    if (HasSelectorStyleSignature)
+      FullName = DeclName(Context, NamePieces[0],
+                          llvm::makeArrayRef(NamePieces.begin() + 1,
+                                             NamePieces.end()));
+    else
+      FullName = DeclName(NamePieces[0]);
+
     if (bodyPatterns.empty()) {
       // If we didn't get anything, add a () pattern to avoid breaking
       // invariants.

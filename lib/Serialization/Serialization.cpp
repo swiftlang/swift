@@ -1700,6 +1700,7 @@ void Serializer::writeDecl(const Decl *D) {
                            addDeclRef(fn->getOperatorDecl()),
                            addDeclRef(fn->getOverriddenDecl()),
                            addDeclRef(fn->getAccessorStorageDecl()),
+                           !fn->getFullName().isSimpleName(),
                            nameComponents);
 
     writeGenericParams(fn->getGenericParams(), DeclTypeAbbrCodes);

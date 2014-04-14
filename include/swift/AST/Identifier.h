@@ -189,13 +189,17 @@ namespace swift {
 /// A declaration name, which may comprise one or more identifier pieces.
 class DeclName {
   friend class ASTContext;
-  
+
+  /// Represents a compound
   struct alignas(Identifier*) CompoundDeclName : llvm::FoldingSetNode {
     Identifier BaseName;
     size_t NumArgs;
     
     explicit CompoundDeclName(Identifier BaseName, size_t NumArgs)
-      : BaseName(BaseName), NumArgs(NumArgs) {}
+      : BaseName(BaseName), NumArgs(NumArgs)
+    {
+      assert(NumArgs > 0 && "Should use NullaryName or Identifier");
+    }
     
     ArrayRef<Identifier> getArgumentNames() const {
       return {reinterpret_cast<const Identifier*>(this + 1), NumArgs};
@@ -213,10 +217,14 @@ class DeclName {
       Profile(id, BaseName, getArgumentNames());
     }
   };
-  
-  // Either a single identifier piece stored inline, or a reference to a
-  // compound declaration name.
-  llvm::PointerUnion<Identifier, CompoundDeclName*> SimpleOrCompound;
+
+  // A single stored identifier, along with a bit stating whether it is is the
+  // base name for a zero-argument (nullary) compound name.
+  typedef llvm::PointerIntPair<Identifier, 1, bool> IdentifierAndNullary;
+
+  // Either a single identifier piece stored inline (with a bit to say whether
+  // it is simple or compound), or a reference to a compound declaration name.
+  llvm::PointerUnion<IdentifierAndNullary, CompoundDeclName*> SimpleOrCompound;
   
   DeclName(void *Opaque)
     : SimpleOrCompound(decltype(SimpleOrCompound)::getFromOpaqueValue(Opaque))
@@ -224,14 +232,14 @@ class DeclName {
   
 public:
   /// Build a null name.
-  DeclName() : SimpleOrCompound(Identifier()) {}
+  DeclName() : SimpleOrCompound(IdentifierAndNullary()) {}
   
   /// Build a simple value name with one component.
   /*implicit*/ DeclName(Identifier simpleName)
-    : SimpleOrCompound(simpleName) {}
+    : SimpleOrCompound(IdentifierAndNullary(simpleName, false)) {}
   
   /// Build a compound value name given a base name and a set of argument names.
-  DeclName(ASTContext &C, Identifier baseName,
+  [[deprecated]] DeclName(ASTContext &C, Identifier baseName,
            ArrayRef<Identifier> argumentNames);
   
   /// Retrive the 'base' name, i.e., the name that follows the introducer,
@@ -241,7 +249,7 @@ public:
     if (auto compound = SimpleOrCompound.dyn_cast<CompoundDeclName*>())
       return compound->BaseName;
     
-    return SimpleOrCompound.get<Identifier>();
+    return SimpleOrCompound.get<IdentifierAndNullary>().getPointer();
   }
 
   /// Retrieve the names of the arguments, if there are any.
@@ -255,12 +263,15 @@ public:
   explicit operator bool() const {
     if (SimpleOrCompound.dyn_cast<CompoundDeclName*>())
       return true;
-    return SimpleOrCompound.get<Identifier>().get();
+    return !SimpleOrCompound.get<IdentifierAndNullary>().getPointer().empty();
   }
   
   /// True if this is a simple one-component name.
   bool isSimpleName() const {
-    return !SimpleOrCompound.dyn_cast<CompoundDeclName*>();
+    if (SimpleOrCompound.dyn_cast<CompoundDeclName*>())
+      return false;
+
+    return !SimpleOrCompound.get<IdentifierAndNullary>().getInt();
   }
   
   /// True if this name is a simple one-component name identical to the
@@ -313,7 +324,7 @@ public:
   LLVM_ATTRIBUTE_DEPRECATED(void dump(),
                             "only for use within the debugger");
 };
-  
+
 } // end namespace swift
 
 namespace llvm {

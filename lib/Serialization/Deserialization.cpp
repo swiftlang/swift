@@ -1825,6 +1825,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     DeclID associatedDeclID;
     DeclID overriddenID;
     DeclID accessorStorageDeclID;
+    bool hasCompoundName;
     ArrayRef<uint64_t> nameIDs;
 
     decls_block::FuncLayout::readRecord(scratch, contextID, isImplicit,
@@ -1836,7 +1837,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                         numParamPatterns, signatureID,
                                         interfaceTypeID, associatedDeclID,
                                         overriddenID, accessorStorageDeclID,
-                                        nameIDs);
+                                        hasCompoundName, nameIDs);
     
     // Resolve the name ids.
     SmallVector<Identifier, 2> names;
@@ -1863,8 +1864,11 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     DeclName name;
     if (!names.empty()) {
-      name = DeclName(ctx, names[0],
-                      llvm::makeArrayRef(names.begin() + 1, names.end()));
+      if (hasCompoundName)
+        name = DeclName(ctx, names[0],
+                        llvm::makeArrayRef(names.begin() + 1, names.end()));
+      else
+        name = DeclName(names[0]);
     }
     auto fn = FuncDecl::createDeserialized(
         ctx, SourceLoc(), StaticSpelling.getValue(), SourceLoc(), name,
