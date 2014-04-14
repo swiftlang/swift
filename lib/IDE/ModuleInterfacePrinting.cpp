@@ -362,7 +362,8 @@ void ClangCommentPrinter::printCommentsUntil(ClangNode Node) {
   const auto &Ctx = ClangLoader.getClangASTContext();
   const auto &SM = Ctx.getSourceManager();
 
-  clang::SourceLocation NodeLoc = SM.getFileLoc(Node.getLocation());
+  clang::SourceLocation NodeLoc =
+      SM.getFileLoc(Node.getSourceRange().getBegin());
   if (NodeLoc.isInvalid())
     return;
   unsigned NodeLineNo = SM.getSpellingLineNumber(NodeLoc);
@@ -424,7 +425,8 @@ void ClangCommentPrinter::printCommentsUntil(ClangNode Node) {
     }
     *this << CommentText << "\n";
     printIndent();
-    LastPrintedCommentLineNo = LineNo;
+    LastPrintedCommentLineNo =
+        SM.getLineNumber(LocInfo.first, LocInfo.second + Tok.getLength());
 
   } while (true);
 

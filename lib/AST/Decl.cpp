@@ -45,6 +45,15 @@ clang::SourceLocation ClangNode::getLocation() const {
   return clang::SourceLocation();
 }
 
+clang::SourceRange ClangNode::getSourceRange() const {
+  if (auto D = getAsDecl())
+    return D->getSourceRange();
+  if (auto M = getAsMacro())
+    return clang::SourceRange(M->getDefinitionLoc(), M->getDefinitionEndLoc());
+
+  return clang::SourceLocation();
+}
+
 // Only allow allocation of Decls using the allocator in ASTContext.
 void *Decl::operator new(size_t Bytes, ASTContext &C,
                          unsigned Alignment) {

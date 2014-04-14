@@ -76,6 +76,10 @@ var fooIntVar: CInt
 func fooFunc1(CInt) -> CInt
 func fooFunc1AnonymousParam(CInt) -> CInt
 func fooFunc3(CInt, CFloat, CDouble, CMutablePointer<CInt>) -> CInt
+/*
+  Very good
+  fooFuncWithBlock function.
+*/
 func fooFuncWithBlock((CFloat) -> CInt)
 
 /**

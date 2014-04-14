@@ -43,6 +43,7 @@ namespace clang {
   class MacroInfo;
   class Module;
   class SourceLocation;
+  class SourceRange;
 }
 
 namespace swift {
@@ -114,6 +115,7 @@ public:
   }
 
   clang::SourceLocation getLocation() const;
+  clang::SourceRange getSourceRange() const;
 };
   
 enum class DeclKind : uint8_t {
