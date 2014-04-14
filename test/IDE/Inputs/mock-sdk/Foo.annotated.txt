@@ -1,6 +1,7 @@
 <decl:Import>@exported import Foo.FooSub</decl>
 <decl:Import>@exported import FooHelper</decl>
 
+
 <decl:Struct>/// Aaa.  FooEnum1.  Bbb.
 struct FooEnum1 {
   <decl:Constructor>init(value: <ref:TypeAlias>CUnsignedInt</ref>)</decl>

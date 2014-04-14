@@ -1,3 +1,4 @@
+
 func fooHelperSubFunc1(_ a: CInt) -> CInt
 struct FooHelperSubEnum1 {
   init(value: CUnsignedInt)

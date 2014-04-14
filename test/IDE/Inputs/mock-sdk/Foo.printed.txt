@@ -18,6 +18,7 @@ struct FooEnum1 {
 
 /// Aaa.  FooEnum1X.  Bbb.
 var FooEnum1X: FooEnum1 { get }
+
 struct FooEnum2 {
   init(value: CUnsignedInt)
   var value: CUnsignedInt
@@ -52,15 +53,18 @@ struct FooRuncingOptions {
   func toRaw() -> CLong
   func getLogicValue() -> Bool
 }
+
 struct FooStruct1 {
   var x: CInt
   var y: CDouble
 }
+
 struct FooStruct2 {
   var x: CInt
   var y: CDouble
 }
 typealias FooStructTypedef1 = FooStruct2
+
 struct FooStructTypedef2 {
   var x: CInt
   var y: CDouble
@@ -74,8 +78,10 @@ var fooIntVar: CInt
 
 /// Aaa.  fooFunc1.  Bbb.
 func fooFunc1(CInt) -> CInt
+
 func fooFunc1AnonymousParam(CInt) -> CInt
 func fooFunc3(CInt, CFloat, CDouble, CMutablePointer<CInt>) -> CInt
+
 /*
   Very good
   fooFuncWithBlock function.
@@ -120,56 +126,63 @@ func redeclaredInMultipleModulesFunc1(CInt) -> CInt
 
 /// Aaa.  FooProtocolBase.  Bbb.
 protocol FooProtocolBase {
-
+  
   /// Aaa.  fooProtoFunc.  Bbb.
   /// Ccc.
   func fooProtoFunc()
-
+  
   /// Aaa.  fooProtoFuncWithExtraIndentation1.  Bbb.
   /// Ccc.
   func fooProtoFuncWithExtraIndentation1()
-
+  
   /**
    * Aaa.  fooProtoFuncWithExtraIndentation2.  Bbb.
    * Ccc.
    */
   func fooProtoFuncWithExtraIndentation2()
+  
   class func fooProtoClassFunc()
+  
   var fooProperty1: CInt { get set }
   var fooProperty2: CInt { get set }
   var fooProperty3: CInt { get }
 }
+
 protocol FooProtocolDerived : FooProtocolBase {
 }
+
 class FooClassBase {
   class func fooBaseInstanceFunc0()
   func fooBaseInstanceFunc0()
   class func fooBaseInstanceFunc1(@unchecked AnyObject?) -> @unchecked FooClassBase?
   func fooBaseInstanceFunc1(@unchecked AnyObject?) -> @unchecked FooClassBase?
+  
   class func fooBaseInstanceFuncOverridden()
   func fooBaseInstanceFuncOverridden()
+  
   class func fooBaseClassFunc0()
 }
 
 /// Aaa.  FooClassDerived.  Bbb.
 class FooClassDerived : FooClassBase, FooProtocolDerived, FooProtocolBase {
+  
   var fooProperty1: CInt
   var fooProperty2: CInt
   var fooProperty3: CInt { get }
+  
   func fooInstanceFunc0()
   func fooInstanceFunc1(CInt)
   func fooInstanceFunc2(CInt, withB: CInt)
+  
   func fooBaseInstanceFuncOverridden()
+  
   class func fooClassFunc0()
-
   /// Aaa.  fooProtoFunc.  Bbb.
   /// Ccc.
   func fooProtoFunc()
-
   /// Aaa.  fooProtoFuncWithExtraIndentation1.  Bbb.
   /// Ccc.
   func fooProtoFuncWithExtraIndentation1()
-
   /**
    * Aaa.  fooProtoFuncWithExtraIndentation2.  Bbb.
    * Ccc.
@@ -177,17 +190,23 @@ class FooClassDerived : FooClassBase, FooProtocolDerived, FooProtocolBase {
   func fooProtoFuncWithExtraIndentation2()
   class func fooProtoClassFunc()
 }
+
 /* FOO_MACRO_1 is the answer */
 var FOO_MACRO_1: CInt { get }
 var FOO_MACRO_2: CInt { get }
 var FOO_MACRO_3: CInt { get } // Don't use FOO_MACRO_3 on Saturdays.
 var FOO_MACRO_4: CUnsignedInt { get }
 var FOO_MACRO_5: CUnsignedLongLong { get }
+
 var FOO_MACRO_REDEF_1: CInt { get }
+
 var FOO_MACRO_REDEF_2: CInt { get }
+
 func theLastDeclInFoo()
+
 /* Extending FooClassBase with cool stuff */
 extension FooClassBase {
+  
   class func nonInternalMeth() -> @unchecked AnyObject?
   func nonInternalMeth() -> @unchecked AnyObject?
 }

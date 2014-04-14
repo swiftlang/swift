@@ -1,4 +1,5 @@
 @exported import FooHelper
+
 func fooSubFunc1(_ a: CInt) -> CInt
 struct FooSubEnum1 {
   init(value: CUnsignedInt)

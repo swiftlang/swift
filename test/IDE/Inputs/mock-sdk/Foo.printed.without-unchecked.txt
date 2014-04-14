@@ -1,6 +1,7 @@
 @exported import Foo.FooSub
 @exported import FooHelper
 
+
 /// Aaa.  FooEnum1.  Bbb.
 struct FooEnum1 {
   init(value: CUnsignedInt)

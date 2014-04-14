@@ -76,10 +76,15 @@ private:
     ResumeOffsets[FID] = Offset;
   }
 
+  bool shouldPrintNewLineBefore(ClangNode Node) const;
+  void updateLastEntityLine(clang::SourceLocation Loc);
+  void updateLastEntityLine(clang::FileID FID, unsigned LineNo);
+
   ASTPrinter &OtherPrinter;
   ClangModuleLoader &ClangLoader;
   llvm::DenseMap<clang::FileID, unsigned> ResumeOffsets;
   SmallVector<StringRef, 2> PendingComments;
+  llvm::DenseMap<clang::FileID, unsigned> LastEntityLines;
 };
 }
 
@@ -317,6 +322,7 @@ void swift::ide::printSubmoduleInterface(
 
   for (auto *D : ImportDecls)
     PrintDecl(D);
+  Printer << "\n";
 
   {
     using ModuleAndName = std::pair<const clang::Module *, std::string>;
@@ -345,8 +351,14 @@ void swift::ide::printSubmoduleInterface(
 }
 
 void ClangCommentPrinter::printDeclPre(const Decl *D) {
-  if (auto ClangN = D->getClangNode())
+  if (auto ClangN = D->getClangNode()) {
     printCommentsUntil(ClangN);
+    if (shouldPrintNewLineBefore(ClangN)) {
+      *this << "\n";
+      printIndent();
+    }
+    updateLastEntityLine(ClangN.getSourceRange().getBegin());
+  }
   return OtherPrinter.printDeclPre(D);
 }
 
@@ -356,6 +368,8 @@ void ClangCommentPrinter::printDeclPost(const Decl *D) {
     *this << " " << CommentText;
   }
   PendingComments.clear();
+  if (auto ClangN = D->getClangNode())
+    updateLastEntityLine(ClangN.getSourceRange().getEnd());
 }
 
 void ClangCommentPrinter::printCommentsUntil(ClangNode Node) {
@@ -385,7 +399,7 @@ void ClangCommentPrinter::printCommentsUntil(ClangNode Node) {
   clang::Lexer Lex(FileLoc, Ctx.getLangOpts(), BufStart, BufPtr, BufEnd);
   Lex.SetCommentRetentionState(true);
 
-  unsigned LastPrintedCommentLineNo = 0;
+  unsigned &LastPrintedLineNo = LastEntityLines[FID];
   clang::Token Tok;
   do {
     BufPtr = Lex.getBufferLocation();
@@ -398,15 +412,15 @@ void ClangCommentPrinter::printCommentsUntil(ClangNode Node) {
     // Reached a comment.
 
     clang::SourceLocation CommentLoc = Tok.getLocation();
-    if (isDocumentationComment(CommentLoc, Node))
-      continue;
-
     std::pair<clang::FileID, unsigned> LocInfo =
-      SM.getDecomposedSpellingLoc(CommentLoc);
+      SM.getDecomposedLoc(CommentLoc);
     assert(LocInfo.first == FID);
+
     unsigned LineNo = SM.getLineNumber(LocInfo.first, LocInfo.second);
     if (LineNo > NodeLineNo)
       break; // Comment is past the clang node.
+
+    bool IsDocComment = isDocumentationComment(CommentLoc, Node);
 
     // Print out the comment.
 
@@ -414,26 +428,23 @@ void ClangCommentPrinter::printCommentsUntil(ClangNode Node) {
 
     // Check if comment is on same line but after the declaration.
     if (SM.isBeforeInTranslationUnit(NodeLoc, Tok.getLocation())) {
-      PendingComments.push_back(CommentText);
-      LastPrintedCommentLineNo = 0;
+      if (!IsDocComment)
+        PendingComments.push_back(CommentText);
       continue;
     }
 
-    if (LastPrintedCommentLineNo && LineNo - LastPrintedCommentLineNo > 1) {
+    if (LastPrintedLineNo && LineNo - LastPrintedLineNo > 1) {
       *this << "\n";
       printIndent();
     }
-    *this << CommentText << "\n";
-    printIndent();
-    LastPrintedCommentLineNo =
+    if (!IsDocComment) {
+      *this << CommentText << "\n";
+      printIndent();
+    }
+    LastPrintedLineNo =
         SM.getLineNumber(LocInfo.first, LocInfo.second + Tok.getLength());
 
   } while (true);
-
-  if (LastPrintedCommentLineNo && NodeLineNo - LastPrintedCommentLineNo > 1) {
-    *this << "\n";
-    printIndent();
-  }
 
   // Resume printing comments from this point.
   setResumeOffset(FID, BufPtr - BufStart);
@@ -456,4 +467,48 @@ bool ClangCommentPrinter::isDocumentationComment(
       SM.isBeforeInTranslationUnit(DocRange.getEnd(), CommentLoc))
     return false;
   return true;
+}
+
+bool ClangCommentPrinter::shouldPrintNewLineBefore(ClangNode Node) const {
+  assert(Node);
+  const auto &Ctx = ClangLoader.getClangASTContext();
+  const auto &SM = Ctx.getSourceManager();
+
+  clang::SourceLocation NodeLoc =
+      SM.getFileLoc(Node.getSourceRange().getBegin());
+  if (NodeLoc.isInvalid())
+    return false;
+  unsigned NodeLineNo = SM.getSpellingLineNumber(NodeLoc);
+  clang::FileID FID = SM.getFileID(NodeLoc);
+  if (FID.isInvalid())
+    return false;
+
+  unsigned LastEntiyLine = 0;
+  auto It = LastEntityLines.find(FID);
+  if (It != LastEntityLines.end())
+    LastEntiyLine = It->second;
+  return (NodeLineNo > LastEntiyLine) && NodeLineNo - LastEntiyLine > 1;
+}
+
+void ClangCommentPrinter::updateLastEntityLine(clang::SourceLocation Loc) {
+  if (Loc.isInvalid())
+    return;
+
+  const auto &Ctx = ClangLoader.getClangASTContext();
+  const auto &SM = Ctx.getSourceManager();
+
+  unsigned LineNo = SM.getSpellingLineNumber(Loc);
+  clang::FileID FID = SM.getFileID(Loc);
+  if (FID.isInvalid())
+    return;
+
+  updateLastEntityLine(FID, LineNo);
+}
+
+void ClangCommentPrinter::updateLastEntityLine(clang::FileID FID,
+                                               unsigned LineNo) {
+  assert(!FID.isInvalid());
+  unsigned &LastEntiyLine = LastEntityLines[FID];
+  if (LineNo > LastEntiyLine)
+    LastEntiyLine = LineNo;
 }

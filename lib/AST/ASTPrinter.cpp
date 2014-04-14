@@ -129,8 +129,10 @@ class PrintAST : public ASTVisitor<PrintAST> {
     if (!RC)
       return;
 
-    Printer.printNewline();
-    indent();
+    if (!Options.PrintRegularClangComments) {
+      Printer.printNewline();
+      indent();
+    }
 
     bool Invalid;
     unsigned StartLocCol =
