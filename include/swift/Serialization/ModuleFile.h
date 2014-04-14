@@ -38,7 +38,8 @@ namespace llvm {
 
 // This template should eventually move to llvm/Support.
 namespace clang {
-  template <typename Info> class OnDiskIterableChainedHashTable;
+  template <typename Info>
+  class OnDiskChainedHashTable;
 }
 
 namespace swift {
@@ -212,8 +213,7 @@ private:
   std::vector<SerializedIdentifier> Identifiers;
 
   class DeclTableInfo;
-  using SerializedDeclTable =
-    clang::OnDiskIterableChainedHashTable<DeclTableInfo>;
+  using SerializedDeclTable = clang::OnDiskChainedHashTable<DeclTableInfo>;
 
   std::unique_ptr<SerializedDeclTable> TopLevelDecls;
   std::unique_ptr<SerializedDeclTable> OperatorDecls;
@@ -231,7 +231,7 @@ private:
 
   class DeclCommentTableInfo;
   using SerializedDeclCommentTable =
-      clang::OnDiskIterableChainedHashTable<DeclCommentTableInfo>;
+      clang::OnDiskChainedHashTable<DeclCommentTableInfo>;
 
   std::unique_ptr<SerializedDeclCommentTable> DeclCommentTable;
 
