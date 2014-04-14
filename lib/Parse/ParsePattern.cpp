@@ -801,18 +801,21 @@ Parser::parseConstructorArguments(Pattern *&ArgPattern, Pattern *&BodyPattern,
 
   // It's just a pattern. Parse it.
   if (Tok.is(tok::l_paren)) {
-    ParserResult<Pattern> Params =
-      parsePatternTuple(/*IsLet*/ true, /*IsArgList*/ true, &DefaultArgs);
+    SmallVector<ParsedParameter, 4> params;
+    SourceLoc leftParenLoc, rightParenLoc;
+    
+    // Parse the parameter clause.
+    ParserStatus status 
+      = parseParameterClause(leftParenLoc, params, rightParenLoc,
+                             DefaultArgs, /*isClosure=*/false);
 
-    // If we failed to parse the pattern, create an empty tuple to recover.
-    if (Params.isNull()) {
-      Params = makeParserResult(Params,
-          TuplePattern::createSimple(Context, Tok.getLoc(), {}, Tok.getLoc()));
-    }
+    // Turn the parameter clause into argument and body patterns.
+    std::tie(ArgPattern, BodyPattern)
+      = mapParsedParameters(*this, leftParenLoc, params,
+                            rightParenLoc, DefaultArgs,
+                            /*isFirstParameterClause=*/true);
 
-    ArgPattern = Params.get();
-    BodyPattern = ArgPattern->clone(Context);
-    return Params;
+    return status;
   }
 
   if (!isAtStartOfBindingName()) {
