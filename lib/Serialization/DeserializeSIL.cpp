@@ -172,7 +172,8 @@ SILDeserializer::readFuncTable(ArrayRef<uint64_t> fields, StringRef blobData) {
   auto base = reinterpret_cast<const uint8_t *>(blobData.data());
 
   using OwnedTable = std::unique_ptr<SerializedFuncTable>;
-  return OwnedTable(SerializedFuncTable::Create(base + tableOffset, base));
+  return OwnedTable(SerializedFuncTable::Create(base + tableOffset,
+                                                base + sizeof(uint32_t), base));
 }
 
 /// A high-level overview of how forward references work in serializer and
