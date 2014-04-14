@@ -356,9 +356,9 @@ bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
 
   auto *BB = BI->getParent(), *DestBB = BI->getDestBB();
 
-  // If this block branches to a block with a single predecessor (us), then
+  // If this block branches to a block with a single predecessor, then
   // merge the DestBB into this BB.
-  if (std::next(DestBB->pred_begin()) == DestBB->pred_end()) {
+  if (BB != DestBB && DestBB->getSinglePredecessor()) {
     // If there are any BB arguments in the destination, replace them with the
     // branch operands, since they must dominate the dest block.
     for (unsigned i = 0, e = BI->getArgs().size(); i != e; ++i)

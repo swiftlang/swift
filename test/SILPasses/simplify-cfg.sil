@@ -213,3 +213,11 @@ bb5(%7 : $Int64):
 bb6(%8 : $Int64):
   return %8 : $Int64
 }
+
+// CHECK-LABEL: @infinite_loop
+// CHECK: bb0
+// CHECK-NEXT: br bb0
+sil @infinite_loop : $@thin () -> () {
+bb0:
+  br bb0
+}
