@@ -132,6 +132,11 @@ public:
 
   /// Is this an increment that we can perform code motion for. This is true
   /// for strong_retain and false for retain_value.
+  ///
+  /// TODO: Previously, retain_value was an instruction called copy_value which
+  /// had a result. Due to the result, we were unable to move copy_value due to
+  /// potential flow issues. That problem has been eliminated, so this code
+  /// should be removed (since we can move everything).
   bool canBeMoved() const { return isa<StrongRetainInst>(getInstruction()); }
 
   /// Initializes/reinitialized the state for I. If we reinitialize we return

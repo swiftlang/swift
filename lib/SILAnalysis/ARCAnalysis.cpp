@@ -15,6 +15,7 @@
 #include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILAnalysis/AliasAnalysis.h"
+#include "swift/SILAnalysis/ValueTracking.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "llvm/Support/Debug.h"
 
@@ -24,11 +25,56 @@ using namespace swift;
 //                             Decrement Analysis
 //===----------------------------------------------------------------------===//
 
+static bool canApplyDecrementRefCount(ApplyInst *AI, SILValue Ptr,
+                                      AliasAnalysis *AA) {
+  // Ignore any thick functions for now due to us not handling the ref-counted
+  // nature of its context.
+  if (auto FTy = AI->getCallee().getType().getAs<SILFunctionType>())
+    if (FTy->getExtInfo().hasContext())
+      return true;
 
-bool swift::arc::canDecrementRefCount(SILInstruction *User,
-                                      SILValue Ptr, AliasAnalysis *AA) {
-  // Clear up some small cases where MayHaveSideEffects is too broad for our
-  // purposes and the instruction does not decrement ref counts.
+  // If we have a builtin that is side effect free, we can commute the
+  // ApplyInst and the retain.
+  if (auto *BI = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee()))
+    if (isSideEffectFree(BI))
+      return false;
+
+  // Ok, this apply *MAY* decrement ref counts. Now our strategy is to attempt
+  // to use properties of the pointer, the function's arguments, and the
+  // function itself to prove that the pointer can not have its ref count be
+  // effected by function.
+
+  // TODO: Put in function property check section here when we get access to
+  // such information.
+
+  // First make sure that the underlying object of ptr is a local object which
+  // does not escape. This prevents the apply from indirectly via the global
+  // affecting the reference count of the pointer.
+  if (!isNonEscapingLocalObject(getUnderlyingObject(Ptr)))
+    return true;
+
+  // Now that we know that the function can not affect the pointer indirectly,
+  // make sure that the apply can not affect the pointer directly via the
+  // applies arguments by proving that the pointer can not alias any of the
+  // functions arguments.
+  for (auto Op : AI->getArgumentsWithoutIndirectResult()) {
+    for (int i = 0, e = Ptr->getNumTypes(); i < e; i++) {
+      if (!AA->isNoAlias(Op, SILValue(Ptr.getDef(), i)))
+        return true;
+    }
+  }
+
+  // Success! The apply inst can not affect the reference count of ptr!
+  return false;
+}
+
+/// Is the may have side effects user by the definition of its value kind unable
+/// to decrement ref counts.
+static bool canDecrementRefCountsByValueKind(SILInstruction *User) {
+  assert(User->getMemoryBehavior()
+           ==  SILInstruction::MemoryBehavior::MayHaveSideEffects &&
+         "Invalid argument. Function is only applicable to isntructions with "
+         "side effects.");
   switch (User->getKind()) {
   case ValueKind::DeallocStackInst:
   case ValueKind::StrongRetainInst:
@@ -46,38 +92,37 @@ bool swift::arc::canDecrementRefCount(SILInstruction *User,
   }
   SWIFT_FALLTHROUGH;
   default:
-    break;
+    return true;
   }
+}
 
-  if (auto *AI = dyn_cast<ApplyInst>(User)) {
-    // Ignore any thick functions for now due to us not handling the ref-counted
-    // nature of its context.
-    if (auto FTy = AI->getCallee().getType().getAs<SILFunctionType>())
-      if (FTy->getExtInfo().hasContext())
-        return true;
-
-    // If we have a builtin that is side effect free, we can commute the
-    // ApplyInst and the retain.
-    if (auto *BI = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee()))
-      if (isSideEffectFree(BI))
-        return false;
-
-    // Ok, this apply *MAY* decrement ref counts. Attempt to prove that it
-    // cannot decrement Target using alias analysis and knowledge about our
-    // calling convention.
-    for (auto Op : AI->getArgumentsWithoutIndirectResult()) {
-      for (int i = 0, e = Ptr->getNumTypes(); i < e; i++) {
-        if (!AA->isNoAlias(Op, SILValue(Ptr.getDef(), i)))
-          return true;
-      }
-    }
-
+bool swift::arc::canDecrementRefCount(SILInstruction *User,
+                                      SILValue Ptr, AliasAnalysis *AA) {
+  // If we have an instruction that does not have *pure* side effects, it can
+  // not affect ref counts.
+  //
+  // This distinguishes in between a "write" side effect and ref count side
+  // effects.
+  if (User->getMemoryBehavior() !=
+      SILInstruction::MemoryBehavior::MayHaveSideEffects)
     return false;
-  }
 
-  // Just make sure that we do not have side effects.
-  return User->getMemoryBehavior() ==
-    SILInstruction::MemoryBehavior::MayHaveSideEffects;
+  // Ok, we know that this instruction's generic behavior is
+  // "MayHaveSideEffects". That is a criterion (it has effects not represented
+  // by use-def chains) that is broader than ours (does it effect a particular
+  // pointers ref counts). Thus begin by attempting to prove that the type of
+  // instruction that the user is by definition can not affect ref counts.
+  if (!canDecrementRefCountsByValueKind(User))
+    return false;
+
+  // Ok, this instruction may have ref counts. If it is an apply, attempt to
+  // prove that the callee is unable to affect Ptr.
+  if (auto *AI = dyn_cast<ApplyInst>(User))
+    return canApplyDecrementRefCount(AI, Ptr, AA);
+
+  // We can not conservatively prove that this instruction can not affect ref
+  // counts. So assume that it does.
+  return true;
 }
 
 //===----------------------------------------------------------------------===//
@@ -144,6 +189,8 @@ bool swift::arc::canUseValue(SILInstruction *User, SILValue Ptr,
     return false;
   }
 
+  // TODO: If we add in alias analysis support here for apply inst, we will need
+  // to check that the pointer does not escape.
 
   // Otherwise, assume that Inst can use Target.
   return true;
