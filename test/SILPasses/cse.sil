@@ -469,7 +469,7 @@ sil @tuple_function : $@thin ((Builtin.Int32, Builtin.Int32), (Builtin.Int32, Bu
 sil @tuple_test : $@thin (Builtin.Int32, Builtin.Int32) -> (Builtin.Int32) {
 bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
   %2 = tuple(%0 : $Builtin.Int32, %1 : $Builtin.Int32)
-  %3 = tuple(%0 : $Builtin.Int32, %1 : $Builtin.Int32)  
+  %3 = tuple(%0 : $Builtin.Int32, %1 : $Builtin.Int32)
   %4 = function_ref @tuple_function : $@thin ((Builtin.Int32, Builtin.Int32), (Builtin.Int32, Builtin.Int32)) -> (Builtin.Int32)
   %5 = apply %4(%2, %3) : $@thin ((Builtin.Int32, Builtin.Int32), (Builtin.Int32, Builtin.Int32)) -> (Builtin.Int32)
   return %5 : $(Builtin.Int32)
@@ -499,7 +499,7 @@ sil @init_tuple_addr : $@thin (@out (Builtin.Int32, Builtin.Int32)) -> ()
 sil @tupleelementaddr_test : $@thin () -> (Builtin.Int32) {
   %0 = alloc_stack $(Builtin.Int32, Builtin.Int32)
   %1 = function_ref @init_tuple_addr : $@thin (@out (Builtin.Int32, Builtin.Int32)) -> ()
-  apply %1(%0#1) : $@thin (@out (Builtin.Int32, Builtin.Int32)) -> ()  
+  apply %1(%0#1) : $@thin (@out (Builtin.Int32, Builtin.Int32)) -> ()
   %2 = tuple_element_addr %0#1 : $*(Builtin.Int32, Builtin.Int32), 0
   %3 = tuple_element_addr %0#1 : $*(Builtin.Int32, Builtin.Int32), 0
   %4 = builtin_function_ref "sadd_with_overflow_Int32" : $@thin (Builtin.Int32, Builtin.Int32, Builtin.Int1) -> (Builtin.Int32, Builtin.Int1)
@@ -520,7 +520,7 @@ sil @metatype_user : $@thin (@thin String.Type) -> ()
 // CHECK: apply {{%[0-9]+}}([[TARGET]])
 // CHECK: apply {{%[0-9]+}}([[TARGET]])
 sil @metatype_test : $@thin () -> () {
-  %0 = metatype $@thin String.Type    
+  %0 = metatype $@thin String.Type
   %1 = metatype $@thin String.Type
   %2 = function_ref @metatype_user : $@thin (@thin String.Type) -> ()
   apply %2(%0) : $@thin (@thin String.Type) -> ()
@@ -585,3 +585,37 @@ bb0(%0 : $Builtin.RawPointer):
   return %Y : $()
 }
 
+enum FakeOptional {
+  case None
+  case Some(Builtin.Int32)
+}
+
+// CHECK-LABEL: sil @enum_cse : $@thin () -> () {
+// CHECK: bb0
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: [[FUNC:%[0-9]+]] = function_ref @unknown_fake_optional_user : $@thin (FakeOptional) -> ()
+// CHECK-NEXT: [[NONE:%[0-9]+]] = enum $FakeOptional, #FakeOptional.None!enumelt
+// CHECK-NEXT: apply [[FUNC]]([[NONE]]) : $@thin (FakeOptional) -> ()
+// CHECK-NEXT: apply [[FUNC]]([[NONE]]) : $@thin (FakeOptional) -> ()
+// CHECK-NEXT: [[INTEGER:%[0-9]+]] = integer_literal $Builtin.Int32, 0
+// CHECK-NEXT: [[SOME:%[0-9]+]] = enum $FakeOptional, #FakeOptional.Some!enumelt.1, [[INTEGER]] : $Builtin.Int32
+// CHECK-NEXT: apply [[FUNC]]([[SOME]]) : $@thin (FakeOptional) -> ()
+// CHECK-NEXT: apply [[FUNC]]([[SOME]]) : $@thin (FakeOptional) -> ()
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @unknown_fake_optional_user : $@thin (FakeOptional) -> ()
+sil @enum_cse : $@thin () -> () {
+bb0:
+  %0 = function_ref @unknown_fake_optional_user : $@thin (FakeOptional) -> ()
+  %1 = enum $FakeOptional, #FakeOptional.None!enumelt
+  %2 = enum $FakeOptional, #FakeOptional.None!enumelt
+  apply %0(%1) : $@thin (FakeOptional) -> ()
+  apply %0(%2) : $@thin (FakeOptional) -> ()
+  %3 = integer_literal $Builtin.Int32, 0
+  %4 = enum $FakeOptional, #FakeOptional.Some!enumelt.1, %3 : $Builtin.Int32
+  %5 = enum $FakeOptional, #FakeOptional.Some!enumelt.1, %3 : $Builtin.Int32
+  apply %0(%4) : $@thin (FakeOptional) -> ()
+  apply %0(%5) : $@thin (FakeOptional) -> ()
+  %6 = tuple()
+  return %6 : $()
+}

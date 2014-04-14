@@ -60,7 +60,7 @@ struct SimpleValue {
     if (auto *AI = dyn_cast<ApplyInst>(Inst)) {
       auto *BFRI = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee());
       return (BFRI && isSideEffectFree(BFRI));
-     }
+    }
     switch (Inst->getKind()) {
       case ValueKind::FunctionRefInst:
       case ValueKind::BuiltinFunctionRefInst:
@@ -79,6 +79,7 @@ struct SimpleValue {
       case ValueKind::IndexRawPointerInst:
       case ValueKind::PointerToAddressInst:
       case ValueKind::CondFailInst:
+      case ValueKind::EnumInst:
         return true;
       default:
         return false;
@@ -207,6 +208,15 @@ public:
                               llvm::hash_combine_range(Operands.begin(),
                                                        Operands.end()),
                               X->hasSubstitutions(), X->isTransparent());
+  }
+  hash_code visitEnumInst(EnumInst *X) {
+    // We hash the enum by hashing its kind, element, and operand if it has one.
+    unsigned base = llvm::hash_combine(unsigned(ValueKind::EnumInst),
+                                       X->getElement());
+    if (!X->hasOperand())
+      return base;
+
+    return llvm::hash_combine(base, X->getOperand());
   }
 };
 } // end anonymous namespace

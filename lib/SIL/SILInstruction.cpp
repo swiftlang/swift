@@ -354,6 +354,13 @@ namespace {
       return X->getSubstitutions() == RHS->getSubstitutions();
     }
 
+    bool visitEnumInst(EnumInst *RHS) {
+      // We already checked operands and types. Only thing we need to check is
+      // that the element is the same.
+      auto *X = cast<EnumInst>(LHS);
+      return X->getElement() == RHS->getElement();
+    }
+
   private:
     const SILInstruction *LHS;
   };
