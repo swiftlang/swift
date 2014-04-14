@@ -804,6 +804,13 @@ ERROR(self_assignment_prop,tce_sema,none,
 ERROR(property_use_in_closure_without_explicit_self,tce_sema,none,
       "reference to property %0 in closure requires explicit 'self.' to make"
       " capture semantics explicit", (Identifier))
+ERROR(method_call_in_closure_without_explicit_self,tce_sema,none,
+      "call to method %0 in closure requires explicit 'self.' to make"
+      " capture semantics explicit", (Identifier))
+ERROR(implicit_use_of_self_in_closure,tce_sema,none,
+      "implicit use of 'self' in closure; use 'self.' to make"
+      " capture semantics explicit", ())
+
 
 WARNING(recursive_accessor_reference,tce_sema,none,
         "attempting to %select{access|modify}1 %0 within its own "

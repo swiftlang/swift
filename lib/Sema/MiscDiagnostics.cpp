@@ -355,10 +355,22 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E) {
   class DiagnoseWalker : public ASTWalker {
     TypeChecker &TC;
     unsigned InClosure = 0;
-    
+
+    // Keep track of DeclRefExpr's we've emitted diagnostics for, so we don't
+    // emit the same error on both the property access and on the underlying
+    // self reference.
+    SmallVector<Expr*, 2> DiagnosedSelfs;
+
   public:
     explicit DiagnoseWalker(TypeChecker &TC) : TC(TC) {}
-    
+
+    /// Return true if this is an implicit reference to self.
+    static bool isImplicitSelfUse(Expr *E) {
+      auto *DRE = dyn_cast<DeclRefExpr>(E);
+      return DRE && DRE->isImplicit() &&
+             DRE->getDecl()->getName().str() == "self";
+    }
+
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       // If this is an explicit closure expression - not an autoclosure - then
       // we keep track of the fact that recursive walks are within the closure.
@@ -370,13 +382,35 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E) {
       // do this in explicit closures, not autoclosures, because otherwise the
       // transparence of autoclosures is lost.
       if (auto *MRE = dyn_cast<MemberRefExpr>(E))
-        if (InClosure && MRE->getBase()->isImplicit() &&
-            isa<DeclRefExpr>(MRE->getBase()))
+        if (InClosure && isImplicitSelfUse(MRE->getBase())) {
           TC.diagnose(MRE->getLoc(),
                       diag::property_use_in_closure_without_explicit_self,
                       MRE->getMember().getDecl()->getName())
             .fixItInsert(MRE->getLoc(), "self.");
-    
+          DiagnosedSelfs.push_back(MRE->getBase());
+        }
+
+      // Handle method calls with a specific diagnostic + fixit.
+      if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(E))
+        if (InClosure && isImplicitSelfUse(DSCE->getBase()) &&
+            isa<DeclRefExpr>(DSCE->getFn())) {
+          auto MethodExpr = cast<DeclRefExpr>(DSCE->getFn());
+
+          TC.diagnose(DSCE->getLoc(),
+                      diag::method_call_in_closure_without_explicit_self,
+                      MethodExpr->getDecl()->getName())
+            .fixItInsert(DSCE->getLoc(), "self.");
+          DiagnosedSelfs.push_back(DSCE->getBase());
+        }
+
+      // Catch any other implicit uses of self with a generic diagnostic.
+      if (InClosure && isImplicitSelfUse(E)) {
+        // Make sure this isn't a subexpression of something we've already
+        // emitted a diagnostic for.
+        if (!std::count(DiagnosedSelfs.begin(), DiagnosedSelfs.end(), E))
+          TC.diagnose(E->getLoc(), diag::implicit_use_of_self_in_closure);
+      }
+
       return { true, E };
     }
     
