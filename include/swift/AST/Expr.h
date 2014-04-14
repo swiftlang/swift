@@ -852,8 +852,8 @@ class UnresolvedDeclRefExpr : public Expr {
 
 public:
   UnresolvedDeclRefExpr(Identifier name, DeclRefKind refKind, SourceLoc loc)
-    : Expr(ExprKind::UnresolvedDeclRef, /*Implicit=*/false), Name(name), Loc(loc),
-      RefKind(refKind) {
+    : Expr(ExprKind::UnresolvedDeclRef, /*Implicit=*/loc.isInvalid()),
+      Name(name), Loc(loc), RefKind(refKind) {
   }
   
   bool hasName() const { return !Name.empty(); }
@@ -1605,10 +1605,13 @@ class ForceValueExpr : public Expr {
 
 public:
   ForceValueExpr(Expr *subExpr, SourceLoc exclaimLoc)
-    : Expr(ExprKind::ForceValue, /*Implicit=*/ false, Type()),
+    : Expr(ExprKind::ForceValue, /*Implicit=*/exclaimLoc.isInvalid(), Type()),
       SubExpr(subExpr), ExclaimLoc(exclaimLoc) {}
 
   SourceRange getSourceRange() const {
+    if (ExclaimLoc.isInvalid())
+      return SubExpr->getSourceRange();
+
     return SourceRange(SubExpr->getStartLoc(), ExclaimLoc);
   }
   SourceLoc getLoc() const { return getExclaimLoc(); }
