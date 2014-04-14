@@ -2160,7 +2160,7 @@ void DeclName::CompoundDeclName::Profile(llvm::FoldingSetNodeID &id,
 DeclName::DeclName(ASTContext &C, Identifier baseName,
                    ArrayRef<Identifier> argumentNames) {
   if (argumentNames.size() == 0) {
-    SimpleOrCompound = IdentifierAndNullary(baseName, true);
+    SimpleOrCompound = IdentifierAndCompound(baseName, true);
     return;
   }
 

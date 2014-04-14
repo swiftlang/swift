@@ -1412,30 +1412,19 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
       case decls_block::ObjC_DECL_ATTR: {
         bool isImplicit;
-        uint8_t kind;
-        ArrayRef<uint64_t> rawNameIDs;
+        uint64_t numArgs;
+        ArrayRef<uint64_t> rawPieceIDs;
         serialization::decls_block::ObjCDeclAttrLayout::readRecord(
-            scratch, isImplicit, kind, rawNameIDs);
+            scratch, isImplicit, numArgs, rawPieceIDs);
 
-        SmallVector<Identifier, 4> names;
-        for (auto nameID : rawNameIDs)
-          names.push_back(getIdentifier(nameID));
+        SmallVector<Identifier, 4> pieces;
+        for (auto pieceID : rawPieceIDs)
+          pieces.push_back(getIdentifier(pieceID));
 
-        switch (kind) {
-        case serialization::ObjCDeclAttrKind::Unnamed:
-          Attr = ObjCAttr::createUnnamed(ctx, SourceLoc(), SourceLoc());
-          break;
-        case serialization::ObjCDeclAttrKind::Nullary:
-          Attr = ObjCAttr::createNullary(ctx, names[0]);
-          break;
-        case serialization::ObjCDeclAttrKind::Selector:
-          Attr = ObjCAttr::createSelector(ctx, names);
-          break;
-        default:
-          // Unknown kind.  Drop the attribute and continue, but log an error.
-          error();
-          break;
-        }
+        if (numArgs == 0)
+          Attr = ObjCAttr::create(ctx, Nothing);
+        else
+          Attr = ObjCAttr::create(ctx, ObjCSelector(ctx, numArgs-1, pieces));
         break;
       }
 

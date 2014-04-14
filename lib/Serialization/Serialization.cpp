@@ -1227,17 +1227,6 @@ static bool isForced(const Decl *D,
   return false;
 }
 
-static uint8_t getRawStableObjCDeclAttrKind(swift::ObjCAttr::Kind kind) {
-  switch (kind) {
-  case swift::ObjCAttr::Kind::Unnamed:
-    return serialization::ObjCDeclAttrKind::Unnamed;
-  case swift::ObjCAttr::Kind::Nullary:
-    return serialization::ObjCDeclAttrKind::Nullary;
-  case swift::ObjCAttr::Kind::Selector:
-    return serialization::ObjCDeclAttrKind::Selector;
-  }
-}
-
 void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
   using namespace decls_block;
 
@@ -1280,15 +1269,17 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
   }
   case DAK_objc: {
     auto *theAttr = cast<ObjCAttr>(DA);
-    SmallVector<IdentifierID, 4> names;
-    for (auto name : theAttr->getNames()) {
-      names.push_back(addIdentifierRef(name));
+    SmallVector<IdentifierID, 4> pieces;
+    unsigned numArgs = 0;
+    if (auto name = theAttr->getName()) {
+      numArgs = name->getNumArgs() + 1;
+      for (auto piece : name->getSelectorPieces()) {
+        pieces.push_back(addIdentifierRef(piece));
+      }
     }
     auto abbrCode = DeclTypeAbbrCodes[ObjCDeclAttrLayout::Code];
-    ObjCDeclAttrLayout::emitRecord(
-        Out, ScratchRecord, abbrCode,
-        theAttr->isImplicit(),
-        getRawStableObjCDeclAttrKind(theAttr->getKind()), names);
+    ObjCDeclAttrLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                   theAttr->isImplicit(), numArgs, pieces);
     return;
   }
   case DAK_override:

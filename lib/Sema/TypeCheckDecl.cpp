@@ -3527,11 +3527,13 @@ public:
 
       // If the overriding declaration already has an @objc attribute, check
       // whether the names are consistent.
+      auto name = *attr->getName();
       if (auto overrideAttr = Override->getAttrs().getAttribute<ObjCAttr>()) {
         if (overrideAttr->hasName()) {
+          auto overrideName =  *overrideAttr->getName();
+
           // If the names (and kind) match, we're done.
-          if (overrideAttr->getKind() == attr->getKind() &&
-              overrideAttr->getNames() == attr->getNames()) {
+          if (overrideName == name) {
             return;
           }
 
@@ -3539,13 +3541,13 @@ public:
           // override that is not going to be reflected in Objective-C.
           llvm::SmallString<64> baseScratch, overrideScratch;
           TC.diagnose(overrideAttr->AtLoc, diag::objc_override_name_mismatch,
-                      overrideAttr->getName(baseScratch),
-                      attr->getName(overrideScratch));
+                      overrideName, name);
           TC.diagnose(Base, diag::overridden_here);
         }
 
-        // Drop the attribute. We'll paste a new one in its place.
-        Override->getMutableAttrs().removeAttribute(overrideAttr);
+        // Set the name on the attribute.
+        const_cast<ObjCAttr *>(overrideAttr)->setName(name);
+        return;
       }
 
       // Copy the name from the base declaration to the overriding
@@ -5148,12 +5150,12 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
 
     // If there is a name, check whether the kind of name is
     // appropriate.
-    if (objcAttr->getKind() != ObjCAttr::Unnamed) {
+    if (auto objcName = objcAttr->getName()) {
       if (isa<ClassDecl>(D) || isa<ProtocolDecl>(D) || isa<VarDecl>(D)) {
         // Protocols, classes, and properties can only have nullary
         // names. Complain and recover by chopping off everything
         // after the first name.
-        if (objcAttr->getKind() != ObjCAttr::Nullary) {
+        if (objcName->getNumArgs() > 0) {
           int which = isa<ClassDecl>(D)? 0 
                     : isa<ProtocolDecl>(D)? 1
                     : 2;
@@ -5162,14 +5164,8 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
             Lexer::getLocForEndOfToken(TC.Context.SourceMgr, firstNameLoc);
           TC.diagnose(firstNameLoc, diag::objc_name_req_nullary, which)
             .fixItRemoveChars(afterFirstNameLoc, objcAttr->getRParenLoc());
-          D->getMutableAttrs().add(
-            ObjCAttr::createNullary(TC.Context, objcAttr->AtLoc,
-                                    objcAttr->Range.Start,
-                                    objcAttr->getLParenLoc(),
-                                    objcAttr->getNameLocs().front(),
-                                    objcAttr->getNames().front(),
-                                    objcAttr->getRParenLoc()));
-          D->getMutableAttrs().removeAttribute(objcAttr);
+          const_cast<ObjCAttr *>(objcAttr)->setName(
+            ObjCSelector(TC.Context, 0, objcName->getSelectorPieces()[0]));
         }
       } else if (isa<SubscriptDecl>(D)) {
       // Subscripts can never have names.
@@ -5190,9 +5186,7 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
         else
           numParameters = 1;
 
-        unsigned numArgumentNames = objcAttr->getKind() == ObjCAttr::Nullary 
-                                      ? 0 
-                                      : objcAttr->getNames().size();
+        unsigned numArgumentNames = objcName->getNumArgs();
         if (numArgumentNames != numParameters) {
           TC.diagnose(objcAttr->getNameLocs().front(), 
                       diag::objc_name_func_mismatch,

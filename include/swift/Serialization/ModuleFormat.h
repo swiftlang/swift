@@ -40,7 +40,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// Serialized module format minor version number.
 ///
 /// When the format changes IN ANY WAY, this number should be incremented.
-const uint16_t VERSION_MINOR = 56;
+const uint16_t VERSION_MINOR = 57;
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -199,15 +199,6 @@ enum LibraryKind : uint8_t {
   Framework
 };
 using LibraryKindField = BCFixed<1>;
-
-// These IDs must \em not be renumbered or reordered without incrementing
-// VERSION_MAJOR.
-enum ObjCDeclAttrKind : uint8_t {
-  Unnamed,
-  Nullary,
-  Selector,
-};
-using ObjCDeclAttrKindField = BCFixed<2>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR. Adding a new ID requires adding a byte of overhead to the
@@ -982,7 +973,7 @@ namespace decls_block {
   using ObjCDeclAttrLayout = BCRecordLayout<
     ObjC_DECL_ATTR,
     BCFixed<1>, // implicit flag
-    ObjCDeclAttrKindField, // kind
+    BCVBR<4>,   // # of arguments (+1) or zero if no name
     BCArray<IdentifierIDField>
   >;
 

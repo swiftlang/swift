@@ -145,13 +145,15 @@ private:
 };
   
 class DeclName;
-  
+class ObjCSelector;
+
 } // end namespace swift
 
 namespace llvm {
   raw_ostream &operator<<(raw_ostream &OS, swift::Identifier I);
   raw_ostream &operator<<(raw_ostream &OS, swift::DeclName I);
-  
+  raw_ostream &operator<<(raw_ostream &OS, swift::ObjCSelector S);
+
   // Identifiers hash just like pointers.
   template<> struct DenseMapInfo<swift::Identifier> {
     static swift::Identifier getEmptyKey() {
@@ -198,7 +200,7 @@ class DeclName {
     explicit CompoundDeclName(Identifier BaseName, size_t NumArgs)
       : BaseName(BaseName), NumArgs(NumArgs)
     {
-      assert(NumArgs > 0 && "Should use NullaryName or Identifier");
+      assert(NumArgs > 0 && "Should use IdentifierAndCompound");
     }
     
     ArrayRef<Identifier> getArgumentNames() const {
@@ -219,12 +221,12 @@ class DeclName {
   };
 
   // A single stored identifier, along with a bit stating whether it is is the
-  // base name for a zero-argument (nullary) compound name.
-  typedef llvm::PointerIntPair<Identifier, 1, bool> IdentifierAndNullary;
+  // base name for a zero-argument compound name.
+  typedef llvm::PointerIntPair<Identifier, 1, bool> IdentifierAndCompound;
 
   // Either a single identifier piece stored inline (with a bit to say whether
   // it is simple or compound), or a reference to a compound declaration name.
-  llvm::PointerUnion<IdentifierAndNullary, CompoundDeclName*> SimpleOrCompound;
+  llvm::PointerUnion<IdentifierAndCompound, CompoundDeclName*> SimpleOrCompound;
   
   DeclName(void *Opaque)
     : SimpleOrCompound(decltype(SimpleOrCompound)::getFromOpaqueValue(Opaque))
@@ -232,14 +234,14 @@ class DeclName {
   
 public:
   /// Build a null name.
-  DeclName() : SimpleOrCompound(IdentifierAndNullary()) {}
+  DeclName() : SimpleOrCompound(IdentifierAndCompound()) {}
   
   /// Build a simple value name with one component.
   /*implicit*/ DeclName(Identifier simpleName)
-    : SimpleOrCompound(IdentifierAndNullary(simpleName, false)) {}
+    : SimpleOrCompound(IdentifierAndCompound(simpleName, false)) {}
   
   /// Build a compound value name given a base name and a set of argument names.
-  [[deprecated]] DeclName(ASTContext &C, Identifier baseName,
+  DeclName(ASTContext &C, Identifier baseName,
            ArrayRef<Identifier> argumentNames);
   
   /// Retrive the 'base' name, i.e., the name that follows the introducer,
@@ -249,7 +251,7 @@ public:
     if (auto compound = SimpleOrCompound.dyn_cast<CompoundDeclName*>())
       return compound->BaseName;
     
-    return SimpleOrCompound.get<IdentifierAndNullary>().getPointer();
+    return SimpleOrCompound.get<IdentifierAndCompound>().getPointer();
   }
 
   /// Retrieve the names of the arguments, if there are any.
@@ -263,7 +265,7 @@ public:
   explicit operator bool() const {
     if (SimpleOrCompound.dyn_cast<CompoundDeclName*>())
       return true;
-    return !SimpleOrCompound.get<IdentifierAndNullary>().getPointer().empty();
+    return !SimpleOrCompound.get<IdentifierAndCompound>().getPointer().empty();
   }
   
   /// True if this is a simple one-component name.
@@ -271,7 +273,7 @@ public:
     if (SimpleOrCompound.dyn_cast<CompoundDeclName*>())
       return false;
 
-    return !SimpleOrCompound.get<IdentifierAndNullary>().getInt();
+    return !SimpleOrCompound.get<IdentifierAndCompound>().getInt();
   }
   
   /// True if this name is a simple one-component name identical to the
@@ -325,6 +327,75 @@ public:
                             "only for use within the debugger");
 };
 
+/// Represents an Objective-C selector.
+class ObjCSelector {
+  /// The storage for an Objective-C selector.
+  ///
+  /// A zero-argument selector is represented as simple name.
+  /// A selector with N arguments is represented as a compound name with
+  /// N arguments, where the simple name is a placeholder.
+  DeclName Storage;
+
+  explicit ObjCSelector(DeclName storage) : Storage(storage) { }
+
+  friend struct llvm::DenseMapInfo<ObjCSelector>;
+
+public:
+  /// Form a selector with the given number of arguments and the given selector
+  /// pieces.
+  ObjCSelector(ASTContext &ctx, unsigned numArgs, ArrayRef<Identifier> pieces);
+
+  /// Determine the number of arguments in the selector.
+  ///
+  /// When this is zero, the number of selector pieces will be one. Otherwise,
+  /// it equals the number of selector pieces.
+  unsigned getNumArgs() const {
+    if (Storage.isSimpleName()) {
+      return 0;
+    }
+
+    return Storage.getArgumentNames().size();
+  }
+
+  /// Determine the number of selector pieces in the selector.
+  ///
+  /// When this is one, the number of arguments may either be zero or one.
+  /// Otherwise, it equals the number of arguments.
+  unsigned getNumSelectorPieces() const {
+    return getSelectorPieces().size();
+  }
+
+  /// Retrieve the pieces in this selector.
+  ArrayRef<Identifier> getSelectorPieces() const {
+    if (Storage.isSimpleName()) {
+      return { reinterpret_cast<const Identifier*>(&Storage), 1 };
+    }
+
+    return Storage.getArgumentNames();
+  }
+
+  /// Get a string representation of the selector.
+  ///
+  /// \param scratch Scratch space to use.
+  StringRef getString(llvm::SmallVectorImpl<char> &scratch) const;
+
+  void *getOpaqueValue() const { return Storage.getOpaqueValue(); }
+  static ObjCSelector getFromOpaqueValue(void *p) {
+    return ObjCSelector(DeclName::getFromOpaqueValue(p));
+  }
+
+  /// Dump this selector to standard error.
+  LLVM_ATTRIBUTE_DEPRECATED(void dump(),
+                            "only for use within the debugger");
+
+  friend bool operator==(ObjCSelector lhs, ObjCSelector rhs) {
+    return lhs.getOpaqueValue() == rhs.getOpaqueValue();
+  }
+  friend bool operator!=(ObjCSelector lhs, ObjCSelector rhs) {
+    return lhs.getOpaqueValue() != rhs.getOpaqueValue();
+  }
+};
+
 } // end namespace swift
 
 namespace llvm {
@@ -343,6 +414,23 @@ namespace llvm {
       return LHS.getOpaqueValue() == RHS.getOpaqueValue();
     }
   };  
+
+  // ObjCSelectors hash just like pointers.
+  template<> struct DenseMapInfo<swift::ObjCSelector> {
+    static swift::ObjCSelector getEmptyKey() {
+      return swift::ObjCSelector(DenseMapInfo<swift::DeclName>::getEmptyKey());
+    }
+    static swift::ObjCSelector getTombstoneKey() {
+      return swift::ObjCSelector(
+               DenseMapInfo<swift::DeclName>::getTombstoneKey());
+    }
+    static unsigned getHashValue(swift::ObjCSelector Val) {
+      return DenseMapInfo<void*>::getHashValue(Val.getOpaqueValue());
+    }
+    static bool isEqual(swift::ObjCSelector LHS, swift::ObjCSelector RHS) {
+      return LHS.getOpaqueValue() == RHS.getOpaqueValue();
+    }
+  };
 } // end namespace llvm
 
 #endif

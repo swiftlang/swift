@@ -275,15 +275,11 @@ protected:
     friend class ObjCAttr;
     unsigned : NumDeclAttrBits;
 
-    // The arity of the name.
-    //
-    // 0 indicates that there is no name.
-    // 1 indicates that there is a single identifier as the name.
-    // 2+ indicates that there are N-1 identifiers, each of which is followed
-    // by a colon.
-    unsigned Arity : 8;
+    /// Whether this attribute has location information that trails the main
+    /// record, which contains the locations of the parentheses and any names.
+    unsigned HasTrailingLocationInfo : 1;
   };
-  enum { NumObjCAttrBits = NumDeclAttrBits + 8 };
+  enum { NumObjCAttrBits = NumDeclAttrBits + 1 };
   static_assert(NumObjCAttrBits <= 32, "fits in an unsigned");
 
   union {
@@ -521,30 +517,53 @@ public:
 
 /// Indicates that the given declaration is visible to Objective-C.
 class ObjCAttr : public DeclAttribute {
-protected:
-  unsigned getArity() const { return ObjCAttrBits.Arity; }
+  /// The Objective-C name associated with this entity, stored in its opaque
+  /// representation so that we can use null as an indicator for "no name".
+  void *NameData;
 
-  ObjCAttr(SourceLoc AtLoc, SourceRange Range, unsigned Arity, bool Implicit) 
-    : DeclAttribute(DAK_objc, AtLoc, Range, Implicit) 
-  { 
-    ObjCAttrBits.Arity = Arity;
+  /// Create an implicit @objc attribute with the given (optional) name.
+  explicit ObjCAttr(Optional<ObjCSelector> name)
+    : DeclAttribute(DAK_objc, SourceLoc(), SourceRange(), /*Implicit=*/true),
+      NameData(nullptr)
+  {
+    ObjCAttrBits.HasTrailingLocationInfo = false;
+
+    if (name) {
+      NameData = name->getOpaqueValue();
+    }
+  }
+
+  /// Create an @objc attribute written in the source.
+  ObjCAttr(SourceLoc atLoc, SourceRange baseRange, Optional<ObjCSelector> name,
+           SourceRange parenRange, ArrayRef<SourceLoc> nameLocs);
+
+  /// Determine whether this attribute has trailing location information.
+  bool hasTrailingLocationInfo() const {
+    return ObjCAttrBits.HasTrailingLocationInfo;
+  }
+
+  /// Retrieve the trailing location information.
+  MutableArrayRef<SourceLoc> getTrailingLocations() {
+    assert(hasTrailingLocationInfo() && "No trailing location information");
+    unsigned length = 2;
+    if (auto name = getName())
+      length += name->getNumSelectorPieces();
+    return { reinterpret_cast<SourceLoc *>(this + 1), length };
+  }
+
+  /// Retrieve the trailing location information.
+  ArrayRef<SourceLoc> getTrailingLocations() const {
+    assert(hasTrailingLocationInfo() && "No trailing location information");
+    unsigned length = 2;
+    if (auto name = getName())
+      length += name->getNumSelectorPieces();
+    return { reinterpret_cast<const SourceLoc *>(this + 1), length };
   }
 
 public:
-  /// Describes the kind of @objc attribute, which indicates how it
-  /// was named.
-  enum Kind {
-    /// A bare @objc attribute that was not provided with a name.
-    Unnamed,
-    /// An @objc attribute that has a single name with no trailing
-    /// colon.
-    Nullary,
-    /// An @objc attribute that has one or more names with colons
-    /// trailing each name.
-    Selector
-  };
+  /// Create implicit ObjC attribute with a given (optional) name.
+  static ObjCAttr *create(ASTContext &Ctx, Optional<ObjCSelector> name);
 
-public:
   /// Create an unnamed Objective-C attribute, i.e., @objc.
   static ObjCAttr *createUnnamed(ASTContext &Ctx, SourceLoc AtLoc, 
                                  SourceLoc ObjCLoc);
@@ -582,25 +601,35 @@ public:
   /// some number of identifiers followed by colons.
   static ObjCAttr *createSelector(ASTContext &Ctx, ArrayRef<Identifier> Names);
 
-  /// Determine what kind of @objc attribute this is.
-  Kind getKind() const {
-    switch (getArity()) {
-    case 0:
-      return Unnamed;
+  /// Determine whether this attribute has a name associated with it.
+  bool hasName() const { return NameData != nullptr; }
 
-    case 1:
-      return Nullary;
+  /// Retrieve the name of this entity, if specified.
+  Optional<ObjCSelector> getName() const {
+    if (!hasName())
+      return Nothing;
 
-    default:
-      return Selector;
-    }
+    return ObjCSelector::getFromOpaqueValue(NameData);
   }
 
-  /// Determine whether this attribute has a name associated with it.
-  bool hasName() const { return getKind() != Unnamed; }
+  /// Set the name of this entity.
+  void setName(ObjCSelector name) {
+    // If we already have a name and we have location information, make sure
+    // drop the location information rather than allowing it to corrupt our
+    // state
+    if (hasTrailingLocationInfo() &&
+        (!hasName() ||
+         getName()->getNumSelectorPieces() < name.getNumSelectorPieces())) {
+      ObjCAttrBits.HasTrailingLocationInfo = false;
+    }
 
-  /// Retrieve the names for a nullary or selector attribute.
-  ArrayRef<Identifier> getNames() const;
+    NameData = name.getOpaqueValue();
+  }
+
+  /// Clear the name of this entity.
+  void clearName() {
+    NameData = nullptr;
+  }
 
   /// Retrieve the source locations for the names in a non-implicit
   /// nullary or selector attribute.
@@ -611,14 +640,6 @@ public:
 
   /// Retrieve the location of the closing parentheses, if there is one.
   SourceLoc getRParenLoc() const;
-
-  /// Print the name (if any) to the given stream.
-  void printName(llvm::raw_ostream &OS) const;
-
-  /// Get the name associated with this attribute.
-  ///
-  /// \param buffer A buffer used to store the data for the returned name.
-  StringRef getName(llvm::SmallVectorImpl<char> &buffer) const;
 
   /// Clone the given attribute, producing an implicit copy of the
   /// original without source location information.

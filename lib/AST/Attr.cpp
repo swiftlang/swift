@@ -133,33 +133,9 @@ void DeclAttribute::print(ASTPrinter &Printer) const {
     break;
   case DAK_objc: {
     Printer << "@objc";
-
-    auto printId = [&](Identifier name) {
-      if (name.empty())
-        return;
-
-      Printer << name.str();
-    };
-
-    auto Attr = cast<ObjCAttr>(this);
-    switch (Attr->getKind()) {
-    case ObjCAttr::Unnamed:
-      break;
-
-    case ObjCAttr::Nullary:
-      Printer << "(";
-      printId(Attr->getNames().front());
-      Printer << ")";
-      break;
-
-    case ObjCAttr::Selector:
-      Printer << "(";
-      for (auto name : Attr->getNames()) {
-        printId(name);
-        Printer << ":";
-      }
-      Printer << ")";
-      break;
+    llvm::SmallString<32> scratch;
+    if (auto Name = cast<ObjCAttr>(this)->getName()) {
+      Printer << "(" << Name->getString(scratch) << ")";
     }
     break;
   }
@@ -205,102 +181,54 @@ StringRef DeclAttribute::getAttrName(DeclAttrKind DK) {
   }
 }
 
-namespace {
-  // Private subclass of ObjCAttr used to store location and
-  // identifier information for the nullary case.
-  struct NullaryObjCAttr : public ObjCAttr {
-    Identifier Name;
-    SourceLoc NameLoc;
-    SourceRange ParenRange;
+ObjCAttr::ObjCAttr(SourceLoc atLoc, SourceRange baseRange,
+                   Optional<ObjCSelector> name, SourceRange parenRange,
+                   ArrayRef<SourceLoc> nameLocs)
+  : DeclAttribute(DAK_objc, atLoc, baseRange, /*Implicit=*/false),
+    NameData(nullptr)
+{
+  if (name) {
+    // Store the name.
+    assert(name->getNumSelectorPieces() == nameLocs.size());
+    NameData = name->getOpaqueValue();
 
-    NullaryObjCAttr(SourceLoc AtLoc, 
-                    SourceLoc ObjCLoc, SourceLoc LParenLoc, 
-                    SourceLoc NameLoc, Identifier Name,
-                    SourceLoc RParenLoc)
-      : ObjCAttr(AtLoc, SourceRange(ObjCLoc, RParenLoc), 1, /*Implicit=*/false),
-        Name(Name), NameLoc(NameLoc), ParenRange(LParenLoc, RParenLoc) { }
-
-    explicit NullaryObjCAttr(Identifier Name)
-      : ObjCAttr(SourceLoc(), SourceRange(), 1, /*Implicit=*/true),
-        Name(Name) { }
-  };
-
-  // Private subclass of ObjCAttr used to store the identifiers and
-  // locations for the selector case.
-  struct SelectorObjCAttr : public ObjCAttr {
-    SourceRange ParenRange;
-
-    SelectorObjCAttr(SourceLoc AtLoc, SourceLoc ObjCLoc, SourceLoc LParenLoc,
-                     ArrayRef<SourceLoc> NameLocs, ArrayRef<Identifier> Names,
-                     SourceLoc RParenLoc, bool Implicit)
-      : ObjCAttr(AtLoc, SourceRange(ObjCLoc, RParenLoc), Names.size() + 1,
-                 Implicit),
-        ParenRange(LParenLoc, RParenLoc)
-    { 
-      assert(Names.size() >= 1 && "No names in selector style");
-      assert(NameLocs.size() == Names.size() && "# names != # locations");
-
-      std::memcpy(getNames().data(), Names.data(), 
-                  Names.size() * sizeof(Identifier));
-      std::memcpy(getNameLocs().data(), NameLocs.data(),
-                  NameLocs.size() * sizeof(SourceLoc));
-    }
-
-    /// Determine the number of names in this selector.
-    unsigned getNumNames() const { return getArity() - 1; }
-
-    /// Retrieve the names, which trail this record.
-    MutableArrayRef<Identifier> getNames() {
-      return MutableArrayRef<Identifier>(reinterpret_cast<Identifier *>(this+1),
-                                         getNumNames());
-    }
-
-    /// Retrieve the names, which trail this record.
-    ArrayRef<Identifier> getNames() const {
-      return ArrayRef<Identifier>(reinterpret_cast<const Identifier *>(this+1),
-                                  getNumNames());
-    }
-
-    /// Retrieve the name locations, which trail the names.
-    MutableArrayRef<SourceLoc> getNameLocs() {
-      auto afterNames = reinterpret_cast<Identifier *>(this+1) + getNumNames();
-      return MutableArrayRef<SourceLoc>(
-               reinterpret_cast<SourceLoc *>(afterNames),
-               getNumNames());
-    }
-
-    /// Retrieve the name locations, which trail the names.
-    ArrayRef<SourceLoc> getNameLocs() const {
-      auto afterNames 
-        = reinterpret_cast<const Identifier *>(this+1) + getNumNames();
-      return ArrayRef<SourceLoc>(
-               reinterpret_cast<const SourceLoc *>(afterNames),
-               getNumNames());
-    }
-  };
+    // Store location information.
+    ObjCAttrBits.HasTrailingLocationInfo = true;
+    getTrailingLocations()[0] = parenRange.Start;
+    getTrailingLocations()[1] = parenRange.End;
+    std::memcpy(getTrailingLocations().slice(2).data(), nameLocs.data(),
+                nameLocs.size() * sizeof(SourceLoc));
+  } else {
+    ObjCAttrBits.HasTrailingLocationInfo = false;
+  }
 }
 
-ObjCAttr *ObjCAttr::createUnnamed(ASTContext &Ctx, SourceLoc AtLoc, 
+ObjCAttr *ObjCAttr::create(ASTContext &Ctx, Optional<ObjCSelector> name) {
+  return new (Ctx) ObjCAttr(name);
+}
+
+ObjCAttr *ObjCAttr::createUnnamed(ASTContext &Ctx, SourceLoc AtLoc,
                                   SourceLoc ObjCLoc) {
-  return new (Ctx) ObjCAttr(AtLoc, SourceRange(ObjCLoc), /*Arity=*/0,
-                            /*Implicit=*/false);
+  return new (Ctx) ObjCAttr(AtLoc, SourceRange(ObjCLoc), Nothing,
+                            SourceRange(), { });
 }
 
 ObjCAttr *ObjCAttr::createUnnamedImplicit(ASTContext &Ctx) {
-  return new (Ctx) ObjCAttr(SourceLoc(), SourceRange(), /*Arity=*/0,
-                            /*Implicit=*/true);
+  return new (Ctx) ObjCAttr(Nothing);
 }
 
 ObjCAttr *ObjCAttr::createNullary(ASTContext &Ctx, SourceLoc AtLoc, 
                                   SourceLoc ObjCLoc, SourceLoc LParenLoc, 
                                   SourceLoc NameLoc, Identifier Name,
                                   SourceLoc RParenLoc) {
-  return new (Ctx) NullaryObjCAttr(AtLoc, ObjCLoc, LParenLoc, NameLoc, Name,
-                                   RParenLoc);
+  return new (Ctx) ObjCAttr(AtLoc, SourceRange(ObjCLoc),
+                            ObjCSelector(Ctx, 0, Name),
+                            SourceRange(LParenLoc, RParenLoc),
+                            NameLoc);
 }
 
 ObjCAttr *ObjCAttr::createNullary(ASTContext &Ctx, Identifier Name) {
-  return new (Ctx) NullaryObjCAttr(Name);
+  return new (Ctx) ObjCAttr(ObjCSelector(Ctx, 0, Name));
 }
 
 ObjCAttr *ObjCAttr::createSelector(ASTContext &Ctx, SourceLoc AtLoc, 
@@ -308,138 +236,42 @@ ObjCAttr *ObjCAttr::createSelector(ASTContext &Ctx, SourceLoc AtLoc,
                                    ArrayRef<SourceLoc> NameLocs,
                                    ArrayRef<Identifier> Names,
                                    SourceLoc RParenLoc) {
-  unsigned size = sizeof(SelectorObjCAttr) 
-                + Names.size() * sizeof(Identifier)
-                + NameLocs.size() * sizeof(SourceLoc);
-  void *mem = Ctx.Allocate(size, alignof(SelectorObjCAttr));
-  return new (mem) SelectorObjCAttr(AtLoc, ObjCLoc, LParenLoc, NameLocs, Names,
-                                    RParenLoc, /*Implicit=*/false);
+  unsigned size = sizeof(ObjCAttr) + NameLocs.size() * sizeof(SourceLoc);
+  void *mem = Ctx.Allocate(size, alignof(ObjCAttr));
+  return new (mem) ObjCAttr(AtLoc, SourceRange(ObjCLoc),
+                            ObjCSelector(Ctx, Names.size(), Names),
+                            SourceRange(LParenLoc, RParenLoc),
+                            NameLocs);
 }
 
 ObjCAttr *ObjCAttr::createSelector(ASTContext &Ctx, 
                                    ArrayRef<Identifier> Names) {
-  llvm::SmallVector<SourceLoc, 2> NameLocs(Names.size(), SourceLoc());
-  unsigned size = sizeof(SelectorObjCAttr) 
-                + Names.size() * sizeof(Identifier)
-                + NameLocs.size() * sizeof(SourceLoc);
-  void *mem = Ctx.Allocate(size, alignof(SelectorObjCAttr));
-  return new (mem) SelectorObjCAttr(SourceLoc(), SourceLoc(), SourceLoc(), 
-                                    NameLocs, Names, SourceLoc(), 
-                                    /*Implicit=*/true);
-}
-
-ArrayRef<Identifier> ObjCAttr::getNames() const {
-  switch (getKind()) {
-  case Unnamed:
-    return { };
-
-  case Nullary:
-    return static_cast<const NullaryObjCAttr *>(this)->Name;
-
-  case Selector:
-    return static_cast<const SelectorObjCAttr *>(this)->getNames();
-  }
+  return new (Ctx) ObjCAttr(ObjCSelector(Ctx, Names.size(), Names));
 }
 
 ArrayRef<SourceLoc> ObjCAttr::getNameLocs() const {
-  switch (getKind()) {
-  case Unnamed:
+  if (!hasTrailingLocationInfo())
     return { };
 
-  case Nullary:
-    return static_cast<const NullaryObjCAttr *>(this)->NameLoc;
-
-  case Selector:
-    return static_cast<const SelectorObjCAttr *>(this)->getNameLocs();
-  }
+  return getTrailingLocations().slice(2);
 }
 
 SourceLoc ObjCAttr::getLParenLoc() const {
-  switch (getKind()) {
-  case Unnamed:
+  if (!hasTrailingLocationInfo())
     return SourceLoc();
 
-  case Nullary:
-    return static_cast<const NullaryObjCAttr *>(this)->ParenRange.Start;
-
-  case Selector:
-    return static_cast<const SelectorObjCAttr *>(this)->ParenRange.Start;
-  }
+  return getTrailingLocations()[0];
 }
 
 SourceLoc ObjCAttr::getRParenLoc() const {
-  switch (getKind()) {
-  case Unnamed:
+  if (!hasTrailingLocationInfo())
     return SourceLoc();
 
-  case Nullary:
-    return static_cast<const NullaryObjCAttr *>(this)->ParenRange.End;
-
-  case Selector:
-    return static_cast<const SelectorObjCAttr *>(this)->ParenRange.End;
-  }
-}
-
-void ObjCAttr::printName(llvm::raw_ostream &OS) const {
-  auto printId = [&](Identifier name) {
-    if (name.empty())
-      return;
-    
-    OS << name.str();
-  };
-
-  switch (getKind()) {
-  case Unnamed:
-    break;
-
-  case Nullary:
-    printId(static_cast<const NullaryObjCAttr *>(this)->Name);
-    break;
-
-  case Selector:
-    for (auto Name : getNames()) {
-      printId(Name);
-      OS << ":";
-    }
-    break;
-  }
-}
-
-StringRef ObjCAttr::getName(llvm::SmallVectorImpl<char> &buffer) const {
-  switch (getKind()) {
-  case Unnamed:
-    return "";
-
-  case Nullary: {
-    auto Name = static_cast<const NullaryObjCAttr *>(this)->Name;
-    if (Name.empty())
-      return "";
-    return Name.str();
-  }
-  
-  case Selector: {
-    buffer.clear(); 
-    {
-      llvm::raw_svector_ostream OS(buffer);
-      printName(OS);
-    }
-    return StringRef(buffer.data(), buffer.size());
-  }
-  }
+  return getTrailingLocations()[0];
 }
 
 ObjCAttr *ObjCAttr::clone(ASTContext &context) const {
-  switch (getKind()) {
-  case Unnamed:
-    return new (context) ObjCAttr(SourceLoc(), SourceRange(), 0, 
-                                  /*Implicit=*/true);
-
-  case Nullary:
-    return createNullary(context, getNames().front());
-
-  case Selector:
-    return createSelector(context, getNames());
-  }
+  return new (context) ObjCAttr(getName());
 }
 
 AvailabilityAttr *

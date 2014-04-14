@@ -78,6 +78,7 @@ namespace swift {
     Integer,
     Unsigned,
     Identifier,
+    ObjCSelector,
     Type,
     TypeRepr,
     PatternKind,
@@ -101,6 +102,7 @@ namespace swift {
       unsigned UnsignedVal;
       StringRef StringVal;
       DeclName IdentifierVal;
+      ObjCSelector ObjCSelectorVal;
       Type TypeVal;
       TypeRepr *TyR;
       PatternKind PatternKindVal;
@@ -129,7 +131,11 @@ namespace swift {
     DiagnosticArgument(Identifier I)
       : Kind(DiagnosticArgumentKind::Identifier), IdentifierVal(I) {
     }
-    
+
+    DiagnosticArgument(ObjCSelector S)
+      : Kind(DiagnosticArgumentKind::ObjCSelector), ObjCSelectorVal(S) {
+    }
+
     DiagnosticArgument(Type T)
       : Kind(DiagnosticArgumentKind::Type), TypeVal(T) {
     }
@@ -186,6 +192,11 @@ namespace swift {
     DeclName getAsIdentifier() const {
       assert(Kind == DiagnosticArgumentKind::Identifier);
       return IdentifierVal;
+    }
+
+    ObjCSelector getAsObjCSelector() const {
+      assert(Kind == DiagnosticArgumentKind::ObjCSelector);
+      return ObjCSelectorVal;
     }
 
     Type getAsType() const {

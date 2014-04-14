@@ -220,6 +220,12 @@ static void formatDiagnosticArgument(StringRef Modifier,
     assert(Modifier.empty() && "Improper modifier for identifier argument");
     Out << '\'' << Arg.getAsIdentifier() << '\'';
     break;
+
+  case DiagnosticArgumentKind::ObjCSelector:
+    assert(Modifier.empty() && "Improper modifier for selector argument");
+    Out << '\'' << Arg.getAsObjCSelector() << '\'';
+    break;
+
   case DiagnosticArgumentKind::Type:
     assert(Modifier.empty() && "Improper modifier for Type argument");
     Out << '\'' << Arg.getAsType() << '\'';

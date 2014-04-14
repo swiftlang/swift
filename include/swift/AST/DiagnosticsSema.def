@@ -1107,7 +1107,7 @@ ERROR(objc_invalid_on_func_result_type,sema_objc,none,
 
 ERROR(objc_override_name_mismatch,sema_objc,none,
       "declaration has a different @objc name than the declaration it "
-      "overrides ('%0' vs. '%1')", (StringRef, StringRef))
+      "overrides (%0 vs. %1)", (ObjCSelector, ObjCSelector))
 
 //------------------------------------------------------------------------------
 // @availability

@@ -1460,8 +1460,8 @@ StringRef ClassDecl::getObjCRuntimeName(
                        llvm::SmallVectorImpl<char> &buffer) {
   // If there is an 'objc' attribute with a name, use that name.
   if (auto objc = getAttrs().getAttribute<ObjCAttr>()) {
-    if (objc->getKind() == ObjCAttr::Nullary)
-      return objc->getNames().front().str();
+    if (auto name = objc->getName())
+      return name->getString(buffer);
   }
 
   // Produce the mangled name for this class.
@@ -1585,8 +1585,8 @@ StringRef ProtocolDecl::getObjCRuntimeName(
                           llvm::SmallVectorImpl<char> &buffer) {
   // If there is an 'objc' attribute with a name, use that name.
   if (auto objc = getAttrs().getAttribute<ObjCAttr>()) {
-    if (objc->getKind() == ObjCAttr::Nullary)
-      return objc->getNames().front().str();
+    if (auto name = objc->getName())
+      return name->getString(buffer);
   }
 
   // Produce the mangled name for this protocol.
@@ -1675,8 +1675,8 @@ getObjCGetterSelector(SmallVectorImpl<char> &buffer) const {
   // If the getter has an @objc attribute with a name, use that.
   if (auto getter = getGetter()) {
     if (auto objcAttr = getter->getAttrs().getAttribute<ObjCAttr>()) {
-      if (objcAttr->hasName())
-        return objcAttr->getName(buffer);
+      if (auto name = objcAttr->getName())
+        return name->getString(buffer);
     }
   }
 
@@ -1706,8 +1706,8 @@ StringRef AbstractStorageDecl::getObjCSetterSelector(SmallVectorImpl<char> &buff
   // If the setter has an @objc attribute with a name, use that.
   if (auto setter = getSetter()) {
     if (auto objcAttr = setter->getAttrs().getAttribute<ObjCAttr>()) {
-      if (objcAttr->hasName())
-        return objcAttr->getName(buffer);
+      if (auto name = objcAttr->getName())
+        return name->getString(buffer);
     }
   }
 
@@ -2343,8 +2343,8 @@ StringRef FuncDecl::getObjCSelector(SmallVectorImpl<char> &buffer) const {
 
   // If there is an @objc attribute with a name, use that name.
   if (auto objc = getAttrs().getAttribute<ObjCAttr>()) {
-    if (objc->hasName())
-      return objc->getName(buffer);
+    if (auto name = objc->getName())
+      return name->getString(buffer);
   }
 
   assert(buffer.empty());
@@ -2465,8 +2465,8 @@ StringRef
 ConstructorDecl::getObjCSelector(SmallVectorImpl<char> &buffer) const {
   // If there is an @objc attribute with a name, use that name.
   if (auto objc = getAttrs().getAttribute<ObjCAttr>()) {
-    if (objc->hasName())
-      return objc->getName(buffer);
+    if (auto name = objc->getName())
+      return name->getString(buffer);
   }
 
   assert(buffer.empty());

@@ -37,6 +37,19 @@ raw_ostream &llvm::operator<<(raw_ostream &OS, DeclName I) {
   return OS;
 }
 
+raw_ostream &llvm::operator<<(raw_ostream &OS, swift::ObjCSelector S) {
+  unsigned n = S.getNumArgs();
+  if (n == 0) {
+    OS << S.getSelectorPieces()[0];
+    return OS;
+  }
+
+  for (auto piece : S.getSelectorPieces()) {
+    OS << piece << ':';
+  }
+  return OS;
+}
+
 bool Identifier::isOperatorSlow() const {
   StringRef data = str();
   auto *s = reinterpret_cast<UTF8 const *>(data.begin()),
@@ -52,3 +65,36 @@ bool Identifier::isOperatorSlow() const {
 void DeclName::dump() {
   llvm::errs() << *this << "\n";
 }
+
+ObjCSelector::ObjCSelector(ASTContext &ctx, unsigned numArgs,
+                           ArrayRef<Identifier> pieces) {
+  if (numArgs == 0) {
+    assert(pieces.size() == 1 && "No-argument selector requires one piece");
+    Storage = DeclName(pieces[0]);
+    return;
+  }
+
+  assert(numArgs == pieces.size() && "Wrong number of selector pieces");
+  Storage = DeclName(ctx, Identifier(), pieces);
+}
+
+StringRef ObjCSelector::getString(llvm::SmallVectorImpl<char> &scratch) const {
+  // Fast path for zero-argument selectors.
+  if (getNumArgs() == 0) {
+    auto name = getSelectorPieces()[0];
+    if (name.empty())
+      return "_";
+    return name.str();
+  }
+
+  scratch.clear();
+  llvm::raw_svector_ostream os(scratch);
+  os << *this;
+  return os.str();
+}
+
+void ObjCSelector::dump() {
+  llvm::errs() << *this << "\n";
+}
+
+
