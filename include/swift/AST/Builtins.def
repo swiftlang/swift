@@ -153,8 +153,8 @@ BUILTIN_BINARY_PREDICATE(FCMP_UNO, "fcmp_uno", "n", FloatOrVector)
 /// Load has type (Builtin.RawPointer) -> T
 BUILTIN_SIL_OPERATION(Load, "load", Special)
 
-/// Move has type (Builtin.RawPointer) -> T
-BUILTIN_SIL_OPERATION(Move, "move", Special)
+/// Take has type (Builtin.RawPointer) -> T
+BUILTIN_SIL_OPERATION(Take, "take", Special)
 
 /// Destroy has type (T.Type, Builtin.RawPointer) -> ()
 BUILTIN_SIL_OPERATION(Destroy, "destroy", Special)

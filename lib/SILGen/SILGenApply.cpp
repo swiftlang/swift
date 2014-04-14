@@ -2080,8 +2080,8 @@ namespace {
     CallEmission &operator=(const CallEmission &) = delete;
   };
 
-  /// Specialized emitter for Builtin.load and Builtin.move.
-  static ManagedValue emitBuiltinLoadOrMove(SILGenFunction &gen,
+  /// Specialized emitter for Builtin.load and Builtin.take.
+  static ManagedValue emitBuiltinLoadOrTake(SILGenFunction &gen,
                                             SILLocation loc,
                                             ArrayRef<Substitution> substitutions,
                                             ArrayRef<ManagedValue> args,
@@ -2108,15 +2108,15 @@ namespace {
                                       ArrayRef<Substitution> substitutions,
                                       ArrayRef<ManagedValue> args,
                                       SGFContext C) {
-    return emitBuiltinLoadOrMove(gen, loc, substitutions, args, C, IsNotTake);
+    return emitBuiltinLoadOrTake(gen, loc, substitutions, args, C, IsNotTake);
   }
 
-  static ManagedValue emitBuiltinMove(SILGenFunction &gen,
+  static ManagedValue emitBuiltinTake(SILGenFunction &gen,
                                       SILLocation loc,
                                       ArrayRef<Substitution> substitutions,
                                       ArrayRef<ManagedValue> args,
                                       SGFContext C) {
-    return emitBuiltinLoadOrMove(gen, loc, substitutions, args, C, IsTake);
+    return emitBuiltinLoadOrTake(gen, loc, substitutions, args, C, IsTake);
   }
 
   /// Specialized emitter for Builtin.destroy.
