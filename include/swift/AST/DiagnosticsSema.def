@@ -659,7 +659,7 @@ ERROR(bad_init_ref_base,sema_tce, none,
       "'init' can only refer to the initializers of "
       "'self'%select{| or 'super'}0", (bool))
 ERROR(init_delegation_outside_initializer,sema_tce,none,
-      "initializer delegation can only occur within an initiailizer", ())
+      "initializer delegation can only occur within an initializer", ())
 ERROR(init_delegates_and_chains,sema_tce,none,
       "initializer cannot both delegate ('self.init') and chain to a "
       "superclass initializer ('super.init')", ())
