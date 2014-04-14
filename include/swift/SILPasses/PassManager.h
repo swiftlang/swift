@@ -45,9 +45,6 @@ namespace swift {
     /// The number of passes run so far.
     unsigned NumPassesRun = 0;
 
-    /// The number of times we've rescheduled to run again.
-    unsigned NumRescheduleIterations = 0;
-
   public:
     /// C'tor
     SILPassManager(SILModule *M, SILOptions Opts) :
@@ -86,10 +83,7 @@ namespace swift {
     void runOneIteration();
 
     /// \brief Request another invocation of the transformation pipeline.
-    void scheduleAnotherIteration() { 
-      if (!anotherIteration && ++NumRescheduleIterations < 25)
-        anotherIteration = true; 
-    }
+    void scheduleAnotherIteration() { anotherIteration = true; }
 
     ///  \brief Broadcast the invalidation of the module to all analysis.
     void invalidateAnalysis(SILAnalysis::InvalidationKind K) {
