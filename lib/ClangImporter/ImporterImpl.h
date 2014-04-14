@@ -335,7 +335,8 @@ public:
 
   /// \brief Keep track of initializer declarations that correspond to
   /// imported methods.
-  llvm::DenseMap<std::pair<FuncDecl *, DeclContext *>, ConstructorDecl *> 
+  llvm::DenseMap<std::pair<const clang::ObjCMethodDecl *, DeclContext *>,
+                 ConstructorDecl *>
     Constructors;
 
 private:

@@ -1707,7 +1707,19 @@ namespace {
     }
 
     Decl *VisitObjCMethodDecl(const clang::ObjCMethodDecl *decl,
-                              DeclContext *dc, bool forceClassMethod = false) {
+                              DeclContext *dc,
+                              bool forceClassMethod = false) {
+      // If we have an init method, import it as an initializer.
+      if (decl->getMethodFamily() == clang::OMF_init &&
+          isReallyInitMethod(decl)) {
+        // Cannot force initializers into class methods.
+        if (forceClassMethod)
+          return nullptr;
+
+        return importConstructor(decl, dc, /*isImplicit=*/false,
+                                 /*isConvenienceInit=*/false);
+      }
+
       DeclName name = Impl.importName(decl->getSelector(),
                                       /*isInitializer=*/false);
       if (!name)
@@ -1848,10 +1860,7 @@ namespace {
             !Impl.ImportedDecls[decl->getCanonicalDecl()])
           Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
 
-        if (decl->getMethodFamily() != clang::OMF_init ||
-            !isReallyInitMethod(decl)) {
-          importSpecialMethod(result, dc);
-        }
+        importSpecialMethod(result, dc);
       }
       return result;
     }
@@ -1901,12 +1910,6 @@ namespace {
         return nullptr;
 
       case clang::OMF_init:
-        // An init instance method can be a constructor.
-        if (isReallyInitMethod(objcMethod))
-          return importConstructor(decl, objcMethod, dc, /*implicit=*/false,
-                                   /*isConvenienceInit=*/false);
-        return nullptr;
-
       case clang::OMF_new:
       case clang::OMF_alloc:
       case clang::OMF_autorelease:
@@ -1979,17 +1982,7 @@ namespace {
 
       // Set constructor override.
       auto swiftCtor = cast<ConstructorDecl>(swiftMethod);
-
-      // If the superclass lookup found a method, not a constructor, try to
-      // map to the constructor.
-      auto superCtor = dyn_cast<ConstructorDecl>(superMethod);
-      if (!superCtor) {
-        superCtor = dyn_cast_or_null<ConstructorDecl>(
-                      importSpecialMethod(superMethod,
-                                          superMethod->getDeclContext()));
-        if (!superCtor)
-          return;
-      }
+      auto superCtor = cast<ConstructorDecl>(superMethod);
       swiftCtor->setOverriddenDecl(superCtor);
     }
 
@@ -2002,8 +1995,7 @@ namespace {
     /// // in objc: [[NSArray alloc] initWithCapacity:1024]
     /// NSArray(withCapacity: 1024)
     /// \endcode
-    ConstructorDecl *importConstructor(Decl *decl,
-                                       const clang::ObjCMethodDecl *objcMethod,
+    ConstructorDecl *importConstructor(const clang::ObjCMethodDecl *objcMethod,
                                        DeclContext *dc,
                                        bool implicit,
                                        bool isConvenienceInit) {
@@ -2017,8 +2009,7 @@ namespace {
       assert(isReallyInitMethod(objcMethod) && "Not a real init method");
 
       // Check whether we've already created the constructor.
-      FuncDecl *init = cast<FuncDecl>(decl);
-      auto known = Impl.Constructors.find({init, dc});
+      auto known = Impl.Constructors.find({objcMethod, dc});
       if (known != Impl.Constructors.end())
         return known->second;
 
@@ -2034,8 +2025,7 @@ namespace {
         interface = objcMethod->getClassInterface();
       }
 
-
-      auto loc = decl->getLoc();
+      SourceLoc loc;
       auto name = Impl.importName(objcMethod->getSelector(), 
                                   /*isInitializer=*/true);
 
@@ -2060,10 +2050,11 @@ namespace {
                                           &hasSelectorStyleSignature,
                                           name,
                                           SpecialMethodKind::Constructor);
-      assert(type && "Type has already been successfully converted?");
+      if (!type)
+        return nullptr;
 
       // Check whether we've already created the constructor.
-      known = Impl.Constructors.find({init, dc});
+      known = Impl.Constructors.find({objcMethod, dc});
       if (known != Impl.Constructors.end())
         return known->second;
 
@@ -2121,7 +2112,7 @@ namespace {
       }
 
       // Record the constructor for future re-use.
-      Impl.Constructors[{init, dc}] = result;
+      Impl.Constructors[{objcMethod, dc}] = result;
 
       // If this constructor overrides another constructor, mark it as such.
       recordObjCMethodOverride(result, objcMethod);
@@ -2842,11 +2833,6 @@ namespace {
           if (auto special = importSpecialMethod(member, swiftContext)) {
             if (knownMembers.insert(special))
               members.push_back(special);
-
-            // If we imported a constructor, the underlying init method is not
-            // visible.
-            if (isa<ConstructorDecl>(special))
-              continue;
           }
 
           // Objective-C root class instance methods are reflected on the
@@ -3038,12 +3024,10 @@ namespace {
                                 (*meth)->isInstanceMethod(),
                                 objcClass) &&
               knownSelectors.insert((*meth)->getSelector())) {
-                if (auto imported = Impl.importDecl(*meth)) {
-                  if (auto special = importConstructor(imported, *meth, dc,
-                                                       /*implicit=*/true,
-                                                       isConvenienceInit)) {
-                    members.push_back(special);
-                  }
+                if (auto special = importConstructor(*meth, dc,
+                                                     /*implicit=*/true,
+                                                     isConvenienceInit)) {
+                  members.push_back(special);
                 }
               }
         }
