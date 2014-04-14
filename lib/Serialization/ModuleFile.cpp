@@ -245,7 +245,8 @@ ModuleFile::readDeclTable(ArrayRef<uint64_t> fields, StringRef blobData) {
   auto base = reinterpret_cast<const uint8_t *>(blobData.data());
 
   using OwnedTable = std::unique_ptr<SerializedDeclTable>;
-  return OwnedTable(SerializedDeclTable::Create(base + tableOffset, base));
+  return OwnedTable(SerializedDeclTable::Create(base + tableOffset,
+                                                base + sizeof(uint32_t), base));
 }
 
 static Optional<KnownProtocolKind> getActualKnownProtocol(unsigned rawKind) {
@@ -437,8 +438,9 @@ ModuleFile::readDeclCommentTable(ArrayRef<uint64_t> fields,
   auto base = reinterpret_cast<const uint8_t *>(blobData.data());
 
   return std::unique_ptr<SerializedDeclCommentTable>(
-      SerializedDeclCommentTable::Create(base + tableOffset, base,
-          DeclCommentTableInfo(*this)));
+    SerializedDeclCommentTable::Create(base + tableOffset,
+                                       base + sizeof(uint32_t), base,
+                                       DeclCommentTableInfo(*this)));
 }
 
 bool ModuleFile::readCommentBlock(llvm::BitstreamCursor &cursor) {

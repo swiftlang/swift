@@ -19,8 +19,7 @@
 
 // This template should eventually move to llvm/Support.
 namespace clang {
-  template <typename Info>
-  class OnDiskChainedHashTable;
+  template <typename Info> class OnDiskIterableChainedHashTable;
 }
 
 namespace swift {
@@ -34,7 +33,8 @@ namespace swift {
     llvm::BitstreamCursor SILIndexCursor;
 
     class FuncTableInfo;
-    using SerializedFuncTable = clang::OnDiskChainedHashTable<FuncTableInfo>;
+    using SerializedFuncTable =
+      clang::OnDiskIterableChainedHashTable<FuncTableInfo>;
 
     std::unique_ptr<SerializedFuncTable> FuncTable;
     std::vector<ModuleFile::PartiallySerialized<SILFunction*>> Funcs;
