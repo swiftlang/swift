@@ -3562,19 +3562,20 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
 Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
                                 ConstraintLocatorBuilder locator) {
   TypeChecker &tc = cs.getTypeChecker();
-
-  // Handle applications that implicitly look through UncheckedOptional<T>.
+  
   auto fn = apply->getFn();
-  if (auto fnTy = cs.lookThroughUncheckedOptionalType(fn->getType())) {
-    fn = coerceUncheckedOptionalToValue(fn, fnTy, locator);
-    if (!fn) return nullptr;
-  }
-
+  
   // The function is always an rvalue.
   fn = tc.coerceToRValue(fn);
   assert(fn && "Rvalue conversion failed?");
   if (!fn)
     return nullptr;
+  
+  // Handle applications that implicitly look through UncheckedOptional<T>.
+  if (auto fnTy = cs.lookThroughUncheckedOptionalType(fn->getType())) {
+    fn = coerceUncheckedOptionalToValue(fn, fnTy, locator);
+    if (!fn) return nullptr;
+  }
 
   // If we're applying a function that resulted from a covariant
   // function conversion, strip off that conversion.
