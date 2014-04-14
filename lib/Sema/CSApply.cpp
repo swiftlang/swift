@@ -3398,20 +3398,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       return Closure;
     }
 
-    // Coercion to a block function type from non-block function type.
-    auto fromFunc = fromType->getAs<FunctionType>();
-    if (toFunc->getRepresentation() == FunctionType::Representation::Block
-        && (!fromFunc || fromFunc->getRepresentation() != FunctionType::Representation::Block)) {
-      // Coerce the expression to the non-block form of the function type.
-      auto toNonBlockTy = FunctionType::get(toFunc->getInput(),
-                                            toFunc->getResult());
-      expr = coerceToType(expr, toNonBlockTy, locator);
-
-      // Bridge to the block form of this function type.
-      return new (tc.Context) BridgeToBlockExpr(expr, toType);
-    }
-
     // Coercion from one function type to another.
+    auto fromFunc = fromType->getAs<FunctionType>();
     if (fromFunc) {
       return new (tc.Context) FunctionConversionExpr(expr, toType);
     }

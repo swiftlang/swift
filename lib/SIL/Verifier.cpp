@@ -1518,7 +1518,7 @@ public:
     require(opTI->getAbstractCC() == resTI->getAbstractCC(),
             "convert_function cannot change function cc");
     require(opTI->getRepresentation() == resTI->getRepresentation(),
-            "convert_function cannot change function thinness");
+            "convert_function cannot change function representation");
   }
 
   void checkCondFailInst(CondFailInst *CFI) {

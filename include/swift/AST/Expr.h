@@ -1708,18 +1708,6 @@ public:
   }
 };
   
-/// BridgeToBlockExpr - FIXME: A hack to represent limited Swift closure to
-/// ObjC block conversion.
-class BridgeToBlockExpr : public ImplicitConversionExpr {
-public:
-  BridgeToBlockExpr(Expr *subExpr, Type ty)
-    : ImplicitConversionExpr(ExprKind::BridgeToBlock, subExpr, ty) {}
-  
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::BridgeToBlock;
-  }
-};
-  
 /// Convert an lvalue to an lvalue of a different type using a pair of
 /// conversion functions.
 class LValueConversionExpr : public ImplicitConversionExpr {

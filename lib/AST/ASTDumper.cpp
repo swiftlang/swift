@@ -1342,11 +1342,6 @@ public:
     printRec(E->getSubExpr());
     OS << ')';
   }
-  void visitBridgeToBlockExpr(BridgeToBlockExpr *E) {
-    printCommon(E, "bridge_to_block") << '\n';
-    printRec(E->getSubExpr());
-    OS << ')';
-  }
   void visitLValueToPointerExpr(LValueToPointerExpr *E) {
     printCommon(E, "lvalue_to_pointer") << '\n';
     printRec(E->getSubExpr());

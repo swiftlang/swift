@@ -2049,9 +2049,9 @@ Type TypeConverter::getLoweredBridgedType(Type t, AbstractCC cc) {
 static bool isCPointerType(TypeConverter &TC,
                            Type ty) {
   auto nom = ty->getNominalOrBoundGenericNominal();
-  return nom == TC.getCMutablePointerDecl()
+  return nom && (nom == TC.getCMutablePointerDecl()
     || nom == TC.getObjCMutablePointerDecl()
-    || nom == TC.getCConstPointerDecl();
+    || nom == TC.getCConstPointerDecl());
 }
 
 Type TypeConverter::getLoweredCBridgedType(Type t) {

@@ -211,7 +211,6 @@ namespace {
     RValue visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E,
                                             SGFContext C);
     RValue visitInjectIntoOptionalExpr(InjectIntoOptionalExpr *E, SGFContext C);
-    RValue visitBridgeToBlockExpr(BridgeToBlockExpr *E, SGFContext C);
     RValue visitLValueConversionExpr(LValueConversionExpr *E, SGFContext C);
     RValue visitLValueToPointerExpr(LValueToPointerExpr *E, SGFContext C);
     RValue visitIfExpr(IfExpr *E, SGFContext C);
@@ -899,14 +898,126 @@ RValue RValueEmitter::visitArchetypeToSuperExpr(ArchetypeToSuperExpr *E,
   return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(base));
 }
 
+/// Bridge a native function to a block with a thunk.
+static ManagedValue emitFuncToBlock(SILGenFunction &gen,
+                                    SILLocation loc,
+                                    ManagedValue fn,
+                                    CanSILFunctionType blockTy) {
+  // FIXME: Use the old bridge_to_block instruction as a stopgap to produce the
+  // block until we can natively construct them.
+  auto block = gen.B.createBridgeToBlock(loc, fn.forward(gen),
+                                   SILType::getPrimitiveObjectType(blockTy));
+  return gen.emitManagedRValueWithCleanup(block);
+}
+
+static void buildBlockToFuncThunkBody(SILGenFunction &gen,
+                                      SILLocation loc,
+                                      CanSILFunctionType blockTy,
+                                      CanSILFunctionType funcTy) {
+  // Collect the native arguments, which should all be +1.
+  Scope scope(gen.Cleanups, CleanupLocation::getCleanupLocation(loc));
+  
+  assert(blockTy->getInterfaceParameters().size()
+           == funcTy->getInterfaceParameters().size()
+         && "block and function types don't match");
+  
+  SmallVector<ManagedValue, 4> args;
+  SILBasicBlock *entry = gen.F.begin();
+  for (unsigned i : indices(funcTy->getInterfaceParameters())) {
+    auto &param = funcTy->getInterfaceParameters()[i];
+    auto &blockParam = blockTy->getInterfaceParameters()[i];
+    
+    auto &tl = gen.getTypeLowering(param.getSILType());
+    assert((tl.isTrivial()
+              ? param.getConvention() == ParameterConvention::Direct_Unowned
+              : param.getConvention() == ParameterConvention::Direct_Owned)
+           && "nonstandard conventions for native functions not implemented");
+    SILValue v = new (gen.SGM.M) SILArgument(param.getSILType(), entry);
+    auto mv = gen.emitManagedRValueWithCleanup(v, tl);
+    args.push_back(gen.emitNativeToBridgedValue(loc, mv, AbstractCC::C,
+                                        param.getType(), param.getType(),
+                                        blockParam.getType()));
+  }
+  
+  // Add the block argument.
+  assert(blockTy->getRepresentation()
+            == FunctionType::Representation::Block
+         && "block-to-func thunk did not get a block as last argument?");
+  SILValue blockV
+    = new (gen.SGM.M) SILArgument(SILType::getPrimitiveObjectType(blockTy),
+                                  entry);
+  ManagedValue block = gen.emitManagedRValueWithCleanup(blockV);
+  
+  // Call the block.
+  assert(!funcTy->hasIndirectResult()
+         && "block thunking func with indirect result not supported");
+  ManagedValue result = gen.emitMonomorphicApply(loc, block, args,
+                         funcTy->getSILInterfaceResult().getSwiftRValueType());
+  
+  // Return the result at +1.
+  auto &resultTL = gen.getTypeLowering(funcTy->getSILInterfaceResult());
+  auto convention = funcTy->getInterfaceResult().getConvention();
+  assert((resultTL.isTrivial()
+           ? convention == ResultConvention::Unowned
+           : convention == ResultConvention::Owned)
+         && "nonstandard conventions for return not implemented");
+  
+  auto r = result.forward(gen);
+  scope.pop();
+  gen.B.createReturn(loc, r);
+}
+
+/// Bridge a native function to a block with a thunk.
+static ManagedValue emitBlockToFunc(SILGenFunction &gen,
+                                    SILLocation loc,
+                                    ManagedValue block,
+                                    CanSILFunctionType funcTy) {
+  CanSILFunctionType substFnTy;
+  SmallVector<Substitution, 4> subs;
+  
+  // Declare the thunk.
+  auto blockTy = block.getType().castTo<SILFunctionType>();
+  auto thunkTy = gen.buildThunkType(block, funcTy, substFnTy, subs);
+  auto thunk = gen.SGM.getOrCreateReabstractionThunk(loc,
+                                               gen.F.getContextGenericParams(),
+                                               thunkTy,
+                                               blockTy,
+                                               funcTy);
+  
+  // Build it if necessary.
+  if (thunk->empty()) {
+    SILGenFunction thunkSGF(gen.SGM, *thunk);
+    buildBlockToFuncThunkBody(thunkSGF, loc, blockTy, funcTy);
+  }
+  
+  // Create it in the current function.
+  auto thunkValue = gen.B.createFunctionRef(loc, thunk);
+  auto thunkedFn = gen.B.createPartialApply(loc, thunkValue,
+                                    SILType::getPrimitiveObjectType(substFnTy),
+                                    subs, block.forward(gen),
+                                    SILType::getPrimitiveObjectType(funcTy));
+  return gen.emitManagedRValueWithCleanup(thunkedFn);
+}
+
 RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
                                                   SGFContext C)
 {
   ManagedValue original = SGF.emitRValueAsSingleValue(e->getSubExpr());
   
+  // Break the conversion into two stages:
+  // - changing the signature within the representation
+  // - changing the representation
+  
+  // First, the signature:
+  
+  auto srcTy = e->getSubExpr()->getType()->castTo<FunctionType>();
+  CanAnyFunctionType destRepTy
+    = cast<FunctionType>(e->getType()->getCanonicalType());
+  CanAnyFunctionType destTy = CanFunctionType::get(
+       destRepTy.getInput(), destRepTy.getResult(),
+       destRepTy->getExtInfo().withRepresentation(srcTy->getRepresentation()));
+  
   // Retain the thinness of the original function type.
-  CanAnyFunctionType destTy =
-    cast<AnyFunctionType>(e->getType()->getCanonicalType());
   auto origRep = original.getType().castTo<SILFunctionType>()->getRepresentation();
   if (origRep != destTy->getRepresentation())
     destTy = adjustFunctionType(destTy, origRep);
@@ -920,6 +1031,45 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
     SILValue converted =
       SGF.B.createConvertFunction(e, original.getValue(), resultType);
     result = ManagedValue(converted, original.getCleanup());
+  }
+  
+  // Now, the representation:
+  
+  if (destRepTy != destTy) {
+    auto resultFTy = resultType.castTo<SILFunctionType>();
+    // The only currently possible representation changes are block -> thick and
+    // thick -> block.
+    switch (destRepTy->getRepresentation()) {
+    case AnyFunctionType::Representation::Block:
+      switch (resultFTy->getRepresentation()) {
+      case AnyFunctionType::Representation::Thin: {
+        // Make thick first.
+        auto v = SGF.B.createThinToThickFunction(e, result.getValue(),
+          SILType::getPrimitiveObjectType(
+           adjustFunctionType(resultFTy, FunctionType::Representation::Thick)));
+        result = ManagedValue(v, result.getCleanup());
+        SWIFT_FALLTHROUGH;
+      }
+      case AnyFunctionType::Representation::Thick:
+        // Convert to a block.
+        result = emitFuncToBlock(SGF, e, result,
+                       SGF.getLoweredType(destRepTy).castTo<SILFunctionType>());
+        break;
+      case AnyFunctionType::Representation::Block:
+        llvm_unreachable("should not try block-to-block repr change");
+      }
+      break;
+    case AnyFunctionType::Representation::Thick: {
+      assert(resultFTy->getRepresentation()
+               == FunctionType::Representation::Block
+             && "only block-to-thick repr changes supported");
+      result = emitBlockToFunc(SGF, e, result,
+                       SGF.getLoweredType(destRepTy).castTo<SILFunctionType>());
+      break;
+    }
+    case AnyFunctionType::Representation::Thin:
+      llvm_unreachable("not supported by sema");
+    }
   }
   
   return RValue(SGF, e, result);
@@ -3420,16 +3570,6 @@ RValue RValueEmitter::visitInjectIntoOptionalExpr(InjectIntoOptionalExpr *E,
   return RValue(SGF, E, result);
 }
 
-RValue RValueEmitter::visitBridgeToBlockExpr(BridgeToBlockExpr *E,
-                                             SGFContext C) {
-  auto func = visit(E->getSubExpr()).getScalarValue();
-
-  // Emit the bridge_to_block instruction.
-  SILValue block = SGF.B.createBridgeToBlock(E, func.forward(SGF),
-                                    SGF.getLoweredLoadableType(E->getType()));
-  return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(block));
-}
-
 RValue RValueEmitter::visitLValueConversionExpr(LValueConversionExpr *E,
                                                 SGFContext C) {
   llvm_unreachable("should only appear in lvalue contexts");
@@ -3559,107 +3699,6 @@ RValue RValueEmitter::visitDefaultValueExpr(DefaultValueExpr *E, SGFContext C) {
 //
 // Bridging
 //
-
-/// Bridge a native function to a block with a thunk.
-static ManagedValue emitBridgeFuncToBlock(SILGenFunction &gen,
-                                          SILLocation loc,
-                                          ManagedValue fn,
-                                          CanSILFunctionType blockTy) {
-  // FIXME: Use the old bridge_to_block instruction as a stopgap to produce the
-  // block until we can natively construct them.
-  auto block = gen.B.createBridgeToBlock(loc, fn.forward(gen),
-                                   SILType::getPrimitiveObjectType(blockTy));
-  return gen.emitManagedRValueWithCleanup(block);
-}
-
-static void buildBlockToFuncThunkBody(SILGenFunction &gen,
-                                      SILLocation loc,
-                                      CanSILFunctionType blockTy,
-                                      CanSILFunctionType funcTy) {
-  // Collect the native arguments, which should all be +1.
-  Scope scope(gen.Cleanups, CleanupLocation::getCleanupLocation(loc));
-  
-  assert(blockTy->getInterfaceParameters().size()
-           == funcTy->getInterfaceParameters().size()
-         && "block and function types don't match");
-  
-  SmallVector<ManagedValue, 4> args;
-  SILBasicBlock *entry = gen.F.begin();
-  for (unsigned i : indices(funcTy->getInterfaceParameters())) {
-    auto &param = funcTy->getInterfaceParameters()[i];
-    auto &blockParam = blockTy->getInterfaceParameters()[i];
-    
-    auto &tl = gen.getTypeLowering(param.getSILType());
-    assert((tl.isTrivial()
-              ? param.getConvention() == ParameterConvention::Direct_Unowned
-              : param.getConvention() == ParameterConvention::Direct_Owned)
-           && "nonstandard conventions for native functions not implemented");
-    SILValue v = new (gen.SGM.M) SILArgument(param.getSILType(), entry);
-    auto mv = gen.emitManagedRValueWithCleanup(v, tl);
-    args.push_back(gen.emitNativeToBridgedValue(loc, mv, AbstractCC::C,
-                                        param.getType(), param.getType(),
-                                        blockParam.getType()));
-  }
-  
-  // Add the block argument.
-  assert(blockTy->getRepresentation()
-            == FunctionType::Representation::Block
-         && "block-to-func thunk did not get a block as last argument?");
-  SILValue blockV
-    = new (gen.SGM.M) SILArgument(SILType::getPrimitiveObjectType(blockTy),
-                                  entry);
-  ManagedValue block = gen.emitManagedRValueWithCleanup(blockV);
-  
-  // Call the block.
-  assert(!funcTy->hasIndirectResult()
-         && "block thunking func with indirect result not supported");
-  ManagedValue result = gen.emitMonomorphicApply(loc, block, args,
-                         funcTy->getSILInterfaceResult().getSwiftRValueType());
-  
-  // Return the result at +1.
-  auto &resultTL = gen.getTypeLowering(funcTy->getSILInterfaceResult());
-  auto convention = funcTy->getInterfaceResult().getConvention();
-  assert((resultTL.isTrivial()
-           ? convention == ResultConvention::Unowned
-           : convention == ResultConvention::Owned)
-         && "nonstandard conventions for return not implemented");
-  
-  auto r = result.forward(gen);
-  scope.pop();
-  gen.B.createReturn(loc, r);
-}
-
-/// Bridge a native function to a block with a thunk.
-static ManagedValue emitBridgeBlockToFunc(SILGenFunction &gen,
-                                          SILLocation loc,
-                                          ManagedValue block,
-                                          CanSILFunctionType funcTy) {
-  CanSILFunctionType substFnTy;
-  SmallVector<Substitution, 4> subs;
-  
-  // Declare the thunk.
-  auto blockTy = block.getType().castTo<SILFunctionType>();
-  auto thunkTy = gen.buildThunkType(block, funcTy, substFnTy, subs);
-  auto thunk = gen.SGM.getOrCreateReabstractionThunk(loc,
-                                               gen.F.getContextGenericParams(),
-                                               thunkTy,
-                                               blockTy,
-                                               funcTy);
-  
-  // Build it if necessary.
-  if (thunk->empty()) {
-    SILGenFunction thunkSGF(gen.SGM, *thunk);
-    buildBlockToFuncThunkBody(thunkSGF, loc, blockTy, funcTy);
-  }
-  
-  // Create it in the current function.
-  auto thunkValue = gen.B.createFunctionRef(loc, thunk);
-  auto thunkedFn = gen.B.createPartialApply(loc, thunkValue,
-                                    SILType::getPrimitiveObjectType(substFnTy),
-                                    subs, block.forward(gen),
-                                    SILType::getPrimitiveObjectType(funcTy));
-  return gen.emitManagedRValueWithCleanup(thunkedFn);
-}
 
 static ManagedValue emitBridgeStringToNSString(SILGenFunction &gen,
                                                SILLocation loc,
@@ -4096,7 +4135,7 @@ static ManagedValue emitNativeToCBridgedValue(SILGenFunction &gen,
     auto nativeFTy = cast<SILFunctionType>(loweredNativeTy);
     
     if (nativeFTy->getRepresentation() != FunctionType::Representation::Block)
-      return emitBridgeFuncToBlock(gen, loc, v, bridgedFTy);
+      return emitFuncToBlock(gen, loc, v, bridgedFTy);
   }
       
   return v;
@@ -4166,7 +4205,7 @@ static ManagedValue emitCBridgedToNativeValue(SILGenFunction &gen,
     auto nativeFTy = cast<SILFunctionType>(loweredNativeTy);
     
     if (nativeFTy->getRepresentation() != FunctionType::Representation::Block)
-      return emitBridgeBlockToFunc(gen, loc, v, nativeFTy);
+      return emitBlockToFunc(gen, loc, v, nativeFTy);
   }
   
   return v;
