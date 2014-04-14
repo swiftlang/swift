@@ -107,6 +107,14 @@ void Pattern::collectVariables(SmallVectorImpl<VarDecl *> &variables) const {
   forEachVariable([&](VarDecl *VD) { variables.push_back(VD); });
 }
 
+VarDecl *Pattern::getSingleVar() const {
+  auto pattern = getSemanticsProvidingPattern();
+  if (auto named = dyn_cast<NamedPattern>(pattern))
+    return named->getDecl();
+
+  return nullptr;
+}
+
 /// \brief apply the specified function to all variables referenced in this
 /// pattern.
 void Pattern::forEachVariable(const std::function<void(VarDecl*)> &fn) const {

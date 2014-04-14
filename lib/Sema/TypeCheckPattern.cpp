@@ -683,7 +683,14 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
   // For wildcard and name patterns, just set the type.
   case PatternKind::Named: {
     NamedPattern *NP = cast<NamedPattern>(P);
-    NP->getDecl()->overwriteType(type);
+    VarDecl *var = NP->getDecl();
+    var->overwriteType(type);
+    if (var->getAttrs().isIBOutlet()) {
+      checkIBOutlet(var);
+    }
+    if (var->getAttrs().hasOwnership()) {
+      checkOwnershipAttr(var, var->getAttrs().getOwnership());
+    }
 
     if (type->is<InOutType>())
       NP->getDecl()->setLet(false);

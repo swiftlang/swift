@@ -255,6 +255,49 @@ void TypeChecker::checkDeclAttributes(Decl *D) {
   }
 }
 
+void TypeChecker::checkOwnershipAttr(VarDecl *var, Ownership ownershipKind) {
+  Type type = var->getType();
+
+  // Just stop if we've already processed this declaration.
+  if (type->is<ReferenceStorageType>())
+    return;
+
+  // A @weak variable must have type R?, possibly @unchecked, for
+  // some ownership-capable type R.
+  if (ownershipKind == Ownership::Weak) {
+    Type objType = type->getAnyOptionalObjectType();
+
+    // Use this special diagnostic if it's actually a reference type
+    // but just isn't Optional.
+    if (!objType && type->allowsOwnership()) {
+      diagnose(var->getStartLoc(),
+               diag::invalid_weak_ownership_not_optional,
+               OptionalType::get(type));
+      var->getMutableAttrs().clearOwnership();
+      return;
+    } else if (objType) {
+      type = objType;
+    }
+  }
+
+  if (!type->allowsOwnership()) {
+    // If we have an opaque type, suggest the possibility of adding
+    // a class bound.
+    if (type->isExistentialType() || type->is<ArchetypeType>()) {
+      diagnose(var->getStartLoc(), diag::invalid_ownership_opaque_type,
+               (unsigned) ownershipKind, type);
+    } else {
+      diagnose(var->getStartLoc(), diag::invalid_ownership_type,
+               (unsigned) ownershipKind, type);
+    }
+    var->getMutableAttrs().clearOwnership();
+    return;
+  }
+
+  // Change the type to the appropriate reference storage type.
+  var->overwriteType(ReferenceStorageType::get(type, ownershipKind, Context));
+}
+
 void TypeChecker::checkIBOutlet(VarDecl *VD) {
   const DeclAttributes &Attrs = VD->getAttrs();
   assert(Attrs.isIBOutlet() && "Only call when @IBOutlet is set");
@@ -276,10 +319,15 @@ void TypeChecker::checkIBOutlet(VarDecl *VD) {
   // If the variable has no type yet, we can't perform any validation.
   if (!VD->hasType())
     return;
-    
+
   // Validate the type of the @IBOutlet.
   auto type = VD->getType();
   bool isOptional = false;
+  Ownership ownership = Ownership::Strong;
+  if (auto refStorageType = type->getAs<ReferenceStorageType>()) {
+    ownership = refStorageType->getOwnership();
+    type = refStorageType->getReferentType();
+  }
   if (auto optObjectType = type->getAnyOptionalObjectType()) {
     isOptional = true;
     type = optObjectType;
@@ -308,18 +356,9 @@ void TypeChecker::checkIBOutlet(VarDecl *VD) {
   // If the type wasn't optional before, turn it into an @unchecked optional
   // now.
   if (!isOptional) {
-    VD->overwriteType(UncheckedOptionalType::get(type));
+    type = UncheckedOptionalType::get(type);
+    if (ownership != Ownership::Strong)
+      type = ReferenceStorageType::get(type, ownership, Context);
+    VD->overwriteType(type);
   }
-}
-
-bool TypeChecker::isIBOutlet(PatternBindingDecl *PBD) {
-  if (auto var = PBD->getSingleVar()) {
-    // FIXME: Some redundant checking here.
-    if (var->getAttrs().isIBOutlet()) {
-      checkIBOutlet(var);
-      return var->getAttrs().isIBOutlet();
-    }
-  }
-
-  return false;
 }

@@ -660,6 +660,10 @@ namespace {
         if (!forFunctionParam && var->getAttrs().isWeak()) {
           ty = CS.getTypeChecker().getOptionalType(var->getLoc(), ty);
           if (!ty) return Type();
+        // For @IBOutlet variables, use @unchecked T?.
+        } else if (var->getAttrs().isIBOutlet()) {
+          ty = CS.getTypeChecker().getUncheckedOptionalType(var->getLoc(), ty);
+          if (!ty) return Type();
         }
 
         // We want to set the variable's type here when type-checking
@@ -674,10 +678,26 @@ namespace {
         return ty;
       }
 
-      case PatternKind::Typed:
+      case PatternKind::Typed: {
+        auto typedPattern = cast<TypedPattern>(pattern);
+
         // For a typed pattern, simply return the opened type of the pattern.
         // FIXME: Error recovery if the type is an error type?
-        return CS.openType(cast<TypedPattern>(pattern)->getType());
+        Type openedType = CS.openType(typedPattern->getType());
+
+        // Somewhat crazy special case: add a level of UncheckedOptional
+        // if we don't have one and this pattern is directly bound to an
+        // IBOutlet.
+        if (auto var = typedPattern->getSingleVar()) {
+          if (var->getAttrs().isIBOutlet() &&
+              !openedType->getAnyOptionalObjectType()) {
+            openedType = CS.getTypeChecker()
+                           .getUncheckedOptionalType(var->getLoc(), openedType);
+            if (!openedType) return Type();
+          }
+        }
+        return openedType;
+      }
 
       case PatternKind::Tuple: {
         auto tuplePat = cast<TuplePattern>(pattern);

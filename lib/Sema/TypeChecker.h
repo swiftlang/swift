@@ -299,6 +299,7 @@ public:
 
   Type getArraySliceType(SourceLoc loc, Type elementType);
   Type getOptionalType(SourceLoc loc, Type elementType);
+  Type getUncheckedOptionalType(SourceLoc loc, Type elementType);
   Expr *buildArrayInjectionFnRef(DeclContext *dc,
                                  ArraySliceType *sliceType,
                                  Type lenTy, SourceLoc Loc);
@@ -474,7 +475,7 @@ public:
   void typeCheckDecl(Decl *D, bool isFirstPass);
 
   void checkIBOutlet(VarDecl *D);
-  bool isIBOutlet(PatternBindingDecl *PBD);
+  void checkOwnershipAttr(VarDecl *D, Ownership ownershipKind);
   void checkDeclAttributesEarly(Decl *D);
   void checkDeclAttributes(Decl *D);
 

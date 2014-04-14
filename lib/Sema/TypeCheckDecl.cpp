@@ -1151,11 +1151,12 @@ static void validatePatternBindingDecl(TypeChecker &tc,
     auto type = binding->getPattern()->getType();
     if (!type->is<ErrorType>()) {
 
-      // If we have the @IBOutlet attribute, use it to adjust our type.
-      if (binding->getPattern()->hasType()) {
-        if (auto var = binding->getSingleVar())
-          if (var->getAttrs().isIBOutlet())
-            tc.checkIBOutlet(var);
+      // If we have a type-adjusting attribute, apply it now.
+      if (auto var = binding->getSingleVar()) {
+        if (var->getAttrs().isIBOutlet())
+          tc.checkIBOutlet(var);
+        if (var->getAttrs().hasOwnership())
+          tc.checkOwnershipAttr(var, var->getAttrs().getOwnership());
       }
 
       // Make sure we aren't @weak or have a 'let'.
@@ -1188,11 +1189,14 @@ static void validatePatternBindingDecl(TypeChecker &tc,
     }
   }
 
-  // If we have the @IBOutlet attribute, use it to adjust our type.
+  // If we have any type-adjusting attributes, apply them here.
   if (binding->getPattern()->hasType()) {
-    if (auto var = binding->getSingleVar())
+    if (auto var = binding->getSingleVar()) {
       if (var->getAttrs().isIBOutlet())
         tc.checkIBOutlet(var);
+      if (var->getAttrs().hasOwnership())
+        tc.checkOwnershipAttr(var, var->getAttrs().getOwnership());
+    }
   }
 
   // If we're in a generic type context, provide interface types for all of
@@ -5210,60 +5214,20 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
 
   // Ownership attributes (weak, unowned).
   if (Attrs.hasOwnership()) {
-    // Diagnostics expect:
-    //   0 - unowned
-    //   1 - weak
-    assert(unsigned(Attrs.isWeak()) + unsigned(Attrs.isUnowned()) == 1);
-    unsigned ownershipKind = (unsigned) Attrs.getOwnership();
+    assert(unsigned(Attrs.isWeak()) + unsigned(Attrs.isUnowned()) == 1 &&
+           "multiple ownership attributes present?");
 
     // Only 'var' declarations can have ownership.
     // TODO: captures, consts, etc.
-    VarDecl *VarD = dyn_cast<VarDecl>(D);
-    if (!VarD) {
+    VarDecl *var = dyn_cast<VarDecl>(D);
+    if (!var) {
       TC.diagnose(D->getStartLoc(), diag::invalid_ownership_decl,
-                  ownershipKind);
+                  (unsigned) Attrs.getOwnership());
       D->getMutableAttrs().clearOwnership();
       return;
     }
 
-    Type type = VarD->getType();
-
-    // A [weak] variable must have type R?, possibly @unchecked, for
-    // some ownership-capable type R.
-    if (Attrs.isWeak()) {
-      Type objType = type->getAnyOptionalObjectType();
-
-      // Use this special diagnostic if it's actually a reference type
-      // but just isn't Optional.
-      if (!objType && type->allowsOwnership()) {
-        TC.diagnose(VarD->getStartLoc(),
-                    diag::invalid_weak_ownership_not_optional,
-                    OptionalType::get(type));
-        VarD->getMutableAttrs().clearOwnership();
-        return;
-      } else if (objType) {
-        type = objType;
-      }
-    }
-
-    if (!type->allowsOwnership()) {
-      // If we have an opaque type, suggest the possibility of adding
-      // a class bound.
-      if (type->isExistentialType() || type->getAs<ArchetypeType>()) {
-        TC.diagnose(D->getStartLoc(), diag::invalid_ownership_opaque_type,
-                    ownershipKind, type);
-      } else {
-        TC.diagnose(D->getStartLoc(), diag::invalid_ownership_type,
-                    ownershipKind, type);
-      }
-      D->getMutableAttrs().clearOwnership();
-      return;
-    }
-
-    // Change the type to the appropriate reference storage type.
-    VarD->overwriteType(ReferenceStorageType::get(type,
-                                                Attrs.getOwnership(),
-                                                TC.Context));
+    TC.checkOwnershipAttr(var, Attrs.getOwnership());
   }
 
   if (Attrs.isIBInspectable()) {

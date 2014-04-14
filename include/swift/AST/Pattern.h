@@ -121,6 +121,10 @@ public:
   /// identifier if the pattern does not bind a name directly.
   Identifier getBoundName() const;
 
+  /// If this pattern binds a single variable without any
+  /// destructuring or conditionalizing, return that variable.
+  VarDecl *getSingleVar() const;
+
   SourceRange getSourceRange() const;
   SourceLoc getStartLoc() const { return getSourceRange().Start; }
   SourceLoc getEndLoc() const { return getSourceRange().End; }

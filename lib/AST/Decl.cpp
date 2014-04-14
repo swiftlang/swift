@@ -735,11 +735,7 @@ bool PatternBindingDecl::hasStorage() const {
 }
 
 VarDecl *PatternBindingDecl::getSingleVar() const {
-  auto pattern = getPattern()->getSemanticsProvidingPattern();
-  if (auto named = dyn_cast<NamedPattern>(pattern))
-    return named->getDecl();
-
-  return nullptr;
+  return getPattern()->getSingleVar();
 }
 
 SourceLoc TopLevelCodeDecl::getStartLoc() const {

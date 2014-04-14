@@ -50,6 +50,15 @@ Type TypeChecker::getOptionalType(SourceLoc loc, Type elementType) {
   return OptionalType::get(elementType);
 }
 
+Type TypeChecker::getUncheckedOptionalType(SourceLoc loc, Type elementType) {
+  if (!Context.getUncheckedOptionalDecl()) {
+    diagnose(loc, diag::sugar_type_not_found, 2);
+    return Type();
+  }
+
+  return UncheckedOptionalType::get(elementType);
+}
+
 Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl,
                                        DeclContext *fromDC,
                                        bool isSpecialized,
