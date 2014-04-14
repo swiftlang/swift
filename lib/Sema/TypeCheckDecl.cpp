@@ -4923,6 +4923,13 @@ void TypeChecker::addImplicitDestructor(ClassDecl *CD) {
   appendMembers(CD, DD);
 }
 
+void TypeChecker::addImplicitStructConformances(StructDecl *SD) {
+  // Type-check the protocol conformances of the struct decl to instantiate its
+  // derived conformances.
+  DeclChecker(*this, false, false)
+    .checkExplicitConformance(SD, SD->getDeclaredTypeInContext());
+}
+
 void TypeChecker::addImplicitEnumConformances(EnumDecl *ED) {
   // Type-check the raw values of the enum.
   for (auto elt : ED->getAllElements()) {
