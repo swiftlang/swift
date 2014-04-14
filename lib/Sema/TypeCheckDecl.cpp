@@ -5144,7 +5144,7 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
 
     if (error) {
       TC.diagnose(D->getStartLoc(), *error);
-      D->getMutableAttrs().removeAttribute(objcAttr);
+      const_cast<ObjCAttr *>(objcAttr)->setInvalid();
       return;
     }
 
@@ -5170,11 +5170,7 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
       } else if (isa<SubscriptDecl>(D)) {
       // Subscripts can never have names.
         TC.diagnose(objcAttr->getLParenLoc(), diag::objc_name_subscript);
-        D->getMutableAttrs().add(
-          ObjCAttr::createUnnamed(TC.Context,
-                                  objcAttr->AtLoc,
-                                  objcAttr->Range.Start));
-        D->getMutableAttrs().removeAttribute(objcAttr);
+        const_cast<ObjCAttr *>(objcAttr)->clearName();
       } else {
         // We have a function. Make sure that the number of parameters
         // matches the "number of colons" in the name.

@@ -45,7 +45,9 @@ raw_ostream &llvm::operator<<(raw_ostream &OS, swift::ObjCSelector S) {
   }
 
   for (auto piece : S.getSelectorPieces()) {
-    OS << piece << ':';
+    if (!piece.empty())
+      OS << piece;
+    OS << ":";
   }
   return OS;
 }
@@ -83,7 +85,7 @@ StringRef ObjCSelector::getString(llvm::SmallVectorImpl<char> &scratch) const {
   if (getNumArgs() == 0) {
     auto name = getSelectorPieces()[0];
     if (name.empty())
-      return "_";
+      return "";
     return name.str();
   }
 
