@@ -8,7 +8,7 @@ class Foo {}
 
 sil @_TFC10objc_block3FooD : $Foo -> ()
 
-sil @call_block : $(@cc(cdecl) @objc_block Foo -> Foo, Foo) -> Foo {
+sil @call_block : $@thin (@cc(cdecl) @objc_block Foo -> Foo, Foo) -> Foo {
 entry(%b : $@cc(cdecl) @objc_block Foo -> Foo, %x : $Foo):
   %y = apply %b(%x) : $@cc(cdecl) @objc_block Foo -> Foo
   return %y : $Foo
@@ -23,3 +23,13 @@ entry(%b : $@cc(cdecl) @objc_block Foo -> Foo, %x : $Foo):
 // CHECK:         %7 = bitcast i8* %6 to %C10objc_block3Foo*
 // CHECK:         ret %C10objc_block3Foo* %7
 // CHECK:       }
+
+sil @bridge_to_block_store : $@thin (@out @objc_block Foo -> Foo, @owned @callee_owned Foo -> Foo) -> () {
+entry(%o : $*@objc_block Foo -> Foo, %f : $@callee_owned Foo -> Foo):
+  %b = bridge_to_block %f : $@callee_owned Foo -> Foo to $@objc_block Foo -> Foo
+  store %b to %o : $*@objc_block Foo -> Foo
+  return undef : $()
+}
+// CHECK-LABEL: define void @bridge_to_block_store(%objc_block** noalias sret, i8*, %swift.refcounted*) {
+// CHECK:         %3 = call %objc_block* @_TTbXFdCb_dC10objc_block3Foo_dS0__(i8* %1, %swift.refcounted* %2)
+// CHECK:         store %objc_block* %3, %objc_block** %0, align 8

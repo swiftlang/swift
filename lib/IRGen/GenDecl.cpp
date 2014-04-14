@@ -1240,9 +1240,9 @@ IRGenModule::getAddrOfBridgeToBlockConverter(SILType blockType,
   // The block converter is a C function with signature
   // __typeof__(R (^)(A...)) converter(R (*)(A..., swift_refcounted*),
   //                                   swift_refcounted*)
-  // We simplify that to the llvm type %objc(i8*, %swift.refcounted*)*.
+  // We simplify that to the llvm type %block(i8*, %swift.refcounted*)*.
   llvm::Type *fnParams[] = {Int8PtrTy, RefCountedPtrTy};
-  llvm::FunctionType *fnType = llvm::FunctionType::get(ObjCPtrTy,
+  llvm::FunctionType *fnType = llvm::FunctionType::get(ObjCBlockPtrTy,
                                                        fnParams,
                                                        /*isVarArg=*/ false);
   
