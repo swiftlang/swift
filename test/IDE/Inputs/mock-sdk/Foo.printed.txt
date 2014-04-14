@@ -86,7 +86,7 @@ func fooFunc3(CInt, CFloat, CDouble, CMutablePointer<CInt>) -> CInt
   Very good
   fooFuncWithBlock function.
 */
-func fooFuncWithBlock((CFloat) -> CInt)
+func fooFuncWithBlock(@unchecked ((CFloat) -> CInt)?)
 
 /**
  * Aaa.  fooFuncWithComment1.  Bbb.

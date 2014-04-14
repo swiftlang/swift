@@ -39,7 +39,8 @@ using namespace swift;
 static bool shouldImportAsOptional(const clang::Type *type) {
   // Modifying this function isn't enough: you need to modify the
   // appropriate visitor case as well.
-  return type->isObjCObjectPointerType();
+  return type->isObjCObjectPointerType()
+    || type->isBlockPointerType();
 }
 
 namespace {
@@ -238,9 +239,10 @@ namespace {
       else
         rep = FunctionType::Representation::Block;
       
-      return FunctionType::get(fTy->getInput(), fTy->getResult(),
-                 fTy->getExtInfo()
-                   .withRepresentation(rep));
+      auto funcTy = FunctionType::get(fTy->getInput(), fTy->getResult(),
+                                      fTy->getExtInfo()
+                                        .withRepresentation(rep));
+      return getOptionalType(funcTy, kind);
     }
 
     Type VisitReferenceType(const clang::ReferenceType *type) {
@@ -560,7 +562,7 @@ namespace {
 
         return ProtocolCompositionType::get(Impl.SwiftContext, protocols);
       }
-
+      
       // Beyond here, we're using AnyObject.
       auto proto = Impl.SwiftContext.getProtocol(
                      KnownProtocolKind::AnyObject);

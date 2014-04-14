@@ -66,7 +66,7 @@ var fooIntVar: CInt
 func fooFunc1(_ a: CInt) -> CInt
 func fooFunc1AnonymousParam(_: CInt) -> CInt
 func fooFunc3(_ a: CInt, _ b: CFloat, _ c: CDouble, _ d: CMutablePointer<CInt>) -> CInt
-func fooFuncWithBlock(_ blk: (CFloat) -> CInt)
+func fooFuncWithBlock(_ blk: ((CFloat) -> CInt)?)
 
 /**
  * Aaa.  fooFuncWithComment1.  Bbb.
