@@ -3049,12 +3049,12 @@ public:
   bool usesObjCGetterAndSetter() const;
 
   /// Given that this is an Objective-C property or subscript declaration,
-  /// produce its getter selector in the given buffer (as UTF-8).
-  StringRef getObjCGetterSelector(SmallVectorImpl<char> &buffer) const;
+  /// produce its getter selector.
+  ObjCSelector getObjCGetterSelector() const;
 
   /// Given that this is an Objective-C property or subscript declaration,
-  /// produce its setter selector in the given buffer (as UTF-8).
-  StringRef getObjCSetterSelector(SmallVectorImpl<char> &buffer) const;
+  /// produce its setter selector.
+  ObjCSelector getObjCSetterSelector() const;
 
   AbstractStorageDecl *getOverriddenDecl() const {
     return OverriddenDecl.getPointer();
@@ -3373,7 +3373,7 @@ public:
   }
 
   /// Retrieve the Objective-C selector that names this method.
-  StringRef getObjCSelector(SmallVectorImpl<char> &buffer) const;
+  ObjCSelector getObjCSelector() const;
 
   /// Determine the default argument kind and type for the given argument index
   /// in this declaration, which must be a function or constructor.
@@ -3722,9 +3722,8 @@ public:
   /// return type.
   DynamicSelfType *getDynamicSelfInterface() const;
 
-  /// Given that this is an Objective-C method declaration, produce
-  /// its selector in the given buffer (as UTF-8).
-  StringRef getObjCSelector(SmallVectorImpl<char> &buffer) const;
+  /// Given that this is an Objective-C method declaration, get its selector.
+  ObjCSelector getObjCSelector() const;
 
   void getLocalCaptures(SmallVectorImpl<CaptureInfo::
                            LocalCaptureTy> &Result) const {
@@ -3955,9 +3954,8 @@ public:
   /// \brief Get the type of the constructed object.
   Type getResultType() const;
 
-  /// Given that this is an Objective-C method declaration, produce
-  /// its selector in the given buffer (as UTF-8).
-  StringRef getObjCSelector(SmallVectorImpl<char> &buffer) const;
+  /// Given that this is an Objective-C method declaration, get its selector.
+  ObjCSelector getObjCSelector() const;
 
   /// Get the type of the initializing constructor.
   Type getInitializerType() const { return InitializerType; }
@@ -4075,7 +4073,7 @@ public:
   /// Retrieve the Objective-C selector associated with the destructor.
   ///
   /// This is always "dealloc".
-  StringRef getObjCSelector(SmallVectorImpl<char> &buffer) const;
+  ObjCSelector getObjCSelector() const;
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Destructor;

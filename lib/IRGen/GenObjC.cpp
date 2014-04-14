@@ -312,18 +312,18 @@ namespace {
     Selector() = default;
 
     Selector(FuncDecl *method) {
-      Text = method->getObjCSelector(Buffer);
+      Text = method->getObjCSelector().getString(Buffer);
     }
     
     Selector(ConstructorDecl *ctor) {
-      Text = ctor->getObjCSelector(Buffer);
+      Text = ctor->getObjCSelector().getString(Buffer);
     }
     
     Selector(ValueDecl *methodOrCtorOrDtor) {
       if (auto *method = dyn_cast<FuncDecl>(methodOrCtorOrDtor)) {
-        Text = method->getObjCSelector(Buffer);
+        Text = method->getObjCSelector().getString(Buffer);
       } else if (auto *ctor = dyn_cast<ConstructorDecl>(methodOrCtorOrDtor)) {
-        Text = ctor->getObjCSelector(Buffer);
+        Text = ctor->getObjCSelector().getString(Buffer);
       } else if (isa<DestructorDecl>(methodOrCtorOrDtor)) {
         Text = "dealloc";
       } else {
@@ -333,11 +333,11 @@ namespace {
     }
     
     Selector(AbstractStorageDecl *asd, ForGetter_t) {
-      Text = asd->getObjCGetterSelector(Buffer);
+      Text = asd->getObjCGetterSelector().getString(Buffer);
     }
 
     Selector(AbstractStorageDecl *asd, ForSetter_t) {
-      Text = asd->getObjCSetterSelector(Buffer);
+      Text = asd->getObjCSetterSelector().getString(Buffer);
     }
 
     Selector(SILDeclRef ref) {
@@ -354,11 +354,13 @@ namespace {
         break;
           
       case SILDeclRef::Kind::Func:
-        Text = cast<FuncDecl>(ref.getDecl())->getObjCSelector(Buffer);
+        Text = cast<FuncDecl>(ref.getDecl())->getObjCSelector()
+                 .getString(Buffer);
         break;
 
       case SILDeclRef::Kind::Initializer:
-        Text = cast<ConstructorDecl>(ref.getDecl())->getObjCSelector(Buffer);
+        Text = cast<ConstructorDecl>(ref.getDecl())->getObjCSelector()
+                 .getString(Buffer);
         break;
 
       case SILDeclRef::Kind::IVarInitializer:

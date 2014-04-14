@@ -151,7 +151,8 @@ getDynamicResultSignature(ValueDecl *decl,
   Type type;
   if (auto func = dyn_cast<FuncDecl>(decl)) {
     // Handle functions.
-    selector = func->getObjCSelector(buffer);
+    // FIXME: Use ObjCSelector here!
+    selector = func->getObjCSelector().getString(buffer);
     type = decl->getType()->castTo<AnyFunctionType>()->getResult();
 
     // Append a '+' for static methods, '-' for instance methods. This
@@ -165,11 +166,11 @@ getDynamicResultSignature(ValueDecl *decl,
     selector = buffer.str();
   } else if (auto asd = dyn_cast<AbstractStorageDecl>(decl)) {
     // Handle properties and subscripts. Only the getter matters.
-    selector = asd->getObjCGetterSelector(buffer);
+    selector = asd->getObjCGetterSelector().getString(buffer);
     type = asd->getType();
   } else if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
     // Handle constructors.
-    selector = ctor->getObjCSelector(buffer);
+    selector = ctor->getObjCSelector().getString(buffer);
     type = decl->getType()->castTo<AnyFunctionType>()->getResult();
   } else {
     llvm_unreachable("Dynamic lookup found a non-[objc] result");

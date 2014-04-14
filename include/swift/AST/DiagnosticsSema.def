@@ -474,8 +474,8 @@ ERROR(override_decl_extension,sema_tcd,none,
 NOTE(overridden_here,sema_tcd,none,
      "overridden declaration is here", ())
 ERROR(override_objc_type_mismatch_method,sema_tcd,none,
-      "overriding method with selector '%0' has incompatible type %1", 
-      (StringRef, Type))
+      "overriding method with selector %0 has incompatible type %1",
+      (ObjCSelector, Type))
 ERROR(override_objc_type_mismatch_subscript,sema_tcd,none,
       "overriding %select{|indexed |keyed }0subscript with incompatible type "
       "%1",

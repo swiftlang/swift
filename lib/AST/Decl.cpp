@@ -1670,75 +1670,72 @@ void AbstractStorageDecl::setObservingAccessors(FuncDecl *Get,
   Set->makeAccessor(this, AccessorKind::IsSetter);
 }
 
-StringRef AbstractStorageDecl::
-getObjCGetterSelector(SmallVectorImpl<char> &buffer) const {
+ObjCSelector AbstractStorageDecl::getObjCGetterSelector() const {
   // If the getter has an @objc attribute with a name, use that.
   if (auto getter = getGetter()) {
     if (auto objcAttr = getter->getAttrs().getAttribute<ObjCAttr>()) {
       if (auto name = objcAttr->getName())
-        return name->getString(buffer);
+        return *name;
     }
   }
 
-  llvm::raw_svector_ostream out(buffer);
-
   // Subscripts use a specific selector.
+  auto &ctx = getASTContext();
   if (auto *SD = dyn_cast<SubscriptDecl>(this)) {
     switch (SD->getObjCSubscriptKind()) {
     case ObjCSubscriptKind::None:
       llvm_unreachable("Not an Objective-C subscript");
     case ObjCSubscriptKind::Indexed:
-      out << "objectAtIndexedSubscript:";
-      break;
+      return ObjCSelector(ctx, 1, ctx.Id_objectAtIndexedSubscript);
     case ObjCSubscriptKind::Keyed:
-      out << "objectForKeyedSubscript:";
-      break;
+      return ObjCSelector(ctx, 1, ctx.Id_objectForKeyedSubscript);
     }
-
-    return out.str();
   }
 
   // The getter selector is the property name itself.
-  return getName().str();
+  return ObjCSelector(ctx, 0, getName());
 }
 
-StringRef AbstractStorageDecl::getObjCSetterSelector(SmallVectorImpl<char> &buffer) const {
+ObjCSelector AbstractStorageDecl::getObjCSetterSelector() const {
   // If the setter has an @objc attribute with a name, use that.
-  if (auto setter = getSetter()) {
-    if (auto objcAttr = setter->getAttrs().getAttribute<ObjCAttr>()) {
-      if (auto name = objcAttr->getName())
-        return name->getString(buffer);
-    }
+  auto setter = getSetter();
+  auto objcAttr = setter ? setter->getAttrs().getAttribute<ObjCAttr>()
+                         : nullptr;
+  if (objcAttr) {
+    if (auto name = objcAttr->getName())
+      return *name;
   }
 
-  llvm::raw_svector_ostream out(buffer);
-
   // Subscripts use a specific selector.
+  auto &ctx = getASTContext();
   if (auto *SD = dyn_cast<SubscriptDecl>(this)) {
     switch (SD->getObjCSubscriptKind()) {
     case ObjCSubscriptKind::None:
       llvm_unreachable("Not an Objective-C subscript");
 
     case ObjCSubscriptKind::Indexed:
-      out << "setObject:atIndexedSubscript:";
-      break;
+      return ObjCSelector(ctx, 2,
+                          { ctx.Id_setObject, ctx.Id_atIndexedSubscript });
     case ObjCSubscriptKind::Keyed:
-      out << "setObject:forKeyedSubscript:";
-      break;
+      return ObjCSelector(ctx, 2,
+                          { ctx.Id_setObject, ctx.Id_forKeyedSubscript });
     }
-
-    return out.str();
   }
   
 
   // The setter selector for, e.g., 'fooBar' is 'setFooBar:', with the
   // property name capitalized and preceded by 'set'.
-  StringRef name = getName().str();
-  assert(name.size() >= 1 && "empty var name?!");
-  
-  out << "set" << clang::toUppercase(name[0]) 
-      << name.slice(1, name.size()) << ':';
-  return out.str();
+  llvm::SmallString<16> scratch1, scratch2;
+  scratch1 += "set";
+  scratch1 += camel_case::toSentencecase(getName().str(), scratch2);
+
+  auto result = ObjCSelector(ctx, 1, ctx.getIdentifier(scratch1));
+
+  // Cache the result, so we don't perform string manipulation again.
+  if (objcAttr)
+    const_cast<ObjCAttr *>(objcAttr)->setName(result);
+
+  return result;
 }
 
 SourceLoc AbstractStorageDecl::getOverrideLoc() const {
@@ -2130,14 +2127,13 @@ SourceRange AbstractFunctionDecl::getBodySourceRange() const {
   }
 }
 
-StringRef AbstractFunctionDecl::getObjCSelector(
-            SmallVectorImpl<char> &buffer) const {
+ObjCSelector AbstractFunctionDecl::getObjCSelector() const {
   if (auto func = dyn_cast<FuncDecl>(this))
-    return func->getObjCSelector(buffer);
+    return func->getObjCSelector();
   if (auto ctor = dyn_cast<ConstructorDecl>(this))
-    return ctor->getObjCSelector(buffer);
+    return ctor->getObjCSelector();
   if (auto dtor = dyn_cast<DestructorDecl>(this))
-    return dtor->getObjCSelector(buffer);
+    return dtor->getObjCSelector();
   llvm_unreachable("Unhandled AbstractFunctionDecl subclass");
 }
 
@@ -2333,26 +2329,20 @@ DynamicSelfType *FuncDecl::getDynamicSelfInterface() const {
 }
 
 /// Produce the selector for this "Objective-C method" in the given buffer.
-StringRef FuncDecl::getObjCSelector(SmallVectorImpl<char> &buffer) const {
+ObjCSelector FuncDecl::getObjCSelector() const {
   // For a getter or setter, go through the variable or subscript decl.
   if (isGetterOrSetter()) {
     auto asd = cast<AbstractStorageDecl>(getAccessorStorageDecl());
-    return isGetter() ? asd->getObjCGetterSelector(buffer)
-                      : asd->getObjCSetterSelector(buffer);
+    return isGetter() ? asd->getObjCGetterSelector()
+                      : asd->getObjCSetterSelector();
   }
 
   // If there is an @objc attribute with a name, use that name.
-  if (auto objc = getAttrs().getAttribute<ObjCAttr>()) {
+  auto objc = getAttrs().getAttribute<ObjCAttr>();
+  if (objc) {
     if (auto name = objc->getName())
-      return name->getString(buffer);
+      return *name;
   }
-
-  assert(buffer.empty());
-  
-  llvm::raw_svector_ostream out(buffer);
-
-  // Start with the method name.
-  out << getName().str();
 
   // We should always have exactly two levels of argument pattern.
   auto argPatterns = getArgParamPatterns();
@@ -2361,44 +2351,46 @@ StringRef FuncDecl::getObjCSelector(SmallVectorImpl<char> &buffer) const {
   auto tuple = dyn_cast<TuplePattern>(pattern);
 
   // If it's an empty tuple pattern, it's a nullary selector.
+  auto &ctx = getASTContext();
   if (tuple && tuple->getNumFields() == 0)
-    return out.str();
+    return ObjCSelector(ctx, 0, getName());
 
-  // Otherwise, it's at least a unary selector.
 
-  // If the first tuple element has a name, uppercase and emit it.
-  if (tuple && getASTContext().LangOpts.SplitPrepositions) {
-    llvm::SmallString<16> scratch;
-    if (auto named = dyn_cast<NamedPattern>(
-                       tuple->getFields()[0].getPattern()
-                         ->getSemanticsProvidingPattern())) {
-      out << camel_case::toSentencecase(named->getBoundName().str(), scratch);
+  // If it's a unary selector with no name for the first argument, we're done.
+  if (!tuple) {
+    return ObjCSelector(ctx, 1, getName());
+  }
+
+  // Attach the first parameter name to the base name.
+  auto firstPiece = getName();
+  bool didStringManipulation = false;
+  if (tuple && ctx.LangOpts.SplitPrepositions) {
+    llvm::SmallString<32> scratch1, scratch2;
+    scratch1 += firstPiece.str();
+    auto firstName = tuple->getFields()[0].getPattern()->getBoundName();
+    if (!firstName.empty()) {
+      scratch1 += camel_case::toSentencecase(firstName.str(), scratch2);
+      firstPiece = ctx.getIdentifier(scratch1);
     }
   }
 
-  out << ':';
-
-  // If it's a unary selector, we're done.
-  if (!tuple) {
-    return out.str();
-  }
-
-  // For every element except the first, add a selector component.
+  // For every element beyond the first, add a selector component.
+  SmallVector<Identifier, 4> argumentNames;
+  argumentNames.push_back(firstPiece);
   for (auto &elt : tuple->getFields().slice(1)) {
     auto eltPattern = elt.getPattern()->getSemanticsProvidingPattern();
-
-    // Add a label to the selector component if there's a tag.
-    if (auto named = dyn_cast<NamedPattern>(eltPattern)) {
-      out << named->getBoundName().str();
-    }
-
-    // Add the colon regardless.  Yes, this can sometimes create a
-    // component that's just a colon, and that's actually a legal
-    // selector.
-    out << ':';
+    argumentNames.push_back(eltPattern->getBoundName());
   }
 
-  return out.str();
+  // Form the result.
+  auto result = ObjCSelector(ctx, argumentNames.size(), argumentNames);
+
+  // If we did any string manipulation, cache the result. We don't want to
+  // do that again.
+  if (didStringManipulation && objc)
+    const_cast<ObjCAttr *>(objc)->setName(result);
+
+  return result;
 }
 
 SourceRange FuncDecl::getSourceRange() const {
@@ -2460,66 +2452,70 @@ Type ConstructorDecl::getResultType() const {
   return ArgTy;
 }
 
-/// Produce the selector for this "Objective-C method" in the given buffer.
-StringRef
-ConstructorDecl::getObjCSelector(SmallVectorImpl<char> &buffer) const {
+ObjCSelector ConstructorDecl::getObjCSelector() const {
   // If there is an @objc attribute with a name, use that name.
-  if (auto objc = getAttrs().getAttribute<ObjCAttr>()) {
+  auto objc = getAttrs().getAttribute<ObjCAttr>();
+  if (objc) {
     if (auto name = objc->getName())
-      return name->getString(buffer);
+      return *name;
   }
 
-  assert(buffer.empty());
-
-  llvm::raw_svector_ostream out(buffer);
-
-  // In the beginning, there was 'init'.
-  out << "init";
+  auto &ctx = getASTContext();
 
   // If there are no parameters, this is just 'init()'.
   auto tuple = cast<TuplePattern>(getArgParamPatterns()[1]);
   if (tuple->getNumFields() == 0)
-    return out.str();
+    return ObjCSelector(ctx, 0, ctx.Id_init);
 
   // The first field is special: we uppercase the name.
+  bool didStringManipulation = false;
+  SmallVector<Identifier, 4> selectorPieces;
   const auto &firstElt = tuple->getFields()[0];
   auto firstPattern = firstElt.getPattern()->getSemanticsProvidingPattern();
-  if (auto firstNamed = dyn_cast<NamedPattern>(firstPattern)) {
-    if (!firstNamed->getBoundName().empty()) {
-      auto nameStr = firstNamed->getBoundName().str();
-      out << (char)toupper(nameStr[0]);
-      out << nameStr.substr(1);
-    }
+  auto firstName = firstElt.getPattern()->getBoundName();
+  if (firstName.empty())
+    selectorPieces.push_back(ctx.Id_init);
+  else {
+    llvm::SmallString<16> scratch1, scratch2;
+    scratch1 += "init";
+    scratch1 += camel_case::toSentencecase(firstName.str(), scratch2);
+    selectorPieces.push_back(ctx.getIdentifier(scratch1));
+    didStringManipulation = true;
+  }
 
-    // If there is only a single parameter and its type is the empty tuple
-    // type, we're done: don't add the trailing colon.
-    if (tuple->getNumFields() == 1) {
-      auto emptyTupleTy = TupleType::getEmpty(getASTContext());
-      if (!firstPattern->getType()->isEqual(emptyTupleTy))
-        out << ':';
-      return out.str();
-    }
+  // If we have just one field, check whether this is actually a
+  // nullary selector that we mapped to a single-element initializer to catch
+  // the name after "init".
+  if (tuple->getNumFields() == 1) {
+    if (firstPattern->hasType()) {
+      if (firstPattern->getType()->isEqual(TupleType::getEmpty(ctx))) {
+        auto result = ObjCSelector(ctx, 0, selectorPieces[0]);
 
-    // Continue with the remaining selectors.
-    out << ':';
+        // Cache the name in the 'objc' attribute. We don't want to perform
+        // string manipulation again.
+        if (objc)
+          const_cast<ObjCAttr *>(objc)->setName(result);
+        return result;
+      }
+    } else {
+      // If we couldn't check the type, don't cache the result.
+      didStringManipulation = false;
+    }
   }
 
   // For every remaining element, add a selector component.
   for (auto &elt : tuple->getFields().slice(1)) {
-    auto eltPattern = elt.getPattern()->getSemanticsProvidingPattern();
-
-    // Add a label to the selector component if there's a tag.
-    if (auto named = dyn_cast<NamedPattern>(eltPattern)) {
-      out << named->getBoundName().str();
-    }
-
-    // Add the colon regardless.  Yes, this can sometimes create a
-    // component that's just a colon, and that's actually a legal
-    // selector.
-    out << ':';
+    selectorPieces.push_back(elt.getPattern()->getBoundName());
   }
 
-  return out.str();
+  auto result = ObjCSelector(ctx, selectorPieces.size(), selectorPieces);
+
+  // Cache the name in the 'objc' attribute. We don't want to perform
+  // string manipulation again.
+  if (objc && didStringManipulation)
+    const_cast<ObjCAttr *>(objc)->setName(result);
+
+  return result;
 }
 
 Type ConstructorDecl::getInitializerInterfaceType() {
@@ -2629,8 +2625,9 @@ ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
   return finder.Kind;
 }
 
-StringRef DestructorDecl::getObjCSelector(SmallVectorImpl<char> &buffer) const {
-  return "dealloc";
+ObjCSelector DestructorDecl::getObjCSelector() const {
+  auto &ctx = getASTContext();
+  return ObjCSelector(ctx, 0, ctx.Id_dealloc);
 }
 
 SourceRange DestructorDecl::getSourceRange() const {

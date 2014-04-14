@@ -23,10 +23,16 @@
 #  error Must define IDENTIFIER_WITH_NAME(Name, IdStr) before including this x-macro file
 #endif
 
+IDENTIFIER(atIndexedSubscript)
+IDENTIFIER(dealloc)
 IDENTIFIER(deinit)
+IDENTIFIER(forKeyedSubscript)
 IDENTIFIER(init)
+IDENTIFIER(objectAtIndexedSubscript)
+IDENTIFIER(objectForKeyedSubscript)
 IDENTIFIER(self)
 IDENTIFIER(Self)
+IDENTIFIER(setObject)
 IDENTIFIER(subscript)
 
 IDENTIFIER_WITH_NAME(MatchOperator, "~=")

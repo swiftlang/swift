@@ -3273,13 +3273,12 @@ public:
       uncurriedDeclTy = uncurriedDeclTy->getUnlabeledType(TC.Context);
 
     // If the method is an Objective-C method, compute its selector.
-    llvm::SmallString<32> methodSelectorBuffer;
-    StringRef methodSelector;
+    Optional<ObjCSelector> methodSelector;
     ObjCSubscriptKind subscriptKind = ObjCSubscriptKind::None;
 
     if (decl->isObjC()) {
       if (method)
-        methodSelector = method->getObjCSelector(methodSelectorBuffer);
+        methodSelector = method->getObjCSelector();
       else if (auto *subscript = dyn_cast<SubscriptDecl>(abstractStorage))
         subscriptKind = subscript->getObjCSubscriptKind();
     }
@@ -3318,8 +3317,7 @@ public:
       if (decl->isObjC() && parentDecl->isObjC()) {
         if (method) {
           // If the selectors don't match, it's not an override.
-          llvm::SmallString<32> buffer;
-          if (methodSelector != parentMethod->getObjCSelector(buffer))
+          if (*methodSelector != parentMethod->getObjCSelector())
             continue;
 
           objCMatch = true;
@@ -3377,7 +3375,7 @@ public:
       if (objCMatch) {
         if (method) {
           TC.diagnose(decl, diag::override_objc_type_mismatch_method,
-                      methodSelector, uncurriedDeclTy);
+                      *methodSelector, uncurriedDeclTy);
         } else {
           TC.diagnose(decl, diag::override_objc_type_mismatch_subscript,
                       static_cast<unsigned>(subscriptKind), uncurriedDeclTy);

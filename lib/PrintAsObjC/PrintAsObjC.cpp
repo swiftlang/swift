@@ -414,7 +414,7 @@ private:
     assert(bodyPatterns.size() == 2 && "not an ObjC-compatible method");
 
     llvm::SmallString<128> selectorBuf;
-    StringRef selectorString = AFD->getObjCSelector(selectorBuf);
+    StringRef selectorString = AFD->getObjCSelector().getString(selectorBuf);
 
     if (isa<ParenPattern>(bodyPatterns.back())) {
       // One argument.
@@ -493,10 +493,10 @@ private:
 
     if (overridesObjC) {
       llvm::SmallString<64> buffer;
-      os << ", getter=" << VD->getObjCGetterSelector(buffer);
+      os << ", getter=" << VD->getObjCGetterSelector().getString(buffer);
       if (VD->isSettable(nullptr)) {
         buffer.clear();
-        os << ", setter=" << VD->getObjCSetterSelector(buffer);
+        os << ", setter=" << VD->getObjCSetterSelector().getString(buffer);
       }
     }
 
