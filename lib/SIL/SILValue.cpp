@@ -34,9 +34,12 @@ SILValue SILValue::stripCasts() {
     case ValueKind::ObjectPointerToRefInst:
     case ValueKind::RefToRawPointerInst:
     case ValueKind::RawPointerToRefInst:
-    case ValueKind::UnconditionalCheckedCastInst:
-      V = cast<SILInstruction>(V.getDef())->getOperand(0);
+    case ValueKind::UnconditionalCheckedCastInst: {
+      auto *I = cast<SILInstruction>(V.getDef());
+      V = I->getOperand(0);
+      assert(V != I && "Instruction cannot be one of its own operands!");
       continue;
+    }
     default:
       return V;
     }
@@ -50,9 +53,12 @@ SILValue SILValue::stripAddressProjections() {
     switch (V->getKind()) {
     case ValueKind::StructElementAddrInst:
     case ValueKind::TupleElementAddrInst:
-    case ValueKind::RefElementAddrInst:
-      V = cast<SILInstruction>(V.getDef())->getOperand(0);
+    case ValueKind::RefElementAddrInst: {
+      auto *I = cast<SILInstruction>(V.getDef());
+      V = I->getOperand(0);
+      assert(V != I && "Instruction cannot be one of its own operands!");
       continue;
+    }
     default:
       return V;
     }
@@ -65,9 +71,12 @@ SILValue SILValue::stripAggregateProjections() {
   while (true) {
     switch (V->getKind()) {
     case ValueKind::StructExtractInst:
-    case ValueKind::TupleExtractInst:
-      V = cast<SILInstruction>(V.getDef())->getOperand(0);
+    case ValueKind::TupleExtractInst: {
+      auto *I = cast<SILInstruction>(V.getDef());
+      V = I->getOperand(0);
+      assert(V != I && "Instruction cannot be one of its own operands!");
       continue;
+    }
     default:
       return V;
     }
@@ -79,6 +88,8 @@ SILValue SILValue::stripIndexingInsts() {
   while (true) {
     if (!isa<IndexingInst>(V.getDef()))
       return V;
-    V = cast<IndexingInst>(V)->getBase();
+    auto *I = cast<IndexingInst>(V);
+    V = I->getBase();
+    assert(V != I && "Instruction cannot be one of its own operands!");
   }
 }
