@@ -233,19 +233,38 @@ private:
     case CheckedCastKind::ConcreteToUnrelatedExistential:
       SILCloner<TypeSubCloner>::visitUnconditionalCheckedCastInst(Inst);
       return;
-    case CheckedCastKind::SuperToArchetype:
-      // Stub implementation.
-      SILCloner<TypeSubCloner>::visitUnconditionalCheckedCastInst(Inst);
+    case CheckedCastKind::SuperToArchetype: {
+      // Just change the type of cast to an unconditional_checked_cast downcast
+      SILLocation OpLoc = getOpLocation(Inst->getLoc());
+      SILValue OpValue = getOpValue(Inst->getOperand());
+      SILType OpType = getOpType(Inst->getType());
+      CheckedCastKind OpCastKind = CheckedCastKind::Downcast;
+      doPostProcess(Inst,
+                    getBuilder().createUnconditionalCheckedCast(OpLoc,
+                                                                OpCastKind,
+                                                                OpValue,
+                                                                OpType));
       return;
+    }
     case CheckedCastKind::ArchetypeToArchetype:
     case CheckedCastKind::ArchetypeToConcrete:
     case CheckedCastKind::ConcreteToArchetype:
       convertArchetypeConcreteCastToConcreteCast(Inst);
       return;
-    case CheckedCastKind::ExistentialToArchetype:
-      // Stub implementation.
-      SILCloner<TypeSubCloner>::visitUnconditionalCheckedCastInst(Inst);
+    case CheckedCastKind::ExistentialToArchetype: {
+      // Just convert to ExistentialToConcrete.
+      // Just change the type of cast to an unconditional_checked_cast downcast
+      SILLocation OpLoc = getOpLocation(Inst->getLoc());
+      SILValue OpValue = getOpValue(Inst->getOperand());
+      SILType OpType = getOpType(Inst->getType());
+      CheckedCastKind OpCastKind = CheckedCastKind::ExistentialToConcrete;
+      doPostProcess(Inst,
+                    getBuilder().createUnconditionalCheckedCast(OpLoc,
+                                                                OpCastKind,
+                                                                OpValue,
+                                                                OpType));
       return;
+    }
     }
   }
 
