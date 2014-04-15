@@ -88,6 +88,8 @@ namespace {
       WorklistMap.erase(It);
     }
 
+    bool simplifyBlocks();
+
     /// \brief Remove the basic block if it has no predecessors. Returns true
     /// If the block was removed.
     bool removeIfDead(SILBasicBlock *BB);
@@ -101,19 +103,20 @@ namespace {
     bool simplifySwitchEnumBlock(SwitchEnumInst *SEI);
     bool simplifyArgs(SILBasicBlock *BB);
   };
+
+  class RemoveUnreachable {
+    SILFunction &Fn;
+    llvm::SmallSet<SILBasicBlock *, 8> Visited;
+  public:
+    RemoveUnreachable(SILFunction &Fn) : Fn(Fn) { }
+    void visit(SILBasicBlock *BB);
+    bool run();
+  };
 } // end anonymous namespace
 
-bool SimplifyCFG::removeIfDead(SILBasicBlock *BB) {
-  if (!BB->pred_empty() || BB == &*Fn.begin())
-    return false;
 
-  removeFromWorklist(BB);
-
-  // Add successor blocks to the worklist since their predecessor list is about
-  // to change.
-  for (auto &S : BB->getSuccs())
-    addToWorklist(S);
-
+// Handle the mechanical aspects of removing an unreachable block.
+static void removeDeadBlock(SILBasicBlock *BB) {
   // Instructions in the dead block may be used by other dead blocks.  Replace
   // any uses of them with undef values.
   while (!BB->empty()) {
@@ -128,6 +131,22 @@ bool SimplifyCFG::removeIfDead(SILBasicBlock *BB) {
   }
 
   BB->eraseFromParent();
+}
+
+// If BB is trivially unreachable, remove it from the worklist, add its
+// successors to the worklist, and then remove the block.
+bool SimplifyCFG::removeIfDead(SILBasicBlock *BB) {
+  if (!BB->pred_empty() || BB == &*Fn.begin())
+    return false;
+
+  removeFromWorklist(BB);
+
+  // Add successor blocks to the worklist since their predecessor list is about
+  // to change.
+  for (auto &S : BB->getSuccs())
+    addToWorklist(S);
+
+  removeDeadBlock(BB);
   ++NumBlocksDeleted;
   return true;
 }
@@ -352,7 +371,6 @@ bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
   // First simplify instructions generating branch operands since that
   // can expose CFG simplifications.
   bool Simplified = simplifyBranchOperands(BI->getArgs());
-  auto *ThisBB = BI->getParent();
 
   auto *BB = BI->getParent(), *DestBB = BI->getDestBB();
 
@@ -384,7 +402,7 @@ bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
     SILBuilder(BI).createBranch(BI->getLoc(), Br->getDestBB(), BI->getArgs());
     BI->eraseFromParent();
     removeIfDead(DestBB);
-    addToWorklist(ThisBB);
+    addToWorklist(BB);
     return true;
   }
 
@@ -517,13 +535,42 @@ bool SimplifyCFG::simplifySwitchEnumBlock(SwitchEnumInst *SEI) {
   return false;
 }
 
-bool SimplifyCFG::run() {
+void RemoveUnreachable::visit(SILBasicBlock *BB) {
+  if (!Visited.insert(BB))
+    return;
+
+  for (auto &Succ : BB->getSuccs())
+    visit(Succ);
+}
+
+bool RemoveUnreachable::run() {
+  bool Changed = false;
+
+  // Clear each time we run so that we can run multiple times.
+  Visited.clear();
+
+  // Visit all blocks reachable from the entry block of the function.
+  visit(Fn.begin());
+
+  // Remove the blocks we never reached.
+  for (auto It = Fn.begin(), End = Fn.end(); It != End; ) {
+    auto *BB = &*It++;
+    if (!Visited.count(BB)) {
+      removeDeadBlock(BB);
+      Changed = true;
+    }
+  }
+
+  return Changed;
+}
+
+bool SimplifyCFG::simplifyBlocks() {
   bool Changed = false;
 
   // Add all of the blocks to the function.
   for (auto &BB : Fn)
     addToWorklist(&BB);
-  
+
   // Iteratively simplify while there is still work to do.
   while (SILBasicBlock *BB = popWorklist()) {
     // If the block is dead, remove it.
@@ -545,7 +592,24 @@ bool SimplifyCFG::run() {
     // Simplify the block argument list.
     Changed |= simplifyArgs(BB);
   }
+
   return Changed;
+}
+
+bool SimplifyCFG::run() {
+  RemoveUnreachable RU(Fn);
+
+  // First remove any block not reachable from the entry.
+  bool Removed = RU.run();
+
+  // Now attempt to simplify the remaining blocks.
+  if (simplifyBlocks()) {
+    // Simplifying other blocks might have resulted in unreachable
+    // loops.
+    RU.run();
+    return true;
+  }
+  return Removed;
 }
 
 static void

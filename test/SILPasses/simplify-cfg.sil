@@ -221,3 +221,34 @@ sil @infinite_loop : $@thin () -> () {
 bb0:
   br bb0
 }
+
+import Builtin
+import Swift
+
+// CHECK-LABEL: @dead_loop
+// CHECK-NOT: br
+sil @dead_loop : $@thin () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Int1, 0           // users: %1, %4
+  %2 = integer_literal $Builtin.Int1, -1          // user: %11
+  cond_br %0, bb1, bb3                            // id: %4
+
+bb1:                                              // Preds: bb0
+  %5 = integer_literal $Builtin.Word, 0           // users: %6, %7
+  %6 = struct $Int (%5 : $Builtin.Word)
+  br bb2(%5 : $Builtin.Word)                      // id: %7
+
+bb2(%8 : $Builtin.Word):                          // Preds: bb1 bb2
+  %9 = integer_literal $Builtin.Word, 1           // user: %11
+  %10 = builtin_function_ref "sadd_with_overflow_Word" : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1) // user: %11
+  %11 = apply %10(%8, %9, %2) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1) // users: %12, %13
+  %12 = tuple_extract %11 : $(Builtin.Word, Builtin.Int1), 0 // users: %15, %16
+  %13 = tuple_extract %11 : $(Builtin.Word, Builtin.Int1), 1 // user: %14
+  cond_fail %13 : $Builtin.Int1                   // id: %14
+  %15 = struct $Int (%12 : $Builtin.Word)
+  br bb2(%12 : $Builtin.Word)                     // id: %16
+
+bb3:                                              // Preds: bb0
+  %17 = tuple ()                                  // user: %18
+  return %17 : $()                                // id: %18
+}
