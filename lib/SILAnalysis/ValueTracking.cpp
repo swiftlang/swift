@@ -106,6 +106,7 @@ static bool isTransitiveEscapeInst(SILInstruction *Inst) {
   case ValueKind::EnumInst:
   case ValueKind::IndexAddrInst:
   case ValueKind::IndexRawPointerInst:
+  case ValueKind::InitBlockStorageHeaderInst:
   case ValueKind::InitEnumDataAddrInst:
   case ValueKind::InitExistentialInst:
   case ValueKind::InitExistentialRefInst:
@@ -115,6 +116,7 @@ static bool isTransitiveEscapeInst(SILInstruction *Inst) {
   case ValueKind::OpenExistentialRefInst:
   case ValueKind::PartialApplyInst:
   case ValueKind::PointerToAddressInst:
+  case ValueKind::ProjectBlockStorageInst:
   case ValueKind::ProjectExistentialInst:
   case ValueKind::ProjectExistentialRefInst:
   case ValueKind::ExistentialMetatypeInst:

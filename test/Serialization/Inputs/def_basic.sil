@@ -883,15 +883,25 @@ entry(%0 : $Builtin.Int1):
 }
 
 // CHECK-LABEL: sil public_external @block_storage_type
-sil @block_storage_type : $@thin () -> () {
+sil @block_storage_type : $@thin Int -> @cc(cdecl) @objc_block () -> () {
+entry(%0 : $Int):
   // CHECK: [[STORAGE:%.*]] = alloc_stack $@block_storage Int
-  %b = alloc_stack $@block_storage Int
-  // CHECK: [[PTR:%.*]] = address_to_pointer [[STORAGE]]#1 : $*@block_storage Int to $Builtin.RawPointer
-  %p = address_to_pointer %b#1 : $*@block_storage Int to $Builtin.RawPointer
+  %s = alloc_stack $@block_storage Int
+  // CHECK: [[PROJECT:%.*]] = project_block_storage [[STORAGE]]#1 : $*@block_storage Int
+  %c = project_block_storage %s#1 : $*@block_storage Int
+  // CHECK: store %0 to [[PROJECT]]
+  store %0 to %c : $*Int
+  // CHECK: [[FUNC:%.*]] = function_ref
+  %f = function_ref @block_invoke : $@thin @cc(cdecl) () -> ()
+  // CHECK: [[BLOCK:%.*]] = init_block_storage_header [[STORAGE]]#1 : $*@block_storage Int, invoke [[FUNC]] : $@cc(cdecl) @thin () -> (), type $@cc(cdecl) @objc_block () -> ()
+  %b = init_block_storage_header %s#1 : $*@block_storage Int, invoke %f : $@thin @cc(cdecl) () -> (), type $@cc(cdecl) @objc_block () -> ()
   // CHECK: dealloc_stack [[STORAGE]]#0 : $*@local_storage @block_storage Int
-  dealloc_stack %b#0 : $*@local_storage @block_storage Int
-  return undef : $()
+  dealloc_stack %s#0 : $*@local_storage @block_storage Int
+  // CHECK: return [[BLOCK]] : $@cc(cdecl) @objc_block () -> ()
+  return %b : $@cc(cdecl) @objc_block () -> ()
 }
+
+sil @block_invoke : $@thin @cc(cdecl) () -> ()
 
 
 // rdar://15351123
@@ -1134,8 +1144,7 @@ bb0:
   %117 = function_ref @test_copy_release_value : $@thin (Val) -> (Val)
   %118 = function_ref @cond_fail_test : $@thin Builtin.Int1 -> ()
 
-  %124 = function_ref @block_storage_type : $@thin () -> ()
-
+  %124 = function_ref @block_storage_type : $@thin Int -> @cc(cdecl) @objc_block () -> ()
   %120 = function_ref @test_forward_ref : $@thin (UInt8, UInt8) -> UInt8
   %121 = function_ref @partial_apply : $@thin (@thin (@out Int, Int) -> (), Int) -> Int
   %122 = function_ref @partial_apply_with_closure : $@thin (@owned @callee_owned () -> Bool, @owned String, CString, Int64) -> ()

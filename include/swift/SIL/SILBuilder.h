@@ -631,6 +631,29 @@ public:
     return insert(new (F.getModule()) DeinitExistentialInst(Loc, Existential));
   }
   
+  ProjectBlockStorageInst *createProjectBlockStorage(SILLocation Loc,
+                                                     SILValue Storage) {
+    auto CaptureTy =
+      Storage.getType().castTo<SILBlockStorageType>()->getCaptureAddressType();
+    return createProjectBlockStorage(Loc, Storage, CaptureTy);
+  }
+  ProjectBlockStorageInst *createProjectBlockStorage(SILLocation Loc,
+                                                     SILValue Storage,
+                                                     SILType CaptureTy) {
+    return insert(new (F.getModule()) ProjectBlockStorageInst(Loc, Storage,
+                                                              CaptureTy));
+  }
+  
+  InitBlockStorageHeaderInst *createInitBlockStorageHeader(SILLocation Loc,
+                                                         SILValue BlockStorage,
+                                                         SILValue InvokeFunction,
+                                                         SILType BlockType) {
+    return insert(new (F.getModule()) InitBlockStorageHeaderInst(Loc,
+                                                                 BlockStorage,
+                                                                 InvokeFunction,
+                                                                 BlockType));
+  }
+  
   MetatypeInst *createMetatype(SILLocation Loc, SILType Metatype) {
     return insert(new (F.getModule()) MetatypeInst(Loc, Metatype));
   }

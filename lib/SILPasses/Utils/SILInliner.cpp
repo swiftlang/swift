@@ -275,6 +275,7 @@ static InlineCost instructionInlineCost(SILInstruction &I,
     // Typed GEPs are free.
     case ValueKind::TupleElementAddrInst:
     case ValueKind::StructElementAddrInst:
+    case ValueKind::ProjectBlockStorageInst:
       return InlineCost::Free;
 
     // Aggregates are exploded at the IR level; these are effectively no-ops.
@@ -390,6 +391,7 @@ static InlineCost instructionInlineCost(SILInstruction &I,
     case ValueKind::UnownedRetainInst:
     case ValueKind::UnownedToRefInst:
     case ValueKind::UpcastExistentialInst:
+    case ValueKind::InitBlockStorageHeaderInst:
       return InlineCost::Expensive;
 
     case ValueKind::SILArgument:

@@ -714,6 +714,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   ONEOPERAND_ONETYPE_INST(BridgeToBlock)
   ONEOPERAND_ONETYPE_INST(ConvertFunction)
   ONEOPERAND_ONETYPE_INST(UpcastExistentialRef)
+  ONEOPERAND_ONETYPE_INST(ProjectBlockStorage)
 #undef ONEOPERAND_ONETYPE_INST
   case ValueKind::InitExistentialInst:
   case ValueKind::InitExistentialRefInst: {
@@ -1399,6 +1400,26 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
 
     ResultVal = Builder.createCheckedCastBranch(Loc, castKind, op, castTy,
                                                 successBB, failureBB);
+    break;
+  }
+  case ValueKind::InitBlockStorageHeaderInst: {
+    assert(ListOfValues.size() == 6 &&
+           "expected 6 values for InitBlockStorageHeader");
+    SILType blockTy
+      = getSILType(MF->getType(TyID), (SILValueCategory)TyCategory);
+    
+    SILType storageTy = getSILType(MF->getType(ListOfValues[2]),
+                                   SILValueCategory::Address);
+    SILValue storage
+      = getLocalValue(ListOfValues[0], ListOfValues[1], storageTy);
+    
+    SILType invokeTy = getSILType(MF->getType(ListOfValues[5]),
+                                  SILValueCategory::Object);
+    SILValue invoke
+      = getLocalValue(ListOfValues[3], ListOfValues[4], invokeTy);
+    
+    ResultVal = Builder.createInitBlockStorageHeader(Loc, storage, invoke,
+                                                     blockTy);
     break;
   }
   case ValueKind::UnreachableInst: {

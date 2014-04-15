@@ -837,72 +837,10 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case ValueKind::ObjCToThickMetatypeInst:
   case ValueKind::BridgeToBlockInst:
   case ValueKind::ConvertFunctionInst:
-  case ValueKind::UpcastExistentialRefInst: {
-    SILValue operand;
-    SILType Ty;
-    switch (SI.getKind()) {
-    default: assert(0 && "Out of sync with parent switch");
-    case ValueKind::RefToObjectPointerInst:
-      operand = cast<RefToObjectPointerInst>(&SI)->getOperand();
-      Ty = cast<RefToObjectPointerInst>(&SI)->getType();
-      break;
-    case ValueKind::UpcastInst:
-      operand = cast<UpcastInst>(&SI)->getOperand();
-      Ty = cast<UpcastInst>(&SI)->getType();
-      break;
-    case ValueKind::AddressToPointerInst:
-      operand = cast<AddressToPointerInst>(&SI)->getOperand();
-      Ty = cast<AddressToPointerInst>(&SI)->getType();
-      break;
-    case ValueKind::PointerToAddressInst:
-      operand = cast<PointerToAddressInst>(&SI)->getOperand();
-      Ty = cast<PointerToAddressInst>(&SI)->getType();
-      break;
-    case ValueKind::ObjectPointerToRefInst:
-      operand = cast<ObjectPointerToRefInst>(&SI)->getOperand();
-      Ty = cast<ObjectPointerToRefInst>(&SI)->getType();
-      break;
-    case ValueKind::RefToRawPointerInst:
-      operand = cast<RefToRawPointerInst>(&SI)->getOperand();
-      Ty = cast<RefToRawPointerInst>(&SI)->getType();
-      break;
-    case ValueKind::RawPointerToRefInst:
-      operand = cast<RawPointerToRefInst>(&SI)->getOperand();
-      Ty = cast<RawPointerToRefInst>(&SI)->getType();
-      break;
-    case ValueKind::RefToUnownedInst:
-      operand = cast<RefToUnownedInst>(&SI)->getOperand();
-      Ty = cast<RefToUnownedInst>(&SI)->getType();
-      break;
-    case ValueKind::UnownedToRefInst:
-      operand = cast<UnownedToRefInst>(&SI)->getOperand();
-      Ty = cast<UnownedToRefInst>(&SI)->getType();
-      break;
-    case ValueKind::ThinToThickFunctionInst:
-      operand = cast<ThinToThickFunctionInst>(&SI)->getOperand();
-      Ty = cast<ThinToThickFunctionInst>(&SI)->getType();
-      break;
-    case ValueKind::ThickToObjCMetatypeInst:
-      operand = cast<ThickToObjCMetatypeInst>(&SI)->getOperand();
-      Ty = cast<ThickToObjCMetatypeInst>(&SI)->getType();
-      break;
-    case ValueKind::ObjCToThickMetatypeInst:
-      operand = cast<ObjCToThickMetatypeInst>(&SI)->getOperand();
-      Ty = cast<ObjCToThickMetatypeInst>(&SI)->getType();
-      break;
-    case ValueKind::BridgeToBlockInst:
-      operand = cast<BridgeToBlockInst>(&SI)->getOperand();
-      Ty = cast<BridgeToBlockInst>(&SI)->getType();
-      break;
-    case ValueKind::ConvertFunctionInst:
-      operand = cast<ConvertFunctionInst>(&SI)->getOperand();
-      Ty = cast<ConvertFunctionInst>(&SI)->getType();
-      break;
-    case ValueKind::UpcastExistentialRefInst:
-      operand = cast<UpcastExistentialRefInst>(&SI)->getOperand();
-      Ty = cast<UpcastExistentialRefInst>(&SI)->getType();
-      break;
-    }
+  case ValueKind::UpcastExistentialRefInst:
+  case ValueKind::ProjectBlockStorageInst: {
+    SILValue operand = SI.getOperand(0);
+    SILType Ty = SI.getType(0);
     SILOneTypeOneOperandLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILOneTypeOneOperandLayout::Code],
         (unsigned)SI.getKind(), 0,
@@ -1211,6 +1149,27 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
              (unsigned)CBI->getCastType().getCategory(),
              ListOfValues);
     break;
+  }
+  case ValueKind::InitBlockStorageHeaderInst: {
+    auto IBSHI = cast<InitBlockStorageHeaderInst>(&SI);
+    SmallVector<ValueID, 6> ListOfValues;
+    ListOfValues.push_back(addValueRef(IBSHI->getBlockStorage()));
+    ListOfValues.push_back(IBSHI->getBlockStorage().getResultNumber());
+    ListOfValues.push_back(
+         S.addTypeRef(IBSHI->getBlockStorage().getType().getSwiftRValueType()));
+    // Always an address, don't need to save category
+    
+    ListOfValues.push_back(addValueRef(IBSHI->getInvokeFunction()));
+    ListOfValues.push_back(IBSHI->getInvokeFunction().getResultNumber());
+    ListOfValues.push_back(
+       S.addTypeRef(IBSHI->getInvokeFunction().getType().getSwiftRValueType()));
+    // Always a value, don't need to save category
+    
+    SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
+             SILAbbrCodes[SILOneTypeValuesLayout::Code], (unsigned)SI.getKind(),
+             S.addTypeRef(IBSHI->getType().getSwiftRValueType()),
+             (unsigned)IBSHI->getType().getCategory(),
+             ListOfValues);
   }
   }
   // Non-void values get registered in the value table.

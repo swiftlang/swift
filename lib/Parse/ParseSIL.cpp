@@ -1035,6 +1035,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("global_addr", ValueKind::GlobalAddrInst)
     .Case("index_addr", ValueKind::IndexAddrInst)
     .Case("index_raw_pointer", ValueKind::IndexRawPointerInst)
+    .Case("init_block_storage_header", ValueKind::InitBlockStorageHeaderInst)
     .Case("init_enum_data_addr", ValueKind::InitEnumDataAddrInst)
     .Case("init_existential", ValueKind::InitExistentialInst)
     .Case("init_existential_ref", ValueKind::InitExistentialRefInst)
@@ -1053,6 +1054,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("open_existential_ref", ValueKind::OpenExistentialRefInst)
     .Case("partial_apply", ValueKind::PartialApplyInst)
     .Case("pointer_to_address", ValueKind::PointerToAddressInst)
+    .Case("project_block_storage", ValueKind::ProjectBlockStorageInst)
     .Case("project_existential", ValueKind::ProjectExistentialInst)
     .Case("project_existential_ref", ValueKind::ProjectExistentialRefInst)
     .Case("existential_metatype", ValueKind::ExistentialMetatypeInst)
@@ -2290,8 +2292,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     if (Opcode == ValueKind::SwitchEnumInst)
       ResultVal = B.createSwitchEnum(InstLoc, Val, DefaultBB, CaseBBs);
     else
-      ResultVal = B.createSwitchEnumAddr(
-                                             InstLoc, Val, DefaultBB, CaseBBs);
+      ResultVal = B.createSwitchEnumAddr(InstLoc, Val, DefaultBB, CaseBBs);
     break;
   }
   case ValueKind::SwitchIntInst: {
@@ -2392,6 +2393,45 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
                                             getBBForReference(BBName, NameLoc),
                                             getBBForReference(BBName2,
                                                               NameLoc2));
+    break;
+  }
+  case ValueKind::ProjectBlockStorageInst: {
+    if (parseTypedValueRef(Val))
+      return true;
+    
+    ResultVal = B.createProjectBlockStorage(InstLoc, Val);
+    break;
+  }
+  case ValueKind::InitBlockStorageHeaderInst: {
+    Identifier invoke, type;
+    SourceLoc invokeLoc, typeLoc;
+    
+    SILValue invokeVal, invokeValLoc;
+    
+    SILType blockType;
+    
+    if (parseTypedValueRef(Val) ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        parseSILIdentifier(invoke, invokeLoc,
+                           diag::expected_tok_in_sil_instr, "invoke") ||
+        parseTypedValueRef(invokeVal) ||
+        P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        parseSILIdentifier(type, typeLoc,
+                           diag::expected_tok_in_sil_instr, "type") ||
+        parseSILType(blockType))
+      return true;
+    
+    if (invoke.str() != "invoke") {
+      P.diagnose(invokeLoc, diag::expected_tok_in_sil_instr, "invoke");
+      return true;
+    }
+    if (type.str() != "type") {
+      P.diagnose(invokeLoc, diag::expected_tok_in_sil_instr, "type");
+      return true;
+    }
+    
+    ResultVal = B.createInitBlockStorageHeader(InstLoc, Val, invokeVal,
+                                               blockType);
     break;
   }
   }

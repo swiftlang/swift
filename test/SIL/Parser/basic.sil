@@ -1052,15 +1052,25 @@ bb0(%0 : $Int, %1 : $*P):
 }
 
 // CHECK-LABEL: sil @block_storage_type
-sil @block_storage_type : $@thin () -> () {
+sil @block_storage_type : $@thin Int -> @cc(cdecl) @objc_block () -> () {
+entry(%0 : $Int):
   // CHECK: [[STORAGE:%.*]] = alloc_stack $@block_storage Int
-  %b = alloc_stack $@block_storage Int
-  // CHECK: [[PTR:%.*]] = address_to_pointer [[STORAGE]]#1 : $*@block_storage Int to $Builtin.RawPointer
-  %p = address_to_pointer %b#1 : $*@block_storage Int to $Builtin.RawPointer
+  %s = alloc_stack $@block_storage Int
+  // CHECK: [[PROJECT:%.*]] = project_block_storage [[STORAGE]]#1 : $*@block_storage Int
+  %c = project_block_storage %s#1 : $*@block_storage Int
+  // CHECK: store %0 to [[PROJECT]]
+  store %0 to %c : $*Int
+  // CHECK: [[FUNC:%.*]] = function_ref
+  %f = function_ref @block_invoke : $@thin @cc(cdecl) () -> ()
+  // CHECK: [[BLOCK:%.*]] = init_block_storage_header [[STORAGE]]#1 : $*@block_storage Int, invoke [[FUNC]] : $@cc(cdecl) @thin () -> (), type $@cc(cdecl) @objc_block () -> ()
+  %b = init_block_storage_header %s#1 : $*@block_storage Int, invoke %f : $@thin @cc(cdecl) () -> (), type $@cc(cdecl) @objc_block () -> ()
   // CHECK: dealloc_stack [[STORAGE]]#0 : $*@local_storage @block_storage Int
-  dealloc_stack %b#0 : $*@local_storage @block_storage Int
-  return undef : $()
+  dealloc_stack %s#0 : $*@local_storage @block_storage Int
+  // CHECK: return [[BLOCK]] : $@cc(cdecl) @objc_block () -> ()
+  return %b : $@cc(cdecl) @objc_block () -> ()
 }
+
+sil @block_invoke : $@thin @cc(cdecl) () -> ()
 
 // CHECK-LABEL: sil_vtable Foo {
 // CHECK: #Foo.subscript!getter.1: _TC3tmp3Foo9subscriptFT1xSi1ySi_Sig

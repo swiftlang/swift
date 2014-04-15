@@ -33,7 +33,7 @@ class SILModule;
   
 enum IsBare_t { IsNotBare, IsBare };
 enum IsTransparent_t { IsNotTransparent, IsTransparent };
-
+  
 /// SILFunction - A function body that has been lowered to SIL. This consists of
 /// zero or more SIL SILBasicBlock objects that contain the SILInstruction
 /// objects making up the function.
@@ -78,7 +78,7 @@ private:
 
   /// The function's transparent attribute.
   unsigned Transparent : 1; // FIXME: pack this somewhere
-
+    
   /// The linkage of the function.
   unsigned Linkage : NumSILLinkageBits;
   

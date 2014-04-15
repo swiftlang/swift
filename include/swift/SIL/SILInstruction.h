@@ -1780,7 +1780,7 @@ class OpenExistentialRefInst
 public:
   OpenExistentialRefInst(SILLocation Loc, SILValue Operand, SILType Ty);
 };
-
+  
 /// InitExistentialInst - Given an address to an uninitialized buffer of
 /// a protocol type, initializes its existential container to contain a concrete
 /// value of the given type, and returns the address of the uninitialized
@@ -1887,7 +1887,53 @@ public:
     : UnaryInstructionBase(Loc, Operand, DestTy)
   {}
 };
-
+  
+/// Projects the capture storage address from a @block_storage address.
+class ProjectBlockStorageInst
+  : public UnaryInstructionBase<ValueKind::ProjectBlockStorageInst,
+                                SILInstruction>
+{
+public:
+  ProjectBlockStorageInst(SILLocation Loc,
+                          SILValue Operand,
+                          SILType DestTy)
+    : UnaryInstructionBase(Loc, Operand, DestTy)
+  {}
+};
+  
+///
+  
+/// Initializes a block header, creating a block that
+/// invokes a given thin cdecl function.
+class InitBlockStorageHeaderInst : public SILInstruction {
+  enum { BlockStorage, InvokeFunction };
+  FixedOperandList<2> Operands;
+public:
+  InitBlockStorageHeaderInst(SILLocation Loc,
+                             SILValue BlockStorage,
+                             SILValue InvokeFunction,
+                             SILType BlockType)
+    : SILInstruction(ValueKind::InitBlockStorageHeaderInst,
+                     Loc, BlockType),
+      Operands(this, BlockStorage, InvokeFunction)
+  {}
+  
+  /// Get the block storage address to be initialized.
+  SILValue getBlockStorage() const { return Operands[BlockStorage].get(); }
+  /// Get the invoke function to form the block around.
+  SILValue getInvokeFunction() const { return Operands[InvokeFunction].get(); }
+  
+  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+  
+  /// getType() is OK since there's only one result.
+  SILType getType() const { return SILInstruction::getType(0); }
+  
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::InitBlockStorageHeaderInst;
+  }
+};
+  
 /// RefCountingInst - An abstract class of instructions which
 /// manipulate the reference count of their object operand.
 class RefCountingInst : public SILInstruction {

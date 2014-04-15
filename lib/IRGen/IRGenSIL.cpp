@@ -618,7 +618,10 @@ public:
   void visitUpcastExistentialInst(UpcastExistentialInst *i);
   void visitUpcastExistentialRefInst(UpcastExistentialRefInst *i);
   void visitDeinitExistentialInst(DeinitExistentialInst *i);
-
+  
+  void visitProjectBlockStorageInst(ProjectBlockStorageInst *i);
+  void visitInitBlockStorageHeaderInst(InitBlockStorageHeaderInst *i);
+  
   void visitFixLifetimeInst(FixLifetimeInst *i);
   void visitCopyBlockInst(CopyBlockInst *i);
   void visitStrongRetainInst(StrongRetainInst *i);
@@ -2938,6 +2941,24 @@ void IRGenSILFunction::visitOpenExistentialRefInst(OpenExistentialRefInst *i) {
                                      openedArchetype);
   result.add(instance);
   setLoweredExplosion(SILValue(i, 0), result);
+}
+
+void IRGenSILFunction::visitProjectBlockStorageInst(ProjectBlockStorageInst *i){
+  // TODO
+  IGM.unimplemented(i->getLoc().getSourceLoc(), "project_block_storage");
+  setLoweredAddress(SILValue(i, 0), getLoweredAddress(i->getOperand()));
+}
+
+void IRGenSILFunction::visitInitBlockStorageHeaderInst(
+                                               InitBlockStorageHeaderInst *i) {
+  // TODO
+  IGM.unimplemented(i->getLoc().getSourceLoc(), "init_block_storage_header");
+  auto addr = getLoweredAddress(i->getBlockStorage());
+  llvm::Value *asBlock = Builder.CreateBitCast(addr.getAddress(),
+                                               IGM.ObjCBlockPtrTy);
+  Explosion e(ResilienceExpansion::Minimal);
+  e.add(asBlock);
+  setLoweredExplosion(SILValue(i, 0), e);
 }
 
 void IRGenSILFunction::visitProtocolMethodInst(swift::ProtocolMethodInst *i) {

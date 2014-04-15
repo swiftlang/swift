@@ -1135,6 +1135,27 @@ visitDynamicMethodBranchInst(DynamicMethodBranchInst *Inst) {
                                            Inst->getMember(),
                                            OpHasMethodBB, OpHasNoMethodBB));
 }
+  
+template<typename ImplClass>
+void
+SILCloner<ImplClass>::
+visitProjectBlockStorageInst(ProjectBlockStorageInst *I) {
+  doPostProcess(I, getBuilder().createProjectBlockStorage(
+                                                getOpLocation(I->getLoc()),
+                                                getOpValue(I->getOperand()),
+                                                getOpType(I->getType())));
+}
+  
+template<typename ImplClass>
+void
+SILCloner<ImplClass>::
+visitInitBlockStorageHeaderInst(InitBlockStorageHeaderInst *I) {
+  doPostProcess(I, getBuilder().createInitBlockStorageHeader(
+                                         getOpLocation(I->getLoc()),
+                                         getOpValue(I->getBlockStorage()),
+                                         getOpValue(I->getInvokeFunction()),
+                                         getOpType(I->getType())));
+}
 
 } // end namespace swift
 

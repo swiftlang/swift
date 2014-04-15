@@ -165,6 +165,10 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   INST(ProjectExistentialRefInst, SILInstruction, None)
   INST(OpenExistentialRefInst, SILInstruction, None)
 
+  // Blocks
+  INST(ProjectBlockStorageInst, SILInstruction, None)
+  INST(InitBlockStorageHeaderInst, SILInstruction, None)
+
   // Conversions
   ABSTRACT_VALUE(ConversionInst, SILInstruction)
     INST(UpcastInst, ConversionInst, None)

@@ -962,6 +962,14 @@ public:
   void visitDeinitExistentialInst(DeinitExistentialInst *DEI) {
     OS << "deinit_existential " << getIDAndType(DEI->getOperand());
   }
+  void visitProjectBlockStorageInst(ProjectBlockStorageInst *PBSI) {
+    OS << "project_block_storage " << getIDAndType(PBSI->getOperand());
+  }
+  void visitInitBlockStorageHeaderInst(InitBlockStorageHeaderInst *IBSHI) {
+    OS << "init_block_storage_header " << getIDAndType(IBSHI->getBlockStorage())
+       << ", invoke " << getIDAndType(IBSHI->getInvokeFunction())
+       << ", type " << IBSHI->getType();
+  }
   void visitValueMetatypeInst(ValueMetatypeInst *MI) {
     OS << "value_metatype " << MI->getType() << ", "
        << getIDAndType(MI->getOperand());
