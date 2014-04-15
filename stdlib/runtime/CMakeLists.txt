@@ -42,3 +42,8 @@ endif()
 
 target_link_libraries(swift_runtime
   "-framework Foundation")
+
+if (EXISTS "/usr/local/lib/libCrashReporterClient.a")
+    target_link_libraries(swift_runtime
+      "-lCrashReporterClient")
+endif()
