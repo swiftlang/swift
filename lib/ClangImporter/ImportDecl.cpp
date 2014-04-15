@@ -1632,21 +1632,13 @@ namespace {
       return nullptr;
     }
 
-    /// Add an @objc(name) attribute that corresponds to the given
-    /// Objective-C selector.
-    void addObjCAttributeForSelector(Decl *decl, clang::Selector sel) {
+    /// Add an @objc(name) attribute with the given name (expressed as a
+    /// selector).
+    ///
+    /// The importer should use this rather than adding the attribute directly.
+    void addObjCAttribute(Decl *decl, ObjCSelector name) {
       auto &ctx = Impl.SwiftContext;
-      if (sel.isUnarySelector()) {
-        auto name = ctx.getIdentifier(sel.getNameForSlot(0));
-        decl->getMutableAttrs().add(ObjCAttr::createNullary(ctx, name));
-        return;
-      } 
-
-      llvm::SmallVector<Identifier, 4> names;
-      for (unsigned i = 0, n = sel.getNumArgs(); i != n; ++i) {
-        names.push_back(ctx.getIdentifier(sel.getNameForSlot(i)));
-      }
-      decl->getMutableAttrs().add(ObjCAttr::createSelector(ctx, names));
+      decl->getMutableAttrs().add(ObjCAttr::create(ctx, name));
     }
 
     Decl *VisitObjCMethodDecl(const clang::ObjCMethodDecl *decl) {
@@ -1834,12 +1826,8 @@ namespace {
           isa<ProtocolDecl>(dc))
         result->getMutableAttrs().setAttr(AK_optional, SourceLoc());
 
-      // Mark this as an Objective-C method.
-      result->setIsObjC(true);
-
-      // Add the appropriate @objc attribute with the name of this
-      // method.
-      addObjCAttributeForSelector(result, decl->getSelector());
+      // Mark this method @objc.
+      addObjCAttribute(result, selector);
 
       // Mark class methods as static.
       if (decl->isClassMethod() || forceClassMethod)
@@ -2079,9 +2067,8 @@ namespace {
       auto result = new (Impl.SwiftContext)
           ConstructorDecl(name.getBaseName(), loc, selfPat, argPatterns.back(),
                          selfPat, bodyPatterns.back(), /*GenericParams=*/0, dc);
-      result->setIsObjC(true);
       result->setClangNode(objcMethod);
-      addObjCAttributeForSelector(result, objcMethod->getSelector());
+      addObjCAttribute(result, selector);
 
       // Fix the types when we've imported into a protocol.
       if (auto proto = dyn_cast<ProtocolDecl>(dc)) {
@@ -2242,9 +2229,10 @@ namespace {
       thunk->setBodyResultType(elementTy);
       thunk->setInterfaceType(interfaceType);
 
-      thunk->setIsObjC(true);
       if (auto objcAttr = getter->getAttrs().getAttribute<ObjCAttr>())
         thunk->getMutableAttrs().add(objcAttr->clone(context));
+      else
+        thunk->setIsObjC(true);
 
       return thunk;
     }
@@ -2326,9 +2314,10 @@ namespace {
       thunk->setBodyResultType(TupleType::getEmpty(context));
       thunk->setInterfaceType(interfaceType);
 
-      thunk->setIsObjC(true);
       if (auto objcAttr = setter->getAttrs().getAttribute<ObjCAttr>())
         thunk->getMutableAttrs().add(objcAttr->clone(context));
+      else
+        thunk->setIsObjC(true);
 
       return thunk;
     }
@@ -3165,8 +3154,7 @@ namespace {
                                    name,
                                    { });
       result->computeType();
-      result->getMutableAttrs().add(
-        ObjCAttr::createNullary(Impl.SwiftContext, origName));
+      addObjCAttribute(result, ObjCSelector(Impl.SwiftContext, 0, origName));
 
       Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
 
@@ -3203,8 +3191,6 @@ namespace {
       importObjCProtocols(result, decl->getReferencedProtocols());
       result->setCheckedInheritanceClause();
 
-      // Note that this is an Objective-C protocol.
-      result->setIsObjC(true);
       result->setMemberLoader(&Impl, 0);
 
       // Add the protocol decl to ExternalDefinitions so that IRGen can emit
@@ -3267,9 +3253,7 @@ namespace {
           result->setCircularityCheck(CircularityCheck::Checked);
           result->setSuperclass(nsObjectTy);
           result->setCheckedInheritanceClause();
-          result->setIsObjC(true);
-          result->getMutableAttrs().add(
-            ObjCAttr::createNullary(Impl.SwiftContext, name));
+          addObjCAttribute(result, ObjCSelector(Impl.SwiftContext, 0, name));
           Impl.registerExternalDecl(result);
           return result;
         }
@@ -3319,8 +3303,7 @@ namespace {
       Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
       result->setClangNode(decl);
       result->setCircularityCheck(CircularityCheck::Checked);
-      result->getMutableAttrs().add(
-        ObjCAttr::createNullary(Impl.SwiftContext, name));
+      addObjCAttribute(result, ObjCSelector(Impl.SwiftContext, 0, name));
 
       // If this Objective-C class has a supertype, import it.
       if (auto objcSuper = decl->getSuperClass()) {
@@ -3334,9 +3317,6 @@ namespace {
       // Import protocols this class conforms to.
       importObjCProtocols(result, decl->getReferencedProtocols());
       result->setCheckedInheritanceClause();
-
-      // Note that this is an Objective-C class.
-      result->setIsObjC(true);
 
       // Add inferred attributes.
 #define INFERRED_ATTRIBUTES(ModuleName, ClassName, AttributeSet)        \

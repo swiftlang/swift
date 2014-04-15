@@ -892,7 +892,7 @@ ArrayRef<ValueDecl *> NominalTypeDecl::lookupDirect(DeclName name) {
 }
 
 void ClassDecl::createObjCMemberLookup() {
-  assert(ObjCMemberLookup && "Already have an Objective-C member table");
+  assert(!ObjCMemberLookup && "Already have an Objective-C member table");
   auto &ctx = getASTContext();
   ObjCMemberLookup = new (ctx) ObjCMemberLookupTable();
 
