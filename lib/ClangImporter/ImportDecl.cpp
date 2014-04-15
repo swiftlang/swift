@@ -1632,13 +1632,21 @@ namespace {
       return nullptr;
     }
 
-    /// Add an @objc(name) attribute with the given name (expressed as a
-    /// selector).
+    /// Add an @objc(name) attribute with the given, optional name expressed as
+    /// selector.
     ///
     /// The importer should use this rather than adding the attribute directly.
-    void addObjCAttribute(Decl *decl, ObjCSelector name) {
+    void addObjCAttribute(ValueDecl *decl, Optional<ObjCSelector> name) {
       auto &ctx = Impl.SwiftContext;
       decl->getMutableAttrs().add(ObjCAttr::create(ctx, name));
+
+      // If the declaration we attached the 'objc' attribute to is within a
+      // class, record it in the class.
+      if (auto contextTy = decl->getDeclContext()->getDeclaredInterfaceType()) {
+        if (auto classDecl = contextTy->getClassOrBoundGenericClass()) {
+          classDecl->recordObjCMember(decl);
+        }
+      }
     }
 
     Decl *VisitObjCMethodDecl(const clang::ObjCMethodDecl *decl) {
@@ -1698,6 +1706,25 @@ namespace {
       return Optional<clang::QualType>();
     }
 
+    /// Check whether we have already imported a method with the given
+    /// selector in the given context.
+    bool methodAlreadyImported(ObjCSelector selector, bool isInstance,
+                               DeclContext *dc) {
+      // We only need to perform this check for classes.
+      auto classDecl
+        = dc->getDeclaredInterfaceType()->getClassOrBoundGenericClass();
+      if (!classDecl)
+        return false;
+
+      // Look for a matching member.
+      for (auto member : classDecl->lookupDirect(selector)) {
+        if (member->isInstanceMember() == isInstance)
+          return true;
+      }
+
+      return false;
+    }
+
     Decl *VisitObjCMethodDecl(const clang::ObjCMethodDecl *decl,
                               DeclContext *dc,
                               bool forceClassMethod = false) {
@@ -1708,11 +1735,26 @@ namespace {
         if (forceClassMethod)
           return nullptr;
 
-        return importConstructor(decl, dc, /*isImplicit=*/false,
-                                 /*isConvenienceInit=*/false);
+        return importConstructor(decl, dc, /*isImplicit=*/false, Nothing,
+                                 /*required=*/false);
       }
 
+      // Check whether we already imported this method.
+      if (!forceClassMethod && dc == Impl.importDeclContextOf(decl)) {
+        // FIXME: Should also be able to do this for forced class
+        // methods.
+        auto known = Impl.ImportedDecls.find(decl->getCanonicalDecl());
+        if (known != Impl.ImportedDecls.end())
+          return known->second;
+      }
+
+      // Check whether another method with the same selector has already been
+      // imported into this context.
       ObjCSelector selector = Impl.importSelector(decl->getSelector());
+      bool isInstance = decl->isInstanceMethod() && !forceClassMethod;
+      if (methodAlreadyImported(selector, isInstance, dc))
+        return nullptr;
+
       DeclName name = Impl.mapSelectorToDeclName(selector,
                                                  /*isInitializer=*/false);
       if (!name)
@@ -1975,6 +2017,12 @@ namespace {
       swiftCtor->setOverriddenDecl(superCtor);
     }
 
+    /// Describes the kind of initializer to import.
+    enum class InitializerKind {
+      Designated,
+      Convenience
+    };
+
     /// \brief Given an imported method, try to import it as a constructor.
     ///
     /// Objective-C methods in the 'init' family are imported as
@@ -1987,7 +2035,8 @@ namespace {
     ConstructorDecl *importConstructor(const clang::ObjCMethodDecl *objcMethod,
                                        DeclContext *dc,
                                        bool implicit,
-                                       bool isConvenienceInit) {
+                                       Optional<InitializerKind> kind,
+                                       bool required) {
       // Figure out the type of the container.
       auto containerTy = dc->getDeclaredTypeOfContext();
       assert(containerTy && "Method in non-type context?");
@@ -2002,6 +2051,11 @@ namespace {
       if (known != Impl.Constructors.end())
         return known->second;
 
+      // Check whether there is already a method with this selector.
+      auto selector = Impl.importSelector(objcMethod->getSelector());
+      if (methodAlreadyImported(selector, /*isInstance=*/false, dc))
+        return nullptr;
+
       // Find the interface, if we can.
       const clang::ObjCInterfaceDecl *interface = nullptr;
       if (isa<clang::ObjCProtocolDecl>(objcMethod->getDeclContext())) {
@@ -2015,7 +2069,6 @@ namespace {
       }
 
       SourceLoc loc;
-      auto selector = Impl.importSelector(objcMethod->getSelector());
       auto name = Impl.mapSelectorToDeclName(selector, /*isInitializer=*/true);
 
       // Add the implicit 'self' parameter patterns.
@@ -2091,12 +2144,29 @@ namespace {
       if (implicit)
         result->setImplicit();
 
-      // If the owning Objective-C class has designated initializers and this
-      // is not one of them, treat it as a convenience initializer.
-      if (isConvenienceInit ||
-          (interface && Impl.hasDesignatedInitializers(interface) &&
-           !Impl.isDesignatedInitializer(interface, objcMethod))) {
-        result->setCompleteObjectInit(true);
+      // If we were told what kind of initializer this should be, set it.
+      if (kind) {
+        switch (*kind) {
+        case InitializerKind::Convenience:
+          result->setCompleteObjectInit(true);
+          break;
+
+        case InitializerKind::Designated:
+          break;
+        }
+      } else {
+        // If the owning Objective-C class has designated initializers and this
+        // is not one of them, treat it as a convenience initializer.
+        if (interface && Impl.hasDesignatedInitializers(interface) &&
+            !Impl.isDesignatedInitializer(interface, objcMethod)) {
+          result->setCompleteObjectInit(true);
+        }
+      }
+
+      // If this initializer is required, add the appropriate attribute.
+      if (required) {
+        result->getMutableAttrs().add(
+          new (Impl.SwiftContext) RequiredAttr(/*implicit=*/true));
       }
 
       // Record the constructor for future re-use.
@@ -2233,6 +2303,7 @@ namespace {
         thunk->getMutableAttrs().add(objcAttr->clone(context));
       else
         thunk->setIsObjC(true);
+      // FIXME: Should we record thunks?
 
       return thunk;
     }
@@ -2504,7 +2575,7 @@ namespace {
       subscript->setAccessors(SourceRange(), getterThunk, setterThunk);
       subscript->setType(FunctionType::get(subscript->getIndices()->getType(),
                                            subscript->getElementType()));
-      subscript->setIsObjC(true);
+      addObjCAttribute(subscript, Nothing);
 
       // Optional subscripts in protocols.
       if (optionalMethods && isa<ProtocolDecl>(dc))
@@ -2788,7 +2859,7 @@ namespace {
       // Turn this into a computed property.
       // FIXME: Fake locations for '{' and '}'?
       result->makeComputed(SourceLoc(), getterThunk, setterThunk, SourceLoc());
-      result->setIsObjC(true);
+      addObjCAttribute(result, Nothing);
 
       if (overridden)
         result->setOverriddenDecl(overridden);
@@ -2949,7 +3020,11 @@ namespace {
             continue;
           }
 
-          if (auto func = dyn_cast<FuncDecl>(member))
+          auto afd = dyn_cast<AbstractFunctionDecl>(member);
+          if (!afd)
+            continue;
+
+          if (auto func = dyn_cast<FuncDecl>(afd))
             if (func->isAccessor())
               continue;
 
@@ -2958,87 +3033,99 @@ namespace {
           if (!objcMethod)
             continue;
 
-          clang::Selector sel = objcMethod->getSelector();
-          if (decl->getMethod(sel, objcMethod->isInstanceMethod()))
-            continue;
+          // When mirroring an initializer, make it designated.
+          // FIXME: Should it be required?
+          if (objcMethod->getMethodFamily() == clang::OMF_init &&
+              isReallyInitMethod(objcMethod)) {
+            // Import the constructor.
+            if (auto imported = importConstructor(
+                                  objcMethod, dc, /*implicit=*/true,
+                                  InitializerKind::Designated,
+                                  /*required=*/false)){
+              members.push_back(imported);
+            }
 
+            continue;
+          }
+
+          // Import the method.
           if (auto imported = Impl.importMirroredDecl(objcMethod, dc)) {
             members.push_back(imported);
+          }
 
-            if (isRoot && objcMethod->isInstanceMethod() &&
-                !decl->getClassMethod(sel, /*AllowHidden=*/true)) {
-              if (auto classImport = Impl.importMirroredDecl(objcMethod,
-                                                             dc, true))
-                members.push_back(classImport);
-            }
+          // Import instance methods of a root class also as class methods.
+          if (isRoot && objcMethod->isInstanceMethod()) {
+            if (auto classImport = Impl.importMirroredDecl(objcMethod,
+                                                           dc, true))
+              members.push_back(classImport);
           }
         }
       }
     }
 
-    /// \brief Determine whether the given Objective-C class has an instance or
-    /// class method with the given selector directly declared (i.e., not in
-    /// a superclass or protocol).
-    static bool hasMethodShallow(const clang::Selector sel, bool isInstance,
-                                 const clang::ObjCInterfaceDecl *objcClass) {
-      if (objcClass->getMethod(sel, isInstance))
-        return true;
-
-      for (auto cat = objcClass->visible_categories_begin(),
-                catEnd = objcClass->visible_categories_end();
-           cat != catEnd;
-           ++cat) {
-        if ((*cat)->getMethod(sel, isInstance))
-          return true;
-      }
-
-      return false;
-    }
-
     /// \brief Import constructors from our superclasses (and their
     /// categories/extensions), effectively "inheriting" constructors.
-    void importInheritedConstructors(const clang::ObjCInterfaceDecl *objcClass,
-                                     DeclContext *dc,
-                                     SmallVectorImpl<Decl *> &members) {
-      // FIXME: Would like a more robust way to ensure that we aren't creating
-      // duplicates.
-      llvm::SmallSet<clang::Selector, 16> knownSelectors;
-      auto inheritConstructors = [&](const clang::ObjCContainerDecl *container,
-                                     bool isConvenienceInit){
-        for (auto meth = container->meth_begin(),
-                  methEnd = container->meth_end();
-             meth != methEnd; ++meth) {
-          if ((*meth)->getMethodFamily() == clang::OMF_init &&
-              isReallyInitMethod(*meth) &&
-              !hasMethodShallow((*meth)->getSelector(),
-                                (*meth)->isInstanceMethod(),
-                                objcClass) &&
-              knownSelectors.insert((*meth)->getSelector())) {
-                if (auto special = importConstructor(*meth, dc,
-                                                     /*implicit=*/true,
-                                                     isConvenienceInit)) {
-                  members.push_back(special);
-                }
-              }
+    void importInheritedConstructors(ClassDecl *classDecl,
+                                     SmallVectorImpl<Decl *> &newMembers) {
+      if (!classDecl->hasSuperclass())
+        return;
+
+      DeclContext *dc = classDecl;
+      auto inheritConstructors = [&](ArrayRef<Decl *> members,
+                                     Optional<InitializerKind> kind) {
+        for (auto member : members) {
+          auto ctor = dyn_cast<ConstructorDecl>(member);
+          if (!ctor)
+            continue;
+
+          auto objcMethod
+            = dyn_cast_or_null<clang::ObjCMethodDecl>(ctor->getClangDecl());
+          if (!objcMethod)
+            continue;
+
+          // Figure out what kind of constructor this will be.
+          InitializerKind myKind;
+          bool isRequired = false;
+          if (ctor->isRequired()) {
+            // Required initializers are always considered designated.
+            isRequired = true;
+            myKind = InitializerKind::Designated;
+          } else if (kind) {
+            myKind = *kind;
+          } else {
+            myKind = ctor->isCompleteObjectInit() ? InitializerKind::Convenience
+                                                  : InitializerKind::Designated;
+          }
+
+          // Import the constructor into this context.
+          if (auto newCtor = importConstructor(objcMethod, dc,
+                                               /*implicit=*/true,
+                                               myKind,
+                                               isRequired)) {
+            newMembers.push_back(newCtor);
+          }
         }
       };
 
-      bool isConvenienceInit = false;
-      for (auto curObjCClass = objcClass->getSuperClass(); curObjCClass;
-           curObjCClass = curObjCClass->getSuperClass()) {
-        inheritConstructors(curObjCClass, isConvenienceInit);
-        for (auto cat = curObjCClass->visible_categories_begin(),
-                  catEnd = curObjCClass->visible_categories_end();
-             cat != catEnd;
-             ++cat) {
-          inheritConstructors(*cat, isConvenienceInit);
+      // The kind of initializer to import. If this class has designated
+      // initializers, everything it imports is a convenience initializer.
+      Optional<InitializerKind> kind;
+      auto curObjCClass
+        = cast<clang::ObjCInterfaceDecl>(classDecl->getClangDecl());
+      if (Impl.hasDesignatedInitializers(curObjCClass))
+        kind = InitializerKind::Convenience;
+
+      auto superclass
+        = cast<ClassDecl>(classDecl->getSuperclass()->getAnyNominal());
+
+      // If we we have a superclass, import from it.
+      if (auto superclassClangDecl = superclass->getClangDecl()) {
+        if (isa<clang::ObjCInterfaceDecl>(superclassClangDecl)) {
+          inheritConstructors(superclass->getMembers(), kind);
+
+          for (auto ext : superclass->getExtensions())
+            inheritConstructors(ext->getMembers(), kind);
         }
-        
-        // When we hit a class that does declare it's designated
-        // initializers, any initializers above it are convenience
-        // initializers.
-        if (Impl.hasDesignatedInitializers(curObjCClass))
-          isConvenienceInit = true;
       }
     }
 
@@ -3419,7 +3506,7 @@ namespace {
       // Turn this into a computed property.
       // FIXME: Fake locations for '{' and '}'?
       result->makeComputed(SourceLoc(), getterThunk, setterThunk, SourceLoc());
-      result->setIsObjC(true);
+      addObjCAttribute(result, Nothing);
 
       // Handle attributes.
       if (decl->hasAttr<clang::IBOutletAttr>())
@@ -3985,32 +4072,34 @@ ClangImporter::Implementation::loadAllMembers(const Decl *D, uint64_t unused) {
   const DeclContext *DC;
   ArrayRef<ProtocolDecl *> protos;
 
-  if (auto clangClass = dyn_cast<clang::ObjCInterfaceDecl>(clangDecl)) {
-    auto swiftClass = cast<ClassDecl>(D);
-    protos = swiftClass->getProtocols();
-    DC = swiftClass;
-
-    clangDecl = clangClass = clangClass->getDefinition();
-
-    // Imported inherited initializers.
-    if (clangClass->getName() != "Protocol") {
-      converter.importInheritedConstructors(clangClass,
-                                            const_cast<DeclContext *>(DC),
-                                            members);
-    }
-
-  } else if (auto clangProto = dyn_cast<clang::ObjCProtocolDecl>(clangDecl)) {
-    DC = cast<ProtocolDecl>(D);
-    clangDecl = clangProto->getDefinition();
-
+  // Figure out the declaration context we're importing into.
+  if (auto nominal = dyn_cast<NominalTypeDecl>(D)) {
+    DC = nominal;
   } else {
-    auto extension = cast<ExtensionDecl>(D);
-    DC = extension;
-    protos = extension->getProtocols();
+    DC = cast<ExtensionDecl>(D);
   }
 
   converter.importObjCMembers(clangDecl, const_cast<DeclContext *>(DC),
                               members);
+
+  if (auto clangClass = dyn_cast<clang::ObjCInterfaceDecl>(clangDecl)) {
+    auto swiftClass = cast<ClassDecl>(D);
+    protos = swiftClass->getProtocols();
+    clangDecl = clangClass = clangClass->getDefinition();
+
+    // Imported inherited initializers.
+    if (clangClass->getName() != "Protocol") {
+      converter.importInheritedConstructors(const_cast<ClassDecl *>(swiftClass),
+                                            members);
+    }
+
+  } else if (auto clangProto = dyn_cast<clang::ObjCProtocolDecl>(clangDecl)) {
+    clangDecl = clangProto->getDefinition();
+
+  } else {
+    auto extension = cast<ExtensionDecl>(D);
+    protos = extension->getProtocols();
+  }
 
   // Import mirrored declarations for protocols to which this category
   // or extension conforms.

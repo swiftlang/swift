@@ -19,7 +19,11 @@ typedef signed char BOOL;
 
 @end
 
+@interface NSCoder : NSObject
+@end
+
 @protocol NSCoding
+- (instancetype)initWithCoder:(NSCoder *)aCoder;
 @end
 
 @protocol NSSecureCoding <NSCoding>

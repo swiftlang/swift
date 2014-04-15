@@ -50,3 +50,10 @@
 @interface NSScrollView : NSObject
 - (void)scrollItemAtIndexToTop:(int)index;
 @end
+
+@interface NSViewController : NSObject <NSCoding>
+@end
+
+@interface NSTableViewController : NSViewController
+-(instancetype)initWithInt:(NSInteger)value NS_DESIGNATED_INITIALIZER;
+@end
