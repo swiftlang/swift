@@ -923,7 +923,7 @@ void ClangImporter::lookupValue(Identifier name, VisibleDeclConsumer &consumer){
 }
 
 static bool isDeclaredInModule(const ClangModuleUnit *ModuleFilter,
-                               const ValueDecl *VD) {
+                               const Decl *VD) {
   auto ContainingUnit = VD->getDeclContext()->getModuleScopeContext();
   return ModuleFilter == ContainingUnit;
 }
@@ -1015,16 +1015,30 @@ public:
 
 class FilteringDeclaredDeclConsumer : public swift::VisibleDeclConsumer {
   swift::VisibleDeclConsumer &NextConsumer;
+  SmallVectorImpl<ExtensionDecl *> &ExtensionResults;
   const ClangModuleUnit *ModuleFilter = nullptr;
 
 public:
   FilteringDeclaredDeclConsumer(swift::VisibleDeclConsumer &consumer,
+                             SmallVectorImpl<ExtensionDecl *> &ExtensionResults,
                                 const ClangModuleUnit *CMU)
-      : NextConsumer(consumer), ModuleFilter(CMU) {}
+      : NextConsumer(consumer),
+        ExtensionResults(ExtensionResults),
+        ModuleFilter(CMU) {}
 
   void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
-    if (isDeclaredInModule(ModuleFilter, VD))
+    if (isDeclaredInModule(ModuleFilter, VD)) {
       NextConsumer.foundDecl(VD, Reason);
+      return;
+    }
+    // Also report the extensions of the module that extend types from another
+    // module.
+    if (auto NTD = dyn_cast<NominalTypeDecl>(VD)) {
+      for (auto Ext : NTD->getExtensions()) {
+        if (isDeclaredInModule(ModuleFilter, Ext))
+          ExtensionResults.push_back(Ext);
+      }
+    }
   }
 };
 
@@ -1108,8 +1122,10 @@ public:
 
 void ClangModuleUnit::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
   VectorDeclPtrConsumer Consumer(results);
-  FilteringDeclaredDeclConsumer FilterConsumer(Consumer, this);
+  SmallVector<ExtensionDecl *, 16> Extensions;
+  FilteringDeclaredDeclConsumer FilterConsumer(Consumer, Extensions, this);
   owner.lookupVisibleDecls(FilterConsumer);
+  results.append(Extensions.begin(), Extensions.end());
 }
 
 static void getImportDecls(ClangModuleUnit *ClangUnit, clang::Module *M,
