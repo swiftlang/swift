@@ -957,7 +957,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   // The type we're working with, in case we want to build it differently
   // based on the attributes we see.
   Type ty;
-
+  
   // In SIL *only*, allow @thin, @thick, or @objc_metatype to apply to
   // a metatype.
   if (attrs.has(TAK_thin) || attrs.has(TAK_thick) || 
@@ -1181,7 +1181,13 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       }
     }
   }
-
+  
+  // In SIL *only*, allow @block_storage to specify a block storage type.
+  if ((options & TR_SILType) && attrs.has(TAK_block_storage)) {
+    ty = SILBlockStorageType::get(ty->getCanonicalType());
+    attrs.clearAttribute(TAK_block_storage);
+  }
+  
   // Diagnose @local_storage in nested positions.
   if (attrs.has(TAK_local_storage)) {
     assert(DC->getParentSourceFile()->Kind == SourceFileKind::SIL);

@@ -751,21 +751,8 @@ bool SILParser::parseSILType(SILType &Result, GenericParamList *&GenericParams,
     category = SILValueCategory::LocalStorage;
     attrs.clearAttribute(TAK_local_storage);
   }
-  
-  // Handle @block_storage, which produces a block storage type.
-  bool isBlockStorage = attrs.has(TAK_block_storage);
-  if (isBlockStorage)
-    attrs.clearAttribute(TAK_block_storage);
-  
-  if (parseSILTypeWithoutQualifiers(Result, category, attrs, GenericParams,
-                                    IsFuncDecl))
-    return true;
-  
-  if (isBlockStorage)
-    Result = SILType::getPrimitiveType(
-                       SILBlockStorageType::get(Result.getSwiftRValueType()),
-                       Result.getCategory());
-  return false;
+  return parseSILTypeWithoutQualifiers(Result, category, attrs, GenericParams,
+                                       IsFuncDecl);
 }
 
 bool SILParser::parseSILDottedPath(ValueDecl *&Decl,
