@@ -170,6 +170,10 @@ class FooClassDerived : FooClassBase, FooProtocolDerived, FooProtocolBase {
   var fooProperty2: CInt
   var fooProperty3: CInt { get }
   
+  /* Blah..
+     for fooInstanceFunc0..
+     blah blah.
+  */
   func fooInstanceFunc0()
   func fooInstanceFunc1(CInt)
   func fooInstanceFunc2(CInt, withB: CInt)

@@ -15,6 +15,7 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
+#include "swift/Basic/PrimitiveParsing.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Serialization/ModuleFile.h"
@@ -62,6 +63,8 @@ private:
   // This expects to get passed clang nodes in source-order (at least within the
   // same header).
   void printCommentsUntil(ClangNode Node);
+
+  void printComment(StringRef Text, unsigned StartLocCol);
 
   bool isDocumentationComment(clang::SourceLocation CommentLoc,
                               ClangNode Node) const;
@@ -438,8 +441,8 @@ void ClangCommentPrinter::printCommentsUntil(ClangNode Node) {
       printIndent();
     }
     if (!IsDocComment) {
-      *this << CommentText << "\n";
-      printIndent();
+      unsigned StartLocCol = SM.getSpellingColumnNumber(Tok.getLocation());
+      printComment(CommentText, StartLocCol);
     }
     LastPrintedLineNo =
         SM.getLineNumber(LocInfo.first, LocInfo.second + Tok.getLength());
@@ -448,6 +451,17 @@ void ClangCommentPrinter::printCommentsUntil(ClangNode Node) {
 
   // Resume printing comments from this point.
   setResumeOffset(FID, BufPtr - BufStart);
+}
+
+void ClangCommentPrinter::printComment(StringRef RawText, unsigned StartCol) {
+  unsigned WhitespaceToTrim = StartCol ? StartCol - 1 : 0;
+  SmallVector<StringRef, 8> Lines;
+  trimLeadingWhitespaceFromLines(RawText, WhitespaceToTrim, Lines);
+
+  for (auto Line : Lines) {
+    *this << Line << "\n";
+    printIndent();
+  }
 }
 
 bool ClangCommentPrinter::isDocumentationComment(

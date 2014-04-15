@@ -158,6 +158,10 @@ int redeclaredInMultipleModulesFunc1(int a);
 @property (readwrite) int fooProperty2;
 @property (readonly) int fooProperty3;
 
+/* Blah..
+   for fooInstanceFunc0..
+   blah blah.
+*/
 - (void) fooInstanceFunc0;
 - (void) fooInstanceFunc1:(int)a;
 - (void) fooInstanceFunc2:(int)a withB:(int)b;

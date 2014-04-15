@@ -18,30 +18,29 @@
 #ifndef SWIFT_BASIC_PRIMITIVEPARSING_H
 #define SWIFT_BASIC_PRIMITIVEPARSING_H
 
-namespace swift {
+#include "llvm/ADT/StringRef.h"
 
-static inline unsigned measureNewline(const char *BufferPtr,
-                                      const char *BufferEnd) {
-  if (BufferPtr == BufferEnd)
-    return 0;
-
-  if (*BufferPtr == '\n')
-    return 1;
-
-  assert(*BufferPtr == '\r');
-  unsigned Bytes = 1;
-  if (BufferPtr != BufferEnd && *BufferPtr == '\n')
-    Bytes++;
-  return Bytes;
+namespace llvm {
+  class StringRef;
+  template<typename T> class SmallVectorImpl;
 }
 
-static inline unsigned measureNewline(StringRef S) {
+namespace swift {
+
+unsigned measureNewline(const char *BufferPtr, const char *BufferEnd);
+
+static inline unsigned measureNewline(llvm::StringRef S) {
   return measureNewline(S.data(), S.data() + S.size());
 }
 
-static inline bool startsWithNewline(StringRef S) {
+static inline bool startsWithNewline(llvm::StringRef S) {
   return S.startswith("\n") || S.startswith("\r\n");
 }
+
+/// Breaks a given string to lines and trims leading whitespace from them.
+void trimLeadingWhitespaceFromLines(llvm::StringRef Text,
+                           unsigned WhitespaceToTrim,
+                           llvm::SmallVectorImpl<llvm::StringRef> &Lines);
 
 } // namespace swift
 

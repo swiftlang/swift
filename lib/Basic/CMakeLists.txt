@@ -5,6 +5,7 @@ add_swift_library(swiftBasic
   DiverseStack.cpp
   LangOptions.cpp
   PrettyStackTrace.cpp
+  PrimitiveParsing.cpp
   Program.cpp
   Punycode.cpp
   QuotedString.cpp

@@ -141,40 +141,15 @@ class PrintAST : public ASTVisitor<PrintAST> {
     if (Invalid)
       StartLocCol = 0;
 
-    unsigned WhitespaceToTrim = StartLocCol - 1;
-    bool IsFirstLine = true;
+    unsigned WhitespaceToTrim = StartLocCol ? StartLocCol - 1 : 0;
 
     SmallVector<StringRef, 8> Lines;
 
     StringRef RawText =
         RC->getRawText(ClangContext.getSourceManager()).rtrim("\n\r");
-    while (!RawText.empty()) {
-      size_t Pos = RawText.find_first_of("\n\r");
-      if (Pos == StringRef::npos)
-        Pos = RawText.size();
+    trimLeadingWhitespaceFromLines(RawText, WhitespaceToTrim, Lines);
 
-      StringRef Line = RawText.substr(0, Pos);
-      Lines.push_back(Line);
-      if (!IsFirstLine) {
-        size_t NonWhitespacePos = RawText.find_first_not_of(' ');
-        if (NonWhitespacePos != StringRef::npos)
-          WhitespaceToTrim =
-              std::min(WhitespaceToTrim,
-                       static_cast<unsigned>(NonWhitespacePos));
-      }
-      IsFirstLine = false;
-
-      RawText = RawText.drop_front(Pos);
-      unsigned NewlineBytes = measureNewline(RawText);
-      RawText = RawText.drop_front(NewlineBytes);
-    }
-
-    IsFirstLine = true;
     for (auto Line : Lines) {
-      if (!IsFirstLine) {
-        Line = Line.drop_front(WhitespaceToTrim);
-      }
-      IsFirstLine = false;
       Printer << Line;
       Printer.printNewline();
     }
