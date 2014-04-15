@@ -460,9 +460,12 @@ void StackAllocationPromoter::fixBranchesAndLoads(BlockSet &PhiBlocks) {
     if (!LI)
       continue;
 
+    SILBasicBlock *BB = LI->getParent();
+    DomTreeNode *Node = DT->getNode(BB);
+
     // If this block has no predecessors then nothing dominates it and the load
     // is dead code. Replace the load value with Undef and move on.
-    if (LI->getParent()->pred_empty()) {
+    if (LI->getParent()->pred_empty() || !Node) {
       SILValue Def =  SILUndef::get(ASI->getElementType(), ASI->getModule());
       SILValue(LI, 0).replaceAllUsesWith(Def);
       LI->eraseFromParent();
@@ -474,7 +477,6 @@ void StackAllocationPromoter::fixBranchesAndLoads(BlockSet &PhiBlocks) {
     // our loads happen before stores, so we need to first check for Phi nodes
     // in the first block, but stores first in all other stores in the idom
     // chain.
-    SILBasicBlock *BB = LI->getParent();
     if (PhiBlocks.count(BB)) {
       DEBUG(llvm::dbgs() << "*** Found a local Phi definiton.\n");
       SILValue Phi = BB->getBBArg(BB->getNumBBArg()-1);
@@ -488,7 +490,6 @@ void StackAllocationPromoter::fixBranchesAndLoads(BlockSet &PhiBlocks) {
 
     // We know that the load definition is not in our block, so start the search
     // one level up the idom tree.
-    DomTreeNode *Node = DT->getNode(BB);
     Node = Node->getIDom();
     assert(Node && "Promoting a load in the entry block ?");
     BB = Node->getBlock();
