@@ -624,13 +624,15 @@ void IRGenDebugInfo::emitImport(ImportDecl *D) {
   }
 
   StringRef Name = BumpAllocatedString(Printed);
-  createImportedModule(Name, Mangled, llvm::DIModule(Module));
+  unsigned Line = getLoc(SM, D).Line;
+  createImportedModule(Name, Mangled, llvm::DIModule(Module), Line);
 }
 
 // Create an imported module and import declarations for all functions
 // from that module.
 void IRGenDebugInfo::createImportedModule(StringRef Name, StringRef Mangled,
-                                          llvm::DIModule Module) {
+                                          llvm::DIModule Module,
+                                          unsigned Line) {
   // This is bending the rules a little bit, but we are creating the
   // imported module with the location of the imported module instead
   // of the location of the import statement. Dsymustil elides
@@ -643,7 +645,7 @@ void IRGenDebugInfo::createImportedModule(StringRef Name, StringRef Mangled,
     File = getOrCreateFile(Path.c_str());
   } 
   llvm::DIImportedEntity Import =
-    DBuilder.createImportedModule(File, Module, 1);
+    DBuilder.createImportedModule(File, Module, Line);
 
   // Add all functions that belong to this module to it.
   //
@@ -677,7 +679,7 @@ llvm::DIScope IRGenDebugInfo::getOrCreateModule(llvm::DIScope Module,
     if (llvm::Value *Val = CachedNS->second)
       return llvm::DIModule(cast<llvm::MDNode>(Val));
 
-  auto NS = DBuilder.createModule(Module, MangledName, File);
+  auto NS = DBuilder.createModule(Module, MangledName, File, 1);
   DIModuleCache[MangledName] = llvm::WeakVH(NS);
   return NS;
 }
@@ -1525,7 +1527,7 @@ void IRGenDebugInfo::finalize() {
     MS << "S";
   else
     mangleIdent(MS, Opts.ModuleName);
-  createImportedModule(Opts.ModuleName, MS.str(), Module);
+  createImportedModule(Opts.ModuleName, MS.str(), Module, 1);
 
   // The default for a function is to be in the file-level scope.
   for (auto FVH: Functions) {

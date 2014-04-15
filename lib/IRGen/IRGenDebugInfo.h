@@ -223,7 +223,7 @@ private:
   StringRef BumpAllocatedString(StringRef S);
 
   void createImportedModule(StringRef Name, StringRef MangledPrefix,
-                            llvm::DIModule Module);
+                            llvm::DIModule Module, unsigned Line);
 
   llvm::DIType createType(DebugTypeInfo DbgTy, llvm::DIDescriptor Scope,
                           llvm::DIFile File);
