@@ -623,6 +623,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
     DotExpr,
     PostfixExprBeginning,
     PostfixExpr,
+    PostfixExprParen,
     SuperExpr,
     SuperExprDot,
     TypeSimpleBeginning,
@@ -722,6 +723,7 @@ public:
   void completeDotExpr(Expr *E) override;
   void completePostfixExprBeginning() override;
   void completePostfixExpr(Expr *E) override;
+  void completePostfixExprParen(Expr *E) override;
   void completeExprSuper(SuperRefExpr *SRE) override;
   void completeExprSuperDot(SuperRefExpr *SRE) override;
 
@@ -778,6 +780,7 @@ class CompletionLookup : public swift::VisibleDeclConsumer {
 
   bool HaveDot = false;
   bool NeedLeadingDot = false;
+  bool HaveLParen = false;
   bool IsSuperRefExpr = false;
   bool IsDynamicLookup = false;
 
@@ -845,6 +848,10 @@ public:
 
   bool needDot() const {
     return NeedLeadingDot;
+  }
+
+  void setHaveLParen(bool Value) {
+    HaveLParen = Value;
   }
 
   void setIsSuperRefExpr() {
@@ -1035,7 +1042,8 @@ public:
         Builder.addTextChunk(Label.str());
         Builder.addTextChunk(": ");
       }
-      Builder.addLeftParen();
+      if (!IsTopLevel || !HaveLParen)
+        Builder.addLeftParen();
       bool NeedComma = false;
       for (auto TupleElt : TT->getFields()) {
         if (NeedComma)
@@ -1048,7 +1056,7 @@ public:
       return;
     }
     if (auto *PT = dyn_cast<ParenType>(T.getPointer())) {
-      if (IsTopLevel)
+      if (IsTopLevel && !HaveLParen)
         Builder.addLeftParen();
       Builder.addCallParameter(Identifier(), PT->getUnderlyingType());
       if (IsTopLevel)
@@ -1056,7 +1064,7 @@ public:
       return;
     }
 
-    if (IsTopLevel)
+    if (IsTopLevel && !HaveLParen)
       Builder.addLeftParen();
 
     Builder.addCallParameter(Label, T);
@@ -1073,7 +1081,8 @@ public:
         Sink,
         CodeCompletionResult::ResultKind::Pattern,
         SemanticContextKind::ExpressionSpecific);
-    Builder.addLeftParen();
+    if (!HaveLParen)
+      Builder.addLeftParen();
     bool NeedComma = false;
     if (auto *TT = AFT->getInput()->getAs<TupleType>()) {
       for (auto TupleElt : TT->getFields()) {
@@ -1339,6 +1348,24 @@ public:
 
     switch (Kind) {
     case LookupKind::ValueExpr:
+      if (auto *CD = dyn_cast<ConstructorDecl>(D)) {
+        if (ExprType->is<AnyMetatypeType>()) {
+          if (HaveDot)
+            return;
+          addConstructorCall(CD, Reason);
+        }
+        if (IsSuperRefExpr) {
+          if (auto *AFD = dyn_cast<AbstractFunctionDecl>(CurrDeclContext))
+            if (!isa<ConstructorDecl>(AFD))
+              return;
+          addConstructorCall(CD, Reason);
+        }
+        return;
+      }
+
+      if (HaveLParen)
+        return;
+
       if (auto *VD = dyn_cast<VarDecl>(D)) {
         addVarDeclRef(VD, Reason);
         return;
@@ -1375,21 +1402,6 @@ public:
 
       if (auto *AT = dyn_cast<AssociatedTypeDecl>(D)) {
         addAssociatedTypeRef(AT, Reason);
-        return;
-      }
-
-      if (auto *CD = dyn_cast<ConstructorDecl>(D)) {
-        if (ExprType->is<AnyMetatypeType>()) {
-          if (HaveDot)
-            return;
-          addConstructorCall(CD, Reason);
-        }
-        if (IsSuperRefExpr) {
-          if (auto *AFD = dyn_cast<AbstractFunctionDecl>(CurrDeclContext))
-            if (!isa<ConstructorDecl>(AFD))
-              return;
-          addConstructorCall(CD, Reason);
-        }
         return;
       }
 
@@ -1716,6 +1728,18 @@ void CodeCompletionCallbacksImpl::completePostfixExpr(Expr *E) {
   CurDeclContext = P.CurDeclContext;
 }
 
+void CodeCompletionCallbacksImpl::completePostfixExprParen(Expr *E) {
+  assert(P.Tok.is(tok::code_complete));
+
+  // Don't produce any results in an enum element.
+  if (InEnumElementRawValue)
+    return;
+
+  Kind = CompletionKind::PostfixExprParen;
+  ParsedExpr = E;
+  CurDeclContext = P.CurDeclContext;
+}
+
 void CodeCompletionCallbacksImpl::completeExprSuper(SuperRefExpr *SRE) {
   // Don't produce any results in an enum element.
   if (InEnumElementRawValue)
@@ -1794,14 +1818,23 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   if (auto *AFD = dyn_cast_or_null<AbstractFunctionDecl>(DelayedParsedDecl))
     CurDeclContext = AFD;
 
-  if (ParsedExpr && !typecheckParsedExpr())
-    return;
+  if (ParsedExpr && !typecheckParsedExpr()) {
+    if (Kind != CompletionKind::PostfixExprParen)
+      return;
+  }
 
   if (!ParsedTypeLoc.isNull() && !typecheckParsedType())
     return;
 
   CompletionLookup Lookup(CompletionContext.getResultSink(), P.Context,
                           CurDeclContext);
+
+  auto DoPostfixExprBeginning = [&] {
+    if (CStyleForLoopIterationVariable)
+      Lookup.addExpressionSpecificDecl(CStyleForLoopIterationVariable);
+    SourceLoc Loc = P.Context.SourceMgr.getCodeCompletionLoc();
+    Lookup.getValueCompletionsInDeclContext(Loc);
+  };
 
   switch (Kind) {
   case CompletionKind::None:
@@ -1818,10 +1851,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   }
 
   case CompletionKind::PostfixExprBeginning: {
-    if (CStyleForLoopIterationVariable)
-      Lookup.addExpressionSpecificDecl(CStyleForLoopIterationVariable);
-    SourceLoc Loc = P.Context.SourceMgr.getCodeCompletionLoc();
-    Lookup.getValueCompletionsInDeclContext(Loc);
+    DoPostfixExprBeginning();
     break;
   }
 
@@ -1830,6 +1860,15 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     if (isDynamicLookup(ExprType))
       Lookup.setIsDynamicLookup();
     Lookup.getValueExprCompletions(ExprType);
+    break;
+  }
+
+  case CompletionKind::PostfixExprParen: {
+    Lookup.setHaveLParen(true);
+    Lookup.getValueExprCompletions(ParsedExpr->getType());
+
+    Lookup.setHaveLParen(false);
+    DoPostfixExprBeginning();
     break;
   }
 

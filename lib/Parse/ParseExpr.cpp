@@ -1802,17 +1802,30 @@ bool Parser::hasExprCallSuffix(bool isExprBasic) {
 /// selector-arg:
 ///   identifier expr-paren
 ///   identifier expr-closure
-ParserResult<Expr> Parser::parseExprCallSuffix(ParserResult<Expr> fn,
-                                               Identifier firstSelectorPiece,
-                                               SourceLoc firstSelectorPieceLoc) {
-  assert((Tok.isFollowingLParen() || Tok.isFollowingLBrace()) 
-         && "Not a call suffix?");
+ParserResult<Expr>
+Parser::parseExprCallSuffix(ParserResult<Expr> fn,
+                            Identifier firstSelectorPiece,
+                            SourceLoc firstSelectorPieceLoc) {
+  assert((Tok.isFollowingLParen() || Tok.isFollowingLBrace()) &&
+         "Not a call suffix?");
 
   // Parse the first argument.
   bool firstArgIsClosure = !Tok.isFollowingLParen();
-  ParserResult<Expr> firstArg
-    = firstArgIsClosure? parseExprClosure()
-                      : parseExprList(Tok.getKind(), tok::r_paren);
+
+  // If there is a code completion token right after the '(', do a special case
+  // callback.
+  if (!firstArgIsClosure && peekToken().is(tok::code_complete) &&
+      CodeCompletion) {
+    consumeToken(tok::l_paren);
+    CodeCompletion->completePostfixExprParen(fn.get());
+    // Eat the code completion token because we handled it.
+    consumeToken(tok::code_complete);
+    return makeParserCodeCompletionResult<Expr>();
+  }
+
+  ParserResult<Expr> firstArg =
+      firstArgIsClosure ? parseExprClosure()
+                        : parseExprList(Tok.getKind(), tok::r_paren);
   if (firstArg.hasCodeCompletion())
     return firstArg;
 
