@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/PrimitiveParsing.h"
+#include "llvm/ADT/SmallVector.h"
 
 using namespace llvm;
 

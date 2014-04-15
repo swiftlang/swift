@@ -19,11 +19,7 @@
 #define SWIFT_BASIC_PRIMITIVEPARSING_H
 
 #include "llvm/ADT/StringRef.h"
-
-namespace llvm {
-  class StringRef;
-  template<typename T> class SmallVectorImpl;
-}
+#include "swift/Basic/LLVM.h"
 
 namespace swift {
 
