@@ -1147,33 +1147,31 @@ static void validatePatternBindingDecl(TypeChecker &tc,
   // If we have a type but no initializer on an @IBOutlet, check
   // whether the type is default-initializable. If so, do it.
   if (binding->getPattern()->hasType() && binding->hasStorage() &&
-      !binding->hasInit()) {
-    auto type = binding->getPattern()->getType();
-    if (!type->is<ErrorType>()) {
+      !binding->hasInit() &&
+      !binding->getPattern()->getType()->is<ErrorType>()) {
 
-      // If we have a type-adjusting attribute, apply it now.
-      if (auto var = binding->getSingleVar()) {
-        if (var->getAttrs().isIBOutlet())
-          tc.checkIBOutlet(var);
-        if (var->getAttrs().hasOwnership())
-          tc.checkOwnershipAttr(var, var->getAttrs().getOwnership());
-      }
+    // If we have a type-adjusting attribute, apply it now.
+    if (auto var = binding->getSingleVar()) {
+      if (var->getAttrs().isIBOutlet())
+        tc.checkIBOutlet(var);
+      if (var->getAttrs().hasOwnership())
+        tc.checkOwnershipAttr(var, var->getAttrs().getOwnership());
+    }
 
-      // Make sure we aren't @weak or have a 'let'.
-      // FIXME: Should be able to handle @weak.
-      bool isWeak = false;
-      bool isLet = false;
-      binding->getPattern()->forEachVariable([&](VarDecl *var) {
-          if (var->getAttrs().isWeak())
-            isWeak = true;
-          if (var->isLet())
-            isLet = true;
-        });
+    // Make sure we aren't @weak or have a 'let'.
+    // FIXME: Should be able to handle @weak.
+    bool isWeak = false, isLet = false;
+    binding->getPattern()->forEachVariable([&](VarDecl *var) {
+      if (var->getAttrs().isWeak())
+        isWeak = true;
+      if (var->isLet())
+        isLet = true;
+    });
 
-      if (!isWeak && !isLet) {
-        if (auto defaultInit = buildDefaultInitializer(tc, type)) {
-          binding->setInit(defaultInit, /*checked=*/false);
-        }
+    if (!isWeak && !isLet) {
+      auto type = binding->getPattern()->getType();
+      if (auto defaultInit = buildDefaultInitializer(tc, type)) {
+        binding->setInit(defaultInit, /*checked=*/false);
       }
     }
   }
