@@ -99,8 +99,8 @@ public:
       /// A placeholder for \c ! or \c ? in a call to a method found by dynamic
       /// lookup.
       ///
-      /// Note that the IDE should not insert any of these characters by
-      /// default.
+      /// The default spelling is \c !, but clients may render it as \c ? if
+      /// desired.
       DynamicLookupMethodCallTail,
 
       /// Specifies the type of the whole entity that is returned in this code

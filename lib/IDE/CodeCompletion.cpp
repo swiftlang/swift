@@ -146,7 +146,7 @@ void CodeCompletionString::print(raw_ostream &OS) const {
       OS << "{#";
       break;
     case Chunk::ChunkKind::DynamicLookupMethodCallTail:
-      OS << "{#" << C.getText() << "#}";
+      OS << C.getText();
       break;
     case Chunk::ChunkKind::TypeAnnotation:
       OS << "[#";

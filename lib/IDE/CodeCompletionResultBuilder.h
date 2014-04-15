@@ -181,7 +181,7 @@ public:
   void addDynamicLookupMethodCallTail() {
     addChunkWithTextNoCopy(
         CodeCompletionString::Chunk::ChunkKind::DynamicLookupMethodCallTail,
-        "?|!");
+        "!");
     getLastChunk().setIsAnnotation();
   }
 
