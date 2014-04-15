@@ -1051,7 +1051,16 @@ bb0(%0 : $Int, %1 : $*P):
   unreachable
 }
 
-
+// CHECK-LABEL: sil @block_storage_type
+sil @block_storage_type : $@thin () -> () {
+  // CHECK: [[STORAGE:%.*]] = alloc_stack $@block_storage Int
+  %b = alloc_stack $@block_storage Int
+  // CHECK: [[PTR:%.*]] = address_to_pointer [[STORAGE]]#1 : $*@block_storage Int to $Builtin.RawPointer
+  %p = address_to_pointer %b#1 : $*@block_storage Int to $Builtin.RawPointer
+  // CHECK: dealloc_stack [[STORAGE]]#0 : $*@local_storage @block_storage Int
+  dealloc_stack %b#0 : $*@local_storage @block_storage Int
+  return undef : $()
+}
 
 // CHECK-LABEL: sil_vtable Foo {
 // CHECK: #Foo.subscript!getter.1: _TC3tmp3Foo9subscriptFT1xSi1ySi_Sig

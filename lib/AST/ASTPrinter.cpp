@@ -1888,6 +1888,11 @@ public:
 
     T->getInterfaceResult().print(Printer, Options);
   }
+  
+  void visitSILBlockStorageType(SILBlockStorageType *T) {
+    Printer << "@block_storage ";
+    printWithParensIfNotSimple(T->getCaptureType());
+  }
 
   void visitArrayType(ArrayType *T) {
     printWithParensIfNotSimple(T->getBaseType());

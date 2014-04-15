@@ -2995,7 +2995,16 @@ Type ModuleFile::getType(TypeID TID) {
                                             info);
     break;
   }
-
+      
+  case decls_block::SIL_BLOCK_STORAGE_TYPE: {
+    TypeID captureID;
+    
+    decls_block::SILBlockStorageTypeLayout::readRecord(scratch, captureID);
+    typeOrOffset = SILBlockStorageType::get(getType(captureID)
+                                              ->getCanonicalType());
+    break;
+  }
+      
   case decls_block::SIL_FUNCTION_TYPE: {
     TypeID interfaceResultID;
     uint8_t rawInterfaceResultConvention;

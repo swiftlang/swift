@@ -321,6 +321,15 @@ namespace {
           return true;
       return false;
     }
+        
+    /// We shouldn't use block storage pointers in a way that requires
+    /// abstraction difference.
+    bool visitSILBlockStorageType(CanSILBlockStorageType origTy,
+                                  CanSILBlockStorageType substTy) {
+      assert(!visit(origTy->getCaptureType(), substTy->getCaptureType())
+             && "block storage should not differ by abstraction");
+      return false;
+    }
   };
 }
 
@@ -398,6 +407,9 @@ struct EmbedsArchetype : DeclVisitor<EmbedsArchetype, bool>,
   bool visitDependentMemberType(CanDependentMemberType type) {
     // FIXME: These might map down to an archetype.
     return false;
+  }
+  bool visitSILBlockStorageType(CanSILBlockStorageType type) {
+    return visit(type->getCaptureType());
   }
   bool visitProtocolDecl(ProtocolDecl *decl) { return false; }
   bool visitClassDecl(ClassDecl *decl) { return false; }
@@ -652,6 +664,11 @@ namespace {
       auto origLoweredTy = getLoweredType(origTy, origTy);
       unsigned count = IGF.IGM.getExplosionSize(origLoweredTy, Out.getKind());
       In.transferInto(Out, count);
+    }
+    
+    void visitSILBlockStorageType(CanSILBlockStorageType origTy,
+                                  CanSILBlockStorageType substTy) {
+      llvm_unreachable("should never be reabstracted");
     }
 
   private:

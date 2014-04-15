@@ -40,7 +40,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// Serialized module format minor version number.
 ///
 /// When the format changes IN ANY WAY, this number should be incremented.
-const uint16_t VERSION_MINOR = 57;
+const uint16_t VERSION_MINOR = 61;
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -528,6 +528,11 @@ namespace decls_block {
     BCArray<TypeIDField>   // parameter types and conventions, alternating
                            // followed by generic parameter types
     // Trailed by its generic requirements, if any.
+  >;
+  
+  using SILBlockStorageTypeLayout = BCRecordLayout<
+    SIL_BLOCK_STORAGE_TYPE,
+    TypeIDField            // capture type
   >;
 
   template <unsigned Code>

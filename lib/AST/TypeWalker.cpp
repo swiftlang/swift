@@ -154,6 +154,12 @@ class Traversal : public TypeVisitor<Traversal, bool>
   }
 
   bool visitTypeVariableType(TypeVariableType *ty) { return false; }
+  
+  bool visitSILBlockStorageType(SILBlockStorageType *ty) {
+    if (doIt(ty->getCaptureType()))
+      return true;
+    return false;
+  }
 
 public:
   explicit Traversal(TypeWalker &walker) : Walker(walker) {}

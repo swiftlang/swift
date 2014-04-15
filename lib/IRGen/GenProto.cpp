@@ -3504,7 +3504,12 @@ namespace {
     void visitArrayType(CanArrayType type) {
       visit(type.getBaseType());
     }
-
+    
+    // Walk into on-stack block storage.
+    void visitSILBlockStorageType(CanSILBlockStorageType t) {
+      visit(t->getCaptureType());
+    }
+    
     // We do not need to walk into any of these types, because their
     // value operations do not depend on the specifics of their
     // sub-structure (or they have none).

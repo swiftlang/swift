@@ -369,6 +369,10 @@ namespace {
     RetTy visitDynamicSelfType(CanDynamicSelfType type) {
       return this->visit(type.getSelfType());
     }
+    
+    RetTy visitSILBlockStorageType(CanSILBlockStorageType type) {
+      return this->visit(type->getCaptureType());
+    }
   };
 
   class TypeClassifier :

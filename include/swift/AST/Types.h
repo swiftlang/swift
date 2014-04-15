@@ -2425,7 +2425,37 @@ public:
   }
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(SILFunctionType, Type)
-
+  
+class SILBlockStorageType;
+typedef CanTypeWrapper<SILBlockStorageType> CanSILBlockStorageType;
+  
+/// The SIL-only type @block_storage T, which represents the layout of an
+/// on-stack block that captures a value of type T.
+///
+/// This type does not have to be able to appear positionally, unlike
+/// SILFunctionType, so it is only parsed and defined within the SIL library.
+class SILBlockStorageType : public TypeBase {
+  CanType CaptureType;
+  
+  SILBlockStorageType(CanType CaptureType)
+    : TypeBase(TypeKind::SILBlockStorage,
+               &CaptureType->getASTContext(),
+               CaptureType->getRecursiveProperties()),
+      CaptureType(CaptureType) {}
+  
+public:
+  static CanSILBlockStorageType get(CanType CaptureType);
+                      
+  CanType getCaptureType() const { return CaptureType; }
+  // In SILType.h
+  SILType getCaptureAddressType() const;
+  
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::SILBlockStorage;
+  }
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(SILBlockStorageType, Type)
+  
 /// ArrayType - An array type has a base type and either an unspecified or a
 /// constant size.  For example "int[]" and "int[4]".  Array types cannot have
 /// size = 0.

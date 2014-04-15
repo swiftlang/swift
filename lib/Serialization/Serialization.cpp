@@ -2143,7 +2143,16 @@ void Serializer::writeType(Type ty) {
     writeRequirements(fnTy->getRequirements());
     break;
   }
-
+      
+  case TypeKind::SILBlockStorage: {
+    auto storageTy = cast<SILBlockStorageType>(ty.getPointer());
+    
+    unsigned abbrCode = DeclTypeAbbrCodes[SILBlockStorageTypeLayout::Code];
+    SILBlockStorageTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                      addTypeRef(storageTy->getCaptureType()));
+    break;
+  }
+      
   case TypeKind::SILFunction: {
     auto fnTy = cast<SILFunctionType>(ty.getPointer());
 
@@ -2331,6 +2340,7 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<BoundGenericSubstitutionLayout>();
     registerDeclTypeAbbr<PolymorphicFunctionTypeLayout>();
     registerDeclTypeAbbr<GenericFunctionTypeLayout>();
+    registerDeclTypeAbbr<SILBlockStorageTypeLayout>();
     registerDeclTypeAbbr<SILFunctionTypeLayout>();
     registerDeclTypeAbbr<ArraySliceTypeLayout>();
     registerDeclTypeAbbr<ArrayTypeLayout>();

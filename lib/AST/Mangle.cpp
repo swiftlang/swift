@@ -1009,6 +1009,9 @@ void Mangler::mangleType(CanType type, ResilienceExpansion explosion,
     Buffer << '_';
     return;
   }
+      
+  case TypeKind::SILBlockStorage:
+    llvm_unreachable("should never be mangled");
   }
   llvm_unreachable("bad type kind");
 }

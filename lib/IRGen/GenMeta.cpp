@@ -602,6 +602,10 @@ namespace {
     llvm::Value *visitInOutType(CanInOutType type) {
       llvm_unreachable("inout type should have been lowered by SILGen");
     }
+      
+    llvm::Value *visitSILBlockStorageType(CanSILBlockStorageType type) {
+      llvm_unreachable("cannot ask for metadata of block storage");
+    }
 
     /// Try to find the metatype in local data.
     llvm::Value *tryGetLocal(CanType type) {

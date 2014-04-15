@@ -76,7 +76,8 @@ bool CanType::hasReferenceSemanticsImpl(CanType type) {
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
     return false;
-
+      
+  case TypeKind::SILBlockStorage:
   case TypeKind::Error:
   case TypeKind::BuiltinInteger:
   case TypeKind::BuiltinFloat:
@@ -364,6 +365,10 @@ bool TypeBase::isUnspecializedGeneric() {
   case TypeKind::GenericTypeParam:
   case TypeKind::DependentMember:
     return false;
+      
+  case TypeKind::SILBlockStorage:
+    return cast<SILBlockStorageType>(this)->getCaptureType()
+        ->isUnspecializedGeneric();
   }
 }
 
@@ -850,9 +855,10 @@ CanType TypeBase::getCanonicalType() {
                                       function->getExtInfo());
     break;
   }
-
+      
+  case TypeKind::SILBlockStorage:
   case TypeKind::SILFunction:
-    llvm_unreachable("SILFunctionTypes are always canonical!");
+    llvm_unreachable("SIL-only types are always canonical!");
 
   case TypeKind::Function: {
     FunctionType *FT = cast<FunctionType>(this);
@@ -942,6 +948,7 @@ TypeBase *TypeBase::getDesugaredType() {
   case TypeKind::Function:
   case TypeKind::PolymorphicFunction:
   case TypeKind::GenericFunction:
+  case TypeKind::SILBlockStorage:
   case TypeKind::SILFunction:
   case TypeKind::Array:
   case TypeKind::LValue:
@@ -1138,6 +1145,7 @@ bool TypeBase::isSpelledLike(Type other) {
   }
 
   case TypeKind::SILFunction:
+  case TypeKind::SILBlockStorage:
   case TypeKind::PolymorphicFunction:
   case TypeKind::GenericFunction: {
     // Polymorphic function types should never be explicitly spelled.
@@ -2113,6 +2121,17 @@ case TypeKind::Id:
     }
 
     return *this;
+  }
+      
+  case TypeKind::SILBlockStorage: {
+    auto storageTy = cast<SILBlockStorageType>(base);
+    Type transCap = storageTy->getCaptureType().transform(fn);
+    if (!transCap)
+      return Type();
+    CanType canTransCap = transCap->getCanonicalType();
+    if (canTransCap != storageTy->getCaptureType())
+      return SILBlockStorageType::get(canTransCap);
+    return storageTy;
   }
 
   case TypeKind::SILFunction: {

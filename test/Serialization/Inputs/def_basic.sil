@@ -882,6 +882,18 @@ entry(%0 : $Builtin.Int1):
   return %1 : $()
 }
 
+// CHECK-LABEL: sil public_external @block_storage_type
+sil @block_storage_type : $@thin () -> () {
+  // CHECK: [[STORAGE:%.*]] = alloc_stack $@block_storage Int
+  %b = alloc_stack $@block_storage Int
+  // CHECK: [[PTR:%.*]] = address_to_pointer [[STORAGE]]#1 : $*@block_storage Int to $Builtin.RawPointer
+  %p = address_to_pointer %b#1 : $*@block_storage Int to $Builtin.RawPointer
+  // CHECK: dealloc_stack [[STORAGE]]#0 : $*@local_storage @block_storage Int
+  dealloc_stack %b#0 : $*@local_storage @block_storage Int
+  return undef : $()
+}
+
+
 // rdar://15351123
 // CHECK-LABEL: @test_forward_ref
 sil  @test_forward_ref : $@thin (UInt8, UInt8) -> UInt8
@@ -1122,10 +1134,13 @@ bb0:
   %117 = function_ref @test_copy_release_value : $@thin (Val) -> (Val)
   %118 = function_ref @cond_fail_test : $@thin Builtin.Int1 -> ()
 
+  %124 = function_ref @block_storage_type : $@thin () -> ()
+
   %120 = function_ref @test_forward_ref : $@thin (UInt8, UInt8) -> UInt8
   %121 = function_ref @partial_apply : $@thin (@thin (@out Int, Int) -> (), Int) -> Int
   %122 = function_ref @partial_apply_with_closure : $@thin (@owned @callee_owned () -> Bool, @owned String, CString, Int64) -> ()
   %123 = function_ref @extract_generic_struct : $@thin GenericStruct<Int64> -> Int64
+
 
   %119 = tuple ()
   return %119 : $()

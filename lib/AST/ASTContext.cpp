@@ -189,6 +189,7 @@ struct ASTContext::Implementation {
     GenericParamTypes;
   llvm::FoldingSet<GenericFunctionType> GenericFunctionTypes;
   llvm::FoldingSet<SILFunctionType> SILFunctionTypes;
+  llvm::DenseMap<CanType, SILBlockStorageType *> SILBlockStorageTypes;
   llvm::DenseMap<BuiltinIntegerWidth, BuiltinIntegerType*> IntegerTypes;
   llvm::FoldingSet<ProtocolCompositionType> ProtocolCompositionTypes;
   llvm::FoldingSet<BuiltinVectorType> BuiltinVectorTypes;
@@ -1767,6 +1768,20 @@ SILFunctionType::SILFunctionType(GenericSignature *genericSig,
     }) && "interface type of generic type should not contain context archetypes");
   }
 #endif
+}
+
+CanSILBlockStorageType SILBlockStorageType::get(CanType captureType) {
+  ASTContext &ctx = captureType->getASTContext();
+  auto found = ctx.Impl.SILBlockStorageTypes.find(captureType);
+  if (found != ctx.Impl.SILBlockStorageTypes.end())
+    return CanSILBlockStorageType(found->second);
+  
+  void *mem = ctx.Allocate(sizeof(SILBlockStorageType),
+                           alignof(SILBlockStorageType));
+  
+  SILBlockStorageType *storageTy = new (mem) SILBlockStorageType(captureType);
+  ctx.Impl.SILBlockStorageTypes.insert({captureType, storageTy});
+  return CanSILBlockStorageType(storageTy);
 }
 
 CanSILFunctionType SILFunctionType::get(GenericSignature *genericSig,

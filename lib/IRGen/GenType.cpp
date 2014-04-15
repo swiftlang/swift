@@ -1050,6 +1050,11 @@ TypeCacheEntry TypeConverter::convertType(CanType ty) {
     return convertUnownedStorageType(cast<UnownedStorageType>(ty));
   case TypeKind::WeakStorage:
     return convertWeakStorageType(cast<WeakStorageType>(ty));
+  case TypeKind::SILBlockStorage: {
+    auto t = cast<SILBlockStorageType>(ty);
+    IGM.unimplemented(SourceLoc(), "block storage lowering");
+    return convertType(t->getCaptureType());
+  }
   }
   llvm_unreachable("bad type kind");
 }
