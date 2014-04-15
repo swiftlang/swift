@@ -2367,6 +2367,9 @@ class NominalTypeDecl : public TypeDecl, public DeclContext {
   /// called.
   MemberLookupTable *LookupTable = nullptr;
 
+  /// Create a lookup table.
+  void createLookupTable();
+
   friend class MemberLookupTable;
   friend class ExtensionDecl;
 
@@ -2702,6 +2705,8 @@ public:
   }
 };
 
+class ObjCMemberLookupTable;
+
 /// ClassDecl - This is the declaration of a class, for example:
 ///
 ///    class Complex { var R : Double, I : Double }
@@ -2711,6 +2716,10 @@ public:
 class ClassDecl : public NominalTypeDecl {
   SourceLoc ClassLoc;
   Type Superclass;
+  ObjCMemberLookupTable *ObjCMemberLookup = nullptr;
+
+  /// Create the Objective-C member lookup table.
+  void createObjCMemberLookup();
 
 public:
   ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
@@ -2766,6 +2775,18 @@ public:
   /// Retrieve the name to use for this class when interoperating with
   /// the Objective-C runtime.
   StringRef getObjCRuntimeName(llvm::SmallVectorImpl<char> &buffer);
+
+  using NominalTypeDecl::lookupDirect;
+
+  /// Look in this class and its extensions (but not any of its protocols or
+  /// superclasses) for declarations with a given Objective-C selector.
+  ///
+  /// Note that this can find methods, initializers, getters, and setters.
+  ArrayRef<ValueDecl *> lookupDirect(ObjCSelector selector);
+
+  /// Record the presence of an @objc member whose Objective-C name has been
+  /// finalized.
+  void recordObjCMember(ValueDecl *vd);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {

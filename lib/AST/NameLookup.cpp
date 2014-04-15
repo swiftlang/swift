@@ -33,6 +33,7 @@ STATISTIC(NumLazyMembers,
           "# of serialized member contexts");
 STATISTIC(NumUnloadedLazyMembers,
           "# of serialized member contexts never loaded");
+namespace swift { class ClassMemberLookupTable; }
 
 using namespace swift;
 
@@ -597,6 +598,9 @@ public:
   /// Create a new member lookup table for the given nominal type.
   explicit MemberLookupTable(NominalTypeDecl *nominal);
 
+  /// Destroy the lookup table.
+  void destroy();
+
   /// Update a lookup table with members from newly-added extensions.
   void updateLookupTable(NominalTypeDecl *nominal);
 
@@ -617,6 +621,39 @@ public:
 
   iterator find(DeclName name) {
     return Lookup.find(name);
+  }
+
+  // Only allow allocation of member lookup tables using the allocator in
+  // ASTContext or by doing a placement new.
+  void *operator new(size_t Bytes, ASTContext &C,
+                     unsigned Alignment = alignof(MemberLookupTable)) {
+    return C.Allocate(Bytes, Alignment);
+  }
+  void *operator new(size_t Bytes, void *Mem) {
+    assert(Mem);
+    return Mem;
+  }
+};
+
+/// Class member lookup table, which is a member lookup table with a second
+/// table for lookup based on Objective-C selector.
+class swift::ObjCMemberLookupTable
+        : public llvm::DenseMap<ObjCSelector, llvm::TinyPtrVector<ValueDecl *>>
+{
+public:
+  void destroy() {
+    this->~ObjCMemberLookupTable();
+  }
+
+  // Only allow allocation of member lookup tables using the allocator in
+  // ASTContext or by doing a placement new.
+  void *operator new(size_t Bytes, ASTContext &C,
+                     unsigned Alignment = alignof(MemberLookupTable)) {
+    return C.Allocate(Bytes, Alignment);
+  }
+  void *operator new(size_t Bytes, void *Mem) {
+    assert(Mem);
+    return Mem;
   }
 };
 
@@ -676,9 +713,13 @@ void MemberLookupTable::updateLookupTable(NominalTypeDecl *nominal) {
                      ? LastExtensionIncluded->NextExtension.getPointer()
                      : nominal->FirstExtension;
        next;
-       LastExtensionIncluded = next, next = next->NextExtension.getPointer()) {
+       (LastExtensionIncluded = next,next = next->NextExtension.getPointer())) {
     addMembers(next->getMembers());
   }
+}
+
+void MemberLookupTable::destroy() {
+  this->~MemberLookupTable();
 }
 
 template <typename T>
@@ -814,6 +855,19 @@ void ExtensionDecl::setMemberLoader(LazyMemberLoader *resolver,
   ++NumUnloadedLazyMembers;
 }
 
+// Create the lookup table.
+void NominalTypeDecl::createLookupTable() {
+  assert(!LookupTable && "Lookup table already created");
+  auto &ctx = getASTContext();
+  LookupTable = new (ctx) MemberLookupTable(this);
+
+  // Register a cleanup with the ASTContext to call the lookup table
+  // destructor.
+  ctx.addCleanup([this]() {
+    this->LookupTable->destroy();
+  });
+}
+
 ArrayRef<ValueDecl *> NominalTypeDecl::lookupDirect(DeclName name) {
   // Make sure we have the complete list of members (in this nominal and in all
   // extensions).
@@ -822,17 +876,7 @@ ArrayRef<ValueDecl *> NominalTypeDecl::lookupDirect(DeclName name) {
   (void)getMembers();
 
   if (!LookupTable) {
-    // Create the lookup table.
-    auto &ctx = getASTContext();
-    void *mem = ctx.Allocate(sizeof(MemberLookupTable),
-                             alignof(MemberLookupTable));
-    LookupTable = new (mem) MemberLookupTable(this);
-
-    // Register a cleanup with the ASTContext to call the lookup table
-    // destructor.
-    ctx.addCleanup([this]() {
-      this->LookupTable->~MemberLookupTable();
-    });
+    createLookupTable();
   } else {
     // Update the lookup table, if any new extension have come into existence.
     LookupTable->updateLookupTable(this);
@@ -845,6 +889,53 @@ ArrayRef<ValueDecl *> NominalTypeDecl::lookupDirect(DeclName name) {
 
   // We found something; return it.
   return { known->second.begin(), known->second.size() };
+}
+
+void ClassDecl::createObjCMemberLookup() {
+  assert(ObjCMemberLookup && "Already have an Objective-C member table");
+  auto &ctx = getASTContext();
+  ObjCMemberLookup = new (ctx) ObjCMemberLookupTable();
+
+  // Register a cleanup with the ASTContext to call the lookup table
+  // destructor.
+  ctx.addCleanup([this]() {
+    this->ObjCMemberLookup->destroy();
+  });
+}
+
+ArrayRef<ValueDecl *> ClassDecl::lookupDirect(ObjCSelector selector) {
+  if (!ObjCMemberLookup) {
+    createObjCMemberLookup();
+  }
+
+  auto known = ObjCMemberLookup->find(selector);
+  if (known != ObjCMemberLookup->end())
+    return { known->second.begin(), known->second.end() };
+
+  // FIXME: Callback to perform lazy lookup of selectors.
+  return { };
+}
+
+void ClassDecl::recordObjCMember(ValueDecl *vd) {
+  if (!ObjCMemberLookup) {
+    createObjCMemberLookup();
+  }
+
+  assert(vd->isObjC() && "Not an Objective-C member");
+
+  // For variables and subscripts, record the getter and setter separately.
+  if (auto storageDecl = dyn_cast<AbstractStorageDecl>(vd)) {
+    auto getter = storageDecl->getGetter();
+    (*ObjCMemberLookup)[getter->getObjCSelector()].push_back(getter);
+
+    if (auto setter = storageDecl->getSetter())
+      (*ObjCMemberLookup)[setter->getObjCSelector()].push_back(setter);
+    return;
+  }
+
+  // For methods and initializers, record just the method or initializer.
+  auto afd = cast<AbstractFunctionDecl>(vd);
+  (*ObjCMemberLookup)[afd->getObjCSelector()].push_back(afd);
 }
 
 bool DeclContext::lookupQualified(Type type,
