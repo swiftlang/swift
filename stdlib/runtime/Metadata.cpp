@@ -1901,7 +1901,7 @@ const void *swift::swift_conformsToProtocol(const Metadata *type,
     return result;
   }
   // Otherwise, try looking in SpriteKit
-  mangledName.erase(mangledName.end() - 8, mangledName.end());
+  mangledName.erase(mangledName.end() - 7, mangledName.end());
   mangledName += "9SpriteKit";
   if (const void * result = dlsym(RTLD_DEFAULT, mangledName.c_str())) {
     return result;
