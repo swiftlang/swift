@@ -82,11 +82,13 @@ DESIGNATED_INIT(NSRulerView, (2, "initWithScrollView", "orientation"))
 
 DESIGNATED_INIT(NSTableColumn, (1, "initWithIdentifier"))
 
-DESIGNATED_INIT(NSTextAttachment, (1, "initWithFileWrapper"))
+// FIXME: Differs from UIKit
+// DESIGNATED_INIT(NSTextAttachment, (1, "initWithFileWrapper"))
 
 DESIGNATED_INIT(NSTextBlock, (0, "init"))
 
-DESIGNATED_INIT(NSTextContainer, (1, "initWithContainerSize"))
+// FIXME: Differs from UIKit
+// DESIGNATED_INIT(NSTextContainer, (1, "initWithContainerSize"))
 
 DESIGNATED_INIT(NSTextFieldCell, (1, "initWithCoder"))
 DESIGNATED_INIT(NSTextFieldCell, (1, "initTextCell"))
@@ -113,6 +115,36 @@ DESIGNATED_INIT(NSWindow,
 DESIGNATED_INIT(NSWindowController, (1, "initWithWindow"))
 
 // UIKit
+
+// FIXME: Differs from AppKit
+// DESIGNATED_INIT(NSTextAttachment, (2, "initWithData", "ofType"))
+
+DESIGNATED_INIT(NSTextContainer, (1, "initWithSize"))
+
+DESIGNATED_INIT(UIAttachmentBehavior, 
+                (4, "initWithItem", "offsetFromCenter", "attachedToItem", 
+                 "offsetFromCenter"))
+
+DESIGNATED_INIT(UICollectionView, (2, "initWithFrame", "collectionViewLayout"))
+
 DESIGNATED_INIT(UIDocument, (1, "initWithFileURL"))
+
+DESIGNATED_INIT(UIGestureRecognizer, (2, "initWithTarget", "action"))
+
+DESIGNATED_INIT(UIInputView, (2, "initWithFrame", "inputViewStyle"))
+
+DESIGNATED_INIT(UINavigationItem, (1, "initWithTitle"))
+
+DESIGNATED_INIT(UIStoryboardSegue, 
+                (3, "initWithIdentifier", "source", "destination"))
+
+DESIGNATED_INIT(UITableViewCell, (2, "initWithStyle", "reuseIdentifier"))
+
+DESIGNATED_INIT(UITextView, (2, "initWithFrame", "textContainer"))
+
+DESIGNATED_INIT(UIView, (1, "initWithFrame"))
+
+DESIGNATED_INIT(UIViewController, (2, "initWithNibName", "bundle"))
+
 
 #undef DESIGNATED_INIT
