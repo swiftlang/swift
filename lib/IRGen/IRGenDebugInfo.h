@@ -81,7 +81,7 @@ class IRGenDebugInfo {
   llvm::DenseMap<SILDebugScope *, llvm::WeakVH> ScopeCache;
   llvm::DenseMap<const char *, llvm::WeakVH> DIFileCache;
   llvm::DenseMap<TypeBase*, llvm::WeakVH> DITypeCache;
-  std::map<std::string, llvm::WeakVH> DINameSpaceCache;
+  std::map<std::string, llvm::WeakVH> DIModuleCache;
   llvm::DITypeIdentifierMap DIRefMap;
 
   // Subprograms and need their scope to be RAUW'd when we work
@@ -99,7 +99,8 @@ class IRGenDebugInfo {
 
   FullLocation LastLoc; /// The last location that was emitted.
   SILDebugScope *LastScope; /// The scope of that last location.
-  bool IsLibrary; /// Are emitting debug info for a libary or a top level module?
+  /// Are emitting debug info for a libary or a top level module?
+  bool IsLibrary;
 
   SmallVector<std::pair<FullLocation, SILDebugScope*>, 8>
   LocationStack; /// Used by pushLoc.
@@ -222,7 +223,7 @@ private:
   StringRef BumpAllocatedString(StringRef S);
 
   void createImportedModule(StringRef Name, StringRef MangledPrefix,
-                            llvm::DINameSpace Namespace);
+                            llvm::DIModule Module);
 
   llvm::DIType createType(DebugTypeInfo DbgTy, llvm::DIDescriptor Scope,
                           llvm::DIFile File);
@@ -251,10 +252,10 @@ private:
                                  llvm::DIFile File, unsigned Flags,
                                  DeclContext* DeclContext);
   llvm::DIFile getFile(llvm::DIDescriptor Scope);
-  llvm::DIScope getOrCreateNamespace(llvm::DIScope Namespace,
-                                     std::string MangledName,
-                                     llvm::DIFile File, unsigned Line = 0);
-  llvm::DIScope getNamespace(StringRef MangledName);
+  llvm::DIScope getOrCreateModule(llvm::DIScope Module,
+                                  std::string MangledName,
+                                  llvm::DIFile File);
+  llvm::DIScope getModule(StringRef MangledName);
   llvm::DIArray getStructMembers(NominalTypeDecl *D, llvm::DIDescriptor Scope,
                                  llvm::DIFile File, unsigned Flags);
   llvm::DICompositeType createStructType(DebugTypeInfo DbgTy,

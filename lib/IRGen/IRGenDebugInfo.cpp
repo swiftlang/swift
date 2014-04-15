@@ -495,7 +495,7 @@ void IRGenDebugInfo::emitFunction(SILModule &SILMod, SILDebugScope *DS,
   assert(Fn);
   auto LinkageName = Fn->getName();
   auto File = getOrCreateFile(L.Filename);
-  // This placeholder scope gets RAUW'd when the namespaces are
+  // This placeholder scope gets RAUW'd when the modules are
   // created after we are finished with the entire module.
   auto Scope = DBuilder.createForwardDecl(llvm::dwarf::DW_TAG_subroutine_type,
                                           LinkageName, File, File, 0);
@@ -592,13 +592,13 @@ static void mangleIdent(llvm::raw_string_ostream &OS, StringRef Id) {
 ///   -->
 ///   0: DW_TAG_imported_module
 ///        DW_AT_import(*1)
-///   1: DW_TAG_namespace
+///   1: DW_TAG_module // instead of DW_TAG_namespace.
 ///        DW_AT_name("Foundation")
 ///
 void IRGenDebugInfo::emitImport(ImportDecl *D) {
   // Imports are visited after SILFunctions.
-  llvm::DIScope Namespace = MainFile;
-  Module *M = IGM.Context.getModule(D->getFullAccessPath());
+  llvm::DIScope Module = MainFile;
+  swift::Module *M = IGM.Context.getModule(D->getFullAccessPath());
   assert(M && "Could not find module for import decl.");
   if (!M) return;
   auto File = getOrCreateFile(getFilenameFromDC(M->getFiles().front()));
@@ -610,12 +610,12 @@ void IRGenDebugInfo::emitImport(ImportDecl *D) {
     for (auto elt : D->getModulePath()) {
       auto Component = elt.first.str();
 
-      // We model each component of the access path as a namespace.
+      // We model each component of the access path as a module.
       if (first && Component == D->getASTContext().StdlibModuleName.str())
         MS << "S";
       else
         mangleIdent(MS, Component);
-      Namespace = getOrCreateNamespace(Namespace, Component, File, 1);
+      Module = getOrCreateModule(Module, Component, File);
 
       if (first) first = false;
       else PS << '.';
@@ -624,27 +624,28 @@ void IRGenDebugInfo::emitImport(ImportDecl *D) {
   }
 
   StringRef Name = BumpAllocatedString(Printed);
-  createImportedModule(Name, Mangled, llvm::DINameSpace(Namespace));
+  createImportedModule(Name, Mangled, llvm::DIModule(Module));
 }
 
 // Create an imported module and import declarations for all functions
 // from that module.
 void IRGenDebugInfo::createImportedModule(StringRef Name, StringRef Mangled,
-                                          llvm::DINameSpace Namespace) {
+                                          llvm::DIModule Module) {
   // This is bending the rules a little bit, but we are creating the
   // imported module with the location of the imported module instead
   // of the location of the import statement. Dsymustil elides
-  // namespaces without children, so all that's left is the
+  // modules without children, so all that's left is the
   // DW_TAG_imported_module.
   llvm::DIScope File;
   {
-    llvm::SmallString<512> Path(Namespace.getDirectory());
-    llvm::sys::path::append(Path, Namespace.getFilename());
+    llvm::SmallString<512> Path(Module.getDirectory());
+    llvm::sys::path::append(Path, Module.getFilename());
     File = getOrCreateFile(Path.c_str());
   } 
-  auto Import = DBuilder.createImportedModule(File, Namespace, 1);
+  llvm::DIImportedEntity Import =
+    DBuilder.createImportedModule(File, Module, 1);
 
-  // Add all functions that belong to this namespace to it.
+  // Add all functions that belong to this module to it.
   //
   // TODO: Since we have the mangled names anyway, this part is purely
   // cosmetic and we may consider removing it.
@@ -655,30 +656,29 @@ void IRGenDebugInfo::createImportedModule(StringRef Name, StringRef Mangled,
     auto SP = llvm::DISubprogram(cast<llvm::MDNode>(F->second));
     assert(SP.Verify());
 
-    // RAUW the context of the function with the namespace.
+    // RAUW the context of the function with the module.
     auto Scope = SP.getContext().resolve(DIRefMap);
     if (Scope.isType() && llvm::DIType(Scope).isForwardDecl())
-      Scope->replaceAllUsesWith(Namespace);
+      Scope->replaceAllUsesWith(Module);
 
     DBuilder.createImportedDeclaration(llvm::DIScope(Import), SP, 1);
   }
 }
 
-/// Return a cached namespace for a mangled access path or create a new one.
-llvm::DIScope IRGenDebugInfo::getOrCreateNamespace(llvm::DIScope Namespace,
-                                                   std::string MangledName,
-                                                   llvm::DIFile File,
-                                                   unsigned Line) {
+/// Return a cached module for a mangled access path or create a new one.
+llvm::DIScope IRGenDebugInfo::getOrCreateModule(llvm::DIScope Module,
+                                                std::string MangledName,
+                                                llvm::DIFile File) {
    // Look in the cache first.
-  auto CachedNS = DINameSpaceCache.find(MangledName);
+  auto CachedNS = DIModuleCache.find(MangledName);
 
-  if (CachedNS != DINameSpaceCache.end())
+  if (CachedNS != DIModuleCache.end())
     // Verify that the information still exists.
     if (llvm::Value *Val = CachedNS->second)
-      return llvm::DINameSpace(cast<llvm::MDNode>(Val));
+      return llvm::DIModule(cast<llvm::MDNode>(Val));
 
-  auto NS = DBuilder.createNameSpace(Namespace, MangledName, File, Line);
-  DINameSpaceCache[MangledName] = llvm::WeakVH(NS);
+  auto NS = DBuilder.createModule(Module, MangledName, File);
+  DIModuleCache[MangledName] = llvm::WeakVH(NS);
   return NS;
 }
 
@@ -1170,7 +1170,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
 
         auto ModuleFile = getOrCreateFile(L.Filename);
         // This placeholder gets RAUW'd by finalize().
-        Scope =getOrCreateNamespace(ModuleFile, ModuleName, ModuleFile, L.Line);
+        Scope = getOrCreateModule(ModuleFile, ModuleName, ModuleFile);
       }
       return createStructType(DbgTy, Decl, Name, Scope,
                               getOrCreateFile(L.Filename), L.Line,
@@ -1518,15 +1518,14 @@ void IRGenDebugInfo::finalize() {
 
   // Create an import declaration for the module defined by current
   // compilation unit so we can record the module name in DWARF.
-  llvm::DINameSpace Namespace(getOrCreateNamespace(MainFile, Opts.ModuleName,
-                                                   MainFile, 1));
+  llvm::DIModule Module(getOrCreateModule(MainFile, Opts.ModuleName, MainFile));
   std::string Mangled("_TF");
   llvm::raw_string_ostream MS(Mangled);
   if (Opts.ModuleName == IGM.Context.StdlibModuleName.str())
     MS << "S";
   else
     mangleIdent(MS, Opts.ModuleName);
-  createImportedModule(Opts.ModuleName, MS.str(), Namespace);
+  createImportedModule(Opts.ModuleName, MS.str(), Module);
 
   // The default for a function is to be in the file-level scope.
   for (auto FVH: Functions) {
