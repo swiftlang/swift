@@ -232,7 +232,7 @@ public:
     SpecialTypedefNames;
 
   /// Mapping from Objective-C selectors to method names.
-  llvm::DenseMap<std::pair<clang::Selector, char>, DeclName> SelectorMappings;
+  llvm::DenseMap<std::pair<ObjCSelector, char>, DeclName> SelectorMappings;
 
   /// Mapping that describes the designated initializers of
   /// Objective-C classes.
@@ -240,7 +240,7 @@ public:
   /// This table, generated from DesignatedInits.def, describes the
   /// designated initializers for a specific set of known
   /// classes. When this information is available, and the class
-  llvm::StringMap<llvm::SmallVector<clang::Selector, 1> > 
+  llvm::StringMap<llvm::SmallVector<ObjCSelector, 1> >
     KnownDesignatedInits;
 
   /// Populate the table of known designated initializers from the
@@ -441,14 +441,17 @@ public:
   /// the Swift name.
   Identifier importName(clang::DeclarationName name, StringRef suffix = "",
                         StringRef removePrefix = "");
-  
-  /// Import the given selector name into Swift.
+
+  /// Import an Objective-C selector.
+  ObjCSelector importSelector(clang::Selector selector);
+
+  /// Map the given selector to a declaration name.
   ///
-  /// \param selector The selector to import.
+  /// \param selector The selector to map.
   ///
-  /// \param isInitializer Whether this name should be imported as an
+  /// \param isInitializer Whether this name should be mapped as an
   /// initializer.
-  DeclName importName(clang::Selector selector, bool isInitializer);
+  DeclName mapSelectorToDeclName(ObjCSelector selector, bool isInitializer);
 
   /// \brief Import the given Swift source location into Clang.
   clang::SourceLocation importSourceLoc(SourceLoc loc);

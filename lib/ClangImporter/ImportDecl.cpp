@@ -1720,8 +1720,9 @@ namespace {
                                  /*isConvenienceInit=*/false);
       }
 
-      DeclName name = Impl.importName(decl->getSelector(),
-                                      /*isInitializer=*/false);
+      ObjCSelector selector = Impl.importSelector(decl->getSelector());
+      DeclName name = Impl.mapSelectorToDeclName(selector,
+                                                 /*isInitializer=*/false);
       if (!name)
         return nullptr;
 
@@ -2026,8 +2027,8 @@ namespace {
       }
 
       SourceLoc loc;
-      auto name = Impl.importName(objcMethod->getSelector(), 
-                                  /*isInitializer=*/true);
+      auto selector = Impl.importSelector(objcMethod->getSelector());
+      auto name = Impl.mapSelectorToDeclName(selector, /*isInitializer=*/true);
 
       // Add the implicit 'self' parameter patterns.
       SmallVector<Pattern *, 4> argPatterns;

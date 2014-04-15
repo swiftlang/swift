@@ -626,47 +626,47 @@ static Identifier importArgName(ASTContext &ctx, StringRef name) {
 
 /// Map an Objective-C selector name to a Swift method name.
 static DeclName mapSelectorName(ASTContext &ctx,
-                                clang::Selector selector,
+                                ObjCSelector selector,
                                 bool isInitializer) {
-  assert(!selector.isNull() && "Null selector?");
-
   // Zero-argument selectors.
-  if (selector.isUnarySelector()) {
+  if (selector.getNumArgs() == 0) {
     ++NumNullaryMethodNames;
 
-    auto name = selector.getNameForSlot(0);
+    auto name = selector.getSelectorPieces()[0];
+    StringRef nameText = name.empty()? "" : name.str();
 
     // Simple case.
-    if (!isInitializer || name.size() == 4)
-      return DeclName(ctx, ctx.getIdentifier(name), { });
+    if (!isInitializer || nameText.size() == 4)
+      return DeclName(ctx, name, { });
 
     // This is an initializer with no parameters but a name that
     // contains more than 'init', so synthesize an argument to capture
     // what follows 'init'.
     ++NumNullaryInitMethodsMadeUnary;
-    assert(camel_case::getFirstWord(name).equals("init"));
+    assert(camel_case::getFirstWord(nameText).equals("init"));
     auto baseName = ctx.Id_init;
-    auto argName = importArgName(ctx, name.substr(4));
+    auto argName = importArgName(ctx, nameText.substr(4));
     return DeclName(ctx, baseName, argName);
   }
 
   // Determine the base name and first argument name.
   Identifier baseName;
   SmallVector<Identifier, 2> argumentNames;
-  StringRef firstPiece = selector.getNameForSlot(0);
+  Identifier firstPiece = selector.getSelectorPieces()[0];
+  StringRef firstPieceText = firstPiece.empty()? "" : firstPiece.str();
   if (isInitializer) {
-    assert(camel_case::getFirstWord(firstPiece).equals("init"));
+    assert(camel_case::getFirstWord(firstPieceText).equals("init"));
     baseName = ctx.Id_init;
-    argumentNames.push_back(importArgName(ctx, firstPiece.substr(4)));
+    argumentNames.push_back(importArgName(ctx, firstPieceText.substr(4)));
   } else if (ctx.LangOpts.SplitPrepositions) {
     llvm::SmallString<16> scratch;
     StringRef funcName, firstArgName;
-    std::tie(funcName, firstArgName) = splitFirstSelectorPiece(firstPiece,
+    std::tie(funcName, firstArgName) = splitFirstSelectorPiece(firstPieceText,
                                                                scratch);
     baseName = ctx.getIdentifier(funcName);
     argumentNames.push_back(importArgName(ctx, firstArgName));
   } else {
-    baseName = ctx.getIdentifier(firstPiece);
+    baseName = firstPiece;
     argumentNames.push_back(Identifier());
   }
 
@@ -679,31 +679,33 @@ static DeclName mapSelectorName(ASTContext &ctx,
     ++NumUnaryMethodNames;
   else
     ++NumMultiMethodNames;
-  
-  for (unsigned i = 1; i != n; ++i) {
-    argumentNames.push_back(importArgName(ctx, selector.getNameForSlot(i)));
+
+  for (auto piece : selector.getSelectorPieces().slice(1)) {
+    if (piece.empty())
+      argumentNames.push_back(piece);
+    else
+      argumentNames.push_back(importArgName(ctx, piece.str()));
   }
-  
   return DeclName(ctx, baseName, argumentNames);
 }
 
 namespace {
   /// Function object used to create Clang selectors from strings.
   class CreateSelector {
-    clang::ASTContext &Ctx;
+    ASTContext &Ctx;
       
   public:
-    CreateSelector(clang::ASTContext &ctx) : Ctx(ctx){ }
+    CreateSelector(ASTContext &ctx) : Ctx(ctx){ }
 
     template<typename ...Strings>
-    clang::Selector operator()(unsigned numParams, Strings ...strings) const {
-      clang::IdentifierInfo *pieces[sizeof...(Strings)] = {
-        (strings[0]? &Ctx.Idents.get(strings) : nullptr)...
+    ObjCSelector operator()(unsigned numParams, Strings ...strings) const {
+      Identifier pieces[sizeof...(Strings)] = {
+        (strings[0]? Ctx.getIdentifier(strings) : Identifier())...
       };
       
       assert((numParams == 0 && sizeof...(Strings) == 1) ||
              (numParams > 0 && sizeof...(Strings) == numParams));
-      return Ctx.Selectors.getSelector(numParams, pieces);
+      return ObjCSelector(Ctx, numParams, pieces);
     }
   };
 
@@ -730,13 +732,38 @@ namespace {
   };
 }
 
-DeclName ClangImporter::Implementation::importName(clang::Selector selector,
-                                                   bool isInitializer) {
+ObjCSelector ClangImporter::Implementation::importSelector(
+               clang::Selector selector) {
+  auto &ctx = SwiftContext;
+
+  // Handle zero-argument selectors directly.
+  if (selector.isUnarySelector()) {
+    Identifier name;
+    if (auto id = selector.getIdentifierInfoForSlot(0))
+      name = ctx.getIdentifier(id->getName());
+    return ObjCSelector(ctx, 0, name);
+  }
+
+  SmallVector<Identifier, 2> pieces;
+  for (auto i = 0u, n = selector.getNumArgs(); i != n; ++i) {
+    Identifier piece;
+    if (auto id = selector.getIdentifierInfoForSlot(i))
+      piece = ctx.getIdentifier(id->getName());
+    pieces.push_back(piece);
+  }
+
+  return ObjCSelector(ctx, pieces.size(), pieces);
+}
+
+DeclName ClangImporter::Implementation::mapSelectorToDeclName(
+           ObjCSelector selector,
+           bool isInitializer)
+{
   // If we haven't computed any selector mappings before, load the
   // default mappings.
   if (SelectorMappings.empty() && SplitPrepositions) {
     // Function object that 
-    CreateSelector createSelector(getClangASTContext());
+    CreateSelector createSelector(SwiftContext);
 
 #define MAP_SELECTOR(Selector, ForMethod, ForInitializer, BaseName, ArgNames) \
     {                                                                   \
@@ -773,7 +800,7 @@ void ClangImporter::Implementation::populateKnownDesignatedInits() {
   if (!KnownDesignatedInits.empty())
     return;
 
-  CreateSelector createSelector(getClangASTContext());
+  CreateSelector createSelector(SwiftContext);
 #define DESIGNATED_INIT(ClassName, Selector)                            \
   KnownDesignatedInits[#ClassName].push_back(createSelector Selector);
 #include "DesignatedInits.def"
@@ -800,7 +827,8 @@ bool ClangImporter::Implementation::isDesignatedInitializer(
   assert(known != KnownDesignatedInits.end() && 
          "Check hasDesignatedInitializers() first!");
   return std::find(known->second.begin(), known->second.end(),
-                   method->getSelector()) != known->second.end();
+                   importSelector(method->getSelector()))
+           != known->second.end();
 }
 
 #pragma mark Name lookup
