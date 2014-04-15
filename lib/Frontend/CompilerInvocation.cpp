@@ -515,6 +515,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_debugger_support)) {
     Opts.DebuggerSupport = true;
   }
+  
+  if (Args.hasArg(OPT_enable_native_blocks)) {
+    Opts.EnableNativeBlocks = true;
+  }
 
   if (auto A = Args.getLastArg(OPT_enable_objc_attr_requires_objc_module,
                                OPT_disable_objc_attr_requires_objc_module)) {

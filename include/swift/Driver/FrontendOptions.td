@@ -46,7 +46,11 @@ def serialize_diagnostics_path_EQ
 def verify : Flag<["-"], "verify">,
   HelpText<"Verify diagnostics against expected-{error|warning|note} "
            "annotations">;
-
+           
+def enable_native_blocks :
+  Flag<["-"], "enable-native-blocks">,
+  HelpText<"Enable native blocks codegen">;
+           
 def enable_objc_attr_requires_objc_module :
   Flag<["-"], "enable-objc-attr-requires-objc-module">,
   HelpText<"Enable requiring uses of @objc require importing the "
