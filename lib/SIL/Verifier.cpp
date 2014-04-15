@@ -1746,6 +1746,64 @@ public:
 
     // FIXME: Check branch arguments.
   }
+  
+  void checkProjectBlockStorageInst(ProjectBlockStorageInst *PBSI) {
+    require(PBSI->getOperand().getType().isAddress(),
+            "operand must be an address");
+    auto storageTy = PBSI->getOperand().getType().getAs<SILBlockStorageType>();
+    require(storageTy, "operand must be a @block_storage type");
+    
+    require(PBSI->getType().isAddress(),
+            "result must be an address");
+    auto captureTy = PBSI->getType().getSwiftRValueType();
+    require(storageTy->getCaptureType() == captureTy,
+            "result must be the capture type of the @block_storage type");
+  }
+  
+  void checkInitBlockStorageHeaderInst(InitBlockStorageHeaderInst *IBSHI) {
+    require(IBSHI->getBlockStorage().getType().isAddress(),
+            "block storage operand must be an address");
+    auto storageTy
+      = IBSHI->getBlockStorage().getType().getAs<SILBlockStorageType>();
+    require(storageTy, "block storage operand must be a @block_storage type");
+    
+    require(IBSHI->getInvokeFunction().getType().isObject(),
+            "invoke function operand must be a value");
+    auto invokeTy
+      = IBSHI->getInvokeFunction().getType().getAs<SILFunctionType>();
+    require(invokeTy, "invoke function operand must be a function");
+    require(invokeTy->getRepresentation() == FunctionType::Representation::Thin,
+            "invoke function operand must be a thin function");
+    require(invokeTy->getAbstractCC() == AbstractCC::C,
+            "invoke function operand must be a cdecl function");
+    require(invokeTy->getInterfaceParameters().size() >= 1,
+            "invoke function must take at least one parameter");
+    auto storageParam = invokeTy->getInterfaceParameters()[0];
+    require(storageParam.getConvention() == ParameterConvention::Indirect_Inout,
+            "invoke function must take block storage as @inout parameter");
+    require(storageParam.getType() == storageTy,
+            "invoke function must take block storage type as first parameter");
+    
+    require(IBSHI->getType().isObject(), "result must be a value");
+    auto blockTy = IBSHI->getType().getAs<SILFunctionType>();
+    require(blockTy, "result must be a function");
+    require(blockTy->getAbstractCC() == AbstractCC::C,
+            "result must be a cdecl block function");
+    require(blockTy->getRepresentation() == FunctionType::Representation::Block,
+            "result must be a cdecl block function");
+    require(blockTy->getInterfaceResult() == invokeTy->getInterfaceResult(),
+            "result must have same return type as invoke function");
+    
+    require(blockTy->getInterfaceParameters().size() + 1
+              == invokeTy->getInterfaceParameters().size(),
+          "result must match all parameters of invoke function but the first");
+    auto blockParams = blockTy->getInterfaceParameters();
+    auto invokeBlockParams = invokeTy->getInterfaceParameters().slice(1);
+    for (unsigned i : indices(blockParams)) {
+      require(blockParams[i] == invokeBlockParams[i],
+          "result must match all parameters of invoke function but the first");
+    }
+  }
 
   void verifyEntryPointArguments(SILBasicBlock *entry) {
     SILFunctionType *ti = F.getLoweredFunctionType();
