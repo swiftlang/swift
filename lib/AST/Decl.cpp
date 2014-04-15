@@ -769,10 +769,15 @@ bool ValueDecl::isUseFromContextDirect(const DeclContext *UseDC) const {
     // This is true in structs and for @final properties.
     // TODO: What about static properties?
     if (var->getStorageKind() == VarDecl::StoredWithTrivialAccessors ||
-        var->getStorageKind() == VarDecl::Stored)
+        var->getStorageKind() == VarDecl::Stored) {
       if (auto ctx = var->getDeclContext()->getDeclaredTypeOfContext())
         if (ctx->getStructOrBoundGenericStruct())
           return true;
+      
+      // Final properties can always be direct, even in classes.
+      if (var->isFinal())
+        return true;
+    }
   }
 
   return false;

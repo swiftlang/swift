@@ -1949,9 +1949,7 @@ public:
       if (auto sourceFile = VD->getDeclContext()->getParentSourceFile())
         isInSILMode = sourceFile->Kind == SourceFileKind::SIL;
 
-      if (isClassMember && !isInSILMode &&
-          // FIXME: Shouldn't be checking for @final here.
-          (!VD->isFinal() || VD->getAttrs().hasAttribute<NSCopyingAttr>())) {
+      if (isClassMember && !isInSILMode) {
         addAccessorsToStoredVar(VD, TC);
 
         // Type check the body of the getter and setter.
