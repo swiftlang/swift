@@ -1387,12 +1387,53 @@ static Expr *createPropertyLoadOrCallSuperclassGetter(VarDecl *VD,
                                      SourceLoc(), /*implicit*/true);
 }
 
+
+/// Synthesize the code to store 'Val' to 'VD', given that VD has an @NSCopying
+/// attribute on it.  We know that VD is a stored property in a class, so we
+/// just need to generate something like "self.property = val.copyWithZone(nil)"
+/// here.  This does some type checking to validate that the call will succeed.
+static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD, TypeChecker &TC) {
+  auto &Ctx = TC.Context;
+
+  // Generate:
+  // (force_value_expr type='<null>'
+  //   (call_expr type='<null>'
+  //     (unresolved_dot_expr type='<null>' field 'copyWithZone'
+  //       "Val")
+  //     (paren_expr type='<null>'
+  //       (unresolved_decl_ref_expr type='<null>' name=nil specialized=no))))
+  auto UDE = new (Ctx) UnresolvedDotExpr(Val, SourceLoc(),
+                                         Ctx.getIdentifier("copyWithZone"),
+                                         SourceLoc(), /*implicit*/true);
+  Expr *Nil = new (Ctx) UnresolvedDeclRefExpr(Ctx.getIdentifier("nil"),
+                                             DeclRefKind::Ordinary,
+                                             SourceLoc());
+  Nil = new (Ctx) ParenExpr(SourceLoc(), Nil, SourceLoc(), false);
+
+  //- (id)copyWithZone:(NSZone *)zone;
+  Expr *Call = new (Ctx) CallExpr(UDE, Nil, /*implicit*/true);
+
+  TypeLoc ResultTy;
+  ResultTy.setType(VD->getType(), true);
+
+  Call = new (Ctx) ConditionalCheckedCastExpr(Call, SourceLoc(),
+                                            TypeLoc::withoutLoc(VD->getType()));
+  Call->setImplicit();
+  return new (Ctx) ForceValueExpr(Call, SourceLoc());
+}
+
 /// Store 'Val' to 'VD'.  If VD is an @override of another value, we call the
 /// superclass setter.  Otherwise, we do a direct store of the value.
-static Expr *createPropertyStoreOrCallSuperclassSetter(Expr *Val,
-                                                       VarDecl *VD,
-                                                       VarDecl *SelfDecl) {
+static void createPropertyStoreOrCallSuperclassSetter(Expr *Val, VarDecl *VD,
+                                                      VarDecl *SelfDecl,
+                                            SmallVectorImpl<ASTNode> &Result,
+                                                      TypeChecker &TC) {
   auto &Ctx = VD->getASTContext();
+
+  // If this property is @NSCopying, then we store the result of a copyWithZone
+  // call on the value, not the value itself.
+  if (VD->getAttrs().hasAttribute<NSCopyingAttr>())
+    Val = synthesizeCopyWithZoneCall(Val, VD, TC);
 
   // Create:
   //   (assign (decl_ref_expr(VD)), decl_ref_expr(value))
@@ -1411,8 +1452,7 @@ static Expr *createPropertyStoreOrCallSuperclassSetter(Expr *Val,
     Dest = new (Ctx) UnresolvedDotExpr(SRE, SourceLoc(), VD->getName(),
                                        SourceLoc(), /*implicit*/true);
   }
-  return new (Ctx) AssignExpr(Dest, SourceLoc(), Val, true);
-
+  Result.push_back(new (Ctx) AssignExpr(Dest, SourceLoc(), Val, true));
 }
 
 
@@ -1445,7 +1485,7 @@ static void synthesizeTrivialGetter(FuncDecl *Get, VarDecl *VD) {
 /// Given a "Stored" property that needs to be converted to
 /// StoredWithTrivialAccessors, create the trivial getter and setter, and switch
 /// the storage kind.
-static void addTrivialAccessorsToStoredVar(VarDecl *VD, TypeChecker &TC) {
+static void addAccessorsToStoredVar(VarDecl *VD, TypeChecker &TC) {
   assert(VD->getStorageKind() == VarDecl::Stored && "Isn't a stored vardecl");
   auto &Context = VD->getASTContext();
   SourceLoc Loc = VD->getLoc();
@@ -1463,9 +1503,10 @@ static void addTrivialAccessorsToStoredVar(VarDecl *VD, TypeChecker &TC) {
     VarDecl *SelfDecl = Set->getImplicitSelfDecl();
 
     auto *ValueDRE = new (Context) DeclRefExpr(ValueDecl, SourceLoc(), true);
-    ASTNode Assign = createPropertyStoreOrCallSuperclassSetter(ValueDRE, VD,
-                                                               SelfDecl);
-    Set->setBody(BraceStmt::create(Context, Loc, Assign, Loc));
+    SmallVector<ASTNode, 1> SetterBody;
+    createPropertyStoreOrCallSuperclassSetter(ValueDRE, VD, SelfDecl,
+                                              SetterBody, TC);
+    Set->setBody(BraceStmt::create(Context, Loc, SetterBody, Loc));
 
     // Mark it transparent, there is no user benefit to this actually existing.
     Set->getMutableAttrs().setAttr(AK_transparent, Loc);
@@ -1503,12 +1544,14 @@ static void addTrivialAccessorsToStoredVar(VarDecl *VD, TypeChecker &TC) {
   appendMembers(SD, newMembers);
 }
 
+
+
 /// The specified VarDecl with "Stored" StorageKind was just found to satisfy
 /// a protocol property requirement.  Convert it to
 /// "StoredWithTrivialAccessors" storage by sythesizing accessors for the
 /// variable, enabling the witness table to use those accessors.
 void TypeChecker::synthesizeWitnessAccessorsForStoredVar(VarDecl *VD) {
-  addTrivialAccessorsToStoredVar(VD, *this);
+  addAccessorsToStoredVar(VD, *this);
 
   // Type check the body of the getter and setter.
   validateDecl(VD->getGetter(), true);
@@ -1523,7 +1566,7 @@ void TypeChecker::synthesizeWitnessAccessorsForStoredVar(VarDecl *VD) {
 
 /// Given a VarDecl with a willSet: and/or didSet: specifier, synthesize the
 /// (trivial) getter and the setter, which calls these.
-static void synthesizeObservingAccessors(VarDecl *VD) {
+static void synthesizeObservingAccessors(VarDecl *VD, TypeChecker &TC) {
   assert(VD->getStorageKind() == VarDecl::Observing);
   assert(VD->getGetter() && VD->getSetter() &&
          !VD->getGetter()->hasBody() && !VD->getSetter()->hasBody() &&
@@ -1598,10 +1641,9 @@ static void synthesizeObservingAccessors(VarDecl *VD) {
   
   // Create an assignment into the storage or call to superclass setter.
   auto *ValueDRE = new (Ctx) DeclRefExpr(ValueDecl, SourceLoc(), true);
-  ASTNode Assign = createPropertyStoreOrCallSuperclassSetter(ValueDRE, VD,
-                                                             SelfDecl);
-  SetterBody.push_back(Assign);
-  
+  createPropertyStoreOrCallSuperclassSetter(ValueDRE, VD, SelfDecl, SetterBody,
+                                            TC);
+
   // Create:
   //   (call_expr (dot_syntax_call_expr (decl_ref_expr(didSet)),
   //                                    (decl_ref_expr(self))),
@@ -1898,7 +1940,7 @@ public:
     // and setter accessors and change its storage kind.  This allows it to be
     // overriden and provide objc entrypoints if needed.
     if (VD->getStorageKind() == VarDecl::Stored &&
-        !VD->isStatic() && !VD->isFinal()) {
+        !VD->isStatic()) {
       
       bool isClassMember = false;
       if (auto ctx = VD->getDeclContext()->getDeclaredTypeOfContext())
@@ -1909,8 +1951,10 @@ public:
       if (auto sourceFile = VD->getDeclContext()->getParentSourceFile())
         isInSILMode = sourceFile->Kind == SourceFileKind::SIL;
 
-      if (isClassMember && !isInSILMode) {
-        addTrivialAccessorsToStoredVar(VD, TC);
+      if (isClassMember && !isInSILMode &&
+          // FIXME: Shouldn't be checking for @final here.
+          (!VD->isFinal() || VD->getAttrs().hasAttribute<NSCopyingAttr>())) {
+        addAccessorsToStoredVar(VD, TC);
 
         // Type check the body of the getter and setter.
         TC.typeCheckDecl(VD->getGetter(), true);
@@ -1926,7 +1970,7 @@ public:
     // decl.
     if (VD->getStorageKind() == VarDecl::Observing &&
         !VD->getGetter()->getBody()) {
-      synthesizeObservingAccessors(VD);
+      synthesizeObservingAccessors(VD, TC);
 
       // Type check the body of the getter and setter.
       TC.typeCheckDecl(VD->getGetter(), true);
@@ -3487,6 +3531,7 @@ public:
     UNINTERESTING_ATTR(Exported)
     UNINTERESTING_ATTR(Override)
     UNINTERESTING_ATTR(Required)
+    UNINTERESTING_ATTR(NSCopying)
 
 #undef UNINTERESTING_ATTR
 

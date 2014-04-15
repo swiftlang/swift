@@ -16,6 +16,7 @@ typedef signed char BOOL;
 @interface NSString : NSObject
 
 - (NSString*)uppercaseString;
+- (id) copyWithZone: (void*)zone;
 
 @end
 

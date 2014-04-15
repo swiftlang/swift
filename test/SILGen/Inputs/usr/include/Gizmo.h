@@ -58,6 +58,7 @@ typedef long NSInteger;
 @end
 
 @interface NSString : NSObject
+- (id) copyWithZone: (void*)zone;
 @end
 
 @interface NSView : NSObject

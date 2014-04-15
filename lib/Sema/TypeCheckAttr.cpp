@@ -43,6 +43,8 @@ public:
 
   void visitFinalAttr(FinalAttr *attr) {}
 
+  void visitNSCopyingAttr(NSCopyingAttr *attr) {}
+
   void visitNoReturnAttr(NoReturnAttr *attr) {}
 
   void visitObjCAttr(ObjCAttr *attr) {}
@@ -125,6 +127,8 @@ public:
 
   void visitFinalAttr(FinalAttr *attr);
 
+  void visitNSCopyingAttr(NSCopyingAttr *attr);
+
   void visitNoReturnAttr(NoReturnAttr *attr);
 
   void visitRequiredAttr(RequiredAttr *attr);
@@ -199,6 +203,47 @@ void AttributeChecker::visitFinalAttr(FinalAttr *attr) {
     }
   }
 }
+
+void AttributeChecker::visitNSCopyingAttr(NSCopyingAttr *attr) {
+  // The @NSCopying attribute is only allowed on stored properties.
+  auto *VD = dyn_cast<VarDecl>(D);
+  if (!VD) {
+    TC.diagnose(attr->getLocation(), diag::nscopying_only_on_class_properties);
+    attr->setInvalid();
+    return;
+  }
+
+  // It may only be used on class members.
+  auto typeContext = D->getDeclContext()->getDeclaredTypeInContext();
+  auto contextTypeDecl =
+  typeContext ? typeContext->getNominalOrBoundGenericNominal() : nullptr;
+  if (!contextTypeDecl || !isa<ClassDecl>(contextTypeDecl)) {
+    TC.diagnose(attr->getLocation(), diag::nscopying_only_on_class_properties);
+    attr->setInvalid();
+    return;
+  }
+
+  if (!VD->isSettable(VD->getDeclContext())) {
+    TC.diagnose(attr->getLocation(), diag::nscopying_only_mutable);
+    attr->setInvalid();
+    return;
+  }
+
+  if (!VD->hasStorage()) {
+    TC.diagnose(attr->getLocation(), diag::nscopying_only_stored_property);
+    attr->setInvalid();
+    return;
+  }
+
+  assert(VD->getOverriddenDecl() == nullptr &&
+         "Can't have value with storage that is an override");
+
+  // Check the type.  It must be must be [unchecked]optional, weak, a normal
+  // class, AnyObject, or classbound protocol.
+  // must conform to the NSCopying protocol.
+  
+}
+
 
 void AttributeChecker::visitNoReturnAttr(NoReturnAttr *attr) {
   auto *FD = dyn_cast<FuncDecl>(D);
