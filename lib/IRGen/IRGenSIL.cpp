@@ -206,6 +206,13 @@ public:
       break;
     }
   }
+
+  LoweredValue &operator=(LoweredValue &&lv) {
+    assert(this != &lv);
+    this->~LoweredValue();
+    ::new (this) LoweredValue(std::move(lv));
+    return *this;
+  }
   
   bool isAddress() const { return kind == Kind::Address; }
   bool isValue() const {
@@ -322,6 +329,13 @@ public:
   void setLoweredExplosion(SILValue v, Explosion &e) {
     assert(v.getType().isObject() && "explosion for address value?!");
     setLoweredValue(v, LoweredValue(e));
+  }
+
+  void overwriteLoweredExplosion(SILValue v, Explosion &e) {
+    assert(v.getType().isObject() && "explosion for address value?!");
+    auto it = LoweredValues.find(v);
+    assert(it != LoweredValues.end() && "no existing entry for overwrite?");
+    it->second = LoweredValue(e);
   }
 
   void setLoweredSingleValue(SILValue v, llvm::Value *scalar) {
@@ -1896,8 +1910,9 @@ void IRGenSILFunction::visitAutoreleaseReturnInst(AutoreleaseReturnInst *i) {
   Explosion result = getLoweredExplosion(i->getOperand());
   assert(result.size() == 1 &&
          "should have one objc pointer value for autorelease_return");
-  emitObjCAutoreleaseReturnValue(*this, result.getAll()[0]);
-  emitReturnInst(*this, i->getOperand().getType(), result);
+  Explosion temp(result.getKind());
+  temp.add(emitObjCAutoreleaseReturnValue(*this, result.claimNext()));
+  emitReturnInst(*this, i->getOperand().getType(), temp);
 }
 
 void IRGenSILFunction::visitSwitchIntInst(SwitchIntInst *i) {
@@ -2277,7 +2292,23 @@ void IRGenSILFunction::
 visitStrongRetainAutoreleasedInst(swift::StrongRetainAutoreleasedInst *i) {
   Explosion lowered = getLoweredExplosion(i->getOperand());
   llvm::Value *value = lowered.claimNext();
-  emitObjCRetainAutoreleasedReturnValue(*this, value);
+  value = emitObjCRetainAutoreleasedReturnValue(*this, value);
+
+  // Overwrite the stored explosion value with the result of
+  // objc_retainAutoreleasedReturnValue.  This is actually
+  // semantically important: if the call result is live across this
+  // call, the backend will have to emit instructions that interfere
+  // with the reclaim optimization.
+  //
+  // This is only sound if the retainAutoreleasedReturnValue
+  // immediately follows the call, but that should be reliably true.
+  //
+  // ...the reclaim here should really be implicit in the SIL calling
+  // convention.
+
+  Explosion out(lowered.getKind());
+  out.add(value);
+  overwriteLoweredExplosion(i->getOperand(), out);
 }
 
 /// Given a SILType which is a ReferenceStorageType, return the type

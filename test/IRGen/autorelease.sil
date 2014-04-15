@@ -18,7 +18,7 @@ bb0(%0 : $C?):
 }
 // CHECK:    define i64 @foo(i64) {
 // CHECK:      [[T0:%.*]] = tail call i64 bitcast ([[OBJC]]* ([[OBJC]]*)* @objc_autoreleaseReturnValue to i64 (i64)*)(i64 %0)
-// CHECK-NEXT: ret i64 %0
+// CHECK-NEXT: ret i64 [[T0]]
 
 sil @bar : $@thin (@owned C?) -> @owned C? {
 bb0(%0 : $C?):
@@ -30,4 +30,4 @@ bb0(%0 : $C?):
 // CHECK:    define i64 @bar(i64)
 // CHECK:      [[T0:%.*]] = call i64 @foo(i64 %0)
 // CHECK-NEXT: [[T1:%.*]] = call i64 bitcast ([[OBJC]]* ([[OBJC]]*)* @objc_retainAutoreleasedReturnValue to i64 (i64)*)(i64 [[T0]])
-// CHECK-NEXT: ret i64 [[T0]]
+// CHECK-NEXT: ret i64 [[T1]]
