@@ -76,7 +76,7 @@ static CharSourceRange toCharSourceRange(SourceManager &SM, SourceLoc Start,
 
 InFlightDiagnostic &InFlightDiagnostic::highlight(SourceRange R) {
   assert(IsActive && "Cannot modify an inactive diagnostic");
-  if (Engine)
+  if (Engine && R.isValid())
     Engine->getActiveDiagnostic()
         .addRange(toCharSourceRange(Engine->SourceMgr, R));
   return *this;
@@ -85,7 +85,7 @@ InFlightDiagnostic &InFlightDiagnostic::highlight(SourceRange R) {
 InFlightDiagnostic &InFlightDiagnostic::highlightChars(SourceLoc Start,
                                                        SourceLoc End) {
   assert(IsActive && "Cannot modify an inactive diagnostic");
-  if (Engine)
+  if (Engine && Start.isValid())
     Engine->getActiveDiagnostic()
         .addRange(toCharSourceRange(Engine->SourceMgr, Start, End));
   return *this;
@@ -94,7 +94,7 @@ InFlightDiagnostic &InFlightDiagnostic::highlightChars(SourceLoc Start,
 InFlightDiagnostic &InFlightDiagnostic::fixItReplace(SourceRange R,
                                                      StringRef Str) {
   assert(IsActive && "Cannot modify an inactive diagnostic");
-  if (Engine)
+  if (Engine && R.isValid())
     Engine->getActiveDiagnostic().addFixIt(
         Diagnostic::FixIt(toCharSourceRange(Engine->SourceMgr, R), Str));
   return *this;
