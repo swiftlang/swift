@@ -128,10 +128,6 @@ public:
         CodeCompletionString::Chunk::ChunkKind::QuestionMark, "?");
   }
 
-  void Func(Type T) {
-    if (T->getAs<InOutType>()) {}
-  }
-
   void addCallParameter(Identifier Name, Type Ty) {
     CurrentNestingLevel++;
 
