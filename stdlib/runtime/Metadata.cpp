@@ -1897,7 +1897,16 @@ const void *swift::swift_conformsToProtocol(const Metadata *type,
   // Otherwise, try looking in AppKit.
   mangledName.erase(mangledName.end() - 12, mangledName.end());
   mangledName += "6AppKit";
-  return dlsym(RTLD_DEFAULT, mangledName.c_str());
+  if (const void * result = dlsym(RTLD_DEFAULT, mangledName.c_str())) {
+    return result;
+  }
+  // Otherwise, try looking in SpriteKit
+  mangledName.erase(mangledName.end() - 8, mangledName.end());
+  mangledName += "9SpriteKit";
+  if (const void * result = dlsym(RTLD_DEFAULT, mangledName.c_str())) {
+    return result;
+  }
+  return nullptr;
 }
 
 /// The protocol descriptor for Printable from the stdlib.
