@@ -29,7 +29,88 @@
 DESIGNATED_INIT(NSObject, (0, "init"))
 
 // AppKit
+DESIGNATED_INIT(NSCell, (0, "init"))
+DESIGNATED_INIT(NSCell, (1, "initWithCoder"))
+DESIGNATED_INIT(NSCell, (1, "initTextCell"))
+DESIGNATED_INIT(NSCell, (1, "initImageCell"))
+
+DESIGNATED_INIT(NSControl, (1, "initWithFrame"))
+
+DESIGNATED_INIT(NSCursor, (2, "initWithImage", "hotSpot"))
+
 DESIGNATED_INIT(NSDocument, (0, "init"))
+
+DESIGNATED_INIT(NSDocumentController, (0, "init"))
+
+DESIGNATED_INIT(NSDraggingImageComponent, (1, "initWithKey"))
+
+DESIGNATED_INIT(NSDraggingItem, (1, "initWithPasteboardWriter"))
+
+DESIGNATED_INIT(NSFontManager, (0, "init"))
+
+DESIGNATED_INIT(NSFormCell, (1, "initTextCell"))
+
+DESIGNATED_INIT(NSGradient, (3, "initWithColors", "atLocations", "colorSpace"))
+
+DESIGNATED_INIT(NSImageCell, (0, "init"))
+DESIGNATED_INIT(NSImageCell, (1, "initWithCoder"))
+DESIGNATED_INIT(NSImageCell, (1, "initTextCell"))
+DESIGNATED_INIT(NSImageCell, (1, "initImageCell"))
+
+DESIGNATED_INIT(NSLayoutManager, (0, "init"))
+
+DESIGNATED_INIT(NSMatrix, 
+                (5, "initWithFrame", "mode", "cellClass", "numberOfRows", 
+                    "numberOfColumns"))
+DESIGNATED_INIT(NSMatrix, 
+                (5, "initWithFrame", "prototype", "cellClass", "numberOfRows", 
+                    "numberOfColumns"))
+
+DESIGNATED_INIT(NSMenu, (1, "initWithTitle"))
+
+DESIGNATED_INIT(NSMenuView, (1, "initWithFrame"))
+
+DESIGNATED_INIT(NSPopUpButtonCell, (2, "initTextCell", "pullsDown"))
+
+DESIGNATED_INIT(NSPrintInfo, (1, "initWithDictionary"))
+
+DESIGNATED_INIT(NSRulerMarker, 
+                (4, "initWithRulerView", "markerLocation", "image", 
+                 "imageOrigin"))
+
+DESIGNATED_INIT(NSRulerView, (2, "initWithScrollView", "orientation"))
+
+DESIGNATED_INIT(NSTableColumn, (1, "initWithIdentifier"))
+
+DESIGNATED_INIT(NSTextAttachment, (1, "initWithFileWrapper"))
+
+DESIGNATED_INIT(NSTextBlock, (0, "init"))
+
+DESIGNATED_INIT(NSTextContainer, (1, "initWithContainerSize"))
+
+DESIGNATED_INIT(NSTextFieldCell, (1, "initWithCoder"))
+DESIGNATED_INIT(NSTextFieldCell, (1, "initTextCell"))
+DESIGNATED_INIT(NSTextFieldCell, (1, "initImageCell"))
+
+DESIGNATED_INIT(NSTextFinder, (0, "init"))
+
+DESIGNATED_INIT(NSTextInputContext, (1, "initWithClient"))
+
+DESIGNATED_INIT(NSTextTableBlock, 
+                (5, "initWithTable", "startingRow", "rowSpan", 
+                 "startingColumn", "columnSpan"))
+
+DESIGNATED_INIT(NSTextView, (2, "initWithFrame", "textContainer"))
+
+DESIGNATED_INIT(NSUserDefaultsController, 
+                (2, "initWithDefaults", "initialValues"))
+
+DESIGNATED_INIT(NSTextView, (1, "initWithFrame"))
+
+DESIGNATED_INIT(NSWindow, 
+                (4, "initWithContentRect", "styleMask", "backing", "defer"))
+
+DESIGNATED_INIT(NSWindowController, (1, "initWithWindow"))
 
 // UIKit
 DESIGNATED_INIT(UIDocument, (1, "initWithFileURL"))
