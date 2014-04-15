@@ -1,0 +1,23 @@
+// RUN: rm -rf %t
+// RUN: %swift -target x86_64-apple-darwin10 -module-cache-path %t/clang-module-cache -sdk %S/Inputs -I=%S/Inputs %s -enable-source-import -emit-ir | FileCheck %s
+
+sil_stage canonical
+
+import gizmo
+
+// rdar://16621578
+
+sil @init_opaque_existential : $@thin <T where T : Gizmo> (@out protocol<>, @owned T) -> () {
+bb0(%0 : $*protocol<>, %1 : $T):
+  %2 = init_existential %0 : $*protocol<>, $*T
+  store %1 to %2 : $*T
+  %3 = tuple ()
+  return %3 : $()
+}
+// CHECK-DAG:   define void @init_opaque_existential([[ANY:%"protocol<>"]]* noalias sret, [[GIZMO:%.*]]*, [[TYPE:%.*]]* %T)
+// CHECK:         [[T0:%.*]] = getelementptr inbounds [[ANY]]* %0, i32 0, i32 1
+// CHECK-NEXT:    store [[TYPE]]* %T, [[TYPE]]** [[T0]], align 8
+// CHECK-NEXT:    [[T0:%.*]] = getelementptr inbounds [[ANY]]* %0, i32 0, i32 0
+// CHECK-NEXT:    [[T1:%.*]] = bitcast [24 x i8]* [[T0]] to [[GIZMO]]**
+// CHECK-NEXT:    store [[GIZMO]]* %1, [[GIZMO]]** [[T1]], align 8
+// CHECK-NEXT:    ret void

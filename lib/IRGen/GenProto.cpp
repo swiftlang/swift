@@ -4091,7 +4091,7 @@ Address irgen::emitOpaqueExistentialContainerInit(IRGenFunction &IGF,
   // buffer.  If we don't, we need a value witness table.
   FixedPacking packing;
   bool needValueWitnessToAllocate;
-  if (srcType.is<ArchetypeType>()) { // FIXME: tuples of archetypes?
+  if (!isa<FixedTypeInfo>(srcTI)) {
     packing = (FixedPacking) -1;
     needValueWitnessToAllocate = true;
   } else {
