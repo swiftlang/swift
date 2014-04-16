@@ -447,8 +447,17 @@ static bool diagAvailability(TypeChecker &TC, const AvailabilityAttr *Attr,
 
   if (Attr->IsUnvailable) {
     auto Name = D->getName();
-    TC.diagnose(R.Start, diag::availability_decl_unavailable, Name)
-      .highlight(R);
+    auto Message = Attr->Message;
+    SourceLoc Loc = R.Start;
+
+    if (Message.empty()) {
+      TC.diagnose(Loc, diag::availability_decl_unavailable, Name)
+        .highlight(R);
+    } else {
+      TC.diagnose(Loc, diag::availability_decl_unavailable_msg,
+                  Name, Message)
+        .highlight(SourceRange(Loc, Loc));
+    }
 
     auto DLoc = D->getLoc();
     if (DLoc.isValid())
