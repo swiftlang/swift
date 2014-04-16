@@ -303,9 +303,9 @@ static Expr *simplifyLocatorToAnchor(ConstraintSystem &cs,
 ///
 static Pattern *getParameterPattern(ValueDecl *decl) {
   if (auto func = dyn_cast<FuncDecl>(decl))
-    return func->getArgParamPatterns()[0];
+    return func->getBodyParamPatterns()[0];
   if (auto constructor = dyn_cast<ConstructorDecl>(decl))
-    return constructor->getArgParamPatterns()[1];
+    return constructor->getBodyParamPatterns()[1];
   if (auto subscript = dyn_cast<SubscriptDecl>(decl))
     return subscript->getIndices();
 
