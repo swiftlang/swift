@@ -431,16 +431,20 @@ static FuncDecl *makeOptionSetFactoryMethod(StructDecl *optionSetDecl,
     break;
   }
   
-  Identifier name;
+  Identifier baseName;
+  Identifier argName;
   switch (factoryMethod) {
   case OptionSetFactoryMethod::FromMask:
-    name = C.getIdentifier("fromMask");
+    baseName = C.Id_fromMask;
+    argName = C.Id_value;
     break;
   case OptionSetFactoryMethod::FromRaw:
-    name = C.getIdentifier("fromRaw");
+    baseName = C.Id_fromRaw;
+    argName = C.Id_raw;
     break;
   }
   
+  DeclName name(C, baseName, C.Id_value);
   auto factoryDecl = FuncDecl::create(C, SourceLoc(), StaticSpellingKind::None,
                                       SourceLoc(),
                                       name,
@@ -502,9 +506,10 @@ static FuncDecl *makeOptionSetToRawMethod(StructDecl *optionSetDecl,
   methodParam->setType(TupleType::getEmpty(C));
   Pattern *params[] = {selfParam, methodParam};
 
+  DeclName name(C, C.Id_toRaw, { });
   FuncDecl *toRawDecl = FuncDecl::create(
       C, SourceLoc(), StaticSpellingKind::None, SourceLoc(),
-      C.getIdentifier("toRaw"), SourceLoc(), nullptr, Type(), params, params,
+      name, SourceLoc(), nullptr, Type(), params, params,
       TypeLoc::withoutLoc(rawType), optionSetDecl);
   toRawDecl->setImplicit();
   
@@ -584,9 +589,10 @@ static FuncDecl *makeOptionSetGetLogicValueMethod(StructDecl *optionSetDecl,
   methodParam->setType(TupleType::getEmpty(C));
   Pattern *params[] = {selfParam, methodParam};
   
+  DeclName name(C, C.Id_GetLogicValue, { });
   FuncDecl *getLVDecl = FuncDecl::create(
       C, SourceLoc(), StaticSpellingKind::None, SourceLoc(),
-      C.getIdentifier("getLogicValue"), SourceLoc(), nullptr, Type(), params,
+      name, SourceLoc(), nullptr, Type(), params,
       params, TypeLoc::withoutLoc(boolType), optionSetDecl);
   getLVDecl->setImplicit();
   
@@ -1493,9 +1499,15 @@ namespace {
       auto resultTy = type->castTo<FunctionType>()->getResult();
       auto loc = Impl.importSourceLoc(decl->getLocation());
 
-      auto name = Impl.importName(decl->getDeclName());
-      if (name.empty())
+      // Form the name of the function.
+      // FIXME: Allow remapping of the name.
+      auto baseName = Impl.importName(decl->getDeclName());
+      if (baseName.empty())
         return nullptr;
+
+      llvm::SmallVector<Identifier, 2> 
+        argNames(bodyPatterns[0]->numTopLevelVariables(), Identifier());
+      DeclName name(Impl.SwiftContext, baseName, argNames);
 
       // FIXME: Poor location info.
       auto nameLoc = Impl.importSourceLoc(decl->getLocation());

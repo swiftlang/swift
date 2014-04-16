@@ -200,9 +200,9 @@ deriveEquatable_enum_eq(TypeChecker &tc, EnumDecl *enumDecl) {
   
   auto boolTy = C.getBoolDecl()->getDeclaredType();
   
-  auto id_eq = C.getIdentifier("==");
+  DeclName name(C, C.Id_EqualsOperator, { Identifier(), Identifier() });
   auto eqDecl = FuncDecl::create(C, SourceLoc(), StaticSpellingKind::None,
-                           SourceLoc(), id_eq,
+                           SourceLoc(), name,
                            SourceLoc(),
                            genericParams,
                            Type(), argParams, params,
@@ -210,7 +210,7 @@ deriveEquatable_enum_eq(TypeChecker &tc, EnumDecl *enumDecl) {
                            &enumDecl->getModuleContext()->getDerivedFileUnit());
   eqDecl->setImplicit();
   eqDecl->getMutableAttrs().setAttr(AttrKind::AK_infix, SourceLoc());
-  auto op = C.getStdlibModule()->lookupInfixOperator(id_eq);
+  auto op = C.getStdlibModule()->lookupInfixOperator(C.Id_EqualsOperator);
   if (!op) {
     tc.diagnose(enumDecl->getLoc(),
                 diag::broken_equatable_eq_operator);
@@ -397,11 +397,10 @@ deriveHashable_enum_hashValue(TypeChecker &tc, EnumDecl *enumDecl) {
   methodParam->setType(TupleType::getEmpty(tc.Context));
   Pattern *params[] = {selfParam, methodParam};
   
-  Identifier id_hashValue = C.getIdentifier("hashValue");
-  
+  DeclName name(C, C.Id_hashValue, { });
   FuncDecl *hashValueDecl =
       FuncDecl::create(C, SourceLoc(), StaticSpellingKind::None, SourceLoc(),
-                     id_hashValue, SourceLoc(), nullptr, Type(),
+                     name, SourceLoc(), nullptr, Type(),
                      params, params, TypeLoc::withoutLoc(intType), enumDecl);
   hashValueDecl->setImplicit();
   hashValueDecl->setBodySynthesizer(deriveBodyHashable_enum_hashValue);

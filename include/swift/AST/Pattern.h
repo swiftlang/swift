@@ -141,6 +141,11 @@ public:
   /// this pattern.  This is a pre-order traversal.
   void forEachNode(const std::function<void(Pattern*)> &f);
 
+  /// Return the number of "top-level" variables in the given pattern,
+  /// which looks into one level of tuple pattern to determine the #
+  /// of variables. If the pattern is not a tuple, the result is one.
+  unsigned numTopLevelVariables() const;
+
   /// Flags used to indicate how pattern cloning should operate.
   enum CloneFlags {
     /// The cloned pattern should be implicit.

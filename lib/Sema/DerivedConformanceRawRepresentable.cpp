@@ -91,7 +91,7 @@ static TypeDecl *deriveRawRepresentable_RawType(TypeChecker &tc,
   auto rawType = ArchetypeBuilder::mapTypeIntoContext(enumDecl,
                                                       rawInterfaceType);
   auto rawTypeDecl = new (C) TypeAliasDecl(SourceLoc(),
-                                   C.getIdentifier("RawType"),
+                                   C.Id_RawType,
                                    SourceLoc(),
                                    TypeLoc::withoutLoc(rawType),
                                    enumDecl);
@@ -184,9 +184,10 @@ static FuncDecl *deriveRawRepresentable_toRaw(TypeChecker &tc,
   methodParam->setType(TupleType::getEmpty(tc.Context));
   Pattern *params[] = {selfParam, methodParam};
   
+  DeclName name(C, C.Id_toRaw, { });
   FuncDecl *toRawDecl =
       FuncDecl::create(C, SourceLoc(), StaticSpellingKind::None, SourceLoc(),
-                       C.getIdentifier("toRaw"), SourceLoc(), nullptr, Type(),
+                       name, SourceLoc(), nullptr, Type(),
                        params, params, TypeLoc::withoutLoc(rawType), enumDecl);
   toRawDecl->setImplicit();
   toRawDecl->setBodySynthesizer(&deriveBodyRawRepresentable_toRaw);
@@ -344,7 +345,7 @@ static FuncDecl *deriveRawRepresentable_fromRaw(TypeChecker &tc,
 
   VarDecl *rawDecl = new (C) VarDecl(/*static*/ false, /*IsVal*/true,
                                      SourceLoc(),
-                                     C.getIdentifier("raw"),
+                                     C.Id_raw,
                                      rawType,
                                      enumDecl);
   rawDecl->setImplicit();
@@ -361,9 +362,10 @@ static FuncDecl *deriveRawRepresentable_fromRaw(TypeChecker &tc,
                           rawParam->clone(C, Pattern::Implicit)};
   Pattern *bodyParams[] = {selfParam, rawParam};
   auto retTy = OptionalType::get(enumType);
+  DeclName name(C, C.Id_fromRaw, { C.Id_raw });
   auto fromRawDecl = FuncDecl::create(
       C, SourceLoc(), StaticSpellingKind::None, SourceLoc(),
-      C.getIdentifier("fromRaw"), SourceLoc(), nullptr, Type(), argParams,
+      name, SourceLoc(), nullptr, Type(), argParams,
       bodyParams, TypeLoc::withoutLoc(retTy), enumDecl);
   fromRawDecl->setStatic();
   fromRawDecl->setImplicit();
@@ -425,13 +427,13 @@ ValueDecl *DerivedConformance::deriveRawRepresentable(TypeChecker &tc,
     tc.validateDecl(elt);
 
   // Start building the conforming decls.
-  if (requirement->getName().str() == "toRaw")
+  if (requirement->getName() == tc.Context.Id_toRaw)
     return deriveRawRepresentable_toRaw(tc, enumDecl);
   
-  if (requirement->getName().str() == "fromRaw")
+  if (requirement->getName() == tc.Context.Id_fromRaw)
     return deriveRawRepresentable_fromRaw(tc, enumDecl);
 
-  if (requirement->getName().str() == "RawType")
+  if (requirement->getName() == tc.Context.Id_RawType)
     return deriveRawRepresentable_RawType(tc, enumDecl);
   
   tc.diagnose(requirement->getLoc(),

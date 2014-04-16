@@ -191,6 +191,13 @@ void Pattern::forEachNode(const std::function<void(Pattern*)> &f) {
   }
 }
 
+unsigned Pattern::numTopLevelVariables() const {
+  auto pattern = getSemanticsProvidingPattern();
+  if (auto tuple = dyn_cast<TuplePattern>(pattern))
+    return tuple->getNumFields();
+  return 1;
+}
+
 Pattern *Pattern::clone(ASTContext &context,
                         OptionSet<CloneFlags> options) const {
   Pattern *result;
