@@ -2867,21 +2867,22 @@ public:
   /// the corresponding operator declaration.
   void bindFuncDeclToOperator(FuncDecl *FD) {
     OperatorDecl *op = nullptr;
+    auto operatorName = FD->getFullName().getBaseName();
     SourceFile &SF = *FD->getDeclContext()->getParentSourceFile();
     if (FD->isUnaryOperator()) {
       if (FD->getAttrs().isPrefix()) {
-        op = SF.lookupPrefixOperator(FD->getName(), FD->getLoc());
+        op = SF.lookupPrefixOperator(operatorName, FD->getLoc());
       } else if (FD->getAttrs().isPostfix()) {
         // Postfix '!' is reserved.
-        if (FD->getName().str().equals("!")) {
+        if (operatorName.str().equals("!")) {
           TC.diagnose(FD->getLoc(), diag::custom_operator_postfix_exclaim);
           return;
         }
 
-        op = SF.lookupPostfixOperator(FD->getName(),FD->getLoc());
+        op = SF.lookupPostfixOperator(operatorName,FD->getLoc());
       } else {
-        auto prefixOp = SF.lookupPrefixOperator(FD->getName(), FD->getLoc());
-        auto postfixOp = SF.lookupPostfixOperator(FD->getName(), FD->getLoc());
+        auto prefixOp = SF.lookupPrefixOperator(operatorName, FD->getLoc());
+        auto postfixOp = SF.lookupPostfixOperator(operatorName, FD->getLoc());
 
         // If we found both prefix and postfix, or neither prefix nor postfix,
         // complain. We can't fix this situation.
@@ -2929,7 +2930,7 @@ public:
                     static_cast<bool>(postfixOp));
       }
     } else if (FD->isBinaryOperator()) {
-      op = SF.lookupInfixOperator(FD->getName(), FD->getLoc());
+      op = SF.lookupInfixOperator(operatorName, FD->getLoc());
     } else {
       TC.diagnose(FD, diag::invalid_arg_count_for_operator);
       return;

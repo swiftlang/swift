@@ -692,7 +692,12 @@ Parser::parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
       ArgPatterns.push_back(mapped.first);
       BodyPatterns.push_back(mapped.second);
 
-      isFirstParameterClause = false;
+      if (isFirstParameterClause) {
+        for (const auto &param : params) {
+          NamePieces.push_back(param.FirstName);
+        }
+        isFirstParameterClause = false;
+      }
     }
 
     return status;
@@ -743,13 +748,9 @@ Parser::parseFunctionSignature(Identifier SimpleName,
   if (Tok.is(tok::l_paren)) {
     Status = parseFunctionArguments(NamePieces, argPatterns, bodyPatterns,
                                     defaultArgs, HasSelectorStyleSignature);
-    // FIXME: Tying compound names to selector-style signatures is bogus.
-    if (HasSelectorStyleSignature)
-      FullName = DeclName(Context, NamePieces[0],
-                          llvm::makeArrayRef(NamePieces.begin() + 1,
-                                             NamePieces.end()));
-    else
-      FullName = DeclName(NamePieces[0]);
+    FullName = DeclName(Context, SimpleName, 
+                        llvm::makeArrayRef(NamePieces.begin() + 1,
+                                           NamePieces.end()));
 
     if (bodyPatterns.empty()) {
       // If we didn't get anything, add a () pattern to avoid breaking

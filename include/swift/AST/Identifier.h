@@ -290,7 +290,7 @@ public:
   
   /// True if this name is an operator.
   bool isOperator() const {
-    return isSimpleName() && getBaseName().isOperator();
+    return getBaseName().isOperator();
   }
   
   /// True if this name should be found by a decl ref or member ref under the

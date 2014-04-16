@@ -319,8 +319,8 @@ namespace {
     }
 
     void printDeclName(ValueDecl *D) {
-      if (D->getName().get())
-        OS << '\"' << D->getName() << '\"';
+      if (D->getFullName())
+        OS << '\"' << D->getFullName() << '\"';
       else
         OS << "'anonname=" << (const void*)D << '\'';
     }
