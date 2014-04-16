@@ -533,7 +533,7 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
                          func->getDeclContext(), resolver);
 
   // Check the parameter patterns.
-  for (auto pattern : func->getArgParamPatterns()) {
+  for (auto pattern : func->getBodyParamPatterns()) {
     // Check the pattern.
     if (tc.typeCheckPattern(pattern, func, TR_ImmediateFunctionInput,
                             &resolver))
@@ -669,7 +669,7 @@ bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
     funcTy = TupleType::getEmpty(Context);
   }
 
-  auto patterns = func->getArgParamPatterns();
+  auto patterns = func->getBodyParamPatterns();
   SmallVector<Pattern *, 4> storedPatterns;
 
   // FIXME: Destructors don't have the '()' pattern in their signature, so
@@ -685,13 +685,13 @@ bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
   }
 
   auto sig = GenericSignature::get(allGenericParams, requirements);
-
+  bool hasSelf = func->getDeclContext()->isTypeContext();
   for (unsigned i = 0, e = patterns.size(); i != e; ++i) {
     Type argTy;
     Type initArgTy;
 
     Type selfTy;
-    if (i == e-1 && func->getDeclContext()->isTypeContext()) {
+    if (i == e-1 && hasSelf) {
       selfTy = func->computeInterfaceSelfType(/*isInitializingCtor=*/false);
       // Substitute in our own 'self' parameter.
 
@@ -707,6 +707,14 @@ bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
       // archetypes with their corresponding dependent types.
       if (func->isImplicit()) {
         argTy = getInterfaceTypeFromInternalType(func, argTy); 
+      }
+
+      // If we have a compound name, relabel the argument type for the
+      // primary argument list.
+      if (e - i - 1 == hasSelf) {
+        if (auto name = func->getFullName()) {
+          argTy = argTy->getRelabeledType(Context, name.getArgumentNames());
+        }
       }
 
       if (initFuncTy)
