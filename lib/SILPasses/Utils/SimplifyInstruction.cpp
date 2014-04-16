@@ -122,7 +122,7 @@ SILValue InstSimplifier::visitTupleExtractInst(TupleExtractInst *TEI) {
 SILValue InstSimplifier::visitStructExtractInst(StructExtractInst *SEI) {
   // struct_extract(struct(x, y), x) -> x
   if (StructInst *Struct = dyn_cast<StructInst>(SEI->getOperand()))
-    return Struct->getOperandForField(SEI->getField())->get();
+    return Struct->getFieldValue(SEI->getField());
   
   return SILValue();
 }

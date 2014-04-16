@@ -669,7 +669,7 @@ bool SimplifyCFG::simplifyArgs(SILBasicBlock *BB) {
     return false;
 
   // Ignore the entry block.
-  if (BB->pred_begin() == BB->pred_end())
+  if (BB->pred_empty())
     return false;
 
   // Ignore blocks that are successors of terminators with mandatory args.
