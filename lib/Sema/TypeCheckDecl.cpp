@@ -1745,6 +1745,10 @@ static void configureConstructorType(ConstructorDecl *ctor,
   Type initFnType;
   Type resultType = selfType->getInOutObjectType();
 
+  // Use the argument names in the argument type.
+  argType = argType->getRelabeledType(ctor->getASTContext(), 
+                                      ctor->getFullName().getArgumentNames());
+
   if (GenericParamList *innerGenericParams = ctor->getGenericParams()) {
     innerGenericParams->setOuterParameters(outerGenericParams);
     fnType = PolymorphicFunctionType::get(argType, resultType,
@@ -3985,7 +3989,7 @@ public:
       CD->setInvalid();
     } else {
       configureConstructorType(CD, outerGenericParams, SelfTy, 
-                               CD->getArgParamPatterns()[1]->getType());
+                               CD->getBodyParamPatterns()[1]->getType());
     }
 
     validateAttributes(TC, CD);
@@ -4650,7 +4654,7 @@ createSubobjectInitOverride(TypeChecker &tc,
 
   // Set the type of the initializer.
   configureConstructorType(ctor, outerGenericParams, selfType, 
-                           argParamPatterns->getType());
+                           bodyParamPatterns->getType());
   if (superclassCtor->isObjC()) {
     ctor->setIsObjC(true);
 
