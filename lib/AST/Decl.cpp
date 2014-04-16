@@ -2355,42 +2355,37 @@ ObjCSelector FuncDecl::getObjCSelector() const {
   }
 
   // We should always have exactly two levels of argument pattern.
-  auto argPatterns = getArgParamPatterns();
-  assert(argPatterns.size() == 2);
-  const Pattern *pattern = argPatterns[1];
-  auto tuple = dyn_cast<TuplePattern>(pattern);
-
-  // If it's an empty tuple pattern, it's a nullary selector.
+  auto argNames = getFullName().getArgumentNames();
   auto &ctx = getASTContext();
-  if (tuple && tuple->getNumFields() == 0)
-    return ObjCSelector(ctx, 0, getName());
 
+  // If we have no arguments, it's a nullary selector.
+  if (argNames.size() == 0) {
+    return ObjCSelector(ctx, 0, getName());
+  }
 
   // If it's a unary selector with no name for the first argument, we're done.
-  if (!tuple) {
+  if (argNames.size() == 1 && argNames[0].empty()) {
     return ObjCSelector(ctx, 1, getName());
   }
 
   // Attach the first parameter name to the base name.
   auto firstPiece = getName();
   bool didStringManipulation = false;
-  if (tuple && ctx.LangOpts.SplitPrepositions) {
+  if (ctx.LangOpts.SplitPrepositions) {
     llvm::SmallString<32> scratch1, scratch2;
     scratch1 += firstPiece.str();
-    auto firstName = tuple->getFields()[0].getPattern()->getBoundName();
+    auto firstName = argNames[0];
     if (!firstName.empty()) {
       scratch1 += camel_case::toSentencecase(firstName.str(), scratch2);
       firstPiece = ctx.getIdentifier(scratch1);
+      didStringManipulation = true;
     }
   }
 
   // For every element beyond the first, add a selector component.
   SmallVector<Identifier, 4> argumentNames;
   argumentNames.push_back(firstPiece);
-  for (auto &elt : tuple->getFields().slice(1)) {
-    auto eltPattern = elt.getPattern()->getSemanticsProvidingPattern();
-    argumentNames.push_back(eltPattern->getBoundName());
-  }
+  argumentNames.append(argNames.begin() + 1, argNames.end());
 
   // Form the result.
   auto result = ObjCSelector(ctx, argumentNames.size(), argumentNames);
