@@ -537,8 +537,12 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
       P->setType(ErrorType::get(Context));
       return true;
     }
-    if (SP->hasType())
-      P->setType(SP->getType());
+    if (SP->hasType()) {
+      auto type = SP->getType();
+      if (P->getKind() == PatternKind::Paren)
+        type = ParenType::get(Context, type);
+      P->setType(type);
+    }
     return false;
   }
 

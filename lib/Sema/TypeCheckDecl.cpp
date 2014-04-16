@@ -2817,8 +2817,9 @@ public:
     }
     auto bodyResultType = funcTy;
 
-    // FIXME: it would be nice to have comments explaining what this is all
-    // about.
+    // Form the function type by building the curried function type
+    // from the back to the front, "prepending" each of the parameter
+    // patterns.
     GenericParamList *genericParams = FD->getGenericParams();
     GenericParamList *outerGenericParams = nullptr;
     auto patterns = FD->getArgParamPatterns();
@@ -2829,11 +2830,20 @@ public:
     for (unsigned i = 0, e = patterns.size(); i != e; ++i) {
       Type argTy = patterns[e - i - 1]->getType();
 
+      // Determine the appropriate generic parameters at this level.
       GenericParamList *params = nullptr;
       if (e - i - 1 == hasSelf && genericParams) {
         params = genericParams;
       } else if (e - i - 1 == 0 && outerGenericParams) {
         params = outerGenericParams;
+      }
+      
+      // If we have a compound name, relabel the argument type for the primary
+      // argument list.
+      if (e - i - 1 == hasSelf) {
+        if (auto name = FD->getFullName()) {
+          argTy = argTy->getRelabeledType(TC.Context, name.getArgumentNames());
+        }
       }
 
       // Validate and consume the function type attributes.
