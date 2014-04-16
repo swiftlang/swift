@@ -718,7 +718,7 @@ static bool CCPFunctionBody(SILFunction &F) {
   llvm::DenseSet<SILInstruction*> ErrorSet;
 
   // The worklist of the constants that could be folded into their users.
-  llvm::SetVector<ValueBase*> WorkList;
+  llvm::SetVector<SILInstruction *> WorkList;
   // Initialize the worklist to all of the constant instructions.
   for (auto &BB : F) {
     for (auto &I : BB) {
@@ -727,11 +727,10 @@ static bool CCPFunctionBody(SILFunction &F) {
     }
   }
 
-  llvm::DenseSet<SILInstruction*> FoldedUsers;
+  llvm::SetVector<SILInstruction *> FoldedUsers;
 
   while (!WorkList.empty()) {
-    ValueBase *I = *WorkList.begin();
-    WorkList.remove(I);
+    SILInstruction *I = WorkList.pop_back_val();
 
     // Go through all users of the constant and try to fold them.
     FoldedUsers.clear();
@@ -779,10 +778,13 @@ static bool CCPFunctionBody(SILFunction &F) {
           // If the user is a tuple_extract, just substitute the right value in.
           if (auto *TEI = dyn_cast<TupleExtractInst>(O->getUser())) {
             SILValue NewVal = TI->getOperand(TEI->getFieldNo());
+            assert(TEI->getTypes().size() == 1 &&
+                   "Currently, we only support single result instructions.");
             SILValue(TEI, 0).replaceAllUsesWith(NewVal);
             TEI->dropAllReferences();
             FoldedUsers.insert(TEI);
-            WorkList.insert(NewVal.getDef());
+            if (auto *SI = dyn_cast<SILInstruction>(NewVal.getDef()))
+              WorkList.insert(SI);
           }
         }
         
@@ -797,14 +799,15 @@ static bool CCPFunctionBody(SILFunction &F) {
       SILValue(User).replaceAllUsesWith(C);
       
       // The new constant could be further folded now, add it to the worklist.
-      WorkList.insert(C.getDef());
+      if (auto *SI = dyn_cast<SILInstruction>(C.getDef()))
+        WorkList.insert(SI);
     }
 
     // Eagerly DCE. We do this after visiting all users to ensure we don't
     // invalidate the uses iterator.
-    for (auto U : FoldedUsers)
-      recursivelyDeleteTriviallyDeadInstructions(U);
-
+    auto UserArray = ArrayRef<SILInstruction *>(&*FoldedUsers.begin(),
+                                                FoldedUsers.size());
+    recursivelyDeleteTriviallyDeadInstructions(UserArray);
   }
 
   return Changed;
