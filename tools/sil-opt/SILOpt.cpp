@@ -36,7 +36,8 @@ namespace {
 enum class PassKind {
   AllocBoxToStack,
   CapturePromotion,
-  CCP,
+  DiagnosticCCP,
+  PerformanceCCP,
   CSE,
   DefiniteInit,
   NoReturn,
@@ -101,9 +102,12 @@ Passes(llvm::cl::desc("Passes:"),
                         clEnumValN(PassKind::SILCleanup,
                                    "cleanup",
                                    "Cleanup SIL in preparation for IRGen"),
-                        clEnumValN(PassKind::CCP,
-                                   "constant-propagation",
-                                   "Propagate constants"),
+                        clEnumValN(PassKind::DiagnosticCCP,
+                                   "diagnostic-constant-propagation",
+                                   "Propagate constants and emit diagnostics"),
+                        clEnumValN(PassKind::PerformanceCCP,
+                                   "performance-constant-propagation",
+                                   "Propagate constants and do not emit diagnostics"),
                         clEnumValN(PassKind::CSE,
                                    "cse",
                                    "Perform constant subexpression elimination."),
@@ -335,8 +339,11 @@ int main(int argc, char **argv) {
     case PassKind::CapturePromotion:
       PM.add(createCapturePromotion());
       break;
-    case PassKind::CCP:
-      PM.add(createConstantPropagation());
+    case PassKind::DiagnosticCCP:
+      PM.add(createDiagnosticConstantPropagation());
+      break;
+    case PassKind::PerformanceCCP:
+      PM.add(createPerformanceConstantPropagation());
       break;
     case PassKind::CSE:
       PM.add(createCSE());

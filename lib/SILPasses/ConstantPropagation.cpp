@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "constant-propagation"
 #include "swift/SILPasses/Passes.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/Basic/Optional.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILPasses/Utils/Local.h"
@@ -20,6 +21,7 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/CommandLine.h"
 using namespace swift;
 
 STATISTIC(NumInstFolded, "Number of constant folded instructions");
@@ -54,10 +56,10 @@ static SILInstruction *constructResultWithOverflowTuple(ApplyInst *AI,
 }
 
 /// \brief Fold arithmetic intrinsics with overflow.
-static SILInstruction *constantFoldBinaryWithOverflow(ApplyInst *AI,
-                                                      llvm::Intrinsic::ID ID,
-                                                      bool ReportOverflow,
-                                                      bool &ResultsInError) {
+static SILInstruction *
+constantFoldBinaryWithOverflow(ApplyInst *AI, llvm::Intrinsic::ID ID,
+                               bool ReportOverflow,
+                               Optional<bool> &ResultsInError) {
   OperandValueArrayRef Args = AI->getArguments();
   assert(Args.size() >= 2);
 
@@ -107,8 +109,8 @@ static SILInstruction *constantFoldBinaryWithOverflow(ApplyInst *AI,
   }
 
   // If we can statically determine that the operation overflows,
-  // warn about it.
-  if (Overflow && ReportOverflow) {
+  // warn about it if warnings are not disabled by ResultsInError being null.
+  if (ResultsInError.hasValue() && Overflow && ReportOverflow) {
     // Try to infer the type of the constant expression that the user operates
     // on. If the intrinsic was lowered from a call to a function that takes
     // two arguments of the same type, use the type of the LHS argument.
@@ -134,7 +136,6 @@ static SILInstruction *constantFoldBinaryWithOverflow(ApplyInst *AI,
                Operator,
                RHSInt.toString(/*Radix*/ 10, Signed),
                OpType);
-      ResultsInError = true;
     } else {
       // If we cannot get the type info in an expected way, describe the type.
       diagnose(AI->getModule().getASTContext(),
@@ -145,16 +146,16 @@ static SILInstruction *constantFoldBinaryWithOverflow(ApplyInst *AI,
                RHSInt.toString(/*Radix*/ 10, Signed),
                Signed,
                LHSInt.getBitWidth());
-      ResultsInError = true;
     }
+    ResultsInError = Optional<bool>(true);
   }
 
   return constructResultWithOverflowTuple(AI, Res, Overflow);
 }
 
-static SILInstruction *constantFoldBinaryWithOverflow(ApplyInst *AI,
-                                                      BuiltinValueKind ID,
-                                                      bool &ResultsInError) {
+static SILInstruction *
+constantFoldBinaryWithOverflow(ApplyInst *AI, BuiltinValueKind ID,
+                               Optional<bool> &ResultsInError) {
   OperandValueArrayRef Args = AI->getArguments();
   IntegerLiteralInst *ShouldReportFlag = dyn_cast<IntegerLiteralInst>(Args[2]);
   return constantFoldBinaryWithOverflow(AI,
@@ -165,7 +166,7 @@ static SILInstruction *constantFoldBinaryWithOverflow(ApplyInst *AI,
 
 static SILInstruction *constantFoldIntrinsic(ApplyInst *AI,
                                              llvm::Intrinsic::ID ID,
-                                             bool &ResultsInError) {
+                                             Optional<bool> &ResultsInError) {
   switch (ID) {
   default: break;
   case llvm::Intrinsic::sadd_with_overflow:
@@ -212,9 +213,9 @@ static SILInstruction *constantFoldCompare(ApplyInst *AI,
   return nullptr;
 }
 
-static SILInstruction *constantFoldAndCheckDivision(ApplyInst *AI,
-                                                    BuiltinValueKind ID,
-                                                    bool &ResultsInError) {
+static SILInstruction *
+constantFoldAndCheckDivision(ApplyInst *AI, BuiltinValueKind ID,
+                             Optional<bool> &ResultsInError) {
   assert(ID == BuiltinValueKind::SDiv ||
          ID == BuiltinValueKind::ExactSDiv ||
          ID == BuiltinValueKind::SRem ||
@@ -231,12 +232,17 @@ static SILInstruction *constantFoldAndCheckDivision(ApplyInst *AI,
     return nullptr;
   APInt DenomVal = Denom->getValue();
 
-  // Reoprt an error if the denominator is zero.
+  // If the denominator is zero...
   if (DenomVal == 0) {
+    // And if we are not asked to report errors, just return nullptr.
+    if (!ResultsInError.hasValue())
+      return nullptr;
+
+    // Otherwise emit a diagnosis error and set ResultsInError to true.
     diagnose(M.getASTContext(),
              AI->getLoc().getSourceLoc(),
              diag::division_by_zero);
-    ResultsInError = true;
+    ResultsInError = Optional<bool>(true);
     return nullptr;
   }
 
@@ -266,14 +272,21 @@ static SILInstruction *constantFoldAndCheckDivision(ApplyInst *AI,
     break;
   }
 
+  // If we overflowed...
   if (Overflowed) {
+    // And we are not asked to produce diagnostics, just return nullptr...
+    if (!ResultsInError.hasValue())
+      return nullptr;
+
+    // Otherwise emit the diagnostic, set ResultsInError to be true, and return
+    // nullptr.
     diagnose(M.getASTContext(),
              AI->getLoc().getSourceLoc(),
              diag::division_overflow,
              NumVal.toString(/*Radix*/ 10, /*Signed*/true),
              "/",
              DenomVal.toString(/*Radix*/ 10, /*Signed*/true));
-    ResultsInError = true;
+    ResultsInError = Optional<bool>(true);
     return nullptr;
   }
 
@@ -288,7 +301,7 @@ static SILInstruction *constantFoldAndCheckDivision(ApplyInst *AI,
 /// folding the operations used by the standard library.
 static SILInstruction *constantFoldBinary(ApplyInst *AI,
                                           BuiltinValueKind ID,
-                                          bool &ResultsInError) {
+                                          Optional<bool> &ResultsInError) {
   switch (ID) {
   default:
     llvm_unreachable("Not all BUILTIN_BINARY_OPERATIONs are covered!");
@@ -399,7 +412,7 @@ static std::pair<bool, bool> getTypeSigndness(const BuiltinInfo &Builtin) {
 static SILInstruction *
 constantFoldAndCheckIntegerConversions(ApplyInst *AI,
                                        const BuiltinInfo &Builtin,
-                                       bool &ResultsInError) {
+                                       Optional<bool> &ResultsInError) {
   assert(Builtin.ID == BuiltinValueKind::SToSCheckedTrunc ||
          Builtin.ID == BuiltinValueKind::UToUCheckedTrunc ||
          Builtin.ID == BuiltinValueKind::SToUCheckedTrunc ||
@@ -491,6 +504,12 @@ constantFoldAndCheckIntegerConversions(ApplyInst *AI,
     // from ObjC interoperability code. Currently, we treat NSUInteger as
     // Int.
     if (Loc.getSourceLoc().isInvalid()) {
+      // If ResultsInError is null, we are not being asked to emit diagnostics,
+      // so just return nullptr.
+      if (!ResultsInError.hasValue())
+        return nullptr;
+
+      // Otherwise emit the appropriate diagnostic and set ResultsInError.
       if (Literal)
         diagnose(M.getASTContext(), Loc.getSourceLoc(),
                  diag::integer_literal_overflow_warn,
@@ -501,11 +520,16 @@ constantFoldAndCheckIntegerConversions(ApplyInst *AI,
                  UserSrcTy.isNull() ? SrcTy : UserSrcTy,
                  UserDstTy.isNull() ? DstTy : UserDstTy);
 
-      ResultsInError = true;
+      ResultsInError = Optional<bool>(true);
       return nullptr;
     }
 
-    // Report the overflow error.
+    // If we are not asked to emit overflow diagnostics, just return nullptr on
+    // overflow.
+    if (!ResultsInError.hasValue())
+      return nullptr;
+
+    // Otherwise report the overflow error.
     if (Literal) {
       // Try to print user-visible types if they are available.
       if (!UserDstTy.isNull()) {
@@ -519,7 +543,7 @@ constantFoldAndCheckIntegerConversions(ApplyInst *AI,
                  diag::integer_literal_overflow_builtin_types,
                  DstTySigned, DstTy);
       }
-    } else
+    } else {
       if (Builtin.ID == BuiltinValueKind::SUCheckedConversion) {
         diagnose(M.getASTContext(), Loc.getSourceLoc(),
                  diag::integer_conversion_sign_error,
@@ -542,7 +566,9 @@ constantFoldAndCheckIntegerConversions(ApplyInst *AI,
                    SrcTySigned, SrcTy, DstTySigned, DstTy);
         }
       }
-    ResultsInError = true;
+    }
+
+    ResultsInError = Optional<bool>(true);
     return nullptr;
   }
 
@@ -553,7 +579,7 @@ constantFoldAndCheckIntegerConversions(ApplyInst *AI,
 
 static SILInstruction *constantFoldBuiltin(ApplyInst *AI,
                                            BuiltinFunctionRefInst *FR,
-                                           bool &ResultsInError) {
+                                           Optional<bool> &ResultsInError) {
   const IntrinsicInfo &Intrinsic = FR->getIntrinsicInfo();
   SILModule &M = AI->getModule();
 
@@ -603,7 +629,7 @@ case BuiltinValueKind::id:
     // Get the cast result.
     Type SrcTy = Builtin.Types[0];
     Type DestTy = Builtin.Types.size() == 2 ? Builtin.Types[1] : Type();
-    uint32_t SrcBitWidth = 
+    uint32_t SrcBitWidth =
       SrcTy->castTo<BuiltinIntegerType>()->getGreatestWidth();
     uint32_t DestBitWidth =
       DestTy->castTo<BuiltinIntegerType>()->getGreatestWidth();
@@ -663,10 +689,15 @@ case BuiltinValueKind::id:
 
     // Check for overflow.
     if (ConversionStatus & APFloat::opOverflow) {
+      // If we overflow and are not asked for diagnostics, just return nullptr.
+      if (!ResultsInError.hasValue())
+        return nullptr;
+
+      // Otherwise emit our diagnostics and then return nullptr.
       diagnose(M.getASTContext(), Loc.getSourceLoc(),
                diag::integer_literal_overflow,
                CE ? CE->getType() : DestTy);
-      ResultsInError = true;
+      ResultsInError = Optional<bool>(true);
       return nullptr;
     }
 
@@ -679,7 +710,7 @@ case BuiltinValueKind::id:
 }
 
 static SILValue constantFoldInstruction(SILInstruction &I,
-                                        bool &ResultsInError) {
+                                        Optional<bool> &ResultsInError) {
   // Constant fold function calls.
   if (ApplyInst *AI = dyn_cast<ApplyInst>(&I)) {
     // Constant fold calls to builtins.
@@ -707,7 +738,7 @@ static bool isFoldable(SILInstruction *I) {
   return isa<IntegerLiteralInst>(I) || isa<FloatLiteralInst>(I);
 }
 
-static bool CCPFunctionBody(SILFunction &F) {
+static bool CCPFunctionBody(SILFunction &F, bool EnableDiagnostics) {
   DEBUG(llvm::dbgs() << "*** ConstPropagation processing: " << F.getName()
         << "\n");
   bool Changed = false;
@@ -760,14 +791,32 @@ static bool CCPFunctionBody(SILFunction &F) {
       if (isa<CondFailInst>(User))
         FoldedUsers.insert(User);
 
-      // Try to fold the user.
-      bool ResultsInError = false;
+      // Initialize ResultsInError as a None optional.
+      //
+      // We are essentially using this optional to represent 3 states: true,
+      // false, and n/a.
+      Optional<bool> ResultsInError;
+
+      // If we are asked to emit diagnostics, override ResultsInError with a
+      // Some optional initialized to false.
+      if (EnableDiagnostics)
+        ResultsInError = false;
+
+      // Try to fold the user. If ResultsInError is None, we do not emit any
+      // diagnostics. If ResultsInError is some, we use it as our return value.
       SILValue C = constantFoldInstruction(*User, ResultsInError);
-      if (ResultsInError)
+
+      // If we did not pass in a None and the optional is set to true, add the
+      // user to our error set.
+      if (ResultsInError.hasValue() && ResultsInError.getValue())
         ErrorSet.insert(User);
 
-      if (!C) continue;
+      // We failed to constant propogate... continue...
+      if (!C)
+        continue;
 
+      // Ok, we have succeeded. Add user to the FoldedUsers list and perform the
+      // necessary cleanups, RAUWs, etc.
       FoldedUsers.insert(User);
       ++NumInstFolded;
       Changed = true;
@@ -791,17 +840,17 @@ static bool CCPFunctionBody(SILFunction &F) {
               WorkList.insert(Inst);
           }
         }
-        
+
         if (User->use_empty())
           FoldedUsers.insert(TI);
       }
-      
-      
+
+
       // We were able to fold, so all users should use the new folded value.
       assert(User->getTypes().size() == 1 &&
              "Currently, we only support single result instructions");
       SILValue(User).replaceAllUsesWith(C);
-      
+
       // The new constant could be further folded now, add it to the worklist.
       if (auto *Inst = dyn_cast<SILInstruction>(C.getDef()))
         WorkList.insert(Inst);
@@ -822,9 +871,16 @@ static bool CCPFunctionBody(SILFunction &F) {
 
 namespace {
 class ConstantPropagation : public SILFunctionTransform {
+  bool EnableDiagnostics;
+
+public:
+  ConstantPropagation(bool EnableDiagnostics) :
+    EnableDiagnostics(EnableDiagnostics) {}
+
+private:
   /// The entry point to the transformation.
   void run() {
-    if (CCPFunctionBody(*getFunction()))
+    if (CCPFunctionBody(*getFunction(), EnableDiagnostics))
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 
@@ -832,6 +888,10 @@ class ConstantPropagation : public SILFunctionTransform {
 };
 } // end anonymous namespace
 
-SILTransform *swift::createConstantPropagation() {
-  return new ConstantPropagation();
+SILTransform *swift::createDiagnosticConstantPropagation() {
+  return new ConstantPropagation(true /*enable diagnostics*/);
+}
+
+SILTransform *swift::createPerformanceConstantPropagation() {
+  return new ConstantPropagation(false /*disable diagnostics*/);
 }

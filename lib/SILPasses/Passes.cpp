@@ -64,7 +64,7 @@ bool swift::runSILDiagnosticPasses(SILModule &Module,
   PM.add(createNoReturnFolding());
   PM.add(createDefiniteInitialization());
   PM.add(createPredictableMemoryOptimizations());
-  PM.add(createConstantPropagation());
+  PM.add(createDiagnosticConstantPropagation());
   PM.add(createDCE());
   PM.add(createEmitDFDiagnostics());
   PM.run();
@@ -95,6 +95,7 @@ void swift::runSILOptimizationPasses(SILModule &Module,
     PM.add(createLowerAggregate());
     PM.add(createSROA());
     PM.add(createMem2Reg());
+    PM.add(createPerformanceConstantPropagation());
     PM.add(createCSE());
     PM.add(createSILCombine());
     PM.add(createLoadStoreOpts());

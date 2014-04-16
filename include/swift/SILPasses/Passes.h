@@ -50,7 +50,7 @@ namespace swift {
   SILTransform *createInOutDeshadowing();
   SILTransform *createDefiniteInitialization();
   SILTransform *createPredictableMemoryOptimizations();
-  SILTransform *createConstantPropagation();
+  SILTransform *createDiagnosticConstantPropagation();
   SILTransform *createNoReturnFolding();
   SILTransform *createDCE();
   SILTransform *createMandatoryInlining();
@@ -73,6 +73,7 @@ namespace swift {
   SILTransform *createAllocBoxToStack();
   SILTransform *createDeadObjectElimination();
   SILTransform *createLoadStoreOpts();
+  SILTransform *createPerformanceConstantPropagation();
 
   // Utilities
   SILTransform *createStripDebug();
