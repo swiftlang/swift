@@ -2071,7 +2071,7 @@ Type AbstractFunctionDecl::getExtensionType() const {
 
 std::pair<DefaultArgumentKind, Type>
 AbstractFunctionDecl::getDefaultArg(unsigned Index) const {
-  ArrayRef<const Pattern *> Patterns = getArgParamPatterns();
+  ArrayRef<const Pattern *> Patterns = getBodyParamPatterns();
 
   if (getImplicitSelfDecl()) {
     // Skip the 'self' parameter; it is not counted.
@@ -2406,7 +2406,7 @@ SourceRange FuncDecl::getSourceRange() const {
     return { StartLoc, B->getEndLoc() };
   if (getBodyResultTypeLoc().hasLocation())
     return { StartLoc, getBodyResultTypeLoc().getSourceRange().End };
-  const Pattern *LastPat = getArgParamPatterns().back();
+  const Pattern *LastPat = getBodyParamPatterns().back();
   return { StartLoc, LastPat->getEndLoc() };
 }
 
