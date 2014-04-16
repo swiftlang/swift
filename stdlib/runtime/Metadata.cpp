@@ -27,6 +27,7 @@
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/Hashing.h"
 #include "MetadataImpl.h"
+#include "Debug.h"
 
 #ifndef SWIFT_DEBUG_RUNTIME
 #define SWIFT_DEBUG_RUNTIME 0
@@ -303,7 +304,7 @@ swift::swift_dynamicCastClassUnconditional(const void *object,
     }
     isa = isa->SuperClass;
   } while (isa);
-  abort();
+  swift::crash("Swift dynamic cast failed");
 #endif
 }
 
@@ -337,8 +338,7 @@ swift::swift_dynamicCast(const void *object, const Metadata *targetType) {
   case MetadataKind::PolyFunction:
   case MetadataKind::Struct:
   case MetadataKind::Tuple:
-    // FIXME: unreachable
-    abort();
+    swift::crash("Swift dynamic cast failed");
   }
 
   return swift_dynamicCastClass(object, targetClassType);
@@ -369,8 +369,7 @@ swift::swift_dynamicCastUnconditional(const void *object,
   case MetadataKind::PolyFunction:
   case MetadataKind::Struct:
   case MetadataKind::Tuple:
-    // FIXME: unreachable
-    abort();
+    swift::crash("Swift dynamic cast failed");
   }
 
   return swift_dynamicCastClassUnconditional(object, targetClassType);
@@ -458,7 +457,7 @@ swift::swift_dynamicCastIndirectUnconditional(const OpaqueValue *value,
     case MetadataKind::PolyFunction:
     case MetadataKind::Struct:
     case MetadataKind::Tuple:
-      abort();
+      swift::crash("Swift dynamic cast failed");
     }
     break;
       
@@ -476,7 +475,7 @@ swift::swift_dynamicCastIndirectUnconditional(const OpaqueValue *value,
     // The cast succeeds only if the metadata pointers are statically
     // equivalent.
     if (sourceType != targetType)
-      abort();
+      swift::crash("Swift dynamic cast failed");
     break;
   }
   

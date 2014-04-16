@@ -18,6 +18,7 @@
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Heap.h"
 #include "Private.h"
+#include "Debug.h"
 #include <mach/vm_statistics.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -241,15 +242,14 @@ void *swift::_swift_zone_realloc(malloc_zone_t *zone,
 }
 
 void swift::_swift_zone_destroy(malloc_zone_t *zone) {
-  // nobody should ever destroy this zone
-  abort();
+  swift::crash("The Swift heap cannot be destroyed");
 }
 
 kern_return_t
 _swift_zone_enumerator(task_t task, void *, unsigned type_mask,
                        vm_address_t zone_address, memory_reader_t reader,
                        vm_range_recorder_t recorder) {
-  abort();
+  swift::crash("Swift Zone enumerator is unimplemented");
 }
 
 size_t _swift_zone_good_size(malloc_zone_t *zone, size_t size) {
@@ -265,7 +265,7 @@ boolean_t _swift_zone_check(malloc_zone_t *zone) {
 }
 
 void _swift_zone_log(malloc_zone_t *zone, void *address) {
-  abort();
+  swift::crash("Swift Zone log is unimplemented");
 }
 
 static inline size_t indexToSize(AllocIndex idx) {
@@ -359,7 +359,7 @@ void *SwiftZone::slowAlloc_optimized(size_t size, uintptr_t flags) {
       if (flags & SWIFT_TRYALLOC) {
         return NULL;
       }
-      abort();
+      swift::crash("Address space exhausted");
     }
     hugeAllocations.insert(std::pair<void *, size_t>(r, size));
     return r;
@@ -508,7 +508,7 @@ local_memory: set to a contiguous chunk of memory; validity of local_memory is a
 #define MALLOC_PTR_REGION_RANGE_TYPE    2   /* for region containing pointers */
 #define MALLOC_ADMIN_REGION_RANGE_TYPE  4   /* for region used internally */
 #define MALLOC_ZONE_SPECIFIC_FLAGS  0xff00  /* bits reserved for zone-specific purposes */
-  abort();
+  swift::crash("Swift Zone memory reader not implemented");
 }
 
 void _swift_vm_range_recorder(task_t task, void *, unsigned type,
@@ -549,7 +549,7 @@ enumerateBlocks(std::function<void(const void *, size_t)> func) {
 
 void _swift_zone_print(malloc_zone_t *zone, boolean_t verbose) {
   enumerateBlocks([&](const void *pointer, size_t size) {
-    abort(); // FIXME -- what should we do?
+    swift::crash("Swift Zone print not implemented");
   });
 }
 

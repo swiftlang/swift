@@ -15,6 +15,7 @@
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/ObjCBridge.h"
 #include "swift/Runtime/Metadata.h"
+#include "Debug.h"
 #include <cassert>
 #include <cstring>
 #include <new>
@@ -265,7 +266,7 @@ StringMirrorTuple swift_TupleMirror_subscript(intptr_t i,
   auto Tuple = static_cast<const TupleTypeMetadata *>(type);
   
   if (i < 0 || (size_t)i > Tuple->NumElements)
-    abort();
+    swift::crash("Swift mirror subscript bounds check failure");
   
   // The name is the stringized element number '.0'.
   char buf[32];
@@ -303,7 +304,7 @@ StringMirrorTuple swift_StructMirror_subscript(intptr_t i,
   auto Struct = static_cast<const StructMetadata *>(type);
   
   if (i < 0 || (size_t)i > Struct->Description->Struct.NumFields)
-    abort();
+    swift::crash("Swift mirror subscript bounds check failure");
   
   // Load the type and offset from their respective vectors.
   auto fieldType = Struct->getFieldTypes()[i];
@@ -376,7 +377,7 @@ StringMirrorTuple swift_ClassMirror_subscript(intptr_t i,
   }
   
   if (i < 0 || (size_t)i > Clas->Description->Class.NumFields)
-    abort();
+    swift::crash("Swift mirror subscript bounds check failure");
   
   // Load the type and offset from their respective vectors.
   auto fieldType = Clas->getFieldTypes()[i];
@@ -526,7 +527,7 @@ StringMirrorTuple swift_ObjCMirror_subscript(intptr_t i,
   }
   
   if (i < 0 || (uintptr_t)i >= (uintptr_t)count)
-    abort();
+    swift::crash("Swift mirror subscript bounds check failure");
   
   const char *name = ivar_getName(ivars[i]);
   ptrdiff_t offset = ivar_getOffset(ivars[i]);
@@ -785,7 +786,7 @@ getImplementationForType(const Metadata *T, const OpaqueValue *Value) {
   case MetadataKind::PolyFunction:
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::HeapArray:
-    abort();
+    swift::crash("Swift mirror lookup failure");
   }
 }
   
@@ -865,7 +866,7 @@ getReflectableConformance(const Metadata *T, const OpaqueValue *Value) {
   case MetadataKind::PolyFunction:
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::HeapArray:
-    abort();
+    swift::crash("Swift mirror lookup failure");
   }
   
   return {

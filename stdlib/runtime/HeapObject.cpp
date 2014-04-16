@@ -19,6 +19,7 @@
 #include "swift/Runtime/Metadata.h"
 #include "llvm/Support/MathExtras.h"
 #include "Private.h"
+#include "Debug.h"
 #include <malloc/malloc.h>
 #include <cassert>
 #include <cstring>
@@ -386,6 +387,6 @@ void swift::swift_weakTakeAssign(WeakReference *dest, WeakReference *src) {
 }
 
 void swift::_swift_abortRetainUnowned(const void *object) {
-  fprintf(stderr, "attempting to retain deallocated object at %p", object);
-  abort();
+  (void)object;
+  swift::crash("attempted to retain deallocated object");
 }
