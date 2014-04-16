@@ -566,6 +566,7 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
 
   Opts.InferImplicitProperties =
     Args.hasArg(OPT_enable_objc_implicit_properties);
+  Opts.IgnoreAdapterModules = Args.hasArg(OPT_ignore_overlays);
 
   return false;
 }

@@ -33,6 +33,9 @@ public:
   /// If true, matched getter-like and setter-like methods will be imported as
   /// properties.
   bool InferImplicitProperties = false;
+
+  /// Whether to ignore Swift adapter modules of non-Swift modules.
+  bool IgnoreAdapterModules = false;
 };
 
 } // end namespace swift

@@ -469,6 +469,7 @@ function(handle_swift_sources sourcesvar externalvar target)
   set(IS_STDLIB_CORE_arg)
   if(SWIFTSOURCES_IS_STDLIB_CORE)
     set(IS_STDLIB_CORE_arg IS_STDLIB_CORE)
+    set(swift_flags ${swift_flags} -ignore-overlays)
   endif()
 
   if(swift_sources)

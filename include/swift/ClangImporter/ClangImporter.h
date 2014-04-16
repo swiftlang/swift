@@ -49,7 +49,8 @@ private:
   Implementation &Impl;
 
   ClangImporter(ASTContext &ctx, bool splitPrepositions,
-                bool implicitProperties);
+                bool implicitProperties,
+                bool ignoreAdapterModules);
 
 public:
   /// \brief Create a new Clang importer that can import a suitable Clang

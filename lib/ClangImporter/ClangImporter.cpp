@@ -101,8 +101,9 @@ namespace {
 
 
 ClangImporter::ClangImporter(ASTContext &ctx, bool splitPrepositions,
-                             bool implicitProperties)
-  : Impl(*new Implementation(ctx, splitPrepositions, implicitProperties))
+                             bool implicitProperties, bool ignoreAdapterModules)
+  : Impl(*new Implementation(ctx, splitPrepositions, implicitProperties,
+                             ignoreAdapterModules))
 {
 }
 
@@ -124,7 +125,8 @@ ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef targetTriple,
     const ClangImporterOptions &clangImporterOpts) {
   std::unique_ptr<ClangImporter> importer{
     new ClangImporter(ctx, ctx.LangOpts.SplitPrepositions,
-                      clangImporterOpts.InferImplicitProperties)
+                      clangImporterOpts.InferImplicitProperties,
+                      clangImporterOpts.IgnoreAdapterModules)
   };
 
   // Get the SearchPathOptions to use when creating the Clang importer.
@@ -1515,6 +1517,11 @@ clang::ASTContext &ClangModuleUnit::getClangASTContext() const {
 }
 
 Module *ClangModuleUnit::getAdapterModule() const {
+  // If we are ignoring adapter modules, always return null.
+  if (owner.Impl.IgnoreAdapterModules) {
+    return nullptr;
+  }
+
   if (!isTopLevel()) {
     // FIXME: Is this correct for submodules?
     auto topLevel = clangModule->getTopLevelModule();

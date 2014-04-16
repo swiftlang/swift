@@ -159,6 +159,10 @@ def split_objc_selectors : Flag<["-"], "split-objc-selectors">,
   Flags<[FrontendOption]>,
   HelpText<"Split imported Objective-C selectors based on prepositions">;
 
+def ignore_overlays : Flag<["-"], "ignore-overlays">,
+  Flags<[DriverOption, FrontendOption]>,
+  HelpText<"Ignore Swift overlays of non-Swift modules">;
+
 // Platform options.
 def enable_app_extension : Flag<["-"], "application-extension">,
   Flags<[DriverOption, FrontendOption]>,
