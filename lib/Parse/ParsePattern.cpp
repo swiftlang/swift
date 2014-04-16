@@ -397,8 +397,6 @@ parseSelectorArgument(Parser &P,
     assert(isa<AnyPattern>(ArgPattern) && "Unexpected selector pattern");
   }
   
-  namePieces.push_back(leadingIdent);
-  
   if (!P.Tok.is(tok::l_paren)) {
     P.diagnose(P.Tok, diag::func_selector_without_paren);
     return makeParserError();
@@ -434,7 +432,7 @@ parseSelectorArgument(Parser &P,
 
     bodyElts.push_back(TP->getFields()[0]);
   }
-  
+  namePieces.push_back(leadingIdent);
 
   TuplePatternElt &TPE = bodyElts.back();
   ArgPattern = rebuildImplicitPatternAround(TPE.getPattern(), ArgPattern,
@@ -505,6 +503,7 @@ parseSelectorFunctionArguments(Parser &P,
     llvm_unreachable("unexpected function argument pattern!");
 
   assert(!ArgElts.empty() && !BodyElts.empty());
+  NamePieces.push_back(Identifier());
 
   // Parse additional selectors as long as we can.
   ParserStatus Status;
@@ -542,7 +541,8 @@ mapParsedParameters(Parser &parser,
                     MutableArrayRef<Parser::ParsedParameter> params,
                     SourceLoc rightParenLoc,
                     Parser::DefaultArgumentInfo &defaultArgs,
-                    bool isFirstParameterClause) {
+                    bool isFirstParameterClause,
+                    SmallVectorImpl<Identifier> *argNames) {
   auto &ctx = parser.Context;
 
   // Local function to create a pattern for a single parameter.
@@ -634,6 +634,9 @@ mapParsedParameters(Parser &parser,
     auto defArgKind = getDefaultArgKind(param.DefaultArg);
     argElements.push_back(TuplePatternElt(arg, param.DefaultArg, defArgKind));
     bodyElements.push_back(TuplePatternElt(body, param.DefaultArg, defArgKind));
+
+    if (argNames)
+      argNames->push_back(param.FirstName);
   }
 
   return { TuplePattern::createSimple(ctx, leftParenLoc, argElements,
@@ -688,16 +691,12 @@ Parser::parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
       // Turn the parameter clause into argument and body patterns.
       auto mapped = mapParsedParameters(*this, leftParenLoc, params,
                                         rightParenLoc, DefaultArgs,
-                                        isFirstParameterClause);
+                                        isFirstParameterClause,
+                                        isFirstParameterClause ? &NamePieces
+                                                               : nullptr);
       ArgPatterns.push_back(mapped.first);
       BodyPatterns.push_back(mapped.second);
-
-      if (isFirstParameterClause) {
-        for (const auto &param : params) {
-          NamePieces.push_back(param.FirstName);
-        }
-        isFirstParameterClause = false;
-      }
+      isFirstParameterClause = false;
     }
 
     return status;
@@ -769,6 +768,7 @@ Parser::parseFunctionSignature(Identifier SimpleName,
         TuplePattern::create(Context, PreviousLoc, {}, PreviousLoc);
     argPatterns.push_back(EmptyTuplePattern);
     bodyPatterns.push_back(EmptyTuplePattern);
+    FullName = DeclName(Context, SimpleName, { });
   }
 
   // If there's a trailing arrow, parse the rest as the result type.
@@ -817,7 +817,8 @@ Parser::parseConstructorArguments(Pattern *&ArgPattern, Pattern *&BodyPattern,
     std::tie(ArgPattern, BodyPattern)
       = mapParsedParameters(*this, leftParenLoc, params,
                             rightParenLoc, DefaultArgs,
-                            /*isFirstParameterClause=*/true);
+                            /*isFirstParameterClause=*/true,
+                            /*FIXME:*/nullptr);
 
     return status;
   }

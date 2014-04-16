@@ -444,7 +444,7 @@ static FuncDecl *makeOptionSetFactoryMethod(StructDecl *optionSetDecl,
     break;
   }
   
-  DeclName name(C, baseName, C.Id_value);
+  DeclName name(C, baseName, argName);
   auto factoryDecl = FuncDecl::create(C, SourceLoc(), StaticSpellingKind::None,
                                       SourceLoc(),
                                       name,
@@ -1821,14 +1821,6 @@ namespace {
         auto known = Impl.ImportedDecls.find(decl->getCanonicalDecl());
         if (known != Impl.ImportedDecls.end())
           return known->second;
-      }
-
-      // If we're not splitting prepositions, the method-name-as-written
-      // has an entry for the first parameter, but shouldn't.
-      // FIXME: This is a hack to keep "x.foo:bar:wibble:" working.
-      if (!Impl.SplitPrepositions && !name.getArgumentNames().empty()) {
-        name = DeclName(Impl.SwiftContext, name.getBaseName(),
-                        name.getArgumentNames().slice(1));
       }
 
       auto result = FuncDecl::create(

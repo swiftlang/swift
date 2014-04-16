@@ -359,18 +359,7 @@ void Module::lookupValue(AccessPathTy AccessPath, DeclName Name,
 void BuiltinUnit::lookupValue(Module::AccessPathTy accessPath, DeclName name,
                               NLKind lookupKind,
                               SmallVectorImpl<ValueDecl*> &result) const {
-  // There are currently no builtins with compound names.
-  if (!name.isSimpleName())
-    return;
-  
   getCache().lookupValue(name.getBaseName(), lookupKind, *this, result);
-  
-  #ifndef NDEBUG
-  for (auto r : result) {
-    assert(r->getFullName().isSimpleName()
-         && "please make the builtin lookup cache handle compound name lookup");
-  }
-  #endif
 }
 
 DerivedFileUnit::DerivedFileUnit(Module &M)

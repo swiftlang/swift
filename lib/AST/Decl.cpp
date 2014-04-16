@@ -2205,6 +2205,15 @@ void FuncDecl::setDeserializedSignature(ArrayRef<Pattern *> ArgParams,
   assert(ArgParams.size() == BodyParams.size());
   assert(NumParamPatterns == ArgParams.size());
 
+#ifndef NDEBUG
+  unsigned NumParams = getDeclContext()->isTypeContext()
+                         ? BodyParams[1]->numTopLevelVariables()
+                         : BodyParams[0]->numTopLevelVariables();
+  auto Name = getFullName();
+  assert(!Name || !Name.isSimpleName() && "Must have a simple name");
+  assert(!Name || (Name.getArgumentNames().size() == NumParams));
+#endif
+
   for (unsigned i = 0; i != NumParamPatterns; ++i)
     ArgParamsRef[i] = ArgParams[i];
   for (unsigned i = 0; i != NumParamPatterns; ++i)

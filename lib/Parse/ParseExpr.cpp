@@ -1076,6 +1076,13 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
           SmallVector<Identifier, 2> ArgumentNames;
           
           Locs.push_back({NameLoc, consumeToken(tok::colon)});
+
+          // If we aren't splitting prepositions, add entry for the
+          // unwritten first argument name.
+          if (!Context.LangOpts.SplitPrepositions) {
+            Locs.push_back({SourceLoc(), SourceLoc()});
+            ArgumentNames.push_back(Identifier()); 
+          }
           while ((Tok.is(tok::identifier) || Tok.is(tok::kw__)) &&
                  peekToken().is(tok::colon)) {
             Identifier SelName;
