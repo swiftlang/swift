@@ -798,7 +798,8 @@ Parser::parseFunctionSignature(Identifier SimpleName,
 }
 
 ParserStatus
-Parser::parseConstructorArguments(Pattern *&ArgPattern, Pattern *&BodyPattern,
+Parser::parseConstructorArguments(DeclName &FullName,
+                                  Pattern *&ArgPattern, Pattern *&BodyPattern,
                                   DefaultArgumentInfo &DefaultArgs,
                                   bool &HasSelectorStyleSignature) {
   HasSelectorStyleSignature = false;
@@ -814,12 +815,14 @@ Parser::parseConstructorArguments(Pattern *&ArgPattern, Pattern *&BodyPattern,
                              DefaultArgs, /*isClosure=*/false);
 
     // Turn the parameter clause into argument and body patterns.
+    llvm::SmallVector<Identifier, 2> namePieces;
     std::tie(ArgPattern, BodyPattern)
       = mapParsedParameters(*this, leftParenLoc, params,
                             rightParenLoc, DefaultArgs,
                             /*isFirstParameterClause=*/true,
-                            /*FIXME:*/nullptr);
+                            &namePieces);
 
+    FullName = DeclName(Context, Context.Id_init, namePieces);
     return status;
   }
 
@@ -835,6 +838,7 @@ Parser::parseConstructorArguments(Pattern *&ArgPattern, Pattern *&BodyPattern,
     ArgPattern = TuplePattern::createSimple(Context, Tok.getLoc(), {},
                                             Tok.getLoc());
     BodyPattern = ArgPattern->clone(Context);
+    FullName = DeclName(Context, Context.Id_init, { });
     return makeParserError();
   }
 
@@ -851,7 +855,6 @@ Parser::parseConstructorArguments(Pattern *&ArgPattern, Pattern *&BodyPattern,
   SmallVector<TuplePatternElt, 4> ArgElts;
   SmallVector<TuplePatternElt, 4> BodyElts;
   SourceLoc RParenLoc;
-  // NB: Not actually used to form the initializer name.
   SmallVector<Identifier, 4> NamePieces;
   
   for (;;) {
@@ -874,6 +877,7 @@ Parser::parseConstructorArguments(Pattern *&ArgPattern, Pattern *&BodyPattern,
   ArgPattern = TuplePattern::create(Context, LParenLoc, ArgElts, RParenLoc);
   BodyPattern = TuplePattern::create(Context, LParenLoc, BodyElts,
                                      RParenLoc);
+  FullName = DeclName(Context, Context.Id_init, NamePieces);
   return Status;
 }
 

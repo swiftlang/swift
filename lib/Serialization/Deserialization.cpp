@@ -1645,13 +1645,14 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     TypeID signatureID;
     TypeID interfaceID;
     DeclID overriddenID;
+    ArrayRef<uint64_t> argNameIDs;
 
     decls_block::ConstructorLayout::readRecord(scratch, parentID, isImplicit,
                                                hasSelectorStyleSignature,
                                                isObjC, isTransparent,
                                                isCompleteObjectInit,
                                                signatureID, interfaceID,
-                                               overriddenID);
+                                               overriddenID, argNameIDs);
     auto parent = getDeclContext(parentID);
     if (declOrOffset.isComplete())
       return declOrOffset;
@@ -1660,7 +1661,13 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto ctor = new (ctx) ConstructorDecl(ctx.Id_init, SourceLoc(),
+    // Resolve the name ids.
+    SmallVector<Identifier, 2> argNames;
+    for (auto argNameID : argNameIDs)
+      argNames.push_back(getIdentifier(argNameID));
+
+    DeclName name(ctx, ctx.Id_init, argNames);
+    auto ctor = new (ctx) ConstructorDecl(name, SourceLoc(),
                                           /*argParams=*/nullptr, nullptr,
                                           /*bodyParams=*/nullptr, nullptr,
                                           genericParams, parent);

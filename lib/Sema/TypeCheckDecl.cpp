@@ -4332,6 +4332,7 @@ static ConstructorDecl *createImplicitConstructor(TypeChecker &tc,
   SourceLoc Loc = decl->getLoc();
   // Determine the parameter type of the implicit constructor.
   SmallVector<TuplePatternElt, 8> patternElts;
+  SmallVector<Identifier, 8> argNames;
   if (ICK == ImplicitConstructorKind::Memberwise) {
     assert(isa<StructDecl>(decl) && "Only struct have memberwise constructor");
 
@@ -4344,6 +4345,7 @@ static ConstructorDecl *createImplicitConstructor(TypeChecker &tc,
       // Create the parameter.
       auto *arg = new (context) VarDecl(/*static*/false, /*IsLet*/true,
                                         Loc, var->getName(), varType, decl);
+      argNames.push_back(var->getName());
       Pattern *pattern = new (context) NamedPattern(arg);
       TypeLoc tyLoc = TypeLoc::withoutLoc(varType);
       pattern = new (context) TypedPattern(pattern, tyLoc);
@@ -4354,9 +4356,9 @@ static ConstructorDecl *createImplicitConstructor(TypeChecker &tc,
   auto pattern = TuplePattern::create(context, Loc, patternElts, Loc);
 
   // Create the constructor.
-  auto constructorID = context.Id_init;
+  DeclName name(context, context.Id_init, argNames);
   Pattern *selfPat = buildImplicitSelfParameter(Loc, decl);
-  auto *ctor = new (context) ConstructorDecl(constructorID, Loc,
+  auto *ctor = new (context) ConstructorDecl(name, Loc,
                                              selfPat, pattern, selfPat, pattern,
                                              nullptr, decl);
 
@@ -4619,7 +4621,8 @@ createSubobjectInitOverride(TypeChecker &tc,
   argParamPatterns->setType(argType);
 
   // Create the initializer declaration.
-  auto ctor = new (ctx) ConstructorDecl(ctx.Id_init, SourceLoc(),
+  auto ctor = new (ctx) ConstructorDecl(superclassCtor->getFullName(), 
+                                        SourceLoc(),
                                         selfArgPattern, argParamPatterns,
                                         selfBodyPattern, bodyParamPatterns,
                                         nullptr, classDecl);

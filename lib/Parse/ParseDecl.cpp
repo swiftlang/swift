@@ -3392,9 +3392,10 @@ Parser::parseDeclConstructor(ParseDeclOptions Flags,
   Pattern *ArgPattern;
   Pattern *BodyPattern;
   bool HasSelectorStyleSignature;
+  DeclName FullName;
   ParserStatus SignatureStatus =
-      parseConstructorArguments(ArgPattern, BodyPattern, DefaultArgs,
-                                HasSelectorStyleSignature);
+    parseConstructorArguments(FullName, ArgPattern, BodyPattern, DefaultArgs,
+                              HasSelectorStyleSignature);
 
   if (SignatureStatus.hasCodeCompletion() && !CodeCompletion) {
     // Trigger delayed parsing, no need to continue.
@@ -3423,7 +3424,7 @@ Parser::parseDeclConstructor(ParseDeclOptions Flags,
                                                  CurDeclContext, &SelfDecl);
 
   Scope S2(this, ScopeKind::ConstructorBody);
-  auto *CD = new (Context) ConstructorDecl(Context.Id_init, ConstructorLoc,
+  auto *CD = new (Context) ConstructorDecl(FullName, ConstructorLoc,
                                            SelfPattern, ArgPattern,
                                            SelfPattern, BodyPattern,
                                            GenericParams, CurDeclContext);

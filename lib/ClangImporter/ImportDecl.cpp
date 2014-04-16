@@ -654,7 +654,8 @@ static ConstructorDecl *makeOptionSetDefaultConstructor(StructDecl *optionSetDec
   Pattern *methodParam = TuplePattern::create(C, SourceLoc(),{},SourceLoc());
   methodParam->setType(TupleType::getEmpty(C));
 
-  auto *ctorDecl = new (C) ConstructorDecl(C.Id_init, optionSetDecl->getLoc(),
+  DeclName name(C, C.Id_init, { });
+  auto *ctorDecl = new (C) ConstructorDecl(name, optionSetDecl->getLoc(),
                                            selfPattern, methodParam,
                                            selfPattern, methodParam,
                                            nullptr, optionSetDecl);
@@ -808,7 +809,6 @@ namespace {
     ConstructorDecl *createValueConstructor(StructDecl *structDecl,
                                             ArrayRef<Decl *> members) {
       auto &context = Impl.SwiftContext;
-      auto name = context.Id_init;
 
       // Create the 'self' declaration.
       auto selfType = structDecl->getDeclaredTypeInContext();
@@ -822,6 +822,7 @@ namespace {
       SmallVector<TuplePatternElt, 8> patternElts;
       SmallVector<TupleTypeElt, 8> tupleElts;
       SmallVector<VarDecl *, 8> params;
+      SmallVector<Identifier, 4> argNames;
       for (auto member : members) {
         if (auto var = dyn_cast<VarDecl>(member)) {
           if (!var->hasStorage())
@@ -830,6 +831,7 @@ namespace {
           auto param = new (context) VarDecl(/*static*/ false, /*IsLet*/ true,
                                              SourceLoc(), var->getName(),
                                              var->getType(), structDecl);
+          argNames.push_back(var->getName());
           params.push_back(param);
           Pattern *pattern = createTypedNamedPattern(param);
           paramPatterns.push_back(pattern);
@@ -843,6 +845,7 @@ namespace {
       paramPattern->setType(paramTy);
 
       // Create the constructor
+      DeclName name(context, context.Id_init, argNames);
       auto constructor =
         new (context) ConstructorDecl(name, structDecl->getLoc(),
                                       selfPattern, paramPattern,
@@ -2118,11 +2121,9 @@ namespace {
       VarDecl *selfVar = createSelfDecl(dc, false);
       selfPat = createTypedNamedPattern(selfVar);
 
-      // FIXME: Temporary hack because initializers don't yet use full
-      // names.
       // Create the actual constructor.
       auto result = new (Impl.SwiftContext)
-          ConstructorDecl(name.getBaseName(), loc, selfPat, argPatterns.back(),
+          ConstructorDecl(name, loc, selfPat, argPatterns.back(),
                          selfPat, bodyPatterns.back(), /*GenericParams=*/0, dc);
       result->setClangNode(objcMethod);
       addObjCAttribute(result, selector);

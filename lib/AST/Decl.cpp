@@ -2272,12 +2272,12 @@ bool FuncDecl::isBinaryOperator() const {
     || (argTuple->getNumFields() == 1 && argTuple->hasVararg());
 }
 
-ConstructorDecl::ConstructorDecl(Identifier NameHack, SourceLoc ConstructorLoc,
+ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
                                  Pattern *SelfArgParam, Pattern *ArgParams,
                                  Pattern *SelfBodyParam, Pattern *BodyParams,
                                  GenericParamList *GenericParams,
                                  DeclContext *Parent)
-  : AbstractFunctionDecl(DeclKind::Constructor, Parent, NameHack,
+  : AbstractFunctionDecl(DeclKind::Constructor, Parent, Name,
                          ConstructorLoc, 2, GenericParams) {
   setArgParams(SelfArgParam, ArgParams);
   setBodyParams(SelfBodyParam, BodyParams);
@@ -2299,6 +2299,11 @@ void ConstructorDecl::setBodyParams(Pattern *selfPattern, Pattern *bodyParams) {
   BodyParams[1] = bodyParams;
   setDeclContextOfPatternVars(selfPattern, this);
   setDeclContextOfPatternVars(bodyParams, this);
+  
+  assert(!getFullName().isSimpleName() && "Constructor name must be compound");
+  assert(!bodyParams || 
+         (getFullName().getArgumentNames().size() 
+          == bodyParams->numTopLevelVariables()));
 }
 
 DestructorDecl::DestructorDecl(Identifier NameHack, SourceLoc DestructorLoc,

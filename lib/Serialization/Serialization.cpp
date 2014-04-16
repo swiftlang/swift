@@ -1755,6 +1755,10 @@ void Serializer::writeDecl(const Decl *D) {
 
     const Decl *DC = getDeclForContext(ctor->getDeclContext());
 
+    SmallVector<IdentifierID, 4> nameComponents;
+    for (auto argName : ctor->getFullName().getArgumentNames())
+      nameComponents.push_back(addIdentifierRef(argName));
+
     unsigned abbrCode = DeclTypeAbbrCodes[ConstructorLayout::Code];
     ConstructorLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                   addDeclRef(DC),
@@ -1765,7 +1769,8 @@ void Serializer::writeDecl(const Decl *D) {
                                   ctor->isCompleteObjectInit(),
                                   addTypeRef(ctor->getType()),
                                   addTypeRef(ctor->getInterfaceType()),
-                                  addDeclRef(ctor->getOverriddenDecl()));
+                                  addDeclRef(ctor->getOverriddenDecl()),
+                                  nameComponents);
 
     writeGenericParams(ctor->getGenericParams(), DeclTypeAbbrCodes);
     assert(ctor->getArgParamPatterns().size() == 2);

@@ -3957,7 +3957,7 @@ class ConstructorDecl : public AbstractFunctionDecl {
   ConstructorDecl *OverriddenDecl = nullptr;
 
 public:
-  ConstructorDecl(Identifier NameHack, SourceLoc ConstructorLoc,
+  ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
                   Pattern *SelfArgParam, Pattern *ArgParams,
                   Pattern *SelfBodyParam, Pattern *BodyParams,
                   GenericParamList *GenericParams, DeclContext *Parent);

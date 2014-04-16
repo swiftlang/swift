@@ -796,7 +796,8 @@ public:
                                       DefaultArgumentInfo &defaultArgs,
                                       TypeRepr *&retType,
                                       bool &HasSelectorStyleSignature);
-  ParserStatus parseConstructorArguments(Pattern *&ArgPattern,
+  ParserStatus parseConstructorArguments(DeclName &FullName,
+                                         Pattern *&ArgPattern,
                                          Pattern *&BodyPattern,
                                          DefaultArgumentInfo &defaultArgs,
                                          bool &HasSelectorStyleSignature);
