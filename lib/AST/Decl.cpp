@@ -770,7 +770,7 @@ bool ValueDecl::isUseFromContextDirect(const DeclContext *UseDC) const {
     // TODO: What about static properties?
     if (var->getStorageKind() == VarDecl::StoredWithTrivialAccessors ||
         var->getStorageKind() == VarDecl::Stored) {
-      if (auto ctx = var->getDeclContext()->getDeclaredTypeOfContext())
+      if (auto ctx = var->getDeclContext()->getDeclaredTypeInContext())
         if (ctx->getStructOrBoundGenericStruct())
           return true;
       
