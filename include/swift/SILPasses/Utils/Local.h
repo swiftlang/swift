@@ -23,7 +23,7 @@ namespace swift {
   /// \param I The instruction to be deleted.
   /// \param Force If Force is set, don't check if the top level instructions
   ///        are considered dead - delete them regardless.
-  /// \param Callback a callback called whenever an instruction is deleted.
+  /// \param C a callback called whenever an instruction is deleted.
   /// \return Returns true if any instructions were deleted.
   bool
   recursivelyDeleteTriviallyDeadInstructions(
@@ -36,7 +36,7 @@ namespace swift {
   /// \param I The instruction to be deleted.
   /// \param Force If Force is set, don't check if the top level instruction is
   ///        considered dead - delete it regardless.
-  /// \param Callback a callback called whenever an instruction is deleted.
+  /// \param C a callback called whenever an instruction is deleted.
   /// \return Returns true if any instructions were deleted.
   bool
   recursivelyDeleteTriviallyDeadInstructions(
