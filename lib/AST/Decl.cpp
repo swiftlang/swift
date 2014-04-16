@@ -2473,16 +2473,14 @@ ObjCSelector ConstructorDecl::getObjCSelector() const {
   auto &ctx = getASTContext();
 
   // If there are no parameters, this is just 'init()'.
-  auto tuple = cast<TuplePattern>(getArgParamPatterns()[1]);
-  if (tuple->getNumFields() == 0)
+  auto argNames = getFullName().getArgumentNames();
+  if (argNames.size() == 0)
     return ObjCSelector(ctx, 0, ctx.Id_init);
 
   // The first field is special: we uppercase the name.
   bool didStringManipulation = false;
   SmallVector<Identifier, 4> selectorPieces;
-  const auto &firstElt = tuple->getFields()[0];
-  auto firstPattern = firstElt.getPattern()->getSemanticsProvidingPattern();
-  auto firstName = firstElt.getPattern()->getBoundName();
+  auto firstName = argNames[0];
   if (firstName.empty())
     selectorPieces.push_back(ctx.Id_init);
   else {
@@ -2496,9 +2494,13 @@ ObjCSelector ConstructorDecl::getObjCSelector() const {
   // If we have just one field, check whether this is actually a
   // nullary selector that we mapped to a single-element initializer to catch
   // the name after "init".
-  if (tuple->getNumFields() == 1) {
-    if (firstPattern->hasType()) {
-      if (firstPattern->getType()->isEqual(TupleType::getEmpty(ctx))) {
+  const TuplePattern *tuple = nullptr;
+  if (argNames.size() == 1 && 
+      (tuple = dyn_cast<TuplePattern>(getBodyParamPatterns()[1]))) {
+    const auto &elt = tuple->getFields()[0];
+    auto pattern = elt.getPattern()->getSemanticsProvidingPattern();
+    if (pattern->hasType()) {
+      if (pattern->getType()->isEqual(TupleType::getEmpty(ctx))) {
         auto result = ObjCSelector(ctx, 0, selectorPieces[0]);
 
         // Cache the name in the 'objc' attribute. We don't want to perform
@@ -2514,10 +2516,7 @@ ObjCSelector ConstructorDecl::getObjCSelector() const {
   }
 
   // For every remaining element, add a selector component.
-  for (auto &elt : tuple->getFields().slice(1)) {
-    selectorPieces.push_back(elt.getPattern()->getBoundName());
-  }
-
+  selectorPieces.append(argNames.begin() + 1, argNames.end());
   auto result = ObjCSelector(ctx, selectorPieces.size(), selectorPieces);
 
   // Cache the name in the 'objc' attribute. We don't want to perform
