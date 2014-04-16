@@ -3674,6 +3674,7 @@ static void importAttributes(ASTContext &C, const clang::NamedDecl *ClangDecl,
                              Decl *MappedDecl) {
   // Scan through Clang attributes and map them onto Swift
   // equivalents.
+  bool IsUnavailable = false;
   for (clang::NamedDecl::attr_iterator AI = ClangDecl->attr_begin(),
        AE = ClangDecl->attr_end(); AI != AE; ++AI) {
     //
@@ -3686,6 +3687,7 @@ static void importAttributes(ASTContext &C, const clang::NamedDecl *ClangDecl,
       auto attr =
         AvailabilityAttr::createImplicitUnavailableAttr(C, Message);
       MappedDecl->getMutableAttrs().add(attr);
+      IsUnavailable = true;
     }
     //
     // __attribute__((deprecated))
@@ -3703,7 +3705,27 @@ static void importAttributes(ASTContext &C, const clang::NamedDecl *ClangDecl,
       auto attr =
         AvailabilityAttr::createImplicitUnavailableAttr(C, Message);
       MappedDecl->getMutableAttrs().add(attr);
+      IsUnavailable = true;
     }
+  }
+
+  // Add implicit unavailablility.
+  if (IsUnavailable)
+    return;
+
+  if (auto MD = dyn_cast<clang::ObjCMethodDecl>(ClangDecl)) {
+    // FIXME: Ban 'performSelector' once all uses of it are
+    // removed from the overlay.
+    if (/* DISABLES CODE */ (0)) {
+      auto sel = MD->getSelector();
+      if (sel.getNameForSlot(0).startswith("performSelector")) {
+        auto attr = AvailabilityAttr::createImplicitUnavailableAttr(C,
+                      "'performSelector' methods are unavailable");
+        MappedDecl->getMutableAttrs().add(attr);
+        return;
+      }
+    }
+
   }
 }
 
