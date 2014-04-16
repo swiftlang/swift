@@ -2898,12 +2898,23 @@ Type ModuleFile::getType(TypeID TID) {
 
     decls_block::BoundGenericTypeLayout::readRecord(scratch, declID, parentID,
                                                     rawArgumentIDs);
-    SmallVector<Type, 8> genericArgs;
-    for (TypeID type : rawArgumentIDs)
-      genericArgs.push_back(getType(type));
 
     auto nominal = cast<NominalTypeDecl>(getDecl(declID));
     auto parentTy = getType(parentID);
+
+    // Check the first ID to decide if we are using indices to the Decl's
+    // Archetypes. 
+    SmallVector<Type, 8> genericArgs;
+    if (rawArgumentIDs.size() > 1 && rawArgumentIDs[0] == INT32_MAX) {
+      for (unsigned i = 1; i < rawArgumentIDs.size(); i++) {
+        auto index = rawArgumentIDs[i];
+        genericArgs.push_back(nominal->getGenericParams()
+                                     ->getAllArchetypes()[index]);
+      }
+    } else {
+      for (TypeID type : rawArgumentIDs)
+        genericArgs.push_back(getType(type));
+    }
 
     auto boundTy = BoundGenericType::get(nominal, parentTy, genericArgs);
     typeOrOffset = boundTy;

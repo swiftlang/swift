@@ -221,6 +221,9 @@ private:
   ///        class extension, or protocol).
   void writeMembers(ArrayRef<Decl *> members, bool isClass);
 
+  /// Check if a decl is cross-referenced.
+  bool isDeclXRef(const Decl *D) const;
+
   /// Writes a reference to a decl in another module.
   void writeCrossReference(const DeclContext *DC, uint32_t pathLen = 1);
 
