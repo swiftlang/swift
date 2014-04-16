@@ -14,6 +14,7 @@
 #include "swift/SILPasses/Passes.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILPasses/Transforms.h"
 #include "llvm/ADT/Statistic.h"
@@ -144,7 +145,6 @@ static SILInstruction *constantFoldBinaryWithOverflow(ApplyInst *AI,
                RHSInt.toString(/*Radix*/ 10, Signed),
                Signed,
                LHSInt.getBitWidth());
-
       ResultsInError = true;
     }
   }
@@ -715,7 +715,7 @@ static bool CCPFunctionBody(SILFunction &F) {
   // The list of instructions whose evaluation resulted in errror or warning.
   // This is used to avoid duplicate error reporting in case we reach the same
   // instruction from different entry points in the WorkList.
-  llvm::DenseSet<SILInstruction*> ErrorSet;
+  llvm::DenseSet<SILInstruction *> ErrorSet;
 
   // The worklist of the constants that could be folded into their users.
   llvm::SetVector<SILInstruction *> WorkList;
@@ -731,11 +731,15 @@ static bool CCPFunctionBody(SILFunction &F) {
 
   while (!WorkList.empty()) {
     SILInstruction *I = WorkList.pop_back_val();
+    assert(I->getParent() && "SILInstruction must have parent.");
+
+    DEBUG(llvm::dbgs() << "Visiting: " << *I);
 
     // Go through all users of the constant and try to fold them.
     FoldedUsers.clear();
     for (auto Use : I->getUses()) {
       SILInstruction *User = Use->getUser();
+      DEBUG(llvm::dbgs() << "    User: " << *User);
 
       // It is possible that we had processed this user already. Do not try
       // to fold it again if we had previously produced an error while folding
@@ -783,8 +787,8 @@ static bool CCPFunctionBody(SILFunction &F) {
             SILValue(TEI, 0).replaceAllUsesWith(NewVal);
             TEI->dropAllReferences();
             FoldedUsers.insert(TEI);
-            if (auto *SI = dyn_cast<SILInstruction>(NewVal.getDef()))
-              WorkList.insert(SI);
+            if (auto *Inst = dyn_cast<SILInstruction>(NewVal.getDef()))
+              WorkList.insert(Inst);
           }
         }
         
@@ -799,15 +803,18 @@ static bool CCPFunctionBody(SILFunction &F) {
       SILValue(User).replaceAllUsesWith(C);
       
       // The new constant could be further folded now, add it to the worklist.
-      if (auto *SI = dyn_cast<SILInstruction>(C.getDef()))
-        WorkList.insert(SI);
+      if (auto *Inst = dyn_cast<SILInstruction>(C.getDef()))
+        WorkList.insert(Inst);
     }
 
     // Eagerly DCE. We do this after visiting all users to ensure we don't
     // invalidate the uses iterator.
     auto UserArray = ArrayRef<SILInstruction *>(&*FoldedUsers.begin(),
                                                 FoldedUsers.size());
-    recursivelyDeleteTriviallyDeadInstructions(UserArray);
+    recursivelyDeleteTriviallyDeadInstructions(UserArray, false,
+                                               [&](SILInstruction *DeadI) {
+                                                 WorkList.remove(DeadI);
+                                               });
   }
 
   return Changed;

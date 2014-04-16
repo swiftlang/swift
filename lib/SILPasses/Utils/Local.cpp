@@ -88,30 +88,29 @@ swift::isInstructionTriviallyDead(SILInstruction *I) {
   return false;
 }
 
-/// \brief For each of the given instructions, if they are dead delete them
-/// along with their dead operands.
-///
-/// \param IA The instruction to be deleted.
-/// \param Force If Force is set, don't check if the top level instructions
-///        are considered dead - delete them regardless.
-bool
-swift::recursivelyDeleteTriviallyDeadInstructions(ArrayRef<SILInstruction*> IA,
-                                                  bool Force) {
+namespace {
+  using CallbackTy = std::function<void(SILInstruction *)>;
+} // end anonymous namespace
+
+bool swift::
+recursivelyDeleteTriviallyDeadInstructions(ArrayRef<SILInstruction *> IA,
+                                           bool Force, CallbackTy Callback) {
   // Delete these instruction and others that become dead after it's deleted.
-  llvm::SmallPtrSet<SILInstruction*, 8> DeadInsts;
+  llvm::SmallPtrSet<SILInstruction *, 8> DeadInsts;
   for (auto I : IA) {
     // If the instruction is not dead or force is false, there is nothing to do.
     if (Force || isInstructionTriviallyDead(I))
       DeadInsts.insert(I);
   }
-  llvm::SmallPtrSet<SILInstruction*, 8> NextInsts;
+  llvm::SmallPtrSet<SILInstruction *, 8> NextInsts;
   while (!DeadInsts.empty()) {
     for (auto I : DeadInsts) {
       // Check if any of the operands will become dead as well.
       MutableArrayRef<Operand> Ops = I->getAllOperands();
       for (Operand &Op : Ops) {
         SILValue OpVal = Op.get();
-        if (!OpVal) continue;
+        if (!OpVal)
+          continue;
 
         // Remove the reference from the instruction being deleted to this
         // operand.
@@ -121,13 +120,14 @@ swift::recursivelyDeleteTriviallyDeadInstructions(ArrayRef<SILInstruction*> IA,
         // being deleted, delete it.
         if (SILInstruction *OpValInst = dyn_cast<SILInstruction>(OpVal))
           if (!DeadInsts.count(OpValInst) &&
-             isInstructionTriviallyDead(OpValInst))
+              isInstructionTriviallyDead(OpValInst))
             NextInsts.insert(OpValInst);
       }
     }
 
     for (auto I : DeadInsts) {
       // This will remove this instruction and all its uses.
+      Callback(I);
       I->eraseFromParent();
     }
 
@@ -145,11 +145,12 @@ swift::recursivelyDeleteTriviallyDeadInstructions(ArrayRef<SILInstruction*> IA,
 /// \param Force If Force is set, don't check if the top level instruction is
 ///        considered dead - delete it regardless.
 /// \return Returns true if any instructions were deleted.
-bool
-swift::recursivelyDeleteTriviallyDeadInstructions(SILInstruction *I,
-                                                       bool Force) {
-  return recursivelyDeleteTriviallyDeadInstructions(
-           ArrayRef<SILInstruction*>(I), Force);
+bool swift::recursivelyDeleteTriviallyDeadInstructions(SILInstruction *I,
+                                                       bool Force,
+                                                       CallbackTy Callback) {
+
+  ArrayRef<SILInstruction *> AI = ArrayRef<SILInstruction *>(I);
+  return recursivelyDeleteTriviallyDeadInstructions(AI, Force, Callback);
 }
 
 void swift::eraseUsesOfInstruction(SILInstruction *Inst) {

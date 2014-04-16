@@ -23,9 +23,12 @@ namespace swift {
   /// \param I The instruction to be deleted.
   /// \param Force If Force is set, don't check if the top level instructions
   ///        are considered dead - delete them regardless.
+  /// \param Callback a callback called whenever an instruction is deleted.
   /// \return Returns true if any instructions were deleted.
-  bool recursivelyDeleteTriviallyDeadInstructions(ArrayRef<SILInstruction*> I,
-                                                  bool Force = false);
+  bool
+  recursivelyDeleteTriviallyDeadInstructions(
+    ArrayRef<SILInstruction*> I, bool Force = false,
+    std::function<void(SILInstruction *)> C = [](SILInstruction *){});
 
   /// \brief If the given instruction is dead, delete it along with its dead
   /// operands.
@@ -33,9 +36,13 @@ namespace swift {
   /// \param I The instruction to be deleted.
   /// \param Force If Force is set, don't check if the top level instruction is
   ///        considered dead - delete it regardless.
+  /// \param Callback a callback called whenever an instruction is deleted.
   /// \return Returns true if any instructions were deleted.
-  bool recursivelyDeleteTriviallyDeadInstructions(SILInstruction *I,
-                                                  bool Force = false);
+  bool
+  recursivelyDeleteTriviallyDeadInstructions(
+    SILInstruction *I,
+    bool Force = false,
+    std::function<void(SILInstruction *)> C = [](SILInstruction *){});
 
   /// \brief Perform a fast local check to see if the instruction is dead.
   ///
