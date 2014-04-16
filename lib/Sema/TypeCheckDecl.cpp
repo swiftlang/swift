@@ -2822,7 +2822,7 @@ public:
     // patterns.
     GenericParamList *genericParams = FD->getGenericParams();
     GenericParamList *outerGenericParams = nullptr;
-    auto patterns = FD->getArgParamPatterns();
+    auto patterns = FD->getBodyParamPatterns();
     bool hasSelf = FD->getDeclContext()->isTypeContext();
     if (hasSelf)
       outerGenericParams = FD->getDeclContext()->getGenericParamsOfContext();
