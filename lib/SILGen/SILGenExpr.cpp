@@ -898,6 +898,86 @@ RValue RValueEmitter::visitArchetypeToSuperExpr(ArchetypeToSuperExpr *E,
   return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(base));
 }
 
+static void buildFuncToBlockInvokeBody(SILGenFunction &gen,
+                                       SILLocation loc,
+                                       CanSILFunctionType blockTy,
+                                       CanSILBlockStorageType blockStorageTy,
+                                       CanSILFunctionType funcTy) {
+  Scope scope(gen.Cleanups, CleanupLocation::getCleanupLocation(loc));
+  SILBasicBlock *entry = gen.F.begin();
+  
+  // Get the captured native function value out of the block.
+  auto storageAddrTy = SILType::getPrimitiveAddressType(blockStorageTy);
+  auto storage = new (gen.SGM.M) SILArgument(storageAddrTy, entry);
+  auto capture = gen.B.createProjectBlockStorage(loc, storage);
+  auto &funcTL = gen.getTypeLowering(funcTy);
+  auto fn = gen.emitLoad(loc, capture, funcTL, SGFContext(), IsNotTake);
+  
+  // Collect the block arguments, which may have nonstandard conventions.
+  assert(blockTy->getInterfaceParameters().size()
+         == funcTy->getInterfaceParameters().size()
+         && "block and function types don't match");
+  
+  SmallVector<ManagedValue, 4> args;
+  for (unsigned i : indices(funcTy->getInterfaceParameters())) {
+    auto &funcParam = funcTy->getInterfaceParameters()[i];
+    auto &param = blockTy->getInterfaceParameters()[i];
+    SILValue v = new (gen.SGM.M) SILArgument(param.getSILType(), entry);
+    
+    ManagedValue mv;
+    switch (param.getConvention()) {
+    case ParameterConvention::Direct_Owned:
+      // Consume owned parameters at +1.
+      mv = gen.emitManagedRValueWithCleanup(v);
+      break;
+        
+    case ParameterConvention::Direct_Guaranteed:
+    case ParameterConvention::Direct_Unowned:
+      // We need to independently retain the value.
+      mv = gen.emitManagedRetain(loc, v);
+      break;
+        
+    case ParameterConvention::Indirect_In:
+    case ParameterConvention::Indirect_Inout:
+    case ParameterConvention::Indirect_Out:
+      llvm_unreachable("indirect arguments to blocks not supported");
+    }
+    
+    args.push_back(gen.emitBridgedToNativeValue(loc, mv, AbstractCC::C,
+                                                funcParam.getType()));
+  }
+  
+  // Call the native function.
+  assert(!funcTy->hasIndirectResult()
+         && "block thunking func with indirect result not supported");
+  ManagedValue result = gen.emitMonomorphicApply(loc, fn, args,
+                         funcTy->getSILInterfaceResult().getSwiftRValueType());
+  
+  // Bridge the result back to ObjC.
+  result = gen.emitNativeToBridgedValue(loc, result, AbstractCC::C,
+                        result.getType().getSwiftRValueType(),
+                        result.getType().getSwiftRValueType(),
+                        blockTy->getSILInterfaceResult().getSwiftRValueType());
+  
+  auto resultVal = result.forward(gen);
+  scope.pop();
+  
+  // Handle the result convention.
+  switch (blockTy->getInterfaceResult().getConvention()) {
+  case ResultConvention::Unowned:
+    assert(gen.getTypeLowering(resultVal.getType()).isTrivial()
+           && "nontrivial result is returned unowned?!");
+    gen.B.createReturn(loc, resultVal);
+    break;
+  case ResultConvention::Autoreleased:
+    gen.B.createAutoreleaseReturn(loc, resultVal);
+    break;
+  case ResultConvention::Owned:
+    gen.B.createReturn(loc, resultVal);
+    break;
+  }
+}
+
 /// Bridge a native function to a block with a thunk.
 static ManagedValue emitFuncToBlock(SILGenFunction &gen,
                                     SILLocation loc,
@@ -905,9 +985,64 @@ static ManagedValue emitFuncToBlock(SILGenFunction &gen,
                                     CanSILFunctionType blockTy) {
   // FIXME: Use the old bridge_to_block instruction as a stopgap to produce the
   // block until we can natively construct them.
-  auto block = gen.B.createBridgeToBlock(loc, fn.forward(gen),
-                                   SILType::getPrimitiveObjectType(blockTy));
-  return gen.emitManagedRValueWithCleanup(block);
+  if (!gen.getASTContext().LangOpts.EnableNativeBlocks) {
+    auto block = gen.B.createBridgeToBlock(loc, fn.forward(gen),
+                                     SILType::getPrimitiveObjectType(blockTy));
+    return gen.emitManagedRValueWithCleanup(block);
+  }
+  
+  // Build the invoke function signature. The block will capture the original
+  // function value.
+  auto fnTy = fn.getType().castTo<SILFunctionType>();
+  auto storageTy = SILBlockStorageType::get(fnTy);
+  
+  // Build the invoke function type.
+  SmallVector<SILParameterInfo, 4> params;
+  params.push_back(
+              SILParameterInfo(storageTy, ParameterConvention::Indirect_Inout));
+  std::copy(blockTy->getInterfaceParameters().begin(),
+            blockTy->getInterfaceParameters().end(),
+            std::back_inserter(params));
+  
+  auto invokeTy =
+    SILFunctionType::get(nullptr,
+                     FunctionType::ExtInfo()
+                       .withCallingConv(AbstractCC::C)
+                       .withRepresentation(FunctionType::Representation::Thin),
+                     ParameterConvention::Direct_Unowned,
+                     params,
+                     blockTy->getInterfaceResult(),
+                     gen.getASTContext());
+  
+  // Create the invoke function. Borrow the mangling scheme from reabstraction
+  // thunks, which is what we are in spirit.
+  auto thunk = gen.SGM.getOrCreateReabstractionThunk(loc,
+                                                     nullptr,
+                                                     invokeTy,
+                                                     fnTy,
+                                                     blockTy);
+  
+  // Build it if necessary.
+  if (thunk->empty()) {
+    SILGenFunction thunkSGF(gen.SGM, *thunk);
+    buildFuncToBlockInvokeBody(thunkSGF, loc, blockTy, storageTy, fnTy);
+  }
+  
+  // Form the block on the stack.
+  auto storageAddrTy = SILType::getPrimitiveAddressType(storageTy);
+  auto storage = gen.emitTemporaryAllocation(loc, storageAddrTy);
+  auto capture = gen.B.createProjectBlockStorage(loc, storage);
+  // Store the function to the block without claiming it, so that it still
+  // gets cleaned up in scope. Copying the block will create an independent
+  // reference.
+  gen.B.createStore(loc, fn.getValue(), capture);
+  auto invokeFn = gen.B.createFunctionRef(loc, thunk);
+  auto stackBlock = gen.B.createInitBlockStorageHeader(loc, storage, invokeFn,
+                                      SILType::getPrimitiveObjectType(blockTy));
+  
+  // Copy the block so we have an independent heap object we can hand off.
+  auto heapBlock = gen.B.createCopyBlock(loc, stackBlock);
+  return gen.emitManagedRValueWithCleanup(heapBlock);
 }
 
 static void buildBlockToFuncThunkBody(SILGenFunction &gen,
