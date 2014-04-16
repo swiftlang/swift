@@ -5,6 +5,7 @@ module ctypes {
     header "ctypes/bits.h"
   }
 }
+module stdio { header "stdio.h" }
 module cvars { header "cvars.h" }
 module blocks { header "blocks.h" }
 module Foundation { 

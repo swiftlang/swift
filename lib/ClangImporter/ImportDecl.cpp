@@ -3684,7 +3684,24 @@ static void importAttributes(ASTContext &C, const clang::NamedDecl *ClangDecl,
     if (auto unavailable = dyn_cast<clang::UnavailableAttr>(*AI)) {
       auto Message = unavailable->getMessage();
       auto attr =
-      AvailabilityAttr::createImplicitUnavailableAttr(C, Message);
+        AvailabilityAttr::createImplicitUnavailableAttr(C, Message);
+      MappedDecl->getMutableAttrs().add(attr);
+    }
+    //
+    // __attribute__((deprecated))
+    //
+    // Mapping: @availability(*,unavailable)
+    //
+    // APIs marked as 'deprecated' are implicitly mapped in as 'unavailable'
+    // for stricter API rules going forward.
+    //
+    // FIXME: This will possibly need to account for versioning and API
+    // evolution in the future if other APIs are marked deprecated.
+    //
+    if (auto deprecated = dyn_cast<clang::DeprecatedAttr>(*AI)) {
+      auto Message = deprecated->getMessage();
+      auto attr =
+        AvailabilityAttr::createImplicitUnavailableAttr(C, Message);
       MappedDecl->getMutableAttrs().add(attr);
     }
   }
