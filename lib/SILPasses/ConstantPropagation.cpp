@@ -63,11 +63,10 @@ constantFoldBinaryWithOverflow(ApplyInst *AI, llvm::Intrinsic::ID ID,
   OperandValueArrayRef Args = AI->getArguments();
   assert(Args.size() >= 2);
 
-  // Check if both arguments are literals.
   IntegerLiteralInst *Op1 = dyn_cast<IntegerLiteralInst>(Args[0]);
   IntegerLiteralInst *Op2 = dyn_cast<IntegerLiteralInst>(Args[1]);
 
-  // We cannot fold a builtin if one of the arguments is not a constant.
+  // If either Op1 or Op2 is not a literal, we cannot do anything.
   if (!Op1 || !Op2)
     return nullptr;
 
@@ -169,6 +168,15 @@ static SILInstruction *constantFoldIntrinsic(ApplyInst *AI,
                                              Optional<bool> &ResultsInError) {
   switch (ID) {
   default: break;
+  case llvm::Intrinsic::expect: {
+    // An expect of an integral constant is the constant itself.
+    assert(AI->getNumArguments() == 2 && "Expect should have 2 args.");
+    auto *Op1 = dyn_cast<IntegerLiteralInst>(AI->getArgument(0));
+    if (!Op1)
+      return nullptr;
+    return Op1;
+  }
+
   case llvm::Intrinsic::sadd_with_overflow:
   case llvm::Intrinsic::uadd_with_overflow:
   case llvm::Intrinsic::ssub_with_overflow:

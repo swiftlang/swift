@@ -452,6 +452,9 @@ public:
     return Operands.getDynamicValuesAsArray();
   }
 
+  /// The number of arguments passed to the ApplyInst.
+  unsigned getNumArguments() const { return getArguments().size(); }
+
   /// Return the ith argument passed to this instruction.
   SILValue getArgument(unsigned i) const { return getArguments()[i]; }
 
