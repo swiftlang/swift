@@ -46,6 +46,7 @@ set(SWIFTLIB_ESSENTIAL
   LifetimeManager.swift
   LogicValue.swift
   Misc.swift
+  Mirrors.swift.gyb
   NativeArrayBuffer.swift
   Nil.swift
   NSSwiftArray.swift
