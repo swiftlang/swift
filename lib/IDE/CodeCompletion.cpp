@@ -1536,6 +1536,15 @@ public:
     }
   }
 
+  bool tryFunctionCallCompletions(Type ExprType) {
+    ExprType = ExprType->getRValueType();
+    if (auto AFT = ExprType->getAs<AnyFunctionType>()) {
+      addFunctionCall(AFT);
+      return true;
+    }
+    return false;
+  }
+
   bool tryStdlibOptionalCompletions(Type ExprType) {
     // FIXME: consider types convertible to T?.
 
@@ -1559,6 +1568,7 @@ public:
     } else {
       return false;
     }
+
     {
       llvm::SaveAndRestore<Optional<SemanticContextKind>>
       ChangeForcedSemanticContext(ForcedSemanticContext,
@@ -1575,16 +1585,8 @@ public:
     NeedLeadingDot = !HaveDot;
     this->ExprType = ExprType;
     bool Done = false;
-    if (auto AFT = ExprType->getAs<AnyFunctionType>()) {
-      addFunctionCall(AFT);
+    if (tryFunctionCallCompletions(ExprType))
       Done = true;
-    }
-    if (auto LVT = ExprType->getAs<LValueType>()) {
-      if (auto AFT = LVT->getObjectType()->getAs<AnyFunctionType>()) {
-        addFunctionCall(AFT);
-        Done = true;
-      }
-    }
     if (auto MT = ExprType->getAs<ModuleType>()) {
       Module *M = MT->getModule();
       if (CurrDeclContext->getParentModule() != M) {

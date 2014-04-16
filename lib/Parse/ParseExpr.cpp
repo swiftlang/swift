@@ -1136,6 +1136,13 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     // Check for a () suffix, which indicates a call.
     // Note that this cannot be the start of a new line.
     if (Tok.isFollowingLParen()) {
+      if (peekToken().is(tok::code_complete)) {
+        consumeToken(tok::l_paren);
+        CodeCompletion->completePostfixExprParen(Result.get());
+        // Eat the code completion token because we handled it.
+        consumeToken(tok::code_complete);
+        return makeParserCodeCompletionResult<Expr>();
+      }
       ParserResult<Expr> Arg = parseExprList(tok::l_paren, tok::r_paren);
       if (Arg.hasCodeCompletion())
         return makeParserCodeCompletionResult<Expr>();
