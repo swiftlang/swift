@@ -449,6 +449,8 @@ class REPLInput {
   /// A buffer for all lines that the user entered, but we have not parsed yet.
   llvm::SmallString<128> CurrentLines;
 
+  llvm::SmallString<16> CodeCompletionErasedBytes;
+
 public:
   REPLEnvironment &Env;
   bool Autoindent;
@@ -677,8 +679,10 @@ private:
     }
 
     // If the user typed anything other than tab, reset the completion state.
-    if (c != L'\t')
+    if (c != L'\t') {
       that->completions.reset();
+      that->CodeCompletionErasedBytes.clear();
+    }
     *out = wchar_t(c);
     return 1;
   }
@@ -867,9 +871,9 @@ private:
   }
   
   unsigned char onComplete(int ch) {
-    LineInfoW const *line = el_wline(e);
+    const LineInfoW *line = el_wline(e);
     llvm::ArrayRef<wchar_t> wprefix(line->buffer, line->cursor - line->buffer);
-    llvm::SmallString<16> Prefix;
+    llvm::SmallString<64> Prefix;
     Prefix.assign(CurrentLines);
     convertToUTF8(wprefix, Prefix);
     
@@ -894,9 +898,19 @@ private:
 
     case CompletionState::DisplayedCompletionList: {
       // Complete the next completion stem in the cycle.
-      llvm::StringRef last = completions.getPreviousStem();
-      el_wdeletestr(e, last.size());
-      insertStringRef(completions.getNextStem());
+      const auto Last = completions.getPreviousStem();
+      el_wdeletestr(e, Last.InsertableString.size());
+      Prefix.resize(Prefix.size() - Last.InsertableString.size());
+      insertStringRef(CodeCompletionErasedBytes);
+      Prefix.append(CodeCompletionErasedBytes);
+
+      const auto Next = completions.getNextStem();
+      CodeCompletionErasedBytes.clear();
+      if (Next.NumBytesToErase != 0) {
+        CodeCompletionErasedBytes.assign(Prefix.end() - Next.NumBytesToErase, Prefix.end());
+        el_wdeletestr(e, Next.NumBytesToErase);
+      }
+      insertStringRef(Next.InsertableString);
       return CC_REFRESH;
     }
     

@@ -1029,7 +1029,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
 
         if (Tok.is(tok::code_complete)) {
           if (CodeCompletion && Result.isNonNull())
-            CodeCompletion->completeDotExpr(Result.get());
+            CodeCompletion->completeDotExpr(Result.get(), /*DotLoc=*/TokLoc);
           // Eat the code completion token because we handled it.
           consumeToken(tok::code_complete);
           Result.setHasCodeCompletion();

@@ -27,10 +27,10 @@ class CodeCompletionResultBuilder {
   CodeCompletionResultSink &Sink;
   CodeCompletionResult::ResultKind Kind;
   SemanticContextKind SemanticContext;
+  unsigned NumBytesToErase = 0;
   const Decl *AssociatedDecl = nullptr;
   unsigned CurrentNestingLevel = 0;
   SmallVector<CodeCompletionString::Chunk, 4> Chunks;
-  bool HasLeadingDot = false;
 
   void addChunkWithText(CodeCompletionString::Chunk::ChunkKind Kind,
                         StringRef Text);
@@ -63,6 +63,10 @@ public:
 
   ~CodeCompletionResultBuilder() {
     finishResult();
+  }
+
+  void setNumBytesToErase(unsigned N) {
+    NumBytesToErase = N;
   }
 
   void setAssociatedDecl(const Decl *D) {
@@ -105,7 +109,6 @@ public:
   }
 
   void addLeadingDot() {
-    HasLeadingDot = true;
     addDot();
   }
 

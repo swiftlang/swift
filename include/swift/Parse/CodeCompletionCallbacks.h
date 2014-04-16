@@ -94,7 +94,7 @@ public:
   virtual void completeExpr() = 0;
 
   /// \brief Complete expr-dot after we have consumed the dot.
-  virtual void completeDotExpr(Expr *E) = 0;
+  virtual void completeDotExpr(Expr *E, SourceLoc DotLoc) = 0;
 
   /// \brief Complete the beginning of expr-postfix -- no tokens provided
   /// by user.

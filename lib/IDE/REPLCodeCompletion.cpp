@@ -46,6 +46,7 @@ std::string toInsertableString(CodeCompletionResult *Result) {
     case CodeCompletionString::Chunk::ChunkKind::ExclamationMark:
     case CodeCompletionString::Chunk::ChunkKind::QuestionMark:
     case CodeCompletionString::Chunk::ChunkKind::Ampersand:
+    case CodeCompletionString::Chunk::ChunkKind::DynamicLookupMethodCallTail:
       Str += C.getText();
       break;
 
@@ -56,7 +57,6 @@ std::string toInsertableString(CodeCompletionResult *Result) {
     case CodeCompletionString::Chunk::ChunkKind::CallParameterBegin:
     case CodeCompletionString::Chunk::ChunkKind::GenericParameterBegin:
     case CodeCompletionString::Chunk::ChunkKind::GenericParameterName:
-    case CodeCompletionString::Chunk::ChunkKind::DynamicLookupMethodCallTail:
     case CodeCompletionString::Chunk::ChunkKind::TypeAnnotation:
       return Str;
     }
@@ -86,8 +86,10 @@ public:
             Completions.CompletionContext.copyString(PrintedResult));
 
         InsertableString = InsertableString.substr(Completions.Prefix.size());
-        Completions.CompletionInsertableStrings.push_back(
-            Completions.CompletionContext.copyString(InsertableString));
+
+        Completions.CookedResults.push_back(
+            { Completions.CompletionContext.copyString(InsertableString),
+              Result->getNumBytesToErase() });
       }
     }
   }
@@ -155,7 +157,7 @@ void REPLCompletions::populate(SourceFile &SF, StringRef EnteredCode) {
   CurrentCompletionIdx = ~size_t(0);
 
   CompletionStrings.clear();
-  CompletionInsertableStrings.clear();
+  CookedResults.clear();
 
   assert(SF.Kind == SourceFileKind::REPL && "Can't append to a non-REPL file");
 
@@ -182,9 +184,9 @@ void REPLCompletions::populate(SourceFile &SF, StringRef EnteredCode) {
     }
   }
 
-  if (CompletionInsertableStrings.empty())
+  if (CookedResults.empty())
     State = CompletionState::Empty;
-  else if (CompletionInsertableStrings.size() == 1)
+  else if (CookedResults.size() == 1)
     State = CompletionState::Unique;
   else
     State = CompletionState::CompletedRoot;
@@ -194,39 +196,45 @@ StringRef REPLCompletions::getRoot() const {
   if (Root)
     return Root.getValue();
 
-  if (CompletionInsertableStrings.empty()) {
+  if (CookedResults.empty()) {
     Root = std::string();
     return Root.getValue();
   }
 
-  std::string RootStr = CompletionInsertableStrings[0];
-  for (auto S : CompletionInsertableStrings) {
-    auto MismatchPlace =
-        std::mismatch(RootStr.begin(), RootStr.end(), S.begin());
+  std::string RootStr = CookedResults[0].InsertableString;
+  for (auto R : CookedResults) {
+    if (R.NumBytesToErase != 0) {
+      RootStr.resize(0);
+      break;
+    }
+    auto MismatchPlace = std::mismatch(RootStr.begin(), RootStr.end(),
+                                       R.InsertableString.begin());
     RootStr.resize(MismatchPlace.first - RootStr.begin());
   }
   Root = RootStr;
   return Root.getValue();
 }
 
-StringRef REPLCompletions::getPreviousStem() const {
-  if (CurrentCompletionIdx == ~size_t(0) || CompletionInsertableStrings.empty())
-    return StringRef();
+REPLCompletions::CookedResult REPLCompletions::getPreviousStem() const {
+  if (CurrentCompletionIdx == ~size_t(0) || CookedResults.empty())
+    return {};
 
-  return CompletionInsertableStrings[CurrentCompletionIdx]
-      .substr(getRoot().size());
+  const auto &Result = CookedResults[CurrentCompletionIdx];
+  return { Result.InsertableString.substr(getRoot().size()),
+           Result.NumBytesToErase };
 }
 
-StringRef REPLCompletions::getNextStem() {
-  if (CompletionInsertableStrings.empty())
-    return StringRef();
+REPLCompletions::CookedResult REPLCompletions::getNextStem() {
+  if (CookedResults.empty())
+    return {};
 
   CurrentCompletionIdx++;
-  if (CurrentCompletionIdx >= CompletionInsertableStrings.size())
+  if (CurrentCompletionIdx >= CookedResults.size())
     CurrentCompletionIdx = 0;
 
-  return CompletionInsertableStrings[CurrentCompletionIdx]
-      .substr(getRoot().size());
+  const auto &Result = CookedResults[CurrentCompletionIdx];
+  return { Result.InsertableString.substr(getRoot().size()),
+           Result.NumBytesToErase };
 }
 
 void REPLCompletions::reset() { State = CompletionState::Invalid; }

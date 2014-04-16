@@ -313,24 +313,37 @@ private:
   unsigned Kind : 2;
   unsigned AssociatedDeclKind : 8;
   unsigned SemanticContext : 3;
+
+  /// The number of bytes to the left of the code completion point that
+  /// should be erased first if this completion string is inserted in the
+  /// editor buffer.
+  unsigned NumBytesToErase : 8;
+
+public:
+  static const unsigned MaxNumBytesToErase = 255;
+
+private:
   CodeCompletionString *const CompletionString;
   StringRef BriefDocComment;
 
   CodeCompletionResult(ResultKind Kind,
                        SemanticContextKind SemanticContext,
+                       unsigned NumBytesToErase,
                        CodeCompletionString *CompletionString)
       : Kind(Kind), SemanticContext(unsigned(SemanticContext)),
-        CompletionString(CompletionString) {
+        NumBytesToErase(NumBytesToErase), CompletionString(CompletionString) {
     assert(Kind != Declaration && "use the other constructor");
     assert(CompletionString);
   }
 
   CodeCompletionResult(SemanticContextKind SemanticContext,
+                       unsigned NumBytesToErase,
                        CodeCompletionString *CompletionString,
                        const Decl *AssociatedDecl,
                        StringRef BriefDocComment)
       : Kind(ResultKind::Declaration),
         SemanticContext(unsigned(SemanticContext)),
+        NumBytesToErase(NumBytesToErase),
         CompletionString(CompletionString),
         BriefDocComment(BriefDocComment) {
     assert(AssociatedDecl && "should have a decl");
@@ -348,6 +361,10 @@ public:
 
   SemanticContextKind getSemanticContext() const {
     return static_cast<SemanticContextKind>(SemanticContext);
+  }
+
+  unsigned getNumBytesToErase() const {
+    return NumBytesToErase;
   }
 
   const CodeCompletionString *getCompletionString() const {

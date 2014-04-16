@@ -14,6 +14,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#ifndef SWIFT_IDE_REPL_CODE_COMPLETION_H
+#define SWIFT_IDE_REPL_CODE_COMPLETION_H
+
 #include "swift/Basic/LLVM.h"
 #include "swift/IDE/CodeCompletion.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
@@ -46,6 +49,13 @@ enum class CompletionState {
 /// Represents a completion set and maintains state for navigating through
 /// a set of completions.
 class REPLCompletions {
+public:
+  struct CookedResult {
+    StringRef InsertableString;
+    unsigned NumBytesToErase;
+  };
+
+private:
   friend class REPLCodeCompletionConsumer;
   CompletionState State;
 
@@ -55,7 +65,7 @@ class REPLCompletions {
   std::unique_ptr<CodeCompletionCallbacksFactory> CompletionCallbacksFactory;
 
   std::vector<StringRef> CompletionStrings;
-  std::vector<StringRef> CompletionInsertableStrings;
+  std::vector<CookedResult> CookedResults;
 
   std::string Prefix;
   mutable Optional<std::string> Root;
@@ -87,12 +97,12 @@ public:
   /// completion for a unique completion).
   StringRef getRoot() const;
 
-  /// Returns the stem (if any) returned by the previous getNextStem() call.
-  StringRef getPreviousStem() const;
+  /// Returns the stem (if any) returned by the previous \c getNextStem() call.
+  CookedResult getPreviousStem() const;
 
   /// Returns the next completion stem. Cycles to the beginning of the list if
   /// the end was reached.
-  StringRef getNextStem();
+  CookedResult getNextStem();
 
   /// Returns a list of all complete names for which completions were found.
   ArrayRef<StringRef> getCompletionList() const {
@@ -103,4 +113,7 @@ public:
   void reset();
 };
 
-}
+} // namespace swift
+
+#endif // LLVM_SWIFT_IDE_REPL_CODE_COMPLETION_H
+

@@ -325,6 +325,11 @@ void CodeCompletionResult::print(raw_ostream &OS) const {
     Prefix.append("OtherModule");
     break;
   }
+  if (NumBytesToErase != 0) {
+    Prefix.append("/Erase[");
+    Prefix.append(Twine(NumBytesToErase).str());
+    Prefix.append("]");
+  }
   Prefix.append(": ");
   while (Prefix.size() < 36) {
     Prefix.append(" ");
@@ -375,14 +380,14 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
       BriefComment = AssociatedDecl->getBriefComment();
     }
     return new (Sink.Allocator) CodeCompletionResult(
-        SemanticContext, CCS, AssociatedDecl,
+        SemanticContext, NumBytesToErase, CCS, AssociatedDecl,
         copyString(Sink.Allocator, BriefComment));
   }
 
   case CodeCompletionResult::ResultKind::Keyword:
   case CodeCompletionResult::ResultKind::Pattern:
-    return new (Sink.Allocator) CodeCompletionResult(Kind, SemanticContext,
-                                                     CCS);
+    return new (Sink.Allocator)
+        CodeCompletionResult(Kind, SemanticContext, NumBytesToErase, CCS);
   }
 }
 
@@ -635,6 +640,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
 
   CompletionKind Kind = CompletionKind::None;
   Expr *ParsedExpr = nullptr;
+  SourceLoc DotLoc;
   TypeLoc ParsedTypeLoc;
   DeclContext *CurDeclContext = nullptr;
   Decl *CStyleForLoopIterationVariable = nullptr;
@@ -720,7 +726,7 @@ public:
   }
 
   void completeExpr() override;
-  void completeDotExpr(Expr *E) override;
+  void completeDotExpr(Expr *E, SourceLoc DotLoc) override;
   void completePostfixExprBeginning() override;
   void completePostfixExpr(Expr *E) override;
   void completePostfixExprParen(Expr *E) override;
@@ -779,7 +785,12 @@ class CompletionLookup : public swift::VisibleDeclConsumer {
   Type BaseType;
 
   bool HaveDot = false;
+  SourceLoc DotLoc;
   bool NeedLeadingDot = false;
+
+  bool NeedOptionalUnwrap = false;
+  unsigned NumBytesToEraseForOptionalUnwrap = 0;
+
   bool HaveLParen = false;
   bool IsSuperRefExpr = false;
   bool IsDynamicLookup = false;
@@ -797,6 +808,8 @@ class CompletionLookup : public swift::VisibleDeclConsumer {
       llvm::DenseMap<const AssociatedTypeDecl *, Type>;
   std::map<const NominalTypeDecl *, DeducedAssociatedTypes>
       DeducedAssociatedTypeCache;
+
+  Optional<SemanticContextKind> ForcedSemanticContext = {};
 
 public:
   struct RequestedResultsTy {
@@ -842,8 +855,9 @@ public:
     TypeResolver.reset();
   }
 
-  void setHaveDot() {
+  void setHaveDot(SourceLoc DotLoc) {
     HaveDot = true;
+    this->DotLoc = DotLoc;
   }
 
   bool needDot() const {
@@ -868,6 +882,9 @@ public:
 
   SemanticContextKind getSemanticContext(const Decl *D,
                                          DeclVisibilityKind Reason) {
+    if (ForcedSemanticContext)
+      return *ForcedSemanticContext;
+
     switch (Reason) {
     case DeclVisibilityKind::LocalVariable:
     case DeclVisibilityKind::FunctionParameter:
@@ -904,6 +921,17 @@ public:
       return SemanticContextKind::OtherModule;
     }
     llvm_unreachable("unhandled kind");
+  }
+
+  void addLeadingDot(CodeCompletionResultBuilder &Builder) {
+    if (NeedOptionalUnwrap) {
+      Builder.setNumBytesToErase(NumBytesToEraseForOptionalUnwrap);
+      Builder.addQuestionMark();
+      Builder.addLeadingDot();
+      return;
+    }
+    if (needDot())
+      Builder.addLeadingDot();
   }
 
   void addTypeAnnotation(CodeCompletionResultBuilder &Builder, Type T) {
@@ -998,8 +1026,7 @@ public:
         CodeCompletionResult::ResultKind::Declaration,
         getSemanticContext(VD, Reason));
     Builder.setAssociatedDecl(VD);
-    if (needDot())
-      Builder.addLeadingDot();
+    addLeadingDot(Builder);
     Builder.addTextChunk(Name);
 
     // Add a type annotation.
@@ -1141,8 +1168,7 @@ public:
         CodeCompletionResult::ResultKind::Declaration,
         getSemanticContext(FD, Reason));
     Builder.setAssociatedDecl(FD);
-    if (needDot())
-      Builder.addLeadingDot();
+    addLeadingDot(Builder);
     Builder.addTextChunk(Name);
     if (IsDynamicLookup)
       Builder.addDynamicLookupMethodCallTail();
@@ -1211,8 +1237,7 @@ public:
       assert(isa<ConstructorDecl>(
                  dyn_cast<AbstractFunctionDecl>(CurrDeclContext)) &&
              "can call super.init only inside a constructor");
-      if (needDot())
-        Builder.addLeadingDot();
+      addLeadingDot(Builder);
       Builder.addTextChunk("init");
     }
     Type ConstructorType =
@@ -1251,8 +1276,7 @@ public:
         CodeCompletionResult::ResultKind::Declaration,
         getSemanticContext(NTD, Reason));
     Builder.setAssociatedDecl(NTD);
-    if (needDot())
-      Builder.addLeadingDot();
+    addLeadingDot(Builder);
     Builder.addTextChunk(NTD->getName().str());
     addTypeAnnotation(Builder, NTD->getDeclaredType());
   }
@@ -1263,8 +1287,7 @@ public:
         CodeCompletionResult::ResultKind::Declaration,
         getSemanticContext(TAD, Reason));
     Builder.setAssociatedDecl(TAD);
-    if (needDot())
-      Builder.addLeadingDot();
+    addLeadingDot(Builder);
     Builder.addTextChunk(TAD->getName().str());
     if (TAD->hasUnderlyingType())
       addTypeAnnotation(Builder, TAD->getUnderlyingType());
@@ -1280,8 +1303,7 @@ public:
         CodeCompletionResult::ResultKind::Declaration,
         getSemanticContext(GP, Reason));
     Builder.setAssociatedDecl(GP);
-    if (needDot())
-      Builder.addLeadingDot();
+    addLeadingDot(Builder);
     Builder.addTextChunk(GP->getName().str());
     addTypeAnnotation(Builder, GP->getDeclaredType());
   }
@@ -1293,8 +1315,7 @@ public:
         CodeCompletionResult::ResultKind::Declaration,
         getSemanticContext(AT, Reason));
     Builder.setAssociatedDecl(AT);
-    if (needDot())
-      Builder.addLeadingDot();
+    addLeadingDot(Builder);
     Builder.addTextChunk(AT->getName().str());
     if (Type T = getAssociatedTypeType(AT))
       addTypeAnnotation(Builder, T);
@@ -1309,8 +1330,7 @@ public:
         HasTypeContext ? SemanticContextKind::ExpressionSpecific
                        : getSemanticContext(EED, Reason));
     Builder.setAssociatedDecl(EED);
-    if (needDot())
-      Builder.addLeadingDot();
+    addLeadingDot(Builder);
     Builder.addTextChunk(EED->getName().str());
     if (EED->hasArgumentType())
       addPatternFromType(Builder, EED->getArgumentType());
@@ -1322,8 +1342,7 @@ public:
         Sink,
         CodeCompletionResult::ResultKind::Keyword,
         SemanticContextKind::None);
-    if (needDot())
-      Builder.addLeadingDot();
+    addLeadingDot(Builder);
     Builder.addTextChunk(Name);
     if (!TypeAnnotation.isNull())
       addTypeAnnotation(Builder, TypeAnnotation);
@@ -1334,8 +1353,7 @@ public:
         Sink,
         CodeCompletionResult::ResultKind::Keyword,
         SemanticContextKind::None);
-    if (needDot())
-      Builder.addLeadingDot();
+    addLeadingDot(Builder);
     Builder.addTextChunk(Name);
     if (!TypeAnnotation.empty())
       Builder.addTypeAnnotation(TypeAnnotation);
@@ -1502,8 +1520,7 @@ public:
           Sink,
           CodeCompletionResult::ResultKind::Pattern,
           SemanticContextKind::CurrentNominal);
-      if (needDot())
-        Builder.addLeadingDot();
+      addLeadingDot(Builder);
       if (TupleElt.hasName()) {
         Builder.addTextChunk(TupleElt.getName().str());
       } else {
@@ -1519,34 +1536,38 @@ public:
     }
   }
 
-  void tryAddStlibOptionalCompletions(Type ExprType) {
-    // If there is a dot, we don't have any special completions for
-    // Optional<T>.
-    if (!needDot())
-      return;
-
-    ExprType = ExprType->getRValueType();
-    Type Unwrapped = ExprType->getAnyOptionalObjectType();
-    if (!Unwrapped)
-      return;
+  bool tryStdlibOptionalCompletions(Type ExprType) {
     // FIXME: consider types convertible to T?.
 
-    {
-      CodeCompletionResultBuilder Builder(
-          Sink,
-          CodeCompletionResult::ResultKind::Pattern,
-          SemanticContextKind::ExpressionSpecific);
-      Builder.addExclamationMark();
-      addTypeAnnotation(Builder, Unwrapped);
+    ExprType = ExprType->getRValueType();
+    if (Type Unwrapped = ExprType->getOptionalObjectType()) {
+      llvm::SaveAndRestore<bool> ChangeNeedOptionalUnwrap(NeedOptionalUnwrap,
+                                                          true);
+      if (DotLoc.isValid()) {
+        NumBytesToEraseForOptionalUnwrap = Ctx.SourceMgr.getByteDistance(
+            DotLoc, Ctx.SourceMgr.getCodeCompletionLoc());
+      } else {
+        NumBytesToEraseForOptionalUnwrap = 0;
+      }
+      if (NumBytesToEraseForOptionalUnwrap <=
+          CodeCompletionResult::MaxNumBytesToErase)
+        lookupVisibleMemberDecls(*this, Unwrapped, CurrDeclContext,
+                                 TypeResolver.get());
+    } else if (Type Unwrapped = ExprType->getUncheckedOptionalObjectType()) {
+      lookupVisibleMemberDecls(*this, Unwrapped, CurrDeclContext,
+                               TypeResolver.get());
+    } else {
+      return false;
     }
     {
-      CodeCompletionResultBuilder Builder(
-          Sink,
-          CodeCompletionResult::ResultKind::Pattern,
-          SemanticContextKind::ExpressionSpecific);
-      Builder.addQuestionMark();
-      addTypeAnnotation(Builder, Unwrapped);
+      llvm::SaveAndRestore<Optional<SemanticContextKind>>
+      ChangeForcedSemanticContext(ForcedSemanticContext,
+                                  SemanticContextKind::OtherModule);
+      lookupVisibleMemberDecls(*this, ExprType, CurrDeclContext,
+                               TypeResolver.get());
     }
+
+    return true;
   }
 
   void getValueExprCompletions(Type ExprType) {
@@ -1577,7 +1598,8 @@ public:
       getTupleExprCompletions(TT);
       Done = true;
     }
-    tryAddStlibOptionalCompletions(ExprType);
+    if (tryStdlibOptionalCompletions(ExprType))
+      Done = true;
     if (!Done) {
       lookupVisibleMemberDecls(*this, ExprType, CurrDeclContext,
                                TypeResolver.get());
@@ -1693,13 +1715,16 @@ public:
 
 } // end unnamed namespace
 
-void CodeCompletionCallbacksImpl::completeDotExpr(Expr *E) {
+void CodeCompletionCallbacksImpl::completeDotExpr(Expr *E, SourceLoc DotLoc) {
+  assert(P.Tok.is(tok::code_complete));
+
   // Don't produce any results in an enum element.
   if (InEnumElementRawValue)
     return;
 
   Kind = CompletionKind::DotExpr;
   ParsedExpr = E;
+  this->DotLoc = DotLoc;
   CurDeclContext = P.CurDeclContext;
 }
 
@@ -1842,7 +1867,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     return;
 
   case CompletionKind::DotExpr: {
-    Lookup.setHaveDot();
+    Lookup.setHaveDot(DotLoc);
     Type ExprType = ParsedExpr->getType();
     if (isDynamicLookup(ExprType))
       Lookup.setIsDynamicLookup();
@@ -1880,7 +1905,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
   case CompletionKind::SuperExprDot: {
     Lookup.setIsSuperRefExpr();
-    Lookup.setHaveDot();
+    Lookup.setHaveDot(SourceLoc());
     Lookup.getValueExprCompletions(ParsedExpr->getType());
     break;
   }
@@ -1892,7 +1917,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   }
 
   case CompletionKind::TypeIdentifierWithDot: {
-    Lookup.setHaveDot();
+    Lookup.setHaveDot(SourceLoc());
     Lookup.getTypeCompletions(ParsedTypeLoc.getType());
     break;
   }
@@ -1910,7 +1935,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   }
 
   case CompletionKind::CaseStmtDotPrefix: {
-    Lookup.setHaveDot();
+    Lookup.setHaveDot(SourceLoc());
     SourceLoc Loc = P.Context.SourceMgr.getCodeCompletionLoc();
     Lookup.getTypeContextEnumElementCompletions(Loc);
     break;
