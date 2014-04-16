@@ -2222,26 +2222,6 @@ static DeclName getMagicFunctionName(DeclContext *dc) {
     if (auto func = dyn_cast<FuncDecl>(absFunc)) {
       if (auto storage = func->getAccessorStorageDecl())
         return storage->getFullName();
-
-      return func->getFullName();
-    }
-
-    // If this is an initializer, form a compound name.
-    // FIXME: should fall out of giving compound names to initializers.
-    if (auto ctor = dyn_cast<ConstructorDecl>(absFunc)) {
-      if (ctor->hasSelectorStyleSignature()) {
-        auto &ctx = dc->getASTContext();
-        SmallVector<Identifier, 4> argumentNames;
-        auto tuple = cast<TuplePattern>(ctor->getArgParamPatterns()[1]);
-        for (const auto &elt : tuple->getFields()) {
-          auto eltPattern = elt.getPattern()->getSemanticsProvidingPattern();
-          if (auto named = dyn_cast<NamedPattern>(eltPattern))
-            argumentNames.push_back(named->getBoundName());
-          else
-            argumentNames.push_back(Identifier());
-        }
-        return DeclName(ctx, ctx.Id_init, argumentNames);
-      }
     }
 
     return absFunc->getFullName();
