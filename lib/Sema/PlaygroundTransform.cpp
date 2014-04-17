@@ -104,10 +104,39 @@ private:
     }
     return EI;
   }
+    
+  class ClosureFinder : public ASTWalker {
+  private:
+    Instrumenter &I;
+  public:
+    ClosureFinder (Instrumenter &Inst) : I(Inst) { }
+    virtual std::pair<bool, Stmt*> walkToStmtPre(Stmt *S) {
+      if (llvm::dyn_cast<BraceStmt>(S)) {
+        return { false, S }; // don't walk into brace statements; we
+                             // need to respect nesting!
+      } else {
+        return { true, S };
+      }
+    }
+    virtual std::pair<bool, Expr*> walkToExprPre(Expr *E) {
+      if (ClosureExpr *CE = llvm::dyn_cast<ClosureExpr>(E)) {
+        BraceStmt *B = CE->getBody();
+        if (B) {
+          BraceStmt *NB = I.transformBraceStmt(B);
+          CE->setBody(NB, false);
+          // just with the entry and exit logging this is going to
+          // be more than a single expression!
+        }
+      }
+      return { true, E };
+    }
+  };
+    
+  ClosureFinder CF;
 
 public:
   Instrumenter (ASTContext &C, DeclContext *DC) :
-    Context(C), TypeCheckDC(DC) { }
+    Context(C), TypeCheckDC(DC), CF(*this) { }
     
   Stmt *transformStmt(Stmt *S) { 
     switch (S->getKind()) {
@@ -244,6 +273,7 @@ public:
          ++EI) {
       swift::ASTNode &Element = Elements[EI];
       if (Expr *E = Element.dyn_cast<Expr*>()) {
+        E->walk(CF);
         if (AssignExpr *AE = llvm::dyn_cast<AssignExpr>(E)) {
           std::pair<PatternBindingDecl *, VarDecl *> PV =
             buildPatternAndVariable(AE->getSrc());
@@ -326,6 +356,7 @@ public:
           }
         }
       } else if (Stmt *S = Element.dyn_cast<Stmt*>()) {
+        S->walk(CF);
         if (ReturnStmt *RS = llvm::dyn_cast<ReturnStmt>(S)) {
           EI = escapeToTarget(BracePair::TargetKinds::Return, Elements, EI);
           if (RS->hasResult()) {
@@ -367,6 +398,7 @@ public:
           }
         }
       } else if (Decl *D = Element.dyn_cast<Decl*>()) {
+        D->walk(CF);
         if (VarDecl *VD = llvm::dyn_cast<VarDecl>(D)) {
           PatternBindingDecl *PBD = VD->getParentPattern();
           if (PBD && PBD->getInit()) {
