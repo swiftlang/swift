@@ -922,11 +922,13 @@ public:
   }
   void visitProtocolMethodInst(ProtocolMethodInst *AMI) {
     printMethodInst(AMI, AMI->getOperand(), "protocol_method");
-    OS << " : " << AMI->getType();
+    OS << " : " << AMI->getMember().getDecl()->getType() << ", ";
+    OS << AMI->getType();
   }
   void visitDynamicMethodInst(DynamicMethodInst *DMI) {
     printMethodInst(DMI, DMI->getOperand(), "dynamic_method");
-    OS << " : " << DMI->getType();
+    OS << " : " << DMI->getMember().getDecl()->getType() << ", ";
+    OS << DMI->getType();
   }
   void visitProjectExistentialInst(ProjectExistentialInst *PI) {
     OS << "project_existential " << getIDAndType(PI->getOperand())

@@ -47,11 +47,19 @@ ParserResult<TypeRepr> Parser::parseTypeSimple() {
 ///     type-simple '?'
 ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID) {
   ParserResult<TypeRepr> ty;
+  // If this is an "inout" marker for an identifier type, consume the inout.
+  SourceLoc InOutLoc;
+  if (Tok.getKind() == tok::identifier && Tok.isContextualKeyword("inout"))
+      InOutLoc = consumeToken(tok::identifier);
   switch (Tok.getKind()) {
   case tok::kw_Self:
-  case tok::identifier:
+  case tok::identifier: {
     ty = parseTypeIdentifier();
+    if (InOutLoc.isValid())
+      ty = makeParserResult(new (Context) InOutTypeRepr(ty.get(),
+                                                        InOutLoc));
     break;
+  }
   case tok::kw_protocol:
     ty = parseTypeComposition();
     break;

@@ -1206,12 +1206,6 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
                                           TypeResolutionOptions options,
                                           FunctionType::ExtInfo extInfo) {
-  // Generic types are only first-class in SIL.
-  if (auto generics = repr->getGenericParams()) {
-    TC.diagnose(generics->getSourceRange().Start,
-                diag::first_class_generic_function);
-  }
-
   Type inputTy = resolveType(repr->getArgsTypeRepr(),
                              options | TR_ImmediateFunctionInput);
   if (inputTy->is<ErrorType>())
@@ -1220,6 +1214,11 @@ Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
                               options | TR_FunctionResult);
   if (outputTy->is<ErrorType>())
     return outputTy;
+
+  // SIL uses polymorphic function types to resolve overloaded member functions.
+  if (auto generics = repr->getGenericParams()) {
+    return PolymorphicFunctionType::get(inputTy, outputTy, generics, extInfo);
+  }
   return FunctionType::get(inputTy, outputTy, extInfo);
 }
 

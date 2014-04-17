@@ -1176,6 +1176,49 @@ bool getApplySubstitutionsFromParsed(
   return false;
 }
 
+// FIXME: we work around canoicalization of PolymorphicFunctionType
+// by generating GenericSignature and transforming the input, output
+// types.
+static GenericSignature *canonicalPolymorphicFunctionType(
+                           PolymorphicFunctionType *Ty,
+                           ASTContext &Context,
+                           CanType &inTy, CanType &outTy) {
+  GenericSignature *genericSig = nullptr;
+  llvm::DenseMap<ArchetypeType*, Type> archetypeMap;
+  genericSig
+    = Ty->getGenericParams().getAsCanonicalGenericSignature(archetypeMap,
+                                                            Context);
+  
+  auto getArchetypesAsDependentTypes = [&](Type t) -> Type {
+    if (!t) return t;
+    if (auto arch = t->getAs<ArchetypeType>()) {
+      // As a kludge, we allow Self archetypes of protocol_methods to be
+      // unapplied.
+      if (arch->getSelfProtocol() && !archetypeMap.count(arch))
+        return arch;
+      return arch->getAsDependentType(archetypeMap);
+    }
+    return t;
+  };
+  
+  inTy = Ty->getInput()
+    .transform(getArchetypesAsDependentTypes)
+    ->getCanonicalType();
+  outTy = Ty->getResult()
+    .transform(getArchetypesAsDependentTypes)
+    ->getCanonicalType();
+  return genericSig;
+}
+
+static bool checkPolymorphicFunctionType(PolymorphicFunctionType *Ty,
+                                         PolymorphicFunctionType *Ty2,
+                                         ASTContext &Context) {
+  CanType inTy, outTy, inTy2, outTy2;
+  auto sig = canonicalPolymorphicFunctionType(Ty, Context, inTy, outTy);
+  auto sig2 = canonicalPolymorphicFunctionType(Ty2, Context, inTy2, outTy2);
+  return sig == sig2 && inTy == inTy2 && outTy == outTy2;
+}
+
 ///   sil-instruction:
 ///     (sil_local_name '=')? identifier ...
 bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
@@ -1967,39 +2010,50 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
         P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":"))
       return true;
 
-    // TODO: we need to handle overloaded members for other MethodInsts as well.
-    // The majority of work is in updating testing cases.
-    if (Opcode == ValueKind::ClassMethodInst ||
-        Opcode == ValueKind::SuperMethodInst) {
-      // Parse the type for SILDeclRef.
-      ParserResult<TypeRepr> TyR = P.parseType();
-      if (TyR.isNull())
-        return true;
-      TypeLoc Ty = TyR.get();
-      if (performTypeLocChecking(Ty, false))
-        return true;
+    // Parse the type for SILDeclRef.
+    ParserResult<TypeRepr> TyR = P.parseType();
+    if (TyR.isNull())
+      return true;
+    TypeLoc Ty = TyR.get();
 
-      if (P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
-          parseSILType(MethodTy, TyLoc)
-         )
-        return true;
-
-      // Pick the ValueDecl that has the right type.
-      ValueDecl *TheDecl = nullptr;
-      for (unsigned I = 0, E = values.size(); I < E; I++) {
-        if (values[I]->getType()->getCanonicalType() ==
-            Ty.getType()->getCanonicalType()) {
-          TheDecl = values[I];
-          // Update SILDeclRef to point to the right Decl.
-          Member.loc = TheDecl;
-          break;
-        }
+    // The type can be polymorphic.
+    ArchetypeBuilder builder(*P.SF.getParentModule(), P.Diags);
+    if (auto fnType = dyn_cast<FunctionTypeRepr>(TyR.get())) {
+      if (auto generics = fnType->getGenericParams()) {
+        generics->setBuilder(&builder);
+        TypeLoc TyLoc = TyR.get();
+        handleSILGenericParams(P.Context, TyLoc, &P.SF, &builder);
       }
-      assert(TheDecl && "Can't find a member with the right type");
-    } else {
-      if (parseSILType(MethodTy, TyLoc))
-        return true;
     }
+
+    if (performTypeLocChecking(Ty, false))
+      return true;
+
+    if (P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+        parseSILType(MethodTy, TyLoc)
+       )
+      return true;
+
+    // Pick the ValueDecl that has the right type.
+    ValueDecl *TheDecl = nullptr;
+    auto declTy = Ty.getType()->getCanonicalType();
+    auto declPoly = dyn_cast<PolymorphicFunctionType>(declTy.getPointer());
+    for (unsigned I = 0, E = values.size(); I < E; I++) {
+      auto lookupTy = values[I]->getType()->getCanonicalType();
+      auto lookupPoly = dyn_cast<PolymorphicFunctionType>(
+                            lookupTy.getPointer());
+      // We handle comparision of PolymorphicFunctionType by calling
+      // checkPolymorphicFunctionType.
+      if ((declPoly && lookupPoly &&
+           checkPolymorphicFunctionType(lookupPoly, declPoly, P.Context)) ||
+          lookupTy == Ty.getType()->getCanonicalType()) {
+        TheDecl = values[I];
+        // Update SILDeclRef to point to the right Decl.
+        Member.loc = TheDecl;
+        break;
+      }
+    }
+    assert(TheDecl && "Can't find a member with the right type");
 
     switch (Opcode) {
     default: assert(0 && "Out of sync with parent switch");
