@@ -33,6 +33,7 @@ KNOWN_SETTINGS=(
     skip-build-ios-device       ""               "set to skip building Swift stdlibs for iOS devices (i.e. build simulators only)"
     skip-build-ios-simulator    ""               "set to skip building Swift stdlibs for iOS simulators (i.e. build devices only)"
     skip-build-sourcekit        ""               "set to skip building SourceKit"
+    skip-build-xctest           ""               "set to skip building the XCTest overlay module"
     skip-test-swift             ""               "set to skip testing Swift"
     skip-test-ios               ""               "set to skip testing Swift stdlibs for iOS"
     skip-test-ios-device        ""               "set to skip testing Swift stdlibs for iOS devices (i.e. test simulators only)"
@@ -204,7 +205,8 @@ LLVM_TARGETS_TO_BUILD="X86;ARM"
 # macosx-x86_64 stdlib is part of the swift product itself
 if [[ ! "$SKIP_IOS" ]]; then
     IOS_SIMULATOR_PRODUCTS=(swift_stdlib_ios_simulator_x86_64 swift_stdlib_ios_simulator_i386)
-    IOS_DEVICE_PRODUCTS=(swift_stdlib_ios_arm64 swift_stdlib_ios_armv7)
+    # FIXME swift_stdlib_ios_arm64 disabled pending rdar://16641385
+    IOS_DEVICE_PRODUCTS=(swift_stdlib_ios_armv7)
     LLVM_TARGETS_TO_BUILD="X86;ARM;ARM64"
     if [[ ! "$SKIP_BUILD_IOS" ]]; then
         if [[ ! "$SKIP_BUILD_IOS_SIMULATOR" ]]; then
@@ -325,7 +327,6 @@ fi
 # CMake options used for all targets, including LLVM/Clang
 COMMON_CMAKE_OPTIONS=(
     "${CMAKE_COMPILER_OPTIONS[@]}"
-    -DCMAKE_BUILD_TYPE="$BUILD_TYPE"
     -DLLVM_ENABLE_ASSERTIONS="ON" 
 )
 
@@ -356,6 +357,7 @@ if [ \! "$SKIP_BUILD_LLVM" ]; then
       # LLDB
       (cd "${LLVM_BUILD_DIR}" &&
           "$CMAKE" -G "${CMAKE_GENERATOR}" "${COMMON_CMAKE_OPTIONS[@]}" \
+              -DCMAKE_BUILD_TYPE="RelWithDebInfo" \
               -DCMAKE_CXX_FLAGS="-stdlib=libc++" \
               -DCMAKE_EXE_LINKER_FLAGS="-stdlib=libc++" \
               -DCMAKE_SHARED_LINKER_FLAGS="-stdlib=libc++" \
@@ -379,7 +381,12 @@ SWIFT_CMAKE_OPTIONS=(
     -DCMAKE_CXX_FLAGS="-isysroot${SYSROOT}"
     -DSWIFT_RUN_LONG_TESTS="ON"
     -DLLVM_CONFIG="${LLVM_BUILD_DIR}/bin/llvm-config"
+    -DCMAKE_BUILD_TYPE="RelWithDebInfo"
 )
+
+if [[ "$SKIP_BUILD_XCTEST" ]]; then
+    SWIFT_CMAKE_OPTIONS=("${SWIFT_CMAKE_OPTIONS[@]}" -DSWIFT_BUILD_XCTEST=OFF)
+fi
 
 # set_ios_options options_var platform deployment_target internal_suffix arch
 function set_ios_options {
@@ -391,6 +398,7 @@ function set_ios_options {
     local sdkroot=$(xcrun -sdk ${platform}${internal_suffix} -show-sdk-path)
 
     local opts=(
+        -DCMAKE_BUILD_TYPE="Debug"
         -DCMAKE_TOOLCHAIN_FILE="${SWIFT_SOURCE_DIR}/cmake/${platform}.cmake"
         -DCMAKE_SYSTEM_PROCESSOR=${arch}
         -DCMAKE_OSX_ARCHITECTURES=${arch}
@@ -511,13 +519,14 @@ for product in "${SWIFT_TEST_PRODUCTS[@]}" ; do
             "${build_cmd[@]}" ${BUILD_TARGET_FLAG} SwiftUnitTests
         fi
 
-        if [[ "${CMAKE_GENERATOR}" == Ninja ]] ; then
+        if [[ ${build_cmd[@]} == *ninja* ]] ; then
             # Ninja buffers command output to avoid scrambling the output
             # of parallel jobs, which is awesome... except that it
             # interferes with the progress meter when testing.  Instead of
             # executing ninja directly, have it dump the commands it would
             # run, strip Ninja's progress prefix with sed, and tell the
             # shell to execute that.
+            echo "$("${build_cmd[@]}" -n -v check-${product} | sed -e 's/[^]]*] //')"
             sh -c "$("${build_cmd[@]}" -n -v check-${product} | sed -e 's/[^]]*] //')"
         else
             "${build_cmd[@]}" ${BUILD_TARGET_FLAG} check-${product}
