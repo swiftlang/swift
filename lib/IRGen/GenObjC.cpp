@@ -18,6 +18,7 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Module.h"
+#include "llvm/IR/InlineAsm.h"
 
 #include "clang/AST/ASTContext.h"
 
@@ -99,9 +100,55 @@ llvm::Value *IRGenFunction::emitObjCRetainCall(llvm::Value *value) {
   return call;
 }
 
+llvm::Value *IRGenModule::getObjCRetainAutoreleasedReturnValueMarker() {
+  // Check to see if we've already computed the market.  Note that we
+  // might have cached a null marker, and that's fine.
+  auto &cache = ObjCRetainAutoreleasedReturnValueMarker;
+  if (cache.hasValue())
+    return cache.getValue();
+
+  // Ask the target for the string.
+  StringRef asmString = TargetInfo.ObjCRetainAutoreleasedReturnValueMarker;
+
+  // If the string is empty, just leave, remembering that we did all this.
+  if (asmString.empty()) {
+    cache = nullptr;
+    return nullptr;
+  }
+
+  // If we're emitting optimized code, record the string in the module
+  // and let the late ARC pass insert it, but don't generate any calls
+  // right now.
+  if (Opts.OptLevel) {
+    llvm::NamedMDNode *metadata =
+      Module.getOrInsertNamedMetadata(
+                            "clang.arc.retainAutoreleasedReturnValueMarker");
+    assert(metadata->getNumOperands() <= 1);
+    if (metadata->getNumOperands() == 0) {
+      llvm::Value *string = llvm::MDString::get(LLVMContext, asmString);
+      metadata->addOperand(llvm::MDNode::get(LLVMContext, string));
+    }
+
+    cache = nullptr;
+
+  // Otherwise, create the module
+  } else {
+    llvm::FunctionType *type =
+      llvm::FunctionType::get(VoidTy, /*variadic*/false);
+    cache = llvm::InlineAsm::get(type, asmString, "", /*sideeffects*/ true);
+  }
+
+  return cache.getValue();
+}
+
 /// Reclaim an autoreleased return value.
 llvm::Value *irgen::emitObjCRetainAutoreleasedReturnValue(IRGenFunction &IGF,
                                                           llvm::Value *value) {
+  // Call the inline-assembly marker if we need one.
+  if (auto marker = IGF.IGM.getObjCRetainAutoreleasedReturnValueMarker()) {
+    IGF.Builder.CreateCall(marker);
+  }
+
   auto fn = IGF.IGM.getObjCRetainAutoreleasedReturnValueFn();
   fn = getCastOfRetainFn(IGF.IGM, fn, value->getType());
 

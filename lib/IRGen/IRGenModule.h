@@ -332,6 +332,7 @@ public:
   llvm::Constant *getEmptyTupleMetadata();
   llvm::Constant *getObjCEmptyCachePtr();
   llvm::Constant *getObjCEmptyVTablePtr();
+  llvm::Value *getObjCRetainAutoreleasedReturnValueMarker();
   ClassDecl *getSwiftRootClass();
   llvm::Module *getModule() const;
   llvm::Module *releaseModule();
@@ -340,6 +341,7 @@ private:
   llvm::Constant *EmptyTupleMetadata = nullptr;
   llvm::Constant *ObjCEmptyCachePtr = nullptr;
   llvm::Constant *ObjCEmptyVTablePtr = nullptr;
+  Optional<llvm::Value*> ObjCRetainAutoreleasedReturnValueMarker;
   ClassDecl *SwiftRootClass = nullptr;
 
 #define FUNCTION_ID(Id)             \
