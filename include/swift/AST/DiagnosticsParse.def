@@ -269,6 +269,9 @@ ERROR(func_selector_with_not_one_argument,decl_parsing,none,
       "selector-style function arguments may only be used with one-argument patterns", ())
 ERROR(func_selector_with_curry,decl_parsing,none,
       "funcs with selector-style arguments may not be curried", ())
+ERROR(selector_func_decl_removed,expr_parsing,none,
+      "the separated declaration syntax is being removed; use keyword "
+      "arguments instead", ())
 ERROR(func_decl_expected_arrow,decl_parsing,none,
       "expected '->' after function parameter tuple", ())
 ERROR(func_static_not_allowed,decl_parsing,none,

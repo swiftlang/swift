@@ -267,8 +267,10 @@ static Pattern *rebuildImplicitPatternAround(const Pattern *P, Pattern *NewRoot,
 }
 
 /// Parse a single argument, the leading token is expected to be a (.
-static ParserResult<Pattern> parseArgument(Parser &P, Identifier leadingIdent,
-                                     Parser::DefaultArgumentInfo *defaultArgs) {
+static ParserResult<Pattern> parseArgument(
+                               Parser &P, Identifier leadingIdent,
+                               Parser::DefaultArgumentInfo *defaultArgs,
+                               bool &isImpliedNameArgument) {
   // Consume the (.
   Parser::StructureMarkerRAII ParsingArgument(P, P.Tok);
   SourceLoc LPLoc = P.consumeToken(tok::l_paren);
@@ -283,8 +285,6 @@ static ParserResult<Pattern> parseArgument(Parser &P, Identifier leadingIdent,
   // "identifier =" (always unnamed).  We know to parse the second identifier in
   // "identifier(identifier = ...)" as a type because all arguments are required
   // to have types.
-  bool isImpliedNameArgument;
-
   if (P.Tok.is(tok::identifier) && P.peekToken().is(tok::colon))
     isImpliedNameArgument = false;
   else if (P.Tok.is(tok::identifier) && P.peekToken().is(tok::r_paren))
@@ -370,12 +370,21 @@ static ParserResult<Pattern> parseArgument(Parser &P, Identifier leadingIdent,
                                     LPLoc, /*DefArgs=*/defaultArgs);
 }
 
+namespace {
+  /// Extra location information for selector-style declarations.
+  struct SelectorParamLoc {
+    SourceLoc LParenLoc;
+    SourceLoc RParenLoc;
+    bool HasBodyParameterName;
+  };
+}
 
 static ParserStatus
 parseSelectorArgument(Parser &P,
                       SmallVectorImpl<Identifier> &namePieces,
                       SmallVectorImpl<TuplePatternElt> &argElts,
                       SmallVectorImpl<TuplePatternElt> &bodyElts,
+                      SmallVectorImpl<SelectorParamLoc> &selectorParamLocs,
                       Parser::DefaultArgumentInfo &defaultArgs,
                       SourceLoc &rp) {
   ParserResult<Pattern> ArgPatternRes = P.parsePatternIdentifier(true);
@@ -402,7 +411,9 @@ parseSelectorArgument(Parser &P,
     return makeParserError();
   }
 
-  auto PatternRes = parseArgument(P, leadingIdent, &defaultArgs);
+  bool isImpliedNameArgument = false;
+  auto PatternRes = parseArgument(P, leadingIdent, &defaultArgs, 
+                                  isImpliedNameArgument);
   if (PatternRes.hasCodeCompletion())
     return PatternRes;
   if (PatternRes.isNull()) {
@@ -434,6 +445,10 @@ parseSelectorArgument(Parser &P,
   }
   namePieces.push_back(leadingIdent);
 
+  selectorParamLocs.push_back({ PatternRes.get()->getStartLoc(),
+                                PatternRes.get()->getEndLoc(),
+                                !isImpliedNameArgument });
+
   TuplePatternElt &TPE = bodyElts.back();
   ArgPattern = rebuildImplicitPatternAround(TPE.getPattern(), ArgPattern,
                                             P.Context);
@@ -455,6 +470,7 @@ static ParserStatus
 parseSelectorFunctionArguments(Parser &P,
                                SmallVectorImpl<Identifier> &NamePieces,
                                SmallVectorImpl<Pattern *> &BodyPatterns,
+                           SmallVectorImpl<SelectorParamLoc> &SelectorParamLocs,
                                Parser::DefaultArgumentInfo &DefaultArgs,
                                Pattern *FirstPattern) {
   SourceLoc LParenLoc;
@@ -510,8 +526,8 @@ parseSelectorFunctionArguments(Parser &P,
   for (;;) {
     if (P.isAtStartOfBindingName()) {
       Status |= parseSelectorArgument(P, NamePieces,
-                                      ArgElts, BodyElts, DefaultArgs,
-                                      RParenLoc);
+                                      ArgElts, BodyElts, SelectorParamLocs, 
+                                      DefaultArgs, RParenLoc);
       continue;
     }
     if (P.Tok.is(tok::l_paren)) {
@@ -688,18 +704,58 @@ Parser::parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
   // Parse all of the selector arguments or curried argument pieces.
 
   // Parse the first function argument clause.
+  bool IsFirstArgumentNameImplied;
   ParserResult<Pattern> ArgPattern =
-    parseArgument(*this, NamePieces.front(), &DefaultArgs);
+    parseArgument(*this, NamePieces.front(), &DefaultArgs, 
+                  IsFirstArgumentNameImplied);
 
   if (ArgPattern.isNull() || ArgPattern.hasCodeCompletion())
     return ArgPattern;
 
+  // Prime the selector parameter location data.
+  SmallVector<SelectorParamLoc, 4> SelectorParamLocs;
+  SelectorParamLocs.push_back({ArgPattern.get()->getStartLoc(),
+                               ArgPattern.get()->getEndLoc(),
+                               !IsFirstArgumentNameImplied});
+
   // This looks like a selector-style argument.  Try to convert the first
   // argument pattern into a single argument type and parse subsequent
   // selector forms.
-  return ParserStatus(ArgPattern) |
+  ParserStatus Status = ParserStatus(ArgPattern) |
     parseSelectorFunctionArguments(*this, NamePieces, BodyPatterns,
-                                   DefaultArgs, ArgPattern.get());
+                                   SelectorParamLocs, DefaultArgs, 
+                                   ArgPattern.get());
+  
+  if (Status.isSuccess()) {
+    auto firstLParenLoc = SelectorParamLocs[0].LParenLoc;
+    auto diag = diagnose(firstLParenLoc, diag::selector_func_decl_removed);
+    
+    // If the first parameter has a name, add "_ " after the first '('.
+    if (SelectorParamLocs[0].HasBodyParameterName) {
+      auto afterFirstLParenLoc
+        = Lexer::getLocForEndOfToken(Context.SourceMgr, firstLParenLoc);
+      diag.fixItInsert(afterFirstLParenLoc, "_ ");
+    }
+
+    // Replace the closing ')' of the first argument with ','.
+    diag.fixItReplace(SourceRange(SelectorParamLocs[0].RParenLoc), ",");
+    
+    for (unsigned i = 1, n = SelectorParamLocs.size(); i != n; ++i) {
+      const auto &ParamLoc = SelectorParamLocs[i];
+
+      // The opening '(' becomes either ':' or ' ', depending on
+      // whether this parameter has a name.
+      diag.fixItReplace(SourceRange(ParamLoc.LParenLoc), 
+                        ParamLoc.HasBodyParameterName? " " : ": ");
+
+      // A non-terminating closing ')' becomes ','.
+      if (i < n-1) {
+        diag.fixItReplace(SourceRange(ParamLoc.RParenLoc), ",");
+      }
+    }
+  }
+
+  return Status;
 }
 
 /// parseFunctionSignature - Parse a function definition signature.
@@ -795,6 +851,7 @@ Parser::parseConstructorArguments(DeclName &FullName, Pattern *&BodyPattern,
     return status;
   }
 
+  SourceLoc InitLoc = PreviousLoc;
   if (!isAtStartOfBindingName()) {
     // Complain that we expected '(' or a parameter name.
     {
@@ -820,11 +877,16 @@ Parser::parseConstructorArguments(DeclName &FullName, Pattern *&BodyPattern,
   SmallVector<TuplePatternElt, 4> BodyElts;
   SourceLoc RParenLoc;
   SmallVector<Identifier, 4> NamePieces;
-  
+  SmallVector<SelectorParamLoc, 4> SelectorParamLocs;  
+  SourceLoc FirstSelectorPieceLoc;
   for (;;) {
+    if (FirstSelectorPieceLoc.isInvalid())
+      FirstSelectorPieceLoc = Tok.getLoc();
+
     if (isAtStartOfBindingName()) {
       Status |= parseSelectorArgument(*this, NamePieces, ArgElts, BodyElts,
-                                      DefaultArgs, RParenLoc);
+                                      SelectorParamLocs, DefaultArgs, 
+                                      RParenLoc);
       continue;
     }
 
@@ -836,6 +898,30 @@ Parser::parseConstructorArguments(DeclName &FullName, Pattern *&BodyPattern,
       Status.setIsParseError();
     }
     break;
+  }
+
+  if (Status.isSuccess()) {
+    auto diag = diagnose(InitLoc, diag::selector_func_decl_removed);
+    
+    // Replace the whitespace after "init" up to the first name with
+    // the (new) opening '('.
+    SourceLoc afterInitLoc = Lexer::getLocForEndOfToken(Context.SourceMgr,
+                                                        InitLoc);
+    diag.fixItReplaceChars(afterInitLoc, FirstSelectorPieceLoc, "(");
+
+    for (unsigned i = 0, n = SelectorParamLocs.size(); i != n; ++i) {
+      const auto &ParamLoc = SelectorParamLocs[i];
+
+      // The opening '(' becomes either ':' or ' ', depending on
+      // whether this parameter has a name.
+      diag.fixItReplace(SourceRange(ParamLoc.LParenLoc), 
+                        ParamLoc.HasBodyParameterName? " " : ": ");
+
+      // A non-terminating closing ')' becomes ','.
+      if (i < n-1) {
+        diag.fixItReplace(SourceRange(ParamLoc.RParenLoc), ",");
+      }
+    }
   }
 
   BodyPattern = TuplePattern::create(Context, LParenLoc, BodyElts,
