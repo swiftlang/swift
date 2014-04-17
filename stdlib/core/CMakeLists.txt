@@ -23,6 +23,7 @@ set(SWIFTLIB_ESSENTIAL
   ArrayBuffer.swift
   ArrayBufferType.swift
   ArrayType.swift
+  Assert.swift
   AssertCommon.swift
   Bool.swift
   BridgeObjectiveC.swift
@@ -73,13 +74,6 @@ set(SWIFTLIB_ESSENTIAL
   UnsafeArray.swift
   UnsafePointer.swift
   )
-
-# Use appropriate assertion code
-if(SWIFT_ASSERTS)
-  list(APPEND SWIFTLIB_ESSENTIAL "AssertDebug.swift")
-else()
-  list(APPEND SWIFTLIB_ESSENTIAL "Assert.swift")
-endif()
 
 # The complete list of sources in the core standard library.  Includes
 # all the essential sources listed above.

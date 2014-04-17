@@ -641,6 +641,7 @@ static void PrintArg(raw_ostream &OS, const char *Arg, bool Quote) {
 
 static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
                          IRGenOptions &IRGenOpts,
+                         FrontendOptions &FEOpts,
                          DiagnosticEngine &Diags) {
   using namespace options;
 
@@ -715,6 +716,10 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
                        A->getAsString(Args), A->getValue());
         return true;
     }
+  } else if (FEOpts.ParseStdlib) {
+    // Disable assertion configuration replacement when we build the standard
+    // library.
+    Opts.AssertConfig = SILOptions::DisableReplacement;
   } else {
     // Set the assert configuration according to the optimization level.
     Opts.AssertConfig =
@@ -879,7 +884,7 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
     return true;
   }
 
-  if (ParseSILArgs(SILOpts, *ParsedArgs, IRGenOpts, Diags)) {
+  if (ParseSILArgs(SILOpts, *ParsedArgs, IRGenOpts, FrontendOpts, Diags)) {
     return true;
   }
 

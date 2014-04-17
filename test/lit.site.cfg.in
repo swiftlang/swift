@@ -36,8 +36,7 @@ if "@SWIFT_RUN_LONG_TESTS@" != "OFF" and "@SWIFT_RUN_LONG_TESTS@" != "NO":
 if "@SWIFT_ASAN_BUILD@" != "OFF" and "@SWIFT_ASAN_BUILD@" != "NO":
   config.available_features.add("asan")
 
-if '@SWIFT_ASSERTS@' == 'ON':
-  config.available_features.add('swift_stdlib_asserts')
+config.available_features.add('swift_stdlib_asserts')
 
 # Let the main config do the real work.
 lit_config.load_config(config, "@SWIFT_SOURCE_DIR@/test/lit.cfg")
