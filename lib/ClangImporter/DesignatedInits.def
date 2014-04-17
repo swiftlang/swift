@@ -28,6 +28,95 @@
 // ObjectiveC
 DESIGNATED_INIT(NSObject, (0, "init"))
 
+// Foundation
+DESIGNATED_INIT(NSArray, (0, "init"))
+DESIGNATED_INIT(NSArray, (1, "initWithObjects"))
+DESIGNATED_INIT(NSArray, (2, "initWithObjects", "count"))
+
+DESIGNATED_INIT(NSCountedSet, (1, "initWithCapacity"))
+
+DESIGNATED_INIT(NSDate, (0, "init"))
+DESIGNATED_INIT(NSDate, (1, "initWithTimeIntervalSinceReferenceDate"))
+
+DESIGNATED_INIT(NSDecimalNumber, (1, "initWithDecimal"))
+
+DESIGNATED_INIT(NSDictionary, (0, "init"))
+DESIGNATED_INIT(NSDictionary, (3, "initWithObjects", "forKeys", "count"))
+
+DESIGNATED_INIT(NSError, (3, "initWithDomain", "code", "userInfo"))
+
+DESIGNATED_INIT(NSException, (3, "initWithName", "reason", "userInfo"))
+
+DESIGNATED_INIT(NSExpression, (1, "initWithExpressionType"))
+
+DESIGNATED_INIT(NSFileWrapper, (3, "initWithURL", "options", "error"))
+DESIGNATED_INIT(NSFileWrapper, (1, "initDirectoryWithFileWrappers"))
+DESIGNATED_INIT(NSFileWrapper, (1, "initRegularFileWithContents"))
+DESIGNATED_INIT(NSFileWrapper, (1, "initSymbolicLinkWithDestinationURL"))
+DESIGNATED_INIT(NSFileWrapper, (1, "initWithSerializedRepresentation"))
+
+DESIGNATED_INIT(NSIndexPath, (0, "init"))
+DESIGNATED_INIT(NSIndexPath, (2, "initWithIndexes", "length"))
+
+DESIGNATED_INIT(NSIndexSet, (0, "init"))
+DESIGNATED_INIT(NSIndexSet, (1, "initWithIndexesInRange"))
+DESIGNATED_INIT(NSIndexSet, (1, "initWithIndexSet"))
+
+DESIGNATED_INIT(NSInvocationOperation, (1, "initWithInvocation"))
+
+DESIGNATED_INIT(NSMachPort, (1, "initWithMachPort"))
+
+DESIGNATED_INIT(NSMutableArray, (0, "init"))
+DESIGNATED_INIT(NSMutableArray, (1, "initWithCapacity"))
+
+DESIGNATED_INIT(NSMutableDictionary, (0, "init"))
+DESIGNATED_INIT(NSMutableDictionary, (1, "initWithCapacity"))
+
+DESIGNATED_INIT(NSMutableOrderedSet, (0, "init"))
+DESIGNATED_INIT(NSMutableOrderedSet, (1, "initWithCapacity"))
+
+DESIGNATED_INIT(NSMutableSet, (0, "init"))
+DESIGNATED_INIT(NSMutableSet, (1, "initWithCapacity"))
+
+DESIGNATED_INIT(NSNetService, (4, "initWithDomain", "type", "name", "port"))
+
+DESIGNATED_INIT(NSNotificationQueue, (1, "initWithNotificationCenter"))
+
+DESIGNATED_INIT(NSOrderedSet, (0, "init"))
+DESIGNATED_INIT(NSOrderedSet, (2, "initWithObjects", "count"))
+
+DESIGNATED_INIT(NSPortMessage, 
+                (3, "initWithSendPort", "receivePort", "components"))
+
+DESIGNATED_INIT(NSScriptObjectSpecifier, 
+                (3, "initWithContainerClassDescription", "containerSpecifier",
+                 "key"))
+
+DESIGNATED_INIT(NSSet, (0, "init"))
+DESIGNATED_INIT(NSSet, (2, "initWithObjects", "count"))
+
+DESIGNATED_INIT(NSThread, (0, "init"))
+
+DESIGNATED_INIT(NSURL, (2, "initWithString", "relativeToURL"))
+
+DESIGNATED_INIT(NSURLProtocol, 
+                (3, "initWithRequest", "cachedResponse", "client"))
+
+DESIGNATED_INIT(NSURLRequest, 
+                (3, "initWithURL", "cachePolicy", "timeoutInterval"))
+
+DESIGNATED_INIT(NSURLResponse, 
+                (4, "initWithURL", "MIMEType", "expectedContentLength", 
+                 "textEncodingName"))
+
+DESIGNATED_INIT(NSValue, (2, "initWithBytes", "objCType"))
+
+DESIGNATED_INIT(NSXMLDocument, (3, "initWithData", "options", "error"))
+
+DESIGNATED_INIT(NSXMLDTD, (3, "initWithData", "options", "error"))
+
+DESIGNATED_INIT(NSXMLParser, (1, "initWithData"))
+
 // AppKit
 DESIGNATED_INIT(NSCell, (0, "init"))
 DESIGNATED_INIT(NSCell, (1, "initWithCoder"))
