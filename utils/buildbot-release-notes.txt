@@ -28,6 +28,10 @@
   The compiler now complains when it sees the selector-style syntax
   and will provide Fix-Its to rewrite to the newer syntax.
 
+  Note that the final form of selector syntax is still being hammered
+  out, but only having one declaration syntax, which will be very
+  close to this, is a known.
+
 2014-04-16
 ----------
 
