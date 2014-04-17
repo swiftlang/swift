@@ -132,6 +132,17 @@ static void addCommonFrontendArgs(const ToolChain &TC,
   }
 }
 
+// Should this be done by the tool chain?
+static void configureDefaultCPU(const llvm::Triple &triple,
+                                ArgStringList &args) {
+  if (triple.isOSDarwin() && triple.getArch() == llvm::Triple::arm64) {
+    args.push_back("-target-cpu");
+    args.push_back("cyclone");
+    args.push_back("-target-feature");
+    args.push_back("+neon");
+  }
+}
+
 Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
                          std::unique_ptr<CommandOutput> Output,
                          const ActionList &InputActions, const ArgList &Args,
@@ -264,6 +275,14 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
   // Pass the optimization level down to the frontend.
   Args.AddLastArg(Arguments, options::OPT_O_Group);
 
+  // Handle the CPU and its preferences.
+  if (auto arg = Args.getLastArg(options::OPT_target_cpu)) {
+    arg->render(Args, Arguments);
+  } else {
+    configureDefaultCPU(getToolChain().getTriple(), Arguments);
+  }
+  Args.AddAllArgs(Arguments, options::OPT_target_feature);
+
   if (Args.hasArg(options::OPT_parse_as_library) ||
       Args.hasArg(options::OPT_emit_library))
     Arguments.push_back("-parse-as-library");
@@ -370,6 +389,8 @@ llvm::Triple::ArchType darwin::getArchTypeForDarwinArchName(StringRef Arch) {
            llvm::Triple::x86)
 
     .Case("x86_64", llvm::Triple::x86_64)
+
+    .Case("arm64", llvm::Triple::arm64)
 
     .Cases("arm", "armv4t", "armv5", "armv6", "armv6m", llvm::Triple::arm)
     .Cases("armv7", "armv7em", "armv7f", "armv7k", "armv7m", llvm::Triple::arm)

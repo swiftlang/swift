@@ -273,6 +273,14 @@ def target : Joined<["--"], "target=">, Flags<[DriverOption, FrontendOption]>,
 def target_legacy_spelling : Separate<["-"], "target">,
   Flags<[DriverOption, FrontendOption]>, Alias<target>;
 
+def target_cpu : Separate<["-"], "target-cpu">,
+  Flags<[DriverOption, FrontendOption]>,
+  HelpText<"Generate code for a particular CPU variant">;
+def target_feature : Separate<["-"], "target-feature">,
+  Flags<[DriverOption, FrontendOption]>,
+  HelpText<"Generate code with a particular CPU feature enabled or disabled">,
+  MetaVarName<"[+-]<feature-name>">;
+
 def working_directory : Separate<["-"], "working-directory">,
   Flags<[FrontendOption]>,
   HelpText<"Resolve file paths relative to the specified directory">;

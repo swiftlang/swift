@@ -69,6 +69,9 @@ ERROR(error_unable_to_make_temporary_file,driver,none,
 ERROR(error_no_input_files,driver,none,
       "no input files", ())
 
+ERROR(error_invalid_arch,driver,none,
+      "invalid target architecture '%0'", (StringRef))
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG

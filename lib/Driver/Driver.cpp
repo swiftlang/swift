@@ -1095,39 +1095,45 @@ std::string Driver::getProgramPath(StringRef Name, const ToolChain &TC) const {
   return Name;
 }
 
-static llvm::Triple computeTargetTriple(StringRef DefaultTargetTriple,
+static void setTargetFromArch(DiagnosticEngine &diags, llvm::Triple &target,
+                              StringRef archName) {
+  llvm::Triple::ArchType archValue
+    = tools::darwin::getArchTypeForDarwinArchName(archName);
+  if (archValue != llvm::Triple::UnknownArch) {
+    target.setArch(archValue);
+  } else {
+    diags.diagnose(SourceLoc(), diag::error_invalid_arch, archName);
+  }
+}
+
+static llvm::Triple computeTargetTriple(DiagnosticEngine &diags,
+                                        StringRef DefaultTargetTriple,
                                         const ArgList &Args,
                                         StringRef DarwinArchName) {
   // FIXME: need to check -target for overrides
 
-  llvm::Triple Target(llvm::Triple::normalize(DefaultTargetTriple));
+  llvm::Triple target(llvm::Triple::normalize(DefaultTargetTriple));
 
   // Handle Darwin-specific options available here.
-  if (Target.isOSDarwin()) {
+  if (target.isOSDarwin()) {
     // If an explict Darwin arch name is given, that trumps all.
     if (!DarwinArchName.empty()) {
-      Target.setArch(
-        tools::darwin::getArchTypeForDarwinArchName(DarwinArchName));
-      return Target;
-    }
+      setTargetFromArch(diags, target, DarwinArchName);
     
     // Handle the Darwin '-arch' flag.
-    if (Arg *A = Args.getLastArg(options::OPT_arch)) {
-      llvm::Triple::ArchType DarwinArch
-        = tools::darwin::getArchTypeForDarwinArchName(A->getValue());
-      if (DarwinArch != llvm::Triple::UnknownArch)
-        Target.setArch(DarwinArch);
+    } else if (Arg *A = Args.getLastArg(options::OPT_arch)) {
+      setTargetFromArch(diags, target, A->getValue());
     }
   }
 
   // TODO: handle other target/pseudo-target flags as necessary.
 
-  return Target;
+  return target;
 }
 
 const ToolChain &Driver::getToolChain(const ArgList &Args,
                                       StringRef DarwinArchName) const {
-  llvm::Triple Target = computeTargetTriple(DefaultTargetTriple, Args,
+  llvm::Triple Target = computeTargetTriple(Diags, DefaultTargetTriple, Args,
                                             DarwinArchName);
 
   ToolChain *&TC = ToolChains[Target.str()];

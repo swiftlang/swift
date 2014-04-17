@@ -29,6 +29,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/Linker/Linker.h"
+#include "llvm/MC/SubtargetFeature.h"
 #include "llvm/PassManager.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -90,17 +91,24 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
 
   // Set up TargetOptions.
   // Things that maybe we should collect from the command line:
-  //   - CPU
-  //   - features
   //   - relocation model
   //   - code model
   TargetOptions TargetOpts;
   TargetOpts.NoFramePointerElim = Opts.DisableFPElim;
-  
+
+  // Create the target features string.
+  std::string targetFeatures;
+  if (!Opts.TargetFeatures.empty()) {
+    llvm::SubtargetFeatures features;
+    for (std::string &feature : Opts.TargetFeatures)
+      features.AddFeature(feature);
+    targetFeatures = features.getString();
+  }
+
   // Create a target machine.
   llvm::TargetMachine *TargetMachine
-    = Target->createTargetMachine(Opts.Triple, /*cpu*/ "generic",
-                                  /*features*/ "",
+    = Target->createTargetMachine(Opts.Triple, Opts.TargetCPU,
+                                  std::move(targetFeatures),
                                   TargetOpts, Reloc::PIC_,
                                   CodeModel::Default, OptLevel);
   if (!TargetMachine) {
