@@ -49,7 +49,8 @@ private:
     enum class TargetKinds {
       None = 0,
       Break,
-      Return
+      Return,
+      Fallthrough
     };
     TargetKinds TargetKind = TargetKinds::None;
 
@@ -132,6 +133,10 @@ public:
         TargetKindSetter TKS(BracePairs, BracePair::TargetKinds::Break);
         return transformForEachStmt(llvm::cast<ForEachStmt>(S));
       }
+    case StmtKind::Switch: {
+        TargetKindSetter TKS(BracePairs, BracePair::TargetKinds::Fallthrough);
+        return transformSwitchStmt(llvm::cast<SwitchStmt>(S));
+      }
     }
   }
     
@@ -197,6 +202,21 @@ public:
     }
       
     return FES;
+  }
+
+  SwitchStmt *transformSwitchStmt(SwitchStmt *SS) {
+    for (CaseStmt *CS : SS->getCases()) {
+      if (Stmt *S = CS->getBody()) {
+        if (BraceStmt *B = llvm::dyn_cast<BraceStmt>(S)) {
+          BraceStmt *NB = transformBraceStmt(B);
+          if (NB != B) {
+            CS->setBody(NB);
+          }
+        }
+      }
+    }
+      
+    return SS;
   }
 
   std::pair<DeclRefExpr *, VarDecl *> digForVariable(Expr *E) {
@@ -337,6 +357,9 @@ public:
           if (llvm::isa<BreakStmt>(S) ||
               llvm::isa<ContinueStmt>(S)) {
             EI = escapeToTarget(BracePair::TargetKinds::Break, Elements, EI);
+          } else if (llvm::isa<FallthroughStmt>(S)) {
+            EI = escapeToTarget(BracePair::TargetKinds::Fallthrough, Elements,
+                                EI);
           }
           Stmt *NS = transformStmt(S);
           if (NS != S) {
