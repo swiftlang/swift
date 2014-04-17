@@ -1471,14 +1471,8 @@ Restart:
       goto Restart;
     }
 
-    // Otherwise, this is the real end of the buffer.
-    if (BufferStart != BufferEnd && CurPtr[-2] != '\n' && CurPtr[-2] != '\r') {
-      // While we are not C, we should not ignore the strong Unix command-line
-      // tool conventions that motivate this warning.
-      diagnose(CurPtr-1, diag::lex_missing_newline_eof)
-        .fixItInsert(getSourceLoc(CurPtr-1), "\n");
-    }
-    // Put CurPtr back into buffer bounds.
+    // Otherwise, this is the real end of the buffer.  Put CurPtr back into
+    // buffer bounds.
     CurPtr--;
     // Return EOF.
     return formToken(tok::eof, TokStart);
