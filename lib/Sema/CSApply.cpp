@@ -337,6 +337,17 @@ namespace {
     Expr *coerceExistential(Expr *expr, Type toType,
                             ConstraintLocatorBuilder locator);
 
+    /// \brief Coerce the given value to an existential metatype type.
+    ///
+    /// \param expr The expression to be coerced.
+    /// \param toType The tupe to which the expression will be coerced.
+    /// \param locator Locator describing where this conversion occurs.
+    ///
+    /// \return The coerced expression, whose type will be equivalent to
+    /// \c toType.
+    Expr *coerceExistentialMetatype(Expr *expr, Type toType,
+                                    ConstraintLocatorBuilder locator);
+
     /// \brief Coerce the expression to another type via a user-defined
     /// conversion.
     ///
@@ -2999,27 +3010,45 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
                                             injectionFn);
 }
 
-Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
-                                      ConstraintLocatorBuilder locator) {
-  auto &tc = solution.getConstraintSystem().getTypeChecker();
-  Type fromType = expr->getType();
-
-  // Compute the conformances for each of the protocols in the existential
-  // type.
+/// Collect the conformances for all the protocols of an existential type.
+static ArrayRef<ProtocolConformance*>
+collectExistentialConformances(TypeChecker &tc, Type fromType, Type toType,
+                               DeclContext *DC) {
   SmallVector<ProtocolDecl *, 4> protocols;
   toType->getAnyExistentialTypeProtocols(protocols);
+
   SmallVector<ProtocolConformance *, 4> conformances;
   for (auto proto : protocols) {
     ProtocolConformance *conformance = nullptr;
-    bool conforms = tc.conformsToProtocol(fromType, proto, cs.DC, &conformance);
+    bool conforms = tc.conformsToProtocol(fromType, proto, DC, &conformance);
     assert(conforms && "Type does not conform to protocol?");
     (void)conforms;
     conformances.push_back(conformance);
   }
 
-  // If we have all of the conformances we need, create an erasure expression.
-  return new (tc.Context) ErasureExpr(expr, toType,
-                                      tc.Context.AllocateCopy(conformances));
+  return tc.Context.AllocateCopy(conformances);
+}
+
+Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
+                                      ConstraintLocatorBuilder locator) {
+  auto &tc = solution.getConstraintSystem().getTypeChecker();
+  Type fromType = expr->getType();
+  auto conformances =
+    collectExistentialConformances(tc, fromType, toType, cs.DC);
+  return new (tc.Context) ErasureExpr(expr, toType, conformances);
+}
+
+Expr *ExprRewriter::coerceExistentialMetatype(Expr *expr, Type toType,
+                                              ConstraintLocatorBuilder locator) {
+  auto &tc = solution.getConstraintSystem().getTypeChecker();
+  Type fromType = expr->getType();
+  Type fromInstanceType = fromType->castTo<AnyMetatypeType>()->getInstanceType();
+  Type toInstanceType =
+    toType->castTo<ExistentialMetatypeType>()->getInstanceType();
+
+  auto conformances =
+    collectExistentialConformances(tc, fromInstanceType, toInstanceType, cs.DC);
+  return new (tc.Context) MetatypeErasureExpr(expr, toType, conformances);
 }
 
 Expr *ExprRewriter::coerceViaUserConversion(Expr *expr, Type toType,
@@ -3410,6 +3439,11 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     return coerceExistential(expr, toType, locator);
   }
 
+  // Coercions to an existential metatype.
+  if (toType->is<ExistentialMetatypeType>()) {
+    return coerceExistentialMetatype(expr, toType, locator);
+  }
+
   // Coercion to Optional<T>.
   if (auto toGenericType = toType->getAs<BoundGenericType>()) {
     if (toGenericType->getDecl()->classifyAsOptionalType()) {
@@ -3432,10 +3466,9 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   }
 
   // Coercion from one metatype to another.
-  if (fromType->is<AnyMetatypeType>()) {
-    if (auto toMeta = toType->getAs<AnyMetatypeType>()) {
-      return new (tc.Context) MetatypeConversionExpr(expr, toMeta);
-    }
+  if (fromType->is<MetatypeType>()) {
+    auto toMeta = toType->castTo<MetatypeType>();
+    return new (tc.Context) MetatypeConversionExpr(expr, toMeta);
   }
 
   llvm_unreachable("Unhandled coercion");

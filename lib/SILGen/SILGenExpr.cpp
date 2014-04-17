@@ -184,6 +184,7 @@ namespace {
              CovariantReturnConversionExpr *E,
              SGFContext C);
     RValue visitErasureExpr(ErasureExpr *E, SGFContext C);
+    RValue visitMetatypeErasureExpr(MetatypeErasureExpr *E, SGFContext C);
     RValue visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *E,
                                            SGFContext C);
     RValue visitIsaExpr(IsaExpr *E, SGFContext C);
@@ -1335,6 +1336,31 @@ RValue RValueEmitter::visitErasureExpr(ErasureExpr *E, SGFContext C) {
   if (E->getType()->isClassExistentialType())
     return emitClassBoundErasure(SGF, E);
   return emitAddressOnlyErasure(SGF, E, C);
+}
+
+RValue RValueEmitter::visitMetatypeErasureExpr(MetatypeErasureExpr *E,
+                                               SGFContext C) {
+  SILValue metatype =
+    SGF.emitRValueAsSingleValue(E->getSubExpr()).getUnmanagedValue();
+
+  // Thicken the metatype if necessary.
+  if (auto metatypeTy = metatype.getType().getAs<MetatypeType>()) {
+    if (metatypeTy->getRepresentation() == MetatypeRepresentation::Thin) {
+      auto thickMetatypeTy = CanMetatypeType::get(metatypeTy.getInstanceType(),
+                                                  MetatypeRepresentation::Thick);
+      metatype = SGF.B.createMetatype(E,
+                             SILType::getPrimitiveObjectType(thickMetatypeTy));
+    }
+  }
+
+  assert(metatype.getType().castTo<AnyMetatypeType>()->getRepresentation()
+           == MetatypeRepresentation::Thick);
+
+  // FIXME: use some sort of init_existential_metatype instruction
+
+  auto loweredResultTy = SGF.getLoweredLoadableType(E->getType());
+  auto upcast = SGF.B.createUpcast(E, metatype, loweredResultTy);
+  return RValue(SGF, E, ManagedValue::forUnmanaged(upcast));
 }
 
 namespace {

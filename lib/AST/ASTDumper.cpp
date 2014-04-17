@@ -1310,6 +1310,11 @@ public:
     printRec(E->getSubExpr());
     OS << ')';
   }
+  void visitMetatypeErasureExpr(MetatypeErasureExpr *E) {
+    printCommon(E, "metatype_erasure_expr") << '\n';
+    printRec(E->getSubExpr());
+    OS << ')';
+  }
   void visitLoadExpr(LoadExpr *E) {
     printCommon(E, "load_expr") << '\n';
     printRec(E->getSubExpr());

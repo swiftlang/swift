@@ -214,6 +214,7 @@ static void diagModuleOrMetatypeValue(TypeChecker &TC, const Expr *E) {
           case ExprKind::CovariantReturnConversion:
           case ExprKind::MetatypeConversion:
           case ExprKind::Erasure:
+          case ExprKind::MetatypeErasure:
           case ExprKind::DerivedToBase:
           case ExprKind::ArchetypeToSuper:
           case ExprKind::ScalarToTuple:
