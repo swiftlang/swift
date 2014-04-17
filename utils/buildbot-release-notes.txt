@@ -1,3 +1,33 @@
+2014-04-23
+----------
+
+* The "selector-style" function and initializer declaration syntax is
+  being phased out. For example, this:
+
+    init withRed(red: CGFloat) green(CGFloat) blue(CGFloat) alpha(CGFloat)
+
+  will now be written as:
+
+    init(withRed red: CGFloat, green: CGFloat, blue: CGFloat, alpha: CGFloat)
+
+  For each parameter, one can have both an argument API name (i.e.,
+  "withRed", which comes first and is used at the call site) and an
+  internal parameter name that follows it (i.e. "red", which comes
+  second and is used in the implementation). When the two names are
+  the same, one can simply write the name once and it will be used for
+  both roles (as with "green", "blue", and "alpha" above). The
+  underscore ("_") can be used to mean "no name", as when the
+  following function/method:
+
+    func murderInRoom(room:String) withWeapon(weapon: String)
+
+  is translated to:
+
+    func murderInRoom(_ room: String, withWeapon weapon: String)
+
+  The compiler now complains when it sees the selector-style syntax
+  and will provide Fix-Its to rewrite to the newer syntax.
+
 2014-04-16
 ----------
 
