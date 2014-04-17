@@ -267,7 +267,6 @@ public:
   SILInstruction *visitAllocStackInst(AllocStackInst *AS);
   SILInstruction *visitSwitchEnumAddrInst(SwitchEnumAddrInst *SEAI);
   SILInstruction *visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI);
-  SILInstruction *visitInitEnumDataAddrInst(InitEnumDataAddrInst *IEDAI);
 
 private:
   /// Perform one SILCombine iteration.
@@ -834,64 +833,64 @@ SILCombiner::visitRefToRawPointerInst(RefToRawPointerInst *RRPI) {
   return nullptr;
 }
 
-SILInstruction *
-SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
-  // Given an inject_enum_addr of a concrete type without payload, promote it to
-  // a store of an enum. Mem2reg/load forwarding will clean things up for us. We
-  // can't handle the payload case here due to the flow problems caused by the
-  // dependency in between the enum and its data.
 
-  assert(IEAI->getOperand().getType().isAddress() && "Must be an address");
-  if (IEAI->getOperand().getType().isAddressOnly(IEAI->getModule()))
-    return nullptr;
-
-  // If the enum does have a payload, we peephole from the init_enum_data_addr.
-  if (IEAI->getElement()->hasArgumentType())
-    return nullptr;
-
-  EnumInst *E =
-    Builder->createEnum(IEAI->getLoc(), SILValue(), IEAI->getElement(),
-                        IEAI->getOperand().getType().getObjectType());
-  Builder->createStore(IEAI->getLoc(), E, IEAI->getOperand());
-  return eraseInstFromFunction(*IEAI);
-}
-
-/// Simplify this common frontend pattern:
+/// Simplify the following two frontend patterns:
 ///
 ///   %payload_addr = init_enum_data_addr %payload_allocation
 ///   store %payload to %payload_addr
 ///   inject_enum_addr %payload_allocation, $EnumType.case
+///
+///   inject_enum_add %nopayload_allocation, $EnumType.case
 ///
 /// for a concrete enum type $EnumType.case to:
 ///
 ///   %1 = enum $EnumType, $EnumType.case, %payload
 ///   store %1 to %payload_addr
 ///
+///   %1 = enum $EnumType, $EnumType.case
+///   store %1 to %nopayload_addr
+///
 /// We leave the cleaning up to mem2reg.
 SILInstruction *
-SILCombiner::visitInitEnumDataAddrInst(InitEnumDataAddrInst *IEDAI) {
-  // If we have an address only type, we can't do anything... bail...
-  assert(IEDAI->getOperand().getType().isAddress() && "Must be an address");
-  if (IEDAI->getOperand().getType().isAddressOnly(IEDAI->getModule()))
+SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
+  // Given an inject_enum_addr of a concrete type without payload, promote it to
+  // a store of an enum. Mem2reg/load forwarding will clean things up for us. We
+  // can't handle the payload case here due to the flow problems caused by the
+  // dependency in between the enum and its data.
+  assert(IEAI->getOperand().getType().isAddress() && "Must be an address");
+  if (IEAI->getOperand().getType().isAddressOnly(IEAI->getModule()))
     return nullptr;
 
-  SILBasicBlock::iterator II = IEDAI;
-  ++II;
+  // If the enum does not have a payload create the enum/store since we don't
+  // need to worry about payloads.
+  if (!IEAI->getElement()->hasArgumentType()) {
+    EnumInst *E =
+      Builder->createEnum(IEAI->getLoc(), SILValue(), IEAI->getElement(),
+                          IEAI->getOperand().getType().getObjectType());
+    Builder->createStore(IEAI->getLoc(), E, IEAI->getOperand());
+    return eraseInstFromFunction(*IEAI);
+  }
 
-  // Look at the next instruction for a store of a payload into the data
-  // projection.
+  // Ok, we have a payload enum, make sure that we have a store previous to
+  // us...
+  SILBasicBlock::iterator II = IEAI;
+  if (II == IEAI->getParent()->begin())
+    return nullptr;
+  --II;
   auto *SI = dyn_cast<StoreInst>(&*II);
-  if (!SI || SI->getDest().getDef() != IEDAI)
+  if (!SI)
     return nullptr;
 
-  // Then check the next instruction for a tag injection of the same case into
-  // our payload allocation.
-  ++II;
-  auto *IEAI = dyn_cast<InjectEnumAddrInst>(&*II);
-  if (!IEAI || IEAI->getOperand() != IEDAI->getOperand() ||
-      IEAI->getElement() != IEDAI->getElement())
+  // ... whose destination is taken from an init_enum_data_addr whose only user
+  // is the store that points to the same allocation as our inject_enum_addr. We
+  // enforce such a strong condition as being directly previously since we want
+  // to avoid any flow issues.
+  auto *IEDAI = dyn_cast<InitEnumDataAddrInst>(SI->getDest().getDef());
+  if (!IEDAI || IEDAI->getOperand() != IEAI->getOperand() ||
+      !IEDAI->hasOneUse())
     return nullptr;
 
+  // In that case, create the payload enum/store.
   EnumInst *E =
       Builder->createEnum(IEDAI->getLoc(), SI->getSrc(), IEDAI->getElement(),
                           IEDAI->getOperand().getType().getObjectType());
@@ -899,8 +898,8 @@ SILCombiner::visitInitEnumDataAddrInst(InitEnumDataAddrInst *IEDAI) {
 
   // Cleanup.
   eraseInstFromFunction(*SI);
-  eraseInstFromFunction(*IEAI);
-  return eraseInstFromFunction(*IEDAI);
+  eraseInstFromFunction(*IEDAI);
+  return eraseInstFromFunction(*IEAI);
 }
 
 SILInstruction *SILCombiner::visitUpcastInst(UpcastInst *UCI) {
