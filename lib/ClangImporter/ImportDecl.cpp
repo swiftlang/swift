@@ -2272,8 +2272,7 @@ namespace {
         indices = indices->clone(context);
         auto pat = TuplePattern::create(context, loc, TuplePatternElt(indices),
                                         loc);
-        pat->setType(TupleType::get(TupleTypeElt(indices->getType(),
-                                                 indices->getBoundName()),
+        pat->setType(TupleType::get(TupleTypeElt(indices->getType()),
                                     context));
         getterArgs.push_back(pat);
       } else {
@@ -2351,16 +2350,14 @@ namespace {
       
       auto valuePattern = tuple->getFields()[0].getPattern()->clone(context);
       ValueElts.push_back(TuplePatternElt(valuePattern));
-      ValueEltTys.push_back(TupleTypeElt(valuePattern->getType(),
-                                         valuePattern->getBoundName()));
+      ValueEltTys.push_back(TupleTypeElt(valuePattern->getType()));
       
       // index, for subscript operations.
       if (indices) {
         // Clone the indices for the thunk.
         indices = indices->clone(context);
         ValueElts.push_back(TuplePatternElt(indices));
-        ValueEltTys.push_back(TupleTypeElt(indices->getType(),
-                                           indices->getBoundName()));
+        ValueEltTys.push_back(TupleTypeElt(indices->getType()));
       }
       
       // value
@@ -2523,7 +2520,7 @@ namespace {
 
       // Find the getter indices and make sure they match.
       {
-        auto tuple = dyn_cast<TuplePattern>(getter->getArgParamPatterns()[1]);
+        auto tuple = dyn_cast<TuplePattern>(getter->getBodyParamPatterns()[1]);
         if (tuple && tuple->getFields().size() != 1)
           return nullptr;
 
@@ -2571,7 +2568,7 @@ namespace {
 
       // Build the subscript declaration.
       auto argPatterns =
-          getterThunk->getArgParamPatterns()[1]->clone(context);
+          getterThunk->getBodyParamPatterns()[1]->clone(context);
       auto name = context.Id_subscript;
       auto subscript
         = new (context) SubscriptDecl(name, decl->getLoc(), argPatterns,

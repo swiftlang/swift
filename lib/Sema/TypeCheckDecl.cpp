@@ -3150,7 +3150,7 @@ public:
         checkGenericParamList(builder, gp, TC, FD->getDeclContext());
 
         // Infer requirements from parameter patterns.
-        for (auto pattern : FD->getArgParamPatterns()) {
+        for (auto pattern : FD->getBodyParamPatterns()) {
           builder.inferRequirements(pattern);
         }
 
@@ -3964,7 +3964,7 @@ public:
         }
 
         // Infer requirements from the parameters of the constructor.
-        builder.inferRequirements(CD->getArgParamPatterns()[1]);
+        builder.inferRequirements(CD->getBodyParamPatterns()[1]);
 
         // Revert the constructor signature so it can be type-checked with
         // archetypes below.
@@ -5236,7 +5236,7 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
         // We have a function. Make sure that the number of parameters
         // matches the "number of colons" in the name.
         auto func = cast<AbstractFunctionDecl>(D);
-        auto argPattern = func->getArgParamPatterns()[1];
+        auto argPattern = func->getBodyParamPatterns()[1];
         unsigned numParameters;
         if (auto tuple = dyn_cast<TuplePattern>(argPattern))
           numParameters = tuple->getNumFields() - tuple->hasVararg();
