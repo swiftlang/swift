@@ -198,6 +198,9 @@ void CommentToXMLConverter::visitFullComment(const FullComment *FC) {
   if (isa<AbstractFunctionDecl>(D)) {
     OS << "<Function";
     RootEndTag = "</Function>";
+  } else if (isa<StructDecl>(D) || isa<ClassDecl>(D) || isa<ProtocolDecl>(D)) {
+    OS << "<Class";
+    RootEndTag = "</Class>";
   } else {
     OS << "<Other";
     RootEndTag = "</Other>";
