@@ -1872,7 +1872,7 @@ namespace {
         result->setImplicit();
 
       // If this method overrides another method, mark it as such.
-      recordObjCMethodOverride(result, decl);
+      recordObjCOverride(result);
 
       // Handle attributes.
       if (decl->hasAttr<clang::IBActionAttr>())
@@ -1953,15 +1953,10 @@ namespace {
     }
 
   private:
-    /// Record the function override by the given Swift method (along with
-    /// it's Objective-C counterpart).
-    void recordObjCMethodOverride(AbstractFunctionDecl *swiftMethod,
-                                  const clang::ObjCMethodDecl *objcMethod) {
-      // FIXME: Rework this using Swift lookup and semantics, to
-      // properly cope with mirrored members.
-
-      // If this function overrides another function, mark it as such.
-      auto classTy = swiftMethod->getExtensionType()->getAs<ClassType>();
+    /// Record the function or initializer overridden by the given Swift method.
+    void recordObjCOverride(AbstractFunctionDecl *decl) {
+      // Figure out the class in which this method occurs.
+      auto classTy = decl->getExtensionType()->getAs<ClassType>();
       if (!classTy)
         return;
 
@@ -1971,44 +1966,27 @@ namespace {
 
       // Dig out the Objective-C superclass.
       auto superDecl = superTy->getAnyNominal();
-      auto superObjCClass = dyn_cast_or_null<clang::ObjCInterfaceDecl>(
-                              superDecl->getClangDecl());
-      if (!superObjCClass)
-        return;
+      SmallVector<ValueDecl *, 4> results;
+      superDecl->lookupQualified(superTy, decl->getFullName(),
+                                 NL_QualifiedDefault, Impl.getTypeResolver(),
+                                 results);
 
-      // Look for an overridden method.
-      auto superObjCMethod = superObjCClass->lookupMethod(
-                               objcMethod->getSelector(),
-                               objcMethod->isInstanceMethod());
-      if (!superObjCMethod)
-        return;
+      for (auto member : results) {
+        if (member->getKind() != decl->getKind() ||
+            member->isInstanceMember() != decl->isInstanceMember())
+          continue;
 
-      // We found a method that we've overridden. Import it.
-      AbstractFunctionDecl *superMethod = nullptr;
-      if (isa<clang::ObjCProtocolDecl>(superObjCMethod->getDeclContext())) {
-        superMethod = cast_or_null<AbstractFunctionDecl>(
-                        Impl.importMirroredDecl(superObjCMethod, superDecl));
-      } else {
-        superMethod = cast_or_null<AbstractFunctionDecl>(
-                        Impl.importDecl(superObjCMethod));
+        // Set function override.
+        // FIXME: Proper type checking here!
+        if (auto func = dyn_cast<FuncDecl>(decl)) {
+          func->setOverriddenDecl(cast<FuncDecl>(member));
+          return;
+        }
+
+        // Set constructor override.
+        auto ctor = cast<ConstructorDecl>(decl);
+        ctor->setOverriddenDecl(cast<ConstructorDecl>(member));
       }
-      if (!superMethod)
-        return;
-
-      assert(swiftMethod->getDeclContext() != superMethod->getDeclContext() &&
-             "can not override method in the same DeclContext");
-
-      // Set function override.
-      // FIXME: Proper type checking here!
-      if (auto swiftFunc = dyn_cast<FuncDecl>(swiftMethod)) {
-        swiftFunc->setOverriddenDecl(cast<FuncDecl>(superMethod));
-        return;
-      }
-
-      // Set constructor override.
-      auto swiftCtor = cast<ConstructorDecl>(swiftMethod);
-      auto superCtor = cast<ConstructorDecl>(superMethod);
-      swiftCtor->setOverriddenDecl(superCtor);
     }
 
     /// Describes the kind of initializer to import.
@@ -2158,7 +2136,7 @@ namespace {
       Impl.Constructors[{objcMethod, dc}] = result;
 
       // If this constructor overrides another constructor, mark it as such.
-      recordObjCMethodOverride(result, objcMethod);
+      recordObjCOverride(result);
 
       // Inform the context that we have external definitions.
       Impl.registerExternalDecl(result);
@@ -3322,6 +3300,7 @@ namespace {
           result->setCircularityCheck(CircularityCheck::Checked);
           result->setSuperclass(nsObjectTy);
           result->setCheckedInheritanceClause();
+          result->setAddedImplicitInitializers();
           addObjCAttribute(result, ObjCSelector(Impl.SwiftContext, 0, name));
           Impl.registerExternalDecl(result);
           return result;
@@ -3372,6 +3351,7 @@ namespace {
       Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
       result->setClangNode(decl);
       result->setCircularityCheck(CircularityCheck::Checked);
+      result->setAddedImplicitInitializers();
       addObjCAttribute(result, ObjCSelector(Impl.SwiftContext, 0, name));
 
       // If this Objective-C class has a supertype, import it.
