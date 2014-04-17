@@ -3721,6 +3721,15 @@ static void importAttributes(ASTContext &C, const clang::NamedDecl *ClangDecl,
       return;
     }
   }
+
+  // Ban NSInvocation.
+  if (auto ID = dyn_cast<clang::ObjCInterfaceDecl>(ClangDecl)) {
+    if (ID->getName() == "NSInvocation") {
+      auto attr = AvailabilityAttr::createImplicitUnavailableAttr(C, "");
+      MappedDecl->getMutableAttrs().add(attr);
+      return;
+    }
+  }
 }
 
 Decl *

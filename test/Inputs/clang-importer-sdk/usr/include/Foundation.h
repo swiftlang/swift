@@ -230,3 +230,7 @@ typedef struct _NSRange {
 @interface NSAttributedString : NSString
 - (NSAttributedString *)sliceAttributedString:(NSInteger)startIndex;
 @end
+
+@interface NSInvocation : NSObject
+@end
+
