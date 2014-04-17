@@ -561,12 +561,7 @@ namespace {
     }
 
     void printAbstractFunctionDecl(AbstractFunctionDecl *D) {
-      if (D->hasSelectorStyleSignature()) {
-        printPatterns("arg_params", D->getArgParamPatterns());
-        printPatterns("body_params", D->getBodyParamPatterns());
-      } else {
-        printPatterns(StringRef(), D->getBodyParamPatterns());
-      }
+      printPatterns("body_params", D->getBodyParamPatterns());
       if (auto FD = dyn_cast<FuncDecl>(D)) {
         if (FD->getBodyResultTypeLoc().getTypeRepr()) {
           OS << '\n';

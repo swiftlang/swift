@@ -436,7 +436,7 @@ static FuncDecl *makeOptionSetFactoryMethod(StructDecl *optionSetDecl,
   switch (factoryMethod) {
   case OptionSetFactoryMethod::FromMask:
     baseName = C.Id_fromMask;
-    argName = C.Id_value;
+    argName = C.Id_raw;
     break;
   case OptionSetFactoryMethod::FromRaw:
     baseName = C.Id_fromRaw;

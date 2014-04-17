@@ -237,9 +237,10 @@ private:
   /// \returns true if anything was printed.
   bool printBraceStmtElements(BraceStmt *stmt, bool NeedIndent = true);
 
-  void printOneParameter(const Pattern *ArgPattern,
+  void printOneParameter(Identifier ArgName,
                          const Pattern *BodyPattern,
-                         bool StripOuterSliceType);
+                         bool StripOuterSliceType,
+                         bool Curried);
 
   /// \brief Print the function parameters in curried or selector style,
   /// to match the original function declaration.
@@ -859,13 +860,14 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
   printAccessors(decl);
 }
 
-void PrintAST::printOneParameter(const Pattern *ArgPattern,
+void PrintAST::printOneParameter(Identifier ArgName,
                                  const Pattern *BodyPattern,
-                                 bool StripOuterSliceType) {
-  if (auto *VP = dyn_cast<VarPattern>(ArgPattern))
-    ArgPattern = VP->getSubPattern();
-  auto *TypedArgPattern = cast<TypedPattern>(ArgPattern);
-  auto TheTypeLoc = TypedArgPattern->getTypeLoc();
+                                 bool StripOuterSliceType,
+                                 bool Curried) {
+  if (auto *VP = dyn_cast<VarPattern>(BodyPattern))
+    BodyPattern = VP->getSubPattern();
+  auto *TypedBodyPattern = cast<TypedPattern>(BodyPattern);
+  auto TheTypeLoc = TypedBodyPattern->getTypeLoc();
   if (TheTypeLoc.hasLocation()) {
     // If the outer typeloc is an InOutTypeRepr, print the 'inout' before the
     // subpattern.
@@ -889,21 +891,22 @@ void PrintAST::printOneParameter(const Pattern *ArgPattern,
   }
 
   // Print argument name.
-  auto ArgName = ArgPattern->getBoundName();
   auto BodyName = BodyPattern->getBoundName();
   if (!ArgName.empty() || Options.PrintParameterNames) {
-    printName(ArgName);
+    if (!Curried)
+      printName(ArgName);
 
     // If the parameter name is different, print it.
-    if (BodyName != ArgName && Options.PrintParameterNames) {
-      Printer << " ";
+    if ((Curried || BodyName != ArgName) && Options.PrintParameterNames) {
+      if (!Curried)
+        Printer << " ";
       printName(BodyName);
     }
 
     Printer << ": ";
   }
   if (StripOuterSliceType && !TheTypeLoc.hasLocation()) {
-    if (auto *BGT = TypedArgPattern->getType()->getAs<BoundGenericType>()) {
+    if (auto *BGT = TypedBodyPattern->getType()->getAs<BoundGenericType>()) {
       BGT->getGenericArgs()[0].print(Printer, Options);
       return;
     }
@@ -912,43 +915,48 @@ void PrintAST::printOneParameter(const Pattern *ArgPattern,
 }
 
 void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
-  ArrayRef<Pattern *> ArgPatterns = AFD->getArgParamPatterns();
+  ArrayRef<Identifier> ArgNames;
+  DeclName Name = AFD->getFullName();
+  if (Name) {
+    ArgNames = Name.getArgumentNames();
+  }
+
   ArrayRef<Pattern *> BodyPatterns = AFD->getBodyParamPatterns();
 
   // Skip over the implicit 'self'.
   if (AFD->getImplicitSelfDecl()) {
-    ArgPatterns = ArgPatterns.slice(1);
     BodyPatterns = BodyPatterns.slice(1);
   }
 
-  for (unsigned CurrPattern = 0, NumPatterns = ArgPatterns.size();
+  for (unsigned CurrPattern = 0, NumPatterns = BodyPatterns.size();
        CurrPattern != NumPatterns; ++CurrPattern) {
-    auto *ArgTuple = dyn_cast<TuplePattern>(ArgPatterns[CurrPattern]);
-    auto *BodyTuple = dyn_cast<TuplePattern>(BodyPatterns[CurrPattern]);
-    if (ArgTuple) {
+    bool UseArgName = Name && (CurrPattern == 0);
+    if (auto *BodyTuple = dyn_cast<TuplePattern>(BodyPatterns[CurrPattern])) {
       Printer << "(";
-      for (unsigned i = 0, e = ArgTuple->getFields().size(); i != e; ++i) {
+      for (unsigned i = 0, e = BodyTuple->getFields().size(); i != e; ++i) {
         if (i > 0)
           Printer << ", ";
-        printOneParameter(ArgTuple->getFields()[i].getPattern(),
+        printOneParameter(UseArgName ? ArgNames[i] : Identifier(),
                           BodyTuple->getFields()[i].getPattern(),
                           /*StripOuterSliceType=*/i == e - 1 &&
-                              ArgTuple->hasVararg());
+                            BodyTuple->hasVararg(),
+                          /*Curried=*/CurrPattern > 0);
         if (Options.PrintDefaultParameterPlaceholder &&
-            ArgTuple->getFields()[i].getDefaultArgKind() !=
+            BodyTuple->getFields()[i].getDefaultArgKind() !=
                 DefaultArgumentKind::None)
           Printer << " = default";
       }
-      if (ArgTuple->hasVararg())
+      if (BodyTuple->hasVararg())
         Printer << "...";
       Printer << ")";
       continue;
     }
-    auto *ArgParen = cast<ParenPattern>(ArgPatterns[CurrPattern]);
     auto *BodyParen = cast<ParenPattern>(BodyPatterns[CurrPattern]);
     Printer << "(";
-    printOneParameter(ArgParen->getSubPattern(), BodyParen->getSubPattern(),
-                      /*StripOuterSliceType=*/false);
+    printOneParameter(UseArgName? ArgNames[0] : Identifier(), 
+                      BodyParen->getSubPattern(),
+                      /*StripOuterSliceType=*/false,
+                      /*Curried=*/CurrPattern > 0);
     Printer << ")";
   }
 }
