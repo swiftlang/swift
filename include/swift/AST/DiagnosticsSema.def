@@ -175,7 +175,7 @@ ERROR(does_not_have_member,sema_tcc,none,
   "%0 does not have a member named %1",
   (Type, DeclName))
 ERROR(does_not_have_non_mutating_member,sema_tcc,none,
-"%0 does not have a non mutating member named %1",
+"immutable value of type %0 only has mutating members named %1",
 (Type, DeclName))
 ERROR(isa_is_always_true,sema_tcc,none,
       "'is' test is always true",
