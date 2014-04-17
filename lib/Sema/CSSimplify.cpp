@@ -1509,6 +1509,9 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
                                             KnownProtocolKind::AnyObject);
   }
 
+  // Record the fact that we found a mutating function for diagnostics.
+  bool FoundMutating = false;
+
   // Introduce a new overload set to capture the choices.
   SmallVector<OverloadChoice, 4> choices;
   for (auto result : lookup) {
@@ -1550,20 +1553,26 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
     if (!isMetatype && !baseObjTy->hasReferenceSemantics() &&
         !baseTy->is<LValueType>() && result->isInstanceMember()) {
       if (auto *FD = dyn_cast<FuncDecl>(result))
-        if (FD->isMutating())
+        if (FD->isMutating()) {
+          FoundMutating = true;
           continue;
-      
+        }
+
       // Subscripts are ok on rvalues so long as the getter is @!mutating.
       if (auto *SD = dyn_cast<SubscriptDecl>(result))
-        if (SD->getGetter()->isMutating())
+        if (SD->getGetter()->isMutating()) {
+          FoundMutating = true;
           continue;
-      
+        }
+
       // Computed properties are ok on rvalues so long as the getter is
       // non-mutating.
       if (auto *VD = dyn_cast<VarDecl>(result))
         if (auto *GD = VD->getGetter())
-          if (GD->isMutating())
+          if (GD->isMutating()) {
+            FoundMutating = true;
             continue;
+          }
     }
 
     // If we're looking into an existential type, check whether this
@@ -1580,7 +1589,9 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   }
 
   if (choices.empty()) {
-    recordFailure(constraint.getLocator(), Failure::DoesNotHaveMember,
+    recordFailure(constraint.getLocator(),
+                  FoundMutating ? Failure::DoesNotHaveNonMutatingMember :
+                                  Failure::DoesNotHaveMember,
                   baseObjTy, name);
     return SolutionKind::Error;
   }

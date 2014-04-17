@@ -334,6 +334,9 @@ public:
     DoesNotConformToProtocol,
     /// \brief The first type does not have a member with the given name.
     DoesNotHaveMember,
+    /// \brief The first type does not have a non mutating member with the given
+    /// name.
+    DoesNotHaveNonMutatingMember,
     /// \brief The type is not an archetype.
     IsNotArchetype,
     /// \brief The type is not a class.
@@ -421,6 +424,7 @@ public:
                      getSecondType());
 
     case DoesNotHaveMember:
+    case DoesNotHaveNonMutatingMember:
       return Profile(id, locator, kind, resolvedOverloadSets, getFirstType(),
                      getName());
 

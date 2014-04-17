@@ -40,6 +40,11 @@ void Failure::dump(SourceManager *sm, raw_ostream &out) const {
         << getName() << "'";
     break;
 
+  case DoesNotHaveNonMutatingMember:
+    out << getFirstType().getString() << " does not have a non mutating member "
+      " named '" << getName() << "'";
+    break;
+
   case FunctionTypesMismatch:
     out << "function type " << getFirstType().getString() << " is not equal to "
     << getSecondType().getString();
@@ -569,13 +574,17 @@ static bool diagnoseFailure(ConstraintSystem &cs, Failure &failure) {
     break;
 
   case Failure::DoesNotHaveMember:
+  case Failure::DoesNotHaveNonMutatingMember:
     if (auto moduleTy = failure.getFirstType()->getAs<ModuleType>()) {
       tc.diagnose(loc, diag::no_member_of_module,
                   moduleTy->getModule()->Name,
                   failure.getName())
         .highlight(range1).highlight(range2);
     } else {
-      tc.diagnose(loc, diag::does_not_have_member,
+      bool IsNoMember = failure.getKind() == Failure::DoesNotHaveMember;
+
+      tc.diagnose(loc, IsNoMember ? diag::does_not_have_member :
+                                    diag::does_not_have_non_mutating_member,
                   failure.getFirstType(),
                   failure.getName())
         .highlight(range1).highlight(range2);
