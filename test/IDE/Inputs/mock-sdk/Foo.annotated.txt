@@ -136,16 +136,19 @@ protocol FooProtocolBase {
   <decl:Func>func fooBaseInstanceFuncOverridden()</decl>
   <decl:Func>class func fooBaseClassFunc0()</decl>
 }</decl>
+
 <decl:Extension>extension <ref:Class>FooClassBase</ref> {
   <decl:Func>class func _internalMeth3() -> @unchecked <ref:Protocol>AnyObject</ref>?</decl>
   <decl:Func>func _internalMeth3() -> @unchecked <ref:Protocol>AnyObject</ref>?</decl>
 }</decl>
+
 <decl:Extension>extension <ref:Class>FooClassBase</ref> {
   <decl:Func>class func _internalMeth2() -> @unchecked <ref:Protocol>AnyObject</ref>?</decl>
   <decl:Func>func _internalMeth2() -> @unchecked <ref:Protocol>AnyObject</ref>?</decl>
   <decl:Func>class func nonInternalMeth() -> @unchecked <ref:Protocol>AnyObject</ref>?</decl>
   <decl:Func>func nonInternalMeth() -> @unchecked <ref:Protocol>AnyObject</ref>?</decl>
 }</decl>
+
 <decl:Extension>extension <ref:Class>FooClassBase</ref> {
   <decl:Func>class func _internalMeth1() -> @unchecked <ref:Protocol>AnyObject</ref>?</decl>
   <decl:Func>func _internalMeth1() -> @unchecked <ref:Protocol>AnyObject</ref>?</decl>

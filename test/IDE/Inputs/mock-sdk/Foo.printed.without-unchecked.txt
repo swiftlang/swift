@@ -136,16 +136,19 @@ class FooClassBase {
   func fooBaseInstanceFuncOverridden()
   class func fooBaseClassFunc0()
 }
+
 extension FooClassBase {
   class func _internalMeth3() -> AnyObject?
   func _internalMeth3() -> AnyObject?
 }
+
 extension FooClassBase {
   class func _internalMeth2() -> AnyObject?
   func _internalMeth2() -> AnyObject?
   class func nonInternalMeth() -> AnyObject?
   func nonInternalMeth() -> AnyObject?
 }
+
 extension FooClassBase {
   class func _internalMeth1() -> AnyObject?
   func _internalMeth1() -> AnyObject?

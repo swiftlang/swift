@@ -300,13 +300,13 @@ void swift::ide::printSubmoduleInterface(
   if (Options.PrintRegularClangComments)
     PrinterToUse = &RegularCommentPrinter;
 
-  auto PrintDecl = [&](Decl *D) {
+  auto PrintDecl = [&](Decl *D) -> bool {
     if (auto Ext = dyn_cast<ExtensionDecl>(D)) {
       // When picking regular comments from clang headers, make sure that
       // extensions/categories are printed in the right source location
       // otherwise the comments will be out-of-place.
       if (!(Options.PrintRegularClangComments && Ext->hasClangNode()))
-        return;
+        return false;
     }
 
     ASTPrinter &Printer = *PrinterToUse;
@@ -316,11 +316,14 @@ void swift::ide::printSubmoduleInterface(
         for (auto Ext : NTD->getExtensions()) {
           if (Options.PrintRegularClangComments && Ext->hasClangNode())
             continue; // will be printed in its source location, see above.
+          Printer << "\n";
           Ext->print(Printer, AdjustedOptions);
           Printer << "\n";
         }
       }
+      return true;
     }
+    return false;
   };
 
   for (auto *D : ImportDecls)
@@ -348,8 +351,10 @@ void swift::ide::printSubmoduleInterface(
 
   if (!(TraversalOptions & ModuleTraversal::SkipOverlay) ||
       !InterestingClangModule) {
-    for (auto *D : SwiftDecls)
-      PrintDecl(D);
+    for (auto *D : SwiftDecls) {
+      if (PrintDecl(D))
+        Printer << "\n";
+    }
   }
 }
 

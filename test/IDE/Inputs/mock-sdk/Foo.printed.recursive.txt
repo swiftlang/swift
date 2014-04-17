@@ -136,16 +136,19 @@ class FooClassBase {
   func fooBaseInstanceFuncOverridden()
   class func fooBaseClassFunc0()
 }
+
 extension FooClassBase {
   class func _internalMeth3() -> @unchecked AnyObject?
   func _internalMeth3() -> @unchecked AnyObject?
 }
+
 extension FooClassBase {
   class func _internalMeth2() -> @unchecked AnyObject?
   func _internalMeth2() -> @unchecked AnyObject?
   class func nonInternalMeth() -> @unchecked AnyObject?
   func nonInternalMeth() -> @unchecked AnyObject?
 }
+
 extension FooClassBase {
   class func _internalMeth1() -> @unchecked AnyObject?
   func _internalMeth1() -> @unchecked AnyObject?
