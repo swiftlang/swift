@@ -1773,7 +1773,7 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc,
   auto *D = FuncDecl::create(P->Context, StaticLoc, StaticSpellingKind::None,
                              /* FIXME*/DeclLoc, Identifier(),
                              DeclLoc, /*GenericParams=*/nullptr, Type(), Params,
-                             Params, ReturnType, P->CurDeclContext);
+                             ReturnType, P->CurDeclContext);
 
   // non-static set/willSet/didSet default to @mutating.
   if (!D->isStatic() && Kind != AccessorKind::IsGetter)
@@ -2624,7 +2624,6 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
     GenericParams = maybeParseGenericParams();
   }
 
-  SmallVector<Pattern*, 8> ArgParams;
   SmallVector<Pattern*, 8> BodyParams;
   
   // If we're within a container, add an implicit first pattern to match the
@@ -2636,7 +2635,6 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
   // Note that we can't actually compute the type here until Sema.
   if (HasContainerType) {
     Pattern *SelfPattern = buildImplicitSelfParameter(NameLoc, CurDeclContext);
-    ArgParams.push_back(SelfPattern);
     BodyParams.push_back(SelfPattern);
   }
 
@@ -2646,7 +2644,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
   DeclName FullName;
   ParserStatus SignatureStatus =
       parseFunctionSignature(SimpleName, FullName,
-                             ArgParams, BodyParams, DefaultArgs,
+                             BodyParams, DefaultArgs,
                              FuncRetTy, HasSelectorStyleSignature);
 
   if (SignatureStatus.hasCodeCompletion() && !CodeCompletion) {
@@ -2670,7 +2668,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
     // Create the decl for the func and add it to the parent scope.
     FD = FuncDecl::create(Context, StaticLoc, StaticSpelling,
                           FuncLoc, FullName, NameLoc, GenericParams,
-                          Type(), ArgParams, BodyParams, FuncRetTy,
+                          Type(), BodyParams, FuncRetTy,
                           CurDeclContext);
 
     if (HasSelectorStyleSignature)
@@ -3389,12 +3387,11 @@ Parser::parseDeclConstructor(ParseDeclOptions Flags,
   // Parse the parameters.
   // FIXME: handle code completion in Arguments.
   DefaultArgumentInfo DefaultArgs;
-  Pattern *ArgPattern;
   Pattern *BodyPattern;
   bool HasSelectorStyleSignature;
   DeclName FullName;
   ParserStatus SignatureStatus =
-    parseConstructorArguments(FullName, ArgPattern, BodyPattern, DefaultArgs,
+    parseConstructorArguments(FullName, BodyPattern, DefaultArgs,
                               HasSelectorStyleSignature);
 
   if (SignatureStatus.hasCodeCompletion() && !CodeCompletion) {
@@ -3425,7 +3422,6 @@ Parser::parseDeclConstructor(ParseDeclOptions Flags,
 
   Scope S2(this, ScopeKind::ConstructorBody);
   auto *CD = new (Context) ConstructorDecl(FullName, ConstructorLoc,
-                                           SelfPattern, ArgPattern,
                                            SelfPattern, BodyPattern,
                                            GenericParams, CurDeclContext);
   CD->setCompleteObjectInit(isCompleteObjectInit);

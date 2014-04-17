@@ -785,19 +785,16 @@ public:
   };
 
   ParserStatus parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
-                                      SmallVectorImpl<Pattern*> &ArgPatterns,
                                       SmallVectorImpl<Pattern*> &BodyPatterns,
                                       DefaultArgumentInfo &defaultArgs,
                                       bool &HasSelectorStyleSignature);
   ParserStatus parseFunctionSignature(Identifier functionName,
                                       DeclName &fullName,
-                                      SmallVectorImpl<Pattern *> &argPatterns,
                                       SmallVectorImpl<Pattern *> &bodyPatterns,
                                       DefaultArgumentInfo &defaultArgs,
                                       TypeRepr *&retType,
                                       bool &HasSelectorStyleSignature);
   ParserStatus parseConstructorArguments(DeclName &FullName,
-                                         Pattern *&ArgPattern,
                                          Pattern *&BodyPattern,
                                          DefaultArgumentInfo &defaultArgs,
                                          bool &HasSelectorStyleSignature);

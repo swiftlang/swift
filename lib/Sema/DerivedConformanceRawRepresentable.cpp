@@ -188,7 +188,7 @@ static FuncDecl *deriveRawRepresentable_toRaw(TypeChecker &tc,
   FuncDecl *toRawDecl =
       FuncDecl::create(C, SourceLoc(), StaticSpellingKind::None, SourceLoc(),
                        name, SourceLoc(), nullptr, Type(),
-                       params, params, TypeLoc::withoutLoc(rawType), enumDecl);
+                       params, TypeLoc::withoutLoc(rawType), enumDecl);
   toRawDecl->setImplicit();
   toRawDecl->setBodySynthesizer(&deriveBodyRawRepresentable_toRaw);
 
@@ -358,15 +358,12 @@ static FuncDecl *deriveRawRepresentable_fromRaw(TypeChecker &tc,
   rawParam->setType(rawType);
   rawParam->setImplicit();
   
-  Pattern *argParams[] = {selfParam->clone(C, Pattern::Implicit),
-                          rawParam->clone(C, Pattern::Implicit)};
   Pattern *bodyParams[] = {selfParam, rawParam};
   auto retTy = OptionalType::get(enumType);
   DeclName name(C, C.Id_fromRaw, { C.Id_raw });
   auto fromRawDecl = FuncDecl::create(
-      C, SourceLoc(), StaticSpellingKind::None, SourceLoc(),
-      name, SourceLoc(), nullptr, Type(), argParams,
-      bodyParams, TypeLoc::withoutLoc(retTy), enumDecl);
+      C, SourceLoc(), StaticSpellingKind::None, SourceLoc(), name, SourceLoc(),
+      nullptr, Type(), bodyParams, TypeLoc::withoutLoc(retTy), enumDecl);
   fromRawDecl->setStatic();
   fromRawDecl->setImplicit();
   fromRawDecl->setBodySynthesizer(&deriveBodyRawRepresentable_frowRaw);

@@ -629,7 +629,6 @@ Type ClangImporter::Implementation::importFunctionType(
        clang::QualType resultType,
        ArrayRef<const clang::ParmVarDecl *> params,
        bool isVariadic, bool isNoReturn,
-       SmallVectorImpl<Pattern*> &argPatterns,
        SmallVectorImpl<Pattern*> &bodyPatterns) {
 
   // Cannot import variadic types.
@@ -718,32 +717,25 @@ Type ClangImporter::Implementation::importFunctionType(
   }
 
   // Form the parameter tuples.
-  auto argParamsTy = TupleType::get(swiftArgParams, SwiftContext);
   auto bodyParamsTy = TupleType::get(swiftBodyParams, SwiftContext);
 
-  // Form the body and argument patterns.
+  // Form the body patterns.
   bodyPatterns.push_back(TuplePattern::create(SwiftContext, SourceLoc(),
                                               bodyPatternElts, SourceLoc()));
-  bodyPatterns.back()->setType(bodyParamsTy);
-  argPatterns.push_back(TuplePattern::create(SwiftContext, SourceLoc(),
-                                             argPatternElts, SourceLoc(),
-                                             false, SourceLoc(),
-                                             /*Implicit=*/true));
-  argPatterns.back()->setType(argParamsTy);
-  
+  bodyPatterns.back()->setType(bodyParamsTy);  
   
   FunctionType::ExtInfo extInfo;
   extInfo = extInfo.withIsNoReturn(isNoReturn);
   
   // Form the function type.
-  return FunctionType::get(argParamsTy, swiftResultTy, extInfo);
+  auto argTy = TupleType::get(swiftArgParams, SwiftContext);
+  return FunctionType::get(argTy, swiftResultTy, extInfo);
 }
 
 Type ClangImporter::Implementation::importMethodType(
        clang::QualType resultType,
        ArrayRef<const clang::ParmVarDecl *> params,
        bool isVariadic, bool isNoReturn,
-       SmallVectorImpl<Pattern*> &argPatterns,
        SmallVectorImpl<Pattern*> &bodyPatterns,
        bool *pHasSelectorStyleSignature,
        DeclName methodName,
@@ -872,26 +864,20 @@ Type ClangImporter::Implementation::importMethodType(
     swiftBodyParams.push_back(TupleTypeElt(type, argName));
   }
 
-  // Form the parameter tuples.
-  auto argParamsTy = TupleType::get(swiftArgParams, SwiftContext);
+  // Form the parameter tuple.
   auto bodyParamsTy = TupleType::get(swiftBodyParams, SwiftContext);
-
-  // Form the body and argument patterns.
+  
+  // Form the body patterns.
   bodyPatterns.push_back(TuplePattern::create(SwiftContext, SourceLoc(),
                                               bodyPatternElts, SourceLoc()));
   bodyPatterns.back()->setType(bodyParamsTy);
-  argPatterns.push_back(TuplePattern::create(SwiftContext, SourceLoc(),
-                                             argPatternElts, SourceLoc(),
-                                             false, SourceLoc(),
-                                             /*Implicit=*/true));
-  argPatterns.back()->setType(argParamsTy);
-  
   
   FunctionType::ExtInfo extInfo;
   extInfo = extInfo.withIsNoReturn(isNoReturn);
   
   // Form the function type.
-  return FunctionType::get(argParamsTy, swiftResultTy, extInfo);
+  auto argTy = TupleType::get(swiftArgParams, SwiftContext);
+  return FunctionType::get(argTy, swiftResultTy, extInfo);
 }
 
 Module *ClangImporter::Implementation::getStdlibModule() {

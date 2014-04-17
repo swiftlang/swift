@@ -620,29 +620,11 @@ public:
 #ifndef NDEBUG
       PrettyStackTraceDecl debugStack("walking into body of", AFD);
 #endif
-      if (AFD->hasSelectorStyleSignature()) {
-        for (auto &P : AFD->getBodyParamPatterns()) {
-          if (Pattern *NewPattern = doIt(P))
-            P = NewPattern;
-          else
-            return true;
-        }
-        for (auto &P : AFD->getArgParamPatterns()) {
-          if (Pattern *NewPattern = doIt(P))
-            P = NewPattern;
-          else
-            return true;
-        }
-      } else {
-        // Body params are same as argument params.
-        auto BodyPatterns = AFD->getBodyParamPatterns();
-        auto ArgPatterns = AFD->getArgParamPatterns();
-        for (unsigned i = 0, e = BodyPatterns.size(); i != e; ++i) {
-          if (Pattern *NewPattern = doIt(BodyPatterns[i]))
-            BodyPatterns[i] = ArgPatterns[i] = NewPattern;
-          else
-            return true;
-        }
+      for (auto &P : AFD->getBodyParamPatterns()) {
+        if (Pattern *NewPattern = doIt(P))
+          P = NewPattern;
+        else
+          return true;
       }
 
       if (auto *FD = dyn_cast<FuncDecl>(AFD))

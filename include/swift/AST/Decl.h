@@ -3312,7 +3312,6 @@ protected:
     assert(AbstractFunctionDeclBits.NumParamPatterns == NumParamPatterns);
   }
 
-  MutableArrayRef<Pattern *> getArgParamBuffer();
   MutableArrayRef<Pattern *> getBodyParamBuffer();
 
   void setBodyKind(BodyKind K) {
@@ -3436,49 +3435,11 @@ public:
     return getNumParamPatterns();
   }
 
-  /// \brief Returns the argument pattern(s) for the function definition
-  /// that determine the function type.
-  //
-  /// - For a definition of the form `func foo(a:A, b:B)`, this will
-  ///   be a one-element array containing the argument pattern `(a:A, b:B)`.
-  /// - For a curried definition such as `func foo(a:A)(b:B)`, this will
-  ///   be a multiple-element array containing a pattern for each level
-  ///   of currying, in this case two patterns `(a:A)` and `(b:B)`.
-  /// - For a selector-style definition such as `func foo(a:A) bar(b:B)`,
-  ///   this will be a one-element array containing the argument pattern
-  ///   of the keyword arguments, in this case `(_:A, bar:B)`. For selector-
-  ///   style definitions, this is different from `getBodyParamPatterns`,
-  ///   which would return the declared parameter names `(a:A, b:B)`.
-  ///
-  /// If the function expression refers to a method definition, there will
-  /// be an additional first argument pattern for the `this` parameter.
-  MutableArrayRef<Pattern *> getArgParamPatterns() {
-    return getArgParamBuffer();
-  }
-  ArrayRef<const Pattern *> getArgParamPatterns() const {
-    auto Patterns =
-        const_cast<AbstractFunctionDecl *>(this)->getArgParamBuffer();
-    return ArrayRef<const Pattern *>(Patterns.data(), Patterns.size());
-  }
-
   /// \brief Returns the parameter pattern(s) for the function definition that
   /// determine the parameter names bound in the function body.
   ///
-  /// Typically, this is the same as \c getArgParamPatterns, unless the
-  /// function was defined with selector-style syntax such as:
-  /// \code
-  ///   func foo(a:A) bar(b:B) {}
-  /// \endcode
-  ///
-  /// For a selector-style definition, \c getArgParamPatterns will return the
-  /// pattern that describes the keyword argument names, in this case
-  /// `(_:A, bar:B)`, whereas \c getBodyParamPatterns will return a pattern
-  /// referencing the declared parameter names in the function body's scope,
-  /// in this case `(a:A, b:B)`.
-  ///
-  /// In all cases `getArgParamPatterns().size()` should equal
-  /// `getBodyParamPatterns().size()`, and the corresponding elements of each
-  /// tuple type should have equivalent types.
+  /// The number of "top-level" elements in this pattern will match the number
+  /// of argument names in the compound name of the function or constructor.
   MutableArrayRef<Pattern *> getBodyParamPatterns() {
     return getBodyParamBuffer();
   }
@@ -3606,7 +3567,6 @@ public:
                           StaticSpellingKind StaticSpelling,
                           SourceLoc FuncLoc, DeclName Name, SourceLoc NameLoc,
                           GenericParamList *GenericParams, Type Ty,
-                          ArrayRef<Pattern *> ArgParams,
                           ArrayRef<Pattern *> BodyParams,
                           TypeLoc FnRetType, DeclContext *Parent);
 
@@ -3629,8 +3589,7 @@ public:
     FuncDeclBits.Mutating = Mutating;
   }
 
-  void setDeserializedSignature(ArrayRef<Pattern *> ArgParams,
-                                ArrayRef<Pattern *> BodyParams,
+  void setDeserializedSignature(ArrayRef<Pattern *> BodyParams,
                                 TypeLoc FnRetType);
 
   SourceLoc getStaticLoc() const { return StaticLoc; }
@@ -3940,7 +3899,7 @@ inline SourceRange EnumCaseDecl::getSourceRange() const {
 class ConstructorDecl : public AbstractFunctionDecl {
   friend class AbstractFunctionDecl;
 
-  Pattern *ArgParams[2], *BodyParams[2];
+  Pattern *BodyParams[2];
 
   /// The type of the initializing constructor.
   Type InitializerType;
@@ -3957,12 +3916,10 @@ class ConstructorDecl : public AbstractFunctionDecl {
   ConstructorDecl *OverriddenDecl = nullptr;
 
 public:
-  ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
-                  Pattern *SelfArgParam, Pattern *ArgParams,
+  ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc, 
                   Pattern *SelfBodyParam, Pattern *BodyParams,
                   GenericParamList *GenericParams, DeclContext *Parent);
 
-  void setArgParams(Pattern *selfPattern, Pattern *argParams);
   void setBodyParams(Pattern *selfPattern, Pattern *bodyParams);
 
   SourceLoc getConstructorLoc() const { return getNameLoc(); }
@@ -4308,27 +4265,6 @@ inline bool NominalTypeDecl::isStoredProperty(VarDecl *vd) {
   return !vd->isStatic() && vd->hasStorage();
 }
 
-inline MutableArrayRef<Pattern *> AbstractFunctionDecl::getArgParamBuffer() {
-  unsigned NumPatterns = AbstractFunctionDeclBits.NumParamPatterns;
-  Pattern **Ptr;
-  switch (getKind()) {
-  default: llvm_unreachable("Unknown AbstractFunctionDecl!");
-  case DeclKind::Constructor:
-    Ptr = cast<ConstructorDecl>(this)->ArgParams;
-    break;
-
-  case DeclKind::Destructor:
-    Ptr = &cast<DestructorDecl>(this)->SelfPattern;
-    break;
-
-  case DeclKind::Func:
-    // Argument patterns are tail allocated.
-    Ptr = reinterpret_cast<Pattern **>(cast<FuncDecl>(this) + 1);
-    break;
-  }
-  return MutableArrayRef<Pattern *>(Ptr, NumPatterns);
-}
-
 inline MutableArrayRef<Pattern *> AbstractFunctionDecl::getBodyParamBuffer() {
   unsigned NumPatterns = AbstractFunctionDeclBits.NumParamPatterns;
   Pattern **Ptr;
@@ -4343,8 +4279,8 @@ inline MutableArrayRef<Pattern *> AbstractFunctionDecl::getBodyParamBuffer() {
     break;
 
   case DeclKind::Func:
-    // Argument patterns are tail allocated.
-    Ptr = reinterpret_cast<Pattern **>(cast<FuncDecl>(this) + 1) + NumPatterns;
+    // Body patterns are tail allocated.
+    Ptr = reinterpret_cast<Pattern **>(cast<FuncDecl>(this) + 1);
     break;
   }
   return MutableArrayRef<Pattern *>(Ptr, NumPatterns);

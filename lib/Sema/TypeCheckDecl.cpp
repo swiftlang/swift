@@ -965,12 +965,6 @@ void TypeChecker::revertGenericFuncSignature(AbstractFunctionDecl *func) {
     }
   }
 
-  // Revert the argument patterns.
-  ArrayRef<Pattern *> argPatterns = func->getArgParamPatterns();
-  for (auto argPattern : argPatterns) {
-    revertDependentPattern(argPattern);
-  }
-
   // Revert the body patterns.
   ArrayRef<Pattern *> bodyPatterns = func->getBodyParamPatterns();
   for (auto bodyPattern : bodyPatterns) {
@@ -1311,7 +1305,7 @@ static FuncDecl *createGetterPrototype(VarDecl *VD, TypeChecker &TC) {
 
   auto Get = FuncDecl::create(
       Context, StaticLoc, StaticSpellingKind::None, Loc, Identifier(), Loc,
-      /*GenericParams=*/nullptr, Type(), GetterParams, GetterParams,
+      /*GenericParams=*/nullptr, Type(), GetterParams,
       TypeLoc::withoutLoc(Ty), VD->getDeclContext());
   Get->setImplicit();
   return Get;
@@ -1334,7 +1328,7 @@ static FuncDecl *createSetterPrototype(VarDecl *VD, VarDecl *&ValueDecl,
   auto *Set = FuncDecl::create(
       Context, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None, Loc,
       Identifier(), Loc, /*generic=*/nullptr, Type(), SetterParams,
-      SetterParams, TypeLoc::withoutLoc(SetterRetTy), VD->getDeclContext());
+      TypeLoc::withoutLoc(SetterRetTy), VD->getDeclContext());
   Set->setImplicit();
   
   // Setters default to mutating.
@@ -1722,10 +1716,6 @@ static Type configureImplicitSelf(AbstractFunctionDecl *func,
   // neither inout.
   selfDecl->setLet(!selfTy->is<InOutType>());
   selfDecl->setType(selfTy);
-
-  auto argPattern = cast<TypedPattern>(func->getArgParamPatterns()[0]);
-  if (!argPattern->getTypeLoc().getTypeRepr())
-    argPattern->getTypeLoc() = TypeLoc::withoutLoc(selfTy);
 
   auto bodyPattern = cast<TypedPattern>(func->getBodyParamPatterns()[0]);
   if (!bodyPattern->getTypeLoc().getTypeRepr())
@@ -2716,34 +2706,16 @@ public:
 
   bool semaFuncParamPatterns(AbstractFunctionDecl *fd,
                              GenericTypeResolver *resolver = nullptr) {
-    // Type check the argument patterns.
+    // Type check the body patterns.
     bool badType = false;
-    auto argPatterns = fd->getArgParamPatterns();
-    for (Pattern *P : argPatterns) {
-      if (P->hasType())
-        continue;
-      if (TC.typeCheckPattern(P, fd, TR_ImmediateFunctionInput, resolver))
-        badType = true;
-    }
-
-    // If we had a type error in the argument patterns, mark the corresponding
-    // body patterns as invalid, otherwise type check it.  We don't want to
-    // just type check all body patterns since we'd output redundant
-    // diagnostics about the same problem.  Arg patterns need to die.
     auto bodyPatterns = fd->getBodyParamPatterns();
     for (unsigned i = 0, e = bodyPatterns.size(); i != e; ++i) {
-      auto *bodyPat = bodyPatterns[i], *argPat = argPatterns[i];
+      auto *bodyPat = bodyPatterns[i];
 
       if (bodyPat->hasType())
         continue;
 
-      if (argPat->getType()->is<ErrorType>()) {
-        auto errorType = ErrorType::get(fd->getASTContext());
-        bodyPat->forEachNode([&](Pattern *P) {
-          P->setType(errorType);
-        });
-      } else if (TC.typeCheckPattern(bodyPat, fd, TR_ImmediateFunctionInput,
-                                     resolver))
+      if (TC.typeCheckPattern(bodyPat, fd, TR_ImmediateFunctionInput, resolver))
         badType = true;
     }
 
@@ -4372,8 +4344,7 @@ static ConstructorDecl *createImplicitConstructor(TypeChecker &tc,
   // Create the constructor.
   DeclName name(context, context.Id_init, argNames);
   Pattern *selfPat = buildImplicitSelfParameter(Loc, decl);
-  auto *ctor = new (context) ConstructorDecl(name, Loc,
-                                             selfPat, pattern, selfPat, pattern,
+  auto *ctor = new (context) ConstructorDecl(name, Loc, selfPat, pattern,
                                              nullptr, decl);
 
   // Mark implicit.
@@ -4396,9 +4367,9 @@ static ConstructorDecl *createImplicitConstructor(TypeChecker &tc,
 /// function with the same signature.
 static Expr *forwardArguments(TypeChecker &tc, ClassDecl *classDecl,
                               ConstructorDecl *toDecl,
-                              Pattern *argPattern,
-                              Pattern *bodyPattern) {
-  switch (argPattern->getKind()) {
+                              Pattern *bodyPattern,
+                              ArrayRef<Identifier> argumentNames) {
+  switch (bodyPattern->getKind()) {
 #define PATTERN(Id, Parent)
 #define REFUTABLE_PATTERN(Id, Parent) case PatternKind::Id:
 #include "swift/AST/PatternNodes.def"
@@ -4407,8 +4378,8 @@ static Expr *forwardArguments(TypeChecker &tc, ClassDecl *classDecl,
   case PatternKind::Paren:
     if (auto subExpr = forwardArguments(
                          tc, classDecl, toDecl,
-                         cast<ParenPattern>(argPattern)->getSubPattern(),
-                         cast<ParenPattern>(bodyPattern)->getSubPattern())) {
+                         cast<ParenPattern>(bodyPattern)->getSubPattern(),
+                         { })) {
       return new (tc.Context) ParenExpr(SourceLoc(), subExpr, SourceLoc(),
                                         /*hasTrailingClosure=*/false);
     }
@@ -4416,14 +4387,11 @@ static Expr *forwardArguments(TypeChecker &tc, ClassDecl *classDecl,
     return nullptr;
 
   case PatternKind::Tuple: {
-    auto argTuple = cast<TuplePattern>(argPattern);
     auto bodyTuple = cast<TuplePattern>(bodyPattern);
-    SmallVector<Identifier, 4> labels;
     SmallVector<Expr *, 4> values;
-    bool hasName = false;
 
     // FIXME: Can't forward varargs yet.
-    if (argTuple->hasVararg()) {
+    if (bodyTuple->hasVararg()) {
       tc.diagnose(classDecl->getLoc(),
                   diag::unsupported_synthesize_init_variadic,
                   classDecl->getDeclaredType());
@@ -4431,17 +4399,17 @@ static Expr *forwardArguments(TypeChecker &tc, ClassDecl *classDecl,
       return nullptr;
     }
 
-    for (unsigned i = 0, n = argTuple->getNumFields(); i != n; ++i) {
+    for (unsigned i = 0, n = bodyTuple->getNumFields(); i != n; ++i) {
       // Forward the value.
       auto subExpr = forwardArguments(tc, classDecl, toDecl,
-                                      argTuple->getFields()[i].getPattern(),
-                                      bodyTuple->getFields()[i].getPattern());
+                                      bodyTuple->getFields()[i].getPattern(),
+                                      { });
       if (!subExpr)
         return nullptr;
       values.push_back(subExpr);
       
       // Dig out the name.
-      auto subPattern = argTuple->getFields()[i].getPattern();
+      auto subPattern = bodyTuple->getFields()[i].getPattern();
       do {
         if (auto typed = dyn_cast<TypedPattern>(subPattern)) {
           subPattern = typed->getSubPattern();
@@ -4455,25 +4423,19 @@ static Expr *forwardArguments(TypeChecker &tc, ClassDecl *classDecl,
 
         break;
       } while (true);
-
-      if (auto named = dyn_cast<NamedPattern>(subPattern)) {
-        if (named->getDecl()->hasName()) {
-          hasName = true;
-          labels.push_back(named->getDecl()->getName());
-          continue;
-        }
-      }
-
-      labels.push_back(Identifier());
     }
 
-    if (values.size() == 1 && !hasName)
+    if (values.size() == 1 && 
+        (argumentNames.empty() || argumentNames[0].empty()))
       return new (tc.Context) ParenExpr(SourceLoc(), values[0], SourceLoc(),
                                         /*hasTrailingClosure=*/false);
 
     Identifier *labelsCopy = nullptr;
-    if (hasName)
-      labelsCopy = tc.Context.AllocateCopy(labels).data();
+    if (std::find_if(argumentNames.begin(), argumentNames.end(),
+                     [](Identifier name) -> bool {
+                       return !name.empty();
+                     }) != argumentNames.end())
+      labelsCopy = tc.Context.AllocateCopy(argumentNames).data();
     return new (tc.Context) TupleExpr(SourceLoc(),
                                       tc.Context.AllocateCopy(values),
                                       labelsCopy,
@@ -4496,13 +4458,13 @@ static Expr *forwardArguments(TypeChecker &tc, ClassDecl *classDecl,
 
   case PatternKind::Typed:
     return forwardArguments(tc, classDecl, toDecl,
-                            cast<TypedPattern>(argPattern)->getSubPattern(),
-                            cast<TypedPattern>(bodyPattern)->getSubPattern());
+                            cast<TypedPattern>(bodyPattern)->getSubPattern(),
+                            argumentNames);
 
   case PatternKind::Var:
     return forwardArguments(tc, classDecl, toDecl,
-                            cast<VarPattern>(argPattern)->getSubPattern(),
-                            cast<VarPattern>(bodyPattern)->getSubPattern());
+                            cast<VarPattern>(bodyPattern)->getSubPattern(),
+                            argumentNames);
 
   }
 }
@@ -4558,9 +4520,6 @@ createSubobjectInitOverride(TypeChecker &tc,
                                      SourceLoc(), ctx.Id_self,
                                      Type(), classDecl);
   selfDecl->setImplicit();
-  Pattern *selfArgPattern 
-    = new (ctx) NamedPattern(selfDecl, /*Implicit=*/true);
-  selfArgPattern = new (ctx) TypedPattern(selfArgPattern, TypeLoc());
   Pattern *selfBodyPattern 
     = new (ctx) NamedPattern(selfDecl, /*Implicit=*/true);
   selfBodyPattern = new (ctx) TypedPattern(selfBodyPattern, TypeLoc());
@@ -4568,8 +4527,6 @@ createSubobjectInitOverride(TypeChecker &tc,
   // Create the initializer parameter patterns.
   OptionSet<Pattern::CloneFlags> options = Pattern::Implicit;
   options |= Pattern::Inherited;
-  Pattern *argParamPatterns
-    = superclassCtor->getArgParamPatterns()[1]->clone(ctx, options);
   Pattern *bodyParamPatterns
     = superclassCtor->getBodyParamPatterns()[1]->clone(
         ctx, options | Pattern::AlwaysNamed);
@@ -4578,7 +4535,7 @@ createSubobjectInitOverride(TypeChecker &tc,
   // arguments.
   // FIXME: If we weren't cloning the type along with the pattern, this would be
   // a lot more direct.
-  Type argType = argParamPatterns->getType();
+  Type argType = bodyParamPatterns->getType();
 
   // Local function that maps default arguments to inherited default arguments.
   std::function<Type(Type)> inheritDefaultArgs = [&](Type type) -> Type {
@@ -4632,12 +4589,11 @@ createSubobjectInitOverride(TypeChecker &tc,
   };
 
   argType = argType.transform(inheritDefaultArgs);
-  argParamPatterns->setType(argType);
+  bodyParamPatterns->setType(argType);
 
   // Create the initializer declaration.
   auto ctor = new (ctx) ConstructorDecl(superclassCtor->getFullName(), 
                                         SourceLoc(),
-                                        selfArgPattern, argParamPatterns,
                                         selfBodyPattern, bodyParamPatterns,
                                         nullptr, classDecl);
   ctor->setImplicit();
@@ -4647,9 +4603,7 @@ createSubobjectInitOverride(TypeChecker &tc,
   // Configure 'self'.
   GenericParamList *outerGenericParams = nullptr;
   Type selfType = configureImplicitSelf(ctor, outerGenericParams);
-  selfArgPattern->setType(selfType);
   selfBodyPattern->setType(selfType);
-  cast<TypedPattern>(selfArgPattern)->getSubPattern()->setType(selfType);
   cast<TypedPattern>(selfBodyPattern)->getSubPattern()->setType(selfType);
 
   // Set the type of the initializer.
@@ -4688,8 +4642,8 @@ createSubobjectInitOverride(TypeChecker &tc,
                                                        /*Implicit=*/true);
 
   Expr *ctorArgs = forwardArguments(tc, classDecl, superclassCtor,
-                                    ctor->getArgParamPatterns()[1],
-                                    ctor->getBodyParamPatterns()[1]);
+                                    ctor->getBodyParamPatterns()[1],
+                                    ctor->getFullName().getArgumentNames());
   if (!ctorArgs) {
     // FIXME: We should be able to assert that this never happens,
     // but there are currently holes when dealing with vararg
@@ -5236,9 +5190,9 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
         // We have a function. Make sure that the number of parameters
         // matches the "number of colons" in the name.
         auto func = cast<AbstractFunctionDecl>(D);
-        auto argPattern = func->getBodyParamPatterns()[1];
+        auto bodyPattern = func->getBodyParamPatterns()[1];
         unsigned numParameters;
-        if (auto tuple = dyn_cast<TuplePattern>(argPattern))
+        if (auto tuple = dyn_cast<TuplePattern>(bodyPattern))
           numParameters = tuple->getNumFields() - tuple->hasVararg();
         else
           numParameters = 1;

@@ -395,9 +395,10 @@ namespace {
 ///     return NSSomeOptionSet(value)
 ///   }
 /// }
-static FuncDecl *makeOptionSetFactoryMethod(StructDecl *optionSetDecl,
-                                      VarDecl *valueDecl,
-                                      OptionSetFactoryMethod factoryMethod) {
+static FuncDecl *makeOptionSetFactoryMethod(
+                   StructDecl *optionSetDecl,
+                   VarDecl *valueDecl,
+                   OptionSetFactoryMethod factoryMethod) {
   auto &C = optionSetDecl->getASTContext();
   auto optionSetType = optionSetDecl->getDeclaredTypeInContext();
   auto rawType = valueDecl->getType();
@@ -417,8 +418,6 @@ static FuncDecl *makeOptionSetFactoryMethod(StructDecl *optionSetDecl,
   rawParam->setImplicit();
   rawParam->setType(rawArgType);
 
-  Pattern *argParams[] = {selfParam->clone(C, Pattern::Implicit),
-                          rawParam->clone(C, Pattern::Implicit)};
   Pattern *bodyParams[] = {selfParam, rawParam};
   
   Type retType;
@@ -449,7 +448,6 @@ static FuncDecl *makeOptionSetFactoryMethod(StructDecl *optionSetDecl,
                                       SourceLoc(),
                                       name,
                                       SourceLoc(), nullptr, Type(),
-                                      argParams,
                                       bodyParams,
                                       TypeLoc::withoutLoc(retType),
                                       optionSetDecl);
@@ -509,7 +507,7 @@ static FuncDecl *makeOptionSetToRawMethod(StructDecl *optionSetDecl,
   DeclName name(C, C.Id_toRaw, { });
   FuncDecl *toRawDecl = FuncDecl::create(
       C, SourceLoc(), StaticSpellingKind::None, SourceLoc(),
-      name, SourceLoc(), nullptr, Type(), params, params,
+      name, SourceLoc(), nullptr, Type(), params, 
       TypeLoc::withoutLoc(rawType), optionSetDecl);
   toRawDecl->setImplicit();
   
@@ -592,7 +590,7 @@ static FuncDecl *makeOptionSetGetLogicValueMethod(StructDecl *optionSetDecl,
   DeclName name(C, C.Id_GetLogicValue, { });
   FuncDecl *getLVDecl = FuncDecl::create(
       C, SourceLoc(), StaticSpellingKind::None, SourceLoc(),
-      name, SourceLoc(), nullptr, Type(), params,
+      name, SourceLoc(), nullptr, Type(), 
       params, TypeLoc::withoutLoc(boolType), optionSetDecl);
   getLVDecl->setImplicit();
   
@@ -656,7 +654,6 @@ static ConstructorDecl *makeOptionSetDefaultConstructor(StructDecl *optionSetDec
 
   DeclName name(C, C.Id_init, { });
   auto *ctorDecl = new (C) ConstructorDecl(name, optionSetDecl->getLoc(),
-                                           selfPattern, methodParam,
                                            selfPattern, methodParam,
                                            nullptr, optionSetDecl);
   ctorDecl->setImplicit();
@@ -848,7 +845,6 @@ namespace {
       DeclName name(context, context.Id_init, argNames);
       auto constructor =
         new (context) ConstructorDecl(name, structDecl->getLoc(),
-                                      selfPattern, paramPattern,
                                       selfPattern, paramPattern,
                                       nullptr, structDecl);
 
@@ -1488,14 +1484,13 @@ namespace {
 
       // Import the function type. If we have parameters, make sure their names
       // get into the resulting function type.
-      SmallVector<Pattern *, 4> argPatterns;
       SmallVector<Pattern *, 4> bodyPatterns;
       Type type = Impl.importFunctionType(decl->getReturnType(),
                                           { decl->param_begin(),
                                             decl->param_size() },
                                           decl->isVariadic(),
                                           decl->isNoReturn(),
-                                          argPatterns, bodyPatterns);
+                                          bodyPatterns);
       if (!type)
         return nullptr;
 
@@ -1517,7 +1512,7 @@ namespace {
       auto result = FuncDecl::create(
           Impl.SwiftContext, SourceLoc(), StaticSpellingKind::None, loc,
           name, nameLoc,
-          /*GenericParams=*/nullptr, type, argPatterns, bodyPatterns,
+          /*GenericParams=*/nullptr, type, bodyPatterns,
           TypeLoc::withoutLoc(resultTy), dc);
 
       // Keep track of inline function bodies so that we can generate
@@ -1786,12 +1781,10 @@ namespace {
         return nullptr;
 
       // Add the implicit 'self' parameter patterns.
-      SmallVector<Pattern *, 4> argPatterns;
       SmallVector<Pattern *, 4> bodyPatterns;
       auto selfVar =
         createSelfDecl(dc, decl->isClassMethod() || forceClassMethod);
       Pattern *selfPat = createTypedNamedPattern(selfVar);
-      argPatterns.push_back(selfPat);
       bodyPatterns.push_back(selfPat);
       bool hasSelectorStyleSignature;
 
@@ -1809,7 +1802,6 @@ namespace {
                                             decl->param_size() },
                                           decl->isVariadic(),
                                           decl->hasAttr<clang::NoReturnAttr>(),
-                                          argPatterns,
                                           bodyPatterns,
                                           &hasSelectorStyleSignature,
                                           name,
@@ -1829,7 +1821,7 @@ namespace {
       auto result = FuncDecl::create(
           Impl.SwiftContext, SourceLoc(), StaticSpellingKind::None,
           SourceLoc(), name, SourceLoc(), /*GenericParams=*/nullptr, Type(),
-          argPatterns, bodyPatterns, TypeLoc(), dc);
+          bodyPatterns, TypeLoc(), dc);
 
       auto resultTy = type->castTo<FunctionType>()->getResult();
       Type interfaceType;
@@ -2079,12 +2071,10 @@ namespace {
       auto name = Impl.mapSelectorToDeclName(selector, /*isInitializer=*/true);
 
       // Add the implicit 'self' parameter patterns.
-      SmallVector<Pattern *, 4> argPatterns;
       SmallVector<Pattern *, 4> bodyPatterns;
       auto selfTy = getSelfTypeForContext(dc);
       auto selfMetaVar = createSelfDecl(dc, true);
       Pattern *selfPat = createTypedNamedPattern(selfMetaVar);
-      argPatterns.push_back(selfPat);
       bodyPatterns.push_back(selfPat);
       bool hasSelectorStyleSignature;
 
@@ -2094,7 +2084,6 @@ namespace {
                                           objcMethod->param_size() },
                                         objcMethod->isVariadic(),
                                   objcMethod->hasAttr<clang::NoReturnAttr>(),
-                                          argPatterns,
                                           bodyPatterns,
                                           &hasSelectorStyleSignature,
                                           name,
@@ -2123,8 +2112,8 @@ namespace {
 
       // Create the actual constructor.
       auto result = new (Impl.SwiftContext)
-          ConstructorDecl(name, loc, selfPat, argPatterns.back(),
-                         selfPat, bodyPatterns.back(), /*GenericParams=*/0, dc);
+          ConstructorDecl(name, loc, selfPat, bodyPatterns.back(), 
+                          /*GenericParams=*/0, dc);
       result->setClangNode(objcMethod);
       addObjCAttribute(result, selector);
 
@@ -2299,7 +2288,7 @@ namespace {
       auto thunk = FuncDecl::create(
           context, SourceLoc(), StaticSpellingKind::None, getter->getLoc(),
           Identifier(), SourceLoc(), nullptr, getterType, getterArgs,
-          getterArgs, TypeLoc::withoutLoc(elementTy), dc);
+          TypeLoc::withoutLoc(elementTy), dc);
       thunk->setBodyResultType(elementTy);
       thunk->setInterfaceType(interfaceType);
 
@@ -2382,7 +2371,7 @@ namespace {
       auto thunk = FuncDecl::create(
           context, SourceLoc(), StaticSpellingKind::None, setter->getLoc(),
           Identifier(), SourceLoc(),
-          nullptr, setterType, setterArgs, setterArgs,
+          nullptr, setterType, setterArgs, 
           TypeLoc::withoutLoc(TupleType::getEmpty(context)), dc);
       thunk->setBodyResultType(TupleType::getEmpty(context));
       thunk->setInterfaceType(interfaceType);
@@ -2567,11 +2556,11 @@ namespace {
         setterThunk = buildSetterThunk(setter, dc, setterIndices);
 
       // Build the subscript declaration.
-      auto argPatterns =
+      auto bodyPatterns =
           getterThunk->getBodyParamPatterns()[1]->clone(context);
       auto name = context.Id_subscript;
       auto subscript
-        = new (context) SubscriptDecl(name, decl->getLoc(), argPatterns,
+        = new (context) SubscriptDecl(name, decl->getLoc(), bodyPatterns,
                                       decl->getLoc(),
                                       TypeLoc::withoutLoc(elementTy), dc);
       subscript->setAccessors(SourceRange(), getterThunk, setterThunk);
@@ -4058,7 +4047,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   auto func = FuncDecl::create(context, SourceLoc(), StaticSpellingKind::None,
                                SourceLoc(), Identifier(),
                                SourceLoc(), nullptr, getterType, getterArgs,
-                               getterArgs, TypeLoc::withoutLoc(type), dc);
+                               TypeLoc::withoutLoc(type), dc);
   func->setStatic(isStatic);
   func->setBodyResultType(type);
 

@@ -1668,16 +1668,9 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     DeclName name(ctx, ctx.Id_init, argNames);
     auto ctor = new (ctx) ConstructorDecl(name, SourceLoc(),
-                                          /*argParams=*/nullptr, nullptr,
                                           /*bodyParams=*/nullptr, nullptr,
                                           genericParams, parent);
     declOrOffset = ctor;
-
-    Pattern *argParams0 = maybeReadPattern();
-    Pattern *argParams1 = maybeReadPattern();
-    assert(argParams0 && argParams1 &&
-           "missing argument patterns for constructor");
-    ctor->setArgParams(argParams0, argParams1);
 
     Pattern *bodyParams0 = maybeReadPattern();
     Pattern *bodyParams1 = maybeReadPattern();
@@ -1899,16 +1892,11 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       patternBuf.push_back(pattern);
 
     assert(!patternBuf.empty());
-    assert((patternBuf.size() == numParamPatterns ||
-            patternBuf.size() == numParamPatterns * 2) &&
+    assert((patternBuf.size() == numParamPatterns) &&
            "incorrect number of parameters");
 
     ArrayRef<Pattern *> patterns(patternBuf);
-    ArrayRef<Pattern *> argPatterns = patterns.slice(0, numParamPatterns);
-    ArrayRef<Pattern *> bodyPatterns = patterns.slice(numParamPatterns);
-    if (bodyPatterns.empty())
-      bodyPatterns = argPatterns;
-    fn->setDeserializedSignature(argPatterns, bodyPatterns,
+    fn->setDeserializedSignature(patterns,
                                  TypeLoc::withoutLoc(signature->getResult()));
 
     if (auto overridden = cast_or_null<FuncDecl>(getDecl(overriddenID))) {

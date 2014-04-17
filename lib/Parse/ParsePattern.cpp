@@ -454,12 +454,12 @@ static Pattern *getFirstSelectorPattern(ASTContext &Context,
 static ParserStatus
 parseSelectorFunctionArguments(Parser &P,
                                SmallVectorImpl<Identifier> &NamePieces,
-                               SmallVectorImpl<Pattern *> &ArgPatterns,
                                SmallVectorImpl<Pattern *> &BodyPatterns,
                                Parser::DefaultArgumentInfo &DefaultArgs,
                                Pattern *FirstPattern) {
   SourceLoc LParenLoc;
   SourceLoc RParenLoc;
+  SmallVector<Pattern *, 4> ArgPatterns;
   SmallVector<TuplePatternElt, 8> ArgElts;
   SmallVector<TuplePatternElt, 8> BodyElts;
 
@@ -523,9 +523,6 @@ parseSelectorFunctionArguments(Parser &P,
     break;
   }
 
-  ArgPatterns.push_back(
-      TuplePattern::create(P.Context, LParenLoc, ArgElts, RParenLoc,
-                           /*hasVarArg=*/false,SourceLoc(), /*Implicit=*/true));
   BodyPatterns.push_back(
       TuplePattern::create(P.Context, LParenLoc, BodyElts, RParenLoc));
   return Status;
@@ -533,9 +530,8 @@ parseSelectorFunctionArguments(Parser &P,
 
 /// Map parsed parameters to argument and body patterns.
 ///
-/// \returns a pair (arg pattern, body pattern) describing the parsed
-/// parameters.
-static std::pair<Pattern *, Pattern *>
+/// \returns the pattern describing the parsed parameters.
+static Pattern*
 mapParsedParameters(Parser &parser,
                     SourceLoc leftParenLoc,
                     MutableArrayRef<Parser::ParsedParameter> params,
@@ -589,28 +585,21 @@ mapParsedParameters(Parser &parser,
 
   // Collect the elements of the tuple patterns for argument and body
   // parameters.
-  SmallVector<TuplePatternElt, 4> argElements;
-  SmallVector<TuplePatternElt, 4> bodyElements;
+  SmallVector<TuplePatternElt, 4> elements;
   SourceLoc ellipsisLoc;
   for (auto &param : params) {
-    // Create the argument pattern.
-    Pattern *arg = createParamPattern(param.InOutLoc,
-                                      param.IsLet, param.LetVarLoc,
-                                      param.FirstName, param.FirstNameLoc,
-                                      param.Type);
-
-    // Create the body pattern.
-    Pattern *body;
+    // Create the pattern.
+    Pattern *pattern;
     if (param.SecondNameLoc.isValid())
-      body = createParamPattern(param.InOutLoc,
-                                param.IsLet, param.LetVarLoc,
-                                param.SecondName, param.SecondNameLoc,
-                                param.Type);
+      pattern = createParamPattern(param.InOutLoc,
+                                   param.IsLet, param.LetVarLoc,
+                                   param.SecondName, param.SecondNameLoc,
+                                   param.Type);
     else
-      body = createParamPattern(param.InOutLoc,
-                                param.IsLet, param.LetVarLoc,
-                                param.FirstName, param.FirstNameLoc,
-                                param.Type);
+      pattern = createParamPattern(param.InOutLoc,
+                                   param.IsLet, param.LetVarLoc,
+                                   param.FirstName, param.FirstNameLoc,
+                                   param.Type);
 
     // If this parameter had an ellipsis, check whether it's the last parameter.
     if (param.EllipsisLoc.isValid()) {
@@ -632,19 +621,15 @@ mapParsedParameters(Parser &parser,
 
     // Create the tuple pattern elements.
     auto defArgKind = getDefaultArgKind(param.DefaultArg);
-    argElements.push_back(TuplePatternElt(arg, param.DefaultArg, defArgKind));
-    bodyElements.push_back(TuplePatternElt(body, param.DefaultArg, defArgKind));
+    elements.push_back(TuplePatternElt(pattern, param.DefaultArg, defArgKind));
 
     if (argNames)
       argNames->push_back(param.FirstName);
   }
 
-  return { TuplePattern::createSimple(ctx, leftParenLoc, argElements,
-                                      rightParenLoc, ellipsisLoc.isValid(),
-                                      ellipsisLoc),
-           TuplePattern::createSimple(ctx, leftParenLoc, bodyElements,
-                                      rightParenLoc, ellipsisLoc.isValid(),
-                                      ellipsisLoc) };
+  return TuplePattern::createSimple(ctx, leftParenLoc, elements,
+                                    rightParenLoc, ellipsisLoc.isValid(),
+                                    ellipsisLoc);
 }
 
 /// Parse function arguments.
@@ -659,7 +644,6 @@ mapParsedParameters(Parser &parser,
 ///
 ParserStatus
 Parser::parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
-                               SmallVectorImpl<Pattern *> &ArgPatterns,
                                SmallVectorImpl<Pattern *> &BodyPatterns,
                                DefaultArgumentInfo &DefaultArgs,
                                bool &HasSelectorStyleSignature) {
@@ -689,13 +673,12 @@ Parser::parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
                                      DefaultArgs, /*isClosure=*/false);
 
       // Turn the parameter clause into argument and body patterns.
-      auto mapped = mapParsedParameters(*this, leftParenLoc, params,
-                                        rightParenLoc, DefaultArgs,
-                                        isFirstParameterClause,
-                                        isFirstParameterClause ? &NamePieces
-                                                               : nullptr);
-      ArgPatterns.push_back(mapped.first);
-      BodyPatterns.push_back(mapped.second);
+      auto pattern = mapParsedParameters(*this, leftParenLoc, params,
+                                         rightParenLoc, DefaultArgs,
+                                         isFirstParameterClause,
+                                         isFirstParameterClause ? &NamePieces
+                                                                : nullptr);
+      BodyPatterns.push_back(pattern);
       isFirstParameterClause = false;
     }
 
@@ -716,8 +699,7 @@ Parser::parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
   // argument pattern into a single argument type and parse subsequent
   // selector forms.
   return ParserStatus(ArgPattern) |
-    parseSelectorFunctionArguments(*this, NamePieces,
-                                   ArgPatterns, BodyPatterns,
+    parseSelectorFunctionArguments(*this, NamePieces, BodyPatterns,
                                    DefaultArgs, ArgPattern.get());
 }
 
@@ -731,7 +713,6 @@ Parser::parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
 ParserStatus
 Parser::parseFunctionSignature(Identifier SimpleName,
                                DeclName &FullName,
-                               SmallVectorImpl<Pattern *> &argPatterns,
                                SmallVectorImpl<Pattern *> &bodyPatterns,
                                DefaultArgumentInfo &defaultArgs,
                                TypeRepr *&retType,
@@ -745,7 +726,7 @@ Parser::parseFunctionSignature(Identifier SimpleName,
   ParserStatus Status;
   // We force first type of a func declaration to be a tuple for consistency.
   if (Tok.is(tok::l_paren)) {
-    Status = parseFunctionArguments(NamePieces, argPatterns, bodyPatterns,
+    Status = parseFunctionArguments(NamePieces, bodyPatterns,
                                     defaultArgs, HasSelectorStyleSignature);
     FullName = DeclName(Context, SimpleName, 
                         llvm::makeArrayRef(NamePieces.begin() + 1,
@@ -757,7 +738,6 @@ Parser::parseFunctionSignature(Identifier SimpleName,
       assert(Status.hasCodeCompletion() || Status.isError());
       bodyPatterns.push_back(TuplePattern::create(Context, Tok.getLoc(),
                                                   {}, Tok.getLoc()));
-      argPatterns.push_back(bodyPatterns.back());
     }
   } else {
     diagnose(Tok, diag::func_decl_without_paren);
@@ -766,7 +746,6 @@ Parser::parseFunctionSignature(Identifier SimpleName,
     // Recover by creating a '() -> ?' signature.
     auto *EmptyTuplePattern =
         TuplePattern::create(Context, PreviousLoc, {}, PreviousLoc);
-    argPatterns.push_back(EmptyTuplePattern);
     bodyPatterns.push_back(EmptyTuplePattern);
     FullName = DeclName(Context, SimpleName, { });
   }
@@ -798,8 +777,7 @@ Parser::parseFunctionSignature(Identifier SimpleName,
 }
 
 ParserStatus
-Parser::parseConstructorArguments(DeclName &FullName,
-                                  Pattern *&ArgPattern, Pattern *&BodyPattern,
+Parser::parseConstructorArguments(DeclName &FullName, Pattern *&BodyPattern,
                                   DefaultArgumentInfo &DefaultArgs,
                                   bool &HasSelectorStyleSignature) {
   HasSelectorStyleSignature = false;
@@ -816,11 +794,10 @@ Parser::parseConstructorArguments(DeclName &FullName,
 
     // Turn the parameter clause into argument and body patterns.
     llvm::SmallVector<Identifier, 2> namePieces;
-    std::tie(ArgPattern, BodyPattern)
-      = mapParsedParameters(*this, leftParenLoc, params,
-                            rightParenLoc, DefaultArgs,
-                            /*isFirstParameterClause=*/true,
-                            &namePieces);
+    BodyPattern = mapParsedParameters(*this, leftParenLoc, params,
+                                      rightParenLoc, DefaultArgs,
+                                      /*isFirstParameterClause=*/true,
+                                      &namePieces);
 
     FullName = DeclName(Context, Context.Id_init, namePieces);
     return status;
@@ -835,9 +812,8 @@ Parser::parseConstructorArguments(DeclName &FullName,
     }
 
     // Create an empty tuple to recover.
-    ArgPattern = TuplePattern::createSimple(Context, Tok.getLoc(), {},
-                                            Tok.getLoc());
-    BodyPattern = ArgPattern->clone(Context);
+    BodyPattern = TuplePattern::createSimple(Context, Tok.getLoc(), {},
+                                             Tok.getLoc());
     FullName = DeclName(Context, Context.Id_init, { });
     return makeParserError();
   }
@@ -874,7 +850,6 @@ Parser::parseConstructorArguments(DeclName &FullName,
     break;
   }
 
-  ArgPattern = TuplePattern::create(Context, LParenLoc, ArgElts, RParenLoc);
   BodyPattern = TuplePattern::create(Context, LParenLoc, BodyElts,
                                      RParenLoc);
   FullName = DeclName(Context, Context.Id_init, NamePieces);

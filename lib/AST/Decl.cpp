@@ -2170,7 +2170,7 @@ FuncDecl *FuncDecl::createDeserialized(ASTContext &Context,
                                        DeclContext *Parent) {
   assert(NumParamPatterns > 0);
   void *Mem = Context.Allocate(
-      sizeof(FuncDecl) + 2 * NumParamPatterns * sizeof(Pattern *),
+      sizeof(FuncDecl) + NumParamPatterns * sizeof(Pattern *),
       alignof(FuncDecl));
   return ::new (Mem)
       FuncDecl(StaticLoc, StaticSpelling, FuncLoc, Name, NameLoc,
@@ -2181,15 +2181,13 @@ FuncDecl *FuncDecl::create(ASTContext &Context, SourceLoc StaticLoc,
                            StaticSpellingKind StaticSpelling,
                            SourceLoc FuncLoc, DeclName Name,
                            SourceLoc NameLoc, GenericParamList *GenericParams,
-                           Type Ty, ArrayRef<Pattern *> ArgParams,
-                           ArrayRef<Pattern *> BodyParams,
+                           Type Ty, ArrayRef<Pattern *> BodyParams,
                            TypeLoc FnRetType, DeclContext *Parent) {
-  assert(ArgParams.size() == BodyParams.size());
-  const unsigned NumParamPatterns = ArgParams.size();
+  const unsigned NumParamPatterns = BodyParams.size();
   auto *FD = FuncDecl::createDeserialized(
       Context, StaticLoc, StaticSpelling, FuncLoc, Name, NameLoc,
       GenericParams, Ty, NumParamPatterns, Parent);
-  FD->setDeserializedSignature(ArgParams, BodyParams, FnRetType);
+  FD->setDeserializedSignature(BodyParams, FnRetType);
   return FD;
 }
 
@@ -2200,15 +2198,10 @@ StaticSpellingKind FuncDecl::getCorrectStaticSpelling() const {
   return getCorrectStaticSpellingForDecl(this);
 }
 
-void FuncDecl::setDeserializedSignature(ArrayRef<Pattern *> ArgParams,
-                                        ArrayRef<Pattern *> BodyParams,
+void FuncDecl::setDeserializedSignature(ArrayRef<Pattern *> BodyParams,
                                         TypeLoc FnRetType) {
-  MutableArrayRef<Pattern *> ArgParamsRef = getArgParamPatterns();
   MutableArrayRef<Pattern *> BodyParamsRef = getBodyParamPatterns();
-  unsigned NumParamPatterns = ArgParamsRef.size();
-
-  assert(ArgParams.size() == BodyParams.size());
-  assert(NumParamPatterns == ArgParams.size());
+  unsigned NumParamPatterns = BodyParamsRef.size();
 
 #ifndef NDEBUG
   unsigned NumParams = getDeclContext()->isTypeContext()
@@ -2220,18 +2213,11 @@ void FuncDecl::setDeserializedSignature(ArrayRef<Pattern *> ArgParams,
 #endif
 
   for (unsigned i = 0; i != NumParamPatterns; ++i)
-    ArgParamsRef[i] = ArgParams[i];
-  for (unsigned i = 0; i != NumParamPatterns; ++i)
     BodyParamsRef[i] = BodyParams[i];
 
   // Set the decl context of any vardecls to this FuncDecl.
-  for (auto P : ArgParams)
+  for (auto P : BodyParams)
     setDeclContextOfPatternVars(P, this);
-
-  if (BodyParams != ArgParams) {
-    for (auto P : BodyParams)
-      setDeclContextOfPatternVars(P, this);
-  }
 
   this->FnRetType = FnRetType;
 }
@@ -2278,25 +2264,16 @@ bool FuncDecl::isBinaryOperator() const {
 }
 
 ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
-                                 Pattern *SelfArgParam, Pattern *ArgParams,
                                  Pattern *SelfBodyParam, Pattern *BodyParams,
                                  GenericParamList *GenericParams,
                                  DeclContext *Parent)
   : AbstractFunctionDecl(DeclKind::Constructor, Parent, Name,
                          ConstructorLoc, 2, GenericParams) {
-  setArgParams(SelfArgParam, ArgParams);
   setBodyParams(SelfBodyParam, BodyParams);
   
   ConstructorDeclBits.ComputedBodyInitKind = 0;
   ConstructorDeclBits.CompleteObjectInit = 0;
   ConstructorDeclBits.HasStubImplementation = 0;
-}
-
-void ConstructorDecl::setArgParams(Pattern *selfPattern, Pattern *argParams) {
-  ArgParams[0] = selfPattern;
-  ArgParams[1] = argParams;
-  setDeclContextOfPatternVars(selfPattern, this);
-  setDeclContextOfPatternVars(argParams, this);
 }
 
 void ConstructorDecl::setBodyParams(Pattern *selfPattern, Pattern *bodyParams) {

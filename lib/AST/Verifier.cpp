@@ -1355,32 +1355,13 @@ struct ASTNodeBase {};
 
     void verifyParsed(AbstractFunctionDecl *AFD) {
       PrettyStackTraceDecl debugStack("verifying AbstractFunctionDecl", AFD);
-
-      if (AFD->getArgParamPatterns().size() !=
-          AFD->getBodyParamPatterns().size()) {
-        Out << "number of arg and body parameter patterns should be equal";
-        abort();
-      }
-
-      if (AFD->hasSelectorStyleSignature()) {
-        unsigned NumExpectedParamPatterns = 1;
-        if (AFD->getImplicitSelfDecl())
-          NumExpectedParamPatterns++;
-        if (AFD->getArgParamPatterns().size() != NumExpectedParamPatterns) {
-          Out << "functions with selector-style signature should "
-                 "not be curried";
-          abort();
-        }
-      }
-
       verifyParsedBase(AFD);
     }
 
     void verifyParsed(ConstructorDecl *CD) {
       PrettyStackTraceDecl debugStack("verifying ConstructorDecl", CD);
 
-      if (CD->getArgParamPatterns().size() != 2 ||
-          CD->getBodyParamPatterns().size() != 2) {
+      if (CD->getBodyParamPatterns().size() != 2) {
         Out << "ConstructorDecl should have exactly two parameter patterns";
         abort();
       }
@@ -1426,8 +1407,7 @@ struct ASTNodeBase {};
         Out << "DestructorDecl can not be generic";
         abort();
       }
-      if (DD->getArgParamPatterns().size() != 1 ||
-          DD->getBodyParamPatterns().size() != 1) {
+      if (DD->getBodyParamPatterns().size() != 1) {
         Out << "DestructorDecl should have 'self' parameter pattern only";
         abort();
       }
@@ -1699,8 +1679,7 @@ struct ASTNodeBase {};
       PrettyStackTraceDecl debugStack("verifying FuncDecl", FD);
 
       unsigned MinParamPatterns = FD->getImplicitSelfDecl() ? 2 : 1;
-      if (FD->getArgParamPatterns().size() < MinParamPatterns ||
-          FD->getBodyParamPatterns().size() < MinParamPatterns) {
+      if (FD->getBodyParamPatterns().size() < MinParamPatterns) {
         Out << "should have at least " << MinParamPatterns
             << " parameter patterns";
         abort();
@@ -1710,7 +1689,7 @@ struct ASTNodeBase {};
         unsigned NumExpectedParamPatterns = 1;
         if (FD->getImplicitSelfDecl())
           NumExpectedParamPatterns++;
-        if (FD->getArgParamPatterns().size() != NumExpectedParamPatterns) {
+        if (FD->getBodyParamPatterns().size() != NumExpectedParamPatterns) {
           Out << "accessors should not be curried";
           abort();
         }

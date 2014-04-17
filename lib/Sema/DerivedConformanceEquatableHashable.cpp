@@ -194,8 +194,6 @@ deriveEquatable_enum_eq(TypeChecker &tc, EnumDecl *enumDecl) {
   params->setImplicit();
   params->setType(paramsTy);
   
-  Pattern *argParams = params->clone(C, Pattern::Implicit);
-  
   auto genericParams = enumDecl->getGenericParamsOfContext();
   
   auto boolTy = C.getBoolDecl()->getDeclaredType();
@@ -205,7 +203,7 @@ deriveEquatable_enum_eq(TypeChecker &tc, EnumDecl *enumDecl) {
                            SourceLoc(), name,
                            SourceLoc(),
                            genericParams,
-                           Type(), argParams, params,
+                           Type(), params,
                            TypeLoc::withoutLoc(boolTy),
                            &enumDecl->getModuleContext()->getDerivedFileUnit());
   eqDecl->setImplicit();
@@ -401,7 +399,7 @@ deriveHashable_enum_hashValue(TypeChecker &tc, EnumDecl *enumDecl) {
   FuncDecl *hashValueDecl =
       FuncDecl::create(C, SourceLoc(), StaticSpellingKind::None, SourceLoc(),
                      name, SourceLoc(), nullptr, Type(),
-                     params, params, TypeLoc::withoutLoc(intType), enumDecl);
+                     params, TypeLoc::withoutLoc(intType), enumDecl);
   hashValueDecl->setImplicit();
   hashValueDecl->setBodySynthesizer(deriveBodyHashable_enum_hashValue);
 

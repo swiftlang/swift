@@ -1689,7 +1689,7 @@ void Serializer::writeDecl(const Decl *D) {
                            fn->isMutating(),
                            fn->hasDynamicSelf(),
                            fn->getAttrs().isOptional(),
-                           fn->getArgParamPatterns().size(),
+                           fn->getBodyParamPatterns().size(),
                            addTypeRef(fn->getType()),
                            addTypeRef(fn->getInterfaceType()),
                            addDeclRef(fn->getOperatorDecl()),
@@ -1700,10 +1700,7 @@ void Serializer::writeDecl(const Decl *D) {
 
     writeGenericParams(fn->getGenericParams(), DeclTypeAbbrCodes);
 
-    // Write both argument and body parameters. This is important for proper
-    // error messages with selector-style declarations.
-    for (auto pattern : fn->getArgParamPatterns())
-      writePattern(pattern);
+    // Write the body parameters.
     for (auto pattern : fn->getBodyParamPatterns())
       writePattern(pattern);
 
@@ -1777,10 +1774,7 @@ void Serializer::writeDecl(const Decl *D) {
                                   nameComponents);
 
     writeGenericParams(ctor->getGenericParams(), DeclTypeAbbrCodes);
-    assert(ctor->getArgParamPatterns().size() == 2);
     assert(ctor->getBodyParamPatterns().size() == 2);
-    for (auto pattern : ctor->getArgParamPatterns())
-      writePattern(pattern);
     for (auto pattern : ctor->getBodyParamPatterns())
       writePattern(pattern);
     break;
@@ -1799,8 +1793,8 @@ void Serializer::writeDecl(const Decl *D) {
                                  dtor->isImplicit(),
                                  dtor->isObjC(),
                                  addTypeRef(dtor->getType()));
-    assert(dtor->getArgParamPatterns().size() == 1);
-    for (auto pattern : dtor->getArgParamPatterns())
+    assert(dtor->getBodyParamPatterns().size() == 1);
+    for (auto pattern : dtor->getBodyParamPatterns())
       writePattern(pattern);
     break;
   }

@@ -640,7 +640,6 @@ public:
   /// \param params The parameter types to the function.
   /// \param isVariadic Whether the function is variadic.
   /// \param isNoReturn Whether the function is noreturn.
-  /// \param argPatterns The externally-visible patterns for the parameters.
   /// \param bodyPatterns The patterns visible inside the function body.
   ///
   /// \returns the imported function type, or null if the type cannot be
@@ -648,7 +647,6 @@ public:
   Type importFunctionType(clang::QualType resultType,
                           ArrayRef<const clang::ParmVarDecl *> params,
                           bool isVariadic, bool isNoReturn,
-                          SmallVectorImpl<Pattern*> &argPatterns,
                           SmallVectorImpl<Pattern*> &bodyPatterns);
 
   /// \brief Import the type of an Objective-C method.
@@ -662,7 +660,6 @@ public:
   /// \param params The parameter types to the function.
   /// \param isVariadic Whether the function is variadic.
   /// \param isNoReturn Whether the function is noreturn.
-  /// \param argPatterns The externally-visible patterns for the parameters.
   /// \param bodyPatterns The patterns visible inside the function body.
   /// \param pHasSelectorStyleSignature if non-null it accepts a boolean for
   ///   whether the created arg/body patterns are different (selector-style).
@@ -675,7 +672,6 @@ public:
   Type importMethodType(clang::QualType resultType,
                         ArrayRef<const clang::ParmVarDecl *> params,
                         bool isVariadic, bool isNoReturn,
-                        SmallVectorImpl<Pattern*> &argPatterns,
                         SmallVectorImpl<Pattern*> &bodyPatterns,
                         bool *pHasSelectorStyleSignature,
                         DeclName methodName,
