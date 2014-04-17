@@ -99,6 +99,7 @@ private:
   const TypeInfo *convertEnumType(TypeBase *key, CanType type, EnumDecl *D);
   const TypeInfo *convertStructType(TypeBase *key, CanType type, StructDecl *D);
   const TypeInfo *convertFunctionType(SILFunctionType *T);
+  const TypeInfo *convertBlockStorageType(SILBlockStorageType *T);
   const TypeInfo *convertArchetypeType(ArchetypeType *T);
   const TypeInfo *convertInOutType(InOutType *T);
   const TypeInfo *convertExistentialMetatypeType(ExistentialMetatypeType *T);

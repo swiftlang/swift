@@ -72,6 +72,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/ADT/StringSwitch.h"
 
+#include "IndirectTypeInfo.h"
 #include "CallingConvention.h"
 #include "CallEmission.h"
 #include "Explosion.h"
@@ -692,6 +693,91 @@ namespace {
       return ReferenceCounting::Block;
     }
   };
+  
+  /// The type info class for the on-stack representation of an ObjC block.
+  ///
+  /// TODO: May not be fixed-layout if we capture generics.
+  class BlockStorageTypeInfo final
+    : public IndirectTypeInfo<BlockStorageTypeInfo, FixedTypeInfo>
+  {
+    Size CaptureOffset;
+  public:
+    BlockStorageTypeInfo(llvm::Type *type, Size size, Alignment align,
+                         IsPOD_t pod, Size captureOffset)
+      : IndirectTypeInfo(type, size, llvm::BitVector{}, align, pod),
+        CaptureOffset(captureOffset)
+    {}
+    
+    // The lowered type should be an LLVM struct comprising the block header
+    // (IGM.ObjCBlockStructTy) as its first element and the capture as its
+    // second.
+    
+    Address projectBlockHeader(IRGenFunction &IGF, Address storage) const {
+      return IGF.Builder.CreateStructGEP(storage, 0, Size(0));
+    }
+    
+    Address projectCapture(IRGenFunction &IGF, Address storage) const {
+      return IGF.Builder.CreateStructGEP(storage, 1, CaptureOffset);
+    }
+    
+    // TODO
+    // The frontend will currently never emit copy_addr or destroy_addr for
+    // block storage.
+    
+    void assignWithCopy(IRGenFunction &IGF, Address dest,
+                        Address src, CanType T) const override {
+      IGF.unimplemented(SourceLoc(), "copying @block_storage");
+    }
+    void initializeWithCopy(IRGenFunction &IGF, Address dest,
+                            Address src, CanType T) const override {
+      IGF.unimplemented(SourceLoc(), "copying @block_storage");
+    }
+    void destroy(IRGenFunction &IGF, Address addr, CanType T) const override {
+      IGF.unimplemented(SourceLoc(), "destroying @block_storage");
+    }
+  };
+}
+
+const TypeInfo *TypeConverter::convertBlockStorageType(SILBlockStorageType *T) {
+  // The block storage consists of the block header (ObjCBlockStructTy)
+  // followed by the lowered type of the capture.
+  auto &capture = IGM.getTypeInfoForLowered(T->getCaptureType());
+  
+  // TODO: Support dynamic-sized captures.
+  const FixedTypeInfo *fixedCapture = dyn_cast<FixedTypeInfo>(&capture);
+  llvm::Type *fixedCaptureTy;
+  // The block header is pointer aligned. The capture may be worse aligned.
+  Alignment align = IGM.getPointerAlignment();
+  Size captureOffset(
+    IGM.DataLayout.getStructLayout(IGM.ObjCBlockStructTy)->getSizeInBytes());
+  Size size = captureOffset;
+  IsPOD_t pod = IsNotPOD;
+  if (!fixedCapture) {
+    IGM.unimplemented(SourceLoc(), "dynamic @block_storage capture");
+    fixedCaptureTy = llvm::StructType::get(IGM.getLLVMContext(), {});
+  } else {
+    fixedCaptureTy = cast<FixedTypeInfo>(capture).getStorageType();
+    align = std::max(align, fixedCapture->getFixedAlignment());
+    captureOffset = captureOffset.roundUpToAlignment(align);
+    size = captureOffset + fixedCapture->getFixedSize();
+    pod = fixedCapture->isPOD(ResilienceScope::Component);
+  }
+  
+  llvm::Type *storageElts[] = {
+    IGM.ObjCBlockStructTy,
+    fixedCaptureTy,
+  };
+  
+  auto storageTy = llvm::StructType::get(IGM.getLLVMContext(), storageElts,
+                                         /*packed*/ false);
+  return new BlockStorageTypeInfo(storageTy, size, align, pod, captureOffset);
+}
+
+Address irgen::projectBlockStorageCapture(IRGenFunction &IGF,
+                                          Address storageAddr,
+                                          CanSILBlockStorageType storageTy) {
+  auto &tl = IGF.getTypeInfoForLowered(storageTy).as<BlockStorageTypeInfo>();
+  return tl.projectCapture(IGF, storageAddr);
 }
 
 const TypeInfo *TypeConverter::convertFunctionType(SILFunctionType *T) {

@@ -2945,8 +2945,11 @@ void IRGenSILFunction::visitOpenExistentialRefInst(OpenExistentialRefInst *i) {
 
 void IRGenSILFunction::visitProjectBlockStorageInst(ProjectBlockStorageInst *i){
   // TODO
-  IGM.unimplemented(i->getLoc().getSourceLoc(), "project_block_storage");
-  setLoweredAddress(SILValue(i, 0), getLoweredAddress(i->getOperand()));
+  Address block = getLoweredAddress(i->getOperand());
+  Address capture = projectBlockStorageCapture(*this, block,
+                       i->getOperand().getType().castTo<SILBlockStorageType>());
+  
+  setLoweredAddress(SILValue(i, 0), capture);
 }
 
 void IRGenSILFunction::visitInitBlockStorageHeaderInst(

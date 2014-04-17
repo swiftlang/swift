@@ -371,7 +371,8 @@ namespace {
     }
     
     RetTy visitSILBlockStorageType(CanSILBlockStorageType type) {
-      return this->visit(type->getCaptureType());
+      // Should not be loaded.
+      return asImpl().handleAddressOnly(type);
     }
   };
 

@@ -1,0 +1,32 @@
+// RUN: %swift -target x86_64-apple-darwin10 %s -emit-ir | FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+// CHECK-LABEL: define i8* @project_block_storage({ %objc_block, i8* }* noalias) {
+// CHECK-NEXT:  entry:
+// CHECK-NEXT:    %1 = getelementptr inbounds { %objc_block, i8* }* %0, i32 0, i32 1
+// CHECK-NEXT:    %2 = load i8** %1, align 8
+// CHECK-NEXT:    ret i8* %2
+// CHECK-NEXT:  }
+sil @project_block_storage : $@thin (@inout @block_storage Builtin.RawPointer) -> Builtin.RawPointer {
+entry(%0 : $*@block_storage Builtin.RawPointer):
+  %c = project_block_storage %0 : $*@block_storage Builtin.RawPointer
+  %p = load %c : $*Builtin.RawPointer
+  return %p : $Builtin.RawPointer
+}
+
+// CHECK-LABEL: define fp128 @overaligned_project_block_storage({ %objc_block, fp128 }* noalias) {
+// CHECK-NEXT:  entry:
+// CHECK-NEXT:    %1 = getelementptr inbounds { %objc_block, fp128 }* %0, i32 0, i32 1
+// CHECK-NEXT:    %2 = load fp128* %1, align 16
+// CHECK-NEXT:    ret fp128 %2
+// CHECK-NEXT:  }
+sil @overaligned_project_block_storage : $@thin (@inout @block_storage Builtin.FPIEEE128) -> Builtin.FPIEEE128 {
+entry(%0 : $*@block_storage Builtin.FPIEEE128):
+  %c = project_block_storage %0 : $*@block_storage Builtin.FPIEEE128
+  %p = load %c : $*Builtin.FPIEEE128
+  return %p : $Builtin.FPIEEE128
+}

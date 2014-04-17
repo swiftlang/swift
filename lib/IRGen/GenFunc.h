@@ -86,7 +86,12 @@ namespace irgen {
                        Explosion &args, Explosion *result,
                        Address indirectResult,
                        ArrayRef<Substitution> substitutions);
-
+  
+  /// Project the capture address from on-stack block storage.
+  Address projectBlockStorageCapture(IRGenFunction &IGF,
+                                     Address storageAddr,
+                                     CanSILBlockStorageType storageTy);
+    
 } // end namespace irgen
 } // end namespace swift
 
