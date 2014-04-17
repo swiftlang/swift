@@ -100,9 +100,9 @@ namespace {
 }
 
 
-ClangImporter::ClangImporter(ASTContext &ctx, bool splitPrepositions,
-                             bool implicitProperties)
-  : Impl(*new Implementation(ctx, splitPrepositions, implicitProperties))
+ClangImporter::ClangImporter(ASTContext &ctx,
+                             const ClangImporterOptions &clangImporterOpts)
+  : Impl(*new Implementation(ctx, clangImporterOpts))
 {
 }
 
@@ -123,8 +123,7 @@ void ClangImporter::clearTypeResolver() {
 ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef targetTriple,
     const ClangImporterOptions &clangImporterOpts) {
   std::unique_ptr<ClangImporter> importer{
-    new ClangImporter(ctx, ctx.LangOpts.SplitPrepositions,
-                      clangImporterOpts.InferImplicitProperties)
+    new ClangImporter(ctx, clangImporterOpts)
   };
 
   // Get the SearchPathOptions to use when creating the Clang importer.
@@ -371,6 +370,15 @@ Module *ClangImporter::loadModule(
   result->forAllVisibleModules(path, [](Module::ImportedModule import) {});
 
   return result;
+}
+
+ClangImporter::Implementation::Implementation(ASTContext &ctx,
+                                              const ClangImporterOptions &opts)
+  : SwiftContext(ctx),
+    SplitPrepositions(ctx.LangOpts.SplitPrepositions),
+    InferImplicitProperties(opts.InferImplicitProperties),
+    ImportFactoryMethodsAsConstructors(opts.ImportFactoryMethodsAsConstructors)
+{
 }
 
 ClangModuleUnit *
@@ -794,6 +802,81 @@ DeclName ClangImporter::Implementation::mapSelectorToDeclName(
   // Cache the result and return.
   SelectorMappings[{selector, isInitializer}] = result;
   return result;
+}
+
+DeclName ClangImporter::Implementation::mapFactorySelectorToInitializerName(
+           ObjCSelector selector,
+           StringRef className) {
+  auto firstPiece = selector.getSelectorPieces()[0];
+  if (firstPiece.empty())
+    return DeclName();
+
+  // Match the camelCase beginning of the first selector piece to the
+  // ending of the class name.
+  auto firstPieceStr = firstPiece.str();
+  auto methodWords = camel_case::getWords(firstPieceStr);
+  auto classWords = camel_case::getWords(className);
+  auto methodWordIter = methodWords.begin(),
+    methodWordIterEnd = methodWords.end();
+  auto classWordRevIter = classWords.rbegin(),
+    classWordRevIterEnd = classWords.rend();
+
+  // Find the last instance of the first word in the method's name within
+  // the words in the class name.
+  while (classWordRevIter != classWordRevIterEnd &&
+         !camel_case::sameWordIgnoreFirstCase(*methodWordIter,
+                                              *classWordRevIter)) {
+    ++classWordRevIter;
+  }
+
+  // If we didn't find the first word in the method's name at all, we're
+  // done.
+  if (classWordRevIter == classWordRevIterEnd)
+    return DeclName();
+
+  // Now, match from the first word up until the end of the class.
+  auto classWordIter = classWordRevIter.base(),
+  classWordIterEnd = classWords.end();
+  ++methodWordIter;
+  while (classWordIter != classWordIterEnd &&
+         methodWordIter != methodWordIterEnd &&
+         camel_case::sameWordIgnoreFirstCase(*classWordIter,
+                                             *methodWordIter)) {
+    ++classWordIter;
+    ++methodWordIter;
+  }
+
+  // If we didn't reach the end of the class name, don't match.
+  if (classWordIter != classWordIterEnd)
+    return DeclName();
+
+  // We found the chopping point. Form the first argument name.
+  llvm::SmallString<32> scratch;
+  SmallVector<Identifier, 4> argumentNames;
+  argumentNames.push_back(
+    importArgName(SwiftContext,
+                  splitSelectorPieceAt(firstPieceStr,
+                                       methodWordIter.getPosition(),
+                                       scratch).second));
+
+  // Handle nullary factory methods.
+  if (selector.getNumArgs() == 0) {
+    if (argumentNames[0].empty())
+      return DeclName(SwiftContext, SwiftContext.Id_init, { });
+
+    // FIXME: Fake up an empty tuple here?
+    return DeclName();
+  }
+
+  // Map the remaining selector pieces.
+  for (auto piece : selector.getSelectorPieces().slice(1)) {
+    if (piece.empty())
+      argumentNames.push_back(piece);
+    else
+      argumentNames.push_back(importArgName(SwiftContext, piece.str()));
+  }
+
+  return DeclName(SwiftContext, SwiftContext.Id_init, argumentNames);
 }
 
 void ClangImporter::Implementation::populateKnownDesignatedInits() {

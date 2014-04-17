@@ -40,6 +40,12 @@
 #define DEBUG_TYPE "Clang module importer"
 
 STATISTIC(NumTotalImportedEntities, "# of imported clang entities");
+STATISTIC(NumFactoryMethodsNSError,
+          "# of factory methods not mapped due to NSError");
+STATISTIC(NumFactoryMethodsWrongResult,
+          "# of factory methods not mapped due to an incorrect result type");
+STATISTIC(NumFactoryMethodsAsInitializers,
+          "# of factory methods mapped to initializers");
 
 using namespace swift;
 
@@ -1735,6 +1741,63 @@ namespace {
       return false;
     }
 
+    /// If the given method is a factory method, import it as a constructor
+    Optional<ConstructorDecl *>
+    importFactoryMethodAsConstructor(const clang::ObjCMethodDecl *decl,
+                                     ObjCSelector selector,
+                                     DeclContext *dc) {
+      if (!Impl.ImportFactoryMethodsAsConstructors)
+        return Nothing;
+
+      // Only class methods can be mapped to constructors.
+      if (!decl->isClassMethod())
+        return Nothing;
+
+      // Said class methods must be in an actual class.
+      auto objcClass = decl->getClassInterface();
+      if (!objcClass)
+        return Nothing;
+
+      // Check whether the name fits the pattern.
+      DeclName initName
+        = Impl.mapFactorySelectorToInitializerName(selector,
+                                                   objcClass->getName());
+      if (!initName)
+        return Nothing;
+
+      // Check whether the result is instancetype.
+      if (!decl->hasRelatedResultType()) {
+        ++NumFactoryMethodsWrongResult;
+        return Nothing;
+      }
+
+      // Check whether there is an NSError parameter, which implies failability.
+      // FIXME: Revisit once we have failing initializers.
+      for (auto param : decl->parameters()) {
+        if (auto ptr = param->getType()->getAs<clang::PointerType>()) {
+          if (auto classPtr = ptr->getPointeeType()
+                                ->getAs<clang::ObjCObjectPointerType>()) {
+            if (auto classDecl = classPtr->getInterfaceDecl()) {
+              if (classDecl->getName() == "NSError") {
+                ++NumFactoryMethodsNSError;
+                return Nothing;
+              }
+            }
+          }
+        }
+      }
+
+      // FIXME: Check for redundant initializers. It's very, very hard to
+      // avoid order dependencies here. Perhaps we should just deal with the
+      // ambiguity later?
+      auto result = importConstructor(decl, dc, false,
+                                      InitializerKind::Convenience,
+                                      /*required=*/false, selector, initName);
+      if (result)
+        ++NumFactoryMethodsAsInitializers;
+      return result;
+    }
+
     Decl *VisitObjCMethodDecl(const clang::ObjCMethodDecl *decl,
                               DeclContext *dc,
                               bool forceClassMethod = false) {
@@ -1764,6 +1827,10 @@ namespace {
       bool isInstance = decl->isInstanceMethod() && !forceClassMethod;
       if (methodAlreadyImported(selector, isInstance, dc))
         return nullptr;
+
+      // If this is a factory method, try to import it as a constructor.
+      if (auto factory = importFactoryMethodAsConstructor(decl, selector, dc))
+        return *factory;
 
       DeclName name = Impl.mapSelectorToDeclName(selector,
                                                  /*isInitializer=*/false);
@@ -2009,10 +2076,6 @@ namespace {
                                        bool implicit,
                                        Optional<InitializerKind> kind,
                                        bool required) {
-      // Figure out the type of the container.
-      auto containerTy = dc->getDeclaredTypeOfContext();
-      assert(containerTy && "Method in non-type context?");
-
       // Only methods in the 'init' family can become constructors.
       assert(objcMethod->getMethodFamily() == clang::OMF_init &&
              "Not an init method");
@@ -2028,21 +2091,31 @@ namespace {
       if (methodAlreadyImported(selector, /*isInstance=*/false, dc))
         return nullptr;
 
-      // Find the interface, if we can.
-      const clang::ObjCInterfaceDecl *interface = nullptr;
-      if (isa<clang::ObjCProtocolDecl>(objcMethod->getDeclContext())) {
-        // FIXME: Part of the mirroring hack.
-        if (auto classDecl = containerTy->getClassOrBoundGenericClass())
-          interface = dyn_cast_or_null<clang::ObjCInterfaceDecl>(
-                        classDecl->getClangDecl());
-      } else {
-        // For non-protocol methods, just look for the interface.
-        interface = objcMethod->getClassInterface();
-      }
-
-      SourceLoc loc;
+      // Map the name and complete the import.
       auto name = Impl.mapSelectorToDeclName(selector, /*isInitializer=*/true);
+      return importConstructor(objcMethod, dc, implicit, kind, required,
+                               selector, name);
+    }
 
+    /// \brief Given an imported method, try to import it as a constructor.
+    ///
+    /// Objective-C methods in the 'init' family are imported as
+    /// constructors in Swift, enabling object construction syntax, e.g.,
+    ///
+    /// \code
+    /// // in objc: [[NSArray alloc] initWithCapacity:1024]
+    /// NSArray(withCapacity: 1024)
+    /// \endcode
+    ///
+    /// This variant of the function is responsible for actually binding the
+    /// constructor declaration appropriately.
+    ConstructorDecl *importConstructor(const clang::ObjCMethodDecl *objcMethod,
+                                       DeclContext *dc,
+                                       bool implicit,
+                                       Optional<InitializerKind> kind,
+                                       bool required,
+                                       ObjCSelector selector,
+                                       DeclName name) {
       // Add the implicit 'self' parameter patterns.
       SmallVector<Pattern *, 4> bodyPatterns;
       auto selfTy = getSelfTypeForContext(dc);
@@ -2063,9 +2136,25 @@ namespace {
         return nullptr;
 
       // Check whether we've already created the constructor.
-      known = Impl.Constructors.find({objcMethod, dc});
+      auto known = Impl.Constructors.find({objcMethod, dc});
       if (known != Impl.Constructors.end())
         return known->second;
+
+      // Figure out the type of the container.
+      auto containerTy = dc->getDeclaredTypeOfContext();
+      assert(containerTy && "Method in non-type context?");
+
+      // Find the interface, if we can.
+      const clang::ObjCInterfaceDecl *interface = nullptr;
+      if (isa<clang::ObjCProtocolDecl>(objcMethod->getDeclContext())) {
+        // FIXME: Part of the mirroring hack.
+        if (auto classDecl = containerTy->getClassOrBoundGenericClass())
+          interface = dyn_cast_or_null<clang::ObjCInterfaceDecl>(
+                        classDecl->getClangDecl());
+      } else {
+        // For non-protocol methods, just look for the interface.
+        interface = objcMethod->getClassInterface();
+      }
 
       // A constructor returns an object of the type, not 'id'.
       // This is effectively implementing related-result-type semantics.
@@ -2083,7 +2172,7 @@ namespace {
 
       // Create the actual constructor.
       auto result = new (Impl.SwiftContext)
-          ConstructorDecl(name, loc, selfPat, bodyPatterns.back(), 
+          ConstructorDecl(name, SourceLoc(), selfPat, bodyPatterns.back(),
                           /*GenericParams=*/0, dc);
       result->setClangNode(objcMethod);
       addObjCAttribute(result, selector);

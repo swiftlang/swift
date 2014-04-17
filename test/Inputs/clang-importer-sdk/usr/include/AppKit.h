@@ -57,3 +57,11 @@
 @interface NSTableViewController : NSViewController
 -(instancetype)initWithInt:(NSInteger)value NS_DESIGNATED_INITIALIZER;
 @end
+
+@interface NSObjectFactory : NSObject
++(instancetype)objectFactory;
++(instancetype)objectFactoryWithInteger:(NSInteger)i;
++(instancetype)factoryWithDouble:(double)i;
++(id)factoryWithString:(NSString *)s;
+@end
+

@@ -177,10 +177,7 @@ public:
     Constants
   };
 
-  Implementation(ASTContext &ctx, bool splitPrepositions,
-                 bool implicitProperties)
-    : SwiftContext(ctx), SplitPrepositions(splitPrepositions),
-      InferImplicitProperties(implicitProperties) { }
+  Implementation(ASTContext &ctx, const ClangImporterOptions &opts);
 
   ~Implementation() {
     assert(NumCurrentImportingEntities == 0);
@@ -191,6 +188,7 @@ public:
 
   const bool SplitPrepositions;
   const bool InferImplicitProperties;
+  const bool ImportFactoryMethodsAsConstructors;
 
 private:
   /// \brief A count of the number of load module operations.
@@ -452,6 +450,18 @@ public:
   /// \param isInitializer Whether this name should be mapped as an
   /// initializer.
   DeclName mapSelectorToDeclName(ObjCSelector selector, bool isInitializer);
+
+  /// Try to map the given selector, which may be the name of a factory method,
+  /// to the name of an initializer.
+  ///
+  /// \param selector The selector to map.
+  ///
+  /// \param className The name of the class in which the method occurs.
+  ///
+  /// \returns the initializer name for this factory method, or an empty
+  /// name if this selector does not fit the pattern.
+  DeclName mapFactorySelectorToInitializerName(ObjCSelector selector,
+                                               StringRef className);
 
   /// \brief Import the given Swift source location into Clang.
   clang::SourceLocation importSourceLoc(SourceLoc loc);
