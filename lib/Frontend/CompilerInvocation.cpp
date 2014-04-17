@@ -764,24 +764,6 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.OptLevel = 0;
   }
 
-  if (const Arg *A = Args.getLastArg(OPT_O_Group)) {
-    if (A->getOption().matches(OPT_O0)) {
-      Opts.OptLevel = 0;
-    }
-    else {
-      unsigned OptLevel;
-      if (StringRef(A->getValue()).getAsInteger(10, OptLevel) || OptLevel > 3) {
-        Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                       A->getAsString(Args), A->getValue());
-        return true;
-      }
-
-      Opts.OptLevel = OptLevel;
-    }
-  } else {
-    Opts.OptLevel = 0;
-  }
-
   if (const Arg *A = Args.getLastArg(OPT_target_cpu)) {
     Opts.TargetCPU = A->getValue();
   }
