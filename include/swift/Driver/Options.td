@@ -192,6 +192,7 @@ def O_Group : OptionGroup<"<optimization level options>">;
 
 def O0 : Flag<["-"], "O0">, Group<O_Group>, Flags<[FrontendOption]>;
 def O : Joined<["-"], "O">, Group<O_Group>, Flags<[FrontendOption]>;
+def OFast : Flag<["-"], "OFast">, Group<O_Group>, Flags<[FrontendOption]>;
 
 // Assert configuration identifiers.
 

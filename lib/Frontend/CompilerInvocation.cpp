@@ -684,6 +684,13 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
 
     if (A->getOption().matches(OPT_O0)) {
       IRGenOpts.OptLevel = 0;
+    } else if (A->getOption().matches(OPT_OFast)) {
+      // Set the maximum optimization level and remove all runtime checks.
+      IRGenOpts.OptLevel = MaxLevel;
+      // Unchecked casts.
+      IRGenOpts.DisableAllRuntimeChecks = true;
+      // Removal of cond_fail (overflow on binary operations).
+      Opts.RemoveRuntimeAsserts = true;
     } else {
       unsigned OptLevel;
       if (StringRef(A->getValue()).getAsInteger(10, OptLevel) ||
