@@ -178,10 +178,9 @@ public:
   };
 
   Implementation(ASTContext &ctx, bool splitPrepositions,
-                 bool implicitProperties, bool ignoreAdapterModules)
+                 bool implicitProperties)
     : SwiftContext(ctx), SplitPrepositions(splitPrepositions),
-      InferImplicitProperties(implicitProperties),
-      IgnoreAdapterModules(ignoreAdapterModules) { }
+      InferImplicitProperties(implicitProperties) { }
 
   ~Implementation() {
     assert(NumCurrentImportingEntities == 0);
@@ -192,7 +191,6 @@ public:
 
   const bool SplitPrepositions;
   const bool InferImplicitProperties;
-  const bool IgnoreAdapterModules;
 
 private:
   /// \brief A count of the number of load module operations.

@@ -270,8 +270,6 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
 
   Args.AddLastArg(Arguments, options::OPT_split_objc_selectors);
 
-  Args.AddLastArg(Arguments, options::OPT_ignore_overlays);
-
   // Pass the optimization level down to the frontend.
   Args.AddLastArg(Arguments, options::OPT_O_Group);
 
