@@ -492,6 +492,9 @@ struct ExtractBriefTestData ExtractBriefTests[] = {
   { { "aaa", "bbb" },
     "aaa bbb",
     "<paragraph>aaa\nbbb</paragraph>" }, // Correct.
+  { { "& < > \" '" },
+    "& < > \" '",
+    "<paragraph>&amp; &lt; &gt; &quot; &apos;</paragraph>" }, // Correct.
   { { "aaa", " " },
     "aaa",
     "<paragraph>aaa</paragraph>" }, // Correct.
@@ -1248,6 +1251,33 @@ struct ExtractBriefTestData ExtractBriefTests[] = {
       "<list_item><paragraph>bbb</paragraph></list_item>"
     "</enumerated_list>"
   }, // Correct.
+  { { "* aaa",
+      "  :bbb: ccc",
+      "  :ddd: eee",
+      "  :fff: ggg" }, "",
+    "<bullet_list>"
+      "<list_item>"
+        "<paragraph>aaa\n:bbb: ccc\n:ddd: eee\n:fff: ggg</paragraph>"
+      "</list_item>"
+    "</bullet_list>" }, // Correct.
+  { { "* aaa",
+      "",
+      "  :bbb: ccc",
+      "  :ddd: eee",
+      "  :fff: ggg" }, "",
+    "<bullet_list>"
+      "<list_item>"
+        "<paragraph>aaa</paragraph>"
+        "<field_list>"
+          "<field>"
+            "<field_name>bbb</field_name>"
+            "<field_body>"
+              "<paragraph>ccc\n:ddd: eee\n:fff: ggg</paragraph>"
+            "</field_body>"
+          "</field>"
+        "</field_list>"
+      "</list_item>"
+    "</bullet_list>" }, // FIXME: WRONG
 
   // Definition lists.
   { { "aaa",
@@ -1543,10 +1573,10 @@ struct ExtractBriefTestData ExtractBriefTests[] = {
   { { "`aaa`__" }, "`aaa`__", "<paragraph>`aaa`__</paragraph>" },
   { { "`aaa <http://example.org/>`_" },
     "`aaa <http://example.org/>`_",
-    "<paragraph>`aaa <http://example.org/>`_</paragraph>"},
+    "<paragraph>`aaa &lt;http://example.org/&gt;`_</paragraph>"},
   { { "`aaa <foo.txt\\_>`__" },
     "`aaa <foo.txt\\_>`__",
-    "<paragraph>`aaa <foo.txt\\_>`__</paragraph>" },
+    "<paragraph>`aaa &lt;foo.txt\\_&gt;`__</paragraph>" },
 };
 INSTANTIATE_TEST_CASE_P(
     ReSTTest, ExtractBriefTest,

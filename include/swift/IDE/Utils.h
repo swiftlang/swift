@@ -21,8 +21,6 @@ namespace llvm {
 }
 
 namespace swift {
-class Decl;
-
 namespace ide {
 
 /// Returns true if the input source is fully formed, or false if, for example,
@@ -30,13 +28,8 @@ namespace ide {
 bool isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf);
 bool isSourceInputComplete(StringRef Text);
 
-/// If the declaration has a documentation comment, prints the comment to \p OS
-/// in Clang-like XML format.
-///
-/// \returns true if the declaration has a documentation comment.
-bool getDocumentationCommentAsXML(const Decl *D, raw_ostream &OS);
-
 } // namespace ide
 } // namespace swift
 
 #endif // SWIFT_IDE_UTILS_H
+

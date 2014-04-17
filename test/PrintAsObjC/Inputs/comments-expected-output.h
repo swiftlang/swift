@@ -5,9 +5,22 @@ SWIFT_CLASS("_TtC8comments4A000")
 
 
 
-/// Aaa.  A10.  Bbb.
-SWIFT_CLASS("_TtC8comments4A010")
-@interface A010
+/// Aaa.  A010.  Bbb.
+SWIFT_CLASS("_TtC8comments21A010_AttachToEntities")
+@interface A010_AttachToEntities
+
+/// Aaa.  init().
+- (instancetype)init OBJC_DESIGNATED_INITIALIZER;
+- (NSInteger)objectAtIndexedSubscript:(NSInteger)i;
+- (void)setObject:(NSInteger)newValue atIndexedSubscript:(NSInteger)i;
+
+/// Aaa.  v1.
+@property (nonatomic) NSInteger v1;
+@end
+
+
+SWIFT_CLASS("_TtC8comments18A100_EmptyComments")
+@interface A100_EmptyComments
 
 - (void)f0;
 
@@ -20,44 +33,76 @@ SWIFT_CLASS("_TtC8comments4A010")
 
 /// <ul><li><p>Aaa.</p></li></ul>
 - (void)f4;
+- (instancetype)init OBJC_DESIGNATED_INITIALIZER;
+@end
 
-/// Aaa.  f5.
+
+SWIFT_CLASS("_TtC8comments13A110_Escaping")
+@interface A110_Escaping
+
+/// & < > " '
+- (void)f0;
+- (instancetype)init OBJC_DESIGNATED_INITIALIZER;
+@end
+
+
+SWIFT_CLASS("_TtC8comments10A120_Brief")
+@interface A120_Brief
+
+/// Aaa.
+- (void)f0;
+
+/// Aaa.
+///
+/// Bbb.
+- (void)f1;
+
+/// Aaa.
+///
+/// <blockquote><p>Bbb.</p></blockquote>
+- (void)f2;
+
+/// Aaa.
+///
+/// Bbb.
+- (void)f3;
+- (instancetype)init OBJC_DESIGNATED_INITIALIZER;
+@end
+
+
+SWIFT_CLASS("_TtC8comments20A200_ParamAndReturns")
+@interface A200_ParamAndReturns
+
+/// Aaa.  f0.
 ///
 /// \param first Bbb.
 ///
 /// \param second Ccc.  Ddd.
 /// Eee.
-- (void)f5:(NSInteger)first second:(double)second;
+- (void)f0:(NSInteger)first second:(double)second;
 
-/// Aaa.  f6.
+/// Aaa.  f1.
 ///
 /// \param first Bbb.
 ///
 /// \returns Ccc.
 /// Ddd.
-- (void)f6:(NSInteger)first;
+- (void)f1:(NSInteger)first;
 
-/// Aaa.  f7.
+/// Aaa.  f2.
 ///
 /// \returns Ccc.
 /// Ddd.
 ///
 /// \returns Eee.
 /// Fff.
-- (void)f7;
-
-/// Aaa.  init().
+- (void)f2;
 - (instancetype)init OBJC_DESIGNATED_INITIALIZER;
-- (NSInteger)objectAtIndexedSubscript:(NSInteger)i;
-- (void)setObject:(NSInteger)newValue atIndexedSubscript:(NSInteger)i;
-
-/// Aaa.  v1.
-@property (nonatomic) NSInteger v1;
 @end
 
 
-SWIFT_CLASS("_TtC8comments15A020_BulletList")
-@interface A020_BulletList
+SWIFT_CLASS("_TtC8comments15A210_BulletList")
+@interface A210_BulletList
 
 /// <ul><li><p>Aaa.</p></li><li><p>Bbb.
 /// Ccc.</p></li></ul>
@@ -66,8 +111,8 @@ SWIFT_CLASS("_TtC8comments15A020_BulletList")
 @end
 
 
-SWIFT_CLASS("_TtC8comments19A030_EnumeratedList")
-@interface A030_EnumeratedList
+SWIFT_CLASS("_TtC8comments19A220_EnumeratedList")
+@interface A220_EnumeratedList
 
 /// <ol><li><p>Aaa.</p></li><li><p>Bbb.
 /// Ccc.</p></li></ol>
@@ -76,8 +121,8 @@ SWIFT_CLASS("_TtC8comments19A030_EnumeratedList")
 @end
 
 
-SWIFT_CLASS("_TtC8comments19A040_DefinitionList")
-@interface A040_DefinitionList
+SWIFT_CLASS("_TtC8comments19A230_DefinitionList")
+@interface A230_DefinitionList
 
 /// <dl><dt>Aaa</dt><dd><p>Bbb.</p></dd><dt>Ccc</dt><dd><p>Ddd.</p></dd><dt>Eee : Fff</dt><dd><p>Ggg.</p></dd><dt>``Hhh``</dt><dd><p>Jjj.</p></dd></dl>
 - (void)f0;
@@ -85,18 +130,23 @@ SWIFT_CLASS("_TtC8comments19A040_DefinitionList")
 @end
 
 
-SWIFT_CLASS("_TtC8comments14A050_FieldList")
-@interface A050_FieldList
+SWIFT_CLASS("_TtC8comments14A240_FieldList")
+@interface A240_FieldList
 
 /// <dl><dt>unknown</dt><dd><p>Aaa.
 /// Bbb.</p></dd></dl>
 - (void)f0;
+
+/// <ul><li><p>Aaa.</p><dl><dt>param</dt><dd><p>Aaa.
+/// :returns: Bbb.
+/// :unknown: Ccc.</p></dd></dl></li></ul>
+- (void)f1;
 - (instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 
 
-SWIFT_CLASS("_TtC8comments15A060_OptionList")
-@interface A060_OptionList
+SWIFT_CLASS("_TtC8comments15A250_OptionList")
+@interface A250_OptionList
 
 /// -a   Aaa.
 /// -b   Bbb.
@@ -107,8 +157,8 @@ SWIFT_CLASS("_TtC8comments15A060_OptionList")
 @end
 
 
-SWIFT_CLASS("_TtC8comments15A070_BlockQuote")
-@interface A070_BlockQuote
+SWIFT_CLASS("_TtC8comments15A260_BlockQuote")
+@interface A260_BlockQuote
 
 /// Aaa.
 ///

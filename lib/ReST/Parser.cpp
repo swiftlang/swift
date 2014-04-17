@@ -13,6 +13,7 @@
 #include "swift/ReST/Parser.h"
 #include "Detail.h"
 #include "swift/ReST/LineList.h"
+#include "swift/ReST/XMLUtils.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "clang/Basic/CharInfo.h"
 
@@ -950,11 +951,11 @@ struct CommentToDocutilsXMLConverter {
   void printTextAndInline(const TextAndInline *T) {
     if (T->isLinePart()) {
       LinePart LP = T->getLinePart();
-      OS << LP.Text;
+      appendWithXMLEscaping(OS, LP.Text);
     } else {
       LineListRef LL = T->getLines();
       for (unsigned i = 0, e = LL.size(); i != e; ++i) {
-        OS << LL[i].Text.drop_front(LL[i].FirstTextByte);
+        appendWithXMLEscaping(OS, LL[i].Text.drop_front(LL[i].FirstTextByte));
         if (i != e - 1)
           OS << '\n';
       }

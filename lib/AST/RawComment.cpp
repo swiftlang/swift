@@ -281,7 +281,17 @@ const FullComment::CommentParts &FullComment::getParts() const {
     return Parts.getValue();
 
   Parts = CommentParts();
+  bool IsFirstChild = true;
   for (const auto *N : Doc->getChildren()) {
+    // If the first document child is a paragraph, consider it a brief
+    // description.
+    if (IsFirstChild) {
+      IsFirstChild = false;
+      if (const auto *P = dyn_cast<llvm::rest::Paragraph>(N)) {
+        Parts->Brief = P;
+        continue;
+      }
+    }
     if (const auto *FL = dyn_cast<llvm::rest::FieldList>(N)) {
       for (const auto *F : FL->getChildren()) {
         if (isFieldNamed(F, "param"))

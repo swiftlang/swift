@@ -206,6 +206,12 @@ else()
    set(SWIFT_COMPILER "${PATH_TO_SWIFT_BUILD}/${CMAKE_CFG_INTDIR}/bin/swift")
 endif()
 
+# FIXME: unify with CLANG_HAVE_LIBXML, which is set in LLVM anyway.
+find_package(LibXml2)
+if(LIBXML2_FOUND)
+  set(SWIFT_HAVE_LIBXML 1)
+endif()
+
 # Xcode: use libc++ and c++11 using proper build settings.
 if ( XCODE )
   # Force usage of Clang.

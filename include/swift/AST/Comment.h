@@ -38,6 +38,7 @@ public:
   public:
     SmallVector<const llvm::rest::Field *, 8> Params;
     SmallVector<const llvm::rest::Field *, 4> Returns;
+    const llvm::rest::Paragraph *Brief = nullptr;
     SmallVector<const llvm::rest::ReSTASTNode *, 4> MiscTopLevelNodes;
   };
 
