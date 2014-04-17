@@ -187,15 +187,15 @@ static bool couldSimplifyUsers(SILArgument *BBArg, SILValue Val) {
 
   // If the value being substituted is an enum, check to see if there are any
   // switches on it.
-  if (isa<EnumInst>(Val)) {
-    for (auto UI : BBArg->getUses()) {
-      auto *User = UI->getUser();
-      if (isa<SwitchEnumInst>(User))
-        return true;
-    }
+  auto *EI = dyn_cast<EnumInst>(Val);
+  if (!EI)
     return false;
-  }
 
+  for (auto UI : BBArg->getUses()) {
+    auto *User = UI->getUser();
+    if (isa<SwitchEnumInst>(User))
+      return true;
+  }
   return false;
 }
 
@@ -502,37 +502,39 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
 /// simplifySwitchEnumBlock - Simplify a basic block that ends with a
 /// switch_enum instruction.
 bool SimplifyCFG::simplifySwitchEnumBlock(SwitchEnumInst *SEI) {
-  if (auto *EI = dyn_cast<EnumInst>(SEI->getOperand())) {
-    auto *LiveBlock = SEI->getCaseDestination(EI->getElement());
-    auto *ThisBB = SEI->getParent();
+  auto *EI = dyn_cast<EnumInst>(SEI->getOperand());
+  if (!EI)
+    return false;
 
-    bool DroppedLiveBlock = false;
-    // Copy the successors into a vector, dropping one entry for the liveblock.
-    SmallVector<SILBasicBlock*, 4> Dests;
-    for (auto &S : SEI->getSuccessors()) {
-      if (S == LiveBlock && !DroppedLiveBlock)
-        DroppedLiveBlock = true;
-      else
-        Dests.push_back(S);
+  auto *LiveBlock = SEI->getCaseDestination(EI->getElement());
+  auto *ThisBB = SEI->getParent();
+
+  bool DroppedLiveBlock = false;
+  // Copy the successors into a vector, dropping one entry for the liveblock.
+  SmallVector<SILBasicBlock*, 4> Dests;
+  for (auto &S : SEI->getSuccessors()) {
+    if (S == LiveBlock && !DroppedLiveBlock) {
+      DroppedLiveBlock = true;
+      continue;
     }
-    
-    if (EI->hasOperand() && !LiveBlock->bbarg_empty())
-      SILBuilder(SEI).createBranch(SEI->getLoc(), LiveBlock,
-                                   EI->getOperand());
-    else
-      SILBuilder(SEI).createBranch(SEI->getLoc(), LiveBlock);
-    SEI->eraseFromParent();
-    if (EI->use_empty()) EI->eraseFromParent();
-    
-    addToWorklist(ThisBB);
-    
-    for (auto B : Dests)
-      simplifyAfterDroppingPredecessor(B);
-    addToWorklist(LiveBlock);
-    ++NumConstantFolded;
-    return true;
+    Dests.push_back(S);
   }
-  return false;
+    
+  if (EI->hasOperand() && !LiveBlock->bbarg_empty())
+    SILBuilder(SEI).createBranch(SEI->getLoc(), LiveBlock,
+                                 EI->getOperand());
+  else
+    SILBuilder(SEI).createBranch(SEI->getLoc(), LiveBlock);
+  SEI->eraseFromParent();
+  if (EI->use_empty()) EI->eraseFromParent();
+    
+  addToWorklist(ThisBB);
+    
+  for (auto B : Dests)
+    simplifyAfterDroppingPredecessor(B);
+  addToWorklist(LiveBlock);
+  ++NumConstantFolded;
+  return true;
 }
 
 void RemoveUnreachable::visit(SILBasicBlock *BB) {
