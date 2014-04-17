@@ -2854,6 +2854,155 @@ void irgen::emitBridgeToBlock(IRGenFunction &IGF,
   outBlock.add(IGF.Builder.CreateCall2(converter, fn, context));
 }
 
+/// Emit the block copy helper for a block.
+static llvm::Function *emitBlockCopyHelper(IRGenModule &IGM,
+                                           CanSILBlockStorageType blockTy,
+                                           const BlockStorageTypeInfo &blockTL){
+  // See if we've produced a block copy helper for this type before.
+  // TODO
+  
+  // Create the helper.
+  llvm::Type *args[] = {
+    blockTL.getStorageType()->getPointerTo(),
+    blockTL.getStorageType()->getPointerTo(),
+  };
+  auto copyTy = llvm::FunctionType::get(IGM.VoidTy, args, /*vararg*/ false);
+  // TODO: Give these predictable mangled names and shared linkage.
+  auto func = llvm::Function::Create(copyTy, llvm::GlobalValue::InternalLinkage,
+                                     "block_copy_helper",
+                                     IGM.getModule());
+  IRGenFunction IGF(IGM, func);
+  
+  // Copy the captures from the source to the destination.
+  Explosion params = IGF.collectParameters(ResilienceExpansion::Minimal);
+  auto dest = Address(params.claimNext(), blockTL.getFixedAlignment());
+  auto src = Address(params.claimNext(), blockTL.getFixedAlignment());
+  
+  auto destCapture = blockTL.projectCapture(IGF, dest);
+  auto srcCapture = blockTL.projectCapture(IGF, src);
+  auto &captureTL = IGM.getTypeInfoForLowered(blockTy->getCaptureType());
+  captureTL.initializeWithCopy(IGF, destCapture, srcCapture,
+                               blockTy->getCaptureType());
+  
+  IGF.Builder.CreateRetVoid();
+  
+  return func;
+}
+
+/// Emit the block copy helper for a block.
+static llvm::Function *emitBlockDisposeHelper(IRGenModule &IGM,
+                                           CanSILBlockStorageType blockTy,
+                                           const BlockStorageTypeInfo &blockTL){
+  // See if we've produced a block destroy helper for this type before.
+  // TODO
+  
+  // Create the helper.
+  auto destroyTy = llvm::FunctionType::get(IGM.VoidTy,
+                                       blockTL.getStorageType()->getPointerTo(),
+                                       /*vararg*/ false);
+  // TODO: Give these predictable mangled names and shared linkage.
+  auto func = llvm::Function::Create(destroyTy,
+                                     llvm::GlobalValue::InternalLinkage,
+                                     "block_destroy_helper",
+                                     IGM.getModule());
+  IRGenFunction IGF(IGM, func);
+  
+  // Destroy the captures.
+  Explosion params = IGF.collectParameters(ResilienceExpansion::Minimal);
+  auto storage = Address(params.claimNext(), blockTL.getFixedAlignment());
+  auto capture = blockTL.projectCapture(IGF, storage);
+  auto &captureTL = IGM.getTypeInfoForLowered(blockTy->getCaptureType());
+  captureTL.destroy(IGF, capture, blockTy->getCaptureType());
+  IGF.Builder.CreateRetVoid();
+  
+  return func;
+}
+
+/// Emit the block header into a block storage slot.
+void irgen::emitBlockHeader(IRGenFunction &IGF,
+                            Address storage,
+                            CanSILBlockStorageType blockTy,
+                            llvm::Function *invokeFunction,
+                            CanSILFunctionType invokeTy) {
+  auto &storageTL
+    = IGF.getTypeInfoForLowered(blockTy).as<BlockStorageTypeInfo>();
+  
+  Address headerAddr = storageTL.projectBlockHeader(IGF, storage);
+  
+  //
+  // Initialize the "isa" pointer, which is _NSConcreteStackBlock.
+  auto NSConcreteStackBlock
+    = IGF.IGM.getModule()->getOrInsertGlobal("_NSConcreteStackBlock",
+                                             IGF.IGM.ObjCClassStructTy);
+  //
+  // Set the flags.
+  // - HAS_COPY_DISPOSE unless the capture type is POD
+  uint32_t flags = 0;
+  auto &captureTL
+    = IGF.getTypeInfoForLowered(blockTy->getCaptureType());
+  bool isPOD = captureTL.isPOD(ResilienceScope::Component);
+  if (!isPOD)
+    flags |= 1 << 25;
+  
+  // - HAS_STRET, if the invoke function is sret
+  if (requiresExternalIndirectResult(IGF.IGM, invokeTy))
+    flags |= 1 << 29;
+  
+  // - HAS_SIGNATURE
+  flags |= 1 << 30;
+  
+  auto flagsVal = llvm::ConstantInt::get(IGF.IGM.Int32Ty, flags);
+  
+  //
+  // Collect the reserved and invoke pointer fields.
+  auto reserved = llvm::ConstantInt::get(IGF.IGM.Int32Ty, 0);
+  auto invokeVal = llvm::ConstantExpr::getBitCast(invokeFunction,
+                                                  IGF.IGM.FunctionPtrTy);
+  
+  //
+  // Build the block descriptor.
+  SmallVector<llvm::Constant*, 5> descriptorFields;
+  descriptorFields.push_back(llvm::ConstantInt::get(IGF.IGM.IntPtrTy, 0));
+  descriptorFields.push_back(llvm::ConstantInt::get(IGF.IGM.IntPtrTy,
+                                         storageTL.getFixedSize().getValue()));
+  
+  if (!isPOD) {
+    // Define the copy and dispose helpers.
+    descriptorFields.push_back(emitBlockCopyHelper(IGF.IGM, blockTy, storageTL));
+    descriptorFields.push_back(emitBlockDisposeHelper(IGF.IGM, blockTy, storageTL));
+  }
+  
+  //
+  // Build the descriptor signature.
+  // TODO
+  descriptorFields.push_back(getBlockTypeExtendedEncoding(IGF.IGM, invokeTy));
+  
+  //
+  // Create the descriptor.
+  auto descriptorInit = llvm::ConstantStruct::getAnon(descriptorFields);
+  auto descriptor = new llvm::GlobalVariable(*IGF.IGM.getModule(),
+                                             descriptorInit->getType(),
+                                             /*constant*/ true,
+                                             llvm::GlobalValue::InternalLinkage,
+                                             descriptorInit,
+                                             "block_descriptor");
+  auto descriptorVal = llvm::ConstantExpr::getBitCast(descriptor,
+                                                      IGF.IGM.Int8PtrTy);
+  
+  //
+  // Store the block header literal.
+  llvm::Constant *blockFields[] = {
+    NSConcreteStackBlock,
+    flagsVal,
+    reserved,
+    invokeVal,
+    descriptorVal,
+  };
+  auto blockHeader = llvm::ConstantStruct::get(IGF.IGM.ObjCBlockStructTy,
+                                               blockFields);
+  IGF.Builder.CreateStore(blockHeader, headerAddr);
+}
+
 namespace {
 
 struct EmitLocalDecls : public ASTWalker {
@@ -2943,3 +3092,4 @@ void IRGenModule::emitLocalDecls(DestructorDecl *dd) {
 void IRGenModule::emitLocalDecls(clang::Decl *decl) {
   ClangCodeGen->HandleTopLevelDecl(clang::DeclGroupRef(decl));
 }
+

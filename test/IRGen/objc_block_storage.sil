@@ -1,9 +1,32 @@
-// RUN: %swift -target x86_64-apple-darwin10 %s -emit-ir | FileCheck %s
+// RUN: rm -rf %t/clang-module-cache
+// RUN: %swift -target x86_64-apple-darwin10 -module-cache-path %t/clang-module-cache -sdk %S/Inputs %s -emit-ir | FileCheck %s
 
 sil_stage canonical
 
 import Builtin
 import Swift
+import gizmo
+
+// CHECK: [[BLOCK_ISA:@_NSConcreteStackBlock]] = external global %objc_class
+// CHECK: [[VOID_BLOCK_SIGNATURE:@.*]] = private unnamed_addr constant {{.*}} c"v8@?\00"
+// CHECK: [[TRIVIAL_BLOCK_DESCRIPTOR:@.*]] = internal constant { {{.*}} } {
+// CHECK:   i64 0,
+// CHECK:   i64 40,
+// CHECK:   i8* {{.*}} [[VOID_BLOCK_SIGNATURE]]
+// CHECK: }
+// CHECK: [[NONTRIVIAL_BLOCK_DESCRIPTOR:@.*]] = internal constant { {{.*}} } {
+// CHECK:   i64 0,
+// CHECK:   i64 40,
+// CHECK:   void ({ %objc_block, %swift.refcounted* }*, { %objc_block, %swift.refcounted* }*)* [[NONTRIVIAL_BLOCK_COPY:@[A-Za-z0-9_]+]],
+// CHECK:   void ({ %objc_block, %swift.refcounted* }*)* [[NONTRIVIAL_BLOCK_DISPOSE:@[A-Za-z0-9_]+]],
+// CHECK:   i8* {{.*}} [[VOID_BLOCK_SIGNATURE]]
+// CHECK: }
+// CHECK: [[NSRECT_BLOCK_SIGNATURE:@.*]] = private unnamed_addr constant {{.*}} c"{NSRect={NSPoint=dd}{NSSize=dd}}8@?\00"
+// CHECK: [[STRET_BLOCK_DESCRIPTOR:@.*]] = internal constant { {{.*}} } {
+// CHECK:   i64 0,
+// CHECK:   i64 40,
+// CHECK:   i8* {{.*}} [[NSRECT_BLOCK_SIGNATURE]]
+// CHECK: }
 
 // CHECK-LABEL: define i8* @project_block_storage({ %objc_block, i8* }* noalias) {
 // CHECK-NEXT:  entry:
@@ -30,3 +53,76 @@ entry(%0 : $*@block_storage Builtin.FPIEEE128):
   %p = load %c : $*Builtin.FPIEEE128
   return %p : $Builtin.FPIEEE128
 }
+
+// CHECK-LABEL: define %objc_block* @init_block_header_trivial({ %objc_block, i8* }* noalias) {
+// CHECK:         %1 = getelementptr inbounds { %objc_block, i8* }* %0, i32 0, i32 0
+// CHECK:         store %objc_block {
+// CHECK:           %objc_class* [[BLOCK_ISA]]
+// --                  0x4000_0000 -- HAS_SIGNATURE
+// CHECK:           i32 1073741824
+// CHECK:           i32 0
+// CHECK:           i8* bitcast {{.*}} @invoke_trivial
+// CHECK:           i8* bitcast {{.*}} [[TRIVIAL_BLOCK_DESCRIPTOR]]
+// CHECK:         }, %objc_block* %1
+// CHECK:         %2 = bitcast {{.*}} %0 to %objc_block*
+// CHECK:         ret %objc_block* %2
+sil @init_block_header_trivial : $@thin (@inout @block_storage Builtin.RawPointer) -> @cc(cdecl) @objc_block () -> () {
+entry(%0 : $*@block_storage Builtin.RawPointer):
+  %i = function_ref @invoke_trivial : $@thin @cc(cdecl) (@inout @block_storage Builtin.RawPointer) -> ()
+  %b = init_block_storage_header %0 : $*@block_storage Builtin.RawPointer, invoke %i : $@thin @cc(cdecl) (@inout @block_storage Builtin.RawPointer) -> (), type $@cc(cdecl) @objc_block () -> ()
+  return %b : $@cc(cdecl) @objc_block () -> ()
+}
+
+sil public_external @invoke_trivial : $@thin @cc(cdecl) (@inout @block_storage Builtin.RawPointer) -> ()
+
+// CHECK-LABEL: define %objc_block* @init_block_header_nontrivial({ %objc_block, %swift.refcounted* }* noalias) {
+// CHECK:         store %objc_block {
+// CHECK:           %objc_class* [[BLOCK_ISA]]
+// --                  0x4200_0000 -- HAS_SIGNATURE, HAS_COPY_DISPOSE
+// CHECK:           i32 1107296256
+// CHECK:           i32 0
+// CHECK:           i8* {{.*}} @invoke_nontrivial
+// CHECK:           i8* bitcast {{.*}} [[NONTRIVIAL_BLOCK_DESCRIPTOR]]
+// CHECK:         }, %objc_block* %1
+sil @init_block_header_nontrivial : $@thin (@inout @block_storage Builtin.ObjectPointer) -> @cc(cdecl) @objc_block () -> () {
+entry(%0 : $*@block_storage Builtin.ObjectPointer):
+  %i = function_ref @invoke_nontrivial : $@thin @cc(cdecl) (@inout @block_storage Builtin.ObjectPointer) -> ()
+  %b = init_block_storage_header %0 : $*@block_storage Builtin.ObjectPointer, invoke %i : $@thin @cc(cdecl) (@inout @block_storage Builtin.ObjectPointer) -> (), type $@cc(cdecl) @objc_block () -> ()
+  return %b : $@cc(cdecl) @objc_block () -> ()
+}
+
+// CHECK:       define internal void [[NONTRIVIAL_BLOCK_COPY]]
+// CHECK-NEXT:  entry:
+// CHECK-NEXT:    %2 = getelementptr inbounds { %objc_block, %swift.refcounted* }* %0, i32 0, i32 1
+// CHECK-NEXT:    %3 = getelementptr inbounds { %objc_block, %swift.refcounted* }* %1, i32 0, i32 1
+// CHECK-NEXT:    %4 = load %swift.refcounted** %3, align 8
+// CHECK-NEXT:    call void @swift_retain_noresult(%swift.refcounted* %4) #0
+// CHECK-NEXT:    store %swift.refcounted* %4, %swift.refcounted** %2, align 8
+// CHECK-NEXT:    ret void
+
+// CHECK:       define internal void [[NONTRIVIAL_BLOCK_DISPOSE]]
+// CHECK-NEXT:  entry:
+// CHECK-NEXT:    %1 = getelementptr inbounds { %objc_block, %swift.refcounted* }* %0, i32 0, i32 1
+// CHECK-NEXT:    %toDestroy = load %swift.refcounted** %1, align 8
+// CHECK-NEXT:    call void @swift_release(%swift.refcounted* %toDestroy) #0
+// CHECK-NEXT:    ret void
+
+sil public_external @invoke_nontrivial : $@thin @cc(cdecl) (@inout @block_storage Builtin.ObjectPointer) -> ()
+
+// CHECK-LABEL: define %objc_block* @init_block_header_stret({ %objc_block, i8* }* noalias) {
+// CHECK:         store %objc_block {
+// CHECK:           %objc_class* [[BLOCK_ISA]]
+// --                  0x6000_0000 -- HAS_STRET, HAS_SIGNATURE
+// CHECK:           i32 1610612736
+// CHECK:           i32 0
+// CHECK:           i8* {{.*}} @invoke_stret
+// CHECK:           i8* bitcast {{.*}} [[STRET_BLOCK_DESCRIPTOR]]
+// CHECK:         }, %objc_block* %1
+sil @init_block_header_stret : $@thin (@inout @block_storage Builtin.RawPointer) -> @cc(cdecl) @objc_block () -> NSRect {
+entry(%0 : $*@block_storage Builtin.RawPointer):
+  %i = function_ref @invoke_stret : $@thin @cc(cdecl) (@inout @block_storage Builtin.RawPointer) -> NSRect
+  %b = init_block_storage_header %0 : $*@block_storage Builtin.RawPointer, invoke %i : $@thin @cc(cdecl) (@inout @block_storage Builtin.RawPointer) -> NSRect, type $@cc(cdecl) @objc_block () -> NSRect
+  return %b : $@cc(cdecl) @objc_block () -> NSRect
+}
+
+sil public_external @invoke_stret : $@thin @cc(cdecl) (@inout @block_storage Builtin.RawPointer) -> NSRect

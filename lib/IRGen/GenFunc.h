@@ -91,7 +91,14 @@ namespace irgen {
   Address projectBlockStorageCapture(IRGenFunction &IGF,
                                      Address storageAddr,
                                      CanSILBlockStorageType storageTy);
-    
+  
+  /// Emit the block header into a block storage slot.
+  void emitBlockHeader(IRGenFunction &IGF,
+                       Address storage,
+                       CanSILBlockStorageType blockTy,
+                       llvm::Function *invokeFunction,
+                       CanSILFunctionType invokeTy);
+  
 } // end namespace irgen
 } // end namespace swift
 

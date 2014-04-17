@@ -132,6 +132,11 @@ namespace irgen {
                                                               ClassDecl *cd,
                                                               bool isDestroyer);
   
+  /// Produces extended encoding of ObjC block signature.
+  /// \returns the encoded type.
+  llvm::Constant *getBlockTypeExtendedEncoding(IRGenModule &IGM,
+                                               CanSILFunctionType invokeTy);
+  
   /// Produces extended encoding of method type.
   /// \returns the encoded type.
   llvm::Constant *getMethodTypeExtendedEncoding(IRGenModule &IGM,

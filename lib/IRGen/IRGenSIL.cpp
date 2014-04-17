@@ -2954,9 +2954,24 @@ void IRGenSILFunction::visitProjectBlockStorageInst(ProjectBlockStorageInst *i){
 
 void IRGenSILFunction::visitInitBlockStorageHeaderInst(
                                                InitBlockStorageHeaderInst *i) {
-  // TODO
-  IGM.unimplemented(i->getLoc().getSourceLoc(), "init_block_storage_header");
   auto addr = getLoweredAddress(i->getBlockStorage());
+  
+  // We currently only support static invoke functions.
+  auto &invokeVal = getLoweredValue(i->getInvokeFunction());
+  llvm::Function *invokeFn = nullptr;
+  if (invokeVal.kind != LoweredValue::Kind::StaticFunction) {
+    IGM.unimplemented(i->getLoc().getSourceLoc(),
+                      "non-static block invoke function");
+  } else {
+    invokeFn = invokeVal.getStaticFunction().getFunction();
+  }
+  
+  // Initialize the header.
+  emitBlockHeader(*this, addr,
+          i->getBlockStorage().getType().castTo<SILBlockStorageType>(),
+          invokeFn, i->getInvokeFunction().getType().castTo<SILFunctionType>());
+  
+  // Cast the storage to the block type to produce the result value.
   llvm::Value *asBlock = Builder.CreateBitCast(addr.getAddress(),
                                                IGM.ObjCBlockPtrTy);
   Explosion e(ResilienceExpansion::Minimal);

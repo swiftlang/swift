@@ -937,9 +937,12 @@ HelperGetObjCEncodingForType(clang::ASTContext &Context, clang::CanQualType T,
                                             T, S, Extended);
 }
 
-static llvm::Constant * GetObjCEncodingForMethodType(IRGenModule &IGM,
-                                                     AnyFunctionType *T,
-                                                     bool Extended) {
+static llvm::Constant *GetObjCEncodingForTypes(IRGenModule &IGM,
+                                               CanType Result,
+                                               ArrayRef<CanType> Args,
+                                               StringRef FixedArgs,
+                                               Size::int_type ParmOffset,
+                                               bool Extended) {
   ASTContext &Context = IGM.Context;
   auto CI = static_cast<ClangImporter*>(&*Context.getClangModuleLoader());
   assert(CI && "no clang module loader");
@@ -948,71 +951,55 @@ static llvm::Constant * GetObjCEncodingForMethodType(IRGenModule &IGM,
   llvm::Constant *cnull = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
   
   // TODO. Encode type qualifer, 'in', 'inout', etc. for the parameter.
-  Type Result = T->getResult();
-  Type Input = T->getInput();
-  std::string TypeStr;
+  std::string EncodeStr;
   auto clangType = CTG.visit(Result->getCanonicalType());
   if (clangType.isNull())
     return cnull;
+  HelperGetObjCEncodingForType(clangASTContext, clangType, EncodeStr, Extended);
+  std::string ArgsStr;
   
-  
-  HelperGetObjCEncodingForType(clangASTContext, clangType, TypeStr, Extended);
-  
-  Size PtrSize = IGM.getPointerSize();
-  Size::int_type ParmOffset = 2 * PtrSize.getValue();
-
-  if (auto tuple = dyn_cast<TupleType>(Input->getCanonicalType())) {
-    for (unsigned i = 0; i < tuple->getNumElements(); i++) {
-      Type ArgType = tuple->getElementType(i);
-      clangType = CTG.visit(ArgType->getCanonicalType());
-      if (clangType.isNull())
-        return cnull;
-      clang::CharUnits sz = clangASTContext.getObjCEncodingTypeSize(clangType);
-      if (sz.isZero())
-        continue;
-      ParmOffset += sz.getQuantity();
-    }
-    TypeStr += llvm::itostr(ParmOffset);
-    TypeStr += "@0:";
-    TypeStr += llvm::itostr(PtrSize.getValue());
+  // Argument types.
+  for (auto ArgType : Args) {
+    auto PType = CTG.visit(ArgType->getCanonicalType());
+    if (PType.isNull())
+      return cnull;
     
-    // Argument types.
-    Size::int_type ParmOffset = 2 * PtrSize.getValue();
-    for (unsigned i = 0; i < tuple->getNumElements(); i++) {
-      Type ArgType = tuple->getElementType(i);
-      auto PType = CTG.visit(ArgType->getCanonicalType());
-      if (PType.isNull())
-        return cnull;
-      
-      // TODO. Some stuff related to Array and Function type is missing.
-      // TODO. Encode type qualifer, 'in', 'inout', etc. for the parameter.
-      HelperGetObjCEncodingForType(clangASTContext, PType, TypeStr, Extended);
-      TypeStr += llvm::itostr(ParmOffset);
-      clang::CharUnits sz = clangASTContext.getObjCEncodingTypeSize(PType);
-      ParmOffset += sz.getQuantity();
-    }
-    return IGM.getAddrOfGlobalString(TypeStr.c_str());
-  }
-  // Case of single argument function type.
-  Type ArgType;
-  if (auto PType = dyn_cast<ParenType>(Input.getPointer()))
-    ArgType = PType->getUnderlyingType()->getCanonicalType();
-  else
-    ArgType = Input;
-  
-  clangType = CTG.visit(ArgType->getCanonicalType());
-  if (clangType.isNull())
-    return cnull;
-  clang::CharUnits sz = clangASTContext.getObjCEncodingTypeSize(clangType);
-  if (!sz.isZero())
+    // TODO. Some stuff related to Array and Function type is missing.
+    // TODO. Encode type qualifer, 'in', 'inout', etc. for the parameter.
+    HelperGetObjCEncodingForType(clangASTContext, PType, ArgsStr, Extended);
+    ArgsStr += llvm::itostr(ParmOffset);
+    clang::CharUnits sz = clangASTContext.getObjCEncodingTypeSize(PType);
     ParmOffset += sz.getQuantity();
-  TypeStr += llvm::itostr(ParmOffset);
-  TypeStr += "@0:";
-  TypeStr += llvm::itostr(PtrSize.getValue());
-  ParmOffset = 2 * PtrSize.getValue();
-  HelperGetObjCEncodingForType(clangASTContext, clangType, TypeStr, Extended);
-  TypeStr += llvm::itostr(ParmOffset);
-  return IGM.getAddrOfGlobalString(TypeStr.c_str());
+  }
+  
+  EncodeStr += llvm::itostr(ParmOffset);
+  EncodeStr += FixedArgs;
+  EncodeStr += ArgsStr;
+  return IGM.getAddrOfGlobalString(StringRef(EncodeStr));
+}
+
+static llvm::Constant * GetObjCEncodingForMethodType(IRGenModule &IGM,
+                                                     CanAnyFunctionType T,
+                                                     bool Extended) {
+  CanType Result = T.getResult();
+  CanType Input = T.getInput();
+  SmallVector<CanType, 4> Inputs;
+  
+  // Unravel one level of tuple.
+  if (auto tuple = dyn_cast<TupleType>(Input)) {
+    for (unsigned i = 0, e = tuple->getNumElements(); i < e; ++i)
+      Inputs.push_back(tuple.getElementType(i));
+  } else {
+    Inputs.push_back(Input);
+  }
+  
+  // Include the encoding for 'self' and '_cmd'.
+  llvm::SmallString<8> specialParams;
+  specialParams += "@0:";
+  auto ptrSize = IGM.getPointerSize().getValue();
+  specialParams += llvm::itostr(ptrSize);
+  return GetObjCEncodingForTypes(IGM, Result, Inputs, specialParams,
+                                 ptrSize * 2, Extended);
 }
 
 /// Emit the components of an Objective-C method descriptor: its selector,
@@ -1029,11 +1016,12 @@ void irgen::emitObjCMethodDescriptorParts(IRGenModule &IGM,
   
   /// The second element is the type @encoding. Handle some simple cases, and
   /// leave the rest as null for now.
-  AnyFunctionType *methodType = method->getType()->castTo<AnyFunctionType>();
-
+  CanAnyFunctionType methodType
+    = cast<AnyFunctionType>(method->getType()->getCanonicalType());
+  
   if (!isa<DestructorDecl>(method)) {
     // Account for the 'self' pointer being curried.
-    methodType = methodType->getResult()->castTo<AnyFunctionType>();
+    methodType = cast<AnyFunctionType>(methodType.getResult());
   }
   atEncoding = GetObjCEncodingForMethodType(IGM, methodType, false);
   
@@ -1203,12 +1191,32 @@ irgen::emitObjCIVarInitDestroyDescriptor(IRGenModule &IGM, ClassDecl *cd,
 llvm::Constant *
 irgen::getMethodTypeExtendedEncoding(IRGenModule &IGM,
                                      AbstractFunctionDecl *method) {
-  AnyFunctionType *methodType = method->getType()->castTo<AnyFunctionType>();
+  CanAnyFunctionType methodType
+    = cast<AnyFunctionType>(method->getType()->getCanonicalType());
   if (!isa<DestructorDecl>(method)) {
     // Account for the 'self' pointer being curried.
-    methodType = methodType->getResult()->castTo<AnyFunctionType>();
+    methodType = cast<AnyFunctionType>(methodType.getResult());
   }
   return GetObjCEncodingForMethodType(IGM, methodType, true/*Extended*/);
+}
+
+llvm::Constant *
+irgen::getBlockTypeExtendedEncoding(IRGenModule &IGM,
+                                    CanSILFunctionType invokeTy) {
+  CanType resultType = invokeTy->getInterfaceResult().getType();
+  SmallVector<CanType, 4> paramTypes;
+  
+  // Skip the storage pointer, which is encoded as '@?' to avoid the infinite
+  // recursion of the usual '@?<...>' rule for blocks.
+  for (auto param : invokeTy->getInterfaceParameters().slice(1)) {
+    assert(!param.isIndirect()
+           && "indirect C arguments not supported");
+    paramTypes.push_back(param.getType());
+  }
+  
+  return GetObjCEncodingForTypes(IGM, resultType, paramTypes,
+                                 "@?", IGM.getPointerSize().getValue(),
+                                 /*extended*/ true);
 }
 
 /// Emit Objective-C method descriptors for the property accessors of the given

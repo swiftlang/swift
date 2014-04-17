@@ -62,7 +62,9 @@ public:
   clang::CanQualType visitSILFunctionType(CanSILFunctionType type);
   clang::CanQualType visitGenericTypeParamType(CanGenericTypeParamType type);
   clang::CanQualType visitDynamicSelfType(CanDynamicSelfType type);
-
+  
+  clang::CanQualType visitSILBlockStorageType(CanSILBlockStorageType type);
+  
   clang::CanQualType visitType(CanType type);
 };
 

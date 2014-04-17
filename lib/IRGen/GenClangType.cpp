@@ -294,6 +294,19 @@ clang::CanQualType GenClangType::visitSILFunctionType(CanSILFunctionType type) {
   // We'll select (void)(^)() for function types. As long as it's a
   // pointer type it doesn't matter exactly which for either ABI type
   // generation or Obj-C type encoding.
+  //
+  // FIXME: This isn't strictly true because ObjC extended method encoding
+  // encodes the parameter and return types of blocks.
+  auto &clangCtx = getClangASTContext();
+  auto fnTy = clangCtx.getFunctionNoProtoType(clangCtx.VoidTy);
+  auto blockTy = clangCtx.getBlockPointerType(fnTy);
+  return clangCtx.getCanonicalType(blockTy);
+}
+
+clang::CanQualType GenClangType::visitSILBlockStorageType(CanSILBlockStorageType type) {
+  // We'll select (void)(^)() for function types. As long as it's a
+  // pointer type it doesn't matter exactly which for either ABI type
+  // generation or Obj-C type encoding.
   auto &clangCtx = getClangASTContext();
   auto fnTy = clangCtx.getFunctionNoProtoType(clangCtx.VoidTy);
   auto blockTy = clangCtx.getBlockPointerType(fnTy);
