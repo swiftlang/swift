@@ -898,16 +898,33 @@ enum FakeOptional<T> {
 // CHECK-NEXT: [[ALLOCA1:%[0-9]+]] = alloc_stack $FakeOptional<Builtin.Int1>
 // CHECK-NEXT: [[ENUM1:%[0-9]+]] = enum $FakeOptional<Builtin.Int1>, #FakeOptional.None!enumelt
 // CHECK-NEXT: store [[ENUM1]] to [[ALLOCA1]]#1
+// CHECK-NEXT: [[INT:%[0-9]+]] = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: [[ALLOCA2:%[0-9]+]] = alloc_stack $FakeOptional<Builtin.Int1>
+// CHECK-NEXT: [[ENUM2:%[0-9]+]] = enum $FakeOptional<Builtin.Int1>, #FakeOptional.Some!enumelt.1, [[INT]] : $Builtin.Int1
+// CHECK-NEXT: store [[ENUM2]] to [[ALLOCA2]]#1 : $*FakeOptional<Builtin.Int1>
 // CHECK-NEXT: [[RESULT1:%[0-9]+]] = load [[ALLOCA1:%[0-9]+]]#1
-// CHECK-NEXT: [[RESULT:%[0-9]+]] = tuple ([[RESULT1]] : $FakeOptional<Builtin.Int1>, [[RESULT1]] : $FakeOptional<Builtin.Int1>)
+// CHECK-NEXT: [[RESULT2:%[0-9]+]] = load [[ALLOCA2:%[0-9]+]]#1
+// CHECK-NEXT: [[RESULT:%[0-9]+]] = tuple ([[RESULT1]] : $FakeOptional<Builtin.Int1>, [[RESULT2]] : $FakeOptional<Builtin.Int1>)
+// CHECK-NEXT: dealloc_stack
 // CHECK-NEXT: dealloc_stack
 // CHECK-NEXT: return [[RESULT]]
 sil @enum_promotion_of_concrete_types : $@thin () -> (FakeOptional<Builtin.Int1>, FakeOptional<Builtin.Int1>) {
 bb0:
   %0 = alloc_stack $FakeOptional<Builtin.Int1>
   inject_enum_addr %0#1 : $*FakeOptional<Builtin.Int1>, #FakeOptional.None!enumelt
+
+  %1 = integer_literal $Builtin.Int1, 1
+  %2 = alloc_stack $FakeOptional<Builtin.Int1>
+  %3 = init_enum_data_addr %2#1 : $*FakeOptional<Builtin.Int1>, #FakeOptional.Some!enumelt.1
+  store %1 to %3 : $*Builtin.Int1
+  inject_enum_addr %2#1 : $*FakeOptional<Builtin.Int1>, #FakeOptional.Some!enumelt.1
+
   %4 = load %0#1 : $*FakeOptional<Builtin.Int1>
-  %6 = tuple(%4 : $FakeOptional<Builtin.Int1>, %4 : $FakeOptional<Builtin.Int1>)
+  %5 = load %2#1 : $*FakeOptional<Builtin.Int1>
+
+  %6 = tuple(%4 : $FakeOptional<Builtin.Int1>, %5 : $FakeOptional<Builtin.Int1>)
+
+  dealloc_stack %2#0 : $*@local_storage FakeOptional<Builtin.Int1>
   dealloc_stack %0#0 : $*@local_storage FakeOptional<Builtin.Int1>
   return %6 : $(FakeOptional<Builtin.Int1>, FakeOptional<Builtin.Int1>)
 }

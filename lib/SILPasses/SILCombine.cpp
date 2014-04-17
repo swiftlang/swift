@@ -267,6 +267,7 @@ public:
   SILInstruction *visitAllocStackInst(AllocStackInst *AS);
   SILInstruction *visitSwitchEnumAddrInst(SwitchEnumAddrInst *SEAI);
   SILInstruction *visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI);
+  SILInstruction *visitInitEnumDataAddrInst(InitEnumDataAddrInst *IEDAI);
 
 private:
   /// Perform one SILCombine iteration.
@@ -853,6 +854,53 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
                         IEAI->getOperand().getType().getObjectType());
   Builder->createStore(IEAI->getLoc(), E, IEAI->getOperand());
   return eraseInstFromFunction(*IEAI);
+}
+
+/// Simplify this common frontend pattern:
+///
+///   %payload_addr = init_enum_data_addr %payload_allocation
+///   store %payload to %payload_addr
+///   inject_enum_addr %payload_allocation, $EnumType.case
+///
+/// for a concrete enum type $EnumType.case to:
+///
+///   %1 = enum $EnumType, $EnumType.case, %payload
+///   store %1 to %payload_addr
+///
+/// We leave the cleaning up to mem2reg.
+SILInstruction *
+SILCombiner::visitInitEnumDataAddrInst(InitEnumDataAddrInst *IEDAI) {
+  // If we have an address only type, we can't do anything... bail...
+  assert(IEDAI->getOperand().getType().isAddress() && "Must be an address");
+  if (IEDAI->getOperand().getType().isAddressOnly(IEDAI->getModule()))
+    return nullptr;
+
+  SILBasicBlock::iterator II = IEDAI;
+  ++II;
+
+  // Look at the next instruction for a store of a payload into the data
+  // projection.
+  auto *SI = dyn_cast<StoreInst>(&*II);
+  if (!SI || SI->getDest().getDef() != IEDAI)
+    return nullptr;
+
+  // Then check the next instruction for a tag injection of the same case into
+  // our payload allocation.
+  ++II;
+  auto *IEAI = dyn_cast<InjectEnumAddrInst>(&*II);
+  if (!IEAI || IEAI->getOperand() != IEDAI->getOperand() ||
+      IEAI->getElement() != IEDAI->getElement())
+    return nullptr;
+
+  EnumInst *E =
+      Builder->createEnum(IEDAI->getLoc(), SI->getSrc(), IEDAI->getElement(),
+                          IEDAI->getOperand().getType().getObjectType());
+  Builder->createStore(IEDAI->getLoc(), E, IEDAI->getOperand());
+
+  // Cleanup.
+  eraseInstFromFunction(*SI);
+  eraseInstFromFunction(*IEAI);
+  return eraseInstFromFunction(*IEDAI);
 }
 
 SILInstruction *SILCombiner::visitUpcastInst(UpcastInst *UCI) {
