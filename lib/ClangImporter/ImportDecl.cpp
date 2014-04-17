@@ -3715,18 +3715,14 @@ static void importAttributes(ASTContext &C, const clang::NamedDecl *ClangDecl,
     return;
 
   if (auto MD = dyn_cast<clang::ObjCMethodDecl>(ClangDecl)) {
-    // FIXME: Ban 'performSelector' once all uses of it are
-    // removed from the overlay.
-    if (/* DISABLES CODE */ (0)) {
-      auto sel = MD->getSelector();
-      if (sel.getNameForSlot(0).startswith("performSelector")) {
-        auto attr = AvailabilityAttr::createImplicitUnavailableAttr(C,
-                      "'performSelector' methods are unavailable");
-        MappedDecl->getMutableAttrs().add(attr);
-        return;
-      }
+    // Ban uses of 'performSelector'.
+    auto sel = MD->getSelector();
+    if (sel.getNameForSlot(0).startswith("performSelector")) {
+      auto attr = AvailabilityAttr::createImplicitUnavailableAttr(C,
+                    "'performSelector' methods are unavailable");
+      MappedDecl->getMutableAttrs().add(attr);
+      return;
     }
-
   }
 }
 
