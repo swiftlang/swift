@@ -3590,3 +3590,54 @@ Performs a checked conversion from ``$A`` to ``$B``. If the conversion succeeds,
 control is transferred to ``bb1``, and the result of the cast is passed into
 ``bb1`` as an argument. If the conversion fails, control is transferred to
 ``bb2``.
+
+Assertion configuration
+~~~~~~~~~~~~~~~~~~~~~~~
+
+To be able to support disabling assertions at compile time there is a builtin
+``assertion_configuration`` function. A call to this function can be replaced at
+compile time by a constant or can stay opaque.
+
+All calls to the ``assert_configuration`` function are replaced by the constant
+propagation pass to the appropriate constant depending on compile time settings.
+Subsequent passes remove dependent unwanted control flow. Using this mechanism
+we support conditionally enabling/disabling of code in SIL libraries depending
+on the assertion configuration selected when the library is linked into user
+code.
+
+There are three assertion configurations: Debug (0), Release (1) and
+DisableReplacement (-1).
+
+The optimization flag or a special assert configuration flag determines the
+value. Depending on the configuration value assertions in the standard library
+will be executed or not.
+
+The standard library uses this builtin to define an assert that can be
+disabled at compile time.
+
+::
+
+  func assert(...) {
+    if (Int32(Builtin.assert_configuration()) == 0) {
+      _fatal_error_message(message, ...)
+    }
+  }
+
+The ``assert_configuration`` function application is serialized when we build
+the standard library (we recognize the ``-parse-stdlib`` option and don't do the
+constant replacement but leave the function application to be serialized to
+sil).
+
+The compiler flag that influences the value of the ``assert_configuration``
+funtion application is the optimization flag: at ``-O0`` the application will be
+replaced by ``Debug`` at higher optimization levels the instruction will be
+replaced by ``Release``. Optionally, the value to use for replacement can be
+specified with the ``-AssertConf`` flag which overwrites the value selected by
+the optimization flag (possible values are ``Debug``, ``Release``,
+``DisableReplacement``).
+
+If the call to the ``assert_configuration`` function stays opaque until IRGen,
+IRGen will replace the application by the constant representing Debug mode (0).
+This happens we can build the standard library .dylib. The generate sil will
+retain the function call but the generated .dylib will contain code with
+assertions enabled.

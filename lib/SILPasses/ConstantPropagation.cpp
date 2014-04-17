@@ -742,14 +742,28 @@ static SILValue constantFoldInstruction(SILInstruction &I,
   return SILValue();
 }
 
+static bool isAssertConfigurationApply(SILInstruction &I) {
+  if (auto *AI = dyn_cast<ApplyInst>(&I))
+    if (auto *FR = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee()))
+      if (FR->getBuiltinInfo().ID == BuiltinValueKind::AssertConf)
+        return true;
+  return false;
+}
+
 static bool isFoldable(SILInstruction *I) {
   return isa<IntegerLiteralInst>(I) || isa<FloatLiteralInst>(I);
 }
 
-static bool CCPFunctionBody(SILFunction &F, bool EnableDiagnostics) {
+static bool CCPFunctionBody(SILFunction &F, bool EnableDiagnostics,
+                            unsigned AssertConfiguration) {
   DEBUG(llvm::dbgs() << "*** ConstPropagation processing: " << F.getName()
         << "\n");
   bool Changed = false;
+
+  // Should we replace calls to assert_configuration by the assert
+  // configuration.
+  bool InstantiateAssertConfiguration =
+      (AssertConfiguration != SILOptions::DisableReplacement);
 
   // The list of instructions whose evaluation resulted in errror or warning.
   // This is used to avoid duplicate error reporting in case we reach the same
@@ -763,6 +777,8 @@ static bool CCPFunctionBody(SILFunction &F, bool EnableDiagnostics) {
     for (auto &I : BB) {
       if (isFoldable(&I) && !I.use_empty())
         WorkList.insert(&I);
+      else if (InstantiateAssertConfiguration && isAssertConfigurationApply(I))
+        WorkList.insert(&I);
     }
   }
 
@@ -773,6 +789,23 @@ static bool CCPFunctionBody(SILFunction &F, bool EnableDiagnostics) {
     assert(I->getParent() && "SILInstruction must have parent.");
 
     DEBUG(llvm::dbgs() << "Visiting: " << *I);
+
+    // Replace assert_configuration instructions by their constant value. We
+    // want them to be replace even if we can't fully propagate the constant.
+    if (InstantiateAssertConfiguration)
+      if (auto *AI = dyn_cast<ApplyInst>(I))
+        if (isAssertConfigurationApply(*AI)) {
+          // Instantiate the constant.
+          SILBuilder B(AI);
+          auto AssertConfInt = B.createIntegerLiteral(
+            AI->getLoc(), AI->getType(0), AssertConfiguration);
+          AI->replaceAllUsesWith(AssertConfInt);
+          // Schedule users for constant folding.
+          WorkList.insert(AssertConfInt);
+          // Delete the call.
+          recursivelyDeleteTriviallyDeadInstructions(AI);
+          continue;
+        }
 
     // Go through all users of the constant and try to fold them.
     FoldedUsers.clear();
@@ -888,7 +921,8 @@ public:
 private:
   /// The entry point to the transformation.
   void run() {
-    if (CCPFunctionBody(*getFunction(), EnableDiagnostics))
+    if (CCPFunctionBody(*getFunction(), EnableDiagnostics,
+                        getOptions().AssertConfig))
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 

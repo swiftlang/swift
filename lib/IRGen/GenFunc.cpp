@@ -1813,6 +1813,18 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     // No return value.
     return;
   }
+
+  if (Builtin.ID == BuiltinValueKind::AssertConf) {
+    // Replace the call to assert_configuration by the Debug configuration
+    // value.
+    // TODO: assert(IGF.IGM.getOptions().AssertConfig ==
+    //              SILOptions::DisableReplacement);
+    // Make sure this only happens in a mode where we build a library dylib.
+
+    llvm::Value *DebugAssert = IGF.Builder.getInt32(SILOptions::Debug);
+    out->add(DebugAssert);
+    return;
+  }
   
   llvm_unreachable("IRGen unimplemented for this builtin!");
 }

@@ -1,0 +1,20 @@
+// RUN: %swift -AssertConfig=DisableReplacement -emit-ir %s   | FileCheck %s --check-prefix=DISABLED
+// RUN: %swift -AssertConfig=Release -emit-ir %s   | FileCheck %s --check-prefix=RELEASE
+// RUN: %swift -AssertConfig=Debug -emit-ir %s   | FileCheck %s --check-prefix=DEBUG
+
+import Builtin
+
+sil @remove_assert_configuration : $@thin () -> Builtin.Int32 {
+  %0 = builtin_function_ref "assert_configuration" : $@thin () -> Builtin.Int32
+  %1 = apply %0() : $@thin () -> Builtin.Int32
+  return %1 : $Builtin.Int32
+}
+
+// DISABLED-LABEL: @remove_assert_configuration
+// DISABLED: ret i32 0
+
+// DEBUG-LABEL: @remove_assert_configuration
+// DEBUG: ret i32 0
+
+// RELEASE-LABEL: @remove_assert_configuration
+// RELEASE: ret i32 1

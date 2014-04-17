@@ -241,6 +241,10 @@ BUILTIN_MISC_OPERATION(InsertElement, "insertelement", "n", Special)
 /// StaticReport has type (Builtin.Int1, Builtin.Int1, Builtin.RawPointer) -> ()
 BUILTIN_MISC_OPERATION(StaticReport, "staticReport", "", Special)
 
+/// assert_configuration has type () -> Builtin.Int32
+/// Returns the selected assertion configuration.
+BUILTIN_MISC_OPERATION(AssertConf, "assert_configuration", "n", Special)
+
 
 /// Special truncation builtins that check for sign and overflow errors. These
 /// take an integer as an input and return a tuple of the truncated result and 

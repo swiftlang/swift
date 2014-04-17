@@ -199,6 +199,10 @@ VerifyMode("verify",
                           "{error|warning|note} annotations"));
 
 static llvm::cl::opt<unsigned>
+AssertConfId("assert-conf-id", llvm::cl::Hidden,
+             llvm::cl::init(0));
+
+static llvm::cl::opt<unsigned>
 SILInlineThreshold("sil-inline-threshold", llvm::cl::Hidden,
                    llvm::cl::init(50));
 
@@ -325,6 +329,7 @@ int main(int argc, char **argv) {
   SILOpts.VerifyAll = EnableSILVerifyAll;
   SILOpts.PrintAll = EnableSILPrintAll;
   SILOpts.RemoveRuntimeAsserts = RemoveRuntimeAsserts;
+  SILOpts.AssertConfig = AssertConfId;
 
   SILPassManager PM(CI.getSILModule(), SILOpts);
   PM.registerAnalysis(createCallGraphAnalysis(CI.getSILModule()));

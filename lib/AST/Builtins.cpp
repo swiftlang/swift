@@ -604,6 +604,14 @@ static ValueDecl *getCondFailOperation(ASTContext &C, Identifier Id) {
   return getBuiltinFunction(Id, CondElt, VoidTy);
 }
 
+static ValueDecl *getAssertConfOperation(ASTContext &C, Identifier Id) {
+  // () -> Int32
+  auto Int32Ty = BuiltinIntegerType::get(32, C);
+  auto VoidTy = TupleType::getEmpty(C);
+  TupleTypeElt EmptyElt(VoidTy);
+  return getBuiltinFunction(Id, EmptyElt, Int32Ty);
+}
+
 static ValueDecl *getFixLifetimeOperation(ASTContext &C, Identifier Id) {
   // <T> T -> ()
   Type GenericTy;
@@ -1165,6 +1173,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
       
   case BuiltinValueKind::CondFail:
     return getCondFailOperation(Context, Id);
+
+  case BuiltinValueKind::AssertConf:
+    return getAssertConfOperation(Context, Id);
       
   case BuiltinValueKind::FixLifetime:
     return getFixLifetimeOperation(Context, Id);

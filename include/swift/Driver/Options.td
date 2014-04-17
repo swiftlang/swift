@@ -193,6 +193,15 @@ def O_Group : OptionGroup<"<optimization level options>">;
 def O0 : Flag<["-"], "O0">, Group<O_Group>, Flags<[FrontendOption]>;
 def O : Joined<["-"], "O">, Group<O_Group>, Flags<[FrontendOption]>;
 
+// Assert configuration identifiers.
+
+def AssertConfig_Group : OptionGroup<"<Assert configuration>">;
+
+def AssertConfig   : JoinedOrSeparate<["-"], "AssertConfig">,
+  Group<AssertConfig_Group>, Flags<[FrontendOption]>;
+def AssertConfigEq : Joined<["-"], "AssertConfig=">,
+  Group<AssertConfig_Group>, Alias<AssertConfig>, Flags<[FrontendOption]>;
+
 // File types
 
 def parse_as_library : Flag<["-"], "parse-as-library">,

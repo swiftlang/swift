@@ -64,6 +64,20 @@ public:
 
   /// Are we debugging sil serialization.
   bool DebugSerialization = false;
+
+  enum AssertConfiguration: unsigned {
+    // Used by standard library code to distinguish between a debug and release
+    // build.
+    Debug = 0, // Enables asserts.
+    Release = 1, // Disables asserts.
+
+    // Leave the assert_configuration instruction around.
+    DisableReplacement = UINT_MAX
+  };
+
+  /// The assert configuration controls how assertions behave.
+  unsigned AssertConfig = DisableReplacement;
+
 };
 
 } // end namespace swift

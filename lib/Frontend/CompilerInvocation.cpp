@@ -640,6 +640,7 @@ static void PrintArg(raw_ostream &OS, const char *Arg, bool Quote) {
 }
 
 static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
+                         IRGenOptions &IRGenOpts,
                          DiagnosticEngine &Diags) {
   using namespace options;
 
@@ -675,7 +676,54 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       llvm_unreachable("Unknown SIL linking option!");
   }
 
-  Opts.RemoveRuntimeAsserts = Args.hasArg(OPT_remove_runtime_asserts);
+  // Parse the optimization level.
+  if (const Arg *A = Args.getLastArg(OPT_O_Group)) {
+    // The maximum optimization level we currently support.
+    unsigned MaxLevel = 3;
+
+    if (A->getOption().matches(OPT_O0)) {
+      IRGenOpts.OptLevel = 0;
+    } else {
+      unsigned OptLevel;
+      if (StringRef(A->getValue()).getAsInteger(10, OptLevel) ||
+          OptLevel > MaxLevel) {
+        Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                       A->getAsString(Args), A->getValue());
+        return true;
+      }
+
+      IRGenOpts.OptLevel = OptLevel;
+    }
+  } else {
+    IRGenOpts.OptLevel = 0;
+  }
+
+  // Parse the build configuration identifier.
+  if (const Arg *A = Args.getLastArg(OPT_AssertConfig_Group)) {
+    // We currently understand build configuration up to 3 of which we only use
+    // 0 and 1 in the standard library.
+    unsigned MaxId = 3;
+    StringRef Configuration = A->getValue();
+    if (Configuration == "DisableReplacement") {
+      Opts.AssertConfig = SILOptions::DisableReplacement;
+    } else if (Configuration == "Debug") {
+      Opts.AssertConfig = SILOptions::Debug;
+    } else if (Configuration == "Release") {
+      Opts.AssertConfig = SILOptions::Release;
+    } else {
+        Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                       A->getAsString(Args), A->getValue());
+        return true;
+    }
+  } else {
+    // Set the assert configuration according to the optimization level.
+    Opts.AssertConfig =
+        IRGenOpts.OptLevel > 0 ? SILOptions::Release : SILOptions::Debug;
+  }
+
+  // OFast might also set removal of runtime asserts (cond_fail).
+  Opts.RemoveRuntimeAsserts |= Args.hasArg(OPT_remove_runtime_asserts);
+
   Opts.EnableARCOptimizations = !Args.hasArg(OPT_disable_arc_opts);
   Opts.VerifyAll = Args.hasArg(OPT_sil_verify_all);
   Opts.PrintAll = Args.hasArg(OPT_sil_print_all);
@@ -744,24 +792,6 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     }
 
     Opts.LinkLibraries.push_back(LinkLibrary(A->getValue(), Kind));
-  }
-
-  if (const Arg *A = Args.getLastArg(OPT_O_Group)) {
-    if (A->getOption().matches(OPT_O0)) {
-      Opts.OptLevel = 0;
-    }
-    else {
-      unsigned OptLevel;
-      if (StringRef(A->getValue()).getAsInteger(10, OptLevel) || OptLevel > 3) {
-        Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                       A->getAsString(Args), A->getValue());
-        return true;
-      }
-
-      Opts.OptLevel = OptLevel;
-    }
-  } else {
-    Opts.OptLevel = 0;
   }
 
   if (const Arg *A = Args.getLastArg(OPT_target_cpu)) {
@@ -849,7 +879,7 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
     return true;
   }
 
-  if (ParseSILArgs(SILOpts, *ParsedArgs, Diags)) {
+  if (ParseSILArgs(SILOpts, *ParsedArgs, IRGenOpts, Diags)) {
     return true;
   }
 
