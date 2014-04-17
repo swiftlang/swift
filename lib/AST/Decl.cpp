@@ -916,7 +916,12 @@ bool ValueDecl::canBeAccessedByDynamicLookup() const {
 
   // Dynamic lookup can only find class and protocol members, or extensions of
   // classes.
-  auto nominalDC =getDeclContext()->getDeclaredTypeOfContext()->getAnyNominal();
+  auto declaredType = getDeclContext()->getDeclaredTypeOfContext();
+  
+  if (!declaredType)
+    return false;
+  
+  auto nominalDC = declaredType->getAnyNominal();
   if (!nominalDC ||
       (!isa<ClassDecl>(nominalDC) && !isa<ProtocolDecl>(nominalDC)))
     return false;

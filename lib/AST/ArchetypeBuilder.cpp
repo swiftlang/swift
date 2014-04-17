@@ -1042,7 +1042,10 @@ Type swift::resolvePotentialArchetypeToType(
         }
       }
     }
-    assert(associatedType && "Couldn't find associated type?");
+    
+    if (!associatedType) {
+      return ErrorType::get(ctx);
+    }
 
     return DependentMemberType::get(parentTy, associatedType, ctx);
   }
