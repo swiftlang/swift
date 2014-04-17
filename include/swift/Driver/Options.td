@@ -116,6 +116,10 @@ def I : JoinedOrSeparate<["-"], "I">, Flags<[FrontendOption]>,
 def I_EQ : Joined<["-"], "I=">, Flags<[FrontendOption]>,
   Alias<I>;
 
+def nostdimport : Flag<["-"], "nostdimport">,
+  Flags<[DriverOption,FrontendOption]>,
+  HelpText<"Don't search the standard library import path for modules">;
+
 def output_file_map : Separate<["-"], "output-file-map">, Flags<[DriverOption]>,
   HelpText<"A file which specifies the location of outputs">,
   MetaVarName<"<path>">;

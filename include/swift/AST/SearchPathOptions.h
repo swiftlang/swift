@@ -38,6 +38,9 @@ public:
 
   /// Path to search for compiler-relative stdlib modules.
   std::string RuntimeLibraryImportPath;
+
+  /// Don't look in for compiler-provided modules.
+  bool SkipRuntimeLibraryImportPath = false;
 };
 
 }

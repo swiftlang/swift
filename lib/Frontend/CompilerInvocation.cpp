@@ -592,6 +592,10 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
     Opts.RuntimeResourcePath = A->getValue();
   }
 
+  if (Args.getLastArg(OPT_nostdimport)) {
+    Opts.SkipRuntimeLibraryImportPath = true;
+  }
+
   // Opts.RuntimeIncludePath is set by calls to
   // setRuntimeIncludePath() or setMainExecutablePath().
   // Opts.RuntimeImportPath is set by calls to

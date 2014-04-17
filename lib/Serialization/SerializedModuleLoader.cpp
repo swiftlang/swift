@@ -114,6 +114,10 @@ findModule(ASTContext &ctx, AccessPathElem moduleID,
     }
   }
 
+  // If we're not allowed to look in the runtime library import path, stop.
+  if (ctx.SearchPathOpts.SkipRuntimeLibraryImportPath)
+    return llvm::make_error_code(llvm::errc::no_such_file_or_directory);
+
   // Search the runtime import path.
   isFramework = false;
   return openModuleFiles(ctx.SearchPathOpts.RuntimeLibraryImportPath,

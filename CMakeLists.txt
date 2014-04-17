@@ -373,7 +373,7 @@ function(compile_swift_files)
     list(APPEND swift_flags -parse-as-library)
   endif()
   if(SWIFTFILE_IS_STDLIB_CORE)
-    list(APPEND swift_flags -parse-stdlib -module-name "Swift" -Xfrontend -sil-serialize-all)
+    list(APPEND swift_flags -nostdimport -parse-stdlib -module-name "Swift" -Xfrontend -sil-serialize-all)
   endif()
 
   set(objfile ${SWIFTFILE_OUTPUT})
