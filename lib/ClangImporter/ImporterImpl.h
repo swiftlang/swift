@@ -661,7 +661,6 @@ public:
   /// \param isVariadic Whether the function is variadic.
   /// \param isNoReturn Whether the function is noreturn.
   /// \param bodyPatterns The patterns visible inside the function body.
-  /// \param pHasSelectorStyleSignature if non-null it accepts a boolean for
   ///   whether the created arg/body patterns are different (selector-style).
   /// \param methodName The name of the imported method.
   /// \param kind Controls whether we're building a type for a method that
@@ -673,7 +672,6 @@ public:
                         ArrayRef<const clang::ParmVarDecl *> params,
                         bool isVariadic, bool isNoReturn,
                         SmallVectorImpl<Pattern*> &bodyPatterns,
-                        bool *pHasSelectorStyleSignature,
                         DeclName methodName,
                         SpecialMethodKind kind);
 

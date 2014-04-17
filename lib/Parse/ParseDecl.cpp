@@ -2640,12 +2640,10 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
 
   DefaultArgumentInfo DefaultArgs;
   TypeRepr *FuncRetTy = nullptr;
-  bool HasSelectorStyleSignature;
   DeclName FullName;
   ParserStatus SignatureStatus =
-      parseFunctionSignature(SimpleName, FullName,
-                             BodyParams, DefaultArgs,
-                             FuncRetTy, HasSelectorStyleSignature);
+      parseFunctionSignature(SimpleName, FullName, BodyParams, DefaultArgs,
+                             FuncRetTy);
 
   if (SignatureStatus.hasCodeCompletion() && !CodeCompletion) {
     // Trigger delayed parsing, no need to continue.
@@ -2670,9 +2668,6 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
                           FuncLoc, FullName, NameLoc, GenericParams,
                           Type(), BodyParams, FuncRetTy,
                           CurDeclContext);
-
-    if (HasSelectorStyleSignature)
-      FD->setHasSelectorStyleSignature();
 
     // Pass the function signature to code completion.
     if (SignatureStatus.hasCodeCompletion())
@@ -3388,11 +3383,9 @@ Parser::parseDeclConstructor(ParseDeclOptions Flags,
   // FIXME: handle code completion in Arguments.
   DefaultArgumentInfo DefaultArgs;
   Pattern *BodyPattern;
-  bool HasSelectorStyleSignature;
   DeclName FullName;
-  ParserStatus SignatureStatus =
-    parseConstructorArguments(FullName, BodyPattern, DefaultArgs,
-                              HasSelectorStyleSignature);
+  ParserStatus SignatureStatus
+    = parseConstructorArguments(FullName, BodyPattern, DefaultArgs);
 
   if (SignatureStatus.hasCodeCompletion() && !CodeCompletion) {
     // Trigger delayed parsing, no need to continue.
@@ -3427,9 +3420,6 @@ Parser::parseDeclConstructor(ParseDeclOptions Flags,
   CD->setCompleteObjectInit(isCompleteObjectInit);
 
   // No need to setLocalDiscriminator.
-
-  if (HasSelectorStyleSignature)
-    CD->setHasSelectorStyleSignature();
 
   DefaultArgs.setFunctionContext(CD);
 

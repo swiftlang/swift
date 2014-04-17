@@ -1640,7 +1640,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
   case decls_block::CONSTRUCTOR_DECL: {
     DeclID parentID;
-    bool isImplicit, hasSelectorStyleSignature, isObjC, isTransparent;
+    bool isImplicit, isObjC, isTransparent;
     bool isCompleteObjectInit;
     TypeID signatureID;
     TypeID interfaceID;
@@ -1648,7 +1648,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     ArrayRef<uint64_t> argNameIDs;
 
     decls_block::ConstructorLayout::readRecord(scratch, parentID, isImplicit,
-                                               hasSelectorStyleSignature,
                                                isObjC, isTransparent,
                                                isCompleteObjectInit,
                                                signatureID, interfaceID,
@@ -1718,8 +1717,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     if (isImplicit)
       ctor->setImplicit();
-    if (hasSelectorStyleSignature)
-      ctor->setHasSelectorStyleSignature();
     if (isTransparent)
       ctor->getMutableAttrs().setAttr(AK_transparent, SourceLoc());
     if (isCompleteObjectInit)
@@ -1802,7 +1799,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   case decls_block::FUNC_DECL: {
     DeclID contextID;
     bool isImplicit;
-    bool hasSelectorStyleSignature;
     bool isStatic;
     uint8_t RawStaticSpelling;
     bool isAssignmentOrConversion;
@@ -1818,7 +1814,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     ArrayRef<uint64_t> nameIDs;
 
     decls_block::FuncLayout::readRecord(scratch, contextID, isImplicit,
-                                        hasSelectorStyleSignature,
                                         isStatic, RawStaticSpelling,
                                         isAssignmentOrConversion,
                                         isObjC, isIBAction, isTransparent,
@@ -1907,8 +1902,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     fn->setStatic(isStatic);
     if (isImplicit)
       fn->setImplicit();
-    if (hasSelectorStyleSignature)
-      fn->setHasSelectorStyleSignature();
     if (isAssignmentOrConversion) {
       assert(!fn->isOperator());
       fn->getMutableAttrs().setAttr(AK_conversion, SourceLoc());

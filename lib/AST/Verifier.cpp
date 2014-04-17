@@ -1420,11 +1420,6 @@ struct ASTNodeBase {};
         abort();
       }
 
-      if (DD->hasSelectorStyleSignature()) {
-        Out << "DestructorDecls can not have a selector-style signature";
-        abort();
-      }
-
       verifyParsedBase(DD);
     }
 

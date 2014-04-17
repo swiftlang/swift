@@ -4597,8 +4597,6 @@ createSubobjectInitOverride(TypeChecker &tc,
                                         selfBodyPattern, bodyParamPatterns,
                                         nullptr, classDecl);
   ctor->setImplicit();
-  if (superclassCtor->hasSelectorStyleSignature())
-    ctor->setHasSelectorStyleSignature();
 
   // Configure 'self'.
   GenericParamList *outerGenericParams = nullptr;

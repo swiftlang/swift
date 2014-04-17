@@ -645,11 +645,10 @@ mapParsedParameters(Parser &parser,
 ParserStatus
 Parser::parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
                                SmallVectorImpl<Pattern *> &BodyPatterns,
-                               DefaultArgumentInfo &DefaultArgs,
-                               bool &HasSelectorStyleSignature) {
+                               DefaultArgumentInfo &DefaultArgs) {
   // Figure out of we have a tuple-like declaration rather than a selector-style
   // declaration.
-  HasSelectorStyleSignature = false;
+  bool HasSelectorStyleSignature = false;
   {
     BacktrackingScope BS(*this);
     consumeToken(tok::l_paren);
@@ -715,10 +714,7 @@ Parser::parseFunctionSignature(Identifier SimpleName,
                                DeclName &FullName,
                                SmallVectorImpl<Pattern *> &bodyPatterns,
                                DefaultArgumentInfo &defaultArgs,
-                               TypeRepr *&retType,
-                               bool &HasSelectorStyleSignature) {
-  HasSelectorStyleSignature = false;
-  
+                               TypeRepr *&retType) {
   SmallVector<Identifier, 4> NamePieces;
   NamePieces.push_back(SimpleName);
   FullName = SimpleName;
@@ -726,8 +722,7 @@ Parser::parseFunctionSignature(Identifier SimpleName,
   ParserStatus Status;
   // We force first type of a func declaration to be a tuple for consistency.
   if (Tok.is(tok::l_paren)) {
-    Status = parseFunctionArguments(NamePieces, bodyPatterns,
-                                    defaultArgs, HasSelectorStyleSignature);
+    Status = parseFunctionArguments(NamePieces, bodyPatterns, defaultArgs);
     FullName = DeclName(Context, SimpleName, 
                         llvm::makeArrayRef(NamePieces.begin() + 1,
                                            NamePieces.end()));
@@ -778,10 +773,7 @@ Parser::parseFunctionSignature(Identifier SimpleName,
 
 ParserStatus
 Parser::parseConstructorArguments(DeclName &FullName, Pattern *&BodyPattern,
-                                  DefaultArgumentInfo &DefaultArgs,
-                                  bool &HasSelectorStyleSignature) {
-  HasSelectorStyleSignature = false;
-
+                                  DefaultArgumentInfo &DefaultArgs) {
   // It's just a pattern. Parse it.
   if (Tok.is(tok::l_paren)) {
     SmallVector<ParsedParameter, 4> params;
@@ -817,10 +809,6 @@ Parser::parseConstructorArguments(DeclName &FullName, Pattern *&BodyPattern,
     FullName = DeclName(Context, Context.Id_init, { });
     return makeParserError();
   }
-
-  // We have the start of a binding name, so this is a selector-style
-  // declaration.
-  HasSelectorStyleSignature = true;
 
   // This is not a parenthesis, but we should provide a reasonable source range
   // for parameters.

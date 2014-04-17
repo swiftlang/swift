@@ -786,18 +786,15 @@ public:
 
   ParserStatus parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
                                       SmallVectorImpl<Pattern*> &BodyPatterns,
-                                      DefaultArgumentInfo &defaultArgs,
-                                      bool &HasSelectorStyleSignature);
+                                      DefaultArgumentInfo &defaultArgs);
   ParserStatus parseFunctionSignature(Identifier functionName,
                                       DeclName &fullName,
                                       SmallVectorImpl<Pattern *> &bodyPatterns,
                                       DefaultArgumentInfo &defaultArgs,
-                                      TypeRepr *&retType,
-                                      bool &HasSelectorStyleSignature);
+                                      TypeRepr *&retType);
   ParserStatus parseConstructorArguments(DeclName &FullName,
                                          Pattern *&BodyPattern,
-                                         DefaultArgumentInfo &defaultArgs,
-                                         bool &HasSelectorStyleSignature);
+                                         DefaultArgumentInfo &defaultArgs);
 
   ParserResult<Pattern> parsePattern(bool isLet);
 

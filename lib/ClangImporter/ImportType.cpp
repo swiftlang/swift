@@ -737,12 +737,8 @@ Type ClangImporter::Implementation::importMethodType(
        ArrayRef<const clang::ParmVarDecl *> params,
        bool isVariadic, bool isNoReturn,
        SmallVectorImpl<Pattern*> &bodyPatterns,
-       bool *pHasSelectorStyleSignature,
        DeclName methodName,
        SpecialMethodKind kind) {
-
-  if (pHasSelectorStyleSignature)
-    *pHasSelectorStyleSignature = false;
 
   // Cannot import variadic types.
   if (isVariadic)
@@ -833,9 +829,6 @@ Type ClangImporter::Implementation::importMethodType(
     }
     argPatternElts.push_back(TuplePatternElt(argPattern));
     
-    if (argPattern != bodyPattern && pHasSelectorStyleSignature)
-      *pHasSelectorStyleSignature = true;
-
     // Add the tuple elements for the function types.
     swiftArgParams.push_back(TupleTypeElt(swiftParamTy, name));
     swiftBodyParams.push_back(TupleTypeElt(swiftParamTy, bodyName));

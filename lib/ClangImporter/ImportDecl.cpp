@@ -1786,7 +1786,6 @@ namespace {
         createSelfDecl(dc, decl->isClassMethod() || forceClassMethod);
       Pattern *selfPat = createTypedNamedPattern(selfVar);
       bodyPatterns.push_back(selfPat);
-      bool hasSelectorStyleSignature;
 
       SpecialMethodKind kind = SpecialMethodKind::Regular;
       if (isNSDictionaryMethod(decl, Impl.objectForKeyedSubscript))
@@ -1803,7 +1802,6 @@ namespace {
                                           decl->isVariadic(),
                                           decl->hasAttr<clang::NoReturnAttr>(),
                                           bodyPatterns,
-                                          &hasSelectorStyleSignature,
                                           name,
                                           kind);
       if (!type)
@@ -1858,9 +1856,6 @@ namespace {
       result->setBodyResultType(resultTy);
       result->setType(type);
       result->setInterfaceType(interfaceType);
-
-      if (hasSelectorStyleSignature)
-        result->setHasSelectorStyleSignature();
 
       // Optional methods in protocols.
       if (decl->getImplementationControl() == clang::ObjCMethodDecl::Optional &&
@@ -2076,7 +2071,6 @@ namespace {
       auto selfMetaVar = createSelfDecl(dc, true);
       Pattern *selfPat = createTypedNamedPattern(selfMetaVar);
       bodyPatterns.push_back(selfPat);
-      bool hasSelectorStyleSignature;
 
       // Import the type that this method will have.
       auto type = Impl.importMethodType(objcMethod->getReturnType(),
@@ -2085,7 +2079,6 @@ namespace {
                                         objcMethod->isVariadic(),
                                   objcMethod->hasAttr<clang::NoReturnAttr>(),
                                           bodyPatterns,
-                                          &hasSelectorStyleSignature,
                                           name,
                                           SpecialMethodKind::Constructor);
       if (!type)
@@ -2133,8 +2126,6 @@ namespace {
       result->setType(allocType);
       result->setInitializerType(initType);
 
-      if (hasSelectorStyleSignature)
-        result->setHasSelectorStyleSignature();
       if (implicit)
         result->setImplicit();
 

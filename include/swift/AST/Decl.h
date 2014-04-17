@@ -304,14 +304,10 @@ class alignas(8) Decl {
     /// \see AbstractFunctionDecl::BodyKind
     unsigned BodyKind : 3;
 
-    /// \brief Whether this function was declared with a selector-style
-    /// signature.
-    unsigned HasSelectorStyleSignature : 1;
-
     /// Number of curried parameter patterns (tuples).
     unsigned NumParamPatterns : 7;
   };
-  enum { NumAbstractFunctionDeclBits = NumValueDeclBits + 11 };
+  enum { NumAbstractFunctionDeclBits = NumValueDeclBits + 10 };
   static_assert(NumAbstractFunctionDeclBits <= 32, "fits in an unsigned");
 
   class FuncDeclBitfields {
@@ -3305,7 +3301,6 @@ protected:
         Body(nullptr), GenericParams(nullptr) {
     setBodyKind(BodyKind::None);
     setGenericParams(GenericParams);
-    AbstractFunctionDeclBits.HasSelectorStyleSignature = false;
     AbstractFunctionDeclBits.NumParamPatterns = NumParamPatterns;
 
     // Verify no bitfield truncation.
@@ -3383,14 +3378,6 @@ public:
 
   CaptureInfo &getCaptureInfo() { return Captures; }
   const CaptureInfo &getCaptureInfo() const { return Captures; }
-
-  bool hasSelectorStyleSignature() const {
-    return AbstractFunctionDeclBits.HasSelectorStyleSignature;
-  }
-
-  void setHasSelectorStyleSignature() {
-    AbstractFunctionDeclBits.HasSelectorStyleSignature = true;
-  }
 
   /// Retrieve the Objective-C selector that names this method.
   ObjCSelector getObjCSelector() const;
