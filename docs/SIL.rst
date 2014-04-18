@@ -3181,21 +3181,6 @@ exceptions:
 - A ``@noreturn`` function may be converted to a non-``@noreturn``
   type and vice-versa.
 
-bridge_to_block
-```````````````
-::
-
-  sil-instruction ::= 'bridge_to_block' sil-operand 'to' sil-type
-
-  %1 = bridge_to_block %0 : $T -> U to $@cc(cdecl), @objc_block T -> U
-  // %0 must be of a function type
-  // The destination must be of the same function type, with the 
-  //   @objc_block attribute
-  // %1 will be of type $@cc(cdecl), @objc_block T -> U
-
-Converts a function value from Swift representation to Objective-C block
-representation.
-
 thick_to_objc_metatype
 ``````````````````````
 ::

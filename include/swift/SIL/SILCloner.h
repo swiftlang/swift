@@ -551,15 +551,6 @@ visitObjCToThickMetatypeInst(ObjCToThickMetatypeInst *Inst) {
 
 template<typename ImplClass>
 void
-SILCloner<ImplClass>::visitBridgeToBlockInst(BridgeToBlockInst *Inst) {
-  doPostProcess(Inst,
-    getBuilder().createBridgeToBlock(getOpLocation(Inst->getLoc()),
-                                     getOpValue(Inst->getOperand()),
-                                     getOpType(Inst->getType())));
-}
-
-template<typename ImplClass>
-void
 SILCloner<ImplClass>::visitIsNonnullInst(IsNonnullInst *Inst) {
   doPostProcess(Inst,
     getBuilder().createIsNonnull(getOpLocation(Inst->getLoc()),

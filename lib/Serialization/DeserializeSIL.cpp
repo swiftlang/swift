@@ -711,7 +711,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   ONEOPERAND_ONETYPE_INST(ThinToThickFunction)
   ONEOPERAND_ONETYPE_INST(ThickToObjCMetatype)
   ONEOPERAND_ONETYPE_INST(ObjCToThickMetatype)
-  ONEOPERAND_ONETYPE_INST(BridgeToBlock)
   ONEOPERAND_ONETYPE_INST(ConvertFunction)
   ONEOPERAND_ONETYPE_INST(UpcastExistentialRef)
   ONEOPERAND_ONETYPE_INST(ProjectBlockStorage)

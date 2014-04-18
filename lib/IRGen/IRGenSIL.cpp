@@ -652,7 +652,6 @@ public:
   void visitThinToThickFunctionInst(ThinToThickFunctionInst *i);
   void visitThickToObjCMetatypeInst(ThickToObjCMetatypeInst *i);
   void visitObjCToThickMetatypeInst(ObjCToThickMetatypeInst *i);
-  void visitBridgeToBlockInst(BridgeToBlockInst *i);
   void visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *i);
 
   void visitIsNonnullInst(IsNonnullInst *i);
@@ -2596,13 +2595,6 @@ void IRGenSILFunction::visitObjCToThickMetatypeInst(
   call->setCallingConv(IGM.RuntimeCC);
   to.add(call);
   setLoweredExplosion(SILValue(i, 0), to);  
-}
-
-void IRGenSILFunction::visitBridgeToBlockInst(swift::BridgeToBlockInst *i) {
-  Explosion from = getLoweredExplosion(i->getOperand());
-  Explosion to(ResilienceExpansion::Maximal);
-  emitBridgeToBlock(*this, i->getType(), from, to);
-  setLoweredExplosion(SILValue(i, 0), to);
 }
 
 /// Emit a checked cast sequence. Returns an Address; this may be either

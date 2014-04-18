@@ -835,7 +835,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case ValueKind::ThinToThickFunctionInst:
   case ValueKind::ThickToObjCMetatypeInst:
   case ValueKind::ObjCToThickMetatypeInst:
-  case ValueKind::BridgeToBlockInst:
   case ValueKind::ConvertFunctionInst:
   case ValueKind::UpcastExistentialRefInst:
   case ValueKind::ProjectBlockStorageInst: {

@@ -340,7 +340,6 @@ static InlineCost instructionInlineCost(SILInstruction &I,
     case ValueKind::AssignInst:
     case ValueKind::AutoreleaseReturnInst:
     case ValueKind::BranchInst:
-    case ValueKind::BridgeToBlockInst:
     case ValueKind::CheckedCastBranchInst:
     case ValueKind::ClassMethodInst:
     case ValueKind::CondBranchInst:

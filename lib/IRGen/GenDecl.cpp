@@ -1222,39 +1222,6 @@ llvm::Constant *IRGenModule::getAddrOfProtocolDescriptor(ProtocolDecl *D,
                                DebugTypeInfo());
 }
 
-/// Fetch the declaration of the given function-to-block converter.
-llvm::Function *
-IRGenModule::getAddrOfBridgeToBlockConverter(SILType blockType,
-                                             ForDefinition_t forDefinition)
-{
-  LinkEntity entity
-    = LinkEntity::forBridgeToBlockConverter(blockType);
-  
-  // Check whether we've cached this.
-  llvm::Function *&entry = GlobalFuncs[entity];
-  if (entry) {
-    if (forDefinition) updateLinkageForDefinition(*this, entry, entity);
-    return entry;
-  }
-  
-  // The block converter is a C function with signature
-  // __typeof__(R (^)(A...)) converter(R (*)(A..., swift_refcounted*),
-  //                                   swift_refcounted*)
-  // We simplify that to the llvm type %block(i8*, %swift.refcounted*)*.
-  llvm::Type *fnParams[] = {Int8PtrTy, RefCountedPtrTy};
-  llvm::FunctionType *fnType = llvm::FunctionType::get(ObjCBlockPtrTy,
-                                                       fnParams,
-                                                       /*isVarArg=*/ false);
-  
-  
-  llvm::AttributeSet attrs;
-  auto cc = expandAbstractCC(*this, AbstractCC::C);
-  
-  LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
-  entry = link.createFunction(*this, fnType, cc, attrs);
-  return entry;
-}
-
 /// Fetch the declaration of the ivar initializer for the given class.
 Optional<llvm::Function*> IRGenModule::getAddrOfObjCIVarInitDestroy(
                             ClassDecl *cd,

@@ -52,13 +52,6 @@ namespace irgen {
                                       CanSILFunctionType outType,
                                       Explosion &out);
   
-  /// Emit a call to convert a Swift closure to an Objective-C block via a
-  /// shim function defined in Objective-C.
-  void emitBridgeToBlock(IRGenFunction &IGF,
-                         SILType blockType,
-                         Explosion &swiftClosure,
-                         Explosion &outBlock);
-
   /// Does an ObjC method or C function with the given signature
   /// require an sret indirect result?
   llvm::PointerType *requiresExternalIndirectResult(IRGenModule &IGM,

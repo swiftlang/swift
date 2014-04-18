@@ -2832,28 +2832,6 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
   out.add(data);
 }
 
-/// Emit a call to convert a Swift closure to an Objective-C block via a
-/// shim function defined in Objective-C.
-void irgen::emitBridgeToBlock(IRGenFunction &IGF,
-                              SILType blockTy,
-                              Explosion &swiftClosure,
-                              Explosion &outBlock) {
-  // Get the function pointer as an i8*.
-  llvm::Value *fn = swiftClosure.claimNext();
-  fn = IGF.Builder.CreateBitCast(fn, IGF.IGM.Int8PtrTy);
-
-  // Get the context pointer as a %swift.refcounted*.
-  llvm::Value *mContext = swiftClosure.claimNext();
-  llvm::Value *context = IGF.Builder.CreateBitCast(mContext,
-                                                   IGF.IGM.RefCountedPtrTy);
-  // Get the shim function we'll call.
-  llvm::Function *converter =
-    IGF.IGM.getAddrOfBridgeToBlockConverter(blockTy, NotForDefinition);
-  
-  // Emit the call.
-  outBlock.add(IGF.Builder.CreateCall2(converter, fn, context));
-}
-
 /// Emit the block copy helper for a block.
 static llvm::Function *emitBlockCopyHelper(IRGenModule &IGM,
                                            CanSILBlockStorageType blockTy,

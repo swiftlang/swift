@@ -103,7 +103,7 @@
                     "address_to_pointer" "pointer_to_address"
                     "ref_to_object_pointer" "object_pointer_to_ref"
                     "ref_to_raw_pointer" "raw_pointer_to_ref"
-                    "convert_function" "bridge_to_block"
+                    "convert_function"
                     "thick_to_objc_metatype" "objc_to_thick_metatype"
                     "thin_to_thick_function" "is_nonnull")
                   'words) . font-lock-keyword-face)

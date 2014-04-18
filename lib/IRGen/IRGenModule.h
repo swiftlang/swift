@@ -429,8 +429,6 @@ public:
                                        ForDefinition_t forDefinition);
   Address getAddrOfSILGlobalVariable(SILGlobalVariable *var,
                                      ForDefinition_t forDefinition);
-  llvm::Function *getAddrOfBridgeToBlockConverter(SILType blockType,
-                                                  ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfWitnessTable(const NormalProtocolConformance *C,
                                         llvm::Type *definitionTy = nullptr);
 

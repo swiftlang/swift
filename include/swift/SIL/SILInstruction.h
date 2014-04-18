@@ -1226,16 +1226,6 @@ public:
     : UnaryInstructionBase(Loc, Operand, Ty) {}
 };
 
-/// BridgeToBlockInst - Converts a Swift function value to an ObjC-compatible
-/// block.
-class BridgeToBlockInst
-  : public UnaryInstructionBase<ValueKind::BridgeToBlockInst, ConversionInst>
-{
-public:
-  BridgeToBlockInst(SILLocation Loc, SILValue Operand, SILType Ty)
-    : UnaryInstructionBase(Loc, Operand, Ty) {}
-};
-
 /// Test that an address or reference type is not null.
 class IsNonnullInst : public UnaryInstructionBase<ValueKind::IsNonnullInst> {
 public:

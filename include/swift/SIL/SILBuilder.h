@@ -376,11 +376,6 @@ public:
     return insert(new (F.getModule()) ObjCToThickMetatypeInst(Loc, Op, Ty));
   }
 
-  BridgeToBlockInst *createBridgeToBlock(SILLocation Loc,
-                                         SILValue Op, SILType Ty) {
-    return insert(new (F.getModule()) BridgeToBlockInst(Loc, Op, Ty));
-  }
-
   UnownedToRefInst *createUnownedToRef(SILLocation loc,
                                        SILValue op, SILType ty) {
     return insert(new (F.getModule()) UnownedToRefInst(loc, op, ty));

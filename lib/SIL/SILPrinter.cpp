@@ -785,9 +785,6 @@ public:
   void visitObjCToThickMetatypeInst(ObjCToThickMetatypeInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand(),"objc_to_thick_metatype");
   }
-  void visitBridgeToBlockInst(BridgeToBlockInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand(), "bridge_to_block");
-  }
   void visitUpcastExistentialRefInst(UpcastExistentialRefInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand(),"upcast_existential_ref");
   }
