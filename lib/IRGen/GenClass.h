@@ -39,7 +39,8 @@ namespace irgen {
   class OwnedAddress;
   
   enum class ReferenceCounting : unsigned char;
-
+  enum class IsaEncoding : unsigned char;
+  
   OwnedAddress projectPhysicalClassMemberAddress(IRGenFunction &IGF,
                                                  llvm::Value *base,
                                                  SILType baseType,
@@ -85,9 +86,12 @@ namespace irgen {
   /// type in the ObjC world.
   bool hasObjCClassRepresentation(IRGenModule &IGM, Type t);
   
-  /// Do instances of the given class have a Swift refcount?
+  /// What reference counting mechanism does a class use?
   ReferenceCounting getReferenceCountingForClass(IRGenModule &IGM,
                                                  ClassDecl *theClass);
+  
+  /// What isa-encoding mechanism does a type use?
+  IsaEncoding getIsaEncodingForType(IRGenModule &IGM, CanType type);
 } // end namespace irgen
 } // end namespace swift
 

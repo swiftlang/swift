@@ -39,6 +39,7 @@
 #include "GenPoly.h"
 #include "GenProto.h"
 #include "GenStruct.h"
+#include "HeapTypeInfo.h"
 #include "IRGenModule.h"
 #include "IRGenDebugInfo.h"
 #include "Linking.h"
@@ -2563,52 +2564,78 @@ irgen::emitClassResilientInstanceSizeAndAlignMask(IRGenFunction &IGF,
   return {size, alignMask};
 }
 
+/// Given a pointer to a heap object, load its heap metadata pointer using the
+/// ObjC runtime.
+static llvm::Value *emitLoadOfObjCHeapMetadataRef(IRGenFunction &IGF,
+                                                  llvm::Value *object) {
+  object = IGF.Builder.CreateBitCast(object, IGF.IGM.ObjCPtrTy);
+  auto metadata = IGF.Builder.CreateCall(IGF.IGM.getGetObjectClassFn(),
+                                         object,
+                                         object->getName() + ".class");
+  metadata->setCallingConv(IGF.IGM.RuntimeCC);
+  metadata->setDoesNotThrow();
+  metadata->setDoesNotAccessMemory();
+  return metadata;
+}
+
 /// Given a pointer to a heap object (i.e. definitely not a tagged
 /// pointer), load its heap metadata pointer.
 static llvm::Value *emitLoadOfHeapMetadataRef(IRGenFunction &IGF,
                                               llvm::Value *object,
+                                              IsaEncoding isaEncoding,
                                               bool suppressCast) {
-  // Drill into the object pointer.  Rather than bitcasting, we make
-  // an effort to do something that should explode if we get something
-  // mistyped.
-  llvm::StructType *structTy =
-    cast<llvm::StructType>(
-      cast<llvm::PointerType>(object->getType())->getElementType());
+  switch (isaEncoding) {
+  case IsaEncoding::Pointer: {
+    // Drill into the object pointer.  Rather than bitcasting, we make
+    // an effort to do something that should explode if we get something
+    // mistyped.
+    llvm::StructType *structTy =
+      cast<llvm::StructType>(
+        cast<llvm::PointerType>(object->getType())->getElementType());
 
-  llvm::Value *slot;
+    llvm::Value *slot;
 
-  // We need a bitcast if we're dealing with an opaque class.
-  if (structTy->isOpaque()) {
-    auto metadataPtrPtrTy = IGF.IGM.TypeMetadataPtrTy->getPointerTo();
-    slot = IGF.Builder.CreateBitCast(object, metadataPtrPtrTy);
+    // We need a bitcast if we're dealing with an opaque class.
+    if (structTy->isOpaque()) {
+      auto metadataPtrPtrTy = IGF.IGM.TypeMetadataPtrTy->getPointerTo();
+      slot = IGF.Builder.CreateBitCast(object, metadataPtrPtrTy);
 
-  // Otherwise, make a GEP.
-  } else {
-    auto zero = llvm::ConstantInt::get(IGF.IGM.Int32Ty, 0);
+    // Otherwise, make a GEP.
+    } else {
+      auto zero = llvm::ConstantInt::get(IGF.IGM.Int32Ty, 0);
 
-    SmallVector<llvm::Value*, 4> indexes;
-    indexes.push_back(zero);
-    do {
+      SmallVector<llvm::Value*, 4> indexes;
       indexes.push_back(zero);
+      do {
+        indexes.push_back(zero);
 
-      // Keep drilling down to the first element type.
-      auto eltTy = structTy->getElementType(0);
-      assert(isa<llvm::StructType>(eltTy) || eltTy == IGF.IGM.TypeMetadataPtrTy);
-      structTy = dyn_cast<llvm::StructType>(eltTy);
-    } while (structTy != nullptr);
+        // Keep drilling down to the first element type.
+        auto eltTy = structTy->getElementType(0);
+        assert(isa<llvm::StructType>(eltTy) || eltTy == IGF.IGM.TypeMetadataPtrTy);
+        structTy = dyn_cast<llvm::StructType>(eltTy);
+      } while (structTy != nullptr);
 
-    slot = IGF.Builder.CreateInBoundsGEP(object, indexes);
+      slot = IGF.Builder.CreateInBoundsGEP(object, indexes);
 
-    if (!suppressCast) {
-      slot = IGF.Builder.CreateBitCast(slot,
-                                  IGF.IGM.TypeMetadataPtrTy->getPointerTo());
+      if (!suppressCast) {
+        slot = IGF.Builder.CreateBitCast(slot,
+                                    IGF.IGM.TypeMetadataPtrTy->getPointerTo());
+      }
     }
-  }
 
-  auto metadata = IGF.Builder.CreateLoad(Address(slot,
-                                             IGF.IGM.getPointerAlignment()));
-  metadata->setName(llvm::Twine(object->getName()) + ".metadata");
-  return metadata;
+    auto metadata = IGF.Builder.CreateLoad(Address(slot,
+                                               IGF.IGM.getPointerAlignment()));
+    metadata->setName(llvm::Twine(object->getName()) + ".metadata");
+    return metadata;
+  }
+      
+  case IsaEncoding::ObjC: {
+    // Feed the object pointer to object_getClass.
+    llvm::Value *objcClass = emitLoadOfObjCHeapMetadataRef(IGF, object);
+    objcClass = IGF.Builder.CreateBitCast(objcClass, IGF.IGM.TypeMetadataPtrTy);
+    return objcClass;
+  }
+  }
 }
 
 static bool isKnownNotTaggedPointer(IRGenModule &IGM, ClassDecl *theClass) {
@@ -2624,18 +2651,13 @@ llvm::Value *irgen::emitHeapMetadataRefForHeapObject(IRGenFunction &IGF,
                                                      bool suppressCast) {
   ClassDecl *theClass = objectType.getClassOrBoundGenericClass();
   if (isKnownNotTaggedPointer(IGF.IGM, theClass))
-    return emitLoadOfHeapMetadataRef(IGF, object, suppressCast);
+    return emitLoadOfHeapMetadataRef(IGF, object,
+                                     getIsaEncodingForType(IGF.IGM, objectType),
+                                     suppressCast);
 
   // OK, ask the runtime for the class pointer of this
   // potentially-ObjC object.
-  object = IGF.Builder.CreateBitCast(object, IGF.IGM.ObjCPtrTy);
-  auto metadata = IGF.Builder.CreateCall(IGF.IGM.getGetObjectClassFn(),
-                                         object,
-                                         object->getName() + ".class");
-  metadata->setCallingConv(IGF.IGM.RuntimeCC);
-  metadata->setDoesNotThrow();
-  metadata->setDoesNotAccessMemory();
-  return metadata;
+  return emitLoadOfObjCHeapMetadataRef(IGF, object);
 }
 
 llvm::Value *irgen::emitHeapMetadataRefForHeapObject(IRGenFunction &IGF,
@@ -2670,7 +2692,9 @@ llvm::Value *irgen::emitTypeMetadataRefForHeapObject(IRGenFunction &IGF,
                                                      bool suppressCast) {
   // If it is known to have swift metadata, just load.
   if (hasKnownSwiftMetadata(IGF.IGM, objectType.getSwiftRValueType())) {
-    return emitLoadOfHeapMetadataRef(IGF, object, suppressCast);
+    return emitLoadOfHeapMetadataRef(IGF, object,
+                getIsaEncodingForType(IGF.IGM, objectType.getSwiftRValueType()),
+                suppressCast);
   }
 
   // Okay, ask the runtime for the type metadata of this

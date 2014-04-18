@@ -69,6 +69,21 @@ ReferenceCounting irgen::getReferenceCountingForClass(IRGenModule &IGM,
   return ReferenceCounting::ObjC;
 }
 
+/// What isa encoding mechanism does a type have?
+IsaEncoding irgen::getIsaEncodingForType(IRGenModule &IGM,
+                                         CanType type) {
+  if (auto theClass = type->getClassOrBoundGenericClass()) {
+    // We can access the isas of pure Swift classes directly.
+    if (hasKnownSwiftImplementation(IGM, getRootClass(theClass)))
+      return IsaEncoding::Pointer;
+    // For ObjC or mixed classes, we need to use object_getClass.
+    return IsaEncoding::ObjC;
+  }
+  // Non-class heap objects should be pure Swift, so we can access their isas
+  // directly.
+  return IsaEncoding::Pointer;
+}
+
 /// Different policies for accessing a physical field.
 enum class FieldAccess : uint8_t {
   /// Instance variable offsets are constant.

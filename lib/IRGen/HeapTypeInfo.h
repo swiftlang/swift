@@ -22,6 +22,7 @@
 #include "ReferenceTypeInfo.h"
 #include "ScalarTypeInfo.h"
 #include "SwiftTargetInfo.h"
+#include "GenType.h"
 
 namespace swift {
 namespace irgen {
@@ -87,6 +88,20 @@ enum class ReferenceCounting : unsigned char {
   Unknown,
 };
   
+/// The kind of 'isa' encoding a heap object uses to reference its heap
+/// metadata.
+enum class IsaEncoding : unsigned char {
+  /// The object stores a plain pointer to its heap metadata as its first word.
+  Pointer,
+  /// The object's isa is managed by the Objective-C runtime and must be
+  /// accessed with object_getClass. This is a superset of "Pointer" because
+  /// object_getClass is compatible with pointer isas.
+  ObjC,
+  /// The isa encoding is unknown and must be accessed in a maximally-compatible
+  /// way.
+  Unknown = ObjC,
+};
+  
 /// HeapTypeInfo - A type designed for use implementing a type
 /// which consists solely of something reference-counted.
 ///
@@ -112,6 +127,20 @@ public:
     case ReferenceCounting::Block:
     case ReferenceCounting::Unknown:
       return false;
+    }
+  }
+  
+  IsaEncoding getIsaEncoding(ResilienceScope scope) const {
+    switch (asDerived().getReferenceCounting()) {
+    // We can access the isa of pure Swift heap objects directly.
+    case ReferenceCounting::Native:
+      return IsaEncoding::Pointer;
+    // Use the ObjC runtime to access ObjC or mixed-heritage isas.
+    case ReferenceCounting::ObjC:
+    case ReferenceCounting::Block:
+      return IsaEncoding::ObjC;
+    case ReferenceCounting::Unknown:
+      return IsaEncoding::Unknown;
     }
   }
   
