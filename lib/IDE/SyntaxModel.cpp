@@ -512,7 +512,6 @@ bool ModelASTWalker::handleAttrRanges(SourceLoc AtLoc,
                            charSourceRangeFromSourceRange(SM, Range)}))
       return false;
 
-    auto RRR = TokenNodes.front();
     while (SM.rangeContainsTokenLoc(AttrRange,
                                     TokenNodes.front().Range.getStart()))
       TokenNodes = TokenNodes.slice(1);
