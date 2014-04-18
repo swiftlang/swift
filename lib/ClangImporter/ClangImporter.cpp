@@ -155,6 +155,7 @@ ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef targetTriple,
     "-DSWIFT_PROTOCOL_EXTRA=__attribute__((annotate(\""
       SWIFT_NATIVE_ANNOTATION_STRING "\")))",
     "-fretain-comments-from-system-headers",
+    "-fmodules-validate-system-headers",
     "swift.m"
   };
 
