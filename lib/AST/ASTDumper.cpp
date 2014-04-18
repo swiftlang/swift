@@ -623,6 +623,10 @@ namespace {
       case CtorInitializerKind::ConvenienceFactory:
         OS << " convenience_factory";
         break;
+
+      case CtorInitializerKind::Factory:
+        OS << " factory";
+        break;
       }
 
       printAbstractFunctionDecl(CD);

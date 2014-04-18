@@ -1114,6 +1114,11 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
   case CtorInitializerKind::ConvenienceFactory:
     Printer << " -> Self";
     break;
+
+  case CtorInitializerKind::Factory:
+    Printer << " -> "
+            << decl->getExtensionType()->getAnyNominal()->getName().str();
+    break;
   }
 
   if (!Options.FunctionDefinitions || !decl->getBody()) {

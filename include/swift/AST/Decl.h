@@ -3886,6 +3886,9 @@ enum class CtorInitializerKind {
   /// object by delegating to another initializer (eventually reaching a
   /// designated initializer).
   ///
+  /// A convenience initializer is written with a return type of "Self" in
+  /// source code.
+  ///
   /// Convenience initializers are inherited into subclasses that override
   /// all of their superclass's designated initializers.
   Convenience,
@@ -3896,7 +3899,20 @@ enum class CtorInitializerKind {
   /// Convenience factory initializers cannot be expressed directly in
   /// Swift; rather, they are produced by the Clang importer when importing
   /// an instancetype factory method from Objective-C.
-  ConvenienceFactory
+  ConvenienceFactory,
+
+  /// A factory initializer is an initializer that is neither designated nor
+  /// convenience: it can be used to create an object of the given type, but
+  /// cannot be chained to via "super.init" nor is it inherited.
+  ///
+  /// A factory initializer is written with a return type of the class name
+  /// itself. FIXME: However, this is only a presentation form, and at present
+  /// the only factory initializers are produced by importing an Objective-C
+  /// factory method that does not return instancetype.
+  ///
+  /// FIXME: Arguably, structs and enums only have factory initializers, and
+  /// using designated initializers for them is a misnomer.
+  Factory
 };
 
 /// ConstructorDecl - Declares a constructor for a type.  For example:
@@ -4017,10 +4033,16 @@ public:
            getInitKind() == CtorInitializerKind::ConvenienceFactory;
   }
 
+  /// Whether this is a factory initializer.
+  bool isFactoryInit() const {
+    return getInitKind() == CtorInitializerKind::Factory;
+  }
+
   /// Determine whether this initializer is inheritable.
   bool isInheritable() const {
     switch (getInitKind()) {
     case CtorInitializerKind::Designated:
+    case CtorInitializerKind::Factory:
       return false;
 
     case CtorInitializerKind::Convenience:

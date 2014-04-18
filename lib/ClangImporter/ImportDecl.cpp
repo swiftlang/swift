@@ -1770,8 +1770,25 @@ namespace {
       if (!initName)
         return Nothing;
 
-      // Check whether the result is instancetype.
-      if (!decl->hasRelatedResultType()) {
+      // Check the result type to determine what kind of initializer we can
+      // create (if any).
+      CtorInitializerKind initKind;
+      if (decl->hasRelatedResultType()) {
+        // instancetype factory methods become convenience factory initializers.
+        initKind = CtorInitializerKind::ConvenienceFactory;
+      } else if (auto objcPtr = decl->getReturnType()
+                                  ->getAs<clang::ObjCObjectPointerType>()) {
+        if (objcPtr->getInterfaceDecl() == objcClass) {
+          initKind = CtorInitializerKind::Factory;
+        } else {
+          // FIXME: Could allow a subclass here, but the rest of the compiler
+          // isn't prepared for that yet.
+          // Not a factory method.
+          ++NumFactoryMethodsWrongResult;
+          return Nothing;
+        }
+      } else {
+        // Not a factory method.
         ++NumFactoryMethodsWrongResult;
         return Nothing;
       }
@@ -1795,8 +1812,7 @@ namespace {
       // FIXME: Check for redundant initializers. It's very, very hard to
       // avoid order dependencies here. Perhaps we should just deal with the
       // ambiguity later?
-      auto result = importConstructor(decl, dc, false,
-                                      CtorInitializerKind::ConvenienceFactory,
+      auto result = importConstructor(decl, dc, false, initKind,
                                       /*required=*/false, selector, initName);
       if (result && member) {
         ++NumFactoryMethodsAsInitializers;
@@ -1805,7 +1821,7 @@ namespace {
         // message.
         llvm::SmallString<64> message;
         llvm::raw_svector_ostream os(message);
-        os << "use initializer '" << objcClass->getName() << "(";
+        os << "use object construction '" << objcClass->getName() << "(";
         for (auto arg : initName.getArgumentNames()) {
           os << arg << ":";
         }
@@ -3139,6 +3155,10 @@ namespace {
         for (auto member : members) {
           auto ctor = dyn_cast<ConstructorDecl>(member);
           if (!ctor)
+            continue;
+
+          // Don't inherit factory initializers.
+          if (ctor->isFactoryInit())
             continue;
 
           auto objcMethod

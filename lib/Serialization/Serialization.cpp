@@ -1300,6 +1300,9 @@ getStableCtorInitializerKind(swift::CtorInitializerKind K){
   case swift::CtorInitializerKind::ConvenienceFactory:
     llvm_unreachable("Convenience factory initializers cannot be uttered");
 
+  case swift::CtorInitializerKind::Factory:
+    llvm_unreachable("Factory initializers cannot be uttered");
+
 #define CASE(NAME) \
   case swift::CtorInitializerKind::NAME: return serialization::NAME;
       CASE(Designated)
