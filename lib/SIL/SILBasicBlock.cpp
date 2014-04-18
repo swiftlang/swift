@@ -72,6 +72,19 @@ void SILBasicBlock::eraseFromParent() {
   getParent()->getBlocks().erase(this);
 }
 
+/// Replace the ith BB argument with a new one with type Ty (and optional
+/// ValueDecl D).
+SILArgument *SILBasicBlock::replaceBBArg(unsigned i, SILType Ty, ValueDecl *D) {
+  SILModule &M = getParent()->getModule();
+  assert(BBArgList[i]->use_empty() && "Expected no uses of the old BB arg!");
+
+  auto *NewArg = new (M) SILArgument(Ty, D);
+  NewArg->setParent(this);
+  BBArgList[i] = NewArg;
+
+  return NewArg;
+}
+
 /// \brief Splits a basic block into two at the specified instruction.
 ///
 /// Note that all the instructions BEFORE the specified iterator

@@ -252,3 +252,49 @@ bb3:                                              // Preds: bb0
   %17 = tuple ()                                  // user: %18
   return %17 : $()                                // id: %18
 }
+
+// We should be able to compile this down to returning the parameter
+// but we're not quite there yet.
+// CHECK-LABEL: @nop
+sil @nop : $@thin (Bool) -> Bool {
+bb0(%0 : $Bool):
+  %1 = struct_extract %0 : $Bool, #Bool.value
+// CHECK: cond_br %1, [[TRUE:[a-zA-Z0-9]+]], [[FALSE:[a-zA-Z0-9]+]]
+  cond_br %1, bb1, bb2
+
+// CHECK: [[TRUE]]:
+bb1:
+  %3 = integer_literal $Builtin.Int1, 0
+  %4 = struct $Bool (%3 : $Builtin.Int1)
+// CHECK: br [[RETURN:[a-zA-Z0-9]+]]
+  br bb3(%4 : $Bool)
+
+// CHECK: [[FALSE]]:
+bb2:
+  %6 = integer_literal $Builtin.Int1, -1          // user: %7
+  %7 = struct $Bool (%6 : $Builtin.Int1)          // user: %8
+// CHECK: br [[RETURN]]
+  br bb3(%7 : $Bool)                              // id: %8
+
+// CHECK: [[RETURN]]
+bb3(%9 : $Bool):                                  // Preds: bb1 bb2
+// CHECK-NOT: struct_extract
+  %10 = struct_extract %9 : $Bool, #Bool.value    // user: %11
+// CHECK: return
+  cond_br %10, bb4, bb5                           // id: %11
+
+// CHECK-NOT: bb4
+bb4:                                              // Preds: bb3
+  %12 = integer_literal $Builtin.Int1, 0          // user: %13
+  %13 = struct $Bool (%12 : $Builtin.Int1)        // user: %14
+  br bb6(%13 : $Bool)                             // id: %14
+
+// CHECK-NOT: bb5
+bb5:                                              // Preds: bb3
+  %15 = integer_literal $Builtin.Int1, -1         // user: %16
+  %16 = struct $Bool (%15 : $Builtin.Int1)        // user: %17
+  br bb6(%16 : $Bool)                             // id: %17
+
+bb6(%18 : $Bool):                                 // Preds: bb4 bb5
+  return %18 : $Bool                              // id: %19
+}

@@ -101,6 +101,7 @@ namespace {
     bool simplifyBranchBlock(BranchInst *BI);
     bool simplifyCondBrBlock(CondBranchInst *BI);
     bool simplifySwitchEnumBlock(SwitchEnumInst *SEI);
+    bool simplifyArgument(SILBasicBlock *BB, unsigned i);
     bool simplifyArgs(SILBasicBlock *BB);
   };
 
@@ -389,6 +390,12 @@ bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
 
     // Revisit this block now that we've changed it and remove the DestBB.
     addToWorklist(BB);
+
+    // This can also expose opportunities in the successors of
+    // the merged block.
+    for (auto &Succ : BB->getSuccs())
+      addToWorklist(Succ);
+
     removeFromWorklist(DestBB);
     DestBB->eraseFromParent();
     ++NumBlocksMerged;
@@ -400,6 +407,9 @@ bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
   if (isTrampolineBlock(DestBB)) {
     BranchInst* Br = dyn_cast<BranchInst>(DestBB->getTerminator());
     SILBuilder(BI).createBranch(BI->getLoc(), Br->getDestBB(), BI->getArgs());
+    // Eliminating the trampoline can expose opportuntities to improve the
+    // new block we branch to.
+    addToWorklist(Br->getDestBB());
     BI->eraseFromParent();
     removeIfDead(DestBB);
     addToWorklist(BB);
@@ -665,6 +675,68 @@ static bool hasMandatoryArgument(TermInst *term) {
   return (!isa<BranchInst>(term) && !isa<CondBranchInst>(term));
 }
 
+
+// Get the element of Aggregate corresponding to the one extracted by
+// Extract.
+static SILValue getInsertedValue(SILInstruction *Aggregate,
+                                 SILInstruction *Extract) {
+  if (auto *Struct = dyn_cast<StructInst>(Aggregate)) {
+    auto *SEI = cast<StructExtractInst>(Extract);
+    return Struct->getFieldValue(SEI->getField());
+  }
+  auto *Tuple = cast<TupleInst>(Aggregate);
+  auto *TEI = cast<TupleExtractInst>(Extract);
+  return Tuple->getElementValue(TEI->getFieldNo());
+}
+
+// Attempt to simplify the ith argument of BB.  We simplify cases
+// where there is a single use of the argument that is an extract from
+// a struct or tuple and where the predecessors all build the struct
+// or tuple and pass it directly.
+bool SimplifyCFG::simplifyArgument(SILBasicBlock *BB, unsigned i) {
+  auto *A = BB->getBBArg(i);
+
+  // For now, just focus on cases where there is a single use.
+  if (!A->hasOneUse())
+    return false;
+
+  auto *Use = *A->use_begin();
+  auto *User = cast<SILInstruction>(Use->getUser());
+  if (!dyn_cast<StructExtractInst>(User) &&
+      !dyn_cast<TupleExtractInst>(User))
+    return false;
+
+  // For now, just handle the case where all predecessors are
+  // unconditional branches.
+  for (auto *Pred : BB->getPreds()) {
+    if (!isa<BranchInst>(Pred->getTerminator()))
+      return false;
+    auto *Branch = cast<BranchInst>(Pred->getTerminator());
+    if (!isa<StructInst>(Branch->getArg(i)) &&
+        !isa<TupleInst>(Branch->getArg(i)))
+      return false;
+  }
+
+  // Okay, we'll replace the BB arg with one with the right type, replace
+  // the uses in this block, and then rewrite the branch operands.
+  A->replaceAllUsesWith(SILUndef::get(A->getType(), BB->getModule()));
+  auto *NewArg = BB->replaceBBArg(i, User->getType(0));
+  User->replaceAllUsesWith(NewArg);
+  User->eraseFromParent();
+
+  // Rewrite the branch operand for each incoming branch.
+  for (auto *Pred : BB->getPreds()) {
+    if (auto *Branch = cast<BranchInst>(Pred->getTerminator())) {
+      auto V = getInsertedValue(cast<SILInstruction>(Branch->getArg(i)),
+                                User);
+      Branch->setOperand(i, V);
+      addToWorklist(Pred);
+    }
+  }
+
+  return true;
+}
+
 bool SimplifyCFG::simplifyArgs(SILBasicBlock *BB) {
   // Ignore blocks with no arguments.
   if (BB->bbarg_empty())
@@ -684,9 +756,12 @@ bool SimplifyCFG::simplifyArgs(SILBasicBlock *BB) {
   for (int i = BB->getNumBBArg() - 1; i >= 0; --i) {
     SILArgument *A = BB->getBBArg(i);
 
-    // Ignore used arguments.
-    if (A->use_begin() != A->use_end())
+    // Try to simplify the argument
+    if (!A->use_empty()) {
+      if (simplifyArgument(BB, i))
+        Changed = true;
       continue;
+    }
 
     DEBUG(llvm::dbgs() << "*** Erasing " << i <<"th BB argument.\n");
     NumDeadArguments++;

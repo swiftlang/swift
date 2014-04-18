@@ -1356,6 +1356,11 @@ public:
     return Operands.getDynamicValuesAsArray();
   }
 
+  // Return the ith value referenced by this TupleInst.
+  SILValue getElementValue(unsigned i) const {
+    return getElements()[i];
+  }
+
   /// Construct a TupleInst.
   static TupleInst *create(SILLocation Loc, SILType Ty,
                            ArrayRef<SILValue> Elements, SILFunction &F);

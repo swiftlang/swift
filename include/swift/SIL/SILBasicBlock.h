@@ -130,6 +130,7 @@ public:
   unsigned getNumBBArg() const { return BBArgList.size(); }
   const SILArgument *getBBArg(unsigned i) const { return BBArgList[i]; }
   SILArgument *getBBArg(unsigned i) { return BBArgList[i]; }
+  SILArgument *replaceBBArg(unsigned i, SILType Ty, ValueDecl *D =nullptr);
 
   /// \brief Remove all block arguments.
   void dropAllArgs() { BBArgList.clear(); }
