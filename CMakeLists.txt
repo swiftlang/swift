@@ -683,6 +683,28 @@ macro(add_swift_library name)
       INSTALL_NAME_DIR "@rpath"
       BUILD_WITH_INSTALL_RPATH YES)
   endif()
+  
+  # Configure plist creation for OS X.
+  set (PLIST_INFO_PLIST "Info.plist" CACHE STRING "Plist name")
+  if (APPLE AND SHARED_LIBRARY)
+    set(PLIST_INFO_NAME ${name})
+    set(PLIST_INFO_UTI "com.apple.dt.${name}")
+    set(PLIST_INFO_VERSION "1.0")
+    if (LLVM_SUBMIT_VERSION)
+      set(PLIST_INFO_BUILD_VERSION
+        "${LLVM_SUBMIT_VERSION}.${LLVM_SUBMIT_SUBVERSION}")
+    endif()
+
+    set(PLIST_INFO_PLIST_OUT "${PLIST_INFO_PLIST}")
+    target_link_libraries(${name}
+      "-Wl,-sectcreate,__TEXT,__info_plist,${PLIST_INFO_PLIST_OUT}")
+    configure_file("${SWIFT_SOURCE_DIR}/stdlib/${PLIST_INFO_PLIST}.in" "${PLIST_INFO_PLIST_OUT}" @ONLY)
+
+    set(PLIST_INFO_UTI)
+    set(PLIST_INFO_NAME)
+    set(PLIST_INFO_VERSION)
+    set(PLIST_INFO_BUILD_VERSION)
+  endif()
 
   set_target_properties(${name} PROPERTIES FOLDER "Swift libraries")
 endmacro(add_swift_library)
