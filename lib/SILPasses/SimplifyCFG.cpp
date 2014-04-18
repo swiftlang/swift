@@ -12,10 +12,12 @@
 
 #define DEBUG_TYPE "sil-simplify-cfg"
 #include "swift/SILPasses/Passes.h"
+#include "swift/SIL/Dominance.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
+#include "swift/SILAnalysis/DominanceAnalysis.h"
 #include "swift/SILPasses/Transforms.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "llvm/ADT/Statistic.h"
@@ -35,6 +37,7 @@ STATISTIC(NumDeadArguments,  "Number of unused arguments removed");
 namespace {
   class SimplifyCFG {
     SILFunction &Fn;
+    SILPassManager *PM;
 
     // WorklistList is the actual list that we iterate over (for determinism).
     // Slots may be null, which should be ignored.
@@ -44,7 +47,8 @@ namespace {
     llvm::SmallDenseMap<SILBasicBlock*, unsigned, 32> WorklistMap;
 
   public:
-    SimplifyCFG(SILFunction &Fn) : Fn(Fn) {}
+    SimplifyCFG(SILFunction &Fn, SILPassManager *PM) :
+      Fn(Fn), PM(PM) {}
 
     bool run();
 
@@ -89,6 +93,7 @@ namespace {
     }
 
     bool simplifyBlocks();
+    bool dominatorBasedSimplify(DominanceInfo *DT);
 
     /// \brief Remove the basic block if it has no predecessors. Returns true
     /// If the block was removed.
@@ -115,6 +120,115 @@ namespace {
   };
 } // end anonymous namespace
 
+
+
+static bool isConditional(TermInst *I) {
+  switch (I->getKind()) {
+  case ValueKind::CondBranchInst:
+  case ValueKind::SwitchIntInst:
+  case ValueKind::SwitchEnumInst:
+  case ValueKind::SwitchEnumAddrInst:
+    return true;
+  default:
+    return false;
+  }
+}
+
+// Get the unique enum element of a switch_enum_inst that transfers control
+// to a given basic block. If multiple cases go to the block, or only
+// the default case does, return nullptr;
+static EnumElementDecl *getUniqueCaseElement(SwitchEnumInst *SEI,
+                                             SILBasicBlock *BB) {
+  EnumElementDecl* element = nullptr;
+  for (unsigned i = 0, e = SEI->getNumCases(); i != e; ++i) {
+    std::pair<EnumElementDecl *, SILBasicBlock *> enumCase;
+
+    enumCase = SEI->getCase(i);
+    if (enumCase.second != BB)
+      continue;
+
+    if (element)
+      return nullptr;
+
+    element = enumCase.first;
+  }
+
+  return element;
+}
+
+// Replace a SwitchEnumInst with an unconditional branch based on the
+// assertion that it will select a particular element.
+static void simplifySwitchEnumInst(SwitchEnumInst *SEI,
+                                   EnumElementDecl *Element) {
+  auto *Dest = SEI->getCaseDestination(Element);
+
+  auto *BB = SEI->getParent();
+  if (BB->bbarg_empty()) {
+    SILBuilder(SEI).createBranch(SEI->getLoc(), Dest);
+  } else {
+    assert(BB->bbarg_size() == 1 && "Expected only one argument!");
+    ArrayRef<SILValue> Args = { BB->getBBArg(0) };
+    SILBuilder(SEI).createBranch(SEI->getLoc(), Dest, Args);
+  }
+  SEI->eraseFromParent();
+}
+
+static bool trySimplifyConditional(TermInst *Term, DominanceInfo *DT) {
+  assert(isConditional(Term) && "Expected conditional terminator!");
+
+  auto *BB = Term->getParent();
+  auto Condition = Term->getOperand(0);
+  auto Kind = Term->getKind();
+
+  for (auto *Node = DT->getNode(BB); Node; Node = Node->getIDom()) {
+    auto *DomBB = Node->getBlock();
+    auto *Pred = DomBB->getSinglePredecessor();
+    if (!Pred)
+      continue;
+
+    auto *PredTerm = Pred->getTerminator();
+    if (PredTerm->getKind() != Kind || PredTerm->getOperand(0) != Condition)
+      continue;
+
+    // Okay, DomBB dominates Term, has a single predecessor, and that
+    // predecessor conditionally branches on the same condition. So we
+    // know that DomBB (and thus Inst) are control-dependent on the
+    // edge that takes us from Pred to DomBB. Since the terminator
+    // kind and condition are the same, we can use the knowledge of
+    // which edge gets us to Inst to optimize Inst.
+
+    switch (Kind) {
+    case ValueKind::SwitchEnumInst: {
+      auto *SEI = cast<SwitchEnumInst>(PredTerm);
+      auto *Element = getUniqueCaseElement(SEI, DomBB);
+      assert(Element &&
+             "Expected exactly one element to transfer control here!");
+      simplifySwitchEnumInst(cast<SwitchEnumInst>(Term), Element);
+
+      return true;
+    }
+    case ValueKind::CondBranchInst:
+    case ValueKind::SwitchIntInst:
+    case ValueKind::SwitchEnumAddrInst:
+      // FIXME: Handle these.
+      return false;
+    default:
+      llvm_unreachable("Should only see conditional terminators here!");
+    }
+  }
+  return false;
+}
+
+// Simplifications that walk the dominator tree to prove redundancy in
+// conditional branching.
+bool SimplifyCFG::dominatorBasedSimplify(DominanceInfo *DT) {
+  bool Changed = false;
+  for (auto &BB : Fn)
+    if (isConditional(BB.getTerminator()))
+      Changed |= trySimplifyConditional(BB.getTerminator(), DT);
+
+  return Changed;
+}
 
 // Handle the mechanical aspects of removing an unreachable block.
 static void removeDeadBlock(SILBasicBlock *BB) {
@@ -510,7 +624,8 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
 
 
 /// simplifySwitchEnumBlock - Simplify a basic block that ends with a
-/// switch_enum instruction.
+/// switch_enum instruction that gets its operand from a an enum
+/// instruction.
 bool SimplifyCFG::simplifySwitchEnumBlock(SwitchEnumInst *SEI) {
   auto *EI = dyn_cast<EnumInst>(SEI->getOperand());
   if (!EI)
@@ -612,7 +727,22 @@ bool SimplifyCFG::run() {
   RemoveUnreachable RU(Fn);
 
   // First remove any block not reachable from the entry.
-  bool Removed = RU.run();
+  bool Changed = RU.run();
+
+  if (simplifyBlocks()) {
+    // Simplifying other blocks might have resulted in unreachable
+    // loops.
+    RU.run();
+
+    // Force dominator recomputation below.
+    PM->invalidateAnalysis(SILAnalysis::InvalidationKind::CFG);
+    Changed = true;
+  }
+
+  // Do simplifications that require the dominator tree to be accurate.
+  DominanceAnalysis* DA = PM->getAnalysis<DominanceAnalysis>();
+  DominanceInfo *DT = DA->getDomInfo(&Fn);
+  Changed |= dominatorBasedSimplify(DT);
 
   // Now attempt to simplify the remaining blocks.
   if (simplifyBlocks()) {
@@ -621,7 +751,7 @@ bool SimplifyCFG::run() {
     RU.run();
     return true;
   }
-  return Removed;
+  return Changed;
 }
 
 static void
@@ -780,7 +910,7 @@ class SimplifyCFGPass : public SILFunctionTransform {
 
   /// The entry point to the transformation.
   void run() {
-    if (SimplifyCFG(*getFunction()).run())
+    if (SimplifyCFG(*getFunction(), PM).run())
       invalidateAnalysis(SILAnalysis::InvalidationKind::CFG);
   }
 
