@@ -685,7 +685,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
 
     if (A->getOption().matches(OPT_O0)) {
       IRGenOpts.OptLevel = 0;
-    } else if (A->getOption().matches(OPT_OFast)) {
+    } else if (A->getOption().matches(OPT_Ofast)) {
       // Set the maximum optimization level and remove all runtime checks.
       IRGenOpts.OptLevel = MaxLevel;
       // Unchecked casts.
