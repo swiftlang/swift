@@ -120,6 +120,17 @@ void ClangImporter::clearTypeResolver() {
 
 #pragma mark Module loading
 
+// FIXME: Unify this with the similar code in the driver.
+static void configureDefaultCPU(const llvm::Triple &triple, 
+                                std::vector<std::string> &args) {
+  if (triple.isOSDarwin() && triple.getArch() == llvm::Triple::arm64) {
+    args.push_back("-target-cpu");
+    args.push_back("cyclone");
+    args.push_back("-target-feature");
+    args.push_back("+neon");
+  }
+}
+
 ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef targetTriple,
     const ClangImporterOptions &clangImporterOpts) {
   std::unique_ptr<ClangImporter> importer{
@@ -158,6 +169,8 @@ ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef targetTriple,
     "-fmodules-validate-system-headers",
     "swift.m"
   };
+
+  configureDefaultCPU(llvm::Triple(targetTriple), invocationArgStrs);
 
   if (ctx.LangOpts.EnableAppExtensionRestrictions) {
     invocationArgStrs.push_back("-fapplication-extension");
