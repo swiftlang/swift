@@ -19,6 +19,7 @@
 #include <vector>
 
 namespace swift {
+  class Decl;
   class Module;
   class SourceFile;
 
@@ -66,6 +67,7 @@ enum class SyntaxStructureKind : uint8_t {
 };
 
 struct SyntaxStructureNode {
+  const Decl *Dcl = nullptr;
   SyntaxStructureKind Kind;
   DeclAttributes Attrs;
   CharSourceRange Range;

@@ -304,6 +304,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
     } else {
       // Pass Function / Method structure node.
       SyntaxStructureNode SN;
+      SN.Dcl = D;
       const DeclContext *DC = AFD->getDeclContext();
       if (DC->isTypeContext()) {
         if (FD && FD->isStatic())
@@ -324,6 +325,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
     }
   } else if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
     SyntaxStructureNode SN;
+    SN.Dcl = D;
     SN.Kind = syntaxStructureKindFromNominalTypeDecl(NTD);
     SN.Range = charSourceRangeFromSourceRange(SM, NTD->getSourceRange());
     SN.BodyRange = innerCharSourceRangeFromSourceRange(SM, NTD->getBraces());
@@ -343,6 +345,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
     const DeclContext *DC = VD->getDeclContext();
     if (DC->isTypeContext()) {
       SyntaxStructureNode SN;
+      SN.Dcl = D;
       SourceRange SR;
       if (PatternBindingDecl *PD = VD->getParentPattern())
         SR = PD->getSourceRange();
