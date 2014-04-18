@@ -1743,7 +1743,8 @@ namespace {
 
     /// If the given method is a factory method, import it as a constructor
     Optional<ConstructorDecl *>
-    importFactoryMethodAsConstructor(const clang::ObjCMethodDecl *decl,
+    importFactoryMethodAsConstructor(Decl *member,
+                                     const clang::ObjCMethodDecl *decl,
                                      ObjCSelector selector,
                                      DeclContext *dc) {
       if (!Impl.ImportFactoryMethodsAsConstructors)
@@ -1793,8 +1794,24 @@ namespace {
       auto result = importConstructor(decl, dc, false,
                                       InitializerKind::Convenience,
                                       /*required=*/false, selector, initName);
-      if (result)
+      if (result) {
         ++NumFactoryMethodsAsInitializers;
+
+        // Mark the imported class method "unavailable", with a useful error
+        // message.
+        llvm::SmallString<64> message;
+        llvm::raw_svector_ostream os(message);
+        os << "use initializer '" << objcClass->getName() << "(";
+        for (auto arg : initName.getArgumentNames()) {
+          os << arg << ":";
+        }
+        os << ")'";
+        member->getMutableAttrs().add(
+          AvailabilityAttr::createImplicitUnavailableAttr(
+            Impl.SwiftContext, 
+            Impl.SwiftContext.AllocateCopy(os.str())));
+      }
+
       return result;
     }
 
@@ -1827,10 +1844,6 @@ namespace {
       bool isInstance = decl->isInstanceMethod() && !forceClassMethod;
       if (methodAlreadyImported(selector, isInstance, dc))
         return nullptr;
-
-      // If this is a factory method, try to import it as a constructor.
-      if (auto factory = importFactoryMethodAsConstructor(decl, selector, dc))
-        return *factory;
 
       DeclName name = Impl.mapSelectorToDeclName(selector,
                                                  /*isInitializer=*/false);
@@ -2943,6 +2956,15 @@ namespace {
           if (auto special = importSpecialMethod(member, swiftContext)) {
             if (knownMembers.insert(special))
               members.push_back(special);
+          }
+
+          // If this is a factory method, try to import it as a constructor.
+          if (auto factory = importFactoryMethodAsConstructor(
+                               member,
+                               objcMethod, 
+                               Impl.importSelector(objcMethod->getSelector()),
+                               swiftContext)) {
+            members.push_back(*factory);
           }
 
           // Objective-C root class instance methods are reflected on the
