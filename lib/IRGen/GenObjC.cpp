@@ -389,7 +389,6 @@ namespace {
 
     Selector(SILDeclRef ref) {
       switch (ref.kind) {
-      case SILDeclRef::Kind::Allocator:
       case SILDeclRef::Kind::DefaultArgGenerator:
       case SILDeclRef::Kind::EnumElement:
       case SILDeclRef::Kind::GlobalAccessor:
@@ -405,6 +404,7 @@ namespace {
                  .getString(Buffer);
         break;
 
+      case SILDeclRef::Kind::Allocator:
       case SILDeclRef::Kind::Initializer:
         Text = cast<ConstructorDecl>(ref.getDecl())->getObjCSelector()
                  .getString(Buffer);
@@ -518,6 +518,7 @@ CallEmission irgen::prepareObjCMethodRootCall(IRGenFunction &IGF,
                                               ResilienceExpansion maxExplosion,
                                               ObjCMessageKind kind) {
   assert((method.kind == SILDeclRef::Kind::Initializer
+          || method.kind == SILDeclRef::Kind::Allocator
           || method.kind == SILDeclRef::Kind::Func
           || method.kind == SILDeclRef::Kind::Destroyer
           || method.kind == SILDeclRef::Kind::Deallocator) &&

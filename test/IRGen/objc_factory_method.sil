@@ -1,0 +1,31 @@
+// RUN: rm -rf %t
+// RUN: %swift -target x86_64-apple-darwin10 -module-cache-path %t/clang-module-cache %clang-importer-sdk -enable-objc-factory-method-constructors %s -emit-ir | FileCheck %s
+
+// CHECK: [[HIVE:%CSo4Hive]] = type opaque
+// CHECK: [[SWIFT_TYPE:%swift.type]] = type { i64 }
+sil_stage canonical
+
+import Builtin
+import Swift
+import Foundation
+
+// top_level_code
+sil private @top_level_code : $@thin () -> () {
+bb0:
+  %0 = tuple ()                                   // user: %1
+  return %0 : $()                                 // id: %1
+}
+
+// CHECK-LABEL: define {{.*}} @_TFCSo4HiveCfMS_FT9withQueenGSQCSo1B__S_
+sil @_TFCSo4HiveCfMS_FT9withQueenGSQCSo1B__S_ : $@thin (@owned UncheckedOptional<B>, @thick Hive.Type) -> @owned Hive {
+bb0(%0 : $UncheckedOptional<B>, %1 : $@thick Hive.Type):
+  %2 = thick_to_objc_metatype %1 : $@thick Hive.Type to $@objc_metatype Hive.Type // users: %3, %4
+  // CHECK: load i8** @"\01L_selector(hiveWithQueen:)"
+  %3 = class_method %2 : $@objc_metatype Hive.Type, #Hive.init!allocator.1.foreign : Hive.Type -> (withQueen: @unchecked B?) -> Hive , $@cc(objc_method) @thin (UncheckedOptional<B>, @objc_metatype Hive.Type) -> @autoreleased Hive // user: %4
+  // CHECK: call {{.*}} @objc_msgSend 
+  %4 = apply %3(%0, %2) : $@cc(objc_method) @thin (UncheckedOptional<B>, @objc_metatype Hive.Type) -> @autoreleased Hive // users: %5, %6
+  // CHECK: call {{.*}} @objc_retainAutoreleasedReturnValue
+  strong_retain_autoreleased %4 : $Hive           // id: %5
+  return %4 : $Hive                               // id: %6
+}
+

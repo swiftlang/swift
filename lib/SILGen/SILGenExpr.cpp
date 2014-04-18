@@ -2978,7 +2978,34 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
 
   // Allocate the 'self' value.
   bool useObjCAllocation = usesObjCAllocator(selfClassDecl);
-  if (ctor->isConvenienceInit() || ctor->hasClangNode()) {
+  bool usesFactoryMethod;
+  switch (ctor->getInitKind()) {
+  case CtorInitializerKind::Convenience:
+  case CtorInitializerKind::Designated:
+    usesFactoryMethod = false;
+    break;
+
+  case CtorInitializerKind::ConvenienceFactory:
+  case CtorInitializerKind::Factory:
+    usesFactoryMethod = true;
+    break;
+  }
+
+  if (usesFactoryMethod) {
+    // If we're using an allocating initializer, the 'self' value is
+    // actually the metatype.
+
+    // When using Objective-C allocation, convert the metatype
+    // argument to an Objective-C metatype.
+    selfValue = selfMetaValue;
+    if (useObjCAllocation) {
+      auto metaTy = selfValue.getType().castTo<MetatypeType>();
+      metaTy = CanMetatypeType::get(metaTy.getInstanceType(),
+                                    MetatypeRepresentation::ObjC);
+      selfValue = B.createThickToObjCMetatype(Loc, selfValue,
+                                              getLoweredType(metaTy));
+    }
+  } else if (ctor->isConvenienceInit() || ctor->hasClangNode()) {
     // For a convenience initializer or an initializer synthesized
     // for an Objective-C class, allocate using the metatype.
     SILValue allocArg = selfMetaValue;
@@ -3005,7 +3032,9 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
 
   // Call the initializer.
   SILDeclRef initConstant =
-    SILDeclRef(ctor, SILDeclRef::Kind::Initializer,
+    SILDeclRef(ctor,
+               usesFactoryMethod ? SILDeclRef::Kind::Allocator
+                                 : SILDeclRef::Kind::Initializer,
                SILDeclRef::ConstructAtBestResilienceExpansion,
                SILDeclRef::ConstructAtNaturalUncurryLevel,
                /*isObjC=*/ctor->hasClangNode());
@@ -3051,7 +3080,14 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   SILValue initedSelfValue
     = B.createApply(Loc, initVal.forward(*this), initTy, selfTy, subs, args,
                     initConstant.isTransparent());
-  
+
+  // If we used a factory method that returns autoreleased, retain the result.
+  if (usesFactoryMethod &&
+      initTy.castTo<SILFunctionType>()->getInterfaceResult().getConvention()
+        == ResultConvention::Autoreleased) {
+    B.createStrongRetainAutoreleased(Loc, initedSelfValue);
+  }
+
   // Return the initialized 'self'.
   B.createReturn(ImplicitReturnLocation::getImplicitReturnLoc(Loc),
                  initedSelfValue);
