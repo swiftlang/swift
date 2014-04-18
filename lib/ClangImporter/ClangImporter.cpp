@@ -70,8 +70,8 @@ STATISTIC(NumSelectorsNotSplit,
           "selectors that were not split (for any reason)");
 STATISTIC(NumMethodsMissingFirstArgName,
           "selectors where the first argument name is missing");
-STATISTIC(NumNullaryFactoryMethodsMadeUnary,
-          "# of nullary factory methods turned into unary initializers");
+STATISTIC(NumFactoryMethodsNullary,
+          "# of factory methods not mapped due to nullary with long name");
 
 // Commonly-used Clang classes.
 using clang::CompilerInstance;
@@ -880,8 +880,10 @@ DeclName ClangImporter::Implementation::mapFactorySelectorToInitializerName(
     if (argumentNames[0].empty())
       return DeclName(SwiftContext, SwiftContext.Id_init, { });
 
-    ++NumNullaryFactoryMethodsMadeUnary;
-    return DeclName(SwiftContext, SwiftContext.Id_init, argumentNames);
+    // We don't have a convenience place to put the remaining argument name,
+    // so leave it as a factory method.
+    ++NumFactoryMethodsNullary;
+    return DeclName();
   }
 
   // Map the remaining selector pieces.
