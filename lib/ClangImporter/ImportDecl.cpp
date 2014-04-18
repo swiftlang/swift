@@ -1794,7 +1794,7 @@ namespace {
       auto result = importConstructor(decl, dc, false,
                                       InitializerKind::Convenience,
                                       /*required=*/false, selector, initName);
-      if (result) {
+      if (result && member) {
         ++NumFactoryMethodsAsInitializers;
 
         // Mark the imported class method "unavailable", with a useful error
@@ -2964,7 +2964,8 @@ namespace {
                                objcMethod, 
                                Impl.importSelector(objcMethod->getSelector()),
                                swiftContext)) {
-            members.push_back(*factory);
+            if (*factory)
+              members.push_back(*factory);
           }
 
           // Objective-C root class instance methods are reflected on the
@@ -3153,6 +3154,19 @@ namespace {
             = dyn_cast_or_null<clang::ObjCMethodDecl>(ctor->getClangDecl());
           if (!objcMethod)
             continue;
+
+          // If this initializer came from a factory method, inherit
+          // it as an initializer.
+          if (objcMethod->isClassMethod()) {
+            if (auto newCtor = importConstructor(objcMethod, dc, 
+                                                 /*implicit=*/true,
+                                                 InitializerKind::Convenience,
+                                                 /*required=*/false, 
+                                                 ctor->getObjCSelector(),
+                                                 ctor->getFullName()))
+              newMembers.push_back(newCtor);
+            continue;
+          }
 
           // Figure out what kind of constructor this will be.
           InitializerKind myKind;

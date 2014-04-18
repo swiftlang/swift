@@ -65,3 +65,6 @@
 +(id)factoryWithString:(NSString *)s;
 @end
 
+@interface NSObjectFactorySub : NSObjectFactory
+@end
+
