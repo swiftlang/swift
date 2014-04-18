@@ -82,6 +82,14 @@ entry(%0 : $*@block_storage Builtin.RawPointer):
   return undef : $()
 }
 
+
+// CHECK-LABEL: define i64 @invoke_trivial_with_arg(void (...)*, i64) {
+// CHECK:         ret i64 %1
+sil @invoke_trivial_with_arg : $@thin @cc(cdecl) (@inout @block_storage Builtin.RawPointer, Int) -> Int {
+entry(%0 : $*@block_storage Builtin.RawPointer, %1 : $Int):
+  return %1 : $Int
+}
+
 // CHECK-LABEL: define %objc_block* @init_block_header_nontrivial({ %objc_block, %swift.refcounted* }* noalias) {
 // CHECK:         store %objc_block {
 // CHECK:           %objc_class* [[BLOCK_ISA]]

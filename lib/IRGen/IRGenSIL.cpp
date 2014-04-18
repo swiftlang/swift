@@ -946,7 +946,7 @@ static void emitEntryPointArgumentsCOrObjC(IRGenSILFunction &IGF,
       ptr = IGF.Builder.CreateBitCast(ptr,
                                       argTI.getStorageType()->getPointerTo());
       IGF.setLoweredAddress(arg, Address(ptr, argTI.getBestKnownAlignment()));
-      return;
+      continue;
     }
     
     auto &loadableArgTI = cast<LoadableTypeInfo>(argTI);
