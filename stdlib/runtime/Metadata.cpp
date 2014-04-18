@@ -1814,7 +1814,8 @@ Metadata::getNominalTypeDescriptor() const {
   }
 }
 
-extern "C" const char* class_getName(const void*);
+extern "C" const char* class_getName(const ClassMetadata*);
+extern "C" const ClassMetadata* class_getSuperclass(const ClassMetadata*);
 
 /// \brief Check whether a type conforms to a given native Swift protocol,
 /// visible from the named module.
@@ -1831,6 +1832,7 @@ extern "C" const char* class_getName(const void*);
 const void *swift::swift_conformsToProtocol(const Metadata *type,
                                             const ProtocolDescriptor *protocol,
                                             const char *module) {
+recur:
   // FIXME: This is an unconscionable hack that only works for 1.0 because
   // we brazenly assume that:
   // - witness tables never require runtime instantiation
@@ -1850,15 +1852,30 @@ const void *swift::swift_conformsToProtocol(const Metadata *type,
     ostream << "CSo" << strlen(objc_class_name) << objc_class_name;
     ostream.flush();
     TypeName = ostream.str();
-  }
     break;
-  default:
+  }
+  case MetadataKind::Tuple:
+  case MetadataKind::Class:
+  case MetadataKind::Struct:
+  case MetadataKind::Enum:
+  case MetadataKind::Opaque:
+  case MetadataKind::Function:
+  case MetadataKind::Existential:
+  case MetadataKind::ExistentialMetatype:
+  case MetadataKind::Metatype: {
     // FIXME: Only check nominal types for now.
     auto *descriptor = type->getNominalTypeDescriptor();
     if (!descriptor)
       return nullptr;
     TypeName = std::string(descriptor->Name);
     break;
+  }
+      
+  // Values should never use these metadata kinds.
+  case MetadataKind::PolyFunction:
+  case MetadataKind::HeapLocalVariable:
+  case MetadataKind::HeapArray:
+    assert(false);
   }
   
   // Derive the symbol name that the witness table ought to have.
@@ -1878,9 +1895,44 @@ const void *swift::swift_conformsToProtocol(const Metadata *type,
     return result;
   }
   
-  // TODO: Try superclasses.
-  
-  return nullptr;
+  // If the type was a class, try again with the superclass.
+  // FIXME: This isn't sound if the conformance isn't heritable, but the
+  // protocols we're using with this hack all should be.
+  switch (type->getKind()) {
+  case MetadataKind::Class: {
+    auto theClass = static_cast<const ClassMetadata *>(type);
+    type = theClass->SuperClass;
+    if (!type)
+      return nullptr;
+    goto recur;
+  }
+  case MetadataKind::ObjCClassWrapper: {
+    auto wrapper = static_cast<const ObjCClassWrapperMetadata *>(type);
+    auto super = class_getSuperclass(wrapper->Class);
+    if (!super)
+      return nullptr;
+    
+    type = swift_getObjCClassMetadata(super);
+    goto recur;
+  }
+      
+  case MetadataKind::Tuple:
+  case MetadataKind::Struct:
+  case MetadataKind::Enum:
+  case MetadataKind::Opaque:
+  case MetadataKind::Function:
+  case MetadataKind::Existential:
+  case MetadataKind::ExistentialMetatype:
+  case MetadataKind::Metatype:
+    return nullptr;
+      
+  // Values should never use these metadata kinds.
+  case MetadataKind::PolyFunction:
+  case MetadataKind::HeapLocalVariable:
+  case MetadataKind::HeapArray:
+    assert(false);
+    return nullptr;
+  }
 }
 
 /// The protocol descriptor for Printable from the stdlib.
