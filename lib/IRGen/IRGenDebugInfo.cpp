@@ -271,7 +271,7 @@ void IRGenDebugInfo::setCurrentLoc(IRBuilder& Builder,
   if (!Scope.Verify()) return;
 
   FullLocation L = getLocation(SM, Loc);
-  if (L.LocForLinetable.Filename &&
+  if (DS && L.LocForLinetable.Filename &&
       L.LocForLinetable.Filename !=
       getLocation(SM, DS->Loc).LocForLinetable.Filename) {
     // We changed files in the middle of a scope. This happens, for
