@@ -697,7 +697,7 @@ macro(add_swift_library name)
 
     set(PLIST_INFO_PLIST_OUT "${PLIST_INFO_PLIST}")
     target_link_libraries(${name}
-      "-Wl,-sectcreate,__TEXT,__info_plist,${PLIST_INFO_PLIST_OUT}")
+      "-Wl,-sectcreate,__TEXT,__info_plist,${CMAKE_CURRENT_BINARY_DIR}/${PLIST_INFO_PLIST_OUT}")
     configure_file("${SWIFT_SOURCE_DIR}/stdlib/${PLIST_INFO_PLIST}.in" "${PLIST_INFO_PLIST_OUT}" @ONLY)
 
     set(PLIST_INFO_UTI)
