@@ -343,7 +343,8 @@ maybeReadGenericDeclContext(ModuleFile *MF, llvm::BitstreamCursor &Cursor) {
 
   uint64_t declID;
   SILGenericOuterParamsLayout::readRecord(scratch, declID);
-  lastRecordOffset.reset();
+  // FIXME: this is correct but there are other issues need to be addressed.
+  // lastRecordOffset.reset();
   return MF->getDeclContext((DeclID)declID);
 }
 
