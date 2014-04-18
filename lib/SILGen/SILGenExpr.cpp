@@ -1598,11 +1598,20 @@ static ManagedValue emitVarargs(SILGenFunction &gen,
                                 Type baseTy,
                                 ArrayRef<ManagedValue> elements,
                                 Expr *VarargsInjectionFn) {
+  // Reabstract the base type against the array element type.
+  Type arrayTy = VarargsInjectionFn->getType()->castTo<FunctionType>()
+                   ->getResult();
+  AbstractionPattern baseAbstraction(
+    arrayTy->getNominalOrBoundGenericNominal()
+           ->getGenericParams()->getPrimaryArchetypes()[0]);
+  auto baseCanTy = baseTy->getCanonicalType();
+  auto &baseTL = gen.getTypeLowering(baseAbstraction, baseCanTy);
+  
   SILValue numEltsVal = gen.B.createIntegerLiteral(loc,
                       SILType::getBuiltinWordType(gen.F.getASTContext()),
                       elements.size());
   AllocArrayInst *allocArray = gen.B.createAllocArray(loc,
-                                                  gen.getLoweredType(baseTy),
+                                                  baseTL.getLoweredType(),
                                                   numEltsVal);
   // The first result is the owning ObjectPointer for the array.
   ManagedValue objectPtr
@@ -1618,6 +1627,7 @@ static ManagedValue emitVarargs(SILGenFunction &gen,
       eltPtr = gen.B.createIndexAddr(loc, basePtr, index);
     }
     ManagedValue v = elements[i];
+    v = gen.emitSubstToOrigValue(loc, v, baseAbstraction, baseCanTy);
     v.forwardInto(gen, loc, eltPtr);
   }
 
