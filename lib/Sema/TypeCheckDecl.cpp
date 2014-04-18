@@ -1390,7 +1390,8 @@ static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD,
 
   // We support @NSCopying on class types (which conform to NSCopying),
   // protocols which conform, and option types thereof.
-  Type UnderlyingType = VD->getType();
+  Type UnderlyingType = TC.getTypeOfRValue(VD, /*want interface type*/false);
+
   bool isOptional = false;
   if (Type optionalEltTy = UnderlyingType->getAnyOptionalObjectType()) {
     UnderlyingType = optionalEltTy;
