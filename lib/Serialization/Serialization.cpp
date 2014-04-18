@@ -49,8 +49,10 @@ namespace {
     using key_type_ref = key_type;
     using data_type = Serializer::DeclTableData;
     using data_type_ref = const data_type &;
+    using hash_value_type = uint32_t;
+    using offset_type = unsigned;
 
-    uint32_t ComputeHash(key_type_ref key) {
+    hash_value_type ComputeHash(key_type_ref key) {
       assert(!key.empty());
       return llvm::HashString(key.str());
     }
@@ -2545,8 +2547,10 @@ public:
   using key_type_ref = key_type;
   using data_type = DeclCommentTableData;
   using data_type_ref = const data_type &;
+  using hash_value_type = uint32_t;
+  using offset_type = unsigned;
 
-  uint32_t ComputeHash(key_type_ref key) {
+  hash_value_type ComputeHash(key_type_ref key) {
     assert(!key.empty());
     return llvm::HashString(key);
   }
