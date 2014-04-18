@@ -1541,13 +1541,15 @@ class BindOptionalExpr : public Expr {
 public:
   BindOptionalExpr(Expr *subExpr, SourceLoc questionLoc,
                    unsigned depth, Type ty = Type())
-    : Expr(ExprKind::BindOptional, /*Implicit=*/ false, ty),
+    : Expr(ExprKind::BindOptional, /*Implicit=*/ questionLoc.isInvalid(), ty),
       SubExpr(subExpr), QuestionLoc(questionLoc) {
     BindOptionalExprBits.Depth = depth;
     assert(BindOptionalExprBits.Depth == depth && "bitfield truncation");
   }
 
   SourceRange getSourceRange() const {
+    if (QuestionLoc.isInvalid())
+      return SubExpr->getSourceRange();
     return SourceRange(SubExpr->getStartLoc(), QuestionLoc);
   }
   SourceLoc getLoc() const { return getQuestionLoc(); }

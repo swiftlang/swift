@@ -1384,8 +1384,23 @@ static Expr *createPropertyLoadOrCallSuperclassGetter(VarDecl *VD,
 /// attribute on it.  We know that VD is a stored property in a class, so we
 /// just need to generate something like "self.property = val.copyWithZone(nil)"
 /// here.  This does some type checking to validate that the call will succeed.
-static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD, TypeChecker &TC) {
+static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD,
+                                        TypeChecker &TC) {
   auto &Ctx = TC.Context;
+
+  // We support @NSCopying on class types (which conform to NSCopying),
+  // protocols which conform, and option types thereof.
+  Type UnderlyingType = VD->getType();
+  bool isOptional = false;
+  if (Type optionalEltTy = UnderlyingType->getAnyOptionalObjectType()) {
+    UnderlyingType = optionalEltTy;
+    isOptional = true;
+  }
+
+  // If we have an optional type, we have to "?" the incoming value to only
+  // evaluate the subexpression if the incoming value is non-null.
+  if (isOptional)
+    Val = new (Ctx) BindOptionalExpr(Val, SourceLoc(), 0);
 
   // Generate:
   // (force_value_expr type='<null>'
@@ -1409,9 +1424,16 @@ static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD, TypeChecker &TC)
   ResultTy.setType(VD->getType(), true);
 
   Call = new (Ctx) ConditionalCheckedCastExpr(Call, SourceLoc(),
-                                            TypeLoc::withoutLoc(VD->getType()));
+                                           TypeLoc::withoutLoc(UnderlyingType));
   Call->setImplicit();
-  return new (Ctx) ForceValueExpr(Call, SourceLoc());
+
+  // If we're working with non-optional types, we use ! to force downcast.
+  if (!isOptional)
+    return new (Ctx) ForceValueExpr(Call, SourceLoc());
+
+  // If we're working with optional types, we use OptionalEvaluationExpr to
+  // evaluate the "?".
+  return new (Ctx) OptionalEvaluationExpr(Call);
 }
 
 /// Store 'Val' to 'VD'.  If VD is an @override of another value, we call the
