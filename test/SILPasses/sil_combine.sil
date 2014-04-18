@@ -948,3 +948,14 @@ bb3(%6 : $*FakeOptional<T>):
   dealloc_stack %3#0 : $*@local_storage FakeOptional<T>
   return %7 : $()
 }
+
+// (ref-to-object-pointer-inst (object-pointer-to-ref-inst x) typeof(x)) -> x
+// CHECK-LABEL: sil @ref_to_object_pointer_round_trip : $@thin (B) -> B {
+// CHECK: bb0
+// CHECK-NEXT: return
+sil @ref_to_object_pointer_round_trip : $@thin (B) -> B {
+bb0(%0 : $B):
+  %1 = ref_to_object_pointer %0 : $B to $Builtin.ObjectPointer
+  %2 = object_pointer_to_ref %1 : $Builtin.ObjectPointer to $B
+  return %2 : $B
+}

@@ -33,6 +33,7 @@ namespace {
     SILValue
     visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *UCCI);
     SILValue visitObjectPointerToRefInst(ObjectPointerToRefInst *OPRI);
+    SILValue visitRefToObjectPointerInst(RefToObjectPointerInst *ROPI);
     SILValue visitStructInst(StructInst *SI);
     SILValue visitTupleInst(TupleInst *SI);
     SILValue visitApplyInst(ApplyInst *AI);
@@ -203,6 +204,13 @@ visitObjectPointerToRefInst(ObjectPointerToRefInst *OPRI) {
   if (auto *RTOPI = dyn_cast<RefToObjectPointerInst>(&*OPRI->getOperand()))
     if (RTOPI->getOperand().getType() == OPRI->getType())
       return RTOPI->getOperand();
+SILValue
+InstSimplifier::
+visitRefToObjectPointerInst(RefToObjectPointerInst *ROPI) {
+  // (ref-to-object-pointer-inst (object-pointer-to-ref-inst x) typeof(x)) -> x
+  if (auto *OPRI = dyn_cast<ObjectPointerToRefInst>(&*ROPI->getOperand()))
+    if (OPRI->getOperand().getType() == ROPI->getType())
+      return OPRI->getOperand();
 
   return SILValue();
 }
