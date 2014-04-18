@@ -12,7 +12,6 @@
 
 #define DEBUG_TYPE "codemotion"
 #include "swift/SILPasses/Passes.h"
-#include "swift/SIL/Dominance.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILValue.h"
