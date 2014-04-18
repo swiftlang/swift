@@ -139,9 +139,7 @@ TypeRepr *CloneVisitor::visitArrayTypeRepr(ArrayTypeRepr *T) {
 }
 
 TypeRepr *CloneVisitor::visitOptionalTypeRepr(OptionalTypeRepr *T) {
-  return new (Ctx) OptionalTypeRepr(visit(T->getBase()),
-                                    T->getPunctiationLoc(),
-                                    T->isUncheckedOptional());
+  return new (Ctx) OptionalTypeRepr(visit(T->getBase()), T->getQuestionLoc());
 }
 
 TypeRepr *CloneVisitor::visitTupleTypeRepr(TupleTypeRepr *T) {
@@ -286,8 +284,8 @@ void ArrayTypeRepr::printImpl(ASTPrinter &Printer,
 
 void OptionalTypeRepr::printImpl(ASTPrinter &Printer,
                                  const PrintOptions &Opts) const {
-  Base.getPointer()->print(Printer, Opts);
-  Printer << (isUncheckedOptional() ? "!" : "?");
+  Base->print(Printer, Opts);
+  Printer << "?";
 }
 
 TupleTypeRepr *TupleTypeRepr::create(ASTContext &C,

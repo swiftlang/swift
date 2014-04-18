@@ -113,11 +113,10 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID) {
       }
     }
 
-    if (!Tok.isAtStartOfLine() && isOptionalToken()) {
+    if (!Tok.isAtStartOfLine() && Tok.is(tok::question_postfix)) {
       ty = parseTypeOptional(ty.get());
       continue;
     }
-
     break;
   }
 
@@ -176,7 +175,7 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID) {
   while (ty.isNonNull() && !Tok.isAtStartOfLine()) {
     if (Tok.is(tok::l_square)) {
       ty = parseTypeArray(ty.get());
-    } else if (isOptionalToken()) {
+    } else if (Tok.is(tok::question_postfix)) {
       if (isa<ArrayTypeRepr>(ty.get())) {
         diagnose(Tok, diag::unsupported_unparenthesized_array_optional)
             .fixItInsert(ty.get()->getStartLoc(), "(")
@@ -614,11 +613,9 @@ ParserResult<ArrayTypeRepr> Parser::parseTypeArray(TypeRepr *Base) {
 /// Parse a single optional suffix, given that we are looking at the
 /// question mark.
 ParserResult<OptionalTypeRepr> Parser::parseTypeOptional(TypeRepr *base) {
-  assert(OptionalTypeRepr::isAnyOptionalPunctuation(Tok));
-  bool isUnchecked = OptionalTypeRepr::isUncheckedOptionalPunctuation(Tok);
-  SourceLoc puncLoc = consumeToken();
-  return makeParserResult(new (Context)
-                          OptionalTypeRepr(base, puncLoc, isUnchecked));
+  assert(Tok.is(tok::question_postfix));
+  SourceLoc questionLoc = consumeToken();
+  return makeParserResult(new (Context) OptionalTypeRepr(base, questionLoc));
 }
 
 //===--------------------------------------------------------------------===//

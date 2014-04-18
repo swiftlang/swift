@@ -17,7 +17,6 @@
 #ifndef SWIFT_AST_TYPEREPR_H
 #define SWIFT_AST_TYPEREPR_H
 
-#include "swift/Parse/Lexer.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/Identifier.h"
@@ -409,44 +408,25 @@ private:
 /// \code
 ///   Foo?
 /// \endcode
-  class OptionalTypeRepr : public TypeRepr {
-  llvm::PointerIntPair<TypeRepr*, 1> Base;
-
-  /// The location of the '?' or '!'
-  SourceLoc PuncLoc;
+class OptionalTypeRepr : public TypeRepr {
+  TypeRepr *Base;
+  SourceLoc QuestionLoc;
 
 public:
-  OptionalTypeRepr(TypeRepr *Base, SourceLoc PuncLoc, bool isUnchecked)
-    : TypeRepr(TypeReprKind::Optional),
-      Base(Base, isUnchecked ? 1 : 0),
-      PuncLoc(PuncLoc) {}
-
-  static bool isOptionalPunctuation(const Token &Tok) {
-    return Tok.is(tok::question_postfix);
+  OptionalTypeRepr(TypeRepr *Base, SourceLoc Question)
+    : TypeRepr(TypeReprKind::Optional), Base(Base), QuestionLoc(Question) {
   }
 
-  static bool isUncheckedOptionalPunctuation(const Token &Tok) {
-    return Tok.is(tok::exclaim_postfix);
-  }
-
-  static bool isAnyOptionalPunctuation(const Token &Tok) {
-    return isOptionalPunctuation(Tok) || isUncheckedOptionalPunctuation(Tok);
-  }
-
-  TypeRepr *getBase() const { return Base.getPointer(); }
-  SourceLoc getPunctiationLoc() const { return PuncLoc; }
-
-  /// Returns true if this was an @unchecked optional written with the '!'
-  /// suffix.
-  bool isUncheckedOptional() const { return Base.getInt() == 1; }
+  TypeRepr *getBase() const { return Base; }
+  SourceLoc getQuestionLoc() const { return QuestionLoc; }
 
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::Optional;
   }
 
 private:
-  SourceLoc getStartLocImpl() const { return getBase()->getStartLoc(); }
-  SourceLoc getEndLocImpl() const { return PuncLoc; }
+  SourceLoc getStartLocImpl() const { return Base->getStartLoc(); }
+  SourceLoc getEndLocImpl() const { return QuestionLoc; }
   void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
   friend class TypeRepr;
 };
