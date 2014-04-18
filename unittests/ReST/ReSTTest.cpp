@@ -694,6 +694,7 @@ struct ExtractBriefTestData ExtractBriefTests[] = {
       "<list_item><paragraph>ccc</paragraph></list_item>"
     "</bullet_list>" }, // Correct.
 
+
   // Bullet list.  Different bullets.
   { { "* aaa",
       "+ bbb" },
@@ -1069,6 +1070,33 @@ struct ExtractBriefTestData ExtractBriefTests[] = {
       "</list_item>"
       "<list_item><paragraph>ccc</paragraph></list_item>"
     "</enumerated_list>" }, // Correct.
+  { { "* aaa",
+      "  + bbb",
+      "  + ccc",
+      "* ddd" },
+    "",
+    "<bullet_list>"
+      "<list_item><paragraph>aaa\n+ bbb\n+ ccc</paragraph></list_item>"
+      "<list_item><paragraph>ddd</paragraph></list_item>"
+    "</bullet_list>" }, // Correct.
+  { { "* aaa",
+      "",
+      "  + bbb",
+      "  + ccc",
+      "",
+      "* ddd" },
+    "",
+    "<bullet_list>"
+      "<list_item>"
+        "<paragraph>aaa</paragraph>"
+        "<bullet_list>"
+          "<list_item><paragraph>bbb</paragraph></list_item>"
+          "<list_item><paragraph>ccc</paragraph></list_item>"
+        "</bullet_list>"
+      "</list_item>"
+      "<list_item><paragraph>ddd</paragraph></list_item>"
+    "</bullet_list>" }, // Correct.
+
 
   // Field list.
   { { ":aaa:" }, "",
