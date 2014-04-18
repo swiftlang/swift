@@ -1443,7 +1443,7 @@ bool ClassDecl::inheritsSuperclassInitializers(LazyResolver *resolver) {
 
 /// Mangle the name of a protocol or class for use in the Objective-C
 /// runtime.
-static StringRef mangleObjCRuntimeName(NominalTypeDecl *nominal,
+static StringRef mangleObjCRuntimeName(const NominalTypeDecl *nominal,
                                        llvm::SmallVectorImpl<char> &buffer) {
   {
     buffer.clear();
@@ -1463,7 +1463,7 @@ static StringRef mangleObjCRuntimeName(NominalTypeDecl *nominal,
 }
 
 StringRef ClassDecl::getObjCRuntimeName(
-                       llvm::SmallVectorImpl<char> &buffer) {
+                       llvm::SmallVectorImpl<char> &buffer) const {
   // If there is an 'objc' attribute with a name, use that name.
   if (auto objc = getAttrs().getAttribute<ObjCAttr>()) {
     if (auto name = objc->getName())
@@ -1588,7 +1588,7 @@ GenericTypeParamDecl *ProtocolDecl::getSelf() const {
 }
 
 StringRef ProtocolDecl::getObjCRuntimeName(
-                          llvm::SmallVectorImpl<char> &buffer) {
+                          llvm::SmallVectorImpl<char> &buffer) const {
   // If there is an 'objc' attribute with a name, use that name.
   if (auto objc = getAttrs().getAttribute<ObjCAttr>()) {
     if (auto name = objc->getName())

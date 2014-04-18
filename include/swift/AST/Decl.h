@@ -2770,7 +2770,7 @@ public:
 
   /// Retrieve the name to use for this class when interoperating with
   /// the Objective-C runtime.
-  StringRef getObjCRuntimeName(llvm::SmallVectorImpl<char> &buffer);
+  StringRef getObjCRuntimeName(llvm::SmallVectorImpl<char> &buffer) const;
 
   using NominalTypeDecl::lookupDirect;
 
@@ -2902,7 +2902,7 @@ public:
 
   /// Retrieve the name to use for this protocol when interoperating
   /// with the Objective-C runtime.
-  StringRef getObjCRuntimeName(llvm::SmallVectorImpl<char> &buffer);
+  StringRef getObjCRuntimeName(llvm::SmallVectorImpl<char> &buffer) const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
