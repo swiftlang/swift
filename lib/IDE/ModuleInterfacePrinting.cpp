@@ -89,7 +89,7 @@ private:
   SmallVector<StringRef, 2> PendingComments;
   llvm::DenseMap<clang::FileID, unsigned> LastEntityLines;
 };
-}
+} // unnamed namespace
 
 static const clang::Module *findTopLevelClangModule(const Module *M) {
   const ClangModuleUnit *CMU = nullptr;
@@ -172,7 +172,7 @@ void swift::ide::printSubmoduleInterface(
       while (!Worklist.empty()) {
         const clang::Module *CM = Worklist.pop_back_val();
         if (!(TraversalOptions & ModuleTraversal::VisitHidden) &&
-            !InterestingClangModule->isModuleVisible(CM))
+            CM->IsExplicit)
           continue;
 
         ClangDecls.insert({ CM, {} });
