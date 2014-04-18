@@ -26,7 +26,6 @@ namespace {
 
     SILValue visitTupleExtractInst(TupleExtractInst *TEI);
     SILValue visitStructExtractInst(StructExtractInst *SEI);
-    SILValue visitIntegerLiteralInst(IntegerLiteralInst *ILI);
     SILValue visitEnumInst(EnumInst *EI);
     SILValue visitAddressToPointerInst(AddressToPointerInst *ATPI);
     SILValue visitPointerToAddressInst(PointerToAddressInst *PTAI);
@@ -124,30 +123,6 @@ SILValue InstSimplifier::visitStructExtractInst(StructExtractInst *SEI) {
   if (StructInst *Struct = dyn_cast<StructInst>(SEI->getOperand()))
     return Struct->getFieldValue(SEI->getField());
   
-  return SILValue();
-}
-
-SILValue InstSimplifier::visitIntegerLiteralInst(IntegerLiteralInst *ILI) {
-  // Simplify bool integer_literal insts to the condition that
-  // generates them when possible, e.g. an Int1 integer_literal 1 in
-  // the TrueBB branch target of a conditional branch.
-  auto *BB = ILI->getParent();
-  auto &Context = BB->getParent()->getASTContext();
-  if (ILI->getType() != SILType::getBuiltinIntegerType(1, Context))
-    return SILValue();
-
-  auto *Pred = BB->getSinglePredecessor();
-  if (!Pred)
-    return SILValue();
-
-  if (auto *CBI = dyn_cast<CondBranchInst>(Pred->getTerminator())) {
-    auto Value = ILI->getValue().getBoolValue();
-    auto *OtherBB = Value ? CBI->getTrueBB() : CBI->getFalseBB();
-
-    if (BB == OtherBB)
-      return CBI->getCondition();
-  }
-
   return SILValue();
 }
 
