@@ -19,6 +19,8 @@ SWIFT_CLASS("_TtC8comments21A010_AttachToEntities")
 @end
 
 
+
+/// Aaa.  A013.
 SWIFT_PROTOCOL("_TtP8comments21A013_AttachToEntities_")
 @protocol A013_AttachToEntities
 @end

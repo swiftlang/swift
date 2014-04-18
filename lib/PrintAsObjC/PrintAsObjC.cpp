@@ -140,6 +140,7 @@ private:
   }
 
   void visitProtocolDecl(ProtocolDecl *PD) {
+    printDocumentationComment(PD);
     llvm::SmallString<32> scratch;
     os << "SWIFT_PROTOCOL(\"" << PD->getObjCRuntimeName(scratch) << "\")\n"
        << "@protocol " << PD->getName();
