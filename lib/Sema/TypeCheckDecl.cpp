@@ -1148,6 +1148,11 @@ static void validatePatternBindingDecl(TypeChecker &tc,
     if (auto var = binding->getSingleVar()) {
       if (var->getAttrs().hasAttribute<IBOutletAttr>())
         tc.checkIBOutlet(var);
+
+      // FIXME: Ugly hack to get the pattern type to reflect the
+      // updated variable type. Not cool.
+      binding->getPattern()->setType(var->getType());
+
       if (var->getAttrs().hasOwnership())
         tc.checkOwnershipAttr(var, var->getAttrs().getOwnership());
     }
