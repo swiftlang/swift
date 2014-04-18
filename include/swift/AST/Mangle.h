@@ -102,6 +102,7 @@ public:
                            ResilienceExpansion explosion, unsigned uncurryingLevel);
   void mangleNominalType(NominalTypeDecl *decl, ResilienceExpansion expansion,
                          BindGenerics shouldBind);
+  void mangleProtocolDecl(ProtocolDecl *protocol);
   void mangleType(CanType type, ResilienceExpansion expansion,
                   unsigned uncurryingLevel);
   void mangleDirectness(bool isIndirect);

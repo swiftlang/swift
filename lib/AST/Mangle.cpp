@@ -1094,6 +1094,14 @@ void Mangler::mangleNominalType(NominalTypeDecl *decl,
   addSubstitution(key);
 }
 
+void Mangler::mangleProtocolDecl(ProtocolDecl *protocol) {
+  Buffer << 'P';
+  ContextStack context(*this);
+  mangleContextOf(protocol, BindGenerics::None);
+  mangleDeclName(protocol);
+  Buffer << '_';
+}
+
 bool Mangler::tryMangleStandardSubstitution(NominalTypeDecl *decl) {
   // Bail out if our parent isn't the swift standard library.
   DeclContext *dc = decl->getDeclContext();

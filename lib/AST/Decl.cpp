@@ -1455,8 +1455,14 @@ static StringRef mangleObjCRuntimeName(const NominalTypeDecl *nominal,
 
     // Mangle the type.
     Mangle::Mangler mangler(os);
-    mangler.mangleType(nominal->getDeclaredType()->getCanonicalType(), 
-                       ResilienceExpansion::Minimal, 0);
+    NominalTypeDecl *NTD = const_cast<NominalTypeDecl*>(nominal);
+    if (isa<ClassDecl>(nominal)) {
+      mangler.mangleNominalType(NTD,
+                                ResilienceExpansion::Minimal,
+                                Mangle::Mangler::BindGenerics::None);
+    } else {
+      mangler.mangleProtocolDecl(cast<ProtocolDecl>(NTD));
+    }
   }
 
   return StringRef(buffer.data(), buffer.size());
