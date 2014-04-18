@@ -64,6 +64,7 @@
 +(instancetype)factoryWithDouble:(double)i;
 +(id)factoryWithString:(NSString *)s;
 +(NSObjectFactory*)factoryWithFloat:(float)f;
++(instancetype)factoryBuildingWidgets;
 @end
 
 @interface NSObjectFactorySub : NSObjectFactory
