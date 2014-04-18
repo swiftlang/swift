@@ -128,8 +128,13 @@ ParserResult<Expr> Parser::parseExprIs() {
 ///     'as' type '!'?
 ParserResult<Expr> Parser::parseExprAs() {
   SourceLoc asLoc = consumeToken(tok::kw_as);
+  ParserResult<TypeRepr> type;
+  {
+    llvm::SaveAndRestore<decltype(TUO_UncheckedOptionalCtx)>
+      T (TUO_UncheckedOptionalCtx, TUO_NoUncheckedOptional);
+    type = parseType(diag::expected_type_after_as);
+  }
 
-  ParserResult<TypeRepr> type = parseType(diag::expected_type_after_as);
   if (type.hasCodeCompletion())
     return makeParserCodeCompletionResult<Expr>();
   if (type.isNull())

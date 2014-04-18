@@ -90,6 +90,12 @@ public:
     IVOLP_InLet
   } InVarOrLetPattern = IVOLP_NotInVarOrLet;
 
+  /// Indicates if we should parse '!' as an @unchecked optional.
+  enum {
+    TUO_AllowUncheckedOptional,
+    TUO_NoUncheckedOptional
+  } TUO_UncheckedOptionalCtx = TUO_AllowUncheckedOptional;
+
   bool GreaterThanIsOperator = true;
 
   LocalContext *CurLocalContext = nullptr;
@@ -754,6 +760,13 @@ public:
   ParserResult<TupleTypeRepr> parseTypeTupleBody();
   ParserResult<ArrayTypeRepr> parseTypeArray(TypeRepr *Base);
   ParserResult<OptionalTypeRepr> parseTypeOptional(TypeRepr *Base);
+
+  /// Returns true if the current token is a valid optional sigil.
+  bool isOptionalToken() {
+    return TUO_UncheckedOptionalCtx == TUO_AllowUncheckedOptional ?
+      OptionalTypeRepr::isAnyOptionalPunctuation(Tok) :
+      OptionalTypeRepr::isOptionalPunctuation(Tok);
+  }
 
   TypeRepr *applyAttributeToType(TypeRepr *Ty, const TypeAttributes &Attr);
 

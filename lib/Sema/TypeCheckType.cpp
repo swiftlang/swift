@@ -1413,13 +1413,17 @@ Type TypeResolver::resolveArrayType(ArrayTypeRepr *repr,
 
 Type TypeResolver::resolveOptionalType(OptionalTypeRepr *repr,
                                        TypeResolutionOptions options) {
-  // The T in T? is a generic type argument and therefore always an AST type.
+  // The T in T?/T! is a generic type argument and therefore always an AST type.
   // FIXME: diagnose non-materializability of element type!
   Type baseTy = resolveType(repr->getBase(), withoutContext(options));
   if (baseTy->is<ErrorType>())
     return baseTy;
 
-  auto optionalTy = TC.getOptionalType(repr->getQuestionLoc(), baseTy);
+  auto Loc = repr->getPunctiationLoc();
+  auto optionalTy =
+    repr->isUncheckedOptional() ? TC.getUncheckedOptionalType(Loc, baseTy)
+                                : TC.getOptionalType(Loc, baseTy);
+
   if (!optionalTy)
     return ErrorType::get(Context);
 
