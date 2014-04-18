@@ -325,6 +325,8 @@ SILFunction *SILDeserializer::getFuncForReference(StringRef name) {
   return readSILFunction(*iter, nullptr, name, /*declarationOnly*/ true);
 }
 
+/// Advance Cursor if we are able to read a generic outer parameter; otherwise
+/// we do not move the cursor.
 static
 DeclContext *
 maybeReadGenericDeclContext(ModuleFile *MF, llvm::BitstreamCursor &Cursor) {
@@ -341,6 +343,7 @@ maybeReadGenericDeclContext(ModuleFile *MF, llvm::BitstreamCursor &Cursor) {
 
   uint64_t declID;
   SILGenericOuterParamsLayout::readRecord(scratch, declID);
+  lastRecordOffset.reset();
   return MF->getDeclContext((DeclID)declID);
 }
 
