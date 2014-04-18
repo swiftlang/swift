@@ -21,8 +21,7 @@ add_swift_library(swift_runtime INSTALL
   Once.cpp
   Init.cpp
   Reflection.mm
-  Heap.cpp
-  BlockShims.mm)
+  Heap.cpp)
 
 add_swift_optimization_flags(swift_runtime)
 
