@@ -959,3 +959,15 @@ bb0(%0 : $B):
   %2 = object_pointer_to_ref %1 : $Builtin.ObjectPointer to $B
   return %2 : $B
 }
+
+// (upcast X2->X (ref-to-object-pointer-inst (object-pointer-to-ref-inst x) typeof(x))) -> x
+// CHECK-LABEL: sil @upcast_ref_to_object_pointer_round_trip : $@thin (E) -> E {
+// CHECK: bb0
+// CHECK-NEXT: return
+sil @upcast_ref_to_object_pointer_round_trip : $@thin (E) -> E {
+bb0(%0 : $E):
+  %1 = upcast %0 : $E to $B
+  %2 = ref_to_object_pointer %1 : $B to $Builtin.ObjectPointer
+  %3 = object_pointer_to_ref %2 : $Builtin.ObjectPointer to $E
+  return %3 : $E
+}

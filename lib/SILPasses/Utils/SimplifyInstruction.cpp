@@ -201,9 +201,25 @@ SILValue
 InstSimplifier::
 visitObjectPointerToRefInst(ObjectPointerToRefInst *OPRI) {
   // (object-pointer-to-ref-inst (ref-to-object-pointer-inst x) typeof(x)) -> x
-  if (auto *RTOPI = dyn_cast<RefToObjectPointerInst>(&*OPRI->getOperand()))
-    if (RTOPI->getOperand().getType() == OPRI->getType())
-      return RTOPI->getOperand();
+  if (auto *ROPI = dyn_cast<RefToObjectPointerInst>(&*OPRI->getOperand())) {
+    if (ROPI->getOperand().getType() == OPRI->getType())
+      return ROPI->getOperand();
+
+    // A common downcast pattern is:
+    //
+    // upcast : $X2 -> $X
+    // ref_to_object_pointer : $X -> $Builtin.ObjectPointer
+    // object_pointer_to_ref : $Builtin.ObjectPointer -> $X2
+    //
+    // We can RAUW the object pointer with the operand of the upcast.
+    if (auto *UI = dyn_cast<UpcastInst>(ROPI->getOperand().getDef()))
+      if (UI->getOperand().getType() == OPRI->getType())
+        return UI->getOperand();
+  }
+
+  return SILValue();
+}
+
 SILValue
 InstSimplifier::
 visitRefToObjectPointerInst(RefToObjectPointerInst *ROPI) {
