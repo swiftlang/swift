@@ -34,9 +34,10 @@ unsigned swift::measureNewline(const char *BufferPtr, const char *BufferEnd) {
   return Bytes;
 }
 
-void swift::trimLeadingWhitespaceFromLines(StringRef RawText,
-                           unsigned WhitespaceToTrim,
-                           SmallVectorImpl<StringRef> &OutLines) {
+void
+swift::trimLeadingWhitespaceFromLines(StringRef RawText,
+                                      unsigned WhitespaceToTrim,
+                                      SmallVectorImpl<StringRef> &OutLines) {
   SmallVector<StringRef, 8> Lines;
 
   bool IsFirstLine = true;

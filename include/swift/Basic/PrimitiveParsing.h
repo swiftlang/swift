@@ -34,9 +34,13 @@ static inline bool startsWithNewline(llvm::StringRef S) {
 }
 
 /// Breaks a given string to lines and trims leading whitespace from them.
-void trimLeadingWhitespaceFromLines(llvm::StringRef Text,
-                           unsigned WhitespaceToTrim,
-                           llvm::SmallVectorImpl<llvm::StringRef> &Lines);
+void trimLeadingWhitespaceFromLines(StringRef Text, unsigned WhitespaceToTrim,
+                                    SmallVectorImpl<StringRef> &Lines);
+
+static inline void splitIntoLines(StringRef Text,
+                                  SmallVectorImpl<StringRef> &Lines) {
+  trimLeadingWhitespaceFromLines(Text, 0, Lines);
+}
 
 } // namespace swift
 
