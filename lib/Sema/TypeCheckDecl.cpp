@@ -3614,6 +3614,17 @@ public:
         TC.diagnose(baseASD, diag::property_override_here);
         return true;
       }
+
+      // Make sure we're not overriding a settable property with a non-settable
+      // one.  The only reasonable semantics for this would be to inherit the
+      // setter but override the getter, and that would be surprising at best.
+      if (baseASD->isSettable(baseASD->getDeclContext()) &&
+          !override->isSettable(override->getDeclContext())) {
+        TC.diagnose(overrideASD, diag::override_mutable_with_readonly_property,
+                    overrideASD->getName());
+        TC.diagnose(baseASD, diag::property_override_here);
+        return true;
+      }
     }
     
     // Non-Objective-C declarations in extensions cannot override or
