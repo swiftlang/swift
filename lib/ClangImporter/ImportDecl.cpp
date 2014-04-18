@@ -4249,6 +4249,59 @@ ClangImporter::Implementation::loadAllMembers(const Decl *D, uint64_t unused) {
                                           const_cast<DeclContext *>(DC),
                                           protos, members, SwiftContext);
 
+
+  // Clean up duplicate initializers that may have come from
+  // duplication between init methods and factory methods.
+  // FIXME: This should be done "online", as we visit declarations,
+  // both because it's silly to have a separate pass here and because
+  // we're not properly dealing with duplication between extensions.
+
+  // First, gather the initializers.
+  llvm::SmallDenseMap<DeclName, llvm::TinyPtrVector<ConstructorDecl *>>
+    AllInitializers;
+  bool anyDuplicates = false;
+  for (auto member : members) {
+    auto ctor = dyn_cast<ConstructorDecl>(member);
+    if (!ctor)
+      continue;
+
+    auto &inits = AllInitializers[ctor->getFullName()];
+    if (!inits.empty())
+      anyDuplicates = true;
+    inits.push_back(ctor);
+  }
+
+  if (anyDuplicates) {
+    // Next, find any redundant initializers.
+    llvm::SmallPtrSet<Decl *, 4> redundantInitializers;
+    for (const auto &colliding : AllInitializers) {
+      if (colliding.second.size() == 1)
+        continue;
+
+      // Find the "best" constructor kind with this signature.
+      CtorInitializerKind bestKind = colliding.second[0]->getInitKind();
+      for (auto ctor : colliding.second) {
+        auto kind = ctor->getInitKind();
+        if (static_cast<unsigned>(kind) < static_cast<unsigned>(bestKind))
+          bestKind = kind;
+      }
+      
+      // Shadow any initializers with a worse kind.
+      for (auto ctor : colliding.second) {
+        auto kind = ctor->getInitKind();
+        if (static_cast<unsigned>(kind) > static_cast<unsigned>(bestKind))
+          redundantInitializers.insert(ctor);
+      }
+    }
+
+    // Remove the redundant initializers.
+    members.erase(std::remove_if(members.begin(), members.end(),
+                                 [&](Decl *decl) -> bool {
+                                   return redundantInitializers.count(decl) > 0;
+                                 }),
+                  members.end());
+  }
+
   return SwiftContext.AllocateCopy(members);
 }
 
