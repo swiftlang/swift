@@ -3190,9 +3190,8 @@ public:
         // checked yet.
         if (isa<SubscriptDecl>(prop))
           TC.validateDecl(prop);
-        else
-          validatePatternBindingDecl(TC,
-                                     cast<VarDecl>(prop)->getParentPattern());
+        else if (auto pat = cast<VarDecl>(prop)->getParentPattern())
+          validatePatternBindingDecl(TC, pat);
 
         isObjC = prop->isObjC() || prop->getAttrs().isIBOutlet();
       }

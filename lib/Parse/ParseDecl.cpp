@@ -2185,13 +2185,6 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
     Invalid = true;
   } else {
     setLocalDiscriminator(PrimaryVar);
-
-    // Reject getters and setters for 'val's, but keep parsing them, for better
-    // recovery.
-    if (PrimaryVar->isLet()) {
-      diagnose(Tok, diag::let_cannot_be_computed_property);
-      Invalid = true;
-    }
   }
 
   // The grammar syntactically requires a type annotation. Complain if
@@ -2217,6 +2210,22 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
   // If we have an invalid case, bail out now.
   if (!PrimaryVar)
     return nullptr;
+  
+  // Reject accessors on 'let's after parsing them (for better recovery).
+  if (PrimaryVar->isLet()) {
+    if (WillSet || DidSet)
+      diagnose(LBLoc, diag::let_cannot_be_observing_property);
+    else
+      diagnose(LBLoc, diag::let_cannot_be_computed_property);
+    
+    auto errorTy = ErrorType::get(Context);
+    
+    if (Get) { Get->setType(errorTy); Get->setInvalid(); }
+    if (Set) { Set->setType(errorTy); Set->setInvalid(); }
+    if (WillSet) { WillSet->setType(errorTy); WillSet->setInvalid(); }
+    if (DidSet) { DidSet->setType(errorTy); DidSet->setInvalid(); }
+    return nullptr;
+  }
   
   // If this is a willSet/didSet observing property, record this and we're done.
   if (WillSet || DidSet) {
