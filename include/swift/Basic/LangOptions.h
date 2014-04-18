@@ -63,9 +63,6 @@ namespace swift {
     /// the ObjectiveC module.
     bool EnableObjCAttrRequiresObjCModule = false;
     
-    /// Enables native block codegen.
-    bool EnableNativeBlocks = false;
-    
     /// Implicit target configuration options.  There are currently two
     ///   supported target configuration values:
     ///     os - The active os target (OSX or IOS)

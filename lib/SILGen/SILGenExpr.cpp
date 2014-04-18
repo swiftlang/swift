@@ -984,14 +984,6 @@ static ManagedValue emitFuncToBlock(SILGenFunction &gen,
                                     SILLocation loc,
                                     ManagedValue fn,
                                     CanSILFunctionType blockTy) {
-  // FIXME: Use the old bridge_to_block instruction as a stopgap to produce the
-  // block until we can natively construct them.
-  if (!gen.getASTContext().LangOpts.EnableNativeBlocks) {
-    auto block = gen.B.createBridgeToBlock(loc, fn.forward(gen),
-                                     SILType::getPrimitiveObjectType(blockTy));
-    return gen.emitManagedRValueWithCleanup(block);
-  }
-  
   // Build the invoke function signature. The block will capture the original
   // function value.
   auto fnTy = fn.getType().castTo<SILFunctionType>();
