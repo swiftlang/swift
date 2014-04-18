@@ -176,12 +176,6 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
     mangler.mangleProtocolConformance(getProtocolConformance());
     return;
 
-  //   global ::= 'Tb' type
-  case Kind::BridgeToBlockConverter:
-    buffer << "_TTb";
-    mangler.mangleType(getType(), ResilienceExpansion::Minimal, 0);
-    return;
-
   // For all the following, this rule was imposed above:
   //   global ::= local-marker? entity            // some identifiable thing
 

@@ -598,11 +598,6 @@ private:
 
     // Other thunks.
     if (Mangled.nextIf('T')) {
-      if (Mangled.nextIf('b')) {
-        auto bridge = Node::create(Node::Kind::BridgeToBlockFunction);
-        DEMANGLE_CHILD_OR_RETURN(bridge, Type);
-        return bridge;
-      }
       if (Mangled.nextIf('R')) {
         NodePointer thunk = Node::create(Node::Kind::ReabstractionThunkHelper);
         if (!demangleReabstractSignature(thunk))
@@ -2256,10 +2251,6 @@ void NodePrinter::print(Node *pointer, bool asContext, bool suppressType) {
              /*suppressType*/ !Options.DisplayTypeOfIVarFieldOffset);
     return;
   }
-  case Node::Kind::BridgeToBlockFunction:
-    Printer << "bridge-to-block function for ";
-    print(pointer->getFirstChild());
-    return;
   case Node::Kind::ReabstractionThunk:
   case Node::Kind::ReabstractionThunkHelper: {
     Printer << "reabstraction thunk ";

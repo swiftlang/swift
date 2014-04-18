@@ -672,7 +672,6 @@ Globals
   global ::= 'Wd' protocol-conformance   // dependent proto witness table template
   global ::= entity                      // some identifiable thing
   global ::= 'To' global                 // swift-as-ObjC thunk
-  global ::= 'Tb' type                   // swift-to-ObjC block converter
   global ::= 'TR' reabstract-signature   // reabstraction thunk helper function
   global ::= 'Tr' reabstract-signature   // reabstraction thunk
 

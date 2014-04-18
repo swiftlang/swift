@@ -587,10 +587,6 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   case Kind::DependentProtocolWitnessTableTemplate:
     return SILLinkage::Private;
   
-  case Kind::BridgeToBlockConverter:
-    // Bridge-to-block shims are currently always provided from a stub.
-    return SILLinkage::PublicExternal;
-
   case Kind::SILFunction:
     return getSILFunction()->getLinkage();
       
