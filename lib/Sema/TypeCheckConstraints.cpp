@@ -497,9 +497,6 @@ static Expr *cleanupIllFormedExpression(ASTContext &context,
       : context(context), cs(cs) { }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      // For closures, type-check the patterns and result type as written,
-      // but do not walk into the body. That will be type-checked after
-      // we've determine the complete function type.
       if (auto closure = dyn_cast<ClosureExpr>(expr)) {
         closure->getParams()->forEachVariable([&](VarDecl *VD) {
           if (VD->hasType()) {
@@ -516,12 +513,6 @@ static Expr *cleanupIllFormedExpression(ASTContext &context,
             VD->setInvalid();
           }
         });
-        
-        if (!closure->hasSingleExpressionBody()) {
-          return { false, walkToExprPost(expr) };
-        }
-
-        return { true, expr };
       }
 
       return { true, expr };
@@ -542,9 +533,14 @@ static Expr *cleanupIllFormedExpression(ASTContext &context,
       return expr;
     }
 
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
-      // Never walk into statements.
-      return { false, stmt };
+    bool walkToDeclPre(Decl *D) override {
+      // Ensure that declarations inside the closure are marked as invalid.
+      // Alternatively, we could type check them anyway, even if inferring the
+      // type of the closure failed.
+      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
+        AFD->overwriteType(ErrorType::get(context));
+      }
+      return true;
     }
   };
 

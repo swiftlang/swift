@@ -341,7 +341,8 @@ struct ASTNodeBase {};
     void verifyCheckedAlways(Stmt *S) {}
     void verifyCheckedAlways(Pattern *P) {}
     void verifyCheckedAlways(Decl *D) {
-      if (D->getAttrs().hasAttribute<OverrideAttr>()) {
+      if (!D->isInvalid() &&
+          D->getAttrs().hasAttribute<OverrideAttr>()) {
         if (!isa<ClassDecl>(D->getDeclContext()) &&
             !isa<ExtensionDecl>(D->getDeclContext())) {
           PrettyStackTraceDecl debugStack("verifying override", D);
