@@ -523,8 +523,8 @@ public:
   SourceFile &getREPLInputFile();
 
   REPLInputKind getREPLInput(SmallVectorImpl<char> &Result) {
-    int BraceCount = 0;
-    bool UnfinishedInput = false;
+    ide::SourceCompleteResult SCR;
+    SCR.IsComplete = true;
     unsigned CurChunkLines = 0;
     wchar_t TotalLine[4096] = L"";
 
@@ -536,8 +536,8 @@ public:
     
     do {
       // Read one line.
-      PromptContinuationLevel = BraceCount;
-      NeedPromptContinuation = UnfinishedInput;
+      PromptContinuationLevel = SCR.IndentLevel;
+      NeedPromptContinuation = !SCR.IsComplete;
       PromptedForLine = false;
       Outdented = false;
       int LineCount;
@@ -570,11 +570,11 @@ public:
         ++p;
       }
       if (p == CurrentLines.end()) {
-        if (UnfinishedInput) continue;
+        if (!SCR.IsComplete) continue;
         return REPLInputKind::Empty;
       }
 
-      if (CurChunkLines == 1 && BraceCount == 0 && *p == ':') {
+      if (CurChunkLines == 1 && SCR.IndentLevel == 0 && *p == ':') {
         // Colorize the response output.
         if (ShowColors)
           llvm::outs().changeColor(llvm::raw_ostream::GREEN);
@@ -593,20 +593,9 @@ public:
         return REPLInputKind::REPLDirective;
       }
 
-      // Figure out indentation using braces.
-      // FIXME: Add indentation support in libIDE and use it here.
-      while (p < CurrentLines.end()) {
-        if (*p == '{' || *p == '(' || *p == '[')
-          ++BraceCount;
-        else if (*p == '}' || *p == ')' || *p == ']')
-          --BraceCount;
-        ++p;
-      }
-
+      SCR = ide::isSourceInputComplete(CurrentLines.str());
       // Keep reading if input is unfinished.
-      UnfinishedInput = !ide::isSourceInputComplete(CurrentLines.str());
-
-    } while (UnfinishedInput);
+    } while (!SCR.IsComplete);
 
     // Enter the line into the line history.
     HistEventW ev;
