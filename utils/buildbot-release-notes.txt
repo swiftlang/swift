@@ -1,51 +1,19 @@
 2014-04-23
 ----------
-* Added "assert_configuration" builtin.
+* Enabling/disabling of asserts
 
-  The builtin function "assert_configuration" is replaced by constant
-  propagation by an appropriate value dependent on the optimization level.
-  It either has the value "Debug" (0), "Release" (1), or "DisableReplacement"
-  (-1).
-  If it has the value "DisableReplacement" constant propagation will not replace
-  it.
-  The value is controlled by the optimization level. At O0 it has the value
-  "Debug", at higher optimization levels it has the value "Release".
-  Building the standard library (-parse-stdlib) triggers the
-  "DisableReplacement" value and the builtin function call stays in the
-  serialized sil module.
-  The standard library uses this feature to provide assertions that can be
-  disabled at compile time.
+  assert(condition, msg)
 
-  Assert.swift:
+  is enabled/disabled dependent on the optimization level. In debug mode at
+  "-O0" asserts are enabled. At higher optimization levels asserts are disabled
+  and no code is generated for them. However, asserts are always type checked
+  even at higher optimization levels.
 
-  @transparent
-  func assert<T : LogicValue>(
-    condition: @auto_closure () -> T, message: StaticString = StaticString(),
-    file: StaticString = __FILE__, line: UWord = __LINE__
-  ) {
-    // Only in debug mode.
-    if _isDebug() {
-      assert(condition().getLogicValue(), message, file, line)
-    }
-  }
+  Alternatively, assertions can be disabled/enabled by using the frontend flag
+  "-AssertConfig=Debug", or "-AssertConfig=Release".
 
-  AssertCommon.swift:
-
-  @transparent
-  func _isDebug() -> Bool {
-    return Int32(Builtin.assert_configuration()) == 0;
-  }
-
-  IRGen replaces calls to "assert_configuration" by the "Debug" value. The
-  standard library dylib therefore contains the assertions.
-
-* This rendered the cmake build flag SWIFT_ASSERTS obsolete. Users can now
-  select the desired behavior by specifying an optimization flag. Alternatively,
-  the assertions can be enabled/disabled by specifying the frontend flag
-  "-AssertConfig=Debug/Release".
-
-* Added the optimization flag "-Ofast". It disables assertions and runtime
-  overflow and type checks.
+* Added optimization flag "-Ofast". It disables all assertions (assert), and
+  runtime overflow and type checks.
 
 * The "selector-style" function and initializer declaration syntax is
   being phased out. For example, this:
