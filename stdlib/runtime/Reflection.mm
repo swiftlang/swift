@@ -453,19 +453,14 @@ static const Metadata *getMetadataForEncoding(const char *encoding) {
   }
 }
   
-// Some classes totally lie about their runtime layout, and we can't mirror
-// them without crashing.
-static bool objcClassLiesAboutLayout(Class c) {
-  const char *name = class_getName(c);
-  if (strcmp(name, "NSURL") == 0)
-    return true;
-  return false;
-}
-  
 extern "C"
 intptr_t swift_ObjCMirror_count(HeapObject *owner,
                                 const OpaqueValue *value,
                                 const Metadata *type) {
+  // ObjC makes no guarantees about the state of ivars, so we can't safely
+  // introspect them in the general case.
+  return 0;
+#if 0
   auto isa = (Class)type;
   
   unsigned count;
@@ -485,6 +480,7 @@ intptr_t swift_ObjCMirror_count(HeapObject *owner,
   
   swift_release(owner);
   return count;
+#endif
 }
   
 static Mirror ObjC_getMirrorForSuperclass(Class sup,
@@ -497,6 +493,10 @@ StringMirrorTuple swift_ObjCMirror_subscript(intptr_t i,
                                              HeapObject *owner,
                                              const OpaqueValue *value,
                                              const Metadata *type) {
+  // ObjC makes no guarantees about the state of ivars, so we can't safely
+  // introspect them in the general case.
+  abort();
+#if 0
   id object = *reinterpret_cast<const id *>(value);
   auto isa = (Class)type;
   
@@ -544,6 +544,7 @@ StringMirrorTuple swift_ObjCMirror_subscript(intptr_t i,
   result.first = String(name, strlen(name));
   result.second = swift_unsafeReflectAny(owner, ivar, ivarType);
   return result;
+#endif
 }
   
 extern "C"
