@@ -711,7 +711,6 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   if (const Arg *A = Args.getLastArg(OPT_AssertConfig_Group)) {
     // We currently understand build configuration up to 3 of which we only use
     // 0 and 1 in the standard library.
-    unsigned MaxId = 3;
     StringRef Configuration = A->getValue();
     if (Configuration == "DisableReplacement") {
       Opts.AssertConfig = SILOptions::DisableReplacement;
