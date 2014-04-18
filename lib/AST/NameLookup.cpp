@@ -23,6 +23,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/STLExtras.h"
+#include "clang/AST/DeclObjC.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/TinyPtrVector.h"
@@ -56,6 +57,12 @@ void swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
   llvm::SmallDenseMap<std::pair<CanType, Identifier>,
                       llvm::TinyPtrVector<ValueDecl *>>
     CollidingDeclGroups;
+
+  /// Objective-C initializers are tracked by their context type and
+  /// full name.
+  llvm::SmallDenseMap<std::pair<CanType, DeclName>, 
+                      llvm::TinyPtrVector<ConstructorDecl *>>
+    ObjCCollidingConstructors;
   bool anyCollisions = false;
   for (auto decl : decls) {
     // Determine the signature of this declaration.
@@ -82,6 +89,20 @@ void swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
       anyCollisions = true;
 
     knownDecls.push_back(decl);
+
+    // Specifically keep track of Objective-C initializers, which can come from
+    // either 
+    if (decl->hasClangNode()) {
+      if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
+        auto ctorSignature
+          = std::make_pair(ctor->getExtensionType()->getCanonicalType(),
+                           decl->getFullName());
+        auto &knownCtors = ObjCCollidingConstructors[ctorSignature];
+        if (!knownCtors.empty())
+          anyCollisions = true;
+        knownCtors.push_back(ctor);
+      }
+    }
   }
 
   // If there were no signature collisions, there is nothing to do.
@@ -152,6 +173,38 @@ void swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
         // no point in continuing to compare the first declaration to others.
         shadowed.insert(firstDecl);
         break;
+      }
+    }
+  }
+  
+  // Check for collisions among Objective-C initializers.
+  for (const auto &colliding : ObjCCollidingConstructors) {
+    if (colliding.second.size() == 1)
+      continue;
+
+    // Check whether we have a constructor based on an init method.
+    bool haveInitMethod = false;
+    for (auto ctor : colliding.second) {
+      if (auto objcMethod
+            = dyn_cast<clang::ObjCMethodDecl>(ctor->getClangDecl())) {
+        if (objcMethod->isInstanceMethod()) {
+          haveInitMethod = true;
+          break;
+        }
+      }
+    }
+
+    if (!haveInitMethod)
+      continue;
+
+    // We found an init method; it shadows any factory methods
+    // imported as initializers.
+    for (auto ctor : colliding.second) {
+      if (auto objcMethod
+            = dyn_cast<clang::ObjCMethodDecl>(ctor->getClangDecl())) {
+        if (objcMethod->isClassMethod()) {
+          shadowed.insert(ctor);
+        }
       }
     }
   }
@@ -1042,7 +1095,8 @@ bool DeclContext::lookupQualified(Type type,
     }
   }
 
-  // Allow filtering of the visible declarations based on
+  // Allow filtering of the visible declarations based on various
+  // criteria.
   bool onlyCompleteObjectInits = false;
   auto isAcceptableDecl = [&](NominalTypeDecl *current, Decl *decl) -> bool {
     // Filter out subobject initializers, if requested.
@@ -1073,8 +1127,7 @@ bool DeclContext::lookupQualified(Type type,
     stack.pop_back();
 
     // Make sure we've resolved implicit constructors, if we need them.
-    if (name.isSimpleName(ctx.Id_init)
-        && typeResolver)
+    if (name.getBaseName() == ctx.Id_init && typeResolver)
       typeResolver->resolveImplicitConstructors(current);
 
     // Look for results within the current nominal type and its extensions.
