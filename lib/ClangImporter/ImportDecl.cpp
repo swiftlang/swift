@@ -1521,6 +1521,10 @@ namespace {
           /*GenericParams=*/nullptr, type, bodyPatterns,
           TypeLoc::withoutLoc(resultTy), dc);
 
+      if (decl->isNoReturn())
+        result->getMutableAttrs().add(
+            new (Impl.SwiftContext) NoReturnAttr(/*IsImplicit=*/false));
+
       // Keep track of inline function bodies so that we can generate
       // IR from them using Clang's IR generator.
       if ((decl->isInlined() || decl->hasAttr<clang::AlwaysInlineAttr>())

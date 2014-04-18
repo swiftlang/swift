@@ -67,6 +67,8 @@ func fooFunc1(_ a: <ref:TypeAlias>CInt</ref>) -> <ref:TypeAlias>CInt</ref></decl
 <decl:Func>func fooFunc1AnonymousParam(_: <ref:TypeAlias>CInt</ref>) -> <ref:TypeAlias>CInt</ref></decl>
 <decl:Func>func fooFunc3(_ a: <ref:TypeAlias>CInt</ref>, _ b: <ref:TypeAlias>CFloat</ref>, _ c: <ref:TypeAlias>CDouble</ref>, _ d: <ref:Struct>CMutablePointer</ref><<ref:TypeAlias>CInt</ref>>) -> <ref:TypeAlias>CInt</ref></decl>
 <decl:Func>func fooFuncWithBlock(_ blk: @unchecked ((<ref:TypeAlias>CFloat</ref>) -> <ref:TypeAlias>CInt</ref>)?)</decl>
+<decl:Func>@noreturn func fooFuncNoreturn1()</decl>
+<decl:Func>@noreturn func fooFuncNoreturn2()</decl>
 
 <decl:Func>/**
  * Aaa.  fooFuncWithComment1.  Bbb.

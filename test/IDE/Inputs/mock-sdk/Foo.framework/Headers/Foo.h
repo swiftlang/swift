@@ -76,6 +76,9 @@ void fooFuncWithBlock(int (^blk)(float x));
 
 void fooFuncWithFunctionPointer(int (*fptr)(float x));
 
+void fooFuncNoreturn1(void) __attribute__((noreturn));
+_Noreturn void fooFuncNoreturn2(void);
+
 /**
  * Aaa.  fooFuncWithComment1.  Bbb.
  * Ccc.

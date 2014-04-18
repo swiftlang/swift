@@ -67,6 +67,8 @@ func fooFunc1(_ a: CInt) -> CInt
 func fooFunc1AnonymousParam(_: CInt) -> CInt
 func fooFunc3(_ a: CInt, _ b: CFloat, _ c: CDouble, _ d: CMutablePointer<CInt>) -> CInt
 func fooFuncWithBlock(_ blk: @unchecked ((CFloat) -> CInt)?)
+@noreturn func fooFuncNoreturn1()
+@noreturn func fooFuncNoreturn2()
 
 /**
  * Aaa.  fooFuncWithComment1.  Bbb.

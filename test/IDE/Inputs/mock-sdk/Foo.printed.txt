@@ -88,6 +88,9 @@ func fooFunc3(CInt, CFloat, CDouble, CMutablePointer<CInt>) -> CInt
 */
 func fooFuncWithBlock(@unchecked ((CFloat) -> CInt)?)
 
+@noreturn func fooFuncNoreturn1()
+@noreturn func fooFuncNoreturn2()
+
 /**
  * Aaa.  fooFuncWithComment1.  Bbb.
  * Ccc.
