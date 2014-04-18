@@ -34,10 +34,6 @@ namespace llvm {
   class BitstreamCursor;
   class BitstreamReader;
   class MemoryBuffer;
-}
-
-// This template should eventually move to llvm/Support.
-namespace clang {
   template <typename Info> class OnDiskIterableChainedHashTable;
 }
 
@@ -213,7 +209,7 @@ private:
 
   class DeclTableInfo;
   using SerializedDeclTable =
-    clang::OnDiskIterableChainedHashTable<DeclTableInfo>;
+      llvm::OnDiskIterableChainedHashTable<DeclTableInfo>;
 
   std::unique_ptr<SerializedDeclTable> TopLevelDecls;
   std::unique_ptr<SerializedDeclTable> OperatorDecls;
@@ -231,7 +227,7 @@ private:
 
   class DeclCommentTableInfo;
   using SerializedDeclCommentTable =
-      clang::OnDiskIterableChainedHashTable<DeclCommentTableInfo>;
+      llvm::OnDiskIterableChainedHashTable<DeclCommentTableInfo>;
 
   std::unique_ptr<SerializedDeclCommentTable> DeclCommentTable;
 

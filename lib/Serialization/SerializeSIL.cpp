@@ -18,13 +18,11 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
 
-// This is a template-only header; eventually it should move to llvm/Support.
-#include "clang/Basic/OnDiskHashTable.h"
-
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/EndianStream.h"
+#include "llvm/Support/OnDiskHashTable.h"
 
 using namespace swift;
 using namespace swift::serialization;
@@ -1191,7 +1189,7 @@ static void writeIndexTable(const sil_index_block::ListLayout &List,
   llvm::SmallString<4096> hashTableBlob;
   uint32_t tableOffset;
   {
-    clang::OnDiskChainedHashTableGenerator<FuncTableInfo> generator;
+    llvm::OnDiskChainedHashTableGenerator<FuncTableInfo> generator;
     for (auto &entry : table)
       generator.insert(entry.first, entry.second);
 

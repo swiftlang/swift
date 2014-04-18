@@ -19,11 +19,9 @@
 #include "swift/Basic/Range.h"
 #include "swift/Serialization/BCReadingExtras.h"
 
-// This is a template-only header; eventually it should move to llvm/Support.
-#include "clang/Basic/OnDiskHashTable.h"
-
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/OnDiskHashTable.h"
 #include "llvm/Support/PrettyStackTrace.h"
 
 using namespace swift;
@@ -965,8 +963,7 @@ void ModuleFile::lookupVisibleDecls(Module::AccessPathTy accessPath,
                          DeclVisibilityKind::VisibleAtTopLevel);
   }
 
-  for (auto entry : make_range(TopLevelDecls->data_begin(),
-                               TopLevelDecls->data_end())) {
+  for (auto entry : TopLevelDecls->data()) {
     for (auto item : entry)
       consumer.foundDecl(cast<ValueDecl>(getDecl(item.second)),
                          DeclVisibilityKind::VisibleAtTopLevel);
@@ -1057,8 +1054,7 @@ void ModuleFile::lookupClassMembers(Module::AccessPathTy accessPath,
     return;
 
   if (!accessPath.empty()) {
-    for (const auto &list : make_range(ClassMembersByName->data_begin(),
-                                       ClassMembersByName->data_end())) {
+    for (const auto &list : ClassMembersByName->data()) {
       for (auto item : list) {
         auto vd = cast<ValueDecl>(getDecl(item.second));
         auto dc = vd->getDeclContext();
@@ -1072,8 +1068,7 @@ void ModuleFile::lookupClassMembers(Module::AccessPathTy accessPath,
     return;
   }
 
-  for (const auto &list : make_range(ClassMembersByName->data_begin(),
-                                     ClassMembersByName->data_end())) {
+  for (const auto &list : ClassMembersByName->data()) {
     for (auto item : list)
       consumer.foundDecl(cast<ValueDecl>(getDecl(item.second)),
                          DeclVisibilityKind::DynamicLookup);
@@ -1092,24 +1087,21 @@ ModuleFile::collectLinkLibraries(Module::LinkLibraryCallback callback) const {
 void ModuleFile::getTopLevelDecls(SmallVectorImpl<Decl *> &results) {
   PrettyModuleFileDeserialization stackEntry(*this);
   if (OperatorDecls) {
-    for (auto entry : make_range(OperatorDecls->data_begin(),
-                                 OperatorDecls->data_end())) {
+    for (auto entry : OperatorDecls->data()) {
       for (auto item : entry)
         results.push_back(getDecl(item.second));
     }
   }
 
   if (TopLevelDecls) {
-    for (auto entry : make_range(TopLevelDecls->data_begin(),
-                                 TopLevelDecls->data_end())) {
+    for (auto entry : TopLevelDecls->data()) {
       for (auto item : entry)
         results.push_back(getDecl(item.second));
     }
   }
 
   if (ExtensionDecls) {
-    for (auto entry : make_range(ExtensionDecls->data_begin(),
-                                 ExtensionDecls->data_end())) {
+    for (auto entry : ExtensionDecls->data()) {
       for (auto item : entry)
         results.push_back(getDecl(item.second));
     }
@@ -1166,4 +1158,3 @@ Optional<BriefAndRawComment> ModuleFile::getCommentForDeclByUSR(StringRef USR) {
 
   return *I;
 }
-

@@ -17,8 +17,7 @@
 
 #include "llvm/ADT/DenseMap.h"
 
-// This template should eventually move to llvm/Support.
-namespace clang {
+namespace llvm {
   template <typename Info> class OnDiskIterableChainedHashTable;
 }
 
@@ -34,7 +33,7 @@ namespace swift {
 
     class FuncTableInfo;
     using SerializedFuncTable =
-      clang::OnDiskIterableChainedHashTable<FuncTableInfo>;
+      llvm::OnDiskIterableChainedHashTable<FuncTableInfo>;
 
     std::unique_ptr<SerializedFuncTable> FuncTable;
     std::vector<ModuleFile::PartiallySerialized<SILFunction*>> Funcs;

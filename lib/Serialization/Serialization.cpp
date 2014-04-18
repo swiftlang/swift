@@ -26,9 +26,6 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Serialization/BCRecordLayout.h"
 
-// This is a template-only header; eventually it should move to llvm/Support.
-#include "clang/Basic/OnDiskHashTable.h"
-
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Bitcode/BitstreamWriter.h"
@@ -37,11 +34,11 @@
 #include "llvm/Support/EndianStream.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/OnDiskHashTable.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 using namespace swift::serialization;
-using clang::OnDiskChainedHashTableGenerator;
 using namespace llvm::support;
 
 namespace {
@@ -2525,7 +2522,7 @@ static void writeDeclTable(const index_block::DeclListLayout &DeclList,
   llvm::SmallString<4096> hashTableBlob;
   uint32_t tableOffset;
   {
-    OnDiskChainedHashTableGenerator<DeclTableInfo> generator;
+    llvm::OnDiskChainedHashTableGenerator<DeclTableInfo> generator;
     for (auto &entry : table)
       generator.insert(entry.first, entry.second);
 
@@ -2601,7 +2598,7 @@ static void writeDeclCommentTable(
   struct DeclCommentTableWriter : public ASTWalker {
     llvm::BumpPtrAllocator Arena;
     llvm::SmallString<512> USRBuffer;
-    OnDiskChainedHashTableGenerator<DeclCommentTableInfo> generator;
+    llvm::OnDiskChainedHashTableGenerator<DeclCommentTableInfo> generator;
 
     StringRef copyString(StringRef String) {
       char *Mem = static_cast<char *>(Arena.Allocate(String.size(), 1));
@@ -2889,4 +2886,3 @@ void swift::serializeModuleDoc(ModuleOrSourceFile DC, const char *outputPath) {
   Serializer S;
   S.writeDocToStream(out, DC);
 }
-

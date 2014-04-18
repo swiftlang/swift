@@ -20,11 +20,9 @@
 #include "swift/SIL/SILUndef.h"
 #include "swift/Serialization/BCReadingExtras.h"
 
-// This is a template-only header; eventually it should move to llvm/Support.
-#include "clang/Basic/OnDiskHashTable.h"
-
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/OnDiskHashTable.h"
 
 using namespace swift;
 using namespace swift::serialization;
