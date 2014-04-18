@@ -1845,7 +1845,8 @@ const void *swift::swift_conformsToProtocol(const Metadata *type,
   switch (type->getKind()) {
   case MetadataKind::ObjCClassWrapper: {
     std::stringstream ostream;
-    const char* objc_class_name = class_getName(*reinterpret_cast<const void* const *>(type+1));
+    auto wrapper = static_cast<const ObjCClassWrapperMetadata*>(type);
+    const char* objc_class_name = class_getName(wrapper->Class);
     ostream << "CSo" << strlen(objc_class_name) << objc_class_name;
     ostream.flush();
     TypeName = ostream.str();
@@ -1872,39 +1873,13 @@ const void *swift::swift_conformsToProtocol(const Metadata *type,
   const char *end = protocol->Name + strlen(protocol->Name) - 1;
   mangledName.append(begin, end);
   
-  // FIXME: Assume the conformance was declared in the same module as the type,
-  // so it will be mangled either as the stdlib module 'Ss' or the first
-  // substitution 'S_'.
-  if (TypeName[0] == 'S'
-      || (TypeName[1] == 'S' && TypeName[2] == 's'))
-    mangledName += "Ss";
-  else
-    mangledName += "S_";
-  
   // Look up the symbol for the conformance everywhere.
   if (const void * result = dlsym(RTLD_DEFAULT, mangledName.c_str())) {
     return result;
   }
-
-  // Otherwise, try looking in Foundation.
-  // FIXME: Egregious hack.
-  mangledName.erase(mangledName.end() - 2, mangledName.end());
-  mangledName += "10Foundation";
-  if (const void * result = dlsym(RTLD_DEFAULT, mangledName.c_str())) {
-    return result;
-  }
-  // Otherwise, try looking in AppKit.
-  mangledName.erase(mangledName.end() - 12, mangledName.end());
-  mangledName += "6AppKit";
-  if (const void * result = dlsym(RTLD_DEFAULT, mangledName.c_str())) {
-    return result;
-  }
-  // Otherwise, try looking in SpriteKit
-  mangledName.erase(mangledName.end() - 7, mangledName.end());
-  mangledName += "9SpriteKit";
-  if (const void * result = dlsym(RTLD_DEFAULT, mangledName.c_str())) {
-    return result;
-  }
+  
+  // TODO: Try superclasses.
+  
   return nullptr;
 }
 
