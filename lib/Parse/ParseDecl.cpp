@@ -3403,13 +3403,13 @@ Parser::parseDeclConstructor(ParseDeclOptions Flags,
 
   // '->' 'Self'
   // FIXME: Parse as general type, verify semantically.
-  bool isCompleteObjectInit = false;
+  CtorInitializerKind initKind = CtorInitializerKind::Designated;
   if (Tok.is(tok::arrow)) {
     consumeToken(tok::arrow);
     
     if (Tok.is(tok::kw_Self)) {
       consumeToken(tok::kw_Self);
-      isCompleteObjectInit = true;
+      initKind = CtorInitializerKind::Convenience;
     } else {
       diagnose(Tok, diag::init_expected_self);
       while (!Tok.is(tok::eof) && !Tok.is(tok::l_brace) &&
@@ -3426,7 +3426,7 @@ Parser::parseDeclConstructor(ParseDeclOptions Flags,
   auto *CD = new (Context) ConstructorDecl(FullName, ConstructorLoc,
                                            SelfPattern, BodyPattern,
                                            GenericParams, CurDeclContext);
-  CD->setCompleteObjectInit(isCompleteObjectInit);
+  CD->setInitKind(initKind);
 
   // No need to setLocalDiscriminator.
 

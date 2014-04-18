@@ -220,9 +220,9 @@ private:
     }
     assert(selectorString.empty());
 
-    // Swift subobject initializers are Objective-C designated initializers.
+    // Swift designated initializers are Objective-C designated initializers.
     if (auto ctor = dyn_cast<ConstructorDecl>(AFD)) {
-      if (ctor->isSubobjectInit()) {
+      if (ctor->isDesignatedInit()) {
         os << " OBJC_DESIGNATED_INITIALIZER";
       }
     }

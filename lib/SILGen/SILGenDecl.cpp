@@ -1082,7 +1082,7 @@ public:
     }
 
     // All constructors have their initializing constructor in the
-    // vtable, which can be used by a complete object initializer. 
+    // vtable, which can be used by a convenience initializer. 
     addEntry(SILDeclRef(cd, SILDeclRef::Kind::Initializer));
   }
   

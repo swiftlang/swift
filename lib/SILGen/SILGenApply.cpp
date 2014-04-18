@@ -1185,7 +1185,7 @@ public:
     // this is the initializing constructor, to which we will dynamically
     // dispatch.
     if (isa<ClassDecl>(nominal)) {
-      // If the constructor is a complete object initializer, use
+      // If the constructor is a convenience initializer, use
       // dynamic dispatch to the initializing constructor.
       setCallee(Callee::forClassMethod(
                   gen,

@@ -1663,8 +1663,8 @@ static void synthesizeObservingAccessors(VarDecl *VD, TypeChecker &TC) {
 
 namespace {
 
-/// The kind of subobject initializer to synthesize.
-enum class SubobjectInitKind {
+/// The kind of designated initializer to synthesize.
+enum class designatedInitKind {
   /// A stub initializer, which is not visible to name lookup and
   /// merely aborts at runtime.
   Stub,
@@ -1676,7 +1676,7 @@ enum class SubobjectInitKind {
 
 }
 
-/// Create a new initializer that overrides the given subobject
+/// Create a new initializer that overrides the given designated
 /// initializer.
 ///
 /// \param classDecl The subclass in which the new initializer will
@@ -1690,10 +1690,10 @@ enum class SubobjectInitKind {
 /// \returns the newly-created initializer that overrides \p
 /// superclassCtor.
 static ConstructorDecl *
-createSubobjectInitOverride(TypeChecker &tc,
+createdesignatedInitOverride(TypeChecker &tc,
                             ClassDecl *classDecl,
                             ConstructorDecl *superclassCtor,
-                            SubobjectInitKind kind);
+                            designatedInitKind kind);
 
 /// Configure the implicit 'self' parameter of a function, setting its type,
 /// pattern, etc.
@@ -2586,7 +2586,7 @@ public:
             !CD->getDeclaredTypeInContext()->getAs<BoundGenericClassType>())
           TC.diagnose(CD, diag::non_generic_class_with_generic_superclass);
               
-        // Look for any required constructors or subobject initializers in the
+        // Look for any required constructors or designated initializers in the
         // subclass that have not been overridden or otherwise provided.
         // Collect the set of initializers we override in superclass.
         llvm::SmallPtrSet<ConstructorDecl *, 4> overriddenCtors;
@@ -2602,10 +2602,10 @@ public:
         bool diagnosed = false;
         llvm::SmallVector<Decl *, 2> synthesizedCtors;
         for (auto superclassMember : TC.lookupConstructors(superclassTy, CD)) {
-          // We only care about required or subobject initializers.
+          // We only care about required or designated initializers.
           auto superclassCtor = cast<ConstructorDecl>(superclassMember);
           if (!superclassCtor->isRequired() && 
-              !superclassCtor->isSubobjectInit())
+              !superclassCtor->isDesignatedInit())
             continue;
 
           // Skip invalid superclass initializers.
@@ -2616,9 +2616,9 @@ public:
           if (overriddenCtors.count(superclassCtor) > 0)
             continue;
 
-          // If the superclass constructor is a complete object initializer
+          // If the superclass constructor is a convenience initializer
           // that is inherited into the current class, it's okay.
-          if (superclassCtor->isCompleteObjectInit() &&
+          if (superclassCtor->isInheritable() &&
               CD->inheritsSuperclassInitializers(&TC)) {
             assert(superclassCtor->isRequired());
             continue;
@@ -2641,17 +2641,17 @@ public:
             continue;
           }
 
-          // A subobject initializer has not been overridden. 
+          // A designated initializer has not been overridden. 
 
-          // Skip this subobject initializer if it's in an extension.
+          // Skip this designated initializer if it's in an extension.
           // FIXME: We shouldn't allow this.
           if (isa<ExtensionDecl>(superclassCtor->getDeclContext()))
             continue;
 
           // Create an override for it.
-          if (auto ctor = createSubobjectInitOverride(
+          if (auto ctor = createdesignatedInitOverride(
                             TC, CD, superclassCtor,
-                            SubobjectInitKind::Stub)) {
+                            designatedInitKind::Stub)) {
             assert(ctor->getOverriddenDecl() == superclassCtor && 
                    "Not an override?");
             synthesizedCtors.push_back(ctor);
@@ -3886,17 +3886,17 @@ public:
       TC.diagnose(CD->getAttrs().getLoc(AK_mutating),
                   diag::mutating_invalid_init);
 
-    // Complete object initializers are only allowed on classes and in
+    // convenience initializers are only allowed on classes and in
     // extensions thereof.
-    if (CD->isCompleteObjectInit()) {
+    if (CD->isConvenienceInit()) {
       if (auto extType = CD->getExtensionType()) {
         if (!extType->getClassOrBoundGenericClass() &&
             !extType->is<ErrorType>()) {
           // FIXME: Add a Fix-It here, which requires source-location
           // information within the AST for '->' and 'Self'.
-          TC.diagnose(CD->getLoc(), diag::nonclass_complete_object_init,
+          TC.diagnose(CD->getLoc(), diag::nonclass_convenience_init,
                       extType);
-          CD->setCompleteObjectInit(false);
+          CD->setInitKind(CtorInitializerKind::Designated);
         }
       }
     } else if (auto extType = CD->getExtensionType()) {
@@ -3908,7 +3908,7 @@ public:
         fixItLoc = Lexer::getLocForEndOfToken(TC.Context.SourceMgr, fixItLoc);
         TC.diagnose(CD->getLoc(), diag::designated_init_in_extension, extType)
           .fixItInsert(fixItLoc, " -> Self"); 
-        CD->setCompleteObjectInit(true);
+        CD->setInitKind(CtorInitializerKind::Convenience);
       }
     }
 
@@ -4500,10 +4500,10 @@ static void createStubBody(TypeChecker &tc, ConstructorDecl *ctor) {
 }
 
 static ConstructorDecl *
-createSubobjectInitOverride(TypeChecker &tc,
+createdesignatedInitOverride(TypeChecker &tc,
                             ClassDecl *classDecl,
                             ConstructorDecl *superclassCtor,
-                            SubobjectInitKind kind) {
+                            designatedInitKind kind) {
   // Determine the initializer parameters.
   Type superInitType = superclassCtor->getInitializerInterfaceType();
   if (superInitType->is<GenericFunctionType>() ||
@@ -4621,14 +4621,14 @@ createSubobjectInitOverride(TypeChecker &tc,
   // Wire up the overides.
   DeclChecker(tc, false, false).checkOverrides(ctor);
 
-  if (kind == SubobjectInitKind::Stub) {
+  if (kind == designatedInitKind::Stub) {
     // Make this a stub implementation.
     createStubBody(tc, ctor);
     return ctor;
   }
 
-  // Form the body of a chaining subobject initializer.
-  assert(kind == SubobjectInitKind::Chaining);
+  // Form the body of a chaining designated initializer.
+  assert(kind == designatedInitKind::Chaining);
 
   // Reference to super.init.
   Expr *superRef = new (ctx) SuperRefExpr(selfDecl, SourceLoc(),
@@ -4820,12 +4820,12 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   // variable.
   bool FoundInstanceVar = false;
   bool FoundUninitializedVars = false;
-  bool FoundSubobjectInit = false;
+  bool FoundDesignatedInit = false;
   decl->setAddedImplicitInitializers();
   for (auto member : decl->getMembers()) {
     if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
-      if (ctor->isSubobjectInit()) {
-        FoundSubobjectInit = true;
+      if (ctor->isDesignatedInit()) {
+        FoundDesignatedInit = true;
         break;
       }
       continue;
@@ -4844,9 +4844,9 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
     }
   }
 
-  // If we found a subobject initializer, don't add any implicit
+  // If we found a designated initializer, don't add any implicit
   // initializers.
-  if (FoundSubobjectInit)
+  if (FoundDesignatedInit)
     return;
 
   if (isa<StructDecl>(decl)) {
@@ -4865,7 +4865,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   }
  
   // For a class with a superclass, automatically define overrides
-  // for all of the superclass's subobject initializers.
+  // for all of the superclass's designated initializers.
   // FIXME: Currently skipping generic classes.
   auto classDecl = cast<ClassDecl>(decl);
   if (classDecl->hasSuperclass() && !classDecl->isGenericContext() &&
@@ -4881,14 +4881,14 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
     SmallVector<Decl *, 4> newInits;
     for (auto member : lookupConstructors(superclassTy, classDecl)) {
       auto superclassCtor = dyn_cast<ConstructorDecl>(member);
-      if (!superclassCtor || superclassCtor->isCompleteObjectInit() 
+      if (!superclassCtor || !superclassCtor->isDesignatedInit()
           || superclassCtor->isRequired() || superclassCtor->isInvalid())
         continue;
 
-      // We have a subobject initializer. Create an override of it.
-      if (auto ctor = createSubobjectInitOverride(
+      // We have a designated initializer. Create an override of it.
+      if (auto ctor = createdesignatedInitOverride(
                         *this, classDecl, superclassCtor,
-                        SubobjectInitKind::Chaining)) {
+                        designatedInitKind::Chaining)) {
         newInits.push_back(ctor);
       }
     }
@@ -5015,9 +5015,9 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
 
         auto paramTuple = ctor->getArgumentType()->getAs<TupleType>();
         if (!paramTuple) {
-          // A subobject initializer other than a default initializer
+          // A designated initializer other than a default initializer
           // means we can't call super.init().
-          if (ctor->isSubobjectInit())
+          if (ctor->isDesignatedInit())
             return;
 
           continue;
@@ -5033,9 +5033,9 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
           break;
         }
         if (missingInit) {
-          // A subobject initializer other than a default initializer
+          // A designated initializer other than a default initializer
           // means we can't call super.init().
-          if (ctor->isSubobjectInit())
+          if (ctor->isDesignatedInit())
             return;
 
           continue;

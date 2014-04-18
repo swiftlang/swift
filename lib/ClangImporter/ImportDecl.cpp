@@ -1796,7 +1796,7 @@ namespace {
       // avoid order dependencies here. Perhaps we should just deal with the
       // ambiguity later?
       auto result = importConstructor(decl, dc, false,
-                                      InitializerKind::Convenience,
+                                      CtorInitializerKind::Convenience,
                                       /*required=*/false, selector, initName);
       if (result && member) {
         ++NumFactoryMethodsAsInitializers;
@@ -2073,12 +2073,6 @@ namespace {
       }
     }
 
-    /// Describes the kind of initializer to import.
-    enum class InitializerKind {
-      Designated,
-      Convenience
-    };
-
     /// \brief Given an imported method, try to import it as a constructor.
     ///
     /// Objective-C methods in the 'init' family are imported as
@@ -2091,7 +2085,7 @@ namespace {
     ConstructorDecl *importConstructor(const clang::ObjCMethodDecl *objcMethod,
                                        DeclContext *dc,
                                        bool implicit,
-                                       Optional<InitializerKind> kind,
+                                       Optional<CtorInitializerKind> kind,
                                        bool required) {
       // Only methods in the 'init' family can become constructors.
       assert(objcMethod->getMethodFamily() == clang::OMF_init &&
@@ -2129,7 +2123,7 @@ namespace {
     ConstructorDecl *importConstructor(const clang::ObjCMethodDecl *objcMethod,
                                        DeclContext *dc,
                                        bool implicit,
-                                       Optional<InitializerKind> kind,
+                                       Optional<CtorInitializerKind> kind,
                                        bool required,
                                        ObjCSelector selector,
                                        DeclName name) {
@@ -2215,20 +2209,13 @@ namespace {
 
       // If we were told what kind of initializer this should be, set it.
       if (kind) {
-        switch (*kind) {
-        case InitializerKind::Convenience:
-          result->setCompleteObjectInit(true);
-          break;
-
-        case InitializerKind::Designated:
-          break;
-        }
+        result->setInitKind(*kind);
       } else {
         // If the owning Objective-C class has designated initializers and this
         // is not one of them, treat it as a convenience initializer.
         if (interface && Impl.hasDesignatedInitializers(interface) &&
             !Impl.isDesignatedInitializer(interface, objcMethod)) {
-          result->setCompleteObjectInit(true);
+          result->setInitKind(CtorInitializerKind::Convenience);
         }
       }
 
@@ -3116,7 +3103,7 @@ namespace {
             // Import the constructor.
             if (auto imported = importConstructor(
                                   objcMethod, dc, /*implicit=*/true,
-                                  InitializerKind::Designated,
+                                  CtorInitializerKind::Designated,
                                   /*required=*/false)){
               members.push_back(imported);
             }
@@ -3148,7 +3135,7 @@ namespace {
 
       DeclContext *dc = classDecl;
       auto inheritConstructors = [&](ArrayRef<Decl *> members,
-                                     Optional<InitializerKind> kind) {
+                                     Optional<CtorInitializerKind> kind) {
         for (auto member : members) {
           auto ctor = dyn_cast<ConstructorDecl>(member);
           if (!ctor)
@@ -3164,7 +3151,7 @@ namespace {
           if (objcMethod->isClassMethod()) {
             if (auto newCtor = importConstructor(objcMethod, dc, 
                                                  /*implicit=*/true,
-                                                 InitializerKind::Convenience,
+                                                 CtorInitializerKind::Convenience,
                                                  /*required=*/false, 
                                                  ctor->getObjCSelector(),
                                                  ctor->getFullName()))
@@ -3173,17 +3160,16 @@ namespace {
           }
 
           // Figure out what kind of constructor this will be.
-          InitializerKind myKind;
+          CtorInitializerKind myKind;
           bool isRequired = false;
           if (ctor->isRequired()) {
             // Required initializers are always considered designated.
             isRequired = true;
-            myKind = InitializerKind::Designated;
+            myKind = CtorInitializerKind::Designated;
           } else if (kind) {
             myKind = *kind;
           } else {
-            myKind = ctor->isCompleteObjectInit() ? InitializerKind::Convenience
-                                                  : InitializerKind::Designated;
+            myKind = ctor->getInitKind();
           }
 
           // Import the constructor into this context.
@@ -3198,11 +3184,11 @@ namespace {
 
       // The kind of initializer to import. If this class has designated
       // initializers, everything it imports is a convenience initializer.
-      Optional<InitializerKind> kind;
+      Optional<CtorInitializerKind> kind;
       auto curObjCClass
         = cast<clang::ObjCInterfaceDecl>(classDecl->getClangDecl());
       if (Impl.hasDesignatedInitializers(curObjCClass))
-        kind = InitializerKind::Convenience;
+        kind = CtorInitializerKind::Convenience;
 
       auto superclass
         = cast<ClassDecl>(classDecl->getSuperclass()->getAnyNominal());

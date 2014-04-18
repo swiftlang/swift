@@ -130,9 +130,8 @@ static bool isDeclVisibleInLookupMode(ValueDecl *Member, LookupState LS) {
       return false;
     if (LS.isQualified() && LS.isOnSuperclass()) {
       // Can not call initializers from a superclass, except for inherited
-      // complete object initializers.
-      return LS.isInheritsSuperclassInitializers() &&
-             CD->isCompleteObjectInit();
+      // convenience initializers.
+      return LS.isInheritsSuperclassInitializers() && CD->isInheritable();
     }
   }
   if (LS.isQualified() && !LS.isOnMetatype() && isa<TypeDecl>(Member)) {

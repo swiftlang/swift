@@ -1294,6 +1294,17 @@ bool Serializer::isDeclXRef(const Decl *D) const {
           (SF && topLevel != SF && !isForced(D, DeclIDs)));
 }
 
+static serialization::CtorInitializerKind
+getStableCtorInitializerKind(swift::CtorInitializerKind K){
+  switch (K) {
+#define CASE(NAME) \
+  case swift::CtorInitializerKind::NAME: return serialization::NAME;
+      CASE(Designated)
+      CASE(Convenience)
+#undef CASE
+  }
+}
+
 void Serializer::writeDecl(const Decl *D) {
   using namespace decls_block;
 
@@ -1765,7 +1776,8 @@ void Serializer::writeDecl(const Decl *D) {
                                   ctor->isImplicit(),
                                   ctor->isObjC(),
                                   ctor->isTransparent(),
-                                  ctor->isCompleteObjectInit(),
+                                  getStableCtorInitializerKind(
+                                    ctor->getInitKind()),
                                   addTypeRef(ctor->getType()),
                                   addTypeRef(ctor->getInterfaceType()),
                                   addDeclRef(ctor->getOverriddenDecl()),

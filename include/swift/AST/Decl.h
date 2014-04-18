@@ -192,7 +192,7 @@ enum class StoredInheritsSuperclassInits {
   Unchecked,
   /// Superclass initializers are not inherited.
   NotInherited,
-  /// Complete object initializers in the superclass are inherited.
+  /// Convenience initializers in the superclass are inherited.
   Inherited
 };
 
@@ -339,11 +339,11 @@ class alignas(8) Decl {
     /// analysis and SIL generation.
     unsigned ComputedBodyInitKind : 3;
 
-    /// Whether this is a complete object initializer.
-    unsigned CompleteObjectInit : 1;
+    /// The kind of initializer we have.
+    unsigned InitKind : 1;
 
     /// Whether this initializer is a stub placed into a subclass to
-    /// catch invalid delegations to a subobject initializer not
+    /// catch invalid delegations to a designated initializer not
     /// overridden by the subclass. A stub will always trap at runtime.
     ///
     /// Initializer stubs can be invoked from Objective-C or through
@@ -422,7 +422,7 @@ class alignas(8) Decl {
     /// have in-class initializers.
     unsigned RequiresStoredPropertyInits : 1;
 
-    /// Whether this class inherits its superclass's complete object
+    /// Whether this class inherits its superclass's convenience
     /// initializers.
     ///
     /// This is a value of \c StoredInheritsSuperclassInits.
@@ -2761,7 +2761,7 @@ public:
   /// Retrieve the destructor for this class.
   DestructorDecl *getDestructor();
 
-  /// Determine whether this class inherits the complete object initializers
+  /// Determine whether this class inherits the convenience initializers
   /// from its superclass.
   ///
   /// \param resolver Used to resolve the signatures of initializers, which is
@@ -3873,6 +3873,24 @@ inline SourceRange EnumCaseDecl::getSourceRange() const {
   return {};
 }
 
+/// Describes the kind of initializer.
+enum class CtorInitializerKind {
+  /// A designated initializer is an initializer responsible for initializing
+  /// the stored properties of the current class and chaining to a superclass's
+  /// designated initializer (for non-root classes).
+  ///
+  /// Designated initializers are never inherited.
+  Designated,
+
+  /// A convenience initializer is an initializer that initializes a complete
+  /// object by delegating to another initializer (eventually reaching a
+  /// designated initializer).
+  ///
+  /// Convenience initializers are inherited into subclasses that override
+  /// all of their superclass's designated initializers.
+  Convenience
+};
+
 /// ConstructorDecl - Declares a constructor for a type.  For example:
 ///
 /// \code
@@ -3970,19 +3988,35 @@ public:
     return getAttrs().hasAttribute<RequiredAttr>();
   }
 
-  /// Whether this is a complete object initializer.
-  bool isCompleteObjectInit() const {
-    return ConstructorDeclBits.CompleteObjectInit;
+  /// Determine the kind of initializer this is.
+  CtorInitializerKind getInitKind() const {
+    return static_cast<CtorInitializerKind>(ConstructorDeclBits.InitKind);
   }
 
-  /// Set whether this is a complete object initializer.
-  void setCompleteObjectInit(bool completeObjectInit) {
-    ConstructorDeclBits.CompleteObjectInit = completeObjectInit;
+  /// Set whether this is a convenience initializer.
+  void setInitKind(CtorInitializerKind kind) {
+    ConstructorDeclBits.InitKind = static_cast<unsigned>(kind);
   }
 
-  /// Whether this is a subobject initializer.
-  bool isSubobjectInit() const {
-    return !isCompleteObjectInit();
+  /// Whether this is a designated initializer.
+  bool isDesignatedInit() const {
+    return getInitKind() == CtorInitializerKind::Designated;
+  }
+
+  /// Whether this is a convenience initializer.
+  bool isConvenienceInit() const {
+    return getInitKind() == CtorInitializerKind::Convenience;
+  }
+
+  /// Determine whether this initializer is inheritable.
+  bool isInheritable() const {
+    switch (getInitKind()) {
+    case CtorInitializerKind::Designated:
+      return false;
+
+    case CtorInitializerKind::Convenience:
+      return true;
+    }
   }
 
   /// Whether the implementation of this method is a stub that traps at runtime.

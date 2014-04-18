@@ -2935,7 +2935,7 @@ bool Lowering::usesObjCAllocator(ClassDecl *theClass) {
 
 void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   // FIXME: Hack until all delegation is dispatched.
-  IsCompleteObjectInit = ctor->isCompleteObjectInit();
+  isConvenienceInit = ctor->isConvenienceInit();
 
   // Emit the prolog. Since we're just going to forward our args directly
   // to the initializer, don't allocate local variables for them.
@@ -2968,8 +2968,8 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
 
   // Allocate the 'self' value.
   bool useObjCAllocation = usesObjCAllocator(selfClassDecl);
-  if (ctor->isCompleteObjectInit() || ctor->hasClangNode()) {
-    // For a complete object initializer or an initializer synthesized
+  if (ctor->isConvenienceInit() || ctor->hasClangNode()) {
+    // For a convenience initializer or an initializer synthesized
     // for an Objective-C class, allocate using the metatype.
     SILValue allocArg = selfMetaValue;
     
@@ -2986,8 +2986,8 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
     selfValue = B.createAllocRefDynamic(Loc, allocArg, selfTy, 
                                         useObjCAllocation);
   } else {
-    // For a subobject initializer, we know that the static type being
-    // allocatedis the type of the class that defines the subobject
+    // For a designated initializer, we know that the static type being
+    // allocated is the type of the class that defines the designated
     // initializer.
     selfValue = B.createAllocRef(Loc, selfTy, useObjCAllocation);
   }
@@ -3051,7 +3051,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   MagicFunctionName = getMagicFunctionName(ctor);
   
   // FIXME: Hack until all delegation is dispatched.
-  IsCompleteObjectInit = ctor->isCompleteObjectInit();
+  isConvenienceInit = ctor->isConvenienceInit();
 
   assert(ctor->getBody() && "Class constructor without a body?");
 

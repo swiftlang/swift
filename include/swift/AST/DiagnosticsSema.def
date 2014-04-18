@@ -678,24 +678,24 @@ ERROR(init_delegates_and_chains,sema_tce,none,
       "superclass initializer ('super.init')", ())
 NOTE(init_delegation_or_chain,sema_tce,none,
       "previous %select{delegation|chaining}0 call is here", (bool))
-ERROR(non_delegating_complete_object_init,sema_tce,none,
+ERROR(non_delegating_convenience_init,sema_tce,none,
       "convenience initializer for %0 must delegate (with 'self.init')",
       (Type))
-ERROR(delegating_subobject_init,sema_tce,none,
+ERROR(delegating_designated_init,sema_tce,none,
       "designated initializer for %0 cannot delegate (with 'self.init'); "
       "did you mean this to be a convenience initializer?",
       (Type))
 NOTE(delegation_here,sema_tce,none, "delegation occurs here", ())
-ERROR(chain_complete_object_init,sema_tce,none,
+ERROR(chain_convenience_init,sema_tce,none,
       "must call a designated initializer of the superclass %0",
       (Type))
-NOTE(complete_object_init_here,sema_tce,none,
+NOTE(convenience_init_here,sema_tce,none,
      "convenience initializer is declared here", ())
 ERROR(designated_init_in_extension,sema_tcd,none,
       "designated initializer cannot be declared in an extension of %0; "
       "did you mean this to be a convenience initializer?",
       (Type))
-ERROR(nonclass_complete_object_init,sema_tce,none,
+ERROR(nonclass_convenience_init,sema_tce,none,
       "convenience initializer not allowed in non-class type %0",
       (Type))
 

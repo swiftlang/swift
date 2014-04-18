@@ -789,11 +789,11 @@ static bool checkSuperInit(TypeChecker &tc, DeclContext *dc, ApplyExpr *apply,
   auto otherCtorRef = cast<OtherConstructorDeclRefExpr>(
                         apply->getFn()->getSemanticsProvidingExpr());
   auto ctor = otherCtorRef->getDecl();
-  if (!ctor->isSubobjectInit()) {
+  if (!ctor->isDesignatedInit()) {
     if (!implicitlyGenerated) {
-      tc.diagnose(apply->getArg()->getLoc(), diag::chain_complete_object_init,
+      tc.diagnose(apply->getArg()->getLoc(), diag::chain_convenience_init,
                   apply->getArg()->getType());
-      tc.diagnose(ctor, diag::complete_object_init_here);
+      tc.diagnose(ctor, diag::convenience_init_here);
     }
     return true;
   }
@@ -804,7 +804,7 @@ static bool checkSuperInit(TypeChecker &tc, DeclContext *dc, ApplyExpr *apply,
     auto superclassTy = ctor->getExtensionType();
     for (auto member : tc.lookupConstructors(superclassTy, dc)) {
       auto superclassCtor = dyn_cast<ConstructorDecl>(member);
-      if (!superclassCtor || superclassCtor->isCompleteObjectInit() ||
+      if (!superclassCtor || !superclassCtor->isDesignatedInit() ||
           superclassCtor == ctor)
         continue;
       
@@ -863,23 +863,23 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
       break;
     }
 
-    /// A complete object initializer must always be delegating.
-    if (ctor->isCompleteObjectInit() && !isDelegating) {
+    /// A convenience initializer must always be delegating.
+    if (ctor->isConvenienceInit() && !isDelegating) {
       diagnose(initExpr? initExpr->getLoc() : ctor->getLoc(),
-               diag::non_delegating_complete_object_init,
+               diag::non_delegating_convenience_init,
                ctor->getDeclContext()->getDeclaredTypeOfContext());
     }
 
-    // A class subobject initializer must never be delegating.
-    if (ctor->isSubobjectInit() && ClassD && isDelegating) {
+    // A class designated initializer must never be delegating.
+    if (ctor->isDesignatedInit() && ClassD && isDelegating) {
       SourceLoc fixItLoc = ctor->getBodyParamPatterns().back()->getEndLoc();
       fixItLoc = Lexer::getLocForEndOfToken(Context.SourceMgr, fixItLoc);
       diagnose(ctor->getLoc(),
-               diag::delegating_subobject_init,
+               diag::delegating_designated_init,
                ctor->getDeclContext()->getDeclaredTypeOfContext())
         .fixItInsert(fixItLoc, " -> Self"); 
       diagnose(initExpr->getLoc(), diag::delegation_here);
-      ctor->setCompleteObjectInit(true);
+      ctor->setInitKind(CtorInitializerKind::Convenience);
     }
   }
 
@@ -887,7 +887,7 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
   if (wantSuperInitCall) {
     // Find a default initializer in the superclass.
     if (Expr *SuperInitCall = constructCallToSuperInit(ctor, ClassD)) {
-      // If the initializer we found is a subobject initializer, we're okay.
+      // If the initializer we found is a designated initializer, we're okay.
       class FindOtherConstructorRef : public ASTWalker {
       public:
         ApplyExpr *Found = nullptr;

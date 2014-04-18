@@ -119,8 +119,8 @@ public:
   bool NeedsReturn : 1;
   
   /// FIXME: Hack to temporarily use dispatched delegation only for
-  /// complete object initializers.
-  bool IsCompleteObjectInit = false;
+  /// convenience initializers.
+  bool isConvenienceInit = false;
 
   /// \brief The SIL location corresponding to the AST node being processed.
   SILLocation CurrentSILLoc;

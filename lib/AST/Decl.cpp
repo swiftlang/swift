@@ -1412,21 +1412,21 @@ bool ClassDecl::inheritsSuperclassInitializers(LazyResolver *resolver) {
       continue;
 
     if (auto overridden = ctor->getOverriddenDecl()) {
-      if (overridden->isSubobjectInit())
+      if (overridden->isDesignatedInit())
         overriddenInits.insert(overridden);
     }
   }
 
-  // Check all of the subobject initializers in the direct superclass.
+  // Check all of the designated initializers in the direct superclass.
   if (resolver)
     resolver->resolveImplicitConstructors(superclassDecl);
   for (auto member : superclassDecl->lookupDirect(ctx.Id_init)) {
-    // We only care about subobject initializers.
+    // We only care about designated initializers.
     auto ctor = dyn_cast<ConstructorDecl>(member);
-    if (!ctor || ctor->isCompleteObjectInit() || ctor->hasStubImplementation())
+    if (!ctor || !ctor->isDesignatedInit() || ctor->hasStubImplementation())
       continue;
 
-    // If this subobject initializer wasn't overridden, we can't inherit.
+    // If this designated initializer wasn't overridden, we can't inherit.
     if (overriddenInits.count(ctor) == 0) {
       ClassDeclBits.InheritsSuperclassInits
         = static_cast<unsigned>(StoredInheritsSuperclassInits::NotInherited);
@@ -1434,7 +1434,7 @@ bool ClassDecl::inheritsSuperclassInitializers(LazyResolver *resolver) {
     }
   }
 
-  // All of the direct superclass's subobject initializers have been overridden
+  // All of the direct superclass's designated initializers have been overridden
   // by the sublcass. Initializers can be inherited.
   ClassDeclBits.InheritsSuperclassInits
     = static_cast<unsigned>(StoredInheritsSuperclassInits::Inherited);
@@ -2278,7 +2278,8 @@ ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
   setBodyParams(SelfBodyParam, BodyParams);
   
   ConstructorDeclBits.ComputedBodyInitKind = 0;
-  ConstructorDeclBits.CompleteObjectInit = 0;
+  ConstructorDeclBits.InitKind
+    = static_cast<unsigned>(CtorInitializerKind::Designated);
   ConstructorDeclBits.HasStubImplementation = 0;
 }
 

@@ -611,8 +611,15 @@ namespace {
       printCommonAFD(CD, "constructor_decl");
       if (CD->isRequired())
         OS << " abstract";
-      if (CD->isCompleteObjectInit())
-        OS << " complete_object";
+      switch (CD->getInitKind()) {
+      case CtorInitializerKind::Designated:
+        OS << " designated";
+        break;
+
+      case CtorInitializerKind::Convenience:
+        OS << " convenience";
+        break;
+      }
 
       printAbstractFunctionDecl(CD);
       OS << ')';

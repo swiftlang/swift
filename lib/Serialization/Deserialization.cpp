@@ -1342,6 +1342,18 @@ static bool isDeclAttrRecord(unsigned ID) {
   }
 }
 
+static Optional<swift::CtorInitializerKind>
+getActualCtorInitializerKind(uint8_t raw) {
+  switch (serialization::CtorInitializerKind(raw)) {
+  case serialization::Designated:
+    return swift::CtorInitializerKind::Designated;
+
+  case serialization::Convenience:
+    return swift::CtorInitializerKind::Convenience;
+  }
+  return Nothing;
+}
+
 Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   if (DID == 0)
     return nullptr;
@@ -1641,7 +1653,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   case decls_block::CONSTRUCTOR_DECL: {
     DeclID parentID;
     bool isImplicit, isObjC, isTransparent;
-    bool isCompleteObjectInit;
+    uint8_t storedInitKind;
     TypeID signatureID;
     TypeID interfaceID;
     DeclID overriddenID;
@@ -1649,7 +1661,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     decls_block::ConstructorLayout::readRecord(scratch, parentID, isImplicit,
                                                isObjC, isTransparent,
-                                               isCompleteObjectInit,
+                                               storedInitKind,
                                                signatureID, interfaceID,
                                                overriddenID, argNameIDs);
     auto parent = getDeclContext(parentID);
@@ -1719,8 +1731,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       ctor->setImplicit();
     if (isTransparent)
       ctor->getMutableAttrs().setAttr(AK_transparent, SourceLoc());
-    if (isCompleteObjectInit)
-      ctor->setCompleteObjectInit(true);
+    if (auto initKind = getActualCtorInitializerKind(storedInitKind))
+      ctor->setInitKind(*initKind);
     if (auto overridden
           = dyn_cast_or_null<ConstructorDecl>(getDecl(overriddenID)))
       ctor->setOverriddenDecl(overridden);

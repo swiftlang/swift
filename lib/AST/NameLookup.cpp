@@ -1099,10 +1099,10 @@ bool DeclContext::lookupQualified(Type type,
   // criteria.
   bool onlyCompleteObjectInits = false;
   auto isAcceptableDecl = [&](NominalTypeDecl *current, Decl *decl) -> bool {
-    // Filter out subobject initializers, if requested.
+    // Filter out designated initializers, if requested.
     if (onlyCompleteObjectInits) {
       if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
-        if (!ctor->isCompleteObjectInit())
+        if (!ctor->isInheritable())
           return false;
       } else {
         return false;

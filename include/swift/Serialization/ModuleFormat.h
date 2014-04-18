@@ -111,6 +111,14 @@ using AccessorKindField = BCFixed<2>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
+enum CtorInitializerKind : uint8_t {
+  Designated = 0,
+  Convenience = 1
+};
+using CtorInitializerKindField = BCFixed<1>;
+
+// These IDs must \em not be renumbered or reordered without incrementing
+// VERSION_MAJOR.
 enum class ParameterConvention : uint8_t {
   Indirect_In,
   Indirect_Out,
@@ -648,7 +656,7 @@ namespace decls_block {
     BCFixed<1>,  // implicit?
     BCFixed<1>,  // objc?
     BCFixed<1>,  // transparent?
-    BCFixed<1>,  // complete object init?
+    CtorInitializerKindField,  // initializer kind
     TypeIDField, // type (signature)
     TypeIDField, // type (interface)
     DeclIDField, // overridden decl

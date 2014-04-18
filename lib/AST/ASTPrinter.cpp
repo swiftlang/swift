@@ -1106,8 +1106,15 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
     printGenericParams(decl->getGenericParams());
   }
   printFunctionParameters(decl);
-  if (decl->isCompleteObjectInit())
+  switch (decl->getInitKind()) {
+  case CtorInitializerKind::Designated:
+    break;
+
+  case CtorInitializerKind::Convenience:
     Printer << " -> Self";
+    break;
+  }
+
   if (!Options.FunctionDefinitions || !decl->getBody()) {
     return;
   }
