@@ -222,12 +222,10 @@ void SILGenFunction::visitBraceStmt(BraceStmt *S) {
         StmtType = ReturnStmtType;
       
     } else if (Expr *E = ESD.dyn_cast<Expr*>()) {
-      FullExpr scope(Cleanups, CleanupLocation(E));
-      // If it is convenient to avoid loading the result, don't bother.
-      emitRValue(E, SGFContext::AllowPlusZero);
-
-    } else
+      emitIgnoredExpr(E);
+    } else {
       visit(ESD.get<Decl*>());
+    }
   }
 }
 
@@ -423,9 +421,7 @@ void SILGenFunction::visitForStmt(ForStmt *S) {
     visit(D);
   
   if (auto *Initializer = S->getInitializer().getPtrOrNull()) {
-    FullExpr Scope(Cleanups, CleanupLocation(Initializer));
-    // If it is convenient to avoid loading the init expr, don't bother.
-    emitRValue(Initializer, SGFContext::AllowPlusZero);
+    emitIgnoredExpr(Initializer);
   }
   
   // If we ever reach an unreachable point, stop emitting statements.

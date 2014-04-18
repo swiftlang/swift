@@ -546,7 +546,10 @@ public:
 
   /// Emit the given expression as an r-value.
   RValue emitRValue(Expr *E, SGFContext C = SGFContext());
-
+  
+  /// Emit the given expression, ignoring its result.
+  void emitIgnoredExpr(Expr *E);
+  
   /// Emit the given expression as an r-value, then (if it is a tuple), combine
   /// it together into a single ManagedValue.
   ManagedValue emitRValueAsSingleValue(Expr *E, SGFContext C = SGFContext());

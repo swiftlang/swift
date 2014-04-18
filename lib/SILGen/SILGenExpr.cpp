@@ -4677,6 +4677,17 @@ RValue SILGenFunction::emitRValue(Expr *E, SGFContext C) {
   return RValueEmitter(*this).visit(E, C);
 }
 
+void SILGenFunction::emitIgnoredExpr(Expr *E) {
+  FullExpr scope(Cleanups, CleanupLocation(E));
+  // Evaluate the expression as an lvalue or rvalue, discarding the result.
+  if (E->getType()->is<LValueType>()) {
+    emitLValue(E);
+  } else {
+    // If it is convenient to avoid loading the result, don't bother.
+    emitRValue(E, SGFContext::AllowPlusZero);
+  }
+}
+
 /// Emit the given expression as an r-value, then (if it is a tuple), combine
 /// it together into a single ManagedValue.
 ManagedValue SILGenFunction::emitRValueAsSingleValue(Expr *E, SGFContext C) {
