@@ -1796,7 +1796,7 @@ namespace {
       // avoid order dependencies here. Perhaps we should just deal with the
       // ambiguity later?
       auto result = importConstructor(decl, dc, false,
-                                      CtorInitializerKind::Convenience,
+                                      CtorInitializerKind::ConvenienceFactory,
                                       /*required=*/false, selector, initName);
       if (result && member) {
         ++NumFactoryMethodsAsInitializers;
@@ -3151,7 +3151,7 @@ namespace {
           if (objcMethod->isClassMethod()) {
             if (auto newCtor = importConstructor(objcMethod, dc, 
                                                  /*implicit=*/true,
-                                                 CtorInitializerKind::Convenience,
+                                                 ctor->getInitKind(),
                                                  /*required=*/false, 
                                                  ctor->getObjCSelector(),
                                                  ctor->getFullName()))

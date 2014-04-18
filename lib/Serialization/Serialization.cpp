@@ -1297,6 +1297,9 @@ bool Serializer::isDeclXRef(const Decl *D) const {
 static serialization::CtorInitializerKind
 getStableCtorInitializerKind(swift::CtorInitializerKind K){
   switch (K) {
+  case swift::CtorInitializerKind::ConvenienceFactory:
+    llvm_unreachable("Convenience factory initializers cannot be uttered");
+
 #define CASE(NAME) \
   case swift::CtorInitializerKind::NAME: return serialization::NAME;
       CASE(Designated)

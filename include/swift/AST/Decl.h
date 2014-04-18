@@ -340,7 +340,7 @@ class alignas(8) Decl {
     unsigned ComputedBodyInitKind : 3;
 
     /// The kind of initializer we have.
-    unsigned InitKind : 1;
+    unsigned InitKind : 2;
 
     /// Whether this initializer is a stub placed into a subclass to
     /// catch invalid delegations to a designated initializer not
@@ -3888,7 +3888,15 @@ enum class CtorInitializerKind {
   ///
   /// Convenience initializers are inherited into subclasses that override
   /// all of their superclass's designated initializers.
-  Convenience
+  Convenience,
+
+  /// A convenience factory initializer is a convenience initializer introduced
+  /// by an imported Objective-C factory method.
+  ///
+  /// Convenience factory initializers cannot be expressed directly in
+  /// Swift; rather, they are produced by the Clang importer when importing
+  /// an instancetype factory method from Objective-C.
+  ConvenienceFactory
 };
 
 /// ConstructorDecl - Declares a constructor for a type.  For example:
@@ -4005,7 +4013,8 @@ public:
 
   /// Whether this is a convenience initializer.
   bool isConvenienceInit() const {
-    return getInitKind() == CtorInitializerKind::Convenience;
+    return getInitKind() == CtorInitializerKind::Convenience ||
+           getInitKind() == CtorInitializerKind::ConvenienceFactory;
   }
 
   /// Determine whether this initializer is inheritable.
@@ -4015,6 +4024,7 @@ public:
       return false;
 
     case CtorInitializerKind::Convenience:
+    case CtorInitializerKind::ConvenienceFactory:
       return true;
     }
   }

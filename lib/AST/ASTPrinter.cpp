@@ -1111,6 +1111,7 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
     break;
 
   case CtorInitializerKind::Convenience:
+  case CtorInitializerKind::ConvenienceFactory:
     Printer << " -> Self";
     break;
   }

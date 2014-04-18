@@ -23,7 +23,6 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/STLExtras.h"
-#include "clang/AST/DeclObjC.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/TinyPtrVector.h"
@@ -177,35 +176,25 @@ void swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
     }
   }
   
-  // Check for collisions among Objective-C initializers.
+  // Check for collisions among Objective-C initializers. When such collisions
+  // exist, we pick the
   for (const auto &colliding : ObjCCollidingConstructors) {
     if (colliding.second.size() == 1)
       continue;
 
-    // Check whether we have a constructor based on an init method.
-    bool haveInitMethod = false;
+    // Find the "best" constructor kind with this signature.
+    CtorInitializerKind bestKind = colliding.second[0]->getInitKind();
     for (auto ctor : colliding.second) {
-      if (auto objcMethod
-            = dyn_cast<clang::ObjCMethodDecl>(ctor->getClangDecl())) {
-        if (objcMethod->isInstanceMethod()) {
-          haveInitMethod = true;
-          break;
-        }
-      }
+      auto kind = ctor->getInitKind();
+      if (static_cast<unsigned>(kind) < static_cast<unsigned>(bestKind))
+        bestKind = kind;
     }
 
-    if (!haveInitMethod)
-      continue;
-
-    // We found an init method; it shadows any factory methods
-    // imported as initializers.
+    // Shadow any initializers with a worse kind.
     for (auto ctor : colliding.second) {
-      if (auto objcMethod
-            = dyn_cast<clang::ObjCMethodDecl>(ctor->getClangDecl())) {
-        if (objcMethod->isClassMethod()) {
-          shadowed.insert(ctor);
-        }
-      }
+      auto kind = ctor->getInitKind();
+      if (static_cast<unsigned>(kind) > static_cast<unsigned>(bestKind))
+        shadowed.insert(ctor);
     }
   }
 
