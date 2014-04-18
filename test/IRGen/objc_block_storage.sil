@@ -73,7 +73,14 @@ entry(%0 : $*@block_storage Builtin.RawPointer):
   return %b : $@cc(cdecl) @objc_block () -> ()
 }
 
-sil public_external @invoke_trivial : $@thin @cc(cdecl) (@inout @block_storage Builtin.RawPointer) -> ()
+// CHECK-LABEL: define void @invoke_trivial(void (...)*) {
+// CHECK:         %1 = bitcast void (...)* %0 to { %objc_block, i8* }*
+// CHECK:         %2 = getelementptr inbounds { %objc_block, i8* }* %1, i32 0, i32 1
+sil @invoke_trivial : $@thin @cc(cdecl) (@inout @block_storage Builtin.RawPointer) -> () {
+entry(%0 : $*@block_storage Builtin.RawPointer):
+  %c = project_block_storage %0 : $*@block_storage Builtin.RawPointer
+  return undef : $()
+}
 
 // CHECK-LABEL: define %objc_block* @init_block_header_nontrivial({ %objc_block, %swift.refcounted* }* noalias) {
 // CHECK:         store %objc_block {

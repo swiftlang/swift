@@ -939,6 +939,16 @@ static void emitEntryPointArgumentsCOrObjC(IRGenSILFunction &IGF,
     auto *arg = args[i];
     auto argTyIdx = i + nextArgTyIdx;
     auto &argTI = IGF.getTypeInfo(arg->getType());
+    
+    // Bitcast indirect argument pointers to the right storage type.
+    if (arg->getType().isAddress()) {
+      llvm::Value *ptr = params.claimNext();
+      ptr = IGF.Builder.CreateBitCast(ptr,
+                                      argTI.getStorageType()->getPointerTo());
+      IGF.setLoweredAddress(arg, Address(ptr, argTI.getBestKnownAlignment()));
+      return;
+    }
+    
     auto &loadableArgTI = cast<LoadableTypeInfo>(argTI);
     Explosion argExplosion(IGF.CurSILFnExplosionLevel);
 
