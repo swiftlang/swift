@@ -1742,14 +1742,14 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   case decls_block::VAR_DECL: {
     IdentifierID nameID;
     DeclID contextID;
-    bool isImplicit, isObjC, isIBOutlet, isOptional, isStatic, isLet;
+    bool isImplicit, isObjC, isOptional, isStatic, isLet;
     uint8_t StorageKind;
     TypeID typeID, interfaceTypeID;
     DeclID getterID, setterID, willSetID, didSetID;
     DeclID overriddenID;
 
     decls_block::VarLayout::readRecord(scratch, nameID, contextID, isImplicit,
-                                       isObjC, isIBOutlet, isOptional, isStatic,
+                                       isObjC, isOptional, isStatic,
                                        isLet, StorageKind, typeID,
                                        interfaceTypeID, getterID, setterID,
                                        willSetID, didSetID, overriddenID);
@@ -1795,8 +1795,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     if (isImplicit)
       var->setImplicit();
-    if (isIBOutlet)
-      var->getMutableAttrs().setAttr(AK_IBOutlet, SourceLoc());
     if (isOptional)
       var->getMutableAttrs().setAttr(AK_optional, SourceLoc());
 
@@ -1814,7 +1812,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     bool isStatic;
     uint8_t RawStaticSpelling;
     bool isAssignmentOrConversion;
-    bool isObjC, isIBAction, isTransparent, isMutating, hasDynamicSelf;
+    bool isObjC, isTransparent, isMutating, hasDynamicSelf;
     bool isOptional;
     unsigned numParamPatterns;
     TypeID signatureID;
@@ -1828,7 +1826,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     decls_block::FuncLayout::readRecord(scratch, contextID, isImplicit,
                                         isStatic, RawStaticSpelling,
                                         isAssignmentOrConversion,
-                                        isObjC, isIBAction, isTransparent,
+                                        isObjC, isTransparent,
                                         isMutating, hasDynamicSelf, isOptional,
                                         numParamPatterns, signatureID,
                                         interfaceTypeID, associatedDeclID,
@@ -1918,8 +1916,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       assert(!fn->isOperator());
       fn->getMutableAttrs().setAttr(AK_conversion, SourceLoc());
     }
-    if (isIBAction)
-      fn->getMutableAttrs().setAttr(AK_IBAction, SourceLoc());
     if (isTransparent)
       fn->getMutableAttrs().setAttr(AK_transparent, SourceLoc());
     fn->setMutating(isMutating);
@@ -2073,12 +2069,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   case decls_block::CLASS_DECL: {
     IdentifierID nameID;
     DeclID contextID;
-    bool isImplicit, isObjC, isIBDesignable, attrRequiresStoredPropertyInits;
+    bool isImplicit, isObjC, attrRequiresStoredPropertyInits;
     bool requiresStoredPropertyInits;
     TypeID superclassID;
     ArrayRef<uint64_t> rawProtocolIDs;
     decls_block::ClassLayout::readRecord(scratch, nameID, contextID,
-                                         isImplicit, isObjC, isIBDesignable,
+                                         isImplicit, isObjC,
                                          attrRequiresStoredPropertyInits,
                                          requiresStoredPropertyInits,
                                          superclassID, rawProtocolIDs);
@@ -2119,8 +2115,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       GenericSignature *sig = GenericSignature::get(paramTypes, requirements);
       theClass->setGenericSignature(sig);
     }
-    if (isIBDesignable)
-      theClass->getMutableAttrs().setAttr(AK_IBDesignable, SourceLoc());
     theClass->computeType();
 
     auto protocols = ctx.Allocate<ProtocolDecl *>(rawProtocolIDs.size());

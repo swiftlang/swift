@@ -1045,10 +1045,10 @@ static bool isDefaultInitializable(PatternBindingDecl *pbd) {
 
   // If it is an IBOutlet, it is trivially true.
   if (auto var = pbd->getSingleVar()) {
-    if (var->getAttrs().isIBOutlet())
+    if (var->getAttrs().hasAttribute<IBOutletAttr>())
       return true;
   }
-    
+
   // If the pattern is typed with optionals, it is true.
   if (auto typedPattern = dyn_cast<TypedPattern>(pbd->getPattern())) {
     if (auto typeRepr = typedPattern->getTypeLoc().getTypeRepr()) {
@@ -1146,7 +1146,7 @@ static void validatePatternBindingDecl(TypeChecker &tc,
 
     // If we have a type-adjusting attribute, apply it now.
     if (auto var = binding->getSingleVar()) {
-      if (var->getAttrs().isIBOutlet())
+      if (var->getAttrs().hasAttribute<IBOutletAttr>())
         tc.checkIBOutlet(var);
       if (var->getAttrs().hasOwnership())
         tc.checkOwnershipAttr(var, var->getAttrs().getOwnership());
@@ -1184,7 +1184,7 @@ static void validatePatternBindingDecl(TypeChecker &tc,
   // If we have any type-adjusting attributes, apply them here.
   if (binding->getPattern()->hasType()) {
     if (auto var = binding->getSingleVar()) {
-      if (var->getAttrs().isIBOutlet())
+      if (var->getAttrs().hasAttribute<IBOutletAttr>())
         tc.checkIBOutlet(var);
       if (var->getAttrs().hasOwnership())
         tc.checkOwnershipAttr(var, var->getAttrs().getOwnership());
@@ -1889,7 +1889,7 @@ public:
       ObjCReason reason = ObjCReason::DontDiagnose;
       if (VD->getAttrs().hasAttribute<ObjCAttr>())
         reason = ObjCReason::ExplicitlyObjC;
-      else if (VD->getAttrs().isIBOutlet())
+      else if (VD->getAttrs().hasAttribute<IBOutletAttr>())
         reason = ObjCReason::ExplicitlyIBOutlet;
       else if (isMemberOfObjCProtocol)
         reason = ObjCReason::MemberOfObjCProtocol;
@@ -3193,7 +3193,8 @@ public:
         else if (auto pat = cast<VarDecl>(prop)->getParentPattern())
           validatePatternBindingDecl(TC, pat);
 
-        isObjC = prop->isObjC() || prop->getAttrs().isIBOutlet();
+        isObjC = prop->isObjC() ||
+                 prop->getAttrs().hasAttribute<IBOutletAttr>();
       }
 
       if (isObjC &&
@@ -3507,6 +3508,10 @@ public:
 #define UNINTERESTING_ATTR(CLASS)                                              \
     void visit##CLASS##Attr(CLASS##Attr *) {}
 
+    UNINTERESTING_ATTR(IBAction)
+    UNINTERESTING_ATTR(IBDesignable)
+    UNINTERESTING_ATTR(IBInspectable)
+    UNINTERESTING_ATTR(IBOutlet)
     UNINTERESTING_ATTR(Asmname)
     UNINTERESTING_ATTR(Assignment)
     UNINTERESTING_ATTR(ClassProtocol)
@@ -5108,12 +5113,6 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     }
   }
 
-  auto isInClassContext = [](Decl *vd) {
-   Type ContextTy = vd->getDeclContext()->getDeclaredTypeInContext();
-    if (!ContextTy)
-      return false;
-    return bool(ContextTy->getClassOrBoundGenericClass());
-  };
   auto isInClassOrProtocolContext = [](Decl *vd) {
    Type ContextTy = vd->getDeclContext()->getDeclaredTypeInContext();
     if (!ContextTy)
@@ -5224,15 +5223,6 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     }
   }
 
-  if (Attrs.isIBOutlet()) {
-    if (auto var = dyn_cast<VarDecl>(D)) {
-      TC.checkIBOutlet(var);
-    } else {
-      TC.diagnose(Attrs.getLoc(AK_IBOutlet), diag::invalid_iboutlet);
-      D->getMutableAttrs().clearAttribute(AK_IBOutlet);
-    }      
-  }
-
   // Ownership attributes (weak, unowned).
   if (Attrs.hasOwnership()) {
     assert(unsigned(Attrs.isWeak()) + unsigned(Attrs.isUnowned()) == 1 &&
@@ -5249,45 +5239,6 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     }
 
     TC.checkOwnershipAttr(var, Attrs.getOwnership());
-  }
-
-  if (Attrs.isIBInspectable()) {
-    // Only instance properties can be IBInspectables.
-    auto *VD = dyn_cast<VarDecl>(D);
-    if (!VD || !isInClassContext(VD) || VD->isStatic()) {
-      TC.diagnose(Attrs.getLoc(AK_IBInspectable), diag::invalid_ibinspectable);
-      D->getMutableAttrs().clearAttribute(AK_IBInspectable);
-      return;
-    }
-  }
-
-  if (Attrs.isIBAction()) {
-    // Only instance methods returning () can be IBActions.
-    const FuncDecl *FD = dyn_cast<FuncDecl>(D);
-    if (!FD || !isInClassContext(D) || FD->isStatic() ||
-        FD->isGetterOrSetter()) {
-      TC.diagnose(Attrs.getLoc(AK_IBAction), diag::invalid_ibaction_decl);
-      D->getMutableAttrs().clearAttribute(AK_IBAction);
-      return;
-    }
-
-    // IBActions instance methods must have type Class -> (...) -> ().
-    // FIXME: This could do some argument type validation as well (only certain
-    // method signatures are allowed for IBActions).
-    Type CurriedTy = FD->getType()->castTo<AnyFunctionType>()->getResult();
-    Type ResultTy = CurriedTy->castTo<AnyFunctionType>()->getResult();
-    if (!ResultTy->isEqual(TupleType::getEmpty(TC.Context))) {
-      TC.diagnose(D->getStartLoc(), diag::invalid_ibaction_result, ResultTy);
-      D->getMutableAttrs().clearAttribute(AK_IBAction);
-      return;
-    }
-  }
-
-  // Only classes can be marked with 'IBDesignable'.
-  if (Attrs.isIBDesignable() && !isa<ClassDecl>(D)) {
-    TC.diagnose(Attrs.getLoc(AK_IBDesignable), diag::invalid_ibdesignable_decl);
-    D->getMutableAttrs().clearAttribute(AK_IBDesignable);
-    return;
   }
 
   if (Attrs.isInfix()) {

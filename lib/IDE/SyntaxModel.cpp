@@ -63,7 +63,8 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
       bool IsAttr = llvm::StringSwitch<bool>(Tok.getText())
 #define ATTR(X) .Case(#X, true)
 #define TYPE_ATTR(X) .Case(#X, true)
-#define IB_ATTR(X) .Case(#X, true)
+#define DECL_ATTR(X, ...) .Case(#X, true)
+#define VIRTUAL_DECL_ATTR(X, ...)
 #include "swift/AST/Attr.def"
       .Default(false);
       if (IsAttr) {
@@ -150,7 +151,7 @@ private:
   bool annotateIfConfigConditionIdentifiers(Expr *Cond);
   bool handleAttrs(const DeclAttributes &Attrs);
   bool handleAttrs(const TypeAttributes &Attrs);
-  bool handleAttrLocs(SourceLoc AtLoc, ArrayRef<SourceLoc> Locs);
+  bool handleAttrRanges(SourceLoc AtLoc, ArrayRef<SourceRange> Ranges);
 
   bool shouldPassBraceStructureNode(BraceStmt *S);
 
@@ -467,69 +468,64 @@ bool ModelASTWalker::annotateIfConfigConditionIdentifiers(Expr *Cond) {
 }
 
 bool ModelASTWalker::handleAttrs(const DeclAttributes &Attrs) {
-  SmallVector<SourceLoc, 4> Locs;
-  Attrs.getAttrLocs(Locs);
-  if (Locs.empty())
-    return true;
-
-  return handleAttrLocs(Attrs.AtLoc, Locs);
+  SmallVector<SourceRange, 4> Ranges;
+  Attrs.getAttrRanges(Ranges);
+  return handleAttrRanges(Attrs.AtLoc, Ranges);
 }
 
 bool ModelASTWalker::handleAttrs(const TypeAttributes &Attrs) {
-  SmallVector<SourceLoc, 4> Locs;
-  Attrs.getAttrLocs(Locs);
-  if (Locs.empty())
-    return true;
-
-  return handleAttrLocs(Attrs.AtLoc, Locs);
+  SmallVector<SourceRange, 4> Ranges;
+  Attrs.getAttrRanges(Ranges);
+  return handleAttrRanges(Attrs.AtLoc, Ranges);
 }
 
-bool ModelASTWalker::handleAttrLocs(SourceLoc BeginLoc,
-                                    ArrayRef<SourceLoc> Locs) {
-  if (Locs.empty())
+bool ModelASTWalker::handleAttrRanges(SourceLoc AtLoc,
+                                      ArrayRef<SourceRange> Ranges) {
+  if (Ranges.empty())
     return true;
 
-  SmallVector<SourceLoc, 6> SortedLocs(Locs.begin(), Locs.end());
-  std::sort(SortedLocs.begin(), SortedLocs.end(),
-      [&](SourceLoc LHS, SourceLoc RHS) {
-        return SM.isBeforeInBuffer(LHS, RHS);
-      }
-  );
-  Locs = SortedLocs;
+  SmallVector<SourceRange, 4> SortedRanges(Ranges.begin(), Ranges.end());
+  std::sort(SortedRanges.begin(), SortedRanges.end(),
+            [&](SourceRange LHS, SourceRange RHS) {
+    return SM.isBeforeInBuffer(LHS.Start, RHS.End);
+  });
+  Ranges = SortedRanges;
 
-  // The BeginLoc is invalid if there's no leading '@', which happens if there
-  // are only virtual attributes. In that case we'll use the location of the
-  // first attribute.
-  if (BeginLoc.isInvalid())
-    BeginLoc = Locs.front();
+  SourceLoc BeginLoc = AtLoc;
+  if (!AtLoc.isValid())
+    BeginLoc = Ranges.front().Start;
 
-  std::vector<Token> Toks =
-      swift::tokenize(LangOpts, SM, BufferID,
-                      SM.getLocOffsetInBuffer(BeginLoc, BufferID),
-                      SM.getLocOffsetInBuffer(SortedLocs.back(), BufferID),
-                      /*KeepComments=*/true,
-                      /*TokenizeInterpolatedString=*/false);
+  std::vector<Token> Toks = swift::tokenize(
+      LangOpts, SM, BufferID,
+      SM.getLocOffsetInBuffer(BeginLoc, BufferID),
+      SM.getLocOffsetInBuffer(Ranges.back().End, BufferID),
+      /*KeepComments=*/true,
+      /*TokenizeInterpolatedString=*/false);
 
-  auto passAttrNode = [&](SourceLoc AtLoc, SourceLoc AttrLoc) -> bool {
+  auto passAttrNode = [&](SourceLoc AtLoc, SourceRange AttrRange) -> bool {
     SourceRange Range;
     if (AtLoc.isValid())
-      Range = SourceRange(AtLoc, AttrLoc);
+      Range = SourceRange(AtLoc, AttrRange.End);
     else
-      Range = AttrLoc;
-    if (!passNonTokenNode({ SyntaxNodeKind::AttributeBuiltin,
-                            charSourceRangeFromSourceRange(SM, Range) }))
+      Range = AttrRange;
+    if (!passNonTokenNode({SyntaxNodeKind::AttributeBuiltin,
+                           charSourceRangeFromSourceRange(SM, Range)}))
       return false;
 
-    if (TokenNodes.front().Range.getStart() == AttrLoc)
+    auto RRR = TokenNodes.front();
+    while (SM.rangeContainsTokenLoc(AttrRange,
+                                    TokenNodes.front().Range.getStart()))
       TokenNodes = TokenNodes.slice(1);
     return true;
   };
 
-  SourceLoc AtLoc;
   for (auto Tok : Toks) {
-    if (Tok.getLoc() == Locs.front()) {
-      Locs = Locs.slice(1);
-      if (!passAttrNode(AtLoc, Tok.getLoc()))
+    if (Ranges.empty())
+      break;
+    if (Tok.getLoc() == Ranges.front().Start) {
+      auto R = Ranges.front();
+      Ranges = Ranges.slice(1);
+      if (!passAttrNode(AtLoc, R))
         return false;
     }
 
@@ -539,8 +535,8 @@ bool ModelASTWalker::handleAttrLocs(SourceLoc BeginLoc,
       AtLoc = SourceLoc();
   }
 
-  if (!Locs.empty()) {
-    if (!passAttrNode(AtLoc, Locs.front()))
+  if (!Ranges.empty()) {
+    if (!passAttrNode(AtLoc, Ranges.front()))
       return false;
   }
 

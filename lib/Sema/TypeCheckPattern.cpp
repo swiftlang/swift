@@ -689,7 +689,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
     NamedPattern *NP = cast<NamedPattern>(P);
     VarDecl *var = NP->getDecl();
     var->overwriteType(type);
-    if (var->getAttrs().isIBOutlet()) {
+    if (var->getAttrs().hasAttribute<IBOutletAttr>()) {
       checkIBOutlet(var);
     }
     if (var->getAttrs().hasOwnership()) {

@@ -19,6 +19,13 @@
 
 using namespace swift;
 
+static bool isInClassContext(const Decl *D) {
+  Type ContextTy = D->getDeclContext()->getDeclaredTypeInContext();
+  if (!ContextTy)
+    return false;
+  return bool(ContextTy->getClassOrBoundGenericClass());
+}
+
 namespace {
 class AttributeEarlyChecker : public AttributeVisitor<AttributeEarlyChecker> {
   TypeChecker &TC;
@@ -30,6 +37,14 @@ public:
   /// Deleting this ensures that all attributes are covered by the visitor
   /// below.
   void visitDeclAttribute(DeclAttribute *A) = delete;
+
+  void visitIBActionAttr(IBActionAttr *attr);
+
+  void visitIBDesignableAttr(IBDesignableAttr *attr);
+
+  void visitIBInspectableAttr(IBInspectableAttr *attr);
+
+  void visitIBOutletAttr(IBOutletAttr *attr);
 
   void visitAsmnameAttr(AsmnameAttr *attr) {}
 
@@ -54,6 +69,45 @@ public:
   void visitRequiredAttr(RequiredAttr *attr) {}
 };
 } // end anonymous namespace
+
+void AttributeEarlyChecker::visitIBActionAttr(IBActionAttr *attr) {
+  // Only instance methods returning () can be IBActions.
+  const FuncDecl *FD = dyn_cast<FuncDecl>(D);
+  if (!FD || !isInClassContext(D) || FD->isStatic() || FD->isGetterOrSetter()) {
+    TC.diagnose(attr->getLocation(), diag::invalid_ibaction_decl);
+    attr->setInvalid();
+    return;
+  }
+}
+
+void AttributeEarlyChecker::visitIBDesignableAttr(IBDesignableAttr *attr) {
+  // Only classes can be marked with 'IBDesignable'.
+  if (!isa<ClassDecl>(D)) {
+    TC.diagnose(attr->getLocation(), diag::invalid_ibdesignable_decl);
+    attr->setInvalid();
+    return;
+  }
+}
+
+void AttributeEarlyChecker::visitIBInspectableAttr(IBInspectableAttr *attr) {
+  // Only instance properties can be 'IBInspectable'.
+  auto *VD = dyn_cast<VarDecl>(D);
+  if (!VD || !isInClassContext(VD) || VD->isStatic()) {
+    TC.diagnose(attr->getLocation(), diag::invalid_ibinspectable);
+    attr->setInvalid();
+    return;
+  }
+}
+
+void AttributeEarlyChecker::visitIBOutletAttr(IBOutletAttr *attr) {
+  // Only instance properties can be 'IBOutlet'.
+  auto *VD = dyn_cast<VarDecl>(D);
+  if (!VD || !isInClassContext(VD) || VD->isStatic()) {
+    TC.diagnose(attr->getLocation(), diag::invalid_iboutlet);
+    attr->setInvalid();
+    return;
+  }
+}
 
 void AttributeEarlyChecker::visitAssignmentAttr(AssignmentAttr *attr) {
   // Only function declarations can be assignments.
@@ -116,6 +170,12 @@ public:
 
 #undef UNINTERESTING_ATTR
 
+  void visitIBActionAttr(IBActionAttr *attr);
+  void visitIBDesignableAttr(IBDesignableAttr *attr) {}
+  void visitIBInspectableAttr(IBInspectableAttr *attr) {}
+
+  void visitIBOutletAttr(IBOutletAttr *attr);
+
   void visitAvailabilityAttr(AvailabilityAttr *attr) {
     // FIXME: Check that this declaration is at least as available as the
     // one it overrides.
@@ -134,6 +194,24 @@ public:
   void visitRequiredAttr(RequiredAttr *attr);
 };
 } // end anonymous namespace
+
+void AttributeChecker::visitIBActionAttr(IBActionAttr *attr) {
+  // IBActions instance methods must have type Class -> (...) -> ().
+  // FIXME: This could do some argument type validation as well (only certain
+  // method signatures are allowed for IBActions).
+  auto *FD = cast<FuncDecl>(D);
+  Type CurriedTy = FD->getType()->castTo<AnyFunctionType>()->getResult();
+  Type ResultTy = CurriedTy->castTo<AnyFunctionType>()->getResult();
+  if (!ResultTy->isEqual(TupleType::getEmpty(TC.Context))) {
+    TC.diagnose(D, diag::invalid_ibaction_result, ResultTy);
+    attr->setInvalid();
+    return;
+  }
+}
+
+void AttributeChecker::visitIBOutletAttr(IBOutletAttr *attr) {
+  TC.checkIBOutlet(cast<VarDecl>(D));
+}
 
 void AttributeChecker::visitAssignmentAttr(AssignmentAttr *attr) {
   auto *FD = cast<FuncDecl>(D);
@@ -344,23 +422,14 @@ void TypeChecker::checkOwnershipAttr(VarDecl *var, Ownership ownershipKind) {
 }
 
 void TypeChecker::checkIBOutlet(VarDecl *VD) {
-  const DeclAttributes &Attrs = VD->getAttrs();
-  assert(Attrs.isIBOutlet() && "Only call when @IBOutlet is set");
+  assert(VD->getMutableAttrs().hasAttribute<IBOutletAttr>() &&
+         "Only call when @IBOutlet is set");
+  checkDeclAttributesEarly(VD);
 
-  auto isInClassContext = [](Decl *vd) {
-   Type ContextTy = vd->getDeclContext()->getDeclaredTypeInContext();
-    if (!ContextTy)
-      return false;
-    return bool(ContextTy->getClassOrBoundGenericClass());
-  };
-
-  // Only instance properties can be IBOutlets.
-  if (!isInClassContext(VD) || VD->isStatic()) {
-    diagnose(Attrs.getLoc(AK_IBOutlet), diag::invalid_iboutlet);
-    VD->getMutableAttrs().clearAttribute(AK_IBOutlet);
+  auto *attr = VD->getMutableAttrs().getAttribute<IBOutletAttr>();
+  if (!attr)
     return;
-  }
-  
+
   // If the variable has no type yet, we can't perform any validation.
   if (!VD->hasType())
     return;
@@ -377,12 +446,12 @@ void TypeChecker::checkIBOutlet(VarDecl *VD) {
     isOptional = true;
     type = optObjectType;
   }
-  
+
   if (auto classDecl = type->getClassOrBoundGenericClass()) {
     // @objc class types are okay.
     if (!classDecl->isObjC()) {
       diagnose(VD->getLoc(), diag::iboutlet_nonobjc_class, type);
-      VD->getMutableAttrs().clearAttribute(AK_IBOutlet);
+      attr->setInvalid();
       return;
     }
   } else if (type->isObjCExistentialType()) {
@@ -394,10 +463,10 @@ void TypeChecker::checkIBOutlet(VarDecl *VD) {
   } else {
     // No other types are permitted.
     diagnose(VD->getLoc(), diag::iboutlet_nonobject_type, type);
-    VD->getMutableAttrs().clearAttribute(AK_IBOutlet);
+    attr->setInvalid();
     return;
   }
-  
+
   // If the type wasn't optional before, turn it into an @unchecked optional
   // now.
   if (!isOptional) {

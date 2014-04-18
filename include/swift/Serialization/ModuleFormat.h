@@ -631,7 +631,6 @@ namespace decls_block {
     DeclIDField,       // context decl
     BCFixed<1>,        // implicit?
     BCFixed<1>,        // explicitly objc?
-    BCFixed<1>,        // IBDesignable?
     BCFixed<1>,        // requires stored property initial values (attribute)
     BCFixed<1>,        // requires stored property initial values
     TypeIDField,       // superclass
@@ -671,7 +670,6 @@ namespace decls_block {
     DeclIDField,  // context decl
     BCFixed<1>,   // implicit?
     BCFixed<1>,   // explicitly objc?
-    BCFixed<1>,   // IBOutlet?
     BCFixed<1>,   // optional?
     BCFixed<1>,   // static?
     BCFixed<1>,   // isLet?
@@ -693,7 +691,6 @@ namespace decls_block {
     StaticSpellingKindField, // spelling of 'static' or 'class'
     BCFixed<1>,   // assignment? / conversion?
     BCFixed<1>,   // explicitly objc?
-    BCFixed<1>,   // IBAction?
     BCFixed<1>,   // transparent?
     BCFixed<1>,   // mutating?
     BCFixed<1>,   // has dynamic self?

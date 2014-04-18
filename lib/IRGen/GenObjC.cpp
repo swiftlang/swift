@@ -1282,7 +1282,7 @@ bool irgen::requiresObjCMethodDescriptor(FuncDecl *method) {
           ->is<BoundGenericType>())
     return false;
   
-  if (method->isObjC() || method->getAttrs().isIBAction())
+  if (method->isObjC() || method->getAttrs().hasAttribute<IBActionAttr>())
     return true;
   if (auto override = method->getOverriddenDecl())
     return requiresObjCMethodDescriptor(override);

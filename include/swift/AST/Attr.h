@@ -182,10 +182,10 @@ public:
     AttrLocs[A] = L;
   }
 
-  void getAttrLocs(SmallVectorImpl<SourceLoc> &Locs) const {
+  void getAttrRanges(SmallVectorImpl<SourceRange> &Ranges) const {
     for (auto Loc : AttrLocs) {
       if (Loc.isValid())
-        Locs.push_back(Loc);
+        Ranges.push_back(Loc);
     }
   }
 
@@ -232,6 +232,12 @@ public:
 
   /// Return the source range of the attribute.
   SourceRange getRange() const { return Range; }
+
+  SourceRange getRangeWithAt() const {
+    if (AtLoc.isValid())
+      return {AtLoc, Range.End};
+    return Range;
+  }
 
   // Only allow allocation of attributes using the allocator in ASTContext
   // or by doing a placement new.
@@ -769,15 +775,15 @@ public:
     }
   }
 
-  void getAttrLocs(SmallVectorImpl<SourceLoc> &Locs) const {
+  void getAttrRanges(SmallVectorImpl<SourceRange> &Ranges) const {
     for (auto Loc : AttrLocs) {
       if (Loc.isValid())
-        Locs.push_back(Loc);
+        Ranges.push_back(Loc);
     }
     for (auto Attr : *this) {
-      auto Loc = Attr->getLocation();
-      if (Loc.isValid())
-        Locs.push_back(Loc);
+      auto R = Attr->getRangeWithAt();
+      if (R.isValid())
+        Ranges.push_back(R);
     }
   }
 
@@ -786,10 +792,6 @@ public:
   bool isPrefix() const { return has(AK_prefix); }
   bool isPostfix() const { return has(AK_postfix); }
   bool isInfix() const { return has(AK_infix); }
-  bool isIBOutlet() const { return has(AK_IBOutlet); }
-  bool isIBAction() const { return has(AK_IBAction); }
-  bool isIBDesignable() const { return has(AK_IBDesignable); }
-  bool isIBInspectable() const { return has(AK_IBInspectable); }
   bool isWeak() const { return has(AK_weak); }
   bool isUnowned() const { return has(AK_unowned); }
   bool isOptional() const { return has(AK_optional); }

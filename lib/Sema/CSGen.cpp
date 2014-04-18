@@ -661,7 +661,7 @@ namespace {
           ty = CS.getTypeChecker().getOptionalType(var->getLoc(), ty);
           if (!ty) return Type();
         // For @IBOutlet variables, use @unchecked T?.
-        } else if (var->getAttrs().isIBOutlet()) {
+        } else if (var->getAttrs().hasAttribute<IBOutletAttr>()) {
           ty = CS.getTypeChecker().getUncheckedOptionalType(var->getLoc(), ty);
           if (!ty) return Type();
         }
@@ -689,7 +689,7 @@ namespace {
         // if we don't have one and this pattern is directly bound to an
         // IBOutlet.
         if (auto var = typedPattern->getSingleVar()) {
-          if (var->getAttrs().isIBOutlet() &&
+          if (var->getAttrs().hasAttribute<IBOutletAttr>() &&
               !openedType->getAnyOptionalObjectType()) {
             openedType = CS.getTypeChecker()
                            .getUncheckedOptionalType(var->getLoc(), openedType);

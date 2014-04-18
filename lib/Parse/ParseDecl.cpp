@@ -218,6 +218,25 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 #include "swift/AST/Attr.def"
     llvm_unreachable("virtual attributes should not be parsed "
                      "by attribute parsing code");
+  case DAK_IBAction:
+    if (!DiscardAttribute)
+      Attributes.add(new (Context) IBActionAttr(AtLoc, Loc));
+    break;
+
+  case DAK_IBDesignable:
+    if (!DiscardAttribute)
+      Attributes.add(new (Context) IBDesignableAttr(AtLoc, Loc));
+    break;
+
+  case DAK_IBInspectable:
+    if (!DiscardAttribute)
+      Attributes.add(new (Context) IBInspectableAttr(AtLoc, Loc));
+    break;
+
+  case DAK_IBOutlet:
+    if (!DiscardAttribute)
+      Attributes.add(new (Context) IBOutletAttr(AtLoc, Loc));
+    break;
 
   case DAK_asmname: {
     if (!consumeIf(tok::l_paren)) {

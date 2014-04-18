@@ -82,10 +82,6 @@ void DeclAttributes::print(ASTPrinter &Printer,
     Printer << "@postfix ";
   if (requiresStoredPropertyInits())
     Printer << "@requires_stored_property_inits ";
-  if (isIBOutlet())
-    Printer << "@IBOutlet ";
-  if (isIBAction())
-    Printer << "@IBAction ";
   if (isOptional())
     Printer << "@optional ";
   Optional<bool> MutatingAttr = getMutating();
@@ -97,6 +93,18 @@ void DeclAttributes::print(ASTPrinter &Printer,
 
 void DeclAttribute::print(ASTPrinter &Printer) const {
   switch (getKind()) {
+  case DAK_IBAction:
+    Printer << "@IBAction";
+    break;
+  case DAK_IBDesignable:
+    Printer << "@IBDesignable";
+    break;
+  case DAK_IBInspectable:
+    Printer << "@IBInspectable";
+    break;
+  case DAK_IBOutlet:
+    Printer << "@IBOutlet";
+    break;
   case DAK_asmname:
     Printer << "@asmname(\"" << cast<AsmnameAttr>(this)->Name << "\")";
     break;

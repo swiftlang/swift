@@ -1568,7 +1568,7 @@ void Serializer::writeDecl(const Decl *D) {
   case DeclKind::Class: {
     auto theClass = cast<ClassDecl>(D);
     checkAllowedAttributes<
-      AK_IBDesignable, AK_requires_stored_property_inits>(theClass);
+      AK_requires_stored_property_inits>(theClass);
     verifyAttrSerializable(theClass);
 
     const Decl *DC = getDeclForContext(theClass->getDeclContext());
@@ -1583,7 +1583,6 @@ void Serializer::writeDecl(const Decl *D) {
                             addDeclRef(DC),
                             theClass->isImplicit(),
                             theClass->isObjC(),
-                            theClass->getAttrs().isIBDesignable(),
                             theClass->getAttrs().requiresStoredPropertyInits(),
                             theClass->requiresStoredPropertyInits(),
                             addTypeRef(theClass->getSuperclass()),
@@ -1625,7 +1624,7 @@ void Serializer::writeDecl(const Decl *D) {
   case DeclKind::Var: {
     auto var = cast<VarDecl>(D);
     checkAllowedAttributes<
-      AK_IBOutlet, AK_optional, AK_unowned, AK_weak, AK_transparent
+      AK_optional, AK_unowned, AK_weak, AK_transparent
     >(var);
     verifyAttrSerializable(var);
 
@@ -1658,7 +1657,6 @@ void Serializer::writeDecl(const Decl *D) {
                           addDeclRef(DC),
                           var->isImplicit(),
                           var->isObjC(),
-                          var->getAttrs().isIBOutlet(),
                           var->getAttrs().isOptional(),
                           var->isStatic(),
                           var->isLet(),
@@ -1676,7 +1674,7 @@ void Serializer::writeDecl(const Decl *D) {
   case DeclKind::Func: {
     auto fn = cast<FuncDecl>(D);
     checkAllowedAttributes<
-      AK_conversion, AK_IBAction, AK_infix,
+      AK_conversion, AK_infix,
       AK_optional, AK_postfix, AK_prefix, AK_transparent,
       AK_mutating
     >(fn);
@@ -1697,7 +1695,6 @@ void Serializer::writeDecl(const Decl *D) {
                            uint8_t(getStableStaticSpelling(fn->getStaticSpelling())),
                            fn->getAttrs().isConversion(),
                            fn->isObjC(),
-                           fn->getAttrs().isIBAction(),
                            fn->isTransparent(),
                            fn->isMutating(),
                            fn->hasDynamicSelf(),

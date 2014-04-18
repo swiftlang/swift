@@ -83,6 +83,23 @@ TYPE_ATTR(opened)
 // VIRTUAL_DECL_ATTR is like DECL_ATTR, but it can not be spelled in the source
 // code as an attribute.  It is modelled as an attribute for the convenience of
 // implementation in the compiler.
+
+SIMPLE_DECL_ATTR(IBAction, IBAction,
+                 OnFunc,
+                 10)
+
+SIMPLE_DECL_ATTR(IBDesignable, IBDesignable,
+                 OnClass,
+                 11)
+
+SIMPLE_DECL_ATTR(IBInspectable, IBInspectable,
+                 OnVar,
+                 12)
+
+SIMPLE_DECL_ATTR(IBOutlet, IBOutlet,
+                 OnVar,
+                 13)
+
 DECL_ATTR(asmname, Asmname,
           OnFunc | OnConstructor | OnDestructor,
           0)
@@ -138,11 +155,6 @@ ATTR(transparent)
 ATTR(unowned)
 ATTR(weak)
 ATTR(requires_stored_property_inits)
-
-IB_ATTR(IBOutlet)
-IB_ATTR(IBAction)
-IB_ATTR(IBDesignable)
-IB_ATTR(IBInspectable)
 
 // "Virtual" attributes can not be spelled in the source code.
 VIRTUAL_ATTR(raw_doc_comment)
