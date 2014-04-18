@@ -413,7 +413,12 @@ extern "C" const FullMetadata<Metadata> _TMdVSs6UInt16;
 extern "C" const FullMetadata<Metadata> _TMdVSs6UInt32;
 extern "C" const FullMetadata<Metadata> _TMdVSs6UInt64;
   
+// Set to 1 to enable reflection of objc ivars.
+#define REFLECT_OBJC_IVARS 0
+  
 /// Map an ObjC type encoding string to a Swift type metadata object.
+///
+#if REFLECT_OBJC_IVARS
 static const Metadata *getMetadataForEncoding(const char *encoding) {
   switch (*encoding) {
   case 'c': // char
@@ -452,15 +457,13 @@ static const Metadata *getMetadataForEncoding(const char *encoding) {
     return &_TMdT_;
   }
 }
+#endif
   
 extern "C"
 intptr_t swift_ObjCMirror_count(HeapObject *owner,
                                 const OpaqueValue *value,
                                 const Metadata *type) {
-  // ObjC makes no guarantees about the state of ivars, so we can't safely
-  // introspect them in the general case.
-  return 0;
-#if 0
+#if REFLECT_OBJC_IVARS
   auto isa = (Class)type;
   
   unsigned count;
@@ -480,6 +483,10 @@ intptr_t swift_ObjCMirror_count(HeapObject *owner,
   
   swift_release(owner);
   return count;
+#else
+  // ObjC makes no guarantees about the state of ivars, so we can't safely
+  // introspect them in the general case.
+  return 0;
 #endif
 }
   
@@ -493,10 +500,7 @@ StringMirrorTuple swift_ObjCMirror_subscript(intptr_t i,
                                              HeapObject *owner,
                                              const OpaqueValue *value,
                                              const Metadata *type) {
-  // ObjC makes no guarantees about the state of ivars, so we can't safely
-  // introspect them in the general case.
-  abort();
-#if 0
+#if REFLECT_OBJC_IVARS
   id object = *reinterpret_cast<const id *>(value);
   auto isa = (Class)type;
   
@@ -544,6 +548,10 @@ StringMirrorTuple swift_ObjCMirror_subscript(intptr_t i,
   result.first = String(name, strlen(name));
   result.second = swift_unsafeReflectAny(owner, ivar, ivarType);
   return result;
+#else
+  // ObjC makes no guarantees about the state of ivars, so we can't safely
+  // introspect them in the general case.
+  abort();  
 #endif
 }
   
