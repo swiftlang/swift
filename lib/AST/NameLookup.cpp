@@ -859,6 +859,12 @@ void NominalTypeDecl::forceDelayedProtocolDecls() {
   
   SmallVector<ProtocolDecl *, 4> protocols;
   
+  // Copy over any non-delayed protocols.
+  if (Protocols.size()) {
+    protocols.append(Protocols.begin(), Protocols.end());
+    Protocols = {};
+  }
+  
   for (auto delayedProtocolCreator : DelayedProtocols) {
     protocols.push_back(delayedProtocolCreator());
   }

@@ -1802,6 +1802,14 @@ public:
   ArrayRef<ProtocolDecl *> getProtocols(bool forceDelayedMembers = true) const {
     return Protocols;
   }
+  
+  /// \brief For declarations that are initially composed of a mix of delayed
+  /// and non-delayed protocols, allow the setting of a temporary list of
+  /// non-delayed protocols that will be copied over to the "official" protocol
+  /// list when the delayed protocol declarations are forced.
+  void setInitialUndelayedProtocols(ArrayRef<ProtocolDecl *> protocols) {
+    Protocols = protocols;
+  }
 
   void setProtocols(ArrayRef<ProtocolDecl *> protocols) {
     assert((!TypeDeclBits.ProtocolsSet || protocols.empty()) &&

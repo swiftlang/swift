@@ -355,6 +355,24 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
   unsigned currentFunctionIdx = 0;
   unsigned currentExternalDef = TC.Context.LastCheckedExternalDefinition;
   do {
+    
+    for (unsigned n = TC.Context.ExternalDefinitions.size();
+         currentExternalDef != n;
+         ++currentExternalDef) {
+      auto decl = TC.Context.ExternalDefinitions[currentExternalDef];
+      
+      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(decl)) {
+        PrettyStackTraceDecl StackEntry("type-checking", AFD);
+        TC.typeCheckAbstractFunctionBody(AFD);
+        continue;
+      }
+      if (isa<NominalTypeDecl>(decl)) {
+        TC.handleExternalDecl(decl);
+        continue;
+      }
+      llvm_unreachable("Unhandled external definition kind");
+    }
+    
     // Type check the body of each of the function in turn.  Note that outside
     // functions must be visited before nested functions for type-checking to
     // work correctly.
@@ -372,23 +390,6 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
     for (unsigned i = currentFunctionIdx; i > previousFunctionIdx; --i) {
       if (auto *FD = dyn_cast<AbstractFunctionDecl>(DefinedFunctions[i-1]))
         TC.computeCaptures(FD);
-    }
-
-    for (unsigned n = TC.Context.ExternalDefinitions.size();
-         currentExternalDef != n;
-         ++currentExternalDef) {
-      auto decl = TC.Context.ExternalDefinitions[currentExternalDef];
-
-      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(decl)) {
-        PrettyStackTraceDecl StackEntry("type-checking", AFD);
-        TC.typeCheckAbstractFunctionBody(AFD);
-        continue;
-      }
-      if (isa<NominalTypeDecl>(decl)) {
-        TC.handleExternalDecl(decl);
-        continue;
-      }
-      llvm_unreachable("Unhandled external definition kind");
     }
 
     // Type-check any referenced nominal types.

@@ -1106,12 +1106,21 @@ namespace {
         // Add delayed protocol declarations to the enum declaration.
         DelayedProtocolDecl delayedProtocols[] = {
           [&]() {return cxt.getProtocol(KnownProtocolKind::RawRepresentable);},
-          [&]() {return cxt.getProtocol(KnownProtocolKind::Equatable);},
           [&]() {return cxt.getProtocol(KnownProtocolKind::Hashable);}
         };
         auto delayedProtoList = Impl.SwiftContext.AllocateCopy(
                                                       delayedProtocols);
         enumDecl->setDelayedProtocolDecls(delayedProtoList);
+        
+        // The type checker assumes that all overloads for '==' are available
+        // when type checking begins, so we don't want to delay adding the
+        // Equatable protocol to the enumeration.
+        ProtocolDecl *initialProtocols[] = {
+          cxt.getProtocol(KnownProtocolKind::Equatable)
+        };
+        
+        auto unforcedProtos = Impl.SwiftContext.AllocateCopy(initialProtocols);
+        enumDecl->setInitialUndelayedProtocols(unforcedProtos);
         
         result = enumDecl;
         computeEnumCommonWordPrefix(decl, name);

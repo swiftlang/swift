@@ -234,3 +234,15 @@ typedef struct _NSRange {
 @interface NSInvocation : NSObject
 @end
 
+typedef NS_ENUM(NSInteger, NSByteCountFormatterCountStyle) {
+  NSByteCountFormatterCountStyleFile    = 0,
+  NSByteCountFormatterCountStyleMemory  = 1,
+  NSByteCountFormatterCountStyleDecimal = 2,
+  NSByteCountFormatterCountStyleBinary  = 3
+};
+
+@interface NSByteCountFormatter : NSObject
+
+@property NSByteCountFormatterCountStyle countStyle;
+
+@end
