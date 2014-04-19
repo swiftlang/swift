@@ -45,6 +45,8 @@ namespace swift {
     unsigned HasValue : 1;
     
   public:
+    typedef T value_type;
+
     /// \brief Construct an empty instance.
     Optional() : HasValue(false) { }
 

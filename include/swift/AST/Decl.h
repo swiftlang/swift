@@ -30,6 +30,7 @@
 #include "swift/AST/TypeLoc.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/SourceLoc.h"
+#include "swift/Basic/STLExtras.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
@@ -2040,89 +2041,6 @@ public:
 
 class MemberLookupTable;
 
-/// A class for iterating local declarations of a nominal type that are of
-/// the given FilterDeclType and for which the FilterPredicate function returns
-/// true.
-template<typename FilterDeclType,
-         bool FilterPredicate(FilterDeclType*)>
-class DeclFilterRange {
-public:
-  class iterator {
-    /// The remaining declarations.  We need both ends here so that
-    /// operator++ knows when to stop.
-    ///
-    /// Invariant: either this is empty or its first element matches the
-    /// filter conditions.
-    ArrayRef<Decl*> Remaining;
-
-    friend class DeclFilterRange;
-    iterator(ArrayRef<Decl*> remaining) : Remaining(remaining) {}
-    
-    void skipNonMatching() {
-      while (!Remaining.empty()) {
-        if (auto filtered = dyn_cast<FilterDeclType>(Remaining.front()))
-          if (FilterPredicate(filtered))
-            return;
-        Remaining = Remaining.slice(1);
-      }
-    }
-
-  public:
-    inline FilterDeclType *operator*() const {
-      assert(!Remaining.empty() && "dereferencing empty iterator!");
-      return cast<FilterDeclType>(Remaining.front());
-    }
-    iterator &operator++() {
-      assert(!Remaining.empty() && "incrementing empty iterator!");
-      Remaining = Remaining.slice(1);
-      skipNonMatching();
-      return *this;
-    }
-    iterator operator++(int) {
-      iterator old = *this;
-      ++*this;
-      return old;
-    }
-    friend bool operator==(iterator lhs, iterator rhs) {
-      assert(lhs.Remaining.end() == rhs.Remaining.end() &&
-             "comparing iterators from different sources?");
-      return lhs.Remaining.begin() == rhs.Remaining.begin();
-    }
-    friend bool operator!=(iterator lhs, iterator rhs) {
-      return !(lhs == rhs);
-    }
-    
-    using difference_type = ptrdiff_t;
-    using value_type = FilterDeclType *;
-    using pointer = FilterDeclType * const *;
-    using reference = FilterDeclType * const &;
-    using iterator_category = std::forward_iterator_tag;
-  };
-
-private:
-  /// Our iterator is actually a pretty reasonable representation of
-  /// the range itself.
-  iterator Members;
-
-public:
-  DeclFilterRange(ArrayRef<Decl*> allMembers) : Members(allMembers) {
-    // Establish the iterator's invariant.
-    Members.skipNonMatching();
-  }
-
-  bool empty() const { return Members.Remaining.empty(); }
-
-  iterator begin() const { return Members; }
-  iterator end() const {
-    // For the benefit of operator==, construct a range whose
-    // begin() is the end of the members array.
-    auto endRange = Members.Remaining.slice(Members.Remaining.size());
-    return iterator(endRange);
-  }
-  
-  FilterDeclType *front() const { return *begin(); }
-};
-
 /// Iterator that walks the generic parameter types declared in a generic
 /// signature and their dependent members.
 class GenericSignatureWitnessIterator {
@@ -2523,8 +2441,10 @@ public:
   
 private:
   /// Predicate used to filter StoredPropertyRange.
-  static bool isStoredProperty(VarDecl *vd); // at end of file
-  
+  struct ToStoredProperty {
+    Optional<VarDecl *> operator()(Decl *decl) const;
+  };
+
   /// Force delayed implicit protocol declarations to be added to the type
   /// declaration.
   void forceDelayedProtocolDecls();
@@ -2535,11 +2455,12 @@ private:
   
 public:
   /// A range for iterating the stored member variables of a structure.
-  using StoredPropertyRange = DeclFilterRange<VarDecl, isStoredProperty>;
+  using StoredPropertyRange = OptionalTransformRange<ArrayRef<Decl*>,
+                                                     ToStoredProperty>;
 
   /// Return a collection of the stored member variables of this type.
   StoredPropertyRange getStoredProperties() const {
-    return StoredPropertyRange(getMembers());
+    return StoredPropertyRange(getMembers(), ToStoredProperty());
   }
   
   ArrayRef<Decl*> getDerivedGlobalDecls() const { return DerivedGlobalDecls; }
@@ -2624,13 +2545,9 @@ public:
 
   EnumElementDecl *getElement(Identifier Name) const;
   
-private:
-  /// Predicate used to filter ElementRange.
-  static bool isElement(EnumElementDecl *ued) { return true; }
-  
 public:
   /// A range for iterating the elements of an enum.
-  using ElementRange = DeclFilterRange<EnumElementDecl, isElement>;
+  using ElementRange = DowncastFilterRange<EnumElementDecl, ArrayRef<Decl*>>;
 
   /// Return a range that iterates over all the elements of an enum.
   ElementRange getAllElements() const {
@@ -4322,8 +4239,14 @@ inline bool ValueDecl::isSettable(DeclContext *UseDC) const {
     return false;
 }
 
-inline bool NominalTypeDecl::isStoredProperty(VarDecl *vd) {
-  return !vd->isStatic() && vd->hasStorage();
+inline Optional<VarDecl *> 
+NominalTypeDecl::ToStoredProperty::operator()(Decl *decl) const {
+  if (auto var = dyn_cast<VarDecl>(decl)) {
+    if (!var->isStatic() && var->hasStorage())
+      return var;
+  }
+
+  return Nothing;
 }
 
 inline MutableArrayRef<Pattern *> AbstractFunctionDecl::getBodyParamBuffer() {
