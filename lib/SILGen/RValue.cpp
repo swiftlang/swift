@@ -115,7 +115,7 @@ public:
     case ImplodeKind::Forward:
       return v.forward(gen);
     case ImplodeKind::Copy:
-      return v.copy(gen, l).forward(gen);
+      return v.copyUnmanaged(gen, l).forward(gen);
     }
   }
   
