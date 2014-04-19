@@ -647,13 +647,13 @@ public:
   void updateLookupTable(NominalTypeDecl *nominal);
 
   /// \brief Add the given members to the lookup table.
-  void addMembers(ArrayRef<Decl *> members);
+  void addMembers(DeclRange members);
 
   /// \brief The given extension has been extended with new members; add them
   /// if appropriate.
   void addExtensionMembers(NominalTypeDecl *nominal,
                            ExtensionDecl *ext,
-                           ArrayRef<Decl *> members);
+                           DeclRange members);
 
   /// Iterator into the lookup table.
   typedef LookupTable::iterator iterator;
@@ -707,7 +707,7 @@ MemberLookupTable::MemberLookupTable(NominalTypeDecl *nominal) {
   updateLookupTable(nominal);
 }
 
-void MemberLookupTable::addMembers(ArrayRef<Decl *> members) {
+void MemberLookupTable::addMembers(DeclRange members) {
   for (auto member : members) {
     // Only value declarations matter.
     auto vd = dyn_cast<ValueDecl>(member);
@@ -726,7 +726,7 @@ void MemberLookupTable::addMembers(ArrayRef<Decl *> members) {
 
 void MemberLookupTable::addExtensionMembers(NominalTypeDecl *nominal,
                                             ExtensionDecl *ext,
-                                            ArrayRef<Decl *> members) {
+                                            DeclRange members) {
   // We have not processed any extensions yet, so there's nothing to do.
   if (!LastExtensionIncluded)
     return;
@@ -781,16 +781,16 @@ static void loadAllMembers(const T *container,
   --NumUnloadedLazyMembers;
 }
 
-ArrayRef<Decl*> NominalTypeDecl::getMembers(bool forceDelayedMembers) const {
+DeclRange NominalTypeDecl::getMembers(bool forceDelayedMembers) const {
   loadAllMembers(this, Members);
   if (forceDelayedMembers)
     const_cast<NominalTypeDecl*>(this)->forceDelayedMemberDecls();
-  return Members.getArray();
+  return DeclRange(Members.getArray().begin(), Members.getArray().end());
 }
 
-ArrayRef<Decl*> ExtensionDecl::getMembers(bool forceDelayedMembers) const {
+DeclRange ExtensionDecl::getMembers(bool forceDelayedMembers) const {
   loadAllMembers(this, Members);
-  return Members.getArray();
+  return DeclRange(Members.getArray().begin(), Members.getArray().end());
 }
 
 void NominalTypeDecl::setMembers(ArrayRef<Decl*> M, SourceRange B) {
@@ -801,7 +801,8 @@ void NominalTypeDecl::setMembers(ArrayRef<Decl*> M, SourceRange B) {
     // Make sure we have the complete list of extensions.
     (void)getExtensions();
 
-    LookupTable->addMembers(M.slice(oldSize));
+    auto slice = M.slice(oldSize);
+    LookupTable->addMembers(DeclRange(slice.begin(), slice.end()));
   }
 
   assert(Members.getArray().equals(M.slice(0, oldSize)) &&
@@ -821,8 +822,10 @@ void ExtensionDecl::setMembers(ArrayRef<Decl*> M, SourceRange B) {
       // Make sure we have the complete list of extensions.
       (void)nominal->getExtensions();
 
+      auto slice = M.slice(oldSize);
       nominal->LookupTable->addExtensionMembers(nominal, this,
-                                                M.slice(oldSize));
+                                                DeclRange(slice.begin(), 
+                                                            slice.end()));
     }
   }
 

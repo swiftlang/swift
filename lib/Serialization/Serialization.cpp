@@ -959,7 +959,7 @@ static bool shouldSerializeMember(Decl *D) {
   }
 }
 
-void Serializer::writeMembers(ArrayRef<Decl*> members, bool isClass) {
+void Serializer::writeMembers(DeclRange members, bool isClass) {
   using namespace decls_block;
 
   unsigned abbrCode = DeclTypeAbbrCodes[DeclContextLayout::Code];
@@ -2676,7 +2676,7 @@ writeKnownProtocolList(const index_block::KnownProtocolLayout &AdopterList,
 ///
 /// Recursively walks the members and derived global decls of any nested
 /// nominal types.
-static void addOperatorsAndTopLevel(Serializer &S, ArrayRef<Decl *> members,
+static void addOperatorsAndTopLevel(Serializer &S, DeclRange members,
                                     Serializer::DeclTable &operatorMethodDecls,
                                     Serializer::DeclTable &topLevelDecls,
                                     bool isDerivedTopLevel) {

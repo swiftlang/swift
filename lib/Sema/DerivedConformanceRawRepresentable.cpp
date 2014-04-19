@@ -30,7 +30,7 @@ using namespace DerivedConformance;
 void DerivedConformance::_insertMemberDecl(NominalTypeDecl *scope, Decl *member)
 {
   auto oldMembers = scope->getMembers();
-  auto oldSize = oldMembers.size();
+  auto oldSize = std::distance(oldMembers.begin(), oldMembers.end());
   auto newMembers = scope->getASTContext().Allocate<Decl*>(oldSize + 1);
 
   std::move(oldMembers.begin(), oldMembers.end(), newMembers.begin());
@@ -50,7 +50,7 @@ void DerivedConformance::_insertOperatorDecl(NominalTypeDecl *scope,
 
   // Add it as a derived global decl to the nominal type.
   auto oldDerived = scope->getDerivedGlobalDecls();
-  auto oldSize = oldDerived.size();
+  auto oldSize = std::distance(oldDerived.begin(), oldDerived.end());
   auto newDerived = C.Allocate<Decl*>(oldSize + 1);
   
   std::move(oldDerived.begin(), oldDerived.end(), newDerived.begin());

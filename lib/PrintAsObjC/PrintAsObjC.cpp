@@ -95,7 +95,7 @@ private:
   }
 
   /// Prints the members of a class, extension, or protocol.
-  void printMembers(ArrayRef<Decl *> members) {
+  void printMembers(DeclRange members) {
     for (auto member : members) {
       auto VD = dyn_cast<ValueDecl>(member);
       if (!VD || !VD->isObjC())
@@ -721,7 +721,7 @@ public:
     forwardDeclare(PD, "@protocol");
   }
 
-  void forwardDeclareMemberTypes(ArrayRef<Decl *> members) {
+  void forwardDeclareMemberTypes(DeclRange members) {
     for (auto member : members) {
       auto VD = dyn_cast<ValueDecl>(member);
       if (!VD || !VD->isObjC())
@@ -951,10 +951,15 @@ public:
 
       // Break ties in extensions by putting smaller extensions last (in reverse
       // order).
+      // FIXME: This will end up taking linear time.
       auto lhsMembers = cast<ExtensionDecl>(*lhs)->getMembers();
       auto rhsMembers = cast<ExtensionDecl>(*rhs)->getMembers();
-      if (lhsMembers.size() != rhsMembers.size())
-        return lhsMembers.size() < rhsMembers.size() ? Descending : Ascending;
+      unsigned numLHSMembers = std::distance(lhsMembers.begin(), 
+                                             lhsMembers.end());
+      unsigned numRHSMembers = std::distance(rhsMembers.begin(), 
+                                             rhsMembers.end());
+      if (numLHSMembers != numRHSMembers)
+        return numLHSMembers < numRHSMembers ? Descending : Ascending;
 
       // Or the extension with fewer protocols.
       auto lhsProtos = cast<ExtensionDecl>(*lhs)->getProtocols();

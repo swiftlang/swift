@@ -219,7 +219,7 @@ private:
   /// \param members The decls within the context
   /// \param isClass True if the context could be a class context (class,
   ///        class extension, or protocol).
-  void writeMembers(ArrayRef<Decl *> members, bool isClass);
+  void writeMembers(DeclRange members, bool isClass);
 
   /// Check if a decl is cross-referenced.
   bool isDeclXRef(const Decl *D) const;

@@ -1286,6 +1286,12 @@ public:
   }
 };
 
+/// An iterator that walks through a list of declarations stored in the AST.
+typedef Decl *const *DeclIterator;
+
+/// The range of declarations within another declaration in the AST.
+typedef IteratorRange<DeclIterator> DeclRange;
+
 /// ExtensionDecl - This represents a type extension containing methods
 /// associated with the type.  This is not a ValueDecl and has no Type because
 /// there are no runtime values of the Extension's type.  
@@ -1376,7 +1382,7 @@ public:
   }
   void setConformanceLoader(LazyMemberLoader *resolver, uint64_t contextData);
 
-  ArrayRef<Decl*> getMembers(bool forceDelayedMembers = true) const;
+  DeclRange getMembers(bool forceDelayedMembers = true) const;
   void setMembers(ArrayRef<Decl*> M, SourceRange B);
   void setMemberLoader(LazyMemberLoader *resolver, uint64_t contextData);
   bool hasLazyMembers() const {
@@ -2322,7 +2328,7 @@ protected:
 public:
   using TypeDecl::getASTContext;
 
-  ArrayRef<Decl*> getMembers(bool forceDelayedMembers = true) const;
+  DeclRange getMembers(bool forceDelayedMembers = true) const;
   SourceRange getBraces() const { return Braces; }
   void setMembers(ArrayRef<Decl*> M, SourceRange B);
   void setMemberLoader(LazyMemberLoader *resolver, uint64_t contextData);
@@ -2455,7 +2461,7 @@ private:
   
 public:
   /// A range for iterating the stored member variables of a structure.
-  using StoredPropertyRange = OptionalTransformRange<ArrayRef<Decl*>,
+  using StoredPropertyRange = OptionalTransformRange<DeclRange,
                                                      ToStoredProperty>;
 
   /// Return a collection of the stored member variables of this type.
@@ -2463,7 +2469,11 @@ public:
     return StoredPropertyRange(getMembers(), ToStoredProperty());
   }
   
-  ArrayRef<Decl*> getDerivedGlobalDecls() const { return DerivedGlobalDecls; }
+  DeclRange getDerivedGlobalDecls() const { 
+  /// FIXME: This is an odd dance
+    return DeclRange(DerivedGlobalDecls.begin(), DerivedGlobalDecls.end()); 
+  }
+
   void setDerivedGlobalDecls(MutableArrayRef<Decl*> decls) {
     DerivedGlobalDecls = decls;
   }
@@ -2547,7 +2557,7 @@ public:
   
 public:
   /// A range for iterating the elements of an enum.
-  using ElementRange = DowncastFilterRange<EnumElementDecl, ArrayRef<Decl*>>;
+  using ElementRange = DowncastFilterRange<EnumElementDecl, DeclRange>;
 
   /// Return a range that iterates over all the elements of an enum.
   ElementRange getAllElements() const {

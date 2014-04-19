@@ -168,7 +168,7 @@ static void appendMembers(NominalTypeDecl *nominal,
     return;
 
   auto members = nominal->getMembers();
-  unsigned numMembers = members.size();
+  unsigned numMembers = std::distance(members.begin(), members.end());
   auto &ctx = nominal->getASTContext();
   MutableArrayRef<Decl *> newMembersCopy
     = ctx.Allocate<Decl*>(numMembers + newMembers.size());
@@ -185,7 +185,7 @@ static void appendMembers(ExtensionDecl *extension,
     return;
 
   auto members = extension->getMembers();
-  unsigned numMembers = members.size();
+  unsigned numMembers = std::distance(members.begin(), members.end());
   auto &ctx = extension->getASTContext();
   MutableArrayRef<Decl *> newMembersCopy
   = ctx.Allocate<Decl*>(numMembers + newMembers.size());

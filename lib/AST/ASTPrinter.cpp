@@ -218,7 +218,7 @@ public:
 private:
   bool shouldPrint(const Decl *D);
   void printAccessors(AbstractStorageDecl *ASD);
-  void printMembers(ArrayRef<Decl *> members, bool needComma = false);
+  void printMembers(DeclRange members, bool needComma = false);
   void printNominalDeclName(NominalTypeDecl *decl);
   void printInherited(const Decl *decl,
                       ArrayRef<TypeLoc> inherited,
@@ -563,12 +563,14 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
   Printer << "}";
 }
 
-void PrintAST::printMembers(ArrayRef<Decl *> members, bool needComma) {
+void PrintAST::printMembers(DeclRange members, bool needComma) {
   Printer << " {";
   Printer.printNewline();
   {
     IndentRAII indentMore(*this);
-    for (auto member : members) {
+    for (auto i = members.begin(), iEnd = members.end(); i != iEnd; ++i) {
+      auto member = *i;
+
       if (!shouldPrint(member))
         continue;
 
@@ -577,7 +579,7 @@ void PrintAST::printMembers(ArrayRef<Decl *> members, bool needComma) {
 
       indent();
       visit(member);
-      if (needComma && member != members.back())
+      if (needComma && std::next(i) != iEnd)
         Printer << ",";
       Printer.printNewline();
     }

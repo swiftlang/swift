@@ -1563,25 +1563,6 @@ void ConformanceChecker::checkConformance() {
   // FIXME: Caller checks that this the type conforms to all of the
   // inherited protocols.
   
-  if (/*FIXME: resolve via temporary slower path*/false) {
-    llvm::SmallVector<Decl *, 4> members;
-    members.append(Proto->getMembers().rbegin(), Proto->getMembers().rend());
-    for (auto member : members) {
-      if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
-        if (!Conformance->hasTypeWitness(assocType))
-          resolveSingleTypeWitness(assocType);
-      } else if (auto requirement = dyn_cast<ValueDecl>(member))
-        if (!Conformance->hasWitness(requirement))
-          resolveSingleWitness(requirement);
-    }
-
-    // We've checked everything. If we haven't managed to fail, then
-    // this conformance is complete.
-    if (!Conformance->isInvalid())
-      Conformance->setState(ProtocolConformanceState::Complete);
-    return;
-  }
-
   // Resolve any associated type members via lookup.
   for (auto member : Proto->getMembers()) {
     auto assocType = dyn_cast<AssociatedTypeDecl>(member);

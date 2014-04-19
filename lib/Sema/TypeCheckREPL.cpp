@@ -155,13 +155,19 @@ Expr *StmtBuilder::getArgRefExpr(VarDecl *Arg, ArrayRef<unsigned> MemberIndexes,
     // For each index, we look through a TupleType or StructType.
     CanType CurT = ArgRef->getType()->getRValueType()->getCanonicalType();
     if (StructType *ST = dyn_cast<StructType>(CurT)) {
-      VarDecl *VD = cast<VarDecl>(ST->getDecl()->getMembers()[i]);
+      // FIXME: Woefully inefficient
+      auto MemberPos = ST->getDecl()->getMembers().begin();
+      std::advance(MemberPos, i);
+      VarDecl *VD = cast<VarDecl>(*MemberPos);
       ArgRef = new (Context) MemberRefExpr(ArgRef, Loc, VD, Loc,
                                            /*Implicit=*/true);
       continue;
     }
     if (BoundGenericStructType *BGST = dyn_cast<BoundGenericStructType>(CurT)) {
-      VarDecl *VD = cast<VarDecl>(BGST->getDecl()->getMembers()[i]);
+      // FIXME: Woefully inefficient
+      auto MemberPos = BGST->getDecl()->getMembers().begin();
+      std::advance(MemberPos, i);
+      VarDecl *VD = cast<VarDecl>(*MemberPos);
       Module *M = Arg->getDeclContext()->getParentModule();
       ArgRef = new (Context) MemberRefExpr(
                                ArgRef, Loc,

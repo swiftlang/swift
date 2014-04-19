@@ -113,8 +113,8 @@ class SourceFile::LookupCache {
   DeclMap TopLevelValues;
   DeclMap ClassMembers;
   bool MemberCachePopulated = false;
-  void doPopulateCache(ArrayRef<Decl*> decls, bool onlyOperators);
-  void addToMemberCache(ArrayRef<Decl*> decls);
+  void doPopulateCache(DeclRange decls, bool onlyOperators);
+  void addToMemberCache(DeclRange decls);
   void populateMemberCache(const SourceFile &SF);
 public:
   typedef Module::AccessPathTy AccessPathTy;
@@ -149,7 +149,7 @@ SourceLookupCache &SourceFile::getCache() const {
   return *Cache;
 }
 
-void SourceLookupCache::doPopulateCache(ArrayRef<Decl*> decls,
+void SourceLookupCache::doPopulateCache(DeclRange decls,
                                         bool onlyOperators) {
   for (Decl *D : decls) {
     if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
@@ -174,7 +174,7 @@ void SourceLookupCache::populateMemberCache(const SourceFile &SF) {
   }
 }
 
-void SourceLookupCache::addToMemberCache(ArrayRef<Decl*> decls) {
+void SourceLookupCache::addToMemberCache(DeclRange decls) {
   for (Decl *D : decls) {
     auto VD = dyn_cast<ValueDecl>(D);
     if (!VD)
@@ -192,7 +192,16 @@ void SourceLookupCache::addToMemberCache(ArrayRef<Decl*> decls) {
 
 /// Populate our cache on the first name lookup.
 SourceLookupCache::LookupCache(const SourceFile &SF) {
-  doPopulateCache(SF.Decls, false);
+  // FIXME: Ugly hack because we're using a vector to store the
+  // declarations. Eww.
+  DeclIterator first = nullptr;
+  DeclIterator last = nullptr;
+  if (!SF.Decls.empty()) {
+    first = &SF.Decls[0];
+    last = first + SF.Decls.size();
+  }
+    
+  doPopulateCache(DeclRange(first, last), false);
 }
 
 void SourceLookupCache::lookupValue(AccessPathTy AccessPath, DeclName Name,

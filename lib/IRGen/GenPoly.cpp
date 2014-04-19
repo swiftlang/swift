@@ -430,7 +430,7 @@ struct EmbedsArchetype : DeclVisitor<EmbedsArchetype, bool>,
   }
   bool visitDecl(Decl *decl) { return false; }
 
-  bool visitMembers(ArrayRef<Decl*> members) {
+  bool visitMembers(DeclRange members) {
     for (auto member : members)
       if (visit(member))
         return true;

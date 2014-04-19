@@ -202,7 +202,7 @@ namespace {
     T &asDerived() { return *static_cast<T*>(this); }
 
     /// Visit the witnesses for the direct members of a protocol.
-    void visitMembers(ArrayRef<Decl*> members) {
+    void visitMembers(DeclRange members) {
       for (Decl *member : members) {
         visitMember(member);
       }

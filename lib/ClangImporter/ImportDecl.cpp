@@ -3161,7 +3161,7 @@ namespace {
         return;
 
       DeclContext *dc = classDecl;
-      auto inheritConstructors = [&](ArrayRef<Decl *> members,
+      auto inheritConstructors = [&](DeclRange members,
                                      Optional<CtorInitializerKind> kind) {
         for (auto member : members) {
           auto ctor = dyn_cast<ConstructorDecl>(member);
