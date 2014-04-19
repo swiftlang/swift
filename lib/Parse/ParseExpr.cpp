@@ -2114,6 +2114,15 @@ ParserResult<Expr> Parser::parseExprDictionary(SourceLoc LSquareLoc,
   if (FirstValue.isNonNull()) {
     // Add the first key/value pair.
     addKeyValuePair(FirstKey, FirstValue.get());
+  } else {
+    // If we failed to parse, recover by reading up to the matching closing
+    // bracket.
+    skipUntil(tok::r_square);
+    if (Tok.is(tok::r_square)) {
+      SourceLoc end = consumeToken();
+      return makeParserErrorResult<Expr>(
+                                   new (Context) ErrorExpr({LSquareLoc, end}));
+    }
   }
 
   consumeIf(tok::comma);
