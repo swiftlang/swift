@@ -553,6 +553,13 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
 }
 
 SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
+  // (load (upcast-ptr %x)) -> (upcast-ref (load %x))
+  if (auto *UI = dyn_cast<UpcastInst>(LI->getOperand())) {
+    SILValue NewLI = Builder->createLoad(LI->getLoc(), UI->getOperand());
+    return new (UI->getModule()) UpcastInst(LI->getLoc(), NewLI,
+                                            LI->getType());
+  }
+
   // Given a load with multiple struct_extracts/tuple_extracts and no other
   // uses, canonicalize the load into several (struct_element_addr (load))
   // pairs.

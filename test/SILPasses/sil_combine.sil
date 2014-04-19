@@ -971,3 +971,16 @@ bb0(%0 : $E):
   %3 = object_pointer_to_ref %2 : $Builtin.ObjectPointer to $E
   return %3 : $E
 }
+
+// (load (upcast-addr %x)) -> (upcast-ref (load %x))
+// CHECK-LABEL: sil @load_upcast_addr_to_upcast_ref_load_canonicalization : $@thin (@inout E) -> B {
+// CHECK: bb0
+// CHECK-NEXT: load
+// CHECK-NEXT: upcast
+// CHECK-NEXT: return
+sil @load_upcast_addr_to_upcast_ref_load_canonicalization : $@thin (@inout E) -> B {
+bb0(%0 : $*E):
+  %1 = upcast %0 : $*E to $*B
+  %2 = load %1 : $*B
+  return %2 : $B
+}
