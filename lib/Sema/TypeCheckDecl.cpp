@@ -29,6 +29,7 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/Twine.h"
+#include "swift/AST/NameLookup.h"
 using namespace swift;
 
 namespace {
@@ -1385,6 +1386,24 @@ static Expr *createPropertyLoadOrCallSuperclassGetter(VarDecl *VD,
 }
 
 
+/// Look up the NSCopying protocol from the Foundation module, if present.
+/// Otherwise return null.
+static ProtocolDecl *getNSCopyingProtocol(TypeChecker &TC,
+                                          DeclContext *DC) {
+
+  // Perform standard value name lookup.
+  UnqualifiedLookup Lookup(DeclName(TC.Context.getIdentifier("NSCopying")),
+                           DC, &TC, SourceLoc());
+
+  if (!Lookup.isSuccess() || Lookup.Results.size() != 1 ||
+      !Lookup.Results[0].hasValueDecl())
+    return nullptr;
+
+  return dyn_cast<ProtocolDecl>(Lookup.Results[0].getValueDecl());
+}
+
+
+
 /// Synthesize the code to store 'Val' to 'VD', given that VD has an @NSCopying
 /// attribute on it.  We know that VD is a stored property in a class, so we
 /// just need to generate something like "self.property = val.copyWithZone(nil)"
@@ -1401,6 +1420,15 @@ static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD,
   if (Type optionalEltTy = UnderlyingType->getAnyOptionalObjectType()) {
     UnderlyingType = optionalEltTy;
     isOptional = true;
+  }
+
+  // The element type must conform to NSCopying.  If not, emit an error and just
+  // recovery by synthesizing without the copy call.
+  auto *CopyingProto = getNSCopyingProtocol(TC, VD->getDeclContext());
+  if (!CopyingProto || !TC.conformsToProtocol(UnderlyingType, CopyingProto,
+                                              VD->getDeclContext())) {
+    TC.diagnose(VD->getLoc(), diag::nscopying_doesnt_conform);
+    return Val;
   }
 
   // If we have an optional type, we have to "?" the incoming value to only

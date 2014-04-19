@@ -46,6 +46,16 @@
   out, but only having one declaration syntax, which will be very
   close to this, is a known.
 
+* Stored properties can now be marked with the @NSCopying attribute, which
+  causes their setter to be synthesized with a copy to copyWithZone:.  This may
+  only be used with types that conform to the NSCopying protocol, or option
+  types thereof.  For example:
+  
+    @NSCopying var myURL : NSURL
+
+  This fills the same niche as the (copy) attribute on Objective-C properties.
+
+
 2014-04-16
 ----------
 

@@ -1,6 +1,10 @@
 typedef signed char BOOL;
 @class NSString;
 
+@protocol NSCopying
+- (id) copyWithZone: (void*)zone;
+@end
+
 @interface NSObject
 + (NSObject*) alloc;
 - (NSObject*) init;
@@ -13,7 +17,7 @@ typedef signed char BOOL;
 
 @end
 
-@interface NSString : NSObject
+@interface NSString : NSObject<NSCopying>
 
 - (NSString*)uppercaseString;
 - (id) copyWithZone: (void*)zone;

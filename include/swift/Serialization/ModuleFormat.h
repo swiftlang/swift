@@ -1100,7 +1100,7 @@ namespace index_block {
     RawOptionSet,
     Equatable,
     Hashable,
-    Comparable,
+    Comparable
   };
 
   using KnownProtocolLayout = BCGenericRecordLayout<

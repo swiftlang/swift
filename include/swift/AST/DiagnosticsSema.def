@@ -636,9 +636,10 @@ ERROR(nscopying_only_on_class_properties,sema_tcd,none,
 ERROR(nscopying_only_mutable,sema_tcd,none,
       "'NSCopying' attribute requires property to be mutable", ())
 ERROR(nscopying_only_stored_property,sema_tcd,none,
-      "'NSCopying' is only valid on stored properties", ())
-ERROR(nscopying_only_,sema_tcd,none,
-"'NSCopying' is only valid on stored properties", ())
+      "'NSCopying' attribute is only valid on stored properties", ())
+ERROR(nscopying_doesnt_conform,sema_tcd,none,
+      "'NSCopying' attribute is only valid with types that conform to"
+      " the NSCopying protocol", ())
 
 //------------------------------------------------------------------------------
 // Type Check Expressions
