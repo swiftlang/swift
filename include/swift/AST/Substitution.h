@@ -64,6 +64,7 @@ public:
   ArrayRef<ProtocolConformance *> Conformance;
 
   bool operator!=(const Substitution &Other) const;
+  bool operator==(const Substitution &Other) const;
   void print(llvm::raw_ostream &os) const;
   void dump() const;
   
