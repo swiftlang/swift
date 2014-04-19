@@ -499,7 +499,8 @@ public:
   /// If the record at the cursor is not a generic param list, returns null
   /// without moving the cursor.
   GenericParamList *maybeReadGenericParams(DeclContext *DC,
-                                           llvm::BitstreamCursor &Cursor);
+                                     llvm::BitstreamCursor &Cursor,
+                                     GenericParamList *outerParams = nullptr);
 
   virtual ArrayRef<Decl *> loadAllMembers(const Decl *D,
                                           uint64_t contextData) override;

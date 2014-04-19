@@ -700,7 +700,8 @@ ModuleFile::maybeGetOrReadGenericParams(serialization::DeclID genericContextID,
 }
 
 GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC,
-                                               llvm::BitstreamCursor &Cursor) {
+                                               llvm::BitstreamCursor &Cursor,
+                                               GenericParamList *outerParams) {
   using namespace decls_block;
 
   assert(DC && "need a context for the decls in the list");
@@ -855,7 +856,8 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC,
                                             params, SourceLoc(), requirements,
                                             SourceLoc());
   paramList->setAllArchetypes(getContext().AllocateCopy(archetypes));
-  paramList->setOuterParameters(DC->getGenericParamsOfContext());
+  paramList->setOuterParameters(outerParams ? outerParams :
+                                DC->getGenericParamsOfContext());
 
   return paramList;
 }

@@ -343,8 +343,7 @@ maybeReadGenericDeclContext(ModuleFile *MF, llvm::BitstreamCursor &Cursor) {
 
   uint64_t declID;
   SILGenericOuterParamsLayout::readRecord(scratch, declID);
-  // FIXME: this is correct but there are other issues need to be addressed.
-  // lastRecordOffset.reset();
+  lastRecordOffset.reset();
   return MF->getDeclContext((DeclID)declID);
 }
 
@@ -442,9 +441,19 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
 
   GenericParamList *contextParams = nullptr;
   if (!declarationOnly) {
-    DeclContext *outerParamContext = maybeReadGenericDeclContext(MF, SILCursor);
-    contextParams = MF->maybeReadGenericParams(outerParamContext,
-                                               SILCursor);
+    // We need to construct a linked list of GenericParamList. The outermost
+    // list appears first in the module file.
+    DeclContext *outerParamContext = MF->getAssociatedModule();
+    while(true) {
+      // Params' OuterParameters will point to contextParams.
+      auto *Params = MF->maybeReadGenericParams(outerParamContext,
+                                                SILCursor, contextParams);
+      if (!Params)
+        break;
+      // contextParams will point to the last deserialized list, which is the
+      // innermost one.
+      contextParams = Params;
+    }
   }
 
   // If the next entry is the end of the block, then this function has

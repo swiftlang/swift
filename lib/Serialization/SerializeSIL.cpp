@@ -215,16 +215,14 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   // Write the body's context archetypes, unless we don't actually have a body.
   if (!F.isExternalDeclaration()) {
     if (auto gp = F.getContextGenericParams()) {
-      // If we have outer parameters, first serialize the decl context of their
-      // parent.
-      if (GenericParamList *outerParams = gp->getOuterParameters()) {
-        DeclID D = S.addDeclRef(S.getGenericContext(outerParams));
-        unsigned abbrCode = SILAbbrCodes[SILGenericOuterParamsLayout::Code];
-        SILGenericOuterParamsLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                                D);
-      }
-
-      S.writeGenericParams(gp, SILAbbrCodes);
+      // To help deserializing the context generic params, we serialize the
+      // outer-most list first. In most cases, we do not have decls associated
+      // with these parameter lists, so serialize the lists directly.
+      std::vector<GenericParamList *> paramLists;
+      for (; gp; gp = gp->getOuterParameters())
+        paramLists.push_back(gp);
+      for (unsigned i = 0, e = paramLists.size(); i < e; i++)
+        S.writeGenericParams(paramLists.rbegin()[i], SILAbbrCodes);
     }
   }
 
