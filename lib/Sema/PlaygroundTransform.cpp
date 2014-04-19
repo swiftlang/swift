@@ -497,7 +497,7 @@ public:
         Name
       };
 
-    return buildLoggerCallWithArgs("playground_log", 
+    return buildLoggerCallWithArgs("$builtin_log", 
                                    MutableArrayRef<Expr *>(LoggerArgExprs),
                                    SR);
   }
@@ -511,8 +511,8 @@ public:
   }
 
   Expr *buildScopeCall(SourceRange SR, bool IsExit) {
-    const char *LoggerName = IsExit ? "playground_log_scope_exit"
-                                    : "playground_log_scope_entry";
+    const char *LoggerName = IsExit ? "$builtin_log_scope_exit"
+                                    : "$builtin_log_scope_entry";
 
     return buildLoggerCallWithArgs(LoggerName,
                                    MutableArrayRef<Expr *>(),
@@ -555,11 +555,13 @@ public:
     char *start_column_buf = (char*)Context.Allocate(buf_size, 1);
     char *end_column_buf = (char*)Context.Allocate(buf_size, 1);
 
+    const int LineOffset = 9;
+
     ::snprintf(start_line_buf, buf_size, "%d",
-               (StartLC.first < 5) ? 0 : (StartLC.first - 5));
+               (StartLC.first < LineOffset) ? 0 : (StartLC.first - LineOffset));
     ::snprintf(start_column_buf, buf_size, "%d", StartLC.second - 1);
     ::snprintf(end_line_buf, buf_size, "%d",
-               (EndLC.first < 5) ?  0 : (EndLC.first - 5));
+               (EndLC.first < LineOffset) ?  0 : (EndLC.first - LineOffset));
     ::snprintf(end_column_buf, buf_size, "%d", EndLC.second - 1);
 
     Expr *StartLine = new (Context) IntegerLiteralExpr(start_line_buf, 
@@ -590,7 +592,7 @@ public:
 
     UnresolvedDeclRefExpr *SendDataRef = 
       new (Context) UnresolvedDeclRefExpr(
-        Context.getIdentifier("DVTSendPlaygroundLogDataToHost"),
+        Context.getIdentifier("$builtin_send_data"),
         DeclRefKind::Ordinary,
         SourceLoc());
 
@@ -655,36 +657,10 @@ void swift::performPlaygroundTransform(SourceFile &SF) {
 
   if (FuncDecl *FuncToTransform = EF.getFunctionToTransform()) {
     if (BraceStmt *Body = FuncToTransform->getBody()) {
-      ASTContext &Context(SF.getASTContext());
-
-      Module *LoggerModule = Context.getModule(
-        std::make_pair(Context.getIdentifier("PlaygroundLogger"),
-                       SourceLoc()));
-
-      Module *CommModule = Context.getModule(
-        std::make_pair(Context.getIdentifier("DVTPlaygroundCommunication"),
-                       SourceLoc()));
-
-      if (LoggerModule && CommModule)
-      {
-        SmallVector<ValueDecl*, 1> Decls;
-
-        bool OK = true;
-
-        if (!moduleHasFunction(LoggerModule, "playground_log") ||
-            !moduleHasFunction(LoggerModule, "playground_log_scope_entry") ||
-            !moduleHasFunction(LoggerModule, "playground_log_scope_exit") ||
-            !moduleHasFunction(CommModule, "DVTSendPlaygroundLogDataToHost")) {
-          OK = false;
-        }
-
-        if (OK) {
-          Instrumenter I(Context, FuncToTransform);
-          BraceStmt *NewBody = I.transformBraceStmt(Body);
-          if (NewBody != Body) {
-            FuncToTransform->setBody(NewBody);
-          }
-        }
+      Instrumenter I(SF.getASTContext(), FuncToTransform);
+      BraceStmt *NewBody = I.transformBraceStmt(Body);
+      if (NewBody != Body) {
+        FuncToTransform->setBody(NewBody);
       }
     }
   }
