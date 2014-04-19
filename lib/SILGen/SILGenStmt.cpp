@@ -352,12 +352,12 @@ void SILGenFunction::visitWhileStmt(WhileStmt *S) {
         enterTrueConditionalBinding(*this, *CondBinding);
       
       visit(S->getBody());
-      if (B.hasValidInsertionPoint()) {
-        // Associate the loop body's closing brace with this branch.
-        RegularLocation L(S->getBody());
-        L.pointToEnd();
-        B.createBranch(L, LoopBB);
-      }
+    }
+    if (B.hasValidInsertionPoint()) {
+      // Associate the loop body's closing brace with this branch.
+      RegularLocation L(S->getBody());
+      L.pointToEnd();
+      B.createBranch(L, LoopBB);
     }
     Cond.exitTrue(B);
   }
