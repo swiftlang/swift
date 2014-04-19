@@ -493,6 +493,15 @@ protected:
     ExtensionDeclBitfields ExtensionDeclBits;
   };
 
+  // FIXME: Unused padding here.
+
+  /// The next declaration in the list of declarations within this
+  /// member context.
+  Decl *NextDecl = nullptr;
+  
+  friend class DeclIterator;
+  friend class IterableDeclContext;
+
 private:
   DeclContext *Context;
 
@@ -1286,23 +1295,18 @@ public:
   }
 };
 
-/// An iterator that walks through a list of declarations stored in the AST.
-typedef Decl *const *DeclIterator;
-
-/// The range of declarations within another declaration in the AST.
-typedef IteratorRange<DeclIterator> DeclRange;
 
 /// ExtensionDecl - This represents a type extension containing methods
 /// associated with the type.  This is not a ValueDecl and has no Type because
 /// there are no runtime values of the Extension's type.  
-class ExtensionDecl : public Decl, public DeclContext {
+class ExtensionDecl : public Decl, public DeclContext, 
+                      public IterableDeclContext {
   SourceLoc ExtensionLoc;  // Location of 'extension' keyword.
   SourceRange Braces;
 
   /// ExtendedType - The type being extended.
   TypeLoc ExtendedType;
   MutableArrayRef<TypeLoc> Inherited;
-  LazyLoaderArray<Decl*> Members;
 
   /// \brief The set of protocols to which this extension conforms.
   ArrayRef<ProtocolDecl *> Protocols;
@@ -1318,9 +1322,13 @@ class ExtensionDecl : public Decl, public DeclContext {
   llvm::PointerIntPair<ExtensionDecl *, 1, bool> NextExtension
     = {nullptr, false};
 
+  /// Note that we have added a member into the iterable declaration context.
+  void addedMember(Decl *member);
+
   friend class ExtensionIterator;
   friend class NominalTypeDecl;
   friend class MemberLookupTable;
+  friend class IterableDeclContext;
 
 public:
   using Decl::getASTContext;
@@ -1330,6 +1338,7 @@ public:
                 DeclContext *Parent)
     : Decl(DeclKind::Extension, Parent),
       DeclContext(DeclContextKind::ExtensionDecl, Parent),
+      IterableDeclContext(IterableDeclContextKind::ExtensionDecl),
       ExtensionLoc(ExtensionLoc),
       ExtendedType(ExtendedType), Inherited(Inherited)
   {
@@ -1343,6 +1352,7 @@ public:
   }
 
   SourceRange getBraces() const { return Braces; }
+  void setBraces(SourceRange braces) { Braces = braces; }
 
   Type getExtendedType() const { return ExtendedType.getType(); }
   TypeLoc &getExtendedTypeLoc() { return ExtendedType; }
@@ -1383,19 +1393,21 @@ public:
   void setConformanceLoader(LazyMemberLoader *resolver, uint64_t contextData);
 
   DeclRange getMembers(bool forceDelayedMembers = true) const;
-  void setMembers(ArrayRef<Decl*> M, SourceRange B);
   void setMemberLoader(LazyMemberLoader *resolver, uint64_t contextData);
   bool hasLazyMembers() const {
-    return Members.isLazy();
+    return IterableDeclContext::isLazy();
   }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Extension;
   }
-  template <typename ...T>
   static bool classof(const DeclContext *C) {
     return C->getContextKind() == DeclContextKind::ExtensionDecl;
+  }
+  static bool classof(const IterableDeclContext *C) {
+    return C->getIterableContextKind() 
+             == IterableDeclContextKind::ExtensionDecl;
   }
 
   using DeclContext::operator new;
@@ -2247,13 +2259,15 @@ typedef std::function<ProtocolDecl *()> DelayedProtocolDecl;
 
 /// NominalTypeDecl - a declaration of a nominal type, like a struct.  This
 /// decl is always a DeclContext.
-class NominalTypeDecl : public TypeDecl, public DeclContext {
+class NominalTypeDecl : public TypeDecl, public DeclContext,
+                        public IterableDeclContext {
   SourceRange Braces;
-  LazyLoaderArray<Decl*> Members;
   
   /// \brief The sets of implicit members and protocols added to imported enum
   /// types.  These members and protocols are added to the NominalDecl only if
   /// the nominal type is directly or indirectly referenced.
+  ///
+  /// FIXME: These should be side-table-allocated.
   ArrayRef<DelayedDecl> DelayedMembers;
   ArrayRef<DelayedProtocolDecl> DelayedProtocols;
   
@@ -2298,8 +2312,13 @@ class NominalTypeDecl : public TypeDecl, public DeclContext {
   /// Create a lookup table.
   void createLookupTable();
 
+  /// Note that we have added a member into the iterable declaration context,
+  /// so that it can also be added to the lookup table (if needed).
+  void addedMember(Decl *member);
+
   friend class MemberLookupTable;
   friend class ExtensionDecl;
+  friend class IterableDeclContext;
 
 protected:
   Type DeclaredTy;
@@ -2316,6 +2335,7 @@ protected:
                   GenericParamList *GenericParams) :
     TypeDecl(K, DC, name, NameLoc, inherited),
     DeclContext(DeclContextKind::NominalTypeDecl, DC),
+    IterableDeclContext(IterableDeclContextKind::NominalTypeDecl),
     GenericParams(nullptr), DeclaredTy(nullptr)
   {
     setGenericParams(GenericParams);
@@ -2330,10 +2350,12 @@ public:
 
   DeclRange getMembers(bool forceDelayedMembers = true) const;
   SourceRange getBraces() const { return Braces; }
-  void setMembers(ArrayRef<Decl*> M, SourceRange B);
+  
+  void setBraces(SourceRange braces) { Braces = braces; }
+
   void setMemberLoader(LazyMemberLoader *resolver, uint64_t contextData);
   bool hasLazyMembers() const {
-    return Members.isLazy();
+    return IterableDeclContext::isLazy();
   }
   
   /// \brief Returns true if this this decl contains delayed value or protocol
@@ -2469,9 +2491,8 @@ public:
     return StoredPropertyRange(getMembers(), ToStoredProperty());
   }
   
-  DeclRange getDerivedGlobalDecls() const { 
-  /// FIXME: This is an odd dance
-    return DeclRange(DerivedGlobalDecls.begin(), DerivedGlobalDecls.end()); 
+  ArrayRef<Decl *> getDerivedGlobalDecls() const { 
+    return DerivedGlobalDecls;
   }
 
   void setDerivedGlobalDecls(MutableArrayRef<Decl*> decls) {
@@ -2514,6 +2535,10 @@ public:
   }
   static bool classof(const DeclContext *C) {
     return C->getContextKind() == DeclContextKind::NominalTypeDecl;
+  }
+  static bool classof(const IterableDeclContext *C) {
+    return C->getIterableContextKind()
+             == IterableDeclContextKind::NominalTypeDecl;
   }
   static bool classof(const NominalTypeDecl *D) { return true; }
   static bool classof(const ExtensionDecl *D) { return false; }
@@ -2590,6 +2615,9 @@ public:
   static bool classof(const DeclContext *C) {
     return isa<NominalTypeDecl>(C) && classof(cast<NominalTypeDecl>(C));
   }
+  static bool classof(const IterableDeclContext *C) {
+    return isa<NominalTypeDecl>(C) && classof(cast<NominalTypeDecl>(C));
+  }
   
   /// Determine whether this enum declares a raw type in its inheritance clause.
   bool hasRawType() const { return (bool)RawType; }
@@ -2632,6 +2660,9 @@ public:
     return D->getKind() == DeclKind::Struct;
   }
   static bool classof(const DeclContext *C) {
+    return isa<NominalTypeDecl>(C) && classof(cast<NominalTypeDecl>(C));
+  }
+  static bool classof(const IterableDeclContext *C) {
     return isa<NominalTypeDecl>(C) && classof(cast<NominalTypeDecl>(C));
   }
 };
@@ -2729,6 +2760,9 @@ public:
   static bool classof(const DeclContext *C) {
     return isa<NominalTypeDecl>(C) && classof(cast<NominalTypeDecl>(C));
   }
+  static bool classof(const IterableDeclContext *C) {
+    return isa<NominalTypeDecl>(C) && classof(cast<NominalTypeDecl>(C));
+  }
 };
 
 
@@ -2747,10 +2781,6 @@ public:
                Identifier Name, MutableArrayRef<TypeLoc> Inherited);
   
   using Decl::getASTContext;
-
-  void setMembers(MutableArrayRef<Decl *> M, SourceRange B) {
-    NominalTypeDecl::setMembers(M, B);
-  }
 
   /// \brief Determine whether this protocol inherits from the given ("super")
   /// protocol.
@@ -2847,6 +2877,9 @@ public:
     return D->getKind() == DeclKind::Protocol;
   }
   static bool classof(const DeclContext *C) {
+    return isa<NominalTypeDecl>(C) && classof(cast<NominalTypeDecl>(C));
+  }
+  static bool classof(const IterableDeclContext *C) {
     return isa<NominalTypeDecl>(C) && classof(cast<NominalTypeDecl>(C));
   }
 };
@@ -4278,6 +4311,11 @@ inline MutableArrayRef<Pattern *> AbstractFunctionDecl::getBodyParamBuffer() {
     break;
   }
   return MutableArrayRef<Pattern *>(Ptr, NumPatterns);
+}
+
+inline DeclIterator &DeclIterator::operator++() {
+  Current = Current->NextDecl;
+  return *this;
 }
 
 } // end namespace swift

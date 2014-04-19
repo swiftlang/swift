@@ -27,18 +27,6 @@
 using namespace swift;
 using namespace DerivedConformance;
 
-void DerivedConformance::_insertMemberDecl(NominalTypeDecl *scope, Decl *member)
-{
-  auto oldMembers = scope->getMembers();
-  auto oldSize = std::distance(oldMembers.begin(), oldMembers.end());
-  auto newMembers = scope->getASTContext().Allocate<Decl*>(oldSize + 1);
-
-  std::move(oldMembers.begin(), oldMembers.end(), newMembers.begin());
-  newMembers[oldSize] = member;
-  
-  scope->setMembers(newMembers, scope->getBraces());
-}
-
 void DerivedConformance::_insertOperatorDecl(NominalTypeDecl *scope,
                                              Decl *member) {
   // Find the module.
@@ -98,7 +86,8 @@ static TypeDecl *deriveRawRepresentable_RawType(TypeChecker &tc,
   rawTypeDecl->setImplicit();
   rawTypeDecl->setType(rawType);
   rawTypeDecl->setInterfaceType(rawInterfaceType);
-  return insertMemberDecl(enumDecl, rawTypeDecl);
+  enumDecl->addMember(rawTypeDecl);
+  return rawTypeDecl;
 }
 
 static void deriveBodyRawRepresentable_toRaw(AbstractFunctionDecl *toRawDecl) {
@@ -218,7 +207,8 @@ static FuncDecl *deriveRawRepresentable_toRaw(TypeChecker &tc,
   if (enumDecl->hasClangNode())
     tc.implicitlyDefinedFunctions.push_back(toRawDecl);
 
-  return insertMemberDecl(enumDecl, toRawDecl);
+  enumDecl->addMember(toRawDecl);
+  return toRawDecl;
 }
 
 static void
@@ -395,7 +385,8 @@ static FuncDecl *deriveRawRepresentable_fromRaw(TypeChecker &tc,
   if (enumDecl->hasClangNode())
     tc.implicitlyDefinedFunctions.push_back(fromRawDecl);
 
-  return insertMemberDecl(enumDecl, fromRawDecl);
+  enumDecl->addMember(fromRawDecl);
+  return fromRawDecl;
 }
 
 ValueDecl *DerivedConformance::deriveRawRepresentable(TypeChecker &tc,

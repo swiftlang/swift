@@ -15,9 +15,17 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/SourceManager.h"
+#include "llvm/ADT/Statistic.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SaveAndRestore.h"
 using namespace swift;
+
+#define DEBUG_TYPE "Name lookup"
+
+STATISTIC(NumLazyIterableDeclContexts,
+          "# of serialized iterable declaration contexts");
+STATISTIC(NumUnloadedLazyIterableDeclContexts,
+          "# of serialized iterable declaration contexts never loaded");
 
 CanType DeclContext::getExtendedType(const ExtensionDecl *ED) {
   CanType ExtendedTy = ED->getExtendedType()->getCanonicalType();
@@ -418,5 +426,97 @@ unsigned DeclContext::printContext(raw_ostream &OS) const {
 
   OS << "\n";
   return Depth + 1;
+}
+
+DeclRange IterableDeclContext::getMembers() const {
+  loadAllMembers();
+
+  return DeclRange(FirstDecl, nullptr);
+}
+
+/// Add a member to this context.
+void IterableDeclContext::addMember(Decl *member) {
+  // Make sure we've loaded any existing members.
+  loadAllMembers();
+
+  // Add the member to the list of declarations without notification.
+  addMemberSilently(member);
+
+  // Notify our parent declaration that we have added the member, which can
+  // be used to update the lookup tables.
+  // FIXME: If only we had the notion of a "searchable" declaration
+  // context...
+  switch (getIterableContextKind()) {
+  case IterableDeclContextKind::NominalTypeDecl: {
+    auto nominal = cast<NominalTypeDecl>(this);
+    nominal->addedMember(member);
+    if (member->getDeclContext() != nominal) {
+      member->dump();
+      nominal->dump();
+    }
+
+    assert(member->getDeclContext() == nominal &&
+           "Added member to the wrong context");
+    break;
+  }
+
+  case IterableDeclContextKind::ExtensionDecl: {
+    auto ext = cast<ExtensionDecl>(this);
+    ext->addedMember(member);
+    assert(member->getDeclContext() == ext &&
+           "Added member to the wrong context");
+    break;
+  }
+  }
+}
+
+void IterableDeclContext::addMemberSilently(Decl *member) const {
+  assert(!member->NextDecl && "Already added to a container");
+  if (auto last = LastDeclAndKind.getPointer()) {
+    last->NextDecl = member;
+  } else {
+    FirstDecl = member;
+  }
+  LastDeclAndKind.setPointer(member);
+}
+
+void IterableDeclContext::setLoader(LazyMemberLoader *loader, 
+                                    uint64_t contextData) {
+  LazyLoader = loader;
+  LazyLoaderContextData = contextData;
+
+  ++NumLazyIterableDeclContexts;
+  ++NumUnloadedLazyIterableDeclContexts;
+}
+
+void IterableDeclContext::loadAllMembers() const {
+  if (!isLazy())
+    return;
+
+  // For now, we can't load members if other members have already been
+  // added. This isn't hard to support, but we don't need it yet.
+  assert(FirstDecl == nullptr && "Already added members");
+
+  // Don't try to load all members re-entrant-ly.
+  auto resolver = getLoader();
+  auto contextData = getLoaderContextData();
+  LazyLoader = nullptr;
+
+  const Decl *container = nullptr;
+  switch (getIterableContextKind()) {
+  case IterableDeclContextKind::NominalTypeDecl:
+    container = cast<NominalTypeDecl>(this);
+    break;
+
+  case IterableDeclContextKind::ExtensionDecl:
+    container = cast<ExtensionDecl>(this);
+    break;
+  }
+
+  for (auto member : resolver->loadAllMembers(container, contextData)) {
+    const_cast<IterableDeclContext *>(this)->addMember(member);
+  }
+
+  --NumUnloadedLazyIterableDeclContexts;
 }
 

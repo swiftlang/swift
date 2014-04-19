@@ -1078,10 +1078,9 @@ namespace {
         auto constructor = createValueConstructor(structDecl, varDecl);
 
         // Set the members of the struct.
-        Decl *members[3] = { constructor, patternBinding, var };
-        structDecl->setMembers(
-          Impl.SwiftContext.AllocateCopy(ArrayRef<Decl *>(members, 3)),
-          SourceRange());
+        structDecl->addMember(constructor);
+        structDecl->addMember(patternBinding);
+        structDecl->addMember(var);
 
         result = structDecl;
         break;
@@ -1188,16 +1187,10 @@ namespace {
                                                               delayedMembers));
         
         // Set the members of the struct.
-        Decl *members[] = {
-          defaultConstructor,
-          valueConstructor,
-          patternBinding,
-          var
-        };
-        structDecl->setMembers(
-          Impl.SwiftContext.AllocateCopy(members),
-          SourceRange());
-
+        structDecl->addMember(defaultConstructor);
+        structDecl->addMember(valueConstructor);
+        structDecl->addMember(patternBinding); 
+        structDecl->addMember(var);
         result = structDecl;
         computeEnumCommonWordPrefix(decl, name);
 
@@ -1209,7 +1202,6 @@ namespace {
 
       // Import each of the enumerators.
       
-      SmallVector<Decl *, 4> enumeratorDecls;
       bool addEnumeratorsAsMembers;
       switch (enumKind) {
       case EnumKind::Constants:
@@ -1219,9 +1211,6 @@ namespace {
       case EnumKind::Options:
       case EnumKind::Enum:
         addEnumeratorsAsMembers = true;
-        // Do not force the creation of the implicit members just yet.
-        enumeratorDecls.append(result->getMembers(false).begin(),
-                               result->getMembers(false).end());
         break;
       }
       
@@ -1244,17 +1233,10 @@ namespace {
         if (!enumeratorDecl)
           continue;
 
-        enumeratorDecls.push_back(enumeratorDecl);
+        if (addEnumeratorsAsMembers)
+          result->addMember(enumeratorDecl);
       }
 
-      // FIXME: Source range isn't totally accurate because Clang lacks the
-      // location of the '{'.
-      if (addEnumeratorsAsMembers) {
-        result->setMembers(Impl.SwiftContext.AllocateCopy(enumeratorDecls),
-                           Impl.importSourceRange({ decl->getLocation(),
-                                                    decl->getRBraceLoc() }));
-      }
-      
       // Add the type decl to ExternalDefinitions so that we can type-check
       // raw values and IRGen can emit metadata for it.
       // FIXME: There might be better ways to do this.
@@ -1337,18 +1319,15 @@ namespace {
             continue;
 
         auto member = Impl.importDecl(nd);
-        if (!member)
+        if (!member || !isa<VarDecl>(member))
           continue;
 
         members.push_back(member);
       }
 
-      // FIXME: Source range isn't totally accurate because Clang lacks the
-      // location of the '{'.
-      result->setMembers(Impl.SwiftContext.AllocateCopy(members),
-                         Impl.importSourceRange(clang::SourceRange(
-                                                  decl->getLocation(),
-                                                  decl->getRBraceLoc())));
+      for (auto member : members) {
+        result->addMember(member);
+      }
       
       // Add the struct decl to ExternalDefinitions so that IRGen can emit
       // metadata for it.
@@ -2583,7 +2562,7 @@ namespace {
       // Check whether we've already created a subscript operation for
       // this getter/setter pair.
       if (auto subscript = Impl.Subscripts[{getter, setter}])
-        return subscript;
+        return subscript->getDeclContext() == dc? subscript : nullptr;
 
       // Compute the element type, looking through the implicit 'self'
       // parameter and the normal function parameters.
@@ -2636,7 +2615,7 @@ namespace {
           // Check whether we've already created a subscript operation for
           // this getter.
           if (auto subscript = Impl.Subscripts[{getter, nullptr}])
-            return subscript;
+            return subscript->getDeclContext() == dc? subscript : nullptr;
         }
       }
 
@@ -4037,6 +4016,7 @@ DeclContext *ClangImporter::Implementation::importDeclContextImpl(
 DeclContext *
 ClangImporter::Implementation::importDeclContextOf(const clang::Decl *D) {
   const clang::DeclContext *DC = D->getDeclContext();
+
   if (DC->isTranslationUnit()) {
     if (auto *M = getClangModuleForDecl(D))
       return M;
@@ -4283,9 +4263,9 @@ ClangImporter::Implementation::loadAllMembers(const Decl *D, uint64_t unused) {
     inits.push_back(ctor);
   }
 
+  llvm::SmallPtrSet<Decl *, 4> redundantMembers;
   if (anyDuplicates) {
     // Next, find any redundant initializers.
-    llvm::SmallPtrSet<Decl *, 4> redundantInitializers;
     for (const auto &colliding : AllInitializers) {
       if (colliding.second.size() == 1)
         continue;
@@ -4302,14 +4282,14 @@ ClangImporter::Implementation::loadAllMembers(const Decl *D, uint64_t unused) {
       for (auto ctor : colliding.second) {
         auto kind = ctor->getInitKind();
         if (static_cast<unsigned>(kind) > static_cast<unsigned>(bestKind))
-          redundantInitializers.insert(ctor);
+          redundantMembers.insert(ctor);
       }
     }
 
     // Remove the redundant initializers.
     members.erase(std::remove_if(members.begin(), members.end(),
                                  [&](Decl *decl) -> bool {
-                                   return redundantInitializers.count(decl) > 0;
+                                   return redundantMembers.count(decl) > 0;
                                  }),
                   members.end());
   }

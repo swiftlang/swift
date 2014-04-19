@@ -56,21 +56,9 @@ ValueDecl *deriveHashable(TypeChecker &tc,
                           NominalTypeDecl *type,
                           ValueDecl *requirement);
   
-/// Insert a declaration as a member of a nominal type. The declaration is
-/// added to the end of the members list.
-void _insertMemberDecl(NominalTypeDecl *scope, Decl *member);
-  
 /// Insert an operator declaration associated with a nominal type. The
 /// declaration is added at global scope
 void _insertOperatorDecl(NominalTypeDecl *scope, Decl *member);
-  
-/// Insert a declaration as a member of a nominal type. The declaration is
-/// added to the end of the members list and returned.
-template<typename SomeDecl>
-inline SomeDecl *insertMemberDecl(NominalTypeDecl *scope, SomeDecl *member) {
-  ::swift::DerivedConformance::_insertMemberDecl(scope, member);
-  return member;
-}
   
 /// Insert a declaration as a member of a nominal type. The declaration is
 /// added at file scope as close as possible to the 

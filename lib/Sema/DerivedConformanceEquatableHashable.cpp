@@ -429,7 +429,8 @@ deriveHashable_enum_hashValue(TypeChecker &tc, EnumDecl *enumDecl) {
   if (enumDecl->hasClangNode())
     tc.implicitlyDefinedFunctions.push_back(hashValueDecl);
   
-  return insertMemberDecl(enumDecl, hashValueDecl);
+  enumDecl->addMember(hashValueDecl);
+  return hashValueDecl;
 }
 
 ValueDecl *DerivedConformance::deriveHashable(TypeChecker &tc,

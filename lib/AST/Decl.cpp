@@ -661,12 +661,19 @@ loadAllConformances(const T *container,
   const_cast<T *>(container)->setConformances(conformances);
 }
 
-ArrayRef<ProtocolConformance*> NominalTypeDecl::getConformances() const {
-  loadAllConformances(this, Conformances);
-  return Conformances.getArray();
+DeclRange NominalTypeDecl::getMembers(bool forceDelayedMembers) const {
+  loadAllMembers();
+  if (forceDelayedMembers)
+    const_cast<NominalTypeDecl*>(this)->forceDelayedMemberDecls();
+  return IterableDeclContext::getMembers();
 }
 
-ArrayRef<ProtocolConformance*> ExtensionDecl::getConformances() const {
+void NominalTypeDecl::setMemberLoader(LazyMemberLoader *resolver,
+                                      uint64_t contextData) {
+  IterableDeclContext::setLoader(resolver, contextData);
+}
+
+ArrayRef<ProtocolConformance*> NominalTypeDecl::getConformances() const {
   loadAllConformances(this, Conformances);
   return Conformances.getArray();
 }
@@ -678,13 +685,27 @@ void NominalTypeDecl::setConformanceLoader(LazyMemberLoader *resolver,
   Conformances.setLoader(resolver, contextData);
 }
 
+DeclRange ExtensionDecl::getMembers(bool forceDelayedMembers) const {
+  loadAllMembers();
+  return IterableDeclContext::getMembers();
+}
+
+void ExtensionDecl::setMemberLoader(LazyMemberLoader *resolver,
+                                    uint64_t contextData) {
+  IterableDeclContext::setLoader(resolver, contextData);
+}
+
+ArrayRef<ProtocolConformance*> ExtensionDecl::getConformances() const {
+  loadAllConformances(this, Conformances);
+  return Conformances.getArray();
+}
+
 void ExtensionDecl::setConformanceLoader(LazyMemberLoader *resolver,
                                          uint64_t contextData) {
   assert(!Conformances.isLazy() && "already have a resolver");
   assert(Conformances.getArray().empty() && "already have conformances");
   Conformances.setLoader(resolver, contextData);
 }
-
 
 GenericParamList *ExtensionDecl::getGenericParams() const {
   auto extendedType = getExtendedType();

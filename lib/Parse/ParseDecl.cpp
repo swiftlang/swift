@@ -1575,10 +1575,9 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
       Status.setIsParseError();
   }
 
-  if (MemberDecls.empty())
-    ED->setMembers({}, { LBLoc, RBLoc });
-  else
-    ED->setMembers(Context.AllocateCopy(MemberDecls), { LBLoc, RBLoc });
+  ED->setBraces({LBLoc, RBLoc});
+  for (auto member : MemberDecls)
+    ED->addMember(member);
 
   if (!(Flags & PD_AllowTopLevel)) {
     diagnose(ExtensionLoc, diag::decl_inner_scope);
@@ -2848,10 +2847,10 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
       Status.setIsParseError();
   }
 
-  if (MemberDecls.empty())
-    UD->setMembers({}, { LBLoc, RBLoc });
-  else
-    UD->setMembers(Context.AllocateCopy(MemberDecls), { LBLoc, RBLoc });
+  UD->setBraces({LBLoc, RBLoc});
+  for (auto member : MemberDecls)
+    UD->addMember(member);
+
   addToScope(UD);
 
   if (Flags & PD_DisallowNominalTypes) {
@@ -3101,10 +3100,10 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
       Status.setIsParseError();
   }
 
-  if (MemberDecls.empty())
-    SD->setMembers({}, { LBLoc, RBLoc });
-  else
-    SD->setMembers(Context.AllocateCopy(MemberDecls), { LBLoc, RBLoc });
+  SD->setBraces({LBLoc, RBLoc});
+  for (auto member : MemberDecls)
+    SD->addMember(member);
+
   addToScope(SD);
 
   if (Flags & PD_DisallowNominalTypes) {
@@ -3181,7 +3180,10 @@ ParserResult<ClassDecl> Parser::parseDeclClass(ParseDeclOptions Flags,
       Status.setIsParseError();
   }
 
-  CD->setMembers(Context.AllocateCopy(MemberDecls), { LBLoc, RBLoc });
+  CD->setBraces({LBLoc, RBLoc});
+  for (auto member : MemberDecls)
+    CD->addMember(member);
+
   addToScope(CD);
 
   if (Flags & PD_DisallowNominalTypes) {
@@ -3262,7 +3264,9 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     }
 
     // Install the protocol elements.
-    Proto->setMembers(Context.AllocateCopy(Members), { LBraceLoc, RBraceLoc });
+    Proto->setBraces({LBraceLoc, RBraceLoc});
+    for (auto member : Members)
+      Proto->addMember(member);
   }
   
   if (Flags & PD_DisallowNominalTypes) {

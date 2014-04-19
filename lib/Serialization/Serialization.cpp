@@ -2676,7 +2676,8 @@ writeKnownProtocolList(const index_block::KnownProtocolLayout &AdopterList,
 ///
 /// Recursively walks the members and derived global decls of any nested
 /// nominal types.
-static void addOperatorsAndTopLevel(Serializer &S, DeclRange members,
+template<typename Range>
+static void addOperatorsAndTopLevel(Serializer &S, Range members,
                                     Serializer::DeclTable &operatorMethodDecls,
                                     Serializer::DeclTable &topLevelDecls,
                                     bool isDerivedTopLevel) {

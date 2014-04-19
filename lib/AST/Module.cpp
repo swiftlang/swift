@@ -113,7 +113,8 @@ class SourceFile::LookupCache {
   DeclMap TopLevelValues;
   DeclMap ClassMembers;
   bool MemberCachePopulated = false;
-  void doPopulateCache(DeclRange decls, bool onlyOperators);
+  template<typename Range>
+  void doPopulateCache(Range decls, bool onlyOperators);
   void addToMemberCache(DeclRange decls);
   void populateMemberCache(const SourceFile &SF);
 public:
@@ -149,7 +150,8 @@ SourceLookupCache &SourceFile::getCache() const {
   return *Cache;
 }
 
-void SourceLookupCache::doPopulateCache(DeclRange decls,
+template<typename Range>
+void SourceLookupCache::doPopulateCache(Range decls,
                                         bool onlyOperators) {
   for (Decl *D : decls) {
     if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
@@ -192,16 +194,7 @@ void SourceLookupCache::addToMemberCache(DeclRange decls) {
 
 /// Populate our cache on the first name lookup.
 SourceLookupCache::LookupCache(const SourceFile &SF) {
-  // FIXME: Ugly hack because we're using a vector to store the
-  // declarations. Eww.
-  DeclIterator first = nullptr;
-  DeclIterator last = nullptr;
-  if (!SF.Decls.empty()) {
-    first = &SF.Decls[0];
-    last = first + SF.Decls.size();
-  }
-    
-  doPopulateCache(DeclRange(first, last), false);
+  doPopulateCache(llvm::makeArrayRef(SF.Decls), false);
 }
 
 void SourceLookupCache::lookupValue(AccessPathTy AccessPath, DeclName Name,

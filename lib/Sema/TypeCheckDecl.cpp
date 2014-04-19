@@ -161,40 +161,6 @@ public:
   
 } // end llvm namespace
 
-/// Append the new set of members to the nominal declaration.
-static void appendMembers(NominalTypeDecl *nominal,
-                          ArrayRef<Decl *> newMembers) {
-  if (newMembers.empty())
-    return;
-
-  auto members = nominal->getMembers();
-  unsigned numMembers = std::distance(members.begin(), members.end());
-  auto &ctx = nominal->getASTContext();
-  MutableArrayRef<Decl *> newMembersCopy
-    = ctx.Allocate<Decl*>(numMembers + newMembers.size());
-  std::copy(members.begin(), members.end(), newMembersCopy.begin());
-  std::copy(newMembers.begin(), newMembers.end(),
-            newMembersCopy.begin() + numMembers);
-  nominal->setMembers(newMembersCopy, nominal->getBraces());
-}
-
-/// Append the new set of members to the extension declaration.
-static void appendMembers(ExtensionDecl *extension,
-                          ArrayRef<Decl *> newMembers) {
-  if (newMembers.empty())
-    return;
-
-  auto members = extension->getMembers();
-  unsigned numMembers = std::distance(members.begin(), members.end());
-  auto &ctx = extension->getASTContext();
-  MutableArrayRef<Decl *> newMembersCopy
-  = ctx.Allocate<Decl*>(numMembers + newMembers.size());
-  std::copy(members.begin(), members.end(), newMembersCopy.begin());
-  std::copy(newMembers.begin(), newMembers.end(),
-            newMembersCopy.begin() + numMembers);
-  extension->setMembers(newMembersCopy, extension->getBraces());
-}
-
 /// Determine whether the given declaration can inherit a class.
 static bool canInheritClass(Decl *decl) {
   // Classes can inherit from a class.
@@ -1353,7 +1319,7 @@ static void convertStoredVarInProtocolToComputed(VarDecl *VD, TypeChecker &TC) {
   // We've added some members to our containing class, add them to the members
   // list.
   ProtocolDecl *PD = cast<ProtocolDecl>(VD->getDeclContext());
-  appendMembers(PD, Get);
+  PD->addMember(Get);
 }
 
 
@@ -1566,30 +1532,17 @@ static void addAccessorsToStoredVar(VarDecl *VD, TypeChecker &TC) {
   // Okay, we have both the getter and setter.  Set them in VD.
   VD->makeStoredWithTrivialAccessors(Get, Set);
   
-  
-  // We've added some members to our containing class, add them to the members
-  // list.
-  if (auto *CD = dyn_cast<ClassDecl>(VD->getDeclContext())) {
-    SmallVector<Decl*, 2> newMembers;
-    newMembers.push_back(Get);
-    if (Set) newMembers.push_back(Set);
-    appendMembers(CD, newMembers);
+  // We've added some members to our containing type, add them to the
+  // members list.
+  if (auto ext = dyn_cast<ExtensionDecl>(VD->getDeclContext())) {
+    ext->addMember(Get);
+    if (Set) ext->addMember(Set);
     return;
   }
-  
-  if (auto *ED = dyn_cast<ExtensionDecl>(VD->getDeclContext())) {
-    SmallVector<Decl *, 2> newMembers;
-    newMembers.push_back(Get);
-    if (Set) newMembers.push_back(Set);
-    appendMembers(ED, newMembers);
-    return;
-  }
-  
-  auto *SD = cast<StructDecl>(VD->getDeclContext());
-  SmallVector<Decl*, 2> newMembers;
-  newMembers.push_back(Get);
-  if (Set) newMembers.push_back(Set);
-  appendMembers(SD, newMembers);
+
+  auto nominal = cast<NominalTypeDecl>(VD->getDeclContext());
+  nominal->addMember(Get);
+  if (Set) nominal->addMember(Set);
 }
 
 
@@ -1838,7 +1791,6 @@ public:
 
   template<typename DeclType>
   void checkExplicitConformance(DeclType *D, Type T) {
-    assert(isa<NominalTypeDecl>(D) || isa<ExtensionDecl>(D));
     SmallVector<ProtocolConformance *, 4> conformances;
     // Don't force delayed protocols to be created if they haven't already been
     // resolved.
@@ -2656,7 +2608,6 @@ public:
         }
         
         bool diagnosed = false;
-        llvm::SmallVector<Decl *, 2> synthesizedCtors;
         for (auto superclassMember : TC.lookupConstructors(superclassTy, CD)) {
           // We only care about required or designated initializers.
           auto superclassCtor = cast<ConstructorDecl>(superclassMember);
@@ -2710,13 +2661,10 @@ public:
                             designatedInitKind::Stub)) {
             assert(ctor->getOverriddenDecl() == superclassCtor && 
                    "Not an override?");
-            synthesizedCtors.push_back(ctor);
+            CD->addMember(ctor);
             visit(ctor);
           }
         }
-
-        // If we synthesized any initializers, add them.
-        appendMembers(CD, synthesizedCtors);
       }
     }
     if (!IsFirstPass) {
@@ -4927,7 +4875,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
     // Create the implicit memberwise constructor.
     auto ctor = createImplicitConstructor(*this, decl,
                                           ImplicitConstructorKind::Memberwise);
-    appendMembers(decl, ctor);
+    decl->addMember(ctor);
 
     // If we found a stored property, add a default constructor.
     if (FoundInstanceVar && !FoundUninitializedVars)
@@ -4950,7 +4898,6 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
     }
 
     auto superclassTy = classDecl->getSuperclass();
-    SmallVector<Decl *, 4> newInits;
     for (auto member : lookupConstructors(superclassTy, classDecl)) {
       auto superclassCtor = dyn_cast<ConstructorDecl>(member);
       if (!superclassCtor || !superclassCtor->isDesignatedInit()
@@ -4961,11 +4908,10 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
       if (auto ctor = createdesignatedInitOverride(
                         *this, classDecl, superclassCtor,
                         designatedInitKind::Chaining)) {
-        newInits.push_back(ctor);
+        classDecl->addMember(ctor);
       }
     }
 
-    appendMembers(classDecl, newInits);
     return;
   }
 
@@ -5005,8 +4951,7 @@ void TypeChecker::addImplicitDestructor(ClassDecl *CD) {
 
   // Create an empty body for the destructor.
   DD->setBody(BraceStmt::create(Context, CD->getLoc(), { }, CD->getLoc()));
-
-  appendMembers(CD, DD);
+  CD->addMember(DD);
 }
 
 void TypeChecker::addImplicitStructConformances(StructDecl *SD) {
@@ -5133,7 +5078,7 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
                 *this, decl, ImplicitConstructorKind::Default);
 
   // Add the constructor.
-  appendMembers(decl, ctor);
+  decl->addMember(ctor);
 
   // Create an empty body for the default constructor. The type-check of the
   // constructor body will introduce default initializations of the members.

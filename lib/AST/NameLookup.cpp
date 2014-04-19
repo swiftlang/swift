@@ -24,16 +24,7 @@
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/STLExtras.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/TinyPtrVector.h"
-
-#define DEBUG_TYPE "Name lookup"
-
-STATISTIC(NumLazyMembers,
-          "# of serialized member contexts");
-STATISTIC(NumUnloadedLazyMembers,
-          "# of serialized member contexts never loaded");
-namespace swift { class ClassMemberLookupTable; }
 
 using namespace swift;
 
@@ -646,6 +637,9 @@ public:
   /// Update a lookup table with members from newly-added extensions.
   void updateLookupTable(NominalTypeDecl *nominal);
 
+  /// \brief Add the given member to the lookup tabke.
+  void addMember(Decl *members);
+
   /// \brief Add the given members to the lookup table.
   void addMembers(DeclRange members);
 
@@ -707,20 +701,24 @@ MemberLookupTable::MemberLookupTable(NominalTypeDecl *nominal) {
   updateLookupTable(nominal);
 }
 
+void MemberLookupTable::addMember(Decl *member) {
+  // Only value declarations matter.
+  auto vd = dyn_cast<ValueDecl>(member);
+  if (!vd)
+    return;
+
+  // Unnamed entities cannot be found by name lookup.
+  if (!vd->hasName())
+    return;
+
+  // Add this declaration to the lookup set under its compound name and simple
+  // name.
+  vd->getFullName().addToLookupTable(Lookup, vd);
+}
+
 void MemberLookupTable::addMembers(DeclRange members) {
   for (auto member : members) {
-    // Only value declarations matter.
-    auto vd = dyn_cast<ValueDecl>(member);
-    if (!vd)
-      continue;
-
-    // Unnamed entities cannot be found by name lookup.
-    if (!vd->hasName())
-      continue;
-
-    // Add this declaration to the lookup set under its compound name and simple
-    // name.
-    vd->getFullName().addToLookupTable(Lookup, vd);
+    addMember(member);
   }
 }
 
@@ -764,96 +762,17 @@ void MemberLookupTable::destroy() {
   this->~MemberLookupTable();
 }
 
-template <typename T>
-static void loadAllMembers(const T *container,
-                           const LazyLoaderArray<Decl*> &memberLoaderInfo) {
-  if (!memberLoaderInfo.isLazy())
-    return;
-
-  // Don't try to load all members re-entrant-ly.
-  auto resolver = memberLoaderInfo.getLoader();
-  auto contextData = memberLoaderInfo.getLoaderContextData();
-  const_cast<LazyLoaderArray<Decl*> &>(memberLoaderInfo) = {};
-
-  auto members = resolver->loadAllMembers(container, contextData);
-  const_cast<T *>(container)->setMembers(members, {});
-
-  --NumUnloadedLazyMembers;
-}
-
-DeclRange NominalTypeDecl::getMembers(bool forceDelayedMembers) const {
-  loadAllMembers(this, Members);
-  if (forceDelayedMembers)
-    const_cast<NominalTypeDecl*>(this)->forceDelayedMemberDecls();
-  return DeclRange(Members.getArray().begin(), Members.getArray().end());
-}
-
-DeclRange ExtensionDecl::getMembers(bool forceDelayedMembers) const {
-  loadAllMembers(this, Members);
-  return DeclRange(Members.getArray().begin(), Members.getArray().end());
-}
-
-void NominalTypeDecl::setMembers(ArrayRef<Decl*> M, SourceRange B) {
-  // If we have already constructed a lookup table and we are adding members,
-  // add them to the lookup table.
-  size_t oldSize = Members.getArray().size();
-  if (LookupTable && (M.size() > oldSize)) {
-    // Make sure we have the complete list of extensions.
-    (void)getExtensions();
-
-    auto slice = M.slice(oldSize);
-    LookupTable->addMembers(DeclRange(slice.begin(), slice.end()));
-  }
-
-  assert(Members.getArray().equals(M.slice(0, oldSize)) &&
-         "newly-added members are not at the end of the array");
-
-  Members = M;
-  Braces = B;
-}
-
-void ExtensionDecl::setMembers(ArrayRef<Decl*> M, SourceRange B) {
-  // If this is a resolved extension and we're adding members to it,
-  // we may have to update the extended type's lookup table.
-  size_t oldSize = Members.getArray().size();
-  if (NextExtension.getInt() && M.size() > oldSize) {
-    auto nominal = getExtendedType()->getAnyNominal();
-    if (nominal->LookupTable) {
-      // Make sure we have the complete list of extensions.
-      (void)nominal->getExtensions();
-
-      auto slice = M.slice(oldSize);
-      nominal->LookupTable->addExtensionMembers(nominal, this,
-                                                DeclRange(slice.begin(), 
-                                                            slice.end()));
-    }
-  }
-
-  assert(Members.getArray().equals(M.slice(0, oldSize)) &&
-         "newly-added members are not at the end of the array");
-
-  Members = M;
-  Braces = B;
-}
-
 void NominalTypeDecl::forceDelayedMemberDecls() {
   if (!hasDelayedMemberDecls())
     return;
-  
-  SmallVector<Decl *, 4> members;
-  members.append(Members.getArray().begin(), Members.getArray().end());
 
-  for (auto delayedDeclCreator : DelayedMembers) {
-    members.push_back(delayedDeclCreator());
-  }
-  
-  // Copy over the members.  There's no need to create a new block, since
-  // these are all implicit.
-  Members = getASTContext().AllocateCopy(members);
-  
-  // Set the delayed members list to empty so we don't attempt to re-force it
-  // later.
+  // Grab the delayed members and then empty the list so we don't recurse.
+  auto delayedMembers = DelayedMembers;
   DelayedMembers = {};
+
+  for (auto delayedDeclCreator : delayedMembers) {
+    addMember(delayedDeclCreator());
+  }
 }
 
 void NominalTypeDecl::forceDelayedProtocolDecls() {
@@ -888,22 +807,25 @@ NominalTypeDecl::getProtocols(bool forceDelayedMembers) const {
   return Protocols;
 }
 
-void NominalTypeDecl::setMemberLoader(LazyMemberLoader *resolver,
-                                      uint64_t contextData) {
-  assert(!Members.isLazy() && "already have a resolver");
-  assert(Members.getArray().empty() && "already have members");
-  Members.setLoader(resolver, contextData);
-  ++NumLazyMembers;
-  ++NumUnloadedLazyMembers;
+void NominalTypeDecl::addedMember(Decl *member) {
+  // If we have a lookup table, add the new member to it.
+  if (LookupTable) {
+    LookupTable->addMember(member);
+  }
 }
 
-void ExtensionDecl::setMemberLoader(LazyMemberLoader *resolver,
-                                    uint64_t contextData) {
-  assert(!Members.isLazy() && "already have a resolver");
-  assert(Members.getArray().empty() && "already have members");
-  Members.setLoader(resolver, contextData);
-  ++NumLazyMembers;
-  ++NumUnloadedLazyMembers;
+void ExtensionDecl::addedMember(Decl *member) {
+  if (NextExtension.getInt()) {
+    auto nominal = getExtendedType()->getAnyNominal();
+    if (nominal->LookupTable) {
+      // Make sure we have the complete list of extensions.
+      // FIXME: This is completely unnecessary. We want to determine whether
+      // our own extension has already been included in the lookup table.
+      (void)nominal->getExtensions();
+
+      nominal->LookupTable->addMember(member);
+    }
+  }
 }
 
 // Create the lookup table.

@@ -21,6 +21,7 @@
 
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/STLExtras.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/PointerUnion.h"
 
@@ -29,10 +30,12 @@ namespace swift {
   class ASTContext;
   class ASTWalker;
   class CanType;
+  class Decl;
   class DeclContext;
   class ExtensionDecl;
   class GenericParamList;
   class LazyResolver;
+  class LazyMemberLoader;
   class GenericSignature;
   class GenericTypeParamType;
   class Requirement;
@@ -271,6 +274,119 @@ public:
   // Only allow allocation of DeclContext using the allocator in ASTContext.
   void *operator new(size_t Bytes, ASTContext &C,
                      unsigned Alignment = alignof(DeclContext));
+};
+
+/// An iterator that walks through a list of declarations stored
+/// within some iterable declaration context.
+class DeclIterator {
+  Decl *Current;
+
+public: 
+  typedef std::forward_iterator_tag iterator_category;
+  typedef Decl *value_type;
+  typedef Decl *reference;
+  typedef Decl *pointer; // Non-standard but convenient
+  typedef std::ptrdiff_t difference_type;
+
+  DeclIterator(Decl *current = nullptr) : Current(current) { }
+
+  reference operator*() const { return Current; }
+  pointer operator->() const { return Current; }
+
+  DeclIterator &operator++();
+
+  DeclIterator operator++(int) {
+    DeclIterator old = *this;
+    ++*this;
+    return old;
+  }
+
+  friend bool operator==(DeclIterator lhs, DeclIterator rhs) {
+    return lhs.Current == rhs.Current; 
+  }
+
+  friend bool operator!=(DeclIterator lhs, DeclIterator rhs) {
+    return !(lhs == rhs);
+  }
+};
+
+/// The range of declarations stored within an iterable declaration
+/// context.
+typedef IteratorRange<DeclIterator> DeclRange;
+
+/// The kind of an \c IterableDeclContext.
+enum class IterableDeclContextKind : uint8_t {  
+  NominalTypeDecl,
+  ExtensionDecl,
+};
+
+/// A declaration context that tracks the declarations it (directly)
+/// owns and permits iteration over them.
+///
+/// Note that an iterable declaration context must inherit from both
+/// \c IterableDeclContext and \c DeclContext.
+class IterableDeclContext {
+  /// The first declaration in this context.
+  mutable Decl *FirstDecl = nullptr;
+
+  /// The last declaration in this context, used for efficient insertion,
+  /// along with the kind of iterable declaration context.
+  mutable llvm::PointerIntPair<Decl *, 2, IterableDeclContextKind> 
+    LastDeclAndKind;
+
+  /// Lazy member loader, if any.
+  ///
+  /// FIXME: Can we collapse this storage into something?
+  mutable LazyMemberLoader *LazyLoader = nullptr;
+
+  /// Lazy member loader context data.
+  uint64_t LazyLoaderContextData = 0;
+
+public:
+  IterableDeclContext(IterableDeclContextKind kind)
+    : LastDeclAndKind(nullptr, kind) { }
+
+  /// Determine the kind of iterable context we have.
+  IterableDeclContextKind getIterableContextKind() const {
+    return LastDeclAndKind.getInt();
+  }
+
+  /// Retrieve the set of members in this context.
+  DeclRange getMembers() const;
+
+  /// Add a member to this context.
+  void addMember(Decl *member);
+
+  /// Retrieve the lazy member loader.
+  LazyMemberLoader *getLoader() const {
+    assert(isLazy());
+    return LazyLoader;
+  }
+
+  /// Retrieve the context data for the lazy member loader.
+  uint64_t getLoaderContextData() const {
+    assert(isLazy());
+    return LazyLoaderContextData;
+  }
+
+  /// Check whether there are lazily-loaded members.
+  bool isLazy() const {
+    return LazyLoader != nullptr;
+  }  
+
+  /// Set the loader for lazily-loaded members.
+  void setLoader(LazyMemberLoader *loader, uint64_t contextData);
+
+  /// Load all of the members of this context.
+  void loadAllMembers() const;
+
+private:
+  /// Add a member to the list for iteration purposes, but do not notify the
+  /// subclass that we have done so.
+  ///
+  /// This is used internally when loading members, because loading a
+  /// member is an invisible addition.
+  void addMemberSilently(Decl *member) const;
 };
   
 } // end namespace swift
