@@ -199,12 +199,14 @@ public:
   using internal_key_type = StringRef;
   using external_key_type = Identifier;
   using data_type = SmallVector<std::pair<uint8_t, DeclID>, 8>;
+  using hash_value_type = uint32_t;
+  using offset_type = unsigned;
 
   internal_key_type GetInternalKey(external_key_type ID) {
     return ID.str();
   }
 
-  uint32_t ComputeHash(internal_key_type key) {
+  hash_value_type ComputeHash(internal_key_type key) {
     return llvm::HashString(key);
   }
 
@@ -376,6 +378,8 @@ public:
   using internal_key_type = StringRef;
   using external_key_type = StringRef;
   using data_type = BriefAndRawComment;
+  using hash_value_type = uint32_t;
+  using offset_type = unsigned;
 
   DeclCommentTableInfo(ModuleFile &F) : F(F) {}
 
@@ -383,7 +387,7 @@ public:
     return key;
   }
 
-  uint32_t ComputeHash(internal_key_type key) {
+  hash_value_type ComputeHash(internal_key_type key) {
     assert(!key.empty());
     return llvm::HashString(key);
   }
