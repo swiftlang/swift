@@ -1,0 +1,23 @@
+from Foundation import *
+
+class Node:
+  def __init__(self, next, data):
+    self.next = next
+    self.data = data
+
+print "Creating list"
+head = Node(None, 0)
+for i in range(1000000):
+  head = Node(head , i)
+
+start = NSProcessInfo.processInfo().systemUptime() * 1e9
+
+print "Summing list"
+sum = 0
+while(head.next):
+  sum += head.data
+  head = head.next
+
+end = NSProcessInfo.processInfo().systemUptime() * 1e9
+print "Sum = %d" % sum
+print "%f ns" % int(end - start)
