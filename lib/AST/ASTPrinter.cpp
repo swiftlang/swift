@@ -863,7 +863,7 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
 }
 
 void PrintAST::visitParamDecl(ParamDecl *decl) {
-  llvm_unreachable("Always handled as part of a parameter list");
+  return visitVarDecl(decl);
 }
 
 void PrintAST::printOneParameter(Identifier ArgName,
