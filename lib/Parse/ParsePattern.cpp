@@ -275,6 +275,11 @@ static ParserResult<Pattern> parseArgument(
   Parser::StructureMarkerRAII ParsingArgument(P, P.Tok);
   SourceLoc LPLoc = P.consumeToken(tok::l_paren);
 
+  // FIXME: Hack to treat arguments as parameters when building
+  // binding patterns.
+  llvm::SaveAndRestore<bool> savedArgumentIsParameter(P.ArgumentIsParameter,
+                                                      true);
+
   // Decide if this is a singular unnamed argument (e.g. "foo(Int)" or if
   // it is a standard tuple body pattern (e.g. "foo(x : Int)").  The former is
   // shorthand where the elements get the name of the selector chunk.  The
@@ -1013,8 +1018,14 @@ bool Parser::isAtStartOfBindingName() {
 
 Pattern *Parser::createBindingFromPattern(SourceLoc loc, Identifier name,
                                           bool isLet) {
-  auto *var = new (Context) VarDecl(/*static*/ false, /*IsLet*/ isLet,
-                                    loc, name, Type(), CurDeclContext);
+  VarDecl *var;
+  if (ArgumentIsParameter) {
+    var = new (Context) ParamDecl(isLet, loc, name, loc, name, Type(),
+                                  CurDeclContext);
+  } else {
+    var = new (Context) VarDecl(/*static*/ false, /*IsLet*/ isLet,
+                                loc, name, Type(), CurDeclContext);
+  }
   return new (Context) NamedPattern(var);
 }
 

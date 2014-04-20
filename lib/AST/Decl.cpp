@@ -246,6 +246,12 @@ DeclContext *Decl::getInnermostDeclContext() {
 
 }
 
+void Decl::setDeclContext(DeclContext *DC) { 
+  assert((isa<ParamDecl>(this) || isa<GenericTypeParamDecl>(this)) &&
+         "Only function and generic parameters can have their contexts set");
+  Context = DC; 
+}
+
 Module *Decl::getModuleContext() const {
   return getDeclContext()->getParentModule();
 }
@@ -2188,6 +2194,7 @@ AbstractFunctionDecl *AbstractFunctionDecl::getOverriddenDecl() const {
 static void setDeclContextOfPatternVars(Pattern *P, DeclContext *DC) {
   if (!P) return;
   P->forEachVariable([&](VarDecl *VD) {
+    assert(isa<ParamDecl>(VD) && "Pattern variable is not a parameter?");
     VD->setDeclContext(DC);
   });
 }

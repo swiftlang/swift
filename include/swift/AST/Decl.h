@@ -542,7 +542,7 @@ public:
   static StringRef getDescriptiveKindName(DescriptiveDeclKind K);
 
   DeclContext *getDeclContext() const { return Context; }
-  void setDeclContext(DeclContext *DC) { Context = DC; }
+  void setDeclContext(DeclContext *DC);
 
   /// Retrieve the innermost declaration context corresponding to this
   /// declaration, which will either be the declaration itself (if it's

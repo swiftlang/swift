@@ -92,6 +92,10 @@ public:
 
   bool GreaterThanIsOperator = true;
 
+  /// FIXME: Temporary hack to keep the selector-style declaration
+  /// syntax working.
+  bool ArgumentIsParameter = false;
+
   LocalContext *CurLocalContext = nullptr;
 
   DelayedParsingCallbacks *DelayedParseCB = nullptr;
