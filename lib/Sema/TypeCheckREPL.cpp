@@ -565,10 +565,10 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
     return;
   
   // Build function of type T->() which prints the operand.
-  VarDecl *Arg = new (Context) VarDecl(/*static*/ false, /*IsLet*/false,
-                                       Loc,
-                                       Context.getIdentifier("arg"),
-                                       E->getType(), /*DC*/ nullptr);
+  VarDecl *Arg = new (Context) ParamDecl(/*isLet=*/true,
+                                         Loc, Context.getIdentifier("arg"),
+                                         Loc, Context.getIdentifier("arg"),
+                                         E->getType(), /*DC*/ nullptr);
   Pattern *ParamPat = new (Context) NamedPattern(Arg);
   ParamPat = new (Context) TypedPattern(ParamPat,
                                         TypeLoc::withoutLoc(Arg->getType()));
