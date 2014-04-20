@@ -670,9 +670,11 @@ Type ClangImporter::Implementation::importFunctionType(
       bodyPattern = new (SwiftContext) AnyPattern(SourceLoc());
     } else {
       auto bodyVar
-        = new (SwiftContext) VarDecl(/*static*/ false, /*IsLet*/ false,
-                                     importSourceLoc(param->getLocation()),
-                                     bodyName, swiftParamTy, firstClangModule);
+        = new (SwiftContext) ParamDecl(/*IsLet*/ true,
+                                       SourceLoc(), name,
+                                       importSourceLoc(param->getLocation()),
+                                       bodyName, swiftParamTy, 
+                                       firstClangModule);
       bodyVar->setClangNode(param);
       bodyPattern = new (SwiftContext) NamedPattern(bodyVar);
     }
@@ -682,33 +684,6 @@ Type ClangImporter::Implementation::importFunctionType(
                                         TypeLoc::withoutLoc(swiftParamTy));
     bodyPattern->setType(swiftParamTy);
     bodyPatternElts.push_back(TuplePatternElt(bodyPattern));
-
-    // Compute the pattern to put into the argument list, which may be
-    // different (when there is a selector involved).
-    Pattern *argPattern = bodyPattern;
-    if (bodyName != name) {
-      if (name.empty()) {
-        argPattern = new (SwiftContext) AnyPattern(SourceLoc(),
-                                                   /*Implicit=*/true);
-      } else {
-        auto argVar = new (SwiftContext) VarDecl(/*static*/ false,
-                                                 /*IsLet*/ false,
-                                                 SourceLoc(), name,
-                                                 swiftParamTy,
-                                                 firstClangModule);
-        argVar->setImplicit();
-        argVar->setClangNode(param);
-        argPattern = new (SwiftContext) NamedPattern(argVar);
-      }
-      argPattern->setType(swiftParamTy);
-
-      argPattern
-        = new (SwiftContext) TypedPattern(argPattern,
-                                          TypeLoc::withoutLoc(swiftParamTy),
-                                          /*Implicit=*/true);
-      argPattern->setType(swiftParamTy);
-    }
-    argPatternElts.push_back(TuplePatternElt(argPattern));
     
     // Add the tuple elements for the function types.
     swiftArgParams.push_back(TupleTypeElt(swiftParamTy, name));
@@ -752,7 +727,6 @@ Type ClangImporter::Implementation::importMethodType(
   // Import the parameters.
   SmallVector<TupleTypeElt, 4> swiftArgParams;
   SmallVector<TupleTypeElt, 4> swiftBodyParams;
-  SmallVector<TuplePatternElt, 4> argPatternElts;
   SmallVector<TuplePatternElt, 4> bodyPatternElts;
   auto argNames = methodName.getArgumentNames();
   unsigned index = 0;
@@ -789,9 +763,10 @@ Type ClangImporter::Implementation::importMethodType(
       bodyPattern = new (SwiftContext) AnyPattern(SourceLoc());
     } else {
       auto bodyVar
-        = new (SwiftContext) VarDecl(/*static*/ false, /*IsLet*/ false,
-                                     importSourceLoc(param->getLocation()),
-                                     bodyName, swiftParamTy, firstClangModule);
+        = new (SwiftContext) ParamDecl(/*IsLet*/ true, SourceLoc(), name,
+                                       importSourceLoc(param->getLocation()),
+                                       bodyName, swiftParamTy, 
+                                       firstClangModule);
       bodyVar->setClangNode(param);
       bodyPattern = new (SwiftContext) NamedPattern(bodyVar);
     }
@@ -802,33 +777,6 @@ Type ClangImporter::Implementation::importMethodType(
     bodyPattern->setType(swiftParamTy);
     bodyPatternElts.push_back(TuplePatternElt(bodyPattern));
 
-    // Compute the pattern to put into the argument list, which may be
-    // different (when there is a selector involved).
-    Pattern *argPattern = bodyPattern;
-    if (bodyName != name) {
-      if (name.empty()) {
-        argPattern = new (SwiftContext) AnyPattern(SourceLoc(),
-                                                   /*Implicit=*/true);
-      } else {
-        auto argVar = new (SwiftContext) VarDecl(/*static*/ false,
-                                                 /*IsLet*/ false,
-                                                 SourceLoc(), name,
-                                                 swiftParamTy,
-                                                 firstClangModule);
-        argVar->setImplicit();
-        argVar->setClangNode(param);
-        argPattern = new (SwiftContext) NamedPattern(argVar);
-      }
-      argPattern->setType(swiftParamTy);
-
-      argPattern
-        = new (SwiftContext) TypedPattern(argPattern,
-                                          TypeLoc::withoutLoc(swiftParamTy),
-                                          /*Implicit=*/true);
-      argPattern->setType(swiftParamTy);
-    }
-    argPatternElts.push_back(TuplePatternElt(argPattern));
-    
     // Add the tuple elements for the function types.
     swiftArgParams.push_back(TupleTypeElt(swiftParamTy, name));
     swiftBodyParams.push_back(TupleTypeElt(swiftParamTy, bodyName));
@@ -841,17 +789,16 @@ Type ClangImporter::Implementation::importMethodType(
       argNames.size() == 1) {
     auto argName = argNames[0];
     auto type = TupleType::getEmpty(SwiftContext);
-    auto var = new (SwiftContext) VarDecl(/*static*/ false,
-                                          /*IsLet*/ true,
-                                          SourceLoc(), argName, type,
-                                          firstClangModule);
+    auto var = new (SwiftContext) ParamDecl(/*IsLet*/ true,
+                                            SourceLoc(), argName,
+                                            SourceLoc(), argName, type,
+                                            firstClangModule);
     Pattern *pattern = new (SwiftContext) NamedPattern(var);
     pattern->setType(type);
     pattern = new (SwiftContext) TypedPattern(pattern,
                                               TypeLoc::withoutLoc(type));
     pattern->setType(type);
     
-    argPatternElts.push_back(TuplePatternElt(pattern));
     bodyPatternElts.push_back(TuplePatternElt(pattern));
     swiftArgParams.push_back(TupleTypeElt(type, argName));
     swiftBodyParams.push_back(TupleTypeElt(type, argName));
