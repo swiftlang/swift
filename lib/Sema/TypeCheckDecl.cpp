@@ -1225,8 +1225,8 @@ static void validatePatternBindingDecl(TypeChecker &tc,
 /// \brief Build an implicit 'self' parameter for the specified DeclContext.
 static Pattern *buildImplicitSelfParameter(SourceLoc Loc, DeclContext *DC) {
   ASTContext &Ctx = DC->getASTContext();
-  auto *SelfDecl = new (Ctx) VarDecl(/*static*/ false, /*IsLet*/ true,
-                                     Loc, Ctx.Id_self, Type(), DC);
+  auto *SelfDecl = new (Ctx) ParamDecl(/*IsLet*/ true, Loc, Identifier(),
+                                       Loc, Ctx.Id_self, Type(), DC);
   SelfDecl->setImplicit();
   Pattern *P = new (Ctx) NamedPattern(SelfDecl, /*Implicit=*/true);
   return new (Ctx) TypedPattern(P, TypeLoc());
@@ -1236,9 +1236,11 @@ static Pattern *buildSetterValueArgumentPattern(VarDecl *VD,
                                                 VarDecl **ValueDecl,
                                                 TypeChecker &TC) {
   auto &Context = VD->getASTContext();
-  auto *Arg = new (Context) VarDecl(/*static*/false, /*IsLet*/true,
-                                    VD->getLoc(),Context.getIdentifier("value"),
-                                    Type(), VD->getDeclContext());
+  auto *Arg = new (Context) ParamDecl(/*IsLet*/true,
+                                      SourceLoc(), Identifier(),
+                                      VD->getLoc(),
+                                      Context.getIdentifier("value"),
+                                      Type(), VD->getDeclContext());
   *ValueDecl = Arg;
   Arg->setImplicit();
 
@@ -1604,9 +1606,10 @@ static void synthesizeObservingAccessors(VarDecl *VD, TypeChecker &TC) {
     Expr *OldValueExpr
       = createPropertyLoadOrCallSuperclassGetter(VD, SelfDecl);
     
-    OldValue = new (Ctx) VarDecl(/*static*/ false, /*isLet*/ true,
-                                 SourceLoc(), Ctx.getIdentifier("tmp"),
-                                 Type(), Set);
+    OldValue = new (Ctx) ParamDecl(/*isLet*/ true,
+                                   SourceLoc(), Identifier(),
+                                   SourceLoc(), Ctx.getIdentifier("tmp"),
+                                   Type(), Set);
     OldValue->setImplicit();
     auto *tmpPattern = new (Ctx) NamedPattern(OldValue, /*implicit*/ true);
     auto tmpPBD = new (Ctx) PatternBindingDecl(SourceLoc(),
@@ -4349,8 +4352,8 @@ static ConstructorDecl *createImplicitConstructor(TypeChecker &tc,
       auto varType = tc.getTypeOfRValue(var);
 
       // Create the parameter.
-      auto *arg = new (context) VarDecl(/*static*/false, /*IsLet*/true,
-                                        Loc, var->getName(), varType, decl);
+      auto *arg = new (context) ParamDecl(/*IsLet*/true, Loc, var->getName(),
+                                          Loc, var->getName(), varType, decl);
       argNames.push_back(var->getName());
       Pattern *pattern = new (context) NamedPattern(arg);
       TypeLoc tyLoc = TypeLoc::withoutLoc(varType);
@@ -4536,9 +4539,10 @@ createdesignatedInitOverride(TypeChecker &tc,
   auto &ctx = tc.Context;
 
   // Create the 'self' declaration and patterns.
-  auto *selfDecl = new (ctx) VarDecl(/*static*/ false, /*IsLet*/ true,
-                                     SourceLoc(), ctx.Id_self,
-                                     Type(), classDecl);
+  auto *selfDecl = new (ctx) ParamDecl(/*IsLet*/ true,
+                                       SourceLoc(), Identifier(),
+                                       SourceLoc(), ctx.Id_self,
+                                       Type(), classDecl);
   selfDecl->setImplicit();
   Pattern *selfBodyPattern 
     = new (ctx) NamedPattern(selfDecl, /*Implicit=*/true);

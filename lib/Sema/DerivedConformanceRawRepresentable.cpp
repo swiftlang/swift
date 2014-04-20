@@ -159,11 +159,13 @@ static FuncDecl *deriveRawRepresentable_toRaw(TypeChecker &tc,
                                                       rawInterfaceType);
   Type enumType = enumDecl->getDeclaredTypeInContext();
   
-  VarDecl *selfDecl = new (C) VarDecl(/*static*/ false, /*IsLet*/true,
-                                      SourceLoc(),
-                                      C.Id_self,
-                                      enumType,
-                                      enumDecl);
+  VarDecl *selfDecl = new (C) ParamDecl(/*IsLet*/true,
+                                        SourceLoc(),
+                                        Identifier(),
+                                        SourceLoc(),
+                                        C.Id_self,
+                                        enumType,
+                                        enumDecl);
   selfDecl->setImplicit();
   Pattern *selfParam = new (C) NamedPattern(selfDecl, /*implicit*/ true);
   selfParam->setType(enumType);
@@ -320,11 +322,13 @@ static FuncDecl *deriveRawRepresentable_fromRaw(TypeChecker &tc,
   Type enumType = enumDecl->getDeclaredTypeInContext();
   Type enumMetaType = MetatypeType::get(enumType);
 
-  VarDecl *selfDecl = new (C) VarDecl(/*static*/ false, /*IsVal*/true,
-                                      SourceLoc(),
-                                      C.Id_self,
-                                      enumMetaType,
-                                      enumDecl);
+  VarDecl *selfDecl = new (C) ParamDecl(/*IsVal*/true,
+                                        SourceLoc(),
+                                        Identifier(),
+                                        SourceLoc(),
+                                        C.Id_self,
+                                        enumMetaType,
+                                        enumDecl);
   selfDecl->setImplicit();
   Pattern *selfParam = new (C) NamedPattern(selfDecl, /*implicit*/ true);
   selfParam->setType(enumMetaType);
@@ -333,11 +337,13 @@ static FuncDecl *deriveRawRepresentable_fromRaw(TypeChecker &tc,
   selfParam->setType(enumMetaType);
   selfParam->setImplicit();
 
-  VarDecl *rawDecl = new (C) VarDecl(/*static*/ false, /*IsVal*/true,
-                                     SourceLoc(),
-                                     C.Id_raw,
-                                     rawType,
-                                     enumDecl);
+  VarDecl *rawDecl = new (C) ParamDecl(/*IsVal*/true,
+                                       SourceLoc(),
+                                       C.Id_raw,
+                                       SourceLoc(),
+                                       C.Id_raw,
+                                       rawType,
+                                       enumDecl);
   rawDecl->setImplicit();
   Pattern *rawParam = new (C) NamedPattern(rawDecl, /*implicit*/ true);
   rawParam->setType(rawType);

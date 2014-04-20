@@ -1469,6 +1469,7 @@ bool Parser::parseClosureSignatureIfPresent(Pattern *&params,
   bool invalid = false;
   if (Tok.is(tok::l_paren)) {
     // Parse the pattern-tuple.
+    // FIXME: Parse as function arguments.
     auto pattern = parsePatternTuple(/*IsLet*/ true, /*IsArgList*/true,
                                      /*DefaultArgs=*/nullptr);
     if (pattern.isNonNull())
@@ -1480,11 +1481,11 @@ bool Parser::parseClosureSignatureIfPresent(Pattern *&params,
     SmallVector<TuplePatternElt, 4> elements;
     do {
       if (Tok.is(tok::identifier)) {
-        auto var = new (Context) VarDecl(/*static*/ false,
-                                         /*IsLet*/ true,
-                                         Tok.getLoc(),
-                                         Context.getIdentifier(Tok.getText()),
-                                         Type(), nullptr);
+        auto var = new (Context) ParamDecl(/*IsLet*/ true,
+                                           SourceLoc(), Identifier(),
+                                           Tok.getLoc(),
+                                           Context.getIdentifier(Tok.getText()),
+                                           Type(), nullptr);
         elements.push_back(TuplePatternElt(new (Context) NamedPattern(var)));
         consumeToken();
       } else if (Tok.is(tok::kw__)) {
@@ -1691,9 +1692,9 @@ Expr *Parser::parseExprAnonClosureArg() {
     StringRef varName = ("$" + Twine(nextIdx)).toStringRef(StrBuf);
     Identifier ident = Context.getIdentifier(varName);
     SourceLoc varLoc = Loc;
-    VarDecl *var = new (Context) VarDecl(/*static*/ false,
-                                         /*IsLet*/ true,
-                                         varLoc, ident, Type(), closure);
+    VarDecl *var = new (Context) ParamDecl(/*IsLet*/ true,
+                                           SourceLoc(), Identifier(),
+                                           varLoc, ident, Type(), closure);
     decls.push_back(var);
   }
 

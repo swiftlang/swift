@@ -84,8 +84,9 @@ static VarDecl *createSelfDecl(DeclContext *DC, bool isStaticMethod) {
   if (auto *ND = selfType->getAnyNominal())
     isLet = !isa<StructDecl>(ND) && !isa<EnumDecl>(ND);
 
-  VarDecl *selfDecl = new (C) VarDecl(/*static*/ false, /*IsLet*/isLet,
-                                      SourceLoc(), C.Id_self, selfType, DC);
+  VarDecl *selfDecl = new (C) ParamDecl(/*IsLet*/isLet, SourceLoc(), 
+                                        Identifier(), SourceLoc(), C.Id_self, 
+                                        selfType, DC);
   selfDecl->setImplicit();
   return selfDecl;
 }
@@ -411,14 +412,14 @@ static FuncDecl *makeOptionSetFactoryMethod(
   
   VarDecl *selfDecl = createSelfDecl(optionSetDecl, true);
   Pattern *selfParam = createTypedNamedPattern(selfDecl);
-  VarDecl *rawDecl = new (C) VarDecl(/*static*/ false, /*IsLet*/true,
-                                     SourceLoc(), C.getIdentifier("raw"),
-                                     Type(), optionSetDecl);
+  VarDecl *rawDecl = new (C) ParamDecl(/*IsLet*/true,
+                                       SourceLoc(), C.Id_raw,
+                                       SourceLoc(), C.Id_raw,
+                                       Type(), optionSetDecl);
   rawDecl->setImplicit();
   rawDecl->setType(rawType);
   Pattern *rawParam = createTypedNamedPattern(rawDecl);
-  auto rawArgType = TupleType::get(TupleTypeElt(rawType,
-                                                C.getIdentifier("raw")), C);
+  auto rawArgType = TupleType::get(TupleTypeElt(rawType, C.Id_raw), C);
   rawParam = TuplePattern::create(C, SourceLoc(),
                                   TuplePatternElt(rawParam), SourceLoc());
   rawParam->setImplicit();
@@ -823,9 +824,10 @@ namespace {
           if (!var->hasStorage())
             continue;
           
-          auto param = new (context) VarDecl(/*static*/ false, /*IsLet*/ true,
-                                             SourceLoc(), var->getName(),
-                                             var->getType(), structDecl);
+          auto param = new (context) ParamDecl(/*IsLet*/ true,
+                                               SourceLoc(), var->getName(),
+                                               SourceLoc(), var->getName(),
+                                               var->getType(), structDecl);
           argNames.push_back(var->getName());
           params.push_back(param);
           Pattern *pattern = createTypedNamedPattern(param);

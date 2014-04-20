@@ -162,11 +162,13 @@ deriveEquatable_enum_eq(TypeChecker &tc, EnumDecl *enumDecl) {
   auto enumTy = enumDecl->getDeclaredTypeInContext();
   
   auto getParamPattern = [&](StringRef s) -> std::pair<VarDecl*, Pattern*> {
-    VarDecl *aDecl = new (C) VarDecl(/*static*/ false, /*isLet*/ true,
-                                     SourceLoc(),
-                                     C.getIdentifier(s),
-                                     enumTy,
-                                     enumDecl);
+    VarDecl *aDecl = new (C) ParamDecl(/*isLet*/ true,
+                                       SourceLoc(),
+                                       C.getIdentifier(s),
+                                       SourceLoc(),
+                                       C.getIdentifier(s),
+                                       enumTy,
+                                       enumDecl);
     aDecl->setImplicit();
     Pattern *aParam = new (C) NamedPattern(aDecl, /*implicit*/ true);
     aParam->setType(enumTy);
@@ -272,10 +274,12 @@ deriveBodyHashable_enum_hashValue(AbstractFunctionDecl *hashValueDecl) {
   auto enumType = enumDecl->getDeclaredTypeInContext();
   Type intType = C.getIntDecl()->getDeclaredType();
 
-  auto indexVar = new (C) VarDecl(/*static*/false, /*let*/false,
-                                  SourceLoc(),
-                                  C.getIdentifier("index"),
-                                  intType, hashValueDecl);
+  auto indexVar = new (C) ParamDecl(/*let*/false,
+                                    SourceLoc(),
+                                    C.getIdentifier("index"),
+                                    SourceLoc(),
+                                    C.getIdentifier("index"),
+                                    intType, hashValueDecl);
   indexVar->setImplicit();
   
   Pattern *indexPat = new (C) NamedPattern(indexVar, /*implicit*/ true);
@@ -381,11 +385,13 @@ deriveHashable_enum_hashValue(TypeChecker &tc, EnumDecl *enumDecl) {
     return nullptr;
   }
   
-  VarDecl *selfDecl = new (C) VarDecl(/*static*/ false, /*IsLet*/true,
-                                    SourceLoc(),
-                                    C.Id_self,
-                                    enumType,
-                                    enumDecl);
+  VarDecl *selfDecl = new (C) ParamDecl(/*IsLet*/true,
+                                        SourceLoc(),
+                                        Identifier(),
+                                        SourceLoc(),
+                                        C.Id_self,
+                                        enumType,
+                                        enumDecl);
   selfDecl->setImplicit();
   Pattern *selfParam = new (C) NamedPattern(selfDecl, /*implicit*/ true);
   selfParam->setType(enumType);

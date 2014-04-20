@@ -1853,9 +1853,10 @@ parseOptionalAccessorArgument(SourceLoc SpecifierLoc, TypeLoc ElementTy,
     StartLoc = SourceLoc();
   }
 
-  VarDecl *Value = new (Context) VarDecl(/*static*/false, /*IsLet*/true,
-                                         NameLoc, Name,
-                                         Type(), P.CurDeclContext);
+  VarDecl *Value = new (Context) ParamDecl(/*IsLet*/true,
+                                           NameLoc, Name,
+                                           NameLoc, Name,
+                                           Type(), P.CurDeclContext);
   if (IsNameImplicit)
     Value->setImplicit();
   auto *namedPat = new (Context) NamedPattern(Value, IsNameImplicit);
