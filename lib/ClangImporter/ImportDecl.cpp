@@ -460,8 +460,6 @@ static FuncDecl *makeOptionSetFactoryMethod(
   
   factoryDecl->setStatic();
   factoryDecl->setImplicit();
-  selfDecl->setDeclContext(factoryDecl);
-  rawDecl->setDeclContext(factoryDecl);
   
   Type factoryType = FunctionType::get(rawArgType, retType);
   factoryType = FunctionType::get(selfDecl->getType(), factoryType);
@@ -523,8 +521,6 @@ static FuncDecl *makeOptionSetToRawMethod(StructDecl *optionSetDecl,
   toRawDecl->setType(toRawType);
   toRawDecl->setBodyResultType(rawType);
   
-  selfDecl->setDeclContext(toRawDecl);
-
   auto selfRef = new (C) DeclRefExpr(selfDecl, SourceLoc(), /*implicit*/ true);
   auto valueRef = new (C) MemberRefExpr(selfRef, SourceLoc(),
                                         valueDecl, SourceLoc(),
@@ -607,8 +603,6 @@ static FuncDecl *makeOptionSetGetLogicValueMethod(StructDecl *optionSetDecl,
   getLVDecl->setType(toRawType);
   getLVDecl->setBodyResultType(boolType);
   
-  selfDecl->setDeclContext(getLVDecl);
-  
   auto selfRef = new (C) DeclRefExpr(selfDecl, SourceLoc(), /*implicit*/ true);
   auto valueRef = new (C) MemberRefExpr(selfRef, SourceLoc(),
                                         valueDecl, SourceLoc(),
@@ -669,8 +663,6 @@ static ConstructorDecl *makeOptionSetDefaultConstructor(StructDecl *optionSetDec
   auto initFnTy = FunctionType::get(optionSetType, fnTy);
   ctorDecl->setType(allocFnTy);
   ctorDecl->setInitializerType(initFnTy);
-  
-  selfDecl->setDeclContext(ctorDecl);
   
   auto selfRef = new (C) DeclRefExpr(selfDecl, SourceLoc(), /*implicit*/true);
   auto valueRef = new (C) MemberRefExpr(selfRef, SourceLoc(),
