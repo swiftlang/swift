@@ -2541,9 +2541,10 @@ static SILValue emitConstructorMetatypeArg(SILGenFunction &gen,
   // the metatype as its first argument, like a static function.
   Type metatype = ctor->getType()->castTo<AnyFunctionType>()->getInput();
   auto &AC = gen.getASTContext();
-  auto VD = new (AC) VarDecl(/*static*/ false, /*IsLet*/ true, SourceLoc(),
-                             AC.getIdentifier("$metatype"), metatype,
-                             ctor->getDeclContext());
+  auto VD = new (AC) ParamDecl(/*IsLet*/ true, SourceLoc(),
+                               AC.getIdentifier("$metatype"), SourceLoc(),
+                               AC.getIdentifier("$metatype"), metatype,
+                               ctor->getDeclContext());
   return new (gen.F.getModule()) SILArgument(gen.getLoweredType(metatype),
                                              gen.F.begin(), VD);
 }
@@ -2561,7 +2562,9 @@ static RValue emitImplicitValueConstructorArg(SILGenFunction &gen,
     return tuple;
   } else {
     auto &AC = gen.getASTContext();
-    auto VD = new (AC) VarDecl(/*static*/ false, /*IsLet*/ true, SourceLoc(),
+    auto VD = new (AC) ParamDecl(/*IsLet*/ true, SourceLoc(),
+                                 AC.getIdentifier("$implicit_value"), 
+                                 SourceLoc(),
                                  AC.getIdentifier("$implicit_value"), ty, DC);
     SILValue arg = new (gen.F.getModule()) SILArgument(gen.getLoweredType(ty),
                                                        gen.F.begin(), VD);
@@ -2594,9 +2597,11 @@ static void emitImplicitValueConstructor(SILGenFunction &gen,
   SILValue resultSlot;
   if (selfTy.isAddressOnly(gen.SGM.M)) {
     auto &AC = gen.getASTContext();
-    auto VD = new (AC) VarDecl(/*static*/ false, /*IsLet*/ false, SourceLoc(),
-                               AC.getIdentifier("$return_value"), selfTyCan,
-                               ctor);
+    auto VD = new (AC) ParamDecl(/*IsLet*/ false, SourceLoc(),
+                                 AC.getIdentifier("$return_value"),
+                                 SourceLoc(),
+                                 AC.getIdentifier("$return_value"), selfTyCan,
+                                 ctor);
     resultSlot = new (gen.F.getModule()) SILArgument(selfTy, gen.F.begin(), VD);
   }
   
@@ -2760,10 +2765,12 @@ static void emitAddressOnlyEnumConstructor(SILGenFunction &gen,
 
   // Emit the indirect return slot.
   auto &AC = gen.getASTContext();
-  auto VD = new (AC) VarDecl(/*static*/ false, /*IsLet*/ false, SourceLoc(),
-                             AC.getIdentifier("$return_value"),
-                             enumTy.getSwiftType(),
-                             element->getDeclContext());
+  auto VD = new (AC) ParamDecl(/*IsLet*/ false, SourceLoc(),
+                               AC.getIdentifier("$return_value"),
+                               SourceLoc(),
+                               AC.getIdentifier("$return_value"),
+                               enumTy.getSwiftType(),
+                               element->getDeclContext());
   SILValue resultSlot
     = new (gen.F.getModule()) SILArgument(enumTy, gen.F.begin(), VD);
   
@@ -2880,9 +2887,10 @@ namespace {
     
     void visitAnyPattern(AnyPattern *P) {
       auto &AC = gen.getASTContext();
-      auto VD = new (AC) VarDecl(/*static*/ false, /*IsLet*/ true, SourceLoc(),
-                                 // FIXME: we should probably number them.
-                                 AC.getIdentifier("_"), P->getType(), DC);
+      auto VD = new (AC) ParamDecl(/*IsLet*/ true, SourceLoc(),
+                                   AC.getIdentifier("_"), SourceLoc(),
+                                   // FIXME: we should probably number them.
+                                   AC.getIdentifier("_"), P->getType(), DC);
       makeArgument(P->getType(), VD);
     }
     

@@ -774,10 +774,11 @@ struct ArgumentInitVisitor :
     auto &lowering = gen.getTypeLowering(P->getType());
 
     auto &AC = gen.getASTContext();
-    auto VD = new (AC) VarDecl(/*static*/ false, /*IsLet*/ true, SourceLoc(),
-                               // FIXME: we should probably number them.
-                               AC.getIdentifier("_"), P->getType(),
-                               f.getDeclContext());
+    auto VD = new (AC) ParamDecl(/*IsLet*/ true, SourceLoc(),
+                                 AC.getIdentifier("_"), SourceLoc(),
+                                 // FIXME: we should probably number them.
+                                 AC.getIdentifier("_"), P->getType(),
+                                 f.getDeclContext());
 
     SILValue arg =
       makeArgument(P->getType(), f.begin(), VD).forwardAsSingleValue(gen, VD);
@@ -909,9 +910,10 @@ void SILGenFunction::emitProlog(ArrayRef<Pattern *> paramPatterns,
   const TypeLowering &returnTI = getTypeLowering(resultType);
   if (returnTI.isReturnedIndirectly()) {
     auto &AC = getASTContext();
-    auto VD = new (AC) VarDecl(/*static*/ false, /*IsLet*/ false, SourceLoc(),
-                               AC.getIdentifier("$return_value"), resultType,
-                               DeclCtx);
+    auto VD = new (AC) ParamDecl(/*IsLet*/ false, SourceLoc(),
+                                 AC.getIdentifier("$return_value"), SourceLoc(),
+                                 AC.getIdentifier("$return_value"), resultType,
+                                 DeclCtx);
     IndirectReturnAddress = new (SGM.M)
       SILArgument(returnTI.getLoweredType(), F.begin(), VD);
   }
