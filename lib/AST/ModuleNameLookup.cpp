@@ -237,9 +237,6 @@ void namelookup::lookupInModule(Module *startModule,
   );
 }
 
-namespace {
-}
-
 void namelookup::lookupVisibleDeclsInModule(
     Module *M,
     Module::AccessPathTy accessPath,
