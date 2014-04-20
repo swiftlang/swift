@@ -263,10 +263,12 @@ class alignas(8) Decl {
   
   class ValueDeclBitfields {
     friend class ValueDecl;
+    friend class MemberLookupTable;
     unsigned : NumDeclBits;
     unsigned ConformsToProtocolRequrement : 1;
+    unsigned AlreadyInLookupTable : 1;
   };
-  enum { NumValueDeclBits = NumDeclBits + 1 };
+  enum { NumValueDeclBits = NumDeclBits + 2 };
   static_assert(NumValueDeclBits <= 32, "fits in an unsigned");
 
   class VarDeclBitfields {
@@ -502,6 +504,7 @@ protected:
   
   friend class DeclIterator;
   friend class IterableDeclContext;
+  friend class MemberLookupTable;
 
 private:
   DeclContext *Context;
@@ -1651,6 +1654,7 @@ protected:
   ValueDecl(DeclKind K, DeclContext *DC, DeclName name, SourceLoc NameLoc)
     : Decl(K, DC), Name(name), NameLoc(NameLoc) {
     ValueDeclBits.ConformsToProtocolRequrement = false;
+    ValueDeclBits.AlreadyInLookupTable = false;
   }
 
   /// The interface type, mutable because some subclasses compute this lazily.
@@ -2306,12 +2310,14 @@ class NominalTypeDecl : public TypeDecl, public DeclContext,
   /// \brief A lookup table containing all of the members of this type and
   /// its extensions.
   ///
-  /// The table itself is lazily constructed and updated when lookupDirect() is
-  /// called.
-  MemberLookupTable *LookupTable = nullptr;
+  /// The table itself is lazily constructed and updated when
+  /// lookupDirect() is called. The bit indicates whether the lookup
+  /// table has already added members by walking the declarations in
+  /// scope.
+  llvm::PointerIntPair<MemberLookupTable *, 1, bool> LookupTable;
 
-  /// Create a lookup table.
-  void createLookupTable();
+  /// Prepare the lookup table to make it ready for lookups.
+  void prepareLookupTable();
 
   /// Note that we have added a member into the iterable declaration context,
   /// so that it can also be added to the lookup table (if needed).
@@ -2431,6 +2437,16 @@ public:
 
   /// \brief Retrieve the set of extensions of this type.
   ExtensionRange getExtensions();
+
+  /// Make a member of this nominal type, or one of its extensions,
+  /// immediately visible in the lookup table.
+  ///
+  /// A member of a nominal type or extension thereof will become
+  /// visible to name lookup as soon as it is added. However, if the
+  /// addition of a member is delayed---for example, because it's
+  /// being introduced in response to name lookup---this method can be
+  /// called to make it immediately visible.
+  void makeMemberVisible(ValueDecl *member);
 
   /// Find all of the declarations with the given name within this nominal type
   /// and its extensions.

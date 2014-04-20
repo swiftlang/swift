@@ -628,8 +628,8 @@ class swift::MemberLookupTable {
   LookupTable Lookup;
 
 public:
-  /// Create a new member lookup table for the given nominal type.
-  explicit MemberLookupTable(NominalTypeDecl *nominal);
+  /// Create a new member lookup table.
+  explicit MemberLookupTable(ASTContext &ctx);
 
   /// Destroy the lookup table.
   void destroy();
@@ -693,12 +693,12 @@ public:
   }
 };
 
-MemberLookupTable::MemberLookupTable(NominalTypeDecl *nominal) {
-  // Add the members of the nominal declaration to the table.
-  addMembers(nominal->getMembers());
-
-  // Update the lookup table to introduce members from extensions.
-  updateLookupTable(nominal);
+MemberLookupTable::MemberLookupTable(ASTContext &ctx) {
+  // Register a cleanup with the ASTContext to call the lookup table
+  // destructor.
+  ctx.addCleanup([this]() {
+    this->destroy();
+  });
 }
 
 void MemberLookupTable::addMember(Decl *member) {
@@ -710,6 +710,13 @@ void MemberLookupTable::addMember(Decl *member) {
   // Unnamed entities cannot be found by name lookup.
   if (!vd->hasName())
     return;
+
+  // If this declaration is already in the lookup table, don't add it
+  // again.
+  if (vd->ValueDeclBits.AlreadyInLookupTable) {
+    return;
+  }
+  vd->ValueDeclBits.AlreadyInLookupTable = true;
 
   // Add this declaration to the lookup set under its compound name and simple
   // name.
@@ -809,36 +816,53 @@ NominalTypeDecl::getProtocols(bool forceDelayedMembers) const {
 
 void NominalTypeDecl::addedMember(Decl *member) {
   // If we have a lookup table, add the new member to it.
-  if (LookupTable) {
-    LookupTable->addMember(member);
+  if (LookupTable.getPointer()) {
+    LookupTable.getPointer()->addMember(member);
   }
 }
 
 void ExtensionDecl::addedMember(Decl *member) {
   if (NextExtension.getInt()) {
     auto nominal = getExtendedType()->getAnyNominal();
-    if (nominal->LookupTable) {
+    if (nominal->LookupTable.getPointer()) {
       // Make sure we have the complete list of extensions.
       // FIXME: This is completely unnecessary. We want to determine whether
       // our own extension has already been included in the lookup table.
       (void)nominal->getExtensions();
 
-      nominal->LookupTable->addMember(member);
+      nominal->LookupTable.getPointer()->addMember(member);
     }
   }
 }
 
-// Create the lookup table.
-void NominalTypeDecl::createLookupTable() {
-  assert(!LookupTable && "Lookup table already created");
-  auto &ctx = getASTContext();
-  LookupTable = new (ctx) MemberLookupTable(this);
+void NominalTypeDecl::prepareLookupTable() {
+  // If we haven't allocated the lookup table yet, do so now.
+  if (!LookupTable.getPointer()) {
+    auto &ctx = getASTContext();
+    LookupTable.setPointer(new (ctx) MemberLookupTable(ctx));
+  }
 
-  // Register a cleanup with the ASTContext to call the lookup table
-  // destructor.
-  ctx.addCleanup([this]() {
-    this->LookupTable->destroy();
-  });
+  // If we haven't walked the member list yet to update the lookup
+  // table, do so now.
+  if (!LookupTable.getInt()) {
+    // Note that we'll have walked the members now.
+    LookupTable.setInt(true);
+
+    // Add the members of the nominal declaration to the table.
+    LookupTable.getPointer()->addMembers(getMembers());
+  }
+
+  // Update the lookup table to introduce members from extensions.
+  LookupTable.getPointer()->updateLookupTable(this);
+}
+
+void NominalTypeDecl::makeMemberVisible(ValueDecl *member) {
+  if (!LookupTable.getPointer()) {
+    auto &ctx = getASTContext();
+    LookupTable.setPointer(new (ctx) MemberLookupTable(ctx));
+  }
+  
+  LookupTable.getPointer()->addMember(member);
 }
 
 ArrayRef<ValueDecl *> NominalTypeDecl::lookupDirect(DeclName name) {
@@ -848,16 +872,11 @@ ArrayRef<ValueDecl *> NominalTypeDecl::lookupDirect(DeclName name) {
     (void)E->getMembers();
   (void)getMembers();
 
-  if (!LookupTable) {
-    createLookupTable();
-  } else {
-    // Update the lookup table, if any new extension have come into existence.
-    LookupTable->updateLookupTable(this);
-  }
+  prepareLookupTable();
 
   // Look for the declarations with this name.
-  auto known = LookupTable->find(name);
-  if (known == LookupTable->end())
+  auto known = LookupTable.getPointer()->find(name);
+  if (known == LookupTable.getPointer()->end())
     return { };
 
   // We found something; return it.
