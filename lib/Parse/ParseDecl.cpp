@@ -37,9 +37,9 @@ static Pattern *buildImplicitSelfParameter(SourceLoc Loc,
                                            DeclContext *CurDeclContext,
                                            VarDecl **SelfDeclRet = nullptr) {
   ASTContext &Ctx = CurDeclContext->getASTContext();
-  auto *SelfDecl = new (Ctx) VarDecl(/*static*/ false, /*IsLet*/ true,
-                                     Loc, Ctx.Id_self,
-                                     Type(), CurDeclContext);
+  auto *SelfDecl = new (Ctx) ParamDecl(/*IsLet*/ true, SourceLoc(), 
+                                       Identifier(), Loc, Ctx.Id_self,
+                                       Type(), CurDeclContext);
   // FIXME: Remove SelfDeclRet when we don't need it anymore.
   if (SelfDeclRet)
     *SelfDeclRet = SelfDecl;
