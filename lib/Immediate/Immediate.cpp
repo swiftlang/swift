@@ -937,7 +937,7 @@ private:
   llvm::SmallPtrSet<swift::Module *, 8> ImportedModules;
   SmallVector<llvm::Function*, 8> InitFns;
   bool RanGlobalInitializers;
-  llvm::LLVMContext LLVMContext;
+  llvm::LLVMContext &LLVMContext;
   llvm::Module Module;
   llvm::Module DumpModule;
   llvm::SmallString<128> DumpSource;
@@ -1041,6 +1041,7 @@ public:
   REPLEnvironment(CompilerInstance &CI,
                   bool ShouldRunREPLApplicationMain,
                   const ProcessCmdLine &CmdLine,
+                  llvm::LLVMContext &LLVMCtx,
                   bool ParseStdlib)
     : CI(CI),
       REPLInputFile(CI.getMainModule()->
@@ -1048,6 +1049,7 @@ public:
       ShouldRunREPLApplicationMain(ShouldRunREPLApplicationMain),
       CmdLine(CmdLine),
       RanGlobalInitializers(false),
+      LLVMContext(LLVMCtx),
       Module("REPL", LLVMContext),
       DumpModule("REPL", LLVMContext),
       IRGenOpts(),
@@ -1310,8 +1312,10 @@ void PrettyStackTraceREPL::print(llvm::raw_ostream &out) const {
   llvm::errs().resetColor();
 }
 
-void swift::REPL(CompilerInstance &CI, const ProcessCmdLine &CmdLine, bool ParseStdlib) {
-  REPLEnvironment env(CI, /*ShouldRunREPLApplicationMain=*/false, CmdLine, ParseStdlib);
+void swift::REPL(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
+                 bool ParseStdlib) {
+  REPLEnvironment env(CI, /*ShouldRunREPLApplicationMain=*/false, CmdLine,
+                      llvm::getGlobalContext(), ParseStdlib);
   if (CI.getASTContext().hadError())
     return;
 
@@ -1323,8 +1327,11 @@ void swift::REPL(CompilerInstance &CI, const ProcessCmdLine &CmdLine, bool Parse
   env.exitREPL();
 }
 
-void swift::REPLRunLoop(CompilerInstance &CI, const ProcessCmdLine &CmdLine, bool ParseStdlib) {
-  REPLEnvironment env(CI, /*ShouldRunREPLApplicationMain=*/true, CmdLine, ParseStdlib);
+void swift::REPLRunLoop(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
+                        bool ParseStdlib) {
+  REPLEnvironment env(CI, /*ShouldRunREPLApplicationMain=*/true, CmdLine,
+                      llvm::getGlobalContext(),
+                      ParseStdlib);
   if (CI.getASTContext().hadError())
     return;
   
