@@ -651,15 +651,15 @@ mapParsedParameters(Parser &parser,
                                     ellipsisLoc);
 }
 
-/// Parse closure arguments, which consist of a single parameter-clause.
-ParserResult<Pattern> Parser::parseClosureArguments() {
+/// Parse a single parameter-clause.
+ParserResult<Pattern> Parser::parseSingleParameterClause(bool isClosure) {
   ParserStatus status;
   SmallVector<ParsedParameter, 4> params;
   SourceLoc leftParenLoc, rightParenLoc;
   
   // Parse the parameter clause.
   status |= parseParameterClause(leftParenLoc, params, rightParenLoc,
-                                 /*defaultArgs=*/nullptr, /*isClosure=*/true);
+                                 /*defaultArgs=*/nullptr, isClosure);
   
   // Turn the parameter clause into argument and body patterns.
   auto pattern = mapParsedParameters(*this, leftParenLoc, params,

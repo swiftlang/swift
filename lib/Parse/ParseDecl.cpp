@@ -3305,8 +3305,8 @@ ParserStatus Parser::parseDeclSubscript(SourceLoc OverrideLoc,
     return makeParserError();
   }
 
-  ParserResult<Pattern> Indices =
-    parsePatternTuple(/*IsLet*/true, /*IsArgList*/true,/*DefaultArgs=*/nullptr);
+  ParserResult<Pattern> Indices
+    = parseSingleParameterClause(/*isClosure=*/false);
   if (Indices.isNull() || Indices.hasCodeCompletion())
     return Indices;
   

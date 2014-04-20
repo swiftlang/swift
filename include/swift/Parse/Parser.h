@@ -784,7 +784,7 @@ public:
     }
   };
 
-  ParserResult<Pattern> parseClosureArguments();
+  ParserResult<Pattern> parseSingleParameterClause(bool isClosure);
 
   ParserStatus parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
                                       SmallVectorImpl<Pattern*> &BodyPatterns,

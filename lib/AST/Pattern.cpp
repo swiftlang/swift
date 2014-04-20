@@ -224,14 +224,28 @@ Pattern *Pattern::clone(ASTContext &context,
 
   case PatternKind::Named: {
     auto named = cast<NamedPattern>(this);
-    VarDecl *var = new (context) VarDecl(!named->getDecl()->isInstanceMember(),
-                                         named->getDecl()->isLet(),
-                                         named->getLoc(),
-                                         named->getBoundName(),
-                                         named->getDecl()->hasType()
-                                           ? named->getDecl()->getType()
-                                           : Type(),
-                                         named->getDecl()->getDeclContext());
+    VarDecl *var;
+    if (auto param = dyn_cast<ParamDecl>(named->getDecl())) {
+      var = new (context) ParamDecl(param->isLet(),
+                                    param->getArgumentNameLoc(),
+                                    param->getArgumentName(),
+                                    param->getLoc(),
+                                    param->getName(),
+                                    param->hasType()
+                                      ? param->getType()
+                                      : Type(),
+                                    param->getDeclContext());
+    } else {
+      var = new (context) VarDecl(!named->getDecl()->isInstanceMember(),
+                                  named->getDecl()->isLet(),
+                                  named->getLoc(),
+                                  named->getBoundName(),
+                                  named->getDecl()->hasType()
+                                    ? named->getDecl()->getType()
+                                    : Type(),
+                                  named->getDecl()->getDeclContext());
+    }
+
     if ((options & Implicit) || var->isImplicit())
       var->setImplicit();
     result = new (context) NamedPattern(var);
