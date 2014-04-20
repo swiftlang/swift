@@ -1707,7 +1707,7 @@ public:
     SmallVector<ValueDecl *, 1> Decls;
     lookupVisibleDeclsInModule(M, LookupAccessPath, Decls,
                                NLKind::QualifiedLookup,
-                               ResolutionKind::Overloadable,
+                               ResolutionKind::Exact,
                                TypeResolver.get());
 
     for (auto *VD : Decls) {
