@@ -205,13 +205,14 @@ Pattern *Pattern::clone(ASTContext &context,
   case PatternKind::Any: {
     auto any = cast<AnyPattern>(this);
     if (options & AlwaysNamed) {
-      VarDecl *var = new (context) VarDecl(/*isStatic=*/false,
-                                           !(options & Pattern::IsVar),
-                                           any->getLoc(),
-                                           context.getIdentifier("_"),
-                                           any->hasType()? any->getType()
-                                                         : Type(),
-                                           nullptr);
+      VarDecl *var = new (context) ParamDecl(!(options & Pattern::IsVar),
+                                             any->getLoc(),
+                                             context.getIdentifier("_"),
+                                             any->getLoc(),
+                                             context.getIdentifier("_"),
+                                             any->hasType()? any->getType()
+                                                           : Type(),
+                                             nullptr);
       if (options & Implicit)
         var->setImplicit();
 
