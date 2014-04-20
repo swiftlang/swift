@@ -24,7 +24,7 @@ add_swift_library(swiftIRGen
   Linking.cpp
   SwiftTargetInfo.cpp
   StructLayout.cpp
-  DEPENDS LLVMMC LLVMSupport LLVMCore swiftAST swiftOptimizeARC)
+  DEPENDS LLVMMC LLVMProfileData LLVMSupport LLVMCore swiftAST swiftOptimizeARC)
 
 # Clang dependencies.
 # FIXME: Clang should really export these in some reasonable manner.
