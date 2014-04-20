@@ -784,6 +784,8 @@ public:
     }
   };
 
+  ParserResult<Pattern> parseClosureArguments();
+
   ParserStatus parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
                                       SmallVectorImpl<Pattern*> &BodyPatterns,
                                       DefaultArgumentInfo &defaultArgs);
@@ -863,7 +865,7 @@ public:
   ParserStatus parseParameterClause(SourceLoc &leftParenLoc,
                                     SmallVectorImpl<ParsedParameter> &params,
                                     SourceLoc &rightParenLoc,
-                                    DefaultArgumentInfo &defaultArgs,
+                                    DefaultArgumentInfo *defaultArgs,
                                     bool isClosure);
 
   /// \brief Determine whether the parser is in a state that can start a
@@ -983,7 +985,7 @@ public:
   ///
   /// \verbatim
   ///   closure-signature:
-  ///     pattern-tuple func-signature-result? 'in'
+  ///     parameter-clause func-signature-result? 'in'
   ///     identifier (',' identifier)* func-signature-result? 'in'
   /// \endverbatim
   ///

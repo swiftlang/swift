@@ -132,7 +132,7 @@ ParserStatus
 Parser::parseParameterClause(SourceLoc &leftParenLoc,
                              SmallVectorImpl<ParsedParameter> &params,
                              SourceLoc &rightParenLoc,
-                             DefaultArgumentInfo &defaultArgs,
+                             DefaultArgumentInfo *defaultArgs,
                              bool isClosure) {
   assert(params.empty() && leftParenLoc.isInvalid() &&
          rightParenLoc.isInvalid() && "Must start with empty state");
@@ -154,7 +154,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
     ParsedParameter param;
     ParserStatus status;
 
-    unsigned defaultArgIndex = defaultArgs.NextIndex++;
+    unsigned defaultArgIndex = defaultArgs? defaultArgs->NextIndex++ : 0;
 
     // 'inout'?
     if (Tok.isContextualKeyword("inout"))
@@ -207,7 +207,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
     // ('=' expr)?
     if (Tok.is(tok::equal)) {
       param.EqualLoc = Tok.getLoc();
-      status |= parseDefaultArgument(*this, &defaultArgs, defaultArgIndex,
+      status |= parseDefaultArgument(*this, defaultArgs, defaultArgIndex,
                                      param.DefaultArg);
 
       if (param.EllipsisLoc.isValid()) {
@@ -552,7 +552,6 @@ mapParsedParameters(Parser &parser,
                     SourceLoc leftParenLoc,
                     MutableArrayRef<Parser::ParsedParameter> params,
                     SourceLoc rightParenLoc,
-                    Parser::DefaultArgumentInfo &defaultArgs,
                     bool isFirstParameterClause,
                     SmallVectorImpl<Identifier> *argNames) {
   auto &ctx = parser.Context;
@@ -652,6 +651,23 @@ mapParsedParameters(Parser &parser,
                                     ellipsisLoc);
 }
 
+/// Parse closure arguments, which consist of a single parameter-clause.
+ParserResult<Pattern> Parser::parseClosureArguments() {
+  ParserStatus status;
+  SmallVector<ParsedParameter, 4> params;
+  SourceLoc leftParenLoc, rightParenLoc;
+  
+  // Parse the parameter clause.
+  status |= parseParameterClause(leftParenLoc, params, rightParenLoc,
+                                 /*defaultArgs=*/nullptr, /*isClosure=*/true);
+  
+  // Turn the parameter clause into argument and body patterns.
+  auto pattern = mapParsedParameters(*this, leftParenLoc, params,
+                                     rightParenLoc, true, nullptr);
+
+  return makeParserResult(status, pattern);
+}
+
 /// Parse function arguments.
 ///   func-arguments:
 ///     curried-arguments | selector-arguments
@@ -689,11 +705,11 @@ Parser::parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
 
       // Parse the parameter clause.
       status |= parseParameterClause(leftParenLoc, params, rightParenLoc,
-                                     DefaultArgs, /*isClosure=*/false);
+                                     &DefaultArgs, /*isClosure=*/false);
 
       // Turn the parameter clause into argument and body patterns.
       auto pattern = mapParsedParameters(*this, leftParenLoc, params,
-                                         rightParenLoc, DefaultArgs,
+                                         rightParenLoc, 
                                          isFirstParameterClause,
                                          isFirstParameterClause ? &NamePieces
                                                                 : nullptr);
@@ -842,12 +858,12 @@ Parser::parseConstructorArguments(DeclName &FullName, Pattern *&BodyPattern,
     // Parse the parameter clause.
     ParserStatus status 
       = parseParameterClause(leftParenLoc, params, rightParenLoc,
-                             DefaultArgs, /*isClosure=*/false);
+                             &DefaultArgs, /*isClosure=*/false);
 
     // Turn the parameter clause into argument and body patterns.
     llvm::SmallVector<Identifier, 2> namePieces;
     BodyPattern = mapParsedParameters(*this, leftParenLoc, params,
-                                      rightParenLoc, DefaultArgs,
+                                      rightParenLoc, 
                                       /*isFirstParameterClause=*/true,
                                       &namePieces);
 

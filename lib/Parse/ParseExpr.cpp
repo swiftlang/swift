@@ -1418,19 +1418,25 @@ bool Parser::parseClosureSignatureIfPresent(Pattern *&params,
     // Parse pattern-tuple func-signature-result? 'in'.
     BacktrackingScope backtrack(*this);
 
-    // Parse the pattern-tuple.
-    if (!canParsePatternTuple())
-      return false;
+    // Consume the ')'.
+    consumeToken();
 
-    // Parse the func-signature-result, if present.
-    if (consumeIf(tok::arrow)) {
-      if (!canParseType())
+    // While we don't have '->' or ')', eat balanced tokens.
+    while (!Tok.is(tok::r_paren) && !Tok.is(tok::eof))
+      skipSingle();
+
+    // Consume the ')', if it's there.
+    if (consumeIf(tok::r_paren)) {
+      // Parse the func-signature-result, if present.
+      if (consumeIf(tok::arrow)) {
+        if (!canParseType())
+          return false;
+      }
+
+      // Parse the 'in' at the end.
+      if (!Tok.is(tok::kw_in)) {
         return false;
-    }
-
-    // Parse the 'in' at the end.
-    if (!Tok.is(tok::kw_in)) {
-      return false;
+      }
     }
 
     // Okay, we have a closure signature.
@@ -1468,10 +1474,8 @@ bool Parser::parseClosureSignatureIfPresent(Pattern *&params,
   // At this point, we know we have a closure signature. Parse the parameters.
   bool invalid = false;
   if (Tok.is(tok::l_paren)) {
-    // Parse the pattern-tuple.
-    // FIXME: Parse as function arguments.
-    auto pattern = parsePatternTuple(/*IsLet*/ true, /*IsArgList*/true,
-                                     /*DefaultArgs=*/nullptr);
+    // Parse the closure arguments.
+    auto pattern = parseClosureArguments();
     if (pattern.isNonNull())
       params = pattern.get();
     else
