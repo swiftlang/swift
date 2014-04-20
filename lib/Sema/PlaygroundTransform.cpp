@@ -609,21 +609,8 @@ public:
   }
 };
 
-}
+} // end anonymous namespace
 
-static bool moduleHasFunction(Module *M, const char *N)
-{
-  ASTContext &Context(M->getASTContext());
-
-  SmallVector<ValueDecl*, 1> Decls;
-
-  M->lookupValue(Module::AccessPathTy(),
-                 Context.getIdentifier(N),
-                 NLKind::UnqualifiedLookup,
-                 Decls);
-
-  return (Decls.size() != 0);
-}
 
 void swift::performPlaygroundTransform(SourceFile &SF) {
   class ExpressionFinder : public ASTWalker {
