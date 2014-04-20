@@ -79,28 +79,25 @@ class IRGenDebugInfo {
 
   // Various caches.
   llvm::DenseMap<SILDebugScope *, llvm::WeakVH> ScopeCache;
+  //llvm::DenseMap<DeclContext *, llvm::WeakVH> ContextCache;
   llvm::DenseMap<const char *, llvm::WeakVH> DIFileCache;
   llvm::DenseMap<TypeBase*, llvm::WeakVH> DITypeCache;
   std::map<std::string, llvm::WeakVH> DIModuleCache;
   llvm::DITypeIdentifierMap DIRefMap;
 
-  // Subprograms and need their scope to be RAUW'd when we work
-  // through the list of imports.
-  std::map<StringRef, llvm::WeakVH> Functions;
-
   llvm::SmallString<256> MainFilename;
-  StringRef CWDName; /// The current working directory.
   llvm::BumpPtrAllocator DebugInfoNames;
-  llvm::DICompileUnit TheCU;
-  llvm::DIFile MainFile;
-  llvm::DIScope EntryPointFn; /// Scope of SWIFT_ENTRY_POINT_FUNCTION.
+  StringRef CWDName;               /// The current working directory.
+  llvm::DICompileUnit TheCU;       /// The current compilation unit.
+  llvm::DIFile MainFile;           /// The main file.
+  llvm::DIModule MainModule;       /// The current module.
+  llvm::DIScope EntryPointFn;      /// Scope of SWIFT_ENTRY_POINT_FUNCTION.
   TypeAliasDecl *MetadataTypeDecl; /// The type decl for swift.type.
-  llvm::MDNode *InternalType; /// Catch-all type for upaque internal types.
+  llvm::MDNode *InternalType;      /// Catch-all type for upaque internal types.
 
-  FullLocation LastLoc; /// The last location that was emitted.
+  FullLocation LastLoc;     /// The last location that was emitted.
   SILDebugScope *LastScope; /// The scope of that last location.
-  /// Are emitting debug info for a libary or a top level module?
-  bool IsLibrary;
+  bool IsLibrary;           /// Whether this is a libary or a top level module.
 
   SmallVector<std::pair<FullLocation, SILDebugScope*>, 8>
   LocationStack; /// Used by pushLoc.
@@ -227,33 +224,29 @@ private:
 
   llvm::DIType createType(DebugTypeInfo DbgTy, llvm::DIDescriptor Scope,
                           llvm::DIFile File);
-  llvm::DIType getOrCreateType(DebugTypeInfo DbgTy, llvm::DIDescriptor Scope);
+  llvm::DIType getOrCreateType(DebugTypeInfo DbgTy);
   llvm::DIDescriptor getOrCreateScope(SILDebugScope *DS);
-  //  llvm::DIDescriptor getOrCreateImportedModuleScope(StringRef ModuleName);
+  llvm::DIScope getOrCreateContext(DeclContext *DC);
 
   StringRef getCurrentDirname();
   llvm::DIFile getOrCreateFile(const char *Filename);
-  llvm::DIType getOrCreateDesugaredType(Type Ty, DebugTypeInfo DTI,
-                                        llvm::DIDescriptor Scope);
+  llvm::DIType getOrCreateDesugaredType(Type Ty, DebugTypeInfo DTI);
   StringRef getName(const FuncDecl& FD);
   StringRef getName(SILLocation L);
   StringRef getMangledName(TypeAliasDecl *Decl);
   StringRef getMangledName(DebugTypeInfo DTI);
   llvm::DIArray createParameterTypes(CanSILFunctionType FnTy,
-                                     llvm::DIDescriptor Scope,
                                      DeclContext *DeclCtx);
   llvm::DIArray createParameterTypes(SILType SILTy,
-                                     llvm::DIDescriptor Scope,
                                      DeclContext *DeclCtx);
   void createParameterType(llvm::SmallVectorImpl<llvm::Value*>& Parameters,
-                           SILType CanTy, llvm::DIDescriptor Scope,
-                           DeclContext* DeclCtx);
+                           SILType CanTy, DeclContext* DeclCtx);
   llvm::DIArray getTupleElements(TupleType *TupleTy, llvm::DIDescriptor Scope,
                                  llvm::DIFile File, unsigned Flags,
                                  DeclContext* DeclContext);
   llvm::DIFile getFile(llvm::DIDescriptor Scope);
-  llvm::DIScope getOrCreateModule(llvm::DIScope Module,
-                                  std::string MangledName,
+  llvm::DIModule getOrCreateModule(llvm::DIScope Parent,
+                                  std::string Name,
                                   llvm::DIFile File);
   llvm::DIScope getModule(StringRef MangledName);
   llvm::DIArray getStructMembers(NominalTypeDecl *D, llvm::DIDescriptor Scope,
@@ -275,14 +268,12 @@ private:
                                        llvm::DIFile File,
                                        unsigned Flags);
   llvm::DIArray getEnumElements(DebugTypeInfo DbgTy,
-                                 EnumDecl *D,
-                                 llvm::DIDescriptor Scope,
-                                 llvm::DIFile File,
-                                 unsigned Flags);
+                                EnumDecl *D,
+                                llvm::DIFile File,
+                                unsigned Flags);
   llvm::DICompositeType createEnumType(DebugTypeInfo DbgTy,
                                        EnumDecl *Decl,
                                        StringRef Name,
-                                       llvm::DIDescriptor Scope,
                                        llvm::DIFile File,
                                        unsigned Line,
                                        unsigned Flags);
