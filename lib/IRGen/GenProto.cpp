@@ -225,6 +225,7 @@ namespace {
       case DeclKind::PostfixOperator:
       case DeclKind::TypeAlias:
       case DeclKind::GenericTypeParam:
+      case DeclKind::Param:
         llvm_unreachable("declaration not legal as a protocol member");
 
       case DeclKind::PatternBinding:

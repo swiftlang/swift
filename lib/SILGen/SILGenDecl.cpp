@@ -1263,6 +1263,7 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
   case DeclKind::AssociatedType:
   case DeclKind::GenericTypeParam:
   case DeclKind::Var:
+  case DeclKind::Param:
   case DeclKind::Import:
   case DeclKind::Subscript:
   case DeclKind::Destructor:

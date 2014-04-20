@@ -193,7 +193,8 @@ CodeCompletionResult::getCodeCompletionDeclKind(const Decl *D) {
     return CodeCompletionDeclKind::Class;
   case DeclKind::Protocol:
     return CodeCompletionDeclKind::Protocol;
-  case DeclKind::Var: {
+  case DeclKind::Var:
+  case DeclKind::Param: {
     auto DC = D->getDeclContext();
     if (DC->isTypeContext()) {
       if (cast<VarDecl>(D)->isStatic())

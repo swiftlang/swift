@@ -142,6 +142,7 @@ enum class DescriptiveDeclKind : uint8_t {
   IfConfig,
   PatternBinding,
   Var,
+  Param,
   Let,
   StaticVar,
   StaticLet,
@@ -3061,15 +3062,22 @@ public:
 /// VarDecl - 'var' and 'let' declarations.
 class VarDecl : public AbstractStorageDecl {
   PatternBindingDecl *ParentPattern = nullptr;
-public:
-  VarDecl(bool IsStatic, bool IsLet, SourceLoc NameLoc, Identifier Name,
-          Type Ty, DeclContext *DC)
-    : AbstractStorageDecl(DeclKind::Var, DC, Name, NameLoc) {
+
+protected:
+  VarDecl(DeclKind Kind, bool IsStatic, bool IsLet, SourceLoc NameLoc, 
+          Identifier Name, Type Ty, DeclContext *DC)
+    : AbstractStorageDecl(Kind, DC, Name, NameLoc) 
+  {
     VarDeclBits.IsStatic = IsStatic;
     VarDeclBits.IsLet = IsLet;
     VarDeclBits.IsDebuggerVar = false;
     setType(Ty);
   }
+
+public:
+  VarDecl(bool IsStatic, bool IsLet, SourceLoc NameLoc, Identifier Name,
+          Type Ty, DeclContext *DC)
+    : VarDecl(DeclKind::Var, IsStatic, IsLet, NameLoc, Name, Ty, DC) { }
 
   SourceLoc getStartLoc() const { return getNameLoc(); }
   SourceRange getSourceRange() const { return getNameLoc(); }
@@ -3119,9 +3127,38 @@ public:
   }
 
   // Implement isa/cast/dyncast/etc.
-  static bool classof(const Decl *D) { return D->getKind() == DeclKind::Var; }
+  static bool classof(const Decl *D) { 
+    return D->getKind() == DeclKind::Var || D->getKind() == DeclKind::Param; 
+  }
 };
 
+/// A function parameter declaration.
+class ParamDecl : public VarDecl {
+  Identifier ArgumentName;
+  SourceLoc ArgumentNameLoc;
+
+public:
+  ParamDecl(bool isLet, SourceLoc argumentNameLoc, 
+            Identifier argumentName, SourceLoc parameterNameLoc,
+            Identifier parameterName, Type ty, DeclContext *dc)
+    : VarDecl(DeclKind::Param, /*IsState=*/false, isLet, parameterNameLoc, 
+              parameterName, ty, dc),
+      ArgumentName(argumentName), ArgumentNameLoc(argumentNameLoc) { }
+
+  /// Retrieve the argument (API) name for this function parameter.
+  Identifier getArgumentName() const { return ArgumentName; }
+
+  /// Retrieve the source location of the argument (API) name.
+  ///
+  /// The resulting source location will be valid if the argument name
+  /// was specified separately from the parameter name.
+  SourceLoc getArgumentNameLoc() const { return ArgumentNameLoc; }
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const Decl *D) { 
+    return D->getKind() == DeclKind::Param;
+  }
+};
   
 /// Describes the kind of subscripting used in Objective-C.
 enum class ObjCSubscriptKind {

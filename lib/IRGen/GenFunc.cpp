@@ -3011,6 +3011,7 @@ struct EmitLocalDecls : public ASTWalker {
       // no IR generation support required.
     case DeclKind::PatternBinding:
     case DeclKind::Var:
+    case DeclKind::Param:
       // These get lowered by SIL.
       return false;
       

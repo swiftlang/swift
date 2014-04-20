@@ -490,6 +490,9 @@ void Mangler::mangleDeclTypeForDebugger(ValueDecl *decl) {
     result_t visitVarDecl(VarDecl *D) {
       return { true, BindGenerics::All };
     }
+    result_t visitParamDecl(ParamDecl *D) {
+      return { true, BindGenerics::All };
+    }
     result_t visitSubscriptDecl(SubscriptDecl *D) {
       return { true, BindGenerics::All };
     }

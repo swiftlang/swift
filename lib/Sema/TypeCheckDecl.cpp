@@ -4252,7 +4252,8 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     break;
   }
       
-  case DeclKind::Var: {
+  case DeclKind::Var:
+  case DeclKind::Param: {
     if (D->hasType())
       return;
 

@@ -741,6 +741,9 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
     // The global initializations are in SIL.
     return;
 
+  case DeclKind::Param:
+    llvm_unreachable("there are no global function parameters");
+
   case DeclKind::Subscript:
     llvm_unreachable("there are no global subscript operations");
       
@@ -815,6 +818,7 @@ void IRGenModule::emitExternalDefinition(Decl *D) {
   case DeclKind::PrefixOperator:
   case DeclKind::PostfixOperator:
   case DeclKind::IfConfig:
+  case DeclKind::Param:
     llvm_unreachable("Not a valid external definition for IRgen");
 
   case DeclKind::Func:
@@ -1370,6 +1374,7 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
     case DeclKind::InfixOperator:
     case DeclKind::PrefixOperator:
     case DeclKind::PostfixOperator:
+    case DeclKind::Param:
       llvm_unreachable("decl not allowed in extension!");
 
     // PatternBindingDecls don't really make sense here, but we

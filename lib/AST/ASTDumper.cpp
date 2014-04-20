@@ -74,6 +74,14 @@ static void printGenericParameters(raw_ostream &OS, GenericParamList *Params) {
 //  Decl printing.
 //===----------------------------------------------------------------------===//
 
+// Print a name.
+static void printName(raw_ostream &os, Identifier name) {
+  if (name.empty())
+    os << "<anonymous>";
+  else
+    os << name.str();
+}
+
 namespace {
   class PrintPattern : public PatternVisitor<PrintPattern> {
   public:
@@ -471,6 +479,17 @@ namespace {
       OS << ')';
     }
 
+    void visitParamDecl(ParamDecl *VD) {
+      printCommon(VD, "param_decl");
+      if (!VD->isLet())
+        OS << " var";
+      if (VD->getName() != VD->getArgumentName()) {
+        OS << " argument_name=";
+        printName(OS, VD->getArgumentName());
+      }
+      OS << ')';
+    }
+
     void visitEnumDecl(EnumDecl *UD) {
       printCommon(UD, "enum_decl");
       printInherited(UD->getInherited());
@@ -703,14 +722,6 @@ void Decl::dump() const {
 void Decl::dump(raw_ostream &OS, unsigned Indent) const {
   PrintDecl(OS, Indent).visit(const_cast<Decl *>(this));
   llvm::errs() << '\n';
-}
-
-// Print a name.
-static void printName(raw_ostream &os, Identifier name) {
-  if (name.empty())
-    os << "<anonymous>";
-  else
-    os << name.str();
 }
 
 /// Print the given declaration context (with its parents).

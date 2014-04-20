@@ -560,16 +560,18 @@ mapParsedParameters(Parser &parser,
   // Local function to create a pattern for a single parameter.
   auto createParamPattern = [&](SourceLoc &inOutLoc, bool isLet,
                                 SourceLoc letVarLoc,
-                                Identifier name, SourceLoc nameLoc,
+                                Identifier argName, SourceLoc argNameLoc,
+                                Identifier paramName, SourceLoc paramNameLoc,
                                 TypeRepr *type) -> Pattern * {
     // Create the parameter based on the name.
     Pattern *param;
-    if (name.empty()) {
-      param = new (ctx) AnyPattern(nameLoc);
+    if (paramName.empty()) {
+      param = new (ctx) AnyPattern(paramNameLoc);
     } else {
       // Create a variable to capture this.
-      VarDecl *var = new (ctx) VarDecl(/*IsStatic=*/false, isLet, nameLoc,
-                                       name, Type(), parser.CurDeclContext);
+      ParamDecl *var = new (ctx) ParamDecl(isLet, argNameLoc, argName,
+                                           paramNameLoc, paramName, Type(), 
+                                           parser.CurDeclContext);
       param = new (ctx) NamedPattern(var);
     }
 
@@ -609,11 +611,13 @@ mapParsedParameters(Parser &parser,
     if (param.SecondNameLoc.isValid())
       pattern = createParamPattern(param.InOutLoc,
                                    param.IsLet, param.LetVarLoc,
+                                   param.FirstName, param.FirstNameLoc,
                                    param.SecondName, param.SecondNameLoc,
                                    param.Type);
     else
       pattern = createParamPattern(param.InOutLoc,
                                    param.IsLet, param.LetVarLoc,
+                                   param.FirstName, SourceLoc(),
                                    param.FirstName, param.FirstNameLoc,
                                    param.Type);
 

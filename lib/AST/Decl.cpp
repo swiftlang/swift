@@ -96,6 +96,7 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
   TRIVIAL_KIND(Constructor);
   TRIVIAL_KIND(Destructor);
   TRIVIAL_KIND(EnumElement);
+  TRIVIAL_KIND(Param);
 
    case DeclKind::Enum:
      return cast<EnumDecl>(this)->getGenericParams()
@@ -182,6 +183,7 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(IfConfig, "if configuration");
   ENTRY(PatternBinding, "pattern binding");
   ENTRY(Var, "var");
+  ENTRY(Param, "parameter");
   ENTRY(Let, "let");
   ENTRY(StaticVar, "static var");
   ENTRY(StaticLet, "static let");
@@ -601,6 +603,7 @@ ImportKind ImportDecl::getBestImportKind(const ValueDecl *VD) {
   case DeclKind::GenericTypeParam:
   case DeclKind::Subscript:
   case DeclKind::EnumElement:
+  case DeclKind::Param:
     llvm_unreachable("not a top-level ValueDecl");
 
   case DeclKind::Protocol:
@@ -826,6 +829,7 @@ bool ValueDecl::isDefinition() const {
         AbstractFunctionDecl::BodyKind::None;
 
   case DeclKind::Var:
+  case DeclKind::Param:
   case DeclKind::Enum:
   case DeclKind::EnumElement:
   case DeclKind::Struct:
@@ -879,7 +883,8 @@ bool ValueDecl::isInstanceMember() const {
     return !cast<FuncDecl>(this)->isStatic();
 
   case DeclKind::EnumElement:
-    // enum elements are not instance members.
+  case DeclKind::Param:
+    // enum elements and function parameters are not instance members.
     return false;
 
   case DeclKind::Subscript:

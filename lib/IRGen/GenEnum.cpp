@@ -3793,6 +3793,7 @@ void IRGenModule::emitEnumDecl(EnumDecl *theEnum) {
     case DeclKind::InfixOperator:
     case DeclKind::PrefixOperator:
     case DeclKind::PostfixOperator:
+    case DeclKind::Param:
       llvm_unreachable("decl not allowed in enum!");
 
     // We can't have meaningful initializers for variables; these just show

@@ -862,6 +862,10 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
   printAccessors(decl);
 }
 
+void PrintAST::visitParamDecl(ParamDecl *decl) {
+  llvm_unreachable("Always handled as part of a parameter list");
+}
+
 void PrintAST::printOneParameter(Identifier ArgName,
                                  const Pattern *BodyPattern,
                                  bool StripOuterSliceType,

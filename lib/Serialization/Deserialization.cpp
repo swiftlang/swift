@@ -1808,6 +1808,36 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     break;
   }
 
+  case decls_block::PARAM_DECL: {
+    IdentifierID argNameID, paramNameID;
+    DeclID contextID;
+    bool isLet;
+    TypeID typeID, interfaceTypeID;
+
+    decls_block::ParamLayout::readRecord(scratch, argNameID, paramNameID,
+                                         contextID, isLet, typeID,
+                                         interfaceTypeID);
+
+    auto DC = ForcedContext ? *ForcedContext : getDeclContext(contextID);
+    if (declOrOffset.isComplete())
+      return declOrOffset;
+
+    auto type = getType(typeID);
+    if (declOrOffset.isComplete())
+      return declOrOffset;
+
+    auto param = new (ctx) ParamDecl(isLet, SourceLoc(), 
+                                     getIdentifier(argNameID), SourceLoc(),
+                                     getIdentifier(paramNameID), type, DC);
+
+    declOrOffset = param;
+
+    if (auto interfaceType = getType(interfaceTypeID))
+      param->setInterfaceType(interfaceType);
+
+    break;
+  }
+
   case decls_block::FUNC_DECL: {
     DeclID contextID;
     bool isImplicit;

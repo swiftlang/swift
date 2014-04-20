@@ -40,7 +40,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// Serialized module format minor version number.
 ///
 /// When the format changes IN ANY WAY, this number should be incremented.
-const uint16_t VERSION_MINOR = 68;
+const uint16_t VERSION_MINOR = 69;
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -683,6 +683,16 @@ namespace decls_block {
     DeclIDField   // overridden decl
   >;
 
+  using ParamLayout = BCRecordLayout<
+    PARAM_DECL,
+    IdentifierIDField, // argument name
+    IdentifierIDField, // parameter name
+    DeclIDField,  // context decl
+    BCFixed<1>,   // isLet?
+    TypeIDField,  // type
+    TypeIDField  // interface type
+  >;
+
   using FuncLayout = BCRecordLayout<
     FUNC_DECL,
     DeclIDField,  // context decl
@@ -1018,6 +1028,8 @@ static inline decls_block::RecordKind getKindForTable(const Decl *D) {
     return decls_block::FUNC_DECL;
   case DeclKind::Var:
     return decls_block::VAR_DECL;
+  case DeclKind::Param:
+    return decls_block::PARAM_DECL;
 
   case DeclKind::Subscript:
     return decls_block::SUBSCRIPT_DECL;

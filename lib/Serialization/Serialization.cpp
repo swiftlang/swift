@@ -954,6 +954,7 @@ static bool shouldSerializeMember(Decl *D) {
   case DeclKind::Struct:
   case DeclKind::Class:
   case DeclKind::Var:
+  case DeclKind::Param:
   case DeclKind::Func:
     return true;
   }
@@ -1670,6 +1671,27 @@ void Serializer::writeDecl(const Decl *D) {
                           addDeclRef(WillSet),
                           addDeclRef(DidSet),
                           addDeclRef(var->getOverriddenDecl()));
+    break;
+  }
+
+  case DeclKind::Param: {
+    auto param = cast<ParamDecl>(D);
+    checkAllowedAttributes<
+      AK_unowned, AK_weak
+    >(param);
+    verifyAttrSerializable(param);
+
+    const Decl *DC = getDeclForContext(param->getDeclContext());
+    Type type = param->hasType() ? param->getType() : nullptr;
+
+    unsigned abbrCode = DeclTypeAbbrCodes[ParamLayout::Code];
+    ParamLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                            addIdentifierRef(param->getArgumentName()),
+                            addIdentifierRef(param->getName()),
+                            addDeclRef(DC),
+                            param->isLet(),
+                            addTypeRef(type),
+                            addTypeRef(param->getInterfaceType()));
     break;
   }
 
@@ -2421,6 +2443,7 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<StructLayout>();
     registerDeclTypeAbbr<ConstructorLayout>();
     registerDeclTypeAbbr<VarLayout>();
+    registerDeclTypeAbbr<ParamLayout>();
     registerDeclTypeAbbr<FuncLayout>();
     registerDeclTypeAbbr<PatternBindingLayout>();
     registerDeclTypeAbbr<ProtocolLayout>();

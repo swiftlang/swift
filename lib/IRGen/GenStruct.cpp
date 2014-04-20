@@ -416,6 +416,7 @@ void IRGenModule::emitStructDecl(StructDecl *st) {
     case DeclKind::InfixOperator:
     case DeclKind::PrefixOperator:
     case DeclKind::PostfixOperator:
+    case DeclKind::Param:
       llvm_unreachable("decl not allowed in struct!");
 
     // We can have meaningful initializers for variables, but
