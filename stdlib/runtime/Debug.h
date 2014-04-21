@@ -29,7 +29,8 @@
 namespace swift {
 
 LLVM_ATTRIBUTE_NORETURN
-static inline void crash(const char *message) {
+LLVM_ATTRIBUTE_ALWAYS_INLINE // Minimize trashed registers
+static void crash(const char *message) {
   CRSetCrashLogMessage(message);
   // __builtin_trap() doesn't always do the right thing due to GCC compatibility
 #if defined(__i386__) || defined(__x86_64__)
