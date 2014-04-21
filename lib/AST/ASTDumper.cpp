@@ -1139,6 +1139,13 @@ public:
   void visitSuperRefExpr(SuperRefExpr *E) {
     printCommon(E, "super_ref_expr") << ')';
   }
+
+  void visitTypeExpr(TypeExpr *E) {
+    printCommon(E, "type_expr");
+    E->getTypeRepr()->print(OS);
+    OS << ')';
+  }
+
   void visitOtherConstructorDeclRefExpr(OtherConstructorDeclRefExpr *E) {
     printCommon(E, "other_constructor_ref_expr")
       << " decl=";

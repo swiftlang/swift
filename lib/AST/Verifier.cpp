@@ -1176,6 +1176,10 @@ struct ASTNodeBase {};
       verifyCheckedBase(expr);
     }
 
+    void verifyChecked(TypeExpr *expr) {
+      verifyCheckedBase(expr);
+    }
+
     void verifyChecked(ForceValueExpr *E) {
       auto valueTy = E->getType();
       auto optValueTy =

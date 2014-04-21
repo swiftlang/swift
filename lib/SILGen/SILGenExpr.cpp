@@ -158,6 +158,7 @@ namespace {
       llvm_unreachable("cannot appear in rvalue");
     }
     RValue visitDeclRefExpr(DeclRefExpr *E, SGFContext C);
+    RValue visitTypeExpr(TypeExpr *E, SGFContext C);
     RValue visitSuperRefExpr(SuperRefExpr *E, SGFContext C);
     RValue visitOtherConstructorDeclRefExpr(OtherConstructorDeclRefExpr *E,
                                             SGFContext C);
@@ -662,6 +663,12 @@ emitRValueForPropertyLoad(SILLocation loc, ManagedValue base,
 RValue RValueEmitter::visitDeclRefExpr(DeclRefExpr *E, SGFContext C) {
   auto Val = SGF.emitRValueForDecl(E, E->getDeclRef(), E->getType(), C);
   return RValue(SGF, E, Val);
+}
+
+RValue RValueEmitter::visitTypeExpr(TypeExpr *E, SGFContext C) {
+  assert(E->getType()->is<MetatypeType>() &&"TypeExpr must have metatype type");
+  auto Val = SGF.B.createMetatype(E, SGF.getLoweredType(E->getType()));
+  return RValue(SGF, E, ManagedValue::forUnmanaged(Val));
 }
 
 

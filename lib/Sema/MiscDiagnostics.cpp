@@ -136,8 +136,9 @@ static void diagModuleOrMetatypeValue(TypeChecker &TC, const Expr *E) {
       
       auto *DRE = dyn_cast<DeclRefExpr>(Base);
       auto *MRE = dyn_cast<MemberRefExpr>(Base);
-      if ((DRE && isa<TypeDecl>(DRE->getDecl()))
-          || (MRE && isa<TypeDecl>(MRE->getMember().getDecl()))) {
+      if ((DRE && isa<TypeDecl>(DRE->getDecl())) ||
+          (MRE && isa<TypeDecl>(MRE->getMember().getDecl())) ||
+          isa<TypeExpr>(Base)) {
         // Allow references to types as a part of:
         // - member references T.foo, T.Type, T.self, etc. (but *not* T.type)
         // - constructor calls T()
@@ -179,6 +180,7 @@ static void diagModuleOrMetatypeValue(TypeChecker &TC, const Expr *E) {
           case ExprKind::DiscardAssignment:
           case ExprKind::DeclRef:
           case ExprKind::SuperRef:
+          case ExprKind::Type:
           case ExprKind::OtherConstructorDeclRef:
           case ExprKind::UnresolvedConstructor:
           case ExprKind::OverloadedDeclRef:

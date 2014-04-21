@@ -1431,6 +1431,11 @@ namespace {
       return expr;
     }
 
+    Expr *visitTypeExpr(TypeExpr *expr) {
+      // TypeExprs are only formed when valid.
+      return expr;
+    }
+
     Expr *visitOtherConstructorDeclRefExpr(OtherConstructorDeclRefExpr *expr) {
       expr->setType(expr->getDecl()->getInitializerType());
       return expr;

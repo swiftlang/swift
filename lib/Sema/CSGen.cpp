@@ -251,7 +251,12 @@ namespace {
       
       return E->getType();
     }
-    
+
+    Type visitTypeExpr(TypeExpr *E) {
+      // TypeExpr is only ever built with the right type.
+      return E->getType();
+    }
+
     Type visitUnresolvedConstructorExpr(UnresolvedConstructorExpr *expr) {
       ASTContext &C = CS.getASTContext();
       

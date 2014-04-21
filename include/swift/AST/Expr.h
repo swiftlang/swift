@@ -691,7 +691,27 @@ public:
     return E->getKind() == ExprKind::SuperRef;
   }
 };
+
+/// A reference to a type in expression context, spelled out as a TypeLoc. Sema
+/// forms this expression as a result of name binding.  This always has
+/// MetaTypetype.
+class TypeExpr : public Expr {
+  TypeLoc Info;
+public:
+
+  TypeLoc getTypeLoc() const { return Info; }
+  TypeRepr *getTypeRepr() const { return Info.getTypeRepr(); }
+  Type getType() const { return Info.getType(); }
+
+  SourceRange getSourceRange() const { return Info.getSourceRange(); }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::Type;
+  }
+};
   
+  
+
 /// A reference to another initializer from within a constructor body,
 /// either to a delegating initializer or to a super.init invocation.
 /// For a reference type, this semantically references a different constructor
@@ -718,7 +738,7 @@ public:
     return E->getKind() == ExprKind::OtherConstructorDeclRef;
   }
 };
-  
+
 /// An unresolved reference to a constructor member of a value. Resolves to a
 /// DotSyntaxCall involving the value and the resolved constructor.
 class UnresolvedConstructorExpr : public Expr {
