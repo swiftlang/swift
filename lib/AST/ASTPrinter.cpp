@@ -2097,6 +2097,7 @@ static StringRef getStringForResultConvention(ResultConvention conv) {
   switch (conv) {
   case ResultConvention::Owned: return "@owned ";
   case ResultConvention::Unowned: return "";
+  case ResultConvention::UnownedInnerPointer: return "@unowned_inner_pointer ";
   case ResultConvention::Autoreleased: return "@autoreleased ";
   }
   llvm_unreachable("bad result convention");

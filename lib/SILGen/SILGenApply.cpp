@@ -1569,7 +1569,14 @@ static ManagedValue emitApply(SILGenFunction &gen,
       // Autoreleased. Retain using retain_autoreleased.
       gen.B.createStrongRetainAutoreleased(loc, scalarResult);
       break;
-    
+        
+    case ResultConvention::UnownedInnerPointer:
+      // We need to lifetime-extend the 'self' parameter to protect the return
+      // value.
+      // TODO
+      gen.SGM.diagnose(loc, diag::not_implemented, "inner pointer lifetime extension");
+      SWIFT_FALLTHROUGH;
+        
     case ResultConvention::Unowned:
       // Unretained. Retain the value.
       actualResultTL.emitRetainValue(gen.B, loc, scalarResult);

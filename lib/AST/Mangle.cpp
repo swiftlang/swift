@@ -814,6 +814,7 @@ void Mangler::mangleType(CanType type, ResilienceExpansion explosion,
       switch (conv) {
       case ResultConvention::Owned: return 'o';
       case ResultConvention::Unowned: return 'd';
+      case ResultConvention::UnownedInnerPointer: return 'D';
       case ResultConvention::Autoreleased: return 'a';
       }
       llvm_unreachable("bad result convention");

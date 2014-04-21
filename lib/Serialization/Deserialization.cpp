@@ -2456,6 +2456,7 @@ Optional<swift::ResultConvention> getActualResultConvention(uint8_t raw) {
   case serialization::ResultConvention::ID: return swift::ResultConvention::ID;
   CASE(Owned)
   CASE(Unowned)
+  CASE(UnownedInnerPointer)
   CASE(Autoreleased)
 #undef CASE
   }

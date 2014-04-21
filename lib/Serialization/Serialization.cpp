@@ -1882,6 +1882,7 @@ static uint8_t getRawStableResultConvention(swift::ResultConvention rc) {
   switch (rc) {
   SIMPLE_CASE(ResultConvention, Owned)
   SIMPLE_CASE(ResultConvention, Unowned)
+  SIMPLE_CASE(ResultConvention, UnownedInnerPointer)
   SIMPLE_CASE(ResultConvention, Autoreleased)
   }
   llvm_unreachable("bad result convention kind");

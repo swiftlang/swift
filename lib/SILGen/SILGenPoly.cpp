@@ -132,6 +132,7 @@
 #include "swift/Basic/Fallthrough.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/Types.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
@@ -709,6 +710,12 @@ static SILValue getThunkResult(SILGenFunction &gen,
       innerResultValue =
         gen.B.createStrongRetainAutoreleased(loc, innerResultValue);
       break;
+    case ResultConvention::UnownedInnerPointer:
+      // FIXME: We can't reasonably lifetime-extend an inner-pointer result
+      // through a thunk.
+      gen.SGM.diagnose(loc.getSourceLoc(), diag::not_implemented,
+                       "reabstraction of returns_inner_pointer function");
+      SWIFT_FALLTHROUGH;
     case ResultConvention::Unowned:
       innerResultTL.emitRetainValue(gen.B, loc, innerResultValue);
       break;

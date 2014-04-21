@@ -2207,6 +2207,11 @@ enum class ResultConvention {
   /// may invalidate it.
   Unowned,
 
+  /// The caller is not responsible for destroying this return value.
+  /// The validity of the return value is dependent on the 'self' parameter,
+  /// so it may be invalidated if that parameter is released.
+  UnownedInnerPointer,
+  
   /// This value has been (or may have been) returned autoreleased.
   /// The caller should make an effort to reclaim the autorelease.
   /// The type must be a class or class existential type, and this

@@ -1506,8 +1506,10 @@ static void emitObjCReturnValue(SILGenFunction &gen,
   case ResultConvention::Autoreleased:
     gen.B.createAutoreleaseReturn(loc, result);
     return;
+  case ResultConvention::UnownedInnerPointer:
   case ResultConvention::Unowned:
-    gen.B.emitReleaseValueOperation(loc, result);
+    assert(gen.getTypeLowering(result.getType()).isTrivial()
+           && "nontrivial result is returned unowned?!");
     SWIFT_FALLTHROUGH;
   case ResultConvention::Owned:
     gen.B.createReturn(loc, result);

@@ -843,6 +843,8 @@ which are juxtaposed and terminated with a trailing underscore.
   impl-callee-convention ::= impl-convention  // thick, callee transfered with given convention
   impl-convention ::= 'a'                     // direct, autoreleased
   impl-convention ::= 'd'                     // direct, no ownership transfer
+  impl-convention ::= 'D'                     // direct, no ownership transfer,
+                                              // dependent on 'self' parameter
   impl-convention ::= 'g'                     // direct, guaranteed
   impl-convention ::= 'i'                     // indirect, ownership transfer
   impl-convention ::= 'l'                     // indirect, inout

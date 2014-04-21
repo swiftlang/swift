@@ -1668,6 +1668,8 @@ private:
 
   // impl-convention ::= 'a'                     // direct, autoreleased
   // impl-convention ::= 'd'                     // direct, no ownership transfer
+  // impl-convention ::= 'D'                     // direct, no ownership transfer,
+                                                 // dependent on self
   // impl-convention ::= 'g'                     // direct, guaranteed
   // impl-convention ::= 'i'                     // indirect, ownership transfer
   // impl-convention ::= 'l'                     // indirect, inout
@@ -1682,9 +1684,9 @@ private:
       }                                                              \
       llvm_unreachable("bad context");                               \
     }
-
     CASE('a',   Nothing,                Nothing,         "@autoreleased")
     CASE('d',   "@callee_unowned",      "@unowned",      "@unowned")
+    CASE('d',   Nothing,                Nothing,         "@unowned_inner_pointer")
     CASE('g',   "@callee_guaranteed",   "@guaranteed",   Nothing)
     CASE('i',   Nothing,                "@in",           "@out")
     CASE('l',   Nothing,                "@inout",        Nothing)

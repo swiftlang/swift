@@ -1362,6 +1362,8 @@ SILResultInfo TypeResolver::resolveSILResult(TypeRepr *repr,
       convention = attrConv;
     };
     checkFor(TypeAttrKind::TAK_owned, ResultConvention::Owned);
+    checkFor(TypeAttrKind::TAK_unowned_inner_pointer,
+             ResultConvention::UnownedInnerPointer);
     checkFor(TypeAttrKind::TAK_autoreleased, ResultConvention::Autoreleased);
 
     type = resolveAttributedType(attrs, attrRepr->getTypeRepr(), options);

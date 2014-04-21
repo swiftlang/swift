@@ -972,6 +972,7 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &gen,
   
   // Handle the result convention.
   switch (blockTy->getInterfaceResult().getConvention()) {
+  case ResultConvention::UnownedInnerPointer:
   case ResultConvention::Unowned:
     assert(gen.getTypeLowering(resultVal.getType()).isTrivial()
            && "nontrivial result is returned unowned?!");
