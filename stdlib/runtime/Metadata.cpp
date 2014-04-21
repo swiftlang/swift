@@ -271,16 +271,11 @@ const void *
 swift::swift_dynamicCastClass(const void *object, 
                               const ClassMetadata *targetType) {
 #if SWIFT_OBJC_INTEROP
-  if (targetType->isPureObjC()) {
-    return swift_dynamicCastObjCClass(object, targetType);
-  }
-  // Swift cannot subclass tagged classes
-  // The tag big is either high or low.
-  // We need to handle both scenarios for now..
-  if (((long)object & 1) || ((long)object <= 0)) {
-    return NULL;
-  }
-#endif
+  // If the object is an Objective-C object then we 
+  // must not dereference it or its isa field directly.
+  // FIXME: optimize this for objects that have no ObjC inheritance.
+  return swift_dynamicCastObjCClass(object, targetType);
+#else
   const ClassMetadata *isa = *reinterpret_cast<ClassMetadata *const*>(object);
   do {
     if (isa == targetType) {
@@ -289,6 +284,7 @@ swift::swift_dynamicCastClass(const void *object,
     isa = isa->SuperClass;
   } while (isa);
   return NULL;
+#endif
 }
 
 /// The primary entrypoint.
@@ -296,10 +292,11 @@ const void *
 swift::swift_dynamicCastClassUnconditional(const void *object,
                                            const ClassMetadata *targetType) {
 #if SWIFT_OBJC_INTEROP
-  if (targetType->isPureObjC()) {
-    return swift_dynamicCastObjCClassUnconditional(object, targetType);
-  }
-#endif
+  // If the object is an Objective-C object then we 
+  // must not dereference it or its isa field directly.
+  // FIXME: optimize this for objects that have no ObjC inheritance.
+  return swift_dynamicCastObjCClassUnconditional(object, targetType);
+#else
   const ClassMetadata *isa = *reinterpret_cast<ClassMetadata *const*>(object);
   do {
     if (isa == targetType) {
@@ -308,6 +305,7 @@ swift::swift_dynamicCastClassUnconditional(const void *object,
     isa = isa->SuperClass;
   } while (isa);
   swift::crash("Swift dynamic cast failed");
+#endif
 }
 
 const void *
