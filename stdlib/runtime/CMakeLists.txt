@@ -44,5 +44,5 @@ target_link_libraries(swift_runtime
 
 if (EXISTS "/usr/local/lib/libCrashReporterClient.a")
     target_link_libraries(swift_runtime
-      "/usr/local/lib/libCrashReporterClient.a")
+      "-lCrashReporterClient")
 endif()
