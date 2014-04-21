@@ -915,6 +915,10 @@ struct ClassMetadata : public HeapMetadata {
   bool isTypeMetadata() const {
     return Data & 1;
   }
+  /// A different perspective on the same bit
+  bool isPureObjC() const {
+    return !isTypeMetadata();
+  }
 
   /// An out-of-line Swift-specific description of the type.
   const NominalTypeDescriptor *Description;
