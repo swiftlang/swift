@@ -580,34 +580,25 @@ ParserResult<ArrayTypeRepr> Parser::parseTypeArray(TypeRepr *Base) {
                                       SourceRange(lsquareLoc,
                                                   getEndOfPreviousLoc()));
     return makeParserErrorResult(ATR);
-  } else {
-
-    // If the size expression is null, we would have raised the
-    // expected_expr_array_type error above when the token stream failed to
-    // parse as an expression
-    if (!sizeEx.isNull()) {
-      diagnose(lsquareLoc, diag::expected_expr_array_type)
-      .highlight(sizeEx.get()->getSourceRange());
-    }
-    else {
-      // Skip until the next decl, statement or block
-      skipUntilDeclStmtRBrace(tok::l_brace);
-    }
-    
-    // Create an array slice type for the malformed array type specification
-    NestedType = makeParserErrorResult(Base);
-    ATR = new (Context) ArrayTypeRepr(NestedType.get(),
-                                           nullptr,
-                                           SourceRange(lsquareLoc,
-                                                       getEndOfPreviousLoc()));
-    return makeParserErrorResult(ATR);
   }
 
-  // If we're starting another square-bracket clause, recur.
-  if (Tok.isFollowingLSquare() && parseTypeArray(Base).isParseError())
-    return nullptr;
+  // If the size expression is null, we would have raised the
+  // expected_expr_array_type error above when the token stream failed to
+  // parse as an expression
+  if (!sizeEx.isNull()) {
+    diagnose(lsquareLoc, diag::expected_expr_array_type)
+    .highlight(sizeEx.get()->getSourceRange());
+  } else {
+    // Skip until the next decl, statement or block
+    skipUntilDeclStmtRBrace(tok::l_brace);
+  }
 
-  return nullptr;
+  // Create an array slice type for the malformed array type specification
+  NestedType = makeParserErrorResult(Base);
+  ATR = new (Context) ArrayTypeRepr(NestedType.get(), nullptr,
+                                    SourceRange(lsquareLoc,
+                                                getEndOfPreviousLoc()));
+  return makeParserErrorResult(ATR);
 }
 
 /// Parse a single optional suffix, given that we are looking at the
