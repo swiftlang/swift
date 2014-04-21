@@ -306,9 +306,8 @@ public:
   }
 
   /// Access to the allocator.
-  typedef typename llvm::ReferenceAdder<AllocatorTy>::result AllocatorRefTy;
-  typedef typename llvm::ReferenceAdder<const AllocatorTy>::result
-  AllocatorCRefTy;
+  typedef AllocatorTy &AllocatorRefTy;
+  typedef const AllocatorTy &AllocatorCRefTy;
   AllocatorRefTy getAllocator() { return Allocator; }
   AllocatorCRefTy getAllocator() const { return Allocator; }
 
