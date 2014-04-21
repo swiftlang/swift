@@ -2123,10 +2123,66 @@ namespace {
     ConstructorDecl *importConstructor(const clang::ObjCMethodDecl *objcMethod,
                                        DeclContext *dc,
                                        bool implicit,
-                                       Optional<CtorInitializerKind> kind,
+                                       Optional<CtorInitializerKind> kindIn,
                                        bool required,
                                        ObjCSelector selector,
                                        DeclName name) {
+      // Figure out the type of the container.
+      auto containerTy = dc->getDeclaredTypeOfContext();
+      assert(containerTy && "Method in non-type context?");
+      auto nominalOwner = containerTy->getAnyNominal();
+
+      // Find the interface, if we can.
+      const clang::ObjCInterfaceDecl *interface = nullptr;
+      if (isa<clang::ObjCProtocolDecl>(objcMethod->getDeclContext())) {
+        // FIXME: Part of the mirroring hack.
+        if (auto classDecl = containerTy->getClassOrBoundGenericClass())
+          interface = dyn_cast_or_null<clang::ObjCInterfaceDecl>(
+                        classDecl->getClangDecl());
+      } else {
+        // For non-protocol methods, just look for the interface.
+        interface = objcMethod->getClassInterface();
+      }
+
+      // If we weren't told what kind of initializer this should be,
+      // figure it out now.
+      CtorInitializerKind kind;
+      if (kindIn) {
+        kind = *kindIn;
+      } else {
+        // If the owning Objective-C class has designated initializers and this
+        // is not one of them, treat it as a convenience initializer.
+        if (interface && Impl.hasDesignatedInitializers(interface) &&
+            !Impl.isDesignatedInitializer(interface, objcMethod)) {
+          kind = CtorInitializerKind::Convenience;
+        } else {
+          kind = CtorInitializerKind::Designated;
+        }
+      }
+
+      // Look for other constructors that occur in this context with
+      // the same name.
+      for (auto other : nominalOwner->lookupDirect(name)) {
+        auto ctor = dyn_cast<ConstructorDecl>(other);
+        if (!ctor || ctor->isInvalid() || ctor->getAttrs().isUnavailable())
+          continue;
+        
+        // If the existing constructor has a less-desirable kind, mark
+        // the existing constructor unavailable.
+        if (static_cast<unsigned>(kind) < 
+              static_cast<unsigned>(ctor->getInitKind())) {
+          auto attr 
+            = AvailabilityAttr::createImplicitUnavailableAttr(
+                Impl.SwiftContext, "superseded");
+          ctor->getMutableAttrs().add(attr);
+          continue;
+        }
+
+        // Otherwise, we shouldn't create a new constructor, because
+        // it will be no better than the existing one.
+        return nullptr;
+      }
+
       // Add the implicit 'self' parameter patterns.
       SmallVector<Pattern *, 4> bodyPatterns;
       auto selfTy = getSelfTypeForContext(dc);
@@ -2151,22 +2207,6 @@ namespace {
       if (known != Impl.Constructors.end())
         return known->second;
 
-      // Figure out the type of the container.
-      auto containerTy = dc->getDeclaredTypeOfContext();
-      assert(containerTy && "Method in non-type context?");
-
-      // Find the interface, if we can.
-      const clang::ObjCInterfaceDecl *interface = nullptr;
-      if (isa<clang::ObjCProtocolDecl>(objcMethod->getDeclContext())) {
-        // FIXME: Part of the mirroring hack.
-        if (auto classDecl = containerTy->getClassOrBoundGenericClass())
-          interface = dyn_cast_or_null<clang::ObjCInterfaceDecl>(
-                        classDecl->getClangDecl());
-      } else {
-        // For non-protocol methods, just look for the interface.
-        interface = objcMethod->getClassInterface();
-      }
-
       // A constructor returns an object of the type, not 'id'.
       // This is effectively implementing related-result-type semantics.
       // FIXME: Perhaps actually check whether the routine has a related result
@@ -2185,6 +2225,11 @@ namespace {
       auto result = new (Impl.SwiftContext)
           ConstructorDecl(name, SourceLoc(), selfPat, bodyPatterns.back(),
                           /*GenericParams=*/0, dc);
+      
+      // Make the constructor declaration immediately visible in its
+      // class or protocol type.
+      nominalOwner->makeMemberVisible(result);
+
       result->setClangNode(objcMethod);
       addObjCAttribute(result, selector);
 
@@ -2207,17 +2252,8 @@ namespace {
       if (implicit)
         result->setImplicit();
 
-      // If we were told what kind of initializer this should be, set it.
-      if (kind) {
-        result->setInitKind(*kind);
-      } else {
-        // If the owning Objective-C class has designated initializers and this
-        // is not one of them, treat it as a convenience initializer.
-        if (interface && Impl.hasDesignatedInitializers(interface) &&
-            !Impl.isDesignatedInitializer(interface, objcMethod)) {
-          result->setInitKind(CtorInitializerKind::Convenience);
-        }
-      }
+      // Set the kind of initializer.
+      result->setInitKind(kind);
 
       // If this initializer is required, add the appropriate attribute.
       if (required) {
@@ -3142,8 +3178,9 @@ namespace {
             continue;
 
           // Don't inherit factory initializers.
-          if (ctor->isFactoryInit())
+          if (ctor->isFactoryInit()) {
             continue;
+          }
 
           auto objcMethod
             = dyn_cast_or_null<clang::ObjCMethodDecl>(ctor->getClangDecl());
@@ -4234,59 +4271,6 @@ ClangImporter::Implementation::loadAllMembers(const Decl *D, uint64_t unused) {
   converter.importMirroredProtocolMembers(clangDecl,
                                           const_cast<DeclContext *>(DC),
                                           protos, members, SwiftContext);
-
-
-  // Clean up duplicate initializers that may have come from
-  // duplication between init methods and factory methods.
-  // FIXME: This should be done "online", as we visit declarations,
-  // both because it's silly to have a separate pass here and because
-  // we're not properly dealing with duplication between extensions.
-
-  // First, gather the initializers.
-  llvm::SmallDenseMap<DeclName, llvm::TinyPtrVector<ConstructorDecl *>>
-    AllInitializers;
-  bool anyDuplicates = false;
-  for (auto member : members) {
-    auto ctor = dyn_cast<ConstructorDecl>(member);
-    if (!ctor)
-      continue;
-
-    auto &inits = AllInitializers[ctor->getFullName()];
-    if (!inits.empty())
-      anyDuplicates = true;
-    inits.push_back(ctor);
-  }
-
-  llvm::SmallPtrSet<Decl *, 4> redundantMembers;
-  if (anyDuplicates) {
-    // Next, find any redundant initializers.
-    for (const auto &colliding : AllInitializers) {
-      if (colliding.second.size() == 1)
-        continue;
-
-      // Find the "best" constructor kind with this signature.
-      CtorInitializerKind bestKind = colliding.second[0]->getInitKind();
-      for (auto ctor : colliding.second) {
-        auto kind = ctor->getInitKind();
-        if (static_cast<unsigned>(kind) < static_cast<unsigned>(bestKind))
-          bestKind = kind;
-      }
-      
-      // Shadow any initializers with a worse kind.
-      for (auto ctor : colliding.second) {
-        auto kind = ctor->getInitKind();
-        if (static_cast<unsigned>(kind) > static_cast<unsigned>(bestKind))
-          redundantMembers.insert(ctor);
-      }
-    }
-
-    // Remove the redundant initializers.
-    members.erase(std::remove_if(members.begin(), members.end(),
-                                 [&](Decl *decl) -> bool {
-                                   return redundantMembers.count(decl) > 0;
-                                 }),
-                  members.end());
-  }
 
   return SwiftContext.AllocateCopy(members);
 }

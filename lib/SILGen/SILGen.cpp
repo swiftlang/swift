@@ -483,6 +483,12 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
   if (isa<ProtocolDecl>(decl->getDeclContext()))
     return;
 
+  // Always-unavailable imported constructors are factory methods
+  // that have been imported as constructors and then hidden by an
+  // imported init method.
+  if (decl->hasClangNode() && decl->getAttrs().isUnavailable())
+    return;
+
   SILDeclRef constant(decl);
   SILFunction *f = preEmitFunction(constant, decl, decl);
   PrettyStackTraceSILFunction X("silgen emitConstructor", f);

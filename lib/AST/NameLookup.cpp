@@ -81,7 +81,7 @@ void swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
     knownDecls.push_back(decl);
 
     // Specifically keep track of Objective-C initializers, which can come from
-    // either 
+    // either init methods or factory methods.
     if (decl->hasClangNode()) {
       if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
         auto ctorSignature
@@ -119,7 +119,20 @@ void swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
         // Determine whether one module takes precedence over another.
         auto secondDecl = collidingDecls.second[secondIdx];
         auto secondModule = secondDecl->getModuleContext();
-
+         
+        // If one declaration is available and the other is not, prefer the
+        // available one.
+        if (firstDecl->getAttrs().isUnavailable() !=
+              secondDecl->getAttrs().isUnavailable()) {
+         if (firstDecl->getAttrs().isUnavailable()) {
+           shadowed.insert(firstDecl);
+           break;
+         } else {
+           shadowed.insert(secondDecl);
+           continue;
+         }
+        }
+         
         // If the first and second declarations are in the same module,
         // prefer one in the type itself vs. one in an extension.
         // FIXME: Should redeclaration checking prevent this from happening?
