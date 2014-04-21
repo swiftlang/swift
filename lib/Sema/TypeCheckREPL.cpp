@@ -361,7 +361,8 @@ void StmtBuilder::printCollection(VarDecl *Arg, Type KeyTy, Type ValueTy,
   // Construct the loop.
   Expr *argRef = getArgRefExpr(Arg, MemberIndexes, Loc);
   
-  addToBody(new (Context) ForEachStmt(Loc, pattern, Loc, argRef, loopBody));
+  addToBody(new (Context) ForEachStmt(LabeledStmtInfo(),
+                                      Loc, pattern, Loc, argRef, loopBody));
 
   // Add closing bracket ']'.
   printLiteralString("]", EndLoc);

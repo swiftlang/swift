@@ -18,6 +18,7 @@
 #define SWIFT_AST_STMT_H
 
 #include "swift/AST/ASTNode.h"
+#include "swift/AST/Identifier.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/NullablePtr.h"
 #include "swift/Basic/Optional.h"
@@ -36,6 +37,8 @@ namespace swift {
   
 enum class StmtKind {
 #define STMT(ID, PARENT) ID,
+#define STMT_RANGE(Id, FirstId, LastId) \
+  First_##Id##Stmt = FirstId, Last_##Id##Stmt = LastId,
 #include "swift/AST/StmtNodes.def"
 };
 
@@ -258,18 +261,50 @@ public:
     return S->getKind() == StmtKind::IfConfig;
   }
 };
+ 
+
+struct LabeledStmtInfo {
+  Identifier Name;
+  SourceLoc Loc;
+  
+  // Evaluates to true if set.
+  operator bool() const { return !Name.empty(); }
+};
+  
+/// LabeledStmt - Common base class between the labeled statements (loops and
+/// switch).
+class LabeledStmt : public Stmt {
+  LabeledStmtInfo LabelInfo;
+protected:
+  SourceLoc getLabelLocOrKeywordLoc(SourceLoc L) const {
+    return LabelInfo ? LabelInfo.Loc : L;
+  }
+public:
+  LabeledStmt(StmtKind Kind, bool Implicit, LabeledStmtInfo LabelInfo)
+    : Stmt(Kind, Implicit), LabelInfo(LabelInfo) {}
+  
+  LabeledStmtInfo getLabelInfo() const { return LabelInfo; }
+  void setLabelInfo(LabeledStmtInfo L) { LabelInfo = L; }
+  
+  static bool classof(const Stmt *S) {
+    return S->getKind() >= StmtKind::First_LabeledStmt &&
+           S->getKind() <= StmtKind::Last_LabeledStmt;
+  }
+};
+
   
 /// WhileStmt - while statement. After type-checking, the condition is of
 /// type Builtin.Int1.
-class WhileStmt : public Stmt {
+class WhileStmt : public LabeledStmt {
   SourceLoc WhileLoc;
   StmtCondition Cond;
   Stmt *Body;
   
 public:
-  WhileStmt(SourceLoc WhileLoc, StmtCondition Cond, Stmt *Body,
-            Optional<bool> implicit = {})
-  : Stmt(StmtKind::While, getDefaultImplicitFlag(implicit, WhileLoc)),
+  WhileStmt(LabeledStmtInfo LabelInfo, SourceLoc WhileLoc, StmtCondition Cond,
+            Stmt *Body, Optional<bool> implicit = {})
+  : LabeledStmt(StmtKind::While, getDefaultImplicitFlag(implicit, WhileLoc),
+                LabelInfo),
     WhileLoc(WhileLoc), Cond(Cond), Body(Body) {}
 
   SourceRange getSourceRange() const;
@@ -285,15 +320,16 @@ public:
   
 /// DoWhileStmt - do/while statement. After type-checking, the condition is of
 /// type Builtin.Int1.
-class DoWhileStmt : public Stmt {
+class DoWhileStmt : public LabeledStmt {
   SourceLoc DoLoc, WhileLoc;
   Stmt *Body;
   Expr *Cond;
   
 public:
-  DoWhileStmt(SourceLoc DoLoc, Expr *Cond, SourceLoc WhileLoc, Stmt *Body,
-              Optional<bool> implicit = {})
-    : Stmt(StmtKind::DoWhile, getDefaultImplicitFlag(implicit, DoLoc)),
+  DoWhileStmt(LabeledStmtInfo LabelInfo, SourceLoc DoLoc, Expr *Cond,
+              SourceLoc WhileLoc, Stmt *Body, Optional<bool> implicit = {})
+    : LabeledStmt(StmtKind::DoWhile, getDefaultImplicitFlag(implicit, DoLoc),
+                  LabelInfo),
       DoLoc(DoLoc), WhileLoc(WhileLoc), Body(Body), Cond(Cond) {}
   
   SourceRange getSourceRange() const;
@@ -311,7 +347,7 @@ public:
 /// type Builtin.Int1.  Note that the condition is optional.  If not present,
 /// it always evaluates to true.  The Initializer and Increment are also
 /// optional.
-class ForStmt : public Stmt {
+class ForStmt : public LabeledStmt {
   SourceLoc ForLoc, Semi1Loc, Semi2Loc;
   NullablePtr<Expr> Initializer;
   ArrayRef<Decl*> InitializerVarDecls;
@@ -320,23 +356,22 @@ class ForStmt : public Stmt {
   Stmt *Body;
   
 public:
-  ForStmt(SourceLoc ForLoc,
+  ForStmt(LabeledStmtInfo LabelInfo, SourceLoc ForLoc,
           NullablePtr<Expr> Initializer,
           ArrayRef<Decl*> InitializerVarDecls,
           SourceLoc Semi1Loc, NullablePtr<Expr> Cond, SourceLoc Semi2Loc,
           NullablePtr<Expr> Increment,
           Stmt *Body,
           Optional<bool> implicit = {})
-  : Stmt(StmtKind::For, getDefaultImplicitFlag(implicit, ForLoc)),
+  : LabeledStmt(StmtKind::For, getDefaultImplicitFlag(implicit, ForLoc),
+                LabelInfo),
     ForLoc(ForLoc), Semi1Loc(Semi1Loc),
     Semi2Loc(Semi2Loc), Initializer(Initializer),
     InitializerVarDecls(InitializerVarDecls),
     Cond(Cond), Increment(Increment), Body(Body) {
   }
   
-  SourceRange getSourceRange() const {
-    return SourceRange(ForLoc, Body->getEndLoc());
-  }
+  SourceRange getSourceRange() const;
   
   NullablePtr<Expr> getInitializer() const { return Initializer; }
   void setInitializer(Expr *V) { Initializer = V; }
@@ -365,7 +400,7 @@ public:
 ///   println(String(i))
 /// }
 /// \endcode
-class ForEachStmt : public Stmt {
+class ForEachStmt : public LabeledStmt {
   SourceLoc ForLoc;
   SourceLoc InLoc;
   Pattern *Pat;
@@ -379,10 +414,11 @@ class ForEachStmt : public Stmt {
   Expr *GeneratorNext = nullptr;
 
 public:
-  ForEachStmt(SourceLoc ForLoc, Pattern *Pat, SourceLoc InLoc,
-              Expr *Sequence, BraceStmt *Body,
+  ForEachStmt(LabeledStmtInfo LabelInfo, SourceLoc ForLoc, Pattern *Pat,
+              SourceLoc InLoc,  Expr *Sequence, BraceStmt *Body,
               Optional<bool> implicit = {})
-    : Stmt(StmtKind::ForEach, getDefaultImplicitFlag(implicit, ForLoc)),
+    : LabeledStmt(StmtKind::ForEach, getDefaultImplicitFlag(implicit, ForLoc),
+                  LabelInfo),
       ForLoc(ForLoc), InLoc(InLoc), Pat(Pat),
       Sequence(Sequence), Body(Body) { }
   
@@ -417,9 +453,7 @@ public:
   BraceStmt *getBody() const { return Body; }
   void setBody(BraceStmt *B) { Body = B; }
   
-  SourceRange getSourceRange() const {
-    return SourceRange(ForLoc, Body->getEndLoc());
-  }
+  SourceRange getSourceRange() const;
   
   static bool classof(const Stmt *S) {
     return S->getKind() == StmtKind::ForEach;
@@ -523,7 +557,7 @@ public:
 };
 
 /// Switch statement.
-class SwitchStmt : public Stmt {
+class SwitchStmt : public LabeledStmt {
   SourceLoc SwitchLoc, LBraceLoc, RBraceLoc;
   Expr *SubjectExpr;
   unsigned CaseCount;
@@ -536,20 +570,18 @@ class SwitchStmt : public Stmt {
     return reinterpret_cast<CaseStmt **>(this + 1);
   }
   
-  SwitchStmt(SourceLoc SwitchLoc,
-             Expr *SubjectExpr,
-             SourceLoc LBraceLoc,
-             unsigned CaseCount,
-             SourceLoc RBraceLoc,
+  SwitchStmt(LabeledStmtInfo LabelInfo, SourceLoc SwitchLoc, Expr *SubjectExpr,
+             SourceLoc LBraceLoc, unsigned CaseCount, SourceLoc RBraceLoc,
              Optional<bool> implicit = {})
-    : Stmt(StmtKind::Switch, getDefaultImplicitFlag(implicit, SwitchLoc)),
+    : LabeledStmt(StmtKind::Switch, getDefaultImplicitFlag(implicit, SwitchLoc),
+                  LabelInfo),
       SwitchLoc(SwitchLoc), LBraceLoc(LBraceLoc), RBraceLoc(RBraceLoc),
       SubjectExpr(SubjectExpr), CaseCount(CaseCount)
   {}
 
 public:
   /// Allocate a new SwitchStmt in the given ASTContext.
-  static SwitchStmt *create(SourceLoc SwitchLoc,
+  static SwitchStmt *create(LabeledStmtInfo LabelInfo, SourceLoc SwitchLoc,
                             Expr *SubjectExpr,
                             SourceLoc LBraceLoc,
                             ArrayRef<CaseStmt*> Cases,
@@ -564,7 +596,7 @@ public:
   SourceLoc getRBraceLoc() const { return RBraceLoc; }
   
   SourceLoc getLoc() const { return SwitchLoc; }
-  SourceRange getSourceRange() const { return {SwitchLoc, RBraceLoc}; }
+  SourceRange getSourceRange() const;
   
   /// Get the subject expression of the switch.
   Expr *getSubjectExpr() const { return SubjectExpr; }

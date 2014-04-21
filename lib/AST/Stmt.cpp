@@ -112,12 +112,26 @@ SourceRange IfConfigStmt::getSourceRange() const {
 }
 
 SourceRange WhileStmt::getSourceRange() const {
-  return SourceRange(WhileLoc, Body->getEndLoc());
+  return SourceRange(getLabelLocOrKeywordLoc(WhileLoc), Body->getEndLoc());
 }
 
 SourceRange DoWhileStmt::getSourceRange() const {
-  return SourceRange(DoLoc, Cond->getEndLoc());
+  return SourceRange(getLabelLocOrKeywordLoc(DoLoc), Cond->getEndLoc());
 }
+
+SourceRange ForStmt::getSourceRange() const {
+  return SourceRange(getLabelLocOrKeywordLoc(ForLoc), Body->getEndLoc());
+}
+
+SourceRange ForEachStmt::getSourceRange() const {
+  return SourceRange(getLabelLocOrKeywordLoc(ForLoc), Body->getEndLoc());
+}
+
+SourceRange SwitchStmt::getSourceRange() const {
+  return {getLabelLocOrKeywordLoc(SwitchLoc), RBraceLoc};
+}
+
+
 
 SourceRange CaseLabelItem::getSourceRange() const {
   if (auto *E = getGuardExpr())
@@ -152,7 +166,7 @@ CaseStmt *CaseStmt::create(ASTContext &C, SourceLoc CaseLoc,
                               Body, Implicit);
 }
 
-SwitchStmt *SwitchStmt::create(SourceLoc SwitchLoc,
+SwitchStmt *SwitchStmt::create(LabeledStmtInfo LabelInfo, SourceLoc SwitchLoc,
                                Expr *SubjectExpr,
                                SourceLoc LBraceLoc,
                                ArrayRef<CaseStmt *> Cases,
@@ -160,11 +174,9 @@ SwitchStmt *SwitchStmt::create(SourceLoc SwitchLoc,
                                ASTContext &C) {
   void *p = C.Allocate(sizeof(SwitchStmt) + Cases.size() * sizeof(SwitchStmt*),
                        alignof(SwitchStmt));
-  SwitchStmt *theSwitch = ::new (p) SwitchStmt(SwitchLoc,
-                                               SubjectExpr,
-                                               LBraceLoc,
-                                               Cases.size(),
-                                               RBraceLoc);
+  SwitchStmt *theSwitch = ::new (p) SwitchStmt(LabelInfo, SwitchLoc,
+                                               SubjectExpr, LBraceLoc,
+                                               Cases.size(), RBraceLoc);
   memcpy(theSwitch->getCaseBuffer(),
          Cases.data(), Cases.size() * sizeof(CaseStmt*));
   return theSwitch;

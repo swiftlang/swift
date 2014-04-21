@@ -132,7 +132,8 @@ static void deriveBodyEquatable_enum_eq(AbstractFunctionDecl *eqDecl) {
                                          /*trailingClosure*/ false,
                                          /*implicit*/ true);
   
-  auto switchStmt = SwitchStmt::create(SourceLoc(), abTuple, SourceLoc(),
+  auto switchStmt = SwitchStmt::create(LabeledStmtInfo(),
+                                       SourceLoc(), abTuple, SourceLoc(),
                                        cases, SourceLoc(), C);
   BraceStmt *body
     = BraceStmt::create(C, SourceLoc(), ASTNode(switchStmt), SourceLoc());
@@ -325,7 +326,8 @@ deriveBodyHashable_enum_hashValue(AbstractFunctionDecl *hashValueDecl) {
     cast<NamedPattern>(curriedArgs->getSemanticsProvidingPattern());
   auto selfDecl = selfPattern->getDecl();
   auto selfRef = new (C) DeclRefExpr(selfDecl, SourceLoc(), /*implicit*/true);
-  auto switchStmt = SwitchStmt::create(SourceLoc(), selfRef,
+  auto switchStmt = SwitchStmt::create(LabeledStmtInfo(),
+                                       SourceLoc(), selfRef,
                                        SourceLoc(), cases, SourceLoc(), C);
   
   auto indexRef = new (C) DeclRefExpr(indexVar, SourceLoc(),

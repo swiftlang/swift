@@ -29,19 +29,29 @@
 #define ABSTRACT_STMT(Id, Parent)
 #endif
 
+/// A convenience for determining the range of statements.  These will always
+/// appear immediately after the last member.
+#ifndef STMT_RANGE
+#define STMT_RANGE(Id, First, Last)
+#endif
+
 STMT(Brace, Stmt)
 STMT(Return, Stmt)
 STMT(If, Stmt)
-STMT(While, Stmt)
-STMT(DoWhile, Stmt)
-STMT(For, Stmt)
-STMT(ForEach, Stmt)
-STMT(Switch, Stmt)
+ABSTRACT_STMT(Labeled, Stmt)
+  STMT(While, Stmt)
+  STMT(DoWhile, Stmt)
+  STMT(For, Stmt)
+  STMT(ForEach, Stmt)
+  STMT(Switch, Stmt)
+  STMT_RANGE(Labeled, While, Switch)
 STMT(Case, Stmt)
 STMT(Break, Stmt)
 STMT(Continue, Stmt)
 STMT(Fallthrough, Stmt)
 STMT(IfConfig, Stmt)
 
+
+#undef STMT_RANGE
 #undef ABSTRACT_STMT
 #undef STMT

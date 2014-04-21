@@ -131,7 +131,7 @@ static void deriveBodyRawRepresentable_toRaw(AbstractFunctionDecl *toRawDecl) {
     cast<NamedPattern>(curriedArgs->getSemanticsProvidingPattern());
   auto selfDecl = selfPattern->getDecl();
   auto selfRef = new (C) DeclRefExpr(selfDecl, SourceLoc(), /*implicit*/true);
-  auto switchStmt = SwitchStmt::create(SourceLoc(), selfRef,
+  auto switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), selfRef,
                                        SourceLoc(), cases, SourceLoc(), C);
   auto body = BraceStmt::create(C, SourceLoc(),
                                 ASTNode(switchStmt),
@@ -275,8 +275,8 @@ deriveBodyRawRepresentable_frowRaw(AbstractFunctionDecl *fromRawDecl) {
   auto rawArgPattern = cast<NamedPattern>(args->getSemanticsProvidingPattern());
   auto rawDecl = rawArgPattern->getDecl();
   auto rawRef = new (C) DeclRefExpr(rawDecl, SourceLoc(), /*implicit*/true);
-  auto switchStmt = SwitchStmt::create(SourceLoc(), rawRef, SourceLoc(),
-                                       cases, SourceLoc(), C);
+  auto switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), rawRef,
+                                       SourceLoc(), cases, SourceLoc(), C);
   auto body = BraceStmt::create(C, SourceLoc(),
                                 ASTNode(switchStmt),
                                 SourceLoc());
