@@ -471,49 +471,79 @@ public:
   }
 
   Stmt *visitBreakStmt(BreakStmt *S) {
-#if 0
-    // This implements the new semantics.  Enable in a bit.
-    if (ActiveLabeledStmts.empty()) {
-      TC.diagnose(S->getLoc(), diag::break_outside_loop);
-      return nullptr;
-    }
-    
-    // Temporarily reject break statements that are in a switch, since their
-    // semantics are changing.
-    if (isa<SwitchStmt>(ActiveLabeledStmts.back())) {
-      TC.diagnose(S->getLoc(), diag::break_not_in_switch);
-      return nullptr;
-    }
-    S->setTarget(ActiveLabeledStmts.back());
-#else
     LabeledStmt *Target = nullptr;
-    // Scan to see if we are in any non-switch labeled statements (loops).
-    for (auto LS : ActiveLabeledStmts) {
-      if (!isa<SwitchStmt>(LS))
-        Target = LS; // Take the last one.  Hacky.
+    // Scan to see if we are in any non-switch labeled statements (loops).  Scan
+    // inside out.
+    if (S->getTargetName().empty()) {
+      for (auto I = ActiveLabeledStmts.rbegin(), E = ActiveLabeledStmts.rend();
+           I != E; ++I) {
+        // FIXME: Remove.
+        if (!isa<SwitchStmt>(*I)) {
+          Target = *I;
+          break;
+        }
+      }
+
+      // Temporarily reject break statements that are in a switch, since their
+      // semantics are changing.
+      if (Target && isa<SwitchStmt>(Target)) {
+        TC.diagnose(S->getLoc(), diag::break_not_in_switch);
+        return nullptr;
+      }
+
+    } else {
+      // Scan inside out until we find something with the right label.
+      for (auto I = ActiveLabeledStmts.rbegin(), E = ActiveLabeledStmts.rend();
+           I != E; ++I) {
+        if (S->getTargetName() == (*I)->getLabelInfo().Name) {
+          Target = *I;
+          break;
+        }
+      }
     }
     if (!Target) {
       TC.diagnose(S->getLoc(), diag::break_outside_loop);
       return nullptr;
     }
     S->setTarget(Target);
-#endif
-
     return S;
   }
 
   Stmt *visitContinueStmt(ContinueStmt *S) {
     LabeledStmt *Target = nullptr;
-    // Scan to see if we are in any non-switch labeled statements (loops).
-    for (auto LS : ActiveLabeledStmts) {
-      if (!isa<SwitchStmt>(LS))
-        Target = LS;  // Take the last one.  Hacky.
+    // Scan to see if we are in any non-switch labeled statements (loops).  Scan
+    // inside out.
+    if (S->getTargetName().empty()) {
+      for (auto I = ActiveLabeledStmts.rbegin(), E = ActiveLabeledStmts.rend();
+           I != E; ++I) {
+        // 'continue' with no label looks through switches.
+        if (!isa<SwitchStmt>(*I)) {
+          Target = *I;
+          break;
+        }
+      }
+    } else {
+      // Scan inside out until we find something with the right label.
+      for (auto I = ActiveLabeledStmts.rbegin(), E = ActiveLabeledStmts.rend();
+           I != E; ++I) {
+        if (S->getTargetName() == (*I)->getLabelInfo().Name) {
+          Target = *I;
+          break;
+        }
+      }
     }
+
     if (!Target) {
       TC.diagnose(S->getLoc(), diag::continue_outside_loop);
       return nullptr;
     }
-    
+
+    // Continue cannot be used to repeat switches, use fallthrough instead.
+    if (isa<SwitchStmt>(Target)) {
+      TC.diagnose(S->getLoc(), diag::continue_not_in_switch);
+      return nullptr;
+    }
+
     S->setTarget(Target);
     return S;
   }
@@ -547,6 +577,8 @@ public:
 
     // Type-check the case blocks.
     AddSwitchNest switchNest(*this);
+    AddLabeledStmt labelNest(*this, S);
+
     bool hadTypeError = false;
     for (unsigned i = 0, e = S->getCases().size(); i < e; ++i) {
       auto *caseBlock = S->getCases()[i];

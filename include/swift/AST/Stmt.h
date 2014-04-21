@@ -612,38 +612,58 @@ public:
   }
 };
 
-/// BreakStmt - The keyword "break".
+/// BreakStmt - The "break" and "break label" statement.
 class BreakStmt : public Stmt {
   SourceLoc Loc;
-  LabeledStmt *Target;
+  Identifier TargetName; // Named target statement, if specified in the source.
+  SourceLoc TargetLoc;
+  LabeledStmt *Target;  // Target stmt, wired up by Sema.
 public:
-  BreakStmt(SourceLoc Loc, Optional<bool> implicit = {})
-    : Stmt(StmtKind::Break, getDefaultImplicitFlag(implicit, Loc)), Loc(Loc)
-  {}
+  BreakStmt(SourceLoc Loc, Identifier TargetName, SourceLoc TargetLoc,
+            Optional<bool> implicit = {})
+    : Stmt(StmtKind::Break, getDefaultImplicitFlag(implicit, Loc)), Loc(Loc),
+      TargetName(TargetName), TargetLoc(TargetLoc) {
+  }
 
   SourceLoc getLoc() const { return Loc; }
-  
+
+  Identifier getTargetName() const { return TargetName; }
+  void setTargetName(Identifier N) { TargetName = N; }
+  SourceLoc getTargetLoc() const { return TargetLoc; }
+  void setTargetLoc(SourceLoc L) { TargetLoc = L; }
+
   // Manipulate the target loop/switch that is bring broken out of.  This is set
   // by sema during type checking.
   void setTarget(LabeledStmt *LS) { Target = LS; }
   LabeledStmt *getTarget() const { return Target; }
   
-  SourceRange getSourceRange() const { return Loc; }
+  SourceRange getSourceRange() const {
+    return { Loc, TargetLoc.isValid() ? TargetLoc : Loc };
+  }
 
   static bool classof(const Stmt *S) {
     return S->getKind() == StmtKind::Break;
   }
 };
 
-/// ContinueStmt - The keyword "continue".
+/// ContinueStmt - The "continue" and "continue label" statement.
 class ContinueStmt : public Stmt {
   SourceLoc Loc;
+  Identifier TargetName; // Named target statement, if specified in the source.
+  SourceLoc TargetLoc;
   LabeledStmt *Target;
 
 public:
-  ContinueStmt(SourceLoc Loc, Optional<bool> implicit = {})
-    : Stmt(StmtKind::Continue, getDefaultImplicitFlag(implicit, Loc)), Loc(Loc)
-  {}
+  ContinueStmt(SourceLoc Loc, Identifier TargetName, SourceLoc TargetLoc,
+               Optional<bool> implicit = {})
+    : Stmt(StmtKind::Continue, getDefaultImplicitFlag(implicit, Loc)), Loc(Loc),
+      TargetName(TargetName), TargetLoc(TargetLoc) {
+  }
+
+  Identifier getTargetName() const { return TargetName; }
+  void setTargetName(Identifier N) { TargetName = N; }
+  SourceLoc getTargetLoc() const { return TargetLoc; }
+  void setTargetLoc(SourceLoc L) { TargetLoc = L; }
 
   // Manipulate the target loop that is bring continued.  This is set by sema
   // during type checking.
@@ -652,7 +672,9 @@ public:
   
   SourceLoc getLoc() const { return Loc; }
   
-  SourceRange getSourceRange() const { return Loc; }
+  SourceRange getSourceRange() const {
+    return { Loc, TargetLoc.isValid() ? TargetLoc : Loc };
+  }
 
   static bool classof(const Stmt *S) {
     return S->getKind() == StmtKind::Continue;

@@ -485,12 +485,10 @@ ParserResult<Stmt> Parser::parseStmt() {
     return recoverFromInvalidCase(*this);
   case tok::kw_break:
     if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
-    return makeParserResult(
-        new (Context) BreakStmt(consumeToken(tok::kw_break)));
+    return parseStmtBreak();
   case tok::kw_continue:
     if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
-    return makeParserResult(
-        new (Context) ContinueStmt(consumeToken(tok::kw_continue)));
+    return parseStmtContinue();
   case tok::kw_fallthrough:
     if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
     return makeParserResult(
@@ -554,11 +552,55 @@ ParserResult<BraceStmt> Parser::parseIfConfigStmtBlock(bool isActive,
   return result;
 }
 
+/// parseStmtBreak
+///
+///   stmt-break:
+///     'break' identifier?
+///
+ParserResult<Stmt> Parser::parseStmtBreak() {
+  SourceLoc Loc = consumeToken(tok::kw_break);
+  SourceLoc TargetLoc;
+  Identifier Target;
+
+  // If we have an identifier after this, which is not the start of another
+  // stmt or decl, we assume it is the label to break to.  There is ambiguity
+  // with expressions (e.g. "break x+y") but since the expression after the
+  // break is dead, we don't feel bad eagerly parsing this.
+  if (Tok.is(tok::identifier) && !isStartOfStmt() && !isStartOfDecl()) {
+    Target = Context.getIdentifier(Tok.getText());
+    TargetLoc = consumeToken(tok::identifier);
+  }
+
+  return makeParserResult(new (Context) BreakStmt(Loc, Target, TargetLoc));
+}
+
+/// parseStmtContinue
+///
+///   stmt-continue:
+///     'continue' identifier?
+///
+ParserResult<Stmt> Parser::parseStmtContinue() {
+  SourceLoc Loc = consumeToken(tok::kw_continue);
+  SourceLoc TargetLoc;
+  Identifier Target;
+
+  // If we have an identifier after this, which is not the start of another
+  // stmt or decl, we assume it is the label to continue to.  There is ambiguity
+  // with expressions (e.g. "continue x+y") but since the expression after the
+  // continue is dead, we don't feel bad eagerly parsing this.
+  if (Tok.is(tok::identifier) && !isStartOfStmt() && !isStartOfDecl()) {
+    Target = Context.getIdentifier(Tok.getText());
+    TargetLoc = consumeToken(tok::identifier);
+  }
+
+  return makeParserResult(new (Context) ContinueStmt(Loc, Target, TargetLoc));
+}
+
 
 /// parseStmtReturn
 ///
 ///   stmt-return:
-///     return expr?
+///     'return' expr?
 ///   
 ParserResult<Stmt> Parser::parseStmtReturn() {
   SourceLoc ReturnLoc = consumeToken(tok::kw_return);

@@ -1024,6 +1024,8 @@ public:
   bool isStartOfStmt();
   ParserResult<Stmt> parseStmt();
   ParserStatus parseExprOrStmt(ASTNode &Result);
+  ParserResult<Stmt> parseStmtBreak();
+  ParserResult<Stmt> parseStmtContinue();
   ParserResult<Stmt> parseStmtReturn();
   ParserStatus parseStmtCondition(StmtCondition &Result, Diag<> ID);
   ParserResult<Stmt> parseStmtIf();

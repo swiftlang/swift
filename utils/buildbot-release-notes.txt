@@ -1,6 +1,24 @@
 Latest
 ----------
 
+* Loops and switch statements can now carry labels, and you can break/continue
+  to those labels.  These use conventional C-style label syntax, and should be
+  dedented relative to the code they are in.  An example:
+  
+    func breakContinue(x : Int) -> Int {
+    Outer:
+      for a in 0..1000 {
+
+      Switch:
+        switch x {
+        case 42: break Outer
+        case 97: continue Outer
+        case 102: break Switch
+        case 13: continue         // continue always works on loops.
+        case 139: break           // break breaks to the loop (right now)
+        }
+      }
+    }
 
 2014-04-18
 ----------
