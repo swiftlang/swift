@@ -108,10 +108,6 @@ struct ASTContext::Implementation {
   // FIXME: We shouldn't be special-casing Clang.
   llvm::IntrusiveRefCntPtr<ClangModuleLoader> TheClangModuleLoader;
 
-  /// \brief Map from Swift declarations to the Clang nodes from which
-  /// they were imported.
-  llvm::DenseMap<const Decl *, ClangNode> ClangNodes;
-
   /// \brief Map from Swift declarations to raw comments.
   llvm::DenseMap<const Decl *, RawComment> RawComments;
 
@@ -924,16 +920,6 @@ Module *ASTContext::getStdlibModule() const {
 
   TheStdlibModule = getLoadedModule(StdlibModuleName);
   return TheStdlibModule;
-}
-
-ClangNode ASTContext::getClangNode(const Decl *decl) {
-  auto known = Impl.ClangNodes.find(decl);
-  assert(known != Impl.ClangNodes.end() && "No Clang node?");
-  return known->second;
-}
-
-void ASTContext::setClangNode(const Decl *decl, ClangNode node) {
-  Impl.ClangNodes[decl] = node;
 }
 
 Optional<RawComment> ASTContext::getRawComment(const Decl *D) {

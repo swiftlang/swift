@@ -598,9 +598,6 @@ private:
   Optional<StringRef> getBriefComment(const Decl *D);
   void setBriefComment(const Decl *D, StringRef Comment);
 
-  ClangNode getClangNode(const Decl *decl);
-  void setClangNode(const Decl *decl, ClangNode node);
-
   friend class BoundGenericType;
 
   /// \brief Retrieve the substitutions for a bound generic type, if known.

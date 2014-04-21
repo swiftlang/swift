@@ -18,6 +18,7 @@
 #define SWIFT_CLANG_IMPORTER_IMPL_H
 
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/StringExtras.h"
@@ -550,7 +551,8 @@ public:
   ValueDecl *createConstant(Identifier name, DeclContext *dc,
                             Type type, const clang::APValue &value,
                             ConstantConvertKind convertKind,
-                            bool isStatic);
+                            bool isStatic,
+                            ClangNode ClangN);
 
   /// \brief Create a new named constant with the given value.
   ///
@@ -563,7 +565,8 @@ public:
   ValueDecl *createConstant(Identifier name, DeclContext *dc,
                             Type type, StringRef value,
                             ConstantConvertKind convertKind,
-                            bool isStatic);
+                            bool isStatic,
+                            ClangNode ClangN);
 
   /// \brief Create a new named constant using the given expression.
   ///
@@ -576,7 +579,8 @@ public:
   ValueDecl *createConstant(Identifier name, DeclContext *dc,
                             Type type, Expr *valueExpr,
                             ConstantConvertKind convertKind,
-                            bool isStatic);
+                            bool isStatic,
+                            ClangNode ClangN);
 
   /// \brief Retrieve the standard library module.
   Module *getStdlibModule();
@@ -704,6 +708,17 @@ public:
 
   virtual ArrayRef<Decl *> loadAllMembers(const Decl *D,
                                           uint64_t unused) override;
+
+  template <typename DeclTy, typename ...Targs>
+  DeclTy *createDeclWithClangNode(ClangNode ClangN, Targs &&... Args) {
+    assert(ClangN);
+    void *Mem = SwiftContext.Allocate(sizeof(DeclTy) + sizeof(void *),
+                                      alignof(DeclTy));
+    void *DeclPtr = reinterpret_cast<void **>(Mem) + 1;
+    auto D = ::new (DeclPtr) DeclTy(std::forward<Targs>(Args)...);
+    D->setClangNode(ClangN);
+    return D;
+  }
 };
 
 }

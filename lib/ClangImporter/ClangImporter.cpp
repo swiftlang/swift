@@ -1254,11 +1254,11 @@ static void getImportDecls(ClangModuleUnit *ClangUnit, clang::Module *M,
     }
 
     auto *ID = ImportDecl::create(Ctx, ClangUnit, SourceLoc(),
-                                  ImportKind::Module, SourceLoc(), AccessPath);
+                                  ImportKind::Module, SourceLoc(), AccessPath,
+                                  ImportedMod);
     if (IsExported)
       ID->getMutableAttrs().add(new (Ctx) ExportedAttr(/*IsImplicit=*/false));
     Results.push_back(ID);
-    ID->setClangNode(ImportedMod);
   }
 }
 

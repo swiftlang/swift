@@ -670,12 +670,12 @@ Type ClangImporter::Implementation::importFunctionType(
       bodyPattern = new (SwiftContext) AnyPattern(SourceLoc());
     } else {
       auto bodyVar
-        = new (SwiftContext) ParamDecl(/*IsLet*/ true,
+        = createDeclWithClangNode<ParamDecl>(param,
+                                       /*IsLet*/ true,
                                        SourceLoc(), name,
                                        importSourceLoc(param->getLocation()),
                                        bodyName, swiftParamTy, 
                                        firstClangModule);
-      bodyVar->setClangNode(param);
       bodyPattern = new (SwiftContext) NamedPattern(bodyVar);
     }
     bodyPattern->setType(swiftParamTy);
@@ -763,11 +763,11 @@ Type ClangImporter::Implementation::importMethodType(
       bodyPattern = new (SwiftContext) AnyPattern(SourceLoc());
     } else {
       auto bodyVar
-        = new (SwiftContext) ParamDecl(/*IsLet*/ true, SourceLoc(), name,
+        = createDeclWithClangNode<ParamDecl>(param,
+                                       /*IsLet*/ true, SourceLoc(), name,
                                        importSourceLoc(param->getLocation()),
                                        bodyName, swiftParamTy, 
                                        firstClangModule);
-      bodyVar->setClangNode(param);
       bodyPattern = new (SwiftContext) NamedPattern(bodyVar);
     }
     bodyPattern->setType(swiftParamTy);

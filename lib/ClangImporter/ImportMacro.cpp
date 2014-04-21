@@ -58,7 +58,8 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
                                        const clang::MacroInfo *MI,
                                        Identifier name,
                                        const clang::Token *signTok,
-                                       const clang::Token &tok) {
+                                       const clang::Token &tok,
+                                       const clang::MacroInfo *ClangN) {
   assert(tok.getKind() == clang::tok::numeric_constant &&
          "not a numeric token");
   {
@@ -97,7 +98,7 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
 
       return Impl.createConstant(name, DC, type, clang::APValue(value),
                                  ConstantConvertKind::Coerce,
-                                 /*static*/ false);
+                                 /*static*/ false, ClangN);
     }
 
     if (auto *floating = dyn_cast<clang::FloatingLiteral>(parsed)) {
@@ -114,7 +115,7 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
 
       return Impl.createConstant(name, DC, type, clang::APValue(value),
                                  ConstantConvertKind::Coerce,
-                                 /*static*/ false);
+                                 /*static*/ false, ClangN);
     }
     // TODO: Other numeric literals (complex, imaginary, etc.)
   }
@@ -131,7 +132,8 @@ static ValueDecl *importStringLiteral(ClangImporter::Implementation &Impl,
                                       const clang::MacroInfo *MI,
                                       Identifier name,
                                       const clang::Token &tok,
-                                      bool isObjC) {
+                                      bool isObjC,
+                                      const clang::MacroInfo *ClangN) {
   DeclContext *dc = Impl.getClangModuleForMacro(MI);
   if (!dc)
     return nullptr;
@@ -156,21 +158,25 @@ static ValueDecl *importStringLiteral(ClangImporter::Implementation &Impl,
     return nullptr;
 
   return Impl.createConstant(name, dc, importTy, parsed->getString(),
-                             ConstantConvertKind::Coerce, /*static*/ false);
+                             ConstantConvertKind::Coerce, /*static*/ false,
+                             ClangN);
 }
 
 static ValueDecl *importLiteral(ClangImporter::Implementation &Impl,
                                 DeclContext *DC,
                                 const clang::MacroInfo *MI,
                                 Identifier name,
-                                const clang::Token &tok) {
+                                const clang::Token &tok,
+                                const clang::MacroInfo *ClangN) {
   switch (tok.getKind()) {
   case clang::tok::numeric_constant:
-    return importNumericLiteral(Impl, DC, MI, name, /*signTok*/nullptr, tok);
+    return importNumericLiteral(Impl, DC, MI, name, /*signTok*/nullptr, tok,
+                                ClangN);
 
   case clang::tok::string_literal:
   case clang::tok::utf8_string_literal:
-    return importStringLiteral(Impl, DC, MI, name, tok, /*isObjC*/false);
+    return importStringLiteral(Impl, DC, MI, name, tok, /*isObjC*/false,
+                               ClangN);
 
   // TODO: char literals.
   default:
@@ -184,7 +190,8 @@ static bool isSignToken(const clang::Token &tok) {
 
 static ValueDecl *importMacro(ClangImporter::Implementation &impl,
                               DeclContext *DC,
-                              Identifier name, clang::MacroInfo *macro) {
+                              Identifier name, clang::MacroInfo *macro,
+                              clang::MacroInfo *ClangN) {
   // Ignore include guards.
   if (macro->isUsedForHeaderGuard())
     return nullptr;
@@ -212,7 +219,7 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
     
     // If it's a literal token, we might be able to translate the literal.
     if (tok.isLiteral()) {
-      return importLiteral(impl, DC, macro, name, tok);
+      return importLiteral(impl, DC, macro, name, tok, ClangN);
     }
 
     if (tok.is(clang::tok::identifier)) {
@@ -220,7 +227,7 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
       // If it's an identifier that is itself a macro, look into that macro.
       if (clangID->hasMacroDefinition()) {
         auto macroID = impl.getClangPreprocessor().getMacroInfo(clangID);
-        return importMacro(impl, DC, name, macroID);
+        return importMacro(impl, DC, name, macroID, ClangN);
       }
 
       // FIXME: If the identifier refers to a declaration, alias it?
@@ -238,11 +245,12 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
     clang::Token const &second = macro->tokens_begin()[1];
     
     if (isSignToken(first) && second.is(clang::tok::numeric_constant))
-      return importNumericLiteral(impl, DC, macro, name, &first, second);
+      return importNumericLiteral(impl, DC, macro, name, &first, second, ClangN);
 
     // We also allow @"string".
     if (first.is(clang::tok::at) && isStringToken(second))
-      return importStringLiteral(impl, DC, macro, name, second, /*objc*/true);
+      return importStringLiteral(impl, DC, macro, name, second, /*objc*/true,
+                                 ClangN);
 
     return nullptr;
   }
@@ -258,7 +266,8 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
         rparenTok.is(clang::tok::r_paren) &&
         isSignToken(signTok) &&
         litTok.is(clang::tok::numeric_constant)) {
-      return importNumericLiteral(impl, DC, macro, name, &signTok, litTok);
+      return importNumericLiteral(impl, DC, macro, name, &signTok, litTok,
+                                  ClangN);
     }
   }
 
@@ -281,10 +290,7 @@ ValueDecl *ClangImporter::Implementation::importMacro(Identifier name,
   if (!DC)
     return nullptr;
 
-  auto valueDecl = ::importMacro(*this, DC, name, macro);
+  auto valueDecl = ::importMacro(*this, DC, name, macro, macro);
   ImportedMacros[macro] = valueDecl;
-  if (valueDecl) {
-    valueDecl->setClangNode(macro);
-  }
   return valueDecl;
 }

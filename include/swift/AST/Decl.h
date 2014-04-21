@@ -117,6 +117,13 @@ public:
 
   clang::SourceLocation getLocation() const;
   clang::SourceRange getSourceRange() const;
+
+  void *getOpaqueValue() const { return Ptr.getOpaqueValue(); }
+  static inline ClangNode getFromOpaqueValue(void *VP) {
+    ClangNode N;
+    N.Ptr = decltype(Ptr)::getFromOpaqueValue(VP);
+    return N;
+  }
 };
   
 enum class DeclKind : uint8_t {
@@ -525,7 +532,24 @@ protected:
     DeclBits.FromClang = false;
   }
 
-  ClangNode getClangNodeSlow() const;
+  ClangNode getClangNodeImpl() const {
+    assert(DeclBits.FromClang);
+    return ClangNode::getFromOpaqueValue(
+        *(reinterpret_cast<void * const*>(this) - 1));
+  }
+
+  /// \brief Set the Clang node associated with this declaration.
+  void setClangNode(ClangNode Node) {
+    DeclBits.FromClang = true;
+    // Extra memory is allocated for this.
+    *(reinterpret_cast<void **>(this) - 1) = Node.getOpaqueValue();
+  }
+
+  void updateClangNode(ClangNode node) {
+    assert(hasClangNode());
+    setClangNode(node);
+  }
+  friend class ClangImporter;
 
 public:
   DeclKind getKind() const { return DeclKind(DeclBits.Kind); }
@@ -644,7 +668,7 @@ public:
     if (!DeclBits.FromClang)
       return ClangNode();
 
-    return getClangNodeSlow();
+    return getClangNodeImpl();
   }
 
   /// \brief Retrieve the Clang declaration from which this declaration was
@@ -653,7 +677,7 @@ public:
     if (!DeclBits.FromClang)
       return nullptr;
 
-    return getClangNodeSlow().getAsDecl();
+    return getClangNodeImpl().getAsDecl();
   }
 
   /// \brief Retrieve the Clang macro from which this declaration was
@@ -662,15 +686,7 @@ public:
     if (!DeclBits.FromClang)
       return nullptr;
 
-    return getClangNodeSlow().getAsMacro();
-  }
-
-  /// \brief Set the Clang node associated with this declaration.
-  void setClangNode(ClangNode node);
-
-  void updateClangNode(ClangNode node) {
-    assert(hasClangNode());
-    setClangNode(node);
+    return getClangNodeImpl().getAsMacro();
   }
 
   // Make vanilla new/delete illegal for Decls.
@@ -1247,7 +1263,8 @@ public:
   static ImportDecl *create(ASTContext &C, DeclContext *DC,
                             SourceLoc ImportLoc, ImportKind Kind,
                             SourceLoc KindLoc,
-                            ArrayRef<AccessPathElement> Path);
+                            ArrayRef<AccessPathElement> Path,
+                            const clang::Module *Mod = nullptr);
 
   /// Returns the import kind that is most appropriate for \p VD.
   ///
@@ -3566,6 +3583,15 @@ class FuncDecl : public AbstractFunctionDecl {
     FuncDeclBits.HasDynamicSelf = false;
   }
 
+  static FuncDecl *createImpl(ASTContext &Context, SourceLoc StaticLoc,
+                              StaticSpellingKind StaticSpelling,
+                              SourceLoc FuncLoc, DeclName Name,
+                              SourceLoc NameLoc,
+                              GenericParamList *GenericParams, Type Ty,
+                              unsigned NumParamPatterns,
+                              DeclContext *Parent,
+                              ClangNode ClangN);
+
 public:
   /// Factory function only for use by deserialization.
   static FuncDecl *createDeserialized(ASTContext &Context, SourceLoc StaticLoc,
@@ -3581,7 +3607,8 @@ public:
                           SourceLoc FuncLoc, DeclName Name, SourceLoc NameLoc,
                           GenericParamList *GenericParams, Type Ty,
                           ArrayRef<Pattern *> BodyParams,
-                          TypeLoc FnRetType, DeclContext *Parent);
+                          TypeLoc FnRetType, DeclContext *Parent,
+                          ClangNode ClangN = ClangNode());
 
   bool isStatic() const {
     return FuncDeclBits.IsStatic;

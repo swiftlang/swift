@@ -786,13 +786,12 @@ namespace {
         return nullptr;
 
       auto Loc = Impl.importSourceLoc(Decl->getLocation());
-      auto Result = new (Impl.SwiftContext) TypeAliasDecl(
+      auto Result = Impl.createDeclWithClangNode<TypeAliasDecl>(Decl,
                                       Impl.importSourceLoc(Decl->getLocStart()),
                                       Name,
                                       Loc,
                                       TypeLoc::withoutLoc(SwiftType),
                                       DC);
-      Result->setClangNode(Decl);
       return Result;
     }
 
@@ -977,7 +976,7 @@ namespace {
         rawValueExpr->setNegative(SourceLoc());
       
       auto element
-        = new (context) EnumElementDecl(SourceLoc(),
+        = Impl.createDeclWithClangNode<EnumElementDecl>(decl, SourceLoc(),
                                         name, TypeLoc(),
                                         SourceLoc(), rawValueExpr,
                                         theEnum);
@@ -986,7 +985,6 @@ namespace {
       auto argTy = MetatypeType::get(theEnum->getDeclaredType());
       element->overwriteType(FunctionType::get(argTy,
                                                theEnum->getDeclaredType()));
-      element->setClangNode(decl);
       return element;
     }
     
@@ -999,13 +997,12 @@ namespace {
         return nullptr;
       
       // Create the constant.
-      auto element = Impl.createConstant(name, theStruct,
+      return Impl.createConstant(name, theStruct,
                                  theStruct->getDeclaredTypeInContext(),
                                  clang::APValue(decl->getInitVal()),
                                  ConstantConvertKind::Construction,
-                                 /*isStatic*/ true);
-      element->setClangNode(decl);
-      return element;
+                                 /*isStatic*/ true,
+                                 decl);
     }
 
     Decl *VisitEnumDecl(const clang::EnumDecl *decl) {
@@ -1042,8 +1039,8 @@ namespace {
 
       case EnumKind::Unknown: {
         auto Loc = Impl.importSourceLoc(decl->getLocation());
-        auto structDecl = new (Impl.SwiftContext)
-          StructDecl(Loc, name, Loc, { }, nullptr, dc);
+        auto structDecl = Impl.createDeclWithClangNode<StructDecl>(decl,
+          Loc, name, Loc, None, nullptr, dc);
         structDecl->computeType();
 
         // Compute the underlying type of the enumeration.
@@ -1089,10 +1086,10 @@ namespace {
         if (!underlyingType)
           return nullptr;
         
-        auto enumDecl = new (Impl.SwiftContext)
-          EnumDecl(Impl.importSourceLoc(decl->getLocStart()),
+        auto enumDecl = Impl.createDeclWithClangNode<EnumDecl>(decl,
+                   Impl.importSourceLoc(decl->getLocStart()),
                    name, Impl.importSourceLoc(decl->getLocation()),
-                   {}, nullptr, dc);
+                   None, nullptr, dc);
         enumDecl->computeType();
         
         // Set up the C underlying type as its Swift raw type.
@@ -1133,8 +1130,8 @@ namespace {
         auto Loc = Impl.importSourceLoc(decl->getLocation());
 
         // Create a struct with the underlying type as a field.
-        auto structDecl = new (Impl.SwiftContext)
-          StructDecl(Loc, name, Loc, { }, nullptr, dc);
+        auto structDecl = Impl.createDeclWithClangNode<StructDecl>(decl,
+          Loc, name, Loc, None, nullptr, dc);
         structDecl->computeType();
         
         // Create a field to store the underlying value.
@@ -1194,7 +1191,6 @@ namespace {
       }
       }
       Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
-      result->setClangNode(decl);
 
       // Import each of the enumerators.
       
@@ -1287,14 +1283,13 @@ namespace {
       }
 
       // Create the struct declaration and record it.
-      auto result = new (Impl.SwiftContext)
-                      StructDecl(Impl.importSourceLoc(decl->getLocStart()),
+      auto result = Impl.createDeclWithClangNode<StructDecl>(decl,
+                                 Impl.importSourceLoc(decl->getLocStart()),
                                  name,
                                  Impl.importSourceLoc(decl->getLocation()),
-                                 { }, nullptr, dc);
+                                 None, nullptr, dc);
       result->computeType();
       Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
-      result->setClangNode(decl);
 
       // FIXME: Figure out what to do with superclasses in C++. One possible
       // solution would be to turn them into members and add conversion
@@ -1384,8 +1379,7 @@ namespace {
         auto result = Impl.createConstant(name, dc, type,
                                           clang::APValue(decl->getInitVal()),
                                           ConstantConvertKind::Coerce,
-                                          /*static*/ false);
-        result->setClangNode(decl);
+                                          /*static*/ false, decl);
         Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
         return result;
       }
@@ -1414,8 +1408,7 @@ namespace {
         auto result = Impl.createConstant(name, dc, enumType,
                                           clang::APValue(decl->getInitVal()),
                                           ConstantConvertKind::Construction,
-                                          /*static*/ false);
-        result->setClangNode(decl);
+                                          /*static*/ false, decl);
         Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
         return result;
       }
@@ -1461,11 +1454,10 @@ namespace {
         return nullptr;
 
       // Map this indirect field to a Swift variable.
-      auto result = new (Impl.SwiftContext)
-               VarDecl(/*static*/ false, /*IsLet*/ false,
+      auto result = Impl.createDeclWithClangNode<VarDecl>(decl,
+                       /*static*/ false, /*IsLet*/ false,
                        Impl.importSourceLoc(decl->getLocStart()),
                        name, type, dc);
-      result->setClangNode(decl);
       return result;
     }
 
@@ -1507,8 +1499,7 @@ namespace {
           Impl.SwiftContext, SourceLoc(), StaticSpellingKind::None, loc,
           name, nameLoc,
           /*GenericParams=*/nullptr, type, bodyPatterns,
-          TypeLoc::withoutLoc(resultTy), dc);
-      result->setClangNode(decl);
+          TypeLoc::withoutLoc(resultTy), dc, decl);
 
       if (decl->isNoReturn())
         result->getMutableAttrs().add(
@@ -1560,10 +1551,10 @@ namespace {
         return nullptr;
 
       auto result =
-        new (Impl.SwiftContext) VarDecl(/*static*/ false, /*IsLet*/ false,
+        Impl.createDeclWithClangNode<VarDecl>(decl,
+                              /*static*/ false, /*IsLet*/ false,
                               Impl.importSourceLoc(decl->getLocation()),
                               name, type, dc);
-      result->setClangNode(decl);
 
       // Handle attributes.
       if (decl->hasAttr<clang::IBOutletAttr>())
@@ -1603,12 +1594,11 @@ namespace {
         return nullptr;
 
       // FIXME: Should 'const' vardecl's be imported as 'let' decls?
-      auto result = new (Impl.SwiftContext)
-               VarDecl(/*static*/ false,
+      auto result = Impl.createDeclWithClangNode<VarDecl>(decl,
+                       /*static*/ false,
                        /*IsLet*/ false,
                        Impl.importSourceLoc(decl->getLocation()),
                        name, type, dc);
-      result->setClangNode(decl);
       return result;
     }
 
@@ -1911,7 +1901,7 @@ namespace {
       auto result = FuncDecl::create(
           Impl.SwiftContext, SourceLoc(), StaticSpellingKind::None,
           SourceLoc(), name, SourceLoc(), /*GenericParams=*/nullptr, Type(),
-          bodyPatterns, TypeLoc(), dc);
+          bodyPatterns, TypeLoc(), dc, decl);
 
       auto resultTy = type->castTo<FunctionType>()->getResult();
       Type interfaceType;
@@ -1972,7 +1962,6 @@ namespace {
             new (Impl.SwiftContext) IBActionAttr(/*IsImplicit=*/false));
 
       // Check whether there's some special method to import.
-      result->setClangNode(decl);
       if (!forceClassMethod) {
         if (dc == Impl.importDeclContextOf(decl) &&
             !Impl.ImportedDecls[decl->getCanonicalDecl()])
@@ -2231,15 +2220,14 @@ namespace {
       selfPat = createTypedNamedPattern(selfVar);
 
       // Create the actual constructor.
-      auto result = new (Impl.SwiftContext)
-          ConstructorDecl(name, SourceLoc(), selfPat, bodyPatterns.back(),
-                          /*GenericParams=*/0, dc);
+      auto result = Impl.createDeclWithClangNode<ConstructorDecl>(objcMethod,
+                          name, SourceLoc(), selfPat, bodyPatterns.back(),
+                          /*GenericParams=*/nullptr, dc);
       
       // Make the constructor declaration immediately visible in its
       // class or protocol type.
       nominalOwner->makeMemberVisible(result);
 
-      result->setClangNode(objcMethod);
       addObjCAttribute(result, selector);
 
       // Fix the types when we've imported into a protocol.
@@ -2667,10 +2655,10 @@ namespace {
           getterThunk->getBodyParamPatterns()[1]->clone(context);
       auto name = context.Id_subscript;
       auto subscript
-        = new (context) SubscriptDecl(name, decl->getLoc(), bodyPatterns,
+        = Impl.createDeclWithClangNode<SubscriptDecl>(objcMethod,
+                                      name, decl->getLoc(), bodyPatterns,
                                       decl->getLoc(),
                                       TypeLoc::withoutLoc(elementTy), dc);
-      subscript->setClangNode(objcMethod);
       subscript->setAccessors(SourceRange(), getterThunk, setterThunk);
       subscript->setType(FunctionType::get(subscript->getIndices()->getType(),
                                            subscript->getElementType()));
@@ -3271,14 +3259,13 @@ namespace {
       // Create the extension declaration and record it.
       auto loc = Impl.importSourceLoc(decl->getLocStart());
       auto result
-        = new (Impl.SwiftContext)
-            ExtensionDecl(loc,
+        = Impl.createDeclWithClangNode<ExtensionDecl>(decl,
+                          loc,
                           TypeLoc::withoutLoc(objcClass->getDeclaredType()),
-                          { },
+                          None,
                           dc);
       objcClass->addExtension(result);
       Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
-      result->setClangNode(decl);
       importObjCProtocols(result, decl->getReferencedProtocols());
       result->setCheckedInheritanceClause();
       result->setMemberLoader(&Impl, 0);
@@ -3360,12 +3347,12 @@ namespace {
         return native;
 
       // Create the protocol declaration and record it.
-      auto result = new (Impl.SwiftContext)
-                      ProtocolDecl(dc,
+      auto result = Impl.createDeclWithClangNode<ProtocolDecl>(decl,
+                                   dc,
                                    Impl.importSourceLoc(decl->getLocStart()),
                                    Impl.importSourceLoc(decl->getLocation()),
                                    name,
-                                   { });
+                                   None);
       result->computeType();
       addObjCAttribute(result, ObjCSelector(Impl.SwiftContext, 0, origName));
 
@@ -3397,7 +3384,6 @@ namespace {
       auto sig = GenericSignature::get(genericParam, genericRequirements);
       result->setGenericSignature(sig);
 
-      result->setClangNode(decl);
       result->setCircularityCheck(CircularityCheck::Checked);
 
       // Import protocols this protocol conforms to.
@@ -3456,13 +3442,13 @@ namespace {
             nsObjectTy->getClassOrBoundGenericClass();
           auto dc = nsObjectDecl->getDeclContext();
 
-          auto result = new (Impl.SwiftContext) ClassDecl(SourceLoc(), name,
-                                                          SourceLoc(), {},
+          auto result = Impl.createDeclWithClangNode<ClassDecl>(decl,
+                                                          SourceLoc(), name,
+                                                          SourceLoc(), None,
                                                           nullptr, dc);
           result->setAddedImplicitInitializers();
           result->computeType();
           Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
-          result->setClangNode(decl);
           result->setCircularityCheck(CircularityCheck::Checked);
           result->setSuperclass(nsObjectTy);
           result->setCheckedInheritanceClause();
@@ -3508,14 +3494,13 @@ namespace {
         return native;
 
       // Create the class declaration and record it.
-      auto result = new (Impl.SwiftContext)
-                      ClassDecl(Impl.importSourceLoc(decl->getLocStart()),
+      auto result = Impl.createDeclWithClangNode<ClassDecl>(decl,
+                                Impl.importSourceLoc(decl->getLocStart()),
                                 name,
                                 Impl.importSourceLoc(decl->getLocation()),
-                                { }, nullptr, dc);
+                                None, nullptr, dc);
       result->computeType();
       Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
-      result->setClangNode(decl);
       result->setCircularityCheck(CircularityCheck::Checked);
       result->setAddedImplicitInitializers();
       addObjCAttribute(result, ObjCSelector(Impl.SwiftContext, 0, name));
@@ -3619,11 +3604,10 @@ namespace {
           return known->second;
       }
 
-      auto result = new (Impl.SwiftContext) VarDecl(
+      auto result = Impl.createDeclWithClangNode<VarDecl>(decl,
           /*static*/ false, /*IsLet*/ false,
           Impl.importSourceLoc(decl->getLocation()),
           name, type, dc);
-      result->setClangNode(decl);
 
       // Build thunks.
       FuncDecl *getterThunk = buildGetterThunk(getter, dc, nullptr);
@@ -4074,7 +4058,8 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
                                               Type type,
                                               const clang::APValue &value,
                                               ConstantConvertKind convertKind,
-                                              bool isStatic) {
+                                              bool isStatic,
+                                              ClangNode ClangN) {
   auto &context = SwiftContext;
 
   // Create the integer literal value.
@@ -4134,7 +4119,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   }
 
   assert(expr);
-  return createConstant(name, dc, type, expr, convertKind, isStatic);
+  return createConstant(name, dc, type, expr, convertKind, isStatic, ClangN);
 }
 
 
@@ -4142,9 +4127,10 @@ ValueDecl *
 ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
                                               Type type, StringRef value,
                                               ConstantConvertKind convertKind,
-                                              bool isStatic) {
+                                              bool isStatic,
+                                              ClangNode ClangN) {
   auto expr = new (SwiftContext) StringLiteralExpr(value, SourceRange());
-  return createConstant(name, dc, type, expr, convertKind, isStatic);
+  return createConstant(name, dc, type, expr, convertKind, isStatic, ClangN);
 }
 
 
@@ -4152,10 +4138,12 @@ ValueDecl *
 ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
                                               Type type, Expr *valueExpr,
                                               ConstantConvertKind convertKind,
-                                              bool isStatic) {
+                                              bool isStatic,
+                                              ClangNode ClangN) {
   auto &context = SwiftContext;
 
-  auto var = new (context) VarDecl(isStatic, /*IsLet*/ false,
+  auto var = createDeclWithClangNode<VarDecl>(ClangN,
+                                   isStatic, /*IsLet*/ false,
                                    SourceLoc(), name, type, dc);
 
   // Form the argument patterns.
