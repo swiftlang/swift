@@ -83,13 +83,13 @@ namespace swift {
 
 /// Represents a clang declaration, macro, or module.
 class ClangNode {
-  llvm::PointerUnion3<const clang::Decl *, clang::MacroInfo *,
+  llvm::PointerUnion3<const clang::Decl *, const clang::MacroInfo *,
                       const clang::Module *> Ptr;
 
 public:
   ClangNode() = default;
   ClangNode(const clang::Decl *D) : Ptr(D) {}
-  ClangNode(clang::MacroInfo *MI) : Ptr(MI) {}
+  ClangNode(const clang::MacroInfo *MI) : Ptr(MI) {}
   ClangNode(const clang::Module *Mod) : Ptr(Mod) {}
 
   bool isNull() const { return Ptr.isNull(); }
@@ -98,8 +98,8 @@ public:
   const clang::Decl *getAsDecl() const {
     return Ptr.dyn_cast<const clang::Decl *>();
   }
-  clang::MacroInfo *getAsMacro() const {
-    return Ptr.dyn_cast<clang::MacroInfo *>();
+  const clang::MacroInfo *getAsMacro() const {
+    return Ptr.dyn_cast<const clang::MacroInfo *>();
   }
   const clang::Module *getAsModule() const {
     return Ptr.dyn_cast<const clang::Module *>();
@@ -108,8 +108,8 @@ public:
   const clang::Decl *castAsDecl() const {
     return Ptr.get<const clang::Decl *>();
   }
-  clang::MacroInfo *castAsMacro() const {
-    return Ptr.get<clang::MacroInfo *>();
+  const clang::MacroInfo *castAsMacro() const {
+    return Ptr.get<const clang::MacroInfo *>();
   }
   const clang::Module *castAsModule() const {
     return Ptr.get<const clang::Module *>();
@@ -658,7 +658,7 @@ public:
 
   /// \brief Retrieve the Clang macro from which this declaration was
   /// synthesized, if any.
-  clang::MacroInfo *getClangMacro() {
+  const clang::MacroInfo *getClangMacro() {
     if (!DeclBits.FromClang)
       return nullptr;
 
