@@ -472,20 +472,14 @@ public:
 
   Stmt *visitBreakStmt(BreakStmt *S) {
     LabeledStmt *Target = nullptr;
-    // Scan to see if we are in any non-switch labeled statements (loops).  Scan
-    // inside out.
+    // Pick the nearest break target that matches the specified name.
     if (S->getTargetName().empty()) {
-      for (auto I = ActiveLabeledStmts.rbegin(), E = ActiveLabeledStmts.rend();
-           I != E; ++I) {
-        // FIXME: Remove.
-        if (!isa<SwitchStmt>(*I)) {
-          Target = *I;
-          break;
-        }
-      }
+      if (!ActiveLabeledStmts.empty())
+        Target = ActiveLabeledStmts.back();
 
       // Temporarily reject break statements that are in a switch, since their
       // semantics are changing.
+      // FIXME: Remove this: rdar://16563853.
       if (Target && isa<SwitchStmt>(Target)) {
         TC.diagnose(S->getLoc(), diag::break_not_in_switch);
         return nullptr;
