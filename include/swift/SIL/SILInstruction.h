@@ -1337,6 +1337,16 @@ public:
     : UnaryInstructionBase(loc, operand) {}
 };
 
+/// Transfers ownership of a loadable value to the current autorelease pool.
+class AutoreleaseValueInst
+                  : public UnaryInstructionBase<ValueKind::AutoreleaseValueInst,
+                                                SILInstruction,
+                                                /*HasValue*/ false> {
+public:
+  AutoreleaseValueInst(SILLocation loc, SILValue operand)
+    : UnaryInstructionBase(loc, operand) {}
+};
+
 /// TupleInst - Represents a constructed loadable tuple.
 class TupleInst : public SILInstruction {
   TailAllocatedOperandList<0> Operands;

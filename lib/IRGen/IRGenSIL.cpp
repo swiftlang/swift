@@ -588,6 +588,7 @@ public:
   void visitStoreWeakInst(StoreWeakInst *i);
   void visitRetainValueInst(RetainValueInst *i);
   void visitReleaseValueInst(ReleaseValueInst *i);
+  void visitAutoreleaseValueInst(AutoreleaseValueInst *i);
   void visitStructInst(StructInst *i);
   void visitTupleInst(TupleInst *i);
   void visitEnumInst(EnumInst *i);
@@ -2115,6 +2116,22 @@ void IRGenSILFunction::visitRetainValueInst(swift::RetainValueInst *i) {
   cast<LoadableTypeInfo>(getTypeInfo(i->getOperand().getType()))
     .copy(*this, in, out);
   out.claimAll();
+}
+
+// TODO: Implement this more generally for arbitrary values. Currently the
+// SIL verifier restricts it to single-refcounted-pointer types.
+void IRGenSILFunction::visitAutoreleaseValueInst(swift::AutoreleaseValueInst *i)
+{
+  Explosion in = getLoweredExplosion(i->getOperand());
+  auto val = in.claimNext();
+  
+  if (val->getType()->isPointerTy())
+    val = Builder.CreateBitCast(val, IGM.ObjCPtrTy);
+  else
+    val = Builder.CreateIntToPtr(val, IGM.ObjCPtrTy);
+  
+  auto call = Builder.CreateCall(IGM.getObjCAutoreleaseFn(), val);
+  call->setDoesNotThrow();
 }
 
 void IRGenSILFunction::visitReleaseValueInst(swift::ReleaseValueInst *i) {

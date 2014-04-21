@@ -519,6 +519,8 @@ FUNCTION(ObjCRetain, objc_retain, C_CC,
          RETURNS(ObjCPtrTy), ARGS(ObjCPtrTy), ATTRS(NoUnwind))
 FUNCTION(ObjCRelease, objc_release, C_CC,
          RETURNS(VoidTy), ARGS(ObjCPtrTy), ATTRS(NoUnwind))
+FUNCTION(ObjCAutorelease, objc_autorelease, C_CC,
+         RETURNS(ObjCPtrTy), ARGS(ObjCPtrTy), ATTRS(NoUnwind))
 FUNCTION(ObjCRetainAutoreleasedReturnValue,
          objc_retainAutoreleasedReturnValue, C_CC,
          RETURNS(ObjCPtrTy), ARGS(ObjCPtrTy), ATTRS(NoUnwind))

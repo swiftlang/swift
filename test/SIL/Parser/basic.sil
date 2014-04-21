@@ -935,9 +935,11 @@ sil @test_copy_release_value : $(Val) -> (Val) {
 bb0(%0 : $Val):
   retain_value %0 : $Val
   release_value %0 : $Val
+  autorelease_value %0 : $Val
   return %0 : $Val
 // CHECK:      retain_value [[T0:%.*]] : $Val
 // CHECK-NEXT: release_value [[T0]] : $Val
+// CHECK-NEXT: autorelease_value [[T0]] : $Val
 // CHECK-NEXT: return [[T0]] : $Val
 }
 

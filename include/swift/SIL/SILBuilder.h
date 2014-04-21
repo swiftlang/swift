@@ -409,6 +409,10 @@ public:
     return insert(new (F.getModule()) ReleaseValueInst(loc, operand));
   }
 
+  AutoreleaseValueInst *createAutoreleaseValue(SILLocation loc, SILValue operand) {
+    return insert(new (F.getModule()) AutoreleaseValueInst(loc, operand));
+  }
+
   StructInst *createStruct(SILLocation Loc, SILType Ty,
                            ArrayRef<SILValue> Elements) {
     return insert(StructInst::create(Loc, Ty, Elements, F));

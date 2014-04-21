@@ -1,6 +1,7 @@
 // RUN: %swift -emit-ir -target x86_64-apple-darwin10 %s | FileCheck %s
 
 import Builtin
+import Swift
 
 // CHECK: [[OBJCCLASS:%objc_class]] = type
 // CHECK: [[OPAQUE:%swift.opaque]] = type opaque
@@ -126,3 +127,22 @@ bb0(%0 : $@thick C.Type):
   return %1 : $C
 }
 
+// CHECK-LABEL: define %C5class1C* @autorelease(%C5class1C*) {
+// CHECK:         %1 = bitcast %C5class1C* %0 to %objc_object*
+// CHECK:         call %objc_object* @objc_autorelease(%objc_object* %1)
+// CHECK:         ret %C5class1C* %0
+sil @autorelease : $@thin (@owned C) -> @autoreleased C {
+entry(%c : $C):
+  autorelease_value %c : $C
+  return %c : $C
+}
+
+// CHECK-LABEL: define i64 @autorelease_optional(i64) {
+// CHECK:         %1 = inttoptr i64 %0 to %objc_object*
+// CHECK:         call %objc_object* @objc_autorelease(%objc_object* %1)
+// CHECK:         ret i64 %0
+sil @autorelease_optional : $@thin (@owned C?) -> @autoreleased C? {
+entry(%c : $C?):
+  autorelease_value %c : $C?
+  return %c : $C?
+}

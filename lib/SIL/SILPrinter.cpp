@@ -801,6 +801,10 @@ public:
     OS << "release_value " << getIDAndType(I->getOperand());
   }
 
+  void visitAutoreleaseValueInst(AutoreleaseValueInst *I) {
+    OS << "autorelease_value " << getIDAndType(I->getOperand());
+  }
+
   void visitStructInst(StructInst *SI) {
     OS << "struct " << SI->getType() << " (";
     interleave(SI->getElements(),

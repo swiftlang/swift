@@ -353,6 +353,7 @@ static InlineCost instructionInlineCost(SILInstruction &I,
     case ValueKind::DeinitExistentialInst:
     case ValueKind::DestroyAddrInst:
     case ValueKind::ReleaseValueInst:
+    case ValueKind::AutoreleaseValueInst:
     case ValueKind::DynamicMethodBranchInst:
     case ValueKind::DynamicMethodInst:
     case ValueKind::EnumInst:

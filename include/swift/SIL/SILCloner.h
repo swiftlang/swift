@@ -589,6 +589,14 @@ SILCloner<ImplClass>::visitReleaseValueInst(ReleaseValueInst *Inst) {
 
 template<typename ImplClass>
 void
+SILCloner<ImplClass>::visitAutoreleaseValueInst(AutoreleaseValueInst *Inst) {
+  doPostProcess(Inst,
+    getBuilder().createAutoreleaseValue(getOpLocation(Inst->getLoc()),
+                                        getOpValue(Inst->getOperand())));
+}
+
+template<typename ImplClass>
+void
 SILCloner<ImplClass>::visitStructInst(StructInst *Inst) {
   auto Elements = getOpValueArray<8>(Inst->getElements());
   doPostProcess(Inst,

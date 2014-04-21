@@ -579,6 +579,14 @@ public:
             "Source value should be an object value");
   }
   
+  void checkAutoreleaseValueInst(ReleaseValueInst *I) {
+    require(I->getOperand().getType().isObject(),
+            "Source value should be an object value");
+    // TODO: This instruction could in principle be generalized.
+    require(I->getOperand().getType().hasRetainablePointerRepresentation(),
+            "Source value must be a reference type or optional thereof");
+  }
+  
   void checkCopyBlockInst(CopyBlockInst *I) {
     require(I->getOperand().getType().isBlockPointerCompatible(),
             "operand of copy_block should be a block");
