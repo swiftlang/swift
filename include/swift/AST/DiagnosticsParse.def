@@ -618,6 +618,8 @@ ERROR(statement_same_line_without_semi,stmt_parsing,none,
       "consecutive statements on a line must be separated by ';'", ())
 ERROR(brace_stmt_invalid,stmt_parsing,none,
       "braced block of statements is an unused closure", ())
+ERROR(invalid_label_on_stmt,stmt_parsing,none,
+      "labels are only valid on loops and switch statement", ())
 
 
 // Assignment statement

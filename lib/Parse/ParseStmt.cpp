@@ -45,6 +45,20 @@ bool Parser::isStartOfStmt() {
   case tok::kw_default:
   case tok::pound_if:
     return true;
+      
+  case tok::identifier:
+    // "identifier ':' for/while/do/switch" is a label on a loop/switch.
+    if (!peekToken().is(tok::colon)) return false;
+
+    // To disambiguate other cases of "identifier :", which might be part of a
+    // question colon expression or something else, we look ahead to the second
+    // token.
+    Parser::BacktrackingScope backtrack(*this);
+    consumeToken(tok::identifier);
+    consumeToken(tok::colon);
+    // For better recovery, we just accept a label on any statement.  We reject
+    // putting a label on something inappropriate in parseStmt().
+    return isStartOfStmt();
   }
 }
 
@@ -436,27 +450,50 @@ ParserResult<Stmt> Parser::parseStmt() {
   StructureMarkerRAII ParsingStmt(*this, Tok.getLoc(),
                                   StructureMarkerKind::Statement);
   
+  SourceLoc LabelLoc;
+  Identifier Label;
+  
+  // If this is a label on a loop/switch statement, consume it and pass it into
+  // parsing logic below.
+  if (Tok.is(tok::identifier) && peekToken().is(tok::colon)) {
+    LabelLoc = Tok.getLoc();
+    Label = Context.getIdentifier(Tok.getText());
+    consumeToken(tok::identifier);
+    consumeToken(tok::colon);
+  }
+  
+  
   switch (Tok.getKind()) {
   default:
     diagnose(Tok, diag::expected_stmt);
     return nullptr;
-  case tok::kw_return: return parseStmtReturn();
-  case tok::kw_if:     return parseStmtIf();
-  case tok::pound_if:  return parseStmtIfConfig();
-  case tok::kw_while:  return parseStmtWhile();
-  case tok::kw_do:     return parseStmtDoWhile();
-  case tok::kw_for:    return parseStmtFor();
-  case tok::kw_switch: return parseStmtSwitch();
+  case tok::kw_return:
+    if (!Label.empty()) diagnose(LabelLoc, diag::invalid_label_on_stmt);
+    return parseStmtReturn();
+  case tok::kw_if:
+    if (!Label.empty()) diagnose(LabelLoc, diag::invalid_label_on_stmt);
+    return parseStmtIf();
+  case tok::pound_if:
+    if (!Label.empty()) diagnose(LabelLoc, diag::invalid_label_on_stmt);
+    return parseStmtIfConfig();
+  case tok::kw_while:  return parseStmtWhile(Label);
+  case tok::kw_do:     return parseStmtDoWhile(Label);
+  case tok::kw_for:    return parseStmtFor(Label);
+  case tok::kw_switch: return parseStmtSwitch(Label);
   /// 'case' and 'default' are only valid at the top level of a switch.
   case tok::kw_case:
-  case tok::kw_default: return recoverFromInvalidCase(*this);
+  case tok::kw_default:
+    return recoverFromInvalidCase(*this);
   case tok::kw_break:
+    if (!Label.empty()) diagnose(LabelLoc, diag::invalid_label_on_stmt);
     return makeParserResult(
         new (Context) BreakStmt(consumeToken(tok::kw_break)));
   case tok::kw_continue:
+    if (!Label.empty()) diagnose(LabelLoc, diag::invalid_label_on_stmt);
     return makeParserResult(
         new (Context) ContinueStmt(consumeToken(tok::kw_continue)));
   case tok::kw_fallthrough:
+    if (!Label.empty()) diagnose(LabelLoc, diag::invalid_label_on_stmt);
     return makeParserResult(
         new (Context) FallthroughStmt(consumeToken(tok::kw_fallthrough)));
   }
@@ -881,8 +918,8 @@ ParserResult<Stmt> Parser::parseStmtIfConfig(BraceItemListKind Kind) {
 
 /// 
 ///   stmt-while:
-///     'while' expr-basic stmt-brace
-ParserResult<Stmt> Parser::parseStmtWhile() {
+///     (identifier ':')? 'while' expr-basic stmt-brace
+ParserResult<Stmt> Parser::parseStmtWhile(Identifier LoopLabel) {
   SourceLoc WhileLoc = consumeToken(tok::kw_while);
 
   Scope S(this, ScopeKind::WhileVars);
@@ -918,8 +955,8 @@ ParserResult<Stmt> Parser::parseStmtWhile() {
 
 /// 
 ///   stmt-do-while:
-///     'do' stmt-brace 'while' expr
-ParserResult<Stmt> Parser::parseStmtDoWhile() {
+///     (identifier ':')? 'do' stmt-brace 'while' expr
+ParserResult<Stmt> Parser::parseStmtDoWhile(Identifier LoopLabel) {
   SourceLoc DoLoc = consumeToken(tok::kw_do);
 
   ParserStatus Status;
@@ -966,7 +1003,7 @@ ParserResult<Stmt> Parser::parseStmtDoWhile() {
       new (Context) DoWhileStmt(DoLoc, Condition.get(), WhileLoc, Body.get()));
 }
 
-ParserResult<Stmt> Parser::parseStmtFor() {
+ParserResult<Stmt> Parser::parseStmtFor(Identifier LoopLabel) {
   SourceLoc ForLoc = consumeToken(tok::kw_for);
 
   // The c-style-for loop and foreach-style-for loop are conflated together into
@@ -980,8 +1017,8 @@ ParserResult<Stmt> Parser::parseStmtFor() {
     bool IsCStyle = peekToken().is(tok::l_brace);
     backtrackToPosition(SavedPosition);
     if (IsCStyle)
-      return parseStmtForCStyle(ForLoc);
-    return parseStmtForEach(ForLoc);
+      return parseStmtForCStyle(ForLoc, LoopLabel);
+    return parseStmtForEach(ForLoc, LoopLabel);
   }
 
   // If we have a leading identifier followed by a ':' or 'in', then this is a
@@ -991,21 +1028,22 @@ ParserResult<Stmt> Parser::parseStmtFor() {
   if ((isAtStartOfBindingName() &&
        (peekToken().is(tok::colon) || peekToken().is(tok::kw_in))) ||
       Tok.is(tok::kw_in))
-    return parseStmtForEach(ForLoc);
+    return parseStmtForEach(ForLoc, LoopLabel);
 
   // Otherwise, this is some sort of c-style for loop.
-  return parseStmtForCStyle(ForLoc);
+  return parseStmtForCStyle(ForLoc, LoopLabel);
 }
 
 ///   stmt-for-c-style:
-///     'for' stmt-for-c-style-init? ';' expr-basic? ';'
+///     (identifier ':')? 'for' stmt-for-c-style-init? ';' expr-basic? ';'
 ///           (expr-basic (',' expr-basic)*)? stmt-brace
-///     'for' '(' stmt-for-c-style-init? ';' expr-basic? ';'
+///     (identifier ':')? 'for' '(' stmt-for-c-style-init? ';' expr-basic? ';'
 ///           (expr-basic (',' expr-basic)*)? ')' stmt-brace
 ///   stmt-for-c-style-init:
 ///     decl-var
 ///     expr (',' expr)*
-ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
+ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc,
+                                              Identifier LoopLabel) {
   SourceLoc Semi1Loc, Semi2Loc;
   SourceLoc LPLoc, RPLoc;
   bool LPLocConsumed = false;
@@ -1224,8 +1262,9 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc) {
 
 /// 
 ///   stmt-for-each:
-///     'for' pattern 'in' expr-basic stmt-brace
-ParserResult<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc) {
+///     (identifier ':')? 'for' pattern 'in' expr-basic stmt-brace
+ParserResult<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc,
+                                            Identifier LoopLabel) {
   ParserResult<Pattern> Pattern = parsePattern(/*isLet*/true);
   if (Pattern.isNull())
     // Recover by creating a "_" pattern.
@@ -1291,8 +1330,8 @@ ParserResult<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc) {
 
 ///
 ///    stmt-switch:
-///      'switch' expr-basic '{' stmt-case+ '}'
-ParserResult<Stmt> Parser::parseStmtSwitch() {
+///      (identifier ':')? 'switch' expr-basic '{' stmt-case+ '}'
+ParserResult<Stmt> Parser::parseStmtSwitch(Identifier Switchlabel) {
   SourceLoc SwitchLoc = consumeToken(tok::kw_switch);
 
   bool SubjectStartsWithLBrace = Tok.is(tok::l_brace);

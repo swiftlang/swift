@@ -1029,12 +1029,12 @@ public:
   ParserResult<Stmt> parseStmtIf();
   ParserResult<Stmt> parseStmtIfConfig(BraceItemListKind Kind
                                         = BraceItemListKind::Brace);
-  ParserResult<Stmt> parseStmtWhile();
-  ParserResult<Stmt> parseStmtDoWhile();
-  ParserResult<Stmt> parseStmtFor();
-  ParserResult<Stmt> parseStmtForCStyle(SourceLoc ForLoc);
-  ParserResult<Stmt> parseStmtForEach(SourceLoc ForLoc);
-  ParserResult<Stmt> parseStmtSwitch();
+  ParserResult<Stmt> parseStmtWhile(Identifier LoopLabel);
+  ParserResult<Stmt> parseStmtDoWhile(Identifier LoopLabel);
+  ParserResult<Stmt> parseStmtFor(Identifier LoopLabel);
+  ParserResult<Stmt> parseStmtForCStyle(SourceLoc ForLoc, Identifier LoopLabel);
+  ParserResult<Stmt> parseStmtForEach(SourceLoc ForLoc, Identifier LoopLabel);
+  ParserResult<Stmt> parseStmtSwitch(Identifier SwitchLabel);
   ParserResult<CaseStmt> parseStmtCase();
 
   /// Evaluate the conditional configuration expression of an #if statement
