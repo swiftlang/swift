@@ -287,6 +287,7 @@ public:
                                                      SourceLoc(),
                                                      DRE,
                                                      true); // implicit
+          NAE->setType(Context.TheEmptyTupleType);
           AE->setImplicit(true);
           Expr *Log = buildLoggerCall(
             new (Context) DeclRefExpr(ConcreteDeclRef(PV.second),
