@@ -14,11 +14,23 @@ Latest
         case 42: break Outer
         case 97: continue Outer
         case 102: break Switch
-        case 13: continue         // continue always works on loops.
-        case 139: break           // break breaks to the loop (right now)
+        case 13: continue // continue always works on loops.
+        case 139: break   // break will break out of the switch (but see below)
         }
       }
     }
+
+* We are changing the behavior of 'break' to provide C-style semantics, to allow
+  breaking out of a switch statement.  Previously, break completely ignored
+  switches so that it would break out of the nearest loop. In the example above,
+  'case 139' would break out of the "Outer" loop, not the "Switch".
+  
+  In order to avoid breaking existing code, we're making this a compile time
+  error instead of a silent behavior change.  If you need a solution for the
+  previous behavior, use labeled break.
+  
+  This error will be removed in a week or two.
+
 
 2014-04-18
 ----------
