@@ -98,7 +98,8 @@ static bool performCompile(CompilerInstance &Instance,
   ASTContext &Context = Instance.getASTContext();
 
   if (Action == FrontendOptions::REPL) {
-    REPLRunLoop(Instance, ProcessCmdLine(Args.begin(), Args.end()), Invocation.getParseStdlib());
+    REPLRunLoop(Instance, ProcessCmdLine(Args.begin(), Args.end()),
+                Invocation.getParseStdlib());
     return false;
   }
 
