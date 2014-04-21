@@ -615,13 +615,18 @@ public:
 /// BreakStmt - The keyword "break".
 class BreakStmt : public Stmt {
   SourceLoc Loc;
-  
+  LabeledStmt *Target;
 public:
   BreakStmt(SourceLoc Loc, Optional<bool> implicit = {})
     : Stmt(StmtKind::Break, getDefaultImplicitFlag(implicit, Loc)), Loc(Loc)
   {}
 
   SourceLoc getLoc() const { return Loc; }
+  
+  // Manipulate the target loop/switch that is bring broken out of.  This is set
+  // by sema during type checking.
+  void setTarget(LabeledStmt *LS) { Target = LS; }
+  LabeledStmt *getTarget() const { return Target; }
   
   SourceRange getSourceRange() const { return Loc; }
 
@@ -633,12 +638,18 @@ public:
 /// ContinueStmt - The keyword "continue".
 class ContinueStmt : public Stmt {
   SourceLoc Loc;
-  
+  LabeledStmt *Target;
+
 public:
   ContinueStmt(SourceLoc Loc, Optional<bool> implicit = {})
     : Stmt(StmtKind::Continue, getDefaultImplicitFlag(implicit, Loc)), Loc(Loc)
   {}
 
+  // Manipulate the target loop that is bring continued.  This is set by sema
+  // during type checking.
+  void setTarget(LabeledStmt *LS) { Target = LS; }
+  LabeledStmt *getTarget() const { return Target; }
+  
   SourceLoc getLoc() const { return Loc; }
   
   SourceRange getSourceRange() const { return Loc; }

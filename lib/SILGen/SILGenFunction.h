@@ -102,8 +102,8 @@ public:
   /// for a function that returns by value.
   SILValue IndirectReturnAddress;
   
-  std::vector<JumpDest> BreakDestStack;
-  std::vector<JumpDest> ContinueDestStack;
+  std::vector<std::tuple<LabeledStmt*, JumpDest, JumpDest>>
+    BreakContinueDestStack;
   std::vector<SwitchContext*> SwitchStack;
   /// Keep track of our current nested scope.
   std::vector<SILDebugScope*> DebugScopeStack;

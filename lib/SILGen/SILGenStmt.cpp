@@ -337,10 +337,11 @@ void SILGenFunction::visitWhileStmt(WhileStmt *S) {
 
   // Set the destinations for 'break' and 'continue'
   SILBasicBlock *EndBB = createBasicBlock();
-  BreakDestStack.emplace_back(EndBB, getCleanupsDepth(),
-                              CleanupLocation(S->getBody()));
-  ContinueDestStack.emplace_back(LoopBB, getCleanupsDepth(),
-                                 CleanupLocation(S->getBody()));
+  BreakContinueDestStack.push_back({
+    S,
+    JumpDest(EndBB, getCleanupsDepth(), CleanupLocation(S->getBody())),
+    JumpDest(LoopBB, getCleanupsDepth(), CleanupLocation(S->getBody()))
+  });
 
   // If there's a true edge, emit the body in it.
   if (Cond.hasTrue()) {
@@ -368,8 +369,7 @@ void SILGenFunction::visitWhileStmt(WhileStmt *S) {
     enterFalseConditionalBinding(*this, *CondBinding);
   
   emitOrDeleteBlock(B, EndBB, S);
-  BreakDestStack.pop_back();
-  ContinueDestStack.pop_back();
+  BreakContinueDestStack.pop_back();
 }
 
 void SILGenFunction::visitDoWhileStmt(DoWhileStmt *S) {
@@ -380,10 +380,11 @@ void SILGenFunction::visitDoWhileStmt(DoWhileStmt *S) {
   // Set the destinations for 'break' and 'continue'
   SILBasicBlock *EndBB = createBasicBlock();
   SILBasicBlock *CondBB = createBasicBlock();
-  BreakDestStack.emplace_back(EndBB, getCleanupsDepth(),
-                              CleanupLocation(S->getBody()));
-  ContinueDestStack.emplace_back(CondBB, getCleanupsDepth(),
-                                 CleanupLocation(S->getBody()));
+  BreakContinueDestStack.push_back({
+    S,
+    JumpDest(EndBB, getCleanupsDepth(), CleanupLocation(S->getBody())),
+    JumpDest(CondBB, getCleanupsDepth(), CleanupLocation(S->getBody()))
+  });
   
   // Emit the body, which is always evaluated the first time around.
   visit(S->getBody());
@@ -408,8 +409,7 @@ void SILGenFunction::visitDoWhileStmt(DoWhileStmt *S) {
   }
   
   emitOrDeleteBlock(B, EndBB, S);
-  BreakDestStack.pop_back();
-  ContinueDestStack.pop_back();
+  BreakContinueDestStack.pop_back();
 }
 
 void SILGenFunction::visitForStmt(ForStmt *S) {
@@ -435,10 +435,11 @@ void SILGenFunction::visitForStmt(ForStmt *S) {
   // Set the destinations for 'break' and 'continue'
   SILBasicBlock *IncBB = createBasicBlock();
   SILBasicBlock *EndBB = createBasicBlock();
-  BreakDestStack.emplace_back(EndBB, getCleanupsDepth(),
-                              CleanupLocation(S->getBody()));
-  ContinueDestStack.emplace_back(IncBB, getCleanupsDepth(),
-                                 CleanupLocation(S->getBody()));
+  BreakContinueDestStack.push_back({
+    S,
+    JumpDest(EndBB, getCleanupsDepth(), CleanupLocation(S->getBody())),
+    JumpDest(IncBB, getCleanupsDepth(), CleanupLocation(S->getBody()))
+  });
   
   // Evaluate the condition with the false edge leading directly
   // to the continuation block.
@@ -472,8 +473,7 @@ void SILGenFunction::visitForStmt(ForStmt *S) {
   Cond.complete(B);
   
   emitOrDeleteBlock(B, EndBB, S);
-  BreakDestStack.pop_back();
-  ContinueDestStack.pop_back();
+  BreakContinueDestStack.pop_back();
 }
 
 namespace {
@@ -517,11 +517,11 @@ void SILGenFunction::visitForEachStmt(ForEachStmt *S) {
   
   // Set the destinations for 'break' and 'continue'.
   SILBasicBlock *EndBB = createBasicBlock();
-  BreakDestStack.emplace_back(EndBB,
-                              getCleanupsDepth(),
-                              CleanupLocation(S->getBody()));
-  ContinueDestStack.emplace_back(LoopBB, getCleanupsDepth(),
-                                 CleanupLocation(S->getBody()));
+  BreakContinueDestStack.push_back({
+    S,
+    JumpDest(EndBB, getCleanupsDepth(), CleanupLocation(S->getBody())),
+    JumpDest(LoopBB, getCleanupsDepth(), CleanupLocation(S->getBody()))
+  });
   
   // Advance the generator.  Use a scope to ensure that any temporary stack
   // allocations in the subexpression are immediately released.
@@ -570,21 +570,41 @@ void SILGenFunction::visitForEachStmt(ForEachStmt *S) {
   Cond.complete(B);
   
   emitOrDeleteBlock(B, EndBB, S);
-  BreakDestStack.pop_back();
-  ContinueDestStack.pop_back();
+  BreakContinueDestStack.pop_back();
   
   // Destroy the last value that came out of the generator.
   B.emitDestroyAddr(S, nextBuf);
 }
 
 void SILGenFunction::visitBreakStmt(BreakStmt *S) {
+  assert(S->getTarget() && "Sema didn't fill in break target?");
   CurrentSILLoc = S;
-  Cleanups.emitBranchAndCleanups(BreakDestStack.back(), S);
+  
+  // Find the target JumpDest based on the target that sema filled into the
+  // stmt.
+  for (auto elt : BreakContinueDestStack) {
+    if (S->getTarget() == std::get<0>(elt)) {
+      Cleanups.emitBranchAndCleanups(std::get<1>(elt), S);
+      return;
+    }
+  }
+  assert(0 && "Break has available target block.");
 }
 
 void SILGenFunction::visitContinueStmt(ContinueStmt *S) {
+  assert(S->getTarget() && "Sema didn't fill in continue target?");
+
   CurrentSILLoc = S;
-  Cleanups.emitBranchAndCleanups(ContinueDestStack.back(), S);
+  
+  // Find the target JumpDest based on the target that sema filled into the
+  // stmt.
+  for (auto elt : BreakContinueDestStack) {
+    if (S->getTarget() == std::get<0>(elt)) {
+      Cleanups.emitBranchAndCleanups(std::get<2>(elt), S);
+      return;
+    }
+  }
+  assert(0 && "Break has available target block.");
 }
 
 void SILGenFunction::visitSwitchStmt(SwitchStmt *S) {

@@ -165,7 +165,9 @@ public:
   
   /// The level of loop nesting. 'break' and 'continue' are valid only in scopes
   /// where this is greater than one.
-  unsigned LoopNestLevel = 0;
+  SmallVector<LabeledStmt*, 2> ActiveLabeledStmts;
+  
+  
   /// The level of 'switch' nesting. 'fallthrough' is valid only in scopes where
   /// this is greater than one.
   unsigned SwitchLevel = 0;
@@ -180,23 +182,21 @@ public:
   /// expressions are not discarded.
   bool IsREPL;
 
-  struct AddLoopNest {
+  struct AddLabeledStmt {
     StmtChecker &SC;
-    AddLoopNest(StmtChecker &SC) : SC(SC) {
-      ++SC.LoopNestLevel;
+    AddLabeledStmt(StmtChecker &SC, LabeledStmt *LS) : SC(SC) {
+      SC.ActiveLabeledStmts.push_back(LS);
     }
-    ~AddLoopNest() {
-      --SC.LoopNestLevel;
+    ~AddLabeledStmt() {
+      SC.ActiveLabeledStmts.pop_back();
     }
   };
   
   struct AddSwitchNest {
     StmtChecker &SC;
     CaseStmt *OuterFallthroughDest;
-    AddSwitchNest(StmtChecker &SC)
-      : SC(SC),
-        OuterFallthroughDest(SC.FallthroughDest)
-    {
+    AddSwitchNest(StmtChecker &SC) : SC(SC),
+        OuterFallthroughDest(SC.FallthroughDest) {
       ++SC.SwitchLevel;
     }
     
@@ -299,25 +299,25 @@ public:
     if (TC.typeCheckCondition(C, DC)) return 0;
     WS->setCond(C);
 
-    AddLoopNest loopNest(*this);
+    AddLabeledStmt loopNest(*this, WS);
     Stmt *S = WS->getBody();
     if (typeCheckStmt(S)) return 0;
     WS->setBody(S);
     
     return WS;
   }
-  Stmt *visitDoWhileStmt(DoWhileStmt *WS) {
+  Stmt *visitDoWhileStmt(DoWhileStmt *DWS) {
     {
-      AddLoopNest loopNest(*this);
-      Stmt *S = WS->getBody();
+      AddLabeledStmt loopNest(*this, DWS);
+      Stmt *S = DWS->getBody();
       if (typeCheckStmt(S)) return 0;
-      WS->setBody(S);
+      DWS->setBody(S);
     }
     
-    Expr *E = WS->getCond();
+    Expr *E = DWS->getCond();
     if (TC.typeCheckCondition(E, DC)) return 0;
-    WS->setCond(E);
-    return WS;
+    DWS->setCond(E);
+    return DWS;
   }
   Stmt *visitForStmt(ForStmt *FS) {
     // Type check any var decls in the initializer.
@@ -342,7 +342,7 @@ public:
       FS->setIncrement(Increment);
     }
 
-    AddLoopNest loopNest(*this);
+    AddLabeledStmt loopNest(*this, FS);
     Stmt *S = FS->getBody();
     if (typeCheckStmt(S)) return 0;
     FS->setBody(S);
@@ -462,7 +462,7 @@ public:
     S->setPattern(pattern);
     
     // Type-check the body of the loop.
-    AddLoopNest loopNest(*this);
+    AddLabeledStmt loopNest(*this, S);
     BraceStmt *Body = S->getBody();
     if (typeCheckStmt(Body)) return nullptr;
     S->setBody(Body);
@@ -471,18 +471,50 @@ public:
   }
 
   Stmt *visitBreakStmt(BreakStmt *S) {
-    if (!LoopNestLevel) {
+#if 0
+    // This implements the new semantics.  Enable in a bit.
+    if (ActiveLabeledStmts.empty()) {
       TC.diagnose(S->getLoc(), diag::break_outside_loop);
       return nullptr;
     }
+    
+    // Temporarily reject break statements that are in a switch, since their
+    // semantics are changing.
+    if (isa<SwitchStmt>(ActiveLabeledStmts.back())) {
+      TC.diagnose(S->getLoc(), diag::break_not_in_switch);
+      return nullptr;
+    }
+    S->setTarget(ActiveLabeledStmts.back());
+#else
+    LabeledStmt *Target = nullptr;
+    // Scan to see if we are in any non-switch labeled statements (loops).
+    for (auto LS : ActiveLabeledStmts) {
+      if (!isa<SwitchStmt>(LS))
+        Target = LS; // Take the last one.  Hacky.
+    }
+    if (!Target) {
+      TC.diagnose(S->getLoc(), diag::break_outside_loop);
+      return nullptr;
+    }
+    S->setTarget(Target);
+#endif
+
     return S;
   }
 
   Stmt *visitContinueStmt(ContinueStmt *S) {
-    if (!LoopNestLevel) {
+    LabeledStmt *Target = nullptr;
+    // Scan to see if we are in any non-switch labeled statements (loops).
+    for (auto LS : ActiveLabeledStmts) {
+      if (!isa<SwitchStmt>(LS))
+        Target = LS;  // Take the last one.  Hacky.
+    }
+    if (!Target) {
       TC.diagnose(S->getLoc(), diag::continue_outside_loop);
       return nullptr;
     }
+    
+    S->setTarget(Target);
     return S;
   }
   
