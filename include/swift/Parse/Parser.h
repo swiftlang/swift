@@ -1021,7 +1021,7 @@ public:
   //===--------------------------------------------------------------------===//
   // Statement Parsing
 
-  bool isStartOfStmt(const Token &Tok);
+  bool isStartOfStmt();
   ParserResult<Stmt> parseStmt();
   ParserStatus parseExprOrStmt(ASTNode &Result);
   ParserResult<Stmt> parseStmtReturn();

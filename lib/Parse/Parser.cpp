@@ -377,7 +377,7 @@ void Parser::skipUntilGreaterInTypeList() {
     // 'Self' can appear in types, skip it.
     if (Tok.is(tok::kw_Self))
       break;
-    if (isStartOfStmt(Tok) || isStartOfDecl())
+    if (isStartOfStmt() || isStartOfDecl())
       return;
     break;
 
@@ -399,8 +399,7 @@ void Parser::skipUntilDeclRBrace() {
 
 void Parser::skipUntilDeclStmtRBrace(tok T1) {
   while (Tok.isNot(T1) && Tok.isNot(tok::eof) && Tok.isNot(tok::r_brace) &&
-         !isStartOfStmt(Tok) &&
-         !isStartOfDecl()) {
+         !isStartOfStmt() && !isStartOfDecl()) {
     skipSingle();
   }
 }

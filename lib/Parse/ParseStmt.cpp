@@ -27,10 +27,9 @@
 
 using namespace swift;
 
-/// isStartOfStmt - Return true if the specified token starts
-/// a statement.
+/// isStartOfStmt - Return true if the current token starts a statement.
 ///
-bool Parser::isStartOfStmt(const Token &Tok) {
+bool Parser::isStartOfStmt() {
   switch (Tok.getKind()) {
   default: return false;
   case tok::kw_return:
@@ -57,7 +56,7 @@ ParserStatus Parser::parseExprOrStmt(ASTNode &Result) {
     return makeParserError();
   }
   
-  if (isStartOfStmt(Tok)) {
+  if (isStartOfStmt()) {
     ParserResult<Stmt> Res = parseStmt();
     if (Res.isNonNull())
       Result = Res.get();
@@ -532,7 +531,7 @@ ParserResult<Stmt> Parser::parseStmtReturn() {
   // enclosing stmt-brace to get it by eagerly eating it unless the return is
   // followed by a '}', ';', statement or decl start keyword sequence.
   if (Tok.isNot(tok::r_brace) && Tok.isNot(tok::semi) &&
-      !isStartOfStmt(Tok) && !isStartOfDecl()) {
+      !isStartOfStmt() && !isStartOfDecl()) {
     SourceLoc ExprLoc;
     if (Tok.isNot(tok::eof))
       ExprLoc = Tok.getLoc();
