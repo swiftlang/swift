@@ -668,6 +668,11 @@ public:
   /// \brief Set the Clang node associated with this declaration.
   void setClangNode(ClangNode node);
 
+  void updateClangNode(ClangNode node) {
+    assert(hasClangNode());
+    setClangNode(node);
+  }
+
   // Make vanilla new/delete illegal for Decls.
   void *operator new(size_t Bytes) = delete;
   void operator delete(void *Data) = delete;

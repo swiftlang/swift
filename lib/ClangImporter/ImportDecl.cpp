@@ -786,12 +786,14 @@ namespace {
         return nullptr;
 
       auto Loc = Impl.importSourceLoc(Decl->getLocation());
-      return new (Impl.SwiftContext) TypeAliasDecl(
+      auto Result = new (Impl.SwiftContext) TypeAliasDecl(
                                       Impl.importSourceLoc(Decl->getLocStart()),
                                       Name,
                                       Loc,
                                       TypeLoc::withoutLoc(SwiftType),
                                       DC);
+      Result->setClangNode(Decl);
+      return Result;
     }
 
     Decl *
@@ -1383,6 +1385,7 @@ namespace {
                                           clang::APValue(decl->getInitVal()),
                                           ConstantConvertKind::Coerce,
                                           /*static*/ false);
+        result->setClangNode(decl);
         Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
         return result;
       }
@@ -1412,6 +1415,7 @@ namespace {
                                           clang::APValue(decl->getInitVal()),
                                           ConstantConvertKind::Construction,
                                           /*static*/ false);
+        result->setClangNode(decl);
         Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
         return result;
       }
@@ -1457,10 +1461,12 @@ namespace {
         return nullptr;
 
       // Map this indirect field to a Swift variable.
-      return new (Impl.SwiftContext)
+      auto result = new (Impl.SwiftContext)
                VarDecl(/*static*/ false, /*IsLet*/ false,
                        Impl.importSourceLoc(decl->getLocStart()),
                        name, type, dc);
+      result->setClangNode(decl);
+      return result;
     }
 
     Decl *VisitFunctionDecl(const clang::FunctionDecl *decl) {
@@ -1502,6 +1508,7 @@ namespace {
           name, nameLoc,
           /*GenericParams=*/nullptr, type, bodyPatterns,
           TypeLoc::withoutLoc(resultTy), dc);
+      result->setClangNode(decl);
 
       if (decl->isNoReturn())
         result->getMutableAttrs().add(
@@ -1521,7 +1528,6 @@ namespace {
         auto *attr = clang::UsedAttr::CreateImplicit(decl->getASTContext());
         const_cast<clang::FunctionDecl *>(decl)->addAttr(attr);
 
-        result->setClangNode(decl);
         Impl.registerExternalDecl(result);
       }
 
@@ -1557,6 +1563,7 @@ namespace {
         new (Impl.SwiftContext) VarDecl(/*static*/ false, /*IsLet*/ false,
                               Impl.importSourceLoc(decl->getLocation()),
                               name, type, dc);
+      result->setClangNode(decl);
 
       // Handle attributes.
       if (decl->hasAttr<clang::IBOutletAttr>())
@@ -1596,11 +1603,13 @@ namespace {
         return nullptr;
 
       // FIXME: Should 'const' vardecl's be imported as 'let' decls?
-      return new (Impl.SwiftContext)
+      auto result = new (Impl.SwiftContext)
                VarDecl(/*static*/ false,
                        /*IsLet*/ false,
                        Impl.importSourceLoc(decl->getLocation()),
                        name, type, dc);
+      result->setClangNode(decl);
+      return result;
     }
 
     Decl *VisitImplicitParamDecl(const clang::ImplicitParamDecl *decl) {
@@ -2661,6 +2670,7 @@ namespace {
         = new (context) SubscriptDecl(name, decl->getLoc(), bodyPatterns,
                                       decl->getLoc(),
                                       TypeLoc::withoutLoc(elementTy), dc);
+      subscript->setClangNode(objcMethod);
       subscript->setAccessors(SourceRange(), getterThunk, setterThunk);
       subscript->setType(FunctionType::get(subscript->getIndices()->getType(),
                                            subscript->getElementType()));
@@ -3613,6 +3623,7 @@ namespace {
           /*static*/ false, /*IsLet*/ false,
           Impl.importSourceLoc(decl->getLocation()),
           name, type, dc);
+      result->setClangNode(decl);
 
       // Build thunks.
       FuncDecl *getterThunk = buildGetterThunk(getter, dc, nullptr);
@@ -3909,8 +3920,9 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
       assert(ImportedCorrectly);
     }
 #endif
-    if (SkippedOverTypedef || !Result->getClangDecl())
-      Result->setClangNode(ClangDecl);
+    assert(Result->hasClangNode());
+    if (SkippedOverTypedef)
+      Result->updateClangNode(ClangDecl);
   }
   return Result;
 }
