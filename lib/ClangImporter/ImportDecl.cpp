@@ -4019,8 +4019,7 @@ ClangImporter::Implementation::importMirroredDecl(const clang::NamedDecl *decl,
         result = special;
     }
 
-    assert(!result->getClangDecl() || result->getClangDecl() == canon);
-    result->setClangNode(decl);
+    assert(result->getClangDecl() && result->getClangDecl() == canon);
     result->setImplicit();
 
     // Map the Clang attributes onto Swift attributes.
