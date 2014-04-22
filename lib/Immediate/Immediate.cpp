@@ -70,6 +70,7 @@
 #include <wchar.h>
 #include <histedit.h>
 #include <dlfcn.h>
+#define DEBUG_TYPE "swift-immediate"
 
 using namespace swift;
 

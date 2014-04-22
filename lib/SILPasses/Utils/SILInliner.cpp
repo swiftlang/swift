@@ -13,7 +13,7 @@
 #include "swift/SILPasses/Utils/SILInliner.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
-
+#define DEBUG_TYPE "sil-inliner"
 using namespace swift;
 
 /// \brief Inlines the callee of a given ApplyInst (which must be the value of a

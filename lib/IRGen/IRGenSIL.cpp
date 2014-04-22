@@ -52,6 +52,7 @@
 #include "ReferenceTypeInfo.h"
 #include "GenType.h"
 #include "WeakTypeInfo.h"
+#define DEBUG_TYPE "irgen"
 
 using namespace swift;
 using namespace irgen;

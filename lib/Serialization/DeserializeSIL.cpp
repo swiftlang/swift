@@ -23,6 +23,7 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/OnDiskHashTable.h"
+#define DEBUG_TYPE "deserialize"
 
 using namespace swift;
 using namespace swift::serialization;

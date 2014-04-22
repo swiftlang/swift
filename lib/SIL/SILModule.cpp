@@ -19,6 +19,7 @@
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
+#define DEBUG_TYPE "libsil"
 using namespace swift;
 
 STATISTIC(NumFuncLinked, "Number of SIL functions linked");

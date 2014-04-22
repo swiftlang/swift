@@ -24,6 +24,7 @@
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/Subsystems.h"
 #include "llvm/Support/Debug.h"
+#define DEBUG_TYPE "silgen"
 using namespace swift;
 using namespace Lowering;
 

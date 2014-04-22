@@ -38,8 +38,8 @@
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
-
 #include "IRGenModule.h"
+#define DEBUG_TYPE "irgen"
 
 using namespace swift;
 using namespace irgen;

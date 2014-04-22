@@ -25,6 +25,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/StringSet.h"
+#define DEBUG_TYPE "silverifier"
 using namespace swift;
 
 using Lowering::AbstractionPattern;
