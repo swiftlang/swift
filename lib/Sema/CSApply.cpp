@@ -1331,7 +1331,9 @@ namespace {
         return nullptr;
 
       // Build a reference to the convertFromStringInterpolation member.
-      auto typeRef = TypeExpr::createImplicit(type, tc.Context);
+      // FIXME: This location info is bogus.
+      auto typeRef = TypeExpr::createImplicitHack(expr->getStartLoc(),
+                                                  type, tc.Context);
       Expr *memberRef = new (tc.Context) MemberRefExpr(typeRef,
                                                        expr->getStartLoc(),
                                                        member,

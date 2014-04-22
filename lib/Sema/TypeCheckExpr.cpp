@@ -95,7 +95,8 @@ Expr *TypeChecker::buildArrayInjectionFnRef(DeclContext *dc,
                                             ArraySliceType *sliceType,
                                             Type lenTy, SourceLoc Loc) {
   // Build the expression "Array<T>".
-  Expr *sliceTypeRef = TypeExpr::createImplicit(sliceType, Context);
+  // FIXME: Bogus location info.
+  Expr *sliceTypeRef = TypeExpr::createImplicitHack(Loc, sliceType, Context);
 
   // Build the expression "Array<T>.convertFromHeapArray".
   Expr *injectionFn = new (Context) UnresolvedDotExpr(

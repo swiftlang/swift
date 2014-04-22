@@ -162,11 +162,12 @@ public:
 
   // Scope information for control flow statements
   // (break, continue, fallthrough).
-
+  
   /// The level of loop nesting. 'break' and 'continue' are valid only in scopes
   /// where this is greater than one.
   SmallVector<LabeledStmt*, 2> ActiveLabeledStmts;
-
+  
+  
   /// The level of 'switch' nesting. 'fallthrough' is valid only in scopes where
   /// this is greater than one.
   unsigned SwitchLevel = 0;
@@ -184,19 +185,6 @@ public:
   struct AddLabeledStmt {
     StmtChecker &SC;
     AddLabeledStmt(StmtChecker &SC, LabeledStmt *LS) : SC(SC) {
-      // Verify that we don't have label shadowing.
-      if (!LS->getLabelInfo().Name.empty())
-        for (auto PrevLS : SC.ActiveLabeledStmts) {
-          if (PrevLS->getLabelInfo().Name == LS->getLabelInfo().Name) {
-            SC.TC.diagnose(LS->getLabelInfo().Loc,
-                        diag::label_shadowed, PrevLS->getLabelInfo().Name);
-            SC.TC.diagnose(PrevLS->getLabelInfo().Loc,
-                        diag::invalid_redecl_prev, PrevLS->getLabelInfo().Name);
-          }
-        }
-
-      // In any case, remember that we're in this labeled statement so that
-      // break and continue are aware of it.
       SC.ActiveLabeledStmts.push_back(LS);
     }
     ~AddLabeledStmt() {
