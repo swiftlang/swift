@@ -132,9 +132,15 @@ FileUnit *SerializedModuleLoader::loadAST(
     bool isFramework) {
   assert(moduleInputBuffer);
 
+  const char *moduleBufferID = moduleInputBuffer->getBufferIdentifier();
+  const char *moduleDocBufferID = nullptr;
+  if (moduleDocInputBuffer)
+    moduleDocBufferID = moduleDocInputBuffer->getBufferIdentifier();
+
   if (moduleInputBuffer->getBufferSize() % 4 != 0) {
     if (diagLoc)
-      Ctx.Diags.diagnose(*diagLoc, diag::serialization_malformed_module);
+      Ctx.Diags.diagnose(*diagLoc, diag::serialization_malformed_module,
+                         moduleBufferID);
     return nullptr;
   }
 
@@ -148,15 +154,24 @@ FileUnit *SerializedModuleLoader::loadAST(
     break;
   case ModuleStatus::FormatTooNew:
     if (diagLoc)
-      Ctx.Diags.diagnose(*diagLoc, diag::serialization_module_too_new);
+      Ctx.Diags.diagnose(*diagLoc, diag::serialization_module_too_new,
+                         moduleBufferID);
     return nullptr;
   case ModuleStatus::FormatTooOld:
     if (diagLoc)
-      Ctx.Diags.diagnose(*diagLoc, diag::serialization_module_too_old);
+      Ctx.Diags.diagnose(*diagLoc, diag::serialization_module_too_old,
+                         moduleBufferID);
     return nullptr;
   case ModuleStatus::Malformed:
     if (diagLoc)
-      Ctx.Diags.diagnose(*diagLoc, diag::serialization_malformed_module);
+      Ctx.Diags.diagnose(*diagLoc, diag::serialization_malformed_module,
+                         moduleBufferID);
+    return nullptr;
+  case ModuleStatus::MalformedDocumentation:
+    assert(moduleDocBufferID);
+    if (diagLoc)
+      Ctx.Diags.diagnose(*diagLoc, diag::serialization_malformed_module,
+                         moduleDocBufferID ? moduleDocBufferID : "");
     return nullptr;
   case ModuleStatus::MissingDependency:
   case ModuleStatus::MissingShadowedModule:

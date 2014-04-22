@@ -720,7 +720,7 @@ ModuleFile::ModuleFile(
   llvm::BitstreamCursor docCursor{ModuleDocInputReader};
   if (!checkModuleDocSignature(docCursor) ||
       !enterTopLevelModuleBlock(docCursor, MODULE_DOC_BLOCK_ID)) {
-    error();
+    error(ModuleStatus::MalformedDocumentation);
     return;
   }
 
@@ -729,7 +729,7 @@ ModuleFile::ModuleFile(
     switch (topLevelEntry.ID) {
     case COMMENT_BLOCK_ID: {
       if (!hasValidControlBlock || !readCommentBlock(docCursor)) {
-        error();
+        error(ModuleStatus::MalformedDocumentation);
         return;
       }
       break;
@@ -739,7 +739,7 @@ ModuleFile::ModuleFile(
       // Unknown top-level block, possibly for use by a future version of the
       // module format.
       if (docCursor.SkipBlock()) {
-        error();
+        error(ModuleStatus::MalformedDocumentation);
         return;
       }
       break;
@@ -749,7 +749,7 @@ ModuleFile::ModuleFile(
   }
 
   if (topLevelEntry.Kind != llvm::BitstreamEntry::EndBlock) {
-    error();
+    error(ModuleStatus::MalformedDocumentation);
     return;
   }
 }

@@ -41,7 +41,10 @@ enum class ModuleStatus {
   MissingShadowedModule,
 
   /// The module file is malformed in some way.
-  Malformed
+  Malformed,
+
+  /// The module documentation file is malformed in some way.
+  MalformedDocumentation
 };
 
 /// \brief Imports serialized Swift modules into an ASTContext.
