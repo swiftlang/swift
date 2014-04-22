@@ -2286,8 +2286,11 @@ void FuncDecl::setDeserializedSignature(ArrayRef<Pattern *> BodyParams,
 }
 
 Type FuncDecl::getResultType() const {
+  if (!hasType())
+    return nullptr;
+
   Type resultTy = getType();
-  if (!resultTy || resultTy->is<ErrorType>())
+  if (resultTy->is<ErrorType>())
     return resultTy;
 
   for (unsigned i = 0, e = getNaturalArgumentCount(); i != e; ++i)

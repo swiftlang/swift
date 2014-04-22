@@ -152,6 +152,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
                       [&]() -> ParserStatus {
     ParsedParameter param;
     ParserStatus status;
+    SourceLoc StartLoc = Tok.getLoc();
 
     unsigned defaultArgIndex = defaultArgs? defaultArgs->NextIndex++ : 0;
 
@@ -223,6 +224,10 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
           .fixItRemove(defaultArgRange);
       }
     }
+
+    // If we haven't made progress, don't add the param.
+    if (Tok.getLoc() == StartLoc)
+      return status;
 
     params.push_back(param);
     return status;
