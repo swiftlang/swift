@@ -580,6 +580,12 @@
         </data>
       </element>
       <element name="rawHTML">
+        <optional>
+          <!-- If not specified, the default value is 'false'. -->
+          <attribute name="isSafeToPassThrough">
+            <data type="boolean" />
+          </attribute>
+        </optional>
         <!-- Non-empty text content. -->
         <data type="string">
           <param name="pattern">.*\S.*</param>
