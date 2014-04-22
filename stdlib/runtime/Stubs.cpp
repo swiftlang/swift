@@ -127,16 +127,6 @@ extern "C" void print_Double(double l) {
   printf("%s", Buffer);
 }
 
-extern "C"
-uint32_t
-swift_runningOnX86_64() {
-#if __x86_64__
-  return true;
-#else
-  return false;
-#endif
-}
-
 static bool
 _swift_replOutputIsUTF8(void) {
   const char *lang = getenv("LANG");
