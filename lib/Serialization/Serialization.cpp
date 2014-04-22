@@ -2586,9 +2586,10 @@ public:
     uint32_t dataLength = 4 + data.Brief.size();
     // number of raw comments,
     dataLength += 4;
-    // length of each raw comment and its text.
+    // for each raw comment: column number of the first line, length of each
+    // raw comment and its text.
     for (auto C : data.Raw.Comments)
-      dataLength += 4 + C.RawText.size();
+      dataLength += 4 + 4 + C.RawText.size();
 
     endian::Writer<little> writer(out);
     writer.write<uint32_t>(keyLength);
@@ -2607,6 +2608,7 @@ public:
     out << data.Brief;
     writer.write<uint32_t>(data.Raw.Comments.size());
     for (auto C : data.Raw.Comments) {
+      writer.write<uint32_t>(C.StartColumn);
       writer.write<uint32_t>(C.RawText.size());
       out << C.RawText;
     }

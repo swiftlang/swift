@@ -38,7 +38,7 @@ SWIFT_CLASS("_TtC8comments18A100_EmptyComments")
 
 - (void)f3;
 
-/// <ul><li><p>Aaa.</p></li></ul>
+/// Aaa.
 - (void)f4;
 - (instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end

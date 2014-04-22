@@ -29,24 +29,29 @@ struct SingleRawComment {
   const CharSourceRange Range;
   const StringRef RawText;
 
-  const CommentKind Kind;
-  const unsigned StartLine;
+  unsigned Kind : 8;
+  unsigned StartColumn : 16;
+  unsigned StartLine;
   const unsigned EndLine;
 
   SingleRawComment(CharSourceRange Range, const SourceManager &SourceMgr);
-  SingleRawComment(StringRef RawText);
+  SingleRawComment(StringRef RawText, unsigned StartColumn);
 
   SingleRawComment(const SingleRawComment &) = default;
   SingleRawComment &operator=(const SingleRawComment &) = default;
 
+  CommentKind getKind() const LLVM_READONLY {
+    return static_cast<CommentKind>(Kind);
+  }
+
   bool isOrdinary() const LLVM_READONLY {
-    return Kind == CommentKind::OrdinaryLine ||
-           Kind == CommentKind::OrdinaryBlock;
+    return getKind() == CommentKind::OrdinaryLine ||
+           getKind() == CommentKind::OrdinaryBlock;
   }
 
   bool isLine() const LLVM_READONLY {
-    return Kind == CommentKind::OrdinaryLine ||
-           Kind == CommentKind::LineDoc;
+    return getKind() == CommentKind::OrdinaryLine ||
+           getKind() == CommentKind::LineDoc;
   }
 };
 

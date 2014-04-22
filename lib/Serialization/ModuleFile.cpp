@@ -421,11 +421,13 @@ public:
         F.getContext().AllocateUninitialized<SingleRawComment>(NumComments);
 
     for (unsigned i = 0; i != NumComments; ++i) {
+      unsigned StartColumn =
+          endian::readNext<uint32_t, little, unaligned>(data);
       unsigned RawSize = endian::readNext<uint32_t, little, unaligned>(data);
       auto RawText = StringRef(reinterpret_cast<const char *>(data), RawSize);
       data += RawSize;
 
-      new (&Comments[i]) SingleRawComment(RawText);
+      new (&Comments[i]) SingleRawComment(RawText, StartColumn);
     }
     result.Raw = RawComment(Comments);
     return result;

@@ -56,13 +56,16 @@ static SingleRawComment::CommentKind getCommentKind(StringRef Comment) {
 SingleRawComment::SingleRawComment(CharSourceRange Range,
                                    const SourceManager &SourceMgr)
     : Range(Range), RawText(SourceMgr.extractText(Range)),
-      Kind(getCommentKind(RawText)),
-      StartLine(SourceMgr.getLineNumber(Range.getStart())),
-      EndLine(SourceMgr.getLineNumber(Range.getEnd())) {}
+      Kind(static_cast<unsigned>(getCommentKind(RawText))),
+      EndLine(SourceMgr.getLineNumber(Range.getEnd())) {
+  auto StartLineAndColumn = SourceMgr.getLineAndColumn(Range.getStart());
+  StartLine = StartLineAndColumn.first;
+  StartColumn = StartLineAndColumn.second;
+}
 
-SingleRawComment::SingleRawComment(StringRef RawText)
-    : RawText(RawText), Kind(getCommentKind(RawText)),
-      StartLine(0), EndLine(0) {}
+SingleRawComment::SingleRawComment(StringRef RawText, unsigned StartColumn)
+    : RawText(RawText), Kind(static_cast<unsigned>(getCommentKind(RawText))),
+      StartColumn(StartColumn), StartLine(0), EndLine(0) {}
 
 static bool canHaveComment(const Decl *D) {
   return !D->hasClangNode() &&
@@ -152,11 +155,19 @@ RawComment Decl::getRawComment() const {
   return RawComment();
 }
 
-static unsigned measureASCIIArt(StringRef S) {
+static unsigned measureASCIIArt(StringRef S, unsigned NumLeadingSpaces) {
+  StringRef Spaces = S.substr(0, NumLeadingSpaces);
+  if (Spaces.size() != NumLeadingSpaces)
+    return 0;
+  if (Spaces.find_first_not_of(' ') != StringRef::npos)
+    return 0;
+
+  S = S.drop_front(NumLeadingSpaces);
+
   if (S.startswith(" * "))
-   return 3;
+   return NumLeadingSpaces + 3;
   if (S.startswith(" *\n") || S.startswith(" *\n\r"))
-    return 2;
+    return NumLeadingSpaces + 2;
   return 0;
 }
 
@@ -190,7 +201,7 @@ toLineList(llvm::rest::ReSTContext &TheReSTContext,
         unsigned NewlineBytes = measureNewline(Cleaned);
         Cleaned = Cleaned.drop_front(NewlineBytes);
         CleanedStartLoc = CleanedStartLoc.getAdvancedLocOrInvalid(NewlineBytes);
-        HasASCIIArt = measureASCIIArt(Cleaned) != 0;
+        HasASCIIArt = measureASCIIArt(Cleaned, C.StartColumn - 1) != 0;
       }
 
       while (!Cleaned.empty()) {
@@ -200,7 +211,8 @@ toLineList(llvm::rest::ReSTContext &TheReSTContext,
 
         // Skip over ASCII art, if present.
         if (HasASCIIArt)
-          if (unsigned ASCIIArtBytes = measureASCIIArt(Cleaned)) {
+          if (unsigned ASCIIArtBytes =
+                  measureASCIIArt(Cleaned, C.StartColumn - 1)) {
             Cleaned = Cleaned.drop_front(ASCIIArtBytes);
             CleanedStartLoc =
                 CleanedStartLoc.getAdvancedLocOrInvalid(ASCIIArtBytes);
