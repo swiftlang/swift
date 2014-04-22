@@ -334,7 +334,7 @@ swift::swift_dynamicCast(const void *object, const Metadata *targetType) {
     printf("casting to objc class wrapper\n");
 #endif
     targetClassType
-      = static_cast<const ObjCClassWrapperMetadata *>(targetType)->getClass();
+      = static_cast<const ObjCClassWrapperMetadata *>(targetType)->Class;
     break;
 
   case MetadataKind::Existential:
@@ -365,7 +365,7 @@ swift::swift_dynamicCastUnconditional(const void *object,
 
   case MetadataKind::ObjCClassWrapper:
     targetClassType
-      = static_cast<const ObjCClassWrapperMetadata *>(targetType)->getClass();
+      = static_cast<const ObjCClassWrapperMetadata *>(targetType)->Class;
     break;
 
   case MetadataKind::Existential:
@@ -601,7 +601,7 @@ swift::swift_getObjCClassMetadata(const ClassMetadata *theClass) {
   auto metadata = entry->getData();
   metadata->setKind(MetadataKind::ObjCClassWrapper);
   metadata->ValueWitnesses = &_TWVBO;
-  metadata->setClass(theClass);
+  metadata->Class = theClass;
 
   return ObjCClassWrappers.add(entry)->getData();
 }
@@ -1824,6 +1824,9 @@ Metadata::getNominalTypeDescriptor() const {
   }
 }
 
+extern "C" const char* class_getName(const ClassMetadata*);
+extern "C" const ClassMetadata* class_getSuperclass(const ClassMetadata*);
+
 /// \brief Check whether a type conforms to a given native Swift protocol,
 /// visible from the named module.
 ///
@@ -1855,7 +1858,7 @@ recur:
   case MetadataKind::ObjCClassWrapper: {
     std::stringstream ostream;
     auto wrapper = static_cast<const ObjCClassWrapperMetadata*>(type);
-    const char* objc_class_name = wrapper->getClassName();
+    const char* objc_class_name = class_getName(wrapper->Class);
     ostream << "CSo" << strlen(objc_class_name) << objc_class_name;
     ostream.flush();
     TypeName = ostream.str();
@@ -1915,7 +1918,7 @@ recur:
   }
   case MetadataKind::ObjCClassWrapper: {
     auto wrapper = static_cast<const ObjCClassWrapperMetadata *>(type);
-    auto super = wrapper->getSuperclass();
+    auto super = class_getSuperclass(wrapper->Class);
     if (!super)
       return nullptr;
     
