@@ -62,7 +62,7 @@ bb0(%0 : $Int):
 bb1:
   // Forward reference MRVs.
   store %0 to %6#1 : $*Int                   // CHECK:   store %0 to %6#1
-  strong_release %6#0 : $Builtin.ObjectPointer        // CHECK:   strong_release %6#0
+  strong_release %6#0 : $Builtin.NativeObject        // CHECK:   strong_release %6#0
 
   return %5 : $()                              // CHECK:   return %5 : $()
 bb2:
@@ -207,10 +207,10 @@ sil @classes : $@thin () -> () {
 bb0:
   // CHECK: %0 = alloc_ref $C
   %C = alloc_ref $C
-  // CHECK: ref_to_object_pointer %0 : $C to $Builtin.ObjectPointer
-  %1 = ref_to_object_pointer %C : $C to $Builtin.ObjectPointer
-  // CHECK: ref_to_object_pointer %0 : $C to $Builtin.ObjCPointer
-  %O = ref_to_object_pointer %C : $C to $Builtin.ObjCPointer
+  // CHECK: ref_to_native_object %0 : $C to $Builtin.NativeObject
+  %1 = ref_to_native_object %C : $C to $Builtin.NativeObject
+  // CHECK: ref_to_native_object %0 : $C to $Builtin.UnknownObject
+  %O = ref_to_native_object %C : $C to $Builtin.UnknownObject
 
   // CHECK: class_method {{.*}} : $C, #C.doIt!1
   %2 = class_method %C : $C, #C.doIt!1 : C -> () -> () , $@cc(method) @thin (@owned C) -> ()
@@ -288,7 +288,7 @@ bb0(%0 : $*Runcible, %1 : $*protocol<Bendable, Runcible>):
   // CHECK: dealloc_stack
   %9 = dealloc_stack %4#0 : $*@local_storage protocol<Bendable, Runcible>
   // CHECK: release
-  %10 = strong_release %2#0 : $Builtin.ObjectPointer
+  %10 = strong_release %2#0 : $Builtin.NativeObject
   // CHECK: return
   %11 = return %7 : $()
 }
@@ -310,7 +310,7 @@ bb0(%0 : $ClassBound):
   %6 = protocol_method %3 : $ClassBound, #ClassBound.classBoundMethod!1 : <Self : ClassBound> Self -> () -> (), $@cc(witness_method) (@sil_self ClassBound) -> ()
   %7 = apply %6(%5) : $@cc(witness_method) (@sil_self ClassBound) -> ()
   %8 = tuple ()
-  %9 = strong_release %1#0 : $Builtin.ObjectPointer
+  %9 = strong_release %1#0 : $Builtin.NativeObject
   %10 = return %8 : $()
 }
 
@@ -354,7 +354,7 @@ bb0(%0 : $@thin Aleph.Type):
   // CHECK: struct_extract {{%.*}} : $Aleph, #Aleph.a
   %15 = struct_extract %14 : $Aleph, #Aleph.a
   %16 = strong_retain %15 : $Ref
-  %17 = strong_release %2#0 : $Builtin.ObjectPointer
+  %17 = strong_release %2#0 : $Builtin.NativeObject
   %18 = return %14 : $Aleph
 }
 
@@ -433,7 +433,7 @@ bb0(%0 : $Int, %1 : $Float32):
   // CHECK: apply
   %24 = apply %19(%17) : $@thin (Float32) -> ()
   %25 = tuple ()
-  %26 = strong_release %2#0 : $Builtin.ObjectPointer
+  %26 = strong_release %2#0 : $Builtin.NativeObject
   %27 = return %25 : $()
 }
 
@@ -457,8 +457,8 @@ bb0(%0 : $Int, %1 : $M):
   %10 = store %6 to %9 : $*Int
   %11 = strong_release %7 : $M
   %12 = tuple ()
-  %13 = strong_release %4#0 : $Builtin.ObjectPointer
-  %14 = strong_release %2#0 : $Builtin.ObjectPointer
+  %13 = strong_release %4#0 : $Builtin.NativeObject
+  %14 = strong_release %2#0 : $Builtin.NativeObject
   %15 = return %12 : $()
 }
 
@@ -496,7 +496,7 @@ no:
   br isa(%n : $Builtin.Int1)
 isa(%6 : $Builtin.Int1):
   %7 = strong_release %3 : $B
-  %8 = strong_release %1#0 : $Builtin.ObjectPointer
+  %8 = strong_release %1#0 : $Builtin.NativeObject
   %9 = return %6 : $Builtin.Int1
 }
 
@@ -514,8 +514,8 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
   %8 = load %3#1 : $*Builtin.Word                // CHECK: load
   // CHECK: index_raw_pointer {{%.*}} : $Builtin.RawPointer, {{%.*}} : $Builtin.Word
   %9 = index_raw_pointer %7 : $Builtin.RawPointer, %8 : $Builtin.Word
-  %10 = strong_release %3#0 : $Builtin.ObjectPointer
-  %11 = strong_release %2#0 : $Builtin.ObjectPointer
+  %10 = strong_release %3#0 : $Builtin.NativeObject
+  %11 = strong_release %2#0 : $Builtin.NativeObject
   %12 = return %9 : $Builtin.RawPointer
 }
 
@@ -560,8 +560,8 @@ bb0(%0 : $SomeClass, %1 : $SomeSubclass):
   %15 = tuple (%9 : $@thick SomeClass.Type, %14 : $@thick SomeClass.Type) // CHECK: tuple
   %16 = strong_release %11 : $SomeSubclass
   %17 = strong_release %7 : $SomeClass
-  %18 = strong_release %3#0 : $Builtin.ObjectPointer
-  %19 = strong_release %2#0 : $Builtin.ObjectPointer
+  %18 = strong_release %3#0 : $Builtin.NativeObject
+  %19 = strong_release %2#0 : $Builtin.NativeObject
   %20 = return %15 : $(@thick SomeClass.Type, @thick SomeClass.Type)
 }
 
@@ -577,7 +577,7 @@ bb0(%0 : $*T):
   %8 = tuple (%3 : $@thick T.Type, %7 : $@thick T.Type) // CHECK: tuple
   %9 = destroy_addr %5#1 : $*T
   %10 = dealloc_stack %5#0 : $*@local_storage T
-  %11 = strong_release %1#0 : $Builtin.ObjectPointer
+  %11 = strong_release %1#0 : $Builtin.NativeObject
   %12 = return %8 : $(@thick T.Type, @thick T.Type)
 }
 
@@ -591,7 +591,7 @@ bb0(%0 : $*SomeProtocol):
   %6 = existential_metatype $@thick SomeProtocol.Type, %4#1 : $*SomeProtocol
   %7 = destroy_addr %4#1 : $*SomeProtocol
   %8 = dealloc_stack %4#0 : $*@local_storage SomeProtocol
-  %9 = strong_release %1#0 : $Builtin.ObjectPointer
+  %9 = strong_release %1#0 : $Builtin.NativeObject
   %10 = return %6 : $@thick SomeProtocol.Type
 }
 
@@ -658,8 +658,8 @@ bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
   %8 = load %2#1 : $*Builtin.Int1
   %9 = load %3#1 : $*Builtin.Int1
   %10 = apply %7(%8, %9) : $@thin (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
-  strong_release %3#0 : $Builtin.ObjectPointer
-  strong_release %2#0 : $Builtin.ObjectPointer
+  strong_release %3#0 : $Builtin.NativeObject
+  strong_release %2#0 : $Builtin.NativeObject
   return %10 : $Builtin.Int1
 }
 
@@ -676,7 +676,7 @@ bb0:
 sil @test_dealloc_box : $@thin () -> () {
 bb0:
   %0 = alloc_box $Class1
-  dealloc_box $Class1, %0#0 : $Builtin.ObjectPointer
+  dealloc_box $Class1, %0#0 : $Builtin.NativeObject
   %2 = tuple ()
   return %2 : $()
 }
@@ -685,18 +685,18 @@ bb0:
 
 // CHECK-LABEL: closure_test
 sil @takes_closure : $@thin (@callee_owned () -> ()) -> ()
-sil @closure0 : $@thin (Builtin.ObjectPointer, @inout Int) -> ()
+sil @closure0 : $@thin (Builtin.NativeObject, @inout Int) -> ()
 
 sil @closure_test : $@thin () -> () {
 bb0:
   %0 = alloc_box $Int                           // users: %10, %8, %8, %7, %4
 
   %5 = function_ref @takes_closure : $@thin (@callee_owned () -> ()) -> ()
-  %6 = function_ref @closure0 : $@thin (Builtin.ObjectPointer, @inout Int) -> ()
-  strong_retain %0#0 : $Builtin.ObjectPointer
-  %8 = partial_apply %6(%0#0, %0#1) : $@thin (Builtin.ObjectPointer, @inout Int) -> ()
+  %6 = function_ref @closure0 : $@thin (Builtin.NativeObject, @inout Int) -> ()
+  strong_retain %0#0 : $Builtin.NativeObject
+  %8 = partial_apply %6(%0#0, %0#1) : $@thin (Builtin.NativeObject, @inout Int) -> ()
   %9 = apply %5(%8) : $@thin (@callee_owned () -> ()) -> ()
-  strong_release %0#0 : $Builtin.ObjectPointer
+  strong_release %0#0 : $Builtin.NativeObject
 
   %11 = tuple ()
   return %11 : $()
@@ -776,7 +776,7 @@ bb4:
 bb5:
   %15 = function_ref @_T6switch1cFT_T_ : $@thin () -> () // CHECK: function_ref
   %16 = apply %15() : $@thin () -> ()
-  strong_release %1#0 : $Builtin.ObjectPointer                   // CHECK: release
+  strong_release %1#0 : $Builtin.NativeObject                   // CHECK: release
   %18 = tuple ()
   return %18 : $()                                        // CHECK: return
 }
@@ -842,7 +842,7 @@ bb0(%0 : $*Bendable, %1 : $Spoon):
   deinit_existential %0 : $*Bendable
   %5 = load %2#1 : $*Spoon
   store %5 to %4 : $*Spoon
-  strong_release %2#0 : $Builtin.ObjectPointer
+  strong_release %2#0 : $Builtin.NativeObject
   %8 = tuple ()
   return %8 : $()
 }
@@ -856,7 +856,7 @@ bb0(%0 : $ConcreteClass):
   strong_retain %3 : $ConcreteClass
   // CHECK: init_existential_ref %{{.*}} : $ConcreteClass, $ClassP
   %5 = init_existential_ref %3 : $ConcreteClass, $ClassP
-  strong_release %1#0 : $Builtin.ObjectPointer
+  strong_release %1#0 : $Builtin.NativeObject
   return %5 : $ClassP
 }
 
@@ -903,8 +903,8 @@ bb0(%0 : $AnyObject):
   %4 = load %1#1 : $*AnyObject
   strong_retain %4 : $AnyObject
   %6 = project_existential_ref %4 : $AnyObject to $@sil_self AnyObject
-  %7 = ref_to_object_pointer %6 : $@sil_self AnyObject to $Builtin.ObjCPointer
-  dynamic_method_br %7 : $Builtin.ObjCPointer, #X.f!1, bb1, bb2
+  %7 = ref_to_native_object %6 : $@sil_self AnyObject to $Builtin.UnknownObject
+  dynamic_method_br %7 : $Builtin.UnknownObject, #X.f!1, bb1, bb2
 bb1:
   br bb3
 

@@ -531,12 +531,12 @@ AllocRefInst::AllocRefInst(SILLocation loc, SILType elementType, SILFunction &F,
 }
 
 
-// Allocations always return two results: Builtin.ObjectPointer & LValue[EltTy]
+// Allocations always return two results: Builtin.NativeObject & LValue[EltTy]
 static SILTypeList *getAllocType(SILType EltTy, SILFunction &F) {
   const ASTContext &Ctx = F.getModule().getASTContext();
 
   SILType ResTys[] = {
-    SILType::getObjectPointerType(Ctx),
+    SILType::getNativeObjectType(Ctx),
     EltTy.getAddressType()
   };
 

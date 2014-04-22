@@ -56,8 +56,8 @@ public:
   clang::CanQualType visitProtocolCompositionType(
                                                CanProtocolCompositionType type);
   clang::CanQualType visitBuiltinRawPointerType(CanBuiltinRawPointerType type);
-  clang::CanQualType visitBuiltinObjCPointerType(
-                                                CanBuiltinObjCPointerType type);
+  clang::CanQualType visitBuiltinUnknownObjectType(
+                                                CanBuiltinUnknownObjectType type);
   clang::CanQualType visitArchetypeType(CanArchetypeType type);
   clang::CanQualType visitSILFunctionType(CanSILFunctionType type);
   clang::CanQualType visitGenericTypeParamType(CanGenericTypeParamType type);

@@ -29,15 +29,15 @@ bb0:
   return %1 : $()                                 // id: %2
 }
 
-sil @_TFC12objc_dealloc10SwiftGizmod : $@thin (@owned SwiftGizmo) -> @owned Builtin.ObjectPointer {
+sil @_TFC12objc_dealloc10SwiftGizmod : $@thin (@owned SwiftGizmo) -> @owned Builtin.NativeObject {
 bb0(%0 : $SwiftGizmo):
   // function_ref objc_dealloc.onDestruct () -> ()
   %1 = function_ref @_TF12objc_dealloc10onDestructFT_T_ : $@thin () -> () // user: %2
   %2 = apply %1() : $@thin () -> ()
   %3 = ref_element_addr %0 : $SwiftGizmo, #SwiftGizmo.x      // user: %4
   destroy_addr %3 : $*X                           // id: %4
-  %5 = ref_to_object_pointer %0 : $SwiftGizmo to $Builtin.ObjectPointer // user: %6
-  return %5 : $Builtin.ObjectPointer              // id: %6
+  %5 = ref_to_native_object %0 : $SwiftGizmo to $Builtin.NativeObject // user: %6
+  return %5 : $Builtin.NativeObject              // id: %6
 }
 
 sil @_TToFC12objc_dealloc10SwiftGizmog1xC12objc_dealloc1X : $@cc(objc_method) @thin (SwiftGizmo) -> @autoreleased X {

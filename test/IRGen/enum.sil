@@ -169,7 +169,7 @@ enum Singleton {
 }
 
 enum SingletonRef {
-  case value(Builtin.ObjectPointer)
+  case value(Builtin.NativeObject)
 }
 
 enum DynamicSingleton<T> {
@@ -2125,10 +2125,10 @@ end:
 }
 
 enum MultiPayloadInnerSpareBits {
-  case A(Builtin.ObjectPointer)
-  case B(Builtin.ObjectPointer)
-  case C(Builtin.ObjectPointer)
-  case D(Builtin.ObjectPointer)
+  case A(Builtin.NativeObject)
+  case B(Builtin.NativeObject)
+  case C(Builtin.NativeObject)
+  case D(Builtin.NativeObject)
 }
 
 enum MultiPayloadNestedSpareBits {

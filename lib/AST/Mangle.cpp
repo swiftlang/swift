@@ -587,8 +587,8 @@ void Mangler::mangleGenericSignature(GenericSignature *sig,
 /// <type> ::= A <natural> <type>    # fixed-sized arrays
 /// <type> ::= Bf <natural> _        # Builtin.Float
 /// <type> ::= Bi <natural> _        # Builtin.Integer
-/// <type> ::= BO                    # Builtin.ObjCPointer
-/// <type> ::= Bo                    # Builtin.ObjectPointer
+/// <type> ::= BO                    # Builtin.UnknownObject
+/// <type> ::= Bo                    # Builtin.NativeObject
 /// <type> ::= Bp                    # Builtin.RawPointer
 /// <type> ::= Bv <natural> <type>   # Builtin.Vector
 /// <type> ::= C <decl>              # class (substitutable)
@@ -656,10 +656,10 @@ void Mangler::mangleType(CanType type, ResilienceExpansion explosion,
   case TypeKind::BuiltinRawPointer:
     Buffer << "Bp";
     return;
-  case TypeKind::BuiltinObjectPointer:
+  case TypeKind::BuiltinNativeObject:
     Buffer << "Bo";
     return;
-  case TypeKind::BuiltinObjCPointer:
+  case TypeKind::BuiltinUnknownObject:
     Buffer << "BO";
     return;
   case TypeKind::BuiltinVector:

@@ -341,14 +341,14 @@ public:
     return insert(new (F.getModule()) PointerToAddressInst(Loc, Op, Ty));
   }
   
-  RefToObjectPointerInst *createRefToObjectPointer(SILLocation Loc, SILValue Op,
+  RefToNativeObjectInst *createRefToNativeObject(SILLocation Loc, SILValue Op,
                                                    SILType Ty) {
-    return insert(new (F.getModule()) RefToObjectPointerInst(Loc, Op, Ty));
+    return insert(new (F.getModule()) RefToNativeObjectInst(Loc, Op, Ty));
   }
   
-  ObjectPointerToRefInst *createObjectPointerToRef(SILLocation Loc, SILValue Op,
+  NativeObjectToRefInst *createNativeObjectToRef(SILLocation Loc, SILValue Op,
                                                    SILType Ty) {
-    return insert(new (F.getModule()) ObjectPointerToRefInst(Loc, Op, Ty));
+    return insert(new (F.getModule()) NativeObjectToRefInst(Loc, Op, Ty));
   }
   
   RefToRawPointerInst *createRefToRawPointer(SILLocation Loc, SILValue Op,

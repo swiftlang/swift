@@ -381,154 +381,154 @@ sil @trivial_objc_caller : $@thin () -> () {
 
 // This function consists of 132 strong_retains. Note that 132 + 132 =
 // 264 which is greater than our inline cost limit.
-sil @large_function : $@thin (Builtin.ObjectPointer) -> () {
-bb0(%0 : $Builtin.ObjectPointer):
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
-  strong_release %0 : $Builtin.ObjectPointer
+sil @large_function : $@thin (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
   %1 = tuple()
   return %1 : $()
 }
 
 // CHECK-LABEL: sil @small_function_that_calls_large_function_twice
-// CHECK: bb0([[INPUT:%[0-9]+]] : $Builtin.ObjectPointer):
-// CHECK: [[FUN:%[0-9]+]] = function_ref @large_function : $@thin (Builtin.ObjectPointer) -> ()
+// CHECK: bb0([[INPUT:%[0-9]+]] : $Builtin.NativeObject):
+// CHECK: [[FUN:%[0-9]+]] = function_ref @large_function : $@thin (Builtin.NativeObject) -> ()
 // CHECK: apply [[FUN]]([[INPUT]])
 // CHECK: return
-sil @small_function_that_calls_large_function_twice : $@thin (Builtin.ObjectPointer) -> () {
-bb0(%0 : $Builtin.ObjectPointer):
-  %1 = function_ref @large_function : $@thin (Builtin.ObjectPointer) -> ()
-  apply %1(%0) : $@thin (Builtin.ObjectPointer) -> ()
-  apply %1(%0) : $@thin (Builtin.ObjectPointer) -> ()
+sil @small_function_that_calls_large_function_twice : $@thin (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = function_ref @large_function : $@thin (Builtin.NativeObject) -> ()
+  apply %1(%0) : $@thin (Builtin.NativeObject) -> ()
+  apply %1(%0) : $@thin (Builtin.NativeObject) -> ()
   %2 = tuple()
   return %2 : $()
 }

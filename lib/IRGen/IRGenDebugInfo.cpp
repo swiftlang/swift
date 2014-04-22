@@ -1133,7 +1133,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     break;
   }
 
-  case TypeKind::BuiltinObjCPointer: {
+  case TypeKind::BuiltinUnknownObject: {
     // The builtin opaque Objective-C pointer type. Useful for pushing
     // an Objective-C type through swift.
     auto IdTy = DBuilder.
@@ -1142,7 +1142,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     return DBuilder.createPointerType(IdTy, SizeInBits, AlignInBits);
   }
 
-  case TypeKind::BuiltinObjectPointer: {
+  case TypeKind::BuiltinNativeObject: {
     Name = getMangledName(DbgTy);
     auto PTy = DBuilder.createPointerType(llvm::DIType(),
                                           SizeInBits, AlignInBits, Name);

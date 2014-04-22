@@ -1228,11 +1228,11 @@ static ManagedValue createUnsafeDowncast(SILGenFunction &gen,
                                          SILLocation loc,
                                          ManagedValue input,
                                          SILType resultTy) {
-  SILType objectPtrTy = SILType::getObjectPointerType(gen.getASTContext());
-  SILValue result = gen.B.createRefToObjectPointer(loc,
+  SILType objectPtrTy = SILType::getNativeObjectType(gen.getASTContext());
+  SILValue result = gen.B.createRefToNativeObject(loc,
                                                    input.forward(gen),
                                                    objectPtrTy);
-  result = gen.B.createObjectPointerToRef(loc, result, resultTy);
+  result = gen.B.createNativeObjectToRef(loc, result, resultTy);
   return gen.emitManagedRValueWithCleanup(result);
 }
 
@@ -1621,7 +1621,7 @@ static ManagedValue emitVarargs(SILGenFunction &gen,
   AllocArrayInst *allocArray = gen.B.createAllocArray(loc,
                                                   baseTL.getLoweredType(),
                                                   numEltsVal);
-  // The first result is the owning ObjectPointer for the array.
+  // The first result is the owning NativeObject for the array.
   ManagedValue objectPtr
     = gen.emitManagedRValueWithCleanup(SILValue(allocArray, 0));
   // The second result is a RawPointer to the base address of the array.
@@ -2481,7 +2481,7 @@ void SILGenFunction::emitDestroyingDestructor(DestructorDecl *dd) {
     
   // If we have a superclass, invoke its destructor.
   SILValue resultSelfValue;
-  SILType objectPtrTy = SILType::getObjectPointerType(F.getASTContext());
+  SILType objectPtrTy = SILType::getNativeObjectType(F.getASTContext());
   if (cd->hasSuperclass()) {
     Type superclassTy
       = ArchetypeBuilder::mapTypeIntoContext(dd, cd->getSuperclass());
@@ -2500,7 +2500,7 @@ void SILGenFunction::emitDestroyingDestructor(DestructorDecl *dd) {
     resultSelfValue = B.createApply(cleanupLoc, dtorValue.forward(*this), 
                                     dtorTy, objectPtrTy, subs, baseSelf);
   } else {
-    resultSelfValue = B.createRefToObjectPointer(cleanupLoc, selfValue,
+    resultSelfValue = B.createRefToNativeObject(cleanupLoc, selfValue,
                                                  objectPtrTy);
   }
 
@@ -2530,12 +2530,12 @@ void SILGenFunction::emitDeallocatingDestructor(DestructorDecl *dd) {
     = emitSiblingMethodRef(loc, selfValue, dtorConstant, subs);
 
   // Call the destroying destructor.
-  SILType objectPtrTy = SILType::getObjectPointerType(F.getASTContext());
+  SILType objectPtrTy = SILType::getNativeObjectType(F.getASTContext());
   selfValue = B.createApply(loc, dtorValue.forward(*this), 
                             dtorTy, objectPtrTy, subs, selfValue);
 
   // Deallocate the object.
-  selfValue = B.createObjectPointerToRef(loc, selfValue, 
+  selfValue = B.createNativeObjectToRef(loc, selfValue, 
                                          getLoweredType(classTy));
   B.createDeallocRef(loc, selfValue);
 
@@ -3406,8 +3406,8 @@ static void forwardCaptureArgs(SILGenFunction &gen,
   case CaptureKind::Box: {
     SILType ty = gen.getLoweredType(vd->getType()->getRValueType())
       .getAddressType();
-    // Forward the captured owning ObjectPointer.
-    addSILArgument(SILType::getObjectPointerType(c));
+    // Forward the captured owning NativeObject.
+    addSILArgument(SILType::getNativeObjectType(c));
     // Forward the captured value address.
     addSILArgument(ty);
     break;
@@ -3708,10 +3708,10 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
     // Assume that the returned 'self' is the appropriate subclass
     // type (or a derived class thereof). Only Objective-C classes can
     // violate this assumption.
-    SILType objectPtrTy = SILType::getObjectPointerType(SGF.getASTContext());
-    newSelfValue = SGF.B.createRefToObjectPointer(E, newSelf.getValue(),
+    SILType objectPtrTy = SILType::getNativeObjectType(SGF.getASTContext());
+    newSelfValue = SGF.B.createRefToNativeObject(E, newSelf.getValue(),
                                                   objectPtrTy);
-    newSelfValue = SGF.B.createObjectPointerToRef(E, newSelfValue, destTy);
+    newSelfValue = SGF.B.createNativeObjectToRef(E, newSelfValue, destTy);
     newSelf = ManagedValue(newSelfValue, newSelfCleanup);
   }
 

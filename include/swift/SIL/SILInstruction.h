@@ -318,7 +318,7 @@ public:
 
 /// This represents the allocation of a heap box for a Swift value of some type.
 /// The instruction returns two values.  The first return value is the object
-/// pointer with Builtin.ObjectPointer type.  The second return value
+/// pointer with Builtin.NativeObject type.  The second return value
 /// is an address pointing to the contained element. The contained
 /// element is uninitialized.
 class AllocBoxInst : public AllocationInst {
@@ -348,7 +348,7 @@ public:
 /// AllocArrayInst - This represents the allocation of an array of elements,
 /// whose element memory is left uninitialized.  This returns two values.  The
 /// first return element is the object pointer (pointer to the object
-/// header) with Builtin.ObjectPointer type.  The second element returned is an
+/// header) with Builtin.NativeObject type.  The second element returned is an
 /// lvalue to the first array element.
 ///
 class AllocArrayInst : public AllocationInst {
@@ -1129,25 +1129,25 @@ public:
     : UnaryInstructionBase(Loc, Operand, Ty) {}
 };
 
-/// RefToObjectPointerInst - Convert a class instance reference to a
-/// Builtin.ObjectPointer or Builtin.ObjCPointer.
-class RefToObjectPointerInst
-  : public UnaryInstructionBase<ValueKind::RefToObjectPointerInst,
+/// RefToNativeObjectInst - Convert a class instance reference to a
+/// Builtin.NativeObject or Builtin.UnknownObject.
+class RefToNativeObjectInst
+  : public UnaryInstructionBase<ValueKind::RefToNativeObjectInst,
                                 ConversionInst>
 {
 public:
-  RefToObjectPointerInst(SILLocation Loc, SILValue Operand, SILType Ty)
+  RefToNativeObjectInst(SILLocation Loc, SILValue Operand, SILType Ty)
     : UnaryInstructionBase(Loc, Operand, Ty) {}
 };
 
-/// ObjectPointerToRefInst - Convert a Builtin.ObjectPointer or
-/// Builtin.ObjCPointer to a class instance reference.
-class ObjectPointerToRefInst
-  : public UnaryInstructionBase<ValueKind::ObjectPointerToRefInst,
+/// NativeObjectToRefInst - Convert a Builtin.NativeObject or
+/// Builtin.UnknownObject to a class instance reference.
+class NativeObjectToRefInst
+  : public UnaryInstructionBase<ValueKind::NativeObjectToRefInst,
                                 ConversionInst>
 {
 public:
-  ObjectPointerToRefInst(SILLocation Loc, SILValue Operand, SILType Ty)
+  NativeObjectToRefInst(SILLocation Loc, SILValue Operand, SILType Ty)
     : UnaryInstructionBase(Loc, Operand, Ty) {}
 };
 
@@ -1761,7 +1761,7 @@ public:
 };
 
 /// ProjectExistentialRefInst - Given a class existential, returns an
-/// ObjCPointer referencing the contained class instance.
+/// UnknownObject referencing the contained class instance.
 class ProjectExistentialRefInst
   : public UnaryInstructionBase<ValueKind::ProjectExistentialRefInst>
 {

@@ -235,7 +235,7 @@ template <> struct CanTypeWrapperTraits<Type> { typedef CanType type; };
 // A wrapper which preserves the fact that a type is canonical.
 //
 // Intended to be used as follows:
-//   DEFINE_LEAF_CAN_TYPE_WRAPPER(BuiltinObjectPointer, BuiltinType)
+//   DEFINE_LEAF_CAN_TYPE_WRAPPER(BuiltinNativeObject, BuiltinType)
 // or
 //   BEGIN_CAN_TYPE_WRAPPER(MetatypeType, Type)
 //     PROXY_CAN_TYPE_SIMPLE_GETTER(getInstanceType)

@@ -56,8 +56,8 @@ public:
 
     case TypeKind::BuiltinFloat:
     case TypeKind::BuiltinInteger:
-    case TypeKind::BuiltinObjectPointer:
-    case TypeKind::BuiltinObjCPointer:
+    case TypeKind::BuiltinNativeObject:
+    case TypeKind::BuiltinUnknownObject:
     case TypeKind::BuiltinRawPointer:
     case TypeKind::BuiltinVector:
     case TypeKind::Class: // FIXME: not a leaf because of the parent type

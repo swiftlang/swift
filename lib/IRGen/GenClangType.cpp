@@ -341,8 +341,8 @@ clang::CanQualType GenClangType::visitBuiltinRawPointerType(
   return getClangASTContext().VoidPtrTy;
 }
 
-clang::CanQualType GenClangType::visitBuiltinObjCPointerType(
-  CanBuiltinObjCPointerType type) {
+clang::CanQualType GenClangType::visitBuiltinUnknownObjectType(
+  CanBuiltinUnknownObjectType type) {
   auto &clangCtx = getClangASTContext();
   auto ptrTy = clangCtx.getObjCObjectPointerType(clangCtx.VoidTy);
   return clangCtx.getCanonicalType(ptrTy);

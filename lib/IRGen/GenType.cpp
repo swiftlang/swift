@@ -1002,10 +1002,10 @@ TypeCacheEntry TypeConverter::convertType(CanType ty) {
     auto nominal = dynamicSelf->getSelfType()->getAnyNominal();
     return convertAnyNominalType(ty, nominal);
   }
-  case TypeKind::BuiltinObjectPointer:
-    return convertBuiltinObjectPointer();
-  case TypeKind::BuiltinObjCPointer:
-    return convertBuiltinObjCPointer();
+  case TypeKind::BuiltinNativeObject:
+    return convertBuiltinNativeObject();
+  case TypeKind::BuiltinUnknownObject:
+    return convertBuiltinUnknownObject();
   case TypeKind::BuiltinRawPointer:
   case TypeKind::BuiltinFloat:
   case TypeKind::BuiltinInteger:

@@ -18,12 +18,12 @@
 using namespace swift;
 using namespace swift::Lowering;
 
-SILType SILType::getObjectPointerType(const ASTContext &C) {
-  return SILType(CanType(C.TheObjectPointerType), SILValueCategory::Object);
+SILType SILType::getNativeObjectType(const ASTContext &C) {
+  return SILType(CanType(C.TheNativeObjectType), SILValueCategory::Object);
 }
 
-SILType SILType::getObjCPointerType(const ASTContext &C) {
-  return getPrimitiveObjectType(CanType(C.TheObjCPointerType));
+SILType SILType::getUnknownObjectType(const ASTContext &C) {
+  return getPrimitiveObjectType(CanType(C.TheUnknownObjectType));
 }
 
 SILType SILType::getRawPointerType(const ASTContext &C) {

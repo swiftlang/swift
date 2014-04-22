@@ -295,14 +295,14 @@ static bool typesMayAlias(SILType T1, SILType T2, SILModule &Mod) {
   CanType CT1 = T1.getSwiftRValueType();
   CanType CT2 = T2.getSwiftRValueType();
 
-  bool IsObjPtr1 = isa<BuiltinObjectPointerType>(CT1);
+  bool IsObjPtr1 = isa<BuiltinNativeObjectType>(CT1);
   bool IsRawPtr1 = isa<BuiltinRawPointerType>(CT1);
   NominalTypeDecl *AsNominal1 = CT1.getNominalOrBoundGenericNominal();
   ClassDecl *AsClass1 = CT1.getClassOrBoundGenericClass();
   StructDecl *AsStruct1 = CT1.getStructOrBoundGenericStruct();
   EnumDecl *AsEnum1 = CT1.getEnumOrBoundGenericEnum();
 
-  bool IsObjPtr2 = isa<BuiltinObjectPointerType>(CT2);
+  bool IsObjPtr2 = isa<BuiltinNativeObjectType>(CT2);
   bool IsRawPtr2 = isa<BuiltinRawPointerType>(CT2);
   NominalTypeDecl *AsNominal2 = CT2.getNominalOrBoundGenericNominal();
   ClassDecl *AsClass2 = CT2.getClassOrBoundGenericClass();
@@ -320,7 +320,7 @@ static bool typesMayAlias(SILType T1, SILType T2, SILModule &Mod) {
   if (hasUnboundGenericTypes(CT1) || hasUnboundGenericTypes(CT2))
     return true;
 
-  // Builtin.ObjectPointer is the root of the class hierarchy may alias classes.
+  // Builtin.NativeObject is the root of the class hierarchy may alias classes.
   if ((IsObjPtr1 && AsClass2)||
       (IsObjPtr2 && AsClass1))
     return true;

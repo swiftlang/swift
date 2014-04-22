@@ -1390,10 +1390,10 @@ private:
       }
       if (c == 'O')
         return Node::create(Node::Kind::BuiltinTypeName,
-                                     "Builtin.ObjCPointer");
+                                     "Builtin.UnknownObject");
       if (c == 'o')
         return Node::create(Node::Kind::BuiltinTypeName,
-                                     "Builtin.ObjectPointer");
+                                     "Builtin.NativeObject");
       if (c == 'p')
         return Node::create(Node::Kind::BuiltinTypeName,
                                      "Builtin.RawPointer");

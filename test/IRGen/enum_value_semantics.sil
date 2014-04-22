@@ -78,7 +78,7 @@ enum SinglePayloadTrivial {
 }
 
 enum SinglePayloadNontrivial {
-  case payload(Builtin.ObjectPointer)
+  case payload(Builtin.NativeObject)
   case a
   case b
   case c
@@ -139,9 +139,9 @@ enum MultiPayloadTrivial {
 }
 
 enum MultiPayloadNontrivial {
-  case payload1(Builtin.ObjectPointer)
+  case payload1(Builtin.NativeObject)
   case payload2(Builtin.Int64)
-  case payload3(Builtin.Int64, Builtin.ObjCPointer)
+  case payload3(Builtin.Int64, Builtin.UnknownObject)
   case payload4(Builtin.Int64, Builtin.Int64)
   case a
   case b
@@ -177,9 +177,9 @@ enum MultiPayloadNontrivial {
 // CHECK: }
 
 enum MultiPayloadNontrivialSpareBits {
-  case payload1(Builtin.ObjectPointer)
+  case payload1(Builtin.NativeObject)
   case payload2(Builtin.Int64)
-  case payload3(Builtin.Int64, Builtin.ObjCPointer)
+  case payload3(Builtin.Int64, Builtin.UnknownObject)
   case a
   case b
   case c
@@ -213,5 +213,5 @@ enum MultiPayloadNontrivialSpareBits {
 
 enum GenericFixedLayout<T> {
   case foo(Builtin.Int64)
-  case bar(Builtin.ObjectPointer)
+  case bar(Builtin.NativeObject)
 }

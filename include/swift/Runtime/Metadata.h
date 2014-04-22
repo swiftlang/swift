@@ -517,10 +517,10 @@ extern "C" const ValueWitnessTable _TWVBi128_;    // Builtin.Int128
   
 // The object-pointer table can be used for arbitrary Swift refcounted
 // pointer types.
-extern "C" const ExtraInhabitantsValueWitnessTable _TWVBo; // Builtin.ObjectPointer
+extern "C" const ExtraInhabitantsValueWitnessTable _TWVBo; // Builtin.NativeObject
 
 // The ObjC-pointer table can be used for arbitrary ObjC pointer types.
-extern "C" const ExtraInhabitantsValueWitnessTable _TWVBO; // Builtin.ObjCPointer
+extern "C" const ExtraInhabitantsValueWitnessTable _TWVBO; // Builtin.UnknownObject
 
 // The () -> () table can be used for arbitrary function types.
 extern "C" const ValueWitnessTable _TWVFT_T_;     // () -> ()
@@ -529,7 +529,7 @@ extern "C" const ValueWitnessTable _TWVFT_T_;     // () -> ()
 extern "C" const ValueWitnessTable _TWVT_;        // ()
 
 // The table for aligned-pointer-to-pointer types.
-extern "C" const ExtraInhabitantsValueWitnessTable _TWVMBo; // Builtin.ObjectPointer.Type
+extern "C" const ExtraInhabitantsValueWitnessTable _TWVMBo; // Builtin.NativeObject.Type
   
 /// Return the value witnesses for unmanaged pointers.
 static inline const ValueWitnessTable &getUnmanagedPointerValueWitnesses() {
@@ -732,8 +732,8 @@ extern "C" const FullOpaqueMetadata _TMdBi16_;     // Builtin.Int16
 extern "C" const FullOpaqueMetadata _TMdBi32_;     // Builtin.Int32
 extern "C" const FullOpaqueMetadata _TMdBi64_;     // Builtin.Int64
 extern "C" const FullOpaqueMetadata _TMdBi128_;    // Builtin.Int128
-extern "C" const FullOpaqueMetadata _TMdBo;        // Builtin.ObjectPointer
-extern "C" const FullOpaqueMetadata _TMdBO;        // Builtin.ObjCPointer
+extern "C" const FullOpaqueMetadata _TMdBo;        // Builtin.NativeObject
+extern "C" const FullOpaqueMetadata _TMdBO;        // Builtin.UnknownObject
 
 /// The prefix on a heap metadata.
 struct HeapMetadataHeaderPrefix {

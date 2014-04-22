@@ -30,8 +30,8 @@ SILValue SILValue::stripCasts() {
     case ValueKind::UpcastInst:
     case ValueKind::AddressToPointerInst:
     case ValueKind::PointerToAddressInst:
-    case ValueKind::RefToObjectPointerInst:
-    case ValueKind::ObjectPointerToRefInst:
+    case ValueKind::RefToNativeObjectInst:
+    case ValueKind::NativeObjectToRefInst:
     case ValueKind::RefToRawPointerInst:
     case ValueKind::RawPointerToRefInst:
     case ValueKind::UnconditionalCheckedCastInst:

@@ -1920,8 +1920,8 @@ void Serializer::writeType(Type ty) {
   case TypeKind::BuiltinInteger:
   case TypeKind::BuiltinFloat:
   case TypeKind::BuiltinRawPointer:
-  case TypeKind::BuiltinObjectPointer:
-  case TypeKind::BuiltinObjCPointer:
+  case TypeKind::BuiltinNativeObject:
+  case TypeKind::BuiltinUnknownObject:
   case TypeKind::BuiltinVector: {
     TypeAliasDecl *typeAlias =
       findTypeAliasForBuiltin(M->Ctx, ty->castTo<BuiltinType>());

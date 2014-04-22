@@ -112,8 +112,8 @@ Expr *TypeChecker::buildArrayInjectionFnRef(DeclContext *dc,
     // FIXME: this should probably be UnsafePointer<T>.
     Context.TheRawPointerType,
 
-    // The second element is the owner pointer, Builtin.ObjectPointer.
-    Context.TheObjectPointerType,
+    // The second element is the owner pointer, Builtin.NativeObject.
+    Context.TheNativeObjectType,
 
     // The third element is the bound type.  Maybe this should be a
     // target-specific size_t type?

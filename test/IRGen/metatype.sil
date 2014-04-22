@@ -10,7 +10,7 @@ import gizmo
 class X {
 }
 
-sil @_TFC8metatype1Xd : $@cc(method) @thin (@owned X) -> @owned Builtin.ObjectPointer
+sil @_TFC8metatype1Xd : $@cc(method) @thin (@owned X) -> @owned Builtin.NativeObject
 
 sil @_TFC8metatype1XD : $@cc(method) @thin (@owned X) -> ()
 

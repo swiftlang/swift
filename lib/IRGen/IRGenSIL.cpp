@@ -644,8 +644,8 @@ public:
   void visitUpcastInst(UpcastInst *i);
   void visitAddressToPointerInst(AddressToPointerInst *i);
   void visitPointerToAddressInst(PointerToAddressInst *i);
-  void visitRefToObjectPointerInst(RefToObjectPointerInst *i);
-  void visitObjectPointerToRefInst(ObjectPointerToRefInst *i);
+  void visitRefToNativeObjectInst(RefToNativeObjectInst *i);
+  void visitNativeObjectToRefInst(NativeObjectToRefInst *i);
   void visitRefToRawPointerInst(RefToRawPointerInst *i);
   void visitRawPointerToRefInst(RawPointerToRefInst *i);
   void visitRefToUnownedInst(RefToUnownedInst *i);
@@ -2535,15 +2535,15 @@ static void emitPointerCastInst(IRGenSILFunction &IGF,
   IGF.setLoweredExplosion(dest, to);
 }
 
-void IRGenSILFunction::visitRefToObjectPointerInst(
-                                             swift::RefToObjectPointerInst *i) {
+void IRGenSILFunction::visitRefToNativeObjectInst(
+                                             swift::RefToNativeObjectInst *i) {
   auto &ti = getTypeInfo(i->getType());
   llvm::Type *destType = ti.getStorageType();
   emitPointerCastInst(*this, i->getOperand(), SILValue(i, 0), destType);
 }
 
-void IRGenSILFunction::visitObjectPointerToRefInst(
-                                             swift::ObjectPointerToRefInst *i) {
+void IRGenSILFunction::visitNativeObjectToRefInst(
+                                             swift::NativeObjectToRefInst *i) {
   auto &ti = getTypeInfo(i->getType());
   llvm::Type *destType = ti.getStorageType();
   emitPointerCastInst(*this, i->getOperand(), SILValue(i, 0), destType);

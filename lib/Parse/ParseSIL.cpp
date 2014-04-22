@@ -1036,7 +1036,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("mark_function_escape", ValueKind::MarkFunctionEscapeInst)
     .Case("metatype", ValueKind::MetatypeInst)
     .Case("objc_to_thick_metatype", ValueKind::ObjCToThickMetatypeInst)
-    .Case("object_pointer_to_ref", ValueKind::ObjectPointerToRefInst)
+    .Case("native_object_to_ref", ValueKind::NativeObjectToRefInst)
     .Case("open_existential", ValueKind::OpenExistentialInst)
     .Case("open_existential_ref", ValueKind::OpenExistentialRefInst)
     .Case("partial_apply", ValueKind::PartialApplyInst)
@@ -1048,7 +1048,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("protocol_method", ValueKind::ProtocolMethodInst)
     .Case("raw_pointer_to_ref", ValueKind::RawPointerToRefInst)
     .Case("ref_element_addr", ValueKind::RefElementAddrInst)
-    .Case("ref_to_object_pointer", ValueKind::RefToObjectPointerInst)
+    .Case("ref_to_native_object", ValueKind::RefToNativeObjectInst)
     .Case("ref_to_raw_pointer", ValueKind::RefToRawPointerInst)
     .Case("ref_to_unowned", ValueKind::RefToUnownedInst)
     .Case("retain_value", ValueKind::RetainValueInst)
@@ -1496,11 +1496,11 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   }
       
     // Conversion instructions.
-  case ValueKind::RefToObjectPointerInst:
+  case ValueKind::RefToNativeObjectInst:
   case ValueKind::UpcastInst:
   case ValueKind::AddressToPointerInst:
   case ValueKind::PointerToAddressInst:
-  case ValueKind::ObjectPointerToRefInst:
+  case ValueKind::NativeObjectToRefInst:
   case ValueKind::RefToRawPointerInst:
   case ValueKind::RawPointerToRefInst:
   case ValueKind::RefToUnownedInst:
@@ -1526,8 +1526,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
 
     switch (Opcode) {
     default: assert(0 && "Out of sync with parent switch");
-    case ValueKind::RefToObjectPointerInst:
-      ResultVal = B.createRefToObjectPointer(InstLoc, Val, Ty);
+    case ValueKind::RefToNativeObjectInst:
+      ResultVal = B.createRefToNativeObject(InstLoc, Val, Ty);
       break;
     case ValueKind::UpcastInst:
       ResultVal = B.createUpcast(InstLoc, Val, Ty);
@@ -1541,8 +1541,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     case ValueKind::PointerToAddressInst:
       ResultVal = B.createPointerToAddress(InstLoc, Val, Ty);
       break;
-    case ValueKind::ObjectPointerToRefInst:
-      ResultVal = B.createObjectPointerToRef(InstLoc, Val, Ty);
+    case ValueKind::NativeObjectToRefInst:
+      ResultVal = B.createNativeObjectToRef(InstLoc, Val, Ty);
       break;
     case ValueKind::RefToRawPointerInst:
       ResultVal = B.createRefToRawPointer(InstLoc, Val, Ty);

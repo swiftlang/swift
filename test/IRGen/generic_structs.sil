@@ -92,7 +92,7 @@ struct Intish { var value : Builtin.Int64 }
 struct Chareth { var value : Builtin.Int21 }
 struct Byteful { var value : Builtin.Int8 }
 struct Stringly {
-  var owner : Builtin.ObjectPointer
+  var owner : Builtin.NativeObject
   var base : Builtin.RawPointer
   var size : Builtin.Int64
 }

@@ -11,12 +11,12 @@ sil_global private @globalinit_token120 : $Builtin.Word
 sil @globalinit_func11 :  $@thin () -> () 
 
 //CHECK: sil @a_method_to_simplify 
-sil @a_method_to_simplify : $@thin (Builtin.RawPointer, @owned Builtin.ObjectPointer, Builtin.Word, @thin StringByteData.Type) -> @owned StringByteData {
-bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.ObjectPointer, %2 : $Builtin.Word, %3 : $@thin StringByteData.Type):
+sil @a_method_to_simplify : $@thin (Builtin.RawPointer, @owned Builtin.NativeObject, Builtin.Word, @thin StringByteData.Type) -> @owned StringByteData {
+bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.NativeObject, %2 : $Builtin.Word, %3 : $@thin StringByteData.Type):
   %4 = struct $UnsafePointer<UInt8> (%0 : $Builtin.RawPointer) // user: %37
-  strong_retain %1 : $Builtin.ObjectPointer       // id: %5
-  strong_retain %1 : $Builtin.ObjectPointer       // id: %6
-  strong_release %1 : $Builtin.ObjectPointer      // id: %7
+  strong_retain %1 : $Builtin.NativeObject       // id: %5
+  strong_retain %1 : $Builtin.NativeObject       // id: %6
+  strong_release %1 : $Builtin.NativeObject      // id: %7
   %8 = integer_literal $Builtin.Int1, 0           // user: %23
   %9 = builtin_function_ref "once" : $@thin (Builtin.RawPointer, @owned @callee_owned () -> ()) -> () // users: %27, %14
   %10 = sil_global_addr @globalinit_token11 : $*Builtin.Word // user: %11
@@ -55,10 +55,10 @@ bb2(%32 : $Builtin.Word):                         // Preds: bb0 bb1
 bb3(%35 : $()):                                   // Preds: bb2
 // CHECK-NEXT: struct $Int ([[VAR_21]] : $Builtin.Word)
   %36 = struct $Int (%32 : $Builtin.Word)         // user: %37
-  %37 = struct $StringByteData (%4 : $UnsafePointer<UInt8>, %36 : $Int, %1 : $Builtin.ObjectPointer) // user: %41
-  strong_retain %1 : $Builtin.ObjectPointer       // id: %38
-  strong_release %1 : $Builtin.ObjectPointer      // id: %39
-  strong_release %1 : $Builtin.ObjectPointer      // id: %40
+  %37 = struct $StringByteData (%4 : $UnsafePointer<UInt8>, %36 : $Int, %1 : $Builtin.NativeObject) // user: %41
+  strong_retain %1 : $Builtin.NativeObject       // id: %38
+  strong_release %1 : $Builtin.NativeObject      // id: %39
+  strong_release %1 : $Builtin.NativeObject      // id: %40
   dealloc_stack %15#0 : $*@local_storage Int      // id: %41
 // CHECK: return
   return %37 : $StringByteData                    // id: %41

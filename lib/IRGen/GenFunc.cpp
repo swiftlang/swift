@@ -2729,9 +2729,9 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
   // Include the context pointer, if any, in the function arguments.
   if (fnContext) {
     args.add(fnContext);
-    argValTypes.push_back(IGF.IGM.Context.TheObjectPointerType);
+    argValTypes.push_back(IGF.IGM.Context.TheNativeObjectType);
     argTypeInfos.push_back(
-         &IGF.getTypeInfoForLowered(IGF.IGM.Context.TheObjectPointerType));
+         &IGF.getTypeInfoForLowered(IGF.IGM.Context.TheNativeObjectType));
     // If this is the only context argument we end up with, we can just share
     // it.
     if (args.size() == 1)

@@ -690,11 +690,11 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   ONEOPERAND_ONETYPE_INST(OpenExistential)
   ONEOPERAND_ONETYPE_INST(OpenExistentialRef)
   // Conversion instructions.
-  ONEOPERAND_ONETYPE_INST(RefToObjectPointer)
+  ONEOPERAND_ONETYPE_INST(RefToNativeObject)
   ONEOPERAND_ONETYPE_INST(Upcast)
   ONEOPERAND_ONETYPE_INST(AddressToPointer)
   ONEOPERAND_ONETYPE_INST(PointerToAddress)
-  ONEOPERAND_ONETYPE_INST(ObjectPointerToRef)
+  ONEOPERAND_ONETYPE_INST(NativeObjectToRef)
   ONEOPERAND_ONETYPE_INST(RefToRawPointer)
   ONEOPERAND_ONETYPE_INST(RawPointerToRef)
   ONEOPERAND_ONETYPE_INST(RefToUnowned)

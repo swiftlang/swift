@@ -60,8 +60,8 @@ entry(%x : $Builtin.Int64):
 class B {}
 class D : B {}
 
-sil @_TFC22disable_runtime_checks1BD : $@thin B -> Builtin.ObjectPointer
-sil @_TFC22disable_runtime_checks1DD : $@thin D -> Builtin.ObjectPointer
+sil @_TFC22disable_runtime_checks1BD : $@thin B -> Builtin.NativeObject
+sil @_TFC22disable_runtime_checks1DD : $@thin D -> Builtin.NativeObject
 
 protocol P {}
 struct X : P { var x : Builtin.Int8 }

@@ -10,7 +10,7 @@ bb0(%0 : $Int):
   %1 = alloc_box $Int
   %2 = store %0 to %1#1 : $*Int
   %3 = load %1#1 : $*Int
-  %4 = strong_release %1#0 : $Builtin.ObjectPointer
+  %4 = strong_release %1#0 : $Builtin.NativeObject
   %5 = return %3 : $Int
 
 // CHECK: alloc_stack
@@ -24,7 +24,7 @@ sil @init_var : $() -> Int {
 bb0:
   %1 = alloc_box $Int
   %3 = load %1#1 : $*Int
-  %4 = strong_release %1#0 : $Builtin.ObjectPointer
+  %4 = strong_release %1#0 : $Builtin.NativeObject
   %5 = return %3 : $Int
 
 // CHECK: %0 = alloc_stack
@@ -41,12 +41,12 @@ bb0:
   %1 = alloc_box $Int
   %2 = mark_uninitialized [rootself] %1#1 : $*Int
   %3 = load %2 : $*Int
-  %x = strong_retain %1#0 : $Builtin.ObjectPointer
-  %y = strong_release %1#0 : $Builtin.ObjectPointer
+  %x = strong_retain %1#0 : $Builtin.NativeObject
+  %y = strong_release %1#0 : $Builtin.NativeObject
   %b = br bb1
 bb1:
 
-  %4 = strong_release %1#0 : $Builtin.ObjectPointer
+  %4 = strong_release %1#0 : $Builtin.NativeObject
   %5 = return %3 : $Int
 
 // CHECK: %0 = alloc_stack
@@ -73,8 +73,8 @@ bb1(%0 : $Int):
 
   %6 = struct_element_addr %1#1 : $*TestStruct, #TestStruct.Elt
   %7 = load %6 : $*Int
-  %x = strong_release %a#0 : $Builtin.ObjectPointer
-  %8 = strong_release %1#0 : $Builtin.ObjectPointer
+  %x = strong_release %a#0 : $Builtin.NativeObject
+  %8 = strong_release %1#0 : $Builtin.NativeObject
 
 
   %9 = return %7 : $Int
@@ -97,7 +97,7 @@ bb0:
   %6 = function_ref @callee : $@thin (@inout Int) -> ()
   %7 = apply %6(%1#1) : $@thin (@inout Int) -> ()
   %8 = load %1#1 : $*Int
-  %9 = strong_release %1#0 : $Builtin.ObjectPointer
+  %9 = strong_release %1#0 : $Builtin.NativeObject
   %10 = address_to_pointer %1#1 : $*Int to $Builtin.RawPointer
   %11 = pointer_to_address %10 : $Builtin.RawPointer to $*Int
   %12 = load %11 : $*Int
@@ -118,7 +118,7 @@ bb0:
   %1 = function_ref @returns_protocol : $@thin (@out P) -> ()
   %2 = alloc_box $P
   %3 = apply %1(%2#1) : $@thin (@out P) -> ()
-  %5 = strong_release %2#0 : $Builtin.ObjectPointer
+  %5 = strong_release %2#0 : $Builtin.NativeObject
   %0 = tuple ()
   %6 = return %0 : $()
   // CHECK: return
@@ -132,7 +132,7 @@ bb0(%0 : $SomeClass):
   %1 = alloc_box $SomeClass
   %2 = store %0 to %1#1 : $*SomeClass
   %3 = load %1#1 : $*SomeClass
-  %4 = strong_release %1#0 : $Builtin.ObjectPointer
+  %4 = strong_release %1#0 : $Builtin.NativeObject
   %5 = return %3 : $SomeClass
 
 // CHECK: %1 = alloc_stack
@@ -155,7 +155,7 @@ bb0(%0 : $*LogicValue, %1 : $@thin Bool.Type):
   %6 = project_existential %2#1 : $*LogicValue to $*@sil_self LogicValue
   %7 = protocol_method %2#1 : $*LogicValue, #LogicValue.getLogicValue!1 : <Self : LogicValue> inout Self -> () -> Bool, $@cc(witness_method) @callee_owned (@inout @sil_self LogicValue) -> Bool
   %8 = apply %7(%6) : $@cc(witness_method) @callee_owned (@inout @sil_self LogicValue) -> Bool
-  strong_release %2#0 : $Builtin.ObjectPointer
+  strong_release %2#0 : $Builtin.NativeObject
 // CHECK:  destroy_addr %2#1 : $*LogicValue
 // CHECK-NEXT:  dealloc_stack %2#0 : $*@local_storage LogicValue
 // CHECK-NEXT:  return
@@ -171,7 +171,7 @@ sil @dealloc_box : $@thin <T> () -> () {
 bb0:  // CHECK-NEXT: bb0:
       // CHECK-NEXT: alloc_stack
   %1 = alloc_box $Generic<T>
-  dealloc_box $Generic<T>, %1#0 : $Builtin.ObjectPointer
+  dealloc_box $Generic<T>, %1#0 : $Builtin.NativeObject
 
   %0 = tuple ()    // CHECK: tuple ()
   %6 = return %0 : $()
@@ -200,7 +200,7 @@ bb0:
   %6 = apply %4(%5) : $@thin (@thick SomeClass.Type) -> @owned SomeClass
   %7 = apply %2(%6, %3) : $@thin (@owned SomeClass, @thin SomeUnion.Type) -> @owned SomeUnion
   store %7 to %1#1 : $*SomeUnion
-  strong_release %1#0 : $Builtin.ObjectPointer
+  strong_release %1#0 : $Builtin.NativeObject
   %10 = tuple ()
   return %10 : $()
   
@@ -214,13 +214,13 @@ sil @multiple_release_test : $@thin (Bool) -> Bool {
 bb0(%0 : $Bool):
   %1 = alloc_box $Bool
   store %0 to %1#1 : $*Bool
-  strong_retain %1#0 : $Builtin.ObjectPointer
-  strong_retain %1#0 : $Builtin.ObjectPointer
+  strong_retain %1#0 : $Builtin.NativeObject
+  strong_retain %1#0 : $Builtin.NativeObject
   %5 = tuple ()
   %6 = load %1#1 : $*Bool
-  strong_release %1#0 : $Builtin.ObjectPointer
-  strong_release %1#0 : $Builtin.ObjectPointer
-  strong_release %1#0 : $Builtin.ObjectPointer
+  strong_release %1#0 : $Builtin.NativeObject
+  strong_release %1#0 : $Builtin.NativeObject
+  strong_release %1#0 : $Builtin.NativeObject
   return %6 : $Bool
 
   // CHECK: alloc_stack $Bool
@@ -250,11 +250,11 @@ bb1:
   cond_br undef, bb2, bb3
 
 bb2:
-  strong_release %1#0 : $Builtin.ObjectPointer
+  strong_release %1#0 : $Builtin.NativeObject
   br bb1
 
 bb3:
-  strong_release %1#0 : $Builtin.ObjectPointer
+  strong_release %1#0 : $Builtin.NativeObject
   %2 = tuple ()
   return %2 : $()
 }
@@ -289,7 +289,7 @@ bb1:
   strong_retain %12 : $SomeClass
   %14 = apply %11(%12) : $@thin (@owned SomeClass) -> ()
   
-  strong_release %2#0 : $Builtin.ObjectPointer
+  strong_release %2#0 : $Builtin.NativeObject
   // CHECK: destroy_addr [[MUI]]
   // CHECK-NEXT: dealloc_stack [[STACK]]#0
   br bb2
@@ -299,7 +299,7 @@ bb2:
   return %17 : $()
 
 bb3:
-  strong_release %2#0 : $Builtin.ObjectPointer
+  strong_release %2#0 : $Builtin.NativeObject
   // CHECK: destroy_addr [[MUI]]
   // CHECK-NEXT: dealloc_stack [[STACK]]#0
   br bb2
@@ -336,12 +336,12 @@ bb0(%0 : $Int):
   %4 = function_ref @_TF6struct5applyFT1fFT_Si_Si : $@thin (@owned @callee_owned () -> Int) -> Int // user: %8
   // CHECK: [[FUNC:%[a-zA-Z0-9]+]] = function_ref @_TFF6struct8useStackFT1tSi_T_U_FT_Si_specialized0
   // function_ref struct.(useStack (t : Swift.Int) -> ()).(closure #1)
-  %5 = function_ref @_TFF6struct8useStackFT1tSi_T_U_FT_Si : $@thin (@owned Builtin.ObjectPointer, @inout Int) -> Int // user: %7
-  strong_retain %2#0 : $Builtin.ObjectPointer     // id: %6
+  %5 = function_ref @_TFF6struct8useStackFT1tSi_T_U_FT_Si : $@thin (@owned Builtin.NativeObject, @inout Int) -> Int // user: %7
+  strong_retain %2#0 : $Builtin.NativeObject     // id: %6
   // CHECK: [[PA:%[a-zA-Z0-9]+]] = partial_apply [[FUNC]]
-  %7 = partial_apply %5(%2#0, %2#1) : $@thin (@owned Builtin.ObjectPointer, @inout Int) -> Int // user: %8
+  %7 = partial_apply %5(%2#0, %2#1) : $@thin (@owned Builtin.NativeObject, @inout Int) -> Int // user: %8
   %8 = apply %4(%7) : $@thin (@owned @callee_owned () -> Int) -> Int
-  strong_release %2#0 : $Builtin.ObjectPointer    // id: %9
+  strong_release %2#0 : $Builtin.NativeObject    // id: %9
   %10 = tuple ()                                  // user: %11
   return %10 : $()                                // id: %11
 }
@@ -349,15 +349,15 @@ bb0(%0 : $Int):
 // CHECK-LABEL: sil private @_TFF6struct8useStackFT1tSi_T_U_FT_Si_specialized0
 // CHECK-LABEL: sil private @_TFF6struct8useStackFT1tSi_T_U_FT_Si
 // struct.(useStack (t : Swift.Int) -> ()).(closure #1)
-sil private @_TFF6struct8useStackFT1tSi_T_U_FT_Si : $@thin (@owned Builtin.ObjectPointer, @inout Int) -> Int {
-bb0(%0 : $Builtin.ObjectPointer, %1 : $*Int):
+sil private @_TFF6struct8useStackFT1tSi_T_U_FT_Si : $@thin (@owned Builtin.NativeObject, @inout Int) -> Int {
+bb0(%0 : $Builtin.NativeObject, %1 : $*Int):
   // function_ref Swift.++ @postfix <A : Swift._Incrementable>(x : @inout A) -> A
   %2 = function_ref @_TFSsoP2ppUSs14_Incrementable__FT1xRQ__Q_ : $@thin <τ_0_0 where τ_0_0 : _Incrementable> (@out τ_0_0, @inout τ_0_0) -> () // user: %4
   %3 = alloc_stack $Int                           // users: %4, %5, %6
   %4 = apply [transparent] %2<Int>(%3#1, %1) : $@thin <τ_0_0 where τ_0_0 : _Incrementable> (@out τ_0_0, @inout τ_0_0) -> ()
   %5 = load %3#1 : $*Int                          // user: %8
   dealloc_stack %3#0 : $*@local_storage Int       // id: %6
-  strong_release %0 : $Builtin.ObjectPointer      // id: %7
+  strong_release %0 : $Builtin.NativeObject      // id: %7
   return %5 : $Int                                // id: %8
 }
 
@@ -375,26 +375,26 @@ bb0(%0 : $Int):
   // function_ref struct.escape (f : () -> Swift.Int) -> () -> Swift.Int
   %4 = function_ref @_TF6struct6escapeFT1fFT_Si_FT_Si : $@thin (@owned @callee_owned () -> Int) -> @owned @callee_owned () -> Int // user: %8
   // function_ref struct.(useBox (t : Swift.Int) -> ()).(closure #1)
-  %5 = function_ref @_TFF6struct6useBoxFT1tSi_T_U_FT_Si : $@thin (@owned Builtin.ObjectPointer, @inout Int) -> Int // user: %7
-  strong_retain %2#0 : $Builtin.ObjectPointer     // id: %6
-  %7 = partial_apply %5(%2#0, %2#1) : $@thin (@owned Builtin.ObjectPointer, @inout Int) -> Int // user: %8
+  %5 = function_ref @_TFF6struct6useBoxFT1tSi_T_U_FT_Si : $@thin (@owned Builtin.NativeObject, @inout Int) -> Int // user: %7
+  strong_retain %2#0 : $Builtin.NativeObject     // id: %6
+  %7 = partial_apply %5(%2#0, %2#1) : $@thin (@owned Builtin.NativeObject, @inout Int) -> Int // user: %8
   %8 = apply %4(%7) : $@thin (@owned @callee_owned () -> Int) -> @owned @callee_owned () -> Int // user: %9
   %9 = apply %8() : $@callee_owned () -> Int
-  strong_release %2#0 : $Builtin.ObjectPointer    // id: %10
+  strong_release %2#0 : $Builtin.NativeObject    // id: %10
   %11 = tuple ()                                  // user: %12
   return %11 : $()                                // id: %12
 }
 
 // CHECK-LABEL: sil private @_TFF6struct6useBoxFT1tSi_T_U_FT_Si
 // struct.(useBox (t : Swift.Int) -> ()).(closure #1)
-sil private @_TFF6struct6useBoxFT1tSi_T_U_FT_Si : $@thin (@owned Builtin.ObjectPointer, @inout Int) -> Int {
-bb0(%0 : $Builtin.ObjectPointer, %1 : $*Int):
+sil private @_TFF6struct6useBoxFT1tSi_T_U_FT_Si : $@thin (@owned Builtin.NativeObject, @inout Int) -> Int {
+bb0(%0 : $Builtin.NativeObject, %1 : $*Int):
   // function_ref Swift.++ @postfix <A : Swift._Incrementable>(x : @inout A) -> A
   %2 = function_ref @_TFSsoP2ppUSs14_Incrementable__FT1xRQ__Q_ : $@thin <τ_0_0 where τ_0_0 : _Incrementable> (@out τ_0_0, @inout τ_0_0) -> () // user: %4
   %3 = alloc_stack $Int                           // users: %4, %5, %6
   %4 = apply [transparent] %2<Int>(%3#1, %1) : $@thin <τ_0_0 where τ_0_0 : _Incrementable> (@out τ_0_0, @inout τ_0_0) -> ()
   %5 = load %3#1 : $*Int                          // user: %8
   dealloc_stack %3#0 : $*@local_storage Int       // id: %6
-  strong_release %0 : $Builtin.ObjectPointer      // id: %7
+  strong_release %0 : $Builtin.NativeObject      // id: %7
   return %5 : $Int                                // id: %8
 }

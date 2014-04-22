@@ -99,10 +99,10 @@ entry(%0 : $*@block_storage Builtin.RawPointer, %1 : $Int):
 // CHECK:           i8* {{.*}} @invoke_nontrivial
 // CHECK:           i8* bitcast {{.*}} [[NONTRIVIAL_BLOCK_DESCRIPTOR]]
 // CHECK:         }, %objc_block* %1
-sil @init_block_header_nontrivial : $@thin (@inout @block_storage Builtin.ObjectPointer) -> @cc(cdecl) @objc_block () -> () {
-entry(%0 : $*@block_storage Builtin.ObjectPointer):
-  %i = function_ref @invoke_nontrivial : $@thin @cc(cdecl) (@inout @block_storage Builtin.ObjectPointer) -> ()
-  %b = init_block_storage_header %0 : $*@block_storage Builtin.ObjectPointer, invoke %i : $@thin @cc(cdecl) (@inout @block_storage Builtin.ObjectPointer) -> (), type $@cc(cdecl) @objc_block () -> ()
+sil @init_block_header_nontrivial : $@thin (@inout @block_storage Builtin.NativeObject) -> @cc(cdecl) @objc_block () -> () {
+entry(%0 : $*@block_storage Builtin.NativeObject):
+  %i = function_ref @invoke_nontrivial : $@thin @cc(cdecl) (@inout @block_storage Builtin.NativeObject) -> ()
+  %b = init_block_storage_header %0 : $*@block_storage Builtin.NativeObject, invoke %i : $@thin @cc(cdecl) (@inout @block_storage Builtin.NativeObject) -> (), type $@cc(cdecl) @objc_block () -> ()
   return %b : $@cc(cdecl) @objc_block () -> ()
 }
 
@@ -122,7 +122,7 @@ entry(%0 : $*@block_storage Builtin.ObjectPointer):
 // CHECK-NEXT:    call void @swift_release(%swift.refcounted* %toDestroy) #0
 // CHECK-NEXT:    ret void
 
-sil public_external @invoke_nontrivial : $@thin @cc(cdecl) (@inout @block_storage Builtin.ObjectPointer) -> ()
+sil public_external @invoke_nontrivial : $@thin @cc(cdecl) (@inout @block_storage Builtin.NativeObject) -> ()
 
 // CHECK-LABEL: define %objc_block* @init_block_header_stret({ %objc_block, i8* }* noalias) {
 // CHECK:         store %objc_block {

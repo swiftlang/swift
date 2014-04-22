@@ -9,7 +9,7 @@ import Builtin
 
 class TrivialDestructor {
   var int : Builtin.Int32
-  var ptr : Builtin.ObjectPointer
+  var ptr : Builtin.NativeObject
   init()
   deinit { }
 }
@@ -41,7 +41,7 @@ bb0(%0 : $TrivialDestructor):
   return %7 : $()
 }
 
-sil @ptr_user : $@thin (Builtin.ObjectPointer) -> ()
+sil @ptr_user : $@thin (Builtin.NativeObject) -> ()
 sil @int_user : $@thin (Builtin.Int32) -> ()
 
 ///////////
@@ -152,7 +152,7 @@ sil @trivial_destructor_refcount_inst_on_value : $@thin () -> () {
 
 // Retains/Releases on a different value in the use list implies abort.
 //
-// CHECK-LABEL: sil @trivial_destructor_refcount_inst_on_diff_value : $@thin (Builtin.ObjectPointer) -> () {
+// CHECK-LABEL: sil @trivial_destructor_refcount_inst_on_diff_value : $@thin (Builtin.NativeObject) -> () {
 // CHECK: bb0
 // CHECK-NEXT: alloc_ref
 // CHECK-NEXT: ref_element_addr
@@ -162,13 +162,13 @@ sil @trivial_destructor_refcount_inst_on_value : $@thin () -> () {
 // CHECK-NEXT: strong_release
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
-sil @trivial_destructor_refcount_inst_on_diff_value : $@thin (Builtin.ObjectPointer) -> () {
-bb0(%0 : $Builtin.ObjectPointer):
+sil @trivial_destructor_refcount_inst_on_diff_value : $@thin (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
   %1 = alloc_ref $TrivialDestructor
   %2 = ref_element_addr %1 : $TrivialDestructor, #TrivialDestructor.ptr
-  store %0 to %2 : $*Builtin.ObjectPointer
-  %3 = load %2 : $*Builtin.ObjectPointer
-  strong_release %3 : $Builtin.ObjectPointer
+  store %0 to %2 : $*Builtin.NativeObject
+  %3 = load %2 : $*Builtin.NativeObject
+  strong_release %3 : $Builtin.NativeObject
   strong_release %1 : $TrivialDestructor
   %4 = tuple()
   return %4 : $()
@@ -183,7 +183,7 @@ sil @trivial_destructor_side_effect_use
 //sil @non_trivial_destructor
 
 class NonTrivialDestructor {
-  var ptr : Builtin.ObjectPointer
+  var ptr : Builtin.NativeObject
 
   init()
   deinit { }
@@ -192,8 +192,8 @@ class NonTrivialDestructor {
 sil @_TFC4main17NonTrivialDestructorD : $@cc(method) @thin (@owned NonTrivialDestructor) -> () {
 bb0(%0 : $NonTrivialDestructor):
   %1 = ref_element_addr %0 : $NonTrivialDestructor, #NonTrivialDestructor.ptr
-  %2 = load %1 : $*Builtin.ObjectPointer
-  strong_retain %2 : $Builtin.ObjectPointer
+  %2 = load %1 : $*Builtin.NativeObject
+  strong_retain %2 : $Builtin.NativeObject
   dealloc_ref %0 : $NonTrivialDestructor
   %3 = tuple()
   return %3 : $()
@@ -247,7 +247,7 @@ sil @non_trivial_destructor_deallocref_on_different_value : $@thin () -> () {
 }
 
 class NonTrivialDestructor3 {
-  var ptr : Builtin.ObjectPointer
+  var ptr : Builtin.NativeObject
 
   init()
   deinit { }
@@ -257,9 +257,9 @@ class NonTrivialDestructor3 {
 sil @_TFC4main17NonTrivialDestructor3D : $@cc(method) @thin (@owned NonTrivialDestructor3) -> () {
 bb0(%0 : $NonTrivialDestructor3):
   %1 = ref_element_addr %0 : $NonTrivialDestructor3, #NonTrivialDestructor3.ptr
-  %2 = load %1 : $*Builtin.ObjectPointer
-  %3 = function_ref @ptr_user : $@thin (Builtin.ObjectPointer) -> ()
-  apply %3 (%2) : $@thin (Builtin.ObjectPointer) -> ()
+  %2 = load %1 : $*Builtin.NativeObject
+  %3 = function_ref @ptr_user : $@thin (Builtin.NativeObject) -> ()
+  apply %3 (%2) : $@thin (Builtin.NativeObject) -> ()
   dealloc_ref %0 : $NonTrivialDestructor3
   %4 = tuple()
   return %4 : $()
@@ -279,7 +279,7 @@ sil @non_trivial_destructor_unknown_apply : $@thin () -> () {
 }
 
 class NonTrivialObjCDestructor {
-  var ptr : Builtin.ObjectPointer
+  var ptr : Builtin.NativeObject
 
   init() { }
   deinit { }

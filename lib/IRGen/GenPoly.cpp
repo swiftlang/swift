@@ -235,7 +235,7 @@ namespace {
     CanType getArchetypeReprType(CanArchetypeType a) {
       if (Type super = a->getSuperclass())
         return CanType(super);
-      return CanType(IGM.Context.TheObjCPointerType);
+      return CanType(IGM.Context.TheUnknownObjectType);
     }
 
     bool visitArchetypeType(CanArchetypeType origTy, CanType substTy) {

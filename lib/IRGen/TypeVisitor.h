@@ -48,8 +48,8 @@ class ReferenceTypeVisitor : public CanTypeVisitor<ImplClass, RetTy, Args...> {
   TYPE(Tuple)
 #undef TYPE
 
-  // BuiltinObjectPointer
-  // BuiltinObjCPointer
+  // BuiltinNativeObject
+  // BuiltinUnknownObject
   // Class
   // BoundGenericClass
   // Protocol

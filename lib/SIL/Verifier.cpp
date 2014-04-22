@@ -763,7 +763,7 @@ public:
   void checkDeallocBoxInst(DeallocBoxInst *DI) {
     require(DI->getElementType().isObject(),
             "Element type of dealloc_box must be an object type");
-    requireObjectType(BuiltinObjectPointerType, DI->getOperand(),
+    requireObjectType(BuiltinNativeObjectType, DI->getOperand(),
                       "Operand of dealloc_box");
   }
   void checkDestroyAddrInst(DestroyAddrInst *DI) {
@@ -1023,8 +1023,8 @@ public:
 
     require(EMI->getMember().getDecl()->isObjC(), "method must be [objc]");
     if (EMI->getMember().getDecl()->isInstanceMember()) {
-      require(operandType.getSwiftType()->is<BuiltinObjCPointerType>(),
-              "operand must have Builtin.ObjCPointer type");
+      require(operandType.getSwiftType()->is<BuiltinUnknownObjectType>(),
+              "operand must have Builtin.UnknownObject type");
     } else {
       require(operandType.getSwiftType()->is<ExistentialMetatypeType>(),
               "operand must have metatype type");
@@ -1444,35 +1444,35 @@ public:
             "address-to-pointer result type must be RawPointer");
   }
 
-  void checkRefToObjectPointerInst(RefToObjectPointerInst *AI) {
+  void checkRefToNativeObjectInst(RefToNativeObjectInst *AI) {
     require(AI->getOperand().getType()
               .getSwiftType()->mayHaveSuperclass(),
             "ref-to-object-pointer operand must be a class reference");
     auto destType = AI->getType().getSwiftType();
     auto &C = AI->getType().getASTContext();
-    require(destType->isEqual(C.TheObjectPointerType)
-            || destType->isEqual(C.TheObjCPointerType),
-          "ref-to-object-pointer result must be ObjectPointer or ObjCPointer");
+    require(destType->isEqual(C.TheNativeObjectType)
+            || destType->isEqual(C.TheUnknownObjectType),
+          "ref-to-object-pointer result must be NativeObject or UnknownObject");
   }
 
-  void checkObjectPointerToRefInst(ObjectPointerToRefInst *AI) {
+  void checkNativeObjectToRefInst(NativeObjectToRefInst *AI) {
     require(AI->getType()
               .getSwiftType()->mayHaveSuperclass(),
             "object-pointer-to-ref result must be a class reference");
     auto srcType = AI->getOperand().getType().getSwiftType();
     auto &C = AI->getOperand().getType().getASTContext();
-    require(srcType->isEqual(C.TheObjectPointerType)
-            || srcType->isEqual(C.TheObjCPointerType),
-          "object-pointer-to-ref operand must be ObjectPointer or ObjCPointer");
+    require(srcType->isEqual(C.TheNativeObjectType)
+            || srcType->isEqual(C.TheUnknownObjectType),
+          "object-pointer-to-ref operand must be NativeObject or UnknownObject");
   }
 
   void checkRefToRawPointerInst(RefToRawPointerInst *AI) {
     require(AI->getOperand().getType()
               .getSwiftType()->mayHaveSuperclass() ||
             AI->getOperand().getType().getSwiftType()->isEqual(
-                            AI->getType().getASTContext().TheObjectPointerType),
+                            AI->getType().getASTContext().TheNativeObjectType),
             "ref-to-raw-pointer operand must be a class reference or"
-            " ObjectPointer");
+            " NativeObject");
     require(AI->getType().getSwiftType()->isEqual(
                             AI->getType().getASTContext().TheRawPointerType),
             "ref-to-raw-pointer result must be RawPointer");
@@ -1482,11 +1482,11 @@ public:
     require(AI->getType()
               .getSwiftType()->mayHaveSuperclass() ||
             AI->getType().getSwiftType()->isEqual(
-                            AI->getType().getASTContext().TheObjectPointerType),
-        "raw-pointer-to-ref result must be a class reference or ObjectPointer");
+                            AI->getType().getASTContext().TheNativeObjectType),
+        "raw-pointer-to-ref result must be a class reference or NativeObject");
     require(AI->getOperand().getType().getSwiftType()->isEqual(
                             AI->getType().getASTContext().TheRawPointerType),
-            "raw-pointer-to-ref operand must be ObjectPointer");
+            "raw-pointer-to-ref operand must be NativeObject");
   }
 
   void checkConvertFunctionInst(ConvertFunctionInst *ICI) {
@@ -1712,8 +1712,8 @@ public:
 
     require(DMBI->getMember().getDecl()->isObjC(), "method must be [objc]");
     if (DMBI->getMember().getDecl()->isInstanceMember()) {
-      require(operandType.getSwiftType()->is<BuiltinObjCPointerType>(),
-              "operand must have Builtin.ObjCPointer type");
+      require(operandType.getSwiftType()->is<BuiltinUnknownObjectType>(),
+              "operand must have Builtin.UnknownObject type");
     } else {
       require(operandType.getSwiftType()->is<ExistentialMetatypeType>(),
               "operand must have metatype type");

@@ -35,7 +35,7 @@ static CanAnyFunctionType getDynamicMethodType(SILGenModule &SGM,
   auto &ctx = SGM.getASTContext();
   CanType selfTy;
   if (member->isInstanceMember()) {
-    selfTy = ctx.TheObjCPointerType;
+    selfTy = ctx.TheUnknownObjectType;
   } else {
     selfTy = proto.getType().getSwiftType();
   }
@@ -1300,8 +1300,8 @@ public:
       val = gen.B.createProjectExistentialRef(dynamicMemberRef,
                       existential.getValue(),
                       getSelfTypeForDynamicLookup(gen, existential.getValue()));
-      val = gen.B.createRefToObjectPointer(dynamicMemberRef, val,
-                             SILType::getObjCPointerType(gen.getASTContext()));
+      val = gen.B.createRefToNativeObject(dynamicMemberRef, val,
+                             SILType::getUnknownObjectType(gen.getASTContext()));
       ManagedValue proj(val, existential.getCleanup());
       setSelfParam(RValue(gen, dynamicMemberRef,
                           proj.getType().getSwiftRValueType(), proj),
@@ -1318,7 +1318,7 @@ public:
     }
 
     // Determine the type of the method we referenced, by replacing the
-    // class type of the 'Self' parameter with Builtin.ObjCPointer.
+    // class type of the 'Self' parameter with Builtin.UnknownObject.
     SILDeclRef member(fd, SILDeclRef::ConstructAtBestResilienceExpansion,
                       SILDeclRef::ConstructAtNaturalUncurryLevel,
                       /*isObjC=*/true);
@@ -2217,8 +2217,8 @@ namespace {
     return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));
   }
 
-  /// Specialized emitter for Builtin.castToObjectPointer.
-  static ManagedValue emitBuiltinCastToObjectPointer(SILGenFunction &gen,
+  /// Specialized emitter for Builtin.castToNativeObject.
+  static ManagedValue emitBuiltinCastToNativeObject(SILGenFunction &gen,
                                            SILLocation loc,
                                            ArrayRef<Substitution> substitutions,
                                            ArrayRef<ManagedValue> args,
@@ -2230,7 +2230,7 @@ namespace {
     if (!substitutions[0].Replacement->mayHaveSuperclass() &&
         !substitutions[0].Replacement->isClassExistentialType()) {
       gen.SGM.diagnose(loc, diag::invalid_sil_builtin,
-                       "castToObjectPointer source must be a class");
+                       "castToNativeObject source must be a class");
       // FIXME: Recovery?
       llvm::report_fatal_error("unable to set up the ObjC bridge!");
     }
@@ -2239,8 +2239,8 @@ namespace {
     // result.
     auto cleanup = args[0].getCleanup();
     
-    // Take the reference type argument and cast it to ObjectPointer.
-    SILType objPointerType = SILType::getObjectPointerType(gen.F.getASTContext());
+    // Take the reference type argument and cast it to NativeObject.
+    SILType objPointerType = SILType::getNativeObjectType(gen.F.getASTContext());
     SILValue arg = args[0].getValue();
 
     // If the argument is existential, project it.
@@ -2256,13 +2256,13 @@ namespace {
       arg = gen.B.createProjectExistentialRef(loc, arg, protoSelfTy);
     }
 
-    SILValue result = gen.B.createRefToObjectPointer(loc, arg, objPointerType);
+    SILValue result = gen.B.createRefToNativeObject(loc, arg, objPointerType);
     // Return the cast result with the original cleanup.
     return ManagedValue(result, cleanup);
   }
 
-  /// Specialized emitter for Builtin.castFromObjectPointer.
-  static ManagedValue emitBuiltinCastFromObjectPointer(SILGenFunction &gen,
+  /// Specialized emitter for Builtin.castFromNativeObject.
+  static ManagedValue emitBuiltinCastFromNativeObject(SILGenFunction &gen,
                                            SILLocation loc,
                                            ArrayRef<Substitution> substitutions,
                                            ArrayRef<ManagedValue> args,
@@ -2274,7 +2274,7 @@ namespace {
     // Bail if the source type is not a class reference of some kind.
     if (!substitutions[0].Replacement->mayHaveSuperclass()) {
       gen.SGM.diagnose(loc, diag::invalid_sil_builtin,
-                       "castFromObjectPointer dest must be a class");
+                       "castFromNativeObject dest must be a class");
       // FIXME: Recovery?
       llvm::report_fatal_error("unable to set up the ObjC bridge!");
     }
@@ -2288,7 +2288,7 @@ namespace {
     SILType destType = gen.getLoweredLoadableType(substitutions[0].Replacement);
     
     // Take the reference type argument and cast it.
-    SILValue result = gen.B.createObjectPointerToRef(loc, args[0].getValue(),
+    SILValue result = gen.B.createNativeObjectToRef(loc, args[0].getValue(),
                                                      destType);
     // Return the cast result with the original cleanup.
     return ManagedValue(result, cleanup);
@@ -2564,7 +2564,7 @@ SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
                    transparent, ctx);
 }
 
-/// emitArrayInjectionCall - Form an array "Array" out of an ObjectPointer
+/// emitArrayInjectionCall - Form an array "Array" out of an NativeObject
 /// (which represents the retain count), a base pointer to some elements, and a
 /// length.
 ManagedValue SILGenFunction::emitArrayInjectionCall(ManagedValue ObjectPtr,
@@ -2853,8 +2853,8 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
   if (e->getMember().getDecl()->isInstanceMember()) {
     operand = B.createProjectExistentialRef(e, operand,
                                   getSelfTypeForDynamicLookup(*this, operand));
-    operand = B.createRefToObjectPointer(e, operand,
-                                 SILType::getObjCPointerType(getASTContext()));
+    operand = B.createRefToNativeObject(e, operand,
+                                 SILType::getUnknownObjectType(getASTContext()));
   } else {
     auto metatype = operand.getType().castTo<ExistentialMetatypeType>();
     assert(metatype->getRepresentation() == MetatypeRepresentation::Thick);
@@ -2957,8 +2957,8 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
   SILValue base = existential.getValue();
   base = B.createProjectExistentialRef(e, base, 
            getSelfTypeForDynamicLookup(*this, base));
-  base = B.createRefToObjectPointer(e, base,
-           SILType::getObjCPointerType(getASTContext()));
+  base = B.createRefToNativeObject(e, base,
+           SILType::getUnknownObjectType(getASTContext()));
 
   // Emit the index.
   RValue index = emitRValue(e->getIndex());

@@ -70,7 +70,7 @@ bool TypeBase::hasReferenceSemantics() {
 }
 
 bool CanType::hasReferenceSemanticsImpl(CanType type) {
-  // At the moment, Builtin.ObjectPointer, class types, and function types.
+  // At the moment, Builtin.NativeObject, class types, and function types.
   switch (type->getKind()) {
 #define SUGARED_TYPE(id, parent) case TypeKind::id:
 #define TYPE(id, parent)
@@ -111,8 +111,8 @@ bool CanType::hasReferenceSemanticsImpl(CanType type) {
   case TypeKind::DynamicSelf:
     return cast<DynamicSelfType>(type)->getSelfType()->hasReferenceSemantics();
       
-  case TypeKind::BuiltinObjCPointer:
-  case TypeKind::BuiltinObjectPointer:
+  case TypeKind::BuiltinUnknownObject:
+  case TypeKind::BuiltinNativeObject:
   case TypeKind::Class:
   case TypeKind::BoundGenericClass:
   case TypeKind::Function:
@@ -348,8 +348,8 @@ bool TypeBase::isUnspecializedGeneric() {
   case TypeKind::Archetype:
   case TypeKind::BuiltinFloat:
   case TypeKind::BuiltinInteger:
-  case TypeKind::BuiltinObjCPointer:
-  case TypeKind::BuiltinObjectPointer:
+  case TypeKind::BuiltinUnknownObject:
+  case TypeKind::BuiltinNativeObject:
   case TypeKind::BuiltinRawPointer:
   case TypeKind::BuiltinVector:
   case TypeKind::Module:

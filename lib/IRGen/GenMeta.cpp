@@ -352,11 +352,11 @@ namespace {
       return emitDirectMetadataRef(CanType(intTy));
     }
 
-    llvm::Value *visitBuiltinObjectPointerType(CanBuiltinObjectPointerType type) {
+    llvm::Value *visitBuiltinNativeObjectType(CanBuiltinNativeObjectType type) {
       return emitDirectMetadataRef(type);
     }
 
-    llvm::Value *visitBuiltinObjCPointerType(CanBuiltinObjCPointerType type) {
+    llvm::Value *visitBuiltinUnknownObjectType(CanBuiltinUnknownObjectType type) {
       return emitDirectMetadataRef(type);
     }
 
@@ -1554,13 +1554,13 @@ namespace {
       Fields.push_back(flags);
     }
 
-    /// The runtime provides a value witness table for Builtin.ObjectPointer.
+    /// The runtime provides a value witness table for Builtin.NativeObject.
     void addValueWitnessTable() {
       ClassDecl *cls = TargetClass;
       
       auto type = cls->isObjC()
-        ? CanType(this->IGM.Context.TheObjCPointerType)
-        : CanType(this->IGM.Context.TheObjectPointerType);
+        ? CanType(this->IGM.Context.TheUnknownObjectType)
+        : CanType(this->IGM.Context.TheNativeObjectType);
       auto wtable = this->IGM.getAddrOfValueWitnessTable(type);
       Fields.push_back(wtable);
     }

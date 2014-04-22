@@ -107,8 +107,8 @@ private:
   const TypeInfo *convertModuleType(ModuleType *T);
   const TypeInfo *convertProtocolType(ProtocolType *T);
   const TypeInfo *convertProtocolCompositionType(ProtocolCompositionType *T);
-  const TypeInfo *convertBuiltinObjectPointer();
-  const TypeInfo *convertBuiltinObjCPointer();
+  const TypeInfo *convertBuiltinNativeObject();
+  const TypeInfo *convertBuiltinUnknownObject();
   const TypeInfo *convertUnownedStorageType(UnownedStorageType *T);
   const TypeInfo *convertWeakStorageType(WeakStorageType *T);
   

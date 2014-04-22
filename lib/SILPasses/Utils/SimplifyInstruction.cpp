@@ -32,8 +32,8 @@ namespace {
     SILValue visitRefToRawPointerInst(RefToRawPointerInst *RRPI);
     SILValue
     visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *UCCI);
-    SILValue visitObjectPointerToRefInst(ObjectPointerToRefInst *OPRI);
-    SILValue visitRefToObjectPointerInst(RefToObjectPointerInst *ROPI);
+    SILValue visitNativeObjectToRefInst(NativeObjectToRefInst *OPRI);
+    SILValue visitRefToNativeObjectInst(RefToNativeObjectInst *ROPI);
     SILValue visitStructInst(StructInst *SI);
     SILValue visitTupleInst(TupleInst *SI);
     SILValue visitApplyInst(ApplyInst *AI);
@@ -199,17 +199,17 @@ visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *UCCI) {
 
 SILValue
 InstSimplifier::
-visitObjectPointerToRefInst(ObjectPointerToRefInst *OPRI) {
+visitNativeObjectToRefInst(NativeObjectToRefInst *OPRI) {
   // (object-pointer-to-ref-inst (ref-to-object-pointer-inst x) typeof(x)) -> x
-  if (auto *ROPI = dyn_cast<RefToObjectPointerInst>(&*OPRI->getOperand())) {
+  if (auto *ROPI = dyn_cast<RefToNativeObjectInst>(&*OPRI->getOperand())) {
     if (ROPI->getOperand().getType() == OPRI->getType())
       return ROPI->getOperand();
 
     // A common downcast pattern is:
     //
     // upcast : $X2 -> $X
-    // ref_to_object_pointer : $X -> $Builtin.ObjectPointer
-    // object_pointer_to_ref : $Builtin.ObjectPointer -> $X2
+    // ref_to_native_object : $X -> $Builtin.NativeObject
+    // native_object_to_ref : $Builtin.NativeObject -> $X2
     //
     // We can RAUW the object pointer with the operand of the upcast.
     if (auto *UI = dyn_cast<UpcastInst>(ROPI->getOperand().getDef()))
@@ -222,9 +222,9 @@ visitObjectPointerToRefInst(ObjectPointerToRefInst *OPRI) {
 
 SILValue
 InstSimplifier::
-visitRefToObjectPointerInst(RefToObjectPointerInst *ROPI) {
+visitRefToNativeObjectInst(RefToNativeObjectInst *ROPI) {
   // (ref-to-object-pointer-inst (object-pointer-to-ref-inst x) typeof(x)) -> x
-  if (auto *OPRI = dyn_cast<ObjectPointerToRefInst>(&*ROPI->getOperand()))
+  if (auto *OPRI = dyn_cast<NativeObjectToRefInst>(&*ROPI->getOperand()))
     if (OPRI->getOperand().getType() == ROPI->getType())
       return OPRI->getOperand();
 

@@ -70,10 +70,10 @@ Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
 
   if (Name == "RawPointer")
     return Context.TheRawPointerType;
-  if (Name == "ObjectPointer")
-    return Context.TheObjectPointerType;
-  if (Name == "ObjCPointer")
-    return Context.TheObjCPointerType;
+  if (Name == "NativeObject")
+    return Context.TheNativeObjectType;
+  if (Name == "UnknownObject")
+    return Context.TheUnknownObjectType;
   
   if (Name == "FPIEEE32")
     return Context.TheIEEE32Type;
@@ -515,7 +515,7 @@ static ValueDecl *getAtomicRMWOperation(ASTContext &Context, Identifier Id,
   return getBuiltinFunction(Id, ArgElts, ResultTy);
 }
 
-static ValueDecl *getObjectPointerCast(ASTContext &Context, Identifier Id,
+static ValueDecl *getNativeObjectCast(ASTContext &Context, Identifier Id,
                                        BuiltinValueKind BV) {
   Type GenericTy;
   Type ArchetypeTy;
@@ -527,10 +527,10 @@ static ValueDecl *getObjectPointerCast(ASTContext &Context, Identifier Id,
       BV == BuiltinValueKind::BridgeFromRawPointer)
     BuiltinTy = Context.TheRawPointerType;
   else
-    BuiltinTy = Context.TheObjectPointerType;
+    BuiltinTy = Context.TheNativeObjectType;
 
   Type ArgParam, ArgBody, ResultTy, BodyResultTy;
-  if (BV == BuiltinValueKind::CastToObjectPointer ||
+  if (BV == BuiltinValueKind::CastToNativeObject ||
       BV == BuiltinValueKind::BridgeToRawPointer) {
     ArgParam = GenericTy;
     ArgBody = ArchetypeTy;
@@ -1156,12 +1156,12 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::DeallocRaw:
     return getDeallocOperation(Context, Id);
 
-  case BuiltinValueKind::CastToObjectPointer:
-  case BuiltinValueKind::CastFromObjectPointer:
+  case BuiltinValueKind::CastToNativeObject:
+  case BuiltinValueKind::CastFromNativeObject:
   case BuiltinValueKind::BridgeToRawPointer:
   case BuiltinValueKind::BridgeFromRawPointer:
     if (!Types.empty()) return nullptr;
-    return getObjectPointerCast(Context, Id, BV);
+    return getNativeObjectCast(Context, Id, BV);
       
   case BuiltinValueKind::AddressOf:
     if (!Types.empty()) return nullptr;

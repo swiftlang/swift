@@ -845,10 +845,10 @@ static void emitCaptureArguments(SILGenFunction &gen,
   }
 
   case CaptureKind::Box: {
-    // LValues are captured as two arguments: a retained ObjectPointer that owns
+    // LValues are captured as two arguments: a retained NativeObject that owns
     // the captured value, and the address of the value itself.
     SILType ty = gen.getLoweredType(type).getAddressType();
-    SILValue box = new (gen.SGM.M) SILArgument(SILType::getObjectPointerType(c),
+    SILValue box = new (gen.SGM.M) SILArgument(SILType::getNativeObjectType(c),
                                                gen.F.begin(), VD);
     SILValue addr = new (gen.SGM.M) SILArgument(ty, gen.F.begin(), VD);
     gen.VarLocs[VD] = SILGenFunction::VarLoc::getAddress(addr, box);

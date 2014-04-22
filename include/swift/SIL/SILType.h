@@ -345,10 +345,10 @@ public:
   // Accessors for types used in SIL instructions:
   //
   
-  /// Get the ObjectPointer type as a SILType.
-  static SILType getObjectPointerType(const ASTContext &C);
-  /// Get the ObjCPointer type as a SILType.
-  static SILType getObjCPointerType(const ASTContext &C);
+  /// Get the NativeObject type as a SILType.
+  static SILType getNativeObjectType(const ASTContext &C);
+  /// Get the UnknownObject type as a SILType.
+  static SILType getUnknownObjectType(const ASTContext &C);
   /// Get the RawPointer type as a SILType.
   static SILType getRawPointerType(const ASTContext &C);
   /// Get a builtin integer type as a SILType.

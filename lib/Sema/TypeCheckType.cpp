@@ -1905,7 +1905,7 @@ bool TypeChecker::isRepresentableInObjC(const SubscriptDecl *SD,
 }
 
 /// True if T is representable as a non-nullable ObjC pointer type.
-static bool isObjCPointerType(Type T) {
+static bool isUnknownObjectType(Type T) {
   // FIXME: Return true for closures, and for anything bridged to a class type.
 
   // Look through a single level of metatype.
@@ -1922,12 +1922,12 @@ static bool isObjCPointerType(Type T) {
 }
 
 /// True if T is representable as an ObjC pointer type, nullable or otherwise.
-static bool isObjCPointerOrOptionalType(Type T) {
+static bool isUnknownObjectOrOptionalType(Type T) {
   // Look through a single layer of optional type.
   if (auto valueType = T->getAnyOptionalObjectType()) {
     T = valueType;
   }
-  return isObjCPointerType(T);
+  return isUnknownObjectType(T);
 }
 
 bool TypeChecker::isTriviallyRepresentableInObjC(const DeclContext *DC,
@@ -1939,7 +1939,7 @@ bool TypeChecker::isTriviallyRepresentableInObjC(const DeclContext *DC,
     wasOptional = true;
   }
 
-  if (isObjCPointerType(T))
+  if (isUnknownObjectType(T))
     return true;
 
   // TODO: maybe Optional<UnsafePointer<T>> should be okay?
@@ -1968,14 +1968,14 @@ bool TypeChecker::isTriviallyRepresentableInObjC(const DeclContext *DC,
     if (NTD == getCMutablePointerDecl(DC)) {
       T = T->castTo<BoundGenericType>()->getGenericArgs()[0];
       return isTriviallyRepresentableInObjC(DC, T)
-        && !isObjCPointerType(T);
+        && !isUnknownObjectType(T);
     }
     
     // An ObjCMutablePointer<T> is representable in ObjC if T
     // is a (potentially optional) ObjC pointer type.
     if (NTD == getObjCMutablePointerDecl(DC)) {
       T = T->castTo<BoundGenericType>()->getGenericArgs()[0];
-      return isObjCPointerOrOptionalType(T);
+      return isUnknownObjectOrOptionalType(T);
     }
     
     // TODO: C*VoidPointer

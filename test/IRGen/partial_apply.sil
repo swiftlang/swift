@@ -134,12 +134,12 @@ entry(%x : $Int):
 // CHECK: define internal void [[DYNAMIC_LOOKUP_BR_PARTIAL_APPLY_STUB]](i64, %swift.refcounted*) {
 // CHECK:   load i8** @"\01L_selector(method:)", align 8
 
-sil @dynamic_lookup_br_partial_apply : $@thin Builtin.ObjCPointer -> @callee_owned Int -> () {
-entry(%o : $Builtin.ObjCPointer):
-  dynamic_method_br %o : $Builtin.ObjCPointer, #ObjCClass.method!1.foreign, yes, no
+sil @dynamic_lookup_br_partial_apply : $@thin Builtin.UnknownObject -> @callee_owned Int -> () {
+entry(%o : $Builtin.UnknownObject):
+  dynamic_method_br %o : $Builtin.UnknownObject, #ObjCClass.method!1.foreign, yes, no
 
-yes(%m : $@cc(objc_method) @thin (Int, Builtin.ObjCPointer) -> ()):
-  %p = partial_apply %m(%o) : $@cc(objc_method) @thin (Int, Builtin.ObjCPointer) -> ()
+yes(%m : $@cc(objc_method) @thin (Int, Builtin.UnknownObject) -> ()):
+  %p = partial_apply %m(%o) : $@cc(objc_method) @thin (Int, Builtin.UnknownObject) -> ()
   br done(%p : $@callee_owned Int -> ())
 
 no:

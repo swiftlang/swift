@@ -101,7 +101,7 @@
    ;; Unchecked Conversions
    `(,(regexp-opt '("upcast"
                     "address_to_pointer" "pointer_to_address"
-                    "ref_to_object_pointer" "object_pointer_to_ref"
+                    "ref_to_native_object" "native_object_to_ref"
                     "ref_to_raw_pointer" "raw_pointer_to_ref"
                     "convert_function"
                     "thick_to_objc_metatype" "objc_to_thick_metatype"

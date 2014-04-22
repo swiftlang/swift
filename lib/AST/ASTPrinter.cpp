@@ -1551,12 +1551,12 @@ public:
     Printer << "Builtin.RawPointer";
   }
 
-  void visitBuiltinObjectPointerType(BuiltinObjectPointerType *T) {
-    Printer << "Builtin.ObjectPointer";
+  void visitBuiltinNativeObjectType(BuiltinNativeObjectType *T) {
+    Printer << "Builtin.NativeObject";
   }
 
-  void visitBuiltinObjCPointerType(BuiltinObjCPointerType *T) {
-    Printer << "Builtin.ObjCPointer";
+  void visitBuiltinUnknownObjectType(BuiltinUnknownObjectType *T) {
+    Printer << "Builtin.UnknownObject";
   }
 
   void visitBuiltinVectorType(BuiltinVectorType *T) {

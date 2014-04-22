@@ -12,10 +12,10 @@ import Swift
 // i386:   [[OBJC:%objc_object]] = type
 
 class C {}
-sil @_TFC11autorelease1Cd : $@cc(method) @thin (@owned C) -> @owned Builtin.ObjectPointer {
+sil @_TFC11autorelease1Cd : $@cc(method) @thin (@owned C) -> @owned Builtin.NativeObject {
 bb0(%0 : $C):
-  %1 = ref_to_object_pointer %0 : $C to $Builtin.ObjectPointer // user: %2
-  return %1 : $Builtin.ObjectPointer              // id: %2
+  %1 = ref_to_native_object %0 : $C to $Builtin.NativeObject // user: %2
+  return %1 : $Builtin.NativeObject              // id: %2
 }
 
 sil @foo : $@thin (@owned C?) -> @autoreleased C? {

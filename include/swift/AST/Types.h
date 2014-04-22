@@ -650,32 +650,32 @@ public:
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinRawPointerType, BuiltinType);
 
-/// BuiltinObjectPointerType - The builtin opaque object-pointer type.
+/// BuiltinNativeObjectType - The builtin opaque object-pointer type.
 /// Useful for keeping an object alive when it is otherwise being
 /// manipulated via an unsafe pointer type.
-class BuiltinObjectPointerType : public BuiltinType {
+class BuiltinNativeObjectType : public BuiltinType {
   friend class ASTContext;
-  BuiltinObjectPointerType(const ASTContext &C)
-    : BuiltinType(TypeKind::BuiltinObjectPointer, C) {}
+  BuiltinNativeObjectType(const ASTContext &C)
+    : BuiltinType(TypeKind::BuiltinNativeObject, C) {}
 public:
   static bool classof(const TypeBase *T) {
-    return T->getKind() == TypeKind::BuiltinObjectPointer;
+    return T->getKind() == TypeKind::BuiltinNativeObject;
   }
 };
-DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinObjectPointerType, BuiltinType);
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinNativeObjectType, BuiltinType);
 
-/// BuiltinObjCPointerType - The builtin opaque Objective-C pointer type.
+/// BuiltinUnknownObjectType - The builtin opaque Objective-C pointer type.
 /// Useful for pushing an Objective-C type through swift.
-class BuiltinObjCPointerType : public BuiltinType {
+class BuiltinUnknownObjectType : public BuiltinType {
   friend class ASTContext;
-  BuiltinObjCPointerType(const ASTContext &C)
-    : BuiltinType(TypeKind::BuiltinObjCPointer, C) {}
+  BuiltinUnknownObjectType(const ASTContext &C)
+    : BuiltinType(TypeKind::BuiltinUnknownObject, C) {}
 public:
   static bool classof(const TypeBase *T) {
-    return T->getKind() == TypeKind::BuiltinObjCPointer;
+    return T->getKind() == TypeKind::BuiltinUnknownObject;
   }
 };
-DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinObjCPointerType, BuiltinType);
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinUnknownObjectType, BuiltinType);
 
 /// \brief A builtin vector type.
 class BuiltinVectorType : public BuiltinType, public llvm::FoldingSetNode {

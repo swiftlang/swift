@@ -766,13 +766,13 @@ getImplementationForType(const Metadata *T, const OpaqueValue *Value) {
   }
       
   case MetadataKind::Opaque: {
-    // If this is the Builtin.ObjCPointer type, use the dynamic type of the
+    // If this is the Builtin.UnknownObject type, use the dynamic type of the
     // object reference.
     if (T == &_TMdBO.base) {
       return getImplementationForClass(Value);
     }
     
-    // If this is the Builtin.ObjectPointer type, and the heap object is a
+    // If this is the Builtin.NativeObject type, and the heap object is a
     // class instance, use the dynamic type of the object reference.
     if (T == &_TMdBo.base) {
       const HeapObject *obj

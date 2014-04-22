@@ -277,10 +277,10 @@ ASTContext::ASTContext(LangOptions &langOpts, SearchPathOptions &SearchPathOpts,
     TypeCheckerDebug(new StderrTypeCheckerDebugConsumer()),
     TheErrorType(new (*this, AllocationArena::Permanent) ErrorType(*this)),
     TheEmptyTupleType(TupleType::get(ArrayRef<TupleTypeElt>(), *this)),
-    TheObjectPointerType(new (*this, AllocationArena::Permanent)
-                           BuiltinObjectPointerType(*this)),
-    TheObjCPointerType(new (*this, AllocationArena::Permanent)
-                         BuiltinObjCPointerType(*this)),
+    TheNativeObjectType(new (*this, AllocationArena::Permanent)
+                           BuiltinNativeObjectType(*this)),
+    TheUnknownObjectType(new (*this, AllocationArena::Permanent)
+                         BuiltinUnknownObjectType(*this)),
     TheRawPointerType(new (*this, AllocationArena::Permanent)
                         BuiltinRawPointerType(*this)),
     TheIEEE32Type(new (*this, AllocationArena::Permanent)

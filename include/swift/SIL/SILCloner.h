@@ -466,9 +466,9 @@ SILCloner<ImplClass>::visitPointerToAddressInst(PointerToAddressInst *Inst) {
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::
-visitRefToObjectPointerInst(RefToObjectPointerInst *Inst) {
+visitRefToNativeObjectInst(RefToNativeObjectInst *Inst) {
   doPostProcess(Inst,
-    getBuilder().createRefToObjectPointer(getOpLocation(Inst->getLoc()),
+    getBuilder().createRefToNativeObject(getOpLocation(Inst->getLoc()),
                                           getOpValue(Inst->getOperand()),
                                           getOpType(Inst->getType())));
 }
@@ -476,9 +476,9 @@ visitRefToObjectPointerInst(RefToObjectPointerInst *Inst) {
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::
-visitObjectPointerToRefInst(ObjectPointerToRefInst *Inst) {
+visitNativeObjectToRefInst(NativeObjectToRefInst *Inst) {
   doPostProcess(Inst,
-    getBuilder().createObjectPointerToRef(getOpLocation(Inst->getLoc()),
+    getBuilder().createNativeObjectToRef(getOpLocation(Inst->getLoc()),
                                           getOpValue(Inst->getOperand()),
                                           getOpType(Inst->getType())));
 }

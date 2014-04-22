@@ -178,14 +178,14 @@ namespace {
       : HeapTypeInfo(storageType, size, spareBits, align) {
     }
 
-    /// Builtin.ObjCPointer requires ObjC reference-counting.
+    /// Builtin.UnknownObject requires ObjC reference-counting.
     ReferenceCounting getReferenceCounting() const {
       return ReferenceCounting::ObjC;
     }
   };
 }
 
-const TypeInfo *TypeConverter::convertBuiltinObjCPointer() {
+const TypeInfo *TypeConverter::convertBuiltinUnknownObject() {
   return new ObjCTypeInfo(IGM.ObjCPtrTy, IGM.getPointerSize(),
                           IGM.getHeapObjectSpareBits(),
                           IGM.getPointerAlignment());

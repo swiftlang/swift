@@ -5,7 +5,7 @@ import Builtin
 // Enums consisting of a retainable pointer and a single empty case use nullable
 // pointer value semantics.
 enum NullableRefcounted {
-  case Ref(Builtin.ObjectPointer)
+  case Ref(Builtin.NativeObject)
   case None
 }
 
@@ -62,7 +62,7 @@ enum NullableRefcounted {
 
 // With multiple empty cases, the nullable pointer semantics aren't used.
 enum MultipleEmptyRefcounted {
-  case Ref(Builtin.ObjectPointer)
+  case Ref(Builtin.NativeObject)
   case A
   case B
 }
@@ -87,7 +87,7 @@ enum MultipleEmptyRefcounted {
 
 // ObjC payloads can be nullable too.
 enum NullableObjCRefcounted {
-  case Ref(Builtin.ObjCPointer)
+  case Ref(Builtin.UnknownObject)
   case None
 }
 // CHECK: define linkonce_odr hidden void @_TwxxO34enum_value_semantics_special_cases22NullableObjCRefcounted(%swift.opaque* %object, %swift.type* %Self) {
@@ -110,7 +110,7 @@ sil @_TFC34enum_value_semantics_special_cases1CD : $@cc(method) @thin (C) -> ()
 sil @_TFC34enum_value_semantics_special_cases1DD : $@cc(method) @thin (D) -> ()
 
 enum AllRefcounted {
-  case Ref(Builtin.ObjectPointer)
+  case Ref(Builtin.NativeObject)
   case CRef(C)
   case DRef(D)
   case None
@@ -129,9 +129,9 @@ enum AllRefcounted {
 // CHECK: }
 
 enum AllMixedRefcounted {
-  case Ref(Builtin.ObjectPointer)
+  case Ref(Builtin.NativeObject)
   case CRef(C)
-  case ORef(Builtin.ObjCPointer)
+  case ORef(Builtin.UnknownObject)
   case None
 }
 

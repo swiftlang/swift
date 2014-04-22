@@ -10,7 +10,7 @@ class C {
 
 sil @_TFC12dynamic_init1CCfMS0_FT_S0_ : $@thin (@thick C.Type) -> @owned C
 sil @_TFC12dynamic_init1CcfMS0_FT_S0_ : $@cc(method) @thin (@owned C) -> @owned C
-sil @_TFC12dynamic_init1Cd : $@cc(method) @thin (@owned C) -> @owned Builtin.ObjectPointer
+sil @_TFC12dynamic_init1Cd : $@cc(method) @thin (@owned C) -> @owned Builtin.NativeObject
 sil @_TFC12dynamic_init1CD : $@cc(method) @thin (@owned C) -> ()
 
 // CHECK-LABEL: define void @_TF12dynamic_init15testDynamicInitFT2cmMCS_1C_T_

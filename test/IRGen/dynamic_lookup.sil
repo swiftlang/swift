@@ -56,14 +56,14 @@ bb0(%0 : $AnyObject):
   %4 = load %1#1 : $*AnyObject
   strong_retain %4 : $AnyObject
   %6 = project_existential_ref %4 : $AnyObject to $@sil_self AnyObject
-  %7 = ref_to_object_pointer %6 : $@sil_self AnyObject to $Builtin.ObjCPointer
+  %7 = ref_to_native_object %6 : $@sil_self AnyObject to $Builtin.UnknownObject
 
   // CHECK: [[SEL:%[0-9]+]] = load i8** @"\01L_selector(f)", align 8
   // CHECK: [[HAS_SEL:%[0-9]]] = call i1 @swift_objcRespondsToSelector(%objc_object* [[OBJECT:%[0-9]+]], i8* [[SEL]]) #0
   // CHECK: br i1 [[HAS_SEL]]
-  dynamic_method_br %7 : $Builtin.ObjCPointer, #X.f!1, bb1, bb2
+  dynamic_method_br %7 : $Builtin.UnknownObject, #X.f!1, bb1, bb2
 
-bb1(%8 : $@cc(objc_method) @thin (Builtin.ObjCPointer) -> ()):
+bb1(%8 : $@cc(objc_method) @thin (Builtin.UnknownObject) -> ()):
   br bb3
 
 bb2:
@@ -82,7 +82,7 @@ bb0(%0 : $@thick AnyObject.Type):
   // CHECK: br i1 [[HAS_SEL]]
   dynamic_method_br %0 : $@thick AnyObject.Type, #X.g!1, bb1, bb2
 
-bb1(%8 : $@cc(objc_method) @thin (Builtin.ObjCPointer) -> ()):
+bb1(%8 : $@cc(objc_method) @thin (Builtin.UnknownObject) -> ()):
   br bb3
 
 bb2:
@@ -100,10 +100,10 @@ sil @_T1t23dynamic_lookup_propertyFT1xPSo13AnyObject__T_ : $@thin (AnyObject) ->
   %6 = load %1#1 : $*AnyObject                // users: %24, %8, %7
   strong_retain %6 : $AnyObject
   %8 = project_existential_ref %6 : $AnyObject to $@sil_self AnyObject // users: %11, %9
-  %9 = ref_to_object_pointer %8 : $@sil_self AnyObject to $Builtin.ObjCPointer
-  dynamic_method_br %9 : $Builtin.ObjCPointer, #X.value!getter.1.foreign, bb1, bb2
+  %9 = ref_to_native_object %8 : $@sil_self AnyObject to $Builtin.UnknownObject
+  dynamic_method_br %9 : $Builtin.UnknownObject, #X.value!getter.1.foreign, bb1, bb2
 
-bb1(%10 : $@cc(objc_method) @thin (Builtin.ObjCPointer) -> Int64):
+bb1(%10 : $@cc(objc_method) @thin (Builtin.UnknownObject) -> Int64):
   br bb3
 
 bb2:
@@ -124,15 +124,15 @@ bb0(%0 : $AnyObject, %1 : $Int64):
   %8 = load %2#1 : $*AnyObject
   strong_retain %8 : $AnyObject
   %10 = project_existential_ref %8 : $AnyObject to $@sil_self AnyObject
-  %11 = ref_to_object_pointer %10 : $@sil_self AnyObject to $Builtin.ObjCPointer
+  %11 = ref_to_native_object %10 : $@sil_self AnyObject to $Builtin.UnknownObject
   // CHECK: [[SEL:%[0-9]+]] = load i8** @"\01L_selector(objectAtIndexedSubscript:)", align 8
   // CHECK-NEXT: [[HAS_SEL:%[0-9]+]] = call i1 @swift_objcRespondsToSelector(%objc_object* %0, i8* [[SEL]]) #0
   // CHECK-NEXT: br i1 [[HAS_SEL]], label [[HAS_METHOD:%[0-9]+]], label [[HAS_METHOD:%[0-9]+]]
 
-  dynamic_method_br %11 : $Builtin.ObjCPointer, #X.subscript!getter.1.foreign, bb1, bb2
+  dynamic_method_br %11 : $Builtin.UnknownObject, #X.subscript!getter.1.foreign, bb1, bb2
 
-bb1(%13 : $@cc(objc_method) @thin (Int64, Builtin.ObjCPointer) -> Int64): // Preds: bb0
-  %14 = partial_apply %13(%11) : $@cc(objc_method) @thin (Int64, Builtin.ObjCPointer) -> Int64
+bb1(%13 : $@cc(objc_method) @thin (Int64, Builtin.UnknownObject) -> Int64): // Preds: bb0
+  %14 = partial_apply %13(%11) : $@cc(objc_method) @thin (Int64, Builtin.UnknownObject) -> Int64
   %15 = load %3#1 : $*Int64             
   %16 = apply %14(%15) : $@callee_owned Int64 -> Int64
   br bb3

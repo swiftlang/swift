@@ -59,10 +59,10 @@ class C {}
 // CHECK-NEXT: entry:
 // CHECK-NEXT: [[OBJ_PTR:%[a-zA-Z0-9]+]] = bitcast [[C_CLASS]]* %0 to [[REF]]*
 // CHECK-NEXT: ret [[REF]]* [[OBJ_PTR]]
-sil @_TFC5class1Cd : $@cc(method) @thin (@owned C) -> @owned Builtin.ObjectPointer {
+sil @_TFC5class1Cd : $@cc(method) @thin (@owned C) -> @owned Builtin.NativeObject {
 bb0(%0 : $C):
-  %1 = ref_to_object_pointer %0 : $C to $Builtin.ObjectPointer // user: %2
-  return %1 : $Builtin.ObjectPointer              // id: %2
+  %1 = ref_to_native_object %0 : $C to $Builtin.NativeObject // user: %2
+  return %1 : $Builtin.NativeObject              // id: %2
 }
 
 // Deallocating destructor
@@ -72,9 +72,9 @@ bb0(%0 : $C):
   // CHECK-NEXT: entry
   // CHECK-NEXT: [[SELF:%[a-zA-Z0-9]+]] = call [[REF]]* @_TFC5class1Cd([[C_CLASS]]* %0)
   // CHECK-NEXT: [[SELF_OBJ:%[a-zA-Z0-9]+]] = bitcast [[REF]]* [[SELF]] to [[C_CLASS]]*
-  %1 = function_ref @_TFC5class1Cd : $@cc(method) @thin (@owned C) -> @owned Builtin.ObjectPointer // user: %2
-  %2 = apply %1(%0) : $@cc(method) @thin (@owned C) -> @owned Builtin.ObjectPointer // user: %3
-  %3 = object_pointer_to_ref %2 : $Builtin.ObjectPointer to $C // user: %4
+  %1 = function_ref @_TFC5class1Cd : $@cc(method) @thin (@owned C) -> @owned Builtin.NativeObject // user: %2
+  %2 = apply %1(%0) : $@cc(method) @thin (@owned C) -> @owned Builtin.NativeObject // user: %3
+  %3 = native_object_to_ref %2 : $Builtin.NativeObject to $C // user: %4
   // CHECK-NEXT: [[SELF:%[a-zA-Z0-9]+]] = bitcast [[C_CLASS]]* [[SELF_OBJ]] to [[REF]]*
   // CHECK-NEXT: call void @swift_deallocObject([[REF]]* [[SELF]], i64 16)
   dealloc_ref %3 : $C                             // id: %4
@@ -83,20 +83,20 @@ bb0(%0 : $C):
   return %5 : $()                                 // id: %6
 }
 
-// CHECK: define [[REF]]* @ref_to_object_pointer_cast([[C_CLASS]]*)
+// CHECK: define [[REF]]* @ref_to_native_object_cast([[C_CLASS]]*)
 // CHECK:   bitcast [[C_CLASS]]* {{%.*}} to [[REF]]*
-sil @ref_to_object_pointer_cast : $@thin C -> Builtin.ObjectPointer {
+sil @ref_to_native_object_cast : $@thin C -> Builtin.NativeObject {
 entry(%c : $C):
-  %r = ref_to_object_pointer %c : $C to $Builtin.ObjectPointer
-  return %r : $Builtin.ObjectPointer
+  %r = ref_to_native_object %c : $C to $Builtin.NativeObject
+  return %r : $Builtin.NativeObject
 }
 
 // CHECK: define [[OBJCOBJ]]* @ref_to_objc_pointer_cast([[C_CLASS]]*)
 // CHECK:   bitcast [[C_CLASS]]* %0 to [[OBJCOBJ]]*
-sil @ref_to_objc_pointer_cast : $@thin C -> Builtin.ObjCPointer {
+sil @ref_to_objc_pointer_cast : $@thin C -> Builtin.UnknownObject {
 entry(%c : $C):
-  %r = ref_to_object_pointer %c : $C to $Builtin.ObjCPointer
-  return %r : $Builtin.ObjCPointer
+  %r = ref_to_native_object %c : $C to $Builtin.UnknownObject
+  return %r : $Builtin.UnknownObject
 }
 
 // Part of rdar://16079147

@@ -252,8 +252,8 @@ namespace {
     IMPL(BuiltinInteger, Trivial)
     IMPL(BuiltinFloat, Trivial)
     IMPL(BuiltinRawPointer, Trivial)
-    IMPL(BuiltinObjectPointer, Reference)
-    IMPL(BuiltinObjCPointer, Reference)
+    IMPL(BuiltinNativeObject, Reference)
+    IMPL(BuiltinUnknownObject, Reference)
     IMPL(BuiltinVector, Trivial)
     IMPL(Class, Reference)
     IMPL(BoundGenericClass, Reference)
@@ -1544,7 +1544,7 @@ static CanAnyFunctionType getDestructorType(DestructorDecl *dd,
   }
   
   CanType resultTy = isDeallocating? TupleType::getEmpty(C)->getCanonicalType()
-                                   : CanType(C.TheObjectPointerType);
+                                   : CanType(C.TheNativeObjectType);
 
   if (auto params = dd->getDeclContext()->getGenericParamsOfContext())
     return CanPolymorphicFunctionType::get(classType, resultTy, params, extInfo);
@@ -1573,7 +1573,7 @@ static CanAnyFunctionType getDestructorInterfaceType(DestructorDecl *dd,
   }
   
   CanType resultTy = isDeallocating? TupleType::getEmpty(C)->getCanonicalType()
-                                   : CanType(C.TheObjectPointerType);
+                                   : CanType(C.TheNativeObjectType);
 
   auto sig = dd->getDeclContext()->getGenericSignatureOfContext();
   if (sig)
@@ -1721,8 +1721,8 @@ TypeConverter::getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
       }
       SWIFT_FALLTHROUGH;
     case CaptureKind::Box: {
-      // Capture the owning ObjectPointer and the address of the value.
-      inputFields.push_back(Context.TheObjectPointerType);
+      // Capture the owning NativeObject and the address of the value.
+      inputFields.push_back(Context.TheNativeObjectType);
       auto lvType = CanInOutType::get(captureType);
       inputFields.push_back(TupleTypeElt(lvType));
       break;
@@ -1806,8 +1806,8 @@ TypeConverter::getFunctionInterfaceTypeWithCaptures(CanAnyFunctionType funcType,
       }
       SWIFT_FALLTHROUGH;
     case CaptureKind::Box: {
-      // Capture the owning ObjectPointer and the address of the value.
-      inputFields.push_back(Context.TheObjectPointerType);
+      // Capture the owning NativeObject and the address of the value.
+      inputFields.push_back(Context.TheNativeObjectType);
       auto lvType = CanInOutType::get(captureType);
       inputFields.push_back(TupleTypeElt(lvType));
       break;

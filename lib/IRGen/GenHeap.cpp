@@ -572,23 +572,23 @@ llvm::Value *IRGenFunction::emitUnmanagedAlloc(const HeapLayout &layout,
 }
 
 namespace {
-  class BuiltinObjectPointerTypeInfo
-    : public HeapTypeInfo<BuiltinObjectPointerTypeInfo> {
+  class BuiltinNativeObjectTypeInfo
+    : public HeapTypeInfo<BuiltinNativeObjectTypeInfo> {
   public:
-    BuiltinObjectPointerTypeInfo(llvm::PointerType *storage,
+    BuiltinNativeObjectTypeInfo(llvm::PointerType *storage,
                                  Size size, llvm::BitVector spareBits,
                                  Alignment align)
     : HeapTypeInfo(storage, size, spareBits, align) {}
 
-    /// Builtin.ObjectPointer uses Swift native reference-counting.
+    /// Builtin.NativeObject uses Swift native reference-counting.
     ReferenceCounting getReferenceCounting() const {
       return ReferenceCounting::Native;
     }
   };
 }
 
-const TypeInfo *TypeConverter::convertBuiltinObjectPointer() {
-  return new BuiltinObjectPointerTypeInfo(IGM.RefCountedPtrTy,
+const TypeInfo *TypeConverter::convertBuiltinNativeObject() {
+  return new BuiltinNativeObjectTypeInfo(IGM.RefCountedPtrTy,
                                       IGM.getPointerSize(),
                                       IGM.getHeapObjectSpareBits(),
                                       IGM.getPointerAlignment());

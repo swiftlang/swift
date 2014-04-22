@@ -289,8 +289,8 @@ static InlineCost instructionInlineCost(SILInstruction &I,
     case ValueKind::AddressToPointerInst:
     case ValueKind::PointerToAddressInst:
 
-    case ValueKind::ObjectPointerToRefInst:
-    case ValueKind::RefToObjectPointerInst:
+    case ValueKind::NativeObjectToRefInst:
+    case ValueKind::RefToNativeObjectInst:
 
     case ValueKind::RawPointerToRefInst:
     case ValueKind::RefToRawPointerInst:

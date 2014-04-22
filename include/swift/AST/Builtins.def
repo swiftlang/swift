@@ -165,11 +165,11 @@ BUILTIN_SIL_OPERATION(Assign, "assign", Special)
 /// Init has type (T, Builtin.RawPointer) -> ()
 BUILTIN_SIL_OPERATION(Init, "initialize", Special)
 
-/// CastToObjectPointer has type (T) -> Builtin.ObjectPointer.
-BUILTIN_SIL_OPERATION(CastToObjectPointer, "castToObjectPointer", Special)
+/// CastToNativeObject has type (T) -> Builtin.NativeObject.
+BUILTIN_SIL_OPERATION(CastToNativeObject, "castToNativeObject", Special)
 
-/// CastFromObjectPointer has type (Builtin.ObjectPointer) -> T
-BUILTIN_SIL_OPERATION(CastFromObjectPointer, "castFromObjectPointer", Special)
+/// CastFromNativeObject has type (Builtin.NativeObject) -> T
+BUILTIN_SIL_OPERATION(CastFromNativeObject, "castFromNativeObject", Special)
 
 /// BridgeToRawPointer has type (T) -> Builtin.RawPointer
 BUILTIN_SIL_OPERATION(BridgeToRawPointer, "bridgeToRawPointer", Special)

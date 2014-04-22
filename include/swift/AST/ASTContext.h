@@ -454,8 +454,8 @@ public:
   // Builtin type and simple types that are used frequently.
   const CanType TheErrorType;       /// TheErrorType - This is the error singleton.
   const CanType TheEmptyTupleType;  /// TheEmptyTupleType - This is "()"
-  const CanType TheObjectPointerType; /// Builtin.ObjectPointer
-  const CanType TheObjCPointerType; /// Builtin.ObjCPointer
+  const CanType TheNativeObjectType; /// Builtin.NativeObject
+  const CanType TheUnknownObjectType; /// Builtin.UnknownObject
   const CanType TheRawPointerType;  /// Builtin.RawPointer
   
   const CanType TheIEEE32Type;     /// TheIEEE32Type  - 32-bit IEEE floating point
