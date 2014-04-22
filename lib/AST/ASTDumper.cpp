@@ -1389,16 +1389,6 @@ public:
     printRec(E->getToConversionFn());
     OS << ')';
   }
-  void visitClassToObjectExpr(ClassToObjectExpr *E) {
-    printCommon(E, "class_to_object") << '\n';
-    printRec(E->getSubExpr());
-    OS << ')';
-  }
-  void visitProtocolToObjectExpr(ProtocolToObjectExpr *E) {
-    printCommon(E, "protocol_to_object") << '\n';
-    printRec(E->getSubExpr());
-    OS << ')';
-  }
   void visitInjectIntoOptionalExpr(InjectIntoOptionalExpr *E) {
     printCommon(E, "inject_into_optional") << '\n';
     printRec(E->getSubExpr());

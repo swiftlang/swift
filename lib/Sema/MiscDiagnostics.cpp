@@ -169,8 +169,6 @@ static void diagModuleOrMetatypeValue(TypeChecker &TC, const Expr *E) {
             Diagnose = Diagnostic::TypeOfMetatypeValue;
             break;
               
-          case ExprKind::ClassToObject:
-          case ExprKind::ProtocolToObject:
           case ExprKind::LValueConversion:
           case ExprKind::InOutConversion:
           case ExprKind::IntegerLiteral:
