@@ -42,13 +42,3 @@ endif()
 target_link_libraries(swift_runtime
   "-framework Foundation")
 
-if (EXISTS "${MODULES_SDK}/../MacOSX10.10.Internal.sdk/usr/local/lib/libCrashReporterClient.a")
-    target_link_libraries(swift_runtime
-      "-lCrashReporterClient")
-elseif (EXISTS "${MODULES_SDK}/../iPhoneOS8.0.Internal.sdk/usr/local/lib/libCrashReporterClient.a")
-    target_link_libraries(swift_runtime
-      "-lCrashReporterClient")
-elseif (EXISTS "${MODULES_SDK}/../iPhoneSimulator8.0.sdk/usr/local/lib/libCrashReporterClient.a")
-    target_link_libraries(swift_runtime
-      "-lCrashReporterClient")
-endif()
