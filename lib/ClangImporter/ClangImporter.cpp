@@ -130,6 +130,8 @@ static void configureDefaultCPU(const llvm::Triple &triple,
     args.push_back("cyclone");
     args.push_back("-target-feature");
     args.push_back("+neon");
+    args.push_back("-target-abi");
+    args.push_back("darwinpcs");
   }
 }
 
