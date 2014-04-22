@@ -158,9 +158,6 @@ const ExtraInhabitantsValueWitnessTable swift::_TWVMBo =
 // This section can reasonably be suppressed in builds that don't
 // need to support Objective-C.
 
-// ObjC runtime entrypoints.
-extern "C" const void *object_getClass(void *);
-
 /// A function to get the Swift type metadata wrapper for an ObjC object's
 /// dynamic type.
 
@@ -172,7 +169,7 @@ const Metadata *swift::swift_objcTypeof(OpaqueValue *src, const Metadata *self)
 
 const Metadata *swift::swift_unknownTypeOf(HeapObject *object)
 {
-  auto theClass = object_getClass(object);
+  auto theClass = object_getClass(reinterpret_cast<id>(object));
   auto classAsMetadata = reinterpret_cast<const ClassMetadata*>(theClass);
   if (classAsMetadata->isTypeMetadata()) return classAsMetadata;
   

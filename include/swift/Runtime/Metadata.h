@@ -22,6 +22,7 @@
 #include <cstdint>
 #include <type_traits>
 #include <utility>
+#include <objc/runtime.h>
 #include "swift/ABI/MetadataValues.h"
 #include "swift/ABI/System.h"
 
@@ -988,7 +989,32 @@ struct HeapArrayMetadata : public HeapMetadata {
 /// is used as a type metadata pointer when the actual class isn't
 /// Swift-compiled.
 struct ObjCClassWrapperMetadata : public Metadata {
-  const ClassMetadata *Class;
+private:
+  // This field is not a pointer on some platforms.
+  uintptr_t isa;
+
+public:
+  Class getObjCClass() const {
+    return object_getClass((id)&isa);
+  }
+
+  const ClassMetadata *getClass() const {
+    Class cls = getObjCClass();
+    return reinterpret_cast<const ClassMetadata *>(cls);
+  }
+
+  const ClassMetadata *getSuperclass() const {
+    Class supercls = class_getSuperclass(getObjCClass());
+    return reinterpret_cast<const ClassMetadata *>(supercls);
+  }
+
+  const char *getClassName() const {
+    return class_getName(getObjCClass());
+  }
+
+  void setClass(const ClassMetadata *cls) {
+    object_setClass((id)&isa, (Class)cls);
+  }
 };
 
 /// The structure of type metadata for structs.
