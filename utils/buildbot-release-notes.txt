@@ -1,6 +1,9 @@
 Latest
 ----------
 
+2014-04-22
+----------
+
 * Loops and switch statements can now carry labels, and you can break/continue
   to those labels.  These use conventional C-style label syntax, and should be
   dedented relative to the code they are in.  An example:
