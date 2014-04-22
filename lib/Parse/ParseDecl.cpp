@@ -1078,10 +1078,8 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
                                   StructureMarkerKind::Declaration);
 
   DeclAttributes Attributes;
-  if (Tok.hasComment()) {
-    Attributes.CommentRange = Tok.getCommentRange();
-    Attributes.setAttr(AK_raw_doc_comment, SourceLoc());
-  }
+  if (Tok.hasComment())
+    Attributes.add(new (Context) RawDocCommentAttr(Tok.getCommentRange()));
   parseDeclAttributeList(Attributes);
 
   // If we see the 'static', 'class' or 'mutating' followed by a declaration

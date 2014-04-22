@@ -1170,11 +1170,7 @@ static void checkAllowedAttributes(const Decl *D) {
 #ifndef NDEBUG
   DeclAttributes attrs = D->getAttrs();
 
-  for (AttrKind AK : {
-#define ATTR(X)
-#define VIRTUAL_ATTR(X) AK_ ## X,
-#include "swift/AST/Attr.def"
-      KINDS... })
+  for (AttrKind AK : std::vector<AttrKind>({ KINDS... }))
     attrs.clearAttribute(AK);
 
   if (attrs.containsTraditionalAttributes()) {
@@ -1284,6 +1280,9 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
   }
   case DAK_override:
     // No need to serialize 'override'.
+    return;
+  case DAK_raw_doc_comment:
+    // Serialized in a separate table.
     return;
   }
 }

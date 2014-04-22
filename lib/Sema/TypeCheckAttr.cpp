@@ -66,6 +66,8 @@ public:
 
   void visitOverrideAttr(OverrideAttr *attr);
 
+  void visitRawDocCommentAttr(RawDocCommentAttr *attr) {}
+
   void visitRequiredAttr(RequiredAttr *attr) {}
 };
 } // end anonymous namespace
@@ -167,6 +169,7 @@ public:
     UNINTERESTING_ATTR(Exported)
     UNINTERESTING_ATTR(ObjC)
     UNINTERESTING_ATTR(Override)
+    UNINTERESTING_ATTR(RawDocComment)
 
 #undef UNINTERESTING_ATTR
 

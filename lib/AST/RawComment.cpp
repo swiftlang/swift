@@ -132,8 +132,8 @@ RawComment Decl::getRawComment() const {
     return RC.getValue();
 
   // Check the declaration itself.
-  if (getAttrs().has(AK_raw_doc_comment)) {
-    RawComment Result = toRawComment(Context, getAttrs().CommentRange);
+  if (auto *Attr = getAttrs().getAttribute<RawDocCommentAttr>()) {
+    RawComment Result = toRawComment(Context, Attr->getCommentRange());
     Context.setRawComment(this, Result);
     return Result;
   }

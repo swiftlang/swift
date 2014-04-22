@@ -153,6 +153,9 @@ void DeclAttribute::print(ASTPrinter &Printer) const {
   case DAK_override:
     // A virtual attribute should be handled elsewhere.
     return;
+  case DAK_raw_doc_comment:
+    // Not printed.
+    return;
   case DAK_required:
     if (isImplicit())
       Printer << "/* @required(inferred) */";

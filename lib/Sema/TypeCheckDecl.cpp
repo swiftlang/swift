@@ -3524,6 +3524,7 @@ public:
     UNINTERESTING_ATTR(ClassProtocol)
     UNINTERESTING_ATTR(Exported)
     UNINTERESTING_ATTR(Override)
+    UNINTERESTING_ATTR(RawDocComment)
     UNINTERESTING_ATTR(Required)
     UNINTERESTING_ATTR(NSCopying)
 

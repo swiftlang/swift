@@ -38,10 +38,6 @@
 #define IB_ATTR(X) ATTR(X)
 #endif
 
-#ifndef VIRTUAL_ATTR
-#define VIRTUAL_ATTR(X) ATTR(X)
-#endif
-
 // Type attributes
 TYPE_ATTR(auto_closure)
 TYPE_ATTR(cc)
@@ -144,6 +140,10 @@ VIRTUAL_DECL_ATTR(override, Override,
                   OnFunc | OnVar | OnSubscript,
                   /* Not serialized */ 65535)
 
+VIRTUAL_DECL_ATTR(raw_doc_comment, RawDocComment,
+                  OnAnyDecl,
+                  /* Not serialized */ 65535)
+
 SIMPLE_DECL_ATTR(required, Required, OnConstructor, 4)
 
 ATTR(conversion)
@@ -157,10 +157,6 @@ ATTR(unowned)
 ATTR(weak)
 ATTR(requires_stored_property_inits)
 
-// "Virtual" attributes can not be spelled in the source code.
-VIRTUAL_ATTR(raw_doc_comment)
-
-#undef VIRTUAL_ATTR
 #undef IB_ATTR
 #undef VIRTUAL_DECL_ATTR
 #undef SIMPLE_DECL_ATTR

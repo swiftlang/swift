@@ -320,6 +320,10 @@ protected:
     OnConstructor = 1 << 13,
     OnDestructor = 1 << 14,
     OnImport = 1 << 15,
+    OnAnyDecl = OnFunc | OnExtension | OnPatternBinding | OnOperator |
+                OnTypeAlias | OnType | OnStruct | OnEnum | OnClass |
+                OnProtocol | OnVar | OnSubscript | OnConstructor |
+                OnDestructor | OnImport,
     AllowMultipleAttributes = 1 << 16
   };
 
@@ -668,6 +672,25 @@ public:
   }
 };
 
+/// Defines the attribute that we use to model documentation comments.
+class RawDocCommentAttr : public DeclAttribute {
+  /// Source range of the attached comment.  This comment is located before
+  /// the declaration.
+  CharSourceRange CommentRange;
+
+public:
+  RawDocCommentAttr(CharSourceRange CommentRange)
+      : DeclAttribute(DAK_raw_doc_comment, SourceLoc(), SourceRange(),
+                      /*Implicit=*/false),
+        CommentRange(CommentRange) {}
+
+  CharSourceRange getCommentRange() const { return CommentRange; }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_raw_doc_comment;
+  }
+};
+
 /// \brief Attributes that may be applied to declarations.
 class DeclAttributes {
   /// Source locations for every possible attribute that can be parsed in
@@ -676,7 +699,6 @@ class DeclAttributes {
   bool HasAttr[AK_Count] = { false };
 
   unsigned NumAttrsSet : 8;
-  unsigned NumVirtualAttrsSet : 8;
 
   /// Linked list of declaration attributes.
   DeclAttribute *DeclAttrs;
@@ -697,12 +719,7 @@ public:
   /// Clients should generally use the getMutating() accessor.
   bool MutatingInverted = false;
 
-  /// Source range of the attached comment.  This comment is located before
-  /// the declaration.
-  CharSourceRange CommentRange;
-
-  DeclAttributes() : NumAttrsSet(0), NumVirtualAttrsSet(0),
-                     DeclAttrs(nullptr) {}
+  DeclAttributes() : NumAttrsSet(0), DeclAttrs(nullptr) {}
 
   bool shouldSaveInAST() const {
     return AtLoc.isValid() || NumAttrsSet != 0 || DeclAttrs;
@@ -713,7 +730,7 @@ public:
   }
 
   bool hasNonVirtualAttributes() const {
-    return NumAttrsSet - NumVirtualAttrsSet != 0;
+    return NumAttrsSet != 0;
   }
 
   void clearAttribute(AttrKind A) {
@@ -723,20 +740,9 @@ public:
     AttrLocs[A] = SourceLoc();
     HasAttr[A] = false;
 
-    // Update counters.
     NumAttrsSet--;
-    switch (A) {
-#define ATTR(X)
-#define VIRTUAL_ATTR(X) case AK_ ## X:
-      NumVirtualAttrsSet--;
-      break;
-#include "swift/AST/Attr.def"
-
-    default:
-      break;
-    }
   }
-  
+
   bool has(AttrKind A) const {
     return HasAttr[A];
   }
@@ -761,18 +767,7 @@ public:
     if (HadAttribute)
       return;
 
-    // Update counters.
     NumAttrsSet++;
-    switch (A) {
-#define ATTR(X)
-#define VIRTUAL_ATTR(X) case AK_ ## X:
-#include "swift/AST/Attr.def"
-      NumVirtualAttrsSet++;
-      break;
-
-    default:
-      break;
-    }
   }
 
   void getAttrRanges(SmallVectorImpl<SourceRange> &Ranges) const {
@@ -822,14 +817,10 @@ public:
     if (isUnowned()) return Ownership::Unowned;
     return Ownership::Strong;
   }
-  
+
   void clearOwnership() {
     clearAttribute(AK_weak);
     clearAttribute(AK_unowned);
-  }
-
-  bool hasRawDocComment() const {
-    return CommentRange.isValid();
   }
 
   void print(llvm::raw_ostream &OS) const;
