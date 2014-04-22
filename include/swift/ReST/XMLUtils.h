@@ -46,6 +46,30 @@ static inline void appendWithXMLEscaping(raw_ostream &OS, StringRef S) {
   }
 }
 
+// FIXME: copied from Clang's
+// CommentASTToXMLConverter::appendToResultWithCDATAEscaping
+static inline void appendWithCDATAEscaping(raw_ostream &OS, StringRef S) {
+  if (S.empty())
+    return;
+
+  OS << "<![CDATA[";
+  while (!S.empty()) {
+    size_t Pos = S.find("]]>");
+    if (Pos == 0) {
+      OS << "]]]]><![CDATA[>";
+      S = S.drop_front(3);
+      continue;
+    }
+    if (Pos == StringRef::npos)
+      Pos = S.size();
+
+    OS << S.substr(0, Pos);
+
+    S = S.drop_front(Pos);
+  }
+  OS << "]]>";
+}
+
 } // namespace rest
 } // namespace llvm
 

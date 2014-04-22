@@ -37,6 +37,12 @@ struct CommentToXMLConverter {
 
   CommentToXMLConverter(raw_ostream &OS) : OS(OS) {}
 
+  void printRawHTML(StringRef Tag) {
+    OS << "<rawHTML isSafeToPassThrough=\"1\">";
+    appendWithCDATAEscaping(OS, Tag);
+    OS << "</rawHTML>";
+  }
+
   void printASTNode(const ReSTASTNode *N) {
     switch (N->getKind()) {
     case ASTNodeKind::Document:
@@ -82,72 +88,82 @@ struct CommentToXMLConverter {
   }
 
   void printParagraph(const Paragraph *P) {
-    OS << "<Para>";
     printTextAndInline(P->getContent());
-    OS << "</Para>";
   }
 
   void printBulletList(const BulletList *BL) {
-    // FIXME: print block markup.
+    printRawHTML("<ul>");
     for (unsigned i = 0, e = BL->getNumItems(); i != e; ++i) {
+      printRawHTML("<li>");
       for (const auto *N : BL->getItemChildren(i)) {
         printASTNode(N);
       }
+      printRawHTML("</li>");
     }
+    printRawHTML("</ul>");
   }
 
   void printEnumeratedList(const EnumeratedList *EL) {
-    // FIXME: print block markup.
+    printRawHTML("<ol>");
     for (unsigned i = 0, e = EL->getNumItems(); i != e; ++i) {
+      printRawHTML("<li>");
       for (const auto *N : EL->getItemChildren(i)) {
         printASTNode(N);
       }
+      printRawHTML("</li>");
     }
+    printRawHTML("</ol>");
   }
 
   void printDefinitionListItem(const DefinitionListItem *DLI) {
-    // FIXME: print real block markup.
-    OS << "<Para>";
+    printRawHTML("<dt>");
     printASTNode(DLI->getTerm());
-    OS << "</Para>";
+    printRawHTML("</dt>");
     for (const auto *N : DLI->getClassifiers()) {
       printASTNode(N);
     }
 
+    printRawHTML("<dd>");
     for (const auto *N : DLI->getDefinitionChildren()) {
       printASTNode(N);
     }
+    printRawHTML("</dd>");
   }
 
   void printDefinitionList(const DefinitionList *DL) {
-    // FIXME: print block markup.
+    printRawHTML("<dl>");
     for (const auto *N : DL->getChildren()) {
       printASTNode(N);
     }
+    printRawHTML("</dl>");
   }
 
   void printField(const Field *F) {
-    // FIXME: print real block markup.
-    OS << "<Para>";
+    printRawHTML("<dt>");
     printASTNode(F->getName());
-    OS << "</Para>";
+    printRawHTML("</dt>");
+
+    printRawHTML("<dd>");
     for (const auto *N : F->getBodyChildren()) {
       printASTNode(N);
     }
+    printRawHTML("</dd>");
   }
 
   void printFieldList(const FieldList *FL) {
-    // FIXME: print block markup.
+    printRawHTML("<dl>");
     for (const auto *F : FL->getChildren()) {
       printASTNode(F);
     }
+    printRawHTML("</dl>");
   }
 
   void printBlockQuote(const BlockQuote *BQ) {
-    // FIXME: print block markup.
+    printRawHTML("<blockquote>");
     for (const auto *N : BQ->getChildren()) {
       printASTNode(N);
     }
+    printRawHTML("</blockquote>");
   }
 
   void printTextAndInline(const TextAndInline *T) {
@@ -165,8 +181,9 @@ struct CommentToXMLConverter {
   }
 
   void printOrphanField(const Field *F) {
-    // FIXME: print block markup.
+    printRawHTML("<dl>");
     printField(F);
+    printRawHTML("</dl>");
   }
 
   void printAsParameter(const Field *F) {
@@ -175,7 +192,9 @@ struct CommentToXMLConverter {
     OS << "x";
     OS << "</Name><Direction isExplicit=\"0\">in</Direction><Discussion>";
     for (const auto *N : F->getBodyChildren()) {
+      OS << "<Para>";
       printASTNode(N);
+      OS << "</Para>";
     }
     OS << "</Discussion></Parameter>";
   }
@@ -247,18 +266,23 @@ void CommentToXMLConverter::visitFullComment(const FullComment *FC) {
   // FIXME: <Declaration>
   if (Parts.Brief) {
     OS << "<Abstract>";
+    OS << "<Para>";
     printASTNode(Parts.Brief);
+    OS << "</Para>";
     OS << "</Abstract>";
   }
 
   if (!Parts.MiscTopLevelNodes.empty()) {
     OS << "<Discussion>";
     for (const auto *N : Parts.MiscTopLevelNodes) {
+      OS << "<Para>";
       if (const auto *F = dyn_cast<Field>(N)) {
         printOrphanField(F);
+        OS << "</Para>";
         continue;
       }
       printASTNode(N);
+      OS << "</Para>";
     }
     OS << "</Discussion>";
   }
@@ -273,7 +297,9 @@ void CommentToXMLConverter::visitFullComment(const FullComment *FC) {
   if (!Parts.Returns.empty()) {
     OS << "<ResultDiscussion>";
     for (const auto *N : Parts.Returns) {
+      OS << "<Para>";
       printAsReturns(N);
+      OS << "</Para>";
     }
     OS << "</ResultDiscussion>";
   }
@@ -445,6 +471,7 @@ struct CommentToDoxygenConverter {
     print("<dt>");
     printASTNode(F->getName());
     print("</dt>");
+
     print("<dd>");
     for (const auto *N : F->getBodyChildren()) {
       printASTNode(N);

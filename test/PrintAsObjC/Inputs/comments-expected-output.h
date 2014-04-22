@@ -144,9 +144,7 @@ SWIFT_CLASS("_TtC8comments14A240_FieldList")
 /// Bbb.</p></dd></dl>
 - (void)f0;
 
-/// <ul><li><p>Aaa.</p><dl><dt>param</dt><dd><p>Aaa.
-/// :returns: Bbb.
-/// :unknown: Ccc.</p></dd></dl></li></ul>
+/// <ul><li><p>Aaa.</p><dl><dt>param</dt><dd><p>Aaa.</p></dd><dt>returns</dt><dd><p>Bbb.</p></dd><dt>unknown</dt><dd><p>Ccc.</p></dd></dl></li></ul>
 - (void)f1;
 - (instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
