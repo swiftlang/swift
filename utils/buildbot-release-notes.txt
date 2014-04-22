@@ -31,6 +31,10 @@ Latest
   
   This error will be removed in a week or two.
 
+* Cocoa methods and properties that are annotated with the
+  NS_RETURNS_INNER_POINTER attribute, including -[NSData bytes] and
+  -[{NS,UI}Color CGColor], are now safe to use and follow the same lifetime
+  extension semantics as ARC.
 
 2014-04-18
 ----------
