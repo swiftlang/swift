@@ -1504,7 +1504,36 @@ static ManagedValue emitApply(SILGenFunction &gen,
         gen.emitTemporaryAllocation(loc, actualResultType.getObjectType());
     }
   }
-
+  
+  // If the function returns an inner pointer, we'll need to lifetime-extend
+  // the 'self' parameter.
+  SILValue lifetimeExtendedSelf;
+  if (substFnType->getInterfaceResult().getConvention()
+        == ResultConvention::UnownedInnerPointer) {
+    lifetimeExtendedSelf = args.back().getValue();
+    
+    switch (substFnType->getInterfaceParameters().back().getConvention()) {
+    case swift::ParameterConvention::Direct_Owned:
+      // If the callee will consume the 'self' parameter, let's retain it so we
+      // can keep it alive.
+      gen.B.emitRetainValueOperation(loc, lifetimeExtendedSelf);
+      break;
+    case swift::ParameterConvention::Direct_Guaranteed:
+    case swift::ParameterConvention::Direct_Unowned:
+      // We'll manually manage the argument's lifetime after the call. Disable
+      // its cleanup.
+      args.back().forwardCleanup(gen);
+      break;
+        
+    case swift::ParameterConvention::Indirect_In:
+    case swift::ParameterConvention::Indirect_Inout:
+    case swift::ParameterConvention::Indirect_Out:
+      // We may need to support this at some point, but currently only imported
+      // objc methods are returns_inner_pointer.
+      llvm_unreachable("indirect self argument to method that returns_inner_pointer?!");
+    }
+  }
+  
   // Emit the raw application.
   SILValue scalarResult = emitRawApply(gen, loc, fn, subs, args,
                                        substFnType, transparent, resultAddr);
@@ -1571,10 +1600,10 @@ static ManagedValue emitApply(SILGenFunction &gen,
       break;
         
     case ResultConvention::UnownedInnerPointer:
-      // We need to lifetime-extend the 'self' parameter to protect the return
-      // value.
-      // TODO
-      gen.SGM.diagnose(loc, diag::not_implemented, "inner pointer lifetime extension");
+      // Autorelease the 'self' value to lifetime-extend it.
+      assert(lifetimeExtendedSelf.isValid()
+             && "did not save lifetime-extended self param");
+      gen.B.createAutoreleaseValue(loc, lifetimeExtendedSelf);
       SWIFT_FALLTHROUGH;
         
     case ResultConvention::Unowned:

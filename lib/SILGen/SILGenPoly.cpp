@@ -712,7 +712,8 @@ static SILValue getThunkResult(SILGenFunction &gen,
       break;
     case ResultConvention::UnownedInnerPointer:
       // FIXME: We can't reasonably lifetime-extend an inner-pointer result
-      // through a thunk.
+      // through a thunk. We don't know which parameter to the thunk was
+      // originally 'self'.
       gen.SGM.diagnose(loc.getSourceLoc(), diag::not_implemented,
                        "reabstraction of returns_inner_pointer function");
       SWIFT_FALLTHROUGH;

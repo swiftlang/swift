@@ -11,6 +11,7 @@
 @property Class<NSAnsing> qualifiedClassProp;
 @end
 
+#define NS_RETURNS_INNER_POINTER __attribute__((objc_returns_inner_pointer))
 #define NS_RETURNS_RETAINED __attribute__((ns_returns_retained))
 #define NS_CONSUMES_SELF __attribute__((ns_consumes_self))
 #define NS_CONSUMED __attribute__((ns_consumed))
@@ -53,6 +54,7 @@ typedef long NSInteger;
 + (void) runce;
 - (void) funge;
 - (void) foo;
+- (void*) getBytes NS_RETURNS_INNER_POINTER;
 @property void (^block)(void);
 @property NSInteger count;
 @end

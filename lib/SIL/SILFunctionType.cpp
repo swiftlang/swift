@@ -347,10 +347,21 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
                            ResultConvention::Unowned);
   } else {
     ResultConvention convention;
+    convention = conventions.getResult(loweredResultType);
     if (substResultTL.isTrivial()) {
-      convention = ResultConvention::Unowned;
-    } else {
-      convention = conventions.getResult(loweredResultType);
+      // Reduce conventions for trivial types to an unowned convention.
+      switch (convention) {
+      case ResultConvention::Unowned:
+      case ResultConvention::UnownedInnerPointer:
+        // Already unowned.
+        break;
+          
+      case ResultConvention::Autoreleased:
+      case ResultConvention::Owned:
+        // These aren't distinguishable from unowned for trivial types.
+        convention = ResultConvention::Unowned;
+        break;
+      }
     }
     result = SILResultInfo(loweredResultType, convention);
   }
@@ -538,8 +549,13 @@ namespace {
     }
 
     ResultConvention getResult(CanType type) const override {
+      assert((!Method->hasAttr<clang::NSReturnsRetainedAttr>()
+              || !Method->hasAttr<clang::ObjCReturnsInnerPointerAttr>())
+             && "cannot be both returns_retained and returns_inner_pointer");
       if (Method->hasAttr<clang::NSReturnsRetainedAttr>())
         return ResultConvention::Owned;
+      if (Method->hasAttr<clang::ObjCReturnsInnerPointerAttr>())
+        return ResultConvention::UnownedInnerPointer;
       return getCResultConvention(Method->getReturnType());
     }
   };
