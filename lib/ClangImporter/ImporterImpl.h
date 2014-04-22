@@ -711,6 +711,8 @@ public:
 
   template <typename DeclTy, typename ...Targs>
   DeclTy *createDeclWithClangNode(ClangNode ClangN, Targs &&... Args) {
+    static_assert(alignof(DeclTy) <= alignof(void*),
+                  "adding ClangNode violates alignment");
     assert(ClangN);
     void *Mem = SwiftContext.Allocate(sizeof(DeclTy) + sizeof(void *),
                                       alignof(DeclTy));

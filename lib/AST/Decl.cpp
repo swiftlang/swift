@@ -565,6 +565,8 @@ ImportDecl *ImportDecl::create(ASTContext &Ctx, DeclContext *DC,
                                SourceLoc KindLoc,
                                ArrayRef<AccessPathElement> Path,
                                const clang::Module *ClangMod) {
+  static_assert(alignof(ImportDecl) <= alignof(void*),
+                "adding ClangNode violates alignment");
   assert(!Path.empty());
   assert(Kind == ImportKind::Module || Path.size() > 1);
   size_t Size = sizeof(ImportDecl) + Path.size() * sizeof(AccessPathElement);
@@ -2207,6 +2209,8 @@ FuncDecl *FuncDecl::createImpl(ASTContext &Context,
                                Type Ty, unsigned NumParamPatterns,
                                DeclContext *Parent,
                                ClangNode ClangN) {
+  static_assert(alignof(FuncDecl) <= alignof(void*),
+                "adding ClangNode violates alignment");
   assert(NumParamPatterns > 0);
   size_t Size = sizeof(FuncDecl) + NumParamPatterns * sizeof(Pattern *);
   if (ClangN)
