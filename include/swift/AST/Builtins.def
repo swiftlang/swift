@@ -150,6 +150,9 @@ BUILTIN_BINARY_PREDICATE(FCMP_UNO, "fcmp_uno", "n", FloatOrVector)
 #define BUILTIN_SIL_OPERATION(Id, Name, Overload) BUILTIN(Id, Name, "")
 #endif
 
+/// autorelease: T -> ()
+BUILTIN_SIL_OPERATION(Autorelease, "autorelease", Special)
+
 /// Load has type (Builtin.RawPointer) -> T
 BUILTIN_SIL_OPERATION(Load, "load", Special)
 

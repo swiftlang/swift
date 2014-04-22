@@ -2116,6 +2116,15 @@ namespace {
     CallEmission &operator=(const CallEmission &) = delete;
   };
 
+  static ManagedValue emitBuiltinAutorelease(SILGenFunction &gen,
+                                             SILLocation loc,
+                                             ArrayRef<Substitution> substitutions,
+                                             ArrayRef<ManagedValue> args,
+                                             SGFContext C) {
+    gen.B.createAutoreleaseValue(loc, args[0].forward(gen));
+    return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));    
+  }
+  
   /// Specialized emitter for Builtin.load and Builtin.take.
   static ManagedValue emitBuiltinLoadOrTake(SILGenFunction &gen,
                                             SILLocation loc,
@@ -2138,7 +2147,7 @@ namespace {
     // Perform the load.
     return gen.emitLoad(loc, addr, rvalueTL, C, isTake);
   }
-
+  
   static ManagedValue emitBuiltinLoad(SILGenFunction &gen,
                                       SILLocation loc,
                                       ArrayRef<Substitution> substitutions,

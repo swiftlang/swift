@@ -428,6 +428,19 @@ getGenericParam(ASTContext &Context) {
                          ParamList);
 }
 
+static ValueDecl *getAutoreleaseOperation(ASTContext &Context, Identifier Id) {
+  Type GenericTy;
+  Type ArchetypeTy;
+  GenericParamList *ParamList;
+  std::tie(GenericTy, ArchetypeTy, ParamList) = getGenericParam(Context);
+
+  TupleTypeElt ParamElts[] = { GenericTy };
+  TupleTypeElt BodyElts[] = { ArchetypeTy };
+  Type ResultTy = TupleType::getEmpty(Context);
+  return getBuiltinGenericFunction(Id, ParamElts, BodyElts,
+                                   ResultTy, ResultTy, ParamList);
+}
+
 static ValueDecl *getLoadOperation(ASTContext &Context, Identifier Id) {
   Type GenericTy;
   Type ArchetypeTy;
@@ -1131,11 +1144,15 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 #include "swift/AST/Builtins.def"
     return getCastOperation(Context, Id, BV, Types);
       
+  case BuiltinValueKind::Autorelease:
+    if (!Types.empty()) return nullptr;
+    return getAutoreleaseOperation(Context, Id);
+      
   case BuiltinValueKind::Load:
   case BuiltinValueKind::Take:
     if (!Types.empty()) return nullptr;
     return getLoadOperation(Context, Id);
-
+      
   case BuiltinValueKind::Destroy:
     if (!Types.empty()) return nullptr;
     return getDestroyOperation(Context, Id);
