@@ -215,6 +215,8 @@ namespace {
     RValue visitInjectIntoOptionalExpr(InjectIntoOptionalExpr *E, SGFContext C);
     RValue visitLValueConversionExpr(LValueConversionExpr *E, SGFContext C);
     RValue visitLValueToPointerExpr(LValueToPointerExpr *E, SGFContext C);
+    RValue visitClassToObjectExpr(ClassToObjectExpr *E, SGFContext C);
+    RValue visitProtocolToObjectExpr(ProtocolToObjectExpr *E, SGFContext C);
     RValue visitIfExpr(IfExpr *E, SGFContext C);
     
     RValue visitDefaultValueExpr(DefaultValueExpr *E, SGFContext C);
@@ -3793,6 +3795,20 @@ RValue RValueEmitter::visitInOutConversionExpr(InOutConversionExpr *E,
   // subexpression.
   InOutConversionScope scope(SGF);
   return visit(E->getSubExpr());
+}
+
+RValue RValueEmitter::visitClassToObjectExpr(ClassToObjectExpr *E,
+                                             SGFContext C) {
+  SGF.SGM.diagnose(E->getLoc(), diag::not_implemented,
+                   "class to AnyObject conversion");
+  exit(1);
+}
+
+RValue RValueEmitter::visitProtocolToObjectExpr(ProtocolToObjectExpr *E,
+                                                SGFContext C) {
+  SGF.SGM.diagnose(E->getLoc(), diag::not_implemented,
+                   "protocol to ObjectiveC.Protocol conversion");
+  exit(1);
 }
 
 namespace {

@@ -1808,6 +1808,31 @@ public:
   }
 };
   
+/// Convert a class metatype to AnyObject.
+class ClassToObjectExpr : public ImplicitConversionExpr {
+public:
+  ClassToObjectExpr(Expr *subExpr, Type ty)
+    : ImplicitConversionExpr(ExprKind::ClassToObject, subExpr, ty)
+  {}
+  
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::ClassToObject;
+  }
+};
+  
+/// Convert a protocol concrete metatype to the a value of the ObjC Protocol
+/// type.
+class ProtocolToObjectExpr : public ImplicitConversionExpr {
+public:
+  ProtocolToObjectExpr(Expr *subExpr, Type ty)
+    : ImplicitConversionExpr(ExprKind::ProtocolToObject, subExpr, ty)
+  {}
+  
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::ProtocolToObject;
+  }
+};
+  
 /// TupleShuffleExpr - This represents a permutation of a tuple value to a new
 /// tuple type.  The expression's type is known to be a tuple type and the
 /// subexpression is known to have a tuple type as well.
