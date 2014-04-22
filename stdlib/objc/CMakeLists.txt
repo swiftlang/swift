@@ -20,7 +20,7 @@ endif()
 
 add_swift_library(swiftObjectiveC INSTALL
   ${SWIFTOBJC_SOURCES}
-  DEPENDS swift_stdlib_core)
+  DEPENDS swift_stdlib_core swiftDarwin)
 
 add_subdirectory(Darwin)
 add_subdirectory(CoreGraphics)
