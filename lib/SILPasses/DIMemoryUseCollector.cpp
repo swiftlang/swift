@@ -879,6 +879,16 @@ static bool isSuperInitUse(UpcastInst *Inst) {
 
     if (LocExpr->getArg()->isSuperExpr())
       return true;
+
+    // Instead of super_ref_expr, we can also get this for inherited delegating
+    // initializers:
+
+    // (derived_to_base_expr implicit type='C'
+    //   (declref_expr type='D' decl='self'))
+    if (auto *DTB = dyn_cast<DerivedToBaseExpr>(LocExpr->getArg()))
+      if (auto *DRE = dyn_cast<DeclRefExpr>(DTB->getSubExpr()))
+        return DRE->getDecl()->isImplicit() &&
+               DRE->getDecl()->getName().str() == "self";
   }
 
   return false;
@@ -1012,7 +1022,14 @@ void ElementUseCollector::collectDelegatingClassInitSelfUses() {
         // call in a delegating initializer.
         if (isa<ApplyInst>(User) && isSelfInitUse(cast<ApplyInst>(User)))
           Kind = DIUseKind::SelfInit;
-        
+
+        // If this is an upcast instruction, it is a conversion of self to the
+        // base.  This is either part of a super.init sequence, or a general
+        // superclass access.
+        if (auto *UCI = dyn_cast<UpcastInst>(User))
+          if (isSuperInitUse(UCI))
+            Kind = DIUseKind::SuperInit;
+
         Uses.push_back(DIMemoryUse(User, Kind, 0, 1));
       }
       continue;
