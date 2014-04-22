@@ -701,24 +701,26 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
     P->setType(type);
     
     // If we are inferring a variable to have type AnyObject, AnyObject.Type,
-    // "()", then emit a diagnostic.  In the first 2 cases, the coder
-    // probably forgot a cast and expected a concrete type.  In the later case,
-    // they probably didn't mean to bind to a variable, or there is some
+    // "()", or optional thereof, emit a diagnostic.  In the first 2 cases, the
+    // coder probably forgot a cast and expected a concrete type.  In the later
+    // case, they probably didn't mean to bind to a variable, or there is some
     // other bug.  We always tell them that they can silence the warning with an
     // explicit type annotation (and provide a fixit) as a note.
+    Type diagTy = type->getAnyOptionalObjectType();
+    if (!diagTy) diagTy = type;
+    
     bool shouldRequireType = false;
-    if (type->getCanonicalType() == Context.TheEmptyTupleType)
+    if (diagTy->getCanonicalType() == Context.TheEmptyTupleType)
       shouldRequireType = true;
-    else if (auto protoTy = type->getAs<ProtocolType>()) {
+    else if (auto protoTy = diagTy->getAs<ProtocolType>()) {
       shouldRequireType =
         protoTy->getDecl()->isSpecificProtocol(KnownProtocolKind::AnyObject);
-    } else if (auto MTT = type->getAs<AnyMetatypeType>()) {
+    } else if (auto MTT = diagTy->getAs<AnyMetatypeType>()) {
       if (auto protoTy = MTT->getInstanceType()->getAs<ProtocolType>()) {
         shouldRequireType =
           protoTy->getDecl()->isSpecificProtocol(KnownProtocolKind::AnyObject);
       }
     }
-
     
     if (shouldRequireType && !(options & TR_FromNonInferredPattern)) {
       diagnose(NP->getLoc(), diag::type_inferred_to_undesirable_type,
