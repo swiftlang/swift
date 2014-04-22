@@ -1464,23 +1464,16 @@ public:
 
   void visitMetatypeExpr(MetatypeExpr *E) {
     printCommon(E, "metatype_expr");
-    if (Expr *base = E->getBase()) {
-      OS << '\n';
-      printRec(base);
-    } else if (TypeRepr *tyR = E->getBaseTypeRepr()) {
-      OS << '\n';
-      printRec(tyR);
-    } else {
-      OS << " baseless";
-    }
-    OS << ")";
+    OS << '\n';
+    printRec(E->getBase());
+    OS << ')';
   }
 
   void visitOpaqueValueExpr(OpaqueValueExpr *E) {
     printCommon(E, "opaque_value_expr") << " @ " << (void*)E;
     if (E->isUniquelyReferenced())
       OS << " unique";
-    OS << ")";
+    OS << ')';
   }
 
   void printApplyExpr(ApplyExpr *E, const char *NodeName) {

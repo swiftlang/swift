@@ -1102,11 +1102,8 @@ struct ASTNodeBase {};
         abort();
       }
 
-      if (E->getBase()) {
-        checkSameType(E->getBase()->getType(), metatype->getInstanceType(),
-                      "base type of .Type expression");
-      }
-
+      checkSameType(E->getBase()->getType(), metatype->getInstanceType(),
+                    "base type of .Type expression");
       verifyCheckedBase(E);
     }
 
@@ -1177,6 +1174,11 @@ struct ASTNodeBase {};
     }
 
     void verifyChecked(TypeExpr *expr) {
+      if (!expr->getType()->getAs<AnyMetatypeType>()) {
+        Out << "TypeExpr must have metatype type\n";
+        abort();
+      }
+
       verifyCheckedBase(expr);
     }
 

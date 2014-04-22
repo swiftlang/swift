@@ -381,8 +381,8 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
   if (AllMemberRefs) {
     Expr *BaseExpr;
     if (auto NTD = dyn_cast<NominalTypeDecl>(Base)) {
-      Type BaseTy = MetatypeType::get(NTD->getDeclaredTypeInContext());
-      BaseExpr = new (TC.Context) MetatypeExpr(nullptr, Loc, BaseTy);
+      Type Ty = NTD->getDeclaredTypeInContext();
+      BaseExpr = TypeExpr::createForIdentifier(Loc, Name, Ty, TC.Context);
     } else {
       BaseExpr = new (TC.Context) DeclRefExpr(Base, Loc, /*implicit=*/true);
     }
@@ -443,9 +443,8 @@ namespace {
         return { true, expr };
       }
 
-      if (auto unresolved = dyn_cast<UnresolvedDeclRefExpr>(expr)) {
+      if (auto unresolved = dyn_cast<UnresolvedDeclRefExpr>(expr))
         return { true, BindName(unresolved, DC, TC) };
-      }
 
       return { true, expr };
     }

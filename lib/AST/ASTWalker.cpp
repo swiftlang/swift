@@ -77,7 +77,14 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   Expr *visitErrorExpr(ErrorExpr *E) { return E; }
   Expr *visitLiteralExpr(LiteralExpr *E) { return E; }
   Expr *visitDiscardAssignmentExpr(DiscardAssignmentExpr *E) { return E; }
-  Expr *visitTypeExpr(TypeExpr *E) { return E; }
+  Expr *visitTypeExpr(TypeExpr *E) {
+    if (!E->isImplicit())
+      if (TypeRepr *tyR = E->getTypeRepr())
+        if (doIt(tyR))
+          return nullptr;
+
+    return E;
+  }
   Expr *visitSuperRefExpr(SuperRefExpr *E) { return E; }
   Expr *visitOtherConstructorDeclRefExpr(OtherConstructorDeclRefExpr *E) {
     return E;
@@ -333,17 +340,11 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   Expr *visitMetatypeExpr(MetatypeExpr *E) {
-    if (Expr *base = E->getBase()) {
-      if ((base = doIt(base)))
-        E->setBase(base);
-      else
-        return nullptr;
-    }
-
-    if (TypeRepr *tyR = E->getBaseTypeRepr()) {
-      if (doIt(tyR))
-        return nullptr;
-    }
+    Expr *base = E->getBase();
+    if ((base = doIt(base)))
+      E->setBase(base);
+    else
+      return nullptr;
 
     return E;
   }

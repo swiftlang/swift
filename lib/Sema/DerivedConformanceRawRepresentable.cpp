@@ -228,7 +228,6 @@ deriveBodyRawRepresentable_frowRaw(AbstractFunctionDecl *fromRawDecl) {
 
   ASTContext &C = enumDecl->getASTContext();
   Type enumType = enumDecl->getDeclaredTypeInContext();
-  Type enumMetaType = MetatypeType::get(enumType);
 
   SmallVector<CaseStmt*, 4> cases;
   for (auto elt : enumDecl->getAllElements()) {
@@ -241,7 +240,7 @@ deriveBodyRawRepresentable_frowRaw(AbstractFunctionDecl *fromRawDecl) {
       CaseLabelItem(/*IsDefault=*/false, litPat, SourceLoc(), nullptr);
 
     auto eltRef = new (C) DeclRefExpr(elt, SourceLoc(), /*implicit*/true);
-    auto metaTyRef = new (C) MetatypeExpr(nullptr, SourceLoc(), enumMetaType);
+    auto metaTyRef = TypeExpr::createImplicit(enumType, C);
     auto returnExpr = new (C) DotSyntaxCallExpr(eltRef, SourceLoc(), metaTyRef);
     auto returnStmt = new (C) ReturnStmt(SourceLoc(), returnExpr);
 

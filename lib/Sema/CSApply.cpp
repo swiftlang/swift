@@ -389,8 +389,8 @@ namespace {
         auto baseTy = simplifyType(openedFnType->getInput())
                         ->getRValueInstanceType();
 
-        Expr * base = new (ctx) MetatypeExpr(nullptr, loc,
-                                             MetatypeType::get(baseTy));
+        Expr *base = TypeExpr::createForIdentifier(loc, decl->getName(),
+                                                   baseTy, ctx);
 
         return buildMemberRef(base, openedType, SourceLoc(), decl,
                               loc, openedFnType->getResult(),
@@ -1331,9 +1331,9 @@ namespace {
         return nullptr;
 
       // Build a reference to the convertFromStringInterpolation member.
-      auto typeRef = new (tc.Context) MetatypeExpr(
-                                        nullptr, expr->getStartLoc(),
-                                        MetatypeType::get(type));
+      // FIXME: This location info is bogus.
+      auto typeRef = TypeExpr::createImplicitHack(expr->getStartLoc(),
+                                                  type, tc.Context);
       Expr *memberRef = new (tc.Context) MemberRefExpr(typeRef,
                                                        expr->getStartLoc(),
                                                        member,
@@ -1432,8 +1432,7 @@ namespace {
     }
 
     Expr *visitTypeExpr(TypeExpr *expr) {
-      // TypeExprs are only formed when valid.
-      return expr;
+      return simplifyExprType(expr);
     }
 
     Expr *visitOtherConstructorDeclRefExpr(OtherConstructorDeclRefExpr *expr) {
@@ -1599,7 +1598,6 @@ namespace {
       // type of this expression.
       Type baseTy = simplifyType(expr->getType())->getRValueType();
       auto &tc = cs.getTypeChecker();
-      auto baseMetaTy = MetatypeType::get(baseTy);
 
       // Find the selected member.
       auto selected = getOverloadChoice(
@@ -1608,9 +1606,9 @@ namespace {
       auto member = selected.choice.getDecl();
 
       // The base expression is simply the metatype of the base type.
-      auto base = new (tc.Context) MetatypeExpr(nullptr,
-                                                expr->getDotLoc(),
-                                                baseMetaTy);
+      // FIXME: This location info is bogus.
+      auto base = TypeExpr::createImplicitHack(expr->getDotLoc(),
+                                               baseTy, tc.Context);
 
       // Build the member reference.
       auto result = buildMemberRef(base,
@@ -1804,9 +1802,10 @@ namespace {
       // to convert the array literal elements to the element type. It would
       // be nicer to re-use them.
       // FIXME: Cache the name.
-      Expr *typeRef = new (tc.Context) MetatypeExpr(nullptr,
-                                         expr->getLoc(),
-                                         MetatypeType::get(arrayTy));
+
+      // FIXME: This location info is bogus.
+      Expr *typeRef = TypeExpr::createImplicitHack(expr->getLoc(),
+                                                   arrayTy, tc.Context);
       auto name = tc.Context.Id_ConvertFromArrayLiteral;
       auto arg = expr->getSubExpr();
       Expr *result = tc.callWitness(typeRef, dc, arrayProto, conformance,
@@ -1839,10 +1838,9 @@ namespace {
       // to convert the dictionary literal elements to the (key, value) tuple.
       // It would be nicer to re-use them.
       // FIXME: Cache the name.
-      Expr *typeRef = new (tc.Context) MetatypeExpr(
-                                         nullptr,
-                                         expr->getLoc(),
-                                         MetatypeType::get(dictionaryTy));
+      // FIXME: This location info is bogus.
+      Expr *typeRef = TypeExpr::createImplicitHack(expr->getLoc(),
+                                                   dictionaryTy, tc.Context);
       auto name = tc.Context.Id_ConvertFromDictionaryLiteral;
       auto arg = expr->getSubExpr();
       Expr *result = tc.callWitness(typeRef, dc, dictionaryProto,
@@ -1903,7 +1901,9 @@ namespace {
       assert(choice <= InOutConversion::Last_Conversion
              && "inout conversion kinds are not synced with disjunction "
                 "constraint system");
-      
+
+      auto StartLoc = expr->getSubExpr()->getStartLoc();
+
       auto buildInOutConversionExpr = [&](const SelectedOverload &choice,
                                           Type resultTy,
                                           Expr *lvExpr) -> Expr * {
@@ -1913,14 +1913,11 @@ namespace {
         
         // Build up a call to the method.
         auto &C = cs.getASTContext();
-        auto resultMeta = new (C) MetatypeExpr(nullptr,
-                                             expr->getSubExpr()->getStartLoc(),
-                                             MetatypeType::get(resultTy));
+        // FIXME: Bogus location info.
+        auto resultMeta = TypeExpr::createImplicitHack(StartLoc, resultTy, C);
         auto memberRef = buildMemberRef(resultMeta, choice.openedFullType,
-                                    expr->getSubExpr()->getStartLoc(),
-                                    choice.choice.getDecl(),
-                                    expr->getSubExpr()->getStartLoc(),
-                                    choice.openedType,
+                                    StartLoc, choice.choice.getDecl(),
+                                    StartLoc, choice.openedType,
                                     ConstraintLocatorBuilder(locator),
                                     /*implicit*/ true,
                                     /*directPropertyAccess*/ false);
@@ -1972,26 +1969,20 @@ namespace {
         
         // Build the LValueConversion through the get/set pair.
         auto &C = cs.getASTContext();
-        auto resultMeta = new (C) MetatypeExpr(nullptr,
-                                             expr->getSubExpr()->getStartLoc(),
-                                             MetatypeType::get(resultTy));
-        Expr *getMemberRef = buildMemberRef(resultMeta, getChoice.openedFullType,
-                                           expr->getSubExpr()->getStartLoc(),
-                                           getChoice.choice.getDecl(),
-                                           expr->getSubExpr()->getStartLoc(),
-                                           getChoice.openedType,
+        // FIXME: Bogus location info.
+        auto resultMeta = TypeExpr::createImplicitHack(StartLoc, resultTy, C);
+        Expr *getMemberRef =buildMemberRef(resultMeta, getChoice.openedFullType,
+                                           StartLoc, getChoice.choice.getDecl(),
+                                           StartLoc, getChoice.openedType,
                                            ConstraintLocatorBuilder(locator),
                                            /*implicit*/ true,
                                            /*directPropertyAccess*/ false);
         auto writebackTy = getMemberRef->getType()
-          ->castTo<AnyFunctionType>()
-          ->getResult();
+          ->castTo<AnyFunctionType>()->getResult();
         
-        Expr *setMemberRef = buildMemberRef(resultMeta, setChoice.openedFullType,
-                                           expr->getSubExpr()->getStartLoc(),
-                                           setChoice.choice.getDecl(),
-                                           expr->getSubExpr()->getStartLoc(),
-                                           setChoice.openedType,
+        Expr *setMemberRef =buildMemberRef(resultMeta, setChoice.openedFullType,
+                                           StartLoc, setChoice.choice.getDecl(),
+                                           StartLoc, setChoice.openedType,
                                            ConstraintLocatorBuilder(locator),
                                            /*implicit*/ true,
                                            /*directPropertyAccess*/ false);
@@ -2086,8 +2077,7 @@ namespace {
         
         Expr *ctor = tc.buildRefExpr(selected.choice.getDecl(), dc,
                                      SourceLoc(), /*implicit*/ true);
-        Expr *metaty = new (tc.Context) MetatypeExpr(nullptr, SourceLoc(),
-                               MetatypeType::get(baseElementType));
+        Expr *metaty = TypeExpr::createImplicit(baseElementType, tc.Context);
         Expr *applyExpr = new(tc.Context) ConstructorRefCallExpr(ctor, metaty);
         if (tc.typeCheckExpression(applyExpr, dc, Type(), /*discarded*/ false))
           llvm_unreachable("should not fail");
@@ -2101,11 +2091,10 @@ namespace {
     Expr *visitMetatypeExpr(MetatypeExpr *expr) {
       auto &tc = cs.getTypeChecker();
 
-      if (Expr *base = expr->getBase()) {
-        base = tc.coerceToRValue(base);
-        if (!base) return nullptr;
-        expr->setBase(base);
-      }
+      Expr *base = expr->getBase();
+      base = tc.coerceToRValue(base);
+      if (!base) return nullptr;
+      expr->setBase(base);
 
       return simplifyExprType(expr);
     }
@@ -3114,10 +3103,9 @@ Expr *ExprRewriter::coerceViaUserConversion(Expr *expr, Type toType,
   // Form a reference to the constructor.
 
   // Form a reference to the constructor or enum declaration.
-  Expr *typeBase = new (tc.Context) MetatypeExpr(
-                                      nullptr,
-                                      expr->getStartLoc(),
-                                      MetatypeType::get(toType));
+  // FIXME: Bogus location info.
+  Expr *typeBase = TypeExpr::createImplicitHack(expr->getStartLoc(), toType,
+                                                 tc.Context);
   Expr *declRef = buildMemberRef(typeBase,
                                  selected.openedFullType,
                                  expr->getStartLoc(),
@@ -3545,8 +3533,9 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
     literal->setType(argType);
 
     // Call the builtin conversion operation.
-    Expr *base = new (tc.Context) MetatypeExpr(nullptr, literal->getLoc(),
-                                               MetatypeType::get(type));
+    // FIXME: Bogus location info.
+    Expr *base = TypeExpr::createImplicitHack(literal->getLoc(), type,
+                                              tc.Context);
     Expr *result = tc.callWitness(base, dc,
                                   builtinProtocol, builtinConformance,
                                   builtinLiteralFuncName,
@@ -3587,8 +3576,9 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
     return nullptr;
 
   // Convert the resulting expression to the final literal type.
-  Expr *base = new (tc.Context) MetatypeExpr(nullptr, literal->getLoc(),
-                                             MetatypeType::get(type));
+  // FIXME: Bogus location info.
+  Expr *base = TypeExpr::createImplicitHack(literal->getLoc(), type,
+                                            tc.Context);
   literal = tc.callWitness(base, dc,
                            protocol, conformance, literalFuncName,
                            literal, brokenProtocolDiag);
@@ -3789,9 +3779,12 @@ Expr *ConstraintSystem::applySolution(const Solution &solution,
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
       // For a default-value expression, do nothing.
-      if (isa<DefaultValueExpr>(expr)) {
+      if (isa<DefaultValueExpr>(expr))
         return { false, expr };
-      }
+
+      // Don't recurse into type expressions that have a specified type.
+      if (isa<TypeExpr>(expr))
+        return { false, expr };
 
       // For closures, update the parameter types and check the body.
       if (auto closure = dyn_cast<ClosureExpr>(expr)) {
@@ -3834,12 +3827,6 @@ Expr *ConstraintSystem::applySolution(const Solution &solution,
         // Compute the capture list, now that we have type-checked the body.
         tc.computeCaptures(closure);
         return { false, closure };
-      }
-
-      // Don't recurse into metatype expressions that have a specified type.
-      if (auto metatypeExpr = dyn_cast<MetatypeExpr>(expr)) {
-        if (metatypeExpr->getBaseTypeRepr())
-          return { false, expr };
       }
 
       // Track whether we're in the left-hand side of an assignment...

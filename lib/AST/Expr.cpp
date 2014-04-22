@@ -124,14 +124,14 @@ bool Expr::isStaticallyDerivedMetatype() const {
     expr = expr->getSemanticsProvidingExpr();
 
     // Direct reference to a type.
-    if (auto declRef = dyn_cast<DeclRefExpr>(expr)) {
+    if (auto declRef = dyn_cast<DeclRefExpr>(expr))
       return isa<TypeDecl>(declRef->getDecl());
-    }
+    if (isa<TypeExpr>(expr))
+      return true;
 
     // A "." expression that refers to a member.
-    if (auto memberRef = dyn_cast<MemberRefExpr>(expr)) {
+    if (auto memberRef = dyn_cast<MemberRefExpr>(expr))
       return isa<TypeDecl>(memberRef->getMember().getDecl());
-    }
 
     // When the base of a "." expression is ignored, look at the member.
     if (auto ignoredDot = dyn_cast<DotSyntaxBaseIgnoredExpr>(expr)) {
@@ -141,15 +141,9 @@ bool Expr::isStaticallyDerivedMetatype() const {
 
     // A synthesized metatype.
     if (auto metatype = dyn_cast<MetatypeExpr>(expr)) {
-      // Recurse into the base, if there is one.
-      if (auto base = metatype->getBase()) {
-        expr = base;
-        continue;
-      }
-
-      // Either a reference to a type, or an expression that synthesizes a
-      // metatype from thin air. Either way, it's statically-derived.
-      return true;
+      // Recurse into the base.
+      expr = metatype->getBase();
+      continue;
     }
 
     // Anything else is not statically derived.
@@ -410,8 +404,8 @@ UnresolvedSelectorExpr::UnresolvedSelectorExpr(Expr *subExpr, SourceLoc dotLoc,
   : Expr(ExprKind::UnresolvedSelector, /*implicit*/ false),
     SubExpr(subExpr), DotLoc(dotLoc), Name(name)
 {
-  assert(name.getArgumentNames().size() + 1 == components.size()
-         && "number of component locs does not match number of name components");
+  assert(name.getArgumentNames().size() + 1 == components.size() &&
+         "number of component locs does not match number of name components");
   auto buf = getComponentsBuf();
   std::uninitialized_copy(components.begin(), components.end(),
                           buf.begin());
@@ -421,8 +415,8 @@ UnresolvedSelectorExpr *UnresolvedSelectorExpr::create(ASTContext &C,
              Expr *subExpr, SourceLoc dotLoc,
              DeclName name,
              ArrayRef<ComponentLoc> components) {
-  assert(name.getArgumentNames().size() + 1 == components.size()
-         && "number of component locs does not match number of name components");
+  assert(name.getArgumentNames().size() + 1 == components.size() &&
+         "number of component locs does not match number of name components");
   
   void *buf = C.Allocate(sizeof(UnresolvedSelectorExpr)
                            + (name.getArgumentNames().size() + 1)
@@ -439,25 +433,42 @@ unsigned ScalarToTupleExpr::getScalarField() const {
   return result;
 }
 
-SourceLoc MetatypeExpr::getLoc() const {
-  if (auto tyR = getBaseTypeRepr())
-    return tyR->getStartLoc();
-
-  return MetatypeLoc;
+TypeExpr::TypeExpr(TypeLoc Ty, const ASTContext &C)
+  : Expr(ExprKind::Type, false, MetatypeType::get(Ty.getType(), C)),
+    Info(Ty) {
 }
 
+TypeExpr::TypeExpr(Type Ty, const ASTContext &C)
+  : Expr(ExprKind::Type, /*implicit*/true, MetatypeType::get(Ty, C)),
+    Info(TypeLoc::withoutLoc(Ty)) {
+}
+
+/// Return a TypeExpr for a simple identifier and the specified location.
+TypeExpr *TypeExpr::createForIdentifier(SourceLoc Loc, Identifier Name,
+                                        Type Ty, ASTContext &C) {
+  assert(Loc.isValid());
+  auto *Repr = new (C) SimpleIdentTypeRepr(Loc, Name);
+  Repr->setValue(Ty);
+  return create(TypeLoc(Repr, Ty), C);
+}
+
+// Create an implicit TypeExpr, with location information even though it
+// shouldn't have one.  This is presently used to work around other location
+// processing bugs.  If you have an implicit location, use createImplicit.
+TypeExpr *TypeExpr::createImplicitHack(SourceLoc Loc, Type Ty, ASTContext &C) {
+  // FIXME: This is horrible.
+  if (Loc.isInvalid()) return createImplicit(Ty, C);
+  auto *Res = createForIdentifier(Loc, C.getIdentifier("<<IMPLICIT>>"), Ty, C);
+  Res->setImplicit();
+  return Res;
+}
+
+
 SourceRange MetatypeExpr::getSourceRange() const {
-  if (auto tyR = getBaseTypeRepr())
-    return tyR->getSourceRange();
+  if (MetatypeLoc.isValid())
+    return SourceRange(getBase()->getStartLoc(), MetatypeLoc);
 
-  if (auto base = getBase()) {
-    if (MetatypeLoc.isValid())
-      return SourceRange(base->getStartLoc(), MetatypeLoc);
-
-    return base->getSourceRange();
-  }
-
-  return SourceRange(MetatypeLoc);
+  return getBase()->getSourceRange();
 }
 
 SourceRange UnresolvedMemberExpr::getSourceRange() const { 

@@ -2055,20 +2055,17 @@ RValue RValueEmitter::visitMetatypeExpr(MetatypeExpr *E, SGFContext C) {
   // Evaluate the base if present.
   SILValue metatype;
   
-  if (auto *base = E->getBase()) {
-    // We can get the metatype for an existential or archetype without
-    // materializing it as a +1 value.
-    SGFContext Ctx;
-    if (base->getType()->isAnyExistentialType() ||
-        base->getType()->is<ArchetypeType>())
-      Ctx = SGFContext::AllowPlusZero;
+  auto *base = E->getBase();
 
-    SILValue baseVal = SGF.emitRValueAsSingleValue(base, Ctx).getValue();
-    metatype = SGF.emitMetatypeOfValue(E, baseVal);
-  } else {
-    metatype = SGF.B.createMetatype(E,SGF.getLoweredLoadableType(E->getType()));
-  }
-  
+  // We can get the metatype for an existential or archetype without
+  // materializing it as a +1 value.
+  SGFContext Ctx;
+  if (base->getType()->isAnyExistentialType() ||
+      base->getType()->is<ArchetypeType>())
+    Ctx = SGFContext::AllowPlusZero;
+
+  SILValue baseVal = SGF.emitRValueAsSingleValue(base, Ctx).getValue();
+  metatype = SGF.emitMetatypeOfValue(E, baseVal);
   return RValue(SGF, E, ManagedValue::forUnmanaged(metatype));
 }
 

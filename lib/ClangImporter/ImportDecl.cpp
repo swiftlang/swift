@@ -4176,8 +4176,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
     break;
 
   case ConstantConvertKind::Construction: {
-    auto typeRef = new (context) MetatypeExpr(nullptr, SourceLoc(),
-                                              MetatypeType::get(type));
+    auto typeRef = TypeExpr::createImplicit(type, context);
     expr = new (context) CallExpr(typeRef, expr, /*Implicit=*/true);
     break;
    }

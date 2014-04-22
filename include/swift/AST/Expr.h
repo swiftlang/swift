@@ -227,7 +227,7 @@ protected:
 private:
   /// Ty - This is the type of the expression.
   Type Ty;
-
+ 
 protected:
   Expr(ExprKind Kind, bool Implicit, Type Ty = Type()) : Ty(Ty) {
     ExprBits.Kind = unsigned(Kind);
@@ -697,12 +697,35 @@ public:
 /// MetaTypetype.
 class TypeExpr : public Expr {
   TypeLoc Info;
+  
+  TypeExpr(TypeLoc Ty, const ASTContext &C);
+  TypeExpr(Type Ty, const ASTContext &C);
 public:
+  // Create a TypeExpr with location information.
+  static TypeExpr *create(TypeLoc Ty, ASTContext &C) {
+    return new (C) TypeExpr(Ty, C);
+  }
+  
+  // Create an implicit TypeExpr, which has no location information.
+  static TypeExpr *createImplicit(Type Ty, ASTContext &C) {
+    return new (C) TypeExpr(Ty, C);
+  }
+  
+  // Create an implicit TypeExpr, with location information even though it
+  // shouldn't have one.  This is presently used to work around other location
+  // processing bugs.  If you have an implicit location, use createImplicit.
+  static TypeExpr *createImplicitHack(SourceLoc Loc, Type Ty, ASTContext &C);
 
+  
+  /// Return a TypeExpr for a simple identifier and the specified location.
+  static TypeExpr *createForIdentifier(SourceLoc Loc, Identifier Name,
+                                       Type Ty, ASTContext &C);
+  
   TypeLoc getTypeLoc() const { return Info; }
   TypeRepr *getTypeRepr() const { return Info.getTypeRepr(); }
-  Type getType() const { return Info.getType(); }
-
+  // NOTE: TypeExpr::getType() returns the type of the expr node, which is the
+  // metatype of what is stored as an operand type.
+  
   SourceRange getSourceRange() const { return Info.getSourceRange(); }
 
   static bool classof(const Expr *E) {
@@ -2516,36 +2539,23 @@ public:
   }
 };
   
-/// MetatypeExpr - Produces a metatype value.
+/// MetatypeExpr - "base.dynamicType" - Produces a metatype value.
 ///
-/// The metatype value can come either from a evaluating an expression (then
-/// getting its metatype) or from a type that was parsed in the source and
-/// suffixed with ".Type".  If neither is available, this isn't a parsed form.
+/// The metatype value can comes from a evaluating an expression and then
+/// getting its metatype.
 class MetatypeExpr : public Expr {
-  llvm::PointerUnion<Expr *, TypeRepr *> BaseOrType;
+  Expr *Base;
   SourceLoc MetatypeLoc;
 
 public:
-  explicit MetatypeExpr(Expr *base, SourceLoc metatypeLoc, Type ty)
-    : Expr(ExprKind::Metatype, /*Implicit=*/true, ty),
-      BaseOrType(base), MetatypeLoc(metatypeLoc) { }
+  explicit MetatypeExpr(Expr *Base, SourceLoc MetatypeLoc, Type Ty)
+    : Expr(ExprKind::Metatype, /*Implicit=*/false, Ty),
+      Base(Base), MetatypeLoc(MetatypeLoc) { }
 
-  explicit MetatypeExpr(TypeRepr *tyRepr)
-    : Expr(ExprKind::Metatype, /*Implicit=*/false, Type()),
-      BaseOrType(tyRepr) { }
+  Expr *getBase() const { return Base; }
+  void setBase(Expr *base) { Base = base; }
 
-  Expr *getBase() const {
-    return BaseOrType.dyn_cast<Expr *>();
-  }
-  void setBase(Expr *base) { BaseOrType = base; }
-
-  TypeRepr *getBaseTypeRepr() const {
-    return BaseOrType.dyn_cast<TypeRepr *>();
-  }
-
-  void setBaseTypeErpr(TypeRepr *tyR) { BaseOrType = tyR; }
-
-  SourceLoc getLoc() const;
+  SourceLoc getLoc() const { return MetatypeLoc; }
   SourceLoc getMetatypeLoc() const { return MetatypeLoc; }
 
   SourceRange getSourceRange() const;
@@ -2790,7 +2800,7 @@ public:
   void setRHS(Expr *E) { RHS = E; }
 
   SourceLoc getStartLoc() const {
-    return DotLoc.isValid()? LHS->getStartLoc() : RHS->getStartLoc();
+    return DotLoc.isValid() ? LHS->getStartLoc() : RHS->getStartLoc();
   }
   
   SourceRange getSourceRange() const {

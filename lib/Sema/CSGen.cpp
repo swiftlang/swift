@@ -253,8 +253,15 @@ namespace {
     }
 
     Type visitTypeExpr(TypeExpr *E) {
-      // TypeExpr is only ever built with the right type.
-      return E->getType();
+      // If this is an implicit TypeExpr, don't validate its contents.
+      if (!E->getTypeRepr())
+        return E->getType();
+      
+      auto type = CS.TC.resolveType(E->getTypeRepr(), CS.DC, None);
+      if (!type) return Type();
+      if (type->isAnyExistentialType())
+        return ExistentialMetatypeType::get(type);
+      return MetatypeType::get(type);
     }
 
     Type visitUnresolvedConstructorExpr(UnresolvedConstructorExpr *expr) {
@@ -998,26 +1005,12 @@ namespace {
     }
 
     Type visitMetatypeExpr(MetatypeExpr *expr) {
-      if (auto base = expr->getBase()) {
-        auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr),
-                                        /*options=*/0);
-        CS.addConstraint(ConstraintKind::DynamicTypeOf, tv, base->getType(),
-          CS.getConstraintLocator(expr, ConstraintLocator::RvalueAdjustment));
-        return tv;
-      }
-
-      if (auto baseTyR = expr->getBaseTypeRepr()) {
-        auto type = CS.TC.resolveType(baseTyR, CS.DC, None);
-        if (!type) return Type();
-        if (type->isAnyExistentialType()) {
-          return ExistentialMetatypeType::get(type);
-        } else {
-          return MetatypeType::get(type);
-        }
-      }
-
-      // This is an artificial MetatypeExpr, so it's fully type-checked.
-      return expr->getType();
+      auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr),
+                                      /*options=*/0);
+      CS.addConstraint(ConstraintKind::DynamicTypeOf, tv,
+                       expr->getBase()->getType(),
+           CS.getConstraintLocator(expr, ConstraintLocator::RvalueAdjustment));
+      return tv;
     }
 
     Type visitOpaqueValueExpr(OpaqueValueExpr *expr) {

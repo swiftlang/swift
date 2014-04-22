@@ -40,6 +40,9 @@ private:
 public:
   TypeLoc() {}
   TypeLoc(TypeRepr *TyR) : TyR(TyR) {}
+  TypeLoc(TypeRepr *TyR, Type Ty) : TyR(TyR) {
+    setType(Ty);
+  }
 
   bool wasValidated() const { return TAndValidBit.getInt(); }
   bool isError() const;
