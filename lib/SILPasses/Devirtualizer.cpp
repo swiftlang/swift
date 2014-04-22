@@ -1216,10 +1216,11 @@ void SILDevirtualizer::optimizeApplyInst(ApplyInst *AI) {
   //   %9 = apply %8<Self = CodeUnit?>(%6#1) : ...
   //
   WitnessMethodInst *AMI = dyn_cast<WitnessMethodInst>(AI->getCallee());
-  if (AMI && AMI->getConformance() ) {
+  if (AMI && AMI->getConformance()) {
+    ProtocolConformance *C = AMI->getConformance();
     // Lookup the function reference in the witness tables.
     std::pair<SILWitnessTable *, ArrayRef<Substitution>> Ret =
-      AI->getModule().lookUpWitnessTable(AMI->getConformance());
+      AI->getModule().lookUpWitnessTable(C);
 
     if (!Ret.first)
       return;
@@ -1229,19 +1230,37 @@ void SILDevirtualizer::optimizeApplyInst(ApplyInst *AI) {
       if (Entry.getKind() != SILWitnessTable::WitnessKind::Method)
         continue;
 
-      SILWitnessTable::MethodWitness MethodEntry = Entry.getMethodWitness();
       // Check if this is the member we were looking for.
+      SILWitnessTable::MethodWitness MethodEntry = Entry.getMethodWitness();
       if (MethodEntry.Requirement != AMI->getMember())
         continue;
 
+      // Ok, we found the member we are looking for. Devirtualize away!
       SILBuilder Builder(AI);
       SILLocation Loc = AI->getLoc();
       SILFunction *F = MethodEntry.Witness;
       FunctionRefInst *FRI = Builder.createFunctionRef(Loc, F);
 
-      // Collect the function arguments.
+      // Collect args from the apply inst.
+      ArrayRef<Operand> ApplyArgs = AI->getArgumentOperands();
       SmallVector<SILValue, 4> Args;
-      for (auto &A : AI->getArgumentOperands())
+
+      // Begin by upcasting self to the appropriate type if we have an inherited
+      // conformance...
+      SILValue Self = ApplyArgs[0].get();
+      if (C->getKind() == ProtocolConformanceKind::Inherited) {
+        CanType Ty = Ret.first->getConformance()->getType()->getCanonicalType();
+        SILType SILTy = SILType::getPrimitiveType(Ty,
+                                                  Self.getType().getCategory());
+        assert(SILTy.isSuperclassOf(Self.getType()) &&
+               "Should only create upcasts for sub class devirtualization.");
+        Self = Builder.createUpcast(Loc, Self, SILTy);
+      }
+      // and then adding in either the original or newly upcasted value.
+      Args.push_back(Self);
+
+      // Then add the rest of the arguments.
+      for (auto &A : ApplyArgs.slice(1))
         Args.push_back(A.get());
 
       SmallVector<Substitution, 16> NewSubstList(Ret.second.begin(),
