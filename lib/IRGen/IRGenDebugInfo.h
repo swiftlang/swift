@@ -222,7 +222,9 @@ private:
   void createImportedModule(StringRef Name, StringRef MangledPrefix,
                             llvm::DIModule Module, unsigned Line);
 
-  llvm::DIType createType(DebugTypeInfo DbgTy, llvm::DIDescriptor Scope,
+  llvm::DIType createType(DebugTypeInfo DbgTy,
+                          StringRef MangledName,
+                          llvm::DIDescriptor Scope,
                           llvm::DIFile File);
   llvm::DIType getOrCreateType(DebugTypeInfo DbgTy);
   llvm::DIDescriptor getOrCreateScope(SILDebugScope *DS);
@@ -260,7 +262,8 @@ private:
                                          unsigned AlignInBits,
                                          unsigned Flags,
                                          llvm::DIType DerivedFrom,
-                                         unsigned RuntimeLang);
+                                         unsigned RuntimeLang,
+                                         StringRef UniqueID);
   llvm::DIDerivedType createMemberType(DebugTypeInfo DTI,
                                        StringRef Name,
                                        unsigned &OffsetInBits,

@@ -108,7 +108,6 @@ DebugTypeInfo::DebugTypeInfo(ValueDecl *Decl, swift::Type Ty,
   initFromTypeInfo(size, align, StorageType, Info);
 }
 
-
 static bool typesEqual(Type A, Type B) {
   if (A.getPointer() == B.getPointer())
     return true;

@@ -59,7 +59,6 @@ namespace swift {
       DebugTypeInfo(ValueDecl *Decl, const TypeInfo &Info);
       DebugTypeInfo(ValueDecl *Decl, Size size, Alignment align);
       DebugTypeInfo(ValueDecl *Decl, swift::Type Ty, const TypeInfo &Info);
-      TypeBase* getHash() const { return getType(); }
       TypeBase* getType() const { return Type; }
 
       ValueDecl* getDecl() const {
