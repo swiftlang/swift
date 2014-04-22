@@ -2902,8 +2902,8 @@ namespace {
     }
 
     /// Creates a computed property VarDecl from the given getter and setter.
-    Decl *makeImplicitPropertyDecl(const Decl *opaqueGetter,
-                                   const Decl *opaqueSetter,
+    Decl *makeImplicitPropertyDecl(Decl *opaqueGetter,
+                                   Decl *opaqueSetter,
                                    DeclContext *dc) {
       auto getter = cast<FuncDecl>(opaqueGetter);
       auto setter = cast<FuncDecl>(opaqueSetter);
@@ -2938,14 +2938,10 @@ namespace {
           /*static*/ false, /*IsLet*/ false,
           Impl.importSourceLoc(clangGetter->getLocation()),
           name, type, dc);
-
-      // Build thunks.
-      FuncDecl *getterThunk = buildGetterThunk(getter, dc, nullptr);
-      FuncDecl *setterThunk = buildSetterThunk(setter, dc, nullptr);
-
+      
       // Turn this into a computed property.
       // FIXME: Fake locations for '{' and '}'?
-      result->makeComputed(SourceLoc(), getterThunk, setterThunk, SourceLoc());
+      result->makeComputed(SourceLoc(), getter, setter, SourceLoc());
       addObjCAttribute(result, Nothing);
 
       if (overridden)
@@ -3608,17 +3604,10 @@ namespace {
           /*static*/ false, /*IsLet*/ false,
           Impl.importSourceLoc(decl->getLocation()),
           name, type, dc);
-
-      // Build thunks.
-      FuncDecl *getterThunk = buildGetterThunk(getter, dc, nullptr);
-
-      FuncDecl *setterThunk = nullptr;
-      if (setter)
-        setterThunk = buildSetterThunk(setter, dc, nullptr);
-
+      
       // Turn this into a computed property.
       // FIXME: Fake locations for '{' and '}'?
-      result->makeComputed(SourceLoc(), getterThunk, setterThunk, SourceLoc());
+      result->makeComputed(SourceLoc(), getter, setter, SourceLoc());
       addObjCAttribute(result, Nothing);
 
       // Handle attributes.

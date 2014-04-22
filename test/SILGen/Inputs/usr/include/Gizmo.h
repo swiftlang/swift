@@ -55,6 +55,11 @@ typedef long NSInteger;
 - (void) funge;
 - (void) foo;
 - (void*) getBytes NS_RETURNS_INNER_POINTER;
+
+@property void *innerProperty;
+- (void*) innerProperty NS_RETURNS_INNER_POINTER;
+- (void) setInnerProperty: (void*)p;
+
 @property void (^block)(void);
 @property NSInteger count;
 @end
