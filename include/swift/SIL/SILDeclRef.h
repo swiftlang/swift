@@ -172,11 +172,14 @@ struct SILDeclRef {
   bool hasDecl() const { return loc.is<ValueDecl *>(); }
   bool hasClosureExpr() const {
     return loc.is<AbstractClosureExpr *>()
-      && isa<ClosureExpr>(getAbstractClosureExpr() );
+      && isa<ClosureExpr>(getAbstractClosureExpr());
   }
   bool hasAutoClosureExpr() const {
     return loc.is<AbstractClosureExpr *>()
       && isa<AutoClosureExpr>(getAbstractClosureExpr());
+  }
+  bool hasFuncDecl() const {
+    return loc.is<ValueDecl *>() && isa<FuncDecl>(getDecl());
   }
 
   ValueDecl *getDecl() const { return loc.get<ValueDecl *>(); }
@@ -189,6 +192,7 @@ struct SILDeclRef {
   AutoClosureExpr *getAutoClosureExpr() const {
     return dyn_cast<AutoClosureExpr>(getAbstractClosureExpr());
   }
+  FuncDecl *getFuncDecl() const { return dyn_cast<FuncDecl>(getDecl()); }
 
   /// Produce a mangled form of this constant.
   llvm::StringRef mangle(llvm::SmallVectorImpl<char> &buffer) const;
