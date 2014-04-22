@@ -1093,12 +1093,12 @@ struct ASTNodeBase {};
       verifyCheckedBase(E);
     }
 
-    void verifyChecked(MetatypeExpr *E) {
-      PrettyStackTraceExpr debugStack(Ctx, "verifying MetatypeExpr", E);
+    void verifyChecked(DynamicTypeExpr *E) {
+      PrettyStackTraceExpr debugStack(Ctx, "verifying DynamicTypeExpr", E);
 
       auto metatype = E->getType()->getAs<AnyMetatypeType>();
       if (!metatype) {
-        Out << "MetatypeExpr must have metatype type\n";
+        Out << "DynamicTypeExpr must have metatype type\n";
         abort();
       }
 

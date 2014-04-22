@@ -196,7 +196,7 @@ void StmtBuilder::printClass(VarDecl *Arg, Type SugarT, ClassDecl *CD,
   if (TC.lookupMember(MetaT, MemberName, CD,
                       /*allowDynamicLookup=*/false)){
     Expr *ArgRef = getArgRefExpr(Arg, MemberIndexes, Loc);
-    auto *Meta = new (Context) MetatypeExpr(ArgRef, Loc, MetaT);
+    auto *Meta = new (Context) DynamicTypeExpr(ArgRef, Loc, MetaT);
     Expr *Res = new (Context) UnresolvedDotExpr(Meta, Loc, MemberName, EndLoc,
                                                 /*Implicit=*/true);
     TupleExpr *CallArgs

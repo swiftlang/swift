@@ -941,7 +941,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
         // A metatype expr.
         if (Tok.is(tok::kw_dynamicType)) {
           Result = makeParserResult(
-            new (Context) MetatypeExpr(Result.get(), consumeToken(),
+            new (Context) DynamicTypeExpr(Result.get(), consumeToken(),
                                        Type()));
           continue;
         }

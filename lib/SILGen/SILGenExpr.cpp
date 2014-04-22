@@ -203,7 +203,7 @@ namespace {
                                      SGFContext C);
     RValue visitTupleShuffleExpr(TupleShuffleExpr *E, SGFContext C);
     RValue visitNewArrayExpr(NewArrayExpr *E, SGFContext C);
-    RValue visitMetatypeExpr(MetatypeExpr *E, SGFContext C);
+    RValue visitDynamicTypeExpr(DynamicTypeExpr *E, SGFContext C);
     RValue visitAbstractClosureExpr(AbstractClosureExpr *E, SGFContext C);
     RValue visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
                                               SGFContext C);
@@ -2051,7 +2051,7 @@ SILValue SILGenFunction::emitMetatypeOfValue(SILLocation loc, SILValue base) {
   return B.createMetatype(loc, metaTy);
 }
 
-RValue RValueEmitter::visitMetatypeExpr(MetatypeExpr *E, SGFContext C) {
+RValue RValueEmitter::visitDynamicTypeExpr(DynamicTypeExpr *E, SGFContext C) {
   // Evaluate the base if present.
   SILValue metatype;
   

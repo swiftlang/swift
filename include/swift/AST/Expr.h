@@ -2539,17 +2539,17 @@ public:
   }
 };
   
-/// MetatypeExpr - "base.dynamicType" - Produces a metatype value.
+/// DynamicTypeExpr - "base.dynamicType" - Produces a metatype value.
 ///
 /// The metatype value can comes from a evaluating an expression and then
 /// getting its metatype.
-class MetatypeExpr : public Expr {
+class DynamicTypeExpr : public Expr {
   Expr *Base;
   SourceLoc MetatypeLoc;
 
 public:
-  explicit MetatypeExpr(Expr *Base, SourceLoc MetatypeLoc, Type Ty)
-    : Expr(ExprKind::Metatype, /*Implicit=*/false, Ty),
+  explicit DynamicTypeExpr(Expr *Base, SourceLoc MetatypeLoc, Type Ty)
+    : Expr(ExprKind::DynamicType, /*Implicit=*/false, Ty),
       Base(Base), MetatypeLoc(MetatypeLoc) { }
 
   Expr *getBase() const { return Base; }
@@ -2561,7 +2561,7 @@ public:
   SourceRange getSourceRange() const;
 
   static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::Metatype;
+    return E->getKind() == ExprKind::DynamicType;
   }
 };
 

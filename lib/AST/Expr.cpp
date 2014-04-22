@@ -140,7 +140,7 @@ bool Expr::isStaticallyDerivedMetatype() const {
     }
 
     // A synthesized metatype.
-    if (auto metatype = dyn_cast<MetatypeExpr>(expr)) {
+    if (auto metatype = dyn_cast<DynamicTypeExpr>(expr)) {
       // Recurse into the base.
       expr = metatype->getBase();
       continue;
@@ -464,7 +464,7 @@ TypeExpr *TypeExpr::createImplicitHack(SourceLoc Loc, Type Ty, ASTContext &C) {
 }
 
 
-SourceRange MetatypeExpr::getSourceRange() const {
+SourceRange DynamicTypeExpr::getSourceRange() const {
   if (MetatypeLoc.isValid())
     return SourceRange(getBase()->getStartLoc(), MetatypeLoc);
 

@@ -339,7 +339,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return E;
   }
 
-  Expr *visitMetatypeExpr(MetatypeExpr *E) {
+  Expr *visitDynamicTypeExpr(DynamicTypeExpr *E) {
     Expr *base = E->getBase();
     if ((base = doIt(base)))
       E->setBase(base);

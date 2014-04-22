@@ -2088,7 +2088,7 @@ namespace {
       return expr;
     }
 
-    Expr *visitMetatypeExpr(MetatypeExpr *expr) {
+    Expr *visitDynamicTypeExpr(DynamicTypeExpr *expr) {
       auto &tc = cs.getTypeChecker();
 
       Expr *base = expr->getBase();

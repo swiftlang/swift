@@ -165,7 +165,7 @@ static void diagModuleOrMetatypeValue(TypeChecker &TC, const Expr *E) {
             Diagnose = Diagnostic::None;
             break;
               
-          case ExprKind::Metatype:
+          case ExprKind::DynamicType:
             Diagnose = Diagnostic::TypeOfMetatypeValue;
             break;
               
@@ -255,7 +255,7 @@ static void diagModuleOrMetatypeValue(TypeChecker &TC, const Expr *E) {
         case Diagnostic::TypeOfMetatypeValue: {
           TC.diagnose(E->getStartLoc(), diag::type_of_metatype);
           // Add a fixit to replace '.type' with '.self'.
-          auto metaExpr = cast<MetatypeExpr>(Parent.getAsExpr());
+          auto metaExpr = cast<DynamicTypeExpr>(Parent.getAsExpr());
           auto endLoc = Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
                                                    metaExpr->getMetatypeLoc());
           

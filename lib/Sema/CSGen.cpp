@@ -1004,7 +1004,7 @@ namespace {
       return tc.getArraySliceType(outerBound.Brackets.Start, resultTy);
     }
 
-    Type visitMetatypeExpr(MetatypeExpr *expr) {
+    Type visitDynamicTypeExpr(DynamicTypeExpr *expr) {
       auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr),
                                       /*options=*/0);
       CS.addConstraint(ConstraintKind::DynamicTypeOf, tv,

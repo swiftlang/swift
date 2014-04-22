@@ -1462,7 +1462,7 @@ public:
     OS << ')';
   }
 
-  void visitMetatypeExpr(MetatypeExpr *E) {
+  void visitDynamicTypeExpr(DynamicTypeExpr *E) {
     printCommon(E, "metatype_expr");
     OS << '\n';
     printRec(E->getBase());
