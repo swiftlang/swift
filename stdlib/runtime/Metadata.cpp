@@ -1118,10 +1118,11 @@ void swift::swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
   auto layout = BasicLayout::initialForHeapObject();
   // If we have a superclass, start from its size and alignment instead.
   if (super) {
-    layout.size = super->InstanceSize;
-    layout.flags = layout.flags.withAlignmentMask(super->InstanceAlignMask);
-    layout.stride = llvm::RoundUpToAlignment(super->InstanceSize,
-                                             super->InstanceAlignMask+1);
+    uintptr_t superSize = super->getInstanceSize();
+    uintptr_t superAlignMask = super->getInstanceAlignMask();
+    layout.size = superSize;
+    layout.flags = layout.flags.withAlignmentMask(superAlignMask);
+    layout.stride = llvm::RoundUpToAlignment(superSize, superAlignMask+1);
   }
   
   performBasicLayout(layout, fieldTypes, numFields,
@@ -1130,8 +1131,9 @@ void swift::swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
     });
 
   // Save the final size and alignment into the metadata record.
-  self->InstanceSize = layout.size;
-  self->InstanceAlignMask = layout.flags.getAlignmentMask();
+  assert(self->isTypeMetadata());
+  self->setInstanceSize(layout.size);
+  self->setInstanceAlignMask(layout.flags.getAlignmentMask());
 }
 
 /*** Metatypes *************************************************************/
@@ -1805,8 +1807,11 @@ OpaqueValue *swift::swift_assignExistentialWithCopy(OpaqueValue *dest,
 const NominalTypeDescriptor *
 Metadata::getNominalTypeDescriptor() const {
   switch (getKind()) {
-  case MetadataKind::Class:
-    return static_cast<const ClassMetadata *>(this)->Description;
+  case MetadataKind::Class: {
+    const ClassMetadata *cls = static_cast<const ClassMetadata *>(this);
+    assert(cls->isTypeMetadata());
+    return cls->getDescription();
+  }
   case MetadataKind::Struct:
   case MetadataKind::Enum:
     return static_cast<const StructMetadata *>(this)->Description;
@@ -1826,6 +1831,15 @@ Metadata::getNominalTypeDescriptor() const {
 
 extern "C" const char* class_getName(const ClassMetadata*);
 extern "C" const ClassMetadata* class_getSuperclass(const ClassMetadata*);
+
+static std::string typeNameForObjCClass(const ClassMetadata *cls)
+{
+    const char* objc_class_name = class_getName(cls);
+    std::stringstream ostream;
+    ostream << "CSo" << strlen(objc_class_name) << objc_class_name;
+    ostream.flush();
+    return ostream.str();
+}
 
 /// \brief Check whether a type conforms to a given native Swift protocol,
 /// visible from the named module.
@@ -1856,16 +1870,19 @@ recur:
 
   switch (type->getKind()) {
   case MetadataKind::ObjCClassWrapper: {
-    std::stringstream ostream;
     auto wrapper = static_cast<const ObjCClassWrapperMetadata*>(type);
-    const char* objc_class_name = class_getName(wrapper->Class);
-    ostream << "CSo" << strlen(objc_class_name) << objc_class_name;
-    ostream.flush();
-    TypeName = ostream.str();
+    TypeName = typeNameForObjCClass(wrapper->Class);
     break;
   }
+  case MetadataKind::Class: {
+    auto theClass = static_cast<const ClassMetadata *>(type);
+    if (theClass->isPureObjC()) {
+      TypeName = typeNameForObjCClass(theClass);
+      break;
+    }
+  }
+  [[clang::fallthrough]];  // FALL THROUGH to nominal type check
   case MetadataKind::Tuple:
-  case MetadataKind::Class:
   case MetadataKind::Struct:
   case MetadataKind::Enum:
   case MetadataKind::Opaque:

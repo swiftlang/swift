@@ -17,6 +17,7 @@
 #ifndef SWIFT_RUNTIME_METADATA_H
 #define SWIFT_RUNTIME_METADATA_H
 
+#include <cassert>
 #include <climits>
 #include <cstddef>
 #include <cstdint>
@@ -920,6 +921,9 @@ struct ClassMetadata : public HeapMetadata {
     return !isTypeMetadata();
   }
 
+private:
+  // The remaining fields are valid only when isTypeMetadata().
+
   /// An out-of-line Swift-specific description of the type.
   const NominalTypeDescriptor *Description;
   
@@ -932,9 +936,34 @@ struct ClassMetadata : public HeapMetadata {
   //   - generic parameters for this class
   //   - class variables (if we choose to support these)
   //   - "tabulated" virtual methods
+
+public:
+  const NominalTypeDescriptor *getDescription() const {
+    assert(isTypeMetadata());
+    return Description;
+  }
+
+  uintptr_t getInstanceSize() const {
+    assert(isTypeMetadata());
+    return InstanceSize;
+  }
+  void setInstanceSize(uintptr_t size) {
+    assert(isTypeMetadata());
+    InstanceSize = size;
+  }
+
+  uintptr_t getInstanceAlignMask() const {
+    assert(isTypeMetadata());
+    return InstanceAlignMask;
+  }
+  void setInstanceAlignMask(uintptr_t mask) {
+    assert(isTypeMetadata());
+    InstanceAlignMask = mask;
+  }
   
   /// Get a pointer to the field offset vector, if present, or null.
   const uintptr_t *getFieldOffsets() const {
+    assert(isTypeMetadata());
     auto offset = Description->Class.FieldOffsetVectorOffset;
     if (offset == 0)
       return nullptr;
@@ -944,6 +973,7 @@ struct ClassMetadata : public HeapMetadata {
   
   /// Get a pointer to the field type vector, if present, or null.
   const Metadata * const *getFieldTypes() const {
+    assert(isTypeMetadata());
     auto *getter = Description->Class.GetFieldTypes;
     if (!getter)
       return nullptr;

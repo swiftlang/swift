@@ -344,7 +344,7 @@ intptr_t swift_ClassMirror_count(HeapObject *owner,
                                  const Metadata *type) {
   auto Clas = static_cast<const ClassMetadata*>(type);
   swift_release(owner);
-  auto count = Clas->Description->Class.NumFields;
+  auto count = Clas->getDescription()->Class.NumFields;
   
   // If the class has a superclass, the superclass instance is treated as the
   // first child.
@@ -376,7 +376,7 @@ StringMirrorTuple swift_ClassMirror_subscript(intptr_t i,
     --i;
   }
   
-  if (i < 0 || (size_t)i > Clas->Description->Class.NumFields)
+  if (i < 0 || (size_t)i > Clas->getDescription()->Class.NumFields)
     swift::crash("Swift mirror subscript bounds check failure");
   
   // Load the type and offset from their respective vectors.
@@ -387,7 +387,7 @@ StringMirrorTuple swift_ClassMirror_subscript(intptr_t i,
   auto fieldData = reinterpret_cast<const OpaqueValue *>(bytes + fieldOffset);
   
   // Get the field name from the doubly-null-terminated list.
-  const char *fieldName = Clas->Description->Class.FieldNames;
+  const char *fieldName = Clas->getDescription()->Class.FieldNames;
   for (size_t j = 0; j < (size_t)i; ++j) {
     while (*fieldName++);
   }
