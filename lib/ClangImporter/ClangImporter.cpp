@@ -1329,6 +1329,21 @@ void ClangImporter::loadExtensions(NominalTypeDecl *nominal,
   }
 }
 
+// FIXME: This should just be the implementation of
+// llvm::array_pod_sort_comparator. The only difference is that it uses
+// std::less instead of operator<.
+// FIXME: Copied from IRGenModule.cpp.
+template <typename T>
+static int pointerPODSortComparator(T * const *lhs, T * const *rhs) {
+  std::less<T *> lt;
+  if (lt(*lhs, *rhs))
+    return -1;
+  if (lt(*rhs, *lhs))
+    return -1;
+  return 0;
+}
+
+
 void ClangModuleUnit::getImportedModules(
     SmallVectorImpl<Module::ImportedModule> &imports,
     Module::ImportFilter filter) const {
@@ -1336,20 +1351,24 @@ void ClangModuleUnit::getImportedModules(
   auto topLevelAdapter = getAdapterModule();
 
   SmallVector<clang::Module *, 8> imported;
-  if (filter == Module::ImportFilter::Public) {
-    clangModule->getExportedModules(imported);
-  } else {
+  clangModule->getExportedModules(imported);
+  if (filter != Module::ImportFilter::Public) {
     if (filter == Module::ImportFilter::All) {
       imported.append(clangModule->Imports.begin(), clangModule->Imports.end());
+      llvm::array_pod_sort(imported.begin(), imported.end(),
+                           pointerPODSortComparator);
+      imported.erase(std::unique(imported.begin(), imported.end()),
+                     imported.end());
     } else {
-      SmallVector<clang::Module *, 8> publicImports;
-      clangModule->getExportedModules(publicImports);
+      llvm::array_pod_sort(imported.begin(), imported.end(),
+                           pointerPODSortComparator);
+      SmallVector<clang::Module *, 8> privateImports;
       std::copy_if(clangModule->Imports.begin(), clangModule->Imports.end(),
-                   std::back_inserter(imported), [&](clang::Module *mod) {
-        return publicImports.end() != std::find(publicImports.begin(),
-                                                publicImports.end(),
-                                                mod);
+                   std::back_inserter(privateImports), [&](clang::Module *mod) {
+        return !std::binary_search(imported.begin(), imported.end(), mod,
+                                   std::less<clang::Module *>());
       });
+      imported.swap(privateImports);
     }
 
     // FIXME: The parent module isn't exactly a private import, but it is
