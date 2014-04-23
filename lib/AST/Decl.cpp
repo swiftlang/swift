@@ -951,7 +951,9 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
   // interface types in their signatures as well as whether they are
   // instance members.
   if (isa<AbstractFunctionDecl>(this)) {
-    signature.InterfaceType = getInterfaceType()->getCanonicalType();
+    signature.InterfaceType
+      = getInterfaceType()->getWithoutDefaultArgs(getASTContext())
+          ->getCanonicalType();
     signature.IsInstanceMember = isInstanceMember();
     // Unary operators also include prefix/postfix.
     if (auto func = dyn_cast<FuncDecl>(this)) {
@@ -964,7 +966,9 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
       }
     }
   } else if (isa<SubscriptDecl>(this)) {
-    signature.InterfaceType = getInterfaceType()->getCanonicalType();    
+    signature.InterfaceType
+      = getInterfaceType()->getWithoutDefaultArgs(getASTContext())
+          ->getCanonicalType();    
   }
 
   return signature;
