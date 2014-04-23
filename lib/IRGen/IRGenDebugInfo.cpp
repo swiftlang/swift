@@ -555,22 +555,23 @@ llvm::DIArray IRGenDebugInfo::createParameterTypes(CanSILFunctionType FnTy,
   return DBuilder.getOrCreateArray(Parameters);
 }
 
+/// FIXME: replace this condition with something more sane.
+static bool isAllocatingConstructor(AbstractCC CC, DeclContext *DeclCtx) {
+  return CC != AbstractCC::Method && DeclCtx && isa<ConstructorDecl>(DeclCtx);
+}
+
 void IRGenDebugInfo::emitFunction(SILModule &SILMod, SILDebugScope *DS,
                                   llvm::Function *Fn,
                                   AbstractCC CC, SILType SILTy,
                                   DeclContext *DeclCtx) {
   StringRef Name;
   Location L = {};
-  Location PrologLoc = {}; // The source line used for the function prologue.
+  unsigned ScopeLine = 0; // The source line used for the function prologue.
   if (DS) {
     Name = getName(DS->Loc);
     auto FL = getLocation(SM, DS->Loc);
     L = FL.Loc;
-
-    // ObjC thunks should not show up in the linetable, because we
-    // never want to set a breakpoint there.
-    if (CC != AbstractCC::ObjCMethod)
-      PrologLoc = FL.LocForLinetable;
+    ScopeLine = FL.LocForLinetable.Line;
   }
   assert(Fn);
   auto LinkageName = Fn->getName();
@@ -599,11 +600,17 @@ void IRGenDebugInfo::emitFunction(SILModule &SILMod, SILDebugScope *DS,
   // Mark everything that is not visible from the source code (i.e.,
   // does not have a Swift name) as artificial, so the debugger can
   // ignore it. Explicit closures are exempt from this rule. We also
-  // make an exception for top_level_code, which albeit it does not
-  // have a Swift name, it does appear prominently in the source code.
-  if (Name.empty() && LinkageName != SWIFT_ENTRY_POINT_FUNCTION
-      && !isExplicitClosure(DS))
+  // make an exception for top_level_code, which, albeit it does not
+  // have a Swift name, does appear prominently in the source code.
+  if ((Name.empty() && LinkageName != SWIFT_ENTRY_POINT_FUNCTION
+       && !isExplicitClosure(DS)) ||
+      // ObjC thunks should also not show up in the linetable, because we
+      // never want to set a breakpoint there.
+      (CC == AbstractCC::ObjCMethod) ||
+      isAllocatingConstructor(CC, DeclCtx)) {
     Flags |= llvm::DIDescriptor::FlagArtificial;
+    ScopeLine = 0;
+  }
 
   if (FnTy && FnTy->getRepresentation() == FunctionType::Representation::Block)
     Flags |= llvm::DIDescriptor::FlagAppleBlock;
@@ -625,7 +632,7 @@ void IRGenDebugInfo::emitFunction(SILModule &SILMod, SILDebugScope *DS,
   llvm::DISubprogram SP =
     DBuilder.createFunction(Scope, Name, LinkageName, File, Line,
                             DIFnTy, IsLocalToUnit, IsDefinition,
-                            PrologLoc.Line,
+                            ScopeLine,
                             Flags, IsOptimized, Fn, TemplateParameters, Decl);
   ScopeCache[DS] = llvm::WeakVH(SP);
 
@@ -882,6 +889,8 @@ void IRGenDebugInfo::emitVariableDeclaration(IRBuilder& Builder,
   auto Call = isa<llvm::AllocaInst>(Storage)
     ? DBuilder.insertDeclare(Storage, Descriptor, BB)
     : DBuilder.insertDbgValueIntrinsic(Storage, 0, Descriptor, BB);
+
+  // Set the location/scope of the intrinsic.
   Call->setDebugLoc(llvm::DebugLoc::get(Line, Loc.Col, Scope));
 }
 
