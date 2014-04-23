@@ -630,11 +630,7 @@ ParserResult<Expr> Parser::parseExprSuper() {
       if (parseIdentifier(name, nameLoc,
                           diag::expected_identifier_after_super_dot_expr))
         return nullptr;
-      
-      if (!selfDecl)
-        return makeParserErrorResult(new (Context) ErrorExpr(
-            SourceRange(superLoc, nameLoc), ErrorType::get(Context)));
-      
+
       return makeParserResult(new (Context) UnresolvedDotExpr(superRef, dotLoc,
                                                               name, nameLoc,
                                                            /*Implicit=*/false));
@@ -909,10 +905,10 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     diagnose(Tok, ID);
     return nullptr;
   }
-  
+
   // If we had a parse error, don't attempt to parse suffixes.
-  if (Result.isNull())
-    return nullptr;
+  if (Result.isParseError())
+    return Result;
 
   bool hasBindOptional = false;
     
