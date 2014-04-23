@@ -326,6 +326,8 @@ void CodeCompletionResult::print(raw_ostream &OS) const {
     Prefix.append("OtherModule");
     break;
   }
+  if (NotRecommended)
+    Prefix.append("/NotRecommended");
   if (NumBytesToErase != 0) {
     Prefix.append("/Erase[");
     Prefix.append(Twine(NumBytesToErase).str());
@@ -359,6 +361,18 @@ StringRef CodeCompletionContext::copyString(StringRef Str) {
   return ::copyString(CurrentResults.Allocator, Str);
 }
 
+static bool isDeclUnavailable(const Decl *D) {
+  auto Attr = D->getAttrs().getUnavailable();
+  if (!Attr)
+    return false;
+
+  // FIXME: match platform.
+  if (Attr->hasPlatform())
+    return false;
+
+  return Attr->IsUnvailable;
+}
+
 CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
   void *CCSMem = Sink.Allocator
       .Allocate(sizeof(CodeCompletionString) +
@@ -380,8 +394,9 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
     } else {
       BriefComment = AssociatedDecl->getBriefComment();
     }
+    bool NotRecommended = isDeclUnavailable(AssociatedDecl);
     return new (Sink.Allocator) CodeCompletionResult(
-        SemanticContext, NumBytesToErase, CCS, AssociatedDecl,
+        SemanticContext, NumBytesToErase, CCS, AssociatedDecl, NotRecommended,
         copyString(Sink.Allocator, BriefComment));
   }
 

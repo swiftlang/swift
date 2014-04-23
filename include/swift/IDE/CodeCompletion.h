@@ -313,6 +313,7 @@ private:
   unsigned Kind : 2;
   unsigned AssociatedDeclKind : 8;
   unsigned SemanticContext : 3;
+  unsigned NotRecommended : 1;
 
   /// The number of bytes to the left of the code completion point that
   /// should be erased first if this completion string is inserted in the
@@ -331,7 +332,8 @@ private:
                        unsigned NumBytesToErase,
                        CodeCompletionString *CompletionString)
       : Kind(Kind), SemanticContext(unsigned(SemanticContext)),
-        NumBytesToErase(NumBytesToErase), CompletionString(CompletionString) {
+        NotRecommended(false), NumBytesToErase(NumBytesToErase),
+        CompletionString(CompletionString) {
     assert(Kind != Declaration && "use the other constructor");
     assert(CompletionString);
   }
@@ -340,9 +342,11 @@ private:
                        unsigned NumBytesToErase,
                        CodeCompletionString *CompletionString,
                        const Decl *AssociatedDecl,
+                       bool NotRecommended,
                        StringRef BriefDocComment)
       : Kind(ResultKind::Declaration),
         SemanticContext(unsigned(SemanticContext)),
+        NotRecommended(NotRecommended),
         NumBytesToErase(NumBytesToErase),
         CompletionString(CompletionString),
         BriefDocComment(BriefDocComment) {
@@ -361,6 +365,10 @@ public:
 
   SemanticContextKind getSemanticContext() const {
     return static_cast<SemanticContextKind>(SemanticContext);
+  }
+
+  bool isNotRecommended() const {
+    return NotRecommended;
   }
 
   unsigned getNumBytesToErase() const {
