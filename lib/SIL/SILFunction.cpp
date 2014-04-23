@@ -64,6 +64,7 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage,
     DebugScope(DebugScope),
     Bare(isBareSILFunction),
     Transparent(isTrans),
+    GlobalInitFlag(false),
     Linkage(unsigned(Linkage)) {
   if (InsertBefore)
     Module.functions.insert(SILModule::iterator(InsertBefore), this);

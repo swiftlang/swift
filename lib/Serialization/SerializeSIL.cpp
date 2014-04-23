@@ -207,6 +207,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   SILFunctionLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                 toStableSILLinkage(F.getLinkage()),
                                 (unsigned)F.isTransparent(),
+                                (unsigned)F.isGlobalInit(),
                                 FnID);
 
   if (DeclOnly || F.isAvailableExternally() || F.isExternalDeclaration())

@@ -624,6 +624,26 @@ static bool parseSILOptional(bool &Result, SILParser &SP, StringRef Expected) {
   return false;
 }
 
+static bool parseDeclSILOptional(bool &isTransparent, bool &isGlobalInit,
+                                 Parser &P) {
+  while (P.consumeIf(tok::l_square)) {
+    if (P.Tok.isNot(tok::identifier)) {
+      P.diagnose(P.Tok, diag::expected_in_attribute_list);
+      return true;
+    } else if (P.Tok.getText() == "transparent")
+      isTransparent = true;
+    else if (P.Tok.getText() == "global_init")
+      isGlobalInit = true;
+    else {
+      P.diagnose(P.Tok, diag::expected_in_attribute_list);
+      return true;
+    }
+    P.consumeToken(tok::identifier);
+    P.parseToken(tok::r_square, diag::expected_in_attribute_list);
+  }
+  return false;
+}
+
 bool SILParser::performTypeLocChecking(TypeLoc &T, bool IsSIL) {
   // Do some type checking / name binding for the parsed type.
   assert(P.SF.ASTStage == SourceFile::Parsing &&
@@ -2703,8 +2723,9 @@ bool Parser::parseDeclSIL() {
 
   Scope S(this, ScopeKind::TopLevel);
   bool isTransparent = false;
+  bool isGlobalInit = false;
   if (parseSILLinkage(FnLinkage, *this) ||
-      parseSILOptional(isTransparent, FunctionState, "transparent") ||
+      parseDeclSILOptional(isTransparent, isGlobalInit, *this) ||
       parseToken(tok::at_sign, diag::expected_sil_function_name) ||
       parseIdentifier(FnName, FnNameLoc, diag::expected_sil_function_name) ||
       parseToken(tok::colon, diag::expected_sil_type))
@@ -2726,6 +2747,7 @@ bool Parser::parseDeclSIL() {
       FunctionState.getGlobalNameForDefinition(FnName, SILFnType, FnNameLoc);
     FunctionState.F->setBare(IsBare);
     FunctionState.F->setTransparent(IsTransparent_t(isTransparent));
+    FunctionState.F->setGlobalInit(isGlobalInit);
 
     // Now that we have a SILFunction parse the body, if present.
 

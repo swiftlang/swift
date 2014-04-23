@@ -78,7 +78,10 @@ private:
 
   /// The function's transparent attribute.
   unsigned Transparent : 1; // FIXME: pack this somewhere
-    
+
+  /// The function's global_init attribute.
+  unsigned GlobalInitFlag : 1;
+
   /// The linkage of the function.
   unsigned Linkage : NumSILLinkageBits;
   
@@ -186,7 +189,22 @@ public:
   /// Get this function's transparent attribute.
   IsTransparent_t isTransparent() const { return IsTransparent_t(Transparent); }
   void setTransparent(IsTransparent_t isT) { Transparent = isT; }
-    
+
+  /// Get this function's global_init attribute.
+  ///
+  /// The implied semantics are:
+  /// - side-effects can occur any time before the first invocation.
+  /// - all calls to the same global_init function have the same side-effects.
+  /// - any operation that may observe the initializer's side-effects must be
+  ///   preceded by a call to the initializer.
+  ///
+  /// This is currently true if the function is an addressor that was lazily
+  /// generated from a global variable access. Note that the initialization
+  /// function itself does not need this attribute. It is private and only
+  /// called within the addressor.
+  bool isGlobalInit() const { return GlobalInitFlag; }
+  void setGlobalInit(bool isGI) { GlobalInitFlag = isGI; }
+
   /// Retrieve the generic parameter list containing the contextual archetypes
   /// of the function.
   ///

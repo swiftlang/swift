@@ -658,6 +658,8 @@ protected:
            && "SILFunction missing location");
     assert((OrigF->isTransparent() || OrigF->isBare() || OrigF->getDebugScope())
            && "SILFunction missing DebugScope");
+    assert(!OrigF->isGlobalInit() && "Global initializer cannot be cloned");
+
     // Create a new empty function.
     // TODO: Use getSpecializedLinkage() once we mangle properly.
     SILFunction *NewF =

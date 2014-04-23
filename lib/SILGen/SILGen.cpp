@@ -343,6 +343,8 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
   auto *F = SILFunction::create(M, linkage, constant.mangle(buffer),
                                 constantType, nullptr,
                                 Nothing, IsNotBare, IsTrans);
+
+  F->setGlobalInit(constant.isGlobal());
   
   ValueDecl *VD = nullptr;
   if (constant.hasDecl())

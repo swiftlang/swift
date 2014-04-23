@@ -407,6 +407,8 @@ private:
            && "SILFunction missing location");
     assert((Orig->isTransparent() || Orig->isBare() || Orig->getDebugScope())
            && "SILFunction missing DebugScope");
+    assert(!Orig->isGlobalInit() && "Global initializer cannot be cloned");
+
     // Create a new empty function.
     SILFunction *NewF =
         SILFunction::create(M, getSpecializedLinkage(Orig->getLinkage()),

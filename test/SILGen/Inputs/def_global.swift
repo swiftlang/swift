@@ -1,0 +1,2 @@
+var ExportedVar = 3
+
