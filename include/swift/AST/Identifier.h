@@ -220,7 +220,7 @@ class DeclName {
     }
   };
 
-  // A single stored identifier, along with a bit stating whether it is is the
+  // A single stored identifier, along with a bit stating whether it is the
   // base name for a zero-argument compound name.
   typedef llvm::PointerIntPair<Identifier, 1, bool> IdentifierAndCompound;
 
@@ -275,6 +275,14 @@ public:
 
     return !SimpleOrCompound.get<IdentifierAndCompound>().getInt();
   }
+
+  /// True if this is a compound name.
+  bool isCompoundName() const {
+    if (SimpleOrCompound.dyn_cast<CompoundDeclName*>())
+      return true;
+
+    return SimpleOrCompound.get<IdentifierAndCompound>().getInt();
+  }
   
   /// True if this name is a simple one-component name identical to the
   /// given identifier.
@@ -319,6 +327,13 @@ public:
     }
   }
   
+  friend bool operator==(DeclName lhs, DeclName rhs) {
+    return lhs.getOpaqueValue() == rhs.getOpaqueValue();
+  }
+  friend bool operator!=(DeclName lhs, DeclName rhs) {
+    return lhs.getOpaqueValue() != rhs.getOpaqueValue();
+  }
+
   void *getOpaqueValue() const { return SimpleOrCompound.getOpaqueValue(); }
   static DeclName getFromOpaqueValue(void *p) { return DeclName(p); }
 

@@ -925,6 +925,51 @@ ValueDecl *ValueDecl::getOverriddenDecl() const {
   return nullptr;
 }
 
+bool swift::conflicting(const OverloadSignature& sig1,
+                        const OverloadSignature& sig2) {
+  // If the base names are different, they can't conflict.
+  if (sig1.Name.getBaseName() != sig2.Name.getBaseName())
+    return false;
+  
+  // If one is a compound name and the other is not, consider this a
+  // match: we're comparing a function with a variable or type.
+  if (sig1.Name.isCompoundName() != sig2.Name.isCompoundName())
+    return true;
+  
+  return sig1.Name == sig2.Name &&
+         sig1.InterfaceType == sig2.InterfaceType &&
+         sig1.UnaryOperator == sig2.UnaryOperator &&
+         sig1.IsInstanceMember == sig2.IsInstanceMember;
+}
+
+OverloadSignature ValueDecl::getOverloadSignature() const {
+  OverloadSignature signature;
+
+  signature.Name = getFullName();
+
+  // Functions, initializers, and de-initializers include their
+  // interface types in their signatures as well as whether they are
+  // instance members.
+  if (isa<AbstractFunctionDecl>(this)) {
+    signature.InterfaceType = getInterfaceType()->getCanonicalType();
+    signature.IsInstanceMember = isInstanceMember();
+    // Unary operators also include prefix/postfix.
+    if (auto func = dyn_cast<FuncDecl>(this)) {
+      if (func->isUnaryOperator()) {
+        signature.UnaryOperator 
+          = func->getAttrs().isPrefix()
+               ? UnaryOperatorKind::Prefix
+               : func->getAttrs().isPostfix() ? UnaryOperatorKind::Postfix
+                                              : UnaryOperatorKind::None;
+      }
+    }
+  } else if (isa<SubscriptDecl>(this)) {
+    signature.InterfaceType = getInterfaceType()->getCanonicalType();    
+  }
+
+  return signature;
+}
+
 void ValueDecl::setIsObjC(bool Value) {
   bool CurrentValue = isObjC();
   if (CurrentValue == Value)

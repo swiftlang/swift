@@ -1061,6 +1061,90 @@ static Expr *buildDefaultInitializer(TypeChecker &tc, Type type) {
   return nullptr;
 }
 
+/// Check whether \c current is a declaration.
+static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
+  // If we've already checked this declaration, don't do it again.
+  if (current->alreadyCheckedRedeclaration())
+    return;
+
+  // Make sure we don't do this checking again.
+  current->setCheckedRedeclaration(true);
+
+  // Ignore invalid declarations.
+  if (current->isInvalid())
+    return;
+
+  // If this declaration isn't from a source file, don't check it.
+  // FIXME: Should restrict this to the source file we care about.
+  DeclContext *currentDC = current->getDeclContext();
+  SourceFile *currentFile = currentDC->getParentSourceFile();
+  if (!currentFile || currentDC->isLocalContext())
+    return;
+
+  // Find other potential definitions.
+  SmallVector<ValueDecl *, 4> otherDefinitionsVec;
+  ArrayRef<ValueDecl *> otherDefinitions;
+  if (currentDC->isTypeContext()) {
+    // Look within a type context.
+    if (auto nominal = currentDC->getDeclaredTypeOfContext()->getAnyNominal()) {
+      otherDefinitions = nominal->lookupDirect(current->getBaseName());
+    }
+  } else {
+    // Look within a module context.
+    currentDC->getParentModule()->lookupValue({ }, current->getBaseName(),
+                                              NLKind::QualifiedLookup,
+                                              otherDefinitionsVec);
+    otherDefinitions = otherDefinitionsVec;
+  }
+
+  // Compare this signature against the signature of other
+  // declarations with the same name.
+  OverloadSignature currentSig = current->getOverloadSignature();
+  Module *currentModule = current->getModuleContext();
+  for (auto other : otherDefinitions) {
+    // Skip invalid declarations and ourselves.
+    if (current == other || other->isInvalid())
+      continue;
+
+    // Skip declarations in other modules.
+    if (currentModule != other->getModuleContext())
+      continue;
+
+    // Don't compare methods vs. non-methods (which only happens with
+    // operators).
+    if (currentDC->isTypeContext() != other->getDeclContext()->isTypeContext())
+      continue;
+
+    // Validate the declaration.
+    tc.validateDecl(other);
+    if (other->isInvalid())
+      continue;
+
+    // If there is a conflict, complain.
+    if (conflicting(currentSig, other->getOverloadSignature())) {
+      // If the two declarations occur in the same source file, make sure
+      // we get the diagnostic ordering to be sensible.
+      if (auto otherFile = other->getDeclContext()->getParentSourceFile()) {
+        if (currentFile == otherFile &&
+            current->getLoc().isValid() &&
+            other->getLoc().isValid() &&
+            tc.Context.SourceMgr.isBeforeInBuffer(current->getLoc(),
+                                                  other->getLoc())) {
+          std::swap(current, other);
+        }
+      }
+
+      tc.diagnose(current, diag::invalid_redecl, current->getFullName());
+      tc.diagnose(other, diag::invalid_redecl_prev);
+
+      current->setInvalid();
+      if (current->hasType())
+        current->overwriteType(ErrorType::get(tc.Context));
+      break;
+    }
+  }
+}
+
 /// Validate the given pattern binding declaration.
 static void validatePatternBindingDecl(TypeChecker &tc,
                                        PatternBindingDecl *binding) {
@@ -1787,6 +1871,14 @@ public:
 
   DeclChecker(TypeChecker &TC, bool IsFirstPass, bool IsSecondPass)
       : TC(TC), IsFirstPass(IsFirstPass), IsSecondPass(IsSecondPass) {}
+
+  void visit(Decl *decl) {
+    DeclVisitor<DeclChecker>::visit(decl);
+
+    if (auto valueDecl = dyn_cast<ValueDecl>(decl)) {
+      checkRedeclaration(TC, valueDecl);
+    }
+  }
 
   //===--------------------------------------------------------------------===//
   // Helper Functions.

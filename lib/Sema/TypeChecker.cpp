@@ -217,21 +217,6 @@ static bool mayConformToKnownProtocol(const DeclTy *D) {
   return false;
 }
 
-static bool haveDifferentFixity(const ValueDecl *lhs, const ValueDecl *rhs) {
-  auto lhsFn = dyn_cast<FuncDecl>(lhs);
-  auto rhsFn = dyn_cast<FuncDecl>(rhs);
-  if (!lhsFn || !rhsFn)
-    return false;
-
-  assert(lhs->getName() == rhs->getName());
-  if (!lhs->getName().isOperator())
-    return false;
-
-  assert(lhs->getAttrs().isPrefix() ^ lhs->getAttrs().isPostfix());
-  assert(rhs->getAttrs().isPrefix() ^ rhs->getAttrs().isPostfix());
-  return lhs->getAttrs().isPrefix() != rhs->getAttrs().isPrefix();
-}
-
 void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
                                 unsigned StartElem) {
   if (SF.ASTStage == SourceFile::TypeChecked)
@@ -322,35 +307,6 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
   // that the REPL needs to synthesize.
   if (SF.Kind == SourceFileKind::REPL && !TC.Context.hadError())
     TC.processREPLTopLevel(SF, TLC, StartElem);
-
-  // Check overloaded vars/funcs.
-  // FIXME: This is quadratic time for source files with multiple chunks.
-  // FIXME: Can we make this more efficient?
-  // FIXME: This check should be earlier to avoid ambiguous overload
-  // errors etc.
-  llvm::DenseMap<Identifier, TinyPtrVector<ValueDecl*>> CheckOverloads;
-  for (unsigned i = 0, e = SF.Decls.size(); i != e; ++i) {
-    if (ValueDecl *VD = dyn_cast<ValueDecl>(SF.Decls[i])) {
-      // FIXME: I'm not sure this check is really correct.
-      if (!VD->hasName())
-        continue;
-      if (VD->getType()->is<ErrorType>())
-        continue;
-      auto &PrevOv = CheckOverloads[VD->getName()];
-      if (i >= StartElem) {
-        for (ValueDecl *PrevD : PrevOv) {
-          if (isa<TypeDecl>(VD) || isa<VarDecl>(VD) ||
-              (PrevD->getType()->isEqual(VD->getType()) &&
-               !haveDifferentFixity(PrevD, VD))) {
-            TC.diagnose(VD->getStartLoc(), diag::invalid_redecl);
-            TC.diagnose(PrevD, diag::invalid_redecl_prev,
-                        VD->getName());
-          }
-        }
-      }
-      PrevOv.push_back(VD);
-    }
-  }
 
   unsigned currentFunctionIdx = 0;
   unsigned currentExternalDef = TC.Context.LastCheckedExternalDefinition;

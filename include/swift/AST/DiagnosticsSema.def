@@ -87,9 +87,9 @@ ERROR(serialization_missing_shadowed_module,sema,none,
 ERROR(unknown_name_in_type,sema_nb,none,
       "use of unknown scope %0 in type reference", (Identifier))
 
-ERROR(invalid_redecl,sema_nb,none,"invalid redeclaration",())
+ERROR(invalid_redecl,sema_nb,none,"invalid redeclaration of %0", (DeclName))
 NOTE(invalid_redecl_prev,sema_nb,none,
-     "%0 previously declared here", (Identifier))
+     "previously declared here", ())
 
 ERROR(ambiguous_type_base,sema_nb,none,
       "%0 is ambiguous for type lookup in this context", (Identifier))

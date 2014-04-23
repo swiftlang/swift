@@ -572,8 +572,9 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
     diagnose(P->getLoc(), diag::cannot_infer_type_for_pattern);
     P->setType(ErrorType::get(Context));
     if (auto named = dyn_cast<NamedPattern>(P)) {
-      if (auto var = named->getDecl())
+      if (auto var = named->getDecl()) {
         var->setType(ErrorType::get(Context));
+      }
     }
     return true;
 
@@ -688,7 +689,10 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
   case PatternKind::Named: {
     NamedPattern *NP = cast<NamedPattern>(P);
     VarDecl *var = NP->getDecl();
-    var->overwriteType(type);
+    if (var->isInvalid())
+      var->overwriteType(ErrorType::get(Context));
+    else
+      var->overwriteType(type);
     if (var->getAttrs().hasAttribute<IBOutletAttr>()) {
       checkIBOutlet(var);
     }

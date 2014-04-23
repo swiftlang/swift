@@ -191,7 +191,7 @@ public:
             SC.TC.diagnose(LS->getLabelInfo().Loc,
                         diag::label_shadowed, PrevLS->getLabelInfo().Name);
             SC.TC.diagnose(PrevLS->getLabelInfo().Loc,
-                        diag::invalid_redecl_prev, PrevLS->getLabelInfo().Name);
+                        diag::invalid_redecl_prev);
           }
         }
 

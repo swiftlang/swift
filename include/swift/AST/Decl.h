@@ -228,6 +228,37 @@ enum class ElementRecursiveness {
 /// Diagnostic printing of \c StaticSpellingKind.
 llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, StaticSpellingKind SSK);
 
+/// The kind of unary operator, if any.
+enum class UnaryOperatorKind : uint8_t {
+  None,
+  Prefix,
+  Postfix
+};
+
+/// Encapsulation of the overload signature of a given declaration,
+/// which is used to determine uniqueness of a declaration within a
+/// given context.
+///
+/// Two definitions in the same context may not have the same overload
+/// signature.
+struct OverloadSignature {
+  /// The full name of the declaration.
+  DeclName Name;
+
+  /// The interface type of the declaration, when relevant to the
+  /// overload signature.
+  CanType InterfaceType;
+
+  /// The kind of unary operator.
+  UnaryOperatorKind UnaryOperator = UnaryOperatorKind::None;
+
+  /// Whether this is an instance member.
+  bool IsInstanceMember = false;
+};
+
+/// Determine whether two overload signatures conflict.
+bool conflicting(const OverloadSignature& sig1, const OverloadSignature& sig2);
+
 /// Decl - Base class for all declarations in Swift.
 class alignas(8) Decl {
   // alignas(8) because we use three tag bits on Decl*.
@@ -250,7 +281,6 @@ class alignas(8) Decl {
   };
   enum { NumDeclBits = 11 };
   static_assert(NumDeclBits <= 32, "fits in an unsigned");
-
   
   class PatternBindingDeclBitfields {
     friend class PatternBindingDecl;
@@ -274,8 +304,12 @@ class alignas(8) Decl {
     unsigned : NumDeclBits;
     unsigned ConformsToProtocolRequrement : 1;
     unsigned AlreadyInLookupTable : 1;
+
+    /// Whether we have already checked whether this declaration is a 
+    /// redeclaration.
+    unsigned CheckedRedeclaration : 1;
   };
-  enum { NumValueDeclBits = NumDeclBits + 2 };
+  enum { NumValueDeclBits = NumDeclBits + 3 };
   static_assert(NumValueDeclBits <= 32, "fits in an unsigned");
 
   class VarDeclBitfields {
@@ -1677,6 +1711,7 @@ protected:
     : Decl(K, DC), Name(name), NameLoc(NameLoc) {
     ValueDeclBits.ConformsToProtocolRequrement = false;
     ValueDeclBits.AlreadyInLookupTable = false;
+    ValueDeclBits.CheckedRedeclaration = false;
   }
 
   /// The interface type, mutable because some subclasses compute this lazily.
@@ -1688,13 +1723,30 @@ public:
   /// swift code.
   bool isDefinition() const;
 
+  /// Determine whether we have already checked whether this
+  /// declaration is a redeclaration.
+  bool alreadyCheckedRedeclaration() const { 
+    return ValueDeclBits.CheckedRedeclaration; 
+  }
+
+  /// Set whether we have already checked this declaration as a
+  /// redeclaration.
+  void setCheckedRedeclaration(bool checked) {
+    ValueDeclBits.CheckedRedeclaration = checked;
+  }
+
   bool hasName() const { return bool(Name); }
   /// TODO: Rename to getSimpleName?
   Identifier getName() const { return Name.getBaseName(); }
   bool isOperator() const { return Name.isOperator(); }
+
+  /// Retrieve the full name of the declaration.
   /// TODO: Rename to getName?
   DeclName getFullName() const { return Name; }
-  
+
+  /// Retrieve the base name of the declaration, ignoring any argument
+  /// names.
+  DeclName getBaseName() const { return Name.getBaseName(); }
   
   SourceLoc getNameLoc() const { return NameLoc; }
   SourceLoc getLoc() const { return NameLoc; }
@@ -1759,6 +1811,9 @@ public:
 
   /// Retrieve the declaration that this declaration overrides, if any.
   ValueDecl *getOverriddenDecl() const;
+
+  /// Compute the overload signature for this declaration.
+  OverloadSignature getOverloadSignature() const;
 
   /// Returns true if the decl requires Objective-C interop.
   ///
