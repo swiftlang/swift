@@ -688,7 +688,7 @@ macro(add_swift_library name)
   set (PLIST_INFO_PLIST "Info.plist" CACHE STRING "Plist name")
   if (APPLE AND SHARED_LIBRARY)
     set(PLIST_INFO_NAME ${name})
-    set(PLIST_INFO_UTI "com.apple.dt.${name}")
+    set(PLIST_INFO_UTI "com.apple.dt.runtime.${name}")
     set(PLIST_INFO_VERSION "1.0")
     if (LLVM_SUBMIT_VERSION)
       set(PLIST_INFO_BUILD_VERSION
