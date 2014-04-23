@@ -38,8 +38,6 @@ namespace swift {
 typedef enum {
   DW_LANG_Swift = 0xf,
   DW_LANG_ObjC = llvm::dwarf::DW_LANG_ObjC, // For symmetry.
-  // Reuse some existing tag so the verifier doesn't complain.
-  DW_TAG_meta_type = llvm::dwarf::DW_TAG_restrict_type
 } dwarf;
 //
 //===--------- END "TO BE FIXED IN A SWIFT BRANCH OF LLVM" --------===//

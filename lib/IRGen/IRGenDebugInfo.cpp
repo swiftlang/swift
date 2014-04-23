@@ -1332,13 +1332,15 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   case TypeKind::ExistentialMetatype:
   case TypeKind::Metatype: {
     // Metatypes are (mostly) singleton type descriptors, often without storage.
+    Location L = getLoc(SM, DbgTy.getDecl());
+    auto File = getOrCreateFile(L.Filename);
     auto Metatype = BaseTy->castTo<AnyMetatypeType>();
     auto Ty = Metatype->getInstanceType();
-    // The type this metatype is describing.
-    // FIXME: Reusing the size and alignment of the metatype for the
-    // type is wrong.
-    auto DITy = getOrCreateDesugaredType(Ty, DbgTy);
-    return DBuilder.createQualifiedType(DW_TAG_meta_type, DITy);
+    return DBuilder.createStructType(Scope, MangledName, File, L.Line,
+                                     SizeInBits, AlignInBits, Flags,
+                                     llvm::DIType(), llvm::DIArray(),
+                                     DW_LANG_Swift, llvm::DIType(),
+                                     MangledName);
   }
 
   case TypeKind::SILFunction:
