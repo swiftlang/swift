@@ -42,7 +42,8 @@ endif()
 target_link_libraries(swift_runtime
   "-framework Foundation")
 
-find_library(CRASHREPORTERCLIENT NAMES CrashReporterClient)
+list(APPEND CMAKE_FIND_ROOT_PATH "${CMAKE_OSX_SYSROOT}")
+find_library(CRASHREPORTERCLIENT CrashReporterClient ONLY_CMAKE_FIND_ROOT_PATH)
 
 if (CRASHREPORTERCLIENT)
   target_link_libraries(swift_runtime "-lCrashReporterClient")
