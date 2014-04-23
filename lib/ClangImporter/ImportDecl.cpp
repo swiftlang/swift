@@ -1787,7 +1787,9 @@ namespace {
       // avoid order dependencies here. Perhaps we should just deal with the
       // ambiguity later?
       auto result = importConstructor(decl, dc, false, initKind,
-                                      /*required=*/false, selector, initName);
+                                      /*required=*/false, selector, initName,
+                                      {decl->param_begin(), decl->param_size()},
+                                      decl->isVariadic());
       if (result && member) {
         ++NumFactoryMethodsAsInitializers;
 
@@ -2062,7 +2064,55 @@ namespace {
         ctor->setOverriddenDecl(cast<ConstructorDecl>(member));
       }
     }
-
+    
+    /// Map an init method to a Swift declaration name.
+    ///
+    /// Some special cased remappings also change the parameter signature of the
+    /// imported initializer, such as to drop vararg parameters.
+    std::tuple<DeclName, ArrayRef<const clang::ParmVarDecl *>, /*variadic*/bool>
+    mapInitSelectorToDeclName(ObjCSelector selector,
+                              ArrayRef<const clang::ParmVarDecl *> args,
+                              bool variadic) {
+      auto &C = Impl.SwiftContext;
+      
+      // Map UIActionSheet and UIAlertView's designated initializers to
+      // non-variadic versions that drop the variadic parameter.
+      Identifier _UIActionSheetInitPieces[] = {
+        C.getIdentifier("initWithTitle"),
+        C.getIdentifier("delegate"),
+        C.getIdentifier("cancelButtonTitle"),
+        C.getIdentifier("destructiveButtonTitle"),
+        C.getIdentifier("otherButtonTitles"),
+      };
+      ArrayRef<Identifier> UIActionSheetInitPieces = _UIActionSheetInitPieces;
+      ObjCSelector UIActionSheetInit(C, UIActionSheetInitPieces.size(),
+                                     UIActionSheetInitPieces);
+      
+      Identifier _UIAlertViewInitPieces[] = {
+        C.getIdentifier("initWithTitle"),
+        C.getIdentifier("message"),
+        C.getIdentifier("delegate"),
+        C.getIdentifier("cancelButtonTitle"),
+        C.getIdentifier("otherButtonTitles"),
+      };
+      ArrayRef<Identifier> UIAlertViewInitPieces = _UIAlertViewInitPieces;
+      ObjCSelector UIAlertViewInit(C, UIAlertViewInitPieces.size(),
+                                   UIAlertViewInitPieces);
+      
+      if (variadic
+          && (selector == UIActionSheetInit || selector == UIAlertViewInit)) {
+        selector = ObjCSelector(C, selector.getNumArgs() - 1,
+                                selector.getSelectorPieces().slice(0,
+                                      selector.getSelectorPieces().size() - 1));
+        args = args.slice(0, args.size() - 1);
+        variadic = false;
+      }
+      
+      DeclName mappedDeclName = Impl.mapSelectorToDeclName(selector,
+                                                         /*initializer*/ true);
+      return {mappedDeclName, args, variadic};
+    }
+    
     /// \brief Given an imported method, try to import it as a constructor.
     ///
     /// Objective-C methods in the 'init' family are imported as
@@ -2086,16 +2136,23 @@ namespace {
       auto known = Impl.Constructors.find({objcMethod, dc});
       if (known != Impl.Constructors.end())
         return known->second;
-
+      
       // Check whether there is already a method with this selector.
       auto selector = Impl.importSelector(objcMethod->getSelector());
       if (methodAlreadyImported(selector, /*isInstance=*/false, dc))
         return nullptr;
 
       // Map the name and complete the import.
-      auto name = Impl.mapSelectorToDeclName(selector, /*isInitializer=*/true);
+      DeclName name;
+      ArrayRef<const clang::ParmVarDecl *> args;
+      bool variadic;
+      std::tie(name, args, variadic)
+        = mapInitSelectorToDeclName(selector,
+                                    {objcMethod->param_begin(),
+                                     objcMethod->param_size()},
+                                    objcMethod->isVariadic());
       return importConstructor(objcMethod, dc, implicit, kind, required,
-                               selector, name);
+                               selector, name, args, variadic);
     }
 
     /// \brief Given an imported method, try to import it as a constructor.
@@ -2116,7 +2173,9 @@ namespace {
                                        Optional<CtorInitializerKind> kindIn,
                                        bool required,
                                        ObjCSelector selector,
-                                       DeclName name) {
+                                       DeclName name,
+                                       ArrayRef<const clang::ParmVarDecl*> args,
+                                       bool variadic) {
       // Figure out the type of the container.
       auto containerTy = dc->getDeclaredTypeOfContext();
       assert(containerTy && "Method in non-type context?");
@@ -2182,13 +2241,12 @@ namespace {
 
       // Import the type that this method will have.
       auto type = Impl.importMethodType(objcMethod->getReturnType(),
-                                        { objcMethod->param_begin(),
-                                          objcMethod->param_size() },
-                                        objcMethod->isVariadic(),
+                                        args,
+                                        variadic,
                                   objcMethod->hasAttr<clang::NoReturnAttr>(),
-                                          bodyPatterns,
-                                          name,
-                                          SpecialMethodKind::Constructor);
+                                        bodyPatterns,
+                                        name,
+                                        SpecialMethodKind::Constructor);
       if (!type)
         return nullptr;
 
@@ -3181,7 +3239,10 @@ namespace {
                                                  ctor->getInitKind(),
                                                  /*required=*/false, 
                                                  ctor->getObjCSelector(),
-                                                 ctor->getFullName()))
+                                                 ctor->getFullName(),
+                                                 {objcMethod->param_begin(),
+                                                  objcMethod->param_size()},
+                                                 objcMethod->isVariadic()))
               newMembers.push_back(newCtor);
             continue;
           }
