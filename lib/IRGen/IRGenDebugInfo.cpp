@@ -843,6 +843,12 @@ void IRGenDebugInfo::emitVariableDeclaration(IRBuilder& Builder,
   // FIXME: this should be the scope of the type's declaration.
   llvm::DIType DTy = getOrCreateType(Ty);
 
+  unsigned Derefs = Indirection ? 1 : 0;
+  // If this is a function pointer we need an extra DW_OP_deref, so we
+  // can distinuguish this from a function symbol.
+  if (Ty.getType()->getCanonicalType()->is<AnyFunctionType>())
+    ++Derefs;
+
   // If there is no debug info for this type then do not emit debug info
   // for this variable.
   assert(DTy);
@@ -857,11 +863,12 @@ void IRGenDebugInfo::emitVariableDeclaration(IRBuilder& Builder,
   // Create the descriptor for the variable.
   llvm::DIVariable Descriptor;
 
-  if (Indirection) {
+  if (Derefs) {
     // Classes are always passed by reference.
     llvm::Type *Int64Ty = llvm::Type::getInt64Ty(M.getContext());
     SmallVector<llvm::Value *, 1> Addr;
-    Addr.push_back(llvm::ConstantInt::get(Int64Ty, llvm::DIBuilder::OpDeref));
+    while (Derefs--)
+      Addr.push_back(llvm::ConstantInt::get(Int64Ty, llvm::DIBuilder::OpDeref));
     assert(Flags == 0 && "Complex variables cannot have flags");
     Descriptor = DBuilder.createComplexVariable(Tag, Scope, Name,
                                                 Unit, Line, DTy, Addr, ArgNo);
@@ -1002,7 +1009,8 @@ IRGenDebugInfo::createStructType(DebugTypeInfo DbgTy,
 
 /// Return an array with the DITypes for each of an enum's elements.
 llvm::DIArray IRGenDebugInfo::
-getEnumElements(DebugTypeInfo DbgTy, EnumDecl *D, llvm::DIFile File,
+getEnumElements(DebugTypeInfo DbgTy, EnumDecl *D,
+                llvm::DIDescriptor Scope, llvm::DIFile File,
                 unsigned Flags) {
   SmallVector<llvm::Value *, 16> Elements;
   for (auto ElemDecl : D->getAllElements()) {
@@ -1010,11 +1018,12 @@ getEnumElements(DebugTypeInfo DbgTy, EnumDecl *D, llvm::DIFile File,
     // Swift Enums can be both like DWARF enums and DWARF unions.
     // We currently cannot represent the enum-like subset of enums.
     if (ElemDecl->hasType()) {
-      auto CanTy = ElemDecl->getType()->getCanonicalType();
       // Use Decl as DeclContext.
       DebugTypeInfo DTI(ElemDecl, DbgTy.size, DbgTy.align);
-      auto DTy = getOrCreateDesugaredType(CanTy, DTI);
-      Elements.push_back(DTy);
+      unsigned Offset = 0;
+      auto MTy = createMemberType(DTI, ElemDecl->getName().str(),
+                                  Offset, Scope, File, Flags);
+      Elements.push_back(MTy);
     }
   }
   return DBuilder.getOrCreateArray(Elements);
@@ -1026,12 +1035,12 @@ llvm::DICompositeType
 IRGenDebugInfo::createEnumType(DebugTypeInfo DbgTy,
                                EnumDecl *Decl,
                                StringRef Name,
+                               llvm::DIDescriptor Scope,
                                llvm::DIFile File, unsigned Line,
                                unsigned Flags) {
   unsigned SizeOfByte = CI.getTargetInfo().getCharWidth();
   unsigned SizeInBits = DbgTy.size.getValue() * SizeOfByte;
   unsigned AlignInBits = DbgTy.align.getValue() * SizeOfByte;
-  auto Scope = getOrCreateContext(DbgTy.getDeclContext());
   // FIXME: Is DW_TAG_union_type the right thing here?
   auto FwdDecl = DBuilder.createForwardDecl
     (llvm::dwarf::DW_TAG_union_type,
@@ -1042,7 +1051,7 @@ IRGenDebugInfo::createEnumType(DebugTypeInfo DbgTy,
   auto DTy =
     DBuilder.createUnionType(Scope, Name, File, Line,
                              SizeInBits, AlignInBits, Flags,
-                             getEnumElements(DbgTy, Decl, File, Flags),
+                             getEnumElements(DbgTy, Decl, Scope, File, Flags),
                              dwarf::DW_LANG_Swift);
   FwdDecl->replaceAllUsesWith(DTy);
   return DTy;
@@ -1334,7 +1343,6 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     // Metatypes are (mostly) singleton type descriptors, often without storage.
     Location L = getLoc(SM, DbgTy.getDecl());
     auto File = getOrCreateFile(L.Filename);
-    auto Metatype = BaseTy->castTo<AnyMetatypeType>();
     return DBuilder.createStructType(Scope, MangledName, File, L.Line,
                                      SizeInBits, AlignInBits, Flags,
                                      llvm::DIType(), llvm::DIArray(),
@@ -1366,8 +1374,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
       FunctionTy = IGM.SILMod->Types.getLoweredType(BaseTy)
                               .castTo<SILFunctionType>();
     auto Params=createParameterTypes(FunctionTy, DbgTy.getDeclContext());
-    auto FnTy = DBuilder.createSubroutineType(MainFile, Params);
-    return DBuilder.createPointerType(FnTy, SizeInBits, AlignInBits);
+    return DBuilder.createSubroutineType(MainFile, Params);
   }
 
   case TypeKind::Enum:
@@ -1375,7 +1382,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     auto EnumTy = BaseTy->castTo<EnumType>();
     if (auto Decl = EnumTy->getDecl()) {
       Location L = getLoc(SM, Decl);
-      return createEnumType(DbgTy, Decl, MangledName,
+      return createEnumType(DbgTy, Decl, MangledName, Scope,
                             getOrCreateFile(L.Filename), L.Line, Flags);
     }
     DEBUG(llvm::dbgs() << "Enum type without Decl: ";
@@ -1388,7 +1395,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     auto EnumTy = BaseTy->castTo<BoundGenericEnumType>();
     if (auto Decl = EnumTy->getDecl()) {
       Location L = getLoc(SM, Decl);
-      return createEnumType(DbgTy, Decl, MangledName,
+      return createEnumType(DbgTy, Decl, MangledName, Scope,
                              getOrCreateFile(L.Filename), L.Line, Flags);
     }
     DEBUG(llvm::dbgs() << "Bound generic enum type without Decl: ";

@@ -242,10 +242,12 @@ private:
                                        llvm::DIDescriptor Scope,
                                        llvm::DIFile File, unsigned Flags);
   llvm::DIArray getEnumElements(DebugTypeInfo DbgTy, EnumDecl *D,
-                                llvm::DIFile File, unsigned Flags);
+                                llvm::DIDescriptor Scope, llvm::DIFile File,
+                                unsigned Flags);
   llvm::DICompositeType createEnumType(DebugTypeInfo DbgTy, EnumDecl *Decl,
-                                       StringRef Name, llvm::DIFile File,
-                                       unsigned Line, unsigned Flags);
+                                       StringRef Name, llvm::DIDescriptor Scope,
+                                       llvm::DIFile File, unsigned Line,
+                                       unsigned Flags);
   uint64_t getSizeOfBasicType(DebugTypeInfo DbgTy);
   TypeAliasDecl *getMetadataType();
 };
