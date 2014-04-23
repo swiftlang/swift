@@ -1335,7 +1335,6 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     Location L = getLoc(SM, DbgTy.getDecl());
     auto File = getOrCreateFile(L.Filename);
     auto Metatype = BaseTy->castTo<AnyMetatypeType>();
-    auto Ty = Metatype->getInstanceType();
     return DBuilder.createStructType(Scope, MangledName, File, L.Line,
                                      SizeInBits, AlignInBits, Flags,
                                      llvm::DIType(), llvm::DIArray(),
