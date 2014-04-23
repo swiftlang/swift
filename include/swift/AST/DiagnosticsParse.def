@@ -835,13 +835,6 @@ ERROR(expected_type_after_is,expr_parsing,none,
 ERROR(expected_type_after_as,expr_parsing,none,
       "expected type after 'as'", ())
 
-// Call expressions
-ERROR(expected_selector_call_args,expr_parsing,PointsToFirstBadToken,
-      "expected '(' or '{' following selector piece %0", (Identifier))
-ERROR(selector_call_args_removed,expr_parsing,none,
-      "the separated call syntax is being removed; use keyword arguments "
-      "instead", ())
-
 //------------------------------------------------------------------------------
 // Attribute-parsing diagnostics
 //------------------------------------------------------------------------------

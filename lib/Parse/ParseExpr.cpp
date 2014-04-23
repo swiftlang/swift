@@ -587,24 +587,6 @@ ParserResult<Expr> Parser::parseExprSuper() {
           return makeParserError();
         
         result = new (Context) CallExpr(result, arg.get(), /*Implicit=*/false);
-      } else if (Tok.is(tok::identifier) && isContinuation(Tok) &&
-                 (peekToken().isFollowingLParen() || 
-                  peekToken().isFollowingLBrace())) {
-        // Parse selector-style arguments.
-        // FIXME: Not checking for the start of a get/set accessor here.
-
-        // Parse the first selector name.
-        Identifier firstSelectorPiece = Context.getIdentifier(Tok.getText());
-        SourceLoc firstSelectorPieceLoc = Tok.getLoc();
-        consumeToken(tok::identifier);
-
-        ParserResult<Expr> call = parseExprCallSuffix(makeParserResult(result), 
-                                                      firstSelectorPiece,
-                                                      firstSelectorPieceLoc);
-        if (call.hasCodeCompletion() || call.isParseError())
-          return call;
-
-        result = call.get();
       } else {
         // It's invalid to refer to an uncalled initializer.
         diagnose(ctorLoc, diag::super_initializer_must_be_called);
@@ -992,26 +974,6 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
                                                                     selfDecl);
               }
             }
-          } else if (Tok.is(tok::identifier) && isContinuation(Tok) &&
-                     (peekToken().isFollowingLParen() ||
-                      peekToken().isFollowingLBrace())) {
-            // Parse selector-style arguments.
-            // FIXME: Not checking for the start of a get/set accessor here.
-            
-            // Parse the first selector name.
-            Identifier firstSelectorPiece
-              = Context.getIdentifier(Tok.getText());
-            SourceLoc firstSelectorPieceLoc = Tok.getLoc();
-            consumeToken(tok::identifier);
-            
-            ParserResult<Expr> call = parseExprCallSuffix(
-                                        makeParserResult(initRef),
-                                        firstSelectorPiece,
-                                        firstSelectorPieceLoc);
-            if (call.hasCodeCompletion() || call.isParseError())
-              return call;
-            
-            initRef = call.get();
           } else {
             // It's invalid to refer to an uncalled initializer.
             diagnose(initLoc, diag::init_ref_must_be_called);
@@ -1844,128 +1806,22 @@ Parser::parseExprCallSuffix(ParserResult<Expr> fn,
   if (firstArg.hasCodeCompletion())
     return firstArg;
 
-  // If we don't have any selector arguments, we're done.
-  if (!Tok.is(tok::identifier) || !isContinuation(Tok)) {
-    if (fn.isParseError())
-      return fn;
-    if (firstArg.isParseError())
-      return firstArg;
+  if (fn.isParseError())
+    return fn;
+  if (firstArg.isParseError())
+    return firstArg;
 
-    // If the argument was a closure, create a trailing closure argument.
-    Expr *arg = firstArg.get();
-    if (firstArgIsClosure) {
-      arg = createArgWithTrailingClosure(Context, SourceLoc(), { }, nullptr, 
-                                         SourceLoc(), arg);
-    }
-
-    // Form the call.
-    return makeParserResult(new (Context) CallExpr(
-                                            fn.get(), arg,
-                                            /*Implicit=*/firstArgIsClosure));
+  // If the argument was a closure, create a trailing closure argument.
+  Expr *arg = firstArg.get();
+  if (firstArgIsClosure) {
+    arg = createArgWithTrailingClosure(Context, SourceLoc(), { }, nullptr, 
+                                       SourceLoc(), arg);
   }
 
-  // Add the first argument.
-  SmallVector<Expr *, 4> selectorArgs;
-  SmallVector<Identifier, 4> selectorPieces;
-  SmallVector<SourceLoc, 4> selectorLocs;
-  bool hadError = false;
-  if (firstArg.isParseError()) {
-    hadError = true;
-  } else {
-    selectorArgs.push_back(firstArg.get());
-    selectorPieces.push_back(firstSelectorPiece);
-    selectorLocs.push_back(firstSelectorPieceLoc);
-  }
-
-  // Parse the remaining selector arguments.
-  while (true) {
-    // Otherwise, an identifier on the same line continues the
-    // selector arguments.
-    if (Tok.isNot(tok::identifier) || !isContinuation(Tok)) {
-      // We're done.
-      break;
-    }
-
-    // Consume the selector piece.
-    Identifier selectorPiece = Context.getIdentifier(Tok.getText());
-    selectorLocs.push_back(Tok.getLoc());
-    consumeToken(tok::identifier);
-
-    // Look for the following '(' or '{' that provides arguments.
-    if (Tok.isNot(tok::l_paren) && Tok.isNot(tok::l_brace)) {
-      diagnose(Tok, diag::expected_selector_call_args, selectorPiece);
-      hadError = true;
-      break;
-    }
-
-    // Parse the expression. We parse a full expression list, but
-    // complain about it later.
-    ParserResult<Expr> selectorArg 
-      = Tok.is(tok::l_paren)? parseExprList(tok::l_paren, tok::r_paren)
-                            : parseExprClosure();
-    if (selectorArg.hasCodeCompletion())
-      return selectorArg;
-    if (selectorArg.isParseError()) {
-      hadError = true;
-    } else {
-      selectorArgs.push_back(selectorArg.get());
-      selectorPieces.push_back(selectorPiece);
-    }
-  }
-
-  if (hadError)
-    return makeParserError();
-
-  // Complain that the selector syntax is going away.
-  auto diag = diagnose(fn.get()->getLoc(), diag::selector_call_args_removed);
-  for (unsigned i = 0, n = selectorArgs.size(); i != n-1; ++i) {
-    // If the next expression is a trailing closure, remove following the ')' of
-    // this argument to the end of the next keyword. There's no way to express
-    // keywords with trailing closures.
-    if (isa<ClosureExpr>(selectorArgs[i+1])) {
-      auto afterThisArg
-        = Lexer::getLocForEndOfToken(Context.SourceMgr,
-                                     selectorArgs[i]->getEndLoc());
-      auto afterNextSelector = Lexer::getLocForEndOfToken(Context.SourceMgr,
-                                                          selectorLocs[i+1]);
-      diag.fixItReplaceChars(afterThisArg, afterNextSelector, "");
-      continue;
-    }
-
-    // However, when we have something like 'super.init withFoo' or
-    // 'X.init withFoo' as our function, and this is the first argument, then
-    // replace the '.init ' part with '(' and replace the first '(' with a ':';.
-    if (i == 0) {
-      if (auto ctor = dyn_cast<UnresolvedConstructorExpr>(fn.get())) {
-        auto endOfSubLoc
-          = Lexer::getLocForEndOfToken(Context.SourceMgr,
-                                       ctor->getSubExpr()->getEndLoc());
-        diag.fixItReplaceChars(endOfSubLoc, selectorLocs[0], "(");
-
-        diag.fixItReplace(selectorArgs[i]->getStartLoc(), ": ");
-      }
-    }
-
-    // Replace from the end of this argument to the start of the name of the
-    // next argument with ", ".
-    diag.fixItReplaceChars(selectorArgs[i]->getEndLoc(),selectorLocs[i+1],", ");
-
-    // Replace the opening '(' of subsequent selector args with ": ".
-    diag.fixItReplace(selectorArgs[i+1]->getStartLoc(), ": ");
-  }
-
-  // FIXME: Improve AST here to represent individual selector pieces
-  // and their arguments cleanly.
-  Expr *arg = new (Context) TupleExpr(selectorArgs.front()->getStartLoc(),
-                                      Context.AllocateCopy(selectorArgs),
-                                      Context.AllocateCopy<Identifier>(
-                                        selectorPieces.begin(),
-                                        selectorPieces.end()),
-                                      selectorArgs.back()->getEndLoc(),
-                                      /*hasTrailingClosure=*/false,
-                                      /*implicit=*/false);
-  return makeParserResult(new (Context) CallExpr(fn.get(), arg, 
-                                                 /*Implicit=*/false));
+  // Form the call.
+  return makeParserResult(new (Context) CallExpr(
+                                          fn.get(), arg,
+                                          /*Implicit=*/firstArgIsClosure));
 }
 
 /// parseExprCollection - Parse a collection literal expression.

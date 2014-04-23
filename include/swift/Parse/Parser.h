@@ -419,18 +419,6 @@ public:
   /// but not when used as comparison operators.
   void skipSingle();
 
-  /// Determine whether the given token is a continuation.
-  bool isContinuation(const Token &tok) {
-    // If this token isn't at the start of the line, it's a continuation.
-    if (!tok.isAtStartOfLine())
-      return true;
-
-    return isContinuationSlow(tok);
-  }
-
-  /// Determine whether the given token is a continuation; slow path.
-  bool isContinuationSlow(const Token &tok);
-
 public:
   InFlightDiagnostic diagnose(SourceLoc Loc, Diagnostic Diag) {
     if (Diags.isDiagnosticPointsToFirstBadToken(Diag.getID()) &&
