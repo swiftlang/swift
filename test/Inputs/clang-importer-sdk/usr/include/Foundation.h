@@ -205,6 +205,35 @@ typedef NS_OPTIONS(NSInteger, AlertBuzzes) {
   AlertBuzzSosumi
 };
 
+// From AppKit
+typedef NS_OPTIONS(NSUInteger, NSBitmapFormat) {
+  NSAlphaFirstBitmapFormat            = 1 << 0, // 0 means is alpha last (RGBA, CMYKA, etc.)
+  NSAlphaNonpremultipliedBitmapFormat = 1 << 1, // 0 means is premultiplied
+  NSFloatingPointSamplesBitmapFormat  = 1 << 2,	// 0 is integer
+
+  NS16BitLittleEndianBitmapFormat /*NS_ENUM_AVAILABLE_MAC(10_10)*/ = (1 << 8),
+  NS32BitLittleEndianBitmapFormat /*NS_ENUM_AVAILABLE_MAC(10_10)*/ = (1 << 9),
+  NS16BitBigEndianBitmapFormat /*NS_ENUM_AVAILABLE_MAC(10_10)*/ = (1 << 10),
+  NS32BitBigEndianBitmapFormat /*NS_ENUM_AVAILABLE_MAC(10_10)*/ = (1 << 11)
+};
+
+typedef NS_OPTIONS(NSUInteger, NSBitmapFormat2) {
+  NSU16a,
+  NSU32a,
+};
+
+typedef NS_OPTIONS(NSUInteger, NSBitmapFormat3) {
+  NSU16b,
+  NSU32b,
+  NSS16b,
+  NSS32b,
+};
+
+typedef NS_OPTIONS(NSUInteger, NSUBitmapFormat4) {
+  NSU16c,
+  NSU32c,
+};
+
 
 @protocol NSWobbling
 -(void)wobble;

@@ -315,25 +315,17 @@ static bool isNSDictionaryMethod(const clang::ObjCMethodDecl *MD,
 /// This is used to derive the common prefix of enum constants so we can elide
 /// it from the Swift interface.
 static StringRef getCommonWordPrefix(StringRef a, StringRef b) {
-  // Ensure that 'b' is the longer string.
-  if (a.size() > b.size())
-    std::swap(a, b);
+  auto aWords = camel_case::getWords(a), bWords = camel_case::getWords(b);
+  auto aI = aWords.begin(), aE = aWords.end(),
+       bI = bWords.begin(), bE = bWords.end();
 
   unsigned prefixLength = 0;
-  unsigned commonSize = a.size();
-  for (size_t i = 0; i < commonSize; ++i) {
-    // If this is a camel-case word boundary, advance the prefix length.
-    if (clang::isUppercase(a[i]) && clang::isUppercase(b[i]))
-      prefixLength = i;
-
-    if (a[i] != b[i])
-      return a.slice(0, prefixLength);
+  for ( ; aI != aE && bI != bE; ++aI, ++bI) {
+    if (*aI != *bI)
+      break;
+    prefixLength = aI.getPosition() + aI->size();
   }
 
-  // If the two strings match exactly, or if we're at a word boundary in the
-  // longer string, the entire shorter string is the prefix.
-  if (b.size() == commonSize || clang::isUppercase(b[commonSize]))
-    prefixLength = commonSize;
   return a.slice(0, prefixLength);
 }
 
