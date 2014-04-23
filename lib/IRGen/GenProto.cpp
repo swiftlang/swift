@@ -897,8 +897,10 @@ namespace {
                                            UnownedTypeInfo> {
   public:
     UnownedClassExistentialTypeInfo(unsigned numTables,
-                                    llvm::Type *ty, Size size, Alignment align)
-      : ScalarExistentialTypeInfoBase(numTables, ty, size, align) {}
+                                    llvm::Type *ty,
+                                    const llvm::BitVector &spareBits,
+                                    Size size, Alignment align)
+      : ScalarExistentialTypeInfoBase(numTables, ty, size, spareBits, align) {}
 
     void emitPayloadRetain(IRGenFunction &IGF, llvm::Value *value) const {
       IGF.emitUnknownUnownedRetain(value);
@@ -927,7 +929,7 @@ namespace {
     
     ClassExistentialTypeInfo(llvm::Type *ty,
                              Size size,
-                             llvm::BitVector spareBits,
+                             llvm::BitVector &&spareBits,
                              Alignment align,
                              ArrayRef<ProtocolEntry> protocols)
       : ScalarExistentialTypeInfoBase(protocols.size(), ty, size,
@@ -940,7 +942,8 @@ namespace {
     
   public:    
     static const ClassExistentialTypeInfo *
-    create(llvm::Type *ty, Size size, llvm::BitVector spareBits, Alignment align,
+    create(llvm::Type *ty, Size size,
+           llvm::BitVector &&spareBits, Alignment align,
            ArrayRef<ProtocolEntry> protocols)
     {
       void *buffer = operator new(sizeof(ClassExistentialTypeInfo) +

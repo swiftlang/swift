@@ -34,7 +34,8 @@ namespace irgen {
 /// memory.
 class LoadableTypeInfo : public FixedTypeInfo {
 protected:
-  LoadableTypeInfo(llvm::Type *type, Size size, llvm::BitVector spareBits,
+  LoadableTypeInfo(llvm::Type *type, Size size,
+                   const llvm::BitVector &spareBits,
                    Alignment align,
                    IsPOD_t pod, SpecialTypeInfoKind stik = STIK_Loadable)
       : FixedTypeInfo(type, size, spareBits, align, pod, stik) {

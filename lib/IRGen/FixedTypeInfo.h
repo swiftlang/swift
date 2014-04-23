@@ -44,11 +44,12 @@ private:
   llvm::BitVector SpareBits;
   
 protected:
-  FixedTypeInfo(llvm::Type *type, Size size, llvm::BitVector spareBits,
+  FixedTypeInfo(llvm::Type *type, Size size,
+                const llvm::BitVector &spareBits,
                 Alignment align, IsPOD_t pod,
                 SpecialTypeInfoKind stik = STIK_Fixed)
       : TypeInfo(type, align, pod, stik), StorageSize(size),
-        SpareBits(std::move(spareBits)) {
+        SpareBits(spareBits) {
     assert(isFixedSize());
   }
 

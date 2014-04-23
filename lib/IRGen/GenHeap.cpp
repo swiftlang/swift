@@ -602,8 +602,9 @@ namespace {
                                   UnownedTypeInfo> {
   public:
     SwiftUnownedReferenceTypeInfo(llvm::Type *type,
+                                  const llvm::BitVector &spareBits,
                                   Size size, Alignment alignment)
-      : SingleScalarTypeInfo(type, size, alignment) {}
+      : SingleScalarTypeInfo(type, size, spareBits, alignment) {}
 
     enum { IsScalarPOD = false };
 
@@ -681,6 +682,7 @@ namespace {
 const UnownedTypeInfo *
 TypeConverter::createSwiftUnownedStorageType(llvm::Type *valueType) {
   return new SwiftUnownedReferenceTypeInfo(valueType,
+                                           IGM.getHeapObjectSpareBits(),
                                            IGM.getPointerSize(),
                                            IGM.getPointerAlignment());
 }
@@ -701,8 +703,9 @@ namespace {
                                   UnownedTypeInfo> {
   public:
     UnknownUnownedReferenceTypeInfo(llvm::Type *type,
+                                    const llvm::BitVector &spareBits,
                                     Size size, Alignment alignment)
-      : SingleScalarTypeInfo(type, size, alignment) {}
+      : SingleScalarTypeInfo(type, size, spareBits, alignment) {}
 
     enum { IsScalarPOD = false };
 
@@ -782,6 +785,7 @@ namespace {
 const UnownedTypeInfo *
 TypeConverter::createUnknownUnownedStorageType(llvm::Type *valueType) {
   return new UnknownUnownedReferenceTypeInfo(valueType,
+                                             IGM.getHeapObjectSpareBits(),
                                              IGM.getPointerSize(),
                                              IGM.getPointerAlignment());
 }
