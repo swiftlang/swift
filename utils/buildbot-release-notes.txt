@@ -1,6 +1,8 @@
 Latest
 ----------
 
+* NSLog is now available from Swift code.
+
 2014-04-22
 ----------
 
