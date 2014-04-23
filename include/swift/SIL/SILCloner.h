@@ -521,6 +521,24 @@ SILCloner<ImplClass>::visitUnownedToRefInst(UnownedToRefInst *Inst) {
 
 template<typename ImplClass>
 void
+SILCloner<ImplClass>::visitRefToUnmanagedInst(RefToUnmanagedInst *Inst) {
+  doPostProcess(Inst,
+    getBuilder().createRefToUnmanaged(getOpLocation(Inst->getLoc()),
+                                      getOpValue(Inst->getOperand()),
+                                      getOpType(Inst->getType())));
+}
+
+template<typename ImplClass>
+void
+SILCloner<ImplClass>::visitUnmanagedToRefInst(UnmanagedToRefInst *Inst) {
+  doPostProcess(Inst,
+    getBuilder().createUnmanagedToRef(getOpLocation(Inst->getLoc()),
+                                      getOpValue(Inst->getOperand()),
+                                      getOpType(Inst->getType())));
+}
+
+template<typename ImplClass>
+void
 SILCloner<ImplClass>::
 visitThinToThickFunctionInst(ThinToThickFunctionInst *Inst) {
   doPostProcess(Inst,

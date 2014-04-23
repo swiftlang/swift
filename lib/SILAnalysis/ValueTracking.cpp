@@ -125,6 +125,7 @@ static bool isTransitiveEscapeInst(SILInstruction *Inst) {
   case ValueKind::RefElementAddrInst:
   case ValueKind::RefToNativeObjectInst:
   case ValueKind::RefToRawPointerInst:
+  case ValueKind::RefToUnmanagedInst:
   case ValueKind::RefToUnownedInst:
   case ValueKind::StructElementAddrInst:
   case ValueKind::StructExtractInst:
@@ -140,6 +141,7 @@ static bool isTransitiveEscapeInst(SILInstruction *Inst) {
   case ValueKind::TupleExtractInst:
   case ValueKind::TupleInst:
   case ValueKind::UnconditionalCheckedCastInst:
+  case ValueKind::UnmanagedToRefInst:
   case ValueKind::UnownedToRefInst:
   case ValueKind::UpcastExistentialRefInst:
   case ValueKind::UpcastInst:

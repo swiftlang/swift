@@ -910,6 +910,27 @@ namespace {
       IGF.emitUnknownUnownedRelease(value);
     }
   };
+
+  /// A type implementation for @unowned(unsafe) class existential types.
+  class UnmanagedClassExistentialTypeInfo
+    : public ScalarExistentialTypeInfoBase<UnmanagedClassExistentialTypeInfo,
+                                           LoadableTypeInfo> {
+  public:
+    UnmanagedClassExistentialTypeInfo(unsigned numTables,
+                                      llvm::Type *ty,
+                                      const llvm::BitVector &spareBits,
+                                      Size size, Alignment align)
+      : ScalarExistentialTypeInfoBase(numTables, ty, size,
+                                      spareBits, align, IsPOD) {}
+
+    void emitPayloadRetain(IRGenFunction &IGF, llvm::Value *value) const {
+      // do nothing
+    }
+
+    void emitPayloadRelease(IRGenFunction &IGF, llvm::Value *value) const {
+      // do nothing
+    }
+  };
   
   /// A type info implementation for class existential types, that is,
   /// an existential type known to conform to one or more class protocols.
@@ -1035,11 +1056,22 @@ namespace {
 
     const UnownedTypeInfo *
     createUnownedStorageType(TypeConverter &TC) const override {
-      // We can just re-use the storage type for the [unowned] type.
+      // We can just re-use the storage type for the @unowned(safe) type.
       return new UnownedClassExistentialTypeInfo(NumProtocols,
                                                  getStorageType(),
+                                                 getSpareBits(),
                                                  getFixedSize(),
                                                  getFixedAlignment());
+    }
+
+    const TypeInfo *
+    createUnmanagedStorageType(TypeConverter &TC) const override {
+      // We can just re-use the storage type for the @unowned(unsafe) type.
+      return new UnmanagedClassExistentialTypeInfo(NumProtocols,
+                                                   getStorageType(),
+                                                   getSpareBits(),
+                                                   getFixedSize(),
+                                                   getFixedAlignment());
     }
 
     const WeakTypeInfo *
@@ -1062,7 +1094,7 @@ namespace {
       return new WeakClassExistentialTypeInfo(NumProtocols, storageTy, size,
                                               TC.IGM.getWeakReferenceAlignment());
     }
-    
+
     // Extra inhabitants of class existential containers.
     // We use the heap object extra inhabitants over the class pointer value.
     // We could get even more extra inhabitants from the witness table

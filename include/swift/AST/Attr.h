@@ -207,6 +207,7 @@ public:
   Ownership getOwnership() const {
     if (has(TAK_sil_weak)) return Ownership::Weak;
     if (has(TAK_sil_unowned)) return Ownership::Unowned;
+    if (has(TAK_sil_unmanaged)) return Ownership::Unmanaged;
     return Ownership::Strong;
   }
   
@@ -789,6 +790,7 @@ public:
   bool isInfix() const { return has(AK_infix); }
   bool isWeak() const { return has(AK_weak); }
   bool isUnowned() const { return has(AK_unowned); }
+  bool isUnmanaged() const { return has(AK_unowned_unsafe); }
   bool isOptional() const { return has(AK_optional); }
 
   // FIXME: eventually take a platform argument.
@@ -811,16 +813,18 @@ public:
     return Nothing;
   }
 
-  bool hasOwnership() const { return isWeak() || isUnowned(); }
+  bool hasOwnership() const { return isWeak() || isUnowned() || isUnmanaged(); }
   Ownership getOwnership() const {
     if (isWeak()) return Ownership::Weak;
     if (isUnowned()) return Ownership::Unowned;
+    if (isUnmanaged()) return Ownership::Unmanaged;
     return Ownership::Strong;
   }
 
   void clearOwnership() {
     clearAttribute(AK_weak);
     clearAttribute(AK_unowned);
+    clearAttribute(AK_unowned_unsafe);
   }
 
   void print(llvm::raw_ostream &OS) const;

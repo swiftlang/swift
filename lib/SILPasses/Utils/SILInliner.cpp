@@ -374,6 +374,7 @@ static InlineCost instructionInlineCost(SILInstruction &I,
     case ValueKind::ExistentialMetatypeInst:
     case ValueKind::ProtocolMethodInst:
     case ValueKind::RefElementAddrInst:
+    case ValueKind::RefToUnmanagedInst:
     case ValueKind::RefToUnownedInst:
     case ValueKind::StoreInst:
     case ValueKind::StoreWeakInst:
@@ -387,6 +388,7 @@ static InlineCost instructionInlineCost(SILInstruction &I,
     case ValueKind::SwitchIntInst:
     case ValueKind::TakeEnumDataAddrInst:
     case ValueKind::UnconditionalCheckedCastInst:
+    case ValueKind::UnmanagedToRefInst:
     case ValueKind::UnownedReleaseInst:
     case ValueKind::UnownedRetainInst:
     case ValueKind::UnownedToRefInst:

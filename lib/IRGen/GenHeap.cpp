@@ -595,6 +595,28 @@ const TypeInfo *TypeConverter::convertBuiltinNativeObject() {
 }
 
 namespace {
+  /// A type implementation for an @unowned(unsafe) reference to an
+  /// object.
+  class UnmanagedReferenceTypeInfo
+    : public PODSingleScalarTypeInfo<UnmanagedReferenceTypeInfo,
+                                     LoadableTypeInfo> {
+  public:
+    UnmanagedReferenceTypeInfo(llvm::Type *type,
+                               const llvm::BitVector &spareBits,
+                               Size size, Alignment alignment)
+      : PODSingleScalarTypeInfo(type, size, spareBits, alignment) {}
+  };
+}
+
+const TypeInfo *
+TypeConverter::createUnmanagedStorageType(llvm::Type *valueType) {
+  return new UnmanagedReferenceTypeInfo(valueType,
+                                        IGM.getHeapObjectSpareBits(),
+                                        IGM.getPointerSize(),
+                                        IGM.getPointerAlignment());
+}
+
+namespace {
   /// A type implementation for an [unowned] reference to an object
   /// with a known-Swift reference count.
   class SwiftUnownedReferenceTypeInfo

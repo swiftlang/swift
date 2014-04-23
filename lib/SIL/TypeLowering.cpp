@@ -282,6 +282,10 @@ namespace {
       llvm_unreachable("should have substituted dependent type into context");
     }
 
+    RetTy visitUnmanagedStorageType(CanUnmanagedStorageType type) {
+      return asImpl().handleTrivial(type);
+    }
+
     RetTy visitUnownedStorageType(CanUnownedStorageType type) {
       return asImpl().handleReference(type);
     }

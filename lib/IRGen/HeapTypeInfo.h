@@ -260,6 +260,11 @@ public:
     }
   }
 
+  const TypeInfo *createUnmanagedStorageType(TypeConverter &TC) const {
+    return TC.createUnmanagedStorageType(this->getStorageType());
+  }
+
+
   // Extra inhabitants of heap object pointers.
 
   bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {

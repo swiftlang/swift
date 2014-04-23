@@ -832,6 +832,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case ValueKind::RawPointerToRefInst:
   case ValueKind::RefToUnownedInst:
   case ValueKind::UnownedToRefInst:
+  case ValueKind::RefToUnmanagedInst:
+  case ValueKind::UnmanagedToRefInst:
   case ValueKind::ThinToThickFunctionInst:
   case ValueKind::ThickToObjCMetatypeInst:
   case ValueKind::ObjCToThickMetatypeInst:

@@ -400,6 +400,10 @@ namespace {
     createUnownedStorageType(TypeConverter &TC) const override {
       llvm_unreachable("[unowned] function type");
     }
+    const TypeInfo *
+    createUnmanagedStorageType(TypeConverter &TC) const override {
+      llvm_unreachable("@unowned(unsafe) function type");
+    }
 
     unsigned getExplosionSize(ResilienceExpansion kind) const {
       return hasExtraData() ? 2 : 1;

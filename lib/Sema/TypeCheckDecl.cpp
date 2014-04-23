@@ -5322,9 +5322,11 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     }
   }
 
-  // Ownership attributes (weak, unowned).
+  // Ownership attributes (weak, unowned(safe), unowned(unsafe)).
   if (Attrs.hasOwnership()) {
-    assert(unsigned(Attrs.isWeak()) + unsigned(Attrs.isUnowned()) == 1 &&
+    assert(unsigned(Attrs.isWeak()) +
+           unsigned(Attrs.isUnowned()) +
+           unsigned(Attrs.isUnmanaged()) == 1 &&
            "multiple ownership attributes present?");
 
     // Only 'var' declarations can have ownership.

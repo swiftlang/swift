@@ -98,6 +98,7 @@ bool CanType::hasReferenceSemanticsImpl(CanType type) {
     return false;
 
   case TypeKind::UnownedStorage:
+  case TypeKind::UnmanagedStorage:
   case TypeKind::WeakStorage:
     return false; // This might seem non-obvious.
 
@@ -327,6 +328,7 @@ bool TypeBase::isUnspecializedGeneric() {
              ->isUnspecializedGeneric();
 
   case TypeKind::UnownedStorage:
+  case TypeKind::UnmanagedStorage:
   case TypeKind::WeakStorage:
     return cast<ReferenceStorageType>(this)->getReferentType()
              ->isUnspecializedGeneric();
@@ -828,17 +830,13 @@ CanType TypeBase::getCanonicalType() {
     break;
   }
 
-  case TypeKind::UnownedStorage: {
-    auto ref = cast<UnownedStorageType>(this);
-    Type referentType = ref->getReferentType()->getCanonicalType();
-    Result = UnownedStorageType::get(referentType,
-                                     referentType->getASTContext());
-    break;
-  }
+  case TypeKind::UnownedStorage:
+  case TypeKind::UnmanagedStorage:
   case TypeKind::WeakStorage: {
-    auto ref = cast<WeakStorageType>(this);
+    auto ref = cast<ReferenceStorageType>(this);
     Type referentType = ref->getReferentType()->getCanonicalType();
-    Result = WeakStorageType::get(referentType, referentType->getASTContext());
+    Result = ReferenceStorageType::get(referentType, ref->getOwnership(),
+                                       referentType->getASTContext());
     break;
   }
   case TypeKind::LValue:
@@ -997,6 +995,7 @@ TypeBase *TypeBase::getDesugaredType() {
   case TypeKind::GenericTypeParam:
   case TypeKind::DependentMember:
   case TypeKind::UnownedStorage:
+  case TypeKind::UnmanagedStorage:
   case TypeKind::WeakStorage:
   case TypeKind::DynamicSelf:
     // None of these types have sugar at the outer level.
@@ -1252,6 +1251,7 @@ bool TypeBase::isSpelledLike(Type other) {
     return aMe->getBaseType()->isSpelledLike(aThem->getBaseType());
   }
   case TypeKind::UnownedStorage:
+  case TypeKind::UnmanagedStorage:
   case TypeKind::WeakStorage: {
     auto rMe = cast<ReferenceStorageType>(me);
     auto rThem = cast<ReferenceStorageType>(them);
@@ -2200,6 +2200,7 @@ case TypeKind::Id:
   }
 
   case TypeKind::UnownedStorage:
+  case TypeKind::UnmanagedStorage:
   case TypeKind::WeakStorage: {
     auto storageTy = cast<ReferenceStorageType>(base);
     Type refTy = storageTy->getReferentType();

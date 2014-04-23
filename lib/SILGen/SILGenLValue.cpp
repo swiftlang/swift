@@ -1020,13 +1020,22 @@ SILValue SILGenFunction::emitConversionToSemanticRValue(SILLocation loc,
   if (src.getType().is<WeakStorageType>())
     return emitRefToOptional(*this, loc, src, valueTL);
 
-  // For @unowned types, we need to strip the unowned box.
+  // For @unowned(safe) types, we need to generate a strong retain and
+  // strip the unowned box.
   if (auto unownedType = src.getType().getAs<UnownedStorageType>()) {
     B.createStrongRetainUnowned(loc, src);
     return B.createUnownedToRef(loc, src,
                 SILType::getPrimitiveObjectType(unownedType.getReferentType()));
   }
 
+  // For @unowned(unsafe) types, we need to strip the unmanaged box
+  // and then do an (unsafe) retain.
+  if (auto unmanagedType = src.getType().getAs<UnmanagedStorageType>()) {
+    auto result = B.createUnmanagedToRef(loc, src,
+              SILType::getPrimitiveObjectType(unmanagedType.getReferentType()));
+    B.createStrongRetain(loc, result);
+    return result;
+  }
 
   llvm_unreachable("unexpected storage type that differs from type-of-rvalue");
 }
@@ -1049,13 +1058,22 @@ static SILValue emitLoadOfSemanticRValue(SILGenFunction &gen,
     return emitRefToOptional(gen, loc, refValue, valueTL);
   }
 
-  // For @unowned types, we need to strip the unowned box.
+  // For @unowned(safe) types, we need to strip the unowned box.
   if (auto unownedType = storageType.getAs<UnownedStorageType>()) {
     auto unownedValue = gen.B.createLoad(loc, src);
     gen.B.createStrongRetainUnowned(loc, unownedValue);
     if (isTake) gen.B.createUnownedRelease(loc, unownedValue);
     return gen.B.createUnownedToRef(loc, unownedValue,
               SILType::getPrimitiveObjectType(unownedType.getReferentType()));
+  }
+
+  // For @unowned(unsafe) types, we need to strip the unmanaged box.
+  if (auto unmanagedType = src.getType().getAs<UnmanagedStorageType>()) {
+    auto value = gen.B.createLoad(loc, src);
+    auto result = gen.B.createUnmanagedToRef(loc, value,
+            SILType::getPrimitiveObjectType(unmanagedType.getReferentType()));
+    gen.B.createStrongRetain(loc, result);
+    return result;
   }
 
   llvm_unreachable("unexpected storage type that differs from type-of-rvalue");
@@ -1084,13 +1102,23 @@ static void emitStoreOfSemanticRValue(SILGenFunction &gen,
     return;
   }
 
-  // For @unowned types, we need to enter the unowned box by turning
-  // the strong retain into an unowned retain.
+  // For @unowned(safe) types, we need to enter the unowned box by
+  // turning the strong retain into an unowned retain.
   if (storageType.is<UnownedStorageType>()) {
     auto unownedValue =
       gen.B.createRefToUnowned(loc, value, storageType.getObjectType());
     gen.B.createUnownedRetain(loc, unownedValue);
     emitUnloweredStoreOfCopy(gen.B, loc, unownedValue, dest, isInit);
+    gen.B.emitStrongRelease(loc, value);
+    return;
+  }
+
+  // For @unowned(unsafe) types, we need to enter the unmanaged box and
+  // release the strong retain.
+  if (storageType.is<UnmanagedStorageType>()) {
+    auto unmanagedValue =
+      gen.B.createRefToUnmanaged(loc, value, storageType.getObjectType());
+    emitUnloweredStoreOfCopy(gen.B, loc, unmanagedValue, dest, isInit);
     gen.B.emitStrongRelease(loc, value);
     return;
   }
@@ -1184,6 +1212,14 @@ SILValue SILGenFunction::emitConversionFromSemanticValue(SILLocation loc,
     B.createUnownedRetain(loc, unowned);
     B.emitStrongRelease(loc, semanticValue);
     return unowned;
+  }
+
+  // For @unmanaged types, place into an unmanaged box.
+  if (storageType.is<UnmanagedStorageType>()) {
+    SILValue unmanaged =
+      B.createRefToUnmanaged(loc, semanticValue, storageType);
+    B.emitStrongRelease(loc, semanticValue);
+    return unmanaged;
   }
   
   llvm_unreachable("unexpected storage type that differs from type-of-rvalue");

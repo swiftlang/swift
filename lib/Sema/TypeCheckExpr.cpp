@@ -397,7 +397,8 @@ Type TypeChecker::getTypeOfRValue(ValueDecl *value, bool wantInterfaceType) {
   }
 
   // Ignore @unowned qualification.
-  if (isa<UnownedStorageType>(canType))
+  if (isa<UnownedStorageType>(canType) ||
+      isa<UnmanagedStorageType>(canType))
     return type->getReferenceStorageReferent();
 
   // No other transforms necessary.

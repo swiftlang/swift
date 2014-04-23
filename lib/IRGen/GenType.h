@@ -109,6 +109,7 @@ private:
   const TypeInfo *convertProtocolCompositionType(ProtocolCompositionType *T);
   const TypeInfo *convertBuiltinNativeObject();
   const TypeInfo *convertBuiltinUnknownObject();
+  const TypeInfo *convertUnmanagedStorageType(UnmanagedStorageType *T);
   const TypeInfo *convertUnownedStorageType(UnownedStorageType *T);
   const TypeInfo *convertWeakStorageType(WeakStorageType *T);
   
@@ -129,6 +130,7 @@ public:
   const UnownedTypeInfo *createSwiftUnownedStorageType(llvm::Type *valueType);
   const WeakTypeInfo *createUnknownWeakStorageType(llvm::Type *valueType);
   const UnownedTypeInfo *createUnknownUnownedStorageType(llvm::Type *valueType);
+  const TypeInfo *createUnmanagedStorageType(llvm::Type *valueType);
 
   /// Enter a generic context for lowering the parameters of a generic function
   /// type.

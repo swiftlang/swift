@@ -1409,6 +1409,27 @@ public:
             "operand's type as its referent type");
   }
 
+  void checkRefToUnmanagedInst(RefToUnmanagedInst *I) {
+    requireReferenceValue(I->getOperand(), "Operand of ref_to_unmanaged");
+    auto operandType = I->getOperand().getType().getSwiftRValueType();
+    auto resultType = requireObjectType(UnmanagedStorageType, I,
+                                        "Result of ref_to_unmanaged");
+    require(resultType.getReferentType() == operandType,
+            "Result of ref_to_unmanaged does not have the "
+            "operand's type as its referent type");
+  }
+
+  void checkUnmanagedToRefInst(UnmanagedToRefInst *I) {
+    auto operandType = requireObjectType(UnmanagedStorageType,
+                                         I->getOperand(),
+                                         "Operand of unmanaged_to_ref");
+    requireReferenceValue(I, "Result of unmanaged_to_ref");
+    auto resultType = I->getType().getSwiftRValueType();
+    require(operandType.getReferentType() == resultType,
+            "Operand of unmanaged_to_ref does not have the "
+            "operand's type as its referent type");
+  }
+
   void checkUpcastInst(UpcastInst *UI) {
     require(UI->getType() != UI->getOperand().getType(),
             "can't upcast to same type");

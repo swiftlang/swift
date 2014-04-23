@@ -2421,9 +2421,10 @@ static Optional<swift::AbstractCC> getActualCC(uint8_t cc) {
 static
 Optional<swift::Ownership> getActualOwnership(serialization::Ownership raw) {
   switch (raw) {
-  case serialization::Ownership::Strong:  return swift::Ownership::Strong;
-  case serialization::Ownership::Unowned: return swift::Ownership::Unowned;
-  case serialization::Ownership::Weak:    return swift::Ownership::Weak;
+  case serialization::Ownership::Strong:   return swift::Ownership::Strong;
+  case serialization::Ownership::Unmanaged:return swift::Ownership::Unmanaged;
+  case serialization::Ownership::Unowned:  return swift::Ownership::Unowned;
+  case serialization::Ownership::Weak:     return swift::Ownership::Weak;
   }
   return Nothing;
 }

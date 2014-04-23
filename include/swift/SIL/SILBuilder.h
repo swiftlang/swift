@@ -386,6 +386,16 @@ public:
     return insert(new (F.getModule()) RefToUnownedInst(loc, op, ty));
   }
 
+  UnmanagedToRefInst *createUnmanagedToRef(SILLocation loc,
+                                           SILValue op, SILType ty) {
+    return insert(new (F.getModule()) UnmanagedToRefInst(loc, op, ty));
+  }
+
+  RefToUnmanagedInst *createRefToUnmanaged(SILLocation loc,
+                                           SILValue op, SILType ty) {
+    return insert(new (F.getModule()) RefToUnmanagedInst(loc, op, ty));
+  }
+
   IsNonnullInst *createIsNonnull(SILLocation loc,
                                  SILValue operand) {
     return insert(new (F.getModule())

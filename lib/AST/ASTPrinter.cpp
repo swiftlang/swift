@@ -2005,6 +2005,11 @@ public:
     visit(T->getReferentType());
   }
 
+  void visitUnmanagedStorageType(UnmanagedStorageType *T) {
+    Printer << "@sil_unmanaged ";
+    visit(T->getReferentType());
+  }
+
   void visitWeakStorageType(WeakStorageType *T) {
     Printer << "@sil_weak ";
     visit(T->getReferentType());

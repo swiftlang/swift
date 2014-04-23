@@ -629,7 +629,7 @@ emitRValueForPropertyLoad(SILLocation loc, ManagedValue base,
     SILValue Scalar = B.createStructExtract(loc, base.getValue(), FieldDecl);
     Result = ManagedValue::forUnmanaged(Scalar);
 
-    if (Result.getSwiftType()->is<ReferenceStorageType>()) {
+    if (Result.getType().is<ReferenceStorageType>()) {
       // For @weak and @unowned types, convert the reference to the right
       // pointer, producing a +1.
       Scalar = emitConversionToSemanticRValue(loc, Scalar, lowering);

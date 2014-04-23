@@ -1070,6 +1070,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("ref_element_addr", ValueKind::RefElementAddrInst)
     .Case("ref_to_native_object", ValueKind::RefToNativeObjectInst)
     .Case("ref_to_raw_pointer", ValueKind::RefToRawPointerInst)
+    .Case("ref_to_unmanaged", ValueKind::RefToUnmanagedInst)
     .Case("ref_to_unowned", ValueKind::RefToUnownedInst)
     .Case("retain_value", ValueKind::RetainValueInst)
     .Case("sil_global_addr", ValueKind::SILGlobalAddrInst)
@@ -1094,6 +1095,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("tuple_element_addr", ValueKind::TupleElementAddrInst)
     .Case("tuple_extract", ValueKind::TupleExtractInst)
     .Case("unconditional_checked_cast", ValueKind::UnconditionalCheckedCastInst)
+    .Case("unmanaged_to_ref", ValueKind::UnmanagedToRefInst)
     .Case("unowned_retain", ValueKind::UnownedRetainInst)
     .Case("unowned_release", ValueKind::UnownedReleaseInst)
     .Case("unowned_to_ref", ValueKind::UnownedToRefInst)
@@ -1525,6 +1527,8 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   case ValueKind::RawPointerToRefInst:
   case ValueKind::RefToUnownedInst:
   case ValueKind::UnownedToRefInst:
+  case ValueKind::RefToUnmanagedInst:
+  case ValueKind::UnmanagedToRefInst:
   case ValueKind::ThinToThickFunctionInst:
   case ValueKind::ThickToObjCMetatypeInst:
   case ValueKind::ObjCToThickMetatypeInst:
@@ -1575,6 +1579,12 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       break;
     case ValueKind::UnownedToRefInst:
       ResultVal = B.createUnownedToRef(InstLoc, Val, Ty);
+      break;
+    case ValueKind::RefToUnmanagedInst:
+      ResultVal = B.createRefToUnmanaged(InstLoc, Val, Ty);
+      break;
+    case ValueKind::UnmanagedToRefInst:
+      ResultVal = B.createUnmanagedToRef(InstLoc, Val, Ty);
       break;
     case ValueKind::ThinToThickFunctionInst:
       ResultVal = B.createThinToThickFunction(InstLoc, Val, Ty);

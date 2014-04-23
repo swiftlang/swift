@@ -651,6 +651,8 @@ public:
   void visitRawPointerToRefInst(RawPointerToRefInst *i);
   void visitRefToUnownedInst(RefToUnownedInst *i);
   void visitUnownedToRefInst(UnownedToRefInst *i);
+  void visitRefToUnmanagedInst(RefToUnmanagedInst *i);
+  void visitUnmanagedToRefInst(UnmanagedToRefInst *i);
   void visitThinToThickFunctionInst(ThinToThickFunctionInst *i);
   void visitThickToObjCMetatypeInst(ThickToObjCMetatypeInst *i);
   void visitObjCToThickMetatypeInst(ObjCToThickMetatypeInst *i);
@@ -2563,17 +2565,17 @@ void IRGenSILFunction::visitRawPointerToRefInst(swift::RawPointerToRefInst *i) {
                       destType);
 }
 
-void IRGenSILFunction::visitUnownedToRefInst(swift::UnownedToRefInst *i) {
-  // This instruction is specified to be a no-op.
-  Explosion temp = getLoweredExplosion(i->getOperand());
-  setLoweredExplosion(SILValue(i, 0), temp);
+// SIL scalar conversions which never change the IR type.
+#define NOOP_CONVERSION(KIND)                                    \
+void IRGenSILFunction::visit##KIND##Inst(swift::KIND##Inst *i) { \
+  Explosion temp = getLoweredExplosion(i->getOperand());         \
+  setLoweredExplosion(SILValue(i, 0), temp);                     \
 }
-
-void IRGenSILFunction::visitRefToUnownedInst(swift::RefToUnownedInst *i) {
-  // This instruction is specified to be a no-op.
-  Explosion temp = getLoweredExplosion(i->getOperand());
-  setLoweredExplosion(SILValue(i, 0), temp);
-}
+NOOP_CONVERSION(UnownedToRef)
+NOOP_CONVERSION(RefToUnowned)
+NOOP_CONVERSION(UnmanagedToRef)
+NOOP_CONVERSION(RefToUnmanaged)
+#undef NOOP_CONVERSION
 
 void IRGenSILFunction::visitThinToThickFunctionInst(
                                             swift::ThinToThickFunctionInst *i) {

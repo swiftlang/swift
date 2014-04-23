@@ -1454,6 +1454,10 @@ ReferenceStorageType *ReferenceStorageType::get(Type T, Ownership ownership,
     return entry =
       new (C, arena) WeakStorageType(T, T->isCanonical() ? &C : 0,
                                      properties);
+  case Ownership::Unmanaged:
+    return entry =
+      new (C, arena) UnmanagedStorageType(T, T->isCanonical() ? &C : 0,
+                                          properties);
   }
   llvm_unreachable("bad ownership");
 }

@@ -3232,8 +3232,9 @@ public:
 
   Type getReferentType() const { return Referent; }
   Ownership getOwnership() const {
-    return (getKind() == TypeKind::WeakStorage ? Ownership::Weak
-                                               : Ownership::Unowned);
+    return (getKind() == TypeKind::WeakStorage    ? Ownership::Weak :
+            getKind() == TypeKind::UnownedStorage ? Ownership::Unowned
+                                                  : Ownership::Unmanaged);
   }
 
   // Implement isa/cast/dyncast/etc.
@@ -3265,6 +3266,28 @@ public:
   }
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(UnownedStorageType, ReferenceStorageType)
+
+/// \brief The storage type of a variable with @unowned(unsafe)
+/// ownership semantics, akin to the library Unmanaged<> type.
+class UnmanagedStorageType : public ReferenceStorageType {
+  friend class ReferenceStorageType;
+  UnmanagedStorageType(Type referent, const ASTContext *C,
+                       RecursiveTypeProperties properties)
+    : ReferenceStorageType(TypeKind::UnmanagedStorage, referent, C,
+                           properties) {}
+
+public:
+  static UnmanagedStorageType *get(Type referent, const ASTContext &C) {
+    return static_cast<UnmanagedStorageType*>(
+                 ReferenceStorageType::get(referent, Ownership::Unmanaged, C));
+  }
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::UnmanagedStorage;
+  }
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(UnmanagedStorageType, ReferenceStorageType)
 
 /// \brief The storage type of a variable with [weak] ownership semantics.
 class WeakStorageType : public ReferenceStorageType {

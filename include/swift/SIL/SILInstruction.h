@@ -1193,6 +1193,30 @@ public:
     : UnaryInstructionBase(Loc, Operand, Ty) {}
 };
 
+/// RefToUnmanagedInst - Given a value of a reference type,
+/// convert it to an unmanaged reference.
+///
+/// This does nothing at runtime; it just changes the formal type.
+class RefToUnmanagedInst
+  : public UnaryInstructionBase<ValueKind::RefToUnmanagedInst, ConversionInst>
+{
+public:
+  RefToUnmanagedInst(SILLocation Loc, SILValue Operand, SILType Ty)
+    : UnaryInstructionBase(Loc, Operand, Ty) {}
+};
+
+/// UnmanagedToRefInst - Given a value of an unmanaged reference type,
+/// convert it to the underlying reference type.
+///
+/// This does nothing at runtime; it just changes the formal type.
+class UnmanagedToRefInst
+  : public UnaryInstructionBase<ValueKind::UnmanagedToRefInst, ConversionInst>
+{
+public:
+  UnmanagedToRefInst(SILLocation Loc, SILValue Operand, SILType Ty)
+    : UnaryInstructionBase(Loc, Operand, Ty) {}
+};
+
 /// ThinToThickFunctionInst - Given a thin function reference, adds a null
 /// context to convert the value to a thick function type.
 class ThinToThickFunctionInst

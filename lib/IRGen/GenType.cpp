@@ -1046,6 +1046,8 @@ TypeCacheEntry TypeConverter::convertType(CanType ty) {
   case TypeKind::GenericTypeParam:
   case TypeKind::DependentMember:
     llvm_unreachable("can't convert dependent type");
+  case TypeKind::UnmanagedStorage:
+    return convertUnmanagedStorageType(cast<UnmanagedStorageType>(ty));
   case TypeKind::UnownedStorage:
     return convertUnownedStorageType(cast<UnownedStorageType>(ty));
   case TypeKind::WeakStorage:
@@ -1075,6 +1077,16 @@ TypeConverter::convertUnownedStorageType(UnownedStorageType *refType) {
   assert(referent->allowsOwnership());
   auto &referentTI = cast<ReferenceTypeInfo>(getCompleteTypeInfo(referent));
   return referentTI.createUnownedStorageType(*this);
+}
+
+/// Convert an @unowned(unsafe) storage type.  The implementation here
+/// depends on the underlying reference type.
+const TypeInfo *
+TypeConverter::convertUnmanagedStorageType(UnmanagedStorageType *refType) {
+  CanType referent = CanType(refType->getReferentType());
+  assert(referent->allowsOwnership());
+  auto &referentTI = cast<ReferenceTypeInfo>(getCompleteTypeInfo(referent));
+  return referentTI.createUnmanagedStorageType(*this);
 }
 
 /// Convert a [weak] storage type.  The implementation here

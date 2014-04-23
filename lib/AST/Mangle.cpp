@@ -689,6 +689,11 @@ void Mangler::mangleType(CanType type, ResilienceExpansion explosion,
     return mangleType(cast<InOutType>(type).getObjectType(),
                       ResilienceExpansion::Minimal, 0);
 
+  case TypeKind::UnmanagedStorage:
+    Buffer << "Xu";
+    return mangleType(cast<UnmanagedStorageType>(type).getReferentType(),
+                      ResilienceExpansion::Minimal, 0);
+
   case TypeKind::UnownedStorage:
     Buffer << "Xo";
     return mangleType(cast<UnownedStorageType>(type).getReferentType(),

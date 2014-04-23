@@ -1565,6 +1565,14 @@ private:
         unowned->addChild(type);
         return unowned;
       }
+      if (Mangled.nextIf('u')) {
+        NodePointer type = demangleType();
+        if (!type)
+          return nullptr;
+        NodePointer unowned = Node::create(Node::Kind::Unmanaged);
+        unowned->addChild(type);
+        return unowned;
+      }
       if (Mangled.nextIf('w')) {
         NodePointer type = demangleType();
         if (!type)
@@ -2156,6 +2164,10 @@ void NodePrinter::print(Node *pointer, bool asContext, bool suppressType) {
     return;
   case Node::Kind::Unowned:
     Printer << "@unowned ";
+    print(pointer->getChild(0));
+    return;
+  case Node::Kind::Unmanaged:
+    Printer << "@unowned(unsafe) ";
     print(pointer->getChild(0));
     return;
   case Node::Kind::InOut:

@@ -184,7 +184,8 @@ using AssociativityField = BCFixed<2>;
 enum Ownership : uint8_t {
   Strong = 0,
   Weak,
-  Unowned
+  Unowned,
+  Unmanaged,
 };
 using OwnershipField = BCFixed<2>;
 

@@ -776,6 +776,12 @@ public:
   void visitUnownedToRefInst(UnownedToRefInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand(), "unowned_to_ref");
   }
+  void visitRefToUnmanagedInst(RefToUnmanagedInst *CI) {
+    printUncheckedConversionInst(CI, CI->getOperand(), "ref_to_unmanaged");
+  }
+  void visitUnmanagedToRefInst(UnmanagedToRefInst *CI) {
+    printUncheckedConversionInst(CI, CI->getOperand(), "unmanaged_to_ref");
+  }
   void visitThinToThickFunctionInst(ThinToThickFunctionInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand(),"thin_to_thick_function");
   }

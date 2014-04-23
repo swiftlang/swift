@@ -1409,6 +1409,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
 
   // Reference storage types.
   case TypeKind::UnownedStorage:
+  case TypeKind::UnmanagedStorage:
   case TypeKind::WeakStorage: {
     auto ReferenceTy = cast<ReferenceStorageType>(BaseTy);
     auto CanTy = ReferenceTy->getReferentType();

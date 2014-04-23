@@ -532,6 +532,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 ///     'weak'
 ///     'inout'
 ///     'unowned'
+///     'unowned' '(' 'safe' ')'
+///     'unowned' '(' 'unsafe' ')'
 ///     'noreturn'
 ///     'optional'
 ///     '!'? 'mutating'
@@ -592,9 +594,39 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
     }
     return true;
   }
-  
+
   // Ok, it is a valid attribute, eat it, and then process it.
   SourceLoc Loc = consumeToken();
+
+  // Parse an optional specifier after @unowned.
+  if (attr == AK_unowned) {
+    SourceLoc lp = Tok.getLoc();
+    if (consumeIfNotAtStartOfLine(tok::l_paren)) {
+      bool invalid = true;
+      if (Tok.is(tok::identifier) && Tok.getText() == "safe") {
+        consumeToken();
+        invalid = false;
+      } else if (Tok.is(tok::identifier) && Tok.getText() == "unsafe") {
+        consumeToken();
+        attr = AK_unowned_unsafe;
+        invalid = false;
+      }
+
+      if (invalid) {
+        diagnose(Tok, diag::attr_unowned_invalid_specifier);
+        (void) consumeIf(tok::identifier);
+        // Go ahead and try to parse the rparen.
+      }
+
+      SourceLoc rp;
+      if (parseMatchingToken(tok::r_paren, rp,
+                             diag::attr_unowned_expected_rparen, lp))
+        return false;
+
+      if (invalid)
+        return false;
+    }
+  }
   
   // Diagnose duplicated attributes.
   if (Attributes.has(attr)) {
@@ -621,6 +653,7 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
   // Ownership attributes.
   case AK_weak:
   case AK_unowned:
+  case AK_unowned_unsafe:
     // Test for duplicate entries by temporarily removing this one.
     Attributes.clearAttribute(attr);
     if (Attributes.hasOwnership()) {

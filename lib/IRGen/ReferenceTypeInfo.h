@@ -64,6 +64,10 @@ public:
   virtual const UnownedTypeInfo *createUnownedStorageType(TypeConverter &TC)
     const = 0;
 
+  /// Produce the storage information for @unowned(unsafe) storage.
+  virtual const TypeInfo *createUnmanagedStorageType(TypeConverter &TC)
+    const = 0;
+
   static bool classof(const ReferenceTypeInfo *type) { return true; }
   static bool classof(const TypeInfo *type) {
     return type->getSpecialTypeInfoKind() == STIK_Reference;

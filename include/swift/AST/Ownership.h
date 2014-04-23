@@ -26,11 +26,14 @@ enum class Ownership {
   /// \brief a strong reference (the default semantics)
   Strong,
 
-  /// \brief a [weak] reference
+  /// \brief a @weak reference
   Weak,
 
-  /// \brief an [unowned] reference
+  /// \brief an @unowned reference
   Unowned,
+
+  /// \brief an @unowned(unsafe) reference
+  Unmanaged,
 };
   
 } // end namespace swift

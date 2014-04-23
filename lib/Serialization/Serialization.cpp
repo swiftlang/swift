@@ -1857,6 +1857,7 @@ static uint8_t getRawStableOwnership(swift::Ownership ownership) {
   SIMPLE_CASE(Ownership, Strong)
   SIMPLE_CASE(Ownership, Weak)
   SIMPLE_CASE(Ownership, Unowned)
+  SIMPLE_CASE(Ownership, Unmanaged)
   }
   llvm_unreachable("bad ownership kind");
 }
@@ -2307,6 +2308,7 @@ void Serializer::writeType(Type ty) {
   }
 
   case TypeKind::UnownedStorage:
+  case TypeKind::UnmanagedStorage:
   case TypeKind::WeakStorage: {
     auto refTy = cast<ReferenceStorageType>(ty.getPointer());
 

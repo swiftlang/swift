@@ -798,8 +798,9 @@ Types
   type ::= 'T' tuple-element* '_'            // tuple
   type ::= 't' tuple-element* '_'            // variadic tuple
   type ::= 'U' generics '_' type             // generic type (old)
-  type ::= 'Xo' type                         // [unowned] type
-  type ::= 'Xw' type                         // [weak] type
+  type ::= 'Xo' type                         // @unowned type
+  type ::= 'Xu' type                         // @unowned(unsafe) type
+  type ::= 'Xw' type                         // @weak type
   type ::= 'XF' impl-function-type           // function implementation type
   nominal-type ::= known-nominal-type
   nominal-type ::= substitution

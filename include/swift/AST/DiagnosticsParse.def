@@ -932,6 +932,12 @@ ERROR(opened_attribute_id_value,attribute_parsing,none,
 ERROR(opened_attribute_expected_rparen,attribute_parsing,none,
       "expected ')' after id value for 'opened' attribute", ())
 
+// unowned
+ERROR(attr_unowned_invalid_specifier,attribute_parsing,none,
+      "expected 'safe' or 'unsafe'", ())
+ERROR(attr_unowned_expected_rparen,attribute_parsing,none,
+      "expected ')' after specifier for 'unowned' attribute", ())
+
 //------------------------------------------------------------------------------
 // Generics parsing diagnostics
 //------------------------------------------------------------------------------
