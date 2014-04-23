@@ -43,6 +43,7 @@ enum class PassKind {
   NoReturn,
   DCE,
   DataflowDiagnostics,
+  GlobalOpt,
   InOutDeshadowing,
   MandatoryInlining,
   PredictableMemoryOpt,
@@ -124,6 +125,9 @@ Passes(llvm::cl::desc("Passes:"),
                         clEnumValN(PassKind::InOutDeshadowing,
                                    "inout-deshadow",
                                    "Remove inout argument shadow variables"),
+                        clEnumValN(PassKind::GlobalOpt,
+                                   "global-opt",
+                                   "Global variable optimizations"),
                         clEnumValN(PassKind::MandatoryInlining,
                                    "mandatory-inlining",
                                    "Inline transparent functions"),
@@ -367,6 +371,9 @@ int main(int argc, char **argv) {
       break;
     case PassKind::InOutDeshadowing:
       PM.add(createInOutDeshadowing());
+      break;
+    case PassKind::GlobalOpt:
+      PM.add(createGlobalOpt());
       break;
     case PassKind::MandatoryInlining:
       PM.add(createMandatoryInlining());

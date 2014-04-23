@@ -60,6 +60,7 @@ namespace swift {
   // Performance transformations.
   SILTransform *createSILCombine();
   SILTransform *createDeadFunctionElimination();
+  SILTransform *createGlobalOpt();
   SILTransform *createLowerAggregate();
   SILTransform *createSROA();
   SILTransform *createMem2Reg();
