@@ -5,7 +5,11 @@ typedef struct objc_object { void *isa; } *id;
 
 typedef signed char BOOL;
 
-@class NSString;
+typedef struct _NSZone NSZone;
+void *allocate(NSZone *zone);
+
+
+@class NSString, NSEnumerator;
 
 /// Aaa.  NSArray.  Bbb.
 @interface NSArray : NSObject
@@ -29,10 +33,33 @@ typedef signed char BOOL;
 @protocol NSSecureCoding <NSCoding>
 @end
 
+@protocol NSCopying
+- (id)copyWithZone:(NSZone *)zone;
+@end
+
+@interface NSDictionary : NSObject /*<NSCopying, NSMutableCopying, NSSecureCoding, NSFastEnumeration>*/
+@property (readonly) NSUInteger count;
+- (id)objectForKey:(id)aKey;
+- (NSEnumerator *)keyEnumerator;
+@end
+@interface NSDictionary (NSExtendedDictionary)
+- (id)objectForKeyedSubscript:(id)key /*NS_AVAILABLE(10_8, 6_0)*/;
+@end
+
+@interface NSMutableDictionary : NSDictionary
+- (void)removeObjectForKey:(id)aKey;
+- (void)setObject:(id)anObject forKey:(id <NSCopying>)aKey;
+@end
+
+@interface NSMutableDictionary (NSExtendedMutableDictionary)
+- (void)setObject:(id)obj forKeyedSubscript:(id <NSCopying>)key /*NS_AVAILABLE(10_8, 6_0)*/;
+@end
+
+
 @interface NSError : NSObject
 @end
 
-@interface NSString : NSObject <NSSecureCoding>
+@interface NSString : NSObject <NSSecureCoding, NSCopying>
 - (void)onlyOnNSString;
 + (instancetype)stringWithContentsOfFile:(NSString*)path error:(NSError**)error;
 @end
@@ -55,10 +82,6 @@ NSString *NSStringToNSString(NSString *str);
 @end
 
 BOOL BOOLtoBOOL(BOOL b);
-
-typedef struct _NSZone NSZone;
-
-void *allocate(NSZone *zone);
 
 typedef CGPoint NSPoint;
 typedef CGSize NSSize;

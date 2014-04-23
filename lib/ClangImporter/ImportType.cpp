@@ -43,6 +43,16 @@ static bool shouldImportAsOptional(const clang::Type *type) {
     || type->isBlockPointerType();
 }
 
+/// Wrap a type in the Optional type appropriate to the import kind.
+static Type getOptionalType(Type payloadType, ImportTypeKind kind) {
+  // Import pointee types as true Optional.
+  if (kind == ImportTypeKind::Pointee)
+    return OptionalType::get(payloadType);
+  // Otherwise, import as UncheckedOptional.
+  return UncheckedOptionalType::get(payloadType);
+}
+
+
 namespace {
   class SwiftTypeConverter : public clang::TypeVisitor<SwiftTypeConverter, Type>
   {
@@ -353,15 +363,6 @@ namespace {
       return ParenType::get(Impl.SwiftContext, inner);
     }
     
-    /// Wrap a type in the Optional type appropriate to the import kind.
-    Type getOptionalType(Type payloadType, ImportTypeKind kind) {
-      // Import pointee types as true Optional.
-      if (kind == ImportTypeKind::Pointee)
-        return OptionalType::get(payloadType);
-      // Otherwise, import as UncheckedOptional.
-      return UncheckedOptionalType::get(payloadType);
-    }
-
     Type VisitTypedefType(const clang::TypedefType *type) {
       // When BOOL is the type of a function parameter or a function
       // result type, map it to swift's Bool.
@@ -741,7 +742,8 @@ Type ClangImporter::Implementation::importMethodType(
     Type swiftParamTy;
     if (kind == SpecialMethodKind::NSDictionarySubscriptGetter &&
         paramTy->isObjCIdType()) {
-      swiftParamTy = getNSCopyingType();
+      swiftParamTy = getOptionalType(getNSCopyingType(),
+                                     ImportTypeKind::Parameter);
     }
     if (!swiftParamTy)
       swiftParamTy = importType(paramTy, ImportTypeKind::Parameter);
