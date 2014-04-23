@@ -318,10 +318,10 @@ private:
   /// The number of bytes to the left of the code completion point that
   /// should be erased first if this completion string is inserted in the
   /// editor buffer.
-  unsigned NumBytesToErase : 8;
+  unsigned NumBytesToErase : 7;
 
 public:
-  static const unsigned MaxNumBytesToErase = 255;
+  static const unsigned MaxNumBytesToErase = 127;
 
 private:
   CodeCompletionString *const CompletionString;
