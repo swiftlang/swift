@@ -189,9 +189,10 @@ public:
         for (auto PrevLS : SC.ActiveLabeledStmts) {
           if (PrevLS->getLabelInfo().Name == LS->getLabelInfo().Name) {
             SC.TC.diagnose(LS->getLabelInfo().Loc,
-                        diag::label_shadowed, PrevLS->getLabelInfo().Name);
+                        diag::label_shadowed, LS->getLabelInfo().Name);
             SC.TC.diagnose(PrevLS->getLabelInfo().Loc,
-                        diag::invalid_redecl_prev);
+                           diag::invalid_redecl_prev, 
+                           PrevLS->getLabelInfo().Name);
           }
         }
 

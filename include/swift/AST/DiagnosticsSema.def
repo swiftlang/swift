@@ -89,7 +89,7 @@ ERROR(unknown_name_in_type,sema_nb,none,
 
 ERROR(invalid_redecl,sema_nb,none,"invalid redeclaration of %0", (DeclName))
 NOTE(invalid_redecl_prev,sema_nb,none,
-     "previously declared here", ())
+     "%0 previously declared here", (DeclName))
 
 ERROR(ambiguous_type_base,sema_nb,none,
       "%0 is ambiguous for type lookup in this context", (Identifier))

@@ -1135,7 +1135,7 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
       }
 
       tc.diagnose(current, diag::invalid_redecl, current->getFullName());
-      tc.diagnose(other, diag::invalid_redecl_prev);
+      tc.diagnose(other, diag::invalid_redecl_prev, other->getFullName());
 
       current->setInvalid();
       if (current->hasType())
