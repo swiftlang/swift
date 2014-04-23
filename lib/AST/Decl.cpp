@@ -2172,6 +2172,13 @@ SourceRange AbstractFunctionDecl::getBodySourceRange() const {
   }
 }
 
+SourceRange AbstractFunctionDecl::getSignatureSourceRange() const {
+  auto Pats = getBodyParamPatterns();
+  if (Pats.empty())
+    return getNameLoc();
+  return SourceRange(getNameLoc(), Pats.back()->getEndLoc());
+}
+
 ObjCSelector AbstractFunctionDecl::getObjCSelector() const {
   if (auto func = dyn_cast<FuncDecl>(this))
     return func->getObjCSelector();

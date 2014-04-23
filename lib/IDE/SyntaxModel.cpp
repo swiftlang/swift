@@ -318,9 +318,8 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
       SN.Range = charSourceRangeFromSourceRange(SM, AFD->getSourceRange());
       SN.BodyRange = innerCharSourceRangeFromSourceRange(SM,
                                                      AFD->getBodySourceRange());
-      SourceLoc NRStart = AFD->getNameLoc();
-      SourceLoc NREnd = NRStart.getAdvancedLoc(AFD->getName().getLength());
-      SN.NameRange = CharSourceRange(SM, NRStart, NREnd);
+      SN.NameRange = charSourceRangeFromSourceRange(SM,
+                          AFD->getSignatureSourceRange());
       SN.Attrs = AFD->getAttrs();
       pushStructureNode(SN);
     }

@@ -3419,6 +3419,9 @@ public:
   /// Retrieve the source range of the function body.
   SourceRange getBodySourceRange() const;
 
+  /// Retrieve the source range of the function declaration name + patterns.
+  SourceRange getSignatureSourceRange() const;
+
   CaptureInfo &getCaptureInfo() { return Captures; }
   const CaptureInfo &getCaptureInfo() const { return Captures; }
 
