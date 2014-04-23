@@ -119,6 +119,10 @@
                     "switch_enum_addr" "dynamic_method_br"
                     "checked_cast_br")
                   'words) . font-lock-keyword-face)
+   ;; Blocks
+   `(,(regexp-opt '("project_block_storage" "init_block_storage_header"
+                    "copy_block")
+                  'words) . font-lock-keyword-face)
    ;; SIL Value
    '("\\b[%][A-Za-z_0-9]+\\([#][0-9]+\\)?\\b" . font-lock-variable-name-face)
    ;; Variables
