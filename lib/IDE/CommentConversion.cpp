@@ -263,7 +263,18 @@ void CommentToXMLConverter::visitFullComment(const FullComment *FC) {
     }
   }
 
-  // FIXME: <Declaration>
+  {
+    PrintOptions PO;
+    PO.PrintDefaultParameterPlaceholder = true;
+    PO.SkipImplicit = true;
+    PO.PrintImplicitAttrs = false;
+    PO.PrintUncheckedOptionalInImportedDecls = false;
+    PO.PrintFunctionRepresentationAttrs = false;
+    OS << "<Declaration>";
+    D->print(OS, PO);
+    OS << "</Declaration>";
+  }
+
   if (Parts.Brief) {
     OS << "<Abstract>";
     OS << "<Para>";
