@@ -17,10 +17,11 @@
 #ifndef _SWIFT_RUNTIME_DEBUG_HELPERS_
 #define _SWIFT_RUNTIME_DEBUG_HELPERS_
 
+#include <llvm/Config/config.h>
 #include <llvm/Support/Compiler.h>
 #include <stdio.h>
 
-#if __has_include(<CrashReporterClient.h>)
+#if HAVE_CRASHREPORTERCLIENT_H
 #include <CrashReporterClient.h>
 #else
 #define CRSetCrashLogMessage(_m_) fprintf(stderr, "%s\n", (_m_))

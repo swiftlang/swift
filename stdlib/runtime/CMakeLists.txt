@@ -42,3 +42,8 @@ endif()
 target_link_libraries(swift_runtime
   "-framework Foundation")
 
+find_library(CRASHREPORTERCLIENT NAMES CrashReporterClient)
+
+if (CRASHREPORTERCLIENT)
+  target_link_libraries(swift_runtime "-lCrashReporterClient")
+endif()
