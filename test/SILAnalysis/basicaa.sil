@@ -613,3 +613,35 @@ sil @projections_from_the_same_source_with_the_same_projection_path_mustalias : 
   %7 = tuple()
   return %7 : $()
 }
+
+var swift_global1 : Builtin.Int32
+var swift_global2 : Builtin.Int32
+sil_global public @sil_global1 : $Builtin.Int32
+sil_global public @sil_global2 : $Builtin.Int32
+
+// CHECK-LABEL: @globals_dont_alias
+// CHECK: PAIR #0.
+// CHECK-NEXT: (0):   %0 = global_addr #swift_global1 : $*Builtin.Int32
+// CHECK-NEXT: (0):   %0 = global_addr #swift_global1 : $*Builtin.Int32
+// CHECK-NEXT: MustAlias
+// CHECK: PAIR #1.
+// CHECK-NEXT: (0):   %0 = global_addr #swift_global1 : $*Builtin.Int32
+// CHECK-NEXT: (0):   %1 = global_addr #swift_global2 : $*Builtin.Int32
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #2.
+// CHECK-NEXT: (0):   %0 = global_addr #swift_global1 : $*Builtin.Int32
+// CHECK-NEXT: (0):   %2 = sil_global_addr @sil_global1 : $*Builtin.Int32
+// CHECK-NEXT: NoAlias
+// CHECK: PAIR #3.
+// CHECK-NEXT: (0):   %0 = global_addr #swift_global1 : $*Builtin.Int32
+// CHECK-NEXT: (0):   %3 = sil_global_addr @sil_global2 : $*Builtin.Int32
+// CHECK-NEXT: NoAlias
+
+sil @globals_dont_alias : $@thin () -> () {
+  %0 = global_addr #swift_global1 : $*Builtin.Int32
+  %1 = global_addr #swift_global2 : $*Builtin.Int32
+  %2 = sil_global_addr @sil_global1 : $*Builtin.Int32
+  %3 = sil_global_addr @sil_global2 : $*Builtin.Int32
+  %4 = tuple()
+  return %4 : $()
+}

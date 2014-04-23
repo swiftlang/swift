@@ -74,8 +74,13 @@ static bool isNoAliasArgument(SILValue V) {
 /// Return true if V is an object that at compile time can be uniquely
 /// identified.
 static bool isIdentifiableObject(SILValue V) {
-  return isa<AllocationInst>(*V) || isNoAliasArgument(V) ||
-    isa<LiteralInst>(*V);
+  if (isa<AllocationInst>(V) || isa<LiteralInst>(V))
+    return true;
+  if (isNoAliasArgument(V))
+    return true;
+  if (isa<GlobalAddrInst>(V) || isa<SILGlobalAddrInst>(V))
+    return true;
+  return false;
 }
 
 /// Is this a literal which we know can not refer to a global object?
