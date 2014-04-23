@@ -1,5 +1,6 @@
 set(SHARED_LIBRARY ON)
 add_swift_library(swiftUIKit INSTALL
+  DesignatedInitializers.mm
   UIKit.swift
   DEPENDS swift_stdlib_core swiftObjectiveC swiftFoundation)
 
