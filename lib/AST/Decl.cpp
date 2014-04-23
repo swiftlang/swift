@@ -942,6 +942,93 @@ bool swift::conflicting(const OverloadSignature& sig1,
          sig1.IsInstanceMember == sig2.IsInstanceMember;
 }
 
+static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
+                                     bool topLevelFunction,
+                                     unsigned curryLevels);
+
+/// Map a type within the signature of a declaration.
+static Type mapSignatureType(ASTContext &ctx, Type type) {
+  return type.transform([&](Type type) -> Type {
+      if (type->is<FunctionType>()) {
+        return mapSignatureFunctionType(ctx, type, false, 1);
+      }
+      
+      return type;
+    });
+}
+
+/// Map a signature type for a parameter.
+static Type mapSignatureParamType(ASTContext &ctx, Type type) {
+  /// Translate unchecked optionals into strict optionals.
+  if (auto uncheckedOptOf = type->getUncheckedOptionalObjectType()) {
+    type = OptionalType::get(uncheckedOptOf);
+  }
+
+  return mapSignatureType(ctx, type);
+}
+
+/// Map a function's type to the type used for computing signatures,
+/// which involves stripping noreturn, stripping default arguments,
+/// transforming unchecked optionals into strict optionals, etc.
+static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
+                                     bool topLevelFunction,
+                                     unsigned curryLevels) {
+  if (curryLevels == 0)
+    return mapSignatureType(ctx, type);
+
+  auto funcTy = type->castTo<AnyFunctionType>();
+  auto argTy = funcTy->getInput();
+
+  if (auto tupleTy = argTy->getAs<TupleType>()) {
+    SmallVector<TupleTypeElt, 4> elements;
+    bool anyChanged = false;
+    unsigned idx = 0;
+    for (const auto &elt : tupleTy->getFields()) {
+      Type eltTy = mapSignatureParamType(ctx, elt.getType());
+      if (anyChanged || eltTy.getPointer() != elt.getType().getPointer() ||
+          elt.hasInit()) {
+        if (!anyChanged) {
+          elements.reserve(tupleTy->getFields().size());
+          for (unsigned i = 0; i != idx; ++i) {
+            const TupleTypeElt &elt = tupleTy->getFields()[i];
+            elements.push_back(TupleTypeElt(elt.getType(), elt.getName(),
+                                            DefaultArgumentKind::None,
+                                            elt.isVararg()));
+          }
+          anyChanged = true;
+        }
+
+        elements.push_back(TupleTypeElt(eltTy, elt.getName(),
+                                        DefaultArgumentKind::None,
+                                        elt.isVararg()));
+      }
+      ++idx;
+    }
+    
+    if (anyChanged) {
+      argTy = TupleType::get(elements, ctx);
+    }
+  } else {
+    argTy = mapSignatureParamType(ctx, argTy);
+  }
+
+  // Map the result type.
+  auto resultTy = mapSignatureFunctionType(ctx, funcTy->getResult(),
+                                           topLevelFunction, curryLevels - 1);
+
+  // At the top level, none of the extended information is relevant.
+  AnyFunctionType::ExtInfo info;
+  if (!topLevelFunction)
+    info = funcTy->getExtInfo();
+
+  // Rebuild the resulting function type.
+  if (auto genericFuncTy = dyn_cast<GenericFunctionType>(funcTy))
+    return GenericFunctionType::get(genericFuncTy->getGenericSignature(),
+                                    argTy, resultTy, info);
+
+  return FunctionType::get(argTy, resultTy, info);
+}
+
 OverloadSignature ValueDecl::getOverloadSignature() const {
   OverloadSignature signature;
 
@@ -950,9 +1037,11 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
   // Functions, initializers, and de-initializers include their
   // interface types in their signatures as well as whether they are
   // instance members.
-  if (isa<AbstractFunctionDecl>(this)) {
+  if (auto afd = dyn_cast<AbstractFunctionDecl>(this)) {
     signature.InterfaceType
-      = getInterfaceType()->getWithoutDefaultArgs(getASTContext())
+      = mapSignatureFunctionType(getASTContext(), getInterfaceType(),
+                                 /*topLevelFunction=*/true,
+                                 afd->getNumParamPatterns())
           ->getCanonicalType();
     signature.IsInstanceMember = isInstanceMember();
     // Unary operators also include prefix/postfix.
