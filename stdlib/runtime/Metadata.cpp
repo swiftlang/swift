@@ -36,6 +36,10 @@
 using namespace swift;
 using namespace metadataimpl;
 
+extern "C" const ClassMetadata* object_getClass(const void *);
+extern "C" const char* class_getName(const ClassMetadata*);
+extern "C" const ClassMetadata* class_getSuperclass(const ClassMetadata*);
+
 namespace {
   template <class Entry> class MetadataCache;
 
@@ -268,15 +272,22 @@ instantiateGenericMetadata(GenericMetadata *pattern,
 
 /// The primary entrypoint.
 const void *
-swift::swift_dynamicCastClass(const void *object, 
+swift::swift_dynamicCastClass(const void *object,
                               const ClassMetadata *targetType) {
 #if SWIFT_OBJC_INTEROP
-  // If the object is an Objective-C object then we 
-  // must not dereference it or its isa field directly.
-  // FIXME: optimize this for objects that have no ObjC inheritance.
-  return swift_dynamicCastObjCClass(object, targetType);
+  if (targetType->isPureObjC()) {
+    return swift_dynamicCastObjCClass(object, targetType);
+  }
+  // Swift cannot subclass tagged classes
+  // The tag big is either high or low.
+  // We need to handle both scenarios for now.
+  if (((long)object & 1) || ((long)object <= 0)) {
+    return NULL;
+  }
+  auto isa = reinterpret_cast<const ClassMetadata *>(object_getClass(object));
 #else
-  const ClassMetadata *isa = *reinterpret_cast<ClassMetadata *const*>(object);
+  auto isa = *reinterpret_cast<const ClassMetadata *const*>(object);
+#endif
   do {
     if (isa == targetType) {
       return object;
@@ -284,28 +295,17 @@ swift::swift_dynamicCastClass(const void *object,
     isa = isa->SuperClass;
   } while (isa);
   return NULL;
-#endif
 }
 
 /// The primary entrypoint.
 const void *
 swift::swift_dynamicCastClassUnconditional(const void *object,
                                            const ClassMetadata *targetType) {
-#if SWIFT_OBJC_INTEROP
-  // If the object is an Objective-C object then we 
-  // must not dereference it or its isa field directly.
-  // FIXME: optimize this for objects that have no ObjC inheritance.
-  return swift_dynamicCastObjCClassUnconditional(object, targetType);
-#else
-  const ClassMetadata *isa = *reinterpret_cast<ClassMetadata *const*>(object);
-  do {
-    if (isa == targetType) {
-      return object;
-    }
-    isa = isa->SuperClass;
-  } while (isa);
-  swift::crash("Swift dynamic cast failed");
-#endif
+  auto value = swift_dynamicCastClass(object, targetType);
+  if (value == nullptr) {
+    swift::crash("Swift dynamic cast failed");
+  }
+  return value;
 }
 
 const void *
@@ -1818,9 +1818,6 @@ Metadata::getNominalTypeDescriptor() const {
     return nullptr;
   }
 }
-
-extern "C" const char* class_getName(const ClassMetadata*);
-extern "C" const ClassMetadata* class_getSuperclass(const ClassMetadata*);
 
 static std::string typeNameForObjCClass(const ClassMetadata *cls)
 {
