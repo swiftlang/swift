@@ -55,15 +55,14 @@ class IRGenFunction;
 
 typedef struct {
   unsigned Line, Col;
-  const char* Filename;
+  const char *Filename;
 } Location;
 
 typedef struct {
   Location LocForLinetable, Loc;
 } FullLocation;
 
-
-enum IndirectionKind: bool { DirectValue = false, IndirectValue = true };
+enum IndirectionKind : bool { DirectValue = false, IndirectValue = true };
 enum ArtificialKind : bool { RealValue = false, ArtificialValue = true };
 
 /// IRGenDebugInfo - Helper object that keeps track of the current
@@ -79,9 +78,8 @@ class IRGenDebugInfo {
 
   // Various caches.
   llvm::DenseMap<SILDebugScope *, llvm::WeakVH> ScopeCache;
-  //llvm::DenseMap<DeclContext *, llvm::WeakVH> ContextCache;
   llvm::DenseMap<const char *, llvm::WeakVH> DIFileCache;
-  llvm::DenseMap<TypeBase*, llvm::WeakVH> DITypeCache;
+  llvm::DenseMap<TypeBase *, llvm::WeakVH> DITypeCache;
   std::map<std::string, llvm::WeakVH> DIModuleCache;
   llvm::DITypeIdentifierMap DIRefMap;
 
@@ -99,13 +97,11 @@ class IRGenDebugInfo {
   SILDebugScope *LastScope; /// The scope of that last location.
   bool IsLibrary;           /// Whether this is a libary or a top level module.
 
-  SmallVector<std::pair<FullLocation, SILDebugScope*>, 8>
+  SmallVector<std::pair<FullLocation, SILDebugScope *>, 8>
   LocationStack; /// Used by pushLoc.
 
 public:
-  IRGenDebugInfo(const IRGenOptions &Opts,
-                 ClangImporter &CI,
-                 IRGenModule &IGM,
+  IRGenDebugInfo(const IRGenOptions &Opts, ClangImporter &CI, IRGenModule &IGM,
                  llvm::Module &M);
 
   /// Finalize the llvm::DIBuilder owned by this object.
@@ -122,7 +118,6 @@ public:
     Builder.SetCurrentDebugLocation(llvm::DebugLoc());
   }
 
-
   /// Push the current debug location onto a stack and initialize the
   /// IRBuilder to an empty location.
   void pushLoc() {
@@ -132,9 +127,7 @@ public:
   }
 
   /// Restore the current debug location from the stack.
-  void popLoc() {
-    std::tie(LastLoc, LastScope) = LocationStack.pop_back_val();
-  }
+  void popLoc() { std::tie(LastLoc, LastScope) = LocationStack.pop_back_val(); }
 
   /// Emit debug info for an import declaration.
   void emitImport(ImportDecl *D);
@@ -150,7 +143,6 @@ public:
   /// Emit debug info for a given SIL function.
   void emitFunction(SILFunction *SILFn, llvm::Function *Fn);
 
-
   /// Convenience function useful for functions without any source
   /// location. Internally calls emitFunction, emits a debug
   /// scope, and finally sets it using setCurrentLoc.
@@ -165,38 +157,28 @@ public:
   /// Emit a dbg.declare instrinsic at the current insertion point and
   /// the Builder's current debug location.
   /// \param Tag The DWARF tag that should be used.
-  void emitVariableDeclaration(IRBuilder& Builder,
-                               llvm::Value *Storage,
-                               DebugTypeInfo Ty,
-                               SILDebugScope *DS,
-                               StringRef Name,
-                               unsigned Tag,
-                               unsigned ArgNo = 0,
+  void emitVariableDeclaration(IRBuilder &Builder, llvm::Value *Storage,
+                               DebugTypeInfo Ty, SILDebugScope *DS,
+                               StringRef Name, unsigned Tag, unsigned ArgNo = 0,
                                IndirectionKind = DirectValue,
                                ArtificialKind = RealValue);
 
   /// Convenience function for stack-allocated variables. Calls
   /// emitVariableDeclaration internally.
-  void emitStackVariableDeclaration(IRBuilder& Builder,
-                                    llvm::Value *Storage,
-                                    DebugTypeInfo Ty,
-                                    SILDebugScope *DS,
+  void emitStackVariableDeclaration(IRBuilder &Builder, llvm::Value *Storage,
+                                    DebugTypeInfo Ty, SILDebugScope *DS,
                                     StringRef Name,
                                     IndirectionKind Indirection = DirectValue);
 
   /// Convenience function for variables that are function arguments.
-  void emitArgVariableDeclaration(IRBuilder& Builder,
-                                  llvm::Value *Storage,
-                                  DebugTypeInfo Ty,
-                                  SILDebugScope *DS,
-                                  StringRef Name,
-                                  unsigned ArgNo,
+  void emitArgVariableDeclaration(IRBuilder &Builder, llvm::Value *Storage,
+                                  DebugTypeInfo Ty, SILDebugScope *DS,
+                                  StringRef Name, unsigned ArgNo,
                                   IndirectionKind = DirectValue,
                                   ArtificialKind = RealValue);
 
   /// Create debug metadata for a global variable.
-  void emitGlobalVariableDeclaration(llvm::GlobalValue *Storage,
-                                     StringRef Name,
+  void emitGlobalVariableDeclaration(llvm::GlobalValue *Storage, StringRef Name,
                                      StringRef LinkageName,
                                      DebugTypeInfo DebugType,
                                      Optional<SILLocation> Loc);
@@ -215,17 +197,15 @@ public:
   void eraseFunction(llvm::Function *Fn);
 
 private:
-  StringRef BumpAllocatedString(const char* Data, size_t Length);
+  StringRef BumpAllocatedString(const char *Data, size_t Length);
   StringRef BumpAllocatedString(std::string S);
   StringRef BumpAllocatedString(StringRef S);
 
   void createImportedModule(StringRef Name, StringRef MangledPrefix,
                             llvm::DIModule Module, unsigned Line);
 
-  llvm::DIType createType(DebugTypeInfo DbgTy,
-                          StringRef MangledName,
-                          llvm::DIDescriptor Scope,
-                          llvm::DIFile File);
+  llvm::DIType createType(DebugTypeInfo DbgTy, StringRef MangledName,
+                          llvm::DIDescriptor Scope, llvm::DIFile File);
   llvm::DIType getOrCreateType(DebugTypeInfo DbgTy);
   llvm::DIDescriptor getOrCreateScope(SILDebugScope *DS);
   llvm::DIScope getOrCreateContext(DeclContext *DC);
@@ -233,53 +213,39 @@ private:
   StringRef getCurrentDirname();
   llvm::DIFile getOrCreateFile(const char *Filename);
   llvm::DIType getOrCreateDesugaredType(Type Ty, DebugTypeInfo DTI);
-  StringRef getName(const FuncDecl& FD);
+  StringRef getName(const FuncDecl &FD);
   StringRef getName(SILLocation L);
   StringRef getMangledName(TypeAliasDecl *Decl);
   StringRef getMangledName(DebugTypeInfo DTI);
   llvm::DIArray createParameterTypes(CanSILFunctionType FnTy,
                                      DeclContext *DeclCtx);
-  llvm::DIArray createParameterTypes(SILType SILTy,
-                                     DeclContext *DeclCtx);
-  void createParameterType(llvm::SmallVectorImpl<llvm::Value*>& Parameters,
-                           SILType CanTy, DeclContext* DeclCtx);
+  llvm::DIArray createParameterTypes(SILType SILTy, DeclContext *DeclCtx);
+  void createParameterType(llvm::SmallVectorImpl<llvm::Value *> &Parameters,
+                           SILType CanTy, DeclContext *DeclCtx);
   llvm::DIArray getTupleElements(TupleType *TupleTy, llvm::DIDescriptor Scope,
                                  llvm::DIFile File, unsigned Flags,
-                                 DeclContext* DeclContext);
+                                 DeclContext *DeclContext);
   llvm::DIFile getFile(llvm::DIDescriptor Scope);
-  llvm::DIModule getOrCreateModule(llvm::DIScope Parent,
-                                  std::string Name,
-                                  llvm::DIFile File);
+  llvm::DIModule getOrCreateModule(llvm::DIScope Parent, std::string Name,
+                                   llvm::DIFile File);
   llvm::DIScope getModule(StringRef MangledName);
   llvm::DIArray getStructMembers(NominalTypeDecl *D, llvm::DIDescriptor Scope,
                                  llvm::DIFile File, unsigned Flags);
-  llvm::DICompositeType createStructType(DebugTypeInfo DbgTy,
-                                         NominalTypeDecl *Decl,
-                                         StringRef Name,
-                                         llvm::DIDescriptor Scope,
-                                         llvm::DIFile File, unsigned Line,
-                                         unsigned SizeInBits,
-                                         unsigned AlignInBits,
-                                         unsigned Flags,
-                                         llvm::DIType DerivedFrom,
-                                         unsigned RuntimeLang,
-                                         StringRef UniqueID);
-  llvm::DIDerivedType createMemberType(DebugTypeInfo DTI,
-                                       StringRef Name,
+  llvm::DICompositeType
+  createStructType(DebugTypeInfo DbgTy, NominalTypeDecl *Decl, StringRef Name,
+                   llvm::DIDescriptor Scope, llvm::DIFile File, unsigned Line,
+                   unsigned SizeInBits, unsigned AlignInBits, unsigned Flags,
+                   llvm::DIType DerivedFrom, unsigned RuntimeLang,
+                   StringRef UniqueID);
+  llvm::DIDerivedType createMemberType(DebugTypeInfo DTI, StringRef Name,
                                        unsigned &OffsetInBits,
                                        llvm::DIDescriptor Scope,
-                                       llvm::DIFile File,
-                                       unsigned Flags);
-  llvm::DIArray getEnumElements(DebugTypeInfo DbgTy,
-                                EnumDecl *D,
-                                llvm::DIFile File,
-                                unsigned Flags);
-  llvm::DICompositeType createEnumType(DebugTypeInfo DbgTy,
-                                       EnumDecl *Decl,
-                                       StringRef Name,
-                                       llvm::DIFile File,
-                                       unsigned Line,
-                                       unsigned Flags);
+                                       llvm::DIFile File, unsigned Flags);
+  llvm::DIArray getEnumElements(DebugTypeInfo DbgTy, EnumDecl *D,
+                                llvm::DIFile File, unsigned Flags);
+  llvm::DICompositeType createEnumType(DebugTypeInfo DbgTy, EnumDecl *Decl,
+                                       StringRef Name, llvm::DIFile File,
+                                       unsigned Line, unsigned Flags);
   uint64_t getSizeOfBasicType(DebugTypeInfo DbgTy);
   TypeAliasDecl *getMetadataType();
 };
@@ -293,14 +259,15 @@ private:
 /// code that can not be attributed to any source location.
 class ArtificialLocation {
   IRGenDebugInfo *DI;
+
 public:
   /// Set the current location to line 0, but within the current scope
   /// (= the top of the LexicalBlockStack).
   ArtificialLocation(IRGenDebugInfo *DI, IRBuilder &Builder) : DI(DI) {
     if (DI) {
       DI->pushLoc();
-      llvm::DIDescriptor Scope(Builder.getCurrentDebugLocation().
-                               getScope(Builder.getContext()));
+      llvm::DIDescriptor Scope(
+          Builder.getCurrentDebugLocation().getScope(Builder.getContext()));
       auto DL = llvm::DebugLoc::get(0, 0, Scope);
       Builder.SetCurrentDebugLocation(DL);
     }
@@ -308,23 +275,24 @@ public:
 
   /// ~ArtificialLocation - Autorestore everything back to normal.
   ~ArtificialLocation() {
-    if (DI) DI->popLoc();
+    if (DI)
+      DI->popLoc();
   }
 };
-
 
 /// PrologueLocation - An RAII object that temporarily switches to an
 /// empty location. This is how the function prologue is represented.
 class PrologueLocation {
   IRGenDebugInfo *DI;
+
 public:
   /// Set the current location to line 0, but within the current scope
   /// (= the top of the LexicalBlockStack).
   PrologueLocation(IRGenDebugInfo *DI, IRBuilder &Builder) : DI(DI) {
     if (DI) {
       DI->pushLoc();
-      llvm::DIDescriptor Scope(Builder.getCurrentDebugLocation().
-                               getScope(Builder.getContext()));
+      llvm::DIDescriptor Scope(
+          Builder.getCurrentDebugLocation().getScope(Builder.getContext()));
       auto DL = llvm::DebugLoc::get(0, 0, nullptr);
       Builder.SetCurrentDebugLocation(DL);
     }
@@ -332,10 +300,10 @@ public:
 
   /// ~PrologueLocation - Autorestore everything back to normal.
   ~PrologueLocation() {
-    if (DI) DI->popLoc();
+    if (DI)
+      DI->popLoc();
   }
 };
-
 
 } // irgen
 } // swift
