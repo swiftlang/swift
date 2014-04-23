@@ -973,8 +973,14 @@ static Type mapSignatureParamType(ASTContext &ctx, Type type) {
 static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
                                      bool topLevelFunction,
                                      unsigned curryLevels) {
-  if (curryLevels == 0)
+  if (curryLevels == 0) {
+    /// Translate unchecked optionals into strict optionals.
+    if (auto uncheckedOptOf = type->getUncheckedOptionalObjectType()) {
+      type = OptionalType::get(uncheckedOptOf);
+    }
+
     return mapSignatureType(ctx, type);
+  }
 
   auto funcTy = type->castTo<AnyFunctionType>();
   auto argTy = funcTy->getInput();
