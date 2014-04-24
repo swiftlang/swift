@@ -231,6 +231,10 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
       if (D->getOverriddenDecl())
         return;
 
+      // Initializers can not be found by dynamic lookup.
+      if (isa<ConstructorDecl>(D))
+        return;
+
       // Check if we already reported a decl with the same signature.
       if (auto *FD = dyn_cast<FuncDecl>(D)) {
         assert(FD->getImplicitSelfDecl() && "should not find free functions");

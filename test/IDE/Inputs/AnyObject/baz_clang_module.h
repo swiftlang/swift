@@ -2,6 +2,8 @@
   int baz_Ivar1;
 }
 
+- (instancetype)initWithInt:(int)i;
+
 - (void)baz_Class_InstanceFunc1;
 + (void)baz_Class_ClassFunc1;
 
