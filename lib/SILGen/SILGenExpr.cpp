@@ -1228,11 +1228,9 @@ static ManagedValue createUnsafeDowncast(SILGenFunction &gen,
                                          SILLocation loc,
                                          ManagedValue input,
                                          SILType resultTy) {
-  SILType objectPtrTy = SILType::getNativeObjectType(gen.getASTContext());
   SILValue result = gen.B.createUncheckedRefCast(loc,
-                                                   input.forward(gen),
-                                                   objectPtrTy);
-  result = gen.B.createUncheckedRefCast(loc, result, resultTy);
+                                                 input.forward(gen),
+                                                 resultTy);
   return gen.emitManagedRValueWithCleanup(result);
 }
 
@@ -3705,10 +3703,8 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
     // Assume that the returned 'self' is the appropriate subclass
     // type (or a derived class thereof). Only Objective-C classes can
     // violate this assumption.
-    SILType objectPtrTy = SILType::getNativeObjectType(SGF.getASTContext());
     newSelfValue = SGF.B.createUncheckedRefCast(E, newSelf.getValue(),
-                                                  objectPtrTy);
-    newSelfValue = SGF.B.createUncheckedRefCast(E, newSelfValue, destTy);
+                                                destTy);
     newSelf = ManagedValue(newSelfValue, newSelfCleanup);
   }
 
