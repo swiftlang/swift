@@ -1185,31 +1185,40 @@ static ApplyInst *replaceDynApplyWithStaticApply(ApplyInst *AI, SILFunction *F,
 /// function that matches the member. Notice that we do not scan the class
 /// hierarchy, just the concrete class type.
 SILFunction *
-findFuncInWitnessTable(SILDeclRef Member, CanType ConcreteTy,
-                       ProtocolDecl *Proto, SILModule &Mod) {
-  // Scan all of the witness tables in search of a matching protocol and class.
-  for (SILWitnessTable &Witness : Mod.getWitnessTableList()) {
-    ProtocolDecl *WitnessProtocol = Witness.getConformance()->getProtocol();
+findFuncInWitnessTable(SILDeclRef Member, ProtocolConformance *C,
+                       SILModule &Mod) {
+  // Look up the witness table associated with our protocol conformance from the
+  // SILModule.
+  std::pair<SILWitnessTable *, ArrayRef<Substitution>> Ret =
+    Mod.lookUpWitnessTable(C);
 
-    // Is this the correct protocol?
-    if (WitnessProtocol != Proto ||
-        !ConcreteTy.getPointer()->isEqual(Witness.getConformance()->getType()))
+  if (!Ret.first) {
+    DEBUG(llvm::dbgs() << "        Failed speculative lookup of witness for: ";
+          C->dump());
+    return nullptr;
+  }
+
+  // Don't handle specialized protocol conformances for now.
+  if (Ret.second.size()) {
+    DEBUG(llvm::dbgs() << "        Found matching specialized protocol "
+          "conformance. Unhandled case.\n");
+    return nullptr;
+  }
+
+  // Okay, we found the correct witness table. Now look for the method.
+  for (auto &Entry : Ret.first->getEntries()) {
+    // Look at method entries only.
+    if (Entry.getKind() != SILWitnessTable::WitnessKind::Method)
       continue;
 
-    // Okay, we found the correct witness table. Now look for the method.
-    for (auto &Entry : Witness.getEntries()) {
-      // Look at method entries only.
-      if (Entry.getKind() != SILWitnessTable::WitnessKind::Method)
-        continue;
+    SILWitnessTable::MethodWitness MethodEntry = Entry.getMethodWitness();
+    // Check if this is the member we were looking for.
+    if (MethodEntry.Requirement != Member)
+      continue;
 
-      SILWitnessTable::MethodWitness MethodEntry = Entry.getMethodWitness();
-      // Check if this is the member we were looking for.
-      if (MethodEntry.Requirement != Member)
-        continue;
-
-      return MethodEntry.Witness;
-    }
+    return MethodEntry.Witness;
   }
+
   return nullptr;
 }
 
@@ -1349,14 +1358,10 @@ void SILDevirtualizer::optimizeApplyInst(ApplyInst *AI) {
   if (!Init)
     return;
 
-  // Strip the InOut qualifier.
-  CanType ConcreteTy = stripInOutQualifier(Init->getConcreteType());
-
   // For each protocol that our type conforms to:
-  for (auto &Conf : Init->getConformances()) {
+  for (ProtocolConformance *Conf : Init->getConformances()) {
     SILFunction *StaticRef = findFuncInWitnessTable(PMI->getMember(),
-                                                    ConcreteTy,
-                                                    Conf->getProtocol(),
+                                                    Conf,
                                                     Init->getModule());
     if (!StaticRef)
       continue;
