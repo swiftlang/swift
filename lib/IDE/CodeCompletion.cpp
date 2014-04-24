@@ -1745,7 +1745,6 @@ public:
 
 class CompletionOverrideLookup : public swift::VisibleDeclConsumer {
   CodeCompletionResultSink &Sink;
-  ASTContext &Ctx;
   OwnedResolver TypeResolver;
   const DeclContext *CurrDeclContext;
 
@@ -1753,7 +1752,7 @@ public:
   CompletionOverrideLookup(CodeCompletionResultSink &Sink,
                            ASTContext &Ctx,
                            const DeclContext *CurrDeclContext)
-      : Sink(Sink), Ctx(Ctx),
+      : Sink(Sink),
         TypeResolver(createLazyResolver(Ctx)),
         CurrDeclContext(CurrDeclContext) {}
 
