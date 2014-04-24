@@ -577,6 +577,40 @@ types. Function types are transformed in order to encode additional attributes:
 TODO: Type-checking of cc and thin attributes will move into Swift's
 type-checker and out of SIL eventually.
 
+Layout Compatible Types
+```````````````````````
+
+(This section applies only to Swift 1.0 and will hopefully be obviated in
+future releases.)
+
+SIL tries to be ignorant of the details of type layout, and low-level
+bit-banging operations such as pointer casts are generally undefined. However,
+as a concession to implementation convenience, some types are allowed to be
+considered **layout compatible**. Type ``T`` is *layout compatible* with type
+``U`` iff:
+
+- an address of type ``$*U`` can be cast by
+  ``address_to_pointer``/``pointer_to_address`` to ``$*T`` and a valid value
+  of type ``T`` can be loaded out (or indirectly used, if ``T`` is address-
+  only),
+- if ``T`` is a nontrivial type, then ``retain_value``/``release_value`` of
+  the loaded ``T`` value is equivalent to ``retain_value``/``release_value`` of
+  the original ``U`` value.
+
+This is not always a transitive relationship; ``T`` can be layout-compatible
+with ``U`` whereas ``U`` is not layout-compatible with ``T``. If the layout
+compatible relationship does extend both ways, ``T`` and ``U`` are
+**transitively layout compatible**.
+
+The following types are considered layout-compatible:
+
+- ``Builtin.RawPointer`` is transitively layout compatible with all heap
+  object reference types, and ``Optional`` of heap object reference types.
+  (Note that ``RawPointer`` is a trivial type, so does not have ownership
+  semantics.)
+- Enums are layout-compatible with the payload type of their first payloaded
+  case.
+
 Values and Operands
 ~~~~~~~~~~~~~~~~~~~
 ::
@@ -3081,9 +3115,9 @@ address_to_pointer
 
 Creates a ``Builtin.RawPointer`` value corresponding to the address ``%0``.
 Converting the result pointer back to an address of the same type will give
-an address equivalent to ``%0``. Type punning is always undefined in SIL; it
-is undefined behavior to cast the ``RawPointer`` to any address type other than
-its original address type.
+an address equivalent to ``%0``. It is undefined behavior to cast the
+``RawPointer`` to any address type other than its original address type or
+any `layout compatible types`_.
 
 pointer_to_address
 ``````````````````
@@ -3097,10 +3131,10 @@ pointer_to_address
 Creates an address value corresponding to the ``Builtin.RawPointer`` value
 ``%0``.  Converting a ``RawPointer`` back to an address of the same type as
 its originating ``address_to_pointer`` instruction gives back an equivalent
-address. Type punning is always undefined in SIL; it
-is undefined behavior to cast the ``RawPointer`` back to any type other than
-its original address type. It is also undefined behavior to cast a
-``RawPointer`` from a heap object to any address type.
+address. It is undefined behavior to cast the ``RawPointer`` back to any type
+other than its original address type or `layout compatible types`_. It is
+also undefined behavior to cast a ``RawPointer`` from a heap object to any
+address type.
 
 ref_to_object_pointer
 `````````````````````
