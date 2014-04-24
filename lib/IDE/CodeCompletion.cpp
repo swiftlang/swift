@@ -138,7 +138,12 @@ void CodeCompletionString::print(raw_ostream &OS) const {
     case Chunk::ChunkKind::CallParameterColon:
     case Chunk::ChunkKind::CallParameterType:
     case CodeCompletionString::Chunk::ChunkKind::GenericParameterName:
-      OS << C.getText();
+      for (char Ch : C.getText()) {
+        if (Ch == '\n')
+          OS << "\\n";
+        else
+          OS << Ch;
+      }
       break;
     case Chunk::ChunkKind::OptionalBegin:
     case Chunk::ChunkKind::CallParameterBegin:
@@ -152,6 +157,9 @@ void CodeCompletionString::print(raw_ostream &OS) const {
       OS << "[#";
       OS << C.getText();
       OS << "#]";
+      break;
+    case Chunk::ChunkKind::PreferredCursorPosition:
+      OS << "{#|#}";
       break;
     }
     PrevNestingLevel = C.getNestingLevel();
@@ -613,6 +621,7 @@ static StringRef getFirstTextChunk(CodeCompletionResult *R) {
     case CodeCompletionString::Chunk::ChunkKind::GenericParameterName:
     case CodeCompletionString::Chunk::ChunkKind::DynamicLookupMethodCallTail:
     case CodeCompletionString::Chunk::ChunkKind::TypeAnnotation:
+    case CodeCompletionString::Chunk::ChunkKind::PreferredCursorPosition:
       continue;
     }
   }
@@ -652,6 +661,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
     TypeIdentifierWithoutDot,
     CaseStmtBeginning,
     CaseStmtDotPrefix,
+    NominalMemberBeginning,
   };
 
   CompletionKind Kind = CompletionKind::None;
@@ -755,6 +765,8 @@ public:
 
   void completeCaseStmtBeginning() override;
   void completeCaseStmtDotPrefix() override;
+
+  void completeNominalMemberBeginning() override;
 
   void doneParsing() override;
 
@@ -1375,7 +1387,7 @@ public:
       Builder.addTypeAnnotation(TypeAnnotation);
   }
 
-  // Implement swift::VisibleDeclConsumer
+  // Implement swift::VisibleDeclConsumer.
   void foundDecl(ValueDecl *D, DeclVisibilityKind Reason) override {
     if (!D->hasType())
       TypeResolver->resolveDeclSignature(D);
@@ -1731,6 +1743,70 @@ public:
   }
 };
 
+class CompletionOverrideLookup : public swift::VisibleDeclConsumer {
+  CodeCompletionResultSink &Sink;
+  ASTContext &Ctx;
+  OwnedResolver TypeResolver;
+  const DeclContext *CurrDeclContext;
+
+public:
+  CompletionOverrideLookup(CodeCompletionResultSink &Sink,
+                           ASTContext &Ctx,
+                           const DeclContext *CurrDeclContext)
+      : Sink(Sink), Ctx(Ctx),
+        TypeResolver(createLazyResolver(Ctx)),
+        CurrDeclContext(CurrDeclContext) {}
+
+  void addMethodOverride(const FuncDecl *FD) {
+    CodeCompletionResultBuilder Builder(
+        Sink,
+        CodeCompletionResult::ResultKind::Declaration,
+        SemanticContextKind::Super);
+    Builder.setAssociatedDecl(FD);
+
+    llvm::SmallString<256> DeclStr;
+    {
+      llvm::raw_svector_ostream OS(DeclStr);
+      OS << "override ";
+      PrintOptions Options;
+      Options.FunctionDefinitions = false;
+      Options.PrintDefaultParameterPlaceholder = false;
+      FD->print(OS, Options);
+      OS << " {\n";
+    }
+    Builder.addTextChunk(DeclStr);
+    Builder.addPreferredCursorPosition();
+    Builder.addTextChunk("\n}");
+  }
+
+  // Implement swift::VisibleDeclConsumer.
+  void foundDecl(ValueDecl *D, DeclVisibilityKind Reason) override {
+    if (D->getAttrs().hasAttribute<FinalAttr>())
+      return;
+
+    if (!D->hasType())
+      TypeResolver->resolveDeclSignature(D);
+
+    if (auto *FD = dyn_cast<FuncDecl>(D)) {
+      // We can override operators as members.
+      if (FD->isBinaryOperator() || FD->isUnaryOperator())
+        return;
+
+      // We can not override individual accessors.
+      if (FD->isAccessor())
+        return;
+
+      addMethodOverride(FD);
+      return;
+    }
+  }
+
+  void getOverrideCompletions(SourceLoc Loc) {
+    lookupVisibleDecls(*this, CurrDeclContext, TypeResolver.get(),
+                       /*IncludeTopLevel=*/false, Loc);
+  }
+};
+
 } // end unnamed namespace
 
 void CodeCompletionCallbacksImpl::completeDotExpr(Expr *E, SourceLoc DotLoc) {
@@ -1838,6 +1914,13 @@ void CodeCompletionCallbacksImpl::completeCaseStmtDotPrefix() {
   assert(!InEnumElementRawValue);
 
   Kind = CompletionKind::CaseStmtDotPrefix;
+  CurDeclContext = P.CurDeclContext;
+}
+
+void CodeCompletionCallbacksImpl::completeNominalMemberBeginning() {
+  assert(!InEnumElementRawValue);
+
+  Kind = CompletionKind::NominalMemberBeginning;
   CurDeclContext = P.CurDeclContext;
 }
 
@@ -1956,6 +2039,14 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     Lookup.setHaveDot(SourceLoc());
     SourceLoc Loc = P.Context.SourceMgr.getCodeCompletionLoc();
     Lookup.getTypeContextEnumElementCompletions(Loc);
+    break;
+  }
+
+  case CompletionKind::NominalMemberBeginning: {
+    Lookup.discardTypeResolver();
+    CompletionOverrideLookup OverrideLookup(CompletionContext.getResultSink(),
+                                            P.Context, CurDeclContext);
+    OverrideLookup.getOverrideCompletions(SourceLoc());
     break;
   }
   }

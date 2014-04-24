@@ -108,7 +108,11 @@ public:
       /// variable type, for function calls it is the return type.
       ///
       /// This chunk should not be inserted into the editor buffer.
-      TypeAnnotation
+      TypeAnnotation,
+
+      /// Marks the preferred position to put the cursor after the
+      /// completion result is inserted into the editor buffer.
+      PreferredCursorPosition,
     };
 
     static bool chunkHasText(ChunkKind Kind) {

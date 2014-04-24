@@ -130,6 +130,10 @@ public:
   /// \brief Complete a case stmt pattern that starts with a dot.
   virtual void completeCaseStmtDotPrefix() = 0;
 
+  /// Complete at the beginning of member of a nominal decl member -- no tokens
+  /// provided by user.
+  virtual void completeNominalMemberBeginning() = 0;
+
   /// \brief Signals that the AST for the all the delayed-parsed code was
   /// constructed.  No \c complete*() callbacks will be done after this.
   virtual void doneParsing() = 0;

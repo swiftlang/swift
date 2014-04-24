@@ -1266,7 +1266,13 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
     Status = parseDeclSubscript(OverrideLoc, Flags, Attributes, Entries);
     UnhandledOverride = false;
     break;
-  
+
+  case tok::code_complete:
+    Status = makeParserCodeCompletionStatus();
+    if (CodeCompletion)
+      CodeCompletion->completeNominalMemberBeginning();
+    break;
+
   case tok::identifier:
     if (isStartOfOperatorDecl(Tok, peekToken())) {
       DeclResult = parseDeclOperator(Flags.contains(PD_AllowTopLevel),
@@ -3031,7 +3037,7 @@ ParserStatus Parser::parseDeclEnumCase(ParseDeclOptions Flags,
   return Status;
 }
 
-/// \brief Parse the members in a struct/class/protocol definition.
+/// \brief Parse the members in a struct/class/enum/protocol definition.
 ///
 /// \verbatim
 ///    decl*

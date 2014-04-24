@@ -193,6 +193,12 @@ public:
         CodeCompletionString::Chunk::ChunkKind::TypeAnnotation, Type);
     getLastChunk().setIsAnnotation();
   }
+
+  void addPreferredCursorPosition() {
+    addSimpleChunk(
+        CodeCompletionString::Chunk::ChunkKind::PreferredCursorPosition);
+    getLastChunk().setIsAnnotation();
+  }
 };
 
 } // namespace ide
