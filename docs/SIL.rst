@@ -3161,14 +3161,27 @@ unchecked_ref_cast
 
   sil-instruction ::= 'unchecked_ref_cast' sil-operand 'to' sil-type
 
-  %1 = ref_to_object_pointer %0 : $C to $D
+  %1 = unchecked_ref_cast %0 : $C to $D
   // %0 must be of heap object reference type $C
   // $D must be a heap object reference type
-  // %1 will be of type $Builtin.ObjectPointer or ObjCPointer
+  // %1 will be of type $D
 
 Converts a heap object reference to another heap object reference type.
 This conversion is unchecked, and it is undefined behavior if the
 destination type is not a valid type for the heap object.
+
+unchecked_addr_cast
+```````````````````
+::
+
+  sil-instruction ::= 'unchecked_addr_cast' sil-operand 'to' sil-type
+
+  %1 = unchecked_addr_cast %0 : $*A to $*B
+  // %0 must be an address
+  // %1 will be of type $*B
+
+Converts an address to a different address type. Using the resulting address 
+is undefined unless ``B`` is layout compatible with ``A``.
 
 ref_to_raw_pointer
 ``````````````````
