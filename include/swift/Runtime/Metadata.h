@@ -300,7 +300,6 @@ typedef OpaqueValue *initializeBufferWithTake(ValueBuffer *dest,
 /// the value from one to the other, leaving the source object
 /// uninitialized.
 ///
-/// Guaranteed to be equivalent to a memcpy of self->size bytes.
 /// There is no need for a initializeBufferWithTakeOfBuffer, because that
 /// can simply be a pointer-aligned memcpy of sizeof(ValueBuffer)
 /// bytes.
@@ -361,6 +360,75 @@ typedef OpaqueValue *allocateBuffer(ValueBuffer *buffer,
 typedef const Metadata *typeOf(OpaqueValue *src,
                                const Metadata *self);
   
+/// Given an initialized array of objects, destroy it.
+///
+/// Preconditions:
+///   'object' is an initialized array of n objects
+/// Postconditions:
+///   'object' is an uninitialized array of n objects
+typedef void destroyArray(OpaqueValue *array, size_t n,
+                          const Metadata *self);
+  
+/// Given an uninitialized array and an initialized array, copy
+/// the value.
+///
+/// This operation does not need to be safe aginst 'dest' and 'src' aliasing.
+/// 
+/// Returns the dest object.
+///
+/// Preconditions:
+///   'dest' is an uninitialized array of n objects
+/// Postconditions:
+///   'dest' is an initialized array of n objects
+/// Invariants:
+///   'src' is an initialized array of n objects
+typedef OpaqueValue *initializeArrayWithCopy(OpaqueValue *dest,
+                                             OpaqueValue *src,
+                                             size_t n,
+                                             const Metadata *self);
+  
+/// Given an uninitialized array and an initialized array, move
+/// the values from one to the other, leaving the source array
+/// uninitialized.
+///
+/// This operation does not need to be safe against 'dest' and 'src' fully
+/// overlapping. 'dest' may partially overlap the head of 'src', because the
+/// values are taken as if in front-to-back order.
+/// 
+/// Returns the dest object.
+///
+/// Preconditions:
+///   'dest' is an uninitialized array of n objects
+///   'src' is an initialized array of n objects
+/// Postconditions:
+///   'dest' is an initialized array of n objects
+///   'src' is an uninitialized array of n objects
+typedef OpaqueValue *initializeArrayWithTakeFrontToBack(OpaqueValue *dest,
+                                                        OpaqueValue *src,
+                                                        size_t n,
+                                                        const Metadata *self);
+  
+/// Given an uninitialized array and an initialized array, move
+/// the values from one to the other, leaving the source array
+/// uninitialized.
+///
+/// This operation does not need to be safe against 'dest' and 'src' fully
+/// overlapping. 'dest' may partially overlap the tail of 'src', because the
+/// values are taken as if in back-to-front order.
+/// 
+/// Returns the dest object.
+///
+/// Preconditions:
+///   'dest' is an uninitialized array of n objects
+///   'src' is an initialized array of n objects
+/// Postconditions:
+///   'dest' is an initialized array of n objects
+///   'src' is an uninitialized array of n objects
+typedef OpaqueValue *initializeArrayWithTakeBackToFront(OpaqueValue *dest,
+                                                        OpaqueValue *src,
+                                                        size_t n,
+                                                        const Metadata *self);
+  
 /// The number of bytes required to store an object of this type.
 /// This value may be zero.  This value is not necessarily a
 /// multiple of the alignment.
@@ -409,7 +477,11 @@ extern "C" OpaqueValue *swift_copyPOD(OpaqueValue *dest,
   MACRO(initializeWithTake) \
   MACRO(assignWithTake) \
   MACRO(allocateBuffer) \
-  MACRO(typeOf)
+  MACRO(typeOf) \
+  MACRO(destroyArray) \
+  MACRO(initializeArrayWithCopy) \
+  MACRO(initializeArrayWithTakeFrontToBack) \
+  MACRO(initializeArrayWithTakeBackToFront)
 
 /// A value-witness table.  A value witness table is built around
 /// the requirements of some specific type.  The information in

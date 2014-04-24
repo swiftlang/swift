@@ -910,23 +910,27 @@ Value Witnesses
 
 ::
 
-  value-witness-kind ::= 'al'                // allocateBuffer
-  value-witness-kind ::= 'ca'                // assignWithCopy
-  value-witness-kind ::= 'ta'                // assignWithTake
-  value-witness-kind ::= 'de'                // deallocateBuffer
-  value-witness-kind ::= 'xx'                // destroy
-  value-witness-kind ::= 'XX'                // destroyBuffer
-  value-witness-kind ::= 'CP'                // initializeBufferWithCopyOfBuffer
-  value-witness-kind ::= 'Cp'                // initializeBufferWithCopy
-  value-witness-kind ::= 'cp'                // initializeWithCopy
-  value-witness-kind ::= 'Tk'                // initializeBufferWithTake
-  value-witness-kind ::= 'tk'                // initializeWithTake
-  value-witness-kind ::= 'pr'                // projectBuffer
-  value-witness-kind ::= 'ty'                // typeof
-  value-witness-kind ::= 'xs'                // storeExtraInhabitant
-  value-witness-kind ::= 'xg'                // getExtraInhabitantIndex
-  value-witness-kind ::= 'ug'                // getEnumTag
-  value-witness-kind ::= 'up'                // inplaceProjectEnumData
+  value-witness-kind ::= 'al'           // allocateBuffer
+  value-witness-kind ::= 'ca'           // assignWithCopy
+  value-witness-kind ::= 'ta'           // assignWithTake
+  value-witness-kind ::= 'de'           // deallocateBuffer
+  value-witness-kind ::= 'xx'           // destroy
+  value-witness-kind ::= 'XX'           // destroyBuffer
+  value-witness-kind ::= 'Xx'           // destroyArray
+  value-witness-kind ::= 'CP'           // initializeBufferWithCopyOfBuffer
+  value-witness-kind ::= 'Cp'           // initializeBufferWithCopy
+  value-witness-kind ::= 'cp'           // initializeWithCopy
+  value-witness-kind ::= 'Tk'           // initializeBufferWithTake
+  value-witness-kind ::= 'tk'           // initializeWithTake
+  value-witness-kind ::= 'pr'           // projectBuffer
+  value-witness-kind ::= 'ty'           // typeof
+  value-witness-kind ::= 'xs'           // storeExtraInhabitant
+  value-witness-kind ::= 'xg'           // getExtraInhabitantIndex
+  value-witness-kind ::= 'ug'           // getEnumTag
+  value-witness-kind ::= 'up'           // inplaceProjectEnumData
+  value-witness-kind ::= 'Cc'           // initializeArrayWithCopy
+  value-witness-kind ::= 'Tt'           // initializeArrayWithTakeFrontToBack
+  value-witness-kind ::= 'tT'           // initializeArrayWithTakeBackToFront
 
 ``<value-witness-kind>`` differentiates the kinds of value
 witness functions for a type.

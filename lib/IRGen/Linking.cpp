@@ -39,6 +39,7 @@ static StringRef mangleValueWitness(ValueWitness witness) {
   case ValueWitness::DeallocateBuffer: return "de";
   case ValueWitness::Destroy: return "xx";
   case ValueWitness::DestroyBuffer: return "XX";
+  case ValueWitness::DestroyArray: return "Xx";
   case ValueWitness::InitializeBufferWithCopyOfBuffer: return "CP";
   case ValueWitness::InitializeBufferWithCopy: return "Cp";
   case ValueWitness::InitializeWithCopy: return "cp";
@@ -46,6 +47,9 @@ static StringRef mangleValueWitness(ValueWitness witness) {
   case ValueWitness::InitializeWithTake: return "tk";
   case ValueWitness::ProjectBuffer: return "pr";
   case ValueWitness::TypeOf: return "ty";
+  case ValueWitness::InitializeArrayWithCopy: return "Cc";
+  case ValueWitness::InitializeArrayWithTakeFrontToBack: return "Tt";
+  case ValueWitness::InitializeArrayWithTakeBackToFront: return "tT";
   case ValueWitness::StoreExtraInhabitant: return "xs";
   case ValueWitness::GetExtraInhabitantIndex: return "xg";
   case ValueWitness::GetEnumTag: return "ug";

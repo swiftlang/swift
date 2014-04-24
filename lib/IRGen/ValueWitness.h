@@ -159,7 +159,36 @@ enum class ValueWitness : unsigned {
   /// the dynamic type of the value of the object.
   TypeOf,
   
-  Last_RequiredValueWitnessFunction = TypeOf,
+  ///   void (*destroyArray)(T *object, size_t n, witness_t *self);
+  ///
+  /// Given a vaild array of n objects of this type, destroy the object, leaving
+  /// the array invalid. This is useful when generically destroying an array of
+  /// objects to avoid calling the scalar 'destroy' witness in a loop.
+  DestroyArray,
+  
+  ///   T *(*initializeArrayWithCopy)(T *dest, T *src, size_t n, M *self);
+  ///
+  /// Given an invalid array of n objects of this type, initialize the objects
+  /// as a copy of the source array.  Returns the dest array.
+  InitializeArrayWithCopy,
+  
+  ///   T *(*initializeArrayWithTakeFrontToBack)(T *dest, T *src, size_t n, M *self);
+  ///
+  /// Given an invalid array of n objects of this type, initialize the objects
+  /// by taking them from the source array in front-to-back order.
+  /// The source array becomes invalid.
+  /// Returns the dest array.
+  InitializeArrayWithTakeFrontToBack,
+
+  ///   T *(*initializeArrayWithTakeBackToFront)(T *dest, T *src, size_t n, M *self);
+  ///
+  /// Given an invalid array of n objects of this type, initialize the objects
+  /// by taking them from the source array in back-to-front order.
+  /// The source array becomes invalid.
+  /// Returns the dest array.
+  InitializeArrayWithTakeBackToFront,
+
+  Last_RequiredValueWitnessFunction = InitializeArrayWithTakeBackToFront,
 
   ///   size_t size;
   ///

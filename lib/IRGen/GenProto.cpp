@@ -1908,7 +1908,7 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
     llvm_unreachable("should always be able to use a standard typeof witness "
                      "from the runtime");
   }
-  
+      
   case ValueWitness::StoreExtraInhabitant: {
     Address dest = getArgAs(IGF, argv, type, "dest");
     llvm::Value *index = getArg(argv, "index");
@@ -1929,6 +1929,10 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
   }
 
   // TODO
+  case ValueWitness::DestroyArray:
+  case ValueWitness::InitializeArrayWithCopy:
+  case ValueWitness::InitializeArrayWithTakeFrontToBack:
+  case ValueWitness::InitializeArrayWithTakeBackToFront:
   case ValueWitness::GetEnumTag:
   case ValueWitness::InplaceProjectEnumData: {
     IGF.Builder.CreateUnreachable();
@@ -2419,6 +2423,10 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
   }
   
   /// TODO:
+  case ValueWitness::DestroyArray:
+  case ValueWitness::InitializeArrayWithCopy:
+  case ValueWitness::InitializeArrayWithTakeFrontToBack:
+  case ValueWitness::InitializeArrayWithTakeBackToFront:
   case ValueWitness::GetEnumTag:
   case ValueWitness::InplaceProjectEnumData:
     return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);

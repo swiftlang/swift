@@ -72,6 +72,13 @@ static llvm::Type *createWitnessType(IRGenModule &IGM, ValueWitness index) {
       ->getPointerTo();
   }
 
+  // void (*destroyArray)(T *object, size_t n, witness_t *self);
+  case ValueWitness::DestroyArray: {
+    llvm::Type *args[] = { IGM.OpaquePtrTy, IGM.SizeTy, IGM.TypeMetadataPtrTy };
+    return llvm::FunctionType::get(IGM.VoidTy, args, /*isVarArg*/ false)
+      ->getPointerTo();
+  }
+
   // T *(*initializeBufferWithCopyOfBuffer)(B *dest, B *src, M *self);
   case ValueWitness::InitializeBufferWithCopyOfBuffer: {
     llvm::Type *bufPtrTy = IGM.getFixedBufferTy()->getPointerTo(0);
@@ -113,7 +120,19 @@ static llvm::Type *createWitnessType(IRGenModule &IGM, ValueWitness index) {
     return llvm::FunctionType::get(ptrTy, args, /*isVarArg*/ false)
       ->getPointerTo();
   }
-
+      
+  // T *(*initializeArrayWithCopy)(T *dest, T *src, size_t n, M *self);
+  // T *(*initializeArrayWithTakeFrontToBack)(T *dest, T *src, size_t n, M *self);
+  // T *(*initializeArrayWithTakeBackToFront)(T *dest, T *src, size_t n, M *self);
+  case ValueWitness::InitializeArrayWithCopy:
+  case ValueWitness::InitializeArrayWithTakeFrontToBack:
+  case ValueWitness::InitializeArrayWithTakeBackToFront: {
+    llvm::Type *ptrTy = IGM.OpaquePtrTy;
+    llvm::Type *args[] = { ptrTy, ptrTy, IGM.SizeTy, IGM.TypeMetadataPtrTy };
+    return llvm::FunctionType::get(ptrTy, args, /*isVarArg*/ false)
+      ->getPointerTo();
+  }
+      
   // M *(*typeof)(T *src, M *self);
   case ValueWitness::TypeOf: {
     llvm::Type *ptrTy = IGM.OpaquePtrTy;
@@ -226,6 +245,14 @@ static StringRef getValueWitnessLabel(ValueWitness index) {
     return "flags";
   case ValueWitness::Stride:
     return "stride";
+  case ValueWitness::DestroyArray:
+    return "destroyArray";
+  case ValueWitness::InitializeArrayWithCopy:
+    return "initializeArrayWithCopy";
+  case ValueWitness::InitializeArrayWithTakeFrontToBack:
+    return "initializeArrayWithTakeFrontToBack";
+  case ValueWitness::InitializeArrayWithTakeBackToFront:
+    return "initializeArrayWithTakeBackToFront";
   case ValueWitness::StoreExtraInhabitant:
     return "storeExtraInhabitant";
   case ValueWitness::GetExtraInhabitantIndex:

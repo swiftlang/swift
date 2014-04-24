@@ -733,6 +733,25 @@ static void tuple_destroy(OpaqueValue *tuple, const Metadata *_metadata) {
   }
 }
 
+/// Generic tuple value witness for 'destroyArray'.
+template <bool IsPOD, bool IsInline>
+static void tuple_destroyArray(OpaqueValue *array, size_t n,
+                               const Metadata *_metadata) {
+  auto &metadata = *(const TupleTypeMetadata*) _metadata;
+  assert(IsPOD == tuple_getValueWitnesses(&metadata)->isPOD());
+  assert(IsInline == tuple_getValueWitnesses(&metadata)->isValueInline());
+  
+  if (IsPOD) return;
+  
+  size_t stride = tuple_getValueWitnesses(&metadata)->stride;
+  char *bytes = (char*)array;
+  
+  while (n--) {
+    tuple_destroy<IsPOD, IsInline>((OpaqueValue*)bytes, _metadata);
+    bytes += stride;
+  }
+}
+
 /// Generic tuple value witness for 'destroyBuffer'.
 template <bool IsPOD, bool IsInline>
 static void tuple_destroyBuffer(ValueBuffer *buffer, const Metadata *metatype) {
@@ -775,6 +794,24 @@ static OpaqueValue *tuple_memcpy(OpaqueValue *dest,
   return (OpaqueValue*)
     memcpy(dest, src, metatype->getValueWitnesses()->getSize());
 }
+/// Perform a naive memcpy of n tuples from src into dest.
+static OpaqueValue *tuple_memcpy_array(OpaqueValue *dest,
+                                       OpaqueValue *src,
+                                       size_t n,
+                                       const Metadata *metatype) {
+  assert(metatype->getValueWitnesses()->isPOD());
+  return (OpaqueValue*)
+    memcpy(dest, src, metatype->getValueWitnesses()->stride * n);
+}
+/// Perform a naive memmove of n tuples from src into dest.
+static OpaqueValue *tuple_memmove_array(OpaqueValue *dest,
+                                        OpaqueValue *src,
+                                        size_t n,
+                                        const Metadata *metatype) {
+  assert(metatype->getValueWitnesses()->isPOD());
+  return (OpaqueValue*)
+    memmove(dest, src, metatype->getValueWitnesses()->stride * n);
+}
 
 /// Generic tuple value witness for 'initializeWithCopy'.
 template <bool IsPOD, bool IsInline>
@@ -789,6 +826,31 @@ static OpaqueValue *tuple_initializeWithCopy(OpaqueValue *dest,
                             &ValueWitnessTable::initializeWithCopy);
 }
 
+/// Generic tuple value witness for 'initializeArrayWithCopy'.
+template <bool IsPOD, bool IsInline>
+static OpaqueValue *tuple_initializeArrayWithCopy(OpaqueValue *dest,
+                                                  OpaqueValue *src,
+                                                  size_t n,
+                                                  const Metadata *metatype) {
+  assert(IsPOD == tuple_getValueWitnesses(metatype)->isPOD());
+  assert(IsInline == tuple_getValueWitnesses(metatype)->isValueInline());
+
+  if (IsPOD) return tuple_memcpy_array(dest, src, n, metatype);
+  
+  char *destBytes = (char*)dest;
+  char *srcBytes = (char*)src;
+  size_t stride = tuple_getValueWitnesses(metatype)->stride;
+  
+  while (n--) {
+    tuple_initializeWithCopy<IsPOD, IsInline>((OpaqueValue*)destBytes,
+                                              (OpaqueValue*)srcBytes,
+                                              metatype);
+    destBytes += stride; srcBytes += stride;
+  }
+  
+  return dest;
+}
+
 /// Generic tuple value witness for 'initializeWithTake'.
 template <bool IsPOD, bool IsInline>
 static OpaqueValue *tuple_initializeWithTake(OpaqueValue *dest,
@@ -800,6 +862,58 @@ static OpaqueValue *tuple_initializeWithTake(OpaqueValue *dest,
   if (IsPOD) return tuple_memcpy(dest, src, metatype);
   return tuple_forEachField(dest, src, metatype,
                             &ValueWitnessTable::initializeWithTake);
+}
+
+/// Generic tuple value witness for 'initializeArrayWithTakeFrontToBack'.
+template <bool IsPOD, bool IsInline>
+static OpaqueValue *tuple_initializeArrayWithTakeFrontToBack(
+                                             OpaqueValue *dest,
+                                             OpaqueValue *src,
+                                             size_t n,
+                                             const Metadata *metatype) {
+  assert(IsPOD == tuple_getValueWitnesses(metatype)->isPOD());
+  assert(IsInline == tuple_getValueWitnesses(metatype)->isValueInline());
+
+  if (IsPOD) return tuple_memmove_array(dest, src, n, metatype);
+  
+  char *destBytes = (char*)dest;
+  char *srcBytes = (char*)src;
+  size_t stride = tuple_getValueWitnesses(metatype)->stride;
+  
+  while (n--) {
+    tuple_initializeWithTake<IsPOD, IsInline>((OpaqueValue*)destBytes,
+                                              (OpaqueValue*)srcBytes,
+                                              metatype);
+    destBytes += stride; srcBytes += stride;
+  }
+  
+  return dest;
+}
+
+/// Generic tuple value witness for 'initializeArrayWithTakeBackToFront'.
+template <bool IsPOD, bool IsInline>
+static OpaqueValue *tuple_initializeArrayWithTakeBackToFront(
+                                             OpaqueValue *dest,
+                                             OpaqueValue *src,
+                                             size_t n,
+                                             const Metadata *metatype) {
+  assert(IsPOD == tuple_getValueWitnesses(metatype)->isPOD());
+  assert(IsInline == tuple_getValueWitnesses(metatype)->isValueInline());
+
+  if (IsPOD) return tuple_memmove_array(dest, src, n, metatype);
+  
+  size_t stride = tuple_getValueWitnesses(metatype)->stride;
+  char *destBytes = (char*)dest + n * stride;
+  char *srcBytes = (char*)src + n * stride;
+  
+  while (n--) {
+    destBytes -= stride; srcBytes -= stride;
+    tuple_initializeWithTake<IsPOD, IsInline>((OpaqueValue*)destBytes,
+                                              (OpaqueValue*)srcBytes,
+                                              metatype);
+  }
+  
+  return dest;
 }
 
 /// Generic tuple value witness for 'assignWithCopy'.
@@ -1272,13 +1386,72 @@ namespace {
 static MetadataCache<ExistentialCacheEntry> ExistentialTypes;
 
 namespace {
-
-struct OpaqueExistentialBoxBase {
+  
+template<typename Impl>
+struct ExistentialBoxBase {
+  template <class Container, class... A>
+  static void destroyArray(Container *array, size_t n, A... args) {
+    size_t stride = Container::getContainerStride(args...);
+    char *bytes = (char*)array;
+    while (n--) {
+      Impl::destroy((Container*)bytes, args...);
+      bytes += stride;
+    }
+  }
+  
+  template <class Container, class... A>
+  static Container *initializeArrayWithCopy(Container *dest,
+                                            Container *src,
+                                            size_t n,
+                                            A... args) {
+    size_t stride = Container::getContainerStride(args...);
+    char *destBytes = (char*)dest, *srcBytes = (char*)src;
+    while (n--) {
+      Impl::initializeWithCopy((Container*)destBytes,
+                               (Container*)srcBytes, args...);
+      destBytes += stride; srcBytes += stride;
+    }
+    return dest;
+  }
+  
+  template <class Container, class... A>
+  static Container *initializeArrayWithTakeFrontToBack(Container *dest,
+                                                       Container *src,
+                                                       size_t n,
+                                                       A... args) {
+    size_t stride = Container::getContainerStride(args...);
+    char *destBytes = (char*)dest, *srcBytes = (char*)src;
+    while (n--) {
+      Impl::initializeWithTake((Container*)destBytes,
+                               (Container*)srcBytes, args...);
+      destBytes += stride; srcBytes += stride;
+    }
+    return dest;
+  }
+  
+  template <class Container, class... A>
+  static Container *initializeArrayWithTakeBackToFront(Container *dest,
+                                                       Container *src,
+                                                       size_t n,
+                                                       A... args) {
+    size_t stride = Container::getContainerStride(args...);
+    char *destBytes = (char*)dest + n * stride, *srcBytes = (char*)src + n * stride;
+    while (n--) {
+      destBytes -= stride; srcBytes -= stride;
+      Impl::initializeWithTake((Container*)destBytes,
+                               (Container*)srcBytes, args...);
+    }
+    return dest;
+  }
+};
+  
+struct OpaqueExistentialBoxBase : ExistentialBoxBase<OpaqueExistentialBoxBase> {
   template <class Container, class... A>
   static void destroy(Container *value, A... args) {
     value->getType()->vw_destroyBuffer(value->getBuffer(args...));
   }
-
+  
+  
   template <class Container, class... A>
   static Container *initializeWithCopy(Container *dest, Container *src,
                                        A... args) {
@@ -1287,7 +1460,7 @@ struct OpaqueExistentialBoxBase {
                                                         src->getBuffer(args...));
     return dest;
   }
-
+  
   template <class Container, class... A>
   static Container *initializeWithTake(Container *dest, Container *src,
                                        A... args) {
@@ -1297,7 +1470,7 @@ struct OpaqueExistentialBoxBase {
     type->vw_initializeBufferWithTake(dest->getBuffer(args...), srcValue); 
     return dest;
   }
-
+  
   template <class Container, class... A>
   static Container *assignWithCopy(Container *dest, Container *src,
                                    A... args) {
@@ -1366,6 +1539,10 @@ struct OpaqueExistentialBox : OpaqueExistentialBoxBase {
     void copyTypeInto(Container *dest) const {
       this->Header.copyTypeInto(&dest->Header, NumWitnessTables);
     }
+    
+    static size_t getContainerStride() {
+      return sizeof(Container);
+    }
   };
   using type = Container;
 
@@ -1411,6 +1588,10 @@ struct NonFixedOpaqueExistentialBox : OpaqueExistentialBoxBase {
     }
     static size_t getStride(unsigned numWitnessTables) {
       return getSize(numWitnessTables);
+    }
+    
+    static size_t getContainerStride(const Metadata *self) {
+      return getStride(getNumWitnessTables(self));
     }
   };
 
@@ -1471,7 +1652,7 @@ namespace {
 
 /// A common base class for fixed and non-fixed class-existential box
 /// implementations.
-struct ClassExistentialBoxBase {
+struct ClassExistentialBoxBase : ExistentialBoxBase<ClassExistentialBoxBase> {
   static constexpr unsigned numExtraInhabitants =
     swift_getHeapObjectExtraInhabitantCount();
 
@@ -1479,7 +1660,7 @@ struct ClassExistentialBoxBase {
   static void destroy(Container *value, A... args) {
     swift_unknownRelease(*value->getValueSlot());
   }
-
+  
   template <class Container, class... A>
   static Container *initializeWithCopy(Container *dest, Container *src,
                                        A... args) {
@@ -1554,6 +1735,8 @@ struct ClassExistentialBox : ClassExistentialBoxBase {
     }
     void **getValueSlot() { return &Header.Value; }
     void * const *getValueSlot() const { return &Header.Value; }
+    
+    static size_t getContainerStride() { return sizeof(Container); }
   };
 
   using type = Container;
@@ -1595,6 +1778,9 @@ struct NonFixedClassExistentialBox : ClassExistentialBoxBase {
     }
     static size_t getStride(unsigned numWitnessTables) {
       return getSize(numWitnessTables);
+    }
+    static size_t getContainerStride(const Metadata *self) {
+      return getStride(getNumWitnessTables(self));
     }
   };
   using type = Container;

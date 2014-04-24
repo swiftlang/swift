@@ -33,7 +33,7 @@ entry(%p : $*DifferentSizeStride, %i: $Builtin.Word):
 // CHECK:        %3 = bitcast %swift.type* %T to i8***
 // CHECK-NEXT:   %4 = getelementptr inbounds i8*** %3, i64 -1
 // CHECK-NEXT:   %5 = load i8*** %4, align 8
-// CHECK-NEXT:   %6 = getelementptr inbounds i8** %5, i32 15
+// CHECK-NEXT:   %6 = getelementptr inbounds i8** %5, i32 19
 // CHECK-NEXT:   %7 = load i8** %6, align 8
 // CHECK-NEXT:   %stride = ptrtoint i8* %7 to i64
 // CHECK-NEXT:   %8 = mul nuw i64 %1, %stride

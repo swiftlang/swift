@@ -42,6 +42,7 @@
 #include "llvm/Support/Compiler.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/HeapObject.h"
+#include <cstring>
 #include <type_traits>
 
 namespace swift {
@@ -77,6 +78,10 @@ namespace metadataimpl {
 //   static T *assignWithCopy(T *dest, T *src);
 //   static T *assignWithTake(T *dest, T *src);
 //   static const Metadata *typeOf(T *obj, const Metadata *self);
+//   static void destroyArray(T *arr, size_t n);
+//   static T *initializeArrayWithCopy(T *dest, T *src, size_t n);
+//   static T *initializeArrayWithTakeFrontToBack(T *dest, T *src, size_t n);
+//   static T *initializeArrayWithTakeBackToFront(T *dest, T *src, size_t n);
 //   // Only if numExtraInhabitants is non-zero:
 //   static void storeExtraInhabitant(T *dest, int index);
 //   static int getExtraInhabitantIndex(const T *src);
@@ -104,6 +109,14 @@ struct NativeBox {
   static void destroy(T *value) {
     value->T::~T();
   }
+  
+  static void destroyArray(T *array, size_t n) {
+    if (isPOD) return;
+    while (n--) {
+      array->T::~T();
+      array = next(array);
+    }
+  }
 
   static T *initializeWithCopy(T *dest, T *src) {
     return new (dest, InPlace) T(*src);
@@ -114,7 +127,50 @@ struct NativeBox {
     src->T::~T();
     return result;
   }
+  
+  static T *initializeArrayWithCopy(T *dest, T *src, size_t n) {
+    if (isPOD) {
+      std::memcpy(dest, src, n * stride);
+      return dest;
+    }
     
+    T *r = dest;
+    while (n--) {
+      new (dest, InPlace) T(*src);
+      dest = next(dest); src = next(src);
+    }
+    return r;
+  }
+  
+  static T *initializeArrayWithTakeFrontToBack(T *dest, T *src, size_t n) {
+    if (isPOD) {
+      std::memmove(dest, src, n * stride);
+      return dest;
+    }
+    
+    T *r = dest;
+    while (n--) {
+      new (dest, InPlace) T(*src);
+      dest = next(dest); src = next(src);
+    }
+    return r;
+  }
+  
+  static T *initializeArrayWithTakeBackToFront(T *dest, T *src, size_t n) {
+    if (isPOD) {
+      std::memmove(dest, src, n * stride);
+      return dest;
+    }
+    
+    T *r = dest;
+    dest = next(dest, n); src = next(src, n);
+    while (n--) {
+      dest = prev(dest); src = prev(src);
+      new (dest, InPlace) T(*src);
+    }
+    return r;
+  }
+  
   static T *assignWithCopy(T *dest, T *src) {
     *dest = *src;
     return dest;
@@ -129,6 +185,14 @@ struct NativeBox {
   /// By default, assume that C++ types are not polymorphic.
   static const Metadata *typeOf(T *src, const Metadata *self) {
     return self;
+  }
+  
+private:
+  static T *next(T *ptr, size_t n = 1) {
+    return (T*)((char*)ptr + stride * n);
+  }
+  static T *prev(T *ptr, size_t n = 1) {
+    return (T*)((char*)ptr - stride * n);
   }
 };
 
@@ -153,7 +217,29 @@ template <class Impl, class T> struct RetainableBoxBase {
     *dest = *src;
     return dest;
   }
-    
+  
+  static void destroyArray(T *arr, size_t n) {
+    while (n--)
+      Impl::release(*arr++);
+  }
+  
+  static T *initializeArrayWithCopy(T *dest, T *src, size_t n) {
+    T *r = dest;
+    memcpy(dest, src, n * sizeof(T));
+    while (n--)
+      Impl::retain(*dest++);
+    return r;
+  }
+  
+  static T *initializeArrayWithTakeFrontToBack(T *dest, T *src, size_t n) {
+    memmove(dest, src, n * sizeof(T));
+    return dest;
+  }
+  static T *initializeArrayWithTakeBackToFront(T *dest, T *src, size_t n) {
+    memmove(dest, src, n * sizeof(T));
+    return dest;
+  }
+  
   static T *assignWithCopy(T *dest, T *src) {
     T oldValue = *dest;
     *dest = Impl::retain(*src);
@@ -367,13 +453,62 @@ struct AggregateBox {
   static char *assignWithTake(char *dest, char *src) {
     return Helper::assignWithTake(dest, src);
   }
-
+  
+  static void destroyArray(char *array, size_t n) {
+    if (isPOD)
+      return;
+    while (n--) {
+      destroy(array);
+      array += stride;
+    }
+  }
+  static char *initializeArrayWithCopy(char *dest, char *src, size_t n) {
+    if (isPOD) {
+      std::memcpy(dest, src, n * stride);
+      return dest;
+    }
+    
+    char *r = dest;
+    while (n--) {
+      initializeWithCopy(dest, src);
+      dest += stride; src += stride;
+    }
+    return r;
+  }
+  static char *initializeArrayWithTakeFrontToBack(char *dest, char *src, size_t n) {
+    if (isPOD) {
+      std::memmove(dest, src, n * stride);
+      return dest;
+    }
+    
+    char *r = dest;
+    while (n--) {
+      initializeWithTake(dest, src);
+      dest += stride; src += stride;
+    }
+    return r;
+  }
+  static char *initializeArrayWithTakeBackToFront(char *dest, char *src, size_t n) {
+    if (isPOD) {
+      std::memmove(dest, src, n * stride);
+      return dest;
+    }
+    
+    char *r = dest;
+    dest += stride * n; src += stride * n;
+    while (n--) {
+      dest -= stride; src -= stride;
+      initializeWithTake(dest, src);
+    }
+    return r;
+  }
+  
   /// By default, assume that C++ types are not polymorphic.
   static const Metadata *typeOf(char *src, const Metadata *self) {
     return self;
   }
 };
-
+  
 /// A template for using the Swift allocation APIs with a known size
 /// and alignment.
 template <size_t Size, size_t Alignment,
@@ -525,7 +660,8 @@ struct NonFixedBufferValueWitnesses : BufferValueWitnessesBase<Impl> {
 /// long as it's zero, the rest is fine.
 template <class Box>
 struct ValueWitnesses : BufferValueWitnesses<ValueWitnesses<Box>,
-                                             Box::size, Box::alignment> {
+                                             Box::size, Box::alignment>
+{
   using Base = BufferValueWitnesses<ValueWitnesses<Box>,
                                     Box::size, Box::alignment>;
 
@@ -574,7 +710,37 @@ struct ValueWitnesses : BufferValueWitnesses<ValueWitnesses<Box>,
   static const Metadata *typeOf(OpaqueValue *src, const Metadata *self) {
     return Box::typeOf((typename Box::type*) src, self);
   }
-
+  
+  static void destroyArray(OpaqueValue *array, size_t n, const Metadata *self) {
+    return Box::destroyArray((typename Box::type*)array, n);
+  }
+  
+  static OpaqueValue *initializeArrayWithCopy(OpaqueValue *dest,
+                                              OpaqueValue *src,
+                                              size_t n,
+                                              const Metadata *self) {
+    return (OpaqueValue*) Box::initializeArrayWithCopy((typename Box::type*) dest,
+                                                 (typename Box::type*) src, n);
+  }
+  
+  static OpaqueValue *initializeArrayWithTakeFrontToBack(OpaqueValue *dest,
+                                              OpaqueValue *src,
+                                              size_t n,
+                                              const Metadata *self) {
+    return (OpaqueValue*) Box::initializeArrayWithTakeFrontToBack(
+                                                   (typename Box::type*) dest,
+                                                   (typename Box::type*) src, n);
+  }
+  
+  static OpaqueValue *initializeArrayWithTakeBackToFront(OpaqueValue *dest,
+                                              OpaqueValue *src,
+                                              size_t n,
+                                              const Metadata *self) {
+    return (OpaqueValue*) Box::initializeArrayWithTakeBackToFront(
+                                                   (typename Box::type*) dest,
+                                                   (typename Box::type*) src, n);
+  }
+  
   // These should not get instantiated if the type doesn't have extra
   // inhabitants.
 
@@ -602,7 +768,8 @@ struct ValueWitnesses : BufferValueWitnesses<ValueWitnesses<Box>,
 template <class Box, bool IsKnownAllocated>
 struct NonFixedValueWitnesses :
   NonFixedBufferValueWitnesses<NonFixedValueWitnesses<Box, IsKnownAllocated>,
-                               IsKnownAllocated> {
+                               IsKnownAllocated>
+{
 
   static constexpr unsigned numExtraInhabitants = Box::numExtraInhabitants;
   static constexpr bool hasExtraInhabitants = (numExtraInhabitants != 0);
@@ -612,19 +779,54 @@ struct NonFixedValueWitnesses :
   static void destroy(OpaqueValue *value, const Metadata *self) {
     return Box::destroy((typename Box::type*) value, self);
   }
-
+  
+  static void destroyArray(OpaqueValue *array, size_t n,
+                           const Metadata *self) {
+    return Box::destroyArray((typename Box::type*) array, n, self);
+  }
+  
   static OpaqueValue *initializeWithCopy(OpaqueValue *dest, OpaqueValue *src,
                                          const Metadata *self) {
     return (OpaqueValue*) Box::initializeWithCopy((typename Box::type*) dest,
                                                   (typename Box::type*) src,
                                                   self);
   }
-
+  
   static OpaqueValue *initializeWithTake(OpaqueValue *dest, OpaqueValue *src,
                                          const Metadata *self) {
     return (OpaqueValue*) Box::initializeWithTake((typename Box::type*) dest,
                                                   (typename Box::type*) src,
                                                   self);
+  }
+  
+  static OpaqueValue *initializeArrayWithCopy(OpaqueValue *dest,
+                                              OpaqueValue *src,
+                                              size_t n,
+                                              const Metadata *self) {
+    return (OpaqueValue*) Box::initializeArrayWithCopy(
+                                                  (typename Box::type*) dest,
+                                                  (typename Box::type*) src,
+                                                  n, self);
+  }
+  
+  static OpaqueValue *initializeArrayWithTakeFrontToBack(OpaqueValue *dest,
+                                                         OpaqueValue *src,
+                                                         size_t n,
+                                                         const Metadata *self) {
+    return (OpaqueValue*) Box::initializeArrayWithTakeFrontToBack(
+                                                  (typename Box::type*) dest,
+                                                  (typename Box::type*) src,
+                                                  n, self);
+  }
+
+  static OpaqueValue *initializeArrayWithTakeBackToFront(OpaqueValue *dest,
+                                                         OpaqueValue *src,
+                                                         size_t n,
+                                                         const Metadata *self) {
+    return (OpaqueValue*) Box::initializeArrayWithTakeBackToFront(
+                                                  (typename Box::type*) dest,
+                                                  (typename Box::type*) src,
+                                                  n, self);
   }
 
   static OpaqueValue *assignWithCopy(OpaqueValue *dest, OpaqueValue *src,

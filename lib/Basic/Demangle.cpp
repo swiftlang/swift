@@ -398,6 +398,10 @@ private:
     InitializeWithTake,
     ProjectBuffer,
     Typeof,
+    DestroyArray,
+    InitializeArrayWithCopy,
+    InitializeArrayWithTakeFrontToBack,
+    InitializeArrayWithTakeBackToFront,
     StoreExtraInhabitant,
     GetExtraInhabitantIndex,
     GetEnumTag,
@@ -433,6 +437,14 @@ private:
       return "projectBuffer";
     case ValueWitnessKind::Typeof:
       return "typeof";
+    case ValueWitnessKind::DestroyArray:
+      return "destroyArray";
+    case ValueWitnessKind::InitializeArrayWithCopy:
+      return "initializeArrayWithCopy";
+    case ValueWitnessKind::InitializeArrayWithTakeFrontToBack:
+      return "initializeArrayWithTakeFrontToBack";
+    case ValueWitnessKind::InitializeArrayWithTakeBackToFront:
+      return "initializeArrayWithTakeBackToFront";
     case ValueWitnessKind::StoreExtraInhabitant:
       return "storeExtraInhabitant";
     case ValueWitnessKind::GetExtraInhabitantIndex:
@@ -480,6 +492,8 @@ private:
       return ValueWitnessKind::ProjectBuffer;
     if (c1 == 't' && c2 == 'y')
       return ValueWitnessKind::Typeof;
+    if (c1 == 'X' && c2 == 'x')
+      return ValueWitnessKind::DestroyArray;
     if (c1 == 'x' && c2 == 's')
       return ValueWitnessKind::StoreExtraInhabitant;
     if (c1 == 'x' && c2 == 'g')
