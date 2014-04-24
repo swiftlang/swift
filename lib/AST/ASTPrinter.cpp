@@ -1007,14 +1007,14 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
       auto BodyParams = decl->getBodyParamPatterns();
       auto ValueParam = BodyParams.back()->getSemanticsProvidingPattern();
       if (auto *TP = dyn_cast<TuplePattern>(ValueParam)) {
-        if (!TP->isImplicit()) {
-          for (auto &Elt : TP->getFields()) {
-            auto *P = Elt.getPattern()->getSemanticsProvidingPattern();
-            Identifier Name = P->getBoundName();
-            if (!Name.empty() && !P->isImplicit())
+        if (!TP->isImplicit() &&
+            TP->getFields().begin() != TP->getFields().end()) {
+          auto *P = TP->getFields().begin()->getPattern()->
+                        getSemanticsProvidingPattern();
+          Identifier Name = P->getBoundName();
+          if (!Name.empty() && !P->isImplicit())
             Printer << "(" << Name.str() << ")";
-            break;
-          }
+          break;
         }
       }
       Printer << " {";
