@@ -219,7 +219,7 @@ sil @singleton_switch_indirect : $(@inout Singleton) -> () {
 entry(%u : $*Singleton):
   switch_enum_addr %u : $*Singleton, case #Singleton.value!enumelt.1: dest
 dest:
-  %u2 = take_enum_data_addr %u : $*Singleton, #Singleton.value!enumelt.1
+  %u2 = unchecked_take_enum_data_addr %u : $*Singleton, #Singleton.value!enumelt.1
   %x = tuple ()
   return %x : $()
 }
@@ -796,7 +796,7 @@ entry(%u : $*SinglePayloadSpareBit):
 // CHECK: ; <label>:
 // CHECK:   [[DATA_ADDR:%.*]] = bitcast %O4enum21SinglePayloadSpareBit* %0 to i63*
 x_dest:
-  %u2 = take_enum_data_addr %u : $*SinglePayloadSpareBit, #SinglePayloadSpareBit.x!enumelt.1
+  %u2 = unchecked_take_enum_data_addr %u : $*SinglePayloadSpareBit, #SinglePayloadSpareBit.x!enumelt.1
   %a = function_ref @a : $@thin () -> ()
   apply %a() : $@thin () -> ()
   br end
@@ -1292,15 +1292,15 @@ entry(%u : $*MultiPayloadNoSpareBits):
 // CHECK:   bitcast %O4enum23MultiPayloadNoSpareBits* %0 to i63*
 
 x_dest:
-  %x = take_enum_data_addr %u : $*MultiPayloadNoSpareBits, #MultiPayloadNoSpareBits.x!enumelt.1
+  %x = unchecked_take_enum_data_addr %u : $*MultiPayloadNoSpareBits, #MultiPayloadNoSpareBits.x!enumelt.1
   br end
 
 y_dest:
-  %y = take_enum_data_addr %u : $*MultiPayloadNoSpareBits, #MultiPayloadNoSpareBits.y!enumelt.1
+  %y = unchecked_take_enum_data_addr %u : $*MultiPayloadNoSpareBits, #MultiPayloadNoSpareBits.y!enumelt.1
   br end
 
 z_dest:
-  %z = take_enum_data_addr %u : $*MultiPayloadNoSpareBits, #MultiPayloadNoSpareBits.z!enumelt.1
+  %z = unchecked_take_enum_data_addr %u : $*MultiPayloadNoSpareBits, #MultiPayloadNoSpareBits.z!enumelt.1
   br end
 
 a_dest:
@@ -1542,15 +1542,15 @@ entry(%u : $*MultiPayloadOneSpareBit):
 // CHECK:   bitcast %O4enum23MultiPayloadOneSpareBit* %0 to i61*
 
 x_dest:
-  %x = take_enum_data_addr %u : $*MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.x!enumelt.1
+  %x = unchecked_take_enum_data_addr %u : $*MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.x!enumelt.1
   br end
 
 y_dest:
-  %y = take_enum_data_addr %u : $*MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.y!enumelt.1
+  %y = unchecked_take_enum_data_addr %u : $*MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.y!enumelt.1
   br end
 
 z_dest:
-  %z = take_enum_data_addr %u : $*MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.z!enumelt.1
+  %z = unchecked_take_enum_data_addr %u : $*MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.z!enumelt.1
   br end
 
 a_dest:
@@ -2217,7 +2217,7 @@ entry(%0 : $*DynamicSingleton<T>):
   switch_enum_addr %0 : $*DynamicSingleton<T>, case #DynamicSingleton.value!enumelt.1: dest
 
 dest:
-  %1 = take_enum_data_addr %0 : $*DynamicSingleton<T>, #DynamicSingleton.value!enumelt.1
+  %1 = unchecked_take_enum_data_addr %0 : $*DynamicSingleton<T>, #DynamicSingleton.value!enumelt.1
   %v = tuple ()
   return %v : $()
 }

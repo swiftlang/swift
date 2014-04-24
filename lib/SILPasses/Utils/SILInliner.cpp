@@ -386,7 +386,7 @@ static InlineCost instructionInlineCost(SILInstruction &I,
     case ValueKind::SwitchEnumAddrInst:
     case ValueKind::SwitchEnumInst:
     case ValueKind::SwitchIntInst:
-    case ValueKind::TakeEnumDataAddrInst:
+    case ValueKind::UncheckedTakeEnumDataAddrInst:
     case ValueKind::UnconditionalCheckedCastInst:
     case ValueKind::UnmanagedToRefInst:
     case ValueKind::UnownedReleaseInst:

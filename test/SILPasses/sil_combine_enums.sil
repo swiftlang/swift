@@ -27,7 +27,7 @@ bb0:
   switch_enum_addr %7#1 : $*Optional<SomeClass>, case #Optional.Some!enumelt.1: bb1, case #Optional.None!enumelt: bb2 // id: %10
 
 bb1:                                              // Preds: bb0
-  %11 = take_enum_data_addr %7#1 : $*Optional<SomeClass>, #Optional.Some!enumelt.1 // user: %12
+  %11 = unchecked_take_enum_data_addr %7#1 : $*Optional<SomeClass>, #Optional.Some!enumelt.1 // user: %12
   %12 = load %11 : $*SomeClass                    // users: %15, %16
   dealloc_stack %7#0 : $*@local_storage Optional<SomeClass> // id: %13
   release_value %5 : $Optional<SomeClass>         // id: %14

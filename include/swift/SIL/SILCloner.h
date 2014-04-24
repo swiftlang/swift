@@ -654,9 +654,9 @@ SILCloner<ImplClass>::visitInitEnumDataAddrInst(InitEnumDataAddrInst *Inst) {
   
 template<typename ImplClass>
 void
-SILCloner<ImplClass>::visitTakeEnumDataAddrInst(TakeEnumDataAddrInst *Inst) {
+SILCloner<ImplClass>::visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *Inst) {
   doPostProcess(Inst,
-    getBuilder().createTakeEnumDataAddr(getOpLocation(Inst->getLoc()),
+    getBuilder().createUncheckedTakeEnumDataAddr(getOpLocation(Inst->getLoc()),
                                         getOpValue(Inst->getOperand()),
                                         Inst->getElement(),
                                         getOpType(Inst->getType())));

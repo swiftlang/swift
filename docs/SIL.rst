@@ -2705,7 +2705,7 @@ discriminator and is done with the `switch_enum`_ terminator::
 
 An address-only enum can be tested by branching on it using the
 `switch_enum_addr`_ terminator. Its value can then be taken by destructively
-projecting the enum value with `take_enum_data_addr`_::
+projecting the enum value with `unchecked_take_enum_data_addr`_::
 
   enum Foo<T> { case A(T), B(String) }
 
@@ -2714,11 +2714,11 @@ projecting the enum value with `take_enum_data_addr`_::
     switch_enum_addr %foo : $*Foo<T>, case #Foo.A: a_dest, case #Foo.B: b_dest
     
   a_dest:
-    %a = take_enum_data_addr %foo : $*Foo<T>, #Foo.A
+    %a = unchecked_take_enum_data_addr %foo : $*Foo<T>, #Foo.A
     /* use %a */
   
   b_dest:
-    %b = take_enum_data_addr %foo : $*Foo<T>, #Foo.B
+    %b = unchecked_take_enum_data_addr %foo : $*Foo<T>, #Foo.B
     /* use %b */
   }
 
@@ -2781,13 +2781,13 @@ into the enum at the ``init_enum_data_addr`` address for the case *before*
 or if ``inject_enum_addr`` is applied for a case with data when data for a
 mismatched case has been stored to the enum.
 
-take_enum_data_addr
-```````````````````
+unchecked_take_enum_data_addr
+`````````````````````````````
 ::
 
-  sil-instruction ::= 'take_enum_data_addr' sil-operand ',' sil-decl-ref
+  sil-instruction ::= 'unchecked_take_enum_data_addr' sil-operand ',' sil-decl-ref
 
-  %1 = take_enum_data_addr %0 : $*U, #U.DataCase
+  %1 = unchecked_take_enum_data_addr %0 : $*U, #U.DataCase
   // $U must be an enum type
   // #U.DataCase must be a case of enum $U with data
   // %1 will be of address type $*T for the data type of case U.DataCase
@@ -3530,7 +3530,7 @@ If the ``enum`` type is resilient, the ``default`` branch is required; if the
 ``enum`` type is fragile, the ``default`` branch is required unless a
 destination is assigned to every ``case`` of the ``enum``.
 Unlike ``switch_enum``, the payload value is not passed to the destination
-basic blocks; it must be projected out separately with `take_enum_data_addr`_.
+basic blocks; it must be projected out separately with `unchecked_take_enum_data_addr`_.
 
 dynamic_method_br
 `````````````````

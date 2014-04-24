@@ -1088,7 +1088,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("super_method", ValueKind::SuperMethodInst)
     .Case("switch_int", ValueKind::SwitchIntInst)
     .Case("switch_enum", ValueKind::SwitchEnumInst)
-    .Case("take_enum_data_addr", ValueKind::TakeEnumDataAddrInst)
+    .Case("unchecked_take_enum_data_addr", ValueKind::UncheckedTakeEnumDataAddrInst)
     .Case("thick_to_objc_metatype", ValueKind::ThickToObjCMetatypeInst)
     .Case("thin_to_thick_function", ValueKind::ThinToThickFunctionInst)
     .Case("tuple", ValueKind::TupleInst)
@@ -1907,7 +1907,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     break;
   }
   case ValueKind::InitEnumDataAddrInst:
-  case ValueKind::TakeEnumDataAddrInst: {
+  case ValueKind::UncheckedTakeEnumDataAddrInst: {
     SILValue Operand;
     SILDeclRef EltRef;
     if (parseTypedValueRef(Operand) ||
@@ -1927,7 +1927,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       ResultVal = B.createInitEnumDataAddr(InstLoc, Operand, Elt,
                                     SILType::getPrimitiveAddressType(ResultTy));
     else
-      ResultVal = B.createTakeEnumDataAddr(InstLoc, Operand, Elt,
+      ResultVal = B.createUncheckedTakeEnumDataAddr(InstLoc, Operand, Elt,
                                     SILType::getPrimitiveAddressType(ResultTy));
     break;
   }

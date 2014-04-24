@@ -1483,12 +1483,12 @@ public:
 
 /// Invalidate an enum value and take ownership of its payload data
 /// without moving it in memory.
-class TakeEnumDataAddrInst
-  : public UnaryInstructionBase<ValueKind::TakeEnumDataAddrInst>
+class UncheckedTakeEnumDataAddrInst
+  : public UnaryInstructionBase<ValueKind::UncheckedTakeEnumDataAddrInst>
 {
   EnumElementDecl *Element;
 public:
-  TakeEnumDataAddrInst(SILLocation Loc, SILValue Operand,
+  UncheckedTakeEnumDataAddrInst(SILLocation Loc, SILValue Operand,
                        EnumElementDecl *Element, SILType ResultTy)
     : UnaryInstructionBase(Loc, Operand, ResultTy),
       Element(Element) {}

@@ -444,10 +444,10 @@ public:
           new (F.getModule()) InitEnumDataAddrInst(Loc, Operand, Element, Ty));
   }
 
-  TakeEnumDataAddrInst *createTakeEnumDataAddr(SILLocation Loc, SILValue Operand,
+  UncheckedTakeEnumDataAddrInst *createUncheckedTakeEnumDataAddr(SILLocation Loc, SILValue Operand,
                                        EnumElementDecl *Element, SILType Ty) {
     return insert(
-          new (F.getModule()) TakeEnumDataAddrInst(Loc, Operand, Element, Ty));
+          new (F.getModule()) UncheckedTakeEnumDataAddrInst(Loc, Operand, Element, Ty));
   }
 
   InjectEnumAddrInst *createInjectEnumAddr(SILLocation Loc, SILValue Operand,

@@ -594,7 +594,7 @@ public:
   void visitTupleInst(TupleInst *i);
   void visitEnumInst(EnumInst *i);
   void visitInitEnumDataAddrInst(InitEnumDataAddrInst *i);
-  void visitTakeEnumDataAddrInst(TakeEnumDataAddrInst *i);
+  void visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *i);
   void visitInjectEnumAddrInst(InjectEnumAddrInst *i);
   void visitMetatypeInst(MetatypeInst *i);
   void visitValueMetatypeInst(ValueMetatypeInst *i);
@@ -2175,7 +2175,7 @@ void IRGenSILFunction::visitInitEnumDataAddrInst(swift::InitEnumDataAddrInst *i)
   setLoweredAddress(SILValue(i, 0), dataAddr);
 }
 
-void IRGenSILFunction::visitTakeEnumDataAddrInst(swift::TakeEnumDataAddrInst *i) {
+void IRGenSILFunction::visitUncheckedTakeEnumDataAddrInst(swift::UncheckedTakeEnumDataAddrInst *i) {
   Address enumAddr = getLoweredAddress(i->getOperand());
   Address dataAddr = emitDestructiveProjectEnumAddressForLoad(*this,
                                                     i->getOperand().getType(),

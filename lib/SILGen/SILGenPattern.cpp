@@ -302,7 +302,7 @@ static SILBasicBlock *emitDispatchAndDestructure(SILGenFunction &gen,
       
       SILBasicBlock *caseBB = gen.createBasicBlock();
       
-      // Create a BB argument or 'take_enum_data_addr' instruction to receive
+      // Create a BB argument or 'unchecked_take_enum_data_addr' instruction to receive
       // the enum case data if it has any.
       SILValue eltValue;
       if (elt->hasArgumentType()) {
@@ -313,7 +313,7 @@ static SILBasicBlock *emitDispatchAndDestructure(SILGenFunction &gen,
           auto &argLowering = gen.getTypeLowering(argTy);
           if (addressOnlyEnum) {
             argTy = argTy.getAddressType();
-            eltValue = gen.B.createTakeEnumDataAddr(Loc, v, elt, argTy);
+            eltValue = gen.B.createUncheckedTakeEnumDataAddr(Loc, v, elt, argTy);
             // Load a loadable data value.
             if (argLowering.isLoadable())
               eltValue = gen.B.createLoad(Loc, eltValue);

@@ -863,8 +863,8 @@ public:
        << SILDeclRef(UDAI->getElement(), SILDeclRef::Kind::EnumElement);
   }
   
-  void visitTakeEnumDataAddrInst(TakeEnumDataAddrInst *UDAI) {
-    OS << "take_enum_data_addr "
+  void visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *UDAI) {
+    OS << "unchecked_take_enum_data_addr "
        << getIDAndType(UDAI->getOperand()) << ", "
        << SILDeclRef(UDAI->getElement(), SILDeclRef::Kind::EnumElement);
   }

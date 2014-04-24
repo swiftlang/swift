@@ -1276,13 +1276,13 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                     Elt, ResultTy);
     break;
   }
-  case ValueKind::TakeEnumDataAddrInst: {
+  case ValueKind::UncheckedTakeEnumDataAddrInst: {
     // Use SILOneValueOneOperandLayout.
     EnumElementDecl *Elt = cast<EnumElementDecl>(MF->getDecl(ValID));
     SILType OperandTy = getSILType(MF->getType(TyID),
                                    (SILValueCategory) TyCategory);
     SILType ResultTy = OperandTy.getEnumElementType(Elt, SILMod);
-    ResultVal = Builder.createTakeEnumDataAddr(Loc,
+    ResultVal = Builder.createUncheckedTakeEnumDataAddr(Loc,
                     getLocalValue(ValID2, ValResNum2, OperandTy),
                     Elt, ResultTy);
     break;
