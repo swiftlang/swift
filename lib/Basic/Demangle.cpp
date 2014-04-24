@@ -484,10 +484,16 @@ private:
       return ValueWitnessKind::InitializeBufferWithCopy;
     if (c1 == 'c' && c2 == 'p')
       return ValueWitnessKind::InitializeWithCopy;
+    if (c1 == 'C' && c2 == 'c')
+      return ValueWitnessKind::InitializeArrayWithCopy;
     if (c1 == 'T' && c2 == 'k')
       return ValueWitnessKind::InitializeBufferWithTake;
     if (c1 == 't' && c2 == 'k')
       return ValueWitnessKind::InitializeWithTake;
+    if (c1 == 'T' && c2 == 't')
+      return ValueWitnessKind::InitializeArrayWithTakeFrontToBack;
+    if (c1 == 't' && c2 == 'T')
+      return ValueWitnessKind::InitializeArrayWithTakeBackToFront;
     if (c1 == 'p' && c2 == 'r')
       return ValueWitnessKind::ProjectBuffer;
     if (c1 == 't' && c2 == 'y')
