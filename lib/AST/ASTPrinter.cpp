@@ -1013,7 +1013,6 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
           Identifier Name = P->getBoundName();
           if (!Name.empty() && !P->isImplicit())
             Printer << "(" << Name.str() << ")";
-          break;
         }
       }
       Printer << " {";
