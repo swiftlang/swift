@@ -601,11 +601,21 @@ macro(add_swift_library name)
   add_library( ${name} ${libkind}
     ${SWIFTLIB_SOURCES}
     ${SWIFTLIB_EXTERNAL_SOURCES})
+
   set_source_files_properties(
     ${SWIFTLIB_SOURCES}
     PROPERTIES OBJECT_DEPENDS "${SWIFTLIB_FILE_DEPENDS}")
   
   set_output_directory(${name} ${SWIFT_RUNTIME_OUTPUT_INTDIR} ${SWIFT_LIBRARY_OUTPUT_INTDIR})
+
+  if (ENABLE_SWIFT_STATIC_RUNTIME AND SHARED_LIBRARY)
+    set(name_static "${name}_static")
+    add_library( ${name_static} STATIC
+      ${SWIFTLIB_SOURCES}
+      ${SWIFTLIB_EXTERNAL_SOURCES})
+    add_dependencies(${name_static} ${name})
+    set_output_directory(${name_static} ${SWIFT_RUNTIME_OUTPUT_INTDIR} ${SWIFT_LIBRARY_OUTPUT_INTDIR})
+  endif()
   
   if (MODULE)
     set_target_properties(${name} PROPERTIES
@@ -648,6 +658,12 @@ macro(add_swift_library name)
       LIBRARY_OUTPUT_DIRECTORY ${SWIFTLIB_DIR}/${SWIFTLIB_SUBDIR}
       ARCHIVE_OUTPUT_DIRECTORY ${SWIFTLIB_DIR}/${SWIFTLIB_SUBDIR} )
 
+    if (name_static)
+      set_target_properties(${name_static} PROPERTIES
+        LIBRARY_OUTPUT_DIRECTORY ${SWIFTLIB_DIR}/${SWIFTLIB_SUBDIR}
+        ARCHIVE_OUTPUT_DIRECTORY ${SWIFTLIB_DIR}/${SWIFTLIB_SUBDIR} )
+    endif()
+
     foreach(config ${CMAKE_CONFIGURATION_TYPES})
       string(TOUPPER ${config} config_upper)
       # Hack to deal with the fact that ${SWIFTLIB_DIR} contains the build-time
@@ -661,11 +677,22 @@ macro(add_swift_library name)
       set_target_properties(${name} PROPERTIES
         LIBRARY_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${SWIFTLIB_SUBDIR}
         ARCHIVE_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${SWIFTLIB_SUBDIR})
+      if (name_static)
+        set_target_properties(${name_static} PROPERTIES
+          LIBRARY_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${SWIFTLIB_SUBDIR}
+          ARCHIVE_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${SWIFTLIB_SUBDIR})
+      endif()
     endforeach()
 
     install(TARGETS ${name}
       LIBRARY DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift/${SWIFTLIB_SUBDIR}
       ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift/${SWIFTLIB_SUBDIR})
+
+    if (name_static)
+      install(TARGETS ${name_static}
+        LIBRARY DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift/${SWIFTLIB_SUBDIR}
+        ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift/${SWIFTLIB_SUBDIR})
+    endif()
 
     # FIXME: Install .swift files so they can be parsed on import.
     # Really we want to install a preparsed metadata file.
