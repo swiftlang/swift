@@ -444,25 +444,66 @@ public:
     return true;
   }
 
-  bool visitWitnessMethodInst(WitnessMethodInst *WMI) {
-    ProtocolConformance *C = WMI->getConformance();
+  bool visitProtocolConformance(ProtocolConformance *C,
+                                const Optional<SILDeclRef> &Member) {
+    // If a null protocol conformance was passed in, just return false.
     if (!C)
       return false;
 
-    SILWitnessTable *WT = WMI->getModule().lookUpWitnessTable(C).first;
-    if (!WT || WT->isDeclaration())
+    // Otherwise try and lookup a witness table for C.
+    SILWitnessTable *WT = Mod.lookUpWitnessTable(C).first;
+
+    // If we don't find any witness table for the conformance, bail and return
+    // false.
+    if (!WT) {
+      Mod.createWitnessTableDeclaration(C);
+      return false;
+    }
+
+    // If the looked up witness table is a declaration, there is nothing we can
+    // do here. Just bail and return false.
+    if (WT->isDeclaration())
       return false;
 
-    SILDeclRef Member = WMI->getMember();
+    bool performFuncDeserialization = false;
+    // For each entry in the witness table...
     for (auto &E : WT->getEntries()) {
-      if (E.getKind() == SILWitnessTable::WitnessKind::Method &&
-          E.getMethodWitness().Requirement == Member) {
-        addFunctionToWorklist(E.getMethodWitness().Witness);
-        return true;
+      // If the entry is a witness method...
+      if (E.getKind() == SILWitnessTable::WitnessKind::Method) {
+        // And we are only interested in deserializing a specific requirement
+        // and don't have that requirement, don't deserialize this method.
+        if (Member.hasValue() && E.getMethodWitness().Requirement != *Member)
+          continue;
+
+        // Otherwise if it is the requirement we are looking for or we just want
+        // to deserialize everything, add the function to the list of functions
+        // to deserialize.
+        performFuncDeserialization = true;
+        addFunctionToWorklist(E.getMethodWitness().Witness);        
       }
     }
 
-    return false;
+    return performFuncDeserialization;
+  }
+
+  bool visitWitnessMethodInst(WitnessMethodInst *WMI) {
+    return visitProtocolConformance(WMI->getConformance(), WMI->getMember());
+  }
+
+  bool visitInitExistentialInst(InitExistentialInst *IEI) {
+    // Link in all protocol conformances that this touches.
+    //
+    // TODO: There might be a two step solution where the init_existential_inst
+    // causes the witness table to be brought in as a declaration and then the
+    // protocol method inst causes the actual deserialization. For now we are
+    // not going to be smart about this to enable avoiding any issues with
+    // visiting the protocol_method before the init_existential_inst.
+    bool performFuncDeserialization = false;
+    for (ProtocolConformance *C : IEI->getConformances()) {
+      performFuncDeserialization |=
+        visitProtocolConformance(C, Optional<SILDeclRef>());
+    }
+    return performFuncDeserialization;
   }
 
   bool visitAllocRefInst(AllocRefInst *ARI) {
