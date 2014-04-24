@@ -130,14 +130,12 @@ private:
     if (!OtherMod.lookUpWitnessTable(sub.Conformance[0]).first)
       OtherMod.createWitnessTableDeclaration(sub.Conformance[0]);
 
-    doPostProcess(Inst,Builder.
-                  createWitnessMethod(getOpLocation(Inst->getLoc()),
-                                      getOpType(Inst->getLookupType()),
-                                      getOpConformance(Inst->getLookupType(),
-                                                       sub.Conformance[0]),
-                                      Inst->getMember(),
-                                      getOpType(Inst->getType()),
-                                      Inst->isVolatile()));
+    // We already subst so getOpConformance is not needed.
+    doPostProcess(Inst, Builder.createWitnessMethod(
+                            getOpLocation(Inst->getLoc()),
+                            getOpType(Inst->getLookupType()),
+                            sub.Conformance[0], Inst->getMember(),
+                            getOpType(Inst->getType()), Inst->isVolatile()));
   }
 
   // If we are performing one of the following checked casts:
