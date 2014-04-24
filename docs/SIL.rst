@@ -597,19 +597,33 @@ considered **layout compatible**. Type ``T`` is *layout compatible* with type
   the loaded ``T`` value is equivalent to ``retain_value``/``release_value`` of
   the original ``U`` value.
 
-This is not always a transitive relationship; ``T`` can be layout-compatible
+This is not always a commutative relationship; ``T`` can be layout-compatible
 with ``U`` whereas ``U`` is not layout-compatible with ``T``. If the layout
 compatible relationship does extend both ways, ``T`` and ``U`` are
-**transitively layout compatible**.
+**commutatively layout compatible**. It is however always transitive; if ``T``
+is layout-compatible with ``U`` and ``U`` is layout-compatible with ``V``, then
+``T`` is layout-compatible with ``V``. All types are layout-compatible with
+themselves.
 
 The following types are considered layout-compatible:
 
-- ``Builtin.RawPointer`` is transitively layout compatible with all heap
+- ``Builtin.RawPointer`` is commutatively layout compatible with all heap
   object reference types, and ``Optional`` of heap object reference types.
   (Note that ``RawPointer`` is a trivial type, so does not have ownership
   semantics.)
-- Enums are layout-compatible with the payload type of their first payloaded
-  case.
+- ``Builtin.RawPointer`` is commutatively layout compatible with
+  ``Builtin.Word``.
+- Structs containing a single stored property are commutatively layout
+  compatible with the type of that property.
+- A heap object reference is commutatively layout compatible with any type
+  that can correctly reference the heap object. For instance, given a class
+  ``B`` and a derived class ``D`` inheriting from ``B``, a value of
+  type ``B`` referencing an instance of type ``D`` is layout compatible with
+  both ``B`` and ``D``, as well as ``Builtin.NativeObject`` and
+  ``Builtin.UnknownObject``. It is not layout compatible with an unrelated class
+  type ``E``.
+- For payloaded enums, the payload type of the first payloaded case is
+  layout-compatible with the enum (*not* commutatively).
 
 Values and Operands
 ~~~~~~~~~~~~~~~~~~~
