@@ -14,7 +14,7 @@ import Swift
 class C {}
 sil @_TFC11autorelease1Cd : $@cc(method) @thin (@owned C) -> @owned Builtin.NativeObject {
 bb0(%0 : $C):
-  %1 = ref_to_native_object %0 : $C to $Builtin.NativeObject // user: %2
+  %1 = unchecked_ref_cast %0 : $C to $Builtin.NativeObject // user: %2
   return %1 : $Builtin.NativeObject              // id: %2
 }
 

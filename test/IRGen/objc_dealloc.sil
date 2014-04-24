@@ -36,7 +36,7 @@ bb0(%0 : $SwiftGizmo):
   %2 = apply %1() : $@thin () -> ()
   %3 = ref_element_addr %0 : $SwiftGizmo, #SwiftGizmo.x      // user: %4
   destroy_addr %3 : $*X                           // id: %4
-  %5 = ref_to_native_object %0 : $SwiftGizmo to $Builtin.NativeObject // user: %6
+  %5 = unchecked_ref_cast %0 : $SwiftGizmo to $Builtin.NativeObject // user: %6
   return %5 : $Builtin.NativeObject              // id: %6
 }
 

@@ -1129,25 +1129,15 @@ public:
     : UnaryInstructionBase(Loc, Operand, Ty) {}
 };
 
-/// RefToNativeObjectInst - Convert a class instance reference to a
-/// Builtin.NativeObject or Builtin.UnknownObject.
-class RefToNativeObjectInst
-  : public UnaryInstructionBase<ValueKind::RefToNativeObjectInst,
+/// Convert a heap object reference to a
+/// different type without any runtime checks.
+///
+class UncheckedRefCastInst
+  : public UnaryInstructionBase<ValueKind::UncheckedRefCastInst,
                                 ConversionInst>
 {
 public:
-  RefToNativeObjectInst(SILLocation Loc, SILValue Operand, SILType Ty)
-    : UnaryInstructionBase(Loc, Operand, Ty) {}
-};
-
-/// NativeObjectToRefInst - Convert a Builtin.NativeObject or
-/// Builtin.UnknownObject to a class instance reference.
-class NativeObjectToRefInst
-  : public UnaryInstructionBase<ValueKind::NativeObjectToRefInst,
-                                ConversionInst>
-{
-public:
-  NativeObjectToRefInst(SILLocation Loc, SILValue Operand, SILType Ty)
+  UncheckedRefCastInst(SILLocation Loc, SILValue Operand, SILType Ty)
     : UnaryInstructionBase(Loc, Operand, Ty) {}
 };
 

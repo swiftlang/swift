@@ -190,10 +190,10 @@ sil @classes : $@thin () -> () {
 bb0:
   // CHECK: %0 = alloc_ref $C
   %C = alloc_ref $C
-  // CHECK: ref_to_native_object %0 : $C to $Builtin.NativeObject
-  %1 = ref_to_native_object %C : $C to $Builtin.NativeObject
-  // CHECK: ref_to_native_object %0 : $C to $Builtin.UnknownObject
-  %O = ref_to_native_object %C : $C to $Builtin.UnknownObject
+  // CHECK: unchecked_ref_cast %0 : $C to $Builtin.NativeObject
+  %1 = unchecked_ref_cast %C : $C to $Builtin.NativeObject
+  // CHECK: unchecked_ref_cast %0 : $C to $Builtin.UnknownObject
+  %O = unchecked_ref_cast %C : $C to $Builtin.UnknownObject
 
   // CHECK: class_method {{.*}} : $C, #C.doIt!1
   %2 = class_method %C : $C, #C.doIt!1 : C -> () -> (), $@cc(method) @thin (@owned C) -> ()
@@ -835,7 +835,7 @@ bb0(%0 : $AnyObject):
   strong_retain %4 : $AnyObject
   // CHECK: project_existential_ref %{{.*}} : $AnyObject to $@sil_self AnyObject
   %6 = project_existential_ref %4 : $AnyObject to $@sil_self AnyObject
-  %7 = ref_to_native_object %6 : $@sil_self AnyObject to $Builtin.UnknownObject
+  %7 = unchecked_ref_cast %6 : $@sil_self AnyObject to $Builtin.UnknownObject
   // CHECK: dynamic_method_br %{{.*}} : $Builtin.UnknownObject, #X.f!1, bb{{.*}}, bb{{.*}}
   dynamic_method_br %7 : $Builtin.UnknownObject, #X.f!1, bb1, bb2
 bb1:

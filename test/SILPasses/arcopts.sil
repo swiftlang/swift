@@ -317,7 +317,7 @@ sil @value_that_does_not_alias_pointer_args_cannot_be_decremented : $@thin (Cls)
 bb0(%0 : $Cls):
   %1 = alloc_ref $Cls
   %2 = function_ref @user : $@thin (Builtin.NativeObject) -> ()
-  %3 = ref_to_native_object %0 : $Cls to $Builtin.NativeObject
+  %3 = unchecked_ref_cast %0 : $Cls to $Builtin.NativeObject
   strong_retain %1 : $Cls
   apply %2(%3) : $@thin (Builtin.NativeObject) -> ()
   apply %2(%3) : $@thin (Builtin.NativeObject) -> ()

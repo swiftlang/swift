@@ -1484,27 +1484,28 @@ public:
                               AI->getType().getASTContext().TheRawPointerType),
             "address-to-pointer result type must be RawPointer");
   }
-
-  void checkRefToNativeObjectInst(RefToNativeObjectInst *AI) {
-    require(AI->getOperand().getType()
-              .getSwiftType()->mayHaveSuperclass(),
-            "ref-to-object-pointer operand must be a class reference");
-    auto destType = AI->getType().getSwiftType();
-    auto &C = AI->getType().getASTContext();
-    require(destType->isEqual(C.TheNativeObjectType)
-            || destType->isEqual(C.TheUnknownObjectType),
-          "ref-to-object-pointer result must be NativeObject or UnknownObject");
+  
+  bool isHeapObjectReferenceType(SILType silTy) {
+    auto &C = silTy.getASTContext();
+    if (silTy.getSwiftRValueType()->mayHaveSuperclass())
+      return true;
+    if (silTy.getSwiftRValueType()->isEqual(C.TheNativeObjectType))
+      return true;
+    if (silTy.getSwiftRValueType()->isEqual(C.TheUnknownObjectType))
+      return true;
+    // TODO: AnyObject type, @objc-only existentials in general
+    return false;
   }
 
-  void checkNativeObjectToRefInst(NativeObjectToRefInst *AI) {
-    require(AI->getType()
-              .getSwiftType()->mayHaveSuperclass(),
-            "object-pointer-to-ref result must be a class reference");
-    auto srcType = AI->getOperand().getType().getSwiftType();
-    auto &C = AI->getOperand().getType().getASTContext();
-    require(srcType->isEqual(C.TheNativeObjectType)
-            || srcType->isEqual(C.TheUnknownObjectType),
-          "object-pointer-to-ref operand must be NativeObject or UnknownObject");
+  void checkUncheckedRefCastInst(UncheckedRefCastInst *AI) {
+    require(AI->getOperand().getType().isObject(),
+            "unchecked_ref_cast operand must be a value");
+    require(isHeapObjectReferenceType(AI->getOperand().getType()),
+            "unchecked_ref_cast operand must be a heap object reference");
+    require(AI->getType().isObject(),
+            "unchecked_ref_cast result must be an object");
+    require(isHeapObjectReferenceType(AI->getType()),
+            "unchecked_ref_cast result must be a heap object reference");
   }
 
   void checkRefToRawPointerInst(RefToRawPointerInst *AI) {

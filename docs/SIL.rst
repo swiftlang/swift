@@ -3155,35 +3155,19 @@ other than its original address type or `layout compatible types`_. It is
 also undefined behavior to cast a ``RawPointer`` from a heap object to any
 address type.
 
-ref_to_object_pointer
-`````````````````````
+unchecked_ref_cast
+``````````````````
 ::
 
-  sil-instruction ::= 'ref_to_object_pointer' sil-operand 'to' sil-type
+  sil-instruction ::= 'unchecked_ref_cast' sil-operand 'to' sil-type
 
-  %1 = ref_to_object_pointer %0 : $C to $Builtin.ObjectPointer
-  %1 = ref_to_object_pointer %0 : $C to $Builtin.ObjCPointer
-  // %0 must be of class type $C
+  %1 = ref_to_object_pointer %0 : $C to $D
+  // %0 must be of heap object reference type $C
+  // $D must be a heap object reference type
   // %1 will be of type $Builtin.ObjectPointer or ObjCPointer
 
-Converts a class instance reference to one of the ``Builtin.ObjectPointer`` or
-``Builtin.ObjCPointer`` types.
-
-object_pointer_to_ref
-`````````````````````
-::
-
-  sil-instruction ::= 'object_pointer_to_ref' sil-operand 'to' sil-type
-
-  %1 = object_pointer_to_ref %0 : $Builtin.ObjectPointer to $C
-  %1 = object_pointer_to_ref %0 : $Builtin.ObjCPointer to $C
-  // $C must be a class type
-  // %1 will be of type $C
-
-Converts a ``Builtin.ObjectPointer`` or ``Builtin.ObjCPointer`` value to a
-class instance reference.  The destination type ``$C`` must match
-the type of the referenced heap object (or a superclass thereof). This
-conversion, however, is unchecked and it is undefined behavior if the
+Converts a heap object reference to another heap object reference type.
+This conversion is unchecked, and it is undefined behavior if the
 destination type is not a valid type for the heap object.
 
 ref_to_raw_pointer

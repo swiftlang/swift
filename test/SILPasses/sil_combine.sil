@@ -111,41 +111,41 @@ bb0:
 // CHECK-LABEL: sil @removeTriviallyDeadInstructions
 // CHECK: store
 // CHECK: strong_retain
-// CHECK-NOT: ref_to_native_object
+// CHECK-NOT: unchecked_ref_cast
 // CHECK: strong_release
 // CHECK-NEXT: strong_release
-// CHECK-NOT: native_object_to_ref
+// CHECK-NOT: unchecked_ref_cast
 sil @removeTriviallyDeadInstructions : $@thin (@owned B) -> () {
 bb0(%0 : $B):
   %1 = alloc_box $B
   %2 = store %0 to %1#1 : $*B
   %3 = load %1#1 : $*B
   %4 = strong_retain %3 : $B
-  %5 = ref_to_native_object %3 : $B to $Builtin.NativeObject
+  %5 = unchecked_ref_cast %3 : $B to $Builtin.NativeObject
   %7 = strong_release %3 : $B
   %8 = strong_release %1#0 : $Builtin.NativeObject
   %9 = function_ref @exit : $@thin @noreturn () -> () // ret.exit : () -> ()
   %10 = apply %9() : $@thin @noreturn () -> ()
-  %6 = native_object_to_ref %5 : $Builtin.NativeObject to $B
+  %6 = unchecked_ref_cast %5 : $Builtin.NativeObject to $B
   %11 = tuple()
   %12 = return %11 : $()
 }
 
 // CHECK-LABEL: sil @removeTriviallyDeadCrossBasicBlocks
-// CHECK-NOT: ref_to_native_object
+// CHECK-NOT: unchecked_ref_cast
 // CHECK: cond_br
-// CHECK-NOT: native_object_to_ref
+// CHECK-NOT: unchecked_ref_cast
 // CHECK: }
 sil @removeTriviallyDeadCrossBasicBlocks : $@thin (@owned B, Builtin.Int1) -> () {
 bb0(%0: $B, %1: $Builtin.Int1):
-  %5 = ref_to_native_object %0 : $B to $Builtin.NativeObject
+  %5 = unchecked_ref_cast %0 : $B to $Builtin.NativeObject
   %13 = cond_br %1, bb1, bb2
 bb1:
   %22 = br bb2
 bb2:
   %9 = function_ref @exit : $@thin @noreturn () -> () // ret.exit : () -> ()
   %10 = apply %9() : $@thin @noreturn () -> ()
-  %21 = native_object_to_ref %5 : $Builtin.NativeObject to $B
+  %21 = unchecked_ref_cast %5 : $Builtin.NativeObject to $B
   %32 = tuple ()
   %33 = return %32 : $()
 }
@@ -468,15 +468,15 @@ bb0(%0 : $@thin U.Type, %1 : $C):
 
 // RefToRawPointer pointer consumption.
 //
-// (ref_to_raw_pointer (ref_to_native_object x))
+// (ref_to_raw_pointer (unchecked_ref_cast x))
 //    -> (ref_to_raw_pointer x)
-// CHECK-LABEL: sil @ref_to_raw_pointer_ref_to_native_object_composition : $@thin (C) -> Builtin.RawPointer
+// CHECK-LABEL: sil @ref_to_raw_pointer_unchecked_ref_cast_composition : $@thin (C) -> Builtin.RawPointer
 // CHECK: bb0
 // CHECK-NEXT: ref_to_raw_pointer
 // CHECK-NEXT: return
-sil @ref_to_raw_pointer_ref_to_native_object_composition : $@thin (C) -> Builtin.RawPointer {
+sil @ref_to_raw_pointer_unchecked_ref_cast_composition : $@thin (C) -> Builtin.RawPointer {
 bb0(%0 : $C):
-  %1 = ref_to_native_object %0 : $C to $Builtin.NativeObject
+  %1 = unchecked_ref_cast %0 : $C to $Builtin.NativeObject
   %2 = ref_to_raw_pointer %1 : $Builtin.NativeObject to $Builtin.RawPointer
   return %2 : $Builtin.RawPointer
 }
@@ -517,13 +517,13 @@ bb0(%0 : $Builtin.NativeObject):
   return %0 : $Builtin.NativeObject
 }
 
-// CHECK-LABEL: sil @native_object_to_ref_ref_to_native_object_round_trip
+// CHECK-LABEL: sil @unchecked_ref_cast_unchecked_ref_cast_round_trip
 // CHECK: bb0
 // CHECK-NEXT: return
-sil @native_object_to_ref_ref_to_native_object_round_trip : $@thin <T_0_0, T_0_1> (HeapBufferStorage<T_0_0, T_0_1>) -> HeapBufferStorage<T_0_0, T_0_1> {
+sil @unchecked_ref_cast_unchecked_ref_cast_round_trip : $@thin <T_0_0, T_0_1> (HeapBufferStorage<T_0_0, T_0_1>) -> HeapBufferStorage<T_0_0, T_0_1> {
 bb0(%0 : $HeapBufferStorage<T_0_0, T_0_1>):
-  %1 = ref_to_native_object %0 : $HeapBufferStorage<T_0_0, T_0_1> to $Builtin.NativeObject
-  %2 = native_object_to_ref %1 : $Builtin.NativeObject to $HeapBufferStorage<T_0_0, T_0_1>
+  %1 = unchecked_ref_cast %0 : $HeapBufferStorage<T_0_0, T_0_1> to $Builtin.NativeObject
+  %2 = unchecked_ref_cast %1 : $Builtin.NativeObject to $HeapBufferStorage<T_0_0, T_0_1>
   return %2 : $HeapBufferStorage<T_0_0, T_0_1>
 }
 
@@ -950,25 +950,25 @@ bb3(%6 : $*FakeOptional<T>):
 }
 
 // (ref-to-object-pointer-inst (object-pointer-to-ref-inst x) typeof(x)) -> x
-// CHECK-LABEL: sil @ref_to_native_object_round_trip : $@thin (B) -> B {
+// CHECK-LABEL: sil @unchecked_ref_cast_round_trip : $@thin (B) -> B {
 // CHECK: bb0
 // CHECK-NEXT: return
-sil @ref_to_native_object_round_trip : $@thin (B) -> B {
+sil @unchecked_ref_cast_round_trip : $@thin (B) -> B {
 bb0(%0 : $B):
-  %1 = ref_to_native_object %0 : $B to $Builtin.NativeObject
-  %2 = native_object_to_ref %1 : $Builtin.NativeObject to $B
+  %1 = unchecked_ref_cast %0 : $B to $Builtin.NativeObject
+  %2 = unchecked_ref_cast %1 : $Builtin.NativeObject to $B
   return %2 : $B
 }
 
 // (upcast X2->X (ref-to-object-pointer-inst (object-pointer-to-ref-inst x) typeof(x))) -> x
-// CHECK-LABEL: sil @upcast_ref_to_native_object_round_trip : $@thin (E) -> E {
+// CHECK-LABEL: sil @upcast_unchecked_ref_cast_round_trip : $@thin (E) -> E {
 // CHECK: bb0
 // CHECK-NEXT: return
-sil @upcast_ref_to_native_object_round_trip : $@thin (E) -> E {
+sil @upcast_unchecked_ref_cast_round_trip : $@thin (E) -> E {
 bb0(%0 : $E):
   %1 = upcast %0 : $E to $B
-  %2 = ref_to_native_object %1 : $B to $Builtin.NativeObject
-  %3 = native_object_to_ref %2 : $Builtin.NativeObject to $E
+  %2 = unchecked_ref_cast %1 : $B to $Builtin.NativeObject
+  %3 = unchecked_ref_cast %2 : $Builtin.NativeObject to $E
   return %3 : $E
 }
 

@@ -823,11 +823,10 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     break;
   }
   // Conversion instructions.
-  case ValueKind::RefToNativeObjectInst:
+  case ValueKind::UncheckedRefCastInst:
   case ValueKind::UpcastInst:
   case ValueKind::AddressToPointerInst:
   case ValueKind::PointerToAddressInst:
-  case ValueKind::NativeObjectToRefInst:
   case ValueKind::RefToRawPointerInst:
   case ValueKind::RawPointerToRefInst:
   case ValueKind::RefToUnownedInst:

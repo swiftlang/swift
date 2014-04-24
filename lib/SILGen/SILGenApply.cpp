@@ -1300,7 +1300,7 @@ public:
       val = gen.B.createProjectExistentialRef(dynamicMemberRef,
                       existential.getValue(),
                       getSelfTypeForDynamicLookup(gen, existential.getValue()));
-      val = gen.B.createRefToNativeObject(dynamicMemberRef, val,
+      val = gen.B.createUncheckedRefCast(dynamicMemberRef, val,
                              SILType::getUnknownObjectType(gen.getASTContext()));
       ManagedValue proj(val, existential.getCleanup());
       setSelfParam(RValue(gen, dynamicMemberRef,
@@ -2294,7 +2294,7 @@ namespace {
       arg = gen.B.createProjectExistentialRef(loc, arg, protoSelfTy);
     }
 
-    SILValue result = gen.B.createRefToNativeObject(loc, arg, objPointerType);
+    SILValue result = gen.B.createUncheckedRefCast(loc, arg, objPointerType);
     // Return the cast result with the original cleanup.
     return ManagedValue(result, cleanup);
   }
@@ -2326,7 +2326,7 @@ namespace {
     SILType destType = gen.getLoweredLoadableType(substitutions[0].Replacement);
     
     // Take the reference type argument and cast it.
-    SILValue result = gen.B.createNativeObjectToRef(loc, args[0].getValue(),
+    SILValue result = gen.B.createUncheckedRefCast(loc, args[0].getValue(),
                                                      destType);
     // Return the cast result with the original cleanup.
     return ManagedValue(result, cleanup);
@@ -2891,7 +2891,7 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
   if (e->getMember().getDecl()->isInstanceMember()) {
     operand = B.createProjectExistentialRef(e, operand,
                                   getSelfTypeForDynamicLookup(*this, operand));
-    operand = B.createRefToNativeObject(e, operand,
+    operand = B.createUncheckedRefCast(e, operand,
                                  SILType::getUnknownObjectType(getASTContext()));
   } else {
     auto metatype = operand.getType().castTo<ExistentialMetatypeType>();
@@ -2995,7 +2995,7 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
   SILValue base = existential.getValue();
   base = B.createProjectExistentialRef(e, base, 
            getSelfTypeForDynamicLookup(*this, base));
-  base = B.createRefToNativeObject(e, base,
+  base = B.createUncheckedRefCast(e, base,
            SILType::getUnknownObjectType(getASTContext()));
 
   // Emit the index.

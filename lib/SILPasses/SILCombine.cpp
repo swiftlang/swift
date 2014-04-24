@@ -830,9 +830,9 @@ SILInstruction *
 SILCombiner::visitRefToRawPointerInst(RefToRawPointerInst *RRPI) {
   // Ref to raw pointer consumption of other ref casts.
   //
-  // (ref_to_raw_pointer (ref_to_native_object x))
+  // (ref_to_raw_pointer (unchecked_ref_cast x))
   //    -> (ref_to_raw_pointer x)
-  if (auto *ROPI = dyn_cast<RefToNativeObjectInst>(RRPI->getOperand())) {
+  if (auto *ROPI = dyn_cast<UncheckedRefCastInst>(RRPI->getOperand())) {
     RRPI->setOperand(ROPI->getOperand());
     return ROPI->use_empty() ? eraseInstFromFunction(*ROPI) : nullptr;
   }

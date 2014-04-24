@@ -758,11 +758,8 @@ public:
   void visitPointerToAddressInst(PointerToAddressInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand(), "pointer_to_address");
   }
-  void visitRefToNativeObjectInst(RefToNativeObjectInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand(), "ref_to_native_object");
-  }
-  void visitNativeObjectToRefInst(NativeObjectToRefInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand(), "native_object_to_ref");
+  void visitUncheckedRefCastInst(UncheckedRefCastInst *CI) {
+    printUncheckedConversionInst(CI, CI->getOperand(), "unchecked_ref_cast");
   }
   void visitRefToRawPointerInst(RefToRawPointerInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand(), "ref_to_raw_pointer");

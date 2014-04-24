@@ -1229,10 +1229,10 @@ static ManagedValue createUnsafeDowncast(SILGenFunction &gen,
                                          ManagedValue input,
                                          SILType resultTy) {
   SILType objectPtrTy = SILType::getNativeObjectType(gen.getASTContext());
-  SILValue result = gen.B.createRefToNativeObject(loc,
+  SILValue result = gen.B.createUncheckedRefCast(loc,
                                                    input.forward(gen),
                                                    objectPtrTy);
-  result = gen.B.createNativeObjectToRef(loc, result, resultTy);
+  result = gen.B.createUncheckedRefCast(loc, result, resultTy);
   return gen.emitManagedRValueWithCleanup(result);
 }
 
@@ -2497,7 +2497,7 @@ void SILGenFunction::emitDestroyingDestructor(DestructorDecl *dd) {
     resultSelfValue = B.createApply(cleanupLoc, dtorValue.forward(*this), 
                                     dtorTy, objectPtrTy, subs, baseSelf);
   } else {
-    resultSelfValue = B.createRefToNativeObject(cleanupLoc, selfValue,
+    resultSelfValue = B.createUncheckedRefCast(cleanupLoc, selfValue,
                                                  objectPtrTy);
   }
 
@@ -2532,7 +2532,7 @@ void SILGenFunction::emitDeallocatingDestructor(DestructorDecl *dd) {
                             dtorTy, objectPtrTy, subs, selfValue);
 
   // Deallocate the object.
-  selfValue = B.createNativeObjectToRef(loc, selfValue, 
+  selfValue = B.createUncheckedRefCast(loc, selfValue, 
                                          getLoweredType(classTy));
   B.createDeallocRef(loc, selfValue);
 
@@ -3706,9 +3706,9 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
     // type (or a derived class thereof). Only Objective-C classes can
     // violate this assumption.
     SILType objectPtrTy = SILType::getNativeObjectType(SGF.getASTContext());
-    newSelfValue = SGF.B.createRefToNativeObject(E, newSelf.getValue(),
+    newSelfValue = SGF.B.createUncheckedRefCast(E, newSelf.getValue(),
                                                   objectPtrTy);
-    newSelfValue = SGF.B.createNativeObjectToRef(E, newSelfValue, destTy);
+    newSelfValue = SGF.B.createUncheckedRefCast(E, newSelfValue, destTy);
     newSelf = ManagedValue(newSelfValue, newSelfCleanup);
   }
 
