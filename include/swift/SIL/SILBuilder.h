@@ -444,6 +444,12 @@ public:
           new (F.getModule()) InitEnumDataAddrInst(Loc, Operand, Element, Ty));
   }
 
+  UncheckedEnumDataInst *createUncheckedEnumData(SILLocation Loc, SILValue Operand,
+                                       EnumElementDecl *Element, SILType Ty) {
+    return insert(
+          new (F.getModule()) UncheckedEnumDataInst(Loc, Operand, Element, Ty));
+  }
+
   UncheckedTakeEnumDataAddrInst *createUncheckedTakeEnumDataAddr(SILLocation Loc, SILValue Operand,
                                        EnumElementDecl *Element, SILType Ty) {
     return insert(

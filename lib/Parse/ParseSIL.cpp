@@ -1088,6 +1088,7 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("super_method", ValueKind::SuperMethodInst)
     .Case("switch_int", ValueKind::SwitchIntInst)
     .Case("switch_enum", ValueKind::SwitchEnumInst)
+    .Case("unchecked_enum_data", ValueKind::UncheckedEnumDataInst)
     .Case("unchecked_take_enum_data_addr", ValueKind::UncheckedTakeEnumDataAddrInst)
     .Case("thick_to_objc_metatype", ValueKind::ThickToObjCMetatypeInst)
     .Case("thin_to_thick_function", ValueKind::ThinToThickFunctionInst)
@@ -1907,6 +1908,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     break;
   }
   case ValueKind::InitEnumDataAddrInst:
+  case ValueKind::UncheckedEnumDataInst:
   case ValueKind::UncheckedTakeEnumDataAddrInst: {
     SILValue Operand;
     SILDeclRef EltRef;
@@ -1916,19 +1918,22 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       return true;
     
     EnumElementDecl *Elt = cast<EnumElementDecl>(EltRef.getDecl());
+    auto ResultTy = Operand.getType().getEnumElementType(Elt, SILMod);
     
-    auto OperandTy = Operand.getType().getSwiftRValueType();
-    auto ResultTy = OperandTy->getTypeOfMember(Elt->getModuleContext(),
-                                               Elt,
-                                               nullptr,
-                                               Elt->getArgumentType())
-      ->getCanonicalType();
-    if (Opcode == ValueKind::InitEnumDataAddrInst)
-      ResultVal = B.createInitEnumDataAddr(InstLoc, Operand, Elt,
-                                    SILType::getPrimitiveAddressType(ResultTy));
-    else
+    switch (Opcode) {
+    case swift::ValueKind::InitEnumDataAddrInst:
+      ResultVal = B.createInitEnumDataAddr(InstLoc, Operand, Elt, ResultTy);
+      break;
+    case swift::ValueKind::UncheckedTakeEnumDataAddrInst:
       ResultVal = B.createUncheckedTakeEnumDataAddr(InstLoc, Operand, Elt,
-                                    SILType::getPrimitiveAddressType(ResultTy));
+                                                    ResultTy);
+      break;
+    case swift::ValueKind::UncheckedEnumDataInst:
+      ResultVal = B.createUncheckedEnumData(InstLoc, Operand, Elt, ResultTy);
+      break;
+    default:
+      llvm_unreachable("switch out of sync");
+    }
     break;
   }
   case ValueKind::InjectEnumAddrInst: {

@@ -904,6 +904,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case ValueKind::StructElementAddrInst:
   case ValueKind::StructExtractInst:
   case ValueKind::InitEnumDataAddrInst:
+  case ValueKind::UncheckedEnumDataInst:
   case ValueKind::UncheckedTakeEnumDataAddrInst:
   case ValueKind::InjectEnumAddrInst: {
     // Has a typed valueref and a field decl. We use SILOneValueOneOperandLayout
@@ -927,6 +928,10 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     case ValueKind::InitEnumDataAddrInst:
       operand = cast<InitEnumDataAddrInst>(&SI)->getOperand();
       tDecl = cast<InitEnumDataAddrInst>(&SI)->getElement();
+      break;
+    case ValueKind::UncheckedEnumDataInst:
+      operand = cast<UncheckedEnumDataInst>(&SI)->getOperand();
+      tDecl = cast<UncheckedEnumDataInst>(&SI)->getElement();
       break;
     case ValueKind::UncheckedTakeEnumDataAddrInst:
       operand = cast<UncheckedTakeEnumDataAddrInst>(&SI)->getOperand();

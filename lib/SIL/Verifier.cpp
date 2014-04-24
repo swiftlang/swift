@@ -654,6 +654,25 @@ public:
             "InitEnumDataAddrInst result does not match type of enum case");
   }
 
+  void checkUncheckedEnumDataInst(UncheckedEnumDataInst *UI) {
+    EnumDecl *ud = UI->getOperand().getType().getEnumOrBoundGenericEnum();
+    require(ud, "UncheckedEnumData must take an enum operand");
+    require(UI->getElement()->getParentEnum() == ud,
+            "UncheckedEnumData case must be a case of the enum operand type");
+    require(UI->getElement()->hasArgumentType(),
+            "UncheckedEnumData case must have a data type");
+    require(UI->getOperand().getType().isObject(),
+            "UncheckedEnumData must take an address operand");
+    require(UI->getType().isObject(),
+            "UncheckedEnumData must produce an address");
+
+    SILType caseTy =
+      UI->getOperand().getType().getEnumElementType(UI->getElement(),
+                                                    F.getModule());
+    require(caseTy == UI->getType(),
+            "UncheckedEnumData result does not match type of enum case");
+  }
+
   void checkUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *UI) {
     EnumDecl *ud = UI->getOperand().getType().getEnumOrBoundGenericEnum();
     require(ud, "UncheckedTakeEnumDataAddrInst must take an enum operand");

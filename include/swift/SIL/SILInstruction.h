@@ -1414,7 +1414,7 @@ public:
   }
 };
 
-/// EnumInst - Represents a loadable enum constructed from one of its
+/// Represents a loadable enum constructed from one of its
 /// elements.
 class EnumInst : public SILInstruction {
   Optional<FixedOperandList<1>> OptionalOperand;
@@ -1449,9 +1449,24 @@ public:
     return V->getKind() == ValueKind::EnumInst;
   }
 };
+  
+/// Unsafely project the data for an enum case out of an enum without checking
+/// the tag.
+class UncheckedEnumDataInst
+  : public UnaryInstructionBase<ValueKind::UncheckedEnumDataInst>
+{
+  EnumElementDecl *Element;
+public:
+  UncheckedEnumDataInst(SILLocation Loc, SILValue Operand,
+                        EnumElementDecl *Element, SILType ResultTy)
+    : UnaryInstructionBase(Loc, Operand, ResultTy),
+      Element(Element) {}
 
-/// Projects the address of the data for a case inside the enum in order to
-/// initialize the payload for that case.
+  EnumElementDecl *getElement() const { return Element; }
+};
+
+/// Projects the address of the data for a case inside an uninitialized enum in
+/// order to initialize the payload for that case.
 class InitEnumDataAddrInst
   : public UnaryInstructionBase<ValueKind::InitEnumDataAddrInst>
 {

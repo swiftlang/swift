@@ -584,7 +584,7 @@ entry(%0 : $*SinglePayloadNoXI2):
   return %v : $()
 }
 
-// CHECK: define { i64, i1 } @single_payload_no_xi_inject_z() {
+// CHECK-LABEL: define { i64, i1 } @single_payload_no_xi_inject_z() {
 // CHECK: entry:
 // CHECK:   ret { i64, i1 } { i64 1, i1 true }
 // CHECK: }
@@ -603,7 +603,7 @@ enum AggregateSinglePayload {
   case z
 }
 
-// CHECK: define void @aggregate_single_payload_unpack(i128, i1) {
+// CHECK-LABEL: define void @aggregate_single_payload_unpack(i128, i1) {
 sil @aggregate_single_payload_unpack : $@thin (AggregateSinglePayload) -> () {
 entry(%u : $AggregateSinglePayload):
   switch_enum %u : $AggregateSinglePayload, case #AggregateSinglePayload.x!enumelt.1: x_dest, default end
@@ -619,7 +619,20 @@ end:
   return %x : $()
 }
 
-// CHECK: define { i128, i1 } @aggregate_single_payload_inject(i21, i64) {
+// CHECK-LABEL: define { i21, i64 } @aggregate_single_payload_unsafe_unpack(i128, i1) {
+// CHECK:  %2 = trunc i128 %0 to i21
+// CHECK:  %3 = lshr i128 %0, 64
+// CHECK:  %4 = trunc i128 %3 to i64
+// CHECK:  %5 = insertvalue { i21, i64 } undef, i21 %2, 0
+// CHECK:  %6 = insertvalue { i21, i64 } %5, i64 %4, 1
+// CHECK:  ret { i21, i64 } %6
+sil @aggregate_single_payload_unsafe_unpack : $@thin (AggregateSinglePayload) -> (Builtin.Int21, Builtin.Int64) {
+entry(%u : $AggregateSinglePayload):
+  %x = unchecked_enum_data %u : $AggregateSinglePayload, #AggregateSinglePayload.x!enumelt.1
+  return %x : $(Builtin.Int21, Builtin.Int64)
+}
+
+// CHECK-LABEL: define { i128, i1 } @aggregate_single_payload_inject(i21, i64) {
 // CHECK: entry:
 // CHECK:   [[ZEXT_0:%.*]] = zext i21 %0 to i128
 // CHECK:   [[ZEXT_1:%.*]] = zext i64 %1 to i128

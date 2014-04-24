@@ -2739,6 +2739,21 @@ enum
 Creates a loadable enum value in the given ``case``. If the ``case`` has a
 data type, the enum value will contain the operand value.
 
+unchecked_enum_data
+```````````````````
+::
+
+  sil-instruction ::= 'unchecked_enum_data' sil-operand ',' sil-decl-ref
+
+  %1 = unchecked_enum_data %0 : $U, #U.DataCase
+  // $U must be an enum type
+  // #U.DataCase must be a case of enum $U with data
+  // %1 will be of object type $T for the data type of case U.DataCase
+
+Unsafely extracts the payload data for an enum ``case`` from an enum value.
+It is undefined behavior if the enum does not contain a value of the given
+case.
+
 init_enum_data_addr
 ```````````````````
 ::

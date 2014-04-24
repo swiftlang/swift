@@ -695,9 +695,11 @@ bb2:
   br bb5                                                 // CHECK: br
 
 bb3(%10 : $Int):
-  br bb4
+  // CHECK: unchecked_enum_data {{%.*}} : $MaybePair, #MaybePair.Left!enumelt.1
+  %x = unchecked_enum_data %3 : $MaybePair, #MaybePair.Left!enumelt.1
+  br bb4(%x : $Int)
 
-bb4:
+bb4(%y : $Int):
   %12 = function_ref @_TF6switch1bFT_T_ : $@thin () -> ()
   %13 = apply %12() : $@thin () -> ()
   br bb5                                                  // CHECK: br

@@ -151,6 +151,7 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
 
   // Enums
   INST(EnumInst, SILInstruction, None)
+  INST(UncheckedEnumDataInst, SILInstruction, None)
   INST(InitEnumDataAddrInst, SILInstruction, None)
   INST(UncheckedTakeEnumDataAddrInst, SILInstruction, MayWrite)
   INST(InjectEnumAddrInst, SILInstruction, MayWrite)

@@ -594,6 +594,7 @@ public:
   void visitTupleInst(TupleInst *i);
   void visitEnumInst(EnumInst *i);
   void visitInitEnumDataAddrInst(InitEnumDataAddrInst *i);
+  void visitUncheckedEnumDataInst(UncheckedEnumDataInst *i);
   void visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *i);
   void visitInjectEnumAddrInst(InjectEnumAddrInst *i);
   void visitMetatypeInst(MetatypeInst *i);
@@ -2173,6 +2174,14 @@ void IRGenSILFunction::visitInitEnumDataAddrInst(swift::InitEnumDataAddrInst *i)
                                                      enumAddr,
                                                      i->getElement());
   setLoweredAddress(SILValue(i, 0), dataAddr);
+}
+
+void IRGenSILFunction::visitUncheckedEnumDataInst(swift::UncheckedEnumDataInst *i) {
+  Explosion enumVal = getLoweredExplosion(i->getOperand());
+  Explosion data(ResilienceExpansion::Maximal);
+  emitProjectLoadableEnum(*this, i->getOperand().getType(),
+                          enumVal, i->getElement(), data);
+  setLoweredExplosion(SILValue(i, 0), data);
 }
 
 void IRGenSILFunction::visitUncheckedTakeEnumDataAddrInst(swift::UncheckedTakeEnumDataAddrInst *i) {
