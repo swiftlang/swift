@@ -17,6 +17,7 @@
 
 #include "swift/AST/RawComment.h"
 #include "swift/AST/Comment.h"
+#include "swift/AST/CommentAST.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
@@ -288,35 +289,74 @@ static bool isFieldNamed(const llvm::rest::Field *F, StringRef Name) {
   }
 }
 
-const FullComment::CommentParts &FullComment::getParts() const {
-  if (Parts.hasValue())
-    return Parts.getValue();
+namespace {
+class CommentSema {
+  CommentContext &Context;
+  FullComment::CommentParts &Parts;
 
-  Parts = CommentParts();
+public:
+  CommentSema(CommentContext &Context, FullComment *FC)
+      : Context(Context), Parts(FC->getMutableParts()) {}
+
+  void visitDocument(llvm::rest::Document *D);
+
+  comments::ParamField *actOnParam(llvm::rest::Field *F);
+};
+} // unnamed namespace
+
+void CommentSema::visitDocument(llvm::rest::Document *D) {
   bool IsFirstChild = true;
-  for (const auto *N : Doc->getChildren()) {
+  for (auto *N : D->getChildren()) {
     // If the first document child is a paragraph, consider it a brief
     // description.
     if (IsFirstChild) {
       IsFirstChild = false;
       if (const auto *P = dyn_cast<llvm::rest::Paragraph>(N)) {
-        Parts->Brief = P;
+        Parts.Brief = P;
         continue;
       }
     }
-    if (const auto *FL = dyn_cast<llvm::rest::FieldList>(N)) {
-      for (const auto *F : FL->getChildren()) {
+    if (auto *FL = dyn_cast<llvm::rest::FieldList>(N)) {
+      for (auto *F : FL->getChildren()) {
         if (isFieldNamed(F, "param"))
-          Parts->Params.push_back(F);
+          Parts.Params.push_back(actOnParam(F));
         else if (isFieldNamed(F, "returns"))
-          Parts->Returns.push_back(F);
+          Parts.Returns.push_back(F);
         else
-          Parts->MiscTopLevelNodes.push_back(F);
+          Parts.MiscTopLevelNodes.push_back(F);
       }
     } else {
-      Parts->MiscTopLevelNodes.push_back(N);
+      Parts.MiscTopLevelNodes.push_back(N);
     }
   }
+}
+
+comments::ParamField *CommentSema::actOnParam(llvm::rest::Field *F) {
+  assert(isFieldNamed(F, "param"));
+  llvm::rest::LinePart ParamName;
+  auto BodyChildren = F->getBodyChildren();
+  if (!BodyChildren.empty()) {
+    auto *P = dyn_cast<llvm::rest::Paragraph>(BodyChildren[0]);
+    if (P) {
+      auto *TAI = dyn_cast<llvm::rest::TextAndInline>(P->getMutableContent());
+      if (TAI)
+        ParamName = extractWord(TAI);
+    }
+  }
+  return new (Context.TheReSTContext)
+      comments::ParamField(F->getName(), ParamName, BodyChildren);
+}
+
+static void performCommentSema(CommentContext &Context, FullComment *FC) {
+  CommentSema(Context, FC).visitDocument(FC->getMutableDocument());
+}
+
+const FullComment::CommentParts &
+FullComment::getParts(CommentContext &Context) const {
+  if (Parts.hasValue())
+    return Parts.getValue();
+
+  performCommentSema(Context, const_cast<FullComment *>(this));
   return Parts.getValue();
 }
 

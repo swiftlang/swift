@@ -149,6 +149,10 @@ Document *parseDocument(ReSTContext &C, LineListRef LL);
 
 void convertToDocutilsXML(const Document *D, raw_ostream &OS);
 
+std::pair<LinePart, LinePart> extractWord(LinePart LP);
+std::pair<LinePart, LineListRef> extractWord(LineListRef LL);
+LinePart extractWord(TextAndInline *TAI);
+
 } // namespace rest
 } // namespace llvm
 

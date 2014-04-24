@@ -33,6 +33,7 @@ REST_AST_NODE(Field, ReSTASTNode)
 REST_AST_NODE(FieldList, ReSTASTNode)
 REST_AST_NODE(BlockQuote, ReSTASTNode)
 REST_AST_NODE(TextAndInline, ReSTASTNode)
+REST_AST_NODE(PrivateExtension, ReSTASTNode)
 
 #undef REST_AST_NODE
 

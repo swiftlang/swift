@@ -1631,6 +1631,88 @@ TEST_P(ParseReSTTest, Test) {
 struct ParseReSTTestData ParseReSTTests[] = {
 };
 
+TEST_F(ReSTTest, ExtractWord_LinePart) {
+  auto ToLinePart = [&](StringRef S) {
+    return LinePart{S, SM.registerLine(S, 0)};
+  };
+  {
+    LinePart LP = ToLinePart("");
+    auto R = extractWord(LP);
+    EXPECT_EQ("", R.first.Text);
+    EXPECT_EQ("", R.second.Text);
+  }
+  {
+    LinePart LP = ToLinePart("a");
+    auto R = extractWord(LP);
+    EXPECT_EQ("a", R.first.Text);
+    EXPECT_EQ("", R.second.Text);
+  }
+  {
+    LinePart LP = ToLinePart("abc");
+    auto R = extractWord(LP);
+    EXPECT_EQ("abc", R.first.Text);
+    EXPECT_EQ("", R.second.Text);
+  }
+  {
+    LinePart LP = ToLinePart("a ");
+    auto R = extractWord(LP);
+    EXPECT_EQ("a", R.first.Text);
+    EXPECT_EQ("", R.second.Text);
+  }
+  {
+    LinePart LP = ToLinePart("abc d");
+    auto R = extractWord(LP);
+    EXPECT_EQ("abc", R.first.Text);
+    EXPECT_EQ("d", R.second.Text);
+  }
+  {
+    LinePart LP = ToLinePart("abc \td");
+    auto R = extractWord(LP);
+    EXPECT_EQ("abc", R.first.Text);
+    EXPECT_EQ("d", R.second.Text);
+  }
+}
+
+TEST_F(ReSTTest, ExtractWord_LineListRef) {
+  ReSTContext Context;
+  {
+    LineList LL = toLineList(Context, std::vector<const char *>());
+    auto R = extractWord(LL);
+    EXPECT_EQ("", R.first.Text);
+    EXPECT_EQ(0u, R.second.size());
+  }
+  {
+    LineList LL = toLineList(Context, std::vector<const char *>{"a"});
+    auto R = extractWord(LL);
+    EXPECT_EQ("a", R.first.Text);
+    EXPECT_EQ("", R.second[0].Text.drop_front(R.second[0].FirstTextByte));
+  }
+  {
+    LineList LL = toLineList(Context, {"a", ""});
+    auto R = extractWord(LL);
+    EXPECT_EQ("a", R.first.Text);
+    EXPECT_EQ("", R.second[0].Text.drop_front(R.second[0].FirstTextByte));
+  }
+  {
+    LineList LL = toLineList(Context, {"a ", ""});
+    auto R = extractWord(LL);
+    EXPECT_EQ("a", R.first.Text);
+    EXPECT_EQ("", R.second[0].Text.drop_front(R.second[0].FirstTextByte));
+  }
+  {
+    LineList LL = toLineList(Context, {"", "a", ""});
+    auto R = extractWord(LL);
+    EXPECT_EQ("a", R.first.Text);
+    EXPECT_EQ("", R.second[0].Text.drop_front(R.second[0].FirstTextByte));
+  }
+  {
+    LineList LL = toLineList(Context, {"abc d", ""});
+    auto R = extractWord(LL);
+    EXPECT_EQ("abc", R.first.Text);
+    EXPECT_EQ("d", R.second[0].Text.drop_front(R.second[0].FirstTextByte));
+  }
+}
+
 // Tests for bullet lists:
 //
 // "* aaa"

@@ -250,6 +250,11 @@ public:
 
 } // namespace detail
 
+struct LinePart {
+  StringRef Text;
+  SourceRange Range;
+};
+
 struct Line {
   StringRef Text;
   SourceRange Range;
@@ -272,11 +277,6 @@ public:
   }
 
   Line() : FirstTextByte(0), ClassificationComputed(0) {}
-};
-
-struct LinePart {
-  StringRef Text;
-  SourceRange Range;
 };
 
 class LineListRef;

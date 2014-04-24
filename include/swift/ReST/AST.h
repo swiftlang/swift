@@ -218,6 +218,8 @@ public:
 
   const TextAndInline *getContent() const { return Content; }
 
+  TextAndInline *getMutableContent() { return Content; }
+
   static bool classof(const ReSTASTNode *N) {
     return N->getKind() == ASTNodeKind::Paragraph;
   }
@@ -471,8 +473,8 @@ public:
 class FieldList final : public ReSTASTNode {
   unsigned NumChildren;
 
-  Field *const *getChildrenBuffer() const {
-    return reinterpret_cast<Field *const *>(this + 1);
+  const Field *const *getChildrenBuffer() const {
+    return reinterpret_cast<const Field *const *>(this + 1);
   }
   Field **getChildrenBuffer() { return reinterpret_cast<Field **>(this + 1); }
 
@@ -481,8 +483,8 @@ class FieldList final : public ReSTASTNode {
 public:
   static FieldList *create(ReSTContext &C, ArrayRef<Field *> Children);
 
-  ArrayRef<Field *> getChildren() const {
-    return ArrayRef<Field *>(getChildrenBuffer(), NumChildren);
+  ArrayRef<const Field *> getChildren() const {
+    return ArrayRef<const Field *>(getChildrenBuffer(), NumChildren);
   }
   MutableArrayRef<Field *> getChildren() {
     return MutableArrayRef<Field *>(getChildrenBuffer(), NumChildren);
@@ -546,15 +548,35 @@ public:
     return LL;
   }
 
+  void setLines(LineListRef LL) {
+    assert(!IsLinePart);
+    this->LL = LL;
+  }
+
   LinePart getLinePart() const {
     assert(IsLinePart);
     return LP;
+  }
+
+  void setLinePart(LinePart LP) {
+    assert(IsLinePart);
+    this->LP = LP;
   }
 
   static bool classof(const ReSTASTNode *N) {
     return N->getKind() == ASTNodeKind::TextAndInline;
   }
 };
+
+class PrivateExtension : public ReSTASTNode {
+public:
+  PrivateExtension() : ReSTASTNode(ASTNodeKind::PrivateExtension) {}
+
+  static bool classof(const ReSTASTNode *N) {
+    return N->getKind() == ASTNodeKind::PrivateExtension;
+  }
+};
+
 } // namespace rest
 } // namespace llvm
 

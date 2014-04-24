@@ -98,12 +98,22 @@ SWIFT_CLASS("_TtC8comments20A200_ParamAndReturns")
 
 /// Aaa.  f2.
 ///
+/// \param first 
+///
+/// \param second 
+///
+/// \param third 
+/// Bbb.
+- (void)f2:(NSInteger)first second:(double)second third:(float)third;
+
+/// Aaa.  f3.
+///
 /// \returns Ccc.
 /// Ddd.
 ///
 /// \returns Eee.
 /// Fff.
-- (void)f2;
+- (void)f3;
 - (instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 

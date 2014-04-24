@@ -25,11 +25,11 @@ namespace swift {
 
 unsigned measureNewline(const char *BufferPtr, const char *BufferEnd);
 
-static inline unsigned measureNewline(llvm::StringRef S) {
+static inline unsigned measureNewline(StringRef S) {
   return measureNewline(S.data(), S.data() + S.size());
 }
 
-static inline bool startsWithNewline(llvm::StringRef S) {
+static inline bool startsWithNewline(StringRef S) {
   return S.startswith("\n") || S.startswith("\r\n");
 }
 

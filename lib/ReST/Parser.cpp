@@ -848,6 +848,9 @@ struct CommentToDocutilsXMLConverter {
     case ASTNodeKind::TextAndInline:
       printTextAndInline(cast<TextAndInline>(N));
       break;
+    case ASTNodeKind::PrivateExtension:
+      printPrivateExtension(cast<PrivateExtension>(N));
+      break;
     }
   }
 
@@ -961,6 +964,10 @@ struct CommentToDocutilsXMLConverter {
       }
     }
   }
+
+  void printPrivateExtension(const PrivateExtension *PE) {
+    OS << "<llvm:private_extension />";
+  }
 };
 
 void llvm::rest::convertToDocutilsXML(const Document *D, raw_ostream &OS) {
@@ -973,3 +980,73 @@ void ReSTASTNode::dump() const {
   Converter.printASTNode(this);
   llvm::errs() << '\n';
 }
+
+static unsigned measureReSTWhitespace(StringRef Text) {
+  unsigned i = 0;
+  for (unsigned e = Text.size(); i != e; ++i) {
+    if (!isReSTWhitespace(Text[i]))
+      break;
+  }
+  return i;
+}
+
+static unsigned measureReSTWord(StringRef Text) {
+  unsigned i = 0;
+  for (unsigned e = Text.size(); i != e; ++i) {
+    if (isReSTWhitespace(Text[i]))
+      break;
+  }
+  return i;
+}
+
+std::pair<LinePart, LinePart> llvm::rest::extractWord(LinePart LP) {
+  unsigned NumWordBytes = measureReSTWord(LP.Text);
+  unsigned NumWhitespaceBytes =
+      (NumWordBytes == 0)
+          ? 0
+          : measureReSTWhitespace(LP.Text.drop_front(NumWordBytes));
+  LinePart Word = {
+      LP.Text.substr(0, NumWordBytes),
+      SourceRange(LP.Range.Start, LP.Range.Start.getAdvancedLoc(NumWordBytes))};
+  LinePart Rest = {LP.Text.drop_front(NumWordBytes + NumWhitespaceBytes),
+                   SourceRange(LP.Range.Start.getAdvancedLoc(
+                                   NumWordBytes + NumWhitespaceBytes),
+                               LP.Range.End)};
+
+  return {Word, Rest};
+}
+
+std::pair<LinePart, LineListRef> llvm::rest::extractWord(LineListRef LL) {
+  for (unsigned i = 0, e = LL.size(); i != e; ++i) {
+    const Line &L = LL[i];
+    StringRef Text = L.Text.drop_front(L.FirstTextByte);
+    if (Text.empty())
+      continue;
+    unsigned NumWordBytes = measureReSTWord(Text);
+    unsigned NumWhitespaceBytes =
+        (NumWordBytes == 0)
+            ? 0
+            : measureReSTWhitespace(Text.drop_front(NumWordBytes));
+
+    LinePart Word = {
+        Text.substr(0, NumWordBytes),
+        SourceRange(L.Range.Start, L.Range.Start.getAdvancedLoc(NumWordBytes))};
+    LineListRef Rest = LL.subList(i, LL.size() - i);
+    Rest.fromFirstLineDropFront(NumWordBytes + NumWhitespaceBytes);
+    return {Word, Rest};
+  }
+  return {LinePart(), LL};
+}
+
+LinePart llvm::rest::extractWord(TextAndInline *TAI) {
+  if (TAI->isLinePart()) {
+    auto WordAndRest = ::extractWord(TAI->getLinePart());
+    TAI->setLinePart(WordAndRest.second);
+    return WordAndRest.first;
+  } else {
+    auto WordAndRest = ::extractWord(TAI->getLines());
+    TAI->setLines(WordAndRest.second);
+    return WordAndRest.first;
+  }
+}
+

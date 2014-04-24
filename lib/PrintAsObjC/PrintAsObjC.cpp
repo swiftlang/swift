@@ -114,7 +114,7 @@ private:
   void printDocumentationComment(Decl *D) {
     CommentContext TheCommentContext;
     if (auto *FC = getFullComment(TheCommentContext, D))
-      ide::getDocumentationCommentAsDoxygen(FC, os);
+      ide::getDocumentationCommentAsDoxygen(TheCommentContext, FC, os);
   }
 
   void visitClassDecl(ClassDecl *CD) {

@@ -21,6 +21,10 @@ class Decl;
 class FullComment;
 struct RawComment;
 
+namespace comments {
+class ParamField;
+}
+
 class CommentContext final {
   SmallVector<FullComment *, 4> FullComments;
 
@@ -36,7 +40,7 @@ class FullComment {
 public:
   class CommentParts {
   public:
-    SmallVector<const llvm::rest::Field *, 8> Params;
+    SmallVector<const comments::ParamField *, 8> Params;
     SmallVector<const llvm::rest::Field *, 4> Returns;
     const llvm::rest::Paragraph *Brief = nullptr;
     SmallVector<const llvm::rest::ReSTASTNode *, 4> MiscTopLevelNodes;
@@ -44,16 +48,26 @@ public:
 
 private:
   const Decl *D;
-  const llvm::rest::Document *Doc;
-  mutable llvm::Optional<CommentParts> Parts;
+  llvm::rest::Document *Doc;
+  llvm::Optional<CommentParts> Parts;
 
 public:
-  FullComment(const Decl *D, const llvm::rest::Document *Doc)
+  FullComment(const Decl *D, llvm::rest::Document *Doc)
       : D(D), Doc(Doc) {}
+
   const Decl *getDecl() const { return D; }
+
   const llvm::rest::Document *getDocument() const { return Doc; }
 
-  const CommentParts &getParts() const;
+  llvm::rest::Document *getMutableDocument() const { return Doc; }
+
+  const CommentParts &getParts(CommentContext &Context) const;
+
+  CommentParts &getMutableParts() {
+    if (!Parts.hasValue())
+      Parts = CommentParts();
+    return Parts.getValue();
+  }
 
   // Only allow allocation using the allocator in ReSTContext or by placement
   // new.

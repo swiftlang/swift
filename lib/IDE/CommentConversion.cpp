@@ -13,6 +13,7 @@
 #include "swift/IDE/CommentConversion.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Comment.h"
+#include "swift/AST/CommentAST.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/SourceManager.h"
@@ -33,9 +34,11 @@ using namespace swift;
 
 namespace {
 struct CommentToXMLConverter {
+  CommentContext &TheCommentContext;
   raw_ostream &OS;
 
-  CommentToXMLConverter(raw_ostream &OS) : OS(OS) {}
+  CommentToXMLConverter(CommentContext &TheCommentContext, raw_ostream &OS)
+      : TheCommentContext(TheCommentContext), OS(OS) {}
 
   void printRawHTML(StringRef Tag) {
     OS << "<rawHTML isSafeToPassThrough=\"1\">";
@@ -84,6 +87,9 @@ struct CommentToXMLConverter {
     case ASTNodeKind::TextAndInline:
       printTextAndInline(cast<TextAndInline>(N));
       break;
+
+    case ASTNodeKind::PrivateExtension:
+      llvm_unreachable("implement");
     }
   }
 
@@ -186,12 +192,11 @@ struct CommentToXMLConverter {
     printRawHTML("</dl>");
   }
 
-  void printAsParameter(const Field *F) {
+  void printAsParameter(const comments::ParamField *PF) {
     OS << "<Parameter><Name>";
-    // FIXME: extract parameter name.
-    OS << "x";
+    OS << PF->getParamName().Text;
     OS << "</Name><Direction isExplicit=\"0\">in</Direction><Discussion>";
-    for (const auto *N : F->getBodyChildren()) {
+    for (const auto *N : PF->getBodyChildren()) {
       OS << "<Para>";
       printASTNode(N);
       OS << "</Para>";
@@ -211,7 +216,7 @@ struct CommentToXMLConverter {
 
 void CommentToXMLConverter::visitFullComment(const FullComment *FC) {
   const Decl *D = FC->getDecl();
-  const auto &Parts = FC->getParts();
+  const auto &Parts = FC->getParts(TheCommentContext);
 
   StringRef RootEndTag;
   if (isa<AbstractFunctionDecl>(D)) {
@@ -349,7 +354,7 @@ bool ide::getDocumentationCommentAsXML(const Decl *D, raw_ostream &OS) {
   if (!FC)
     return false;
 
-  CommentToXMLConverter Converter(OS);
+  CommentToXMLConverter Converter(TheCommentContext, OS);
   Converter.visitFullComment(FC);
 
   OS.flush();
@@ -362,10 +367,12 @@ bool ide::getDocumentationCommentAsXML(const Decl *D, raw_ostream &OS) {
 
 namespace {
 struct CommentToDoxygenConverter {
+  CommentContext &TheCommentContext;
   raw_ostream &OS;
   unsigned PendingNewlines = 1;
 
-  CommentToDoxygenConverter(raw_ostream &OS) : OS(OS) {}
+  CommentToDoxygenConverter(CommentContext &TheCommentContext, raw_ostream &OS)
+      : TheCommentContext(TheCommentContext), OS(OS) {}
 
   void print(StringRef Text) {
     for (unsigned i = 0; i != PendingNewlines; ++i) {
@@ -422,6 +429,9 @@ struct CommentToDoxygenConverter {
     case ASTNodeKind::TextAndInline:
       printTextAndInline(cast<TextAndInline>(N));
       break;
+
+    case ASTNodeKind::PrivateExtension:
+      llvm_unreachable("implement");
     }
   }
 
@@ -527,6 +537,9 @@ struct CommentToDoxygenConverter {
   }
 
   void printBlockCommandContent(ArrayRef<const ReSTASTNode *> Nodes) {
+    if (Nodes.size() == 0)
+      return;
+    print(" ");
     if (Nodes.size() == 1) {
       if (const auto *P = dyn_cast<Paragraph>(Nodes[0])) {
         printTextAndInline(P->getContent());
@@ -538,23 +551,26 @@ struct CommentToDoxygenConverter {
     }
   }
 
-  void printAsDoxygenParam(const Field *F) {
+  void printAsDoxygenParam(const comments::ParamField *PF) {
     print("\\param ");
-    printBlockCommandContent(F->getBodyChildren());
+    print(PF->getParamName().Text);
+    printBlockCommandContent(PF->getBodyChildren());
     printNewline();
   }
 
   void printAsDoxygenReturns(const Field *F) {
-    print("\\returns ");
+    print("\\returns");
     printBlockCommandContent(F->getBodyChildren());
     printNewline();
   }
 };
 } // unnamed namespace
 
-void ide::getDocumentationCommentAsDoxygen(const FullComment *FC, raw_ostream &OS) {
-  CommentToDoxygenConverter Converter(OS);
-  const auto &Parts = FC->getParts();
+void ide::getDocumentationCommentAsDoxygen(CommentContext &TheCommentContext,
+                                           const FullComment *FC,
+                                           raw_ostream &OS) {
+  CommentToDoxygenConverter Converter(TheCommentContext, OS);
+  const auto &Parts = FC->getParts(TheCommentContext);
 
   if (Parts.Brief) {
     Converter.printTextAndInline(Parts.Brief->getContent());

@@ -17,6 +17,7 @@
 #include <memory>
 
 namespace swift {
+class CommentContext;
 class Decl;
 class FullComment;
 
@@ -29,7 +30,8 @@ namespace ide {
 bool getDocumentationCommentAsXML(const Decl *D, raw_ostream &OS);
 
 /// Converts the given comment to Doxygen.
-void getDocumentationCommentAsDoxygen(const FullComment *FC, raw_ostream &OS);
+void getDocumentationCommentAsDoxygen(CommentContext &TheCommentContext,
+                                      const FullComment *FC, raw_ostream &OS);
 
 } // namespace ide
 } // namespace swift
