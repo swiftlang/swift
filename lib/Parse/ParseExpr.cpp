@@ -1940,60 +1940,37 @@ ParserResult<Expr> Parser::parseExprArray(SourceLoc LSquareLoc,
 ///     '[' ':' ']'
 ParserResult<Expr> Parser::parseExprDictionary(SourceLoc LSquareLoc,
                                                Expr *FirstKey) {
-  // Each subexpression is a (key, value) tuple. 
+  assert(Tok.is(tok::colon));
+
+  // Each subexpression is a (key, value) tuple.
   // FIXME: We're not tracking the colon locations in the AST.
   SmallVector<Expr *, 8> SubExprs;
   SourceLoc RSquareLoc;
-  ParserStatus Status;
-
-  // Consume the ':'.
-  consumeToken(tok::colon);
 
   // Function that adds a new key/value pair.
   auto addKeyValuePair = [&](Expr *Key, Expr *Value) -> void {
-    SmallVector<Expr *, 2> Exprs;
-    Exprs.push_back(Key);
-    Exprs.push_back(Value);
-    SubExprs.push_back(new (Context) TupleExpr(SourceLoc(),
-                                               Context.AllocateCopy(Exprs),
-                                               nullptr,
-                                               SourceLoc(),
-                                               /*hasTrailingClosure=*/false,
-                                               /*Implicit=*/false));
+    Expr *Exprs[] = {Key, Value};
+    SubExprs.push_back(new (Context) TupleExpr(
+        SourceLoc(), Context.AllocateCopy(Exprs), nullptr, SourceLoc(),
+        /*hasTrailingClosure=*/false, /*Implicit=*/false));
   };
 
-  // Parse the first value.
-  ParserResult<Expr> FirstValue
-    = parseExpr(diag::expected_value_in_dictionary_literal);
-  if (FirstValue.hasCodeCompletion())
-    return makeParserCodeCompletionResult<Expr>();
-  Status |= FirstValue;
-  if (FirstValue.isNonNull()) {
-    // Add the first key/value pair.
-    addKeyValuePair(FirstKey, FirstValue.get());
-  } else {
-    // If we failed to parse, recover by reading up to the matching closing
-    // bracket.
-    skipUntil(tok::r_square);
-    if (Tok.is(tok::r_square)) {
-      SourceLoc end = consumeToken();
-      return makeParserErrorResult<Expr>(
-                                   new (Context) ErrorExpr({LSquareLoc, end}));
-    }
-  }
+  bool FirstPair = true;
 
-  consumeIf(tok::comma);
-
-  Status |= parseList(tok::r_square, LSquareLoc, RSquareLoc,
-                      tok::comma, /*OptionalSep=*/false,
-                      /*AllowSepAfterLast=*/true,
-                      diag::expected_rsquare_array_expr,
-                      [&] () -> ParserStatus {
+  ParserStatus Status =
+      parseList(tok::r_square, LSquareLoc, RSquareLoc, tok::comma,
+                /*OptionalSep=*/false, /*AllowSepAfterLast=*/true,
+                diag::expected_rsquare_array_expr, [&]() -> ParserStatus {
     // Parse the next key.
-    ParserResult<Expr> Key
-      = parseExpr(diag::expected_key_in_dictionary_literal);
-    if (Key.isNull() || Key.hasCodeCompletion())
-      return Key;
+    ParserResult<Expr> Key;
+    if (FirstPair) {
+      Key = makeParserResult(FirstKey);
+      FirstPair = false;
+    } else {
+      Key = parseExpr(diag::expected_key_in_dictionary_literal);
+      if (Key.isNull() || Key.hasCodeCompletion())
+        return Key;
+    }
 
     // Parse the ':'.
     if (Tok.isNot(tok::colon)) {
@@ -2003,14 +1980,17 @@ ParserResult<Expr> Parser::parseExprDictionary(SourceLoc LSquareLoc,
     consumeToken();
 
     // Parse the next value.
-    ParserResult<Expr> Value
-      = parseExpr(diag::expected_value_in_dictionary_literal);
-    if (Value.isNull() || Value.hasCodeCompletion())
+    ParserResult<Expr> Value =
+        parseExpr(diag::expected_value_in_dictionary_literal);
+    if (Value.hasCodeCompletion())
       return Value;
+
+    if (Value.isNull())
+      Value = makeParserResult(Value, new (Context) ErrorExpr(PreviousLoc));
 
     // Add this key/value pair.
     addKeyValuePair(Key.get(), Value.get());
-    return makeParserSuccess();
+    return Value;
   });
 
   if (Status.hasCodeCompletion())
@@ -2020,18 +2000,15 @@ ParserResult<Expr> Parser::parseExprDictionary(SourceLoc LSquareLoc,
 
   Expr *SubExpr;
   if (SubExprs.size() == 1)
-    SubExpr = new (Context) ParenExpr(LSquareLoc, SubExprs[0],
-                                      RSquareLoc,
+    SubExpr = new (Context) ParenExpr(LSquareLoc, SubExprs[0], RSquareLoc,
                                       /*hasTrailingClosure=*/false);
   else
-    SubExpr = new (Context) TupleExpr(LSquareLoc,
-                                      Context.AllocateCopy(SubExprs),
-                                      nullptr, RSquareLoc,
-                                      /*hasTrailingClosure=*/false,
-                                      /*Implicit=*/false);
+    SubExpr = new (Context) TupleExpr(
+        LSquareLoc, Context.AllocateCopy(SubExprs), nullptr, RSquareLoc,
+        /*hasTrailingClosure=*/false, /*Implicit=*/false);
 
-  return makeParserResult(
-      new (Context) DictionaryExpr(LSquareLoc, SubExpr, RSquareLoc));
+  return makeParserResult(new (Context)
+                          DictionaryExpr(LSquareLoc, SubExpr, RSquareLoc));
 }
 
 void Parser::addPatternVariablesToScope(ArrayRef<Pattern *> Patterns) {

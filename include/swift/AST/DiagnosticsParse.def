@@ -818,7 +818,7 @@ ERROR(expected_rsquare_expr_list,expr_parsing,none,
       "expected ']' in expression list", ())
 
 // Array literal expressions
-ERROR(expected_rsquare_array_expr,expr_parsing,none,
+ERROR(expected_rsquare_array_expr,expr_parsing,PointsToFirstBadToken,
       "expected ']' in container literal expression", ())
 
 // If expressions
