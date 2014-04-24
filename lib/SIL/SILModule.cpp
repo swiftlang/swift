@@ -136,7 +136,8 @@ SILModule::createWitnessTableDeclaration(ProtocolConformance *C) {
 }
 
 std::pair<SILWitnessTable *, ArrayRef<Substitution>>
-SILModule::lookUpWitnessTable(const ProtocolConformance *C) {
+SILModule::
+lookUpWitnessTable(const ProtocolConformance *C, bool deserializeLazily) {
   // Walk down to the base NormalProtocolConformance.
   const ProtocolConformance *ParentC = C;
   ArrayRef<Substitution> Subs;
@@ -201,8 +202,9 @@ SILModule::lookUpWitnessTable(const ProtocolConformance *C) {
   //
   // *NOTE* In practice, wT will be deserializedTable, but I do not want to rely
   // on that behavior for now.
-  if (auto deserializedTable = getSILLoader()->lookupWitnessTable(wT))
-    return {deserializedTable, Subs};
+  if (deserializeLazily)
+    if (auto deserializedTable = getSILLoader()->lookupWitnessTable(wT))
+      return {deserializedTable, Subs};
 
   // If we fail, just return the declaration.
   return {wT, Subs};

@@ -323,8 +323,13 @@ public:
   /// Look up the SILWitnessTable representing the lowering of a protocol
   /// conformance, and collect the substitutions to apply to the referenced
   /// witnesses, if any.
+  ///
+  /// \arg C The protocol conformance mapped key to use to lookup the witness
+  ///        table.
+  /// \arg deserializeLazily If we can not find the witness table should we
+  ///                        attempt to lazily deserialize it.
   std::pair<SILWitnessTable *, ArrayRef<Substitution>>
-  lookUpWitnessTable(const ProtocolConformance *C);
+  lookUpWitnessTable(const ProtocolConformance *C, bool deserializeLazily=true);
 
   /// Look up the VTable mapped to the given ClassDecl. Returns null on failure.
   SILVTable *lookUpVTable(const ClassDecl *C);

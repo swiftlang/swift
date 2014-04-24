@@ -1682,7 +1682,7 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
   auto theConformance = cast<NormalProtocolConformance>(*maybeConformance);
 
   if (!existingWt)
-    existingWt = SILMod.lookUpWitnessTable(theConformance).first;
+    existingWt = SILMod.lookUpWitnessTable(theConformance, false).first;
   auto wT = existingWt;
 
   // If we have an existing witness table, verify that the conformance matches
@@ -1698,7 +1698,7 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
     // declaration.
 
   } else {
-    // Otherwise, create a new function.
+    // Otherwise, create a new witness table declaration.
     wT = SILWitnessTable::create(SILMod, *Linkage, theConformance);
     if (Callback)
       Callback->didDeserialize(MF->getAssociatedModule(), wT);
@@ -1707,7 +1707,8 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
   assert(wT->isDeclaration() && "Our witness table at this point must be a "
                                 "declaration.");
 
-  // If we have a declaration, create the witness table declaration and bail.
+  // If we are asked to just emit a declaration, return the declaration and say
+  // that the witness table is not fully deserialized.
   if (IsDeclaration || declarationOnly) {
     wTableOrOffset.set(wT, /*fully deserialized*/ false);
     return wT;
