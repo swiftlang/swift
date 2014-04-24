@@ -1,0 +1,17 @@
+// RUN: %swift -target x86_64-apple-darwin10 %s -emit-ir | FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+
+class A {}
+class B: A {}
+
+// CHECK-LABEL: define %C5casts1B* @unchecked_addr_cast(%C5casts1A** noalias) {
+// CHECK:         bitcast %C5casts1A** %0 to %C5casts1B**
+sil @unchecked_addr_cast : $(@in A) -> B {
+entry(%a : $*A):
+  %b = unchecked_addr_cast %a : $*A to $*B
+  %x = load %b : $*B
+  return %x : $B
+}

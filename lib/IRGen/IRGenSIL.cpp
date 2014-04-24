@@ -647,6 +647,7 @@ public:
   void visitAddressToPointerInst(AddressToPointerInst *i);
   void visitPointerToAddressInst(PointerToAddressInst *i);
   void visitUncheckedRefCastInst(UncheckedRefCastInst *i);
+  void visitUncheckedAddrCastInst(UncheckedAddrCastInst *i);
   void visitRefToRawPointerInst(RefToRawPointerInst *i);
   void visitRawPointerToRefInst(RawPointerToRefInst *i);
   void visitRefToUnownedInst(RefToUnownedInst *i);
@@ -2551,6 +2552,14 @@ void IRGenSILFunction::visitUncheckedRefCastInst(
   auto &ti = getTypeInfo(i->getType());
   llvm::Type *destType = ti.getStorageType();
   emitPointerCastInst(*this, i->getOperand(), SILValue(i, 0), destType);
+}
+
+void IRGenSILFunction::visitUncheckedAddrCastInst(
+                                             swift::UncheckedAddrCastInst *i) {
+  auto addr = getLoweredAddress(i->getOperand());
+  auto &ti = getTypeInfo(i->getType());
+  auto result = Builder.CreateBitCast(addr, ti.getStorageType()->getPointerTo());
+  setLoweredAddress(SILValue(i, 0), result);
 }
 
 void IRGenSILFunction::visitRefToRawPointerInst(

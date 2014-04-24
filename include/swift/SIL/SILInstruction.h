@@ -1129,9 +1129,8 @@ public:
     : UnaryInstructionBase(Loc, Operand, Ty) {}
 };
 
-/// Convert a heap object reference to a
-/// different type without any runtime checks.
-///
+/// Convert a heap object reference to a different type without any runtime
+/// checks.
 class UncheckedRefCastInst
   : public UnaryInstructionBase<ValueKind::UncheckedRefCastInst,
                                 ConversionInst>
@@ -1140,7 +1139,16 @@ public:
   UncheckedRefCastInst(SILLocation Loc, SILValue Operand, SILType Ty)
     : UnaryInstructionBase(Loc, Operand, Ty) {}
 };
-
+  
+class UncheckedAddrCastInst
+  : public UnaryInstructionBase<ValueKind::UncheckedAddrCastInst,
+                                ConversionInst>
+{
+public:
+  UncheckedAddrCastInst(SILLocation Loc, SILValue Operand, SILType Ty)
+    : UnaryInstructionBase(Loc, Operand, Ty) {}
+};
+  
 /// RefToRawPointer - Convert a reference type to a Builtin.RawPointer.
 class RefToRawPointerInst
   : public UnaryInstructionBase<ValueKind::RefToRawPointerInst, ConversionInst>

@@ -112,6 +112,7 @@ static bool isTransitiveEscapeInst(SILInstruction *Inst) {
   case ValueKind::InitExistentialRefInst:
   case ValueKind::ObjCToThickMetatypeInst:
   case ValueKind::UncheckedRefCastInst:
+  case ValueKind::UncheckedAddrCastInst:
   case ValueKind::OpenExistentialInst:
   case ValueKind::OpenExistentialRefInst:
   case ValueKind::PartialApplyInst:

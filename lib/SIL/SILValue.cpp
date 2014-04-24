@@ -31,6 +31,7 @@ SILValue SILValue::stripCasts() {
     case ValueKind::AddressToPointerInst:
     case ValueKind::PointerToAddressInst:
     case ValueKind::UncheckedRefCastInst:
+    case ValueKind::UncheckedAddrCastInst:
     case ValueKind::RefToRawPointerInst:
     case ValueKind::RawPointerToRefInst:
     case ValueKind::UnconditionalCheckedCastInst:

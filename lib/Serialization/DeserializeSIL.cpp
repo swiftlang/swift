@@ -694,6 +694,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   ONEOPERAND_ONETYPE_INST(OpenExistentialRef)
   // Conversion instructions.
   ONEOPERAND_ONETYPE_INST(UncheckedRefCast)
+  ONEOPERAND_ONETYPE_INST(UncheckedAddrCast)
   ONEOPERAND_ONETYPE_INST(Upcast)
   ONEOPERAND_ONETYPE_INST(AddressToPointer)
   ONEOPERAND_ONETYPE_INST(PointerToAddress)

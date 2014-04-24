@@ -290,6 +290,7 @@ static InlineCost instructionInlineCost(SILInstruction &I,
     case ValueKind::PointerToAddressInst:
 
     case ValueKind::UncheckedRefCastInst:
+    case ValueKind::UncheckedAddrCastInst:
 
     case ValueKind::RawPointerToRefInst:
     case ValueKind::RefToRawPointerInst:
@@ -385,6 +386,7 @@ static InlineCost instructionInlineCost(SILInstruction &I,
     case ValueKind::SwitchEnumAddrInst:
     case ValueKind::SwitchEnumInst:
     case ValueKind::SwitchIntInst:
+    case ValueKind::UncheckedEnumDataInst:
     case ValueKind::UncheckedTakeEnumDataAddrInst:
     case ValueKind::UnconditionalCheckedCastInst:
     case ValueKind::UnmanagedToRefInst:

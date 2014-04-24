@@ -475,6 +475,16 @@ visitUncheckedRefCastInst(UncheckedRefCastInst *Inst) {
 
 template<typename ImplClass>
 void
+SILCloner<ImplClass>::
+visitUncheckedAddrCastInst(UncheckedAddrCastInst *Inst) {
+  doPostProcess(Inst,
+    getBuilder().createUncheckedAddrCast(getOpLocation(Inst->getLoc()),
+                                          getOpValue(Inst->getOperand()),
+                                          getOpType(Inst->getType())));
+}
+
+template<typename ImplClass>
+void
 SILCloner<ImplClass>::visitRefToRawPointerInst(RefToRawPointerInst *Inst) {
   doPostProcess(Inst,
     getBuilder().createRefToRawPointer(getOpLocation(Inst->getLoc()),

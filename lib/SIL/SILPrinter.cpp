@@ -761,6 +761,9 @@ public:
   void visitUncheckedRefCastInst(UncheckedRefCastInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand(), "unchecked_ref_cast");
   }
+  void visitUncheckedAddrCastInst(UncheckedAddrCastInst *CI) {
+    printUncheckedConversionInst(CI, CI->getOperand(), "unchecked_addr_cast");
+  }
   void visitRefToRawPointerInst(RefToRawPointerInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand(), "ref_to_raw_pointer");
   }

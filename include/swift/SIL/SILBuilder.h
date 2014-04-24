@@ -345,7 +345,12 @@ public:
                                                    SILType Ty) {
     return insert(new (F.getModule()) UncheckedRefCastInst(Loc, Op, Ty));
   }
-
+  
+  UncheckedAddrCastInst *createUncheckedAddrCast(SILLocation Loc, SILValue Op,
+                                               SILType Ty) {
+    return insert(new (F.getModule()) UncheckedAddrCastInst(Loc, Op, Ty));
+  }
+  
   RefToRawPointerInst *createRefToRawPointer(SILLocation Loc, SILValue Op,
                                              SILType Ty) {
     return insert(new (F.getModule()) RefToRawPointerInst(Loc, Op, Ty));

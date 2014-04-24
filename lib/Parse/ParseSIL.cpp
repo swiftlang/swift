@@ -1087,7 +1087,8 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("switch_int", ValueKind::SwitchIntInst)
     .Case("switch_enum", ValueKind::SwitchEnumInst)
     .Case("unchecked_enum_data", ValueKind::UncheckedEnumDataInst)
-    .Case("unchecked_ref_cast", ValueKind::UncheckedRefCastInst)  
+    .Case("unchecked_addr_cast", ValueKind::UncheckedAddrCastInst)
+    .Case("unchecked_ref_cast", ValueKind::UncheckedRefCastInst)
     .Case("unchecked_take_enum_data_addr", ValueKind::UncheckedTakeEnumDataAddrInst)
     .Case("thick_to_objc_metatype", ValueKind::ThickToObjCMetatypeInst)
     .Case("thin_to_thick_function", ValueKind::ThinToThickFunctionInst)
@@ -1519,6 +1520,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       
     // Conversion instructions.
   case ValueKind::UncheckedRefCastInst:
+  case ValueKind::UncheckedAddrCastInst:
   case ValueKind::UpcastInst:
   case ValueKind::AddressToPointerInst:
   case ValueKind::PointerToAddressInst:
@@ -1551,6 +1553,9 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     default: assert(0 && "Out of sync with parent switch");
     case ValueKind::UncheckedRefCastInst:
       ResultVal = B.createUncheckedRefCast(InstLoc, Val, Ty);
+      break;
+    case ValueKind::UncheckedAddrCastInst:
+      ResultVal = B.createUncheckedAddrCast(InstLoc, Val, Ty);
       break;
     case ValueKind::UpcastInst:
       ResultVal = B.createUpcast(InstLoc, Val, Ty);

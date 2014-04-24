@@ -824,6 +824,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
   // Conversion instructions.
   case ValueKind::UncheckedRefCastInst:
+  case ValueKind::UncheckedAddrCastInst:
   case ValueKind::UpcastInst:
   case ValueKind::AddressToPointerInst:
   case ValueKind::PointerToAddressInst:

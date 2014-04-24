@@ -1029,7 +1029,9 @@ bb0:
   %0 = builtin_function_ref "once" : $@thin (Builtin.RawPointer, @owned @callee_owned () -> ()) -> ()
   // CHECK: sil_global_addr @globalinit_token0 : $*Builtin.Word
   %1 = sil_global_addr @globalinit_token0 : $*Builtin.Word
-  %2 = address_to_pointer %1 : $*Builtin.Word to $Builtin.RawPointer
+  // CHECK: unchecked_addr_cast {{%.*}} : $*Builtin.Word to $*Builtin.RawPointer
+  %a = unchecked_addr_cast %1 : $*Builtin.Word to $*Builtin.RawPointer
+  %2 = address_to_pointer %a : $*Builtin.RawPointer to $Builtin.RawPointer
   %3 = function_ref @globalinit_func0 : $@thin () -> ()
   %4 = thin_to_thick_function %3 : $@thin () -> () to $@callee_owned () -> ()
   %5 = apply %0(%2, %4) : $@thin (Builtin.RawPointer, @owned @callee_owned () -> ()) -> ()
