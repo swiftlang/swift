@@ -2863,6 +2863,11 @@ value of the given ``case``. The result shares memory with the original enum
 value; the enum memory cannot be reinitialized as an enum until the payload has
 also been invalidated.
 
+(1.0 only)
+
+For the first payloaded case of an enum, ``unchecked_take_enum_data_addr``
+is guaranteed to have no side effects; the enum value will not be invalidated.
+
 Protocol and Protocol Composition Types
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
