@@ -1062,8 +1062,8 @@ static bool isVisibleFromModule(const ClangModuleUnit *ModuleFilter,
   auto ClangNode = VD->getClangNode();
   assert(ClangNode);
 
-  auto OwningClangModule = getClangOwningModule(ClangNode,
-                                            ModuleFilter->getClangASTContext());
+  auto &ClangASTContext = ModuleFilter->getClangASTContext();
+  auto OwningClangModule = getClangOwningModule(ClangNode, ClangASTContext);
 
   // FIXME: This only triggers for implicitly-generated decls like
   // __builtin_va_list, which we probably shouldn't be importing anyway.
@@ -1072,10 +1072,34 @@ static bool isVisibleFromModule(const ClangModuleUnit *ModuleFilter,
   if (!OwningClangModule)
     return true;
 
-  // FIXME: If this is in another module, we shouldn't really be considering
-  // it here, but the recursive lookup through exports doesn't seem to be
-  // working right yet.
-  return ModuleFilter->getClangModule()->isModuleVisible(OwningClangModule);
+  if (OwningClangModule->getTopLevelModule() == ModuleFilter->getClangModule())
+    return true;
+
+  if (auto D = ClangNode.getAsDecl()) {
+    // Handle redeclared decls.
+    if (isa<clang::FunctionDecl>(D) || isa<clang::VarDecl>(D) ||
+        isa<clang::TypedefNameDecl>(D)) {
+      for (auto Redeclaration : D->redecls()) {
+        if (Redeclaration == D)
+          continue;
+        auto OwningClangModule = getClangOwningModule(Redeclaration,
+                                                      ClangASTContext);
+
+        // FIXME: This only triggers for implicitly-generated decls like
+        // __builtin_va_list, which we probably shouldn't be importing anyway.
+        // But it also includes the builtin declarations for 'id', 'Class', 'SEL',
+        // and '__int128_t'.
+        if (!OwningClangModule)
+          return true;
+
+        if (OwningClangModule->getTopLevelModule() ==
+            ModuleFilter->getClangModule())
+          return true;
+      }
+    }
+  }
+
+  return false;
 }
 
 

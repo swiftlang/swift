@@ -60,3 +60,8 @@ module ProtoWithInitializer {
   header "ProtoWithInitializer.h"
   export *
 }
+
+module Redeclaration {
+  header "Redeclaration.h"
+  export *
+}

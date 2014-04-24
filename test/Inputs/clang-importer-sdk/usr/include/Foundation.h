@@ -171,6 +171,11 @@ typedef NS_ENUM(NSUInteger, NSPostingStyle) {
   NSPostNow = 3
 };
 
+// Deliberately simple to test the overlay module.
+enum {
+  NSUTF8StringEncoding = 8
+};
+
 
 /// Aaa.  NSRuncingOptions.  Bbb.
 typedef NS_OPTIONS(NSUInteger, NSRuncingOptions) {
