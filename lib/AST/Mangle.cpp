@@ -1188,8 +1188,10 @@ void Mangler::mangleClosureEntity(AbstractClosureExpr *closure,
   mangleContext(closure->getParent(), BindGenerics::All);
   Buffer << (isa<ClosureExpr>(closure) ? 'U' : 'u') << Index(discriminator);
 
-  mangleType(closure->getType()->getCanonicalType(),
-             ResilienceExpansion::Minimal, /*uncurry*/ 0);
+  Type Ty = closure->getType();
+  if (!Ty)
+    Ty = ErrorType::get(closure->getASTContext());
+  mangleType(Ty->getCanonicalType(), ResilienceExpansion::Minimal, /*uncurry*/ 0);
 }
 
 void Mangler::mangleConstructorEntity(ConstructorDecl *ctor,
