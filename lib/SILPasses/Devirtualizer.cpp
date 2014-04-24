@@ -1006,14 +1006,17 @@ ClassDecl *SILDevirtualizer::findClassDeclForSILValue(SILValue Cls) {
 }
 
 void SILDevirtualizer::optimizeClassMethodInst(ClassMethodInst *CMI) {
-  DEBUG(llvm::dbgs() << " *** Trying to optimize : " << *CMI);
+  DEBUG(llvm::dbgs() << "    Trying to optimize : " << *CMI);
 
   // Attempt to find a ClassDecl for our operand.
   ClassDecl *Class = findClassDeclForSILValue(CMI->getOperand());
 
   // If we fail, bail...
-  if (!Class)
+  if (!Class) {
+    DEBUG(llvm::dbgs() << "        FAIL: Could not find class decl for "
+          "SILValue.\n");
     return;
+  }
 
   // Otherwise walk up the class heirarchy until there are no more super classes
   // (i.e. Class becomes null) or we find a match with member.
@@ -1047,7 +1050,7 @@ void SILDevirtualizer::optimizeClassMethodInst(ClassMethodInst *CMI) {
     SILInstruction *FRI =
         new (CMI->getModule()) FunctionRefInst(CMI->getLoc(), F);
 
-    DEBUG(llvm::dbgs() << " *** Devirtualized : " << *CMI);
+    DEBUG(llvm::dbgs() << "        SUCCESS: " << *CMI);
     CMI->getParent()->getInstList().insert(CMI, FRI);
     CMI->replaceAllUsesWith(FRI);
     CMI->eraseFromParent();
@@ -1058,6 +1061,9 @@ void SILDevirtualizer::optimizeClassMethodInst(ClassMethodInst *CMI) {
     Changed = true;
     break;
   }
+
+  DEBUG(llvm::dbgs() << "        FAIL: Could not find matching VTable or "
+        "vtable method for this class.\n");
 }
 
 /// \brief Scan the uses of the protocol object and return the initialization
@@ -1083,7 +1089,7 @@ findSingleInitNoCaptureProtocol(SILValue ProtocolObject) {
     case ValueKind::InitExistentialInst: {
       // Make sure there is a single initialization:
       if (Init) {
-        DEBUG(llvm::dbgs() << " *** Multiple Protocol initializers: "
+        DEBUG(llvm::dbgs() << "        FAIL: Multiple Protocol initializers: "
                            << *UI.getUser() << " and " << *Init);
         return nullptr;
       }
@@ -1103,7 +1109,8 @@ findSingleInitNoCaptureProtocol(SILValue ProtocolObject) {
       continue;
 
     default: {
-      DEBUG(llvm::dbgs() << " *** Protocol captured by: " << *UI.getUser());
+      DEBUG(llvm::dbgs() << "        FAIL: Protocol captured by: "
+            << *UI.getUser());
       return nullptr;
     }
     }
@@ -1207,7 +1214,7 @@ findFuncInWitnessTable(SILDeclRef Member, CanType ConcreteTy,
 }
 
 void SILDevirtualizer::optimizeApplyInst(ApplyInst *AI) {
-  DEBUG(llvm::dbgs() << " *** Trying to optimize : " << *AI);
+  DEBUG(llvm::dbgs() << "    Trying to optimize ApplyInst : " << *AI);
 
   // Find call sites that may participate in deep devirtualization.
   collectPolyArgs(AI);
@@ -1224,8 +1231,11 @@ void SILDevirtualizer::optimizeApplyInst(ApplyInst *AI) {
     std::pair<SILWitnessTable *, ArrayRef<Substitution>> Ret =
       AI->getModule().lookUpWitnessTable(C);
 
-    if (!Ret.first)
+    if (!Ret.first) {
+      DEBUG(llvm::dbgs() << "        FAIL: Did not find a matching witness "
+            "table.\n");
       return;
+    }
 
     for (auto &Entry : Ret.first->getEntries()) {
       // Look at method entries only.
@@ -1286,7 +1296,7 @@ void SILDevirtualizer::optimizeApplyInst(ApplyInst *AI) {
       Changed = true;
     }
 
-    DEBUG(llvm::dbgs() << " *** Could not find a witness table.\n");
+    DEBUG(llvm::dbgs() << "        FAIL: Could not find a witness table.\n");
     return;
   }
 
@@ -1321,7 +1331,7 @@ void SILDevirtualizer::optimizeApplyInst(ApplyInst *AI) {
   if (PEI->getOperand().getDef() != ProtocolObject.getDef())
     return;
 
-  DEBUG(llvm::dbgs() << " *** Protocol to devirtualize : "
+  DEBUG(llvm::dbgs() << "        Protocol to devirtualize : "
                      << *ProtocolObject.getDef());
 
   // Find a single initialization point, and make sure the protocol is not
@@ -1351,20 +1361,22 @@ void SILDevirtualizer::optimizeApplyInst(ApplyInst *AI) {
     if (!StaticRef)
       continue;
 
-    DEBUG(llvm::dbgs() << " *** Devirtualized : " << *AI);
+    DEBUG(llvm::dbgs() << "        SUCCESS! Devirtualized : " << *AI);
     ApplyInst *NewApply =
       replaceDynApplyWithStaticApply(AI, StaticRef, Init, PEI);
+    DEBUG(llvm::dbgs() << "                To : " << *NewApply);
     collectPolyArgs(NewApply);
     NumDynApply++;
     Changed = true;
     return;
   }
 
-  DEBUG(llvm::dbgs() << " *** Could not find a witness table for: " << *PMI);
+  DEBUG(llvm::dbgs() << "        FAIL: Could not find a witness table "
+        "for: " << *PMI);
 }
 
 void SILDevirtualizer::optimizeFuncBody(SILFunction *F) {
-  DEBUG(llvm::dbgs() << "Devirtualizing: "
+  DEBUG(llvm::dbgs() << "*** Devirtualizing Function: "
         << Demangle::demangleSymbolAsString(F->getName()) << "\n");
   for (auto &BB : *F) {
     auto I = BB.begin(), E = BB.end();
@@ -1376,6 +1388,8 @@ void SILDevirtualizer::optimizeFuncBody(SILFunction *F) {
         optimizeApplyInst(AI);
     }
   }
+
+  DEBUG(llvm::dbgs() << "\n");
 }
 
 bool SILDevirtualizer::run() {
