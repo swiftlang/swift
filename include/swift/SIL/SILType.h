@@ -341,6 +341,9 @@ public:
                                                 nullptr);
   }
 
+  SILType substInterfaceGenericArgs(SILModule &M,
+                                    ArrayRef<Substitution> Subs) const;
+
   //
   // Accessors for types used in SIL instructions:
   //
