@@ -276,6 +276,9 @@ BUILTIN_MISC_OPERATION(IntToFPWithOverflow, "itofp_with_overflow", "n", Special)
 /// once has type (Builtin.RawPointer, () -> ())
 BUILTIN_MISC_OPERATION(Once, "once", "", Special)
 
+/// unreachable has type @noreturn () -> ()
+BUILTIN_MISC_OPERATION(Unreachable, "unreachable", "", Special)
+
 #undef BUILTIN_MISC_OPERATION
 
 // BUILTIN_TYPE_TRAIT_OPERATION - Compile-time type trait operations.

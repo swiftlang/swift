@@ -734,6 +734,14 @@ static ValueDecl *getIntToFPWithOverflowOperation(ASTContext &Context,
   return getBuiltinFunction(Id, ArgElts, ResultTy);
 }
 
+static ValueDecl *getUnreachableOperation(ASTContext &Context,
+                                          Identifier Id) {
+  // @noreturn () -> ()
+  auto VoidTy = Context.TheEmptyTupleType;
+  return getBuiltinFunction(Id, {}, VoidTy,
+                            AnyFunctionType::ExtInfo().withIsNoReturn(true));
+}
+
 static ValueDecl *getOnceOperation(ASTContext &Context,
                                    Identifier Id) {
   // (RawPointer, () -> ()) -> ()
@@ -1199,7 +1207,10 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
       
   case BuiltinValueKind::CanBeObjCClass:
     return getCanBeObjCClassOperation(Context, Id);
-
+      
+  case BuiltinValueKind::Unreachable:
+    return getUnreachableOperation(Context, Id);
+      
   case BuiltinValueKind::Once:
     return getOnceOperation(Context, Id);
       

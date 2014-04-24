@@ -360,3 +360,10 @@ bb1(%3 : $Builtin.Int1, %4 : $Builtin.Int1):
 // CHECK-NOT: cond_br
 // CHECK: return
 }
+
+sil @builtin_unreachable : $@thin () -> () {
+bb0:
+  %u = builtin_function_ref "unreachable" : $@thin @noreturn () -> ()
+  %z = apply %u() : $@thin @noreturn () -> ()
+  unreachable
+}

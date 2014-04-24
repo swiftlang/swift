@@ -429,13 +429,21 @@ static bool simplifyBlocksWithCallsToNoReturn(SILBasicBlock &BB,
     }
 
     // Check if this instruction is the first call to noreturn in this block.
-    if (!NoReturnCall)
+    if (!NoReturnCall) {
       NoReturnCall = getAsCallToNoReturn(CurrentInst, BB);
+    }
   }
 
   if (!NoReturnCall)
     return false;
-
+  
+  // If the call is to the 'unreachable' builtin, then remove the call,
+  // as it is redundant with the actual unreachable terminator.
+  if (auto builtin = dyn_cast<BuiltinFunctionRefInst>(NoReturnCall->getCallee())) {
+    if (builtin->getName().str() == "unreachable")
+      ToBeDeleted.push_back(const_cast<ApplyInst*>(NoReturnCall));
+  }
+  
   // Record the diagnostic info.
   if (!DiagnosedUnreachableCode &&
       NoReturnCall->getLoc().is<RegularLocation>() && State){
