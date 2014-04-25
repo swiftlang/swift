@@ -93,6 +93,12 @@ struct QuickLookObject {
     Array Data;
     String Type;
   };
+  struct Rectangle {
+    double x, y, w, h;
+  };
+  struct Point {
+    double x, y;
+  };
   
   union {
     String Text;
@@ -101,6 +107,8 @@ struct QuickLookObject {
     double Float;
     Any Any;
     RawData Raw;
+    Rectangle Rect;
+    Point PointOrSize;
   };
   enum class Tag : uint8_t {
     Text,
@@ -112,6 +120,9 @@ struct QuickLookObject {
     Color,
     BezierPath,
     AttributedString,
+    Rectangle,
+    Point,
+    Size,
     Raw,
   } Kind;
 };
@@ -130,6 +141,8 @@ struct OptionalQuickLookObject {
         double Float;
         Any Any;
         QuickLookObject::RawData Raw;
+        QuickLookObject::Rectangle Rect;
+        QuickLookObject::Point PointOrSize;
       };
       QuickLookObject::Tag Kind;
       bool isNone;
