@@ -287,11 +287,19 @@ void TypeChecker::checkInheritanceClause(Decl *decl, DeclContext *DC,
     // If this is a protocol or protocol composition type, record the
     // protocols.
     if (inheritedTy->isExistentialType()) {
-      // AnyObject cannot be used in a generic constraint.
-      if (auto protoTy = inheritedTy->getAs<ProtocolType>()) {
-        if (protoTy->getDecl()->isSpecificProtocol(
-                                   KnownProtocolKind::AnyObject) &&
-            !decl->isImplicit()) {
+      SmallVector<ProtocolDecl *, 4> protocols;
+      inheritedTy->isExistentialType(protocols);
+
+      // AnyObject cannot be used in a type's inheritance clause.
+      if (isa<NominalTypeDecl>(decl) && !decl->isImplicit()) {
+        bool hasAnyObject = false;
+        for (auto proto : protocols) {
+          if (proto->isSpecificProtocol(KnownProtocolKind::AnyObject)) {
+            hasAnyObject = true;
+            break;
+          }
+        }
+        if (hasAnyObject) {
           diagnose(inheritedClause[i].getSourceRange().Start,
                    diag::dynamic_lookup_conformance);
           inherited.setInvalidType(Context);
@@ -299,8 +307,6 @@ void TypeChecker::checkInheritanceClause(Decl *decl, DeclContext *DC,
         }
       }
 
-      SmallVector<ProtocolDecl *, 4> protocols;
-      inheritedTy->isExistentialType(protocols);
       allProtocols.insert(protocols.begin(), protocols.end());
       continue;
     }
@@ -775,17 +781,6 @@ static void checkGenericParamList(ArchetypeBuilder &builder,
         Req.getConstraintLoc().setInvalidType(TC.Context);
         Req.setInvalid();
         continue;
-      }
-
-      // AnyObject cannot be used in a generic constraint.
-      if (auto protoTy = Req.getConstraint()->getAs<ProtocolType>()) {
-        if (protoTy->getDecl()->isSpecificProtocol(
-                                  KnownProtocolKind::AnyObject)) {
-          TC.diagnose(Req.getConstraintLoc().getSourceRange().Start,
-                      diag::dynamic_lookup_conformance);
-          Req.setInvalid();
-          continue;
-        }
       }
       break;
     }

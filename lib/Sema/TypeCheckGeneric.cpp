@@ -270,16 +270,6 @@ static bool checkGenericParameters(TypeChecker &tc, ArchetypeBuilder *builder,
         continue;
       }
 
-      // AnyObject cannot be used in a generic constraint.
-      if (auto protoTy = req.getConstraint()->getAs<ProtocolType>()) {
-        if (protoTy->getDecl()->isSpecificProtocol(
-                                  KnownProtocolKind::AnyObject)) {
-          tc.diagnose(req.getConstraintLoc().getSourceRange().Start,
-                      diag::dynamic_lookup_conformance);
-          req.setInvalid();
-          continue;
-        }
-      }
       break;
     }
 
