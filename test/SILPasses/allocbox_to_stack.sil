@@ -62,6 +62,8 @@ struct TestStruct {
 // CHECK-LABEL: sil @struct_tuple_element_addr
 sil @struct_tuple_element_addr : $(Int) -> Int {
 bb1(%0 : $Int):
+// CHECK-DAG: [[STRUCT:%.*]] = alloc_stack $TestStruct
+// CHECK-DAG: [[TUPLE:%.*]] = alloc_stack $(Int, Int)
   %1 = alloc_box $TestStruct
   %a = alloc_box $(Int, Int)
   
@@ -79,8 +81,8 @@ bb1(%0 : $Int):
 
   %9 = return %7 : $Int
 
-// CHECK: %1 = alloc_stack $TestStruct
-// CHECK: dealloc_stack %1
+// CHECK-DAG: dealloc_stack [[STRUCT]]
+// CHECK-DAG: dealloc_stack [[TUPLE]]
 // CHECK: return
 }
 
@@ -192,6 +194,7 @@ sil @_TC1t9SomeClassCfMS0_FT_S0_ : $@thin (@thick SomeClass.Type) -> @owned Some
 // CHECK-LABEL: sil @union_test
 sil @union_test : $@thin () -> () {
 bb0:
+// CHECK: [[UNION:%.*]] = alloc_stack
   %1 = alloc_box $SomeUnion
   %2 = function_ref @_TO1t9SomeUnion1yfMS0_FCS_9SomeClassS0_ : $@thin (@owned SomeClass, @thin SomeUnion.Type) -> @owned SomeUnion // user: %7
   %3 = metatype $@thin SomeUnion.Type
@@ -203,9 +206,8 @@ bb0:
   strong_release %1#0 : $Builtin.NativeObject
   %10 = tuple ()
   return %10 : $()
-  
-// CHECK: alloc_stack
 // CHECK:  [[T0:%.*]] = tuple ()
+// CHECK: dealloc_stack [[UNION]]
 // CHECK-NEXT:  return [[T0]] : $()
 }
 
@@ -235,13 +237,9 @@ bb0(%0 : $Bool):
 // on each path.
 //
 // CHECK-LABEL: sil @box_reachable_from_release_test
-// CHECK: bb1
-// CHECK: alloc_stack
-// CHECK: bb2:
-// CHECK: dealloc_stack
-// CHECK: bb3:
-// CHECK: dealloc_stack
 sil @box_reachable_from_release_test : $@thin () -> () {
+// CHECK: bb0:
+// CHECK: alloc_stack
 bb0:
   br bb1
 
@@ -256,6 +254,8 @@ bb2:
 bb3:
   strong_release %1#0 : $Builtin.NativeObject
   %2 = tuple ()
+// CHECK: dealloc_stack
+// CHECK-NEXT: return
   return %2 : $()
 }
 
@@ -291,17 +291,18 @@ bb1:
   
   strong_release %2#0 : $Builtin.NativeObject
   // CHECK: destroy_addr [[MUI]]
-  // CHECK-NEXT: dealloc_stack [[STACK]]#0
   br bb2
 
+  // CHECK: bb2
 bb2:
   %17 = tuple ()
+  // CHECK: dealloc_stack [[STACK]]#0
+  // CHECK-NEXT: return
   return %17 : $()
 
 bb3:
   strong_release %2#0 : $Builtin.NativeObject
   // CHECK: destroy_addr [[MUI]]
-  // CHECK-NEXT: dealloc_stack [[STACK]]#0
   br bb2
 }
 

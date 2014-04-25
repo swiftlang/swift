@@ -414,16 +414,18 @@ static bool canPromoteAllocBox(AllocBoxInst *ABI,
 
 /// rewriteAllocBoxAsAllocStack - Replace uses of the alloc_box with a
 /// new alloc_stack, but do not delete the alloc_box yet.
-static void rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
+static void rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI,
+                                   llvm::SmallVectorImpl<TermInst *> &Returns) {
   DEBUG(llvm::dbgs() << "*** Promoting alloc_box to stack: " << *ABI);
 
   llvm::SmallVector<SILInstruction*, 4> FinalReleases;
   getFinalReleases(ABI, FinalReleases);
 
-  // Promote this alloc_box to an alloc_stack.  Start by inserting the
-  // alloc_stack after the alloc_box.
-  SILBuilder B1(ABI->getParent(), ++SILBasicBlock::iterator(ABI));
-  auto *ASI = B1.createAllocStack(ABI->getLoc(), ABI->getElementType());
+  // Promote this alloc_box to an alloc_stack. Insert the alloc_stack
+  // at the beginning of the funtion.
+  auto &Entry = ABI->getFunction()->front();
+  SILBuilder BuildAlloc(&Entry, Entry.begin());
+  auto *ASI = BuildAlloc.createAllocStack(ABI->getLoc(), ABI->getElementType());
   ASI->setDebugScope(ABI->getDebugScope());
 
   // Replace all uses of the address of the box's contained value with
@@ -443,18 +445,23 @@ static void rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
     }
 
   auto &Lowering = ABI->getModule().getTypeLowering(ABI->getElementType());
+  auto Loc = CleanupLocation::getCleanupLocation(ABI->getLoc());
 
-  for (auto LastRelease : FinalReleases) {
-    SILBuilder B2(LastRelease);
+  // For non-trivial types, insert destroys for each final release-like
+  // instruction we found that isn't an explicit dealloc_box.
+  if (!Lowering.isTrivial()) {
+    for (auto LastRelease : FinalReleases) {
+      if (isa<DeallocBoxInst>(LastRelease))
+        continue;
 
-    if (!Lowering.isTrivial() && !isa<DeallocBoxInst>(LastRelease))
-      B2.emitDestroyAddr(CleanupLocation::getCleanupLocation(ABI->getLoc()),
-                         PointerResult);
+      SILBuilder BuildDestroy(LastRelease);
+      BuildDestroy.emitDestroyAddr(Loc, PointerResult);
+    }
+  }
 
-    // Reset the insertion point in case the destroy address expanded to
-    // multiple blocks.
-    B2.setInsertionPoint(LastRelease);
-    B2.createDeallocStack(LastRelease->getLoc(), ASI->getContainerResult());
+  for (auto Return : Returns) {
+    SILBuilder BuildDealloc(Return);
+    BuildDealloc.createDeallocStack(Loc, ASI->getContainerResult());
   }
 
   // Remove any retain and release instructions.  Since all uses of result #1
@@ -695,13 +702,16 @@ rewritePartialApplies(llvm::SmallVectorImpl<Operand *> &ElidedOperands) {
 
 static void
 rewritePromotedBoxes(llvm::SmallVectorImpl<AllocBoxInst *> &Promoted,
-                     llvm::SmallVectorImpl<Operand *> &ElidedOperands) {
+                     llvm::SmallVectorImpl<Operand *> &ElidedOperands,
+                     llvm::SmallVectorImpl<TermInst *> &Returns) {
   // First we'll rewrite any partial applies that we can to remove the
   // box container pointer from the operands.
   rewritePartialApplies(ElidedOperands);
 
-  for (auto *ABI : Promoted) {
-    rewriteAllocBoxAsAllocStack(ABI);
+  auto rend = Promoted.rend();
+  for (auto I = Promoted.rbegin(); I != rend; ++I) {
+    auto *ABI = *I;
+    rewriteAllocBoxAsAllocStack(ABI, Returns);
     ABI->eraseFromParent();
   }
 }
@@ -712,15 +722,22 @@ class AllocBoxToStack : public SILFunctionTransform {
   void run() {
     llvm::SmallVector<AllocBoxInst *, 8> Promoted;
     llvm::SmallVector<Operand *, 8> ElidedOperands;
+    llvm::SmallVector<TermInst *, 8> Returns;
 
-    for (auto &BB : *getFunction())
+    for (auto &BB : *getFunction()) {
+      auto *Term = BB.getTerminator();
+      if (isa<AutoreleaseReturnInst>(Term) ||
+          isa<ReturnInst>(Term))
+        Returns.push_back(Term);
+
       for (auto &I : BB)
         if (auto *ABI = dyn_cast<AllocBoxInst>(&I))
           if (canPromoteAllocBox(ABI, ElidedOperands))
             Promoted.push_back(ABI);
+    }
 
     if (!Promoted.empty()) {
-      rewritePromotedBoxes(Promoted, ElidedOperands);
+      rewritePromotedBoxes(Promoted, ElidedOperands, Returns);
       NumStackPromoted += Promoted.size();
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
     }
