@@ -494,7 +494,8 @@ namespace {
     // pointers.
     OpaqueExistentialTypeInfo(llvm::Type *ty, Size size, Alignment align,
                         ArrayRef<ProtocolEntry> protocols)
-      : IndirectTypeInfo(ty, size, llvm::BitVector{}, align, IsNotPOD),
+      : IndirectTypeInfo(ty, size, llvm::BitVector{}, align,
+                         IsNotPOD, IsNotBitwiseTakable),
         NumProtocols(protocols.size()) {
 
       for (unsigned i = 0; i != NumProtocols; ++i) {
@@ -1187,7 +1188,7 @@ namespace {
   {
     OpaqueArchetypeTypeInfo(llvm::Type *type,
                             ArrayRef<ProtocolEntry> protocols)
-      : IndirectTypeInfo(type, Alignment(1), IsNotPOD),
+      : IndirectTypeInfo(type, Alignment(1), IsNotPOD, IsNotBitwiseTakable),
         ArchetypeTypeInfoBase(this + 1, protocols)
     {}
 

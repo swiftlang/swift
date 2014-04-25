@@ -82,9 +82,10 @@ protected:
   };
 
   TypeInfo(llvm::Type *Type, Alignment A, IsPOD_t pod,
+           IsBitwiseTakable_t bitwiseTakable,
            SpecialTypeInfoKind stik)
     : NextConverted(0), StorageType(Type), StorageAlignment(A),
-      POD(pod), STIK(stik) {}
+      POD(pod), BitwiseTakable(bitwiseTakable), STIK(stik) {}
 
   /// Change the minimum alignment of a stored value of this type.
   void setStorageAlignment(Alignment alignment) {
@@ -111,6 +112,9 @@ private:
 
   /// Whether this type is known to be POD.
   unsigned POD : 1;
+  
+  /// Whether this type is known to be bitwise-takable.
+  unsigned BitwiseTakable : 1;
 
   /// The kind of supplemental API this type has, if any.
   unsigned STIK : 3;
@@ -120,6 +124,12 @@ public:
   /// completion of a forward-declaration.
   void setPOD(IsPOD_t isPOD) { POD = unsigned(isPOD); }
 
+  /// Sets whether this type is bitwise-takable.  Should only be called during
+  /// completion of a forward-declaration.
+  void setBitwiseTakable(IsBitwiseTakable_t takable) {
+    BitwiseTakable = unsigned(takable);
+  }
+  
   /// Whether this type info has been completely converted.
   bool isComplete() const { return !StorageAlignment.isZero(); }
 
@@ -129,7 +139,13 @@ public:
   /// Whether this type is known to be POD, i.e. to not require any
   /// particular action on copy or destroy.
   IsPOD_t isPOD(ResilienceScope scope) const { return IsPOD_t(POD); }
-
+  
+  /// Whether this type is known to be bitwise-takable, i.e. "initializeWithTake"
+  /// is equivalent to a memcpy.
+  IsBitwiseTakable_t isBitwiseTakable(ResilienceScope scope) const {
+    return IsBitwiseTakable_t(BitwiseTakable);
+  }
+  
   /// Returns the type of special interface followed by this TypeInfo.
   /// It is important for our design that this depends only on
   /// immediate type structure and not on, say, properties that can

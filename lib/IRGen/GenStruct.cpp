@@ -168,9 +168,9 @@ namespace {
     // FIXME: Spare bits between struct members.
     FixedStructTypeInfo(unsigned numFields, llvm::Type *T, Size size,
                         llvm::BitVector spareBits,
-                        Alignment align, IsPOD_t isPOD)
+                        Alignment align, IsPOD_t isPOD, IsBitwiseTakable_t isBT)
       : StructTypeInfoBase(numFields, T, size, std::move(spareBits), align,
-                           isPOD)
+                           isPOD, isBT)
     {}
     Nothing_t getNonFixedOffsets(IRGenFunction &IGF, CanType T) const {
       return Nothing;
@@ -253,8 +253,9 @@ namespace {
   {
   public:
     NonFixedStructTypeInfo(unsigned numFields, llvm::Type *T,
-                           Alignment align, IsPOD_t isPOD)
-      : StructTypeInfoBase(numFields, T, align, isPOD) {
+                           Alignment align,
+                           IsPOD_t isPOD, IsBitwiseTakable_t isBT)
+      : StructTypeInfoBase(numFields, T, align, isPOD, isBT) {
     }
 
     // We have an indirect schema.
@@ -335,14 +336,16 @@ namespace {
                                          layout.getSize(),
                                          layout.getSpareBits(),
                                          layout.getAlignment(),
-                                         layout.isKnownPOD());
+                                         layout.isKnownPOD(),
+                                         layout.isKnownBitwiseTakable());
     }
 
     NonFixedStructTypeInfo *createNonFixed(ArrayRef<StructFieldInfo> fields,
                                            const StructLayout &layout) {
       return create<NonFixedStructTypeInfo>(fields, layout.getType(),
                                             layout.getAlignment(),
-                                            layout.isKnownPOD());
+                                            layout.isKnownPOD(),
+                                            layout.isKnownBitwiseTakable());
     }
 
     StructFieldInfo getFieldInfo(unsigned index,

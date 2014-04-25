@@ -38,7 +38,9 @@ protected:
                    const llvm::BitVector &spareBits,
                    Alignment align,
                    IsPOD_t pod, SpecialTypeInfoKind stik = STIK_Loadable)
-      : FixedTypeInfo(type, size, spareBits, align, pod, stik) {
+      : FixedTypeInfo(type, size, spareBits, align, pod,
+                      // All currently implemented loadable types are bitwise-takable.
+                      IsBitwiseTakable, stik) {
     assert(isLoadable());
   }
 

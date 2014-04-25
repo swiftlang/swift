@@ -60,6 +60,14 @@ inline IsLoadable_t &operator&=(IsLoadable_t &l, IsLoadable_t r) {
   return (l = (l & r));
 }
 
+enum IsBitwiseTakable_t : bool { IsNotBitwiseTakable, IsBitwiseTakable };
+inline IsBitwiseTakable_t operator&(IsBitwiseTakable_t l, IsBitwiseTakable_t r) {
+  return IsBitwiseTakable_t(unsigned(l) & unsigned(r));
+}
+inline IsBitwiseTakable_t &operator&=(IsBitwiseTakable_t &l, IsBitwiseTakable_t r) {
+  return (l = (l & r));
+}
+
 /// Whether or not an object should be emitted on the heap.
 enum OnHeap_t : unsigned char {
   NotOnHeap,

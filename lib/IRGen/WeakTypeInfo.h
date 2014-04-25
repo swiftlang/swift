@@ -29,7 +29,8 @@ class WeakTypeInfo : public FixedTypeInfo {
 protected:
   // FIXME: Weak types could have spare bits.
   WeakTypeInfo(llvm::Type *type, Size size, Alignment align)
-    : FixedTypeInfo(type, size, {}, align, IsNotPOD, STIK_Weak) {}
+    : FixedTypeInfo(type, size, {}, align, IsNotPOD,
+                    IsNotBitwiseTakable, STIK_Weak) {}
 
 public:
   virtual void weakLoadStrong(IRGenFunction &IGF, Address addr,

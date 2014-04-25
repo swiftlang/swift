@@ -40,8 +40,9 @@ private:
 protected:
   const Impl &asImpl() const { return static_cast<const Impl &>(*this); }
 
-  WitnessSizedTypeInfo(llvm::Type *type, Alignment align, IsPOD_t pod)
-    : super(type, align, pod, TypeInfo::STIK_None) {}
+  WitnessSizedTypeInfo(llvm::Type *type, Alignment align, IsPOD_t pod,
+                       IsBitwiseTakable_t bt)
+    : super(type, align, pod, bt, TypeInfo::STIK_None) {}
 
 private:
   /// Bit-cast the given pointer to the right type and assume it as an

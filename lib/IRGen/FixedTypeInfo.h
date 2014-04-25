@@ -46,9 +46,9 @@ private:
 protected:
   FixedTypeInfo(llvm::Type *type, Size size,
                 const llvm::BitVector &spareBits,
-                Alignment align, IsPOD_t pod,
+                Alignment align, IsPOD_t pod, IsBitwiseTakable_t bt,
                 SpecialTypeInfoKind stik = STIK_Fixed)
-      : TypeInfo(type, align, pod, stik), StorageSize(size),
+      : TypeInfo(type, align, pod, bt, stik), StorageSize(size),
         SpareBits(spareBits) {
     assert(isFixedSize());
   }

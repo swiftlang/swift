@@ -159,9 +159,9 @@ namespace {
     // FIXME: Spare bits between tuple elements.
     FixedTupleTypeInfo(unsigned numFields, llvm::Type *ty,
                        Size size, llvm::BitVector spareBits, Alignment align,
-                       IsPOD_t isPOD)
+                       IsPOD_t isPOD, IsBitwiseTakable_t isBT)
       : TupleTypeInfoBase(numFields, ty, size, std::move(spareBits), align,
-                          isPOD)
+                          isPOD, isBT)
     {}
 
     Nothing_t getNonFixedOffsets(IRGenFunction &IGF) const { return Nothing; }
@@ -213,8 +213,9 @@ namespace {
   {
   public:
     NonFixedTupleTypeInfo(unsigned numFields, llvm::Type *T,
-                          Alignment minAlign, IsPOD_t isPOD)
-      : TupleTypeInfoBase(numFields, T, minAlign, isPOD) {}
+                          Alignment minAlign, IsPOD_t isPOD,
+                          IsBitwiseTakable_t isBT)
+      : TupleTypeInfoBase(numFields, T, minAlign, isPOD, isBT) {}
 
     TupleNonFixedOffsets getNonFixedOffsets(IRGenFunction &IGF,
                                             CanType T) const {
@@ -246,7 +247,8 @@ namespace {
                                         layout.getSize(),
                                         layout.getSpareBits(),
                                         layout.getAlignment(),
-                                        layout.isKnownPOD());
+                                        layout.isKnownPOD(),
+                                        layout.isKnownBitwiseTakable());
     }
 
     LoadableTupleTypeInfo *createLoadable(ArrayRef<TupleFieldInfo> fields,
@@ -262,7 +264,8 @@ namespace {
                                           const StructLayout &layout) {
       return create<NonFixedTupleTypeInfo>(fields, layout.getType(),
                                            layout.getAlignment(),
-                                           layout.isKnownPOD());
+                                           layout.isKnownPOD(),
+                                           layout.isKnownBitwiseTakable());
     }
 
     TupleFieldInfo getFieldInfo(unsigned index,

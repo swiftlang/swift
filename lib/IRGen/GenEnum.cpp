@@ -3297,8 +3297,8 @@ namespace {
   public:
     FixedEnumTypeInfo(EnumImplStrategy &strategy,
                        llvm::StructType *T, Size S, llvm::BitVector SB,
-                       Alignment A, IsPOD_t isPOD)
-      : EnumTypeInfoBase(strategy, T, S, std::move(SB), A, isPOD) {}
+                       Alignment A, IsPOD_t isPOD, IsBitwiseTakable_t isBT)
+      : EnumTypeInfoBase(strategy, T, S, std::move(SB), A, isPOD, isBT) {}
     
     /// \group Methods delegated to the EnumImplStrategy
 
@@ -3385,8 +3385,9 @@ namespace {
     NonFixedEnumTypeInfo(EnumImplStrategy &strategy,
                          llvm::Type *irTy,
                          Alignment align,
-                         IsPOD_t pod)
-      : EnumTypeInfoBase(strategy, irTy, align, pod) {}
+                         IsPOD_t pod,
+                         IsBitwiseTakable_t bt)
+      : EnumTypeInfoBase(strategy, irTy, align, pod, bt) {}
   };
 } // end anonymous namespace
 
@@ -3409,15 +3410,17 @@ irgen::getEnumImplStrategy(IRGenModule &IGM, SILType ty) {
 TypeInfo *
 EnumImplStrategy::getFixedEnumTypeInfo(llvm::StructType *T, Size S,
                                     llvm::BitVector SB,
-                                    Alignment A, IsPOD_t isPOD) {
+                                    Alignment A, IsPOD_t isPOD,
+                                    IsBitwiseTakable_t isBT) {
   TypeInfo *mutableTI;
   switch (TIK) {
   case Opaque:
     llvm_unreachable("not valid");
   case Fixed:
-    mutableTI = new FixedEnumTypeInfo(*this, T, S, SB, A, isPOD);
+    mutableTI = new FixedEnumTypeInfo(*this, T, S, SB, A, isPOD, isBT);
     break;
   case Loadable:
+    assert(isBT && "loadable enum not bitwise takable?!");
     mutableTI = new LoadableEnumTypeInfo(*this, T, S, SB, A, isPOD);
     break;
   }
@@ -3450,15 +3453,17 @@ namespace {
       
       if (TIK <= Opaque) {
         return registerEnumTypeInfo(new NonFixedEnumTypeInfo(*this, enumTy,
-                                         eltTI.getBestKnownAlignment(),
-                                         eltTI.isPOD(ResilienceScope::Local)));
+                               eltTI.getBestKnownAlignment(),
+                               eltTI.isPOD(ResilienceScope::Local),
+                               eltTI.isBitwiseTakable(ResilienceScope::Local)));
       } else {
         auto &fixedEltTI = cast<FixedTypeInfo>(eltTI);
         return getFixedEnumTypeInfo(enumTy,
-                                fixedEltTI.getFixedSize(),
-                                fixedEltTI.getSpareBits(),
-                                fixedEltTI.getFixedAlignment(),
-                                fixedEltTI.isPOD(ResilienceScope::Local));
+                          fixedEltTI.getFixedSize(),
+                          fixedEltTI.getSpareBits(),
+                          fixedEltTI.getFixedAlignment(),
+                          fixedEltTI.isPOD(ResilienceScope::Local),
+                          fixedEltTI.isBitwiseTakable(ResilienceScope::Local));
       }
     }
   }
@@ -3590,8 +3595,9 @@ namespace {
                        true);
     }
     return getFixedEnumTypeInfo(enumTy, Size(sizeWithTag), std::move(spareBits),
-                            payloadTI.getFixedAlignment(),
-                            payloadTI.isPOD(ResilienceScope::Component));
+                        payloadTI.getFixedAlignment(),
+                        payloadTI.isPOD(ResilienceScope::Component),
+                        payloadTI.isBitwiseTakable(ResilienceScope::Component));
   }
   
   TypeInfo *SinglePayloadEnumImplStrategy::completeDynamicLayout(
@@ -3606,8 +3612,9 @@ namespace {
     // Layout has to be done when the value witness table is instantiated,
     // during initializeMetadata.
     return registerEnumTypeInfo(new NonFixedEnumTypeInfo(*this, enumTy,
-                       getPayloadTypeInfo().getBestKnownAlignment(),
-                       getPayloadTypeInfo().isPOD(ResilienceScope::Component)));
+           getPayloadTypeInfo().getBestKnownAlignment(),
+           getPayloadTypeInfo().isPOD(ResilienceScope::Component),
+           getPayloadTypeInfo().isBitwiseTakable(ResilienceScope::Component)));
   }
   
   TypeInfo *
@@ -3643,6 +3650,7 @@ namespace {
     CommonSpareBits = {};
     Alignment worstAlignment(1);
     IsPOD_t isPOD = IsPOD;
+    IsBitwiseTakable_t isBT = IsBitwiseTakable;
     for (auto &elt : ElementsWithPayload) {
       auto &fixedPayloadTI = cast<FixedTypeInfo>(*elt.ti); // FIXME
       fixedPayloadTI.applyFixedSpareBitsMask(CommonSpareBits);
@@ -3650,6 +3658,8 @@ namespace {
         worstAlignment = fixedPayloadTI.getFixedAlignment();
       if (!fixedPayloadTI.isPOD(ResilienceScope::Component))
         isPOD = IsNotPOD;
+      if (!fixedPayloadTI.isBitwiseTakable(ResilienceScope::Component))
+        isBT = IsNotBitwiseTakable;
     }
     
     unsigned commonSpareBitCount = CommonSpareBits.count();
@@ -3719,7 +3729,7 @@ namespace {
       }
     }
     return getFixedEnumTypeInfo(enumTy, Size(sizeWithTag), std::move(spareBits),
-                                worstAlignment, isPOD);
+                                worstAlignment, isPOD, isBT);
   }
 }
 

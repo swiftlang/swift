@@ -223,6 +223,7 @@ private:
   unsigned NextNonFixedOffsetIndex = 0;
   bool IsFixedLayout = true;
   IsPOD_t IsKnownPOD = IsPOD;
+  IsBitwiseTakable_t IsKnownBitwiseTakable = IsBitwiseTakable;
 public:
   StructLayoutBuilder(IRGenModule &IGM) : IGM(IGM) {}
 
@@ -250,6 +251,12 @@ public:
   /// Return whether the structure is known to be POD in the local
   /// resilience scope.
   IsPOD_t isKnownPOD() const { return IsKnownPOD; }
+
+  /// Return whether the structure is known to be bitwise-takable in the local
+  /// resilience scope.
+  IsBitwiseTakable_t isKnownBitwiseTakable() const {
+    return IsKnownBitwiseTakable;
+  }
 
   /// Return the size of the structure built so far.
   Size getSize() const { return CurSize; }
@@ -293,7 +300,9 @@ class StructLayout {
 
   /// Whether the elements in this layout are all POD.
   IsPOD_t IsKnownPOD;
-
+  /// Whether the elements in this layout are all bitwise-takable.
+  IsBitwiseTakable_t IsKnownBitwiseTakable;
+  
   llvm::Type *Ty;
   SmallVector<ElementLayout, 8> Elements;
 
@@ -327,6 +336,7 @@ public:
       SpareBits(getSpareBitsFromBuilder(builder)),
       IsFixedLayout(builder.isFixedLayout()),
       IsKnownPOD(builder.isKnownPOD()),
+      IsKnownBitwiseTakable(builder.isKnownBitwiseTakable()),
       Ty(type),
       Elements(elements.begin(), elements.end()) {}
 
@@ -339,6 +349,9 @@ public:
   const llvm::BitVector &getSpareBits() const { return SpareBits; }
   bool isKnownEmpty() const { return isFixedLayout() && MinimumSize.isZero(); }
   IsPOD_t isKnownPOD() const { return IsKnownPOD; }
+  IsBitwiseTakable_t isKnownBitwiseTakable() const {
+    return IsKnownBitwiseTakable;
+  }
 
   bool isFixedLayout() const { return IsFixedLayout; }
   llvm::Constant *emitSize(IRGenModule &IGM) const;

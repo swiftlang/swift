@@ -234,7 +234,8 @@ protected:
   /// Constructs a TypeInfo for an enum of the best possible kind for its
   /// layout, FixedEnumTypeInfo or LoadableEnumTypeInfo.
   TypeInfo *getFixedEnumTypeInfo(llvm::StructType *T, Size S, llvm::BitVector SB,
-                                  Alignment A, IsPOD_t isPOD);
+                                 Alignment A, IsPOD_t isPOD,
+                                 IsBitwiseTakable_t isBT);
   
 public:
   virtual ~EnumImplStrategy() { }

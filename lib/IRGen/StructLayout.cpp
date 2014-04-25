@@ -83,6 +83,7 @@ StructLayout::StructLayout(IRGenModule &IGM, LayoutKind layoutKind,
     SpareBits.clear();
     IsFixedLayout = true;
     IsKnownPOD = IsPOD;
+    IsKnownBitwiseTakable = IsBitwiseTakable;
     Ty = (typeToFill ? typeToFill : IGM.OpaquePtrTy->getElementType());
   } else {
     MinimumAlign = builder.getAlignment();
@@ -90,6 +91,7 @@ StructLayout::StructLayout(IRGenModule &IGM, LayoutKind layoutKind,
     SpareBits = getSpareBitsFromBuilder(builder);
     IsFixedLayout = builder.isFixedLayout();
     IsKnownPOD = builder.isKnownPOD();
+    IsKnownBitwiseTakable = builder.isKnownBitwiseTakable();
     if (typeToFill) {
       builder.setAsBodyOfStruct(typeToFill);
       Ty = typeToFill;
@@ -165,7 +167,8 @@ bool StructLayoutBuilder::addFields(llvm::MutableArrayRef<ElementLayout> elts,
   for (auto &elt : elts) {
     auto &eltTI = elt.getType();
     IsKnownPOD &= eltTI.isPOD(ResilienceScope::Local);
-
+    IsKnownBitwiseTakable &= eltTI.isBitwiseTakable(ResilienceScope::Local);
+    
     // If the element type is empty, it adds nothing.
     if (eltTI.isKnownEmpty()) {
       addEmptyElement(elt);

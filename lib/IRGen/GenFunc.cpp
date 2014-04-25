@@ -707,8 +707,8 @@ namespace {
     Size CaptureOffset;
   public:
     BlockStorageTypeInfo(llvm::Type *type, Size size, Alignment align,
-                         IsPOD_t pod, Size captureOffset)
-      : IndirectTypeInfo(type, size, llvm::BitVector{}, align, pod),
+                         IsPOD_t pod, IsBitwiseTakable_t bt, Size captureOffset)
+      : IndirectTypeInfo(type, size, llvm::BitVector{}, align, pod, bt),
         CaptureOffset(captureOffset)
     {}
     
@@ -756,6 +756,7 @@ const TypeInfo *TypeConverter::convertBlockStorageType(SILBlockStorageType *T) {
     IGM.DataLayout.getStructLayout(IGM.ObjCBlockStructTy)->getSizeInBytes());
   Size size = captureOffset;
   IsPOD_t pod = IsNotPOD;
+  IsBitwiseTakable_t bt = IsNotBitwiseTakable;
   if (!fixedCapture) {
     IGM.unimplemented(SourceLoc(), "dynamic @block_storage capture");
     fixedCaptureTy = llvm::StructType::get(IGM.getLLVMContext(), {});
@@ -765,6 +766,7 @@ const TypeInfo *TypeConverter::convertBlockStorageType(SILBlockStorageType *T) {
     captureOffset = captureOffset.roundUpToAlignment(align);
     size = captureOffset + fixedCapture->getFixedSize();
     pod = fixedCapture->isPOD(ResilienceScope::Component);
+    bt = fixedCapture->isBitwiseTakable(ResilienceScope::Component);
   }
   
   llvm::Type *storageElts[] = {
@@ -774,7 +776,7 @@ const TypeInfo *TypeConverter::convertBlockStorageType(SILBlockStorageType *T) {
   
   auto storageTy = llvm::StructType::get(IGM.getLLVMContext(), storageElts,
                                          /*packed*/ false);
-  return new BlockStorageTypeInfo(storageTy, size, align, pod, captureOffset);
+  return new BlockStorageTypeInfo(storageTy, size, align, pod, bt, captureOffset);
 }
 
 Address irgen::projectBlockStorageCapture(IRGenFunction &IGF,
