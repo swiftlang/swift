@@ -66,15 +66,21 @@ public:
   static void *globalAlloc(AllocIndex idx, uintptr_t flags);
 
   static void *alloc_optimized(AllocIndex idx);
-  static void *alloc_unoptimized(AllocIndex idx);
   static void *tryAlloc_optimized(AllocIndex idx);
-  static void *tryAlloc_unoptimized(AllocIndex idx);
   static void *slowAlloc_optimized(size_t size, uintptr_t flags);
-  static void *slowAlloc_unoptimized(size_t size, uintptr_t flags);
   static void dealloc_optimized(void *ptr, AllocIndex idx);
-  static void dealloc_unoptimized(void *ptr, AllocIndex idx);
   static void slowDealloc_optimized(void *ptr, size_t bytes);
+
+  static void *alloc_semi_optimized(AllocIndex idx);
+  static void *tryAlloc_semi_optimized(AllocIndex idx);
+  static void dealloc_semi_optimized(void *ptr, AllocIndex idx);
+
+  static void *alloc_unoptimized(AllocIndex idx);
+  static void *tryAlloc_unoptimized(AllocIndex idx);
+  static void *slowAlloc_unoptimized(size_t size, uintptr_t flags);
+  static void dealloc_unoptimized(void *ptr, AllocIndex idx);
   static void slowDealloc_unoptimized(void *ptr, size_t bytes);
+
   static bool tryWriteLock() {
     int r = pthread_rwlock_trywrlock(&lock);
     assert(r == 0 || errno == EBUSY);
@@ -132,6 +138,103 @@ typedef struct AllocCacheEntry_s {
 } *AllocCacheEntry;
 
 AllocCacheEntry globalCache[ALLOC_CACHE_COUNT];
+
+#if __has_include(<os/tsd.h>)
+// OS X and iOS internal version
+#include <os/tsd.h>
+#else
+#define _os_tsd_get_direct pthread_getspecific
+#define _os_tsd_set_direct pthread_setspecific
+#endif
+
+// These are implemented in FastEntryPoints.s on some platforms.
+#ifndef SWIFT_HAVE_FAST_ENTRY_POINTS
+
+static AllocCacheEntry
+getAllocCacheEntry(unsigned long idx) {
+  assert(idx < ALLOC_CACHE_COUNT);
+  return (AllocCacheEntry)_os_tsd_get_direct(idx + _swiftAllocOffset);
+}
+
+static void
+setAllocCacheEntry(unsigned long idx, AllocCacheEntry entry) {
+  assert(idx < ALLOC_CACHE_COUNT);
+  _os_tsd_set_direct(idx + _swiftAllocOffset, entry);
+}
+
+static AllocCacheEntry
+getAllocCacheEntry_slow(unsigned long idx) {
+  assert(idx < ALLOC_CACHE_COUNT);
+  return (AllocCacheEntry)pthread_getspecific(idx + _swiftAllocOffset);
+}
+
+static void
+setAllocCacheEntry_slow(unsigned long idx, AllocCacheEntry entry) {
+  assert(idx < ALLOC_CACHE_COUNT);
+  auto result = pthread_setspecific(idx + _swiftAllocOffset, entry);
+  assert(result == 0);
+}
+
+void *SwiftZone::alloc_optimized(AllocIndex idx) {
+  assert(idx < ALLOC_CACHE_COUNT);
+  AllocCacheEntry r = getAllocCacheEntry(idx);
+  if (r) {
+    setAllocCacheEntry(idx, r->next);
+    return r;
+  }
+  return globalAlloc(idx, 0);
+}
+
+void *SwiftZone::tryAlloc_optimized(AllocIndex idx) {
+  assert(idx < ALLOC_CACHE_COUNT);
+  AllocCacheEntry r = getAllocCacheEntry(idx);
+  if (r) {
+    setAllocCacheEntry(idx, r->next);
+    return r;
+  }
+  return globalAlloc(idx, SWIFT_TRYALLOC);
+}
+
+void SwiftZone::dealloc_optimized(void *ptr, AllocIndex idx) {
+  assert(idx < ALLOC_CACHE_COUNT);
+  auto cur = static_cast<AllocCacheEntry>(ptr);
+  AllocCacheEntry prev = getAllocCacheEntry(idx);
+  assert(cur != prev && "trivial double free!");
+  cur->next = prev;
+  setAllocCacheEntry(idx, cur);
+}
+
+void *SwiftZone::alloc_semi_optimized(AllocIndex idx) {
+  assert(idx < ALLOC_CACHE_COUNT);
+  AllocCacheEntry r = getAllocCacheEntry_slow(idx);
+  if (r) {
+    setAllocCacheEntry_slow(idx, r->next);
+    return r;
+  }
+  return globalAlloc(idx, 0);
+}
+
+void *SwiftZone::tryAlloc_semi_optimized(AllocIndex idx) {
+  assert(idx < ALLOC_CACHE_COUNT);
+  AllocCacheEntry r = getAllocCacheEntry_slow(idx);
+  if (r) {
+    setAllocCacheEntry_slow(idx, r->next);
+    return r;
+  }
+  return globalAlloc(idx, SWIFT_TRYALLOC);
+}
+
+void SwiftZone::dealloc_semi_optimized(void *ptr, AllocIndex idx) {
+  assert(idx < ALLOC_CACHE_COUNT);
+  auto cur = static_cast<AllocCacheEntry>(ptr);
+  AllocCacheEntry prev = getAllocCacheEntry_slow(idx);
+  assert(cur != prev && "trivial double free!");
+  cur->next = prev;
+  setAllocCacheEntry_slow(idx, cur);
+}
+
+// !SWIFT_HAVE_FAST_ENTRY_POINTS
+#endif
 
 class Arena;
 static llvm::DenseMap<const void *, Arena> arenas;
@@ -191,6 +294,16 @@ SwiftZone::SwiftZone() {
     assert(key == prev_key + 1);
     prev_key = key;
   }
+
+  AllocCacheEntry magic = (AllocCacheEntry)1804289383; // result from random()
+  setAllocCacheEntry_slow(0, magic);
+  if (getAllocCacheEntry(0) != magic) {
+    _swift_alloc = SwiftZone::alloc_semi_optimized;
+    _swift_tryAlloc = SwiftZone::tryAlloc_semi_optimized;
+    _swift_dealloc = SwiftZone::dealloc_semi_optimized;
+  }
+  setAllocCacheEntry_slow(0, NULL);
+
   if (getenv("SWIFT_ZONE_DEBUG")) {
     _swift_alloc = SwiftZone::alloc_unoptimized;
     _swift_tryAlloc = SwiftZone::tryAlloc_unoptimized;
@@ -377,61 +490,6 @@ void *SwiftZone::slowAlloc_optimized(size_t size, uintptr_t flags) {
   }
 }
 
-#if __has_include(<os/tsd.h>)
-// OS X and iOS internal version
-#include <os/tsd.h>
-#else
-#define _os_tsd_get_direct pthread_getspecific
-#define _os_tsd_set_direct pthread_setspecific
-#endif
-
-// These are implemented in FastEntryPoints.s on some platforms.
-#ifndef SWIFT_HAVE_FAST_ENTRY_POINTS
-
-static AllocCacheEntry
-getAllocCacheEntry(unsigned long idx) {
-  assert(idx < ALLOC_CACHE_COUNT);
-  return (AllocCacheEntry)_os_tsd_get_direct(idx + _swiftAllocOffset);
-}
-
-static void
-setAllocCacheEntry(unsigned long idx, AllocCacheEntry entry) {
-  assert(idx < ALLOC_CACHE_COUNT);
-  _os_tsd_set_direct(idx + _swiftAllocOffset, entry);
-}
-
-void *SwiftZone::alloc_optimized(AllocIndex idx) {
-  assert(idx < ALLOC_CACHE_COUNT);
-  AllocCacheEntry r = getAllocCacheEntry(idx);
-  if (r) {
-    setAllocCacheEntry(idx, r->next);
-    return r;
-  }
-  return globalAlloc(idx, 0);
-}
-
-void *SwiftZone::tryAlloc_optimized(AllocIndex idx) {
-  assert(idx < ALLOC_CACHE_COUNT);
-  AllocCacheEntry r = getAllocCacheEntry(idx);
-  if (r) {
-    setAllocCacheEntry(idx, r->next);
-    return r;
-  }
-  return globalAlloc(idx, SWIFT_TRYALLOC);
-}
-
-void SwiftZone::dealloc_optimized(void *ptr, AllocIndex idx) {
-  assert(idx < ALLOC_CACHE_COUNT);
-  auto cur = static_cast<AllocCacheEntry>(ptr);
-  AllocCacheEntry prev = getAllocCacheEntry(idx);
-  assert(cur != prev && "trivial double free!");
-  cur->next = prev;
-  setAllocCacheEntry(idx, cur);
-}
-
-// !SWIFT_HAVE_FAST_ENTRY_POINTS
-#endif
-
 void SwiftZone::slowDealloc_optimized(void *ptr, size_t bytes) {
   if (bytes == 0) {
     bytes = zoneShims.size(NULL, ptr);
@@ -466,7 +524,7 @@ void SwiftZone::slowDealloc_optimized(void *ptr, size_t bytes) {
     return;
   }
 
-  dealloc_optimized(ptr, idx);
+  dealloc_semi_optimized(ptr, idx);
 }
 
 void
@@ -526,7 +584,7 @@ enumerateBlocks(std::function<void(const void *, size_t)> func) {
          pointer = pointer->next) {
       unusedBlocks.insert(std::pair<void *, bool>(pointer, true));
     }
-    for (AllocCacheEntry pointer = getAllocCacheEntry(i); pointer;
+    for (AllocCacheEntry pointer = getAllocCacheEntry_slow(i); pointer;
          pointer = pointer->next) {
       unusedBlocks.insert(std::pair<void *, bool>(pointer, true));
     }
