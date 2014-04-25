@@ -428,7 +428,8 @@ getGenericParam(ASTContext &Context) {
                          ParamList);
 }
 
-static ValueDecl *getAutoreleaseOperation(ASTContext &Context, Identifier Id) {
+/// Create a function with type <T> T -> ().
+static ValueDecl *getRefCountingOperation(ASTContext &Context, Identifier Id) {
   Type GenericTy;
   Type ArchetypeTy;
   GenericParamList *ParamList;
@@ -1152,9 +1153,11 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 #include "swift/AST/Builtins.def"
     return getCastOperation(Context, Id, BV, Types);
       
+  case BuiltinValueKind::Retain:
+  case BuiltinValueKind::Release:
   case BuiltinValueKind::Autorelease:
     if (!Types.empty()) return nullptr;
-    return getAutoreleaseOperation(Context, Id);
+    return getRefCountingOperation(Context, Id);
       
   case BuiltinValueKind::Load:
   case BuiltinValueKind::Take:

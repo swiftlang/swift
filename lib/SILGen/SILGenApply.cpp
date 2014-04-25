@@ -2116,12 +2116,37 @@ namespace {
     CallEmission &operator=(const CallEmission &) = delete;
   };
 
+  static ManagedValue emitBuiltinRetain(SILGenFunction &gen,
+                                         SILLocation loc,
+                                         ArrayRef<Substitution> substitutions,
+                                         ArrayRef<ManagedValue> args,
+                                         SGFContext C) {
+    // The value was produced at +1; we can produce an unbalanced
+    // retain simply by disabling the cleanup.
+    args[0].forward(gen);
+    return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));    
+  }
+
+  static ManagedValue emitBuiltinRelease(SILGenFunction &gen,
+                                         SILLocation loc,
+                                         ArrayRef<Substitution> substitutions,
+                                         ArrayRef<ManagedValue> args,
+                                         SGFContext C) {
+    // The value was produced at +1, so to produce an unbalanced
+    // release we need to leave the cleanup intact and then do a *second*
+    // release.
+    args[0].forward(gen);
+    return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));    
+  }
+
   static ManagedValue emitBuiltinAutorelease(SILGenFunction &gen,
                                              SILLocation loc,
                                              ArrayRef<Substitution> substitutions,
                                              ArrayRef<ManagedValue> args,
                                              SGFContext C) {
-    gen.B.createAutoreleaseValue(loc, args[0].forward(gen));
+    // The value was produced at +1, so to produce an unbalanced
+    // autorelease we need to leave the cleanup intact.
+    gen.B.createAutoreleaseValue(loc, args[0].getValue());
     return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));    
   }
   
