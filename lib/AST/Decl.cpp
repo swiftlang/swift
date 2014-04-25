@@ -1803,6 +1803,16 @@ void AbstractStorageDecl::makeComputed(SourceLoc LBraceLoc,
   setStorageKind(Computed);
 }
 
+void AbstractStorageDecl::setComputedSetter(FuncDecl *Set) {
+  assert(getStorageKind() == Computed && "Not a computed variable");
+  assert(getGetter() && "sanity check: missing getter");
+  assert(!getSetter() && "already has a setter");
+  assert(hasClangNode() && "should only be used for ObjC properties");
+  assert(Set && "should not be called for readonly properties");
+  GetSetInfo->Set = Set;
+  Set->makeAccessor(this, AccessorKind::IsSetter);
+}
+
 /// \brief Turn this into a StoredWithTrivialAccessors var, specifying the
 /// accessors (getter and setter) that go with it.
 void AbstractStorageDecl::makeStoredWithTrivialAccessors(FuncDecl *Get,

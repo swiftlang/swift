@@ -2529,6 +2529,35 @@ namespace {
       return thunk;
     }
     
+    /// Hack: Handle the case where a subscript is read-only in the
+    /// main class interface (either explicitly or because of an adopted
+    /// protocol) and then the setter is added in a category/extension.
+    ///
+    /// \see importSubscript
+    // FIXME: This is basically the same as handlePropertyRedeclaration below.
+    void handleSubscriptRedeclaration(SubscriptDecl *original,
+                                      const SubscriptDecl *redecl) {
+      // If the subscript isn't from Clang, we can't safely update it.
+      if (!original->hasClangNode())
+        return;
+
+      // If the original declaration was implicit, we may want to change that.
+      if (original->isImplicit() && !redecl->isImplicit() &&
+          !isa<ProtocolDecl>(redecl->getDeclContext()))
+        original->setImplicit(false);
+
+      // The only other transformation we know how to do safely is add a
+      // setter. If the subscript is already settable, we're done.
+      if (original->isSettable())
+        return;
+
+      auto setter = redecl->getSetter();
+      if (!setter)
+        return;
+
+      original->setComputedSetter(setter);
+    }
+
     /// \brief Given either the getter or setter for a subscript operation,
     /// create the Swift subscript declaration.
     SubscriptDecl *importSubscript(Decl *decl,
@@ -2749,15 +2778,21 @@ namespace {
         if (parentSub == subscript)
           continue;
 
-        assert(subscript->getDeclContext() != parentSub->getDeclContext() &&
-               "can not override method in the same DeclContext");
+        const DeclContext *overrideContext = parentSub->getDeclContext();
+        assert(dc != overrideContext && "subscript already exists");
+
+        if (overrideContext->getDeclaredTypeInContext()->isEqual(containerTy)) {
+          // We've encountered a redeclaration of the subscript.
+          // HACK: Just update the original declaration instead of importing a
+          // second subscript.
+          handleSubscriptRedeclaration(parentSub, subscript);
+          Impl.Subscripts[{getter, setter}] = parentSub;
+          return nullptr;
+        }
 
         // The index types match. This is an override, so mark it as such.
         subscript->setOverriddenDecl(parentSub);
-        if (auto parentGetter = parentSub->getGetter()) {
-          if (getterThunk)
-            getterThunk->setOverriddenDecl(parentGetter);
-        }
+        getterThunk->setOverriddenDecl(parentSub->getGetter());
         if (auto parentSetter = parentSub->getSetter()) {
           if (setterThunk)
             setterThunk->setOverriddenDecl(parentSetter);
@@ -3057,7 +3092,10 @@ namespace {
           if (objcMethod->isPropertyAccessor()) {
             auto prop = objcMethod->findPropertyDecl(/*checkOverrides=*/false);
             assert(prop);
-            if (Impl.importDecl(const_cast<clang::ObjCPropertyDecl *>(prop)))
+            (void)Impl.importDecl(const_cast<clang::ObjCPropertyDecl *>(prop));
+            // We may have attached this member to an existing property even
+            // if we've failed to import a new property.
+            if (cast<FuncDecl>(member)->isAccessor())
               continue;
           } else if (Impl.InferImplicitProperties) {
             // Try to infer properties for matched getter/setter pairs.
@@ -3601,6 +3639,38 @@ namespace {
       return VisitObjCPropertyDecl(decl, dc);
     }
 
+    /// Hack: Handle the case where a property is declared \c readonly in the
+    /// main class interface (either explicitly or because of an adopted
+    /// protocol) and then \c readwrite in a category/extension.
+    ///
+    /// \see VisitObjCPropertyDecl
+    void handlePropertyRedeclaration(VarDecl *original,
+                                     const clang::ObjCPropertyDecl *redecl) {
+      // If the property isn't from Clang, we can't safely update it.
+      if (!original->hasClangNode())
+        return;
+
+      // If the original declaration was implicit, we may want to change that.
+      if (original->isImplicit() && !redecl->isImplicit() &&
+          !isa<clang::ObjCProtocolDecl>(redecl->getDeclContext()))
+        original->setImplicit(false);
+
+      // The only other transformation we know how to do safely is add a
+      // setter. If the property is already settable, we're done.
+      if (original->isSettable(nullptr))
+        return;
+
+      auto clangSetter = redecl->getSetterMethodDecl();
+      if (!clangSetter)
+        return;
+
+      auto setter = cast_or_null<FuncDecl>(VisitObjCMethodDecl(clangSetter));
+      if (!setter)
+        return;
+
+      original->setComputedSetter(setter);
+    }
+
     Decl *VisitObjCPropertyDecl(const clang::ObjCPropertyDecl *decl,
                                 DeclContext *dc) {
       auto name = Impl.importName(decl->getDeclName());
@@ -3622,6 +3692,18 @@ namespace {
 
         if (auto var = dyn_cast<VarDecl>(result))
           overridden = var;
+      }
+
+      if (overridden) {
+        const DeclContext *overrideContext = overridden->getDeclContext();
+        if (overrideContext != dc &&
+            overrideContext->getDeclaredTypeInContext()->isEqual(containerTy)) {
+          // We've encountered a redeclaration of the property.
+          // HACK: Just update the original declaration instead of importing a
+          // second property.
+          handlePropertyRedeclaration(overridden, decl);
+          return nullptr;
+        }
       }
 
       auto type = Impl.importType(decl->getType(), ImportTypeKind::Property);

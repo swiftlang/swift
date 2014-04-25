@@ -31,3 +31,31 @@ __attribute__((objc_root_class))
 - (id)protoProp;
 - (id)protoPropRO;
 @end
+
+
+@interface SubscriptAndProperty : NSObject
+@property (readonly) int x;
+- (id)objectAtIndexedSubscript:(int)i;
+@end
+
+@interface SubscriptAndProperty ()
+@property int x;
+- (void)setObject:(id)obj atIndexedSubscript:(int)i;
+@end
+
+
+@protocol SubscriptAndPropertyProto <NSObject>
+@property(readonly) int x;
+- (id)objectAtIndexedSubscript:(int)i;
+@end
+
+@interface SubscriptAndPropertyWithProto : NSObject
+@end
+
+@interface SubscriptAndPropertyWithProto (AdoptTheProtocol) <SubscriptAndPropertyProto>
+@end
+
+@interface SubscriptAndPropertyWithProto (DeclareTheSetters)
+@property int x;
+- (void)setObject:(id)obj atIndexedSubscript:(int)i;
+@end

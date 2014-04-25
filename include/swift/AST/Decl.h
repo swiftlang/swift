@@ -682,7 +682,7 @@ public:
   bool isImplicit() const { return DeclBits.Implicit; }
 
   /// \brief Mark this declaration as implicit.
-  void setImplicit() { DeclBits.Implicit = true; }
+  void setImplicit(bool implicit = true) { DeclBits.Implicit = implicit; }
 
   /// \returns the unparsed comment attached to this declaration.
   RawComment getRawComment() const;
@@ -3103,6 +3103,11 @@ public:
   /// \brief Specify the synthesized get/set functions for a Observing var.
   /// This is used by Sema.
   void setObservingAccessors(FuncDecl *Get, FuncDecl *Set);
+
+  /// \brief Add a setter to an existing Computed var.
+  ///
+  /// This should only be used by the ClangImporter.
+  void setComputedSetter(FuncDecl *Set);
 
   SourceRange getBracesRange() const {
     assert(GetSetInfo && "Not computed!");
