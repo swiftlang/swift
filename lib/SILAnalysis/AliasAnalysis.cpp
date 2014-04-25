@@ -443,13 +443,16 @@ namespace {
 
 using MemBehavior = SILInstruction::MemoryBehavior;
 
+/// Visitor that determines the memory behavior of an instruction relative to a
+/// specific SILValue (i.e. can the instruction cause the value to be read,
+/// etc.).
 class MemoryBehaviorVisitor
     : public SILInstructionVisitor<MemoryBehaviorVisitor, MemBehavior> {
 
-  // The alias analysis for any queries we may need.
+  /// The alias analysis for any queries we may need.
   AliasAnalysis &AA;
 
-  // The value we are attempting to discover memory behavior relative to.
+  /// The value we are attempting to discover memory behavior relative to.
   SILValue V;
 
 public:
@@ -465,27 +468,47 @@ public:
     return Inst->getMemoryBehavior();
   }
 
-  MemBehavior visitLoadInst(LoadInst *LI);
   MemBehavior visitStoreInst(StoreInst *SI);
   MemBehavior visitApplyInst(ApplyInst *AI);
+
+  // Instructions which are none if our SILValue does not alias one of its
+  // arguments. If we can not prove such a thing, return the relevant memory
+  // behavior.
+#define OPERANDALIAS_MEMBEHAVIOR_INST(Name)                             \
+  MemBehavior visit##Name(Name *I) {                                    \
+    for (Operand &Op : I->getAllOperands()) {                           \
+      if (!AA.isNoAlias(Op.get(), V)) {                                 \
+        DEBUG(llvm::dbgs() << "  " #Name                                \
+              " does alias inst. Returning  Normal behavior.\n");       \
+        return I->getMemoryBehavior();                                  \
+      }                                                                 \
+    }                                                                   \
+                                                                        \
+    DEBUG(llvm::dbgs() << "  " #Name " does not alias inst. Returning " \
+          "None.\n");                                                   \
+    return MemBehavior::None;                                           \
+  }
+
+  OPERANDALIAS_MEMBEHAVIOR_INST(LoadInst)
+  OPERANDALIAS_MEMBEHAVIOR_INST(InjectEnumAddrInst)
+  OPERANDALIAS_MEMBEHAVIOR_INST(UncheckedTakeEnumDataAddrInst)
+  OPERANDALIAS_MEMBEHAVIOR_INST(InitExistentialInst)
+  OPERANDALIAS_MEMBEHAVIOR_INST(UpcastExistentialInst)
+  OPERANDALIAS_MEMBEHAVIOR_INST(DeinitExistentialInst)
+  OPERANDALIAS_MEMBEHAVIOR_INST(DeallocStackInst)
+  OPERANDALIAS_MEMBEHAVIOR_INST(FixLifetimeInst)
+#undef OPERANDALIAS_MEMBEHAVIOR_INST
+
+  // Override simple behaviors where MayHaveSideEffects is too general and
+  // encompasses other behavior that is not read/write/ref count decrement
+  // behavior we care about.
+#define SIMPLE_MEMBEHAVIOR_INST(Name, Behavior)                         \
+  MemBehavior visit##Name(Name *I) { return MemBehavior::Behavior; }
+  SIMPLE_MEMBEHAVIOR_INST(CondFailInst, None)
+#undef SIMPLE_MEMBEHAVIOR_INST
 };
 
 } // end anonymous namespace
-
-MemBehavior MemoryBehaviorVisitor::visitLoadInst(LoadInst *LI) {
-  // If the load address doesn't alias the given address, it doesn't read or
-  // write the specified memory.
-  if (AA.isNoAlias(LI->getOperand(), V)) {
-    DEBUG(llvm::dbgs() << "  Load does not alias inst. Returning None.\n");
-    return MemBehavior::None;
-  }
-
-  // Otherwise be conservative and just return reads since loads can only
-  // read.
-  DEBUG(llvm::dbgs() << "  Could not prove load does not alias inst. "
-                        "Returning MayRead.\n");
-  return MemBehavior::MayRead;
-}
 
 MemBehavior MemoryBehaviorVisitor::visitStoreInst(StoreInst *SI) {
   // If the store dest cannot alias the pointer in question, then the
