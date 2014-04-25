@@ -1746,6 +1746,16 @@ static bool isParamPatternRepresentableInObjC(TypeChecker &TC,
     auto Fields = TP->getFields();
     unsigned NumParams = Fields.size();
 
+    // Varargs are not representable in Objective-C.
+    if (TP->hasVararg()) {
+      if (Diagnose && Reason != ObjCReason::DontDiagnose) {
+        TC.diagnose(TP->getEllipsisLoc(), diag::objc_invalid_on_func_variadic);
+        describeObjCReason(TC, AFD, Reason);
+      }
+
+      return false;
+    }
+
     if (NumParams == 0)
       return true;
 
