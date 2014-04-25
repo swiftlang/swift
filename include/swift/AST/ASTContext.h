@@ -377,9 +377,9 @@ public:
   
   /// Retrieve the simple upcast conversion functions for Array<T>, Slice<T> or
   /// NativeArray<T>.
-  FuncDecl *getConvertArraySimple(LazyResolver *resolver) const;
-  FuncDecl *getConvertSliceSimple(LazyResolver *resolver) const;
-  FuncDecl *getConvertNativeArraySimple(LazyResolver *resolver) const;
+  FuncDecl *getUpcastArray(LazyResolver *resolver) const;
+  FuncDecl *getUpcastSlice(LazyResolver *resolver) const;
+  FuncDecl *getUpcastNativeArray(LazyResolver *resolver) const;
 
   /// Retrieve the declaration of Swift._does{,Unchecked}OptionalHaveValue.
   FuncDecl *getDoesOptionalHaveValueDecl(LazyResolver *resolver,

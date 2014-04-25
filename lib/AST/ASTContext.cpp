@@ -74,9 +74,9 @@ struct ASTContext::Implementation {
   EnumElementDecl *OptionalNoneDecl = nullptr;
   
   /// Array<T>, Slice<T> and NativeArray<T> simple upcast functions.
-  FuncDecl *GetConvertArraySimple = nullptr;
-  FuncDecl *GetConvertSliceSimple = nullptr;
-  FuncDecl *GetConvertNativeArraySimple = nullptr;
+  FuncDecl *GetUpcastArray = nullptr;
+  FuncDecl *GetUpcastSlice = nullptr;
+  FuncDecl *GetUpcastNativeArray = nullptr;
 
   /// func _doesOptionalHaveValue<T>(v : [inout] Optional<T>) -> T
   FuncDecl *DoesOptionalHaveValueDecls[NumOptionalTypeKinds] = {};
@@ -619,13 +619,13 @@ static bool isGenericIntrinsic(FuncDecl *fn, CanType &input, CanType &output,
   return true;
 }
 
-FuncDecl *ASTContext::getConvertArraySimple(LazyResolver *resolver) const {
-  auto &cache = Impl.GetConvertArraySimple;
+FuncDecl *ASTContext::getUpcastArray(LazyResolver *resolver) const {
+  auto &cache = Impl.GetUpcastArray;
   if (cache) return cache;
   
   // Look for a generic function.
   CanType input, output, param;
-  auto decl = findLibraryIntrinsic(*this, "_convertArraySimple", resolver);
+  auto decl = findLibraryIntrinsic(*this, "upcastArray", resolver);
   if (!decl)
     return nullptr;
   
@@ -633,13 +633,13 @@ FuncDecl *ASTContext::getConvertArraySimple(LazyResolver *resolver) const {
   return decl;
 }
 
-FuncDecl *ASTContext::getConvertSliceSimple(LazyResolver *resolver) const {
-  auto &cache = Impl.GetConvertSliceSimple;
+FuncDecl *ASTContext::getUpcastSlice(LazyResolver *resolver) const {
+  auto &cache = Impl.GetUpcastSlice;
   if (cache) return cache;
   
   // Look for a generic function.
   CanType input, output, param;
-  auto decl = findLibraryIntrinsic(*this, "_convertSliceSimple", resolver);
+  auto decl = findLibraryIntrinsic(*this, "upcastSlice", resolver);
   if (!decl)
     return nullptr;
   
@@ -647,13 +647,13 @@ FuncDecl *ASTContext::getConvertSliceSimple(LazyResolver *resolver) const {
   return decl;
 }
 
-FuncDecl *ASTContext::getConvertNativeArraySimple(LazyResolver *resolver) const{
-  auto &cache = Impl.GetConvertNativeArraySimple;
+FuncDecl *ASTContext::getUpcastNativeArray(LazyResolver *resolver) const{
+  auto &cache = Impl.GetUpcastNativeArray;
   if (cache) return cache;
   
   // Look for a generic function.
   CanType input, output, param;
-  auto decl = findLibraryIntrinsic(*this, "_convertNativeArraySimple", resolver);
+  auto decl = findLibraryIntrinsic(*this, "upcastNativeArray", resolver);
   if (!decl)
     return nullptr;
   

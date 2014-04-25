@@ -159,7 +159,7 @@ enum class ConversionRestrictionKind {
   /// Implicit forces of unchecked optionals to their presumed values
   ForceUnchecked,
   /// Implicit upcast conversion of array types
-  ArrayToArray,
+  ArrayUpcast,
   /// User-defined conversions.
   User
 };

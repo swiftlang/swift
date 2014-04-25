@@ -1358,7 +1358,7 @@ public:
     printRec(E->getSubExpr());
     OS << ')';
   }
-  void visitSimpleArrayConversionExpr(SimpleArrayConversionExpr *E) {
+  void visitArrayUpcastConversionExpr(ArrayUpcastConversionExpr *E) {
     printCommon(E, "simple_array_conversion_expr") << '\n';
     printRec(E->getSubExpr());
     OS << ')';

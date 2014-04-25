@@ -275,7 +275,6 @@ public:
   SILDeclRef getUnsafePointerToCConstPointerFn();
   SILDeclRef getCOpaquePointerToCMutableVoidPointerFn();
   SILDeclRef getCOpaquePointerToCConstVoidPointerFn();
-  SILDeclRef getConvertArraySimpleFn();
   
   /// Report a diagnostic.
   template<typename...T, typename...U>

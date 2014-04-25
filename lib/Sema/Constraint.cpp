@@ -273,8 +273,8 @@ StringRef swift::constraints::getName(ConversionRestrictionKind kind) {
     return "[optional-to-unchecked-optional]";
   case ConversionRestrictionKind::ForceUnchecked:
     return "[force-unchecked]";
-  case ConversionRestrictionKind::ArrayToArray:
-    return "[array-to-array]";
+  case ConversionRestrictionKind::ArrayUpcast:
+    return "[array-upcast]";
   case ConversionRestrictionKind::User:
     return "[user]";
   }

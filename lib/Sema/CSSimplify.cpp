@@ -854,7 +854,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
           (isNativeArrayType(desugar1) && isNativeArrayType(desugar2))) {
         
         potentialConversions.push_back(ConversionRestrictionKind::
-                                          ArrayToArray);
+                                          ArrayUpcast);
       }
     }
   }
@@ -2029,7 +2029,8 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
                       matchKind, flags, locator);
   }
       
-  case ConversionRestrictionKind::ArrayToArray: {
+  // T < U ===> Array<T> <c Array<U>
+  case ConversionRestrictionKind::ArrayUpcast: {
     increaseScore(SK_ArrayConversion);
     
     addContextualScore();
@@ -2053,6 +2054,16 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
     } else {
       auto arrayType2 = cast<BoundGenericStructType>(t2);
       baseType2 = arrayType2->getGenericArgs()[0];
+    }
+    
+    // Allow assignments from Array<T> to Array<AnyObject> if T is a bridged
+    // type.
+    if (auto protoTy = baseType2->getAs<ProtocolType>()) {
+      if(protoTy->getDecl()->isSpecificProtocol(KnownProtocolKind::AnyObject)) {
+        if (TC.isTriviallyRepresentableInObjC(DC, baseType1)) {
+          return SolutionKind::Solved;
+        }
+      }
     }
     
     return matchTypes(baseType1,

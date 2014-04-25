@@ -175,7 +175,7 @@ namespace {
     RValue visitDerivedToBaseExpr(DerivedToBaseExpr *E, SGFContext C);
     RValue visitMetatypeConversionExpr(MetatypeConversionExpr *E,
                                        SGFContext C);
-    RValue visitSimpleArrayConversionExpr(SimpleArrayConversionExpr *E,
+    RValue visitArrayUpcastConversionExpr(ArrayUpcastConversionExpr *E,
                                           SGFContext C);
     RValue visitArchetypeToSuperExpr(ArchetypeToSuperExpr *E, SGFContext C);
     RValue visitFunctionConversionExpr(FunctionConversionExpr *E,
@@ -899,7 +899,7 @@ visitMetatypeConversionExpr(MetatypeConversionExpr *E,
 }
 
 RValue RValueEmitter::
-visitSimpleArrayConversionExpr(SimpleArrayConversionExpr *E,
+visitArrayUpcastConversionExpr(ArrayUpcastConversionExpr *E,
                                SGFContext C) {
   
   SILLocation loc = RegularLocation(E);
@@ -920,11 +920,11 @@ visitSimpleArrayConversionExpr(SimpleArrayConversionExpr *E,
   FuncDecl *fn = nullptr;
   
   if (typeName.str() == "Array") {
-    fn = SGF.getASTContext().getConvertArraySimple(nullptr);
+    fn = SGF.getASTContext().getUpcastArray(nullptr);
   } else if (typeName.str() == "Slice") {
-    fn = SGF.getASTContext().getConvertSliceSimple(nullptr);
+    fn = SGF.getASTContext().getUpcastSlice(nullptr);
   } else if (typeName.str() == "NativeArray") {
-    fn = SGF.getASTContext().getConvertNativeArraySimple(nullptr);
+    fn = SGF.getASTContext().getUpcastNativeArray(nullptr);
   } else {
     llvm_unreachable("unsupported array upcast kind");
   }

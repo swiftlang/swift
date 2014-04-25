@@ -48,11 +48,11 @@ BRIDGING_KNOWN_TYPE(Swift, AnyObjectArray)
 BRIDGING_KNOWN_TYPE(ObjectiveC, ObjCBool)
 BRIDGING_KNOWN_TYPE(Swift, Bool)
 
-BRIDGE_TYPE(Swift,COpaquePointer, Swift,CMutableVoidPointer, false)
-BRIDGE_TYPE(Swift,COpaquePointer, Swift,CConstVoidPointer, false)
-BRIDGE_TYPE(Foundation,NSString, Swift,String,  true)
-BRIDGE_TYPE(Foundation,NSArray, Swift,AnyObjectArray,  true)
-BRIDGE_TYPE(ObjectiveC,ObjCBool, Swift,Bool,    false)
+BRIDGE_TYPE(Swift, COpaquePointer, Swift, CMutableVoidPointer, false)
+BRIDGE_TYPE(Swift, COpaquePointer, Swift, CConstVoidPointer, false)
+BRIDGE_TYPE(Foundation, NSString, Swift, String, true)
+BRIDGE_TYPE(Foundation, NSArray, Swift, AnyObjectArray, true)
+BRIDGE_TYPE(ObjectiveC, ObjCBool, Swift, Bool, false)
 
 #undef BRIDGING_KNOWN_TYPE
 #undef BRIDGE_TYPE

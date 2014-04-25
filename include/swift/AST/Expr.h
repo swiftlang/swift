@@ -1953,15 +1953,15 @@ public:
   }
 };
   
-// SimpleArrayConversionExpr - Convert an Array<U> to an Array<T>, where
+// ArrayUpcastConversionExpr - Convert an Array<U> to an Array<T>, where
 // U is a subtype of T.
-class SimpleArrayConversionExpr : public ImplicitConversionExpr {
+class ArrayUpcastConversionExpr : public ImplicitConversionExpr {
 public:
-  SimpleArrayConversionExpr(Expr *subExpr, Type type)
-  : ImplicitConversionExpr(ExprKind::SimpleArrayConversion, subExpr, type) {}
+  ArrayUpcastConversionExpr(Expr *subExpr, Type type)
+  : ImplicitConversionExpr(ExprKind::ArrayUpcastConversion, subExpr, type) {}
   
   static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::SimpleArrayConversion;
+    return E->getKind() == ExprKind::ArrayUpcastConversion;
   }
 };
 

@@ -3338,9 +3338,9 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       return coerceToType(expr, toType, locator);
     }
         
-    case ConversionRestrictionKind::ArrayToArray: {
+    case ConversionRestrictionKind::ArrayUpcast: {
       auto arrayConversion = new (tc.Context)
-                                  SimpleArrayConversionExpr(expr, toType);
+                                  ArrayUpcastConversionExpr(expr, toType);
       arrayConversion->setType(toType);
       return arrayConversion;
     }
