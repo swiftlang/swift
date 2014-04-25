@@ -298,9 +298,11 @@ void _swift_release_slow(HeapObject *object) {
 }
 
 void swift::swift_deallocObject(HeapObject *object, size_t allocatedSize) {
+  assert(object->refCount == RC_INTERVAL);
 #ifdef SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS
-  memset_pattern8(object, "\xAB\xAD\x1D\xEA\xF4\xEE\xD0\bB9",
-                  allocatedSize);
+  memset_pattern8((void *)((size_t)object + sizeof(HeapObject)),
+                  "\xAB\xAD\x1D\xEA\xF4\xEE\xD0\bB9",
+                  allocatedSize - sizeof(HeapObject));
 #endif
   swift_weakRelease(object);
 }
