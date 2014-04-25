@@ -374,6 +374,12 @@ public:
   
   /// Retrieve the declaration of Swift.Optional<T>.None.
   EnumElementDecl *getOptionalNoneDecl() const;
+  
+  /// Retrieve the simple upcast conversion functions for Array<T>, Slice<T> or
+  /// NativeArray<T>.
+  FuncDecl *getConvertArraySimple(LazyResolver *resolver) const;
+  FuncDecl *getConvertSliceSimple(LazyResolver *resolver) const;
+  FuncDecl *getConvertNativeArraySimple(LazyResolver *resolver) const;
 
   /// Retrieve the declaration of Swift._does{,Unchecked}OptionalHaveValue.
   FuncDecl *getDoesOptionalHaveValueDecl(LazyResolver *resolver,

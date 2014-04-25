@@ -175,6 +175,8 @@ namespace {
     RValue visitDerivedToBaseExpr(DerivedToBaseExpr *E, SGFContext C);
     RValue visitMetatypeConversionExpr(MetatypeConversionExpr *E,
                                        SGFContext C);
+    RValue visitSimpleArrayConversionExpr(SimpleArrayConversionExpr *E,
+                                          SGFContext C);
     RValue visitArchetypeToSuperExpr(ArchetypeToSuperExpr *E, SGFContext C);
     RValue visitFunctionConversionExpr(FunctionConversionExpr *E,
                                        SGFContext C);
@@ -879,7 +881,8 @@ RValue RValueEmitter::visitDerivedToBaseExpr(DerivedToBaseExpr *E,
   return RValue(SGF, E, ManagedValue(converted, original.getCleanup()));
 }
 
-RValue RValueEmitter::visitMetatypeConversionExpr(MetatypeConversionExpr *E,
+RValue RValueEmitter::
+visitMetatypeConversionExpr(MetatypeConversionExpr *E,
                                                   SGFContext C) {
   SILValue metaBase =
     SGF.emitRValueAsSingleValue(E->getSubExpr()).getUnmanagedValue();
@@ -893,6 +896,61 @@ RValue RValueEmitter::visitMetatypeConversionExpr(MetatypeConversionExpr *E,
 
   auto upcast = SGF.B.createUpcast(E, metaBase, loweredResultTy);
   return RValue(SGF, E, ManagedValue::forUnmanaged(upcast));
+}
+
+RValue RValueEmitter::
+visitSimpleArrayConversionExpr(SimpleArrayConversionExpr *E,
+                               SGFContext C) {
+  
+  SILLocation loc = RegularLocation(E);
+  
+  // Get the address of the sub expression array argument.
+  const TypeLowering &optTL = SGF.getTypeLowering(E->getSubExpr()->getType());
+  auto temp = SGF.emitTemporary(E->getSubExpr(), optTL);
+  SGF.emitExprInto(E->getSubExpr(), temp.get());
+  
+  // Compute substitutions for the intrinsic call.
+  auto canTypeT = E->getSubExpr()->getType().getPointer()->getCanonicalType();
+  auto canTypeU = E->getType().getPointer()->getCanonicalType();
+  auto arrayT = cast<BoundGenericStructType>(canTypeT)->getGenericArgs()[0];
+  auto arrayU = cast<BoundGenericStructType>(canTypeU)->getGenericArgs()[0];
+  auto typeName = cast<BoundGenericStructType>(canTypeT)->getDecl()->getName();
+  
+  // Get the intrinsic function.
+  FuncDecl *fn = nullptr;
+  
+  if (typeName.str() == "Array") {
+    fn = SGF.getASTContext().getConvertArraySimple(nullptr);
+  } else if (typeName.str() == "Slice") {
+    fn = SGF.getASTContext().getConvertSliceSimple(nullptr);
+  } else if (typeName.str() == "NativeArray") {
+    fn = SGF.getASTContext().getConvertNativeArraySimple(nullptr);
+  } else {
+    llvm_unreachable("unsupported array upcast kind");
+  }
+  
+  // Compute type parameter substitutions.
+  SmallVector<Substitution, 2> subs;
+  
+  auto polyFnType = cast<PolymorphicFunctionType>
+                        (fn->getType()->getCanonicalType());
+  auto genericParams = polyFnType->getGenericParameters();
+  
+  
+  auto gp1 = genericParams[0].getAsTypeParam();
+  auto gp2 = genericParams[1].getAsTypeParam();
+  subs.push_back(Substitution{gp1->getArchetype(), arrayT, {}});
+  subs.push_back(Substitution{gp2->getArchetype(), arrayU, {}});
+  
+  auto args = {ManagedValue::forUnmanaged(temp->getAddress())};
+  
+  auto emitApply = SGF.emitApplyOfLibraryIntrinsic(loc,
+                                                   fn,
+                                                   subs,
+                                                   args,
+                                                   C);
+  
+  return RValue(SGF, E, emitApply);
 }
 
 RValue RValueEmitter::visitArchetypeToSuperExpr(ArchetypeToSuperExpr *E,

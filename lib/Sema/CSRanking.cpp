@@ -52,6 +52,10 @@ void ConstraintSystem::increaseScore(ScoreKind kind) {
     case SK_NonDefaultLiteral:
       log << "non-default literal";
       break;
+        
+    case SK_ArrayConversion:
+      log << "array conversion";
+      break;
     }
     log << ")\n";
   }

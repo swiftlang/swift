@@ -1952,6 +1952,18 @@ public:
     return E->getKind() == ExprKind::MetatypeConversion;
   }
 };
+  
+// SimpleArrayConversionExpr - Convert an Array<U> to an Array<T>, where
+// U is a subtype of T.
+class SimpleArrayConversionExpr : public ImplicitConversionExpr {
+public:
+  SimpleArrayConversionExpr(Expr *subExpr, Type type)
+  : ImplicitConversionExpr(ExprKind::SimpleArrayConversion, subExpr, type) {}
+  
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::SimpleArrayConversion;
+  }
+};
 
 /// AnyErasureExpr - An abstract class for implicit conversions that
 /// erase a type into an existential in some way.

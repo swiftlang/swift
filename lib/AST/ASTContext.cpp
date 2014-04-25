@@ -72,6 +72,11 @@ struct ASTContext::Implementation {
 
   /// The declaration of Swift.Optional<T>.None.
   EnumElementDecl *OptionalNoneDecl = nullptr;
+  
+  /// Array<T>, Slice<T> and NativeArray<T> simple upcast functions.
+  FuncDecl *GetConvertArraySimple = nullptr;
+  FuncDecl *GetConvertSliceSimple = nullptr;
+  FuncDecl *GetConvertNativeArraySimple = nullptr;
 
   /// func _doesOptionalHaveValue<T>(v : [inout] Optional<T>) -> T
   FuncDecl *DoesOptionalHaveValueDecls[NumOptionalTypeKinds] = {};
@@ -612,6 +617,48 @@ static bool isGenericIntrinsic(FuncDecl *fn, CanType &input, CanType &output,
   input = stripImmediateLabels(fnType.getInput());
   output = stripImmediateLabels(fnType.getResult());
   return true;
+}
+
+FuncDecl *ASTContext::getConvertArraySimple(LazyResolver *resolver) const {
+  auto &cache = Impl.GetConvertArraySimple;
+  if (cache) return cache;
+  
+  // Look for a generic function.
+  CanType input, output, param;
+  auto decl = findLibraryIntrinsic(*this, "_convertArraySimple", resolver);
+  if (!decl)
+    return nullptr;
+  
+  cache = decl;
+  return decl;
+}
+
+FuncDecl *ASTContext::getConvertSliceSimple(LazyResolver *resolver) const {
+  auto &cache = Impl.GetConvertSliceSimple;
+  if (cache) return cache;
+  
+  // Look for a generic function.
+  CanType input, output, param;
+  auto decl = findLibraryIntrinsic(*this, "_convertSliceSimple", resolver);
+  if (!decl)
+    return nullptr;
+  
+  cache = decl;
+  return decl;
+}
+
+FuncDecl *ASTContext::getConvertNativeArraySimple(LazyResolver *resolver) const{
+  auto &cache = Impl.GetConvertNativeArraySimple;
+  if (cache) return cache;
+  
+  // Look for a generic function.
+  CanType input, output, param;
+  auto decl = findLibraryIntrinsic(*this, "_convertNativeArraySimple", resolver);
+  if (!decl)
+    return nullptr;
+  
+  cache = decl;
+  return decl;
 }
 
 /// Check whether the given type is Optional applied to the given

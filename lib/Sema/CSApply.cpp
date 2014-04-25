@@ -3337,6 +3337,13 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       if (!expr) return nullptr;
       return coerceToType(expr, toType, locator);
     }
+        
+    case ConversionRestrictionKind::ArrayToArray: {
+      auto arrayConversion = new (tc.Context)
+                                  SimpleArrayConversionExpr(expr, toType);
+      arrayConversion->setType(toType);
+      return arrayConversion;
+    }
 
     case ConversionRestrictionKind::User:
       return coerceViaUserConversion(expr, toType, locator);

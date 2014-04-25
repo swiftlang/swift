@@ -97,6 +97,7 @@ public:
   Optional<SILDeclRef> UnsafePointerToCConstPointerFn;
   Optional<SILDeclRef> UnsafePointerToCMutablePointerFn;
   Optional<SILDeclRef> UnsafePointerToObjCMutablePointerFn;
+  Optional<SILDeclRef> ConvertArraySimpleFn;
   
 public:
   SILGenModule(SILModule &M, Module *SM);
@@ -274,6 +275,7 @@ public:
   SILDeclRef getUnsafePointerToCConstPointerFn();
   SILDeclRef getCOpaquePointerToCMutableVoidPointerFn();
   SILDeclRef getCOpaquePointerToCConstVoidPointerFn();
+  SILDeclRef getConvertArraySimpleFn();
   
   /// Report a diagnostic.
   template<typename...T, typename...U>

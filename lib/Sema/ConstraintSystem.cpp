@@ -632,18 +632,55 @@ Type ConstraintSystem::openType(
   return startingType.transform(replaceDependentTypes);
 }
 
+bool ConstraintSystem::isArrayType(Type t) {
+  
+  // ArraySliceType<T> now desugars to Array<T>.
+  if (dyn_cast<ArraySliceType>(t.getPointer())) {
+    return true;
+  }
+  if (auto boundStruct = dyn_cast<BoundGenericStructType>(t.getPointer())) {
+    if (!boundStruct->getParent() &&
+        boundStruct->getGenericArgs().size() == 1 &&
+        boundStruct->getDecl()->getName().str() == "Array") {
+      return true;
+    }
+  }
+  
+  return false;
+}
+
+bool ConstraintSystem::isNativeArrayType(Type t) {
+  if (auto boundStruct = dyn_cast<BoundGenericStructType>(t.getPointer())) {
+    if (!boundStruct->getParent() &&
+        boundStruct->getGenericArgs().size() == 1 &&
+        boundStruct->getDecl()->getName().str() == "NativeArray") {
+      return true;
+    }
+  }
+  
+  return false;
+}
+
+bool ConstraintSystem::isSliceType(Type t) {
+  if (auto boundStruct = dyn_cast<BoundGenericStructType>(t.getPointer())) {
+    if (!boundStruct->getParent() &&
+        boundStruct->getGenericArgs().size() == 1 &&
+        boundStruct->getDecl()->getName().str() == "Slice") {
+      return true;
+    }
+  }
+  
+  return false;
+}
+
 Type ConstraintSystem::openBindingType(Type type, DeclContext *dc) {
   Type result = openType(type, dc);
-  // FIXME: Better way to identify Array<T>.
-  if (auto boundStruct
-        = dyn_cast<BoundGenericStructType>(result.getPointer())) {
-    if (!boundStruct->getParent() &&
-        boundStruct->getDecl()->getName().str() == "Array" &&
-        boundStruct->getGenericArgs().size() == 1) {
-      if (auto replacement = getTypeChecker().getArraySliceType(
-                               SourceLoc(), boundStruct->getGenericArgs()[0])) {
-        return replacement;
-      }
+  
+  if (isArrayType(type)) {
+    auto boundStruct = cast<BoundGenericStructType>(type.getPointer());
+    if (auto replacement = getTypeChecker().getArraySliceType(
+                             SourceLoc(), boundStruct->getGenericArgs()[0])) {
+      return replacement;
     }
   }
 

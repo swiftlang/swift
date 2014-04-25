@@ -598,11 +598,13 @@ enum ScoreKind {
   /// A non-trivial function conversion.
   SK_FunctionConversion,
   /// A literal expression bound to a non-default literal type.
-  SK_NonDefaultLiteral
+  SK_NonDefaultLiteral,
+  /// An implicit conversion between array types.
+  SK_ArrayConversion,
 };
 
 /// The number of score kinds.
-const unsigned NumScoreKinds = 4;
+const unsigned NumScoreKinds = 5;
 
 /// Describes the fixed score of a solution to the constraint system.
 struct Score {
@@ -1291,6 +1293,12 @@ private:
   DeclName simplifyFailureArg(DeclName arg) {
     return arg;
   }
+  
+  /// \brief Determine if the type in question is an Array<T>, Slice<T> or
+  /// NativeArray<T>
+  bool isArrayType(Type t);
+  bool isNativeArrayType(Type t);
+  bool isSliceType(Type t);
 
 public:
   /// \brief Whether we should be recording failures.

@@ -841,7 +841,7 @@ public:
   ///
   /// The result is a Builtin.Int1.
   SILValue emitDoesOptionalHaveValue(SILLocation loc, SILValue addr);
-
+  
   /// \brief Emit a call to the library intrinsic _getOptionalValue
   /// given the address of the optional.
   ManagedValue emitGetOptionalValueFrom(SILLocation loc, ManagedValue addr,

@@ -739,6 +739,21 @@ struct ASTNodeBase {};
       checkTrivialSubtype(srcTy, destTy, "MetatypeConversionExpr");
       verifyCheckedBase(E);
     }
+    
+    void verifyChecked(SimpleArrayConversionExpr *E) {
+      PrettyStackTraceExpr debugStack(Ctx,
+                                      "verifying SimpleArrayConversionExpr",
+                                      E);
+      auto canTypeT = E->getSubExpr()->getType().
+                          getPointer()->getCanonicalType();
+      auto canTypeU = E->getType().getPointer()->getCanonicalType();
+      auto arrayT = cast<BoundGenericStructType>(canTypeT)->getGenericArgs()[0];
+      auto arrayU = cast<BoundGenericStructType>(canTypeU)->getGenericArgs()[0];
+      
+      checkTrivialSubtype(arrayT, arrayU, "SimpleArrayConversionExpr");
+      
+      verifyCheckedBase(E);
+    }
 
     void verifyChecked(DerivedToBaseExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx, "verifying DerivedToBaseExpr", E);

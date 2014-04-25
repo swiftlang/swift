@@ -846,6 +846,17 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
           != type2->getClassOrBoundGenericClass()) {
       potentialConversions.push_back(ConversionRestrictionKind::Superclass);
     }
+    
+    // Array supertype conversions.
+    if (kind >= TypeMatchKind::Conversion) {      
+      if ((isArrayType(desugar1) && isArrayType(desugar2)) ||
+          (isSliceType(desugar1) && isSliceType(desugar2)) ||
+          (isNativeArrayType(desugar1) && isNativeArrayType(desugar2))) {
+        
+        potentialConversions.push_back(ConversionRestrictionKind::
+                                          ArrayToArray);
+      }
+    }
   }
 
   if (concrete && kind >= TypeMatchKind::Conversion) {
@@ -2017,6 +2028,39 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
     return matchTypes(valueType1, type2,
                       matchKind, flags, locator);
   }
+      
+  case ConversionRestrictionKind::ArrayToArray: {
+    increaseScore(SK_ArrayConversion);
+    
+    addContextualScore();
+    assert(matchKind >= TypeMatchKind::Conversion);
+    
+    Type baseType1;
+    Type baseType2;
+    
+    auto t1 = type1->getDesugaredType();
+    auto t2 = type2->getDesugaredType();
+    
+    if (auto sliceType1 = dyn_cast<ArraySliceType>(t1)) {
+      baseType1 = sliceType1->getBaseType();
+    } else {
+        auto arrayType1 = cast<BoundGenericStructType>(t1);
+        baseType1 = arrayType1->getGenericArgs()[0];
+    }
+    
+    if (auto sliceType2 = dyn_cast<ArraySliceType>(t2)) {
+      baseType2 = sliceType2->getBaseType();
+    } else {
+      auto arrayType2 = cast<BoundGenericStructType>(t2);
+      baseType2 = arrayType2->getGenericArgs()[0];
+    }
+    
+    return matchTypes(baseType1,
+                      baseType2,
+                      TypeMatchKind::Subtype,
+                      flags,
+                      locator);
+  }
 
   // T' < U, hasMember(T, conversion, T -> T') ===> T <c U
   case ConversionRestrictionKind::User:
@@ -2026,7 +2070,9 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
                              ConstraintKind::Subtype,
                              type2,
                              locator);
+      
   }
+  
   llvm_unreachable("bad conversion restriction");
 }
 
