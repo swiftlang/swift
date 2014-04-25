@@ -934,7 +934,7 @@ implements the method for that class::
 
   sil_vtable B {
     #A.foo!1: @A_foo
-    #B.bar!1: @B_bar
+    #A.bar!1: @B_bar
     #A.bas!1: @A_bas
   }
 
@@ -946,16 +946,16 @@ implements the method for that class::
 
   sil_vtable C {
     #A.foo!1: @A_foo
-    #B.bar!1: @B_bar
-    #C.bas!1: @C_bas
+    #A.bar!1: @B_bar
+    #A.bas!1: @C_bas
   }
 
-Note that the declaration reference in the vtable is to the most-derived method
+Note that the declaration reference in the vtable is to the least-derived method
 visible through that class (in the example above, ``B``'s vtable references
-``B.bar`` and not ``A.bar``, and ``C``'s vtable references ``C.bas`` and not
-``A.bas``). The Swift AST maintains override relationships between declarations
+``A.bar`` and not ``B.bar``, and ``C``'s vtable references ``A.bas`` and not
+``C.bas``). The Swift AST maintains override relationships between declarations
 that can be used to look up overridden methods in the SIL vtable for a derived
-class (such as ``A.bas`` in ``C``'s vtable).
+class (such as ``C.bas`` in ``C``'s vtable).
 
 Witness Tables
 ~~~~~~~~~~~~~~

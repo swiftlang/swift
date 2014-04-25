@@ -169,6 +169,9 @@ struct SILDevirtualizer {
   /// A list of declared function names.
   llvm::StringSet<> FunctionNameCache;
 
+  /// The instruction to be deleted.
+  SILInstruction *toBeDeleted = nullptr;
+
   /// Map caller functions to their list of polymorphic arguments.  Each
   /// function is mapped to an ordered list of Arguments. This is the order that
   /// the arguments were analyzed, not the order in the declaration.  Each
@@ -254,6 +257,9 @@ struct SILDevirtualizer {
       FunctionNameCache.insert(F.getName());
   }
 
+  /// Check for type mismatch when replacing a ClassMethodInst with a
+  /// FunctionRefInst.
+  bool checkDevirtType(SILFunction *F, ClassMethodInst *CMI);
   void collectPolyArgs(ApplyInst *AI);
 
   CanType resolveObjectType(SILValue Obj);
@@ -1005,6 +1011,63 @@ ClassDecl *SILDevirtualizer::findClassDeclForSILValue(SILValue Cls) {
   return nullptr;
 }
 
+bool SILDevirtualizer::checkDevirtType(SILFunction *F, ClassMethodInst *CMI) {
+  auto paramTypes = F->getLoweredFunctionType()
+                     ->getInterfaceParametersWithoutIndirectResult();
+  if (paramTypes.empty())
+    return true;
+
+  auto paramTy = paramTypes[paramTypes.size() - 1].getType();
+  auto argTy = CMI->getOperand().getType().getSwiftRValueType();
+  if (paramTy == argTy ||
+      paramTy->getClassOrBoundGenericClass() ==
+      argTy->getClassOrBoundGenericClass())
+    return true;
+
+  // When there is a type mismatch, we currently only allow upcast where
+  // the source operand has the expected paramTy. Another option is to perform
+  // a downcast to have the correct type.
+  if (CMI->getOperand()->getKind() != ValueKind::UpcastInst)
+    return false;
+  auto Origin = cast<SILInstruction>(CMI->getOperand())->getOperand(0);
+  if (paramTy != Origin.getType().getSwiftRValueType())
+    return false;
+
+  // We handle updating of ApplyInst only.
+  for (auto UI = CMI->use_begin(), UE = CMI->use_end(); UI != UE; ++UI)
+    if (!isa<ApplyInst>(UI->getUser()))
+      return false;
+
+  // Find the next instruction of CMI before modifying anything.
+  SILBasicBlock::iterator iter(CMI);
+  ++iter;
+  SILInstruction *nextI = (iter == CMI->getParent()->end()) ? nullptr : iter;
+  for (auto UI = CMI->use_begin(), UE = CMI->use_end(); UI != UE; ++UI)
+    if (ApplyInst *AI = dyn_cast<ApplyInst>(UI->getUser())) {
+      // Update the last argument for ApplyInst.
+      SILBuilder Builder(AI);
+
+      SmallVector<SILValue, 4> Args;
+      ArrayRef<Operand> ApplyArgs = AI->getArgumentOperands();
+      for (auto &A : ApplyArgs.slice(0, ApplyArgs.size() - 1))
+        Args.push_back(A.get());
+      Args.push_back(Origin);
+
+      ApplyInst *SAI = Builder.createApply(AI->getLoc(), AI->getCallee(),
+                                           AI->getSubstCalleeSILType(),
+                                           AI->getType(),
+                                           AI->getSubstitutions(), Args);
+       AI->replaceAllUsesWith(SAI);
+       // If AI is the next instruction after CMI, do not erase here. It can
+       // cause invalid iterator for the loop in optimizeFuncBody.
+       if (AI != nextI)
+         AI->eraseFromParent();
+       else
+         toBeDeleted = AI;
+    }
+  return true;
+}
+
 void SILDevirtualizer::optimizeClassMethodInst(ClassMethodInst *CMI) {
   DEBUG(llvm::dbgs() << "    Trying to optimize : " << *CMI);
 
@@ -1046,6 +1109,17 @@ void SILDevirtualizer::optimizeClassMethodInst(ClassMethodInst *CMI) {
       continue;
     }
 
+    // If F's this pointer has a different type from the CMI's operand, we
+    // will have type checking issues later on. For now, we only devirtualize
+    // if the operand is set with "upcast" and the source operand of "upcast"
+    // has the required type.
+    bool allowDevirt = checkDevirtType(F, CMI);
+    if (!allowDevirt) {
+      DEBUG(llvm::dbgs() <<
+            " *** Disable devirtualization due to type mismatch : " << *CMI);
+      break;
+    }
+
     // Success! We found the method! Create a direct reference to it.
     SILInstruction *FRI =
         new (CMI->getModule()) FunctionRefInst(CMI->getLoc(), F);
@@ -1056,7 +1130,8 @@ void SILDevirtualizer::optimizeClassMethodInst(ClassMethodInst *CMI) {
     CMI->eraseFromParent();
     for (auto UI = FRI->use_begin(), UE = FRI->use_end(); UI != UE; ++UI)
       if (ApplyInst *AI = dyn_cast<ApplyInst>(UI->getUser()))
-        collectPolyArgs(AI);
+        if (AI != toBeDeleted)
+          collectPolyArgs(AI);
     NumDevirtualized++;
     Changed = true;
     break;
@@ -1387,6 +1462,11 @@ void SILDevirtualizer::optimizeFuncBody(SILFunction *F) {
     auto I = BB.begin(), E = BB.end();
     while (I != E) {
       SILInstruction *Inst = I++; // Inst may be erased.
+      if (Inst == toBeDeleted) {
+        toBeDeleted = nullptr;
+        Inst->eraseFromParent();
+        continue;
+      }
       if (ClassMethodInst *CMI = dyn_cast<ClassMethodInst>(Inst))
         optimizeClassMethodInst(CMI);
       else if (ApplyInst *AI = dyn_cast<ApplyInst>(Inst))

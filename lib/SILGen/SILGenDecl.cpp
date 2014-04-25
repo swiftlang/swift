@@ -1029,7 +1029,7 @@ public:
     // FIXME: O(n^2)
     if (auto overridden = member.getOverridden()) {
       // If we overrode an ObjC decl, or this is an accessor for a property that
-      // overrides and ObjC decl, then it won't be in the vtable.
+      // overrides an ObjC decl, then it won't be in the vtable.
       if (overridden.getDecl()->hasClangNode())
         goto not_overridden;
       if (auto *ovFD = dyn_cast<FuncDecl>(overridden.getDecl()))
@@ -1048,7 +1048,8 @@ public:
         do {
           // Replace the overridden member.
           if (entry.first == ref) {
-            entry = {member, SGM.getFunction(member, NotForDefinition)};
+            // The entry is keyed by the least derived method.
+            entry = {ref, SGM.getFunction(member, NotForDefinition)};
             return;
           }
         } while ((ref = ref.getOverridden()));
@@ -1070,7 +1071,7 @@ public:
   void visitDecl(Decl*) {}
   
   void visitFuncDecl(FuncDecl *fd) {
-    // ObjC declsdon't go in vtables.
+    // ObjC decls don't go in vtables.
     if (fd->hasClangNode())
       return;
     
