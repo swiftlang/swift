@@ -255,6 +255,7 @@ private:
   Type StringLiteralType;
   Type ArrayLiteralType;
   Type DictionaryLiteralType;
+  Type NSStringType;
 
   /// The \c Swift.UnsafePointer<T> declaration.
   Optional<NominalTypeDecl *> UnsafePointerDecl;
@@ -300,6 +301,8 @@ public:
   Type getArraySliceType(SourceLoc loc, Type elementType);
   Type getOptionalType(SourceLoc loc, Type elementType);
   Type getUncheckedOptionalType(SourceLoc loc, Type elementType);
+  Type getNSStringType(DeclContext *dc);
+  
   Expr *buildArrayInjectionFnRef(DeclContext *dc,
                                  ArraySliceType *sliceType,
                                  Type lenTy, SourceLoc Loc);
@@ -664,6 +667,12 @@ public:
                                        SourceRange diagFromRange,
                                        SourceRange diagToRange,
                                        std::function<bool(Type)> convertToType);
+  
+  /// \brief Determine if a given concrete type can be coerced to an existential
+  /// protocol type.
+  /// FIXME: This is currently only allowed for coercions from AnyObject to
+  /// String via NSString.
+  bool isBridgedDynamicConversion(Type protocolType, Type concreteType);
 
   /// \brief Type check the given expression as an array bound, which converts
   /// it to a builtin integer value.

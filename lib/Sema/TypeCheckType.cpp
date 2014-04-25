@@ -59,6 +59,42 @@ Type TypeChecker::getUncheckedOptionalType(SourceLoc loc, Type elementType) {
   return UncheckedOptionalType::get(elementType);
 }
 
+Type TypeChecker::getNSStringType(DeclContext *dc) {
+  
+  if (NSStringType.isNull()) {
+    Module *M = Context.LoadedModules.lookup(FOUNDATION_MODULE_NAME);
+    
+    if (M) {
+      auto NSStringName = StringRef("NSString");
+      auto identifier = Context.getIdentifier(NSStringName);
+      
+      LookupTypeResult lookup =
+                          lookupMemberType(ModuleType::get(M), identifier, dc);
+      
+      if (lookup) {
+        NSStringType = lookup.back().second;
+      }
+    }
+  }
+  
+  return NSStringType;
+}
+
+bool TypeChecker::isBridgedDynamicConversion(Type protocolType, Type concreteType) {
+  if (auto protocol = protocolType->getAs<ProtocolType>()) {
+    if (protocol->getDecl()->
+        isSpecificProtocol(KnownProtocolKind::AnyObject)) {
+      if (auto nominalType = concreteType->getAs<NominalType>()) {
+        if (nominalType->getDecl() == Context.getStringDecl()) {
+          return true;
+        }
+      }
+    }
+  }
+  
+  return false;
+}
+        
 Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl,
                                        DeclContext *fromDC,
                                        bool isSpecialized,

@@ -1156,7 +1156,23 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     if (TC.conformsToProtocol(type, protocol, DC))
       return SolutionKind::Solved;
   }
-
+  
+  // If possible, redirect the coercion from String to NSString.
+  if (TC.isBridgedDynamicConversion(protocol->getDeclaredType(), type)) {
+    auto NSStringType = TC.getNSStringType(DC);
+    
+    if (!NSStringType.isNull()) {
+      simplifyRestrictedConstraint(ConversionRestrictionKind::User,
+                                   type,
+                                   NSStringType,
+                                   TypeMatchKind::Conversion,
+                                   TMF_GenerateConstraints,
+                                   locator);
+      
+      return SolutionKind::Solved;
+    }
+  }
+  
   // There's nothing more we can do; fail.
   recordFailure(getConstraintLocator(locator),
                 Failure::DoesNotConformToProtocol, type,

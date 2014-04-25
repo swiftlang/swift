@@ -2277,11 +2277,44 @@ namespace {
         expr->setCastKind(castKind);
         break;
       }
-
+      
+      // Allow for casts from AnyObject to String through NSString.
+      if (tc.isBridgedDynamicConversion(fromType, toType)) {
+        auto NSStringType = tc.getNSStringType(cs.DC);
+        
+        if (!NSStringType.isNull()) {
+          sub->setType(NSStringType);
+          
+          sub = tc.coerceToRValue(expr->getSubExpr());
+          if (!sub)
+            return nullptr;
+          expr->setSubExpr(sub);
+          
+          expr->getCastTypeLoc().setType(NSStringType,
+                                         true);
+          
+          expr->setType(tc.getOptionalType(expr->getLoc(),
+                                           NSStringType));
+          
+          auto optionalStringType = tc.getOptionalType(expr->getLoc(),
+                                                       toType);
+          
+          auto OSTLoc = TypeLoc::withoutLoc(optionalStringType);
+          
+          auto wrappedExpr =
+              new (tc.Context)
+                  ConditionalCheckedCastExpr(expr,
+                                             expr->getLoc(),
+                                             OSTLoc);
+          
+          return visitConditionalCheckedCastExpr(wrappedExpr);
+        }
+      }
+      
       Type finalResultType = simplifyType(expr->getType());
-
+      
       // Handle optional operands or optional results.
-
+      
       // FIXME: some of this work needs to be delayed until runtime to
       // properly account for archetypes dynamically being optional
       // types.  For example, if we're casting T to NSView?, that
@@ -3027,6 +3060,17 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
                                       ConstraintLocatorBuilder locator) {
   auto &tc = solution.getConstraintSystem().getTypeChecker();
   Type fromType = expr->getType();
+  
+  if (tc.isBridgedDynamicConversion(toType, fromType)) {
+    // Need to coerce from String to NSString.
+    auto NSStringType = tc.getNSStringType(cs.DC);
+    
+    if (!NSStringType.isNull()) {
+      expr = coerceViaUserConversion(expr, NSStringType, locator);
+      fromType = NSStringType;
+    }
+  }
+  
   auto conformances =
     collectExistentialConformances(tc, fromType, toType, cs.DC);
   return new (tc.Context) ErasureExpr(expr, toType, conformances);
