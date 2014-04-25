@@ -250,6 +250,7 @@ void SerializedDiagnosticConsumer::addRangeToRecord(CharSourceRange Range,
                                                     SourceManager &SM,
                                                     StringRef Filename,
                                                     RecordDataImpl &Record) {
+  assert(Range.isValid());
   addLocToRecord(Range.getStart(), SM, Filename, Record);
   addLocToRecord(Range.getEnd(), SM, Filename, Record);
 }
@@ -485,6 +486,8 @@ emitDiagnosticMessage(SourceManager &SM,
   // of the original range.  Use Swift's ranges.
   auto RangeAbbrev = State->Abbrevs.get(RECORD_SOURCE_RANGE);
   for (const auto &R : Info.Ranges) {
+    if (R.isInvalid())
+      continue;
     State->Record.clear();
     State->Record.push_back(RECORD_SOURCE_RANGE);
     addRangeToRecord(R, SM, D.getFilename(), State->Record);
