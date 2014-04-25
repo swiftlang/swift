@@ -1800,6 +1800,9 @@ public:
 
   // Implement swift::VisibleDeclConsumer.
   void foundDecl(ValueDecl *D, DeclVisibilityKind Reason) override {
+    if (Reason == DeclVisibilityKind::MemberOfCurrentNominal)
+      return;
+
     if (D->getAttrs().hasAttribute<FinalAttr>())
       return;
 
