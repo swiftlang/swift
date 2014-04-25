@@ -373,6 +373,10 @@ ERROR(type_does_not_inherit,sema_tcd,none,
 ERROR(non_class_cannot_conform_to_class_protocol,sema_tcd,none,
       "non-class type %0 cannot conform to class protocol %1",
       (Type, Type))
+ERROR(witness_argument_name_mismatch,sema_tcd,none,
+      "%select{method|initializer}0 %1 has different argument names than those "
+      "required by protocol %2 (%3)", (bool, DeclName, Type, DeclName))
+
 ERROR(protocol_property_must_be_computed,sema_tcd,none,
       "property in protocol must have explicit { get } or { get set } specifier",
       ())
@@ -380,11 +384,15 @@ NOTE(inherited_protocol_does_not_conform,sema_tcd,none,
      "type %0 does not conform to inherited protocol %1", (Type, Type))
 NOTE(no_witnesses,sema_tcd,none,
      "protocol requires %select{initializer %1|function %1|property %1|"
-     "subscript}0 with type %2", (RequirementKind, Identifier, Type))
+     "subscript}0 with type %2", (RequirementKind, DeclName, Type))
 NOTE(ambiguous_witnesses,sema_tcd,none,
      "multiple matching "
-     "%select{initializers names %1|functions named %1|properties named %1|"
-     "subscript operators}0 with type %2", (RequirementKind, Identifier, Type))
+     "%select{initializers named %1|functions named %1|properties named %1|"
+     "subscript operators}0 with type %2", (RequirementKind, DeclName, Type))
+NOTE(ambiguous_witnesses_wrong_name,sema_tcd,none,
+     "multiple matching "
+     "%select{initializers named %1|functions named %1|properties named %1|"
+     "subscript operators}0 with type %2", (RequirementKind, DeclName, Type))
 NOTE(no_witnesses_type,sema_tcd,none,
      "protocol requires nested type %0", (Identifier))
 NOTE(default_assocated_type_req_fail,sema_tcd,none,
@@ -418,6 +426,9 @@ NOTE(protocol_witness_type,sema_tcd,none,
      "possibly intended match", ())
 NOTE(protocol_witness_nonconform_type,sema_tcd,none,
      "possibly intended match %0 does not conform to %1", (Type, Type))
+
+NOTE(protocol_requirement_here,sema_tcd,none,
+     "requirement %0 declared here", (DeclName))
 
 // Protocols and existentials
 NOTE(protocol_existential_assoc_type,sema_tcd,none,

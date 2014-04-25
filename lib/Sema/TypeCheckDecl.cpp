@@ -3313,100 +3313,6 @@ public:
     TC.checkDeclAttributes(FD);
   }
 
-  /// Fix the names in the given function to match those in the given target
-  /// name by adding Fix-Its to the provided in-flight diagnostic.
-  void fixAbstractFunctionNames(InFlightDiagnostic &diag,
-                                AbstractFunctionDecl *func,
-                                DeclName targetName) {
-    auto name = func->getFullName();
-
-    // Fix the name of the function itself.
-    if (name.getBaseName() != targetName.getBaseName()) {
-      diag.fixItReplace(func->getLoc(), targetName.getBaseName().str());
-    }
-
-    // Fix the argument names that need fixing.
-    assert(name.getArgumentNames().size()
-             == targetName.getArgumentNames().size());
-    auto pattern
-      = func->getBodyParamPatterns()[func->getDeclContext()->isTypeContext()];
-    auto tuplePattern = dyn_cast<TuplePattern>(
-                          pattern->getSemanticsProvidingPattern());
-    for (unsigned i = 0, n = name.getArgumentNames().size(); i != n; ++i) {
-      auto origArg = name.getArgumentNames()[i];
-      auto targetArg = targetName.getArgumentNames()[i];
-
-      if (origArg == targetArg)
-        continue;
-
-      // Find the location to update or insert.
-      SourceLoc loc;
-      bool needColon = false;
-      if (tuplePattern) {
-        auto origPattern = tuplePattern->getFields()[i].getPattern();
-        if (auto param = cast_or_null<ParamDecl>(origPattern->getSingleVar())) {
-          // The parameter has an explicitly-specified API name, and it's wrong.
-          if (param->getArgumentNameLoc() != param->getLoc() &&
-              param->getArgumentNameLoc().isValid()) {
-            // ... but the internal parameter name was right. Just zap the
-            // incorrect explicit specialization.
-            if (param->getName() == targetArg) {
-              diag.fixItRemoveChars(param->getArgumentNameLoc(),
-                                    param->getLoc());
-              continue;
-            }
-
-            // Fix the API name.
-            StringRef targetArgStr = targetArg.empty()? "_" : targetArg.str();
-            diag.fixItReplace(param->getArgumentNameLoc(), targetArgStr);
-            continue;
-          }
-
-          // The parameter did not specify a separate API name. Insert one.
-          if (targetArg.empty())
-            diag.fixItInsert(param->getLoc(), "_ ");
-          else {
-            llvm::SmallString<8> targetArgStr;
-            targetArgStr += targetArg.str();
-            targetArgStr += ' ';
-            diag.fixItInsert(param->getLoc(), targetArgStr);
-          }
-          continue;
-        }
-
-        if (auto any = dyn_cast<AnyPattern>(
-                         origPattern->getSemanticsProvidingPattern())) {
-          if (any->isImplicit()) {
-            needColon = true;
-            loc = origPattern->getLoc();
-          } else {
-            needColon = false;
-            loc = any->getLoc();
-          }
-        } else {
-          loc = origPattern->getLoc();
-          needColon = true;
-        }
-      } else if (auto paren = dyn_cast<ParenPattern>(pattern)) {
-        loc = paren->getSubPattern()->getLoc();
-        needColon = true;
-      } else {
-        loc = pattern->getLoc();
-        needColon = true;
-      }
-
-      assert(!targetArg.empty() && "Must have a name here");
-      llvm::SmallString<8> replacement;
-      replacement += targetArg.str();
-      if (needColon)
-        replacement += ": ";
-
-      diag.fixItInsert(loc, replacement);
-    }
-
-    // FIXME: Update the AST accordingly.
-  }
-
   /// Adjust the type of the given declaration to appear as if it were
   /// in the given subclass of its actual declared class.
   Type adjustSuperclassMemberDeclType(ValueDecl *decl, Type subclass) {
@@ -3641,8 +3547,8 @@ public:
                                 isa<ConstructorDecl>(decl),
                                 decl->getFullName(),
                                 matchDecl->getFullName());
-        fixAbstractFunctionNames(diag, cast<AbstractFunctionDecl>(decl),
-                                 matchDecl->getFullName());
+        TC.fixAbstractFunctionNames(diag, cast<AbstractFunctionDecl>(decl),
+                                    matchDecl->getFullName());
       }
 
       // If this is an exact type match, we're successful!
@@ -3704,8 +3610,8 @@ public:
         auto diag = TC.diagnose(matchDecl, diag::overridden_near_match_here,
                                 isa<ConstructorDecl>(matchDecl),
                                 matchDecl->getFullName());
-        fixAbstractFunctionNames(diag, cast<AbstractFunctionDecl>(decl),
-                                 matchDecl->getFullName());
+        TC.fixAbstractFunctionNames(diag, cast<AbstractFunctionDecl>(decl),
+                                    matchDecl->getFullName());
         continue;
       }
 
@@ -5655,4 +5561,98 @@ bool TypeChecker::typeCheckConditionalPatternBinding(PatternBindingDecl *PBD,
   
   DeclChecker(*this, false, false).visitBoundVars(PBD->getPattern());
   return false;
+}
+
+/// Fix the names in the given function to match those in the given target
+/// name by adding Fix-Its to the provided in-flight diagnostic.
+void TypeChecker::fixAbstractFunctionNames(InFlightDiagnostic &diag,
+                                           AbstractFunctionDecl *func,
+                                           DeclName targetName) {
+  auto name = func->getFullName();
+  
+  // Fix the name of the function itself.
+  if (name.getBaseName() != targetName.getBaseName()) {
+    diag.fixItReplace(func->getLoc(), targetName.getBaseName().str());
+  }
+  
+  // Fix the argument names that need fixing.
+  assert(name.getArgumentNames().size()
+           == targetName.getArgumentNames().size());
+  auto pattern
+    = func->getBodyParamPatterns()[func->getDeclContext()->isTypeContext()];
+  auto tuplePattern = dyn_cast<TuplePattern>(
+                        pattern->getSemanticsProvidingPattern());
+  for (unsigned i = 0, n = name.getArgumentNames().size(); i != n; ++i) {
+    auto origArg = name.getArgumentNames()[i];
+    auto targetArg = targetName.getArgumentNames()[i];
+    
+    if (origArg == targetArg)
+      continue;
+    
+    // Find the location to update or insert.
+    SourceLoc loc;
+    bool needColon = false;
+    if (tuplePattern) {
+      auto origPattern = tuplePattern->getFields()[i].getPattern();
+      if (auto param = cast_or_null<ParamDecl>(origPattern->getSingleVar())) {
+        // The parameter has an explicitly-specified API name, and it's wrong.
+        if (param->getArgumentNameLoc() != param->getLoc() &&
+            param->getArgumentNameLoc().isValid()) {
+          // ... but the internal parameter name was right. Just zap the
+          // incorrect explicit specialization.
+          if (param->getName() == targetArg) {
+            diag.fixItRemoveChars(param->getArgumentNameLoc(),
+                                  param->getLoc());
+            continue;
+          }
+          
+          // Fix the API name.
+          StringRef targetArgStr = targetArg.empty()? "_" : targetArg.str();
+          diag.fixItReplace(param->getArgumentNameLoc(), targetArgStr);
+          continue;
+        }
+        
+        // The parameter did not specify a separate API name. Insert one.
+        if (targetArg.empty())
+          diag.fixItInsert(param->getLoc(), "_ ");
+        else {
+          llvm::SmallString<8> targetArgStr;
+          targetArgStr += targetArg.str();
+          targetArgStr += ' ';
+          diag.fixItInsert(param->getLoc(), targetArgStr);
+        }
+        continue;
+      }
+      
+      if (auto any = dyn_cast<AnyPattern>(
+                       origPattern->getSemanticsProvidingPattern())) {
+        if (any->isImplicit()) {
+          needColon = true;
+          loc = origPattern->getLoc();
+        } else {
+          needColon = false;
+          loc = any->getLoc();
+        }
+      } else {
+        loc = origPattern->getLoc();
+        needColon = true;
+      }
+    } else if (auto paren = dyn_cast<ParenPattern>(pattern)) {
+      loc = paren->getSubPattern()->getLoc();
+      needColon = true;
+    } else {
+      loc = pattern->getLoc();
+      needColon = true;
+    }
+    
+    assert(!targetArg.empty() && "Must have a name here");
+    llvm::SmallString<8> replacement;
+    replacement += targetArg.str();
+    if (needColon)
+      replacement += ": ";
+    
+    diag.fixItInsert(loc, replacement);
+  }
+  
+  // FIXME: Update the AST accordingly.
 }

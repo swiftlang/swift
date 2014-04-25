@@ -935,6 +935,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
 
   // Gather the witnesses.
   SmallVector<ValueDecl *, 4> witnesses;
+  bool ignoringNames = false;
   if (requirement->getName().isOperator()) {
     // Operator lookup is always global.
     UnqualifiedLookup lookup(requirement->getName(),
@@ -948,7 +949,16 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
     }
   } else {
     // Variable/function/subscript requirements.
-    for (auto candidate : TC.lookupMember(metaType,requirement->getName(),DC)) {
+    auto candidates = TC.lookupMember(metaType, requirement->getFullName(), DC);
+
+    // If we didn't find anything with the appropriate name, look
+    // again using only the base name.
+    if (candidates.empty()) {
+      candidates = TC.lookupMember(metaType, requirement->getName(), DC);
+      ignoringNames = true;
+    }
+
+    for (auto candidate : candidates) {
       witnesses.push_back(candidate);
     }
   }
@@ -1017,6 +1027,25 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
     if (isReallyBest) {
       auto &best = matches[bestIdx];
 
+      // If the name didn't actually line up, complain.
+      if (ignoringNames && 
+          requirement->getFullName() != best.Witness->getFullName()) {
+        {
+          auto diag = TC.diagnose(best.Witness, 
+                                  diag::witness_argument_name_mismatch,
+                                  isa<ConstructorDecl>(best.Witness),
+                                  best.Witness->getFullName(),
+                                  Proto->getDeclaredType(),
+                                  requirement->getFullName());
+          TC.fixAbstractFunctionNames(diag,
+                                      cast<AbstractFunctionDecl>(best.Witness),
+                                      requirement->getFullName());
+        }
+
+        TC.diagnose(requirement, diag::protocol_requirement_here,
+                    requirement->getFullName());
+      }
+
       // Record the match.
       recordWitness(requirement, best);
       return ResolveWitnessResult::Success;
@@ -1069,10 +1098,12 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
 
   // Point out the requirement that wasn't met.
   TC.diagnose(requirement,
-              numViable > 0? diag::ambiguous_witnesses
-                           : diag::no_witnesses,
+              numViable > 0 ? (ignoringNames
+                                 ? diag::ambiguous_witnesses_wrong_name
+                                 : diag::ambiguous_witnesses)
+                            : diag::no_witnesses,
               getRequirementKind(requirement),
-              requirement->getName(),
+              requirement->getFullName(),
               reqType);
     
   if (!didDerive) {

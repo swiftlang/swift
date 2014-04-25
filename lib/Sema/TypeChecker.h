@@ -57,6 +57,7 @@ public:
   iterator begin() { return Results.begin(); }
   iterator end() { return Results.end(); }
   unsigned size() const { return Results.size(); }
+  bool empty() const { return Results.empty(); }
 
   ValueDecl *operator[](unsigned index) const { return Results[index]; }
 
@@ -911,6 +912,12 @@ public:
                                    LookupTypeResult &lookup);
 
   /// @}
+
+  /// Fix the name of the given function to the target name, attaching
+  /// Fix-Its to the provided in-flight diagnostic.
+  void fixAbstractFunctionNames(InFlightDiagnostic &diag,
+                                AbstractFunctionDecl *func,
+                                DeclName targetName);
 
   /// \name Overload resolution
   ///
