@@ -236,6 +236,23 @@ enum class DeclVisibilityKind {
   /// \endcode
   MemberOfCurrentNominal,
 
+  /// Declaration that is a requirement of a protocol implemented by the
+  /// immediately enclosing nominal decl, in case the nominal decl does not
+  /// supply a witness for this requirement.
+  ///
+  /// For example, 'foo' is visible at (1) because of this.
+  /// \code
+  /// protocol P {
+  ///   func foo()
+  /// }
+  /// struct A : P {
+  ///   func bar() {
+  ///     // (1)
+  ///   }
+  /// }
+  /// \endcode
+  MemberOfProtocolImplementedByCurrentNominal,
+
   /// Declaration is a member of the superclass of the immediately enclosing
   /// nominal decl.
   MemberOfSuper,

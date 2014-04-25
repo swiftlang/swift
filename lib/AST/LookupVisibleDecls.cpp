@@ -285,6 +285,7 @@ namespace {
 static DeclVisibilityKind getReasonForSuper(DeclVisibilityKind Reason) {
   switch (Reason) {
   case DeclVisibilityKind::MemberOfCurrentNominal:
+  case DeclVisibilityKind::MemberOfProtocolImplementedByCurrentNominal:
   case DeclVisibilityKind::MemberOfSuper:
     return DeclVisibilityKind::MemberOfSuper;
 
@@ -306,6 +307,13 @@ static void lookupAssociatedTypes(Type BaseTy, VisibleDeclConsumer &Consumer,
   if (!CurNominal)
     return;
 
+  llvm::SmallPtrSet<ProtocolDecl *, 8> ProtocolsWithConformances;
+  for (const auto *Conformance : CurNominal->getConformances()) {
+    if (!Conformance->isComplete())
+      continue;
+    ProtocolsWithConformances.insert(Conformance->getProtocol());
+  }
+
   auto TopProtocols = CurNominal->getProtocols();
   SmallVector<ProtocolDecl *, 8> Worklist(TopProtocols.begin(),
                                           TopProtocols.end());
@@ -314,9 +322,23 @@ static void lookupAssociatedTypes(Type BaseTy, VisibleDeclConsumer &Consumer,
     if (!Visited.insert(Proto))
       return;
 
+    bool ShouldFindValueRequirements = !ProtocolsWithConformances.count(Proto);
+    DeclVisibilityKind ReasonForThisProtocol;
+    if (Reason == DeclVisibilityKind::MemberOfCurrentNominal)
+      ReasonForThisProtocol =
+          DeclVisibilityKind::MemberOfProtocolImplementedByCurrentNominal;
+    else
+      ReasonForThisProtocol = getReasonForSuper(Reason);
+
     for (auto Member : Proto->getMembers()) {
-      if (auto ATD = dyn_cast<AssociatedTypeDecl>(Member))
-        Consumer.foundDecl(ATD, getReasonForSuper(Reason));
+      if (auto *ATD = dyn_cast<AssociatedTypeDecl>(Member)) {
+        Consumer.foundDecl(ATD, ReasonForThisProtocol);
+        continue;
+      }
+      if (ShouldFindValueRequirements) {
+        if (auto *VD = dyn_cast<ValueDecl>(Member))
+          Consumer.foundDecl(VD, ReasonForThisProtocol);
+      }
     }
     auto Protocols = Proto->getProtocols();
     Worklist.append(Protocols.begin(), Protocols.end());

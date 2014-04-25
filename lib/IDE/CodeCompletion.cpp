@@ -927,6 +927,7 @@ public:
         return SemanticContextKind::ExpressionSpecific;
       return SemanticContextKind::CurrentNominal;
 
+    case DeclVisibilityKind::MemberOfProtocolImplementedByCurrentNominal:
     case DeclVisibilityKind::MemberOfSuper:
       return SemanticContextKind::Super;
 
@@ -1774,7 +1775,7 @@ public:
         TypeResolver(createLazyResolver(Ctx)),
         CurrDeclContext(CurrDeclContext) {}
 
-  void addMethodOverride(const FuncDecl *FD) {
+  void addMethodOverride(const FuncDecl *FD, DeclVisibilityKind Reason) {
     CodeCompletionResultBuilder Builder(
         Sink,
         CodeCompletionResult::ResultKind::Declaration,
@@ -1784,7 +1785,8 @@ public:
     llvm::SmallString<256> DeclStr;
     {
       llvm::raw_svector_ostream OS(DeclStr);
-      OS << "override ";
+      if (Reason == DeclVisibilityKind::MemberOfSuper)
+        OS << "override ";
       PrintOptions Options;
       Options.FunctionDefinitions = false;
       Options.PrintDefaultParameterPlaceholder = false;
@@ -1813,7 +1815,7 @@ public:
       if (FD->isAccessor())
         return;
 
-      addMethodOverride(FD);
+      addMethodOverride(FD, Reason);
       return;
     }
   }
