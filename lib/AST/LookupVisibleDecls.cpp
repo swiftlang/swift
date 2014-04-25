@@ -297,11 +297,9 @@ static DeclVisibilityKind getReasonForSuper(DeclVisibilityKind Reason) {
   }
 }
 
-static void lookupDeclsFromConformedProtocols(Type BaseTy,
-                                              VisibleDeclConsumer &Consumer,
-                                              LookupState LS,
-                                              DeclVisibilityKind Reason,
-                                              VisitedSet &Visited) {
+static void lookupDeclsFromProtocolsBeingConformedTo(
+    Type BaseTy, VisibleDeclConsumer &Consumer, LookupState LS,
+    DeclVisibilityKind Reason, VisitedSet &Visited) {
   if (!isTypeDeclVisibleInLookupMode(LS))
     return;
 
@@ -427,8 +425,8 @@ static void lookupVisibleMemberDeclsImpl(
 
     // Look in for members of a nominal type.
     lookupTypeMembers(BaseTy, Consumer, CurrDC, LS, Reason, TypeResolver);
-    lookupDeclsFromConformedProtocols(BaseTy, Consumer, LS, Reason, Visited);
-
+    lookupDeclsFromProtocolsBeingConformedTo(BaseTy, Consumer, LS, Reason,
+                                             Visited);
     // If we have a class type, look into its superclass.
     ClassDecl *CurClass = dyn_cast<ClassDecl>(CurNominal);
 
