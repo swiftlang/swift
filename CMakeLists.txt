@@ -345,8 +345,8 @@ function(compile_swift_files)
   # Allow import of other Swift modules we just built.
   list(APPEND swift_flags "-resource-dir" "${SWIFTLIB_DIR}")
 
-  # Turn on debug symbols in debug builds.
-  if(CMAKE_BUILD_TYPE MATCHES Debug)
+  # Turn on debug symbols in appropriate builds.
+  if(CMAKE_BUILD_TYPE MATCHES "Debug|.*DebInfo.*")
     list(APPEND swift_flags "-g")
   endif()
   
