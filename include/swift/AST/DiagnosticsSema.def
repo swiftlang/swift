@@ -303,6 +303,8 @@ ERROR(optional_attribute_non_protocol,sema_tcd,none,
 ERROR(optional_attribute_non_objc_protocol,sema_tcd,none,
       "'optional' attribute can only be applied to members of an @objc protocol", 
       ())
+ERROR(optional_attribute_initializer,sema_tcd,none,
+      "'optional' attribute cannot be applied to an initializer", ())
 ERROR(unavailable_method_non_objc_protocol,sema_tcd,none,
       "protocol members can only be marked unavailable in an @objc protocol",
       ())

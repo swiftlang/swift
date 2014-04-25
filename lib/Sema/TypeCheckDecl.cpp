@@ -5615,6 +5615,10 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
       TC.diagnose(Attrs.getLoc(AK_optional),
                   diag::optional_attribute_non_objc_protocol);
       D->getMutableAttrs().clearAttribute(AK_optional);
+    } else if (isa<ConstructorDecl>(D)) {
+      TC.diagnose(Attrs.getLoc(AK_optional),
+                  diag::optional_attribute_initializer);
+      D->getMutableAttrs().clearAttribute(AK_optional);
     }
   }
 
