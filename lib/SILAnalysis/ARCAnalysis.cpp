@@ -82,6 +82,9 @@ static bool canDecrementRefCountsByValueKind(SILInstruction *User) {
   case ValueKind::StrongRetainUnownedInst:
   case ValueKind::UnownedRetainInst:
   case ValueKind::PartialApplyInst:
+  case ValueKind::FixLifetimeInst:
+  case ValueKind::CopyBlockInst:
+  case ValueKind::RetainValueInst:
   case ValueKind::CondFailInst:
     return false;
 
@@ -111,7 +114,7 @@ bool swift::arc::canDecrementRefCount(SILInstruction *User,
   // "MayHaveSideEffects". That is a criterion (it has effects not represented
   // by use-def chains) that is broader than ours (does it effect a particular
   // pointers ref counts). Thus begin by attempting to prove that the type of
-  // instruction that the user is by definition can not affect ref counts.
+  // instruction that the user is by definition can not decrement ref counts.
   if (!canDecrementRefCountsByValueKind(User))
     return false;
 
@@ -120,8 +123,8 @@ bool swift::arc::canDecrementRefCount(SILInstruction *User,
   if (auto *AI = dyn_cast<ApplyInst>(User))
     return canApplyDecrementRefCount(AI, Ptr, AA);
 
-  // We can not conservatively prove that this instruction can not affect ref
-  // counts. So assume that it does.
+  // We can not conservatively prove that this instruction can not decrement the
+  // ref count of Ptr. So assume that it does.
   return true;
 }
 
