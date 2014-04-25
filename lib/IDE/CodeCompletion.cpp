@@ -1009,6 +1009,8 @@ public:
                                                    TopConformances.end());
     while (!Worklist.empty()) {
       auto Conformance = Worklist.pop_back_val();
+      if (!Conformance->isComplete())
+        continue;
       Conformance->forEachTypeWitness(TypeResolver.get(),
                                       [&](const AssociatedTypeDecl *ATD,
                                           const Substitution &Subst) -> bool {
