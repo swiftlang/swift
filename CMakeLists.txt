@@ -614,6 +614,7 @@ macro(add_swift_library name)
     add_library( ${name_static} STATIC
       ${SWIFTLIB_SOURCES}
       ${SWIFTLIB_EXTERNAL_SOURCES})
+    set_target_properties(${name_static} PROPERTIES OUTPUT_NAME ${name})
     add_dependencies(${name_static} ${name})
     set_output_directory(${name_static} ${SWIFT_RUNTIME_OUTPUT_INTDIR} ${SWIFT_LIBRARY_OUTPUT_INTDIR})
   endif()
