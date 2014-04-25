@@ -161,10 +161,26 @@ static bool canInstUseRefCountValues(SILInstruction *Inst) {
   case ValueKind::DebugValueAddrInst:
     return true;
 
+  // Casts do not use pointers in a manner that we care about since we strip
+  // them during our analysis. The reason for this is if the cast is not dead
+  // then there must be some other use after the cast that we will protect if a
+  // release is not in between the cast and the use.
+  case ValueKind::UpcastInst:
+  case ValueKind::AddressToPointerInst:
+  case ValueKind::PointerToAddressInst:
+  case ValueKind::UncheckedRefCastInst:
+  case ValueKind::UncheckedAddrCastInst:
+  case ValueKind::RefToRawPointerInst:
+  case ValueKind::RawPointerToRefInst:
+  case ValueKind::UnconditionalCheckedCastInst:
+      return true;
+
   default:
     return false;
   }
 }
+
+
 
 bool swift::arc::canUseValue(SILInstruction *User, SILValue Ptr,
                              AliasAnalysis *AA) {
