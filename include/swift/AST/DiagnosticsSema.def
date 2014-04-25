@@ -469,10 +469,17 @@ ERROR(requires_generic_param_same_type_does_not_conform,sema_tcd,none,
       (Type, Identifier))
 
 ERROR(override_multiple_decls_base,sema_tcd,none,
-      "declaration cannot override more than one superclass declaration", ())
+      "declaration %0 cannot override more than one superclass declaration",
+      (DeclName))
+ERROR(override_multiple_decls_arg_mismatch,sema_tcd,none,
+      "declaration %0 has different argument names than any potential "
+      "overrides", (DeclName))
 ERROR(override_multiple_decls_derived,sema_tcd,none,
       "declaration cannot be overridden by more than one subclass "
       "declaration", ())
+NOTE(overridden_near_match_here,sema_tcd,none,
+     "potential overridden %select{method|initializer}0 %1 here",
+      (bool, DeclName))
 ERROR(override_decl_extension,sema_tcd,none,
       "declarations %select{in extensions|from extensions}0 cannot "
       "%select{override|be overridden}0 yet", (bool))
@@ -513,6 +520,10 @@ ERROR(observing_readonly_property,sema_tcd,none,
 ERROR(override_mutable_with_readonly_property,sema_tcd,none,
       "cannot override mutable property with read-only property %0",
       (Identifier))
+ERROR(override_argument_name_mismatch,sema_tcd,none,
+      "argument names for %select{method|initializer}0 %1 do not match those "
+      "of overridden %select{method|initializer}0 %2",
+      (bool, DeclName, DeclName))
 
 ERROR(override_mutable_covariant_property,sema_tcd,none,
       "cannot override mutable property %0 of type %1 with covariant type %2",

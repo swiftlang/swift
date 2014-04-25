@@ -1107,7 +1107,7 @@ bool DeclContext::lookupQualified(Type type,
       // If we're looking for initializers, only look at the superclass if the
       // current class permits inheritance. Even then, only find complete
       // object initializers.
-      if (name.isSimpleName(ctx.Id_init)) {
+      if (name.getBaseName() == ctx.Id_init) {
         if (classDecl->inheritsSuperclassInitializers(typeResolver) &&
             !classDecl->hasClangNode())
           onlyCompleteObjectInits = true;
@@ -1191,7 +1191,7 @@ bool DeclContext::lookupQualified(Type type,
         // C.init overrides B.init overrides A.init, but only C.init and
         // A.init are in the chain. Make sure we still remove A.init from the
         // set in this case.
-        if (name.isSimpleName(ctx.Id_init)) {
+        if (name.getBaseName() == ctx.Id_init) {
           decl = overrides;
           continue;
         }

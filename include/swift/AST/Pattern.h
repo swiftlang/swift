@@ -392,7 +392,12 @@ public:
   TypeLoc &getTypeLoc() { return PatType; }
   TypeLoc getTypeLoc() const { return PatType; }
 
-  SourceLoc getLoc() const { return SubPattern->getLoc(); }
+  SourceLoc getLoc() const {
+    if (SubPattern->isImplicit())
+      return PatType.getSourceRange().Start;
+
+    return SubPattern->getLoc();
+  }
   SourceRange getSourceRange() const;
 
   static bool classof(const Pattern *P) {

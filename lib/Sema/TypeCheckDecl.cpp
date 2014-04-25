@@ -3317,6 +3317,100 @@ public:
     TC.checkDeclAttributes(FD);
   }
 
+  /// Fix the names in the given function to match those in the given target
+  /// name by adding Fix-Its to the provided in-flight diagnostic.
+  void fixAbstractFunctionNames(InFlightDiagnostic &diag,
+                                AbstractFunctionDecl *func,
+                                DeclName targetName) {
+    auto name = func->getFullName();
+
+    // Fix the name of the function itself.
+    if (name.getBaseName() != targetName.getBaseName()) {
+      diag.fixItReplace(func->getLoc(), targetName.getBaseName().str());
+    }
+
+    // Fix the argument names that need fixing.
+    assert(name.getArgumentNames().size()
+             == targetName.getArgumentNames().size());
+    auto pattern
+      = func->getBodyParamPatterns()[func->getDeclContext()->isTypeContext()];
+    auto tuplePattern = dyn_cast<TuplePattern>(
+                          pattern->getSemanticsProvidingPattern());
+    for (unsigned i = 0, n = name.getArgumentNames().size(); i != n; ++i) {
+      auto origArg = name.getArgumentNames()[i];
+      auto targetArg = targetName.getArgumentNames()[i];
+
+      if (origArg == targetArg)
+        continue;
+
+      // Find the location to update or insert.
+      SourceLoc loc;
+      bool needColon = false;
+      if (tuplePattern) {
+        auto origPattern = tuplePattern->getFields()[i].getPattern();
+        if (auto param = cast_or_null<ParamDecl>(origPattern->getSingleVar())) {
+          // The parameter has an explicitly-specified API name, and it's wrong.
+          if (param->getArgumentNameLoc() != param->getLoc() &&
+              param->getArgumentNameLoc().isValid()) {
+            // ... but the internal parameter name was right. Just zap the
+            // incorrect explicit specialization.
+            if (param->getName() == targetArg) {
+              diag.fixItRemoveChars(param->getArgumentNameLoc(),
+                                    param->getLoc());
+              continue;
+            }
+
+            // Fix the API name.
+            StringRef targetArgStr = targetArg.empty()? "_" : targetArg.str();
+            diag.fixItReplace(param->getArgumentNameLoc(), targetArgStr);
+            continue;
+          }
+
+          // The parameter did not specify a separate API name. Insert one.
+          if (targetArg.empty())
+            diag.fixItInsert(param->getLoc(), "_ ");
+          else {
+            llvm::SmallString<8> targetArgStr;
+            targetArgStr += targetArg.str();
+            targetArgStr += ' ';
+            diag.fixItInsert(param->getLoc(), targetArgStr);
+          }
+          continue;
+        }
+
+        if (auto any = dyn_cast<AnyPattern>(
+                         origPattern->getSemanticsProvidingPattern())) {
+          if (any->isImplicit()) {
+            needColon = true;
+            loc = origPattern->getLoc();
+          } else {
+            needColon = false;
+            loc = any->getLoc();
+          }
+        } else {
+          loc = origPattern->getLoc();
+          needColon = true;
+        }
+      } else if (auto paren = dyn_cast<ParenPattern>(pattern)) {
+        loc = paren->getSubPattern()->getLoc();
+        needColon = true;
+      } else {
+        loc = pattern->getLoc();
+        needColon = true;
+      }
+
+      assert(!targetArg.empty() && "Must have a name here");
+      llvm::SmallString<8> replacement;
+      replacement += targetArg.str();
+      if (needColon)
+        replacement += ": ";
+
+      diag.fixItInsert(loc, replacement);
+    }
+
+    // FIXME: Update the AST accordingly.
+  }
+
   /// Adjust the type of the given declaration to appear as if it were
   /// in the given subclass of its actual declared class.
   Type adjustSuperclassMemberDeclType(ValueDecl *decl, Type subclass) {
@@ -3393,14 +3487,12 @@ public:
     assert((method || abstractStorage) && "Not a method or abstractStorage?");
 
     // Figure out the type of the declaration that we're using for comparisons.
-    auto declTy = decl->getInterfaceType();
+    auto declTy = decl->getInterfaceType()->getUnlabeledType(TC.Context);
     auto uncurriedDeclTy = declTy;
     if (method) {
       declTy = declTy->getWithoutNoReturn(2);
       uncurriedDeclTy = declTy->castTo<AnyFunctionType>()->getResult();
     }
-    if (decl->isObjC())
-      uncurriedDeclTy = uncurriedDeclTy->getUnlabeledType(TC.Context);
 
     // If the method is an Objective-C method, compute its selector.
     Optional<ObjCSelector> methodSelector;
@@ -3416,13 +3508,18 @@ public:
     // Look for members with the same name and matching types as this
     // one.
     auto superclassMetaTy = MetatypeType::get(superclass);
-    LookupResult members = TC.lookupMember(superclassMetaTy, decl->getName(),
+    bool retried = false;
+    DeclName name = decl->getFullName();
+
+  retry:
+    LookupResult members = TC.lookupMember(superclassMetaTy, name,
                                            decl->getDeclContext(),
                                            /*allowDynamicLookup=*/false);
 
     typedef std::tuple<ValueDecl *, bool, Type> MatchType;
     SmallVector<MatchType, 2> matches;
     bool hadExactMatch = false;
+
     for (auto member : members) {
       if (member->isInvalid())
         continue;
@@ -3433,7 +3530,7 @@ public:
       auto parentDecl = cast<ValueDecl>(member);
 
       // Check whether there are any obvious reasons why the two given
-      // functions do not have an overriding relationship.
+      // declarations do not have an overriding relationship.
       if (!areOverrideCompatibleSimple(decl, parentDecl))
         continue;
 
@@ -3466,16 +3563,13 @@ public:
 
       // Check whether the types are identical.
       // FIXME: It's wrong to use the uncurried types here for methods.
-      auto parentDeclTy = adjustSuperclassMemberDeclType(parentDecl, owningTy);
+      auto parentDeclTy = adjustSuperclassMemberDeclType(parentDecl, owningTy)
+                            ->getUnlabeledType(TC.Context);
       auto uncurriedParentDeclTy = parentDeclTy;
       if (method) {
         parentDeclTy = parentDeclTy->getWithoutNoReturn(2);
         uncurriedParentDeclTy = parentDeclTy->castTo<AnyFunctionType>()
                                   ->getResult();
-      }
-      if (objCMatch) {
-        uncurriedParentDeclTy = uncurriedParentDeclTy
-                                  ->getUnlabeledType(TC.Context);
       }
 
       if (uncurriedDeclTy->isEqual(uncurriedParentDeclTy)) {
@@ -3516,9 +3610,21 @@ public:
       }
     }
 
-    // If we have no matches, there's nothing to do.
-    if (matches.empty())
-      return false;
+    // If we have no matches.
+    if (matches.empty()) {
+      // If we already re-tried, or if the user didn't indicate that this is
+      // an override, or we don't know what else to look for, try again.
+      if (retried || name.isSimpleName() ||
+          name.getArgumentNames().size() == 0 ||
+          !decl->getAttrs().has(DAK_override))
+        return false;
+
+      // Try looking again, this time using just the base name, so that we'll
+      // catch
+      retried = true;
+      name = name.getBaseName();
+      goto retry;
+    }
 
     // If we had an exact match, throw away any non-exact matches.
     if (hadExactMatch)
@@ -3531,7 +3637,18 @@ public:
     if (matches.size() == 1) {
       auto matchDecl = std::get<0>(matches[0]);
       auto matchType = std::get<2>(matches[0]);
- 
+
+      // If the name of our match differs from the name we were looking for,
+      // complain.
+      if (decl->getFullName() != matchDecl->getFullName()) {
+        auto diag = TC.diagnose(decl, diag::override_argument_name_mismatch,
+                                isa<ConstructorDecl>(decl),
+                                decl->getFullName(),
+                                matchDecl->getFullName());
+        fixAbstractFunctionNames(diag, cast<AbstractFunctionDecl>(decl),
+                                 matchDecl->getFullName());
+      }
+
       // If this is an exact type match, we're successful!
       if (uncurriedDeclTy->isEqual(matchType)) {
         // Nothing to do.
@@ -3581,9 +3698,23 @@ public:
     }
 
     // We override more than one declaration. Complain.
-    TC.diagnose(decl, diag::override_multiple_decls_base);
-    for (auto match : matches)
+    TC.diagnose(decl,
+                retried ? diag::override_multiple_decls_arg_mismatch
+                        : diag::override_multiple_decls_base,
+                decl->getFullName());
+    for (auto match : matches) {
+      auto matchDecl = std::get<0>(match);
+      if (retried) {
+        auto diag = TC.diagnose(matchDecl, diag::overridden_near_match_here,
+                                isa<ConstructorDecl>(matchDecl),
+                                matchDecl->getFullName());
+        fixAbstractFunctionNames(diag, cast<AbstractFunctionDecl>(decl),
+                                 matchDecl->getFullName());
+        continue;
+      }
+
       TC.diagnose(std::get<0>(match), diag::overridden_here);
+    }
     return true;
   }
 
