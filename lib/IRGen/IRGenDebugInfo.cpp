@@ -1151,7 +1151,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     // an Objective-C type through swift.
     auto IdTy = DBuilder.
       createStructType(Scope, MangledName, File, 0, 0, 0, 0,
-                       llvm::DIType(), llvm::DIArray(), DW_LANG_ObjC,
+                       llvm::DIType(), llvm::DIArray(), DW_LANG_Swift,
                        llvm::DIType(), MangledName);
     return DBuilder.createPointerType(IdTy, SizeInBits, AlignInBits);
   }
@@ -1189,7 +1189,9 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     auto ClassTy = BaseTy->castTo<ClassType>();
     if (auto *Decl = ClassTy->getDecl()) {
       Location L = getLoc(SM, Decl);
-      auto RuntimeLang = Decl->isObjC() ? DW_LANG_ObjC : DW_LANG_Swift;
+      // TODO: We may want to peek at Decl->isObjC() and set this
+      // attribute accordingly.
+      auto RuntimeLang = DW_LANG_Swift;
       if (auto *ClangDecl = Decl->getClangDecl()) {
         auto ClangSrcLoc = ClangDecl->getLocStart();
         clang::SourceManager &ClangSM =
@@ -1290,7 +1292,9 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     auto ClassTy = BaseTy->castTo<BoundGenericClassType>();
     if (auto Decl = ClassTy->getDecl()) {
       Location L = getLoc(SM, Decl);
-      auto RuntimeLang = Decl->isObjC()? DW_LANG_ObjC : DW_LANG_Swift;
+      // TODO: We may want to peek at Decl->isObjC() and set this
+      // attribute accordingly.
+      auto RuntimeLang = DW_LANG_Swift;
       return createStructType(DbgTy, Decl, Decl->getName().str(), Scope,
                               getOrCreateFile(L.Filename), L.Line,
                               SizeInBits, AlignInBits, Flags,
