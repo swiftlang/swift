@@ -2533,7 +2533,8 @@ static void emitApplyArgument(IRGenFunction &IGF,
     return;
   }
   
-  reemitAsUnsubstituted(IGF, origParam.getType(), substParam.getType(),
+  reemitAsUnsubstituted(IGF, origParam.getSILType(),
+                        substParam.getSILType(),
                         subs, in, out);
 }
 

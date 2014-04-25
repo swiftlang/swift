@@ -438,244 +438,16 @@ struct EmbedsArchetype : DeclVisitor<EmbedsArchetype, bool>,
   }
 };
 
-namespace {
-  /// A CRTP class for translating substituted explosions into
-  /// unsubstituted ones, or in other words, emitting them at a higher
-  /// (less concrete) abstraction level.
-  class ReemitAsUnsubstituted : public SubstTypeVisitor<ReemitAsUnsubstituted> {
-    IRGenFunction &IGF;
-    ArrayRef<Substitution> Subs;
-    Explosion &In;
-    Explosion &Out;
-  public:
-    ReemitAsUnsubstituted(IRGenFunction &IGF, ArrayRef<Substitution> subs,
-                          Explosion &in, Explosion &out)
-      : IGF(IGF), Subs(subs), In(in), Out(out) {
-    }
+static SILType applyContextArchetypes(IRGenFunction &IGF,
+                                      SILType type) {
+  if (!type.isDependentType()) {
+    return type;
+  }
 
-    void visitLeafType(CanType origTy, CanType substTy) {
-      assert(origTy == substTy);
-      auto &ti = IGF.getTypeInfo(getLoweredType(origTy, origTy));
-      if (ti.isLoadable()) {
-        cast<LoadableTypeInfo>(ti).reexplode(IGF, In, Out);
-      } else {
-        Out.add(In.claimNext());
-      }
-    }
-
-    void visitArchetypeType(CanArchetypeType origTy, CanType substTy) {
-      // For class protocols, bitcast to the archetype class pointer
-      // representation.
-      if (origTy->requiresClass()) {
-        llvm::Value *inValue = In.claimNext();
-        auto origStorageType = IGF.IGM.getStorageTypeForLowered(origTy);
-        auto addr = IGF.Builder.CreateBitCast(inValue,
-                                              origStorageType,
-                                              "substitution.class_bound");
-        Out.add(addr);
-        return;
-      }
-
-      auto loweredTy = getLoweredType(origTy, substTy);
-      
-      // Handle the not-unlikely case that the input is a single
-      // indirect value.
-      if (IGF.IGM.isSingleIndirectValue(loweredTy, In.getKind())) {
-        llvm::Value *inValue = In.claimNext();
-        auto addr = IGF.Builder.CreateBitCast(inValue,
-                                              IGF.IGM.OpaquePtrTy,
-                                              "substitution.reinterpret");
-        Out.add(addr);
-        return;
-      }
-
-      // Otherwise, we need to make a temporary.
-      // FIXME: this temporary has to get cleaned up!
-      auto &substTI = IGF.getTypeInfo(loweredTy);
-      auto addr = substTI.allocateStack(IGF, substTy,
-                                        "substitution.temp").getAddress();
-
-      // Initialize into it.
-      initIntoTemporary(substTy, substTI, addr);
-
-      // Cast to the expected pointer type.
-      addr = IGF.Builder.CreateBitCast(addr, IGF.IGM.OpaquePtrTy, "temp.cast");
-
-      // Add that to the output explosion.
-      Out.add(addr.getAddress());
-    }
-
-    void initIntoTemporary(CanType substTy, const TypeInfo &substTI,
-                           Address dest) {
-      // This is really easy if the substituted type is loadable.
-      if (substTI.isLoadable()) {
-        cast<LoadableTypeInfo>(substTI).initialize(IGF, In, dest);
-
-      // Otherwise, if it's a tuple, we need to unexplode it.
-      } else if (auto tupleTy = dyn_cast<TupleType>(substTy)) {
-        auto nextIndex = 0;
-        for (auto eltType : tupleTy.getElementTypes()) {
-          auto index = nextIndex++;
-          auto &eltTI = IGF.getTypeInfoForUnlowered(eltType);
-          if (eltTI.isKnownEmpty()) continue;
-
-          auto eltAddr = projectTupleElementAddress(IGF, dest,
-                                SILType::getPrimitiveObjectType(tupleTy),
-                                                    index);
-          initIntoTemporary(eltType, eltTI, eltAddr);
-        }
-
-      // Otherwise, just copy over.
-      } else {
-        Address src = substTI.getAddressForPointer(In.claimNext());
-        substTI.initializeWithTake(IGF, dest, src, substTy);
-      }
-    }
-
-    void visitArrayType(CanArrayType origTy, CanArrayType substTy) {
-      llvm_unreachable("remapping values of array type");
-    }
-
-    void visitBoundGenericType(CanBoundGenericType origTy,
-                               CanBoundGenericType substTy) {
-      assert(origTy->getDecl() == substTy->getDecl());
-
-      // If the base type has reference semantics, we can just copy
-      // that reference into the output explosion.
-      if (origTy->hasReferenceSemantics())
-        return In.transferInto(Out, 1);
-
-      auto origSILTy = getLoweredType(origTy, origTy);
-      auto substSILTy = getLoweredType(origTy, substTy);
-
-      // Otherwise, this gets more complicated.
-      // Handle the easy cases where one or both of the arguments are
-      // represented using single indirect pointers
-      auto *origIndirect = IGF.IGM.isSingleIndirectValue(origSILTy, In.getKind());
-      auto *substIndirect = IGF.IGM.isSingleIndirectValue(substSILTy, In.getKind());
-      
-      // Bitcast between address-only instantiations.
-      if (origIndirect && substIndirect) {
-        llvm::Value *inValue = In.claimNext();
-        auto addr = IGF.Builder.CreateBitCast(inValue, origIndirect);
-        Out.add(addr);
-        return;
-      }
-      
-      // Substitute a loadable instantiation for an address-only one by emitting
-      // to a temporary.
-      if (origIndirect && !substIndirect) {
-        auto &substTI = IGF.getTypeInfo(substSILTy);
-        auto addr = substTI.allocateStack(IGF, substTy,
-                                          "substitution.temp").getAddress();
-        initIntoTemporary(substTy, substTI, addr);
-        addr = IGF.Builder.CreateBitCast(addr, origIndirect);
-        Out.add(addr.getAddress());
-        return;
-      }
-      
-      // FIXME: This is my first shot at implementing this, but it doesn't
-      // handle cases which actually need remapping.
-      if (EmbedsArchetype(IGF.IGM).visitBoundGenericType(origTy))
-        IGF.unimplemented(SourceLoc(),
-              "remapping bound generic value types with archetype members");
-      
-      auto n = IGF.IGM.getExplosionSize(origSILTy, In.getKind());
-      In.transferInto(Out, n);
-    }
-
-    void visitAnyFunctionType(CanAnyFunctionType origTy,
-                              CanAnyFunctionType substTy) {
-      llvm_unreachable("should have been lowered by SIL");
-    }
-
-    void visitSILFunctionType(CanSILFunctionType origTy,
-                              CanSILFunctionType substTy) {
-      checkFunctionsAreCompatible(IGF.IGM, origTy, substTy);
-      
-      switch (origTy->getRepresentation()) {
-      case AnyFunctionType::Representation::Block:
-      case AnyFunctionType::Representation::Thin:
-        In.transferInto(Out, 1);
-        break;
-      case AnyFunctionType::Representation::Thick:
-        In.transferInto(Out, 2);
-        break;
-      }
-    }
-
-    void visitLValueType(CanLValueType origTy, CanLValueType substTy) {
-      llvm_unreachable("should have been lowered by SILGen");
-    }
-
-    void visitInOutType(CanInOutType origTy, CanInOutType substTy) {
-      CanType origObjectTy = origTy.getObjectType();
-      CanType substObjectTy = substTy.getObjectType();
-      if (differsByAbstractionInMemory(IGF.IGM, origObjectTy, substObjectTy))
-        IGF.unimplemented(SourceLoc(), "remapping inout values");
-      
-      llvm::Value *substMV = In.claimNext();
-      if (origObjectTy == substObjectTy)
-        return Out.add(substMV);
-      
-      // A bitcast will be sufficient.
-      auto &origObjectTI = IGF.IGM.getTypeInfoForUnlowered(origObjectTy);
-      auto origPtrTy = origObjectTI.getStorageType()->getPointerTo();
-      
-      auto substValue = substMV;
-      auto origValue =
-      IGF.Builder.CreateBitCast(substValue, origPtrTy,
-                                substValue->getName() + ".reinterpret");
-      Out.add(origValue);
-    }
-
-    void visitMetatypeType(CanMetatypeType origTy, CanMetatypeType substTy) {
-      CanType origInstanceTy = origTy.getInstanceType();
-      CanType substInstanceTy = substTy.getInstanceType();
-
-      // The only metatypes with non-trivial representations are those
-      // for archetypes and class types.  A type can't lose the class
-      // nature under substitution, so if the substituted type is
-      // trivial, the original type either must also be or must be an
-      // archetype.
-      if (IGF.IGM.isTrivialMetatype(substTy)) {
-        assert(IGF.IGM.isTrivialMetatype(origTy) ||
-               isa<ArchetypeType>(origInstanceTy));
-        if (isa<ArchetypeType>(origInstanceTy))
-          Out.add(IGF.emitTypeMetadataRef(substInstanceTy));
-        return;
-      }
-
-      // Otherwise, the original type is either a class type or an
-      // archetype, and in either case it has a non-trivial representation.
-      assert(!IGF.IGM.isTrivialMetatype(origTy));
-      In.transferInto(Out, 1);
-    }
-
-    void visitTupleType(CanTupleType origTy, CanTupleType substTy) {
-      assert(origTy->getNumElements() == substTy->getNumElements());
-      for (unsigned i = 0, e = origTy->getNumElements(); i != e; ++i) {
-        visit(origTy.getElementType(i), substTy.getElementType(i));
-      }
-    }
-
-    void visitReferenceStorageType(CanReferenceStorageType origTy,
-                                   CanReferenceStorageType substTy) {
-      auto origLoweredTy = getLoweredType(origTy, origTy);
-      unsigned count = IGF.IGM.getExplosionSize(origLoweredTy, Out.getKind());
-      In.transferInto(Out, count);
-    }
-    
-    void visitSILBlockStorageType(CanSILBlockStorageType origTy,
-                                  CanSILBlockStorageType substTy) {
-      llvm_unreachable("should never be reabstracted");
-    }
-
-  private:
-    SILType getLoweredType(CanType orig, CanType subst) {
-      return IGF.IGM.SILMod->Types.getLoweredType(subst); // FIXME
-    }
-  };
+  auto substType =
+    IGF.IGM.getContextArchetypes().substDependentType(type.getSwiftRValueType())
+      ->getCanonicalType();
+  return SILType::getPrimitiveType(substType, type.getCategory());
 }
 
 /// Given a substituted explosion, re-emit it as an unsubstituted one.
@@ -686,17 +458,27 @@ namespace {
 ///
 /// The substitutions must carry origTy to substTy.
 void irgen::reemitAsUnsubstituted(IRGenFunction &IGF,
-                                  CanType expectedTy, CanType substTy,
+                                  SILType expectedTy, SILType substTy,
                                   ArrayRef<Substitution> subs,
                                   Explosion &in, Explosion &out) {
-  if (expectedTy->isDependentType())
-    expectedTy = IGF.IGM.getContextArchetypes().substDependentType(expectedTy)
-      ->getCanonicalType();
-  if (substTy->isDependentType())
-    substTy = IGF.IGM.getContextArchetypes().substDependentType(substTy)
-      ->getCanonicalType();
-  
-  ReemitAsUnsubstituted(IGF, subs, in, out).visit(expectedTy, substTy);
+  expectedTy = applyContextArchetypes(IGF, expectedTy);
+
+  ExplosionSchema expectedSchema = IGF.IGM.getSchema(expectedTy, in.getKind());
+  assert(expectedSchema.size() ==
+         IGF.IGM.getExplosionSize(applyContextArchetypes(IGF, substTy),
+                                  in.getKind()));
+  for (ExplosionSchema::Element &elt : expectedSchema) {
+    llvm::Value *value = in.claimNext();
+    assert(elt.isScalar());
+
+    // The only type differences we expect here should be due to
+    // substitution of class archetypes.
+    if (value->getType() != elt.getScalarType()) {
+      value = IGF.Builder.CreateBitCast(value, elt.getScalarType(),
+                                        value->getName() + ".asUnsubstituted");
+    }
+    out.add(value);
+  }
 }
 
 llvm::Value *

@@ -1472,7 +1472,7 @@ static void emitApplyArgument(IRGenSILFunction &IGF,
     return;
   }
 
-  reemitAsUnsubstituted(IGF, param.getType(), arg.getType().getSwiftRValueType(),
+  reemitAsUnsubstituted(IGF, param.getSILType(), arg.getType(),
                         subs, temp, out);
 }
 

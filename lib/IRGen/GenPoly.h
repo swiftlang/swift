@@ -50,7 +50,7 @@ namespace irgen {
   ///
   /// The substitutions must carry origTy to substTy.
   void reemitAsUnsubstituted(IRGenFunction &IGF,
-                             CanType origTy, CanType substTy,
+                             SILType origTy, SILType substTy,
                              ArrayRef<Substitution> subs,
                              Explosion &src, Explosion &dest);
 
