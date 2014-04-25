@@ -876,7 +876,7 @@ void ASTContext::recordConformingDecl(ValueDecl *ConformingD,
   }
 }
 
-ArrayRef<ValueDecl *> ASTContext::getConformances(ValueDecl *D) {
+ArrayRef<ValueDecl *> ASTContext::getConformances(const ValueDecl *D) {
   return ConformingDeclMap[D];
 }
 

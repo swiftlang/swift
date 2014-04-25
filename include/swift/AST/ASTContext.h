@@ -210,7 +210,7 @@ public:
   std::unique_ptr<TypeCheckerDebugConsumer> TypeCheckerDebug;
 
   /// Associates a conforming decl to its protocol conformance decls.
-  llvm::DenseMap<ValueDecl *, llvm::TinyPtrVector<ValueDecl *>>
+  llvm::DenseMap<const ValueDecl *, llvm::TinyPtrVector<ValueDecl *>>
      ConformingDeclMap;
 
   /// Cache for names of canonical GenericTypeParamTypes.
@@ -588,7 +588,7 @@ public:
   void recordConformingDecl(ValueDecl *ConformingD, ValueDecl *ConformanceD);
 
   /// Returns the protocol requirement decls for a conforming decl.
-  ArrayRef<ValueDecl *> getConformances(ValueDecl *D);
+  ArrayRef<ValueDecl *> getConformances(const ValueDecl *D);
 
 private:
   friend class Decl;
