@@ -782,6 +782,7 @@ static void checkGenericParamList(ArchetypeBuilder &builder,
         Req.setInvalid();
         continue;
       }
+      
       break;
     }
 
