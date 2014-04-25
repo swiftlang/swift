@@ -1626,7 +1626,7 @@ void Serializer::writeDecl(const Decl *D) {
   case DeclKind::Var: {
     auto var = cast<VarDecl>(D);
     checkAllowedAttributes<
-      AK_optional, AK_unowned, AK_weak, AK_transparent
+      AK_optional, AK_unowned, AK_unowned_unsafe, AK_weak, AK_transparent
     >(var);
     verifyAttrSerializable(var);
 
@@ -1676,7 +1676,7 @@ void Serializer::writeDecl(const Decl *D) {
   case DeclKind::Param: {
     auto param = cast<ParamDecl>(D);
     checkAllowedAttributes<
-      AK_unowned, AK_weak
+      AK_unowned, AK_unowned_unsafe, AK_weak
     >(param);
     verifyAttrSerializable(param);
 
