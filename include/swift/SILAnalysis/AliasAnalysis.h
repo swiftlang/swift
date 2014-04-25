@@ -72,11 +72,15 @@ public:
 
   /// Use the alias analysis to determine the memory behavior of Inst with
   /// respect to V.
-  MemoryBehavior getMemoryBehavior(SILInstruction *Inst, SILValue V);
+  ///
+  /// TODO: When ref count behavior is separated from generic memory behavior,
+  /// the IgnoreRefCountIncrements flag will be unnecessary.
+  MemoryBehavior getMemoryBehavior(SILInstruction *Inst, SILValue V,
+                                   bool IgnoreRefCountIncrements=false);
 
   /// Returns true if Inst may read from memory in a manner that affects V.
   bool mayReadFromMemory(SILInstruction *Inst, SILValue V) {
-    MemoryBehavior B = getMemoryBehavior(Inst, V);
+    MemoryBehavior B = getMemoryBehavior(Inst, V, true/*IgnoreRefCountIncs*/);
     return B == MemoryBehavior::MayRead ||
       B == MemoryBehavior::MayReadWrite ||
       B == MemoryBehavior::MayHaveSideEffects;
@@ -84,7 +88,7 @@ public:
 
   /// Returns true if Inst may write to memory in a manner that affects V.
   bool mayWriteToMemory(SILInstruction *Inst, SILValue V) {
-    MemoryBehavior B = getMemoryBehavior(Inst, V);
+    MemoryBehavior B = getMemoryBehavior(Inst, V, true/*IgnoreRefCountIncs*/);
     return B == MemoryBehavior::MayWrite ||
       B == MemoryBehavior::MayReadWrite ||
       B == MemoryBehavior::MayHaveSideEffects;
@@ -93,7 +97,8 @@ public:
   /// Returns true if Inst may read or write to memory in a manner that affects
   /// V.
   bool mayReadOrWriteMemory(SILInstruction *Inst, SILValue V) {
-    return getMemoryBehavior(Inst, V) != MemoryBehavior::None;
+    auto B = getMemoryBehavior(Inst, V, true/*IgnoreRefCountIncs*/);
+    return B != MemoryBehavior::None;
   }
 
   /// Returns true if Inst may have side effects in a manner that affects V.

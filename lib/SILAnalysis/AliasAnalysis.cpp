@@ -455,8 +455,13 @@ class MemoryBehaviorVisitor
   /// The value we are attempting to discover memory behavior relative to.
   SILValue V;
 
+  /// Should we treat instructions that increment ref counts as None instead of
+  /// MayHaveSideEffects.
+  bool IgnoreRefCountIncrements;
+
 public:
-  MemoryBehaviorVisitor(AliasAnalysis &AA, SILValue V) : AA(AA), V(V) {}
+  MemoryBehaviorVisitor(AliasAnalysis &AA, SILValue V, bool IgnoreRefCountIncs)
+      : AA(AA), V(V), IgnoreRefCountIncrements(IgnoreRefCountIncs) {}
 
   MemBehavior visitValueBase(ValueBase *V) {
     llvm_unreachable("unimplemented");
@@ -506,6 +511,25 @@ public:
   MemBehavior visit##Name(Name *I) { return MemBehavior::Behavior; }
   SIMPLE_MEMBEHAVIOR_INST(CondFailInst, None)
 #undef SIMPLE_MEMBEHAVIOR_INST
+
+  // If we are asked to treat ref count increments as being inert, return None
+  // for these.
+  //
+  // FIXME: Once we separate the notion of ref counts from reading/writing
+  // memory this will be unnecessary.
+#define REFCOUNTINC_MEMBEHAVIOR_INST(Name)                                     \
+  MemBehavior visit##Name(Name *I) {                                           \
+    if (IgnoreRefCountIncrements)                                              \
+      return MemBehavior::None;                                                \
+    return I->getMemoryBehavior();                                             \
+  }
+  REFCOUNTINC_MEMBEHAVIOR_INST(StrongRetainInst)
+  REFCOUNTINC_MEMBEHAVIOR_INST(StrongRetainAutoreleasedInst)
+  REFCOUNTINC_MEMBEHAVIOR_INST(StrongRetainUnownedInst)
+  REFCOUNTINC_MEMBEHAVIOR_INST(UnownedRetainInst)
+  REFCOUNTINC_MEMBEHAVIOR_INST(RetainValueInst)
+#undef REFCOUNTINC_MEMBEHAVIOR_INST
+
 };
 
 } // end anonymous namespace
@@ -558,10 +582,11 @@ MemBehavior MemoryBehaviorVisitor::visitApplyInst(ApplyInst *AI) {
 }
 
 SILInstruction::MemoryBehavior
-AliasAnalysis::getMemoryBehavior(SILInstruction *Inst, SILValue V) {
+AliasAnalysis::getMemoryBehavior(SILInstruction *Inst, SILValue V,
+                                 bool IgnoreRefCountIncrements) {
   DEBUG(llvm::dbgs() << "GET MEMORY BEHAVIOR FOR:\n    " << *Inst << "    "
         << *V.getDef());
-  return MemoryBehaviorVisitor(*this, V).visit(Inst);
+  return MemoryBehaviorVisitor(*this, V, IgnoreRefCountIncrements).visit(Inst);
 }
 
 SILAnalysis *swift::createAliasAnalysis(SILModule *M) {
