@@ -274,6 +274,11 @@ typedef NS_OPTIONS(NSUInteger, NSUBitmapFormat4) {
 - (id)objectAtIndexedSubscript:(NSUInteger)idx;
 @end
 
+@protocol NSMaybeInitWobble
+@optional
+- (id)initWithWobble:(int)wobble;
+@end
+
 #define NS_DESIGNATED_INITIALIZER __attribute__((objc_designated_initializer))
 
 @interface NSURL : NSObject
