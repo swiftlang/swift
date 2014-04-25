@@ -1004,9 +1004,22 @@ public:
     }
 
     DeducedAssociatedTypes Types;
-    auto TopConformances = NTD->getConformances();
-    SmallVector<ProtocolConformance *, 8> Worklist(TopConformances.begin(),
-                                                   TopConformances.end());
+    SmallVector<ProtocolConformance *, 8> Worklist;
+
+    // Collect conformances from the nominal and its superclasses.
+    const auto *CurrNominal = NTD;
+    while (true) {
+      auto Conformances = CurrNominal->getConformances();
+      Worklist.append(Conformances.begin(), Conformances.end());
+      if (const auto *CD = dyn_cast<ClassDecl>(CurrNominal)) {
+        if (CD->hasSuperclass()) {
+          CurrNominal = CD->getSuperclass()->getAnyNominal();
+          continue;
+        }
+      }
+      break;
+    }
+
     while (!Worklist.empty()) {
       auto Conformance = Worklist.pop_back_val();
       if (!Conformance->isComplete())
@@ -1030,6 +1043,9 @@ public:
     Type BaseTy = BaseType;
     if (!BaseTy)
       BaseTy = ExprType;
+    if (!BaseTy && CurrDeclContext)
+      BaseTy = CurrDeclContext->getInnermostTypeContext()
+                   ->getDeclaredTypeInContext();
     if (BaseTy) {
       BaseTy = BaseTy->getRValueInstanceType();
       if (auto NTD = BaseTy->getAnyNominal()) {

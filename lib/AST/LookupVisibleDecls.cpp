@@ -99,6 +99,12 @@ public:
 };
 } // unnamed namespace
 
+static bool isTypeDeclVisibleInLookupMode(LookupState LS) {
+  // Nested type declarations can be accessed only with unqualified lookup or
+  // on metatypes.
+  return !LS.isQualified() || LS.isOnMetatype();
+}
+
 static bool isDeclVisibleInLookupMode(ValueDecl *Member, LookupState LS) {
   if (auto *FD = dyn_cast<FuncDecl>(Member)) {
     // Can not call static functions on non-metatypes.
@@ -134,11 +140,8 @@ static bool isDeclVisibleInLookupMode(ValueDecl *Member, LookupState LS) {
       return LS.isInheritsSuperclassInitializers() && CD->isInheritable();
     }
   }
-  if (LS.isQualified() && !LS.isOnMetatype() && isa<TypeDecl>(Member)) {
-    // Nested type declarations can be accessed only with unqualified lookup or
-    // on metatypes.
-    return false;
-  }
+  if (isa<TypeDecl>(Member))
+    return isTypeDeclVisibleInLookupMode(LS);
 
   return true;
 }
@@ -294,12 +297,15 @@ static DeclVisibilityKind getReasonForSuper(DeclVisibilityKind Reason) {
 }
 
 static void lookupAssociatedTypes(Type BaseTy, VisibleDeclConsumer &Consumer,
-                                  DeclVisibilityKind Reason) {
+                                  LookupState LS, DeclVisibilityKind Reason,
+                                  VisitedSet &Visited) {
+  if (!isTypeDeclVisibleInLookupMode(LS))
+    return;
+
   NominalTypeDecl *CurNominal = BaseTy->getAnyNominal();
   if (!CurNominal)
     return;
 
-  VisitedSet Visited;
   auto TopProtocols = CurNominal->getProtocols();
   SmallVector<ProtocolDecl *, 8> Worklist(TopProtocols.begin(),
                                           TopProtocols.end());
@@ -390,8 +396,6 @@ static void lookupVisibleMemberDeclsImpl(
     return;
   }
 
-  lookupAssociatedTypes(BaseTy, Consumer, Reason);
-
   do {
     NominalTypeDecl *CurNominal = BaseTy->getAnyNominal();
     if (!CurNominal)
@@ -399,6 +403,7 @@ static void lookupVisibleMemberDeclsImpl(
 
     // Look in for members of a nominal type.
     lookupTypeMembers(BaseTy, Consumer, CurrDC, LS, Reason, TypeResolver);
+    lookupAssociatedTypes(BaseTy, Consumer, LS, Reason, Visited);
 
     // If we have a class type, look into its superclass.
     ClassDecl *CurClass = dyn_cast<ClassDecl>(CurNominal);

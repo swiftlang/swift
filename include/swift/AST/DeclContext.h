@@ -198,6 +198,16 @@ public:
     return const_cast<DeclContext*>(this)->getInnermostMethodContext();
   }
 
+  /// Returns the innermost type context.
+  ///
+  /// This routine looks through closure, initializer, and local function
+  /// contexts to find the innermost type context -- nominal type or
+  /// extension.
+  DeclContext *getInnermostTypeContext();
+  const DeclContext *getInnermostTypeContext() const {
+    return const_cast<DeclContext *>(this)->getInnermostTypeContext();
+  }
+
   /// Returns the semantic parent of this context.  A context has a
   /// parent if and only if it is not a module context.
   DeclContext *getParent() const {
