@@ -1798,6 +1798,9 @@ public:
     Builder.addTextChunk("\n}");
   }
 
+  void addConstructor(const ConstructorDecl *CD) {
+  }
+
   // Implement swift::VisibleDeclConsumer.
   void foundDecl(ValueDecl *D, DeclVisibilityKind Reason) override {
     if (D->getAttrs().hasAttribute<FinalAttr>())
