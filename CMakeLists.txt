@@ -506,6 +506,7 @@ endfunction()
 # should be placed. Note that $CMAKE_CFG_INTDIR expands to "." for
 # single-configuration builds.
 set(SWIFTLIB_DIR "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib/swift")
+set(SWIFTSTATICLIB_DIR "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib/swift_static")
 
 # Set SWIFTLIB_SUBDIR to the subdirectory inside SWIFTLIB_DIR 
 # where Swift .swiftmodules and libraries should be placed.
@@ -660,8 +661,8 @@ macro(add_swift_library name)
 
     if (name_static)
       set_target_properties(${name_static} PROPERTIES
-        LIBRARY_OUTPUT_DIRECTORY ${SWIFTLIB_DIR}/${SWIFTLIB_SUBDIR}
-        ARCHIVE_OUTPUT_DIRECTORY ${SWIFTLIB_DIR}/${SWIFTLIB_SUBDIR} )
+        LIBRARY_OUTPUT_DIRECTORY ${SWIFTSTATICLIB_DIR}/${SWIFTLIB_SUBDIR}
+        ARCHIVE_OUTPUT_DIRECTORY ${SWIFTSTATICLIB_DIR}/${SWIFTLIB_SUBDIR} )
     endif()
 
     foreach(config ${CMAKE_CONFIGURATION_TYPES})
@@ -677,7 +678,11 @@ macro(add_swift_library name)
       set_target_properties(${name} PROPERTIES
         LIBRARY_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${SWIFTLIB_SUBDIR}
         ARCHIVE_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${SWIFTLIB_SUBDIR})
-      if (name_static)
+
+      # Do the same for static libraries.
+      if (name_static)  
+        string(REPLACE "$(CONFIGURATION)" ${config} config_lib_dir
+          ${SWIFTSTATICLIB_DIR})
         set_target_properties(${name_static} PROPERTIES
           LIBRARY_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${SWIFTLIB_SUBDIR}
           ARCHIVE_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${SWIFTLIB_SUBDIR})
@@ -690,8 +695,8 @@ macro(add_swift_library name)
 
     if (name_static)
       install(TARGETS ${name_static}
-        LIBRARY DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift/${SWIFTLIB_SUBDIR}
-        ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift/${SWIFTLIB_SUBDIR})
+        LIBRARY DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift_static/${SWIFTLIB_SUBDIR}
+        ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX}/swift_static/${SWIFTLIB_SUBDIR})
     endif()
 
     # FIXME: Install .swift files so they can be parsed on import.
