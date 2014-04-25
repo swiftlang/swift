@@ -1689,7 +1689,7 @@ struct ASTNodeBase {};
     }
 
     void verifyChecked(FuncDecl *FD) {
-      // FIXME: Chain to AbstractFunctionDecl checking!
+      verifyCheckedBase(FD);
     }
 
     void verifyParsed(FuncDecl *FD) {
