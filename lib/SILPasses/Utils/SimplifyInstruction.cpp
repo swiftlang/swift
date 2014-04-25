@@ -27,6 +27,7 @@ namespace {
     SILValue visitTupleExtractInst(TupleExtractInst *TEI);
     SILValue visitStructExtractInst(StructExtractInst *SEI);
     SILValue visitEnumInst(EnumInst *EI);
+    SILValue visitUncheckedEnumDataInst(UncheckedEnumDataInst *UEDI);
     SILValue visitAddressToPointerInst(AddressToPointerInst *ATPI);
     SILValue visitPointerToAddressInst(PointerToAddressInst *PTAI);
     SILValue visitRefToRawPointerInst(RefToRawPointerInst *RRPI);
@@ -123,6 +124,19 @@ SILValue InstSimplifier::visitStructExtractInst(StructExtractInst *SEI) {
   if (StructInst *Struct = dyn_cast<StructInst>(SEI->getOperand()))
     return Struct->getFieldValue(SEI->getField());
   
+  return SILValue();
+}
+
+SILValue
+InstSimplifier::
+visitUncheckedEnumDataInst(UncheckedEnumDataInst *UEDI) {
+  // (unchecked_enum_data (enum payload)) -> payload
+  if (EnumInst *EI = dyn_cast<EnumInst>(UEDI->getOperand())) {
+    assert(EI->hasOperand() && "Should only get data from an enum with "
+           "payload.");
+    return EI->getOperand();
+  }
+
   return SILValue();
 }
 
