@@ -58,8 +58,11 @@ std::string toInsertableString(CodeCompletionResult *Result) {
     case CodeCompletionString::Chunk::ChunkKind::GenericParameterBegin:
     case CodeCompletionString::Chunk::ChunkKind::GenericParameterName:
     case CodeCompletionString::Chunk::ChunkKind::TypeAnnotation:
-    case CodeCompletionString::Chunk::ChunkKind::PreferredCursorPosition:
       return Str;
+
+    case CodeCompletionString::Chunk::ChunkKind::BraceStmtWithCursor:
+      Str += "{";
+      break;
     }
   }
   return Str;

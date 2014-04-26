@@ -110,9 +110,13 @@ public:
       /// This chunk should not be inserted into the editor buffer.
       TypeAnnotation,
 
-      /// Marks the preferred position to put the cursor after the
-      /// completion result is inserted into the editor buffer.
-      PreferredCursorPosition,
+      /// A brace statement -- left brace and right brace.  The preferred
+      /// position to put the cursor after the completion result is inserted
+      /// into the editor buffer is between the braces.
+      ///
+      /// The spelling as always "{}", but clients may choose to insert newline
+      /// and indentation in between.
+      BraceStmtWithCursor,
     };
 
     static bool chunkHasText(ChunkKind Kind) {
@@ -133,7 +137,8 @@ public:
              Kind == ChunkKind::CallParameterType ||
              Kind == ChunkKind::GenericParameterName ||
              Kind == ChunkKind::DynamicLookupMethodCallTail ||
-             Kind == ChunkKind::TypeAnnotation;
+             Kind == ChunkKind::TypeAnnotation ||
+             Kind == ChunkKind::BraceStmtWithCursor;
     }
 
   private:

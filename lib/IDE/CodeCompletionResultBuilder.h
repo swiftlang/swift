@@ -194,10 +194,9 @@ public:
     getLastChunk().setIsAnnotation();
   }
 
-  void addPreferredCursorPosition() {
-    addSimpleChunk(
-        CodeCompletionString::Chunk::ChunkKind::PreferredCursorPosition);
-    getLastChunk().setIsAnnotation();
+  void addBraceStmtWithCursor() {
+    addChunkWithTextNoCopy(
+        CodeCompletionString::Chunk::ChunkKind::BraceStmtWithCursor, "{}");
   }
 };
 

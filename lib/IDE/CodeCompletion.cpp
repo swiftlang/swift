@@ -158,8 +158,8 @@ void CodeCompletionString::print(raw_ostream &OS) const {
       OS << C.getText();
       OS << "#]";
       break;
-    case Chunk::ChunkKind::PreferredCursorPosition:
-      OS << "{#|#}";
+    case Chunk::ChunkKind::BraceStmtWithCursor:
+      OS << "{|}";
       break;
     }
     PrevNestingLevel = C.getNestingLevel();
@@ -621,8 +621,10 @@ static StringRef getFirstTextChunk(CodeCompletionResult *R) {
     case CodeCompletionString::Chunk::ChunkKind::GenericParameterName:
     case CodeCompletionString::Chunk::ChunkKind::DynamicLookupMethodCallTail:
     case CodeCompletionString::Chunk::ChunkKind::TypeAnnotation:
-    case CodeCompletionString::Chunk::ChunkKind::PreferredCursorPosition:
       continue;
+
+    case CodeCompletionString::Chunk::ChunkKind::BraceStmtWithCursor:
+      llvm_unreachable("should have already extracted the text");
     }
   }
   return StringRef();
@@ -1791,11 +1793,10 @@ public:
       Options.FunctionDefinitions = false;
       Options.PrintDefaultParameterPlaceholder = false;
       FD->print(OS, Options);
-      OS << " {\n";
     }
     Builder.addTextChunk(DeclStr);
-    Builder.addPreferredCursorPosition();
-    Builder.addTextChunk("\n}");
+    Builder.addTextChunk(" ");
+    Builder.addBraceStmtWithCursor();
   }
 
   void addConstructor(const ConstructorDecl *CD) {
@@ -1812,11 +1813,10 @@ public:
       Options.FunctionDefinitions = false;
       Options.PrintDefaultParameterPlaceholder = false;
       CD->print(OS, Options);
-      OS << " {\n";
     }
     Builder.addTextChunk(DeclStr);
-    Builder.addPreferredCursorPosition();
-    Builder.addTextChunk("\n}");
+    Builder.addTextChunk(" ");
+    Builder.addBraceStmtWithCursor();
   }
 
   // Implement swift::VisibleDeclConsumer.
