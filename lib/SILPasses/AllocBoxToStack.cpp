@@ -243,16 +243,9 @@ static FunctionRefInst *getDirectCallee(SILInstruction *Call) {
     return dyn_cast<FunctionRefInst>(cast<PartialApplyInst>(Call)->getCallee());
 }
 
-static bool callIsPolymorphic(SILInstruction *Call) {
-  if (auto *Apply = dyn_cast<ApplyInst>(Call))
-    return Apply->hasSubstitutions();
-  else
-    return cast<PartialApplyInst>(Call)->hasSubstitutions();
-}
-
-/// Given an operand of a direct apply or partial_apply of a
-/// non-generic function, return the index of the parameter used in
-/// the body of the function to represent this operand.
+/// Given an operand of a direct apply or partial_apply of a function,
+/// return the index of the parameter used in the body of the function
+/// to represent this operand.
 static size_t getParameterIndexForOperand(Operand *O) {
   assert(isa<ApplyInst>(O->getUser()) || isa<PartialApplyInst>(O->getUser()) &&
          "Expected apply or partial_apply!");
@@ -282,11 +275,10 @@ static size_t getParameterIndexForOperand(Operand *O) {
   return ParamIndex;
 }
 
-/// Given an operand of a direct apply or partial_apply of a
-/// non-generic function, return the parameter used in the body of the
-/// function to represent this operand. For non-direct calls and for
-/// functions that we cannot examine the body of, return an empty
-/// SILValue.
+/// Given an operand of a direct apply or partial_apply of a function,
+/// return the parameter used in the body of the function to represent
+/// this operand. For non-direct calls and for functions that we
+/// cannot examine the body of, return an empty SILValue.
 static SILValue getParameterForOperand(SILFunction *F, Operand *O) {
   assert(F && !F->empty() && "Expected a function with a body!");
 
@@ -301,10 +293,6 @@ static SILValue getParameterForOperand(SILFunction *F, Operand *O) {
 /// determine which funciton that is, and we have a body for that
 /// function. Otherwise return nullptr.
 static SILFunction *getFunctionBody(SILInstruction *Call) {
-  // TODO: Support generics at some point.
-  if (callIsPolymorphic(Call))
-    return nullptr;
-
   if (auto *FRI = getDirectCallee(Call))
     if (auto *F = FRI->getReferencedFunction())
       if (!F->empty())
@@ -655,8 +643,15 @@ static PartialApplyInst *specializePartialApply(PartialApplyInst *PartialApply,
   SILBuilder Builder(PartialApply);
   SILValue FunctionRef = Builder.createFunctionRef(PartialApply->getLoc(),
                                                    Cloner.getCloned());
+  CanSILFunctionType CanFnTy = Cloner.getCloned()->getLoweredFunctionType();
+  auto &M = PartialApply->getModule();
+  auto const &Subs = PartialApply->getSubstitutions();
+  CanSILFunctionType SubstCalleeTy = CanFnTy->substInterfaceGenericArgs(M,
+                                                             M.getSwiftModule(),
+                                                             Subs);
   return Builder.createPartialApply(PartialApply->getLoc(), FunctionRef,
-                                    FunctionRef.getType(), {}, Args,
+                                 SILType::getPrimitiveObjectType(SubstCalleeTy),
+                                    PartialApply->getSubstitutions(), Args,
                                     PartialApply->getType());
 }
 
