@@ -1140,7 +1140,7 @@ Optional<BriefAndRawComment> ModuleFile::getCommentForDecl(const Decl *D) {
     return Nothing;
 
   auto *VD = dyn_cast<ValueDecl>(D);
-  if (!VD)
+  if (!VD || isa<ParamDecl>(D))
     return Nothing;
 
   // Compute the USR.
