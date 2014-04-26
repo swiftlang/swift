@@ -1620,6 +1620,15 @@ extern "C" const ExistentialTypeMetadata *
 swift_getExistentialTypeMetadata(size_t numProtocols,
                                  const ProtocolDescriptor **protocols);
   
+/// \brief Load the Swift class metadata
+///
+/// \param object The object
+///
+/// \returns the Class class metadata in a way that ignores dynamic subclassing.
+/// This will crash if the object is not a pure Swift class.
+extern "C" const ClassMetadata *
+swift_getClassMetadata(const void *object);
+
 /// \brief Checked dynamic cast to a class type.
 ///
 /// \param object The object to cast.
