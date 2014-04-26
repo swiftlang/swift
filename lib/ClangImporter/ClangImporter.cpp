@@ -19,6 +19,7 @@
 #include "swift/Subsystems.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/IRGenOptions.h"
 #include "swift/AST/LinkLibrary.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
@@ -122,23 +123,11 @@ void ClangImporter::clearTypeResolver() {
 
 #pragma mark Module loading
 
-// FIXME: Unify this with the similar code in the driver.
-static void configureDefaultCPU(const llvm::Triple &triple, 
-                                std::vector<std::string> &args) {
-  if (triple.isOSDarwin() && triple.getArch() == llvm::Triple::arm64) {
-    args.push_back("-target-cpu");
-    args.push_back("cyclone");
-    args.push_back("-target-feature");
-    args.push_back("+neon");
-    args.push_back("-target-abi");
-    args.push_back("darwinpcs");
-  }
-}
-
-ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef targetTriple,
-    const ClangImporterOptions &clangImporterOpts) {
+ClangImporter *ClangImporter::create(ASTContext &ctx,
+                                     const ClangImporterOptions &importerOpts,
+                                     const IRGenOptions &irGenOpts) {
   std::unique_ptr<ClangImporter> importer{
-    new ClangImporter(ctx, clangImporterOpts)
+    new ClangImporter(ctx, importerOpts)
   };
 
   // Get the SearchPathOptions to use when creating the Clang importer.
@@ -163,7 +152,8 @@ ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef targetTriple,
   // FIXME: Figure out an appropriate OS deployment version to pass along.
   std::vector<std::string> invocationArgStrs = {
     "-x", "objective-c", "-std=gnu11", "-fobjc-arc", "-fmodules", "-fblocks",
-    "-fsyntax-only", "-w", "-triple", targetTriple.str(),
+    "-fsyntax-only", "-w",
+    "-triple", irGenOpts.Triple, "-target-cpu", irGenOpts.TargetCPU,
     "-I", searchPathOpts.RuntimeResourcePath,
     "-DSWIFT_CLASS_EXTRA=__attribute__((annotate(\""
       SWIFT_NATIVE_ANNOTATION_STRING "\")))",
@@ -173,8 +163,6 @@ ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef targetTriple,
     "-fmodules-validate-system-headers",
     "swift.m"
   };
-
-  configureDefaultCPU(llvm::Triple(targetTriple), invocationArgStrs);
 
   if (ctx.LangOpts.EnableAppExtensionRestrictions) {
     invocationArgStrs.push_back("-fapplication-extension");
@@ -197,7 +185,7 @@ ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef targetTriple,
     invocationArgStrs.push_back(path);
   }
 
-  const std::string &moduleCachePath = clangImporterOpts.ModuleCachePath;
+  const std::string &moduleCachePath = importerOpts.ModuleCachePath;
 
   // Set the module cache path.
   if (moduleCachePath.empty()) {
@@ -213,7 +201,7 @@ ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef targetTriple,
     invocationArgStrs.back().append(moduleCachePath);
   }
 
-  const std::string &overrideResourceDir = clangImporterOpts.OverrideResourceDir;
+  const std::string &overrideResourceDir = importerOpts.OverrideResourceDir;
 
   if (overrideResourceDir.empty()) {
     llvm::SmallString<128> resourceDir(searchPathOpts.RuntimeResourcePath);
@@ -231,7 +219,12 @@ ClangImporter *ClangImporter::create(ASTContext &ctx, StringRef targetTriple,
     invocationArgStrs.push_back(overrideResourceDir);
   }
 
-  for (auto extraArg : clangImporterOpts.ExtraArgs) {
+  for (auto &feature : irGenOpts.TargetFeatures) {
+    invocationArgStrs.push_back("-target-feature");
+    invocationArgStrs.push_back(feature);
+  }
+
+  for (auto extraArg : importerOpts.ExtraArgs) {
     invocationArgStrs.push_back(extraArg);
   }
 

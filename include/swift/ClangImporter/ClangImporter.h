@@ -28,13 +28,14 @@ namespace clang {
 namespace swift {
 
 class ASTContext;
+class ClangImporterOptions;
 class ClangModuleUnit;
 class ClangNode;
+class IRGenOptions;
 class LazyResolver;
 class Module;
 class NominalTypeDecl;
 class VisibleDeclConsumer;
-class ClangImporterOptions;
 enum class SelectorSplitKind;
 
 /// \brief Class that imports Clang modules into Swift, mapping directly
@@ -57,14 +58,15 @@ public:
   /// \param ctx The ASTContext into which the module will be imported.
   /// The ASTContext's SearchPathOptions will be used for the Clang importer.
   ///
-  /// \param targetTriple The target triple to use for the import.
-  ///
   /// \param clangImporterOpts The options to use for the Clang importer.
+  ///
+  /// \param irGenOpts The options for Swift's IRGen, to keep them in sync.
   ///
   /// \returns a new Clang module importer, or null (with a diagnostic) if
   /// an error occurred.
-  static ClangImporter *create(ASTContext &ctx, StringRef targetTriple,
-                               const ClangImporterOptions &clangImporterOpts);
+  static ClangImporter *create(ASTContext &ctx,
+                               const ClangImporterOptions &clangImporterOpts,
+                               const IRGenOptions &irGenOpts);
 
   ClangImporter(const ClangImporter &) = delete;
   ClangImporter(ClangImporter &&) = delete;

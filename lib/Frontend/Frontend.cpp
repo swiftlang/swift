@@ -112,9 +112,9 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   // knowledge.
   auto ImporterCtor = swift::getClangImporterCtor();
   if (ImporterCtor) {
-    auto clangImporter =
-        ImporterCtor(*Context, Invocation.getTargetTriple(),
-                     Invocation.getClangImporterOptions());
+    auto clangImporter = ImporterCtor(*Context,
+                                      Invocation.getClangImporterOptions(),
+                                      Invocation.getIRGenOptions());
     if (!clangImporter) {
       Diagnostics.diagnose(SourceLoc(), diag::error_clang_importer_create_fail);
       return true;
