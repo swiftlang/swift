@@ -268,6 +268,7 @@ public:
   SILInstruction *visitSwitchEnumAddrInst(SwitchEnumAddrInst *SEAI);
   SILInstruction *visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI);
   SILInstruction *visitPointerToAddressInst(PointerToAddressInst *PTAI);
+  SILInstruction *visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI);
 
 private:
   /// Perform one SILCombine iteration.
@@ -939,6 +940,17 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
   return nullptr;
 }
 
+SILInstruction *
+SILCombiner::visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI) {
+  // (unchecked-addr-cast (unchecked-addr-cast x X->Y) Y->Z)
+  //   ->
+  // (unchecked-addr-cast x X->Z)
+  if (auto *OtherUADCI = dyn_cast<UncheckedAddrCastInst>(UADCI->getOperand()))
+    return new (UADCI->getModule()) UncheckedAddrCastInst(
+        UADCI->getLoc(), OtherUADCI->getOperand(), UADCI->getType());
+
+  return nullptr;
+}
 //===----------------------------------------------------------------------===//
 //                                Entry Points
 //===----------------------------------------------------------------------===//

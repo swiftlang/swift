@@ -1010,3 +1010,16 @@ bb0(%0 : $*FakeOptional<Builtin.Int1>):
   %3 = load %2 : $*Builtin.Int1
   return %3 : $Builtin.Int1
 }
+
+// CHECK-LABEL: sil @unchecked_addr_cast_forwarding : $@thin (@inout FakeOptional<StringData>) -> Builtin.Word {
+// CHECK: bb0([[INPUT_PTR:%[0-9]+]] : $*FakeOptional<StringData>):
+// CHECK-NEXT: [[CAST_PTR:%[0-9]+]] = unchecked_addr_cast [[INPUT_PTR]] : $*FakeOptional<StringData> to $*Builtin.Word
+// CHECK-NEXT: load [[CAST_PTR]]
+// CHECK-NEXT: return
+sil @unchecked_addr_cast_forwarding : $@thin (@inout FakeOptional<StringData>) -> Builtin.Word {
+bb0(%0 : $*FakeOptional<StringData>):
+  %1 = unchecked_addr_cast %0 : $*FakeOptional<StringData> to $*StringData
+  %2 = unchecked_addr_cast %1 : $*StringData to $*Builtin.Word
+  %3 = load %2 : $*Builtin.Word
+  return %3 : $Builtin.Word
+}
