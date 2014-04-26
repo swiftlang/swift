@@ -69,6 +69,23 @@ private:
     return SILType::substType(OrigFunc->getModule(), SwiftMod, SubsMap, Ty);
   }
 
+  ProtocolConformance *remapConformance(SILType Ty, ProtocolConformance *C) {
+    // If Ty does not have unbound generic types, we did not specialize it so
+    // just return C. This relies on the fact that we do not partially
+    // specialize.
+    if (!hasUnboundGenericTypes(Ty.getSwiftRValueType()->getCanonicalType()))
+      return C;
+
+    // Otherwise we need to create a specialized conformance for C. Remap the
+    // type...
+    CanType Type = remapType(Ty).getSwiftRValueType()->getCanonicalType();
+
+    // And create the new specialized conformance.
+    ASTContext &AST = SwiftMod->getASTContext();
+    return AST.getSpecializedConformance(Type, C,
+                                         CallerInst->getSubstitutions());
+  }
+
   void visitClassMethodInst(ClassMethodInst *Inst) {
     NumCMSpecialized++;
     doPostProcess(Inst,
