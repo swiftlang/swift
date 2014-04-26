@@ -741,17 +741,7 @@ struct ASTNodeBase {};
     }
     
     void verifyChecked(ArrayUpcastConversionExpr *E) {
-      PrettyStackTraceExpr debugStack(Ctx,
-                                      "verifying ArrayUpcastConversionExpr",
-                                      E);
-      auto canTypeT = E->getSubExpr()->getType().
-                          getPointer()->getCanonicalType();
-      auto canTypeU = E->getType().getPointer()->getCanonicalType();
-      auto arrayT = cast<BoundGenericStructType>(canTypeT)->getGenericArgs()[0];
-      auto arrayU = cast<BoundGenericStructType>(canTypeU)->getGenericArgs()[0];
-      
-      checkTrivialSubtype(arrayT, arrayU, "ArrayUpcastConversionExpr");
-      
+      verifyChecked(E->getSubExpr());
       verifyCheckedBase(E);
     }
 
