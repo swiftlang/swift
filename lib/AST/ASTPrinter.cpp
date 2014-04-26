@@ -535,8 +535,6 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
   auto PrintAccessor = [&](AbstractFunctionDecl *Accessor, StringRef Label) {
     if (!Accessor)
       return;
-    if (Accessor->isImplicit())
-      return;
     if (!PrintAccessorBody)
       Printer << " " << Label;
     else {

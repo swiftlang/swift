@@ -284,7 +284,9 @@ deriveBodyHashable_enum_hashValue(AbstractFunctionDecl *hashValueDecl) {
   indexVar->setImplicit();
   
   Pattern *indexPat = new (C) NamedPattern(indexVar, /*implicit*/ true);
+  indexPat->setType(intType);
   indexPat = new (C) TypedPattern(indexPat, TypeLoc::withoutLoc(intType));
+  indexPat->setType(intType);
   auto indexBind = new (C) PatternBindingDecl(SourceLoc(),
                                               StaticSpellingKind::None,
                                               SourceLoc(),
@@ -333,18 +335,17 @@ deriveBodyHashable_enum_hashValue(AbstractFunctionDecl *hashValueDecl) {
   auto indexRef = new (C) DeclRefExpr(indexVar, SourceLoc(),
                                       /*implicit*/ true);
   auto memberRef = new (C) UnresolvedDotExpr(indexRef, SourceLoc(),
-                                             hashValueDecl->getName(),
-                                             SourceLoc(), /*implicit*/ true);
-  auto args = new (C) TupleExpr(SourceLoc(), SourceLoc(), /*implicit*/ true);
-  auto call = new (C) CallExpr(memberRef, args, /*implicit*/true);
-  auto returnStmt = new (C) ReturnStmt(SourceLoc(), call);
-  
+                                             C.getIdentifier("hashValue"),
+                                             SourceLoc(),
+                                             /*implicit*/true);
+  auto returnStmt = new (C) ReturnStmt(SourceLoc(), memberRef);
+
   ASTNode bodyStmts[] = {
     indexBind,
     switchStmt,
     returnStmt,
   };
-  
+
   auto body = BraceStmt::create(C, SourceLoc(), bodyStmts, SourceLoc());
   hashValueDecl->setBody(body);
 }
@@ -354,7 +355,7 @@ static ValueDecl *
 deriveHashable_enum_hashValue(TypeChecker &tc, EnumDecl *enumDecl) {
   // enum SomeEnum {
   //   case A, B, C
-  //   @derived func hashValue() -> Int {
+  //   @derived var hashValue: Int {
   //     var index: Int
   //     switch self {
   //     case A:
@@ -364,7 +365,7 @@ deriveHashable_enum_hashValue(TypeChecker &tc, EnumDecl *enumDecl) {
   //     case C:
   //       index = 2
   //     }
-  //     return index.hashValue()
+  //     return index.hashValue
   //   }
   // }
   ASTContext &C = tc.Context;
@@ -403,41 +404,63 @@ deriveHashable_enum_hashValue(TypeChecker &tc, EnumDecl *enumDecl) {
   methodParam->setType(TupleType::getEmpty(tc.Context));
   Pattern *params[] = {selfParam, methodParam};
   
-  DeclName name(C, C.Id_hashValue, { });
-  FuncDecl *hashValueDecl =
+  FuncDecl *getterDecl =
       FuncDecl::create(C, SourceLoc(), StaticSpellingKind::None, SourceLoc(),
-                     name, SourceLoc(), nullptr, Type(),
-                     params, TypeLoc::withoutLoc(intType), enumDecl);
-  hashValueDecl->setImplicit();
-  hashValueDecl->setBodySynthesizer(deriveBodyHashable_enum_hashValue);
+                       Identifier(), SourceLoc(), nullptr, Type(),
+                       params, TypeLoc::withoutLoc(intType), enumDecl);
+  getterDecl->setImplicit();
+  getterDecl->setBodySynthesizer(deriveBodyHashable_enum_hashValue);
 
   // Compute the type of hashValue().
   GenericParamList *genericParams = nullptr;
   Type methodType = FunctionType::get(TupleType::getEmpty(tc.Context), intType);
-  Type selfType = hashValueDecl->computeSelfType(&genericParams);
+  Type selfType = getterDecl->computeSelfType(&genericParams);
   Type type;
   if (genericParams)
     type = PolymorphicFunctionType::get(selfType, methodType, genericParams);
   else
     type = FunctionType::get(selfType, methodType);
-  hashValueDecl->setType(type);
-  hashValueDecl->setBodyResultType(intType);
+  getterDecl->setType(type);
+  getterDecl->setBodyResultType(intType);
   
   // Compute the interface type of hashValue().
   Type interfaceType;
-  Type selfIfaceType = hashValueDecl->computeInterfaceSelfType(false);
+  Type selfIfaceType = getterDecl->computeInterfaceSelfType(false);
   if (auto sig = enumDecl->getGenericSignatureOfContext())
     interfaceType = GenericFunctionType::get(sig, selfIfaceType, methodType,
                                              AnyFunctionType::ExtInfo());
   else
     interfaceType = type;
   
-  hashValueDecl->setInterfaceType(interfaceType);
+  getterDecl->setInterfaceType(interfaceType);
   
   if (enumDecl->hasClangNode())
-    tc.implicitlyDefinedFunctions.push_back(hashValueDecl);
+    tc.implicitlyDefinedFunctions.push_back(getterDecl);
   
+  // Create the property.
+  VarDecl *hashValueDecl = new (C) VarDecl(/*static*/ false,
+                                           /*let*/ false,
+                                           SourceLoc(), C.Id_hashValue,
+                                           intType, enumDecl);
+  hashValueDecl->setImplicit();
+  hashValueDecl->makeComputed(SourceLoc(), getterDecl, nullptr, SourceLoc());
+  
+  Pattern *hashValuePat = new (C) NamedPattern(hashValueDecl, /*implicit*/true);
+  hashValuePat->setType(intType);
+  hashValuePat
+    = new (C) TypedPattern(hashValuePat, TypeLoc::withoutLoc(intType),
+                           /*implicit*/ true);
+  hashValuePat->setType(intType);
+  
+  auto patDecl = new (C) PatternBindingDecl(SourceLoc(),
+                              StaticSpellingKind::None,
+                              SourceLoc(), hashValuePat, nullptr,
+                              /*conditional*/true, enumDecl);
+  patDecl->setImplicit();
+  
+  enumDecl->addMember(getterDecl);
   enumDecl->addMember(hashValueDecl);
+  enumDecl->addMember(patDecl);
   return hashValueDecl;
 }
 

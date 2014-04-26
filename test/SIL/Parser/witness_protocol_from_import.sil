@@ -21,17 +21,17 @@ bb0(%0 : $*X, %1 : $*X, %2 : $@thick X.Type):
 }
 
 
-sil @_TTWO5test21XSs8HashableS_FS1_9hashValueUS1___fRQPS1_FT_Si : $@cc(witness_method) @thin (@inout X) -> Int {
+sil @_TTWO5test21XSs8HashableS_FS1_g9hashValueSi : $@cc(witness_method) @thin (@inout X) -> Int {
 bb0(%0 : $*X):
   %1 = load %0 : $*X                             
  
-  %2 = function_ref @_TFO5test21X9hashValuefS0_FT_Si : $@cc(method) @thin (X) -> Int
+  %2 = function_ref @_TFO5test21Xg9hashValueSi : $@cc(method) @thin (X) -> Int
   %3 = apply %2(%1) : $@cc(method) @thin (X) -> Int
   return %3 : $Int                               
 }
 
 sil @_TF5test2oi2eeFTOS_1XS0__Sb : $@thin (X, X) -> Bool
-sil @_TFO5test21X9hashValuefS0_FT_Si : $@cc(method) @thin (X) -> Int
+sil @_TFO5test21Xg9hashValueSi : $@cc(method) @thin (X) -> Int
 
 // CHECK-LABEL: sil_witness_table X: Equatable module
 // CHECK: method #Equatable."=="!1: @_TTWO5test21XSs9EquatableS_FS1_oi2eeUS1___fMQPS1_FT3lhsS2_3rhsS2__Sb
@@ -41,8 +41,8 @@ sil_witness_table X: Equatable module test2 {
 
 // CHECK-LABEL: sil_witness_table X: Hashable module 
 // CHECK: base_protocol Equatable: X: Equatable module 
-// CHECK: method #Hashable.hashValue!1: @_TTWO5test21XSs8HashableS_FS1_9hashValueUS1___fRQPS1_FT_Si
+// CHECK: method #Hashable.hashValue!getter.1: @_TTWO5test21XSs8HashableS_FS1_g9hashValueSi
 sil_witness_table X: Hashable module test2 {
   base_protocol Equatable: X: Equatable module test2
-  method #Hashable.hashValue!1: @_TTWO5test21XSs8HashableS_FS1_9hashValueUS1___fRQPS1_FT_Si
+  method #Hashable.hashValue!getter.1: @_TTWO5test21XSs8HashableS_FS1_g9hashValueSi
 }
