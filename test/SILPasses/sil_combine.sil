@@ -373,12 +373,13 @@ bb0(%0 : $*Builtin.Word, %1 : $Builtin.RawPointer):
   return %7 : $(Builtin.Word, Builtin.RawPointer)
 }
 
-// CHECK-LABEL: sil @a2p_p2a_fail
-// CHECK: address_to_pointer
-// CHECK: pointer_to_address
-// CHECK: return
-sil @a2p_p2a_fail : $@thin (@inout Builtin.Word, Builtin.RawPointer) -> Int32 {
-  bb0(%0 : $*Builtin.Word, %1 : $Builtin.RawPointer):
+// CHECK-LABEL: sil @a2p_p2a_reinterpret_cast_word_raw_pointer
+// CHECK: bb0
+// CHECK-NEXT: unchecked_addr_cast
+// CHECK-NEXT: load
+// CHECK-NEXT: return
+sil @a2p_p2a_reinterpret_cast_word_raw_pointer : $@thin (@inout Builtin.Word, Builtin.RawPointer) -> Int32 {
+bb0(%0 : $*Builtin.Word, %1 : $Builtin.RawPointer):
   %2 = address_to_pointer %0 : $*Builtin.Word to $Builtin.RawPointer
   %3 = pointer_to_address %2 : $Builtin.RawPointer to $*Int32
   %4 = load %3 : $*Int32
@@ -995,4 +996,17 @@ bb0:
   %1 = enum $FakeOptional<Builtin.Int1>, #FakeOptional.Some!enumelt.1, %0 : $Builtin.Int1
   %2 = unchecked_enum_data %1 : $FakeOptional<Builtin.Int1>, #FakeOptional.Some!enumelt.1
   return %2 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @unchecked_addr_cast_formation : $@thin (@inout FakeOptional<Builtin.Int1>) -> Builtin.Int1 {
+// CHECK: bb0([[INPUT_PTR:%[0-9]+]] : $*FakeOptional<Builtin.Int1>):
+// CHECK-NEXT: [[CAST_PTR:%[0-9]+]] = unchecked_addr_cast [[INPUT_PTR]] : $*FakeOptional<Builtin.Int1> to $*Builtin.Int1
+// CHECK-NEXT: load [[CAST_PTR]]
+// CHECK-NEXT: return
+sil @unchecked_addr_cast_formation : $@thin (@inout FakeOptional<Builtin.Int1>) -> Builtin.Int1 {
+bb0(%0 : $*FakeOptional<Builtin.Int1>):
+  %1 = address_to_pointer %0 : $*FakeOptional<Builtin.Int1> to $Builtin.RawPointer
+  %2 = pointer_to_address %1 : $Builtin.RawPointer to $*Builtin.Int1
+  %3 = load %2 : $*Builtin.Int1
+  return %3 : $Builtin.Int1
 }

@@ -267,6 +267,7 @@ public:
   SILInstruction *visitAllocStackInst(AllocStackInst *AS);
   SILInstruction *visitSwitchEnumAddrInst(SwitchEnumAddrInst *SEAI);
   SILInstruction *visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI);
+  SILInstruction *visitPointerToAddressInst(PointerToAddressInst *PTAI);
 
 private:
   /// Perform one SILCombine iteration.
@@ -918,6 +919,23 @@ SILInstruction *SILCombiner::visitUpcastInst(UpcastInst *UCI) {
     return Op->use_empty() ? eraseInstFromFunction(*Op) : nullptr;
   }
   
+  return nullptr;
+}
+
+SILInstruction *
+SILCombiner::
+visitPointerToAddressInst(PointerToAddressInst *PTAI) {
+  // If we reach this point, we know that the types must be different since
+  // otherwise simplifyInstruction would have handled the identity case. This is
+  // always legal to do since address-to-pointer pointer-to-address implies
+  // layout compatibility.
+  //
+  // (pointer-to-address (address-to-pointer %x)) -> unchecked_
+  if (auto *ATPI = dyn_cast<AddressToPointerInst>(PTAI->getOperand())) {
+    return new (PTAI->getModule()) UncheckedAddrCastInst(PTAI->getLoc(),
+                                                         ATPI->getOperand(),
+                                                         PTAI->getType());
+  }
   return nullptr;
 }
 
