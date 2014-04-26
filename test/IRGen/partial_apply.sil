@@ -180,3 +180,21 @@ entry(%c : $Gizmo):
   return %g : $@callee_owned () -> ()
 }
 
+//
+// Check that partially applied generic parameters are correctly substituted
+// in the forwarder.
+//
+
+// CHECK-LABEL: define internal i64 @_TPA_generic_captured_param(i64, %swift.refcounted*) {
+// CHECK:         bitcast %Si* {{%.*}} to %swift.opaque*
+sil public_external @generic_captured_param : $@thin <T> (Int, @inout T) -> Int
+
+sil @partial_apply_generic_capture : $@thin Int -> @callee_owned Int -> Int {
+entry(%x : $Int):
+  %a = alloc_stack $Int
+  store %x to %a#1 : $*Int
+  %f = function_ref @generic_captured_param : $@thin <T> (Int, @inout T) -> Int
+  %p = partial_apply %f<Int>(%a#1) : $@thin <T> (Int, @inout T) -> Int
+  dealloc_stack %a#0 : $*@local_storage Int
+  return %p : $@callee_owned Int -> Int
+}

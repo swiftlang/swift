@@ -2547,9 +2547,14 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
                                        llvm::Type *fnTy,
                                        ResilienceExpansion explosionLevel,
                                        CanSILFunctionType origType,
+                                       CanSILFunctionType substType,
                                        CanSILFunctionType outType,
                                        ArrayRef<Substitution> subs,
                                        HeapLayout const &layout) {
+  #warning ""
+  origType.dump();
+  substType.dump();
+  outType.dump();
   llvm::AttributeSet attrs;
   ExtraData extraData
     = layout.isKnownEmpty() ? ExtraData::None : ExtraData::Retainable;
@@ -2612,16 +2617,21 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   // last parameter) and load out the extra, previously-curried
   // parameters.
   if (!layout.isKnownEmpty()) {
+    // Lower the captured arguments in the original function's generic context.
+    GenericContextScope scope(IGM, origType->getGenericSignature());
+    
     llvm::Value *rawData = origParams.takeLast();
     Address data = layout.emitCastTo(subIGF, rawData);
 
     // Perform the loads.
+    unsigned origParamI = outType->getInterfaceParameters().size();
     for (unsigned i : indices(layout.getElements())) {
       auto &fieldLayout = layout.getElements()[i];
       auto &fieldTy = layout.getElementTypes()[i];
       Address fieldAddr = fieldLayout.project(subIGF, data, offsets);
       auto &fieldTI = fieldLayout.getType();
-
+      
+      Explosion param(explosionLevel);
       // If the argument is passed indirectly, copy into a temporary.
       // (If it were instead passed "const +0", we could pass a reference
       // to the memory in the data pointer.  But it isn't.)
@@ -2629,16 +2639,28 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
         auto caddr = fieldTI.allocateStack(subIGF, fieldTy, "arg.temp");
         fieldTI.initializeWithCopy(subIGF, caddr.getAddress(), fieldAddr,
                                    fieldTy);
-        params.add(caddr.getAddressPointer());
-
+        param.add(caddr.getAddressPointer());
+        
         // Remember to deallocate later.
         addressesToDeallocate.push_back(
                   AddressToDeallocate{fieldTy, fieldTI, caddr.getContainer()});
-        continue;
+      } else {
+        // Otherwise, just load out.
+        cast<LoadableTypeInfo>(fieldTI).loadAsCopy(subIGF, fieldAddr, param);
       }
-
-      // Otherwise, just load out.
-      cast<LoadableTypeInfo>(fieldTI).loadAsCopy(subIGF, fieldAddr, params);
+      
+      // Reemit the capture params as unsubstituted.
+      if (origParamI < origType->getInterfaceParameters().size()) {
+#warning ""
+        origType->getInterfaceParameters()[origParamI].dump();
+        substType->getInterfaceParameters()[origParamI].dump();
+        emitApplyArgument(subIGF,
+                          origType->getInterfaceParameters()[origParamI],
+                          substType->getInterfaceParameters()[origParamI], subs, param, params);
+        ++origParamI;
+      } else {
+        params.add(param.claimAll());
+      }
     }
     
     // Kill the allocated data pointer immediately.  The safety of
@@ -2830,6 +2852,7 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
                                                               fnPtrTy,
                                                               args.getKind(),
                                                               origType,
+                                                              substType,
                                                               outType,
                                                               subs,
                                                               layout);
