@@ -78,10 +78,6 @@ STATISTIC(NumFactoryMethodsNullary,
 using clang::CompilerInstance;
 using clang::CompilerInvocation;
 
-ClangImporterCtorTy swift::getClangImporterCtor() {
-  return &ClangImporter::create;
-}
-
 #pragma mark Internal data structures
 namespace {
   class SwiftModuleLoaderAction : public clang::SyntaxOnlyAction {
@@ -123,9 +119,10 @@ void ClangImporter::clearTypeResolver() {
 
 #pragma mark Module loading
 
-ClangImporter *ClangImporter::create(ASTContext &ctx,
-                                     const ClangImporterOptions &importerOpts,
-                                     const IRGenOptions &irGenOpts) {
+std::unique_ptr<ClangImporter>
+ClangImporter::create(ASTContext &ctx,
+                      const ClangImporterOptions &importerOpts,
+                      const IRGenOptions &irGenOpts) {
   std::unique_ptr<ClangImporter> importer{
     new ClangImporter(ctx, importerOpts)
   };
@@ -305,7 +302,7 @@ ClangImporter *ClangImporter::create(ASTContext &ctx,
   importer->Impl.setObjectForKeyedSubscript
     = clangContext.Selectors.getSelector(2, setObjectForKeyedSubscriptIdents);
 
-  return importer.release();
+  return importer;
 }
 
 Module *ClangImporter::loadModule(

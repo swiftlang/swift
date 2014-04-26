@@ -104,28 +104,22 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
     Context->addModuleLoader(SourceLoader::create(*Context, !immediate));
   }
   
-  SML = SerializedModuleLoader::create(*Context);
-  Context->addModuleLoader(SML);
+  auto SML = SerializedModuleLoader::create(*Context);
+  this->SML = SML.get();
+  Context->addModuleLoader(std::move(SML));
 
   // Wire up the Clang importer. If the user has specified an SDK, use it.
   // Otherwise, we just keep it around as our interface to Clang's ABI
   // knowledge.
-  auto ImporterCtor = swift::getClangImporterCtor();
-  if (ImporterCtor) {
-    auto clangImporter = ImporterCtor(*Context,
-                                      Invocation.getClangImporterOptions(),
-                                      Invocation.getIRGenOptions());
-    if (!clangImporter) {
-      Diagnostics.diagnose(SourceLoc(), diag::error_clang_importer_create_fail);
-      return true;
-    }
-
-    Context->addModuleLoader(clangImporter, /*isClang*/true);
-  } else if (!Invocation.getSDKPath().empty()) {
-    Diagnostics.diagnose(SourceLoc(),
-                         diag::error_clang_importer_not_linked_in);
+  auto clangImporter =
+    ClangImporter::create(*Context, Invocation.getClangImporterOptions(),
+                          Invocation.getIRGenOptions());
+  if (!clangImporter) {
+    Diagnostics.diagnose(SourceLoc(), diag::error_clang_importer_create_fail);
     return true;
   }
+
+  Context->addModuleLoader(std::move(clangImporter), /*isClang*/true);
 
   assert(Lexer::isIdentifier(Invocation.getModuleName()));
 

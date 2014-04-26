@@ -41,14 +41,14 @@ TypeChecker::TypeChecker(ASTContext &Ctx, DiagnosticEngine &Diags)
   : Context(Ctx), Diags(Diags)
 {
   auto clangImporter =
-    static_cast<ClangImporter *>(Context.getClangModuleLoader().getPtr());
+    static_cast<ClangImporter *>(Context.getClangModuleLoader());
   clangImporter->setTypeResolver(*this);
 
 }
 
 TypeChecker::~TypeChecker() {
   auto clangImporter =
-    static_cast<ClangImporter *>(Context.getClangModuleLoader().getPtr());
+    static_cast<ClangImporter *>(Context.getClangModuleLoader());
   clangImporter->clearTypeResolver();
 }
 

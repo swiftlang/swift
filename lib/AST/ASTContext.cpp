@@ -107,11 +107,10 @@ struct ASTContext::Implementation {
 
   /// \brief The various module loaders that import external modules into this
   /// ASTContext.
-  SmallVector<llvm::IntrusiveRefCntPtr<swift::ModuleLoader>, 4> ModuleLoaders;
+  SmallVector<std::unique_ptr<swift::ModuleLoader>, 4> ModuleLoaders;
 
   /// \brief The module loader used to load Clang modules.
-  // FIXME: We shouldn't be special-casing Clang.
-  llvm::IntrusiveRefCntPtr<ClangModuleLoader> TheClangModuleLoader;
+  ClangModuleLoader *TheClangModuleLoader = nullptr;
 
   /// \brief Map from Swift declarations to raw comments.
   llvm::DenseMap<const Decl *, RawComment> RawComments;
@@ -876,25 +875,24 @@ Type ASTContext::getTypeVariableMemberType(TypeVariableType *baseTypeVar,
   return arena.GetTypeMember(baseTypeVar, assocType);
 }
 
-void ASTContext::addModuleLoader(llvm::IntrusiveRefCntPtr<ModuleLoader> loader,
+void ASTContext::addModuleLoader(std::unique_ptr<ModuleLoader> loader,
                                  bool IsClang) {
-  Impl.ModuleLoaders.push_back(loader);
   if (IsClang) {
     assert(!Impl.TheClangModuleLoader && "Already have a Clang module loader");
     Impl.TheClangModuleLoader =
-        static_cast<ClangModuleLoader *>(loader.getPtr());
+      static_cast<ClangModuleLoader *>(loader.get());
   }
+  Impl.ModuleLoaders.push_back(std::move(loader));
 }
 
 void ASTContext::loadExtensions(NominalTypeDecl *nominal,
                                 unsigned previousGeneration) {
-  for (auto loader : Impl.ModuleLoaders) {
+  for (auto &loader : Impl.ModuleLoaders) {
     loader->loadExtensions(nominal, previousGeneration);
   }
 }
 
-llvm::IntrusiveRefCntPtr<ClangModuleLoader>
-ASTContext::getClangModuleLoader() const {
+ClangModuleLoader *ASTContext::getClangModuleLoader() const {
   return Impl.TheClangModuleLoader;
 }
 
@@ -950,7 +948,7 @@ ASTContext::getModule(ArrayRef<std::pair<Identifier, SourceLoc>> ModulePath) {
     return M;
 
   auto moduleID = ModulePath[0];
-  for (auto importer : Impl.ModuleLoaders) {
+  for (auto &importer : Impl.ModuleLoaders) {
     if (Module *M = importer->loadModule(moduleID.second, ModulePath)) {
       if (ModulePath.size() == 1 && ModulePath[0].first == StdlibModuleName)
         recordKnownProtocols(M);
@@ -1075,7 +1073,7 @@ ArrayRef<Decl *> ASTContext::getTypesThatConformTo(KnownProtocolKind kind) {
   auto index = static_cast<unsigned>(kind);
   assert(index < NumKnownProtocols);
 
-  for (auto loader : Impl.ModuleLoaders) {
+  for (auto &loader : Impl.ModuleLoaders) {
     loader->loadDeclsConformingTo(kind,
                                   Impl.KnownProtocolConformances[index].first);
   }

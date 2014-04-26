@@ -30,7 +30,7 @@ class NominalTypeDecl;
 enum class KnownProtocolKind : uint8_t;
 
 /// \brief Abstract interface that loads named modules into the AST.
-class ModuleLoader : public llvm::RefCountedBaseVPTR {
+class ModuleLoader {
   virtual void anchor();
 
 public:

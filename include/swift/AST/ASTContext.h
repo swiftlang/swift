@@ -487,7 +487,7 @@ public:
   /// \param isClang \c true if this module loader is responsible for loading
   ///                Clang modules, which are special-cased in some parts of the
   ///                compiler.
-  void addModuleLoader(llvm::IntrusiveRefCntPtr<ModuleLoader> loader,
+  void addModuleLoader(std::unique_ptr<ModuleLoader> loader,
                        bool isClang = false);
 
   /// \brief Load extensions to the given nominal type from the external
@@ -502,8 +502,9 @@ public:
 
   /// \brief Retrieve the Clang module loader for this ASTContext.
   ///
-  /// If there is no Clang module loader, returns a null smart pointer.
-  llvm::IntrusiveRefCntPtr<ClangModuleLoader> getClangModuleLoader() const;
+  /// If there is no Clang module loader, returns a null pointer.
+  /// The loader is owned by the AST context.
+  ClangModuleLoader *getClangModuleLoader() const;
 
   /// \returns a module with a given name that was already loaded.  If the
   /// module was not loaded, returns nullptr.

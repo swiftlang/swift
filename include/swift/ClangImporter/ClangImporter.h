@@ -64,9 +64,9 @@ public:
   ///
   /// \returns a new Clang module importer, or null (with a diagnostic) if
   /// an error occurred.
-  static ClangImporter *create(ASTContext &ctx,
-                               const ClangImporterOptions &clangImporterOpts,
-                               const IRGenOptions &irGenOpts);
+  static std::unique_ptr<ClangImporter>
+  create(ASTContext &ctx, const ClangImporterOptions &clangImporterOpts,
+         const IRGenOptions &irGenOpts);
 
   ClangImporter(const ClangImporter &) = delete;
   ClangImporter(ClangImporter &&) = delete;
@@ -125,9 +125,6 @@ public:
   clang::Preprocessor &getClangPreprocessor() const override;
   std::string getClangModuleHash() const;
 };
-
-typedef decltype(&ClangImporter::create) ClangImporterCtorTy;
-ClangImporterCtorTy getClangImporterCtor();
 
 }
 

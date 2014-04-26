@@ -30,8 +30,11 @@ private:
     : Ctx(ctx), SkipBodies(skipBodies) {}
 
 public:
-  static SourceLoader *create(ASTContext &ctx, bool skipBodies) {
-    return new SourceLoader(ctx, skipBodies);
+  static std::unique_ptr<SourceLoader>
+  create(ASTContext &ctx, bool skipBodies) {
+    return std::unique_ptr<SourceLoader>{
+      new SourceLoader(ctx, skipBodies)
+    };
   }
 
   SourceLoader(const SourceLoader &) = delete;

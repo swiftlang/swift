@@ -61,8 +61,10 @@ private:
 public:
   /// \brief Create a new importer that can load serialized Swift modules
   /// into the given ASTContext.
-  static SerializedModuleLoader *create(ASTContext &ctx) {
-    return new SerializedModuleLoader(ctx);
+  static std::unique_ptr<SerializedModuleLoader> create(ASTContext &ctx) {
+    return std::unique_ptr<SerializedModuleLoader>{
+      new SerializedModuleLoader(ctx)
+    };
   }
 
   ~SerializedModuleLoader();
