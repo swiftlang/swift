@@ -349,6 +349,7 @@ static SILValue findOrigin(SILValue S) {
         break;
       case ValueKind::UpcastInst:
       case ValueKind::UnconditionalCheckedCastInst:
+      case ValueKind::UncheckedRefCastInst:
         Origin = cast<SILInstruction>(Origin)->getOperand(0);
         continue;
       case ValueKind::ApplyInst: {

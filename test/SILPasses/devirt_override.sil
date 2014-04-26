@@ -6,6 +6,7 @@ import Builtin
 import Swift
 
 class Hash {
+  func update()
   func hash()
 }
 
@@ -22,8 +23,9 @@ bb0(%0 : $MD5):
 
 sil @_TFC4test3MD54hashfS0_FT3MsgVSs5UInt8_T_ : $@cc(method) @thin (@owned MD5) -> ()
 sil @_TFC4test4Hash4hashfS0_FT3MsgVSs5UInt8_T_ : $@cc(method) @thin (@owned Hash) -> ()
+sil @_TFC9hash2_new4Hash6updatefS0_FT3MsgVSs5UInt83CntSi_T_ : $@cc(method) @thin (@owned Hash) -> ()
 
-//CHECK_LABEL: @_TF4test8testHashFT_T_
+// CHECK_LABEL: @_TF4test8testHashFT_T_
 sil @_TF4test8testHashFT_T_ : $@thin () -> () {
 bb0:
   %0 = alloc_ref $MD5
@@ -42,7 +44,23 @@ bb0:
   return %17 : $()
 }
 
+// CHECK_LABEL: @test_unchecked_ref
+sil @test_unchecked_ref : $@thin () -> () {
+bb0:
+  %0 = alloc_ref $MD5
+  %11 = upcast %0 : $MD5 to $Hash
+  %21 = unchecked_ref_cast %11 : $Hash to $MD5
+  %61 = upcast %21 : $MD5 to $Hash 
+  // CHECK: function_ref @_TFC9hash2_new4Hash6updatefS0_FT3MsgVSs5UInt83CntSi_T_ : $@cc(method) @thin (@owned Hash) -> ()
+  // CHECK: apply {{%[0-9]+}}({{%[0-9]+}}) : $@cc(method) @thin (@owned Hash) -> ()
+  %62 = class_method %61 : $Hash, #Hash.update!1 : Hash -> () -> () , $@cc(method) @thin (@owned Hash) -> ()
+  %135 = apply %62(%61) : $@cc(method) @thin (@owned Hash) -> ()
+  %17 = tuple ()
+  return %17 : $()
+}
+
 sil_vtable Hash {
+  #Hash.update!1: _TFC9hash2_new4Hash6updatefS0_FT3MsgVSs5UInt83CntSi_T_
   #Hash.hash!1: _TFC4test4Hash4hashfS0_FT3MsgVSs5UInt8_T_
 }
 
@@ -51,4 +69,5 @@ sil_vtable MD5 {
   // devirtualizer will choose the wrong function ref.
   #Hash.hash!1: _TFC4test3MD54hashfS0_FT3MsgVSs5UInt8_T_
   #MD5.init!initializer.1: _TFC4test3MD5cfMS0_FT_S0_
+  #Hash.update!1: _TFC9hash2_new4Hash6updatefS0_FT3MsgVSs5UInt83CntSi_T_
 }
