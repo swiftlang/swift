@@ -411,6 +411,22 @@ public:
     require(resultInfo->getExtInfo().hasContext(),
             "result of closure cannot have a thin function type");
 
+    // If we have a substitution whose replacement type is an archetype, make
+    // sure that the replacement archetype is in the context generic params of
+    // the caller function.
+    // For each substitution Sub in AI...
+    for (auto &Sub : PAI->getSubstitutions()) {
+      // If Sub's replacement is not an archetype type or is from an opened
+      // existential type, skip it...
+      Sub.Replacement.visit([&](Type t) {
+        auto *A = t->getAs<ArchetypeType>();
+        if (!A)
+          return;
+        require(isArchetypeValidInFunction(A, PAI->getFunction()),
+                "Archetype to be substituted must be valid in function.");
+      });
+    }
+
     auto substTy = checkApplySubstitutions(PAI->getSubstitutions(),
                                         PAI->getCallee().getType());
 

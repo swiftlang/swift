@@ -112,6 +112,40 @@ private:
    doPostProcess(Inst, N);
  }
 
+ void visitPartialApplyInst(PartialApplyInst *Inst) {
+   auto Args = getOpValueArray<8>(Inst->getArguments());
+
+   // Handle recursions by replacing the apply to the callee with an apply to
+   // the newly specialized function.
+   SILValue CalleeVal = Inst->getCallee();
+   FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(CalleeVal);
+   if (FRI && FRI->getReferencedFunction() == Inst->getFunction()) {
+     FRI = Builder.createFunctionRef(getOpLocation(Inst->getLoc()),
+                                     &Builder.getFunction());
+     PartialApplyInst *NPAI =
+       Builder.createPartialApply(getOpLocation(Inst->getLoc()), FRI,
+                                  getOpType(Inst->getSubstCalleeSILType()),
+                                  ArrayRef<Substitution>(),
+                                  Args,
+                                  getOpType(Inst->getType()));
+     doPostProcess(Inst, NPAI);
+     return;
+   }
+
+   SmallVector<Substitution, 16> TempSubstList;
+   for (auto &Sub : Inst->getSubstitutions())
+     TempSubstList.push_back(Sub.subst(Inst->getModule().getSwiftModule(),
+                                       OrigFunc->getContextGenericParams(),
+                                       CallerInst->getSubstitutions()));
+
+   PartialApplyInst *N = Builder.createPartialApply(
+       getOpLocation(Inst->getLoc()), getOpValue(CalleeVal),
+       getOpType(Inst->getSubstCalleeSILType()), TempSubstList, Args,
+       getOpType(Inst->getType()));
+   doPostProcess(Inst, N);
+ }
+
+
   void visitWitnessMethodInst(WitnessMethodInst *Inst) {
     DEBUG(llvm::dbgs()<<"Specializing : " << *Inst << "\n");
 
@@ -466,19 +500,7 @@ void TypeSubCloner::populateCloned() {
 
 /// Check if we can clone and remap types this function.
 static bool canSpecializeFunction(SILFunction *F) {
-  if (F->isExternalDeclaration())
-    return false;
-
-  for (auto &BB : *F)
-    for (auto &I : BB) {
-      // We don't specialize the PartialApply instructions.
-      if (PartialApplyInst *PAI = dyn_cast<PartialApplyInst>(&I)) {
-        if (PAI->hasSubstitutions())
-          return false;
-      }
-    }
-
-  return true;
+  return !F->isExternalDeclaration();
 }
 
 /// \brief return true if we can specialize the function type with a specific
