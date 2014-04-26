@@ -344,6 +344,8 @@ namespace {
     // Keep track of whether we've emitted an error.  We only emit one error per
     // location as a policy decision.
     std::vector<SILLocation> EmittedErrorLocs;
+    SmallPtrSet<SILBasicBlock*, 16> BlocksReachableFromEntry;
+    
   public:
     LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
                     SmallVectorImpl<DIMemoryUse> &Uses,
@@ -383,6 +385,8 @@ namespace {
 
     bool shouldEmitError(SILInstruction *Inst);
     void diagnoseInitError(const DIMemoryUse &Use, Diag<StringRef> DiagMessage);
+    
+    bool isBlockIsReachableFromEntry(SILBasicBlock *BB);
   };
 } // end anonymous namespace
 
@@ -436,15 +440,48 @@ LifetimeChecker::LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
   MemBBInfo.LOState = LiveOutBlockState::IsKnown;
 }
 
+/// Determine whether the specified block is reachable from the entry of the
+/// containing function's entrypoint.  This allows us to avoid diagnosing DI
+/// errors in synthesized code that turns out to be unreachable.
+bool LifetimeChecker::isBlockIsReachableFromEntry(SILBasicBlock *BB) {
+  // Lazily compute reachability, so we only have to do it in the case of an
+  // error.
+  if (BlocksReachableFromEntry.empty()) {
+    SmallVector<SILBasicBlock*, 128> Worklist;
+    Worklist.push_back(&BB->getParent()->front());
+    BlocksReachableFromEntry.insert(Worklist.back());
+    
+    // Collect all reachable blocks by walking the successors.
+    while (!Worklist.empty()) {
+      SILBasicBlock *BB = Worklist.pop_back_val();
+      for (auto &Succ : BB->getSuccs()) {
+        if (BlocksReachableFromEntry.insert(Succ))
+          Worklist.push_back(Succ);
+      }
+    }
+  }
+  
+  return BlocksReachableFromEntry.count(BB);
+}
+
+
 /// shouldEmitError - Check to see if we've already emitted an error at the
 /// specified instruction.  If so, return false.  If not, remember the
 /// instruction and return true.
 bool LifetimeChecker::shouldEmitError(SILInstruction *Inst) {
+  // If this instruction is in a dead region, don't report the error.  This can
+  // occur because we haven't run DCE before DI and this may be a synthesized
+  // statement.  If it isn't synthesized, then DCE will report an error on the
+  // dead code.
+  if (!isBlockIsReachableFromEntry(Inst->getParent()))
+    return false;
+  
   // Check to see if we've already emitted an error at this location.  If so,
   // swallow the error.
   for (auto L : EmittedErrorLocs)
     if (L == Inst->getLoc())
       return false;
+  
   EmittedErrorLocs.push_back(Inst->getLoc());
   return true;
 }
@@ -845,7 +882,7 @@ void LifetimeChecker::handleSelfInitUse(const DIMemoryUse &InstInfo) {
     break;
   case DIKind::Yes:
   case DIKind::Partial:
-    // This is bad, only one super.init call is allowed.
+    // This is bad, only one self.init call is allowed.
     if (EmittedErrorLocs.empty() && shouldEmitError(Inst))
       diagnose(Module, Inst->getLoc(), diag::selfinit_multiple_times, 1);
     return;
