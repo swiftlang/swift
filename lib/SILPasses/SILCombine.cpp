@@ -269,6 +269,7 @@ public:
   SILInstruction *visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI);
   SILInstruction *visitPointerToAddressInst(PointerToAddressInst *PTAI);
   SILInstruction *visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI);
+  SILInstruction *visitUncheckedRefCastInst(UncheckedRefCastInst *URCI);
 
 private:
   /// Perform one SILCombine iteration.
@@ -948,6 +949,18 @@ SILCombiner::visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI) {
   if (auto *OtherUADCI = dyn_cast<UncheckedAddrCastInst>(UADCI->getOperand()))
     return new (UADCI->getModule()) UncheckedAddrCastInst(
         UADCI->getLoc(), OtherUADCI->getOperand(), UADCI->getType());
+
+  return nullptr;
+}
+
+SILInstruction *
+SILCombiner::visitUncheckedRefCastInst(UncheckedRefCastInst *URCI) {
+  // (unchecked-ref-cast (unchecked-ref-cast x X->Y) Y->Z)
+  //   ->
+  // (unchecked-ref-cast x X->Z)
+  if (auto *OtherURCI = dyn_cast<UncheckedRefCastInst>(URCI->getOperand()))
+    return new (URCI->getModule()) UncheckedRefCastInst(
+        URCI->getLoc(), OtherURCI->getOperand(), URCI->getType());
 
   return nullptr;
 }

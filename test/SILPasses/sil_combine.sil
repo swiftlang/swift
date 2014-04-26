@@ -1023,3 +1023,16 @@ bb0(%0 : $*FakeOptional<StringData>):
   %3 = load %2 : $*Builtin.Word
   return %3 : $Builtin.Word
 }
+
+class F : E {}
+
+// CHECK-LABEL: sil @unchecked_ref_cast_forwarding : $@thin (B) -> F {
+// CHECK: bb0([[INPUT_REF:%[0-9]+]] : $B):
+// CHECK-NEXT: [[CAST_REF:%[0-9]+]] = unchecked_ref_cast [[INPUT_REF]] : $B to $F
+// CHECK-NEXT: return
+sil @unchecked_ref_cast_forwarding : $@thin (B) -> F {
+bb0(%0 : $B):
+  %1 = unchecked_ref_cast %0 : $B to $E
+  %2 = unchecked_ref_cast %1 : $E to $F
+  return %2 : $F
+}
