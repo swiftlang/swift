@@ -1798,6 +1798,27 @@ public:
     Builder.addTextChunk("\n}");
   }
 
+  void addConstructor(const ConstructorDecl *CD) {
+    CodeCompletionResultBuilder Builder(
+        Sink,
+        CodeCompletionResult::ResultKind::Declaration,
+        SemanticContextKind::Super);
+    Builder.setAssociatedDecl(CD);
+
+    llvm::SmallString<256> DeclStr;
+    {
+      llvm::raw_svector_ostream OS(DeclStr);
+      PrintOptions Options;
+      Options.FunctionDefinitions = false;
+      Options.PrintDefaultParameterPlaceholder = false;
+      CD->print(OS, Options);
+      OS << " {\n";
+    }
+    Builder.addTextChunk(DeclStr);
+    Builder.addPreferredCursorPosition();
+    Builder.addTextChunk("\n}");
+  }
+
   // Implement swift::VisibleDeclConsumer.
   void foundDecl(ValueDecl *D, DeclVisibilityKind Reason) override {
     if (Reason == DeclVisibilityKind::MemberOfCurrentNominal)
@@ -1821,11 +1842,45 @@ public:
       addMethodOverride(FD, Reason);
       return;
     }
+
+    if (auto *CD = dyn_cast<ConstructorDecl>(D)) {
+      if (!isa<ProtocolDecl>(CD->getDeclContext()))
+        return;
+      if (CD->isRequired() || CD->isDesignatedInit())
+        addConstructor(CD);
+      return;
+    }
+  }
+
+  void addDesignatedInitializers() {
+    Type CurrTy = CurrDeclContext->getInnermostTypeContext()
+                      ->getDeclaredTypeInContext();
+    if (!CurrTy)
+      return;
+    const auto *NTD = CurrTy->getAnyNominal();
+    if (!NTD)
+      return;
+    const auto *CD = dyn_cast<ClassDecl>(NTD);
+    if (!CD)
+      return;
+    if (!CD->getSuperclass())
+      return;
+    CD = CD->getSuperclass()->getClassOrBoundGenericClass();
+    for (const auto *Member : CD->getMembers()) {
+      const auto *Constructor = dyn_cast<ConstructorDecl>(Member);
+      if (!Constructor)
+        continue;
+      if (Constructor->hasStubImplementation())
+        continue;
+      if (Constructor->isDesignatedInit())
+        addConstructor(Constructor);
+    }
   }
 
   void getOverrideCompletions(SourceLoc Loc) {
     lookupVisibleDecls(*this, CurrDeclContext, TypeResolver.get(),
                        /*IncludeTopLevel=*/false, Loc);
+    addDesignatedInitializers();
   }
 };
 
