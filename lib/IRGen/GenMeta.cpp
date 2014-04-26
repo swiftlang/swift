@@ -61,6 +61,7 @@ static llvm::ConstantInt *getMetadataKind(IRGenModule &IGM,
 }
 
 static Size::int_type getOffsetInWords(IRGenModule &IGM, Size offset) {
+  assert(offset.isMultipleOf(IGM.getPointerSize()));
   return offset / IGM.getPointerSize();
 }
 static Address createPointerSizedGEP(IRGenFunction &IGF,
@@ -856,13 +857,13 @@ namespace {
       if (!ntd->getGenericParams()) {
         // If there are no generic parameters, there is no generic parameter
         // vector.
-        addConstantWord(0);
-        addConstantWord(0);
+        addConstantInt32(0);
+        addConstantInt32(0);
         return;
       }
       
-      // uintptr_t GenericParameterVectorOffset;
-      addConstantWordInWords(asImpl().getGenericParamsOffset());
+      // uint32_t GenericParameterVectorOffset;
+      addConstantInt32InWords(asImpl().getGenericParamsOffset());
 
       // The archetype order here needs to be consistent with
       // MetadataLayout::addGenericFields.
@@ -874,18 +875,18 @@ namespace {
       // TODO: not archetypes from outer contexts.
       auto allArchetypes = ntd->getGenericParams()->getAllArchetypes();
       
-      // uintptr_t NumGenericParameters;
-      addConstantWord(allArchetypes.size());
+      // uint32_t NumGenericParameters;
+      addConstantInt32(allArchetypes.size());
       
       // GenericParameter Parameters[NumGenericParameters];
       // struct GenericParameter {
       for (auto archetype : allArchetypes) {
-        //   uintptr_t NumWitnessTables;
+        //   uint32_t NumWitnessTables;
         // Count the protocol conformances that require witness tables.
         unsigned count = std::count_if(archetype->getConformsTo().begin(),
                                        archetype->getConformsTo().end(),
                [](ProtocolDecl *p) { return requiresProtocolWitnessTable(p); });
-        addConstantWord(count);
+        addConstantInt32(count);
       }
       // };
     }
@@ -1281,8 +1282,8 @@ namespace {
       }
       // The final null terminator is provided by getAddrOfGlobalString.
       
-      addConstantWord(numFields);
-      addConstantWordInWords(FieldVectorOffset);
+      addConstantInt32(numFields);
+      addConstantInt32InWords(FieldVectorOffset);
       addWord(IGM.getAddrOfGlobalString(fieldNames));
       
       // Build the field type accessor function.
@@ -1371,8 +1372,8 @@ namespace {
       }
       // The final null terminator is provided by getAddrOfGlobalString.
       
-      addConstantWord(numFields);
-      addConstantWordInWords(FieldVectorOffset);
+      addConstantInt32(numFields);
+      addConstantInt32InWords(FieldVectorOffset);
       addWord(IGM.getAddrOfGlobalString(fieldNames));
       
       // Build the field type accessor function.
@@ -1438,8 +1439,8 @@ namespace {
     
     void addKindDependentFields() {
       // FIXME: Populate.
-      addConstantWord(0);
-      addConstantWord(0);
+      addConstantInt32(0);
+      addConstantInt32(0);
       addConstantWord(0);
       addConstantWord(0);
     }
@@ -1701,6 +1702,8 @@ namespace {
     using super::Target;
     using super::addWord;
     using super::addConstantWord;
+    using super::addInt32;
+    using super::addConstantInt32;
     using super::getNextOffset;
     const StructLayout &Layout;
 
@@ -1827,20 +1830,25 @@ namespace {
     void addInstanceSize() {
       if (llvm::Constant *size
             = tryEmitClassConstantFragileInstanceSize(IGM, Target)) {
-        addWord(size);
+        // We only support a maximum 32-bit instance size.
+        if (IGM.SizeTy != IGM.Int32Ty)
+          size = llvm::ConstantExpr::getTrunc(size, IGM.Int32Ty);
+        addInt32(size);
       } else {
         // Leave a zero placeholder to be filled at runtime
-        addConstantWord(0);
+        addConstantInt32(0);
       }
     }
     
     void addInstanceAlignMask() {
       if (llvm::Constant *align
             = tryEmitClassConstantFragileInstanceAlignMask(IGM, Target)) {
-        addWord(align);
+        if (IGM.SizeTy != IGM.Int32Ty)
+          align = llvm::ConstantExpr::getTrunc(align, IGM.Int32Ty);
+        addInt32(align);
       } else {
         // Leave a zero placeholder to be filled at runtime
-        addConstantWord(0);
+        addConstantInt32(0);
       }
     }
     
@@ -2573,14 +2581,18 @@ irgen::emitClassResilientInstanceSizeAndAlignMask(IRGenFunction &IGF,
   assert(!scanner.InstanceSize.isInvalid()
          && !scanner.InstanceAlignMask.isInvalid()
          && "didn't find size or alignment in metadata?!");
-  llvm::Value *size =
-    emitLoadOfWitnessTableRefAtIndex(IGF, metadata,
-                               getOffsetInWords(IGF.IGM, scanner.InstanceSize));
-  size = IGF.Builder.CreatePtrToInt(size, IGF.IGM.SizeTy);
-  llvm::Value *alignMask = emitLoadOfWitnessTableRefAtIndex(IGF, metadata,
-                          getOffsetInWords(IGF.IGM, scanner.InstanceAlignMask));
-  alignMask = IGF.Builder.CreatePtrToInt(alignMask, IGF.IGM.SizeTy);
-  
+  Address metadataAsBytes(IGF.Builder.CreateBitCast(metadata, IGF.IGM.Int8PtrTy),
+                          IGF.IGM.getPointerAlignment());
+  auto loadZExtInt32AtOffset = [&](Size offset) {
+    Address slot = IGF.Builder.CreateConstByteArrayGEP(metadataAsBytes, offset);
+    slot = IGF.Builder.CreateBitCast(slot, IGF.IGM.Int32Ty->getPointerTo());
+    llvm::Value *result = IGF.Builder.CreateLoad(slot);
+    if (IGF.IGM.SizeTy != IGF.IGM.Int32Ty)
+      result = IGF.Builder.CreateZExt(result, IGF.IGM.SizeTy);
+    return result;
+  };
+  llvm::Value *size = loadZExtInt32AtOffset(scanner.InstanceSize);
+  llvm::Value *alignMask = loadZExtInt32AtOffset(scanner.InstanceAlignMask);
   return {size, alignMask};
 }
 

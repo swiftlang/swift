@@ -7,21 +7,21 @@ import Builtin
 // CHECK-NOT: @_TWVV15generic_structs13SingleDynamic
 // CHECK: [[SINGLEDYNAMIC_NAME:@.*]] = private unnamed_addr constant [34 x i8] c"V15generic_structs13SingleDynamic\00"
 // CHECK: [[SINGLEDYNAMIC_FIELDS:@.*]] = private unnamed_addr constant [3 x i8] c"x\00\00"
-// CHECK: @_TMnV15generic_structs13SingleDynamic = constant { {{.*}} i64 } {
+// CHECK: @_TMnV15generic_structs13SingleDynamic = constant { {{.*}} i32 } {
 // --       1 = struct
 // CHECK:   i64 1,
 // --       name
 // CHECK:   i8* getelementptr inbounds ([34 x i8]* [[SINGLEDYNAMIC_NAME]], i64 0, i64 0),
 // --       field count
-// CHECK:   i64 1,
+// CHECK:   i32 1,
 // --       field offset vector offset
-// CHECK:   i64 3,
+// CHECK:   i32 3,
 // --       field names
 // CHECK:   i8* getelementptr inbounds ([3 x i8]* [[SINGLEDYNAMIC_FIELDS]], i64 0, i64 0),
 // --       generic parameter vector offset
-// CHECK:   i64 4,
+// CHECK:   i32 4,
 // --       generic parameter count; generic parameter witness counts
-// CHECK:   i64 1, i64 0
+// CHECK:   i32 1, i32 0
 // CHECK: }
 // CHECK: @_TMPdV15generic_structs13SingleDynamic = global {{[{].*\* [}]}} {
 // -- template header
@@ -43,21 +43,21 @@ import Builtin
 // -- Nominal type descriptor for generic struct with protocol requirements
 // CHECK: [[DYNAMICWITHREQUIREMENTS_NAME:@.*]] = private unnamed_addr constant [44 x i8] c"V15generic_structs23DynamicWithRequirements\00"
 // CHECK: [[DYNAMICWITHREQUIREMENTS_FIELDS:@.*]] = private unnamed_addr constant [5 x i8] c"x\00y\00\00"
-// CHECK: @_TMnV15generic_structs23DynamicWithRequirements = constant { {{.*}} i64 } {
+// CHECK: @_TMnV15generic_structs23DynamicWithRequirements = constant { {{.*}} i32 } {
 // --       1 = struct
 // CHECK:   i64 1,
 // --       name
 // CHECK:   i8* getelementptr inbounds ([44 x i8]* [[DYNAMICWITHREQUIREMENTS_NAME]], i64 0, i64 0),
 // --       field count
-// CHECK:   i64 2,
+// CHECK:   i32 2,
 // --       field offset vector offset
-// CHECK:   i64 3,
+// CHECK:   i32 3,
 // --       field names
 // CHECK:   i8* getelementptr inbounds ([5 x i8]* [[DYNAMICWITHREQUIREMENTS_FIELDS]], i64 0, i64 0),
 // --       generic parameter vector offset
-// CHECK:   i64 5,
+// CHECK:   i32 5,
 // --       generic parameter count; generic parameter witness counts
-// CHECK:   i64 2, i64 1, i64 1
+// CHECK:   i32 2, i32 1, i32 1
 // CHECK: }
 
 // CHECK: @_TMPdV15generic_structs23DynamicWithRequirements = global { {{.*}}* } {

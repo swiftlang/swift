@@ -25,13 +25,13 @@ entry(%x : $*Foo):
 
 // CHECK-LABEL: define %swift.type* @generic_type_concrete_method_witness(%C19sil_witness_methods3Bar** noalias, %swift.type* %Self)
 // CHECK:         [[T0:%.*]] = bitcast %swift.type* %Self to %swift.type**
-// CHECK:         [[T1:%.*]] = getelementptr inbounds %swift.type** [[T0]], i64 8
+// CHECK:         [[T1:%.*]] = getelementptr inbounds %swift.type** [[T0]], i64 7
 // CHECK:         %T = load %swift.type** [[T1]], align 8
 // CHECK:         [[U0:%.*]] = bitcast %swift.type* %Self to %swift.type**
-// CHECK:         [[U1:%.*]] = getelementptr inbounds %swift.type** [[U0]], i64 9
+// CHECK:         [[U1:%.*]] = getelementptr inbounds %swift.type** [[U0]], i64 8
 // CHECK:         %U = load %swift.type** [[U1]], align 8
 // CHECK:         [[V0:%.*]] = bitcast %swift.type* %Self to %swift.type**
-// CHECK:         [[V1:%.*]] = getelementptr inbounds %swift.type** [[V0]], i64 10
+// CHECK:         [[V1:%.*]] = getelementptr inbounds %swift.type** [[V0]], i64 9
 // CHECK:         %V = load %swift.type** [[V1]], align 8
 sil @generic_type_concrete_method_witness : $@thin @cc(witness_method) <T, U, V> (@in Bar<T, U, V>) -> @thick Bar<T, U, V>.Type {
 entry(%x : $*Bar<T, U, V>):
@@ -54,13 +54,13 @@ entry(%x : $@thick Foo.Type):
 
 // CHECK-LABEL: define %swift.type* @generic_type_concrete_static_method_witness(%swift.type*, %swift.type* %Self)
 // CHECK:         [[T0:%.*]] = bitcast %swift.type* %Self to %swift.type**
-// CHECK:         [[T1:%.*]] = getelementptr inbounds %swift.type** [[T0]], i64 8
+// CHECK:         [[T1:%.*]] = getelementptr inbounds %swift.type** [[T0]], i64 7
 // CHECK:         %T = load %swift.type** [[T1]], align 8
 // CHECK:         [[U0:%.*]] = bitcast %swift.type* %Self to %swift.type**
-// CHECK:         [[U1:%.*]] = getelementptr inbounds %swift.type** [[U0]], i64 9
+// CHECK:         [[U1:%.*]] = getelementptr inbounds %swift.type** [[U0]], i64 8
 // CHECK:         %U = load %swift.type** [[U1]], align 8
 // CHECK:         [[V0:%.*]] = bitcast %swift.type* %Self to %swift.type**
-// CHECK:         [[V1:%.*]] = getelementptr inbounds %swift.type** [[V0]], i64 10
+// CHECK:         [[V1:%.*]] = getelementptr inbounds %swift.type** [[V0]], i64 9
 // CHECK:         %V = load %swift.type** [[V1]], align 8
 sil @generic_type_concrete_static_method_witness : $@thin @cc(witness_method) <T, U, V> (@thick Bar<T, U, V>.Type) -> @thick Bar<T, U, V>.Type {
 entry(%x : $@thick Bar<T, U, V>.Type):

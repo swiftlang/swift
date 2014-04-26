@@ -48,9 +48,9 @@ class C {}
 // \ CHECK:   [[OPAQUE]]* @_objc_empty_cache,
 // \ CHECK:   [[OPAQUE]]* @_objc_empty_vtable,
 // \ CHECK:   i64 add (i64 ptrtoint ({{.*}}* @_DATA__TtC5class1D to i64), i64 1),
+// \ CHECK:   i32 16,
+// \ CHECK:   i32 7,
 // \ CHECK:   {{.*}}* @_TMnC5class1D,
-// \ CHECK:   i64 16,
-// \ CHECK:   i64 7,
 // \ CHECK:   i32 (i16, i8, [[D_CLASS]]*)* @_TFC5class1D8multiplyfS0_fT1xBi8__FT1yBi16__Bi32_
 // \ CHECK: }
 
@@ -114,14 +114,15 @@ bb0(%0 : $D):
 // CHECK-LABEL: define %C5class1C* @alloc_ref_dynamic(%swift.type*)
 sil @alloc_ref_dynamic : $@thin (@thick C.Type) -> @owned C {
 bb0(%0 : $@thick C.Type):
-  // CHECK:   [[META_PTR:%[0-9]+]] = bitcast %swift.type* %0 to i8***
-  // CHECK:   [[SIZE_ADDR:%[0-9]+]] = getelementptr inbounds i8*** [[META_PTR]], i64 6
-  // CHECK:   [[SIZE_AS_PTR:%[0-9]+]] = load i8*** [[SIZE_ADDR]], align 8
-  // CHECK:   [[SIZE:%[0-9]+]] = ptrtoint i8** [[SIZE_AS_PTR]] to i64
-  // CHECK:   [[META_PTR:%[0-9]+]] = bitcast %swift.type* %0 to i8***
-  // CHECK:   [[ALIGN_ADDR:%[0-9]+]] = getelementptr inbounds i8*** [[META_PTR]], i64 7
-  // CHECK:   [[ALIGN_AS_PTR:%[0-9]+]] = load i8*** [[ALIGN_ADDR]], align 8
-  // CHECK:   [[ALIGN:%[0-9]+]] = ptrtoint i8** [[ALIGN_AS_PTR]] to i64
+  // CHECK:   [[META_PTR:%[0-9]+]] = bitcast %swift.type* %0 to i8*
+  // CHECK:   [[T0:%.*]] = getelementptr inbounds i8* [[META_PTR]], i32 40
+  // CHECK:   [[T1:%.*]] = bitcast i8* [[T0]] to i32*
+  // CHECK:   [[SIZE32:%.*]] = load i32* [[T1]], align 8
+  // CHECK:   [[SIZE:%.*]] = zext i32 [[SIZE32]] to i64
+  // CHECK:   [[T0:%.*]] = getelementptr inbounds i8* [[META_PTR]], i32 44
+  // CHECK:   [[T1:%.*]] = bitcast i8* [[T0]] to i32*
+  // CHECK:   [[ALIGN32:%.*]] = load i32* [[T1]], align 4
+  // CHECK:   [[ALIGN:%.*]] = zext i32 [[ALIGN32]] to i64
   // CHECK:   [[RESULT:%[0-9]+]] = call noalias %swift.refcounted* @swift_allocObject(%swift.type* %0, i64 [[SIZE]], i64 [[ALIGN]]) #0
   %1 = alloc_ref_dynamic %0 : $@thick C.Type, $C
   return %1 : $C

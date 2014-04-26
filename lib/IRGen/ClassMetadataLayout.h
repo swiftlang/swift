@@ -76,9 +76,9 @@ public:
       asImpl().addClassDataPointer();
     }
 
-    asImpl().addNominalTypeDescriptor();
     asImpl().addInstanceSize();
     asImpl().addInstanceAlignMask();
+    asImpl().addNominalTypeDescriptor();
     
     // Class members.
     addClassMembers(Target);
@@ -257,8 +257,8 @@ public:
   void addDestructorFunction() { addPointer(); }
   void addParentMetadataRef(ClassDecl *forClass) { addPointer(); }
   void addSuperClass() { addPointer(); }
-  void addInstanceSize() { addPointer(); }
-  void addInstanceAlignMask() { addPointer(); }
+  void addInstanceSize() { addInt32(); }
+  void addInstanceAlignMask() { addInt32(); }
   void addClassCacheData() { addPointer(); addPointer(); }
   void addClassDataPointer() { addPointer(); }
   void addMethod(SILDeclRef fn) { addPointer(); }

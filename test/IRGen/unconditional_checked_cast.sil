@@ -10,7 +10,7 @@ class D : C {}
 // CHECK: entry:
 // CHECK-NEXT: [[INPUTPTR:%[0-9]+]] = load %C26unconditional_checked_cast1C** [[INPUTPTRPTR:%[0-9]+]], align 8
 // CHECK-NEXT: [[I8INPUTPTR:%[0-9]+]] = bitcast %C26unconditional_checked_cast1C* [[INPUTPTR]] to i8*
-// CHECK-NEXT: call i8* @swift_dynamicCastClassUnconditional(i8* [[I8INPUTPTR]], i8* bitcast (%swift.type* getelementptr inbounds (%swift.full_heapmetadata* bitcast ({ void (%C26unconditional_checked_cast1D*)*, i8**, i64, %swift.type*, %swift.opaque*, %swift.opaque*, i64, { i64, i8*, i64, i64, i8*, %swift.type** (%swift.type*)*, i64, i64 }*, i64, i64, %C26unconditional_checked_cast1D* (%C26unconditional_checked_cast1D*)* }* @_TMdC26unconditional_checked_cast1D to %swift.full_heapmetadata*), i32 0, i32 2) to i8*))
+// CHECK-NEXT: call i8* @swift_dynamicCastClassUnconditional(i8* [[I8INPUTPTR]], i8* bitcast (%swift.type* getelementptr inbounds (%swift.full_heapmetadata* bitcast ({ void (%C26unconditional_checked_cast1D*)*, i8**, i64, %swift.type*, %swift.opaque*, %swift.opaque*, i64, i32, i32, { i64, i8*, i32, i32, i8*, %swift.type** (%swift.type*)*, i32, i32 }*, %C26unconditional_checked_cast1D* (%C26unconditional_checked_cast1D*)* }* @_TMdC26unconditional_checked_cast1D to %swift.full_heapmetadata*), i32 0, i32 2) to i8*))
 // CHECK-NEXT: bitcast
 // CHECK-NEXT: [[DOWNCASTINPUTPTR:%[0-9]+]] = bitcast %C26unconditional_checked_cast1C** [[INPUTPTRPTR]] to %C26unconditional_checked_cast1D**
 // CHECK-NEXT: [[DOWNCASTLOADINPUTPTR:%[0-9]+]] = load %C26unconditional_checked_cast1D** [[DOWNCASTINPUTPTR]], align 8

@@ -841,10 +841,10 @@ struct HeapMetadata : Metadata {
 struct GenericParameterDescriptor {
   /// The offset of the descriptor in the metadata record. If NumParams is zero,
   /// this value is meaningless.
-  uintptr_t Offset;
+  uint32_t Offset;
   /// The number of type parameters. A value of zero means there is no generic
   /// parameter vector.
-  uintptr_t NumParams;
+  uint32_t NumParams;
   
   /// True if the nominal type has generic parameters.
   bool hasGenericParams() const { return NumParams > 0; }
@@ -852,7 +852,7 @@ struct GenericParameterDescriptor {
   /// A type parameter.
   struct Parameter {
     /// The number of protocol witness tables required by this type parameter.
-    uintptr_t NumWitnessTables;
+    uint32_t NumWitnessTables;
     
     // TODO: This is the bare minimum to be able to parse an opaque generic
     // parameter vector. Should we include additional info, such as the
@@ -882,11 +882,15 @@ struct NominalTypeDescriptor {
     struct {
       /// The number of stored properties in the class, not including its
       /// superclasses. If there is a field offset vector, this is its length.
-      uintptr_t NumFields;
+      uint32_t NumFields;
       /// The offset of the field offset vector for this class's stored
       /// properties in its metadata, if any. 0 means there is no field offset
       /// vector.
-      uintptr_t FieldOffsetVectorOffset;
+      ///
+      /// To deal with resilient superclasses correctly, this will
+      /// eventually need to be relative to the start of this class's
+      /// metadata area.
+      uint32_t FieldOffsetVectorOffset;
       
       /// True if metadata records for this type have a field offset vector for
       /// its stored properties.
@@ -906,11 +910,11 @@ struct NominalTypeDescriptor {
     struct {
       /// The number of stored properties in the class, not including its
       /// superclasses. If there is a field offset vector, this is its length.
-      uintptr_t NumFields;
+      uint32_t NumFields;
       /// The offset of the field offset vector for this class's stored
       /// properties in its metadata, if any. 0 means there is no field offset
       /// vector.
-      uintptr_t FieldOffsetVectorOffset;
+      uint32_t FieldOffsetVectorOffset;
       
       /// True if metadata records for this type have a field offset vector for
       /// its stored properties.
@@ -929,9 +933,9 @@ struct NominalTypeDescriptor {
     /// Information about enum types.
     struct {
       /// The number of non-empty cases in the enum.
-      uintptr_t NumNonEmptyCases;
+      uint32_t NumNonEmptyCases;
       /// The number of empty cases in the enum.
-      uintptr_t NumEmptyCases;
+      uint32_t NumEmptyCases;
       /// The names of the cases. A doubly-null-terminated list of strings,
       /// whose length is NumNonEmptyCases + NumEmptyCases. Cases are named in
       /// tag order, non-empty cases first, followed by empty cases.
@@ -967,8 +971,8 @@ struct ClassMetadata : public HeapMetadata {
                           uintptr_t size, uintptr_t alignMask)
     : HeapMetadata(base), SuperClass(superClass),
       CacheData{nullptr, nullptr}, Data(data),
-      Description(description),
-      InstanceSize(size), InstanceAlignMask(alignMask) {}
+      InstanceSize(size), InstanceAlignMask(alignMask),
+      Description(description) {}
 
   /// The metadata for the superclass.  This is null for the root class.
   const ClassMetadata *SuperClass;
@@ -996,11 +1000,14 @@ struct ClassMetadata : public HeapMetadata {
 private:
   // The remaining fields are valid only when isTypeMetadata().
 
-  /// An out-of-line Swift-specific description of the type.
-  const NominalTypeDescriptor *Description;
-  
   /// The size and alignment mask of instances of this type.
-  uintptr_t InstanceSize, InstanceAlignMask;
+  uint32_t InstanceSize, InstanceAlignMask;
+
+  /// An out-of-line Swift-specific description of the type, or null
+  /// if this is an artificial subclass.  We currently provide no
+  /// supported mechanism for making a non-artifical subclass
+  /// dynamically.
+  const NominalTypeDescriptor *Description;
 
   // After this come the class members, laid out as follows:
   //   - class members for the superclass (recursively)
@@ -1012,7 +1019,19 @@ private:
 public:
   const NominalTypeDescriptor *getDescription() const {
     assert(isTypeMetadata());
+    assert(!isArtificialSubclass());
     return Description;
+  }
+
+  /// Is this class an artificial subclass, such as one dynamically
+  /// created for various dynamic purposes like KVO?
+  bool isArtificialSubclass() const {
+    assert(isTypeMetadata());
+    return Description == nullptr;
+  }
+  void setArtificialSubclass() {
+    assert(isTypeMetadata());
+    Description = nullptr;
   }
 
   uintptr_t getInstanceSize() const {
