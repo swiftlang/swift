@@ -968,10 +968,12 @@ struct ClassMetadata : public HeapMetadata {
                           const ClassMetadata *superClass,
                           uintptr_t data,
                           const NominalTypeDescriptor *description,
-                          uintptr_t size, uintptr_t alignMask)
+                          uintptr_t size, uintptr_t alignMask,
+                          uintptr_t classSize, uintptr_t addressPoint)
     : HeapMetadata(base), SuperClass(superClass),
       CacheData{nullptr, nullptr}, Data(data),
       InstanceSize(size), InstanceAlignMask(alignMask),
+      ClassSize(size), ClassAddressPoint(addressPoint),
       Description(description) {}
 
   /// The metadata for the superclass.  This is null for the root class.
@@ -1002,6 +1004,13 @@ private:
 
   /// The size and alignment mask of instances of this type.
   uint32_t InstanceSize, InstanceAlignMask;
+
+  /// The total size of the class object, including prefix and suffix
+  /// extents.
+  uint32_t ClassSize;
+
+  /// The offset of the address point within the class object.
+  uint32_t ClassAddressPoint;
 
   /// An out-of-line Swift-specific description of the type, or null
   /// if this is an artificial subclass.  We currently provide no
@@ -1050,6 +1059,24 @@ public:
   void setInstanceAlignMask(uintptr_t mask) {
     assert(isTypeMetadata());
     InstanceAlignMask = mask;
+  }
+
+  uintptr_t getClassSize() const {
+    assert(isTypeMetadata());
+    return ClassSize;
+  }
+  void setClassSize(uintptr_t size) {
+    assert(isTypeMetadata());
+    ClassSize = size;
+  }
+
+  uintptr_t getClassAddressPoint() const {
+    assert(isTypeMetadata());
+    return ClassAddressPoint;
+  }
+  void setClassAddressPoint(uintptr_t offset) {
+    assert(isTypeMetadata());
+    ClassAddressPoint = offset;
   }
   
   /// Get a pointer to the field offset vector, if present, or null.

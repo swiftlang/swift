@@ -1042,8 +1042,7 @@ namespace {
       super::noteAddressPoint();
     }
 
-    static MetadataSize
-        getSizeAndAddressPoint(IRGenModule &IGM, TargetType target) {
+    static MetadataSize compute(IRGenModule &IGM, TargetType target) {
       MetadataSizer sizer(IGM, target);
       sizer.layout();
 
@@ -1054,26 +1053,31 @@ namespace {
       return { sizer.NextOffset, sizer.AddressPoint };
     }
   };
-  
-  /// Return the total size and address point of a metadata record.
-  static MetadataSize
-  getSizeOfMetadataRecord(IRGenModule &IGM, NominalTypeDecl *type) {
-    if (auto theStruct = dyn_cast<StructDecl>(type)) {
-      typedef MetadataSizer<StructMetadataScanner> sizer;
-      return sizer::getSizeAndAddressPoint(IGM, theStruct);
-    }
-    
-    if (auto theClass = dyn_cast<ClassDecl>(type)) {
-      typedef MetadataSizer<ClassMetadataScanner> sizer;
-      return sizer::getSizeAndAddressPoint(IGM, theClass);
-    }
 
-    if (auto theEnum = dyn_cast<EnumDecl>(type)) {
-      typedef MetadataSizer<EnumMetadataScanner> sizer;
-      return sizer::getSizeAndAddressPoint(IGM, theEnum);
+  static MetadataSize getSizeOfMetadata(IRGenModule &IGM, StructDecl *decl) {
+    return MetadataSizer<StructMetadataScanner>::compute(IGM, decl);
+  }
+
+  static MetadataSize getSizeOfMetadata(IRGenModule &IGM, ClassDecl *decl) {
+    return MetadataSizer<ClassMetadataScanner>::compute(IGM, decl);
+  }
+
+  static MetadataSize getSizeOfMetadata(IRGenModule &IGM, EnumDecl *decl) {
+    return MetadataSizer<EnumMetadataScanner>::compute(IGM, decl);
+  }
+
+  /// Return the total size and address point of a metadata record.
+  static MetadataSize getSizeOfMetadata(IRGenModule &IGM,
+                                        NominalTypeDecl *decl) {
+    if (auto theStruct = dyn_cast<StructDecl>(decl)) {
+      return getSizeOfMetadata(IGM, theStruct);
+    } else if (auto theClass = dyn_cast<ClassDecl>(decl)) {
+      return getSizeOfMetadata(IGM, theClass);
+    } else if (auto theEnum = dyn_cast<EnumDecl>(decl)) {
+      return getSizeOfMetadata(IGM, theEnum);
+    } else {
+      llvm_unreachable("not implemented for other nominal types");
     }
-    
-    llvm_unreachable("not implemented for other nominal types");
   }
   
   /// Build the field type vector accessor for a nominal type. This is a
@@ -1117,7 +1121,7 @@ namespace {
     // immediately after the metadata object itself, which should be
     // instantiated with every generic metadata instance.
     } else {
-      Size offset = getSizeOfMetadataRecord(IGM, type).getOffsetToEnd();
+      Size offset = getSizeOfMetadata(IGM, type).getOffsetToEnd();
       vectorPtr = IGF.Builder.CreateBitCast(metadata,
                                             metadataArrayPtrTy->getPointerTo());
       vectorPtr = IGF.Builder.CreateConstInBoundsGEP1_32(vectorPtr,
@@ -1697,6 +1701,11 @@ namespace {
          : public ConstantBuilder<ClassMetadataLayout<Impl>> {
     using super = ConstantBuilder<ClassMetadataLayout<Impl>>;
 
+    /// A mapping from functions to their final overriders.
+    llvm::DenseMap<AbstractFunctionDecl*,AbstractFunctionDecl*> FinalOverriders;
+
+    Optional<MetadataSize> ClassObjectExtents;
+
   protected:
     using super::IGM;
     using super::Target;
@@ -1706,9 +1715,6 @@ namespace {
     using super::addConstantInt32;
     using super::getNextOffset;
     const StructLayout &Layout;
-
-    /// A mapping from functions to their final overriders.
-    llvm::DenseMap<AbstractFunctionDecl*,AbstractFunctionDecl*> FinalOverriders;
 
     ClassMetadataBuilderBase(IRGenModule &IGM, ClassDecl *theClass,
                              const StructLayout &layout)
@@ -1743,6 +1749,11 @@ namespace {
         
       } while (cls->hasSuperclass() &&
                (cls = cls->getSuperclass()->getClassOrBoundGenericClass()));
+    }
+
+    void computeClassObjectExtents() {
+      if (ClassObjectExtents.hasValue()) return;
+      ClassObjectExtents = getSizeOfMetadata(IGM, Target);
     }
 
   public:
@@ -1850,6 +1861,16 @@ namespace {
         // Leave a zero placeholder to be filled at runtime
         addConstantInt32(0);
       }
+    }
+
+    void addClassSize() {
+      computeClassObjectExtents();
+      addConstantInt32(ClassObjectExtents->FullSize.getValue());
+    }
+
+    void addClassAddressPoint() {
+      computeClassObjectExtents();
+      addConstantInt32(ClassObjectExtents->AddressPoint.getValue());
     }
     
     void addClassCacheData() {

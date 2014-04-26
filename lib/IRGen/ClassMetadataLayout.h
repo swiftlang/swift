@@ -78,6 +78,8 @@ public:
 
     asImpl().addInstanceSize();
     asImpl().addInstanceAlignMask();
+    asImpl().addClassSize();
+    asImpl().addClassAddressPoint();
     asImpl().addNominalTypeDescriptor();
     
     // Class members.
@@ -259,6 +261,8 @@ public:
   void addSuperClass() { addPointer(); }
   void addInstanceSize() { addInt32(); }
   void addInstanceAlignMask() { addInt32(); }
+  void addClassSize() { addInt32(); }
+  void addClassAddressPoint() { addInt32(); }
   void addClassCacheData() { addPointer(); addPointer(); }
   void addClassDataPointer() { addPointer(); }
   void addMethod(SILDeclRef fn) { addPointer(); }
