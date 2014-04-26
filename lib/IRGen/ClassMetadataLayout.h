@@ -47,7 +47,7 @@ protected:
   using super::asImpl;
 
   /// The most-derived class.
-  ClassDecl *const TargetClass;
+  ClassDecl *const Target;
 
   /// Is the object layout globally resilient at this point?
   bool IsObjectResilient = false;
@@ -56,7 +56,7 @@ protected:
   bool IsMetadataResilient = false;
 
   ClassMetadataLayout(IRGenModule &IGM, ClassDecl *target)
-    : super(IGM), TargetClass(target) {}
+    : super(IGM), Target(target) {}
 
 public:
   void layout() {
@@ -81,7 +81,7 @@ public:
     asImpl().addInstanceAlignMask();
     
     // Class members.
-    addClassMembers(TargetClass);
+    addClassMembers(Target);
   }
 
 private:
@@ -240,37 +240,46 @@ private:
 };
 
 /// An "implementation" of ClassMetadataLayout that just scans through
-/// the metadata layout, maintaining the next index: the offset (in
-/// pointer-sized chunks) into the metadata for the next field.
+/// the metadata layout, maintaining the offset of the next field.
 template <class Impl>
 class ClassMetadataScanner : public ClassMetadataLayout<Impl> {
   typedef ClassMetadataLayout<Impl> super;
 protected:
-  unsigned NextIndex = 0;
+  Size NextOffset = Size(0);
 
   ClassMetadataScanner(IRGenModule &IGM, ClassDecl *target)
     : super(IGM, target) {}
 
 public:
-  void addMetadataFlags() { NextIndex++; }
-  void addNominalTypeDescriptor() { NextIndex++; }
-  void addValueWitnessTable() { NextIndex++; }
-  void addDestructorFunction() { NextIndex++; }
-  void addParentMetadataRef(ClassDecl *forClass) { NextIndex++; }
-  void addSuperClass() { NextIndex++; }
-  void addInstanceSize() { NextIndex++; }
-  void addInstanceAlignMask() { NextIndex++; }
-  void addClassCacheData() { NextIndex += 2; }
-  void addClassDataPointer() { NextIndex++; }
-  void addMethod(SILDeclRef fn) { NextIndex++; }
-  void addFieldOffset(VarDecl *var) { NextIndex++; }
+  void addMetadataFlags() { addPointer(); }
+  void addNominalTypeDescriptor() { addPointer(); }
+  void addValueWitnessTable() { addPointer(); }
+  void addDestructorFunction() { addPointer(); }
+  void addParentMetadataRef(ClassDecl *forClass) { addPointer(); }
+  void addSuperClass() { addPointer(); }
+  void addInstanceSize() { addPointer(); }
+  void addInstanceAlignMask() { addPointer(); }
+  void addClassCacheData() { addPointer(); addPointer(); }
+  void addClassDataPointer() { addPointer(); }
+  void addMethod(SILDeclRef fn) { addPointer(); }
+  void addFieldOffset(VarDecl *var) { addPointer(); }
   void addGenericArgument(ArchetypeType *argument, ClassDecl *forClass) {
-    NextIndex++;
+    addPointer();
   }
   void addGenericWitnessTable(ArchetypeType *argument,
                               ProtocolDecl *protocol,
                               ClassDecl *forClass) {
-    NextIndex++;
+    addPointer();
+  }
+
+private:
+  // Our layout here assumes that there will never be unclaimed space
+  // in the metadata.
+  void addPointer() {
+    NextOffset += super::IGM.getPointerSize();
+  }
+  void addInt32() {
+    NextOffset += Size(4);
   }
 };
 

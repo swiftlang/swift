@@ -197,31 +197,31 @@ namespace {
       GetStartOfFieldOffsets(IRGenModule &IGM, StructDecl *target)
         : StructMetadataScanner(IGM, target) {}
       
-      unsigned StartOfFieldOffsets = ~0U;
+      Size StartOfFieldOffsets = Size::invalid();
       
       void noteAddressPoint() {
-        assert(StartOfFieldOffsets == ~0U
+        assert(StartOfFieldOffsets == Size::invalid()
                && "found field offsets before address point?");
-        NextIndex = 0;
+        NextOffset = Size(0);
       }
-      void noteStartOfFieldOffsets() { StartOfFieldOffsets = NextIndex; }
+      void noteStartOfFieldOffsets() { StartOfFieldOffsets = NextOffset; }
     };
     
     // Find where the field offsets begin.
     GetStartOfFieldOffsets scanner(IGF.IGM, S);
     scanner.layout();
-    assert(scanner.StartOfFieldOffsets != ~0U
+    assert(scanner.StartOfFieldOffsets != Size::invalid()
            && "did not find start of field offsets?!");
     
-    unsigned StartOfFieldOffsets = scanner.StartOfFieldOffsets;
+    Size StartOfFieldOffsets = scanner.StartOfFieldOffsets;
     
     // Find that offset into the metadata.
     llvm::Value *fieldVector
       = IGF.Builder.CreateBitCast(metadata, IGF.IGM.SizeTy->getPointerTo());
     return IGF.Builder.CreateConstArrayGEP(
                             Address(fieldVector, IGF.IGM.getPointerAlignment()),
-                            StartOfFieldOffsets,
-                            IGF.IGM.getPointerSize());
+                            StartOfFieldOffsets / IGF.IGM.getPointerSize(),
+                            StartOfFieldOffsets);
   }
   
   /// Accessor for the non-fixed offsets of a struct type.

@@ -65,20 +65,25 @@ template <class Impl>
 class EnumMetadataScanner : public EnumMetadataLayout<Impl> {
   typedef EnumMetadataLayout<Impl> super;
 protected:
-  unsigned NextIndex = 0;
+  Size NextOffset = Size(0);
 
   EnumMetadataScanner(IRGenModule &IGM, EnumDecl *target)
     : super(IGM, target) {}
 
 public:
-  void addMetadataFlags() { NextIndex++; }
-  void addValueWitnessTable() { NextIndex++; }
-  void addNominalTypeDescriptor() { NextIndex++; }
-  void addParentMetadataRef() { NextIndex++; }
-  void addGenericArgument(ArchetypeType *argument) { NextIndex++; }
+  void addMetadataFlags() { addPointer(); }
+  void addValueWitnessTable() { addPointer(); }
+  void addNominalTypeDescriptor() { addPointer(); }
+  void addParentMetadataRef() { addPointer(); }
+  void addGenericArgument(ArchetypeType *argument) { addPointer(); }
   void addGenericWitnessTable(ArchetypeType *argument,
                               ProtocolDecl *protocol) {
-    NextIndex++;
+    addPointer();
+  }
+
+private:
+  void addPointer() {
+    NextOffset += super::IGM.getPointerSize();
   }
 };
 
