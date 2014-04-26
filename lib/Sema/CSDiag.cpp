@@ -41,7 +41,8 @@ void Failure::dump(SourceManager *sm, raw_ostream &out) const {
     break;
 
   case DoesNotHaveNonMutatingMember:
-    out << " immutable value of type " << getFirstType().getString() << " only has mutating members named '"
+    out << " immutable value of type " << getFirstType().getString()
+        << " only has mutating members named '"
         << getName() << "'";
     break;
 

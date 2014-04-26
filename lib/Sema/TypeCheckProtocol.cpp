@@ -208,7 +208,7 @@ namespace {
     /// \brief The witness did not match due to postfix/non-postfix differences.
     PostfixNonPostfixConflict,
     
-    /// \brief The witness did not match because of @mutating conflicts.
+    /// \brief The witness did not match because of mutating conflicts.
     MutatingConflict,
 
     /// The witness is not @noreturn, but the requirement is.
@@ -467,9 +467,9 @@ matchWitness(TypeChecker &tc, NormalProtocolConformance *conformance,
     if (reqAttrs.isPostfix() && !witnessAttrs.isPostfix())
       return RequirementMatch(witness, MatchKind::PostfixNonPostfixConflict);
 
-    // If the requirement is for a @mutating member, then the witness must also
-    // be @mutating (unless it is defined on a type with reference semantics
-    // (e.g. a class).  It is fine for the witness to be non-mutating if the
+    // If the requirement is for a mutating member, then the witness must also
+    // be mutating (unless it is defined on a type with reference semantics
+    // (e.g. a class).  It is fine for the witness to be nonmutating if the
     // protocol is declared mutating.
     if (funcWitness->isMutating() && !funcReq->isMutating())
       return RequirementMatch(witness, MatchKind::MutatingConflict);

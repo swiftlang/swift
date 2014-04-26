@@ -672,8 +672,6 @@ public:
                                    const DeclAttributes &Attrs);
   ParserResult<FuncDecl> parseDeclFunc(SourceLoc StaticLoc,
                                        StaticSpellingKind StaticSpelling,
-                                       SourceLoc MutatingLoc,
-                                       SourceLoc OverrideLoc,
                                        ParseDeclOptions Flags,
                                        DeclAttributes &Attributes);
   bool parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD);

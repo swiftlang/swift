@@ -536,7 +536,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 ///     'unowned' '(' 'unsafe' ')'
 ///     'noreturn'
 ///     'optional'
-///     '!'? 'mutating'
+///     'mutating'   Note: syntactically rejected, parsed as c-s keyword
 ///     'requires_stored_property_inits'
 /// \endverbatim
 bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
@@ -676,6 +676,12 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
       diagnose(Loc, diag::cannot_combine_attribute, "prefix");
       Attributes.clearAttribute(attr);
     }
+    break;
+      
+      
+  case AK_mutating:
+    diagnose(Loc, diag::mutating_not_keyword, isInverted)
+      .fixItReplace(AtLoc, isInverted ? "non" : "");
     break;
   }
 
@@ -974,6 +980,7 @@ static unsigned getNumDeclModifierKeywords(Parser &P) {
 
     case tok::identifier:
       if (P.Tok.isContextualKeyword("mutating") ||
+          P.Tok.isContextualKeyword("nonmutating") ||
           P.Tok.isContextualKeyword("override")) {
         P.consumeToken(tok::identifier);
         NumConsumedTokens++;
@@ -997,6 +1004,7 @@ static unsigned getNumDeclModifierKeywords(Parser &P) {
 
 static bool isStartOfModifiedDeclFast(const Token &Tok, const Token &Tok2) {
   if (!Tok.isContextualKeyword("mutating") &&
+      !Tok.isContextualKeyword("nonmutating") &&
       !Tok.isContextualKeyword("override"))
     return false;
 
@@ -1011,6 +1019,7 @@ static bool isStartOfModifiedDeclFast(const Token &Tok, const Token &Tok2) {
 
   default: {
     return Tok2.isContextualKeyword("mutating") ||
+           Tok2.isContextualKeyword("nonmutating") ||
            Tok2.isContextualKeyword("override");
   }
   }
@@ -1115,9 +1124,10 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
     Attributes.add(new (Context) RawDocCommentAttr(Tok.getCommentRange()));
   parseDeclAttributeList(Attributes);
 
-  // If we see the 'static', 'class' or 'mutating' followed by a declaration
+  // If we see the 'static', 'class' or 'non?mutating' followed by a declaration
   // keyword, parse it now.
   SourceLoc StaticLoc, MutatingLoc, OverrideLoc;
+  bool isNonMutating = false;
   bool UnhandledStatic = false;
   bool UnhandledMutating = false;
   bool UnhandledOverride = false;
@@ -1151,12 +1161,14 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
       consumeToken(tok::kw_static);
       break;
     case tok::identifier: {
-      if (Tok.isContextualKeyword("mutating")) {
+      if (Tok.isContextualKeyword("mutating") ||
+          Tok.isContextualKeyword("nonmutating")) {
         if (MutatingLoc.isValid()) {
           diagnose(Tok, diag::decl_already_mutating)
               .highlight(MutatingLoc)
               .fixItRemove(Tok.getLoc());
         } else {
+          isNonMutating = Tok.isContextualKeyword("nonmutating");
           MutatingLoc = Tok.getLoc();
           UnhandledMutating = true;
         }
@@ -1249,8 +1261,19 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
     break;
 
   case tok::kw_func:
-    DeclResult = parseDeclFunc(StaticLoc, StaticSpelling, MutatingLoc,
-                               OverrideLoc, Flags, Attributes);
+    // If the 'mutating' or 'nonmutating' modifier was applied to the func,
+    // model it an attribute.
+    if (MutatingLoc.isValid()) {
+      if (!Attributes.AtLoc.isValid())
+        Attributes.AtLoc = MutatingLoc;
+      Attributes.setAttr(AK_mutating, MutatingLoc);
+      Attributes.MutatingInverted = isNonMutating;
+    }
+      
+    if (OverrideLoc.isValid())
+      Attributes.add(new (Context) OverrideAttr(OverrideLoc));
+
+    DeclResult = parseDeclFunc(StaticLoc, StaticSpelling, Flags, Attributes);
     Status = DeclResult;
     UnhandledStatic = false;
     UnhandledMutating = false;
@@ -1311,9 +1334,14 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
                StaticSpelling)
           .fixItRemove(SourceRange(StaticLoc));
     // If we parsed 'mutating' but didn't handle it above, complain about it.
-    if (UnhandledMutating)
-      diagnose(Entries.back()->getLoc(), diag::mutating_invalid)
+    if (UnhandledMutating) {
+      bool isInit = DeclResult.isNonNull() &&
+                    isa<ConstructorDecl>(DeclResult.get());
+      diagnose(Entries.back()->getLoc(),
+               isInit ? diag::mutating_invalid_init :  diag::mutating_invalid)
           .fixItRemove(SourceRange(MutatingLoc));
+    }
+    
     // If we parsed 'override' but didn't handle it above, complain about it.
     if (UnhandledOverride)
       diagnose(Entries.back()->getLoc(), diag::override_invalid)
@@ -1831,7 +1859,7 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc,
                              DeclLoc, /*GenericParams=*/nullptr, Type(), Params,
                              ReturnType, P->CurDeclContext);
 
-  // non-static set/willSet/didSet default to @mutating.
+  // non-static set/willSet/didSet default to mutating.
   if (!D->isStatic() && Kind != AccessorKind::IsGetter)
     D->setMutating();
 
@@ -2045,6 +2073,17 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags, Pattern *Indices,
     DeclAttributes Attributes;
     parseDeclAttributeList(Attributes);
 
+    // Parse the contextual keywords for 'mutating' and 'nonmutating' before
+    // get and set.
+    if ((Tok.isContextualKeyword("mutating") ||
+         Tok.isContextualKeyword("nonmutating")) &&
+        (peekToken().isContextualKeyword("get") ||
+         peekToken().isContextualKeyword("set"))) {
+      Attributes.setAttr(AK_mutating, Tok.getLoc());
+      Attributes.MutatingInverted = Tok.isContextualKeyword("nonmutating");
+      consumeToken(tok::identifier);
+    }
+    
     bool isImplicitGet = false;
     AccessorKind Kind;
     FuncDecl **TheDeclPtr;
@@ -2608,10 +2647,7 @@ void Parser::consumeAbstractFunctionBody(AbstractFunctionDecl *AFD,
 /// \note The caller of this method must ensure that the next token is 'func'.
 ParserResult<FuncDecl>
 Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
-                      SourceLoc MutatingLoc, SourceLoc OverrideLoc,
                       ParseDeclOptions Flags, DeclAttributes &Attributes) {
-  assert((StaticLoc.isInvalid() || MutatingLoc.isInvalid()) &&
-         "Parser should only parse one of 'mutating' or 'class'/'static'");
   assert(StaticLoc.isInvalid() || StaticSpelling != StaticSpellingKind::None);
 
   bool HasContainerType = Flags.contains(PD_HasContainerType);
@@ -2633,21 +2669,10 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
     }
   }
 
-  // If the 'mutating' modifier was applied to the func, model it as if the
-  // @mutating attribute were specified.
-  if (MutatingLoc.isValid()) {
-    if (!Attributes.AtLoc.isValid())
-      Attributes.AtLoc = MutatingLoc;
-    Attributes.setAttr(AK_mutating, MutatingLoc);
-  }
-
   if (StaticLoc.isValid() && Attributes.hasMutating()) {
     diagnose(Tok, diag::static_functions_not_mutating);
     Attributes.clearAttribute(AK_mutating);
   }
-
-  if (OverrideLoc.isValid())
-    Attributes.add(new (Context) OverrideAttr(OverrideLoc));
 
   SourceLoc FuncLoc = consumeToken(tok::kw_func);
 
@@ -2664,7 +2689,8 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
     diagnose(Tok, diag::func_decl_nonglobal_operator);
     return nullptr;
   }
-  if (parseAnyIdentifier(SimpleName, diag::expected_identifier_in_decl, "function")) {
+  if (parseAnyIdentifier(SimpleName, diag::expected_identifier_in_decl,
+                         "function")) {
     ParserStatus NameStatus =
         parseIdentifierDeclName(*this, SimpleName, NameLoc, tok::l_paren, tok::arrow,
                                 tok::l_brace, diag::invalid_diagnostic);

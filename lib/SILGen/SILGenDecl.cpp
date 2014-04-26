@@ -2180,9 +2180,9 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
          && "uncurry level of requirement and witness do not match");
       
   // In addition to the usual bevy of abstraction differences, protocol
-  // witnesses have potential differences in inout-ness of self. @mutating
+  // witnesses have potential differences in inout-ness of self. mutating
   // value type methods may reassign 'self' as an inout parameter, but may be
-  // conformed to by non-@mutating or class methods that cannot.
+  // conformed to by nonmutating or class methods that cannot.
   // Handle this special case in the witness type before applying the
   // abstraction change.
   auto inOutSelf = DoesNotHaveInOutSelfAbstractionDifference;

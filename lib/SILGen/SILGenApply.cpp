@@ -994,8 +994,8 @@ public:
     //  1) for a "static" / "type" method, the base is a metatype.
     //  2) for a classbound protocol, the base is a class-bound protocol rvalue,
     //     which is loadable.
-    //  3) for an @mutating method, the base has inout type.
-    //  4) for a @!mutating method, the base is a general protocol/archetype
+    //  3) for a mutating method, the base has inout type.
+    //  4) for a nonmutating method, the base is a general protocol/archetype
     //     rvalue, which is address-only.  The base is passed at +0, so it isn't
     //     consumed.
     //

@@ -432,7 +432,7 @@ static bool doesVarDeclMemberProduceLValue(VarDecl *VD, Type baseType,
     return true;
 
   // If the base is an rvalue, then we only produce an lvalue if the vardecl
-  // is a computed property, whose setter is @!mutating.
+  // is a computed property, whose setter is nonmutating.
   return VD->getSetter() && !VD->getSetter()->isMutating();
 }
 
@@ -450,7 +450,7 @@ static bool doesSubscriptDeclProduceLValue(SubscriptDecl *SD, Type baseType) {
     return true;
 
   // If the base is an rvalue, then we only produce an lvalue if both the getter
-  // and setter are non-mutating.
+  // and setter are nonmutating.
   return !SD->getGetter()->isMutating() && !SD->getSetter()->isMutating();
 }
 

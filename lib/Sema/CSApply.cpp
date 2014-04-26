@@ -205,7 +205,7 @@ static Type adjustSelfTypeForMember(Type baseTy, ValueDecl *member,
     // type with the same qualifiers.
     auto selfTy = func->getType()->getAs<AnyFunctionType>()->getInput();
     if (selfTy->is<InOutType>()) {
-      // Unless we're looking at a non-@mutating existential member.  In which
+      // Unless we're looking at a nonmutating existential member.  In which
       // case, the member will be modeled as an inout but ExistentialMemberRef
       // and ArchetypeMemberRef want to take the base as an rvalue.
       if (auto *fd = dyn_cast<FuncDecl>(func))

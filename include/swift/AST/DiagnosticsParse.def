@@ -177,8 +177,14 @@ ERROR(decl_inner_scope,decl_parsing,none,
 
 ERROR(decl_not_static,decl_parsing,none,
       "declaration cannot be marked %0", (StaticSpellingKind))
-ERROR(mutating_invalid,sema_tcd,none,
+ERROR(mutating_invalid,decl_parsing,none,
       "'mutating' is not valid on this declaration", ())
+ERROR(mutating_invalid_init,decl_parsing,none,
+      "'mutating' isn't allowed on init methods", ())
+
+ERROR(mutating_not_keyword,sema_tcd,none,
+      "'mutating' is not an attribute, use the %select{|non}0mutating keyword",
+     (unsigned))
 ERROR(override_invalid,sema_tcd,none,
       "'override' is not valid on this declaration", ())
 
@@ -262,7 +268,7 @@ ERROR(static_func_decl_global_scope,decl_parsing,none,
       "%select{ERROR|static functions|class methods}0 may only be declared on a type",
       (StaticSpellingKind))
 ERROR(static_functions_not_mutating,sema_tcd,none,
-      "static functions may not be declared @mutating", ())
+      "static functions may not be declared mutating", ())
 ERROR(func_selector_without_paren,decl_parsing,PointsToFirstBadToken,
       "expected '(' after identifier in argument list of selector-style function declaration", ())
 ERROR(func_selector_with_not_one_argument,decl_parsing,none,

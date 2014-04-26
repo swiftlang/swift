@@ -3178,7 +3178,7 @@ public:
       }
     }
 
-    // Validate the @mutating attribute if present, and install it into the bit
+    // Validate the mutating attribute if present, and install it into the bit
     // on funcdecl (instead of just being in DeclAttrs).
     Optional<bool> MutatingAttr = FD->getAttrs().getMutating();
     if (MutatingAttr) {
@@ -4029,11 +4029,7 @@ public:
 
     assert(CD->getDeclContext()->isTypeContext()
            && "Decl parsing must prevent constructors outside of types!");
-
-    // Reject @mutating and @!mutating attributes.
-    if (CD->getAttrs().getMutating())
-      TC.diagnose(CD->getAttrs().getLoc(AK_mutating),
-                  diag::mutating_invalid_init);
+    assert(!CD->getAttrs().hasMutating() && "Cannot parse this");
 
     // convenience initializers are only allowed on classes and in
     // extensions thereof.

@@ -165,20 +165,20 @@ ERROR(load_of_explicit_lvalue,sema_tcc,none,
 // Expression Type Checking Errors
 //------------------------------------------------------------------------------
 ERROR(invalid_relation,sema_tcc,none,
-  "%1 is not %select{identical to|a subtype of|"
-  "convertible to|constructible with|identical to}0 %2", (unsigned, Type, Type))
+      "%1 is not %select{identical to|a subtype of|"
+      "convertible to|constructible with|identical to}0 %2", (unsigned, Type, Type))
 ERROR(invalid_tuple_size,sema_tcc,none,
-  "tuple types %0 and %1 have a different number of elements (%2 vs. %3)",
-  (Type, Type, unsigned, unsigned))
+      "tuple types %0 and %1 have a different number of elements (%2 vs. %3)",
+      (Type, Type, unsigned, unsigned))
 ERROR(invalid_tuple_element_unused,sema_tcc,none,
-  "tuple element of type %0 unused when converting tuple to %1",
-  (Type, Type))
+      "tuple element of type %0 unused when converting tuple to %1",
+      (Type, Type))
 ERROR(does_not_have_member,sema_tcc,none,
-  "%0 does not have a member named %1",
-  (Type, DeclName))
+      "%0 does not have a member named %1",
+      (Type, DeclName))
 ERROR(does_not_have_non_mutating_member,sema_tcc,none,
-"immutable value of type %0 only has mutating members named %1",
-(Type, DeclName))
+      "immutable value of type %0 only has mutating members named %1",
+      (Type, DeclName))
 ERROR(isa_is_always_true,sema_tcc,none,
       "'is' test is always true",
       (Type, Type))
@@ -255,8 +255,6 @@ ERROR(mutating_invalid_global_scope,sema_tcd,none,
 ERROR(mutating_invalid_classes,sema_tcd,none,
       "'mutating' isn't valid on methods in classes or class-bound protocols",
       ())
-ERROR(mutating_invalid_init,sema_tcd,none,
-      "'mutating' isn't allowed on init methods", ())
 ERROR(conversion_not_function,sema_tcd,none,
       "conversion should be applied to an instance method", ())
 ERROR(conversion_not_instance_method,sema_tcd,none,

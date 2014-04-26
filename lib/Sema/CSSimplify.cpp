@@ -1576,7 +1576,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
     }
 
     // If we have an rvalue base of struct or enum type, make sure that the
-    // result isn't @mutating (only valid on lvalues).
+    // result isn't mutating (only valid on lvalues).
     if (!isMetatype && !baseObjTy->hasReferenceSemantics() &&
         !baseTy->is<LValueType>() && result->isInstanceMember()) {
       if (auto *FD = dyn_cast<FuncDecl>(result))
@@ -1585,7 +1585,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
           continue;
         }
 
-      // Subscripts are ok on rvalues so long as the getter is @!mutating.
+      // Subscripts are ok on rvalues so long as the getter is nonmutating.
       if (auto *SD = dyn_cast<SubscriptDecl>(result))
         if (SD->getGetter()->isMutating()) {
           FoundMutating = true;
@@ -1593,7 +1593,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
         }
 
       // Computed properties are ok on rvalues so long as the getter is
-      // non-mutating.
+      // nonmutating.
       if (auto *VD = dyn_cast<VarDecl>(result))
         if (auto *GD = VD->getGetter())
           if (GD->isMutating()) {

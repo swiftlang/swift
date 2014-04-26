@@ -84,11 +84,10 @@ void DeclAttributes::print(ASTPrinter &Printer,
     Printer << "@requires_stored_property_inits ";
   if (isOptional())
     Printer << "@optional ";
+
   Optional<bool> MutatingAttr = getMutating();
-  if (MutatingAttr && MutatingAttr.getValue())
-    Printer << "@mutating ";
-  if (MutatingAttr && !MutatingAttr.getValue())
-    Printer << "@!mutating ";
+  if (MutatingAttr)
+    Printer << (MutatingAttr.getValue() ? "mutating " : "nonmutating ");
 }
 
 void DeclAttribute::print(ASTPrinter &Printer) const {

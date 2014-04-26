@@ -716,7 +716,7 @@ public:
   SourceLoc AtLoc;
 
   /// When the mutating attribute is present (i.e., we have a location for it),
-  /// this indicates whether it was inverted (@!mutating) or not (@mutating).
+  /// indicating whether it was inverted ("nonmutating") or not ("mutating").
   /// Clients should generally use the getMutating() accessor.
   bool MutatingInverted = false;
 
