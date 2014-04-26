@@ -2002,6 +2002,17 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags, Pattern *Indices,
       DeclAttributes Attributes;
       parseDeclAttributeList(Attributes);
 
+      // Parse the contextual keywords for 'mutating' and 'nonmutating' before
+      // get and set.
+      if ((Tok.isContextualKeyword("mutating") ||
+           Tok.isContextualKeyword("nonmutating")) &&
+          (peekToken().isContextualKeyword("get") ||
+           peekToken().isContextualKeyword("set"))) {
+        Attributes.setAttr(AK_mutating, Tok.getLoc());
+        Attributes.MutatingInverted = Tok.isContextualKeyword("nonmutating");
+        consumeToken(tok::identifier);
+      }
+
       AccessorKind Kind;
       FuncDecl **TheDeclPtr;
       if (Tok.isContextualKeyword("get")) {
