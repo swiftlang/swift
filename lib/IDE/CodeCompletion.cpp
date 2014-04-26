@@ -1852,9 +1852,7 @@ public:
     }
   }
 
-  void addDesignatedInitializers() {
-    Type CurrTy = CurrDeclContext->getInnermostTypeContext()
-                      ->getDeclaredTypeInContext();
+  void addDesignatedInitializers(Type CurrTy) {
     if (!CurrTy)
       return;
     const auto *NTD = CurrTy->getAnyNominal();
@@ -1878,9 +1876,11 @@ public:
   }
 
   void getOverrideCompletions(SourceLoc Loc) {
-    lookupVisibleDecls(*this, CurrDeclContext, TypeResolver.get(),
-                       /*IncludeTopLevel=*/false, Loc);
-    addDesignatedInitializers();
+    Type CurrTy =
+        CurrDeclContext->getInnermostTypeContext()->getDeclaredTypeInContext();
+    lookupVisibleMemberDecls(*this, CurrTy, CurrDeclContext,
+                             TypeResolver.get());
+    addDesignatedInitializers(CurrTy);
   }
 };
 

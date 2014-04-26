@@ -300,21 +300,23 @@ static DeclVisibilityKind getReasonForSuper(DeclVisibilityKind Reason) {
 static void lookupDeclsFromProtocolsBeingConformedTo(
     Type BaseTy, VisibleDeclConsumer &Consumer, LookupState LS,
     DeclVisibilityKind Reason, VisitedSet &Visited) {
-  if (!isTypeDeclVisibleInLookupMode(LS))
-    return;
-
-  NominalTypeDecl *CurNominal = BaseTy->getAnyNominal();
-  if (!CurNominal)
+  NominalTypeDecl *CurrNominal = BaseTy->getAnyNominal();
+  if (!CurrNominal)
     return;
 
   llvm::SmallPtrSet<ProtocolDecl *, 8> ProtocolsWithConformances;
-  for (const auto *Conformance : CurNominal->getConformances()) {
+  for (const auto *Conformance : CurrNominal->getConformances()) {
     if (!Conformance->isComplete())
       continue;
-    ProtocolsWithConformances.insert(Conformance->getProtocol());
+    auto Proto = Conformance->getProtocol();
+    ProtocolsWithConformances.insert(Proto);
+    auto Protocols = Proto->getProtocols();
+    ProtocolsWithConformances.insert(Protocols.begin(), Protocols.end());
   }
 
-  auto TopProtocols = CurNominal->getProtocols();
+  CurrNominal = BaseTy->getAnyNominal();
+
+  auto TopProtocols = CurrNominal->getProtocols();
   SmallVector<ProtocolDecl *, 8> Worklist(TopProtocols.begin(),
                                           TopProtocols.end());
   while (!Worklist.empty()) {
@@ -332,7 +334,9 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
 
     for (auto Member : Proto->getMembers()) {
       if (auto *ATD = dyn_cast<AssociatedTypeDecl>(Member)) {
-        Consumer.foundDecl(ATD, ReasonForThisProtocol);
+        if (isTypeDeclVisibleInLookupMode(LS)) {
+          Consumer.foundDecl(ATD, ReasonForThisProtocol);
+        }
         continue;
       }
       if (ShouldFindValueRequirements) {
