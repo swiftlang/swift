@@ -490,14 +490,6 @@ public:
       if (!ActiveLabeledStmts.empty())
         Target = ActiveLabeledStmts.back();
 
-      // Temporarily reject break statements that are in a switch, since their
-      // semantics are changing.
-      // FIXME: Remove this: rdar://16563853.
-      if (Target && isa<SwitchStmt>(Target)) {
-        TC.diagnose(S->getLoc(), diag::break_not_in_switch);
-        return nullptr;
-      }
-
     } else {
       // Scan inside out until we find something with the right label.
       for (auto I = ActiveLabeledStmts.rbegin(), E = ActiveLabeledStmts.rend();

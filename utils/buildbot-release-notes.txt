@@ -1,6 +1,8 @@
 Latest
 ----------
 
+* 'break' now breaks out of switch statements.
+
 * NSLog is now available from Swift code.
 
 2014-04-22

@@ -918,9 +918,6 @@ ERROR(sequence_protocol_broken,sema_tcs,none,
 ERROR(generator_protocol_broken,sema_tcs,none,
       "Generator protocol definition is broken", ())
 
-ERROR(break_not_in_switch,sema_tcs,none,
-      "'break' is (temporarily) not allowed inside a switch", ())
-
 ERROR(label_shadowed,sema_tcs, none,
       "label %0 cannot be reused on an inner statement", (Identifier))
 ERROR(break_outside_loop,sema_tcs,none,
