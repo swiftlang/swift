@@ -285,6 +285,7 @@ contextual keywords within the language:
   get
   infix
   mutating
+  nonmutating
   operator
   override
   postfix
@@ -640,8 +641,8 @@ Import Declarations
   get-set        ::= get set?
   get-set        ::= set get
 
-  get            ::= attribute-list 'get' brace-item-list
-  set            ::= attribute-list 'set' set-name? brace-item-list
+  get            ::= attribute-list ( 'mutating' | 'nonmutating' )? 'get' brace-item-list
+  set            ::= attribute-list ( 'mutating' | 'nonmutating' )? 'set' set-name? brace-item-list
   set-name       ::= '(' identifier ')'
 
   willset-didset ::= willset didset?
@@ -650,8 +651,8 @@ Import Declarations
   willset        ::= attribute-list 'willSet' set-name? brace-item-list
   didset         ::= attribute-list 'didSet' set-name? brace-item-list
 
-  get-kw         ::= attribute-list 'get'
-  set-kw         ::= attribute-list 'set'
+  get-kw         ::= attribute-list ( 'mutating' | 'nonmutating' )? 'get'
+  set-kw         ::= attribute-list ( 'mutating' | 'nonmutating' )? 'set'
   get-set-kw     ::= get-kw set-kw?
   get-set-kw     ::= set-kw get-kw
 
@@ -795,7 +796,7 @@ protocols.
 .. code-block:: none
 
   // Keywords can be specified in any order.
-  decl-func-head-kw ::= ('static' | 'class')? 'override'? 'mutating'?
+  decl-func-head-kw ::= ( 'static' | 'class' )? 'override'? ( 'mutating' | 'nonmutating' )?
 
   decl-func        ::= attribute-list decl-func-head-kw? 'func' any-identifier generic-params? func-signature brace-item-list?
 
