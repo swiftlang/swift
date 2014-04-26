@@ -431,6 +431,11 @@ public:
     return SubstCalleeType;
   }
 
+  bool isCalleeThin() const {
+    auto Rep = getSubstCalleeType()->getRepresentation();
+    return Rep == FunctionType::Representation::Thin;
+  }
+
   /// True if this application has generic substitutions.
   bool hasSubstitutions() const { return NumSubstitutions != 0; }
 

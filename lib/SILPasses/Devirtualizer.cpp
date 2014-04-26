@@ -1085,6 +1085,8 @@ void SILDevirtualizer::optimizeClassMethodInst(ClassMethodInst *CMI) {
   // Otherwise walk up the class heirarchy until there are no more super classes
   // (i.e. Class becomes null) or we find a match with member.
   SILDeclRef Member = CMI->getMember();
+  bool Success = false;
+  (void)Success;
 
   // Until we reach the top of the class hierarchy...
   while (Class) {
@@ -1122,24 +1124,29 @@ void SILDevirtualizer::optimizeClassMethodInst(ClassMethodInst *CMI) {
     }
 
     // Success! We found the method! Create a direct reference to it.
-    SILInstruction *FRI =
+    FunctionRefInst *FRI =
         new (CMI->getModule()) FunctionRefInst(CMI->getLoc(), F);
 
-    DEBUG(llvm::dbgs() << "        SUCCESS: " << *CMI);
     CMI->getParent()->getInstList().insert(CMI, FRI);
     CMI->replaceAllUsesWith(FRI);
     CMI->eraseFromParent();
+
+    DEBUG(llvm::dbgs() << "        SUCCESS: " << F->getName() << "\n");
+
     for (auto UI = FRI->use_begin(), UE = FRI->use_end(); UI != UE; ++UI)
       if (ApplyInst *AI = dyn_cast<ApplyInst>(UI->getUser()))
         if (AI != toBeDeleted)
           collectPolyArgs(AI);
     NumDevirtualized++;
     Changed = true;
+    Success = true;
     break;
   }
 
-  DEBUG(llvm::dbgs() << "        FAIL: Could not find matching VTable or "
-        "vtable method for this class.\n");
+  if (!Success)
+    DEBUG(llvm::dbgs() << "        FAIL: Could not find matching VTable or "
+          "vtable method for this class.\n");
+
 }
 
 /// \brief Scan the uses of the protocol object and return the initialization
@@ -1148,6 +1155,7 @@ void SILDevirtualizer::optimizeClassMethodInst(ClassMethodInst *CMI) {
 /// object must not be captured by any instruction that may re-initialize it.
 static SILInstruction *
 findSingleInitNoCaptureProtocol(SILValue ProtocolObject) {
+  DEBUG(llvm::dbgs() << "        Checking if protocol object is captured: " << ProtocolObject);
   SILInstruction *Init = 0;
   for (auto UI = ProtocolObject->use_begin(), E = ProtocolObject->use_end();
        UI != E; UI++) {
@@ -1165,7 +1173,7 @@ findSingleInitNoCaptureProtocol(SILValue ProtocolObject) {
     case ValueKind::InitExistentialInst: {
       // Make sure there is a single initialization:
       if (Init) {
-        DEBUG(llvm::dbgs() << "        FAIL: Multiple Protocol initializers: "
+        DEBUG(llvm::dbgs() << "            FAIL: Multiple Protocol initializers: "
                            << *UI.getUser() << " and " << *Init);
         return nullptr;
       }
@@ -1184,13 +1192,24 @@ findSingleInitNoCaptureProtocol(SILValue ProtocolObject) {
     case ValueKind::ReleaseValueInst:
       continue;
 
+    // A thin apply inst that uses this object as a callee does not capture it.
+    case ValueKind::ApplyInst: {
+      auto *AI = cast<ApplyInst>(UI.getUser());
+      if (AI->isCalleeThin() && AI->getCallee() == ProtocolObject)
+        continue;
+
+      // Fallthrough
+      SWIFT_FALLTHROUGH;
+    }
+
     default: {
-      DEBUG(llvm::dbgs() << "        FAIL: Protocol captured by: "
-            << *UI.getUser());
+      DEBUG(llvm::dbgs() << "            FAIL: Protocol captured by: "
+                         << *UI.getUser());
       return nullptr;
     }
     }
   }
+  DEBUG(llvm::dbgs() << "            Protocol not captured.\n");
   return Init;
 }
 
@@ -1230,6 +1249,7 @@ CanType SILDevirtualizer::resolveObjectType(SILValue Obj) {
 /// instruction that does not use a project_existential \p PEI and calls \p F
 /// directly. See visitApplyInst.
 static ApplyInst *replaceDynApplyWithStaticApply(ApplyInst *AI, SILFunction *F,
+                                                 ArrayRef<Substitution> Subs,
                                                  InitExistentialInst *In,
                                                  ProjectExistentialInst *PEI) {
   // Creates a new FunctionRef Inst and inserts it to the basic block.
@@ -1245,11 +1265,12 @@ static ApplyInst *replaceDynApplyWithStaticApply(ApplyInst *AI, SILFunction *F,
   }
 
   // Create a new non-virtual ApplyInst.
-  SILType FnTy = FRI->getType();
+  SILType SubstFnTy = FRI->getType().substInterfaceGenericArgs(F->getModule(),
+                                                               Subs);
   ApplyInst *SAI = ApplyInst::create(
-      AI->getLoc(), FRI, FnTy,
-      FnTy.castTo<SILFunctionType>()->getInterfaceResult().getSILType(),
-      ArrayRef<Substitution>(), Args, false, *F);
+      AI->getLoc(), FRI, SubstFnTy,
+      SubstFnTy.castTo<SILFunctionType>()->getInterfaceResult().getSILType(),
+      Subs, Args, false, *F);
   AI->getParent()->getInstList().insert(AI, SAI);
   AI->replaceAllUsesWith(SAI);
   AI->eraseFromParent();
@@ -1258,9 +1279,10 @@ static ApplyInst *replaceDynApplyWithStaticApply(ApplyInst *AI, SILFunction *F,
 
 /// \brief Given a protocol \p Proto, a member method \p Member and a concrete
 /// class type \p ConcreteTy, search the witness tables and return the static
-/// function that matches the member. Notice that we do not scan the class
-/// hierarchy, just the concrete class type.
-SILFunction *
+/// function that matches the member with any specializations may be
+/// required. Notice that we do not scan the class hierarchy, just the concrete
+/// class type.
+std::pair<SILFunction *, ArrayRef<Substitution>>
 findFuncInWitnessTable(SILDeclRef Member, ProtocolConformance *C,
                        SILModule &Mod) {
   // Look up the witness table associated with our protocol conformance from the
@@ -1268,17 +1290,11 @@ findFuncInWitnessTable(SILDeclRef Member, ProtocolConformance *C,
   std::pair<SILWitnessTable *, ArrayRef<Substitution>> Ret =
     Mod.lookUpWitnessTable(C);
 
+  // If no witness table was found, bail.
   if (!Ret.first) {
     DEBUG(llvm::dbgs() << "        Failed speculative lookup of witness for: ";
           C->dump());
-    return nullptr;
-  }
-
-  // Don't handle specialized protocol conformances for now.
-  if (Ret.second.size()) {
-    DEBUG(llvm::dbgs() << "        Found matching specialized protocol "
-          "conformance. Unhandled case.\n");
-    return nullptr;
+    return {nullptr, ArrayRef<Substitution>()};
   }
 
   // Okay, we found the correct witness table. Now look for the method.
@@ -1292,10 +1308,10 @@ findFuncInWitnessTable(SILDeclRef Member, ProtocolConformance *C,
     if (MethodEntry.Requirement != Member)
       continue;
 
-    return MethodEntry.Witness;
+    return {MethodEntry.Witness, Ret.second};
   }
 
-  return nullptr;
+  return {nullptr, ArrayRef<Substitution>()};
 }
 
 void SILDevirtualizer::optimizeApplyInst(ApplyInst *AI) {
@@ -1399,6 +1415,8 @@ void SILDevirtualizer::optimizeApplyInst(ApplyInst *AI) {
   if (!PMI)
     return;
 
+  DEBUG(llvm::dbgs() << "        Found ProtocolMethodInst: " << *PMI);
+
   // Find the last argument, which is the Self argument, which may be a
   // project_existential instruction.
   MutableArrayRef<Operand> Args = AI->getArgumentOperands();
@@ -1409,6 +1427,9 @@ void SILDevirtualizer::optimizeApplyInst(ApplyInst *AI) {
   ProjectExistentialInst *PEI = dyn_cast<ProjectExistentialInst>(LastArg);
   if (!PEI)
     return;
+
+  DEBUG(llvm::dbgs() << "        Found ProjectExistentialInst: "
+        << *PEI);
 
   // Make sure that the project_existential and protocol_method instructions
   // use the same protocol.
@@ -1433,18 +1454,32 @@ void SILDevirtualizer::optimizeApplyInst(ApplyInst *AI) {
   InitExistentialInst *Init = dyn_cast_or_null<InitExistentialInst>(InitInst);
   if (!Init)
     return;
+  DEBUG(llvm::dbgs() << "        InitExistentialInst : " << *Init);
 
   // For each protocol that our type conforms to:
   for (ProtocolConformance *Conf : Init->getConformances()) {
-    SILFunction *StaticRef = findFuncInWitnessTable(PMI->getMember(),
-                                                    Conf,
-                                                    Init->getModule());
+    auto Pair = findFuncInWitnessTable(PMI->getMember(),
+                                       Conf,
+                                       Init->getModule());
+
+    SILFunction *StaticRef = Pair.first;
+    ArrayRef<Substitution> Subs = Pair.second;
+
     if (!StaticRef)
+      continue;
+
+    // If any of our subs is generic, don't replace anything.
+    bool FoundGenericSub = false;
+    for (auto &Sub : Subs)
+      if (hasUnboundGenericTypes(Sub.Replacement->getCanonicalType()))
+        FoundGenericSub = true;
+
+    if (FoundGenericSub)
       continue;
 
     DEBUG(llvm::dbgs() << "        SUCCESS! Devirtualized : " << *AI);
     ApplyInst *NewApply =
-      replaceDynApplyWithStaticApply(AI, StaticRef, Init, PEI);
+      replaceDynApplyWithStaticApply(AI, StaticRef, Subs, Init, PEI);
     DEBUG(llvm::dbgs() << "                To : " << *NewApply);
     collectPolyArgs(NewApply);
     NumDynApply++;
