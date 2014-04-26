@@ -2551,10 +2551,6 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
                                        CanSILFunctionType outType,
                                        ArrayRef<Substitution> subs,
                                        HeapLayout const &layout) {
-  #warning ""
-  origType.dump();
-  substType.dump();
-  outType.dump();
   llvm::AttributeSet attrs;
   ExtraData extraData
     = layout.isKnownEmpty() ? ExtraData::None : ExtraData::Retainable;
@@ -2651,9 +2647,6 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
       
       // Reemit the capture params as unsubstituted.
       if (origParamI < origType->getInterfaceParameters().size()) {
-#warning ""
-        origType->getInterfaceParameters()[origParamI].dump();
-        substType->getInterfaceParameters()[origParamI].dump();
         emitApplyArgument(subIGF,
                           origType->getInterfaceParameters()[origParamI],
                           substType->getInterfaceParameters()[origParamI], subs, param, params);
