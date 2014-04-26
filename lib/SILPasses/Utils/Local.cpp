@@ -211,7 +211,7 @@ void swift::replaceWithSpecializedFunction(ApplyInst *AI, SILFunction *NewF) {
 }
 
 bool swift::hasUnboundGenericTypes(CanType T) {
-    return T.findIf([](Type type) ->bool {
-      return isa<ArchetypeType>(type.getPointer());
-    });
- }
+  return T.findIf([](Type type) ->bool {
+    return isa<ArchetypeType>(type.getPointer());
+  });
+}
