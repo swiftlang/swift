@@ -192,7 +192,14 @@ public:
   /// insertion point to it.  Only valid if the IP is valid.
   void emitBlock(llvm::BasicBlock *BB);
 
- };
+  using IRBuilderBase::CreateMemCpy;
+  llvm::CallInst *CreateMemCpy(Address dest, Address src, Size size) {
+    return CreateMemCpy(dest.getAddress(), src.getAddress(),
+                        size.getValue(),
+                        std::min(dest.getAlignment(),
+                                 src.getAlignment()).getValue());
+  }
+};
 
 } // end namespace irgen
 } // end namespace swift
