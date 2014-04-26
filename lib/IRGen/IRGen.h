@@ -195,8 +195,14 @@ class Size {
 public:
   typedef uint64_t int_type;
 
-  Size() : Value(0) {}
-  explicit Size(int_type Value) : Value(Value) {}
+  constexpr Size() : Value(0) {}
+  explicit constexpr Size(int_type Value) : Value(Value) {}
+
+  /// An "invalid" size, equal to the maximum possible size.
+  static constexpr Size invalid() { return Size(~int_type(0)); }
+
+  /// Is this the "invalid" size value?
+  bool isInvalid() const { return *this == Size::invalid(); }
 
   int_type getValue() const { return Value; }
   
@@ -231,6 +237,10 @@ public:
     return L;
   }
 
+  friend int_type operator/(Size L, Size R) {
+    return L.Value / R.Value;
+  }
+
   explicit operator bool() const { return Value != 0; }
 
   Size roundUpToAlignment(Alignment align) const {
@@ -241,6 +251,10 @@ public:
   bool isPowerOf2() const {
     auto value = getValue();
     return ((value & -value) == value);
+  }
+
+  bool isMultipleOf(Size other) const {
+    return (Value % other.Value) == 0;
   }
 
   friend bool operator< (Size L, Size R) { return L.Value <  R.Value; }
