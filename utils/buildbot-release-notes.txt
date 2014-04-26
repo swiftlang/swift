@@ -3,6 +3,18 @@ Latest
 
 * 'break' now breaks out of switch statements.
 
+* It is no longer possible to specify "@mutating" as an attribute, you may only
+  use it as a keyword, e.g.:
+  
+    struct Pair {
+      var x, y : Int
+      mutating func nuke() { x = 0; y = 0 }
+    }
+  
+  The former "@!mutating" syntax used to mark setters as non-mutating is now
+  spelled with the "nonmutating" keyword.  Both mutating and nonmutating are
+  context sensitive keywords.
+
 * NSLog is now available from Swift code.
 
 2014-04-22
