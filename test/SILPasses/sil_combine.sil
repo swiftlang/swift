@@ -1036,3 +1036,14 @@ bb0(%0 : $B):
   %2 = unchecked_ref_cast %1 : $E to $F
   return %2 : $F
 }
+
+// CHECK-LABEL: sil @unchecked_ref_cast_formation : $@thin (B) -> F {
+// CHECK: bb0([[INPUT_REF:%[0-9]+]] : $B):
+// CHECK-NEXT: [[CAST_REF:%[0-9]+]] = unchecked_ref_cast [[INPUT_REF]] : $B to $F
+// CHECK-NEXT: return
+sil @unchecked_ref_cast_formation : $@thin (B) -> F {
+bb0(%0 : $B):
+  %1 = ref_to_raw_pointer %0 : $B to $Builtin.RawPointer
+  %2 = raw_pointer_to_ref %1 : $Builtin.RawPointer to $F
+  return %2 : $F
+}

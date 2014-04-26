@@ -270,6 +270,8 @@ public:
   SILInstruction *visitPointerToAddressInst(PointerToAddressInst *PTAI);
   SILInstruction *visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI);
   SILInstruction *visitUncheckedRefCastInst(UncheckedRefCastInst *URCI);
+  SILInstruction *visitRawPointerToRefInst(RawPointerToRefInst *RPTR);
+
 
 private:
   /// Perform one SILCombine iteration.
@@ -964,6 +966,21 @@ SILCombiner::visitUncheckedRefCastInst(UncheckedRefCastInst *URCI) {
 
   return nullptr;
 }
+
+SILInstruction *
+SILCombiner::
+visitRawPointerToRefInst(RawPointerToRefInst *RawToRef) {
+  // (raw_pointer_to_ref (ref_to_raw_pointer x X->Y) Y->Z)
+  //   ->
+  // (unchecked_ref_cast X->Z)
+  if (auto *RefToRaw = dyn_cast<RefToRawPointerInst>(RawToRef->getOperand())) {
+    return new (RawToRef->getModule()) UncheckedRefCastInst(
+        RawToRef->getLoc(), RefToRaw->getOperand(), RawToRef->getType());
+  }
+
+  return nullptr;
+}
+
 //===----------------------------------------------------------------------===//
 //                                Entry Points
 //===----------------------------------------------------------------------===//
