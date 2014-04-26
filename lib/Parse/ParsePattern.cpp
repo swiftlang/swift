@@ -289,31 +289,24 @@ static ParserResult<Pattern> parseArgument(
   // shorthand where the elements get the name of the selector chunk.  The
   // later includes the names are specified for each piece.
 
-  // Before doing a speculative parse, check for the common cases of
+  // Before doing a full speculative parse, check for the common cases of
   // "identifier:" (always named), "identifier)" (always unnamed), and
   // "identifier =" (always unnamed).  We know to parse the second identifier in
   // "identifier(identifier = ...)" as a type because all arguments are required
   // to have types.
-  if (P.Tok.is(tok::identifier) && P.peekToken().is(tok::colon))
+  if ((P.Tok.is(tok::identifier) || P.Tok.is(tok::kw__)) &&
+      P.peekToken().is(tok::colon))
     isImpliedNameArgument = false;
-  else if (P.Tok.is(tok::identifier) && P.peekToken().is(tok::r_paren))
+  else if (P.Tok.is(tok::identifier) &&
+           (P.peekToken().is(tok::r_paren) || P.peekToken().is(tok::comma)))
+    // "Int," and "Int)" are always a type.
     isImpliedNameArgument = true;
   else if (P.Tok.is(tok::identifier) && P.peekToken().is(tok::equal))
+    // This is always a type with a default argument.
     isImpliedNameArgument = true;
-  else if (P.Tok.is(tok::l_paren)) {
-    // Nested tuple values like "(a : Int, b: Int)" destructure the argument
-    // further, so never parse them as an implied name.  However, function types
-    // like "() -> Int" are implied name arguments.  Speculatively parse to
-    // disambiguate the cases.
-
-    // Otherwise, we do a full speculative parse to determine this.
-    Parser::BacktrackingScope backtrack(P);
-    P.consumeToken(tok::l_paren);
-    
-    isImpliedNameArgument = P.canParseTypeTupleBody() &&
-        P.Tok.isNot(tok::r_paren) && P.Tok.isNot(tok::colon) &&
-        P.Tok.isNot(tok::comma);
-  } else {
+  else if (!P.Tok.isContextualKeyword("inout") || P.peekToken().is(tok::colon))
+    isImpliedNameArgument = true;
+  else {
     // Otherwise, we do a full speculative parse to determine this.
     Parser::BacktrackingScope backtrack(P);
 
@@ -321,10 +314,13 @@ static ParserResult<Pattern> parseArgument(
     if (P.Tok.isContextualKeyword("inout"))
       P.consumeToken(tok::identifier);
 
-    // This is type-only if it is a valid type followed by an r_paren or equal.
-    isImpliedNameArgument = P.canParseType();
-    if (isImpliedNameArgument)
-      isImpliedNameArgument = P.Tok.is(tok::r_paren) || P.Tok.is(tok::equal);
+    // If we are left with "x :" or "x y:" then we have a name.
+    isImpliedNameArgument = true;
+    if (P.consumeIf(tok::identifier) || P.consumeIf(tok::kw__)) {
+      // We allow doubled names.
+      if (!P.consumeIf(tok::identifier)) P.consumeIf(tok::kw__);
+      isImpliedNameArgument = !P.Tok.is(tok::colon);
+    }
   }
 
   // If this is a standard tuple, parse it.
