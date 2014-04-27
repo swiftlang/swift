@@ -1030,8 +1030,25 @@ bool SILDevirtualizer::checkDevirtType(SILFunction *F, ClassMethodInst *CMI) {
   // a downcast to have the correct type.
   if (CMI->getOperand()->getKind() != ValueKind::UpcastInst)
     return false;
-  auto Origin = cast<SILInstruction>(CMI->getOperand())->getOperand(0);
-  if (paramTy != Origin.getType().getSwiftRValueType())
+  auto origin = cast<SILInstruction>(CMI->getOperand())->getOperand(0);
+
+  // See if Origin has any substitutions. If it does, we need to specialize
+  // paramTy.
+  //
+  // FIXME: See if this can be moved to the beginning.
+  SILModule &Mod = F->getModule();
+  SILType originTy = origin.getType();
+  ArrayRef<Substitution> originSubs = originTy.gatherAllSubstitutions(Mod);
+  if (originSubs.size()) {
+    CanSILFunctionType FTy = F->getLoweredFunctionType();
+    FTy = FTy->substInterfaceGenericArgs(Mod,
+                                         Mod.getSwiftModule(),
+                                         originSubs);
+    paramTypes = FTy->getInterfaceParametersWithoutIndirectResult();
+    paramTy = paramTypes[paramTypes.size() - 1].getType();
+  }
+
+  if (paramTy != originTy.getSwiftRValueType())
     return false;
 
   // We handle updating of ApplyInst only.
@@ -1052,7 +1069,7 @@ bool SILDevirtualizer::checkDevirtType(SILFunction *F, ClassMethodInst *CMI) {
       ArrayRef<Operand> ApplyArgs = AI->getArgumentOperands();
       for (auto &A : ApplyArgs.slice(0, ApplyArgs.size() - 1))
         Args.push_back(A.get());
-      Args.push_back(Origin);
+      Args.push_back(origin);
 
       ApplyInst *SAI = Builder.createApply(AI->getLoc(), AI->getCallee(),
                                            AI->getSubstCalleeSILType(),
@@ -1371,7 +1388,7 @@ void SILDevirtualizer::optimizeApplyInst(ApplyInst *AI) {
         if (Ret.second.size()) {
           // If we have substitutions then we are an inherited specialized
           // conformance. Substitute in the generic type so we upcast correctly.
-          GenericParamList *GP = C->getGenericParams();
+          GenericParamList *GP = C->getSubstitutedGenericParams();
           if (!GP)
             return;
 
