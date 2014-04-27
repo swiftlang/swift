@@ -583,6 +583,9 @@ public:
     return getAnyOptionalObjectType(ignored);
   }
 
+  /// Whether this is the AnyObject type.
+  bool isAnyObject();
+
   void dump() const;
   void print(raw_ostream &OS,
              const PrintOptions &PO = PrintOptions()) const;

@@ -1005,7 +1005,7 @@ commit_to_conversions:
   // If we should attempt fixes, add those to the list. They'll only be visited
   // if there are no other possible solutions.
   if (shouldAttemptFixes() && !typeVar1 && !typeVar2 &&
-      !(flags & TMF_ApplyingFix)) {
+      !(flags & TMF_ApplyingFix) && kind >= TypeMatchKind::Conversion) {
     // If the source type is a function type that could be applied with (),
     // try it.
     if (isFunctionTypeAcceptingNoArguments(type1)) {
@@ -1016,6 +1016,13 @@ commit_to_conversions:
     // FIXME: Should we also try '?'?
     if (type1->getRValueType()->getOptionalObjectType()) {
       conversionsOrFixes.push_back(ExprFixKind::ForceOptional);
+    }
+
+    // If we have a value of type AnyObject that we're trying to convert to
+    // a class, force a downcast.
+    if (type1->getRValueType()->isAnyObject() &&
+        type2->getClassOrBoundGenericClass()) {
+      conversionsOrFixes.push_back(ExprFixKind::ForceDowncast);
     }
   }
 
@@ -2197,7 +2204,8 @@ ConstraintSystem::simplifyFixConstraint(ExprFixKind fix,
                       matchKind, subFlags, locator);
 
   case ExprFixKind::ForceDowncast: {
-    llvm_unreachable("Force-downcast fix not yet supported");
+    // This one works whenever it is suggested.
+    return SolutionKind::Solved;
   }
   }
 }

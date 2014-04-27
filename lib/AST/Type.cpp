@@ -442,6 +442,13 @@ CanType CanType::getAnyOptionalObjectTypeImpl(CanType type) {
   return CanType();
 }
 
+bool TypeBase::isAnyObject() {
+  if (auto proto = getAs<ProtocolType>())
+    return proto->getDecl()->isSpecificProtocol(KnownProtocolKind::AnyObject);
+
+  return false;
+}
+
 static Type getStrippedType(const ASTContext &context, Type type,
                             bool stripLabels, bool stripDefaultArgs) {
   return type.transform([&](Type type) -> Type {
