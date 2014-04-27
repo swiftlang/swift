@@ -431,6 +431,34 @@ private:
   friend class TypeRepr;
 };
 
+/// \brief An unchecked optional type.
+/// \code
+///   Foo!
+/// \endcode
+class UncheckedOptionalTypeRepr : public TypeRepr {
+  TypeRepr *Base;
+  SourceLoc ExclamationLoc;
+
+public:
+  UncheckedOptionalTypeRepr(TypeRepr *Base, SourceLoc Exclamation)
+    : TypeRepr(TypeReprKind::UncheckedOptional),
+      Base(Base),
+      ExclamationLoc(Exclamation) {}
+
+  TypeRepr *getBase() const { return Base; }
+  SourceLoc getExclamationLoc() const { return ExclamationLoc; }
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::UncheckedOptional;
+  }
+
+private:
+  SourceLoc getStartLocImpl() const { return Base->getStartLoc(); }
+  SourceLoc getEndLocImpl() const { return ExclamationLoc; }
+  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  friend class TypeRepr;
+};
+
 /// \brief A tuple type.
 /// \code
 ///   (Foo, Bar)
@@ -642,6 +670,7 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::Protocol:
   case TypeReprKind::Named:
   case TypeReprKind::Optional:
+  case TypeReprKind::UncheckedOptional:
   case TypeReprKind::ProtocolComposition:
   case TypeReprKind::Tuple:
     return true;

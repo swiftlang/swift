@@ -142,6 +142,12 @@ TypeRepr *CloneVisitor::visitOptionalTypeRepr(OptionalTypeRepr *T) {
   return new (Ctx) OptionalTypeRepr(visit(T->getBase()), T->getQuestionLoc());
 }
 
+TypeRepr *
+CloneVisitor::visitUncheckedOptionalTypeRepr(UncheckedOptionalTypeRepr *T) {
+  return new (Ctx) UncheckedOptionalTypeRepr(visit(T->getBase()),
+                                             T->getExclamationLoc());
+}
+
 TypeRepr *CloneVisitor::visitTupleTypeRepr(TupleTypeRepr *T) {
   return new (Ctx) TupleTypeRepr(Ctx.AllocateCopy(T->getElements()),
                                  T->getParens(), T->getEllipsisLoc());
@@ -286,6 +292,12 @@ void OptionalTypeRepr::printImpl(ASTPrinter &Printer,
                                  const PrintOptions &Opts) const {
   Base->print(Printer, Opts);
   Printer << "?";
+}
+
+void UncheckedOptionalTypeRepr::printImpl(ASTPrinter &Printer,
+                                          const PrintOptions &Opts) const {
+  Base->print(Printer, Opts);
+  Printer << "!";
 }
 
 TupleTypeRepr *TupleTypeRepr::create(ASTContext &C,

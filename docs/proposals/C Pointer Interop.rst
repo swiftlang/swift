@@ -261,11 +261,11 @@ An example of a conformance for ``ObjCInOut``::
   struct ObjCInOut<T: class>: BuiltinInOutWritebackConvertible {
     let ptr: Builtin.RawPointer
 
-    typealias InOutType = @unchecked T?
+    typealias InOutType = T!
     typealias WritebackType = Builtin.RawPointer
 
     @transparent
-    static func _createWriteback(inout ref: @unchecked T?)
+    static func _createWriteback(inout ref: T!)
     -> Builtin.RawPointer {
       // The initial object reference is passed into the callee effectively
       // __unsafe_unretained, so pass it as a RawPointer.
@@ -273,7 +273,7 @@ An example of a conformance for ``ObjCInOut``::
     }
 
     @transparent
-    static func _commitWriteback(inout ref: @unchecked T?,
+    static func _commitWriteback(inout ref: T!,
                                  value: Builtin.RawPointer) {
       // The reference is autoreleased on return from the caller, so retain it
       // by loading it back as a T?.

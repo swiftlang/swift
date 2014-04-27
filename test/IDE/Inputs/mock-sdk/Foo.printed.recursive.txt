@@ -66,7 +66,7 @@ var fooIntVar: CInt
 func fooFunc1(_ a: CInt) -> CInt
 func fooFunc1AnonymousParam(_: CInt) -> CInt
 func fooFunc3(_ a: CInt, _ b: CFloat, _ c: CDouble, _ d: CMutablePointer<CInt>) -> CInt
-func fooFuncWithBlock(_ blk: @unchecked ((CFloat) -> CInt)?)
+func fooFuncWithBlock(_ blk: ((CFloat) -> CInt)!)
 @noreturn func fooFuncNoreturn1()
 @noreturn func fooFuncNoreturn2()
 
@@ -132,8 +132,8 @@ protocol FooProtocolDerived : FooProtocolBase {
 class FooClassBase {
   class func fooBaseInstanceFunc0()
   func fooBaseInstanceFunc0()
-  class func fooBaseInstanceFunc1(_ anObject: @unchecked AnyObject?) -> @unchecked FooClassBase?
-  func fooBaseInstanceFunc1(_ anObject: @unchecked AnyObject?) -> @unchecked FooClassBase?
+  class func fooBaseInstanceFunc1(_ anObject: AnyObject!) -> FooClassBase!
+  func fooBaseInstanceFunc1(_ anObject: AnyObject!) -> FooClassBase!
   init()
   class func fooBaseInstanceFuncOverridden()
   func fooBaseInstanceFuncOverridden()
@@ -141,20 +141,20 @@ class FooClassBase {
 }
 
 extension FooClassBase {
-  class func _internalMeth3() -> @unchecked AnyObject?
-  func _internalMeth3() -> @unchecked AnyObject?
+  class func _internalMeth3() -> AnyObject!
+  func _internalMeth3() -> AnyObject!
 }
 
 extension FooClassBase {
-  class func _internalMeth2() -> @unchecked AnyObject?
-  func _internalMeth2() -> @unchecked AnyObject?
-  class func nonInternalMeth() -> @unchecked AnyObject?
-  func nonInternalMeth() -> @unchecked AnyObject?
+  class func _internalMeth2() -> AnyObject!
+  func _internalMeth2() -> AnyObject!
+  class func nonInternalMeth() -> AnyObject!
+  func nonInternalMeth() -> AnyObject!
 }
 
 extension FooClassBase {
-  class func _internalMeth1() -> @unchecked AnyObject?
-  func _internalMeth1() -> @unchecked AnyObject?
+  class func _internalMeth1() -> AnyObject!
+  func _internalMeth1() -> AnyObject!
 }
 
 /// Aaa.  FooClassDerived.  Bbb.

@@ -129,7 +129,18 @@ ParserResult<Expr> Parser::parseExprIs() {
 ParserResult<Expr> Parser::parseExprAs() {
   SourceLoc asLoc = consumeToken(tok::kw_as);
 
-  ParserResult<TypeRepr> type = parseType(diag::expected_type_after_as);
+  ParserResult<TypeRepr> type;
+  {
+    // Disable looking for unchecked optional, treating '!' as
+    // a forced value expression later.  Do a lookahead for '(' to see
+    // if we are declaring a type within '()' where unchecked optional
+    // is allowed.
+    llvm::SaveAndRestore<decltype(TUO_UncheckedOptionalCtx)>
+      T(TUO_UncheckedOptionalCtx, Tok.isFollowingLParen()
+        ? TUO_AllowUncheckedOptional : TUO_NoUncheckedOptional);
+    type = parseType(diag::expected_type_after_as);
+  }
+
   if (type.hasCodeCompletion())
     return makeParserCodeCompletionResult<Expr>();
   if (type.isNull())

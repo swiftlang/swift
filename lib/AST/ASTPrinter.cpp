@@ -1682,11 +1682,8 @@ public:
         return;
       }
       if (NT == Ctx.getUncheckedOptionalDecl()) {
-        if (Options.PrintUncheckedOptional)
-          Printer << "@unchecked ";
-
         printWithParensIfNotSimple(T->getGenericArgs()[0]);
-        Printer << "?";
+        Printer << (Options.PrintUncheckedOptional ? "!" : "?");
         return;
       }
     }
@@ -1930,11 +1927,8 @@ public:
   }
 
   void visitUncheckedOptionalType(UncheckedOptionalType *T) {
-    if (Options.PrintUncheckedOptional)
-      Printer << "@unchecked ";
-
     printWithParensIfNotSimple(T->getBaseType());
-    Printer << "?";
+    Printer <<  (Options.PrintUncheckedOptional ? "!" : "?");
   }
 
   void visitProtocolType(ProtocolType *T) {

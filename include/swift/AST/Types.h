@@ -2571,7 +2571,7 @@ public:
   }
 };
 
-/// The type @unchecked T?, which is always sugar for a library type.
+/// The type T!, which is always sugar for a library type.
 class UncheckedOptionalType : public SyntaxSugarType {
   UncheckedOptionalType(const ASTContext &ctx, Type base,
                         RecursiveTypeProperties properties)

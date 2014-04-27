@@ -1439,7 +1439,7 @@ static bool canOverride(CanType t1, CanType t2,
 
     // Optional-to-optional.
     if (auto obj1 = t1.getAnyOptionalObjectType()) {
-      // Allow T? and @unchecked T? to freely override one another.
+      // Allow T? and T! to freely override one another.
       // We can assume that these types have the exact same
       // representation as long as the underlying types have exact
       // same representation constraints.  Unfortunately, subtyping
@@ -1456,7 +1456,7 @@ static bool canOverride(CanType t1, CanType t2,
     return obj2->isSuperclassOf(t1, resolver);
   }
 
-  // Allow T to override @unchecked T? in certain cases.
+  // Allow T to override T! in certain cases.
   // FIXME: this should force a thunk that does the checking!
   if (allowUnsafeParameterOverride && isParameter) {
     if (auto obj1 = t1->getUncheckedOptionalObjectType()) {

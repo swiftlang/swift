@@ -938,7 +938,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
   // A value of type T can be converted to type U? if T is convertible to U.
   // A value of type T? can be converted to type U? if T is convertible to U.
   // The above conversions also apply to unchecked optional types, except
-  // that there is no implicit conversion from T? to @unchecked T?.
+  // that there is no implicit conversion from T? to T!.
   {
     BoundGenericType *boundGenericType2;
     if (concrete && kind >= TypeMatchKind::Subtype &&
@@ -974,7 +974,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     }
   }
 
-  // A value of type @unchecked T? can be (unsafely) forced to U if T
+  // A value of type T! can be (unsafely) forced to U if T
   // is convertible to U.
   {
     Type objectType1;
@@ -2070,10 +2070,10 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
 
   // for $< in { <, <c, <oc }:
   //   T $< U ===> T? $< U?
-  //   T $< U ===> @unchecked T? $< @unchecked U?
-  //   T $< U ===> @unchecked T? $< U?
+  //   T $< U ===> T! $< U!
+  //   T $< U ===> T! $< U?
   // also:
-  //   T <c U ===> T? <c @unchecked U?
+  //   T <c U ===> T? <c U!
   case ConversionRestrictionKind::OptionalToUncheckedOptional:
   case ConversionRestrictionKind::UncheckedOptionalToOptional:
   case ConversionRestrictionKind::OptionalToOptional: {
@@ -2088,7 +2088,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
                       matchKind, flags, locator);
   }
 
-  // T <c U ===> @unchecked T? <c U
+  // T <c U ===> T! <c U
   //
   // We don't want to allow this after user-defined conversions:
   //   - it gets really complex for users to understand why there's

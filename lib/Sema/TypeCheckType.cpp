@@ -898,6 +898,8 @@ namespace {
                           TypeResolutionOptions options);
     Type resolveOptionalType(OptionalTypeRepr *repr,
                              TypeResolutionOptions options);
+    Type resolveUncheckedOptionalType(UncheckedOptionalTypeRepr *repr,
+                                      TypeResolutionOptions options);
     Type resolveTupleType(TupleTypeRepr *repr,
                           TypeResolutionOptions options);
     Type resolveProtocolCompositionType(ProtocolCompositionTypeRepr *repr,
@@ -957,6 +959,10 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
 
   case TypeReprKind::Optional:
     return resolveOptionalType(cast<OptionalTypeRepr>(repr), options);
+
+  case TypeReprKind::UncheckedOptional:
+    return resolveUncheckedOptionalType(cast<UncheckedOptionalTypeRepr>(repr),
+                                        options);
 
   case TypeReprKind::Tuple:
     return resolveTupleType(cast<TupleTypeRepr>(repr), options);
@@ -1462,6 +1468,22 @@ Type TypeResolver::resolveOptionalType(OptionalTypeRepr *repr,
     return ErrorType::get(Context);
 
   return optionalTy;
+}
+
+Type TypeResolver::resolveUncheckedOptionalType(UncheckedOptionalTypeRepr *repr,
+                                                TypeResolutionOptions options) {
+  // The T in T! is a generic type argument and therefore always an AST type.
+  // FIXME: diagnose non-materializability of element type!
+  Type baseTy = resolveType(repr->getBase(), withoutContext(options));
+  if (baseTy->is<ErrorType>())
+    return baseTy;
+
+  auto uncheckedOptionalTy =
+    TC.getUncheckedOptionalType(repr->getExclamationLoc(), baseTy);
+  if (!uncheckedOptionalTy)
+    return ErrorType::get(Context);
+
+  return uncheckedOptionalTy;
 }
 
 Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,

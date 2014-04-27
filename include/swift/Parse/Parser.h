@@ -90,6 +90,12 @@ public:
     IVOLP_InLet
   } InVarOrLetPattern = IVOLP_NotInVarOrLet;
 
+  /// Indicates if we should parse '!' as an @unchecked optional.
+  enum {
+    TUO_AllowUncheckedOptional,
+    TUO_NoUncheckedOptional
+  } TUO_UncheckedOptionalCtx = TUO_AllowUncheckedOptional;
+
   bool GreaterThanIsOperator = true;
 
   /// FIXME: Temporary hack to keep the selector-style declaration
@@ -743,6 +749,14 @@ public:
   ParserResult<TupleTypeRepr> parseTypeTupleBody();
   ParserResult<ArrayTypeRepr> parseTypeArray(TypeRepr *Base);
   ParserResult<OptionalTypeRepr> parseTypeOptional(TypeRepr *Base);
+
+  ParserResult<UncheckedOptionalTypeRepr>
+    parseTypeUncheckedOptional(TypeRepr *Base);
+
+  bool isUncheckedOptionalToken() const {
+    return TUO_UncheckedOptionalCtx == TUO_AllowUncheckedOptional &&
+           Tok.is(tok::exclaim_postfix);
+  }
 
   TypeRepr *applyAttributeToType(TypeRepr *Ty, const TypeAttributes &Attr);
 

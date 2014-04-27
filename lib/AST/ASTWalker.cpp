@@ -1116,6 +1116,12 @@ bool Traversal::visitOptionalTypeRepr(OptionalTypeRepr *T) {
   return false;
 }
 
+bool Traversal::visitUncheckedOptionalTypeRepr(UncheckedOptionalTypeRepr *T) {
+  if (doIt(T->getBase()))
+    return true;
+  return false;
+}
+
 bool Traversal::visitTupleTypeRepr(TupleTypeRepr *T) {
   for (auto elem : T->getElements()) {
     if (doIt(elem))

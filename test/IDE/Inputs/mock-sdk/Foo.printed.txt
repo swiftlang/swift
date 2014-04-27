@@ -86,7 +86,7 @@ func fooFunc3(CInt, CFloat, CDouble, CMutablePointer<CInt>) -> CInt
   Very good
   fooFuncWithBlock function.
 */
-func fooFuncWithBlock(@unchecked ((CFloat) -> CInt)?)
+func fooFuncWithBlock(((CFloat) -> CInt)!)
 
 @noreturn func fooFuncNoreturn1()
 @noreturn func fooFuncNoreturn2()
@@ -157,8 +157,8 @@ protocol FooProtocolDerived : FooProtocolBase {
 class FooClassBase {
   class func fooBaseInstanceFunc0()
   func fooBaseInstanceFunc0()
-  class func fooBaseInstanceFunc1(@unchecked AnyObject?) -> @unchecked FooClassBase?
-  func fooBaseInstanceFunc1(@unchecked AnyObject?) -> @unchecked FooClassBase?
+  class func fooBaseInstanceFunc1(AnyObject!) -> FooClassBase!
+  func fooBaseInstanceFunc1(AnyObject!) -> FooClassBase!
   init()
   class func fooBaseInstanceFuncOverridden()
   func fooBaseInstanceFuncOverridden()
@@ -215,6 +215,6 @@ func theLastDeclInFoo()
 /* Extending FooClassBase with cool stuff */
 extension FooClassBase {
   
-  class func nonInternalMeth() -> @unchecked AnyObject?
-  func nonInternalMeth() -> @unchecked AnyObject?
+  class func nonInternalMeth() -> AnyObject!
+  func nonInternalMeth() -> AnyObject!
 }

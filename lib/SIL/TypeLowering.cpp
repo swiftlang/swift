@@ -981,7 +981,7 @@ namespace {
       if (TC.isAnywhereResilient(D))
         return handleAddressOnly(structType);
 
-      // Lower @unchecked Self? as if it were @unchecked Whatever?.
+      // Lower Self! as if it were Whatever!.
       if (D == TC.Context.getUncheckedOptionalDecl()) {
         auto valueType = cast<BoundGenericType>(structType).getGenericArgs()[0];
         if (auto dynamicSelf = dyn_cast<DynamicSelfType>(valueType)) {

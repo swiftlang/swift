@@ -672,7 +672,7 @@ namespace {
         if (!forFunctionParam && var->getAttrs().isWeak()) {
           ty = CS.getTypeChecker().getOptionalType(var->getLoc(), ty);
           if (!ty) return Type();
-        // For @IBOutlet variables, use @unchecked T?.
+        // For @IBOutlet variables, use T!.
         } else if (var->getAttrs().hasAttribute<IBOutletAttr>()) {
           ty = CS.getTypeChecker().getUncheckedOptionalType(var->getLoc(), ty);
           if (!ty) return Type();
