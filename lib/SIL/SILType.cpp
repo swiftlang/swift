@@ -111,3 +111,8 @@ SILType SILType::substInterfaceGenericArgs(SILModule &M,
     fnTy->substInterfaceGenericArgs(M, M.getSwiftModule(), Subs);
   return SILType::getPrimitiveObjectType(canFnTy);
 }
+
+ArrayRef<Substitution> SILType::gatherAllSubstitutions(SILModule &M) {
+  return getSwiftRValueType()->gatherAllSubstitutions(M.getSwiftModule(),
+                                                      nullptr);
+}

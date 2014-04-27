@@ -351,6 +351,10 @@ public:
   SILType subst(SILModule &silModule, Module *astModule,
                 TypeSubstitutionMap &subs) const;
 
+  /// If this is a specialized generic type, return all substitutions used to
+  /// generate it.
+  ArrayRef<Substitution> gatherAllSubstitutions(SILModule &M);
+
   //
   // Accessors for types used in SIL instructions:
   //
