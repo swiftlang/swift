@@ -922,9 +922,7 @@ bool Parser::parseTypeAttributeListPresent(TypeAttributes &Attributes) {
     if (parseToken(tok::at_sign, diag::expected_in_attribute_list) ||
         parseTypeAttribute(Attributes))
       return true;
-    
-    // Attribute lists don't require separating commas.
-  } while (Tok.is(tok::at_sign) || consumeIf(tok::comma));
+  } while (Tok.is(tok::at_sign));
   
   return false;
 }
