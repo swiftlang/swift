@@ -159,7 +159,7 @@ class FooClassBase {
   func fooBaseInstanceFunc0()
   class func fooBaseInstanceFunc1(@unchecked AnyObject?) -> @unchecked FooClassBase?
   func fooBaseInstanceFunc1(@unchecked AnyObject?) -> @unchecked FooClassBase?
-  
+  init()
   class func fooBaseInstanceFuncOverridden()
   func fooBaseInstanceFuncOverridden()
   
@@ -184,6 +184,7 @@ class FooClassDerived : FooClassBase, FooProtocolDerived, FooProtocolBase {
   func fooBaseInstanceFuncOverridden()
   
   class func fooClassFunc0()
+  init()
   /// Aaa.  fooProtoFunc.  Bbb.
   /// Ccc.
   func fooProtoFunc()

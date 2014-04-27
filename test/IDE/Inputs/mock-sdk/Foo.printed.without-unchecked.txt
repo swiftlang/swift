@@ -134,6 +134,7 @@ class FooClassBase {
   func fooBaseInstanceFunc0()
   class func fooBaseInstanceFunc1(_ anObject: AnyObject?) -> FooClassBase?
   func fooBaseInstanceFunc1(_ anObject: AnyObject?) -> FooClassBase?
+  init()
   class func fooBaseInstanceFuncOverridden()
   func fooBaseInstanceFuncOverridden()
   class func fooBaseClassFunc0()
@@ -166,6 +167,7 @@ class FooClassDerived : FooClassBase, FooProtocolDerived, FooProtocolBase {
   func fooInstanceFunc2(_ a: CInt, withB b: CInt)
   func fooBaseInstanceFuncOverridden()
   class func fooClassFunc0()
+  init()
 
   /// Aaa.  fooProtoFunc.  Bbb.
   /// Ccc.

@@ -134,6 +134,7 @@ protocol FooProtocolBase {
   <decl:Func>func fooBaseInstanceFunc0()</decl>
   <decl:Func>class func fooBaseInstanceFunc1(_ anObject: @unchecked <ref:Protocol>AnyObject</ref>?) -> @unchecked <ref:Class>FooClassBase</ref>?</decl>
   <decl:Func>func fooBaseInstanceFunc1(_ anObject: @unchecked <ref:Protocol>AnyObject</ref>?) -> @unchecked <ref:Class>FooClassBase</ref>?</decl>
+  <decl:Constructor>init()</decl>
   <decl:Func>class func fooBaseInstanceFuncOverridden()</decl>
   <decl:Func>func fooBaseInstanceFuncOverridden()</decl>
   <decl:Func>class func fooBaseClassFunc0()</decl>
@@ -166,6 +167,7 @@ class FooClassDerived : <ref:Class>FooClassBase</ref>, <ref:Protocol>FooProtocol
   <decl:Func>func fooInstanceFunc2(_ a: <ref:TypeAlias>CInt</ref>, withB b: <ref:TypeAlias>CInt</ref>)</decl>
   <decl:Func>func fooBaseInstanceFuncOverridden()</decl>
   <decl:Func>class func fooClassFunc0()</decl>
+  <decl:Constructor>init()</decl>
 
   <decl:Func>/// Aaa.  fooProtoFunc.  Bbb.
   /// Ccc.
