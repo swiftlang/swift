@@ -550,9 +550,7 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
 
   // If this not an identifier, the attribute is malformed.
   if (Tok.isNot(tok::identifier) &&
-      Tok.isNot(tok::kw_in) &&
-      Tok.isNot(tok::kw_weak) &&
-      Tok.isNot(tok::kw_unowned)) {
+      Tok.isNot(tok::kw_in)) {
     diagnose(Tok, diag::expected_attribute_name);
     return true;
   }
