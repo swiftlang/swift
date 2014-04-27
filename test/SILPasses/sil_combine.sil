@@ -1057,3 +1057,13 @@ bb0(%0 : $B):
   %2 = upcast %1 : $E to $B
   return %2 : $B
 }
+
+// CHECK-LABEL: sil @unchecked_ref_cast_upcast_roundtrip : $@thin (E) -> E {
+// CHECK: bb0
+// CHECK-NEXT: return
+sil @unchecked_ref_cast_upcast_roundtrip : $@thin (E) -> E {
+bb0(%0 : $E):
+  %1 = upcast %0 : $E to $B
+  %2 = unchecked_ref_cast %1 : $B to $E
+  return %2 : $E
+}

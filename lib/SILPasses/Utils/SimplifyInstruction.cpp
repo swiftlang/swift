@@ -213,24 +213,19 @@ visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *UCCI) {
 SILValue
 InstSimplifier::
 visitUncheckedRefCastInst(UncheckedRefCastInst *OPRI) {
-  // (object-pointer-to-ref-inst (ref-to-object-pointer-inst x) typeof(x)) -> x
-  if (auto *ROPI = dyn_cast<UncheckedRefCastInst>(&*OPRI->getOperand())) {
+  // (unchecked-ref-cast Y->X (unchecked-ref-cast x X->Y)) -> x
+  if (auto *ROPI = dyn_cast<UncheckedRefCastInst>(&*OPRI->getOperand()))
     if (ROPI->getOperand().getType() == OPRI->getType())
       return ROPI->getOperand();
 
-    // A common downcast pattern is:
-    //
-    // upcast : $X2 -> $X
-    // unchecked_ref_cast : $X -> $Builtin.NativeObject
-    // unchecked_ref_cast : $Builtin.NativeObject -> $X2
-    //
-    // We can RAUW the object pointer with the operand of the upcast.
-    if (auto *UI = dyn_cast<UpcastInst>(ROPI->getOperand().getDef()))
-      if (UI->getOperand().getType() == OPRI->getType())
-        return UI->getOperand();
-  }
+  // (unchecked-ref-cast Y->X (upcast x X->Y)) -> x
+  if (auto *UI = dyn_cast<UpcastInst>(OPRI->getOperand()))
+    if (UI->getOperand().getType() == OPRI->getType())
+      return UI->getOperand();
+
   return SILValue();
 }
+
 SILValue InstSimplifier::visitUpcastInst(UpcastInst *UI) {
   // (upcast Y->X (unchecked-ref-cast x X->Y)) -> x
   if (auto *URCI = dyn_cast<UncheckedRefCastInst>(UI->getOperand()))
