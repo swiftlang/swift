@@ -414,7 +414,7 @@ on top of basic runtime support.
 
 The first set of use cases will require more direct language support.
 To that end, I propose adding two new variable attributes,
-:code:`[weak]` and :code:`[unowned]`.  I also propose a small slate of
+:code:`@weak` and :code:`@unowned`.  I also propose a small slate of
 new features which directly address the problem of capturing a value
 in a closure with a different strength of reference than it had in the
 enclosing context.
@@ -428,7 +428,7 @@ arbitrary type.  Currently this is just :code:`var`, but this proposal
 also adds :code:`capture`, and we may later add more variants, such as
 :code:`const` or :code:`val` or the like.
 
-:code:`[weak]`
+:code:`@weak`
 --------------
 
 :code:`weak` is an attribute which may be applied to any
@@ -474,7 +474,7 @@ be cleaner than changing the type of the variable but can't really be
 designed without first having a solid error-handling design.
 
 
-:code:`[unowned]`
+:code:`@unowned`
 -----------------
 
 :code:`unowned` is an attribute which may be applied to any
@@ -589,7 +589,7 @@ Declaration Attribute or Type Attribute
 This proposal describes :code:`weak` and :code:`unowned` as
 declaration attributes, not type attributes.
 
-As declaration attributes, :code:`[unowned]` and :code:`weak` would be
+As declaration attributes, :code:`@unowned` and :code:`weak` would be
 permitted on any :code:`var` declaration of reference type.  Their
 special semantics would be a property only of the declaration; in
 particular, they would not change the type (beyond the shift to
@@ -598,7 +598,7 @@ type-checker would not need to know about them.  The implementation
 would simply use different behavior when loading or storing that
 variable.
 
-As a type attribute, :code:`weak` and :code:`[unowned]` would be
+As a type attribute, :code:`weak` and :code:`@unowned` would be
 permitted to appear at arbitrary nested locations in the type system,
 such as tuple elements, function result types, or generic arguments.
 It would be possible to have both lvalues and rvalues of so-qualified
@@ -609,7 +609,7 @@ These implicit conversions require some thought.  Consider code like
 the following::
 
   func moveToWindow(newWindow : Window) {
-    var oldWindow = self.window   // an [unowned] back reference
+    var oldWindow = self.window   // an @unowned back reference
     oldWindow.hide()              // might remove the UI's strong reference
     oldWindow.remove(self)
     newWindow.add(self)
@@ -625,7 +625,7 @@ That rule, however, is problematic for generics.  A key goal of
 generics is substitutability: the semantics of generic code should
 match the semantics of the code you'd get from copy-pasting the
 generic code and substituting the arguments wherever they're written.
-But if a generic argument can be :code:`[unowned] T`, then this
+But if a generic argument can be :code:`@unowned T`, then this
 won't be true; consider::
 
   func foo<T>(x : T) {
@@ -677,7 +677,7 @@ are still costs to making them declaration attributes:
   physical variable depend on more than just the type of the variable.
 
 - It automatically enables certain things (like passing the address of
-  a :code:`[unowned]` variable of type :code:`T` to a :code:`[inout] T`
+  a :code:`@unowned` variable of type :code:`T` to a :code:`inout T`
   parameter) that perhaps ought to be more carefully considered.
 
 The first two points can be partly compensated for by adding library
@@ -701,7 +701,7 @@ semantics that it could be useful to extend :code:`weak` (and/or
 
 - Being able to conveniently form an optional back-reference seems
   like a core requirement.  If :code:`weak` were a type attribute,
-  we could just expect users to write :code:`Optional<[weak] T>`;
+  we could just expect users to write :code:`Optional<@weak T>`;
   as a declaration attribute, this is substantially more difficult.  I
   expect this to be common enough that it'll be unreasonable to ask
   users to use :code:`Optional<WeakReference<T>>`.
@@ -910,11 +910,11 @@ so-attributed :code:`capture` declaration (see below) with a nonce
 identifier to the top of the closure::
 
     button1.setAction {
-      capture [unowned] _V1 = this
+      capture @unowned _V1 = this
       _V1.tapOut()
     }
     button2.setAction {
-      capture [weak] _V2 = this
+      capture @weak _V2 = this
       if (_V2) { _V2.swapIn() }
     }
     button3.setAction {
@@ -1018,7 +1018,7 @@ declares.
 Let's spell out some examples.  I expect the dominant form to be a
 simple identifier::
 
-  capture [unowned] foo
+  capture @unowned foo
 
 This captures the current value of whatever :code:`foo` resolves to
 (potentially a member of :code:`this`!) and binds it within the
@@ -1076,7 +1076,7 @@ I've considered it quite a bit, and I think that a by-value capture of
 a variable from a non-immediately enclosing context must be made
 ill-formed.  At the very least, it must be ill-formed if either the
 original variable is mutable (or anything along the path is, if it
-involves properties) or the capture adds ``[unowned]``.
+involves properties) or the capture adds ``@unowned``.
 
 This rule will effectively force programmers to use extra variables or
 ``capture``\ s as a way of promising validity of the internal
