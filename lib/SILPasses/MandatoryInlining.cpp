@@ -203,8 +203,7 @@ getCalleeFunction(ApplyInst* AI, bool &IsThick,
                   SmallVectorImpl<SILValue>& CaptureArgs,
                   SmallVectorImpl<SILValue>& FullArgs,
                   SILModule::LinkingMode Mode) {
-  if (!AI->isTransparent())
-    return nullptr;
+  assert(AI->isTransparent() && "Expected an apply of a transparent function!");
 
   IsThick = false;
   CaptureArgs.clear();
@@ -276,13 +275,11 @@ getCalleeFunction(ApplyInst* AI, bool &IsThick,
   FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(CalleeValue);
   if (!FRI)
     return nullptr;
-  assert(CalleeValue.getResultNumber() == 0);
 
   SILFunction *CalleeFunction = FRI->getReferencedFunction();
 
-  if (!CalleeFunction ||
-      (CalleeFunction->getAbstractCC() != AbstractCC::Freestanding &&
-       CalleeFunction->getAbstractCC() != AbstractCC::Method))
+  if (CalleeFunction->getAbstractCC() != AbstractCC::Freestanding &&
+      CalleeFunction->getAbstractCC() != AbstractCC::Method)
     return nullptr;
 
   // If CalleeFunction is a declaration, see if we can load it. If we fail to
@@ -338,7 +335,7 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
   for (auto FI = F->begin(), FE = F->end(); FI != FE; ++FI) {
     for (auto I = FI->begin(), E = FI->end(); I != E; ++I) {
       ApplyInst *InnerAI = dyn_cast<ApplyInst>(I);
-      if (!InnerAI)
+      if (!InnerAI || !InnerAI->isTransparent())
         continue;
 
       SILLocation Loc = InnerAI->getLoc();
