@@ -969,6 +969,15 @@ ERROR(unsupported_target_config_argument_type,parsing,none,
 ERROR(unsupported_config_conditional_expression_type,parsing,none,
 "unexpected configuration expression type", ())
 
+
+//------------------------------------------------------------------------------
+// Code Migration.
+//------------------------------------------------------------------------------
+
+ERROR(unchecked_attr_going_away, parsing, none,
+  "'@unchecked T?' syntax is going away, use 'T!'", ())
+
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG

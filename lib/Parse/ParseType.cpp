@@ -31,6 +31,19 @@ TypeRepr *Parser::applyAttributeToType(TypeRepr *ty,
   // Apply those attributes that do apply.
   if (attrs.empty()) return ty;
 
+  // Error on removed '@unchecked T?' syntax.
+  if (auto OptionalTy = dyn_cast<OptionalTypeRepr>(ty)) {
+    auto AttrLoc = attrs.getLoc(TAK_unchecked);
+    if (AttrLoc.isValid()) {
+      auto AtLoc = attrs.AtLoc;
+      auto qLoc = OptionalTy->getQuestionLoc();
+      diagnose(AttrLoc, diag::unchecked_attr_going_away)
+        .fixItRemove(SourceRange(AtLoc, AtLoc))
+        .fixItRemove(SourceRange(AttrLoc, AttrLoc))
+        .fixItReplace(SourceRange(qLoc, qLoc), "!");
+    }
+  }
+
   return new (Context) AttributedTypeRepr(attrs, ty);
 }
 
