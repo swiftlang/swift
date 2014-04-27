@@ -3949,7 +3949,7 @@ RValue RValueEmitter::visitDefaultValueExpr(DefaultValueExpr *E, SGFContext C) {
 static ManagedValue emitBridgeStringToNSString(SILGenFunction &gen,
                                                SILLocation loc,
                                                ManagedValue str) {
-  // func convertStringToNSString(inout String) -> NSString
+  // func _convertStringToNSString(inout String) -> NSString
   SILValue stringToNSStringFn
     = gen.emitGlobalFunctionRef(loc, gen.SGM.getStringToNSStringFn());
   
@@ -3970,7 +3970,7 @@ static ManagedValue emitBridgeStringToNSString(SILGenFunction &gen,
 static ManagedValue emitBridgeNSStringToString(SILGenFunction &gen,
                                                SILLocation loc,
                                                ManagedValue nsstr) {
-  // func convertNSStringToString(NSString, [inout] String) -> ()
+  // func _convertNSStringToString(NSString, [inout] String) -> ()
   SILValue nsstringToStringFn
     = gen.emitGlobalFunctionRef(loc, gen.SGM.getNSStringToStringFn());
   
@@ -4004,7 +4004,7 @@ static ManagedValue emitBridgeNSStringToString(SILGenFunction &gen,
 static ManagedValue emitBridgeAnyObjectArrayToNSArray(SILGenFunction &gen,
                                                       SILLocation loc,
                                                       ManagedValue arr) {
-  // func convertAnyObjectArrayToNSArray(inout AnyObjectArray) -> NSArray
+  // func _convertAnyObjectArrayToNSArray(inout AnyObjectArray) -> NSArray
   SILValue arrayToNSArrayFn
     = gen.emitGlobalFunctionRef(loc, gen.SGM.getAnyObjectArrayToNSArrayFn());
   
@@ -4019,7 +4019,7 @@ static ManagedValue emitBridgeAnyObjectArrayToNSArray(SILGenFunction &gen,
 static ManagedValue emitBridgeNSArrayToAnyObjectArray(SILGenFunction &gen,
                                                       SILLocation loc,
                                                       ManagedValue nsarr) {
-  // func convertNSArrayToAnyObjectArray(NSArray, [inout] AnyObjectArray) -> ()
+  // func _convertNSArrayToAnyObjectArray(NSArray, [inout] AnyObjectArray) -> ()
   SILValue nsarrayToAnyObjectArrayFn
     = gen.emitGlobalFunctionRef(loc, gen.SGM.getNSArrayToAnyObjectArrayFn());
   
@@ -4035,7 +4035,7 @@ static ManagedValue emitBridgeNSArrayToAnyObjectArray(SILGenFunction &gen,
 static ManagedValue emitBridgeBoolToObjCBool(SILGenFunction &gen,
                                              SILLocation loc,
                                              ManagedValue swiftBool) {
-  // func convertBoolToObjCBool(Bool) -> ObjCBool
+  // func _convertBoolToObjCBool(Bool) -> ObjCBool
   SILValue boolToObjCBoolFn
     = gen.emitGlobalFunctionRef(loc, gen.SGM.getBoolToObjCBoolFn());
   
@@ -4050,7 +4050,7 @@ static ManagedValue emitBridgeBoolToObjCBool(SILGenFunction &gen,
 static ManagedValue emitBridgeObjCBoolToBool(SILGenFunction &gen,
                                              SILLocation loc,
                                              ManagedValue objcBool) {
-  // func convertObjCBoolToBool(ObjCBool) -> Bool
+  // func _convertObjCBoolToBool(ObjCBool) -> Bool
   SILValue objcBoolToBoolFn
     = gen.emitGlobalFunctionRef(loc, gen.SGM.getObjCBoolToBoolFn());
   
@@ -4295,7 +4295,7 @@ static ManagedValue emitBridgeUnsafePointerToCPointer(SILGenFunction &gen,
                                                       SILLocation loc,
                                                       ManagedValue v,
                                                       CanType nativeTy) {
-  // func convertUnsafePointerToC*Pointer<T>(UnsafePointer<T>) -> C*Pointer<T>
+  // func _convertUnsafePointerToC*Pointer<T>(UnsafePointer<T>) -> C*Pointer<T>
   SILValue unsafeToCPointer;
   auto nativeNom = nativeTy->getNominalOrBoundGenericNominal();
   if (nativeNom == gen.SGM.Types.getCMutablePointerDecl())

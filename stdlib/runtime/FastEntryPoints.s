@@ -57,7 +57,7 @@ $0:
 // This ABI has many advantages. In particular, it helps avoid many register
 // spills and even makes unusual tail calls possible:
 //
-// convertStringToNSSwiftString:
+// _convertStringToNSSwiftString:
 //   mov   %rdi, %rcx     // backup %rdi without spilling
 //   mov   $5, %rdi
 //   call  swift_alloc

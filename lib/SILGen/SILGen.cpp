@@ -149,7 +149,7 @@ static SILType getNSStringTy(SILGenModule &SGM) {
 
 SILDeclRef SILGenModule::getNSStringToStringFn() {
   return getBridgingFn(NSStringToStringFn, *this,
-                       FOUNDATION_MODULE_NAME, "convertNSStringToString",
+                       FOUNDATION_MODULE_NAME, "_convertNSStringToString",
                        {getNSStringTy(*this), getInOutStringTy(*this)},
                        Types.getEmptyTupleType());
 }
@@ -191,7 +191,7 @@ SILDeclRef SILGenModule::getStringDefaultInitFn() {
 
 SILDeclRef SILGenModule::getStringToNSStringFn() {
   return getBridgingFn(StringToNSStringFn, *this,
-                       FOUNDATION_MODULE_NAME, "convertStringToNSString",
+                       FOUNDATION_MODULE_NAME, "_convertStringToNSString",
                        {getInOutStringTy(*this)},
                        getNSStringTy(*this));
 }
@@ -206,14 +206,14 @@ static SILType getAnyObjectArrayTy(SILGenModule &SGM) {
 
 SILDeclRef SILGenModule::getAnyObjectArrayToNSArrayFn() {
   return getBridgingFn(AnyObjectArrayToNSArrayFn, *this,
-                       FOUNDATION_MODULE_NAME, "convertAnyObjectArrayToNSArray",
+                       FOUNDATION_MODULE_NAME, "_convertAnyObjectArrayToNSArray",
                        {getAnyObjectArrayTy(*this)},
                        getNSArrayTy(*this));
 }
 
 SILDeclRef SILGenModule::getNSArrayToAnyObjectArrayFn() {
   return getBridgingFn(NSArrayToAnyObjectArrayFn, *this,
-                       FOUNDATION_MODULE_NAME, "convertNSArrayToAnyObjectArray",
+                       FOUNDATION_MODULE_NAME, "_convertNSArrayToAnyObjectArray",
                        {getNSArrayTy(*this)},
                        getAnyObjectArrayTy(*this));
 }
@@ -221,7 +221,7 @@ SILDeclRef SILGenModule::getNSArrayToAnyObjectArrayFn() {
 #define STANDARD_GET_BRIDGING_FN(Module, FromTy, ToTy) \
   SILDeclRef SILGenModule::get##FromTy##To##ToTy##Fn() { \
     return getBridgingFn(FromTy##To##ToTy##Fn, *this, \
-                         Module, "convert" #FromTy "To" #ToTy, \
+                         Module, "_convert" #FromTy "To" #ToTy, \
                          {getLoweredType(Types.get##FromTy##Type())}, \
                          getLoweredType(Types.get##ToTy##Type())); \
   }
@@ -258,42 +258,42 @@ static SILType getUnsafePointerInterfaceType(SILGenModule &SGM) {
 
 SILDeclRef SILGenModule::getCConstPointerToUnsafePointerFn() {
   return getBridgingFn(CConstPointerToUnsafePointerFn, *this,
-                       STDLIB_NAME, "convertCConstPointerToUnsafePointer",
+                       STDLIB_NAME, "_convertCConstPointerToUnsafePointer",
                        {getCConstPointerInterfaceType(*this)},
                        getUnsafePointerInterfaceType(*this));
 }
 
 SILDeclRef SILGenModule::getCMutablePointerToUnsafePointerFn() {
   return getBridgingFn(CMutablePointerToUnsafePointerFn, *this,
-                       STDLIB_NAME, "convertCMutablePointerToUnsafePointer",
+                       STDLIB_NAME, "_convertCMutablePointerToUnsafePointer",
                        {getCMutablePointerInterfaceType(*this)},
                        getUnsafePointerInterfaceType(*this));
 }
 
 SILDeclRef SILGenModule::getObjCMutablePointerToUnsafePointerFn() {
   return getBridgingFn(ObjCMutablePointerToUnsafePointerFn, *this,
-                       STDLIB_NAME, "convertObjCMutablePointerToUnsafePointer",
+                       STDLIB_NAME, "_convertObjCMutablePointerToUnsafePointer",
                        {getObjCMutablePointerInterfaceType(*this)},
                        getUnsafePointerInterfaceType(*this));
 }
 
 SILDeclRef SILGenModule::getUnsafePointerToCConstPointerFn() {
   return getBridgingFn(UnsafePointerToCConstPointerFn, *this,
-                       STDLIB_NAME, "convertUnsafePointerToCConstPointer",
+                       STDLIB_NAME, "_convertUnsafePointerToCConstPointer",
                        {getUnsafePointerInterfaceType(*this)},
                        getCConstPointerInterfaceType(*this));
 }
 
 SILDeclRef SILGenModule::getUnsafePointerToCMutablePointerFn() {
   return getBridgingFn(UnsafePointerToCMutablePointerFn, *this,
-                       STDLIB_NAME, "convertUnsafePointerToCMutablePointer",
+                       STDLIB_NAME, "_convertUnsafePointerToCMutablePointer",
                        {getUnsafePointerInterfaceType(*this)},
                        getCMutablePointerInterfaceType(*this));
 }
 
 SILDeclRef SILGenModule::getUnsafePointerToObjCMutablePointerFn() {
   return getBridgingFn(UnsafePointerToObjCMutablePointerFn, *this,
-                       STDLIB_NAME, "convertUnsafePointerToObjCMutablePointer",
+                       STDLIB_NAME, "_convertUnsafePointerToObjCMutablePointer",
                        {getUnsafePointerInterfaceType(*this)},
                        getObjCMutablePointerInterfaceType(*this));
 }

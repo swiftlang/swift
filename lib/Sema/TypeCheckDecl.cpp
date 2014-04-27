@@ -1931,21 +1931,21 @@ public:
     #define BRIDGE_TYPE(BRIDGED_MOD, BRIDGED_TYPE, _, NATIVE_TYPE, OPT) \
     if (Module *module = TC.Context.LoadedModules.lookup(#BRIDGED_MOD)) {\
       checkObjCBridgingFunctions(module, #BRIDGED_TYPE, \
-      "convert" #BRIDGED_TYPE "To" #NATIVE_TYPE, \
-      "convert" #NATIVE_TYPE "To" #BRIDGED_TYPE); \
+      "_convert" #BRIDGED_TYPE "To" #NATIVE_TYPE, \
+      "_convert" #NATIVE_TYPE "To" #BRIDGED_TYPE); \
     }
     #include "swift/SIL/BridgedTypes.def"
     
     if (Module *module = TC.Context.LoadedModules.lookup("Swift")) {
       checkObjCBridgingFunctions(module, "ObjCMutablePointer",
-                                 "convertUnsafePointerToObjCMutablePointer",
-                                 "convertObjCMutablePointerToUnsafePointer");
+                                 "_convertUnsafePointerToObjCMutablePointer",
+                                 "_convertObjCMutablePointerToUnsafePointer");
       checkObjCBridgingFunctions(module, "CMutablePointer",
-                                 "convertUnsafePointerToCMutablePointer",
-                                 "convertCMutablePointerToUnsafePointer");
+                                 "_convertUnsafePointerToCMutablePointer",
+                                 "_convertCMutablePointerToUnsafePointer");
       checkObjCBridgingFunctions(module, "CConstPointer",
-                                 "convertUnsafePointerToCConstPointer",
-                                 "convertCConstPointerToUnsafePointer");
+                                 "_convertUnsafePointerToCConstPointer",
+                                 "_convertCConstPointerToUnsafePointer");
     }
   }
   
