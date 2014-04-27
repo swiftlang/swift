@@ -1189,7 +1189,7 @@ namespace {
         return Type();
       
       // The source must be convertible to the destination.
-      auto assignLocator = CS.getConstraintLocator(expr->getSrc(),
+      auto assignLocator = CS.getConstraintLocator(expr,
                                                ConstraintLocator::AssignSource);
       CS.addConstraint(ConstraintKind::Conversion,
                        expr->getSrc()->getType(), destTy,

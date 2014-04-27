@@ -3893,7 +3893,7 @@ Expr *ConstraintSystem::applySolution(const Solution &solution,
 
         auto &cs = Rewriter.getConstraintSystem();
         auto srcLocator = cs.getConstraintLocator(
-                            assign->getSrc(),
+                            assign,
                             ConstraintLocator::AssignSource);
 
         if (auto src = assign->getSrc()->walk(*this))

@@ -277,6 +277,17 @@ void constraints::simplifyLocator(Expr *&anchor,
       }
       break;
 
+    case ConstraintLocator::AssignSource:
+      if (auto assign = dyn_cast<AssignExpr>(anchor)) {
+        targetAnchor = assign->getDest();
+        targetPath.clear();
+
+        anchor = assign->getSrc();
+        path = path.slice(1);
+        continue;
+      }
+      break;
+
     default:
       // FIXME: Lots of other cases to handle.
       break;
