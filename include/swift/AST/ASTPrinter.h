@@ -14,6 +14,7 @@
 #define SWIFT_AST_ASTPRINTER_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/AST/Identifier.h"
 #include "llvm/ADT/StringRef.h"
 
 namespace swift {
@@ -44,12 +45,12 @@ public:
   virtual void printDeclPost(const Decl *D) {}
 
   /// Called when printing the referenced name of a type declaration.
-  virtual void printTypeRef(const TypeDecl *TD, StringRef Text) {
-    printTextImpl(Text);
+  virtual void printTypeRef(const TypeDecl *TD, Identifier Name) {
+    printName(Name);
   }
   /// Called when printing the referenced name of a module.
-  virtual void printModuleRef(const Module *Mod, StringRef Text) {
-    printTextImpl(Text);
+  virtual void printModuleRef(const Module *Mod, Identifier Name) {
+    printName(Name);
   }
 
   // Helper functions.
@@ -60,6 +61,8 @@ public:
   }
 
   ASTPrinter &operator<<(unsigned long long N);
+
+  void printName(Identifier Name);
 
   void setIndent(unsigned NumSpaces) {
     CurrentIndentation = NumSpaces;

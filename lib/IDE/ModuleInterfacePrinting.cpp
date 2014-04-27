@@ -50,11 +50,11 @@ private:
   void printDeclLoc(const Decl *D) override {
     return OtherPrinter.printDeclLoc(D);
   }
-  void printTypeRef(const TypeDecl *TD, StringRef Text) override {
-    return OtherPrinter.printTypeRef(TD, Text);
+  void printTypeRef(const TypeDecl *TD, Identifier Name) override {
+    return OtherPrinter.printTypeRef(TD, Name);
   }
-  void printModuleRef(const Module *Mod, StringRef Text) override {
-    return OtherPrinter.printModuleRef(Mod, Text);
+  void printModuleRef(const Module *Mod, Identifier Name) override {
+    return OtherPrinter.printModuleRef(Mod, Name);
   }
 
   // Prints regular comments of the header the clang node comes from, until

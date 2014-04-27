@@ -31,6 +31,7 @@
 #include "swift/Basic/STLExtras.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include <algorithm>
@@ -79,6 +80,23 @@ ASTPrinter &ASTPrinter::operator<<(unsigned long long N) {
   OS << N;
   printTextImpl(OS.str());
   return *this;
+}
+
+void ASTPrinter::printName(Identifier Name) {
+  if (Name.empty()) {
+    *this << "_";
+    return;
+  }
+  bool IsKeyword = llvm::StringSwitch<bool>(Name.str())
+#define KEYWORD(KW) \
+      .Case(#KW, true)
+#include "swift/Parse/Tokens.def"
+      .Default(false);
+  if (IsKeyword)
+    *this << "`";
+  *this << Name.str();
+  if (IsKeyword)
+    *this << "`";
 }
 
 void StreamPrinter::printText(StringRef Text) {
@@ -203,13 +221,6 @@ class PrintAST : public ASTVisitor<PrintAST> {
   void printTypedPattern(const TypedPattern *TP,
                          bool StripOuterSliceType = false);
 
-  void printName(Identifier name) {
-    if (name.empty())
-      Printer << "_";
-    else
-      Printer << name.str(); // FIXME: use backticks for keywords.
-  }
-
 public:
   void printPattern(const Pattern *pattern);
 
@@ -233,6 +244,8 @@ private:
   void printInherited(const EnumDecl *D);
   void printInherited(const ExtensionDecl *decl);
   void printInherited(const GenericTypeParamDecl *D);
+
+  void printEnumElement(EnumElementDecl *elt);
 
   /// \returns true if anything was printed.
   bool printBraceStmtElements(BraceStmt *stmt, bool NeedIndent = true);
@@ -338,7 +351,7 @@ void PrintAST::printPattern(const Pattern *pattern) {
   case PatternKind::Named: {
     auto named = cast<NamedPattern>(pattern);
     recordDeclLoc(named->getDecl());
-    Printer << named->getBoundName().str();
+    Printer.printName(named->getBoundName());
     break;
   }
 
@@ -434,7 +447,7 @@ void PrintAST::printGenericParams(GenericParamList *Params) {
     }
 
     auto TypeParam = GP.getAsTypeParam();
-    Printer << TypeParam->getName().str();
+    Printer.printName(TypeParam->getName());
     printInherited(TypeParam);
   }
 
@@ -584,7 +597,7 @@ void PrintAST::printMembers(DeclRange members, bool needComma) {
 }
 
 void PrintAST::printNominalDeclName(NominalTypeDecl *decl) {
-  Printer << decl->getName().str();
+  Printer.printName(decl->getName());
   if (auto gp = decl->getGenericParams()) {
     if (!isa<ProtocolDecl>(decl))
       printGenericParams(gp);
@@ -765,7 +778,7 @@ void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
   printAttributes(decl);
   Printer << "typealias ";
   recordDeclLoc(decl);
-  Printer << decl->getName().str();
+  Printer.printName(decl->getName());
   if (Options.TypeDefinitions && decl->hasUnderlyingType()) {
     Printer << " = ";
     decl->getUnderlyingType().print(Printer, Options);
@@ -774,7 +787,7 @@ void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
 
 void PrintAST::visitGenericTypeParamDecl(GenericTypeParamDecl *decl) {
   recordDeclLoc(decl);
-  Printer << decl->getName().str();
+  Printer.printName(decl->getName());
   printInheritedWithSuperclass(decl);
 }
 
@@ -783,7 +796,7 @@ void PrintAST::visitAssociatedTypeDecl(AssociatedTypeDecl *decl) {
   printAttributes(decl);
   Printer << "typealias ";
   recordDeclLoc(decl);
-  Printer << decl->getName().str();
+  Printer.printName(decl->getName());
   printInheritedWithSuperclass(decl);
 
   if (!decl->getDefaultDefinitionLoc().isNull()) {
@@ -848,7 +861,7 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
     printStaticKeyword(decl->getCorrectStaticSpelling());
   Printer << (decl->isLet() ? "let " : "var ");
   recordDeclLoc(decl);
-  Printer << decl->getName().str();
+  Printer.printName(decl->getName());
   if (decl->hasType()) {
     Printer << ": ";
     decl->getType().print(Printer, Options);
@@ -895,13 +908,13 @@ void PrintAST::printOneParameter(Identifier ArgName,
   auto BodyName = BodyPattern->getBoundName();
   if (!ArgName.empty() || Options.PrintParameterNames) {
     if (!Curried)
-      printName(ArgName);
+      Printer.printName(ArgName);
 
     // If the parameter name is different, print it.
     if ((Curried || BodyName != ArgName) && Options.PrintParameterNames) {
       if (!Curried)
         Printer << " ";
-      printName(BodyName);
+      Printer.printName(BodyName);
     }
 
     Printer << ": ";
@@ -1006,8 +1019,11 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
           auto *P = TP->getFields().begin()->getPattern()->
                         getSemanticsProvidingPattern();
           Identifier Name = P->getBoundName();
-          if (!Name.empty() && !P->isImplicit())
-            Printer << "(" << Name.str() << ")";
+          if (!Name.empty() && !P->isImplicit()) {
+            Printer << "(";
+            Printer.printName(Name);
+            Printer << ")";
+          }
         }
       }
       Printer << " {";
@@ -1030,7 +1046,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
     if (!decl->hasName())
       Printer << "<anonymous>";
     else
-      Printer << decl->getName().str();
+      Printer.printName(decl->getName());
     if (decl->isGeneric()) {
       printGenericParams(decl->getGenericParams());
     }
@@ -1053,9 +1069,8 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
   }
 }
 
-static void printEnumElement(ASTPrinter &Printer, const PrintOptions &Options,
-                             EnumElementDecl *elt) {
-  Printer << elt->getName().str();
+void PrintAST::printEnumElement(EnumElementDecl *elt) {
+  Printer.printName(elt->getName());
 
   if (elt->hasArgumentType())
     elt->getArgumentType().print(Printer, Options);
@@ -1068,7 +1083,7 @@ void PrintAST::visitEnumCaseDecl(EnumCaseDecl *decl) {
 
   interleave(decl->getElements().begin(), decl->getElements().end(),
     [&](EnumElementDecl *elt) {
-      printEnumElement(Printer, Options, elt);
+      printEnumElement(elt);
     },
     [&] { Printer << ", "; });
 }
@@ -1080,7 +1095,7 @@ void PrintAST::visitEnumElementDecl(EnumElementDecl *decl) {
   // In cases where there is no parent EnumCaseDecl (such as imported or
   // deserialized elements), print the element independently.
   Printer << "case ";
-  printEnumElement(Printer, Options, decl);
+  printEnumElement(decl);
 }
 
 void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
@@ -1115,8 +1130,8 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
     break;
 
   case CtorInitializerKind::Factory:
-    Printer << " -> "
-            << decl->getExtensionType()->getAnyNominal()->getName().str();
+    Printer << " -> ";
+    Printer.printName(decl->getExtensionType()->getAnyNominal()->getName());
     break;
   }
 
@@ -1144,7 +1159,9 @@ void PrintAST::visitDestructorDecl(DestructorDecl *decl) {
 
 void PrintAST::visitInfixOperatorDecl(InfixOperatorDecl *decl) {
   recordDeclLoc(decl);
-  Printer << "operator infix " << decl->getName().str() << " {";
+  Printer << "operator infix ";
+  Printer.printName(decl->getName());
+  Printer << " {";
   Printer.printNewline();
   {
     IndentRAII indentMore(*this);
@@ -1176,14 +1193,18 @@ void PrintAST::visitInfixOperatorDecl(InfixOperatorDecl *decl) {
 
 void PrintAST::visitPrefixOperatorDecl(PrefixOperatorDecl *decl) {
   recordDeclLoc(decl);
-  Printer << "operator prefix " << decl->getName().str() << " {";
+  Printer << "operator prefix ";
+  Printer.printName(decl->getName());
+  Printer << " {";
   Printer.printNewline();
   Printer << "}";
 }
 
 void PrintAST::visitPostfixOperatorDecl(PostfixOperatorDecl *decl) {
   recordDeclLoc(decl);
-  Printer << "operator postfix " << decl->getName().str() << " {";
+  Printer << "operator postfix ";
+  Printer.printName(decl->getName());
+  Printer << " {";
   Printer.printNewline();
   Printer << "}";
 }
@@ -1399,7 +1420,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
 
       if (auto Parent = M->getParent())
         printDeclContext(Parent);
-      Printer.printModuleRef(M, M->Name.str());
+      Printer.printModuleRef(M, M->Name);
       return;
     }
 
@@ -1490,14 +1511,14 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
   template <typename T>
   void printModuleContext(T *Ty) {
     Module *Mod = Ty->getDecl()->getModuleContext();
-    Printer.printModuleRef(Mod, Mod->Name.str());
+    Printer.printModuleRef(Mod, Mod->Name);
     Printer << ".";
   }
 
   template <typename T>
   void printTypeDeclName(T *Ty) {
     TypeDecl *TD = Ty->getDecl();
-    Printer.printTypeRef(TD, TD->getName().get());
+    Printer.printTypeRef(TD, TD->getName());
   }
 
   bool shouldPrintFullyQualified(TypeBase *T) {
@@ -1622,8 +1643,10 @@ public:
         EltType = IOT->getObjectType();
       }
 
-      if (TD.hasName())
-        Printer << TD.getName().str() << ": ";
+      if (TD.hasName()) {
+        Printer.printName(TD.getName());
+        Printer << ": ";
+      }
 
       if (TD.isVararg()) {
         visit(TD.getVarargBaseTy());
@@ -1731,7 +1754,7 @@ public:
 
   void visitModuleType(ModuleType *T) {
     Printer << "module<";
-    Printer.printModuleRef(T->getModule(), T->getModule()->Name.str());
+    Printer.printModuleRef(T->getModule(), T->getModule()->Name);
     Printer << ">";
   }
 
@@ -1975,7 +1998,7 @@ public:
     if (Name.empty())
       Printer << "<anonymous>";
     else
-      Printer << Name.str();
+      Printer.printName(Name);
   }
 
   void visitAssociatedTypeType(AssociatedTypeType *T) {
@@ -1983,7 +2006,7 @@ public:
     if (Name.empty())
       Printer << "<anonymous>";
     else
-      Printer << Name.str();
+      Printer.printName(Name);
   }
 
   void visitSubstitutedType(SubstitutedType *T) {
@@ -1992,7 +2015,8 @@ public:
 
   void visitDependentMemberType(DependentMemberType *T) {
     visit(T->getBase());
-    Printer << "." << T->getName().str();
+    Printer << ".";
+    Printer.printName(T->getName());
   }
 
   void visitUnownedStorageType(UnownedStorageType *T) {

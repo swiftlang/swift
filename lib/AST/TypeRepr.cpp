@@ -244,10 +244,10 @@ static void printGenericArgs(ASTPrinter &Printer, const PrintOptions &Opts,
 void ComponentIdentTypeRepr::printImpl(ASTPrinter &Printer,
                                        const PrintOptions &Opts) const {
   if (Module *Mod = getBoundModule()) {
-    Printer.printModuleRef(Mod, getIdentifier().str());
+    Printer.printModuleRef(Mod, getIdentifier());
   } else if (Type Ty = getBoundType()) {
     if (auto NTD = Ty->getAnyNominal())
-      Printer.printTypeRef(NTD, getIdentifier().str());
+      Printer.printTypeRef(NTD, getIdentifier());
     else
       Printer << getIdentifier().str();
   } else {
@@ -311,8 +311,10 @@ void TupleTypeRepr::printImpl(ASTPrinter &Printer,
 
 void NamedTypeRepr::printImpl(ASTPrinter &Printer,
                               const PrintOptions &Opts) const {
-  if (!Id.empty())
-    Printer << Id.str() << " : ";
+  if (!Id.empty()) {
+    Printer.printName(Id);
+    Printer << ": ";
+  }
   Ty->print(Printer, Opts);
 }
 
