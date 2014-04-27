@@ -748,9 +748,8 @@ ParserResult<Stmt> Parser::parseStmtIf() {
 //    supported target configuration (currently "os" and "arch"), and whose
 //    argument is a named decl ref expression
 bool Parser::evaluateConfigConditionExpr(Expr *configExpr) {
-  
-  // Evaluate a ParenExpr.
-  if (auto *PE = dyn_cast_or_null<ParenExpr>(configExpr))
+    // Evaluate a ParenExpr.
+  if (auto *PE = dyn_cast<ParenExpr>(configExpr))
     return evaluateConfigConditionExpr(PE->getSubExpr());
   
   // Evaluate a "&&" or "||" expression.
@@ -775,14 +774,12 @@ bool Parser::evaluateConfigConditionExpr(Expr *configExpr) {
       // against the current compiler submit version.
       // We'll need to remove this functionality for 1.0, per
       // rdar://problem/16380797
-      if (auto *UDRE = dyn_cast_or_null<UnresolvedDeclRefExpr>
-                           (elements[iOperator - 1]))
-      {
+      if (auto *UDRE =dyn_cast<UnresolvedDeclRefExpr>(elements[iOperator - 1])){
         auto name = UDRE->getName().str();
         
         if (name.equals("compiler_submit_version")) {
           if (auto *UDREOp =
-              dyn_cast_or_null<UnresolvedDeclRefExpr>(elements[iOperator])) {
+                dyn_cast<UnresolvedDeclRefExpr>(elements[iOperator])) {
             auto name = UDREOp->getName().str();
             
             if (auto *SLEp = dyn_cast<StringLiteralExpr>(elements[iOperand])) {
@@ -790,31 +787,18 @@ bool Parser::evaluateConfigConditionExpr(Expr *configExpr) {
               auto userSubmitQuad = SLEp->getValue();
               auto compareResult = submitQuad.compare_numeric(userSubmitQuad);
               
-              if (name.equals("==")) {
-                return !compareResult;
-              }
-              if (name.equals("!=")) {
-                return compareResult;
-              }
-              if (name.equals(">")) {
-                return compareResult == 1;
-              }
-              if (name.equals("<")) {
-                return compareResult == -1;
-              }
-              if (name.equals(">=")) {
-                return (compareResult == 1) || !compareResult;
-              }
-              if (name.equals("<=")) {
-                return (compareResult == -1) || !compareResult;
-              }
+              if (name.equals("==")) return !compareResult;
+              if (name.equals("!=")) return compareResult;
+              if (name.equals(">"))  return compareResult == 1;
+              if (name.equals("<"))  return compareResult == -1;
+              if (name.equals(">=")) return compareResult >= 0;
+              if (name.equals("<=")) return compareResult <= 0;
             }
           }
         }
       }
       
-      if (auto *UDREOp =
-            dyn_cast_or_null<UnresolvedDeclRefExpr>(elements[iOperator])) {
+      if (auto *UDREOp = dyn_cast<UnresolvedDeclRefExpr>(elements[iOperator])) {
         auto name = UDREOp->getName().str();
         
         if (name.equals("||")) {
@@ -844,10 +828,8 @@ bool Parser::evaluateConfigConditionExpr(Expr *configExpr) {
   }
   
   // Evaluate a named reference expression.
-  if (auto *UDRE = dyn_cast_or_null<UnresolvedDeclRefExpr>(configExpr)) {
-    // look up name
+  if (auto *UDRE = dyn_cast<UnresolvedDeclRefExpr>(configExpr)) {
     auto name = UDRE->getName().str();
-    
     if (name == "true")
       return true;
     if (name == "false")
@@ -857,12 +839,10 @@ bool Parser::evaluateConfigConditionExpr(Expr *configExpr) {
   }
 
   // Evaluate a negation (unary "!") expression.
-  if (auto *PUE = dyn_cast_or_null<PrefixUnaryExpr>(configExpr)) {
+  if (auto *PUE = dyn_cast<PrefixUnaryExpr>(configExpr)) {
     // If the PUE is not a negation expression, return false
-    auto fnNameExpr = dyn_cast_or_null<UnresolvedDeclRefExpr>(PUE->getFn());
-    auto name = fnNameExpr->getName().str();
-    
-    if (!name.equals("!")) {
+    auto name = cast<UnresolvedDeclRefExpr>(PUE->getFn())->getName().str();
+    if (name != "!") {
       diagnose(PUE->getLoc(), diag::unsupported_build_config_unary_expression);
       return false;
     }
@@ -871,40 +851,35 @@ bool Parser::evaluateConfigConditionExpr(Expr *configExpr) {
   }
   
   // Evaluate a target config call expression.
-  if (auto *CE = dyn_cast_or_null<CallExpr>(configExpr)) {
+  if (auto *CE = dyn_cast<CallExpr>(configExpr)) {
     // look up target config, and compare value
-    auto fnNameExpr = dyn_cast_or_null<UnresolvedDeclRefExpr>(CE->getFn());
+    auto fnNameExpr = dyn_cast<UnresolvedDeclRefExpr>(CE->getFn());
+    
+    // Get the arg, which should be in a paren expression.
+    auto *PE = dyn_cast<ParenExpr>(CE->getArg());
+    if (!fnNameExpr || !PE || !isa<UnresolvedDeclRefExpr>(PE->getSubExpr())) {
+      diagnose(CE->getLoc(), diag::unsupported_target_config_argument_type);
+      return false;
+    }
+
     auto targetValue = fnNameExpr->getName().str();
     
     if (!targetValue.equals("arch") && !targetValue.equals("os")) {
       diagnose(CE->getLoc(), diag::unsupported_target_config_expression);
       return false;
     }
-    
-    // Get the arg, which should be in a paren expression.
-    if (auto *PE = dyn_cast_or_null<ParenExpr>(CE->getArg())) {
-      auto subExpr = PE->getSubExpr();
-      
-      // The sub expression should be an UnresolvedDeclRefExpr (we won't
-      // tolerate extra parens).
-      if (auto *UDRE = dyn_cast_or_null<UnresolvedDeclRefExpr>(subExpr)) {
-        auto argValue = UDRE->getName().str();
-        return
-          !Context.LangOpts.getTargetConfigOption(targetValue).compare(argValue);
-      } else {
-        diagnose(CE->getLoc(), diag::unsupported_target_config_argument_type);
-        return false;
-      }
-    } else {
-      diagnose(CE->getLoc(), diag::unsupported_target_config_argument_type);
-      return false;
-    }
+
+    // The sub expression should be an UnresolvedDeclRefExpr (we won't
+    // tolerate extra parens).
+    auto *UDRE = cast<UnresolvedDeclRefExpr>(PE->getSubExpr());
+    auto target = Context.LangOpts.getTargetConfigOption(targetValue);
+    return target == UDRE->getName().str();
   }
   
   // If we've gotten here, it's an unsupported expression type.
   diagnose(configExpr->getLoc(),
-             diag::unsupported_config_conditional_expression_type);
-    return false;
+           diag::unsupported_config_conditional_expression_type);
+  return false;
 }
 
 ParserResult<Stmt> Parser::parseStmtIfConfig(BraceItemListKind Kind) {
