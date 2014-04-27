@@ -224,7 +224,8 @@ void constraints::simplifyLocator(Expr *&anchor,
 
     case ConstraintLocator::Load:
     case ConstraintLocator::RvalueAdjustment:
-      // Loads and rvalue adjustments are implicit.
+    case ConstraintLocator::ScalarToTuple:
+      // Loads, rvalue adjustment, and scalar-to-tuple conversions are implicit.
       path = path.slice(1);
       continue;
 

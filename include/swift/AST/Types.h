@@ -519,6 +519,11 @@ public:
   /// Otherwise, returns the type itself.
   Type getRValueType();
 
+  /// getRValueType - For an @lvalue type or tuple containing a single
+  /// non-variadic element, retrieves the underlying object type.
+  /// Otherwise, returns the type itself.
+  Type getRValueObjectType();
+
   /// getInOutObjectType - For an inout type, retrieves the underlying object
   /// type.  Otherwise, returns the type itself.
   Type getInOutObjectType();
@@ -3476,11 +3481,31 @@ inline Type TypeBase::getInOutObjectType() {
 }
 
 inline Type TypeBase::getRValueType() {
-  if (auto lv = getAs<LValueType>())
-    return lv->getObjectType();
-  return this;
+  Type type = this;
+
+  // Look through lvalue type.
+  if (auto lv = type->getAs<LValueType>())
+    type = lv->getObjectType();
+
+  return type;
 }
+
+inline Type TypeBase::getRValueObjectType() {
+  Type type = this;
+
+  // Look through lvalue type.
+  if (auto lv = type->getAs<LValueType>())
+    type = lv->getObjectType();
+
+  // Look through argument list tuples.
+  if (auto tupleTy = type->getAs<TupleType>()) {
+    if (tupleTy->getNumElements() == 1 && !tupleTy->getFields()[0].isVararg())
+      type = tupleTy->getElementType(0);
+  }
   
+  return type;
+}
+
 /// getLValueOrInOutObjectType - For an @lvalue or inout type, retrieves the
 /// underlying object type. Otherwise, returns the type itself.
 inline Type TypeBase::getLValueOrInOutObjectType() {

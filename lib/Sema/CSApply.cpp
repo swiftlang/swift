@@ -3844,7 +3844,8 @@ Expr *ConstraintSystem::applySolution(const Solution &solution,
 
       case ExprFixKind::NullaryCall: {
         auto type = solution.simplifyType(TC, affected->getType())
-                      ->getRValueType()->castTo<AnyFunctionType>()->getResult();
+                      ->getRValueObjectType()->castTo<AnyFunctionType>()
+                      ->getResult();
         SourceLoc afterAffectedLoc
           = Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
                                        affected->getEndLoc());
@@ -3857,7 +3858,7 @@ Expr *ConstraintSystem::applySolution(const Solution &solution,
       case ExprFixKind::ForceOptional:
       case ExprFixKind::ForceDowncast: {
         auto type = solution.simplifyType(TC, affected->getType())
-                      ->getRValueType();
+                      ->getRValueObjectType();
         SourceLoc afterAffectedLoc
           = Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
                                        affected->getEndLoc());
@@ -3870,7 +3871,20 @@ Expr *ConstraintSystem::applySolution(const Solution &solution,
         diagnosed = true;
         break;
       }
+
+      case ExprFixKind::AddressOf: {
+        auto type = solution.simplifyType(TC, affected->getType())
+                      ->getRValueObjectType();
+        TC.diagnose(affected->getLoc(), diag::missing_address_of, type)
+          .fixItInsert(affected->getStartLoc(), "&");
+        diagnosed = true;
+        break;
       }
+      }
+
+      // FIXME: It would be really nice to emit a follow-up note showing where
+      // we got the other type information from, e.g., the parameter we're
+      // initializing.
     }
 
     if (diagnosed)

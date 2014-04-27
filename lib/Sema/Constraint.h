@@ -190,6 +190,9 @@ enum class ExprFixKind : uint8_t {
 
   /// Introduce a '!' to force a downcast.
   ForceDowncast,
+
+  /// Introduce a '&' to take the address of an lvalue.
+  AddressOf,
 };
 
 /// Return a string representation of an expression fix.

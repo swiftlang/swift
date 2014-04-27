@@ -1006,23 +1006,30 @@ commit_to_conversions:
   // if there are no other possible solutions.
   if (shouldAttemptFixes() && !typeVar1 && !typeVar2 &&
       !(flags & TMF_ApplyingFix) && kind >= TypeMatchKind::Conversion) {
+    Type objectType1 = type1->getRValueObjectType();
+
     // If the source type is a function type that could be applied with (),
     // try it.
-    if (isFunctionTypeAcceptingNoArguments(type1->getRValueType())) {
+    if (isFunctionTypeAcceptingNoArguments(objectType1)) {
       conversionsOrFixes.push_back(ExprFixKind::NullaryCall);
     }
 
     // If we have an optional type, try to force-unwrap it.
     // FIXME: Should we also try '?'?
-    if (type1->getRValueType()->getOptionalObjectType()) {
+    if (objectType1->getOptionalObjectType()) {
       conversionsOrFixes.push_back(ExprFixKind::ForceOptional);
     }
 
     // If we have a value of type AnyObject that we're trying to convert to
     // a class, force a downcast.
-    if (type1->getRValueType()->isAnyObject() &&
+    if (objectType1->isAnyObject() &&
         type2->getClassOrBoundGenericClass()) {
       conversionsOrFixes.push_back(ExprFixKind::ForceDowncast);
+    }
+
+    // If we're converting an lvalue to an inout type, add the missing '&'.
+    if (type2->getRValueType()->is<InOutType>() && type1->is<LValueType>()) {
+      conversionsOrFixes.push_back(ExprFixKind::AddressOf);
     }
   }
 
@@ -2204,10 +2211,15 @@ ConstraintSystem::simplifyFixConstraint(ExprFixKind fix,
     return matchTypes(type1->getRValueType()->getOptionalObjectType(), type2,
                       matchKind, subFlags, locator);
 
-  case ExprFixKind::ForceDowncast: {
+  case ExprFixKind::ForceDowncast:
     // This one works whenever it is suggested.
     return SolutionKind::Solved;
-  }
+
+  case ExprFixKind::AddressOf:
+    // Assume that '&' was applied to the first type, turning an lvalue into
+    // an inout.
+    return matchTypes(InOutType::get(type1->getRValueType()), type2,
+                      matchKind, subFlags, locator);
   }
 }
 

@@ -221,6 +221,9 @@ ERROR(missing_unwrap_optional,sema_tcc,none,
 ERROR(missing_forced_downcast,sema_tcc,none,
       "type %0 cannot be implicitly downcast; did you mean to use '!'?",
       (Type))
+ERROR(missing_address_of,sema_tcc,none,
+      "passing value of type %0 by reference requires explicit '&'",
+      (Type))
 
 //------------------------------------------------------------------------------
 // Type Check Declarations
