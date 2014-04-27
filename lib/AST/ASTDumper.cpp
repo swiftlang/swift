@@ -1139,8 +1139,9 @@ public:
 
   void visitTypeExpr(TypeExpr *E) {
     printCommon(E, "type_expr");
+    OS << " typerepr: \"";
     E->getTypeRepr()->print(OS);
-    OS << ')';
+    OS << "\")";
   }
 
   void visitOtherConstructorDeclRefExpr(OtherConstructorDeclRefExpr *E) {
