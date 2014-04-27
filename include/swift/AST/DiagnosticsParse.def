@@ -600,7 +600,7 @@ ERROR(inout_must_have_type,pattern_parsing,none,
       "'inout' arguments must have a type specified", ())
 ERROR(implied_name_multiple_parameters,pattern_parsing,none,
       "no name specified for first parameter, name it '_' to ignore it", ())
-ERROR(expected_rparen_parameter,decl_parsing,none,
+ERROR(expected_rparen_parameter,decl_parsing,PointsToFirstBadToken,
       "expected ')' in parameter", ())
 ERROR(expected_parameter_type,decl_parsing,PointsToFirstBadToken,
       "expected parameter type following ':'", ())
