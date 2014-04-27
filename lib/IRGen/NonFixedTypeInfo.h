@@ -88,14 +88,6 @@ public:
     emitDeallocateBufferCall(IGF, metadata, buffer);
   }
 
-  /// Perform a "take-initialization" from the given object.  A
-  /// take-initialization is like a C++ move-initialization, except that
-  /// the old object is actually no longer permitted to be destroyed.
-  void initializeWithTake(IRGenFunction &IGF, Address destAddr,
-                          Address srcAddr, CanType T) const override {
-    return IGF.emitMemCpy(destAddr, srcAddr, asImpl().Impl::getSize(IGF, T));
-  }
-
   llvm::Value *getValueWitnessTable(IRGenFunction &IGF, CanType T) const {
     auto metadata = IGF.emitTypeMetadataRef(T);
     return IGF.emitValueWitnessTableRefForMetadata(metadata);

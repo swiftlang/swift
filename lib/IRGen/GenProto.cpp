@@ -2316,7 +2316,10 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
     goto standard;
 
   case ValueWitness::InitializeWithTake:
-    return asOpaquePtr(IGM, getMemCpyFunction(IGM, concreteTI));
+    if (concreteTI.isBitwiseTakable(ResilienceScope::Local)) {
+      return asOpaquePtr(IGM, getMemCpyFunction(IGM, concreteTI));
+    }
+    goto standard;
 
   case ValueWitness::AssignWithCopy:
     if (concreteTI.isPOD(ResilienceScope::Local)) {

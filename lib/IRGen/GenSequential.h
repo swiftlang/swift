@@ -176,6 +176,28 @@ public:
                                              field.getType(IGF.IGM, T));
     }
   }
+  
+  void initializeWithTake(IRGenFunction &IGF,
+                          Address dest, Address src,
+                          CanType T) const override {
+    // If we're bitwise-takable, use memcpy.
+    if (this->isBitwiseTakable(ResilienceScope::Local)) {
+      IGF.Builder.CreateMemCpy(dest.getAddress(), src.getAddress(),
+                 asImpl().Impl::getSize(IGF, T),
+                 std::min(dest.getAlignment(), src.getAlignment()).getValue());
+      return;
+    }
+    
+    auto offsets = asImpl().getNonFixedOffsets(IGF, T);
+    for (auto &field : getFields()) {
+      if (field.isEmpty()) continue;
+      
+      Address destField = field.projectAddress(IGF, dest, offsets);
+      Address srcField = field.projectAddress(IGF, src, offsets);
+      field.getTypeInfo().initializeWithTake(IGF, destField, srcField,
+                                             field.getType(IGF.IGM, T));
+    }
+  }
 
   void destroy(IRGenFunction &IGF, Address addr, CanType T) const {
     auto offsets = asImpl().getNonFixedOffsets(IGF, T);
