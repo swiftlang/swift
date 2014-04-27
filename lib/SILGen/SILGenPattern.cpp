@@ -1592,13 +1592,23 @@ static void emitCaseBody(SILGenFunction &gen,
 /// Emit cases for a scope, identified by its continuation BB.
 static void emitCasesForScope(SILGenFunction &gen,
                               SILBasicBlock *contBB,
-                              const CaseMap &caseMap) {
+                              const CaseMap &caseMap,
+                              SwitchStmt *S) {
   for (auto &cases : caseMap) {
     CaseStmt *caseStmt = cases.first;
     const CaseBlock &caseBlock = cases.second;
     
-    if (caseBlock.cont == contBB)
-      emitCaseBody(gen, caseStmt, caseBlock);
+    if (caseBlock.cont != contBB) continue;
+    
+    gen.BreakContinueDestStack.push_back({
+      S,
+      JumpDest(contBB, gen.getCleanupsDepth(), CleanupLocation(caseStmt)),
+      JumpDest(caseStmt)
+    });
+
+    emitCaseBody(gen, caseStmt, caseBlock);
+    
+    gen.BreakContinueDestStack.pop_back();
   }
 }
 
@@ -1702,6 +1712,8 @@ recur:
                                  contLoc);
     Scope dispatchScope(gen.Cleanups, contLoc);
 
+    gen.BreakContinueDestStack.push_back({ stmt, contDest, JumpDest(contLoc) });
+    
     defaultBB
       = emitDispatchAndDestructure(gen, specializers,
                                    clauses.getOccurrences()[0],
@@ -1741,7 +1753,7 @@ recur:
                && "recursive emitDecisionTree did not terminate all its BBs");
         
         // Emit cases in this scope.
-        emitCasesForScope(gen, innerContBB, caseMap);
+        emitCasesForScope(gen, innerContBB, caseMap, stmt);
         
         if (innerContBB->pred_empty()) {
           // If the continuation wasn't used, kill it.
@@ -1756,6 +1768,8 @@ recur:
       if (gen.B.hasValidInsertionPoint())
         gen.Cleanups.emitBranchAndCleanups(contDest, CleanupLocation(stmt));
     }
+    
+    gen.BreakContinueDestStack.pop_back();
   }
 
   // If the dispatch was exhaustive, then emitDispatchAndDestructure returns
@@ -1808,7 +1822,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
     // Create a continuation bb for life after the switch.
     SILBasicBlock *contBB = createBasicBlock();
     
-    // Set up an initial clause matrix.
+     // Set up an initial clause matrix.
     ClauseMatrix clauses(subject, S->getCases().size(),
                          S->getCases()[0]);
     
@@ -1840,7 +1854,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
            "emitDecisionTree did not terminate all its BBs");
     
     // Emit cases for the outermost scope.
-    emitCasesForScope(*this, contBB, caseMap);
+    emitCasesForScope(*this, contBB, caseMap, S);
 
     SwitchStack.pop_back();
     

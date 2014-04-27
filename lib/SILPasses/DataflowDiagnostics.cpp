@@ -66,9 +66,7 @@ static void diagnoseNonExhaustiveSwitch(const UnreachableInst *UI,
                                         ASTContext &Context) {
   SILLocation L = UI->getLoc();
   assert(L);
-  diagnose(Context,
-           L.getEndSourceLoc(),
-           diag::non_exhaustive_switch);
+  diagnose(Context, L.getEndSourceLoc(), diag::non_exhaustive_switch);
 }
 
 static void diagnoseUnreachable(const SILInstruction *I,
@@ -140,8 +138,7 @@ static void diagnoseStaticReports(const SILInstruction *I,
         if (!V || V->getValue() != 1)
           return;
 
-        diagnose(M.getASTContext(),
-                 I->getLoc().getSourceLoc(),
+        diagnose(M.getASTContext(), I->getLoc().getSourceLoc(),
                  diag::static_report_error);
       }
     }
