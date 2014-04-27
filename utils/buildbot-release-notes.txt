@@ -1,6 +1,16 @@
 Latest
 ----------
 
+* Swift now supports a #elseif form for build configurations, e.g.:
+
+    #if os(OSX)
+      typealias SKColor = NSColor
+    #elseif os(iOS)
+      typealias SKColor = UIColor
+    #else
+      typealias SKColor = Green
+    #endif
+
 * 'break' now breaks out of switch statements.
 
 * It is no longer possible to specify "@mutating" as an attribute, you may only
