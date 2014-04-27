@@ -341,8 +341,15 @@ public:
                                                 nullptr);
   }
 
+  /// Transform the function type SILType by replacing all of its interface
+  /// generic args with the appropriate item from the substitution.
+  ///
+  /// Only call this with function types!
   SILType substInterfaceGenericArgs(SILModule &M,
                                     ArrayRef<Substitution> Subs) const;
+
+  SILType subst(SILModule &silModule, Module *astModule,
+                TypeSubstitutionMap &subs) const;
 
   //
   // Accessors for types used in SIL instructions:

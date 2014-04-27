@@ -87,34 +87,51 @@ bool ProtocolConformance::usesDefaultDefinition(ValueDecl *requirement) const {
   CONFORMANCE_SUBCLASS_DISPATCH(usesDefaultDefinition, (requirement))
 }
 
-GenericParamList *ProtocolConformance::getGenericParams() const {
-  switch (getKind()) {
-  case ProtocolConformanceKind::Normal: {
-    // FIXME: This should be an independent property of the conformance.
-    // Assuming a BoundGenericType conformance is always for the
-    // DeclaredTypeInContext is unsound if we ever add constrained extensions.
-    Type ty = getType();
-    while (ty) {
-      if (auto nt = ty->getAs<NominalType>())
-        ty = nt->getParent();
-      else
-        break;
-    }
-    
-    if (!ty)
-      return nullptr;
-    
-    if (auto bgt = ty->getAs<BoundGenericType>()) {
-      auto decl = bgt->getDecl();
-      assert(bgt->isEqual(decl->getDeclaredTypeInContext())
-             && "conformance for constrained generic type not implemented");
-      return decl->getGenericParams();
-    }
+/// FIXME: This should be an independent property of the conformance.
+/// Assuming a BoundGenericType conformance is always for the
+/// DeclaredTypeInContext is unsound if we ever add constrained extensions.
+static GenericParamList *genericParamListForType(Type ty) {
+  while (ty) {
+    if (auto nt = ty->getAs<NominalType>())
+      ty = nt->getParent();
+    else
+      break;
+  }
+
+  if (!ty)
     return nullptr;
+
+  if (auto bgt = ty->getAs<BoundGenericType>()) {
+    auto decl = bgt->getDecl();
+    assert(bgt->isEqual(decl->getDeclaredTypeInContext()) &&
+           "conformance for constrained generic type not implemented");
+    return decl->getGenericParams();
+  }
+  return nullptr;
+}
+
+GenericParamList *ProtocolConformance::getGenericParams() const {
+  const ProtocolConformance *C = this;
+  switch (getKind()) {
+  case ProtocolConformanceKind::Inherited: {
+    // Look through all the inherited layers and then fall through to the
+    // normal.
+    do {
+      C = cast<InheritedProtocolConformance>(C)->getInheritedConformance();
+    } while (C->getKind() == ProtocolConformanceKind::Inherited);
+
+    // We don't handle specialized conformances here so bail.
+    if (C->getKind() == ProtocolConformanceKind::Specialized)
+      return nullptr;
+
+    // Otherwise we have a normal conformance. Fallthrough.
+    SWIFT_FALLTHROUGH;
+  }
+  case ProtocolConformanceKind::Normal: {
+    return genericParamListForType(C->getType());
   }
   case ProtocolConformanceKind::Specialized:
-  case ProtocolConformanceKind::Inherited:
-    // FIXME: These could reasonably have open type variables.
+    // FIXME: This could reasonably have open type variables.
     return nullptr;
   }
 }

@@ -1472,8 +1472,13 @@ namespace {
 
 SILType SILType::substType(SILModule &silModule, Module *astModule,
                            TypeSubstitutionMap &subs, SILType SrcTy) {
+  return SrcTy.subst(silModule, astModule, subs);
+}
+
+SILType SILType::subst(SILModule &silModule, Module *astModule,
+                       TypeSubstitutionMap &subs) const {
   SILTypeSubstituter STST(silModule, astModule, subs);
-  return STST.subst(SrcTy);
+  return STST.subst(*this);
 }
 
 CanSILFunctionType SILType::substFuncType(SILModule &silModule,

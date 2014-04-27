@@ -1363,9 +1363,26 @@ void SILDevirtualizer::optimizeApplyInst(ApplyInst *AI) {
       SILValue Self = ApplyArgs[0].get();
       if (C->getKind() == ProtocolConformanceKind::Inherited) {
         CanType Ty = Ret.first->getConformance()->getType()->getCanonicalType();
-        SILType SILTy = SILType::getPrimitiveType(Ty,
-                                                  Self.getType().getCategory());
-        assert(SILTy.isSuperclassOf(Self.getType()) &&
+        SILType SILTy =
+            SILType::getPrimitiveType(Ty, Self.getType().getCategory());
+        SILType SelfTy = Self.getType();
+        (void)SelfTy;
+
+        if (Ret.second.size()) {
+          // If we have substitutions then we are an inherited specialized
+          // conformance. Substitute in the generic type so we upcast correctly.
+          GenericParamList *GP = C->getGenericParams();
+          if (!GP)
+            return;
+
+          TypeSubstitutionMap TSM = GP->getSubstitutionMap(Ret.second);
+          SILTy = SILTy.subst(F->getModule(), F->getModule().getSwiftModule(),
+                              TSM);
+          SelfTy = SelfTy.subst(F->getModule(), F->getModule().getSwiftModule(),
+                                TSM);
+        }
+
+        assert(SILTy.isSuperclassOf(SelfTy) &&
                "Should only create upcasts for sub class devirtualization.");
         Self = Builder.createUpcast(Loc, Self, SILTy);
       }
