@@ -211,7 +211,12 @@ NOTE(note_call_to_initializer,sema_tcc,none,
      "in call to initializer", ())
 NOTE(note_init_parameter,sema_tcc,none,
      "in initialization of parameter %0", (Identifier))
-
+ERROR(missing_nullary_call,sema_tcc,none,
+     "function produces expected type %0; did you mean to call it with '()'?",
+     (Type))
+ERROR(missing_nullary_call_somewhere,sema_tcc,none,
+      "function call would produce type %0; did you mean to call it with '()'?",
+     (Type))
 
 //------------------------------------------------------------------------------
 // Type Check Declarations

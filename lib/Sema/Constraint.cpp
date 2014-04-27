@@ -28,8 +28,9 @@ using namespace constraints;
 Constraint::Constraint(ConstraintKind kind, ArrayRef<Constraint *> constraints,
                        ConstraintLocator *locator, 
                        ArrayRef<TypeVariableType *> typeVars)
-  : Kind(kind), HasRestriction(false), IsActive(false), RememberChoice(false),
-    NumTypeVariables(typeVars.size()), Nested(constraints), Locator(locator)
+  : Kind(kind), HasRestriction(false), HasFix(false), IsActive(false),
+    RememberChoice(false), NumTypeVariables(typeVars.size()),
+    Nested(constraints), Locator(locator)
 {
   assert(kind == ConstraintKind::Conjunction ||
          kind == ConstraintKind::Disjunction);
@@ -39,8 +40,8 @@ Constraint::Constraint(ConstraintKind kind, ArrayRef<Constraint *> constraints,
 Constraint::Constraint(ConstraintKind Kind, Type First, Type Second, 
                        DeclName Member, ConstraintLocator *locator,
                        ArrayRef<TypeVariableType *> typeVars)
-  : Kind(Kind), HasRestriction(false), IsActive(false), RememberChoice(false),
-    NumTypeVariables(typeVars.size()),
+  : Kind(Kind), HasRestriction(false), HasFix(false), IsActive(false),
+    RememberChoice(false), NumTypeVariables(typeVars.size()),
     Types { First, Second, Member }, Locator(locator)
 {
   switch (Kind) {
@@ -93,9 +94,9 @@ Constraint::Constraint(Type type, OverloadChoice choice,
                        ConstraintLocator *locator,
                        ArrayRef<TypeVariableType *> typeVars)
   : Kind(ConstraintKind::BindOverload),
-    HasRestriction(false), IsActive(false), RememberChoice(false),
-    NumTypeVariables(typeVars.size()), Overload{type, choice},
-    Locator(locator) 
+    HasRestriction(false), HasFix(false), IsActive(false),
+    RememberChoice(false), NumTypeVariables(typeVars.size()),
+    Overload{type, choice}, Locator(locator)
 { 
   std::copy(typeVars.begin(), typeVars.end(), getTypeVariablesBuffer().begin());
 }
@@ -105,9 +106,22 @@ Constraint::Constraint(ConstraintKind kind,
                        Type first, Type second, ConstraintLocator *locator,
                        ArrayRef<TypeVariableType *> typeVars)
     : Kind(kind), Restriction(restriction),
-      HasRestriction(true), IsActive(false), RememberChoice(false),
-      NumTypeVariables(typeVars.size()), 
+      HasRestriction(true), HasFix(false), IsActive(false),
+      RememberChoice(false), NumTypeVariables(typeVars.size()),
       Types{ first, second, Identifier() }, Locator(locator)
+{
+  assert(!first.isNull());
+  assert(!second.isNull());
+  std::copy(typeVars.begin(), typeVars.end(), getTypeVariablesBuffer().begin());
+}
+
+Constraint::Constraint(ConstraintKind kind,
+                       ExprFixKind fix,
+                       Type first, Type second, ConstraintLocator *locator,
+                       ArrayRef<TypeVariableType *> typeVars)
+  : Kind(kind), Fix(fix), HasRestriction(false), HasFix(true),
+    IsActive(false), RememberChoice(false), NumTypeVariables(typeVars.size()),
+    Types{ first, second, Identifier() }, Locator(locator)
 {
   assert(!first.isNull());
   assert(!second.isNull());
@@ -236,6 +250,10 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
     Out << ' ' << getName(*restriction);
   }
 
+  if (auto fix = getFix()) {
+    Out << ' ' << getName(*fix);
+  }
+
   if (Locator) {
     Out << " [[";
     Locator->dump(sm, Out);
@@ -279,6 +297,15 @@ StringRef swift::constraints::getName(ConversionRestrictionKind kind) {
     return "[user]";
   }
   llvm_unreachable("bad conversion restriction kind");
+}
+
+StringRef swift::constraints::getName(ExprFixKind kind) {
+  switch (kind) {
+  case ExprFixKind::None:
+    return "[prevent fixes]";
+  case ExprFixKind::NullaryCall:
+    return "[fix: add nullary call]";
+  }
 }
 
 /// Recursively gather the set of type variables referenced by this constraint.
@@ -391,6 +418,25 @@ Constraint *Constraint::createRestricted(ConstraintSystem &cs,
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
   return new (mem) Constraint(kind, restriction, first, second, locator,
                               typeVars);
+}
+
+Constraint *Constraint::createFixed(ConstraintSystem &cs, ConstraintKind kind,
+                                    ExprFixKind fix,
+                                    Type first, Type second,
+                                    ConstraintLocator *locator) {
+  // Collect type variables.
+  SmallVector<TypeVariableType *, 4> typeVars;
+  if (first->hasTypeVariable())
+    first->getTypeVariables(typeVars);
+  if (second->hasTypeVariable())
+    second->getTypeVariables(typeVars);
+  uniqueTypeVariables(typeVars);
+
+  // Create the constraint.
+  unsigned size = sizeof(Constraint)
+  + typeVars.size() * sizeof(TypeVariableType*);
+  void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
+  return new (mem) Constraint(kind, fix, first, second, locator, typeVars);
 }
 
 Constraint *Constraint::createConjunction(ConstraintSystem &cs,

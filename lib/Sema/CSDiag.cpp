@@ -186,6 +186,11 @@ void constraints::simplifyLocator(Expr *&anchor,
 
         anchor = applyExpr->getArg();
         path = path.slice(1);
+
+        // Look through parentheses around the argument.
+        if (auto paren = dyn_cast<ParenExpr>(anchor))
+          anchor = paren->getSubExpr();
+
         continue;
       }
       break;
@@ -740,49 +745,62 @@ bool diagnoseAmbiguity(ConstraintSystem &cs, ArrayRef<Solution> solutions) {
   return false;
 }
 
-bool ConstraintSystem::diagnose() {
+bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
   // If there were any unavoidable failures, emit the first one we can.
   if (!unavoidableFailures.empty()) {
     for (auto failure : unavoidableFailures) {
       if (diagnoseFailure(*this, *failure))
         return true;
     }
-    
-    return false;
+
+    // FIXME: Crappy generic diagnostic.
+    TC.diagnose(expr->getLoc(), diag::constraint_type_check_fail)
+      .highlight(expr->getSourceRange());
+
+    return true;
   }
 
   // There were no unavoidable failures, so attempt to solve again, capturing
   // any failures that come from our attempts to select overloads or bind
   // type variables.
   {
-    SmallVector<Solution, 4> solutions;
-    
+    viable.clear();
+
     // Set up solver state.
     SolverState state(*this);
     state.recordFailures = true;
     this->solverState = &state;
 
     // Solve the system.
-    solve(solutions);
+    solve(viable);
+
+    // Check whether we have a best solution; this can happen if we found
+    // a series of fixes that worked.
+    if (auto best = findBestSolution(viable, /*minimize=*/true)) {
+      if (*best != 0)
+        viable[0] = std::move(viable[*best]);
+      viable.erase(viable.begin() + 1, viable.end());
+      return false;
+    }
 
     // FIXME: If we were able to actually fix things along the way,
     // we may have to hunt for the best solution. For now, we don't care.
 
     // If there are multiple solutions, try to diagnose an ambiguity.
-    if (solutions.size() > 1) {
+    if (viable.size() > 1) {
       if (getASTContext().LangOpts.DebugConstraintSolver) {
         auto &log = getASTContext().TypeCheckerDebug->getStream();
         log << "---Ambiguity error: "
-            << solutions.size() << " solutions found---\n";
+            << viable.size() << " solutions found---\n";
         int i = 0;
-        for (auto &solution : solutions) {
+        for (auto &solution : viable) {
           log << "---Ambiguous solution #" << i++ << "---\n";
           solution.dump(&TC.Context.SourceMgr, log);
           log << "\n";
         }
       }        
 
-      if (diagnoseAmbiguity(*this, solutions)) {
+      if (diagnoseAmbiguity(*this, viable)) {
         return true;
       }
     }
@@ -796,8 +814,12 @@ bool ConstraintSystem::diagnose() {
   if (failures.size() == 1) {
     auto &failure = unavoidableFailures.empty()? *failures.begin()
                                                : **unavoidableFailures.begin();
-    return diagnoseFailure(*this, failure);
+    if (diagnoseFailure(*this, failure))
+      return true;
   }
 
-  return false;
+  // FIXME: Crappy generic diagnostic.
+  TC.diagnose(expr->getLoc(), diag::constraint_type_check_fail)
+    .highlight(expr->getSourceRange());
+  return true;
 }

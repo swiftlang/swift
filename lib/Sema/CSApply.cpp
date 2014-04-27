@@ -21,6 +21,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"
+#include "swift/Parse/Lexer.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallString.h"
@@ -3820,6 +3821,50 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
 /// type-checked expression.
 Expr *ConstraintSystem::applySolution(const Solution &solution,
                                       Expr *expr) {
+  // If any fixes needed to be applied to arrive at this solution, resolve
+  // them to specific expressions.
+  if (!solution.Fixes.empty()) {
+    bool diagnosed = false;
+    for (auto fix : solution.Fixes) {
+      // Resolve the locator to a specific expression.
+      SourceRange range1, range2;
+      ConstraintLocator *resolved
+        = simplifyLocator(*this, fix.second, range1, range2);
+
+      // If we didn't manage to resolve directly to an expression, we don't
+      // have a great diagnostic to give, so continue.
+      if (!resolved || !resolved->getAnchor() || !resolved->getPath().empty())
+        continue;
+
+      Expr *affected = resolved->getAnchor();
+
+      switch (fix.first) {
+      case ExprFixKind::None:
+        llvm_unreachable("no-fix marker should never make it into solution");
+
+      case ExprFixKind::NullaryCall: {
+        auto type = solution.simplifyType(TC, affected->getType())
+                      ->getRValueType()->castTo<AnyFunctionType>()->getResult();
+        SourceLoc afterAffectedLoc
+          = Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
+                                       affected->getEndLoc());
+        TC.diagnose(affected->getLoc(), diag::missing_nullary_call, type)
+          .fixItInsert(afterAffectedLoc, "()");
+        diagnosed = true;
+        break;
+      }
+      }
+    }
+
+    if (diagnosed)
+      return nullptr;
+
+    // We didn't manage to diagnose anything well, so fall back to
+    // diagnosing poorly.
+    // FIXME: Lame, of course. We probably shouldn't get there.
+    TC.diagnose(expr->getLoc(), diag::constraint_type_check_fail);
+    return nullptr;
+  }
 
   class ExprWalker : public ASTWalker {
     ExprRewriter &Rewriter;
@@ -3953,7 +3998,7 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
                                MutableArrayRef<Expr *> arguments,
                                Diag<> brokenProtocolDiag) {
   // Construct an empty constraint system and solution.
-  ConstraintSystem cs(*this, dc);
+  ConstraintSystem cs(*this, dc, ConstraintSystemOptions());
 
   // Find the witness we need to use.
   auto type = base->getType();

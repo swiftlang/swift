@@ -37,6 +37,10 @@ void ConstraintSystem::increaseScore(ScoreKind kind) {
       log.indent(solverState->depth * 2);
     log << "(increasing score due to ";
     switch (kind) {
+      case SK_Fix:
+      log << "attempting to fix the source";
+      break;
+
     case SK_ForceUnchecked:
       log << "force of an unchecked optional";
       break;
@@ -399,7 +403,7 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
   }
 
   // Construct a constraint system to compare the two declarations.
-  ConstraintSystem cs(tc, dc);
+  ConstraintSystem cs(tc, dc, ConstraintSystemOptions());
 
   // Get the type of a reference to the second declaration.
   Type openedType2 = cs.openType(type2,decl2->getPotentialGenericDeclContext());

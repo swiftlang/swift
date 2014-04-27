@@ -174,6 +174,21 @@ enum RememberChoice_t : bool {
   RememberChoice = true
 };
 
+/// Describes the kind of fix to apply to the given constraint before
+/// visiting it.
+enum class ExprFixKind : uint8_t {
+  /// No fix, which is used as a placeholder indicating that future processing
+  /// of this constraint should not attempt fixes.
+  None,
+
+  /// Introduce a call with no arguments, i.e., (), on the first type before
+  /// applying the constraint to the second type.
+  NullaryCall,
+};
+
+/// Return a string representation of an expression fix.
+llvm::StringRef getName(ExprFixKind kind);
+
 /// \brief A constraint between two type variables.
 class Constraint : public llvm::ilist_node<Constraint> {
   /// \brief The kind of constraint.
@@ -182,8 +197,14 @@ class Constraint : public llvm::ilist_node<Constraint> {
   /// The kind of restriction placed on this constraint.
   ConversionRestrictionKind Restriction : 8;
 
+  /// The kind of fix to be applied to the constraint before visiting it.
+  ExprFixKind Fix : 8;
+
   /// Whether the \c Restriction field is valid.
   unsigned HasRestriction : 1;
+
+  /// Whether the \c Fix field is valid.
+  unsigned HasFix : 1;
 
   /// Whether this constraint is currently active, i.e., stored in the worklist.
   unsigned IsActive : 1;
@@ -195,7 +216,7 @@ class Constraint : public llvm::ilist_node<Constraint> {
   /// The number of type variables referenced by this constraint.
   ///
   /// The type variables themselves are tail-allocated.
-  unsigned NumTypeVariables : 29;
+  unsigned NumTypeVariables : 12;
 
   union {
     struct {
@@ -246,6 +267,11 @@ class Constraint : public llvm::ilist_node<Constraint> {
              Type first, Type second, ConstraintLocator *locator,
              ArrayRef<TypeVariableType *> typeVars);
 
+  /// Constraint a relational constraint with a fix.
+  Constraint(ConstraintKind kind, ExprFixKind fix,
+             Type first, Type second, ConstraintLocator *locator,
+             ArrayRef<TypeVariableType *> typeVars);
+
   /// Retrieve the type variables buffer, for internal mutation.
   MutableArrayRef<TypeVariableType *> getTypeVariablesBuffer() {
     return { reinterpret_cast<TypeVariableType **>(this + 1), NumTypeVariables };
@@ -268,6 +294,12 @@ public:
                                       Type first, Type second, 
                                       ConstraintLocator *locator);
 
+  /// Create a relational constraint with a fix.
+  static Constraint *createFixed(ConstraintSystem &cs, ConstraintKind kind,
+                                 ExprFixKind fix,
+                                 Type first, Type second,
+                                 ConstraintLocator *locator);
+
   /// Create a new conjunction constraint.
   static Constraint *createConjunction(ConstraintSystem &cs,
                                        ArrayRef<Constraint *> constraints,
@@ -289,6 +321,14 @@ public:
       return Nothing;
 
     return Restriction;
+  }
+
+  /// Retrieve the fix associated with this constraint.
+  Optional<ExprFixKind> getFix() const {
+    if (!HasFix)
+      return Nothing;
+
+    return Fix;
   }
 
   /// Whether this constraint is active, i.e., in the worklist.

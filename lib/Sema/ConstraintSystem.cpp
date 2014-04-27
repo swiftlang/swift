@@ -22,8 +22,9 @@
 using namespace swift;
 using namespace constraints;
 
-ConstraintSystem::ConstraintSystem(TypeChecker &tc, DeclContext *dc)
-  : TC(tc), DC(dc), 
+ConstraintSystem::ConstraintSystem(TypeChecker &tc, DeclContext *dc,
+                                   ConstraintSystemOptions options)
+  : TC(tc), DC(dc), Options(options),
     Arena(tc.Context, Allocator, 
           [&](TypeVariableType *baseTypeVar, AssociatedTypeDecl *assocType) {
             return getMemberType(baseTypeVar, assocType,

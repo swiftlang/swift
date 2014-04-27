@@ -1214,7 +1214,8 @@ void TupleType::Profile(llvm::FoldingSetNodeID &ID,
 
 /// getTupleType - Return the uniqued tuple type with the specified elements.
 Type TupleType::get(ArrayRef<TupleTypeElt> Fields, const ASTContext &C) {
-  if (Fields.size() == 1 && !Fields[0].isVararg() && !Fields[0].hasName())
+  if (Fields.size() == 1 && !Fields[0].isVararg() && !Fields[0].hasName()
+      && Fields[0].getDefaultArgKind() == DefaultArgumentKind::None)
     return ParenType::get(C, Fields[0].getType());
 
   RecursiveTypeProperties properties;

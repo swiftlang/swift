@@ -627,7 +627,7 @@ bool TypeChecker::typeCheckExpression(
     return true;
 
   // Construct a constraint system from this expression.
-  ConstraintSystem cs(*this, dc);
+  ConstraintSystem cs(*this, dc, ConstraintSystemFlags::AllowFixes);
   CleanupIllFormedExpressionRAII cleanup(cs, expr);
   if (auto generatedExpr = cs.generateConstraints(expr))
     expr = generatedExpr;
@@ -662,17 +662,12 @@ bool TypeChecker::typeCheckExpression(
       return true;
 
     // Try to provide a decent diagnostic.
-    if (cs.diagnose()) {
+    if (cs.salvage(viable, expr)) {
       diagnoseExpr(*this, expr, dc, listener);
       return true;
     }
 
-    // FIXME: Crappy diagnostic.
-    diagnose(expr->getLoc(), diag::constraint_type_check_fail)
-      .highlight(expr->getSourceRange());
-
-    diagnoseExpr(*this, expr, dc, listener);
-    return true;
+    // The system was salvaged; continue on as if nothing happened.
   }
 
   auto &solution = viable[0];
@@ -692,7 +687,7 @@ bool TypeChecker::typeCheckExpression(
   if (!result) {
     diagnoseExpr(*this, expr, dc, listener);
     // Failure already diagnosed, above, as part of applying the solution.
-   return true;
+    return true;
   }
 
   // If we're supposed to convert the expression to some particular type,
@@ -748,7 +743,7 @@ bool TypeChecker::typeCheckExpressionShallow(Expr *&expr, DeclContext *dc,
   PrettyStackTraceExpr stackTrace(Context, "shallow type-checking", expr);
 
   // Construct a constraint system from this expression.
-  ConstraintSystem cs(*this, dc);
+  ConstraintSystem cs(*this, dc, ConstraintSystemFlags::AllowFixes);
   CleanupIllFormedExpressionRAII cleanup(cs, expr);
   if (auto generatedExpr = cs.generateConstraintsShallow(expr))
     expr = generatedExpr;
@@ -772,16 +767,7 @@ bool TypeChecker::typeCheckExpressionShallow(Expr *&expr, DeclContext *dc,
 
   // Attempt to solve the constraint system.
   SmallVector<Solution, 4> viable;
-  if (cs.solve(viable)) {
-    // Try to provide a decent diagnostic.
-    if (cs.diagnose()) {
-      return true;
-    }
-
-    // FIXME: Crappy diagnostic.
-    diagnose(expr->getLoc(), diag::constraint_type_check_fail)
-      .highlight(expr->getSourceRange());
-
+  if (cs.solve(viable) && cs.salvage(viable, expr)) {
     return true;
   }
 
@@ -1217,14 +1203,14 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
 }
 
 bool TypeChecker::isSubtypeOf(Type type1, Type type2, DeclContext *dc) {
-  ConstraintSystem cs(*this, dc);
+  ConstraintSystem cs(*this, dc, ConstraintSystemOptions());
   cs.addConstraint(ConstraintKind::Subtype, type1, type2);
   SmallVector<Solution, 1> solutions;
   return !cs.solve(solutions);
 }
 
 bool TypeChecker::isConvertibleTo(Type type1, Type type2, DeclContext *dc) {
-  ConstraintSystem cs(*this, dc);
+  ConstraintSystem cs(*this, dc, ConstraintSystemOptions());
   cs.addConstraint(ConstraintKind::Conversion, type1, type2);
   SmallVector<Solution, 1> solutions;
   return !cs.solve(solutions);
@@ -1232,7 +1218,7 @@ bool TypeChecker::isConvertibleTo(Type type1, Type type2, DeclContext *dc) {
 
 bool TypeChecker::isSubstitutableFor(Type type, ArchetypeType *archetype,
                                      DeclContext *dc) {
-  ConstraintSystem cs(*this, dc);
+  ConstraintSystem cs(*this, dc, ConstraintSystemOptions());
 
   // Add all of the requirements of the archetype to the given type.
   // FIXME: Short-circuit if any of the constraints fails.
@@ -1329,7 +1315,7 @@ Expr *TypeChecker::coerceToMaterializable(Expr *expr) {
 
 bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc) {
   // Construct a constraint system from this expression.
-  ConstraintSystem cs(*this, dc);
+  ConstraintSystem cs(*this, dc, ConstraintSystemFlags::AllowFixes);
   CleanupIllFormedExpressionRAII cleanup(cs, expr);
 
   // If there is a type that we're expected to convert to, add the conversion
@@ -1347,16 +1333,7 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc) {
 
   // Attempt to solve the constraint system.
   SmallVector<Solution, 4> viable;
-  if (cs.solve(viable)) {
-    // Try to provide a decent diagnostic.
-    if (cs.diagnose()) {
-      return true;
-    }
-
-    // FIXME: Crappy diagnostic.
-    diagnose(expr->getLoc(), diag::constraint_type_check_fail)
-      .highlight(expr->getSourceRange());
-
+  if (cs.solve(viable) && cs.salvage(viable, expr)) {
     return true;
   }
 

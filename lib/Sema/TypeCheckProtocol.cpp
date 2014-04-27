@@ -502,7 +502,8 @@ matchWitness(TypeChecker &tc, NormalProtocolConformance *conformance,
 
   // Construct a constraint system to use to solve the equality between
   // the required type and the witness type.
-  constraints::ConstraintSystem cs(tc, dc);
+  constraints::ConstraintSystem cs(tc, dc,
+                                   constraints::ConstraintSystemOptions());
 
   // Open up the witness type.
   Type witnessType = witness->getInterfaceType();

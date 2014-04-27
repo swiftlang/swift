@@ -125,6 +125,10 @@ Solution ConstraintSystem::finalize(
     }
   }
 
+  // For each of the fixes, record it as an operation on the affected
+  // expression.
+  solution.Fixes = Fixes;
+
   // Remember all the disjunction choices we made.
   for (auto &choice : DisjunctionChoices) {
     // We shouldn't ever register disjunction choices multiple times,
@@ -366,6 +370,7 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numSavedBindings = cs.solverState->savedBindings.size();
   firstRetired = cs.solverState->retiredConstraints.begin();
   numConstraintRestrictions = cs.ConstraintRestrictions.size();
+  numFixes = cs.Fixes.size();
   numDisjunctionChoices = cs.DisjunctionChoices.size();
   numGeneratedConstraints = cs.solverState->generatedConstraints.size();
   PreviousScore = cs.CurrentScore;
@@ -410,6 +415,9 @@ ConstraintSystem::SolverScope::~SolverScope() {
 
   // Remove any constraint restrictions.
   truncate(cs.ConstraintRestrictions, numConstraintRestrictions);
+
+  // Remove any fixes.
+  truncate(cs.Fixes, numFixes);
 
   // Remove any disjunction choices.
   truncate(cs.DisjunctionChoices, numDisjunctionChoices);
@@ -1145,6 +1153,10 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
 /// solution when we encounter the given constraint.
 static bool shortCircuitDisjunctionAt(Constraint *constraint,
                                       Constraint *successfulConstraint) {
+  // Anything without a fix is better than anything with a fix.
+  if (constraint->getFix() && !successfulConstraint->getFix())
+    return true;
+
   // Non-optional conversions are better than optional-to-optional
   // conversions.
   if (auto restriction = constraint->getRestriction()) {

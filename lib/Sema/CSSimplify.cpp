@@ -521,6 +521,33 @@ tryUserConversion(ConstraintSystem &cs, Type type, ConstraintKind kind,
   return ConstraintSystem::SolutionKind::Solved;
 }
 
+/// Determine whether this is a function type accepting no arguments as input.
+static bool isFunctionTypeAcceptingNoArguments(Type type) {
+  // The type must be a function type.
+  auto fnType = type->getAs<AnyFunctionType>();
+  if (!fnType)
+    return false;
+
+  // Only tuple arguments make sense.
+  auto tupleTy = fnType->getInput()->getAs<TupleType>();
+  if (!tupleTy) return false;
+
+  // Look for any non-defaulted, non-variadic elements.
+  for (const auto &elt : tupleTy->getFields()) {
+    // Defaulted arguments are okay.
+    if (elt.getDefaultArgKind() != DefaultArgumentKind::None)
+      continue;
+
+    // Variadic arguments are okay.
+    if (elt.isVararg())
+      continue;
+
+    return false;
+  }
+
+  return true;
+}
+
 ConstraintSystem::SolutionKind
 ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
                              unsigned flags,
@@ -647,11 +674,11 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     }
   }
 
-  llvm::SmallVector<ConversionRestrictionKind, 4> potentialConversions;
+  llvm::SmallVector<RestrictionOrFix, 4> conversionsOrFixes;
   bool concrete = !typeVar1 && !typeVar2;
 
   // Decompose parallel structure.
-  unsigned subFlags = flags | TMF_GenerateConstraints;
+  unsigned subFlags = (flags | TMF_GenerateConstraints) & ~TMF_ApplyingFix;
   if (desugar1->getKind() == desugar2->getKind()) {
     switch (desugar1->getKind()) {
 #define SUGARED_TYPE(id, parent) case TypeKind::id:
@@ -694,7 +721,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
 
     case TypeKind::Tuple: {
       // Try the tuple-to-tuple conversion.
-      potentialConversions.push_back(ConversionRestrictionKind::TupleToTuple);
+      conversionsOrFixes.push_back(ConversionRestrictionKind::TupleToTuple);
       break;
     }
 
@@ -704,7 +731,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       auto nominal1 = cast<NominalType>(desugar1);
       auto nominal2 = cast<NominalType>(desugar2);
       if (nominal1->getDecl() == nominal2->getDecl()) {
-        potentialConversions.push_back(ConversionRestrictionKind::DeepEquality);
+        conversionsOrFixes.push_back(ConversionRestrictionKind::DeepEquality);
       }
       break;
     }
@@ -786,7 +813,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       auto bound2 = cast<BoundGenericType>(desugar2);
       
       if (bound1->getDecl() == bound2->getDecl()) {
-        potentialConversions.push_back(ConversionRestrictionKind::DeepEquality);
+        conversionsOrFixes.push_back(ConversionRestrictionKind::DeepEquality);
       }
       break;
     }
@@ -822,7 +849,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
            !tuple2->getFields()[0].isVararg()) ||
           (kind >= TypeMatchKind::Conversion &&
            tuple2->getFieldForScalarInit() >= 0)) {
-        potentialConversions.push_back(
+        conversionsOrFixes.push_back(
           ConversionRestrictionKind::ScalarToTuple);
 
         // FIXME: Prohibits some user-defined conversions for tuples.
@@ -834,7 +861,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       // A single-element tuple can be a trivial subtype of a scalar.
       if (tuple1->getFields().size() == 1 &&
           !tuple1->getFields()[0].isVararg()) {
-        potentialConversions.push_back(
+        conversionsOrFixes.push_back(
           ConversionRestrictionKind::TupleToScalar);
       }
     }
@@ -844,7 +871,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
         type2->getClassOrBoundGenericClass() &&
         type1->getClassOrBoundGenericClass()
           != type2->getClassOrBoundGenericClass()) {
-      potentialConversions.push_back(ConversionRestrictionKind::Superclass);
+      conversionsOrFixes.push_back(ConversionRestrictionKind::Superclass);
     }
     
     // Array supertype conversions.
@@ -853,7 +880,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
           (isSliceType(desugar1) && isSliceType(desugar2)) ||
           (isNativeArrayType(desugar1) && isNativeArrayType(desugar2))) {
         
-        potentialConversions.push_back(ConversionRestrictionKind::
+        conversionsOrFixes.push_back(ConversionRestrictionKind::
                                           ArrayUpcast);
       }
     }
@@ -863,7 +890,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     // An lvalue of type T1 can be converted to a value of type T2 so long as
     // T1 is convertible to T2 (by loading the value).
     if (type1->is<LValueType>())
-      potentialConversions.push_back(
+      conversionsOrFixes.push_back(
         ConversionRestrictionKind::LValueToRValue);
 
     // An expression can be converted to an auto-closure function type, creating
@@ -905,7 +932,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
   // protocols in the second type.
   if (concrete && kind >= TypeMatchKind::Subtype &&
       type2->isExistentialType()) {
-    potentialConversions.push_back(ConversionRestrictionKind::Existential);
+    conversionsOrFixes.push_back(ConversionRestrictionKind::Existential);
   }
 
   // A value of type T can be converted to type U? if T is convertible to U.
@@ -925,23 +952,23 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
           auto decl1 = boundGenericType1->getDecl();
           if (decl1 == decl2) {
             assert(boundGenericType1->getGenericArgs().size() == 1);
-            potentialConversions.push_back(
+            conversionsOrFixes.push_back(
                                 ConversionRestrictionKind::OptionalToOptional);
           } else if (optionalKind2 == OTK_Optional &&
                      decl1 == TC.Context.getUncheckedOptionalDecl()) {
             assert(boundGenericType1->getGenericArgs().size() == 1);
-            potentialConversions.push_back(
+            conversionsOrFixes.push_back(
                        ConversionRestrictionKind::UncheckedOptionalToOptional);
           } else if (optionalKind2 == OTK_UncheckedOptional &&
                      kind >= TypeMatchKind::Conversion &&
                      decl1 == TC.Context.getOptionalDecl()) {
             assert(boundGenericType1->getGenericArgs().size() == 1);
-            potentialConversions.push_back(
+            conversionsOrFixes.push_back(
                        ConversionRestrictionKind::OptionalToUncheckedOptional);
           }
         }
         
-        potentialConversions.push_back(
+        conversionsOrFixes.push_back(
           ConversionRestrictionKind::ValueToOptional);
       }
     }
@@ -953,7 +980,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     Type objectType1;
     if (concrete && kind >= TypeMatchKind::Conversion &&
         (objectType1 = lookThroughUncheckedOptionalType(type1))) {
-      potentialConversions.push_back(
+      conversionsOrFixes.push_back(
                           ConversionRestrictionKind::ForceUnchecked);
     }
   }
@@ -962,7 +989,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
   // conversion function.
   if (concrete && kind >= TypeMatchKind::Conversion &&
       shouldTryUserConversion(*this, type1)) {
-    potentialConversions.push_back(ConversionRestrictionKind::User);
+    conversionsOrFixes.push_back(ConversionRestrictionKind::User);
   }
 
 commit_to_conversions:
@@ -974,7 +1001,19 @@ commit_to_conversions:
   // cut off other potential conversions because we know none of them apply.
   // Gradually, those gotos should go away as we can handle more kinds of
   // conversions via disjunction constraints.
-  if (potentialConversions.empty()) {
+
+  // If we should attempt fixes, add those to the list. They'll only be visited
+  // if there are no other possible solutions.
+  if (shouldAttemptFixes() && !typeVar1 && !typeVar2 &&
+      !(flags & TMF_ApplyingFix)) {
+    // If the source type is a function type that could be applied with (),
+    // try it.
+    if (isFunctionTypeAcceptingNoArguments(type1)) {
+      conversionsOrFixes.push_back(ExprFixKind::NullaryCall);
+    }
+  }
+
+  if (conversionsOrFixes.empty()) {
     // If one of the types is a type variable, we leave this unsolved.
     if (typeVar1 || typeVar2)
       return SolutionKind::Unsolved;
@@ -990,19 +1029,35 @@ commit_to_conversions:
 
   // Where there is more than one potential conversion, create a disjunction
   // so that we'll explore all of the options.
-  if (potentialConversions.size() > 1) {
+  if (conversionsOrFixes.size() > 1) {
     auto fixedLocator = getConstraintLocator(locator);
     SmallVector<Constraint *, 2> constraints;
-    for (auto potential : potentialConversions) {
-      // Determine the constraint kind. For a deep equality constraint, only
-      // perform equality.
+    for (auto potential : conversionsOrFixes) {
       auto constraintKind = getConstraintKind(kind);
-      if (potential == ConversionRestrictionKind::DeepEquality)
-        constraintKind = ConstraintKind::Equal;
 
+      if (auto restriction = potential.getRestriction()) {
+        // Determine the constraint kind. For a deep equality constraint, only
+        // perform equality.
+        if (*restriction == ConversionRestrictionKind::DeepEquality)
+          constraintKind = ConstraintKind::Equal;
+
+        constraints.push_back(
+          Constraint::createRestricted(*this, constraintKind, *restriction,
+                                       type1, type2, fixedLocator));
+        continue;
+      }
+
+      // If the first thing we found is a fix, add a "don't fix" marker.
+      if (conversionsOrFixes.empty()) {
+        constraints.push_back(
+          Constraint::createFixed(*this, constraintKind, ExprFixKind::None,
+                                  type1, type2, fixedLocator));
+      }
+
+      auto fix = *potential.getFix();
       constraints.push_back(
-        Constraint::createRestricted(*this, constraintKind, potential, 
-                                     type1, type2, fixedLocator));
+        Constraint::createFixed(*this, constraintKind, fix, type1, type2,
+                                fixedLocator));
     }
     addConstraint(Constraint::createDisjunction(*this, constraints,
                                                 fixedLocator));
@@ -1011,12 +1066,17 @@ commit_to_conversions:
 
   // For a single potential conversion, directly recurse, so that we
   // don't allocate a new constraint or constraint locator.
-  auto restriction = potentialConversions[0];
 
-  // Record that we have a conversion restriction on this path.
-  ConstraintRestrictions.push_back({type1, type2, restriction});
-  return simplifyRestrictedConstraint(restriction, type1, type2,
-                                      kind, subFlags, locator);
+  // Handle restrictions.
+  if (auto restriction = conversionsOrFixes[0].getRestriction()) {
+    ConstraintRestrictions.push_back({type1, type2, *restriction});
+    return simplifyRestrictedConstraint(*restriction, type1, type2,
+                                        kind, subFlags, locator);
+  }
+
+  // Handle fixes.
+  auto fix = *conversionsOrFixes[0].getFix();
+  return simplifyFixConstraint(fix, type1, type2, kind, subFlags, locator);
 }
 
 ConstraintSystem::SolutionKind
@@ -2087,6 +2147,45 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
   llvm_unreachable("bad conversion restriction");
 }
 
+ConstraintSystem::SolutionKind
+ConstraintSystem::simplifyFixConstraint(ExprFixKind fix,
+                                        Type type1, Type type2,
+                                        TypeMatchKind matchKind,
+                                        unsigned flags,
+                                        ConstraintLocatorBuilder locator) {
+  auto &ctx = getASTContext();
+  if (ctx.LangOpts.DebugConstraintSolver) {
+    auto &log = ctx.TypeCheckerDebug->getStream();
+    log.indent(solverState? solverState->depth * 2 + 2 : 0)
+      << "(attempting fix " << getName(fix) << " @ ";
+
+    getConstraintLocator(locator)->dump(&ctx.SourceMgr, log);
+    log << ")\n";
+  }
+
+  // Record the fix.
+  if (fix != ExprFixKind::None) {
+    Fixes.push_back({fix, getConstraintLocator(locator)});
+
+    // Increase the score. If this would make the current solution worse than
+    // the best solution we've seen already, stop now.
+    increaseScore(SK_Fix);
+    if (worseThanBestSolution())
+      return SolutionKind::Error;
+  }
+
+  // Try with the fix.
+  unsigned subFlags = flags | TMF_ApplyingFix | TMF_GenerateConstraints;
+  switch (fix) {
+  case ExprFixKind::None:
+    return matchTypes(type1, type2, matchKind, subFlags, locator);
+
+  case ExprFixKind::NullaryCall:
+    // Assume that '()' was applied to the first type.
+    return matchTypes(type1->castTo<AnyFunctionType>()->getResult(),
+                      type2, matchKind, subFlags, locator);
+  }
+}
 
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
@@ -2098,6 +2197,16 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   case ConstraintKind::OperatorConversion: {
     // For relational constraints, match up the types.
     auto matchKind = getTypeMatchKind(constraint.getKind());
+
+    // If there is a fix associated with this constraint, apply it before
+    // we continue.
+    if (auto fix = constraint.getFix()) {
+      return simplifyFixConstraint(*fix, constraint.getFirstType(),
+                                   constraint.getSecondType(), matchKind,
+                                   TMF_GenerateConstraints,
+                                   constraint.getLocator());
+    }
+
 
     // If there is a restriction on this constraint, apply it directly rather
     // than going through the general \c matchTypes() machinery.

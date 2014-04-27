@@ -26,6 +26,7 @@
 #include "swift/Basic/Fixnum.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Optional.h"
+#include "swift/Basic/OptionSet.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Types.h"
@@ -80,6 +81,33 @@ public:
 typedef SmallVector<SavedTypeVariableBinding, 16> SavedTypeVariableBindings;
 
 class ConstraintLocator;
+
+/// Describes a conversion restriction or a fix.
+struct RestrictionOrFix {
+  ConversionRestrictionKind Restriction;
+  ExprFixKind Fix;
+  bool IsRestriction;
+
+public:
+  RestrictionOrFix(ConversionRestrictionKind restriction)
+  : Restriction(restriction), IsRestriction(true) { }
+
+  RestrictionOrFix(ExprFixKind fix) : Fix(fix), IsRestriction(false) { }
+
+  Optional<ConversionRestrictionKind> getRestriction() const {
+    if (IsRestriction)
+      return Restriction;
+
+    return Nothing;
+  }
+
+  Optional<ExprFixKind> getFix() const {
+    if (!IsRestriction)
+      return Fix;
+
+    return Nothing;
+  }
+};
 
 } // end namespace constraints
 
@@ -591,6 +619,8 @@ struct SelectedOverload {
 enum ScoreKind {
   // These values are used as indices into a Score value.
 
+  /// A fix needs to be applied to the source.
+  SK_Fix,
   /// An implicit force of an unchecked optional value.
   SK_ForceUnchecked,
   /// A user-defined conversion.
@@ -604,7 +634,7 @@ enum ScoreKind {
 };
 
 /// The number of score kinds.
-const unsigned NumScoreKinds = 5;
+const unsigned NumScoreKinds = 6;
 
 /// Describes the fixed score of a solution to the constraint system.
 struct Score {
@@ -720,6 +750,10 @@ public:
   /// which informs constraint application.
   llvm::SmallDenseMap<std::pair<CanType, CanType>, ConversionRestrictionKind>
     ConstraintRestrictions;
+
+  /// The list of fixes that need to be applied to the initial expression
+  /// to make the solution work.
+  llvm::SmallVector<std::pair<ExprFixKind, ConstraintLocator *>, 4> Fixes;
 
   /// The set of disjunction choices used to arrive at this solution,
   /// which informs constraint application.
@@ -937,6 +971,14 @@ public:
 /// An intrusive, doubly-linked list of constraints.
 typedef llvm::ilist<Constraint> ConstraintList;
 
+enum class ConstraintSystemFlags {
+  /// Whether we allow the solver to attempt fixes to the system.
+  AllowFixes = 0x01
+};
+
+/// Options that affect the constraint system as a whole.
+typedef OptionSet<ConstraintSystemFlags> ConstraintSystemOptions;
+
 /// \brief Describes a system of constraints on type variables, the
 /// solution of which assigns concrete types to each of the type variables.
 /// Constraint systems are typically generated given an (untyped) expression.
@@ -944,6 +986,8 @@ class ConstraintSystem {
 public:
   TypeChecker &TC;
   DeclContext *DC;
+  ConstraintSystemOptions Options;
+
 private:
   Constraint *failedConstraint = nullptr;
   
@@ -1000,6 +1044,12 @@ private:
   /// conversion or a user-defined conversion.
   SmallVector<std::tuple<Type, Type, ConversionRestrictionKind>, 32>
       ConstraintRestrictions;
+
+  /// The set of fixes applied to make the solution work.
+  ///
+  /// Each fix contains a fix kind as well as a locator to describe where the
+  /// fix occurs.
+  SmallVector<std::pair<ExprFixKind, ConstraintLocator *>, 4> Fixes;
 
   /// \brief The set of remembered disjunction choices used to reach
   /// the current constraint system.
@@ -1098,6 +1148,9 @@ public:
     /// \brief The length of \c ConstraintRestrictions.
     unsigned numConstraintRestrictions;
 
+    /// \brief The length of \c Fixes.
+    unsigned numFixes;
+
     /// \brief The length of \c DisjunctionChoices.
     unsigned numDisjunctionChoices;
 
@@ -1115,7 +1168,8 @@ public:
     ~SolverScope();
   };
 
-  ConstraintSystem(TypeChecker &tc, DeclContext *dc);
+  ConstraintSystem(TypeChecker &tc, DeclContext *dc,
+                   ConstraintSystemOptions options);
   ~ConstraintSystem();
 
   /// Retrieve the type checker associated with this constraint system.
@@ -1303,8 +1357,21 @@ private:
 public:
   /// \brief Whether we should be recording failures.
   bool shouldRecordFailures() {
+    // FIXME: It still makes sense to record failures when there are fixes
+    // present, but they shold be less desirable.
+    if (!Fixes.empty())
+      return false;
+
     return !solverState || solverState->recordFailures ||
            TC.Context.LangOpts.DebugConstraintSolver;
+  }
+
+  /// \brief Whether we should attempt to fix problems.
+  bool shouldAttemptFixes() {
+    if (!(Options & ConstraintSystemFlags::AllowFixes))
+      return false;
+
+    return !solverState || solverState->recordFailures;
   }
 
   /// \brief Record a failure at the given location with the given kind,
@@ -1322,11 +1389,18 @@ public:
                             simplifyFailureArg(std::forward<Args>(args))...);
   }
 
-  /// \brief Try to diagnose the problem that caused this constraint system
-  /// to fail.
+  /// \brief Try to salvage the constraint system by applying (speculative)
+  /// fixes to the underlying expression.
   ///
-  /// \returns true if a diagnostic was produced, false otherwise.
-  bool diagnose();
+  /// \param viable the set of viable solutions produced by the initial
+  /// solution attempt.
+  ///
+  /// \param expr the expression we're trying to salvage.
+  ///
+  /// \returns false if we were able to salvage the system, in which case
+  /// \c viable[0] contains the resulting solution. Otherwise, emits a
+  /// diagnostic and returns true.
+  bool salvage(SmallVectorImpl<Solution> &viable, Expr *expr);
 
   /// \brief Add a newly-allocated constraint after attempting to simplify
   /// it.
@@ -1633,7 +1707,10 @@ private:
     /// This flag is automatically introduced when type matching destructures
     /// a type constructor (tuple, function type, etc.), solving that
     /// constraint while potentially generating others.
-    TMF_GenerateConstraints = 0x01
+    TMF_GenerateConstraints = 0x01,
+
+    /// Indicates that we are applying a fix.
+    TMF_ApplyingFix = 0x02,
   };
 
   /// \brief Subroutine of \c matchTypes(), which matches up two tuple types.
@@ -1793,6 +1870,13 @@ private:
                                             TypeMatchKind matchKind,
                                             unsigned flags,
                                             ConstraintLocatorBuilder locator);
+
+  /// \brief Simplify a conversion constraint with a fix applied to it.
+  SolutionKind simplifyFixConstraint(ExprFixKind fix,
+                                     Type type1, Type type2,
+                                     TypeMatchKind matchKind,
+                                     unsigned flags,
+                                     ConstraintLocatorBuilder locator);
 
 public:
   /// \brief Simplify the system of constraints, by breaking down complex
