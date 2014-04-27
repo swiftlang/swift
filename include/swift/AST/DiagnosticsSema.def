@@ -384,7 +384,7 @@ ERROR(non_class_cannot_conform_to_class_protocol,sema_tcd,none,
       "non-class type %0 cannot conform to class protocol %1",
       (Type, Type))
 ERROR(witness_argument_name_mismatch,sema_tcd,none,
-      "%select{method|initializer}0 %1 has different argument names than those "
+      "%select{method|initializer}0 %1 has different argument names from those "
       "required by protocol %2 (%3)", (bool, DeclName, Type, DeclName))
 
 ERROR(protocol_property_must_be_computed,sema_tcd,none,
@@ -495,7 +495,7 @@ ERROR(override_multiple_decls_base,sema_tcd,none,
       "declaration %0 cannot override more than one superclass declaration",
       (DeclName))
 ERROR(override_multiple_decls_arg_mismatch,sema_tcd,none,
-      "declaration %0 has different argument names than any potential "
+      "declaration %0 has different argument names from any potential "
       "overrides", (DeclName))
 ERROR(override_multiple_decls_derived,sema_tcd,none,
       "declaration cannot be overridden by more than one subclass "
@@ -1166,7 +1166,7 @@ ERROR(objc_invalid_on_func_result_type,sema_objc,none,
       "represented in Objective-C", ())
 
 ERROR(objc_override_name_mismatch,sema_objc,none,
-      "declaration has a different @objc name than the declaration it "
+      "declaration has a different @objc name from the declaration it "
       "overrides (%0 vs. %1)", (ObjCSelector, ObjCSelector))
 
 //------------------------------------------------------------------------------
