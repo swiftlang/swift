@@ -424,6 +424,33 @@ static std::pair<Type,Type> getTypesToCompare(ValueDecl *reqt, Type reqtType,
   return {reqtType, witnessType};
 }
 
+
+// Verify that the mutating bit is correct between a protocol requirement and a
+// witness.  This returns true on invalid.
+static bool checkMutating(FuncDecl *requirement, FuncDecl *witness,
+                          ValueDecl *witnessDecl) {
+  // Witnesses in classes never have mutating conflicts.
+  if (auto contextType =
+        witnessDecl->getDeclContext()->getDeclaredTypeInContext())
+    if (contextType->hasReferenceSemantics())
+      return false;
+  
+  // Determine whether the witness will be mutating or not.  If the witness is
+  // stored property accessor, it may not be synthesized yet.
+  bool witnessMutating;
+  if (witness)
+    witnessMutating = witness->isMutating();
+  else {
+    assert(requirement->isAccessor());
+    witnessMutating = requirement->isSetter();
+  }
+  
+  // If the requirement is for a nonmutating member, then the witness may not
+  // mutate self.
+  return !requirement->isMutating() && witnessMutating;
+}
+
+
 /// \brief Match the given witness to the given requirement.
 ///
 /// \returns the result of performing the match.
@@ -467,11 +494,8 @@ matchWitness(TypeChecker &tc, NormalProtocolConformance *conformance,
     if (reqAttrs.isPostfix() && !witnessAttrs.isPostfix())
       return RequirementMatch(witness, MatchKind::PostfixNonPostfixConflict);
 
-    // If the requirement is for a mutating member, then the witness must also
-    // be mutating (unless it is defined on a type with reference semantics
-    // (e.g. a class).  It is fine for the witness to be nonmutating if the
-    // protocol is declared mutating.
-    if (funcWitness->isMutating() && !funcReq->isMutating())
+    // Check that the mutating bit is ok.
+    if (checkMutating(funcReq, funcWitness, funcWitness))
       return RequirementMatch(witness, MatchKind::MutatingConflict);
 
     /// If the requirement is @noreturn, the witness must also be @noreturn.
@@ -481,7 +505,9 @@ matchWitness(TypeChecker &tc, NormalProtocolConformance *conformance,
 
     // We want to decompose the parameters to handle them separately.
     decomposeFunctionType = true;
-  } else if (isa<AbstractStorageDecl>(witness)) {
+  } else if (auto *witnessASD = dyn_cast<AbstractStorageDecl>(witness)) {
+    auto *reqASD = cast<AbstractStorageDecl>(req);
+    
     // If this is a property requirement, check that the static-ness matches.
     if (auto *vdWitness = dyn_cast<VarDecl>(witness)) {
       if (cast<VarDecl>(req)->isStatic() != vdWitness->isStatic())
@@ -492,6 +518,17 @@ matchWitness(TypeChecker &tc, NormalProtocolConformance *conformance,
     if (req->isSettable(req->getDeclContext()) &&
         !witness->isSettable(witness->getDeclContext()))
       return RequirementMatch(witness, MatchKind::SettableConflict);
+    
+    // Validate that the 'mutating' bit lines up for getters and setters.
+    if (checkMutating(reqASD->getGetter(), witnessASD->getGetter(),
+                      witnessASD))
+      return RequirementMatch(witnessASD->getGetter(),
+                              MatchKind::MutatingConflict);
+    
+    if (req->isSettable(req->getDeclContext()) &&
+        checkMutating(reqASD->getSetter(), witnessASD->getSetter(), witnessASD))
+      return RequirementMatch(witnessASD->getSetter(),
+                              MatchKind::MutatingConflict);
 
     // Decompose the parameters for subscript declarations.
     decomposeFunctionType = isa<SubscriptDecl>(req);
