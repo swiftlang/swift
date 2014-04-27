@@ -50,6 +50,23 @@
 using namespace swift;
 using namespace irgen;
 
+static bool isTypeMetadataEmittedLazily(CanType type) {
+  // All classes have eagerly-emitted metadata (at least for now).
+  if (type.getClassOrBoundGenericClass()) return false;
+
+  switch (getTypeLinkage(type)) {
+  case FormalLinkage::PublicUnique:
+  case FormalLinkage::HiddenUnique:
+  case FormalLinkage::Private:
+    // Maybe this *should* be lazy for private types?
+    return false;
+  case FormalLinkage::PublicNonUnique:
+  case FormalLinkage::HiddenNonUnique:
+    return true;
+  }
+  llvm_unreachable("bad formal linkage");
+}
+
 /// Generates a function to call +load on all the given classes.
 static llvm::Function *emitObjCClassInitializer(IRGenModule &IGM,
                                                 ArrayRef<llvm::WeakVH> classes){
@@ -509,19 +526,43 @@ void IRGenModule::emitGlobalTopLevel() {
   }
 }
 
+static void emitLazyTypeMetadata(IRGenModule &IGM, CanType type) {
+  auto decl = type.getAnyNominal();
+  assert(decl);
+
+  if (auto sd = dyn_cast<StructDecl>(decl)) {
+    return emitStructMetadata(IGM, sd);
+  } else if (auto ed = dyn_cast<EnumDecl>(decl)) {
+    emitEnumMetadata(IGM, ed);
+  } else if (auto pd = dyn_cast<ProtocolDecl>(decl)) {
+    IGM.emitProtocolDecl(pd);
+  } else {
+    llvm_unreachable("should not have enqueued a class decl here!");
+  }
+}
+
 /// Emit any lazy definitions (of globals or functions or whatever
 /// else) that we require.
 void IRGenModule::emitLazyDefinitions() {
   while (!LazyWitnessTables.empty() ||
+         !LazyTypeMetadata.empty() ||
          !LazyFunctionDefinitions.empty()) {
 
     // Emit any lazy witness tables we require.  We do this first
-    // because it's likely to introduce new uses of lazy functions.
+    // because it's likely to introduce new uses of lazy functions
+    // and possibly of type metadata.
     while (!LazyWitnessTables.empty()) {
       SILWitnessTable *wt = LazyWitnessTables.pop_back_val();
       assert(!isPossiblyUsedExternally(wt->getLinkage()) &&
              "witness table with externally-visible linkage emitted lazily?");
       emitSILWitnessTable(wt);
+    }
+
+    // Emit any lazy type metadata we require.
+    while (!LazyTypeMetadata.empty()) {
+      CanType type = LazyTypeMetadata.pop_back_val();
+      assert(isTypeMetadataEmittedLazily(type));
+      emitLazyTypeMetadata(*this, type);
     }
 
     // Emit any lazy function definitions we require.
@@ -857,22 +898,11 @@ void IRGenModule::emitExternalDefinition(Decl *D) {
   case DeclKind::Constructor:
     return emitLocalDecls(cast<ConstructorDecl>(D));
     
+  // No need to eagerly emit Swift metadata for external types.
   case DeclKind::Struct:
-    // Emit Swift metadata for the external struct.
-    emitStructMetadata(*this, cast<StructDecl>(D));
-    break;
   case DeclKind::Enum:
-    // Emit Swift metadata for the external enum.
-    emitEnumMetadata(*this, cast<EnumDecl>(D));
-    break;
-
   case DeclKind::Class:
-    // No need to emit Swift metadata for external ObjC classes.
-    break;
-
   case DeclKind::Protocol:
-    // Emit Swift metadata for the protocol type.
-    emitProtocolDecl(cast<ProtocolDecl>(D));
     break;
   }
 }
@@ -1194,6 +1224,14 @@ llvm::Constant *IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
     defaultVarTy = FullTypeMetadataStructTy;
     defaultVarPtrTy = FullTypeMetadataPtrTy;
     adjustmentIndex = MetadataAdjustmentIndex::ValueType;
+  }
+
+  // If this is a use, and the type metadata is emitted lazily,
+  // trigger lazy emission of the metadata.
+  if (!definitionType && isTypeMetadataEmittedLazily(concreteType)) {
+    // Add it to the queue if it hasn't already been put there.
+    if (LazilyEmittedTypeMetadata.insert(concreteType))
+      LazyTypeMetadata.push_back(concreteType);
   }
 
   // When indirect, this is always a pointer variable and has no

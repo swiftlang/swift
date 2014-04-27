@@ -22,6 +22,7 @@
 #include "swift/Basic/SuccessorMap.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/IR/ValueHandle.h"
@@ -310,6 +311,12 @@ private:
   };
   
   llvm::DenseMap<ProtocolDecl*, ObjCProtocolPair> ObjCProtocols;
+
+  /// The set of type metadata that have been enqueue for lazy emission.
+  llvm::SmallPtrSet<CanType, 4> LazilyEmittedTypeMetadata;
+
+  /// The queue of lazy type metadata to emit.
+  llvm::SmallVector<CanType, 4> LazyTypeMetadata;
 
   /// SIL witness tables that can be emitted lazily and that we know
   /// how to emit.  This can have entries for keys that are not
