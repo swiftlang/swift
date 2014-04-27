@@ -570,6 +570,8 @@ mapParsedParameters(Parser &parser,
     // Create the parameter based on the name.
     Pattern *param;
     if (paramName.empty()) {
+      if (paramNameLoc.isInvalid())
+        paramNameLoc = letVarLoc;
       param = new (ctx) AnyPattern(paramNameLoc);
     } else {
       // Create a variable to capture this.
