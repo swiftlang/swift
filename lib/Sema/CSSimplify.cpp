@@ -1008,7 +1008,7 @@ commit_to_conversions:
       !(flags & TMF_ApplyingFix) && kind >= TypeMatchKind::Conversion) {
     // If the source type is a function type that could be applied with (),
     // try it.
-    if (isFunctionTypeAcceptingNoArguments(type1)) {
+    if (isFunctionTypeAcceptingNoArguments(type1->getRValueType())) {
       conversionsOrFixes.push_back(ExprFixKind::NullaryCall);
     }
 
@@ -2195,7 +2195,8 @@ ConstraintSystem::simplifyFixConstraint(ExprFixKind fix,
 
   case ExprFixKind::NullaryCall:
     // Assume that '()' was applied to the first type.
-    return matchTypes(type1->castTo<AnyFunctionType>()->getResult(),
+    return matchTypes(type1->getRValueType()->castTo<AnyFunctionType>()
+                        ->getResult(),
                       type2, matchKind, subFlags, locator);
 
   case ExprFixKind::ForceOptional:
