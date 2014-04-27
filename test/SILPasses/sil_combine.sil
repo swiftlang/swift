@@ -1047,3 +1047,13 @@ bb0(%0 : $B):
   %2 = raw_pointer_to_ref %1 : $Builtin.RawPointer to $F
   return %2 : $F
 }
+
+// CHECK-LABEL: sil @upcast_unchecked_ref_cast_roundtrip : $@thin (B) -> B {
+// CHECK: bb0(
+// CHECK-NEXT: return
+sil @upcast_unchecked_ref_cast_roundtrip : $@thin (B) -> B {
+bb0(%0 : $B):
+  %1 = unchecked_ref_cast %0 : $B to $E
+  %2 = upcast %1 : $E to $B
+  return %2 : $B
+}

@@ -37,7 +37,7 @@ namespace {
     SILValue visitStructInst(StructInst *SI);
     SILValue visitTupleInst(TupleInst *SI);
     SILValue visitApplyInst(ApplyInst *AI);
-
+    SILValue visitUpcastInst(UpcastInst *UI);
   };
 } // end anonymous namespace
 
@@ -229,6 +229,13 @@ visitUncheckedRefCastInst(UncheckedRefCastInst *OPRI) {
       if (UI->getOperand().getType() == OPRI->getType())
         return UI->getOperand();
   }
+  return SILValue();
+}
+SILValue InstSimplifier::visitUpcastInst(UpcastInst *UI) {
+  // (upcast Y->X (unchecked-ref-cast x X->Y)) -> x
+  if (auto *URCI = dyn_cast<UncheckedRefCastInst>(UI->getOperand()))
+    if (URCI->getOperand().getType() == UI->getType())
+      return URCI->getOperand();
 
   return SILValue();
 }
