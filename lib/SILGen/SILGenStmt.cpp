@@ -572,8 +572,9 @@ void SILGenFunction::visitForEachStmt(ForEachStmt *S) {
   emitOrDeleteBlock(B, EndBB, S);
   BreakContinueDestStack.pop_back();
   
-  // Destroy the last value that came out of the generator.
-  B.emitDestroyAddr(S, nextBuf);
+  // We do not need to destroy the value in the 'nextBuf' slot here, because
+  // either the 'for' loop finished naturally and the buffer contains '.None',
+  // or we exited by 'break' and the value in the buffer was consumed.
 }
 
 void SILGenFunction::visitBreakStmt(BreakStmt *S) {
