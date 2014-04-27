@@ -78,7 +78,7 @@ Bridging Rules and Terminology for all Types
   ``BridgedToObjectiveC``, which specifies its conversions to and from
   ObjectiveC::
 
-    protocol BridgedToObjectiveC {
+    protocol _BridgedToObjectiveC {
       // FIXME: should be ': class' or ': AnyObject'
       typealias ObjectiveCType: ObjCClassType
       func bridgeToObjectiveC() -> ObjectiveCType
@@ -92,19 +92,19 @@ Bridging Rules and Terminology for all Types
 
 * Some generic types (``Array<T>`` in particular) can be bridged only
   if their element type can be bridged.  These conform to
-  ``ConditionallyBridgedToObjectiveC``::
+  ``_ConditionallyBridgedToObjectiveC``::
 
-    protocol ConditionallyBridgedToObjectiveC : BridgedToObjectiveC {
+    protocol _ConditionallyBridgedToObjectiveC : _BridgedToObjectiveC {
       class func isBridgedToObjectiveC() -> Bool
     }
 
 * A type ``T`` is formally considered **bridged** if:
 
-  - it conforms to ``ConditionallyBridgedToObjectiveC`` and
+  - it conforms to ``_ConditionallyBridgedToObjectiveC`` and
     ``T.isBridgedToObjectiveC()`` is ``true``
 
   - or, ``T`` does not conform to
-    ``ConditionallyBridgedToObjectiveC``, and
+    ``_ConditionallyBridgedToObjectiveC``, and
 
     + it is a class type, or
     + it conforms to ``BridgedToObjectiveC``
