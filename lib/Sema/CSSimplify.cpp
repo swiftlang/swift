@@ -1011,6 +1011,12 @@ commit_to_conversions:
     if (isFunctionTypeAcceptingNoArguments(type1)) {
       conversionsOrFixes.push_back(ExprFixKind::NullaryCall);
     }
+
+    // If we have an optional type, try to force-unwrap it.
+    // FIXME: Should we also try '?'?
+    if (type1->getRValueType()->getOptionalObjectType()) {
+      conversionsOrFixes.push_back(ExprFixKind::ForceOptional);
+    }
   }
 
   if (conversionsOrFixes.empty()) {
@@ -2184,6 +2190,15 @@ ConstraintSystem::simplifyFixConstraint(ExprFixKind fix,
     // Assume that '()' was applied to the first type.
     return matchTypes(type1->castTo<AnyFunctionType>()->getResult(),
                       type2, matchKind, subFlags, locator);
+
+  case ExprFixKind::ForceOptional:
+    // Assume that '!' was applied to the first type.
+    return matchTypes(type1->getRValueType()->getOptionalObjectType(), type2,
+                      matchKind, subFlags, locator);
+
+  case ExprFixKind::ForceDowncast: {
+    llvm_unreachable("Force-downcast fix not yet supported");
+  }
   }
 }
 

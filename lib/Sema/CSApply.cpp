@@ -3853,6 +3853,23 @@ Expr *ConstraintSystem::applySolution(const Solution &solution,
         diagnosed = true;
         break;
       }
+
+      case ExprFixKind::ForceOptional:
+      case ExprFixKind::ForceDowncast: {
+        auto type = solution.simplifyType(TC, affected->getType())
+                      ->getRValueType();
+        SourceLoc afterAffectedLoc
+          = Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
+                                       affected->getEndLoc());
+        TC.diagnose(affected->getLoc(),
+                    fix.first == ExprFixKind::ForceOptional
+                      ? diag::missing_unwrap_optional
+                      : diag::missing_forced_downcast,
+                    type)
+          .fixItInsert(afterAffectedLoc, "!");
+        diagnosed = true;
+        break;
+      }
       }
     }
 

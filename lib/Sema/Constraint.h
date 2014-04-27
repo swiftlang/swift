@@ -184,6 +184,12 @@ enum class ExprFixKind : uint8_t {
   /// Introduce a call with no arguments, i.e., (), on the first type before
   /// applying the constraint to the second type.
   NullaryCall,
+
+  /// Introduce a '!' to force an optional unwrap.
+  ForceOptional,
+
+  /// Introduce a '!' to force a downcast.
+  ForceDowncast,
 };
 
 /// Return a string representation of an expression fix.

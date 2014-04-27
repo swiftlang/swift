@@ -214,9 +214,13 @@ NOTE(note_init_parameter,sema_tcc,none,
 ERROR(missing_nullary_call,sema_tcc,none,
      "function produces expected type %0; did you mean to call it with '()'?",
      (Type))
-ERROR(missing_nullary_call_somewhere,sema_tcc,none,
-      "function call would produce type %0; did you mean to call it with '()'?",
+ERROR(missing_unwrap_optional,sema_tcc,none,
+      "value of optional type %0 not unwrapped; did you mean to use '!' "
+      "or '?'?",
      (Type))
+ERROR(missing_forced_downcast,sema_tcc,none,
+      "type %0 cannot be implicitly downcast; did you mean to use '!'?",
+      (Type))
 
 //------------------------------------------------------------------------------
 // Type Check Declarations

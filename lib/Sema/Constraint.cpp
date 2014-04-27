@@ -305,6 +305,10 @@ StringRef swift::constraints::getName(ExprFixKind kind) {
     return "[prevent fixes]";
   case ExprFixKind::NullaryCall:
     return "[fix: add nullary call]";
+  case ExprFixKind::ForceOptional:
+    return "[fix: force optional]";
+  case ExprFixKind::ForceDowncast:
+    return "[fix: force downcast]";
   }
 }
 
