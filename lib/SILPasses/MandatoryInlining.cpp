@@ -336,13 +336,10 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
   SmallVector<SILValue, 32> FullArgs;
   SILInliner Inliner(*F, SILInliner::InlineKind::MandatoryInline);
   for (auto FI = F->begin(), FE = F->end(); FI != FE; ++FI) {
-    auto I = FI->begin(), E = FI->end();
-    while (I != E) {
+    for (auto I = FI->begin(), E = FI->end(); I != E; ++I) {
       ApplyInst *InnerAI = dyn_cast<ApplyInst>(I);
-      if (!InnerAI) {
-        ++I;
+      if (!InnerAI)
         continue;
-      }
 
       SILLocation Loc = InnerAI->getLoc();
       SILValue CalleeValue = InnerAI->getCallee();
@@ -350,10 +347,8 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
       SILFunction *CalleeFunction = getCalleeFunction(InnerAI, IsThick,
                                                       CaptureArgs, FullArgs,
                                                       Mode);
-      if (!CalleeFunction) {
-        ++I;
+      if (!CalleeFunction)
         continue;
-      }
 
       // Then recursively process it first before trying to inline it.
       if (!runOnFunctionRecursively(CalleeFunction, InnerAI, Mode,
@@ -394,7 +389,6 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
       if (!Inliner.inlineFunction(InnerAI, CalleeFunction,
                                   InnerAI->getSubstitutions(), FullArgs)) {
         I = InnerAI;
-        ++I;
         continue;
       }
 
