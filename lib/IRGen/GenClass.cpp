@@ -481,7 +481,11 @@ OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
   auto &baseClassTI = IGF.getTypeInfo(baseType).as<ClassTypeInfo>();
   ClassDecl *baseClass = baseType.getClassOrBoundGenericClass();
   
-  LayoutClass layout(IGF.IGM, ResilienceScope::Local, baseClass, baseType);
+  // TODO: Lay out the class based on the substituted baseType rather than
+  // the generic type. Doing this requires that we also handle
+  // specialized layout in ClassTypeInfo.
+  LayoutClass layout(IGF.IGM, ResilienceScope::Local, baseClass,
+                     getSelfType(baseClass) /* TODO: should be baseType */);
   
   auto &entry = layout.getFieldEntry(field);
   switch (entry.getAccess()) {
