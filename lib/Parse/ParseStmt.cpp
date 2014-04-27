@@ -126,7 +126,8 @@ static bool isTerminatorForBraceItemListKind(const Token &Tok,
     return false;
   case BraceItemListKind::ActiveConfigBlock:
   case BraceItemListKind::InactiveConfigBlock:
-    return Tok.isNot(tok::pound_else) && Tok.isNot(tok::pound_endif);
+    return Tok.isNot(tok::pound_else) && Tok.isNot(tok::pound_endif) &&
+           Tok.isNot(tok::pound_elseif);
   }
 }
 
@@ -216,6 +217,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
   while ((Kind == BraceItemListKind::TopLevelLibrary ||
           Tok.isNot(tok::r_brace)) &&
          Tok.isNot(tok::pound_endif) &&
+         Tok.isNot(tok::pound_elseif) &&
          Tok.isNot(tok::pound_else) &&
          Tok.isNot(tok::eof) &&
          Tok.isNot(tok::kw_sil) && Tok.isNot(tok::kw_sil_stage) &&
@@ -336,9 +338,8 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
         
         if (auto *RS = Result.dyn_cast<Stmt *>()) {
           if (auto *ifConfigStmt = dyn_cast<IfConfigStmt>(RS)) {
-              if(ifConfigStmt->getActiveStmt()) {
+              if (ifConfigStmt->getActiveStmt())
                 Brace->markAsConfigBlock();
-              }
           }
         }
         TLCD->setBody(Brace);
@@ -525,31 +526,24 @@ ParserResult<BraceStmt> Parser::parseBraceItemList(Diag<> ID) {
 
 /// parseIfConfigStmtBlock - Parse the active or inactive block of an
 /// #if/#else/#endif statement.
-ParserResult<BraceStmt> Parser::parseIfConfigStmtBlock(bool isActive,
-                                                       BraceItemListKind Kind) {
+BraceStmt *Parser::parseIfConfigStmtBlock(bool isActive,
+                                          BraceItemListKind Kind) {
   SourceLoc LBloc = Tok.getLoc();
   
+  BraceItemListKind configKind =
+    isActive ? BraceItemListKind::ActiveConfigBlock :
+               BraceItemListKind::InactiveConfigBlock;
+
   SmallVector<ASTNode, 16> Entries;
-  SourceLoc RBloc;
+  parseBraceItems(Entries, Kind, configKind);
   
-  BraceItemListKind configKind = isActive ?
-                                  BraceItemListKind::ActiveConfigBlock :
-                                  BraceItemListKind::InactiveConfigBlock;
-  ParserStatus Status = parseBraceItems(Entries,
-                                        Kind,
-                                        configKind);
+  auto *Result = BraceStmt::create(Context, LBloc, Entries, Tok.getLoc());
   
-  RBloc = Tok.getLoc();
+  Result->markAsConfigBlock();
+  if (!isActive)
+    Result->markAsInactiveConfigBlock();
   
-  auto result = makeParserResult(Status,
-                          BraceStmt::create(Context, LBloc, Entries, RBloc));
-  
-  (result.get())->markAsConfigBlock();
-  if (!isActive) {
-    (result.get())->markAsInactiveConfigBlock();
-  }
-  
-  return result;
+  return Result;
 }
 
 /// parseStmtBreak
@@ -755,9 +749,8 @@ ParserResult<Stmt> Parser::parseStmtIf() {
 bool Parser::evaluateConfigConditionExpr(Expr *configExpr) {
   
   // Evaluate a ParenExpr.
-  if (auto *PE = dyn_cast_or_null<ParenExpr>(configExpr)) {
+  if (auto *PE = dyn_cast_or_null<ParenExpr>(configExpr))
     return evaluateConfigConditionExpr(PE->getSubExpr());
-  }
   
   // Evaluate a "&&" or "||" expression.
   if (auto *SE = dyn_cast<SequenceExpr>(configExpr)) {
@@ -908,53 +901,65 @@ bool Parser::evaluateConfigConditionExpr(Expr *configExpr) {
 }
 
 ParserResult<Stmt> Parser::parseStmtIfConfig(BraceItemListKind Kind) {
-  
-  if (peekToken().isAtStartOfLine()) {
-    diagnose(Tok.getLoc(), diag::expected_build_configuration_expression);
-  }
-  
-  SourceLoc IfLoc = consumeToken(tok::pound_if);
-  
-  ParserResult<Expr> Configuration;
-  ParserResult<BraceStmt> NormalBody;
-  
   StructureMarkerRAII ParsingDecl(*this, Tok.getLoc(),
                                   StructureMarkerKind::IfConfig);
   
+  bool foundActive = false;
+  SmallVector<IfConfigStmtClause, 4> Clauses;
   
-  Configuration = parseExprSequence(diag::expected_expr, true, true);
-  
-  if (Configuration.isNull()) {
-    return makeParserError();
+  while (1) {
+    bool isElse = Tok.is(tok::pound_else);
+    SourceLoc ClauseLoc = consumeToken();
+    Expr *Condition = nullptr;
+    
+    bool ClauseIsActive;
+    if (isElse) {
+      ClauseIsActive = !foundActive;
+    } else {
+      if (Tok.isAtStartOfLine())
+        diagnose(ClauseLoc, diag::expected_build_configuration_expression);
+      
+      // Evaluate the condition.
+      ParserResult<Expr> Configuration = parseExprSequence(diag::expected_expr,
+                                                           true, true);
+      if (Configuration.isNull())
+        return makeParserError();
+      
+      Condition = Configuration.get();
+      
+      // Evaluate the condition, to validate it.
+      bool condActive = evaluateConfigConditionExpr(Condition);
+      ClauseIsActive = condActive && !foundActive;
+    }
+
+    foundActive |= ClauseIsActive;
+    
+    if (!Tok.isAtStartOfLine())
+      diagnose(Tok.getLoc(), diag::extra_tokens_config_directive);
+
+    auto Body = parseIfConfigStmtBlock(ClauseIsActive, Kind);
+    
+    Clauses.push_back(IfConfigStmtClause(ClauseLoc, Condition, Body,
+                                         ClauseIsActive));
+    
+    if (Tok.isNot(tok::pound_elseif) && Tok.isNot(tok::pound_else))
+      break;
+    
+    if (isElse)
+      diagnose(Tok, diag::expected_close_after_else);
   }
-  
-  bool ifBlockIsActive = evaluateConfigConditionExpr(Configuration.get());
-  
-  NormalBody = parseIfConfigStmtBlock(ifBlockIsActive, Kind);
-  
-  SourceLoc ElseLoc;
-  ParserResult<Stmt> ElseBody;
-  if (Tok.is(tok::pound_else)) {
-    ElseLoc = consumeToken(tok::pound_else);
-    ElseBody = parseIfConfigStmtBlock(!ifBlockIsActive, Kind);
-  }
-  SourceLoc EndLoc;
-  if (Tok.is(tok::pound_endif)) {
-    EndLoc = consumeToken(tok::pound_endif);
-  } else {
-    diagnose(Tok, diag::expected_close_to_config_stmt);
+
+  // Parse the #endif
+  SourceLoc EndLoc = Tok.getLoc();
+  if (parseToken(tok::pound_endif, diag::expected_close_to_config_stmt))
     skipUntilConfigBlockClose();
-  }
+  else if (!Tok.isAtStartOfLine())
+    diagnose(Tok.getLoc(), diag::extra_tokens_config_directive);
+
   
-  auto ifConfigStmt = new (Context) IfConfigStmt(ifBlockIsActive,
-                                                 IfLoc,
-                                                 Configuration.getPtrOrNull(),
-                                                 NormalBody.get(),
-                                                 ElseLoc,
-                                                 ElseBody.getPtrOrNull(),
-                                                 EndLoc);
-  
-  return makeParserResult(ifConfigStmt);
+  auto *ICS = new (Context) IfConfigStmt(Context.AllocateCopy(Clauses),
+                                         EndLoc);
+  return makeParserResult(ICS);
 }
 
 /// 

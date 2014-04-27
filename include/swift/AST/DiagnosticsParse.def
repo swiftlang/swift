@@ -59,7 +59,9 @@ ERROR(extra_rbrace,parsing,none,
 ERROR(unexpected_config_block_terminator,parsing,none,
       "unexpected configuration block terminator", ())
 ERROR(expected_build_configuration_expression,parsing,none,
-"expected a build configuration expression to follow the #if clause", ())
+      "expected a build configuration expression to follow the #if clause", ())
+ERROR(extra_tokens_config_directive,parsing,none,
+      "extra tokens at the end of the build configuration directive", ())
 
 WARNING(val_deprecated,lexing,none,
         "'val' is being removed, please switch to 'let'", ())
@@ -73,8 +75,6 @@ WARNING(lex_nul_character,lexing,none,
 ERROR(lex_utf16_bom_marker,lexing,none,
       "input files must be encoded as UTF-8 instead of UTF-16", ())
 
-ERROR(lex_extra_tokens_config_directive,lexing,none,
-      "extra tokens at the end of the build configuration directive", ())
 ERROR(lex_hashbang_not_allowed,lexing,none,
       "hashbang line is allowed only in the main file", ())
 
@@ -638,7 +638,9 @@ ERROR(expected_rbrace_in_brace_stmt,stmt_parsing,none,
 
 /// #if Statement
 ERROR(expected_close_to_config_stmt,stmt_parsing,none,
-"expected #else or #endif at end of configuration block", ())
+      "expected #else or #endif at end of configuration block", ())
+ERROR(expected_close_after_else,stmt_parsing,none,
+      "further conditions after #else are unreachable", ())
 
 // Return Statement
 ERROR(expected_expr_return,stmt_parsing,PointsToFirstBadToken,

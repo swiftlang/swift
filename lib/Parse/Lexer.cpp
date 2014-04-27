@@ -158,30 +158,6 @@ static uint32_t validateUTF8CharacterAndAdvance(const char *&Ptr,
   return EncodedBytes == 4 ? CharValue : ~0U;
 }
 
-/// Returns pointer to the first newline character in the string.
-const char *findNewline(const char *BufferPtr, const char *BufferEnd) {
-  for ( ; BufferPtr != BufferEnd; ++BufferPtr) {
-    if (isVerticalWhitespace(*BufferPtr))
-      return BufferPtr;
-  }
-  return BufferEnd;
-}
-
-static bool isOnlyWhitespaceUntilNewline(const char *BufferPtr,
-                                         const char *BufferEnd,
-                                         const char *&NonWhitespace) {
-  for ( ; BufferPtr != BufferEnd; ++BufferPtr) {
-    char C = *BufferPtr;
-    if (isVerticalWhitespace(C))
-      return true;
-    if (!isHorizontalWhitespace(C)) {
-      NonWhitespace = BufferPtr;
-      return false;
-    }
-  }
-  return true;
-}
-
 //===----------------------------------------------------------------------===//
 // Setup and Helper Methods
 //===----------------------------------------------------------------------===//
@@ -1498,27 +1474,27 @@ Restart:
     if (InSILMode)
       return formToken(tok::sil_pound, TokStart);
 
-    tok Kind = tok::unknown;
     if (getSubstring(TokStart + 1, 2).equals("if") &&
         isWhitespace(CurPtr[2])) {
       CurPtr += 2;
       return formToken(tok::pound_if, TokStart);
-    } else if (getSubstring(TokStart + 1, 4).equals("else") &&
-               isWhitespace(CurPtr[4])) {
-      CurPtr += 4;
-      Kind = tok::pound_else;
-    } else if(getSubstring(TokStart + 1, 5).equals("endif") &&
-              isWhitespace(CurPtr[5])) {
-      CurPtr += 5;
-      Kind = tok::pound_endif;
     }
-    if (Kind != tok::unknown) {
-      const char *NonWhitespace = nullptr;
-      if (!isOnlyWhitespaceUntilNewline(CurPtr, BufferEnd, NonWhitespace)) {
-        diagnose(NonWhitespace, diag::lex_extra_tokens_config_directive);
-        CurPtr = findNewline(CurPtr, BufferEnd);
-      }
-      return formToken(Kind, TokStart);
+    
+    if (getSubstring(TokStart + 1, 4).equals("else") &&
+        isWhitespace(CurPtr[4])) {
+      CurPtr += 4;
+      return formToken(tok::pound_else, TokStart);
+    }
+    
+    if (getSubstring(TokStart + 1, 6).equals("elseif") &&
+        isWhitespace(CurPtr[6])) {
+      CurPtr += 6;
+      return formToken(tok::pound_elseif, TokStart);
+    }
+    if (getSubstring(TokStart + 1, 5).equals("endif") &&
+        isWhitespace(CurPtr[5])) {
+      CurPtr += 5;
+      return formToken(tok::pound_endif, TokStart);
     }
 
     // Allow a hashbang #! line at the beginning of the file.

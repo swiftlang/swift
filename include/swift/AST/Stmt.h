@@ -216,46 +216,56 @@ public:
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::If; }
 };
 
+/// This represents one part of a #if block.  If the condition field is
+/// non-null, then this represents a #if or a #elseif, otherwise it represents
+/// an #else block.
+struct IfConfigStmtClause {
+  /// The location of the #if, #elseif, or #else keyword.
+  SourceLoc Loc;
+  
+  /// The condition guarding this #if or #elseif block.  If this is null, this
+  /// is a #else clause.
+  Expr *Cond;
+  
+  /// The body of the clause.
+  BraceStmt *Body;
+  
+  /// True if this is the active clause of the #if block.  Since this is
+  /// evaluated at parse time, this is always known.
+  bool isActive;
+  
+  IfConfigStmtClause(SourceLoc Loc, Expr *Cond, BraceStmt *Body, bool isActive)
+    : Loc(Loc), Cond(Cond), Body(Body), isActive(isActive) {
+  }
+};
+
 /// IfConfigStmt - This class models the statement-side representation of
 /// #if/#else/#endif blocks.
 class IfConfigStmt : public Stmt {
-  bool IfBlockIsActive;
-  SourceLoc IfLoc;
-  SourceLoc ElseLoc;
+  /// An array of clauses controlling each of the #if/#elseif/#else conditions.
+  /// The array is ASTContext allocated.
+  ArrayRef<IfConfigStmtClause> Clauses;
   SourceLoc EndLoc;
-  Expr *Cond = nullptr;
-  Stmt *Then = nullptr;
-  Stmt *Else = nullptr;
 
 public:
-  IfConfigStmt(bool IfBlockIsActive, SourceLoc IfLoc, Expr *Cond, Stmt *Then,
-               SourceLoc ElseLoc, Stmt *Else, SourceLoc EndLoc)
+  IfConfigStmt(ArrayRef<IfConfigStmtClause> Clauses, SourceLoc EndLoc)
   : Stmt(StmtKind::IfConfig, /*implicit=*/false),
-    IfBlockIsActive(IfBlockIsActive),
-    IfLoc(IfLoc), ElseLoc(ElseLoc), EndLoc(EndLoc),
-    Cond(Cond), Then(Then), Else(Else) {}
+    Clauses(Clauses), EndLoc(EndLoc) {}
   
-  SourceLoc getIfLoc() const { return IfLoc; }
-  SourceLoc getElseLoc() const { return ElseLoc; }
+  SourceLoc getIfLoc() const { return Clauses[0].Loc; }
   SourceLoc getEndLoc() const { return EndLoc; }
   
   SourceRange getSourceRange() const;
   
-  Stmt *getThenStmt() const { return Then; }
-  void setThenStmt(Stmt *s) { Then = s; }
-  
-  bool isIfBlockActive() const { return IfBlockIsActive; }
-  bool hasElse() const { return ElseLoc.isValid(); }
-  Stmt *getElseStmt() const { return Else; }
-  void setElseStmt(Stmt *s) { Else = s; }
+  const ArrayRef<IfConfigStmtClause> &getClauses() const { return Clauses; }
   
   Stmt *getActiveStmt() const {
-    return IfBlockIsActive ? Then : Else;
+    for (auto &Clause : Clauses)
+      if (Clause.isActive)
+        return Clause.Body;
+    return nullptr;
   }
 
-  Expr* getCond() const { return Cond; }
-  void setCond(Expr* e) { Cond = e; }
-  
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Stmt *S) {
     return S->getKind() == StmtKind::IfConfig;

@@ -668,23 +668,18 @@ namespace {
     
     void visitIfConfigDecl(IfConfigDecl *ICD) {
       OS.indent(Indent) << "(#if_decl\n";
-      printRec(ICD->getCond());
-      OS << '\n';
       Indent += 2;
-
-      OS.indent(Indent) << "(active";
-      for (auto D : ICD->getActiveMembers()) {
-        OS << '\n';
-        printRec(D);
+      for (auto &Clause : ICD->getClauses()) {
+        OS.indent(Indent) << (Clause.Cond ? "(#if:\n" : "#else");
+        if (Clause.Cond)
+          printRec(Clause.Cond);
+        
+        for (auto D : Clause.Members) {
+          OS << '\n';
+          printRec(D);
+        }
       }
-
-      OS << '\n';
-      OS.indent(Indent) << "(inactive";
-      for (auto D : ICD->getInactiveMembers()) {
-        OS << '\n';
-        printRec(D);
-      }
-
+    
       Indent -= 2;
       OS << ')';
     }
@@ -901,15 +896,17 @@ public:
   
   void visitIfConfigStmt(IfConfigStmt *S) {
     OS.indent(Indent) << "(#if_stmt\n";
-    printRec(S->getCond());
-    OS << '\n';
-    printRec(S->getThenStmt());
-    if (S->getElseStmt()) {
+    Indent += 2;
+    for (auto &Clause : S->getClauses()) {
+      OS.indent(Indent) << (Clause.Cond ? "(#if:\n" : "#else");
+      if (Clause.Cond)
+        printRec(Clause.Cond);
+
       OS << '\n';
-      OS.indent(Indent) << "(#else_stmt\n";
-      printRec(S->getElseStmt());
-      OS << ')';
+      printRec(Clause.Body);
     }
+    
+    Indent -= 2;
     OS << ')';
   }
 

@@ -413,9 +413,10 @@ void Parser::skipUntilDeclRBrace(tok T1, tok T2) {
 }
 
 void Parser::skipUntilConfigBlockClose() {
-  while(Tok.isNot(tok::pound_else) &&
-        Tok.isNot(tok::pound_endif) &&
-        Tok.isNot(tok::eof)) {
+  while (Tok.isNot(tok::pound_else) &&
+         Tok.isNot(tok::pound_elseif) &&
+         Tok.isNot(tok::pound_endif) &&
+         Tok.isNot(tok::eof)) {
     skipSingle();
   }
 }

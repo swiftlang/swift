@@ -238,26 +238,29 @@ std::pair<bool, Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
     }
 
   } else if (auto ConfigS = dyn_cast<IfConfigStmt>(S)) {
-    if (!passNonTokenNode({ SyntaxNodeKind::BuildConfigKeyword,
-          CharSourceRange(ConfigS->getIfLoc(), 3/*'#if'*/) }))
-      return { false, nullptr };
-    if (!annotateIfConfigConditionIdentifiers(ConfigS->getCond()))
-      return { false, nullptr };
-    if (Stmt *S = ConfigS->getThenStmt())
-      if (!S->walk(*this))
+    for (auto &Clause : ConfigS->getClauses()) {
+      unsigned TokLen;
+      if (&Clause == &*ConfigS->getClauses().begin())
+        TokLen = 3; // '#if'
+      else if (Clause.Cond == nullptr)
+        TokLen = 5; // '#else'
+      else
+        TokLen = 7; // '#elseif'
+      if (!passNonTokenNode({SyntaxNodeKind::BuildConfigKeyword,
+        CharSourceRange(Clause.Loc, TokLen) }))
+        return  { false, nullptr };
+
+      if (Clause.Cond && !annotateIfConfigConditionIdentifiers(Clause.Cond))
         return { false, nullptr };
-    if (ConfigS->hasElse()) {
-      if (!passNonTokenNode({ SyntaxNodeKind::BuildConfigKeyword,
-            CharSourceRange(ConfigS->getElseLoc(), 5/*'#else'*/) }))
+      
+      if (!Clause.Body->walk(*this))
         return { false, nullptr };
 
-      if (Stmt *S = ConfigS->getElseStmt())
-        if (!S->walk(*this))
-          return { false, nullptr };
     }
+    
     if (ConfigS->getEndLoc().isValid())
       if (!passNonTokenNode({ SyntaxNodeKind::BuildConfigKeyword,
-            CharSourceRange(ConfigS->getEndLoc(), 6/*'#endif'*/) }))
+        CharSourceRange(ConfigS->getEndLoc(), 6/*'#endif'*/) }))
         return { false, nullptr };
   }
 
@@ -367,23 +370,26 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
     }
 
   } else if (auto *ConfigD = dyn_cast<IfConfigDecl>(D)) {
-    if (!passNonTokenNode({ SyntaxNodeKind::BuildConfigKeyword,
-          CharSourceRange(ConfigD->getIfLoc(), 3/*'#if'*/) }))
-      return false;
-    if (!annotateIfConfigConditionIdentifiers(ConfigD->getCond()))
-      return false;
-    for (auto D : ConfigD->getThenMembers())
-      if (D->walk(*this))
+    for (auto &Clause : ConfigD->getClauses()) {
+      unsigned TokLen;
+      if (&Clause == &*ConfigD->getClauses().begin())
+        TokLen = 3; // '#if'
+      else if (Clause.Cond == nullptr)
+        TokLen = 5; // '#else'
+      else
+        TokLen = 7; // '#elseif'
+      if (!passNonTokenNode({SyntaxNodeKind::BuildConfigKeyword,
+                            CharSourceRange(Clause.Loc, TokLen) }))
         return false;
-    if (ConfigD->hasElse()) {
-      if (!passNonTokenNode({ SyntaxNodeKind::BuildConfigKeyword,
-            CharSourceRange(ConfigD->getElseLoc(), 5/*'#else'*/) }))
+      
+      if (Clause.Cond && !annotateIfConfigConditionIdentifiers(Clause.Cond))
         return false;
 
-      for (auto D : ConfigD->getElseMembers())
+      for (auto *D : Clause.Members)
         if (D->walk(*this))
           return false;
     }
+    
     if (ConfigD->getEndLoc().isValid())
       if (!passNonTokenNode({ SyntaxNodeKind::BuildConfigKeyword,
             CharSourceRange(ConfigD->getEndLoc(), 6/*'#endif'*/) }))

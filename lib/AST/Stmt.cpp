@@ -103,12 +103,7 @@ SourceRange IfStmt::getSourceRange() const {
 }
 
 SourceRange IfConfigStmt::getSourceRange() const {
-  SourceLoc End;
-  if (Else)
-    End = Else->getEndLoc();
-  else
-    End = Then->getEndLoc();
-  return SourceRange(IfLoc, End);
+  return SourceRange(getIfLoc(), EndLoc);
 }
 
 SourceRange WhileStmt::getSourceRange() const {

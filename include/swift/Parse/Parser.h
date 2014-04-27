@@ -556,8 +556,7 @@ public:
                                    BraceItemListKind::Brace);
   ParserResult<BraceStmt> parseBraceItemList(Diag<> ID);
   
-  ParserResult<BraceStmt> parseIfConfigStmtBlock(bool isActive,
-                                                 BraceItemListKind Kind);
+  BraceStmt *parseIfConfigStmtBlock(bool isActive, BraceItemListKind Kind);
 
   void parseTopLevelCodeDeclDelayed();
 

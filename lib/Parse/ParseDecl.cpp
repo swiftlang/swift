@@ -99,9 +99,10 @@ bool Parser::parseTopLevel() {
   }
   
   // In the case of a catastrophic parse error, consume any trailing
-  // #else or #endif and move on to the next statement or declaration
+  // #else, #elseif, or #endif and move on to the next statement or declaration
   // block.
-  if (Tok.is(tok::pound_else) || Tok.is(tok::pound_endif)) {
+  if (Tok.is(tok::pound_else) || Tok.is(tok::pound_elseif) ||
+      Tok.is(tok::pound_endif)) {
     diagnose(Tok.getLoc(), diag::unexpected_config_block_terminator);
     consumeToken();
   }
@@ -1656,68 +1657,78 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   return makeParserResult(Status, ED);
 }
 
-ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(
-                                            ParseDeclOptions Flags) {
-  if (peekToken().isAtStartOfLine()) {
-    diagnose(Tok.getLoc(), diag::expected_build_configuration_expression);
-  }
-  
-  SourceLoc IfLoc = consumeToken(tok::pound_if);
-  SourceLoc ElseLoc;
-  SourceLoc EndLoc;
-  
+ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
   StructureMarkerRAII ParsingDecl(*this, Tok.getLoc(),
                                   StructureMarkerKind::IfConfig);
-  
-  // Evaluate the condition.
-  ParserResult<Expr> Configuration = parseExprSequence(diag::expected_expr,
-                                                       true,
-                                                       true);
-  if (Configuration.isNull()) {
-    return makeParserError();
-  }
-  
-  bool ifBlockIsActive = evaluateConfigConditionExpr(Configuration.get());
 
-  SmallVector<Decl*, 8> IfDecls;
-  SmallVector<Decl*, 8> ElseDecls;
-  ParserStatus Status;
-  while(Tok.isNot(tok::pound_else) && Tok.isNot(tok::pound_endif)) {
-    Status = parseDecl(IfDecls, Flags);
-    
-    if (Status.isError()) {
-      diagnose(Tok, diag::expected_close_to_config_stmt);
-      skipUntilConfigBlockClose();
-    }
-  }
+  bool foundActive = false;
+  SmallVector<IfConfigDeclClause, 4> Clauses;
   
-  if (Tok.is(tok::pound_else)) {
-    ElseLoc = consumeToken(tok::pound_else);
+  while (1) {
+    bool isElse = Tok.is(tok::pound_else);
+    SourceLoc ClauseLoc = consumeToken();
+    Expr *Condition = nullptr;
     
-    while(Tok.isNot(tok::pound_endif)) {
-      Status = parseDecl(ElseDecls, Flags);
+    bool ClauseIsActive;
+    if (isElse) {
+      ClauseIsActive = !foundActive;
+    } else {
+      if (Tok.isAtStartOfLine())
+        diagnose(ClauseLoc, diag::expected_build_configuration_expression);
+      
+      // Evaluate the condition.
+      ParserResult<Expr> Configuration = parseExprSequence(diag::expected_expr,
+                                                           true, true);
+      if (Configuration.isNull())
+        return makeParserError();
+      
+      Condition = Configuration.get();
+
+      // Evaluate the condition, to validate it.
+      bool condActive = evaluateConfigConditionExpr(Condition);
+      ClauseIsActive = condActive && !foundActive;
+    }
+
+    foundActive |= ClauseIsActive;
+
+    if (!Tok.isAtStartOfLine())
+      diagnose(Tok.getLoc(), diag::extra_tokens_config_directive);
+
+    
+    SmallVector<Decl*, 8> Decls;
+    ParserStatus Status;
+    while (Tok.isNot(tok::pound_else) && Tok.isNot(tok::pound_endif) &&
+           Tok.isNot(tok::pound_elseif)) {
+      Status = parseDecl(Decls, Flags);
       
       if (Status.isError()) {
+        diagnose(Tok, diag::expected_close_to_config_stmt);
         skipUntilConfigBlockClose();
+        break;
       }
     }
+
+    Clauses.push_back(IfConfigDeclClause(ClauseLoc, Condition,
+                                         Context.AllocateCopy(Decls),
+                                         ClauseIsActive));
+
+    if (Tok.isNot(tok::pound_elseif) && Tok.isNot(tok::pound_else))
+      break;
+    
+    if (isElse)
+      diagnose(Tok, diag::expected_close_after_else);
   }
-  
-  if (Tok.is(tok::pound_endif)) {
-    EndLoc = consumeToken(tok::pound_endif);
-  } else {
-    diagnose(Tok, diag::expected_close_to_config_stmt);
+
+  // Parse the #endif
+  SourceLoc EndLoc = Tok.getLoc();
+  if (parseToken(tok::pound_endif, diag::expected_close_to_config_stmt))
     skipUntilConfigBlockClose();
-  }
-  
+  else if (!Tok.isAtStartOfLine())
+    diagnose(Tok.getLoc(), diag::extra_tokens_config_directive);
+
   IfConfigDecl *ICD = new (Context) IfConfigDecl(CurDeclContext,
-                                                 ifBlockIsActive,
-                                                 IfLoc,
-                                                 ElseLoc,
-                                                 EndLoc,
-                                                 Configuration.getPtrOrNull(),
-                                                 Context.AllocateCopy(IfDecls),
-                                                 Context.AllocateCopy(ElseDecls));
+                                                 Context.AllocateCopy(Clauses),
+                                                 EndLoc);
   return makeParserResult(ICD);
 }
 

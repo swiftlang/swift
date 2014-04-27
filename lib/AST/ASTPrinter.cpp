@@ -1219,13 +1219,15 @@ void PrintAST::visitIfStmt(IfStmt *stmt) {
 }
 
 void PrintAST::visitIfConfigStmt(IfConfigStmt *stmt) {
-  Printer << "#if ";
-  // FIXME: print condition
-  Printer.printNewline();
-  visit(stmt->getThenStmt());
-  if (auto elseStmt = stmt->getElseStmt()) {
-    Printer << " #else\n";
-    visit(elseStmt);
+  for (auto &Clause : stmt->getClauses()) {
+    if (&Clause == &*stmt->getClauses().begin())
+      Printer << "#if "; // FIXME: print condition
+    else if (Clause.Cond)
+      Printer << "#elseif"; // FIXME: print condition
+    else
+      Printer << "#else";
+    Printer.printNewline();
+    visit(Clause.Body);
   }
   Printer.printNewline();
   Printer << "#endif";

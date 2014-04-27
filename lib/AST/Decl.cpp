@@ -779,7 +779,7 @@ SourceRange TopLevelCodeDecl::getSourceRange() const {
 }
 
 SourceRange IfConfigDecl::getSourceRange() const {
-  return SourceRange(IfLoc, EndLoc);
+  return SourceRange(getLoc(), EndLoc);
 }
 
 /// Return true if a DeclRefExpr or MemberRefExpr use of this value is

@@ -39,6 +39,7 @@ enum class tok {
   sil_local_name,      // %42 in SIL mode.
   pound_if,
   pound_else,
+  pound_elseif,
   pound_endif,
   comment,
   

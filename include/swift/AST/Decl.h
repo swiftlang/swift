@@ -1629,71 +1629,65 @@ public:
   using DeclContext::operator new;
 };
 
+/// This represents one part of a #if block.  If the condition field is
+/// non-null, then this represents a #if or a #elseif, otherwise it represents
+/// an #else block.
+struct IfConfigDeclClause {
+  /// The location of the #if, #elseif, or #else keyword.
+  SourceLoc Loc;
+  
+  /// The condition guarding this #if or #elseif block.  If this is null, this
+  /// is a #else clause.
+  Expr *Cond;
+
+  ArrayRef<Decl*> Members;
+
+  /// True if this is the active clause of the #if block.  Since this is
+  /// evaluated at parse time, this is always known.
+  bool isActive;
+
+  IfConfigDeclClause(SourceLoc Loc, Expr *Cond, ArrayRef<Decl*> Members,
+                     bool isActive)
+    : Loc(Loc), Cond(Cond), Members(Members), isActive(isActive) {
+  }
+};
+  
+  
 /// IfConfigDecl - This class represents the declaration-side representation of
 /// #if/#else/#endif blocks. Active and inactive block members are stored
 /// separately, with the intention being that active members will be handed
 /// back to the enclosing declaration.
 class IfConfigDecl : public Decl {
-  ArrayRef<Decl*> ThenMembers;
-  ArrayRef<Decl*> ElseMembers;
-  bool IfBlockIsActive;
-  SourceLoc IfLoc;
-  SourceLoc ElseLoc;
+  /// An array of clauses controlling each of the #if/#elseif/#else conditions.
+  /// The array is ASTContext allocated.
+  ArrayRef<IfConfigDeclClause> Clauses;
   SourceLoc EndLoc;
-  Expr *Cond;
-  
 public:
   
-  IfConfigDecl(DeclContext *Parent,
-               bool IfBlockIsActive,
-               SourceLoc ifLoc,
-               SourceLoc elseLoc,
-               SourceLoc endLoc,
-               Expr *cond,
-               ArrayRef<Decl*> ThenMembers,
-               ArrayRef<Decl*> ElseMembers):
-          Decl(DeclKind::IfConfig, Parent),
-          ThenMembers(ThenMembers),
-          ElseMembers(ElseMembers),
-          IfBlockIsActive(IfBlockIsActive),
-          IfLoc(ifLoc),
-          ElseLoc(elseLoc),
-          EndLoc(endLoc),
-          Cond(cond) {}
-
-  ArrayRef<Decl*> getThenMembers() const { return ThenMembers; }
-  ArrayRef<Decl*> getElseMembers() const { return ElseMembers; }
-
-  ArrayRef<Decl*> getActiveMembers() const {
-    return IfBlockIsActive ? ThenMembers : ElseMembers;
+  IfConfigDecl(DeclContext *Parent, ArrayRef<IfConfigDeclClause> Clauses,
+               SourceLoc EndLoc)
+    : Decl(DeclKind::IfConfig, Parent), Clauses(Clauses), EndLoc(EndLoc) {
   }
 
-  ArrayRef<Decl*> getInactiveMembers() const {
-    return !IfBlockIsActive ? ThenMembers : ElseMembers;
+  ArrayRef<IfConfigDeclClause> getClauses() const { return Clauses; }
+
+  /// Return the active clause, or null if there is no active one.
+  const IfConfigDeclClause *getActiveClause() const {
+    for (auto &Clause : Clauses)
+      if (Clause.isActive) return &Clause;
+    return nullptr;
   }
-
-  Expr *getCond() { return Cond; }
-
-  bool isIfBlockActive() const { return IfBlockIsActive; }
-  bool hasElse() const { return ElseLoc.isValid(); }
+  const ArrayRef<Decl*> getActiveMembers() const {
+    if (auto *Clause = getActiveClause())
+      return Clause->Members;
+    return {};
+  }
   
-  SourceLoc getIfLoc() const { return IfLoc; }
-  SourceLoc getElseLoc() const { return ElseLoc; }
   SourceLoc getEndLoc() const { return EndLoc; }
-  SourceLoc getLoc() const { return getIfLoc(); }
+  SourceLoc getLoc() const { return Clauses[0].Loc; }
   
   SourceRange getSourceRange() const;
   
-  SourceRange getInactiveSourceRange() const {
-    if (isIfBlockActive()) {
-      if (hasElse())
-        return SourceRange(ElseLoc, EndLoc);
-      else
-        return SourceRange();
-    }
-    return SourceRange(IfLoc, ElseLoc.isValid() ? ElseLoc : EndLoc);
-  }
-
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::IfConfig;
   }
