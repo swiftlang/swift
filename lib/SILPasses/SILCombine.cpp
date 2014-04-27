@@ -964,6 +964,10 @@ SILCombiner::visitUncheckedRefCastInst(UncheckedRefCastInst *URCI) {
     return new (URCI->getModule()) UncheckedRefCastInst(
         URCI->getLoc(), OtherURCI->getOperand(), URCI->getType());
 
+  // (unchecked_ref_cast (upcast x X->Y) Y->Z) -> (unchecked_ref_cast x X->Z)
+  if (auto *UI = dyn_cast<UpcastInst>(URCI->getOperand()))
+    return new (URCI->getModule())
+        UncheckedRefCastInst(URCI->getLoc(), UI->getOperand(), URCI->getType());
   return nullptr;
 }
 
