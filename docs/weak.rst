@@ -830,7 +830,7 @@ they are independent objects.)
 Closures therefore make it fairly easy to introduce reference cycles:
 for example, an instance method might install a closure as an event
 listener on a child object, and if that closure refers to
-:code:`this`, a reference cycle will be formed.  This is an
+:code:`self`, a reference cycle will be formed.  This is an
 indisputable drawback of an environment which cannot collect reference
 cycles.
 
@@ -890,7 +890,7 @@ More complicated expressions really ought to be hoisted out to a
 separate variable for legibility anyway.
 
 I do believe that being able to capture the value of a property
-(particulary of :code:`this`) is very important.  In fact, it's
+(particulary of :code:`self`) is very important.  In fact, it's
 important independent of weak references.  It is often possible to
 avoid a reference cycle by simply capturing a specific property value
 instead of the base object.  Capturing by value is also an
@@ -910,11 +910,11 @@ so-attributed :code:`capture` declaration (see below) with a nonce
 identifier to the top of the closure::
 
     button1.setAction {
-      capture @unowned _V1 = this
+      capture @unowned _V1 = self
       _V1.tapOut()
     }
     button2.setAction {
-      capture @weak _V2 = this
+      capture @weak _V2 = self
       if (_V2) { _V2.swapIn() }
     }
     button3.setAction {
@@ -1021,7 +1021,7 @@ simple identifier::
   capture @unowned foo
 
 This captures the current value of whatever :code:`foo` resolves to
-(potentially a member of :code:`this`!) and binds it within the
+(potentially a member of :code:`self`!) and binds it within the
 closure as a back-reference.
 
 Permitting the slightly more general form::
@@ -1031,8 +1031,8 @@ Permitting the slightly more general form::
 allows users to conveniently capture specific values without mucking
 up the enclosing scope with tons of variables only needed for setting
 up the closure.  In particular, this makes it easy to capture specific
-fields out of an enclosing :code:`this` object instead of capturing
-the object itself; that, plus forcing uses of :code:`this` to be
+fields out of an enclosing :code:`self` object instead of capturing
+the object itself; that, plus forcing uses of :code:`self` to be
 explicit in closures, would help users to conveniently avoid a class
 of inadvertent retain cycles.
 
