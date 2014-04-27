@@ -737,6 +737,7 @@ ParserResult<Stmt> Parser::parseStmtIf() {
 
 // Evaluate a subset of expression types suitable for build configuration
 // conditional expressions.  The accepted expression types are:
+//  - The magic constants "true" and "false".
 //  - Named decl ref expressions ("FOO")
 //  - Parenthesized expressions ("(FOO)")
 //  - Binary "&&" or "||" operations applied to other build configuration
@@ -846,9 +847,15 @@ bool Parser::evaluateConfigConditionExpr(Expr *configExpr) {
   if (auto *UDRE = dyn_cast_or_null<UnresolvedDeclRefExpr>(configExpr)) {
     // look up name
     auto name = UDRE->getName().str();
+    
+    if (name == "true")
+      return true;
+    if (name == "false")
+      return false;
+    
     return Context.LangOpts.hasBuildConfigOption(name);
   }
-  
+
   // Evaluate a negation (unary "!") expression.
   if (auto *PUE = dyn_cast_or_null<PrefixUnaryExpr>(configExpr)) {
     // If the PUE is not a negation expression, return false
@@ -880,7 +887,7 @@ bool Parser::evaluateConfigConditionExpr(Expr *configExpr) {
       
       // The sub expression should be an UnresolvedDeclRefExpr (we won't
       // tolerate extra parens).
-      if(auto *UDRE = dyn_cast_or_null<UnresolvedDeclRefExpr>(subExpr)) {
+      if (auto *UDRE = dyn_cast_or_null<UnresolvedDeclRefExpr>(subExpr)) {
         auto argValue = UDRE->getName().str();
         return
           !Context.LangOpts.getTargetConfigOption(targetValue).compare(argValue);

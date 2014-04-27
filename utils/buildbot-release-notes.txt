@@ -11,6 +11,9 @@ Latest
       typealias SKColor = Green
     #endif
 
+* You can now use the "true" and "false" constants in build configurations,
+  allowing you to emulate the C idioms of "#if 0" (but spelled "#if false").
+
 * 'break' now breaks out of switch statements.
 
 * It is no longer possible to specify "@mutating" as an attribute, you may only
