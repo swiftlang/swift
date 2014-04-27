@@ -2135,7 +2135,7 @@ namespace {
     // The value was produced at +1, so to produce an unbalanced
     // release we need to leave the cleanup intact and then do a *second*
     // release.
-    args[0].forward(gen);
+    gen.B.createReleaseValue(loc, args[0].getValue());
     return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));    
   }
 
