@@ -193,6 +193,9 @@ enum class ExprFixKind : uint8_t {
 
   /// Introduce a '&' to take the address of an lvalue.
   AddressOf,
+
+  /// Remove a no-argument call to something that is not a function.
+  RemoveNullaryCall,
 };
 
 /// Return a string representation of an expression fix.

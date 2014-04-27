@@ -1888,7 +1888,8 @@ ConstraintSystem::simplifyApplicableFnConstraint(const Constraint &constraint) {
   parts.pop_back();
   ConstraintLocatorBuilder outerLocator =
     getConstraintLocator(anchor, parts, locator.getSummaryFlags());
-  
+
+retry:
   // For a function, bind the output and convert the argument to the input.
   auto func1 = type1->castTo<FunctionType>();
   if (desugar2->getKind() == TypeKind::Function) {
@@ -1939,6 +1940,40 @@ ConstraintSystem::simplifyApplicableFnConstraint(const Constraint &constraint) {
     addConstraint(ConstraintKind::Construction, func1->getInput(), instanceTy2,
                   getConstraintLocator(outerLocator));
     return SolutionKind::Solved;
+  }
+
+  // If we're coming from an optional type, unwrap the optional and try again.
+  if (auto objectType2 = desugar2->getOptionalObjectType()) {
+    // Increase the score before we attempt a fix.
+    increaseScore(SK_Fix);
+    if (worseThanBestSolution())
+      return SolutionKind::Error;
+
+    Fixes.push_back({ExprFixKind::ForceOptional,getConstraintLocator(locator)});
+
+    type2 = objectType2;
+    desugar2 = type2->getDesugaredType();
+    goto retry;
+  }
+
+  // If this is a '()' call, drop the call.
+  if (shouldAttemptFixes() &&
+      func1->getInput()->isEqual(TupleType::getEmpty(getASTContext()))) {
+    // Increase the score before we attempt a fix.
+    increaseScore(SK_Fix);
+    if (worseThanBestSolution())
+      return SolutionKind::Error;
+
+    // We don't bother with a 'None' case, because at this point we won't get
+    // a better diagnostic from that case.
+    Fixes.push_back({ExprFixKind::RemoveNullaryCall,
+                     getConstraintLocator(locator)});
+
+    return matchTypes(func1->getResult(), type2,
+                      TypeMatchKind::BindType,
+                      flags | TMF_ApplyingFix | TMF_GenerateConstraints,
+                      locator.withPathElement(
+                        ConstraintLocator::FunctionResult));
   }
 
   // If we are supposed to record failures, do so.
@@ -2206,6 +2241,9 @@ ConstraintSystem::simplifyFixConstraint(ExprFixKind fix,
                         ->getResult(),
                       type2, matchKind, subFlags, locator);
 
+  case ExprFixKind::RemoveNullaryCall:
+    llvm_unreachable("Always applied directly");
+
   case ExprFixKind::ForceOptional:
     // Assume that '!' was applied to the first type.
     return matchTypes(type1->getRValueType()->getOptionalObjectType(), type2,
@@ -2220,6 +2258,8 @@ ConstraintSystem::simplifyFixConstraint(ExprFixKind fix,
     // an inout.
     return matchTypes(InOutType::get(type1->getRValueType()), type2,
                       matchKind, subFlags, locator);
+
+
   }
 }
 

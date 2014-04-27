@@ -311,6 +311,8 @@ StringRef swift::constraints::getName(ExprFixKind kind) {
     return "[fix: force downcast]";
   case ExprFixKind::AddressOf:
     return "[fix: add address-of]";
+  case ExprFixKind::RemoveNullaryCall:
+    return "[fix: remove nullary call]";
   }
 }
 

@@ -3826,10 +3826,28 @@ Expr *ConstraintSystem::applySolution(const Solution &solution,
   if (!solution.Fixes.empty()) {
     bool diagnosed = false;
     for (auto fix : solution.Fixes) {
+      // Some fixes need more information from the locator itself, including
+      // tweaking the locator. Deal with those now.
+      ConstraintLocator *locator = fix.second;
+
+      // Removing a nullary call to a non-function requires us to have an
+      // 'ApplyFunction', which we strip.
+      if (fix.first == ExprFixKind::RemoveNullaryCall) {
+        auto anchor = locator->getAnchor();
+        auto path = locator->getPath();
+        if (!path.empty() &&
+            path.back().getKind() == ConstraintLocator::ApplyFunction) {
+          locator = getConstraintLocator(anchor, path.slice(0, path.size()-1),
+                                         locator->getSummaryFlags());
+        } else {
+          continue;
+        }
+      }
+
       // Resolve the locator to a specific expression.
       SourceRange range1, range2;
       ConstraintLocator *resolved
-        = simplifyLocator(*this, fix.second, range1, range2);
+        = simplifyLocator(*this, locator, range1, range2);
 
       // If we didn't manage to resolve directly to an expression, we don't
       // have a great diagnostic to give, so continue.
@@ -3852,6 +3870,17 @@ Expr *ConstraintSystem::applySolution(const Solution &solution,
         TC.diagnose(affected->getLoc(), diag::missing_nullary_call, type)
           .fixItInsert(afterAffectedLoc, "()");
         diagnosed = true;
+        break;
+      }
+
+      case ExprFixKind::RemoveNullaryCall: {
+        if (auto apply = dyn_cast<ApplyExpr>(affected)) {
+          auto type = solution.simplifyType(TC, apply->getFn()->getType())
+                        ->getRValueObjectType();
+          TC.diagnose(affected->getLoc(), diag::extra_call_nonfunction, type)
+            .fixItRemove(apply->getArg()->getSourceRange());
+          diagnosed = true;
+        }
         break;
       }
 

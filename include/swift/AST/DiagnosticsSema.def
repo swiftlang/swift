@@ -224,6 +224,9 @@ ERROR(missing_forced_downcast,sema_tcc,none,
 ERROR(missing_address_of,sema_tcc,none,
       "passing value of type %0 by reference requires explicit '&'",
       (Type))
+ERROR(extra_call_nonfunction,sema_tcc,none,
+      "call to non-function of type %0; did you mean to leave off the '()'?",
+      (Type))
 
 //------------------------------------------------------------------------------
 // Type Check Declarations
