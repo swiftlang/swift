@@ -2751,6 +2751,10 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   if (wt->isDeclaration())
     return;
 
+  if (!isPossiblyUsedExternally(wt->getLinkage())) {
+    
+  }
+
   // Build the witnesses.
   SmallVector<llvm::Constant*, 32> witnesses;
   WitnessTableBuilder(*this, witnesses, wt)

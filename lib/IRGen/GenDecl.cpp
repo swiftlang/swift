@@ -468,8 +468,26 @@ void IRGenModule::emitGlobalTopLevel() {
   }
 
   // Emit witness tables.
-  for (SILWitnessTable &wt : SILMod->getWitnessTableList())
+  for (SILWitnessTable &wt : SILMod->getWitnessTableList()) {
+    // Try to be lazy about it.
+    if (!isPossiblyUsedExternally(wt.getLinkage())) {
+      // Remember that we know how to emit this conformance.
+      auto lookup =
+        LazyWitnessTablesByConformance.insert({wt.getConformance(), &wt});
+
+      // If we successfully made a new entry, just continue.
+      if (lookup.second) {
+        assert(lookup.first->second == &wt);
+        continue;
+      }
+
+      // Otherwise, we already have an outstanding request for this
+      // conformance, so go ahead and emit it now.
+      assert(lookup.first->second == nullptr);
+    }
+
     emitSILWitnessTable(&wt);
+  }
   
   // Emit the implicit import of the swift standard libary.
   if (DebugInfo) {
@@ -494,12 +512,25 @@ void IRGenModule::emitGlobalTopLevel() {
 /// Emit any lazy definitions (of globals or functions or whatever
 /// else) that we require.
 void IRGenModule::emitLazyDefinitions() {
-  // Emit any lazy function definitions we require.
-  while (!LazyFunctionDefinitions.empty()) {
-    SILFunction *f = LazyFunctionDefinitions.pop_back_val();
-    assert(!isPossiblyUsedExternally(f->getLinkage()) &&
-           "function with externally-visible linkage emitted lazily?");
-    emitSILFunction(f);
+  while (!LazyWitnessTables.empty() ||
+         !LazyFunctionDefinitions.empty()) {
+
+    // Emit any lazy witness tables we require.  We do this first
+    // because it's likely to introduce new uses of lazy functions.
+    while (!LazyWitnessTables.empty()) {
+      SILWitnessTable *wt = LazyWitnessTables.pop_back_val();
+      assert(!isPossiblyUsedExternally(wt->getLinkage()) &&
+             "witness table with externally-visible linkage emitted lazily?");
+      emitSILWitnessTable(wt);
+    }
+
+    // Emit any lazy function definitions we require.
+    while (!LazyFunctionDefinitions.empty()) {
+      SILFunction *f = LazyFunctionDefinitions.pop_back_val();
+      assert(!isPossiblyUsedExternally(f->getLinkage()) &&
+             "function with externally-visible linkage emitted lazily?");
+      emitSILFunction(f);
+    }
   }
 }
 
@@ -1581,6 +1612,27 @@ bool IRGenModule::isResilient(Decl *theDecl, ResilienceScope scope) {
 llvm::Constant*
 IRGenModule::getAddrOfWitnessTable(const NormalProtocolConformance *C,
                                    llvm::Type *storageTy) {
+  // If this is a non-definition use, we may need to force a lazy
+  // conformance to be emitted.
+  if (!storageTy) {
+    // Eagerly try to map the conformance to null to mark that we need it.
+    auto lookup = LazyWitnessTablesByConformance.insert({C, nullptr});
+
+    // If that didn't succeed because there's an existing entry, and
+    // the existing entry is pointing to an implementation, enqueue
+    // that implementation, then clear out the entry so that we don't
+    // try to enqueue it multiple times.
+    if (!lookup.second) {
+      SILWitnessTable *&entry = lookup.first->second;
+      if (entry != nullptr) {
+        LazyWitnessTables.push_back(entry);
+        entry = nullptr;
+      }
+    } else {
+      assert(lookup.first->second == nullptr);
+    }
+  }
+
   auto entity = LinkEntity::forDirectProtocolWitnessTable(
                               const_cast<NormalProtocolConformance*>(C), *this);
   return getAddrOfLLVMVariable(*this, GlobalVars, entity,

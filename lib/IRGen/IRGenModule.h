@@ -311,6 +311,17 @@ private:
   
   llvm::DenseMap<ProtocolDecl*, ObjCProtocolPair> ObjCProtocols;
 
+  /// SIL witness tables that can be emitted lazily and that we know
+  /// how to emit.  This can have entries for keys that are not
+  /// lazy-emitted conformances.  However, if the value for a key
+  /// is not null, then that witness table is lazy and has not yet
+  /// been emitted.
+  llvm::DenseMap<const NormalProtocolConformance *, SILWitnessTable*>
+  LazyWitnessTablesByConformance;
+
+  /// SIL witness tables that we need to emit lazily.
+  llvm::SmallVector<SILWitnessTable*, 4> LazyWitnessTables;
+
   /// SIL functions that we need to emit lazily.
   llvm::SmallVector<SILFunction*, 4> LazyFunctionDefinitions;
 
