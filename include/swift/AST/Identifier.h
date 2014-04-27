@@ -338,7 +338,7 @@ public:
   static DeclName getFromOpaqueValue(void *p) { return DeclName(p); }
 
   /// Dump this name to standard error.
-  LLVM_ATTRIBUTE_DEPRECATED(void dump(),
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const,
                             "only for use within the debugger");
 };
 
@@ -400,7 +400,7 @@ public:
   }
 
   /// Dump this selector to standard error.
-  LLVM_ATTRIBUTE_DEPRECATED(void dump(),
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const,
                             "only for use within the debugger");
 
   friend bool operator==(ObjCSelector lhs, ObjCSelector rhs) {

@@ -64,7 +64,7 @@ bool Identifier::isOperatorSlow() const {
   return !empty() && isOperatorStartCodePoint(codePoint);
 }
 
-void DeclName::dump() {
+void DeclName::dump() const {
   llvm::errs() << *this << "\n";
 }
 
@@ -95,7 +95,7 @@ StringRef ObjCSelector::getString(llvm::SmallVectorImpl<char> &scratch) const {
   return os.str();
 }
 
-void ObjCSelector::dump() {
+void ObjCSelector::dump() const {
   llvm::errs() << *this << "\n";
 }
 
