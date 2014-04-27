@@ -110,29 +110,61 @@ static GenericParamList *genericParamListForType(Type ty) {
   return nullptr;
 }
 
+/// Return the list of generic params that were substituted if this conformance
+/// was specialized somewhere along the inheritence chain.
+GenericParamList *ProtocolConformance::getSubstitutedGenericParams() const {
+  const ProtocolConformance *C = this;
+
+  bool FoundSpecializedConformance = false;
+  while (true) {
+    switch (C->getKind()) {
+    case ProtocolConformanceKind::Inherited:
+      // If we have an inherited protocol conformance, grab our inherited
+      // conformance and continue. Inheritence in it of itself does not yield
+      // additional type variables.
+      C = cast<InheritedProtocolConformance>(C)->getInheritedConformance();
+      continue;
+    case ProtocolConformanceKind::Specialized:
+      // If we have a specialized protocol conformance, since we do not support
+      // currently partial specialization, we know that it can not have any open
+      // type variables.
+      C = cast<SpecializedProtocolConformance>(C)->getGenericConformance();
+      FoundSpecializedConformance = true;
+      continue;
+    case ProtocolConformanceKind::Normal:
+      // If we have a normal protocol conformance and we have not seen a
+      // specialized protocol conformance yet, we know that the normal protocol
+      // conformance can only contain open types. Bail.
+      if (!FoundSpecializedConformance)
+        return nullptr;
+
+      // Otherwise, this must be the original conformance containing the
+      // specialized generic parameters.  Attempt to create the param list.
+      return genericParamListForType(C->getType());
+    }
+  }
+}
+
 GenericParamList *ProtocolConformance::getGenericParams() const {
   const ProtocolConformance *C = this;
-  switch (getKind()) {
-  case ProtocolConformanceKind::Inherited: {
-    // Look through all the inherited layers and then fall through to the
-    // normal.
-    do {
+
+  while (true) {
+    switch (C->getKind()) {
+    case ProtocolConformanceKind::Inherited:
+      // If we have an inherited protocol conformance, grab our inherited
+      // conformance and continue.
       C = cast<InheritedProtocolConformance>(C)->getInheritedConformance();
-    } while (C->getKind() == ProtocolConformanceKind::Inherited);
-
-    // We don't handle specialized conformances here so bail.
-    if (C->getKind() == ProtocolConformanceKind::Specialized)
+      continue;
+    case ProtocolConformanceKind::Specialized:
+      // If we have a specialized protocol conformance, since we do not support
+      // currently partial specialization, we know that it can not have any open
+      // type variables.
       return nullptr;
-
-    // Otherwise we have a normal conformance. Fallthrough.
-    SWIFT_FALLTHROUGH;
-  }
-  case ProtocolConformanceKind::Normal: {
-    return genericParamListForType(C->getType());
-  }
-  case ProtocolConformanceKind::Specialized:
-    // FIXME: This could reasonably have open type variables.
-    return nullptr;
+    case ProtocolConformanceKind::Normal:
+      // If we have a normal protocol conformance, attempt to look up its open
+      // generic type variables.
+      return genericParamListForType(C->getType());
+    }
   }
 }
 

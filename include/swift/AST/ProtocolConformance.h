@@ -194,6 +194,12 @@ public:
   /// Get the generic parameters open on the conforming type.
   /// FIXME: Retire in favor of getGenericSignature().
   GenericParamList *getGenericParams() const;
+
+  /// Return the list of generic params that were substituted if this conformance
+  /// was specialized somewhere along the inheritence chain.
+  ///
+  /// FIXME: Retire in favor of getGenericSignature().
+  GenericParamList *getSubstitutedGenericParams() const;
   
   /// Get the generic signature containing the parameters open on the conforming
   /// interface type.
