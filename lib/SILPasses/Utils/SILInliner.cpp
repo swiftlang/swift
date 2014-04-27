@@ -24,19 +24,18 @@ using namespace swift;
 ///
 /// \returns true on success or false if it is unable to inline the function
 /// (for any reason).
-bool SILInliner::inlineFunction(SILBasicBlock::iterator &I,
+bool SILInliner::inlineFunction(ApplyInst *AI,
                                 SILFunction *CalleeFunction,
                                 ArrayRef<Substitution> Subs,
                                 ArrayRef<SILValue> Args) {
   // Do not attempt to inline an apply into its parent function.
-  if (I->getParent()->getParent() == CalleeFunction)
+  if (AI->getParent()->getParent() == CalleeFunction)
     return false;
 
   SILFunction &F = getBuilder().getFunction();
 
-  assert(I->getParent()->getParent() && I->getParent()->getParent() == &F &&
+  assert(AI->getParent()->getParent() && AI->getParent()->getParent() == &F &&
          "Inliner called on apply instruction in wrong function?");
-  assert(I != I->getParent()->end() && "Inliner called on a terminator?");
   assert(((CalleeFunction->getAbstractCC() != AbstractCC::ObjCMethod &&
            CalleeFunction->getAbstractCC() != AbstractCC::C) ||
           IKind == InlineKind::PerformanceInline) &&    
@@ -52,18 +51,18 @@ bool SILInliner::inlineFunction(SILBasicBlock::iterator &I,
   // Compute the SILLocation which should be used by all the inlined
   // instructions.
   if (IKind == InlineKind::PerformanceInline) {
-    Loc = InlinedLocation::getInlinedLocation(I->getLoc());
+    Loc = InlinedLocation::getInlinedLocation(AI->getLoc());
   } else {
     assert(IKind == InlineKind::MandatoryInline && "Unknown InlineKind.");
-    Loc = MandatoryInlinedLocation::getMandatoryInlinedLocation(I->getLoc());
+    Loc = MandatoryInlinedLocation::getMandatoryInlinedLocation(AI->getLoc());
   }
 
-  DebugScope = I->getDebugScope();
+  DebugScope = AI->getDebugScope();
 
   // If the caller's BB is not the last BB in the calling function, then keep
   // track of the next BB so we always insert new BBs before it; otherwise,
   // we just leave the new BBs at the end as they are by default.
-  auto IBI = std::next(SILFunction::iterator(I->getParent()));
+  auto IBI = std::next(SILFunction::iterator(AI->getParent()));
   InsertBeforeBB = IBI != F.end() ? IBI : nullptr;
 
   // Clear argument map and map ApplyInst arguments to the arguments of the
@@ -79,7 +78,7 @@ bool SILInliner::inlineFunction(SILBasicBlock::iterator &I,
   BBMap.clear();
   // Do not allow the entry block to be cloned again
   BBMap.insert(std::make_pair(CalleeEntryBB, nullptr));
-  SILBasicBlock::iterator InsertPoint = std::next(I);
+  SILBasicBlock::iterator InsertPoint = std::next(SILBasicBlock::iterator(AI));
   getBuilder().setInsertionPoint(InsertPoint);
   // Recursively visit callee's BB in depth-first preorder, starting with the
   // entry block, cloning all instructions other than terminators.
@@ -89,60 +88,59 @@ bool SILInliner::inlineFunction(SILBasicBlock::iterator &I,
   if (ReturnInst *RI = dyn_cast<ReturnInst>(CalleeEntryBB->getTerminator())) {
     // Replace all uses of the apply instruction with the operands of the
     // return instruction, appropriately mapped.
-    SILValue(I).replaceAllUsesWith(remapValue(RI->getOperand()));
+    SILValue(AI).replaceAllUsesWith(remapValue(RI->getOperand()));
     // And get rid of the no-longer-needed ApplyInst.
-    SILBasicBlock::iterator II = I++;
-    II->eraseFromParent();
-  } else {
-    // Otherwise, split the caller's basic block to create a return-to BB.
-    SILBasicBlock *CallerBB = I->getParent();
-    // Split the BB and do NOT create a branch between the old and new
-    // BBs; we will create the appropriate terminator manually later.
-    SILBasicBlock *ReturnToBB = CallerBB->splitBasicBlock(InsertPoint);
-    // Place the return-to BB after all the other mapped BBs.
-    if (InsertBeforeBB)
-      F.getBlocks().splice(SILFunction::iterator(InsertBeforeBB), F.getBlocks(),
-                           SILFunction::iterator(ReturnToBB));
-    else
-      F.getBlocks().splice(F.getBlocks().end(), F.getBlocks(),
-                           SILFunction::iterator(ReturnToBB));
-    // Create an argument on the return-to BB representing the returned value.
-    SILValue RetArg = new (F.getModule()) SILArgument(I->getType(0),
-                                                      ReturnToBB);
-    // Replace all uses of the ApplyInst with the new argument.
-    SILValue(I).replaceAllUsesWith(RetArg);
-    // And get rid of the no-longer-needed ApplyInst.
-    SILBasicBlock::iterator II = I++;
-    II->eraseFromParent();
+    AI->eraseFromParent();
+    return true;
+  }
 
-    // Now iterate over the callee BBs and fix up the terminators.
-    getBuilder().setInsertionPoint(CallerBB);
-    // We already know that the callee's entry block does not terminate with a
-    // Return Inst, so it can definitely be cloned with the normal SILCloner
-    // visit function.
-    visit(CalleeEntryBB->getTerminator());
-    for (auto BI = BBMap.begin(), BE = BBMap.end(); BI != BE; ++BI) {
-      // Ignore entry block
-      if (BI->first == CalleeEntryBB)
-        continue;
+  // Otherwise, split the caller's basic block to create a return-to BB.
+  SILBasicBlock *CallerBB = AI->getParent();
+  // Split the BB and do NOT create a branch between the old and new
+  // BBs; we will create the appropriate terminator manually later.
+  SILBasicBlock *ReturnToBB = CallerBB->splitBasicBlock(InsertPoint);
+  // Place the return-to BB after all the other mapped BBs.
+  if (InsertBeforeBB)
+    F.getBlocks().splice(SILFunction::iterator(InsertBeforeBB), F.getBlocks(),
+                         SILFunction::iterator(ReturnToBB));
+  else
+    F.getBlocks().splice(F.getBlocks().end(), F.getBlocks(),
+                         SILFunction::iterator(ReturnToBB));
+  // Create an argument on the return-to BB representing the returned value.
+  SILValue RetArg = new (F.getModule()) SILArgument(AI->getType(0),
+                                                    ReturnToBB);
+  // Replace all uses of the ApplyInst with the new argument.
+  SILValue(AI).replaceAllUsesWith(RetArg);
+  // And get rid of the no-longer-needed ApplyInst.
+  AI->eraseFromParent();
 
-      getBuilder().setInsertionPoint(BI->second);
+  // Now iterate over the callee BBs and fix up the terminators.
+  getBuilder().setInsertionPoint(CallerBB);
+  // We already know that the callee's entry block does not terminate with a
+  // Return Inst, so it can definitely be cloned with the normal SILCloner
+  // visit function.
+  visit(CalleeEntryBB->getTerminator());
+  for (auto BI = BBMap.begin(), BE = BBMap.end(); BI != BE; ++BI) {
+    // Ignore entry block
+    if (BI->first == CalleeEntryBB)
+      continue;
 
-      // Modify return terminators to branch to the return-to BB, rather than
-      // trying to clone the ReturnInst.
-      if (ReturnInst *RI = dyn_cast<ReturnInst>(BI->first->getTerminator())) {
-        getBuilder().createBranch(Loc.getValue(), ReturnToBB,
-                                  remapValue(RI->getOperand()));
-        continue;
-      }
+    getBuilder().setInsertionPoint(BI->second);
 
-      assert(!isa<AutoreleaseReturnInst>(BI->first->getTerminator()) &&
-             "Unexpected autorelease return while inlining non-Objective-C "
-             "function?");
-      // Otherwise use normal visitor, which clones the existing instruction
-      // but remaps basic blocks and values.
-      visit(BI->first->getTerminator());
+    // Modify return terminators to branch to the return-to BB, rather than
+    // trying to clone the ReturnInst.
+    if (ReturnInst *RI = dyn_cast<ReturnInst>(BI->first->getTerminator())) {
+      getBuilder().createBranch(Loc.getValue(), ReturnToBB,
+                                remapValue(RI->getOperand()));
+      continue;
     }
+
+    assert(!isa<AutoreleaseReturnInst>(BI->first->getTerminator()) &&
+           "Unexpected autorelease return while inlining non-Objective-C "
+           "function?");
+    // Otherwise use normal visitor, which clones the existing instruction
+    // but remaps basic blocks and values.
+    visit(BI->first->getTerminator());
   }
 
   return true;
