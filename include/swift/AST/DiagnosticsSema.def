@@ -53,6 +53,10 @@ NOTE(while_converting_subscript_index,sema,none,
 ERROR(constraint_type_check_fail,sema,none,
       "expression does not type-check", ())
 
+ERROR(cannot_find_conversion,sema,none,
+      "cannot find a conversion to %0", (Type))
+
+
 //------------------------------------------------------------------------------
 // Name Binding
 //------------------------------------------------------------------------------

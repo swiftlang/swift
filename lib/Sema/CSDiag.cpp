@@ -818,9 +818,26 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
     if (diagnoseFailure(*this, failure))
       return true;
   }
-
-  // FIXME: Crappy generic diagnostic.
-  TC.diagnose(expr->getLoc(), diag::constraint_type_check_fail)
-    .highlight(expr->getSourceRange());
+  
+  if (TC.Context.LangOpts.detailedTypeCheckDiagnostics) {
+    while (!InactiveConstraints.empty()) {
+      auto *constraint = &InactiveConstraints.front();
+      
+      if (constraint->getKind() != ConstraintKind::Disjunction) {
+        TC.diagnose(expr->getLoc(),
+                    diag::cannot_find_conversion,
+                    constraint->getSecondType())
+          .highlight(expr->getSourceRange());
+        
+        break;
+      }
+      
+      InactiveConstraints.pop_front();
+    }
+  } else {
+    TC.diagnose(expr->getLoc(), diag::constraint_type_check_fail)
+      .highlight(expr->getSourceRange());
+  }
+  
   return true;
 }
