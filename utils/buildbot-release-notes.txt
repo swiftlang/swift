@@ -30,6 +30,14 @@ Latest
 
 * NSLog is now available from Swift code.
 
+* 'Character' is the new character literal type:
+
+    var x = 'a' // Infers 'Character' type
+
+  You can force inference of UnicodeScalar like this:
+
+    var scalar: UnicodeScalar = 'a'
+
 2014-04-22
 ----------
 
