@@ -675,7 +675,7 @@ namespace {
           ty = CS.getTypeChecker().getUncheckedOptionalType(var->getLoc(), ty);
           if (!ty) return Type();
         }
-
+ 
         // We want to set the variable's type here when type-checking
         // a function's parameter clauses because we're going to
         // type-check the entire function body within the context of
@@ -695,12 +695,17 @@ namespace {
         // FIXME: Error recovery if the type is an error type?
         Type openedType = CS.openType(typedPattern->getType());
 
-        // Somewhat crazy special case: add a level of UncheckedOptional
+        // Somewhat crazy special cases: add a level of UncheckedOptional
         // if we don't have one and this pattern is directly bound to an
-        // IBOutlet.
+        // IBOutlet, or turn a @weak into an optional
         if (auto var = typedPattern->getSingleVar()) {
-          if (var->getAttrs().hasAttribute<IBOutletAttr>() &&
-              !openedType->getAnyOptionalObjectType()) {
+          if (var->getAttrs().isWeak()) {
+            if (auto weakTy = openedType->getAs<WeakStorageType>())
+              openedType = weakTy->getReferentType();
+            if (!openedType->getAnyOptionalObjectType())
+              openedType = OptionalType::get(openedType);
+          } else if (var->getAttrs().hasAttribute<IBOutletAttr>() &&
+                     !openedType->getAnyOptionalObjectType()) {
             openedType = CS.getTypeChecker()
                            .getUncheckedOptionalType(var->getLoc(), openedType);
             if (!openedType) return Type();

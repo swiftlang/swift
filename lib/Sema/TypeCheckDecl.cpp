@@ -950,9 +950,9 @@ void TypeChecker::revertGenericFuncSignature(AbstractFunctionDecl *func) {
 static bool isDefaultInitializable(TypeRepr *typeRepr) {
   // Look through most attributes.
   if (auto attributed = dyn_cast<AttributedTypeRepr>(typeRepr)) {
-    // FIXME: 'weak' attribute currently causes problems.
+    // Weak ownership implies optionality.
     if (attributed->getAttrs().getOwnership() == Ownership::Weak)
-      return false;
+      return true;
     
     return isDefaultInitializable(attributed->getTypeRepr());
   }
@@ -992,18 +992,13 @@ static bool isDefaultInitializable(PatternBindingDecl *pbd) {
   if (pbd->hasInit())
     return true;
 
-  // If any variable is @weak, we're not default-initializable.
   // A 'let' variable is not default-initializable, because it cannot change.
-  // FIXME: This is a hack to avoid tripping over problems with @weak.
-  bool isWeak = false;
   bool isLet = false;
   pbd->getPattern()->forEachVariable([&](VarDecl *var) {
-      if (var->getAttrs().isWeak())
-        isWeak = true;
       if (var->isLet())
         isLet = true;
     });
-  if (isWeak || isLet)
+  if (isLet)
     return false;
 
   // If it is an IBOutlet, it is trivially true.
@@ -1024,8 +1019,8 @@ static bool isDefaultInitializable(PatternBindingDecl *pbd) {
 
 /// Build a default initializer for the given type.
 static Expr *buildDefaultInitializer(TypeChecker &tc, Type type) {
-  // Default-initialize optional types to 'nil'.
-  if (type->getAnyOptionalObjectType()) {
+  // Default-initialize optional types and weak values to 'nil'.
+  if (type->getAnyOptionalObjectType() || type->is<WeakStorageType>()) {
     auto nilDecl = tc.Context.getNilDecl();
     return new (tc.Context) DeclRefExpr(nilDecl, SourceLoc(), /*implicit=*/true,
                                         /*direct access=*/false,
@@ -1204,17 +1199,14 @@ static void validatePatternBindingDecl(TypeChecker &tc,
         tc.checkOwnershipAttr(var, var->getAttrs().getOwnership());
     }
 
-    // Make sure we aren't @weak or have a 'let'.
-    // FIXME: Should be able to handle @weak.
-    bool isWeak = false, isLet = false;
+    // Make sure we don't have a 'let'.
+    bool isLet = false;
     binding->getPattern()->forEachVariable([&](VarDecl *var) {
-      if (var->getAttrs().isWeak())
-        isWeak = true;
       if (var->isLet())
         isLet = true;
     });
 
-    if (!isWeak && !isLet) {
+    if (!isLet) {
       auto type = binding->getPattern()->getType();
       if (auto defaultInit = buildDefaultInitializer(tc, type)) {
         binding->setInit(defaultInit, /*checked=*/false);
