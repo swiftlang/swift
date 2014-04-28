@@ -1765,6 +1765,131 @@ static void getArgAsLocalSelfTypeMetadata(IRGenFunction &IGF,
                                           llvm::Function::arg_iterator &it,
                                           CanType abstractType);
 
+/// Build a value witness that initializes an array front-to-back.
+static void emitInitializeArrayFrontToBack(IRGenFunction &IGF,
+                                           llvm::Function::arg_iterator argv,
+                                           CanType abstractType,
+                                           CanType concreteType,
+                                           const TypeInfo &type,
+                                 void (*emitInitializeElement)(IRGenFunction &,
+                                                               CanType,
+                                                               const TypeInfo &,
+                                                               Address,
+                                                               Address)) {
+  auto &IGM = IGF.IGM;
+  
+  Address destArray = getArgAs(IGF, argv, type, "dest");
+  Address srcArray = getArgAs(IGF, argv, type, "src");
+  llvm::Value *count = getArg(argv, "count");
+  getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
+  
+  auto entry = IGF.Builder.GetInsertBlock();
+  auto iter = IGF.createBasicBlock("iter");
+  auto loop = IGF.createBasicBlock("loop");
+  auto exit = IGF.createBasicBlock("exit");
+  IGF.Builder.CreateBr(iter);
+  IGF.Builder.emitBlock(iter);
+  
+  auto counter = IGF.Builder.CreatePHI(IGM.SizeTy, 2);
+  counter->addIncoming(count, entry);
+  auto destVal = IGF.Builder.CreatePHI(destArray.getType(), 2);
+  destVal->addIncoming(destArray.getAddress(), entry);
+  auto srcVal = IGF.Builder.CreatePHI(srcArray.getType(), 2);
+  srcVal->addIncoming(srcArray.getAddress(), entry);
+  Address dest(destVal, destArray.getAlignment());
+  Address src(srcVal, srcArray.getAlignment());
+  
+  auto done = IGF.Builder.CreateICmpEQ(counter,
+                                       llvm::ConstantInt::get(IGM.SizeTy, 0));
+  IGF.Builder.CreateCondBr(done, exit, loop);
+  
+  IGF.Builder.emitBlock(loop);
+  emitInitializeElement(IGF, concreteType, type, dest, src);
+  
+  auto nextCounter = IGF.Builder.CreateSub(counter,
+                                   llvm::ConstantInt::get(IGM.SizeTy, 1));
+  auto nextDest = type.indexArray(IGF, dest,
+                                  llvm::ConstantInt::get(IGM.SizeTy, 1),
+                                  concreteType);
+  auto nextSrc = type.indexArray(IGF, src,
+                                 llvm::ConstantInt::get(IGM.SizeTy, 1),
+                                 concreteType);
+  auto loopEnd = IGF.Builder.GetInsertBlock();
+  counter->addIncoming(nextCounter, loopEnd);
+  destVal->addIncoming(nextDest.getAddress(), loopEnd);
+  srcVal->addIncoming(nextSrc.getAddress(), loopEnd);
+  IGF.Builder.CreateBr(iter);
+  
+  IGF.Builder.emitBlock(exit);
+  destArray = IGF.Builder.CreateBitCast(destArray, IGF.IGM.OpaquePtrTy);
+  IGF.Builder.CreateRet(destArray.getAddress());
+}
+
+/// Build a value witness that initializes an array back-to-front.
+static void emitInitializeArrayBackToFront(IRGenFunction &IGF,
+                                           llvm::Function::arg_iterator argv,
+                                           CanType abstractType,
+                                           CanType concreteType,
+                                           const TypeInfo &type,
+                                 void (*emitInitializeElement)(IRGenFunction &,
+                                                               CanType,
+                                                               const TypeInfo &,
+                                                               Address,
+                                                               Address))
+{
+  auto &IGM = IGF.IGM;
+  
+  Address destArray = getArgAs(IGF, argv, type, "dest");
+  Address srcArray = getArgAs(IGF, argv, type, "src");
+  llvm::Value *count = getArg(argv, "count");
+  getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
+  
+  auto destEnd = type.indexArray(IGF, destArray, count, concreteType);
+  auto srcEnd = type.indexArray(IGF, destArray, count, concreteType);
+  
+  auto entry = IGF.Builder.GetInsertBlock();
+  auto iter = IGF.createBasicBlock("iter");
+  auto loop = IGF.createBasicBlock("loop");
+  auto exit = IGF.createBasicBlock("exit");
+  IGF.Builder.CreateBr(iter);
+  IGF.Builder.emitBlock(iter);
+  
+  auto counter = IGF.Builder.CreatePHI(IGM.SizeTy, 2);
+  counter->addIncoming(count, entry);
+  auto destVal = IGF.Builder.CreatePHI(destEnd.getType(), 2);
+  destVal->addIncoming(destArray.getAddress(), entry);
+  auto srcVal = IGF.Builder.CreatePHI(srcEnd.getType(), 2);
+  srcVal->addIncoming(srcArray.getAddress(), entry);
+  Address dest(destVal, destArray.getAlignment());
+  Address src(srcVal, srcArray.getAlignment());
+  
+  auto done = IGF.Builder.CreateICmpEQ(counter,
+                                       llvm::ConstantInt::get(IGM.SizeTy, 0));
+  IGF.Builder.CreateCondBr(done, exit, loop);
+  
+  IGF.Builder.emitBlock(loop);
+  auto prevDest = type.indexArray(IGF, dest,
+                                  llvm::ConstantInt::getSigned(IGM.SizeTy, -1),
+                                  concreteType);
+  auto prevSrc = type.indexArray(IGF, src,
+                                 llvm::ConstantInt::getSigned(IGM.SizeTy, -1),
+                                 concreteType);
+  
+  emitInitializeElement(IGF, concreteType, type, prevDest, prevSrc);
+  
+  auto nextCounter = IGF.Builder.CreateSub(counter,
+                                   llvm::ConstantInt::get(IGM.SizeTy, 1));
+  auto loopEnd = IGF.Builder.GetInsertBlock();
+  counter->addIncoming(nextCounter, loopEnd);
+  destVal->addIncoming(prevDest.getAddress(), loopEnd);
+  srcVal->addIncoming(prevSrc.getAddress(), loopEnd);
+  IGF.Builder.CreateBr(iter);
+  
+  IGF.Builder.emitBlock(exit);
+  destArray = IGF.Builder.CreateBitCast(destArray, IGF.IGM.OpaquePtrTy);
+  IGF.Builder.CreateRet(destArray.getAddress());
+}
+
 /// Build a specific value-witness function.
 static void buildValueWitnessFunction(IRGenModule &IGM,
                                       llvm::Function *fn,
@@ -1825,6 +1950,46 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
     IGF.Builder.CreateRetVoid();
     return;
   }
+      
+  case ValueWitness::DestroyArray: {
+    Address array = getArgAs(IGF, argv, type, "array");
+    llvm::Value *count = getArg(argv, "count");
+    getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
+    
+    auto entry = IGF.Builder.GetInsertBlock();
+    auto iter = IGF.createBasicBlock("iter");
+    auto loop = IGF.createBasicBlock("loop");
+    auto exit = IGF.createBasicBlock("exit");
+    IGF.Builder.CreateBr(iter);
+    IGF.Builder.emitBlock(iter);
+    
+    auto counter = IGF.Builder.CreatePHI(IGM.SizeTy, 2);
+    counter->addIncoming(count, entry);
+    auto elementVal = IGF.Builder.CreatePHI(array.getType(), 2);
+    elementVal->addIncoming(array.getAddress(), entry);
+    Address element(elementVal, array.getAlignment());
+    
+    auto done = IGF.Builder.CreateICmpEQ(counter,
+                                         llvm::ConstantInt::get(IGM.SizeTy, 0));
+    IGF.Builder.CreateCondBr(done, exit, loop);
+    
+    IGF.Builder.emitBlock(loop);
+    type.destroy(IGF, element, concreteType);
+    auto nextCounter = IGF.Builder.CreateSub(counter,
+                                     llvm::ConstantInt::get(IGM.SizeTy, 1));
+    auto nextElement = type.indexArray(IGF, element,
+                                       llvm::ConstantInt::get(IGM.SizeTy, 1),
+                                       concreteType);
+    auto loopEnd = IGF.Builder.GetInsertBlock();
+    counter->addIncoming(nextCounter, loopEnd);
+    elementVal->addIncoming(nextElement.getAddress(), loopEnd);
+    IGF.Builder.CreateBr(iter);
+    
+    IGF.Builder.emitBlock(exit);
+    IGF.Builder.CreateRetVoid();
+    
+    return;
+  }
 
   case ValueWitness::DestroyBuffer: {
     Address buffer = getArgAsBuffer(IGF, argv, "buffer");
@@ -1882,6 +2047,12 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
     return;
   }
 
+  case ValueWitness::InitializeArrayWithCopy: {
+    emitInitializeArrayFrontToBack(IGF, argv, abstractType, concreteType,
+                                   type, emitInitializeWithCopy);
+    return;
+  }
+
   case ValueWitness::InitializeWithTake: {
     Address dest = getArgAs(IGF, argv, type, "dest");
     Address src = getArgAs(IGF, argv, type, "src");
@@ -1890,6 +2061,18 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
     emitInitializeWithTake(IGF, concreteType, type, dest, src);
     dest = IGF.Builder.CreateBitCast(dest, IGF.IGM.OpaquePtrTy);
     IGF.Builder.CreateRet(dest.getAddress());
+    return;
+  }
+
+  case ValueWitness::InitializeArrayWithTakeFrontToBack: {
+    emitInitializeArrayFrontToBack(IGF, argv, abstractType, concreteType,
+                                   type, emitInitializeWithTake);
+    return;
+  }
+
+  case ValueWitness::InitializeArrayWithTakeBackToFront: {
+    emitInitializeArrayBackToFront(IGF, argv, abstractType, concreteType,
+                                   type, emitInitializeWithTake);
     return;
   }
 
@@ -1930,10 +2113,6 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
   }
 
   // TODO
-  case ValueWitness::DestroyArray:
-  case ValueWitness::InitializeArrayWithCopy:
-  case ValueWitness::InitializeArrayWithTakeFrontToBack:
-  case ValueWitness::InitializeArrayWithTakeBackToFront:
   case ValueWitness::GetEnumTag:
   case ValueWitness::InplaceProjectEnumData: {
     IGF.Builder.CreateUnreachable();
@@ -2224,7 +2403,7 @@ static llvm::Constant *getDestroyStrongFunction(IRGenModule &IGM) {
   return fn;
 }
 
-/// Return a function which takes three pointer arguments, memcpys
+/// Return a function which takes two pointer arguments, memcpys
 /// from the second to the first, and returns the first argument.
 static llvm::Constant *getMemCpyFunction(IRGenModule &IGM,
                                          const TypeInfo &objectTI) {
@@ -2266,6 +2445,83 @@ static llvm::Constant *getMemCpyFunction(IRGenModule &IGM,
   return fn;
 }
 
+namespace {
+  enum class MemMoveOrCpy { MemMove, MemCpy };
+}
+
+/// Return a function which takes two pointer arguments and a count, memmoves
+/// or memcpys from the second to the first, and returns the first argument.
+static llvm::Constant *getMemOpArrayFunction(IRGenModule &IGM,
+                                             const TypeInfo &objectTI,
+                                             MemMoveOrCpy kind) {
+  llvm::Type *argTys[] = {
+    IGM.Int8PtrTy, IGM.Int8PtrTy, IGM.SizeTy,
+    IGM.TypeMetadataPtrTy
+  };
+  llvm::FunctionType *fnTy =
+    llvm::FunctionType::get(IGM.Int8PtrTy, argTys, false);
+  
+  // TODO: Add a copyPODArray runtime entry point for bitwise-takable but non-
+  // fixed-size types. Currently only fixed-layout types should be known
+  // bitwise-takable.
+  auto &fixedTI = cast<FixedTypeInfo>(objectTI);
+  
+  // We need to unique by both size and alignment.  Note that we're
+  // assuming that it's safe to call a function that returns a pointer
+  // at a site that assumes the function returns void.
+  llvm::SmallString<40> name;
+  {
+    llvm::raw_svector_ostream nameStream(name);
+    switch (kind) {
+    case MemMoveOrCpy::MemCpy:
+      nameStream << "__swift_memcpy_array";
+      break;
+    case MemMoveOrCpy::MemMove:
+      nameStream << "__swift_memmove_array";
+      break;
+    }
+    nameStream << fixedTI.getFixedStride().getValue();
+    nameStream << '_';
+    nameStream << fixedTI.getFixedAlignment().getValue();
+  }
+  
+  llvm::Constant *fn = IGM.Module.getOrInsertFunction(name, fnTy);
+  if (llvm::Function *def = shouldDefineHelper(IGM, fn)) {
+    IRGenFunction IGF(IGM, def);
+    if (IGM.DebugInfo)
+      IGM.DebugInfo->emitArtificialFunction(IGF, def);
+    
+    auto it = def->arg_begin();
+    Address dest(it++, fixedTI.getFixedAlignment());
+    Address src(it++, fixedTI.getFixedAlignment());
+    llvm::Value *count = it++;
+    llvm::Value *stride
+      = llvm::ConstantInt::get(IGM.SizeTy, fixedTI.getFixedStride().getValue());
+    llvm::Value *totalCount = IGF.Builder.CreateNUWMul(count, stride);
+    switch (kind) {
+    case MemMoveOrCpy::MemMove:
+      IGF.Builder.CreateMemMove(dest.getAddress(), src.getAddress(), totalCount,
+                                fixedTI.getFixedAlignment().getValue());
+      break;
+    case MemMoveOrCpy::MemCpy:
+      IGF.Builder.CreateMemCpy(dest.getAddress(), src.getAddress(), totalCount,
+                               fixedTI.getFixedAlignment().getValue());
+      break;
+    }
+    IGF.Builder.CreateRet(dest.getAddress());
+  }
+  return fn;
+}
+
+static llvm::Constant *getMemMoveArrayFunction(IRGenModule &IGM,
+                                               const TypeInfo &objectTI) {
+  return getMemOpArrayFunction(IGM, objectTI, MemMoveOrCpy::MemMove);
+}
+static llvm::Constant *getMemCpyArrayFunction(IRGenModule &IGM,
+                                               const TypeInfo &objectTI) {
+  return getMemOpArrayFunction(IGM, objectTI, MemMoveOrCpy::MemCpy);
+}
+
 /// Find a witness to the fact that a type is a value type.
 /// Always returns an i8*.
 static llvm::Constant *getValueWitness(IRGenModule &IGM,
@@ -2299,6 +2555,14 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
     }
     goto standard;
 
+  case ValueWitness::DestroyArray:
+    if (concreteTI.isPOD(ResilienceScope::Local)) {
+      return asOpaquePtr(IGM, getNoOpVoidFunction(IGM));
+    }
+    // TODO: A standard "destroy strong array" entrypoint for arrays of single
+    // refcounted pointer types.
+    goto standard;
+      
   case ValueWitness::InitializeBufferWithCopyOfBuffer:
   case ValueWitness::InitializeBufferWithCopy:
     if (packing == FixedPacking::OffsetZero) {
@@ -2311,7 +2575,8 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
     goto standard;
 
   case ValueWitness::InitializeBufferWithTake:
-    if (packing == FixedPacking::OffsetZero)    
+    if (concreteTI.isBitwiseTakable(ResilienceScope::Local)
+        && packing == FixedPacking::OffsetZero)
       return asOpaquePtr(IGM, getMemCpyFunction(IGM, concreteTI));
     goto standard;
 
@@ -2320,7 +2585,19 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
       return asOpaquePtr(IGM, getMemCpyFunction(IGM, concreteTI));
     }
     goto standard;
-
+      
+  case ValueWitness::InitializeArrayWithTakeFrontToBack:
+    if (concreteTI.isBitwiseTakable(ResilienceScope::Local)) {
+      return asOpaquePtr(IGM, getMemMoveArrayFunction(IGM, concreteTI));
+    }
+    goto standard;
+      
+  case ValueWitness::InitializeArrayWithTakeBackToFront:
+    if (concreteTI.isBitwiseTakable(ResilienceScope::Local)) {
+      return asOpaquePtr(IGM, getMemMoveArrayFunction(IGM, concreteTI));
+    }
+    goto standard;
+      
   case ValueWitness::AssignWithCopy:
     if (concreteTI.isPOD(ResilienceScope::Local)) {
       return asOpaquePtr(IGM, getMemCpyFunction(IGM, concreteTI));
@@ -2343,6 +2620,14 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
     } else if (concreteTI.isSingleSwiftRetainablePointer(ResilienceScope::Local)) {
       return asOpaquePtr(IGM, getInitWithCopyStrongFunction(IGM));
     }
+    goto standard;
+      
+  case ValueWitness::InitializeArrayWithCopy:
+    if (concreteTI.isPOD(ResilienceScope::Local)) {
+      return asOpaquePtr(IGM, getMemCpyArrayFunction(IGM, concreteTI));
+    }
+    // TODO: A standard "copy strong array" entrypoint for arrays of single
+    // refcounted pointer types.
     goto standard;
 
   case ValueWitness::AllocateBuffer:
@@ -2427,10 +2712,6 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
   }
   
   /// TODO:
-  case ValueWitness::DestroyArray:
-  case ValueWitness::InitializeArrayWithCopy:
-  case ValueWitness::InitializeArrayWithTakeFrontToBack:
-  case ValueWitness::InitializeArrayWithTakeBackToFront:
   case ValueWitness::GetEnumTag:
   case ValueWitness::InplaceProjectEnumData:
     return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);

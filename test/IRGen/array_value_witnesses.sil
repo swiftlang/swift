@@ -1,0 +1,44 @@
+// RUN: %swift -target x86_64-apple-darwin10 %s -emit-ir | FileCheck %s
+
+import Swift
+
+class C {}
+
+struct POD {
+  var x: Int
+}
+
+struct BitwiseTakable {
+  var x: C
+}
+
+struct SomeWeak {
+  var x: C
+  @weak var y: C?
+}
+
+// CHECK: @_TWVV21array_value_witnesses3POD = 
+// CHECK-NOT: @_TwXxV21array_value_witnesses3POD
+// CHECK:   @__swift_noop_void_return
+// CHECK-NOT: @_TwCcV21array_value_witnesses3POD
+// CHECK:   @__swift_memcpy_array8_8
+// CHECK-NOT: @_TwTtV21array_value_witnesses3POD
+// CHECK:   @__swift_memmove_array8_8
+// CHECK-NOT: @_TwtTV21array_value_witnesses3POD
+// CHECK:   @__swift_memmove_array8_8
+
+// CHECK: @_TWVV21array_value_witnesses14BitwiseTakable = 
+// CHECK:   @_TwXxV21array_value_witnesses14BitwiseTakable
+// CHECK:   @_TwCcV21array_value_witnesses14BitwiseTakable
+// CHECK-NOT: @_TwTtV21array_value_witnesses14BitwiseTakable
+// CHECK:   @__swift_memmove_array8_8
+// CHECK-NOT: @_TwtTV21array_value_witnesses14BitwiseTakable
+// CHECK:   @__swift_memmove_array8_8
+
+// CHECK: @_TWVV21array_value_witnesses8SomeWeak =
+// CHECK:   @_TwXxV21array_value_witnesses8SomeWeak
+// CHECK:   @_TwCcV21array_value_witnesses8SomeWeak
+// CHECK:   @_TwTtV21array_value_witnesses8SomeWeak
+// CHECK:   @_TwtTV21array_value_witnesses8SomeWeak
+
+

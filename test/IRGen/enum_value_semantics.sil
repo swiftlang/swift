@@ -16,10 +16,10 @@ import Builtin
 // CHECK:   i8* bitcast (i8* (i8*, i8*, %swift.type*)* @__swift_memcpy9_8 to i8*),
 // CHECK:   i8* bitcast (i8* (i8*, %swift.type*)* @__swift_noop_self_return to i8*),
 // CHECK:   i8* bitcast (%swift.type* (%swift.opaque*, %swift.type*)* @swift_staticTypeof to i8*),
-// CHECK:   null
-// CHECK:   null
-// CHECK:   null
-// CHECK:   null
+// CHECK:   i8* bitcast (void (i8*, %swift.type*)* @__swift_noop_void_return to i8*),
+// CHECK:   i8* bitcast (i8* (i8*, i8*, i64, %swift.type*)* @__swift_memcpy_array16_8 to i8*),
+// CHECK:   i8* bitcast (i8* (i8*, i8*, i64, %swift.type*)* @__swift_memmove_array16_8 to i8*),
+// CHECK:   i8* bitcast (i8* (i8*, i8*, i64, %swift.type*)* @__swift_memmove_array16_8 to i8*),
 // CHECK:   i8* inttoptr (i64 9 to i8*),
 // CHECK:   i8* inttoptr (i64 7 to i8*),
 // CHECK:   i8* inttoptr (i64 16 to i8*)
@@ -46,10 +46,10 @@ import Builtin
 // CHECK:   i8* bitcast (%swift.opaque* (%swift.opaque*, %swift.opaque*, %swift.type*)* @_TwtaO20enum_value_semantics23SinglePayloadNontrivial to i8*),
 // CHECK:   i8* bitcast (i8* (i8*, %swift.type*)* @__swift_noop_self_return to i8*),
 // CHECK:   i8* bitcast (%swift.type* (%swift.opaque*, %swift.type*)* @swift_staticTypeof to i8*),
-// CHECK:   null
-// CHECK:   null
-// CHECK:   null
-// CHECK:   null
+// CHECK:   i8* bitcast (void (%swift.opaque*, i64, %swift.type*)* @_TwXxO20enum_value_semantics23SinglePayloadNontrivial to i8*),
+// CHECK:   i8* bitcast (%swift.opaque* (%swift.opaque*, %swift.opaque*, i64, %swift.type*)* @_TwCcO20enum_value_semantics23SinglePayloadNontrivial to i8*),
+// CHECK:   i8* bitcast (i8* (i8*, i8*, i64, %swift.type*)* @__swift_memmove_array8_8 to i8*),
+// CHECK:   i8* bitcast (i8* (i8*, i8*, i64, %swift.type*)* @__swift_memmove_array8_8 to i8*),
 // CHECK:   i8* inttoptr (i64 8 to i8*),
 // --                         0x50007
 // CHECK:   i8* inttoptr (i64 327687 to i8*),
