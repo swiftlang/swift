@@ -254,16 +254,12 @@ namespace {
     Type visitTypeExpr(TypeExpr *E) {
       Type type;
       // If this is an implicit TypeExpr, don't validate its contents.
-      if (auto *rep = E->getTypeRepr()) {
+      if (auto *rep = E->getTypeRepr())
         type = CS.TC.resolveType(rep, CS.DC, None);
-      } else {
+      else
         type = E->getTypeLoc().getType();
-      }
       
-      if (!type) return Type();
-      if (type->isAnyExistentialType())
-        return ExistentialMetatypeType::get(type);
-      return MetatypeType::get(type);
+      return type ? MetatypeType::get(type) : Type();
     }
 
     Type visitUnresolvedConstructorExpr(UnresolvedConstructorExpr *expr) {

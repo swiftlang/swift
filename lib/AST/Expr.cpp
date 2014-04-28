@@ -436,23 +436,15 @@ unsigned ScalarToTupleExpr::getScalarField() const {
 TypeExpr::TypeExpr(TypeLoc TyLoc)
   : Expr(ExprKind::Type, /*implicit*/false), Info(TyLoc) {
   Type Ty = TyLoc.getType();
-  if (Ty->hasCanonicalTypeComputed()) {
-    if (Ty->isAnyExistentialType())
-      setType(ExistentialMetatypeType::get(Ty, Nothing, Ty->getASTContext()));
-    else
-      setType(MetatypeType::get(Ty, Ty->getASTContext()));
-  }
+  if (Ty->hasCanonicalTypeComputed())
+    setType(MetatypeType::get(Ty, Ty->getASTContext()));
 }
 
 TypeExpr::TypeExpr(Type Ty)
   : Expr(ExprKind::Type, /*implicit*/true),
     Info(TypeLoc::withoutLoc(Ty)) {
-  if (Ty->hasCanonicalTypeComputed()) {
-    if (Ty->isAnyExistentialType())
-      setType(ExistentialMetatypeType::get(Ty, Nothing, Ty->getASTContext()));
-    else
-      setType(MetatypeType::get(Ty, Ty->getASTContext()));
-  }
+  if (Ty->hasCanonicalTypeComputed())
+    setType(MetatypeType::get(Ty, Ty->getASTContext()));
 }
 
 /// Return a TypeExpr for a simple identifier and the specified location.
@@ -472,12 +464,7 @@ TypeExpr *TypeExpr::createImplicitHack(SourceLoc Loc, Type Ty, ASTContext &C) {
   if (Loc.isInvalid()) return createImplicit(Ty, C);
   auto *Res = createForIdentifier(Loc, C.getIdentifier("<<IMPLICIT>>"), Ty, C);
   Res->setImplicit();
-  
-  if (Ty->isAnyExistentialType())
-    Res->setType(ExistentialMetatypeType::get(Ty, Nothing, C));
-  else
-    Res->setType(MetatypeType::get(Ty, C));
-
+  Res->setType(MetatypeType::get(Ty, C));
   return Res;
 }
 

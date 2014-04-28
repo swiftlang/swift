@@ -1354,6 +1354,20 @@ Expr *Parser::parseExprIdentifier() {
     auto unresolved = new (Context) UnresolvedDeclRefExpr(name, refKind, loc);
     unresolved->setSpecialized(hasGenericArgumentList);
     E = unresolved;
+  } else if (isa<TypeDecl>(D)) {
+    Type Ty = cast<TypeDecl>(D)->getDeclaredInterfaceType();
+    
+    ComponentIdentTypeRepr *Repr;
+    if (!hasGenericArgumentList)
+      Repr = new (Context) SimpleIdentTypeRepr(loc, name);
+    else
+      Repr = new (Context) GenericIdentTypeRepr(loc, name,
+                                                Context.AllocateCopy(args),
+                                                SourceRange(LAngleLoc,
+                                                            RAngleLoc));
+
+    // Turn references to local types directly into TypeExprs.
+    E = new (Context) TypeExpr(TypeLoc(Repr, Ty));
   } else {
     auto declRef = new (Context) DeclRefExpr(D, loc, /*Implicit=*/false);
     declRef->setGenericArgs(args);
