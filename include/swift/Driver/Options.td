@@ -130,6 +130,10 @@ def serialize_diagnostics : Flag<["-"], "serialize-diagnostics">,
   Flags<[DriverOption, FrontendOption]>,
   HelpText<"Serialize diagnostics in a binary format">;
 
+def detailed_diagnostics : Flag<["-"], "detailed-diagnostics">,
+  Flags<[DriverOption, FrontendOption]>,
+  HelpText<"Produce more detailed diagnostics for type-check errors">;
+
 def module_cache_path : Separate<["-"], "module-cache-path">,
   Flags<[DriverOption, FrontendOption]>,
   HelpText<"Specifies the Clang module cache path">;

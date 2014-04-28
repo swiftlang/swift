@@ -89,6 +89,9 @@ namespace swift {
         getTargetConfigOptions() const {
       return TargetConfigOptions;
     }
+    
+    /// Enables detailed type-check error reportin.
+    bool detailedTypeCheckDiagnostics = false;
 
   private:
     llvm::SmallVector<std::pair<std::string, std::string>, 2>
