@@ -741,7 +741,7 @@ ERROR(case_stmt_without_body,stmt_parsing,none,
 
 ERROR(expected_expr,expr_parsing,none,
       "expected expression", ())
-ERROR(expected_separator,expr_parsing,none,
+ERROR(expected_separator,expr_parsing,PointsToFirstBadToken,
       "expected '%0' separator", (StringRef))
 ERROR(unexpected_separator,expr_parsing,none,
       "unexpected '%0' separator", (StringRef))
