@@ -1619,22 +1619,15 @@ swift_getExistentialMetatypeMetadata(const Metadata *instanceType);
 extern "C" const ExistentialTypeMetadata *
 swift_getExistentialTypeMetadata(size_t numProtocols,
                                  const ProtocolDescriptor **protocols);
-
+  
 /// \brief Load the Swift class metadata
 ///
 /// \param object The object
 ///
 /// \returns the Class class metadata in a way that ignores dynamic subclassing.
-/// This will crash if the object is not a pure Swift class. If we know that
-/// dynamic subclassing will never happen, then swift_classMask and
-/// swift_classShift are sufficient.
+/// This will crash if the object is not a pure Swift class.
 extern "C" const ClassMetadata *
 swift_getClassMetadata(const void *object);
-
-// Mask and left shift for reading the isa directly from Swift objects when
-// we know that dynamic subclassing (CoreData, KVO, etc) doesn't happen.
-extern "C" size_t swift_classMask;
-extern "C" uint8_t swift_classShift;
 
 /// \brief Checked dynamic cast to a class type.
 ///
