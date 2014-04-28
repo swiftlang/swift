@@ -796,40 +796,53 @@ SILValue SILGenFunction::emitTemporaryAllocation(SILLocation loc,
   return alloc->getAddressResult();
 }
 
+// Return an initialization address we can emit directly into.
+static SILValue getAddressForInPlaceInitialization(Initialization *I) {
+  if (!I) return SILValue();
+  
+  SILValue address;
+  switch (I->kind) {
+  case Initialization::Kind::AddressBinding:
+    llvm_unreachable("can't emit into address binding");
+  case Initialization::Kind::LetValue:
+    // Emit into the buffer that 'let's produce for address-only values if
+    // we have it.
+    if (I->hasAddress())
+      address = I->getAddress();
+    break;
+  case Initialization::Kind::Translating:
+  case Initialization::Kind::Ignored:
+    break;
+    
+  case Initialization::Kind::Tuple:
+    // FIXME: For a single-element tuple, we could emit into the single field.
+    
+    // The tuple initialization isn't contiguous, so we can't emit directly
+    // into it.
+    break;
+    
+  case Initialization::Kind::SingleBuffer:
+    // Emit into the buffer.
+    address = I->getAddress();
+    break;
+  }
+  // Don't emit directly into reference storage slots; these always require an
+  // additional semantic conversion.
+  if (address && !address.getType().is<ReferenceStorageType>())
+    return address;
+  return SILValue();
+}
+
 SILValue SILGenFunction::
 getBufferForExprResult(SILLocation loc, SILType ty, SGFContext C) {
   // If you change this, change manageBufferForExprResult below as well.
 
   // If we have a single-buffer "emit into" initialization, use that for the
   // result.
-  if (Initialization *I = C.getEmitInto()) {
-    switch (I->kind) {
-    case Initialization::Kind::AddressBinding:
-      llvm_unreachable("can't emit into address binding");
-    case Initialization::Kind::LetValue:
-      // Emit into the buffer that 'let's produce for address-only values if
-      // we have it.
-      if (I->hasAddress())
-        return I->getAddress();
-      break;
-    case Initialization::Kind::Translating:
-    case Initialization::Kind::Ignored:
-      break;
-      
-    case Initialization::Kind::Tuple:
-      // FIXME: For a single-element tuple, we could emit into the single field.
-      
-      // The tuple initialization isn't contiguous, so we can't emit directly
-      // into it.
-      break;
-
-    case Initialization::Kind::SingleBuffer:
-      // Emit into the buffer.
-      return I->getAddress();
-    }
-  }
+  if (SILValue address = getAddressForInPlaceInitialization(C.getEmitInto()))
+    return address;
   
-  // If we couldn't emit into an Initialization, emit into a temporary
+  // If we couldn't emit into the Initialization, emit into a temporary
   // allocation.
   return emitTemporaryAllocation(loc, ty.getObjectType());
 }
@@ -837,27 +850,13 @@ getBufferForExprResult(SILLocation loc, SILType ty, SGFContext C) {
 ManagedValue SILGenFunction::
 manageBufferForExprResult(SILValue buffer, const TypeLowering &bufferTL,
                           SGFContext C) {
-  if (Initialization *I = C.getEmitInto()) {
-    switch (I->kind) {
-    case Initialization::Kind::AddressBinding:
-      llvm_unreachable("can't emit into address binding");
-    case Initialization::Kind::Ignored:
-    case Initialization::Kind::Translating:
-    case Initialization::Kind::Tuple:
-      break;
-    case Initialization::Kind::LetValue:
-      if (I->hasAddress()) {
-        I->finishInitialization(*this);
-        return ManagedValue::forInContext();
-      }
-      break;
-
-    case Initialization::Kind::SingleBuffer:
-      I->finishInitialization(*this);
-      return ManagedValue::forInContext();
-    }
+  // If we have a single-buffer "emit into" initialization, use that for the
+  // result.
+  if (getAddressForInPlaceInitialization(C.getEmitInto())) {
+    C.getEmitInto()->finishInitialization(*this);
+    return ManagedValue::forInContext();
   }
-
+  
   // Add a cleanup for the temporary we allocated.
   if (bufferTL.isTrivial())
     return ManagedValue::forUnmanaged(buffer);
