@@ -38,6 +38,10 @@ Latest
 
     var scalar: UnicodeScalar = 'a'
 
+  'Character' type represents a Unicode default grapheme cluster (to put it
+  simply, a grapheme cluster is what users think of as a character: a base plus
+  any combining marks, or other cases explained in Unicode Standard Annex #29).
+
 2014-04-22
 ----------
 
