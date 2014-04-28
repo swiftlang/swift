@@ -67,6 +67,7 @@ set(SWIFTLIB_ESSENTIAL
   StringByte.swift
   StringCore.swift
   StringLegacy.swift
+  StringUTF8.swift
   UTF16Scalars.swift
   UncheckedOptional.swift
   Unicode.swift
