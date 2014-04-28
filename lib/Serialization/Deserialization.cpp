@@ -3156,15 +3156,6 @@ Type ModuleFile::getType(TypeID TID) {
     break;
   }
 
-  case decls_block::ARRAY_TYPE: {
-    TypeID baseID;
-    uint64_t size;
-    decls_block::ArrayTypeLayout::readRecord(scratch, baseID, size);
-
-    typeOrOffset = ArrayType::get(getType(baseID), size);
-    break;
-  }
-
   case decls_block::UNBOUND_GENERIC_TYPE: {
     DeclID genericID;
     TypeID parentID;

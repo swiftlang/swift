@@ -772,13 +772,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     case TypeKind::GenericFunction:
       llvm_unreachable("Polymorphic function type should have been opened");
 
-    case TypeKind::Array:
-      return matchTypes(cast<ArrayType>(desugar1)->getBaseType(),
-                        cast<ArrayType>(desugar2)->getBaseType(),
-                        TypeMatchKind::SameType, subFlags,
-                        locator.withPathElement(
-                          ConstraintLocator::ArrayElementType));
-
     case TypeKind::ProtocolComposition:
       // Existential types handled below.
       break;
@@ -1170,7 +1163,6 @@ ConstraintSystem::simplifyConstructionConstraint(Type valueType, Type argType,
   case TypeKind::ExistentialMetatype:
   case TypeKind::Metatype:
   case TypeKind::Function:
-  case TypeKind::Array:
   case TypeKind::LValue:
   case TypeKind::InOut:
   case TypeKind::Module:

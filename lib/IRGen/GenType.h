@@ -26,7 +26,6 @@
 namespace swift {
   class ArchetypeBuilder;
   class ArchetypeType;
-  class ArrayType;
   class CanType;
   class ClassDecl;
   class AnyFunctionType;

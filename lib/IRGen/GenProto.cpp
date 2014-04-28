@@ -3547,11 +3547,6 @@ namespace {
         visit(eltType);
       }
     }
-
-    // We need to walk into constant-sized arrays.
-    void visitArrayType(CanArrayType type) {
-      visit(type.getBaseType());
-    }
     
     // Walk into on-stack block storage.
     void visitSILBlockStorageType(CanSILBlockStorageType t) {

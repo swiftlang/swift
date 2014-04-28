@@ -89,7 +89,6 @@ bool CanType::hasReferenceSemanticsImpl(CanType type) {
   case TypeKind::Metatype:
   case TypeKind::ExistentialMetatype:
   case TypeKind::Module:
-  case TypeKind::Array:
   case TypeKind::LValue:
   case TypeKind::InOut:
   case TypeKind::TypeVariable:
@@ -360,9 +359,6 @@ bool TypeBase::isUnspecializedGeneric() {
   case TypeKind::ProtocolComposition:
   case TypeKind::SILFunction:
     return false;
-    
-  case TypeKind::Array:
-    return cast<ArrayType>(this)->getBaseType()->isUnspecializedGeneric();
 
   case TypeKind::GenericTypeParam:
   case TypeKind::DependentMember:
@@ -904,12 +900,6 @@ CanType TypeBase::getCanonicalType() {
     Result = FunctionType::get(In, Out, FT->getExtInfo());
     break;
   }
-  case TypeKind::Array: {
-    ArrayType *AT = cast<ArrayType>(this);
-    Type EltTy = AT->getBaseType()->getCanonicalType();
-    Result = ArrayType::get(EltTy, AT->getSize());
-    break;
-  }
   case TypeKind::ProtocolComposition: {
     SmallVector<Type, 4> CanProtos;
     for (Type t : cast<ProtocolCompositionType>(this)->getProtocols())
@@ -987,7 +977,6 @@ TypeBase *TypeBase::getDesugaredType() {
   case TypeKind::GenericFunction:
   case TypeKind::SILBlockStorage:
   case TypeKind::SILFunction:
-  case TypeKind::Array:
   case TypeKind::LValue:
   case TypeKind::InOut:
   case TypeKind::ProtocolComposition:
@@ -1207,14 +1196,6 @@ bool TypeBase::isSpelledLike(Type other) {
     return true;
   }
 
-  case TypeKind::Array: {
-    auto aMe = cast<ArrayType>(me);
-    auto aThem = cast<ArrayType>(them);
-    if (aMe->getSize() != aThem->getSize())
-      return false;
-    return aMe->getBaseType()->isSpelledLike(aThem->getBaseType());
-  }
-      
   case TypeKind::LValue: {
     auto lMe = cast<LValueType>(me);
     auto lThem = cast<LValueType>(them);
@@ -2503,18 +2484,6 @@ case TypeKind::Id:
     
     return GenericFunctionType::get(sig, inputTy, resultTy,
                                     function->getExtInfo());
-  }
-
-  case TypeKind::Array: {
-    auto array = cast<ArrayType>(base);
-    auto baseTy = array->getBaseType().transform(fn);
-    if (!baseTy)
-      return Type();
-
-    if (baseTy.getPointer() == array->getBaseType().getPointer())
-      return *this;
-
-    return ArrayType::get(baseTy, array->getSize());
   }
 
   case TypeKind::ArraySlice: {

@@ -85,7 +85,6 @@ public:
       return static_cast<Impl*>(this)                           \
         ->visit##Concrete##Type(cast<Concrete##Type>(origTy),   \
                                 cast<Concrete##Type>(substTy));
-    DISPATCH(Array)
     DISPATCH(BoundGenericClass)
     DISPATCH(BoundGenericEnum)
     DISPATCH(BoundGenericStruct)
@@ -124,7 +123,6 @@ public:
   DEFER_TO_SUPERTYPE(LValue, Type)
   DEFER_TO_SUPERTYPE(InOut, Type)
   DEFER_TO_SUPERTYPE(Metatype, Type)
-  DEFER_TO_SUPERTYPE(Array, Type)
   DEFER_TO_SUPERTYPE(SILBlockStorage, Type)
   DEFER_TO_SUPERTYPE(SILFunction, Type)
   DEFER_TO_SUPERTYPE(Tuple, Type)

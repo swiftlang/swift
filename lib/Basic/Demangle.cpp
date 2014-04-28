@@ -1345,19 +1345,6 @@ private:
     if (!Mangled)
       return nullptr;
     char c = Mangled.next();
-    if (c == 'A') {
-      Node::IndexType size;
-      if (demangleNatural(size)) {
-        NodePointer type = demangleType();
-        if (!type)
-          return nullptr;
-        NodePointer array = Node::create(Node::Kind::ArrayType);
-        array->addChild(type);
-        array->addChild(Node::create(Node::Kind::Number, size));
-        return array;
-      }
-      return nullptr;
-    }
     if (c == 'B') {
       if (!Mangled)
         return nullptr;
@@ -2222,15 +2209,6 @@ void NodePrinter::print(Node *pointer, bool asContext, bool suppressType) {
   case Node::Kind::Number:
     Printer << pointer->getIndex();
     return;
-  case Node::Kind::ArrayType: {
-    Node *type = pointer->getChild(0);
-    Node *size = pointer->getChild(1);
-    print(type);
-    Printer << "[";
-    print(size);
-    Printer << "]";
-    return;
-  }
   case Node::Kind::InfixOperator:
     Printer << pointer->getText() << " @infix";
     return;

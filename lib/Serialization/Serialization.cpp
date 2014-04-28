@@ -2232,18 +2232,7 @@ void Serializer::writeType(Type ty) {
       writeRequirements({});
     break;
   }
-
-  case TypeKind::Array: {
-    auto arrayTy = cast<ArrayType>(ty.getPointer());
-
-    Type base = arrayTy->getBaseType();
-
-    unsigned abbrCode = DeclTypeAbbrCodes[ArrayTypeLayout::Code];
-    ArrayTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                     addTypeRef(base), arrayTy->getSize());
-    break;
-  }
-
+      
   case TypeKind::ArraySlice: {
     auto sliceTy = cast<ArraySliceType>(ty.getPointer());
 
@@ -2430,7 +2419,6 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<SILBlockStorageTypeLayout>();
     registerDeclTypeAbbr<SILFunctionTypeLayout>();
     registerDeclTypeAbbr<ArraySliceTypeLayout>();
-    registerDeclTypeAbbr<ArrayTypeLayout>();
     registerDeclTypeAbbr<ReferenceStorageTypeLayout>();
     registerDeclTypeAbbr<UnboundGenericTypeLayout>();
     registerDeclTypeAbbr<OptionalTypeLayout>();

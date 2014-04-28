@@ -63,7 +63,6 @@ namespace swift {
   class TupleType;
   class FunctionType;
   class ArchetypeType;
-  class ArrayType;
   class Identifier;
   class Module;
   class ModuleLoader;

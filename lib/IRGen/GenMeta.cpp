@@ -519,11 +519,6 @@ namespace {
       return setLocal(CanType(type), call);
     }
 
-    llvm::Value *visitArrayType(CanArrayType type) {
-      IGF.unimplemented(SourceLoc(), "metadata ref for array type");
-      return llvm::UndefValue::get(IGF.IGM.TypeMetadataPtrTy);
-    }
-
     llvm::Value *visitAnyMetatypeType(CanAnyMetatypeType type) {
       if (auto metatype = tryGetLocal(type))
         return metatype;

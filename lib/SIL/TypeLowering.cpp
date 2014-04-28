@@ -261,7 +261,6 @@ namespace {
     IMPL(AnyMetatype, Trivial)
     IMPL(AnyFunction, Reference)
     IMPL(SILFunction, Reference)
-    IMPL(Array, AddressOnly) // who knows?
     IMPL(Module, Trivial)
 
 #undef IMPL

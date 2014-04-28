@@ -1037,8 +1037,6 @@ TypeCacheEntry TypeConverter::convertType(CanType ty) {
     llvm_unreachable("AST FunctionTypes should be lowered by SILGen");
   case TypeKind::SILFunction:
     return convertFunctionType(cast<SILFunctionType>(ty));
-  case TypeKind::Array:
-    llvm_unreachable("array types should be lowered by SILGen");
   case TypeKind::Protocol:
     return convertProtocolType(cast<ProtocolType>(ty));
   case TypeKind::ProtocolComposition:
@@ -1385,10 +1383,6 @@ namespace {
         result = std::max(result, visit(eltType));
       }
       return result;
-    }
-
-    ObjectSize visitArrayType(CanArrayType array) {
-      return visit(array.getBaseType());
     }
 
     ObjectSize visitStructType(CanStructType type) {

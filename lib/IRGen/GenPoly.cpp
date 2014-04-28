@@ -259,10 +259,6 @@ namespace {
       return !IGM.isSingleIndirectValue(substType, ExplosionLevel);
     }
 
-    bool visitArrayType(CanArrayType origTy, CanArrayType substTy) {
-      return visit(origTy.getBaseType(), substTy.getBaseType());
-    }
-
     bool visitBoundGenericType(CanBoundGenericType origTy,
                                CanBoundGenericType substTy) {
       assert(origTy->getDecl() == substTy->getDecl());
@@ -378,10 +374,6 @@ struct EmbedsArchetype : DeclVisitor<EmbedsArchetype, bool>,
   FOR_NOMINAL_TYPE(Class)
   FOR_NOMINAL_TYPE(Enum)
 #undef FOR_NOMINAL_TYPE
-
-  bool visitArrayType(CanArrayType type) {
-    return visit(type.getBaseType());
-  }
 
   // All these types are leaves, in the sense that they don't directly
   // store any other types.

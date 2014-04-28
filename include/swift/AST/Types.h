@@ -2473,33 +2473,6 @@ public:
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(SILBlockStorageType, Type)
   
-/// ArrayType - An array type has a base type and either an unspecified or a
-/// constant size.  For example "int[]" and "int[4]".  Array types cannot have
-/// size = 0.
-class ArrayType : public TypeBase {
-  const Type Base;
-  
-  /// Size - When this is zero it indicates an unsized array like "int[]".
-  uint64_t Size;
-  
-public:
-  /// 'Constructor' Factory Function.
-  static ArrayType *get(Type BaseType, uint64_t Size);
-
-  Type getBaseType() const { return Base; }
-  uint64_t getSize() const { return Size; }
-
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const TypeBase *T) {
-    return T->getKind() == TypeKind::Array;
-  }
-  
-private:
-  ArrayType(Type Base, uint64_t Size, RecursiveTypeProperties properties);
-};
-BEGIN_CAN_TYPE_WRAPPER(ArrayType, Type)
-  PROXY_CAN_TYPE_SIMPLE_GETTER(getBaseType)
-END_CAN_TYPE_WRAPPER(ArrayType, Type)
 
 /// A type with a special syntax that is always sugar for a library type.
 ///

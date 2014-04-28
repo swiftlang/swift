@@ -1468,7 +1468,6 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
 
   static bool isSimple(Type type) {
     switch (type->getKind()) {
-    case TypeKind::Array:
     case TypeKind::ArraySlice:
     case TypeKind::Function:
     case TypeKind::PolymorphicFunction:
@@ -1909,11 +1908,6 @@ public:
   void visitSILBlockStorageType(SILBlockStorageType *T) {
     Printer << "@block_storage ";
     printWithParensIfNotSimple(T->getCaptureType());
-  }
-
-  void visitArrayType(ArrayType *T) {
-    printWithParensIfNotSimple(T->getBaseType());
-    Printer << "[" << T->getSize() << "]";
   }
 
   void visitArraySliceType(ArraySliceType *T) {

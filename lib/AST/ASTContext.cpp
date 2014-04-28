@@ -137,7 +137,6 @@ struct ASTContext::Implementation {
                    ExistentialMetatypeType*> ExistentialMetatypeTypes;
     llvm::DenseMap<std::pair<Type,std::pair<Type,char>>, FunctionType*>
       FunctionTypes;
-    llvm::DenseMap<std::pair<Type, uint64_t>, ArrayType*> ArrayTypes;
     llvm::DenseMap<Type, ArraySliceType*> ArraySliceTypes;
     llvm::DenseMap<Type, OptionalType*> OptionalTypes;
     llvm::DenseMap<Type, UncheckedOptionalType*> UncheckedOptionalTypes;
@@ -1875,30 +1874,6 @@ did_set_dependent:
   ctx.Impl.SILFunctionTypes.InsertNode(fnType, insertPos);
   return CanSILFunctionType(fnType);
 }
-
-/// Return a uniqued array type with the specified base type and the
-/// specified size.
-ArrayType *ArrayType::get(Type BaseType, uint64_t Size) {
-  assert(Size != 0);
-
-  RecursiveTypeProperties properties = BaseType->getRecursiveProperties();
-  auto arena = getArena(properties);
-
-  const ASTContext &C = BaseType->getASTContext();
-
-  ArrayType *&Entry
-    = C.Impl.getArena(arena).ArrayTypes[std::make_pair(BaseType, Size)];
-  if (Entry) return Entry;
-
-  return Entry = new (C, arena) ArrayType(BaseType, Size, properties);
-}
-
-ArrayType::ArrayType(Type base, uint64_t size,
-                     RecursiveTypeProperties properties)
-  : TypeBase(TypeKind::Array,
-             base->isCanonical() ? &base->getASTContext() : 0,
-             properties),
-    Base(base), Size(size) {}
 
 
 ArraySliceType *ArraySliceType::get(Type base) {

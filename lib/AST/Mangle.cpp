@@ -998,15 +998,6 @@ void Mangler::mangleType(CanType type, ResilienceExpansion explosion,
     mangleFunctionType(cast<FunctionType>(type), explosion, uncurryLevel);
     return;
 
-  case TypeKind::Array: {
-    // type ::= 'A' integer type
-    auto array = cast<ArrayType>(type);
-    Buffer << 'A';
-    Buffer << array->getSize();
-    mangleType(array.getBaseType(), ResilienceExpansion::Minimal, 0);
-    return;
-  };
-
   case TypeKind::ProtocolComposition: {
     // We mangle ProtocolType and ProtocolCompositionType using the
     // same production:

@@ -1499,7 +1499,6 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     return DBuilder.createUnspecifiedType(MemberTy->getName().str());
   }
 
-  case TypeKind::Array:
   case TypeKind::AssociatedType:
   case TypeKind::Error:
   case TypeKind::LValue:

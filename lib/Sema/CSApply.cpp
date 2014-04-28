@@ -1433,6 +1433,10 @@ namespace {
     }
 
     Expr *visitTypeExpr(TypeExpr *expr) {
+      auto selected = getOverloadChoice(cs.getConstraintLocator(expr));
+      auto MTT = selected.openedFullType;
+
+      (void)MTT;
       return simplifyExprType(expr);
     }
 
@@ -2066,16 +2070,10 @@ namespace {
                                           ConstraintLocator::NewArrayElement));
         
         auto baseElementType = elementType;
-        while (true) {
-          if (auto arrayTy = baseElementType->getAs<ArrayType>())
-            baseElementType = arrayTy->getBaseType();
-          else if (auto sliceTy =
-                     dyn_cast<ArraySliceType>(baseElementType.getPointer()))
-            baseElementType = sliceTy->getBaseType();
-          else
-            break;
-        }
-        
+        while (auto sliceTy =
+                 dyn_cast<ArraySliceType>(baseElementType.getPointer()))
+          baseElementType = sliceTy->getBaseType();
+
         Expr *ctor = tc.buildRefExpr(selected.choice.getDecl(), dc,
                                      SourceLoc(), /*implicit*/ true);
         Expr *metaty = TypeExpr::createImplicit(baseElementType, tc.Context);

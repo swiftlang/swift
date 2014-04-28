@@ -112,10 +112,6 @@ class Traversal : public TypeVisitor<Traversal, bool>
     return doIt(ty->getInterfaceResult().getType());
   }
 
-  bool visitArrayType(ArrayType *ty) {
-    return doIt(ty->getBaseType());
-  }
-
   bool visitSyntaxSugarType(SyntaxSugarType *ty) {
     return doIt(ty->getBaseType());
   }
