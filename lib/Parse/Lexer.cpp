@@ -1189,6 +1189,8 @@ void Lexer::lexStringLiteral() {
 
 /// lexEscapedIdentifier:
 ///   identifier ::= '`' identifier '`'
+///
+/// If it doesn't match this production, the leading ` is a punctuator.
 void Lexer::lexEscapedIdentifier() {
   assert(CurPtr[-1] == '`' && "Unexpected start of escaped identifier");
   
@@ -1201,43 +1203,25 @@ void Lexer::lexEscapedIdentifier() {
     ++CurPtr;
     return formToken(tok::unknown, Quote);
   }
-  
-  /// Recover by forming an unknown token and skipping ahead to whitespace
-  /// or to a matching '`'.
-  auto invalidEscapedIdentifier = [&]{
-    while (*CurPtr != '\n' && *CurPtr != '\r'
-           && *CurPtr != ' ' && *CurPtr != '\t'
-           && *CurPtr != '`')
+
+  // Check whether we have an identifier followed by another backtick, in which
+  // case this is an escaped identifier.
+  if (advanceIfValidStartOfIdentifier(CurPtr, BufferEnd)) {
+    // Keep continuing the identifier.
+    while (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd));
+
+    // If we have the terminating "`", it's an escaped identifier.
+    if (*CurPtr == '`') {
+      formToken(tok::identifier, TokStart);
+      NextToken.setEscapedIdentifier(true);
       ++CurPtr;
-    
-    if (*CurPtr == '`')
-      ++CurPtr;
-    
-    formToken(tok::unknown, Quote);
-  };
-  
-  bool didStart = advanceIfValidStartOfIdentifier(CurPtr, BufferEnd);
-  if (!didStart) {
-    diagnose(TokStart, diag::lex_escaped_identifier_invalid_start);
-    return invalidEscapedIdentifier();
+      return;
+    }
   }
-  
-  while (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd));
-  
-  if (*CurPtr == '\n' || *CurPtr == '\r'
-      || *CurPtr == ' ' || *CurPtr == '\t') {
-    diagnose(CurPtr, diag::lex_escaped_identifier_not_terminated);
-    return invalidEscapedIdentifier();
-  }
-  if (*CurPtr != '`') {
-    diagnose(CurPtr, diag::lex_escaped_identifier_invalid_character);
-    return invalidEscapedIdentifier();
-  }
-  assert(*CurPtr == '`');
-  formToken(tok::identifier, TokStart);
-  NextToken.setEscapedIdentifier(true);
-  ++CurPtr;
-  return;
+
+  // The backtick is punctuation.
+  CurPtr = TokStart;
+  formToken(tok::backtick, Quote);
 }
 
 StringRef Lexer::getEncodedStringSegment(StringRef Bytes,

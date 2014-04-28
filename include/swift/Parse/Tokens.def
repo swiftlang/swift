@@ -107,6 +107,8 @@ PUNCTUATOR(sil_pound,     "#")    // Only in SIL mode.
 PUNCTUATOR(amp_prefix,    "&")
 PUNCTUATOR(arrow,         "->")
 
+PUNCTUATOR(backtick,      "`")
+
 PUNCTUATOR(exclaim_postfix, "!") // if left-bound
 
 PUNCTUATOR(question_postfix, "?") // if left-bound
