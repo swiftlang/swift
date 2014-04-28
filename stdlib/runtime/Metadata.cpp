@@ -36,6 +36,7 @@
 using namespace swift;
 using namespace metadataimpl;
 
+extern "C" const uintptr_t objc_debug_isa_class_mask;
 extern "C" const ClassMetadata* object_getClass(const void *);
 extern "C" const char* class_getName(const ClassMetadata*);
 extern "C" const ClassMetadata* class_getSuperclass(const ClassMetadata*);
@@ -283,6 +284,9 @@ swift::swift_getClassMetadata(const void *object) {
   return isa;
 }
 #endif
+
+size_t swift::swift_classMask = objc_debug_isa_class_mask;
+uint8_t swift::swift_classShift = 0;
 
 /// The primary entrypoint.
 const void *
