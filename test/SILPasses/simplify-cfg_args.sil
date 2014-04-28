@@ -1,3 +1,4 @@
+// XFAIL:
 // RUN: %sil-opt %s -simplify-cfg | FileCheck %s
 sil_stage canonical
 
