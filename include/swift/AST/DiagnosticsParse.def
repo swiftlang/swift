@@ -130,9 +130,6 @@ ERROR(lex_unary_equal_is_reserved,lexing,none,
 ERROR(lex_unary_postfix_dot_is_reserved,lexing,none,
       "postfix '.' is reserved", ())
 
-ERROR(lex_escaped_identifier_empty,lexing,none,
-      "escaped identifier cannot be empty", ())
-
 //------------------------------------------------------------------------------
 // Declaration parsing diagnostics
 //------------------------------------------------------------------------------
@@ -591,6 +588,12 @@ ERROR(parameter_ellipsis_not_at_end,decl_parsing,none,
       "'...' must be on the last parameter", ())
 ERROR(parameter_vararg_default,decl_parsing,none,
       "variadic parameter cannot have a default value", ())
+ERROR(parameter_backtick_missing_name,decl_parsing,PointsToFirstBadToken,
+      "expected parameter name after '`'", ())
+ERROR(parameter_backtick_two_names,decl_parsing,PointsToFirstBadToken,
+      "extraneous '`' in parameter", ())
+WARNING(parameter_two_equivalent_names,decl_parsing,PointsToFirstBadToken,
+        "'%0 %0' can be expressed more succinctly as '`%0'", (StringRef))
 
 //------------------------------------------------------------------------------
 // Statement parsing diagnostics

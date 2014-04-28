@@ -813,6 +813,9 @@ public:
     /// \p IsLet indicates whether this was 'let'.
     SourceLoc LetVarLoc;
 
+    /// The location of the back-tick preceding the first name, if any.
+    SourceLoc BackTickLoc;
+
     /// The location of the first name.
     ///
     /// \c FirstName is the name.
@@ -858,7 +861,7 @@ public:
   ///     '(' parameter (',' parameter)* '...'? )'
   ///
   ///   parameter:
-  ///     'inout'? ('let' | 'var')? identifier-or-none identifier-or-none?
+  ///     'inout'? ('let' | 'var')? '`'? identifier-or-none identifier-or-none?
   ///         (':' type)? ('...' | '=' expr)?
   ///
   ///   identifier-or-none:

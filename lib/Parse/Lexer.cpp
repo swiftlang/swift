@@ -1195,17 +1195,10 @@ void Lexer::lexEscapedIdentifier() {
   assert(CurPtr[-1] == '`' && "Unexpected start of escaped identifier");
   
   const char *Quote = CurPtr-1;
-  // We don't include the escaping quotes in the token.
-  const char *TokStart = CurPtr;
-  
-  if (*CurPtr == '`') {
-    diagnose(Quote, diag::lex_escaped_identifier_empty);
-    ++CurPtr;
-    return formToken(tok::unknown, Quote);
-  }
 
   // Check whether we have an identifier followed by another backtick, in which
   // case this is an escaped identifier.
+  const char *TokStart = CurPtr;
   if (advanceIfValidStartOfIdentifier(CurPtr, BufferEnd)) {
     // Keep continuing the identifier.
     while (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd));

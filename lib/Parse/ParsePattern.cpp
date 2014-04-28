@@ -169,13 +169,23 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
       param.IsLet = false;
     }
 
-    if (startsParameterName(*this, isClosure)) {
+    // '`'?
+    if (Tok.is(tok::backtick)) {
+      param.BackTickLoc = consumeToken(tok::backtick);
+    }
+
+    if (param.BackTickLoc.isValid() || startsParameterName(*this, isClosure)) {
       // identifier-or-none for the first name
       if (Tok.is(tok::identifier)) {
         param.FirstName = Context.getIdentifier(Tok.getText());
         param.FirstNameLoc = consumeToken();
       } else if (Tok.is(tok::kw__)) {
         param.FirstNameLoc = consumeToken();
+      } else {
+        assert(param.BackTickLoc.isValid() && "startsParameterName() lied");
+        diagnose(Tok, diag::parameter_backtick_missing_name);
+        param.FirstNameLoc = param.BackTickLoc;
+        param.BackTickLoc = SourceLoc();
       }
 
       // identifier-or-none? for the second name
@@ -184,6 +194,30 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         param.SecondNameLoc = consumeToken();
       } else if (Tok.is(tok::kw__)) {
         param.SecondNameLoc = consumeToken();
+      }
+
+      // Cannot have a back-tick and two names.
+      if (param.BackTickLoc.isValid() && param.SecondNameLoc.isValid()) {
+        diagnose(param.BackTickLoc, diag::parameter_backtick_two_names)
+          .fixItRemove(param.BackTickLoc);
+        param.BackTickLoc = SourceLoc();
+      }
+
+      // If we have two equivalent names, suggest using the back-tick.
+      if (param.FirstNameLoc.isValid() && param.SecondNameLoc.isValid() &&
+          param.FirstName == param.SecondName) {
+        StringRef name;
+        if (param.FirstName.empty())
+          name = "_";
+        else
+          name = param.FirstName.str();
+
+        SourceLoc afterFirst = Lexer::getLocForEndOfToken(Context.SourceMgr,
+                                                          param.FirstNameLoc);
+        diagnose(param.FirstNameLoc, diag::parameter_two_equivalent_names,
+                 name)
+          .fixItInsert(param.FirstNameLoc, "`")
+          .fixItRemove(SourceRange(afterFirst, param.SecondNameLoc));
       }
 
       // (':' type)?
