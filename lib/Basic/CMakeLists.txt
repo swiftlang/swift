@@ -4,6 +4,7 @@ add_swift_library(swiftBasic
   DiagnosticConsumer.cpp
   DiverseStack.cpp
   LangOptions.cpp
+  Platform.cpp
   PrettyStackTrace.cpp
   PrimitiveParsing.cpp
   Program.cpp

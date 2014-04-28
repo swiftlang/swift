@@ -19,6 +19,7 @@
 #include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/LinkLibrary.h"
+#include "swift/Basic/Platform.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/OptimizeARC/PassesFwd.h"
 #include "llvm/Bitcode/BitcodeWriterPass.h"
@@ -193,10 +194,7 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
                         "Objective-C Garbage Collection", (uint32_t)0);
 
   // Mark iOS simulator images.
-  const llvm::Triple Triple(Opts.Triple);
-  if (Triple.isiOS() &&
-      (Triple.getArch() == llvm::Triple::x86 ||
-       Triple.getArch() == llvm::Triple::x86_64))
+  if (tripleIsiOSSimulator(llvm::Triple(Opts.Triple)))
     Module->addModuleFlag(llvm::Module::Error, "Objective-C Is Simulated",
                           eImageInfo_ImageIsSimulated);
 

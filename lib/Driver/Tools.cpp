@@ -15,6 +15,7 @@
 
 #include "swift/Basic/Dwarf.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/Platform.h"
 #include "swift/Basic/Range.h"
 #include "swift/Driver/Driver.h"
 #include "swift/Driver/Job.h"
@@ -29,26 +30,6 @@ using namespace swift;
 using namespace swift::driver;
 using namespace swift::driver::tools;
 using namespace llvm::opt;
-
-static bool tripleIsiOSSimulator(const llvm::Triple &triple) {
-  llvm::Triple::ArchType arch = triple.getArch();
-  return (triple.isiOS() &&
-          (arch == llvm::Triple::ArchType::x86 ||
-           arch == llvm::Triple::ArchType::x86_64));
-}
-
-StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
-  if (triple.isiOS()) {
-    if (tripleIsiOSSimulator(triple))
-      return "iphonesimulator";
-    return "iphoneos";
-  }
-
-  if (triple.isMacOSX())
-    return "macosx";
-
-  return "";
-}
 
 /// Swift Tool
 
