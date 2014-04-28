@@ -746,6 +746,21 @@ bool diagnoseAmbiguity(ConstraintSystem &cs, ArrayRef<Solution> solutions) {
   return false;
 }
 
+Constraint *getOverloadConstraint(Constraint *constraint) {
+  if (constraint->getKind() != ConstraintKind::Disjunction) {
+    return nullptr;
+  }
+  
+  auto nestedConstraints = constraint->getNestedConstraints();
+  
+  for (auto nestedConstraint : nestedConstraints) {
+    if (nestedConstraint->getKind() == ConstraintKind::BindOverload)
+      return nestedConstraint;
+  }
+  
+  return nullptr;
+}
+
 bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
   // If there were any unavoidable failures, emit the first one we can.
   if (!unavoidableFailures.empty()) {
@@ -819,21 +834,78 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
       return true;
   }
   
+  Constraint *conversionConstraint = nullptr;
+  Constraint *overloadConstraint = nullptr;
+  Constraint *fallbackConstraint = nullptr;
+  
+  // If we've been asked for more detailed type-check diagnostics, mine the
+  // system's inactive constraints for information on why we could not find a
+  // solution.
   if (TC.Context.LangOpts.detailedTypeCheckDiagnostics) {
+    
     while (!InactiveConstraints.empty()) {
       auto *constraint = &InactiveConstraints.front();
       
-      if (constraint->getKind() != ConstraintKind::Disjunction) {
-        TC.diagnose(expr->getLoc(),
-                    diag::cannot_find_conversion,
-                    constraint->getSecondType())
-          .highlight(expr->getSourceRange());
-        
-        break;
+      // Capture the first non-disjunction constraint we find. We'll use this
+      // if we can't find a clearer reason for the failure.
+      if (!fallbackConstraint &&
+          (constraint->getKind() != ConstraintKind::Disjunction)) {
+        fallbackConstraint = constraint;
+      }
+      
+      // Overload resolution failures are often nicely descriptive, so store
+      // off the first one we find.
+      if (!overloadConstraint) {
+        overloadConstraint = getOverloadConstraint(constraint);
+      }
+      
+      // Conversion constraints are also nicely descriptive, so we'll grab the
+      // first one of those as well.
+      if (!conversionConstraint &&
+          (constraint->getKind() == ConstraintKind::Conversion)) {
+        conversionConstraint = constraint;
       }
       
       InactiveConstraints.pop_front();
     }
+  }
+  
+  // If no more descriptive constraint was found, use the fallback constraint.
+  if (!(conversionConstraint || overloadConstraint)) {
+    conversionConstraint = fallbackConstraint;
+  }
+  
+  // If we have a conversion constraint, use that as the basis for the
+  // diagnostic.
+  if (conversionConstraint) {
+    auto locator = conversionConstraint->getLocator();
+    auto anchor = locator->getAnchor();
+    auto type = conversionConstraint->getSecondType();
+    
+    if (auto typeVariableType = dyn_cast<TypeVariableType>(type.getPointer())) {
+      auto impl = typeVariableType->getImpl();
+      if (auto archetypeType = impl.getArchetype()) {
+        type = archetypeType;
+      } else {
+        auto implAnchor = impl.getLocator()->getAnchor();
+        type = implAnchor->getType();
+      }
+    }
+    
+    TC.diagnose(anchor->getLoc(),
+                diag::cannot_find_conversion,
+                type)
+      .highlight(expr->getSourceRange());
+    
+  } else if (overloadConstraint) {
+    
+    // In the absense of a better conversion constraint failure, point out the
+    // inability to find an appropriate overload.
+    auto overloadChoice = overloadConstraint->getOverloadChoice();
+    auto overloadName = overloadChoice.getDecl()->getName();
+    TC.diagnose(expr->getLoc(),
+                diag::cannot_find_appropriate_overload,
+                overloadName.str());
   } else {
     TC.diagnose(expr->getLoc(), diag::constraint_type_check_fail)
       .highlight(expr->getSourceRange());

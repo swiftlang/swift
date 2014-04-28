@@ -54,7 +54,10 @@ ERROR(constraint_type_check_fail,sema,none,
       "expression does not type-check", ())
 
 ERROR(cannot_find_conversion,sema,none,
-      "cannot find a conversion to %0", (Type))
+      "cannot convert the expression's type to type %0", (Type))
+
+ERROR(cannot_find_appropriate_overload,sema,none,
+      "could not find an appropriate overload for '%0'", (StringRef))
 
 
 //------------------------------------------------------------------------------
