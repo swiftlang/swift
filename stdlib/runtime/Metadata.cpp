@@ -284,6 +284,21 @@ swift::swift_getClassMetadata(const void *object) {
 }
 #endif
 
+
+static size_t
+_setupClassMask() {
+  void *handle = dlopen(nullptr, RTLD_LAZY);
+  assert(handle);
+  void *symbol = dlsym(handle, "objc_debug_isa_class_mask");
+  if (symbol) {
+    return *(uintptr_t *)symbol;
+  }
+  return ~(size_t)0;
+}
+
+size_t swift::swift_classMask = _setupClassMask();
+uint8_t swift::swift_classShift = 0;
+
 /// The primary entrypoint.
 const void *
 swift::swift_dynamicCastClass(const void *object,
