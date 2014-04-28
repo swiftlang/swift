@@ -931,10 +931,10 @@ bool swift::conflicting(const OverloadSignature& sig1,
   if (sig1.Name.getBaseName() != sig2.Name.getBaseName())
     return false;
   
-  // If one is a compound name and the other is not, consider this a
-  // match: we're comparing a function with a variable or type.
+  // If one is a compound name and the other is not, they do not conflict
+  // if both have types.
   if (sig1.Name.isCompoundName() != sig2.Name.isCompoundName())
-    return true;
+    return !(sig1.InterfaceType && sig2.InterfaceType);
   
   return sig1.Name == sig2.Name &&
          sig1.InterfaceType == sig2.InterfaceType &&
