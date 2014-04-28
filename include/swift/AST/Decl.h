@@ -1894,10 +1894,8 @@ public:
   ///
   /// FIXME: Include protocol conformance from extensions? This will require
   /// semantic analysis to compute.
-  ArrayRef<ProtocolDecl *> getProtocols(bool forceDelayedMembers = true) const {
-    return Protocols;
-  }
-  
+  ArrayRef<ProtocolDecl *> getProtocols(bool forceDelayedMembers = true) const;
+
   /// \brief For declarations that are initially composed of a mix of delayed
   /// and non-delayed protocols, allow the setting of a temporary list of
   /// non-delayed protocols that will be copied over to the "official" protocol

@@ -31,7 +31,7 @@ enum FooComparisonResult : <ref:TypeAlias>CLong</ref> {
 }</decl>
 
 <decl:Struct>/// Aaa.  FooRuncingOptions.  Bbb.
-struct FooRuncingOptions {
+struct FooRuncingOptions : <ref:Protocol>RawOptionSet</ref> {
   <decl:Constructor>init()</decl>
   <decl:Constructor>init(value: <ref:TypeAlias>CLong</ref>)</decl>
   <decl:Var>var value: <ref:TypeAlias>CLong</ref></decl>

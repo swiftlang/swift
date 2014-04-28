@@ -1202,6 +1202,12 @@ Type TypeDecl::getDeclaredInterfaceType() const {
   return getInterfaceType()->castTo<MetatypeType>()->getInstanceType();
 }
 
+ArrayRef<ProtocolDecl *> TypeDecl::getProtocols(bool forceDelayedMembers) const {
+  if (auto *NTD = dyn_cast<NominalTypeDecl>(this))
+    return NTD->getProtocols(forceDelayedMembers);
+  return Protocols;
+}
+
 /// Provide the set of parameters to a generic type, or null if
 /// this function is not generic.
 void NominalTypeDecl::setGenericParams(GenericParamList *params) {

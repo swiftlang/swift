@@ -41,7 +41,7 @@ enum FooComparisonResult : CLong {
 }
 
 /// Aaa.  FooRuncingOptions.  Bbb.
-struct FooRuncingOptions {
+struct FooRuncingOptions : RawOptionSet {
   init()
   init(value: CLong)
   var value: CLong
