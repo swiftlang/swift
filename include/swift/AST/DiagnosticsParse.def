@@ -590,6 +590,8 @@ ERROR(parameter_vararg_default,decl_parsing,none,
       "variadic parameter cannot have a default value", ())
 ERROR(parameter_backtick_missing_name,decl_parsing,PointsToFirstBadToken,
       "expected parameter name after '`'", ())
+ERROR(parameter_backtick_empty_name,decl_parsing,none,
+      "expected non-empty parameter name after '`'", ())
 ERROR(parameter_backtick_two_names,decl_parsing,PointsToFirstBadToken,
       "extraneous '`' in parameter", ())
 WARNING(parameter_two_equivalent_names,decl_parsing,PointsToFirstBadToken,

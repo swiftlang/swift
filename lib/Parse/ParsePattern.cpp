@@ -180,6 +180,13 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         param.FirstName = Context.getIdentifier(Tok.getText());
         param.FirstNameLoc = consumeToken();
       } else if (Tok.is(tok::kw__)) {
+        // A back-tick cannot precede an empty name marker.
+        if (param.BackTickLoc.isValid()) {
+          diagnose(Tok, diag::parameter_backtick_empty_name)
+            .fixItRemove(param.BackTickLoc);
+          param.BackTickLoc = SourceLoc();
+        }
+
         param.FirstNameLoc = consumeToken();
       } else {
         assert(param.BackTickLoc.isValid() && "startsParameterName() lied");
