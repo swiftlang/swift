@@ -234,321 +234,6 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
   });
 }
 
-/// Given a pattern "P" based on a pattern atom (either an identifer or _
-/// pattern), rebuild and return the nested pattern around another root that
-/// replaces the atom.
-static Pattern *rebuildImplicitPatternAround(const Pattern *P, Pattern *NewRoot,
-                                             ASTContext &C) {
-  // We'll return a cloned copy of the pattern.
-  Pattern *Result = P->clone(C, Pattern::Implicit);
-
-  class ReplaceRoot : public ASTWalker {
-    Pattern *NewRoot;
-  public:
-    ReplaceRoot(Pattern *NewRoot) : NewRoot(NewRoot) {}
-
-    // If we find a typed pattern, replace its subpattern with the NewRoot and
-    // return.
-    std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
-      if (auto *TP = dyn_cast<TypedPattern>(P)) {
-        TP->setSubPattern(NewRoot);
-        return { false, TP };
-      }
-      
-      return { true, P };
-    }
-
-    // If we get down to a named pattern "x" or any pattern "_", replace it
-    // with our root.
-    Pattern *walkToPatternPost(Pattern *P) override {
-      if (isa<NamedPattern>(P) || isa<AnyPattern>(P))
-        return NewRoot;
-      return P;
-    }
-  };
-  
-  return Result->walk(ReplaceRoot(NewRoot));
-}
-
-/// Parse a single argument, the leading token is expected to be a (.
-static ParserResult<Pattern> parseArgument(
-                               Parser &P, Identifier leadingIdent,
-                               Parser::DefaultArgumentInfo *defaultArgs,
-                               bool &isImpliedNameArgument) {
-  // Consume the (.
-  Parser::StructureMarkerRAII ParsingArgument(P, P.Tok);
-  SourceLoc LPLoc = P.consumeToken(tok::l_paren);
-
-  // FIXME: Hack to treat arguments as parameters when building
-  // binding patterns.
-  llvm::SaveAndRestore<bool> savedArgumentIsParameter(P.ArgumentIsParameter,
-                                                      true);
-
-  // Decide if this is a singular unnamed argument (e.g. "foo(Int)" or if
-  // it is a standard tuple body pattern (e.g. "foo(x : Int)").  The former is
-  // shorthand where the elements get the name of the selector chunk.  The
-  // later includes the names are specified for each piece.
-
-  // Before doing a full speculative parse, check for the common cases of
-  // "identifier:" (always named), "identifier)" (always unnamed), and
-  // "identifier =" (always unnamed).  We know to parse the second identifier in
-  // "identifier(identifier = ...)" as a type because all arguments are required
-  // to have types.
-  if ((P.Tok.is(tok::identifier) || P.Tok.is(tok::kw__)) &&
-      P.peekToken().is(tok::colon))
-    isImpliedNameArgument = false;
-  else if (P.Tok.is(tok::identifier) &&
-           (P.peekToken().is(tok::r_paren) || P.peekToken().is(tok::comma)))
-    // "Int," and "Int)" are always a type.
-    isImpliedNameArgument = true;
-  else if (P.Tok.is(tok::identifier) && P.peekToken().is(tok::equal))
-    // This is always a type with a default argument.
-    isImpliedNameArgument = true;
-  else if (!P.Tok.isContextualKeyword("inout") || P.peekToken().is(tok::colon))
-    isImpliedNameArgument = true;
-  else {
-    // Otherwise, we do a full speculative parse to determine this.
-    Parser::BacktrackingScope backtrack(P);
-
-    // Allow "identifier(inout Type)"
-    if (P.Tok.isContextualKeyword("inout"))
-      P.consumeToken(tok::identifier);
-
-    // If we are left with "x :" or "x y:" then we have a name.
-    isImpliedNameArgument = true;
-    if (P.consumeIf(tok::identifier) || P.consumeIf(tok::kw__)) {
-      // We allow doubled names.
-      if (!P.consumeIf(tok::identifier)) P.consumeIf(tok::kw__);
-      isImpliedNameArgument = !P.Tok.is(tok::colon);
-    }
-  }
-
-  // If this is a standard tuple, parse it.
-  if (!isImpliedNameArgument)
-    return P.parsePatternTupleAfterLP(/*IsLet*/true, /*IsArgList*/true,
-                                      LPLoc, /*DefArgs=*/defaultArgs);
-
-  SourceLoc ArgStartLoc = P.Tok.getLoc();
-  
-  // Create the patterns for the identifier.
-  Pattern *Name;
-  if (leadingIdent.empty())
-    Name = new (P.Context) AnyPattern(ArgStartLoc, /*Implicit=*/true);
-  else
-    Name = P.createBindingFromPattern(ArgStartLoc, leadingIdent, /*isLet*/true);
-  Name->setImplicit();
-
-
-  ParserStatus EltStatus;
-  Optional<TuplePatternElt> elto;
-  std::tie(EltStatus, elto) =
-    P.parsePatternTupleElement(/*isLet*/true, /*isArgumentList*/true,
-                               Name, defaultArgs);
-
-  if (EltStatus.hasCodeCompletion())
-    return makeParserCodeCompletionResult<Pattern>();
-  if (!elto)
-    return makeParserError();
-  TuplePatternElt elt = elto.getValue();
-
-  // If we found our r_paren, we're done.
-  SourceLoc RPLoc = P.Tok.getLoc();
-  if (P.consumeIf(tok::r_paren)) {
-    auto *Res = TuplePattern::createSimple(P.Context, LPLoc, elt, RPLoc);
-    return makeParserResult(Res);
-  }
-  
-  // If not, we must have a default value, and we haven't validated that there
-  // is a single argument above (because we don't have a "canParseExpr" to check
-  // that the default value is valid).
-  //
-  // If we have a ",", then reject the code with a specific error and recover.
-  // Otherwise, emit a generic error.
-  if (!P.consumeIf(tok::comma)) {
-    P.diagnose(P.Tok, diag::expected_rparen_parameter);
-    return makeParserError();
-  }
-  
-  P.diagnose(ArgStartLoc, diag::implied_name_multiple_parameters)
-    .fixItInsert(ArgStartLoc, "_: ");
-  return P.parsePatternTupleAfterLP(/*IsLet*/true, /*IsArgList*/true,
-                                    LPLoc, /*DefArgs=*/defaultArgs);
-}
-
-namespace {
-  /// Extra location information for selector-style declarations.
-  struct SelectorParamLoc {
-    SourceLoc LParenLoc;
-    SourceLoc RParenLoc;
-    bool HasBodyParameterName;
-  };
-}
-
-static ParserStatus
-parseSelectorArgument(Parser &P,
-                      SmallVectorImpl<Identifier> &namePieces,
-                      SmallVectorImpl<TuplePatternElt> &argElts,
-                      SmallVectorImpl<TuplePatternElt> &bodyElts,
-                      SmallVectorImpl<SelectorParamLoc> &selectorParamLocs,
-                      Parser::DefaultArgumentInfo &defaultArgs,
-                      SourceLoc &rp) {
-  ParserResult<Pattern> ArgPatternRes = P.parsePatternIdentifier(true);
-  assert(ArgPatternRes.isNonNull() &&
-         "selector argument did not start with an identifier or _!");
-  Pattern *ArgPattern = ArgPatternRes.get();
-  ArgPattern->setImplicit();
-
-  Identifier leadingIdent;
-
-  // Check that a selector name isn't used multiple times, which would
-  // lead to the function type having multiple arguments with the same name.
-  if (NamedPattern *name = dyn_cast<NamedPattern>(ArgPattern)) {
-    VarDecl *decl = name->getDecl();
-    decl->setImplicit();
-    leadingIdent = name->getDecl()->getName();
-  } else {
-    // If the selector is named "_", then we ignore it.
-    assert(isa<AnyPattern>(ArgPattern) && "Unexpected selector pattern");
-  }
-  
-  if (!P.Tok.is(tok::l_paren)) {
-    P.diagnose(P.Tok, diag::func_selector_without_paren);
-    return makeParserError();
-  }
-
-  bool isImpliedNameArgument = false;
-  auto PatternRes = parseArgument(P, leadingIdent, &defaultArgs, 
-                                  isImpliedNameArgument);
-  if (PatternRes.hasCodeCompletion())
-    return PatternRes;
-  if (PatternRes.isNull()) {
-    if (PatternRes.isParseError())
-      recoverFromBadSelectorArgument(P);
-    return PatternRes;
-  }
-  
-  // The result of parsing a '(' pattern is either a ParenPattern or a
-  // TuplePattern.
-  if (auto *PP = dyn_cast<ParenPattern>(PatternRes.get())) {
-    bodyElts.push_back(TuplePatternElt(PP->getSubPattern(), /*init*/nullptr,
-                                       DefaultArgumentKind::None));
-    // Return the ')' location.
-    rp = PP->getRParenLoc();
-  } else {
-    auto *TP = cast<TuplePattern>(PatternRes.get());
-
-    // Return the ')' location.
-    rp = TP->getRParenLoc();
-
-    // Reject tuple patterns that aren't a single argument.
-    if (TP->getNumFields() != 1 || TP->hasVararg()) {
-      P.diagnose(TP->getLParenLoc(), diag::func_selector_with_not_one_argument);
-      return makeParserError();
-    }
-
-    bodyElts.push_back(TP->getFields()[0]);
-  }
-  namePieces.push_back(leadingIdent);
-
-  selectorParamLocs.push_back({ PatternRes.get()->getStartLoc(),
-                                PatternRes.get()->getEndLoc(),
-                                !isImpliedNameArgument });
-
-  TuplePatternElt &TPE = bodyElts.back();
-  ArgPattern = rebuildImplicitPatternAround(TPE.getPattern(), ArgPattern,
-                                            P.Context);
-  
-  argElts.push_back(TuplePatternElt(ArgPattern, TPE.getInit(),
-                                    getDefaultArgKind(TPE.getInit())));
-  return makeParserSuccess();
-}
-
-static Pattern *getFirstSelectorPattern(ASTContext &Context,
-                                        const Pattern *argPattern,
-                                        SourceLoc loc) {
-  Pattern *any = new (Context) AnyPattern(loc, /*Implicit=*/true);
-  return rebuildImplicitPatternAround(argPattern, any, Context);
-}
-
-
-static ParserStatus
-parseSelectorFunctionArguments(Parser &P,
-                               SmallVectorImpl<Identifier> &NamePieces,
-                               SmallVectorImpl<Pattern *> &BodyPatterns,
-                           SmallVectorImpl<SelectorParamLoc> &SelectorParamLocs,
-                               Parser::DefaultArgumentInfo &DefaultArgs,
-                               Pattern *FirstPattern) {
-  SourceLoc LParenLoc;
-  SourceLoc RParenLoc;
-  SmallVector<Pattern *, 4> ArgPatterns;
-  SmallVector<TuplePatternElt, 8> ArgElts;
-  SmallVector<TuplePatternElt, 8> BodyElts;
-
-  // For the argument pattern, try to convert the first parameter pattern to
-  // an anonymous AnyPattern of the same type as the body parameter.
-  if (ParenPattern *FirstParen = dyn_cast<ParenPattern>(FirstPattern)) {
-    BodyElts.push_back(TuplePatternElt(FirstParen->getSubPattern()));
-    LParenLoc = FirstParen->getLParenLoc();
-    RParenLoc = FirstParen->getRParenLoc();
-    ArgElts.push_back(TuplePatternElt(
-        getFirstSelectorPattern(P.Context,
-                                FirstParen->getSubPattern(),
-                                FirstParen->getLoc())));
-  } else if (TuplePattern *FirstTuple = dyn_cast<TuplePattern>(FirstPattern)) {
-    LParenLoc = FirstTuple->getLParenLoc();
-    RParenLoc = FirstTuple->getRParenLoc();
-    if (FirstTuple->getNumFields() != 1)
-      P.diagnose(P.Tok, diag::func_selector_with_not_one_argument);
-
-    if (FirstTuple->getNumFields() >= 1) {
-      const TuplePatternElt &FirstElt = FirstTuple->getFields()[0];
-      BodyElts.push_back(FirstElt);
-      ArgElts.push_back(TuplePatternElt(
-          getFirstSelectorPattern(P.Context,
-                                  FirstElt.getPattern(),
-                                  FirstTuple->getLoc()),
-        FirstElt.getInit(),
-        FirstElt.getDefaultArgKind()));
-    } else {
-      // Recover by creating a '(_: ())' pattern.
-      TuplePatternElt FirstElt(
-          new (P.Context) TypedPattern(
-              new (P.Context) AnyPattern(FirstTuple->getLParenLoc()),
-              TupleTypeRepr::create(P.Context, {},
-                                    FirstTuple->getSourceRange(),
-                                    SourceLoc())));
-      BodyElts.push_back(FirstElt);
-      ArgElts.push_back(FirstElt);
-    }
-  } else
-    llvm_unreachable("unexpected function argument pattern!");
-
-  assert(!ArgElts.empty() && !BodyElts.empty());
-  NamePieces.push_back(Identifier());
-
-  // Parse additional selectors as long as we can.
-  ParserStatus Status;
-  for (;;) {
-    if (P.isAtStartOfBindingName()) {
-      Status |= parseSelectorArgument(P, NamePieces,
-                                      ArgElts, BodyElts, SelectorParamLocs, 
-                                      DefaultArgs, RParenLoc);
-      continue;
-    }
-    if (P.Tok.is(tok::l_paren)) {
-      P.diagnose(P.Tok, diag::func_selector_with_curry);
-      // FIXME: better recovery: just parse a tuple instead of skipping tokens.
-      P.skipUntilDeclRBrace(tok::l_brace);
-      Status.setIsParseError();
-    }
-    break;
-  }
-
-  BodyPatterns.push_back(
-      TuplePattern::create(P.Context, LParenLoc, BodyElts, RParenLoc));
-  return Status;
-}
-
 /// Map parsed parameters to argument and body patterns.
 ///
 /// \returns the pattern describing the parsed parameters.
@@ -689,100 +374,28 @@ ParserStatus
 Parser::parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
                                SmallVectorImpl<Pattern *> &BodyPatterns,
                                DefaultArgumentInfo &DefaultArgs) {
-  // Figure out of we have a tuple-like declaration rather than a selector-style
-  // declaration.
-  bool HasSelectorStyleSignature = false;
-  {
-    BacktrackingScope BS(*this);
-    consumeToken(tok::l_paren);
-    while (!Tok.is(tok::eof) && !Tok.is(tok::r_paren))
-      skipSingle();
+  // Parse parameter-clauses.
+  ParserStatus status;
+  bool isFirstParameterClause = true;
+  while (Tok.is(tok::l_paren)) {
+    SmallVector<ParsedParameter, 4> params;
+    SourceLoc leftParenLoc, rightParenLoc;
 
-    if (consumeIf(tok::r_paren))
-      HasSelectorStyleSignature = isAtStartOfBindingName();
+    // Parse the parameter clause.
+    status |= parseParameterClause(leftParenLoc, params, rightParenLoc,
+                                   &DefaultArgs, /*isClosure=*/false);
+
+    // Turn the parameter clause into argument and body patterns.
+    auto pattern = mapParsedParameters(*this, leftParenLoc, params,
+                                       rightParenLoc, 
+                                       isFirstParameterClause,
+                                       isFirstParameterClause ? &NamePieces
+                                                              : nullptr);
+    BodyPatterns.push_back(pattern);
+    isFirstParameterClause = false;
   }
 
-  // If we don't have a selector-style signature, parse parameter-clauses.
-  if (!HasSelectorStyleSignature) {
-    ParserStatus status;
-    bool isFirstParameterClause = true;
-    while (Tok.is(tok::l_paren)) {
-      SmallVector<ParsedParameter, 4> params;
-      SourceLoc leftParenLoc, rightParenLoc;
-
-      // Parse the parameter clause.
-      status |= parseParameterClause(leftParenLoc, params, rightParenLoc,
-                                     &DefaultArgs, /*isClosure=*/false);
-
-      // Turn the parameter clause into argument and body patterns.
-      auto pattern = mapParsedParameters(*this, leftParenLoc, params,
-                                         rightParenLoc, 
-                                         isFirstParameterClause,
-                                         isFirstParameterClause ? &NamePieces
-                                                                : nullptr);
-      BodyPatterns.push_back(pattern);
-      isFirstParameterClause = false;
-    }
-
-    return status;
-  }
-
-
-  // Parse all of the selector arguments or curried argument pieces.
-
-  // Parse the first function argument clause.
-  bool IsFirstArgumentNameImplied;
-  ParserResult<Pattern> ArgPattern =
-    parseArgument(*this, NamePieces.front(), &DefaultArgs, 
-                  IsFirstArgumentNameImplied);
-
-  if (ArgPattern.isNull() || ArgPattern.hasCodeCompletion())
-    return ArgPattern;
-
-  // Prime the selector parameter location data.
-  SmallVector<SelectorParamLoc, 4> SelectorParamLocs;
-  SelectorParamLocs.push_back({ArgPattern.get()->getStartLoc(),
-                               ArgPattern.get()->getEndLoc(),
-                               !IsFirstArgumentNameImplied});
-
-  // This looks like a selector-style argument.  Try to convert the first
-  // argument pattern into a single argument type and parse subsequent
-  // selector forms.
-  ParserStatus Status = ParserStatus(ArgPattern) |
-    parseSelectorFunctionArguments(*this, NamePieces, BodyPatterns,
-                                   SelectorParamLocs, DefaultArgs, 
-                                   ArgPattern.get());
-  
-  if (Status.isSuccess()) {
-    auto firstLParenLoc = SelectorParamLocs[0].LParenLoc;
-    auto diag = diagnose(firstLParenLoc, diag::selector_func_decl_removed);
-    
-    // If the first parameter has a name, add "_ " after the first '('.
-    if (SelectorParamLocs[0].HasBodyParameterName) {
-      auto afterFirstLParenLoc
-        = Lexer::getLocForEndOfToken(Context.SourceMgr, firstLParenLoc);
-      diag.fixItInsert(afterFirstLParenLoc, "_ ");
-    }
-
-    // Replace the closing ')' of the first argument with ','.
-    diag.fixItReplace(SourceRange(SelectorParamLocs[0].RParenLoc), ",");
-    
-    for (unsigned i = 1, n = SelectorParamLocs.size(); i != n; ++i) {
-      const auto &ParamLoc = SelectorParamLocs[i];
-
-      // The opening '(' becomes either ':' or ' ', depending on
-      // whether this parameter has a name.
-      diag.fixItReplace(SourceRange(ParamLoc.LParenLoc), 
-                        ParamLoc.HasBodyParameterName? " " : ": ");
-
-      // A non-terminating closing ')' becomes ','.
-      if (i < n-1) {
-        diag.fixItReplace(SourceRange(ParamLoc.RParenLoc), ",");
-      }
-    }
-  }
-
-  return Status;
+  return status;
 }
 
 /// parseFunctionSignature - Parse a function definition signature.
@@ -857,30 +470,9 @@ Parser::parseFunctionSignature(Identifier SimpleName,
 ParserStatus
 Parser::parseConstructorArguments(DeclName &FullName, Pattern *&BodyPattern,
                                   DefaultArgumentInfo &DefaultArgs) {
-  // It's just a pattern. Parse it.
-  if (Tok.is(tok::l_paren)) {
-    SmallVector<ParsedParameter, 4> params;
-    SourceLoc leftParenLoc, rightParenLoc;
-    
-    // Parse the parameter clause.
-    ParserStatus status 
-      = parseParameterClause(leftParenLoc, params, rightParenLoc,
-                             &DefaultArgs, /*isClosure=*/false);
-
-    // Turn the parameter clause into argument and body patterns.
-    llvm::SmallVector<Identifier, 2> namePieces;
-    BodyPattern = mapParsedParameters(*this, leftParenLoc, params,
-                                      rightParenLoc, 
-                                      /*isFirstParameterClause=*/true,
-                                      &namePieces);
-
-    FullName = DeclName(Context, Context.Id_init, namePieces);
-    return status;
-  }
-
-  SourceLoc InitLoc = PreviousLoc;
-  if (!isAtStartOfBindingName()) {
-    // Complain that we expected '(' or a parameter name.
+  // If we don't have the leading '(', complain.
+  if (!Tok.is(tok::l_paren)) {
+    // Complain that we expected '('.
     {
       auto diag = diagnose(Tok, diag::expected_lparen_initializer);
       if (Tok.is(tok::l_brace))
@@ -894,67 +486,24 @@ Parser::parseConstructorArguments(DeclName &FullName, Pattern *&BodyPattern,
     return makeParserError();
   }
 
-  // This is not a parenthesis, but we should provide a reasonable source range
-  // for parameters.
-  SourceLoc LParenLoc = Tok.getLoc();
+  // Parse the parameter-clause.
+  SmallVector<ParsedParameter, 4> params;
+  SourceLoc leftParenLoc, rightParenLoc;
+  
+  // Parse the parameter clause.
+  ParserStatus status 
+    = parseParameterClause(leftParenLoc, params, rightParenLoc,
+                           &DefaultArgs, /*isClosure=*/false);
 
-  // Parse additional selectors as long as we can.
-  ParserStatus Status;
-  SmallVector<TuplePatternElt, 4> ArgElts;
-  SmallVector<TuplePatternElt, 4> BodyElts;
-  SourceLoc RParenLoc;
-  SmallVector<Identifier, 4> NamePieces;
-  SmallVector<SelectorParamLoc, 4> SelectorParamLocs;  
-  SourceLoc FirstSelectorPieceLoc;
-  for (;;) {
-    if (FirstSelectorPieceLoc.isInvalid())
-      FirstSelectorPieceLoc = Tok.getLoc();
+  // Turn the parameter clause into argument and body patterns.
+  llvm::SmallVector<Identifier, 2> namePieces;
+  BodyPattern = mapParsedParameters(*this, leftParenLoc, params,
+                                    rightParenLoc, 
+                                    /*isFirstParameterClause=*/true,
+                                    &namePieces);
 
-    if (isAtStartOfBindingName()) {
-      Status |= parseSelectorArgument(*this, NamePieces, ArgElts, BodyElts,
-                                      SelectorParamLocs, DefaultArgs, 
-                                      RParenLoc);
-      continue;
-    }
-
-    if (Tok.is(tok::l_paren)) {
-      // FIXME: Should we assume this is '_'?
-      diagnose(Tok, diag::func_selector_with_curry);
-      // FIXME: better recovery: just parse a tuple instead of skipping tokens.
-      skipUntilDeclRBrace(tok::l_brace);
-      Status.setIsParseError();
-    }
-    break;
-  }
-
-  if (Status.isSuccess()) {
-    auto diag = diagnose(InitLoc, diag::selector_func_decl_removed);
-    
-    // Replace the whitespace after "init" up to the first name with
-    // the (new) opening '('.
-    SourceLoc afterInitLoc = Lexer::getLocForEndOfToken(Context.SourceMgr,
-                                                        InitLoc);
-    diag.fixItReplaceChars(afterInitLoc, FirstSelectorPieceLoc, "(");
-
-    for (unsigned i = 0, n = SelectorParamLocs.size(); i != n; ++i) {
-      const auto &ParamLoc = SelectorParamLocs[i];
-
-      // The opening '(' becomes either ':' or ' ', depending on
-      // whether this parameter has a name.
-      diag.fixItReplace(SourceRange(ParamLoc.LParenLoc), 
-                        ParamLoc.HasBodyParameterName? " " : ": ");
-
-      // A non-terminating closing ')' becomes ','.
-      if (i < n-1) {
-        diag.fixItReplace(SourceRange(ParamLoc.RParenLoc), ",");
-      }
-    }
-  }
-
-  BodyPattern = TuplePattern::create(Context, LParenLoc, BodyElts,
-                                     RParenLoc);
-  FullName = DeclName(Context, Context.Id_init, NamePieces);
-  return Status;
+  FullName = DeclName(Context, Context.Id_init, namePieces);
+  return status;
 }
 
 /// Parse a pattern.

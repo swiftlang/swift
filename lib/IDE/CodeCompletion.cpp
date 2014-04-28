@@ -1289,8 +1289,14 @@ public:
       addLeadingDot(Builder);
       Builder.addTextChunk("init");
     }
-    Type ConstructorType =
-        getTypeOfMember(CD)->castTo<AnyFunctionType>()->getResult();
+
+    Type MemberType = getTypeOfMember(CD);
+    if (MemberType->is<ErrorType>()) {
+      addTypeAnnotation(Builder, MemberType);
+      return;
+    }
+
+    Type ConstructorType = MemberType->castTo<AnyFunctionType>()->getResult();
     addPatternFromType(
         Builder, ConstructorType->castTo<AnyFunctionType>()->getInput());
     addTypeAnnotation(
