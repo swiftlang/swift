@@ -299,6 +299,10 @@ public:
   
   /// Compute the packing of values of this type into a fixed-size buffer.
   FixedPacking getFixedPacking(IRGenModule &IGM) const;
+  
+  /// Index into an array of objects of this type.
+  Address indexArray(IRGenFunction &IGF, Address base, llvm::Value *offset,
+                     CanType T) const;
 };
 
 } // end namespace irgen

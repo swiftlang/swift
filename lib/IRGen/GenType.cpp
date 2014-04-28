@@ -87,6 +87,32 @@ FixedPacking TypeInfo::getFixedPacking(IRGenModule &IGM) const {
   return FixedPacking::Allocate;
 }
 
+Address TypeInfo::indexArray(IRGenFunction &IGF, Address base,
+                             llvm::Value *index, CanType T) const {
+  // The stride of a Swift type may not match its LLVM size. If we know we have
+  // a fixed stride different from our size, or we have a dynamic size,
+  // do a byte-level GEP with the proper stride.
+  const FixedTypeInfo *fixedTI = dyn_cast<FixedTypeInfo>(this);
+  
+  Address dest;
+  if (!fixedTI || fixedTI->getFixedStride() != fixedTI->getFixedSize()) {
+    llvm::Value *byteAddr = IGF.Builder.CreateBitCast(base.getAddress(),
+                                                      IGF.IGM.Int8PtrTy);
+    llvm::Value *size = getStride(IGF, T);
+    if (size->getType() != index->getType())
+      size = IGF.Builder.CreateZExtOrTrunc(size, index->getType());
+    llvm::Value *distance = IGF.Builder.CreateNSWMul(index, size);
+    llvm::Value *destValue = IGF.Builder.CreateInBoundsGEP(byteAddr, distance);
+    destValue = IGF.Builder.CreateBitCast(destValue, base.getType());
+    return Address(destValue, base.getAlignment());
+  } else {
+    // We don't expose a non-inbounds GEP operation.
+    llvm::Value *destValue = IGF.Builder.CreateInBoundsGEP(base.getAddress(),
+                                                           index);
+    return Address(destValue, base.getAlignment());
+  }
+}
+
 ExplosionSchema TypeInfo::getSchema(ResilienceExpansion kind) const {
   ExplosionSchema schema(kind);
   getSchema(schema);
