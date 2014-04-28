@@ -333,6 +333,9 @@ function(compile_swift_files)
   # <rdar://problem/15972329>
   list(APPEND swift_flags "-force-single-frontend-invocation")
 
+  # Don't include libarclite in any build products by default.
+  list(APPEND swift_flags "-no-link-objc-runtime")
+
   if(NOT SWIFT_RUNTIME_CHECKS)
     # FIXME: Should this be exposed at the driver level?
     list(APPEND swift_flags "-Xfrontend" "-disable-all-runtime-checks")

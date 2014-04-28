@@ -187,6 +187,10 @@ def L : JoinedOrSeparate<["-"], "L">, Group<linker_option_Group>,
   HelpText<"Add directory to library link search path">;
 def L_EQ : Joined<["-"], "L=">, Alias<L>;
 
+def link_objc_runtime : Flag<["-"], "link-objc-runtime">;
+def no_link_objc_runtime : Flag<["-"], "no-link-objc-runtime">,
+  HelpText<"Don't link in additions to the Objective-C runtime">;
+
 def Xlinker : Separate<["-"], "Xlinker">,
   HelpText<"Specifies an option which should be passed to the linker">;
 

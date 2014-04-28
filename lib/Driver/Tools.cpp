@@ -400,6 +400,10 @@ Job *darwin::Linker::constructJob(const JobAction &JA,
   assert(Output->getPrimaryOutputType() == types::TY_Image &&
          "Invalid linker output type.");
 
+  const toolchains::Darwin &TC = getDarwinToolChain();
+  const Driver &D = TC.getDriver();
+  const llvm::Triple &Triple = TC.getTriple();
+
   ArgStringList Arguments;
   addPrimaryInputsOfType(Arguments, Inputs.get(), types::TY_Object);
   addInputsOfType(Arguments, InputActions, types::TY_Object);
@@ -435,6 +439,21 @@ Job *darwin::Linker::constructJob(const JobAction &JA,
     break;
   }
 
+  if (Args.hasFlag(options::OPT_link_objc_runtime,
+                   options::OPT_no_link_objc_runtime,
+                   /*default=*/false)) {
+    // FIXME: Copied from Clang's ToolChains.cpp.
+    llvm::SmallString<128> ARCLiteLib(D.getSwiftProgramPath());
+    llvm::sys::path::remove_filename(ARCLiteLib); // 'swift'
+    llvm::sys::path::remove_filename(ARCLiteLib); // 'bin'
+    llvm::sys::path::append(ARCLiteLib, "lib", "arc", "libarclite_");
+    ARCLiteLib += getPlatformNameForTriple(Triple);
+    ARCLiteLib += ".a";
+
+    Arguments.push_back("-force_load");
+    Arguments.push_back(Args.MakeArgString(ARCLiteLib));
+  }
+
   Args.AddAllArgValues(Arguments, options::OPT_Xlinker);
   Args.AddAllArgs(Arguments, options::OPT_linker_option_Group);
   Args.AddAllArgs(Arguments, options::OPT_F);
@@ -452,9 +471,6 @@ Job *darwin::Linker::constructJob(const JobAction &JA,
 
   Arguments.push_back("-lSystem");
   AddDarwinArch(Args, Arguments);
-
-  const toolchains::Darwin &TC = getDarwinToolChain();
-  const Driver &D = TC.getDriver();
 
   // Add the runtime library link path, which is platform-specific and found
   // relative to the compiler.
@@ -482,7 +498,6 @@ Job *darwin::Linker::constructJob(const JobAction &JA,
   Arguments.push_back(Args.MakeArgString(RuntimeLibPath));
 
   // FIXME: Properly handle deployment targets.
-  llvm::Triple Triple = TC.getTriple();
   assert(Triple.isiOS() || Triple.isMacOSX());
   if (Triple.isiOS()) {
     if (tripleIsiOSSimulator(Triple))
