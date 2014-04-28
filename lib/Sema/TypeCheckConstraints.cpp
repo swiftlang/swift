@@ -313,6 +313,7 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
       }
     }
   }
+
   if (AllDeclRefs) {
     // Diagnose uses of operators that found no matching candidates.
     if (ResultValues.empty()) {
@@ -435,7 +436,7 @@ namespace {
         // here.
         if (!closure->hasSingleExpressionBody())
           return { false, expr };
-        
+
         // Update the current DeclContext to be the closure we're about to
         // recurse into.
         assert(DC == closure->getParent() && "Decl context isn't correct");
@@ -451,9 +452,8 @@ namespace {
 
     Expr *walkToExprPost(Expr *expr) override {
       // Fold sequence expressions.
-      if (auto seqExpr = dyn_cast<SequenceExpr>(expr)) {
+      if (auto seqExpr = dyn_cast<SequenceExpr>(expr))
         return TC.foldSequence(seqExpr, DC);
-      }
 
       // Type check the type parameters in an UnresolvedSpecializeExpr.
       if (auto us = dyn_cast<UnresolvedSpecializeExpr>(expr)) {
@@ -473,6 +473,11 @@ namespace {
         DC = ce->getParent();
       }
 
+      // If this is a sugared type that needs to be folded into a single
+      // TypeExpr, do it.
+      if (auto *simplified = simplifyTypeExpr(expr))
+        return simplified;
+
       return expr;
     }
 
@@ -480,8 +485,60 @@ namespace {
       // Never walk into statements.
       return { false, stmt };
     }
+    
+    /// Simplify expressions which are type sugar productions that got parsed
+    /// as expressions due to the parser not knowing which identifiers are
+    /// type names.
+    TypeExpr *simplifyTypeExpr(Expr *E);
   };
 }
+
+/// Simplify expressions which are type sugar productions that got parsed
+/// as expressions due to the parser not knowing which identifiers are
+/// type names.
+TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
+  
+  // Fold T[] into an array, it isn't a subscript on a metatype.
+  if (auto *SE = dyn_cast<SubscriptExpr>(E)) {
+    auto *TyExpr = dyn_cast<TypeExpr>(SE->getBase());
+    if (!TyExpr) return nullptr;
+    
+    // We don't fold subscripts with indexes, just an empty subscript.
+    TupleExpr *Indexes = dyn_cast<TupleExpr>(SE->getIndex());
+    if (!Indexes || Indexes->getNumElements() != 0)
+      return nullptr;
+
+    auto *InnerTypeRepr = TyExpr->getTypeRepr();
+    assert(!TyExpr->isImplicit() && InnerTypeRepr &&
+           "SubscriptExpr doesn't work on implicit TypeExpr's, "
+           "the TypeExpr should have been built correctly in the first place");
+
+    auto *NewTypeRepr =
+      new (TC.Context) ArrayTypeRepr(InnerTypeRepr, nullptr,
+                                     Indexes->getSourceRange());
+    Type ResTy = ArraySliceType::get(TyExpr->getTypeLoc().getType());
+    return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, ResTy));
+  }
+
+  // Fold T? into an optional type when T is a TypeExpr.
+  if (auto *BOE = dyn_cast<BindOptionalExpr>(E)) {
+    auto *TyExpr = dyn_cast<TypeExpr>(BOE->getSubExpr());
+    if (!TyExpr) return nullptr;
+
+    auto *InnerTypeRepr = TyExpr->getTypeRepr();
+    assert(!TyExpr->isImplicit() && InnerTypeRepr &&
+           "SubscriptExpr doesn't work on implicit TypeExpr's, "
+           "the TypeExpr should have been built correctly in the first place");
+    
+    auto *NewTypeRepr =
+      new (TC.Context) OptionalTypeRepr(InnerTypeRepr, BOE->getQuestionLoc());
+    Type ResTy = OptionalType::get(TyExpr->getTypeLoc().getType());
+    return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, ResTy));
+  }
+
+  return nullptr;
+}
+
 
 /// \brief Clean up the given ill-formed expression, removing any references
 /// to type variables and setting error types on erroneous expression nodes.
