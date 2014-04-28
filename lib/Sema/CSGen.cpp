@@ -242,22 +242,24 @@ namespace {
     }
 
     Type visitSuperRefExpr(SuperRefExpr *E) {
-      if (!E->getType()) {
-        // Resolve the super type of 'self'.
-        return getSuperType(E->getSelf(), E->getLoc(),
-                            diag::super_not_in_class_method,
-                            diag::super_with_no_base_class);
-      }
-      
-      return E->getType();
+      if (E->getType())
+        return E->getType();
+
+      // Resolve the super type of 'self'.
+      return getSuperType(E->getSelf(), E->getLoc(),
+                          diag::super_not_in_class_method,
+                          diag::super_with_no_base_class);
     }
 
     Type visitTypeExpr(TypeExpr *E) {
+      Type type;
       // If this is an implicit TypeExpr, don't validate its contents.
-      if (!E->getTypeRepr())
-        return E->getType();
+      if (auto *rep = E->getTypeRepr()) {
+        type = CS.TC.resolveType(rep, CS.DC, None);
+      } else {
+        type = E->getTypeLoc().getType();
+      }
       
-      auto type = CS.TC.resolveType(E->getTypeRepr(), CS.DC, None);
       if (!type) return Type();
       if (type->isAnyExistentialType())
         return ExistentialMetatypeType::get(type);

@@ -697,20 +697,16 @@ public:
 /// MetaTypetype.
 class TypeExpr : public Expr {
   TypeLoc Info;
-  
-  TypeExpr(TypeLoc Ty, const ASTContext &C);
-  TypeExpr(Type Ty, const ASTContext &C);
+  TypeExpr(Type Ty);
 public:
   // Create a TypeExpr with location information.
-  static TypeExpr *create(TypeLoc Ty, ASTContext &C) {
-    return new (C) TypeExpr(Ty, C);
-  }
-  
+  TypeExpr(TypeLoc Ty);
+
   // Create an implicit TypeExpr, which has no location information.
   static TypeExpr *createImplicit(Type Ty, ASTContext &C) {
-    return new (C) TypeExpr(Ty, C);
+    return new (C) TypeExpr(Ty);
   }
-  
+
   // Create an implicit TypeExpr, with location information even though it
   // shouldn't have one.  This is presently used to work around other location
   // processing bugs.  If you have an implicit location, use createImplicit.

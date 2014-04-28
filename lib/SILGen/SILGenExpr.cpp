@@ -668,7 +668,8 @@ RValue RValueEmitter::visitDeclRefExpr(DeclRefExpr *E, SGFContext C) {
 }
 
 RValue RValueEmitter::visitTypeExpr(TypeExpr *E, SGFContext C) {
-  assert(E->getType()->is<MetatypeType>() &&"TypeExpr must have metatype type");
+  assert(E->getType()->is<AnyMetatypeType>() &&
+         "TypeExpr must have metatype type");
   auto Val = SGF.B.createMetatype(E, SGF.getLoweredType(E->getType()));
   return RValue(SGF, E, ManagedValue::forUnmanaged(Val));
 }

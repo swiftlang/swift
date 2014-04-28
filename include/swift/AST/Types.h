@@ -1587,11 +1587,11 @@ END_CAN_TYPE_WRAPPER(MetatypeType, AnyMetatypeType)
 ///
 /// The representation of an existential metatype cannot be thin.
 class ExistentialMetatypeType : public AnyMetatypeType {
+public:
   static ExistentialMetatypeType *get(Type T,
                                       Optional<MetatypeRepresentation> Repr,
                                       const ASTContext &C);
 
-public:
   /// Return the ExistentialMetatypeType for the specified type
   /// with the given representation.
   ///
