@@ -99,6 +99,9 @@ struct QuickLookObject {
   struct Point {
     double x, y;
   };
+  struct Interval {
+    uint64_t loc,len;
+  };
   
   union {
     String Text;
@@ -110,6 +113,7 @@ struct QuickLookObject {
     Rectangle Rect;
     Point PointOrSize;
     bool Logical;
+    Interval Range;
   };
   enum class Tag : uint8_t {
     Text,
@@ -125,6 +129,7 @@ struct QuickLookObject {
     Point,
     Size,
     Logical,
+    Range,
     Raw,
   } Kind;
 };
@@ -146,6 +151,7 @@ struct OptionalQuickLookObject {
         QuickLookObject::Rectangle Rect;
         QuickLookObject::Point PointOrSize;
         bool Logical;
+        QuickLookObject::Interval Range;
       };
       QuickLookObject::Tag Kind;
       bool isNone;
