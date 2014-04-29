@@ -340,7 +340,8 @@ ParserResult<IdentTypeRepr> Parser::parseTypeIdentifier() {
         continue;
       }
     } else if (Tok.is(tok::code_complete)) {
-      Status.setHasCodeCompletion();
+      if (!Tok.isAtStartOfLine())
+        Status.setHasCodeCompletion();
       break;
     }
     break;
