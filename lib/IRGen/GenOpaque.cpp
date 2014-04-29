@@ -393,6 +393,20 @@ void irgen::emitInitializeWithCopyCall(IRGenFunction &IGF,
   call->setDoesNotThrow();
 }
 
+/// Emit a call to do an 'initializeArrayWithCopy' operation.
+void irgen::emitInitializeArrayWithCopyCall(IRGenFunction &IGF,
+                                            llvm::Value *metadata,
+                                            llvm::Value *destObject,
+                                            llvm::Value *srcObject,
+                                            llvm::Value *count) {
+  llvm::Value *copyFn = emitLoadOfValueWitnessFromMetadata(IGF, metadata,
+                                         ValueWitness::InitializeArrayWithCopy);
+  llvm::CallInst *call =
+    IGF.Builder.CreateCall4(copyFn, destObject, srcObject, count, metadata);
+  call->setCallingConv(IGF.IGM.RuntimeCC);
+  call->setDoesNotThrow();
+}
+
 /// Emit a call to do an 'initializeWithTake' operation.
 void irgen::emitInitializeWithTakeCall(IRGenFunction &IGF,
                                        llvm::Value *metadata,
@@ -402,6 +416,34 @@ void irgen::emitInitializeWithTakeCall(IRGenFunction &IGF,
                                          ValueWitness::InitializeWithTake);
   llvm::CallInst *call =
     IGF.Builder.CreateCall3(copyFn, destObject, srcObject, metadata);
+  call->setCallingConv(IGF.IGM.RuntimeCC);
+  call->setDoesNotThrow();
+}
+
+/// Emit a call to do an 'initializeArrayWithTakeFrontToBack' operation.
+void irgen::emitInitializeArrayWithTakeFrontToBackCall(IRGenFunction &IGF,
+                                            llvm::Value *metadata,
+                                            llvm::Value *destObject,
+                                            llvm::Value *srcObject,
+                                            llvm::Value *count) {
+  llvm::Value *copyFn = emitLoadOfValueWitnessFromMetadata(IGF, metadata,
+                             ValueWitness::InitializeArrayWithTakeFrontToBack);
+  llvm::CallInst *call =
+    IGF.Builder.CreateCall4(copyFn, destObject, srcObject, count, metadata);
+  call->setCallingConv(IGF.IGM.RuntimeCC);
+  call->setDoesNotThrow();
+}
+
+/// Emit a call to do an 'initializeArrayWithTakeBackToFront' operation.
+void irgen::emitInitializeArrayWithTakeBackToFrontCall(IRGenFunction &IGF,
+                                            llvm::Value *metadata,
+                                            llvm::Value *destObject,
+                                            llvm::Value *srcObject,
+                                            llvm::Value *count) {
+  llvm::Value *copyFn = emitLoadOfValueWitnessFromMetadata(IGF, metadata,
+                             ValueWitness::InitializeArrayWithTakeBackToFront);
+  llvm::CallInst *call =
+    IGF.Builder.CreateCall4(copyFn, destObject, srcObject, count, metadata);
   call->setCallingConv(IGF.IGM.RuntimeCC);
   call->setDoesNotThrow();
 }
@@ -439,6 +481,18 @@ void irgen::emitDestroyCall(IRGenFunction &IGF,
   auto fn = emitLoadOfValueWitnessFromMetadata(IGF, metadata,
                                    ValueWitness::Destroy);
   llvm::CallInst *call = IGF.Builder.CreateCall2(fn, object, metadata);
+  call->setCallingConv(IGF.IGM.RuntimeCC);
+  setHelperAttributes(call);
+}
+
+/// Emit a call to do a 'destroy' operation.
+void irgen::emitDestroyArrayCall(IRGenFunction &IGF,
+                                 llvm::Value *metadata,
+                                 llvm::Value *object,
+                                 llvm::Value *count) {
+  auto fn = emitLoadOfValueWitnessFromMetadata(IGF, metadata,
+                                   ValueWitness::DestroyArray);
+  llvm::CallInst *call = IGF.Builder.CreateCall3(fn, object, count, metadata);
   call->setCallingConv(IGF.IGM.RuntimeCC);
   setHelperAttributes(call);
 }

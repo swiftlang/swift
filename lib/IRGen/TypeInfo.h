@@ -303,6 +303,33 @@ public:
   /// Index into an array of objects of this type.
   Address indexArray(IRGenFunction &IGF, Address base, llvm::Value *offset,
                      CanType T) const;
+  
+  /// Destroy an array of objects of this type in memory.
+  virtual void destroyArray(IRGenFunction &IGF, Address base,
+                            llvm::Value *count, CanType T) const;
+  
+  /// Initialize an array of objects of this type in memory by copying the
+  /// values from another array. The arrays must not overlap.
+  virtual void initializeArrayWithCopy(IRGenFunction &IGF,
+                                       Address dest,
+                                       Address src,
+                                       llvm::Value *count, CanType T) const;
+  
+  /// Initialize an array of objects of this type in memory by taking the
+  /// values from another array. The destination array may overlap the head of
+  /// the source array because the elements are taken as if in front-to-back
+  /// order.
+  virtual void initializeArrayWithTakeFrontToBack(IRGenFunction &IGF,
+                                       Address dest, Address src,
+                                       llvm::Value *count, CanType T) const;
+  
+  /// Initialize an array of objects of this type in memory by taking the
+  /// values from another array. The destination array may overlap the tail of
+  /// the source array because the elements are taken as if in back-to-front
+  /// order.
+  virtual void initializeArrayWithTakeBackToFront(IRGenFunction &IGF,
+                                       Address dest, Address src,
+                                       llvm::Value *count, CanType T) const;
 };
 
 } // end namespace irgen

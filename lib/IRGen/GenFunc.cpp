@@ -1832,6 +1832,56 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     return;
   }
   
+  if (Builtin.ID == BuiltinValueKind::DestroyArray) {
+    // The input type is (T.Type, Builtin.RawPointer, Builtin.Word).
+    /* metatype */ args.claimNext();
+    llvm::Value *ptr = args.claimNext();
+    llvm::Value *count = args.claimNext();
+    
+    CanType valueTy = substitutions[0].Replacement->getCanonicalType();
+    const TypeInfo &valueTI = IGF.getTypeInfoForUnlowered(valueTy);
+    
+    ptr = IGF.Builder.CreateBitCast(ptr, valueTI.getStorageType()->getPointerTo());
+    Address array = valueTI.getAddressForPointer(ptr);
+    valueTI.destroyArray(IGF, array, count, valueTy);
+    return;
+  }
+  
+  if (Builtin.ID == BuiltinValueKind::CopyArray
+      || Builtin.ID == BuiltinValueKind::TakeArrayFrontToBack
+      || Builtin.ID == BuiltinValueKind::TakeArrayBackToFront) {
+    // The input type is (T.Type, Builtin.RawPointer, Builtin.RawPointer, Builtin.Word).
+    /* metatype */ args.claimNext();
+    llvm::Value *dest = args.claimNext();
+    llvm::Value *src = args.claimNext();
+    llvm::Value *count = args.claimNext();
+    
+    CanType valueTy = substitutions[0].Replacement->getCanonicalType();
+    const TypeInfo &valueTI = IGF.getTypeInfoForUnlowered(valueTy);
+    
+    dest = IGF.Builder.CreateBitCast(dest, valueTI.getStorageType()->getPointerTo());
+    src = IGF.Builder.CreateBitCast(src, valueTI.getStorageType()->getPointerTo());
+    Address destArray = valueTI.getAddressForPointer(dest);
+    Address srcArray = valueTI.getAddressForPointer(src);
+    
+    switch (Builtin.ID) {
+    case BuiltinValueKind::CopyArray:
+      valueTI.initializeArrayWithCopy(IGF, destArray, srcArray, count, valueTy);
+      break;
+    case BuiltinValueKind::TakeArrayFrontToBack:
+      valueTI.initializeArrayWithTakeFrontToBack(IGF, destArray, srcArray,
+                                                 count, valueTy);
+      break;
+    case BuiltinValueKind::TakeArrayBackToFront:
+      valueTI.initializeArrayWithTakeBackToFront(IGF, destArray, srcArray,
+                                                 count, valueTy);
+      break;
+    default:
+      llvm_unreachable("out of sync with if condition");
+    }    
+    return;
+  }
+  
   llvm_unreachable("IRGen unimplemented for this builtin!");
 }
 

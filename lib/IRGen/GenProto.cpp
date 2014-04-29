@@ -1217,21 +1217,50 @@ namespace {
     }
 
     void initializeWithCopy(IRGenFunction &IGF,
-                            Address dest, Address src, CanType T) const {
+                            Address dest, Address src, CanType T) const override {
       emitInitializeWithCopyCall(IGF, IGF.emitTypeMetadataRef(T),
                                  dest.getAddress(), src.getAddress());
     }
+    
+    void initializeArrayWithCopy(IRGenFunction &IGF,
+                                 Address dest, Address src, llvm::Value *count,
+                                 CanType T) const override {
+      emitInitializeArrayWithCopyCall(IGF, IGF.emitTypeMetadataRef(T),
+                                 dest.getAddress(), src.getAddress(), count);
+    }
 
     void initializeWithTake(IRGenFunction &IGF,
-                            Address dest, Address src, CanType T) const {
+                            Address dest, Address src, CanType T) const override {
       emitInitializeWithTakeCall(IGF, IGF.emitTypeMetadataRef(T),
                                  dest.getAddress(), src.getAddress());
     }
 
-    void destroy(IRGenFunction &IGF, Address addr, CanType T) const {
+    void initializeArrayWithTakeFrontToBack(IRGenFunction &IGF,
+                                            Address dest, Address src,
+                                            llvm::Value *count,
+                                            CanType T) const override {
+      emitInitializeArrayWithTakeFrontToBackCall(IGF, IGF.emitTypeMetadataRef(T),
+                                    dest.getAddress(), src.getAddress(), count);
+    }
+    
+    void initializeArrayWithTakeBackToFront(IRGenFunction &IGF,
+                                            Address dest, Address src,
+                                            llvm::Value *count,
+                                            CanType T) const override {
+      emitInitializeArrayWithTakeBackToFrontCall(IGF, IGF.emitTypeMetadataRef(T),
+                                    dest.getAddress(), src.getAddress(), count);
+    }
+    
+    void destroy(IRGenFunction &IGF, Address addr, CanType T) const override {
       emitDestroyCall(IGF, IGF.emitTypeMetadataRef(T), addr.getAddress());
     }
-
+    
+    void destroyArray(IRGenFunction &IGF, Address addr, llvm::Value *count,
+                      CanType T) const override {
+      emitDestroyArrayCall(IGF, IGF.emitTypeMetadataRef(T),
+                           addr.getAddress(), count);
+    }
+    
     std::pair<llvm::Value*,llvm::Value*>
     getSizeAndAlignment(IRGenFunction &IGF, CanType T) const {
       llvm::Value *wtable = getValueWitnessTable(IGF, T);

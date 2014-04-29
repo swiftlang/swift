@@ -483,6 +483,48 @@ static ValueDecl *getDestroyOperation(ASTContext &Context, Identifier Id) {
                                    ResultTy, ResultTy, ParamList);
 }
 
+static ValueDecl *getDestroyArrayOperation(ASTContext &Context, Identifier Id) {
+  Type GenericTy;
+  Type ArchetypeTy;
+  GenericParamList *ParamList;
+  std::tie(GenericTy, ArchetypeTy, ParamList) = getGenericParam(Context);
+  
+  auto wordType = BuiltinIntegerType::get(BuiltinIntegerWidth::pointer(),
+                                          Context);
+  
+  TupleTypeElt ArgParamElts[] = { MetatypeType::get(GenericTy),
+                                  Context.TheRawPointerType,
+                                  wordType };
+  TupleTypeElt ArgBodyElts[] = { MetatypeType::get(ArchetypeTy),
+                                 Context.TheRawPointerType,
+                                 wordType };
+  Type ResultTy = TupleType::getEmpty(Context);
+  return getBuiltinGenericFunction(Id, ArgParamElts, ArgBodyElts,
+                                   ResultTy, ResultTy, ParamList);
+}
+
+static ValueDecl *getTransferArrayOperation(ASTContext &Context, Identifier Id){
+  Type GenericTy;
+  Type ArchetypeTy;
+  GenericParamList *ParamList;
+  std::tie(GenericTy, ArchetypeTy, ParamList) = getGenericParam(Context);
+  
+  auto wordType = BuiltinIntegerType::get(BuiltinIntegerWidth::pointer(),
+                                          Context);
+  
+  TupleTypeElt ArgParamElts[] = { MetatypeType::get(GenericTy),
+                                  Context.TheRawPointerType,
+                                  Context.TheRawPointerType,
+                                  wordType };
+  TupleTypeElt ArgBodyElts[] = { MetatypeType::get(ArchetypeTy),
+                                 Context.TheRawPointerType,
+                                 Context.TheRawPointerType,
+                                 wordType };
+  Type ResultTy = TupleType::getEmpty(Context);
+  return getBuiltinGenericFunction(Id, ArgParamElts, ArgBodyElts,
+                                   ResultTy, ResultTy, ParamList);
+}
+
 static ValueDecl *getSizeOrAlignOfOperation(ASTContext &Context,
                                             Identifier Id) {
   Type GenericTy;
@@ -1173,6 +1215,16 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     if (!Types.empty()) return nullptr;
     return getStoreOperation(Context, Id);
 
+  case BuiltinValueKind::DestroyArray:
+    if (!Types.empty()) return nullptr;
+    return getDestroyArrayOperation(Context, Id);
+      
+  case BuiltinValueKind::CopyArray:
+  case BuiltinValueKind::TakeArrayFrontToBack:
+  case BuiltinValueKind::TakeArrayBackToFront:
+    if (!Types.empty()) return nullptr;
+    return getTransferArrayOperation(Context, Id);
+      
   case BuiltinValueKind::Sizeof:
   case BuiltinValueKind::Strideof:
   case BuiltinValueKind::Alignof:

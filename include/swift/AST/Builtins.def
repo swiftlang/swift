@@ -285,6 +285,15 @@ BUILTIN_MISC_OPERATION(Once, "once", "", Special)
 /// unreachable has type @noreturn () -> ()
 BUILTIN_MISC_OPERATION(Unreachable, "unreachable", "", Special)
 
+/// DestroyArray has type (T.Type, Builtin.RawPointer, Builtin.Word) -> ()
+BUILTIN_MISC_OPERATION(DestroyArray, "destroyArray", "", Special)
+
+/// CopyArray, TakeArrayFrontToBack, and TakeArrayBackToFront all have type
+/// (T.Type, Builtin.RawPointer, Builtin.RawPointer, Builtin.Word) -> ()
+BUILTIN_MISC_OPERATION(CopyArray, "copyArray", "", Special)
+BUILTIN_MISC_OPERATION(TakeArrayFrontToBack, "takeArrayFrontToBack", "", Special)
+BUILTIN_MISC_OPERATION(TakeArrayBackToFront, "takeArrayBackToFront", "", Special)
+
 #undef BUILTIN_MISC_OPERATION
 
 // BUILTIN_TYPE_TRAIT_OPERATION - Compile-time type trait operations.

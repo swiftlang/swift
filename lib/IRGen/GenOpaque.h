@@ -65,11 +65,32 @@ namespace irgen {
                                   llvm::Value *destObject,
                                   llvm::Value *srcObject);
 
+  /// Emit a call to do an 'initializeArrayWithCopy' operation.
+  void emitInitializeArrayWithCopyCall(IRGenFunction &IGF,
+                                       llvm::Value *metadata,
+                                       llvm::Value *destObject,
+                                       llvm::Value *srcObject,
+                                       llvm::Value *count);
+
   /// Emit a call to do an 'initializeWithTake' operation.
   void emitInitializeWithTakeCall(IRGenFunction &IGF,
                                   llvm::Value *metadata,
                                   llvm::Value *destObject,
                                   llvm::Value *srcObject);
+
+  /// Emit a call to do an 'initializeArrayWithTakeFrontToBack' operation.
+  void emitInitializeArrayWithTakeFrontToBackCall(IRGenFunction &IGF,
+                                                  llvm::Value *metadata,
+                                                  llvm::Value *destObject,
+                                                  llvm::Value *srcObject,
+                                                  llvm::Value *count);
+
+  /// Emit a call to do an 'initializeArrayWithTakeBackToFront' operation.
+  void emitInitializeArrayWithTakeBackToFrontCall(IRGenFunction &IGF,
+                                                  llvm::Value *metadata,
+                                                  llvm::Value *destObject,
+                                                  llvm::Value *srcObject,
+                                                  llvm::Value *count);
 
   /// Emit a call to do an 'assignWithCopy' operation.
   void emitAssignWithCopyCall(IRGenFunction &IGF,
@@ -87,6 +108,12 @@ namespace irgen {
   void emitDestroyCall(IRGenFunction &IGF,
                        llvm::Value *metadata,
                        llvm::Value *object);
+
+  /// Emit a call to do a 'destroyArray' operation.
+  void emitDestroyArrayCall(IRGenFunction &IGF,
+                            llvm::Value *metadata,
+                            llvm::Value *object,
+                            llvm::Value *count);
 
   /// Emit a call to do a 'destroyBuffer' operation.
   void emitDestroyBufferCall(IRGenFunction &IGF,

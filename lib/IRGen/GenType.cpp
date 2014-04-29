@@ -118,6 +118,193 @@ Address TypeInfo::indexArray(IRGenFunction &IGF, Address base,
   }
 }
 
+void TypeInfo::destroyArray(IRGenFunction &IGF, Address array,
+                            llvm::Value *count, CanType T) const {
+  if (isPOD(ResilienceScope::Local))
+    return;
+  
+  auto entry = IGF.Builder.GetInsertBlock();
+  auto iter = IGF.createBasicBlock("iter");
+  auto loop = IGF.createBasicBlock("loop");
+  auto exit = IGF.createBasicBlock("exit");
+  IGF.Builder.CreateBr(iter);
+  IGF.Builder.emitBlock(iter);
+  
+  auto counter = IGF.Builder.CreatePHI(IGF.IGM.SizeTy, 2);
+  counter->addIncoming(count, entry);
+  auto elementVal = IGF.Builder.CreatePHI(array.getType(), 2);
+  elementVal->addIncoming(array.getAddress(), entry);
+  Address element(elementVal, array.getAlignment());
+  
+  auto done = IGF.Builder.CreateICmpEQ(counter,
+                                     llvm::ConstantInt::get(IGF.IGM.SizeTy, 0));
+  IGF.Builder.CreateCondBr(done, exit, loop);
+  
+  IGF.Builder.emitBlock(loop);
+  destroy(IGF, element, T);
+  auto nextCounter = IGF.Builder.CreateSub(counter,
+                                   llvm::ConstantInt::get(IGF.IGM.SizeTy, 1));
+  auto nextElement = indexArray(IGF, element,
+                                llvm::ConstantInt::get(IGF.IGM.SizeTy, 1), T);
+  auto loopEnd = IGF.Builder.GetInsertBlock();
+  counter->addIncoming(nextCounter, loopEnd);
+  elementVal->addIncoming(nextElement.getAddress(), loopEnd);
+  IGF.Builder.CreateBr(iter);
+  
+  IGF.Builder.emitBlock(exit);
+}
+
+/// Build a value witness that initializes an array front-to-back.
+static void emitInitializeArrayFrontToBack(IRGenFunction &IGF,
+                                           const TypeInfo &type,
+                                           Address destArray,
+                                           Address srcArray,
+                                           llvm::Value *count,
+                                           CanType T,
+                 void (TypeInfo::*emitInitializeElement)(IRGenFunction &,
+                                                         Address, Address,
+                                                         CanType) const) {
+  auto &IGM = IGF.IGM;
+                   
+  auto entry = IGF.Builder.GetInsertBlock();
+  auto iter = IGF.createBasicBlock("iter");
+  auto loop = IGF.createBasicBlock("loop");
+  auto exit = IGF.createBasicBlock("exit");
+  IGF.Builder.CreateBr(iter);
+  IGF.Builder.emitBlock(iter);
+  
+  auto counter = IGF.Builder.CreatePHI(IGM.SizeTy, 2);
+  counter->addIncoming(count, entry);
+  auto destVal = IGF.Builder.CreatePHI(destArray.getType(), 2);
+  destVal->addIncoming(destArray.getAddress(), entry);
+  auto srcVal = IGF.Builder.CreatePHI(srcArray.getType(), 2);
+  srcVal->addIncoming(srcArray.getAddress(), entry);
+  Address dest(destVal, destArray.getAlignment());
+  Address src(srcVal, srcArray.getAlignment());
+  
+  auto done = IGF.Builder.CreateICmpEQ(counter,
+                                       llvm::ConstantInt::get(IGM.SizeTy, 0));
+  IGF.Builder.CreateCondBr(done, exit, loop);
+  
+  IGF.Builder.emitBlock(loop);
+  (type.*emitInitializeElement)(IGF, dest, src, T);
+  
+  auto nextCounter = IGF.Builder.CreateSub(counter,
+                                   llvm::ConstantInt::get(IGM.SizeTy, 1));
+  auto nextDest = type.indexArray(IGF, dest,
+                                  llvm::ConstantInt::get(IGM.SizeTy, 1), T);
+  auto nextSrc = type.indexArray(IGF, src,
+                                 llvm::ConstantInt::get(IGM.SizeTy, 1), T);
+  auto loopEnd = IGF.Builder.GetInsertBlock();
+  counter->addIncoming(nextCounter, loopEnd);
+  destVal->addIncoming(nextDest.getAddress(), loopEnd);
+  srcVal->addIncoming(nextSrc.getAddress(), loopEnd);
+  IGF.Builder.CreateBr(iter);
+  
+  IGF.Builder.emitBlock(exit);
+}
+
+/// Build a value witness that initializes an array back-to-front.
+static void emitInitializeArrayBackToFront(IRGenFunction &IGF,
+                                           const TypeInfo &type,
+                                           Address destArray,
+                                           Address srcArray,
+                                           llvm::Value *count,
+                                           CanType T,
+                 void (TypeInfo::*emitInitializeElement)(IRGenFunction &,
+                                                         Address, Address,
+                                                         CanType) const) {
+  auto &IGM = IGF.IGM;
+  
+  auto destEnd = type.indexArray(IGF, destArray, count, T);
+  auto srcEnd = type.indexArray(IGF, destArray, count, T);
+  
+  auto entry = IGF.Builder.GetInsertBlock();
+  auto iter = IGF.createBasicBlock("iter");
+  auto loop = IGF.createBasicBlock("loop");
+  auto exit = IGF.createBasicBlock("exit");
+  IGF.Builder.CreateBr(iter);
+  IGF.Builder.emitBlock(iter);
+  
+  auto counter = IGF.Builder.CreatePHI(IGM.SizeTy, 2);
+  counter->addIncoming(count, entry);
+  auto destVal = IGF.Builder.CreatePHI(destEnd.getType(), 2);
+  destVal->addIncoming(destArray.getAddress(), entry);
+  auto srcVal = IGF.Builder.CreatePHI(srcEnd.getType(), 2);
+  srcVal->addIncoming(srcArray.getAddress(), entry);
+  Address dest(destVal, destArray.getAlignment());
+  Address src(srcVal, srcArray.getAlignment());
+  
+  auto done = IGF.Builder.CreateICmpEQ(counter,
+                                       llvm::ConstantInt::get(IGM.SizeTy, 0));
+  IGF.Builder.CreateCondBr(done, exit, loop);
+  
+  IGF.Builder.emitBlock(loop);
+  auto prevDest = type.indexArray(IGF, dest,
+                              llvm::ConstantInt::getSigned(IGM.SizeTy, -1), T);
+  auto prevSrc = type.indexArray(IGF, src,
+                              llvm::ConstantInt::getSigned(IGM.SizeTy, -1), T);
+                   
+  (type.*emitInitializeElement)(IGF, prevDest, prevSrc, T);
+  
+  auto nextCounter = IGF.Builder.CreateSub(counter,
+                                   llvm::ConstantInt::get(IGM.SizeTy, 1));
+  auto loopEnd = IGF.Builder.GetInsertBlock();
+  counter->addIncoming(nextCounter, loopEnd);
+  destVal->addIncoming(prevDest.getAddress(), loopEnd);
+  srcVal->addIncoming(prevSrc.getAddress(), loopEnd);
+  IGF.Builder.CreateBr(iter);
+  
+  IGF.Builder.emitBlock(exit);
+}
+
+void TypeInfo::initializeArrayWithCopy(IRGenFunction &IGF,
+                                       Address dest, Address src,
+                                       llvm::Value *count, CanType T) const {
+  if (isPOD(ResilienceScope::Local)) {
+    llvm::Value *stride = getStride(IGF, T);
+    llvm::Value *byteCount = IGF.Builder.CreateNUWMul(stride, count);
+    IGF.Builder.CreateMemCpy(dest.getAddress(), src.getAddress(),
+                             byteCount, dest.getAlignment().getValue());
+    return;
+  }
+  
+  emitInitializeArrayFrontToBack(IGF, *this, dest, src, count, T,
+                                 &TypeInfo::initializeWithCopy);
+}
+
+void TypeInfo::initializeArrayWithTakeFrontToBack(IRGenFunction &IGF,
+                                                  Address dest, Address src,
+                                                  llvm::Value *count, CanType T)
+const {
+  if (isBitwiseTakable(ResilienceScope::Local)) {
+    llvm::Value *stride = getStride(IGF, T);
+    llvm::Value *byteCount = IGF.Builder.CreateNUWMul(stride, count);
+    IGF.Builder.CreateMemMove(dest.getAddress(), src.getAddress(),
+                              byteCount, dest.getAlignment().getValue());
+    return;
+  }
+  
+  emitInitializeArrayFrontToBack(IGF, *this, dest, src, count, T,
+                                 &TypeInfo::initializeWithTake);
+}
+
+void TypeInfo::initializeArrayWithTakeBackToFront(IRGenFunction &IGF,
+                                                  Address dest, Address src,
+                                                  llvm::Value *count, CanType T)
+const {
+  if (isBitwiseTakable(ResilienceScope::Local)) {
+    llvm::Value *stride = getStride(IGF, T);
+    llvm::Value *byteCount = IGF.Builder.CreateNUWMul(stride, count);
+    IGF.Builder.CreateMemMove(dest.getAddress(), src.getAddress(),
+                              byteCount, dest.getAlignment().getValue());
+    return;
+  }
+  
+  emitInitializeArrayBackToFront(IGF, *this, dest, src, count, T,
+                                 &TypeInfo::initializeWithTake);
+}
+
 ExplosionSchema TypeInfo::getSchema(ResilienceExpansion kind) const {
   ExplosionSchema schema(kind);
   getSchema(schema);
