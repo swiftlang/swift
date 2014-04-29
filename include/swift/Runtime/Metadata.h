@@ -1001,6 +1001,8 @@ struct ClassMetadata : public HeapMetadata {
 
 private:
   // The remaining fields are valid only when isTypeMetadata().
+  // The Objective-C runtime knows the offsets to some of these fields.
+  // Be careful when changing them.
 
   /// The size and alignment mask of instances of this type.
   uint32_t InstanceSize, InstanceAlignMask;
