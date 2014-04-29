@@ -1030,9 +1030,14 @@ namespace {
       // two values.  If the instanceSize of the superclass equals the
       // stored instanceStart of the subclass, the ivar offsets
       // will not be changed.
-      Size instanceStart = Size(0);
-      Size instanceSize = Size(0);
-      if (!forMeta) {
+      Size instanceStart;
+      Size instanceSize;
+      if (forMeta) {
+        // sizeof(struct class_t)
+        instanceSize = Size(5 * IGM.getPointerSize().getValue());
+        // historical nonsense
+        instanceStart = instanceSize;
+      } else {
         instanceSize = FieldLayout->getSize();
         if (FieldLayout->getElements().empty()
             || FieldLayout->getElements().size() == FirstFieldIndex) {
@@ -1043,6 +1048,7 @@ namespace {
           instanceStart = FieldLayout->getElements()[FirstFieldIndex].getByteOffset();
         } else {
           // FIXME: arrange to initialize this at runtime
+          instanceStart = Size(0);
         }
       }
       fields.push_back(llvm::ConstantInt::get(IGM.Int32Ty,
