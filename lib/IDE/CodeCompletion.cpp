@@ -2074,7 +2074,8 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
   case CompletionKind::PostfixExprParen: {
     Lookup.setHaveLParen(true);
-    Lookup.getValueExprCompletions(ParsedExpr->getType());
+    if (ParsedExpr->getType())
+      Lookup.getValueExprCompletions(ParsedExpr->getType());
 
     Lookup.setHaveLParen(false);
     DoPostfixExprBeginning();
