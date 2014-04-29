@@ -455,6 +455,18 @@ TypeExpr *TypeExpr::createForDecl(SourceLoc Loc, TypeDecl *Decl) {
   return new (C) TypeExpr(TypeLoc(Repr, Type()));
 }
 
+TypeExpr *TypeExpr::createForSpecializedDecl(SourceLoc Loc, TypeDecl *D,
+                                             ArrayRef<TypeRepr*> args,
+                                             SourceRange AngleLocs) {
+  ASTContext &C = D->getASTContext();
+  assert(Loc.isValid());
+  auto *Repr = new (C) GenericIdentTypeRepr(Loc, D->getName(),
+                                            args, AngleLocs);
+  Repr->setValue(D);
+  return new (C) TypeExpr(TypeLoc(Repr, Type()));
+}
+
+
 // Create an implicit TypeExpr, with location information even though it
 // shouldn't have one.  This is presently used to work around other location
 // processing bugs.  If you have an implicit location, use createImplicit.

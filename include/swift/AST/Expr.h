@@ -716,6 +716,9 @@ public:
   
   /// Return a TypeExpr for a TypeDecl and the specified location.
   static TypeExpr *createForDecl(SourceLoc Loc, TypeDecl *D);
+  static TypeExpr *createForSpecializedDecl(SourceLoc Loc, TypeDecl *D,
+                                            ArrayRef<TypeRepr*> args,
+                                            SourceRange angleLocs);
   TypeLoc &getTypeLoc() { return Info; }
   TypeLoc getTypeLoc() const { return Info; }
   TypeRepr *getTypeRepr() const { return Info.getTypeRepr(); }

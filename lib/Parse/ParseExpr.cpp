@@ -1355,20 +1355,13 @@ Expr *Parser::parseExprIdentifier() {
     unresolved->setSpecialized(hasGenericArgumentList);
     E = unresolved;
   } else if (auto TD = dyn_cast<TypeDecl>(D)) {
-    
-    ComponentIdentTypeRepr *Repr;
     if (!hasGenericArgumentList)
-      Repr = new (Context) SimpleIdentTypeRepr(loc, name);
+      E = TypeExpr::createForDecl(loc, TD);
     else
-      Repr = new (Context) GenericIdentTypeRepr(loc, name,
-                                                Context.AllocateCopy(args),
-                                                SourceRange(LAngleLoc,
-                                                            RAngleLoc));
-    Repr->setValue(TD);
-    
-    // Turn references to local types directly into TypeExprs.
-    E = new (Context) TypeExpr(TypeLoc(Repr, Type()));
-    
+      E = TypeExpr::createForSpecializedDecl(loc, TD,
+                                             Context.AllocateCopy(args),
+                                             SourceRange(LAngleLoc,
+                                                         RAngleLoc));
   } else {
     auto declRef = new (Context) DeclRefExpr(D, loc, /*Implicit=*/false);
     declRef->setGenericArgs(args);
