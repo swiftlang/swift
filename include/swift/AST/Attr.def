@@ -88,60 +88,49 @@ TYPE_ATTR(opened)
 // code as an attribute.  It is modelled as an attribute for the convenience of
 // implementation in the compiler.
 
-SIMPLE_DECL_ATTR(IBAction, IBAction,
-                 OnFunc,
-                 10)
-
-SIMPLE_DECL_ATTR(IBDesignable, IBDesignable,
-                 OnClass,
-                 11)
-
-SIMPLE_DECL_ATTR(IBInspectable, IBInspectable,
-                 OnVar,
-                 12)
-
-SIMPLE_DECL_ATTR(IBOutlet, IBOutlet,
-                 OnVar,
-                 13)
-
 DECL_ATTR(asmname, Asmname,
-          OnFunc | OnConstructor | OnDestructor,
-          0)
-
-SIMPLE_DECL_ATTR(assignment, Assignment,
-                 OnFunc,
-                 8)
+          OnFunc | OnConstructor | OnDestructor, 0)
 
 DECL_ATTR(availability, Availability,
           OnFunc | OnStruct | OnEnum | OnClass | OnProtocol | OnVar |
-          OnConstructor | OnDestructor |
-          AllowMultipleAttributes,
-          1)
-
-SIMPLE_DECL_ATTR(class_protocol, ClassProtocol,
-                 OnProtocol,
-                 5)
-
-SIMPLE_DECL_ATTR(exported, Exported,
-                 OnImport,
-                 7)
+          OnConstructor | OnDestructor | AllowMultipleAttributes, 1)
 
 SIMPLE_DECL_ATTR(final, Final,
-                 OnClass | OnFunc | OnVar | OnSubscript,
-                 2)
+                 OnClass | OnFunc | OnVar | OnSubscript, 2)
+
+DECL_ATTR(objc, ObjC,
+          OnFunc | OnClass | OnProtocol | OnVar | OnSubscript |
+          OnConstructor | OnDestructor, 3)
+    
+SIMPLE_DECL_ATTR(required, Required,
+                 OnConstructor, 4)
+                               
+SIMPLE_DECL_ATTR(class_protocol, ClassProtocol,
+                 OnProtocol, 5)
+
+SIMPLE_DECL_ATTR(noreturn, NoReturn,
+                 OnFunc, 6)
+
+SIMPLE_DECL_ATTR(exported, Exported,
+                 OnImport, 7)
+
+SIMPLE_DECL_ATTR(assignment, Assignment,
+                 OnFunc, 8)
 
 SIMPLE_DECL_ATTR(NSCopying, NSCopying,
                  OnVar, 9)
 
+SIMPLE_DECL_ATTR(IBAction, IBAction,
+                 OnFunc, 10)
 
-SIMPLE_DECL_ATTR(noreturn, NoReturn,
-                 OnFunc,
-                 6)
+SIMPLE_DECL_ATTR(IBDesignable, IBDesignable,
+                 OnClass, 11)
 
-DECL_ATTR(objc, ObjC,
-          OnFunc | OnClass | OnProtocol | OnVar | OnSubscript |
-          OnConstructor | OnDestructor,
-          3)
+SIMPLE_DECL_ATTR(IBInspectable, IBInspectable,
+                 OnVar, 12)
+
+SIMPLE_DECL_ATTR(IBOutlet, IBOutlet,
+                 OnVar, 13)
 
 VIRTUAL_DECL_ATTR(override, Override,
                   OnFunc | OnVar | OnSubscript,
@@ -150,8 +139,6 @@ VIRTUAL_DECL_ATTR(override, Override,
 VIRTUAL_DECL_ATTR(raw_doc_comment, RawDocComment,
                   OnAnyDecl,
                   /* Not serialized */ 65535)
-
-SIMPLE_DECL_ATTR(required, Required, OnConstructor, 4)
 
 ATTR(conversion)
 ATTR(infix)
