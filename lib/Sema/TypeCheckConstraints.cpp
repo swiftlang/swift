@@ -314,6 +314,14 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
     }
   }
 
+  // If we have an unambiguous reference to a type decl, form a TypeExpr.
+  if (// FIXME: Specialized too!
+      !UDRE->isSpecialized() &&
+      ResultValues.size() == 1 && UDRE->getRefKind() == DeclRefKind::Ordinary &&
+      isa<TypeDecl>(ResultValues[0])) {
+    return TypeExpr::createForDecl(Loc, cast<TypeDecl>(ResultValues[0]));
+  }
+  
   if (AllDeclRefs) {
     // Diagnose uses of operators that found no matching candidates.
     if (ResultValues.empty()) {
@@ -382,8 +390,7 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
   if (AllMemberRefs) {
     Expr *BaseExpr;
     if (auto NTD = dyn_cast<NominalTypeDecl>(Base)) {
-      Type Ty = NTD->getDeclaredTypeInContext();
-      BaseExpr = TypeExpr::createForIdentifier(Loc, Name, Ty, TC.Context);
+      BaseExpr = TypeExpr::createForDecl(Loc, NTD);
     } else {
       BaseExpr = new (TC.Context) DeclRefExpr(Base, Loc, /*implicit=*/true);
     }
@@ -516,8 +523,7 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
     auto *NewTypeRepr =
       new (TC.Context) ArrayTypeRepr(InnerTypeRepr, nullptr,
                                      Indexes->getSourceRange());
-    Type ResTy = ArraySliceType::get(TyExpr->getTypeLoc().getType());
-    return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, ResTy));
+    return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
   }
 
   // Fold T? into an optional type when T is a TypeExpr.
@@ -532,8 +538,7 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
     
     auto *NewTypeRepr =
       new (TC.Context) OptionalTypeRepr(InnerTypeRepr, BOE->getQuestionLoc());
-    Type ResTy = OptionalType::get(TyExpr->getTypeLoc().getType());
-    return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, ResTy));
+    return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
   }
 
   return nullptr;

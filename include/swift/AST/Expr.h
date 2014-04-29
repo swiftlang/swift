@@ -49,6 +49,7 @@ namespace swift {
   class FuncDecl;
   class ConstructorDecl;
   class SubstitutableType;
+  class TypeDecl;
   
 enum class ExprKind : uint8_t {
 #define EXPR(Id, Parent) Id,
@@ -713,10 +714,9 @@ public:
   static TypeExpr *createImplicitHack(SourceLoc Loc, Type Ty, ASTContext &C);
 
   
-  /// Return a TypeExpr for a simple identifier and the specified location.
-  static TypeExpr *createForIdentifier(SourceLoc Loc, Identifier Name,
-                                       Type Ty, ASTContext &C);
-  
+  /// Return a TypeExpr for a TypeDecl and the specified location.
+  static TypeExpr *createForDecl(SourceLoc Loc, TypeDecl *D);
+  TypeLoc &getTypeLoc() { return Info; }
   TypeLoc getTypeLoc() const { return Info; }
   TypeRepr *getTypeRepr() const { return Info.getTypeRepr(); }
   // NOTE: TypeExpr::getType() returns the type of the expr node, which is the

@@ -389,10 +389,7 @@ namespace {
         auto openedFnType = openedType->castTo<FunctionType>();
         auto baseTy = simplifyType(openedFnType->getInput())
                         ->getRValueInstanceType();
-
-        Expr *base = TypeExpr::createForIdentifier(loc, decl->getName(),
-                                                   baseTy, ctx);
-
+        Expr *base = TypeExpr::createImplicitHack(loc, baseTy, ctx);
         return buildMemberRef(base, openedType, SourceLoc(), decl,
                               loc, openedFnType->getResult(),
                               locator, implicit, isDirectPropertyAccess);
@@ -1433,7 +1430,10 @@ namespace {
     }
 
     Expr *visitTypeExpr(TypeExpr *expr) {
-      return simplifyExprType(expr);
+      auto toType = simplifyType(expr->getTypeLoc().getType());
+      expr->getTypeLoc().setType(toType, /*validated=*/true);
+      expr->setType(MetatypeType::get(toType));
+      return expr;
     }
 
     Expr *visitOtherConstructorDeclRefExpr(OtherConstructorDeclRefExpr *expr) {

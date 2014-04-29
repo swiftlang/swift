@@ -259,7 +259,9 @@ namespace {
       else
         type = E->getTypeLoc().getType();
       if (!type) return Type();
-
+      
+      type = CS.openType(type);
+      E->getTypeLoc().setType(type, /*validated=*/true);
       return MetatypeType::get(CS.openType(type));
     }
 

@@ -436,24 +436,23 @@ unsigned ScalarToTupleExpr::getScalarField() const {
 TypeExpr::TypeExpr(TypeLoc TyLoc)
   : Expr(ExprKind::Type, /*implicit*/false), Info(TyLoc) {
   Type Ty = TyLoc.getType();
-  if (Ty->hasCanonicalTypeComputed())
+  if (Ty && Ty->hasCanonicalTypeComputed())
     setType(MetatypeType::get(Ty, Ty->getASTContext()));
 }
 
 TypeExpr::TypeExpr(Type Ty)
-  : Expr(ExprKind::Type, /*implicit*/true),
-    Info(TypeLoc::withoutLoc(Ty)) {
+  : Expr(ExprKind::Type, /*implicit*/true), Info(TypeLoc::withoutLoc(Ty)) {
   if (Ty->hasCanonicalTypeComputed())
     setType(MetatypeType::get(Ty, Ty->getASTContext()));
 }
 
 /// Return a TypeExpr for a simple identifier and the specified location.
-TypeExpr *TypeExpr::createForIdentifier(SourceLoc Loc, Identifier Name,
-                                        Type Ty, ASTContext &C) {
+TypeExpr *TypeExpr::createForDecl(SourceLoc Loc, TypeDecl *Decl) {
+  ASTContext &C = Decl->getASTContext();
   assert(Loc.isValid());
-  auto *Repr = new (C) SimpleIdentTypeRepr(Loc, Name);
-  Repr->setValue(Ty);
-  return new (C) TypeExpr(TypeLoc(Repr, Ty));
+  auto *Repr = new (C) SimpleIdentTypeRepr(Loc, Decl->getName());
+  Repr->setValue(Decl);
+  return new (C) TypeExpr(TypeLoc(Repr, Type()));
 }
 
 // Create an implicit TypeExpr, with location information even though it
@@ -462,7 +461,10 @@ TypeExpr *TypeExpr::createForIdentifier(SourceLoc Loc, Identifier Name,
 TypeExpr *TypeExpr::createImplicitHack(SourceLoc Loc, Type Ty, ASTContext &C) {
   // FIXME: This is horrible.
   if (Loc.isInvalid()) return createImplicit(Ty, C);
-  auto *Res = createForIdentifier(Loc, C.getIdentifier("<<IMPLICIT>>"), Ty, C);
+  auto Name = C.getIdentifier("<<IMPLICIT>>");
+  auto *Repr = new (C) SimpleIdentTypeRepr(Loc, Name);
+  Repr->setValue(Ty);
+  auto *Res = new (C) TypeExpr(TypeLoc(Repr, Ty));
   Res->setImplicit();
   Res->setType(MetatypeType::get(Ty, C));
   return Res;
