@@ -57,6 +57,9 @@ bool ide::printDeclUSR(const ValueDecl *D, raw_ostream &OS) {
     return Ignore;
   }
 
+  if (!D->hasType())
+    return true;
+
   // FIXME: mangling 'self' in destructors crashes in mangler.
   if (isa<ParamDecl>(VD) && isa<DestructorDecl>(VD->getDeclContext()))
       return true;
