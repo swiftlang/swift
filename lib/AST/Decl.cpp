@@ -932,9 +932,11 @@ bool swift::conflicting(const OverloadSignature& sig1,
     return false;
   
   // If one is a compound name and the other is not, they do not conflict
-  // if both have types.
-  if (sig1.Name.isCompoundName() != sig2.Name.isCompoundName())
-    return !(sig1.InterfaceType && sig2.InterfaceType);
+  // if one is a property and the other is a non-nullary function.
+  if (sig1.Name.isCompoundName() != sig2.Name.isCompoundName()) {
+    return !((sig1.IsProperty && sig2.Name.getArgumentNames().size() > 0) ||
+             (sig2.IsProperty && sig1.Name.getArgumentNames().size() > 0));
+  }
   
   return sig1.Name == sig2.Name &&
          sig1.InterfaceType == sig2.InterfaceType &&
@@ -1064,6 +1066,8 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
     signature.InterfaceType
       = getInterfaceType()->getWithoutDefaultArgs(getASTContext())
           ->getCanonicalType();    
+  } else if (isa<VarDecl>(this)) {
+    signature.IsProperty = true;
   }
 
   return signature;

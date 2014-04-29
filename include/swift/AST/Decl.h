@@ -254,6 +254,9 @@ struct OverloadSignature {
 
   /// Whether this is an instance member.
   bool IsInstanceMember = false;
+
+  /// Whether this is a property.
+  bool IsProperty = false;
 };
 
 /// Determine whether two overload signatures conflict.

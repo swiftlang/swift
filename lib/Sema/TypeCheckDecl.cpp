@@ -1106,11 +1106,6 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
     if (currentDC->isTypeContext() != other->getDeclContext()->isTypeContext())
       continue;
 
-    // A property and a method can have the same name.
-    if ((isa<VarDecl>(current) && isa<FuncDecl>(other)) ||
-        (isa<FuncDecl>(current) && isa<VarDecl>(other)))
-      continue;
-
     // Validate the declaration.
     tc.validateDecl(other);
     if (other->isInvalid())
