@@ -109,6 +109,7 @@ struct QuickLookObject {
     RawData Raw;
     Rectangle Rect;
     Point PointOrSize;
+    bool Logical;
   };
   enum class Tag : uint8_t {
     Text,
@@ -123,6 +124,7 @@ struct QuickLookObject {
     Rectangle,
     Point,
     Size,
+    Logical,
     Raw,
   } Kind;
 };
@@ -143,6 +145,7 @@ struct OptionalQuickLookObject {
         QuickLookObject::RawData Raw;
         QuickLookObject::Rectangle Rect;
         QuickLookObject::Point PointOrSize;
+        bool Logical;
       };
       QuickLookObject::Tag Kind;
       bool isNone;
