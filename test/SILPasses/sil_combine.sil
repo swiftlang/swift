@@ -8,6 +8,11 @@ import Swift
 class RawBuffer {}
 class HeapBufferStorage<T,U> : RawBuffer {}
 
+enum FakeOptional<T> {
+  case None
+  case Some(T)
+}
+
 //////////////////////
 // Simple DCE Tests //
 //////////////////////
@@ -510,11 +515,15 @@ bb0(%0 : $Builtin.Int1):
 // CHECK: bb0
 // CHECK-NOT: strong_release
 // CHECK-NOT: strong_retain
+// CHECK-NOT: retain_value
+// CHECK-NOT: release_value
 // CHECK-NEXT: return
-sil @release_then_retain_peephole : $@thin (Builtin.NativeObject) -> (Builtin.NativeObject) {
-bb0(%0 : $Builtin.NativeObject):
+sil @release_then_retain_peephole : $@thin (Builtin.NativeObject, FakeOptional<Builtin.NativeObject>) -> (Builtin.NativeObject) {
+bb0(%0 : $Builtin.NativeObject, %1 : $FakeOptional<Builtin.NativeObject>):
   strong_release %0 : $Builtin.NativeObject
   strong_retain %0 : $Builtin.NativeObject
+  release_value %1 : $FakeOptional<Builtin.NativeObject>
+  retain_value %1 : $FakeOptional<Builtin.NativeObject>
   return %0 : $Builtin.NativeObject
 }
 
@@ -862,11 +871,6 @@ bb0:
 
   %12 = tuple (%9 : $Builtin.Int1, %10 : $Builtin.Int32, %11 : $Builtin.Int64)
   return %12 : $(Builtin.Int1, Builtin.Int32, Builtin.Int64)
-}
-
-enum FakeOptional<T> {
-  case None
-  case Some(T)
 }
 
 // CHECK-LABEL: sil @enum_promotion_of_concrete_types

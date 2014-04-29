@@ -666,30 +666,58 @@ SILInstruction *SILCombiner::visitReleaseValueInst(ReleaseValueInst *DI) {
   return nullptr;
 }
 
-SILInstruction *SILCombiner::visitRetainValueInst(RetainValueInst *CI) {
-  SILValue Operand = CI->getOperand();
+SILInstruction *SILCombiner::visitRetainValueInst(RetainValueInst *RVI) {
+  SILValue Operand = RVI->getOperand();
   SILType OperandTy = Operand.getType();
 
   // retain_value of an enum with a trivial payload or no-payload is a no-op +
   // RAUW.
   if (auto *EI = dyn_cast<EnumInst>(Operand))
     if (!EI->hasOperand() ||
-        EI->getOperand().getType().isTrivial(CI->getModule())) {
-      return eraseInstFromFunction(*CI);
+        EI->getOperand().getType().isTrivial(RVI->getModule())) {
+      return eraseInstFromFunction(*RVI);
     }
 
   // RetainValueInst of a reference type is a strong_release.
   if (OperandTy.hasReferenceSemantics()) {
-    Builder->createStrongRetain(CI->getLoc(), Operand);
-    return eraseInstFromFunction(*CI);
+    Builder->createStrongRetain(RVI->getLoc(), Operand);
+    return eraseInstFromFunction(*RVI);
   }
 
   // RetainValueInst of a trivial type is a no-op + use propogation.
-  if (OperandTy.isTrivial(CI->getModule())) {
-    return eraseInstFromFunction(*CI);
+  if (OperandTy.isTrivial(RVI->getModule())) {
+    return eraseInstFromFunction(*RVI);
   }
 
-  // Do nothing for non-trivial non-reference types.
+  // Sometimes in the stdlib due to hand offs, we will see code like:
+  //
+  // release_value %0
+  // retain_value %0
+  //
+  // with the matching retain_value to the release_value in a predecessor basic
+  // block and the matching release_value for the retain_value_retain in a
+  // successor basic block.
+  //
+  // Due to the matching pairs being in different basic blocks, the ARC
+  // Optimizer (which is currently local to one basic block does not handle
+  // it). But that does not mean that we can not eliminate this pair with a
+  // peephole.
+
+  // If we are not the first instruction in this basic block...
+  if (RVI != &*RVI->getParent()->begin()) {
+    SILBasicBlock::iterator Pred = RVI;
+    --Pred;
+
+    // ...and the predecessor instruction is a release_value on the same value
+    // as our retain_value...
+    if (ReleaseValueInst *Release = dyn_cast<ReleaseValueInst>(&*Pred))
+      // Remove them...
+      if (Release->getOperand() == RVI->getOperand()) {
+        eraseInstFromFunction(*Release);
+        return eraseInstFromFunction(*RVI);
+      }
+  }
+
   return nullptr;
 }
 
