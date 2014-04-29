@@ -75,7 +75,7 @@ public:
 void AttributeEarlyChecker::visitIBActionAttr(IBActionAttr *attr) {
   // Only instance methods returning () can be IBActions.
   const FuncDecl *FD = dyn_cast<FuncDecl>(D);
-  if (!FD || !isInClassContext(D) || FD->isStatic() || FD->isGetterOrSetter()) {
+  if (!FD || !isInClassContext(D) || FD->isStatic() || FD->isAccessor()) {
     TC.diagnose(attr->getLocation(), diag::invalid_ibaction_decl);
     attr->setInvalid();
     return;
@@ -198,10 +198,41 @@ public:
 };
 } // end anonymous namespace
 
+static bool checkObjectOrOptionalObjectType(TypeChecker &TC, Decl *D,
+                                            const Pattern *argPattern) {
+  Type ty = argPattern->getType();
+  if (auto unwrapped = ty->getAnyOptionalObjectType())
+    ty = unwrapped;
+
+  if (auto classDecl = ty->getClassOrBoundGenericClass()) {
+    // @objc class types are okay.
+    if (!classDecl->isObjC()) {
+      TC.diagnose(D, diag::ibaction_nonobjc_class_argument,
+                  argPattern->getType())
+        .highlight(argPattern->getSourceRange());
+      return true;
+    }
+  } else if (ty->isObjCExistentialType()) {
+    // @objc existential types are okay
+    // Nothing to do.
+  } else {
+    // No other types are permitted.
+    TC.diagnose(D, diag::ibaction_nonobject_argument,
+                argPattern->getSemanticsProvidingPattern()->getType())
+      .highlight(argPattern->getSourceRange());
+    return true;
+  }
+
+  return false;
+}
+
+static bool isiOS(TypeChecker &TC) {
+  // FIXME: This is a very ugly way of checking the OS.
+  return TC.getLangOpts().getTargetConfigOption("os") == "iOS";
+}
+
 void AttributeChecker::visitIBActionAttr(IBActionAttr *attr) {
   // IBActions instance methods must have type Class -> (...) -> ().
-  // FIXME: This could do some argument type validation as well (only certain
-  // method signatures are allowed for IBActions).
   auto *FD = cast<FuncDecl>(D);
   Type CurriedTy = FD->getType()->castTo<AnyFunctionType>()->getResult();
   Type ResultTy = CurriedTy->castTo<AnyFunctionType>()->getResult();
@@ -210,6 +241,58 @@ void AttributeChecker::visitIBActionAttr(IBActionAttr *attr) {
     attr->setInvalid();
     return;
   }
+
+  auto Arguments = FD->getBodyParamPatterns()[1];
+  auto ArgTuple = dyn_cast<TuplePattern>(Arguments);
+
+  bool iOSOnlyUsedOnOSX = false;
+  bool Valid = true;
+  if (ArgTuple) {
+    auto fields = ArgTuple->getFields();
+    switch (ArgTuple->getNumFields()) {
+    case 0:
+      // (iOS only) No arguments.
+      if (!isiOS(TC)) {
+        iOSOnlyUsedOnOSX = true;
+        break;
+      }
+      break;
+    case 1:
+      // One argument.
+      if (checkObjectOrOptionalObjectType(TC, D, fields[0].getPattern()))
+        Valid = false;
+      break;
+    case 2:
+      // (iOS only) Two arguments, the second of which is a UIEvent.
+      // We don't currently enforce the UIEvent part.
+      if (!isiOS(TC)) {
+        iOSOnlyUsedOnOSX = true;
+        break;
+      }
+      if (checkObjectOrOptionalObjectType(TC, D, fields[0].getPattern()))
+        Valid = false;
+      if (checkObjectOrOptionalObjectType(TC, D, fields[1].getPattern()))
+        Valid = false;
+      break;
+    default:
+      // No platform allows an action signature with more than two arguments.
+      TC.diagnose(D, diag::invalid_ibaction_argument_count, isiOS(TC));
+      Valid = false;
+      break;
+    }
+  } else {
+    // One argument without a name.
+    if (checkObjectOrOptionalObjectType(TC, D, Arguments))
+      Valid = false;
+  }
+
+  if (iOSOnlyUsedOnOSX) {
+    TC.diagnose(D, diag::invalid_ibaction_argument_count, /*iOS=*/false);
+    Valid = false;
+  }
+
+  if (!Valid)
+    attr->setInvalid();
 }
 
 void AttributeChecker::visitIBOutletAttr(IBOutletAttr *attr) {
