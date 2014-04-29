@@ -535,6 +535,14 @@ Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc) {
     type = &CharacterLiteralType;
     name = "CharacterLiteralType";
   }
+  // ExtendedGraphemeClusterLiteralConvertible -> ExtendedGraphemeClusterType
+  else if (protocol ==
+           getProtocol(
+               SourceLoc(),
+               KnownProtocolKind::ExtendedGraphemeClusterLiteralConvertible)) {
+    type = &ExtendedGraphemeClusterType;
+    name = "ExtendedGraphemeClusterType";
+  }
   // StringLiteralConvertible -> StringLiteralType
   // StringInterpolationConvertible -> StringLiteralType
   else if (protocol == getProtocol(

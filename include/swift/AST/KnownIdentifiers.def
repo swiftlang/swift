@@ -47,28 +47,31 @@ IDENTIFIER_WITH_NAME(EqualsOperator, "==")
 IDENTIFIER_WITH_NAME(NotEqualsOperator, "!=")
 
 // Built-in identifiers
-IDENTIFIER_WITH_NAME(MaxBuiltinIntegerType, "MaxBuiltinIntegerType")
-IDENTIFIER_WITH_NAME(IntegerLiteralType, "IntegerLiteralType")
+IDENTIFIER(MaxBuiltinIntegerType)
+IDENTIFIER(IntegerLiteralType)
 IDENTIFIER_WITH_NAME(ConvertFromIntegerLiteral, "convertFromIntegerLiteral")
 IDENTIFIER_WITH_NAME(ConvertFromBuiltinIntegerLiteral,
                      "_convertFromBuiltinIntegerLiteral")
-IDENTIFIER_WITH_NAME(MaxBuiltinFloatType, "MaxBuiltinFloatType")
-IDENTIFIER_WITH_NAME(FloatLiteralType, "FloatLiteralType")
+IDENTIFIER(MaxBuiltinFloatType)
+IDENTIFIER(FloatLiteralType)
 IDENTIFIER_WITH_NAME(ConvertFromFloatLiteral, "convertFromFloatLiteral")
 IDENTIFIER_WITH_NAME(ConvertFromBuiltinFloatLiteral,
                      "_convertFromBuiltinFloatLiteral")
-IDENTIFIER_WITH_NAME(CharacterLiteralType, "CharacterLiteralType")
+IDENTIFIER(CharacterLiteralType)
 IDENTIFIER_WITH_NAME(ConvertFromCharacterLiteral,
                      "convertFromCharacterLiteral")
 IDENTIFIER_WITH_NAME(ConvertFromBuiltinCharacterLiteral,
                      "_convertFromBuiltinCharacterLiteral")
+IDENTIFIER_WITH_NAME(ConvertFromBuiltinExtendedGraphemeClusterLiteral,
+                     "_convertFromBuiltinExtendedGraphemeClusterLiteral")
+IDENTIFIER_WITH_NAME(ConvertFromExtendedGraphemeClusterLiteral,
+                     "convertFromExtendedGraphemeClusterLiteral")
 IDENTIFIER_WITH_NAME(ConvertFromStringLiteral, "convertFromStringLiteral")
 IDENTIFIER_WITH_NAME(ConvertFromBuiltinUTF16StringLiteral,
                      "_convertFromBuiltinUTF16StringLiteral")
 IDENTIFIER_WITH_NAME(ConvertFromBuiltinStringLiteral,
                      "_convertFromBuiltinStringLiteral")
-IDENTIFIER_WITH_NAME(StringLiteralType,
-                     "StringLiteralType")
+IDENTIFIER(StringLiteralType)
 IDENTIFIER_WITH_NAME(ConvertFromStringInterpolation,
                      "convertFromStringInterpolation")
 IDENTIFIER_WITH_NAME(ConvertFromArrayLiteral, "convertFromArrayLiteral")

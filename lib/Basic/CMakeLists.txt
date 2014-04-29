@@ -14,6 +14,7 @@ add_swift_library(swiftBasic
   StringExtras.cpp
   TaskQueue.cpp
   ThreadSafeRefCounted.cpp
+  Unicode.cpp
   Version.cpp
 
   # Platform-specific TaskQueue implementations

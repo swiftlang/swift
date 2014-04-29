@@ -820,6 +820,11 @@ ERROR(builtin_character_literal_broken_proto,sema_tce,none,
 ERROR(character_literal_broken_proto,sema_tce,none,
       "protocol 'CharacterLiteralConvertible' is broken", ())
 
+ERROR(builtin_extended_grapheme_cluster_literal_broken_proto,sema_tce,none,
+      "protocol 'BuiltinExtendedGraphemeClusterLiteralConvertible' is broken", ())
+ERROR(extended_grapheme_cluster_literal_broken_proto,sema_tce,none,
+      "protocol 'ExtendedGraphemeClusterLiteralConvertible' is broken", ())
+
 ERROR(builtin_string_literal_broken_proto,sema_tce,none,
       "protocol 'BuiltinStringLiteralConvertible' is broken", ())
 ERROR(string_literal_broken_proto,sema_tce,none,

@@ -127,8 +127,9 @@ class alignas(8) Expr {
     unsigned : NumLiteralExprBits;
 
     unsigned Encoding : 1;
+    unsigned IsSingleExtendedGraphemeCluster : 1;
   };
-  enum { NumStringLiteralExprBits = NumLiteralExprBits + 1 };
+  enum { NumStringLiteralExprBits = NumLiteralExprBits + 2 };
   static_assert(NumStringLiteralExprBits <= 32, "fits in an unsigned");
 
   class DeclRefExprBitfields {
@@ -462,13 +463,8 @@ public:
     UTF16
   };
 
-  StringLiteralExpr(StringRef Val, SourceRange Range)
-    : LiteralExpr(ExprKind::StringLiteral, /*Implicit=*/false),
-      Val(Val), Range(Range)
-  {
-    StringLiteralExprBits.Encoding = static_cast<unsigned>(UTF8);
-  }
-  
+  StringLiteralExpr(StringRef Val, SourceRange Range);
+
   StringRef getValue() const { return Val; }
   SourceRange getSourceRange() const { return Range; }
 
@@ -480,6 +476,10 @@ public:
   /// Set the encoding that should be used for this string literal.
   void setEncoding(Encoding encoding) {
     StringLiteralExprBits.Encoding = static_cast<unsigned>(encoding);
+  }
+
+  bool isSingleExtendedGraphemeCluster() const {
+    return StringLiteralExprBits.IsSingleExtendedGraphemeCluster;
   }
 
   static bool classof(const Expr *E) {

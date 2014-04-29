@@ -253,6 +253,7 @@ private:
   Type IntLiteralType;
   Type FloatLiteralType;
   Type CharacterLiteralType;
+  Type ExtendedGraphemeClusterType;
   Type StringLiteralType;
   Type ArrayLiteralType;
   Type DictionaryLiteralType;

@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Expr.h"
+#include "swift/Basic/Unicode.h"
 #include "swift/AST/Decl.h" // FIXME: Bad dependency
 #include "swift/AST/Stmt.h"
 #include "swift/AST/AST.h"
@@ -213,6 +214,14 @@ llvm::APFloat FloatLiteralExpr::getValue() const {
   
   return getValue(getText(),
                   getType()->castTo<BuiltinFloatType>()->getAPFloatSemantics());
+}
+
+StringLiteralExpr::StringLiteralExpr(StringRef Val, SourceRange Range)
+    : LiteralExpr(ExprKind::StringLiteral, /*Implicit=*/false), Val(Val),
+      Range(Range) {
+  StringLiteralExprBits.Encoding = static_cast<unsigned>(UTF8);
+  StringLiteralExprBits.IsSingleExtendedGraphemeCluster =
+      unicode::isSingleExtendedGraphemeCluster(Val);
 }
 
 void DeclRefExpr::setDeclRef(ConcreteDeclRef ref) {

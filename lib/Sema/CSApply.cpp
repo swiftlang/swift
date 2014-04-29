@@ -778,8 +778,9 @@ namespace {
     /// \brief Convert the given literal expression via a protocol pair.
     ///
     /// This routine handles the two-step literal conversion process used
-    /// by integer, float, character, and string literals. The first step
-    /// uses \c protocol while the second step uses \c builtinProtocol.
+    /// by integer, float, character, extended grapheme cluster, and string
+    /// literals. The first step uses \c builtinProtocol while the second
+    /// step uses \c protocol.
     ///
     /// \param literal The literal expression.
     ///
@@ -1240,53 +1241,87 @@ namespace {
       assert(bool(stringLiteral) != bool(magicLiteral) &&
              "literal must be either a string literal or a magic literal");
 
+      auto type = simplifyType(expr->getType());
       auto &tc = cs.getTypeChecker();
-      ProtocolDecl *protocol
-        = tc.getProtocol(expr->getLoc(),
-                         KnownProtocolKind::StringLiteralConvertible);
+
+      bool isStringLiteral = true;
+      ProtocolDecl *protocol = tc.getProtocol(
+          expr->getLoc(), KnownProtocolKind::StringLiteralConvertible);
+
+      if (!tc.conformsToProtocol(type, protocol, cs.DC)) {
+        // If the type does not conform to StringLiteralConvertible, it should
+        // be ExtendedGraphemeClusterLiteralConvertible.
+        protocol = tc.getProtocol(
+            expr->getLoc(),
+            KnownProtocolKind::ExtendedGraphemeClusterLiteralConvertible);
+        isStringLiteral = false;
+      }
+
+      assert(tc.conformsToProtocol(type, protocol, cs.DC));
 
       // For type-sugar reasons, prefer the spelling of the default literal
       // type.
-      auto type = simplifyType(expr->getType());
       if (auto defaultType = tc.getDefaultType(protocol, dc)) {
         if (defaultType->isEqual(type))
           type = defaultType;
       }
-      
+
       TupleTypeElt elementsArray[3] = {
         TupleTypeElt(tc.Context.TheRawPointerType),
         TupleTypeElt(BuiltinIntegerType::getWordType(tc.Context)),
         TupleTypeElt(BuiltinIntegerType::get(1, tc.Context))
       };
 
-      Identifier CFSLID = tc.Context.Id_ConvertFromStringLiteral;
+      ProtocolDecl *builtinProtocol;
+      Identifier literalFuncName;
+      Identifier builtinLiteralFuncName;
+      ArrayRef<TupleTypeElt> elements;
+      Diag<> brokenProtocolDiag;
+      Diag<> brokenBuiltinProtocolDiag;
 
+      if (isStringLiteral) {
+        literalFuncName = tc.Context.Id_ConvertFromStringLiteral;
 
-      // If the type can handle UTF-16 string literals, prefer them.
-      Identifier CFBSLID;
-      ProtocolDecl *builtinProtocol
-        = tc.getProtocol(
+        // If the type can handle UTF-16 string literals, prefer them.
+        builtinProtocol = tc.getProtocol(
             expr->getLoc(),
             KnownProtocolKind::BuiltinUTF16StringLiteralConvertible);
-      ArrayRef<TupleTypeElt> elements;
-      if (tc.conformsToProtocol(type, builtinProtocol, cs.DC)) {
-        CFBSLID = tc.Context.Id_ConvertFromBuiltinUTF16StringLiteral;
-        elements = llvm::makeArrayRef(elementsArray).slice(0, 2);
-        if (stringLiteral)
-          stringLiteral->setEncoding(StringLiteralExpr::UTF16);
-        else
-          magicLiteral->setStringEncoding(StringLiteralExpr::UTF16);
+        if (tc.conformsToProtocol(type, builtinProtocol, cs.DC)) {
+          builtinLiteralFuncName =
+              tc.Context.Id_ConvertFromBuiltinUTF16StringLiteral;
+          elements = llvm::makeArrayRef(elementsArray).slice(0, 2);
+          if (stringLiteral)
+            stringLiteral->setEncoding(StringLiteralExpr::UTF16);
+          else
+            magicLiteral->setStringEncoding(StringLiteralExpr::UTF16);
+        } else {
+          // Otherwise, fall back to UTF-8.
+          builtinProtocol = tc.getProtocol(
+              expr->getLoc(),
+              KnownProtocolKind::BuiltinStringLiteralConvertible);
+          builtinLiteralFuncName =
+              tc.Context.Id_ConvertFromBuiltinStringLiteral;
+          elements = elementsArray;
+          if (stringLiteral)
+            stringLiteral->setEncoding(StringLiteralExpr::UTF8);
+          else
+            magicLiteral->setStringEncoding(StringLiteralExpr::UTF8);
+        }
+        brokenProtocolDiag = diag::string_literal_broken_proto;
+        brokenBuiltinProtocolDiag = diag::builtin_string_literal_broken_proto;
       } else {
-        // Otherwise, fall back to UTF-8.
-        builtinProtocol
-          = tc.getProtocol(expr->getLoc(),
-                           KnownProtocolKind::BuiltinStringLiteralConvertible);
-        CFBSLID = tc.Context.Id_ConvertFromBuiltinStringLiteral;
+        literalFuncName =
+            tc.Context.Id_ConvertFromExtendedGraphemeClusterLiteral;
+        builtinLiteralFuncName =
+            tc.Context.Id_ConvertFromBuiltinExtendedGraphemeClusterLiteral;
+        builtinProtocol = tc.getProtocol(
+            expr->getLoc(),
+            KnownProtocolKind::BuiltinExtendedGraphemeClusterLiteralConvertible);
         elements = elementsArray;
-        if (stringLiteral)
-          stringLiteral->setEncoding(StringLiteralExpr::UTF8);
-        else
-          magicLiteral->setStringEncoding(StringLiteralExpr::UTF8);
+        brokenProtocolDiag =
+            diag::extended_grapheme_cluster_literal_broken_proto;
+        brokenBuiltinProtocolDiag =
+            diag::builtin_extended_grapheme_cluster_literal_broken_proto;
       }
 
       return convertLiteral(expr,
@@ -1294,13 +1329,13 @@ namespace {
                             expr->getType(),
                             protocol,
                             tc.Context.Id_StringLiteralType,
-                            CFSLID,
+                            literalFuncName,
                             builtinProtocol,
                             TupleType::get(elements, tc.Context),
-                            CFBSLID,
+                            builtinLiteralFuncName,
                             nullptr,
-                            diag::string_literal_broken_proto,
-                            diag::builtin_string_literal_broken_proto);
+                            brokenProtocolDiag,
+                            brokenBuiltinProtocolDiag);
     }
     
     Expr *visitStringLiteralExpr(StringLiteralExpr *expr) {

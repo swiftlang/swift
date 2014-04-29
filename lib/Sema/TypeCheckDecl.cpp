@@ -2373,10 +2373,11 @@ public:
         // literal protocols.
         bool literalConvertible = false;
         for (auto literalProtoKind : {
-                                KnownProtocolKind::IntegerLiteralConvertible,
-                                KnownProtocolKind::StringLiteralConvertible,
-                                KnownProtocolKind::FloatLiteralConvertible,
-                                KnownProtocolKind::CharacterLiteralConvertible})
+                 KnownProtocolKind::CharacterLiteralConvertible,
+                 KnownProtocolKind::ExtendedGraphemeClusterLiteralConvertible,
+                 KnownProtocolKind::FloatLiteralConvertible,
+                 KnownProtocolKind::IntegerLiteralConvertible,
+                 KnownProtocolKind::StringLiteralConvertible})
         {
           ProtocolDecl *literalProto =
             TC.getProtocol(ED->getLoc(), literalProtoKind);
@@ -4828,6 +4829,7 @@ static Optional<std::string> buildDefaultInitializerString(TypeChecker &tc,
     }
     CHECK_LITERAL_PROTOCOL(ArrayLiteralConvertible, "[]")
     CHECK_LITERAL_PROTOCOL(DictionaryLiteralConvertible, "[]")
+    CHECK_LITERAL_PROTOCOL(ExtendedGraphemeClusterLiteralConvertible, "\"\"")
     CHECK_LITERAL_PROTOCOL(FloatLiteralConvertible, "0.0")
     CHECK_LITERAL_PROTOCOL(IntegerLiteralConvertible, "0")
     CHECK_LITERAL_PROTOCOL(StringLiteralConvertible, "\"\"")

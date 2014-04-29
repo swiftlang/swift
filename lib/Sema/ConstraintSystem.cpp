@@ -245,20 +245,24 @@ ArrayRef<Type> ConstraintSystem::getAlternativeLiteralTypes(
     index = 2;
     break;
 
-  case KnownProtocolKind::FloatLiteralConvertible:
+  case KnownProtocolKind::ExtendedGraphemeClusterLiteralConvertible:
     index = 3;
     break;
 
-  case KnownProtocolKind::IntegerLiteralConvertible:
+  case KnownProtocolKind::FloatLiteralConvertible:
     index = 4;
     break;
 
-  case KnownProtocolKind::StringInterpolationConvertible:
+  case KnownProtocolKind::IntegerLiteralConvertible:
     index = 5;
     break;
 
-  case KnownProtocolKind::StringLiteralConvertible:
+  case KnownProtocolKind::StringInterpolationConvertible:
     index = 6;
+    break;
+
+  case KnownProtocolKind::StringLiteralConvertible:
+    index = 7;
     break;
   }
 
