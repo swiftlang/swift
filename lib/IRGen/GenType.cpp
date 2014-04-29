@@ -57,11 +57,16 @@ bool TypeInfo::isSingleUnknownRetainablePointer(ResilienceScope scope) const {
 FixedPacking TypeInfo::getFixedPacking(IRGenModule &IGM) const {
   auto fixedTI = dyn_cast<FixedTypeInfo>(this);
   
-  // If the type is fixed, we have to do something dynamic.
+  // If the type isn't fixed, we have to do something dynamic.
   // FIXME: some types are provably too big (or aligned) to be
   // allocated inline.
   if (!fixedTI)
     return FixedPacking::Dynamic;
+  
+  // Never store types that aren't bitwise-takable inline. This allows the
+  // existential container itself to be bitwise-takable.
+  if (!fixedTI->isBitwiseTakable(ResilienceScope::Local))
+    return FixedPacking::Allocate;
   
   Size bufferSize = getFixedBufferSize(IGM);
   Size requiredSize = fixedTI->getFixedSize();
@@ -143,6 +148,9 @@ void FixedTypeInfo::initializeWithTake(IRGenFunction &IGF,
                                        Address destAddr,
                                        Address srcAddr,
                                        CanType T) const {
+  assert(isBitwiseTakable(ResilienceScope::Local)
+        && "non-bitwise-takable type must override default initializeWithTake");
+  
   // Prefer loads and stores if we won't make a million of them.
   // Maybe this should also require the scalars to have a fixed offset.
   ExplosionSchema schema = getSchema(ResilienceExpansion::Maximal);

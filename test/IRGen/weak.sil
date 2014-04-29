@@ -87,16 +87,25 @@ bb0(%0 : $P):
 // Value witnesses for A:
 
 //   destroyBuffer
+//     The value is stored out of line so that the buffer is bitwise-takable.
 // CHECK:    define linkonce_odr hidden void @_TwXXV4weak1A([[BUFFER:\[24 x i8\]]]* [[ARG:%.*]], [[TYPE]]*
-// CHECK:      [[T0:%.*]] = bitcast [[BUFFER]]* [[ARG]] to [[A]]*
-// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds [[A]]* [[T0]], i32 0, i32 0
-// CHECK-NEXT: call void @swift_weakDestroy([[WEAK]]* [[T1]])
+// CHECK:      [[T0:%.*]] = bitcast [[BUFFER]]* [[ARG]] to [[A]]**
+// CHECK-NEXT: [[T1:%.*]] = load [[A]]** [[T0]]
+// CHECK-NEXT: [[T2:%.*]] = getelementptr inbounds [[A]]* [[T1]], i32 0, i32 0
+// CHECK-NEXT: call void @swift_weakDestroy([[WEAK]]* [[T2]])
+// CHECK-NEXT: [[T0:%.*]] = bitcast [[BUFFER]]* [[ARG]] to i8**
+// CHECK-NEXT: [[T1:%.*]] = load i8** [[T0]]
+// CHECK-NEXT: call void @swift_dealloc(i8* [[T1]]
 // CHECK-NEXT: ret void
 
 //   initializeBufferWithCopyOfBuffer
 // CHECK:    define linkonce_odr hidden [[OPAQUE]]* @_TwCPV4weak1A([[BUFFER]]* [[DESTBUF:%.*]], [[BUFFER]]* [[SRCBUF:%.*]], [[TYPE]]*
-// CHECK:      [[DEST:%.*]] = bitcast [[BUFFER]]* [[DESTBUF]] to [[A]]*
-// CHECK-NEXT: [[SRC:%.*]] = bitcast [[BUFFER]]* [[SRCBUF]] to [[A]]*
+// CHECK:      [[DESTALLOC:%.*]] = call noalias i8* @swift_alloc
+// CHECK-NEXT: [[DESTPTR:%.*]] = bitcast [[BUFFER]]* [[DESTBUF]] to i8**
+// CHECK-NEXT: store i8* [[DESTALLOC]], i8** [[DESTPTR]]
+// CHECK-NEXT: [[DEST:%.*]] = bitcast i8* [[DESTALLOC]] to [[A]]*
+// CHECK-NEXT: [[SRCPTR:%.*]] = bitcast [[BUFFER]]* [[SRCBUF]] to [[A]]**
+// CHECK-NEXT: [[SRC:%.*]] = load [[A]]** [[SRCPTR]]
 // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[A]]* [[DEST]], i32 0, i32 0
 // CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds [[A]]* [[SRC]], i32 0, i32 0
 // CHECK-NEXT: call void @swift_weakCopyInit([[WEAK]]* [[T0]], [[WEAK]]* [[T1]])
@@ -113,7 +122,10 @@ bb0(%0 : $P):
 //   initializeBufferWithCopy
 // CHECK:    define linkonce_odr hidden [[OPAQUE]]* @_TwCpV4weak1A([[BUFFER]]* [[DESTBUF:%.*]], [[OPAQUE]]* [[SRC_OPQ:%.*]], [[TYPE]]*
 // CHECK:      [[SRC:%.*]] = bitcast [[OPAQUE]]* [[SRC_OPQ]] to [[A]]*
-// CHECK-NEXT: [[DEST:%.*]] = bitcast [[BUFFER]]* [[DESTBUF]] to [[A]]*
+// CHECK-NEXT: [[DESTALLOC:%.*]] = call noalias i8* @swift_alloc
+// CHECK-NEXT: [[DESTPTR:%.*]] = bitcast [[BUFFER]]* [[DESTBUF]] to i8**
+// CHECK-NEXT: store i8* [[DESTALLOC]], i8** [[DESTPTR]]
+// CHECK-NEXT: [[DEST:%.*]] = bitcast i8* [[DESTALLOC]] to [[A]]*
 // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[A]]* [[DEST]], i32 0, i32 0
 // CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds [[A]]* [[SRC]], i32 0, i32 0
 // CHECK-NEXT: call void @swift_weakCopyInit([[WEAK]]* [[T0]], [[WEAK]]* [[T1]])

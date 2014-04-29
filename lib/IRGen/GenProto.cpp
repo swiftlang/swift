@@ -495,7 +495,11 @@ namespace {
     OpaqueExistentialTypeInfo(llvm::Type *ty, Size size, Alignment align,
                         ArrayRef<ProtocolEntry> protocols)
       : IndirectTypeInfo(ty, size, llvm::BitVector{}, align,
-                         IsNotPOD, IsNotBitwiseTakable),
+                         IsNotPOD,
+                         // We ensure opaque existentials are always bitwise-
+                         // takable by storing non-bitwise-takable objects out
+                         // of line.
+                         IsBitwiseTakable),
         NumProtocols(protocols.size()) {
 
       for (unsigned i = 0; i != NumProtocols; ++i) {
@@ -573,7 +577,7 @@ namespace {
       emitInitializeBufferWithCopyOfBufferCall(IGF, metadata,
                                                destBuffer, srcBuffer);
     }
-
+        
     void destroy(IRGenFunction &IGF, Address addr, CanType T) const {
       emitDestroyExistential(IGF, addr, getLayout());
     }
