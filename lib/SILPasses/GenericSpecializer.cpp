@@ -401,25 +401,46 @@ private:
     case CheckedCastKind::ConcreteToUnrelatedExistential:
       SILCloner<TypeSubCloner>::visitCheckedCastBranchInst(Inst);
       return;
-    case CheckedCastKind::SuperToArchetype:
-      // Stub implementation.
-      SILCloner<TypeSubCloner>::visitCheckedCastBranchInst(Inst);
+    case CheckedCastKind::SuperToArchetype: {
+      // Just change the type of cast to a checked_cast_br downcast
+      SILLocation OpLoc = getOpLocation(Inst->getLoc());
+      SILValue OpValue = getOpValue(Inst->getOperand());
+      SILType OpType = getOpType(Inst->getCastType());
+      SILBasicBlock *OpSuccBB = getOpBasicBlock(Inst->getSuccessBB());
+      SILBasicBlock *OpFailBB = getOpBasicBlock(Inst->getFailureBB());
+      CheckedCastKind OpCastKind = CheckedCastKind::Downcast;
+      doPostProcess(Inst,
+                    getBuilder().createCheckedCastBranch(OpLoc,
+                                                         OpCastKind,
+                                                         OpValue,
+                                                         OpType,
+                                                         OpSuccBB,
+                                                         OpFailBB));
       return;
+    }
     case CheckedCastKind::ArchetypeToArchetype:
+    case CheckedCastKind::ArchetypeToConcrete:
+    case CheckedCastKind::ConcreteToArchetype:
       visitCheckedCastBrArchToArchCast(Inst);
       return;
-    case CheckedCastKind::ArchetypeToConcrete:
-      // Stub implementation.
-      SILCloner<TypeSubCloner>::visitCheckedCastBranchInst(Inst);
+    case CheckedCastKind::ExistentialToArchetype: {
+      // Just convert to ExistentialToConcrete.
+      // Just change the type of cast to a checked_cast_br downcast
+      SILLocation OpLoc = getOpLocation(Inst->getLoc());
+      SILValue OpValue = getOpValue(Inst->getOperand());
+      SILType OpType = getOpType(Inst->getCastType());
+      SILBasicBlock *OpSuccBB = getOpBasicBlock(Inst->getSuccessBB());
+      SILBasicBlock *OpFailBB = getOpBasicBlock(Inst->getFailureBB());
+      CheckedCastKind OpCastKind = CheckedCastKind::ExistentialToConcrete;
+      doPostProcess(Inst,
+                    getBuilder().createCheckedCastBranch(OpLoc,
+                                                         OpCastKind,
+                                                         OpValue,
+                                                         OpType,
+                                                         OpSuccBB,
+                                                         OpFailBB));
       return;
-    case CheckedCastKind::ExistentialToArchetype:
-      // Stub implementation.
-      SILCloner<TypeSubCloner>::visitCheckedCastBranchInst(Inst);
-      return;
-    case CheckedCastKind::ConcreteToArchetype:
-      // Stub implementation.
-      SILCloner<TypeSubCloner>::visitCheckedCastBranchInst(Inst);
-      return;
+    }
     }
   }
 
