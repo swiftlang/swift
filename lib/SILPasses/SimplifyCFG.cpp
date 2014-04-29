@@ -192,20 +192,25 @@ static bool trySimplifyConditional(TermInst *Term, DominanceInfo *DT) {
 
     // Okay, DomBB dominates Term, has a single predecessor, and that
     // predecessor conditionally branches on the same condition. So we
-    // know that DomBB (and thus Inst) are control-dependent on the
-    // edge that takes us from Pred to DomBB. Since the terminator
-    // kind and condition are the same, we can use the knowledge of
-    // which edge gets us to Inst to optimize Inst.
+    // know that DomBB are control-dependent on the edge that takes us
+    // from Pred to DomBB. Since the terminator kind and condition are
+    // the same, we can use the knowledge of which edge gets us to
+    // Inst to optimize Inst.
 
     switch (Kind) {
     case ValueKind::SwitchEnumInst: {
       auto *SEI = cast<SwitchEnumInst>(PredTerm);
       auto *Element = getUniqueCaseElement(SEI, DomBB);
-      assert(Element &&
-             "Expected exactly one element to transfer control here!");
-      simplifySwitchEnumInst(cast<SwitchEnumInst>(Term), Element);
+      if (Element) {
+        simplifySwitchEnumInst(cast<SwitchEnumInst>(Term), Element);
+        return true;
+      }
 
-      return true;
+      // FIXME: We could also simplify things in some cases when we
+      //        reach this switch_enum_inst from another
+      //        switch_enum_inst that is branching on the same value
+      //        and taking the default path.
+      continue;
     }
     case ValueKind::CondBranchInst:
     case ValueKind::SwitchIntInst:

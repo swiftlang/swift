@@ -359,3 +359,33 @@ bb8(%39 : $Int):
   release_value %0 : $Optional<C>
   return %39 : $Int
 }
+
+enum A {
+  case B, C, D
+}
+
+// CHECK-LABEL: cannot_optimize_switch_enum
+sil @cannot_optimize_switch_enum : $@thin (A) -> () {
+// CHECK: bb0
+bb0(%0 : $A):
+// CHECK-NEXT: switch_enum %0 : $A, case #A.B!enumelt: bb1, default [[BB:bb[0-9a-zA-Z]+]]
+  switch_enum %0 : $A, case #A.B!enumelt: bb1, default bb2
+
+bb1:
+  br bb5
+
+// CHECK: [[BB]]
+bb2:
+// CHECK-NEXT: switch_enum %0
+  switch_enum %0 : $A, case #A.C!enumelt: bb3, default bb4
+
+bb3:
+  br bb5
+
+bb4:
+  br bb5
+
+bb5:
+  %6 = tuple ()
+  return %6 : $()
+}
