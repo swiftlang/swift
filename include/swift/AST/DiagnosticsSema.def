@@ -296,15 +296,15 @@ ERROR(transparent_in_classes_not_supported,sema_tcd,none,
 ERROR(conversion_params,sema_tcd,none,
       "conversion function %0 has non-defaulted parameters", (Identifier))
 ERROR(invalid_iboutlet,sema_tcd,none,
-      "only properties can be declared 'IBOutlet'", ())
+      "only instance properties can be declared 'IBOutlet'", ())
 ERROR(iboutlet_nonobjc_class,sema_tcd,none,
       "'IBOutlet' property cannot have non-'@objc' class type %0", (Type))
 ERROR(iboutlet_nonobject_type,sema_tcd,none,
       "'IBOutlet' property cannot have non-object type %0", (Type))
 ERROR(invalid_ibinspectable,sema_tcd,none,
-      "only properties can be declared 'IBInspectable'", ())
+      "only instance properties can be declared 'IBInspectable'", ())
 ERROR(invalid_ibaction_decl,sema_tcd,none,
-      "only methods can be declared 'IBAction'", ())
+      "only instance methods can be declared 'IBAction'", ())
 ERROR(invalid_ibaction_result,sema_tcd,none,
       "methods declared 'IBAction' must return 'Void' (not %0)", (Type))
 ERROR(invalid_ibaction_argument_count,sema_tcd,none,
