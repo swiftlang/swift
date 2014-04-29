@@ -67,6 +67,10 @@ enum class PassKind {
   SILLinker,
 };
 
+enum class OptGroup {
+  Unknown, Diagnostics, Performance
+};
+
 } // end anonymous namespace
 
 static llvm::cl::opt<std::string>
@@ -89,6 +93,14 @@ SDKPath("sdk", llvm::cl::desc("The path to the SDK for use with the clang "
                               "importer."),
         llvm::cl::init(""));
 
+static llvm::cl::opt<OptGroup> OptimizationGroup(
+    llvm::cl::desc("Predefined optimization groups:"),
+    llvm::cl::values(clEnumValN(OptGroup::Diagnostics, "diagnostics",
+                                "Run diagnostic passes"),
+                     clEnumValN(OptGroup::Performance, "performance",
+                                "Run performance passes"),
+                     clEnumValEnd),
+    llvm::cl::init(OptGroup::Unknown));
 
 static llvm::cl::list<PassKind>
 Passes(llvm::cl::desc("Passes:"),
@@ -240,106 +252,14 @@ static llvm::cl::opt<std::string>
 ModuleCachePath("module-cache-path", llvm::cl::desc("Clang module cache path"),
                 llvm::cl::init(SWIFT_MODULE_CACHE_PATH));
 
-// This function isn't referenced outside its translation unit, but it
-// can't use the "static" keyword because its address is used for
-// getMainExecutable (since some platforms don't support taking the
-// address of main, and some platforms can't implement getMainExecutable
-// without being given the address of a function in the main executable).
-void anchorForGetMainExecutable() {}
+static void runCommandLineSelectedPasses(SILModule *Module,
+                                         const SILOptions &Options) {
+  SILPassManager PM(Module, Options);
 
-int main(int argc, char **argv) {
-  // Print a stack trace if we signal out.
-  llvm::sys::PrintStackTraceOnErrorSignal();
-  llvm::PrettyStackTraceProgram X(argc, argv);
-
-  llvm::cl::ParseCommandLineOptions(argc, argv, "Swift SIL optimizer\n");
-
-  // Call llvm_shutdown() on exit to print stats and free memory.
-  llvm::llvm_shutdown_obj Y;
-
-  if (PrintStats)
-    llvm::EnableStatistics();
-
-  CompilerInvocation Invocation;
-
-  Invocation.setMainExecutablePath(
-      llvm::sys::fs::getMainExecutable(argv[0],
-          reinterpret_cast<void *>(&anchorForGetMainExecutable)));
-
-  // Give the context the list of search paths to use for modules.
-  Invocation.setImportSearchPaths(ImportPaths);
-  // Set the SDK path if we are passed in one.
-  if (SDKPath.size())
-    Invocation.setSDKPath(SDKPath);
-  // Set the module cache path. If not passed in we use the default swift module
-  // cache.
-  Invocation.getClangImporterOptions().ModuleCachePath = ModuleCachePath;
-
-  // Load the input file.
-  std::unique_ptr<llvm::MemoryBuffer> InputFile;
-  if (llvm::MemoryBuffer::getFileOrSTDIN(InputFilename, InputFile)) {
-    fprintf(stderr, "Error! Failed to open file: %s\n", InputFilename.c_str());
-    exit(-1);
-  }
-
-  // If it looks like we have an AST, set the source file kind to SIL and the
-  // name of the module to the file's name.
-  Invocation.addInputBuffer(InputFile.get());
-  bool IsModule = false;
-  if (SerializedModuleLoader::isSerializedAST(InputFile.get()->getBuffer())) {
-    IsModule = true;
-    const StringRef Stem = ModuleName.size() ?
-                             StringRef(ModuleName) :
-                             llvm::sys::path::stem(InputFilename);
-    Invocation.setModuleName(Stem);
-    Invocation.setInputKind(SourceFileKind::Library);
-  } else {
-    const StringRef Name = ModuleName.size() ? StringRef(ModuleName) : "main";
-    Invocation.setModuleName(Name);
-    Invocation.setInputKind(SourceFileKind::SIL);
-  }
-
-  CompilerInstance CI;
-  PrintingDiagnosticConsumer PrintDiags;
-  CI.addDiagnosticConsumer(&PrintDiags);
-
-  if (CI.setup(Invocation))
-    return 1;
-  CI.performParse();
-
-  // If parsing produced an error, don't run any passes.
-  if (CI.getASTContext().hadError())
-    return 1;
-
-  // Load the SIL if we have a module. We have to do this after SILParse
-  // creating the unfortunate double if statement.
-  if (IsModule) {
-    assert(!CI.hasSILModule() &&
-           "performParse() should not create a SILModule.");
-    CI.setSILModule(SILModule::createEmptyModule(CI.getMainModule()));
-    std::unique_ptr<SerializedSILLoader> SL = SerializedSILLoader::create(
-        CI.getASTContext(), CI.getSILModule(), nullptr);
-    SL->getAll();
-  }
-
-  // If we're in verify mode, install a custom diagnostic handling for
-  // SourceMgr.
-  if (VerifyMode)
-    enableDiagnosticVerifier(CI.getSourceMgr());
-
-  SILOptions &SILOpts = Invocation.getSILOptions();
-  SILOpts.InlineThreshold = SILInlineThreshold;
-  SILOpts.DevirtThreshold = SILDevirtThreshold;
-  SILOpts.VerifyAll = EnableSILVerifyAll;
-  SILOpts.PrintAll = EnableSILPrintAll;
-  SILOpts.RemoveRuntimeAsserts = RemoveRuntimeAsserts;
-  SILOpts.AssertConfig = AssertConfId;
-
-  SILPassManager PM(CI.getSILModule(), SILOpts);
-  PM.registerAnalysis(createCallGraphAnalysis(CI.getSILModule()));
-  PM.registerAnalysis(createAliasAnalysis(CI.getSILModule()));
-  PM.registerAnalysis(createDominanceAnalysis(CI.getSILModule()));
-  PM.registerAnalysis(createSpecializedArgsAnalysis(CI.getSILModule()));
+  PM.registerAnalysis(createCallGraphAnalysis(Module));
+  PM.registerAnalysis(createAliasAnalysis(Module));
+  PM.registerAnalysis(createDominanceAnalysis(Module));
+  PM.registerAnalysis(createSpecializedArgsAnalysis(Module));
   for (auto Pass : Passes) {
     switch (Pass) {
     case PassKind::AllocBoxToStack:
@@ -437,8 +357,111 @@ int main(int argc, char **argv) {
       break;
     }
   }
-
   PM.run();
+}
+
+// This function isn't referenced outside its translation unit, but it
+// can't use the "static" keyword because its address is used for
+// getMainExecutable (since some platforms don't support taking the
+// address of main, and some platforms can't implement getMainExecutable
+// without being given the address of a function in the main executable).
+void anchorForGetMainExecutable() {}
+
+int main(int argc, char **argv) {
+  // Print a stack trace if we signal out.
+  llvm::sys::PrintStackTraceOnErrorSignal();
+  llvm::PrettyStackTraceProgram X(argc, argv);
+
+  llvm::cl::ParseCommandLineOptions(argc, argv, "Swift SIL optimizer\n");
+
+  // Call llvm_shutdown() on exit to print stats and free memory.
+  llvm::llvm_shutdown_obj Y;
+
+  if (PrintStats)
+    llvm::EnableStatistics();
+
+  CompilerInvocation Invocation;
+
+  Invocation.setMainExecutablePath(
+      llvm::sys::fs::getMainExecutable(argv[0],
+          reinterpret_cast<void *>(&anchorForGetMainExecutable)));
+
+  // Give the context the list of search paths to use for modules.
+  Invocation.setImportSearchPaths(ImportPaths);
+  // Set the SDK path if we are passed in one.
+  if (SDKPath.size())
+    Invocation.setSDKPath(SDKPath);
+  // Set the module cache path. If not passed in we use the default swift module
+  // cache.
+  Invocation.getClangImporterOptions().ModuleCachePath = ModuleCachePath;
+
+  // Load the input file.
+  std::unique_ptr<llvm::MemoryBuffer> InputFile;
+  if (llvm::MemoryBuffer::getFileOrSTDIN(InputFilename, InputFile)) {
+    fprintf(stderr, "Error! Failed to open file: %s\n", InputFilename.c_str());
+    exit(-1);
+  }
+
+  // If it looks like we have an AST, set the source file kind to SIL and the
+  // name of the module to the file's name.
+  Invocation.addInputBuffer(InputFile.get());
+  bool IsModule = false;
+  if (SerializedModuleLoader::isSerializedAST(InputFile.get()->getBuffer())) {
+    IsModule = true;
+    const StringRef Stem = ModuleName.size() ?
+                             StringRef(ModuleName) :
+                             llvm::sys::path::stem(InputFilename);
+    Invocation.setModuleName(Stem);
+    Invocation.setInputKind(SourceFileKind::Library);
+  } else {
+    const StringRef Name = ModuleName.size() ? StringRef(ModuleName) : "main";
+    Invocation.setModuleName(Name);
+    Invocation.setInputKind(SourceFileKind::SIL);
+  }
+
+  CompilerInstance CI;
+  PrintingDiagnosticConsumer PrintDiags;
+  CI.addDiagnosticConsumer(&PrintDiags);
+
+  if (CI.setup(Invocation))
+    return 1;
+  CI.performParse();
+
+  // If parsing produced an error, don't run any passes.
+  if (CI.getASTContext().hadError())
+    return 1;
+
+  // Load the SIL if we have a module. We have to do this after SILParse
+  // creating the unfortunate double if statement.
+  if (IsModule) {
+    assert(!CI.hasSILModule() &&
+           "performParse() should not create a SILModule.");
+    CI.setSILModule(SILModule::createEmptyModule(CI.getMainModule()));
+    std::unique_ptr<SerializedSILLoader> SL = SerializedSILLoader::create(
+        CI.getASTContext(), CI.getSILModule(), nullptr);
+    SL->getAll();
+  }
+
+  // If we're in verify mode, install a custom diagnostic handling for
+  // SourceMgr.
+  if (VerifyMode)
+    enableDiagnosticVerifier(CI.getSourceMgr());
+
+  SILOptions &SILOpts = Invocation.getSILOptions();
+  SILOpts.InlineThreshold = SILInlineThreshold;
+  SILOpts.DevirtThreshold = SILDevirtThreshold;
+  SILOpts.VerifyAll = EnableSILVerifyAll;
+  SILOpts.PrintAll = EnableSILPrintAll;
+  SILOpts.RemoveRuntimeAsserts = RemoveRuntimeAsserts;
+  SILOpts.AssertConfig = AssertConfId;
+
+  if (OptimizationGroup == OptGroup::Diagnostics) {
+    runSILDiagnosticPasses(*CI.getSILModule(), SILOpts);
+  } else if (OptimizationGroup == OptGroup::Performance) {
+    runSILOptimizationPasses(*CI.getSILModule(), SILOpts);
+  } else {
+    runCommandLineSelectedPasses(CI.getSILModule(), SILOpts);
+  }
 
   std::string ErrorInfo;
   llvm::raw_fd_ostream OS(OutputFilename.c_str(), ErrorInfo,
