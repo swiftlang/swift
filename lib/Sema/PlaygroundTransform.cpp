@@ -259,6 +259,17 @@ public:
       return std::make_pair(nullptr, nullptr);
     }
   }
+  
+  std::string digForName(Expr *E) {
+    DeclRefExpr *DRE = nullptr;
+    VarDecl *VD = nullptr;
+    std::tie(DRE, VD) = digForVariable(E);
+    if (VD) {
+      return VD->getName().str();
+    } else {
+      return std::string("");
+    }
+  }
 
   BraceStmt *transformBraceStmt(BraceStmt *BS) {
     llvm::ArrayRef<ASTNode> OriginalElements = BS->getElements();
@@ -289,13 +300,15 @@ public:
                                                      true); // implicit
           NAE->setType(Context.TheEmptyTupleType);
           AE->setImplicit(true);
+          std::string Name = digForName(AE->getDest());
+          
           Expr *Log = buildLoggerCall(
             new (Context) DeclRefExpr(ConcreteDeclRef(PV.second),
                                       SourceLoc(),
                                       true, // implicit
                                       false, // uses direct property access
                                       AE->getSrc()->getType()),
-            AE->getSrc()->getSourceRange());
+            AE->getSrc()->getSourceRange(), Name.c_str());
           Elements[EI] = PV.first;
           Elements.insert(Elements.begin() + (EI + 1), PV.second);
           Elements.insert(Elements.begin() + (EI + 2), Log);
@@ -331,7 +344,7 @@ public:
                                         true, // implicit
                                         false, // uses direct property access
                                         E->getType()),
-              E->getSourceRange());
+              E->getSourceRange(), "");
             Elements[EI] = PV.first;
             Elements.insert(Elements.begin() + (EI + 1), PV.second);
             Elements.insert(Elements.begin() + (EI + 2), Log);
@@ -349,7 +362,7 @@ public:
                                         true, // implicit
                                         false, // uses direct property access
                                         E->getType()),
-              E->getSourceRange());
+              E->getSourceRange(), "");
             Elements[EI] = PV.first;
             Elements.insert(Elements.begin() + (EI + 1), PV.second);
             Elements.insert(Elements.begin() + (EI + 2), Log);
@@ -378,7 +391,7 @@ public:
                                         true, // implicit
                                         false, // uses direct property access
                                         RS->getResult()->getType()),
-              RS->getResult()->getSourceRange());
+              RS->getResult()->getSourceRange(), "");
             Elements[EI] = PV.first;
             Elements.insert(Elements.begin() + (EI + 1), PV.second);
             Elements.insert(Elements.begin() + (EI + 2), Log);
@@ -432,10 +445,6 @@ public:
 
   // log*() functions return a newly-created log expression to be inserted
   // after or instead of the expression they're looking at.
-  Expr *logExpr(Expr *E) {
-    return buildLoggerCall(E, E->getSourceRange());
-  }
-
   Expr *logVarDecl(VarDecl *VD) {
     return buildLoggerCall(
       new (Context) DeclRefExpr(ConcreteDeclRef(VD),
@@ -443,7 +452,7 @@ public:
                                 true, // implicit
                                 false, // uses direct property access
                                 Type()),
-      VD->getSourceRange());
+      VD->getSourceRange(), VD->getName().str().str().c_str());
   }
 
   Expr *logDeclRef(DeclRefExpr *DRE) {
@@ -454,7 +463,7 @@ public:
                                 true, // implicit
                                 false, // uses direct property access
                                 Type()),
-      DRE->getSourceRange());
+      DRE->getSourceRange(), VD->getName().str().str().c_str());
   }
 
   std::pair<PatternBindingDecl*, VarDecl*>
@@ -489,13 +498,16 @@ public:
     return std::make_pair(PBD, VD);
   }
 
-  Expr *buildLoggerCall(Expr *E, SourceRange SR) {
-    Expr *Name = new (Context) StringLiteralExpr("", SourceRange());
-    Name->setImplicit(true);
+  Expr *buildLoggerCall(Expr *E, SourceRange SR, const char *Name) {
+    assert(Name);
+    std::string *NameInContext = Context.AllocateObjectCopy(std::string(Name));
+    Expr *NameExpr = new (Context) StringLiteralExpr(NameInContext->c_str(),
+                                                     SourceRange());
+    NameExpr->setImplicit(true);
       
     Expr *LoggerArgExprs[] = {
         E,
-        Name
+        NameExpr
       };
 
     return buildLoggerCallWithArgs("$builtin_log", 
