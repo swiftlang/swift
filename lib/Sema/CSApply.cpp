@@ -1433,10 +1433,6 @@ namespace {
     }
 
     Expr *visitTypeExpr(TypeExpr *expr) {
-      auto selected = getOverloadChoice(cs.getConstraintLocator(expr));
-      auto MTT = selected.openedFullType;
-
-      (void)MTT;
       return simplifyExprType(expr);
     }
 
@@ -3934,10 +3930,6 @@ Expr *ConstraintSystem::applySolution(const Solution &solution,
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
       // For a default-value expression, do nothing.
       if (isa<DefaultValueExpr>(expr))
-        return { false, expr };
-
-      // Don't recurse into type expressions that have a specified type.
-      if (isa<TypeExpr>(expr))
         return { false, expr };
 
       // For closures, update the parameter types and check the body.

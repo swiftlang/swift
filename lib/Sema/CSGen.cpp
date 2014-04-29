@@ -255,11 +255,12 @@ namespace {
       Type type;
       // If this is an implicit TypeExpr, don't validate its contents.
       if (auto *rep = E->getTypeRepr())
-        type = CS.TC.resolveType(rep, CS.DC, None);
+        type = CS.TC.resolveType(rep, CS.DC, TR_AllowUnboundGenerics);
       else
         type = E->getTypeLoc().getType();
-      
-      return type ? MetatypeType::get(type) : Type();
+      if (!type) return Type();
+
+      return MetatypeType::get(CS.openType(type));
     }
 
     Type visitUnresolvedConstructorExpr(UnresolvedConstructorExpr *expr) {

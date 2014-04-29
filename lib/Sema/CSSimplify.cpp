@@ -1811,14 +1811,14 @@ ConstraintSystem::simplifyDynamicTypeOfConstraint(const Constraint &constraint) 
 
   // If we have an existential metatype, that's good enough to solve
   // the constraint.
-  if (auto metatype1 = type1->getAs<ExistentialMetatypeType>()) {
+  if (auto metatype1 = type1->getAs<ExistentialMetatypeType>())
     return matchTypes(metatype1->getInstanceType(), type2,
                       TypeMatchKind::BindType,
                       TMF_GenerateConstraints, constraint.getLocator());
 
   // If we have a normal metatype, we can't solve backwards unless we
   // know what kind of object it is.
-  } else if (auto metatype1 = type1->getAs<MetatypeType>()) {
+  if (auto metatype1 = type1->getAs<MetatypeType>()) {
     TypeVariableType *instanceTypeVar1;
     Type instanceType1 = getFixedTypeRecursive(metatype1->getInstanceType(),
                                                instanceTypeVar1, true);
