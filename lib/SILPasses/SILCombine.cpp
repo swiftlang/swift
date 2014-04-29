@@ -271,6 +271,9 @@ public:
   SILInstruction *visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI);
   SILInstruction *visitUncheckedRefCastInst(UncheckedRefCastInst *URCI);
   SILInstruction *visitRawPointerToRefInst(RawPointerToRefInst *RPTR);
+  SILInstruction *
+  visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *TEDAI);
+
 
 
 private:
@@ -982,6 +985,52 @@ visitRawPointerToRefInst(RawPointerToRefInst *RawToRef) {
         RawToRef->getLoc(), RefToRaw->getOperand(), RawToRef->getType());
   }
 
+  return nullptr;
+}
+
+/// We really want to eliminate unchecked_take_enum_data_addr. Thus if we find
+/// one go through all of its uses and see if they are all loads and address
+/// projections (in many common situations this is true). If so, perform:
+///
+/// (load (unchecked_take_enum_data_addr x)) -> (unchecked_enum_data (load x))
+///
+/// FIXME: Implement this for address projections.
+SILInstruction *SILCombiner::visitUncheckedTakeEnumDataAddrInst(
+    UncheckedTakeEnumDataAddrInst *TEDAI) {
+  // If our TEDAI has no users, there is nothing to do.
+  if (TEDAI->use_empty())
+    return nullptr;
+
+  // For each user U of the take_enum_data_addr...
+  for (auto U : TEDAI->getUses())
+    // Check if it is load. If it is not a load, bail...
+    if (!isa<LoadInst>(U->getUser()))
+      return nullptr;
+
+  // Grab the EnumAddr.
+  SILLocation Loc = TEDAI->getLoc();
+  SILValue EnumAddr = TEDAI->getOperand();
+  EnumElementDecl *EnumElt = TEDAI->getElement();
+  SILType PayloadType = TEDAI->getType().getObjectType();
+
+  // Go back through a second time now that we know all of our users are
+  // stores. Perform the transformation on each load.
+  for (auto U : TEDAI->getUses()) {
+    // Grab the load.
+    LoadInst *L = cast<LoadInst>(U->getUser());
+
+    // Insert a new Load of the enum and extract the data from that.
+    auto *D = Builder->createUncheckedEnumData(
+        Loc, Builder->createLoad(Loc, EnumAddr), EnumElt, PayloadType);
+
+    // Replace all uses of the old load with the data and erase the old load.
+    replaceInstUsesWith(*L, D, 0);
+    eraseInstFromFunction(*L);
+  }
+
+  // Just return nullptr without removing unchecked_take_enum_data_addr. The
+  // reason why we do this is so that we ensure that the enum address is
+  // properly invalidated.
   return nullptr;
 }
 
