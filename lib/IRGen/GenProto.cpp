@@ -2704,6 +2704,9 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
       if (fixedTI->getFixedExtraInhabitantCount(IGM) > 0)
         flags |= ValueWitnessFlags::Enum_HasExtraInhabitants;
       
+      if (!fixedTI->isBitwiseTakable(ResilienceScope::Local))
+        flags |= ValueWitnessFlags::IsNonBitwiseTakable;
+      
       auto value = IGM.getSize(Size(flags));
       return llvm::ConstantExpr::getIntToPtr(value, IGM.Int8PtrTy);
     }

@@ -296,9 +296,10 @@ enum class ValueWitness : unsigned {
 // to uint64_t.
 namespace ValueWitnessFlags {
   enum : uint64_t {
-    AlignmentMask = 0x0FFFF,
-    IsNonPOD      = 0x10000,
-    IsNonInline   = 0x20000,
+    AlignmentMask       = 0x0FFFF,
+    IsNonPOD            = 0x10000,
+    IsNonInline         = 0x20000,
+    IsNonBitwiseTakable = 0x40000,
     
     /// Flags pertaining to enum representation.
     Enum_FlagMask = 0xC0000,

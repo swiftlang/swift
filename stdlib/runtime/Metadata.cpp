@@ -1080,6 +1080,7 @@ void performBasicLayout(BasicLayout &layout,
   size_t size = layout.size;
   size_t alignment = layout.flags.getAlignment();
   bool isPOD = layout.flags.isPOD();
+  bool isBitwiseTakable = layout.flags.isBitwiseTakable();
   for (unsigned i = 0; i != numElements; ++i) {
     auto elt = elements[i];
     
@@ -1094,12 +1095,15 @@ void performBasicLayout(BasicLayout &layout,
     size += eltVWT->size;
     alignment = std::max(alignment, eltVWT->getAlignment());
     if (!eltVWT->isPOD()) isPOD = false;
+    if (!eltVWT->isBitwiseTakable()) isBitwiseTakable = false;
   }
-  bool isInline = ValueWitnessTable::isValueInline(size, alignment);
+  bool isInline = ValueWitnessTable::isValueInline(size, alignment,
+                                                   isBitwiseTakable);
   
   layout.size = size;
   layout.flags = ValueWitnessFlags().withAlignment(alignment)
                                     .withPOD(isPOD)
+                                    .withBitwiseTakable(isBitwiseTakable)
                                     .withInlineStorage(isInline);
   layout.stride = llvm::RoundUpToAlignment(size, alignment);
 }

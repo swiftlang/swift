@@ -84,11 +84,17 @@ struct ValueWitnessTable;
 /// Types stored in the value-witness table.
 class ValueWitnessFlags {
   typedef size_t int_type;
+  
+  // The polarity of these bits is chosen so that, when doing struct layout, the
+  // flags of the field types can be mostly bitwise-or'ed together to derive the
+  // flags for the struct. (The "non-inline" and "has-extra-inhabitants" bits
+  // still require additional fixup.)
   enum : int_type {
     AlignmentMask = 0x0000FFFF,
     IsNonPOD =      0x00010000,
     IsNonInline =   0x00020000,
     HasExtraInhabitants = 0x00040000,
+    IsNonBitwiseTakable = 0x00080000,
     // Everything else is reserved.
   };
   int_type Data;
@@ -130,16 +136,22 @@ public:
 
   /// True if values of this type can be copied with memcpy and
   /// destroyed with a no-op.
-  ///
-  /// Unlike C++, non-POD types in Swift are still required to be
-  /// address-invariant, so a value can always be "moved" from place
-  /// to place with a memcpy.
   bool isPOD() const { return !(Data & IsNonPOD); }
   constexpr ValueWitnessFlags withPOD(bool isPOD) const {
     return ValueWitnessFlags((Data & ~IsNonPOD) |
                                (isPOD ? 0 : IsNonPOD));
   }
   
+  /// True if values of this type can be taken with memcpy. Unlike C++ 'move',
+  /// 'take' is a destructive operation that invalidates the source object, so
+  /// most types can be taken with a simple bitwise copy. Only types with side
+  /// table references, like @weak references, or types with opaque value
+  /// semantics, like imported C++ types, are not bitwise-takable.
+  bool isBitwiseTakable() const { return !(Data & IsNonBitwiseTakable); }
+  constexpr ValueWitnessFlags withBitwiseTakable(bool isBT) const {
+    return ValueWitnessFlags((Data & ~IsNonBitwiseTakable) |
+                               (isBT ? 0 : IsNonBitwiseTakable));
+  }
   /// True if this type's binary representation has extra inhabitants, that is,
   /// bit patterns that do not form valid values of the type.
   ///
@@ -502,8 +514,12 @@ struct ValueWitnessTable {
 
   /// Would values of a type with the given layout requirements be
   /// allocated inline?
-  static bool isValueInline(size_t size, size_t alignment) {
-    return (size <= sizeof(ValueBuffer) &&
+  ///
+  /// TODO: Instead of storing all non-bitwise-takable types out-of-line, we
+  /// should have an initializeBufferWithTakeOfBuffer value witness.
+  static bool isValueInline(size_t size, size_t alignment, bool bitwiseTakable) {
+    return (bitwiseTakable &&
+            size <= sizeof(ValueBuffer) &&
             alignment <= alignof(ValueBuffer));
   }
 
@@ -515,6 +531,11 @@ struct ValueWitnessTable {
   /// Is this type POD?
   bool isPOD() const {
     return flags.isPOD();
+  }
+
+  /// Is this type bitwise-takable?
+  bool isBitwiseTakable() const {
+    return flags.isBitwiseTakable();
   }
 
   /// Return the size of this type.  Unlike in C, this has not been

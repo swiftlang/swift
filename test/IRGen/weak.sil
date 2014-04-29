@@ -23,6 +23,11 @@ struct A {
   @weak var x : C?
 }
 
+// size 8
+// flags 0x70007 == 458759 (non-POD, non-inline, non-bitwise-takable)
+// stride 8
+// CHECK: @_TWVV4weak1A = {{.*}} i8* inttoptr (i64 8 to i8*), i8* inttoptr (i64 458759 to i8*), i8* inttoptr (i64 8 to i8*)]
+
 sil @test_weak_load_store : $@thin (@inout A, C) -> () {
 bb0(%0 : $*A, %1 : $C):
   %2 = struct_element_addr %0 : $*A, #A.x
