@@ -235,11 +235,37 @@ void CompilerInstance::performParse() {
     createSILModule();
   }
 
+  Module *underlying = nullptr;
+  if (Invocation.getFrontendOptions().ImportUnderlyingModule) {
+    underlying = Context->getClangModuleLoader()->loadModule(SourceLoc(), {
+      { ID, SourceLoc() }
+    });
+    if (!underlying) {
+      Diagnostics.diagnose(SourceLoc(), diag::error_underlying_module_not_found,
+                           ID);
+    }
+  }
+  auto addAdditionalInitialImports = [&](SourceFile *SF) {
+    if (!underlying)
+      return;
+
+    auto initialImports = SF->getImports(/*allowUnparsed=*/true);
+
+    using ImportPair = std::pair<Module::ImportedModule, bool>;
+    SmallVector<ImportPair, 4> initialImportsBuf{
+      initialImports.begin(), initialImports.end()
+    };
+    initialImportsBuf.push_back({ { /*accessPath=*/{}, underlying },
+                                  /*exported=*/false });
+    SF->setImports(Context->AllocateCopy(initialImportsBuf));
+  };
+
   if (Kind == SourceFileKind::REPL) {
     auto *SingleInputFile =
       new (*Context) SourceFile(*MainModule, Kind, {},
                                 Invocation.getParseStdlib());
     MainModule->addFile(*SingleInputFile);
+    addAdditionalInitialImports(SingleInputFile);
     return;
   }
 
@@ -263,13 +289,13 @@ void CompilerInstance::performParse() {
     if (Kind == SourceFileKind::Main)
       SourceMgr.setHashbangBufferID(MainBufferID);
 
-    auto *SingleInputFile =
-      new (*Context) SourceFile(*MainModule, Kind, MainBufferID,
-                                Invocation.getParseStdlib());
-    MainModule->addFile(*SingleInputFile);
+    auto *MainFile = new (*Context) SourceFile(*MainModule, Kind, MainBufferID,
+                                               Invocation.getParseStdlib());
+    MainModule->addFile(*MainFile);
+    addAdditionalInitialImports(MainFile);
 
     if (MainBufferID == PrimaryBufferID)
-      PrimarySourceFile = SingleInputFile;
+      PrimarySourceFile = MainFile;
   }
 
   bool hadLoadError = false;
@@ -292,6 +318,7 @@ void CompilerInstance::performParse() {
                                                 BufferID,
                                                 Invocation.getParseStdlib());
     MainModule->addFile(*NextInput);
+    addAdditionalInitialImports(NextInput);
 
     if (BufferID == PrimaryBufferID)
       PrimarySourceFile = NextInput;

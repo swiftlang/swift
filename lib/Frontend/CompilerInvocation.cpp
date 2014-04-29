@@ -493,6 +493,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
   Opts.EnableSourceImport = Args.hasArg(OPT_enable_source_import);
   Opts.SILSerializeAll = Args.hasArg(OPT_sil_serialize_all);
   Opts.LLVMArgs = Args.getAllArgValues(OPT_Xllvm);
+  Opts.ImportUnderlyingModule = Args.hasArg(OPT_import_underlying_module);
 
   return false;
 }

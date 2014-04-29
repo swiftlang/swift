@@ -140,6 +140,8 @@ public:
   /// (if asked to emit SIL).
   bool EmitVerboseSIL = false;
 
+  bool ImportUnderlyingModule = false;
+
   /// Indicates that all generated SIL should be serialized into a module,
   /// not just code considered fragile.
   bool SILSerializeAll = false;

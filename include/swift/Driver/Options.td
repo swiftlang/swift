@@ -116,6 +116,10 @@ def I : JoinedOrSeparate<["-"], "I">, Flags<[FrontendOption]>,
 def I_EQ : Joined<["-"], "I=">, Flags<[FrontendOption]>,
   Alias<I>;
 
+def import_underlying_module : Flag<["-"], "import-underlying-module">,
+  Flags<[FrontendOption]>,
+  HelpText<"Implicitly imports the Objective-C half of a module">;
+
 def nostdimport : Flag<["-"], "nostdimport">,
   Flags<[DriverOption,FrontendOption]>,
   HelpText<"Don't search the standard library import path for modules">;

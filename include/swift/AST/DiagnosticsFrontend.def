@@ -85,6 +85,9 @@ ERROR(error_stdlib_module_name,frontend,none,
       "%select{|; use -module-name flag to specify an alternate name}1",
       (StringRef, bool))
 
+ERROR(error_underlying_module_not_found,frontend,none,
+      "underlying Objective-C module %0 not found", (Identifier))
+
 ERROR(error_repl_requires_no_input_files,frontend,none,
   "REPL mode requires no input files", ())
 ERROR(error_mode_requires_one_input_file,frontend,none,
