@@ -270,6 +270,31 @@ public:
       return std::string("");
     }
   }
+  
+  DeclRefExpr *digForInoutDeclRef(Expr *E) {
+    if (ScalarToTupleExpr *STE = llvm::dyn_cast<ScalarToTupleExpr>(E)) {
+      if (InOutExpr *IOE = llvm::dyn_cast<InOutExpr>(STE->getSubExpr())) {
+        return llvm::dyn_cast<DeclRefExpr>(IOE->getSubExpr());
+      }
+    } else if (TupleExpr *TE = llvm::dyn_cast<TupleExpr>(E)) {
+      DeclRefExpr *DRE = nullptr;
+      for (Expr *Element : TE->getElements()) {
+        if (InOutExpr *IOE = llvm::dyn_cast<InOutExpr>(Element)) {
+          if (DeclRefExpr *NDRE =
+              llvm::dyn_cast<DeclRefExpr>(IOE->getSubExpr())) {
+            if (DRE) {
+              return nullptr;
+            }
+            else {
+              DRE = NDRE;
+            }
+          }
+        }
+      }
+      return DRE;
+    }
+    return nullptr;
+  }
 
   BraceStmt *transformBraceStmt(BraceStmt *BS) {
     llvm::ArrayRef<ASTNode> OriginalElements = BS->getElements();
@@ -315,11 +340,11 @@ public:
           Elements.insert(Elements.begin() + (EI + 3), NAE);
           EI += 3;
         }
-        else if (CallExpr *CE = llvm::dyn_cast<CallExpr>(E)) {
-          if (CE->getType()->getCanonicalType() ==
+        else if (ApplyExpr *AE = llvm::dyn_cast<ApplyExpr>(E)) {
+          if (AE->getType()->getCanonicalType() ==
               Context.TheEmptyTupleType) {
             if (DotSyntaxCallExpr *DSCE =
-                llvm::dyn_cast<DotSyntaxCallExpr>(CE->getFn())) {
+                llvm::dyn_cast<DotSyntaxCallExpr>(AE->getFn())) {
               Expr *TargetExpr = DSCE->getArg();
               DeclRefExpr *TargetDRE = nullptr;
               VarDecl *TargetVD = nullptr;
@@ -332,6 +357,12 @@ public:
                   Elements.insert(Elements.begin() + (EI + 1), Log);
                   ++EI;
                 }
+              }
+            } else if (DeclRefExpr *DRE = digForInoutDeclRef(AE->getArg())) {
+              Expr *Log = logDeclRef(DRE);
+              if (Log) {
+                Elements.insert(Elements.begin() + (EI + 1), Log);
+                ++EI;
               }
             }
           } else {
@@ -501,6 +532,7 @@ public:
   Expr *buildLoggerCall(Expr *E, SourceRange SR, const char *Name) {
     assert(Name);
     std::string *NameInContext = Context.AllocateObjectCopy(std::string(Name));
+    
     Expr *NameExpr = new (Context) StringLiteralExpr(NameInContext->c_str(),
                                                      SourceRange());
     NameExpr->setImplicit(true);
