@@ -34,7 +34,6 @@ set(SWIFTLIB_ESSENTIAL
   Character.swift
   Collection.swift
   CompilerProtocols.swift
-  ContiguousString.swift
   Dictionary.swift
   EmptyCollection.swift
   Existential.swift
@@ -52,7 +51,6 @@ set(SWIFTLIB_ESSENTIAL
   Nil.swift
   NSSwiftArray.swift
   Map.swift
-  OpaqueString.swift
   Optional.swift
   OutputStream.swift
   Policy.swift
