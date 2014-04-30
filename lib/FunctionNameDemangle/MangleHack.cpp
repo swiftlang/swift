@@ -1,4 +1,4 @@
-//===-- MangleHack.cpp - Swift Runtime Mangle Hack for Interface Builder --===//
+//===-- MangleHack.cpp - Swift Mangle Hack for various clients ------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -17,31 +17,44 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Runtime/MangleHack.h"
+#include "swift/FunctionNameDemangle/MangleHack.h"
 #include "cassert"
 #include "cstring"
-#include "Debug.h"
+#include "cstdio"
 
 const char *
-_swift_mangleClassForIB(const char *module, const char *class_) {
+_swift_mangleSimpleClass(const char *module, const char *class_) {
   size_t moduleLength = strlen(module);
   size_t classLength = strlen(class_);
   char *value = nullptr;
-  int result = asprintf(&value, "_TtC%zu%s%zu%s", moduleLength, module,
-                        classLength, class_);
-  assert(result > 0);
+  if (strcmp(module, "swift") == 0) {
+    int result = asprintf(&value, "_TtCSs%zu%s", classLength, class_);
+    assert(result > 0);
+  } else {
+    int result = asprintf(&value, "_TtC%zu%s%zu%s", moduleLength, module,
+                          classLength, class_);
+    assert(result > 0);
+  }
   assert(value);
   return value;
 }
 
 const char *
-_swift_mangleProtocolForIB(const char *module, const char *protocol) {
+_swift_mangleSimpleProtocol(const char *module, const char *protocol) {
+  if (strcmp(module, "swift") == 0) {
+    module = "Ss";
+  }
   size_t moduleLength = strlen(module);
   size_t protocolLength = strlen(protocol);
   char *value = nullptr;
-  int result = asprintf(&value, "_TtP%zu%s%zu%s_", moduleLength, module,
-                        protocolLength, protocol);
-  assert(result > 0);
+  if (strcmp(module, "swift") == 0) {
+    int result = asprintf(&value, "_TtPSs%zu%s_", protocolLength, protocol);
+    assert(result > 0);
+  } else {
+    int result = asprintf(&value, "_TtP%zu%s%zu%s_", moduleLength, module,
+                          protocolLength, protocol);
+    assert(result > 0);
+  }
   assert(value);
   return value;
 }

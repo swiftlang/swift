@@ -1,4 +1,4 @@
-//===--- MangleHack.h - Swift Support for Interface Builder -----*- C++ -*-===//
+//===--- MangleHack.h - Swift Mangler hack for various clients --*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -19,10 +19,10 @@
 
 // This returns a C string that must be deallocated with free().
 extern "C" const char *
-_swift_mangleClassForIB(const char *module, const char *class_);
+_swift_mangleSimpleClass(const char *module, const char *class_);
 
 // This returns a C string that must be deallocated with free().
 extern "C" const char *
-_swift_mangleProtocolForIB(const char *module, const char *protocol);
+_swift_mangleSimpleProtocol(const char *module, const char *protocol);
 
 #endif

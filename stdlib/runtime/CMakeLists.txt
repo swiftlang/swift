@@ -14,7 +14,6 @@ add_swift_library(swift_runtime INSTALL
   HeapObject.cpp
   KnownMetadata.cpp
   Metadata.cpp
-  MangleHack.cpp
   Stubs.cpp
   SwiftObject.mm
   NSSwiftXXXBase.mm.gyb
