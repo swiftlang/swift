@@ -273,8 +273,16 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
       status |= parseDefaultArgument(*this, defaultArgs, defaultArgIndex,
                                      param.DefaultArg);
 
+      // A default argument implies that the name is API, making the
+      // back-tick redundant.
+      if (param.BackTickLoc.isValid()) {
+        diagnose(param.BackTickLoc, diag::parameter_backtick_default_arg)
+          .fixItRemove(param.BackTickLoc);
+        param.BackTickLoc = SourceLoc();
+      }
+
       if (param.EllipsisLoc.isValid()) {
-        // Thee range of the complete default argument.
+        // The range of the complete default argument.
         SourceRange defaultArgRange;
         if (param.DefaultArg) {
           if (auto init = param.DefaultArg->getExpr()) {
@@ -364,23 +372,28 @@ mapParsedParameters(Parser &parser,
   for (auto &param : params) {
     // Whether the provided name is API by default depends on the parameter
     // context.
-    bool isAPINameByDefault;
+    bool isKeywordArgumentByDefault;
     switch (paramContext) {
     case Parser::ParameterContextKind::Function:
     case Parser::ParameterContextKind::Closure:
     case Parser::ParameterContextKind::Subscript:
     case Parser::ParameterContextKind::Operator:
-      isAPINameByDefault = false;
+      isKeywordArgumentByDefault = false;
       break;
 
     case Parser::ParameterContextKind::Initializer:
-      isAPINameByDefault = true;
+      isKeywordArgumentByDefault = true;
       break;
 
     case Parser::ParameterContextKind::Method:
-      isAPINameByDefault = !isFirstParameter;
+      isKeywordArgumentByDefault = !isFirstParameter;
       break;
     }
+
+    // The presence of a default argument implies that this argument
+    // is a keyword argument.
+    if (param.DefaultArg)
+      isKeywordArgumentByDefault = true;
 
     // Create the pattern.
     Pattern *pattern;
@@ -397,7 +410,7 @@ mapParsedParameters(Parser &parser,
 
       // If the first name is empty and this parameter would not have been
       // an API name by default, complain.
-      if (param.FirstName.empty() && !isAPINameByDefault) {
+      if (param.FirstName.empty() && !isKeywordArgumentByDefault) {
         parser.diagnose(param.FirstNameLoc,
                         diag::parameter_extraneous_empty_name,
                         param.SecondName)
@@ -408,11 +421,11 @@ mapParsedParameters(Parser &parser,
     } else {
       // If it's an API name by default, or there was a back-tick, we have an
       // API name.
-      if (isAPINameByDefault || param.BackTickLoc.isValid()) {
+      if (isKeywordArgumentByDefault || param.BackTickLoc.isValid()) {
         argName = param.FirstName;
 
         // If both are true, warn that the back-tick is unnecessary.
-        if (isAPINameByDefault && param.BackTickLoc.isValid()) {
+        if (isKeywordArgumentByDefault && param.BackTickLoc.isValid()) {
           parser.diagnose(param.BackTickLoc,
                           diag::parameter_extraneous_backtick, argName)
             .fixItRemove(param.BackTickLoc);

@@ -971,7 +971,10 @@ void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
 
         // Determine whether the argument name is API by default.
         bool ArgNameIsAPIByDefault = (CurrPattern == 0 &&
-                                      AFD->argumentNameIsAPIByDefault(i));
+                                      AFD->argumentNameIsAPIByDefault(i)) ||
+          (BodyTuple->getFields()[i].getDefaultArgKind() != 
+             DefaultArgumentKind::None &&
+           Options.PrintDefaultParameterPlaceholder);
 
         printOneParameter(UseArgName ? ArgNames[i] : Identifier(),
                           BodyTuple->getFields()[i].getPattern(),
