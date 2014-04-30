@@ -251,8 +251,10 @@ struct SILDeclRef {
   SILDeclRef atUncurryLevel(unsigned level) const {
     assert(level <= uncurryLevel && "can't safely go to deeper uncurry level");
     bool willBeCurried = isCurried || level < uncurryLevel;
+    // Curry thunks are never foreign.
+    bool willBeForeign = isForeign && !willBeCurried;
     return SILDeclRef(loc.getOpaqueValue(), kind, level,
-                      willBeCurried, isForeign,
+                      willBeCurried, willBeForeign,
                       defaultArgIndex);
   }
   

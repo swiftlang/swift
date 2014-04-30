@@ -3488,16 +3488,17 @@ static SILValue getNextUncurryLevelRef(SILGenFunction &gen,
                                        SILLocation loc,
                                        SILDeclRef next,
                                        ArrayRef<SILValue> curriedArgs) {
-  // For the fully-uncurried reference to a class method, emit the dynamic
-  // dispatch.
-  // FIXME: We should always emit dynamic dispatch at uncurry level 1,
-  // to support overriding a curried method with a non-curried,
-  // function-returning method.
+  // For a foreign function, reference the native thunk.
+  if (next.isForeign)
+    return gen.emitGlobalFunctionRef(loc, next.asForeign(false));
+  
+  // For the fully-uncurried reference to a native class method, emit the
+  // dynamic dispatch.
   if (!next.isCurried
+      && !next.isForeign
       && next.kind == SILDeclRef::Kind::Func
       && next.hasDecl() && isa<ClassDecl>(next.getDecl()->getDeclContext())) {
-    SILValue thisArg;
-    thisArg = curriedArgs.back();
+    SILValue thisArg = curriedArgs.back();
     
     return gen.B.createClassMethod(loc, thisArg, next,
                                    gen.SGM.getConstantType(next));
@@ -3558,6 +3559,27 @@ void SILGenFunction::emitCurryThunk(FuncDecl *fd,
   B.createReturn(ImplicitReturnLocation::getImplicitReturnLoc(fd), toClosure);
 }
 
+static SILValue
+getThunkedForeignFunctionRef(SILGenFunction &gen,
+                             SILLocation loc,
+                             SILDeclRef foreign,
+                             ArrayRef<SILValue> args) {
+  assert(!foreign.isCurried
+         && "should not thunk calling convention when curried");
+  
+  // Produce a class_method when thunking ObjC methods.
+  auto foreignTy = gen.SGM.getConstantType(foreign);
+  if (foreignTy.castTo<SILFunctionType>()->getAbstractCC() == AbstractCC::ObjCMethod) {
+    SILValue thisArg = args.back();
+    
+    return gen.B.createClassMethod(loc, thisArg, foreign,
+                                   gen.SGM.getConstantType(foreign),
+                                   /*volatile*/ true);
+  }
+  // Otherwise, emit a function_ref.
+  return gen.emitGlobalFunctionRef(loc, foreign);
+}
+
 void SILGenFunction::emitForeignThunk(SILDeclRef thunk) {
   // FIXME: native-to-foreign thunk
   assert(!thunk.isForeign && "native to foreign thunk not implemented");
@@ -3599,7 +3621,8 @@ void SILGenFunction::emitForeignThunk(SILDeclRef thunk) {
     }
 
     // Call the original.
-    auto fn = emitGlobalFunctionRef(fd, original, originalInfo);
+    auto fn = getThunkedForeignFunctionRef(*this, fd, original,
+                                           args);
     result = emitMonomorphicApply(fd, ManagedValue::forUnmanaged(fn),
                                   managedArgs,
                                   fd->getBodyResultType()->getCanonicalType())

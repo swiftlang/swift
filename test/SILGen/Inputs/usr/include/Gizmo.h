@@ -72,6 +72,13 @@ typedef long NSInteger;
 - (struct NSRect) convertRectFromBase: (struct NSRect) r;
 @end
 
+@interface CurryTest : NSObject
+// no bridging
+- (NSInteger)foo:(NSInteger)x;
+// requires bridging
+- (NSString*)bar:(NSString*)x;
+@end
+
 #define CF_ENUM(_type, _name) enum _name : _type _name; enum _name : _type
 #define NS_ENUM(_type, _name) CF_ENUM(_type, _name)
 

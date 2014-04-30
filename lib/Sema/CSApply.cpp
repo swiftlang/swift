@@ -1676,8 +1676,7 @@ namespace {
         Struct,
         Enum,
         Archetype,
-        Protocol,
-        ObjC
+        Protocol
       };
       unsigned kind : 3;
     };
@@ -1723,8 +1722,6 @@ namespace {
             kind = MemberPartialApplication::Struct;
           else if (selfTy->getEnumOrBoundGenericEnum())
             kind = MemberPartialApplication::Enum;
-          else if (fnDeclRef->getDecl()->isObjC())
-            kind = MemberPartialApplication::ObjC;
           else
             goto not_value_type_member;
         } else if (auto pmRef = dyn_cast<MemberRefExpr>(member)) {
