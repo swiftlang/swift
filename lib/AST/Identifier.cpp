@@ -31,9 +31,7 @@ raw_ostream &llvm::operator<<(raw_ostream &OS, DeclName I) {
 
   OS << I.getBaseName() << "(";
   for (auto c : I.getArgumentNames()) {
-    if (!c.empty())
-      OS << c;
-    OS << ':';
+    OS << c << ':';
   }
   OS << ")";
   return OS;
