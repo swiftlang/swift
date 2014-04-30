@@ -488,22 +488,32 @@ constantFoldAndCheckIntegerConversions(ApplyInst *AI,
 
   // Check for overflow.
   if (OverflowError) {
+    // If we are not asked to emit overflow diagnostics, just return nullptr on
+    // overflow.
+    if (!ResultsInError.hasValue())
+      return nullptr;
+
     SILLocation Loc = AI->getLoc();
     SILModule &M = AI->getModule();
     const ApplyExpr *CE = Loc.getAsASTNode<ApplyExpr>();
     Type UserSrcTy;
     Type UserDstTy;
     // Primitive heuristics to get the user-written type.
-    // Eventually we might be able to use SILLocatuion (when it contains info
+    // Eventually we might be able to use SILLocation (when it contains info
     // about inlined call chains).
-    if (CE)
+    if (CE) {
       if (const TupleType *RTy = CE->getArg()->getType()->getAs<TupleType>()) {
         if (RTy->getNumElements() == 1) {
           UserSrcTy = RTy->getElementType(0);
           UserDstTy = CE->getType();
         }
+      } else {
+        UserSrcTy = CE->getArg()->getType();
+        UserDstTy = CE->getType();
       }
-
+    }
+    
+ 
     // Assume that we are converting from a literal if the Source size is
     // 2048. Is there a better way to identify conversions from literals?
     bool Literal = (SrcBitWidth == 2048);
@@ -512,11 +522,7 @@ constantFoldAndCheckIntegerConversions(ApplyInst *AI,
     // from ObjC interoperability code. Currently, we treat NSUInteger as
     // Int.
     if (Loc.getSourceLoc().isInvalid()) {
-      // If ResultsInError is null, we are not being asked to emit diagnostics,
-      // so just return nullptr.
-      if (!ResultsInError.hasValue())
-        return nullptr;
-
+ 
       // Otherwise emit the appropriate diagnostic and set ResultsInError.
       if (Literal)
         diagnose(M.getASTContext(), Loc.getSourceLoc(),
@@ -531,11 +537,6 @@ constantFoldAndCheckIntegerConversions(ApplyInst *AI,
       ResultsInError = Optional<bool>(true);
       return nullptr;
     }
-
-    // If we are not asked to emit overflow diagnostics, just return nullptr on
-    // overflow.
-    if (!ResultsInError.hasValue())
-      return nullptr;
 
     // Otherwise report the overflow error.
     if (Literal) {
