@@ -17,6 +17,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Strings.h"
 #include "swift/FunctionNameDemangle/MangleHack.h"
 #include "cassert"
 #include "cstring"
@@ -27,7 +28,7 @@ _swift_mangleSimpleClass(const char *module, const char *class_) {
   size_t moduleLength = strlen(module);
   size_t classLength = strlen(class_);
   char *value = nullptr;
-  if (strcmp(module, "Swift") == 0) {
+  if (strcmp(module, swift::STDLIB_NAME) == 0) {
     int result = asprintf(&value, "_TtCSs%zu%s", classLength, class_);
     assert(result > 0);
   } else {
@@ -44,7 +45,7 @@ _swift_mangleSimpleProtocol(const char *module, const char *protocol) {
   size_t moduleLength = strlen(module);
   size_t protocolLength = strlen(protocol);
   char *value = nullptr;
-  if (strcmp(module, "Swift") == 0) {
+  if (strcmp(module, swift::STDLIB_NAME) == 0) {
     int result = asprintf(&value, "_TtPSs%zu%s_", protocolLength, protocol);
     assert(result > 0);
   } else {
