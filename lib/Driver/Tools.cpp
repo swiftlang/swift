@@ -125,6 +125,15 @@ static void configureDefaultCPU(const llvm::Triple &triple,
   }
 }
 
+// Configure the ABI default
+static void configureDefaultABI(const llvm::Triple &triple,
+                                ArgStringList &args) {
+  if (triple.isOSDarwin() && triple.getArch() == llvm::Triple::arm64) {
+    args.push_back("-target-abi");
+    args.push_back("darwinpcs");
+  }
+}
+
 Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
                          std::unique_ptr<CommandOutput> Output,
                          const ActionList &InputActions, const ArgList &Args,
@@ -265,6 +274,9 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
     configureDefaultCPU(getToolChain().getTriple(), Arguments);
   }
   Args.AddAllArgs(Arguments, options::OPT_target_feature);
+
+  // Default the ABI based on the triple.
+  configureDefaultABI(getToolChain().getTriple(), Arguments);
 
   if (Args.hasArg(options::OPT_parse_as_library) ||
       Args.hasArg(options::OPT_emit_library))

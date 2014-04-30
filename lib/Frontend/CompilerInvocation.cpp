@@ -812,6 +812,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   if (const Arg *A = Args.getLastArg(OPT_target_cpu)) {
     Opts.TargetCPU = A->getValue();
   }
+  if (const Arg *A = Args.getLastArg(OPT_target_abi)) {
+    Opts.TargetABI = A->getValue();
+  }
   Opts.TargetFeatures = Args.getAllArgValues(OPT_target_feature);
 
   if (Args.hasArg(OPT_disable_all_runtime_checks)) {

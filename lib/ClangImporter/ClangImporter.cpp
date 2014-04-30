@@ -151,6 +151,7 @@ ClangImporter::create(ASTContext &ctx,
     "-x", "objective-c", "-std=gnu11", "-fobjc-arc", "-fmodules", "-fblocks",
     "-fsyntax-only", "-w",
     "-triple", irGenOpts.Triple, "-target-cpu", irGenOpts.TargetCPU,
+    "-target-abi", irGenOpts.TargetABI,
     "-I", searchPathOpts.RuntimeResourcePath,
     "-DSWIFT_CLASS_EXTRA=__attribute__((annotate(\""
       SWIFT_NATIVE_ANNOTATION_STRING "\")))",

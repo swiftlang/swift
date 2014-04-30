@@ -54,6 +54,7 @@ public:
   // The CPU and features.
   std::string TargetCPU;
   std::vector<std::string> TargetFeatures;
+  std::string TargetABI;
 
   /// The libraries and frameworks specified on the command line.
   SmallVector<LinkLibrary, 4> LinkLibraries;
