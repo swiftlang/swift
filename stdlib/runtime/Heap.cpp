@@ -53,6 +53,7 @@ private:
   static pthread_rwlock_t lock;
 
   void *operator new(size_t size) = delete;
+  void operator delete(void *pointer) = delete;
   SwiftZone(SwiftZone const &) = delete;
   SwiftZone &operator=(SwiftZone const &) = delete;
 
@@ -314,16 +315,20 @@ SwiftZone::SwiftZone() {
 }
 
 size_t swift::_swift_zone_size(malloc_zone_t *zone, const void *pointer) {
+  SwiftZone::readLock();
   void *ptr = (void *)((unsigned long)pointer & ~arenaMask);
+  size_t value = 0;
   auto it = arenas.find(ptr);
   if (it != arenas.end()) {
-    return it->second.byteSize;
+    value = it->second.byteSize;
+  } else {
+    auto it2 = hugeAllocations.find(pointer);
+    if (it2 != hugeAllocations.end()) {
+      value = it2->second;
+    }
   }
-  auto it2 = hugeAllocations.find(pointer);
-  if (it2 != hugeAllocations.end()) {
-    return it2->second;
-  }
-  return 0;
+  SwiftZone::readUnlock();
+  return value;
 }
 
 void *swift::_swift_zone_malloc(malloc_zone_t *zone, size_t size) {
@@ -590,6 +595,7 @@ enumerateBlocks(std::function<void(const void *, size_t)> func) {
     }
   }
 
+  SwiftZone::readLock();
   for (auto &pair : arenas) {
     Arena &arena = pair.second;
     size_t count = arenaSize / arena.byteSize;
@@ -603,6 +609,7 @@ enumerateBlocks(std::function<void(const void *, size_t)> func) {
   for (auto &pair : hugeAllocations) {
     func(pair.first, pair.second);
   }
+  SwiftZone::readUnlock();
 }
 
 void _swift_zone_print(malloc_zone_t *zone, boolean_t verbose) {
