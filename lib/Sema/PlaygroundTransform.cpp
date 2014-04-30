@@ -24,6 +24,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
+#include "swift/Parse/Lexer.h"
 #include "swift/Sema/CodeCompletionTypeChecking.h"
 #include "swift/Subsystems.h"
 
@@ -591,7 +592,8 @@ public:
       Context.SourceMgr.getLineAndColumn(SR.Start);
 
     std::pair<unsigned, unsigned> EndLC =
-      Context.SourceMgr.getLineAndColumn(SR.End);
+      Context.SourceMgr.getLineAndColumn(
+        Lexer::getLocForEndOfToken(Context.SourceMgr, SR.End));
 
     const size_t buf_size = 8;
 
