@@ -85,14 +85,16 @@ class ConstraintLocator;
 /// Describes a conversion restriction or a fix.
 struct RestrictionOrFix {
   ConversionRestrictionKind Restriction;
-  ExprFixKind Fix;
+  Fix TheFix;
   bool IsRestriction;
 
 public:
   RestrictionOrFix(ConversionRestrictionKind restriction)
   : Restriction(restriction), IsRestriction(true) { }
 
-  RestrictionOrFix(ExprFixKind fix) : Fix(fix), IsRestriction(false) { }
+  RestrictionOrFix(Fix fix) : TheFix(fix), IsRestriction(false) { }
+
+  RestrictionOrFix(FixKind fix) : TheFix(fix), IsRestriction(false) { }
 
   Optional<ConversionRestrictionKind> getRestriction() const {
     if (IsRestriction)
@@ -101,9 +103,9 @@ public:
     return Nothing;
   }
 
-  Optional<ExprFixKind> getFix() const {
+  Optional<Fix> getFix() const {
     if (!IsRestriction)
-      return Fix;
+      return TheFix;
 
     return Nothing;
   }
@@ -753,7 +755,7 @@ public:
 
   /// The list of fixes that need to be applied to the initial expression
   /// to make the solution work.
-  llvm::SmallVector<std::pair<ExprFixKind, ConstraintLocator *>, 4> Fixes;
+  llvm::SmallVector<std::pair<Fix, ConstraintLocator *>, 4> Fixes;
 
   /// The set of disjunction choices used to arrive at this solution,
   /// which informs constraint application.
@@ -1047,9 +1049,8 @@ private:
 
   /// The set of fixes applied to make the solution work.
   ///
-  /// Each fix contains a fix kind as well as a locator to describe where the
-  /// fix occurs.
-  SmallVector<std::pair<ExprFixKind, ConstraintLocator *>, 4> Fixes;
+  /// Each fix is paired with a locator that describes where the fix occurs.
+  SmallVector<std::pair<Fix, ConstraintLocator *>, 4> Fixes;
 
   /// \brief The set of remembered disjunction choices used to reach
   /// the current constraint system.
@@ -1872,7 +1873,7 @@ private:
                                             ConstraintLocatorBuilder locator);
 
   /// \brief Simplify a conversion constraint with a fix applied to it.
-  SolutionKind simplifyFixConstraint(ExprFixKind fix,
+  SolutionKind simplifyFixConstraint(Fix fix,
                                      Type type1, Type type2,
                                      TypeMatchKind matchKind,
                                      unsigned flags,

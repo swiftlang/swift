@@ -115,11 +115,10 @@ Constraint::Constraint(ConstraintKind kind,
   std::copy(typeVars.begin(), typeVars.end(), getTypeVariablesBuffer().begin());
 }
 
-Constraint::Constraint(ConstraintKind kind,
-                       ExprFixKind fix,
+Constraint::Constraint(ConstraintKind kind, Fix fix,
                        Type first, Type second, ConstraintLocator *locator,
                        ArrayRef<TypeVariableType *> typeVars)
-  : Kind(kind), Fix(fix), HasRestriction(false), HasFix(true),
+  : Kind(kind), TheFix(fix.getKind()), HasRestriction(false), HasFix(true),
     IsActive(false), RememberChoice(false), NumTypeVariables(typeVars.size()),
     Types{ first, second, Identifier() }, Locator(locator)
 {
@@ -251,7 +250,8 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
   }
 
   if (auto fix = getFix()) {
-    Out << ' ' << getName(*fix);
+    Out << ' ';
+    fix->print(Out);
   }
 
   if (Locator) {
@@ -299,21 +299,30 @@ StringRef swift::constraints::getName(ConversionRestrictionKind kind) {
   llvm_unreachable("bad conversion restriction kind");
 }
 
-StringRef swift::constraints::getName(ExprFixKind kind) {
+StringRef Fix::getName(FixKind kind) {
   switch (kind) {
-  case ExprFixKind::None:
+  case FixKind::None:
     return "[prevent fixes]";
-  case ExprFixKind::NullaryCall:
+  case FixKind::NullaryCall:
     return "[fix: add nullary call]";
-  case ExprFixKind::ForceOptional:
+  case FixKind::ForceOptional:
     return "[fix: force optional]";
-  case ExprFixKind::ForceDowncast:
+  case FixKind::ForceDowncast:
     return "[fix: force downcast]";
-  case ExprFixKind::AddressOf:
+  case FixKind::AddressOf:
     return "[fix: add address-of]";
-  case ExprFixKind::RemoveNullaryCall:
+  case FixKind::RemoveNullaryCall:
     return "[fix: remove nullary call]";
   }
+}
+
+void Fix::print(llvm::raw_ostream &Out) const {
+  Out << getName(getKind());
+}
+
+void Fix::dump() const {
+  print(llvm::errs());
+  llvm::errs() << "\n";
 }
 
 /// Recursively gather the set of type variables referenced by this constraint.
@@ -429,7 +438,7 @@ Constraint *Constraint::createRestricted(ConstraintSystem &cs,
 }
 
 Constraint *Constraint::createFixed(ConstraintSystem &cs, ConstraintKind kind,
-                                    ExprFixKind fix,
+                                    Fix fix,
                                     Type first, Type second,
                                     ConstraintLocator *locator) {
   // Collect type variables.

@@ -176,7 +176,7 @@ enum RememberChoice_t : bool {
 
 /// Describes the kind of fix to apply to the given constraint before
 /// visiting it.
-enum class ExprFixKind : uint8_t {
+enum class FixKind : uint8_t {
   /// No fix, which is used as a placeholder indicating that future processing
   /// of this constraint should not attempt fixes.
   None,
@@ -198,8 +198,27 @@ enum class ExprFixKind : uint8_t {
   RemoveNullaryCall,
 };
 
-/// Return a string representation of an expression fix.
-llvm::StringRef getName(ExprFixKind kind);
+/// Desribes a fix that can be applied to a constraint before visiting it.
+class Fix {
+  FixKind Kind;
+
+public:
+  Fix() : Kind(FixKind::None) { }
+  
+  Fix(FixKind kind) : Kind(kind) { }
+
+  /// Retrieve the kind of fix.
+  FixKind getKind() const { return Kind; }
+
+  /// Return a string representation of a fix.
+  static llvm::StringRef getName(FixKind kind);
+
+  void print(llvm::raw_ostream &Out) const;
+
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
+                            "only for use within the debugger");
+};
+
 
 /// \brief A constraint between two type variables.
 class Constraint : public llvm::ilist_node<Constraint> {
@@ -210,7 +229,7 @@ class Constraint : public llvm::ilist_node<Constraint> {
   ConversionRestrictionKind Restriction : 8;
 
   /// The kind of fix to be applied to the constraint before visiting it.
-  ExprFixKind Fix : 8;
+  FixKind TheFix : 8;
 
   /// Whether the \c Restriction field is valid.
   unsigned HasRestriction : 1;
@@ -280,7 +299,7 @@ class Constraint : public llvm::ilist_node<Constraint> {
              ArrayRef<TypeVariableType *> typeVars);
 
   /// Constraint a relational constraint with a fix.
-  Constraint(ConstraintKind kind, ExprFixKind fix,
+  Constraint(ConstraintKind kind, Fix fix,
              Type first, Type second, ConstraintLocator *locator,
              ArrayRef<TypeVariableType *> typeVars);
 
@@ -308,7 +327,7 @@ public:
 
   /// Create a relational constraint with a fix.
   static Constraint *createFixed(ConstraintSystem &cs, ConstraintKind kind,
-                                 ExprFixKind fix,
+                                 Fix fix,
                                  Type first, Type second,
                                  ConstraintLocator *locator);
 
@@ -336,11 +355,11 @@ public:
   }
 
   /// Retrieve the fix associated with this constraint.
-  Optional<ExprFixKind> getFix() const {
+  Optional<Fix> getFix() const {
     if (!HasFix)
       return Nothing;
 
-    return Fix;
+    return Fix(TheFix);
   }
 
   /// Whether this constraint is active, i.e., in the worklist.

@@ -1004,25 +1004,25 @@ commit_to_conversions:
     // If the source type is a function type that could be applied with (),
     // try it.
     if (isFunctionTypeAcceptingNoArguments(objectType1)) {
-      conversionsOrFixes.push_back(ExprFixKind::NullaryCall);
+      conversionsOrFixes.push_back(FixKind::NullaryCall);
     }
 
     // If we have an optional type, try to force-unwrap it.
     // FIXME: Should we also try '?'?
     if (objectType1->getOptionalObjectType()) {
-      conversionsOrFixes.push_back(ExprFixKind::ForceOptional);
+      conversionsOrFixes.push_back(FixKind::ForceOptional);
     }
 
     // If we have a value of type AnyObject that we're trying to convert to
     // a class, force a downcast.
     if (objectType1->isAnyObject() &&
         type2->getClassOrBoundGenericClass()) {
-      conversionsOrFixes.push_back(ExprFixKind::ForceDowncast);
+      conversionsOrFixes.push_back(FixKind::ForceDowncast);
     }
 
     // If we're converting an lvalue to an inout type, add the missing '&'.
     if (type2->getRValueType()->is<InOutType>() && type1->is<LValueType>()) {
-      conversionsOrFixes.push_back(ExprFixKind::AddressOf);
+      conversionsOrFixes.push_back(FixKind::AddressOf);
     }
   }
 
@@ -1063,7 +1063,7 @@ commit_to_conversions:
       // If the first thing we found is a fix, add a "don't fix" marker.
       if (conversionsOrFixes.empty()) {
         constraints.push_back(
-          Constraint::createFixed(*this, constraintKind, ExprFixKind::None,
+          Constraint::createFixed(*this, constraintKind, FixKind::None,
                                   type1, type2, fixedLocator));
       }
 
@@ -1941,7 +1941,7 @@ retry:
     if (worseThanBestSolution())
       return SolutionKind::Error;
 
-    Fixes.push_back({ExprFixKind::ForceOptional,getConstraintLocator(locator)});
+    Fixes.push_back({FixKind::ForceOptional,getConstraintLocator(locator)});
 
     type2 = objectType2;
     desugar2 = type2->getDesugaredType();
@@ -1958,7 +1958,7 @@ retry:
 
     // We don't bother with a 'None' case, because at this point we won't get
     // a better diagnostic from that case.
-    Fixes.push_back({ExprFixKind::RemoveNullaryCall,
+    Fixes.push_back({FixKind::RemoveNullaryCall,
                      getConstraintLocator(locator)});
 
     return matchTypes(func1->getResult(), type2,
@@ -2195,7 +2195,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
 }
 
 ConstraintSystem::SolutionKind
-ConstraintSystem::simplifyFixConstraint(ExprFixKind fix,
+ConstraintSystem::simplifyFixConstraint(Fix fix,
                                         Type type1, Type type2,
                                         TypeMatchKind matchKind,
                                         unsigned flags,
@@ -2204,14 +2204,15 @@ ConstraintSystem::simplifyFixConstraint(ExprFixKind fix,
   if (ctx.LangOpts.DebugConstraintSolver) {
     auto &log = ctx.TypeCheckerDebug->getStream();
     log.indent(solverState? solverState->depth * 2 + 2 : 0)
-      << "(attempting fix " << getName(fix) << " @ ";
-
+      << "(attempting fix ";
+    fix.print(log);
+    log << " @";
     getConstraintLocator(locator)->dump(&ctx.SourceMgr, log);
     log << ")\n";
   }
 
   // Record the fix.
-  if (fix != ExprFixKind::None) {
+  if (fix.getKind() != FixKind::None) {
     Fixes.push_back({fix, getConstraintLocator(locator)});
 
     // Increase the score. If this would make the current solution worse than
@@ -2223,29 +2224,29 @@ ConstraintSystem::simplifyFixConstraint(ExprFixKind fix,
 
   // Try with the fix.
   unsigned subFlags = flags | TMF_ApplyingFix | TMF_GenerateConstraints;
-  switch (fix) {
-  case ExprFixKind::None:
+  switch (fix.getKind()) {
+  case FixKind::None:
     return matchTypes(type1, type2, matchKind, subFlags, locator);
 
-  case ExprFixKind::NullaryCall:
+  case FixKind::NullaryCall:
     // Assume that '()' was applied to the first type.
     return matchTypes(type1->getRValueType()->castTo<AnyFunctionType>()
                         ->getResult(),
                       type2, matchKind, subFlags, locator);
 
-  case ExprFixKind::RemoveNullaryCall:
+  case FixKind::RemoveNullaryCall:
     llvm_unreachable("Always applied directly");
 
-  case ExprFixKind::ForceOptional:
+  case FixKind::ForceOptional:
     // Assume that '!' was applied to the first type.
     return matchTypes(type1->getRValueType()->getOptionalObjectType(), type2,
                       matchKind, subFlags, locator);
 
-  case ExprFixKind::ForceDowncast:
+  case FixKind::ForceDowncast:
     // This one works whenever it is suggested.
     return SolutionKind::Solved;
 
-  case ExprFixKind::AddressOf:
+  case FixKind::AddressOf:
     // Assume that '&' was applied to the first type, turning an lvalue into
     // an inout.
     return matchTypes(InOutType::get(type1->getRValueType()), type2,

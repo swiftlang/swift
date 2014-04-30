@@ -3861,7 +3861,7 @@ Expr *ConstraintSystem::applySolution(const Solution &solution,
 
       // Removing a nullary call to a non-function requires us to have an
       // 'ApplyFunction', which we strip.
-      if (fix.first == ExprFixKind::RemoveNullaryCall) {
+      if (fix.first.getKind() == FixKind::RemoveNullaryCall) {
         auto anchor = locator->getAnchor();
         auto path = locator->getPath();
         if (!path.empty() &&
@@ -3885,11 +3885,11 @@ Expr *ConstraintSystem::applySolution(const Solution &solution,
 
       Expr *affected = resolved->getAnchor();
 
-      switch (fix.first) {
-      case ExprFixKind::None:
+      switch (fix.first.getKind()) {
+      case FixKind::None:
         llvm_unreachable("no-fix marker should never make it into solution");
 
-      case ExprFixKind::NullaryCall: {
+      case FixKind::NullaryCall: {
         auto type = solution.simplifyType(TC, affected->getType())
                       ->getRValueObjectType()->castTo<AnyFunctionType>()
                       ->getResult();
@@ -3902,7 +3902,7 @@ Expr *ConstraintSystem::applySolution(const Solution &solution,
         break;
       }
 
-      case ExprFixKind::RemoveNullaryCall: {
+      case FixKind::RemoveNullaryCall: {
         if (auto apply = dyn_cast<ApplyExpr>(affected)) {
           auto type = solution.simplifyType(TC, apply->getFn()->getType())
                         ->getRValueObjectType();
@@ -3913,15 +3913,15 @@ Expr *ConstraintSystem::applySolution(const Solution &solution,
         break;
       }
 
-      case ExprFixKind::ForceOptional:
-      case ExprFixKind::ForceDowncast: {
+      case FixKind::ForceOptional:
+      case FixKind::ForceDowncast: {
         auto type = solution.simplifyType(TC, affected->getType())
                       ->getRValueObjectType();
         SourceLoc afterAffectedLoc
           = Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
                                        affected->getEndLoc());
         TC.diagnose(affected->getLoc(),
-                    fix.first == ExprFixKind::ForceOptional
+                    fix.first.getKind() == FixKind::ForceOptional
                       ? diag::missing_unwrap_optional
                       : diag::missing_forced_downcast,
                     type)
@@ -3930,7 +3930,7 @@ Expr *ConstraintSystem::applySolution(const Solution &solution,
         break;
       }
 
-      case ExprFixKind::AddressOf: {
+      case FixKind::AddressOf: {
         auto type = solution.simplifyType(TC, affected->getType())
                       ->getRValueObjectType();
         TC.diagnose(affected->getLoc(), diag::missing_address_of, type)
