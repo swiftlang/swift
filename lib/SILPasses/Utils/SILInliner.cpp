@@ -410,7 +410,8 @@ static InlineCost instructionInlineCost(SILInstruction &I,
 /// \param Caller is nonnull if the function is being evaluated for inlining.
 unsigned swift::getFunctionCost(SILFunction *F, SILFunction *Caller,
                                 unsigned Cutoff) {
-  DEBUG(llvm::dbgs() << "  Calculating cost for " << F->getName() << ".\n");
+  DEBUG(llvm::dbgs() << "            Calculating cost for " << F->getName()
+        << ".\n");
 
   if (F->isTransparent() == IsTransparent_t::IsTransparent)
     return 0;
@@ -436,6 +437,6 @@ unsigned swift::getFunctionCost(SILFunction *F, SILFunction *Caller,
     }
   }
 
-  DEBUG(llvm::dbgs() << "  Found cost: " << Cost << "\n");
+  DEBUG(llvm::dbgs() << "            Found cost: " << Cost << "\n");
   return Cost;
 }

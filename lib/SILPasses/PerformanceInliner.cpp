@@ -59,11 +59,13 @@ static SILFunction *getInlinableFunction(ApplyInst *AI,
   SILFunction *F = FRI->getReferencedFunction();
   // If F is an external declaration, we can't inline...
   if (F->empty() || F->isExternalDeclaration()) {
-    DEBUG(llvm::dbgs() << "  Can't inline " << F->getName() << ".\n");
+    DEBUG(llvm::dbgs() << "        FAIL! Can't inline " << F->getName()
+          << ".\n");
     return nullptr;
   }
 
-  DEBUG(llvm::dbgs() << "  Can inline " << F->getName() << ".\n");
+  DEBUG(llvm::dbgs() << "        SUCCESS! Can inline " << F->getName()
+        << ".\n");
   return F;
 }
 
@@ -114,18 +116,21 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
   }
 
   for (auto AI : CallSites) {
-    DEBUG(llvm::dbgs() << "  Found call site:" <<  *AI);
+    DEBUG(llvm::dbgs() << "    Found call site:" <<  *AI);
 
     // Get the callee.
     SILFunction *Callee = getInlinableFunction(AI, Mode);
-    if (!Callee)
+    if (!Callee) {
+      DEBUG(llvm::dbgs() << "        FAIL! Couldn't find inlineable callee.\n");
       continue;
+    }
 
-    DEBUG(llvm::dbgs() << "  Found callee:" <<  Callee->getName() << ".\n");
+    DEBUG(llvm::dbgs() << "        Found callee:" <<  Callee->getName()
+          << ".\n");
 
     // Prevent circular inlining.
     if (Callee == Caller) {
-      DEBUG(llvm::dbgs() << "  Skipping recursive calls.\n");
+      DEBUG(llvm::dbgs() << "        FAIL! Skipping recursive calls.\n");
       continue;
     }
 
@@ -133,7 +138,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
     // with a less visible linkage than caller, don't inline Callee into caller.
     if (transitivelyReferencesLessVisibleLinkage(*Callee,
                                                  Caller->getLinkage())) {
-      DEBUG(llvm::dbgs() << "  Skipping less visible call.");
+      DEBUG(llvm::dbgs() << "        FAIL! Skipping less visible call.");
       continue;
     }
 
@@ -154,8 +159,11 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
     unsigned CalleeCost = getFunctionCost(Callee, Caller,
                                           InlineCostThreshold * BoostFactor);
 
-    if (CalleeCost > InlineCostThreshold * BoostFactor) {
-      DEBUG(llvm::dbgs() << "  Function too big to inline. Skipping.\n");
+    unsigned Threshold = InlineCostThreshold * BoostFactor;
+    if (CalleeCost > Threshold) {
+      DEBUG(llvm::dbgs() << "        FAIL! Function too big to inline. "
+            "Skipping. CalleeCost: " << CalleeCost << ". Threshold: "
+            << Threshold << "\n");
       continue;
     }
 
@@ -165,8 +173,8 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
     Args.push_back(Arg);
 
     // Ok, we are within budget. Attempt to inline.
-    DEBUG(llvm::dbgs() << "  Inlining " << Callee->getName() << " Into " <<
-          Caller->getName() << "\n");
+    DEBUG(llvm::dbgs() << "        SUCCESS! Inlining " << Callee->getName()
+          << " Into " << Caller->getName() << "\n");
 
     // We already moved the iterator to the next instruction because the AI
     // will be erased by the inliner. Notice that we will skip all of the
@@ -176,6 +184,8 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
     NumFunctionsInlined++;
     Changed = true;
   }
+
+  DEBUG(llvm::dbgs() << "\n");
   return Changed;
 }
 
