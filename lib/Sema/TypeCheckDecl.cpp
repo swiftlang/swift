@@ -5630,6 +5630,11 @@ void TypeChecker::fixAbstractFunctionNames(InFlightDiagnostic &diag,
     } else if (auto paren = dyn_cast<ParenPattern>(pattern)) {
       loc = paren->getSubPattern()->getLoc();
       needColon = true;
+
+      // FIXME: Representation doesn't let us fix this easily.
+      if (targetArg.empty())
+        continue;
+
     } else {
       loc = pattern->getLoc();
       needColon = true;

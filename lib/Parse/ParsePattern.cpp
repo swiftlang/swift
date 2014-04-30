@@ -132,7 +132,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
                              SmallVectorImpl<ParsedParameter> &params,
                              SourceLoc &rightParenLoc,
                              DefaultArgumentInfo *defaultArgs,
-                             bool isClosure) {
+                             ParameterContextKind paramContext) {
   assert(params.empty() && leftParenLoc.isInvalid() &&
          rightParenLoc.isInvalid() && "Must start with empty state");
 
@@ -146,6 +146,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
   }
 
   // Parse the parameter list.
+  bool isClosure = paramContext == ParameterContextKind::Closure;
   return parseList(tok::r_paren, leftParenLoc, rightParenLoc, tok::comma,
                       /*OptionalSep=*/false, /*AllowSepAfterLast=*/false,
                       diag::expected_rparen_parameter,
@@ -284,7 +285,8 @@ mapParsedParameters(Parser &parser,
                     MutableArrayRef<Parser::ParsedParameter> params,
                     SourceLoc rightParenLoc,
                     bool isFirstParameterClause,
-                    SmallVectorImpl<Identifier> *argNames) {
+                    SmallVectorImpl<Identifier> *argNames,
+                    Parser::ParameterContextKind paramContext) {
   auto &ctx = parser.Context;
 
   // Local function to create a pattern for a single parameter.
@@ -337,21 +339,71 @@ mapParsedParameters(Parser &parser,
   // parameters.
   SmallVector<TuplePatternElt, 4> elements;
   SourceLoc ellipsisLoc;
+  bool isFirstParameter = true;
   for (auto &param : params) {
+    // Whether the provided name is API by default depends on the parameter
+    // context.
+    bool isAPINameByDefault;
+    switch (paramContext) {
+    case Parser::ParameterContextKind::Function:
+    case Parser::ParameterContextKind::Closure:
+    case Parser::ParameterContextKind::Subscript:
+    case Parser::ParameterContextKind::Operator:
+      isAPINameByDefault = false;
+      break;
+
+    case Parser::ParameterContextKind::Initializer:
+      isAPINameByDefault = true;
+      break;
+
+    case Parser::ParameterContextKind::Method:
+      isAPINameByDefault = !isFirstParameter;
+      break;
+    }
+
     // Create the pattern.
     Pattern *pattern;
-    if (param.SecondNameLoc.isValid())
+    Identifier argName;
+    if (param.SecondNameLoc.isValid()) {
+      // Both names were provided, so pass them in directly.
       pattern = createParamPattern(param.InOutLoc,
                                    param.IsLet, param.LetVarLoc,
                                    param.FirstName, param.FirstNameLoc,
                                    param.SecondName, param.SecondNameLoc,
                                    param.Type);
-    else
+
+      argName = param.FirstName;
+
+      // If the first name is empty and this parameter would not have been
+      // an API name by default, complain.
+      if (param.FirstName.empty() && !isAPINameByDefault) {
+        parser.diagnose(param.FirstNameLoc,
+                        diag::parameter_extraneous_empty_name,
+                        param.SecondName)
+          .fixItRemoveChars(param.FirstNameLoc, param.SecondNameLoc);
+
+        param.FirstNameLoc = SourceLoc();
+      }
+    } else {
+      // If it's an API name by default, or there was a back-tick, we have an
+      // API name.
+      if (isAPINameByDefault || param.BackTickLoc.isValid()) {
+        argName = param.FirstName;
+
+        // If both are true, warn that the back-tick is unnecessary.
+        if (isAPINameByDefault && param.BackTickLoc.isValid()) {
+          parser.diagnose(param.BackTickLoc,
+                          diag::parameter_extraneous_backtick, argName)
+            .fixItRemove(param.BackTickLoc);
+        }
+      }
+
       pattern = createParamPattern(param.InOutLoc,
                                    param.IsLet, param.LetVarLoc,
-                                   param.FirstName, SourceLoc(),
+                                   argName, SourceLoc(),
                                    param.FirstName, param.FirstNameLoc,
                                    param.Type);
+    }
 
     // If this parameter had an ellipsis, check whether it's the last parameter.
     if (param.EllipsisLoc.isValid()) {
@@ -376,7 +428,9 @@ mapParsedParameters(Parser &parser,
     elements.push_back(TuplePatternElt(pattern, param.DefaultArg, defArgKind));
 
     if (argNames)
-      argNames->push_back(param.FirstName);
+      argNames->push_back(argName);
+
+    isFirstParameter = false;
   }
 
   return TuplePattern::createSimple(ctx, leftParenLoc, elements,
@@ -385,18 +439,20 @@ mapParsedParameters(Parser &parser,
 }
 
 /// Parse a single parameter-clause.
-ParserResult<Pattern> Parser::parseSingleParameterClause(bool isClosure) {
+ParserResult<Pattern> Parser::parseSingleParameterClause(
+                                ParameterContextKind paramContext) {
   ParserStatus status;
   SmallVector<ParsedParameter, 4> params;
   SourceLoc leftParenLoc, rightParenLoc;
   
   // Parse the parameter clause.
   status |= parseParameterClause(leftParenLoc, params, rightParenLoc,
-                                 /*defaultArgs=*/nullptr, isClosure);
+                                 /*defaultArgs=*/nullptr, paramContext);
   
   // Turn the parameter clause into argument and body patterns.
   auto pattern = mapParsedParameters(*this, leftParenLoc, params,
-                                     rightParenLoc, true, nullptr);
+                                     rightParenLoc, true, nullptr,
+                                     paramContext);
 
   return makeParserResult(status, pattern);
 }
@@ -414,6 +470,7 @@ ParserResult<Pattern> Parser::parseSingleParameterClause(bool isClosure) {
 ParserStatus
 Parser::parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
                                SmallVectorImpl<Pattern *> &BodyPatterns,
+                               ParameterContextKind paramContext,
                                DefaultArgumentInfo &DefaultArgs) {
   // Parse parameter-clauses.
   ParserStatus status;
@@ -424,14 +481,15 @@ Parser::parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
 
     // Parse the parameter clause.
     status |= parseParameterClause(leftParenLoc, params, rightParenLoc,
-                                   &DefaultArgs, /*isClosure=*/false);
+                                   &DefaultArgs, paramContext);
 
     // Turn the parameter clause into argument and body patterns.
     auto pattern = mapParsedParameters(*this, leftParenLoc, params,
                                        rightParenLoc, 
                                        isFirstParameterClause,
                                        isFirstParameterClause ? &NamePieces
-                                                              : nullptr);
+                                                              : nullptr,
+                                       paramContext);
     BodyPatterns.push_back(pattern);
     isFirstParameterClause = false;
   }
@@ -439,7 +497,7 @@ Parser::parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
   return status;
 }
 
-/// parseFunctionSignature - Parse a function definition signature.
+/// Parse a function definition signature.
 ///   func-signature:
 ///     func-arguments func-signature-result?
 ///   func-signature-result:
@@ -459,7 +517,16 @@ Parser::parseFunctionSignature(Identifier SimpleName,
   ParserStatus Status;
   // We force first type of a func declaration to be a tuple for consistency.
   if (Tok.is(tok::l_paren)) {
-    Status = parseFunctionArguments(NamePieces, bodyPatterns, defaultArgs);
+    ParameterContextKind paramContext;
+    if (SimpleName.isOperator())
+      paramContext = ParameterContextKind::Operator;
+    else if (CurDeclContext->isTypeContext())
+      paramContext = ParameterContextKind::Method;
+    else
+      paramContext = ParameterContextKind::Function;
+
+    Status = parseFunctionArguments(NamePieces, bodyPatterns, paramContext,
+                                    defaultArgs);
     FullName = DeclName(Context, SimpleName, 
                         llvm::makeArrayRef(NamePieces.begin() + 1,
                                            NamePieces.end()));
@@ -534,14 +601,15 @@ Parser::parseConstructorArguments(DeclName &FullName, Pattern *&BodyPattern,
   // Parse the parameter clause.
   ParserStatus status 
     = parseParameterClause(leftParenLoc, params, rightParenLoc,
-                           &DefaultArgs, /*isClosure=*/false);
+                           &DefaultArgs, ParameterContextKind::Initializer);
 
   // Turn the parameter clause into argument and body patterns.
   llvm::SmallVector<Identifier, 2> namePieces;
   BodyPattern = mapParsedParameters(*this, leftParenLoc, params,
                                     rightParenLoc, 
                                     /*isFirstParameterClause=*/true,
-                                    &namePieces);
+                                    &namePieces,
+                                    ParameterContextKind::Initializer);
 
   FullName = DeclName(Context, Context.Id_init, namePieces);
   return status;

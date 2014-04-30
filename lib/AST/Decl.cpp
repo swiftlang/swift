@@ -2319,6 +2319,24 @@ AbstractFunctionDecl::getDefaultArg(unsigned Index) const {
   return { Found->getDefaultArgKind(), Found->getPattern()->getType() };
 }
 
+bool AbstractFunctionDecl::argumentNameIsAPIByDefault(unsigned i) const {
+  // All initializer argument names are API by default.
+  if (isa<ConstructorDecl>(this))
+    return true;
+
+  if (auto func = dyn_cast<FuncDecl>(this)) {
+    // No argument names for operators or global functions are API by default.
+    if (func->isOperator() || !func->getDeclContext()->isTypeContext())
+      return false;
+
+    // For methods, argument names after the first argument are API by default.
+    return i > 0;
+  }
+
+  assert(isa<DestructorDecl>(this));
+  return false;
+}
+
 SourceRange AbstractFunctionDecl::getBodySourceRange() const {
   switch (getBodyKind()) {
   case BodyKind::None:

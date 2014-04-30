@@ -3387,8 +3387,9 @@ ParserStatus Parser::parseDeclSubscript(SourceLoc OverrideLoc,
     return makeParserError();
   }
 
+  //
   ParserResult<Pattern> Indices
-    = parseSingleParameterClause(/*isClosure=*/false);
+    = parseSingleParameterClause(ParameterContextKind::Subscript);
   if (Indices.isNull() || Indices.hasCodeCompletion())
     return Indices;
   

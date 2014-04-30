@@ -217,6 +217,9 @@ LookupResult &ConstraintSystem::lookupMember(Type base, DeclName name) {
   llvm::DenseSet<std::pair<unsigned, CanType>> known;
   llvm::StringMap<unsigned> selectors;
   result->filter([&](ValueDecl *decl) -> bool {
+    if (decl->isInvalid())
+      return false;
+
     return known.insert(getDynamicResultSignature(decl, selectors)).second;
   });
 

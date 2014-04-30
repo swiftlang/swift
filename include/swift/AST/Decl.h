@@ -3493,6 +3493,8 @@ public:
   /// the type of the corresponding parameter.
   std::pair<DefaultArgumentKind, Type> getDefaultArg(unsigned Index) const;
 
+  /// Determine whether the name of the ith argument is an API name by default.
+  bool argumentNameIsAPIByDefault(unsigned i) const;
 
   unsigned getNumParamPatterns() const {
     return AbstractFunctionDeclBits.NumParamPatterns;

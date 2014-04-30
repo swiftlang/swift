@@ -338,7 +338,7 @@ static FuncDecl *deriveRawRepresentable_fromRaw(TypeChecker &tc,
 
   VarDecl *rawDecl = new (C) ParamDecl(/*IsVal*/true,
                                        SourceLoc(),
-                                       C.Id_raw,
+                                       Identifier(),
                                        SourceLoc(),
                                        C.Id_raw,
                                        rawType,
@@ -355,7 +355,7 @@ static FuncDecl *deriveRawRepresentable_fromRaw(TypeChecker &tc,
   
   Pattern *bodyParams[] = {selfParam, rawParam};
   auto retTy = OptionalType::get(enumType);
-  DeclName name(C, C.Id_fromRaw, { C.Id_raw });
+  DeclName name(C, C.Id_fromRaw, { Identifier() });
   auto fromRawDecl = FuncDecl::create(
       C, SourceLoc(), StaticSpellingKind::None, SourceLoc(), name, SourceLoc(),
       nullptr, Type(), bodyParams, TypeLoc::withoutLoc(retTy), enumDecl);

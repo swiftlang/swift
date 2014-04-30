@@ -405,7 +405,7 @@ static FuncDecl *makeOptionSetFactoryMethod(
   VarDecl *selfDecl = createSelfDecl(optionSetDecl, true);
   Pattern *selfParam = createTypedNamedPattern(selfDecl);
   VarDecl *rawDecl = new (C) ParamDecl(/*IsLet*/true,
-                                       SourceLoc(), C.Id_raw,
+                                       SourceLoc(), Identifier(),
                                        SourceLoc(), C.Id_raw,
                                        Type(), optionSetDecl);
   rawDecl->setImplicit();
@@ -430,19 +430,16 @@ static FuncDecl *makeOptionSetFactoryMethod(
   }
   
   Identifier baseName;
-  Identifier argName;
   switch (factoryMethod) {
   case OptionSetFactoryMethod::FromMask:
     baseName = C.Id_fromMask;
-    argName = C.Id_raw;
     break;
   case OptionSetFactoryMethod::FromRaw:
     baseName = C.Id_fromRaw;
-    argName = C.Id_raw;
     break;
   }
   
-  DeclName name(C, baseName, argName);
+  DeclName name(C, baseName, { Identifier() });
   auto factoryDecl = FuncDecl::create(C, SourceLoc(), StaticSpellingKind::None,
                                       SourceLoc(),
                                       name,

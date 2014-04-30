@@ -252,6 +252,7 @@ private:
 
   void printOneParameter(Identifier ArgName,
                          const Pattern *BodyPattern,
+                         bool ArgNameIsAPIByDefault,
                          bool StripOuterSliceType,
                          bool Curried);
 
@@ -876,6 +877,7 @@ void PrintAST::visitParamDecl(ParamDecl *decl) {
 
 void PrintAST::printOneParameter(Identifier ArgName,
                                  const Pattern *BodyPattern,
+                                 bool ArgNameIsAPIByDefault,
                                  bool StripOuterSliceType,
                                  bool Curried) {
   if (auto *VP = dyn_cast<VarPattern>(BodyPattern))
@@ -906,19 +908,35 @@ void PrintAST::printOneParameter(Identifier ArgName,
 
   // Print argument name.
   auto BodyName = BodyPattern->getBoundName();
-  if (!ArgName.empty() || Options.PrintParameterNames) {
-    if (!Curried)
-      Printer.printName(ArgName);
-
-    // If the parameter name is different, print it.
-    if ((Curried || BodyName != ArgName) && Options.PrintParameterNames) {
-      if (!Curried)
-        Printer << " ";
-      Printer.printName(BodyName);
-    }
-
+  if (Curried) {
+    // For curried parameters, just print the body name if there is one.
+    Printer.printName(BodyName);
     Printer << ": ";
+  } else {
+    if (ArgName == BodyName) {
+      if (!ArgName.empty()) {
+        // The argument and parameter names match, so we only have one thing to
+        // print.
+        if (!ArgNameIsAPIByDefault)
+          Printer << "`";
+        Printer.printName(ArgName);
+        Printer << ": ";
+      } else {
+        Printer << "_: ";
+      }
+    } else if (ArgName.empty()) {
+      if (ArgNameIsAPIByDefault)
+        Printer << "_ ";
+      Printer.printName(BodyName);
+      Printer << ": ";
+    } else {
+      Printer.printName(ArgName);
+      Printer << " ";
+      Printer.printName(BodyName);
+      Printer << ": ";
+    }
   }
+
   if (StripOuterSliceType && !TheTypeLoc.hasLocation()) {
     if (auto *BGT = TypedBodyPattern->getType()->getAs<BoundGenericType>()) {
       BGT->getGenericArgs()[0].print(Printer, Options);
@@ -950,8 +968,14 @@ void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
       for (unsigned i = 0, e = BodyTuple->getFields().size(); i != e; ++i) {
         if (i > 0)
           Printer << ", ";
+
+        // Determine whether the argument name is API by default.
+        bool ArgNameIsAPIByDefault = (CurrPattern == 0 &&
+                                      AFD->argumentNameIsAPIByDefault(i));
+
         printOneParameter(UseArgName ? ArgNames[i] : Identifier(),
                           BodyTuple->getFields()[i].getPattern(),
+                          ArgNameIsAPIByDefault,
                           /*StripOuterSliceType=*/i == e - 1 &&
                             BodyTuple->hasVararg(),
                           /*Curried=*/CurrPattern > 0);
@@ -965,10 +989,13 @@ void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
       Printer << ")";
       continue;
     }
+    bool ArgNameIsAPIByDefault = (CurrPattern == 0 &&
+                                  AFD->argumentNameIsAPIByDefault(0));
     auto *BodyParen = cast<ParenPattern>(BodyPatterns[CurrPattern]);
     Printer << "(";
     printOneParameter(UseArgName? ArgNames[0] : Identifier(), 
                       BodyParen->getSubPattern(),
+                      ArgNameIsAPIByDefault,
                       /*StripOuterSliceType=*/false,
                       /*Curried=*/CurrPattern > 0);
     Printer << ")";

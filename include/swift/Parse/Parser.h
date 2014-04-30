@@ -787,22 +787,6 @@ public:
     }
   };
 
-  ParserResult<Pattern> parseSingleParameterClause(bool isClosure);
-
-  ParserStatus parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
-                                      SmallVectorImpl<Pattern*> &BodyPatterns,
-                                      DefaultArgumentInfo &defaultArgs);
-  ParserStatus parseFunctionSignature(Identifier functionName,
-                                      DeclName &fullName,
-                                      SmallVectorImpl<Pattern *> &bodyPatterns,
-                                      DefaultArgumentInfo &defaultArgs,
-                                      TypeRepr *&retType);
-  ParserStatus parseConstructorArguments(DeclName &FullName,
-                                         Pattern *&BodyPattern,
-                                         DefaultArgumentInfo &defaultArgs);
-
-  ParserResult<Pattern> parsePattern(bool isLet);
-
   /// Describes a parsed parameter.
   struct ParsedParameter {
     /// The location of the 'inout' keyword, if present.
@@ -853,6 +837,22 @@ public:
     ExprHandle *DefaultArg = nullptr;
   };
 
+  /// Describes the context in which the given parameter is being parsed.
+  enum class ParameterContextKind {
+    /// An operator.
+    Operator,
+    /// A function that is not a method.
+    Function,
+    /// A method.
+    Method,
+    /// An initializer.
+    Initializer,
+    /// A closure.
+    Closure,
+    /// A subscript.
+    Subscript
+  };
+
   /// Parse a parameter-clause.
   ///
   /// \verbatim
@@ -872,7 +872,25 @@ public:
                                     SmallVectorImpl<ParsedParameter> &params,
                                     SourceLoc &rightParenLoc,
                                     DefaultArgumentInfo *defaultArgs,
-                                    bool isClosure);
+                                    ParameterContextKind paramContext);
+
+  ParserResult<Pattern> parseSingleParameterClause(
+                          ParameterContextKind paramContext);
+
+  ParserStatus parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
+                                      SmallVectorImpl<Pattern*> &BodyPatterns,
+                                      ParameterContextKind paramContext,
+                                      DefaultArgumentInfo &defaultArgs);
+  ParserStatus parseFunctionSignature(Identifier functionName,
+                                      DeclName &fullName,
+                                      SmallVectorImpl<Pattern *> &bodyPatterns,
+                                      DefaultArgumentInfo &defaultArgs,
+                                      TypeRepr *&retType);
+  ParserStatus parseConstructorArguments(DeclName &FullName,
+                                         Pattern *&BodyPattern,
+                                         DefaultArgumentInfo &defaultArgs);
+
+  ParserResult<Pattern> parsePattern(bool isLet);
 
   /// \brief Determine whether the parser is in a state that can start a
   /// binding name, identifier or the special discard-value binding '_'.

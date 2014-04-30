@@ -303,7 +303,7 @@ void AttributeChecker::visitAssignmentAttr(AssignmentAttr *attr) {
   auto *FD = cast<FuncDecl>(D);
   auto *FT = FD->getType()->castTo<AnyFunctionType>();
 
-  int NumArguments = -1;
+  int NumArguments = 1;
   if (FD->getDeclContext()->isTypeContext() && FD->isStatic())
     FT = FT->getResult()->castTo<AnyFunctionType>();
   if (auto *TT = FT->getInput()->getAs<TupleType>())

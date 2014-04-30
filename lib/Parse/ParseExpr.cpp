@@ -1452,7 +1452,7 @@ bool Parser::parseClosureSignatureIfPresent(Pattern *&params,
   bool invalid = false;
   if (Tok.is(tok::l_paren)) {
     // Parse the closure arguments.
-    auto pattern = parseSingleParameterClause(/*isClosure=*/true);
+    auto pattern = parseSingleParameterClause(ParameterContextKind::Closure);
     if (pattern.isNonNull())
       params = pattern.get();
     else
