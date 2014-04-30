@@ -30,6 +30,11 @@ Latest
 
 * NSLog is now available from Swift code.
 
+* The parser now correctly handles expressions like "var x = Int[]()" to
+  create an empty array of integers.  Previously you'd have to use syntax like
+  "Array<Int>()" to get this.  Now that this is all working, please prefer to
+  use Int[] consistently instead of Array<Int>.
+
 * 'Character' is the new character literal type:
 
     var x = 'a' // Infers 'Character' type
