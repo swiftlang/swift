@@ -312,34 +312,51 @@ public:
       if (Expr *E = Element.dyn_cast<Expr*>()) {
         E->walk(CF);
         if (AssignExpr *AE = llvm::dyn_cast<AssignExpr>(E)) {
-          std::pair<PatternBindingDecl *, VarDecl *> PV =
-            buildPatternAndVariable(AE->getSrc());
-          DeclRefExpr *DRE =
-            new (Context) DeclRefExpr(ConcreteDeclRef(PV.second),
-                                      SourceLoc(),
-                                      true, // implicit
-                                      false, // uses direct property access
-                                      AE->getSrc()->getType());
-          AssignExpr *NAE = new (Context) AssignExpr(AE->getDest(),
-                                                     SourceLoc(),
-                                                     DRE,
-                                                     true); // implicit
-          NAE->setType(Context.TheEmptyTupleType);
-          AE->setImplicit(true);
-          std::string Name = digForName(AE->getDest());
-          
-          Expr *Log = buildLoggerCall(
-            new (Context) DeclRefExpr(ConcreteDeclRef(PV.second),
-                                      SourceLoc(),
-                                      true, // implicit
-                                      false, // uses direct property access
-                                      AE->getSrc()->getType()),
-            AE->getSrc()->getSourceRange(), Name.c_str());
-          Elements[EI] = PV.first;
-          Elements.insert(Elements.begin() + (EI + 1), PV.second);
-          Elements.insert(Elements.begin() + (EI + 2), Log);
-          Elements.insert(Elements.begin() + (EI + 3), NAE);
-          EI += 3;
+          if (MemberRefExpr *MRE =
+              llvm::dyn_cast<MemberRefExpr>(AE->getDest())) {
+            // an assignment to a property of an object counts as a mutation of
+            // that object
+            DeclRefExpr *BaseDRE = nullptr;
+            VarDecl *BaseVD = nullptr;
+            std::tie(BaseDRE, BaseVD) = digForVariable(MRE->getBase());
+            
+            if (BaseDRE) {
+              Expr *Log = logDeclRef(BaseDRE);
+              if (Log) {
+                Elements.insert(Elements.begin() + (EI + 1), Log);
+                ++EI;
+              }
+            }
+          } else {
+            std::pair<PatternBindingDecl *, VarDecl *> PV =
+              buildPatternAndVariable(AE->getSrc());
+            DeclRefExpr *DRE =
+              new (Context) DeclRefExpr(ConcreteDeclRef(PV.second),
+                                        SourceLoc(),
+                                        true, // implicit
+                                        false, // uses direct property access
+                                        AE->getSrc()->getType());
+            AssignExpr *NAE = new (Context) AssignExpr(AE->getDest(),
+                                                       SourceLoc(),
+                                                       DRE,
+                                                       true); // implicit
+            NAE->setType(Context.TheEmptyTupleType);
+            AE->setImplicit(true);
+            std::string Name = digForName(AE->getDest());
+            
+            Expr *Log = buildLoggerCall(
+              new (Context) DeclRefExpr(ConcreteDeclRef(PV.second),
+                                        SourceLoc(),
+                                        true, // implicit
+                                        false, // uses direct property access
+                                        AE->getSrc()->getType()),
+              AE->getSrc()->getSourceRange(), Name.c_str());
+            Elements[EI] = PV.first;
+            Elements.insert(Elements.begin() + (EI + 1), PV.second);
+            Elements.insert(Elements.begin() + (EI + 2), Log);
+            Elements.insert(Elements.begin() + (EI + 3), NAE);
+            EI += 3;
+          }
         }
         else if (ApplyExpr *AE = llvm::dyn_cast<ApplyExpr>(E)) {
           if (AE->getType()->getCanonicalType() ==
