@@ -589,14 +589,6 @@ OptionalQuickLookObject swift_ObjCMirror_quickLookObject(HeapObject *owner,
   if ([object respondsToSelector:@selector(debugQuickLookObject)])
     object = [object debugQuickLookObject];
   
-  // NSStrings quick-look as text.
-  if ([object isKindOfClass:[NSString class]]) {
-    result.payload.Text = String((NSString*)object);
-    result.payload.Kind = QuickLookObject::Tag::Text;
-    result.optional.isNone = false;
-    return result;
-  }
-  
   // NSNumbers quick-look as integers or doubles, depending on type.
   if ([object isKindOfClass:[NSNumber class]]) {
     NSNumber *n = object;
