@@ -542,8 +542,16 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
   }
 
   // Fold T? into an optional type when T is a TypeExpr.
-  if (auto *BOE = dyn_cast<BindOptionalExpr>(E)) {
-    auto *TyExpr = dyn_cast<TypeExpr>(BOE->getSubExpr());
+  if (isa<OptionalEvaluationExpr>(E) || isa<BindOptionalExpr>(E)) {
+    TypeExpr *TyExpr;
+    SourceLoc QuestionLoc;
+    if (auto *OOE = dyn_cast<OptionalEvaluationExpr>(E)) {
+      TyExpr = dyn_cast<TypeExpr>(OOE->getSubExpr());
+      QuestionLoc = OOE->getLoc();
+    } else {
+      TyExpr = dyn_cast<TypeExpr>(cast<BindOptionalExpr>(E)->getSubExpr());
+      QuestionLoc = cast<BindOptionalExpr>(E)->getQuestionLoc();
+    }
     if (!TyExpr) return nullptr;
 
     auto *InnerTypeRepr = TyExpr->getTypeRepr();
@@ -552,8 +560,25 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
            "the TypeExpr should have been built correctly in the first place");
     
     auto *NewTypeRepr =
-      new (TC.Context) OptionalTypeRepr(InnerTypeRepr, BOE->getQuestionLoc());
+      new (TC.Context) OptionalTypeRepr(InnerTypeRepr, QuestionLoc);
     return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
+  }
+  
+  // Fold (T) into a type T with parens around it.
+  if (auto *PE = dyn_cast<ParenExpr>(E)) {
+    auto *TyExpr = dyn_cast<TypeExpr>(PE->getSubExpr());
+    if (!TyExpr) return nullptr;
+    
+    TypeRepr *InnerTypeRepr[] = { TyExpr->getTypeRepr() };
+    assert(!TyExpr->isImplicit() && InnerTypeRepr[0] &&
+           "SubscriptExpr doesn't work on implicit TypeExpr's, "
+           "the TypeExpr should have been built correctly in the first place");
+    
+    auto *NewTypeRepr =
+     new (TC.Context) TupleTypeRepr(TC.Context.AllocateCopy(InnerTypeRepr),
+                                    PE->getSourceRange(), SourceLoc());
+    return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
+
   }
 
   return nullptr;
