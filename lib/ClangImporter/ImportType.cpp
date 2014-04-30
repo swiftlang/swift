@@ -34,65 +34,83 @@
 
 using namespace swift;
 
-/// Is the given type one of the kinds of type that we should import
-/// as an optional type?
-static bool shouldImportAsOptional(const clang::Type *type) {
-  // Modifying this function isn't enough: you need to modify the
-  // appropriate visitor case as well.
-  return type->isObjCObjectPointerType()
-    || type->isBlockPointerType();
-}
-
-/// Wrap a type in the Optional type appropriate to the import kind.
-static Type getOptionalType(Type payloadType, ImportTypeKind kind) {
-  // Import pointee types as true Optional.
-  if (kind == ImportTypeKind::Pointee)
-    return OptionalType::get(payloadType);
-  // Otherwise, import as UncheckedOptional.
-  return UncheckedOptionalType::get(payloadType);
-}
-
-
 namespace {
-  class SwiftTypeConverter : public clang::TypeVisitor<SwiftTypeConverter, Type>
+  /// Various types that we want to do something interesting to after
+  /// importing them.
+  enum class ImportHint {
+    /// There is nothing special about the source type.
+    None,
+
+    /// The source type is 'void'.
+    Void,
+
+    /// The source type is 'BOOL'.
+    BOOL,
+
+    /// The source type is 'NSString'.
+    NSString,
+
+    /// The source type is 'NSUInteger'.
+    NSUInteger,
+
+    /// The source type is a C pointer type.
+    CPointer,
+
+    /// The source type is an Objective-C object pointer type.
+    ObjCPointer,
+
+    /// The source type is a C++ reference type.
+    Reference,
+
+    /// The source type is a block pointer type.
+    Block,
+  };
+
+  struct ImportResult {
+    Type AbstractType;
+    ImportHint Hint;
+
+    /*implicit*/ ImportResult(Type type = Type(),
+                              ImportHint hint = ImportHint::None)
+      : AbstractType(type), Hint(hint) {}
+
+    /*implicit*/ ImportResult(TypeBase *type = nullptr,
+                              ImportHint hint = ImportHint::None)
+      : AbstractType(type), Hint(hint) {}
+
+    explicit operator bool() const { return (bool) AbstractType; }
+  };
+
+  class SwiftTypeConverter :
+    public clang::TypeVisitor<SwiftTypeConverter, ImportResult>
   {
     ClangImporter::Implementation &Impl;
-    ImportTypeKind kind;
     
   public:
-    SwiftTypeConverter(ClangImporter::Implementation &impl, ImportTypeKind kind)
-      : Impl(impl), kind(kind) { }
+    SwiftTypeConverter(ClangImporter::Implementation &impl)
+      : Impl(impl) {}
 
+    using TypeVisitor::Visit;
+    ImportResult Visit(clang::QualType type) {
+      return Visit(type.getTypePtr());
+    }
 
-#define DEPENDENT_TYPE(Class, Base)                            \
-    Type Visit##Class##Type(const clang::Class##Type *) {      \
-      llvm_unreachable("Dependent types cannot be converted"); \
+#define DEPENDENT_TYPE(Class, Base)                               \
+    ImportResult Visit##Class##Type(const clang::Class##Type *) { \
+      llvm_unreachable("Dependent types cannot be converted");    \
     }
 #define TYPE(Class, Base)
 #include "clang/AST/TypeNodes.def"
     
-    /// True if we're converting a function parameter, property type, or
-    /// function result type, and can thus safely apply representation
-    /// conversions for bridged types.
-    bool canBridgeTypes() const {
-      return kind == ImportTypeKind::Parameter ||
-             kind == ImportTypeKind::Result ||
-             kind == ImportTypeKind::Property;
-    }
-
-    Type VisitBuiltinType(const clang::BuiltinType *type) {
+    ImportResult VisitBuiltinType(const clang::BuiltinType *type) {
       switch (type->getKind()) {
       case clang::BuiltinType::Void:
-        // 'void' can only be imported as a function result type.
-        if (kind == ImportTypeKind::Result)
-          return Impl.getNamedSwiftType(Impl.getStdlibModule(), "Void");
+        return { Type(), ImportHint::Void };
 
-        return nullptr;
-
-#define MAP_BUILTIN_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME) \
-      case clang::BuiltinType::CLANG_BUILTIN_KIND:            \
+#define MAP_BUILTIN_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME)  \
+      case clang::BuiltinType::CLANG_BUILTIN_KIND:             \
         return Impl.getNamedSwiftType(Impl.getStdlibModule(),  \
-                                      #SWIFT_TYPE_NAME);
+                                        #SWIFT_TYPE_NAME);
 #include "swift/ClangImporter/BuiltinMappedTypes.def"
 
       // Types that cannot be mapped into Swift, and probably won't ever be.
@@ -131,48 +149,21 @@ namespace {
       }
     }
 
-    Type VisitComplexType(const clang::ComplexType *type) {
+    ImportResult VisitComplexType(const clang::ComplexType *type) {
       // FIXME: Implement once Complex is in the library.
       return Type();
     }
-    
-    Type importParameterPointerType(const clang::PointerType *type) {
-      auto pointeeQualType = type->getPointeeType();
-      if (type->isVoidPointerType()) {
-        // Pointers to unmappable or void types map to C*VoidPointer.
-        if (pointeeQualType.isConstQualified())
-          return Impl.getNamedSwiftType(Impl.getStdlibModule(),
-                                        "CConstVoidPointer");
-        else
-          return Impl.getNamedSwiftType(Impl.getStdlibModule(),
-                                        "CMutableVoidPointer");
-      }
-      
-      // Import the pointee type as a pointer parameter.
-      auto pointeeType = Impl.importType(pointeeQualType,
-                                         ImportTypeKind::Pointee);
-      
-      // If we can't represent the pointee in Swift, don't try to use a bridged
-      // pointer type.
-      if (!pointeeType)
-        return Type();
-      
-      if (pointeeQualType.isConstQualified()) {
-        // Const pointers map to CConstPointer.
-        return Impl.getNamedSwiftTypeSpecialization(Impl.getStdlibModule(),
-                                                  "CConstPointer", pointeeType);
-      } else if (pointeeQualType->isObjCObjectPointerType()) {
-        // Mutable pointers to ObjC pointers map to ObjCMutablePointer.
-        return Impl.getNamedSwiftTypeSpecialization(Impl.getStdlibModule(),
-                                             "ObjCMutablePointer", pointeeType);
-      } else {
-        // Mutable non-ObjC pointers map to CMutablePointer.
-        return Impl.getNamedSwiftTypeSpecialization(Impl.getStdlibModule(),
-                                                "CMutablePointer", pointeeType);
-      }
+
+    ImportResult VisitAtomicType(const clang::AtomicType *type) {
+      // FIXME: handle pointers and fields of atomic type
+      return Type();
+    }
+
+    ImportResult VisitMemberPointerType(const clang::MemberPointerType *type) {
+      return Type();
     }
     
-    Type VisitPointerType(const clang::PointerType *type) {      
+    ImportResult VisitPointerType(const clang::PointerType *type) {      
       // FIXME: Function pointer types can be mapped to Swift function types
       // once we have the notion of a "thin" function that does not capture
       // anything.
@@ -200,89 +191,65 @@ namespace {
         }
       }
       
-      // All other C pointers to concrete types map to UnsafePointer<T> or, if
-      // in parameter position, to bridged pointer types.
+      // All other C pointers to concrete types map to UnsafePointer<T> or
+      // COpaquePointer, except in parameter position.
       auto pointeeQualType = type->getPointeeType();
-      
-      // Pointer parameters map to the bridged argument pointer types.
-      // We don't bridge volatile or nontrivial lifetime pointer parameters.
-      if (kind == ImportTypeKind::Parameter
-          && !pointeeQualType.isVolatileQualified()
-          && !pointeeQualType.hasStrongOrWeakObjCLifetime())
-        if (Type paramType = importParameterPointerType(type))
-          return paramType;
-      
+
       // Import void* as COpaquePointer.
-      // TODO: Map argument pointers to CConstVoidPointer/CMutableVoidPointer
-      // based on qualifiers.
-      if (type->isVoidPointerType()) {
-        return Impl.getNamedSwiftType(Impl.getStdlibModule(), "COpaquePointer");
+      if (pointeeQualType->isVoidType()) {
+        return { getOpaquePointerType(), ImportHint::CPointer };
       }
       
       auto pointeeType = Impl.importType(pointeeQualType,
                                          ImportTypeKind::Pointee);
       
       // If the pointed-to type is unrepresentable in Swift, import as
-      // COpaquePointer.
+      // COpaquePointer (and don't hint to the adjuster).
       if (!pointeeType)
-        return Impl.getNamedSwiftType(Impl.getStdlibModule(), "COpaquePointer");
+        return getOpaquePointerType();
       
       // Non-parameter pointers map to UnsafePointer.
-      return Impl.getNamedSwiftTypeSpecialization(Impl.getStdlibModule(),
-                                                  "UnsafePointer", pointeeType);
+      return { Impl.getNamedSwiftTypeSpecialization(Impl.getStdlibModule(),
+                                               "UnsafePointer", pointeeType),
+               ImportHint::CPointer };
     }
 
-    Type VisitBlockPointerType(const clang::BlockPointerType *type) {
+    Type getOpaquePointerType() {
+      return Impl.getNamedSwiftType(Impl.getStdlibModule(), "COpaquePointer");
+    }
+
+    ImportResult VisitBlockPointerType(const clang::BlockPointerType *type) {
       // Block pointer types are mapped to function types.
       Type pointeeType = Impl.importType(type->getPointeeType(),
-                                         ImportTypeKind::Normal);
+                                         ImportTypeKind::Abstract);
       if (!pointeeType)
         return Type();
       FunctionType *fTy = pointeeType->castTo<FunctionType>();
       
-      FunctionType::Representation rep;
-      // If the block is a parameter, result, or property, we can bridge it to
-      // a native thick Swift function type.
-      if (canBridgeTypes())
-        rep = FunctionType::Representation::Thick;
-      // Otherwise, it keeps its block representation.
-      else
-        rep = FunctionType::Representation::Block;
-      
+      auto rep = FunctionType::Representation::Block;
       auto funcTy = FunctionType::get(fTy->getInput(), fTy->getResult(),
-                                      fTy->getExtInfo()
-                                        .withRepresentation(rep));
-      return getOptionalType(funcTy, kind);
+                                   fTy->getExtInfo().withRepresentation(rep));
+      return { funcTy, ImportHint::Block };
     }
 
-    Type VisitReferenceType(const clang::ReferenceType *type) {
-      // Reference types are only permitted as function parameter types.
-      if (kind != ImportTypeKind::Parameter)
-        return nullptr;
-
-      // Import the underlying type.
-      auto objectType = Impl.importType(type->getPointeeType(),
-                                        ImportTypeKind::Normal);
-      if (!objectType)
-        return nullptr;
-
-      return InOutType::get(objectType);
+    ImportResult VisitReferenceType(const clang::ReferenceType *type) {
+      return { nullptr, ImportHint::Reference };
     }
 
-    Type VisitMemberPointer(const clang::MemberPointerType *type) {
+    ImportResult VisitMemberPointer(const clang::MemberPointerType *type) {
       // FIXME: Member function pointers can be mapped to curried functions,
       // but only when we can express the notion of a function that does
       // not capture anything from its enclosing context.
       return Type();
     }
 
-    Type VisitArrayType(const clang::ArrayType *type) {
+    ImportResult VisitArrayType(const clang::ArrayType *type) {
       // FIXME: Array types will need to be mapped differently depending on
       // context.
       return Type();
     }
     
-    Type VisitConstantArrayType(const clang::ConstantArrayType *type) {
+    ImportResult VisitConstantArrayType(const clang::ConstantArrayType *type) {
       // FIXME: In a function argument context, arrays should import as
       // pointers.
       
@@ -291,7 +258,7 @@ namespace {
       // we can cheese static-offset "indexing" using .$n operations.
       
       Type elementType = Impl.importType(type->getElementType(),
-                                         ImportTypeKind::Normal);
+                                         ImportTypeKind::Pointee);
       if (!elementType)
         return Type();
       
@@ -303,17 +270,17 @@ namespace {
       return TupleType::get(elts, elementType->getASTContext());
     }
 
-    Type VisitVectorType(const clang::VectorType *type) {
+    ImportResult VisitVectorType(const clang::VectorType *type) {
       // FIXME: We could map these.
       return Type();
     }
 
-    Type VisitExtVectorType(const clang::ExtVectorType *type) {
+    ImportResult VisitExtVectorType(const clang::ExtVectorType *type) {
       // FIXME: We could map these.
       return Type();
     }
 
-    Type VisitFunctionProtoType(const clang::FunctionProtoType *type) {
+    ImportResult VisitFunctionProtoType(const clang::FunctionProtoType *type) {
       // C-style variadic functions cannot be called from Swift.
       if (type->isVariadic())
         return Type();
@@ -345,7 +312,8 @@ namespace {
       return FunctionType::get(paramsTy, resultTy);
     }
 
-    Type VisitFunctionNoProtoType(const clang::FunctionNoProtoType *type) {
+    ImportResult
+    VisitFunctionNoProtoType(const clang::FunctionNoProtoType *type) {
       // Import functions without prototypes as functions with no parameters.
       auto resultTy = Impl.importType(type->getReturnType(),
                                       ImportTypeKind::Result);
@@ -355,93 +323,74 @@ namespace {
       return FunctionType::get(TupleType::getEmpty(Impl.SwiftContext),resultTy);
     }
 
-    Type VisitParenType(const clang::ParenType *type) {
-      auto inner = Impl.importType(type->getInnerType(), kind);
+    ImportResult VisitParenType(const clang::ParenType *type) {
+      auto inner = Visit(type->getInnerType());
       if (!inner)
         return Type();
 
-      return ParenType::get(Impl.SwiftContext, inner);
+      return { ParenType::get(Impl.SwiftContext, inner.AbstractType),
+               inner.Hint };
     }
-    
-    Type VisitTypedefType(const clang::TypedefType *type) {
-      // When BOOL is the type of a function parameter or a function
-      // result type, map it to swift's Bool.
-      if (canBridgeTypes() && type->getDecl()->getName() == "BOOL")
-        return Impl.getNamedSwiftType(Impl.getStdlibModule(), "Bool");
 
-      // When NSUInteger is used as an enum's underlying type, make sure it
-      // stays unsigned.
-      if (kind == ImportTypeKind::Enum &&
-          type->getDecl()->getName() == "NSUInteger")
-        return Impl.getNamedSwiftType(Impl.getStdlibModule(), "UInt");
-      
+    ImportResult VisitTypedefType(const clang::TypedefType *type) {
       // Import the underlying declaration.
       auto decl = dyn_cast_or_null<TypeDecl>(Impl.importDecl(type->getDecl()));
 
-      // The type of the underlying declaration is always imported as a "normal"
-      // type. If we're asked to import a normal type, or if the typedef is
-      // one of the special set of typedefs for which we provide a special
-      // mapping, just return the type of the imported declaration.
+      // If that fails, fall back on importing the underlying type.
+      if (!decl) return Visit(type->desugar());
+
+      Type mappedType = decl->getDeclaredType();
+      ImportHint hint = ImportHint::None;
+
+      // For certain special typedefs, we don't want to use the imported type.
       if (auto specialKind = Impl.getSpecialTypedefKind(type->getDecl())) {
-        if (!decl)
-          return nullptr;
-        Type mappedType;
         switch (specialKind.getValue()) {
         case MappedTypeNameKind::DoNothing:
         case MappedTypeNameKind::DefineAndUse:
-          mappedType = decl->getDeclaredType();
           break;
         case MappedTypeNameKind::DefineOnly:
           mappedType = cast<TypeAliasDecl>(decl)->getUnderlyingType();
           break;
         }
-        if (shouldImportAsOptional(type))
-          mappedType = getOptionalType(mappedType, kind);
-        return mappedType;
+
+        if (type->getDecl()->getName() == "BOOL") {
+          hint = ImportHint::BOOL;
+        } else if (type->getDecl()->getName() == "NSUInteger") {
+          hint = ImportHint::NSUInteger;
+        }
+        // Any other interesting special typedefs should be hinted here.
+
+      // Otherwise, recurse on the underlying type in order to compute
+      // the hint correctly.
+      } else {
+        auto underlyingResult = Visit(type->desugar());
+        assert(underlyingResult.AbstractType->isEqual(mappedType) &&
+               "typedef without special typedef kind was mapped "
+               "differently from its underlying type?");
+        hint = underlyingResult.Hint;
       }
-      if (kind == ImportTypeKind::Normal)
-        return decl ? decl->getDeclaredType() : nullptr;
 
-      // For non-normal type imports 
-
-      // Import the underlying type directly. Due to the import kind, it may
-      // differ from directly referencing the declaration (including being
-      // defined in cases where the typedef can't be referenced directly).
-      auto underlyingType
-        = Impl.importType(type->getDecl()->getUnderlyingType(), kind);
-
-      // If the underlying type is in fact the same as the declaration's
-      // imported type, use the declaration's type to maintain more sugar.
-      if (decl && underlyingType->isEqual(decl->getDeclaredType()))
-        return decl->getDeclaredType();
-
-      return underlyingType;
+      return { mappedType, hint };
     }
 
-    Type VisitDecayedType(const clang::DecayedType *Type) {
-      return Impl.importType(Type->getDecayedType(), kind);
+#define SUGAR_TYPE(KIND)                                            \
+    ImportResult Visit##KIND##Type(const clang::KIND##Type *type) { \
+      return Visit(type->desugar());                                \
     }
+    SUGAR_TYPE(Decayed)
+    SUGAR_TYPE(TypeOfExpr)
+    SUGAR_TYPE(TypeOf)
+    SUGAR_TYPE(Decltype)
+    SUGAR_TYPE(UnaryTransform)
+    SUGAR_TYPE(Elaborated)
+    SUGAR_TYPE(Attributed)
+    SUGAR_TYPE(SubstTemplateTypeParm)
+    SUGAR_TYPE(TemplateSpecialization)
+    SUGAR_TYPE(Auto)
+    SUGAR_TYPE(Adjusted)
+    SUGAR_TYPE(PackExpansion)
 
-    Type VisitTypeOfExpr(const clang::TypeOfExprType *type) {
-      return Impl.importType(
-               Impl.getClangASTContext().getCanonicalType(clang::QualType(type,
-                                                                          0)),
-               kind);
-    }
-
-    Type VisitTypeOfType(const clang::TypeOfType *type) {
-      return Impl.importType(type->getUnderlyingType(), kind);
-    }
-
-    Type VisitDecltypeType(const clang::DecltypeType *type) {
-      return Impl.importType(type->getUnderlyingType(), kind);
-    }
-
-    Type VisitUnaryTransformType(const clang::UnaryTransformType *type) {
-      return Impl.importType(type->getUnderlyingType(), kind);
-    }
-
-    Type VisitRecordType(const clang::RecordType *type) {
+    ImportResult VisitRecordType(const clang::RecordType *type) {
       auto decl = dyn_cast_or_null<TypeDecl>(Impl.importDecl(type->getDecl()));
       if (!decl)
         return nullptr;
@@ -449,7 +398,7 @@ namespace {
       return decl->getDeclaredType();
     }
 
-    Type VisitEnumType(const clang::EnumType *type) {
+    ImportResult VisitEnumType(const clang::EnumType *type) {
       auto clangDecl = type->getDecl();
       switch (Impl.classifyEnum(clangDecl)) {
       case ClangImporter::Implementation::EnumKind::Constants: {
@@ -463,7 +412,7 @@ namespace {
           return Impl.getNamedSwiftType(Impl.getStdlibModule(), "Int");
 
         // Import the underlying integer type.
-        return Impl.importType(clangDecl->getIntegerType(), kind);
+        return Visit(clangDecl->getIntegerType());
       }
       case ClangImporter::Implementation::EnumKind::Enum:
       case ClangImporter::Implementation::EnumKind::Unknown:
@@ -477,29 +426,7 @@ namespace {
       }
     }
 
-    Type VisitElaboratedType(const clang::ElaboratedType *type) {
-      return Impl.importType(type->getNamedType(), kind);
-    }
-
-    Type VisitAttributedType(const clang::AttributedType *type) {
-      return Impl.importType(type->getEquivalentType(), kind);
-    }
-
-    Type VisitSubstTemplateTypeParmType(
-           const clang::SubstTemplateTypeParmType *type) {
-      return Impl.importType(type->getReplacementType(), kind);
-    }
-
-    Type VisitTemplateSpecializationType(
-           const clang::TemplateSpecializationType *type) {
-      return Impl.importType(type->desugar(), kind);
-    }
-
-    Type VisitAutoType(const clang::AutoType *type) {
-      return Impl.importType(type->getDeducedType(), kind);
-    }
-
-    Type VisitObjCObjectType(const clang::ObjCObjectType *type) {
+    ImportResult VisitObjCObjectType(const clang::ObjCObjectType *type) {
       // If this is id<P> , turn this into a protocol type.
       // FIXME: What about Class<P>?
       if (type->isObjCQualifiedId()) {
@@ -513,33 +440,32 @@ namespace {
           protocols.push_back(proto->getDeclaredType());
         }
 
-        return ProtocolCompositionType::get(Impl.SwiftContext, protocols);
+        return { ProtocolCompositionType::get(Impl.SwiftContext, protocols),
+                 ImportHint::ObjCPointer };
       }
 
       // FIXME: Swift cannot express qualified object pointer types, e.g.,
       // NSObject<Proto>, so we drop the <Proto> part.
-      return Visit(type->getBaseType().getTypePtr());
+      return Visit(type->getBaseType());
     }
 
-    Type VisitObjCInterfaceType(const clang::ObjCInterfaceType *type) {
+    ImportResult VisitObjCInterfaceType(const clang::ObjCInterfaceType *type) {
       auto imported = cast_or_null<ClassDecl>(Impl.importDecl(type->getDecl()));
       if (!imported)
         return nullptr;
 
-      // When NSString* is the type of a function parameter or a function
-      // result type, map it to String.
-      if (canBridgeTypes() &&
-          imported->hasName() &&
-          imported->getName().str() == "NSString" &&
-          Impl.hasFoundationModule()) {
-        return Impl.getNamedSwiftType(Impl.getStdlibModule(), "String");
+      Type importedType = imported->getDeclaredType();
+
+      if (imported->hasName() &&
+          imported->getName().str() == "NSString") {
+        return { importedType, ImportHint::NSString };
       }
 
-      return imported->getDeclaredType();
+      return { importedType, ImportHint::ObjCPointer };
     }
 
-    Type
-    VisitObjCObjectPointerTypeImpl(const clang::ObjCObjectPointerType *type) {
+    ImportResult
+    VisitObjCObjectPointerType(const clang::ObjCObjectPointerType *type) {
       // If this object pointer refers to an Objective-C class (possibly
       // qualified),
       if (auto interface = type->getInterfaceType()) {
@@ -561,7 +487,8 @@ namespace {
           protocols.push_back(proto->getDeclaredType());
         }
 
-        return ProtocolCompositionType::get(Impl.SwiftContext, protocols);
+        return { ProtocolCompositionType::get(Impl.SwiftContext, protocols),
+                 ImportHint::ObjCPointer };
       }
       
       // Beyond here, we're using AnyObject.
@@ -572,25 +499,170 @@ namespace {
 
       // id maps to AnyObject.
       if (type->isObjCIdType()) {
-        return proto->getDeclaredType();
+        return { proto->getDeclaredType(), ImportHint::ObjCPointer };
       }
 
       // Class maps to AnyObject.Type.
       assert(type->isObjCClassType() || type->isObjCQualifiedClassType());
-      return ExistentialMetatypeType::get(proto->getDeclaredType());
-    }
-
-    Type VisitObjCObjectPointerType(const clang::ObjCObjectPointerType *type) {
-      Type result = VisitObjCObjectPointerTypeImpl(type);
-      if (!result)
-        return result;
-      return getOptionalType(result, kind);
+      return { ExistentialMetatypeType::get(proto->getDeclaredType()),
+               ImportHint::ObjCPointer };
     }
   };
 }
 
+/// Import a C pointer type as a function parameter.
+///
+/// This function assumes that the abstract imported type is either
+/// COpaquePointer or UnsafePointer<T> for some T.
+static Type importParameterPointerType(ClangImporter::Implementation &impl,
+                                       clang::QualType clangType,
+                                       Type abstractImportedType) {
+  auto clangPointeeType = clangType->getPointeeType();
+  clang::Qualifiers quals = clangPointeeType.getQualifiers();
+
+  // Give no special treatment to volatile or __weak pointers.
+  // FIXME: we really shouldn't even import __weak pointers as
+  // UnsafePointer<>.
+  if (quals.hasVolatile() ||
+      quals.getObjCLifetime() == clang::Qualifiers::OCL_Weak)
+    return abstractImportedType;
+
+  if (clangPointeeType->isVoidType()) {
+    // Pointers to unmappable or void types map to C*VoidPointer.
+    if (quals.hasConst())
+      return impl.getNamedSwiftType(impl.getStdlibModule(),
+                                    "CConstVoidPointer");
+    else
+      return impl.getNamedSwiftType(impl.getStdlibModule(),
+                                    "CMutableVoidPointer");
+  }
+
+  // Otherwise, we should have an UnsafePointer<T>.
+  Type pointeeType =
+    abstractImportedType->castTo<BoundGenericType>()->getGenericArgs()[0];
+
+  // Const pointers map to CConstPointer<T>.
+  if (quals.hasConst()) {
+    return impl.getNamedSwiftTypeSpecialization(impl.getStdlibModule(),
+                                                "CConstPointer", pointeeType);
+
+  // Mutable pointers with __autoreleasing or __unsafe_unretained
+  // ownership map to ObjCMutablePointer<T>.
+  } else if (quals.getObjCLifetime() == clang::Qualifiers::OCL_Autoreleasing ||
+             quals.getObjCLifetime() == clang::Qualifiers::OCL_ExplicitNone) {
+    return impl.getNamedSwiftTypeSpecialization(impl.getStdlibModule(),
+                                                "ObjCMutablePointer", pointeeType);
+
+  // All other mutable pointers map to CMutablePointer<T>.
+  } else {
+    return impl.getNamedSwiftTypeSpecialization(impl.getStdlibModule(),
+                                                "CMutablePointer", pointeeType);
+  }
+}
+
+/// True if we're converting a function parameter, property type, or
+/// function result type, and can thus safely apply representation
+/// conversions for bridged types.
+static bool canBridgeTypes(ImportTypeKind importKind) {
+  return importKind == ImportTypeKind::Parameter ||
+         importKind == ImportTypeKind::Result ||
+         importKind == ImportTypeKind::Property;
+}
+
+/// Wrap a type in the Optional type appropriate to the import kind.
+static Type getOptionalType(Type payloadType, ImportTypeKind kind) {
+  // Import pointee types as true Optional.
+  if (kind == ImportTypeKind::Pointee)
+    return OptionalType::get(payloadType);
+  // Otherwise, import as UncheckedOptional.
+  return UncheckedOptionalType::get(payloadType);
+}
+
+static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
+                                        clang::QualType clangType,
+                                        Type importedType,
+                                        ImportTypeKind importKind,
+                                        ImportHint hint) {
+  if (importKind == ImportTypeKind::Abstract) {
+    return importedType;
+  }
+
+  // 'void' can only be imported as a function result type.
+  if (hint == ImportHint::Void &&
+      importKind == ImportTypeKind::Result) {
+    return impl.getNamedSwiftType(impl.getStdlibModule(), "Void");
+  }
+
+  // Reference types are only permitted as function parameter types.
+  if (hint == ImportHint::Reference &&
+      importKind == ImportTypeKind::Parameter) {
+    auto refType = clangType->castAs<clang::ReferenceType>();
+    // Import the underlying type.
+    auto objectType = impl.importType(refType->getPointeeType(),
+                                      ImportTypeKind::Pointee);
+    if (!objectType)
+      return nullptr;
+
+    return InOutType::get(objectType);
+  }
+
+  // For anything else, if we completely failed to import the type
+  // abstractly, give up now.
+  if (!importedType)
+    return Type();
+
+  // Pointer parameters have a number of special cases.
+  if (importKind == ImportTypeKind::Parameter &&
+      hint == ImportHint::CPointer) {
+    return importParameterPointerType(impl, clangType, importedType);
+  }
+
+  // Turn block pointer types back into normal function types in any
+  // context where bridging is possible.
+  if (hint == ImportHint::Block && canBridgeTypes(importKind)) {
+    auto fTy = importedType->castTo<FunctionType>();
+    FunctionType::ExtInfo einfo =
+      fTy->getExtInfo().withRepresentation(FunctionType::Representation::Thick);
+    importedType = FunctionType::get(fTy->getInput(), fTy->getResult(), einfo);
+  }
+
+  // Turn BOOL into Bool in contexts that can bridge types.
+  if (hint == ImportHint::BOOL && canBridgeTypes(importKind)) {
+    return impl.getNamedSwiftType(impl.getStdlibModule(), "Bool");
+  }
+
+  // When NSUInteger is used as an enum's underlying type, make sure
+  // it stays unsigned.
+  if (hint == ImportHint::NSUInteger && importKind == ImportTypeKind::Enum) {
+    return impl.getNamedSwiftType(impl.getStdlibModule(), "UInt");
+  }
+
+  bool addOptional = false;
+
+  // When NSString* is the type of a function parameter or a function
+  // result type, map it to String.
+  if (hint == ImportHint::NSString && canBridgeTypes(importKind) &&
+      impl.hasFoundationModule()) {
+    importedType = impl.getNamedSwiftType(impl.getStdlibModule(), "String");
+    addOptional = true;
+  }
+
+  // Wrap class, class protocol, function, and metatype types in an
+  // optional type.
+  auto canImportedType = importedType->getCanonicalType();
+  if (addOptional ||
+      canImportedType.getClassOrBoundGenericClass() ||
+      canImportedType.isAnyExistentialType() ||
+      isa<AnyMetatypeType>(canImportedType) ||
+      isa<FunctionType>(canImportedType)) {
+    importedType = getOptionalType(importedType, importKind);
+  }
+
+  return importedType;
+}
+
 Type ClangImporter::Implementation::importType(clang::QualType type,
-                                               ImportTypeKind kind) {
+                                               ImportTypeKind importKind) {
   if (type.isNull())
     return Type();
 
@@ -622,8 +694,13 @@ Type ClangImporter::Implementation::importType(clang::QualType type,
       type = clangContext.getObjCSelType();
   }
   
-  SwiftTypeConverter converter(*this, kind);
-  return converter.Visit(type.getTypePtr());
+  // Perform abstract conversion, ignoring how the type is actually used.
+  SwiftTypeConverter converter(*this);
+  auto importResult = converter.Visit(type);
+
+  // Now fix up the type based on we're concretely using it.
+  return adjustTypeForConcreteImport(*this, type, importResult.AbstractType,
+                                     importKind, importResult.Hint);
 }
 
 Type ClangImporter::Implementation::importFunctionType(

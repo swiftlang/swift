@@ -76,8 +76,18 @@ enum class ConstantConvertKind {
 
 /// \brief Describes the kind of type import we're performing.
 enum class ImportTypeKind {
-  /// \brief A "normal" type import, with no special rules.
-  Normal,
+  /// \brief Import an abstract type reference, like the underlying
+  /// type of a typedef.
+  ///
+  /// This provides special treatment for class reference types:
+  /// the typedef itself is left as a non-optional type.
+  Abstract,
+
+  /// \brief Import the type of a literal value.
+  Value,
+
+  /// \brief Import the declared type of a variable.
+  Variable,
 
   /// \brief Import the result type of a function.
   ///
@@ -92,7 +102,7 @@ enum class ImportTypeKind {
   /// among other things, and enables the conversion of bridged types.
   Parameter,
   
-  /// \brief Import the type pointed to by a pointer.
+  /// \brief Import the type pointed to by a pointer or reference.
   ///
   /// This provides special treatment for pointer-to-ObjC-pointer
   /// types, which get imported as pointers to *checked* optional,
@@ -691,12 +701,7 @@ public:
   /// that it has performed some non-trivial mapping of its underlying type
   /// based on the name of the typedef.
   Optional<MappedTypeNameKind>
-  getSpecialTypedefKind(clang::TypedefNameDecl *decl) {
-    auto iter = SpecialTypedefNames.find(decl);
-    if (iter == SpecialTypedefNames.end())
-      return {};
-    return iter->second;
-  }
+  getSpecialTypedefKind(clang::TypedefNameDecl *decl);
 
   LazyResolver *getTypeResolver() const {
     return typeResolver;

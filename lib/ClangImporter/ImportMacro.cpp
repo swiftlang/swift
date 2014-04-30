@@ -82,7 +82,7 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
   if (result.isUsable()) {
     clang::Expr *parsed = result.get();
     if (auto *integer = dyn_cast<clang::IntegerLiteral>(parsed)) {
-      auto type = Impl.importType(integer->getType(), ImportTypeKind::Normal);
+      auto type = Impl.importType(integer->getType(), ImportTypeKind::Value);
       if (!type)
         return nullptr;
 
@@ -102,7 +102,7 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
     }
 
     if (auto *floating = dyn_cast<clang::FloatingLiteral>(parsed)) {
-      auto type = Impl.importType(floating->getType(), ImportTypeKind::Normal);
+      auto type = Impl.importType(floating->getType(), ImportTypeKind::Value);
       if (!type)
         return nullptr;
 

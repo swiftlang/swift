@@ -739,7 +739,7 @@ namespace {
 
         if (SwiftType) {
           // Note that this typedef-name is special.
-          Impl.SpecialTypedefNames[Decl] = NameMapping;
+          Impl.SpecialTypedefNames[Decl->getCanonicalDecl()] = NameMapping;
 
           if (NameMapping == MappedTypeNameKind::DoNothing) {
             // Record the remapping using the name of the Clang declaration.
@@ -769,7 +769,7 @@ namespace {
 
       if (!SwiftType)
         SwiftType = Impl.importType(Decl->getUnderlyingType(),
-                                    ImportTypeKind::Normal);
+                                    ImportTypeKind::Abstract);
 
       if (!SwiftType)
         return nullptr;
@@ -1355,7 +1355,7 @@ namespace {
         // Enumeration type.
         auto &clangContext = Impl.getClangASTContext();
         auto type = Impl.importType(clangContext.getTagDeclType(clangEnum),
-                                    ImportTypeKind::Normal);
+                                    ImportTypeKind::Value);
         if (!type)
           return nullptr;
         // FIXME: Importing the type will recursively revisit this same
@@ -1384,7 +1384,7 @@ namespace {
         // Import the enumeration type.
         auto enumType = Impl.importType(
                           Impl.getClangASTContext().getTagDeclType(clangEnum),
-                          ImportTypeKind::Normal);
+                          ImportTypeKind::Value);
         if (!enumType)
           return nullptr;
         // FIXME: Importing the type will can recursively revisit this same
@@ -1434,7 +1434,7 @@ namespace {
       if (name.empty())
         return nullptr;
 
-      auto type = Impl.importType(decl->getType(), ImportTypeKind::Normal);
+      auto type = Impl.importType(decl->getType(), ImportTypeKind::Variable);
       if (!type)
         return nullptr;
 
@@ -1531,7 +1531,7 @@ namespace {
       if (name.empty())
         return nullptr;
 
-      auto type = Impl.importType(decl->getType(), ImportTypeKind::Normal);
+      auto type = Impl.importType(decl->getType(), ImportTypeKind::Variable);
       if (!type)
         return nullptr;
 
@@ -1574,7 +1574,7 @@ namespace {
       if (name.empty())
         return nullptr;
 
-      auto type = Impl.importType(decl->getType(), ImportTypeKind::Normal);
+      auto type = Impl.importType(decl->getType(), ImportTypeKind::Variable);
       if (!type)
         return nullptr;
 
@@ -4344,3 +4344,10 @@ ClangImporter::Implementation::loadAllMembers(const Decl *D, uint64_t unused) {
   return SwiftContext.AllocateCopy(members);
 }
 
+Optional<MappedTypeNameKind>
+ClangImporter::Implementation::getSpecialTypedefKind(clang::TypedefNameDecl *decl) {
+  auto iter = SpecialTypedefNames.find(decl->getCanonicalDecl());
+  if (iter == SpecialTypedefNames.end())
+    return {};
+  return iter->second;
+}
