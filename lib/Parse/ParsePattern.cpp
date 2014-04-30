@@ -180,6 +180,15 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
       if (Tok.is(tok::identifier)) {
         param.FirstName = Context.getIdentifier(Tok.getText());
         param.FirstNameLoc = consumeToken();
+
+        // Operators can not have API names.
+        if (paramContext == ParameterContextKind::Operator &&
+            param.BackTickLoc.isValid()) {
+          diagnose(param.BackTickLoc, 
+                   diag::parameter_operator_keyword_argument)
+            .fixItRemove(param.BackTickLoc);
+          param.BackTickLoc = SourceLoc();
+        }
       } else if (Tok.is(tok::kw__)) {
         // A back-tick cannot precede an empty name marker.
         if (param.BackTickLoc.isValid()) {
@@ -202,6 +211,18 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         param.SecondNameLoc = consumeToken();
       } else if (Tok.is(tok::kw__)) {
         param.SecondNameLoc = consumeToken();
+      }
+
+      // Operators can not have API names.
+      if (paramContext == ParameterContextKind::Operator &&
+          param.SecondNameLoc.isValid()) {
+        diagnose(param.FirstNameLoc, 
+                 diag::parameter_operator_keyword_argument)
+          .fixItRemoveChars(param.FirstNameLoc, param.SecondNameLoc);
+        param.FirstName = param.SecondName;
+        param.FirstNameLoc = param.SecondNameLoc;
+        param.SecondName = Identifier();
+        param.SecondNameLoc = SourceLoc();
       }
 
       // Cannot have a back-tick and two names.
