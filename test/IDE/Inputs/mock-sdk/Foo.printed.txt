@@ -77,16 +77,16 @@ typealias FooTypedef1 = CInt
 var fooIntVar: CInt
 
 /// Aaa.  fooFunc1.  Bbb.
-func fooFunc1(CInt) -> CInt
+func fooFunc1(a: CInt) -> CInt
 
-func fooFunc1AnonymousParam(CInt) -> CInt
-func fooFunc3(CInt, CFloat, CDouble, CMutablePointer<CInt>) -> CInt
+func fooFunc1AnonymousParam(_: CInt) -> CInt
+func fooFunc3(a: CInt, b: CFloat, c: CDouble, d: CMutablePointer<CInt>) -> CInt
 
 /*
   Very good
   fooFuncWithBlock function.
 */
-func fooFuncWithBlock(((CFloat) -> CInt)!)
+func fooFuncWithBlock(blk: ((CFloat) -> CInt)!)
 
 @noreturn func fooFuncNoreturn1()
 @noreturn func fooFuncNoreturn2()

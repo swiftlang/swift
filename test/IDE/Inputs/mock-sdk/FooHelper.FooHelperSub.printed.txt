@@ -1,5 +1,5 @@
 
-func fooHelperSubFunc1(_ a: CInt) -> CInt
+func fooHelperSubFunc1(a: CInt) -> CInt
 struct FooHelperSubEnum1 {
   init(value: CUnsignedInt)
   var value: CUnsignedInt
