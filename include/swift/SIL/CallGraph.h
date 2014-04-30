@@ -38,15 +38,19 @@ template <typename Node> struct CallGraphSorter {
       StableNodeList.push_back(From);
 
     // Add new edges to the graph.
-    if (edges.insert(std::make_pair(From, To)).second)
+    if (edges.insert(std::make_pair(From, To)).second || From == To)
       graph[From].push_back(To);
   }
 
   /// Perform a post-order scan of the graph while ignoring back-edges.
   /// Returns a list of edged sorted bottom-up.
-  void sort(std::vector<Node> &Res) {
+  void sort(std::vector<Node> &Order, llvm::DenseSet<Node> &Recursive) {
+    // The DFS stack.
     std::vector<Node> Worklist;
+    // The set of visited nodes.
     llvm::DenseSet<Node> Seen;
+    // The set of nodes that are currently on the stack.
+    llvm::DenseSet<Node> OnStack;
 
     // We start the scan from each of the nodes in our stable node list. This
     // is equivalent to constructing a new node with edges to each one of our
@@ -54,8 +58,10 @@ template <typename Node> struct CallGraphSorter {
     // node that dominates all others.
     for (auto StartNode : StableNodeList) {
       // Start the DFS scan with this node.
-      if (Seen.insert(StartNode).second)
+      if (Seen.insert(StartNode).second) {
         Worklist.push_back(StartNode);
+        OnStack.insert(StartNode);
+      }
 
       // For each starting point in the graph, perform a post-order DFS scan
       // and insert the values into Res.
@@ -66,14 +72,23 @@ template <typename Node> struct CallGraphSorter {
         // Insert all of the successors what were not seen before (unvisited
         // nodes) into the worklist.
         NodeList &Succ = graph[N];
-        for (Node S : Succ)
-          if (Seen.insert(S).second)
+        for (Node S : Succ) {
+          if (OnStack.count(S))
+            Recursive.insert(N);
+
+          if (Seen.insert(S).second) {
             Worklist.push_back(S);
+            OnStack.insert(S);
+          }
+        }
 
         // If we did not push any successors then we can schedule this node.
         if (Worklist.back() == N) {
           Worklist.pop_back();
-          Res.push_back(N);
+          bool In = OnStack.erase(N);
+          (void)In;
+          assert(In && "Node expected to be in the list.");
+          Order.push_back(N);
         }
       }
     }

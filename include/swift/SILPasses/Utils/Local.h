@@ -63,7 +63,11 @@ namespace swift {
 
   /// Return the bottom up call-graph order for module M. Notice that we don't
   /// include functions that don't participate in any call (caller or callee).
-  void bottomUpCallGraphOrder(SILModule *M, std::vector<SILFunction*> &order);
+  /// \p Order returns the sorted order. \p Recursive returns a list of nodes
+  /// with back-edges. These nodes make recursive calls.
+  void bottomUpCallGraphOrder(SILModule *M,
+                              std::vector<SILFunction*> &Order,
+                              llvm::DenseSet<SILFunction*> &Recursive);
 
   /// Does the passed in BuiltinFunctionRefInst have any side effects?
   bool isSideEffectFree(BuiltinFunctionRefInst *FR);

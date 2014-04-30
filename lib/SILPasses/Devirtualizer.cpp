@@ -1561,7 +1561,8 @@ bool SILDevirtualizer::run() {
     // CallGraph::sort provides a post-ordering of the calls.
     // We reverse-visit this bottom-up ordering.
     std::vector<SILFunction *> BottomUpCalls;
-    CallGraphOrder.sort(BottomUpCalls);
+    llvm::DenseSet<SILFunction *> Recursive;
+    CallGraphOrder.sort(BottomUpCalls, Recursive);
     for (auto &F : reversed(BottomUpCalls))
       for (auto &BB : *F)
         for (auto &I : BB)

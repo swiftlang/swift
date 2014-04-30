@@ -108,6 +108,7 @@ namespace swift {
   class CallGraphAnalysis : public SILAnalysis {
     SILModule *M;
     std::vector<SILFunction *> BottomUpFunctionOrder;
+    llvm::DenseSet<SILFunction*> RecursiveCallers;
 
   public:
     virtual ~CallGraphAnalysis() {}
@@ -120,6 +121,9 @@ namespace swift {
 
     /// \brief return a bottom-up function order.
     const std::vector<SILFunction*> &bottomUpCallGraphOrder();
+
+    /// \brief return a set of recursive caller functions.
+    const llvm::DenseSet<SILFunction*> &recursiveCallers();
 
     virtual void invalidate(InvalidationKind K) {
       if (K >= InvalidationKind::CallGraph)

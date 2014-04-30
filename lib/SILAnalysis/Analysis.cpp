@@ -41,9 +41,16 @@ void CompleteFunctions::setComplete() {
 const std::vector<SILFunction*> &CallGraphAnalysis::bottomUpCallGraphOrder() {
   // If we haven't calculated the order before do it now.
   if (!BottomUpFunctionOrder.size())
-    swift::bottomUpCallGraphOrder(M, BottomUpFunctionOrder);
+    swift::bottomUpCallGraphOrder(M, BottomUpFunctionOrder, RecursiveCallers);
 
   return BottomUpFunctionOrder;
+}
+
+const llvm::DenseSet<SILFunction*> &CallGraphAnalysis::recursiveCallers() {
+  // Calculate the call-graph.
+  bottomUpCallGraphOrder();
+
+  return RecursiveCallers;
 }
 
 SILAnalysis *swift::createCallGraphAnalysis(SILModule *M) {

@@ -1,0 +1,89 @@
+// RUN: %sil-opt %s -inline -sil-inline-threshold=50 -sil-combine -verify | FileCheck %s
+sil_stage canonical
+
+import Builtin
+import Swift
+
+//CHECK-LABEL: _TF8testcase6callerFT_T_ 
+//CHECK: _TF8testcase4foo4FT_T_
+//CHECK: _TF8testcase4foo3FT_T_
+//CHECK-NOT: _TF8testcase3foo5FT_T_
+//CHECK-NOT: _TF8testcase3foo6FT_T_
+//CHECK: return
+sil @_TF8testcase6callerFT_T_ : $@thin () -> () {
+bb0:
+  // function_ref testcase.foo4 () -> ()
+  %0 = function_ref @_TF8testcase4foo4FT_T_ : $@thin () -> () // user: %1
+  %1 = apply %0() : $@thin () -> ()
+  // function_ref testcase.foo1 () -> ()
+  %2 = function_ref @_TF8testcase4foo1FT_T_ : $@thin () -> () // user: %3
+  %3 = apply %2() : $@thin () -> ()
+  // function_ref testcase.foo5 () -> ()
+  %4 = function_ref @_TF8testcase4foo5FT_T_ : $@thin () -> () // user: %5
+  %5 = apply %4() : $@thin () -> ()
+  // function_ref testcase.foo6 () -> ()
+  %6 = function_ref @_TF8testcase4foo6FT_T_ : $@thin () -> () // user: %7
+  %7 = apply %6() : $@thin () -> ()
+  %8 = tuple ()                                   // user: %9
+  return %8 : $()                                 // id: %9
+}
+
+// testcase.foo4 () -> ()
+sil @_TF8testcase4foo4FT_T_ : $@thin () -> () {
+bb0:
+  // function_ref testcase.foo4 () -> ()
+  %0 = function_ref @_TF8testcase4foo4FT_T_ : $@thin () -> () // user: %1
+  %1 = apply %0() : $@thin () -> ()
+  %2 = tuple ()                                   // user: %3
+  return %2 : $()                                 // id: %3
+}
+
+// testcase.foo1 () -> ()
+sil @_TF8testcase4foo1FT_T_ : $@thin () -> () {
+bb0:
+  // function_ref testcase.foo2 () -> ()
+  %0 = function_ref @_TF8testcase4foo2FT_T_ : $@thin () -> () // user: %1
+  %1 = apply %0() : $@thin () -> ()
+  %2 = tuple ()                                   // user: %3
+  return %2 : $()                                 // id: %3
+}
+
+// testcase.foo5 () -> ()
+sil @_TF8testcase4foo5FT_T_ : $@thin () -> () {
+bb0:
+  // function_ref testcase.foo6 () -> ()
+  %0 = function_ref @_TF8testcase4foo6FT_T_ : $@thin () -> () // user: %1
+  %1 = apply %0() : $@thin () -> ()
+  %2 = tuple ()                                   // user: %3
+  return %2 : $()                                 // id: %3
+}
+
+// testcase.foo6 () -> ()
+sil @_TF8testcase4foo6FT_T_ : $@thin () -> () {
+bb0:
+  %0 = tuple ()                                   // user: %1
+  return %0 : $()                                 // id: %1
+}
+
+// testcase.foo2 () -> ()
+sil @_TF8testcase4foo2FT_T_ : $@thin () -> () {
+bb0:
+  // function_ref testcase.foo3 () -> ()
+  %0 = function_ref @_TF8testcase4foo3FT_T_ : $@thin () -> () // user: %1
+  %1 = apply %0() : $@thin () -> ()
+  %2 = tuple ()                                   // user: %3
+  return %2 : $()                                 // id: %3
+}
+
+// testcase.foo3 () -> ()
+sil @_TF8testcase4foo3FT_T_ : $@thin () -> () {
+bb0:
+  // function_ref testcase.foo1 () -> ()
+  %0 = function_ref @_TF8testcase4foo1FT_T_ : $@thin () -> () // user: %1
+  %1 = apply %0() : $@thin () -> ()
+  %2 = tuple ()                                   // user: %3
+  return %2 : $()                                 // id: %3
+}
+
+
+
