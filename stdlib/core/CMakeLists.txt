@@ -81,7 +81,6 @@ set(SWIFTLIB_SOURCES
   ### PLEASE KEEP THIS LIST IN ALPHABETICAL ORDER ###
   Bit.swift
   CollectionOfOne.swift
-  InputStream.swift
   Process.swift
   SliceBuffer.swift
   VarArgs.swift
