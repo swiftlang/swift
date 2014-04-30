@@ -838,6 +838,11 @@ Function signatures
 
 ...
 
+An argument name is a keyword argument if:
+- It is an argument to an initializer, or
+- It is an argument to a method after the first argument, or
+- It is preceded by a back-tick (`), or
+- Both a keyword argument name and an internal parameter name are specified.
 
 .. _langref.decl.subscript:
 
