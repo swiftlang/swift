@@ -742,6 +742,16 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
   return result;
 }
 
+Type ConstraintSystem::getFirstComputedBinding(TypeVariableType *tvt) {
+  PotentialBindings potentialBindings = getPotentialBindings(*this, tvt);
+  
+  if (potentialBindings.Bindings.size()) {
+    return potentialBindings.Bindings.front().BindingType;
+  }
+  
+  return Type();
+}
+
 /// \brief Try each of the given type variable bindings to find solutions
 /// to the given constraint system.
 ///

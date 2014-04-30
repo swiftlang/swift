@@ -288,7 +288,7 @@ class Constraint : public llvm::ilist_node<Constraint> {
   Constraint(ConstraintKind kind, ArrayRef<Constraint *> constraints,
              ConstraintLocator *locator, ArrayRef<TypeVariableType *> typeVars);
 
-  /// Constraint a new constraint.
+  /// Construct a new constraint.
   Constraint(ConstraintKind kind, Type first, Type second, DeclName member,
              ConstraintLocator *locator, ArrayRef<TypeVariableType *> typeVars);
 
@@ -296,12 +296,12 @@ class Constraint : public llvm::ilist_node<Constraint> {
   Constraint(Type type, OverloadChoice choice, ConstraintLocator *locator,
              ArrayRef<TypeVariableType *> typeVars);
 
-  /// Constraint a restricted constraint.
+  /// Construct a restricted constraint.
   Constraint(ConstraintKind kind, ConversionRestrictionKind restriction,
              Type first, Type second, ConstraintLocator *locator,
              ArrayRef<TypeVariableType *> typeVars);
-
-  /// Constraint a relational constraint with a fix.
+  
+  /// Construct a relational constraint with a fix.
   Constraint(ConstraintKind kind, Fix fix,
              Type first, Type second, ConstraintLocator *locator,
              ArrayRef<TypeVariableType *> typeVars);

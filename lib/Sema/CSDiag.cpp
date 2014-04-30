@@ -761,6 +761,14 @@ Constraint *getOverloadConstraint(Constraint *constraint) {
   return nullptr;
 }
 
+Constraint *getComponentConstraint(Constraint *constraint) {
+  if (constraint->getKind() != ConstraintKind::Disjunction) {
+    return constraint;
+  }
+  
+  return constraint->getNestedConstraints().front();
+}
+
 bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
   // If there were any unavoidable failures, emit the first one we can.
   if (!unavoidableFailures.empty()) {
@@ -837,11 +845,21 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
   Constraint *conversionConstraint = nullptr;
   Constraint *overloadConstraint = nullptr;
   Constraint *fallbackConstraint = nullptr;
+  Constraint *activeConformanceConstraint = nullptr;
   
   // If we've been asked for more detailed type-check diagnostics, mine the
   // system's inactive constraints for information on why we could not find a
   // solution.
   if (TC.Context.LangOpts.detailedTypeCheckDiagnostics) {
+    
+    if(!ActiveConstraints.empty()) {
+      // If any active conformance constraints are in the system, we know that
+      // any inactive constraints are in its service. Capture the constraint and
+      // present this information to the user.
+      auto *constraint = &ActiveConstraints.front();
+      
+      activeConformanceConstraint = getComponentConstraint(constraint);
+    }
     
     while (!InactiveConstraints.empty()) {
       auto *constraint = &InactiveConstraints.front();
@@ -876,20 +894,34 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
     conversionConstraint = fallbackConstraint;
   }
   
-  // If we have a conversion constraint, use that as the basis for the
-  // diagnostic.
-  if (conversionConstraint) {
+  if (activeConformanceConstraint) {
+    auto type = activeConformanceConstraint->getSecondType();
+    
+    TC.diagnose(expr->getLoc(),
+                diag::does_not_conform_to_constraint,
+                type)
+    .highlight(expr->getSourceRange());
+  } else  if (conversionConstraint) {
+    // Otherwise, if we have a conversion constraint, use that as the basis for
+    // the diagnostic.
     auto locator = conversionConstraint->getLocator();
-    auto anchor = locator->getAnchor();
+    auto anchor = locator ? locator->getAnchor() : expr;
     auto type = conversionConstraint->getSecondType();
     
     if (auto typeVariableType = dyn_cast<TypeVariableType>(type.getPointer())) {
-      auto impl = typeVariableType->getImpl();
-      if (auto archetypeType = impl.getArchetype()) {
-        type = archetypeType;
+      
+      auto binding = this->getFirstComputedBinding(typeVariableType);
+      
+      if (!binding.isNull()) {
+        type = binding;
       } else {
-        auto implAnchor = impl.getLocator()->getAnchor();
-        type = implAnchor->getType();
+        auto impl = typeVariableType->getImpl();
+        if (auto archetypeType = impl.getArchetype()) {
+          type = archetypeType;
+        } else {
+          auto implAnchor = impl.getLocator()->getAnchor();
+          type = implAnchor->getType();
+        }
       }
     }
     

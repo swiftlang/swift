@@ -90,7 +90,7 @@ namespace swift {
       return TargetConfigOptions;
     }
     
-    /// Enables detailed type-check error reportin.
+    /// Enables detailed type-check error reporting.
     bool detailedTypeCheckDiagnostics = false;
 
   private:

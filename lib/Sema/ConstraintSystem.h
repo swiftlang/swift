@@ -1966,6 +1966,10 @@ public:
   /// \brief Apply a given solution to the expression to the top-level
   /// expression, producing a fully type-checked expression.
   Expr *applySolutionShallow(const Solution &solution, Expr *expr);
+  
+  /// \brief Get the first specialization computed for a type variable. This is
+  /// useful when emitting diagnostics for computed type variables.
+  Type getFirstComputedBinding(TypeVariableType *tvt);
 
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump() LLVM_ATTRIBUTE_USED,
