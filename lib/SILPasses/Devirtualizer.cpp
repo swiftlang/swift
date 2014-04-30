@@ -296,6 +296,10 @@ struct SILDevirtualizer {
 
   void optimizeApplyInst(ApplyInst *Inst);
   void optimizeFuncBody(SILFunction *F);
+
+  bool optimizeApplyOfWitnessMethod(ApplyInst *AI, WitnessMethodInst *AMI);
+  bool optimizeApplyOfProtocolMethod(ApplyInst *AI, ProtocolMethodInst *PMI);
+
   bool run();
 
 #ifndef NDEBUG
@@ -1331,123 +1335,120 @@ findFuncInWitnessTable(SILDeclRef Member, ProtocolConformance *C,
   return {nullptr, ArrayRef<Substitution>()};
 }
 
-void SILDevirtualizer::optimizeApplyInst(ApplyInst *AI) {
-  DEBUG(llvm::dbgs() << "    Trying to optimize ApplyInst : " << *AI);
-
-  // Find call sites that may participate in deep devirtualization.
-  collectPolyArgs(AI);
-
-  // Devirtualize apply instructions that call witness_method instructions:
-  //
-  //   %8 = witness_method $Optional<UInt16>, #LogicValue.getLogicValue!1
-  //   %9 = apply %8<Self = CodeUnit?>(%6#1) : ...
-  //
-  WitnessMethodInst *AMI = dyn_cast<WitnessMethodInst>(AI->getCallee());
-  if (AMI && AMI->getConformance()) {
-    ProtocolConformance *C = AMI->getConformance();
-    // Lookup the function reference in the witness tables.
-    std::pair<SILWitnessTable *, ArrayRef<Substitution>> Ret =
-      AI->getModule().lookUpWitnessTable(C);
-
-    if (!Ret.first) {
-      DEBUG(llvm::dbgs() << "        FAIL: Did not find a matching witness "
-            "table.\n");
-      return;
-    }
-
-    for (auto &Entry : Ret.first->getEntries()) {
-      // Look at method entries only.
-      if (Entry.getKind() != SILWitnessTable::WitnessKind::Method)
-        continue;
-
-      // Check if this is the member we were looking for.
-      SILWitnessTable::MethodWitness MethodEntry = Entry.getMethodWitness();
-      if (MethodEntry.Requirement != AMI->getMember())
-        continue;
-
-      // Ok, we found the member we are looking for. Devirtualize away!
-      SILBuilder Builder(AI);
-      SILLocation Loc = AI->getLoc();
-      SILFunction *F = MethodEntry.Witness;
-      FunctionRefInst *FRI = Builder.createFunctionRef(Loc, F);
-
-      // Collect args from the apply inst.
-      ArrayRef<Operand> ApplyArgs = AI->getArgumentOperands();
-      SmallVector<SILValue, 4> Args;
-
-      // Begin by upcasting self to the appropriate type if we have an inherited
-      // conformance...
-      SILValue Self = ApplyArgs[0].get();
-      if (C->getKind() == ProtocolConformanceKind::Inherited) {
-        CanType Ty = Ret.first->getConformance()->getType()->getCanonicalType();
-        SILType SILTy =
-            SILType::getPrimitiveType(Ty, Self.getType().getCategory());
-        SILType SelfTy = Self.getType();
-        (void)SelfTy;
-
-        if (Ret.second.size()) {
-          // If we have substitutions then we are an inherited specialized
-          // conformance. Substitute in the generic type so we upcast correctly.
-          GenericParamList *GP = C->getSubstitutedGenericParams();
-          if (!GP)
-            return;
-
-          TypeSubstitutionMap TSM = GP->getSubstitutionMap(Ret.second);
-          SILTy = SILTy.subst(F->getModule(), F->getModule().getSwiftModule(),
-                              TSM);
-          SelfTy = SelfTy.subst(F->getModule(), F->getModule().getSwiftModule(),
-                                TSM);
-        }
-
-        assert(SILTy.isSuperclassOf(SelfTy) &&
-               "Should only create upcasts for sub class devirtualization.");
-        Self = Builder.createUpcast(Loc, Self, SILTy);
-      }
-      // and then adding in either the original or newly upcasted value.
-      Args.push_back(Self);
-
-      // Then add the rest of the arguments.
-      for (auto &A : ApplyArgs.slice(1))
-        Args.push_back(A.get());
-
-      SmallVector<Substitution, 16> NewSubstList(Ret.second.begin(),
-                                                 Ret.second.end());
-
-      // Add the non-self-derived substitutions from the original application.
-      assert(AI->getSubstitutions().size() && "Subst list must not be empty");
-      assert(AI->getSubstitutions()[0].Archetype->getSelfProtocol() &&
-             "The first substitution needs to be a 'self' substitution.");
-      for (auto &origSub : AI->getSubstitutions().slice(1)) {
-        if (!origSub.Archetype->isSelfDerived())
-          NewSubstList.push_back(origSub);
-      }
-
-      ApplyInst *SAI = Builder.createApply(Loc, FRI,
-                                           AI->getSubstCalleeSILType(),
-                                           AI->getType(), NewSubstList, Args);
-      AI->replaceAllUsesWith(SAI);
-      AI->eraseFromParent();
-      NumAMI++;
-      Changed = true;
-    }
-
-    DEBUG(llvm::dbgs() << "        FAIL: Could not find a witness table.\n");
-    return;
+/// Devirtualize apply instructions that call witness_method instructions:
+///
+///   %8 = witness_method $Optional<UInt16>, #LogicValue.getLogicValue!1
+///   %9 = apply %8<Self = CodeUnit?>(%6#1) : ...
+///
+bool SILDevirtualizer::optimizeApplyOfWitnessMethod(ApplyInst *AI,
+                                                    WitnessMethodInst *AMI) {
+  ProtocolConformance *C = AMI->getConformance();
+  if (!C) {
+    DEBUG(llvm::dbgs() << "        FAIL: Null conformance.\n");
+    return false;
   }
 
-  // Devirtualize protocol_method + project_existential + init_existential
-  // instructions.  For example:
-  //
-  // %0 = alloc_box $Pingable
-  // %1 = init_existential %0#1 : $*Pingable, $*Foo  <-- Foo is the static type!
-  // %4 = project_existential %0#1 : $*Pingable to $*@sil_self Pingable
-  // %5 = protocol_method %0#1 : $*Pingable, #Pingable.ping!1 :
-  // %8 = apply %5(ARGUMENTS ... , %4) :
+  // Lookup the function reference in the witness tables.
+  std::pair<SILWitnessTable *, ArrayRef<Substitution>> Ret =
+      AI->getModule().lookUpWitnessTable(C);
 
-  // Find the protocol_method instruction.
-  ProtocolMethodInst *PMI = dyn_cast<ProtocolMethodInst>(AI->getCallee());
+  if (!Ret.first) {
+    DEBUG(llvm::dbgs() << "        FAIL: Did not find a matching witness "
+                          "table.\n");
+    return false;
+  }
+
+  for (auto &Entry : Ret.first->getEntries()) {
+    // Look at method entries only.
+    if (Entry.getKind() != SILWitnessTable::WitnessKind::Method)
+      continue;
+
+    // Check if this is the member we were looking for.
+    SILWitnessTable::MethodWitness MethodEntry = Entry.getMethodWitness();
+    if (MethodEntry.Requirement != AMI->getMember())
+      continue;
+
+    // Ok, we found the member we are looking for. Devirtualize away!
+    SILBuilder Builder(AI);
+    SILLocation Loc = AI->getLoc();
+    SILFunction *F = MethodEntry.Witness;
+    FunctionRefInst *FRI = Builder.createFunctionRef(Loc, F);
+
+    // Collect args from the apply inst.
+    ArrayRef<Operand> ApplyArgs = AI->getArgumentOperands();
+    SmallVector<SILValue, 4> Args;
+
+    // Begin by upcasting self to the appropriate type if we have an inherited
+    // conformance...
+    SILValue Self = ApplyArgs[0].get();
+    if (C->getKind() == ProtocolConformanceKind::Inherited) {
+      CanType Ty = Ret.first->getConformance()->getType()->getCanonicalType();
+      SILType SILTy =
+          SILType::getPrimitiveType(Ty, Self.getType().getCategory());
+      SILType SelfTy = Self.getType();
+      (void)SelfTy;
+
+      if (Ret.second.size()) {
+        // If we have substitutions then we are an inherited specialized
+        // conformance. Substitute in the generic type so we upcast correctly.
+        GenericParamList *GP = C->getSubstitutedGenericParams();
+        if (!GP)
+          return false;
+
+        TypeSubstitutionMap TSM = GP->getSubstitutionMap(Ret.second);
+        SILTy =
+            SILTy.subst(F->getModule(), F->getModule().getSwiftModule(), TSM);
+        SelfTy =
+            SelfTy.subst(F->getModule(), F->getModule().getSwiftModule(), TSM);
+      }
+
+      assert(SILTy.isSuperclassOf(SelfTy) &&
+             "Should only create upcasts for sub class devirtualization.");
+      Self = Builder.createUpcast(Loc, Self, SILTy);
+    }
+    // and then adding in either the original or newly upcasted value.
+    Args.push_back(Self);
+
+    // Then add the rest of the arguments.
+    for (auto &A : ApplyArgs.slice(1))
+      Args.push_back(A.get());
+
+    SmallVector<Substitution, 16> NewSubstList(Ret.second.begin(),
+                                               Ret.second.end());
+
+    // Add the non-self-derived substitutions from the original application.
+    assert(AI->getSubstitutions().size() && "Subst list must not be empty");
+    assert(AI->getSubstitutions()[0].Archetype->getSelfProtocol() &&
+           "The first substitution needs to be a 'self' substitution.");
+    for (auto &origSub : AI->getSubstitutions().slice(1)) {
+      if (!origSub.Archetype->isSelfDerived())
+        NewSubstList.push_back(origSub);
+    }
+
+    ApplyInst *SAI = Builder.createApply(Loc, FRI, AI->getSubstCalleeSILType(),
+                                         AI->getType(), NewSubstList, Args);
+    AI->replaceAllUsesWith(SAI);
+    AI->eraseFromParent();
+    NumAMI++;
+    return true;
+  }
+
+  DEBUG(llvm::dbgs() << "        FAIL: Could not find a witness table.\n");
+  return false;
+}
+
+/// Devirtualize protocol_method + project_existential + init_existential
+/// instructions.  For example:
+///
+/// %0 = alloc_box $Pingable
+/// %1 = init_existential %0#1 : $*Pingable, $*Foo  <-- Foo is the static type!
+/// %4 = project_existential %0#1 : $*Pingable to $*@sil_self Pingable
+/// %5 = protocol_method %0#1 : $*Pingable, #Pingable.ping!1 :
+/// %8 = apply %5(ARGUMENTS ... , %4) :
+bool SILDevirtualizer::optimizeApplyOfProtocolMethod(ApplyInst *AI,
+                                                     ProtocolMethodInst *PMI) {
   if (!PMI)
-    return;
+    return false;
 
   DEBUG(llvm::dbgs() << "        Found ProtocolMethodInst: " << *PMI);
 
@@ -1455,21 +1456,20 @@ void SILDevirtualizer::optimizeApplyInst(ApplyInst *AI) {
   // project_existential instruction.
   MutableArrayRef<Operand> Args = AI->getArgumentOperands();
   if (Args.size() < 1)
-    return;
+    return false;
 
   SILValue LastArg = Args[Args.size() - 1].get();
   ProjectExistentialInst *PEI = dyn_cast<ProjectExistentialInst>(LastArg);
   if (!PEI)
-    return;
+    return false;
 
-  DEBUG(llvm::dbgs() << "        Found ProjectExistentialInst: "
-        << *PEI);
+  DEBUG(llvm::dbgs() << "        Found ProjectExistentialInst: " << *PEI);
 
   // Make sure that the project_existential and protocol_method instructions
   // use the same protocol.
   SILValue ProtocolObject = PMI->getOperand();
   if (PEI->getOperand().getDef() != ProtocolObject.getDef())
-    return;
+    return false;
 
   DEBUG(llvm::dbgs() << "        Protocol to devirtualize : "
                      << *ProtocolObject.getDef());
@@ -1480,21 +1480,20 @@ void SILDevirtualizer::optimizeApplyInst(ApplyInst *AI) {
   SILInstruction *InitInst = findSingleInitNoCaptureProtocol(ProtocolObject);
   if (CopyAddrInst *CAI = dyn_cast_or_null<CopyAddrInst>(InitInst)) {
     if (!CAI->isInitializationOfDest() || !CAI->isTakeOfSrc())
-      return;
+      return false;
 
     InitInst = findSingleInitNoCaptureProtocol(CAI->getSrc());
   }
 
   InitExistentialInst *Init = dyn_cast_or_null<InitExistentialInst>(InitInst);
   if (!Init)
-    return;
+    return false;
   DEBUG(llvm::dbgs() << "        InitExistentialInst : " << *Init);
 
   // For each protocol that our type conforms to:
   for (ProtocolConformance *Conf : Init->getConformances()) {
-    auto Pair = findFuncInWitnessTable(PMI->getMember(),
-                                       Conf,
-                                       Init->getModule());
+    auto Pair =
+        findFuncInWitnessTable(PMI->getMember(), Conf, Init->getModule());
 
     SILFunction *StaticRef = Pair.first;
     ArrayRef<Substitution> Subs = Pair.second;
@@ -1513,16 +1512,47 @@ void SILDevirtualizer::optimizeApplyInst(ApplyInst *AI) {
 
     DEBUG(llvm::dbgs() << "        SUCCESS! Devirtualized : " << *AI);
     ApplyInst *NewApply =
-      replaceDynApplyWithStaticApply(AI, StaticRef, Subs, Init, PEI);
+        replaceDynApplyWithStaticApply(AI, StaticRef, Subs, Init, PEI);
     DEBUG(llvm::dbgs() << "                To : " << *NewApply);
     collectPolyArgs(NewApply);
     NumDynApply++;
     Changed = true;
-    return;
+    return true;
   }
 
   DEBUG(llvm::dbgs() << "        FAIL: Could not find a witness table "
-        "for: " << *PMI);
+                        "for: " << *PMI);
+  return false;
+}
+
+void SILDevirtualizer::optimizeApplyInst(ApplyInst *AI) {
+  DEBUG(llvm::dbgs() << "    Trying to optimize ApplyInst : " << *AI);
+
+  // Find call sites that may participate in deep devirtualization.
+  collectPolyArgs(AI);
+
+  // Devirtualize apply instructions that call witness_method instructions:
+  //
+  //   %8 = witness_method $Optional<UInt16>, #LogicValue.getLogicValue!1
+  //   %9 = apply %8<Self = CodeUnit?>(%6#1) : ...
+  //
+  if (auto *AMI = dyn_cast<WitnessMethodInst>(AI->getCallee())) {
+    Changed |= optimizeApplyOfWitnessMethod(AI, AMI);
+    return;
+  }
+
+  // Devirtualize protocol_method + project_existential + init_existential
+  // instructions.  For example:
+  //
+  // %0 = alloc_box $Pingable
+  // %1 = init_existential %0#1 : $*Pingable, $*Foo  <-- Foo is the static type!
+  // %4 = project_existential %0#1 : $*Pingable to $*@sil_self Pingable
+  // %5 = protocol_method %0#1 : $*Pingable, #Pingable.ping!1 :
+  // %8 = apply %5(ARGUMENTS ... , %4) :
+  ProtocolMethodInst *PMI = dyn_cast<ProtocolMethodInst>(AI->getCallee());
+  if (!PMI)
+    return;
+  Changed |= optimizeApplyOfProtocolMethod(AI, PMI);
 }
 
 void SILDevirtualizer::optimizeFuncBody(SILFunction *F) {
