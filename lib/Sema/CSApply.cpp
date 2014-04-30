@@ -4122,7 +4122,7 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
   }
 
   // Add the conversion from the argument to the function parameter type.
-  cs.addConstraint(ConstraintKind::Conversion, arg->getType(),
+  cs.addConstraint(ConstraintKind::ArgumentTupleConversion, arg->getType(),
                    openedType->castTo<FunctionType>()->getInput(),
                    cs.getConstraintLocator(arg,
                                            ConstraintLocator::ApplyArgument));

@@ -862,7 +862,8 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
       // Conversion constraints are also nicely descriptive, so we'll grab the
       // first one of those as well.
       if (!conversionConstraint &&
-          (constraint->getKind() == ConstraintKind::Conversion)) {
+          (constraint->getKind() == ConstraintKind::Conversion ||
+           constraint->getKind() == ConstraintKind::ArgumentTupleConversion)) {
         conversionConstraint = constraint;
       }
       

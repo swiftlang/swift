@@ -248,6 +248,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
 
   case TypeMatchKind::Subtype:
   case TypeMatchKind::Conversion:
+  case TypeMatchKind::ArgumentTupleConversion:
   case TypeMatchKind::OperatorConversion:
     subKind = TypeMatchKind::Subtype;
     break;
@@ -295,6 +296,7 @@ static Failure::FailureKind getRelationalFailureKind(TypeMatchKind kind) {
 
   case TypeMatchKind::Conversion:
   case TypeMatchKind::OperatorConversion:
+  case TypeMatchKind::ArgumentTupleConversion:
     return Failure::TypesNotConvertible;
   }
 
@@ -426,7 +428,10 @@ static ConstraintKind getConstraintKind(TypeMatchKind kind) {
 
   case TypeMatchKind::Conversion:
     return ConstraintKind::Conversion;
-      
+
+  case TypeMatchKind::ArgumentTupleConversion:
+    return ConstraintKind::ArgumentTupleConversion;
+
   case TypeMatchKind::OperatorConversion:
     return ConstraintKind::OperatorConversion;
   }
@@ -459,6 +464,7 @@ tryUserConversion(ConstraintSystem &cs, Type type, ConstraintKind kind,
                   Type otherType, ConstraintLocatorBuilder locator) {
   assert(kind != ConstraintKind::Construction &&
          kind != ConstraintKind::Conversion &&
+         kind != ConstraintKind::ArgumentTupleConversion &&
          kind != ConstraintKind::OperatorConversion &&
          "Construction/conversion constraints create potential cycles");
   
@@ -491,7 +497,8 @@ tryUserConversion(ConstraintSystem &cs, Type type, ConstraintKind kind,
   // A conversion function must accept an empty parameter list ().
   // Note: This should never fail, because the declaration checker
   // should ensure that conversions have no non-defaulted parameters.
-  cs.addConstraint(ConstraintKind::Conversion, TupleType::getEmpty(ctx),
+  cs.addConstraint(ConstraintKind::ArgumentTupleConversion,
+                   TupleType::getEmpty(ctx),
                    inputTV, cs.getConstraintLocator(locator));
 
   // Relate the output of the conversion function to the other type, using
@@ -652,6 +659,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
 
     case TypeMatchKind::Subtype:
     case TypeMatchKind::Conversion:
+    case TypeMatchKind::ArgumentTupleConversion:
     case TypeMatchKind::OperatorConversion:
       if (flags & TMF_GenerateConstraints) {
         // Add a new constraint between these types. We consider the current
@@ -1204,7 +1212,8 @@ ConstraintSystem::simplifyConstructionConstraint(Type valueType, Type argType,
                              ConstraintLocator::ConstructorMember));
   
   // The first type must be convertible to the constructor's argument type.
-  addConstraint(ConstraintKind::Conversion, argType, tv, applyLocator);
+  addConstraint(ConstraintKind::ArgumentTupleConversion, argType, tv,
+                applyLocator);
 
   return SolutionKind::Solved;
 }
@@ -1986,6 +1995,8 @@ static TypeMatchKind getTypeMatchKind(ConstraintKind kind) {
   case ConstraintKind::Equal: return TypeMatchKind::SameType;
   case ConstraintKind::Subtype: return TypeMatchKind::Subtype;
   case ConstraintKind::Conversion: return TypeMatchKind::Conversion;
+  case ConstraintKind::ArgumentTupleConversion:
+    return TypeMatchKind::ArgumentTupleConversion;
   case ConstraintKind::OperatorConversion:
     return TypeMatchKind::OperatorConversion;
 
@@ -2263,6 +2274,7 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   case ConstraintKind::Equal:
   case ConstraintKind::Subtype:
   case ConstraintKind::Conversion:
+  case ConstraintKind::ArgumentTupleConversion:
   case ConstraintKind::OperatorConversion: {
     // For relational constraints, match up the types.
     auto matchKind = getTypeMatchKind(constraint.getKind());

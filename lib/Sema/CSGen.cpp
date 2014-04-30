@@ -147,8 +147,8 @@ namespace {
 
       // Add the constraint that the index expression's type be convertible
       // to the input type of the subscript operator.
-      CS.addConstraint(ConstraintKind::Conversion, index->getType(), inputTv,
-                       indexLocator);
+      CS.addConstraint(ConstraintKind::ArgumentTupleConversion,
+                       index->getType(), inputTv, indexLocator);
       return outputTv;
     }
 

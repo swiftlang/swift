@@ -577,6 +577,9 @@ enum class TypeMatchKind : char {
   /// \brief Requires the first type to be convertible to the second type,
   /// which includes exact matches and both forms of subtyping.
   Conversion,
+  /// Requires the first type to be an argument type (tuple) that can be
+  /// converted to the second type, which represents the parameter type (tuple).
+  ArgumentTupleConversion,
   /// \brief Requires the first type to be convertible to the second type,
   /// which includes exact matches, both forms of subtyping, and inserting
   /// address-of to convert implicit lvalues to inout arguments.  This is

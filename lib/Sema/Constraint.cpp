@@ -49,6 +49,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
   case ConstraintKind::Equal:
   case ConstraintKind::Subtype:
   case ConstraintKind::Conversion:
+  case ConstraintKind::ArgumentTupleConversion:
   case ConstraintKind::OperatorConversion:
   case ConstraintKind::Construction:
   case ConstraintKind::ConformsTo:
@@ -176,6 +177,7 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
   case ConstraintKind::Equal: Out << " == "; break;
   case ConstraintKind::Subtype: Out << " < "; break;
   case ConstraintKind::Conversion: Out << " <c "; break;
+  case ConstraintKind::ArgumentTupleConversion: Out << " <ac "; break;
   case ConstraintKind::OperatorConversion: Out << " <oc "; break;
   case ConstraintKind::Construction: Out << " <C "; break;
   case ConstraintKind::ConformsTo: Out << " conforms to "; break;
@@ -340,6 +342,7 @@ gatherReferencedTypeVars(Constraint *constraint,
   case ConstraintKind::Bind:
   case ConstraintKind::Construction:
   case ConstraintKind::Conversion:
+  case ConstraintKind::ArgumentTupleConversion:
   case ConstraintKind::OperatorConversion:
   case ConstraintKind::CheckedCast:
   case ConstraintKind::Equal:
