@@ -337,6 +337,13 @@ public:
   void *getOpaqueValue() const { return SimpleOrCompound.getOpaqueValue(); }
   static DeclName getFromOpaqueValue(void *p) { return DeclName(p); }
 
+  /// Print a "pretty" representation of this declaration name to the given
+  /// stream.
+  ///
+  /// This is the name used for diagnostics; it is not necessarily the
+  /// fully-specified name that would be written in the source.
+  llvm::raw_ostream &printPretty(llvm::raw_ostream &os) const;
+
   /// Dump this name to standard error.
   LLVM_ATTRIBUTE_DEPRECATED(void dump() const,
                             "only for use within the debugger");

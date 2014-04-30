@@ -218,7 +218,9 @@ static void formatDiagnosticArgument(StringRef Modifier,
 
   case DiagnosticArgumentKind::Identifier:
     assert(Modifier.empty() && "Improper modifier for identifier argument");
-    Out << '\'' << Arg.getAsIdentifier() << '\'';
+    Out << '\'';
+    Arg.getAsIdentifier().printPretty(Out);
+    Out << '\'';
     break;
 
   case DiagnosticArgumentKind::ObjCSelector:

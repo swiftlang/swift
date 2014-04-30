@@ -68,6 +68,38 @@ void DeclName::dump() const {
   llvm::errs() << *this << "\n";
 }
 
+llvm::raw_ostream &DeclName::printPretty(llvm::raw_ostream &os) const {
+  // Print the base name.
+  os << getBaseName();
+
+  // If this is a simple name, we're done.
+  if (isSimpleName())
+    return os;
+
+  // If there is more than one argument yet none of them have names,
+  // we're done.
+  if (getArgumentNames().size() > 0) {
+    bool anyNonEmptyNames = false;
+    for (auto c : getArgumentNames()) {
+      if (!c.empty()) {
+        anyNonEmptyNames = true;
+        break;
+      }
+    }
+
+    if (!anyNonEmptyNames)
+      return os;
+  }
+
+  // Print the argument names.
+  os << "(";
+  for (auto c : getArgumentNames()) {
+    os << c << ':';
+  }
+  os << ")";
+  return os;
+}
+
 ObjCSelector::ObjCSelector(ASTContext &ctx, unsigned numArgs,
                            ArrayRef<Identifier> pieces) {
   if (numArgs == 0) {
