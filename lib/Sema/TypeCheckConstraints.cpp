@@ -314,9 +314,10 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
     }
   }
 
-  // If we have an unambiguous reference to a type decl, form a TypeExpr.
-  if (// FIXME: Specialized too!
-      !UDRE->isSpecialized() &&
+  // If we have an unambiguous reference to a type decl, form a TypeExpr.  This
+  // doesn't handle specialized decls since they are processed when the
+  // UnresolvedSpecializeExpr is seen.
+  if (!UDRE->isSpecialized() &&
       ResultValues.size() == 1 && UDRE->getRefKind() == DeclRefKind::Ordinary &&
       isa<TypeDecl>(ResultValues[0])) {
     return TypeExpr::createForDecl(Loc, cast<TypeDecl>(ResultValues[0]));
@@ -471,6 +472,21 @@ namespace {
             return nullptr;
           }
         }
+        
+        // If this is a reference type a specialized type, form a TypeExpr.
+        if (auto *dre = dyn_cast<DeclRefExpr>(us->getSubExpr())) {
+          if (auto *TD = dyn_cast<TypeDecl>(dre->getDecl())) {
+            SmallVector<TypeRepr*, 4> TypeReprs;
+            for (auto elt : us->getUnresolvedParams())
+              TypeReprs.push_back(elt.getTypeRepr());
+            auto angles = SourceRange(us->getLAngleLoc(), us->getRAngleLoc());
+            return TypeExpr::createForSpecializedDecl(dre->getLoc(),
+                                                      TD,
+                                            TC.Context.AllocateCopy(TypeReprs),
+                                                      angles);
+          }
+        }
+        
         return expr;
       }
       
@@ -504,7 +520,6 @@ namespace {
 /// as expressions due to the parser not knowing which identifiers are
 /// type names.
 TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
-  
   // Fold T[] into an array, it isn't a subscript on a metatype.
   if (auto *SE = dyn_cast<SubscriptExpr>(E)) {
     auto *TyExpr = dyn_cast<TypeExpr>(SE->getBase());
