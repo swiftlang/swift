@@ -534,8 +534,6 @@ ERROR(expected_rparen_tuple_type_list,type_parsing,none,
       "expected ')' at end of tuple list", ())
 ERROR(empty_tuple_ellipsis,type_parsing,none,
       "varargs used in tuple type with no fields", ())
-ERROR(tuple_ellipsis_init,type_parsing,none,
-      "varargs used with tuple field with default value", ())
 ERROR(unexpected_ellipsis_in_tuple,type_parsing,none,
       "unexpected '...' before the end of a tuple list", ())
 ERROR(tuple_type_init,pattern_parsing,none,

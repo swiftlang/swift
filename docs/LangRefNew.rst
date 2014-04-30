@@ -1104,7 +1104,6 @@ Tuple Patterns
   pattern-tuple ::= '(' pattern-tuple-body? ')'
   pattern-tuple-body ::= pattern-tuple-element (',' pattern-tuple-body)* '...'?
   pattern-tuple-element ::= pattern
-  pattern-tuple-element ::= pattern '=' expr
 
 A tuple pattern is a list of zero or more patterns.  Within a :ref:`function
 signature <langref.decl.func.signature>`, patterns may also be given a

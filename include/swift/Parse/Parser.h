@@ -903,17 +903,12 @@ public:
   ///     pattern ('=' expr)?
   /// \endcode
   ///
-  /// \param args If non-null, collect default arguments here.
-  ///
   /// \returns The tuple pattern element, if successful.
   std::pair<ParserStatus, Optional<TuplePatternElt>>
-  parsePatternTupleElement(bool isLet, bool isArgumentList,
-                           Pattern *ImplicitName, DefaultArgumentInfo *args);
-  ParserResult<Pattern> parsePatternTuple(bool isLet, bool isArgumentList,
-                                          DefaultArgumentInfo *args);
+  parsePatternTupleElement(bool isLet, bool isArgumentList);
+  ParserResult<Pattern> parsePatternTuple(bool isLet, bool isArgumentList);
   ParserResult<Pattern> parsePatternTupleAfterLP(bool isLet,bool isArgumentList,
-                                                 SourceLoc LPLoc,
-                                                 DefaultArgumentInfo *args);
+                                                 SourceLoc LPLoc);
   ParserResult<Pattern> parsePatternAtom(bool isLet);
   ParserResult<Pattern> parsePatternIdentifier(bool isLet);
   ParserResult<Pattern> parsePatternVarOrLet();
