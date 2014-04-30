@@ -1,6 +1,9 @@
 Latest
 ----------
 
+2014-04-30
+----------
+
 * Swift now supports a #elseif form for build configurations, e.g.:
 
     #if os(OSX)
