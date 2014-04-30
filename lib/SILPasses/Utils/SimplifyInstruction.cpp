@@ -235,35 +235,12 @@ SILValue InstSimplifier::visitUpcastInst(UpcastInst *UI) {
   return SILValue();
 }
 
-static SILValue optimizeBuiltinCanBeObjCClass(ApplyInst *AI) {
-  assert(AI->hasSubstitutions() && "Expected substitutions for canBeObjCClass");
-
-  auto const &Subs = AI->getSubstitutions();
-  assert((Subs.size() == 1) &&
-         "Expected one substitution in call to canBeObjCClass");
-
-  SILBuilder Builder(AI);
-
-  auto Ty = Subs[0].Replacement->getCanonicalType();
-  switch (Ty->canBeObjCClass()) {
-  case TypeTraitResult::IsNot:
-    return Builder.createIntegerLiteral(AI->getLoc(), AI->getType(), 0);
-  case TypeTraitResult::Is:
-    return Builder.createIntegerLiteral(AI->getLoc(), AI->getType(), 1);
-  case TypeTraitResult::CanBe:
-    return SILValue();
-  }
-}
-
 /// Simplify an apply of the builtin canBeObjCClass to either 0 or 1
 /// when we can statically determine the result.
 SILValue InstSimplifier::visitApplyInst(ApplyInst *AI) {
   auto *BFRI = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee());
   if (!BFRI)
     return SILValue();
-
-  if (BFRI->getBuiltinInfo().ID == BuiltinValueKind::CanBeObjCClass)
-    return optimizeBuiltinCanBeObjCClass(AI);
 
   // If we have an expect optimizer hint with a constant value input, there is
   // nothing left to expect so propagate the input, i.e.,

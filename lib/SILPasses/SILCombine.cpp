@@ -255,6 +255,8 @@ public:
 
   /// Base visitor that does not do anything.
   SILInstruction *visitValueBase(ValueBase *V) { return nullptr; }
+
+  /// Instruction visitors.
   SILInstruction *visitReleaseValueInst(ReleaseValueInst *DI);
   SILInstruction *visitRetainValueInst(RetainValueInst *CI);
   SILInstruction *visitPartialApplyInst(PartialApplyInst *AI);
@@ -274,7 +276,10 @@ public:
   SILInstruction *
   visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *TEDAI);
 
-
+  /// Instruction visitor helpers.
+  SILInstruction *optimizeBuiltinCanBeObjCClass(ApplyInst *AI);
+  SILInstruction *optimizeApplyOfPartialApply(ApplyInst *AI,
+                                              PartialApplyInst *PAI);
 
 private:
   /// Perform one SILCombine iteration.
@@ -772,46 +777,74 @@ SILInstruction *SILCombiner::visitPartialApplyInst(PartialApplyInst *PAI) {
   return nullptr;
 }
 
+SILInstruction *
+SILCombiner::optimizeApplyOfPartialApply(ApplyInst *AI, PartialApplyInst *PAI) {
+  // Don't handle generic applys.
+  if (AI->hasSubstitutions() || PAI->hasSubstitutions())
+    return nullptr;
+
+  FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(PAI->getCallee());
+  if (!FRI)
+    return nullptr;
+
+  // Prepare the args.
+  SmallVector<SILValue, 8> Args;
+  // First the ApplyInst args.
+  for (auto Op : AI->getArguments())
+    Args.push_back(Op);
+  // Next, the partial apply args.
+  for (auto Op : PAI->getArguments())
+    Args.push_back(Op);
+
+  // The thunk that implements the partial apply calls the closure function
+  // that expects all arguments to be consumed by the function. However, the
+  // captured arguments are not arguments of *this* apply, so they are not
+  // pre-incremented. When we combine the partial_apply and this apply into
+  // a new apply we need to retain all of the closure non-address type
+  // arguments.
+  for (auto Arg : PAI->getArguments())
+    if (!Arg.getType().isAddress())
+      Builder->emitRetainValueOperation(PAI->getLoc(), Arg);
+
+  ApplyInst *NAI =
+      Builder->createApply(AI->getLoc(), FRI, Args, AI->isTransparent());
+
+  // We also need to release the partial_apply instruction itself because it
+  // is consumed by the apply_instruction.
+  Builder->createStrongRelease(AI->getLoc(), PAI);
+
+  replaceInstUsesWith(*AI, NAI);
+  return eraseInstFromFunction(*AI);
+}
+
+SILInstruction *SILCombiner::optimizeBuiltinCanBeObjCClass(ApplyInst *AI) {
+  assert(AI->hasSubstitutions() && "Expected substitutions for canBeObjCClass");
+
+  auto const &Subs = AI->getSubstitutions();
+  assert((Subs.size() == 1) &&
+         "Expected one substitution in call to canBeObjCClass");
+
+  auto Ty = Subs[0].Replacement->getCanonicalType();
+  switch (Ty->canBeObjCClass()) {
+  case TypeTraitResult::IsNot:
+    return IntegerLiteralInst::create(AI->getLoc(), AI->getType(),
+                                      APInt(1, 0), *AI->getFunction());
+  case TypeTraitResult::Is:
+    return IntegerLiteralInst::create(AI->getLoc(), AI->getType(),
+                                      APInt(1, 1), *AI->getFunction());
+  case TypeTraitResult::CanBe:
+    return nullptr;
+  }
+}
+
 SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
   // Optimize apply{partial_apply(x,y)}(z) -> apply(z,x,y).
-  if (auto *PAI = dyn_cast<PartialApplyInst>(AI->getCallee())) {
-    // Don't handle generic applys.
-    if (AI->hasSubstitutions() || PAI->hasSubstitutions())
-      return nullptr;
+  if (auto *PAI = dyn_cast<PartialApplyInst>(AI->getCallee()))
+    return optimizeApplyOfPartialApply(AI, PAI);
 
-    FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(PAI->getCallee());
-    if (!FRI)
-      return nullptr;
-
-    // Prepare the args.
-    SmallVector<SILValue, 8> Args;
-    // First the ApplyInst args.
-    for (auto Op : AI->getArguments())
-      Args.push_back(Op);
-    // Next, the partial apply args.
-    for (auto Op : PAI->getArguments())
-      Args.push_back(Op);
-
-    // The thunk that implements the partial apply calls the closure function
-    // that expects all arguments to be consumed by the function. However, the
-    // captured arguments are not arguments of *this* apply, so they are not
-    // pre-incremented. When we combine the partial_apply and this apply into
-    // a new apply we need to retain all of the closure non-address type
-    // arguments.
-    for (auto Arg : PAI->getArguments())
-      if (!Arg.getType().isAddress())
-        Builder->emitRetainValueOperation(PAI->getLoc(), Arg);
-
-    ApplyInst *NAI = Builder->createApply(AI->getLoc(), FRI, Args,
-                                          AI->isTransparent());
-
-    // We also need to release the partial_apply instruction itself because it
-    // is consumed by the apply_instruction.
-    Builder->createStrongRelease(AI->getLoc(), PAI);
-
-    replaceInstUsesWith(*AI, NAI);
-    return eraseInstFromFunction(*AI);
-  }
+  if (auto *BFRI = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee()))
+    if (BFRI->getBuiltinInfo().ID == BuiltinValueKind::CanBeObjCClass)
+      return optimizeBuiltinCanBeObjCClass(AI);
 
   return nullptr;
 }
