@@ -43,6 +43,7 @@ private:
   ASTContext &Context;
   DeclContext *TypeCheckDC;
   unsigned TmpNameIndex = 0;
+  const unsigned int LineOffset = 9;
 
   struct BracePair {
   public:
@@ -62,16 +63,31 @@ private:
   typedef std::forward_list<BracePair> BracePairStack;
 
   BracePairStack BracePairs;
+  bool EnteredGlobalBrace = false;
 
   class BracePairPusher {
     BracePairStack &BracePairs;
+    bool Valid = false;
   public:
-    BracePairPusher(BracePairStack &BPS, const SourceRange &BR) : 
+    BracePairPusher(BracePairStack &BPS, const SourceRange &BR) :
       BracePairs(BPS) {
       BracePairs.push_front(BracePair(BR));
+      Valid = true;
     }
     ~BracePairPusher() {
-      BracePairs.pop_front();
+      if (isValid()) {
+        Valid = false;
+        BracePairs.pop_front();
+      }
+    }
+    void invalidate() {
+      if (isValid()) {
+        Valid = false;
+        BracePairs.pop_front();
+      }
+    }
+    bool isValid() {
+      return Valid;
     }
   };
 
@@ -303,7 +319,16 @@ public:
     ElementVector Elements(OriginalElements.begin(),
                            OriginalElements.end());
 
-    BracePairPusher BPP(BracePairs, BS->getSourceRange());
+    bool IsGlobal = !EnteredGlobalBrace;
+    EnteredGlobalBrace = true;
+    
+    SourceRange SR = BS->getSourceRange();
+    BracePairPusher BPP(BracePairs, SR);
+    
+    if ((Context.SourceMgr.getLineAndColumn(SR.Start).first < LineOffset) &&
+        (!IsGlobal)) {
+      BPP.invalidate();
+    }
 
     for (size_t EI = 0;
          EI != Elements.size();
@@ -421,7 +446,6 @@ public:
       } else if (Stmt *S = Element.dyn_cast<Stmt*>()) {
         S->walk(CF);
         if (ReturnStmt *RS = llvm::dyn_cast<ReturnStmt>(S)) {
-          EI = escapeToTarget(BracePair::TargetKinds::Return, Elements, EI);
           if (RS->hasResult()) {
             std::pair<PatternBindingDecl *, VarDecl *> PV =
               buildPatternAndVariable(RS->getResult());
@@ -447,6 +471,7 @@ public:
             Elements.insert(Elements.begin() + (EI + 3), NRS);
             EI += 3;
           }
+          EI = escapeToTarget(BracePair::TargetKinds::Return, Elements, EI);
         } else {
           if (llvm::isa<BreakStmt>(S) ||
               llvm::isa<ContinueStmt>(S)) {
@@ -484,9 +509,12 @@ public:
       }
     }
 
-    Elements.insert(Elements.begin(), buildScopeEntry(BS->getSourceRange()));
-    Elements.insert(Elements.end(), buildScopeExit(BS->getSourceRange()));
-
+    if (BPP.isValid())
+    {
+      Elements.insert(Elements.begin(), buildScopeEntry(BS->getSourceRange()));
+      Elements.insert(Elements.end(), buildScopeExit(BS->getSourceRange()));
+    }
+    
     return swift::BraceStmt::create(Context, BS->getLBraceLoc(),
                                     Context.AllocateCopy(Elements),
                                     BS->getRBraceLoc());
@@ -618,8 +646,6 @@ public:
     char *end_line_buf = (char*)Context.Allocate(buf_size, 1);
     char *start_column_buf = (char*)Context.Allocate(buf_size, 1);
     char *end_column_buf = (char*)Context.Allocate(buf_size, 1);
-
-    const int LineOffset = 9;
 
     ::snprintf(start_line_buf, buf_size, "%d",
                (StartLC.first < LineOffset) ? 0 : (StartLC.first - LineOffset));
