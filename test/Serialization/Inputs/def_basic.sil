@@ -864,16 +864,16 @@ sil @test_mark_fn_escape : $@thin () -> () {
 }
 
 // CHECK-LABEL: sil public_external @test_copy_release_value
-sil @test_copy_release_value : $@thin (Val) -> (Val) {
-bb0(%0 : $Val):
-  retain_value %0 : $Val
-  release_value %0 : $Val
-  autorelease_value %0 : $Val
-  return %0 : $Val
-  // CHECK:      retain_value [[T0:%.*]] : $Val
-  // CHECK-NEXT: release_value [[T0]] : $Val
-  // CHECK-NEXT: autorelease_value [[T0]] : $Val
-  // CHECK-NEXT: return [[T0]] : $Val
+sil @test_copy_release_value : $@thin (X) -> (X) {
+bb0(%0 : $X):
+  retain_value %0 : $X
+  release_value %0 : $X
+  autorelease_value %0 : $X
+  return %0 : $X
+  // CHECK:      retain_value [[T0:%.*]] : $X
+  // CHECK-NEXT: release_value [[T0]] : $X
+  // CHECK-NEXT: autorelease_value [[T0]] : $X
+  // CHECK-NEXT: return [[T0]] : $X
 }
 
 func serialize_all() {
@@ -1147,7 +1147,7 @@ bb0:
   %111 = function_ref @test_partial_apply : $@thin Float32 -> @callee_owned Int -> ()
   %113 = function_ref @test_dynamic_lookup_br : $@thin (AnyObject) -> ()
   %115 = function_ref @test_mark_fn_escape : $@thin () -> ()
-  %117 = function_ref @test_copy_release_value : $@thin (Val) -> (Val)
+  %117 = function_ref @test_copy_release_value : $@thin (X) -> (X)
   %118 = function_ref @cond_fail_test : $@thin Builtin.Int1 -> ()
 
   %124 = function_ref @block_storage_type : $@thin Int -> @cc(cdecl) @objc_block () -> ()

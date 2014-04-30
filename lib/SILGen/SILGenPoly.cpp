@@ -1408,7 +1408,8 @@ static SILValue getWitnessFunctionRef(SILGenModule &SGM, SILDeclRef witness,
     return B.createFunctionRef(loc, SGM.getFunction(witness, NotForDefinition));
 
   // Otherwise emit a class method.
-  return B.createClassMethod(loc, selfParam.getValue(), witness, witnessSILTy,
+  return B.createClassMethod(loc, selfParam.getValue(), witness,
+                             SGM.getConstantType(witness),
                              isObjC | isVolatile);
 }
 

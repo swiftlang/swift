@@ -1072,14 +1072,14 @@ bb0(%0 : $E):
   return %2 : $E
 }
 
-// CHECK-LABEL: sil @unchecked_ref_cast_upcast_combine : $@thin (B) -> Builtin.NativeObject {
+// CHECK-LABEL: sil @unchecked_ref_cast_upcast_combine : $@thin (E) -> Builtin.NativeObject {
 // CHECK: bb0
 // CHECK-NEXT: unchecked_ref_cast
 // CHECK-NEXT: return
-sil @unchecked_ref_cast_upcast_combine : $@thin (B) -> Builtin.NativeObject {
-bb0(%0 : $B):
-  %1 = upcast %0 : $B to $E
-  %2 = unchecked_ref_cast %1 : $E to $Builtin.NativeObject
+sil @unchecked_ref_cast_upcast_combine : $@thin E -> Builtin.NativeObject {
+bb0(%0 : $E):
+  %1 = upcast %0 : $E to $B
+  %2 = unchecked_ref_cast %1 : $B to $Builtin.NativeObject
   return %2 : $Builtin.NativeObject
 }
 

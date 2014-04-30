@@ -596,7 +596,7 @@ public:
             "Source value should be an object value");
   }
   
-  void checkAutoreleaseValueInst(ReleaseValueInst *I) {
+  void checkAutoreleaseValueInst(AutoreleaseValueInst *I) {
     require(I->getOperand().getType().isObject(),
             "Source value should be an object value");
     // TODO: This instruction could in principle be generalized.
@@ -1468,9 +1468,23 @@ public:
   void checkUpcastInst(UpcastInst *UI) {
     require(UI->getType() != UI->getOperand().getType(),
             "can't upcast to same type");
-
+    // FIXME: Existential metatype upcasts should have their own instruction.
+    // For now accept them blindly.
+    if (UI->getType().is<ExistentialMetatypeType>()) {
+      require(UI->getOperand().getType().is<AnyMetatypeType>(),
+              "must upcast existential metatype from metatype");
+      require(UI->getOperand().getType().castTo<AnyMetatypeType>()
+                ->getRepresentation() == MetatypeRepresentation::Thick,
+              "must upcast existential metatype from thick metatype");
+      return;
+    }
+    
     if (UI->getType().is<MetatypeType>()) {
       CanType instTy(UI->getType().castTo<MetatypeType>()->getInstanceType());
+      
+      if (instTy->isExistentialType())
+        return;
+      
       require(UI->getOperand().getType().is<MetatypeType>(),
               "upcast operand must be a class or class metatype instance");
       CanType opInstTy(UI->getOperand().getType().castTo<MetatypeType>()
@@ -1478,7 +1492,7 @@ public:
       require(instTy->getClassOrBoundGenericClass(),
               "upcast must convert a class metatype to a class metatype");
       require(instTy->isSuperclassOf(opInstTy, nullptr),
-              "upcast must cast to a superclass");
+              "upcast must cast to a superclass or an existential metatype");
     } else {
       require(UI->getType().getClassOrBoundGenericClass(),
               "upcast must convert a class instance to a class type");

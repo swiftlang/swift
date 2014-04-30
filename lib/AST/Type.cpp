@@ -1329,8 +1329,8 @@ static bool hasRetainablePointerRepresentation(CanType type) {
     type = objType;
   }
 
-  // Classes.
-  if (type.getClassOrBoundGenericClass())
+  // Classes and class-constrained archetypes.
+  if (type->mayHaveSuperclass())
     return true;
 
   // Pure-ObjC existential types.

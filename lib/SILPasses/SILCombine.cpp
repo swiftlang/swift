@@ -546,13 +546,13 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
     for (Operand *Op: AS->getUses()) {
       if (auto *DA = dyn_cast<DestroyAddrInst>(Op->getUser())) {
         Builder->setInsertionPoint(DA);
-        Builder->createDestroyAddr(DA->getLoc(), ConcAlloc);
+        Builder->createDestroyAddr(DA->getLoc(), SILValue(ConcAlloc, 1));
         eraseInstFromFunction(*DA);
 
       }
       if (auto *DS = dyn_cast<DeallocStackInst>(Op->getUser())) {
         Builder->setInsertionPoint(DS);
-        Builder->createDeallocStack(DS->getLoc(), ConcAlloc);
+        Builder->createDeallocStack(DS->getLoc(), SILValue(ConcAlloc, 0));
         eraseInstFromFunction(*DS);
       }
     }
