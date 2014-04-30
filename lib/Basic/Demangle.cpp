@@ -267,6 +267,9 @@ public:
     } else if (Mangled.hasAtLeast(4) && Mangled.slice(4) == "_TTo") {
       Mangled.advanceOffset(4);
       appendNode(Node::Kind::ObjCAttribute);
+    } else if (Mangled.hasAtLeast(4) && Mangled.slice(4) == "_TTO") {
+      Mangled.advanceOffset(4);
+      appendNode(Node::Kind::NonObjCAttribute);
     } else {
       Mangled.advanceOffset(2);
     }
@@ -2180,6 +2183,9 @@ void NodePrinter::print(Node *pointer, bool asContext, bool suppressType) {
   case Node::Kind::InOut:
     Printer << "@inout ";
     print(pointer->getChild(0));
+    return;
+  case Node::Kind::NonObjCAttribute:
+    Printer << "@!objc ";
     return;
   case Node::Kind::ObjCAttribute:
     Printer << "@objc ";
