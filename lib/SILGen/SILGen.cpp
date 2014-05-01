@@ -714,6 +714,10 @@ void SILGenModule::emitObjCMethodThunk(FuncDecl *method) {
 }
 
 void SILGenModule::emitObjCPropertyMethodThunks(AbstractStorageDecl *prop) {
+  // If we don't actually need an entry point for the getter, do nothing.
+  if (!requiresObjCMethodEntryPoint(prop->getGetter()))
+    return;
+
   SILDeclRef getter(prop->getGetter(), SILDeclRef::Kind::Func,
                     SILDeclRef::ConstructAtBestResilienceExpansion,
                     SILDeclRef::ConstructAtNaturalUncurryLevel,

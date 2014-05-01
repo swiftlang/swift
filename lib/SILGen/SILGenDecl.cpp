@@ -955,15 +955,15 @@ void SILGenFunction::prepareEpilog(Type resultType, CleanupLocation CleanupL) {
 }
 
 bool SILGenModule::requiresObjCMethodEntryPoint(FuncDecl *method) {
-  // Property accessors should be generated alongside the property.
-  if (method->isGetterOrSetter())
-    return method->getAccessorStorageDecl()->usesObjCGetterAndSetter();
-    
-  if (method->isObjC() || method->getAttrs().hasAttribute<IBActionAttr>())
-    return true;
-  if (auto override = method->getOverriddenDecl())
-    return requiresObjCMethodEntryPoint(override);
-  return false;
+  // Property accessors should be generated alongside the property unless
+  // the @NSManagedAttr attribute is present.
+  if (method->isGetterOrSetter()) {
+    auto asd = method->getAccessorStorageDecl();
+    return asd->usesObjCGetterAndSetter() &&
+           !asd->getAttrs().hasAttribute<NSManagedAttr>();
+  }
+
+  return method->isObjC();
 }
 
 bool SILGenModule::requiresObjCMethodEntryPoint(ConstructorDecl *constructor) {
@@ -973,13 +973,17 @@ bool SILGenModule::requiresObjCMethodEntryPoint(ConstructorDecl *constructor) {
 bool SILGenModule::requiresObjCDispatch(ValueDecl *vd) {
   if (auto *fd = dyn_cast<FuncDecl>(vd)) {
     // If a function has an associated Clang node, it's foreign.
-    if (vd->hasClangNode())
+    if (fd->hasClangNode())
       return true;
 
-    return requiresObjCMethodEntryPoint(fd);
+    // Property accessors should be generated alongside the property.
+    if (fd->isGetterOrSetter())
+      return requiresObjCDispatch(fd->getAccessorStorageDecl());
+
+    return fd->isObjC();
   }
   if (auto *cd = dyn_cast<ConstructorDecl>(vd))
-    return requiresObjCMethodEntryPoint(cd);
+    return cd->isObjC();
   if (auto *asd = dyn_cast<AbstractStorageDecl>(vd))
     return asd->usesObjCGetterAndSetter();
   return vd->isObjC();
