@@ -119,7 +119,8 @@ Constraint::Constraint(ConstraintKind kind,
 Constraint::Constraint(ConstraintKind kind, Fix fix,
                        Type first, Type second, ConstraintLocator *locator,
                        ArrayRef<TypeVariableType *> typeVars)
-  : Kind(kind), TheFix(fix.getKind()), HasRestriction(false), HasFix(true),
+  : Kind(kind), TheFix(fix.getKind()), FixData(fix.getData()), 
+    HasRestriction(false), HasFix(true),
     IsActive(false), RememberChoice(false), NumTypeVariables(typeVars.size()),
     Types{ first, second, Identifier() }, Locator(locator)
 {
@@ -253,7 +254,7 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
 
   if (auto fix = getFix()) {
     Out << ' ';
-    fix->print(Out);
+    fix->print(Out, nullptr);
   }
 
   if (Locator) {
@@ -301,29 +302,55 @@ StringRef swift::constraints::getName(ConversionRestrictionKind kind) {
   llvm_unreachable("bad conversion restriction kind");
 }
 
+Fix Fix::getRelabelTuple(ConstraintSystem &cs, ArrayRef<Identifier> names) {
+  Fix result(FixKind::RelabelTuple, cs.RelabelTupleNames.size());
+  auto &allocator = cs.getAllocator();
+
+  // Copy the names and indices.
+  Identifier *namesCopy = allocator.Allocate<Identifier>(names.size());
+  memcpy(namesCopy, names.data(), names.size() * sizeof(Identifier));
+  cs.RelabelTupleNames.push_back({namesCopy, names.size()});
+
+  return result;
+}
+
+ArrayRef<Identifier> Fix::getRelabelTupleNames(ConstraintSystem &cs) const {
+  assert(getKind() == FixKind::RelabelTuple);
+  return cs.RelabelTupleNames[Data];
+}
+
 StringRef Fix::getName(FixKind kind) {
   switch (kind) {
   case FixKind::None:
-    return "[prevent fixes]";
+    return "prevent fixes";
   case FixKind::NullaryCall:
-    return "[fix: add nullary call]";
+    return "fix: add nullary call";
   case FixKind::ForceOptional:
-    return "[fix: force optional]";
+    return "fix: force optional";
   case FixKind::ForceDowncast:
-    return "[fix: force downcast]";
+    return "fix: force downcast";
   case FixKind::AddressOf:
-    return "[fix: add address-of]";
+    return "fix: add address-of";
   case FixKind::RemoveNullaryCall:
-    return "[fix: remove nullary call]";
+    return "fix: remove nullary call";
+  case FixKind::RelabelTuple:
+    return "fix: relabel tuple";
   }
 }
 
-void Fix::print(llvm::raw_ostream &Out) const {
-  Out << getName(getKind());
+void Fix::print(llvm::raw_ostream &Out, ConstraintSystem *cs) const {
+  Out << "[" << getName(getKind());
+
+  if (getKind() == FixKind::RelabelTuple && cs) {
+    Out << " to ";
+    for (auto name : getRelabelTupleNames(*cs))
+      Out << name << ":";
+  }
+  Out << "]";
 }
 
-void Fix::dump() const {
-  print(llvm::errs());
+void Fix::dump(ConstraintSystem *cs) const {
+  print(llvm::errs(), cs);
   llvm::errs() << "\n";
 }
 

@@ -200,6 +200,16 @@ ConstraintSystem::matchTupleToScalarTypes(TupleType *tuple1, Type type2,
                                           ConstraintLocatorBuilder locator) {
   assert(tuple1->getNumElements() == 1 && "Wrong number of elements");
   assert(!tuple1->getFields()[0].isVararg() && "Should not be variadic");
+
+  // For an argument tuple conversion, provide a fix that removes the
+  // label.
+  if (kind == TypeMatchKind::ArgumentTupleConversion &&
+      shouldAttemptFixes() && !(flags & TMF_ApplyingFix)) {
+    return simplifyFixConstraint(
+             Fix::getRelabelTuple(*this, Identifier()),
+             tuple1, type2, TypeMatchKind::Conversion, flags, locator);
+  }
+
   return matchTypes(tuple1->getElementType(0),
                     type2, kind, flags,
                     locator.withPathElement(
@@ -1902,7 +1912,7 @@ retry:
     // If this application is part of an operator, then we allow an implicit
     // lvalue to be compatible with inout arguments.  This is used by
     // assignment operators.
-    TypeMatchKind ArgConv = TypeMatchKind::Conversion;
+    TypeMatchKind ArgConv = TypeMatchKind::ArgumentTupleConversion;
     if (isa<PrefixUnaryExpr>(anchor) || isa<PostfixUnaryExpr>(anchor) ||
         isa<BinaryExpr>(anchor))
       ArgConv = TypeMatchKind::OperatorConversion;
@@ -2216,7 +2226,7 @@ ConstraintSystem::simplifyFixConstraint(Fix fix,
     auto &log = ctx.TypeCheckerDebug->getStream();
     log.indent(solverState? solverState->depth * 2 + 2 : 0)
       << "(attempting fix ";
-    fix.print(log);
+    fix.print(log, this);
     log << " @";
     getConstraintLocator(locator)->dump(&ctx.SourceMgr, log);
     log << ")\n";
@@ -2254,7 +2264,7 @@ ConstraintSystem::simplifyFixConstraint(Fix fix,
                       matchKind, subFlags, locator);
 
   case FixKind::ForceDowncast:
-    // This one works whenever it is suggested.
+    // These work whenever they are suggested.
     return SolutionKind::Solved;
 
   case FixKind::AddressOf:
@@ -2263,7 +2273,11 @@ ConstraintSystem::simplifyFixConstraint(Fix fix,
     return matchTypes(InOutType::get(type1->getRValueType()), type2,
                       matchKind, subFlags, locator);
 
-
+  case FixKind::RelabelTuple:
+    return matchTypes(type1->castTo<TupleType>()->getElementType(0),
+                      type2, matchKind, subFlags, 
+                      locator.withPathElement(
+                        LocatorPathElt::getTupleElement(0)));
   }
 }
 

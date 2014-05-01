@@ -237,6 +237,12 @@ ERROR(missing_address_of,sema_tcc,none,
 ERROR(extra_call_nonfunction,sema_tcc,none,
       "call to non-function of type %0; did you mean to leave off the '()'?",
       (Type))
+ERROR(extra_argument_labels,sema_tcc,none,
+      "extraneous argument label%select{|s}0 in call", (bool))
+ERROR(missing_argument_labels,sema_tcc,none,
+      "missing argument label%select{|s}0 in call", (bool))
+ERROR(wrong_argument_labels,sema_tcc,none,
+      "incorrect argument label%select{|s}0 in call", (bool))
 
 //------------------------------------------------------------------------------
 // Type Check Declarations

@@ -993,6 +993,8 @@ public:
   DeclContext *DC;
   ConstraintSystemOptions Options;
 
+  friend class Fix;
+
 private:
   Constraint *failedConstraint = nullptr;
   
@@ -1054,6 +1056,9 @@ private:
   ///
   /// Each fix is paired with a locator that describes where the fix occurs.
   SmallVector<std::pair<Fix, ConstraintLocator *>, 4> Fixes;
+
+  /// The names used in relabel-tuple fixes.
+  std::vector<ArrayRef<Identifier>> RelabelTupleNames;
 
   /// \brief The set of remembered disjunction choices used to reach
   /// the current constraint system.

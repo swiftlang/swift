@@ -3844,6 +3844,80 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   return finishApply(apply, openedType, locator);
 }
 
+/// Diagnose a relabel-tuple 
+///
+/// \returns true if we successfully diagnosed the issue.
+static bool diagnoseRelabel(TypeChecker &tc, Expr *expr, 
+                            ArrayRef<Identifier> newNames) {
+  auto tuple = dyn_cast<TupleExpr>(expr);
+  if (!tuple) {
+    return false;
+  }
+
+  // Figure out how many extraneous, missing, and wrong labels are in
+  // the call.
+  unsigned numExtra = 0, numMissing = 0, numWrong = 0;
+  unsigned n = tuple->getNumElements();
+  if (newNames.size() < n)
+    n = newNames.size();
+  for (unsigned i = 0; i != n; ++i) {
+    Identifier oldName = tuple->getElementName(i);
+    Identifier newName = newNames[i];
+
+    if (oldName == newName)
+      continue;
+
+    if (oldName.empty())
+      ++numMissing;
+    else if (newName.empty())
+      ++numExtra;
+    else
+      ++numWrong;
+  }
+
+  // Emit the diagnostic.
+  assert(numMissing > 0 || numExtra > 0 || numWrong > 0);
+  auto diag = tc.diagnose(expr->getLoc(), 
+                          (numWrong > 0 || (numMissing > 0 && numExtra > 00)
+                             ? diag::wrong_argument_labels
+                             : (numMissing == 0 
+                                  ? diag::extra_argument_labels
+                                  : diag::missing_argument_labels)),
+                          (numMissing + numExtra + numWrong) > 1);
+  
+  // Emit Fix-Its to the correct names.
+  for (unsigned i = 0; i != n; ++i) {
+    Identifier oldName = tuple->getElementName(i);
+    Identifier newName = newNames[i];
+
+    if (oldName == newName)
+      continue;
+
+    if (newName.empty()) {
+      // Delete the old name.
+      diag.fixItRemoveChars(tuple->getElementNameLocs()[i],
+                            tuple->getElements()[i]->getStartLoc());
+      continue;
+    }
+
+    if (oldName.empty()) {
+      // Insert the name.
+      llvm::SmallString<16> str;
+      str += newName.str();
+      str += ": ";
+      diag.fixItInsert(tuple->getElements()[i]->getStartLoc(), str);
+      continue;
+    }
+    
+    // Change the name.
+    diag.fixItReplace(tuple->getElementNameLocs()[i], newName.str());
+  }
+
+  // FIXME: Fix AST.
+
+  return true;
+}
+
 /// \brief Apply a given solution to the expression, producing a fully
 /// type-checked expression.
 Expr *ConstraintSystem::applySolution(const Solution &solution,
@@ -3934,6 +4008,12 @@ Expr *ConstraintSystem::applySolution(const Solution &solution,
         TC.diagnose(affected->getLoc(), diag::missing_address_of, type)
           .fixItInsert(affected->getStartLoc(), "&");
         diagnosed = true;
+        break;
+      }
+
+      case FixKind::RelabelTuple: {
+        if (diagnoseRelabel(TC,affected,fix.first.getRelabelTupleNames(*this)))
+          diagnosed = true;
         break;
       }
       }

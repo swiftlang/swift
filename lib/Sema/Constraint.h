@@ -199,26 +199,45 @@ enum class FixKind : uint8_t {
 
   /// Remove a no-argument call to something that is not a function.
   RemoveNullaryCall,
+
+  /// Relabel a tuple.
+  RelabelTuple,
 };
 
 /// Desribes a fix that can be applied to a constraint before visiting it.
 class Fix {
   FixKind Kind;
+  uint16_t Data;
+
+  Fix(FixKind kind, uint16_t data) : Kind(kind), Data(data){ }
+
+  uint16_t getData() const { return Data; }
+
+  friend class Constraint;
 
 public:
-  Fix() : Kind(FixKind::None) { }
+  Fix() : Kind(FixKind::None), Data(0) { }
   
-  Fix(FixKind kind) : Kind(kind) { }
+  Fix(FixKind kind) : Kind(kind), Data(0) { 
+    assert(kind != FixKind::RelabelTuple && "Use factory method");
+  }
+
+  /// Produce a new fix that relabels a tuple.
+  static Fix getRelabelTuple(ConstraintSystem &cs, ArrayRef<Identifier> names);
 
   /// Retrieve the kind of fix.
   FixKind getKind() const { return Kind; }
 
+  /// For a relabel-tuple fix, retrieve the new names.
+  ArrayRef<Identifier> getRelabelTupleNames(ConstraintSystem &cs) const;
+
   /// Return a string representation of a fix.
   static llvm::StringRef getName(FixKind kind);
 
-  void print(llvm::raw_ostream &Out) const;
+  void print(llvm::raw_ostream &Out, ConstraintSystem *cs) const;
 
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
+  LLVM_ATTRIBUTE_DEPRECATED(void dump(ConstraintSystem *cs) const 
+                              LLVM_ATTRIBUTE_USED,
                             "only for use within the debugger");
 };
 
@@ -232,7 +251,10 @@ class Constraint : public llvm::ilist_node<Constraint> {
   ConversionRestrictionKind Restriction : 8;
 
   /// The kind of fix to be applied to the constraint before visiting it.
-  FixKind TheFix : 8;
+  FixKind TheFix;
+
+  /// Data associated with the fix.
+  uint16_t FixData;
 
   /// Whether the \c Restriction field is valid.
   unsigned HasRestriction : 1;
@@ -362,7 +384,7 @@ public:
     if (!HasFix)
       return Nothing;
 
-    return Fix(TheFix);
+    return Fix(TheFix, FixData);
   }
 
   /// Whether this constraint is active, i.e., in the worklist.
