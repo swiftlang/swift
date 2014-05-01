@@ -1033,14 +1033,19 @@ public:
     // NB: Mutates vtableEntries in-place
     // FIXME: O(n^2)
     if (auto overridden = member.getOverridden()) {
-      // If we overrode an ObjC decl, or this is an accessor for a property that
-      // overrides an ObjC decl, then it won't be in the vtable.
+      // If we overrode an ObjC decl, or this is an accessor for a
+      // property that overrides an ObjC decl, or if it is an
+      // @NSManaged property, then it won't be in the vtable.
       if (overridden.getDecl()->hasClangNode())
         goto not_overridden;
       if (auto *ovFD = dyn_cast<FuncDecl>(overridden.getDecl()))
-        if (auto *asd = ovFD->getAccessorStorageDecl())
+        if (auto *asd = ovFD->getAccessorStorageDecl()) {
           if (asd->hasClangNode())
             goto not_overridden;
+
+          if (asd->getAttrs().hasAttribute<NSManagedAttr>())
+            goto not_overridden;
+        }
 
       // If we overrode a decl from an extension, it won't be in a vtable
       // either. This can occur for extensions to ObjC classes.
@@ -1068,6 +1073,15 @@ public:
     if (member.getDecl()->isFinal())
       return;
     
+    // @NSManaged property getters/setters don't have vtable entries, because
+    // they are only accessible via the @objc entry points.
+    if (auto func = dyn_cast<FuncDecl>(member.getDecl())) {
+      if (auto ads = func->getAccessorStorageDecl()) {
+        if (ads->getAttrs().hasAttribute<NSManagedAttr>())
+          return;
+      }
+    }
+
     // Otherwise, introduce a new vtable entry.
     vtableEntries.emplace_back(member, SGM.getFunction(member, NotForDefinition));
   }

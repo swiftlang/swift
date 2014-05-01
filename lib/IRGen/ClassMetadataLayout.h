@@ -137,6 +137,9 @@ private:
         // FIXME: Stored properties shouldn't be represented this way.
         if (!asd->hasAccessorFunctions()) continue;
 
+        // @NSManaged properties don't have vtable entries.
+        if (asd->getAttrs().hasAttribute<NSManagedAttr>()) continue;
+
         addMethodEntries(asd->getGetter());
         if (auto *setter = asd->getSetter())
           addMethodEntries(setter);
