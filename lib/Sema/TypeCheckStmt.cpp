@@ -682,7 +682,7 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
 /// Check an expression whose result is not being used at all.
 void TypeChecker::typeCheckIgnoredExpr(Expr *E) {
   // Complain about l-values that are neither loaded nor stored.
-  if (E->getType()->is<LValueType>()) {
+  if (E->getType()->is<LValueType>() && !Context.LangOpts.DebuggerSupport) {
     diagnose(E->getLoc(), diag::expression_unused_lvalue)
       .highlight(E->getSourceRange());
     return;
