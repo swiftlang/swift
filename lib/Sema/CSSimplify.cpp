@@ -206,7 +206,7 @@ ConstraintSystem::matchTupleToScalarTypes(TupleType *tuple1, Type type2,
   if (kind == TypeMatchKind::ArgumentTupleConversion &&
       shouldAttemptFixes() && !(flags & TMF_ApplyingFix)) {
     return simplifyFixConstraint(
-             Fix::getRelabelTuple(*this, Identifier()),
+             Fix::getRelabelTuple(*this, FixKind::TupleToScalar, Identifier()),
              tuple1, type2, TypeMatchKind::Conversion, flags, locator);
   }
 
@@ -2273,7 +2273,7 @@ ConstraintSystem::simplifyFixConstraint(Fix fix,
     return matchTypes(InOutType::get(type1->getRValueType()), type2,
                       matchKind, subFlags, locator);
 
-  case FixKind::RelabelTuple:
+  case FixKind::TupleToScalar:
     return matchTypes(type1->castTo<TupleType>()->getElementType(0),
                       type2, matchKind, subFlags, 
                       locator.withPathElement(

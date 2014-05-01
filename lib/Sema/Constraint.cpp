@@ -302,8 +302,10 @@ StringRef swift::constraints::getName(ConversionRestrictionKind kind) {
   llvm_unreachable("bad conversion restriction kind");
 }
 
-Fix Fix::getRelabelTuple(ConstraintSystem &cs, ArrayRef<Identifier> names) {
-  Fix result(FixKind::RelabelTuple, cs.RelabelTupleNames.size());
+Fix Fix::getRelabelTuple(ConstraintSystem &cs, FixKind kind,
+                         ArrayRef<Identifier> names) {
+  assert(isRelabelTupleKind(kind) && "Not a tuple-relabel fix");
+  Fix result(kind, cs.RelabelTupleNames.size());
   auto &allocator = cs.getAllocator();
 
   // Copy the names and indices.
@@ -315,7 +317,7 @@ Fix Fix::getRelabelTuple(ConstraintSystem &cs, ArrayRef<Identifier> names) {
 }
 
 ArrayRef<Identifier> Fix::getRelabelTupleNames(ConstraintSystem &cs) const {
-  assert(getKind() == FixKind::RelabelTuple);
+  assert(isRelabelTuple());
   return cs.RelabelTupleNames[Data];
 }
 
@@ -333,15 +335,15 @@ StringRef Fix::getName(FixKind kind) {
     return "fix: add address-of";
   case FixKind::RemoveNullaryCall:
     return "fix: remove nullary call";
-  case FixKind::RelabelTuple:
-    return "fix: relabel tuple";
+  case FixKind::TupleToScalar:
+    return "fix: tuple-to-scalar";
   }
 }
 
 void Fix::print(llvm::raw_ostream &Out, ConstraintSystem *cs) const {
   Out << "[" << getName(getKind());
 
-  if (getKind() == FixKind::RelabelTuple && cs) {
+  if (isRelabelTuple() && cs) {
     Out << " to ";
     for (auto name : getRelabelTupleNames(*cs))
       Out << name << ":";

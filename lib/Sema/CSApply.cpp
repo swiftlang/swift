@@ -4011,7 +4011,7 @@ Expr *ConstraintSystem::applySolution(const Solution &solution,
         break;
       }
 
-      case FixKind::RelabelTuple: {
+      case FixKind::TupleToScalar: {
         if (diagnoseRelabel(TC,affected,fix.first.getRelabelTupleNames(*this)))
           diagnosed = true;
         break;
