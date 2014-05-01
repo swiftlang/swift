@@ -338,6 +338,10 @@ public:
   /// Look up the VTable mapped to the given ClassDecl. Returns null on failure.
   SILVTable *lookUpVTable(const ClassDecl *C);
 
+  /// Attempt to lookup the function corresponding to \p Member in the class
+  /// hierarchy of \p Class.
+  SILFunction *lookUpSILFunctionFromVTable(ClassDecl *Class, SILDeclRef Member);
+
   // Given a protocol conformance, attempt to create a witness table declaration
   // for it.
   SILWitnessTable *

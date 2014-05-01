@@ -995,13 +995,6 @@ static ClassDecl *findClassTypeForOperand(SILValue S) {
   }
 }
 
-static ClassDecl *getClassDeclSuperClass(ClassDecl *Class) {
-  Type T = Class->getSuperclass();
-  if (!T)
-    return nullptr;
-  return T->getClassOrBoundGenericClass();
-}
-
 ClassDecl *SILDevirtualizer::findClassDeclForSILValue(SILValue Cls) {
   SILValue OperDef = findOrigin(Cls);
   SILArgument *Arg = dyn_cast<SILArgument>(OperDef);
@@ -1105,34 +1098,8 @@ void SILDevirtualizer::optimizeClassMethodInst(ClassMethodInst *CMI) {
 
   // Otherwise walk up the class heirarchy until there are no more super classes
   // (i.e. Class becomes null) or we find a match with member.
-  SILDeclRef Member = CMI->getMember();
-  SILFunction *F = nullptr;
-
-  // Until we reach the top of the class hierarchy...
-  while (Class) {
-    // Try to lookup a VTable for Class from the module...
-    auto *Vtbl = CMI->getModule().lookUpVTable(Class);
-
-    // If the lookup fails, skip Class and attempt to resolve the method in
-    // the VTable of the super class of Class if it exists...
-    if (!Vtbl) {
-      Class = getClassDeclSuperClass(Class);
-      continue;
-    }
-
-    // Ok, we have a VTable. Try to lookup the SILFunction implementation from
-    // the VTable.
-    F = Vtbl->getImplementation(CMI->getModule(), Member);
-
-    if (F)
-      break;
-
-    // If we fail to lookup the SILFunction, again skip Class and attempt to
-    // resolve the method in the VTable of the super class of Class if such a
-    // super class exists.
-    Class = getClassDeclSuperClass(Class);
-  }
-
+  SILModule &Mod = CMI->getModule();
+  SILFunction *F = Mod.lookUpSILFunctionFromVTable(Class, CMI->getMember());
   if (!F) {
     DEBUG(llvm::dbgs() << "        FAIL: Could not find matching VTable or "
           "vtable method for this class.\n");

@@ -683,3 +683,39 @@ SILModule::findFuncInWitnessTable(const ProtocolConformance *C,
 
   return {nullptr, ArrayRef<Substitution>()};
 }
+
+static ClassDecl *getClassDeclSuperClass(ClassDecl *Class) {
+  Type T = Class->getSuperclass();
+  if (!T)
+    return nullptr;
+  return T->getCanonicalType()->getClassOrBoundGenericClass();
+}
+
+SILFunction *
+SILModule::
+lookUpSILFunctionFromVTable(ClassDecl *Class, SILDeclRef Member) {
+  // Until we reach the top of the class hierarchy...
+  while (Class) {
+    // Try to lookup a VTable for Class from the module...
+    auto *Vtbl = lookUpVTable(Class);
+
+    // If the lookup fails, skip Class and attempt to resolve the method in
+    // the VTable of the super class of Class if it exists...
+    if (!Vtbl) {
+      Class = getClassDeclSuperClass(Class);
+      continue;
+    }
+
+    // Ok, we have a VTable. Try to lookup the SILFunction implementation from
+    // the VTable.
+    if (SILFunction *F = Vtbl->getImplementation(*this, Member))
+      return F;
+
+    // If we fail to lookup the SILFunction, again skip Class and attempt to
+    // resolve the method in the VTable of the super class of Class if such a
+    // super class exists.
+    Class = getClassDeclSuperClass(Class);
+  }
+
+  return nullptr;
+}
