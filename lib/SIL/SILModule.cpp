@@ -646,3 +646,40 @@ SerializedSILLoader *SILModule::getSILLoader() {
   // Return the SerializedSILLoader.
   return SILLoader.get();
 }
+
+
+/// \brief Given a protocol \p Proto, a member method \p Member and a concrete
+/// class type \p ConcreteTy, search the witness tables and return the static
+/// function that matches the member with any specializations may be
+/// required. Notice that we do not scan the class hierarchy, just the concrete
+/// class type.
+std::pair<SILFunction *, ArrayRef<Substitution>>
+SILModule::findFuncInWitnessTable(const ProtocolConformance *C,
+                                  SILDeclRef Member) {
+  // Look up the witness table associated with our protocol conformance from the
+  // SILModule.
+  auto Ret = lookUpWitnessTable(C);
+
+  // If no witness table was found, bail.
+  if (!Ret.first) {
+    DEBUG(llvm::dbgs() << "        Failed speculative lookup of witness for: ";
+          C->dump());
+    return {nullptr, ArrayRef<Substitution>()};
+  }
+
+  // Okay, we found the correct witness table. Now look for the method.
+  for (auto &Entry : Ret.first->getEntries()) {
+    // Look at method entries only.
+    if (Entry.getKind() != SILWitnessTable::WitnessKind::Method)
+      continue;
+
+    SILWitnessTable::MethodWitness MethodEntry = Entry.getMethodWitness();
+    // Check if this is the member we were looking for.
+    if (MethodEntry.Requirement != Member)
+      continue;
+
+    return {MethodEntry.Witness, Ret.second};
+  }
+
+  return {nullptr, ArrayRef<Substitution>()};
+}

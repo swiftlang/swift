@@ -1298,43 +1298,6 @@ static ApplyInst *replaceDynApplyWithStaticApply(ApplyInst *AI, SILFunction *F,
   return SAI;
 }
 
-/// \brief Given a protocol \p Proto, a member method \p Member and a concrete
-/// class type \p ConcreteTy, search the witness tables and return the static
-/// function that matches the member with any specializations may be
-/// required. Notice that we do not scan the class hierarchy, just the concrete
-/// class type.
-std::pair<SILFunction *, ArrayRef<Substitution>>
-findFuncInWitnessTable(SILDeclRef Member, ProtocolConformance *C,
-                       SILModule &Mod) {
-  // Look up the witness table associated with our protocol conformance from the
-  // SILModule.
-  std::pair<SILWitnessTable *, ArrayRef<Substitution>> Ret =
-    Mod.lookUpWitnessTable(C);
-
-  // If no witness table was found, bail.
-  if (!Ret.first) {
-    DEBUG(llvm::dbgs() << "        Failed speculative lookup of witness for: ";
-          C->dump());
-    return {nullptr, ArrayRef<Substitution>()};
-  }
-
-  // Okay, we found the correct witness table. Now look for the method.
-  for (auto &Entry : Ret.first->getEntries()) {
-    // Look at method entries only.
-    if (Entry.getKind() != SILWitnessTable::WitnessKind::Method)
-      continue;
-
-    SILWitnessTable::MethodWitness MethodEntry = Entry.getMethodWitness();
-    // Check if this is the member we were looking for.
-    if (MethodEntry.Requirement != Member)
-      continue;
-
-    return {MethodEntry.Witness, Ret.second};
-  }
-
-  return {nullptr, ArrayRef<Substitution>()};
-}
-
 /// Devirtualize apply instructions that call witness_method instructions:
 ///
 ///   %8 = witness_method $Optional<UInt16>, #LogicValue.getLogicValue!1
@@ -1490,10 +1453,10 @@ bool SILDevirtualizer::optimizeApplyOfProtocolMethod(ApplyInst *AI,
     return false;
   DEBUG(llvm::dbgs() << "        InitExistentialInst : " << *Init);
 
+  SILModule &Mod = Init->getModule();
   // For each protocol that our type conforms to:
   for (ProtocolConformance *Conf : Init->getConformances()) {
-    auto Pair =
-        findFuncInWitnessTable(PMI->getMember(), Conf, Init->getModule());
+    auto Pair = Mod.findFuncInWitnessTable(Conf, PMI->getMember());
 
     SILFunction *StaticRef = Pair.first;
     ArrayRef<Substitution> Subs = Pair.second;
