@@ -59,7 +59,7 @@ void WordIterator::computeNextPosition() const {
     // If we hit the end of the string, that's it. Otherwise, this
     // word ends at the last uppercase letter, so that the next word
     // starts with the last uppercase letter.
-    NextPosition = i == n? i : i-1;
+    NextPosition = (i == n || !clang::isLowercase(String[i])) ? i : i-1;
     NextPositionValid = true;
     return;
   }
@@ -86,7 +86,7 @@ void WordIterator::computePrevPosition() const {
     // If we hit the beginning of the string, that's it. Otherwise,
     // this word starts at the uppercase letter that terminated the
     // search above.
-    PrevPosition = i == 0 ? 0 : i-1;
+    PrevPosition = (i == 0 || !clang::isLowercase(String[i])) ? i : i-1;
     PrevPositionValid = true;
     return;
   }

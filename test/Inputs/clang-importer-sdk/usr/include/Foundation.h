@@ -245,6 +245,17 @@ typedef NS_OPTIONS(NSUInteger, NSBitmapFormat) {
   NS32BitBigEndianBitmapFormat /*NS_ENUM_AVAILABLE_MAC(10_10)*/ = (1 << 11)
 };
 
+typedef NS_OPTIONS(NSUInteger, NSBitmapFormatReversed) {
+  NS16BitLittleEndianBitmapFormatR /*NS_ENUM_AVAILABLE_MAC(10_10)*/ = (1 << 8),
+  NS32BitLittleEndianBitmapFormatR /*NS_ENUM_AVAILABLE_MAC(10_10)*/ = (1 << 9),
+  NS16BitBigEndianBitmapFormatR /*NS_ENUM_AVAILABLE_MAC(10_10)*/ = (1 << 10),
+  NS32BitBigEndianBitmapFormatR /*NS_ENUM_AVAILABLE_MAC(10_10)*/ = (1 << 11),
+
+  NSAlphaFirstBitmapFormatR            = 1 << 0, // 0 means is alpha last (RGBA, CMYKA, etc.)
+  NSAlphaNonpremultipliedBitmapFormatR = 1 << 1, // 0 means is premultiplied
+  NSFloatingPointSamplesBitmapFormatR  = 1 << 2,	// 0 is integer
+};
+
 typedef NS_OPTIONS(NSUInteger, NSBitmapFormat2) {
   NSU16a,
   NSU32a,
@@ -260,6 +271,11 @@ typedef NS_OPTIONS(NSUInteger, NSBitmapFormat3) {
 typedef NS_OPTIONS(NSUInteger, NSUBitmapFormat4) {
   NSU16c,
   NSU32c,
+};
+
+typedef NS_OPTIONS(NSUInteger, NSABitmapFormat5) {
+  NSAA16d,
+  NSAB32d,
 };
 
 

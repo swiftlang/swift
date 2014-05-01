@@ -26,6 +26,7 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/Parse/Lexer.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/DeclVisitor.h"
@@ -319,11 +320,20 @@ static StringRef getCommonWordPrefix(StringRef a, StringRef b) {
   auto aI = aWords.begin(), aE = aWords.end(),
        bI = bWords.begin(), bE = bWords.end();
 
+  unsigned prevLength = 0;
   unsigned prefixLength = 0;
   for ( ; aI != aE && bI != bE; ++aI, ++bI) {
     if (*aI != *bI)
       break;
+
+    prevLength = prefixLength;
     prefixLength = aI.getPosition() + aI->size();
+  }
+
+  // Avoid creating a prefix where the rest of the string starts with a number.
+  if ((aI != aE && !Lexer::isIdentifier(*aI)) ||
+      (bI != bE && !Lexer::isIdentifier(*bI))) {
+    prefixLength = prevLength;
   }
 
   return a.slice(0, prefixLength);
