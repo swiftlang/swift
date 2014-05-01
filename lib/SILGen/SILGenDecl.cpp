@@ -963,7 +963,7 @@ bool SILGenModule::requiresObjCMethodEntryPoint(FuncDecl *method) {
            !asd->getAttrs().hasAttribute<NSManagedAttr>();
   }
 
-  return method->isObjC();
+  return method->isObjC() || method->getAttrs().hasAttribute<IBActionAttr>();
 }
 
 bool SILGenModule::requiresObjCMethodEntryPoint(ConstructorDecl *constructor) {
@@ -980,7 +980,7 @@ bool SILGenModule::requiresObjCDispatch(ValueDecl *vd) {
     if (fd->isGetterOrSetter())
       return requiresObjCDispatch(fd->getAccessorStorageDecl());
 
-    return fd->isObjC();
+    return fd->isObjC() || fd->getAttrs().hasAttribute<IBActionAttr>();
   }
   if (auto *cd = dyn_cast<ConstructorDecl>(vd))
     return cd->isObjC();
