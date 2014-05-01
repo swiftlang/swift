@@ -21,7 +21,6 @@ namespace swift {
   /// The extension for SIL files.
   static const char SIL_EXTENSION[] = "sil";
   /// The name of the standard library, which is a reserved module name.
-
   static const char STDLIB_NAME[] = "Swift";
   /// The name of the ObjectiveC module.
   static const char OBJC_MODULE_NAME[] = "ObjectiveC";
