@@ -46,6 +46,11 @@ module CoreData {
   export *
 }
 
+module CoreCooling {
+  header "CoreCooling.h"
+  export *
+}
+
 module ObjCParseExtras {
   header "ObjCParseExtras.h"
   export *

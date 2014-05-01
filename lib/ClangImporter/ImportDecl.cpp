@@ -739,6 +739,63 @@ namespace {
       return nullptr;
     }
 
+    static bool isPointerToIncompleteType(clang::QualType type) {
+      if (auto ptr = type->getAs<clang::PointerType>()) {
+        if (auto record = ptr->getPointeeType()->getAs<clang::RecordType>()) {
+          if (!record->getDecl()->getDefinition()) {
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+
+    Type importCFClassType(const clang::TypedefNameDecl *decl) {
+      // Name the class 'CFString', not 'CFStringRef'.
+      Identifier className =
+        Impl.SwiftContext.getIdentifier(decl->getName().drop_back(3));
+
+      auto dc = Impl.importDeclContextOf(decl);
+      if (!dc) return Type();
+
+      Type superclass = Type();
+
+      // TODO: maybe use NSObject as the superclass if we can find it?
+      // TODO: try to find a non-mutable type to use as the superclass.
+
+      auto theClass =
+        Impl.createDeclWithClangNode<ClassDecl>(decl, SourceLoc(), className,
+                                                SourceLoc(), None,
+                                                nullptr, dc);
+      theClass->computeType();
+      theClass->setCircularityCheck(CircularityCheck::Checked);
+      theClass->setSuperclass(superclass);
+      theClass->setCheckedInheritanceClause();
+      theClass->setAddedImplicitInitializers(); // suppress all initializers
+      addObjCAttribute(theClass, ObjCSelector(Impl.SwiftContext, 0, className));
+      Impl.registerExternalDecl(theClass);
+
+      SmallVector<ProtocolDecl *, 4> protocols;
+      theClass->getImplicitProtocols(protocols);
+      theClass->setProtocols(Impl.SwiftContext.AllocateCopy(protocols));
+
+      // Unconditionally wrap that type in Unmanaged<> for now.
+      auto classType = theClass->getDeclaredType();
+
+      Module *M = Impl.getStdlibModule();
+      if (!M) return Type();
+      Type unmanagedType = Impl.getNamedSwiftType(M, "Unmanaged");
+      if (!unmanagedType) return Type();
+      auto unboundTy = unmanagedType->getAs<UnboundGenericType>();
+      if (!unboundTy || unboundTy->getDecl()->getGenericParams()->size() != 1)
+        return Type();
+
+      Type unmanagedClassType =
+        BoundGenericType::get(unboundTy->getDecl(), /*parent*/ Type(),
+                              classType);
+      return unmanagedClassType;
+    }
+
     Decl *VisitTypedefNameDecl(const clang::TypedefNameDecl *Decl) {
       auto Name = Impl.importName(Decl->getDeclName());
       if (Name.empty())
@@ -754,6 +811,16 @@ namespace {
 
         if (IsError)
           return nullptr;
+
+        // Import 'typedef struct __Blah *BlahRef;' as a CF type.
+        if (!SwiftType &&
+            Impl.SwiftContext.LangOpts.ImportCFTypes &&
+            Decl->getName().endswith("Ref") &&
+            isPointerToIncompleteType(Decl->getUnderlyingType())) {
+          SwiftType = importCFClassType(Decl);
+          if (!SwiftType) return nullptr;
+          NameMapping = MappedTypeNameKind::DefineOnly;
+        }
 
         if (SwiftType) {
           // Note that this typedef-name is special.

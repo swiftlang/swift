@@ -160,7 +160,8 @@ void Mangler::mangleContextOf(ValueDecl *decl, BindGenerics shouldBind) {
   // mangling.
   //   known-context ::= 'So'
   if (isa<ClassDecl>(decl) && clangDecl) {
-    assert(isa<clang::ObjCInterfaceDecl>(clangDecl));
+    assert(isa<clang::ObjCInterfaceDecl>(clangDecl) ||
+           isa<clang::TypedefDecl>(clangDecl));
     Buffer << "So";
     return;
   }
