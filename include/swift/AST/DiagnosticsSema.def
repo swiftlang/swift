@@ -386,6 +386,11 @@ ERROR(attr_NSManaged_not_property,sema_tcd,none,
 ERROR(attr_NSManaged_not_stored,sema_tcd,none,
       "'NSManaged' not allowed on %select{computed|observing}0 properties",
       (bool))
+ERROR(attr_NSManaged_let_property,sema_tcd,none,
+      "'NSManaged' attribute not allowed on a 'let' property", ())
+ERROR(attr_NSManaged_initial_value,sema_tcd,none,
+      "'NSManaged' property cannot have an initial value", ())
+
 
 // Variables (var and let).
 ERROR(unimplemented_type_var,decl_parsing,none,

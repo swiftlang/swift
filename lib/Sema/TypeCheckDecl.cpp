@@ -1195,14 +1195,17 @@ static void validatePatternBindingDecl(TypeChecker &tc,
         tc.checkOwnershipAttr(var, var->getAttrs().getOwnership());
     }
 
-    // Make sure we don't have a 'let'.
+    // Make sure we don't have a 'let' or an @NSManaged property.
     bool isLet = false;
+    bool hasNSManaged = false;
     binding->getPattern()->forEachVariable([&](VarDecl *var) {
       if (var->isLet())
         isLet = true;
+      if (var->getAttrs().hasAttribute<NSManagedAttr>())
+        hasNSManaged = true;
     });
 
-    if (!isLet) {
+    if (!isLet && !hasNSManaged) {
       auto type = binding->getPattern()->getType();
       if (auto defaultInit = buildDefaultInitializer(tc, type)) {
         binding->setInit(defaultInit, /*checked=*/false);
@@ -1392,6 +1395,28 @@ static void convertStoredVarInProtocolToComputed(VarDecl *VD, TypeChecker &TC) {
   PD->addMember(Get);
 }
 
+static void convertNSManagedStoredVarToComputed(VarDecl *VD, TypeChecker &TC) {
+  // Create the getter.
+  auto *Get = createGetterPrototype(VD, TC);
+
+  // Create the setter.
+  VarDecl *SetValueDecl = nullptr;
+  auto *Set = createSetterPrototype(VD, SetValueDecl, TC);
+
+  // Okay, we have both the getter and setter.  Set them in VD.
+  VD->makeComputed(VD->getLoc(), Get, Set, VD->getLoc());
+
+  // We've added some members to our containing class/extension, add them to
+  // the members list.
+  if (auto classDecl = dyn_cast<ClassDecl>(VD->getDeclContext())) {
+    classDecl->addMember(Get);
+    classDecl->addMember(Set);
+  } else {
+    auto ext = cast<ExtensionDecl>(VD->getDeclContext());
+    ext->addMember(Get);
+    ext->addMember(Set);
+  }
+}
 
 /// Load the value of VD.  If VD is an @override of another value, we call the
 /// superclass getter.  Otherwise, we do a direct load of the value.
@@ -2028,11 +2053,24 @@ public:
         TC.diagnose(attr->getLocation(), diag::attr_NSManaged_not_property)
           .fixItRemove(attr->getRange());
         attr->setInvalid();
+      } else if (VD->isLet()) {
+        TC.diagnose(attr->getLocation(), diag::attr_NSManaged_let_property)
+          .fixItRemove(attr->getRange());
+        attr->setInvalid();
       } else {
         // @NSManaged properties must be written as stored.
         switch (VD->getStorageKind()) {
         case AbstractStorageDecl::Stored:
-          // FIXME: Convert to computed.
+          // @NSManaged properties end up being computed; complain if there is
+          // an initializer.
+          if (VD->getParentPattern()->hasInit()) {
+            TC.diagnose(attr->getLocation(), diag::attr_NSManaged_initial_value)
+              .highlight(VD->getParentPattern()->getInit()->getSourceRange());
+            VD->getParentPattern()->setInit(nullptr, false);
+          }
+
+          // Convert this property to a computed property.
+          convertNSManagedStoredVarToComputed(VD, TC);
           break;
 
         case AbstractStorageDecl::StoredWithTrivialAccessors:
