@@ -73,13 +73,35 @@ findModule(ASTContext &ctx, AccessPathElem moduleID,
   moduleDocFilename += '.';
   moduleDocFilename += SERIALIZED_MODULE_DOC_EXTENSION;
 
+  // FIXME: Which name should we be using here? Do we care about CPU subtypes?
+  // FIXME: At the very least, don't hardcode "arch".
+  llvm::SmallString<16> archFile(ctx.LangOpts.getTargetConfigOption("arch"));
+  llvm::SmallString<16> archDocFile(ctx.LangOpts.getTargetConfigOption("arch"));
+  if (!archFile.empty()) {
+    archFile += '.';
+    archFile += SERIALIZED_MODULE_EXTENSION;
+
+    archDocFile += '.';
+    archDocFile += SERIALIZED_MODULE_DOC_EXTENSION;
+  }
+
   llvm::SmallString<128> scratch;
+  llvm::SmallString<128> currPath;
 
   isFramework = false;
   for (auto path : ctx.SearchPathOpts.ImportSearchPaths) {
-    auto err = openModuleFiles(path, moduleFilename.str(),
-                               moduleDocFilename.str(), moduleBuffer,
-                               moduleDocBuffer, scratch);
+    auto err = openModuleFiles(path,
+                               moduleFilename.str(), moduleDocFilename.str(),
+                               moduleBuffer, moduleDocBuffer,
+                               scratch);
+    if (err.value() == llvm::errc::is_a_directory) {
+      currPath = path;
+      llvm::sys::path::append(currPath, moduleFilename.str());
+      err = openModuleFiles(currPath,
+                            archFile.str(), archDocFile.str(),
+                            moduleBuffer, moduleDocBuffer,
+                            scratch);
+    }
     if (!err || err.value() != llvm::errc::no_such_file_or_directory)
       return err;
   }
@@ -89,26 +111,14 @@ findModule(ASTContext &ctx, AccessPathElem moduleID,
     moduleFramework += ".framework";
     isFramework = true;
 
-    // FIXME: Which name should we be using here? Do we care about CPU subtypes?
-    // FIXME: At the very least, don't hardcode "arch".
-    llvm::SmallString<16> archFile(ctx.LangOpts.getTargetConfigOption("arch"));
-    llvm::SmallString<16> archDocFile(ctx.LangOpts.getTargetConfigOption("arch"));
-    if (!archFile.empty()) {
-      archFile += '.';
-      archFile += SERIALIZED_MODULE_EXTENSION;
-
-      archDocFile += '.';
-      archDocFile += SERIALIZED_MODULE_DOC_EXTENSION;
-    }
-
-    llvm::SmallString<128> currPath;
     for (auto path : ctx.SearchPathOpts.FrameworkSearchPaths) {
-      currPath.clear();
-      llvm::sys::path::append(currPath, path, moduleFramework.str(),
+      currPath = path;
+      llvm::sys::path::append(currPath, moduleFramework.str(),
                               "Modules", moduleFilename.str());
-      auto err = openModuleFiles(currPath, archFile.str(),
-                                 archDocFile.str(), moduleBuffer,
-                                 moduleDocBuffer, scratch);
+      auto err = openModuleFiles(currPath,
+                                 archFile.str(), archDocFile.str(),
+                                 moduleBuffer, moduleDocBuffer,
+                                 scratch);
       if (!err || err.value() != llvm::errc::no_such_file_or_directory)
         return err;
     }
