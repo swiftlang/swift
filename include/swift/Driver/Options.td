@@ -171,6 +171,10 @@ def split_objc_selectors : Flag<["-"], "split-objc-selectors">,
   Flags<[FrontendOption]>,
   HelpText<"Split imported Objective-C selectors based on prepositions">;
 
+def import_cf_types : Flag<["-"], "import-cf-types">,
+  Flags<[FrontendOption]>,
+  HelpText<"Recognize and import CF types as class types">;
+
 // Platform options.
 def enable_app_extension : Flag<["-"], "application-extension">,
   Flags<[DriverOption, FrontendOption]>,

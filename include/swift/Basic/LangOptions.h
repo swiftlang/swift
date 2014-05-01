@@ -62,6 +62,9 @@ namespace swift {
     /// Enables checking that uses of @objc require importing
     /// the ObjectiveC module.
     bool EnableObjCAttrRequiresObjCModule = false;
+
+    /// Enables special importing of CF types.
+    bool ImportCFTypes = false;
     
     /// Be strict about the use of keyword arguments.
     /// FIXME: This will become the default.
