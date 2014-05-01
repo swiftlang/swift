@@ -1014,9 +1014,42 @@ void ClangImporter::lookupValue(Identifier name, VisibleDeclConsumer &consumer){
     if (sema.LookupName(lookupResult, /*Scope=*/0)) {
       // FIXME: Filter based on access path? C++ access control?
       for (auto decl : lookupResult) {
-        if (auto swiftDecl = Impl.importDeclReal(decl->getUnderlyingDecl()))
-          if (auto valueDecl = dyn_cast<ValueDecl>(swiftDecl))
+        if (auto swiftDecl = Impl.importDeclReal(decl->getUnderlyingDecl())) {
+          if (auto valueDecl = dyn_cast<ValueDecl>(swiftDecl)) {
             consumer.foundDecl(valueDecl, DeclVisibilityKind::VisibleAtTopLevel);
+            FoundAny = true;
+          }
+        }
+      }
+    }
+  }
+
+  // If we *still* haven't found anything, try looking for '<name>Ref'.
+  // Eventually, this should be optimized by recognizing this case when
+  // generating the clang module.
+  if (lookupNameKind == clang::Sema::LookupOrdinaryName &&
+      !FoundAny && clangID && Impl.SwiftContext.LangOpts.ImportCFTypes) {
+    lookupResult.clear(clang::Sema::LookupOrdinaryName);
+
+    llvm::SmallString<128> buffer;
+    buffer += clangID->getName();
+    buffer += "Ref";
+    auto refIdent = &Impl.Instance->getASTContext().Idents.get(buffer.str());
+    lookupResult.setLookupName(refIdent);
+
+    if (sema.LookupName(lookupResult, /*Scope=*/0)) {
+      // FIXME: Filter based on access path? C++ access control?
+      for (auto decl : lookupResult) {
+        if (auto swiftDecl = Impl.importDeclReal(decl->getUnderlyingDecl())) {
+          auto alias = dyn_cast<TypeAliasDecl>(swiftDecl);
+          if (!alias) continue;
+          auto aliasedClass = alias->getUnderlyingType()->getAs<ClassType>();
+          if (!aliasedClass) continue;
+          if (aliasedClass->getDecl()->getName() == name) {
+            consumer.foundDecl(aliasedClass->getDecl(),
+                               DeclVisibilityKind::VisibleAtTopLevel);
+          }
+        }
       }
     }
   }
