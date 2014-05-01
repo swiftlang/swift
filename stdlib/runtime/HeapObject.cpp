@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Runtime/HeapObject.h"
+#include "swift/Runtime/InstrumentsSupport.h"
 #include "swift/Runtime/Heap.h"
 #include "swift/Runtime/Metadata.h"
 #include "llvm/Support/MathExtras.h"
@@ -38,6 +39,11 @@ HeapObject *
 swift::swift_allocObject(HeapMetadata const *metadata,
                          size_t requiredSize,
                          size_t requiredAlignmentMask) {
+  return _swift_allocObject(metadata, requiredSize, requiredAlignmentMask);
+}
+static HeapObject *
+_swift_allocObject_(HeapMetadata const *metadata, size_t requiredSize,
+                    size_t requiredAlignmentMask) {
   // llvm::RoundUpToAlignment(size, mask + 1) generates terrible code
   auto size = (requiredSize + requiredAlignmentMask) & ~requiredAlignmentMask;
   auto object = reinterpret_cast<HeapObject *>(swift_slowAlloc(size, 0));
@@ -46,6 +52,7 @@ swift::swift_allocObject(HeapMetadata const *metadata,
   object->weakRefCount = WRC_INTERVAL;
   return object;
 }
+auto swift::_swift_allocObject = _swift_allocObject_;
 
 /// \brief Allocate a reference-counted object on the heap that
 /// occupies <size> bytes of maximally-aligned storage.  The object is
@@ -169,6 +176,9 @@ static const FullMetadata<HeapMetadata> GenericBoxHeapMetadata{
 
 BoxPair::Return
 swift::swift_allocBox(Metadata const *type) {
+  return _swift_allocBox(type);
+}
+static BoxPair::Return _swift_allocBox_(Metadata const *type) {
   // NB: Special cases here need to also be checked for and handled in
   // swift_deallocBox.
   
@@ -191,6 +201,7 @@ swift::swift_allocBox(Metadata const *type) {
   // Return the box and the value pointer.
   return BoxPair{box, box->getValuePointer()};
 }
+auto swift::_swift_allocBox = _swift_allocBox_;
 
 void swift::swift_deallocBox(HeapObject *box, Metadata const *type) {
   // NB: Special cases here need to also be checked for and handled in
@@ -232,12 +243,20 @@ swift::swift_retain_noresult(HeapObject *object) {
 HeapObject *swift::swift_retain(HeapObject *object) {
   return _swift_retain(object);
 }
+static HeapObject *_swift_retain_(HeapObject *object) {
+  return _swift_retain_inlined(object);
+}
+auto swift::_swift_retain = _swift_retain_;
 
 void swift::swift_release(HeapObject *object) {
+  return _swift_release(object);
+}
+static void _swift_release_(HeapObject *object) {
   if (object && (__sync_sub_and_fetch(&object->refCount, RC_INTERVAL) == 0)) {
     _swift_release_slow(object);
   }
 }
+auto swift::_swift_release = _swift_release_;
 
 size_t swift::swift_retainCount(HeapObject *object) {
   return object->refCount >> RC_INTERVAL_SHIFT;

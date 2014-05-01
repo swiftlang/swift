@@ -16,6 +16,7 @@
 
 #include "llvm/ADT/DenseMap.h"
 #include "swift/Runtime/HeapObject.h"
+#include "swift/Runtime/InstrumentsSupport.h"
 #include "swift/Runtime/Heap.h"
 #include "Private.h"
 #include "Debug.h"
@@ -76,12 +77,6 @@ public:
   static void *tryAlloc_semi_optimized(AllocIndex idx);
   static void dealloc_semi_optimized(void *ptr, AllocIndex idx);
 
-  static void *alloc_unoptimized(AllocIndex idx);
-  static void *tryAlloc_unoptimized(AllocIndex idx);
-  static void *slowAlloc_unoptimized(size_t size, uintptr_t flags);
-  static void dealloc_unoptimized(void *ptr, AllocIndex idx);
-  static void slowDealloc_unoptimized(void *ptr, size_t bytes);
-
   static bool tryWriteLock() {
     int r = pthread_rwlock_trywrlock(&lock);
     assert(r == 0 || errno == EBUSY);
@@ -118,12 +113,6 @@ const size_t  pageSize = getpagesize();
 const size_t  pageMask = getpagesize() - 1;
 const size_t arenaSize = 0x10000;
 const size_t arenaMask =  0xFFFF;
-
-auto _swift_alloc = SwiftZone::alloc_optimized;
-auto _swift_tryAlloc = SwiftZone::tryAlloc_optimized;
-auto _swift_slowAlloc = SwiftZone::slowAlloc_optimized;
-auto _swift_dealloc = SwiftZone::dealloc_optimized;
-auto _swift_slowDealloc = SwiftZone::slowDealloc_optimized;
 
 size_t roundToPage(size_t size) {
   return (size + pageMask) & ~pageMask;
@@ -304,14 +293,6 @@ SwiftZone::SwiftZone() {
     _swift_dealloc = SwiftZone::dealloc_semi_optimized;
   }
   setAllocCacheEntry_slow(0, NULL);
-
-  if (getenv("SWIFT_ZONE_DEBUG")) {
-    _swift_alloc = SwiftZone::alloc_unoptimized;
-    _swift_tryAlloc = SwiftZone::tryAlloc_unoptimized;
-    _swift_slowAlloc = SwiftZone::slowAlloc_unoptimized;
-    _swift_dealloc = SwiftZone::dealloc_unoptimized;
-    _swift_slowDealloc = SwiftZone::slowDealloc_unoptimized;
-  }
 }
 
 size_t swift::_swift_zone_size(malloc_zone_t *zone, const void *pointer) {
@@ -445,7 +426,7 @@ void _swift_refillThreadAllocCache(AllocIndex idx, uintptr_t flags) {
   if (!tmp) {
     return;
   }
-  SwiftZone::dealloc_unoptimized(tmp, idx);
+  SwiftZone::dealloc_semi_optimized(tmp, idx);
 }
 
 void *SwiftZone::slowAlloc_optimized(size_t size, uintptr_t flags) {
@@ -634,31 +615,6 @@ void _swift_zone_statistics(malloc_zone_t *zone,
   }
 }
 
-void *SwiftZone::alloc_unoptimized(AllocIndex idx) {
-  return swiftZone.slowAlloc_unoptimized(indexToSize(idx), 0);
-}
-
-void *SwiftZone::tryAlloc_unoptimized(AllocIndex idx) {
-  return swiftZone.slowAlloc_unoptimized(indexToSize(idx), SWIFT_TRYALLOC);
-}
-
-void *SwiftZone::slowAlloc_unoptimized(size_t size, uintptr_t flags) {
-  void *r;
-  // the zone API does not have a notion of try-vs-not
-  do {
-    r = malloc_zone_malloc(&zoneShims, size);
-  } while ((r == NULL) && (flags & SWIFT_TRYALLOC));
-  return r;
-}
-
-void SwiftZone::dealloc_unoptimized(void *ptr, AllocIndex idx) {
-  malloc_zone_free(&zoneShims, ptr);
-}
-
-void SwiftZone::slowDealloc_unoptimized(void *ptr, size_t bytes) {
-  malloc_zone_free(&zoneShims, ptr);
-}
-
 malloc_zone_t swift::zoneShims = {
   nullptr,
   nullptr,
@@ -725,3 +681,9 @@ void swift::swift_dealloc(void *ptr, AllocIndex idx) {
 void swift::swift_slowDealloc(void *ptr, size_t bytes) {
   return _swift_slowDealloc(ptr, bytes);
 }
+
+auto swift::_swift_alloc = SwiftZone::alloc_optimized;
+auto swift::_swift_tryAlloc = SwiftZone::tryAlloc_optimized;
+auto swift::_swift_slowAlloc = SwiftZone::slowAlloc_optimized;
+auto swift::_swift_dealloc = SwiftZone::dealloc_optimized;
+auto swift::_swift_slowDealloc = SwiftZone::slowDealloc_optimized;

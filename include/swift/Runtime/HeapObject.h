@@ -222,7 +222,7 @@ extern "C" void swift_slowDealloc(void *ptr, size_t bytes);
 extern "C" HeapObject *swift_retain(HeapObject *object);
 extern "C" void swift_retain_noresult(HeapObject *object);
 
-static inline HeapObject *_swift_retain(HeapObject *object) {
+static inline HeapObject *_swift_retain_inlined(HeapObject *object) {
   if (object) {
     __sync_fetch_and_add(&object->refCount, RC_INTERVAL);
   }
