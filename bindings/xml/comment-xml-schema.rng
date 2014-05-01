@@ -582,7 +582,9 @@
       <element name="rawHTML">
         <optional>
           <!-- If not specified, the default value is 'false'. -->
-          <attribute name="isSafeToPassThrough">
+          <!-- The value 'false' or absence of the attribute does not imply
+               that the HTML is actually well-formed. -->
+          <attribute name="isMalformed">
             <data type="boolean" />
           </attribute>
         </optional>

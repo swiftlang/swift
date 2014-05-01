@@ -41,7 +41,7 @@ struct CommentToXMLConverter {
       : TheCommentContext(TheCommentContext), OS(OS) {}
 
   void printRawHTML(StringRef Tag) {
-    OS << "<rawHTML isSafeToPassThrough=\"1\">";
+    OS << "<rawHTML>";
     appendWithCDATAEscaping(OS, Tag);
     OS << "</rawHTML>";
   }
