@@ -23,6 +23,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/Basic/SourceManager.h"
 #include "llvm/ADT/SmallBitVector.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/Support/raw_ostream.h"
 #include <functional>
 using namespace swift;

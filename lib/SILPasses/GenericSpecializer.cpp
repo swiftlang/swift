@@ -23,6 +23,7 @@
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringSet.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/Support/Debug.h"
 using namespace swift;
 

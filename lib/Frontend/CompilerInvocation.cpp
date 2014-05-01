@@ -22,6 +22,7 @@
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/Option.h"
+#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 
 using namespace swift;

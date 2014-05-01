@@ -34,6 +34,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/Option/Option.h"
 #include "llvm/Option/OptTable.h"
+#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/raw_ostream.h"

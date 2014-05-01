@@ -21,6 +21,7 @@
 #include "swift/Basic/Optional.h"
 #include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Basic/QuotedString.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
 #include <functional>
 #include <tuple>

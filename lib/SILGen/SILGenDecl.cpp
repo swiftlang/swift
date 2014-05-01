@@ -23,6 +23,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "llvm/ADT/SmallString.h"
 #include <iterator>
 using namespace swift;
 using namespace Mangle;

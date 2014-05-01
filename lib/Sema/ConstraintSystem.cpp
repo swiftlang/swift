@@ -18,6 +18,7 @@
 #include "ConstraintSystem.h"
 #include "ConstraintGraph.h"
 #include "swift/AST/ArchetypeBuilder.h"
+#include "llvm/ADT/SmallString.h"
 
 using namespace swift;
 using namespace constraints;

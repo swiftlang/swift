@@ -17,13 +17,14 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeChecker.h"
-#include "llvm/ADT/APInt.h"
-#include "llvm/Support/raw_ostream.h"
 #include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Types.h"
+#include "llvm/ADT/APInt.h"
+#include "llvm/ADT/SmallString.h"
+#include "llvm/Support/raw_ostream.h"
 #include "DerivedConformances.h"
 
 using namespace swift;

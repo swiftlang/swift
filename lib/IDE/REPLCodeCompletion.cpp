@@ -25,6 +25,7 @@
 #include "swift/Subsystems.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/ADT/SmallString.h"
 #include <algorithm>
 
 using namespace swift;
