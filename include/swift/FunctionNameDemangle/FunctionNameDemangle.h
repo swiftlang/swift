@@ -27,7 +27,7 @@
 
 /// Minor version changes when new APIs are added in ABI- and source-compatible
 /// way.
-#define FUNCTION_NAME_DEMANGLE_VERSION_MINOR 1
+#define FUNCTION_NAME_DEMANGLE_VERSION_MINOR 2
 
 /// @}
 

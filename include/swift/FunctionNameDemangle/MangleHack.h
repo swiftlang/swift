@@ -14,8 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_RUNTIME_MANGLEHACK_H
-#define SWIFT_RUNTIME_MANGLEHACK_H
+#ifndef SWIFT_MANGLEHACK_H
+#define SWIFT_MANGLEHACK_H
 
 // This returns a C string that must be deallocated with free().
 extern "C" const char *
