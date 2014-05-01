@@ -313,9 +313,16 @@ static bool isNSDictionaryMethod(const clang::ObjCMethodDecl *MD,
 /// For example, given "NSFooBar" and "NSFooBas", returns "NSFoo"
 /// (not "NSFooBa"). The returned StringRef is a slice of the "a" argument.
 ///
+/// If either string has a non-identifier character immediately after the
+/// prefix, \p followedByNonIdentifier will be set to \c true. If both strings
+/// have identifier characters after the prefix, \p followedByNonIdentifier will
+/// be set to \c false. Otherwise, \p followedByNonIdentifier will not be
+/// changed from its initial value.
+///
 /// This is used to derive the common prefix of enum constants so we can elide
 /// it from the Swift interface.
-static StringRef getCommonWordPrefix(StringRef a, StringRef b) {
+static StringRef getCommonWordPrefix(StringRef a, StringRef b,
+                                     bool &followedByNonIdentifier) {
   auto aWords = camel_case::getWords(a), bWords = camel_case::getWords(b);
   auto aI = aWords.begin(), aE = aWords.end(),
        bI = bWords.begin(), bE = bWords.end();
@@ -323,8 +330,10 @@ static StringRef getCommonWordPrefix(StringRef a, StringRef b) {
   unsigned prevLength = 0;
   unsigned prefixLength = 0;
   for ( ; aI != aE && bI != bE; ++aI, ++bI) {
-    if (*aI != *bI)
+    if (*aI != *bI) {
+      followedByNonIdentifier = false;
       break;
+    }
 
     prevLength = prefixLength;
     prefixLength = aI.getPosition() + aI->size();
@@ -333,6 +342,7 @@ static StringRef getCommonWordPrefix(StringRef a, StringRef b) {
   // Avoid creating a prefix where the rest of the string starts with a number.
   if ((aI != aE && !Lexer::isIdentifier(*aI)) ||
       (bI != bE && !Lexer::isIdentifier(*bI))) {
+    followedByNonIdentifier = true;
     prefixLength = prevLength;
   }
 
@@ -351,10 +361,13 @@ static StringRef getCommonWordPrefix(StringRef a, StringRef b) {
 ///
 /// \see getCommonWordPrefix
 static StringRef getCommonPluralPrefix(StringRef singular, StringRef plural) {
-  assert(!singular.empty());
   assert(!plural.empty());
 
-  StringRef commonPrefix = getCommonWordPrefix(singular, plural);
+  if (singular.empty())
+    return singular;
+
+  bool ignored;
+  StringRef commonPrefix = getCommonWordPrefix(singular, plural, ignored);
   if (commonPrefix.size() == singular.size() || plural.back() != 's')
     return commonPrefix;
 
@@ -914,8 +927,10 @@ namespace {
         return;
 
       StringRef commonPrefix = (*ec)->getName();
+      bool followedByNonIdentifier = false;
       for (++ec; ec != ecEnd; ++ec) {
-        commonPrefix = getCommonWordPrefix(commonPrefix, (*ec)->getName());
+        commonPrefix = getCommonWordPrefix(commonPrefix, (*ec)->getName(),
+                                           followedByNonIdentifier);
         if (commonPrefix.empty())
           break;
       }
@@ -925,11 +940,11 @@ namespace {
 
         // Account for the 'kConstant' naming convention on enumerators.
         bool dropKPrefix = false;
-        if (checkPrefix.size() >= 2) {
-          if (checkPrefix[0] == 'k' && clang::isUppercase(checkPrefix[1])) {
-            checkPrefix = checkPrefix.substr(1);
-            dropKPrefix = true;
-          }
+        if (checkPrefix[0] == 'k' &&
+            ((checkPrefix.size() >= 2 && clang::isUppercase(checkPrefix[1])) ||
+             !followedByNonIdentifier)) {
+          checkPrefix = checkPrefix.substr(1);
+          dropKPrefix = true;
         }
 
         StringRef commonWithEnum = getCommonPluralPrefix(checkPrefix,

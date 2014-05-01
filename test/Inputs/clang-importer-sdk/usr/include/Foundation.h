@@ -171,6 +171,31 @@ typedef NS_ENUM(NSUInteger, NSPostingStyle) {
   NSPostNow = 3
 };
 
+// From CoreFoundation
+typedef CF_ENUM(NSInteger, CFURLPathStyle) {
+  kCFURLPOSIXPathStyle = 0,
+  kCFURLHFSPathStyle /*CF_ENUM_DEPRECATED(10_0, 10_9, 2_0, 7_0)*/,
+  kCFURLWindowsPathStyle
+};
+
+typedef CF_ENUM(NSInteger, CFURLOrUTI) {
+  kCFURLKind,
+  kCFUTIKind
+};
+
+typedef CF_ENUM(NSInteger, Magnitude) {
+  k0,
+  k1,
+  k2,
+};
+
+typedef CF_ENUM(NSInteger, MagnitudeWords) {
+  kZero,
+  kOne,
+  kTwo,
+};
+
+
 // Deliberately simple to test the overlay module.
 enum {
   NSUTF8StringEncoding = 8
