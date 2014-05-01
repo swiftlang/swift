@@ -829,27 +829,27 @@ ERROR(missing_protocol,sema_tce,none,
       "missing protocol %0", (Identifier))
       
 ERROR(builtin_integer_literal_broken_proto,sema_tce,none,
-      "protocol 'BuiltinIntegerLiteralConvertible' is broken", ())
+      "protocol '_BuiltinIntegerLiteralConvertible' is broken", ())
 ERROR(integer_literal_broken_proto,sema_tce,none,
       "protocol 'IntegerLiteralConvertible' is broken", ())
 
 ERROR(builtin_float_literal_broken_proto,sema_tce,none,
-      "protocol 'BuiltinFloatLiteralConvertible' is broken", ())
+      "protocol '_BuiltinFloatLiteralConvertible' is broken", ())
 ERROR(float_literal_broken_proto,sema_tce,none,
       "protocol 'FloatLiteralConvertible' is broken", ())
 
 ERROR(builtin_character_literal_broken_proto,sema_tce,none,
-      "protocol 'BuiltinCharacterLiteralConvertible' is broken", ())
+      "protocol '_BuiltinCharacterLiteralConvertible' is broken", ())
 ERROR(character_literal_broken_proto,sema_tce,none,
       "protocol 'CharacterLiteralConvertible' is broken", ())
 
 ERROR(builtin_extended_grapheme_cluster_literal_broken_proto,sema_tce,none,
-      "protocol 'BuiltinExtendedGraphemeClusterLiteralConvertible' is broken", ())
+      "protocol '_BuiltinExtendedGraphemeClusterLiteralConvertible' is broken", ())
 ERROR(extended_grapheme_cluster_literal_broken_proto,sema_tce,none,
       "protocol 'ExtendedGraphemeClusterLiteralConvertible' is broken", ())
 
 ERROR(builtin_string_literal_broken_proto,sema_tce,none,
-      "protocol 'BuiltinStringLiteralConvertible' is broken", ())
+      "protocol '_BuiltinStringLiteralConvertible' is broken", ())
 ERROR(string_literal_broken_proto,sema_tce,none,
       "protocol 'StringLiteralConvertible' is broken", ())
 

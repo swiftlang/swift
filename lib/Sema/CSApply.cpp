@@ -1097,7 +1097,7 @@ namespace {
                          KnownProtocolKind::IntegerLiteralConvertible);
       ProtocolDecl *builtinProtocol
         = tc.getProtocol(expr->getLoc(),
-                         KnownProtocolKind::BuiltinIntegerLiteralConvertible);
+                         KnownProtocolKind::_BuiltinIntegerLiteralConvertible);
 
       // For type-sugar reasons, prefer the spelling of the default literal
       // type.
@@ -1157,7 +1157,7 @@ namespace {
                          KnownProtocolKind::FloatLiteralConvertible);
       ProtocolDecl *builtinProtocol
         = tc.getProtocol(expr->getLoc(),
-                         KnownProtocolKind::BuiltinFloatLiteralConvertible);
+                         KnownProtocolKind::_BuiltinFloatLiteralConvertible);
 
       // For type-sugar reasons, prefer the spelling of the default literal
       // type.
@@ -1205,7 +1205,7 @@ namespace {
                          KnownProtocolKind::CharacterLiteralConvertible);
       ProtocolDecl *builtinProtocol
         = tc.getProtocol(expr->getLoc(),
-                         KnownProtocolKind::BuiltinCharacterLiteralConvertible);
+                         KnownProtocolKind::_BuiltinCharacterLiteralConvertible);
 
       // For type-sugar reasons, prefer the spelling of the default literal
       // type.
@@ -1285,7 +1285,7 @@ namespace {
         // If the type can handle UTF-16 string literals, prefer them.
         builtinProtocol = tc.getProtocol(
             expr->getLoc(),
-            KnownProtocolKind::BuiltinUTF16StringLiteralConvertible);
+            KnownProtocolKind::_BuiltinUTF16StringLiteralConvertible);
         if (tc.conformsToProtocol(type, builtinProtocol, cs.DC)) {
           builtinLiteralFuncName =
               tc.Context.Id_ConvertFromBuiltinUTF16StringLiteral;
@@ -1298,7 +1298,7 @@ namespace {
           // Otherwise, fall back to UTF-8.
           builtinProtocol = tc.getProtocol(
               expr->getLoc(),
-              KnownProtocolKind::BuiltinStringLiteralConvertible);
+              KnownProtocolKind::_BuiltinStringLiteralConvertible);
           builtinLiteralFuncName =
               tc.Context.Id_ConvertFromBuiltinStringLiteral;
           elements = elementsArray;
@@ -1316,7 +1316,7 @@ namespace {
             tc.Context.Id_ConvertFromBuiltinExtendedGraphemeClusterLiteral;
         builtinProtocol = tc.getProtocol(
             expr->getLoc(),
-            KnownProtocolKind::BuiltinExtendedGraphemeClusterLiteralConvertible);
+            KnownProtocolKind::_BuiltinExtendedGraphemeClusterLiteralConvertible);
         elements = elementsArray;
         brokenProtocolDiag =
             diag::extended_grapheme_cluster_literal_broken_proto;

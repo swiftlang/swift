@@ -1097,12 +1097,12 @@ namespace index_block {
     StringInterpolationConvertible,
     StringLiteralConvertible,
 
-    BuiltinCharacterLiteralConvertible,
-    BuiltinExtendedGraphemeClusterLiteralConvertible,
-    BuiltinFloatLiteralConvertible,
-    BuiltinIntegerLiteralConvertible,
-    BuiltinStringLiteralConvertible,
-    BuiltinUTF16StringLiteralConvertible,
+    _BuiltinCharacterLiteralConvertible,
+    _BuiltinExtendedGraphemeClusterLiteralConvertible,
+    _BuiltinFloatLiteralConvertible,
+    _BuiltinIntegerLiteralConvertible,
+    _BuiltinStringLiteralConvertible,
+    _BuiltinUTF16StringLiteralConvertible,
 
     AnyObject,
     RawRepresentable,

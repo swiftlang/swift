@@ -188,10 +188,10 @@ To pass an ``inout`` as a pointer argument, we need to be able to lock an
 address for the ``inout`` for the duration of the call, which is not normally
 possible. This functionality only needs to be available to the standard library,
 so can be expressed in terms of builtins. A type can conform to the
-``BuiltinInOutAddressConvertible`` protocol to be convertible from an
+``_BuiltinInOutAddressConvertible`` protocol to be convertible from an
 inout reference. The protocol is defined as follows::
 
-  protocol BuiltinInOutAddressConvertible {
+  protocol _BuiltinInOutAddressConvertible {
     /// The type from which inout conversions are allowed to the conforming
     /// type.
     typealias InOutType
@@ -203,7 +203,7 @@ inout reference. The protocol is defined as follows::
 
 An example of a conformance for ``CMutablePointer``::
 
-  struct CMutablePointer<T>: BuiltinInOutAddressConvertible {
+  struct CMutablePointer<T>: _BuiltinInOutAddressConvertible {
     let ptr: Builtin.RawPointer
 
     typealias InOutType = T
@@ -231,11 +231,11 @@ Inout Writeback Conversion
 Inout address conversion alone is not enough for ``ObjCInOut`` to work as
 intended, because the change to the ``__autoreleasing`` convention for the
 pointed-to object reference requires a writeback temporary. The
-``BuiltinInOutWritebackConvertible`` protocol allows for an additional
+``_BuiltinInOutWritebackConvertible`` protocol allows for an additional
 writeback to be introduced before and after the address of the ``inout`` is
 taken::
 
-  protocol BuiltinInOutWritebackConvertible {
+  protocol _BuiltinInOutWritebackConvertible {
     /// The original type from which inout conversions are allowed to the
     /// conforming type.
     typealias InOutType
@@ -258,7 +258,7 @@ taken::
 
 An example of a conformance for ``ObjCInOut``::
 
-  struct ObjCInOut<T: class>: BuiltinInOutWritebackConvertible {
+  struct ObjCInOut<T: class>: _BuiltinInOutWritebackConvertible {
     let ptr: Builtin.RawPointer
 
     typealias InOutType = T!

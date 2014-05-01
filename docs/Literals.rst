@@ -40,7 +40,7 @@ library's Policy.swift::
 
   // NOTE: the compiler has builtin knowledge of this protocol
   protocol StringLiteralConvertible {
-    typealias StringLiteralType : BuiltinStringLiteralConvertible
+    typealias StringLiteralType : _BuiltinStringLiteralConvertible
     class func convertFromStringLiteral(value : StringLiteralType) -> Self
   }
 
@@ -55,13 +55,13 @@ if the string literal contains escape sequences, an invalid series of code
 points could be constructed...which may be what's desired in some cases.)
 
 
-The BuiltinStringLiteralConvertible Protocol
---------------------------------------------
+The _BuiltinStringLiteralConvertible Protocol
+---------------------------------------------
 
 Policy.swift contains a second protocol::
 
   // NOTE: the compiler has builtin knowledge of this protocol
-  protocol BuiltinStringLiteralConvertible {
+  protocol _BuiltinStringLiteralConvertible {
     class func _convertFromBuiltinStringLiteral(value : Builtin.RawPointer,
                                                 byteSize : Builtin.Int64,
                                                 isASCII: Builtin.Int1) -> Self
@@ -75,7 +75,7 @@ data from the literal, and the arguments describe that raw data.
 So, the general runtime behavior is now clear:
 
 1. The compiler generates raw string data.
-2. Some type conforming to BuiltinStringLiteralConvertible is constructed from 
+2. Some type conforming to _BuiltinStringLiteralConvertible is constructed from 
    the raw string data. This will be a standard library type.
 3. Some type conforming to StringLiteralConvertible is constructed from the
    object constructed in step 2. This may be a user-defined type. This is the
