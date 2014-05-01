@@ -1134,9 +1134,6 @@ static void buildBlockToFuncThunkBody(SILGenFunction &gen,
   }
   
   // Add the block argument.
-  assert(blockTy->getRepresentation()
-            == FunctionType::Representation::Block
-         && "block-to-func thunk did not get a block as last argument?");
   SILValue blockV
     = new (gen.SGM.M) SILArgument(SILType::getPrimitiveObjectType(blockTy),
                                   entry);
@@ -1146,7 +1143,9 @@ static void buildBlockToFuncThunkBody(SILGenFunction &gen,
   assert(!funcTy->hasIndirectResult()
          && "block thunking func with indirect result not supported");
   ManagedValue result = gen.emitMonomorphicApply(loc, block, args,
-                         funcTy->getSILInterfaceResult().getSwiftRValueType());
+                         funcTy->getSILInterfaceResult().getSwiftRValueType(),
+                         /*transparent*/ false,
+                         /*override CC*/ AbstractCC::C);
   
   // Return the result at +1.
   auto &resultTL = gen.getTypeLowering(funcTy->getSILInterfaceResult());
@@ -1162,35 +1161,35 @@ static void buildBlockToFuncThunkBody(SILGenFunction &gen,
 }
 
 /// Bridge a native function to a block with a thunk.
-static ManagedValue emitBlockToFunc(SILGenFunction &gen,
-                                    SILLocation loc,
-                                    ManagedValue block,
-                                    CanSILFunctionType funcTy) {
+ManagedValue
+SILGenFunction::emitBlockToFunc(SILLocation loc,
+                                ManagedValue block,
+                                CanSILFunctionType funcTy) {
   CanSILFunctionType substFnTy;
   SmallVector<Substitution, 4> subs;
   
   // Declare the thunk.
   auto blockTy = block.getType().castTo<SILFunctionType>();
-  auto thunkTy = gen.buildThunkType(block, funcTy, substFnTy, subs);
-  auto thunk = gen.SGM.getOrCreateReabstractionThunk(loc,
-                                               gen.F.getContextGenericParams(),
-                                               thunkTy,
-                                               blockTy,
-                                               funcTy);
+  auto thunkTy = buildThunkType(block, funcTy, substFnTy, subs);
+  auto thunk = SGM.getOrCreateReabstractionThunk(loc,
+                                                 F.getContextGenericParams(),
+                                                 thunkTy,
+                                                 blockTy,
+                                                 funcTy);
   
   // Build it if necessary.
   if (thunk->empty()) {
-    SILGenFunction thunkSGF(gen.SGM, *thunk);
+    SILGenFunction thunkSGF(SGM, *thunk);
     buildBlockToFuncThunkBody(thunkSGF, loc, blockTy, funcTy);
   }
   
   // Create it in the current function.
-  auto thunkValue = gen.B.createFunctionRef(loc, thunk);
-  auto thunkedFn = gen.B.createPartialApply(loc, thunkValue,
+  auto thunkValue = B.createFunctionRef(loc, thunk);
+  auto thunkedFn = B.createPartialApply(loc, thunkValue,
                                     SILType::getPrimitiveObjectType(substFnTy),
-                                    subs, block.forward(gen),
+                                    subs, block.forward(*this),
                                     SILType::getPrimitiveObjectType(funcTy));
-  return gen.emitManagedRValueWithCleanup(thunkedFn);
+  return emitManagedRValueWithCleanup(thunkedFn);
 }
 
 RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
@@ -1257,7 +1256,7 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
       assert(resultFTy->getRepresentation()
                == FunctionType::Representation::Block
              && "only block-to-thick repr changes supported");
-      result = emitBlockToFunc(SGF, e, result,
+      result = SGF.emitBlockToFunc(e, result,
                        SGF.getLoweredType(destRepTy).castTo<SILFunctionType>());
       break;
     }
@@ -4474,7 +4473,7 @@ static ManagedValue emitCBridgedToNativeValue(SILGenFunction &gen,
     auto nativeFTy = cast<SILFunctionType>(loweredNativeTy);
     
     if (nativeFTy->getRepresentation() != FunctionType::Representation::Block)
-      return emitBlockToFunc(gen, loc, v, nativeFTy);
+      return gen.emitBlockToFunc(loc, v, nativeFTy);
   }
   
   return v;

@@ -26,25 +26,25 @@ bb0(%0 : $@thick X.Type):
   return %14 : $()
 }
 
-sil @_TToFC14dynamic_lookup1Xg9subscriptFT1iSi_Si : $@cc(objc_method) @thin (Int64, X) -> Int64 {
-bb0(%0 : $Int64, %1 : $X):
-  %4 = function_ref @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi64__Si : $@thin (Builtin.Int64, @thin Int64.Type) -> Int64 // user: %7
-  %5 = metatype $@thin Int64.Type
+sil @_TToFC14dynamic_lookup1Xg9subscriptFT1iSi_Si : $@cc(objc_method) @thin (Int, X) -> Int {
+bb0(%0 : $Int, %1 : $X):
+  %4 = function_ref @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi64__Si : $@thin (Builtin.Int64, @thin Int.Type) -> Int // user: %7
+  %5 = metatype $@thin Int.Type
   %6 = integer_literal $Builtin.Int64, 5
-  %7 = apply [transparent] %4(%6, %5) : $@thin (Builtin.Int64, @thin Int64.Type) -> Int64 // user: %9
-  return %7 : $Int64
+  %7 = apply [transparent] %4(%6, %5) : $@thin (Builtin.Int64, @thin Int.Type) -> Int // user: %9
+  return %7 : $Int
 }
 
-sil @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi64__Si : $@thin (Builtin.Int64, @thin Int64.Type) -> Int64
+sil @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi64__Si : $@thin (Builtin.Int64, @thin Int.Type) -> Int
 
-// [objc] dynamic_lookup.X.value.getter : Swift.Int64
-sil @_TToFC14dynamic_lookup1Xg5valueSi : $@cc(objc_method) @thin (X) -> Int64 {
+// [objc] dynamic_lookup.X.value.getter : Swift.Int
+sil @_TToFC14dynamic_lookup1Xg5valueSi : $@cc(objc_method) @thin (X) -> Int {
 bb0(%0 : $X):
-  %4 = function_ref @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi64__Si : $@thin (Builtin.Int64, @thin Int64.Type) -> Int64 // user: %7
-  %5 = metatype $@thin Int64.Type
+  %4 = function_ref @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi64__Si : $@thin (Builtin.Int64, @thin Int.Type) -> Int // user: %7
+  %5 = metatype $@thin Int.Type
   %6 = integer_literal $Builtin.Int64, 5
-  %7 = apply [transparent] %4(%6, %5) : $@thin (Builtin.Int64, @thin Int64.Type) -> Int64 // user: %9
-  return %7 : $Int64
+  %7 = apply [transparent] %4(%6, %5) : $@thin (Builtin.Int64, @thin Int.Type) -> Int // user: %9
+  return %7 : $Int
 }
 
 // CHECK: define void @dynamic_lookup_br(%objc_object*)
@@ -61,7 +61,7 @@ bb0(%0 : $AnyObject):
   // CHECK: [[SEL:%[0-9]+]] = load i8** @"\01L_selector(f)", align 8
   // CHECK: [[HAS_SEL:%[0-9]]] = call i1 @swift_objcRespondsToSelector(%objc_object* [[OBJECT:%[0-9]+]], i8* [[SEL]]) #0
   // CHECK: br i1 [[HAS_SEL]]
-  dynamic_method_br %7 : $Builtin.UnknownObject, #X.f!1, bb1, bb2
+  dynamic_method_br %7 : $Builtin.UnknownObject, #X.f!1.foreign, bb1, bb2
 
 bb1(%8 : $@cc(objc_method) @thin (Builtin.UnknownObject) -> ()):
   br bb3
@@ -80,9 +80,9 @@ bb0(%0 : $@thick AnyObject.Type):
   // CHECK: [[SEL:%[0-9]+]] = load i8** @"\01L_selector(g)", align 8
   // CHECK: [[HAS_SEL:%[0-9]]] = call i1 @swift_objcRespondsToSelector(%objc_object* [[OBJECT:%[0-9]+]], i8* [[SEL]]) #0
   // CHECK: br i1 [[HAS_SEL]]
-  dynamic_method_br %0 : $@thick AnyObject.Type, #X.g!1, bb1, bb2
+  dynamic_method_br %0 : $@thick AnyObject.Type, #X.g!1.foreign, bb1, bb2
 
-bb1(%8 : $@cc(objc_method) @thin (Builtin.UnknownObject) -> ()):
+bb1(%8 : $@cc(objc_method) @thin (@thick AnyObject.Type) -> ()):
   br bb3
 
 bb2:
@@ -103,7 +103,7 @@ sil @_T1t23dynamic_lookup_propertyFT1xPSo13AnyObject__T_ : $@thin (AnyObject) ->
   %9 = unchecked_ref_cast %8 : $@sil_self AnyObject to $Builtin.UnknownObject
   dynamic_method_br %9 : $Builtin.UnknownObject, #X.value!getter.1.foreign, bb1, bb2
 
-bb1(%10 : $@cc(objc_method) @thin (Builtin.UnknownObject) -> Int64):
+bb1(%10 : $@cc(objc_method) @thin (Builtin.UnknownObject) -> Int):
   br bb3
 
 bb2:
@@ -115,12 +115,12 @@ bb3:
 }
 
 // CHECK-LABEL: define void @_T1t16opt_to_subscriptFT3objPSo13AnyObject_1iSi_T_(%objc_object*, i64)
-sil @_T1t16opt_to_subscriptFT3objPSo13AnyObject_1iSi_T_ : $@thin (AnyObject, Int64) -> () {
-bb0(%0 : $AnyObject, %1 : $Int64):
+sil @_T1t16opt_to_subscriptFT3objPSo13AnyObject_1iSi_T_ : $@thin (AnyObject, Int) -> () {
+bb0(%0 : $AnyObject, %1 : $Int):
   %2 = alloc_box $AnyObject
-  %3 = alloc_box $Int64
+  %3 = alloc_box $Int
   store %0 to %2#1 : $*AnyObject
-  store %1 to %3#1 : $*Int64
+  store %1 to %3#1 : $*Int
   %8 = load %2#1 : $*AnyObject
   strong_retain %8 : $AnyObject
   %10 = project_existential_ref %8 : $AnyObject to $@sil_self AnyObject
@@ -131,10 +131,10 @@ bb0(%0 : $AnyObject, %1 : $Int64):
 
   dynamic_method_br %11 : $Builtin.UnknownObject, #X.subscript!getter.1.foreign, bb1, bb2
 
-bb1(%13 : $@cc(objc_method) @thin (Int64, Builtin.UnknownObject) -> Int64): // Preds: bb0
-  %14 = partial_apply %13(%11) : $@cc(objc_method) @thin (Int64, Builtin.UnknownObject) -> Int64
-  %15 = load %3#1 : $*Int64             
-  %16 = apply %14(%15) : $@callee_owned Int64 -> Int64
+bb1(%13 : $@cc(objc_method) @thin (Int, Builtin.UnknownObject) -> Int): // Preds: bb0
+  %14 = partial_apply %13(%11) : $@cc(objc_method) @thin (Int, Builtin.UnknownObject) -> Int
+  %15 = load %3#1 : $*Int             
+  %16 = apply %14(%15) : $@callee_owned Int -> Int
   br bb3
 
 bb2:

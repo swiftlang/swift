@@ -1052,7 +1052,44 @@ public:
               "result must be a method of the existential metatype");
     }
   }
-
+  
+  // Get the expected type of a dynamic method reference.
+  SILType getDynamicMethodType(SILType selfType, SILDeclRef method) {
+    auto &C = F.getASTContext();
+    
+    // The type of the dynamic method must match the usual type of the method,
+    // but with the more opaque Self type.
+    auto methodTy = F.getModule().Types.getConstantType(method)
+      .castTo<SILFunctionType>();
+    
+    auto params = methodTy->getInterfaceParameters();
+    SmallVector<SILParameterInfo, 4>
+      dynParams(params.begin(), params.end() - 1);
+    dynParams.push_back(SILParameterInfo(selfType.getSwiftType(),
+                                             params.back().getConvention()));
+    
+    auto dynResult = methodTy->getInterfaceResult();
+    // If the method returns Self, substitute AnyObject for the result type.
+    if (auto fnDecl = dyn_cast<FuncDecl>(method.getDecl())) {
+      if (fnDecl->hasDynamicSelf()) {
+        auto anyObjectTy = C.getProtocol(KnownProtocolKind::AnyObject)
+                             ->getDeclaredType();
+        auto newResultTy
+          = dynResult.getType()->replaceCovariantResultType(anyObjectTy, 0);
+        dynResult = SILResultInfo(newResultTy->getCanonicalType(),
+                                  dynResult.getConvention());
+      }
+    }
+    
+    auto fnTy = SILFunctionType::get(nullptr,
+                                     methodTy->getExtInfo(),
+                                     methodTy->getCalleeConvention(),
+                                     dynParams,
+                                     dynResult,
+                                     F.getASTContext());
+    return SILType::getPrimitiveObjectType(fnTy);
+  }
+  
   void checkDynamicMethodInst(DynamicMethodInst *EMI) {
     requireObjectType(SILFunctionType, EMI, "result of dynamic_method");
     SILType operandType = EMI->getOperand().getType();
@@ -1072,6 +1109,10 @@ public:
                 ->isSpecificProtocol(KnownProtocolKind::AnyObject),
               "operand must have metatype of AnyObject type");
     }
+    
+    requireSameType(EMI->getType(),
+                    getDynamicMethodType(operandType, EMI->getMember()),
+                    "result must be of the method's type");
   }
 
   static bool isClassOrClassMetatype(Type t) {
@@ -1805,7 +1846,13 @@ public:
               "operand must have metatype of AnyObject type");
     }
 
-    // FIXME: Check branch arguments.
+    // Check that the branch argument is of the expected dynamic method type.
+    require(DMBI->getHasMethodBB()->bbarg_size() == 1,
+            "true bb for dynamic_method_br must take an argument");
+    
+    requireSameType(DMBI->getHasMethodBB()->bbarg_begin()[0]->getType(),
+                    getDynamicMethodType(operandType, DMBI->getMember()),
+              "bb argument for dynamic_method_br must be of the method's type");
   }
   
   void checkProjectBlockStorageInst(ProjectBlockStorageInst *PBSI) {
@@ -1969,6 +2016,10 @@ public:
       }
       require(FoundSelfInPredecessor, "Must be a successor of each predecessor.");
     }
+    
+    // FIXME: Uncomment to actually verify instructions. Disabled pending
+    // fixups in SILPasses.
+    //SILVisitor::visitSILBasicBlock(BB);
   }
 
   void visitSILFunction(SILFunction *F) {

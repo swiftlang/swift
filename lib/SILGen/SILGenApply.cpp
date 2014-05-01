@@ -27,11 +27,11 @@ using namespace swift;
 using namespace Lowering;
 
 /// Retrieve the type to use for a method found via dynamic lookup.
-static CanAnyFunctionType getDynamicMethodType(SILGenModule &SGM,
-                                               SILValue proto,
-                                               ValueDecl *member,
-                                               SILDeclRef methodName,
-                                               Type memberType) {
+static CanAnyFunctionType getDynamicMethodFormalType(SILGenModule &SGM,
+                                                     SILValue proto,
+                                                     ValueDecl *member,
+                                                     SILDeclRef methodName,
+                                                     Type memberType) {
   auto &ctx = SGM.getASTContext();
   CanType selfTy;
   if (member->isInstanceMember()) {
@@ -51,19 +51,52 @@ static CanAnyFunctionType getDynamicMethodType(SILGenModule &SGM,
 static CanSILFunctionType
 replaceSelfTypeForDynamicLookup(ASTContext &ctx,
                                 CanSILFunctionType fnType,
-                                SILType newSelfType) {
+                                CanType newSelfType,
+                                SILDeclRef methodName) {
   auto oldParams = fnType->getInterfaceParameters();
   SmallVector<SILParameterInfo, 4> newParams;
   newParams.append(oldParams.begin(), oldParams.end() - 1);
-  newParams.push_back({newSelfType.getSwiftRValueType(),
-                       oldParams.back().getConvention()});
-
+  newParams.push_back({newSelfType, oldParams.back().getConvention()});
+  
+  auto newResult = fnType->getInterfaceResult();
+  // If the method returns Self, substitute AnyObject for the result type.
+  if (auto fnDecl = dyn_cast<FuncDecl>(methodName.getDecl())) {
+    if (fnDecl->hasDynamicSelf()) {
+      auto anyObjectTy = ctx.getProtocol(KnownProtocolKind::AnyObject)
+                                  ->getDeclaredType();
+      auto newResultTy
+        = newResult.getType()->replaceCovariantResultType(anyObjectTy, 0);
+      newResult = SILResultInfo(newResultTy->getCanonicalType(),
+                                newResult.getConvention());
+    }
+  }
+  
   return SILFunctionType::get(nullptr,
                               fnType->getExtInfo(),
                               fnType->getCalleeConvention(),
                               newParams,
-                              fnType->getInterfaceResult(),
+                              newResult,
                               ctx);
+}
+
+/// Retrieve the type to use for a method found via dynamic lookup.
+static CanSILFunctionType getDynamicMethodLoweredType(SILGenModule &SGM,
+                                                      SILValue proto,
+                                                      SILDeclRef methodName) {
+  auto &ctx = SGM.getASTContext();
+  
+  // Determine the opaque 'self' parameter type.
+  CanType selfTy;
+  if (methodName.getDecl()->isInstanceMember()) {
+    selfTy = ctx.TheUnknownObjectType;
+  } else {
+    selfTy = proto.getType().getSwiftType();
+  }
+  
+  // Replace the 'self' parameter type in the method type with it.
+  auto methodTy = SGM.getConstantType(methodName).castTo<SILFunctionType>();
+  
+  return replaceSelfTypeForDynamicLookup(ctx, methodTy, selfTy, methodName);
 }
 
 namespace {
@@ -358,9 +391,9 @@ private:
 
     // Replace it with the dynamic self type.
     OrigFormalOldType = OrigFormalInterfaceType
-      = getDynamicMethodType(SGM, method.selfValue,
-                             method.methodName.getDecl(),
-                             method.methodName, methodType);
+      = getDynamicMethodFormalType(SGM, method.selfValue,
+                                   method.methodName.getDecl(),
+                                   method.methodName, methodType);
 
     // Add a self clause to the substituted type.
     auto origFormalType = cast<AnyFunctionType>(OrigFormalOldType);
@@ -591,9 +624,10 @@ public:
 
       auto closureType =
         replaceSelfTypeForDynamicLookup(gen.getASTContext(),
-                                        constantInfo.SILFnType,
-                                        method.selfValue.getType());
-
+                                constantInfo.SILFnType,
+                                method.selfValue.getType().getSwiftRValueType(),
+                                method.methodName);
+      
       SILValue fn = gen.B.createDynamicMethod(Loc,
                           method.selfValue,
                           constant,
@@ -1466,9 +1500,11 @@ static ManagedValue emitApply(SILGenFunction &gen,
                               AbstractionPattern origResultType,
                               CanType substResultType,
                               bool transparent,
+                              Optional<AbstractCC> overrideCC,
                               SGFContext evalContext) {
   auto &formalResultTL = gen.getTypeLowering(substResultType);
   auto loweredFormalResultType = formalResultTL.getLoweredType();
+  AbstractCC cc = overrideCC ? *overrideCC : substFnType->getAbstractCC();
 
   SILType actualResultType = substFnType->getSemanticInterfaceResultSILType();
 
@@ -1477,7 +1513,7 @@ static ManagedValue emitApply(SILGenFunction &gen,
   // the actual result type we got back.  Note that this will also
   // include bridging differences.
   bool hasAbsDiffs =
-    hasAbstractionDifference(substFnType->getAbstractCC(),
+    hasAbstractionDifference(cc,
                              loweredFormalResultType.getSwiftRValueType(),
                              actualResultType.getSwiftRValueType());
 
@@ -1628,8 +1664,7 @@ static ManagedValue emitApply(SILGenFunction &gen,
   }
 
   // Convert the result to a native value.
-  return gen.emitBridgedToNativeValue(loc, managedScalar,
-                                      substFnType->getAbstractCC(),
+  return gen.emitBridgedToNativeValue(loc, managedScalar, cc,
                                       substResultType);
 }
 
@@ -1637,12 +1672,13 @@ ManagedValue SILGenFunction::emitMonomorphicApply(SILLocation loc,
                                                   ManagedValue fn,
                                                   ArrayRef<ManagedValue> args,
                                                   CanType resultType,
-                                                  bool transparent) {
+                                                  bool transparent,
+                                              Optional<AbstractCC> overrideCC) {
   auto fnType = fn.getType().castTo<SILFunctionType>();
   assert(!fnType->isPolymorphic());
   return emitApply(*this, loc, fn, {}, args, fnType,
                    AbstractionPattern(resultType), resultType,
-                   transparent, SGFContext());
+                   transparent, overrideCC, SGFContext());
 }
 
 /// Count the number of SILParameterInfos that are needed in order to
@@ -2064,7 +2100,7 @@ namespace {
                            substFnType,
                            origFormalType,
                            uncurriedSites.back().getSubstResultType(),
-                           transparent,
+                           transparent, Nothing,
                            uncurriedContext);
       
       // End the initial writeback scope, if any.
@@ -2092,7 +2128,7 @@ namespace {
                            substFnType,
                            origFormalType,
                            extraSites[i].getSubstResultType(),
-                           false, context);
+                           false, Nothing, context);
       }
       
       return result;
@@ -2624,7 +2660,7 @@ SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
   return emitApply(*this, loc, mv, subs, args, substFnType,
                    AbstractionPattern(origFormalType.getResult()),
                    substFormalType.getResult(),
-                   transparent, ctx);
+                   transparent, Nothing, ctx);
 }
 
 /// emitArrayInjectionCall - Form an array "Array" out of an NativeObject
@@ -2907,6 +2943,42 @@ ManagedValue SILGenFunction::emitApplyConversionFunction(SILLocation loc,
   return emission.apply();
 }
 
+// Create a partial application of a dynamic method, applying bridging thunks
+// if necessary.
+static SILValue emitDynamicPartialApply(SILGenFunction &gen,
+                                        SILLocation loc,
+                                        SILValue method,
+                                        SILValue self,
+                                        CanFunctionType methodTy) {
+  // Pop the self type off of the function type.
+  // Just to be weird, partially applying an objc method produces a native
+  // function (?!)
+  auto fnTy = method.getType().castTo<SILFunctionType>();
+  auto partialApplyTy = SILFunctionType::get(fnTy->getGenericSignature(),
+                     fnTy->getExtInfo()
+                       .withCallingConv(AbstractCC::Freestanding)
+                       .withRepresentation(FunctionType::Representation::Thick),
+                     ParameterConvention::Direct_Owned,
+                     fnTy->getInterfaceParameters()
+                       .slice(0, fnTy->getInterfaceParameters().size() - 1),
+                     fnTy->getInterfaceResult(), gen.getASTContext());
+  
+  // Retain 'self' because the partial apply will take ownership.
+  // We can't simply forward 'self' because the partial apply is conditional.
+  gen.B.emitRetainValueOperation(loc, self);
+  SILValue result = gen.B.createPartialApply(loc, method, method.getType(), {},
+                        self, SILType::getPrimitiveObjectType(partialApplyTy));
+  // If necessary, thunk to the native ownership conventions and bridged types.
+  auto nativeTy = gen.getLoweredLoadableType(methodTy).castTo<SILFunctionType>();
+  
+  if (nativeTy != partialApplyTy) {
+    result = gen.emitBlockToFunc(loc, ManagedValue::forUnmanaged(result),
+                                 nativeTy).forward(gen);
+  }
+  
+  return result;
+}
+
 RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
                                                 SGFContext c) {
   // Emit the operand.
@@ -2969,17 +3041,14 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
       methodTy = CanFunctionType::get(TupleType::getEmpty(getASTContext()),
                                       methodTy);
 
-    auto dynamicMethodTy = getDynamicMethodType(SGM, operand,
-                                                e->getMember().getDecl(),
-                                                member, methodTy);
-    auto loweredMethodTy = getLoweredType(dynamicMethodTy, 1);
+    auto dynamicMethodTy = getDynamicMethodLoweredType(SGM, operand, member);
+    auto loweredMethodTy = SILType::getPrimitiveObjectType(dynamicMethodTy);
     SILValue memberArg = new (F.getModule()) SILArgument(loweredMethodTy,
                                                          hasMemberBB);
 
     // Create the result value.
-    SILValue result = B.createPartialApply(e, memberArg, memberArg.getType(),
-                                           {}, operand,
-                                           getLoweredType(methodTy));
+    SILValue result = emitDynamicPartialApply(*this, e, memberArg, operand,
+                                              cast<FunctionType>(methodTy));
     if (isa<VarDecl>(e->getMember().getDecl())) {
       result = B.createApply(e, result, result.getType(),
                              getLoweredType(valueTy), {}, {});
@@ -3059,18 +3128,14 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
     auto valueTy = e->getType()->getCanonicalType().getAnyOptionalObjectType();
     auto methodTy =
       subscriptDecl->getGetter()->getType()->castTo<AnyFunctionType>()
-                      ->getResult();
-    auto dynamicMethodTy =
-      getDynamicMethodType(SGM, base, e->getMember().getDecl(),
-                           member, methodTy);
-    auto loweredMethodTy = getLoweredType(dynamicMethodTy, 1);
+                      ->getResult()->getCanonicalType();
+    auto dynamicMethodTy = getDynamicMethodLoweredType(SGM, base, member);
+    auto loweredMethodTy = SILType::getPrimitiveObjectType(dynamicMethodTy);
     SILValue memberArg = new (F.getModule()) SILArgument(loweredMethodTy,
                                                          hasMemberBB);
     // Emit the application of 'self'.
-    SILValue result = B.createPartialApply(e, memberArg, memberArg.getType(),
-                                           {}, base,
-                                           getLoweredType(methodTy, 0));
-
+    SILValue result = emitDynamicPartialApply(*this, e, memberArg, base,
+                                              cast<FunctionType>(methodTy));
     // Emit the index.
     llvm::SmallVector<SILValue, 1> indexArgs;
     std::move(index).forwardAll(*this, indexArgs);

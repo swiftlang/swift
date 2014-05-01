@@ -393,6 +393,11 @@ public:
                            IsFreeFunctionWitness_t isFree,
                            HasInOutSelfAbstractionDifference_t inOutSelf);
   
+  /// Convert a block to a native function with a thunk.
+  ManagedValue emitBlockToFunc(SILLocation loc,
+                               ManagedValue block,
+                               CanSILFunctionType funcTy);
+  
   //===--------------------------------------------------------------------===//
   // Control flow
   //===--------------------------------------------------------------------===//
@@ -747,7 +752,8 @@ public:
                                     ManagedValue fn,
                                     ArrayRef<ManagedValue> args,
                                     CanType resultType,
-                                    bool forceInline = false);
+                                    bool transparent = false,
+                                    Optional<AbstractCC> overrideCC = Nothing);
 
   ManagedValue emitApplyOfLibraryIntrinsic(SILLocation loc,
                                            FuncDecl *fn,

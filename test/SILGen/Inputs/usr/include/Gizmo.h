@@ -73,10 +73,17 @@ typedef long NSInteger;
 @end
 
 @interface CurryTest : NSObject
-// no bridging
-- (NSInteger)foo:(NSInteger)x;
+// no bridging, pod
+- (NSInteger)pod:(NSInteger)x;
 // requires bridging
-- (NSString*)bar:(NSString*)x;
+- (NSString*)bridged:(NSString*)x;
+// normal ownership conventions
+- (CurryTest*)normalOwnership:(CurryTest*)x;
+// weird ownership conventions
+- (CurryTest*)weirdOwnership:(NS_CONSUMED CurryTest*)x
+    NS_RETURNS_RETAINED NS_CONSUMES_SELF;
+// covariant result type
+- (instancetype)returnsSelf;
 @end
 
 #define CF_ENUM(_type, _name) enum _name : _type _name; enum _name : _type
