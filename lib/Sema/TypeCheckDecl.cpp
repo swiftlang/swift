@@ -1041,11 +1041,7 @@ static Expr *buildDefaultInitializer(TypeChecker &tc, Type type) {
       inits.push_back(eltInit);
     }
 
-    return new (tc.Context) TupleExpr(SourceLoc(),
-                                      tc.Context.AllocateCopy(inits),
-                                      nullptr, SourceLoc(),
-                                      /*hasTrailingClosure=*/false,
-                                      /*Implicit=*/true);
+    return TupleExpr::createImplicit(tc.Context, inits, { });
   }
 
   // We don't default-initialize anything else.
@@ -4568,18 +4564,7 @@ static Expr *forwardArguments(TypeChecker &tc, ClassDecl *classDecl,
       return new (tc.Context) ParenExpr(SourceLoc(), values[0], SourceLoc(),
                                         /*hasTrailingClosure=*/false);
 
-    Identifier *labelsCopy = nullptr;
-    if (std::find_if(argumentNames.begin(), argumentNames.end(),
-                     [](Identifier name) -> bool {
-                       return !name.empty();
-                     }) != argumentNames.end())
-      labelsCopy = tc.Context.AllocateCopy(argumentNames).data();
-    return new (tc.Context) TupleExpr(SourceLoc(),
-                                      tc.Context.AllocateCopy(values),
-                                      labelsCopy,
-                                      SourceLoc(),
-                                      /*hasTrailingClosure=*/false,
-                                      /*Implicit=*/true);
+    return TupleExpr::createImplicit(tc.Context, values, argumentNames);
   }
 
   case PatternKind::Any:

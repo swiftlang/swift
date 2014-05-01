@@ -259,8 +259,8 @@ deriveBodyRawRepresentable_frowRaw(AbstractFunctionDecl *fromRawDecl) {
 
   auto optionalRef = new (C) DeclRefExpr(C.getOptionalDecl(),
                                          SourceLoc(), /*implicit*/true);
-  auto emptyArgs = new (C) TupleExpr(SourceLoc(), SourceLoc(),
-                                     /*implicit*/ true);
+  auto emptyArgs = TupleExpr::createEmpty(C, SourceLoc(), SourceLoc(),
+                                          /*implicit*/ true);
   auto dfltReturnExpr = new (C) CallExpr(optionalRef, emptyArgs,
                                          /*implicit*/ true);
   auto dfltReturnStmt = new (C) ReturnStmt(SourceLoc(), dfltReturnExpr);

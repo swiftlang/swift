@@ -1397,14 +1397,15 @@ namespace {
       else {
         SmallVector<TupleTypeElt, 4> tupleElements(segments.size(),
                                                    TupleTypeElt(type));
-        argument = new (tc.Context) TupleExpr(expr->getStartLoc(),
-                                              tc.Context.AllocateCopy(segments),
-                                              nullptr,
-                                              expr->getStartLoc(),
-                                              /*hasTrailingClosure=*/false,
-                                              /*Implicit=*/true,
-                                              TupleType::get(tupleElements,
-                                                             tc.Context));
+        argument = TupleExpr::create(tc.Context,
+                                     expr->getStartLoc(),
+                                     segments,
+                                     { }, 
+                                     { },
+                                     expr->getStartLoc(),
+                                     /*hasTrailingClosure=*/false,
+                                     /*Implicit=*/true,
+                                     TupleType::get(tupleElements,tc.Context));
       }
 
       // Call the convertFromStringInterpolation member with the arguments.
@@ -3140,10 +3141,10 @@ Expr *ExprRewriter::coerceViaUserConversion(Expr *expr, Type toType,
                                     /*Implicit=*/true, /*direct ivar*/false);
 
     // Form an empty tuple.
-    Expr *args = new (tc.Context) TupleExpr(expr->getStartLoc(),
-                                            expr->getEndLoc(),
-                                            /*Implicit=*/true,
-                                            TupleType::getEmpty(tc.Context));
+    Expr *args = TupleExpr::createEmpty(tc.Context,
+                                        expr->getStartLoc(),
+                                        expr->getEndLoc(),
+                                        /*Implicit=*/true);
 
     // Call the conversion function with an empty tuple.
     ApplyExpr *apply = new (tc.Context) CallExpr(memberRef, args,
@@ -4109,13 +4110,15 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
     for (auto elt : arguments)
       elementTypes.push_back(TupleTypeElt(elt->getType()));
 
-    arg = new (Context) TupleExpr(base->getStartLoc(),
-                                  Context.AllocateCopy(arguments),
-                                  nullptr,
-                                  base->getEndLoc(),
-                                  /*hasTrailingClosure=*/false,
-                                  /*Implicit=*/true,
-                                  TupleType::get(elementTypes, Context));
+    arg = TupleExpr::create(Context,
+                            base->getStartLoc(),
+                            arguments,
+                            { },
+                            { },
+                            base->getEndLoc(),
+                            /*hasTrailingClosure=*/false,
+                            /*Implicit=*/true,
+                            TupleType::get(elementTypes, Context));
   }
 
   // Add the conversion from the argument to the function parameter type.
@@ -4204,9 +4207,8 @@ static Expr *convertViaBuiltinProtocol(const Solution &solution,
     }
 
     // Call the witness.
-    Expr *arg = new (ctx) TupleExpr(expr->getStartLoc(), expr->getEndLoc(),
-                                    /*Implicit=*/true,
-                                    TupleType::getEmpty(ctx));
+    Expr *arg = TupleExpr::createEmpty(ctx, expr->getStartLoc(), 
+                                       expr->getEndLoc(), /*Implicit=*/true);
     expr = new (ctx) CallExpr(memberRef, arg, /*Implicit=*/true);
     failed = tc.typeCheckExpressionShallow(expr, cs.DC);
     assert(!failed && "Could not call witness?");
@@ -4242,8 +4244,8 @@ static Expr *convertViaBuiltinProtocol(const Solution &solution,
   (void)failed;
 
   // Call the builtin method.
-  Expr *arg = new (ctx) TupleExpr(expr->getStartLoc(), expr->getEndLoc(),
-                                  /*Implicit=*/true, TupleType::getEmpty(ctx));
+  Expr *arg = TupleExpr::createEmpty(ctx, expr->getStartLoc(), 
+                                     expr->getEndLoc(), /*Implicit=*/true);
   expr = new (ctx) CallExpr(memberRef, arg, /*Implicit=*/true);
   failed = tc.typeCheckExpressionShallow(expr, cs.DC);
   assert(!failed && "Could not call witness?");

@@ -302,7 +302,7 @@ NewArrayExpr *NewArrayExpr::create(ASTContext &ctx, SourceLoc newLoc,
 }
 
 SourceRange TupleExpr::getSourceRange() const {
-  if (LParenLoc.isValid() && !HasTrailingClosure) {
+  if (LParenLoc.isValid() && !hasTrailingClosure()) {
     assert(RParenLoc.isValid() && "Mismatched parens?");
     return SourceRange(LParenLoc, RParenLoc);
   }
@@ -313,6 +313,71 @@ SourceRange TupleExpr::getSourceRange() const {
                                        : getElement(0)->getStartLoc();
   SourceLoc End = getElement(getElements().size()-1)->getEndLoc();
   return SourceRange(Start, End);
+}
+
+TupleExpr::TupleExpr(SourceLoc LParenLoc, ArrayRef<Expr *> SubExprs,
+                     ArrayRef<Identifier> ElementNames, 
+                     ArrayRef<SourceLoc> ElementNameLocs,
+                     SourceLoc RParenLoc, bool HasTrailingClosure, 
+                     bool Implicit, Type Ty)
+  : Expr(ExprKind::Tuple, Implicit, Ty),
+    LParenLoc(LParenLoc), RParenLoc(RParenLoc),
+    NumElements(SubExprs.size())
+{
+  TupleExprBits.HasTrailingClosure = HasTrailingClosure;
+  TupleExprBits.HasElementNames = !ElementNames.empty();
+  TupleExprBits.HasElementNameLocations = !ElementNameLocs.empty();
+  
+  assert(LParenLoc.isValid() == RParenLoc.isValid() &&
+         "Mismatched parenthesis location information validity");
+  assert(ElementNames.empty() || ElementNames.size() == SubExprs.size());
+  assert(ElementNameLocs.empty() || 
+         ElementNames.size() == ElementNameLocs.size());
+
+  // Copy elements.
+  memcpy(getElements().data(), SubExprs.data(), 
+         SubExprs.size() * sizeof(Expr *));
+
+  // Copy element names, if provided.
+  if (hasElementNames()) {
+    memcpy(getElementNamesBuffer().data(), ElementNames.data(),
+           ElementNames.size() * sizeof(Identifier));
+  }
+
+  // Copy element name locations, if provided.
+  if (hasElementNameLocs()) {
+    memcpy(getElementNameLocsBuffer().data(), ElementNameLocs.data(),
+           ElementNameLocs.size() * sizeof(SourceLoc));
+  }
+}
+
+TupleExpr *TupleExpr::create(ASTContext &ctx,
+                             SourceLoc LParenLoc, 
+                             ArrayRef<Expr *> SubExprs,
+                             ArrayRef<Identifier> ElementNames, 
+                             ArrayRef<SourceLoc> ElementNameLocs,
+                             SourceLoc RParenLoc, bool HasTrailingClosure, 
+                             bool Implicit, Type Ty) {
+  unsigned size = sizeof(TupleExpr);
+  size += SubExprs.size() * sizeof(Expr*);
+  size += ElementNames.size() * sizeof(Identifier);
+  size += ElementNameLocs.size() * sizeof(SourceLoc);
+  void *mem = ctx.Allocate(size, alignof(TupleExpr));
+  return new (mem) TupleExpr(LParenLoc, SubExprs, ElementNames, ElementNameLocs,
+                             RParenLoc, HasTrailingClosure, Implicit, Ty);
+}
+
+TupleExpr *TupleExpr::createEmpty(ASTContext &ctx, SourceLoc LParenLoc, 
+                                  SourceLoc RParenLoc, bool Implicit) {
+  return create(ctx, LParenLoc, { }, { }, { }, RParenLoc, 
+                /*HasTrailingClosure=*/false, Implicit, 
+                TupleType::getEmpty(ctx));
+}
+
+TupleExpr *TupleExpr::createImplicit(ASTContext &ctx, ArrayRef<Expr *> SubExprs,
+                                     ArrayRef<Identifier> ElementNames) {
+  return create(ctx, SourceLoc(), SubExprs, ElementNames, { }, SourceLoc(),
+                /*HasTrailingClosure=*/false, /*Implicit=*/true, Type());
 }
 
 ArrayRef<Expr *> CollectionExpr::getElements() const {

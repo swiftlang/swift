@@ -149,6 +149,22 @@ class alignas(8) Expr {
   enum { NumMemberRefExprBits = NumExprBits + 2 };
   static_assert(NumMemberRefExprBits <= 32, "fits in an unsigned");
 
+  class TupleExprBitfields {
+    friend class TupleExpr;
+    unsigned : NumExprBits;
+
+    /// Whether this tuple has a trailing closure.
+    unsigned HasTrailingClosure : 1;
+
+    /// Whether this tuple has any labels.
+    unsigned HasElementNames : 1;
+
+    /// Whether this tuple has label locations.
+    unsigned HasElementNameLocations : 1;
+  };
+  enum { NumTupleExprBits = NumExprBits + 3 };
+  static_assert(NumTupleExprBits <= 32, "fits in an unsigned");
+
   class SubscriptExprBitfields {
     friend class SubscriptExpr;
     unsigned : NumExprBits;
@@ -217,6 +233,7 @@ protected:
     IntegerLiteralExprBitfields IntegerLiteralExprBits;
     StringLiteralExprBitfields StringLiteralExprBits;
     DeclRefExprBitfields DeclRefExprBits;
+    TupleExprBitfields TupleExprBits;
     MemberRefExprBitfields MemberRefExprBits;
     SubscriptExprBitfields SubscriptExprBits;
     MagicIdentifierLiteralExprBitfields MagicIdentifierLiteralExprBits;
@@ -333,7 +350,11 @@ public:
   // Make placement new and vanilla new/delete illegal for Exprs.
   void *operator new(size_t Bytes) throw() = delete;
   void operator delete(void *Data) throw() = delete;
-  void *operator new(size_t Bytes, void *Mem) throw() = delete;
+
+  void *operator new(size_t Bytes, void *Mem) { 
+    assert(Mem); 
+    return Mem; 
+  }
 };
 
 /// ErrorExpr - Represents a semantically erroneous subexpression in the AST,
@@ -1225,39 +1246,51 @@ public:
 class TupleExpr : public Expr {
   SourceLoc LParenLoc;
   SourceLoc RParenLoc;
-  /// SubExprs - Elements of these can be set to null to get the default init
-  /// value for the tuple element.
-  MutableArrayRef<Expr *> SubExprs;
-  /// SubExprNames - Can be null if no names.  Otherwise length = SubExpr.size()
-  Identifier *SubExprNames;
+  unsigned NumElements;
 
-  /// \brief Whether we're wrapping a trailing closure expression.
-  /// FIXME: Pack bit into superclass.
-  bool HasTrailingClosure;
+  /// Retrieve the buffer containing the element names.
+  MutableArrayRef<Identifier> getElementNamesBuffer() {
+    if (!hasElementNames())
+      return { };
+
+    return { reinterpret_cast<Identifier *>(
+               getElements().data() + getNumElements()), 
+             getNumElements() };
+  }
+
+  /// Retrieve the buffer containing the element name locations.
+  MutableArrayRef<SourceLoc> getElementNameLocsBuffer() {
+    if (!hasElementNameLocs())
+      return { };
+    
+    return { reinterpret_cast<SourceLoc *>(
+               getElementNamesBuffer().data() + getNumElements()), 
+             getNumElements() };
+  }
+
+  TupleExpr(SourceLoc LParenLoc, ArrayRef<Expr *> SubExprs,
+            ArrayRef<Identifier> ElementNames, 
+            ArrayRef<SourceLoc> ElementNameLocs,
+            SourceLoc RParenLoc, bool HasTrailingClosure, bool Implicit, 
+            Type Ty);
 
 public:
-  TupleExpr(SourceLoc LParenLoc, MutableArrayRef<Expr *> SubExprs,
-            Identifier *SubExprNames, SourceLoc RParenLoc,
-            bool hasTrailingClosure, bool Implicit, Type Ty = Type())
-    : Expr(ExprKind::Tuple, Implicit, Ty),
-      LParenLoc(LParenLoc), RParenLoc(RParenLoc),
-      SubExprs(SubExprs), SubExprNames(SubExprNames),
-      HasTrailingClosure(hasTrailingClosure)
-  {
-    assert(LParenLoc.isValid() == RParenLoc.isValid() &&
-           "Mismatched parenthesis location information validity");
-  }
+  /// Create a tuple.
+  static TupleExpr *create(ASTContext &ctx,
+                           SourceLoc LParenLoc, 
+                           ArrayRef<Expr *> SubExprs,
+                           ArrayRef<Identifier> ElementNames, 
+                           ArrayRef<SourceLoc> ElementNameLocs,
+                           SourceLoc RParenLoc, bool HasTrailingClosure, 
+                           bool Implicit, Type Ty = Type());
 
-  TupleExpr(SourceLoc LParenLoc, SourceLoc RParenLoc,
-            bool Implicit, Type Ty = Type())
-    : Expr(ExprKind::Tuple, Implicit, Ty),
-      LParenLoc(LParenLoc), RParenLoc(RParenLoc),
-      SubExprs({}), SubExprNames(nullptr), HasTrailingClosure(false)
-  {
-    assert(LParenLoc.isValid() == RParenLoc.isValid() &&
-           "Mismatched parenthesis location information validity");
+  /// Create an empty tuple.
+  static TupleExpr *createEmpty(ASTContext &ctx, SourceLoc LParenLoc, 
+                                SourceLoc RParenLoc, bool Implicit);
 
-  }
+  /// Create an implicit tuple with no source information.
+  static TupleExpr *createImplicit(ASTContext &ctx, ArrayRef<Expr *> SubExprs,
+                                   ArrayRef<Identifier> ElementNames);
 
   SourceLoc getLParenLoc() const { return LParenLoc; }
   SourceLoc getRParenLoc() const { return RParenLoc; }
@@ -1265,33 +1298,70 @@ public:
   SourceRange getSourceRange() const;
 
   /// \brief Whether this expression has a trailing closure as its argument.
-  bool hasTrailingClosure() const { return HasTrailingClosure; }
+  bool hasTrailingClosure() const { return TupleExprBits.HasTrailingClosure; }
 
+  /// Retrieve the elements of this tuple.
   MutableArrayRef<Expr*> getElements() {
-    return SubExprs;
+    return { reinterpret_cast<Expr **>(this + 1), getNumElements() };
   }
 
+  /// Retrieve the elements of this tuple.
   ArrayRef<Expr*> getElements() const {
-    return SubExprs;
+    return { reinterpret_cast<Expr *const *>(this + 1), getNumElements() };
   }
   
-  unsigned getNumElements() const { return SubExprs.size(); }
+  unsigned getNumElements() const { return NumElements; }
   
   Expr *getElement(unsigned i) const {
-    return SubExprs[i];
+    return getElements()[i];
   }
   void setElement(unsigned i, Expr *e) {
-    SubExprs[i] = e;
+    getElements()[i] = e;
   }
 
-  bool hasElementNames() const { return SubExprNames; }
+  /// Whether this tuple has element names.
+  bool hasElementNames() const { 
+    return TupleExprBits.HasElementNames;
+  }
 
-  Identifier *getElementNames() const { return SubExprNames; }
+  /// Retrieve the element names for a tuple.
+  ArrayRef<Identifier> getElementNames() const { 
+    if (!hasElementNames())
+      return { };
+
+    return { reinterpret_cast<const Identifier *>(
+               getElements().data() + getNumElements()),
+               getNumElements() };
+  }
   
+  /// Retrieve the ith element name.
   Identifier getElementName(unsigned i) const {
-    return SubExprNames ? SubExprNames[i] : Identifier();
+    return hasElementNames()? getElementNames()[i] : Identifier();
   }
   
+  /// Whether this tuple has element name locations.
+  bool hasElementNameLocs() const { 
+    return TupleExprBits.HasElementNameLocations;
+  }
+
+  /// Retrieve the locations of the element names for a tuple.
+  ArrayRef<SourceLoc> getElementNameLocs() const {
+    if (!hasElementNameLocs())
+      return { };
+
+    return { reinterpret_cast<const SourceLoc *>(
+               getElementNames().data() + getNumElements()), 
+             getNumElements() };
+  }
+
+  /// Retrieve the location of the ith label, if known.
+  SourceLoc getElementNameLoc(unsigned i) const {
+    if (hasElementNameLocs())
+      return getElementNameLocs()[i];
+    
+    return SourceLoc();
+  }
+
   static bool classof(const Expr *E) { return E->getKind() == ExprKind::Tuple; }
 };
 

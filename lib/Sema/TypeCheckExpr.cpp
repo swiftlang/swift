@@ -226,10 +226,11 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS) {
   // Build the argument to the operation.
   Expr *ArgElts[] = { LHS, RHS };
   auto ArgElts2 = TC.Context.AllocateCopy(MutableArrayRef<Expr*>(ArgElts));
-  TupleExpr *Arg = new (TC.Context) TupleExpr(SourceLoc(), 
-                                              ArgElts2, 0, SourceLoc(),
-                                              /*hasTrailingClosure=*/false,
-                                        LHS->isImplicit() && RHS->isImplicit());
+  TupleExpr *Arg = TupleExpr::create(TC.Context,
+                                     SourceLoc(), 
+                                     ArgElts2, { }, { }, SourceLoc(),
+                                     /*hasTrailingClosure=*/false,
+                                     LHS->isImplicit() && RHS->isImplicit());
 
   // Build the operation.
   return new (TC.Context) BinaryExpr(Op, Arg, Op->isImplicit());

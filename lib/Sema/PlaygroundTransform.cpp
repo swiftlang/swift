@@ -613,14 +613,7 @@ public:
   Expr *buildLoggerCallWithArgs(const char *LoggerName,
                                 MutableArrayRef<Expr *> Args,
                                 SourceRange SR) {
-    TupleExpr *LoggerArgs = new (Context) TupleExpr(
-      SourceLoc(),
-      Context.AllocateCopy(Args),
-      (Identifier*)nullptr,
-      SourceLoc(),
-      false, // hasTrailingClosure
-      true, // implicit
-      Type());
+    TupleExpr *LoggerArgs = TupleExpr::createImplicit(Context, Args, { });
 
     UnresolvedDeclRefExpr *LoggerRef =
       new (Context) UnresolvedDeclRefExpr(
@@ -671,15 +664,8 @@ public:
         EndColumn
       };
 
-    TupleExpr *SendDataArgs = new (Context) TupleExpr(
-      SourceLoc(),
-      Context.AllocateCopy(SendDataArgExprs),
-      (Identifier*)nullptr,
-      SourceLoc(),
-      false, // hasTrailingClosure
-      true, // implicit
-      Type());
-
+    TupleExpr *SendDataArgs = TupleExpr::createImplicit(Context, 
+                                                        SendDataArgExprs, { });
     UnresolvedDeclRefExpr *SendDataRef = 
       new (Context) UnresolvedDeclRefExpr(
         Context.getIdentifier("$builtin_send_data"),

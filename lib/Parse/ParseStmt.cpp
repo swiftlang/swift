@@ -1131,12 +1131,8 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc,
 
     // If we had more than one expression, form a tuple.
     if (FirstExprs.size() > 1) {
-      First = makeParserResult(new (Context) TupleExpr(
-                                               SourceLoc(),
-                                               Context.AllocateCopy(FirstExprs),
-                                               nullptr, SourceLoc(),
-                                               /*hasTrailingClosure=*/false,
-                                               /*Implicit=*/true));
+      First = makeParserResult(
+                TupleExpr::createImplicit(Context, FirstExprs, { }));
     }
   }
 
@@ -1262,12 +1258,8 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc,
 
     // If we had more than one expression, form a tuple.
     if (ThirdExprs.size() > 1) {
-      Third = makeParserResult(new (Context) TupleExpr(
-                                               SourceLoc(),
-                                               Context.AllocateCopy(ThirdExprs),
-                                               nullptr, SourceLoc(),
-                                               /*hasTrailingClosure=*/false,
-                                               /*Implicit=*/true));
+      Third = makeParserResult(
+                TupleExpr::createImplicit(Context, ThirdExprs, { }));
     }
   }
 

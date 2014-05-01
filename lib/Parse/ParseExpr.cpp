@@ -30,7 +30,8 @@ using namespace swift;
 static Expr *createArgWithTrailingClosure(ASTContext &context,
                                           SourceLoc leftParen,
                                           ArrayRef<Expr *> elementsIn,
-                                          Identifier *namesIn,
+                                          ArrayRef<Identifier> namesIn,
+                                          ArrayRef<SourceLoc> nameLocsIn,
                                           SourceLoc rightParen,
                                           Expr *closure) {
   // If there are no elements, just build a parenthesized expression around
@@ -44,17 +45,20 @@ static Expr *createArgWithTrailingClosure(ASTContext &context,
   SmallVector<Expr *, 4> elements(elementsIn.begin(), elementsIn.end());
   elements.push_back(closure);
 
-  Identifier *names = nullptr;
-  if (namesIn) {
-    names = context.Allocate<Identifier>(elements.size()).data();
-    std::copy(namesIn, namesIn + elements.size() - 1, names);
+  SmallVector<Identifier, 4> names;
+  SmallVector<SourceLoc, 4> nameLocs;
+  if (!namesIn.empty()) {
+    names.append(namesIn.begin(), namesIn.end());
+    names.push_back(Identifier());
+
+    nameLocs.append(nameLocsIn.begin(), nameLocsIn.end());
+    nameLocs.push_back(SourceLoc());
   }
 
   // Form a full tuple expression.
-  return new (context) TupleExpr(leftParen, context.AllocateCopy(elements),
-                                 names, rightParen,
-                                 /*hasTrailingClosure=*/true,
-                                 /*Implicit=*/false);
+  return TupleExpr::create(context, leftParen, elements, names, nameLocs,
+                           rightParen, /*hasTrailingClosure=*/true,
+                           /*Implicit=*/false);
 }
 
 /// \brief Add the given trailing closure argument to the call argument.
@@ -68,6 +72,7 @@ static Expr *addTrailingClosureToArgument(ASTContext &context,
                                         tuple->getLParenLoc(),
                                         tuple->getElements(),
                                         tuple->getElementNames(),
+                                        tuple->getElementNameLocs(),
                                         tuple->getRParenLoc(),
                                         closure);
   }
@@ -77,7 +82,8 @@ static Expr *addTrailingClosureToArgument(ASTContext &context,
   return createArgWithTrailingClosure(context,
                                       paren->getLParenLoc(),
                                       paren->getSubExpr(),
-                                      nullptr,
+                                      { },
+                                      { },
                                       paren->getRParenLoc(), closure);
 }
 
@@ -1158,7 +1164,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
       } else {
         // Otherwise, the closure implicitly forms a call.
         Expr *arg = createArgWithTrailingClosure(Context, SourceLoc(), { },
-                                                 nullptr, SourceLoc(), 
+                                                 { }, { }, SourceLoc(), 
                                                  closure.get());
         Result = makeParserResult(new (Context) CallExpr(Result.get(), arg,
                                                        /*Implicit=*/true));
@@ -1702,6 +1708,7 @@ ParserResult<Expr> Parser::parseExprList(tok LeftTok, tok RightTok) {
 
   SmallVector<Expr*, 8> SubExprs;
   SmallVector<Identifier, 8> SubExprNames;
+  SmallVector<SourceLoc, 8> SubExprNameLocs;
 
   ParserStatus Status = parseList(RightTok, LLoc, RLoc,
                                   tok::comma, /*OptionalSep=*/false,
@@ -1711,8 +1718,11 @@ ParserResult<Expr> Parser::parseExprList(tok LeftTok, tok RightTok) {
                                       diag::expected_rsquare_expr_list,
                                   [&] () -> ParserStatus {
     Identifier FieldName;
+    SourceLoc FieldNameLoc;
+
     // Check to see if there is a field specifier
     if (Tok.is(tok::identifier) && peekToken().is(tok::colon)) {
+      FieldNameLoc = Tok.getLoc();
       if (parseIdentifier(FieldName,
                           diag::expected_field_spec_name_tuple_expr)) {
         return makeParserError();
@@ -1720,16 +1730,11 @@ ParserResult<Expr> Parser::parseExprList(tok LeftTok, tok RightTok) {
       consumeToken(tok::colon);
     }
 
-    if (!SubExprNames.empty()) {
-      SubExprNames.push_back(FieldName);
-    } else if (FieldName.get()) {
-      SubExprNames.resize(SubExprs.size());
-      SubExprNames.push_back(FieldName);
-    }
-
     // See if we have an operator decl ref '(<op>)'. The operator token in
     // this case lexes as a binary operator because it neither leads nor
     // follows a proper subexpression.
+    ParserStatus Status;
+    Expr *SubExpr = nullptr;
     if (Tok.is(tok::oper_binary) &&
         (peekToken().is(RightTok) || peekToken().is(tok::comma))) {
       SourceLoc Loc;
@@ -1740,30 +1745,40 @@ ParserResult<Expr> Parser::parseExprList(tok LeftTok, tok RightTok) {
       // Bypass local lookup. Use an 'Ordinary' reference kind so that the
       // reference may resolve to any unary or binary operator based on
       // context.
-      auto *SubExpr = new(Context) UnresolvedDeclRefExpr(OperName,
-                                                         DeclRefKind::Ordinary,
-                                                         Loc);
-      SubExprs.push_back(SubExpr);
+      SubExpr = new(Context) UnresolvedDeclRefExpr(OperName,
+                                                   DeclRefKind::Ordinary,
+                                                   Loc);
     } else {
-      ParserResult<Expr> SubExpr = parseExpr(diag::expected_expr_in_expr_list);
-      if (SubExpr.isNonNull())
-        SubExprs.push_back(SubExpr.get());
-      return SubExpr;
+      ParserResult<Expr> ParsedSubExpr 
+        = parseExpr(diag::expected_expr_in_expr_list);
+      SubExpr = ParsedSubExpr.getPtrOrNull();
+      Status = ParsedSubExpr;
     }
-    return makeParserSuccess();
+
+    // If we got a subexpression, add it.
+    if (SubExpr) {
+      // Update names and locations.
+      if (!SubExprNames.empty()) {
+        SubExprNames.push_back(FieldName);
+        SubExprNameLocs.push_back(FieldNameLoc);
+      } else if (FieldName.get()) {
+        SubExprNames.resize(SubExprs.size());
+        SubExprNames.push_back(FieldName);
+
+        SubExprNameLocs.resize(SubExprs.size());
+        SubExprNameLocs.push_back(FieldNameLoc);
+      }
+
+      // Add the subexpression.
+      SubExprs.push_back(SubExpr);
+    }
+
+    return Status;
   });
 
   if (Status.hasCodeCompletion())
     return makeParserCodeCompletionResult<Expr>();
 
-  MutableArrayRef<Expr *> NewSubExprs = Context.AllocateCopy(SubExprs);
-  
-  Identifier *NewSubExprsNames = 0;
-  if (!SubExprNames.empty())
-    NewSubExprsNames =
-      Context.AllocateCopy<Identifier>(SubExprNames.data(),
-                                       SubExprNames.data()+SubExprs.size());
-  
   // A tuple with a single, unlabelled element is just parentheses.
   if (SubExprs.size() == 1 &&
       (SubExprNames.empty() || SubExprNames[0].empty())) {
@@ -1773,9 +1788,8 @@ ParserResult<Expr> Parser::parseExprList(tok LeftTok, tok RightTok) {
   }
 
   return makeParserResult(
-      new (Context) TupleExpr(LLoc, NewSubExprs, NewSubExprsNames, RLoc,
-                              /*hasTrailingClosure=*/false,
-                              /*Implicit=*/false));
+    TupleExpr::create(Context, LLoc, SubExprs, SubExprNames, SubExprNameLocs,
+                      RLoc, /*hasTrailingClosure=*/false, /*Implicit=*/false));
 }
 
 /// Determine whether the parser is at an expr-call-suffix.
@@ -1833,7 +1847,7 @@ Parser::parseExprCallSuffix(ParserResult<Expr> fn,
   // If the argument was a closure, create a trailing closure argument.
   Expr *arg = firstArg.get();
   if (firstArgIsClosure) {
-    arg = createArgWithTrailingClosure(Context, SourceLoc(), { }, nullptr, 
+    arg = createArgWithTrailingClosure(Context, SourceLoc(), { }, { }, { },
                                        SourceLoc(), arg);
   }
 
@@ -1856,8 +1870,8 @@ ParserResult<Expr> Parser::parseExprCollection() {
   // [] is always an array.
   if (Tok.is(tok::r_square)) {
     SourceLoc RSquareLoc = consumeToken();
-    auto EmptyTuple =
-      new (Context) TupleExpr(LSquareLoc, RSquareLoc, /*Implicit=*/false);
+    auto EmptyTuple = TupleExpr::createEmpty(Context, LSquareLoc, 
+                                             RSquareLoc, /*Implicit=*/false);
     return makeParserResult(
                 new (Context) ArrayExpr(LSquareLoc, EmptyTuple, RSquareLoc));
   }
@@ -1866,8 +1880,8 @@ ParserResult<Expr> Parser::parseExprCollection() {
   if (Tok.is(tok::colon) && peekToken().is(tok::r_square)) {
     consumeToken(tok::colon);
     SourceLoc RSquareLoc = consumeToken();
-    auto EmptyTuple =
-      new (Context) TupleExpr(LSquareLoc, RSquareLoc, /*Implicit=*/false);
+    auto EmptyTuple = TupleExpr::createEmpty(Context, LSquareLoc, 
+                                             RSquareLoc, /*Implicit=*/false);
     return makeParserResult(
               new (Context) DictionaryExpr(LSquareLoc, EmptyTuple, RSquareLoc));
   }
@@ -1934,16 +1948,15 @@ ParserResult<Expr> Parser::parseExprArray(SourceLoc LSquareLoc,
   assert(SubExprs.size() >= 1);
 
   Expr *SubExpr;
-  if (SubExprs.size() == 1)
+  if (SubExprs.size() == 1) {
     SubExpr = new (Context) ParenExpr(LSquareLoc, SubExprs[0],
                                       RSquareLoc,
                                       /*hasTrailingClosure=*/false);
-  else
-    SubExpr = new (Context) TupleExpr(LSquareLoc,
-                                      Context.AllocateCopy(SubExprs),
-                                      nullptr, RSquareLoc,
-                                      /*hasTrailingClosure=*/false,
-                                      /*Implicit=*/false);
+  } else {
+    SubExpr = TupleExpr::create(Context, LSquareLoc, SubExprs, { }, { },
+                                RSquareLoc, /*hasTrailingClosure=*/false,
+                                /*Implicit=*/false);
+  }
 
   return makeParserResult(
       Status, new (Context) ArrayExpr(LSquareLoc, SubExpr, RSquareLoc));
@@ -1969,9 +1982,7 @@ ParserResult<Expr> Parser::parseExprDictionary(SourceLoc LSquareLoc,
   // Function that adds a new key/value pair.
   auto addKeyValuePair = [&](Expr *Key, Expr *Value) -> void {
     Expr *Exprs[] = {Key, Value};
-    SubExprs.push_back(new (Context) TupleExpr(
-        SourceLoc(), Context.AllocateCopy(Exprs), nullptr, SourceLoc(),
-        /*hasTrailingClosure=*/false, /*Implicit=*/false));
+    SubExprs.push_back(TupleExpr::createImplicit(Context, Exprs, { }));
   };
 
   bool FirstPair = true;
@@ -2022,9 +2033,9 @@ ParserResult<Expr> Parser::parseExprDictionary(SourceLoc LSquareLoc,
     SubExpr = new (Context) ParenExpr(LSquareLoc, SubExprs[0], RSquareLoc,
                                       /*hasTrailingClosure=*/false);
   else
-    SubExpr = new (Context) TupleExpr(
-        LSquareLoc, Context.AllocateCopy(SubExprs), nullptr, RSquareLoc,
-        /*hasTrailingClosure=*/false, /*Implicit=*/false);
+    SubExpr = TupleExpr::create(Context, LSquareLoc, SubExprs, { }, { },
+                                RSquareLoc, /*hasTrailingClosure=*/false, 
+                                /*Implicit=*/false);
 
   return makeParserResult(new (Context)
                           DictionaryExpr(LSquareLoc, SubExpr, RSquareLoc));

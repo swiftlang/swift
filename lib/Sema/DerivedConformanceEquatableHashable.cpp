@@ -126,11 +126,7 @@ static void deriveBodyEquatable_enum_eq(AbstractFunctionDecl *eqDecl) {
   
   Expr *ab[] = {aRef, bRef};
   
-  TupleExpr *abTuple = new (C) TupleExpr(SourceLoc(),
-                                         C.AllocateCopy(ab), nullptr,
-                                         SourceLoc(),
-                                         /*trailingClosure*/ false,
-                                         /*implicit*/ true);
+  TupleExpr *abTuple = TupleExpr::createImplicit(C, ab, { });
   
   auto switchStmt = SwitchStmt::create(LabeledStmtInfo(),
                                        SourceLoc(), abTuple, SourceLoc(),

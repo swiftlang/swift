@@ -1284,11 +1284,10 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
   
   Expr *matchArgElts[] = {EP->getSubExpr(), matchVarRef};
   auto *matchArgs
-    = new (Context) TupleExpr(EP->getSubExpr()->getSourceRange().Start,
-                    Context.AllocateCopy(MutableArrayRef<Expr*>(matchArgElts)),
-                    nullptr,
-                    EP->getSubExpr()->getSourceRange().End,
-                    false, /*Implicit=*/true);
+    = TupleExpr::create(Context, EP->getSubExpr()->getSourceRange().Start,
+                        matchArgElts, { }, { },
+                        EP->getSubExpr()->getSourceRange().End,
+                        /*hasTrailingClosure=*/false, /*Implicit=*/true);
   
   Expr *matchCall = new (Context) BinaryExpr(matchOp, matchArgs,
                                              /*Implicit=*/true);

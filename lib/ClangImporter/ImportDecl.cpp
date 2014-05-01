@@ -626,12 +626,7 @@ static FuncDecl *makeOptionSetGetLogicValueMethod(StructDecl *optionSetDecl,
   auto neRef = getOperatorRef(C, C.Id_NotEqualsOperator);
   
   Expr *args[] = {valueRef, zero};
-  auto argsTuple = new (C) TupleExpr(SourceLoc(),
-                                     C.AllocateCopy(args),
-                                     nullptr,
-                                     SourceLoc(),
-                                     /*trailingClosure*/ false,
-                                     /*implicit*/ true);
+  auto argsTuple = TupleExpr::createImplicit(C, args, { });
   auto apply = new (C) BinaryExpr(neRef, argsTuple, /*implicit*/ true);
   auto ret = new (C) ReturnStmt(SourceLoc(), apply);
 
