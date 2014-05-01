@@ -67,31 +67,31 @@ ERROR(cannot_find_appropriate_overload,sema,none,
 // Name Binding
 //------------------------------------------------------------------------------
 
-ERROR(sema_no_import,sema_nb,none,
+ERROR(sema_no_import,sema_nb,Fatal,
       "no such module '%0'", (StringRef))
-ERROR(sema_no_import_submodule,sema_nb,none,
+ERROR(sema_no_import_submodule,sema_nb,Fatal,
       "no such module", ())
 NOTE(sema_no_import_no_sdk,sema_nb,none,
      "did you forget to set an SDK using -sdk or SDKROOT?", ())
 NOTE(sema_no_import_no_sdk_xcrun,sema_nb,none,
      "use \"-sdk $(xcrun --show-sdk-path --sdk macosx)\" to select the default "
      "OS X SDK installed with Xcode", ())
-ERROR(sema_opening_import,sema_nb,none,
+ERROR(sema_opening_import,sema_nb,Fatal,
       "opening import file '%0.swift': %1", (StringRef, StringRef))
 
-ERROR(serialization_malformed_module,sema,none,
+ERROR(serialization_malformed_module,sema,Fatal,
       "malformed module file: %0", (StringRef))
-ERROR(serialization_module_too_new,sema,none,
+ERROR(serialization_module_too_new,sema,Fatal,
       "module file was created by a newer version of the compiler: %0",
       (StringRef))
-ERROR(serialization_module_too_old,sema,none,
+ERROR(serialization_module_too_old,sema,Fatal,
       "module file was created by an older version of the compiler: %0",
       (StringRef))
-ERROR(serialization_missing_single_dependency,sema,none,
+ERROR(serialization_missing_single_dependency,sema,Fatal,
       "missing required module '%0'", (StringRef))
-ERROR(serialization_missing_dependencies,sema,none,
+ERROR(serialization_missing_dependencies,sema,Fatal,
       "missing required modules: %0", (StringRef))
-ERROR(serialization_missing_shadowed_module,sema,none,
+ERROR(serialization_missing_shadowed_module,sema,Fatal,
       "cannot load underlying module for %0", (Identifier))
 
 ERROR(unknown_name_in_type,sema_nb,none,

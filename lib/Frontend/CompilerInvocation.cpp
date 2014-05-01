@@ -621,6 +621,10 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
     Opts.SkipDiagnosticPasses = true;
   }
 
+  if (Args.hasArg(OPT_show_diagnostics_after_fatal)) {
+    Opts.ShowDiagnosticsAfterFatalError = true;
+  }
+
   return false;
 }
 

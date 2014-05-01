@@ -39,7 +39,10 @@ enum class DiagnosticOptions {
   /// of the previous token.
   ///
   /// This behaviour improves experience for "expected token X" diagnostics.
-  PointsToFirstBadToken
+  PointsToFirstBadToken,
+
+  /// After a fatal error subsequent diagnostics are suppressed.
+  Fatal,
 };
 
 struct StoredDiagnosticInfo {
@@ -123,6 +126,12 @@ bool DiagnosticEngine::isDiagnosticPointsToFirstBadToken(DiagID ID) const {
   const StoredDiagnosticInfo &StoredInfo =
       StoredDiagnosticInfos[(unsigned) ID];
   return StoredInfo.Options == DiagnosticOptions::PointsToFirstBadToken;
+}
+
+bool DiagnosticEngine::isDiagnosticFatal(DiagID ID) const {
+  const StoredDiagnosticInfo &StoredInfo =
+      StoredDiagnosticInfos[(unsigned) ID];
+  return StoredInfo.Options == DiagnosticOptions::Fatal;
 }
 
 /// \brief Skip forward to one of the given delimiters.
@@ -333,10 +342,17 @@ void DiagnosticEngine::flushActiveDiagnostic() {
   const StoredDiagnosticInfo &StoredInfo
     = StoredDiagnosticInfos[(unsigned)ActiveDiagnostic->getID()];
 
+  if (FatalErrorOccurred && !ShowDiagnosticsAfterFatalError) {
+    ActiveDiagnostic.reset();
+    return;
+  }
+
   // Check whether this is an error.
   switch (StoredInfo.Kind) {
   case DiagnosticKind::Error:
     HadAnyError = true;
+    if (isDiagnosticFatal(ActiveDiagnostic->getID()))
+      FatalErrorOccurred = true;
     break;
     
   case DiagnosticKind::Note:

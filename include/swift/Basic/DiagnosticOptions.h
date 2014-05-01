@@ -25,6 +25,9 @@ public:
 
   /// Indicates whether diagnostic passes should be skipped.
   bool SkipDiagnosticPasses = false;
+
+  /// Keep emitting subsequent diagnostics after a fatal error.
+  bool ShowDiagnosticsAfterFatalError = false;
 };
 
 }

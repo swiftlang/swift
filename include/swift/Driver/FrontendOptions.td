@@ -49,6 +49,9 @@ def serialize_diagnostics_path_EQ
 def verify : Flag<["-"], "verify">,
   HelpText<"Verify diagnostics against expected-{error|warning|note} "
            "annotations">;
+
+def show_diagnostics_after_fatal : Flag<["-"], "show-diagnostics-after-fatal">,
+  HelpText<"Keep emitting subsequent diagnostics after a fatal error">;
            
 def enable_objc_attr_requires_objc_module :
   Flag<["-"], "enable-objc-attr-requires-objc-module">,

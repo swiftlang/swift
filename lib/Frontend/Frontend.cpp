@@ -85,7 +85,11 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
     Args.push_back(nullptr);
     llvm::cl::ParseCommandLineOptions(Args.size()-1, Args.data());
   }
-  
+
+  if (Invocation.getDiagnosticOptions().ShowDiagnosticsAfterFatalError) {
+    Diagnostics.setShowDiagnosticsAfterFatalError();
+  }
+
   // Initialize the target build configuration settings ("os" and "arch").
   setTargetConfigurations(Invocation.getIRGenOptions(),
                           Invocation.getLangOptions());

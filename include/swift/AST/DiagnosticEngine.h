@@ -376,6 +376,11 @@ namespace swift {
     /// HadAnyError - True if any error diagnostics have been emitted.
     bool HadAnyError;
 
+    /// Sticky flag set to \c true when a fatal error is emitted.
+    bool FatalErrorOccurred = false;
+
+    bool ShowDiagnosticsAfterFatalError = false;
+
     /// \brief The declaration of the currently active diagnostic, if there is
     /// one.
     Decl *ActiveDiagnosticDecl = nullptr;
@@ -403,8 +408,15 @@ namespace swift {
       return HadAnyError;
     }
 
+    bool hasFatalErrorOccurred() const { return FatalErrorOccurred; }
+
+    void setShowDiagnosticsAfterFatalError(bool Val = true) {
+      ShowDiagnosticsAfterFatalError = Val;
+    }
+
     void resetHadAnyError() {
       HadAnyError = false;
+      FatalErrorOccurred = false;
     }
 
     /// \brief Add an additional DiagnosticConsumer to receive diagnostics.
@@ -541,6 +553,9 @@ namespace swift {
     /// \returns true if diagnostic is marked with PointsToFirstBadToken
     /// option.
     bool isDiagnosticPointsToFirstBadToken(DiagID ID) const;
+
+    /// \returns true if diagnostic is marked as fatal.
+    bool isDiagnosticFatal(DiagID ID) const;
 
   private:
     /// \brief Flush the active diagnostic.
