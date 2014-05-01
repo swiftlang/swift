@@ -1106,8 +1106,7 @@ void SILDevirtualizer::optimizeClassMethodInst(ClassMethodInst *CMI) {
   // Otherwise walk up the class heirarchy until there are no more super classes
   // (i.e. Class becomes null) or we find a match with member.
   SILDeclRef Member = CMI->getMember();
-  bool Success = false;
-  (void)Success;
+  SILFunction *F = nullptr;
 
   // Until we reach the top of the class hierarchy...
   while (Class) {
@@ -1123,51 +1122,50 @@ void SILDevirtualizer::optimizeClassMethodInst(ClassMethodInst *CMI) {
 
     // Ok, we have a VTable. Try to lookup the SILFunction implementation from
     // the VTable.
-    SILFunction *F = Vtbl->getImplementation(CMI->getModule(), Member);
+    F = Vtbl->getImplementation(CMI->getModule(), Member);
+
+    if (F)
+      break;
 
     // If we fail to lookup the SILFunction, again skip Class and attempt to
     // resolve the method in the VTable of the super class of Class if such a
     // super class exists.
-    if (!F) {
-      Class = getClassDeclSuperClass(Class);
-      continue;
-    }
-
-    // If F's this pointer has a different type from the CMI's operand, we
-    // will have type checking issues later on. For now, we only devirtualize
-    // if the operand is set with "upcast" and the source operand of "upcast"
-    // has the required type.
-    bool allowDevirt = checkDevirtType(F, CMI);
-    if (!allowDevirt) {
-      DEBUG(llvm::dbgs() <<
-            " *** Disable devirtualization due to type mismatch : " << *CMI);
-      break;
-    }
-
-    // Success! We found the method! Create a direct reference to it.
-    FunctionRefInst *FRI =
-        new (CMI->getModule()) FunctionRefInst(CMI->getLoc(), F);
-
-    CMI->getParent()->getInstList().insert(CMI, FRI);
-    CMI->replaceAllUsesWith(FRI);
-    CMI->eraseFromParent();
-
-    DEBUG(llvm::dbgs() << "        SUCCESS: " << F->getName() << "\n");
-
-    for (auto UI = FRI->use_begin(), UE = FRI->use_end(); UI != UE; ++UI)
-      if (ApplyInst *AI = dyn_cast<ApplyInst>(UI->getUser()))
-        if (AI != toBeDeleted)
-          collectPolyArgs(AI);
-    NumDevirtualized++;
-    Changed = true;
-    Success = true;
-    break;
+    Class = getClassDeclSuperClass(Class);
   }
 
-  if (!Success)
+  if (!F) {
     DEBUG(llvm::dbgs() << "        FAIL: Could not find matching VTable or "
           "vtable method for this class.\n");
+    return;
+  }
 
+  // If F's this pointer has a different type from the CMI's operand, we
+  // will have type checking issues later on. For now, we only devirtualize
+  // if the operand is set with "upcast" and the source operand of "upcast"
+  // has the required type.
+  bool allowDevirt = checkDevirtType(F, CMI);
+  if (!allowDevirt) {
+    DEBUG(llvm::dbgs() <<
+          " *** Disable devirtualization due to type mismatch : " << *CMI);
+    return;
+  }
+
+  // Success! We found the method! Create a direct reference to it.
+  FunctionRefInst *FRI =
+    new (CMI->getModule()) FunctionRefInst(CMI->getLoc(), F);
+
+  CMI->getParent()->getInstList().insert(CMI, FRI);
+  CMI->replaceAllUsesWith(FRI);
+  CMI->eraseFromParent();
+
+  DEBUG(llvm::dbgs() << "        SUCCESS: " << F->getName() << "\n");
+
+  for (auto UI = FRI->use_begin(), UE = FRI->use_end(); UI != UE; ++UI)
+    if (ApplyInst *AI = dyn_cast<ApplyInst>(UI->getUser()))
+      if (AI != toBeDeleted)
+        collectPolyArgs(AI);
+  NumDevirtualized++;
+  Changed = true;
 }
 
 /// \brief Scan the uses of the protocol object and return the initialization
