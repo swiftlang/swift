@@ -585,9 +585,6 @@ ApplyInst::ApplyInst(SILLocation Loc, SILValue Callee,
                 "assuming Substitution is trivially copyable");
   memcpy(getSubstitutionsStorage(), Subs.begin(),
          sizeof(Substitution) * Subs.size());
-  
-  if (Subs.empty())
-    assert(SubstCalleeTy == Callee.getType());
 }
 
 ApplyInst *ApplyInst::create(SILLocation Loc, SILValue Callee,
