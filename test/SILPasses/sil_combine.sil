@@ -683,18 +683,18 @@ bb0(%0 : $*X):
   return %19 : $()
 }
 
-sil @stringcore_invariant_check : $@thin (@owned StringCore) -> @owned Optional<_CocoaString>
+sil @stringcore_invariant_check : $@thin (@owned _StringCore) -> @owned Optional<_CocoaString>
 sil @reabstruction_thunk : $@thin (@out Optional<_CocoaString>, @owned @callee_owned () -> @owned Optional<_CocoaString>) -> ()
 
-// CHECK-LABEL: sil @dead_closure_elimination : $@thin (@owned StringCore) -> ()
+// CHECK-LABEL: sil @dead_closure_elimination : $@thin (@owned _StringCore) -> ()
 // CHECK: bb0
 // CHECK-NEXT: release_value
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
-sil @dead_closure_elimination : $@thin (@owned StringCore) -> () {
-bb0(%0 : $StringCore):
-  %1 = function_ref @stringcore_invariant_check : $@thin (@owned StringCore) -> @owned Optional<_CocoaString>
-  %2 = partial_apply %1(%0) : $@thin (@owned StringCore) -> @owned Optional<_CocoaString>
+sil @dead_closure_elimination : $@thin (@owned _StringCore) -> () {
+bb0(%0 : $_StringCore):
+  %1 = function_ref @stringcore_invariant_check : $@thin (@owned _StringCore) -> @owned Optional<_CocoaString>
+  %2 = partial_apply %1(%0) : $@thin (@owned _StringCore) -> @owned Optional<_CocoaString>
   %3 = function_ref @reabstruction_thunk : $@thin (@out Optional<_CocoaString>, @owned @callee_owned () -> @owned Optional<_CocoaString>) -> ()
   %4 = partial_apply %3(%2) : $@thin (@out Optional<_CocoaString>, @owned @callee_owned () -> @owned Optional<_CocoaString>) -> ()
   strong_release %4 : $@callee_owned (@out Optional<_CocoaString>) -> ()
