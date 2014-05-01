@@ -12,6 +12,7 @@
 
 #include "swift/ReST/LineList.h"
 #include "swift/ReST/Parser.h"
+#include "llvm/ADT/SmallString.h"
 #include "gtest/gtest.h"
 #include <vector>
 
