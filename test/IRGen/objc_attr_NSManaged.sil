@@ -1,0 +1,40 @@
+// RUN: rm -rf %t/clang-module-cache
+// RUN: %swift -target x86_64-apple-darwin10 -module-cache-path %t/clang-module-cache -sdk %S/Inputs -I=%S/Inputs -enable-source-import %s -emit-ir | FileCheck %s
+
+// CHECK: [[SGIZMO:%C19objc_attr_NSManaged10SwiftGizmo]] = type
+
+// CHECK: [[X:@[0-9+]]] = private unnamed_addr constant [2 x i8] c"x\00"
+
+import Builtin
+import Swift
+import gizmo
+
+@objc class X {
+}
+
+// The getter/setter should not show up in the metadata.
+// CHECK: _INSTANCE_METHODS__TtC19objc_attr_NSManaged10SwiftGizmo = private constant { {{.*}}i32, i32, [2 x { i8*, i8*, i8* }] } { i32 24, i32 2, {{.*}} @"\01L_selector_data(initWithBellsOn:)", {{.*}} @"\01L_selector_data(init)", 
+
+// The property "x' should show up in the metadata.
+// CHECK: @_PROPERTIES__TtC19objc_attr_NSManaged10SwiftGizmo = private constant { {{.*}}i32, i32, [1 x { i8*, i8* }] } { i32 16, i32 1, [1 x { i8*, i8* }] [{ i8*, i8* } { i8* getelementptr inbounds ([2 x i8]* [[X]], i64 0, i64 0),
+
+@objc class SwiftGizmo : Gizmo {
+  @objc @NSManaged var x: X
+}
+
+sil @_TToFC19objc_attr_NSManaged1XcfMS0_FT_S0_ : $@cc(objc_method) @thin (@owned X) -> @owned X {
+bb0(%0 : $X):
+  return %0 : $X
+}
+
+sil @_TToFC19objc_attr_NSManaged10SwiftGizmocfMS0_FT_S0_ : $@cc(objc_method) @thin (@owned SwiftGizmo) -> @owned SwiftGizmo {
+bb0(%0 : $SwiftGizmo):
+  return %0 : $SwiftGizmo
+}
+
+sil @_TToFC19objc_attr_NSManaged10SwiftGizmocfMS0_FT11withBellsOnSi_S0_ : $@cc(objc_method) @thin (Int, @owned SwiftGizmo) -> @owned SwiftGizmo {
+bb0(%0 : $Int, %1 : $SwiftGizmo):
+  return %1 : $SwiftGizmo
+}
+
+

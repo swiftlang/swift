@@ -1422,6 +1422,11 @@ namespace {
       if (requiresObjCPropertyDescriptor(IGM, var)) {
         if (llvm::Constant *prop = buildProperty(var))
           Properties.push_back(prop);
+
+        // Don't emit getter/setter descriptors for @NSManagedAttr properties.
+        if (var->getAttrs().hasAttribute<NSManagedAttr>())
+          return;
+
         auto getter_setter = emitObjCPropertyMethodDescriptors(IGM, var);
         if (var->getAttrs().isOptional())
           OptInstanceMethods.push_back(getter_setter.first);

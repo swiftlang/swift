@@ -194,7 +194,13 @@ public:
 
   void visitVarDecl(VarDecl *prop) {
     if (!requiresObjCPropertyDescriptor(IGF.IGM, prop)) return;
-    
+
+    // FIXME: register property metadata in addition to the methods.
+
+    // Don't emit getters/setters for @NSManagedAttr properties.
+    if (prop->getAttrs().hasAttribute<NSManagedAttr>())
+      return;
+
     llvm::Constant *name, *imp, *types;
     emitObjCGetterDescriptorParts(IGF.IGM, prop,
                                   name, types, imp);
@@ -214,8 +220,6 @@ public:
       
       IGF.Builder.CreateCall(class_replaceMethod, setterArgs);
     }
-
-    // FIXME: register property metadata in addition to the methods.
   }
 
   void visitSubscriptDecl(SubscriptDecl *subscript) {
@@ -1525,6 +1529,11 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
 
       if (auto var = dyn_cast<VarDecl>(member)) {
         if (requiresObjCPropertyDescriptor(*this, var)) {
+          // Don't emit getters/setters for @NSManagedAttr properties.
+          // FIXME: We should still emit property metadata.
+          if (var->getAttrs().hasAttribute<NSManagedAttr>())
+            break;
+
           needsCategory = true;
           break;
         }
