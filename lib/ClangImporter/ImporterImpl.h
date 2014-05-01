@@ -23,9 +23,8 @@
 #include "swift/AST/Type.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Basic/Optional.h"
-#include "clang/Frontend/CompilerInstance.h"
-#include "clang/Frontend/FrontendActions.h"
 #include "clang/Basic/IdentifierTable.h"
+#include "clang/Frontend/CompilerInstance.h"
 #include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
@@ -33,7 +32,6 @@
 
 namespace clang {
 class APValue;
-class CompilerInvocation;
 class Decl;
 class DeclarationName;
 class EnumDecl;
@@ -42,8 +40,9 @@ class NamedDecl;
 class ObjCInterfaceDecl;
 class ObjCMethodDecl;
 class ParmVarDecl;
-class TypedefNameDecl;
+class Parser;
 class QualType;
+class TypedefNameDecl;
 }
 
 namespace swift {
@@ -189,10 +188,7 @@ public:
   };
 
   Implementation(ASTContext &ctx, const ClangImporterOptions &opts);
-
-  ~Implementation() {
-    assert(NumCurrentImportingEntities == 0);
-  }
+  ~Implementation();
 
   /// \brief Swift AST context.
   ASTContext &SwiftContext;
@@ -219,7 +215,10 @@ private:
 
   /// \brief Clang compiler action, which is used to actually run the
   /// parser.
-  std::unique_ptr<clang::SyntaxOnlyAction> Action;
+  std::unique_ptr<clang::FrontendAction> Action;
+
+  /// \brief Clang parser, which is used to load textual headers.
+  std::unique_ptr<clang::Parser> Parser;
 
   /// The active type checker, or null if there is no active type checker.
   LazyResolver *typeResolver = nullptr;

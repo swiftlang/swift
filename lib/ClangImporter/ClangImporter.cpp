@@ -33,8 +33,9 @@
 #include "clang/Basic/Module.h"
 #include "clang/Basic/TargetInfo.h"
 #include "clang/Basic/Version.h"
-#include "clang/Frontend/CompilerInvocation.h"
+#include "clang/Frontend/FrontendActions.h"
 #include "clang/Lex/Preprocessor.h"
+#include "clang/Parse/Parser.h"
 #include "clang/Sema/Lookup.h"
 #include "clang/Sema/Sema.h"
 #include "llvm/ADT/Statistic.h"
@@ -82,11 +83,6 @@ using clang::CompilerInvocation;
 namespace {
   class SwiftModuleLoaderAction : public clang::SyntaxOnlyAction {
   protected:
-    /// BeginSourceFileAction - Callback at the start of processing a single
-    /// input.
-    ///
-    /// \return True on success; on failure \see ExecutionAction() and
-    /// EndSourceFileAction() will not be called.
     virtual bool BeginSourceFileAction(CompilerInstance &ci,
                                        StringRef filename) {
       // Enable incremental processing, so we can load modules after we've
@@ -253,6 +249,7 @@ ClangImporter::create(ASTContext &ctx,
 
   // Create the associated action.
   importer->Impl.Action.reset(new SwiftModuleLoaderAction);
+  auto *action = importer->Impl.Action.get();
 
   // Execute the action. We effectively inline most of
   // CompilerInstance::ExecuteAction here, because we need to leave the AST
@@ -272,15 +269,21 @@ ClangImporter::create(ASTContext &ctx,
   // created. This complexity should be lifted elsewhere.
   instance.getTarget().setForcedLangOptions(instance.getLangOpts());
 
-  // Run the action.
-  auto &action = *importer->Impl.Action;
-  if (action.BeginSourceFile(instance, instance.getFrontendOpts().Inputs[0])) {
-    action.Execute();
-    // Note: don't call EndSourceFile here!
-  }
-  // FIXME: This is necessary because Clang doesn't really support what we're
-  // doing, and TUScope has gone stale.
-  instance.getSema().TUScope = nullptr;
+  bool canBegin = action->BeginSourceFile(instance,
+                                          instance.getFrontendOpts().Inputs[0]);
+  assert(canBegin);
+
+  // Manually run the action, so that the TU stays open for additional parsing.
+  instance.createSema(action->getTranslationUnitKind(), nullptr);
+  importer->Impl.Parser.reset(new clang::Parser(instance.getPreprocessor(),
+                                                instance.getSema(),
+                                                /*skipFunctionBodies=*/false));
+
+  instance.getPreprocessor().EnterMainSourceFile();
+  importer->Impl.Parser->Initialize();
+
+  clang::Parser::DeclGroupPtrTy parsed;
+  while (!importer->Impl.Parser->ParseTopLevelDecl(parsed)) {}
 
   // Create the selectors we'll be looking for.
   auto &clangContext = importer->Impl.Instance->getASTContext();
@@ -388,6 +391,9 @@ ClangImporter::Implementation::Implementation(ASTContext &ctx,
     InferImplicitProperties(opts.InferImplicitProperties),
     ImportFactoryMethodsAsConstructors(opts.ImportFactoryMethodsAsConstructors)
 {
+}
+ClangImporter::Implementation::~Implementation() {
+  assert(NumCurrentImportingEntities == 0);
 }
 
 ClangModuleUnit *

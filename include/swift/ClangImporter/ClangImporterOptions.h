@@ -30,6 +30,9 @@ public:
   /// A directory for overriding Clang's resource directory.
   std::string OverrideResourceDir;
 
+  /// A header to import and make implicitly visible.
+  std::string ImplicitHeaderPath;
+
   /// If true, matched getter-like and setter-like methods will be imported as
   /// properties.
   bool InferImplicitProperties = false;
