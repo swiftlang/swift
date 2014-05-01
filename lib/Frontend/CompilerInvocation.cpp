@@ -701,6 +701,9 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       IRGenOpts.DisableAllRuntimeChecks = true;
       // Removal of cond_fail (overflow on binary operations).
       Opts.RemoveRuntimeAsserts = true;
+    } else if (!StringRef(A->getValue()).size()) {
+        // -O is an alias to -O3.
+        IRGenOpts.OptLevel = MaxLevel;
     } else {
       unsigned OptLevel;
       if (StringRef(A->getValue()).getAsInteger(10, OptLevel) ||
