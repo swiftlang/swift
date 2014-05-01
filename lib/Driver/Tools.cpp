@@ -454,7 +454,7 @@ Job *darwin::Linker::constructJob(const JobAction &JA,
 
   if (Args.hasFlag(options::OPT_link_objc_runtime,
                    options::OPT_no_link_objc_runtime,
-                   /*default=*/false)) {
+                   /*default=*/true)) {
     // FIXME: Copied from Clang's ToolChains.cpp.
     llvm::SmallString<128> ARCLiteLib(D.getSwiftProgramPath());
     llvm::sys::path::remove_filename(ARCLiteLib); // 'swift'
