@@ -612,7 +612,7 @@ macro(add_swift_library name)
   
   set_output_directory(${name} ${SWIFT_RUNTIME_OUTPUT_INTDIR} ${SWIFT_LIBRARY_OUTPUT_INTDIR})
 
-  if (ENABLE_SWIFT_STATIC_RUNTIME AND SHARED_LIBRARY)
+  if (ENABLE_SWIFT_STATIC_RUNTIME AND SWIFTLIB_INSTALL)
     set(name_static "${name}_static")
     add_library( ${name_static} STATIC
       ${SWIFTLIB_SOURCES}
