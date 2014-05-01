@@ -779,21 +779,7 @@ namespace {
       theClass->getImplicitProtocols(protocols);
       theClass->setProtocols(Impl.SwiftContext.AllocateCopy(protocols));
 
-      // Unconditionally wrap that type in Unmanaged<> for now.
-      auto classType = theClass->getDeclaredType();
-
-      Module *M = Impl.getStdlibModule();
-      if (!M) return Type();
-      Type unmanagedType = Impl.getNamedSwiftType(M, "Unmanaged");
-      if (!unmanagedType) return Type();
-      auto unboundTy = unmanagedType->getAs<UnboundGenericType>();
-      if (!unboundTy || unboundTy->getDecl()->getGenericParams()->size() != 1)
-        return Type();
-
-      Type unmanagedClassType =
-        BoundGenericType::get(unboundTy->getDecl(), /*parent*/ Type(),
-                              classType);
-      return unmanagedClassType;
+      return theClass->getDeclaredType();
     }
 
     Decl *VisitTypedefNameDecl(const clang::TypedefNameDecl *Decl) {

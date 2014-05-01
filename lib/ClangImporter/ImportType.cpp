@@ -34,6 +34,16 @@
 
 using namespace swift;
 
+/// Is the given type the result of importing a CF pointer?
+static bool isImportedCFPointer(Type type) {
+  if (auto classType = type->getAs<ClassType>()) {
+    assert(classType->getDecl()->hasClangNode());
+    auto clangNode = classType->getDecl()->getClangNode();
+    return isa<clang::TypedefDecl>(clangNode.castAsDecl());
+  }
+  return false;
+}
+
 namespace {
   /// Various types that we want to do something interesting to after
   /// importing them.
@@ -58,6 +68,9 @@ namespace {
 
     /// The source type is an Objective-C object pointer type.
     ObjCPointer,
+
+    /// The source type is a CF object pointer type.
+    CFPointer,
 
     /// The source type is a C++ reference type.
     Reference,
@@ -357,8 +370,12 @@ namespace {
           hint = ImportHint::BOOL;
         } else if (type->getDecl()->getName() == "NSUInteger") {
           hint = ImportHint::NSUInteger;
+        } else if (isImportedCFPointer(mappedType)) {
+          hint = ImportHint::CFPointer;
+        } else if (mappedType->isAnyExistentialType()) { // id, Class
+          hint = ImportHint::ObjCPointer;
         }
-        // Any other interesting special typedefs should be hinted here.
+        // Any other interesting mapped types should be hinted here.
 
       // Otherwise, recurse on the underlying type in order to compute
       // the hint correctly.
@@ -578,6 +595,23 @@ static Type getOptionalType(Type payloadType, ImportTypeKind kind) {
   return UncheckedOptionalType::get(payloadType);
 }
 
+/// Turn T into Unmanaged<T>.
+static Type getUnmanagedType(ClangImporter::Implementation &impl,
+                             Type payloadType) {
+  Module *stdlib = impl.getStdlibModule();
+  if (!stdlib) return payloadType;
+  Type unmanagedType = impl.getNamedSwiftType(stdlib, "Unmanaged");
+  if (!unmanagedType) return payloadType;
+  auto unboundTy = unmanagedType->getAs<UnboundGenericType>();
+  if (!unboundTy || unboundTy->getDecl()->getGenericParams()->size() != 1)
+    return payloadType;
+
+  Type unmanagedClassType =
+    BoundGenericType::get(unboundTy->getDecl(), /*parent*/ Type(),
+                          payloadType);
+  return unmanagedClassType;
+}
+
 static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
                                         clang::QualType clangType,
                                         Type importedType,
@@ -637,24 +671,24 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
     return impl.getNamedSwiftType(impl.getStdlibModule(), "UInt");
   }
 
-  bool addOptional = false;
+  // Wrap CF pointers up as unmanaged types.
+  if (hint == ImportHint::CFPointer) {
+    importedType = getUnmanagedType(impl, importedType);
+  }
 
   // When NSString* is the type of a function parameter or a function
   // result type, map it to String.
   if (hint == ImportHint::NSString && canBridgeTypes(importKind) &&
       impl.hasFoundationModule()) {
     importedType = impl.getNamedSwiftType(impl.getStdlibModule(), "String");
-    addOptional = true;
   }
 
   // Wrap class, class protocol, function, and metatype types in an
   // optional type.
-  auto canImportedType = importedType->getCanonicalType();
-  if (addOptional ||
-      canImportedType.getClassOrBoundGenericClass() ||
-      canImportedType.isAnyExistentialType() ||
-      isa<AnyMetatypeType>(canImportedType) ||
-      isa<FunctionType>(canImportedType)) {
+  if (hint == ImportHint::NSString ||
+      hint == ImportHint::ObjCPointer ||
+      hint == ImportHint::CFPointer ||
+      hint == ImportHint::Block) {
     importedType = getOptionalType(importedType, importKind);
   }
 
