@@ -3344,18 +3344,38 @@ namespace {
     }
 
     template <typename T, typename U>
-    T *resolveSwiftDeclIfAnnotated(const U *decl, Identifier name,
-                                   const DeclContext *dc) {
+    bool hasNativeSwiftDecl(const U *decl, Identifier name,
+                            const DeclContext *dc, T *&swiftDecl) {
       using clang::AnnotateAttr;
       for (auto annotation : decl->template specific_attrs<AnnotateAttr>()) {
         if (annotation->getAnnotation() == SWIFT_NATIVE_ANNOTATION_STRING) {
           auto wrapperUnit = cast<ClangModuleUnit>(dc->getModuleScopeContext());
-          return resolveSwiftDecl<T>(decl, name,
-                                     wrapperUnit->getAdapterModule());
+          if (auto adapter = wrapperUnit->getAdapterModule()) {
+            swiftDecl = resolveSwiftDecl<T>(decl, name, adapter);
+          } else {
+            // This is intended to have a Swift decl, but the Swift part is
+            // missing. Fail instead of pretending it's a normal ObjC decl.
+            swiftDecl = nullptr;
+          }
+
+          return true;
         }
       }
 
-      return nullptr;
+      return false;
+    }
+
+    void markMissingSwiftDecl(ValueDecl *VD) {
+      const char *message;
+      if (isa<ClassDecl>(VD))
+        message = "cannot find Swift declaration for this class";
+      else if (isa<ProtocolDecl>(VD))
+        message = "cannot find Swift declaration for this protocol";
+      else
+        llvm_unreachable("unknown bridged decl kind");
+      auto attr = AvailabilityAttr::createImplicitUnavailableAttr(
+        Impl.SwiftContext, message);
+      VD->getMutableAttrs().add(attr);
     }
 
     Decl *VisitObjCProtocolDecl(const clang::ObjCProtocolDecl *decl) {
@@ -3396,9 +3416,10 @@ namespace {
       if (!dc)
         return nullptr;
 
-      if (auto native = resolveSwiftDeclIfAnnotated<ProtocolDecl>(decl, name,
-                                                                  dc))
-        return native;
+      ProtocolDecl *nativeDecl;
+      bool declaredNative = hasNativeSwiftDecl(decl, name, dc, nativeDecl);
+      if (declaredNative && nativeDecl)
+        return nativeDecl;
 
       // Create the protocol declaration and record it.
       auto result = Impl.createDeclWithClangNode<ProtocolDecl>(decl,
@@ -3409,6 +3430,9 @@ namespace {
                                    None);
       result->computeType();
       addObjCAttribute(result, ObjCSelector(Impl.SwiftContext, 0, origName));
+
+      if (declaredNative)
+        markMissingSwiftDecl(result);
 
       Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
 
@@ -3544,8 +3568,10 @@ namespace {
         return nullptr;
       }
 
-      if (auto native = resolveSwiftDeclIfAnnotated<ClassDecl>(decl, name, dc))
-        return native;
+      ClassDecl *nativeDecl;
+      bool declaredNative = hasNativeSwiftDecl(decl, name, dc, nativeDecl);
+      if (declaredNative && nativeDecl)
+        return nativeDecl;
 
       // Create the class declaration and record it.
       auto result = Impl.createDeclWithClangNode<ClassDecl>(decl,
@@ -3558,6 +3584,9 @@ namespace {
       result->setCircularityCheck(CircularityCheck::Checked);
       result->setAddedImplicitInitializers();
       addObjCAttribute(result, ObjCSelector(Impl.SwiftContext, 0, name));
+
+      if (declaredNative)
+        markMissingSwiftDecl(result);
 
       // If this Objective-C class has a supertype, import it.
       if (auto objcSuper = decl->getSuperClass()) {

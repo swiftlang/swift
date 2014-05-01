@@ -19,3 +19,8 @@ __attribute__((objc_root_class))
 @interface SwiftClass (Category)
 - (void)categoryMethod:(struct PureClangType)arg;
 @end
+
+
+SWIFT_CLASS("BOGUS")
+@interface BogusClass
+@end
