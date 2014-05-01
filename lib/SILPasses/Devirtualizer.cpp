@@ -1277,92 +1277,76 @@ bool SILDevirtualizer::optimizeApplyOfWitnessMethod(ApplyInst *AI,
   }
 
   // Lookup the function reference in the witness tables.
-  std::pair<SILWitnessTable *, ArrayRef<Substitution>> Ret =
-      AI->getModule().lookUpWitnessTable(C);
+  std::pair<SILFunction *, ArrayRef<Substitution>> Ret =
+      AI->getModule().findFuncInWitnessTable(C, AMI->getMember());
 
   if (!Ret.first) {
     DEBUG(llvm::dbgs() << "        FAIL: Did not find a matching witness "
-                          "table.\n");
+                          "table or witness method.\n");
     return false;
   }
 
-  for (auto &Entry : Ret.first->getEntries()) {
-    // Look at method entries only.
-    if (Entry.getKind() != SILWitnessTable::WitnessKind::Method)
-      continue;
+  // Ok, we found the member we are looking for. Devirtualize away!
+  SILBuilder Builder(AI);
+  SILLocation Loc = AI->getLoc();
+  SILFunction *F = Ret.first;
+  FunctionRefInst *FRI = Builder.createFunctionRef(Loc, F);
 
-    // Check if this is the member we were looking for.
-    SILWitnessTable::MethodWitness MethodEntry = Entry.getMethodWitness();
-    if (MethodEntry.Requirement != AMI->getMember())
-      continue;
+  // Collect args from the apply inst.
+  ArrayRef<Operand> ApplyArgs = AI->getArgumentOperands();
+  SmallVector<SILValue, 4> Args;
 
-    // Ok, we found the member we are looking for. Devirtualize away!
-    SILBuilder Builder(AI);
-    SILLocation Loc = AI->getLoc();
-    SILFunction *F = MethodEntry.Witness;
-    FunctionRefInst *FRI = Builder.createFunctionRef(Loc, F);
+  // Begin by upcasting self to the appropriate type if we have an inherited
+  // conformance...
+  SILValue Self = ApplyArgs[0].get();
+  if (C->getKind() == ProtocolConformanceKind::Inherited) {
+    CanType Ty = C->getType()->getCanonicalType();
+    SILType SILTy = SILType::getPrimitiveType(Ty, Self.getType().getCategory());
+    SILType SelfTy = Self.getType();
+    (void)SelfTy;
 
-    // Collect args from the apply inst.
-    ArrayRef<Operand> ApplyArgs = AI->getArgumentOperands();
-    SmallVector<SILValue, 4> Args;
+    if (Ret.second.size()) {
+      // If we have substitutions then we are an inherited specialized
+      // conformance. Substitute in the generic type so we upcast correctly.
+      GenericParamList *GP = C->getSubstitutedGenericParams();
+      if (!GP)
+        return false;
 
-    // Begin by upcasting self to the appropriate type if we have an inherited
-    // conformance...
-    SILValue Self = ApplyArgs[0].get();
-    if (C->getKind() == ProtocolConformanceKind::Inherited) {
-      CanType Ty = Ret.first->getConformance()->getType()->getCanonicalType();
-      SILType SILTy =
-          SILType::getPrimitiveType(Ty, Self.getType().getCategory());
-      SILType SelfTy = Self.getType();
-      (void)SelfTy;
-
-      if (Ret.second.size()) {
-        // If we have substitutions then we are an inherited specialized
-        // conformance. Substitute in the generic type so we upcast correctly.
-        GenericParamList *GP = C->getSubstitutedGenericParams();
-        if (!GP)
-          return false;
-
-        TypeSubstitutionMap TSM = GP->getSubstitutionMap(Ret.second);
-        SILTy =
-            SILTy.subst(F->getModule(), F->getModule().getSwiftModule(), TSM);
-        SelfTy =
-            SelfTy.subst(F->getModule(), F->getModule().getSwiftModule(), TSM);
-      }
-
-      assert(SILTy.isSuperclassOf(SelfTy) &&
-             "Should only create upcasts for sub class devirtualization.");
-      Self = Builder.createUpcast(Loc, Self, SILTy);
-    }
-    // and then adding in either the original or newly upcasted value.
-    Args.push_back(Self);
-
-    // Then add the rest of the arguments.
-    for (auto &A : ApplyArgs.slice(1))
-      Args.push_back(A.get());
-
-    SmallVector<Substitution, 16> NewSubstList(Ret.second.begin(),
-                                               Ret.second.end());
-
-    // Add the non-self-derived substitutions from the original application.
-    assert(AI->getSubstitutions().size() && "Subst list must not be empty");
-    assert(AI->getSubstitutions()[0].Archetype->getSelfProtocol() &&
-           "The first substitution needs to be a 'self' substitution.");
-    for (auto &origSub : AI->getSubstitutions().slice(1)) {
-      if (!origSub.Archetype->isSelfDerived())
-        NewSubstList.push_back(origSub);
+      TypeSubstitutionMap TSM = GP->getSubstitutionMap(Ret.second);
+      SILTy = SILTy.subst(F->getModule(), F->getModule().getSwiftModule(), TSM);
+      SelfTy =
+          SelfTy.subst(F->getModule(), F->getModule().getSwiftModule(), TSM);
     }
 
-    ApplyInst *SAI = Builder.createApply(Loc, FRI, AI->getSubstCalleeSILType(),
-                                         AI->getType(), NewSubstList, Args);
-    AI->replaceAllUsesWith(SAI);
-    AI->eraseFromParent();
-    NumAMI++;
-    return true;
+    assert(SILTy.isSuperclassOf(SelfTy) &&
+           "Should only create upcasts for sub class devirtualization.");
+    Self = Builder.createUpcast(Loc, Self, SILTy);
+  }
+  // and then adding in either the original or newly upcasted value.
+  Args.push_back(Self);
+
+  // Then add the rest of the arguments.
+  for (auto &A : ApplyArgs.slice(1))
+    Args.push_back(A.get());
+
+  SmallVector<Substitution, 16> NewSubstList(Ret.second.begin(),
+                                             Ret.second.end());
+
+  // Add the non-self-derived substitutions from the original application.
+  assert(AI->getSubstitutions().size() && "Subst list must not be empty");
+  assert(AI->getSubstitutions()[0].Archetype->getSelfProtocol() &&
+         "The first substitution needS to be a 'self' substitution.");
+  for (auto &origSub : AI->getSubstitutions().slice(1)) {
+    if (!origSub.Archetype->isSelfDerived())
+      NewSubstList.push_back(origSub);
   }
 
-  DEBUG(llvm::dbgs() << "        FAIL: Could not find a witness table.\n");
-  return false;
+  ApplyInst *SAI = Builder.createApply(Loc, FRI, AI->getSubstCalleeSILType(),
+                                       AI->getType(), NewSubstList, Args);
+  AI->replaceAllUsesWith(SAI);
+  AI->eraseFromParent();
+  NumAMI++;
+  return true;
 }
 
 /// Devirtualize protocol_method + project_existential + init_existential
