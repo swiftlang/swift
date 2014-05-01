@@ -189,6 +189,18 @@ ConstraintSystem::matchScalarToTupleTypes(Type type1, TupleType *tuple2,
   int scalarFieldIdx = tuple2->getFieldForScalarInit();
   assert(scalarFieldIdx >= 0 && "Invalid tuple for scalar-to-tuple");
   const auto &elt = tuple2->getFields()[scalarFieldIdx];
+
+  // For an argument tuple conversion, provide a fix that adds the
+  // missing label (if it needs one).
+  // FIXME: Handle varargs.
+  if (kind == TypeMatchKind::ArgumentTupleConversion &&
+      elt.hasName() && !elt.isVararg() &&
+      getASTContext().LangOpts.StrictKeywordArguments) {
+    return simplifyFixConstraint(
+             Fix::getRelabelTuple(*this, FixKind::ScalarToTuple, elt.getName()),
+             type1, tuple2, TypeMatchKind::Conversion, flags, locator);
+  }
+
   auto scalarFieldTy = elt.isVararg()? elt.getVarargBaseTy() : elt.getType();
   return matchTypes(type1, scalarFieldTy, kind, flags,
                     locator.withPathElement(ConstraintLocator::ScalarToTuple));
@@ -2278,6 +2290,17 @@ ConstraintSystem::simplifyFixConstraint(Fix fix,
                       type2, matchKind, subFlags, 
                       locator.withPathElement(
                         LocatorPathElt::getTupleElement(0)));
+
+  case FixKind::ScalarToTuple: {
+    auto tuple2 = type2->castTo<TupleType>();
+    int scalarFieldIdx = tuple2->getFieldForScalarInit();
+    assert(scalarFieldIdx >= 0 && "Invalid tuple for scalar-to-tuple");
+    const auto &elt = tuple2->getFields()[scalarFieldIdx];
+    auto scalarFieldTy = elt.isVararg()? elt.getVarargBaseTy() : elt.getType();
+    return matchTypes(type1, scalarFieldTy, matchKind, subFlags,
+                      locator.withPathElement(
+                        ConstraintLocator::ScalarToTuple));
+  }
   }
 }
 

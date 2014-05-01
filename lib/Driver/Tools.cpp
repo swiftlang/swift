@@ -262,6 +262,7 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
   Args.AddAllArgs(Arguments, options::OPT_import_underlying_module);
 
   Args.AddLastArg(Arguments, options::OPT_split_objc_selectors);
+  Args.AddLastArg(Arguments, options::OPT_strict_keyword_arguments);
   
   Args.AddLastArg(Arguments, options::OPT_detailed_diagnostics);
 

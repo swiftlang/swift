@@ -127,7 +127,11 @@ Solution ConstraintSystem::finalize(
 
   // For each of the fixes, record it as an operation on the affected
   // expression.
-  solution.Fixes = Fixes;
+  unsigned firstFixIndex = 0;
+  if (solverState && solverState->PartialSolutionScope) {
+    firstFixIndex = solverState->PartialSolutionScope->numFixes;
+  }
+  solution.Fixes.append(Fixes.begin() + firstFixIndex, Fixes.end());
 
   // Remember all the disjunction choices we made.
   for (auto &choice : DisjunctionChoices) {
@@ -186,6 +190,9 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   for (auto &choice : solution.DisjunctionChoices) {
     DisjunctionChoices.push_back(choice);
   }
+
+  // Register any fixes produced along this path.
+  Fixes.append(solution.Fixes.begin(), solution.Fixes.end());
 }
 
 /// \brief Restore the type variable bindings to what they were before
@@ -1050,7 +1057,11 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
                                          << component << "\n";
     }
     {
+      // Introduce a scope for this partial solution.
       SolverScope scope(*this);
+      llvm::SaveAndRestore<SolverScope *> 
+        partialSolutionScope(solverState->PartialSolutionScope, &scope);
+
       failed = solveSimplified(partialSolutions[component], 
                                allowFreeTypeVariables);
     }
@@ -1073,7 +1084,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
 
     if (TC.getLangOpts().DebugConstraintSolver) {
       auto &log = getASTContext().TypeCheckerDebug->getStream();
-      log.indent(solverState->depth * 2) << "finised component #" 
+      log.indent(solverState->depth * 2) << "finished component #" 
                                          << component << ")\n";
     }
     

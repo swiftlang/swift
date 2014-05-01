@@ -129,6 +129,10 @@ def enable_objc_factory_method_constructors :
   Flag<["-"], "enable-objc-factory-method-constructors">,
   HelpText<"Import Objective-C factory methods as constructors">;
 
+def strict_keyword_arguments :
+  Flag<["-"], "strict-keyword-arguments">,
+  HelpText<"Be strict about keyword argument presence/absence/ordering">;
+
 def enable_source_import : Flag<["-"], "enable-source-import">,
   HelpText<"Enable importing of Swift source files">;
 

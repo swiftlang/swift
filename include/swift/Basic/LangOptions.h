@@ -63,6 +63,10 @@ namespace swift {
     /// the ObjectiveC module.
     bool EnableObjCAttrRequiresObjCModule = false;
     
+    /// Be strict about the use of keyword arguments.
+    /// FIXME: This will become the default.
+    bool StrictKeywordArguments = false;
+
     /// Implicit target configuration options.  There are currently two
     ///   supported target configuration values:
     ///     os - The active os target (OSX or IOS)

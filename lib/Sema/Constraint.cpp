@@ -337,6 +337,8 @@ StringRef Fix::getName(FixKind kind) {
     return "fix: remove nullary call";
   case FixKind::TupleToScalar:
     return "fix: tuple-to-scalar";
+  case FixKind::ScalarToTuple:
+    return "fix: scalar-to-tuple";
   }
 }
 

@@ -994,6 +994,7 @@ public:
   ConstraintSystemOptions Options;
 
   friend class Fix;
+  class SolverScope;
 
 private:
   Constraint *failedConstraint = nullptr;
@@ -1112,6 +1113,9 @@ private:
     /// The number of the solution attempt we're looking at.
     unsigned SolutionAttempt;
 
+    /// Refers to the innermost partial solution scope.
+    SolverScope *PartialSolutionScope = nullptr;
+
     // Statistics
     #define CS_STATISTIC(Name, Description) unsigned Name = 0;
     #include "ConstraintSolverStats.def"
@@ -1171,6 +1175,8 @@ public:
 
     SolverScope(const SolverScope &) = delete;
     SolverScope &operator=(const SolverScope &) = delete;
+
+    friend class ConstraintSystem;
 
   public:
     explicit SolverScope(ConstraintSystem &cs);

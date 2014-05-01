@@ -3851,7 +3851,16 @@ static bool diagnoseRelabel(TypeChecker &tc, Expr *expr,
                             ArrayRef<Identifier> newNames) {
   auto tuple = dyn_cast<TupleExpr>(expr);
   if (!tuple) {
-    return false;
+    // This is a scalar-to-tuple conversion. Add the name.  We "know"
+    // that we're inside a ParenExpr, because ParenExprs are required
+    // by the syntax and locator resolution looks through on level of
+    // them.
+    llvm::SmallString<16> str;
+    str += newNames[0].str();
+    str += ": ";
+    tc.diagnose(expr->getStartLoc(), diag::missing_argument_labels, false)
+      .fixItInsert(expr->getStartLoc(), str);
+    return true;
   }
 
   // Figure out how many extraneous, missing, and wrong labels are in
@@ -4011,7 +4020,8 @@ Expr *ConstraintSystem::applySolution(const Solution &solution,
         break;
       }
 
-      case FixKind::TupleToScalar: {
+      case FixKind::TupleToScalar: 
+      case FixKind::ScalarToTuple: {
         if (diagnoseRelabel(TC,affected,fix.first.getRelabelTupleNames(*this)))
           diagnosed = true;
         break;
