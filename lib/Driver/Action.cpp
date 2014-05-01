@@ -29,6 +29,7 @@ const char *Action::getClassName(ActionClass AC) {
     case Input: return "input";
     case CompileJob: return "compile";
     case MergeModuleJob: return "merge-module";
+    case REPLJob: return "repl";
     case LinkJob: return "link";
   }
 
@@ -42,5 +43,7 @@ void JobAction::anchor() {}
 void CompileJobAction::anchor() {}
 
 void MergeModuleJobAction::anchor() {}
+
+void REPLJobAction::anchor() {}
 
 void LinkJobAction::anchor() {}

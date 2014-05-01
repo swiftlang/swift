@@ -31,30 +31,42 @@ Tool *ToolChain::getMergeModule() const {
   return MergeModule.get();
 }
 
+Tool *ToolChain::getLLDB() const {
+  if (!LLDB)
+    LLDB.reset(new tools::LLDB(*this));
+  return LLDB.get();
+}
+
 Tool *ToolChain::getLinker() const {
   if (!Linker)
     Linker = buildLinker();
   return Linker.get();
 }
 
-Tool *ToolChain::getTool(Action::ActionClass AC) const {
-  switch (AC) {
+Tool *ToolChain::selectTool(const JobAction &JA) const {
+  switch (JA.getKind()) {
   case Action::CompileJob:
     return getSwift();
   case Action::MergeModuleJob:
     return getMergeModule();
   case Action::LinkJob:
     return getLinker();
-
+  case Action::REPLJob:
+    switch (cast<REPLJobAction>(JA).getRequestedMode()) {
+    case REPLJobAction::Mode::Integrated:
+      return getSwift();
+    case REPLJobAction::Mode::RequireLLDB:
+      return getLLDB();
+    case REPLJobAction::Mode::PreferLLDB:
+      if (static_cast<tools::LLDB *>(getLLDB())->isPresentRelativeToDriver())
+        return getLLDB();
+      return getSwift();
+    }
   case Action::Input:
     llvm_unreachable("Invalid tool kind.");
   }
 
   llvm_unreachable("Invalid tool kind.");
-}
-
-Tool *ToolChain::selectTool(const JobAction &JA) const {
-  return getTool(JA.getKind());
 }
 
 types::ID ToolChain::lookupTypeForExtension(StringRef Ext) const {

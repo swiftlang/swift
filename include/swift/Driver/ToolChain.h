@@ -40,16 +40,17 @@ class ToolChain {
 
   mutable std::unique_ptr<Tool> Swift;
   mutable std::unique_ptr<Tool> MergeModule;
+  mutable std::unique_ptr<Tool> LLDB;
   mutable std::unique_ptr<Tool> Linker;
   Tool *getSwift() const;
   Tool *getMergeModule() const;
+  Tool *getLLDB() const;
   Tool *getLinker() const;
 
 protected:
   ToolChain(const Driver &D, const llvm::Triple &T) : D(D), Triple(T) {}
 
   virtual std::unique_ptr<Tool> buildLinker() const = 0;
-  virtual Tool *getTool(Action::ActionClass AC) const;
 
 public:
   virtual ~ToolChain() = default;
@@ -67,7 +68,7 @@ public:
   std::string getTripleString() const { return Triple.getTriple(); }
 
   /// Choose a tool to use to handle the action \p JA.
-  Tool *selectTool(const JobAction &JA) const;
+  virtual Tool *selectTool(const JobAction &JA) const;
 
   // Platform defaults information
 

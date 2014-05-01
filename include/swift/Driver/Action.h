@@ -38,6 +38,7 @@ public:
     Input = 0,
     CompileJob,
     MergeModuleJob,
+    REPLJob,
     LinkJob,
 
     JobFirst=CompileJob,
@@ -120,6 +121,28 @@ public:
 
   static bool classof(const Action *A) {
     return A->getKind() == Action::CompileJob;
+  }
+};
+
+class REPLJobAction : public JobAction {
+public:
+  enum class Mode {
+    Integrated,
+    PreferLLDB,
+    RequireLLDB
+  };
+private:
+  virtual void anchor();
+  Mode RequestedMode;
+public:
+  REPLJobAction(Mode mode)
+    : JobAction(Action::REPLJob, llvm::None, types::TY_Nothing),
+      RequestedMode(mode) {}
+
+  Mode getRequestedMode() const { return RequestedMode; }
+
+  static bool classof(const Action *A) {
+    return A->getKind() == Action::REPLJob;
   }
 };
 

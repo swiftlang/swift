@@ -57,6 +57,25 @@ public:
                             const OutputInfo &OI) const;
 };
 
+class LLVM_LIBRARY_VISIBILITY LLDB : public Tool {
+  mutable std::string Path;
+  struct {
+    mutable unsigned DidCheckRelativeToDriver : 1;
+  } Bits;
+public:
+  explicit LLDB(const ToolChain &TC) : Tool("LLDB", "LLDB REPL", TC), Bits() {}
+
+  bool isPresentRelativeToDriver() const;
+
+  virtual Job *constructJob(const JobAction &JA,
+                            std::unique_ptr<JobList> Inputs,
+                            std::unique_ptr<CommandOutput> Output,
+                            const ActionList &InputActions,
+                            const llvm::opt::ArgList &Args,
+                            const OutputInfo &OI) const;
+};
+
+
 namespace darwin {
 
 llvm::Triple::ArchType getArchTypeForDarwinArchName(StringRef DarwinArchName);

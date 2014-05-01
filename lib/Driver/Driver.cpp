@@ -391,6 +391,8 @@ void Driver::buildOutputInfo(const DerivedArgList &Args,
       break;
 
     case options::OPT_repl:
+    case options::OPT_integrated_repl:
+    case options::OPT_lldb_repl:
       OI.CompilerOutputType = types::TY_Nothing;
       OI.CompilerMode = OutputInfo::Mode::REPL;
       break;
@@ -522,7 +524,22 @@ void Driver::buildActions(const ToolChain &TC,
       Diags.diagnose(SourceLoc(), diag::error_repl_requires_no_input_files);
       return;
     }
-    CompileActions.push_back(new CompileJobAction(OI.CompilerOutputType));
+
+    // FIXME: Change this to PreferLLDB and drop the -experimental-prefer-lldb
+    // option once LLDB is ready.
+    REPLJobAction::Mode Mode = REPLJobAction::Mode::Integrated;
+    if (const Arg *A = Args.getLastArg(options::OPT_lldb_repl,
+                                       options::OPT_integrated_repl,
+                                       options::OPT_experimental_prefer_lldb)) {
+      if (A->getOption().matches(options::OPT_lldb_repl))
+        Mode = REPLJobAction::Mode::RequireLLDB;
+      else if (A->getOption().matches(options::OPT_experimental_prefer_lldb))
+        Mode = REPLJobAction::Mode::PreferLLDB;
+      else
+        Mode = REPLJobAction::Mode::Integrated;
+    }
+
+    CompileActions.push_back(new REPLJobAction(Mode));
     break;
   }
   }

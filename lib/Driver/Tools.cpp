@@ -24,6 +24,7 @@
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
+#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 
 using namespace swift;
@@ -370,6 +371,61 @@ Job *MergeModule::constructJob(const JobAction &JA,
 
   Arguments.push_back("-o");
   Arguments.push_back(Args.MakeArgString(Output->getPrimaryOutputFilename()));
+
+  return new Command(JA, *this, std::move(Inputs), std::move(Output), Exec,
+                     Arguments);
+}
+
+bool LLDB::isPresentRelativeToDriver() const {
+  if (!Bits.DidCheckRelativeToDriver) {
+    const Driver &D = getToolChain().getDriver();
+    llvm::SmallString<128> LLDBPath{D.getSwiftProgramPath()};
+    llvm::sys::path::remove_filename(LLDBPath); // swift
+
+    // First try "bin/lldb" (i.e. next to Swift).
+    llvm::sys::path::append(LLDBPath, "lldb");
+    if (llvm::sys::fs::exists(LLDBPath.str())) {
+      Path = LLDBPath.str().str();
+    } else {
+      // Then see if we're in an Xcode toolchain.
+      llvm::sys::path::remove_filename(LLDBPath); // lldb
+      llvm::sys::path::remove_filename(LLDBPath); // bin
+      llvm::sys::path::remove_filename(LLDBPath); // usr
+      if (llvm::sys::path::extension(LLDBPath) == ".xctoolchain") {
+        llvm::sys::path::remove_filename(LLDBPath); // *.xctoolchain
+        llvm::sys::path::remove_filename(LLDBPath); // Toolchains
+        llvm::sys::path::append(LLDBPath, "usr", "bin", "lldb");
+        if (llvm::sys::fs::exists(LLDBPath.str()))
+          Path = LLDBPath.str().str();
+      }
+    }
+
+    Bits.DidCheckRelativeToDriver = true;
+  }
+  return !Path.empty();
+}
+
+Job *LLDB::constructJob(const JobAction &JA,
+                        std::unique_ptr<JobList> Inputs,
+                        std::unique_ptr<CommandOutput> Output,
+                        const ActionList &InputActions,
+                        const ArgList &Args,
+                        const OutputInfo &OI) const {
+  assert(Inputs->empty());
+  assert(InputActions.empty());
+
+  ArgStringList Arguments;
+  Arguments.push_back("--repl");
+
+  // FIXME: LLDB doesn't currently handle any Swift arguments.
+
+  const char *Exec;
+  if (isPresentRelativeToDriver()) {
+    Exec = Path.c_str();
+  } else {
+    auto &TC = getToolChain();
+    Exec = TC.getDriver().getProgramPath("lldb", TC).c_str();
+  }
 
   return new Command(JA, *this, std::move(Inputs), std::move(Output), Exec,
                      Arguments);
