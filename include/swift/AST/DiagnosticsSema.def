@@ -381,6 +381,12 @@ WARNING(unsupported_synthesize_init_variadic,sema_tcd,none,
 NOTE(variadic_superclass_init_here,sema_tcd,none,
      "variadic superclass initializer defined here", ())
 
+ERROR(attr_NSManaged_not_property,sema_tcd,none,
+      "'NSManaged' attribute only allowed on a property in a class", ())
+ERROR(attr_NSManaged_not_stored,sema_tcd,none,
+      "'NSManaged' not allowed on %select{computed|observing}0 properties",
+      (bool))
+
 // Variables (var and let).
 ERROR(unimplemented_type_var,decl_parsing,none,
      "static variables not yet supported in "
@@ -1152,8 +1158,8 @@ ERROR(objc_name_func_mismatch,sema_objc,none,
       (bool, unsigned, bool, unsigned, bool))
 
 ERROR(objc_invalid_on_var,sema_objc,none,
-      "property cannot be marked %select{@objc|@IBOutlet}0 because its type "
-      "cannot be represented in Objective-C", (unsigned))
+      "property cannot be marked %select{@objc|@IBOutlet|@NSManaged}0 because "
+      "its type cannot be represented in Objective-C", (unsigned))
 ERROR(objc_invalid_subscript_key_type,sema_objc,none,
       "subscript cannot be marked @objc because its key "
       "type is neither an integer nor an object", ())

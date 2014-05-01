@@ -142,6 +142,10 @@ void DeclAttribute::print(ASTPrinter &Printer) const {
   case DAK_NSCopying:
     Printer << "@NSCopying";
     break;
+  case DAK_NSManaged:
+    Printer << "@NSManaged";
+    break;
+
   case DAK_objc: {
     Printer << "@objc";
     llvm::SmallString<32> scratch;

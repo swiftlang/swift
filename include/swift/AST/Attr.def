@@ -132,6 +132,8 @@ SIMPLE_DECL_ATTR(IBInspectable, IBInspectable,
 SIMPLE_DECL_ATTR(IBOutlet, IBOutlet,
                  OnVar, 13)
 
+SIMPLE_DECL_ATTR(NSManaged, NSManaged, OnVar, 14)
+
 VIRTUAL_DECL_ATTR(override, Override,
                   OnFunc | OnVar | OnSubscript,
                   /* Not serialized */ 65535)

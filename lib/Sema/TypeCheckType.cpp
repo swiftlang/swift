@@ -1909,12 +1909,15 @@ bool TypeChecker::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
 
   enum {
     DiagnoseAsAtObjC = 0,
-    DiagnoseAsIBOutlet = 1
+    DiagnoseAsIBOutlet = 1,
+    DiagnoseAsNSManaged = 2
   };
 
   unsigned AttrKind = (Reason == ObjCReason::ExplicitlyIBOutlet)
                           ? DiagnoseAsIBOutlet
-                          : DiagnoseAsAtObjC;
+                          : (Reason == ObjCReason::ExplicitlyNSManaged)
+                            ? DiagnoseAsNSManaged
+                            : DiagnoseAsAtObjC;
   SourceRange TypeRange = VD->getTypeSourceRangeForDiagnostics();
   diagnose(VD->getLoc(), diag::objc_invalid_on_var, AttrKind)
       .highlight(TypeRange);

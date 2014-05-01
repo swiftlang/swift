@@ -60,6 +60,8 @@ public:
 
   void visitNSCopyingAttr(NSCopyingAttr *attr) {}
 
+  void visitNSManagedAttr(NSManagedAttr *attr) { }
+
   void visitNoReturnAttr(NoReturnAttr *attr) {}
 
   void visitObjCAttr(ObjCAttr *attr) {}
@@ -191,6 +193,8 @@ public:
   void visitFinalAttr(FinalAttr *attr);
 
   void visitNSCopyingAttr(NSCopyingAttr *attr);
+
+  void visitNSManagedAttr(NSManagedAttr *attr);
 
   void visitNoReturnAttr(NoReturnAttr *attr);
 
@@ -406,6 +410,19 @@ void AttributeChecker::visitNSCopyingAttr(NSCopyingAttr *attr) {
   // class, AnyObject, or classbound protocol.
   // must conform to the NSCopying protocol.
   
+}
+
+void AttributeChecker::visitNSManagedAttr(NSManagedAttr *attr) {
+  // NSManaged only applies to non-class properties within a class.
+  if (!isa<VarDecl>(D)) {
+    TC.diagnose(attr->getLocation(), diag::attr_NSManaged_not_property)
+      .fixItRemove(attr->getRange());
+    attr->setInvalid();
+    return;
+  }
+
+  // Note: all other validation for @NSManaged occurs when the declaration is
+  // type-checked.
 }
 
 

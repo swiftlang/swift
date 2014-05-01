@@ -1978,6 +1978,8 @@ public:
         reason = ObjCReason::ExplicitlyObjC;
       else if (VD->getAttrs().hasAttribute<IBOutletAttr>())
         reason = ObjCReason::ExplicitlyIBOutlet;
+      else if (VD->getAttrs().hasAttribute<NSManagedAttr>())
+        reason = ObjCReason::ExplicitlyNSManaged;
       else if (isMemberOfObjCProtocol)
         reason = ObjCReason::MemberOfObjCProtocol;
 
@@ -2015,17 +2017,42 @@ public:
       TC.typeCheckDecl(VD->getGetter(), false);
     }
 
+    // Is this a class member?
+    bool isClassMember = false;
+    if (auto ctx = VD->getDeclContext()->getDeclaredTypeOfContext())
+      isClassMember = ctx->getClassOrBoundGenericClass();
+
+    // Checking for @NSManaged.
+    if (auto attr = VD->getMutableAttrs().getAttribute<NSManagedAttr>()) {
+      if (VD->isStatic() || !isClassMember) {
+        TC.diagnose(attr->getLocation(), diag::attr_NSManaged_not_property)
+          .fixItRemove(attr->getRange());
+        attr->setInvalid();
+      } else {
+        // @NSManaged properties must be written as stored.
+        switch (VD->getStorageKind()) {
+        case AbstractStorageDecl::Stored:
+          // FIXME: Convert to computed.
+          break;
+
+        case AbstractStorageDecl::StoredWithTrivialAccessors:
+          llvm_unreachable("Already created accessors?");
+
+        case AbstractStorageDecl::Computed:
+        case AbstractStorageDecl::Observing:
+          TC.diagnose(attr->getLocation(), diag::attr_NSManaged_not_stored,
+                      VD->getStorageKind() == AbstractStorageDecl::Observing);
+          attr->setInvalid();
+          break;
+        }
+      }
+    }
+
     // If this is a non-final stored property in a class, then synthesize getter
     // and setter accessors and change its storage kind.  This allows it to be
     // overriden and provide objc entrypoints if needed.
-    if (VD->getStorageKind() == VarDecl::Stored &&
-        !VD->isStatic()) {
-      
-      bool isClassMember = false;
-      if (auto ctx = VD->getDeclContext()->getDeclaredTypeOfContext())
-        isClassMember = ctx->getClassOrBoundGenericClass();
-
-             // Variables in SIL mode don't get auto-synthesized getters.
+    if (VD->getStorageKind() == VarDecl::Stored && !VD->isStatic()) {
+      // Variables in SIL mode don't get auto-synthesized getters.
       bool isInSILMode = false;
       if (auto sourceFile = VD->getDeclContext()->getParentSourceFile())
         isInSILMode = sourceFile->Kind == SourceFileKind::SIL;
@@ -3641,6 +3668,7 @@ public:
     UNINTERESTING_ATTR(RawDocComment)
     UNINTERESTING_ATTR(Required)
     UNINTERESTING_ATTR(NSCopying)
+    UNINTERESTING_ATTR(NSManaged)
 
 #undef UNINTERESTING_ATTR
 

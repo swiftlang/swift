@@ -223,6 +223,7 @@ enum class ObjCReason {
   DontDiagnose,
   ExplicitlyObjC,
   ExplicitlyIBOutlet,
+  ExplicitlyNSManaged,
   MemberOfObjCProtocol
 };
 
