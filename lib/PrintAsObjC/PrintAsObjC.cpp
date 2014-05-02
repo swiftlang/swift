@@ -827,8 +827,7 @@ public:
            "# include <swift/objc-prologue.h>\n"
            "#endif\n"
            "\n"
-           "@import ObjectiveC;\n"
-           "\n"
+           "#include <objc/NSObject.h>\n"
            "#include <stdint.h>\n"
            "#include <stddef.h>\n"
            "#include <stdbool.h>\n"
@@ -891,10 +890,10 @@ public:
            "# endif\n"
            "#endif\n"
            "\n";
-    seenImports.insert("ObjectiveC");
   }
 
   void writeImports(raw_ostream &out) {
+    out << "#if defined(__has_feature) && __has_feature(modules)\n";
     for (auto import : imports) {
       auto Name = import->Name.str();
       if (seenImports.find(Name) == seenImports.end()) {
@@ -902,7 +901,7 @@ public:
         out << "@import " << Name << ";\n";
       }
     }
-    os << '\n';
+    out << "\n#endif\n";
   }
 
   bool writeToStream(raw_ostream &out) {

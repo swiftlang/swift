@@ -1,5 +1,10 @@
+#if __has_feature(modules)
 @import ObjectiveC;
 @import CoreGraphics;
+#else
+#import <objc/NSObject.h>
+#import <CoreGraphics.h>
+#endif
 
 typedef struct objc_object { void *isa; } *id;
 
