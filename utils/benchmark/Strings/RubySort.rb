@@ -1001,8 +1001,29 @@ words=[
  "юишиане",
  "юринам"]
 
-(0..50).each do |i|
-  y = Array.new(words)
-  y.sort!
+# This is a phone book record.
+class Record
+  def initialize(fn, num)
+    @fullname = fn
+    @number = num
+  end
+  def fullname
+    return @fullname
+  end
+  def num
+    return @number
+  end
+end
+
+Names = []
+
+words.each do |name|
+  x = Record.new(name, "8512038")
+  Names.push(x)
+end
+
+(0..500).each do |i|
+  y = Array.new(Names)
+  y.sort! {|a,b| a.fullname <=> b.fullname}
 end
 
