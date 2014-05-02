@@ -159,10 +159,10 @@ static EnumElementDecl *getUniqueCaseElement(SwitchEnumInst *SEI,
 // Replace a SwitchEnumInst with an unconditional branch based on the
 // assertion that it will select a particular element.
 static void simplifySwitchEnumInst(SwitchEnumInst *SEI,
-                                   EnumElementDecl *Element) {
+                                   EnumElementDecl *Element,
+                                   SILBasicBlock *BB) {
   auto *Dest = SEI->getCaseDestination(Element);
 
-  auto *BB = SEI->getParent();
   if (BB->bbarg_empty() || Dest->bbarg_empty()) {
     SILBuilder(SEI).createBranch(SEI->getLoc(), Dest);
   } else {
@@ -202,7 +202,7 @@ static bool trySimplifyConditional(TermInst *Term, DominanceInfo *DT) {
       auto *SEI = cast<SwitchEnumInst>(PredTerm);
       auto *Element = getUniqueCaseElement(SEI, DomBB);
       if (Element) {
-        simplifySwitchEnumInst(cast<SwitchEnumInst>(Term), Element);
+        simplifySwitchEnumInst(cast<SwitchEnumInst>(Term), Element, DomBB);
         return true;
       }
 
