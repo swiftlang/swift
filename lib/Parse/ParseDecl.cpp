@@ -938,88 +938,6 @@ static bool isStartOfOperatorDecl(const Token &Tok, const Token &Tok2) {
           Tok2.isContextualKeyword("infix"));
 }
 
-static unsigned getNumDeclModifierKeywords(Parser &P) {
-  Parser::ParserPosition DeclBegin = P.getParserPosition();
-  unsigned NumConsumedTokens = 0;
-  unsigned NumConfirmedModifiers = 0;
-  while (true) {
-    switch (P.Tok.getKind()) {
-    case tok::kw_class:
-      // We have arrived at the keyword that might be a modifier or it might
-      // start a declaration.
-      P.consumeToken(tok::kw_class);
-      NumConfirmedModifiers = NumConsumedTokens;
-      NumConsumedTokens++;
-      continue;
-
-    case tok::kw_static:
-      // This is definitely a modified decl.
-      P.consumeToken(tok::kw_static);
-      NumConsumedTokens++;
-      NumConfirmedModifiers = NumConsumedTokens;
-      continue;
-
-    case tok::kw_case:
-    case tok::kw_deinit:
-    case tok::kw_destructor:
-    case tok::kw_enum:
-    case tok::kw_extension:
-    case tok::kw_func:
-    case tok::kw_import:
-    case tok::kw_init:
-    case tok::kw_let:
-    case tok::kw_struct:
-    case tok::kw_subscript:
-    case tok::kw_typealias:
-    case tok::kw_var:
-      // We have arrived at the keyword that starts a declaration.
-      if (NumConsumedTokens)
-        P.backtrackToPosition(DeclBegin);
-
-      // The declaration was modified if we consumed some tokens previously.
-      return NumConsumedTokens;
-
-    case tok::identifier:
-      if (P.Tok.isContextualDeclKeyword()) {
-        P.consumeToken(tok::identifier);
-        NumConsumedTokens++;
-        continue;
-      }
-
-      // This identifier is a name for the declaration.
-      if (NumConsumedTokens)
-        P.backtrackToPosition(DeclBegin);
-
-      return NumConfirmedModifiers;
-
-    default: {
-      if (NumConsumedTokens)
-        P.backtrackToPosition(DeclBegin);
-      return NumConfirmedModifiers;
-    }
-    }
-  }
-}
-
-static bool isStartOfModifiedDeclFast(const Token &Tok, const Token &Tok2) {
-  if (!Tok.isContextualDeclKeyword())
-    return false;
-
-  switch (Tok2.getKind()) {
-  case tok::kw_class:
-  case tok::kw_func:
-  case tok::kw_let:
-  case tok::kw_static:
-  case tok::kw_subscript:
-  case tok::kw_var:
-    return true;
-
-  default: {
-    return Tok2.isContextualDeclKeyword();
-  }
-  }
-}
-
 bool Parser::isStartOfDecl() {
   switch (Tok.getKind()) {
   case tok::at_sign:
@@ -1044,13 +962,28 @@ bool Parser::isStartOfDecl() {
     const Token &Tok2 = peekToken();
     return !Tok2.isAnyOperator() || !Tok2.getText().equals("<");
   }
-  default: {
+  default:
+    if (!Tok.is(tok::identifier))
+      return false;      
+      
     const Token &Tok2 = peekToken();
-    if (isStartOfOperatorDecl(Tok, Tok2))
+    if (isStartOfOperatorDecl(Tok, Tok2) || Tok.isContextualDeclKeyword())
       return true;
-
-    return isStartOfModifiedDeclFast(Tok, Tok2);
-  }
+    
+    switch (Tok2.getKind()) {
+    // These are all of the decl kinds that can be modified by context sensitive
+    // keywords.
+    case tok::kw_class:
+    case tok::kw_func:
+    case tok::kw_let:
+    case tok::kw_static:
+    case tok::kw_subscript:
+    case tok::kw_var:
+      return true;
+      
+    default:
+      return false;
+    }
   }
 }
 
@@ -1127,182 +1060,192 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
   bool UnhandledMutating = false;
   bool UnhandledOverride = false;
   StaticSpellingKind StaticSpelling = StaticSpellingKind::None;
-  for (unsigned i = 0, e = getNumDeclModifierKeywords(*this); i != e; ++i) {
+  ParserResult<Decl> DeclResult;
+  ParserStatus Status;
+  
+  while (1) {
     switch (Tok.getKind()) {
-    case tok::kw_class:
-      if (StaticLoc.isValid()) {
-        diagnose(Tok, diag::decl_already_static,
-                 StaticSpellingKind::KeywordClass)
-            .highlight(StaticLoc)
-            .fixItRemove(Tok.getLoc());
-      } else {
-        StaticLoc = Tok.getLoc();
-        StaticSpelling = StaticSpellingKind::KeywordClass;
-        UnhandledStatic = true;
-      }
-      consumeToken(tok::kw_class);
-      break;
+    // Modifiers
     case tok::kw_static:
       if (StaticLoc.isValid()) {
         diagnose(Tok, diag::decl_already_static,
                  StaticSpellingKind::KeywordStatic)
-            .highlight(StaticLoc)
-            .fixItRemove(Tok.getLoc());
+        .highlight(StaticLoc)
+        .fixItRemove(Tok.getLoc());
       } else {
         StaticLoc = Tok.getLoc();
         StaticSpelling = StaticSpellingKind::KeywordStatic;
         UnhandledStatic = true;
       }
       consumeToken(tok::kw_static);
+      continue;
+
+    // 'class' is a modifier on func, but is also a top-level decl.
+    case tok::kw_class: {
+      SourceLoc ClassLoc = consumeToken(tok::kw_class);
+      
+      // If 'class' is a modifier on another decl kind, like var or func,
+      // then treat it as a modifier.
+      if (isStartOfDecl()) {
+        if (StaticLoc.isValid()) {
+          diagnose(Tok, diag::decl_already_static,
+                   StaticSpellingKind::KeywordClass)
+            .highlight(StaticLoc).fixItRemove(ClassLoc);
+        } else {
+          StaticLoc = ClassLoc;
+          StaticSpelling = StaticSpellingKind::KeywordClass;
+          UnhandledStatic = true;
+        }
+        continue;
+      }
+      
+      // Otherwise this is the start of a class declaration.
+      DeclResult = parseDeclClass(ClassLoc, Flags, Attributes);
+      Status = DeclResult;
       break;
-    case tok::identifier: {
+    }
+        
+    // Context sensitive keywords.
+    case tok::identifier:
+      // If this is the start of an operator, parse it as such.
+      if (isStartOfOperatorDecl(Tok, peekToken())) {
+        DeclResult = parseDeclOperator(Flags.contains(PD_AllowTopLevel),
+                                       Attributes);
+        break;
+      }
+      
+      // Likewise, if this is a context sensitive keyword, parse it too.
       if (Tok.isContextualKeyword("mutating") ||
           Tok.isContextualKeyword("nonmutating")) {
         if (MutatingLoc.isValid()) {
           diagnose(Tok, diag::decl_already_mutating)
-              .highlight(MutatingLoc)
-              .fixItRemove(Tok.getLoc());
+            .highlight(MutatingLoc).fixItRemove(Tok.getLoc());
         } else {
           isNonMutating = Tok.isContextualKeyword("nonmutating");
           MutatingLoc = Tok.getLoc();
           UnhandledMutating = true;
         }
         consumeToken(tok::identifier);
-        break;
+        continue;
       }
       if (Tok.isContextualKeyword("override")) {
         if (OverrideLoc.isValid()) {
           diagnose(Tok, diag::decl_already_override)
-              .highlight(OverrideLoc)
-              .fixItRemove(Tok.getLoc());
+            .highlight(OverrideLoc).fixItRemove(Tok.getLoc());
         } else {
           OverrideLoc = Tok.getLoc();
           UnhandledOverride = true;
         }
         consumeToken(tok::identifier);
-        break;
+        continue;
       }
-      llvm_unreachable("unknown modifier");
-    }
+
+      // Otherwise this is not a context-sensitive keyword.
+      SWIFT_FALLTHROUGH;
+
+    // Obvious nonsense.
     default:
-      llvm_unreachable("unknown modifier");
-    }
-  }
-
-  ParserResult<Decl> DeclResult;
-  ParserStatus Status;
-  switch (Tok.getKind()) {
-  case tok::kw_import:
-    DeclResult = parseDeclImport(Flags, Attributes);
-    Status = DeclResult;
-    break;
-  case tok::kw_extension:
-    DeclResult = parseDeclExtension(Flags, Attributes);
-    Status = DeclResult;
-    break;
-  case tok::kw_let:
-  case tok::kw_var:
-    Status = parseDeclVar(Flags, Attributes, Entries, StaticLoc,
-                          StaticSpelling, OverrideLoc);
-    UnhandledStatic = false;
-    UnhandledOverride = false;
-    break;
-  case tok::kw_typealias:
-    DeclResult = parseDeclTypeAlias(!(Flags & PD_DisallowTypeAliasDef),
-                                     Flags.contains(PD_InProtocol), Attributes);
-    Status = DeclResult;
-    break;
-  case tok::kw_enum:
-    DeclResult = parseDeclEnum(Flags, Attributes);
-    Status = DeclResult;
-    break;
-  case tok::kw_case:
-    Status = parseDeclEnumCase(Flags, Attributes, Entries);
-    break;
-  case tok::kw_struct:
-    DeclResult = parseDeclStruct(Flags, Attributes);
-    Status = DeclResult;
-    break;
-  case tok::kw_class:
-    DeclResult = parseDeclClass(Flags, Attributes);
-    Status = DeclResult;
-    break;
-  case tok::kw_init:
-    DeclResult = parseDeclConstructor(Flags, Attributes);
-    Status = DeclResult;
-    break;
-  case tok::kw_deinit:
-  case tok::kw_destructor:
-    DeclResult = parseDeclDestructor(Flags, Attributes);
-    Status = DeclResult;
-    break;
-  case tok::kw_protocol:
-    DeclResult = parseDeclProtocol(Flags, Attributes);
-    Status = DeclResult;
-    break;
-  case tok::pound_if: {
-    auto IfConfigResult = parseDeclIfConfig(Flags);
-    Status = IfConfigResult;
-
-    if (auto ICD = IfConfigResult.getPtrOrNull()) {
-      // The IfConfigDecl is ahead of its members in source order.
-      Entries.push_back(ICD);
-      // Copy the active members into the entries list.
-      for (auto activeMember : ICD->getActiveMembers()) {
-        Entries.push_back(activeMember);
-      }
-    }
-    }
-    break;
-
-  case tok::kw_func:
-    // If the 'mutating' or 'nonmutating' modifier was applied to the func,
-    // model it an attribute.
-    if (MutatingLoc.isValid()) {
-      if (!Attributes.AtLoc.isValid())
-        Attributes.AtLoc = MutatingLoc;
-      Attributes.setAttr(AK_mutating, MutatingLoc);
-      Attributes.MutatingInverted = isNonMutating;
-    }
-      
-    if (OverrideLoc.isValid())
-      Attributes.add(new (Context) OverrideAttr(OverrideLoc));
-
-    DeclResult = parseDeclFunc(StaticLoc, StaticSpelling, Flags, Attributes);
-    Status = DeclResult;
-    UnhandledStatic = false;
-    UnhandledMutating = false;
-    UnhandledOverride = false;
-    break;
-
-  case tok::kw_subscript:
-    if (StaticLoc.isValid()) {
-      diagnose(Tok, diag::subscript_static, StaticSpelling)
-        .fixItRemove(SourceRange(StaticLoc));
+      diagnose(Tok, diag::expected_decl);
+      return makeParserErrorResult<Decl>();
+        
+    // Unambiguous top level decls.
+    case tok::kw_import:
+      DeclResult = parseDeclImport(Flags, Attributes);
+      Status = DeclResult;
+      break;
+    case tok::kw_extension:
+      DeclResult = parseDeclExtension(Flags, Attributes);
+      Status = DeclResult;
+      break;
+    case tok::kw_let:
+    case tok::kw_var:
+      Status = parseDeclVar(Flags, Attributes, Entries, StaticLoc,
+                            StaticSpelling, OverrideLoc);
       UnhandledStatic = false;
-    }
-    Status = parseDeclSubscript(OverrideLoc, Flags, Attributes, Entries);
-    UnhandledOverride = false;
-    break;
+      UnhandledOverride = false;
+      break;
+    case tok::kw_typealias:
+      DeclResult = parseDeclTypeAlias(!(Flags & PD_DisallowTypeAliasDef),
+                                       Flags.contains(PD_InProtocol), Attributes);
+      Status = DeclResult;
+      break;
+    case tok::kw_enum:
+      DeclResult = parseDeclEnum(Flags, Attributes);
+      Status = DeclResult;
+      break;
+    case tok::kw_case:
+      Status = parseDeclEnumCase(Flags, Attributes, Entries);
+      break;
+    case tok::kw_struct:
+      DeclResult = parseDeclStruct(Flags, Attributes);
+      Status = DeclResult;
+      break;
+    case tok::kw_init:
+      DeclResult = parseDeclConstructor(Flags, Attributes);
+      Status = DeclResult;
+      break;
+    case tok::kw_deinit:
+    case tok::kw_destructor:
+      DeclResult = parseDeclDestructor(Flags, Attributes);
+      Status = DeclResult;
+      break;
+    case tok::kw_protocol:
+      DeclResult = parseDeclProtocol(Flags, Attributes);
+      Status = DeclResult;
+      break;
+    case tok::pound_if: {
+      auto IfConfigResult = parseDeclIfConfig(Flags);
+      Status = IfConfigResult;
 
-  case tok::code_complete:
-    Status = makeParserCodeCompletionStatus();
-    if (CodeCompletion)
-      CodeCompletion->completeNominalMemberBeginning();
-    break;
-
-  case tok::identifier:
-    if (isStartOfOperatorDecl(Tok, peekToken())) {
-      DeclResult = parseDeclOperator(Flags.contains(PD_AllowTopLevel),
-                                     Attributes);
+      if (auto ICD = IfConfigResult.getPtrOrNull()) {
+        // The IfConfigDecl is ahead of its members in source order.
+        Entries.push_back(ICD);
+        // Copy the active members into the entries list.
+        for (auto activeMember : ICD->getActiveMembers()) {
+          Entries.push_back(activeMember);
+        }
+      }
       break;
     }
-    SWIFT_FALLTHROUGH;
 
-  default:
-    diagnose(Tok, diag::expected_decl);
-    DeclResult = makeParserErrorResult<Decl>();
-    Status = DeclResult;
+    case tok::kw_func:
+      // If the 'mutating' or 'nonmutating' modifier was applied to the func,
+      // model it an attribute.
+      if (MutatingLoc.isValid()) {
+        if (!Attributes.AtLoc.isValid())
+          Attributes.AtLoc = MutatingLoc;
+        Attributes.setAttr(AK_mutating, MutatingLoc);
+        Attributes.MutatingInverted = isNonMutating;
+      }
+        
+      if (OverrideLoc.isValid())
+        Attributes.add(new (Context) OverrideAttr(OverrideLoc));
+
+      DeclResult = parseDeclFunc(StaticLoc, StaticSpelling, Flags, Attributes);
+      Status = DeclResult;
+      UnhandledStatic = false;
+      UnhandledMutating = false;
+      UnhandledOverride = false;
+      break;
+
+    case tok::kw_subscript:
+      if (StaticLoc.isValid()) {
+        diagnose(Tok, diag::subscript_static, StaticSpelling)
+          .fixItRemove(SourceRange(StaticLoc));
+        UnhandledStatic = false;
+      }
+      Status = parseDeclSubscript(OverrideLoc, Flags, Attributes, Entries);
+      UnhandledOverride = false;
+      break;
+
+    case tok::code_complete:
+      Status = makeParserCodeCompletionStatus();
+      if (CodeCompletion)
+        CodeCompletion->completeNominalMemberBeginning();
+       break;
+    }
+  
+    // If we 'break' out of the switch, break out of the loop too.
     break;
   }
 
@@ -3204,10 +3147,9 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
 ///   decl-class-body:
 ///      decl*
 /// \endverbatim
-ParserResult<ClassDecl> Parser::parseDeclClass(ParseDeclOptions Flags,
+ParserResult<ClassDecl> Parser::parseDeclClass(SourceLoc ClassLoc,
+                                               ParseDeclOptions Flags,
                                                DeclAttributes &Attributes) {
-  SourceLoc ClassLoc = consumeToken(tok::kw_class);
-
   Identifier ClassName;
   SourceLoc ClassNameLoc;
   ParserStatus Status;

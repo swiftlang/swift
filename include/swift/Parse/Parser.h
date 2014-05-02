@@ -650,7 +650,8 @@ public:
   ParserResult<StructDecl>
   parseDeclStruct(ParseDeclOptions Flags, DeclAttributes &Attributes);
   ParserResult<ClassDecl>
-  parseDeclClass(ParseDeclOptions Flags, DeclAttributes &Attributes);
+  parseDeclClass(SourceLoc ClassLoc,
+                 ParseDeclOptions Flags, DeclAttributes &Attributes);
   ParserStatus parseDeclVar(ParseDeclOptions Flags, DeclAttributes &Attributes,
                             SmallVectorImpl<Decl *> &Decls,
                             SourceLoc StaticLoc,
