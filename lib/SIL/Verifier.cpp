@@ -2017,11 +2017,7 @@ public:
       require(FoundSelfInPredecessor, "Must be a successor of each predecessor.");
     }
     
-    // FIXME: Remove conditional when the canonicalized SIL passes are
-    // ready. This lets us at least verify SILGen and the gauranteed
-    // optimization passes.
-    if (BB->getModule().getStage() == SILStage::Raw)
-      SILVisitor::visitSILBasicBlock(BB);
+    SILVisitor::visitSILBasicBlock(BB);
   }
 
   void visitSILFunction(SILFunction *F) {
