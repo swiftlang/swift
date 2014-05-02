@@ -659,7 +659,7 @@ enum AggregateSinglePayload2 {
   case z
 }
 
-// CHECK: define void @aggregate_single_payload_unpack_2(i256) {
+// CHECK: define void @aggregate_single_payload_unpack_2(i256, i1) {
 sil @aggregate_single_payload_unpack_2 : $@thin (AggregateSinglePayload2) -> () {
 entry(%u : $AggregateSinglePayload2):
   switch_enum %u : $AggregateSinglePayload2, case #AggregateSinglePayload2.x!enumelt.1: x_dest, default end
@@ -679,7 +679,7 @@ end:
   return %x : $()
 }
 
-// CHECK: define i256 @aggregate_single_payload_2_inject(i21, i64, i64, i64) {
+// CHECK: define { i256, i1 } @aggregate_single_payload_2_inject(i21, i64, i64, i64) {
 // CHECK: entry:
 // CHECK:   [[ZEXT_0:%.*]] = zext i21 %0 to i256
 // CHECK:   [[ZEXT_1:%.*]] = zext i64 %1 to i256
@@ -691,7 +691,9 @@ end:
 // CHECK:   [[SHIFT_2_TO:%.*]] = shl i256 [[ZEXT_2_TO]], 192
 // CHECK:   [[PAYLOAD_2:%.*]] = or i256 [[SHIFT_2_FROM]], [[SHIFT_2_TO]]
 // CHECK:   [[PAYLOAD:%.*]] = or i256 [[PAYLOAD_0_1]], [[PAYLOAD_2]]
-// CHECK:   ret i256 [[PAYLOAD]]
+// CHECK:   [[RES_0:%.*]] = insertvalue { i256, i1 } undef, i256 [[PAYLOAD]], 0
+// CHECK:   [[RES:%.*]] = insertvalue { i256, i1 } [[RES_0]], i1 false, 1
+// CHECK:   ret { i256, i1 } [[RES]]
 // CHECK: }
 sil @aggregate_single_payload_2_inject : $(CharLike, IntLike, RangeLike) -> AggregateSinglePayload2 {
 entry(%0 : $CharLike, %1 : $IntLike, %2 : $RangeLike):

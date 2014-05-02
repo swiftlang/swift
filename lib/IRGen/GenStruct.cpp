@@ -123,62 +123,6 @@ namespace {
       }
       return nullptr;
     }
-
-    // For now, just use extra inhabitants from the first field.
-    // FIXME: generalize
-    bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
-      if (asImpl().getFields().empty()) return false;
-      return asImpl().getFields()[0].getTypeInfo().mayHaveExtraInhabitants(IGM);
-    }
-
-    // This is dead code in NonFixedStructTypeInfo.
-    unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const {
-      if (asImpl().getFields().empty()) return 0;
-      auto &fieldTI = cast<FixedTypeInfo>(asImpl().getFields()[0].getTypeInfo());
-      return fieldTI.getFixedExtraInhabitantCount(IGM);
-    }
-
-    // This is dead code in NonFixedStructTypeInfo.
-    llvm::ConstantInt *getFixedExtraInhabitantValue(IRGenModule &IGM,
-                                                    unsigned bits,
-                                                    unsigned index) const {
-      auto &fieldTI = cast<FixedTypeInfo>(asImpl().getFields()[0].getTypeInfo());
-      return fieldTI.getFixedExtraInhabitantValue(IGM, bits, index);
-    }
-
-    // This is dead code in NonFixedStructTypeInfo.
-    llvm::Value *maskFixedExtraInhabitant(IRGenFunction &IGF,
-                                          llvm::Value *structValue) const {
-      // Truncate down to the width of the field, mask it recursively,
-      // and then zext back out to the payload size.
-      auto &fieldTI = cast<FixedTypeInfo>(asImpl().getFields()[0].getTypeInfo());
-      unsigned fieldWidth = fieldTI.getFixedSize().getValueInBits();
-      auto fieldTy = llvm::IntegerType::get(IGF.IGM.getLLVMContext(), fieldWidth);
-      auto fieldValue = IGF.Builder.CreateTrunc(structValue, fieldTy);
-      fieldValue = fieldTI.maskFixedExtraInhabitant(IGF, fieldValue);
-      return IGF.Builder.CreateZExt(fieldValue, structValue->getType());
-    }
-
-    llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
-                                         Address structAddr,
-                                         CanType structType) const override {
-      auto &field = asImpl().getFields()[0];
-      Address fieldAddr =
-        asImpl().projectFieldAddress(IGF, structAddr, structType, field.Field);
-      return field.getTypeInfo().getExtraInhabitantIndex(IGF, fieldAddr,
-                                          field.getType(IGF.IGM, structType));
-    }
-
-    void storeExtraInhabitant(IRGenFunction &IGF,
-                              llvm::Value *index,
-                              Address structAddr,
-                              CanType structType) const override {
-      auto &field = asImpl().getFields()[0];
-      Address fieldAddr =
-        asImpl().projectFieldAddress(IGF, structAddr, structType, field.Field);
-      field.getTypeInfo().storeExtraInhabitant(IGF, index, fieldAddr,
-                                          field.getType(IGF.IGM, structType));
-    }
   };
 
 
@@ -205,6 +149,14 @@ namespace {
     Nothing_t getNonFixedOffsets(IRGenFunction &IGF) const {
       return Nothing;
     }
+        
+    // FIXME: Suppress use of extra inhabitants for single-payload enum layout
+    // until we're ready to handle the runtime logic for exporting extra
+    // inhabitants through generic structs.
+    bool mayHaveExtraInhabitants(IRGenModule&) const override { return false; }
+    unsigned getFixedExtraInhabitantCount(IRGenModule&) const override {
+      return 0;
+    }
   };
 
   /// A type implementation for non-loadable but fixed-size struct types.
@@ -224,6 +176,14 @@ namespace {
       return Nothing;
     }
     Nothing_t getNonFixedOffsets(IRGenFunction &IGF) const { return Nothing; }
+                                                     
+    // FIXME: Suppress use of extra inhabitants for single-payload enum layout
+    // until we're ready to handle the runtime logic for exporting extra
+    // inhabitants through generic structs.
+    bool mayHaveExtraInhabitants(IRGenModule&) const override { return false; }
+    unsigned getFixedExtraInhabitantCount(IRGenModule&) const override {
+      return 0;
+    }
   };
   
   /// Find the beginning of the field offset vector in a struct's metadata.

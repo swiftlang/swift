@@ -26,7 +26,7 @@ import Builtin
 // CHECK: @_TMPdV15generic_structs13SingleDynamic = global {{[{].*\* [}]}} {
 // -- template header
 // CHECK:   void (i8*, i8*)* [[SINGLE_DYNAMIC_FILL_METADATA:@fill_generic_metadata[0-9]*]],
-// CHECK:   i32 240, i16 1, i16 8, [8 x i8*] zeroinitializer,
+// CHECK:   i32 216, i16 1, i16 8, [8 x i8*] zeroinitializer,
 // -- placeholder for vwtable pointer
 // CHECK:   i8* null,
 // -- address point
@@ -37,11 +37,7 @@ import Builtin
 // CHECK:   i8* bitcast (void ([24 x i8]*, %swift.type*)* @_TwXXV15generic_structs13SingleDynamic to i8*),
 // -- ...
 // -- placeholder for size, flags, stride
-// CHECK:   i8* null, i8* null, i8* null
-// -- extra inhabitants
-// CHECK:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @_TwxsV15generic_structs13SingleDynamic to i8*),
-// CHECK:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @_TwxgV15generic_structs13SingleDynamic to i8*),
-// CHECK:   i8* null }
+// CHECK:   i8* null, i8* null, i8* null }
 // CHECK-NOT: @_TWVV15generic_structs13SingleDynamic
 
 // -- Nominal type descriptor for generic struct with protocol requirements

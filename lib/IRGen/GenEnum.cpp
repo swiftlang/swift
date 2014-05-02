@@ -1000,8 +1000,6 @@ namespace {
     };
     
     CopyDestroyStrategy CopyDestroyKind;
-
-    unsigned NumExtraInhabitantTagValues = ~0U;
     
   public:
     SinglePayloadEnumImplStrategy(IRGenModule &IGM,
@@ -1039,13 +1037,6 @@ namespace {
       }
       
       // TODO: Same for single unknown-refcounted pointers.
-    }
-
-    /// Return the number of tag values represented with extra
-    /// inhabitants in the payload.
-    unsigned getNumExtraInhabitantTagValues() const {
-      assert(NumExtraInhabitantTagValues != ~0U);
-      return NumExtraInhabitantTagValues;
     }
     
     /// The payload for a single-payload enum is always placed in front and
@@ -1148,7 +1139,8 @@ namespace {
       if (payloadTy)
         payload = value.claimNext();
       llvm::BasicBlock *payloadDest = blockForCase(getPayloadElement());
-      unsigned extraInhabitantCount = getNumExtraInhabitantTagValues();
+      unsigned extraInhabitantCount
+        = getFixedPayloadTypeInfo().getFixedExtraInhabitantCount(IGF.IGM);
       
       // If there are extra tag bits, switch over them first.
       SmallVector<llvm::BasicBlock*, 2> tagBitBlocks;
@@ -1203,9 +1195,7 @@ namespace {
         = getFixedPayloadTypeInfo().getFixedSize().getValueInBits();
       if (extraInhabitantCount > 0) {
         assert(payload && "extra inhabitants with empty payload?!");
-        auto *switchValue =
-          getFixedPayloadTypeInfo().maskFixedExtraInhabitant(IGF, payload);
-        auto *swi = IGF.Builder.CreateSwitch(switchValue, payloadDest);
+        auto *swi = IGF.Builder.CreateSwitch(payload, payloadDest);
         for (unsigned i = 0; i < extraInhabitantCount && elti != eltEnd; ++i) {
           auto v = getFixedPayloadTypeInfo().getFixedExtraInhabitantValue(
                                                        IGF.IGM, payloadBits, i);
@@ -1375,7 +1365,8 @@ namespace {
       // Non-payload cases use extra inhabitants, if any, or are discriminated
       // by setting the tag bits.
       unsigned tagIndex = getSimpleElementTagIndex(elt);
-      unsigned numExtraInhabitants = getNumExtraInhabitantTagValues();
+      unsigned numExtraInhabitants
+        = getFixedPayloadTypeInfo().getFixedExtraInhabitantCount(IGM);
       llvm::ConstantInt *payload = nullptr;
       unsigned extraTagValue;
       if (tagIndex < numExtraInhabitants) {
@@ -1476,15 +1467,11 @@ namespace {
       
       // If we used extra inhabitants to represent empty case discriminators,
       // weed them out.
-      unsigned numExtraInhabitants = getNumExtraInhabitantTagValues();
+      unsigned numExtraInhabitants
+        = getFixedPayloadTypeInfo().getFixedExtraInhabitantCount(IGF.IGM);
       if (numExtraInhabitants > 0) {
-        unsigned bitWidth =
-          getFixedPayloadTypeInfo().getFixedSize().getValueInBits();
-
         auto *payloadBB = llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
-        auto *switchValue =
-          getFixedPayloadTypeInfo().maskFixedExtraInhabitant(IGF, payload);
-        auto *swi = IGF.Builder.CreateSwitch(switchValue, payloadBB);
+        auto *swi = IGF.Builder.CreateSwitch(payload, payloadBB);
         
         auto elements = getPayloadElement()->getParentEnum()->getAllElements();
         unsigned inhabitant = 0;
@@ -1497,7 +1484,9 @@ namespace {
               break;
           }
           auto xi = getFixedPayloadTypeInfo().getFixedExtraInhabitantValue(
-                      IGF.IGM, bitWidth, inhabitant);
+                      IGF.IGM,
+                      getFixedPayloadTypeInfo().getFixedSize().getValueInBits(),
+                      inhabitant);
           swi->addCase(xi, falseBB);
         }
         
@@ -2014,8 +2003,15 @@ namespace {
     }
     
     unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {
-      return getFixedPayloadTypeInfo().getFixedExtraInhabitantCount(IGM)
-               - getNumExtraInhabitantTagValues();
+      unsigned payloadXI
+        = getFixedPayloadTypeInfo().getFixedExtraInhabitantCount(IGM);
+      
+      unsigned numEmptyCases = ElementsWithNoPayload.size();
+      
+      if (payloadXI <= numEmptyCases)
+        return 0;
+      
+      return payloadXI - numEmptyCases;
     }
     
     llvm::ConstantInt *
@@ -2024,7 +2020,7 @@ namespace {
                                  unsigned index) const override {
       return getFixedPayloadTypeInfo()
         .getFixedExtraInhabitantValue(IGM, bits,
-                                      index + getNumExtraInhabitantTagValues());
+                                      index + ElementsWithNoPayload.size());
     }
     
     llvm::Value *
@@ -3556,9 +3552,9 @@ namespace {
     // Determine how many tag bits we need. Given N extra inhabitants, we
     // represent the first N tags using those inhabitants. For additional tags,
     // we use discriminator bit(s) to inhabit the full bit size of the payload.
-    NumExtraInhabitantTagValues = std::min(numTags, fixedExtraInhabitants);
+    unsigned tagsWithoutInhabitants = numTags <= fixedExtraInhabitants
+      ? 0 : numTags - fixedExtraInhabitants;
     
-    unsigned tagsWithoutInhabitants = numTags - NumExtraInhabitantTagValues;    
     if (tagsWithoutInhabitants == 0) {
       ExtraTagBitCount = 0;
       NumExtraTagValues = 0;
