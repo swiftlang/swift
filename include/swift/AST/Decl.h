@@ -1665,11 +1665,13 @@ class IfConfigDecl : public Decl {
   /// The array is ASTContext allocated.
   ArrayRef<IfConfigDeclClause> Clauses;
   SourceLoc EndLoc;
+  bool HadMissingEnd;
 public:
   
   IfConfigDecl(DeclContext *Parent, ArrayRef<IfConfigDeclClause> Clauses,
-               SourceLoc EndLoc)
-    : Decl(DeclKind::IfConfig, Parent), Clauses(Clauses), EndLoc(EndLoc) {
+               SourceLoc EndLoc, bool HadMissingEnd)
+    : Decl(DeclKind::IfConfig, Parent), Clauses(Clauses), EndLoc(EndLoc),
+      HadMissingEnd(HadMissingEnd) {
   }
 
   ArrayRef<IfConfigDeclClause> getClauses() const { return Clauses; }
@@ -1688,6 +1690,8 @@ public:
   
   SourceLoc getEndLoc() const { return EndLoc; }
   SourceLoc getLoc() const { return Clauses[0].Loc; }
+
+  bool hadMissingEnd() const { return HadMissingEnd; }
   
   SourceRange getSourceRange() const;
   

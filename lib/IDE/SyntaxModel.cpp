@@ -258,7 +258,7 @@ std::pair<bool, Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
 
     }
     
-    if (ConfigS->getEndLoc().isValid())
+    if (!ConfigS->hadMissingEnd())
       if (!passNonTokenNode({ SyntaxNodeKind::BuildConfigKeyword,
         CharSourceRange(ConfigS->getEndLoc(), 6/*'#endif'*/) }))
         return { false, nullptr };
@@ -390,7 +390,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
           return false;
     }
     
-    if (ConfigD->getEndLoc().isValid())
+    if (!ConfigD->hadMissingEnd())
       if (!passNonTokenNode({ SyntaxNodeKind::BuildConfigKeyword,
             CharSourceRange(ConfigD->getEndLoc(), 6/*'#endif'*/) }))
         return false;

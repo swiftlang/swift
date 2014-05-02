@@ -1658,14 +1658,17 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
 
   // Parse the #endif
   SourceLoc EndLoc = Tok.getLoc();
-  if (parseToken(tok::pound_endif, diag::expected_close_to_config_stmt))
+  bool HadMissingEnd = false;
+  if (parseToken(tok::pound_endif, diag::expected_close_to_config_stmt)) {
+    HadMissingEnd = true;
     skipUntilConfigBlockClose();
+  }
   else if (!Tok.isAtStartOfLine())
     diagnose(Tok.getLoc(), diag::extra_tokens_config_directive);
 
   IfConfigDecl *ICD = new (Context) IfConfigDecl(CurDeclContext,
                                                  Context.AllocateCopy(Clauses),
-                                                 EndLoc);
+                                                 EndLoc, HadMissingEnd);
   return makeParserResult(ICD);
 }
 

@@ -246,15 +246,19 @@ class IfConfigStmt : public Stmt {
   /// The array is ASTContext allocated.
   ArrayRef<IfConfigStmtClause> Clauses;
   SourceLoc EndLoc;
+  bool HadMissingEnd;
 
 public:
-  IfConfigStmt(ArrayRef<IfConfigStmtClause> Clauses, SourceLoc EndLoc)
+  IfConfigStmt(ArrayRef<IfConfigStmtClause> Clauses, SourceLoc EndLoc,
+               bool HadMissingEnd)
   : Stmt(StmtKind::IfConfig, /*implicit=*/false),
-    Clauses(Clauses), EndLoc(EndLoc) {}
+    Clauses(Clauses), EndLoc(EndLoc), HadMissingEnd(HadMissingEnd) {}
   
   SourceLoc getIfLoc() const { return Clauses[0].Loc; }
   SourceLoc getEndLoc() const { return EndLoc; }
-  
+
+  bool hadMissingEnd() const { return HadMissingEnd; }
+
   SourceRange getSourceRange() const;
   
   const ArrayRef<IfConfigStmtClause> &getClauses() const { return Clauses; }
