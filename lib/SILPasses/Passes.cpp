@@ -92,7 +92,6 @@ void swift::runSILOptimizationPasses(SILModule &Module,
     PM.add(createPerfInliner());
     PM.add(createSILCombine());
     PM.add(createDeadFunctionElimination());
-    PM.add(createGlobalOpt());
     PM.add(createLowerAggregate());
     PM.add(createSROA());
     PM.add(createMem2Reg());
@@ -110,3 +109,4 @@ void swift::runSILOptimizationPasses(SILModule &Module,
 
     DEBUG(Module.verify());
 }
+
