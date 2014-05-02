@@ -407,31 +407,31 @@ bb0(%0 : $*Gimel, %1 : $*Q):
 sil @_T5tuple5floatFT1xSf_T_ : $@thin (Float32) -> ()
 sil @_T5tuple5tupleFT_TSiSf_ : $@thin () -> (Int, Float32)
 
-// CHECK: $@thin (Int, Float32) -> ()
-sil @_T5tuple13tuple_elementFT1xTSiSf__T_ : $@thin (Int, Float32) -> () {
-bb0(%0 : $Int, %1 : $Float32):
-  %2 = alloc_box $(Int, Float32)
-  // CHECK: tuple ({{%.*}} : $Int, {{%.*}} : $Float32)
-  %3 = tuple (%0 : $Int, %1 : $Float32)
-  %4 = store %3 to %2#1 : $*(Int, Float32)
-  // CHECK: tuple_element_addr {{%.*}}#{{.*}} : $*(Int, Float32), 0
-  %6 = tuple_element_addr %2#1 : $*(Int, Float32), 0
+// CHECK: $@thin (Int, Float) -> ()
+sil @_T5tuple13tuple_elementFT1xTSiSf__T_ : $@thin (Int, Float) -> () {
+bb0(%0 : $Int, %1 : $Float):
+  %2 = alloc_box $(Int, Float)
+  // CHECK: tuple ({{%.*}} : $Int, {{%.*}} : $Float)
+  %3 = tuple (%0 : $Int, %1 : $Float)
+  %4 = store %3 to %2#1 : $*(Int, Float)
+  // CHECK: tuple_element_addr {{%.*}}#{{.*}} : $*(Int, Float), 0
+  %6 = tuple_element_addr %2#1 : $*(Int, Float), 0
   // CHECK: load
   %7 = load %6 : $*Int
-  // CHECK: tuple_element_addr {{%.*}}#{{.*}} : $*(Int, Float32), 1
-  %10 = tuple_element_addr %2#1 : $*(Int, Float32), 1
+  // CHECK: tuple_element_addr {{%.*}}#{{.*}} : $*(Int, Float), 1
+  %10 = tuple_element_addr %2#1 : $*(Int, Float), 1
   // CHECK: load
-  %11 = load %10 : $*Float32
+  %11 = load %10 : $*Float
   // CHECK: function_ref
-  %14 = function_ref @_T5tuple5tupleFT_TSiSf_ : $@thin () -> (Int, Float32)
+  %14 = function_ref @_T5tuple5tupleFT_TSiSf_ : $@thin () -> (Int, Float)
   // CHECK: apply
-  %15 = apply %14() : $@thin () -> (Int, Float32)
+  %15 = apply %14() : $@thin () -> (Int, Float)
   // CHECK: function_ref
-  %19 = function_ref @_T5tuple5floatFT1xSf_T_ : $@thin (Float32) -> ()
-  // CHECK: tuple_extract {{%.*}} : $(Int, Float32), 1
-  %17 = tuple_extract %15 : $(Int, Float32), 1
+  %19 = function_ref @_T5tuple5floatFT1xSf_T_ : $@thin (Float) -> ()
+  // CHECK: tuple_extract {{%.*}} : $(Int, Float), 1
+  %17 = tuple_extract %15 : $(Int, Float), 1
   // CHECK: apply
-  %24 = apply %19(%17) : $@thin (Float32) -> ()
+  %24 = apply %19(%17) : $@thin (Float) -> ()
   %25 = tuple ()
   %26 = strong_release %2#0 : $Builtin.NativeObject
   %27 = return %25 : $()
@@ -883,12 +883,12 @@ sil @takes_unnamed_closure : $@thin (@callee_owned () -> Int) -> () -> () -> Int
 
 sil @takes_int64_float32 : $@thin (Int, Float32) -> ()
 
-// CHECK-LABEL: sil @test_partial_apply : $@thin (Float32) -> @callee_owned (Int) -> () {
-sil @test_partial_apply : $@thin Float32 -> @callee_owned Int -> () {
-bb0(%0 : $Float32):
-  %1 = function_ref @takes_int64_float32 : $@thin (Int, Float32) -> ()
-  // CHECK: partial_apply %{{.*}}(%{{.*}}) : $@thin (Int, Float32) -> ()
-  %2 = partial_apply %1(%0) : $@thin (Int, Float32) -> ()
+// CHECK-LABEL: sil @test_partial_apply : $@thin (Float) -> @callee_owned (Int) -> () {
+sil @test_partial_apply : $@thin Float -> @callee_owned Int -> () {
+bb0(%0 : $Float):
+  %1 = function_ref @takes_int64_float32 : $@thin (Int, Float) -> ()
+  // CHECK: partial_apply %{{.*}}(%{{.*}}) : $@thin (Int, Float) -> ()
+  %2 = partial_apply %1(%0) : $@thin (Int, Float) -> ()
   %3 = return %2 : $@callee_owned Int -> ()
 }
 

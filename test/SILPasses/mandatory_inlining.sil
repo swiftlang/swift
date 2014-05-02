@@ -194,18 +194,18 @@ sil @sub_floats : $@thin (Float32, Float32) -> Float32
 sil @foo : $@thin (Float32, Float32) -> Bool
 sil @bar : $@thin (Float32) -> Bool
 
-// CHECK-LABEL: sil @test_control_flow : $@thin (Float32, Float32) -> Float32
-sil @test_control_flow : $@thin (Float32, Float32) -> Float32 {
-bb0(%0 : $Float32, %1 : $Float32):
-  %2 = alloc_box $Float32
-  %3 = alloc_box $Float32
-  store %0 to %2#1 : $*Float32
-  store %1 to %3#1 : $*Float32
+// CHECK-LABEL: sil @test_control_flow : $@thin (Float, Float) -> Float
+sil @test_control_flow : $@thin (Float, Float) -> Float {
+bb0(%0 : $Float, %1 : $Float):
+  %2 = alloc_box $Float
+  %3 = alloc_box $Float
+  store %0 to %2#1 : $*Float
+  store %1 to %3#1 : $*Float
   %6 = function_ref @get_logic_value : $@cc(method) @thin (@inout Bool) -> Builtin.Int1
-  %7 = function_ref @foo : $@thin (Float32, Float32) -> Bool
-  %8 = load %2#1 : $*Float32
-  %9 = load %3#1 : $*Float32
-  %10 = apply %7(%8, %9) : $@thin (Float32, Float32) -> Bool
+  %7 = function_ref @foo : $@thin (Float, Float) -> Bool
+  %8 = load %2#1 : $*Float
+  %9 = load %3#1 : $*Float
+  %10 = apply %7(%8, %9) : $@thin (Float, Float) -> Bool
   %11 = alloc_stack $Bool
   store %10 to %11#1 : $*Bool
   %13 = apply %6(%11#1) : $@cc(method) @thin (@inout Bool) -> Builtin.Int1
@@ -213,7 +213,7 @@ bb0(%0 : $Float32, %1 : $Float32):
   cond_br %13, bb1, bb2
 
 bb1:
-  %16 = load %2#1 : $*Float32
+  %16 = load %2#1 : $*Float
   unreachable
 
 bb2:
@@ -221,9 +221,9 @@ bb2:
 
 bb3:
   %19 = function_ref @get_logic_value : $@cc(method) @thin (@inout Bool) -> Builtin.Int1
-  %20 = function_ref @bar : $@thin (Float32) -> Bool
-  %21 = load %3#1 : $*Float32
-  %22 = apply %20(%21) : $@thin (Float32) -> Bool
+  %20 = function_ref @bar : $@thin (Float) -> Bool
+  %21 = load %3#1 : $*Float
+  %22 = apply %20(%21) : $@thin (Float) -> Bool
   %23 = alloc_stack $Bool
   store %22 to %23#1 : $*Bool
   %25 = apply %19(%23#1) : $@cc(method) @thin (@inout Bool) -> Builtin.Int1
@@ -231,46 +231,46 @@ bb3:
   cond_br %25, bb4, bb5
 
 bb4:
-  %28 = function_ref @add_floats : $@thin (Float32, Float32) -> Float32
-  %29 = load %3#1 : $*Float32
-  %30 = function_ref @convertFromBuiltinFloatLiteral : $@thin (Builtin.FPIEEE64, @thin Float32.Type) -> Float32
-  %31 = metatype $@thin Float32.Type
+  %28 = function_ref @add_floats : $@thin (Float, Float) -> Float
+  %29 = load %3#1 : $*Float
+  %30 = function_ref @convertFromBuiltinFloatLiteral : $@thin (Builtin.FPIEEE64, @thin Float.Type) -> Float
+  %31 = metatype $@thin Float.Type
   %32 = float_literal $Builtin.FPIEEE64, 0x3FF0000000000000
-  %33 = apply %30(%32, %31) : $@thin (Builtin.FPIEEE64, @thin Float32.Type) -> Float32
-  %34 = apply %28(%29, %33) : $@thin (Float32, Float32) -> Float32
-  store %34 to %3#1 : $*Float32
+  %33 = apply %30(%32, %31) : $@thin (Builtin.FPIEEE64, @thin Float.Type) -> Float
+  %34 = apply %28(%29, %33) : $@thin (Float, Float) -> Float
+  store %34 to %3#1 : $*Float
   br bb3
 
 bb5:
-  %37 = load %3#1 : $*Float32
-  br bb6(%37 : $Float32)
+  %37 = load %3#1 : $*Float
+  br bb6(%37 : $Float)
 
-bb6(%39 : $Float32):
+bb6(%39 : $Float):
   strong_release %3#0 : $Builtin.NativeObject
   strong_release %2#0 : $Builtin.NativeObject
-  return %39 : $Float32
+  return %39 : $Float
 }
 
-// CHECK-LABEL: sil @inline_test_control_flow : $@thin (Float32) -> Float32
-sil @inline_test_control_flow : $@thin (Float32) -> Float32 {
+// CHECK-LABEL: sil @inline_test_control_flow : $@thin (Float) -> Float
+sil @inline_test_control_flow : $@thin (Float) -> Float {
 
-// CHECK: [[BB0:.*]]([[VAL0:%.*]] : $Float32):
-  // CHECK: [[VAL1:%.*]] = alloc_box $Float32
+// CHECK: [[BB0:.*]]([[VAL0:%.*]] : $Float):
+  // CHECK: [[VAL1:%.*]] = alloc_box $Float
   // CHECK: store [[VAL0]] to [[VAL1]]#1
   // CHECK: [[VAL3:%.*]] = function_ref @sub_floats
   // CHECK: [[VAL4:%.*]] = function_ref @add_floats
   // CHECK: [[VAL5:%.*]] = load [[VAL1]]#1
   // CHECK: [[VAL6:%.*]] = function_ref @convertFromBuiltinFloatLiteral
-  // CHECK: [[VAL7:%.*]] = metatype $@thin Float32.Type
+  // CHECK: [[VAL7:%.*]] = metatype $@thin Float.Type
   // CHECK: [[VAL8:%.*]] = float_literal $Builtin.FPIEEE64, 0x3FF0000000000000
   // CHECK: [[VAL9:%.*]] = apply [[VAL6]]([[VAL8]], [[VAL7]])
   // CHECK: [[VAL10:%.*]] = apply [[VAL4]]([[VAL5]], [[VAL9]])
   // CHECK: [[VAL11:%.*]] = function_ref @convertFromBuiltinFloatLiteral
-  // CHECK: [[VAL12:%.*]] = metatype $@thin Float32.Type
+  // CHECK: [[VAL12:%.*]] = metatype $@thin Float.Type
   // CHECK: [[VAL13:%.*]] = float_literal $Builtin.FPIEEE64, 0x4000000000000000
   // CHECK: [[VAL14:%.*]] = apply [[VAL11]]([[VAL13]], [[VAL12]])
-  // CHECK: [[VAL15:%.*]] = alloc_box $Float32
-  // CHECK: [[VAL16:%.*]] = alloc_box $Float32
+  // CHECK: [[VAL15:%.*]] = alloc_box $Float
+  // CHECK: [[VAL16:%.*]] = alloc_box $Float
   // CHECK: store [[VAL10]] to [[VAL15]]#1
   // CHECK: store [[VAL14]] to [[VAL16]]#1
   // CHECK: [[VAL19:%.*]] = function_ref @get_logic_value
@@ -306,7 +306,7 @@ sil @inline_test_control_flow : $@thin (Float32) -> Float32 {
   // CHECK: [[VAL41:%.*]] = function_ref @add_floats
   // CHECK: [[VAL42:%.*]] = load [[VAL16]]#1
   // CHECK: [[VAL43:%.*]] = function_ref @convertFromBuiltinFloatLiteral
-  // CHECK: [[VAL44:%.*]] = metatype $@thin Float32.Type
+  // CHECK: [[VAL44:%.*]] = metatype $@thin Float.Type
   // CHECK: [[VAL45:%.*]] = float_literal $Builtin.FPIEEE64, 0x3FF0000000000000
   // CHECK: [[VAL46:%.*]] = apply [[VAL43]]([[VAL45]], [[VAL44]])
   // CHECK: [[VAL47:%.*]] = apply [[VAL41]]([[VAL42]], [[VAL46]])
@@ -317,78 +317,78 @@ sil @inline_test_control_flow : $@thin (Float32) -> Float32 {
   // CHECK: [[VAL50:%.*]] = load [[VAL16]]#1
   // CHECK: br [[BB6:.*]]([[VAL50]]
 
-// CHECK: [[BB6]]([[VAL52:%.*]] : $Float32):
+// CHECK: [[BB6]]([[VAL52:%.*]] : $Float):
   // CHECK: strong_release [[VAL16]]#0
   // CHECK: strong_release [[VAL15]]#0
   // CHECK: br [[BB7:.*]]([[VAL52]]
 
-// CHECK: [[BB7]]([[VAL56:%.*]] : $Float32):
+// CHECK: [[BB7]]([[VAL56:%.*]] : $Float):
   // CHECK: [[VAL57:%.*]] = function_ref @convertFromBuiltinFloatLiteral
-  // CHECK: [[VAL58:%.*]] = metatype $@thin Float32.Type
+  // CHECK: [[VAL58:%.*]] = metatype $@thin Float.Type
   // CHECK: [[VAL59:%.*]] = float_literal $Builtin.FPIEEE64, 0x4008000000000000
   // CHECK: [[VAL60:%.*]] = apply [[VAL57]]([[VAL59]], [[VAL58]])
   // CHECK: [[VAL61:%.*]] = apply [[VAL3]]([[VAL56]], [[VAL60]])
   // CHECK: strong_release [[VAL1]]#0
   // CHECK: return [[VAL61]]
 
-bb0(%0 : $Float32):
-  %1 = alloc_box $Float32
-  store %0 to %1#1 : $*Float32
-  %3 = function_ref @sub_floats : $@thin (Float32, Float32) -> Float32
-  %4 = function_ref @test_control_flow : $@thin (Float32, Float32) -> Float32
-  %5 = function_ref @add_floats : $@thin (Float32, Float32) -> Float32
-  %6 = load %1#1 : $*Float32
-  %7 = function_ref @convertFromBuiltinFloatLiteral : $@thin (Builtin.FPIEEE64, @thin Float32.Type) -> Float32
-  %8 = metatype $@thin Float32.Type
+bb0(%0 : $Float):
+  %1 = alloc_box $Float
+  store %0 to %1#1 : $*Float
+  %3 = function_ref @sub_floats : $@thin (Float, Float) -> Float
+  %4 = function_ref @test_control_flow : $@thin (Float, Float) -> Float
+  %5 = function_ref @add_floats : $@thin (Float, Float) -> Float
+  %6 = load %1#1 : $*Float
+  %7 = function_ref @convertFromBuiltinFloatLiteral : $@thin (Builtin.FPIEEE64, @thin Float.Type) -> Float
+  %8 = metatype $@thin Float.Type
   %9 = float_literal $Builtin.FPIEEE64, 0x3FF0000000000000
-  %10 = apply %7(%9, %8) : $@thin (Builtin.FPIEEE64, @thin Float32.Type) -> Float32
-  %11 = apply %5(%6, %10) : $@thin (Float32, Float32) -> Float32
-  %12 = function_ref @convertFromBuiltinFloatLiteral : $@thin (Builtin.FPIEEE64, @thin Float32.Type) -> Float32
-  %13 = metatype $@thin Float32.Type
+  %10 = apply %7(%9, %8) : $@thin (Builtin.FPIEEE64, @thin Float.Type) -> Float
+  %11 = apply %5(%6, %10) : $@thin (Float, Float) -> Float
+  %12 = function_ref @convertFromBuiltinFloatLiteral : $@thin (Builtin.FPIEEE64, @thin Float.Type) -> Float
+  %13 = metatype $@thin Float.Type
   %14 = float_literal $Builtin.FPIEEE64, 0x4000000000000000
-  %15 = apply %12(%14, %13) : $@thin (Builtin.FPIEEE64, @thin Float32.Type) -> Float32
-  %16 = apply [transparent] %4(%11, %15) : $@thin (Float32, Float32) -> Float32
-  %17 = function_ref @convertFromBuiltinFloatLiteral : $@thin (Builtin.FPIEEE64, @thin Float32.Type) -> Float32
-  %18 = metatype $@thin Float32.Type
+  %15 = apply %12(%14, %13) : $@thin (Builtin.FPIEEE64, @thin Float.Type) -> Float
+  %16 = apply [transparent] %4(%11, %15) : $@thin (Float, Float) -> Float
+  %17 = function_ref @convertFromBuiltinFloatLiteral : $@thin (Builtin.FPIEEE64, @thin Float.Type) -> Float
+  %18 = metatype $@thin Float.Type
   %19 = float_literal $Builtin.FPIEEE64, 0x4008000000000000
-  %20 = apply %17(%19, %18) : $@thin (Builtin.FPIEEE64, @thin Float32.Type) -> Float32
-  %21 = apply %3(%16, %20) : $@thin (Float32, Float32) -> Float32
+  %20 = apply %17(%19, %18) : $@thin (Builtin.FPIEEE64, @thin Float.Type) -> Float
+  %21 = apply %3(%16, %20) : $@thin (Float, Float) -> Float
   strong_release %1#0 : $Builtin.NativeObject
-  return %21 : $Float32
+  return %21 : $Float
 }
 
-// CHECK-LABEL: @test_recursive_foo : $@thin (Float32) -> Float32
-sil @test_recursive_foo : $@thin (Float32) -> Float32 {
+// CHECK-LABEL: @test_recursive_foo : $@thin (Float) -> Float
+sil @test_recursive_foo : $@thin (Float) -> Float {
   // CHECK-NOT: function_ref
   // CHECK-NOT: apply
   // CHECK: return
 
-bb0(%0 : $Float32):
-  %3 = function_ref @test_recursive_bar : $@thin (Float32) -> Float32
-  %5 = apply [transparent] %3(%0) : $@thin (Float32) -> Float32
-  return %5 : $Float32
+bb0(%0 : $Float):
+  %3 = function_ref @test_recursive_bar : $@thin (Float) -> Float
+  %5 = apply [transparent] %3(%0) : $@thin (Float) -> Float
+  return %5 : $Float
 }
 
-// CHECK-LABEL: sil @test_recursive_bar : $@thin (Float32) -> Float32
-sil @test_recursive_bar : $@thin (Float32) -> Float32 {
+// CHECK-LABEL: sil @test_recursive_bar : $@thin (Float) -> Float
+sil @test_recursive_bar : $@thin (Float) -> Float {
   // CHECK-NOT: function_ref
   // CHECK-NOT: apply
   // CHECK: return
 
-bb0(%0 : $Float32):
-  %3 = function_ref @test_recursive_baz : $@thin (Float32) -> Float32
-  %5 = apply [transparent] %3(%0) : $@thin (Float32) -> Float32
-  return %5 : $Float32
+bb0(%0 : $Float):
+  %3 = function_ref @test_recursive_baz : $@thin (Float) -> Float
+  %5 = apply [transparent] %3(%0) : $@thin (Float) -> Float
+  return %5 : $Float
 }
 
-// CHECK-LABEL: sil @test_recursive_baz : $@thin (Float32) -> Float32
-sil @test_recursive_baz : $@thin (Float32) -> Float32 {
+// CHECK-LABEL: sil @test_recursive_baz : $@thin (Float) -> Float
+sil @test_recursive_baz : $@thin (Float) -> Float {
   // CHECK-NOT: function_ref
   // CHECK-NOT: apply
   // CHECK: return
 
-bb0(%0 : $Float32):
-  return %0 : $Float32
+bb0(%0 : $Float):
+  return %0 : $Float
 }
 
 // CHECK-LABEL: sil @test_partial_foo : $@thin (Int64) -> Int64 {

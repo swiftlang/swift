@@ -1125,10 +1125,10 @@ bool Mangler::tryMangleStandardSubstitution(NominalTypeDecl *decl) {
   } else if (name == "UnicodeScalar") {
     Buffer << "Sc";
     return true;
-  } else if (name == "Float64") {
+  } else if (name == "Double") {
     Buffer << "Sd";
     return true;
-  } else if (name == "Float32") {
+  } else if (name == "Float") {
     Buffer << "Sf";
     return true;
   } else if (name == "Optional") {
