@@ -163,7 +163,7 @@ static void simplifySwitchEnumInst(SwitchEnumInst *SEI,
   auto *Dest = SEI->getCaseDestination(Element);
 
   auto *BB = SEI->getParent();
-  if (BB->bbarg_empty()) {
+  if (BB->bbarg_empty() || Dest->bbarg_empty()) {
     SILBuilder(SEI).createBranch(SEI->getLoc(), Dest);
   } else {
     assert(BB->bbarg_size() == 1 && "Expected only one argument!");
