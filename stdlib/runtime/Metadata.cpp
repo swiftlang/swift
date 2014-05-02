@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Support/MathExtras.h"
+#include "swift/Basic/LLVM.h"
 #include "swift/Basic/Range.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
@@ -673,7 +674,9 @@ swift::swift_getFunctionTypeMetadata(const Metadata *argMetadata,
 namespace {
   class TupleCacheEntry : public CacheEntry<TupleCacheEntry> {
   public:
-    ValueWitnessTable Witnesses;
+    // NOTE: if you change the layout of this type, you'll also need
+    // to update tuple_getValueWitnesses().
+    ExtraInhabitantsValueWitnessTable Witnesses;
     FullMetadata<TupleTypeMetadata> Metadata;
 
     TupleCacheEntry(size_t numArguments) : CacheEntry(numArguments) {
@@ -695,7 +698,7 @@ static MetadataCache<TupleCacheEntry> TupleTypes;
 /// Given a metatype pointer, produce the value-witness table for it.
 /// This is equivalent to metatype->ValueWitnesses but more efficient.
 static const ValueWitnessTable *tuple_getValueWitnesses(const Metadata *metatype) {
-  return ((const ValueWitnessTable*) asFullMetadata(metatype)) - 1;
+  return ((const ExtraInhabitantsValueWitnessTable*) asFullMetadata(metatype)) - 1;
 }
 
 /// Generic tuple value witness for 'projectBuffer'.
@@ -1016,6 +1019,29 @@ static const Metadata *tuple_typeOf(OpaqueValue *obj,
   return metatype;
 }
 
+static void tuple_storeExtraInhabitant(OpaqueValue *tuple,
+                                       int index,
+                                       const Metadata *_metatype) {
+  auto &metatype = *(const TupleTypeMetadata*) _metatype;
+  auto &eltInfo = metatype.getElements()[0];
+
+  assert(eltInfo.Offset == 0);
+  OpaqueValue *elt = tuple;
+
+  eltInfo.Type->vw_storeExtraInhabitant(elt, index);
+}
+
+static int tuple_getExtraInhabitantIndex(const OpaqueValue *tuple,
+                                         const Metadata *_metatype) {
+  auto &metatype = *(const TupleTypeMetadata*) _metatype;
+  auto &eltInfo = metatype.getElements()[0];
+
+  assert(eltInfo.Offset == 0);
+  const OpaqueValue *elt = tuple;
+
+  return eltInfo.Type->vw_getExtraInhabitantIndex(elt);
+}
+
 /// Various standard witness table for tuples.
 static const ValueWitnessTable tuple_witnesses_pod_inline = {
 #define TUPLE_WITNESS(NAME) &tuple_##NAME<true, true>,
@@ -1199,6 +1225,16 @@ swift::swift_getTupleTypeMetadata(size_t numElements,
   FOR_ALL_FUNCTION_VALUE_WITNESSES(ASSIGN_TUPLE_WITNESS)
 #undef ASSIGN_TUPLE_WITNESS
 
+  // We have extra inhabitants if the first element does.
+  // FIXME: generalize this.
+  if (auto firstEltEIVWT = dyn_cast<ExtraInhabitantsValueWitnessTable>(
+                                          elements[0]->getValueWitnesses())) {
+    witnesses->flags = witnesses->flags.withExtraInhabitants(true);
+    witnesses->extraInhabitantFlags = firstEltEIVWT->extraInhabitantFlags;
+    witnesses->storeExtraInhabitant = tuple_storeExtraInhabitant;
+    witnesses->getExtraInhabitantIndex = tuple_getExtraInhabitantIndex;
+  }
+
   auto finalMetadata = TupleTypes.add(entry)->getData();
 #if SWIFT_DEBUG_RUNTIME
   printf(" -> %p\n", finalMetadata);
@@ -1240,6 +1276,19 @@ void swift::swift_initStructMetadata_UniversalStrategy(size_t numFields,
   vwtable->size = layout.size;
   vwtable->flags = layout.flags;
   vwtable->stride = layout.stride;
+
+  // We have extra inhabitants if the first element does.
+  // FIXME: generalize this.
+  if (auto firstFieldVWT = dyn_cast<ExtraInhabitantsValueWitnessTable>(
+                                        fieldTypes[0]->getValueWitnesses())) {
+    vwtable->flags = vwtable->flags.withExtraInhabitants(true);
+    auto xiVWT = cast<ExtraInhabitantsValueWitnessTable>(vwtable);
+    xiVWT->extraInhabitantFlags = firstFieldVWT->extraInhabitantFlags;
+
+    // The compiler should already have initialized these.
+    assert(xiVWT->storeExtraInhabitant);
+    assert(xiVWT->getExtraInhabitantIndex);
+  }
 }
 
 /*** Classes ***************************************************************/

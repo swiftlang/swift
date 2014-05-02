@@ -569,6 +569,15 @@ struct ValueWitnessTable {
   /// The number of extra inhabitants, that is, bit patterns that do not form
   /// valid values of the type, in this type's binary representation.
   unsigned getNumExtraInhabitants() const;
+
+  /// Assert that this value witness table is an extra-inhabitants
+  /// value witness table and return it as such.
+  ///
+  /// This has an awful name because it's supposed to be internal to
+  /// this file.  Code outside this file should use LLVM's cast/dyn_cast.
+  /// We don't want to use those here because we need to avoid accidentally
+  /// introducing ABI dependencies on LLVM structures.
+  const struct ExtraInhabitantsValueWitnessTable *_asXIVWT() const;
 };
   
 /// A value-witness table with extra inhabitants entry points.
@@ -588,15 +597,23 @@ struct ExtraInhabitantsValueWitnessTable : ValueWitnessTable {
                             value_witness_types::extraInhabitantFlags eif)
     : ValueWitnessTable(base), storeExtraInhabitant(sei),
       getExtraInhabitantIndex(geii), extraInhabitantFlags(eif) {}
+
+  static bool classof(const ValueWitnessTable *table) {
+    return table->flags.hasExtraInhabitants();
+  }
 };
+
+inline const ExtraInhabitantsValueWitnessTable *
+ValueWitnessTable::_asXIVWT() const {
+  assert(ExtraInhabitantsValueWitnessTable::classof(this));
+  return static_cast<const ExtraInhabitantsValueWitnessTable *>(this);
+}
   
 inline unsigned ValueWitnessTable::getNumExtraInhabitants() const {
   // If the table does not have extra inhabitant witnesses, then there are zero.
   if (!flags.hasExtraInhabitants())
     return 0;
-  return static_cast<const ExtraInhabitantsValueWitnessTable &>(*this)
-    .extraInhabitantFlags
-    .getNumExtraInhabitants();
+  return this->_asXIVWT()->extraInhabitantFlags.getNumExtraInhabitants();
 }
 
 // Standard value-witness tables.
@@ -794,6 +811,13 @@ public:
     }
   FOR_ALL_FUNCTION_VALUE_WITNESSES(FORWARD_WITNESS)
   #undef FORWARD_WITNESS
+
+  int vw_getExtraInhabitantIndex(const OpaqueValue *value) const  {
+    return getValueWitnesses()->_asXIVWT()->getExtraInhabitantIndex(value, this);
+  }
+  void vw_storeExtraInhabitant(OpaqueValue *value, int index) const {
+    getValueWitnesses()->_asXIVWT()->storeExtraInhabitant(value, index, this);
+  }
   
   /// Get the nominal type descriptor if this metadata describes a nominal type,
   /// or return null if it does not.

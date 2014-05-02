@@ -124,6 +124,17 @@ public:
     return getFixedExtraInhabitantCount(IGM) > 0;
   }
 
+  /// Given a payload value that might be an extra enhabitant, return
+  /// a value that can be compared for bitwise equality with an extra
+  /// inhabitant.
+  ///
+  /// This is necessary because we don't want to promise to initialize
+  /// every bit in the value when setting up an extra inhabitant.
+  virtual llvm::Value *maskFixedExtraInhabitant(IRGenFunction &IGF,
+                                                llvm::Value *payload) const {
+    return payload;
+  }
+
   /// Create a constant of the given bit width holding one of the extra
   /// inhabitants of the type.
   /// The index must be less than the value returned by
