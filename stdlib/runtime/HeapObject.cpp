@@ -284,6 +284,9 @@ void swift::swift_weakRelease(HeapObject *object) {
 }
 
 HeapObject *swift::swift_tryRetain(HeapObject *object) {
+  return _swift_tryRetain(object);
+}
+static HeapObject *_swift_tryRetain_(HeapObject *object) {
   if (!object) return nullptr;
 
   uint32_t newCount = __sync_add_and_fetch(&object->refCount, RC_INTERVAL);
@@ -294,6 +297,7 @@ HeapObject *swift::swift_tryRetain(HeapObject *object) {
   }
   return object;
 }
+auto swift::_swift_tryRetain = _swift_tryRetain_;
 
 #endif
 

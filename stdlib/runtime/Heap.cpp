@@ -45,6 +45,7 @@ static void _swift_zone_log(malloc_zone_t *zone, void *address);
 static void _swift_zone_statistics(malloc_zone_t *zone,
                                    malloc_statistics_t *stats);
 
+static const AllocIndex badAllocIndex = AllocIndex(-1);
 
 namespace {
 
@@ -395,6 +396,38 @@ static inline size_t indexToSize(AllocIndex idx) {
   return size;
 }
 
+static inline AllocIndex sizeToIndex(size_t size) {
+  assert(size != 0); // pass '1' if you want a placeholder object
+  --size;
+  // we could do a table based lookup if we think it worthwhile
+#ifdef __LP64__
+  if      (size <   0x80) return (size >> 3) +  0x0;
+  else if (size <  0x100) return (size >> 4) +  0x8;
+  else if (size <  0x200) return (size >> 5) + 0x10;
+  else if (size <  0x400) return (size >> 6) + 0x18;
+  else if (size <  0x800) return (size >> 7) + 0x20;
+  else if (size < 0x1000) return (size >> 8) + 0x28;
+#else
+  if      (size <   0x40) return (size >> 2) +  0x0;
+  else if (size <   0x80) return (size >> 3) +  0x8;
+  else if (size <  0x100) return (size >> 4) + 0x10;
+  else if (size <  0x200) return (size >> 5) + 0x18;
+  else if (size <  0x400) return (size >> 6) + 0x20;
+  else if (size <  0x800) return (size >> 7) + 0x28;
+  else if (size < 0x1000) return (size >> 8) + 0x30;
+#endif
+  return badAllocIndex;
+}
+
+size_t swift::_swift_indexToSize(unsigned idx) {
+  return indexToSize(idx);
+}
+
+int swift::_swift_sizeToIndex(size_t size) {
+  return sizeToIndex(size);
+}
+
+
 __attribute__((noinline,used))
 void *SwiftZone::globalAlloc(AllocIndex idx, uintptr_t flags)
 {
@@ -430,28 +463,8 @@ void _swift_refillThreadAllocCache(AllocIndex idx, uintptr_t flags) {
 }
 
 void *SwiftZone::slowAlloc_optimized(size_t size, uintptr_t flags) {
-  assert(size != 0); // pass '1' if you want a placeholder object
-  size_t idx = SIZE_MAX;
-  --size;
-  // we could do a table based lookup if we think it worthwhile
-#ifdef __LP64__
-  if      (size <   0x80) idx = (size >> 3) +  0x0;
-  else if (size <  0x100) idx = (size >> 4) +  0x8;
-  else if (size <  0x200) idx = (size >> 5) + 0x10;
-  else if (size <  0x400) idx = (size >> 6) + 0x18;
-  else if (size <  0x800) idx = (size >> 7) + 0x20;
-  else if (size < 0x1000) idx = (size >> 8) + 0x28;
-#else
-  if      (size <   0x40) idx = (size >> 2) +  0x0;
-  else if (size <   0x80) idx = (size >> 3) +  0x8;
-  else if (size <  0x100) idx = (size >> 4) + 0x10;
-  else if (size <  0x200) idx = (size >> 5) + 0x18;
-  else if (size <  0x400) idx = (size >> 6) + 0x20;
-  else if (size <  0x800) idx = (size >> 7) + 0x28;
-  else if (size < 0x1000) idx = (size >> 8) + 0x30;
-#endif
-  else {
-    ++size;
+  AllocIndex idx = sizeToIndex(size);
+  if (idx == badAllocIndex) {
     // large allocations
     void *r = mmapWrapper(size, /*huge*/ true);
     if (r == MAP_FAILED) {
@@ -481,27 +494,8 @@ void SwiftZone::slowDealloc_optimized(void *ptr, size_t bytes) {
     bytes = zoneShims.size(NULL, ptr);
   }
   assert(bytes != 0);
-
-  bytes--;
-
-  AllocIndex idx;
-#ifdef __LP64__
-  if        (bytes < 0x80)   { idx = (bytes >> 3);
-  } else if (bytes < 0x100)  { idx = (bytes >> 4) + 0x8;
-  } else if (bytes < 0x200)  { idx = (bytes >> 5) + 0x10;
-  } else if (bytes < 0x400)  { idx = (bytes >> 6) + 0x18;
-  } else if (bytes < 0x800)  { idx = (bytes >> 7) + 0x20;
-  } else if (bytes < 0x1000) { idx = (bytes >> 8) + 0x28;
-#else
-  if        (bytes < 0x40)   { idx = (bytes >> 2);
-  } else if (bytes < 0x80)   { idx = (bytes >> 3) + 0x8;
-  } else if (bytes < 0x100)  { idx = (bytes >> 4) + 0x10;
-  } else if (bytes < 0x200)  { idx = (bytes >> 5) + 0x18;
-  } else if (bytes < 0x400)  { idx = (bytes >> 6) + 0x20;
-  } else if (bytes < 0x800)  { idx = (bytes >> 7) + 0x28;
-  } else if (bytes < 0x1000) { idx = (bytes >> 8) + 0x30;
-#endif
-  } else {
+  AllocIndex idx = sizeToIndex(bytes);
+  if (idx == badAllocIndex) {
     auto it2 = hugeAllocations.find(ptr);
     assert(it2 != hugeAllocations.end());
     int r = munmap(const_cast<void *>(it2->first), it2->second);

@@ -33,7 +33,12 @@ extern "C" void (*_swift_dealloc)(void *ptr, AllocIndex idx);
 extern "C" void (*_swift_slowDealloc)(void *ptr, size_t bytes);
 
 extern "C" HeapObject *(*_swift_retain)(HeapObject *object);
+extern "C" HeapObject *(*_swift_tryRetain)(HeapObject *object);
 extern "C" void (*_swift_release)(HeapObject *object);
+
+
+size_t _swift_indexToSize(unsigned idx);
+int _swift_sizeToIndex(size_t size);
 
 };
 
