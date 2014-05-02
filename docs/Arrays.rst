@@ -20,16 +20,34 @@ The Swift Array Design
     }
    </style>
 
-Introductory Blather
---------------------
+Goals
+-----
+
+1. Performance equivalent to C arrays for subscript get/set of
+   non-class element types is the most important performance goal.
+
+2. It should be possible to receive an ``NSArray`` from Cocoa,
+   represent it as an ``Array<AnyObject>``, and pass it right back to
+   Cocoa as an ``NSArray`` in O(1) and with no memory allocations.
+      
+3. Arrays should be usable as stacks, so we want amortized O(1) append
+   and O(1) popBack.  Together with goal #1, this implies a
+   ``std::vector``\ -like layout, with a reserved tail memory capacity
+   that can exceed the number of actual stored elements.
+
+To achieve goals 1 and 2 together, we use static knowledge of the
+element type: when it is statically known that the element type is
+not, and is not derived from, an Objective-C class, code and checks
+accounting for the possibility of wrapping an ``NSArray`` are
+eliminated.  An ``Array`` of Swift value types or pure-Swift classes
+always uses the most efficient possible representation.
 
 Components
 ----------
 
-Swift provides three generic array types, all of which have
-copy-on-write value semantics and amortized O(1) growth.  In this
-document, statements about **ArrayType** apply to all three of the
-components.
+Swift provides three generic array types, all of which have amortized
+O(1) growth.  In this document, statements about **ArrayType** apply
+to all three of the components.
 
 * ``NativeArray<T>`` is the fastest and simplest of the three—use this
   when you need "C array" performance.  The elements of a
@@ -55,21 +73,90 @@ components.
   backing buffer, a ``Slice`` may artificially prolong the lifetime of
   elements outside the ``Slice`` itself.
 
+Mutation Semantics
+------------------
+
+Originally, the plan was to give *ArrayType*\ s full value semantics
+via copy-on-write (COW).  However, that COW requires a check for
+unique ownership before every write, which is only compatible with our
+primary performance goal if those checks can be hoisted out of loops.
+Since we can almost certainly not get hoisting uniqueness checks for
+1.0, subscript assignments on an array will be visible through all
+copies of that array::
+
+  var a = [1, 2, 3]
+  let b = a
+  a[1] = 42
+  println(b[1]) // prints "42"
+
+This implies that the elments of an array are notionally not part of
+the array's value, and indeed subscript assignment is a non-mutating
+operation:
+
+.. parsed-literal::
+
+  **let** a = [1, 2, 3]
+  **a[1] = 42** // OK
+
+Unfortunately, full consistent reference semantics would also be
+problematic with this design, because during array growth, at some
+point available capacity is filled, and the array's buffer needs be
+reallocated.  The only way to keep changes to the array visible
+through its copies once the buffer was reallocated would be to add a
+level of indirection between the arrays and their shared buffer, which
+would conflict with our primary performance goals, requiring a hoist
+optimization that we are again unlikely to get for 1.0.
+
+Therefore, potentially size-changing operations such as ``append`` do
+*not* have reference semantics, as they always (effectively) copy the
+array to ensure unique ownership before mutating it::
+
+  var a = [1, 2, 3]
+  let b = a
+  a[1] = 42
+  println(b[1]) // prints "42"
+
+Shared Subscript Assignment and ``NSArray``
+-------------------------------------------
+
+For ``Array`` there is one more wrinkle: when its storage is backed by
+an immutable ``NSArray``, shared semantics for subscript assignment
+implies that we add a level of indirection anyway: the NSArray needs
+to be replaced by an array buffer containing the new value, and that
+change needs to be visible through all copies of the array.  Remember
+that this indirection has no cost in cases like ``Array<Int>``, where
+it is statically known to be unneeded.
+
+.. image:: ArrayBridge.png
+
 Array Casts
 -----------
 
-* *ArrayType*\ ``<T>`` implicitly converts to *ArrayType*\ ``<U>`` if
-  ``T`` is a trivial subtype of ``U`` (or if ``U`` is ``AnyObject``\
-  —see below).  [Implementation note: when accessed as *ArrayType*\
-  ``<U>``, the underlying buffer of ``T``\ s is treated as immutable,
-  to be copied-on-write, even if uniquely-referenced]
+We can essentially reinterpret an array buffer containing elements of
+dynamic type T as an *immutable* buffer of elemeents of type U, as
+long as T was a trivial subtype of U.  Since the buffer has static
+knowledge of its element type, allowing it to be mutated would be
+unsafe, as we could then insert an object of type ``U`` but not ``T``.
+This capability would still be useful to us if we had full value
+semantics for array, but our shared subscript assignment semantics
+imply that we must produce a new buffer in order to view an
+*ArrayType*\ ``<T>`` as an *ArrayType*\ ``<U>``.
 
-* *ArrayType*\ ``<U>`` explicitly converts to *ArrayType*\ ``<T>``?
-  via ``x as ArrayType<T>``.  The cast succeeds, yielding a non-nil
-  result, iff the original value was of some *ArrayType*\ ``<V>``
-  where ``V`` is a trivial subtype of ``T``. [Implementation note: if
-  ``V`` == ``T``, the underlying buffer need only be treated as
-  immutable if uniquely referenced]
+.. Because of the above, the logic below no longer works.
+   
+   * *ArrayType*\ ``<T>`` implicitly converts to *ArrayType*\ ``<U>`` if
+     ``T`` is a trivial subtype of ``U`` (or if ``U`` is ``AnyObject``\
+     —see below).  [Implementation note: when accessed as *ArrayType*\
+     ``<U>``, the underlying buffer of ``T``\ s is treated as immutable,
+     to be copied-on-write, even if uniquely-referenced]
+
+   * *ArrayType*\ ``<U>`` explicitly converts to *ArrayType*\ ``<T>``?
+     via ``x as ArrayType<T>``.  The cast succeeds, yielding a non-nil
+     result, iff the original value was of some *ArrayType*\ ``<V>``
+     where ``V`` is a trivial subtype of ``T``. [Implementation note: if
+     ``V`` == ``T``, the underlying buffer need only be treated as
+     immutable if uniquely referenced]
+
 
 Bridging Rules and Terminology for all Types
 --------------------------------------------
