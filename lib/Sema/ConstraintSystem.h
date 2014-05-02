@@ -1978,9 +1978,10 @@ public:
   /// expression, producing a fully type-checked expression.
   Expr *applySolutionShallow(const Solution &solution, Expr *expr);
   
-  /// \brief Get the first specialization computed for a type variable. This is
+  /// \brief Obtain the specializations computed for a type variable. This is
   /// useful when emitting diagnostics for computed type variables.
-  Type getFirstComputedBinding(TypeVariableType *tvt);
+  void getComputedBindings(TypeVariableType *tvt,
+                           SmallVectorImpl<Type> &bindings);
 
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump() LLVM_ATTRIBUTE_USED,

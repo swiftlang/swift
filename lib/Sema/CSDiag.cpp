@@ -746,7 +746,8 @@ bool diagnoseAmbiguity(ConstraintSystem &cs, ArrayRef<Solution> solutions) {
   return false;
 }
 
-Constraint *getOverloadConstraint(Constraint *constraint) {
+Constraint *getDisjunctionChoice(Constraint *constraint,
+                                 ConstraintKind kind) {
   if (constraint->getKind() != ConstraintKind::Disjunction) {
     return nullptr;
   }
@@ -754,7 +755,7 @@ Constraint *getOverloadConstraint(Constraint *constraint) {
   auto nestedConstraints = constraint->getNestedConstraints();
   
   for (auto nestedConstraint : nestedConstraints) {
-    if (nestedConstraint->getKind() == ConstraintKind::BindOverload)
+    if (nestedConstraint->getKind() == kind)
       return nestedConstraint;
   }
   
@@ -846,6 +847,8 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
   Constraint *overloadConstraint = nullptr;
   Constraint *fallbackConstraint = nullptr;
   Constraint *activeConformanceConstraint = nullptr;
+  Constraint *valueMemberConstraint = nullptr;
+  Constraint *argumentConstraint = nullptr;
   
   // If we've been asked for more detailed type-check diagnostics, mine the
   // system's inactive constraints for information on why we could not find a
@@ -871,10 +874,26 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
         fallbackConstraint = constraint;
       }
       
+      // Failed binding constraints point to a missing member.
+      if (!valueMemberConstraint &&
+          (constraint->getKind() == ConstraintKind::ValueMember)) {
+        valueMemberConstraint = constraint;
+      }
+      
+      // A missed argument conversion can result in better error messages when
+      // a user passes the wrong arguments to a function application.
+      if (!argumentConstraint) {
+        argumentConstraint = getDisjunctionChoice(
+                                                  constraint,
+                                                  ConstraintKind::
+                                                      ArgumentTupleConversion);
+      }
+      
       // Overload resolution failures are often nicely descriptive, so store
       // off the first one we find.
       if (!overloadConstraint) {
-        overloadConstraint = getOverloadConstraint(constraint);
+        overloadConstraint = getDisjunctionChoice(constraint,
+                                                  ConstraintKind::BindOverload);
       }
       
       // Conversion constraints are also nicely descriptive, so we'll grab the
@@ -893,43 +912,24 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
   if (!(conversionConstraint || overloadConstraint)) {
     conversionConstraint = fallbackConstraint;
   }
-  
-  if (activeConformanceConstraint) {
+  if (argumentConstraint) {
+    TC.diagnose(expr->getLoc(),
+                diag::could_not_convert_argument,
+                argumentConstraint->getFirstType(),
+                argumentConstraint->getSecondType());
+  } else if (valueMemberConstraint) {
+    auto memberName = valueMemberConstraint->getMember().getBaseName().str();
+    TC.diagnose(expr->getLoc(),
+                diag::could_not_find_member,
+                memberName);
+    
+  } else if (activeConformanceConstraint) {
     auto type = activeConformanceConstraint->getSecondType();
     
     TC.diagnose(expr->getLoc(),
                 diag::does_not_conform_to_constraint,
                 type)
     .highlight(expr->getSourceRange());
-  } else  if (conversionConstraint) {
-    // Otherwise, if we have a conversion constraint, use that as the basis for
-    // the diagnostic.
-    auto locator = conversionConstraint->getLocator();
-    auto anchor = locator ? locator->getAnchor() : expr;
-    auto type = conversionConstraint->getSecondType();
-    
-    if (auto typeVariableType = dyn_cast<TypeVariableType>(type.getPointer())) {
-      
-      auto binding = this->getFirstComputedBinding(typeVariableType);
-      
-      if (!binding.isNull()) {
-        type = binding;
-      } else {
-        auto impl = typeVariableType->getImpl();
-        if (auto archetypeType = impl.getArchetype()) {
-          type = archetypeType;
-        } else {
-          auto implAnchor = impl.getLocator()->getAnchor();
-          type = implAnchor->getType();
-        }
-      }
-    }
-    
-    TC.diagnose(anchor->getLoc(),
-                diag::cannot_find_conversion,
-                type)
-      .highlight(expr->getSourceRange());
-    
   } else if (overloadConstraint) {
     
     // In the absense of a better conversion constraint failure, point out the
@@ -939,6 +939,57 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
     TC.diagnose(expr->getLoc(),
                 diag::cannot_find_appropriate_overload,
                 overloadName.str());
+  } else  if (conversionConstraint) {
+    // Otherwise, if we have a conversion constraint, use that as the basis for
+    // the diagnostic.
+    auto locator = conversionConstraint->getLocator();
+    auto anchor = locator ? locator->getAnchor() : expr;
+    auto type1 = expr->getType();
+    auto type2 = conversionConstraint->getSecondType();
+    
+    if (auto typeVariableType =
+                dyn_cast<TypeVariableType>(type2.getPointer())) {
+      SmallVector<Type, 4> bindings;
+      this->getComputedBindings(typeVariableType, bindings);
+      auto binding = bindings.size() ? bindings.front() : Type();
+      
+      if (!binding.isNull()) {
+        if (binding.getPointer() != type1.getPointer())
+          type2 = binding;
+      } else {
+        auto impl = typeVariableType->getImpl();
+        if (auto archetypeType = impl.getArchetype()) {
+          type2 = archetypeType;
+        } else {
+          auto implAnchor = impl.getLocator()->getAnchor();
+          auto anchorType = implAnchor->getType();
+          
+          // Don't re-substitute an opened type variable for itself.
+          if (anchorType.getPointer() != type1.getPointer())
+            type2 = anchorType;
+        }
+      }
+    }
+    
+    if (auto typeVariableType =
+        dyn_cast<TypeVariableType>(type1.getPointer())) {
+      SmallVector<Type, 4> bindings;
+      
+      this->getComputedBindings(typeVariableType, bindings);
+      
+      for (auto binding : bindings) {
+        if (type2.getPointer() != binding.getPointer()) {
+          type1 = binding;
+          break;
+        }
+      }
+    }
+    
+    TC.diagnose(anchor->getLoc(),
+                diag::cannot_find_conversion,
+                type1, type2)
+      .highlight(expr->getSourceRange());
+    
   } else {
     TC.diagnose(expr->getLoc(), diag::constraint_type_check_fail)
       .highlight(expr->getSourceRange());

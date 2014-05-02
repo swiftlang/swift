@@ -49,12 +49,15 @@ NOTE(while_converting_default_tuple_value,sema,none,
      "while converting default tuple value to element type %0", (Type))
 NOTE(while_converting_subscript_index,sema,none,
      "while converting subscript index to expected type %0", (Type))
+//------------------------------------------------------------------------------
+// Constraint solver diagnostics
+//------------------------------------------------------------------------------
 
 ERROR(constraint_type_check_fail,sema,none,
       "expression does not type-check", ())
 
 ERROR(cannot_find_conversion,sema,none,
-      "cannot convert the expression's type to type %0", (Type))
+      "cannot convert the expression's type %0 to type %1", (Type, Type))
 
 ERROR(does_not_conform_to_constraint,sema,none,
       "type does not conform to protocol %0", (Type))
@@ -62,7 +65,11 @@ ERROR(does_not_conform_to_constraint,sema,none,
 ERROR(cannot_find_appropriate_overload,sema,none,
       "could not find an appropriate overload for '%0'", (StringRef))
 
+ERROR(could_not_find_member,sema,none,
+      "could not find member '%0'", (StringRef))
 
+ERROR(could_not_convert_argument,sema,none,
+      "argument type %0 does not convert to %1", (Type, Type))
 //------------------------------------------------------------------------------
 // Name Binding
 //------------------------------------------------------------------------------
