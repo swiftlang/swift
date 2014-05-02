@@ -207,12 +207,14 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
     CMutablePointer,
     CConstPointer,
     Array,
+    Unmanaged,
   } kind = llvm::StringSwitch<StructKind>(swiftStructDecl->getName().str())
     .Case("UnsafePointer", StructKind::UnsafePointer)
     .Case("ObjCMutablePointer", StructKind::ObjCMutablePointer)
     .Case("CMutablePointer", StructKind::CMutablePointer)
     .Case("CConstPointer", StructKind::CConstPointer)
     .Case("Array", StructKind::Array)
+    .Case("Unmanaged", StructKind::Unmanaged)
     .Default(StructKind::Invalid);
   
   auto args = type->getGenericArgs();
@@ -225,6 +227,7 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
                      " Clang module!");
       
   case StructKind::UnsafePointer: // Assume UnsafePointer is mutable
+  case StructKind::Unmanaged:
   case StructKind::ObjCMutablePointer:
   case StructKind::CMutablePointer: {
     auto clangCanTy = visit(args.front()->getCanonicalType());
