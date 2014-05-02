@@ -1,9 +1,10 @@
 @import Foundation;
 
 typedef struct dispatch_queue_t {} dispatch_queue_t;
+typedef void (^dispatch_block_t)(void);
 
 dispatch_queue_t dispatch_get_current_queue(void);
-void dispatch_async(dispatch_queue_t q, void (^f)(void));
+void dispatch_async(dispatch_queue_t q, dispatch_block_t);
 
 @interface NSString ()
 

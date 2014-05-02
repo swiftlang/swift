@@ -652,8 +652,9 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
   }
 
   // Turn block pointer types back into normal function types in any
-  // context where bridging is possible.
-  if (hint == ImportHint::Block && canBridgeTypes(importKind)) {
+  // context where bridging is possible, unless the block has a typedef.
+  if (hint == ImportHint::Block && canBridgeTypes(importKind) &&
+      !isa<NameAliasType>(importedType.getPointer())) {
     auto fTy = importedType->castTo<FunctionType>();
     FunctionType::ExtInfo einfo =
       fTy->getExtInfo().withRepresentation(FunctionType::Representation::Thick);
