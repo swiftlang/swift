@@ -346,16 +346,19 @@ ERROR(unavailable_method_non_objc_protocol,sema_tcd,none,
       "protocol members can only be marked unavailable in an @objc protocol",
       ())
 ERROR(missing_in_class_init_1,sema_tcd,none,
-      "stored property %0 requires an initial value", (Identifier))
+      "stored property %0 requires an initial value%select{| or should be "
+      "@NSManaged}1", (Identifier, bool))
 ERROR(missing_in_class_init_2,sema_tcd,none,
-      "stored properties %0 and %1 require initial values", 
-      (Identifier, Identifier))
+      "stored properties %0 and %1 require initial values%select{| or should "
+      "be @NSManaged}2", 
+      (Identifier, Identifier, bool))
 ERROR(missing_in_class_init_3plus,sema_tcd,none,
       "stored properties %0, %1, %select{and %2|%2, and others}3 "
-      "require initial values", (Identifier, Identifier, Identifier, bool))
+      "require initial values%select{| or should be @NSManaged}4", 
+      (Identifier, Identifier, Identifier, bool, bool))
 NOTE(requires_stored_property_inits_here,sema_tcd,none,
      "%select{superclass|class}1 %0 requires all stored properties to have "
-     "initial values", (Type, bool))
+     "initial values%select{| or use @NSManaged}2", (Type, bool, bool))
 ERROR(implied_name_no_argument,sema_tcd,none,
       "no name specified for first argument, name it '_' to ignore it", ())
 ERROR(class_without_init,sema_tcd,none,

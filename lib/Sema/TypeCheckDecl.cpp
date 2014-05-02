@@ -2604,6 +2604,33 @@ public:
       checkObjCConformance(protocols[i], conformances[i]);
   }
 
+  /// Check whether the given propertes can be @NSManaged in this class.
+  static bool propertiesCanBeNSManaged(ClassDecl *classDecl,
+                                       ArrayRef<VarDecl *> vars) {
+    // Check whether we have an Objective-C-defined class in our
+    // inheritance chain.
+    while (classDecl) {
+      // If we found an Objective-C-defined class, continue checking.
+      if (classDecl->hasClangNode())
+        break;
+
+      // If we ran out of superclasses, we're done.
+      if (!classDecl->hasSuperclass())
+        return false;
+
+      classDecl = classDecl->getSuperclass()->getClassOrBoundGenericClass();
+    }
+
+    // If all of the variables are @objc, we can use @NSManaged.
+    for (auto var : vars) {
+      if (!var->isObjC())
+        return false;
+    }
+
+    // Okay, we can use @NSManaged.
+    return true;
+  }
+
   /// Check that all stored properties have in-class initializers.
   void checkRequiredInClassInits(ClassDecl *cd) {
     ClassDecl *source = nullptr;
@@ -2621,30 +2648,31 @@ public:
       pbd->setInvalid();
       SmallVector<VarDecl *, 4> vars;
       pbd->getPattern()->collectVariables(vars);
+      bool suggestNSManaged = propertiesCanBeNSManaged(cd, vars);
       switch (vars.size()) {
       case 0:
         llvm_unreachable("should have been marked invalid");
 
       case 1:
         TC.diagnose(pbd->getLoc(), diag::missing_in_class_init_1,
-                    vars[0]->getName());
+                    vars[0]->getName(), suggestNSManaged);
         break;
 
       case 2:
         TC.diagnose(pbd->getLoc(), diag::missing_in_class_init_2,
-                    vars[0]->getName(), vars[1]->getName());
+                    vars[0]->getName(), vars[1]->getName(), suggestNSManaged);
         break;
 
       case 3:
         TC.diagnose(pbd->getLoc(), diag::missing_in_class_init_3plus,
                     vars[0]->getName(), vars[1]->getName(), vars[2]->getName(),
-                    false);
+                    false, suggestNSManaged);
         break;
 
       default:
         TC.diagnose(pbd->getLoc(), diag::missing_in_class_init_3plus,
                     vars[0]->getName(), vars[1]->getName(), vars[2]->getName(),
-                    true);
+                    true, suggestNSManaged);
         break;
       }
 
@@ -2672,7 +2700,7 @@ public:
 
       // Add a note describing why we need an initializer.
       TC.diagnose(source, diag::requires_stored_property_inits_here,
-                  source->getDeclaredType(), cd == source);
+                  source->getDeclaredType(), cd == source, suggestNSManaged);
     }
   }
 
