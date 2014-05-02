@@ -673,7 +673,9 @@ swift::swift_getFunctionTypeMetadata(const Metadata *argMetadata,
 namespace {
   class TupleCacheEntry : public CacheEntry<TupleCacheEntry> {
   public:
-    ValueWitnessTable Witnesses;
+    // NOTE: if you change the layout of this type, you'll also need
+    // to update tuple_getValueWitnesses().
+    ExtraInhabitantsValueWitnessTable Witnesses;
     FullMetadata<TupleTypeMetadata> Metadata;
 
     TupleCacheEntry(size_t numArguments) : CacheEntry(numArguments) {
@@ -695,7 +697,7 @@ static MetadataCache<TupleCacheEntry> TupleTypes;
 /// Given a metatype pointer, produce the value-witness table for it.
 /// This is equivalent to metatype->ValueWitnesses but more efficient.
 static const ValueWitnessTable *tuple_getValueWitnesses(const Metadata *metatype) {
-  return ((const ValueWitnessTable*) asFullMetadata(metatype)) - 1;
+  return ((const ExtraInhabitantsValueWitnessTable*) asFullMetadata(metatype)) - 1;
 }
 
 /// Generic tuple value witness for 'projectBuffer'.
@@ -1198,6 +1200,18 @@ swift::swift_getTupleTypeMetadata(size_t numElements,
   witnesses->NAME = proposedWitnesses->NAME;
   FOR_ALL_FUNCTION_VALUE_WITNESSES(ASSIGN_TUPLE_WITNESS)
 #undef ASSIGN_TUPLE_WITNESS
+
+  // We have extra inhabitants if the first element does.
+  // FIXME: generalize this.
+  auto firstEltVWT = elements[0]->getValueWitnesses();
+  if (firstEltVWT->flags.hasExtraInhabitants()) {
+    witnesses->flags = witnesses->flags.withExtraInhabitants(true);
+    auto firstEltEIVWT =
+      static_cast<const ExtraInhabitantsValueWitnessTable*>(firstEltVWT);
+    witnesses->extraInhabitantFlags = firstEltEIVWT->extraInhabitantFlags;
+    witnesses->storeExtraInhabitant = firstEltEIVWT->storeExtraInhabitant;
+    witnesses->getExtraInhabitantIndex = firstEltEIVWT->getExtraInhabitantIndex;
+  }
 
   auto finalMetadata = TupleTypes.add(entry)->getData();
 #if SWIFT_DEBUG_RUNTIME

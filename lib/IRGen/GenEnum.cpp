@@ -379,7 +379,8 @@ namespace {
       }
 
       return getSingleton()->getExtraInhabitantIndex(IGF,
-                                             getSingletonAddress(IGF, src), T);
+                                             getSingletonAddress(IGF, src),
+                                             getSingletonType(IGF.IGM, T));
     }
     
     void storeExtraInhabitant(IRGenFunction &IGF,
@@ -390,7 +391,8 @@ namespace {
         return;
       }
       getSingleton()->storeExtraInhabitant(IGF, index,
-                                           getSingletonAddress(IGF, dest), T);
+                                           getSingletonAddress(IGF, dest),
+                                           getSingletonType(IGF.IGM, T));
     }
     
     unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {

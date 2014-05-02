@@ -598,7 +598,7 @@ entry:
 // -- Test packing and unpacking aggregates.
 
 enum AggregateSinglePayload {
-  case x(Builtin.Int21, Builtin.Int64)
+  case x(Builtin.Int64, Builtin.Int64)
   case y
   case z
 }
@@ -608,10 +608,10 @@ sil @aggregate_single_payload_unpack : $@thin (AggregateSinglePayload) -> () {
 entry(%u : $AggregateSinglePayload):
   switch_enum %u : $AggregateSinglePayload, case #AggregateSinglePayload.x!enumelt.1: x_dest, default end
 
-// CHECK:   {{%.*}} = trunc i128 %0 to i21
+// CHECK:   {{%.*}} = trunc i128 %0 to i64
 // CHECK:   [[SHIFT_1:%.*]] = lshr i128 %0, 64
 // CHECK:   {{%.*}} = trunc i128 [[SHIFT_1]] to i64
-x_dest(%v : $(Builtin.Int21, Builtin.Int64)):
+x_dest(%v : $(Builtin.Int64, Builtin.Int64)):
   br end
 
 end:
@@ -619,22 +619,22 @@ end:
   return %x : $()
 }
 
-// CHECK-LABEL: define { i21, i64 } @aggregate_single_payload_unsafe_unpack(i128, i1) {
-// CHECK:  %2 = trunc i128 %0 to i21
+// CHECK-LABEL: define { i64, i64 } @aggregate_single_payload_unsafe_unpack(i128, i1) {
+// CHECK:  %2 = trunc i128 %0 to i64
 // CHECK:  %3 = lshr i128 %0, 64
 // CHECK:  %4 = trunc i128 %3 to i64
-// CHECK:  %5 = insertvalue { i21, i64 } undef, i21 %2, 0
-// CHECK:  %6 = insertvalue { i21, i64 } %5, i64 %4, 1
-// CHECK:  ret { i21, i64 } %6
-sil @aggregate_single_payload_unsafe_unpack : $@thin (AggregateSinglePayload) -> (Builtin.Int21, Builtin.Int64) {
+// CHECK:  %5 = insertvalue { i64, i64 } undef, i64 %2, 0
+// CHECK:  %6 = insertvalue { i64, i64 } %5, i64 %4, 1
+// CHECK:  ret { i64, i64 } %6
+sil @aggregate_single_payload_unsafe_unpack : $@thin (AggregateSinglePayload) -> (Builtin.Int64, Builtin.Int64) {
 entry(%u : $AggregateSinglePayload):
   %x = unchecked_enum_data %u : $AggregateSinglePayload, #AggregateSinglePayload.x!enumelt.1
-  return %x : $(Builtin.Int21, Builtin.Int64)
+  return %x : $(Builtin.Int64, Builtin.Int64)
 }
 
-// CHECK-LABEL: define { i128, i1 } @aggregate_single_payload_inject(i21, i64) {
+// CHECK-LABEL: define { i128, i1 } @aggregate_single_payload_inject(i64, i64) {
 // CHECK: entry:
-// CHECK:   [[ZEXT_0:%.*]] = zext i21 %0 to i128
+// CHECK:   [[ZEXT_0:%.*]] = zext i64 %0 to i128
 // CHECK:   [[ZEXT_1:%.*]] = zext i64 %1 to i128
 // CHECK:   [[SHIFT_1:%.*]] = shl i128 [[ZEXT_1]], 64
 // CHECK:   [[PAYLOAD:%.*]] = or i128 [[ZEXT_0]], [[SHIFT_1]]
@@ -642,10 +642,10 @@ entry(%u : $AggregateSinglePayload):
 // CHECK:   [[RES:%.*]] = insertvalue { i128, i1 } [[RES_0]], i1 false, 1
 // CHECK:   ret { i128, i1 } [[RES]]
 // CHECK: }
-sil @aggregate_single_payload_inject : $(Builtin.Int21, Builtin.Int64) -> AggregateSinglePayload {
-entry(%0 : $Builtin.Int21, %1 : $Builtin.Int64):
-  %t = tuple (%0 : $Builtin.Int21, %1 : $Builtin.Int64)
-  %u = enum $AggregateSinglePayload, #AggregateSinglePayload.x!enumelt.1, %t : $(Builtin.Int21, Builtin.Int64)
+sil @aggregate_single_payload_inject : $(Builtin.Int64, Builtin.Int64) -> AggregateSinglePayload {
+entry(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
+  %t = tuple (%0 : $Builtin.Int64, %1 : $Builtin.Int64)
+  %u = enum $AggregateSinglePayload, #AggregateSinglePayload.x!enumelt.1, %t : $(Builtin.Int64, Builtin.Int64)
   return %u : $AggregateSinglePayload
 }
 
@@ -702,6 +702,53 @@ entry(%0 : $CharLike, %1 : $IntLike, %2 : $RangeLike):
   return %u : $AggregateSinglePayload2
 }
 
+enum AggregateSinglePayload3 {
+  case x(Builtin.Int21, Builtin.Int64)
+  case y
+  case z
+}
+
+// CHECK-LABEL: define void @aggregate_single_payload_unpack_3(i128) {
+sil @aggregate_single_payload_unpack_3 : $@thin (AggregateSinglePayload3) -> () {
+entry(%u : $AggregateSinglePayload3):
+  switch_enum %u : $AggregateSinglePayload3, case #AggregateSinglePayload3.x!enumelt.1: x_dest, default end
+
+// CHECK:   {{%.*}} = trunc i128 %0 to i21
+// CHECK:   [[SHIFT_1:%.*]] = lshr i128 %0, 64
+// CHECK:   {{%.*}} = trunc i128 [[SHIFT_1]] to i64
+x_dest(%v : $(Builtin.Int21, Builtin.Int64)):
+  br end
+
+end:
+  %x = tuple ()
+  return %x : $()
+}
+
+// CHECK-LABEL: define i128 @aggregate_single_payload_inject_x3(i21, i64) {
+// CHECK: entry:
+// CHECK:   [[ZEXT_0:%.*]] = zext i21 %0 to i128
+// CHECK:   [[ZEXT_1:%.*]] = zext i64 %1 to i128
+// CHECK:   [[SHIFT_1:%.*]] = shl i128 [[ZEXT_1]], 64
+// CHECK:   [[PAYLOAD:%.*]] = or i128 [[ZEXT_0]], [[SHIFT_1]]
+// CHECK:   ret i128 [[PAYLOAD]]
+// CHECK: }
+sil @aggregate_single_payload_inject_x3 : $(Builtin.Int21, Builtin.Int64) -> AggregateSinglePayload3 {
+entry(%0 : $Builtin.Int21, %1 : $Builtin.Int64):
+  %t = tuple (%0 : $Builtin.Int21, %1 : $Builtin.Int64)
+  %u = enum $AggregateSinglePayload3, #AggregateSinglePayload3.x!enumelt.1, %t : $(Builtin.Int21, Builtin.Int64)
+  return %u : $AggregateSinglePayload3
+}
+
+// CHECK-LABEL: define i128 @aggregate_single_payload_inject_y3() {
+// CHECK: entry:
+// CHECK:   ret i128 2097152
+// CHECK: }
+//   2097152 == 0x200000
+sil @aggregate_single_payload_inject_y3 : $() -> AggregateSinglePayload3 {
+entry:
+  %u = enum $AggregateSinglePayload3, #AggregateSinglePayload3.y!enumelt
+  return %u : $AggregateSinglePayload3
+}
 
 enum SinglePayloadSpareBit {
   case x(Builtin.Int63)
