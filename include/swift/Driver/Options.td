@@ -119,6 +119,9 @@ def I_EQ : Joined<["-"], "I=">, Flags<[FrontendOption]>,
 def import_underlying_module : Flag<["-"], "import-underlying-module">,
   Flags<[FrontendOption]>,
   HelpText<"Implicitly imports the Objective-C half of a module">;
+def import_objc_header : Separate<["-"], "import-objc-header">,
+  Flags<[FrontendOption,HelpHidden]>,
+  HelpText<"Implicitly imports an Objective-C header file">;
 
 def nostdimport : Flag<["-"], "nostdimport">,
   Flags<[DriverOption,FrontendOption]>,

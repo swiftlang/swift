@@ -80,20 +80,43 @@ using clang::CompilerInstance;
 using clang::CompilerInvocation;
 
 #pragma mark Internal data structures
-namespace {
-  class SwiftModuleLoaderAction : public clang::SyntaxOnlyAction {
-  protected:
-    virtual bool BeginSourceFileAction(CompilerInstance &ci,
-                                       StringRef filename) {
-      // Enable incremental processing, so we can load modules after we've
-      // finished parsing our fake translation unit.
-      ci.getPreprocessor().enableIncrementalProcessing();
 
-      return clang::SyntaxOnlyAction::BeginSourceFileAction(ci, filename);
+namespace {
+  class HeaderImportCallbacks : public clang::PPCallbacks {
+    ClangImporter &Importer;
+    ClangImporter::Implementation &Impl;
+  public:
+    HeaderImportCallbacks(ClangImporter &importer,
+                          ClangImporter::Implementation &impl)
+      : Importer(importer), Impl(impl) {}
+
+    void handleImport(const clang::Module *imported) {
+      if (!imported)
+        return;
+      Module *nativeImported = Impl.finishLoadingClangModule(Importer, imported,
+                                                             /*adapter=*/true);
+      Impl.importedHeaderExports.push_back({ /*filter=*/{}, nativeImported });
+    }
+
+    virtual void InclusionDirective(clang::SourceLocation HashLoc,
+                                    const clang::Token &IncludeTok,
+                                    StringRef FileName,
+                                    bool IsAngled,
+                                    clang::CharSourceRange FilenameRange,
+                                    const clang::FileEntry *File,
+                                    StringRef SearchPath,
+                                    StringRef RelativePath,
+                                    const clang::Module *Imported) override {
+      handleImport(Imported);
+    }
+
+    virtual void moduleImport(clang::SourceLocation ImportLoc,
+                              clang::ModuleIdPath Path,
+                              const clang::Module *Imported) override {
+      handleImport(Imported);
     }
   };
 }
-
 
 ClangImporter::ClangImporter(ASTContext &ctx,
                              const ClangImporterOptions &clangImporterOpts)
@@ -248,7 +271,7 @@ ClangImporter::create(ASTContext &ctx,
   instance.setInvocation(&*invocation);
 
   // Create the associated action.
-  importer->Impl.Action.reset(new SwiftModuleLoaderAction);
+  importer->Impl.Action.reset(new clang::SyntaxOnlyAction);
   auto *action = importer->Impl.Action.get();
 
   // Execute the action. We effectively inline most of
@@ -273,13 +296,16 @@ ClangImporter::create(ASTContext &ctx,
                                           instance.getFrontendOpts().Inputs[0]);
   assert(canBegin);
 
+  clang::Preprocessor &clangPP = instance.getPreprocessor();
+  clangPP.enableIncrementalProcessing();
+  clangPP.addPPCallbacks(new HeaderImportCallbacks(*importer, importer->Impl));
+
   // Manually run the action, so that the TU stays open for additional parsing.
   instance.createSema(action->getTranslationUnitKind(), nullptr);
-  importer->Impl.Parser.reset(new clang::Parser(instance.getPreprocessor(),
-                                                instance.getSema(),
+  importer->Impl.Parser.reset(new clang::Parser(clangPP, instance.getSema(),
                                                 /*skipFunctionBodies=*/false));
 
-  instance.getPreprocessor().EnterMainSourceFile();
+  clangPP.EnterMainSourceFile();
   importer->Impl.Parser->Initialize();
 
   clang::Parser::DeclGroupPtrTy parsed;
@@ -306,7 +332,32 @@ ClangImporter::create(ASTContext &ctx,
   importer->Impl.setObjectForKeyedSubscript
     = clangContext.Selectors.getSelector(2, setObjectForKeyedSubscriptIdents);
 
+  // Set up the imported header module.
+  auto *importedHeaderModule = Module::create(ctx.getIdentifier("__ObjC"), ctx);
+  importer->Impl.importedHeaderUnit =
+    new (ctx) ClangModuleUnit(*importedHeaderModule, *importer, nullptr);
+  importedHeaderModule->addFile(*importer->Impl.importedHeaderUnit);
+
   return importer;
+}
+
+void ClangImporter::importHeader(StringRef header) {
+  llvm::SmallString<128> importLine{"#import \""};
+  importLine += header;
+  importLine += "\"\n";
+
+  auto sourceBuffer = llvm::MemoryBuffer::getMemBufferCopy(importLine,
+                                                           "<import>");
+
+  clang::SourceManager &sourceMgr =
+    Impl.getClangASTContext().getSourceManager();
+  clang::FileID bufferID = sourceMgr.createFileIDForMemBuffer(sourceBuffer);
+
+  clang::Preprocessor &pp = Impl.getClangPreprocessor();
+  pp.EnterSourceFile(bufferID, /*directoryLookup=*/nullptr, /*loc=*/{});
+  clang::Parser::DeclGroupPtrTy parsed;
+  while (!Impl.Parser->ParseTopLevelDecl(parsed)) {}
+  pp.EndSourceFile();
 }
 
 Module *ClangImporter::loadModule(
@@ -342,46 +393,54 @@ Module *ClangImporter::loadModule(
   if (!clangModule)
     return nullptr;
 
-  // Bump the generation count.
-  ++Impl.Generation;
-  Impl.SwiftContext.bumpGeneration();
-  Impl.CachedVisibleDecls.clear();
-  Impl.CurrentCacheState = Implementation::CacheState::Invalid;
+  return Impl.finishLoadingClangModule(*this, clangModule, /*adapter=*/false);
+}
 
-  auto &cacheEntry = Impl.ModuleWrappers[clangModule];
+Module *ClangImporter::Implementation::finishLoadingClangModule(
+    ClangImporter &owner,
+    const clang::Module *clangModule,
+    bool findAdapter) {
+  assert(clangModule);
+
+  // Bump the generation count.
+  ++Generation;
+  SwiftContext.bumpGeneration();
+  CachedVisibleDecls.clear();
+  CurrentCacheState = CacheState::Invalid;
+
+  auto &cacheEntry = ModuleWrappers[clangModule];
+  Module *result;
   if (ClangModuleUnit *cached = cacheEntry.getPointer()) {
-    Module *M = cached->getParentModule();
+    result = cached->getParentModule();
     if (!cacheEntry.getInt()) {
       // Force load adapter modules for all imported modules.
       // FIXME: This forces the creation of wrapper modules for all imports as
       // well, and may do unnecessary work.
       cacheEntry.setInt(true);
-      M->forAllVisibleModules(path, [&](Module::ImportedModule import) {});
+      result->forAllVisibleModules({}, [&](Module::ImportedModule import) {});
     }
-    return M;
+  } else {
+    // Build the representation of the Clang module in Swift.
+    // FIXME: The name of this module could end up as a key in the ASTContext,
+    // but that's not correct for submodules.
+    Identifier name = SwiftContext.getIdentifier((*clangModule).Name);
+    result = Module::create(name, SwiftContext);
+
+    auto file = new (SwiftContext) ClangModuleUnit(*result, owner, clangModule);
+    result->addFile(*file);
+    cacheEntry.setPointerAndInt(file, true);
+
+    // Force load adapter modules for all imported modules.
+    // FIXME: This forces the creation of wrapper modules for all imports as
+    // well, and may do unnecessary work.
+    result->forAllVisibleModules({}, [](Module::ImportedModule import) {});
   }
 
-  // Build the representation of the Clang module in Swift.
-  // FIXME: The name of this module could end up as a key in the ASTContext,
-  // but that's not correct for submodules.
-  Identifier name = Impl.SwiftContext.getIdentifier((*clangModule).Name);
-  auto result = Module::create(name, Impl.SwiftContext);
-
-  auto file = new (Impl.SwiftContext) ClangModuleUnit(*result, *this,
-                                                      clangModule);
-  result->addFile(*file);
-  cacheEntry.setPointerAndInt(file, true);
-
-  // FIXME: Total hack.
-  if (!Impl.firstClangModule)
-    Impl.firstClangModule = file;
-
-  // Force load adapter modules for all imported modules.
-  // FIXME: This forces the creation of wrapper modules for all imports as
-  // well, and may do unnecessary work.
-  result->forAllVisibleModules(path, [](Module::ImportedModule import) {});
-
   return result;
+}
+
+Module *ClangImporter::getImportedHeaderModule() {
+  return Impl.importedHeaderUnit->getParentModule();
 }
 
 ClangImporter::Implementation::Implementation(ASTContext &ctx,
@@ -1260,6 +1319,7 @@ void ClangImporter::lookupVisibleDecls(VisibleDeclConsumer &Consumer) const {
 void ClangModuleUnit::lookupVisibleDecls(Module::AccessPathTy AccessPath,
                                          VisibleDeclConsumer &Consumer,
                                          NLKind LookupKind) const {
+  // FIXME: Respect the access path.
   FilteringVisibleDeclConsumer filterConsumer(Consumer, this);
   owner.lookupVisibleDecls(filterConsumer);
 }
@@ -1320,7 +1380,8 @@ static void getImportDecls(ClangModuleUnit *ClangUnit, const clang::Module *M,
 }
 
 void ClangModuleUnit::getDisplayDecls(SmallVectorImpl<Decl*> &results) const {
-  getImportDecls(const_cast<ClangModuleUnit *>(this), clangModule, results);
+  if (clangModule)
+    getImportDecls(const_cast<ClangModuleUnit *>(this), clangModule, results);
   getTopLevelDecls(results);
 }
 
@@ -1329,11 +1390,11 @@ void ClangModuleUnit::lookupValue(Module::AccessPathTy accessPath,
                                   SmallVectorImpl<ValueDecl*> &results) const {
   if (!Module::matchesAccessPath(accessPath, name))
     return;
-  
+
   // There should be no multi-part top-level decls in a Clang module.
   if (!name.isSimpleName())
     return;
-  
+
   VectorDeclConsumer vectorWriter(results);
   FilteringVisibleDeclConsumer filteringConsumer(vectorWriter, this);
   
@@ -1402,6 +1463,14 @@ static int pointerPODSortComparator(T * const *lhs, T * const *rhs) {
 void ClangModuleUnit::getImportedModules(
     SmallVectorImpl<Module::ImportedModule> &imports,
     Module::ImportFilter filter) const {
+  if (!clangModule) {
+    // This is the special "imported headers" module.
+    if (filter != Module::ImportFilter::Private) {
+      imports.append(owner.Impl.importedHeaderExports.begin(),
+                     owner.Impl.importedHeaderExports.end());
+    }
+    return;
+  }
 
   auto topLevelAdapter = getAdapterModule();
 
@@ -1608,6 +1677,8 @@ void ClangModuleUnit::lookupClassMembers(Module::AccessPathTy accessPath,
 
 void ClangModuleUnit::collectLinkLibraries(
     Module::LinkLibraryCallback callback) const {
+  if (!clangModule)
+    return;
   for (auto clangLinkLib : clangModule->LinkLibraries) {
     LibraryKind kind;
     if (clangLinkLib.IsFramework)
@@ -1620,7 +1691,7 @@ void ClangModuleUnit::collectLinkLibraries(
 }
 
 StringRef ClangModuleUnit::getFilename() const {
-  return clangModule->getASTFile()->getName();
+  return clangModule ? clangModule->getASTFile()->getName() : "<imports>";
 }
 
 clang::TargetInfo &ClangImporter::getTargetInfo() const {
@@ -1680,11 +1751,11 @@ bool ClangModuleUnit::hasClangModule(Module *M) {
 }
 
 bool ClangModuleUnit::isTopLevel() const {
-  return !clangModule->isSubModule();
+  return !clangModule || !clangModule->isSubModule();
 }
 
 bool ClangModuleUnit::isSystemModule() const {
-  return clangModule->IsSystem;
+  return clangModule && clangModule->IsSystem;
 }
 
 clang::ASTContext &ClangModuleUnit::getClangASTContext() const {
@@ -1692,12 +1763,14 @@ clang::ASTContext &ClangModuleUnit::getClangASTContext() const {
 }
 
 Module *ClangModuleUnit::getAdapterModule() const {
+  if (!clangModule)
+    return nullptr;
+
   if (!isTopLevel()) {
     // FIXME: Is this correct for submodules?
     auto topLevel = clangModule->getTopLevelModule();
     auto wrapper = owner.Impl.getWrapperForModule(owner, topLevel);
     return wrapper->getAdapterModule();
-
   }
 
   if (!adapterModule.getInt()) {

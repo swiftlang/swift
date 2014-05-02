@@ -496,6 +496,9 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
   Opts.LLVMArgs = Args.getAllArgValues(OPT_Xllvm);
   Opts.ImportUnderlyingModule = Args.hasArg(OPT_import_underlying_module);
 
+  if (const Arg *A = Args.getLastArg(OPT_import_objc_header))
+    Opts.ImplicitObjCHeaderPath = A->getValue();
+
   return false;
 }
 

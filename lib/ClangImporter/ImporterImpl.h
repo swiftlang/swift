@@ -20,6 +20,7 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/LazyResolver.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Basic/Optional.h"
@@ -360,13 +361,11 @@ public:
   /// A map from Clang modules to their Swift wrapper modules.
   llvm::SmallDenseMap<const clang::Module *, ModuleInitPair, 16> ModuleWrappers;
 
-  /// \brief The first Clang module we loaded.
-  ///
-  /// FIXME: This horrible hack is used because we don't have a nice way to
-  /// map from a Decl in the tree back to the appropriate Clang module.
-  /// It also means building ClangModules for all of the dependencies of a
-  /// Clang module.
-  ClangModuleUnit *firstClangModule = nullptr;
+  /// The module unit that contains declarations from imported headers.
+  ClangModuleUnit *importedHeaderUnit = nullptr;
+
+  /// The modules re-exported by imported headers.
+  llvm::SmallVector<Module::ImportedModule, 8> importedHeaderExports;
 
   /// \brief Clang's objectAtIndexedSubscript: selector.
   clang::Selector objectAtIndexedSubscript;
@@ -611,6 +610,11 @@ public:
   /// it if necessary.
   ClangModuleUnit *getWrapperForModule(ClangImporter &importer,
                                        const clang::Module *underlying);
+
+  /// \brief Constructs a Swift module for the given Clang module.
+  Module *finishLoadingClangModule(ClangImporter &importer,
+                                   const clang::Module *clangModule,
+                                   bool preferAdapter);
 
   /// \brief Retrieve the named Swift type, e.g., Int32.
   ///

@@ -73,6 +73,9 @@ public:
   /// by the frontend.
   std::string OutputFilename;
 
+  /// An Objective-C header to import and make implicitly visible.
+  std::string ImplicitObjCHeaderPath;
+
   /// The name of the module which the frontend is building.
   std::string ModuleName;
 
@@ -140,6 +143,8 @@ public:
   /// (if asked to emit SIL).
   bool EmitVerboseSIL = false;
 
+  /// If set, this module is part of a mixed Objective-C/Swift framework, and
+  /// the Objective-C half should implicitly be visible to the Swift sources.
   bool ImportUnderlyingModule = false;
 
   /// Indicates that all generated SIL should be serialized into a module,

@@ -781,13 +781,15 @@ Type ClangImporter::Implementation::importFunctionType(
     if (bodyName.empty()) {
       bodyPattern = new (SwiftContext) AnyPattern(SourceLoc());
     } else {
+      // It doesn't actually matter which DeclContext we use, so just use the
+      // imported header unit.
       auto bodyVar
         = createDeclWithClangNode<ParamDecl>(param,
                                        /*IsLet*/ true,
                                        SourceLoc(), name,
                                        importSourceLoc(param->getLocation()),
                                        bodyName, swiftParamTy, 
-                                       firstClangModule);
+                                       importedHeaderUnit);
       bodyPattern = new (SwiftContext) NamedPattern(bodyVar);
     }
     bodyPattern->setType(swiftParamTy);
@@ -875,12 +877,14 @@ Type ClangImporter::Implementation::importMethodType(
     if (bodyName.empty()) {
       bodyPattern = new (SwiftContext) AnyPattern(SourceLoc());
     } else {
+      // It doesn't actually matter which DeclContext we use, so just use the
+      // imported header unit.
       auto bodyVar
         = createDeclWithClangNode<ParamDecl>(param,
                                        /*IsLet*/ true, SourceLoc(), name,
                                        importSourceLoc(param->getLocation()),
                                        bodyName, swiftParamTy, 
-                                       firstClangModule);
+                                       importedHeaderUnit);
       bodyPattern = new (SwiftContext) NamedPattern(bodyVar);
     }
     bodyPattern->setType(swiftParamTy);
@@ -900,12 +904,14 @@ Type ClangImporter::Implementation::importMethodType(
   // argument name, synthesize a Void parameter with that name.
   if (kind == SpecialMethodKind::Constructor && params.empty() && 
       argNames.size() == 1) {
+    // It doesn't actually matter which DeclContext we use, so just use the
+    // imported header unit.
     auto argName = argNames[0];
     auto type = TupleType::getEmpty(SwiftContext);
     auto var = new (SwiftContext) ParamDecl(/*IsLet*/ true,
                                             SourceLoc(), argName,
                                             SourceLoc(), argName, type,
-                                            firstClangModule);
+                                            importedHeaderUnit);
     Pattern *pattern = new (SwiftContext) NamedPattern(var);
     pattern->setType(type);
     pattern = new (SwiftContext) TypedPattern(pattern,

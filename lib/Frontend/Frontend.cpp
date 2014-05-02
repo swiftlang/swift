@@ -239,18 +239,30 @@ void CompilerInstance::performParse() {
     createSILModule();
   }
 
+  auto clangImporter =
+    static_cast<ClangImporter *>(Context->getClangModuleLoader());
+
   Module *underlying = nullptr;
   if (Invocation.getFrontendOptions().ImportUnderlyingModule) {
-    underlying = Context->getClangModuleLoader()->loadModule(SourceLoc(), {
-      { ID, SourceLoc() }
-    });
+    underlying = clangImporter->loadModule(SourceLoc(),
+                                           std::make_pair(ID, SourceLoc()));
     if (!underlying) {
       Diagnostics.diagnose(SourceLoc(), diag::error_underlying_module_not_found,
                            ID);
     }
   }
+
+  Module *importedHeaderModule = nullptr;
+  StringRef implicitHeaderPath =
+    Invocation.getFrontendOptions().ImplicitObjCHeaderPath;
+  if (!implicitHeaderPath.empty()) {
+    clangImporter->importHeader(implicitHeaderPath);
+    importedHeaderModule = clangImporter->getImportedHeaderModule();
+    assert(importedHeaderModule);
+  }
+
   auto addAdditionalInitialImports = [&](SourceFile *SF) {
-    if (!underlying)
+    if (!underlying && !importedHeaderModule)
       return;
 
     auto initialImports = SF->getImports(/*allowUnparsed=*/true);
@@ -259,8 +271,12 @@ void CompilerInstance::performParse() {
     SmallVector<ImportPair, 4> initialImportsBuf{
       initialImports.begin(), initialImports.end()
     };
-    initialImportsBuf.push_back({ { /*accessPath=*/{}, underlying },
-                                  /*exported=*/false });
+    if (underlying)
+      initialImportsBuf.push_back({ { /*accessPath=*/{}, underlying },
+                                    /*exported=*/false });
+    if (importedHeaderModule)
+      initialImportsBuf.push_back({ { /*accessPath=*/{}, importedHeaderModule },
+                                    /*exported=*/true });
     SF->setImports(Context->AllocateCopy(initialImportsBuf));
   };
 

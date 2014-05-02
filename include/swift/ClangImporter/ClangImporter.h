@@ -113,6 +113,17 @@ public:
   virtual void loadExtensions(NominalTypeDecl *nominal,
                               unsigned previousGeneration) override;
 
+  /// Imports an Objective-C header file into the shared imported header module.
+  ///
+  /// \sa getImportedHeaderModule
+  void importHeader(StringRef header);
+
+  /// Returns the module that contains imports and declarations from all loaded
+  /// Objective-C header files.
+  ///
+  /// \sa importHeader
+  Module *getImportedHeaderModule();
+
   const clang::Module *getClangOwningModule(ClangNode Node) const;
 
   void verifyAllModules() override;
