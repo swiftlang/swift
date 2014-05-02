@@ -122,41 +122,6 @@ namespace {
                               Address src, CanType T) const override {
       llvm_unreachable("unexploded tuple as argument?");
     }
-
-    // For now, just use extra inhabitants from the first element.
-    // FIXME: generalize
-    bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
-      if (asImpl().getFields().empty()) return false;
-      return asImpl().getFields()[0].getTypeInfo().mayHaveExtraInhabitants(IGM);
-    }
-
-    // This is dead code in NonFixedTupleTypeInfo.
-    unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const {
-      if (asImpl().getFields().empty()) return 0;
-      auto &eltTI = cast<FixedTypeInfo>(asImpl().getFields()[0].getTypeInfo());
-      return eltTI.getFixedExtraInhabitantCount(IGM);
-    }
-
-    llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
-                                         Address tupleAddr,
-                                         CanType tupleType) const override {
-      Address eltAddr =
-        asImpl().projectElementAddress(IGF, tupleAddr, tupleType, 0);
-      auto &elt = asImpl().getFields()[0];
-      return elt.getTypeInfo().getExtraInhabitantIndex(IGF, eltAddr,
-                                               elt.getType(IGF.IGM, tupleType));
-    }
-  
-    void storeExtraInhabitant(IRGenFunction &IGF,
-                              llvm::Value *index,
-                              Address tupleAddr,
-                              CanType tupleType) const override {
-      Address eltAddr =
-        asImpl().projectElementAddress(IGF, tupleAddr, tupleType, 0);
-      auto &elt = asImpl().getFields()[0];
-      elt.getTypeInfo().storeExtraInhabitant(IGF, index, eltAddr,
-                                             elt.getType(IGF.IGM, tupleType));
-    }
   };
 
   /// Type implementation for loadable tuples.
@@ -174,6 +139,14 @@ namespace {
     Nothing_t getNonFixedOffsets(IRGenFunction &IGF) const { return Nothing; }
     Nothing_t getNonFixedOffsets(IRGenFunction &IGF,
                                  CanType T) const { return Nothing; }
+    
+    // FIXME: Suppress use of extra inhabitants for single-payload enum layout
+    // until we're ready to handle the runtime logic for exporting extra
+    // inhabitants through tuple metadata.
+    bool mayHaveExtraInhabitants(IRGenModule&) const override { return false; }
+    unsigned getFixedExtraInhabitantCount(IRGenModule&) const override {
+      return 0;
+    }
   };
 
   /// Type implementation for fixed-size but non-loadable tuples.
@@ -194,6 +167,14 @@ namespace {
     Nothing_t getNonFixedOffsets(IRGenFunction &IGF) const { return Nothing; }
     Nothing_t getNonFixedOffsets(IRGenFunction &IGF,
                                  CanType T) const { return Nothing; }
+    
+    // FIXME: Suppress use of extra inhabitants for single-payload enum layout
+    // until we're ready to handle the runtime logic for exporting extra
+    // inhabitants through tuple metadata.
+    bool mayHaveExtraInhabitants(IRGenModule&) const override { return false; }
+    unsigned getFixedExtraInhabitantCount(IRGenModule&) const override {
+      return 0;
+    }
   };
 
   /// An accessor for the non-fixed offsets for a tuple type.
