@@ -42,6 +42,9 @@ SILWitnessTable *
 SILWitnessTable::create(SILModule &M, SILLinkage Linkage,
                         NormalProtocolConformance *Conformance,
                         ArrayRef<SILWitnessTable::Entry> entries) {
+  assert(Conformance && "Can not create a witness table for a null "
+         "conformance.");
+
   // Create the mangled name of our witness table...
   llvm::SmallString<32> buffer;
   llvm::raw_svector_ostream stream(buffer);
@@ -67,6 +70,9 @@ SILWitnessTable::create(SILModule &M, SILLinkage Linkage,
 SILWitnessTable *
 SILWitnessTable::create(SILModule &M, SILLinkage Linkage,
                         NormalProtocolConformance *Conformance) {
+  assert(Conformance && "Can not create a witness table for a null "
+         "conformance.");
+
   // Create the mangled name of our witness table...
   llvm::SmallString<32> buffer;
   llvm::raw_svector_ostream stream(buffer);
