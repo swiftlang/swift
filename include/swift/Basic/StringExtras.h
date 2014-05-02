@@ -227,7 +227,7 @@ namespace swift {
     StringRef dropPrefix(StringRef string);
 
     /// Append the given string to the given buffer, sentence-casing the string
-    /// so that the result is a
+    /// so that the result reads as separate camelCase words.
     ///
     /// \param buffer The buffer to append to.
     /// \param string The new string to append, which will be sentence-cased.

@@ -174,6 +174,10 @@ def split_objc_selectors : Flag<["-"], "split-objc-selectors">,
   Flags<[FrontendOption]>,
   HelpText<"Split imported Objective-C selectors based on prepositions">;
 
+def implicit_objc_with : Flag<["-"], "implicit-objc-with">,
+  Flags<[FrontendOption]>,
+  HelpText<"Make 'with' in the first initializer argument implicit">;
+
 def import_cf_types : Flag<["-"], "import-cf-types">,
   Flags<[FrontendOption]>,
   HelpText<"Recognize and import CF types as class types">;

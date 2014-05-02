@@ -2725,6 +2725,15 @@ ObjCSelector ConstructorDecl::getObjCSelector() const {
   else {
     llvm::SmallString<16> scratch;
     scratch += "init";
+
+    // If we're inferring with and the first argument name doesn't start with
+    // a preposition, add "with".
+    if (ctx.LangOpts.ImplicitObjCWith &&
+        getPrepositionKind(camel_case::getFirstWord(firstName.str()))
+          == PK_None) {
+      camel_case::appendSentenceCase(scratch, "With");
+    }
+
     camel_case::appendSentenceCase(scratch, firstName.str());
     selectorPieces.push_back(ctx.getIdentifier(scratch));
     didStringManipulation = true;

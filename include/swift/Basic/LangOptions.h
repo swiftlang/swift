@@ -58,7 +58,12 @@ namespace swift {
 
     /// Whether to split imported Objective-C selectors into Swift method names.
     bool SplitPrepositions = false;
-    
+
+    /// Whether to make the "with" at the beginning of the first argument of
+    /// an initializer implicit (i.e., dropped on import, added when computing
+    /// a selector).
+    bool ImplicitObjCWith = false;
+
     /// Enables checking that uses of @objc require importing
     /// the ObjectiveC module.
     bool EnableObjCAttrRequiresObjCModule = false;

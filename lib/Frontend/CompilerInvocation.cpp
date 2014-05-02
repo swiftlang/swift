@@ -550,6 +550,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.EnableAppExtensionRestrictions = Args.hasArg(OPT_enable_app_extension);
   Opts.SplitPrepositions = Args.hasArg(OPT_split_objc_selectors);
+  Opts.ImplicitObjCWith = Args.hasArg(OPT_implicit_objc_with);
   Opts.detailedTypeCheckDiagnostics = Args.hasArg(OPT_detailed_diagnostics);
   Opts.StrictKeywordArguments = Args.hasArg(OPT_strict_keyword_arguments);
 

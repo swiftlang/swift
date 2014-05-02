@@ -74,6 +74,12 @@ STATISTIC(NumMethodsMissingFirstArgName,
           "selectors where the first argument name is missing");
 STATISTIC(NumFactoryMethodsNullary,
           "# of factory methods not mapped due to nullary with long name");
+STATISTIC(NumInitsDroppedWith,
+          "# of initializer selectors from which \"with\" was dropped");
+STATISTIC(NumInitsPrepositionSplit,
+          "# of initializer selectors where the split was on a preposition");
+STATISTIC(NumInitsNonPrepositionSplit,
+          "# of initializer selectors where the split wasn't on a preposition");
 
 // Commonly-used Clang classes.
 using clang::CompilerInstance;
@@ -683,15 +689,46 @@ splitFirstSelectorPiece(StringRef selector,
 }
 
 /// Import an argument name.
-static Identifier importArgName(ASTContext &ctx, StringRef name) {
+static Identifier importArgName(ASTContext &ctx, StringRef name, bool dropWith){
   // Simple case: empty name.
   if (name.empty())
     return Identifier();
 
+  llvm::SmallString<16> scratch;
+  auto words = camel_case::getWords(name);
+  auto firstWord = *words.begin();
+
+  // If we're dropping "with", handle that now.
+  if (dropWith) {
+    // If the first word is "with"...
+    StringRef argName;
+    if (name.size() > 4 &&
+        camel_case::sameWordIgnoreFirstCase(firstWord, "with")) {
+      // Drop it.
+      ++NumInitsDroppedWith;
+
+      auto iter = words.begin();
+      ++iter;
+
+      argName = name.substr(iter.getPosition());
+    } else {
+      // If we're tracking statistics, check whether the name starts with
+      // a preposition.
+      if (llvm::AreStatisticsEnabled()) {
+        if (getPrepositionKind(firstWord))
+          ++NumInitsPrepositionSplit;
+        else
+          ++NumInitsNonPrepositionSplit;
+      }
+
+      argName = name;
+    }
+
+    return ctx.getIdentifier(camel_case::toLowercaseWord(argName, scratch));
+  }
+
   // If the first word isn't a non-directional preposition, lowercase
   // it to form the argument name.
-  llvm::SmallString<16> scratch;
-  auto firstWord = camel_case::getFirstWord(name);
   if (!ctx.LangOpts.SplitPrepositions ||
       getPrepositionKind(firstWord) != PK_Nondirectional)
     return ctx.getIdentifier(camel_case::toLowercaseWord(name, scratch));
@@ -727,7 +764,8 @@ static DeclName mapSelectorName(ASTContext &ctx,
     ++NumNullaryInitMethodsMadeUnary;
     assert(camel_case::getFirstWord(nameText).equals("init"));
     auto baseName = ctx.Id_init;
-    auto argName = importArgName(ctx, nameText.substr(4));
+    auto argName = importArgName(ctx, nameText.substr(4),
+                                 /*dropWith=*/ctx.LangOpts.ImplicitObjCWith);
     return DeclName(ctx, baseName, argName);
   }
 
@@ -739,14 +777,17 @@ static DeclName mapSelectorName(ASTContext &ctx,
   if (isInitializer) {
     assert(camel_case::getFirstWord(firstPieceText).equals("init"));
     baseName = ctx.Id_init;
-    argumentNames.push_back(importArgName(ctx, firstPieceText.substr(4)));
+    argumentNames.push_back(
+      importArgName(ctx, firstPieceText.substr(4),
+                    /*dropWith=*/ctx.LangOpts.ImplicitObjCWith));
   } else if (ctx.LangOpts.SplitPrepositions) {
     llvm::SmallString<16> scratch;
     StringRef funcName, firstArgName;
     std::tie(funcName, firstArgName) = splitFirstSelectorPiece(firstPieceText,
                                                                scratch);
     baseName = ctx.getIdentifier(funcName);
-    argumentNames.push_back(importArgName(ctx, firstArgName));
+    argumentNames.push_back(importArgName(ctx, firstArgName,
+                                          /*dropWith=*/false));
   } else {
     baseName = firstPiece;
     argumentNames.push_back(Identifier());
@@ -766,7 +807,8 @@ static DeclName mapSelectorName(ASTContext &ctx,
     if (piece.empty())
       argumentNames.push_back(piece);
     else
-      argumentNames.push_back(importArgName(ctx, piece.str()));
+      argumentNames.push_back(importArgName(ctx, piece.str(),
+                                            /*dropWith=*/false));
   }
   return DeclName(ctx, baseName, argumentNames);
 }
@@ -931,7 +973,8 @@ DeclName ClangImporter::Implementation::mapFactorySelectorToInitializerName(
     importArgName(SwiftContext,
                   splitSelectorPieceAt(firstPieceStr,
                                        methodWordIter.getPosition(),
-                                       scratch).second));
+                                       scratch).second,
+                  /*dropWith=*/SwiftContext.LangOpts.ImplicitObjCWith));
 
   // Handle nullary factory methods.
   if (selector.getNumArgs() == 0) {
@@ -949,7 +992,8 @@ DeclName ClangImporter::Implementation::mapFactorySelectorToInitializerName(
     if (piece.empty())
       argumentNames.push_back(piece);
     else
-      argumentNames.push_back(importArgName(SwiftContext, piece.str()));
+      argumentNames.push_back(importArgName(SwiftContext, piece.str(),
+                                            /*dropWith=*/false));
   }
 
   return DeclName(SwiftContext, SwiftContext.Id_init, argumentNames);
