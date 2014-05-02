@@ -800,8 +800,8 @@ sil @generic_is_objc : $@thin <T> (@in T) -> Bool {
 bb0(%0 : $*T):
 // CHECK: [[TYPE:%[a-zA-Z0-9]+]] = metatype $@thick [[ARCH:[a-zA-Z]+]].Type
   %1 = metatype $@thick T.Type                    // user: %3
-// CHECK: [[FUNCTION:%[a-zA-Z0-9]+]] = builtin_function_ref "canBeObjCClass"
-  %2 = builtin_function_ref "canBeObjCClass" : $@thin <τ_0_0> (@thick τ_0_0.Type) -> Builtin.Int1 // user: %3
+// CHECK: [[FUNCTION:%[a-zA-Z0-9]+]] = builtin_function_ref "canBeClass"
+  %2 = builtin_function_ref "canBeClass" : $@thin <τ_0_0> (@thick τ_0_0.Type) -> Builtin.Int1 // user: %3
 // CHECK: apply [[FUNCTION]]<[[ARCH]]>([[TYPE]])
   %3 = apply %2<T>(%1) : $@thin <τ_0_0> (@thick τ_0_0.Type) -> Builtin.Int1 // user: %4
   %4 = struct $Bool (%3 : $Builtin.Int1)          // user: %6
@@ -813,8 +813,8 @@ bb0(%0 : $*T):
 sil @is_int_objc : $@thin (Int) -> Bool {
 bb0(%0 : $Int):
   %1 = metatype $@thick Int.Type                  // user: %3
-// CHECK-NOT: builtin_function_ref "canBeObjCClass"
-  %2 = builtin_function_ref "canBeObjCClass" : $@thin <τ_0_0> (@thick τ_0_0.Type) -> Builtin.Int1 // user: %3
+// CHECK-NOT: builtin_function_ref "canBeClass"
+  %2 = builtin_function_ref "canBeClass" : $@thin <τ_0_0> (@thick τ_0_0.Type) -> Builtin.Int1 // user: %3
 // CHECK-NOT: apply
   %3 = apply %2<Int>(%1) : $@thin <τ_0_0> (@thick τ_0_0.Type) -> Builtin.Int1 // user: %4
 // CHECK: [[LITERAL:%[a-zA-Z0-9]+]] = integer_literal $Builtin.Int1, 0
@@ -831,8 +831,8 @@ bb0(%0 : $Int):
 sil @is_objc_class_objc : $@thin (@owned MyClass) -> Bool {
 bb0(%0 : $MyClass):
   %1 = metatype $@thick MyClass.Type              // user: %3
-// CHECK-NOT: builtin_function_ref "canBeObjCClass"
-  %2 = builtin_function_ref "canBeObjCClass" : $@thin <τ_0_0> (@thick τ_0_0.Type) -> Builtin.Int1 // user: %3
+// CHECK-NOT: builtin_function_ref "canBeClass"
+  %2 = builtin_function_ref "canBeClass" : $@thin <τ_0_0> (@thick τ_0_0.Type) -> Builtin.Int1 // user: %3
 // CHECK-NOT: apply
   %3 = apply %2<MyClass>(%1) : $@thin <τ_0_0> (@thick τ_0_0.Type) -> Builtin.Int1 // user: %4
 // CHECK: [[LITERAL:%[a-zA-Z0-9]+]] = integer_literal $Builtin.Int1, -1

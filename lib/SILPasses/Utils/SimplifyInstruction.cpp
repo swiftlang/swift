@@ -235,7 +235,7 @@ SILValue InstSimplifier::visitUpcastInst(UpcastInst *UI) {
   return SILValue();
 }
 
-/// Simplify an apply of the builtin canBeObjCClass to either 0 or 1
+/// Simplify an apply of the builtin canBeClass to either 0 or 1
 /// when we can statically determine the result.
 SILValue InstSimplifier::visitApplyInst(ApplyInst *AI) {
   auto *BFRI = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee());

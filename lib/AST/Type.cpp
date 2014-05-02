@@ -2689,21 +2689,21 @@ found_conformance:;
   return Substitution{Archetype, substReplacement, substConformanceRef};
 }
 
-TypeTraitResult TypeBase::canBeObjCClass() {
+TypeTraitResult TypeBase::canBeClass() {
   CanType self = getCanonicalType();
   // Look through one level of metatype.
   if (auto m = dyn_cast<AnyMetatypeType>(self))
     self = m.getInstanceType();
   
-  // Classes either definitely are or are not ObjC.
-  if (auto c = self->getClassOrBoundGenericClass()) {
-    return c->isObjC() ? TypeTraitResult::Is : TypeTraitResult::IsNot;
+  // Classes and class-constrained archetypes definitely are classes.
+  if (self->mayHaveSuperclass()) {
+    return TypeTraitResult::Is;
   }
-  // Protocol types are objc if all their protocols are.
+  // Protocol types are a single class reference if all their protocols are ObjC.
   if (self->isObjCExistentialType())
     return TypeTraitResult::Is;
   
-  // Dependent types might be bound to @objc classes.
+  // Dependent types might be bound to classes.
   if (isa<SubstitutableType>(self))
     return TypeTraitResult::CanBe;
   if (isa<DependentMemberType>(self))

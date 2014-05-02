@@ -600,7 +600,7 @@ public:
   std::string getString(const PrintOptions &PO = PrintOptions()) const;
   
   /// Return whether this type is or can be substituted for an @objc class type.
-  TypeTraitResult canBeObjCClass();
+  TypeTraitResult canBeClass();
 private:
   // Make vanilla new/delete illegal for Types.
   void *operator new(size_t Bytes) throw() = delete;

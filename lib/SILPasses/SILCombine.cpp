@@ -818,14 +818,14 @@ SILCombiner::optimizeApplyOfPartialApply(ApplyInst *AI, PartialApplyInst *PAI) {
 }
 
 SILInstruction *SILCombiner::optimizeBuiltinCanBeObjCClass(ApplyInst *AI) {
-  assert(AI->hasSubstitutions() && "Expected substitutions for canBeObjCClass");
+  assert(AI->hasSubstitutions() && "Expected substitutions for canBeClass");
 
   auto const &Subs = AI->getSubstitutions();
   assert((Subs.size() == 1) &&
-         "Expected one substitution in call to canBeObjCClass");
+         "Expected one substitution in call to canBeClass");
 
   auto Ty = Subs[0].Replacement->getCanonicalType();
-  switch (Ty->canBeObjCClass()) {
+  switch (Ty->canBeClass()) {
   case TypeTraitResult::IsNot:
     return IntegerLiteralInst::create(AI->getLoc(), AI->getType(),
                                       APInt(1, 0), *AI->getFunction());
