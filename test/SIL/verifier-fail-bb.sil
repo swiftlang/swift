@@ -1,4 +1,5 @@
 // RUN: not --crash %sil-opt %s -verify
+// REQUIRES: asserts
 
 sil @no_terminator : $@thin () -> () {
 bb0:
