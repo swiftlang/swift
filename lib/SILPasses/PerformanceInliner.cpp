@@ -30,13 +30,11 @@ namespace {
   class SILPerformanceInliner {
     const unsigned InlineCostThreshold;
     SILModule::LinkingMode Mode;
-    const llvm::DenseSet<SILFunction *> Recursions;
 
   public:
     SILPerformanceInliner(unsigned threshold,
-                          SILModule::LinkingMode M,
-                          const llvm::DenseSet<SILFunction *> Rec)
-      : InlineCostThreshold(threshold), Mode(M), Recursions(Rec) {}
+                          SILModule::LinkingMode M)
+      : InlineCostThreshold(threshold), Mode(M) {}
 
     bool inlineCallsIntoFunction(SILFunction *F);
   };
@@ -131,7 +129,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
           << ".\n");
 
     // Prevent circular inlining.
-    if (Callee == Caller || Recursions.count(Callee)) {
+    if (Callee == Caller) {
       DEBUG(llvm::dbgs() << "        FAIL! Skipping recursive calls.\n");
       continue;
     }
@@ -207,14 +205,11 @@ public:
     // Initialize the worklist with a bottom-up call-graph order list of
     // functions.
     const std::vector<SILFunction *> &Order = CGA->bottomUpCallGraphOrder();
-    const llvm::DenseSet<SILFunction*> &Recursions = CGA->recursiveCallers();
-
     std::vector<SILFunction *> Worklist(Order);
     std::reverse(Worklist.begin(), Worklist.end());
 
     SILPerformanceInliner inliner(getOptions().InlineThreshold,
-                                  SILModule::LinkingMode::LinkAll,
-                                  Recursions);
+                                  SILModule::LinkingMode::LinkAll);
 
     bool Changed = false;
     while (!Worklist.empty()) {

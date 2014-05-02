@@ -179,19 +179,17 @@ void swift::eraseUsesOfInstruction(SILInstruction *Inst) {
 }
 
 void swift::bottomUpCallGraphOrder(SILModule *M,
-                                   std::vector<SILFunction*> &Order,
-                                   llvm::DenseSet<SILFunction*> &Recursive) {
+                                   std::vector<SILFunction*> &order) {
   CallGraphSorter<SILFunction*> sorter;
   for (auto &Caller : *M)
     for (auto &BB : Caller)
       for (auto &I : BB)
         if (FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(&I)) {
           SILFunction *Callee = FRI->getReferencedFunction();
-          assert(Callee && "Invalid callee");
           sorter.addEdge(&Caller, Callee);
         }
 
-  sorter.sort(Order, Recursive);
+  sorter.sort(order);
 }
 
 void swift::replaceWithSpecializedFunction(ApplyInst *AI, SILFunction *NewF) {
