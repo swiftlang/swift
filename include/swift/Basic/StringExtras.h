@@ -225,6 +225,16 @@ namespace swift {
     /// \returns the result of dropping the prefix from \p string, or the
     /// whole string if it has no prefix.
     StringRef dropPrefix(StringRef string);
+
+    /// Append the given string to the given buffer, sentence-casing the string
+    /// so that the result is a
+    ///
+    /// \param buffer The buffer to append to.
+    /// \param string The new string to append, which will be sentence-cased.
+    ///
+    /// \returns the contents of the buffer after appending.
+    StringRef appendSentenceCase(SmallVectorImpl<char> &buffer,
+                                 StringRef string);
   } // end namespace camel_case
 }
 

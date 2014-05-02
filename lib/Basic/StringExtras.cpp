@@ -190,3 +190,17 @@ StringRef camel_case::dropPrefix(StringRef string) {
 
   return string;
 }
+
+StringRef camel_case::appendSentenceCase(SmallVectorImpl<char> &buffer,
+                                         StringRef string) {
+  // Trivial case: empty string.
+  if (string.empty())
+    return StringRef(buffer.data(), buffer.size());
+
+  // Uppercase the first letter, append the rest.
+  buffer.push_back(clang::toUppercase(string[0]));
+  buffer.append(string.begin() + 1, string.end());
+  return StringRef(buffer.data(), buffer.size());
+}
+
+

@@ -1935,11 +1935,11 @@ ObjCSelector AbstractStorageDecl::getObjCSetterSelector() const {
 
   // The setter selector for, e.g., 'fooBar' is 'setFooBar:', with the
   // property name capitalized and preceded by 'set'.
-  llvm::SmallString<16> scratch1, scratch2;
-  scratch1 += "set";
-  scratch1 += camel_case::toSentencecase(getName().str(), scratch2);
+  llvm::SmallString<16> scratch;
+  scratch += "set";
+  camel_case::appendSentenceCase(scratch, getName().str());
 
-  auto result = ObjCSelector(ctx, 1, ctx.getIdentifier(scratch1));
+  auto result = ObjCSelector(ctx, 1, ctx.getIdentifier(scratch));
 
   // Cache the result, so we don't perform string manipulation again.
   if (objcAttr)
@@ -2616,12 +2616,12 @@ ObjCSelector FuncDecl::getObjCSelector() const {
   auto firstPiece = getName();
   bool didStringManipulation = false;
   if (ctx.LangOpts.SplitPrepositions) {
-    llvm::SmallString<32> scratch1, scratch2;
-    scratch1 += firstPiece.str();
+    llvm::SmallString<32> scratch;
+    scratch += firstPiece.str();
     auto firstName = argNames[0];
     if (!firstName.empty()) {
-      scratch1 += camel_case::toSentencecase(firstName.str(), scratch2);
-      firstPiece = ctx.getIdentifier(scratch1);
+      camel_case::appendSentenceCase(scratch, firstName.str());
+      firstPiece = ctx.getIdentifier(scratch);
       didStringManipulation = true;
     }
   }
@@ -2723,10 +2723,10 @@ ObjCSelector ConstructorDecl::getObjCSelector() const {
   if (firstName.empty())
     selectorPieces.push_back(ctx.Id_init);
   else {
-    llvm::SmallString<16> scratch1, scratch2;
-    scratch1 += "init";
-    scratch1 += camel_case::toSentencecase(firstName.str(), scratch2);
-    selectorPieces.push_back(ctx.getIdentifier(scratch1));
+    llvm::SmallString<16> scratch;
+    scratch += "init";
+    camel_case::appendSentenceCase(scratch, firstName.str());
+    selectorPieces.push_back(ctx.getIdentifier(scratch));
     didStringManipulation = true;
   }
 
