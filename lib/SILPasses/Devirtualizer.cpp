@@ -1325,6 +1325,54 @@ static bool optimizeApplyOfNormalConformanceWitnessMethod(
   return true;
 }
 
+static bool optimizeApplyOfInheritedConformanceWitnessMethod(
+    ApplyInst *AI, WitnessMethodInst *WMI, ProtocolConformance *C,
+    SILFunction *F, SILWitnessTable *WT) {
+  // Since we do not need to worry about substitutions, we can just insert an
+  // upcast of self to the appropriate type.
+  SILValue Self = AI->getArgumentOperands()[0].get();
+  CanType Ty = WT->getConformance()->getType()->getCanonicalType();
+  SILType SILTy = SILType::getPrimitiveType(Ty, Self.getType().getCategory());
+  SILType SelfTy = Self.getType();
+  (void)SelfTy;
+
+  assert(SILTy.isSuperclassOf(SelfTy) &&
+         "Should only create upcasts for sub class devirtualization.");
+  Self = SILBuilder(AI).createUpcast(AI->getLoc(), Self, SILTy);
+
+  SmallVector<Substitution, 16> SelfDerivedSubstitutions;
+  for (auto &origSub : AI->getSubstitutions())
+    if (origSub.Archetype->isSelfDerived())
+      SelfDerivedSubstitutions.push_back(origSub);
+
+  // If we have more than 1 substitution on AI that is self derived, that means
+  // we either have a property or a typealias. We currently do not specialize
+  // those correctly implying that we will have an archetype instead of a
+  // concrete type here that we can not work with. Thus bail and don't do
+  // anything.
+  if (SelfDerivedSubstitutions.size() > 1)
+    return false;
+
+  // Grab self and substitute into the old generic callee type to get the new
+  // non-generic callee type.
+  assert(SelfDerivedSubstitutions.size() == 1 &&
+         "Must have a substitution for self.");
+  Substitution S = AI->getSubstitutions()[0];
+  S.Replacement = Ty;
+
+  CanSILFunctionType OrigType = AI->getOrigCalleeType();
+  CanSILFunctionType SubstCalleeType = OrigType->substInterfaceGenericArgs(
+      AI->getModule(), AI->getModule().getSwiftModule(),
+      ArrayRef<Substitution>(S));
+
+  SILType SubstCalleeSILType = SILType::getPrimitiveObjectType(SubstCalleeType);
+
+  // Then pass of our new self to the normal protocol conformance witness method
+  // handling code.
+  DevirtInfo DInfo = DevirtInfo{Self, SubstCalleeSILType};
+  return optimizeApplyOfNormalConformanceWitnessMethod(AI, WMI, C, F, DInfo);
+}
+
 /// Devirtualize apply instructions that call witness_method instructions:
 ///
 ///   %8 = witness_method $Optional<UInt16>, #LogicValue.getLogicValue!1
@@ -1362,6 +1410,14 @@ bool SILDevirtualizer::optimizeApplyOfWitnessMethod(ApplyInst *AI,
   if (WTCType == CType)
     return optimizeApplyOfNormalConformanceWitnessMethod(AI, AMI, C, F);
 
+  // Ok, we do not have a simple specialization to do here. First find out if
+  // there is a specialized conformance in our type hierarchy. If there is no
+  // such thing, we have a pure inherited protocol conformance.
+  if (Subs.empty())
+    return optimizeApplyOfInheritedConformanceWitnessMethod(AI, AMI, C, F, WT);
+
+  // Otherwise we have a mixed specialized, or mixed specialized inherited
+  // protocol conformance to deal with. Bail.
   return false;
 }
 
