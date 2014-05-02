@@ -938,7 +938,7 @@ static bool isStartOfOperatorDecl(const Token &Tok, const Token &Tok2) {
           Tok2.isContextualKeyword("infix"));
 }
 
-bool Parser::isStartOfDecl() {
+static bool isKeywordPossibleDeclStart(const Token &Tok) {
   switch (Tok.getKind()) {
   case tok::at_sign:
   case tok::kw_case:
@@ -957,34 +957,75 @@ bool Parser::isStartOfDecl() {
   case tok::kw_typealias:
   case tok::kw_var:
   case tok::pound_if:
+  case tok::kw_protocol:
+  case tok::identifier:
     return true;
-  case tok::kw_protocol: {
+  default:
+    return false;
+  }
+}
+
+/// Given a current token of 'unowned', check to see if it is followed by a
+/// "(safe)" or "(unsafe)" specifier.
+static bool isParenthesizedUnowned(Parser &P) {
+  assert(P.Tok.getText() == "unowned" && P.peekToken().is(tok::l_paren) &&
+         "Invariant violated");
+  
+  // Look ahead to parse the parenthesized expression.
+  Parser::BacktrackingScope Backtrack(P);
+  P.consumeToken(tok::identifier);
+  P.consumeToken(tok::l_paren);
+  return P.Tok.is(tok::identifier) && P.peekToken().is(tok::r_paren) &&
+          (P.Tok.getText() == "safe" || P.Tok.getText() == "unsafe");
+}
+
+  
+
+bool Parser::isStartOfDecl() {
+  // If this is obviously not the start of a decl, then we're done.
+  if (!isKeywordPossibleDeclStart(Tok)) return false;
+  
+  // The protocol keyword needs more checking to reject "protocol<Int>".
+  if (Tok.is(tok::kw_protocol)) {
     const Token &Tok2 = peekToken();
     return !Tok2.isAnyOperator() || !Tok2.getText().equals("<");
   }
-  default:
-    if (!Tok.is(tok::identifier))
-      return false;      
-      
-    const Token &Tok2 = peekToken();
-    if (isStartOfOperatorDecl(Tok, Tok2) || Tok.isContextualDeclKeyword())
-      return true;
+  
+  // Otherwise, the only hard case left is the identifier case.
+  if (Tok.isNot(tok::identifier)) return true;
+
+  // If this is an operator declaration, handle it.
+  const Token &Tok2 = peekToken();
+  if (isStartOfOperatorDecl(Tok, Tok2))
+    return true;
     
-    switch (Tok2.getKind()) {
-    // These are all of the decl kinds that can be modified by context sensitive
-    // keywords.
-    case tok::kw_class:
-    case tok::kw_func:
-    case tok::kw_let:
-    case tok::kw_static:
-    case tok::kw_subscript:
-    case tok::kw_var:
-      return true;
+  // If this can't possibly be a contextual keyword, then this identifier is
+  // not interesting.  Bail out.
+  if (!Tok.isContextualDeclKeyword())
+    return false;
       
-    default:
-      return false;
-    }
+  // If it might be, we do some more digging.
+  
+  // If this is 'unowned', check to see if it is valid.
+  if (Tok.getText() == "unowned" && Tok2.is(tok::l_paren) &&
+      isParenthesizedUnowned(*this)) {
+    Parser::BacktrackingScope Backtrack(*this);
+    consumeToken(tok::identifier);
+    consumeToken(tok::l_paren);
+    consumeToken(tok::identifier);
+    consumeToken(tok::r_paren);
+
+    return isStartOfDecl();
   }
+  
+  // If the next token is obviously not the start of a decl, bail early.
+  if (!isKeywordPossibleDeclStart(Tok2))
+    return false;
+  
+  // Otherwise, do a recursive parse.
+  Parser::BacktrackingScope Backtrack(*this);
+  consumeToken(tok::identifier);
+  return isStartOfDecl();
 }
 
 void Parser::consumeDecl(ParserPosition BeginParserPosition,
@@ -1115,6 +1156,32 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
       }
       
       // Likewise, if this is a context sensitive keyword, parse it too.
+      if (Tok.isContextualKeyword("weak") ||
+          Tok.isContextualKeyword("unowned")) {
+        AttrKind attr = AK_Count;
+        bool isUnowned = Tok.getText() == "unowned";
+
+        SourceLoc Loc = Tok.getLoc();
+        if (isUnowned && peekToken().is(tok::l_paren) &&
+            isParenthesizedUnowned(*this)) {
+          consumeToken(tok::identifier);
+          consumeToken(tok::l_paren);
+          // TODO, no "safe" variant?
+          attr = Tok.getText() == "safe" ? AK_unowned : AK_unowned_unsafe;
+          consumeToken(tok::identifier);
+          consumeToken(tok::r_paren);
+        } else {
+          consumeToken(tok::identifier);
+          attr = isUnowned ? AK_unowned : AK_weak;
+        }
+        
+        if (Attributes.hasOwnership())
+          diagnose(Tok, diag::duplicate_attribute);
+        else
+          Attributes.setAttr(attr, Loc);
+        continue;
+      }
+        
       if (Tok.isContextualKeyword("mutating") ||
           Tok.isContextualKeyword("nonmutating")) {
         if (MutatingLoc.isValid()) {

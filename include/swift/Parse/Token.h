@@ -128,7 +128,7 @@ public:
     if (isNot(tok::identifier) || isEscapedIdentifier()) return false;
 
     return Text == "mutating" || Text == "nonmutating" ||
-           Text == "override";
+           Text == "override" || Text == "weak" || Text == "unowned";
   }
 
   bool isContextualPunctuator(StringRef ContextPunc) const {
