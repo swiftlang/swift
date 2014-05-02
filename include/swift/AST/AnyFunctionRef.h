@@ -90,6 +90,14 @@ public:
       return AFD;
     return TheFunction.get<AbstractClosureExpr *>();
   }
+  
+  AbstractFunctionDecl *getAbstractFunctionDecl() const {
+    return TheFunction.dyn_cast<AbstractFunctionDecl*>();
+  }
+  
+  AbstractClosureExpr *getAbstractClosureExpr() const {
+    return TheFunction.dyn_cast<AbstractClosureExpr*>();
+  }
 };
 
 } // namespace swift
