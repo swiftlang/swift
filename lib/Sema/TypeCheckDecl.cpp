@@ -3660,7 +3660,7 @@ public:
           return true;
         }
         
-        // Differing only in Optional vs. UncheckedOptional is fine.
+        // Differing only in Optional vs. ImplicitlyUnwrappedOptional is fine.
         bool IsSilentDifference = false;
         if (auto propertyTyNoOptional = propertyTy->getAnyOptionalObjectType())
           if (auto parentPropertyTyNoOptional =

@@ -416,9 +416,9 @@ Type TypeBase::getOptionalObjectType() {
   return Type();
 }
 
-Type TypeBase::getUncheckedOptionalObjectType() {
+Type TypeBase::getImplicitlyUnwrappedOptionalObjectType() {
   if (auto boundTy = getAs<BoundGenericType>())
-    if (boundTy->getDecl()->classifyAsOptionalType() == OTK_UncheckedOptional)
+    if (boundTy->getDecl()->classifyAsOptionalType() == OTK_ImplicitlyUnwrappedOptional)
       return boundTy->getGenericArgs()[0];
   return Type();
 }
@@ -551,8 +551,8 @@ Type TypeBase::replaceCovariantResultType(Type newResultType,
         return newResultType;
       case OTK_Optional:
         return OptionalType::get(newResultType);
-      case OTK_UncheckedOptional:
-        return UncheckedOptionalType::get(newResultType);
+      case OTK_ImplicitlyUnwrappedOptional:
+        return ImplicitlyUnwrappedOptionalType::get(newResultType);
       }
       llvm_unreachable("bad optional type kind");
     }
@@ -1032,8 +1032,8 @@ Type SyntaxSugarType::getImplementationType() {
   } else if (isa<OptionalType>(this)) {
     implDecl = ctx.getOptionalDecl();
     assert(implDecl && "Optional type has not been set yet");
-  } else if (isa<UncheckedOptionalType>(this)) {
-    implDecl = ctx.getUncheckedOptionalDecl();
+  } else if (isa<ImplicitlyUnwrappedOptionalType>(this)) {
+    implDecl = ctx.getImplicitlyUnwrappedOptionalDecl();
     assert(implDecl && "Optional type has not been set yet");
   } else {
     llvm_unreachable("Unhandled syntax sugar type");
@@ -1233,7 +1233,7 @@ bool TypeBase::isSpelledLike(Type other) {
   }
   case TypeKind::ArraySlice:
   case TypeKind::Optional:
-  case TypeKind::UncheckedOptional: {
+  case TypeKind::ImplicitlyUnwrappedOptional: {
     auto aMe = cast<SyntaxSugarType>(me);
     auto aThem = cast<SyntaxSugarType>(them);
     return aMe->getBaseType()->isSpelledLike(aThem->getBaseType());
@@ -1324,7 +1324,7 @@ bool TypeBase::isSuperclassOf(Type ty, LazyResolver *resolver) {
 }
 
 static bool hasRetainablePointerRepresentation(CanType type) {
-  // Look through one level of Optional<> or UncheckedOptional<>.
+  // Look through one level of Optional<> or ImplicitlyUnwrappedOptional<>.
   if (auto objType = type.getAnyOptionalObjectType()) {
     type = objType;
   }
@@ -1440,7 +1440,7 @@ static bool canOverride(CanType t1, CanType t2,
   // Allow T to override T! in certain cases.
   // FIXME: this should force a thunk that does the checking!
   if (allowUnsafeParameterOverride && isParameter) {
-    if (auto obj1 = t1->getUncheckedOptionalObjectType()) {
+    if (auto obj1 = t1->getImplicitlyUnwrappedOptionalObjectType()) {
       t1 = obj1->getCanonicalType();
       if (t1 == t2) return true;
     }
@@ -2510,8 +2510,8 @@ case TypeKind::Id:
     return OptionalType::get(baseTy);
   }
 
-  case TypeKind::UncheckedOptional: {
-    auto optional = cast<UncheckedOptionalType>(base);
+  case TypeKind::ImplicitlyUnwrappedOptional: {
+    auto optional = cast<ImplicitlyUnwrappedOptionalType>(base);
     auto baseTy = optional->getBaseType().transform(fn);
     if (!baseTy)
       return Type();
@@ -2519,7 +2519,7 @@ case TypeKind::Id:
     if (baseTy.getPointer() == optional->getBaseType().getPointer())
       return *this;
 
-    return UncheckedOptionalType::get(baseTy);
+    return ImplicitlyUnwrappedOptionalType::get(baseTy);
   }
 
   case TypeKind::LValue: {

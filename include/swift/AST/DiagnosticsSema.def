@@ -1042,7 +1042,7 @@ ERROR(type_inferred_to_nil,sema_tcp,none,
 
 ERROR(sugar_type_not_found,sema_tct,none,
       "broken standard library: cannot find "
-      "%select{Array|Optional|UncheckedOptional}0 type",
+      "%select{Array|Optional|ImplicitlyUnwrappedOptional}0 type",
       (/*SugarImplTypeKind*/ unsigned))
 ERROR(optional_intrinsics_not_found,sema_tct,none,
       "broken standard library: cannot find intrinsic operations on "

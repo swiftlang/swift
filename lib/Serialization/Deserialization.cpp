@@ -3149,9 +3149,9 @@ Type ModuleFile::getType(TypeID TID) {
 
   case decls_block::UNCHECKED_OPTIONAL_TYPE: {
     TypeID baseID;
-    decls_block::UncheckedOptionalTypeLayout::readRecord(scratch, baseID);
+    decls_block::ImplicitlyUnwrappedOptionalTypeLayout::readRecord(scratch, baseID);
 
-    auto optionalTy = UncheckedOptionalType::get(getType(baseID));
+    auto optionalTy = ImplicitlyUnwrappedOptionalType::get(getType(baseID));
     typeOrOffset = optionalTy;
     break;
   }

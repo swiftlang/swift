@@ -278,9 +278,9 @@ public:
     if (!shouldPrint(D))
       return false;
 
-    llvm::SaveAndRestore<bool> SavePrintUncheckedOptional(Options.PrintUncheckedOptional);
-    if (!Options.PrintUncheckedOptionalInImportedDecls && D->hasClangNode())
-      Options.PrintUncheckedOptional = false;
+    llvm::SaveAndRestore<bool> SavePrintImplicitlyUnwrappedOptional(Options.PrintImplicitlyUnwrappedOptional);
+    if (!Options.PrintImplicitlyUnwrappedOptionalInImportedDecls && D->hasClangNode())
+      Options.PrintImplicitlyUnwrappedOptional = false;
 
     Printer.callPrintDeclPre(D);
     ASTVisitor::visit(D);
@@ -1502,7 +1502,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     case TypeKind::Function:
     case TypeKind::PolymorphicFunction:
     case TypeKind::GenericFunction:
-    case TypeKind::UncheckedOptional:
+    case TypeKind::ImplicitlyUnwrappedOptional:
       return false;
 
     case TypeKind::Metatype:
@@ -1710,9 +1710,9 @@ public:
         Printer << "?";
         return;
       }
-      if (NT == Ctx.getUncheckedOptionalDecl()) {
+      if (NT == Ctx.getImplicitlyUnwrappedOptionalDecl()) {
         printWithParensIfNotSimple(T->getGenericArgs()[0]);
-        Printer << (Options.PrintUncheckedOptional ? "!" : "?");
+        Printer << (Options.PrintImplicitlyUnwrappedOptional ? "!" : "?");
         return;
       }
     }
@@ -1950,9 +1950,9 @@ public:
     Printer << "?";
   }
 
-  void visitUncheckedOptionalType(UncheckedOptionalType *T) {
+  void visitImplicitlyUnwrappedOptionalType(ImplicitlyUnwrappedOptionalType *T) {
     printWithParensIfNotSimple(T->getBaseType());
-    Printer <<  (Options.PrintUncheckedOptional ? "!" : "?");
+    Printer <<  (Options.PrintImplicitlyUnwrappedOptional ? "!" : "?");
   }
 
   void visitProtocolType(ProtocolType *T) {

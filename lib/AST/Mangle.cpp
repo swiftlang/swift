@@ -1134,7 +1134,7 @@ bool Mangler::tryMangleStandardSubstitution(NominalTypeDecl *decl) {
   } else if (name == "Optional") {
     Buffer << "Sq";
     return true;
-  } else if (name == "UncheckedOptional") {
+  } else if (name == "ImplicitlyUnwrappedOptional") {
     Buffer << "SQ";
     return true;
   } else if (name == "Array") {

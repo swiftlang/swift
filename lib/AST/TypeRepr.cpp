@@ -143,8 +143,8 @@ TypeRepr *CloneVisitor::visitOptionalTypeRepr(OptionalTypeRepr *T) {
 }
 
 TypeRepr *
-CloneVisitor::visitUncheckedOptionalTypeRepr(UncheckedOptionalTypeRepr *T) {
-  return new (Ctx) UncheckedOptionalTypeRepr(visit(T->getBase()),
+CloneVisitor::visitImplicitlyUnwrappedOptionalTypeRepr(ImplicitlyUnwrappedOptionalTypeRepr *T) {
+  return new (Ctx) ImplicitlyUnwrappedOptionalTypeRepr(visit(T->getBase()),
                                              T->getExclamationLoc());
 }
 
@@ -294,7 +294,7 @@ void OptionalTypeRepr::printImpl(ASTPrinter &Printer,
   Printer << "?";
 }
 
-void UncheckedOptionalTypeRepr::printImpl(ASTPrinter &Printer,
+void ImplicitlyUnwrappedOptionalTypeRepr::printImpl(ASTPrinter &Printer,
                                           const PrintOptions &Opts) const {
   Base->print(Printer, Opts);
   Printer << "!";

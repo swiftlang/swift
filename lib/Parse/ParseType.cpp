@@ -128,8 +128,8 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID) {
         ty = parseTypeOptional(ty.get());
         continue;
       }
-      if (isUncheckedOptionalToken()) {
-        ty = parseTypeUncheckedOptional(ty.get());
+      if (isImplicitlyUnwrappedOptionalToken()) {
+        ty = parseTypeImplicitlyUnwrappedOptional(ty.get());
         continue;
       }
     }
@@ -191,18 +191,18 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID) {
   while (ty.isNonNull() && !Tok.isAtStartOfLine()) {
     if (Tok.is(tok::l_square)) {
       ty = parseTypeArray(ty.get());
-    } else if (Tok.is(tok::question_postfix) || isUncheckedOptionalToken()) {
-      bool IsUncheckedOptional = isUncheckedOptionalToken();
+    } else if (Tok.is(tok::question_postfix) || isImplicitlyUnwrappedOptionalToken()) {
+      bool IsImplicitlyUnwrappedOptional = isImplicitlyUnwrappedOptionalToken();
       if (isa<ArrayTypeRepr>(ty.get())) {
         diagnose(Tok, diag::unsupported_unparenthesized_array_optional,
-                 IsUncheckedOptional ? 1 : 0)
+                 IsImplicitlyUnwrappedOptional ? 1 : 0)
             .fixItInsert(ty.get()->getStartLoc(), "(")
             .fixItInsert(Lexer::getLocForEndOfToken(SourceMgr,
                                                     ty.get()->getEndLoc()),
                          ")");
       }
-      if (IsUncheckedOptional)
-        ty = parseTypeUncheckedOptional(ty.get());
+      if (IsImplicitlyUnwrappedOptional)
+        ty = parseTypeImplicitlyUnwrappedOptional(ty.get());
       else
         ty = parseTypeOptional(ty.get());
     } else {
@@ -633,12 +633,12 @@ ParserResult<OptionalTypeRepr> Parser::parseTypeOptional(TypeRepr *base) {
 
 /// Parse a single unchecked optional suffix, given that we are looking at
 ///  the exclamation mark.
-ParserResult<UncheckedOptionalTypeRepr>
-Parser::parseTypeUncheckedOptional(TypeRepr *base) {
+ParserResult<ImplicitlyUnwrappedOptionalTypeRepr>
+Parser::parseTypeImplicitlyUnwrappedOptional(TypeRepr *base) {
   assert(Tok.is(tok::exclaim_postfix));
   SourceLoc exclamationLoc = consumeToken();
   return makeParserResult(new (Context)
-                            UncheckedOptionalTypeRepr(base, exclamationLoc));
+                            ImplicitlyUnwrappedOptionalTypeRepr(base, exclamationLoc));
 }
 
 //===--------------------------------------------------------------------===//
@@ -739,7 +739,7 @@ bool Parser::canParseType() {
       consumeToken(tok::kw_Type);
       continue;
     }
-    if (Tok.is(tok::question_postfix) || isUncheckedOptionalToken()) {
+    if (Tok.is(tok::question_postfix) || isImplicitlyUnwrappedOptionalToken()) {
       consumeToken();
       continue;
     }
@@ -760,7 +760,7 @@ bool Parser::canParseType() {
     if (Tok.is(tok::l_square)) {
       if (!canParseTypeArray())
         return false;
-    } else if (Tok.is(tok::question_postfix) || isUncheckedOptionalToken()) {
+    } else if (Tok.is(tok::question_postfix) || isImplicitlyUnwrappedOptionalToken()) {
       consumeToken();
     } else {
       break;

@@ -90,8 +90,8 @@ struct ASTContext::Implementation {
   /// func _injectNothingIntoOptional<T>() -> Optional<T>
   FuncDecl *InjectNothingIntoOptionalDecls[NumOptionalTypeKinds] = {};
 
-  /// The declaration of Swift.UncheckedOptional<T>.
-  StructDecl *UncheckedOptionalDecl = nullptr;
+  /// The declaration of Swift.ImplicitlyUnwrappedOptional<T>.
+  StructDecl *ImplicitlyUnwrappedOptionalDecl = nullptr;
 
   /// func _getBool(Builtin.Int1) -> Bool
   FuncDecl *GetBoolDecl = nullptr;
@@ -139,7 +139,7 @@ struct ASTContext::Implementation {
       FunctionTypes;
     llvm::DenseMap<Type, ArraySliceType*> ArraySliceTypes;
     llvm::DenseMap<Type, OptionalType*> OptionalTypes;
-    llvm::DenseMap<Type, UncheckedOptionalType*> UncheckedOptionalTypes;
+    llvm::DenseMap<Type, ImplicitlyUnwrappedOptionalType*> ImplicitlyUnwrappedOptionalTypes;
     llvm::DenseMap<Type, ParenType*> ParenTypes;
     llvm::DenseMap<uintptr_t, ReferenceStorageType*> ReferenceStorageTypes;
     llvm::DenseMap<Type, LValueType*> LValueTypes;
@@ -480,13 +480,13 @@ EnumElementDecl *ASTContext::getOptionalNoneDecl() const {
   return Impl.OptionalNoneDecl;
 }
 
-StructDecl *ASTContext::getUncheckedOptionalDecl() const {
-  if (!Impl.UncheckedOptionalDecl)
-    Impl.UncheckedOptionalDecl
+StructDecl *ASTContext::getImplicitlyUnwrappedOptionalDecl() const {
+  if (!Impl.ImplicitlyUnwrappedOptionalDecl)
+    Impl.ImplicitlyUnwrappedOptionalDecl
       = dyn_cast_or_null<StructDecl>(findSyntaxSugarImpl(*this,
-                                                         "UncheckedOptional"));
+                                                         "ImplicitlyUnwrappedOptional"));
 
-  return Impl.UncheckedOptionalDecl;
+  return Impl.ImplicitlyUnwrappedOptionalDecl;
 }
 
 ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
@@ -681,7 +681,7 @@ static unsigned asIndex(OptionalTypeKind optionalKind) {
 #define getOptionalIntrinsicName(PREFIX, KIND, SUFFIX) \
   ((KIND) == OTK_Optional                              \
     ? (PREFIX "Optional" SUFFIX)                       \
-    : (PREFIX "UncheckedOptional" SUFFIX))
+    : (PREFIX "ImplicitlyUnwrappedOptional" SUFFIX))
 
 FuncDecl *ASTContext::getDoesOptionalHaveValueDecl(LazyResolver *resolver,
                                         OptionalTypeKind optionalKind) const {
@@ -799,7 +799,7 @@ bool ASTContext::hasOptionalIntrinsics(LazyResolver *resolver) const {
          getOptionalSomeDecl() &&
          getOptionalNoneDecl() &&
          ::hasOptionalIntrinsics(*this, resolver, OTK_Optional) &&
-         ::hasOptionalIntrinsics(*this, resolver, OTK_UncheckedOptional);
+         ::hasOptionalIntrinsics(*this, resolver, OTK_ImplicitlyUnwrappedOptional);
 }
 
 void ASTContext::addedExternalDecl(Decl *decl) {
@@ -1894,7 +1894,7 @@ Type OptionalType::get(OptionalTypeKind which, Type valueType) {
   // OTK_None if we made code more convenient to write.
   case OTK_None: llvm_unreachable("building a non-optional type!");
   case OTK_Optional: return OptionalType::get(valueType);
-  case OTK_UncheckedOptional: return UncheckedOptionalType::get(valueType);
+  case OTK_ImplicitlyUnwrappedOptional: return ImplicitlyUnwrappedOptionalType::get(valueType);
   }
   llvm_unreachable("bad optional type kind");
 }
@@ -1911,16 +1911,16 @@ OptionalType *OptionalType::get(Type base) {
   return entry = new (C, arena) OptionalType(C, base, properties);
 }
 
-UncheckedOptionalType *UncheckedOptionalType::get(Type base) {
+ImplicitlyUnwrappedOptionalType *ImplicitlyUnwrappedOptionalType::get(Type base) {
   auto properties = base->getRecursiveProperties();
   auto arena = getArena(properties);
 
   const ASTContext &C = base->getASTContext();
 
-  auto *&entry = C.Impl.getArena(arena).UncheckedOptionalTypes[base];
+  auto *&entry = C.Impl.getArena(arena).ImplicitlyUnwrappedOptionalTypes[base];
   if (entry) return entry;
 
-  return entry = new (C, arena) UncheckedOptionalType(C, base, properties);
+  return entry = new (C, arena) ImplicitlyUnwrappedOptionalType(C, base, properties);
 }
 
 ProtocolType *ProtocolType::get(ProtocolDecl *D, const ASTContext &C) {

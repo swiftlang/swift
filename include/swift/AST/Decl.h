@@ -2325,8 +2325,8 @@ enum OptionalTypeKind : unsigned {
   /// The type is Optional<T>.
   OTK_Optional,
 
-  /// The type is UncheckedOptional<T>.
-  OTK_UncheckedOptional
+  /// The type is ImplicitlyUnwrappedOptional<T>.
+  OTK_ImplicitlyUnwrappedOptional
 };
 enum { NumOptionalTypeKinds = 2 };
 
@@ -2557,7 +2557,7 @@ public:
   using TypeDecl::getDeclaredInterfaceType;
 
   /// classifyAsOptionalType - Decide whether this declaration is one
-  /// of the library-intrinsic Optional<T> or UncheckedOptional<T> types.
+  /// of the library-intrinsic Optional<T> or ImplicitlyUnwrappedOptional<T> types.
   OptionalTypeKind classifyAsOptionalType() const;
   
 private:

@@ -303,7 +303,7 @@ public:
 
   Type getArraySliceType(SourceLoc loc, Type elementType);
   Type getOptionalType(SourceLoc loc, Type elementType);
-  Type getUncheckedOptionalType(SourceLoc loc, Type elementType);
+  Type getImplicitlyUnwrappedOptionalType(SourceLoc loc, Type elementType);
   Type getNSStringType(DeclContext *dc);
   
   Expr *buildArrayInjectionFnRef(DeclContext *dc,

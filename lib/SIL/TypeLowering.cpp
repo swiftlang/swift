@@ -981,11 +981,11 @@ namespace {
         return handleAddressOnly(structType);
 
       // Lower Self! as if it were Whatever!.
-      if (D == TC.Context.getUncheckedOptionalDecl()) {
+      if (D == TC.Context.getImplicitlyUnwrappedOptionalDecl()) {
         auto valueType = cast<BoundGenericType>(structType).getGenericArgs()[0];
         if (auto dynamicSelf = dyn_cast<DynamicSelfType>(valueType)) {
           return &TC.getTypeLowering(
-                      UncheckedOptionalType::get(dynamicSelf->getSelfType()));
+                      ImplicitlyUnwrappedOptionalType::get(dynamicSelf->getSelfType()));
         }
       }
 
@@ -2047,8 +2047,8 @@ Type TypeConverter::getLoweredBridgedType(Type t, AbstractCC cc) {
     // Look through optional types.
     if (auto valueTy = t->getOptionalObjectType()) {
       return OptionalType::get(getLoweredCBridgedType(valueTy));
-    } else if (auto valueTy = t->getUncheckedOptionalObjectType()) {
-      return UncheckedOptionalType::get(getLoweredCBridgedType(valueTy));
+    } else if (auto valueTy = t->getImplicitlyUnwrappedOptionalObjectType()) {
+      return ImplicitlyUnwrappedOptionalType::get(getLoweredCBridgedType(valueTy));
     } else {
       return getLoweredCBridgedType(t);
     }

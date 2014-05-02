@@ -4740,7 +4740,7 @@ RValue RValueEmitter::emitForceValue(SILLocation loc, Expr *E,
     auto subexpr = injection->getSubExpr()->getSemanticsProvidingExpr();
 
     // An injection of a bind is the idiom for a conversion between
-    // optional types (e.g. UncheckedOptional<T> -> Optional<T>).
+    // optional types (e.g. ImplicitlyUnwrappedOptional<T> -> Optional<T>).
     // Handle it specially to avoid unnecessary control flow.
     if (auto bindOptional = dyn_cast<BindOptionalExpr>(subexpr)) {
       if (bindOptional->getDepth() < numOptionalEvaluations) {

@@ -804,7 +804,7 @@ private:
     if (Mangled.nextIf('q'))
       return createSwiftType(Node::Kind::Enum, "Optional");
     if (Mangled.nextIf('Q'))
-      return createSwiftType(Node::Kind::Structure, "UncheckedOptional");
+      return createSwiftType(Node::Kind::Structure, "ImplicitlyUnwrappedOptional");
     if (Mangled.nextIf('S'))
       return createSwiftType(Node::Kind::Structure, "String");
     if (Mangled.nextIf('u'))

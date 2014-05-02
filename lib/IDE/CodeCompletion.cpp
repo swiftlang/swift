@@ -1617,7 +1617,7 @@ public:
           CodeCompletionResult::MaxNumBytesToErase)
         lookupVisibleMemberDecls(*this, Unwrapped, CurrDeclContext,
                                  TypeResolver.get());
-    } else if (Type Unwrapped = ExprType->getUncheckedOptionalObjectType()) {
+    } else if (Type Unwrapped = ExprType->getImplicitlyUnwrappedOptionalObjectType()) {
       lookupVisibleMemberDecls(*this, Unwrapped, CurrDeclContext,
                                TypeResolver.get());
     } else {

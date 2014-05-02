@@ -1929,8 +1929,8 @@ namespace {
         resultTy = result->getDynamicSelf();
         assert(resultTy && "failed to get dynamic self");
         Type interfaceSelfTy = result->getDynamicSelfInterface();
-        resultTy = UncheckedOptionalType::get(resultTy);
-        interfaceSelfTy = UncheckedOptionalType::get(interfaceSelfTy);
+        resultTy = ImplicitlyUnwrappedOptionalType::get(resultTy);
+        interfaceSelfTy = ImplicitlyUnwrappedOptionalType::get(interfaceSelfTy);
         
         // Update the method type with the new result type.
         auto methodTy = type->castTo<FunctionType>();

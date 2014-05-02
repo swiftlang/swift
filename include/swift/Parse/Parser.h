@@ -92,9 +92,9 @@ public:
 
   /// Indicates if we should parse '!' as an @unchecked optional.
   enum {
-    TUO_AllowUncheckedOptional,
-    TUO_NoUncheckedOptional
-  } TUO_UncheckedOptionalCtx = TUO_AllowUncheckedOptional;
+    TUO_AllowImplicitlyUnwrappedOptional,
+    TUO_NoImplicitlyUnwrappedOptional
+  } TUO_ImplicitlyUnwrappedOptionalCtx = TUO_AllowImplicitlyUnwrappedOptional;
 
   bool GreaterThanIsOperator = true;
 
@@ -751,11 +751,11 @@ public:
   ParserResult<ArrayTypeRepr> parseTypeArray(TypeRepr *Base);
   ParserResult<OptionalTypeRepr> parseTypeOptional(TypeRepr *Base);
 
-  ParserResult<UncheckedOptionalTypeRepr>
-    parseTypeUncheckedOptional(TypeRepr *Base);
+  ParserResult<ImplicitlyUnwrappedOptionalTypeRepr>
+    parseTypeImplicitlyUnwrappedOptional(TypeRepr *Base);
 
-  bool isUncheckedOptionalToken() const {
-    return TUO_UncheckedOptionalCtx == TUO_AllowUncheckedOptional &&
+  bool isImplicitlyUnwrappedOptionalToken() const {
+    return TUO_ImplicitlyUnwrappedOptionalCtx == TUO_AllowImplicitlyUnwrappedOptional &&
            Tok.is(tok::exclaim_postfix);
   }
 

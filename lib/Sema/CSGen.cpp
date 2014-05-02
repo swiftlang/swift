@@ -395,7 +395,7 @@ namespace {
       // If there is an argument, apply it.
       if (auto arg = expr->getArgument()) {
         // The result type of the function must be convertible to the base type.
-        // TODO: we definitely want this to include UncheckedOptional; does it
+        // TODO: we definitely want this to include ImplicitlyUnwrappedOptional; does it
         // need to include everything else in the world?
         auto outputTy
           = CS.createTypeVariable(
@@ -675,7 +675,7 @@ namespace {
           if (!ty) return Type();
         // For @IBOutlet variables, use T!.
         } else if (var->getAttrs().hasAttribute<IBOutletAttr>()) {
-          ty = CS.getTypeChecker().getUncheckedOptionalType(var->getLoc(), ty);
+          ty = CS.getTypeChecker().getImplicitlyUnwrappedOptionalType(var->getLoc(), ty);
           if (!ty) return Type();
         }
  
@@ -698,7 +698,7 @@ namespace {
         // FIXME: Error recovery if the type is an error type?
         Type openedType = CS.openType(typedPattern->getType());
 
-        // Somewhat crazy special cases: add a level of UncheckedOptional
+        // Somewhat crazy special cases: add a level of ImplicitlyUnwrappedOptional
         // if we don't have one and this pattern is directly bound to an
         // IBOutlet, or turn a @weak into an optional
         if (auto var = typedPattern->getSingleVar()) {
@@ -710,7 +710,7 @@ namespace {
           } else if (var->getAttrs().hasAttribute<IBOutletAttr>() &&
                      !openedType->getAnyOptionalObjectType()) {
             openedType = CS.getTypeChecker()
-                           .getUncheckedOptionalType(var->getLoc(), openedType);
+                           .getImplicitlyUnwrappedOptionalType(var->getLoc(), openedType);
             if (!openedType) return Type();
           }
         }

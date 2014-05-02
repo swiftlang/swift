@@ -573,8 +573,8 @@ static Type getInterfaceResultType(TypeChecker &TC, FuncDecl *fn,
     case OTK_None: llvm_unreachable("impossible");
     case OTK_Optional:
       return OptionalType::get(ifaceValueType);
-    case OTK_UncheckedOptional:
-      return UncheckedOptionalType::get(ifaceValueType);
+    case OTK_ImplicitlyUnwrappedOptional:
+      return ImplicitlyUnwrappedOptionalType::get(ifaceValueType);
     }
     llvm_unreachable("bad optional kind");
   }

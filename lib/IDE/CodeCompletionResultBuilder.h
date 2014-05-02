@@ -156,7 +156,7 @@ public:
 
     // Print non-inout '@unchecked' optional arguments as normal optionals,
     // because the difference is not important for the caller.
-    if (Type ObjectType = Ty->getUncheckedOptionalObjectType()) {
+    if (Type ObjectType = Ty->getImplicitlyUnwrappedOptionalObjectType()) {
       Ty = OptionalType::get(ObjectType);
     }
 

@@ -506,7 +506,7 @@ void TypeChecker::checkOwnershipAttr(VarDecl *var, Ownership ownershipKind) {
       type = objType;
 
       // Cannot use an unchecked optional with @weak.
-      if (kind == OTK_UncheckedOptional) {
+      if (kind == OTK_ImplicitlyUnwrappedOptional) {
         // Find the location of the '!'.
         SourceLoc bangLoc;
         auto *pattern = var->getParentPattern()->getPattern();
@@ -515,7 +515,7 @@ void TypeChecker::checkOwnershipAttr(VarDecl *var, Ownership ownershipKind) {
         }
         if (auto *typedPattern = dyn_cast<TypedPattern>(pattern)) {
           auto typeRepr = typedPattern->getTypeLoc().getTypeRepr();
-          if (auto unchecked = dyn_cast<UncheckedOptionalTypeRepr>(typeRepr)) {
+          if (auto unchecked = dyn_cast<ImplicitlyUnwrappedOptionalTypeRepr>(typeRepr)) {
             bangLoc = unchecked->getExclamationLoc();
           }
         }
@@ -607,7 +607,7 @@ void TypeChecker::checkIBOutlet(VarDecl *VD) {
     if (ownership == Ownership::Weak)
       type = ReferenceStorageType::get(type, ownership, Context);
     else
-      type = UncheckedOptionalType::get(type);
+      type = ImplicitlyUnwrappedOptionalType::get(type);
     VD->overwriteType(type);
   }
 }

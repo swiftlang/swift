@@ -50,13 +50,13 @@ Type TypeChecker::getOptionalType(SourceLoc loc, Type elementType) {
   return OptionalType::get(elementType);
 }
 
-Type TypeChecker::getUncheckedOptionalType(SourceLoc loc, Type elementType) {
-  if (!Context.getUncheckedOptionalDecl()) {
+Type TypeChecker::getImplicitlyUnwrappedOptionalType(SourceLoc loc, Type elementType) {
+  if (!Context.getImplicitlyUnwrappedOptionalDecl()) {
     diagnose(loc, diag::sugar_type_not_found, 2);
     return Type();
   }
 
-  return UncheckedOptionalType::get(elementType);
+  return ImplicitlyUnwrappedOptionalType::get(elementType);
 }
 
 Type TypeChecker::getNSStringType(DeclContext *dc) {
@@ -898,7 +898,7 @@ namespace {
                           TypeResolutionOptions options);
     Type resolveOptionalType(OptionalTypeRepr *repr,
                              TypeResolutionOptions options);
-    Type resolveUncheckedOptionalType(UncheckedOptionalTypeRepr *repr,
+    Type resolveImplicitlyUnwrappedOptionalType(ImplicitlyUnwrappedOptionalTypeRepr *repr,
                                       TypeResolutionOptions options);
     Type resolveTupleType(TupleTypeRepr *repr,
                           TypeResolutionOptions options);
@@ -960,8 +960,8 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
   case TypeReprKind::Optional:
     return resolveOptionalType(cast<OptionalTypeRepr>(repr), options);
 
-  case TypeReprKind::UncheckedOptional:
-    return resolveUncheckedOptionalType(cast<UncheckedOptionalTypeRepr>(repr),
+  case TypeReprKind::ImplicitlyUnwrappedOptional:
+    return resolveImplicitlyUnwrappedOptionalType(cast<ImplicitlyUnwrappedOptionalTypeRepr>(repr),
                                         options);
 
   case TypeReprKind::Tuple:
@@ -1060,7 +1060,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 
   // @unchecked should only annotate a ? representation.  Remember
   // that we saw this and drill into the OptionalTypeRepr.
-  bool isUncheckedOptional = false;
+  bool isImplicitlyUnwrappedOptional = false;
   if (attrs.has(TAK_unchecked)) {
     attrs.clearAttribute(TAK_unchecked);
     if (auto optionalRepr = dyn_cast<OptionalTypeRepr>(repr)) {
@@ -1081,7 +1081,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
         diagnostic.fixItInsert(range.End, ")?");
       }
     }
-    isUncheckedOptional = true;
+    isImplicitlyUnwrappedOptional = true;
   }
 
   // Pass down the variable function type attributes to the
@@ -1189,8 +1189,8 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     return ty;
 
   // Apply @unchecked first.
-  if (isUncheckedOptional) {
-    ty = UncheckedOptionalType::get(ty);
+  if (isImplicitlyUnwrappedOptional) {
+    ty = ImplicitlyUnwrappedOptionalType::get(ty);
   }
 
   // In SIL, handle @sil_self, which extracts the Self type of a protocol.
@@ -1470,7 +1470,7 @@ Type TypeResolver::resolveOptionalType(OptionalTypeRepr *repr,
   return optionalTy;
 }
 
-Type TypeResolver::resolveUncheckedOptionalType(UncheckedOptionalTypeRepr *repr,
+Type TypeResolver::resolveImplicitlyUnwrappedOptionalType(ImplicitlyUnwrappedOptionalTypeRepr *repr,
                                                 TypeResolutionOptions options) {
   // The T in T! is a generic type argument and therefore always an AST type.
   // FIXME: diagnose non-materializability of element type!
@@ -1479,7 +1479,7 @@ Type TypeResolver::resolveUncheckedOptionalType(UncheckedOptionalTypeRepr *repr,
     return baseTy;
 
   auto uncheckedOptionalTy =
-    TC.getUncheckedOptionalType(repr->getExclamationLoc(), baseTy);
+    TC.getImplicitlyUnwrappedOptionalType(repr->getExclamationLoc(), baseTy);
   if (!uncheckedOptionalTy)
     return ErrorType::get(Context);
 

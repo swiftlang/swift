@@ -80,11 +80,11 @@ struct PrintOptions {
 
   /// Whether to print '@unchecked' inside declarations imported from
   /// Objective-C.  If false, print @unchecked optionals as normal optionals.
-  bool PrintUncheckedOptionalInImportedDecls = true;
+  bool PrintImplicitlyUnwrappedOptionalInImportedDecls = true;
 
   /// Whether to print '@unchecked' at all.  If false, print @unchecked
   /// optionals as normal optionals.
-  bool PrintUncheckedOptional = true;
+  bool PrintImplicitlyUnwrappedOptional = true;
 
   /// Whether to print function representation attributes on function types:
   /// '@thin' or '@objc_block'.

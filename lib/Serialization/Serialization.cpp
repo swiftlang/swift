@@ -2255,13 +2255,13 @@ void Serializer::writeType(Type ty) {
     break;
   }
 
-  case TypeKind::UncheckedOptional: {
-    auto sliceTy = cast<UncheckedOptionalType>(ty.getPointer());
+  case TypeKind::ImplicitlyUnwrappedOptional: {
+    auto sliceTy = cast<ImplicitlyUnwrappedOptionalType>(ty.getPointer());
 
     Type base = sliceTy->getBaseType();
 
-    unsigned abbrCode = DeclTypeAbbrCodes[UncheckedOptionalTypeLayout::Code];
-    UncheckedOptionalTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+    unsigned abbrCode = DeclTypeAbbrCodes[ImplicitlyUnwrappedOptionalTypeLayout::Code];
+    ImplicitlyUnwrappedOptionalTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                             addTypeRef(base));
     break;
   }
@@ -2422,7 +2422,7 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<ReferenceStorageTypeLayout>();
     registerDeclTypeAbbr<UnboundGenericTypeLayout>();
     registerDeclTypeAbbr<OptionalTypeLayout>();
-    registerDeclTypeAbbr<UncheckedOptionalTypeLayout>();
+    registerDeclTypeAbbr<ImplicitlyUnwrappedOptionalTypeLayout>();
     registerDeclTypeAbbr<DynamicSelfTypeLayout>();
     registerDeclTypeAbbr<OpenedExistentialTypeLayout>();
 

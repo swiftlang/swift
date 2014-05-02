@@ -1089,7 +1089,7 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
     if (subscript->getAttrs().isOptional())
       elementTy = OptionalType::get(elementTy->getRValueType());
     else if (isDynamicResult)
-      elementTy = UncheckedOptionalType::get(elementTy->getRValueType());
+      elementTy = ImplicitlyUnwrappedOptionalType::get(elementTy->getRValueType());
 
     type = FunctionType::get(fnType->getInput(), elementTy);
   } else if (isa<ProtocolDecl>(value->getDeclContext()) &&
@@ -1208,7 +1208,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     // getTypeOfMemberReference(); their result types are unchecked
     // optional.
     else if (isDynamicResult && !isa<SubscriptDecl>(choice.getDecl())) {    
-      refType = UncheckedOptionalType::get(refType->getRValueType());
+      refType = ImplicitlyUnwrappedOptionalType::get(refType->getRValueType());
     } 
 
     break;
@@ -1269,11 +1269,11 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
   }
 }
 
-/// Given that we're accessing a member of an UncheckedOptional<T>, is
+/// Given that we're accessing a member of an ImplicitlyUnwrappedOptional<T>, is
 /// the DC one of the special cases where we should not instead look at T?
-static bool isPrivilegedAccessToUncheckedOptional(DeclContext *DC,
+static bool isPrivilegedAccessToImplicitlyUnwrappedOptional(DeclContext *DC,
                                                   NominalTypeDecl *D) {
-  assert(D == DC->getASTContext().getUncheckedOptionalDecl());
+  assert(D == DC->getASTContext().getImplicitlyUnwrappedOptionalDecl());
 
   // Walk up through the chain of current contexts.
   for (; ; DC = DC->getParent()) {
@@ -1284,13 +1284,13 @@ static bool isPrivilegedAccessToUncheckedOptional(DeclContext *DC,
       continue;
 
     // If we're in a type context that's defining or extending
-    // UncheckedOptional<T>, we're privileged.
+    // ImplicitlyUnwrappedOptional<T>, we're privileged.
     } else if (DC->isTypeContext()) {
       if (DC->getDeclaredTypeInContext()->getAnyNominal() == D)
         return true;
 
     // Otherwise, we're privileged if we're within the same file that
-    // defines UncheckedOptional<T>.
+    // defines ImplicitlyUnwrappedOptional<T>.
     } else {
       assert(DC->isModuleScopeContext());
       return (DC == D->getModuleScopeContext());
@@ -1298,11 +1298,11 @@ static bool isPrivilegedAccessToUncheckedOptional(DeclContext *DC,
   }
 }
 
-Type ConstraintSystem::lookThroughUncheckedOptionalType(Type type) {
+Type ConstraintSystem::lookThroughImplicitlyUnwrappedOptionalType(Type type) {
   if (auto boundTy = type->getAs<BoundGenericStructType>()) {
     auto boundDecl = boundTy->getDecl();
-    if (boundDecl == TC.Context.getUncheckedOptionalDecl() &&
-        !isPrivilegedAccessToUncheckedOptional(DC, boundDecl))
+    if (boundDecl == TC.Context.getImplicitlyUnwrappedOptionalDecl() &&
+        !isPrivilegedAccessToImplicitlyUnwrappedOptional(DC, boundDecl))
       return boundTy->getGenericArgs()[0];
   }
   return Type();

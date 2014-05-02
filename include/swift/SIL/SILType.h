@@ -292,7 +292,7 @@ public:
   }
   
   /// True if the type is block-pointer-compatible, meaning it either is a block
-  /// or is an Optional or UncheckedOptional with a block payload.
+  /// or is an Optional or ImplicitlyUnwrappedOptional with a block payload.
   bool isBlockPointerCompatible() const {
     CanType ty = getSwiftRValueType();
     if (auto optPayload = ty->getAnyOptionalObjectType()) {

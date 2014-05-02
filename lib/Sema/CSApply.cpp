@@ -369,7 +369,7 @@ namespace {
     /// \brief Coerce an expression of unchecked optional type to its
     /// underlying value type, in the correct way for an implicit
     /// look-through.
-    Expr *coerceUncheckedOptionalToValue(Expr *expr, Type objTy,
+    Expr *coerceImplicitlyUnwrappedOptionalToValue(Expr *expr, Type objTy,
                                          ConstraintLocatorBuilder locator);
 
   public:
@@ -503,10 +503,10 @@ namespace {
       Type baseTy = base->getType()->getRValueType();
 
       // Explicit member accesses are permitted to implicitly look
-      // through UncheckedOptional<T>.
+      // through ImplicitlyUnwrappedOptional<T>.
       if (!Implicit) {
-        if (auto objTy = cs.lookThroughUncheckedOptionalType(baseTy)) {
-          base = coerceUncheckedOptionalToValue(base, objTy, locator);
+        if (auto objTy = cs.lookThroughImplicitlyUnwrappedOptionalType(baseTy)) {
+          base = coerceImplicitlyUnwrappedOptionalToValue(base, objTy, locator);
           if (!base) return nullptr;
           baseTy = objTy;
         }
@@ -761,8 +761,8 @@ namespace {
       // The base must always be an rvalue.
       base = cs.getTypeChecker().coerceToRValue(base);
       if (!base) return nullptr;
-      if (auto objTy = cs.lookThroughUncheckedOptionalType(base->getType())) {
-        base = coerceUncheckedOptionalToValue(base, objTy, locator);
+      if (auto objTy = cs.lookThroughImplicitlyUnwrappedOptionalType(base->getType())) {
+        base = coerceImplicitlyUnwrappedOptionalToValue(base, objTy, locator);
         if (!base) return nullptr;
       }
 
@@ -926,9 +926,9 @@ namespace {
       // Check whether the base is 'super'.
       bool isSuper = base->isSuperExpr();
 
-      // Handle accesses that implicitly look through UncheckedOptional<T>.
-      if (auto objTy = cs.lookThroughUncheckedOptionalType(baseTy)) {
-        base = coerceUncheckedOptionalToValue(base, objTy, locator);
+      // Handle accesses that implicitly look through ImplicitlyUnwrappedOptional<T>.
+      if (auto objTy = cs.lookThroughImplicitlyUnwrappedOptionalType(baseTy)) {
+        base = coerceImplicitlyUnwrappedOptionalToValue(base, objTy, locator);
         if (!base) return nullptr;
       }
 
@@ -1759,8 +1759,8 @@ namespace {
 
       case OverloadChoiceKind::TupleIndex: {
         auto baseTy = base->getType()->getRValueType();
-        if (auto objTy = cs.lookThroughUncheckedOptionalType(baseTy)) {
-          base = coerceUncheckedOptionalToValue(base, objTy,
+        if (auto objTy = cs.lookThroughImplicitlyUnwrappedOptionalType(baseTy)) {
+          base = coerceImplicitlyUnwrappedOptionalToValue(base, objTy,
                                          cs.getConstraintLocator(base));
           if (!base) return nullptr;
         }
@@ -1894,11 +1894,11 @@ namespace {
     }
 
     Expr *visitTupleElementExpr(TupleElementExpr *expr) {
-      // Handle accesses that implicitly look through UncheckedOptional<T>.
+      // Handle accesses that implicitly look through ImplicitlyUnwrappedOptional<T>.
       auto base = expr->getBase();
       auto baseTy = base->getType()->getRValueType();
-      if (auto objTy = cs.lookThroughUncheckedOptionalType(baseTy)) {
-        base = coerceUncheckedOptionalToValue(base, objTy,
+      if (auto objTy = cs.lookThroughImplicitlyUnwrappedOptionalType(baseTy)) {
+        base = coerceImplicitlyUnwrappedOptionalToValue(base, objTy,
                                               cs.getConstraintLocator(base));
         if (!base) return nullptr;
         expr->setBase(base);
@@ -3224,11 +3224,11 @@ Expr *ExprRewriter::coerceOptionalToOptional(Expr *expr, Type toType,
   return expr;
 }
 
-Expr *ExprRewriter::coerceUncheckedOptionalToValue(Expr *expr, Type objTy,
+Expr *ExprRewriter::coerceImplicitlyUnwrappedOptionalToValue(Expr *expr, Type objTy,
                                             ConstraintLocatorBuilder locator) {
   // Coerce to an r-value.
   auto rvalueTy = expr->getType()->getRValueType();
-  assert(rvalueTy->getUncheckedOptionalObjectType()->isEqual(objTy));
+  assert(rvalueTy->getImplicitlyUnwrappedOptionalObjectType()->isEqual(objTy));
 
   if (cs.getTypeChecker().requireOptionalIntrinsics(expr->getLoc()))
     return nullptr;
@@ -3353,15 +3353,15 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       return new (tc.Context) InjectIntoOptionalExpr(expr, toType);
     }
 
-    case ConversionRestrictionKind::OptionalToUncheckedOptional:
-    case ConversionRestrictionKind::UncheckedOptionalToOptional:
+    case ConversionRestrictionKind::OptionalToImplicitlyUnwrappedOptional:
+    case ConversionRestrictionKind::ImplicitlyUnwrappedOptionalToOptional:
     case ConversionRestrictionKind::OptionalToOptional:
       return coerceOptionalToOptional(expr, toType, locator);
 
     case ConversionRestrictionKind::ForceUnchecked: {
-      auto valueTy = fromType->getUncheckedOptionalObjectType();
+      auto valueTy = fromType->getImplicitlyUnwrappedOptionalObjectType();
       assert(valueTy);
-      expr = coerceUncheckedOptionalToValue(expr, valueTy, locator);
+      expr = coerceImplicitlyUnwrappedOptionalToValue(expr, valueTy, locator);
       if (!expr) return nullptr;
       return coerceToType(expr, toType, locator);
     }
@@ -3678,9 +3678,9 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   if (!fn)
     return nullptr;
   
-  // Handle applications that implicitly look through UncheckedOptional<T>.
-  if (auto fnTy = cs.lookThroughUncheckedOptionalType(fn->getType())) {
-    fn = coerceUncheckedOptionalToValue(fn, fnTy, locator);
+  // Handle applications that implicitly look through ImplicitlyUnwrappedOptional<T>.
+  if (auto fnTy = cs.lookThroughImplicitlyUnwrappedOptionalType(fn->getType())) {
+    fn = coerceImplicitlyUnwrappedOptionalToValue(fn, fnTy, locator);
     if (!fn) return nullptr;
   }
 

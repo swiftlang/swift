@@ -435,13 +435,13 @@ private:
 /// \code
 ///   Foo!
 /// \endcode
-class UncheckedOptionalTypeRepr : public TypeRepr {
+class ImplicitlyUnwrappedOptionalTypeRepr : public TypeRepr {
   TypeRepr *Base;
   SourceLoc ExclamationLoc;
 
 public:
-  UncheckedOptionalTypeRepr(TypeRepr *Base, SourceLoc Exclamation)
-    : TypeRepr(TypeReprKind::UncheckedOptional),
+  ImplicitlyUnwrappedOptionalTypeRepr(TypeRepr *Base, SourceLoc Exclamation)
+    : TypeRepr(TypeReprKind::ImplicitlyUnwrappedOptional),
       Base(Base),
       ExclamationLoc(Exclamation) {}
 
@@ -449,7 +449,7 @@ public:
   SourceLoc getExclamationLoc() const { return ExclamationLoc; }
 
   static bool classof(const TypeRepr *T) {
-    return T->getKind() == TypeReprKind::UncheckedOptional;
+    return T->getKind() == TypeReprKind::ImplicitlyUnwrappedOptional;
   }
 
 private:
@@ -670,7 +670,7 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::Protocol:
   case TypeReprKind::Named:
   case TypeReprKind::Optional:
-  case TypeReprKind::UncheckedOptional:
+  case TypeReprKind::ImplicitlyUnwrappedOptional:
   case TypeReprKind::ProtocolComposition:
   case TypeReprKind::Tuple:
     return true;

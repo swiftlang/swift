@@ -1116,7 +1116,7 @@ bool Traversal::visitOptionalTypeRepr(OptionalTypeRepr *T) {
   return false;
 }
 
-bool Traversal::visitUncheckedOptionalTypeRepr(UncheckedOptionalTypeRepr *T) {
+bool Traversal::visitImplicitlyUnwrappedOptionalTypeRepr(ImplicitlyUnwrappedOptionalTypeRepr *T) {
   if (doIt(T->getBase()))
     return true;
   return false;

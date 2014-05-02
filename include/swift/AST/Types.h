@@ -576,11 +576,11 @@ public:
   /// Return T if this type is Optional<T>; otherwise, return the null type.
   Type getOptionalObjectType();
 
-  /// Return T if this type is UncheckedOptional<T>; otherwise, return
+  /// Return T if this type is ImplicitlyUnwrappedOptional<T>; otherwise, return
   /// the null type.
-  Type getUncheckedOptionalObjectType();
+  Type getImplicitlyUnwrappedOptionalObjectType();
 
-  /// Return T if this type is Optional<T> or UncheckedOptional<T>;
+  /// Return T if this type is Optional<T> or ImplicitlyUnwrappedOptional<T>;
   /// otherwise, return the null type.
   Type getAnyOptionalObjectType(OptionalTypeKind &kind);
   Type getAnyOptionalObjectType() {
@@ -2545,18 +2545,18 @@ public:
 };
 
 /// The type T!, which is always sugar for a library type.
-class UncheckedOptionalType : public SyntaxSugarType {
-  UncheckedOptionalType(const ASTContext &ctx, Type base,
+class ImplicitlyUnwrappedOptionalType : public SyntaxSugarType {
+  ImplicitlyUnwrappedOptionalType(const ASTContext &ctx, Type base,
                         RecursiveTypeProperties properties)
-    : SyntaxSugarType(TypeKind::UncheckedOptional, ctx, base, properties) {}
+    : SyntaxSugarType(TypeKind::ImplicitlyUnwrappedOptional, ctx, base, properties) {}
 
 public:
   /// Return a uniqued optional type with the specified base type.
-  static UncheckedOptionalType *get(Type baseTy);
+  static ImplicitlyUnwrappedOptionalType *get(Type baseTy);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
-    return T->getKind() == TypeKind::UncheckedOptional;
+    return T->getKind() == TypeKind::ImplicitlyUnwrappedOptional;
   }
 };
 

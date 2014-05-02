@@ -190,7 +190,7 @@ clang::CanQualType GenClangType::visitBoundGenericClassType(
 
 clang::CanQualType
 GenClangType::visitBoundGenericType(CanBoundGenericType type) {
-  // We only expect *Pointer<T>, UncheckedOptional<T>, and Optional<T>.
+  // We only expect *Pointer<T>, ImplicitlyUnwrappedOptional<T>, and Optional<T>.
   // The first two are structs; the last is an enum.
   if (auto underlyingTy = type.getAnyOptionalObjectType()) {
     // The underlying type could be a bridged type, which makes any

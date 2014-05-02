@@ -542,7 +542,7 @@ Some additional meaningful categories of type:
   The value at runtime may be ``nil``.  This includes classes,
   class metatypes, block functions, and class-bounded existentials with
   only Objective-C-compatible protocol constraints, as well as one
-  level of ``Optional`` or ``UncheckedOptional`` applied to any of the
+  level of ``Optional`` or ``ImplicitlyUnwrappedOptional`` applied to any of the
   above.  Types with retainable pointer representation can be returned
   via the ``@autoreleased`` return convention.
 

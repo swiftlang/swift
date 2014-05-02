@@ -365,8 +365,8 @@ public:
   /// Retrieve the declaration of Swift.Optional<T>.
   EnumDecl *getOptionalDecl() const;
 
-  /// Retrieve the declaration of Swift.UncheckedOptional<T>.
-  StructDecl *getUncheckedOptionalDecl() const;
+  /// Retrieve the declaration of Swift.ImplicitlyUnwrappedOptional<T>.
+  StructDecl *getImplicitlyUnwrappedOptionalDecl() const;
   
   /// Retrieve the declaration of Swift.Optional<T>.Some.
   EnumElementDecl *getOptionalSomeDecl() const;
@@ -380,19 +380,23 @@ public:
   FuncDecl *getUpcastSlice(LazyResolver *resolver) const;
   FuncDecl *getUpcastNativeArray(LazyResolver *resolver) const;
 
-  /// Retrieve the declaration of Swift._does{,Unchecked}OptionalHaveValue.
+  /// Retrieve the declaration of
+  /// Swift._does{,ImplicitlyUnwrapped}OptionalHaveValue.
   FuncDecl *getDoesOptionalHaveValueDecl(LazyResolver *resolver,
                                          OptionalTypeKind kind) const;
 
-  /// Retrieve the declaration of Swift._get{,Unchecked}OptionalValue.
+  /// Retrieve the declaration of
+  /// Swift._get{,ImplicitlyUnwrapped}OptionalValue.
   FuncDecl *getGetOptionalValueDecl(LazyResolver *resolver,
                                     OptionalTypeKind kind) const;
 
-  /// Retrieve the declaration of Swift._injectValueInto{,Unchecked}Optional.
+  /// Retrieve the declaration of
+  /// Swift._injectValueInto{,ImplicitlyUnwrapped}Optional.
   FuncDecl *getInjectValueIntoOptionalDecl(LazyResolver *resolver,
                                            OptionalTypeKind kind) const;
 
-  /// Retrieve the declaration of Swift._injectNothingInto{,Unchecked}Optional.
+  /// Retrieve the declaration of
+  /// Swift._injectNothingInto{,ImplicitlyUnwrapped}Optional.
   FuncDecl *getInjectNothingIntoOptionalDecl(LazyResolver *resolver,
                                              OptionalTypeKind kind) const;
 

@@ -1648,10 +1648,10 @@ public:
   void addOverloadSet(Type boundType, ArrayRef<OverloadChoice> choices,
                       ConstraintLocator *locator);
 
-  /// If the given type is UncheckedOptional<T>, and we're in a context
-  /// that should transparently look through UncheckedOptional types,
+  /// If the given type is ImplicitlyUnwrappedOptional<T>, and we're in a context
+  /// that should transparently look through ImplicitlyUnwrappedOptional types,
   /// return T.
-  Type lookThroughUncheckedOptionalType(Type type);
+  Type lookThroughImplicitlyUnwrappedOptionalType(Type type);
 
   /// \brief Retrieve the allocator used by this constraint system.
   llvm::BumpPtrAllocator &getAllocator() { return Allocator; }

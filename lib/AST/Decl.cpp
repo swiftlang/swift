@@ -962,7 +962,7 @@ static Type mapSignatureType(ASTContext &ctx, Type type) {
 /// Map a signature type for a parameter.
 static Type mapSignatureParamType(ASTContext &ctx, Type type) {
   /// Translate unchecked optionals into strict optionals.
-  if (auto uncheckedOptOf = type->getUncheckedOptionalObjectType()) {
+  if (auto uncheckedOptOf = type->getImplicitlyUnwrappedOptionalObjectType()) {
     type = OptionalType::get(uncheckedOptOf);
   }
 
@@ -977,7 +977,7 @@ static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
                                      unsigned curryLevels) {
   if (curryLevels == 0) {
     /// Translate unchecked optionals into strict optionals.
-    if (auto uncheckedOptOf = type->getUncheckedOptionalObjectType()) {
+    if (auto uncheckedOptOf = type->getImplicitlyUnwrappedOptionalObjectType()) {
       type = OptionalType::get(uncheckedOptOf);
     }
 
@@ -1426,8 +1426,8 @@ OptionalTypeKind NominalTypeDecl::classifyAsOptionalType() const {
   const ASTContext &ctx = getASTContext();
   if (this == ctx.getOptionalDecl()) {
     return OTK_Optional;
-  } else if (this == ctx.getUncheckedOptionalDecl()) {
-    return OTK_UncheckedOptional;
+  } else if (this == ctx.getImplicitlyUnwrappedOptionalDecl()) {
+    return OTK_ImplicitlyUnwrappedOptional;
   } else {
     return OTK_None;
   }

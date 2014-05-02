@@ -142,9 +142,9 @@ ParserResult<Expr> Parser::parseExprAs() {
     // a forced value expression later.  Do a lookahead for '(' to see
     // if we are declaring a type within '()' where unchecked optional
     // is allowed.
-    llvm::SaveAndRestore<decltype(TUO_UncheckedOptionalCtx)>
-      T(TUO_UncheckedOptionalCtx, Tok.isFollowingLParen()
-        ? TUO_AllowUncheckedOptional : TUO_NoUncheckedOptional);
+    llvm::SaveAndRestore<decltype(TUO_ImplicitlyUnwrappedOptionalCtx)>
+      T(TUO_ImplicitlyUnwrappedOptionalCtx, Tok.isFollowingLParen()
+        ? TUO_AllowImplicitlyUnwrappedOptional : TUO_NoImplicitlyUnwrappedOptional);
     type = parseType(diag::expected_type_after_as);
   }
 

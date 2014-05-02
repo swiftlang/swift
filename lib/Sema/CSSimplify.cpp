@@ -978,16 +978,16 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
             conversionsOrFixes.push_back(
                                 ConversionRestrictionKind::OptionalToOptional);
           } else if (optionalKind2 == OTK_Optional &&
-                     decl1 == TC.Context.getUncheckedOptionalDecl()) {
+                     decl1 == TC.Context.getImplicitlyUnwrappedOptionalDecl()) {
             assert(boundGenericType1->getGenericArgs().size() == 1);
             conversionsOrFixes.push_back(
-                       ConversionRestrictionKind::UncheckedOptionalToOptional);
-          } else if (optionalKind2 == OTK_UncheckedOptional &&
+                       ConversionRestrictionKind::ImplicitlyUnwrappedOptionalToOptional);
+          } else if (optionalKind2 == OTK_ImplicitlyUnwrappedOptional &&
                      kind >= TypeMatchKind::Conversion &&
                      decl1 == TC.Context.getOptionalDecl()) {
             assert(boundGenericType1->getGenericArgs().size() == 1);
             conversionsOrFixes.push_back(
-                       ConversionRestrictionKind::OptionalToUncheckedOptional);
+                       ConversionRestrictionKind::OptionalToImplicitlyUnwrappedOptional);
           }
         }
         
@@ -1002,7 +1002,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
   {
     Type objectType1;
     if (concrete && kind >= TypeMatchKind::Conversion &&
-        (objectType1 = lookThroughUncheckedOptionalType(type1))) {
+        (objectType1 = lookThroughImplicitlyUnwrappedOptionalType(type1))) {
       conversionsOrFixes.push_back(
                           ConversionRestrictionKind::ForceUnchecked);
     }
@@ -1464,8 +1464,8 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   Type baseTy = simplifyType(constraint.getFirstType());
   Type baseObjTy = baseTy->getRValueType();
 
-  // Try to look through UncheckedOptional<T>; the result is always an r-value.
-  if (auto objTy = lookThroughUncheckedOptionalType(baseObjTy)) {
+  // Try to look through ImplicitlyUnwrappedOptional<T>; the result is always an r-value.
+  if (auto objTy = lookThroughImplicitlyUnwrappedOptionalType(baseObjTy)) {
     increaseScore(SK_ForceUnchecked);
     baseTy = baseObjTy = objTy;
   }
@@ -1883,8 +1883,8 @@ ConstraintSystem::simplifyApplicableFnConstraint(const Constraint &constraint) {
                                      /*wantRValue=*/true);
   auto desugar2 = type2->getDesugaredType();
 
-  // Try to look through UncheckedOptional<T>; the result is always an r-value.
-  if (auto objTy = lookThroughUncheckedOptionalType(desugar2)) {
+  // Try to look through ImplicitlyUnwrappedOptional<T>; the result is always an r-value.
+  if (auto objTy = lookThroughImplicitlyUnwrappedOptionalType(desugar2)) {
     type2 = objTy;
     desugar2 = type2->getDesugaredType();
   }
@@ -2134,8 +2134,8 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
   //   T $< U ===> T! $< U?
   // also:
   //   T <c U ===> T? <c U!
-  case ConversionRestrictionKind::OptionalToUncheckedOptional:
-  case ConversionRestrictionKind::UncheckedOptionalToOptional:
+  case ConversionRestrictionKind::OptionalToImplicitlyUnwrappedOptional:
+  case ConversionRestrictionKind::ImplicitlyUnwrappedOptionalToOptional:
   case ConversionRestrictionKind::OptionalToOptional: {
     addContextualScore();
     assert(matchKind >= TypeMatchKind::Subtype);
@@ -2161,7 +2161,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
     assert(matchKind >= TypeMatchKind::Conversion);
     auto boundGenericType1 = type1->castTo<BoundGenericType>();
     assert(boundGenericType1->getDecl()->classifyAsOptionalType()
-             == OTK_UncheckedOptional);
+             == OTK_ImplicitlyUnwrappedOptional);
     assert(boundGenericType1->getGenericArgs().size() == 1);
     Type valueType1 = boundGenericType1->getGenericArgs()[0];
     increaseScore(SK_ForceUnchecked);

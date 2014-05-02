@@ -1034,7 +1034,7 @@ Predefined Substitutions
   known-nominal-type ::= 'Sd'                // Swift.Float64
   known-nominal-type ::= 'Sf'                // Swift.Float32
   known-nominal-type ::= 'Si'                // Swift.Int
-  known-nominal-type ::= 'SQ'                // Swift.UncheckedOptional
+  known-nominal-type ::= 'SQ'                // Swift.ImplicitlyUnwrappedOptional
   known-nominal-type ::= 'Sq'                // Swift.Optional
   known-nominal-type ::= 'SS'                // Swift.String
   known-nominal-type ::= 'Su'                // Swift.UInt

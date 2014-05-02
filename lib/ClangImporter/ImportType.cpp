@@ -591,8 +591,8 @@ static Type getOptionalType(Type payloadType, ImportTypeKind kind) {
   // Import pointee types as true Optional.
   if (kind == ImportTypeKind::Pointee)
     return OptionalType::get(payloadType);
-  // Otherwise, import as UncheckedOptional.
-  return UncheckedOptionalType::get(payloadType);
+  // Otherwise, import as ImplicitlyUnwrappedOptional.
+  return ImplicitlyUnwrappedOptionalType::get(payloadType);
 }
 
 /// Turn T into Unmanaged<T>.
