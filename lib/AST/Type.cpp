@@ -2691,6 +2691,10 @@ found_conformance:;
 
 TypeTraitResult TypeBase::canBeObjCClass() {
   CanType self = getCanonicalType();
+  // Look through one level of metatype.
+  if (auto m = dyn_cast<AnyMetatypeType>(self))
+    self = m.getInstanceType();
+  
   // Classes either definitely are or are not ObjC.
   if (auto c = self->getClassOrBoundGenericClass()) {
     return c->isObjC() ? TypeTraitResult::Is : TypeTraitResult::IsNot;
