@@ -1,0 +1,6 @@
+// RUN: not --crash %sil-opt %s -verify
+
+sil @no_terminator : $@thin () -> () {
+bb0:
+  %1 = tuple()
+}
