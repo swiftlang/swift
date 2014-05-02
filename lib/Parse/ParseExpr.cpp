@@ -138,9 +138,9 @@ ParserResult<Expr> Parser::parseExprAs() {
 
   ParserResult<TypeRepr> type;
   {
-    // Disable looking for unchecked optional, treating '!' as
+    // Disable looking for implicitly unwrapped optional, treating '!' as
     // a forced value expression later.  Do a lookahead for '(' to see
-    // if we are declaring a type within '()' where unchecked optional
+    // if we are declaring a type within '()' where implicitly unwrapped optional
     // is allowed.
     llvm::SaveAndRestore<decltype(TUO_ImplicitlyUnwrappedOptionalCtx)>
       T(TUO_ImplicitlyUnwrappedOptionalCtx, Tok.isFollowingLParen()

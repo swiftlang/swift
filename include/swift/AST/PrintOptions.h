@@ -79,7 +79,7 @@ struct PrintOptions {
   bool PrintAttrExported = true;
 
   /// Whether to print '@unchecked' inside declarations imported from
-  /// Objective-C.  If false, print @unchecked optionals as normal optionals.
+  /// Objective-C.  If false, print @implicitly unwrapped optionals as normal optionals.
   bool PrintImplicitlyUnwrappedOptionalInImportedDecls = true;
 
   /// Whether to print '@unchecked' at all.  If false, print @unchecked

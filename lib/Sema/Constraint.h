@@ -151,15 +151,15 @@ enum class ConversionRestrictionKind {
   LValueToRValue,
   /// Value to existential value conversion.
   Existential,
-  /// T -> U? value to optional conversion (or to unchecked optional).
+  /// T -> U? value to optional conversion (or to implicitly unwrapped optional).
   ValueToOptional,
   /// T? -> U? optional to optional conversion (or unchecked to unchecked).
   OptionalToOptional,
   /// T! -> U? unchecked-optional to optional conversion
   ImplicitlyUnwrappedOptionalToOptional,
-  /// T? -> U! optional to unchecked optional conversion
+  /// T? -> U! optional to implicitly unwrapped optional conversion
   OptionalToImplicitlyUnwrappedOptional,
-  /// Implicit forces of unchecked optionals to their presumed values
+  /// Implicit forces of implicitly unwrapped optionals to their presumed values
   ForceUnchecked,
   /// Implicit upcast conversion of array types
   ArrayUpcast,

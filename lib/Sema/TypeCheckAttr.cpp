@@ -505,7 +505,7 @@ void TypeChecker::checkOwnershipAttr(VarDecl *var, Ownership ownershipKind) {
     } else if (objType) {
       type = objType;
 
-      // Cannot use an unchecked optional with @weak.
+      // Cannot use an implicitly unwrapped optional with @weak.
       if (kind == OTK_ImplicitlyUnwrappedOptional) {
         // Find the location of the '!'.
         SourceLoc bangLoc;
@@ -601,7 +601,7 @@ void TypeChecker::checkIBOutlet(VarDecl *VD) {
     return;
   }
 
-  // If the type wasn't optional before, turn it into an @unchecked optional
+  // If the type wasn't optional before, turn it into an @implicitly unwrapped optional
   // now.
   if (!isOptional) {
     if (ownership == Ownership::Weak)

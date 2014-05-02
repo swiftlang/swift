@@ -90,7 +90,7 @@ public:
     IVOLP_InLet
   } InVarOrLetPattern = IVOLP_NotInVarOrLet;
 
-  /// Indicates if we should parse '!' as an @unchecked optional.
+  /// Indicates if we should parse '!' as an @implicitly unwrapped optional.
   enum {
     TUO_AllowImplicitlyUnwrappedOptional,
     TUO_NoImplicitlyUnwrappedOptional

@@ -626,7 +626,7 @@ enum ScoreKind {
 
   /// A fix needs to be applied to the source.
   SK_Fix,
-  /// An implicit force of an unchecked optional value.
+  /// An implicit force of an implicitly unwrapped optional value.
   SK_ForceUnchecked,
   /// A user-defined conversion.
   SK_UserConversion,

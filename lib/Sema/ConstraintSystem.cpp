@@ -1202,7 +1202,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     // For a non-subscript declaration found via dynamic lookup, strip
     // off the lvalue-ness (FIXME: as a temporary hack. We eventually
     // want this to work) and make a reference to that declaration be
-    // an unchecked optional.
+    // an implicitly unwrapped optional.
     //
     // Subscript declarations are handled within
     // getTypeOfMemberReference(); their result types are unchecked

@@ -961,7 +961,7 @@ static Type mapSignatureType(ASTContext &ctx, Type type) {
 
 /// Map a signature type for a parameter.
 static Type mapSignatureParamType(ASTContext &ctx, Type type) {
-  /// Translate unchecked optionals into strict optionals.
+  /// Translate implicitly unwrapped optionals into strict optionals.
   if (auto uncheckedOptOf = type->getImplicitlyUnwrappedOptionalObjectType()) {
     type = OptionalType::get(uncheckedOptOf);
   }
@@ -971,12 +971,12 @@ static Type mapSignatureParamType(ASTContext &ctx, Type type) {
 
 /// Map a function's type to the type used for computing signatures,
 /// which involves stripping noreturn, stripping default arguments,
-/// transforming unchecked optionals into strict optionals, etc.
+/// transforming implicitly unwrapped optionals into strict optionals, etc.
 static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
                                      bool topLevelFunction,
                                      unsigned curryLevels) {
   if (curryLevels == 0) {
-    /// Translate unchecked optionals into strict optionals.
+    /// Translate implicitly unwrapped optionals into strict optionals.
     if (auto uncheckedOptOf = type->getImplicitlyUnwrappedOptionalObjectType()) {
       type = OptionalType::get(uncheckedOptOf);
     }

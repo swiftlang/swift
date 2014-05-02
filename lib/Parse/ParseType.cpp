@@ -631,7 +631,7 @@ ParserResult<OptionalTypeRepr> Parser::parseTypeOptional(TypeRepr *base) {
   return makeParserResult(new (Context) OptionalTypeRepr(base, questionLoc));
 }
 
-/// Parse a single unchecked optional suffix, given that we are looking at
+/// Parse a single implicitly unwrapped optional suffix, given that we are looking at
 ///  the exclamation mark.
 ParserResult<ImplicitlyUnwrappedOptionalTypeRepr>
 Parser::parseTypeImplicitlyUnwrappedOptional(TypeRepr *base) {

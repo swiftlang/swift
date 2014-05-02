@@ -366,7 +366,7 @@ namespace {
     Expr *coerceOptionalToOptional(Expr *expr, Type toType,
                                    ConstraintLocatorBuilder locator);
 
-    /// \brief Coerce an expression of unchecked optional type to its
+    /// \brief Coerce an expression of implicitly unwrapped optional type to its
     /// underlying value type, in the correct way for an implicit
     /// look-through.
     Expr *coerceImplicitlyUnwrappedOptionalToValue(Expr *expr, Type objTy,

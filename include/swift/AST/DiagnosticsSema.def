@@ -1072,7 +1072,7 @@ ERROR(invalid_ownership_opaque_type,attribute_parsing,none,
 ERROR(invalid_weak_ownership_not_optional,attribute_parsing,none,
       "'weak' variable should have Optional type %0", (Type))
 ERROR(invalid_weak_ownership_unchecked_optional,attribute_parsing,none,
-      "'weak' variable cannot have unchecked optional type %0; did you mean "
+      "'weak' variable cannot have implicitly unwrapped optional type %0; did you mean "
       "'unowned'?", (Type))
 
 // requires_stored_property_inits

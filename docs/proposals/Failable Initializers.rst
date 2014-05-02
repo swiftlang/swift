@@ -8,7 +8,7 @@ Failable initializers
 =====================
 
 A **failable initializer** can be declared by specifying its return type to be
-an optional or unchecked optional type. The base type of the optional must be
+an optional or implicitly unwrapped optional type. The base type of the optional must be
 ``Self``, to indicate a whole-object initializer, or the declared type, to
 indicate a subobject initializer. Only classes that inherit from ``@objc`` base
 classes may declare failable initializers. For example::

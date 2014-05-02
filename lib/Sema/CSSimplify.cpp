@@ -960,7 +960,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
 
   // A value of type T can be converted to type U? if T is convertible to U.
   // A value of type T? can be converted to type U? if T is convertible to U.
-  // The above conversions also apply to unchecked optional types, except
+  // The above conversions also apply to implicitly unwrapped optional types, except
   // that there is no implicit conversion from T? to T!.
   {
     BoundGenericType *boundGenericType2;

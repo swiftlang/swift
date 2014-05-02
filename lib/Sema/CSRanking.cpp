@@ -42,7 +42,7 @@ void ConstraintSystem::increaseScore(ScoreKind kind) {
       break;
 
     case SK_ForceUnchecked:
-      log << "force of an unchecked optional";
+      log << "force of an implicitly unwrapped optional";
       break;
 
     case SK_UserConversion:

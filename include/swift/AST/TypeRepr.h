@@ -431,7 +431,7 @@ private:
   friend class TypeRepr;
 };
 
-/// \brief An unchecked optional type.
+/// \brief An implicitly unwrapped optional type.
 /// \code
 ///   Foo!
 /// \endcode
