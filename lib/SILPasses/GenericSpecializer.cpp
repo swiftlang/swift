@@ -168,6 +168,9 @@ private:
     DEBUG(llvm::dbgs()<<"Specializing : " << *Inst << "\n");
 
     // Specialize the Self substitution of the witness_method.
+    //
+    // FIXME: This needs to not only handle Self but all Self derived types so
+    // we handle type aliases correctly.
     auto sub =
       Inst->getSelfSubstitution().subst(Inst->getModule().getSwiftModule(),
                                         OrigFunc->getContextGenericParams(),
