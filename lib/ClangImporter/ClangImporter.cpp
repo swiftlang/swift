@@ -396,9 +396,9 @@ ClangImporter::Implementation::~Implementation() {
   assert(NumCurrentImportingEntities == 0);
 }
 
-ClangModuleUnit *
-ClangImporter::Implementation::getWrapperForModule(ClangImporter &importer,
-                                                   clang::Module *underlying) {
+ClangModuleUnit *ClangImporter::Implementation::getWrapperForModule(
+    ClangImporter &importer,
+    const clang::Module *underlying) {
   auto &cacheEntry = ModuleWrappers[underlying];
   if (ClangModuleUnit *cached = cacheEntry.getPointer())
     return cached;
@@ -1285,8 +1285,9 @@ void ClangModuleUnit::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
   results.append(Extensions.begin(), Extensions.end());
 }
 
-static void getImportDecls(ClangModuleUnit *ClangUnit, clang::Module *M,
+static void getImportDecls(ClangModuleUnit *ClangUnit, const clang::Module *M,
                            SmallVectorImpl<Decl *> &Results) {
+  assert(M);
   SmallVector<clang::Module *, 1> Exported;
   M->getExportedModules(Exported);
 
@@ -1665,7 +1666,7 @@ void ClangImporter::verifyAllModules() {
 //===----------------------------------------------------------------------===//
 
 ClangModuleUnit::ClangModuleUnit(Module &M, ClangImporter &owner,
-                                 clang::Module *clangModule)
+                                 const clang::Module *clangModule)
   : LoadedFile(FileUnitKind::ClangModule, M), owner(owner),
     clangModule(clangModule) {
 }

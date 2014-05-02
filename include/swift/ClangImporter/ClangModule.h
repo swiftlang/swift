@@ -32,7 +32,7 @@ class ModuleLoader;
 /// \brief Represents a Clang module that has been imported into Swift.
 class ClangModuleUnit final : public LoadedFile {
   ClangImporter &owner;
-  clang::Module *clangModule;
+  const clang::Module *clangModule;
   llvm::PointerIntPair<Module *, 1, bool> adapterModule;
 
   ~ClangModuleUnit() = default;
@@ -42,10 +42,12 @@ public:
   static bool hasClangModule(Module *M);
 
   ClangModuleUnit(Module &M, ClangImporter &owner,
-                  clang::Module *clangModule);
+                  const clang::Module *clangModule);
 
   /// \brief Retrieve the underlying Clang module.
-  clang::Module *getClangModule() const { return clangModule; }
+  ///
+  /// This will be null if the module unit represents the imported headers.
+  const clang::Module *getClangModule() const { return clangModule; }
 
   /// Returns true if this is a top-level Clang module (not a submodule).
   bool isTopLevel() const;

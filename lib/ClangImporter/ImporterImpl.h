@@ -358,7 +358,7 @@ private:
 
 public:
   /// A map from Clang modules to their Swift wrapper modules.
-  llvm::SmallDenseMap<clang::Module *, ModuleInitPair, 16> ModuleWrappers;
+  llvm::SmallDenseMap<const clang::Module *, ModuleInitPair, 16> ModuleWrappers;
 
   /// \brief The first Clang module we loaded.
   ///
@@ -610,7 +610,7 @@ public:
   /// \brief Retrieves the Swift wrapper for the given Clang module, creating
   /// it if necessary.
   ClangModuleUnit *getWrapperForModule(ClangImporter &importer,
-                                       clang::Module *underlying);
+                                       const clang::Module *underlying);
 
   /// \brief Retrieve the named Swift type, e.g., Int32.
   ///
