@@ -1277,19 +1277,23 @@ bool SILDevirtualizer::optimizeApplyOfWitnessMethod(ApplyInst *AI,
   }
 
   // Lookup the function reference in the witness tables.
-  std::pair<SILFunction *, ArrayRef<Substitution>> Ret =
+  SILFunction *F;
+  ArrayRef<Substitution> Subs;
+  SILWitnessTable *WitnessTable;
+  std::tie(F, Subs, WitnessTable) =
       AI->getModule().findFuncInWitnessTable(C, AMI->getMember());
 
-  if (!Ret.first) {
+  if (!F) {
+    assert(!WitnessTable && "WitnessTable should always be null if F is.");
     DEBUG(llvm::dbgs() << "        FAIL: Did not find a matching witness "
                           "table or witness method.\n");
     return false;
   }
+  assert(WitnessTable && "WitnessTable should never be null if F is not.");
 
   // Ok, we found the member we are looking for. Devirtualize away!
   SILBuilder Builder(AI);
   SILLocation Loc = AI->getLoc();
-  SILFunction *F = Ret.first;
   FunctionRefInst *FRI = Builder.createFunctionRef(Loc, F);
 
   // Collect args from the apply inst.
@@ -1300,19 +1304,19 @@ bool SILDevirtualizer::optimizeApplyOfWitnessMethod(ApplyInst *AI,
   // conformance...
   SILValue Self = ApplyArgs[0].get();
   if (C->getKind() == ProtocolConformanceKind::Inherited) {
-    CanType Ty = C->getType()->getCanonicalType();
+    CanType Ty = WitnessTable->getConformance()->getType()->getCanonicalType();
     SILType SILTy = SILType::getPrimitiveType(Ty, Self.getType().getCategory());
     SILType SelfTy = Self.getType();
     (void)SelfTy;
 
-    if (Ret.second.size()) {
+    if (Subs.size()) {
       // If we have substitutions then we are an inherited specialized
       // conformance. Substitute in the generic type so we upcast correctly.
       GenericParamList *GP = C->getSubstitutedGenericParams();
       if (!GP)
         return false;
 
-      TypeSubstitutionMap TSM = GP->getSubstitutionMap(Ret.second);
+      TypeSubstitutionMap TSM = GP->getSubstitutionMap(Subs);
       SILTy = SILTy.subst(F->getModule(), F->getModule().getSwiftModule(), TSM);
       SelfTy =
           SelfTy.subst(F->getModule(), F->getModule().getSwiftModule(), TSM);
@@ -1329,8 +1333,7 @@ bool SILDevirtualizer::optimizeApplyOfWitnessMethod(ApplyInst *AI,
   for (auto &A : ApplyArgs.slice(1))
     Args.push_back(A.get());
 
-  SmallVector<Substitution, 16> NewSubstList(Ret.second.begin(),
-                                             Ret.second.end());
+  SmallVector<Substitution, 16> NewSubstList(Subs.begin(), Subs.end());
 
   // Add the non-self-derived substitutions from the original application.
   assert(AI->getSubstitutions().size() && "Subst list must not be empty");
@@ -1405,13 +1408,17 @@ bool SILDevirtualizer::optimizeApplyOfProtocolMethod(ApplyInst *AI,
   SILModule &Mod = Init->getModule();
   // For each protocol that our type conforms to:
   for (ProtocolConformance *Conf : Init->getConformances()) {
-    auto Pair = Mod.findFuncInWitnessTable(Conf, PMI->getMember());
+    SILFunction *StaticRef;
+    ArrayRef<Substitution> Subs;
+    SILWitnessTable *WT;
+    std::tie(StaticRef, Subs, WT) =
+      Mod.findFuncInWitnessTable(Conf, PMI->getMember());
 
-    SILFunction *StaticRef = Pair.first;
-    ArrayRef<Substitution> Subs = Pair.second;
-
-    if (!StaticRef)
+    if (!StaticRef) {
+      assert(!WT && "WT must always be null if static ref is.");
       continue;
+    }
+    assert(WT && "WT must never be null if static ref is also not.");
 
     // If any of our subs is generic, don't replace anything.
     bool FoundGenericSub = false;
