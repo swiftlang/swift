@@ -251,6 +251,9 @@ ERROR(missing_argument_labels,sema_tcc,none,
       "missing argument label%select{|s}0 in call", (bool))
 ERROR(wrong_argument_labels,sema_tcc,none,
       "incorrect argument label%select{|s}0 in call", (bool))
+ERROR(extra_named_single_element_tuple,sema_tcc,none,
+      "cannot treat single-element named tuple as a scalar; use '.%0' to "
+      "access its element", (StringRef))
 
 //------------------------------------------------------------------------------
 // Type Check Declarations

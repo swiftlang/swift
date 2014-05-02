@@ -3851,6 +3851,34 @@ static bool diagnoseRelabel(TypeChecker &tc, Expr *expr,
                             ArrayRef<Identifier> newNames) {
   auto tuple = dyn_cast<TupleExpr>(expr);
   if (!tuple) {
+    if (newNames[0].empty()) {
+      // This is probably a conversion from a value of labeled tuple type to
+      // a scalar.
+      // FIXME: We want this issue to disappear completely when single-element
+      // labelled tuples go away.
+      if (auto tupleTy = expr->getType()->getRValueType()->getAs<TupleType>()) {
+        int scalarFieldIdx = tupleTy->getFieldForScalarInit();
+        if (scalarFieldIdx >= 0) {
+          auto &field = tupleTy->getFields()[scalarFieldIdx];
+          if (field.hasName()) {
+            llvm::SmallString<16> str;
+            str = ".";
+            str += field.getName().str();
+            auto insertLoc = Lexer::getLocForEndOfToken(tc.Context.SourceMgr,
+                                                        expr->getEndLoc());
+            tc.diagnose(expr->getStartLoc(),
+                        diag::extra_named_single_element_tuple,
+                        field.getName().str())
+              .fixItInsert(insertLoc, str);
+            return true;
+          }
+        }
+      }
+
+      // We don't know what to do with this.
+      return false;
+    }
+
     // This is a scalar-to-tuple conversion. Add the name.  We "know"
     // that we're inside a ParenExpr, because ParenExprs are required
     // by the syntax and locator resolution looks through on level of
