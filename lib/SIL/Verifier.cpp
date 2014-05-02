@@ -977,7 +977,10 @@ public:
       require(AMI->getConformance()->getType()
                 ->isEqual(AMI->getLookupType().getSwiftRValueType()),
               "concrete type lookup requires conformance that matches type");
-      require(AMI->getModule().lookUpWitnessTable(AMI->getConformance()).first,
+      // We allow for null conformances.
+      require(!AMI->getConformance() ||
+              AMI->getModule().lookUpWitnessTable(AMI->getConformance(),
+                                                  false).first,
               "Could not find witness table for conformance.");
     }
   }
@@ -1270,6 +1273,11 @@ public:
     require(!AEI->getConcreteType().isExistentialType(),
             "init_existential cannot put an existential container inside "
             "an existential container");
+
+    for (ProtocolConformance *C : AEI->getConformances())
+      // We allow for null conformances.
+      require(!C || AEI->getModule().lookUpWitnessTable(C, false).first,
+              "Could not find witness table for conformance.");
   }
 
   void checkInitExistentialRefInst(InitExistentialRefInst *IEI) {
@@ -1280,6 +1288,10 @@ public:
             "init_existential_ref result must be a class existential type");
     require(IEI->getType().isObject(),
             "init_existential_ref result must not be an address");
+    for (ProtocolConformance *C : IEI->getConformances())
+      // We allow for null conformances.
+      require(!C || IEI->getModule().lookUpWitnessTable(C, false).first,
+              "Could not find witness table for conformance.");
   }
 
   void checkUpcastExistentialInst(UpcastExistentialInst *UEI) {
@@ -2157,8 +2169,10 @@ void SILModule::verify() const {
   }
 
   // Check all witness tables.
+  DEBUG(llvm::dbgs() << "*** Checking witness tables for duplicates ***\n");
   llvm::DenseSet<NormalProtocolConformance*> wtableConformances;
   for (const SILWitnessTable &wt : getWitnessTables()) {
+    DEBUG(llvm::dbgs() << "Witness Table:\n"; wt.dump());
     auto conformance = wt.getConformance();
     if (!wtableConformances.insert(conformance).second) {
       llvm::errs() << "Witness table redefined: ";

@@ -1128,3 +1128,56 @@ DynamicMethodBranchInst *DynamicMethodBranchInst::create(
   return ::new (Buffer) DynamicMethodBranchInst(Loc, Operand, Member,
                                                 HasMethodBB, NoMethodBB);
 }
+
+/// Create a witness method, creating a witness table declaration if we don't
+/// have a witness table for it. Later on if someone wants the real definition,
+/// lookUpWitnessTable will deserialize it for us if we can.
+///
+/// This is following the same model of how we deal with SILFunctions in
+/// function_ref. There we always just create a declaration and then later
+/// deserialize the actual function definition if we need to.
+WitnessMethodInst *
+WitnessMethodInst::create(SILLocation Loc, SILType LookupType,
+                          ProtocolConformance *Conformance, SILDeclRef Member,
+                          SILType Ty, SILFunction *F, bool Volatile) {
+  SILModule &Mod = F->getModule();
+  void *Buffer = Mod.allocate(sizeof(WitnessMethodInst),
+                              alignof(WitnessMethodInst));
+
+  if (!Mod.lookUpWitnessTable(Conformance, false).first)
+    Mod.createWitnessTableDeclaration(Conformance);
+  return ::new (Buffer) WitnessMethodInst(Loc, LookupType, Conformance, Member,
+                                          Ty, Volatile);
+}
+
+InitExistentialInst *
+InitExistentialInst::create(SILLocation Loc, SILValue Existential,
+                            SILType ConcreteType,
+                            ArrayRef<ProtocolConformance *> Conformances,
+                            SILFunction *F) {
+  SILModule &Mod = F->getModule();
+  void *Buffer = Mod.allocate(sizeof(InitExistentialInst),
+                              alignof(InitExistentialInst));
+  for (ProtocolConformance *C : Conformances)
+    if (!Mod.lookUpWitnessTable(C, false).first)
+      Mod.createWitnessTableDeclaration(C);
+  return ::new (Buffer) InitExistentialInst(Loc, Existential, ConcreteType,
+                                            Conformances);
+}
+
+InitExistentialRefInst *
+InitExistentialRefInst::create(SILLocation Loc, SILType ExistentialType,
+                               SILValue Instance,
+                               ArrayRef<ProtocolConformance *> Conformances,
+                               SILFunction *F) {
+  SILModule &Mod = F->getModule();
+  void *Buffer = Mod.allocate(sizeof(InitExistentialRefInst),
+                              alignof(InitExistentialRefInst));
+  for (ProtocolConformance *C : Conformances)
+    if (!Mod.lookUpWitnessTable(C, false).first)
+      Mod.createWitnessTableDeclaration(C);
+
+  return ::new (Buffer) InitExistentialRefInst(Loc, ExistentialType,
+                                               Instance,
+                                               Conformances);
+}

@@ -53,9 +53,12 @@ SILWitnessTable::create(SILModule &M, SILLinkage Linkage,
   SILWitnessTable *wt = ::new (buf) SILWitnessTable(M, Linkage, Name.str(),
                                                     Conformance, entries);
 
-  // Update the SILModule state in light of wT.
-  M.witnessTables.push_back(wt);
+  // Make sure we have not seen this witness table yet.
+  assert(M.WitnessTableLookupCache.find(Conformance) ==
+         M.WitnessTableLookupCache.end() && "Attempting to create duplicate "
+         "witness table.");
   M.WitnessTableLookupCache[Conformance] = wt;
+  M.witnessTables.push_back(wt);
 
   // Return the resulting witness table.
   return wt;
@@ -76,8 +79,11 @@ SILWitnessTable::create(SILModule &M, SILLinkage Linkage,
                                                     Conformance);
 
   // Update the SILModule state in light of wT.
-  M.witnessTables.push_back(wt);
+  assert(M.WitnessTableLookupCache.find(Conformance) ==
+         M.WitnessTableLookupCache.end() && "Attempting to create duplicate "
+         "witness table.");
   M.WitnessTableLookupCache[Conformance] = wt;
+  M.witnessTables.push_back(wt);
 
   // Return the resulting witness table.
   return wt;

@@ -106,6 +106,11 @@ SILModule::~SILModule() {
 
 SILWitnessTable *
 SILModule::createWitnessTableDeclaration(ProtocolConformance *C) {
+  // If we are passed in a null conformance (a valid value), just return nullptr
+  // since we can not map a witness table to it.
+  if (!C)
+    return nullptr;
+
   // Walk down to the base NormalProtocolConformance.
   ProtocolConformance *ParentC = C;
   ArrayRef<Substitution> Subs;
@@ -138,9 +143,14 @@ SILModule::createWitnessTableDeclaration(ProtocolConformance *C) {
 std::pair<SILWitnessTable *, ArrayRef<Substitution>>
 SILModule::
 lookUpWitnessTable(const ProtocolConformance *C, bool deserializeLazily) {
+  // If we have a null conformance passed in (a legal value), just return
+  // nullptr.
+  ArrayRef<Substitution> Subs;
+  if (!C)
+    return {nullptr, Subs};
+
   // Walk down to the base NormalProtocolConformance.
   const ProtocolConformance *ParentC = C;
-  ArrayRef<Substitution> Subs;
   while (!isa<NormalProtocolConformance>(ParentC)) {
     switch (ParentC->getKind()) {
     case ProtocolConformanceKind::Normal:
@@ -500,6 +510,22 @@ public:
     // visiting the protocol_method before the init_existential_inst.
     bool performFuncDeserialization = false;
     for (ProtocolConformance *C : IEI->getConformances()) {
+      performFuncDeserialization |=
+        visitProtocolConformance(C, Optional<SILDeclRef>());
+    }
+    return performFuncDeserialization;
+  }
+
+  bool visitInitExistentialRefInst(InitExistentialRefInst *IERI) {
+    // Link in all protocol conformances that this touches.
+    //
+    // TODO: There might be a two step solution where the init_existential_inst
+    // causes the witness table to be brought in as a declaration and then the
+    // protocol method inst causes the actual deserialization. For now we are
+    // not going to be smart about this to enable avoiding any issues with
+    // visiting the protocol_method before the init_existential_inst.
+    bool performFuncDeserialization = false;
+    for (ProtocolConformance *C : IERI->getConformances()) {
       performFuncDeserialization |=
         visitProtocolConformance(C, Optional<SILDeclRef>());
     }

@@ -1734,14 +1734,21 @@ public:
 class WitnessMethodInst : public MethodInst {
   SILType LookupType;
   ProtocolConformance *Conformance;
-public:
+
   WitnessMethodInst(SILLocation Loc, SILType LookupType,
-                      ProtocolConformance *Conformance,
-                      SILDeclRef Member,
-                      SILType Ty, bool Volatile = false)
+                    ProtocolConformance *Conformance,
+                    SILDeclRef Member,
+                    SILType Ty, bool Volatile = false)
     : MethodInst(ValueKind::WitnessMethodInst, Loc, Ty, Member, Volatile),
       LookupType(LookupType), Conformance(Conformance)
   {}
+
+public:
+  static WitnessMethodInst *create(SILLocation Loc, SILType LookupType,
+                                   ProtocolConformance *Conformance,
+                                   SILDeclRef Member,
+                                   SILType Ty, SILFunction *Parent,
+                                   bool Volatile=false);
 
   SILType getLookupType() const { return LookupType; }
   ProtocolDecl *getLookupProtocol() const {
@@ -1839,7 +1846,7 @@ class InitExistentialInst
   : public UnaryInstructionBase<ValueKind::InitExistentialInst>
 {
   ArrayRef<ProtocolConformance*> Conformances;
-public:
+
   InitExistentialInst(SILLocation Loc,
                       SILValue Existential,
                       SILType ConcreteType,
@@ -1847,6 +1854,10 @@ public:
     : UnaryInstructionBase(Loc, Existential, ConcreteType.getAddressType()),
       Conformances(Conformances)
   {}
+public:
+  static InitExistentialInst *
+  create(SILLocation Loc, SILValue Existential, SILType ConcreteType,
+         ArrayRef<ProtocolConformance *> Conformances, SILFunction *Parent);
 
   ArrayRef<ProtocolConformance*> getConformances() const {
     return Conformances;
@@ -1864,7 +1875,7 @@ class InitExistentialRefInst
   : public UnaryInstructionBase<ValueKind::InitExistentialRefInst>
 {
   ArrayRef<ProtocolConformance*> Conformances;
-public:
+
   InitExistentialRefInst(SILLocation Loc,
                          SILType ExistentialType,
                          SILValue Instance,
@@ -1872,6 +1883,10 @@ public:
     : UnaryInstructionBase(Loc, Instance, ExistentialType),
       Conformances(Conformances)
   {}
+public:
+  static InitExistentialRefInst *
+  create(SILLocation Loc, SILType ExistentialType, SILValue Instance,
+         ArrayRef<ProtocolConformance *> Conformances, SILFunction *Parent);
 
   ArrayRef<ProtocolConformance*> getConformances() const {
     return Conformances;

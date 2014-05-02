@@ -1937,8 +1937,36 @@ public:
     // Emit witnesses in protocol declaration order.
     for (auto reqt : protocol->getMembers())
       visit(reqt);
-    
-    // Create the witness table.
+
+    // Check if we already have a declaration or definition for this witness
+    // table.
+    if (auto *wt = SGM.M.lookUpWitnessTable(Conformance, false).first) {
+      // If we have a definition already, just return it.
+      //
+      // FIXME: I am not sure if this is possible, if it is not change this to an
+      // assert.
+      if (wt->isDefinition())
+        return wt;
+
+      // If we have a declaration, convert the witness table to a definition.
+      if (wt->isDeclaration()) {
+        wt->convertToDefinition(Entries);
+
+        // Since we had a declaration before, its linkage should be external,
+        // ensure that we have a compatible linkage for sanity. *NOTE* we are ok
+        // with both being shared since we do not have a shared_external
+        // linkage.
+        assert(stripExternalFromLinkage(wt->getLinkage()) == Linkage &&
+               "Witness table declaration has inconsistent linkage with"
+               " silgen definition.");
+
+        // And then override the linkage with the new linkage.
+        wt->setLinkage(Linkage);
+        return wt;
+      }
+    }
+
+    // Otherwise if we have no witness table yet, create it.
     return SILWitnessTable::create(SGM.M, Linkage,
                                  Conformance, Entries);
   }

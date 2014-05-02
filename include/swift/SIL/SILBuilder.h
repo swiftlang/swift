@@ -547,19 +547,13 @@ public:
   }
 
   WitnessMethodInst *createWitnessMethod(SILLocation Loc, SILType LookupTy,
-                                             ProtocolConformance *Conformance,
-                                             SILDeclRef Member,
-                                             SILType MethodTy,
-                                             bool Volatile = false)
+                                         ProtocolConformance *Conformance,
+                                         SILDeclRef Member,
+                                         SILType MethodTy,
+                                         bool Volatile = false)
   {
-    assert((!Conformance ||
-            F.getModule().lookUpWitnessTable(Conformance).first) &&
-           "Can not create a witness method inst for a conformance that does "
-           "not have a witness table mapped to it.");
-    return insert(new (F.getModule())
-                    WitnessMethodInst(Loc, LookupTy, Conformance,
-                                        Member, MethodTy,
-                                        Volatile));
+    return insert(WitnessMethodInst::create(Loc, LookupTy, Conformance, Member,
+                                            MethodTy, &F, Volatile));
   }
   
   ProtocolMethodInst *createProtocolMethod(SILLocation Loc, SILValue Operand,
@@ -605,24 +599,21 @@ public:
                     OpenExistentialRefInst(Loc, Operand, Ty));
   }
 
-  InitExistentialInst *createInitExistential(SILLocation Loc,
-                                 SILValue Existential,
-                                 SILType ConcreteType,
-                                 ArrayRef<ProtocolConformance*> Conformances) {
-    return insert(new (F.getModule())
-                    InitExistentialInst(Loc,
-                                          Existential,
-                                          ConcreteType,
-                                          Conformances));
+  InitExistentialInst *
+  createInitExistential(SILLocation Loc,
+                        SILValue Existential,
+                        SILType ConcreteType,
+                        ArrayRef<ProtocolConformance*> Conformances) {
+    return insert(InitExistentialInst::create(Loc, Existential, ConcreteType,
+                                              Conformances, &F));
   }
   
-  InitExistentialRefInst *createInitExistentialRef(SILLocation Loc,
-                                 SILType ExistentialType,
-                                 SILValue Concrete,
-                                 ArrayRef<ProtocolConformance*> Conformances) {
-    return insert(new (F.getModule())
-                    InitExistentialRefInst(Loc, ExistentialType, Concrete,
-                                           Conformances));
+  InitExistentialRefInst *
+  createInitExistentialRef(SILLocation Loc, SILType ExistentialType,
+                           SILValue Concrete,
+                           ArrayRef<ProtocolConformance*> Conformances) {
+    return insert(InitExistentialRefInst::create(Loc, ExistentialType, Concrete,
+                                                 Conformances, &F));
   }
   
   UpcastExistentialInst *createUpcastExistential(SILLocation Loc,

@@ -73,6 +73,16 @@ enum {
   NumSILLinkageBits = 3
 };
 
+/// Strip external from public_external, hidden_external. Otherwise just return
+/// the linkage.
+inline SILLinkage stripExternalFromLinkage(SILLinkage linkage) {
+  if (linkage == SILLinkage::PublicExternal)
+    return SILLinkage::Public;
+  if (linkage == SILLinkage::HiddenExternal)
+    return SILLinkage::Hidden;
+  return linkage;
+}
+
 /// Return whether the linkage indicates that an object has a
 /// definition outside the current SILModule.
 inline bool isAvailableExternally(SILLinkage linkage) {
