@@ -137,6 +137,27 @@ namespace {
       return eltTI.getFixedExtraInhabitantCount(IGM);
     }
 
+    // This is dead code in NonFixedTupleTypeInfo.
+    llvm::ConstantInt *getFixedExtraInhabitantValue(IRGenModule &IGM,
+                                                    unsigned bits,
+                                                    unsigned index) const {
+      auto &eltTI = cast<FixedTypeInfo>(asImpl().getFields()[0].getTypeInfo());
+      return eltTI.getFixedExtraInhabitantValue(IGM, bits, index);
+    }
+
+    // This is dead code in NonFixedTupleTypeInfo.
+    llvm::Value *maskFixedExtraInhabitant(IRGenFunction &IGF,
+                                          llvm::Value *tupleValue) const {
+      // Truncate down to the width of the element, mask it recursively,
+      // and then zext back out to the payload size.
+      auto &eltTI = cast<FixedTypeInfo>(asImpl().getFields()[0].getTypeInfo());
+      unsigned eltWidth = eltTI.getFixedSize().getValueInBits();
+      auto eltTy = llvm::IntegerType::get(IGF.IGM.getLLVMContext(), eltWidth);
+      auto eltValue = IGF.Builder.CreateTrunc(tupleValue, eltTy);      
+      eltValue = eltTI.maskFixedExtraInhabitant(IGF, eltValue);
+      return IGF.Builder.CreateZExt(eltValue, tupleValue->getType());
+    }
+
     llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
                                          Address tupleAddr,
                                          CanType tupleType) const override {

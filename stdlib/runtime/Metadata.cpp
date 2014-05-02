@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Support/MathExtras.h"
+#include "swift/Basic/LLVM.h"
 #include "swift/Basic/Range.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
@@ -1203,11 +1204,9 @@ swift::swift_getTupleTypeMetadata(size_t numElements,
 
   // We have extra inhabitants if the first element does.
   // FIXME: generalize this.
-  auto firstEltVWT = elements[0]->getValueWitnesses();
-  if (firstEltVWT->flags.hasExtraInhabitants()) {
+  if (auto firstEltEIVWT = dyn_cast<ExtraInhabitantsValueWitnessTable>(
+                                          elements[0]->getValueWitnesses())) {
     witnesses->flags = witnesses->flags.withExtraInhabitants(true);
-    auto firstEltEIVWT =
-      static_cast<const ExtraInhabitantsValueWitnessTable*>(firstEltVWT);
     witnesses->extraInhabitantFlags = firstEltEIVWT->extraInhabitantFlags;
     witnesses->storeExtraInhabitant = firstEltEIVWT->storeExtraInhabitant;
     witnesses->getExtraInhabitantIndex = firstEltEIVWT->getExtraInhabitantIndex;
@@ -1254,6 +1253,17 @@ void swift::swift_initStructMetadata_UniversalStrategy(size_t numFields,
   vwtable->size = layout.size;
   vwtable->flags = layout.flags;
   vwtable->stride = layout.stride;
+
+  // We have extra inhabitants if the first element does.
+  // FIXME: generalize this.
+  if (auto firstFieldVWT = dyn_cast<ExtraInhabitantsValueWitnessTable>(
+                                        fieldTypes[0]->getValueWitnesses())) {
+    vwtable->flags = vwtable->flags.withExtraInhabitants(true);
+    auto xiVWT = cast<ExtraInhabitantsValueWitnessTable>(vwtable);
+    xiVWT->extraInhabitantFlags = firstFieldVWT->extraInhabitantFlags;
+    xiVWT->storeExtraInhabitant = firstFieldVWT->storeExtraInhabitant;
+    xiVWT->getExtraInhabitantIndex = firstFieldVWT->getExtraInhabitantIndex;
+  }
 }
 
 /*** Classes ***************************************************************/

@@ -588,6 +588,10 @@ struct ExtraInhabitantsValueWitnessTable : ValueWitnessTable {
                             value_witness_types::extraInhabitantFlags eif)
     : ValueWitnessTable(base), storeExtraInhabitant(sei),
       getExtraInhabitantIndex(geii), extraInhabitantFlags(eif) {}
+
+  static bool classof(const ValueWitnessTable *table) {
+    return table->flags.hasExtraInhabitants();
+  }
 };
   
 inline unsigned ValueWitnessTable::getNumExtraInhabitants() const {
