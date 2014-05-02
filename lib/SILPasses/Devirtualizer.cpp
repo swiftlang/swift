@@ -1280,7 +1280,7 @@ bool SILDevirtualizer::optimizeApplyOfWitnessMethod(ApplyInst *AI,
   SILFunction *F;
   ArrayRef<Substitution> Subs;
   SILWitnessTable *WitnessTable;
-  std::tie(F, Subs, WitnessTable) =
+  std::tie(F, WitnessTable, Subs) =
       AI->getModule().findFuncInWitnessTable(C, AMI->getMember());
 
   if (!F) {
@@ -1411,7 +1411,7 @@ bool SILDevirtualizer::optimizeApplyOfProtocolMethod(ApplyInst *AI,
     SILFunction *StaticRef;
     ArrayRef<Substitution> Subs;
     SILWitnessTable *WT;
-    std::tie(StaticRef, Subs, WT) =
+    std::tie(StaticRef, WT, Subs) =
       Mod.findFuncInWitnessTable(Conf, PMI->getMember());
 
     if (!StaticRef) {

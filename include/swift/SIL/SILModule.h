@@ -332,7 +332,7 @@ public:
   lookUpWitnessTable(const ProtocolConformance *C, bool deserializeLazily=true);
 
   /// Attempt to lookup \p Member in the witness table for C.
-  std::tuple<SILFunction *, ArrayRef<Substitution>, SILWitnessTable *>
+  std::tuple<SILFunction *, SILWitnessTable *, ArrayRef<Substitution>>
   findFuncInWitnessTable(const ProtocolConformance *C, SILDeclRef Member);
 
   /// Look up the VTable mapped to the given ClassDecl. Returns null on failure.

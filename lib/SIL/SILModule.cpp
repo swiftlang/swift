@@ -653,7 +653,7 @@ SerializedSILLoader *SILModule::getSILLoader() {
 /// function that matches the member with any specializations may be
 /// required. Notice that we do not scan the class hierarchy, just the concrete
 /// class type.
-std::tuple<SILFunction *, ArrayRef<Substitution>, SILWitnessTable *>
+std::tuple<SILFunction *, SILWitnessTable *, ArrayRef<Substitution>>
 SILModule::findFuncInWitnessTable(const ProtocolConformance *C,
                                   SILDeclRef Member) {
   // Look up the witness table associated with our protocol conformance from the
@@ -664,7 +664,7 @@ SILModule::findFuncInWitnessTable(const ProtocolConformance *C,
   if (!Ret.first) {
     DEBUG(llvm::dbgs() << "        Failed speculative lookup of witness for: ";
           C->dump());
-    return {nullptr, ArrayRef<Substitution>(), nullptr};
+    return {nullptr, nullptr, ArrayRef<Substitution>()};
   }
 
   // Okay, we found the correct witness table. Now look for the method.
@@ -678,10 +678,10 @@ SILModule::findFuncInWitnessTable(const ProtocolConformance *C,
     if (MethodEntry.Requirement != Member)
       continue;
 
-    return {MethodEntry.Witness, Ret.second, Ret.first};
+    return {MethodEntry.Witness, Ret.first, Ret.second};
   }
 
-  return {nullptr, ArrayRef<Substitution>(), nullptr};
+  return {nullptr, nullptr, ArrayRef<Substitution>()};
 }
 
 static ClassDecl *getClassDeclSuperClass(ClassDecl *Class) {
