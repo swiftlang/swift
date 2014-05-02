@@ -121,6 +121,15 @@ public:
     return is(tok::identifier) && !isEscapedIdentifier()
       && Text == ContextKW;
   }
+  
+  /// Return true if this is a contextual keyword that could be the start of a
+  /// decl.
+  bool isContextualDeclKeyword() const {
+    if (isNot(tok::identifier) || isEscapedIdentifier()) return false;
+
+    return Text == "mutating" || Text == "nonmutating" ||
+           Text == "override";
+  }
 
   bool isContextualPunctuator(StringRef ContextPunc) const {
     return isAnyOperator() && Text == ContextPunc;

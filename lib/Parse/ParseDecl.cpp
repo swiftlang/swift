@@ -980,9 +980,7 @@ static unsigned getNumDeclModifierKeywords(Parser &P) {
       return NumConsumedTokens;
 
     case tok::identifier:
-      if (P.Tok.isContextualKeyword("mutating") ||
-          P.Tok.isContextualKeyword("nonmutating") ||
-          P.Tok.isContextualKeyword("override")) {
+      if (P.Tok.isContextualDeclKeyword()) {
         P.consumeToken(tok::identifier);
         NumConsumedTokens++;
         continue;
@@ -1004,9 +1002,7 @@ static unsigned getNumDeclModifierKeywords(Parser &P) {
 }
 
 static bool isStartOfModifiedDeclFast(const Token &Tok, const Token &Tok2) {
-  if (!Tok.isContextualKeyword("mutating") &&
-      !Tok.isContextualKeyword("nonmutating") &&
-      !Tok.isContextualKeyword("override"))
+  if (!Tok.isContextualDeclKeyword())
     return false;
 
   switch (Tok2.getKind()) {
@@ -1019,9 +1015,7 @@ static bool isStartOfModifiedDeclFast(const Token &Tok, const Token &Tok2) {
     return true;
 
   default: {
-    return Tok2.isContextualKeyword("mutating") ||
-           Tok2.isContextualKeyword("nonmutating") ||
-           Tok2.isContextualKeyword("override");
+    return Tok2.isContextualDeclKeyword();
   }
   }
 }
