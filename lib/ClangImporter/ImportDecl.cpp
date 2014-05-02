@@ -777,7 +777,7 @@ namespace {
 
       SmallVector<ProtocolDecl *, 4> protocols;
       theClass->getImplicitProtocols(protocols);
-      addObjCProtocolConformances(theClass, protocols);
+      theClass->setProtocols(Impl.SwiftContext.AllocateCopy(protocols));
 
       return theClass->getDeclaredType();
     }
@@ -2891,13 +2891,6 @@ namespace {
         }
       }
 
-      addObjCProtocolConformances(decl, protocols);
-    }
-
-    /// Add conformances to the given Objective-C protocols to the
-    /// given declaration.
-    void addObjCProtocolConformances(Decl *decl,
-                                     ArrayRef<ProtocolDecl*> protocols) {
       // Copy the list of protocols.
       MutableArrayRef<ProtocolDecl *> allProtocols 
         = Impl.SwiftContext.AllocateCopy(protocols);
