@@ -2145,9 +2145,6 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
   
   // Forward substitutions from the outer scope.
   
-  // FIXME: AutoClosureExprs appear to always have null parent decl contexts,
-  // so getFunctionTypeWithCaptures is unable to find contextual generic
-  // parameters for them. The getAs null check here should be unnecessary.
   auto pft = constantInfo.SILFnType;
 
   bool wasSpecialized = false;
