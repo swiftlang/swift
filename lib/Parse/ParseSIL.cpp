@@ -918,6 +918,16 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
 
   } while (P.consumeIf(tok::period));
 
+  if (Kind == SILDeclRef::Kind::EnumElement) {
+    // Sometimes lookupMember on Enum will return the Enum itself. We pick the
+    // correct one out of the look up results.
+    for (unsigned I = 0, E = values.size(); I < E; I++)
+      if (auto *ed = dyn_cast<EnumElementDecl>(values[I])) {
+        VD = values[I];
+        break;
+      }
+  }
+
   // Construct SILDeclRef.
   Result = SILDeclRef(VD, Kind, expansion, uncurryLevel, IsObjC);
   return false;
