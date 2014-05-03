@@ -26,11 +26,390 @@ static bool hasMandatoryTupleLabels(const ConstraintLocatorBuilder &locator) {
   return false;
 }
 
+// Match the argument tuple of a call to the parameter tuple.
+static ConstraintSystem::SolutionKind
+matchCallArguments(ConstraintSystem &cs,
+                   TupleType *argTuple, TupleType *paramTuple,
+                   ConstraintLocatorBuilder locator) {
+  // Keep track of the parameter we're matching and what argument indices
+  // got bound to each parameter.
+  unsigned paramIdx, numParams = paramTuple->getNumElements();
+  llvm::SmallVector<SmallVector<unsigned, 1>, 4> parameterBindings; // FIXME:ick
+  parameterBindings.resize(numParams);
+
+  // Keep track of which arguments we have claimed from the argument tuple.
+  unsigned nextArgIdx = 0, numArgs = argTuple->getNumElements();
+  SmallVector<bool, 4> claimedArgs(numArgs, false);
+  SmallVector<Identifier, 4> actualArgNames;
+  unsigned numClaimedArgs = 0;
+
+  // Indicates whether any of the arguments are potentially out-of-order,
+  // requiring further checking at the end.
+  bool potentiallyOutOfOrder = false;
+
+  // Local function that claims the argument at \c nextArgIdx, returning the
+  // index of the claimed argument. This is primarily a helper for
+  // \c claimNextNamed.
+  auto claim = [&](Identifier expectedName) -> unsigned {
+    // Make sure we can claim this argument.
+    assert(nextArgIdx != numArgs && "Must have a valid index to claim");
+    assert(!claimedArgs[nextArgIdx] && "Argument already claimed");
+
+    if (!actualArgNames.empty()) {
+      // We're recording argument names; record this one.
+      actualArgNames[nextArgIdx] = expectedName;
+    } else if (argTuple->getFields()[nextArgIdx].getName() != expectedName) {
+      // We have an argument name mismatch. Start recording argument names.
+      actualArgNames.resize(numArgs);
+
+      // Figure out previous argument names from the parameter bindings.
+      for (unsigned i = 0; i != numParams; ++i) {
+        const auto &param = paramTuple->getFields()[i];
+        bool firstArg = true;
+
+        for (auto argIdx : parameterBindings[i]) {
+          actualArgNames[argIdx] = firstArg ? param.getName() : Identifier();
+          firstArg = false;
+        }
+      }
+
+      // Record this argument name.
+      actualArgNames[nextArgIdx] = expectedName;
+    }
+
+    ++numClaimedArgs;
+    return nextArgIdx++;
+  };
+
+  // Local function that skips over any claimed arguments.
+  auto skipClaimedArgs = [&]() {
+    while (nextArgIdx != numArgs && claimedArgs[nextArgIdx])
+      ++nextArgIdx;
+  };
+
+  // Local function that retrieves the next unclaimed argument with the given
+  // name (which may be empty). This routine claims the argument.
+  auto claimNextNamed
+    = [&](Identifier name, bool ignoreNameMismatch) -> Optional<unsigned> {
+    // If we've claimed all of the arguments, there's nothing more to do.
+    if (numClaimedArgs == numArgs)
+      return Nothing;
+
+    // When the expected name is empty, we claim the next argument if it has
+    // no name.
+    if (name.empty()) {
+      // Nothing to claim.
+      if (nextArgIdx == numArgs ||
+          claimedArgs[nextArgIdx] ||
+          (argTuple->getFields()[nextArgIdx].hasName() &&
+           !ignoreNameMismatch))
+        return Nothing;
+
+      return claim(name);
+    }
+
+    // Skip over any claimed arguments.
+    skipClaimedArgs();
+
+    // If the name matches, claim this argument.
+    if (nextArgIdx != numArgs &&
+        (ignoreNameMismatch ||
+         argTuple->getFields()[nextArgIdx].getName() == name)) {
+      return claim(name);
+    }
+
+    // The name didn't match. Go hunting for an unclaimed argument whose name
+    // does match.
+    Optional<unsigned> claimedWithSameName;
+    for (unsigned i = nextArgIdx; i != numArgs; ++i) {
+      // Skip arguments where the name doesn't match.
+      if (argTuple->getFields()[i].getName() != name)
+        continue;
+
+      // Skip claimed arguments.
+      if (claimedArgs[i]) {
+        // Note that we have already claimed an argument with the same name.
+        if (!claimedWithSameName) {
+          claimedWithSameName = i;
+        }
+        continue;
+      }
+
+      // We found a match. Claim it.
+      nextArgIdx = i;
+      return claim(name);
+    }
+
+    // Look at previous arguments to determine whether any are unclaimed and
+    // have the same name.
+    for (unsigned i = 0; i != nextArgIdx; ++i) {
+      // Skip arguments where the name doesn't match.
+      if (argTuple->getFields()[i].getName() != name)
+        continue;
+
+      // Skip claimed arguments.
+      if (claimedArgs[i]) {
+        // Note that we have already claimed an argument with the same name.
+        if (!claimedWithSameName) {
+          claimedWithSameName = i;
+        }
+
+        continue;
+      }
+
+      // We found a match. Claim it and note that the arguments are potentially
+      // out of order.
+      potentiallyOutOfOrder = true;
+      nextArgIdx = i;
+      return claim(name);
+    }
+
+    // If the next argument has a name, check whether that name applies to
+    // some other parameter that hasn't yet been processed. If so, there is
+    // nothing to claim.
+    for (unsigned i = paramIdx + 1; i != numParams; ++i) {
+      if (paramTuple->getFields()[i].getName() == name)
+        return Nothing;
+    }
+
+    // If we're not supposed to attempt any fixes, we're done.
+    if (!cs.shouldAttemptFixes())
+      return Nothing;
+
+    // Several things could have gone wrong here, and we'll check for each
+    // of them:
+    //   - The keyword argument might be redundant, in which case we can point
+    //     out the issue.
+    //   - The argument might be unnamed, in which case we try to fix the
+    //     problem by adding the name.
+    //   - The keyword argument might be a typo for an actual argument name, in
+    //     which case we should find the closest match to correct to.
+
+    // Redundant keyword arguments.
+    if (claimedWithSameName) {
+      // FIXME: We can provide better diagnostics here.
+      return Nothing;
+    }
+
+    // Missing a keyword argument name.
+    if (nextArgIdx != numArgs && !argTuple->getFields()[nextArgIdx].hasName()) {
+      // Claim the next argument.
+      return claim(name);
+    }
+
+    // Typo correction is handled in a later pass.
+    return Nothing;
+  };
+
+  // Local function that attempts to bind the given parameter to arguments in
+  // the list.
+  bool haveUnfulfilledParams = false;
+  auto bindNextParameter = [&](bool ignoreNameMismatch) {
+    const auto &param = paramTuple->getFields()[paramIdx];
+
+    // Handle variadic parameters.
+    if (param.isVararg()) {
+      // Claim the next argument with the name of this parameter.
+      auto claimed = claimNextNamed(param.getName(), ignoreNameMismatch);
+
+      // If there was no such argument, leave the argument unf
+      if (!claimed) {
+        haveUnfulfilledParams = true;
+        return;
+      }
+
+      // Record the first argument for the variadic.
+      parameterBindings[paramIdx].push_back(*claimed);
+
+      // Claim any additional unnamed arguments.
+      while ((claimed = claimNextNamed(Identifier(), false))) {
+        parameterBindings[paramIdx].push_back(*claimed);
+      }
+
+      skipClaimedArgs();
+      return;
+    }
+
+    // Try to claim an argument for this parameter.
+    if (auto claimed = claimNextNamed(param.getName(), ignoreNameMismatch)) {
+      parameterBindings[paramIdx].push_back(*claimed);
+      skipClaimedArgs();
+      return;
+    }
+
+    // There was no argument to claim. Leave the argument unfulfilled.
+    haveUnfulfilledParams = true;
+  };
+
+  // Mark through the parameters, binding them to their arguments.
+  for (paramIdx = 0; paramIdx != numParams; ++paramIdx) {
+    bindNextParameter(false);
+  }
+
+  // If we have any unclaimed arguments, complain about those.
+  // FIXME: These might be typos for unfulfilled parameters, or labels where
+  // we should not have them.
+  if (numClaimedArgs != numArgs) {
+    // If we're not allowed to fix anything, or if we don't have any
+    // unfulfilled parameters, fail.
+    if (!haveUnfulfilledParams || !cs.shouldAttemptFixes()) {
+      // FIXME: record why this failed. We have extraneous arguments.
+      return ConstraintSystem::SolutionKind::Error;
+    }
+
+    // Find all of the unfulfilled parameters, and match them up
+    // semi-positionally.
+    // FIXME: We could try to typo-correct named unfulfilled parameters first,
+    // with a low tolerance for mistakes if there are
+    // then take a second pass for unnamed to handle those positionally.
+
+    // Restart at the first argument/parameter.
+    nextArgIdx = 0;
+    skipClaimedArgs();
+    haveUnfulfilledParams = false;
+    for (paramIdx = 0; paramIdx != numParams; ++paramIdx) {
+      // Skip fulfilled parameters.
+      if (!parameterBindings[paramIdx].empty())
+        continue;
+
+
+      bindNextParameter(true);
+    }
+
+    // If we still haven't claimed all of the arguments, fail.
+    if (numClaimedArgs != numArgs) {
+      // FIXME: record why this failed. We have extraneous arguments.
+      return ConstraintSystem::SolutionKind::Error;
+    }
+
+    // FIXME: If we had the actual parameters and knew the body names, those
+    // matches would be best.
+  }
+
+  // If we have any unfulfilled parameters, check them now.
+  if (haveUnfulfilledParams) {
+    for (paramIdx = 0; paramIdx != numParams; ++paramIdx) {
+      // If we have a binding for this parameter, we're done.
+      if (!parameterBindings[paramIdx].empty())
+        continue;
+
+      const auto &param = paramTuple->getFields()[paramIdx];
+
+      // Variadic parameters can be unfulfilled.
+      if (param.isVararg())
+        continue;
+
+      // Parameters with defaults can be unfilfilled.
+      if (param.getDefaultArgKind() != DefaultArgumentKind::None)
+        continue;
+
+      // FIXME: record why this failed. We are missing arguments.
+      return ConstraintSystem::SolutionKind::Error;
+    }
+  }
+
+  // If any arguments were provided out-of-order, check whether we have
+  // violated any of the reordering rules.
+  if (potentiallyOutOfOrder) {
+    // Build a mapping from arguments to parameters.
+    SmallVector<unsigned, 4> argumentBindings(numArgs);
+    for(paramIdx = 0; paramIdx != numParams; ++paramIdx) {
+      for (auto argIdx : parameterBindings[paramIdx])
+        argumentBindings[argIdx] = paramIdx;
+    }
+
+    // Walk through the arguments, det
+    unsigned prevParamIdx = argumentBindings[0];
+    for (unsigned argIdx = 1; argIdx != numArgs; ++argIdx) {
+      unsigned paramIdx = argumentBindings[argIdx];
+
+      // If this argument binds to the same parameter as the previous one or to
+      // a later parameter, just update the parameter index.
+      if (paramIdx >= prevParamIdx) {
+        prevParamIdx = paramIdx;
+        continue;
+      }
+
+      // The argument binds to a parameter that comes earlier than the
+      // previous argument. This is fine so long as this parameter and all of
+      // those parameters up to (and including) the previously-bound parameter
+      // are either variadic or have a default argument.
+      for (unsigned i = paramIdx; i != prevParamIdx + 1; ++i) {
+        const auto &param = paramTuple->getFields()[i];
+        if (param.isVararg() ||
+            param.getDefaultArgKind() != DefaultArgumentKind::None)
+          continue;
+
+        // FIXME: Add a failure kind for re-ordering violations.
+        return ConstraintSystem::SolutionKind::Error;
+      }
+    }
+  }
+
+  // If any arguments were renamed, the call is ill-formed.
+  if (!actualArgNames.empty()) {
+    if (!cs.shouldAttemptFixes()) {
+      // FIXME: record why this failed. We have renaming.
+      return ConstraintSystem::SolutionKind::Error;
+    }
+
+    // Add a fix for the name. This is only responsible for recording the fix.
+    auto result = cs.simplifyFixConstraint(
+                    Fix::getRelabelTuple(cs, FixKind::RelabelCallTuple,
+                                         actualArgNames),
+                    argTuple, paramTuple,
+                    TypeMatchKind::ArgumentTupleConversion,
+                    ConstraintSystem::TMF_None,
+                    locator);
+    if (result != ConstraintSystem::SolutionKind::Solved)
+      return result;
+  }
+
+  // Check the argument types for each of the parameters.
+  unsigned subflags = ConstraintSystem::TMF_GenerateConstraints;
+  for (paramIdx = 0; paramIdx != numParams; ++paramIdx) {
+    // Skip unfulfilled parameters. There's nothing to do for them.
+    if (parameterBindings[paramIdx].empty())
+      continue;
+
+    // Determine the parameter type.
+    const auto &param = paramTuple->getFields()[paramIdx];
+    auto paramTy = param.isVararg() ? param.getVarargBaseTy()
+                                    : param.getType();
+
+    // Compare each of the bound arguments for this parameter.
+    for (auto argIdx : parameterBindings[paramIdx]) {
+      // FIXME: Add a special locator for matching a parameter to an argument,
+      // because we need both indices to diagnose well.
+      switch (cs.matchTypes(argTuple->getElementType(argIdx), paramTy,
+                            TypeMatchKind::Conversion, subflags,
+                            locator.withPathElement(
+                              LocatorPathElt::getTupleElement(paramIdx)))) {
+      case ConstraintSystem::SolutionKind::Error:
+        return ConstraintSystem::SolutionKind::Error;
+
+      case ConstraintSystem::SolutionKind::Solved:
+      case ConstraintSystem::SolutionKind::Unsolved:
+        break;
+      }
+    }
+  }
+
+  return ConstraintSystem::SolutionKind::Solved;
+}
+
 ConstraintSystem::SolutionKind
 ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
                                   TypeMatchKind kind, unsigned flags,
                                   ConstraintLocatorBuilder locator) {
   unsigned subFlags = flags | TMF_GenerateConstraints;
+
+  // If this is an argument tuple conversion, handle it directly. The rules are
+  // different than for normal tuple conversions.
+  if (kind == TypeMatchKind::ArgumentTupleConversion &&
+      getASTContext().LangOpts.StrictKeywordArguments) {
+    return matchCallArguments(*this, tuple1, tuple2, locator);
+  }
 
   // Equality and subtyping have fairly strict requirements on tuple matching,
   // requiring element names to either match up or be disjoint.
@@ -2301,6 +2680,10 @@ ConstraintSystem::simplifyFixConstraint(Fix fix,
                       locator.withPathElement(
                         ConstraintLocator::ScalarToTuple));
   }
+
+  case FixKind::RelabelCallTuple:
+    // The actual semantics are handled elsewhere.
+    return SolutionKind::Solved;
   }
 }
 

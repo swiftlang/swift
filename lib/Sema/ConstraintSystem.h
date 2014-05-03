@@ -1727,7 +1727,7 @@ public:
   /// destination of an assignment statement.
   Type computeAssignDestType(Expr *dest, SourceLoc equalLoc);
 
-private:
+public:
   /// \brief Flags that direct type matching.
   enum TypeMatchFlags {
     TMF_None = 0,
@@ -1744,6 +1744,7 @@ private:
     TMF_ApplyingFix = 0x02,
   };
 
+private:
   /// \brief Subroutine of \c matchTypes(), which matches up two tuple types.
   ///
   /// \returns the result of performing the tuple-to-tuple conversion.
@@ -1790,6 +1791,7 @@ private:
                                      TypeMatchKind kind, unsigned flags,
                                      ConstraintLocatorBuilder locator);
 
+public: // FIXME: public due to statics in CSSimplify.cpp
   /// \brief Attempt to match up types \c type1 and \c type2, which in effect
   /// is solving the given type constraint between these two types.
   ///
@@ -1902,6 +1904,7 @@ private:
                                             unsigned flags,
                                             ConstraintLocatorBuilder locator);
 
+public: // FIXME: Public for use by static functions.
   /// \brief Simplify a conversion constraint with a fix applied to it.
   SolutionKind simplifyFixConstraint(Fix fix,
                                      Type type1, Type type2,

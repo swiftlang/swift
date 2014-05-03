@@ -205,6 +205,9 @@ enum class FixKind : uint8_t {
 
   /// Relabel a tuple due to a scalar-to-tuple conversion.
   ScalarToTuple,
+
+  /// Relabel a tuple due to a call
+  RelabelCallTuple,
 };
 
 /// Desribes a fix that can be applied to a constraint before visiting it.
@@ -238,7 +241,8 @@ public:
   /// Whether the fix kind is a tuple-relabelling fix.
   static bool isRelabelTupleKind(FixKind kind) { 
     return kind == FixKind::TupleToScalar ||
-           kind == FixKind::ScalarToTuple; 
+           kind == FixKind::ScalarToTuple ||
+           kind == FixKind::RelabelCallTuple;
   }
 
   /// For a relabel-tuple fix, retrieve the new names.

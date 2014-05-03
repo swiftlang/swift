@@ -3886,7 +3886,8 @@ static bool diagnoseRelabel(TypeChecker &tc, Expr *expr,
     llvm::SmallString<16> str;
     str += newNames[0].str();
     str += ": ";
-    tc.diagnose(expr->getStartLoc(), diag::missing_argument_labels, false)
+    tc.diagnose(expr->getStartLoc(), diag::missing_argument_labels, false,
+                str.substr(0, str.size()-1))
       .fixItInsert(expr->getStartLoc(), str);
     return true;
   }
@@ -3897,6 +3898,8 @@ static bool diagnoseRelabel(TypeChecker &tc, Expr *expr,
   unsigned n = tuple->getNumElements();
   if (newNames.size() < n)
     n = newNames.size();
+  llvm::SmallString<16> missingStr;
+  llvm::SmallString<16> extraStr;
   for (unsigned i = 0; i != n; ++i) {
     Identifier oldName = tuple->getElementName(i);
     Identifier newName = newNames[i];
@@ -3904,25 +3907,58 @@ static bool diagnoseRelabel(TypeChecker &tc, Expr *expr,
     if (oldName == newName)
       continue;
 
-    if (oldName.empty())
+    if (oldName.empty()) {
       ++numMissing;
-    else if (newName.empty())
+      missingStr += newName.str();
+      missingStr += ":";
+    } else if (newName.empty()) {
       ++numExtra;
-    else
+      extraStr += oldName.str();
+      extraStr += ':';
+    } else
       ++numWrong;
   }
 
   // Emit the diagnostic.
   assert(numMissing > 0 || numExtra > 0 || numWrong > 0);
-  auto diag = tc.diagnose(expr->getLoc(), 
-                          (numWrong > 0 || (numMissing > 0 && numExtra > 00)
-                             ? diag::wrong_argument_labels
-                             : (numMissing == 0 
-                                  ? diag::extra_argument_labels
-                                  : diag::missing_argument_labels)),
-                          (numMissing + numExtra + numWrong) > 1);
-  
-  // Emit Fix-Its to the correct names.
+  Optional<InFlightDiagnostic> diagOpt;
+
+  // If we had any wrong labels, or we have both missing and extra labels,
+  // emit the catch-all "wrong labels" diagnostic.
+  bool plural = (numMissing + numExtra + numWrong) > 1;
+  if (numWrong > 0 || (numMissing > 0 && numExtra > 0)) {
+    llvm::SmallString<16> haveStr;
+    for(unsigned i = 0, n = tuple->getNumElements(); i != n; ++i) {
+      auto haveName = tuple->getElementName(i);
+      if (haveName.empty())
+        haveStr += '_';
+      else
+        haveStr += haveName.str();
+      haveStr += ':';
+    }
+
+    llvm::SmallString<16> expectedStr;
+    for (auto expected : newNames) {
+      if (expected.empty())
+        expectedStr += '_';
+      else
+        expectedStr += expected.str();
+      expectedStr += ':';
+    }
+
+    diagOpt.emplace(tc.diagnose(expr->getLoc(), diag::wrong_argument_labels,
+                                plural, haveStr, expectedStr));
+  } else if (numMissing > 0) {
+    diagOpt.emplace(tc.diagnose(expr->getLoc(), diag::missing_argument_labels,
+                                plural, missingStr));
+  } else {
+    assert(numExtra > 0);
+    diagOpt.emplace(tc.diagnose(expr->getLoc(), diag::extra_argument_labels,
+                                plural, extraStr));
+  }
+
+  // Emit Fix-Its to correct the names.
+  auto &diag = *diagOpt;
   for (unsigned i = 0; i != n; ++i) {
     Identifier oldName = tuple->getElementName(i);
     Identifier newName = newNames[i];
@@ -4048,7 +4084,8 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr) {
       }
 
       case FixKind::TupleToScalar: 
-      case FixKind::ScalarToTuple: {
+      case FixKind::ScalarToTuple:
+      case FixKind::RelabelCallTuple: {
         if (diagnoseRelabel(TC,affected,fix.first.getRelabelTupleNames(*this)))
           diagnosed = true;
         break;
