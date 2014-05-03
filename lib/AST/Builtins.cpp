@@ -1263,6 +1263,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::CanBeObjCClass:
     return getCanBeObjCClassOperation(Context, Id);
       
+  case BuiltinValueKind::CondUnreachable:
   case BuiltinValueKind::Unreachable:
     return getUnreachableOperation(Context, Id);
       

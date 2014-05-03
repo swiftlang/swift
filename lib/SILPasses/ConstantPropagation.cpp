@@ -743,10 +743,10 @@ static SILValue constantFoldInstruction(SILInstruction &I,
   return SILValue();
 }
 
-static bool isAssertConfigurationApply(SILInstruction &I) {
+static bool isApplyOfBuiltin(SILInstruction &I, BuiltinValueKind kind) {
   if (auto *AI = dyn_cast<ApplyInst>(&I))
     if (auto *FR = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee()))
-      if (FR->getBuiltinInfo().ID == BuiltinValueKind::AssertConf)
+      if (FR->getBuiltinInfo().ID == kind)
         return true;
   return false;
 }
@@ -778,7 +778,9 @@ static bool CCPFunctionBody(SILFunction &F, bool EnableDiagnostics,
     for (auto &I : BB) {
       if (isFoldable(&I) && !I.use_empty())
         WorkList.insert(&I);
-      else if (InstantiateAssertConfiguration && isAssertConfigurationApply(I))
+      else if (InstantiateAssertConfiguration
+               && (isApplyOfBuiltin(I, BuiltinValueKind::AssertConf)
+                   || isApplyOfBuiltin(I, BuiltinValueKind::CondUnreachable)))
         WorkList.insert(&I);
     }
   }
@@ -794,8 +796,8 @@ static bool CCPFunctionBody(SILFunction &F, bool EnableDiagnostics,
     // Replace assert_configuration instructions by their constant value. We
     // want them to be replace even if we can't fully propagate the constant.
     if (InstantiateAssertConfiguration)
-      if (auto *AI = dyn_cast<ApplyInst>(I))
-        if (isAssertConfigurationApply(*AI)) {
+      if (auto *AI = dyn_cast<ApplyInst>(I)) {
+        if (isApplyOfBuiltin(*AI, BuiltinValueKind::AssertConf)) {
           // Instantiate the constant.
           SILBuilder B(AI);
           auto AssertConfInt = B.createIntegerLiteral(
@@ -807,6 +809,15 @@ static bool CCPFunctionBody(SILFunction &F, bool EnableDiagnostics,
           recursivelyDeleteTriviallyDeadInstructions(AI);
           continue;
         }
+        
+        // Kill calls to conditionallyUnreachable if we've folded assert
+        // configuration calls.
+        if (isApplyOfBuiltin(*AI, BuiltinValueKind::CondUnreachable)) {
+          assert(AI->use_empty() && "use of conditionallyUnreachable?!");
+          recursivelyDeleteTriviallyDeadInstructions(AI, /*force*/ true);
+          continue;
+        }
+      }
 
     // Go through all users of the constant and try to fold them.
     FoldedUsers.clear();

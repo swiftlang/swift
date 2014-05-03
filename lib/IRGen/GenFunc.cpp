@@ -1882,6 +1882,12 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     return;
   }
   
+  if (Builtin.ID == BuiltinValueKind::CondUnreachable) {
+    // conditionallyUnreachable is a no-op by itself. Since it's noreturn, there
+    // should be a true unreachable terminator right after.
+    return;
+  }
+  
   llvm_unreachable("IRGen unimplemented for this builtin!");
 }
 
