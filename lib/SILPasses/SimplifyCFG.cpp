@@ -105,7 +105,9 @@ namespace {
     bool simplifyBranchOperands(OperandValueArrayRef Operands);
     bool simplifyBranchBlock(BranchInst *BI);
     bool simplifyCondBrBlock(CondBranchInst *BI);
+    bool simplifySwitchEnumUnreachableBlocks(SwitchEnumInst *SEI);
     bool simplifySwitchEnumBlock(SwitchEnumInst *SEI);
+    bool simplifyUnreachableBlock(UnreachableInst *UI);
     bool simplifyArgument(SILBasicBlock *BB, unsigned i);
     bool simplifyArgs(SILBasicBlock *BB);
   };
@@ -627,14 +629,92 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
   return false;
 }
 
+// Does this basic block consist of only an "unreachable" instruction?
+static bool isOnlyUnreachable(SILBasicBlock *BB) {
+  auto *Term = BB->getTerminator();
+  if (!isa<UnreachableInst>(Term))
+    return false;
+
+  return (&*BB->begin() == BB->getTerminator());
+}
+
+
+/// simplifySwitchEnumUnreachableBlocks - Attempt to replace a
+/// switch_enum_inst where all but one block consists of just an
+/// "unreachable" with an unchecked_enum_data and branch.
+bool SimplifyCFG::simplifySwitchEnumUnreachableBlocks(SwitchEnumInst *SEI) {
+  auto Count = SEI->getNumCases();
+
+  SILBasicBlock *Dest = nullptr;
+  EnumElementDecl *Element = nullptr;
+
+  if (SEI->hasDefault()) {
+    if (!isOnlyUnreachable(SEI->getDefaultBB()))
+      Dest = SEI->getDefaultBB();
+  }
+
+  for (unsigned i = 0; i < Count; ++i) {
+    auto EnumCase = SEI->getCase(i);
+
+    if (isOnlyUnreachable(EnumCase.second))
+      continue;
+
+    if (Dest)
+      return false;
+
+    assert(!Element && "Did not expect to have an element without a block!");
+    Element = EnumCase.first;
+    Dest = EnumCase.second;
+  }
+
+  if (!Dest) {
+    addToWorklist(SEI->getParent());
+    SILBuilder(SEI).createUnreachable(SEI->getLoc());
+    SEI->eraseFromParent();
+    return true;
+  }
+
+  if (!Element || !Element->hasArgumentType() || Dest->bbarg_empty()) {
+    assert(Dest->bbarg_empty() && "Unexpected argument at destination!");
+
+    SILBuilder(SEI).createBranch(SEI->getLoc(), Dest);
+
+    addToWorklist(SEI->getParent());
+    addToWorklist(Dest);
+
+    SEI->eraseFromParent();
+    return true;
+  }
+
+  auto &Mod = SEI->getModule();
+  auto OpndTy = SEI->getOperand()->getType(0);
+  auto Ty = OpndTy.getEnumElementType(Element, Mod);
+  auto *UED = SILBuilder(SEI).createUncheckedEnumData(SEI->getLoc(),
+                                                      SEI->getOperand(),
+                                                      Element, Ty);
+
+  assert(Dest->bbarg_size() == 1 && "Expected only one argument!");
+  ArrayRef<SILValue> Args = { UED };
+  SILBuilder(SEI).createBranch(SEI->getLoc(), Dest, Args);
+
+  addToWorklist(SEI->getParent());
+  addToWorklist(Dest);
+
+  SEI->eraseFromParent();
+  return true;
+}
 
 /// simplifySwitchEnumBlock - Simplify a basic block that ends with a
 /// switch_enum instruction that gets its operand from a an enum
 /// instruction.
 bool SimplifyCFG::simplifySwitchEnumBlock(SwitchEnumInst *SEI) {
   auto *EI = dyn_cast<EnumInst>(SEI->getOperand());
+
+  // If the operand is not from an enum, see if this is a case where
+  // only one destination of the branch has code that does not end
+  // with unreachable.
   if (!EI)
-    return false;
+    return simplifySwitchEnumUnreachableBlocks(SEI);
 
   auto *LiveBlock = SEI->getCaseDestination(EI->getElement());
   auto *ThisBB = SEI->getParent();
@@ -665,6 +745,52 @@ bool SimplifyCFG::simplifySwitchEnumBlock(SwitchEnumInst *SEI) {
   addToWorklist(LiveBlock);
   ++NumConstantFolded;
   return true;
+}
+
+/// simplifyUnreachableBlock - Simplify blocks ending with unreachable by
+/// removing instructions that are safe to delete backwards until we
+/// hit an instruction we cannot delete.
+bool SimplifyCFG::simplifyUnreachableBlock(UnreachableInst *UI) {
+  bool Changed = false;
+  auto BB = UI->getParent();
+  auto I = std::next(BB->rbegin());
+  auto End = BB->rend();
+
+  // Walk backwards deleting instructions that should be safe to delete
+  // in a block that ends with unreachable.
+  while (I != End) {
+    auto Dead = I++;
+
+    switch (Dead->getKind()) {
+      // These technically have side effects, but not ones that matter
+      // in a block that we shouldn't really reach...
+    case ValueKind::StrongRetainInst:
+    case ValueKind::StrongReleaseInst:
+    case ValueKind::RetainValueInst:
+    case ValueKind::ReleaseValueInst:
+      break;
+
+    default:
+      if (Dead->mayHaveSideEffects())
+        return Changed;
+    }
+
+    for (unsigned i = 0, e = Dead->getNumTypes(); i != e; ++i)
+      if (!SILValue(&*Dead, i).use_empty())
+        SILValue(&*Dead, i).replaceAllUsesWith(SILUndef::get(Dead->getType(i),
+                                                             BB->getModule()));
+
+    Dead->eraseFromParent();
+    Changed = true;
+  }
+
+  // If this block was changed and it now consists of only the unreachable,
+  // make sure we process its predecessors.
+  if (Changed && isOnlyUnreachable(BB))
+    for (auto *P : BB->getPreds())
+      addToWorklist(P);
+
+  return Changed;
 }
 
 void RemoveUnreachable::visit(SILBasicBlock *BB) {
@@ -726,6 +852,9 @@ bool SimplifyCFG::simplifyBlocks() {
       break;
     case ValueKind::SwitchEnumInst:
       Changed |= simplifySwitchEnumBlock(cast<SwitchEnumInst>(TI));
+      break;
+    case ValueKind::UnreachableInst:
+      Changed |= simplifyUnreachableBlock(cast<UnreachableInst>(TI));
       break;
     default:
       break;
