@@ -1,6 +1,9 @@
 Latest
 ----------
 
+2014-05-03
+----------
+
 * The @NSManaged attribute can be applied to the properties of an
   NSManagedObject subclass to indicate that they should be handled by
   CoreData:
