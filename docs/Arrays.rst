@@ -59,7 +59,8 @@ to all three of the components.
   storage of an arbitrary ``NSArray`` rather than by a Swift
   ``NativeArray``.  When ``T`` is known to be a non-class type, the
   performance of ``Array<T>`` is identical to that of
-  ``NativeArray<T>``.
+  ``NativeArray<T>``.  It also supports up- and down- casts between
+  arrays of related class types.
 
 * ``Slice<T>`` is a subrange of some ``Array<T>`` or
   ``NativeArray<T>``; it's the result of using slice notation,
