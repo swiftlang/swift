@@ -4,7 +4,7 @@
 #include "NSStringSort.h"
 // NOTE: compile with ARC enabled
 // clang -fobjc-arc -O3 NSStringBench.m -o NSStringBench.bin -framework Foundation
-#define LAPS 500
+#define LAPS 5000
 
 @implementation Record
 

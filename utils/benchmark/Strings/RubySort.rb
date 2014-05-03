@@ -1018,7 +1018,7 @@ words.each do |name|
   Names.push(x)
 end
 
-(0..500).each do |i|
+(0..5000).each do |i|
   y = Array.new(Names)
   y.sort! {|a,b| a.fullname <=> b.fullname}
 end
