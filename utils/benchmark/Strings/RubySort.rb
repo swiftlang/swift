@@ -1005,13 +1005,9 @@ words=[
 class Record
   def initialize(fn, num)
     @fullname = fn
-    @number = num
   end
   def fullname
     return @fullname
-  end
-  def num
-    return @number
   end
 end
 
