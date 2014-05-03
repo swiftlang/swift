@@ -54,8 +54,8 @@ class Zang<V>: Zim<V, V> {
 
 // -- For storage-qualified fields, we just report the formal type.
 class StorageQualified {
-  @unowned var a: StorageQualified
-  @weak var b: StorageQualified?
+  unowned var a: StorageQualified
+  weak var b: StorageQualified?
 
   init(x: StorageQualified) {
     a = x

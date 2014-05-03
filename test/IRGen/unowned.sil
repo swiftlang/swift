@@ -14,7 +14,7 @@ class C {}
 sil @_TFC7unowned1CD : $@cc(method) @thin (C) -> ()
 
 struct A {
-  @unowned var x : C
+  unowned var x : C
 }
 
 sil @test_weak_rr_class : $@thin (@sil_unowned C) -> () {

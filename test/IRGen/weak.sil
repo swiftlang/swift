@@ -20,7 +20,7 @@ sil @_TFC4weak1CD : $@cc(method) @thin (C) -> ()
 }
 
 struct A {
-  @weak var x : C?
+  weak var x : C?
 }
 
 // size 8
@@ -45,7 +45,7 @@ bb0(%0 : $*A, %1 : $C):
 // CHECK-NEXT: ret void
 
 struct B {
-  @weak var x : P?
+  weak var x : P?
 }
 
 sil @test_weak_load_store_proto : $@thin (@inout B, P) -> () {

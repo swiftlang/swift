@@ -14,7 +14,7 @@ struct BitwiseTakable {
 
 struct SomeWeak {
   var x: C
-  @weak var y: C?
+  weak var y: C?
 }
 
 // CHECK: @_TWVV21array_value_witnesses3POD = 

@@ -10,7 +10,7 @@ struct NoWeak {
 
 struct SomeWeak {
   var x: C
-  @weak var y: C?
+  weak var y: C?
 }
 
 struct Gen<T> {
