@@ -21,7 +21,8 @@ add_swift_library(swift_runtime INSTALL
   Once.cpp
   Init.cpp
   Reflection.mm
-  Heap.cpp)
+  Heap.cpp
+  Errors.cpp)
 
 add_swift_optimization_flags(swift_runtime)
 
@@ -47,4 +48,6 @@ find_library(CRASHREPORTERCLIENT CrashReporterClient ONLY_CMAKE_FIND_ROOT_PATH)
 
 if (CRASHREPORTERCLIENT)
   target_link_libraries(swift_runtime "-lCrashReporterClient")
+  set_target_properties(swift_runtime 
+    PROPERTIES COMPILE_FLAGS "-DSWIFT_HAVE_CRASHREPORTERCLIENT=1")
 endif()
