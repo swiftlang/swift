@@ -78,9 +78,13 @@ static clang::CanQualType getClangIdType(
   return clangCtx.getCanonicalType(clangType);
 }
 
-static clang::CanQualType getClangVaListType(
+static clang::CanQualType getClangDecayedVaListType(
   const clang::ASTContext &clangCtx) {
-  return clangCtx.getCanonicalType(clangCtx.getBuiltinVaListType());
+  clang::QualType clangType =
+    clangCtx.getCanonicalType(clangCtx.getBuiltinVaListType());
+  if (clangType->isConstantArrayType())
+    clangType = clangCtx.getDecayedType(clangType);
+  return clangCtx.getCanonicalType(clangType);
 }
 
 clang::CanQualType GenClangType::visitStructType(CanStructType type) {
@@ -126,7 +130,8 @@ clang::CanQualType GenClangType::visitStructType(CanStructType type) {
   CHECK_CLANG_TYPE_MATCH(type, "NSZone", clangCtx.VoidPtrTy);
   // We import NSString* (an Obj-C object pointer) as String.
   CHECK_CLANG_TYPE_MATCH(type, "String", getClangIdType(getClangASTContext()));
-  CHECK_CLANG_TYPE_MATCH(type, "CVaListPointer", getClangVaListType(clangCtx));
+  CHECK_CLANG_TYPE_MATCH(type, "CVaListPointer",
+                         getClangDecayedVaListType(clangCtx));
 #undef CHECK_CLANG_TYPE_MATCH
 
   llvm_unreachable("Unhandled struct type in Clang type generation");

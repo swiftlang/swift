@@ -241,8 +241,7 @@ getSwiftStdlibType(const clang::TypedefNameDecl *D,
     break;
 
   case MappedCTypeKind::VaList:
-    // FIXME: why is va_list not a pointer type on 32-bit arm
-    if (ClangTypeSize != 64 && ClangTypeSize != 32)
+    if (ClangTypeSize != ClangCtx.getTypeSize(ClangCtx.VoidPtrTy))
       return std::make_pair(Type(), "");
     break;
 

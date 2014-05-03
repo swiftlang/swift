@@ -394,7 +394,6 @@ namespace {
     ImportResult Visit##KIND##Type(const clang::KIND##Type *type) { \
       return Visit(type->desugar());                                \
     }
-    SUGAR_TYPE(Decayed)
     SUGAR_TYPE(TypeOfExpr)
     SUGAR_TYPE(TypeOf)
     SUGAR_TYPE(Decltype)
@@ -406,6 +405,14 @@ namespace {
     SUGAR_TYPE(Auto)
     SUGAR_TYPE(Adjusted)
     SUGAR_TYPE(PackExpansion)
+
+    ImportResult VisitDecayedType(const clang::DecayedType *type) {
+      clang::ASTContext &clangCtx = Impl.getClangASTContext();
+      if (clangCtx.hasSameType(type->getOriginalType(),
+                               clangCtx.getBuiltinVaListType()))
+        return Impl.getNamedSwiftType(Impl.getStdlibModule(), "CVaListPointer");
+      return Visit(type->desugar());
+    }
 
     ImportResult VisitRecordType(const clang::RecordType *type) {
       auto decl = dyn_cast_or_null<TypeDecl>(Impl.importDecl(type->getDecl()));
