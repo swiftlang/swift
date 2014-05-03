@@ -781,59 +781,56 @@ void ConstraintSystem::diagnoseFailureFromConstraints(Expr *expr) {
   Constraint *activeConformanceConstraint = nullptr;
   Constraint *valueMemberConstraint = nullptr;
   Constraint *argumentConstraint = nullptr;
+    
+  if(!ActiveConstraints.empty()) {
+    // If any active conformance constraints are in the system, we know that
+    // any inactive constraints are in its service. Capture the constraint and
+    // present this information to the user.
+    auto *constraint = &ActiveConstraints.front();
+    
+    activeConformanceConstraint = getComponentConstraint(constraint);
+  }
   
-  if (TC.Context.LangOpts.detailedTypeCheckDiagnostics) {
+  while (!InactiveConstraints.empty()) {
+    auto *constraint = &InactiveConstraints.front();
     
-    if(!ActiveConstraints.empty()) {
-      // If any active conformance constraints are in the system, we know that
-      // any inactive constraints are in its service. Capture the constraint and
-      // present this information to the user.
-      auto *constraint = &ActiveConstraints.front();
-      
-      activeConformanceConstraint = getComponentConstraint(constraint);
+    // Capture the first non-disjunction constraint we find. We'll use this
+    // if we can't find a clearer reason for the failure.
+    if (!fallbackConstraint &&
+        (constraint->getKind() != ConstraintKind::Disjunction)) {
+      fallbackConstraint = constraint;
     }
     
-    while (!InactiveConstraints.empty()) {
-      auto *constraint = &InactiveConstraints.front();
-      
-      // Capture the first non-disjunction constraint we find. We'll use this
-      // if we can't find a clearer reason for the failure.
-      if (!fallbackConstraint &&
-          (constraint->getKind() != ConstraintKind::Disjunction)) {
-        fallbackConstraint = constraint;
-      }
-      
-      // Failed binding constraints point to a missing member.
-      if (!valueMemberConstraint &&
-          (constraint->getKind() == ConstraintKind::ValueMember)) {
-        valueMemberConstraint = constraint;
-      }
-      
-      // A missed argument conversion can result in better error messages when
-      // a user passes the wrong arguments to a function application.
-      if (!argumentConstraint) {
-        argumentConstraint = getDisjunctionChoice(constraint,
-                                                  ConstraintKind::
-                                                  ArgumentTupleConversion);
-      }
-      
-      // Overload resolution failures are often nicely descriptive, so store
-      // off the first one we find.
-      if (!overloadConstraint) {
-        overloadConstraint = getDisjunctionChoice(constraint,
-                                                  ConstraintKind::BindOverload);
-      }
-      
-      // Conversion constraints are also nicely descriptive, so we'll grab the
-      // first one of those as well.
-      if (!conversionConstraint &&
-          (constraint->getKind() == ConstraintKind::Conversion ||
-           constraint->getKind() == ConstraintKind::ArgumentTupleConversion)) {
-            conversionConstraint = constraint;
-          }
-      
-      InactiveConstraints.pop_front();
+    // Failed binding constraints point to a missing member.
+    if (!valueMemberConstraint &&
+        (constraint->getKind() == ConstraintKind::ValueMember)) {
+      valueMemberConstraint = constraint;
     }
+    
+    // A missed argument conversion can result in better error messages when
+    // a user passes the wrong arguments to a function application.
+    if (!argumentConstraint) {
+      argumentConstraint = getDisjunctionChoice(constraint,
+                                                ConstraintKind::
+                                                ArgumentTupleConversion);
+    }
+    
+    // Overload resolution failures are often nicely descriptive, so store
+    // off the first one we find.
+    if (!overloadConstraint) {
+      overloadConstraint = getDisjunctionChoice(constraint,
+                                                ConstraintKind::BindOverload);
+    }
+    
+    // Conversion constraints are also nicely descriptive, so we'll grab the
+    // first one of those as well.
+    if (!conversionConstraint &&
+        (constraint->getKind() == ConstraintKind::Conversion ||
+         constraint->getKind() == ConstraintKind::ArgumentTupleConversion)) {
+          conversionConstraint = constraint;
+        }
+    
+    InactiveConstraints.pop_front();
   }
   
   // If no more descriptive constraint was found, use the fallback constraint.
