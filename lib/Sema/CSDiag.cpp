@@ -542,18 +542,29 @@ static void noteTargetOfDiagnostic(ConstraintSystem &cs,
 ///
 /// \param cs The constraint system in which the diagnostic was generated.
 /// \param failure The failure to emit.
+/// \param expr The expression associated with the failure.
+/// \param useExprLoc If the failure lacks a location, use the one associated
+/// with expr.
 ///
 /// \returns true if the diagnostic was emitted successfully.
-static bool diagnoseFailure(ConstraintSystem &cs, Failure &failure) {
-  // If there's no anchor, we have no location information to use when emitting
-  // the diagnostic.
-  if (!failure.getLocator() || !failure.getLocator()->getAnchor())
-    return false;
+static bool diagnoseFailure(ConstraintSystem &cs,
+                            Failure &failure,
+                            Expr *expr,
+                            bool useExprLoc) {
+  ConstraintLocator *cloc;
+  if (!failure.getLocator() || !failure.getLocator()->getAnchor()) {
+    if (useExprLoc)
+      cloc = cs.getConstraintLocator(expr);
+    else
+      return false;
+  } else {
+    cloc = failure.getLocator();
+  }
 
   SourceRange range1, range2;
 
   ConstraintLocator *targetLocator;
-  auto locator = simplifyLocator(cs, failure.getLocator(), range1, range2,
+  auto locator = simplifyLocator(cs, cloc, range1, range2,
                                  &targetLocator);
   auto &tc = cs.getTypeChecker();
 
@@ -747,7 +758,8 @@ bool diagnoseAmbiguity(ConstraintSystem &cs, ArrayRef<Solution> solutions) {
 }
 
 Constraint *getDisjunctionChoice(Constraint *constraint,
-                                 ConstraintKind kind) {
+                                 ConstraintKind kind,
+                                 bool takeAny = false) {
   if (constraint->getKind() != ConstraintKind::Disjunction) {
     return nullptr;
   }
@@ -755,7 +767,8 @@ Constraint *getDisjunctionChoice(Constraint *constraint,
   auto nestedConstraints = constraint->getNestedConstraints();
   
   for (auto nestedConstraint : nestedConstraints) {
-    if (nestedConstraint->getKind() == kind)
+    if (takeAny ||
+        (nestedConstraint->getKind() == kind))
       return nestedConstraint;
   }
   
@@ -770,7 +783,7 @@ Constraint *getComponentConstraint(Constraint *constraint) {
   return constraint->getNestedConstraints().front();
 }
 
-void ConstraintSystem::diagnoseFailureFromConstraints(Expr *expr) {
+bool ConstraintSystem::diagnoseFailureFromConstraints(Expr *expr) {
   
   // If we've been asked for more detailed type-check diagnostics, mine the
   // system's active and inactive constraints for information on why we could
@@ -781,6 +794,7 @@ void ConstraintSystem::diagnoseFailureFromConstraints(Expr *expr) {
   Constraint *activeConformanceConstraint = nullptr;
   Constraint *valueMemberConstraint = nullptr;
   Constraint *argumentConstraint = nullptr;
+  Constraint *disjunctionConversionConstraint = nullptr;
     
   if(!ActiveConstraints.empty()) {
     // If any active conformance constraints are in the system, we know that
@@ -791,8 +805,8 @@ void ConstraintSystem::diagnoseFailureFromConstraints(Expr *expr) {
     activeConformanceConstraint = getComponentConstraint(constraint);
   }
   
-  while (!InactiveConstraints.empty()) {
-    auto *constraint = &InactiveConstraints.front();
+  for (auto & constraintRef : InactiveConstraints) {
+    auto constraint = &constraintRef;
     
     // Capture the first non-disjunction constraint we find. We'll use this
     // if we can't find a clearer reason for the failure.
@@ -812,7 +826,7 @@ void ConstraintSystem::diagnoseFailureFromConstraints(Expr *expr) {
     if (!argumentConstraint) {
       argumentConstraint = getDisjunctionChoice(constraint,
                                                 ConstraintKind::
-                                                ArgumentTupleConversion);
+                                                    ArgumentTupleConversion);
     }
     
     // Overload resolution failures are often nicely descriptive, so store
@@ -828,45 +842,80 @@ void ConstraintSystem::diagnoseFailureFromConstraints(Expr *expr) {
         (constraint->getKind() == ConstraintKind::Conversion ||
          constraint->getKind() == ConstraintKind::ArgumentTupleConversion)) {
           conversionConstraint = constraint;
-        }
+    }
     
-    InactiveConstraints.pop_front();
+    // When all else fails, inspect a potential disjunction for a consituent
+    // conversion.
+    if (!disjunctionConversionConstraint) {
+      disjunctionConversionConstraint = getDisjunctionChoice(constraint,
+                                                             ConstraintKind::
+                                                                Conversion,
+                                                             true);
+    }
   }
   
   // If no more descriptive constraint was found, use the fallback constraint.
   if (!(conversionConstraint || overloadConstraint)) {
     conversionConstraint = fallbackConstraint;
   }
+  
+  // If there's still no conversion to diagnose, use the disjunction conversion.
+  if (!conversionConstraint) {
+    conversionConstraint = disjunctionConversionConstraint;
+  }
+  
+  // If there was already a conversion failure, use it.
+  if (!conversionConstraint &&
+      this->failedConstraint &&
+      this->failedConstraint->getKind() != ConstraintKind::Disjunction) {
+    conversionConstraint = this->failedConstraint;
+  }
+  
   if (argumentConstraint) {
     TC.diagnose(expr->getLoc(),
                 diag::could_not_convert_argument,
                 argumentConstraint->getFirstType(),
                 argumentConstraint->getSecondType());
-  } else if (valueMemberConstraint) {
+    return true;
+  }
+  
+  if (valueMemberConstraint) {
     auto memberName = valueMemberConstraint->getMember().getBaseName().str();
     TC.diagnose(expr->getLoc(),
                 diag::could_not_find_member,
-                memberName);
+                memberName)
+    .highlight(expr->getSourceRange());
     
-  } else if (activeConformanceConstraint) {
+    return true;
+  }
+  
+  if (activeConformanceConstraint) {
     auto type = activeConformanceConstraint->getSecondType();
     
     TC.diagnose(expr->getLoc(),
                 diag::does_not_conform_to_constraint,
                 type)
     .highlight(expr->getSourceRange());
-  } else if (overloadConstraint) {
-    
-    // In the absense of a better conversion constraint failure, point out the
-    // inability to find an appropriate overload.
+  
+    return true;
+  }
+
+  // In the absense of a better conversion constraint failure, point out the
+  // inability to find an appropriate overload.
+  if (overloadConstraint) {
     auto overloadChoice = overloadConstraint->getOverloadChoice();
     auto overloadName = overloadChoice.getDecl()->getName();
     TC.diagnose(expr->getLoc(),
                 diag::cannot_find_appropriate_overload,
-                overloadName.str());
-  } else  if (conversionConstraint) {
-    // Otherwise, if we have a conversion constraint, use that as the basis for
-    // the diagnostic.
+                overloadName.str())
+    .highlight(expr->getSourceRange());
+    
+    return true;
+  }
+  
+  // Otherwise, if we have a conversion constraint, use that as the basis for
+  // the diagnostic.
+  if (conversionConstraint) {
     auto locator = conversionConstraint->getLocator();
     auto anchor = locator ? locator->getAnchor() : expr;
     auto type1 = expr->getType();
@@ -913,26 +962,43 @@ void ConstraintSystem::diagnoseFailureFromConstraints(Expr *expr) {
     TC.diagnose(anchor->getLoc(),
                 diag::cannot_find_conversion,
                 type1, type2)
-    .highlight(expr->getSourceRange());
-  } else {
-    // FIXME: Raise an assertion instead.
-    TC.diagnose(expr->getLoc(), diag::constraint_type_check_fail)
-    .highlight(expr->getSourceRange());
+    .highlight(anchor->getSourceRange());
+    
+    return true;
   }
+  
+  return false;
 }
 
-bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
+bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable,
+                               Expr *expr,
+                               bool onlyFailures) {
   // If there were any unavoidable failures, emit the first one we can.
   if (!unavoidableFailures.empty()) {
     for (auto failure : unavoidableFailures) {
-      if (diagnoseFailure(*this, *failure))
+      
+      // In the 'onlyFailures' case, we'll want to synthesize a locator if one
+      // does not exist. That allows us to emit decent diagnostics for
+      // constraint application failures where the constraints themselves lack
+      // a valid location.
+      if (diagnoseFailure(*this, *failure, expr, onlyFailures))
         return true;
     }
+    
+    if (onlyFailures)
+      return true;
 
-    // FIXME: Crappy generic diagnostic.
-    TC.diagnose(expr->getLoc(), diag::constraint_type_check_fail)
-      .highlight(expr->getSourceRange());
-
+    // If we can't make sense of the existing constraints (or none exist), go
+    // ahead and try the unavoidable failures again, but with locator
+    // substitutions in place.
+    if (!this->diagnoseFailureFromConstraints(expr) &&
+        !unavoidableFailures.empty()) {
+      for (auto failure : unavoidableFailures) {
+        if (diagnoseFailure(*this, *failure, expr, true))
+          return true;
+      }
+    }
+    
     return true;
   }
 
@@ -990,7 +1056,7 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
   if (failures.size() == 1) {
     auto &failure = unavoidableFailures.empty()? *failures.begin()
                                                : **unavoidableFailures.begin();
-    if (diagnoseFailure(*this, failure))
+    if (diagnoseFailure(*this, failure, expr, false))
       return true;
   }
   

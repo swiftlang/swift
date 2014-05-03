@@ -1250,7 +1250,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
   }
 
   // Add the type binding constraint.
-  addConstraint(ConstraintKind::Bind, boundType, refType);
+  addConstraint(ConstraintKind::Bind, boundType, refType, locator);
 
   // Note that we have resolved this overload.
   resolvedOverloadSets

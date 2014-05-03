@@ -1412,15 +1412,26 @@ public:
   ///
   /// \param expr the expression we're trying to salvage.
   ///
+  /// \param onlyFailures Whether we only want to salvage a diagnostic based off
+  /// of unavoidable failures in the system.
+  ///
   /// \returns false if we were able to salvage the system, in which case
   /// \c viable[0] contains the resulting solution. Otherwise, emits a
   /// diagnostic and returns true.
-  bool salvage(SmallVectorImpl<Solution> &viable, Expr *expr);
+  bool salvage(SmallVectorImpl<Solution> &viable,
+              Expr *expr,
+              bool onlyFailures = false);
   
   /// \brief Mine the active and inactive constraints in the constraint
   /// system to generate a plausible diagnosis of why the system could not be
   /// solved.
-  void diagnoseFailureFromConstraints(Expr *expr);
+  ///
+  /// \param expr The expression whose constraints we're investigating for a
+  /// better diagnostic.
+  ///
+  /// \return true if we were able to create a diagnostic from expr's
+  /// constraints.
+  bool diagnoseFailureFromConstraints(Expr *expr);
 
   /// \brief Add a newly-allocated constraint after attempting to simplify
   /// it.
@@ -1977,7 +1988,7 @@ public:
 
   /// \brief Apply a given solution to the expression, producing a fully
   /// type-checked expression.
-  Expr *applySolution(const Solution &solution, Expr *expr);
+  Expr *applySolution(Solution &solution, Expr *expr);
 
   /// \brief Apply a given solution to the expression to the top-level
   /// expression, producing a fully type-checked expression.

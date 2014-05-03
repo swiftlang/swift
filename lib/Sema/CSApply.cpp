@@ -3957,8 +3957,7 @@ static bool diagnoseRelabel(TypeChecker &tc, Expr *expr,
 
 /// \brief Apply a given solution to the expression, producing a fully
 /// type-checked expression.
-Expr *ConstraintSystem::applySolution(const Solution &solution,
-                                      Expr *expr) {
+Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr) {
   // If any fixes needed to be applied to arrive at this solution, resolve
   // them to specific expressions.
   if (!solution.Fixes.empty()) {
@@ -4065,9 +4064,14 @@ Expr *ConstraintSystem::applySolution(const Solution &solution,
       return nullptr;
 
     // We didn't manage to diagnose anything well, so fall back to
-    // diagnosing poorly.
-    // FIXME: Lame, of course. We probably shouldn't get there.
-    TC.diagnose(expr->getLoc(), diag::constraint_type_check_fail);
+    // diagnosing mining the system to construct a resonable error message.
+    SmallVector<Solution, 4> solutionVector;
+    solutionVector.push_back(std::move(solution));
+    
+    // Only emit diagnostics for unsupported failures. That way we won't attempt
+    // to re-solve the system.
+    this->salvage(solutionVector, expr, true);
+    
     return nullptr;
   }
 
