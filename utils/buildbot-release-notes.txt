@@ -10,6 +10,14 @@ Latest
       @NSManaged var department: Department
     }
 
+* The @weak and @unowned attributes have become context sensitive keywords
+  instead of attributes.  To declare a weak or unowned pointer, use:
+  
+    weak var someOtherWindow : NSWindow?
+    unowned var someWindow : NSWindow
+
+  ... with no @ on the weak/unowned.
+
 2014-04-30
 ----------
 

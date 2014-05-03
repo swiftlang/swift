@@ -173,7 +173,11 @@ ERROR(mutating_invalid,decl_parsing,none,
 ERROR(mutating_invalid_init,decl_parsing,none,
       "'mutating' isn't allowed on init methods", ())
 
-ERROR(mutating_not_keyword,sema_tcd,none,
+ERROR(ownership_not_attribute,sema_tcd,none,
+      "'@%0' is not an attribute, use the '%0' keyword instead",
+      (StringRef))
+
+ERROR(mutating_not_attribute,sema_tcd,none,
       "'mutating' is not an attribute, use the %select{|non}0mutating keyword",
      (unsigned))
 ERROR(override_invalid,sema_tcd,none,
@@ -185,6 +189,8 @@ ERROR(decl_already_mutating,decl_parsing,none,
       "'mutating' specified twice", ())
 ERROR(decl_already_override,decl_parsing,none,
       "'override' specified twice", ())
+ERROR(decl_already_ownership,decl_parsing,none,
+      "declaration cannot have multiple ownership specifiers", ())
 
 // Variable getters/setters
 ERROR(static_var_decl_global_scope,decl_parsing,none,

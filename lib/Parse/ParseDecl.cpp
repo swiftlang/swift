@@ -541,9 +541,13 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 ///     'unowned' '(' 'unsafe' ')'
 ///     'noreturn'
 ///     'optional'
-///     'mutating'   Note: syntactically rejected, parsed as c-s keyword
+///     'mutating'
 ///     'requires_stored_property_inits'
 /// \endverbatim
+///
+/// Note that the mutating, weak, and unowned attributes are parsed but
+/// rejected since they have context-sensitive keywords.
+///
 bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
   SourceLoc InversionLoc;
   bool isInverted = false;
@@ -653,20 +657,6 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
   // Handle any attribute-specific processing logic.
   switch (attr) {
   default: break;
-  // Ownership attributes.
-  case AK_weak:
-  case AK_unowned:
-  case AK_unowned_unsafe:
-    // Test for duplicate entries by temporarily removing this one.
-    Attributes.clearAttribute(attr);
-    if (Attributes.hasOwnership()) {
-      diagnose(Loc, diag::duplicate_attribute);
-      break;
-    }
-    Attributes.setAttr(attr, Loc);
-    break;
-      
-      
   case AK_prefix:
     if (Attributes.isPostfix()) {
       diagnose(Loc, diag::cannot_combine_attribute, "postfix");
@@ -683,8 +673,15 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
       
       
   case AK_mutating:
-    diagnose(Loc, diag::mutating_not_keyword, isInverted)
+    diagnose(Loc, diag::mutating_not_attribute, isInverted)
       .fixItReplace(AtLoc, isInverted ? "non" : "");
+    break;
+  case AK_weak:
+  case AK_unowned:
+  case AK_unowned_unsafe:
+    // Ownership are context-sensitive keywords, not attributes.
+    diagnose(Loc, diag::ownership_not_attribute,
+             attr == AK_weak ? "weak" : "unowned").fixItRemove(AtLoc);
     break;
   }
 
@@ -1176,7 +1173,7 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
         }
         
         if (Attributes.hasOwnership())
-          diagnose(Tok, diag::duplicate_attribute);
+          diagnose(Tok, diag::decl_already_ownership);
         else
           Attributes.setAttr(attr, Loc);
         continue;
