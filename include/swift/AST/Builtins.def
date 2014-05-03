@@ -303,8 +303,8 @@ BUILTIN_MISC_OPERATION(TakeArrayBackToFront, "takeArrayBackToFront", "", Special
 #endif
 
 /// canBeClass(T.Type) -> Builtin.Int1
-/// At compile time, evaluate whether T is or can be bound to an @objc class or
-/// protocol type.
+/// At compile time, evaluate whether T is or can be bound to a class or
+/// @objc protocol type.
 BUILTIN_TYPE_TRAIT_OPERATION(CanBeObjCClass, canBeClass)
 
 #undef BUILTIN_TYPE_TRAIT_OPERATION

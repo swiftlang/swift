@@ -599,7 +599,7 @@ public:
   /// Return the name of the type as a string, for use in diagnostics only.
   std::string getString(const PrintOptions &PO = PrintOptions()) const;
   
-  /// Return whether this type is or can be substituted for an @objc class type.
+  /// Return whether this type is or can be substituted for a class type.
   TypeTraitResult canBeClass();
 private:
   // Make vanilla new/delete illegal for Types.
