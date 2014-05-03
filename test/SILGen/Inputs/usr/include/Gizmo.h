@@ -84,6 +84,8 @@ typedef long NSInteger;
     NS_RETURNS_RETAINED NS_CONSUMES_SELF;
 // covariant result type
 - (instancetype)returnsSelf;
+// inner pointer result
+- (void*)returnsInnerPointer NS_RETURNS_INNER_POINTER;
 @end
 
 #define CF_ENUM(_type, _name) enum _name : _type _name; enum _name : _type

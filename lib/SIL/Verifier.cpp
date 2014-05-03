@@ -463,9 +463,23 @@ public:
               "inputs to result function type do not match unapplied inputs "
               "of original function");
     }
-    require(resultInfo->getInterfaceResult() == substTy->getInterfaceResult(),
-            "result type of result function type does not match original "
-            "function");
+    
+    // The "returns inner pointer" convention doesn't survive through a partial
+    // application, since the thunk takes responsibility for lifetime-extending
+    // 'self'.
+    auto expectedResult = substTy->getInterfaceResult();
+    if (expectedResult.getConvention() == ResultConvention::UnownedInnerPointer)
+    {
+      expectedResult = SILResultInfo(expectedResult.getType(),
+                                     ResultConvention::Unowned);
+      require(resultInfo->getInterfaceResult() == expectedResult,
+              "result type of result function type for partially applied "
+              "@unowned_inner_pointer function should have @unowned convention");
+    } else {
+      require(resultInfo->getInterfaceResult() == expectedResult,
+              "result type of result function type does not match original "
+              "function");
+    }
   }
 
   void checkBuiltinFunctionRefInst(BuiltinFunctionRefInst *BFI) {

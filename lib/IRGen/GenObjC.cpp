@@ -100,6 +100,17 @@ llvm::Value *IRGenFunction::emitObjCRetainCall(llvm::Value *value) {
   return call;
 }
 
+llvm::Value *IRGenFunction::emitObjCAutoreleaseCall(llvm::Value *val) {
+  if (val->getType()->isPointerTy())
+    val = Builder.CreateBitCast(val, IGM.ObjCPtrTy);
+  else
+    val = Builder.CreateIntToPtr(val, IGM.ObjCPtrTy);
+  
+  auto call = Builder.CreateCall(IGM.getObjCAutoreleaseFn(), val);
+  call->setDoesNotThrow();
+  return call;
+}
+
 llvm::Value *IRGenModule::getObjCRetainAutoreleasedReturnValueMarker() {
   // Check to see if we've already computed the market.  Note that we
   // might have cached a null marker, and that's fine.
@@ -690,6 +701,20 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
   
   IRGenFunction subIGF(IGM, fwd);
   
+  // Do we need to lifetime-extend self?
+  bool lifetimeExtendsSelf;
+  switch (origMethodType->getInterfaceResult().getConvention()) {
+  case ResultConvention::UnownedInnerPointer:
+    lifetimeExtendsSelf = true;
+    break;
+      
+  case ResultConvention::Unowned:
+  case ResultConvention::Owned:
+  case ResultConvention::Autoreleased:
+    lifetimeExtendsSelf = false;
+    break;
+  }
+  
   // Do we need to retain self before calling, and/or release it after?
   bool retainsSelf;
   switch (origMethodType->getInterfaceParameters().back().getConvention()) {
@@ -739,16 +764,27 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
   args.add(params.claimAll());
   emission.addArg(args);
   
+  // Cleanup that always has to occur after the function call.
+  auto cleanup = [&]{
+    // Lifetime-extend 'self' by sending it to the autorelease pool if need be.
+    if (lifetimeExtendsSelf) {
+      subIGF.emitObjCRetainCall(self);
+      subIGF.emitObjCAutoreleaseCall(self);
+    }
+    // Release the context.
+    subIGF.emitRelease(context);
+  };
+  
   // Emit the call and produce the return value.
   if (indirectReturn) {
     emission.emitToMemory(appliedResultTI.getAddressForPointer(indirectReturn),
                           appliedResultTI);
-    subIGF.emitRelease(context);
+    cleanup();
     subIGF.Builder.CreateRetVoid();
   } else {
     Explosion result(ResilienceExpansion::Minimal);
     emission.emitToExplosion(result);
-    subIGF.emitRelease(context);
+    cleanup();
     auto &callee = emission.getCallee();
     auto resultType = callee.getOrigFunctionType()->getSILInterfaceResult();
     subIGF.emitScalarReturn(resultType, result);

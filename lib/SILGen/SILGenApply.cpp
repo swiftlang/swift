@@ -2954,6 +2954,12 @@ static SILValue emitDynamicPartialApply(SILGenFunction &gen,
   // Just to be weird, partially applying an objc method produces a native
   // function (?!)
   auto fnTy = method.getType().castTo<SILFunctionType>();
+  // If the original method has an @unowned_inner_pointer return, the partial
+  // application thunk will lifetime-extend 'self' for us.
+  auto resultInfo = fnTy->getInterfaceResult();
+  if (resultInfo.getConvention() == ResultConvention::UnownedInnerPointer)
+    resultInfo = SILResultInfo(resultInfo.getType(), ResultConvention::Unowned);
+  
   auto partialApplyTy = SILFunctionType::get(fnTy->getGenericSignature(),
                      fnTy->getExtInfo()
                        .withCallingConv(AbstractCC::Freestanding)
@@ -2961,7 +2967,7 @@ static SILValue emitDynamicPartialApply(SILGenFunction &gen,
                      ParameterConvention::Direct_Owned,
                      fnTy->getInterfaceParameters()
                        .slice(0, fnTy->getInterfaceParameters().size() - 1),
-                     fnTy->getInterfaceResult(), gen.getASTContext());
+                     resultInfo, gen.getASTContext());
   
   // Retain 'self' because the partial apply will take ownership.
   // We can't simply forward 'self' because the partial apply is conditional.

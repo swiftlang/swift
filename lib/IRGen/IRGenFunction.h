@@ -191,6 +191,7 @@ public:
   void emitWeakTakeAssign(Address destAddr, Address srcAddr);
   void emitObjCRetain(llvm::Value *value, Explosion &explosion);
   llvm::Value *emitObjCRetainCall(llvm::Value *value);
+  llvm::Value *emitObjCAutoreleaseCall(llvm::Value *value);
   void emitObjCRelease(llvm::Value *value);
   llvm::Value *emitBlockCopyCall(llvm::Value *value);
   void emitBlockRelease(llvm::Value *value);

@@ -2129,13 +2129,7 @@ void IRGenSILFunction::visitAutoreleaseValueInst(swift::AutoreleaseValueInst *i)
   Explosion in = getLoweredExplosion(i->getOperand());
   auto val = in.claimNext();
   
-  if (val->getType()->isPointerTy())
-    val = Builder.CreateBitCast(val, IGM.ObjCPtrTy);
-  else
-    val = Builder.CreateIntToPtr(val, IGM.ObjCPtrTy);
-  
-  auto call = Builder.CreateCall(IGM.getObjCAutoreleaseFn(), val);
-  call->setDoesNotThrow();
+  emitObjCAutoreleaseCall(val);
 }
 
 void IRGenSILFunction::visitReleaseValueInst(swift::ReleaseValueInst *i) {
