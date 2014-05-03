@@ -18,6 +18,9 @@ Latest
 
   ... with no @ on the weak/unowned.
 
+* Ranges can be formed with floating point numbers, e.g. "0.0 .. 100.0".
+
+
 2014-04-30
 ----------
 
