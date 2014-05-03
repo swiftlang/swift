@@ -65,7 +65,7 @@ static void
 reportNow(const char *message)
 {
   write(STDERR_FILENO, message, strlen(message));
-  asl_log_message(ASL_LEVEL_ERR, "%s", message);
+  // FIXME: asl_log_message(ASL_LEVEL_ERR, "%s", message);
 }
 
 
