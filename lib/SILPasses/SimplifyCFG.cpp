@@ -710,16 +710,26 @@ bool SimplifyCFG::simplifyBlocks() {
       Changed = true;
       continue;
     }
+
     // Otherwise, try to simplify the terminator.
     TermInst *TI = BB->getTerminator();
-    if (auto *BI = dyn_cast<BranchInst>(TI))
-      Changed |= simplifyBranchBlock(BI);
-    else if (auto *CBI = dyn_cast<CondBranchInst>(TI))
-      Changed |= simplifyCondBrBlock(CBI);
-    else if (auto *SII = dyn_cast<SwitchIntInst>(TI))
-      (void)SII;
-    else if (auto *SEI = dyn_cast<SwitchEnumInst>(TI))
-      Changed |= simplifySwitchEnumBlock(SEI);
+
+    switch (TI->getKind()) {
+    case ValueKind::BranchInst:
+      Changed |= simplifyBranchBlock(cast<BranchInst>(TI));
+      break;
+    case ValueKind::CondBranchInst:
+      Changed |= simplifyCondBrBlock(cast<CondBranchInst>(TI));
+      break;
+    case ValueKind::SwitchIntInst:
+      // FIXME: Optimize for known switch values.
+      break;
+    case ValueKind::SwitchEnumInst:
+      Changed |= simplifySwitchEnumBlock(cast<SwitchEnumInst>(TI));
+      break;
+    default:
+      break;
+    }
 
     // Simplify the block argument list.
     Changed |= simplifyArgs(BB);
