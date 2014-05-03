@@ -129,42 +129,42 @@ it is statically known to be unneeded.
 
 .. image:: ArrayBridge.png
 
-Array Casts
------------
+``Array`` Casts
+---------------
 
-We can essentially reinterpret an array buffer containing elements of
+We can essentially reinterpret an ``Array`` buffer containing elements of
 dynamic type ``Derived`` as a buffer of elements of type ``Base``,
 where ``Derived`` is a subclass of ``Base``.  However, we cannot allow
 arbitrary ``Base`` elements to be inserted in the buffer without
 compromising type safety.  Also, our shared subscript assignment
-semantics imply that all copies of the resulting array of ``Base``
-elements see its subscript mutations.
+semantics imply that all copies of the resulting ``Array<Base>``
+see its subscript mutations.
 
-Therefore, casting one array type to another is akin to resizing an
-array: the new copy becomes independent.  To avoid an O(N) conversion
-cost, we use a layer of indirection in the data structure.  The
-indirection object is marked to prevent in-place mutation of the
-buffer; it will be copied upon its first mutation:
+Therefore, casting ``Array<T>`` to ``Array<U>`` is akin to resizing:
+the new copy becomes independent.  To avoid an O(N) conversion cost,
+we use a layer of indirection in the data structure.  The indirection
+object is marked to prevent in-place mutation of the buffer; it will
+be copied upon its first mutation:
 
 .. image:: ArrayCast.png
 
 The specific rules for casting are as follows:
 
-* An *ArrayType*\ ``<T>`` references a buffer of elements dynamically
+* An ``Array<T>`` references a buffer of elements dynamically
   known to have type ``T``
 
-* In O(1), *ArrayType*\ ``<T>`` implicitly converts to *ArrayType*\
-  ``<U>`` iff ``T`` is derived from ``U`` or if ``T`` is *bridged* to
-  ``U`` or a subclass thereof, including ``AnyObject``—see below__.  The
+* In O(1), ``Array<T>`` implicitly converts to ``Array<U>`` iff ``T``
+  is derived from ``U`` or if ``T`` is *bridged* to ``U`` or a
+  subclass thereof, including ``AnyObject``\ —see below__.  The
   resulting array references the same buffer as the original.
 
   __ `bridging to objective-c`_
 
-* In O(1), *ArrayType*\ ``<U>`` explicitly converts to *ArrayType*\
-  ``<T>?`` via ``x as ArrayType<T>``.  The cast succeeds, yielding a
-  non-nil result, iff the array buffer elements are dynamically known
-  to have type ``T`` or a type derived from ``T``.  The resulting
-  array references the same buffer as the original.
+* In O(1), ``Array<U>`` explicitly converts to ``Array<T>?`` via ``x
+  as Array<T>``.  The cast succeeds, yielding a non-nil result, iff
+  the array buffer elements are dynamically known to have type ``T``
+  or a type derived from ``T``.  The resulting ``Array<T>`` references
+  the same buffer as the original.
 
 Bridging Rules and Terminology for all Types
 --------------------------------------------
