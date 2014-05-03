@@ -1,12 +1,34 @@
 #import <Foundation/Foundation.h>
 #include <mach/mach_time.h>
 #include <stdio.h>
+#include "NSStringSort.h"
 // NOTE: compile with ARC enabled
 // clang -fobjc-arc -O3 NSStringBench.m -o NSStringBench.bin -framework Foundation
-#define LAPS 50
+#define LAPS 500
 
-int
-main(void) {
+@implementation Record
+
+- (NSString*) FullName {
+    return FullName;
+}
+
+- (id) init: (NSString*) FN {
+    if ( self = [super init]) {
+        [self setFullName:FN];
+    }
+    return self;
+}
+
+- (NSComparisonResult)compare:(Record *)otherObject {
+    return [self.FullName compare:otherObject.FullName];
+}
+
+- (void) setFullName: (NSString*)input {
+    FullName = input;
+}
+@end
+
+int main(void) {
   NSArray *myArray = @[
  @"юношей",
  @"юриспруденции",
@@ -1009,10 +1031,18 @@ main(void) {
  @"юишиане",
  @"юринам"];
 
+  NSMutableArray *PhoneBook = [[NSMutableArray alloc] init];
+
+  int size = [myArray count];
+  for (int i=0; i < size; i++) {
+    NSString *FN = [myArray objectAtIndex: i];
+    [PhoneBook addObject: FN];
+  }
+
   uint64_t count = 0;
   uint64_t start = mach_absolute_time();
   for (unsigned i = 0; i < LAPS; i++) {
-    [[myArray mutableCopy] sortUsingSelector: @selector(compare:)];
+    [[PhoneBook mutableCopy] sortUsingSelector: @selector(compare:)];
   }
   uint64_t delta = mach_absolute_time() - start;
   printf("%f ns\n",
