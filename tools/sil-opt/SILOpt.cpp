@@ -260,7 +260,6 @@ static void runCommandLineSelectedPasses(SILModule *Module,
   PM.registerAnalysis(createCallGraphAnalysis(Module));
   PM.registerAnalysis(createAliasAnalysis(Module));
   PM.registerAnalysis(createDominanceAnalysis(Module));
-  PM.registerAnalysis(createSpecializedArgsAnalysis(Module));
   for (auto Pass : Passes) {
     switch (Pass) {
     case PassKind::AllocBoxToStack:
