@@ -53,9 +53,6 @@ NOTE(while_converting_subscript_index,sema,none,
 // Constraint solver diagnostics
 //------------------------------------------------------------------------------
 
-ERROR(constraint_type_check_fail,sema,none,
-      "expression does not type-check", ())
-
 ERROR(cannot_find_conversion,sema,none,
       "cannot convert the expression's type %0 to type %1", (Type, Type))
 
