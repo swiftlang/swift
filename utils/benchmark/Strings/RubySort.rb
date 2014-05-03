@@ -1018,7 +1018,7 @@ end
 Names = []
 
 words.each do |name|
-  x = Record.new(name, "8512038")
+  x = Record.new(name, 8512038)
   Names.push(x)
 end
 
