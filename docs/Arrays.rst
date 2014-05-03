@@ -57,7 +57,7 @@ to all three of the components.
   conversions from Cocoa and back—when ``T`` can be a class type,
   ``Array<T>`` can be backed by the (potentially non-contiguous)
   storage of an arbitrary ``NSArray`` rather than by a Swift
-  ``NativeArray``.  When ``T`` is known to be a pure Swift type, the
+  ``NativeArray``.  When ``T`` is known to be a non-class type, the
   performance of ``Array<T>`` is identical to that of
   ``NativeArray<T>``.
 
@@ -133,29 +133,36 @@ Array Casts
 -----------
 
 We can essentially reinterpret an array buffer containing elements of
-dynamic type T as an *immutable* buffer of elemeents of type U, as
-long as T was a trivial subtype of U.  Since the buffer has static
-knowledge of its element type, allowing it to be mutated would be
-unsafe, as we could then insert an object of type ``U`` but not ``T``.
-This capability would still be useful to us if we had full value
-semantics for array, but our shared subscript assignment semantics
-imply that we must produce a new buffer in order to view an
-*ArrayType*\ ``<T>`` as an *ArrayType*\ ``<U>``.
+dynamic type ``Derived`` as a buffer of elements of type ``Base``,
+where ``Derived`` is a subclass of ``Base``.  However, we cannot allow
+arbitrary ``Base`` elements to be inserted in the buffer without
+compromising type safety.  Also, our shared subscript assignment
+semantics imply that all copies of the resulting array of ``Base``
+elements see its subscript mutations.
 
-.. Because of the above, the logic below no longer works.
-   
-   * *ArrayType*\ ``<T>`` implicitly converts to *ArrayType*\ ``<U>`` if
-     ``T`` is a trivial subtype of ``U`` (or if ``U`` is ``AnyObject``\
-     —see below).  [Implementation note: when accessed as *ArrayType*\
-     ``<U>``, the underlying buffer of ``T``\ s is treated as immutable,
-     to be copied-on-write, even if uniquely-referenced]
+Therefore, casting one array type to another is akin to resizing an
+array: the new copy becomes independent.  To avoid an O(N) conversion
+cost, we use a layer of indirection in the data structure.  The
+indirection object is marked to prevent in-place mutation of the
+buffer; it will be copied upon its first mutation:
 
-   * *ArrayType*\ ``<U>`` explicitly converts to *ArrayType*\ ``<T>``?
-     via ``x as ArrayType<T>``.  The cast succeeds, yielding a non-nil
-     result, iff the original value was of some *ArrayType*\ ``<V>``
-     where ``V`` is a trivial subtype of ``T``. [Implementation note: if
-     ``V`` == ``T``, the underlying buffer need only be treated as
-     immutable if uniquely referenced]
+.. image:: ArrayCast.png
+
+The specific rules for casting are as follows:
+
+* An *ArrayType*\ ``<T>`` references a buffer of elements dynamically
+  known to have type ``T``
+
+* In O(1), *ArrayType*\ ``<T>`` implicitly converts to *ArrayType*\
+  ``<U>`` iff ``T`` is derived from ``U`` (or if ``U`` is
+  ``AnyObject``\ —see below).  The resulting array references the same
+  buffer as the original.
+
+* In O(1), *ArrayType*\ ``<U>`` explicitly converts to *ArrayType*\
+  ``<T>?`` via ``x as ArrayType<T>``.  The cast succeeds, yielding a
+  non-nil result, iff the array buffer elements are dynamically known
+  to have type ``T`` or a type derived from ``T``.  The resulting
+  array references the same buffer as the original.
 
 
 Bridging Rules and Terminology for all Types
