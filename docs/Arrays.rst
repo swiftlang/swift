@@ -36,11 +36,11 @@ Goals
    that can exceed the number of actual stored elements.
 
 To achieve goals 1 and 2 together, we use static knowledge of the
-element type: when it is statically known that the element type is
-not, and is not derived from, an Objective-C class, code and checks
-accounting for the possibility of wrapping an ``NSArray`` are
-eliminated.  An ``Array`` of Swift value types or pure-Swift classes
-always uses the most efficient possible representation.
+element type: when it is statically known that the element type is not
+a class, code and checks accounting for the possibility of wrapping an
+``NSArray`` are eliminated.  An ``Array`` of Swift value types always
+uses the most efficient possible representation, identical to that of
+``NativeArray``.
 
 Components
 ----------
@@ -54,11 +54,11 @@ to all three of the components.
   ``NativeArray`` are always stored contiguously in memory.
 
 * ``Array<T>`` is like ``NativeArray<T>``, but optimized for efficient
-  conversions from Cocoa and back—when ``T`` is a pure Objective-C
-  class or protocol, it can be backed by the (potentially
-  non-contiguous) storage of an arbitrary ``NSArray`` rather than by a
-  Swift ``NativeArray``.  When ``T`` is known to be a pure Swift type,
-  the performance of ``Array<T>`` is identical to that of
+  conversions from Cocoa and back—when ``T`` can be a class type,
+  ``Array<T>`` can be backed by the (potentially non-contiguous)
+  storage of an arbitrary ``NSArray`` rather than by a Swift
+  ``NativeArray``.  When ``T`` is known to be a pure Swift type, the
+  performance of ``Array<T>`` is identical to that of
   ``NativeArray<T>``.
 
 * ``Slice<T>`` is a subrange of some ``Array<T>`` or
