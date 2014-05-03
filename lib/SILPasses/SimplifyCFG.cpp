@@ -648,10 +648,9 @@ bool SimplifyCFG::simplifySwitchEnumUnreachableBlocks(SwitchEnumInst *SEI) {
   SILBasicBlock *Dest = nullptr;
   EnumElementDecl *Element = nullptr;
 
-  if (SEI->hasDefault()) {
+  if (SEI->hasDefault())
     if (!isOnlyUnreachable(SEI->getDefaultBB()))
       Dest = SEI->getDefaultBB();
-  }
 
   for (unsigned i = 0; i < Count; ++i) {
     auto EnumCase = SEI->getCase(i);
