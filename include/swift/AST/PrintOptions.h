@@ -13,8 +13,11 @@
 #ifndef SWIFT_AST_PRINTOPTIONS_H
 #define SWIFT_AST_PRINTOPTIONS_H
 
+#include <vector>
+
 namespace swift {
 class GenericParamList;
+enum DeclAttrKind : unsigned;
 
 struct PrintOptions {
   /// \brief The indentation width.
@@ -75,8 +78,8 @@ struct PrintOptions {
 
   bool PrintImplicitAttrs = true;
 
-  /// \brief Whether to print '@exported' on exported imports.
-  bool PrintAttrExported = true;
+  /// List of attribute kinds that should not be printed.
+  std::vector<DeclAttrKind> ExcludeAttrList;
 
   /// Whether to print '@unchecked' inside declarations imported from
   /// Objective-C.  If false, print @implicitly unwrapped optionals as normal optionals.

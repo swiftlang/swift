@@ -67,7 +67,9 @@ void DeclAttributes::print(ASTPrinter &Printer,
   for (auto DA : *this) {
     if (!Options.PrintImplicitAttrs && DA->isImplicit())
       continue;
-    if (!Options.PrintAttrExported && isa<ExportedAttr>(DA))
+    if (std::find(Options.ExcludeAttrList.begin(),
+                  Options.ExcludeAttrList.end(),
+                  DA->getKind()) != Options.ExcludeAttrList.end())
       continue;
 
     DA->print(Printer);
