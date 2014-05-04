@@ -110,6 +110,19 @@ void Failure::dump(SourceManager *sm, raw_ostream &out) const {
     out << "disallowed l-value binding of " << getFirstType().getString()
         << " and " << getSecondType().getString();
     break;
+
+  case OutOfOrderArgument:
+    out << "out-of-order argument " << getValue() << " should come before "
+        << getSecondValue();
+    break;
+
+  case MissingArgument:
+    out << "missing argument for parameter " << getValue();
+    break;
+
+  case ExtraArgument:
+    out << "extra argument " << getValue();
+    break;
   }
 
   out << ")\n";
@@ -641,6 +654,52 @@ static bool diagnoseFailure(ConstraintSystem &cs,
     }
     // FIXME: diagnose other cases
     return false;
+
+  case Failure::OutOfOrderArgument: 
+    if (auto tuple = dyn_cast_or_null<TupleExpr>(anchor)) {
+      unsigned firstIdx = failure.getValue();
+      Identifier first = tuple->getElementName(firstIdx);
+      unsigned secondIdx = failure.getSecondValue();
+      Identifier second = tuple->getElementName(secondIdx);
+      if (!first.empty()  && !second.empty()) {
+        tc.diagnose(tuple->getElementNameLoc(firstIdx),
+                    diag::argument_out_of_order, first, second)
+          .highlight(tuple->getElement(firstIdx)->getSourceRange())
+          .highlight(SourceRange(tuple->getElementNameLoc(secondIdx),
+                                 tuple->getElement(secondIdx)->getEndLoc()));
+        return true;
+      }
+    }
+    // FIXME: Can this even happen?
+    return false;
+
+  case Failure::MissingArgument: {
+    auto tupleTy = failure.getFirstType()->castTo<TupleType>();
+    unsigned idx = failure.getValue();
+    auto name = tupleTy->getFields()[idx].getName();
+    if (name.empty())
+      tc.diagnose(loc, diag::missing_argument_positional, idx+1);
+    else
+      tc.diagnose(loc, diag::missing_argument_named, name);
+    return true;
+  }
+    
+  case Failure::ExtraArgument: {
+    if (auto tuple = dyn_cast_or_null<TupleExpr>(anchor)) {
+      unsigned firstIdx = failure.getValue();
+      auto name = tuple->getElementName(firstIdx);
+      if (name.empty())
+        tc.diagnose(loc, diag::extra_argument_positional)
+          .highlight(tuple->getElement(firstIdx)->getSourceRange());
+      else
+        tc.diagnose(loc, diag::extra_argument_named, name)
+          .highlight(tuple->getElement(firstIdx)->getSourceRange());        
+      return true;
+    }
+
+    return false;
+  }
+    
 
   default:
     // FIXME: Handle all failure kinds

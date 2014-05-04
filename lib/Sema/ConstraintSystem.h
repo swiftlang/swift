@@ -377,6 +377,12 @@ public:
     IsForbiddenLValue,
     /// \brief The type is not a metatype.
     IsNotMetatype,
+    /// Out-of-order arguments.
+    OutOfOrderArgument,
+    /// Missing argument in a call.
+    MissingArgument,
+    /// Extra argument in a call.
+    ExtraArgument,
   };
 
 private:
@@ -384,7 +390,10 @@ private:
   FailureKind kind : 8;
 
   /// \brief A value, if used.
-  unsigned value : 32;
+  unsigned value;
+
+  /// \brief Another value, if used.
+  unsigned value2;
 
   /// Describes the location of this failure.
   ConstraintLocator *locator;
@@ -432,6 +441,9 @@ public:
   /// \brief Retrieve the value.
   unsigned getValue() const { return value; }
 
+  /// \brief Retrieve the value.
+  unsigned getSecondValue() const { return value2; }
+
   /// \brief Profile the given failure.
   void Profile(llvm::FoldingSetNodeID &id) {
     switch (kind) {
@@ -461,7 +473,15 @@ public:
     case IsNotArchetype:
     case IsNotClass:
     case IsNotDynamicLookup:
-      return Profile(id, locator, kind, resolvedOverloadSets, getFirstType());
+    case MissingArgument:
+      return Profile(id, locator, kind, resolvedOverloadSets, getFirstType(),
+                    value);
+
+    case OutOfOrderArgument:
+      return Profile(id, locator, kind, resolvedOverloadSets, value, value2);
+
+    case ExtraArgument:
+      return Profile(id, locator, kind, resolvedOverloadSets, value, value2);
     }
   }
 
@@ -478,8 +498,8 @@ private:
   /// \brief Construct a failure involving one type.
   Failure(ConstraintLocator *locator, FailureKind kind,
           ResolvedOverloadSetListItem *resolvedOverloadSets,
-          Type type)
-    : kind(kind), value(0), locator(locator),
+          Type type, unsigned value = 0)
+    : kind(kind), value(value), value2(0), locator(locator),
       resolvedOverloadSets(resolvedOverloadSets), first(type)
   {
     second.type = nullptr;
@@ -489,7 +509,7 @@ private:
   Failure(ConstraintLocator *locator, FailureKind kind,
           ResolvedOverloadSetListItem *resolvedOverloadSets,
           Type type1, Type type2, unsigned value = 0)
-    : kind(kind), value(value), locator(locator),
+    : kind(kind), value(value), value2(0), locator(locator),
       resolvedOverloadSets(resolvedOverloadSets), first(type1)
   {
     second.type = type2.getPointer();
@@ -499,21 +519,32 @@ private:
   Failure(ConstraintLocator *locator, FailureKind kind,
           ResolvedOverloadSetListItem *resolvedOverloadSets,
           Type type, DeclName name)
-    : kind(kind), value(0), locator(locator),
+    : kind(kind), value(0), value2(0), locator(locator),
       resolvedOverloadSets(resolvedOverloadSets), first(type)
   {
     second.name = name.getOpaqueValue();
+  }
+
+  /// \brief Construct a failure involving two values.
+  Failure(ConstraintLocator *locator, FailureKind kind,
+          ResolvedOverloadSetListItem *resolvedOverloadSets,
+          unsigned value, unsigned value2 = 0)
+    : kind(kind), value(value), value2(value2), locator(locator),
+      resolvedOverloadSets(resolvedOverloadSets)
+  {
+    second.type = nullptr;
   }
 
   /// \brief Profile a failure involving one type.
   static void Profile(llvm::FoldingSetNodeID &id, ConstraintLocator *locator,
                       FailureKind kind,
                       ResolvedOverloadSetListItem *resolvedOverloadSets,
-                      Type type) {
+                      Type type, unsigned value = 0) {
     id.AddPointer(locator);
     id.AddInteger(kind);
     id.AddPointer(resolvedOverloadSets);
     id.AddPointer(type.getPointer());
+    id.AddInteger(value);
   }
 
   /// \brief Profile a failure involving two types.
@@ -551,6 +582,18 @@ private:
     id.AddPointer(resolvedOverloadSets);
     id.AddPointer(type.getPointer());
     id.AddPointer(name.getOpaqueValue());
+  }
+
+  /// \brief Profile a failure involving two values.
+  static void Profile(llvm::FoldingSetNodeID &id, ConstraintLocator *locator,
+                      FailureKind kind,
+                      ResolvedOverloadSetListItem *resolvedOverloadSets,
+                      unsigned value, unsigned value2 = 0) {
+    id.AddPointer(locator);
+    id.AddInteger(kind);
+    id.AddPointer(resolvedOverloadSets);
+    id.AddInteger(value);
+    id.AddInteger(value2);
   }
 
   /// \brief Create a new Failure object with the given arguments, allocated

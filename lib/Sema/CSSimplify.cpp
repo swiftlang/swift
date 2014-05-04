@@ -77,6 +77,7 @@ matchCallArguments(ConstraintSystem &cs,
       actualArgNames[nextArgIdx] = expectedName;
     }
 
+    claimedArgs[nextArgIdx] = true;
     ++numClaimedArgs;
     return nextArgIdx++;
   };
@@ -247,13 +248,19 @@ matchCallArguments(ConstraintSystem &cs,
   }
 
   // If we have any unclaimed arguments, complain about those.
-  // FIXME: These might be typos for unfulfilled parameters, or labels where
-  // we should not have them.
   if (numClaimedArgs != numArgs) {
     // If we're not allowed to fix anything, or if we don't have any
     // unfulfilled parameters, fail.
     if (!haveUnfulfilledParams || !cs.shouldAttemptFixes()) {
-      // FIXME: record why this failed. We have extraneous arguments.
+      if (cs.shouldRecordFailures()) {
+        nextArgIdx = 0;
+        skipClaimedArgs();
+
+        cs.recordFailure(cs.getConstraintLocator(locator),
+                         Failure::ExtraArgument,
+                         nextArgIdx);
+      }
+
       return ConstraintSystem::SolutionKind::Error;
     }
 
@@ -272,13 +279,19 @@ matchCallArguments(ConstraintSystem &cs,
       if (!parameterBindings[paramIdx].empty())
         continue;
 
-
       bindNextParameter(true);
     }
 
     // If we still haven't claimed all of the arguments, fail.
     if (numClaimedArgs != numArgs) {
-      // FIXME: record why this failed. We have extraneous arguments.
+      if (cs.shouldRecordFailures()) {
+        nextArgIdx = 0;
+        skipClaimedArgs();
+
+        cs.recordFailure(cs.getConstraintLocator(locator),
+                         Failure::ExtraArgument,
+                         nextArgIdx);
+      }
       return ConstraintSystem::SolutionKind::Error;
     }
 
@@ -303,7 +316,12 @@ matchCallArguments(ConstraintSystem &cs,
       if (param.getDefaultArgKind() != DefaultArgumentKind::None)
         continue;
 
-      // FIXME: record why this failed. We are missing arguments.
+      if (cs.shouldRecordFailures()) {
+        cs.recordFailure(cs.getConstraintLocator(locator),
+                         Failure::MissingArgument,
+                         paramTuple, paramIdx);
+      }
+
       return ConstraintSystem::SolutionKind::Error;
     }
   }
@@ -340,7 +358,16 @@ matchCallArguments(ConstraintSystem &cs,
             param.getDefaultArgKind() != DefaultArgumentKind::None)
           continue;
 
-        // FIXME: Add a failure kind for re-ordering violations.
+        if (cs.shouldRecordFailures()) {
+          unsigned prevArgIdx = parameterBindings[i].front();
+          if (prevArgIdx == argIdx)
+            prevArgIdx = parameterBindings[i+1].front();
+
+          cs.recordFailure(cs.getConstraintLocator(locator),
+                           Failure::OutOfOrderArgument,
+                           argIdx, prevArgIdx);
+        }
+
         return ConstraintSystem::SolutionKind::Error;
       }
     }
