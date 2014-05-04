@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "ConstraintSystem.h"
+#include "swift/Basic/StringExtras.h"
 
 using namespace swift;
 using namespace constraints;
@@ -24,6 +25,52 @@ static bool hasMandatoryTupleLabels(const ConstraintLocatorBuilder &locator) {
   if (Expr *e = locator.trySimplifyToExpr())
     return hasMandatoryTupleLabels(e);
   return false;
+}
+
+/// Produce a score (smaller is better) comparing a parameter name and
+/// potentially-typod argument name.
+///
+/// \param paramName The name of the parameter.
+/// \param argName The name of the argument.
+/// \param maxScore The maximum score permitted by this comparison, or
+/// 0 if there is no limit.
+///
+/// \returns the score, if it is good enough to even consider this a match.
+/// Otherwise, an empty optional.
+///
+static Optional<unsigned> scoreParamAndArgNameTypo(StringRef paramName,
+                                                   StringRef argName,
+                                                   unsigned maxScore) {
+  using namespace camel_case;
+
+  // If one of the names starts with "with", drop it and compare the rest.
+  bool argStartsWith = startsWithIgnoreFirstCase(argName, "with");
+  bool paramStartsWith = startsWithIgnoreFirstCase(paramName, "with");
+  if (argStartsWith != paramStartsWith) {
+    if (argStartsWith)
+      argName = argName.substr(4);
+    else
+      paramName = paramName.substr(4);
+  }
+
+  // Compute the edit distance.
+  unsigned dist = argName.edit_distance(paramName, /*AllowReplacements=*/true,
+                                        /*MaxEditDistance=*/maxScore);
+
+  // If the edit distance would be too long, we're done.
+  if (maxScore != 0 && dist > maxScore)
+    return Nothing;
+
+  // The distance can be zero due to the "with" transformation above.
+  if (dist == 0)
+    return 1;
+
+  // Only allow about one typo for every two properly-typed characters, which
+  // prevents completely-wacky suggestions in many cases.
+  if (dist > (argName.size() + 1) / 3)
+    return Nothing;
+
+  return dist;
 }
 
 // Match the argument tuple of a call to the parameter tuple.
@@ -178,7 +225,7 @@ matchCallArguments(ConstraintSystem &cs,
       return Nothing;
 
     // Several things could have gone wrong here, and we'll check for each
-    // of them:
+    // of them at some point:
     //   - The keyword argument might be redundant, in which case we can point
     //     out the issue.
     //   - The argument might be unnamed, in which case we try to fix the
@@ -264,22 +311,87 @@ matchCallArguments(ConstraintSystem &cs,
       return ConstraintSystem::SolutionKind::Error;
     }
 
+    // Find all of the named, unclaimed arguments.
+    llvm::SmallVector<unsigned, 4> unclaimedNamedArgs;
+    for (nextArgIdx = 0; skipClaimedArgs(), nextArgIdx != numArgs;
+         ++nextArgIdx) {
+      if (argTuple->getFields()[nextArgIdx].hasName())
+        unclaimedNamedArgs.push_back(nextArgIdx);
+    }
+
+    if (!unclaimedNamedArgs.empty()) {
+      // Find all of the named, unfulfilled parameters.
+      llvm::SmallVector<unsigned, 4> unfulfilledNamedParams;
+      bool hasUnfulfilledUnnamedParams = false;
+      for (paramIdx = 0; paramIdx != numParams; ++paramIdx ) {
+        if (parameterBindings[paramIdx].empty()) {
+          if (paramTuple->getFields()[paramIdx].hasName())
+            unfulfilledNamedParams.push_back(paramIdx);
+          else
+            hasUnfulfilledUnnamedParams = true;
+        }
+      }
+
+      if (!unfulfilledNamedParams.empty()) {
+        // Use typo correction to find the best matches.
+        // FIXME: There is undoubtedly a good dynamic-programming algorithm
+        // to find the best assignment here.
+        for (auto argIdx : unclaimedNamedArgs) {
+          auto argName = argTuple->getFields()[argIdx].getName();
+
+          // Find the closest matching unfulfilled named parameter.
+          unsigned bestScore = 0;
+          unsigned best = 0;
+          for (unsigned i = 0, n = unfulfilledNamedParams.size(); i != n; ++i) {
+            unsigned param = unfulfilledNamedParams[i];
+            auto paramName = paramTuple->getFields()[param].getName();
+
+            if (auto score = scoreParamAndArgNameTypo(paramName.str(),
+                                                      argName.str(),
+                                                      bestScore)) {
+              if (*score < bestScore || bestScore == 0) {
+                bestScore = *score;
+                best = i;
+              }
+            }
+          }
+
+          // If we found a parameter to fulfill, do it.
+          if (bestScore > 0) {
+            // Bind this parameter to the argument.
+            nextArgIdx = argIdx;
+            paramIdx = unfulfilledNamedParams[best];
+            bindNextParameter(true);
+
+            // Erase this parameter from the list of unfulfilled named
+            // parameters, so we don't try to fulfill it again.
+            unfulfilledNamedParams.erase(unfulfilledNamedParams.begin() + best);
+            if (unfulfilledNamedParams.empty())
+              break;
+          }
+        }
+
+        // Update haveUnfulfilledParams, because we may have fulfilled some
+        // parameters above.
+        haveUnfulfilledParams = hasUnfulfilledUnnamedParams ||
+                                !unfulfilledNamedParams.empty();
+      }
+    }
+
     // Find all of the unfulfilled parameters, and match them up
     // semi-positionally.
-    // FIXME: We could try to typo-correct named unfulfilled parameters first,
-    // with a low tolerance for mistakes if there are
-    // then take a second pass for unnamed to handle those positionally.
+    if (numClaimedArgs != numArgs) {
+      // Restart at the first argument/parameter.
+      nextArgIdx = 0;
+      skipClaimedArgs();
+      haveUnfulfilledParams = false;
+      for (paramIdx = 0; paramIdx != numParams; ++paramIdx) {
+        // Skip fulfilled parameters.
+        if (!parameterBindings[paramIdx].empty())
+          continue;
 
-    // Restart at the first argument/parameter.
-    nextArgIdx = 0;
-    skipClaimedArgs();
-    haveUnfulfilledParams = false;
-    for (paramIdx = 0; paramIdx != numParams; ++paramIdx) {
-      // Skip fulfilled parameters.
-      if (!parameterBindings[paramIdx].empty())
-        continue;
-
-      bindNextParameter(true);
+        bindNextParameter(true);
+      }
     }
 
     // If we still haven't claimed all of the arguments, fail.
