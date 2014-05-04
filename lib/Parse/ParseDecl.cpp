@@ -3523,17 +3523,20 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes,
   }
 
   // '->' 'Self'
-  // FIXME: Parse as general type, verify semantically.
   CtorInitializerKind initKind = CtorInitializerKind::Designated;
-  
   if (ConvenienceLoc.isValid())
     initKind = CtorInitializerKind::Convenience;
   else if (Tok.is(tok::arrow)) {
-    consumeToken(tok::arrow);
+    SourceLoc arrowLoc = consumeToken(tok::arrow);
     
     if (Tok.is(tok::kw_Self)) {
-      consumeToken(tok::kw_Self);
+      SourceLoc SelfLoc = consumeToken(tok::kw_Self);
       initKind = CtorInitializerKind::Convenience;
+      
+      diagnose(arrowLoc, diag::convenience_init_syntax_change)
+        .fixItRemove(SourceRange(arrowLoc, SelfLoc))
+        .fixItInsert(ConstructorLoc, "convenience ");
+      
     } else {
       diagnose(Tok, diag::init_expected_self);
       while (!Tok.is(tok::eof) && !Tok.is(tok::l_brace) &&

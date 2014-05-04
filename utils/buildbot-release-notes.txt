@@ -6,6 +6,18 @@ Latest
 
 * Ranges can be formed with floating point numbers, e.g. "0.0 .. 100.0".
 
+* Convenience initializers are now spelled as "convenience init" instead of with
+  the "-> Self" syntax.  For example:
+  
+    class Foo {
+      init(x : Int) {}  // designated initializer
+      
+      convenience init() { self.init(42) } // convenience initializer
+    }
+
+  Initializers in extensions are still implicitly convenience initializers.  
+  
+
 2014-05-03
 ----------
 
