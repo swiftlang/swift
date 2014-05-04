@@ -2380,6 +2380,21 @@ public:
   using Expr::dump;
 };
 
+/// Instances of this structure represent elements of the capture list that can
+/// optionally occur in a capture expression.
+struct CaptureListEntry {
+  enum KindTy {
+    Weak, Unowned, UnownedSafe, UnownedUnsafe
+  } Kind;
+  
+  SourceLoc Loc;
+  Identifier Name;
+  
+  CaptureListEntry(KindTy kind, SourceLoc loc, Identifier name)
+    : Kind(kind), Loc(loc), Name(name) {
+  }
+};
+  
 /// \brief An explicit unnamed function expression, which can optionally have
 /// named arguments.
 ///
@@ -2387,6 +2402,7 @@ public:
 ///     { $0 + $1 }
 ///     { a, b -> Int in a + b }
 ///     { (a : Int, b : Int) -> Int in a + b }
+///     { [weak c] (a : Int) -> Int in a + c!.getFoo() }
 /// \endcode
 class ClosureExpr : public AbstractClosureExpr {
   /// \brief The location of the '->' denoting an explicit return type,

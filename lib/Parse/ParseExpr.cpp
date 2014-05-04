@@ -1384,10 +1384,10 @@ Expr *Parser::parseExprIdentifier() {
   return E;
 }
 
-bool Parser::parseClosureSignatureIfPresent(Pattern *&params,
-                                            SourceLoc &arrowLoc,
-                                            TypeRepr *&explicitResultType,
-                                            SourceLoc &inLoc) {
+bool Parser::
+parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
+                               Pattern *&params, SourceLoc &arrowLoc,
+                               TypeRepr *&explicitResultType, SourceLoc &inLoc){
   // Clear out result parameters.
   params = nullptr;
   arrowLoc = SourceLoc();
@@ -1396,9 +1396,48 @@ bool Parser::parseClosureSignatureIfPresent(Pattern *&params,
 
   // If we have a leading token that may be part of the closure signature, do a
   // speculative parse to validate it and look for 'in'.
-  if (Tok.is(tok::l_paren) || Tok.isIdentifierOrNone()) {
+  if (Tok.is(tok::l_paren) || Tok.isIdentifierOrNone() ||
+      Tok.is(tok::l_square)) {
     BacktrackingScope backtrack(*this);
 
+    // Skip by a closure capture list if present.
+    if (consumeIf(tok::l_square) &&
+        !consumeIf(tok::r_square)) {
+      // Skip by the capture list, checking it as we go.
+      do {
+        // Check for the strength specifier, "weak", "unowned", or
+        // "unowned(safe/unsafe)".
+        if (Tok.isContextualKeyword("weak")){
+          consumeToken(tok::identifier);
+        } else if (Tok.isContextualKeyword("unowned")) {
+          consumeToken(tok::identifier);
+
+          // Skip over "safe" and "unsafe" if present.
+          if (consumeIf(tok::l_paren)) {
+            if ((Tok.getText() != "safe" && Tok.getText() != "unsafe") ||
+                peekToken().isNot(tok::r_paren))
+              return false;
+            consumeToken(tok::identifier);
+            consumeToken(tok::r_paren);
+          }
+        } else {
+          // Not a valid capture list, so this isn't a closure signature.
+          return false;
+        }
+
+        // The thing being capture specified is an identifier.
+        // TODO: Generalize this to being full expressions, which can be
+        // renamed.
+        if (!consumeIf(tok::identifier) &&
+            !consumeIf(tok::kw_self))
+          return false;
+      } while (consumeIf(tok::comma));
+      
+      // The capture list needs to be closed off with a ']'.
+      if (!consumeIf(tok::r_square))
+        return false;
+    }
+    
     // Parse pattern-tuple func-signature-result? 'in'.
     if (consumeIf(tok::l_paren)) {      // Consume the ')'.
 
@@ -1445,60 +1484,106 @@ bool Parser::parseClosureSignatureIfPresent(Pattern *&params,
     return false;
   }
 
-  // At this point, we know we have a closure signature. Parse the parameters.
-  bool invalid = false;
-  if (Tok.is(tok::l_paren)) {
-    // Parse the closure arguments.
-    auto pattern = parseSingleParameterClause(ParameterContextKind::Closure);
-    if (pattern.isNonNull())
-      params = pattern.get();
-    else
-      invalid = true;
-  } else {
-    // Parse identifier (',' identifier)*
-    SmallVector<TuplePatternElt, 4> elements;
+  // At this point, we know we have a closure signature. Parse the capture list
+  // and parameters.
+  if (consumeIf(tok::l_square) &&
+      !consumeIf(tok::r_square)) {
+    // Skip by the capture list, checking it as we go.
     do {
-      if (Tok.is(tok::identifier)) {
-        auto var = new (Context) ParamDecl(/*IsLet*/ true,
-                                           SourceLoc(), Identifier(),
-                                           Tok.getLoc(),
-                                           Context.getIdentifier(Tok.getText()),
-                                           Type(), nullptr);
-        elements.push_back(TuplePatternElt(new (Context) NamedPattern(var)));
-        consumeToken();
-      } else if (Tok.is(tok::kw__)) {
-        elements.push_back(TuplePatternElt(
-                             new (Context) AnyPattern(Tok.getLoc())));
-        consumeToken();
+      // Check for the strength specifier, "weak", "unowned", or
+      // "unowned(safe/unsafe)".
+      SourceLoc loc;
+      CaptureListEntry::KindTy kind;
+      if (Tok.isContextualKeyword("weak")){
+        loc = consumeToken(tok::identifier);
+        kind = CaptureListEntry::Weak;
       } else {
-        diagnose(Tok, diag::expected_closure_parameter_name);
-        invalid = true;
-        break;
+        assert(Tok.isContextualKeyword("unowned") && "preparse above failed");
+        loc = consumeToken(tok::identifier);
+        kind = CaptureListEntry::Unowned;
+
+        // Skip over "safe" and "unsafe" if present.
+        if (consumeIf(tok::l_paren)) {
+          if (Tok.getText() == "safe")
+            kind = CaptureListEntry::UnownedSafe;
+          else {
+            assert(Tok.getText() == "unsafe" && "preparse failed");
+            kind = CaptureListEntry::UnownedUnsafe;
+          }
+          consumeToken(tok::identifier);
+          consumeToken(tok::r_paren);
+        }
       }
-
-      // Consume a comma to continue.
-      if (consumeIf(tok::comma)) {
-        continue;
-      }
-
-      break;
-    } while (true);
-
-    params = TuplePattern::create(Context, SourceLoc(), elements, SourceLoc());
+      
+      // The thing being capture specified is an identifier.
+      // TODO: Generalize this to being full expressions, which can be
+      // renamed.
+      auto name = Context.getIdentifier(Tok.getText());
+      if (!consumeIf(tok::kw_self))
+        consumeToken(tok::identifier);
+      
+      captureList.push_back(CaptureListEntry(kind, loc, name));
+    } while (consumeIf(tok::comma));
+    
+    // The capture list needs to be closed off with a ']'.
+    consumeToken(tok::r_square);
   }
+  
+  bool invalid = false;
+  if (Tok.isNot(tok::kw_in)) {
+    if (Tok.is(tok::l_paren)) {
+      // Parse the closure arguments.
+      auto pattern = parseSingleParameterClause(ParameterContextKind::Closure);
+      if (pattern.isNonNull())
+        params = pattern.get();
+      else
+        invalid = true;
+    } else {
+      // Parse identifier (',' identifier)*
+      SmallVector<TuplePatternElt, 4> elements;
+      do {
+        if (Tok.is(tok::identifier)) {
+          auto var = new (Context) ParamDecl(/*IsLet*/ true,
+                                             SourceLoc(), Identifier(),
+                                             Tok.getLoc(),
+                                           Context.getIdentifier(Tok.getText()),
+                                             Type(), nullptr);
+          elements.push_back(TuplePatternElt(new (Context) NamedPattern(var)));
+          consumeToken();
+        } else if (Tok.is(tok::kw__)) {
+          elements.push_back(TuplePatternElt(
+                               new (Context) AnyPattern(Tok.getLoc())));
+          consumeToken();
+        } else {
+          diagnose(Tok, diag::expected_closure_parameter_name);
+          invalid = true;
+          break;
+        }
 
-  // Parse the optional explicit return type.
-  if (Tok.is(tok::arrow)) {
-    // Consume the '->'.
-    arrowLoc = consumeToken();
+        // Consume a comma to continue.
+        if (consumeIf(tok::comma)) {
+          continue;
+        }
 
-    // Parse the type.
-    explicitResultType =
-        parseType(diag::expected_closure_result_type).getPtrOrNull();
-    if (!explicitResultType) {
-      // If we couldn't parse the result type, clear out the arrow location.
-      arrowLoc = SourceLoc();
-      invalid = true;
+        break;
+      } while (true);
+
+      params = TuplePattern::create(Context, SourceLoc(), elements,SourceLoc());
+    }
+
+    // Parse the optional explicit return type.
+    if (Tok.is(tok::arrow)) {
+      // Consume the '->'.
+      arrowLoc = consumeToken();
+
+      // Parse the type.
+      explicitResultType =
+          parseType(diag::expected_closure_result_type).getPtrOrNull();
+      if (!explicitResultType) {
+        // If we couldn't parse the result type, clear out the arrow location.
+        arrowLoc = SourceLoc();
+        invalid = true;
+      }
     }
   }
 
@@ -1548,7 +1633,9 @@ ParserResult<Expr> Parser::parseExprClosure() {
   SourceLoc arrowLoc;
   TypeRepr *explicitResultType;
   SourceLoc inLoc;
-  parseClosureSignatureIfPresent(params, arrowLoc, explicitResultType, inLoc);
+  SmallVector<CaptureListEntry, 2> captureList;
+  parseClosureSignatureIfPresent(captureList, params, arrowLoc,
+                                 explicitResultType, inLoc);
 
   // If the closure was created in the context of an array type signature's
   // size expression, there will not be a local context. A parse error will

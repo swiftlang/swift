@@ -1010,13 +1010,16 @@ public:
   ///     identifier (',' identifier)* func-signature-result? 'in'
   /// \endverbatim
   ///
+  /// \param captureList The entries in the capture list.
   /// \param params The parsed parameter list, or null if none was provided.
   /// \param arrowLoc The location of the arrow, if present.
   /// \param explicitResultType The explicit result type, if specified.
   /// \param inLoc The location of the 'in' keyword, if present.
   ///
   /// \returns true if an error occurred, false otherwise.
-  bool parseClosureSignatureIfPresent(Pattern *&params,
+  bool parseClosureSignatureIfPresent(
+                                SmallVectorImpl<CaptureListEntry> &captureList,
+                                      Pattern *&params,
                                       SourceLoc &arrowLoc,
                                       TypeRepr *&explicitResultType,
                                       SourceLoc &inLoc);
