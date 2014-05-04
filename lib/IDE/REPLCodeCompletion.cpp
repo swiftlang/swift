@@ -64,7 +64,7 @@ std::string toInsertableString(CodeCompletionResult *Result) {
       return Str;
 
     case CodeCompletionString::Chunk::ChunkKind::BraceStmtWithCursor:
-      Str += "{";
+      Str += " {";
       break;
     }
   }

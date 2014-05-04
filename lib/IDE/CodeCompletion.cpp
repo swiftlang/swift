@@ -162,7 +162,7 @@ void CodeCompletionString::print(raw_ostream &OS) const {
       OS << "#]";
       break;
     case Chunk::ChunkKind::BraceStmtWithCursor:
-      OS << "{|}";
+      OS << " {|}";
       break;
     }
     PrevNestingLevel = C.getNestingLevel();
@@ -1832,7 +1832,6 @@ public:
     }
     Builder.addDeclIntroducer(DeclStr.str().substr(0, NameOffset));
     Builder.addTextChunk(DeclStr.str().substr(NameOffset));
-    Builder.addTextChunk(" ");
     Builder.addBraceStmtWithCursor();
   }
 
@@ -1855,7 +1854,6 @@ public:
       CD->print(OS, Options);
     }
     Builder.addTextChunk(DeclStr);
-    Builder.addTextChunk(" ");
     Builder.addBraceStmtWithCursor();
   }
 

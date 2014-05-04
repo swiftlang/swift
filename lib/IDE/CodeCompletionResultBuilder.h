@@ -206,7 +206,7 @@ public:
 
   void addBraceStmtWithCursor() {
     addChunkWithTextNoCopy(
-        CodeCompletionString::Chunk::ChunkKind::BraceStmtWithCursor, "{}");
+        CodeCompletionString::Chunk::ChunkKind::BraceStmtWithCursor, " {}");
   }
 };
 
