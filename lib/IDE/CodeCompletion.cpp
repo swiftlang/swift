@@ -598,8 +598,9 @@ MutableArrayRef<CodeCompletionResult *> CodeCompletionContext::takeResults() {
   return MutableArrayRef<CodeCompletionResult *>(Results, Count);
 }
 
-static StringRef getFirstTextChunk(CodeCompletionResult *R) {
-  for (auto C : R->getCompletionString()->getChunks()) {
+Optional<unsigned> CodeCompletionString::getFirstTextChunkIndex() const {
+  for (auto i : indices(getChunks())) {
+    auto &C = getChunks()[i];
     switch (C.getKind()) {
     case CodeCompletionString::Chunk::ChunkKind::Text:
     case CodeCompletionString::Chunk::ChunkKind::LeftParen:
@@ -613,7 +614,7 @@ static StringRef getFirstTextChunk(CodeCompletionResult *R) {
     case CodeCompletionString::Chunk::ChunkKind::ExclamationMark:
     case CodeCompletionString::Chunk::ChunkKind::QuestionMark:
     case CodeCompletionString::Chunk::ChunkKind::Ampersand:
-      return C.getText();
+      return i;
 
     case CodeCompletionString::Chunk::ChunkKind::OverrideKeyword:
     case CodeCompletionString::Chunk::ChunkKind::DeclIntroducer:
@@ -632,6 +633,13 @@ static StringRef getFirstTextChunk(CodeCompletionResult *R) {
       llvm_unreachable("should have already extracted the text");
     }
   }
+  return None;
+}
+
+StringRef CodeCompletionString::getFirstTextChunk() const {
+  Optional<unsigned> Idx = getFirstTextChunkIndex();
+  if (Idx.hasValue())
+    return getChunks()[*Idx].getText();
   return StringRef();
 }
 
@@ -639,8 +647,8 @@ void CodeCompletionContext::sortCompletionResults(
     MutableArrayRef<CodeCompletionResult *> Results) {
   std::sort(Results.begin(), Results.end(),
             [](CodeCompletionResult *LHS, CodeCompletionResult *RHS) {
-    StringRef LHSChunk = getFirstTextChunk(LHS);
-    StringRef RHSChunk = getFirstTextChunk(RHS);
+    StringRef LHSChunk = LHS->getCompletionString()->getFirstTextChunk();
+    StringRef RHSChunk = RHS->getCompletionString()->getFirstTextChunk();
     int Result = LHSChunk.compare_lower(RHSChunk);
     // If the case insensitive comparison is equal, then secondary sort order
     // should be case sensitive.

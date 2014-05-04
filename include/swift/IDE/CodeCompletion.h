@@ -15,6 +15,7 @@
 
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/Optional.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Allocator.h"
@@ -213,6 +214,9 @@ public:
     return llvm::makeArrayRef(reinterpret_cast<const Chunk *>(this + 1),
                               NumChunks);
   }
+
+  StringRef getFirstTextChunk() const;
+  Optional<unsigned> getFirstTextChunkIndex() const;
 
   /// Print a debug representation of the code completion string to \p OS.
   void print(raw_ostream &OS) const;
