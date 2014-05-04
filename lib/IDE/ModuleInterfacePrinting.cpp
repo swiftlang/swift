@@ -326,9 +326,12 @@ void swift::ide::printSubmoduleInterface(
     return false;
   };
 
-  for (auto *D : ImportDecls)
-    PrintDecl(D);
-  Printer << "\n";
+  // Imports from the stdlib are internal details that don't need to be exposed.
+  if (!M->isStdlibModule()) {
+    for (auto *D : ImportDecls)
+      PrintDecl(D);
+    Printer << "\n";
+  }
 
   {
     using ModuleAndName = std::pair<const clang::Module *, std::string>;
