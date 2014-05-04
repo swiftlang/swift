@@ -74,6 +74,11 @@ public:
     AssociatedDecl = D;
   }
 
+  void addDeclIntroducer(StringRef Text) {
+    addChunkWithText(CodeCompletionString::Chunk::ChunkKind::DeclIntroducer,
+                     Text);
+  }
+
   void addTextChunk(StringRef Text) {
     addChunkWithText(CodeCompletionString::Chunk::ChunkKind::Text, Text);
   }

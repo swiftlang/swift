@@ -35,6 +35,7 @@ std::string toInsertableString(CodeCompletionResult *Result) {
   std::string Str;
   for (auto C : Result->getCompletionString()->getChunks()) {
     switch (C.getKind()) {
+    case CodeCompletionString::Chunk::ChunkKind::DeclIntroducer:
     case CodeCompletionString::Chunk::ChunkKind::Text:
     case CodeCompletionString::Chunk::ChunkKind::LeftParen:
     case CodeCompletionString::Chunk::ChunkKind::RightParen:

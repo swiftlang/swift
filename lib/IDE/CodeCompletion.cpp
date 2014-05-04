@@ -13,6 +13,7 @@
 #include "swift/IDE/CodeCompletion.h"
 #include "swift/Basic/Cache.h"
 #include "swift/Basic/ThreadSafeRefCounted.h"
+#include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/NameLookup.h"
@@ -122,6 +123,7 @@ void CodeCompletionString::print(raw_ostream &OS) const {
       OS << "#}";
     }
     switch (C.getKind()) {
+    case Chunk::ChunkKind::DeclIntroducer:
     case Chunk::ChunkKind::Text:
     case Chunk::ChunkKind::LeftParen:
     case Chunk::ChunkKind::RightParen:
@@ -612,6 +614,7 @@ static StringRef getFirstTextChunk(CodeCompletionResult *R) {
     case CodeCompletionString::Chunk::ChunkKind::Ampersand:
       return C.getText();
 
+    case CodeCompletionString::Chunk::ChunkKind::DeclIntroducer:
     case CodeCompletionString::Chunk::ChunkKind::CallParameterName:
     case CodeCompletionString::Chunk::ChunkKind::CallParameterColon:
     case CodeCompletionString::Chunk::ChunkKind::CallParameterType:
@@ -1790,9 +1793,23 @@ public:
         SemanticContextKind::Super);
     Builder.setAssociatedDecl(FD);
 
+    class DeclNameOffsetLocatorPrinter : public StreamPrinter {
+    public:
+      using StreamPrinter::StreamPrinter;
+
+      Optional<unsigned> NameOffset;
+
+      void printDeclLoc(const Decl *D) override {
+        if (!NameOffset.hasValue())
+          NameOffset = OS.tell();
+      }
+    };
+
     llvm::SmallString<256> DeclStr;
+    unsigned NameOffset = 0;
     {
       llvm::raw_svector_ostream OS(DeclStr);
+      DeclNameOffsetLocatorPrinter Printer(OS);
       if (Reason == DeclVisibilityKind::MemberOfSuper)
         OS << "override ";
       PrintOptions Options;
@@ -1801,9 +1818,11 @@ public:
       Options.ExclusiveAttrList.push_back(DAK_noreturn);
       Options.FunctionDefinitions = false;
       Options.PrintDefaultParameterPlaceholder = false;
-      FD->print(OS, Options);
+      FD->print(Printer, Options);
+      NameOffset = Printer.NameOffset.getValue();
     }
-    Builder.addTextChunk(DeclStr);
+    Builder.addDeclIntroducer(DeclStr.str().substr(0, NameOffset));
+    Builder.addTextChunk(DeclStr.str().substr(NameOffset));
     Builder.addTextChunk(" ");
     Builder.addBraceStmtWithCursor();
   }

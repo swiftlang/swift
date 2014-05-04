@@ -59,6 +59,10 @@ public:
 
   public:
     enum class ChunkKind {
+      /// The keyword part of a declaration before the name,
+      /// like "override func".
+      DeclIntroducer,
+
       /// Normal text chunk.
       Text,
 
@@ -120,7 +124,8 @@ public:
     };
 
     static bool chunkHasText(ChunkKind Kind) {
-      return Kind == ChunkKind::Text ||
+      return Kind == ChunkKind::DeclIntroducer ||
+             Kind == ChunkKind::Text ||
              Kind == ChunkKind::LeftParen ||
              Kind == ChunkKind::RightParen ||
              Kind == ChunkKind::LeftBracket ||
