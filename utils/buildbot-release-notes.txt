@@ -1,6 +1,9 @@
 Latest
 ----------
 
+* The compiler's ability to diagnose many common kinds of type check errors has
+  improved. ("expression does not type-check" has been retired.)
+
 * Ranges can be formed with floating point numbers, e.g. "0.0 .. 100.0".
 
 2014-05-03
