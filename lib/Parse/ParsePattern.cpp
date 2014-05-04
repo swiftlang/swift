@@ -724,21 +724,6 @@ Pattern *Parser::createBindingFromPattern(SourceLoc loc, Identifier name,
   return new (Context) NamedPattern(var);
 }
 
-/// Parse an identifier as a pattern.
-ParserResult<Pattern> Parser::parsePatternIdentifier(bool isLet) {
-  SourceLoc loc = Tok.getLoc();
-  if (consumeIf(tok::kw__))
-    return makeParserResult(new (Context) AnyPattern(loc));
-  
-  StringRef text = Tok.getText();
-  if (consumeIf(tok::identifier)) {
-    Identifier ident = Context.getIdentifier(text);
-    return makeParserResult(createBindingFromPattern(loc, ident, isLet));
-  }
-
-  return nullptr;
-}
-
 /// Parse a pattern "atom", meaning the part that precedes the
 /// optional type annotation.
 ///
@@ -750,9 +735,14 @@ ParserResult<Pattern> Parser::parsePatternAtom(bool isLet) {
   case tok::l_paren:
     return parsePatternTuple(isLet, /*IsArgList*/false);
 
-  case tok::identifier:
   case tok::kw__:
-    return parsePatternIdentifier(isLet);
+    return makeParserResult(new (Context) AnyPattern(consumeToken(tok::kw__)));
+
+  case tok::identifier: {
+    Identifier name;
+    SourceLoc loc = consumeIdentifier(&name);
+    return makeParserResult(createBindingFromPattern(loc, name, isLet));
+  }
 
   case tok::code_complete:
     // Just eat the token and return an error status, *not* the code completion

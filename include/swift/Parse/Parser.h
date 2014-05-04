@@ -372,6 +372,12 @@ public:
     return consumeToken();
   }
 
+  SourceLoc consumeIdentifier(Identifier *Result = nullptr) {
+    if (Result)
+      *Result = Context.getIdentifier(Tok.getText());
+    return consumeToken(tok::identifier);
+  }
+
   /// \brief Retrieve the location just past the end of the previous
   /// source location.
   SourceLoc getEndOfPreviousLoc();
@@ -913,7 +919,6 @@ public:
   ParserResult<Pattern> parsePatternTupleAfterLP(bool isLet,bool isArgumentList,
                                                  SourceLoc LPLoc);
   ParserResult<Pattern> parsePatternAtom(bool isLet);
-  ParserResult<Pattern> parsePatternIdentifier(bool isLet);
   ParserResult<Pattern> parsePatternVarOrLet();
   
   Pattern *createBindingFromPattern(SourceLoc loc, Identifier name, bool isLet);
