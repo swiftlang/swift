@@ -59,8 +59,9 @@ public:
 
   public:
     enum class ChunkKind {
-      /// The keyword part of a declaration before the name,
-      /// like "override func".
+      OverrideKeyword,
+
+      /// The keyword part of a declaration before the name, like "func".
       DeclIntroducer,
 
       /// Normal text chunk.
@@ -124,7 +125,8 @@ public:
     };
 
     static bool chunkHasText(ChunkKind Kind) {
-      return Kind == ChunkKind::DeclIntroducer ||
+      return Kind == ChunkKind::OverrideKeyword ||
+             Kind == ChunkKind::DeclIntroducer ||
              Kind == ChunkKind::Text ||
              Kind == ChunkKind::LeftParen ||
              Kind == ChunkKind::RightParen ||

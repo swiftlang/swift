@@ -74,6 +74,11 @@ public:
     AssociatedDecl = D;
   }
 
+  void addOverrideKeyword() {
+    addChunkWithTextNoCopy(
+        CodeCompletionString::Chunk::ChunkKind::OverrideKeyword, "override ");
+  }
+
   void addDeclIntroducer(StringRef Text) {
     addChunkWithText(CodeCompletionString::Chunk::ChunkKind::DeclIntroducer,
                      Text);

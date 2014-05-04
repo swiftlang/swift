@@ -123,6 +123,7 @@ void CodeCompletionString::print(raw_ostream &OS) const {
       OS << "#}";
     }
     switch (C.getKind()) {
+    case Chunk::ChunkKind::OverrideKeyword:
     case Chunk::ChunkKind::DeclIntroducer:
     case Chunk::ChunkKind::Text:
     case Chunk::ChunkKind::LeftParen:
@@ -614,6 +615,7 @@ static StringRef getFirstTextChunk(CodeCompletionResult *R) {
     case CodeCompletionString::Chunk::ChunkKind::Ampersand:
       return C.getText();
 
+    case CodeCompletionString::Chunk::ChunkKind::OverrideKeyword:
     case CodeCompletionString::Chunk::ChunkKind::DeclIntroducer:
     case CodeCompletionString::Chunk::ChunkKind::CallParameterName:
     case CodeCompletionString::Chunk::ChunkKind::CallParameterColon:
@@ -1811,7 +1813,7 @@ public:
       llvm::raw_svector_ostream OS(DeclStr);
       DeclNameOffsetLocatorPrinter Printer(OS);
       if (Reason == DeclVisibilityKind::MemberOfSuper)
-        OS << "override ";
+        Builder.addOverrideKeyword();
       PrintOptions Options;
       Options.PrintImplicitAttrs = false;
       Options.PrintAttrTransparent = false;
