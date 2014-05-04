@@ -1090,13 +1090,9 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
     Attributes.add(new (Context) RawDocCommentAttr(Tok.getCommentRange()));
   parseDeclAttributeList(Attributes);
 
-  // If we see the 'static', 'class' or 'non?mutating' followed by a declaration
-  // keyword, parse it now.
-  SourceLoc StaticLoc, MutatingLoc, OverrideLoc;
+  // Keep track of where and whether we see a contextual keyword on the decl.
+  SourceLoc StaticLoc, MutatingLoc, OverrideLoc, ConvenienceLoc;
   bool isNonMutating = false;
-  bool UnhandledStatic = false;
-  bool UnhandledMutating = false;
-  bool UnhandledOverride = false;
   StaticSpellingKind StaticSpelling = StaticSpellingKind::None;
   ParserResult<Decl> DeclResult;
   ParserStatus Status;
@@ -1113,7 +1109,6 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
       } else {
         StaticLoc = Tok.getLoc();
         StaticSpelling = StaticSpellingKind::KeywordStatic;
-        UnhandledStatic = true;
       }
       consumeToken(tok::kw_static);
       continue;
@@ -1132,7 +1127,6 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
         } else {
           StaticLoc = ClassLoc;
           StaticSpelling = StaticSpellingKind::KeywordClass;
-          UnhandledStatic = true;
         }
         continue;
       }
@@ -1187,7 +1181,6 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
         } else {
           isNonMutating = Tok.isContextualKeyword("nonmutating");
           MutatingLoc = Tok.getLoc();
-          UnhandledMutating = true;
         }
         consumeToken(tok::identifier);
         continue;
@@ -1195,15 +1188,25 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
       if (Tok.isContextualKeyword("override")) {
         if (OverrideLoc.isValid()) {
           diagnose(Tok, diag::decl_already_override)
-            .highlight(OverrideLoc).fixItRemove(Tok.getLoc());
+          .highlight(OverrideLoc).fixItRemove(Tok.getLoc());
         } else {
           OverrideLoc = Tok.getLoc();
-          UnhandledOverride = true;
         }
         consumeToken(tok::identifier);
         continue;
       }
 
+      if (Tok.isContextualKeyword("convenience")) {
+        if (ConvenienceLoc.isValid()) {
+          diagnose(Tok, diag::decl_already_convenience)
+            .highlight(ConvenienceLoc).fixItRemove(Tok.getLoc());
+        } else {
+          ConvenienceLoc = Tok.getLoc();
+        }
+        consumeToken(tok::identifier);
+        continue;
+      }
+        
       // Otherwise this is not a context-sensitive keyword.
       SWIFT_FALLTHROUGH;
 
@@ -1225,8 +1228,8 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
     case tok::kw_var:
       Status = parseDeclVar(Flags, Attributes, Entries, StaticLoc,
                             StaticSpelling, OverrideLoc);
-      UnhandledStatic = false;
-      UnhandledOverride = false;
+      StaticLoc = SourceLoc();   // we handled static if present.
+      OverrideLoc = SourceLoc(); // we handled override if present.
       break;
     case tok::kw_typealias:
       DeclResult = parseDeclTypeAlias(!(Flags & PD_DisallowTypeAliasDef),
@@ -1245,12 +1248,13 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
       Status = DeclResult;
       break;
     case tok::kw_init:
-      DeclResult = parseDeclConstructor(Flags, Attributes);
+      DeclResult = parseDeclInit(Flags, Attributes, ConvenienceLoc);
       Status = DeclResult;
+      ConvenienceLoc = SourceLoc(); // we handled 'convenience' if present.
       break;
     case tok::kw_deinit:
     case tok::kw_destructor:
-      DeclResult = parseDeclDestructor(Flags, Attributes);
+      DeclResult = parseDeclDeinit(Flags, Attributes);
       Status = DeclResult;
       break;
     case tok::kw_protocol:
@@ -1287,19 +1291,19 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
 
       DeclResult = parseDeclFunc(StaticLoc, StaticSpelling, Flags, Attributes);
       Status = DeclResult;
-      UnhandledStatic = false;
-      UnhandledMutating = false;
-      UnhandledOverride = false;
+      StaticLoc = SourceLoc();   // we handled static if present.
+      MutatingLoc = SourceLoc(); // we handled mutating if present.
+      OverrideLoc = SourceLoc(); // we handled override if present.
       break;
 
     case tok::kw_subscript:
       if (StaticLoc.isValid()) {
         diagnose(Tok, diag::subscript_static, StaticSpelling)
           .fixItRemove(SourceRange(StaticLoc));
-        UnhandledStatic = false;
+        StaticLoc = SourceLoc();
       }
       Status = parseDeclSubscript(OverrideLoc, Flags, Attributes, Entries);
-      UnhandledOverride = false;
+      OverrideLoc = SourceLoc(); // we handled override if present.
       break;
 
     case tok::code_complete:
@@ -1331,23 +1335,26 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
   if (Status.isSuccess()) {
     // If we parsed 'class' or 'static', but didn't handle it above, complain
     // about it.
-    if (UnhandledStatic)
+    if (StaticLoc.isValid())
       diagnose(Entries.back()->getLoc(), diag::decl_not_static,
                StaticSpelling)
           .fixItRemove(SourceRange(StaticLoc));
     // If we parsed 'mutating' but didn't handle it above, complain about it.
-    if (UnhandledMutating) {
-      bool isInit = DeclResult.isNonNull() &&
-                    isa<ConstructorDecl>(DeclResult.get());
+    if (MutatingLoc.isValid()) {
+      bool isInit = isa<ConstructorDecl>(Entries.back());
       diagnose(Entries.back()->getLoc(),
                isInit ? diag::mutating_invalid_init :  diag::mutating_invalid)
           .fixItRemove(SourceRange(MutatingLoc));
     }
     
     // If we parsed 'override' but didn't handle it above, complain about it.
-    if (UnhandledOverride)
+    if (OverrideLoc.isValid())
       diagnose(Entries.back()->getLoc(), diag::override_invalid)
           .fixItRemove(SourceRange(OverrideLoc));
+    
+    if (ConvenienceLoc.isValid())
+      diagnose(Entries.back()->getLoc(), diag::convenience_invalid)
+        .fixItRemove(SourceRange(ConvenienceLoc));
   }
 
   return Status;
@@ -3486,8 +3493,8 @@ ParserStatus Parser::parseDeclSubscript(SourceLoc OverrideLoc,
 }
 
 ParserResult<ConstructorDecl>
-Parser::parseDeclConstructor(ParseDeclOptions Flags,
-                             DeclAttributes &Attributes) {
+Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes,
+                      SourceLoc ConvenienceLoc) {
   assert(Tok.is(tok::kw_init));
   SourceLoc ConstructorLoc = consumeToken();
 
@@ -3518,7 +3525,10 @@ Parser::parseDeclConstructor(ParseDeclOptions Flags,
   // '->' 'Self'
   // FIXME: Parse as general type, verify semantically.
   CtorInitializerKind initKind = CtorInitializerKind::Designated;
-  if (Tok.is(tok::arrow)) {
+  
+  if (ConvenienceLoc.isValid())
+    initKind = CtorInitializerKind::Convenience;
+  else if (Tok.is(tok::arrow)) {
     consumeToken(tok::arrow);
     
     if (Tok.is(tok::kw_Self)) {
@@ -3578,7 +3588,7 @@ Parser::parseDeclConstructor(ParseDeclOptions Flags,
 }
 
 ParserResult<DestructorDecl> Parser::
-parseDeclDestructor(ParseDeclOptions Flags, DeclAttributes &Attributes) {
+parseDeclDeinit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   assert(Tok.is(tok::kw_deinit) || Tok.is(tok::kw_destructor));
   bool hasDestructorKeyword = Tok.is(tok::kw_destructor);
   SourceLoc DestructorLoc = consumeToken();

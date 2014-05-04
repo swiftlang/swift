@@ -938,12 +938,10 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
 
     // A class designated initializer must never be delegating.
     if (ctor->isDesignatedInit() && ClassD && isDelegating) {
-      SourceLoc fixItLoc = ctor->getBodyParamPatterns().back()->getEndLoc();
-      fixItLoc = Lexer::getLocForEndOfToken(Context.SourceMgr, fixItLoc);
       diagnose(ctor->getLoc(),
                diag::delegating_designated_init,
                ctor->getDeclContext()->getDeclaredTypeOfContext())
-        .fixItInsert(fixItLoc, " -> Self"); 
+        .fixItInsert(ctor->getLoc(), "convenience ");
       diagnose(initExpr->getLoc(), diag::delegation_here);
       ctor->setInitKind(CtorInitializerKind::Convenience);
     }

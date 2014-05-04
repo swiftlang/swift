@@ -690,9 +690,10 @@ public:
                                   SmallVectorImpl<Decl *> &Decls);
 
   ParserResult<ConstructorDecl>
-  parseDeclConstructor(ParseDeclOptions Flags, DeclAttributes &Attributes);
+  parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes,
+                SourceLoc ConvenienceLoc);
   ParserResult<DestructorDecl>
-  parseDeclDestructor(ParseDeclOptions Flags, DeclAttributes &Attributes);
+  parseDeclDeinit(ParseDeclOptions Flags, DeclAttributes &Attributes);
 
   void addPatternVariablesToScope(ArrayRef<Pattern *> Patterns);
 

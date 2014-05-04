@@ -4121,7 +4121,7 @@ public:
         if (!extType->getClassOrBoundGenericClass() &&
             !extType->is<ErrorType>()) {
           // FIXME: Add a Fix-It here, which requires source-location
-          // information within the AST for '->' and 'Self'.
+          // information within the AST for "convenience".
           TC.diagnose(CD->getLoc(), diag::nonclass_convenience_init,
                       extType);
           CD->setInitKind(CtorInitializerKind::Designated);
@@ -4132,10 +4132,8 @@ public:
       // itself.
       if (extType->getClassOrBoundGenericClass() &&
           isa<ExtensionDecl>(CD->getDeclContext())) {
-        SourceLoc fixItLoc = CD->getBodyParamPatterns().back()->getEndLoc();
-        fixItLoc = Lexer::getLocForEndOfToken(TC.Context.SourceMgr, fixItLoc);
         TC.diagnose(CD->getLoc(), diag::designated_init_in_extension, extType)
-          .fixItInsert(fixItLoc, " -> Self"); 
+          .fixItInsert(CD->getLoc(), "convenience ");
         CD->setInitKind(CtorInitializerKind::Convenience);
       }
     }

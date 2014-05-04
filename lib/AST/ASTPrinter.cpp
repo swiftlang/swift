@@ -1145,24 +1145,18 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
   recordDeclLoc(decl);
   printAttributes(decl);
 
+  if (decl->getInitKind() == CtorInitializerKind::Convenience ||
+      decl->getInitKind() == CtorInitializerKind::ConvenienceFactory)
+    Printer << "convenience ";
+  
   Printer << "init";
-  if (decl->isGeneric()) {
+  if (decl->isGeneric())
     printGenericParams(decl->getGenericParams());
-  }
   printFunctionParameters(decl);
-  switch (decl->getInitKind()) {
-  case CtorInitializerKind::Designated:
-    break;
-
-  case CtorInitializerKind::Convenience:
-  case CtorInitializerKind::ConvenienceFactory:
-    Printer << " -> Self";
-    break;
-
-  case CtorInitializerKind::Factory:
+  
+  if (decl->getInitKind() == CtorInitializerKind::Factory) {
     Printer << " -> ";
     Printer.printName(decl->getExtensionType()->getAnyNominal()->getName());
-    break;
   }
 
   if (!Options.FunctionDefinitions || !decl->getBody()) {
