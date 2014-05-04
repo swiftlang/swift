@@ -726,9 +726,8 @@ Pattern *Parser::createBindingFromPattern(SourceLoc loc, Identifier name,
 /// Parse an identifier as a pattern.
 ParserResult<Pattern> Parser::parsePatternIdentifier(bool isLet) {
   SourceLoc loc = Tok.getLoc();
-  if (consumeIf(tok::kw__)) {
+  if (consumeIf(tok::kw__))
     return makeParserResult(new (Context) AnyPattern(loc));
-  }
   
   StringRef text = Tok.getText();
   if (consumeIf(tok::identifier)) {

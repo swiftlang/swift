@@ -1037,8 +1037,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
         
         // If this is a selector reference, collect the selector pieces.
         bool IsSelector = false;
-        if (Tok.is(tok::colon) &&
-            (peekToken().is(tok::identifier) || peekToken().is(tok::kw__))) {
+        if (Tok.is(tok::colon) && peekToken().isIdentifierOrNone()) {
           BacktrackingScope BS(*this);
 
           consumeToken(); // ':'
@@ -1059,8 +1058,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
             Locs.push_back({SourceLoc(), SourceLoc()});
             ArgumentNames.push_back(Identifier()); 
           }
-          while ((Tok.is(tok::identifier) || Tok.is(tok::kw__)) &&
-                 peekToken().is(tok::colon)) {
+          while (Tok.isIdentifierOrNone() && peekToken().is(tok::colon)) {
             Identifier SelName;
             if (Tok.is(tok::identifier))
               SelName = Context.getIdentifier(Tok.getText());
@@ -1396,58 +1394,50 @@ bool Parser::parseClosureSignatureIfPresent(Pattern *&params,
   explicitResultType = nullptr;
   inLoc = SourceLoc();
 
-  // Check whether we have a closure signature here.
-  // FIXME: We probably want to be a bit more permissive here.
-  if (Tok.is(tok::l_paren)) {
-    // Parse pattern-tuple func-signature-result? 'in'.
+  // If we have a leading token that may be part of the closure signature, do a
+  // speculative parse to validate it and look for 'in'.
+  if (Tok.is(tok::l_paren) || Tok.isIdentifierOrNone()) {
     BacktrackingScope backtrack(*this);
 
-    // Consume the ')'.
-    consumeToken();
+    // Parse pattern-tuple func-signature-result? 'in'.
+    if (consumeIf(tok::l_paren)) {      // Consume the ')'.
 
-    // While we don't have '->' or ')', eat balanced tokens.
-    while (!Tok.is(tok::r_paren) && !Tok.is(tok::eof))
-      skipSingle();
+      // While we don't have '->' or ')', eat balanced tokens.
+      while (!Tok.is(tok::r_paren) && !Tok.is(tok::eof))
+        skipSingle();
 
-    // Consume the ')', if it's there.
-    if (consumeIf(tok::r_paren)) {
+      // Consume the ')', if it's there.
+      if (consumeIf(tok::r_paren)) {
+        // Parse the func-signature-result, if present.
+        if (consumeIf(tok::arrow)) {
+          if (!canParseType())
+            return false;
+        }
+      }
+
+      // Okay, we have a closure signature.
+    } else if (Tok.isIdentifierOrNone()) {
+      // Parse identifier (',' identifier)*
+      consumeToken();
+      while (consumeIf(tok::comma)) {
+        if (Tok.isIdentifierOrNone()) {
+          consumeToken();
+          continue;
+        }
+
+        return false;
+      }
+
       // Parse the func-signature-result, if present.
       if (consumeIf(tok::arrow)) {
         if (!canParseType())
           return false;
       }
-
-      // Parse the 'in' at the end.
-      if (!Tok.is(tok::kw_in)) {
-        return false;
-      }
     }
-
-    // Okay, we have a closure signature.
-  } else if (Tok.is(tok::identifier) || Tok.is(tok::kw__)) {
-    BacktrackingScope backtrack(*this);
-
-    // Parse identifier (',' identifier)*
-    consumeToken();
-    while (consumeIf(tok::comma)) {
-      if (Tok.is(tok::identifier) || Tok.is(tok::kw__)) {
-        consumeToken();
-        continue;
-      }
-
-      return false;
-    }
-
-    // Parse the func-signature-result, if present.
-    if (consumeIf(tok::arrow)) {
-      if (!canParseType())
-        return false;
-    }
-
+    
     // Parse the 'in' at the end.
-    if (!Tok.is(tok::kw_in)) {
+    if (Tok.isNot(tok::kw_in))
       return false;
-    }
 
     // Okay, we have a closure signature.
   } else {
