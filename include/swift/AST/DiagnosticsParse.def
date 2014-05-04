@@ -332,8 +332,6 @@ ERROR(destructor_decl_outside_class,decl_parsing,none,
       "'deinitializer' functions may only be declared within a class", ())
 ERROR(expected_lbrace_destructor,decl_parsing,PointsToFirstBadToken,
       "expected '{' for deinitializer", ())
-ERROR(destructor_is_deinit,decl_parsing,none,
-      "'destructor ()' is now written as 'deinit'", ())
 ERROR(opened_destructor_expected_rparen,attribute_parsing,none,
       "expected ')' to close parameter list", ())
 ERROR(destructor_params,decl_parsing,none,

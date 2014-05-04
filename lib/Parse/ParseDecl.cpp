@@ -941,7 +941,6 @@ static bool isKeywordPossibleDeclStart(const Token &Tok) {
   case tok::kw_case:
   case tok::kw_class:
   case tok::kw_deinit:
-  case tok::kw_destructor:
   case tok::kw_enum:
   case tok::kw_extension:
   case tok::kw_func:
@@ -1253,7 +1252,6 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
       ConvenienceLoc = SourceLoc(); // we handled 'convenience' if present.
       break;
     case tok::kw_deinit:
-    case tok::kw_destructor:
       DeclResult = parseDeclDeinit(Flags, Attributes);
       Status = DeclResult;
       break;
@@ -3592,13 +3590,11 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes,
 
 ParserResult<DestructorDecl> Parser::
 parseDeclDeinit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
-  assert(Tok.is(tok::kw_deinit) || Tok.is(tok::kw_destructor));
-  bool hasDestructorKeyword = Tok.is(tok::kw_destructor);
-  SourceLoc DestructorLoc = consumeToken();
+  SourceLoc DestructorLoc = consumeToken(tok::kw_deinit);
 
-  // Parse extraneous parentheses.
-  SourceRange ParenRange;
+  // Parse extraneous parentheses and remove them with a fixit.
   if (Tok.is(tok::l_paren)) {
+    SourceRange ParenRange;
     SourceLoc LParenLoc = consumeToken();
     SourceLoc RParenLoc;
     skipUntil(tok::r_paren);
@@ -3606,27 +3602,16 @@ parseDeclDeinit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     if (Tok.is(tok::r_paren)) {
       SourceLoc RParenLoc = consumeToken();
       ParenRange = SourceRange(LParenLoc, RParenLoc);
+      
+      diagnose(ParenRange.Start, diag::destructor_params)
+      .fixItRemoveChars(Lexer::getLocForEndOfToken(Context.SourceMgr,
+                                                   DestructorLoc),
+                        Lexer::getLocForEndOfToken(Context.SourceMgr,
+                                                   ParenRange.End));
     } else {
       diagnose(Tok, diag::opened_destructor_expected_rparen);
       diagnose(LParenLoc, diag::opening_paren);
     }
-  }
-
-  // If we have 'destructor', replace it (and any extraneous parentheses) with
-  // 'deinit'.
-  if (hasDestructorKeyword) {
-    SourceLoc StartLoc = DestructorLoc;
-    SourceLoc EndLoc = ParenRange.isValid()? ParenRange.End : DestructorLoc;
-    EndLoc = Lexer::getLocForEndOfToken(Context.SourceMgr, EndLoc);
-
-    diagnose(Tok, diag::destructor_is_deinit)
-      .fixItReplaceChars(StartLoc, EndLoc, "deinit");
-  } else if (ParenRange.isValid()) {
-    diagnose(ParenRange.Start, diag::destructor_params)
-    .fixItRemoveChars(Lexer::getLocForEndOfToken(Context.SourceMgr,
-                                                 DestructorLoc),
-                      Lexer::getLocForEndOfToken(Context.SourceMgr,
-                                                 ParenRange.End));
   }
 
   // '{'

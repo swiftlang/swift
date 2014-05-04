@@ -255,10 +255,6 @@ bool SILParser::parseSILIdentifier(Identifier &Result, SourceLoc &Loc,
     // A binary operator can be part of a SILDeclRef.
     Result = P.Context.getIdentifier(P.Tok.getText());
     break;
-  case tok::kw_destructor:
-    P.diagnose(P.Tok, diag::destructor_is_deinit)
-      .fixItReplace(SourceLoc(P.Tok.getLoc()), "deinit");
-    SWIFT_FALLTHROUGH;
   case tok::kw_deinit:
     Result = P.Context.Id_deinit;
     break;
