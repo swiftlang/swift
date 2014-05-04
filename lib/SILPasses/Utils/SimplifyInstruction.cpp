@@ -132,8 +132,11 @@ InstSimplifier::
 visitUncheckedEnumDataInst(UncheckedEnumDataInst *UEDI) {
   // (unchecked_enum_data (enum payload)) -> payload
   if (EnumInst *EI = dyn_cast<EnumInst>(UEDI->getOperand())) {
-    assert(EI->hasOperand() && "Should only get data from an enum with "
-           "payload.");
+    if (EI->getElement() != UEDI->getElement())
+      return SILValue();
+
+    assert(EI->hasOperand() &&
+           "Should only get data from an enum with payload.");
     return EI->getOperand();
   }
 
