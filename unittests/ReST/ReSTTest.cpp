@@ -1611,27 +1611,6 @@ INSTANTIATE_TEST_CASE_P(
     ReSTTest, ExtractBriefTest,
     ::testing::ValuesIn(ExtractBriefTests));
 
-struct ParseReSTTestData {
-  std::vector<const char *> InText;
-  std::string DocutilsXML;
-};
-
-struct ParseReSTTest
-    : public ReSTTest,
-      public ::testing::WithParamInterface<ExtractBriefTestData> {};
-
-TEST_P(ParseReSTTest, Test) {
-  const auto &Test = GetParam();
-  ReSTContext Context;
-  auto LL = toLineList(Context, Test.InText);
-  llvm::SmallString<64> Str;
-  extractBrief(LL, Str);
-  EXPECT_EQ(Test.Brief, Str.str());
-}
-
-struct ParseReSTTestData ParseReSTTests[] = {
-};
-
 TEST_F(ReSTTest, ExtractWord_LinePart) {
   auto ToLinePart = [&](StringRef S) {
     return LinePart{S, SM.registerLine(S, 0)};
