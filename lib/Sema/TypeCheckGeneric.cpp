@@ -702,7 +702,7 @@ bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
       // If we have a compound name, relabel the argument type for the
       // primary argument list.
       if (e - i - 1 == hasSelf) {
-        if (auto name = func->getFullName()) {
+        if (auto name = func->getEffectiveFullName()) {
           argTy = argTy->getRelabeledType(Context, name.getArgumentNames());
         }
       }

@@ -243,12 +243,15 @@ ERROR(extra_call_nonfunction,sema_tcc,none,
       "call to non-function of type %0; did you mean to leave off the '()'?",
       (Type))
 ERROR(extra_argument_labels,sema_tcc,none,
-      "extraneous argument label%select{|s}0 '%1' in call", (bool, StringRef))
+      "extraneous argument label%select{|s}0 '%1' in %select{call|subscript}2",
+      (bool, StringRef, bool))
 ERROR(missing_argument_labels,sema_tcc,none,
-      "missing argument label%select{|s}0 '%1' in call", (bool, StringRef))
+      "missing argument label%select{|s}0 '%1' in %select{call|subscript}2",
+      (bool, StringRef, bool))
 ERROR(wrong_argument_labels,sema_tcc,none,
-      "incorrect argument label%select{|s}0 in call (have '%1', expected '%2')",
-     (bool, StringRef, StringRef))
+      "incorrect argument label%select{|s}0 in %select{call|subscript}3 "
+      "(have '%1', expected '%2')",
+      (bool, StringRef, StringRef, bool))
 ERROR(extra_named_single_element_tuple,sema_tcc,none,
       "cannot treat single-element named tuple as a scalar; use '.%0' to "
       "access its element", (StringRef))

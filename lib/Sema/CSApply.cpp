@@ -3848,7 +3848,8 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
 ///
 /// \returns true if we successfully diagnosed the issue.
 static bool diagnoseRelabel(TypeChecker &tc, Expr *expr, 
-                            ArrayRef<Identifier> newNames) {
+                            ArrayRef<Identifier> newNames,
+                            bool isSubscript) {
   auto tuple = dyn_cast<TupleExpr>(expr);
   if (!tuple) {
     if (newNames[0].empty()) {
@@ -3887,7 +3888,7 @@ static bool diagnoseRelabel(TypeChecker &tc, Expr *expr,
     str += newNames[0].str();
     str += ": ";
     tc.diagnose(expr->getStartLoc(), diag::missing_argument_labels, false,
-                str.substr(0, str.size()-1))
+                str.substr(0, str.size()-1), isSubscript)
       .fixItInsert(expr->getStartLoc(), str);
     return true;
   }
@@ -3947,14 +3948,14 @@ static bool diagnoseRelabel(TypeChecker &tc, Expr *expr,
     }
 
     diagOpt.emplace(tc.diagnose(expr->getLoc(), diag::wrong_argument_labels,
-                                plural, haveStr, expectedStr));
+                                plural, haveStr, expectedStr, isSubscript));
   } else if (numMissing > 0) {
     diagOpt.emplace(tc.diagnose(expr->getLoc(), diag::missing_argument_labels,
-                                plural, missingStr));
+                                plural, missingStr, isSubscript));
   } else {
     assert(numExtra > 0);
     diagOpt.emplace(tc.diagnose(expr->getLoc(), diag::extra_argument_labels,
-                                plural, extraStr));
+                                plural, extraStr, isSubscript));
   }
 
   // Emit Fix-Its to correct the names.
@@ -4086,7 +4087,9 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr) {
       case FixKind::TupleToScalar: 
       case FixKind::ScalarToTuple:
       case FixKind::RelabelCallTuple: {
-        if (diagnoseRelabel(TC,affected,fix.first.getRelabelTupleNames(*this)))
+        if (diagnoseRelabel(TC,affected,fix.first.getRelabelTupleNames(*this),
+                            /*isSubscript=*/locator->getPath().back().getKind()
+                              == ConstraintLocator::SubscriptIndex))
           diagnosed = true;
         break;
       }

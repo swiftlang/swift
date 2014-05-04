@@ -3710,7 +3710,7 @@ getMagicFunctionString(SILGenFunction &gen) {
          && "asking for __FUNCTION__ but we don't have a function name?!");
   {
     llvm::raw_string_ostream os(gen.MagicFunctionString);
-    os << gen.MagicFunctionName;
+    gen.MagicFunctionName.printPretty(os);
   }
   return gen.MagicFunctionString;
 }

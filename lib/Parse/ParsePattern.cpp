@@ -474,7 +474,8 @@ mapParsedParameters(Parser &parser,
 
 /// Parse a single parameter-clause.
 ParserResult<Pattern> Parser::parseSingleParameterClause(
-                                ParameterContextKind paramContext) {
+                                ParameterContextKind paramContext,
+                                SmallVectorImpl<Identifier> *namePieces) {
   ParserStatus status;
   SmallVector<ParsedParameter, 4> params;
   SourceLoc leftParenLoc, rightParenLoc;
@@ -485,7 +486,7 @@ ParserResult<Pattern> Parser::parseSingleParameterClause(
   
   // Turn the parameter clause into argument and body patterns.
   auto pattern = mapParsedParameters(*this, leftParenLoc, params,
-                                     rightParenLoc, true, nullptr,
+                                     rightParenLoc, true, namePieces,
                                      paramContext);
 
   return makeParserResult(status, pattern);

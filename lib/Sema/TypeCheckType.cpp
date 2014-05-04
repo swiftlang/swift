@@ -1933,7 +1933,7 @@ bool TypeChecker::isRepresentableInObjC(const SubscriptDecl *SD,
   bool Diagnose = (Reason != ObjCReason::DontDiagnose);
 
   // Figure out the type of the indices.
-  Type IndicesType = SD->getIndices()->getType();
+  Type IndicesType = SD->getIndicesType();
   if (auto TupleTy = IndicesType->getAs<TupleType>()) {
     if (TupleTy->getNumElements() == 1 && !TupleTy->getFields()[0].isVararg())
       IndicesType = TupleTy->getElementType(0);

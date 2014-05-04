@@ -3381,7 +3381,7 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 ///   decl-subscript:
 ///     subscript-head get-set
 ///   subscript-head
-///     'subscript' attribute-list pattern-tuple '->' type
+///     'subscript' attribute-list parameter-clause '->' type
 /// \endverbatim
 ParserStatus Parser::parseDeclSubscript(SourceLoc OverrideLoc,
                                         ParseDeclOptions Flags,
@@ -3393,15 +3393,16 @@ ParserStatus Parser::parseDeclSubscript(SourceLoc OverrideLoc,
   ParserStatus Status;
   SourceLoc SubscriptLoc = consumeToken(tok::kw_subscript);
 
-  // pattern-tuple
+  // parameter-clause
   if (Tok.isNot(tok::l_paren)) {
     diagnose(Tok, diag::expected_lparen_subscript);
     return makeParserError();
   }
 
-  //
+  SmallVector<Identifier, 4> argumentNames;
   ParserResult<Pattern> Indices
-    = parseSingleParameterClause(ParameterContextKind::Subscript);
+    = parseSingleParameterClause(ParameterContextKind::Subscript,
+                                 &argumentNames);
   if (Indices.isNull() || Indices.hasCodeCompletion())
     return Indices;
   
@@ -3419,7 +3420,8 @@ ParserStatus Parser::parseDeclSubscript(SourceLoc OverrideLoc,
 
   
   // Build an AST for the subscript declaration.
-  auto *Subscript = new (Context) SubscriptDecl(Context.Id_subscript,
+  DeclName name = DeclName(Context, Context.Id_subscript, argumentNames);
+  auto *Subscript = new (Context) SubscriptDecl(name,
                                                 SubscriptLoc, Indices.get(),
                                                 ArrowLoc, ElementTy.get(),
                                                 CurDeclContext);

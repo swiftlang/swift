@@ -1748,7 +1748,7 @@ public:
   /// Retrieve the base name of the declaration, ignoring any argument
   /// names.
   DeclName getBaseName() const { return Name.getBaseName(); }
-  
+
   SourceLoc getNameLoc() const { return NameLoc; }
   SourceLoc getLoc() const { return NameLoc; }
 
@@ -3032,7 +3032,7 @@ private:
 
   void setStorageKind(StorageKindTy K) { OverriddenDecl.setInt(K); }
 protected:
-  AbstractStorageDecl(DeclKind Kind, DeclContext *DC, Identifier Name,
+  AbstractStorageDecl(DeclKind Kind, DeclContext *DC, DeclName Name,
                       SourceLoc NameLoc)
     : ValueDecl(Kind, DC, Name, NameLoc) {
     OverriddenDecl.setInt(Stored);
@@ -3303,9 +3303,9 @@ class SubscriptDecl : public AbstractStorageDecl {
   TypeLoc ElementTy;
 
 public:
-  SubscriptDecl(Identifier NameHack, SourceLoc SubscriptLoc, Pattern *Indices,
+  SubscriptDecl(DeclName Name, SourceLoc SubscriptLoc, Pattern *Indices,
                 SourceLoc ArrowLoc, TypeLoc ElementTy, DeclContext *Parent)
-    : AbstractStorageDecl(DeclKind::Subscript, Parent, NameHack, SubscriptLoc),
+    : AbstractStorageDecl(DeclKind::Subscript, Parent, Name, SubscriptLoc),
       ArrowLoc(ArrowLoc), Indices(nullptr), ElementTy(ElementTy) {
     setIndices(Indices);
   }
@@ -3324,6 +3324,12 @@ public:
   Pattern *getIndices() { return Indices; }
   const Pattern *getIndices() const { return Indices; }
   void setIndices(Pattern *p);
+
+  /// Retrieve the type of the indices.
+  Type getIndicesType() const;
+
+  /// Retrieve the interface type of the indices.
+  Type getIndicesInterfaceType() const;
 
   /// \brief Retrieve the type of the element referenced by a subscript
   /// operation.
@@ -3417,6 +3423,9 @@ protected:
 
   void setGenericParams(GenericParamList *GenericParams);
 public:
+  // FIXME: Hack that provides names with keyword arguments for subscripts.
+  DeclName getEffectiveFullName() const;
+
   /// \brief If this is a method in a type extension for some type,
   /// return that type, otherwise return Type().
   Type getExtensionType() const;

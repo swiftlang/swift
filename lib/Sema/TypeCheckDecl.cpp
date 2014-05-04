@@ -2237,13 +2237,16 @@ public:
       SD->overwriteType(ErrorType::get(TC.Context));
       SD->setInvalid();
     } else {
-      SD->setType(FunctionType::get(SD->getIndices()->getType(),
-                                    SD->getElementType()));
+      // Relabel the indices according to the subscript name.
+      auto indicesType = SD->getIndices()->getType();
+      indicesType = indicesType->getRelabeledType(
+                      TC.Context, SD->getFullName().getArgumentNames());
+      SD->setType(FunctionType::get(indicesType, SD->getElementType()));
 
       // If we're in a generic context, set the interface type.
       if (dc->isGenericContext()) {
         auto indicesTy = TC.getInterfaceTypeFromInternalType(
-                           dc, SD->getIndices()->getType());
+                           dc, indicesType);
         auto elementTy = TC.getInterfaceTypeFromInternalType(
                            dc, SD->getElementType());
         SD->setInterfaceType(FunctionType::get(indicesTy, elementTy));
@@ -2994,7 +2997,7 @@ public:
       // If we have a compound name, relabel the argument type for the primary
       // argument list.
       if (e - i - 1 == hasSelf) {
-        if (auto name = FD->getFullName()) {
+        if (auto name = FD->getEffectiveFullName()) {
           argTy = argTy->getRelabeledType(TC.Context, name.getArgumentNames());
         }
       }

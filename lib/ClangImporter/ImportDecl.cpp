@@ -2440,7 +2440,9 @@ namespace {
       auto getterType = elementTy;
       for (auto it = getterArgs.rbegin(), itEnd = getterArgs.rend();
            it != itEnd; ++it) {
-        getterType = FunctionType::get((*it)->getType(), getterType);
+        getterType = FunctionType::get(
+                       (*it)->getType()->getUnlabeledType(context),
+                       getterType);
       }
 
       // If we're in a protocol, the getter thunk will be polymorphic.
@@ -2523,7 +2525,9 @@ namespace {
       Type setterType = TupleType::getEmpty(context);
       for (auto it = setterArgs.rbegin(), itEnd = setterArgs.rend();
            it != itEnd; ++it) {
-        setterType = FunctionType::get((*it)->getType(), setterType);
+        setterType = FunctionType::get(
+                       (*it)->getType()->getUnlabeledType(context),
+                       setterType);
       }
 
       // If we're in a protocol, the setter thunk will be polymorphic.
@@ -2751,14 +2755,18 @@ namespace {
       // Build the subscript declaration.
       auto bodyPatterns =
           getterThunk->getBodyParamPatterns()[1]->clone(context);
-      auto name = context.Id_subscript;
+      DeclName name(context, context.Id_subscript, { Identifier() });
       auto subscript
         = Impl.createDeclWithClangNode<SubscriptDecl>(objcMethod,
                                       name, decl->getLoc(), bodyPatterns,
                                       decl->getLoc(),
                                       TypeLoc::withoutLoc(elementTy), dc);
       subscript->setAccessors(SourceRange(), getterThunk, setterThunk);
-      subscript->setType(FunctionType::get(subscript->getIndices()->getType(),
+      auto indicesType = bodyPatterns->getType();
+      indicesType = indicesType->getRelabeledType(context,
+                                                  name.getArgumentNames());
+
+      subscript->setType(FunctionType::get(indicesType,
                                            subscript->getElementType()));
       addObjCAttribute(subscript, Nothing);
 
@@ -4347,7 +4355,8 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   auto getterType = type;
   for (auto it = getterArgs.rbegin(), itEnd = getterArgs.rend();
        it != itEnd; ++it) {
-    getterType = FunctionType::get((*it)->getType(), getterType);
+    getterType = FunctionType::get((*it)->getType()->getUnlabeledType(context),
+                                   getterType);
   }
 
   // Create the getter function declaration.

@@ -26,7 +26,7 @@ bb0(%0 : $@thick X.Type):
   return %14 : $()
 }
 
-sil @_TToFC14dynamic_lookup1Xg9subscriptFT1iSi_Si : $@cc(objc_method) @thin (Int, X) -> Int {
+sil @_TToFC14dynamic_lookup1Xg9subscriptFSiSi : $@cc(objc_method) @thin (Int, X) -> Int {
 bb0(%0 : $Int, %1 : $X):
   %4 = function_ref @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi64__Si : $@thin (Builtin.Int64, @thin Int.Type) -> Int // user: %7
   %5 = metatype $@thin Int.Type

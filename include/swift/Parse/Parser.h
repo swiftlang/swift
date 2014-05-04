@@ -877,7 +877,8 @@ public:
                                     ParameterContextKind paramContext);
 
   ParserResult<Pattern> parseSingleParameterClause(
-                          ParameterContextKind paramContext);
+                          ParameterContextKind paramContext,
+                          SmallVectorImpl<Identifier> *namePieces = nullptr);
 
   ParserStatus parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
                                       SmallVectorImpl<Pattern*> &BodyPatterns,

@@ -1764,6 +1764,10 @@ void Serializer::writeDecl(const Decl *D) {
 
     const Decl *DC = getDeclForContext(subscript->getDeclContext());
 
+    SmallVector<IdentifierID, 4> nameComponents;
+    for (auto argName : subscript->getFullName().getArgumentNames())
+      nameComponents.push_back(addIdentifierRef(argName));
+
     unsigned abbrCode = DeclTypeAbbrCodes[SubscriptLayout::Code];
     SubscriptLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                 addDeclRef(DC),
@@ -1775,7 +1779,8 @@ void Serializer::writeDecl(const Decl *D) {
                                 addTypeRef(subscript->getInterfaceType()),
                                 addDeclRef(subscript->getGetter()),
                                 addDeclRef(subscript->getSetter()),
-                                addDeclRef(subscript->getOverriddenDecl()));
+                                addDeclRef(subscript->getOverriddenDecl()),
+                                nameComponents);
 
     writePattern(subscript->getIndices());
     break;

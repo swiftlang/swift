@@ -2266,13 +2266,15 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     TypeID declTypeID, elemTypeID, interfaceTypeID;
     DeclID getterID, setterID;
     DeclID overriddenID;
+    ArrayRef<uint64_t> argNameIDs;
 
     decls_block::SubscriptLayout::readRecord(scratch, contextID, isImplicit,
                                              isObjC, isOptional,
                                              declTypeID, elemTypeID,
                                              interfaceTypeID,
                                              getterID, setterID,
-                                             overriddenID);
+                                             overriddenID,
+                                             argNameIDs);
     auto Getter = cast_or_null<FuncDecl>(getDecl(getterID));
     auto Setter = cast_or_null<FuncDecl>(getDecl(setterID));
     auto DC = getDeclContext(contextID);
@@ -2286,9 +2288,14 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto subscript = new (ctx) SubscriptDecl(ctx.Id_subscript,
-                                             SourceLoc(), indices, SourceLoc(),
-                                             elemTy, DC);
+    // Resolve the name ids.
+    SmallVector<Identifier, 2> argNames;
+    for (auto argNameID : argNameIDs)
+      argNames.push_back(getIdentifier(argNameID));
+
+    DeclName name(ctx, ctx.Id_subscript, argNames);
+    auto subscript = new (ctx) SubscriptDecl(name, SourceLoc(), indices,
+                                             SourceLoc(), elemTy, DC);
     declOrOffset = subscript;
 
     subscript->setAccessors(SourceRange(), Getter, Setter);

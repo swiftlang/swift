@@ -2114,9 +2114,18 @@ void SubscriptDecl::setIndices(Pattern *p) {
   // FIXME: What context should the indices patterns be in?
 }
 
+Type SubscriptDecl::getIndicesType() const {
+  return getType()->castTo<AnyFunctionType>()->getInput();
+}
+
+Type SubscriptDecl::getIndicesInterfaceType() const {
+  // FIXME: Unfortunate that we can't really capture the generic parameters
+  // here.
+  return getInterfaceType()->castTo<AnyFunctionType>()->getInput();
+}
 
 ObjCSubscriptKind SubscriptDecl::getObjCSubscriptKind() const {
-  auto indexTy = getIndices()->getType();
+  auto indexTy = getIndicesType();
 
   // Look through a named 1-tuple.
   if (auto tupleTy = indexTy->getAs<TupleType>()) {
@@ -2234,6 +2243,37 @@ static Type getSelfTypeForContainer(AbstractFunctionDecl *theMethod,
   
   // Nonmutating methods on structs and enums pass the receiver by value.
   return selfTy;
+}
+
+DeclName AbstractFunctionDecl::getEffectiveFullName() const {
+  if (getFullName())
+    return getFullName();
+
+  if (auto func = dyn_cast<FuncDecl>(this)) {
+    if (auto subscript
+          = dyn_cast_or_null<SubscriptDecl>(func->getAccessorStorageDecl())) {
+      switch (func->getAccessorKind()) {
+        case AccessorKind::IsDidSet:
+        case AccessorKind::IsWillSet:
+        case AccessorKind::NotAccessor:
+          break;
+
+        case AccessorKind::IsGetter:
+          return subscript->getFullName();
+
+        case AccessorKind::IsSetter: {
+          auto &ctx = getASTContext();
+          SmallVector<Identifier, 4> argNames;
+          argNames.push_back(Identifier());
+          argNames.append(subscript->getFullName().getArgumentNames().begin(),
+                          subscript->getFullName().getArgumentNames().end());
+          return DeclName(ctx, ctx.Id_subscript, argNames);
+        }
+      }
+    }
+  }
+
+  return DeclName();
 }
 
 void AbstractFunctionDecl::setGenericParams(GenericParamList *GP) {
