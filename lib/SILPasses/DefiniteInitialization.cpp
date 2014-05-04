@@ -129,6 +129,34 @@ namespace {
   };
 }
 
+/// This implements the lattice merge operation for 2 optional DIKinds.
+static Optional<DIKind> mergeKinds(Optional<DIKind> OK1, Optional<DIKind> OK2) {
+  // If OK1 is unset, ignore it.
+  if (!OK1.hasValue())
+    return OK2;
+
+  DIKind K1 = OK1.getValue();
+
+  // If "this" is already partial, we won't learn anything.
+  if (K1 == DIKind::Partial)
+    return K1;
+
+  // If OK2 is unset, take K1.
+  if (!OK2.hasValue())
+    return K1;
+
+  DIKind K2 = OK2.getValue();
+
+  // If "K1" is yes, or no, then switch to partial if we find a different
+  // answer.
+  if (K1 != K2)
+    return DIKind::Partial;
+
+  // Otherwise, we're still consistently Yes or No.
+  return K1;
+}
+
+
 namespace {
   /// AvailabilitySet - This class stores an array of lattice values for tuple
   /// elements being analyzed for liveness computations.  Each element is
@@ -219,32 +247,8 @@ namespace {
     void mergeIn(const AvailabilitySet &RHS) {
       // Logically, this is an elementwise "this = merge(this, RHS)" operation,
       // using the lattice merge operation for each element.
-      for (unsigned i = 0, e = size(); i != e; ++i) {
-        Optional<DIKind> RO = RHS.getConditional(i);
-        
-        // If RHS is unset, ignore it.
-        if (!RO.hasValue())
-          continue;
-
-        DIKind R = RO.getValue();
-        
-        // If This is unset, take R
-        Optional<DIKind> TO = getConditional(i);
-        if (!TO.hasValue()) {
-          set(i, R);
-          continue;
-        }
-        DIKind T = TO.getValue();
-        
-        // If "this" is already partial, we won't learn anything.
-        if (T == DIKind::Partial)
-          continue;
-        
-        // If "T" is yes, or no, then switch to partial if we find a different
-        // answer.
-        if (T != R)
-          set(i, DIKind::Partial);
-      }
+      for (unsigned i = 0, e = size(); i != e; ++i)
+        set(i, mergeKinds(getConditional(i), RHS.getConditional(i)));
     }
   };
 }
@@ -1316,10 +1320,10 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
 }
 
 Optional<DIKind> LifetimeChecker::getLiveOut1(SILBasicBlock *BB) {
-  LiveOutBlockState &BBState = getBlockInfo(BB);
-  switch (BBState.LOState) {
+  LiveOutBlockState *BBState = &getBlockInfo(BB);
+  switch (BBState->LOState) {
   case LiveOutBlockState::IsKnown:
-    return BBState.getAvailability(0);
+    return BBState->getAvailability(0);
   case LiveOutBlockState::IsComputingLiveOut:
     // In cyclic cases we contribute no information, allow other nodes feeding
     // in to define the successors liveness.
@@ -1329,50 +1333,51 @@ Optional<DIKind> LifetimeChecker::getLiveOut1(SILBasicBlock *BB) {
     break;
   }
 
+  // Anything that our initial pass knew as a definition is still a definition
+  // live out of this block.  Something known to be not-defined in a predecessor
+  // does not drop it to "partial".
+  auto LocalAV = BBState->getAvailabilityConditional(0);
+  if (LocalAV.hasValue() && LocalAV.getValue() == DIKind::Yes) {
+    BBState->setBlockAvailability1(LocalAV.getValue());
+    return LocalAV;
+  }
+
   // Set the block's state to reflect that we're currently processing it.  This
   // is required to handle cycles properly.
-  BBState.LOState = LiveOutBlockState::IsComputingLiveOut;
+  BBState->LOState = LiveOutBlockState::IsComputingLiveOut;
 
   // Compute the liveness of our predecessors value.
-  Optional<DIKind> Result = BBState.getAvailabilityConditional(0);
+  Optional<DIKind> Result = BBState->getAvailabilityConditional(0);
   getPredsLiveOut1(BB, Result);
 
+  // Computing predecessor live-out information may invalidate BBState.
+  // Refresh it.
+  BBState = &getBlockInfo(BB);
+
+  // Finally, cache and return our result.
+  if (Result) {
+    BBState->setBlockAvailability1(Result.getValue());
+  } else {
+    // If the result is still unknown, then do not cache the result.  This
+    // can happen in cyclic cases where a predecessor is being recursively
+    // analyzed.  Not caching here means that this block will have to be
+    // reanalyzed again if a future query for it comes along.
+    //
+    // In principle this algorithm should be rewritten to use standard dense RPO
+    // bitvector algorithms someday.
+    BBState->LOState = LiveOutBlockState::IsUnknown;
+  }
+
   // Otherwise, we're golden.  Return success.
-  getBlockInfo(BB).setBlockAvailability1(Result.getValue());
-  return Result.getValue();
+  return Result;
 }
 
 void LifetimeChecker::getPredsLiveOut1(SILBasicBlock *BB,
                                        Optional<DIKind> &Result) {
-  bool LiveInAny = false, LiveInAll = true;
-
-  // If we have a starting point, incorporate it into our state.
-  if (Result.hasValue()) {
-    if (Result.getValue() != DIKind::No)
-      LiveInAny = true;
-    if (Result.getValue() != DIKind::Yes)
-      LiveInAll = false;
-  }
-
-  // Recursively processes all of our predecessor blocks.  If any of them is
-  // not live out, then we aren't either.
-  for (auto P : BB->getPreds()) {
-    auto LOPred = getLiveOut1(P);
-    if (!LOPred.hasValue()) continue;
-    
-    if (LOPred.getValue() != DIKind::No)
-      LiveInAny = true;
-
-    if (LOPred.getValue() != DIKind::Yes)
-      LiveInAll = false;
-  }
-
-  if (LiveInAll)
-    Result = DIKind::Yes;
-  else if (LiveInAny)
-    Result = DIKind::Partial;
-  else
-    Result = DIKind::No;
+  // Recursively processes all of our predecessor blocks and merge the dataflow
+  // facts together.
+  for (auto P : BB->getPreds())
+    Result = mergeKinds(Result, getLiveOut1(P));
 }
 
 /// Compute the set of live-outs for the specified basic block, which merges
@@ -1383,10 +1388,10 @@ AvailabilitySet LifetimeChecker::getLiveOutN(SILBasicBlock *BB) {
   switch (BBState->LOState) {
   case LiveOutBlockState::IsKnown:
     return BBState->getAvailabilitySet();
-  case LiveOutBlockState::IsComputingLiveOut: {
-    // Speculate that it will be live out in cyclic cases.
+  case LiveOutBlockState::IsComputingLiveOut:
+    // In cyclic cases we contribute no information, allow other nodes feeding
+    // in to define the successors liveness.
     return AvailabilitySet(TheMemory.NumElements);
-  }
   case LiveOutBlockState::IsUnknown:
     // Otherwise, process this block.
     break;
@@ -1431,13 +1436,10 @@ AvailabilitySet LifetimeChecker::getLiveOutN(SILBasicBlock *BB) {
 
 void LifetimeChecker::
 getPredsLiveOutN(SILBasicBlock *BB, AvailabilitySet &Result) {
-  // Recursively processes all of our predecessor blocks.  If any of them is
-  // not live out, then we aren't either.
-  for (auto P : BB->getPreds()) {
-    // The liveness of this block is the intersection of all of the predecessor
-    // block's liveness.
+  // Recursively processes all of our predecessor blocks and merge the dataflow
+  // facts together.
+  for (auto P : BB->getPreds())
     Result.mergeIn(getLiveOutN(P));
-  }
 }
 
 /// getLivenessAtInst - Compute the liveness state for any number of tuple
@@ -1483,7 +1485,13 @@ getLivenessAtInst(SILInstruction *Inst, unsigned FirstElt, unsigned NumElts) {
 
     Optional<DIKind> ResultVal = Nothing;
     getPredsLiveOut1(InstBB, ResultVal);
-    Result.set(0, ResultVal.getValue());
+
+    // If the result element wasn't computed, we must be analyzing code within
+    // an unreachable cycle that is not dominated by "TheMemory".  Just force
+    // the unset element to yes so that clients don't have to handle this.
+    if (!ResultVal) ResultVal = DIKind::Yes;
+
+    Result.set(0, ResultVal);
     return Result;
   }
 
@@ -1532,9 +1540,7 @@ getLivenessAtInst(SILInstruction *Inst, unsigned FirstElt, unsigned NumElts) {
   
   // If any of the elements was locally satisfied, make sure to mark them.
   for (unsigned i = FirstElt, e = i+NumElts; i != e; ++i) {
-    if (!NeededElements[i])
-      Result.set(i, DIKind::Yes);
-    else if (!Result.getConditional(i)) {
+    if (!NeededElements[i] || !Result.getConditional(i)) {
       // If the result element wasn't computed, we must be analyzing code within
       // an unreachable cycle that is not dominated by "TheMemory".  Just force
       // the unset element to yes so that clients don't have to handle this.
