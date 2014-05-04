@@ -133,6 +133,8 @@ void swift::ide::printSubmoduleInterface(
 
   AdjustedOptions.PrintDefaultParameterPlaceholder = true;
 
+  AdjustedOptions.PrintAttrTransparent = false;
+
   SmallVector<Decl *, 1> Decls;
   M->getDisplayDecls(Decls);
 

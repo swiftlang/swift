@@ -81,6 +81,10 @@ struct PrintOptions {
   /// List of attribute kinds that should not be printed.
   std::vector<DeclAttrKind> ExcludeAttrList;
 
+  /// Whether to print '@transparent'.
+  /// FIXME: Remove this once this attribute becomes a DeclAttr.
+  bool PrintAttrTransparent = true;
+
   /// Whether to print '@unchecked' inside declarations imported from
   /// Objective-C.  If false, print @implicitly unwrapped optionals as normal optionals.
   bool PrintImplicitlyUnwrappedOptionalInImportedDecls = true;
@@ -121,6 +125,7 @@ struct PrintOptions {
     result.SkipImplicit = false;
     result.SkipLeadingUnderscoreDecls = false;
     result.PrintImplicitAttrs = true;
+    result.PrintAttrTransparent = true;
     result.PrintParameterNames = true;
     result.PrintDocumentationComments = true;
     result.PrintRegularClangComments = true;
