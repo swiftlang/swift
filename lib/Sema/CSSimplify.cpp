@@ -97,7 +97,8 @@ matchCallArguments(ConstraintSystem &cs,
   // Local function that claims the argument at \c nextArgIdx, returning the
   // index of the claimed argument. This is primarily a helper for
   // \c claimNextNamed.
-  auto claim = [&](Identifier expectedName) -> unsigned {
+  auto claim = [&](Identifier expectedName, bool ignoreNameClash = false)
+                  -> unsigned {
     // Make sure we can claim this argument.
     assert(nextArgIdx != numArgs && "Must have a valid index to claim");
     assert(!claimedArgs[nextArgIdx] && "Argument already claimed");
@@ -105,7 +106,8 @@ matchCallArguments(ConstraintSystem &cs,
     if (!actualArgNames.empty()) {
       // We're recording argument names; record this one.
       actualArgNames[nextArgIdx] = expectedName;
-    } else if (argTuple->getFields()[nextArgIdx].getName() != expectedName) {
+    } else if (argTuple->getFields()[nextArgIdx].getName() != expectedName &&
+               !ignoreNameClash) {
       // We have an argument name mismatch. Start recording argument names.
       actualArgNames.resize(numArgs);
 
@@ -133,6 +135,23 @@ matchCallArguments(ConstraintSystem &cs,
   auto skipClaimedArgs = [&]() {
     while (nextArgIdx != numArgs && claimedArgs[nextArgIdx])
       ++nextArgIdx;
+  };
+
+  // Location function that determines whether the parameter at the given
+  // index can be treated as a trailing closure.
+  auto paramIsTrailingClosure = [&](unsigned paramIdx) -> bool {
+    for (unsigned i = paramIdx; i != numParams; ++i) {
+      const auto &param = paramTuple->getFields()[i];
+      auto type = param.isVararg() ? param.getVarargBaseTy() : param.getType();
+      auto funcTy = type->getAs<FunctionType>();
+      if (!funcTy)
+        return false;
+
+      if (funcTy->isAutoClosure())
+        return false;
+    }
+
+    return true;
   };
 
   // Local function that retrieves the next unclaimed argument with the given
@@ -210,6 +229,15 @@ matchCallArguments(ConstraintSystem &cs,
       potentiallyOutOfOrder = true;
       nextArgIdx = i;
       return claim(name);
+    }
+
+    // If the current parameter appears to be a trailing closure, consume as if
+    // the name were always correct.
+    // FIXME: This is a hack. We should know whether it's a trailing closure
+    // or not.
+    if (paramIsTrailingClosure(paramIdx)) {
+      return claim(argTuple->getFields()[nextArgIdx].getName(),
+                   /*ignoreNameClash=*/true);
     }
 
     // If the next argument has a name, check whether that name applies to
