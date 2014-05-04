@@ -53,14 +53,18 @@ to all three of the components.
   when you need "C array" performance.  The elements of a
   ``NativeArray`` are always stored contiguously in memory.
 
+  .. image:: NativeArray.png
+
 * ``Array<T>`` is like ``NativeArray<T>``, but optimized for efficient
   conversions from Cocoa and back—when ``T`` can be a class type,
   ``Array<T>`` can be backed by the (potentially non-contiguous)
   storage of an arbitrary ``NSArray`` rather than by a Swift
-  ``NativeArray``.  When ``T`` is known to be a non-class type, the
-  performance of ``Array<T>`` is identical to that of
-  ``NativeArray<T>``.  It also supports up- and down- casts between
-  arrays of related class types.
+  ``NativeArray``.  ``Array<T>`` also supports up- and down- casts
+  between arrays of related class types.  When ``T`` is known to be a
+  non-class type, the performance of ``Array<T>`` is identical to that
+  of ``NativeArray<T>``.
+
+  .. image:: Array.png
 
 * ``Slice<T>`` is a subrange of some ``Array<T>`` or
   ``NativeArray<T>``; it's the result of using slice notation,
@@ -73,6 +77,8 @@ to all three of the components.
   long-term storage.  Since it references a sub-range of some shared
   backing buffer, a ``Slice`` may artificially prolong the lifetime of
   elements outside the ``Slice`` itself.
+
+  .. image:: Slice.png
 
 Mutation Semantics
 ------------------
@@ -103,7 +109,7 @@ Unfortunately, full consistent reference semantics would also be
 problematic with this design, because during array growth, at some
 point available capacity is filled, and the array's buffer needs be
 reallocated.  The only way to keep changes to the array visible
-through its copies once the buffer was reallocated would be to add a
+through its copies once the buffer is reallocated would be to add a
 level of indirection between the arrays and their shared buffer, which
 would conflict with our primary performance goals, requiring a hoist
 optimization that we are again unlikely to get for 1.0.
