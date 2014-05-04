@@ -603,6 +603,7 @@ Optional<unsigned> CodeCompletionString::getFirstTextChunkIndex() const {
     auto &C = getChunks()[i];
     switch (C.getKind()) {
     case CodeCompletionString::Chunk::ChunkKind::Text:
+      return i;
     case CodeCompletionString::Chunk::ChunkKind::LeftParen:
     case CodeCompletionString::Chunk::ChunkKind::RightParen:
     case CodeCompletionString::Chunk::ChunkKind::LeftBracket:
@@ -614,8 +615,6 @@ Optional<unsigned> CodeCompletionString::getFirstTextChunkIndex() const {
     case CodeCompletionString::Chunk::ChunkKind::ExclamationMark:
     case CodeCompletionString::Chunk::ChunkKind::QuestionMark:
     case CodeCompletionString::Chunk::ChunkKind::Ampersand:
-      return i;
-
     case CodeCompletionString::Chunk::ChunkKind::OverrideKeyword:
     case CodeCompletionString::Chunk::ChunkKind::DeclIntroducer:
     case CodeCompletionString::Chunk::ChunkKind::CallParameterName:
