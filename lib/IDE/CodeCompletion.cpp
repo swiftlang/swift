@@ -1636,13 +1636,11 @@ public:
       return false;
     }
 
-    {
-      llvm::SaveAndRestore<Optional<SemanticContextKind>>
-      ChangeForcedSemanticContext(ForcedSemanticContext,
-                                  SemanticContextKind::OtherModule);
-      lookupVisibleMemberDecls(*this, ExprType, CurrDeclContext,
-                               TypeResolver.get());
-    }
+    // Ignore the internal members of Optional, like getLogicValue() and
+    // getMirror().
+    // These are not commonly used and cause noise and confusion when showing
+    // among the the members of the underlying type. If someone really wants to
+    // use them they can write them directly.
 
     return true;
   }
