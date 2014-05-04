@@ -20,6 +20,7 @@
 #include <stdint.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <malloc/malloc.h>
 #include <asl.h>
 
 
@@ -39,7 +40,7 @@ reportOnCrash(const char *message)
   char *newMessage;
   if (oldMessage) {
     asprintf(&newMessage, "%s%s", oldMessage, message);
-    free(oldMessage);
+    if (malloc_size(oldMessage)) free(oldMessage);
   } else {
     newMessage = strdup(message);
   }
