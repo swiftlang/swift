@@ -880,7 +880,7 @@ bool ConstraintSystem::diagnoseFailureFromConstraints(Expr *expr) {
   }
   
   if (valueMemberConstraint) {
-    auto memberName = valueMemberConstraint->getMember().getBaseName().str();
+    auto memberName = valueMemberConstraint->getMember().getBaseName();
     TC.diagnose(expr->getLoc(),
                 diag::could_not_find_member,
                 memberName)

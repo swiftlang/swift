@@ -64,7 +64,7 @@ ERROR(cannot_find_appropriate_overload,sema,none,
       "arguments", (StringRef))
 
 ERROR(could_not_find_member,sema,none,
-      "could not find member '%0'", (StringRef))
+      "could not find member %0", (Identifier))
 
 ERROR(could_not_convert_argument,sema,none,
       "argument type %0 does not convert to %1", (Type, Type))
