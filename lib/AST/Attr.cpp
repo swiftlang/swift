@@ -71,6 +71,12 @@ void DeclAttributes::print(ASTPrinter &Printer,
                   Options.ExcludeAttrList.end(),
                   DA->getKind()) != Options.ExcludeAttrList.end())
       continue;
+    if (!Options.ExclusiveAttrList.empty()) {
+      if (std::find(Options.ExclusiveAttrList.begin(),
+                    Options.ExclusiveAttrList.end(),
+                    DA->getKind()) == Options.ExclusiveAttrList.end())
+        continue;
+    }
 
     DA->print(Printer);
   }

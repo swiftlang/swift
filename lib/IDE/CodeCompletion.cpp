@@ -1796,6 +1796,9 @@ public:
       if (Reason == DeclVisibilityKind::MemberOfSuper)
         OS << "override ";
       PrintOptions Options;
+      Options.PrintImplicitAttrs = false;
+      Options.PrintAttrTransparent = false;
+      Options.ExclusiveAttrList.push_back(DAK_noreturn);
       Options.FunctionDefinitions = false;
       Options.PrintDefaultParameterPlaceholder = false;
       FD->print(OS, Options);
@@ -1816,6 +1819,9 @@ public:
     {
       llvm::raw_svector_ostream OS(DeclStr);
       PrintOptions Options;
+      Options.PrintImplicitAttrs = false;
+      Options.PrintAttrTransparent = false;
+      Options.ExclusiveAttrList.push_back(DAK_noreturn);
       Options.FunctionDefinitions = false;
       Options.PrintDefaultParameterPlaceholder = false;
       CD->print(OS, Options);

@@ -81,6 +81,10 @@ struct PrintOptions {
   /// List of attribute kinds that should not be printed.
   std::vector<DeclAttrKind> ExcludeAttrList;
 
+  /// List of attribute kinds that should be printed exclusively.
+  /// Empty means allow all.
+  std::vector<DeclAttrKind> ExclusiveAttrList;
+
   /// Whether to print '@transparent'.
   /// FIXME: Remove this once this attribute becomes a DeclAttr.
   bool PrintAttrTransparent = true;
