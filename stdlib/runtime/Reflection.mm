@@ -129,8 +129,8 @@ struct QuickLookObject {
     Point,
     Size,
     Logical,
-    View,
     Range,
+    View,
     Raw,
   } Kind;
 };
