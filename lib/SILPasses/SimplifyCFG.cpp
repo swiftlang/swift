@@ -20,6 +20,7 @@
 #include "swift/SILAnalysis/DominanceAnalysis.h"
 #include "swift/SILPasses/Transforms.h"
 #include "swift/SILPasses/Utils/Local.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
 using namespace swift;
@@ -754,13 +755,14 @@ bool SimplifyCFG::simplifyUnreachableBlock(UnreachableInst *UI) {
   auto BB = UI->getParent();
   auto I = std::next(BB->rbegin());
   auto End = BB->rend();
+  SmallVector<SILInstruction *, 8> DeadInstrs;
 
   // Walk backwards deleting instructions that should be safe to delete
   // in a block that ends with unreachable.
   while (I != End) {
-    auto Dead = I++;
+    auto MaybeDead = I++;
 
-    switch (Dead->getKind()) {
+    switch (MaybeDead->getKind()) {
       // These technically have side effects, but not ones that matter
       // in a block that we shouldn't really reach...
     case ValueKind::StrongRetainInst:
@@ -770,24 +772,34 @@ bool SimplifyCFG::simplifyUnreachableBlock(UnreachableInst *UI) {
       break;
 
     default:
-      if (Dead->mayHaveSideEffects())
+      if (MaybeDead->mayHaveSideEffects()) {
+        if (Changed)
+          for (auto Dead : DeadInstrs)
+            Dead->eraseFromParent();
         return Changed;
+      }
     }
 
-    for (unsigned i = 0, e = Dead->getNumTypes(); i != e; ++i)
-      if (!SILValue(&*Dead, i).use_empty())
-        SILValue(&*Dead, i).replaceAllUsesWith(SILUndef::get(Dead->getType(i),
-                                                             BB->getModule()));
+    for (unsigned i = 0, e = MaybeDead->getNumTypes(); i != e; ++i)
+      if (!SILValue(&*MaybeDead, i).use_empty()) {
+        auto Undef = SILUndef::get(MaybeDead->getType(i), BB->getModule());
+        SILValue(&*MaybeDead, i).replaceAllUsesWith(Undef);
+      }
 
-    Dead->eraseFromParent();
+    DeadInstrs.push_back(&*MaybeDead);
     Changed = true;
   }
 
   // If this block was changed and it now consists of only the unreachable,
   // make sure we process its predecessors.
-  if (Changed && isOnlyUnreachable(BB))
-    for (auto *P : BB->getPreds())
-      addToWorklist(P);
+  if (Changed) {
+    for (auto Dead : DeadInstrs)
+      Dead->eraseFromParent();
+
+    if (isOnlyUnreachable(BB))
+      for (auto *P : BB->getPreds())
+        addToWorklist(P);
+  }
 
   return Changed;
 }
