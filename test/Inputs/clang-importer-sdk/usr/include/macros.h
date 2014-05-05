@@ -49,3 +49,8 @@
 
 #define DISPATCH_TIME_NOW (0ull)
 #define DISPATCH_TIME_FOREVER (~0ull)
+
+#define BIT_SHIFT_1 (1 << 0)
+#define BIT_SHIFT_2 (1 << 2)
+#define BIT_SHIFT_3 (3LL << 3)
+#define BIT_SHIFT_4 (1U << 1)

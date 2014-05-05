@@ -53,6 +53,16 @@ ClangModuleUnit *ClangImporter::Implementation::getClangModuleForMacro(
   return getWrapperForModule(importer, M);
 }
 
+template <typename T = clang::Expr>
+static const T *
+parseNumericLiteral(ClangImporter::Implementation &impl,
+                    const clang::Token &tok) {
+  auto result = impl.getClangSema().ActOnNumericConstant(tok);
+  if (result.isUsable())
+    return dyn_cast<T>(result.get());
+  return nullptr;
+}
+
 static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
                                        DeclContext *DC,
                                        const clang::MacroInfo *MI,
@@ -77,21 +87,15 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
       return nullptr;
   }
 
-  clang::ActionResult<clang::Expr*> result =
-    Impl.getClangSema().ActOnNumericConstant(tok);
-  if (result.isUsable()) {
-    const clang::Expr *parsed = result.get();
-
+  if (const clang::Expr *parsed = parseNumericLiteral<>(Impl, tok)) {
     auto clangTy = parsed->getType();
     auto type = Impl.importType(clangTy, ImportTypeKind::Value);
     if (!type)
       return nullptr;
 
     if (auto *integer = dyn_cast<clang::IntegerLiteral>(parsed)) {
-
       // Determine the value.
-      llvm::APSInt value(integer->getValue(),
-                         integer->getType()->isUnsignedIntegerType());
+      llvm::APSInt value{integer->getValue(), clangTy->isUnsignedIntegerType()};
 
       // If there was a - sign, negate the value.
       // If there was a ~, flip all bits.
@@ -305,6 +309,31 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
 
     break;
   }
+  case 3: {
+    // Check for a three-token expression of the form <number> << <number>.
+    // No signs or inner parentheses are allowed here.
+    // FIXME: What about people who define BIT_MASK(pos) helper macros?
+    if (tokenI[0].is(clang::tok::numeric_constant) &&
+        tokenI[1].is(clang::tok::lessless) &&
+        tokenI[2].is(clang::tok::numeric_constant)) {
+      auto *base = parseNumericLiteral<clang::IntegerLiteral>(impl, tokenI[0]);
+      auto *shift = parseNumericLiteral<clang::IntegerLiteral>(impl, tokenI[2]);
+      if (!base || !shift)
+        return nullptr;
+
+      auto clangTy = base->getType();
+      auto type = impl.importType(clangTy, ImportTypeKind::Value);
+      if (!type)
+        return nullptr;
+
+      llvm::APSInt value{ base->getValue() << shift->getValue(),
+                          clangTy->isUnsignedIntegerType() };
+      return impl.createConstant(name, DC, type, clang::APValue(value),
+                                 ConstantConvertKind::Coerce, /*static=*/false,
+                                 ClangN);
+    }
+    break;
+  }
   case 5:
     // Check for the literal series of tokens (void*)0. (We've already stripped
     // one layer of parentheses.)
@@ -313,11 +342,8 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
         tokenI[2].is(clang::tok::star) &&
         tokenI[3].is(clang::tok::r_paren) &&
         tokenI[4].is(clang::tok::numeric_constant)) {
-      clang::ActionResult<clang::Expr*> result =
-        impl.getClangSema().ActOnNumericConstant(tokenI[4]);
-      if (!result.isUsable())
-        break;
-      auto *integerLiteral = dyn_cast<clang::IntegerLiteral>(result.get());
+      auto *integerLiteral =
+        parseNumericLiteral<clang::IntegerLiteral>(impl, tokenI[4]);
       if (!integerLiteral || integerLiteral->getValue() != 0)
         break;
       return importNil(impl, DC, name, ClangN);
