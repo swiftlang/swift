@@ -137,7 +137,7 @@ Latest
   even at higher optimization levels.
 
   Alternatively, assertions can be disabled/enabled by using the frontend flag
-  "-AssertConfig=Debug", or "-AssertConfig=Release".
+  "-assert-config Debug", or "-assert-config Release".
 
 * Added optimization flag "-Ofast". It disables all assertions (assert), and
   runtime overflow and type checks.
