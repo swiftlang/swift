@@ -2320,23 +2320,23 @@ namespace {
         break;
       }
       
-      // Allow for casts from AnyObject to String through NSString.
-      if (tc.isBridgedDynamicConversion(fromType, toType)) {
-        auto NSStringType = tc.getNSStringType(cs.DC);
+      // Allow for casts from AnyObject to a briged type.
+      if (tc.isBridgedDynamicConversion(cs.DC, fromType, toType)) {
+        auto bridgedType = tc.getBridgedType(cs.DC, toType);
         
-        if (!NSStringType.isNull()) {
-          sub->setType(NSStringType);
+        if (!bridgedType.isNull()) {
+          sub->setType(bridgedType);
           
           sub = tc.coerceToRValue(expr->getSubExpr());
           if (!sub)
             return nullptr;
           expr->setSubExpr(sub);
           
-          expr->getCastTypeLoc().setType(NSStringType,
+          expr->getCastTypeLoc().setType(bridgedType,
                                          true);
           
           expr->setType(tc.getOptionalType(expr->getLoc(),
-                                           NSStringType));
+                                           bridgedType));
           
           auto optionalStringType = tc.getOptionalType(expr->getLoc(),
                                                        toType);
@@ -3103,13 +3103,18 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
   auto &tc = solution.getConstraintSystem().getTypeChecker();
   Type fromType = expr->getType();
   
-  if (tc.isBridgedDynamicConversion(toType, fromType)) {
-    // Need to coerce from String to NSString.
-    auto NSStringType = tc.getNSStringType(cs.DC);
+  if (tc.isBridgedDynamicConversion(cs.DC, toType, fromType)) {
+    // Need to coerce to the briged type.
+    auto bridgedType = tc.getBridgedType(cs.DC, fromType);
     
-    if (!NSStringType.isNull()) {
-      expr = coerceViaUserConversion(expr, NSStringType, locator);
-      fromType = NSStringType;
+    if (!bridgedType.isNull() &&
+        // Protect against "no-op" conversions. If the bridged type points back
+        // to itself, the constraint solver won't have a conversion handy to
+        // coerce to a user conversion, so we'll should avoid creating a new
+        // expression node.
+        (bridgedType.getPointer() != fromType.getPointer())) {
+      expr = coerceViaUserConversion(expr, bridgedType, locator);
+      fromType = bridgedType;
     }
   }
   

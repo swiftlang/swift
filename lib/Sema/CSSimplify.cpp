@@ -1829,14 +1829,14 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
       return SolutionKind::Solved;
   }
   
-  // If possible, redirect the coercion from String to NSString.
-  if (TC.isBridgedDynamicConversion(protocol->getDeclaredType(), type)) {
-    auto NSStringType = TC.getNSStringType(DC);
+  // If possible, redirect the coercion to a bridged type.
+  if (TC.isBridgedDynamicConversion(DC, protocol->getDeclaredType(), type)) {
+    auto bridgedType = TC.getBridgedType(DC, type);
     
-    if (!NSStringType.isNull()) {
+    if (!bridgedType.isNull()) {
       simplifyRestrictedConstraint(ConversionRestrictionKind::User,
                                    type,
-                                   NSStringType,
+                                   bridgedType,
                                    TypeMatchKind::Conversion,
                                    TMF_GenerateConstraints,
                                    locator);

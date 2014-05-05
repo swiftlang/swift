@@ -673,9 +673,13 @@ public:
   
   /// \brief Determine if a given concrete type can be coerced to an existential
   /// protocol type.
-  /// FIXME: This is currently only allowed for coercions from AnyObject to
-  /// String via NSString.
-  bool isBridgedDynamicConversion(Type protocolType, Type concreteType);
+  bool isBridgedDynamicConversion(DeclContext *dc,
+                                  Type protocolType,
+                                  Type concreteType);
+  
+  /// \brief Return the bridged Objective-C type if possbile, otherwise return
+  /// a null Type.
+  Type getBridgedType(DeclContext *dc, Type type);
 
   /// \brief Type check the given expression as an array bound, which converts
   /// it to a builtin integer value.

@@ -881,7 +881,8 @@ bool ConstraintSystem::diagnoseFailureFromConstraints(Expr *expr) {
     // Capture the first non-disjunction constraint we find. We'll use this
     // if we can't find a clearer reason for the failure.
     if (!fallbackConstraint &&
-        (constraint->getKind() != ConstraintKind::Disjunction)) {
+        (constraint->getKind() != ConstraintKind::Disjunction) &&
+        (constraint->getKind() != ConstraintKind::Conjunction)) {
       fallbackConstraint = constraint;
     }
     

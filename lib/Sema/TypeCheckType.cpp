@@ -80,12 +80,14 @@ Type TypeChecker::getNSStringType(DeclContext *dc) {
   return NSStringType;
 }
 
-bool TypeChecker::isBridgedDynamicConversion(Type protocolType, Type concreteType) {
+bool TypeChecker::isBridgedDynamicConversion(DeclContext *dc,
+                                             Type protocolType,
+                                             Type concreteType) {
   if (auto protocol = protocolType->getAs<ProtocolType>()) {
     if (protocol->getDecl()->
         isSpecificProtocol(KnownProtocolKind::AnyObject)) {
       if (auto nominalType = concreteType->getAs<NominalType>()) {
-        if (nominalType->getDecl() == Context.getStringDecl()) {
+        if (getBridgedType(dc, nominalType)) {
           return true;
         }
       }
@@ -94,7 +96,31 @@ bool TypeChecker::isBridgedDynamicConversion(Type protocolType, Type concreteTyp
   
   return false;
 }
-        
+
+Type TypeChecker::getBridgedType(DeclContext *dc, Type type) {
+  auto name = dc->getASTContext().getIdentifier("bridgeToObjectiveC");
+  auto result = lookupMember(type, name,
+                             dc,
+                             true);
+  
+  if (!result.empty()) {
+    auto memberDecl = result.front();
+    auto memberType = memberDecl->getType();
+    
+    // Unwrap the inner function from self -> () -> bridgedType.
+    if (auto functionType =
+            dyn_cast<FunctionType>(memberType.getPointer())) {
+      if (auto innerFunctionType =
+              dyn_cast<FunctionType>(functionType->getResult().getPointer())) {
+        return innerFunctionType->getResult();
+      }
+    }
+  }
+  
+  return Type();
+}
+
+
 Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl,
                                        DeclContext *fromDC,
                                        bool isSpecialized,
