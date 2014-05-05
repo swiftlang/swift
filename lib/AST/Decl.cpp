@@ -2260,7 +2260,6 @@ DeclName AbstractFunctionDecl::getEffectiveFullName() const {
     if (auto afd = func->getAccessorStorageDecl()) {
       auto &ctx = getASTContext();
       auto subscript = dyn_cast<SubscriptDecl>(afd);
-      auto var = dyn_cast<VarDecl>(afd);
       switch (func->getAccessorKind()) {
         case AccessorKind::NotAccessor:
           break;
