@@ -143,6 +143,13 @@ matchCallArguments(ConstraintSystem &cs,
     for (unsigned i = paramIdx; i != numParams; ++i) {
       const auto &param = paramTuple->getFields()[i];
       auto type = param.isVararg() ? param.getVarargBaseTy() : param.getType();
+      type = type->getRValueInstanceType();
+
+      // Look through optionals.
+      if (auto optValue = type->getAnyOptionalObjectType()) {
+        type = optValue;
+      }
+
       auto funcTy = type->getAs<FunctionType>();
       if (!funcTy)
         return false;
