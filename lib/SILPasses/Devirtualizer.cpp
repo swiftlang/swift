@@ -428,6 +428,116 @@ static ApplyInst *replaceDynApplyWithStaticApply(ApplyInst *AI, SILFunction *F,
   return SAI;
 }
 
+namespace {
+
+struct DevirtInfo {
+  SILValue Self = SILValue();
+  ArrayRef<Substitution> Subs = ArrayRef<Substitution>();
+  SILType SubstCalleeType = SILType();
+  SILType Type = SILType();
+
+  DevirtInfo() {}
+  DevirtInfo(SILValue Self, SILType SubstCalleeType)
+    : Self(Self), SubstCalleeType(SubstCalleeType) {}
+};
+
+}
+
+static bool optimizeApplyOfNormalConformanceWitnessMethod(
+    ApplyInst *AI, WitnessMethodInst *WMI, ProtocolConformance *C,
+    SILFunction *F, DevirtInfo Info={}) {
+
+  // Ok, we found the member we are looking for. Devirtualize away!
+  SILBuilder Builder(AI);
+  SILLocation Loc = AI->getLoc();
+  FunctionRefInst *FRI = Builder.createFunctionRef(Loc, F);
+
+  // Collect args from the apply inst.
+  ArrayRef<Operand> ApplyArgs = AI->getArgumentOperands();
+  SmallVector<SILValue, 4> Args;
+
+  // Add self to the Args list...
+  if (!Info.Self)
+    Info.Self = ApplyArgs[0].get();
+  Args.push_back(Info.Self);
+
+  // Then add the rest of the arguments.
+  for (auto &A : ApplyArgs.slice(1))
+    Args.push_back(A.get());
+
+  SmallVector<Substitution, 16> NewSubstList(Info.Subs.begin(),
+                                             Info.Subs.end());
+
+  // Add the non-self-derived substitutions from the original application.
+  assert(AI->getSubstitutions().size() && "Subst list must not be empty");
+  assert(AI->getSubstitutions()[0].Archetype->getSelfProtocol() &&
+         "The first substitution needS to be a 'self' substitution.");
+  for (auto &origSub : AI->getSubstitutions().slice(1)) {
+    if (!origSub.Archetype->isSelfDerived())
+      NewSubstList.push_back(origSub);
+  }
+
+  if (!Info.SubstCalleeType)
+    Info.SubstCalleeType = AI->getSubstCalleeSILType();
+  if (!Info.Type)
+    Info.Type = AI->getType();
+
+  ApplyInst *SAI = Builder.createApply(Loc, FRI, Info.SubstCalleeType,
+                                       Info.Type, NewSubstList, Args);
+  AI->replaceAllUsesWith(SAI);
+  AI->eraseFromParent();
+  NumAMI++;
+  return true;
+}
+
+static bool optimizeApplyOfInheritedConformanceWitnessMethod(
+    ApplyInst *AI, WitnessMethodInst *WMI, ProtocolConformance *C,
+    SILFunction *F, SILWitnessTable *WT) {
+  // Since we do not need to worry about substitutions, we can just insert an
+  // upcast of self to the appropriate type.
+  SILValue Self = AI->getArgumentOperands()[0].get();
+  CanType Ty = WT->getConformance()->getType()->getCanonicalType();
+  SILType SILTy = SILType::getPrimitiveType(Ty, Self.getType().getCategory());
+  SILType SelfTy = Self.getType();
+  (void)SelfTy;
+
+  assert(SILTy.isSuperclassOf(SelfTy) &&
+         "Should only create upcasts for sub class devirtualization.");
+  Self = SILBuilder(AI).createUpcast(AI->getLoc(), Self, SILTy);
+
+  SmallVector<Substitution, 16> SelfDerivedSubstitutions;
+  for (auto &origSub : AI->getSubstitutions())
+    if (origSub.Archetype->isSelfDerived())
+      SelfDerivedSubstitutions.push_back(origSub);
+
+  // If we have more than 1 substitution on AI that is self derived, that means
+  // we either have a property or a typealias. We currently do not specialize
+  // those correctly implying that we will have an archetype instead of a
+  // concrete type here that we can not work with. Thus bail and don't do
+  // anything.
+  if (SelfDerivedSubstitutions.size() > 1)
+    return false;
+
+  // Grab self and substitute into the old generic callee type to get the new
+  // non-generic callee type.
+  assert(SelfDerivedSubstitutions.size() == 1 &&
+         "Must have a substitution for self.");
+  Substitution S = AI->getSubstitutions()[0];
+  S.Replacement = Ty;
+
+  CanSILFunctionType OrigType = AI->getOrigCalleeType();
+  CanSILFunctionType SubstCalleeType = OrigType->substInterfaceGenericArgs(
+      AI->getModule(), AI->getModule().getSwiftModule(),
+      ArrayRef<Substitution>(S));
+
+  SILType SubstCalleeSILType = SILType::getPrimitiveObjectType(SubstCalleeType);
+
+  // Then pass of our new self to the normal protocol conformance witness method
+  // handling code.
+  DevirtInfo DInfo = DevirtInfo{Self, SubstCalleeSILType};
+  return optimizeApplyOfNormalConformanceWitnessMethod(AI, WMI, C, F, DInfo);
+}
+
 /// Devirtualize apply instructions that call witness_method instructions:
 ///
 ///   %8 = witness_method $Optional<UInt16>, #LogicValue.getLogicValue!1
@@ -444,77 +554,36 @@ bool SILDevirtualizer::optimizeApplyOfWitnessMethod(ApplyInst *AI,
   // Lookup the function reference in the witness tables.
   SILFunction *F;
   ArrayRef<Substitution> Subs;
-  SILWitnessTable *WitnessTable;
-  std::tie(F, WitnessTable, Subs) =
+  SILWitnessTable *WT;
+  std::tie(F, WT, Subs) =
       AI->getModule().findFuncInWitnessTable(C, AMI->getMember());
 
   if (!F) {
-    assert(!WitnessTable && "WitnessTable should always be null if F is.");
+    assert(!WT && "WitnessTable should always be null if F is.");
     DEBUG(llvm::dbgs() << "        FAIL: Did not find a matching witness "
                           "table or witness method.\n");
     return false;
   }
-  assert(WitnessTable && "WitnessTable should never be null if F is not.");
+  assert(WT && "WitnessTable should never be null if F is not.");
 
-  // Ok, we found the member we are looking for. Devirtualize away!
-  SILBuilder Builder(AI);
-  SILLocation Loc = AI->getLoc();
-  FunctionRefInst *FRI = Builder.createFunctionRef(Loc, F);
+  // Start by looking at the type of the witness table and the type of the
+  // witness table. If they are different, we have some combination of generic
+  // conformance, specialized generic conformance or inherited conformance. If
+  // we just have a simple conformance handle it quickly and effortlessly.
+  auto WTCType = WT->getConformance()->getType()->getCanonicalType();
+  auto CType = C->getType()->getCanonicalType();
+  if (WTCType == CType)
+    return optimizeApplyOfNormalConformanceWitnessMethod(AI, AMI, C, F);
 
-  // Collect args from the apply inst.
-  ArrayRef<Operand> ApplyArgs = AI->getArgumentOperands();
-  SmallVector<SILValue, 4> Args;
+  // Ok, we do not have a simple specialization to do here. First find out if
+  // there is a specialized conformance in our type hierarchy. If there is no
+  // such thing, we have a pure inherited protocol conformance.
+  if (Subs.empty())
+    return optimizeApplyOfInheritedConformanceWitnessMethod(AI, AMI, C, F, WT);
 
-  // Begin by upcasting self to the appropriate type if we have an inherited
-  // conformance...
-  SILValue Self = ApplyArgs[0].get();
-  if (C->getKind() == ProtocolConformanceKind::Inherited) {
-    CanType Ty = WitnessTable->getConformance()->getType()->getCanonicalType();
-    SILType SILTy = SILType::getPrimitiveType(Ty, Self.getType().getCategory());
-    SILType SelfTy = Self.getType();
-    (void)SelfTy;
-
-    if (Subs.size()) {
-      // If we have substitutions then we are an inherited specialized
-      // conformance. Substitute in the generic type so we upcast correctly.
-      GenericParamList *GP = C->getSubstitutedGenericParams();
-      if (!GP)
-        return false;
-
-      TypeSubstitutionMap TSM = GP->getSubstitutionMap(Subs);
-      SILTy = SILTy.subst(F->getModule(), F->getModule().getSwiftModule(), TSM);
-      SelfTy =
-          SelfTy.subst(F->getModule(), F->getModule().getSwiftModule(), TSM);
-    }
-
-    assert(SILTy.isSuperclassOf(SelfTy) &&
-           "Should only create upcasts for sub class devirtualization.");
-    Self = Builder.createUpcast(Loc, Self, SILTy);
-  }
-  // and then adding in either the original or newly upcasted value.
-  Args.push_back(Self);
-
-  // Then add the rest of the arguments.
-  for (auto &A : ApplyArgs.slice(1))
-    Args.push_back(A.get());
-
-  SmallVector<Substitution, 16> NewSubstList(Subs.begin(), Subs.end());
-
-  // Add the non-self-derived substitutions from the original application.
-  assert(AI->getSubstitutions().size() && "Subst list must not be empty");
-  assert(AI->getSubstitutions()[0].Archetype->getSelfProtocol() &&
-         "The first substitution needS to be a 'self' substitution.");
-  for (auto &origSub : AI->getSubstitutions().slice(1)) {
-    if (!origSub.Archetype->isSelfDerived())
-      NewSubstList.push_back(origSub);
-  }
-
-  ApplyInst *SAI = Builder.createApply(Loc, FRI, AI->getSubstCalleeSILType(),
-                                       AI->getType(), NewSubstList, Args);
-  AI->replaceAllUsesWith(SAI);
-  AI->eraseFromParent();
-  NumAMI++;
-  return true;
+  // Otherwise we have a mixed specialized, or mixed specialized inherited
+  // protocol conformance to deal with. Bail.
+  return false;
 }
 
 /// Devirtualize protocol_method + project_existential + init_existential
