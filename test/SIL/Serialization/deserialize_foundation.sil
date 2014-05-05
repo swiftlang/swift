@@ -1,0 +1,6 @@
+// Make sure that we can deserialize foundation.
+// RUN: %sil-opt -verify %libdir/swift/macosx/Foundation.swiftmodule -module-name Foundation -I=%libdir/swift/macosx -sdk=%sdk > /dev/null
+// RUN: llvm-bcanalyzer %libdir/swift/macosx/Foundation.swiftmodule | FileCheck %s
+// REQUIRES: sdk
+
+// CHECK-NOT: Unknown

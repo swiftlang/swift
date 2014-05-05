@@ -1,0 +1,6 @@
+// Make sure that we can deserialize AppKit.
+// RUN: %sil-opt -verify %libdir/swift/macosx/AppKit.swiftmodule -module-name AppKit -I=%libdir/swift/macosx -sdk=%sdk > /dev/null
+// RUN: llvm-bcanalyzer %libdir/swift/macosx/AppKit.swiftmodule | FileCheck %s
+// REQUIRES: sdk
+
+// CHECK-NOT: Unknown

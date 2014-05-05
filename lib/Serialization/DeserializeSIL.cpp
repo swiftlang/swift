@@ -1533,8 +1533,15 @@ void SILDeserializer::getAllSILFunctions() {
 
   for (auto KI = FuncTable->key_begin(), KE = FuncTable->key_end(); KI != KE;
        ++KI) {
+    // Attempt to lookup our name from the output module. If we have a
+    // definition already, don't do anything.
+    if (SILFunction *F = SILMod.lookUpFunction(*KI))
+      if (!F->isExternalDeclaration())
+        continue;
+
     auto DI = FuncTable->find(*KI);
     assert(DI != FuncTable->end() && "There should never be a key without data.");
+
     readSILFunction(*DI, nullptr, *KI, false);
   }
 }
