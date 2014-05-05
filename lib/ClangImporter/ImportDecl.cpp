@@ -473,7 +473,7 @@ static FuncDecl *makeOptionSetFactoryMethod(
   factoryDecl->setStatic();
   factoryDecl->setImplicit();
   
-  Type factoryType = FunctionType::get(rawArgType, retType);
+  Type factoryType = FunctionType::get(ParenType::get(C, rawType), retType);
   factoryType = FunctionType::get(selfDecl->getType(), factoryType);
   factoryDecl->setType(factoryType);
   factoryDecl->setBodyResultType(retType);
