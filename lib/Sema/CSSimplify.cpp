@@ -551,7 +551,7 @@ matchCallArguments(ConstraintSystem &cs,
       switch (cs.matchTypes(argTuple->getElementType(argIdx), paramTy,
                             TypeMatchKind::Conversion, subflags,
                             locator.withPathElement(
-                              LocatorPathElt::getTupleElement(paramIdx)))) {
+                              LocatorPathElt::getTupleElement(argIdx)))) {
       case ConstraintSystem::SolutionKind::Error:
         return ConstraintSystem::SolutionKind::Error;
 
