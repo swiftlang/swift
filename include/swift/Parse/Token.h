@@ -85,11 +85,23 @@ public:
   /// "if (Tok.is(tok::l_brace)) {...}".
   bool is(tok K) const { return Kind == K; }
   bool isNot(tok K) const { return Kind != K; }
-  
+
+  // Predicates to check to see if the token is any of a list of tokens.
+  bool isAny(tok K1, tok K2) const {
+    return Kind == K1 || Kind == K2;
+  }
+  bool isAny(tok K1, tok K2, tok K3) const {
+    return Kind == K1 || Kind == K2 || Kind == K3;
+  }
+
+  // Predicates to check to see if the token is not the same as any of a list.
+  bool isNotAny(tok K1, tok K2) const { return !isAny(K1, K2); }
+  bool isNotAny(tok K1, tok K2, tok K3) const { return !isAny(K1, K2, K3); }
+
   bool isAnyOperator() const {
-    return Kind == tok::oper_binary
-        || Kind == tok::oper_postfix
-        || Kind == tok::oper_prefix;
+    return Kind == tok::oper_binary ||
+           Kind == tok::oper_postfix ||
+           Kind == tok::oper_prefix;
   }
   bool isNotAnyOperator() const {
     return !isAnyOperator();
@@ -112,14 +124,14 @@ public:
   bool isEscapedIdentifier() const { return EscapedIdentifier; }
   /// \brief Set whether this token is an escaped identifier token.
   void setEscapedIdentifier(bool value) {
-    assert(!value || Kind == tok::identifier
-           && "only identifiers can be escaped identifiers");
+    assert(!value || Kind == tok::identifier &&
+           "only identifiers can be escaped identifiers");
     EscapedIdentifier = value;
   }
   
   bool isContextualKeyword(StringRef ContextKW) const {
-    return is(tok::identifier) && !isEscapedIdentifier()
-      && Text == ContextKW;
+    return is(tok::identifier) && !isEscapedIdentifier() &&
+           Text == ContextKW;
   }
   
   /// Return true if this is a contextual keyword that could be the start of a
