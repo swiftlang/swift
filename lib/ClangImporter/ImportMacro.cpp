@@ -184,14 +184,31 @@ static ValueDecl *importLiteral(ClangImporter::Implementation &Impl,
   }
 }
 
+static ValueDecl *importNil(ClangImporter::Implementation &Impl,
+                            DeclContext *DC,
+                            Identifier name,
+                            const clang::MacroInfo *clangN) {
+  auto nilVar = Impl.SwiftContext.getNilDecl();
+  auto nilExpr =
+    new (Impl.SwiftContext) DeclRefExpr(nilVar,
+                                        /*Loc=*/{},
+                                        /*Implicit=*/true,
+                                        /*Direct=*/false,
+                                        nilVar->getInterfaceType());
+  return Impl.createConstant(name, DC, nilExpr->getType(), nilExpr,
+                             ConstantConvertKind::None, /*static=*/false,
+                             clangN);
+}
+
 static bool isSignToken(const clang::Token &tok) {
   return tok.is(clang::tok::plus) || tok.is(clang::tok::minus);
 }
 
 static ValueDecl *importMacro(ClangImporter::Implementation &impl,
                               DeclContext *DC,
-                              Identifier name, clang::MacroInfo *macro,
-                              clang::MacroInfo *ClangN) {
+                              Identifier name,
+                              const clang::MacroInfo *macro,
+                              const clang::MacroInfo *ClangN) {
   // Ignore include guards.
   if (macro->isUsedForHeaderGuard())
     return nullptr;
@@ -210,12 +227,25 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
   if (suppressMacro)
     return nullptr;
 
+  auto numTokens = macro->getNumTokens();
+  auto tokenI = macro->tokens_begin(), tokenE = macro->tokens_end();
+
+  // Drop one layer of parentheses.
+  if (numTokens > 2 &&
+      tokenI[0].is(clang::tok::l_paren) &&
+      tokenE[-1].is(clang::tok::r_paren)) {
+    ++tokenI;
+    --tokenE;
+    numTokens -= 2;
+  }
+
   // FIXME: Ask Clang to try to parse and evaluate the expansion as a constant
   // expression instead of doing these special-case pattern matches.
-  if (macro->getNumTokens() == 1) {
+  switch (numTokens) {
+  case 1: {
     // Check for a single-token expansion of the form <literal>.
     // TODO: or <identifier>.
-    clang::Token const &tok = *macro->tokens_begin();
+    const clang::Token &tok = *tokenI;
     
     // If it's a literal token, we might be able to translate the literal.
     if (tok.isLiteral()) {
@@ -224,8 +254,17 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
 
     if (tok.is(clang::tok::identifier)) {
       auto clangID = tok.getIdentifierInfo();
+
       // If it's an identifier that is itself a macro, look into that macro.
       if (clangID->hasMacroDefinition()) {
+        auto isNilMacro =
+          llvm::StringSwitch<bool>(clangID->getName())
+#define NIL_MACRO(NAME) .Case(#NAME, true)
+#include "SuppressedMacros.def"
+          .Default(false);
+        if (isNilMacro)
+          return importNil(impl, DC, name, ClangN);
+
         auto macroID = impl.getClangPreprocessor().getMacroInfo(clangID);
         return importMacro(impl, DC, name, macroID, ClangN);
       }
@@ -234,15 +273,15 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
     }
     return nullptr;
   }
-
-  if (macro->getNumTokens() == 2) {
+  case 2: {
     // Check for a two-token expansion of the form +<number> or -<number>.
-    // These are technically subtly wrong because they allow things like:
+    // These are technically subtly wrong without parentheses because they
+    // allow things like:
     //   #define EOF -1
     //   int pred(int x) { return x EOF; }
     // but are pervasive in C headers anyway.
-    clang::Token const &first = macro->tokens_begin()[0];
-    clang::Token const &second = macro->tokens_begin()[1];
+    clang::Token const &first = tokenI[0];
+    clang::Token const &second = tokenI[1];
     
     if (isSignToken(first) && second.is(clang::tok::numeric_constant))
       return importNumericLiteral(impl, DC, macro, name, &first, second, ClangN);
@@ -252,23 +291,28 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
       return importStringLiteral(impl, DC, macro, name, second, /*objc*/true,
                                  ClangN);
 
-    return nullptr;
+    break;
   }
-
-  if (macro->getNumTokens() == 4) {
-    // Check for a four-token expansion of the form (+<number>) or (-<number>).
-    clang::Token const &lparenTok = macro->tokens_begin()[0];
-    clang::Token const &signTok = macro->tokens_begin()[1];
-    clang::Token const &litTok = macro->tokens_begin()[2];
-    clang::Token const &rparenTok = macro->tokens_begin()[3];
-    
-    if (lparenTok.is(clang::tok::l_paren) &&
-        rparenTok.is(clang::tok::r_paren) &&
-        isSignToken(signTok) &&
-        litTok.is(clang::tok::numeric_constant)) {
-      return importNumericLiteral(impl, DC, macro, name, &signTok, litTok,
-                                  ClangN);
+  case 5:
+    // Check for the literal series of tokens (void*)0. (We've already stripped
+    // one layer of parentheses.)
+    if (tokenI[0].is(clang::tok::l_paren) &&
+        tokenI[1].is(clang::tok::kw_void) &&
+        tokenI[2].is(clang::tok::star) &&
+        tokenI[3].is(clang::tok::r_paren) &&
+        tokenI[4].is(clang::tok::numeric_constant)) {
+      clang::ActionResult<clang::Expr*> result =
+        impl.getClangSema().ActOnNumericConstant(tokenI[4]);
+      if (!result.isUsable())
+        break;
+      auto *integerLiteral = dyn_cast<clang::IntegerLiteral>(result.get());
+      if (!integerLiteral || integerLiteral->getValue() != 0)
+        break;
+      return importNil(impl, DC, name, ClangN);
     }
+    break;
+  default:
+    break;
   }
 
   return nullptr;

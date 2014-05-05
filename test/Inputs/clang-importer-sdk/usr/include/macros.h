@@ -1,6 +1,9 @@
 #include <macros_impl.h>
 #include <macros_private_impl.h>
 
+// Get Clang's NULL.
+#include <stddef.h>
+
 #define M_PI 3.14159265358979
 #define M_PIf 3.14159265358979F
 #define GL_FALSE 0
@@ -29,4 +32,17 @@
 
 // Should be suppressed during import.
 #define NS_BLOCKS_AVAILABLE 1
+
+#define NULL_VIA_NAME (NULL)
+#define NULL_VIA_VALUE ((void *) 0)
+
+#ifndef nil
+# define nil ((id)0)
+#endif
+#define NULL_AS_NIL nil
+
+#ifndef Nil
+# define Nil ((Class)0)
+#endif
+#define NULL_AS_CLASS_NIL Nil
 
