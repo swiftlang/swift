@@ -771,6 +771,7 @@ namespace {
       theClass->setSuperclass(superclass);
       theClass->setCheckedInheritanceClause();
       theClass->setAddedImplicitInitializers(); // suppress all initializers
+      theClass->setForeign(true);
       addObjCAttribute(theClass, ObjCSelector(Impl.SwiftContext, 0, className));
       Impl.registerExternalDecl(theClass);
 

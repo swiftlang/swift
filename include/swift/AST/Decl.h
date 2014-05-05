@@ -475,8 +475,11 @@ class alignas(8) Decl {
     ///
     /// This is a value of \c StoredInheritsSuperclassInits.
     unsigned InheritsSuperclassInits : 2;
+
+    /// Whether this class is "foreign".
+    unsigned Foreign : 1;
   };
-  enum { NumClassDeclBits = NumNominalTypeDeclBits + 5 };
+  enum { NumClassDeclBits = NumNominalTypeDeclBits + 6 };
   static_assert(NumClassDeclBits <= 32, "fits in an unsigned");
 
   class EnumDeclBitfields {
@@ -2815,6 +2818,23 @@ public:
   /// have initializers in the class definition.
   void setRequiresStoredPropertyInits(bool requiresInits) {
     ClassDeclBits.RequiresStoredPropertyInits = requiresInits;
+  }
+
+  /// Whether this class is "foreign", meaning that it is implemented
+  /// by a runtime that Swift does not have first-class integration
+  /// with.  This generally means that:
+  ///   - class data is either abstracted or cannot be made to
+  ///     fit with Swift's metatype schema, and/or
+  ///   - there is no facility for subclassing or adding polymorphic
+  ///     methods to the class.
+  ///
+  /// We may find ourselves wanting to break this bit into more
+  /// precise chunks later.
+  bool isForeign() const {
+    return ClassDeclBits.Foreign;
+  }
+  void setForeign(bool isForeign = true) {
+    ClassDeclBits.Foreign = true;
   }
 
   /// Retrieve the destructor for this class.

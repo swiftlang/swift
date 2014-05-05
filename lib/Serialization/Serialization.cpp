@@ -1587,6 +1587,7 @@ void Serializer::writeDecl(const Decl *D) {
                             theClass->isObjC(),
                             theClass->getAttrs().requiresStoredPropertyInits(),
                             theClass->requiresStoredPropertyInits(),
+                            theClass->isForeign(),
                             addTypeRef(theClass->getSuperclass()),
                             protocols);
 

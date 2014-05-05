@@ -1546,6 +1546,7 @@ ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
   ClassDeclBits.RequiresStoredPropertyInits = 0;
   ClassDeclBits.InheritsSuperclassInits
     = static_cast<unsigned>(StoredInheritsSuperclassInits::Unchecked);
+  ClassDeclBits.Foreign = false;
 }
 
 DestructorDecl *ClassDecl::getDestructor() {

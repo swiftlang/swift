@@ -629,6 +629,7 @@ namespace decls_block {
     BCFixed<1>,        // explicitly objc?
     BCFixed<1>,        // requires stored property initial values (attribute)
     BCFixed<1>,        // requires stored property initial values
+    BCFixed<1>,        // foreign
     TypeIDField,       // superclass
     BCArray<DeclIDField> // protocols
     // Trailed by the generic parameters (if any), the decl context record, and

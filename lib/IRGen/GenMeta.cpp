@@ -2221,6 +2221,8 @@ static void emitObjCClassSymbol(IRGenModule &IGM,
 /// Emit the type metadata or metadata template for a class.
 void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
                               const StructLayout &layout) {
+  assert(!classDecl->isForeign());
+
   // TODO: classes nested within generic types
   llvm::Constant *init;
   bool isPattern;

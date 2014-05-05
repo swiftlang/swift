@@ -2103,12 +2103,14 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     DeclID contextID;
     bool isImplicit, isObjC, attrRequiresStoredPropertyInits;
     bool requiresStoredPropertyInits;
+    bool foreign;
     TypeID superclassID;
     ArrayRef<uint64_t> rawProtocolIDs;
     decls_block::ClassLayout::readRecord(scratch, nameID, contextID,
                                          isImplicit, isObjC,
                                          attrRequiresStoredPropertyInits,
                                          requiresStoredPropertyInits,
+                                         foreign,
                                          superclassID, rawProtocolIDs);
 
     auto DC = getDeclContext(contextID);
@@ -2133,6 +2135,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                           SourceLoc());
     if (requiresStoredPropertyInits)
       theClass->setRequiresStoredPropertyInits(true);
+    if (foreign)
+      theClass->setForeign();
     if (genericParams) {
       SmallVector<GenericTypeParamType *, 4> paramTypes;
       for (auto &genericParam : *theClass->getGenericParams()) {
