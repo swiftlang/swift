@@ -249,6 +249,12 @@ FUNCTION(GetFunctionMetadata, swift_getFunctionTypeMetadata, RuntimeCC,
          ARGS(TypeMetadataPtrTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind, ReadNone))
 
+// type_metadata_t *swift_getForeignTypeMetadata(type_metadata_t *nonUnique);
+FUNCTION(GetForeignTypeMetadata, swift_getForeignTypeMetadata, RuntimeCC,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(TypeMetadataPtrTy),
+         ATTRS(NoUnwind, ReadNone)) // only writes to runtime-private fields
+
 // type_metadata_t *swift_getGenericMetadata(type_metadata_pattern_t *pattern,
 //                                           const void *arguments);
 FUNCTION(GetGenericMetadata, swift_getGenericMetadata, RuntimeCC,

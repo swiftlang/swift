@@ -152,6 +152,10 @@ class LinkEntity {
     /// The metadata or metadata template for a type.
     /// The pointer is a canonical TypeBase*.
     TypeMetadata,
+
+    /// A foreign type metadata candidate.
+    /// The pointer is a canonical TypeBase*.
+    ForeignTypeMetadataCandidate,
     
     /// A type which is being mangled just for its string.
     /// The pointer is a canonical TypeBase*.
@@ -264,6 +268,12 @@ public:
     entity.Data = LINKENTITY_SET_FIELD(Kind, unsigned(Kind::TypeMetadata))
                 | LINKENTITY_SET_FIELD(IsIndirect, unsigned(isIndirect))
                 | LINKENTITY_SET_FIELD(IsPattern, unsigned(isPattern));
+    return entity;
+  }
+
+  static LinkEntity forForeignTypeMetadataCandidate(CanType type) {
+    LinkEntity entity;
+    entity.setForType(Kind::ForeignTypeMetadataCandidate, type);
     return entity;
   }
   

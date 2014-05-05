@@ -107,6 +107,13 @@ void LinkEntity::mangle(raw_ostream &buffer) const {
     return;
   }
 
+  //   global ::= 'M' directness type             // type metadata
+  case Kind::ForeignTypeMetadataCandidate:
+    buffer << "_TM";
+    mangler.mangleDirectness(false);
+    mangler.mangleType(getType(), ResilienceExpansion::Minimal, 0);
+    return;
+
   //   global ::= 'Mm' type                       // class metaclass
   case Kind::SwiftMetaclassStub:
     buffer << "_TMm";

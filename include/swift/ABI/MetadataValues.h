@@ -60,6 +60,9 @@ enum class MetadataKind : uintptr_t {
   /// An existential metatype.
   ExistentialMetatype = 15,
 
+  /// A foreign class, such as a Core Foundation class.
+  ForeignClass = 16,
+
   // Array types?
   // L-value types?
 

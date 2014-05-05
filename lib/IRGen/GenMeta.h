@@ -40,6 +40,7 @@ namespace irgen {
   class Explosion;
   class IRGenFunction;
   class IRGenModule;
+  class Size;
   class StructLayout;
 
   /// Is the given class known to have Swift-compatible metadata?
@@ -79,6 +80,12 @@ namespace irgen {
   /// Emit the metadata associated with the given class declaration.
   void emitClassMetadata(IRGenModule &IGM, ClassDecl *theClass,
                          const StructLayout &layout);
+
+  /// Emit the constant initializer of the type metadata candidate for
+  /// the given foreign class declaration.
+  llvm::Constant *emitForeignTypeMetadataInitializer(IRGenModule &IGM,
+                                                     CanType type,
+                                                     Size &addressPointOffset);
 
   /// Emit the metadata associated with the given struct declaration.
   void emitStructMetadata(IRGenModule &IGM, StructDecl *theStruct);

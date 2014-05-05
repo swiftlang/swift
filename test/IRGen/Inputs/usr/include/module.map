@@ -4,6 +4,10 @@ module ObjectiveC {
   header "BridgeTestObjectiveC.h" 
 }
 
+module CoreCooling {
+  header "CoreCooling.h"
+}
+
 module Foundation { 
   header "BridgeTestFoundation.h" 
 }

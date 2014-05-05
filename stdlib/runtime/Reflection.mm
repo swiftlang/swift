@@ -776,6 +776,7 @@ getImplementationForType(const Metadata *T, const OpaqueValue *Value) {
     return {T, &_TMdVSs13_StructMirror, &_TWPVSs13_StructMirrorSs6Mirror};
       
   case MetadataKind::ObjCClassWrapper:
+  case MetadataKind::ForeignClass:
   case MetadataKind::Class: {
     return getImplementationForClass(Value);
   }
@@ -846,6 +847,7 @@ getReflectableConformance(const Metadata *T, const OpaqueValue *Value) {
   switch (T->getKind()) {
   case MetadataKind::Tuple:
   case MetadataKind::Struct:
+  case MetadataKind::ForeignClass:
   case MetadataKind::ObjCClassWrapper:
   case MetadataKind::Class:
   case MetadataKind::Opaque:

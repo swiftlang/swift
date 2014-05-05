@@ -273,7 +273,7 @@ public:
   void addObjCClass(llvm::Constant *addr);
 
 private:
-  llvm::DenseMap<LinkEntity, llvm::GlobalVariable*> GlobalVars;
+  llvm::DenseMap<LinkEntity, llvm::Constant*> GlobalVars;
   llvm::DenseMap<LinkEntity, llvm::Function*> GlobalFuncs;
   llvm::StringMap<llvm::Constant*> GlobalStrings;
   llvm::StringMap<llvm::Constant*> GlobalUTF16Strings;
@@ -429,6 +429,7 @@ public:
   llvm::Constant *getAddrOfTypeMetadata(CanType concreteType,
                                         bool isIndirect, bool isPattern,
                                         llvm::Type *definitionType = nullptr);
+  llvm::Constant *getAddrOfForeignTypeMetadataCandidate(CanType concreteType);
   llvm::Constant *getAddrOfNominalTypeDescriptor(NominalTypeDecl *D,
                                         llvm::Type *definitionType);
   llvm::Constant *getAddrOfProtocolDescriptor(ProtocolDecl *D,

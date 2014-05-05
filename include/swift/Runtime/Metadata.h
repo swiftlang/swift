@@ -1186,6 +1186,64 @@ struct ObjCClassWrapperMetadata : public Metadata {
   const ClassMetadata *Class;
 };
 
+/// The structure of metadata for foreign types where the source
+/// language doesn't provide any sort of more interesting metadata for
+/// us to use.
+struct ForeignTypeMetadata : public Metadata {
+  using InitializationFunction_t =
+    void (*)(ForeignTypeMetadata *selectedMetadata);
+
+  /// Foreign type metadata may have extra header fields depending on
+  /// the flags.
+  struct HeaderPrefix {
+    /// An optional callback performed when a particular metadata object
+    /// is chosen as the unique structure.
+    InitializationFunction_t InitializationFunction;
+  };
+
+  struct HeaderType : HeaderPrefix, TypeMetadataHeader {};
+
+  /// The Swift-mangled name of the type.
+  const char *Name;
+
+  /// A pointer to the actual, runtime-uniqued metadata for this
+  /// type.  This is essentially an invasive cache for the lookup
+  /// structure.
+  const ForeignTypeMetadata *Unique;
+
+  /// Various flags.
+  enum : size_t {
+    /// This metadata has an initialization callback function.  If
+    /// this flag is not set, the metadata object needn't actually
+    /// have a InitializationFunction field.
+    HasInitializationFunction = 0x1,
+  } Flags;
+
+  bool hasInitializationFunction() const {
+    return Flags & HasInitializationFunction;
+  }
+
+  InitializationFunction_t getInitializationFunction() const {
+    assert(hasInitializationFunction());
+    return asFullMetadata(this)->InitializationFunction;
+  }
+};
+
+/// The structure of metadata objects for foreign class types.
+/// A foreign class is a foreign type with reference semantics and
+/// Swift-supported reference counting.  Generally this requires
+/// special logic in the importer.
+///
+/// We assume for now that foreign classes are entirely opaque
+/// to Swift introspection.
+struct ForeignClassMetadata : public ForeignTypeMetadata {
+  /// The superclass of the foreign class, if any.
+  const ForeignClassMetadata *SuperClass;
+
+  /// Reserved space.  For now, these should be zero-initialized.
+  void *Reserved[3];
+};
+
 /// The structure of type metadata for structs.
 struct StructMetadata : public Metadata {
   /// An out-of-line description of the type.
@@ -1599,6 +1657,10 @@ swift_getFunctionTypeMetadata(const Metadata *argMetadata,
 /// \brief Fetch a uniqued type metadata for an ObjC class.
 extern "C" const Metadata *
 swift_getObjCClassMetadata(const ClassMetadata *theClass);
+
+/// \brief Fetch a unique type metadata object for a foreign type.
+extern "C" const ForeignTypeMetadata *
+swift_getForeignTypeMetadata(ForeignTypeMetadata *nonUnique);
 
 /// \brief Fetch a uniqued metadata for a tuple type.
 ///

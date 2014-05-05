@@ -210,7 +210,7 @@ namespace {
     /// Regardless, the argument should be considered potentially
     /// invalid after this call.
     ///
-    /// FIXME: This doesn't actually handle races yet.
+    /// FIXME: locking!
     const Entry *add(Entry *entry) {
       // Maintain the linked list.
       /// TODO: Remove this when LLDB is able to understand the final data
@@ -357,6 +357,7 @@ swift::swift_dynamicCast(const void *object, const Metadata *targetType) {
       = static_cast<const ObjCClassWrapperMetadata *>(targetType)->Class;
     break;
 
+  case MetadataKind::ForeignClass: // FIXME
   case MetadataKind::Existential:
   case MetadataKind::ExistentialMetatype:
   case MetadataKind::Function:
@@ -388,6 +389,7 @@ swift::swift_dynamicCastUnconditional(const void *object,
       = static_cast<const ObjCClassWrapperMetadata *>(targetType)->Class;
     break;
 
+  case MetadataKind::ForeignClass: // FIXME
   case MetadataKind::Existential:
   case MetadataKind::ExistentialMetatype:
   case MetadataKind::Function:
@@ -423,6 +425,7 @@ swift::swift_dynamicCastIndirect(const OpaqueValue *value,
         return nullptr;
       break;
     }
+    case MetadataKind::ForeignClass: // FIXME
     case MetadataKind::Existential:
     case MetadataKind::ExistentialMetatype:
     case MetadataKind::Function:
@@ -438,6 +441,7 @@ swift::swift_dynamicCastIndirect(const OpaqueValue *value,
     }
     break;
       
+  case MetadataKind::ForeignClass: // FIXME
   case MetadataKind::Existential:
   case MetadataKind::ExistentialMetatype:
   case MetadataKind::Function:
@@ -476,6 +480,7 @@ swift::swift_dynamicCastIndirectUnconditional(const OpaqueValue *value,
       swift_dynamicCastUnconditional(object, targetType);
       break;
     }
+    case MetadataKind::ForeignClass: // FIXME
     case MetadataKind::Existential:
     case MetadataKind::ExistentialMetatype:
     case MetadataKind::Function:
@@ -491,6 +496,7 @@ swift::swift_dynamicCastIndirectUnconditional(const OpaqueValue *value,
     }
     break;
       
+  case MetadataKind::ForeignClass: // FIXME
   case MetadataKind::Existential:
   case MetadataKind::ExistentialMetatype:
   case MetadataKind::Function:
@@ -2062,6 +2068,67 @@ OpaqueValue *swift::swift_assignExistentialWithCopy(OpaqueValue *dest,
   return Witnesses::assignWithCopy(dest, const_cast<OpaqueValue*>(src), type);
 }
 
+/*** Foreign types *********************************************************/
+
+namespace {
+  /// A string whose data is globally-allocated.
+  struct GlobalString {
+    StringRef Data;
+    /*implicit*/ GlobalString(StringRef data) : Data(data) {}
+  };
+}
+
+template <>
+struct llvm::DenseMapInfo<GlobalString> {
+  static GlobalString getEmptyKey() {
+    return StringRef((const char*) 0, 0);
+  }
+  static GlobalString getTombstoneKey() {
+    return StringRef((const char*) 1, 0);
+  }
+  static unsigned getHashValue(const GlobalString &val) {
+    // llvm::hash_value(StringRef) is, unfortunately, defined out of
+    // line in a library we otherwise would not need to link against.
+    return llvm::hash_combine_range(val.Data.begin(), val.Data.end());
+  }
+  static bool isEqual(const GlobalString &lhs, const GlobalString &rhs) {
+    return lhs.Data == rhs.Data;
+  }
+};
+
+// We use a DenseMap over what are essentially StringRefs instead of a
+// StringMap because we don't need to actually copy the string.
+static llvm::DenseMap<GlobalString, const ForeignTypeMetadata *> ForeignTypes;
+
+const ForeignTypeMetadata *
+swift::swift_getForeignTypeMetadata(ForeignTypeMetadata *nonUnique) {
+  // Fast path: check the invasive cache.
+  if (nonUnique->Unique) return nonUnique->Unique;
+
+  // Okay, insert a new row.
+  // FIXME: locking!
+  auto insertResult = ForeignTypes.insert({GlobalString(nonUnique->Name),
+                                           nonUnique});
+  auto uniqueMetadata = insertResult.first->second;
+
+  // If the insertion created a new entry, set up the metadata we were
+  // passed as the insertion result.
+  if (insertResult.second) {
+    // Call the initialization callback if present.
+    if (nonUnique->hasInitializationFunction())
+      nonUnique->getInitializationFunction()(nonUnique);
+  }
+
+  // Remember the unique result in the invasive cache.  We don't want
+  // to do this until after the initialization completes; otherwise,
+  // it will be possible for code to fast-path through this function
+  // too soon.
+  nonUnique->Unique = uniqueMetadata;
+  return uniqueMetadata;
+}
+
+/*** Other metadata routines ***********************************************/
+
 const NominalTypeDescriptor *
 Metadata::getNominalTypeDescriptor() const {
   switch (getKind()) {
@@ -2075,6 +2142,7 @@ Metadata::getNominalTypeDescriptor() const {
   case MetadataKind::Struct:
   case MetadataKind::Enum:
     return static_cast<const StructMetadata *>(this)->Description;
+  case MetadataKind::ForeignClass:
   case MetadataKind::Opaque:
   case MetadataKind::Tuple:
   case MetadataKind::Function:
@@ -2129,6 +2197,11 @@ recur:
   case MetadataKind::ObjCClassWrapper: {
     auto wrapper = static_cast<const ObjCClassWrapperMetadata*>(type);
     TypeName = typeNameForObjCClass(wrapper->Class);
+    break;
+  }
+  case MetadataKind::ForeignClass: {
+    auto metadata = static_cast<const ForeignClassMetadata*>(type);
+    TypeName = metadata->Name;
     break;
   }
   case MetadataKind::Class: {
@@ -2199,7 +2272,16 @@ recur:
     type = swift_getObjCClassMetadata(super);
     goto recur;
   }
-      
+  case MetadataKind::ForeignClass: {
+    auto theClass = static_cast<const ForeignClassMetadata *>(type);
+    auto super = theClass->SuperClass;
+    if (!super)
+      return nullptr;
+
+    type = super;
+    goto recur;
+  }
+
   case MetadataKind::Tuple:
   case MetadataKind::Struct:
   case MetadataKind::Enum:
@@ -2251,6 +2333,7 @@ static void defaultPrint(OpaqueValue *value, const Metadata *type) {
   case MetadataKind::ExistentialMetatype:
   case MetadataKind::Metatype:
   case MetadataKind::ObjCClassWrapper:
+  case MetadataKind::ForeignClass:
     // TODO
     printf("<something>");
     type->getValueWitnesses()->destroy(value, type);

@@ -643,6 +643,11 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   case Kind::ValueWitness:
     return getNonUniqueSILLinkage(getTypeLinkage(getType()), forDefinition);
 
+  // Foreign type metadata candidates are always shared; the runtime
+  // does the uniquing.
+  case Kind::ForeignTypeMetadataCandidate:
+    return SILLinkage::Shared;
+
   case Kind::WitnessTableOffset:
   case Kind::Function:
   case Kind::Other:
@@ -947,7 +952,7 @@ Address IRGenModule::getAddrOfGlobalVariable(VarDecl *var,
                                              ForDefinition_t forDefinition) {
   // Check whether we've cached this.
   LinkEntity entity = LinkEntity::forNonFunction(var);
-  llvm::GlobalVariable *&entry = GlobalVars[entity];
+  llvm::Constant *&entry = GlobalVars[entity];
   if (entry) {
     llvm::GlobalVariable *gv = cast<llvm::GlobalVariable>(entry);
     if (forDefinition) updateLinkageForDefinition(*this, gv, entity);
@@ -1060,19 +1065,24 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
 /// llvm::GlobalVariable of that type.  Otherwise, the result will
 /// have type pointerToDefaultType and may involve bitcasts.
 static llvm::Constant *getAddrOfLLVMVariable(IRGenModule &IGM,
-                     llvm::DenseMap<LinkEntity, llvm::GlobalVariable*> &globals,
+                     llvm::DenseMap<LinkEntity, llvm::Constant*> &globals,
                                              LinkEntity entity,
                                              llvm::Type *definitionType,
                                              llvm::Type *defaultType,
                                              llvm::Type *pointerToDefaultType,
                                              DebugTypeInfo debugType) {
+  // This function assumes that 'globals' only contains GlobalVariable
+  // values for the entities that it will look up.
+
   auto &entry = globals[entity];
   if (entry) {
+    auto existing = cast<llvm::GlobalVariable>(entry);
+
     // If we're looking to define something, we may need to replace a
     // forward declaration.
     if (definitionType) {
       assert(entry->getType() == pointerToDefaultType);
-      updateLinkageForDefinition(IGM, entry, entity);
+      updateLinkageForDefinition(IGM, existing, entity);
 
       // If the type is right, we're done.
       if (definitionType == defaultType)
@@ -1101,9 +1111,10 @@ static llvm::Constant *getAddrOfLLVMVariable(IRGenModule &IGM,
   // If we have an existing entry, destroy it, replacing it with the
   // new variable.
   if (entry) {
+    auto existing = cast<llvm::GlobalVariable>(entry);
     auto castVar = llvm::ConstantExpr::getBitCast(var, pointerToDefaultType);
-    entry->replaceAllUsesWith(castVar);
-    entry->eraseFromParent();
+    existing->replaceAllUsesWith(castVar);
+    existing->eraseFromParent();
   }
 
   // Cache and return.
@@ -1112,7 +1123,7 @@ static llvm::Constant *getAddrOfLLVMVariable(IRGenModule &IGM,
 }
 
 static llvm::Constant *getAddrOfLLVMVariable(IRGenModule &IGM,
-                     llvm::DenseMap<LinkEntity, llvm::GlobalVariable*> &globals,
+                     llvm::DenseMap<LinkEntity, llvm::Constant*> &globals,
                                              LinkEntity entity,
                                              ForDefinition_t forDefinition,
                                              llvm::Type *defaultType,
@@ -1271,6 +1282,41 @@ llvm::Constant *IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
   return addr;
 }
 
+/// Return the address of a foreign-type metadata candidate.  There is no
+/// single translation unit which can uniquely emit foreign-type metadata,
+/// and we don't want to force the dynamic linker to eagerly unique them
+/// by symbol name, so instead we emit a "candidate" metadata and ask
+/// the runtime to unique them.
+llvm::Constant *
+IRGenModule::getAddrOfForeignTypeMetadataCandidate(CanType type) {
+  // What we save in GlobalVars is actually the offsetted value.
+  auto entity = LinkEntity::forForeignTypeMetadataCandidate(type);
+  auto &entry = GlobalVars[entity];
+  if (entry) return entry;
+
+  // Compute the constant initializer and the offset of the type
+  // metadata candidate within it.
+  Size addressPoint;
+  auto init = emitForeignTypeMetadataInitializer(*this, type, addressPoint);
+
+  // Create the global variable.
+  LinkInfo link = LinkInfo::get(*this, entity, ForDefinition);
+  auto var = link.createVariable(*this, init->getType());
+  var->setInitializer(init);
+
+  // Apply the offset.
+  llvm::Constant *result = var;
+  result = llvm::ConstantExpr::getBitCast(result, Int8PtrTy);
+  result = llvm::ConstantExpr::getInBoundsGetElementPtr(result,
+                                                        getSize(addressPoint));
+  result = llvm::ConstantExpr::getBitCast(result, TypeMetadataPtrTy);
+
+  // Only remember the offset.
+  entry = result;
+
+  return result;
+}
+
 /// Return the address of a nominal type descriptor.  Right now, this
 /// must always be for purposes of defining it.
 llvm::Constant *IRGenModule::getAddrOfNominalTypeDescriptor(NominalTypeDecl *D,
@@ -1357,16 +1403,17 @@ llvm::Constant *IRGenModule::getAddrOfValueWitnessTable(CanType concreteType,
 }
 
 static Address getAddrOfSimpleVariable(IRGenModule &IGM,
-                    llvm::DenseMap<LinkEntity, llvm::GlobalVariable*> &cache,
+                            llvm::DenseMap<LinkEntity, llvm::Constant*> &cache,
                                        LinkEntity entity,
                                        llvm::Type *type,
                                        Alignment alignment,
                                        ForDefinition_t forDefinition) {
   // Check whether it's already cached.
-  llvm::GlobalVariable *&entry = cache[entity];
+  llvm::Constant *&entry = cache[entity];
   if (entry) {
-    assert(alignment == Alignment(entry->getAlignment()));
-    if (forDefinition) updateLinkageForDefinition(IGM, entry, entity);
+    auto existing = cast<llvm::GlobalVariable>(entry);
+    assert(alignment == Alignment(existing->getAlignment()));
+    if (forDefinition) updateLinkageForDefinition(IGM, existing, entity);
     return Address(entry, alignment);
   }
 
