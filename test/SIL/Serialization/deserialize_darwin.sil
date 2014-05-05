@@ -1,5 +1,5 @@
 // Make sure that we can deserialize darwin.
-// RUN: %sil-opt -verify %libdir/swift/macosx/Darwin.swiftmodule -module-name Darwin -sdk=%sdk > /dev/null
+// RUN: %sil-opt -verify %libdir/swift/macosx/Darwin.swiftmodule -module-name Darwin -sdk=%sdk -target=%target-triple > /dev/null
 // RUN: llvm-bcanalyzer %libdir/swift/macosx/Darwin.swiftmodule | FileCheck %s
 // REQUIRES: sdk
 

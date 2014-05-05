@@ -1,5 +1,5 @@
 // Make sure that we can deserialize objective c.
-// RUN: %sil-opt -verify %libdir/swift/macosx/ObjectiveC.swiftmodule -module-name ObjectiveC -sdk=%sdk > /dev/null
+// RUN: %sil-opt -verify %libdir/swift/macosx/ObjectiveC.swiftmodule -module-name ObjectiveC -sdk=%sdk -target=%target-triple > /dev/null
 // RUN: llvm-bcanalyzer %libdir/swift/macosx/ObjectiveC.swiftmodule | FileCheck %s
 // REQUIRES: sdk
 

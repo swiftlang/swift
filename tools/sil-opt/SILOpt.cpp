@@ -94,6 +94,9 @@ SDKPath("sdk", llvm::cl::desc("The path to the SDK for use with the clang "
                               "importer."),
         llvm::cl::init(""));
 
+static llvm::cl::opt<std::string>
+Target("target", llvm::cl::desc("target triple"));
+
 static llvm::cl::opt<OptGroup> OptimizationGroup(
     llvm::cl::desc("Predefined optimization groups:"),
     llvm::cl::values(clEnumValN(OptGroup::Diagnostics, "diagnostics",
@@ -388,9 +391,11 @@ int main(int argc, char **argv) {
 
   // Give the context the list of search paths to use for modules.
   Invocation.setImportSearchPaths(ImportPaths);
-  // Set the SDK path if we are passed in one.
-  if (SDKPath.size())
+  // Set the SDK path and target if given.
+  if (!SDKPath.empty())
     Invocation.setSDKPath(SDKPath);
+  if (!Target.empty())
+    Invocation.setTargetTriple(Target);
   // Set the module cache path. If not passed in we use the default swift module
   // cache.
   Invocation.getClangImporterOptions().ModuleCachePath = ModuleCachePath;
