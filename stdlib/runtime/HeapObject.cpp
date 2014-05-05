@@ -415,3 +415,14 @@ void swift::_swift_abortRetainUnowned(const void *object) {
   (void)object;
   swift::crash("attempted to retain deallocated object");
 }
+
+// Return true if object is non-nil and has exactly one strong
+// reference
+extern "C" bool _swift_isUniquelyReferenced(HeapObject *object) {
+  // Sometimes we have a NULL "owner" object, e.g. because the data
+  // being referenced (usually via UnsafePointer<T>) has infinite
+  // lifetime, or lifetime managed outside the Swift object system.
+  // In these cases we have to assume the data is shared among
+  // multiple references, and needs to be copied before modification.
+  return object != nullptr && object->refCount < 2 * RC_INTERVAL;
+}
