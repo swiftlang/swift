@@ -80,20 +80,28 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
   clang::ActionResult<clang::Expr*> result =
     Impl.getClangSema().ActOnNumericConstant(tok);
   if (result.isUsable()) {
-    clang::Expr *parsed = result.get();
+    const clang::Expr *parsed = result.get();
+
+    auto clangTy = parsed->getType();
+    auto type = Impl.importType(clangTy, ImportTypeKind::Value);
+    if (!type)
+      return nullptr;
+
     if (auto *integer = dyn_cast<clang::IntegerLiteral>(parsed)) {
-      auto type = Impl.importType(integer->getType(), ImportTypeKind::Value);
-      if (!type)
-        return nullptr;
 
       // Determine the value.
       llvm::APSInt value(integer->getValue(),
                          integer->getType()->isUnsignedIntegerType());
 
       // If there was a - sign, negate the value.
-      if (signTok && signTok->is(clang::tok::minus) &&
-          !value.isMinSignedValue()) {
-        value = -value;
+      // If there was a ~, flip all bits.
+      if (signTok) {
+        if (signTok->is(clang::tok::minus)) {
+          if (!value.isMinSignedValue())
+            value = -value;
+        } else if (signTok->is(clang::tok::tilde)) {
+          value.flipAllBits();
+        }
       }
 
       return Impl.createConstant(name, DC, type, clang::APValue(value),
@@ -102,8 +110,8 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
     }
 
     if (auto *floating = dyn_cast<clang::FloatingLiteral>(parsed)) {
-      auto type = Impl.importType(floating->getType(), ImportTypeKind::Value);
-      if (!type)
+      // ~ doesn't make sense with floating-point literals.
+      if (signTok && signTok->is(clang::tok::tilde))
         return nullptr;
 
       llvm::APFloat value = floating->getValue();
@@ -189,6 +197,9 @@ static ValueDecl *importNil(ClangImporter::Implementation &Impl,
                             Identifier name,
                             const clang::MacroInfo *clangN) {
   auto nilVar = Impl.SwiftContext.getNilDecl();
+  if (!nilVar->hasInterfaceType())
+    if (auto typeResolver = Impl.getTypeResolver())
+      typeResolver->resolveDeclSignature(nilVar);
   auto nilExpr =
     new (Impl.SwiftContext) DeclRefExpr(nilVar,
                                         /*Loc=*/{},
@@ -201,7 +212,8 @@ static ValueDecl *importNil(ClangImporter::Implementation &Impl,
 }
 
 static bool isSignToken(const clang::Token &tok) {
-  return tok.is(clang::tok::plus) || tok.is(clang::tok::minus);
+  return tok.is(clang::tok::plus) || tok.is(clang::tok::minus) ||
+         tok.is(clang::tok::tilde);
 }
 
 static ValueDecl *importMacro(ClangImporter::Implementation &impl,

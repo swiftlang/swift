@@ -46,3 +46,6 @@
 #endif
 #define NULL_AS_CLASS_NIL Nil
 
+
+#define DISPATCH_TIME_NOW (0ull)
+#define DISPATCH_TIME_FOREVER (~0ull)
