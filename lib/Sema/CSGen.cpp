@@ -728,12 +728,8 @@ namespace {
                                          locator.withPathElement(
                                            LocatorPathElt::getTupleElement(i)));
 
-          // Only cons up a tuple element name in a function signature.
-          Identifier name;
-          if (forFunctionParam) name = findPatternName(tupleElt.getPattern());
-
           Type varArgBaseTy;
-          tupleTypeElts.push_back(TupleTypeElt(eltTy, name,
+          tupleTypeElts.push_back(TupleTypeElt(eltTy, Identifier(),
                                                tupleElt.getDefaultArgKind(),
                                                isVararg));
         }
@@ -776,6 +772,8 @@ namespace {
                        CS.getConstraintLocator(
                          expr,
                          LocatorPathElt::getTupleElement(0)));
+
+      // FIXME: If we want keyword arguments for closures, add them here.
       funcTy = FunctionType::get(paramTy, funcTy);
 
       return funcTy;
