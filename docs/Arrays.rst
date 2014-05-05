@@ -216,17 +216,15 @@ Bridging Rules and Terminology for all Types
     ``BridgedToObjectiveC`` and ``T`` == ``U``.  In this case ``T`` is
     **bridged verbatim**.
 
-* For a type ``T`` that is *bridged*, a value ``x`` of class type
-  **bridges back** to ``T`` as the first of these values that is
-  non-``nil``:
+* A value ``x`` of class type **bridges back** to ``T`` if 
 
-  - if ``T`` conforms to ``BridgedToObjectiveC``, ::
+  - ``T`` is *bridged*, and ::
+
        T.bridgeFromObjectiveC((x as T.ObjectiveCType)!)
 
-  - if ``T`` is a class type, ::
-      ``(x as T)``
+    is valid and non-nil,
 
-  Otherwise, ``x`` does not *bridge back* to ``T``.
+  - *or* if ``x`` has dynamic type ``T``
 
 Bridging To Objective-C
 -----------------------
@@ -246,8 +244,8 @@ Bridging To Objective-C
      We *could* also support construction of ``NSArray`` from
      ``Slice<T>`` at the cost of a single allocation
 
-* Constructing an ``NSArray`` from an array of un-\ *bridged* element
-  type is a fatal error detected at runtime.
+* Constructing an ``NSArray`` from an un-\ *bridged* ``Array<T>`` is a
+  fatal error detected at runtime.
 
   .. Admonition:: Implementation Note
 
@@ -258,7 +256,7 @@ Bridging To Objective-C
   once, on-demand, by calling ``bridgeToObjectiveC()`` on the original
   ``T``\ s, and will not be destroyed before the array from which they
   were extracted.  We cache these objects both in order to satisfy
-  Cocoa users' expectations of stable element identity, and because
+  Cocoa users' expectations of object identity, and because
   ``NSArray`` APIs such as ``getObjects:range:`` are required to
   expose elements without lifetime management.
 
@@ -269,17 +267,20 @@ Bridging From Objective-C
   O(1)
 
 * ``NSArray`` and ``Array<AnyObject>`` can be *explicitly* converted
-  to ``Array<T>?`` using ``a as Array<T>``.  There are several cases,
-  all O(1):
+  to ``Array<T>?`` using ``a as Array<T>``.  There are several cases:
 
-  - If ``T`` is not *bridged*, conversion fails, yielding nil
+  - If the ``NSArray`` was originally created as a Swift 
+    *ArrayType*\ ``<U>``, conversion is O(1) and succeeds if ``U`` 
+    is ``T`` or a subclass thereof
 
-  - If the ``NSArray`` was originally created as a Swift *ArrayType*\
-    ``<U>``, conversion succeeds if ``U`` is ``T`` or a subclass
-    thereof. No further dynamic type checks are required.
+  - Otherwise, if ``T`` is not *bridged*, conversion fails in O(1),
+    yielding nil
 
-  - Otherwise, conversion succeeds, but type-checking of elements is
-    deferred and on-demand.  The result of subscripting is the result
-    of *bridging back* the corresponding stored ``NSArray`` element to
-    ``T``.  Failure to *bridge back* is a fatal error detected at
-    runtime.
+  - Otherwise, if ``T`` is a pure ObjC class or protocol, conversion
+    succeeds unconditionally in O(1).  In that case, any individual
+    element that is not actually a ``T`` may be detected later by the
+    usual Objective-C means, most commonly an ``objc_msgSend``
+    failure.
+
+  - Otherwise, conversion is O(N) and succeeds iff every element of
+    the ``NSArray`` *bridges back* to ``T``.
