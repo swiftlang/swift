@@ -15,6 +15,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/Pattern.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeRepr.h"
@@ -146,6 +147,7 @@ public:
   bool walkToDeclPre(Decl *D) override;
   bool walkToDeclPost(Decl *D) override;
   bool walkToTypeReprPre(TypeRepr *T) override;
+  std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override;
 
 private:
   bool annotateIfConfigConditionIdentifiers(Expr *Cond);
@@ -344,6 +346,16 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
 
     SN.Attrs = NTD->getAttrs();
     pushStructureNode(SN);
+
+  } else if (auto *PD = dyn_cast<ParamDecl>(D)) {
+    SyntaxStructureNode SN;
+    SN.Dcl = D;
+    SN.Kind = SyntaxStructureKind::Parameter;
+    SN.NameRange = charSourceRangeFromSourceRange(SM, PD->getSourceRange());
+      SN.Range = SN.NameRange;
+    SN.Attrs = PD->getAttrs();
+    pushStructureNode(SN);
+
   } else if (auto *VD = dyn_cast<VarDecl>(D)) {
     const DeclContext *DC = VD->getDeclContext();
     if (DC->isTypeContext()) {
@@ -404,6 +416,10 @@ bool ModelASTWalker::walkToDeclPost(swift::Decl *D) {
     if (!(FD && FD->isAccessor())) {
       popStructureNode();
     }
+
+  } else if (isa<ParamDecl>(D)) {
+    popStructureNode();
+
   } else if (VarDecl *VD = dyn_cast<VarDecl>(D)) {
     const DeclContext *DC = VD->getDeclContext();
     if (DC->isTypeContext()) {
@@ -426,14 +442,24 @@ bool ModelASTWalker::walkToTypeReprPre(TypeRepr *T) {
                                             IdT->getIdentifier().getLength())
                           }))
       return false;
-
-  } else if (auto InOutT = dyn_cast<InOutTypeRepr>(T)) {
-    if (!passNonTokenNode({ SyntaxNodeKind::Keyword,
-                            CharSourceRange(InOutT->getInOutLoc(), /*'inout'*/5)
-                          }))
-      return false;
   }
   return true;
+}
+
+std::pair<bool, Pattern*> ModelASTWalker::walkToPatternPre(Pattern *P) {
+  if (!P->isImplicit()) {
+    if (auto TyPat = dyn_cast<TypedPattern>(P)) {
+      if (auto InOutT =
+           dyn_cast_or_null<InOutTypeRepr>(TyPat->getTypeLoc().getTypeRepr())) {
+        if (!passNonTokenNode({ SyntaxNodeKind::Keyword,
+                                CharSourceRange(InOutT->getInOutLoc(),
+                                                /*'inout'*/5)
+                              }))
+          return { false, nullptr };
+      }
+    }
+  }
+  return { true, P };
 }
 
 namespace {

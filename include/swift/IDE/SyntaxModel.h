@@ -63,6 +63,7 @@ enum class SyntaxStructureKind : uint8_t {
   InstanceFunction,
   StaticFunction,
   InstanceVariable,
+  Parameter,
   BraceStatement,
 };
 
