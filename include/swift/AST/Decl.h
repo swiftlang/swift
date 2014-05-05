@@ -3458,7 +3458,7 @@ protected:
 
   void setGenericParams(GenericParamList *GenericParams);
 public:
-  // FIXME: Hack that provides names with keyword arguments for subscripts.
+  // FIXME: Hack that provides names with keyword arguments for accessors.
   DeclName getEffectiveFullName() const;
 
   /// \brief If this is a method in a type extension for some type,

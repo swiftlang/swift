@@ -2257,24 +2257,28 @@ DeclName AbstractFunctionDecl::getEffectiveFullName() const {
     return getFullName();
 
   if (auto func = dyn_cast<FuncDecl>(this)) {
-    if (auto subscript
-          = dyn_cast_or_null<SubscriptDecl>(func->getAccessorStorageDecl())) {
+    if (auto afd = func->getAccessorStorageDecl()) {
+      auto &ctx = getASTContext();
+      auto subscript = dyn_cast<SubscriptDecl>(afd);
+      auto var = dyn_cast<VarDecl>(afd);
       switch (func->getAccessorKind()) {
-        case AccessorKind::IsDidSet:
-        case AccessorKind::IsWillSet:
         case AccessorKind::NotAccessor:
           break;
 
         case AccessorKind::IsGetter:
-          return subscript->getFullName();
+          return subscript ? subscript->getFullName()
+                           : DeclName(ctx, afd->getName(), { });
 
-        case AccessorKind::IsSetter: {
-          auto &ctx = getASTContext();
+        case AccessorKind::IsSetter:
+        case AccessorKind::IsDidSet:
+        case AccessorKind::IsWillSet: {
           SmallVector<Identifier, 4> argNames;
           argNames.push_back(Identifier());
-          argNames.append(subscript->getFullName().getArgumentNames().begin(),
-                          subscript->getFullName().getArgumentNames().end());
-          return DeclName(ctx, ctx.Id_subscript, argNames);
+          if (subscript) {
+            argNames.append(subscript->getFullName().getArgumentNames().begin(),
+                            subscript->getFullName().getArgumentNames().end());
+          }
+          return DeclName(ctx, afd->getName(), argNames);
         }
       }
     }
