@@ -1312,8 +1312,8 @@ Expr *Parser::parseExprIdentifier() {
   assert(Tok.is(tok::identifier) || Tok.is(tok::kw_self) ||
          Tok.is(tok::kw_Self));
 
-  Identifier name = Context.getIdentifier(Tok.getText());
-  SourceLoc loc = consumeToken();
+  Identifier name;
+  SourceLoc loc = consumeIdentifier(&name);
   SmallVector<TypeRepr*, 8> args;
   SourceLoc LAngleLoc, RAngleLoc;
   bool hasGenericArgumentList = false;
@@ -1428,9 +1428,9 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
         // The thing being capture specified is an identifier.
         // TODO: Generalize this to being full expressions, which can be
         // renamed.
-        if (!consumeIf(tok::identifier) &&
-            !consumeIf(tok::kw_self))
+        if (Tok.isNot(tok::identifier) && Tok.isNot(tok::kw_self))
           return false;
+        consumeIdentifier();
       } while (consumeIf(tok::comma));
       
       // The capture list needs to be closed off with a ']'.
@@ -1518,10 +1518,9 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
       // The thing being capture specified is an identifier.
       // TODO: Generalize this to being full expressions, which can be
       // renamed.
-      auto name = Context.getIdentifier(Tok.getText());
-      if (!consumeIf(tok::kw_self))
-        consumeToken(tok::identifier);
-      
+      Identifier name;
+      consumeIdentifier(&name);
+
       captureList.push_back(CaptureListEntry(kind, loc, name));
     } while (consumeIf(tok::comma));
     

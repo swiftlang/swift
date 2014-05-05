@@ -298,15 +298,14 @@ ParserResult<IdentTypeRepr> Parser::parseTypeIdentifier() {
   while (true) {
     SourceLoc Loc;
     Identifier Name;
-    if (Tok.isNot(tok::kw_Self)) {
+    if (Tok.is(tok::kw_Self)) {
+      Loc = consumeIdentifier(&Name);
+    } else {
       // FIXME: specialize diagnostic for 'Type': type can not start with
       // 'metatype'
       // FIXME: offer a fixit: 'self' -> 'Self'
       if (parseIdentifier(Name, Loc, diag::expected_identifier_in_dotted_type))
         Status.setIsParseError();
-    } else {
-      Name = Context.getIdentifier(Tok.getText());
-      Loc = consumeToken(tok::kw_Self);
     }
 
     if (Loc.isValid()) {
@@ -771,9 +770,8 @@ bool Parser::canParseType() {
 }
 
 bool Parser::canParseTypeIdentifier() {
-  if (Tok.isNot(tok::identifier) && Tok.isNot(tok::kw_Self)) {
+  if (Tok.isNot(tok::identifier) && Tok.isNot(tok::kw_Self))
     return false;
-  }
   
   while (true) {
     switch (Tok.getKind()) {
