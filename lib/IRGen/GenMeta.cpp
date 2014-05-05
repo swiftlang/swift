@@ -72,6 +72,13 @@ static Address createPointerSizedGEP(IRGenFunction &IGF,
                                          offset);
 }
 
+static llvm::Constant *getMangledTypeName(IRGenModule &IGM, CanType type) {
+  auto name = LinkEntity::forTypeMangling(type);
+  llvm::SmallString<32> mangling;
+  name.mangle(mangling);
+  return IGM.getAddrOfGlobalString(mangling);
+}
+
 /// Emit a reference to the Swift metadata for an Objective-C class.
 static llvm::Value *emitObjCMetadataRef(IRGenFunction &IGF,
                                         ClassDecl *theClass) {
@@ -840,11 +847,8 @@ namespace {
     
     void addName() {
       NominalTypeDecl *ntd = asImpl().getTarget();
-      auto name = LinkEntity::forTypeMangling(
-                                    ntd->getDeclaredType()->getCanonicalType());
-      llvm::SmallString<32> mangling;
-      name.mangle(mangling);
-      addWord(IGM.getAddrOfGlobalString(mangling));
+      addWord(getMangledTypeName(IGM,
+                                 ntd->getDeclaredType()->getCanonicalType()));
     }
     
     void addGenericParams() {
@@ -3215,11 +3219,8 @@ namespace {
     }
     
     void addName() {
-      auto name = LinkEntity::forTypeMangling(
-                              Protocol->getDeclaredType()->getCanonicalType());
-      llvm::SmallString<32> mangling;
-      name.mangle(mangling);
-      Fields.push_back(IGM.getAddrOfGlobalString(mangling));
+      Fields.push_back(getMangledTypeName(IGM,
+                             Protocol->getDeclaredType()->getCanonicalType()));
     }
     
     void addInherited() {
