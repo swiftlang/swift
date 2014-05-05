@@ -327,7 +327,7 @@ public:
   Identifier getBoundName() const { return Var->getName(); }
 
   SourceLoc getLoc() const { return Var->getLoc(); }
-  SourceRange getSourceRange() const { return getLoc(); }
+  SourceRange getSourceRange() const { return Var->getSourceRange(); }
 
   static bool classof(const Pattern *P) {
     return P->getKind() == PatternKind::Named;

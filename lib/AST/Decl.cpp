@@ -1980,6 +1980,12 @@ bool VarDecl::isSettable(DeclContext *UseDC) const {
   return hasStorage() || getSetter();
 }
 
+SourceRange VarDecl::getSourceRange() const {
+  if (auto Param = dyn_cast<ParamDecl>(this))
+    return Param->getSourceRange();
+  return getNameLoc();
+}
+
 SourceRange VarDecl::getTypeSourceRangeForDiagnostics() const {
   if (!getParentPattern())
     return getSourceRange();

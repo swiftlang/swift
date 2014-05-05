@@ -326,13 +326,14 @@ mapParsedParameters(Parser &parser,
                                 TypeRepr *type) -> Pattern * {
     // Create the parameter based on the name.
     Pattern *param;
+    ParamDecl *var = nullptr;
     if (paramName.empty()) {
       if (paramNameLoc.isInvalid())
         paramNameLoc = letVarLoc;
       param = new (ctx) AnyPattern(paramNameLoc);
     } else {
       // Create a variable to capture this.
-      ParamDecl *var = new (ctx) ParamDecl(isLet, argNameLoc, argName,
+      var = new (ctx) ParamDecl(isLet, argNameLoc, argName,
                                            paramNameLoc, paramName, Type(), 
                                            parser.CurDeclContext);
       param = new (ctx) NamedPattern(var);
@@ -361,6 +362,8 @@ mapParsedParameters(Parser &parser,
       }
     }
 
+    if (var)
+      var->setParamParentPattern(param);
     return param;
   };
 
