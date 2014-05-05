@@ -2166,6 +2166,13 @@ static std::string typeNameForObjCClass(const ClassMetadata *cls)
     return ostream.str();
 }
 
+/// A cache used for swift_conformsToProtocol.
+static llvm::DenseMap<std::pair<const Metadata*, const ProtocolDescriptor*>,
+                      const void *> FoundProtocolConformances;
+/// Read-write lock used to guard FoundProtocolConformances during lookup
+static pthread_rwlock_t FoundProtocolConformancesLock
+  = PTHREAD_RWLOCK_INITIALIZER;
+
 /// \brief Check whether a type conforms to a given native Swift protocol,
 /// visible from the named module.
 ///
@@ -2181,7 +2188,6 @@ static std::string typeNameForObjCClass(const ClassMetadata *cls)
 const void *swift::swift_conformsToProtocol(const Metadata *type,
                                             const ProtocolDescriptor *protocol,
                                             const char *module) {
-recur:
   // FIXME: This is an unconscionable hack that only works for 1.0 because
   // we brazenly assume that:
   // - witness tables never require runtime instantiation
@@ -2190,6 +2196,27 @@ recur:
   // - all conformances are public, and defined in the same module as the
   //   conforming type
   // - only nominal types conform to protocols
+
+  // See whether we cached this lookup.
+  pthread_rwlock_rdlock(&FoundProtocolConformancesLock);
+  auto cached = FoundProtocolConformances.find({type, protocol});
+  if (cached != FoundProtocolConformances.end()) {
+    pthread_rwlock_unlock(&FoundProtocolConformancesLock);
+    return cached->second;
+  }
+  pthread_rwlock_unlock(&FoundProtocolConformancesLock);
+
+  auto origType = type;
+  auto origProtocol = protocol;
+  /// Cache and return the result.
+  auto cacheResult = [&](const void *result) -> const void * {
+    pthread_rwlock_wrlock(&FoundProtocolConformancesLock);
+    FoundProtocolConformances.insert({{origType, origProtocol}, result});
+    pthread_rwlock_unlock(&FoundProtocolConformancesLock);
+    return result;
+  };
+
+recur:
 
   std::string TypeName;
 
@@ -2223,7 +2250,7 @@ recur:
     // FIXME: Only check nominal types for now.
     auto *descriptor = type->getNominalTypeDescriptor();
     if (!descriptor)
-      return nullptr;
+      return cacheResult(nullptr);
     TypeName = std::string(descriptor->Name);
     break;
   }
@@ -2233,6 +2260,7 @@ recur:
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::HeapArray:
     assert(false);
+    return nullptr;
   }
   
   // Derive the symbol name that the witness table ought to have.
@@ -2248,8 +2276,8 @@ recur:
   mangledName.append(begin, end);
   
   // Look up the symbol for the conformance everywhere.
-  if (const void * result = dlsym(RTLD_DEFAULT, mangledName.c_str())) {
-    return result;
+  if (const void *result = dlsym(RTLD_DEFAULT, mangledName.c_str())) {
+    return cacheResult(result);
   }
   
   // If the type was a class, try again with the superclass.
@@ -2260,14 +2288,14 @@ recur:
     auto theClass = static_cast<const ClassMetadata *>(type);
     type = theClass->SuperClass;
     if (!type)
-      return nullptr;
+      return cacheResult(nullptr);
     goto recur;
   }
   case MetadataKind::ObjCClassWrapper: {
     auto wrapper = static_cast<const ObjCClassWrapperMetadata *>(type);
     auto super = class_getSuperclass(wrapper->Class);
     if (!super)
-      return nullptr;
+      return cacheResult(nullptr);
     
     type = swift_getObjCClassMetadata(super);
     goto recur;
@@ -2276,7 +2304,7 @@ recur:
     auto theClass = static_cast<const ForeignClassMetadata *>(type);
     auto super = theClass->SuperClass;
     if (!super)
-      return nullptr;
+      return cacheResult(nullptr);
 
     type = super;
     goto recur;
@@ -2290,7 +2318,7 @@ recur:
   case MetadataKind::Existential:
   case MetadataKind::ExistentialMetatype:
   case MetadataKind::Metatype:
-    return nullptr;
+    return cacheResult(nullptr);
       
   // Values should never use these metadata kinds.
   case MetadataKind::PolyFunction:
