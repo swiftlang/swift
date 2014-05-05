@@ -555,10 +555,12 @@ ParserResult<Stmt> Parser::parseStmtBreak() {
   Identifier Target;
 
   // If we have an identifier after this, which is not the start of another
-  // stmt or decl, we assume it is the label to break to.  There is ambiguity
-  // with expressions (e.g. "break x+y") but since the expression after the
-  // break is dead, we don't feel bad eagerly parsing this.
-  if (Tok.is(tok::identifier) && !isStartOfStmt() && !isStartOfDecl())
+  // stmt or decl, we assume it is the label to break to, unless there is a
+  // line break.  There is ambiguity with expressions (e.g. "break x+y") but
+  // since the expression after the break is dead, we don't feel bad eagerly
+  // parsing this.
+  if (Tok.is(tok::identifier) && !Tok.isAtStartOfLine() &&
+      !isStartOfStmt() && !isStartOfDecl())
     TargetLoc = consumeIdentifier(&Target);
 
   return makeParserResult(new (Context) BreakStmt(Loc, Target, TargetLoc));
@@ -575,10 +577,12 @@ ParserResult<Stmt> Parser::parseStmtContinue() {
   Identifier Target;
 
   // If we have an identifier after this, which is not the start of another
-  // stmt or decl, we assume it is the label to continue to.  There is ambiguity
-  // with expressions (e.g. "continue x+y") but since the expression after the
-  // continue is dead, we don't feel bad eagerly parsing this.
-  if (Tok.is(tok::identifier) && !isStartOfStmt() && !isStartOfDecl())
+  // stmt or decl, we assume it is the label to continue to, unless there is a
+  // line break.  There is ambiguity with expressions (e.g. "continue x+y") but
+  // since the expression after the continue is dead, we don't feel bad eagerly
+  // parsing this.
+  if (Tok.is(tok::identifier) && !Tok.isAtStartOfLine() &&
+      !isStartOfStmt() && !isStartOfDecl())
     TargetLoc = consumeIdentifier(&Target);
 
   return makeParserResult(new (Context) ContinueStmt(Loc, Target, TargetLoc));
