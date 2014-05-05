@@ -1430,6 +1430,15 @@ public:
 
   void visitClosureExpr(ClosureExpr *expr) {
     printClosure(expr, "closure_expr");
+
+    auto captures = expr->getCaptureList();
+    if (!captures.empty()) {
+      OS << " capturelist=" << captures[0].Name.str();
+      for (const auto &elt : captures.slice(1))
+        OS << ',' << elt.Name.str();
+    }
+
+
     if (expr->hasSingleExpressionBody()) {
       OS << " single-expression\n";
       printRec(expr->getSingleExpressionBody());

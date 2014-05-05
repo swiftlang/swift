@@ -1650,10 +1650,9 @@ ParserResult<Expr> Parser::parseExprClosure() {
   unsigned discriminator = CurLocalContext->claimNextClosureDiscriminator();
 
   // Create the closure expression and enter its context.
-  ClosureExpr *closure = new (Context) ClosureExpr(params, arrowLoc,
-                                                   explicitResultType,
-                                                   discriminator,
-                                                   CurDeclContext);
+  auto *closure = new (Context) ClosureExpr(Context.AllocateCopy(captureList),
+                                            params, arrowLoc,explicitResultType,
+                                            discriminator, CurDeclContext);
   // The arguments to the func are defined in their own scope.
   Scope S(this, ScopeKind::ClosureParams);
   ParseFunctionBody cc(*this, closure);

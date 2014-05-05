@@ -579,7 +579,8 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
   unsigned discriminator = TLC.claimNextClosureDiscriminator();
 
   ClosureExpr *CE =
-      new (Context) ClosureExpr(ParamPat, SourceLoc(), TypeLoc(),
+      new (Context) ClosureExpr(ArrayRef<CaptureListEntry>(),
+                                ParamPat, SourceLoc(), TypeLoc(),
                                 discriminator, newTopLevel);
   Type FuncTy = FunctionType::get(ParamPat->getType(),
                                   TupleType::getEmpty(Context));

@@ -2405,25 +2405,29 @@ struct CaptureListEntry {
 ///     { [weak c] (a : Int) -> Int in a + c!.getFoo() }
 /// \endcode
 class ClosureExpr : public AbstractClosureExpr {
+  ArrayRef<CaptureListEntry> CaptureList;
+
   /// \brief The location of the '->' denoting an explicit return type,
   /// if present.
-  SourceLoc arrowLoc;
+  SourceLoc ArrowLoc;
 
   /// \brief The explicitly-specified result type.
-  TypeLoc explicitResultType;
+  TypeLoc ExplicitResultType;
 
   /// \brief The body of the closure, along with a bit indicating whether it
   /// was originally just a single expression.
-  llvm::PointerIntPair<BraceStmt *, 1, bool> body;
+  llvm::PointerIntPair<BraceStmt *, 1, bool> Body;
   
 public:
-  ClosureExpr(Pattern *params, SourceLoc arrowLoc,
+  ClosureExpr(ArrayRef<CaptureListEntry> captureList,
+              Pattern *params, SourceLoc arrowLoc,
               TypeLoc explicitResultType, unsigned discriminator,
               DeclContext *parent)
     : AbstractClosureExpr(ExprKind::Closure, Type(), /*Implicit=*/false,
                           discriminator, parent),
-      arrowLoc(arrowLoc), explicitResultType(explicitResultType),
-      body(nullptr) {
+      CaptureList(captureList), ArrowLoc(arrowLoc),
+      ExplicitResultType(explicitResultType),
+      Body(nullptr) {
     setParams(params);
     ClosureExprBits.HasAnonymousClosureVars = false;
   }
@@ -2431,14 +2435,16 @@ public:
   SourceRange getSourceRange() const;
   SourceLoc getLoc() const;
 
-  BraceStmt *getBody() const { return body.getPointer(); }
+  BraceStmt *getBody() const { return Body.getPointer(); }
   void setBody(BraceStmt *S, bool isSingleExpression) {
-    body.setPointer(S);
-    body.setInt(isSingleExpression);
+    Body.setPointer(S);
+    Body.setInt(isSingleExpression);
   }
   
   // Expose this to users.
   using DeclContext::setParent;
+
+  ArrayRef<CaptureListEntry> getCaptureList() { return CaptureList; }
 
   /// \brief Determine whether the parameters of this closure are actually
   /// anonymous closure variables.
@@ -2454,19 +2460,19 @@ public:
 
   /// \brief Determine whether this closure expression has an
   /// explicitly-specified result type.
-  bool hasExplicitResultType() const { return arrowLoc.isValid(); }
+  bool hasExplicitResultType() const { return ArrowLoc.isValid(); }
 
   /// \brief Retrieve the location of the \c '->' for closures with an
   /// explicit result type.
   SourceLoc getArrowLoc() const {
     assert(hasExplicitResultType() && "No arrow location");
-    return arrowLoc;
+    return ArrowLoc;
   }
 
   /// \brief Retrieve the explicit result type location information.
   TypeLoc &getExplicitResultTypeLoc() {
     assert(hasExplicitResultType() && "No explicit result type");
-    return explicitResultType;
+    return ExplicitResultType;
   }
 
   /// \brief Determine whether the closure has a single expression for its
@@ -2485,7 +2491,7 @@ public:
   ///
   /// But not for empty closures nor 
   bool hasSingleExpressionBody() const {
-    return body.getInt();
+    return Body.getInt();
   }
 
   /// \brief Retrieve the body for closure that has a single expression for

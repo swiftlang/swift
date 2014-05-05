@@ -429,21 +429,21 @@ Type AbstractClosureExpr::getResultType() const {
 }
 
 SourceRange ClosureExpr::getSourceRange() const {
-  return body.getPointer()->getSourceRange();
+  return Body.getPointer()->getSourceRange();
 }
 
 SourceLoc ClosureExpr::getLoc() const {
-  return body.getPointer()->getStartLoc();
+  return Body.getPointer()->getStartLoc();
 }
 
 Expr *ClosureExpr::getSingleExpressionBody() const {
   assert(hasSingleExpressionBody() && "Not a single-expression body");
-  return cast<ReturnStmt>(body.getPointer()->getElements()[0].get<Stmt *>())
+  return cast<ReturnStmt>(Body.getPointer()->getElements()[0].get<Stmt *>())
            ->getResult();
 }
 
 void ClosureExpr::setSingleExpressionBody(Expr *NewBody) {
-  cast<ReturnStmt>(body.getPointer()->getElements()[0].get<Stmt *>())
+  cast<ReturnStmt>(Body.getPointer()->getElements()[0].get<Stmt *>())
     ->setResult(NewBody);
 }
 

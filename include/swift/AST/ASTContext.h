@@ -290,15 +290,13 @@ public:
   }
 
   template<typename T, size_t N>
-  MutableArrayRef<T> AllocateCopy(
-      T (&array)[N],
+  MutableArrayRef<T> AllocateCopy(T (&array)[N],
       AllocationArena arena = AllocationArena::Permanent) const {
     return MutableArrayRef<T>(AllocateCopy<T>(array, array+N, arena), N);
   }
 
   template<typename T>
-  MutableArrayRef<T> AllocateCopy(
-      ArrayRef<T> array,
+  MutableArrayRef<T> AllocateCopy(ArrayRef<T> array,
       AllocationArena arena = AllocationArena::Permanent) const {
     return MutableArrayRef<T>(AllocateCopy<T>(array.begin(),array.end(), arena),
                               array.size());
@@ -306,8 +304,7 @@ public:
 
 
   template<typename T>
-  ArrayRef<T> AllocateCopy(
-      const SmallVectorImpl<T> &vec,
+  ArrayRef<T> AllocateCopy(const SmallVectorImpl<T> &vec,
       AllocationArena arena = AllocationArena::Permanent) const {
     return AllocateCopy(ArrayRef<T>(vec), arena);
   }
@@ -319,9 +316,8 @@ public:
     return AllocateCopy(MutableArrayRef<T>(vec), arena);
   }
 
-  StringRef AllocateCopy(
-      StringRef Str,
-      AllocationArena arena = AllocationArena::Permanent) const {
+  StringRef AllocateCopy(StringRef Str,
+                    AllocationArena arena = AllocationArena::Permanent) const {
     ArrayRef<char> Result =
         AllocateCopy(llvm::makeArrayRef(Str.data(), Str.size()), arena);
     return StringRef(Result.data(), Result.size());
