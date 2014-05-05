@@ -3070,6 +3070,11 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   // Don't emit a witness table if it is a declaration.
   if (wt->isDeclaration())
     return;
+  // Don't emit a witness table that is available externally if we are emitting
+  // code for the JIT. We do not do any optimization for the JIT and it has
+  // problems with external symbols that get merged with non-external symbols.
+  if (Opts.UseJIT && isAvailableExternally(wt->getLinkage()))
+    return;
 
   // Build the witnesses.
   SmallVector<llvm::Constant*, 32> witnesses;
