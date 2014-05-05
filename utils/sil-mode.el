@@ -27,7 +27,7 @@
    ;; Decl and type keywords
    `(,(regexp-opt '("class" "init" "deinit" "extension" "func"
                     "import" "protocol" "static" "struct" "subscript"
-                    "typealias" "enum" "var" "where"  "sil_vtable"
+                    "typealias" "enum" "var" "let" "where"  "sil_vtable"
                     "sil_global" "private" "sil_witness_table")
                   'words) . font-lock-keyword-face)
    ;; SIL Types
