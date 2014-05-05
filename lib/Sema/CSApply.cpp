@@ -3916,14 +3916,17 @@ static bool diagnoseRelabel(TypeChecker &tc, Expr *expr,
   // Figure out how many extraneous, missing, and wrong labels are in
   // the call.
   unsigned numExtra = 0, numMissing = 0, numWrong = 0;
-  unsigned n = tuple->getNumElements();
-  if (newNames.size() < n)
-    n = newNames.size();
+  unsigned n = std::max(tuple->getNumElements(), (unsigned)newNames.size());
+
   llvm::SmallString<16> missingStr;
   llvm::SmallString<16> extraStr;
   for (unsigned i = 0; i != n; ++i) {
-    Identifier oldName = tuple->getElementName(i);
-    Identifier newName = newNames[i];
+    Identifier oldName;
+    if (i < tuple->getNumElements())
+      oldName = tuple->getElementName(i);
+    Identifier newName;
+    if (i < newNames.size())
+      newName = newNames[i];
 
     if (oldName == newName)
       continue;
@@ -3980,9 +3983,11 @@ static bool diagnoseRelabel(TypeChecker &tc, Expr *expr,
 
   // Emit Fix-Its to correct the names.
   auto &diag = *diagOpt;
-  for (unsigned i = 0; i != n; ++i) {
+  for (unsigned i = 0, n = tuple->getNumElements(); i != n; ++i) {
     Identifier oldName = tuple->getElementName(i);
-    Identifier newName = newNames[i];
+    Identifier newName;
+    if (i < newNames.size())
+      newName = newNames[i];
 
     if (oldName == newName)
       continue;
