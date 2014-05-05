@@ -131,6 +131,7 @@ struct QuickLookObject {
     Logical,
     Range,
     View,
+    Sprite,
     Raw,
   } Kind;
 };
