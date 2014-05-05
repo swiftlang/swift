@@ -461,8 +461,9 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
     // annotation.
     if (isAtStartOfBindingName() && peekToken().is(tok::colon)) {
       // Consume the name
-      // FIXME: Should the identifier '_' ever be formed?
-      Identifier name = Context.getIdentifier(Tok.getText());
+      Identifier name;
+      if (!Tok.is(tok::kw__))
+        name = Context.getIdentifier(Tok.getText());
       SourceLoc nameLoc = consumeToken();
 
       // Consume the ':'.
