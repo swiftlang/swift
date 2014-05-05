@@ -457,19 +457,9 @@ bool Parser::parseIdentifier(Identifier &Result, SourceLoc &Loc,
                              const Diagnostic &D) {
   switch (Tok.getKind()) {
   case tok::kw_self:
-    Result = Context.getIdentifier("self");
-    Loc = Tok.getLoc();
-    consumeToken();
-    return false;
   case tok::kw_Self:
-    Result = Context.getIdentifier("Self");
-    Loc = Tok.getLoc();
-    consumeToken();
-    return false;
   case tok::identifier:
-    Result = Context.getIdentifier(Tok.getText());
-    Loc = Tok.getLoc();
-    consumeToken(tok::identifier);
+    Loc = consumeIdentifier(&Result);
     return false;
   default:
     checkForInputIncomplete();

@@ -373,9 +373,11 @@ public:
   }
 
   SourceLoc consumeIdentifier(Identifier *Result = nullptr) {
+    assert(Tok.is(tok::identifier) || Tok.is(tok::kw_self) ||
+           Tok.is(tok::kw_Self));
     if (Result)
       *Result = Context.getIdentifier(Tok.getText());
-    return consumeToken(tok::identifier);
+    return consumeToken();
   }
 
   /// \brief Retrieve the location just past the end of the previous

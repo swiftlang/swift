@@ -456,9 +456,7 @@ ParserResult<Stmt> Parser::parseStmt() {
   // If this is a label on a loop/switch statement, consume it and pass it into
   // parsing logic below.
   if (Tok.is(tok::identifier) && peekToken().is(tok::colon)) {
-    LabelInfo.Loc = Tok.getLoc();
-    LabelInfo.Name = Context.getIdentifier(Tok.getText());
-    consumeToken(tok::identifier);
+    LabelInfo.Loc = consumeIdentifier(&LabelInfo.Name);
     consumeToken(tok::colon);
   }
   
@@ -560,10 +558,8 @@ ParserResult<Stmt> Parser::parseStmtBreak() {
   // stmt or decl, we assume it is the label to break to.  There is ambiguity
   // with expressions (e.g. "break x+y") but since the expression after the
   // break is dead, we don't feel bad eagerly parsing this.
-  if (Tok.is(tok::identifier) && !isStartOfStmt() && !isStartOfDecl()) {
-    Target = Context.getIdentifier(Tok.getText());
-    TargetLoc = consumeToken(tok::identifier);
-  }
+  if (Tok.is(tok::identifier) && !isStartOfStmt() && !isStartOfDecl())
+    TargetLoc = consumeIdentifier(&Target);
 
   return makeParserResult(new (Context) BreakStmt(Loc, Target, TargetLoc));
 }
@@ -582,10 +578,8 @@ ParserResult<Stmt> Parser::parseStmtContinue() {
   // stmt or decl, we assume it is the label to continue to.  There is ambiguity
   // with expressions (e.g. "continue x+y") but since the expression after the
   // continue is dead, we don't feel bad eagerly parsing this.
-  if (Tok.is(tok::identifier) && !isStartOfStmt() && !isStartOfDecl()) {
-    Target = Context.getIdentifier(Tok.getText());
-    TargetLoc = consumeToken(tok::identifier);
-  }
+  if (Tok.is(tok::identifier) && !isStartOfStmt() && !isStartOfDecl())
+    TargetLoc = consumeIdentifier(&Target);
 
   return makeParserResult(new (Context) ContinueStmt(Loc, Target, TargetLoc));
 }
