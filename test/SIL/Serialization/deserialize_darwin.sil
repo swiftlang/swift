@@ -2,5 +2,6 @@
 // RUN: %sil-opt -verify %libdir/swift/macosx/Darwin.swiftmodule -module-name Darwin -I=%libdir/swift/macosx -sdk=%sdk > /dev/null
 // RUN: llvm-bcanalyzer %libdir/swift/macosx/Darwin.swiftmodule | FileCheck %s
 // REQUIRES: sdk
+// REQUIRES: OS=macosx
 
 // CHECK-NOT: Unknown

@@ -2,5 +2,6 @@
 // RUN: %sil-opt -verify %libdir/swift/macosx/ObjectiveC.swiftmodule -module-name ObjectiveC -I=%libdir/swift/macosx -sdk=%sdk > /dev/null
 // RUN: llvm-bcanalyzer %libdir/swift/macosx/ObjectiveC.swiftmodule | FileCheck %s
 // REQUIRES: sdk
+// REQUIRES: OS=macosx
 
 // CHECK-NOT: Unknown
