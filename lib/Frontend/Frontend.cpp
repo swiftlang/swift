@@ -256,7 +256,7 @@ void CompilerInstance::performParse() {
   StringRef implicitHeaderPath =
     Invocation.getFrontendOptions().ImplicitObjCHeaderPath;
   if (!implicitHeaderPath.empty()) {
-    clangImporter->importHeader(implicitHeaderPath);
+    clangImporter->importHeader(implicitHeaderPath, MainModule);
     importedHeaderModule = clangImporter->getImportedHeaderModule();
     assert(importedHeaderModule);
   }

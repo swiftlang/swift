@@ -3456,7 +3456,7 @@ namespace {
     }
 
     template <typename T, typename U>
-    T *resolveSwiftDecl(const U *decl, Identifier name, Module *adapter) {
+    T *resolveSwiftDeclImpl(const U *decl, Identifier name, Module *adapter) {
       SmallVector<ValueDecl *, 4> results;
       adapter->lookupValue({}, name, NLKind::QualifiedLookup, results);
       if (results.size() == 1) {
@@ -3472,20 +3472,30 @@ namespace {
     }
 
     template <typename T, typename U>
+    T *resolveSwiftDecl(const U *decl, Identifier name,
+                        ClangModuleUnit *clangModule) {
+      if (auto adapter = clangModule->getAdapterModule())
+        return resolveSwiftDeclImpl<T>(decl, name, adapter);
+      if (clangModule == Impl.ImportedHeaderUnit) {
+        // Use an index-based loop because new owners can come in as we're
+        // iterating.
+        for (size_t i = 0; i < Impl.ImportedHeaderOwners.size(); ++i) {
+          Module *owner = Impl.ImportedHeaderOwners[i];
+          if (T *result = resolveSwiftDeclImpl<T>(decl, name, owner))
+            return result;
+        }
+      }
+      return nullptr;
+    }
+
+    template <typename T, typename U>
     bool hasNativeSwiftDecl(const U *decl, Identifier name,
                             const DeclContext *dc, T *&swiftDecl) {
       using clang::AnnotateAttr;
       for (auto annotation : decl->template specific_attrs<AnnotateAttr>()) {
         if (annotation->getAnnotation() == SWIFT_NATIVE_ANNOTATION_STRING) {
           auto wrapperUnit = cast<ClangModuleUnit>(dc->getModuleScopeContext());
-          if (auto adapter = wrapperUnit->getAdapterModule()) {
-            swiftDecl = resolveSwiftDecl<T>(decl, name, adapter);
-          } else {
-            // This is intended to have a Swift decl, but the Swift part is
-            // missing. Fail instead of pretending it's a normal ObjC decl.
-            swiftDecl = nullptr;
-          }
-
+          swiftDecl = resolveSwiftDecl<T>(decl, name, wrapperUnit);
           return true;
         }
       }
@@ -3527,12 +3537,10 @@ namespace {
       // notion doesn't exist in Swift.
       if (!decl->hasDefinition()) {
         // Check if this protocol is implemented in its adapter.
-        // FIXME: This only matters for the module currently being built.
         if (auto clangModule = Impl.getClangModuleForDecl(decl, true))
-          if (auto adapter = clangModule->getAdapterModule())
-            if (auto native = resolveSwiftDecl<ProtocolDecl>(decl, name,
-                                                             adapter))
-              return native;
+          if (auto native = resolveSwiftDecl<ProtocolDecl>(decl, name,
+                                                           clangModule))
+            return native;
 
         forwardDeclaration = true;
         return nullptr;
@@ -3665,11 +3673,10 @@ namespace {
         }
 
         // Otherwise, check if this class is implemented in its adapter.
-        // FIXME: This only matters for the module currently being built.
         if (auto clangModule = Impl.getClangModuleForDecl(decl, true))
-          if (auto adapter = clangModule->getAdapterModule())
-            if (auto native = resolveSwiftDecl<ClassDecl>(decl, name, adapter))
-              return native;
+          if (auto native = resolveSwiftDecl<ClassDecl>(decl, name,
+                                                        clangModule))
+            return native;
       }
 
       // FIXME: Figure out how to deal with incomplete types, since that
@@ -3687,12 +3694,10 @@ namespace {
       // Resolve @partial_interfaces to a definition in the adapter, just like
       // @class. If it fails, don't bring it in as a new class -- that's likely
       // to lead to problems down the line.
-      // FIXME: This only matters for the module currently being built.
       if (isPartialInterface(decl)) {
         auto clangModule = cast<ClangModuleUnit>(dc->getModuleScopeContext());
-        if (auto adapter = clangModule->getAdapterModule())
-          if (auto native = resolveSwiftDecl<ClassDecl>(decl, name, adapter))
-            return native;
+        if (auto native = resolveSwiftDecl<ClassDecl>(decl, name, clangModule))
+          return native;
         return nullptr;
       }
 

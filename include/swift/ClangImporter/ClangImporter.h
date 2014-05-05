@@ -115,8 +115,11 @@ public:
 
   /// Imports an Objective-C header file into the shared imported header module.
   ///
+  /// \param header A header name or full path, to be used in a \#import
+  /// directive.
+  ///
   /// \sa getImportedHeaderModule
-  void importHeader(StringRef header);
+  void importHeader(StringRef header, Module *adapter);
 
   /// Returns the module that contains imports and declarations from all loaded
   /// Objective-C header files.

@@ -31,7 +31,8 @@
 
 using namespace swift;
 
-clang::Module *ClangImporter::Implementation::getClangSubmoduleForMacro(
+Optional<clang::Module *>
+ClangImporter::Implementation::getClangSubmoduleForMacro(
     const clang::MacroInfo *MI) {
   auto *ExternalSource = getClangASTContext().getExternalSource();
   return ExternalSource->getModule(MI->getOwningModuleID());
@@ -39,14 +40,15 @@ clang::Module *ClangImporter::Implementation::getClangSubmoduleForMacro(
 
 ClangModuleUnit *ClangImporter::Implementation::getClangModuleForMacro(
     const clang::MacroInfo *MI) {
-  clang::Module *M = getClangSubmoduleForMacro(MI);
-  if (!M)
+  auto maybeModule = getClangSubmoduleForMacro(MI);
+  if (!maybeModule)
     return nullptr;
+  if (!maybeModule.getValue())
+    return ImportedHeaderUnit;
 
   // Get the parent module because currently we don't represent submodules with
   // ClangModule.
-  // FIXME: this is just a workaround until we can import submodules.
-  M = M->getTopLevelModule();
+  auto *M = maybeModule.getValue()->getTopLevelModule();
 
   auto &importer =
     static_cast<ClangImporter &>(*SwiftContext.getClangModuleLoader());

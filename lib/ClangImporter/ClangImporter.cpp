@@ -101,7 +101,7 @@ namespace {
         return;
       Module *nativeImported = Impl.finishLoadingClangModule(Importer, imported,
                                                              /*adapter=*/true);
-      Impl.importedHeaderExports.push_back({ /*filter=*/{}, nativeImported });
+      Impl.ImportedHeaderExports.push_back({ /*filter=*/{}, nativeImported });
     }
 
     virtual void InclusionDirective(clang::SourceLocation HashLoc,
@@ -267,7 +267,8 @@ ClangImporter::create(ASTContext &ctx,
   importer->Impl.Invocation = invocation;
 
   // Create an almost-empty memory buffer corresponding to the file "swift.m"
-  auto sourceBuffer = llvm::MemoryBuffer::getMemBuffer("extern int __swift;");
+  auto sourceBuffer = llvm::MemoryBuffer::getMemBuffer(
+    "extern int __swift __attribute__((unavailable));");
   invocation->getPreprocessorOpts().addRemappedFile("swift.m", sourceBuffer);
 
   // Create a compiler instance.
@@ -340,14 +341,17 @@ ClangImporter::create(ASTContext &ctx,
 
   // Set up the imported header module.
   auto *importedHeaderModule = Module::create(ctx.getIdentifier("__ObjC"), ctx);
-  importer->Impl.importedHeaderUnit =
+  importer->Impl.ImportedHeaderUnit =
     new (ctx) ClangModuleUnit(*importedHeaderModule, *importer, nullptr);
-  importedHeaderModule->addFile(*importer->Impl.importedHeaderUnit);
+  importedHeaderModule->addFile(*importer->Impl.ImportedHeaderUnit);
 
   return importer;
 }
 
-void ClangImporter::importHeader(StringRef header) {
+void ClangImporter::importHeader(StringRef header, Module *adapter) {
+  if (adapter)
+    Impl.ImportedHeaderOwners.push_back(adapter);
+
   llvm::SmallString<128> importLine{"#import \""};
   importLine += header;
   importLine += "\"\n";
@@ -364,6 +368,8 @@ void ClangImporter::importHeader(StringRef header) {
   clang::Parser::DeclGroupPtrTy parsed;
   while (!Impl.Parser->ParseTopLevelDecl(parsed)) {}
   pp.EndSourceFile();
+
+  Impl.bumpGeneration();
 }
 
 Module *ClangImporter::loadModule(
@@ -409,10 +415,7 @@ Module *ClangImporter::Implementation::finishLoadingClangModule(
   assert(clangModule);
 
   // Bump the generation count.
-  ++Generation;
-  SwiftContext.bumpGeneration();
-  CachedVisibleDecls.clear();
-  CurrentCacheState = CacheState::Invalid;
+  bumpGeneration();
 
   auto &cacheEntry = ModuleWrappers[clangModule];
   Module *result;
@@ -446,7 +449,7 @@ Module *ClangImporter::Implementation::finishLoadingClangModule(
 }
 
 Module *ClangImporter::getImportedHeaderModule() {
-  return Impl.importedHeaderUnit->getParentModule();
+  return Impl.ImportedHeaderUnit->getParentModule();
 }
 
 ClangImporter::Implementation::Implementation(ASTContext &ctx,
@@ -480,7 +483,8 @@ ClangModuleUnit *ClangImporter::Implementation::getWrapperForModule(
   return file;
 }
 
-clang::Module *ClangImporter::Implementation::getClangSubmoduleForDecl(
+Optional<clang::Module *>
+ClangImporter::Implementation::getClangSubmoduleForDecl(
     const clang::Decl *D,
     bool allowForwardDeclaration) {
   const clang::Decl *actual = nullptr;
@@ -489,12 +493,12 @@ clang::Module *ClangImporter::Implementation::getClangSubmoduleForDecl(
     // definition, not just some @class forward declaration.
     actual = OID->getDefinition();
     if (!actual && !allowForwardDeclaration)
-      return nullptr;
+      return Nothing;
 
   } else if (auto TD = dyn_cast<clang::TagDecl>(D)) {
     actual = TD->getDefinition();
     if (!actual && !allowForwardDeclaration)
-      return nullptr;
+      return Nothing;
   }
 
   if (!actual)
@@ -506,14 +510,15 @@ clang::Module *ClangImporter::Implementation::getClangSubmoduleForDecl(
 ClangModuleUnit *ClangImporter::Implementation::getClangModuleForDecl(
     const clang::Decl *D,
     bool allowForwardDeclaration) {
-  clang::Module *M = getClangSubmoduleForDecl(D, allowForwardDeclaration);
-  if (!M)
+  auto maybeModule = getClangSubmoduleForDecl(D, allowForwardDeclaration);
+  if (!maybeModule)
     return nullptr;
+  if (!maybeModule.getValue())
+    return ImportedHeaderUnit;
 
   // Get the parent module because currently we don't represent submodules with
-  // ClangModule.
-  // FIXME: this is just a workaround until we can import submodules.
-  M = M->getTopLevelModule();
+  // ClangModuleUnit.
+  auto *M = maybeModule.getValue()->getTopLevelModule();
 
   auto &importer =
     static_cast<ClangImporter &>(*SwiftContext.getClangModuleLoader());
@@ -1198,14 +1203,12 @@ static bool isVisibleFromModule(const ClangModuleUnit *ModuleFilter,
   auto &ClangASTContext = ModuleFilter->getClangASTContext();
   auto OwningClangModule = getClangOwningModule(ClangNode, ClangASTContext);
 
-  // FIXME: This only triggers for implicitly-generated decls like
-  // __builtin_va_list, which we probably shouldn't be importing anyway.
-  // But it also includes the builtin declarations for 'id', 'Class', 'SEL',
-  // and '__int128_t'.
-  if (!OwningClangModule)
-    return true;
+  // We don't handle Clang submodules; pop everything up to the top-level
+  // module.
+  if (OwningClangModule)
+    OwningClangModule = OwningClangModule->getTopLevelModule();
 
-  if (OwningClangModule->getTopLevelModule() == ModuleFilter->getClangModule())
+  if (OwningClangModule == ModuleFilter->getClangModule())
     return true;
 
   if (auto D = ClangNode.getAsDecl()) {
@@ -1218,15 +1221,7 @@ static bool isVisibleFromModule(const ClangModuleUnit *ModuleFilter,
         auto OwningClangModule = getClangOwningModule(Redeclaration,
                                                       ClangASTContext);
 
-        // FIXME: This only triggers for implicitly-generated decls like
-        // __builtin_va_list, which we probably shouldn't be importing anyway.
-        // But it also includes the builtin declarations for 'id', 'Class', 'SEL',
-        // and '__int128_t'.
-        if (!OwningClangModule)
-          return true;
-
-        if (OwningClangModule->getTopLevelModule() ==
-            ModuleFilter->getClangModule())
+        if (OwningClangModule == ModuleFilter->getClangModule())
           return true;
       }
     }
@@ -1510,8 +1505,8 @@ void ClangModuleUnit::getImportedModules(
   if (!clangModule) {
     // This is the special "imported headers" module.
     if (filter != Module::ImportFilter::Private) {
-      imports.append(owner.Impl.importedHeaderExports.begin(),
-                     owner.Impl.importedHeaderExports.end());
+      imports.append(owner.Impl.ImportedHeaderExports.begin(),
+                     owner.Impl.ImportedHeaderExports.end());
     }
     return;
   }

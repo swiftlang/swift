@@ -797,7 +797,7 @@ Type ClangImporter::Implementation::importFunctionType(
                                        SourceLoc(), name,
                                        importSourceLoc(param->getLocation()),
                                        bodyName, swiftParamTy, 
-                                       importedHeaderUnit);
+                                       ImportedHeaderUnit);
       bodyPattern = new (SwiftContext) NamedPattern(bodyVar);
     }
     bodyPattern->setType(swiftParamTy);
@@ -892,7 +892,7 @@ Type ClangImporter::Implementation::importMethodType(
                                        /*IsLet*/ true, SourceLoc(), name,
                                        importSourceLoc(param->getLocation()),
                                        bodyName, swiftParamTy, 
-                                       importedHeaderUnit);
+                                       ImportedHeaderUnit);
       bodyPattern = new (SwiftContext) NamedPattern(bodyVar);
     }
     bodyPattern->setType(swiftParamTy);
@@ -919,7 +919,7 @@ Type ClangImporter::Implementation::importMethodType(
     auto var = new (SwiftContext) ParamDecl(/*IsLet*/ true,
                                             SourceLoc(), argName,
                                             SourceLoc(), argName, type,
-                                            importedHeaderUnit);
+                                            ImportedHeaderUnit);
     Pattern *pattern = new (SwiftContext) NamedPattern(var);
     pattern->setType(type);
     pattern = new (SwiftContext) TypedPattern(pattern,

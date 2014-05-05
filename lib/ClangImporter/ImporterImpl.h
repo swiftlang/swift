@@ -29,6 +29,8 @@
 #include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
+#include "llvm/ADT/SmallSet.h"
+#include "llvm/ADT/TinyPtrVector.h"
 #include <set>
 
 namespace clang {
@@ -327,6 +329,13 @@ private:
     unsigned Generation;
   };
 
+  void bumpGeneration() {
+    ++Generation;
+    SwiftContext.bumpGeneration();
+    CachedVisibleDecls.clear();
+    CurrentCacheState = CacheState::Invalid;
+  }
+
   /// \brief Cache of the class extensions.
   llvm::DenseMap<ClassDecl *, CachedExtensions> ClassExtensions;
 
@@ -362,10 +371,16 @@ public:
   llvm::SmallDenseMap<const clang::Module *, ModuleInitPair, 16> ModuleWrappers;
 
   /// The module unit that contains declarations from imported headers.
-  ClangModuleUnit *importedHeaderUnit = nullptr;
+  ClangModuleUnit *ImportedHeaderUnit = nullptr;
 
   /// The modules re-exported by imported headers.
-  llvm::SmallVector<Module::ImportedModule, 8> importedHeaderExports;
+  llvm::SmallVector<Module::ImportedModule, 8> ImportedHeaderExports;
+
+  /// The modules that requested imported headers.
+  ///
+  /// These are used to look up Swift classes forward-declared with \@class.
+  TinyPtrVector<Module *> ImportedHeaderOwners;
+
 
   /// \brief Clang's objectAtIndexedSubscript: selector.
   clang::Selector objectAtIndexedSubscript;
@@ -422,15 +437,27 @@ public:
     return Instance->getPreprocessor();
   }
 
-  clang::Module *getClangSubmoduleForDecl(const clang::Decl *D,
-                                          bool allowForwardDeclaration = false);
+  /// Returns the module \p D comes from, or \c Nothing if \p D does not have
+  /// a valid associated module.
+  ///
+  /// The returned module may be null (but not \c Nothing) if \p D comes from
+  /// imported header.
+  Optional<clang::Module *>
+  getClangSubmoduleForDecl(const clang::Decl *D,
+                           bool allowForwardDeclaration = false);
 
   /// \brief Retrieve the imported module that should contain the given
   /// Clang decl.
   ClangModuleUnit *getClangModuleForDecl(const clang::Decl *D,
                                          bool allowForwardDeclaration = false);
 
-  clang::Module *getClangSubmoduleForMacro(const clang::MacroInfo *MI);
+  /// Returns the module \p MI comes from, or \c Nothing if \p MI does not have
+  /// a valid associated module.
+  ///
+  /// The returned module may be null (but not \c Nothing) if \p MI comes from
+  /// an imported header.
+  Optional<clang::Module *>
+  getClangSubmoduleForMacro(const clang::MacroInfo *MI);
 
   ClangModuleUnit *getClangModuleForMacro(const clang::MacroInfo *MI);
 
