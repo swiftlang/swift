@@ -104,6 +104,9 @@ struct PrintOptions {
   /// Whether to print 'override' keyword on overridden decls.
   bool PrintOverrideKeyword = true;
 
+  /// Whether to always print both the keyword argument and parameter name.
+  bool PrintKeywordArgAndParam = false;
+
   /// \brief Whether to print documentation comments attached to declarations.
   /// Note that this may print documentation comments from related declarations
   /// (e.g. the overridden method in the superclass) if such comment is found.

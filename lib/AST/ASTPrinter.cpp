@@ -913,7 +913,12 @@ void PrintAST::printOneParameter(Identifier ArgName,
     Printer.printName(BodyName);
     Printer << ": ";
   } else {
-    if (ArgName == BodyName) {
+    if (Options.PrintKeywordArgAndParam) {
+      Printer.printName(ArgName);
+      Printer << " ";
+      Printer.printName(BodyName);
+      Printer << ": ";
+    } else if (ArgName == BodyName) {
       if (!ArgName.empty()) {
         // The argument and parameter names match, so we only have one thing to
         // print.
