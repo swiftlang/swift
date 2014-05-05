@@ -217,13 +217,12 @@ def O : Joined<["-"], "O">, Group<O_Group>, Flags<[FrontendOption]>;
 def Ofast : Flag<["-"], "Ofast">, Group<O_Group>, Flags<[FrontendOption]>;
 
 // Assert configuration identifiers.
-
-def AssertConfig_Group : OptionGroup<"<Assert configuration>">;
-
-def AssertConfig   : JoinedOrSeparate<["-"], "AssertConfig">,
-  Group<AssertConfig_Group>, Flags<[FrontendOption]>;
-def AssertConfigEq : Joined<["-"], "AssertConfig=">,
-  Group<AssertConfig_Group>, Alias<AssertConfig>, Flags<[FrontendOption]>;
+def AssertConfig : JoinedOrSeparate<["-"], "AssertConfig">,
+  Flags<[FrontendOption]>,
+  HelpText<"Specify the assert_configuration replacement. "
+           "Possible values are Debug, Release, Replacement.">;
+def AssertConfig_EQ : Joined<["-"], "AssertConfig=">,
+  Flags<[FrontendOption]>, Alias<AssertConfig>;
 
 // File types
 

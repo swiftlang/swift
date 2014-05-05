@@ -727,7 +727,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   }
 
   // Parse the build configuration identifier.
-  if (const Arg *A = Args.getLastArg(OPT_AssertConfig_Group)) {
+  if (const Arg *A = Args.getLastArg(OPT_AssertConfig)) {
     // We currently understand build configuration up to 3 of which we only use
     // 0 and 1 in the standard library.
     StringRef Configuration = A->getValue();

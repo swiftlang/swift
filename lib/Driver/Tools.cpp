@@ -93,6 +93,7 @@ static void addCommonFrontendArgs(const ToolChain &TC,
   inputArgs.AddAllArgs(arguments, options::OPT_I);
   inputArgs.AddAllArgs(arguments, options::OPT_F);
   inputArgs.AddLastArg(arguments, options::OPT_nostdimport);
+  inputArgs.AddLastArg(arguments, options::OPT_AssertConfig);
 
   inputArgs.AddLastArg(arguments, options::OPT_g);
   inputArgs.AddLastArg(arguments, options::OPT_resource_dir);
