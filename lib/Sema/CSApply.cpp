@@ -1266,16 +1266,18 @@ namespace {
           type = defaultType;
       }
 
-      TupleTypeElt elementsArray[3] = {
-        TupleTypeElt(tc.Context.TheRawPointerType),
+      // Add the first element (
+      SmallVector<TupleTypeElt, 3> elements;
+      elements.push_back(TupleTypeElt(tc.Context.TheRawPointerType));
+
+/*
         TupleTypeElt(BuiltinIntegerType::getWordType(tc.Context)),
         TupleTypeElt(BuiltinIntegerType::get(1, tc.Context))
-      };
+*/
 
       ProtocolDecl *builtinProtocol;
       Identifier literalFuncName;
       Identifier builtinLiteralFuncName;
-      ArrayRef<TupleTypeElt> elements;
       Diag<> brokenProtocolDiag;
       Diag<> brokenBuiltinProtocolDiag;
 
@@ -1289,7 +1291,9 @@ namespace {
         if (tc.conformsToProtocol(type, builtinProtocol, cs.DC)) {
           builtinLiteralFuncName =
               tc.Context.Id_ConvertFromBuiltinUTF16StringLiteral;
-          elements = llvm::makeArrayRef(elementsArray).slice(0, 2);
+          elements.push_back(
+            TupleTypeElt(BuiltinIntegerType::getWordType(tc.Context),
+                         tc.Context.getIdentifier("numberOfCodeUnits")));
           if (stringLiteral)
             stringLiteral->setEncoding(StringLiteralExpr::UTF16);
           else
@@ -1301,7 +1305,12 @@ namespace {
               KnownProtocolKind::_BuiltinStringLiteralConvertible);
           builtinLiteralFuncName =
               tc.Context.Id_ConvertFromBuiltinStringLiteral;
-          elements = elementsArray;
+          elements.push_back(
+            TupleTypeElt(BuiltinIntegerType::getWordType(tc.Context),
+                         tc.Context.getIdentifier("byteSize")));
+          elements.push_back(
+            TupleTypeElt(BuiltinIntegerType::get(1, tc.Context),
+                         tc.Context.getIdentifier("isASCII")));
           if (stringLiteral)
             stringLiteral->setEncoding(StringLiteralExpr::UTF8);
           else
@@ -1317,7 +1326,12 @@ namespace {
         builtinProtocol = tc.getProtocol(
             expr->getLoc(),
             KnownProtocolKind::_BuiltinExtendedGraphemeClusterLiteralConvertible);
-        elements = elementsArray;
+        elements.push_back(
+          TupleTypeElt(BuiltinIntegerType::getWordType(tc.Context),
+                       tc.Context.getIdentifier("byteSize")));
+        elements.push_back(
+          TupleTypeElt(BuiltinIntegerType::get(1, tc.Context),
+                       tc.Context.getIdentifier("isASCII")));
         brokenProtocolDiag =
             diag::extended_grapheme_cluster_literal_broken_proto;
         brokenBuiltinProtocolDiag =
@@ -3599,6 +3613,7 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
                                   builtinConformance,
                                   builtinLiteralType.get<Identifier>(),
                                   brokenBuiltinProtocolDiag);
+
     if (!argType)
       return nullptr;
 
@@ -4270,7 +4285,7 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
     arg = TupleExpr::create(Context,
                             base->getStartLoc(),
                             arguments,
-                            { },
+                            witness->getFullName().getArgumentNames(),
                             { },
                             base->getEndLoc(),
                             /*hasTrailingClosure=*/false,
