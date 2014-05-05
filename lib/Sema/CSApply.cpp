@@ -4060,9 +4060,19 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr) {
         llvm_unreachable("no-fix marker should never make it into solution");
 
       case FixKind::NullaryCall: {
+        // Dig for the function we want to call.
         auto type = solution.simplifyType(TC, affected->getType())
-                      ->getRValueObjectType()->castTo<AnyFunctionType>()
-                      ->getResult();
+                      ->getRValueType();
+        if (auto tupleTy = type->getAs<TupleType>()) {
+          if (auto tuple = dyn_cast<TupleExpr>(affected))
+            affected = tuple->getElement(0);
+          type = tupleTy->getFields()[0].getType()->getRValueType();
+        }
+
+        if (auto optTy = type->getAnyOptionalObjectType())
+          type = optTy;
+
+        type = type->castTo<AnyFunctionType>()->getResult();
         SourceLoc afterAffectedLoc
           = Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
                                        affected->getEndLoc());

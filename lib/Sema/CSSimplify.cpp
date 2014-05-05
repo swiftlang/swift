@@ -739,6 +739,17 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   return SolutionKind::Solved;
 }
 
+/// Check whether this is a single-element tuple whose element name is the
+/// given name.
+static bool isSingleElementTupleNamed(Type type, Identifier name) {
+  if (auto tupleTy = type->getAs<TupleType>()) {
+    if (tupleTy->getNumElements() == 1)
+      return tupleTy->getFields()[0].getName() == name;
+  }
+
+  return false;
+}
+
 ConstraintSystem::SolutionKind
 ConstraintSystem::matchScalarToTupleTypes(Type type1, TupleType *tuple2,
                                           TypeMatchKind kind, unsigned flags,
@@ -753,7 +764,8 @@ ConstraintSystem::matchScalarToTupleTypes(Type type1, TupleType *tuple2,
   if (kind == TypeMatchKind::ArgumentTupleConversion &&
       elt.hasName() && !elt.isVararg() &&
       getASTContext().LangOpts.StrictKeywordArguments &&
-      !paramIsTrailingClosure(tuple2, scalarFieldIdx)) {
+      !paramIsTrailingClosure(tuple2, scalarFieldIdx) &&
+      !isSingleElementTupleNamed(type1, elt.getName())) {
     return simplifyFixConstraint(
              Fix::getRelabelTuple(*this, FixKind::ScalarToTuple, elt.getName()),
              type1, tuple2, TypeMatchKind::Conversion, flags, locator);
@@ -2819,11 +2831,28 @@ ConstraintSystem::simplifyFixConstraint(Fix fix,
   case FixKind::None:
     return matchTypes(type1, type2, matchKind, subFlags, locator);
 
-  case FixKind::NullaryCall:
+  case FixKind::NullaryCall: {
     // Assume that '()' was applied to the first type.
-    return matchTypes(type1->getRValueType()->castTo<AnyFunctionType>()
-                        ->getResult(),
-                      type2, matchKind, subFlags, locator);
+
+    // If the function was actually in a tuple, tuple'ify the
+    // FIXME: This is yet another awful hack due to one-element tuples.
+    auto funcTy = type1->getRValueType();
+    Identifier nameToAdd;
+    if (auto tupleTy = funcTy->getAs<TupleType>()) {
+      int scalarIdx = tupleTy->getFieldForScalarInit();
+      nameToAdd = tupleTy->getFields()[scalarIdx].getName();
+      funcTy = tupleTy->getElementType(scalarIdx);
+    }
+
+    if (auto optObjectTy = funcTy->getAnyOptionalObjectType())
+      funcTy = optObjectTy;
+
+    auto resultTy = funcTy->castTo<AnyFunctionType>()->getResult();
+    if (!nameToAdd.empty())
+      resultTy = TupleType::get(TupleTypeElt(resultTy, nameToAdd),
+                                  getASTContext());
+    return matchTypes(resultTy, type2, matchKind, subFlags, locator);
+  }
 
   case FixKind::RemoveNullaryCall:
     llvm_unreachable("Always applied directly");
