@@ -18,20 +18,20 @@
 set(SWIFTLIB_ESSENTIAL
   ### PLEASE KEEP THIS LIST IN ALPHABETICAL ORDER ###
   Algorithm.swift
-  Arrays.swift.gyb
   ArrayBody.swift
   ArrayBuffer.swift
   ArrayBufferType.swift
   ArrayType.swift
+  Arrays.swift.gyb
   Assert.swift
   AssertCommon.swift
   Bool.swift
   BridgeObjectiveC.swift
   Builtin.swift
-  CocoaArray.swift
   CString.swift
   CTypes.swift
   Character.swift
+  CocoaArray.swift
   Collection.swift
   CompilerProtocols.swift
   Dictionary.swift
@@ -41,23 +41,24 @@ set(SWIFTLIB_ESSENTIAL
   FloatingPoint.swift.gyb
   FloatingPointOperations.swift
   HeapBuffer.swift
+  ImplicitlyUnwrappedOptional.swift
   Index.swift
   IntegerArithmetic.swift.gyb
   LifetimeManager.swift
   LogicValue.swift
-  Misc.swift
+  Map.swift
   Mirrors.swift.gyb
+  Misc.swift
+  NSSwiftArray.swift
   NativeArrayBuffer.swift
   Nil.swift
-  NSSwiftArray.swift
-  Map.swift
   Optional.swift
   OutputStream.swift
   Policy.swift
-  Repeat.swift
   REPL.swift
   Range.swift
   Reflection.swift
+  Repeat.swift
   StaticString.swift
   String.swift
   StringBridge.swift
@@ -67,7 +68,6 @@ set(SWIFTLIB_ESSENTIAL
   StringUTF16.swift
   StringUTF8.swift
   UTF16Scalars.swift
-  ImplicitlyUnwrappedOptional.swift
   Unicode.swift
   UnicodeScalar.swift
   Unmanaged.swift
