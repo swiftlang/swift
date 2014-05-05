@@ -1401,43 +1401,12 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
     BacktrackingScope backtrack(*this);
 
     // Skip by a closure capture list if present.
-    if (consumeIf(tok::l_square) &&
-        !consumeIf(tok::r_square)) {
-      // Skip by the capture list, checking it as we go.
-      do {
-        // Check for the strength specifier, "weak", "unowned", or
-        // "unowned(safe/unsafe)".
-        if (Tok.isContextualKeyword("weak")){
-          consumeToken(tok::identifier);
-        } else if (Tok.isContextualKeyword("unowned")) {
-          consumeToken(tok::identifier);
-
-          // Skip over "safe" and "unsafe" if present.
-          if (consumeIf(tok::l_paren)) {
-            if ((Tok.getText() != "safe" && Tok.getText() != "unsafe") ||
-                peekToken().isNot(tok::r_paren))
-              return false;
-            consumeToken(tok::identifier);
-            consumeToken(tok::r_paren);
-          }
-        } else {
-          // Not a valid capture list, so this isn't a closure signature.
-          return false;
-        }
-
-        // The thing being capture specified is an identifier.
-        // TODO: Generalize this to being full expressions, which can be
-        // renamed.
-        if (Tok.isNot(tok::identifier) && Tok.isNot(tok::kw_self))
-          return false;
-        consumeIdentifier();
-      } while (consumeIf(tok::comma));
-      
-      // The capture list needs to be closed off with a ']'.
+    if (consumeIf(tok::l_square)) {
+      skipUntil(tok::r_square);
       if (!consumeIf(tok::r_square))
         return false;
     }
-    
+
     // Parse pattern-tuple func-signature-result? 'in'.
     if (consumeIf(tok::l_paren)) {      // Consume the ')'.
 
@@ -1497,8 +1466,7 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
       if (Tok.isContextualKeyword("weak")){
         loc = consumeToken(tok::identifier);
         kind = CaptureListEntry::Weak;
-      } else {
-        assert(Tok.isContextualKeyword("unowned") && "preparse above failed");
+      } else if (Tok.isContextualKeyword("unowned")) {
         loc = consumeToken(tok::identifier);
         kind = CaptureListEntry::Unowned;
 
@@ -1506,22 +1474,52 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
         if (consumeIf(tok::l_paren)) {
           if (Tok.getText() == "safe")
             kind = CaptureListEntry::UnownedSafe;
-          else {
-            assert(Tok.getText() == "unsafe" && "preparse failed");
+          else if (Tok.getText() == "unsafe")
             kind = CaptureListEntry::UnownedUnsafe;
-          }
-          consumeToken(tok::identifier);
-          consumeToken(tok::r_paren);
+          else
+            diagnose(Tok, diag::attr_unowned_invalid_specifier);
+          consumeIf(tok::identifier);
+          if (!consumeIf(tok::r_paren))
+            diagnose(Tok, diag::attr_unowned_expected_rparen);
         }
+      } else if (Tok.is(tok::identifier) &&
+                 peekToken().isAny(tok::equal, tok::comma, tok::r_square)) {
+        // "x = 42", "x," and "x]" are all strong captures of x.
+        loc = Tok.getLoc();
+        kind = CaptureListEntry::Strong;
+      } else {
+        diagnose(Tok, diag::expected_capture_specifier);
+        skipUntil(tok::comma, tok::r_square);
+        continue;
       }
-      
-      // The thing being capture specified is an identifier.
-      // TODO: Generalize this to being full expressions, which can be
-      // renamed.
-      Identifier name;
-      consumeIdentifier(&name);
 
-      captureList.push_back(CaptureListEntry(kind, loc, name));
+      if (Tok.isNotAny(tok::identifier, tok::kw_self)) {
+        diagnose(Tok, diag::expected_capture_specifier_name);
+        skipUntil(tok::comma, tok::r_square);
+        continue;
+      }
+
+      // The thing being capture specified is an identifier, or as an identifier
+      // followed by an expression.
+      Expr *initializer;
+      Identifier name;
+      if (peekToken().isNot(tok::equal)) {
+        // If this is the simple case, then the identifier is both the name and
+        // the expression to capture.
+        name = Context.getIdentifier(Tok.getText());
+        initializer = parseExprIdentifier();
+      } else {
+        // Otherwise, the name is a new declaration.
+        consumeIdentifier(&name);
+        consumeToken(tok::equal);
+
+        auto ExprResult = parseExpr(diag::expected_init_capture_specifier);
+        if (ExprResult.isNull())
+          continue;
+        initializer = ExprResult.get();
+      }
+
+      captureList.push_back(CaptureListEntry(kind, loc, name, initializer));
     } while (consumeIf(tok::comma));
     
     // The capture list needs to be closed off with a ']'.

@@ -2384,14 +2384,15 @@ public:
 /// optionally occur in a capture expression.
 struct CaptureListEntry {
   enum KindTy {
-    Weak, Unowned, UnownedSafe, UnownedUnsafe
+    Strong, Weak, Unowned, UnownedSafe, UnownedUnsafe
   } Kind;
   
   SourceLoc Loc;
   Identifier Name;
+  Expr *Init;
   
-  CaptureListEntry(KindTy kind, SourceLoc loc, Identifier name)
-    : Kind(kind), Loc(loc), Name(name) {
+  CaptureListEntry(KindTy Kind, SourceLoc Loc, Identifier Name, Expr *Init)
+    : Kind(Kind), Loc(Loc), Name(Name), Init(Init) {
   }
 };
   
