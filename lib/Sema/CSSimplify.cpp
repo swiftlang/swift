@@ -73,6 +73,34 @@ static Optional<unsigned> scoreParamAndArgNameTypo(StringRef paramName,
   return dist;
 }
 
+/// Function that determines whether the parameter at the given
+/// index can be treated as a trailing closure.
+///
+/// FIXME: This is the wrong question to ask. We should know when something is
+/// a trailing closure.
+static bool paramIsTrailingClosure(const TupleType *paramTuple,
+                                   unsigned paramIdx) {
+  for (unsigned i = paramIdx, n = paramTuple->getNumElements(); i != n; ++i) {
+    const auto &param = paramTuple->getFields()[i];
+    auto type = param.isVararg() ? param.getVarargBaseTy() : param.getType();
+    type = type->getRValueInstanceType();
+
+    // Look through optionals.
+    if (auto optValue = type->getAnyOptionalObjectType()) {
+      type = optValue;
+    }
+
+    auto funcTy = type->getAs<FunctionType>();
+    if (!funcTy)
+      return false;
+
+    if (funcTy->isAutoClosure())
+      return false;
+  }
+
+  return true;
+};
+
 // Match the argument tuple of a call to the parameter tuple.
 static ConstraintSystem::SolutionKind
 matchCallArguments(ConstraintSystem &cs,
@@ -135,30 +163,6 @@ matchCallArguments(ConstraintSystem &cs,
   auto skipClaimedArgs = [&]() {
     while (nextArgIdx != numArgs && claimedArgs[nextArgIdx])
       ++nextArgIdx;
-  };
-
-  // Location function that determines whether the parameter at the given
-  // index can be treated as a trailing closure.
-  auto paramIsTrailingClosure = [&](unsigned paramIdx) -> bool {
-    for (unsigned i = paramIdx; i != numParams; ++i) {
-      const auto &param = paramTuple->getFields()[i];
-      auto type = param.isVararg() ? param.getVarargBaseTy() : param.getType();
-      type = type->getRValueInstanceType();
-
-      // Look through optionals.
-      if (auto optValue = type->getAnyOptionalObjectType()) {
-        type = optValue;
-      }
-
-      auto funcTy = type->getAs<FunctionType>();
-      if (!funcTy)
-        return false;
-
-      if (funcTy->isAutoClosure())
-        return false;
-    }
-
-    return true;
   };
 
   // Local function that retrieves the next unclaimed argument with the given
@@ -242,7 +246,7 @@ matchCallArguments(ConstraintSystem &cs,
     // the name were always correct.
     // FIXME: This is a hack. We should know whether it's a trailing closure
     // or not.
-    if (paramIsTrailingClosure(paramIdx)) {
+    if (paramIsTrailingClosure(paramTuple, paramIdx)) {
       return claim(argTuple->getFields()[nextArgIdx].getName(),
                    /*ignoreNameClash=*/true);
     }
@@ -748,7 +752,8 @@ ConstraintSystem::matchScalarToTupleTypes(Type type1, TupleType *tuple2,
   // FIXME: Handle varargs.
   if (kind == TypeMatchKind::ArgumentTupleConversion &&
       elt.hasName() && !elt.isVararg() &&
-      getASTContext().LangOpts.StrictKeywordArguments) {
+      getASTContext().LangOpts.StrictKeywordArguments &&
+      !paramIsTrailingClosure(tuple2, scalarFieldIdx)) {
     return simplifyFixConstraint(
              Fix::getRelabelTuple(*this, FixKind::ScalarToTuple, elt.getName()),
              type1, tuple2, TypeMatchKind::Conversion, flags, locator);
