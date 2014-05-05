@@ -4,20 +4,20 @@
 
 /// Aaa.  FooEnum1.  Bbb.
 struct FooEnum1 {
-  init(value: CUnsignedInt)
+  init(_ value: CUnsignedInt)
   var value: CUnsignedInt
 }
 
 /// Aaa.  FooEnum1X.  Bbb.
 var FooEnum1X: FooEnum1 { get }
 struct FooEnum2 {
-  init(value: CUnsignedInt)
+  init(_ value: CUnsignedInt)
   var value: CUnsignedInt
 }
 var FooEnum2X: FooEnum2 { get }
 var FooEnum2Y: FooEnum2 { get }
 struct FooEnum3 {
-  init(value: CUnsignedInt)
+  init(_ value: CUnsignedInt)
   var value: CUnsignedInt
 }
 var FooEnum3X: FooEnum3 { get }
@@ -33,7 +33,7 @@ enum FooComparisonResult : CLong {
 /// Aaa.  FooRuncingOptions.  Bbb.
 struct FooRuncingOptions : RawOptionSet {
   init()
-  init(value: CLong)
+  init(_ value: CLong)
   var value: CLong
   static var EnableMince: FooRuncingOptions { get }
   static var EnableQuince: FooRuncingOptions { get }
@@ -198,7 +198,7 @@ struct _InternalStruct {
 }
 func fooSubFunc1(a: CInt) -> CInt
 struct FooSubEnum1 {
-  init(value: CUnsignedInt)
+  init(_ value: CUnsignedInt)
   var value: CUnsignedInt
 }
 var FooSubEnum1X: FooSubEnum1 { get }

@@ -863,7 +863,8 @@ namespace {
 
     /// \brief Create a constructor that initializes a struct from its members.
     ConstructorDecl *createValueConstructor(StructDecl *structDecl,
-                                            ArrayRef<Decl *> members) {
+                                            ArrayRef<Decl *> members,
+                                            bool wantCtorParamNames) {
       auto &context = Impl.SwiftContext;
 
       // Create the 'self' declaration.
@@ -883,12 +884,14 @@ namespace {
         if (auto var = dyn_cast<VarDecl>(member)) {
           if (!var->hasStorage())
             continue;
-          
+
+          Identifier argName = wantCtorParamNames ? var->getName()
+                                                  : Identifier();
           auto param = new (context) ParamDecl(/*IsLet*/ true,
-                                               SourceLoc(), var->getName(),
+                                               SourceLoc(), argName,
                                                SourceLoc(), var->getName(),
                                                var->getType(), structDecl);
-          argNames.push_back(var->getName());
+          argNames.push_back(argName);
           params.push_back(param);
           Pattern *pattern = createTypedNamedPattern(param);
           paramPatterns.push_back(pattern);
@@ -900,6 +903,7 @@ namespace {
                                                SourceLoc());
       auto paramTy = TupleType::get(tupleElts, context);
       paramPattern->setType(paramTy);
+      paramTy = paramTy->getRelabeledType(context, argNames);
 
       // Create the constructor
       DeclName name(context, context.Id_init, argNames);
@@ -1129,7 +1133,8 @@ namespace {
         // Create a constructor to initialize that value from a value of the
         // underlying type.
         Decl *varDecl = var;
-        auto constructor = createValueConstructor(structDecl, varDecl);
+        auto constructor = createValueConstructor(structDecl, varDecl,
+                                                  /*wantCtorParamNames=*/false);
 
         // Set the members of the struct.
         structDecl->addMember(constructor);
@@ -1218,7 +1223,9 @@ namespace {
         // Create a constructor to initialize that value from a value of the
         // underlying type.
         Decl *varDecl = var;
-        auto valueConstructor = createValueConstructor(structDecl, varDecl);
+        auto valueConstructor = createValueConstructor(
+                                  structDecl, varDecl,
+                                  /*wantCtorParamNames=*/false);
 
         // Build a delayed RawOptionSet conformance for the type.
         DelayedProtocolDecl delayedProtocols[] = {

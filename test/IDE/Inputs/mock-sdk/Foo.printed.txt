@@ -12,7 +12,7 @@
 
 /// Aaa.  FooEnum1.  Bbb.
 struct FooEnum1 {
-  init(value: CUnsignedInt)
+  init(_ value: CUnsignedInt)
   var value: CUnsignedInt
 }
 
@@ -20,13 +20,13 @@ struct FooEnum1 {
 var FooEnum1X: FooEnum1 { get }
 
 struct FooEnum2 {
-  init(value: CUnsignedInt)
+  init(_ value: CUnsignedInt)
   var value: CUnsignedInt
 }
 var FooEnum2X: FooEnum2 { get }
 var FooEnum2Y: FooEnum2 { get }
 struct FooEnum3 {
-  init(value: CUnsignedInt)
+  init(_ value: CUnsignedInt)
   var value: CUnsignedInt
 }
 var FooEnum3X: FooEnum3 { get }
@@ -43,7 +43,7 @@ enum FooComparisonResult : CLong {
 /// Aaa.  FooRuncingOptions.  Bbb.
 struct FooRuncingOptions : RawOptionSet {
   init()
-  init(value: CLong)
+  init(_ value: CLong)
   var value: CLong
   // This is mince.
   static var EnableMince: FooRuncingOptions { get }

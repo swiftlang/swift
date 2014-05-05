@@ -4,20 +4,20 @@
 
 <decl:Struct>/// Aaa.  FooEnum1.  Bbb.
 struct FooEnum1 {
-  <decl:Constructor>init(value: <ref:TypeAlias>CUnsignedInt</ref>)</decl>
+  <decl:Constructor>init(_ value: <ref:TypeAlias>CUnsignedInt</ref>)</decl>
   <decl:Var>var value: <ref:TypeAlias>CUnsignedInt</ref></decl>
 }</decl>
 
 <decl:Var>/// Aaa.  FooEnum1X.  Bbb.
 var FooEnum1X: <ref:Struct>FooEnum1</ref> { get }</decl>
 <decl:Struct>struct FooEnum2 {
-  <decl:Constructor>init(value: <ref:TypeAlias>CUnsignedInt</ref>)</decl>
+  <decl:Constructor>init(_ value: <ref:TypeAlias>CUnsignedInt</ref>)</decl>
   <decl:Var>var value: <ref:TypeAlias>CUnsignedInt</ref></decl>
 }</decl>
 <decl:Var>var FooEnum2X: <ref:Struct>FooEnum2</ref> { get }</decl>
 <decl:Var>var FooEnum2Y: <ref:Struct>FooEnum2</ref> { get }</decl>
 <decl:Struct>struct FooEnum3 {
-  <decl:Constructor>init(value: <ref:TypeAlias>CUnsignedInt</ref>)</decl>
+  <decl:Constructor>init(_ value: <ref:TypeAlias>CUnsignedInt</ref>)</decl>
   <decl:Var>var value: <ref:TypeAlias>CUnsignedInt</ref></decl>
 }</decl>
 <decl:Var>var FooEnum3X: <ref:Struct>FooEnum3</ref> { get }</decl>
@@ -33,7 +33,7 @@ enum FooComparisonResult : <ref:TypeAlias>CLong</ref> {
 <decl:Struct>/// Aaa.  FooRuncingOptions.  Bbb.
 struct FooRuncingOptions : <ref:Protocol>RawOptionSet</ref> {
   <decl:Constructor>init()</decl>
-  <decl:Constructor>init(value: <ref:TypeAlias>CLong</ref>)</decl>
+  <decl:Constructor>init(_ value: <ref:TypeAlias>CLong</ref>)</decl>
   <decl:Var>var value: <ref:TypeAlias>CLong</ref></decl>
   <decl:Var>static var EnableMince: <ref:Struct>FooRuncingOptions</ref> { get }</decl>
   <decl:Var>static var EnableQuince: <ref:Struct>FooRuncingOptions</ref> { get }</decl>

@@ -1,7 +1,7 @@
 
 func fooHelperSubFunc1(a: CInt) -> CInt
 struct FooHelperSubEnum1 {
-  init(value: CUnsignedInt)
+  init(_ value: CUnsignedInt)
   var value: CUnsignedInt
 }
 var FooHelperSubEnum1X: FooHelperSubEnum1 { get }
