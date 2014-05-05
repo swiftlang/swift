@@ -1832,6 +1832,7 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc,
       EndLoc = NamePattern->getEndLoc();
     }
 
+    bool isVararg = false;
     if (Indices) {
       Indices = Indices->clone(P->Context, Pattern::Implicit);
       if (auto *PP = dyn_cast<ParenPattern>(Indices)) {
@@ -1839,6 +1840,7 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc,
       } else {
         auto *TP = cast<TuplePattern>(Indices);
         ValueArgElements.append(TP->getFields().begin(), TP->getFields().end());
+        isVararg = TP->hasVararg();
       }
 
       StartLoc = Indices->getStartLoc();
@@ -1850,8 +1852,8 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc,
       EndLoc = NamePattern->getEndLoc();
     }
 
-    ValueArg = TuplePattern::create(P->Context, StartLoc,
-                                    ValueArgElements, EndLoc);
+    ValueArg = TuplePattern::create(P->Context, StartLoc, ValueArgElements,
+                                    EndLoc, isVararg);
     if (NamePattern && !NamePattern->isImplicit())
       ValueArg->setImplicit();
   }
