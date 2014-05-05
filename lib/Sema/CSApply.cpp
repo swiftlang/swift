@@ -4104,14 +4104,9 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr) {
       return nullptr;
 
     // We didn't manage to diagnose anything well, so fall back to
-    // diagnosing mining the system to construct a resonable error message.
-    SmallVector<Solution, 4> solutionVector;
-    solutionVector.push_back(std::move(solution));
-    
-    // Only emit diagnostics for unsupported failures. That way we won't attempt
-    // to re-solve the system.
-    this->salvage(solutionVector, expr, true);
-    
+    // diagnosing mining the system to construct a reasonable error message.
+    this->diagnoseFailureFromConstraints(expr);
+
     return nullptr;
   }
 
