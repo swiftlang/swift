@@ -264,6 +264,24 @@ public:
       
     return SS;
   }
+  
+  Decl *transformDecl(Decl *D) {
+    if (FuncDecl *FD = llvm::dyn_cast<FuncDecl>(D)) {
+      if (BraceStmt *B = FD->getBody()) {
+        TargetKindSetter TKS(BracePairs, BracePair::TargetKinds::Return);
+        BraceStmt *NB = transformBraceStmt(B);
+        if (NB != B) {
+          FD->setBody(NB);
+        }
+      }
+    } else if (NominalTypeDecl *NTD = llvm::dyn_cast<NominalTypeDecl>(D)) {
+      for (Decl *Member : NTD->getMembers()) {
+        transformDecl(Member);
+      }
+    }
+    
+    return D;
+  }
 
   std::pair<DeclRefExpr *, VarDecl *> digForVariable(Expr *E) {
     if (DeclRefExpr *DRE = llvm::dyn_cast<DeclRefExpr>(E)) {
@@ -496,15 +514,8 @@ public:
               ++EI;
             }
           }
-        }
-        else if (FuncDecl *FD = llvm::dyn_cast<FuncDecl>(D)) {
-          if (BraceStmt *B = FD->getBody()) {
-            TargetKindSetter TKS(BracePairs, BracePair::TargetKinds::Return);
-            BraceStmt *NB = transformBraceStmt(B);
-            if (NB != B) {
-              FD->setBody(NB);
-            }
-          }
+        } else {
+          transformDecl(D);
         }
       }
     }
