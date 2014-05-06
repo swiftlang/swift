@@ -28,13 +28,11 @@ class Record
   end
 
   def <=>(other)
-    if self.last < other.last
-      return -1
-    elsif other.last < self.last
-      return 1
-    else
-      return self.first <=> other.first
+    comp = self.last <=> other.last
+    if comp != 0
+      return comp
     end
+    return self.first <=> other.first
   end
 end
 
