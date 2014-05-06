@@ -16,7 +16,39 @@ Latest
     }
 
   Initializers in extensions are still implicitly convenience initializers.  
-  
+
+* Reference types using the CoreFoundation runtime are now imported as
+  class types.  This means that Swift will automatically manage the
+  lifetime of a CFStringRef the same way that it manages the lifetime
+  of an NSString.
+
+  In many common cases, this will just work.  Unfortunately, values
+  are returned from CF-style APIs in a wide variety of ways, and
+  unlike Objective C methods, there simply isn't enough consistency
+  for Swift to be able to safely apply the documented conventions
+  universally.  The framework teams have already audited many of the
+  most important CF-style APIs, and those APIs should be imported
+  without a hitch into Swift.  For all the APIs which haven't yet
+  been audited, we must import return types using the Unmanaged type.
+  This type allows the programmer to control exactly how the object
+  is passed.
+
+  For example:
+
+    // CFBundleGetAllBundles() returns an Unmanaged<CFArrayRef>.
+    // From the documentation, we know that it returns a +0 value.
+    let bundles = CFBundleGetAllBundles().takeUnretainedValue()
+
+    // CFRunLoopCopyAllModes() returns an Unmanaged<CFArrayRef>.
+    // From the documentation, we know that it returns a +1 value.
+    let modes = CFRunLoopCopyAllModes(CFRunLoopGetMain()).takeRetainedValue()
+
+  You can also use Unmanaged types to pass and return objects
+  indirectly, as well as to generate unbalanced retains and releases
+  if you really require them.
+
+  The API of the Unmanaged type is still in flux, and your feedback
+  would be greatly appreciated.
 
 2014-05-03
 ----------
