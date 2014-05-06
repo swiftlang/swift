@@ -38,8 +38,6 @@
 #include "llvm/Support/CommandLine.h"
 using namespace swift;
 
-static const unsigned RecursionMaxDepth = 8;
-
 STATISTIC(NumDevirtualized, "Number of calls devirtualzied");
 STATISTIC(NumDynApply, "Number of dynamic apply devirtualzied");
 STATISTIC(NumAMI, "Number of witness_method devirtualzied");
@@ -60,276 +58,211 @@ struct SILDevirtualizer {
   SILDevirtualizer(SILModule *M)
     : M(M), Changed(false) {}
 
-  /// Check for type mismatch when replacing a ClassMethodInst with a
-  /// FunctionRefInst.
-  bool checkDevirtType(SILFunction *F, ClassMethodInst *CMI);
-
-  /// Optimize a class_method and alloc_ref pair into a direct function
-  /// reference:
-  ///
-  /// \code
-  /// %XX = alloc_ref $Foo
-  /// %YY = class_method %XX : $Foo, #Foo.get!1 : $@cc(method) @thin ...
-  /// \endcode
-  ///
-  ///  or
-  ///
-  /// %XX = metatype $...
-  /// %YY = class_method %XX : ...
-  ///
-  ///  into
-  ///
-  /// %YY = function_ref @...
-  void optimizeClassMethodInst(ClassMethodInst *CMI);
-
   void optimizeApplyInst(ApplyInst *Inst);
   void optimizeFuncBody(SILFunction *F);
 
   bool optimizeWitnessMethod(ApplyInst *AI, WitnessMethodInst *AMI);
   bool optimizeProtocolMethod(ApplyInst *AI, ProtocolMethodInst *PMI);
+  bool optimizeClassMethod(ApplyInst *AI, ClassMethodInst *CMI);
 
   bool run();
 };
 
 } // anonymous namespace.
 
-/// \brief Returns the index of the argument that the function returns or -1
-/// if the return value is not always an argument.
-static int functionReturnsArgument(SILFunction *F) {
-  if (F->getBlocks().size() != 1)
-    return -1;
-
-  // Check if there is a single terminator which is a ReturnInst.
-  ReturnInst *RI = dyn_cast<ReturnInst>(F->begin()->getTerminator());
-  if (!RI)
-    return -1;
-
-  // Check that the single return instruction that we found returns the
-  // correct argument. Scan all of the argument and check if the return inst
-  // returns them.
-  ValueBase *ReturnedVal = RI->getOperand().getDef();
-  for (int i = 0, e = F->begin()->getNumBBArg(); i != e; ++i)
-    if (F->begin()->getBBArg(i) == ReturnedVal)
-      return i;
-
-  // The function does not return an argument.
-  return -1;
-}
-
-/// \brief Returns the single return value if there is one.
-static SILValue functionSingleReturn(SILFunction *F) {
-  if (F->getBlocks().size() != 1)
-    return SILValue();
-
-  // Check if there is a single terminator which is a ReturnInst.
-  ReturnInst *RI = dyn_cast<ReturnInst>(F->begin()->getTerminator());
-  if (!RI)
-    return SILValue();
-  return RI->getOperand();
-}
-
-static SILValue findOrigin(SILValue S) {
-  SILValue Origin = S;
-  unsigned Depth = 0;
-  for (; Depth < RecursionMaxDepth; ++Depth) {
-    switch (Origin->getKind()) {
-      default:
-        break;
-      case ValueKind::UpcastInst:
-      case ValueKind::UnconditionalCheckedCastInst:
-      case ValueKind::UncheckedRefCastInst:
-        Origin = cast<SILInstruction>(Origin)->getOperand(0);
-        continue;
-      case ValueKind::ApplyInst: {
-        ApplyInst *AI = cast<ApplyInst>(Origin);
-        FunctionRefInst *FR =
-          dyn_cast<FunctionRefInst>(AI->getCallee());
-        if (!FR)
-          break;
-
-        SILFunction *F = FR->getReferencedFunction();
-        if (F->isExternalDeclaration()) {
-          if (!F->getModule().linkFunction(F, SILModule::LinkingMode::LinkAll))
-            break;
-        }
-
-        // Does this function return one of its arguments ?
-        int RetArg = functionReturnsArgument(F);
-        if (RetArg != -1) {
-          Origin = AI->getOperand(1 /* 1st operand is Callee */ + RetArg);
-          continue;
-        }
-        SILValue RetV = functionSingleReturn(F);
-        if (RetV.isValid()) {
-          Origin = RetV;
-          continue;
-        }
-        break;
-      }
-    }
-    // No cast or pass-thru args found.
-    break;
-  }
-  DEBUG(if (Depth == RecursionMaxDepth)
-          llvm::dbgs() << "findMetaType: Max recursion depth.\n");
-
-  return Origin;
-}
-
-/// \brief Scan the use-def chain and skip cast instructions that don't change
-/// the value of the class. Stop on classes that define a class type.
-static SILInstruction *findMetaType(SILValue S, unsigned Depth = 0) {
-  SILInstruction *Inst = dyn_cast<SILInstruction>(findOrigin(S));
-  if (!Inst)
-    return nullptr;
-
-  switch (Inst->getKind()) {
+/// Is this an instruction kind which allows us to conclude definitively what
+/// the class decls of its results are.
+///
+/// FIXME: We can expand this to use typed GEPs.
+static bool isClassDeclOracle(ValueKind Kind) {
+  switch (Kind) {
   case ValueKind::AllocRefInst:
   case ValueKind::AllocRefDynamicInst:
   case ValueKind::MetatypeInst:
-    return Inst;
+    return true;
   default:
-    return nullptr;
+    return false;
   }
 }
 
 /// \brief Recursively searches the ClassDecl for the type of \p S, or null.
 static ClassDecl *findClassDeclForOperand(SILValue S) {
-  // Look for an instruction that defines a class type.
-  SILInstruction *Meta = findMetaType(S);
-  if (!Meta)
+  // First strip off casts.
+  S = S.stripCasts();
+
+  // Then if S is not a class decl oracle, we can not ascertain what its results
+  // "true" type is.
+  if (!isClassDeclOracle(S->getKind()))
     return nullptr;
 
   // Look for a a static ClassTypes in AllocRefInst or MetatypeInst.
-  if (AllocRefInst *ARI = dyn_cast<AllocRefInst>(Meta)) {
+  if (AllocRefInst *ARI = dyn_cast<AllocRefInst>(S))
     return ARI->getType().getClassOrBoundGenericClass();
-  } else if (MetatypeInst *MTI = dyn_cast<MetatypeInst>(Meta)) {
-    CanType instTy = MTI->getType().castTo<MetatypeType>().getInstanceType();
-    return instTy.getClassOrBoundGenericClass();
-  } else {
+
+  auto *MTI = dyn_cast<MetatypeInst>(S);
+  if (!MTI)
     return nullptr;
-  }
+
+  CanType instTy = MTI->getType().castTo<MetatypeType>().getInstanceType();
+  return instTy.getClassOrBoundGenericClass();
 }
 
-bool SILDevirtualizer::checkDevirtType(SILFunction *F, ClassMethodInst *CMI) {
-  auto paramTypes = F->getLoweredFunctionType()
-                     ->getInterfaceParametersWithoutIndirectResult();
-  if (paramTypes.empty())
-    return true;
-
-  auto paramTy = paramTypes[paramTypes.size() - 1].getType();
-  auto argTy = CMI->getOperand().getType().getSwiftRValueType();
-  if (paramTy == argTy ||
-      paramTy->getClassOrBoundGenericClass() ==
-      argTy->getClassOrBoundGenericClass())
-    return true;
-
-  // When there is a type mismatch, we currently only allow upcast where
-  // the source operand has the expected paramTy. Another option is to perform
-  // a downcast to have the correct type.
-  if (CMI->getOperand()->getKind() != ValueKind::UpcastInst)
-    return false;
-  auto origin = cast<SILInstruction>(CMI->getOperand())->getOperand(0);
-
-  // See if Origin has any substitutions. If it does, we need to specialize
-  // paramTy.
-  //
-  // FIXME: See if this can be moved to the beginning.
-  SILModule &Mod = F->getModule();
-  SILType originTy = origin.getType();
-  ArrayRef<Substitution> originSubs = originTy.gatherAllSubstitutions(Mod);
-  if (originSubs.size()) {
-    CanSILFunctionType FTy = F->getLoweredFunctionType();
-    FTy = FTy->substInterfaceGenericArgs(Mod,
-                                         Mod.getSwiftModule(),
-                                         originSubs);
-    paramTypes = FTy->getInterfaceParametersWithoutIndirectResult();
-    paramTy = paramTypes[paramTypes.size() - 1].getType();
-  }
-
-  if (paramTy != originTy.getSwiftRValueType())
-    return false;
-
-  // We handle updating of ApplyInst only.
-  for (auto UI = CMI->use_begin(), UE = CMI->use_end(); UI != UE; ++UI)
-    if (!isa<ApplyInst>(UI->getUser()))
-      return false;
-
-  // Find the next instruction of CMI before modifying anything.
-  SILBasicBlock::iterator iter(CMI);
-  ++iter;
-  SILInstruction *nextI = (iter == CMI->getParent()->end()) ? nullptr : iter;
-  for (auto UI = CMI->use_begin(), UE = CMI->use_end(); UI != UE; ++UI)
-    if (ApplyInst *AI = dyn_cast<ApplyInst>(UI->getUser())) {
-      // Update the last argument for ApplyInst.
-      SILBuilder Builder(AI);
-
-      SmallVector<SILValue, 4> Args;
-      ArrayRef<Operand> ApplyArgs = AI->getArgumentOperands();
-      for (auto &A : ApplyArgs.slice(0, ApplyArgs.size() - 1))
-        Args.push_back(A.get());
-      Args.push_back(origin);
-
-      ApplyInst *SAI = Builder.createApply(AI->getLoc(), AI->getCallee(),
-                                           AI->getSubstCalleeSILType(),
-                                           AI->getType(),
-                                           AI->getSubstitutions(), Args);
-       AI->replaceAllUsesWith(SAI);
-       // If AI is the next instruction after CMI, do not erase here. It can
-       // cause invalid iterator for the loop in optimizeFuncBody.
-       if (AI != nextI)
-         AI->eraseFromParent();
-       else
-         toBeDeleted = AI;
-    }
-  return true;
-}
-
-void SILDevirtualizer::optimizeClassMethodInst(ClassMethodInst *CMI) {
+/// Optimize a class_method and alloc_ref pair into a direct function
+/// reference:
+///
+/// \code
+/// %XX = alloc_ref $Foo
+/// %YY = class_method %XX : $Foo, #Foo.get!1 : $@cc(method) @thin ...
+/// apply %YY(...)
+/// \endcode
+///
+///  or
+///
+/// %XX = metatype $...
+/// %YY = class_method %XX : ...
+/// apply %YY(...)
+///
+///  into
+///
+/// %YY = function_ref @...
+/// apply %YY(...)
+///
+bool SILDevirtualizer::optimizeClassMethod(ApplyInst *AI,
+                                           ClassMethodInst *CMI) {
   DEBUG(llvm::dbgs() << "    Trying to optimize : " << *CMI);
 
-  // Attempt to find a ClassDecl for our operand.
-  ClassDecl *Class = findClassDeclForOperand(findOrigin(CMI->getOperand()));
+  // First attempt to lookup the origin for our class method. The origin should
+  // either be a metatype or an alloc_ref.
+  SILValue Origin = CMI->getOperand().stripCasts();
+  DEBUG(llvm::dbgs() << "        Origin: " << Origin);
 
-  // If we fail, bail...
+  // Then attempt to lookup the class for origin.
+  ClassDecl *Class = findClassDeclForOperand(Origin);
+
+  // If we are unable to lookup a class decl for origin there is nothing here
+  // that we can deserialize.
   if (!Class) {
     DEBUG(llvm::dbgs() << "        FAIL: Could not find class decl for "
-          "SILValue.\n");
-    return;
+                          "SILValue.\n");
+    return false;
   }
 
-  // Otherwise walk up the class heirarchy until there are no more super classes
-  // (i.e. Class becomes null) or we find a match with member.
+  // Otherwise lookup from the module the least derived implementing method from
+  // the module vtables.
   SILModule &Mod = CMI->getModule();
   SILFunction *F = Mod.lookUpSILFunctionFromVTable(Class, CMI->getMember());
+
+  // If we do not find any such function, we have no function to devirtualize
+  // to... so bail.
   if (!F) {
     DEBUG(llvm::dbgs() << "        FAIL: Could not find matching VTable or "
-          "vtable method for this class.\n");
-    return;
+                          "vtable method for this class.\n");
+    return false;
   }
 
-  // If F's this pointer has a different type from the CMI's operand, we
-  // will have type checking issues later on. For now, we only devirtualize
-  // if the operand is set with "upcast" and the source operand of "upcast"
-  // has the required type.
-  bool allowDevirt = checkDevirtType(F, CMI);
-  if (!allowDevirt) {
-    DEBUG(llvm::dbgs() <<
-          " *** Disable devirtualization due to type mismatch : " << *CMI);
-    return;
+  // Ok, we found a function F that we can devirtualization our class method
+  // to. We want to do everything on the substituted type in the case of
+  // generics. Thus construct our subst callee type for F.
+  SILModule &M = F->getModule();
+  CanSILFunctionType GenCalleeType = F->getLoweredFunctionType();
+  CanSILFunctionType SubstCalleeType =
+    GenCalleeType->substInterfaceGenericArgs(M, M.getSwiftModule(),
+                                             AI->getSubstitutions());
+
+
+  // If F's this pointer has a different type from CMI's operand and the
+  // "this" pointer type is a super class of the CMI's operand, insert an
+  // upcast.
+  auto paramTypes =
+    SubstCalleeType->getInterfaceParameterSILTypesWithoutIndirectResult();
+
+  // We should always have a this pointer. Assert on debug builds, return
+  // nullptr on release builds.
+  assert(!paramTypes.empty() &&
+         "Must have a this pointer when calling a class method inst.");
+  if (paramTypes.empty())
+    return false;
+
+  // Grab the self type from the function ref and the self type from the class
+  // method inst.
+  SILType FuncSelfTy = paramTypes[paramTypes.size() - 1];
+  SILType OriginTy = Origin.getType();
+
+  SILBuilder B(AI);
+
+  // Then compare the two types and if they are unequal...
+  if (FuncSelfTy != OriginTy) {
+
+    // And the self type on the function is not a super class of our class
+    // method inst, bail. Something weird is happening here.
+    if (!FuncSelfTy.isSuperclassOf(OriginTy))
+      return false;
+
+    // Otherwise, upcast origin to the appropriate type.
+    Origin = B.createUpcast(CMI->getLoc(), Origin, FuncSelfTy);
   }
 
-  // Success! We found the method! Create a direct reference to it.
-  FunctionRefInst *FRI =
-    new (CMI->getModule()) FunctionRefInst(CMI->getLoc(), F);
+  // Success! Perform the devirtualization.
+  FunctionRefInst *FRI = B.createFunctionRef(CMI->getLoc(), F);
 
-  CMI->getParent()->getInstList().insert(CMI, FRI);
-  CMI->replaceAllUsesWith(FRI);
-  CMI->eraseFromParent();
+  // Construct a new arg list. First process all non-self operands, ref, addr
+  // casting them to the appropriate types for F so that we allow for covariant
+  // indirect return types and contravariant arguments.
+  llvm::SmallVector<SILValue, 8> NewArgs;
+  auto Args = AI->getArguments();
+  auto allParamTypes = SubstCalleeType->getInterfaceParameterSILTypes();
+
+  // For each old argument Op...
+  for (unsigned i = 0, e = Args.size() - 1; i != e; ++i) {
+    SILValue Op = Args[i];
+    SILType OpTy = Op.getType();
+    SILType FOpTy = allParamTypes[i];
+
+    // If the type matches the type for the given parameter in F, just add it to
+    // our arg list and continue.
+    if (OpTy == FOpTy) {
+      NewArgs.push_back(Op);
+      continue;
+    }
+
+    // Otherwise we have either a covariant return type or a contravariant
+    // argument type. Cast it appropriately.
+    assert((OpTy.isAddress() || OpTy.isHeapObjectReferenceType()) &&
+           "Only addresses and refs can have their types changed due to "
+           "covariant return types or contravariant argument types.");
+
+    // If OpTy is an address, perform an unchecked_addr_cast.
+    if (OpTy.isAddress()) {
+      NewArgs.push_back(B.createUncheckedAddrCast(AI->getLoc(), Op, FOpTy));
+    } else {
+      // Otherwise perform a ref cast.
+      NewArgs.push_back(B.createUncheckedRefCast(AI->getLoc(), Op, FOpTy));
+    }
+  }
+  // Add in self to the end.
+  NewArgs.push_back(Origin);
+
+  // If we have a direct return type, make sure we use the subst calle return
+  // type. If we have an indirect return type, AI's return type of the empty
+  // tuple should be ok.
+  SILType ReturnType = AI->getType();
+  if (!SubstCalleeType->hasIndirectResult()) {
+    ReturnType = SubstCalleeType->getSILInterfaceResult();
+  }
+
+  SILType SubstCalleeSILType = SILType::getPrimitiveObjectType(SubstCalleeType);
+  ApplyInst *NewAI =
+      B.createApply(AI->getLoc(), FRI, SubstCalleeSILType, ReturnType,
+                    AI->getSubstitutions(), NewArgs);
+
+  AI->replaceAllUsesWith(NewAI);
+  AI->eraseFromParent();
+  if (CMI->use_empty())
+    CMI->eraseFromParent();
 
   DEBUG(llvm::dbgs() << "        SUCCESS: " << F->getName() << "\n");
   NumDevirtualized++;
-  Changed = true;
+  return true;
 }
 
 /// \brief Scan the uses of the protocol object and return the initialization
@@ -694,6 +627,27 @@ void SILDevirtualizer::optimizeApplyInst(ApplyInst *AI) {
     return;
   }
 
+  /// Optimize a class_method and alloc_ref pair into a direct function
+  /// reference:
+  ///
+  /// \code
+  /// %XX = alloc_ref $Foo
+  /// %YY = class_method %XX : $Foo, #Foo.get!1 : $@cc(method) @thin ...
+  /// \endcode
+  ///
+  ///  or
+  ///
+  /// %XX = metatype $...
+  /// %YY = class_method %XX : ...
+  ///
+  ///  into
+  ///
+  /// %YY = function_ref @...
+  if (auto *CMI = dyn_cast<ClassMethodInst>(AI->getCallee())) {
+    Changed |= optimizeClassMethod(AI, CMI);
+    return;
+  }
+
   // Devirtualize protocol_method + project_existential + init_existential
   // instructions.  For example:
   //
@@ -711,21 +665,10 @@ void SILDevirtualizer::optimizeApplyInst(ApplyInst *AI) {
 void SILDevirtualizer::optimizeFuncBody(SILFunction *F) {
   DEBUG(llvm::dbgs() << "*** Devirtualizing Function: "
         << Demangle::demangleSymbolAsString(F->getName()) << "\n");
-  for (auto &BB : *F) {
-    auto I = BB.begin(), E = BB.end();
-    while (I != E) {
-      SILInstruction *Inst = I++; // Inst may be erased.
-      if (Inst == toBeDeleted) {
-        toBeDeleted = nullptr;
-        Inst->eraseFromParent();
-        continue;
-      }
-      if (ClassMethodInst *CMI = dyn_cast<ClassMethodInst>(Inst))
-        optimizeClassMethodInst(CMI);
-      else if (ApplyInst *AI = dyn_cast<ApplyInst>(Inst))
+  for (auto &BB : *F)
+    for (auto &II : BB)
+      if (ApplyInst *AI = dyn_cast<ApplyInst>(&II))
         optimizeApplyInst(AI);
-    }
-  }
 
   DEBUG(llvm::dbgs() << "\n");
 }

@@ -1,5 +1,4 @@
-// RUN: %sil-opt %s -devirtualize -verify | FileCheck %s
-// XFAIL: *
+// RUN: %sil-opt %s -inline -devirtualize -verify | FileCheck %s
 
 sil_stage canonical
 
