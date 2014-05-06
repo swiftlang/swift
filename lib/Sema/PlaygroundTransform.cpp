@@ -548,12 +548,23 @@ public:
     char NameBuf[11] = { 0 };
     snprintf(NameBuf, 11, "tmp%u", TmpNameIndex);
     TmpNameIndex++;
+        
+    Expr *MaybeLoadInitExpr = nullptr;
+    
+    if (LValueType *LVT =
+        llvm::dyn_cast<LValueType>(InitExpr->getType().getPointer())) {
+      MaybeLoadInitExpr = new (Context) LoadExpr (InitExpr,
+                                                  LVT->getObjectType());
+    }
+    else {
+      MaybeLoadInitExpr = InitExpr;
+    }
 
     VarDecl *VD = new (Context) VarDecl(false, // static
                                         true, // let
                                         SourceLoc(),
                                         Context.getIdentifier(NameBuf),
-                                        InitExpr->getType(),
+                                        MaybeLoadInitExpr->getType(),
                                         TypeCheckDC);
 
     VD->setImplicit();
@@ -566,7 +577,7 @@ public:
                                        StaticSpellingKind::None,
                                        SourceLoc(),
                                        NP,
-                                       InitExpr,
+                                       MaybeLoadInitExpr,
                                        false, // is conditional
                                        TypeCheckDC);
 
