@@ -245,25 +245,104 @@ static bool optimizeClassMethod(ApplyInst *AI, ClassMethodInst *CMI) {
 
 namespace {
 
-struct DevirtInfo {
-  SILValue Self = SILValue();
-  ArrayRef<Substitution> Subs = ArrayRef<Substitution>();
-  SILType SubstCalleeType = SILType();
-  SILType Type = SILType();
+class WitnessMethodDevirtualizer {
 
-  DevirtInfo() {}
-  DevirtInfo(SILValue Self, SILType SubstCalleeType)
-    : Self(Self), SubstCalleeType(SubstCalleeType) {}
+  //==-----------
+  // Input fields
+
+  /// The apply that we are attempting to optimize.
+  ApplyInst *AI;
+
+  /// The witness method that is the callee of the apply.
+  WitnessMethodInst *WMI;
+
+  /// The conformance that the witness method is using.
+  ProtocolConformance *C;
+
+  /// The SILFunction devirtualization target.
+  SILFunction *F;
+
+  /// If we have a specialized protocol conformance, the substitutions for the
+  /// conformance.
+  ArrayRef<Substitution> Subs;
+
+  /// The witness table which we got F, Subs from.
+  SILWitnessTable *WT;
+
+
+  //==---------------
+  // Workspace fields
+
+  /// If we needed to change Self, this field contains the modified self.
+  Optional<SILValue> Self;
+
+  /// If we had other substitutions that
+  SmallVector<Substitution, 16> SubstList;
+
+  /// Field which distinguishes the SubstList being empty from it not having a
+  /// value. This could be as apart of an optional but I don't think that
+  bool HasSubstList;
+
+  /// If we needed to modify the subst callee type of the function, this is the
+  /// new subst callee type.
+  Optional<SILType> SubstCalleeSILType;
+
+  /// If we needed to modify the result type of the function, this is the new
+  /// result type.
+  Optional<SILType> ResultSILType;
+
+public:
+  WitnessMethodDevirtualizer(ApplyInst *AI, WitnessMethodInst *WMI,
+                             ProtocolConformance *C, SILFunction *F,
+                             ArrayRef<Substitution> Subs, SILWitnessTable *WT)
+      : AI(AI), WMI(WMI), C(C), F(F), Subs(Subs), WT(WT), Self(), SubstList(),
+        HasSubstList(false), SubstCalleeSILType(), ResultSILType() {}
+
+  /// Main entry point.
+  bool devirtualize();
+private:
+
+  bool processNormalProtocolConformance();
+  bool processInheritedProtocolConformance();
+  bool
+  processSpecializedProtocolConformance(SpecializedProtocolConformance *SPC,
+                                        ProtocolConformance *GenericConf);
 };
 
+} // end anonymous namespace
+
+bool WitnessMethodDevirtualizer::devirtualize() {
+  /// Use to quite the unused-private-field warning.
+  (void)WMI;
+
+  /// First check if we have a simple normal protocol conformance.
+  if (isa<NormalProtocolConformance>(C))
+    return processNormalProtocolConformance();
+
+  /// If we dont and do not have any substitutions, we must then have a pure
+  /// inherited protocol conformance.
+  if (Subs.empty()) {
+    assert(isa<InheritedProtocolConformance>(C) &&
+           "At this point C must be an inherited protocol conformance.");
+    return processInheritedProtocolConformance();
+  }
+
+  /// If we have substitutions, we must have some sort of specialized protocol
+  /// conformance. If it is just a simple specialized + normal protocol
+  /// conformance, handle it early.
+  if (auto *SPC = dyn_cast<SpecializedProtocolConformance>(C)) {
+    if (auto *GNC =
+          dyn_cast<NormalProtocolConformance>(SPC->getGenericConformance())) {
+      return processSpecializedProtocolConformance(SPC, GNC);
+    }
+  }
+
+  // Otherwise, we have a complicated specialized, inherited protocol
+  // conformance that we need to devirtualize.
+  return false;
 }
 
-static bool optimizeNormalConformanceWitnessMethod(ApplyInst *AI,
-                                                   WitnessMethodInst *WMI,
-                                                   ProtocolConformance *C,
-                                                   SILFunction *F,
-                                                   DevirtInfo Info = {}) {
-
+bool WitnessMethodDevirtualizer::processNormalProtocolConformance() {
   // Ok, we found the member we are looking for. Devirtualize away!
   SILBuilder Builder(AI);
   SILLocation Loc = AI->getLoc();
@@ -274,16 +353,16 @@ static bool optimizeNormalConformanceWitnessMethod(ApplyInst *AI,
   SmallVector<SILValue, 4> Args;
 
   // Add self to the Args list...
-  if (!Info.Self)
-    Info.Self = ApplyArgs[0].get();
-  Args.push_back(Info.Self);
+  if (!Self)
+    Self = ApplyArgs[0].get();
+  Args.push_back(*Self);
 
   // Then add the rest of the arguments.
   for (auto &A : ApplyArgs.slice(1))
     Args.push_back(A.get());
 
-  SmallVector<Substitution, 16> NewSubstList(Info.Subs.begin(),
-                                             Info.Subs.end());
+  SmallVector<Substitution, 16> NewSubstList(Subs.begin(),
+                                             Subs.end());
 
   // Add the non-self-derived substitutions from the original application.
   assert(AI->getSubstitutions().size() && "Subst list must not be empty");
@@ -294,35 +373,31 @@ static bool optimizeNormalConformanceWitnessMethod(ApplyInst *AI,
       NewSubstList.push_back(origSub);
   }
 
-  if (!Info.SubstCalleeType)
-    Info.SubstCalleeType = AI->getSubstCalleeSILType();
-  if (!Info.Type)
-    Info.Type = AI->getType();
+  if (!SubstCalleeSILType)
+    SubstCalleeSILType = AI->getSubstCalleeSILType();
+  if (!ResultSILType)
+    ResultSILType = AI->getType();
 
-  ApplyInst *SAI = Builder.createApply(Loc, FRI, Info.SubstCalleeType,
-                                       Info.Type, NewSubstList, Args);
+  ApplyInst *SAI = Builder.createApply(Loc, FRI, *SubstCalleeSILType,
+                                       *ResultSILType, NewSubstList, Args);
   AI->replaceAllUsesWith(SAI);
   AI->eraseFromParent();
   NumAMI++;
   return true;
 }
 
-static bool optimizeInheritedConformanceWitnessMethod(ApplyInst *AI,
-                                                      WitnessMethodInst *WMI,
-                                                      ProtocolConformance *C,
-                                                      SILFunction *F,
-                                                      SILWitnessTable *WT) {
+bool WitnessMethodDevirtualizer::processInheritedProtocolConformance() {
   // Since we do not need to worry about substitutions, we can just insert an
   // upcast of self to the appropriate type.
-  SILValue Self = AI->getArgumentOperands()[0].get();
+  Self = AI->getArgumentOperands()[0].get();
   CanType Ty = WT->getConformance()->getType()->getCanonicalType();
-  SILType SILTy = SILType::getPrimitiveType(Ty, Self.getType().getCategory());
-  SILType SelfTy = Self.getType();
+  SILType SILTy = SILType::getPrimitiveType(Ty, Self->getType().getCategory());
+  SILType SelfTy = Self->getType();
   (void)SelfTy;
 
   assert(SILTy.isSuperclassOf(SelfTy) &&
          "Should only create upcasts for sub class devirtualization.");
-  Self = SILBuilder(AI).createUpcast(AI->getLoc(), Self, SILTy);
+  Self = SILBuilder(AI).createUpcast(AI->getLoc(), *Self, SILTy);
 
   SmallVector<Substitution, 16> SelfDerivedSubstitutions;
   for (auto &origSub : AI->getSubstitutions())
@@ -349,12 +424,32 @@ static bool optimizeInheritedConformanceWitnessMethod(ApplyInst *AI,
       AI->getModule(), AI->getModule().getSwiftModule(),
       ArrayRef<Substitution>(S));
 
-  SILType SubstCalleeSILType = SILType::getPrimitiveObjectType(SubstCalleeType);
+  SubstCalleeSILType = SILType::getPrimitiveObjectType(SubstCalleeType);
 
   // Then pass of our new self to the normal protocol conformance witness method
   // handling code.
-  DevirtInfo DInfo = DevirtInfo{Self, SubstCalleeSILType};
-  return optimizeNormalConformanceWitnessMethod(AI, WMI, C, F, DInfo);
+  return processNormalProtocolConformance();
+}
+
+bool
+WitnessMethodDevirtualizer::
+processSpecializedProtocolConformance(SpecializedProtocolConformance *SPC,
+                                      ProtocolConformance *GenericConf) {
+  // We do not need to worry about covariant/contravariant return types here
+  // since we don't support that for 1.0. But when we do this needs to be
+  // updated.
+  SILModule &M = F->getModule();
+  CanSILFunctionType GenCalleeType = F->getLoweredFunctionType();
+  CanSILFunctionType SubstCalleeType =
+    GenCalleeType->substInterfaceGenericArgs(M, M.getSwiftModule(),
+                                             Subs);
+
+  std::copy(Subs.begin(), Subs.end(), SubstList.begin());
+  HasSubstList = true;
+  SubstCalleeSILType = SILType::getPrimitiveObjectType(SubstCalleeType);
+  ResultSILType = SubstCalleeType->getSILInterfaceResult();
+
+  return processNormalProtocolConformance();
 }
 
 /// Devirtualize apply instructions that call witness_method instructions:
@@ -362,8 +457,8 @@ static bool optimizeInheritedConformanceWitnessMethod(ApplyInst *AI,
 ///   %8 = witness_method $Optional<UInt16>, #LogicValue.getLogicValue!1
 ///   %9 = apply %8<Self = CodeUnit?>(%6#1) : ...
 ///
-static bool optimizeWitnessMethod(ApplyInst *AI, WitnessMethodInst *AMI) {
-  ProtocolConformance *C = AMI->getConformance();
+static bool optimizeWitnessMethod(ApplyInst *AI, WitnessMethodInst *WMI) {
+  ProtocolConformance *C = WMI->getConformance();
   if (!C) {
     DEBUG(llvm::dbgs() << "        FAIL: Null conformance.\n");
     return false;
@@ -374,7 +469,7 @@ static bool optimizeWitnessMethod(ApplyInst *AI, WitnessMethodInst *AMI) {
   ArrayRef<Substitution> Subs;
   SILWitnessTable *WT;
   std::tie(F, WT, Subs) =
-      AI->getModule().findFuncInWitnessTable(C, AMI->getMember());
+      AI->getModule().findFuncInWitnessTable(C, WMI->getMember());
 
   if (!F) {
     assert(!WT && "WitnessTable should always be null if F is.");
@@ -384,24 +479,9 @@ static bool optimizeWitnessMethod(ApplyInst *AI, WitnessMethodInst *AMI) {
   }
   assert(WT && "WitnessTable should never be null if F is not.");
 
-  // Start by looking at the type of the witness table and the type of the
-  // witness table. If they are different, we have some combination of generic
-  // conformance, specialized generic conformance or inherited conformance. If
-  // we just have a simple conformance handle it quickly and effortlessly.
-  auto WTCType = WT->getConformance()->getType()->getCanonicalType();
-  auto CType = C->getType()->getCanonicalType();
-  if (WTCType == CType)
-    return optimizeNormalConformanceWitnessMethod(AI, AMI, C, F);
+  WitnessMethodDevirtualizer WMD{AI, WMI, C, F, Subs, WT};
 
-  // Ok, we do not have a simple specialization to do here. First find out if
-  // there is a specialized conformance in our type hierarchy. If there is no
-  // such thing, we have a pure inherited protocol conformance.
-  if (Subs.empty())
-    return optimizeInheritedConformanceWitnessMethod(AI, AMI, C, F, WT);
-
-  // Otherwise we have a mixed specialized, or mixed specialized inherited
-  // protocol conformance to deal with. Bail.
-  return false;
+  return WMD.devirtualize();
 }
 
 //===----------------------------------------------------------------------===//
@@ -684,7 +764,6 @@ public:
 };
 
 } // end anonymous namespace
-
 
 SILTransform *swift::createDevirtualization() {
   return new SILDevirtualizationPass();
