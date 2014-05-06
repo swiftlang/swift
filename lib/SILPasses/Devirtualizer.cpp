@@ -416,7 +416,8 @@ static bool optimizeWitnessMethod(ApplyInst *AI, WitnessMethodInst *AMI) {
 /// object must not be captured by any instruction that may re-initialize it.
 static SILInstruction *
 findSingleInitNoCaptureProtocol(SILValue ProtocolObject) {
-  DEBUG(llvm::dbgs() << "        Checking if protocol object is captured: " << ProtocolObject);
+  DEBUG(llvm::dbgs() << "        Checking if protocol object is captured: "
+        << ProtocolObject);
   SILInstruction *Init = 0;
   for (auto UI = ProtocolObject->use_begin(), E = ProtocolObject->use_end();
        UI != E; UI++) {
@@ -434,8 +435,8 @@ findSingleInitNoCaptureProtocol(SILValue ProtocolObject) {
     case ValueKind::InitExistentialInst: {
       // Make sure there is a single initialization:
       if (Init) {
-        DEBUG(llvm::dbgs() << "            FAIL: Multiple Protocol initializers: "
-                           << *UI.getUser() << " and " << *Init);
+        DEBUG(llvm::dbgs() << "            FAIL: Multiple Protocol "
+              "initializers: " << *UI.getUser() << " and " << *Init);
         return nullptr;
       }
       // This is the first initialization.
