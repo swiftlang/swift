@@ -588,6 +588,8 @@ ERROR(inout_varpattern,pattern_parsing,none,
       "'inout' arguments may not also be marked 'var' or 'let'", ())
 ERROR(inout_must_have_type,pattern_parsing,none,
       "'inout' arguments must have a type specified", ())
+ERROR(inout_must_appear_before_param,pattern_parsing,none,
+      "'inout' must appear before the parameter name", ())
 ERROR(expected_rparen_parameter,decl_parsing,PointsToFirstBadToken,
       "expected ')' in parameter", ())
 ERROR(expected_parameter_type,decl_parsing,PointsToFirstBadToken,

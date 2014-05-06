@@ -255,6 +255,15 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         auto type = parseType(diag::expected_parameter_type);
         status |= type;
         param.Type = type.getPtrOrNull();
+        // Only allow 'inout' before the parameter name.
+        if (auto InOutTy = dyn_cast_or_null<InOutTypeRepr>(param.Type)) {
+          SourceLoc InOutLoc = InOutTy->getInOutLoc();
+          SourceLoc NameLoc = param.FirstNameLoc;
+          diagnose(InOutLoc, diag::inout_must_appear_before_param)
+              .fixItRemove(InOutLoc)
+              .fixItInsert(NameLoc, "inout ");
+          param.Type = InOutTy->getBase();
+        }
       }
     } else {
       auto type = parseType(diag::expected_parameter_type);
