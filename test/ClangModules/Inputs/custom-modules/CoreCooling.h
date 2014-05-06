@@ -1,3 +1,6 @@
+typedef const void *CFTypeRef;
+CFTypeRef CFBottom();
+
 typedef const struct __CCPowerSupply *CCPowerSupplyRef;
 
 /// The standard power supply.

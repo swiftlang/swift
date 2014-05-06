@@ -799,12 +799,21 @@ namespace {
           return nullptr;
 
         // Import 'typedef struct __Blah *BlahRef;' as a CF type.
-        if (!SwiftType &&
-            Impl.SwiftContext.LangOpts.ImportCFTypes &&
-            Decl->getName().endswith("Ref") &&
-            isPointerToIncompleteType(Decl->getUnderlyingType())) {
-          SwiftType = importCFClassType(Decl);
-          if (!SwiftType) return nullptr;
+        if (!SwiftType && Impl.SwiftContext.LangOpts.ImportCFTypes &&
+            Decl->getName().endswith("Ref")) {
+          // Import 'CFTypeRef' specifically as AnyObject.
+          if (Decl->getName() == "CFTypeRef") {
+            auto proto = Impl.SwiftContext.getProtocol(
+                                               KnownProtocolKind::AnyObject);
+            if (!proto)
+              return nullptr;
+            SwiftType = proto->getDeclaredType();
+
+          // Otherwise, consider creating a class type.
+          } else if (isPointerToIncompleteType(Decl->getUnderlyingType())) {
+            SwiftType = importCFClassType(Decl);
+            if (!SwiftType) return nullptr;
+          }
           NameMapping = MappedTypeNameKind::DefineOnly;
         }
 

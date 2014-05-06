@@ -34,14 +34,11 @@
 
 using namespace swift;
 
-/// Is the given type the result of importing a CF pointer?
-static bool isImportedCFPointer(Type type) {
-  if (auto classType = type->getAs<ClassType>()) {
-    assert(classType->getDecl()->hasClangNode());
-    auto clangNode = classType->getDecl()->getClangNode();
-    return isa<clang::TypedefDecl>(clangNode.castAsDecl());
-  }
-  return false;
+/// Given that a type is the result of a special typedef import, was
+/// it originally a CF pointer?
+static bool isImportedCFPointer(clang::QualType clangType, Type type) {
+  return (clangType->isPointerType() &&
+          (type->is<ClassType>() || type->isClassExistentialType()));
 }
 
 namespace {
@@ -371,7 +368,7 @@ namespace {
           hint = ImportHint::BOOL;
         } else if (type->getDecl()->getName() == "NSUInteger") {
           hint = ImportHint::NSUInteger;
-        } else if (isImportedCFPointer(mappedType)) {
+        } else if (isImportedCFPointer(type->desugar(), mappedType)) {
           hint = ImportHint::CFPointer;
         } else if (mappedType->isAnyExistentialType()) { // id, Class
           hint = ImportHint::ObjCPointer;
