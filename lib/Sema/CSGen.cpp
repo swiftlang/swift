@@ -24,33 +24,6 @@
 using namespace swift;
 using namespace swift::constraints;
 
-/// \brief Retrieve the name bound by the given (immediate) pattern.
-static Identifier findPatternName(Pattern *pattern) {
-  switch (pattern->getKind()) {
-  case PatternKind::Paren:
-  case PatternKind::Any:
-  case PatternKind::Tuple:
-    return Identifier();
-
-  case PatternKind::Named:
-    return cast<NamedPattern>(pattern)->getBoundName();
-
-  case PatternKind::Typed:
-    return findPatternName(cast<TypedPattern>(pattern)->getSubPattern());
-
-  case PatternKind::Var:
-    return findPatternName(cast<VarPattern>(pattern)->getSubPattern());
-
-  // TODO
-#define PATTERN(Id, Parent)
-#define REFUTABLE_PATTERN(Id, Parent) case PatternKind::Id:
-#include "swift/AST/PatternNodes.def"
-    llvm_unreachable("not implemented");
-  }
-
-  llvm_unreachable("Unhandled pattern kind");  
-}
-
 /// \brief Skip any implicit conversions applied to this expression.
 static Expr *skipImplicitConversions(Expr *expr) {
   while (auto ice = dyn_cast<ImplicitConversionExpr>(expr))
