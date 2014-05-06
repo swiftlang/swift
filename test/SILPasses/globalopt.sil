@@ -71,7 +71,7 @@ bb2(%16 : $Builtin.Word):                         // Preds: bb0 bb1
   return %17 : $Int                               // id: %18
 }
 
-// Don't hoist this initializer call.
+// Do hoist this initializer call.
 // ginit.loop (Swift.Int) -> Swift.Int
 // CHECK-LABEL: sil @_TF5ginit4loopFSiSi
 // CHECK: {{^bb0}}
