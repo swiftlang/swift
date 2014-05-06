@@ -30,3 +30,5 @@ struct CGRect {
   CGSize size;
 };
 typedef struct CGRect CGRect;
+
+typedef CGRect CGRectTy;

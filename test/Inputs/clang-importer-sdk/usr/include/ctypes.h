@@ -38,18 +38,9 @@ typedef struct __NSFastEnumerationState_s {
 
 typedef void *CFTypeRef;
 typedef void const *HWND;
-typedef struct __CFString *CFStringRef;
-
-typedef struct {
-  struct CGPoint {
-    double x;
-    double y;
-  } origin;
-  struct CGSize {
-    double width;
-    double height;
-  } size;
-} CGRect;
+typedef struct __CFString *CFMutableStringRef;
+typedef struct __CFString const *CFStringRef;
+typedef struct __CFTree *CFTreeRef;
 
 struct StructWithBitfields {
   unsigned First;
@@ -104,8 +95,6 @@ struct FooStruct6 {
 // Typedefs.
 //===---
 
-typedef CGRect NSRect;
-
 typedef void MyVoid;
 MyVoid returnsMyVoid(void);
 
@@ -115,9 +104,10 @@ struct funcOrStruct { int i; };
 
 // Names from MacTypes.h that conflict with swift's library types.
 // rdar://14175675
+#define STDLIB_TEST(TYPE, NAME) extern NAME NAME##_test
 #define STDLIB_TYPEDEF(TYPE, NAME) \
   typedef TYPE NAME; \
-  extern NAME NAME##_test
+  STDLIB_TEST(TYPE, NAME)
 STDLIB_TYPEDEF(unsigned __INT8_TYPE__, UInt8);
 STDLIB_TYPEDEF(unsigned __INT16_TYPE__, UInt16);
 STDLIB_TYPEDEF(unsigned __INT32_TYPE__, UInt32);
@@ -133,16 +123,17 @@ STDLIB_TYPEDEF(__INT32_TYPE__, SInt32);
 STDLIB_TYPEDEF(__INT64_TYPE__, SInt64);
 
 // Types from stdint.h.
-STDLIB_TYPEDEF(unsigned __INT8_TYPE__, uint8_t);
-STDLIB_TYPEDEF(unsigned __INT16_TYPE__, uint16_t);
-STDLIB_TYPEDEF(unsigned __INT32_TYPE__, uint32_t);
-STDLIB_TYPEDEF(unsigned __INT64_TYPE__, uint64_t);
-STDLIB_TYPEDEF(__INT8_TYPE__, int8_t);
-STDLIB_TYPEDEF(__INT16_TYPE__, int16_t);
-STDLIB_TYPEDEF(__INT32_TYPE__, int32_t);
-STDLIB_TYPEDEF(__INT64_TYPE__, int64_t);
-STDLIB_TYPEDEF(__INTPTR_TYPE__, intptr_t);
-STDLIB_TYPEDEF(unsigned __INTPTR_TYPE__, uintptr_t);
+#include <stdint.h>
+STDLIB_TEST(unsigned __INT8_TYPE__, uint8_t);
+STDLIB_TEST(unsigned __INT16_TYPE__, uint16_t);
+STDLIB_TEST(unsigned __INT32_TYPE__, uint32_t);
+STDLIB_TEST(unsigned __INT64_TYPE__, uint64_t);
+STDLIB_TEST(__INT8_TYPE__, int8_t);
+STDLIB_TEST(__INT16_TYPE__, int16_t);
+STDLIB_TEST(__INT32_TYPE__, int32_t);
+STDLIB_TEST(__INT64_TYPE__, int64_t);
+STDLIB_TEST(__INTPTR_TYPE__, intptr_t);
+STDLIB_TEST(unsigned __INTPTR_TYPE__, uintptr_t);
 
 // Types from stddef.h.
 STDLIB_TYPEDEF(__PTRDIFF_TYPE__, ptrdiff_t);

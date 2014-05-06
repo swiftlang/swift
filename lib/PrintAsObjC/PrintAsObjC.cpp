@@ -21,6 +21,7 @@
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/CommentConversion.h"
 #include "clang/AST/Decl.h"
+#include "clang/AST/DeclObjC.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Path.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -469,7 +470,16 @@ private:
   void visitClassType(ClassType *CT) {
     const ClassDecl *CD = CT->getClassOrBoundGenericClass();
     assert(CD->isObjC());
-    os << CD->getName() << " *";
+    auto clangDecl = dyn_cast_or_null<clang::NamedDecl>(CD->getClangDecl());
+    if (clangDecl) {
+      if (isa<clang::ObjCInterfaceDecl>(clangDecl)) {
+        os << clangDecl->getName() << " *";
+      } else {
+        os << clangDecl->getName();
+      }
+    } else {
+      os << CD->getName() << " *";
+    }
   }
 
   void visitProtocolType(ProtocolType *PT, bool isMetatype = false) {
