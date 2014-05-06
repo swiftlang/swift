@@ -1,4 +1,4 @@
-//===--- SILFunctionType.cpp - Lowering for SILFunctionType ---------------===//
+//===--- SILFunctionType.cpp - Giving SIL types to AST functions ----------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -9,6 +9,12 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+//
+// This file defines the native Swift ownership transfer conventions
+// and works in concert with the importer to give the correct
+// conventions to imported functions and types.
+//
+//===----------------------------------------------------------------------===//
 
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILModule.h"
@@ -16,6 +22,7 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/SubstTypeVisitor.h"
 #include "swift/Basic/Fallthrough.h"
+#include "clang/Analysis/DomainSpecific/CocoaConventions.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/DeclObjC.h"
 #include "llvm/Support/Debug.h"
@@ -74,7 +81,7 @@ namespace {
     virtual ParameterConvention getDirectParameter(unsigned index,
                                                    CanType type) const = 0;
     virtual ParameterConvention getCallee() const = 0;
-    virtual ResultConvention getResult(CanType type) const = 0;
+    virtual ResultConvention getResult(const TypeLowering &resultTL) const = 0;
   };
 
   template<typename F>
@@ -348,7 +355,7 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
                            ResultConvention::Unowned);
   } else {
     ResultConvention convention;
-    convention = conventions.getResult(loweredResultType);
+    convention = conventions.getResult(substResultTL);
     if (substResultTL.isTrivial()) {
       // Reduce conventions for trivial types to an unowned convention.
       switch (convention) {
@@ -403,7 +410,7 @@ namespace {
     ParameterConvention getCallee() const override {
       return DefaultThickCalleeConvention;
     }
-    ResultConvention getResult(CanType type) const override {
+    ResultConvention getResult(const TypeLowering &tl) const override {
       return ResultConvention::Owned;
     }
   };
@@ -421,7 +428,7 @@ namespace {
     ParameterConvention getCallee() const override {
       return ParameterConvention::Direct_Unowned;
     }
-    ResultConvention getResult(CanType type) const override {
+    ResultConvention getResult(const TypeLowering &tl) const override {
       return ResultConvention::Autoreleased;
     }
   };
@@ -496,7 +503,8 @@ static ParameterConvention getDirectCParameterConvention(clang::QualType type) {
 /// deduce the convention for it.
 static ParameterConvention
 getDirectCParameterConvention(const clang::ParmVarDecl *param) {
-  if (param->hasAttr<clang::NSConsumedAttr>())
+  if (param->hasAttr<clang::NSConsumedAttr>() ||
+      param->hasAttr<clang::CFConsumedAttr>())
     return ParameterConvention::Direct_Owned;
   return getDirectCParameterConvention(param->getType());
 }
@@ -549,14 +557,26 @@ namespace {
       return ParameterConvention::Direct_Unowned;
     }
 
-    ResultConvention getResult(CanType type) const override {
+    ResultConvention getResult(const TypeLowering &tl) const override {
       assert((!Method->hasAttr<clang::NSReturnsRetainedAttr>()
               || !Method->hasAttr<clang::ObjCReturnsInnerPointerAttr>())
              && "cannot be both returns_retained and returns_inner_pointer");
-      if (Method->hasAttr<clang::NSReturnsRetainedAttr>())
+      if (Method->hasAttr<clang::NSReturnsRetainedAttr>() ||
+          Method->hasAttr<clang::CFReturnsRetainedAttr>())
         return ResultConvention::Owned;
-      if (Method->hasAttr<clang::ObjCReturnsInnerPointerAttr>())
-        return ResultConvention::UnownedInnerPointer;
+
+      if (Method->hasAttr<clang::CFReturnsNotRetainedAttr>())
+        return ResultConvention::Autoreleased;
+
+      // Make sure we apply special lifetime-extension behavior to
+      // inner pointer results, unless we managed to import them with a
+      // managed type.
+      if (Method->hasAttr<clang::ObjCReturnsInnerPointerAttr>()) {
+        if (tl.isTrivial())
+          return ResultConvention::UnownedInnerPointer;
+        else
+          return ResultConvention::Autoreleased;
+      }
       return getCResultConvention(Method->getReturnType());
     }
   };
@@ -580,6 +600,8 @@ namespace {
 
     ParameterConvention getDirectParameter(unsigned index,
                                            CanType type) const override {
+      if (cast<clang::FunctionProtoType>(FnType)->isParamConsumed(index))
+        return ParameterConvention::Direct_Owned;
       return getDirectCParameterConvention(getParamType(index));
     }
 
@@ -588,11 +610,60 @@ namespace {
       return ParameterConvention::Direct_Unowned;
     }
 
-    ResultConvention getResult(CanType type) const override {
+    ResultConvention getResult(const TypeLowering &tl) const override {
       if (FnType->getExtInfo().getProducesResult())
         return ResultConvention::Owned;
       return getCResultConvention(FnType->getReturnType());
     }    
+  };
+
+  /// Conventions based on C function declarations.
+  class CFunctionConventions : public CFunctionTypeConventions {
+    using super = CFunctionTypeConventions;
+    const clang::FunctionDecl *TheDecl;
+  public:
+    CFunctionConventions(const clang::FunctionDecl *decl)
+      : CFunctionTypeConventions(decl->getType()->castAs<clang::FunctionType>()),
+        TheDecl(decl) {}
+
+    ParameterConvention getDirectParameter(unsigned index,
+                                           CanType type) const override {
+      if (auto param = TheDecl->getParamDecl(index))
+        if (param->hasAttr<clang::CFConsumedAttr>())
+          return ParameterConvention::Direct_Owned;
+      return super::getDirectParameter(index, type);
+    }
+
+    static bool isCFTypedef(const TypeLowering &tl, clang::QualType type) {
+      // If we imported a C pointer type as a non-trivial type, it was
+      // a foreign class type.
+      return !tl.isTrivial() && type->isPointerType();
+    }
+
+    ResultConvention getResult(const TypeLowering &tl) const override {
+      if (isCFTypedef(tl, TheDecl->getReturnType())) {
+        // The CF attributes aren't represented in the type, so we need
+        // to check them here.
+        if (TheDecl->hasAttr<clang::CFReturnsRetainedAttr>()) {
+          return ResultConvention::Owned;
+        } else if (TheDecl->hasAttr<clang::CFReturnsNotRetainedAttr>()) {
+          // Probably not actually autoreleased.
+          return ResultConvention::Autoreleased;
+
+        // The CF Create/Copy rule only applies to functions that return
+        // a CF-runtime type; it does not apply to methods, and it does
+        // not apply to functions returning ObjC types.
+        } else if (clang::ento::coreFoundation::followsCreateRule(TheDecl)) {
+          return ResultConvention::Owned;
+        } else {
+          return ResultConvention::Autoreleased;
+        }
+      }
+
+      // Otherwise, fall back on the ARC annotations, which are part
+      // of the type.
+      return super::getResult(tl);
+    }
   };
 }
 
@@ -611,10 +682,8 @@ getSILFunctionTypeForClangDecl(SILModule &M, const clang::Decl *clangDecl,
   }
 
   if (auto func = dyn_cast<clang::FunctionDecl>(clangDecl)) {
-    auto fnType = func->getType()->castAs<clang::FunctionType>();
     return getSILFunctionType(M, origType, substType, substInterfaceType,
-                              extInfo,
-                              CFunctionTypeConventions(fnType));
+                              extInfo, CFunctionConventions(func));
   }
 
   llvm_unreachable("call to unknown kind of C function");
@@ -756,7 +825,7 @@ namespace {
       return ParameterConvention::Direct_Unowned;
     }
 
-    ResultConvention getResult(CanType type) const override {
+    ResultConvention getResult(const TypeLowering &tl) const override {
       switch (Family) {
       case SelectorFamily::Alloc:
       case SelectorFamily::Copy:
@@ -770,6 +839,7 @@ namespace {
         break;
       }
 
+      auto type = tl.getLoweredType().getSwiftRValueType();
       if (type->hasRetainablePointerRepresentation())
         return ResultConvention::Autoreleased;
 

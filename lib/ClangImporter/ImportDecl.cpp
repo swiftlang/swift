@@ -1540,7 +1540,8 @@ namespace {
       // Import the function type. If we have parameters, make sure their names
       // get into the resulting function type.
       SmallVector<Pattern *, 4> bodyPatterns;
-      Type type = Impl.importFunctionType(decl->getReturnType(),
+      Type type = Impl.importFunctionType(decl,
+                                          decl->getReturnType(),
                                           { decl->param_begin(),
                                             decl->param_size() },
                                           decl->isVariadic(),
@@ -1654,7 +1655,15 @@ namespace {
       if (name.empty())
         return nullptr;
 
-      auto type = Impl.importType(decl->getType(), ImportTypeKind::Variable);
+      // If the declaration is const, consider it audited.
+      // We can assume that loading a const global variable doesn't
+      // involve an ownership transfer.
+      bool isAudited = (decl->getType().isConstQualified() &&
+                        Impl.SwiftContext.LangOpts.ImportCFTypes);
+
+      auto type = Impl.importType(decl->getType(), (isAudited
+                                                    ? ImportTypeKind::AuditedVariable
+                                                    : ImportTypeKind::Variable));
       if (!type)
         return nullptr;
 
@@ -1901,7 +1910,8 @@ namespace {
         kind = SpecialMethodKind::NSDictionarySubscriptGetter;
 
       // Import the type that this method will have.
-      auto type = Impl.importMethodType(decl->getReturnType(),
+      auto type = Impl.importMethodType(decl,
+                                        decl->getReturnType(),
                                           { decl->param_begin(),
                                             decl->param_size() },
                                           decl->isVariadic(),
@@ -2269,7 +2279,8 @@ namespace {
       bodyPatterns.push_back(selfPat);
 
       // Import the type that this method will have.
-      auto type = Impl.importMethodType(objcMethod->getReturnType(),
+      auto type = Impl.importMethodType(objcMethod,
+                                        objcMethod->getReturnType(),
                                         args,
                                         variadic,
                                   objcMethod->hasAttr<clang::NoReturnAttr>(),

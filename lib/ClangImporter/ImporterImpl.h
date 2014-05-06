@@ -91,11 +91,23 @@ enum class ImportTypeKind {
   /// \brief Import the declared type of a variable.
   Variable,
 
+  /// \brief Import the declared type of an audited variable.
+  ///
+  /// This is exactly like ImportTypeKind::Variable, except it
+  /// disables wrapping CF class types in Unmanaged.
+  AuditedVariable,
+
   /// \brief Import the result type of a function.
   ///
   /// This provides special treatment for 'void', among other things, and
   /// enables the conversion of bridged types.
   Result,
+
+  /// \brief Import the result type of an audited function.
+  ///
+  /// This is exactly like ImportTypeKind::Result, except it
+  /// disables wrapping CF class types in Unmanaged.
+  AuditedResult,
 
   /// \brief Import the type of a function parameter.
   ///
@@ -691,6 +703,8 @@ public:
   /// function declaration, because it produces a function type whose input
   /// tuple has argument names.
   ///
+  /// \param clangDecl The underlying declaration, if any; should only be
+  ///   considered for any attributes it might carry.
   /// \param resultType The result type of the function.
   /// \param params The parameter types to the function.
   /// \param isVariadic Whether the function is variadic.
@@ -699,7 +713,8 @@ public:
   ///
   /// \returns the imported function type, or null if the type cannot be
   /// imported.
-  Type importFunctionType(clang::QualType resultType,
+  Type importFunctionType(const clang::Decl *clangDecl,
+                          clang::QualType resultType,
                           ArrayRef<const clang::ParmVarDecl *> params,
                           bool isVariadic, bool isNoReturn,
                           SmallVectorImpl<Pattern*> &bodyPatterns);
@@ -711,6 +726,8 @@ public:
   /// function declaration, because it produces a function type whose input
   /// tuple has argument names.
   ///
+  /// \param clangDecl The underlying declaration, if any; should only be
+  ///   considered for any attributes it might carry.
   /// \param resultType The result type of the function.
   /// \param params The parameter types to the function.
   /// \param isVariadic Whether the function is variadic.
@@ -723,7 +740,8 @@ public:
   ///
   /// \returns the imported function type, or null if the type cannot be
   /// imported.
-  Type importMethodType(clang::QualType resultType,
+  Type importMethodType(const clang::Decl *clangDecl,
+                        clang::QualType resultType,
                         ArrayRef<const clang::ParmVarDecl *> params,
                         bool isVariadic, bool isNoReturn,
                         SmallVectorImpl<Pattern*> &bodyPatterns,

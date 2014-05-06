@@ -24,6 +24,7 @@ add_swift_library(swiftSIL
 # Clang dependencies.
 # FIXME: remove this.  SIL should not depend on Clang.
 target_link_libraries(swiftSIL
+  clangAnalysis
   clangAST
   clangLex
   clangBasic

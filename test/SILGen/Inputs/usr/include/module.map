@@ -1,3 +1,4 @@
 module ansible { header "Ansible.h" }
 module gizmo { header "Gizmo.h" }
 module Foundation { header "BridgeTestFoundation.h" }
+module CoreCooling { header "CoreCooling.h" }

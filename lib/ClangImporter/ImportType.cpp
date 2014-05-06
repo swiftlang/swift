@@ -298,7 +298,8 @@ namespace {
       if (type->isVariadic())
         return Type();
 
-      // Import the result type.
+      // Import the result type.  We currently provide no mechanism
+      // for this to be audited.
       auto resultTy = Impl.importType(type->getReturnType(),
                                       ImportTypeKind::Result);
       if (!resultTy)
@@ -590,6 +591,7 @@ static Type importParameterPointerType(ClangImporter::Implementation &impl,
 static bool canBridgeTypes(ImportTypeKind importKind) {
   return importKind == ImportTypeKind::Parameter ||
          importKind == ImportTypeKind::Result ||
+         importKind == ImportTypeKind::AuditedResult ||
          importKind == ImportTypeKind::Property;
 }
 
@@ -630,7 +632,8 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
 
   // 'void' can only be imported as a function result type.
   if (hint == ImportHint::Void &&
-      importKind == ImportTypeKind::Result) {
+      (importKind == ImportTypeKind::AuditedResult ||
+       importKind == ImportTypeKind::Result)) {
     return impl.getNamedSwiftType(impl.getStdlibModule(), "Void");
   }
 
@@ -679,8 +682,12 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
     return impl.getNamedSwiftType(impl.getStdlibModule(), "UInt");
   }
 
-  // Wrap CF pointers up as unmanaged types.
-  if (hint == ImportHint::CFPointer) {
+  // Wrap CF pointers up as unmanaged types, unless this is an audited
+  // context.
+  if (hint == ImportHint::CFPointer &&
+      !(importKind == ImportTypeKind::Parameter ||
+        importKind == ImportTypeKind::AuditedResult ||
+        importKind == ImportTypeKind::AuditedVariable)) {
     importedType = getUnmanagedType(impl, importedType);
   }
 
@@ -746,6 +753,7 @@ Type ClangImporter::Implementation::importType(clang::QualType type,
 }
 
 Type ClangImporter::Implementation::importFunctionType(
+       const clang::Decl *clangDecl,
        clang::QualType resultType,
        ArrayRef<const clang::ParmVarDecl *> params,
        bool isVariadic, bool isNoReturn,
@@ -755,8 +763,19 @@ Type ClangImporter::Implementation::importFunctionType(
   if (isVariadic)
     return Type();
 
+  // CF function results can be managed if they are audited or
+  // the ownership convention is explicitly declared.
+  bool isAuditedResult =
+    (SwiftContext.LangOpts.ImportCFTypes &&
+     clangDecl &&
+     (clangDecl->hasAttr<clang::CFAuditedTransferAttr>() ||
+      clangDecl->hasAttr<clang::CFReturnsRetainedAttr>() ||
+      clangDecl->hasAttr<clang::CFReturnsNotRetainedAttr>()));
+
   // Import the result type.
-  auto swiftResultTy = importType(resultType, ImportTypeKind::Result);
+  auto swiftResultTy = importType(resultType, (isAuditedResult
+                                               ? ImportTypeKind::AuditedResult
+                                               : ImportTypeKind::Result));
   if (!swiftResultTy)
     return Type();
 
@@ -830,6 +849,7 @@ Type ClangImporter::Implementation::importFunctionType(
 }
 
 Type ClangImporter::Implementation::importMethodType(
+       const clang::Decl *clangDecl,
        clang::QualType resultType,
        ArrayRef<const clang::ParmVarDecl *> params,
        bool isVariadic, bool isNoReturn,
@@ -841,8 +861,23 @@ Type ClangImporter::Implementation::importMethodType(
   if (isVariadic)
     return Type();
 
+  // Clang doesn't provide pragmas for auditing the CF behavior of
+  // ObjC methods, but it does have attributes for declaring
+  // return-type management:
+  //   - cf_returns_retained and cf_returns_not_retained are obvious
+  //   - objc_returns_inner_pointer is sometimes used on methods
+  //     returning CF types as a workaround for ARC not managing CF
+  //     objects
+  bool isAuditedResult =
+    (SwiftContext.LangOpts.ImportCFTypes && clangDecl &&
+     (clangDecl->hasAttr<clang::CFReturnsRetainedAttr>() ||
+      clangDecl->hasAttr<clang::CFReturnsNotRetainedAttr>() ||
+      clangDecl->hasAttr<clang::ObjCReturnsInnerPointerAttr>()));
+
   // Import the result type.
-  auto swiftResultTy = importType(resultType, ImportTypeKind::Result);
+  auto swiftResultTy = importType(resultType, (isAuditedResult
+                                               ? ImportTypeKind::AuditedResult
+                                               : ImportTypeKind::Result));
   if (!swiftResultTy)
     return Type();
 
