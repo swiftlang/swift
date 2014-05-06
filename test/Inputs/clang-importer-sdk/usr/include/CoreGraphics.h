@@ -32,3 +32,5 @@ struct CGRect {
 typedef struct CGRect CGRect;
 
 typedef CGRect CGRectTy;
+
+typedef struct CGColor *CGColorRef;

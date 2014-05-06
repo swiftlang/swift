@@ -19,5 +19,6 @@
 #endif
 
 RENAMED_PROTOCOL(NSObject, NSObjectProtocol)
+RENAMED_PROTOCOL(AVVideoCompositionInstruction, AVVideoCompositionInstructionProtocol)
 
 #undef RENAMED_PROTOCOL

@@ -8,7 +8,16 @@ module ctypes {
 module stdio { header "stdio.h" }
 module cvars { header "cvars.h" }
 module blocks { header "blocks.h" }
-module Foundation { 
+
+module AVFoundation {
+  header "AVFoundation.h"
+  export *
+}
+module CoreGraphics {
+  header "CoreGraphics.h"
+  export *
+}
+module Foundation {
   header "Foundation.h" 
   export *
 }
@@ -16,10 +25,7 @@ module AppKit {
   header "AppKit.h" 
   export *
 }
-module CoreGraphics {
-  header "CoreGraphics.h" 
-  export *
-}
+
 module objc_ext { header "objc_ext.h" }
 module macros {
   header "macros.h"
