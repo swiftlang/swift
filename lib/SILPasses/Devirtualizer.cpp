@@ -59,8 +59,6 @@ struct SILDevirtualizer {
     : M(M), Changed(false) {}
 
   void optimizeApplyInst(ApplyInst *Inst);
-  void optimizeFuncBody(SILFunction *F);
-
   bool optimizeWitnessMethod(ApplyInst *AI, WitnessMethodInst *AMI);
   bool optimizeProtocolMethod(ApplyInst *AI, ProtocolMethodInst *PMI);
   bool optimizeClassMethod(ApplyInst *AI, ClassMethodInst *CMI);
@@ -662,22 +660,25 @@ void SILDevirtualizer::optimizeApplyInst(ApplyInst *AI) {
   Changed |= optimizeProtocolMethod(AI, PMI);
 }
 
-void SILDevirtualizer::optimizeFuncBody(SILFunction *F) {
-  DEBUG(llvm::dbgs() << "*** Devirtualizing Function: "
-        << Demangle::demangleSymbolAsString(F->getName()) << "\n");
-  for (auto &BB : *F)
-    for (auto &II : BB)
-      if (ApplyInst *AI = dyn_cast<ApplyInst>(&II))
-        optimizeApplyInst(AI);
-
-  DEBUG(llvm::dbgs() << "\n");
-}
-
 bool SILDevirtualizer::run() {
   // Perform devirtualization locally and compute potential polymorphic
   // arguments for all existing functions.
-  for (auto &F : *M)
-    optimizeFuncBody(&F);
+  for (auto &F : *M) {
+    DEBUG(llvm::dbgs() << "*** Devirtualizing Function: "
+                       << Demangle::demangleSymbolAsString(F.getName())
+                       << "\n");
+    for (auto &BB : F) {
+      for (auto II = BB.begin(), IE = BB.end(); II != IE;) {
+        SILInstruction *Inst = &*II;
+        ++II;
+        if (ApplyInst *AI = dyn_cast<ApplyInst>(Inst))
+          optimizeApplyInst(AI);
+      }
+    }
+
+    DEBUG(llvm::dbgs() << "\n");
+  }
+
   return Changed;
 }
 
