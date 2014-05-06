@@ -40,14 +40,19 @@ SerializedSILLoader::SerializedSILLoader(ASTContext &Ctx,
 SerializedSILLoader::~SerializedSILLoader() {}
 
 SILFunction *SerializedSILLoader::lookupSILFunction(SILFunction *Callee) {
+  // It is possible that one module has a declaration of a SILFunction, while
+  // another has the full definition.
+  SILFunction *retVal = nullptr;
   for (auto &Des : LoadedSILSections) {
     if (auto Func = Des->lookupSILFunction(Callee)) {
       DEBUG(llvm::dbgs() << "Deserialized " << Func->getName() << " from "
             << Des->getModuleIdentifier().str() << "\n");
-      return Func;
+      if (!Func->empty())
+        return Func;
+      retVal = Func;
     }
   }
-  return nullptr;
+  return retVal;
 }
 
 SILVTable *SerializedSILLoader::lookupVTable(Identifier Name) {
