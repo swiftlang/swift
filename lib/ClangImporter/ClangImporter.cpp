@@ -1359,6 +1359,10 @@ void ClangImporter::lookupVisibleDecls(VisibleDeclConsumer &Consumer) const {
 void ClangModuleUnit::lookupVisibleDecls(Module::AccessPathTy AccessPath,
                                          VisibleDeclConsumer &Consumer,
                                          NLKind LookupKind) const {
+  // FIXME: Ignore submodules, which are empty for now.
+  if (clangModule && clangModule->isSubModule())
+    return;
+
   // FIXME: Respect the access path.
   FilteringVisibleDeclConsumer filterConsumer(Consumer, this);
   owner.lookupVisibleDecls(filterConsumer);
@@ -1433,6 +1437,10 @@ void ClangModuleUnit::lookupValue(Module::AccessPathTy accessPath,
 
   // There should be no multi-part top-level decls in a Clang module.
   if (!name.isSimpleName())
+    return;
+
+  // FIXME: Ignore submodules, which are empty for now.
+  if (clangModule && clangModule->isSubModule())
     return;
 
   VectorDeclConsumer vectorWriter(results);
@@ -1704,6 +1712,10 @@ void
 ClangModuleUnit::lookupClassMember(Module::AccessPathTy accessPath,
                                    DeclName name,
                                    SmallVectorImpl<ValueDecl*> &results) const {
+  // FIXME: Ignore submodules, which are empty for now.
+  if (clangModule && clangModule->isSubModule())
+    return;
+
   // FIXME: Not limited by module.
   VectorDeclConsumer consumer(results);
   lookupClassMembersImpl(owner.Impl, consumer, name);
@@ -1711,6 +1723,10 @@ ClangModuleUnit::lookupClassMember(Module::AccessPathTy accessPath,
 
 void ClangModuleUnit::lookupClassMembers(Module::AccessPathTy accessPath,
                                          VisibleDeclConsumer &consumer) const {
+  // FIXME: Ignore submodules, which are empty for now.
+  if (clangModule && clangModule->isSubModule())
+    return;
+
   // FIXME: Not limited by module.
   lookupClassMembersImpl(owner.Impl, consumer);
 }
