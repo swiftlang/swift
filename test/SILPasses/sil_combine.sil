@@ -1107,6 +1107,15 @@ bb2:
 
 sil @weird_function : $@thin (@inout E, E, Builtin.Int1) -> ()
 
+// CHECK-LABEL: sil @convert_function_simplification : $@thin (@inout B, B, Builtin.Int1) -> () {
+// CHECK: bb0([[ADDR:%[0-9]+]] : $*B, [[REF:%[0-9]+]] : $B, [[NA:%[0-9]+]] : $Builtin.Int1):
+// CHECK-NEXT: function_ref weird_function
+// CHECK-NEXT: [[FUN:%[0-9]+]] = function_ref @weird_function : $@thin (@inout E, E, Builtin.Int1) -> ()
+// CHECK-NEXT: [[ADDR_CAST:%[0-9]+]] = unchecked_addr_cast %0 : $*B to $*E
+// CHECK-NEXT: [[REF_CAST:%[0-9]+]] = unchecked_ref_cast %1 : $B to $E
+// CHECK-NEXT: apply [[FUN]]([[ADDR_CAST]], [[REF_CAST]], [[NA]])
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
 sil @convert_function_simplification : $@thin (@inout B, B, Builtin.Int1) -> () {
 bb0(%0 : $*B, %1 : $B, %2 : $Builtin.Int1):
   %3 = function_ref @weird_function : $@thin (@inout E, E, Builtin.Int1) -> ()
