@@ -85,8 +85,8 @@ struct SILDevirtualizer {
   void optimizeApplyInst(ApplyInst *Inst);
   void optimizeFuncBody(SILFunction *F);
 
-  bool optimizeApplyOfWitnessMethod(ApplyInst *AI, WitnessMethodInst *AMI);
-  bool optimizeApplyOfProtocolMethod(ApplyInst *AI, ProtocolMethodInst *PMI);
+  bool optimizeWitnessMethod(ApplyInst *AI, WitnessMethodInst *AMI);
+  bool optimizeProtocolMethod(ApplyInst *AI, ProtocolMethodInst *PMI);
 
   bool run();
 };
@@ -443,9 +443,11 @@ struct DevirtInfo {
 
 }
 
-static bool optimizeApplyOfNormalConformanceWitnessMethod(
-    ApplyInst *AI, WitnessMethodInst *WMI, ProtocolConformance *C,
-    SILFunction *F, DevirtInfo Info={}) {
+static bool optimizeNormalConformanceWitnessMethod(ApplyInst *AI,
+                                                   WitnessMethodInst *WMI,
+                                                   ProtocolConformance *C,
+                                                   SILFunction *F,
+                                                   DevirtInfo Info = {}) {
 
   // Ok, we found the member we are looking for. Devirtualize away!
   SILBuilder Builder(AI);
@@ -490,9 +492,11 @@ static bool optimizeApplyOfNormalConformanceWitnessMethod(
   return true;
 }
 
-static bool optimizeApplyOfInheritedConformanceWitnessMethod(
-    ApplyInst *AI, WitnessMethodInst *WMI, ProtocolConformance *C,
-    SILFunction *F, SILWitnessTable *WT) {
+static bool optimizeInheritedConformanceWitnessMethod(ApplyInst *AI,
+                                                      WitnessMethodInst *WMI,
+                                                      ProtocolConformance *C,
+                                                      SILFunction *F,
+                                                      SILWitnessTable *WT) {
   // Since we do not need to worry about substitutions, we can just insert an
   // upcast of self to the appropriate type.
   SILValue Self = AI->getArgumentOperands()[0].get();
@@ -535,7 +539,7 @@ static bool optimizeApplyOfInheritedConformanceWitnessMethod(
   // Then pass of our new self to the normal protocol conformance witness method
   // handling code.
   DevirtInfo DInfo = DevirtInfo{Self, SubstCalleeSILType};
-  return optimizeApplyOfNormalConformanceWitnessMethod(AI, WMI, C, F, DInfo);
+  return optimizeNormalConformanceWitnessMethod(AI, WMI, C, F, DInfo);
 }
 
 /// Devirtualize apply instructions that call witness_method instructions:
@@ -543,8 +547,8 @@ static bool optimizeApplyOfInheritedConformanceWitnessMethod(
 ///   %8 = witness_method $Optional<UInt16>, #LogicValue.getLogicValue!1
 ///   %9 = apply %8<Self = CodeUnit?>(%6#1) : ...
 ///
-bool SILDevirtualizer::optimizeApplyOfWitnessMethod(ApplyInst *AI,
-                                                    WitnessMethodInst *AMI) {
+bool SILDevirtualizer::optimizeWitnessMethod(ApplyInst *AI,
+                                             WitnessMethodInst *AMI) {
   ProtocolConformance *C = AMI->getConformance();
   if (!C) {
     DEBUG(llvm::dbgs() << "        FAIL: Null conformance.\n");
@@ -573,13 +577,13 @@ bool SILDevirtualizer::optimizeApplyOfWitnessMethod(ApplyInst *AI,
   auto WTCType = WT->getConformance()->getType()->getCanonicalType();
   auto CType = C->getType()->getCanonicalType();
   if (WTCType == CType)
-    return optimizeApplyOfNormalConformanceWitnessMethod(AI, AMI, C, F);
+    return optimizeNormalConformanceWitnessMethod(AI, AMI, C, F);
 
   // Ok, we do not have a simple specialization to do here. First find out if
   // there is a specialized conformance in our type hierarchy. If there is no
   // such thing, we have a pure inherited protocol conformance.
   if (Subs.empty())
-    return optimizeApplyOfInheritedConformanceWitnessMethod(AI, AMI, C, F, WT);
+    return optimizeInheritedConformanceWitnessMethod(AI, AMI, C, F, WT);
 
   // Otherwise we have a mixed specialized, or mixed specialized inherited
   // protocol conformance to deal with. Bail.
@@ -594,8 +598,8 @@ bool SILDevirtualizer::optimizeApplyOfWitnessMethod(ApplyInst *AI,
 /// %4 = project_existential %0#1 : $*Pingable to $*@sil_self Pingable
 /// %5 = protocol_method %0#1 : $*Pingable, #Pingable.ping!1 :
 /// %8 = apply %5(ARGUMENTS ... , %4) :
-bool SILDevirtualizer::optimizeApplyOfProtocolMethod(ApplyInst *AI,
-                                                     ProtocolMethodInst *PMI) {
+bool SILDevirtualizer::optimizeProtocolMethod(ApplyInst *AI,
+                                              ProtocolMethodInst *PMI) {
   if (!PMI)
     return false;
 
@@ -686,7 +690,7 @@ void SILDevirtualizer::optimizeApplyInst(ApplyInst *AI) {
   //   %9 = apply %8<Self = CodeUnit?>(%6#1) : ...
   //
   if (auto *AMI = dyn_cast<WitnessMethodInst>(AI->getCallee())) {
-    Changed |= optimizeApplyOfWitnessMethod(AI, AMI);
+    Changed |= optimizeWitnessMethod(AI, AMI);
     return;
   }
 
@@ -701,7 +705,7 @@ void SILDevirtualizer::optimizeApplyInst(ApplyInst *AI) {
   ProtocolMethodInst *PMI = dyn_cast<ProtocolMethodInst>(AI->getCallee());
   if (!PMI)
     return;
-  Changed |= optimizeApplyOfProtocolMethod(AI, PMI);
+  Changed |= optimizeProtocolMethod(AI, PMI);
 }
 
 void SILDevirtualizer::optimizeFuncBody(SILFunction *F) {
