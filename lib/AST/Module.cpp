@@ -689,6 +689,12 @@ LookupConformanceResult Module::lookupConformance(Type type,
   // An archetype conforms to a protocol if the protocol is listed in the
   // archetype's list of conformances.
   if (auto archetype = type->getAs<ArchetypeType>()) {
+    if (protocol->isSpecificProtocol(KnownProtocolKind::AnyObject)) {
+      if (archetype->requiresClass())
+        return { nullptr, ConformanceKind::Conforms };
+      return { nullptr, ConformanceKind::DoesNotConform };
+    }
+
     for (auto ap : archetype->getConformsTo()) {
       if (ap == protocol || ap->inheritsFrom(protocol))
         return { nullptr, ConformanceKind::Conforms };
@@ -712,6 +718,15 @@ LookupConformanceResult Module::lookupConformance(Type type,
     // If we know that protocol doesn't conform to itself, we're done.
     if (known && !*known)
       return { nullptr, ConformanceKind::DoesNotConform };
+
+    // Special-case AnyObject, which may not be in the list of conformances.
+    if (protocol->isSpecificProtocol(KnownProtocolKind::AnyObject)) {
+      if (type->isClassExistentialType()) {
+        return { nullptr, known ? ConformanceKind::Conforms
+                                : ConformanceKind::UncheckedConforms };
+      }
+      return { nullptr, ConformanceKind::DoesNotConform };
+    }
 
     // Look for this protocol within the existential's list of conformances.
     SmallVector<ProtocolDecl *, 4> protocols;
