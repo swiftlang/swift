@@ -557,7 +557,8 @@ ERROR(expected_rangle_protocol,type_parsing,PointsToFirstBadToken,
 
 // Optional Types
 ERROR(unsupported_unparenthesized_array_optional,type_parsing,none,
-      "%select{|unchecked }0optional array type requires parentheses", (unsigned))
+      "%select{|implicitly unwrapped }0optional array type requires "
+      "parentheses", (unsigned))
 
 // Dynamic Self
 ERROR(init_expected_self,type_parsing,PointsToFirstBadToken,
