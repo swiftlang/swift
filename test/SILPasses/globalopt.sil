@@ -1,0 +1,134 @@
+// RUN: %sil-opt %s -globalopt | FileCheck %s
+//
+// ginit.cold has a hammock with an initializer call on the slow path.
+// ginit.loop has a loop containing an initializer call.
+sil_stage canonical
+
+let MyConst = 0
+
+import Builtin
+import Swift
+
+// globalinit_token0
+sil_global private @globalinit_token0 : $Builtin.Word
+
+// globalinit_func0
+sil private @globalinit_func0 : $@thin () -> () {
+bb0:
+  %0 = global_addr #MyConst : $*Int               // user: %3
+  %1 = integer_literal $Builtin.Word, 0           // user: %2
+  %2 = struct $Int (%1 : $Builtin.Word)           // user: %3
+  store %2 to %0 : $*Int                          // id: %3
+  %4 = tuple ()                                   // user: %5
+  return %4 : $()                                 // id: %5
+}
+
+// ginit.MyConst.addressor : Swift.Int
+sil [global_init] @_TF5ginita7MyConstSi : $@thin () -> Builtin.RawPointer {
+bb0:
+  %0 = builtin_function_ref "once" : $@thin (Builtin.RawPointer, @owned @callee_owned () -> ()) -> () // user: %5
+  %1 = sil_global_addr @globalinit_token0 : $*Builtin.Word // user: %2
+  %2 = address_to_pointer %1 : $*Builtin.Word to $Builtin.RawPointer // user: %5
+  // function_ref globalinit_func0
+  %3 = function_ref @globalinit_func0 : $@thin () -> () // user: %4
+  %4 = thin_to_thick_function %3 : $@thin () -> () to $@callee_owned () -> () // user: %5
+  %5 = apply %0(%2, %4) : $@thin (Builtin.RawPointer, @owned @callee_owned () -> ()) -> ()
+  %6 = global_addr #MyConst : $*Int               // user: %7
+  %7 = address_to_pointer %6 : $*Int to $Builtin.RawPointer // user: %8
+  return %7 : $Builtin.RawPointer                 // id: %8
+}
+
+// Don't hoist this initializer call.
+// ginit.cold (Swift.Int) -> Swift.Int
+// CHECK-LABEL: sil @_TF5ginit4coldFSiSi
+// CHECK-NOT: 5ginita7MyConst
+// CHECK: bb1:
+// CHECK: 5ginita7MyConst
+// CHECK: {{^bb2}}
+sil @_TF5ginit4coldFSiSi : $@thin (Int) -> Int {
+bb0(%0 : $Int):
+  %1 = integer_literal $Builtin.Word, 0           // users: %4, %5, %13
+  %2 = builtin_function_ref "cmp_sgt_Word" : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1 // user: %4
+  %3 = struct_extract %0 : $Int, #Int.value       // user: %4
+  %4 = apply %2(%3, %1) : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1 // user: %5
+  cond_br %4, bb1, bb2(%1 : $Builtin.Word)        // id: %5
+
+bb1:                                              // Preds: bb0
+  // function_ref ginit.MyConst.addressor : Swift.Int
+  %6 = function_ref @_TF5ginita7MyConstSi : $@thin () -> Builtin.RawPointer // user: %7
+  %7 = apply %6() : $@thin () -> Builtin.RawPointer // user: %8
+  %8 = pointer_to_address %7 : $Builtin.RawPointer to $*Int // user: %9
+  %9 = struct_element_addr %8 : $*Int, #Int.value // user: %10
+  %10 = load %9 : $*Builtin.Word                  // user: %13
+  %11 = builtin_function_ref "sadd_with_overflow_Word" : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1) // user: %13
+  %12 = integer_literal $Builtin.Int1, -1         // user: %13
+  %13 = apply %11(%1, %10, %12) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1) // user: %14
+  %14 = tuple_extract %13 : $(Builtin.Word, Builtin.Int1), 0 // user: %15
+  br bb2(%14 : $Builtin.Word)                     // id: %15
+
+bb2(%16 : $Builtin.Word):                         // Preds: bb0 bb1
+  %17 = struct $Int (%16 : $Builtin.Word)         // user: %18
+  return %17 : $Int                               // id: %18
+}
+
+// Don't hoist this initializer call.
+// ginit.loop (Swift.Int) -> Swift.Int
+// CHECK-LABEL: sil @_TF5ginit4loopFSiSi
+// CHECK: {{^bb0}}
+// CHECK: 5ginita7MyConst
+// CHECK: {{^bb1}}
+// CHECK-NOT: 5ginita7MyConst
+sil @_TF5ginit4loopFSiSi : $@thin (Int) -> Int {
+bb0(%0 : $Int):
+  %1 = integer_literal $Builtin.Word, 0           // user: %8
+  %2 = integer_literal $Builtin.Word, 1           // users: %6, %8, %22
+  %3 = struct_extract %0 : $Int, #Int.value       // user: %6
+  %4 = builtin_function_ref "sadd_with_overflow_Word" : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1) // users: %6, %22, %37
+  %5 = integer_literal $Builtin.Int1, -1          // users: %6, %22, %37
+  %6 = apply %4(%3, %2, %5) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1) // user: %7
+  %7 = tuple_extract %6 : $(Builtin.Word, Builtin.Int1), 0 // user: %13
+  br bb1(%1 : $Builtin.Word, %2 : $Builtin.Word)  // id: %8
+
+bb1(%9 : $Builtin.Word, %10 : $Builtin.Word):     // Preds: bb0 bb5
+  %11 = struct $Int (%10 : $Builtin.Word)         // user: %24
+  %12 = builtin_function_ref "cmp_eq_Word" : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1 // user: %13
+  %13 = apply %12(%10, %7) : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1 // user: %14
+  cond_br %13, bb2, bb4                           // id: %14
+
+bb2:                                              // Preds: bb1
+  %15 = enum $Optional<Int>, #Optional.None!enumelt // user: %16
+  br bb3(%10 : $Builtin.Word, %15 : $Optional<Int>) // id: %16
+
+bb3(%17 : $Builtin.Word, %18 : $Optional<Int>):   // Preds: bb2 bb4
+  %19 = alloc_stack $Optional<Int>                // users: %20, %26, %27, %40
+  store %18 to %19#1 : $*Optional<Int>            // id: %20
+  switch_enum %18 : $Optional<Int>, case #Optional.Some!enumelt.1: bb5, case #Optional.None!enumelt: bb6 // id: %21
+
+bb4:                                              // Preds: bb1
+  %22 = apply %4(%10, %2, %5) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1) // user: %23
+  %23 = tuple_extract %22 : $(Builtin.Word, Builtin.Int1), 0 // user: %25
+  %24 = enum $Optional<Int>, #Optional.Some!enumelt.1, %11 : $Int // user: %25
+  br bb3(%23 : $Builtin.Word, %24 : $Optional<Int>) // id: %25
+
+bb5:                                              // Preds: bb3
+  %26 = unchecked_take_enum_data_addr %19#1 : $*Optional<Int>, #Optional.Some!enumelt.1
+  dealloc_stack %19#0 : $*@local_storage Optional<Int> // id: %27
+  %28 = alloc_stack $Optional<Int>                // users: %29, %30, %31
+  store %18 to %28#1 : $*Optional<Int>            // id: %29
+  %30 = unchecked_take_enum_data_addr %28#1 : $*Optional<Int>, #Optional.Some!enumelt.1
+  dealloc_stack %28#0 : $*@local_storage Optional<Int> // id: %31
+  // function_ref ginit.MyConst.addressor : Swift.Int
+  %32 = function_ref @_TF5ginita7MyConstSi : $@thin () -> Builtin.RawPointer // user: %33
+  %33 = apply %32() : $@thin () -> Builtin.RawPointer // user: %34
+  %34 = pointer_to_address %33 : $Builtin.RawPointer to $*Int // user: %35
+  %35 = struct_element_addr %34 : $*Int, #Int.value // user: %36
+  %36 = load %35 : $*Builtin.Word                 // user: %37
+  %37 = apply %4(%9, %36, %5) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1) // user: %38
+  %38 = tuple_extract %37 : $(Builtin.Word, Builtin.Int1), 0 // user: %39
+  br bb1(%38 : $Builtin.Word, %17 : $Builtin.Word) // id: %39
+
+bb6:                                              // Preds: bb3
+  dealloc_stack %19#0 : $*@local_storage Optional<Int> // id: %40
+  %41 = struct $Int (%9 : $Builtin.Word)          // user: %42
+  return %41 : $Int                               // id: %42
+}

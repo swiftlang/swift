@@ -12,10 +12,12 @@
 
 #define DEBUG_TYPE "globalopt"
 #include "swift/Basic/Demangle.h"
-#include "swift/SILPasses/Passes.h"
+#include "swift/SIL/CFG.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SILPasses/Passes.h"
 #include "swift/SILPasses/Transforms.h"
 #include "llvm/ADT/MapVector.h"
+#include "llvm/ADT/SCCIterator.h"
 #include "llvm/Support/Debug.h"
 using namespace swift;
 
@@ -41,6 +43,11 @@ class SILGlobalOpt : public SILModuleTransform
   typedef SmallVector<ApplyInst *, 4> GlobalInitCalls;
   llvm::MapVector<SILFunction*, GlobalInitCalls> GlobalInitCallMap;
 
+  // Mark any block that this pass has determined to be inside a loop.
+  llvm::DenseSet<SILBasicBlock*> LoopBlocks;
+  // Mark any functions for which loops have been analyzed.
+  llvm::DenseSet<SILFunction*> LoopCheckedFunctions;
+
 public:
   void run() override;
 
@@ -48,6 +55,7 @@ public:
 
 protected:
   void collectGlobalInitCall(ApplyInst *AI);
+  bool isInLoop(SILBasicBlock *CurBB);
   void placeInitializers(SILFunction *InitF, ArrayRef<ApplyInst*> Calls);
 };
 } // namespace
@@ -63,6 +71,23 @@ void SILGlobalOpt::collectGlobalInitCall(ApplyInst *AI) {
     return;
 
   GlobalInitCallMap[F].push_back(AI);
+}
+
+/// return true if this block is inside a loop.
+bool SILGlobalOpt::isInLoop(SILBasicBlock *CurBB) {
+  SILFunction *F = CurBB->getParent();
+  // Catch the common case in which we've already hoisted the initializer.
+  if (CurBB == &F->front())
+    return false;
+
+  if (LoopCheckedFunctions.insert(F).second) {
+    for (auto I = scc_begin(F); !I.isAtEnd(); ++I) {
+      if (I.hasLoop())
+        for (SILBasicBlock *BB : *I)
+          LoopBlocks.insert(BB);
+    }
+  }
+  return LoopBlocks.count(CurBB);
 }
 
 /// Optimize placement of initializer calls given a list of calls to the
@@ -90,6 +115,15 @@ void SILGlobalOpt::placeInitializers(SILFunction *InitF,
       AI->eraseFromParent();
       continue;
     }
+    // Check if this call is inside a loop. If not, don't move it.
+    if (!isInLoop(AI->getParent())) {
+      DEBUG(llvm::dbgs() << "  skipping (not in a loop): " << *AI
+            << "  in " << AI->getFunction()->getName() << "\n");
+      continue;
+    }
+    DEBUG(llvm::dbgs() << "  hoisting: " << *AI
+          << "  in " << AI->getFunction()->getName() << "\n");
+
     // Move this call to the parent function's entry.
     FunctionRefInst *FuncRef = cast<FunctionRefInst>(AI->getOperand(0));
     assert(FuncRef->getReferencedFunction() == InitF && "wrong init call");
