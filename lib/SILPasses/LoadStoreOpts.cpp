@@ -129,7 +129,11 @@ bool performLoadStoreOptimizations(SILBasicBlock *BB, AliasAnalysis *AA) {
         // is the same as the loaded address.
         if (Loads.count(LdSrc) && LdSrc->getOperand() == SI->getDest()) {
           Changed = true;
-          recursivelyDeleteTriviallyDeadInstructions(SI, true);
+          recursivelyDeleteTriviallyDeadInstructions(SI, true,
+                                [&](SILInstruction *DeadI) {
+                                  if (LoadInst *LI = dyn_cast<LoadInst>(DeadI))
+                                    Loads.erase(LI);
+                                });
           NumDeadStores++;
           continue;
         }
@@ -145,7 +149,11 @@ bool performLoadStoreOptimizations(SILBasicBlock *BB, AliasAnalysis *AA) {
         DEBUG(llvm::dbgs() << "    Found a dead previous store... Removing...:"
               << *PrevStore);
         Changed = true;
-        recursivelyDeleteTriviallyDeadInstructions(PrevStore, true);
+        recursivelyDeleteTriviallyDeadInstructions(PrevStore, true,
+                                [&](SILInstruction *DeadI) {
+                                  if (LoadInst *LI = dyn_cast<LoadInst>(DeadI))
+                                    Loads.erase(LI);
+                                });
         PrevStore = SI;
         NumDeadStores++;
         continue;
@@ -159,7 +167,11 @@ bool performLoadStoreOptimizations(SILBasicBlock *BB, AliasAnalysis *AA) {
       if (PrevStore && PrevStore->getDest() == LI->getOperand()) {
         DEBUG(llvm::dbgs() << "    Forwarding store from: " << *PrevStore);
         SILValue(LI, 0).replaceAllUsesWith(PrevStore->getSrc());
-        recursivelyDeleteTriviallyDeadInstructions(LI, true);
+        recursivelyDeleteTriviallyDeadInstructions(LI, true,
+                                [&](SILInstruction *DeadI) {
+                                  if (LoadInst *LI = dyn_cast<LoadInst>(DeadI))
+                                    Loads.erase(LI);
+                                });
         Changed = true;
         NumForwardedLoads++;
         continue;
@@ -176,7 +188,11 @@ bool performLoadStoreOptimizations(SILBasicBlock *BB, AliasAnalysis *AA) {
                   *PrevStore);
             unsigned FieldNo = SEAI->getFieldNo();
             SILValue(LI, 0).replaceAllUsesWith(SI->getOperand(FieldNo));
-            recursivelyDeleteTriviallyDeadInstructions(LI, true);
+            recursivelyDeleteTriviallyDeadInstructions(LI, true,
+                                [&](SILInstruction *DeadI) {
+                                  if (LoadInst *LI = dyn_cast<LoadInst>(DeadI))
+                                    Loads.erase(LI);
+                                });
             Changed = true;
             NumForwardedLoads++;
             continue;
@@ -194,7 +210,11 @@ bool performLoadStoreOptimizations(SILBasicBlock *BB, AliasAnalysis *AA) {
         DEBUG(llvm::dbgs() << "    Replacing with previous load: "
               << *ForwardingExtract);
         SILValue(LI, 0).replaceAllUsesWith(ForwardingExtract);
-        recursivelyDeleteTriviallyDeadInstructions(LI, true);
+        recursivelyDeleteTriviallyDeadInstructions(LI, true,
+                                [&](SILInstruction *DeadI) {
+                                  if (LoadInst *LI = dyn_cast<LoadInst>(DeadI))
+                                    Loads.erase(LI);
+                                });
         Changed = true;
         LI = nullptr;
         NumDupLoads++;
