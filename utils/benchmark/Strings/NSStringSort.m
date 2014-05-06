@@ -19,11 +19,11 @@
 
 - (NSComparisonResult)compare:(Record *)otherObject {
   NSComparisonResult FirstComp =
-    [self.Lastname compare:otherObject.Lastname];
+    [self->Last compare:otherObject->Last];
   if (FirstComp != NSOrderedSame)
     return FirstComp;
 
-  return [self.Firstname compare:otherObject.Firstname];
+  return [self->First compare:otherObject->First];
 }
 
 - (void) setFirst: (NSString*)input { First = input; }
