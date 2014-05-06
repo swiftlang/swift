@@ -400,6 +400,12 @@ private:
     if (!SD->getModuleContext()->isStdlibModule())
       return false;
 
+    if (SD == ctx.getArrayDecl()) {
+      // FIXME: It'd be nice to put the element type here as well.
+      os << "NSArray *";
+      return true;
+    }
+
     if (unsafePointerID.empty())
       unsafePointerID = ctx.getIdentifier("UnsafePointer");
     if (SD->getName() != unsafePointerID)
