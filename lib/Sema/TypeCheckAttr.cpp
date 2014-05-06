@@ -581,28 +581,54 @@ void TypeChecker::checkIBOutlet(VarDecl *VD) {
     type = optObjectType;
   }
 
-  if (auto classDecl = type->getClassOrBoundGenericClass()) {
+  auto nominal = type->getAnyNominal();
+  if (auto classDecl = dyn_cast_or_null<ClassDecl>(nominal)) {
     // @objc class types are okay.
     if (!classDecl->isObjC()) {
-      diagnose(VD->getLoc(), diag::iboutlet_nonobjc_class, type);
+      diagnose(VD->getLoc(), diag::iboutlet_nonobjc_class,
+               /*array=*/false, type);
       attr->setInvalid();
       return;
     }
   } else if (type->isObjCExistentialType()) {
     // @objc existential types are okay
     // Nothing to do.
-  } else if (type->getAnyNominal() == Context.getStringDecl()) {
+  } else if (nominal == Context.getStringDecl()) {
     // String is okay because it is bridged to NSString.
     // FIXME: BridgesTypes.def is almost sufficient for this.
+  } else if (nominal == Context.getArrayDecl()) {
+    // Handle Array<T>. T must be an Objective-C class or protocol.
+    auto boundTy = type->castTo<BoundGenericStructType>();
+    auto boundArgs = boundTy->getGenericArgs();
+    assert(boundArgs.size() == 1 && "invalid Array declaration");
+    Type elementTy = boundArgs.front();
+    if (auto classDecl = elementTy->getClassOrBoundGenericClass()) {
+      if (!classDecl->isObjC()) {
+        diagnose(VD->getLoc(), diag::iboutlet_nonobjc_class,
+                 /*array=*/true, type);
+        attr->setInvalid();
+        return;
+      }
+    } else if (elementTy->isObjCExistentialType()) {
+      // okay
+    } else {
+      // No other element types are permitted.
+      diagnose(VD->getLoc(), diag::iboutlet_nonobject_type,
+               /*array=*/true, type);
+      attr->setInvalid();
+      return;
+    }
   } else {
     // No other types are permitted.
-    diagnose(VD->getLoc(), diag::iboutlet_nonobject_type, type);
+    diagnose(VD->getLoc(), diag::iboutlet_nonobject_type,
+             /*array=*/false, type);
     attr->setInvalid();
     return;
   }
 
-  // If the type wasn't optional before, turn it into an @implicitly unwrapped optional
-  // now.
+  // If the type wasn't optional before, turn it into an implicitly unwrapped
+  // optional now.
+  // FIXME: Should arrays start out empty instead?
   if (!isOptional) {
     if (ownership == Ownership::Weak)
       type = ReferenceStorageType::get(type, ownership, Context);
