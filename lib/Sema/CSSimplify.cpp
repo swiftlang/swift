@@ -2027,6 +2027,45 @@ static bool isUnavailableInExistential(TypeChecker &tc, ValueDecl *decl) {
   return containsProtocolSelf(type);
 }
 
+static DeclName
+getNameForValueLookup(
+    ASTContext &ctx,
+    const Constraint &constraint,
+    Type baseObjTy,
+    const llvm::DenseMap<UnresolvedDotExpr *, ApplyExpr *> &callMap) {
+  auto origName = constraint.getMember();
+  if (origName.isCompoundName())
+    return origName;
+
+  auto protoTy = baseObjTy->getAs<ProtocolType>();
+  if (!protoTy ||
+      !protoTy->getDecl()->isSpecificProtocol(KnownProtocolKind::AnyObject))
+    return origName;
+
+  // FIXME: Pulling out the expr from the locator is pretty hacky.
+  const ConstraintLocator *loc = constraint.getLocator();
+  if (!loc)
+    return origName;
+
+  auto UDE = dyn_cast_or_null<UnresolvedDotExpr>(loc->getAnchor());
+  if (!UDE)
+    return origName;
+
+  const ApplyExpr *call = callMap.lookup(UDE);
+  if (!call)
+    return origName;
+
+  // Handle the one-argument, no-argument-name case.
+  if (isa<ParenExpr>(call->getArg()))
+    return DeclName(ctx, origName.getBaseName(), Identifier());
+
+  auto args = dyn_cast<TupleExpr>(call->getArg());
+  if (!args)
+    return origName;
+
+  return DeclName(ctx, origName.getBaseName(), args->getElementNames());
+}
+
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   // Resolve the base type, if we can. If we can't resolve the base type,
@@ -2176,6 +2215,11 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
     addOverloadSet(memberTy, choices, locator);
     return SolutionKind::Solved;
   }
+
+  // If we're doing dynamic lookup, and this is a call, use the full name of
+  // the member.
+  name = getNameForValueLookup(getASTContext(), constraint, baseObjTy,
+                               PossibleDynamicLookupCalls);
 
   // Look for members within the base.
   LookupResult &lookup = lookupMember(baseObjTy, name);

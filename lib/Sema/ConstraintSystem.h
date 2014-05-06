@@ -1068,7 +1068,7 @@ private:
   ///
   /// These failures are unavoidable, in the sense that they occur before
   /// we have made any (potentially incorrect) assumptions at all.
-  SmallVector<Failure *, 1> unavoidableFailures;
+  TinyPtrVector<Failure *> unavoidableFailures;
 
   /// \brief Failures that occured while solving.
   ///
@@ -1085,6 +1085,8 @@ private:
   Score CurrentScore;
 
   SmallVector<TypeVariableType *, 16> TypeVariables;
+
+  llvm::DenseMap<UnresolvedDotExpr *, ApplyExpr *> PossibleDynamicLookupCalls;
 
   /// \brief The set of constraint restrictions used to reach the
   /// current constraint system.
@@ -1522,6 +1524,10 @@ public:
     addConstraint(Constraint::create(*this, ConstraintKind::Archetype,
                                      baseTy, Type(), DeclName(),
                                          locator));
+  }
+
+  void recordPossibleDynamicCall(UnresolvedDotExpr *UDE, ApplyExpr *AE) {
+    PossibleDynamicLookupCalls[UDE] = AE;
   }
 
   /// Retrieve the type that corresponds to the given member of the

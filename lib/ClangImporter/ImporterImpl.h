@@ -479,6 +479,9 @@ public:
   /// Import an Objective-C selector.
   ObjCSelector importSelector(clang::Selector selector);
 
+  /// Import a Swift name as a Clang selector.
+  clang::Selector importSelector(DeclName name, bool allowSimpleName = true);
+
   /// Map the given selector to a declaration name.
   ///
   /// \param selector The selector to map.

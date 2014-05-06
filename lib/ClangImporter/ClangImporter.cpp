@@ -885,6 +885,31 @@ ObjCSelector ClangImporter::Implementation::importSelector(
   return ObjCSelector(ctx, pieces.size(), pieces);
 }
 
+clang::Selector
+ClangImporter::Implementation::importSelector(DeclName name,
+                                              bool allowSimpleName) {
+  if (!allowSimpleName && name.isSimpleName())
+    return {};
+
+  clang::ASTContext &ctx = getClangASTContext();
+
+  SmallVector<clang::IdentifierInfo *, 8> pieces;
+  pieces.push_back(importName(name.getBaseName()).getAsIdentifierInfo());
+
+  auto argNames = name.getArgumentNames();
+  if (argNames.empty())
+    return ctx.Selectors.getNullarySelector(pieces.front());
+
+  if (!argNames.front().empty())
+    return {};
+  argNames = argNames.slice(1);
+
+  for (Identifier argName : argNames)
+    pieces.push_back(importName(argName).getAsIdentifierInfo());
+
+  return ctx.Selectors.getSelector(pieces.size(), pieces.data());
+}
+
 DeclName ClangImporter::Implementation::mapSelectorToDeclName(
            ObjCSelector selector,
            bool isInitializer)
@@ -1564,100 +1589,16 @@ void ClangModuleUnit::getImportedModules(
                        getASTContext().getStdlibModule()});
 }
 
-/// Returns true if the first selector piece matches the given identifier.
-static bool selectorMatchesName(clang::Selector sel, DeclName name) {
-  if (name.isSimpleName())
-    return sel.getNameForSlot(0) == name.getBaseName().str();
-  
-  if (sel.getNumArgs() != name.getArgumentNames().size() + 1)
-    return false;
-  if (sel.getNameForSlot(0) != name.getBaseName().str())
-    return false;
-
-  for (unsigned i = 1, e = sel.getNumArgs(); i < e; ++i)
-    if (sel.getNameForSlot(i) != name.getArgumentNames()[i-1].str())
-      return false;
-  return true;
-}
-
 static void lookupClassMembersImpl(ClangImporter::Implementation &Impl,
                                    VisibleDeclConsumer &consumer,
-                                   DeclName name = DeclName()) {
-  clang::Sema &S = Impl.getClangSema();
-  clang::ExternalASTSource *source = S.getExternalSource();
-
+                                   DeclName name) {
   // When looking for a subscript, we actually look for the getters
   // and setters.
-  clang::IdentifierInfo *objectAtIndexedSubscriptId = nullptr;
-  clang::IdentifierInfo *objectForKeyedSubscriptId = nullptr;
-  clang::IdentifierInfo *setObjectId = nullptr;
-  clang::IdentifierInfo *atIndexedSubscriptId = nullptr;
-  clang::IdentifierInfo *forKeyedSubscriptId = nullptr;
   bool isSubscript = name.isSimpleName(Impl.SwiftContext.Id_subscript);
-  if (isSubscript) {
-    auto &identTable = S.Context.Idents;
-    objectAtIndexedSubscriptId = &identTable.get("objectAtIndexedSubscript");
-    objectForKeyedSubscriptId = &identTable.get("objectForKeyedSubscript");
-    setObjectId = &identTable.get("setObject");
-    atIndexedSubscriptId = &identTable.get("atIndexedSubscript");
-    forKeyedSubscriptId = &identTable.get("forKeyedSubscript");
-  }
-
-  // Function that determines whether the given selector is acceptable.
-  auto acceptableSelector = [&](clang::Selector sel) -> bool {
-    if (!name)
-      return true;
-
-    switch (sel.getNumArgs()) {
-    case 0:
-      if (isSubscript)
-        return false;
-
-      break;
-
-    case 1:
-      if (isSubscript)
-        return sel.getIdentifierInfoForSlot(0) == objectAtIndexedSubscriptId ||
-               sel.getIdentifierInfoForSlot(0) == objectForKeyedSubscriptId;
-
-      break;
-
-    case 2:
-      if (isSubscript)
-        return (sel.getIdentifierInfoForSlot(0) == setObjectId &&
-                (sel.getIdentifierInfoForSlot(1) == atIndexedSubscriptId ||
-                 sel.getIdentifierInfoForSlot(1) == forKeyedSubscriptId));
-
-      break;
-
-    default:
-      if (isSubscript)
-        return false;
-
-      break;
-    }
-
-    return selectorMatchesName(sel, name);
-  };
-
-  // Force load all external methods.
-  // FIXME: Copied from Clang's SemaCodeComplete.
-  for (uint32_t i = 0, n = source->GetNumExternalSelectors(); i != n; ++i) {
-    clang::Selector sel = source->GetExternalSelector(i);
-    if (sel.isNull() || S.MethodPool.count(sel))
-      continue;
-    if (!acceptableSelector(sel))
-      continue;
-
-    S.ReadMethodPool(sel);
-  }
 
   // FIXME: Does not include methods from protocols.
-  // FIXME: Do we really have to import every single method?
-  // FIXME: Need a more efficient table in Clang to find "all selectors whose
-  // first piece is this name".
-  auto importMethods = [&](const clang::ObjCMethodList *list) {
-    for (; list != nullptr; list = list->getNext()) {
+  auto importMethodsImpl = [&](const clang::ObjCMethodList &start) {
+    for (auto *list = &start; list != nullptr; list = list->getNext()) {
       if (list->Method->isUnavailable())
         continue;
 
@@ -1675,36 +1616,85 @@ static void lookupClassMembersImpl(ClangImporter::Implementation &Impl,
         }
       }
 
-      if (auto VD = cast_or_null<ValueDecl>(Impl.importDeclReal(searchForDecl))) {
-        if (isSubscript || !name) {
-          // When searching for a subscript, we may have found a getter.  If so,
-          // use the subscript instead.
-          if (auto func = dyn_cast<FuncDecl>(VD)) {
-            auto known = Impl.Subscripts.find({func, nullptr});
-            if (known != Impl.Subscripts.end()) {
-              consumer.foundDecl(known->second, DeclVisibilityKind::DynamicLookup);
-            }
-          }
+      auto VD = cast_or_null<ValueDecl>(Impl.importDeclReal(searchForDecl));
+      if (!VD)
+        continue;
 
-          // If we were looking only for subscripts, don't report the getter.
-          if (isSubscript)
-            continue;
+      if (isSubscript || !name) {
+        // When searching for a subscript, we may have found a getter.  If so,
+        // use the subscript instead.
+        if (auto func = dyn_cast<FuncDecl>(VD)) {
+          auto known = Impl.Subscripts.find({func, nullptr});
+          if (known != Impl.Subscripts.end()) {
+            consumer.foundDecl(known->second,
+                               DeclVisibilityKind::DynamicLookup);
+          }
         }
 
-        consumer.foundDecl(VD, DeclVisibilityKind::DynamicLookup);
+        // If we were looking only for subscripts, don't report the getter.
+        if (isSubscript)
+          continue;
       }
+
+      consumer.foundDecl(VD, DeclVisibilityKind::DynamicLookup);
     }
   };
 
-  for (auto entry : S.MethodPool) {
-    if (!acceptableSelector(entry.first))
-      continue;
-  
-    auto &methodListPair = entry.second;
+  auto importMethods = [=](const clang::Sema::GlobalMethods &methodListPair) {
     if (methodListPair.first.Method)
-      importMethods(&methodListPair.first);
+      importMethodsImpl(methodListPair.first);
     if (methodListPair.second.Method)
-      importMethods(&methodListPair.second);
+      importMethodsImpl(methodListPair.second);
+  };
+
+  clang::Sema &S = Impl.getClangSema();
+
+  if (isSubscript) {
+    clang::Selector sels[] = {
+      Impl.objectAtIndexedSubscript,
+      Impl.setObjectAtIndexedSubscript,
+      Impl.objectForKeyedSubscript,
+      Impl.setObjectForKeyedSubscript
+    };
+    for (auto sel : sels) {
+      S.ReadMethodPool(sel);
+      importMethods(S.MethodPool[sel]);
+    }
+
+  } else if (name) {
+    auto sel = Impl.importSelector(name);
+    if (!sel.isNull()) {
+      S.ReadMethodPool(sel);
+      importMethods(S.MethodPool[sel]);
+
+      // If this is a simple name, we only checked nullary selectors. Check
+      // unary ones as well.
+      // Note: If this is ever used to look up init methods, we'd need to do
+      // the reverse as well.
+      if (name.isSimpleName()) {
+        auto *II = Impl.importName(name.getBaseName()).getAsIdentifierInfo();
+        sel = Impl.getClangASTContext().Selectors.getUnarySelector(II);
+        assert(!sel.isNull());
+
+        S.ReadMethodPool(sel);
+        importMethods(S.MethodPool[sel]);
+      }
+    }
+
+  } else {
+    // Force load all external methods.
+    // FIXME: Copied from Clang's SemaCodeComplete.
+    clang::ExternalASTSource *source = S.getExternalSource();
+    for (uint32_t i = 0, n = source->GetNumExternalSelectors(); i != n; ++i) {
+      clang::Selector sel = source->GetExternalSelector(i);
+      if (sel.isNull() || S.MethodPool.count(sel))
+        continue;
+
+      S.ReadMethodPool(sel);
+    }
+
+    for (auto entry : S.MethodPool)
+      importMethods(entry.second);
   }
 }
 
@@ -1728,7 +1718,7 @@ void ClangModuleUnit::lookupClassMembers(Module::AccessPathTy accessPath,
     return;
 
   // FIXME: Not limited by module.
-  lookupClassMembersImpl(owner.Impl, consumer);
+  lookupClassMembersImpl(owner.Impl, consumer, {});
 }
 
 void ClangModuleUnit::collectLinkLibraries(

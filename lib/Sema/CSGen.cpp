@@ -1361,6 +1361,22 @@ namespace {
       if (isa<DefaultValueExpr>(expr)) {
         return { false, expr };
       }
+
+      // FIXME: This is a bit of a hack, recording the CallExpr that consumes
+      // an UnresolvedDotExpr so that we can do dynamic lookups more
+      // efficiently. Really we should just have the arguments be part of the
+      // UnresolvedDotExpr from the start.
+      if (auto call = dyn_cast<CallExpr>(expr)) {
+        if (Expr *fn = call->getFn()) {
+          if (auto optionalWrapper = dyn_cast<BindOptionalExpr>(fn))
+            fn = optionalWrapper->getSubExpr();
+          else if (auto forceWrapper = dyn_cast<ForceValueExpr>(fn))
+            fn = forceWrapper->getSubExpr();
+
+          if (auto UDE = dyn_cast<UnresolvedDotExpr>(fn))
+            CG.getConstraintSystem().recordPossibleDynamicCall(UDE, call);
+        }
+      }
       
       return { true, expr };
     }
