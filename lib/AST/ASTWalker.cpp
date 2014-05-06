@@ -387,6 +387,14 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       Expr *E2 = doIt(E->getFn());
       if (E2 == nullptr) return nullptr;
       E->setFn(E2);
+      
+      // Propagate the global operator flag from the overload expression to
+      // the application.
+      if (auto overloadedFn = dyn_cast<OverloadedDeclRefExpr>(E2)) {
+        if (overloadedFn->isPotentiallyDelayedGlobalOperator()) {
+          E->IsGlobalDelayedOperatorApply = true;
+        }
+      }
     }
 
     if (E->getArg()) {

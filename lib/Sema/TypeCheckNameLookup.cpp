@@ -64,7 +64,7 @@ LookupResult TypeChecker::lookupMember(Type type, DeclName name,
     
     // Force the creation of any delayed members, to ensure proper member
     // lookup.
-    nominalDecl->forceDelayed();
+    this->forceExternalDeclMembers(nominalDecl);
 
     bool anyChange = false;
     for (auto proto : nominalDecl->getProtocols()) {

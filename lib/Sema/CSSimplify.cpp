@@ -2318,6 +2318,13 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
             continue;
           }
     }
+    
+    // If the result's type contains delayed members, we need to force them now.
+    if (auto NT = dyn_cast<NominalType>(result->getType().getPointer())) {
+      if (auto *NTD = dyn_cast<NominalTypeDecl>(NT->getDecl())) {
+        TC.forceExternalDeclMembers(NTD);
+      }
+    }
 
     // If we're looking into an existential type, check whether this
     // result was found via dynamic lookup.

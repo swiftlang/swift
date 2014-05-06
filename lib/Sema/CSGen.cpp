@@ -13,6 +13,7 @@
 // This file implements constraint generation for the type checker.
 //
 //===----------------------------------------------------------------------===//
+#include "ConstraintGraph.h"
 #include "ConstraintSystem.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
@@ -48,6 +49,14 @@ static ValueDecl *findReferencedDecl(Expr *expr, SourceLoc &loc) {
 
     return nullptr;
   } while (true);
+}
+
+/// \brief Return 'true' if the decl in question refers to an operator that
+/// could be added to the global scope via a delayed protcol conformance.
+/// Currently, this is only true for '==', which is added via an Equatable
+/// conformance.
+static bool isDelayedOperatorDecl(ValueDecl *vd) {
+  return vd && (vd->getName().str() == "==");
 }
 
 namespace {
@@ -275,6 +284,13 @@ namespace {
       auto tv = CS.createTypeVariable(locator, TVO_CanBindToLValue);
       ArrayRef<ValueDecl*> decls = expr->getDecls();
       SmallVector<OverloadChoice, 4> choices;
+      
+      if (decls.size()) {
+        if (isDelayedOperatorDecl(decls[0])) {
+          expr->setIsPotentiallyDelayedGlobalOperator();
+        }
+      }
+      
       for (unsigned i = 0, n = decls.size(); i != n; ++i) {
         // If the result is invalid, skip it.
         // FIXME: Note this as invalid, in case we don't find a solution,
@@ -1008,6 +1024,86 @@ namespace {
             /*options=*/0);
 
       auto funcTy = FunctionType::get(expr->getArg()->getType(), outputTy);
+      
+      // Check to see if the type checker has any newly created functions with
+      // this name - if it does, they were created before the list of overloads
+      // was created, so we'll need to add a new disjunction constraint for the
+      // new set of overloads.
+      if (expr->IsGlobalDelayedOperatorApply) {
+        if (CS.TC.HasForcedExternalDecl &&
+            CS.TC.implicitlyDefinedFunctions.size()) {
+          
+          // This will only occur if the new bindings were added while solving
+          // the system, so disable the flag to prevent further unnecessary
+          // checks.
+          CS.TC.HasForcedExternalDecl = false;
+          
+          auto declRef = dyn_cast<OverloadedDeclRefExpr>(expr->getFn());
+          auto declName = declRef->getDecls()[0]->getName();
+          SmallVector<OverloadChoice, 4> choices;
+          
+          for (auto implicitFn : CS.TC.implicitlyDefinedFunctions) {
+            if (implicitFn->getName() == declName) {
+              CS.TC.validateDecl(implicitFn, true);
+              choices.push_back(OverloadChoice(Type(),
+                                               implicitFn,
+                                               declRef->isSpecialized()));
+            }
+          }
+          
+          if (!choices.empty()) {
+            SmallVector<Constraint *, 4> constraints;
+            
+            auto fnType = expr->getFn()->getType().getPointer();
+            auto tyvarType = cast<TypeVariableType>(fnType);
+            auto &CG = CS.getConstraintGraph();
+            
+            // This type variable is only currently associated with the function
+            // being applied, and the only constraint attached to it should
+            // be the disjunction constraint for the overload group.
+            CG.gatherConstraints(tyvarType, constraints);
+            
+            if (constraints.size()) {
+              for (auto constraint : constraints) {
+                if (constraint->getKind() == ConstraintKind::Disjunction) {
+                  SmallVector<Constraint *, 4> newConstraints;
+                  
+                  auto oldConstraints = constraint->getNestedConstraints();
+                  auto csLoc = CS.getConstraintLocator(expr->getFn());
+                  
+                  // Only replace the disjunctive overload constraint.
+                  if (oldConstraints[0]->getKind() !=
+                          ConstraintKind::BindOverload) {
+                    continue;
+                  }
+                  
+                  // Copy over the existing bindings.
+                  for (auto oldConstraint : oldConstraints) {
+                    newConstraints.push_back(oldConstraint);
+                  }
+                  
+                  // Now add the new bindings as overloads.
+                  for (auto choice : choices) {
+                    auto overload = Constraint::createBindOverload(CS,
+                                                                   tyvarType,
+                                                                   choice,
+                                                                   csLoc);
+                    newConstraints.push_back(overload);
+                  }
+
+                  // Remove the original constraint from the inactive constraint
+                  // list and add the new one.
+                  CS.removeInactiveConstraint(constraint);
+                  CS.addConstraint(Constraint::createDisjunction(CS,
+                                                                 newConstraints,
+                                                                 csLoc));
+                  break;
+                }
+              }
+            }
+          }
+        }
+      }
 
       CS.addConstraint(ConstraintKind::ApplicableFunction, funcTy,
         expr->getFn()->getType(),

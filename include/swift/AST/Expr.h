@@ -847,6 +847,7 @@ public:
 class OverloadedDeclRefExpr : public OverloadSetRefExpr {
   SourceLoc Loc;
   bool IsSpecialized = false;
+  bool IsPotentiallyDelayedGlobalOperator = false;
 
 public:
   OverloadedDeclRefExpr(ArrayRef<ValueDecl*> Decls, SourceLoc Loc,
@@ -862,6 +863,13 @@ public:
   /// \brief Determine whether this declaration reference was immediately
   /// specialized by <...>.
   bool isSpecialized() const { return IsSpecialized; }
+  
+  void setIsPotentiallyDelayedGlobalOperator() {
+    IsPotentiallyDelayedGlobalOperator = true;
+  }
+  bool isPotentiallyDelayedGlobalOperator() const {
+    return IsPotentiallyDelayedGlobalOperator;
+  }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::OverloadedDeclRef;
@@ -2716,6 +2724,11 @@ protected:
   }
 
 public:
+  
+  /// Signifies whether or not this is an application of a potentially delayed,
+  /// globally scoped operator.
+  bool IsGlobalDelayedOperatorApply = false;
+  
   Expr *getFn() const { return Fn; }
   void setFn(Expr *e) { Fn = e; }
 

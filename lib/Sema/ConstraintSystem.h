@@ -20,6 +20,7 @@
 
 #include "TypeChecker.h"
 #include "Constraint.h"
+#include "ConstraintGraph.h"
 #include "ConstraintGraphScope.h"
 #include "ConstraintLocator.h"
 #include "OverloadChoice.h"
@@ -1525,6 +1526,12 @@ public:
                                      baseTy, Type(), DeclName(),
                                          locator));
   }
+  
+  /// \brief Remove an inactive constraint from the current constraint graph.
+  void removeInactiveConstraint(Constraint *constraint) {
+    CG.removeConstraint(constraint);
+    InactiveConstraints.erase(constraint);
+  }
 
   void recordPossibleDynamicCall(UnresolvedDotExpr *UDE, ApplyExpr *AE) {
     PossibleDynamicLookupCalls[UDE] = AE;
@@ -1548,7 +1555,7 @@ public:
                                   ConstraintLocatorBuilder locator,
                                   unsigned options);
 
-  /// Retrieve the list of active constraints.
+  /// Retrieve the list of inactive constraints.
   ConstraintList &getConstraints() { return InactiveConstraints; }
 
   /// \brief Retrieve the representative of the equivalence class containing
