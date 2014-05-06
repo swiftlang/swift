@@ -4495,6 +4495,7 @@ ClangImporter::Implementation::loadAllMembers(const Decl *D, uint64_t unused) {
     DC = cast<ExtensionDecl>(D);
   }
 
+  ImportingEntityRAII Importing(*this);
   converter.importObjCMembers(clangDecl, const_cast<DeclContext *>(DC),
                               members);
 

@@ -27,7 +27,7 @@ typedef signed char BOOL;
 @interface NSArray : NSObject
 @end
 
-@interface Foo
+@interface Foo : NSObject
 
 - (NSString*) foo;
 - (void) setFoo: (NSString*)s;
