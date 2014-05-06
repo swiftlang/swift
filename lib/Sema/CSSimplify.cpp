@@ -1469,10 +1469,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     
     // Array supertype conversions.
     if (kind >= TypeMatchKind::Conversion) {      
-      if ((isArrayType(desugar1) && isArrayType(desugar2)) ||
-          (isSliceType(desugar1) && isSliceType(desugar2)) ||
-          (isNativeArrayType(desugar1) && isNativeArrayType(desugar2))) {
-        
+      if (isArrayType(desugar1) && isArrayType(desugar2)) {
         conversionsOrFixes.push_back(ConversionRestrictionKind::
                                           ArrayUpcast);
       }

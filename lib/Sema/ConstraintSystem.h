@@ -1409,11 +1409,8 @@ private:
     return arg;
   }
   
-  /// \brief Determine if the type in question is an Array<T>, Slice<T> or
-  /// NativeArray<T>
+  /// \brief Determine if the type in question is an Array<T>.
   bool isArrayType(Type t);
-  bool isNativeArrayType(Type t);
-  bool isSliceType(Type t);
 
 public:
   /// \brief Whether we should be recording failures.

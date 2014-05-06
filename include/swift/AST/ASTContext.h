@@ -370,11 +370,8 @@ public:
   /// Retrieve the declaration of Swift.Optional<T>.None.
   EnumElementDecl *getOptionalNoneDecl() const;
   
-  /// Retrieve the simple upcast conversion functions for Array<T>, Slice<T> or
-  /// NativeArray<T>.
-  FuncDecl *getUpcastArray(LazyResolver *resolver) const;
-  FuncDecl *getUpcastSlice(LazyResolver *resolver) const;
-  FuncDecl *getUpcastNativeArray(LazyResolver *resolver) const;
+  /// Retrieve the simple upcast conversion function for Array<T>.
+  FuncDecl *getArrayUpCast(LazyResolver *resolver) const;
 
   /// Retrieve the declaration of
   /// Swift._does{,ImplicitlyUnwrapped}OptionalHaveValue.

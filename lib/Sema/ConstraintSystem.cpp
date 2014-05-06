@@ -658,30 +658,6 @@ bool ConstraintSystem::isArrayType(Type t) {
   return false;
 }
 
-bool ConstraintSystem::isNativeArrayType(Type t) {
-  if (auto boundStruct = dyn_cast<BoundGenericStructType>(t.getPointer())) {
-    if (!boundStruct->getParent() &&
-        boundStruct->getGenericArgs().size() == 1 &&
-        boundStruct->getDecl()->getName().str() == "NativeArray") {
-      return true;
-    }
-  }
-  
-  return false;
-}
-
-bool ConstraintSystem::isSliceType(Type t) {
-  if (auto boundStruct = dyn_cast<BoundGenericStructType>(t.getPointer())) {
-    if (!boundStruct->getParent() &&
-        boundStruct->getGenericArgs().size() == 1 &&
-        boundStruct->getDecl()->getName().str() == "Slice") {
-      return true;
-    }
-  }
-  
-  return false;
-}
-
 Type ConstraintSystem::openBindingType(Type type, DeclContext *dc) {
   Type result = openType(type, dc);
   

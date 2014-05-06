@@ -73,10 +73,8 @@ struct ASTContext::Implementation {
   /// The declaration of Swift.Optional<T>.None.
   EnumElementDecl *OptionalNoneDecl = nullptr;
   
-  /// Array<T>, Slice<T> and NativeArray<T> simple upcast functions.
-  FuncDecl *GetUpcastArray = nullptr;
-  FuncDecl *GetUpcastSlice = nullptr;
-  FuncDecl *GetUpcastNativeArray = nullptr;
+  /// Array<T> simple upcast.
+  FuncDecl *GetArrayUpCast = nullptr;
 
   /// func _doesOptionalHaveValue<T>(v : [inout] Optional<T>) -> T
   FuncDecl *DoesOptionalHaveValueDecls[NumOptionalTypeKinds] = {};
@@ -617,41 +615,13 @@ static bool isGenericIntrinsic(FuncDecl *fn, CanType &input, CanType &output,
   return true;
 }
 
-FuncDecl *ASTContext::getUpcastArray(LazyResolver *resolver) const {
-  auto &cache = Impl.GetUpcastArray;
+FuncDecl *ASTContext::getArrayUpCast(LazyResolver *resolver) const {
+  auto &cache = Impl.GetArrayUpCast;
   if (cache) return cache;
   
   // Look for a generic function.
   CanType input, output, param;
-  auto decl = findLibraryIntrinsic(*this, "upcastArray", resolver);
-  if (!decl)
-    return nullptr;
-  
-  cache = decl;
-  return decl;
-}
-
-FuncDecl *ASTContext::getUpcastSlice(LazyResolver *resolver) const {
-  auto &cache = Impl.GetUpcastSlice;
-  if (cache) return cache;
-  
-  // Look for a generic function.
-  CanType input, output, param;
-  auto decl = findLibraryIntrinsic(*this, "upcastSlice", resolver);
-  if (!decl)
-    return nullptr;
-  
-  cache = decl;
-  return decl;
-}
-
-FuncDecl *ASTContext::getUpcastNativeArray(LazyResolver *resolver) const{
-  auto &cache = Impl.GetUpcastNativeArray;
-  if (cache) return cache;
-  
-  // Look for a generic function.
-  CanType input, output, param;
-  auto decl = findLibraryIntrinsic(*this, "upcastNativeArray", resolver);
+  auto decl = findLibraryIntrinsic(*this, "_arrayUpCast", resolver);
   if (!decl)
     return nullptr;
   

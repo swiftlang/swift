@@ -904,10 +904,8 @@ visitArrayUpcastConversionExpr(ArrayUpcastConversionExpr *E,
   
   SILLocation loc = RegularLocation(E);
   
-  // Get the address of the sub expression array argument.
-  const TypeLowering &optTL = SGF.getTypeLowering(E->getSubExpr()->getType());
-  auto temp = SGF.emitTemporary(E->getSubExpr(), optTL);
-  SGF.emitExprInto(E->getSubExpr(), temp.get());
+  // Get the sub expression argument as a managed value
+  auto mv = SGF.emitRValueAsSingleValue(E->getSubExpr());
   
   // Compute substitutions for the intrinsic call.
   auto canTypeT = E->getSubExpr()->getType().getPointer()->getCanonicalType();
@@ -920,11 +918,7 @@ visitArrayUpcastConversionExpr(ArrayUpcastConversionExpr *E,
   FuncDecl *fn = nullptr;
   
   if (typeName.str() == "Array") {
-    fn = SGF.getASTContext().getUpcastArray(nullptr);
-  } else if (typeName.str() == "Slice") {
-    fn = SGF.getASTContext().getUpcastSlice(nullptr);
-  } else if (typeName.str() == "NativeArray") {
-    fn = SGF.getASTContext().getUpcastNativeArray(nullptr);
+    fn = SGF.getASTContext().getArrayUpCast(nullptr);
   } else {
     llvm_unreachable("unsupported array upcast kind");
   }
@@ -942,7 +936,7 @@ visitArrayUpcastConversionExpr(ArrayUpcastConversionExpr *E,
   subs.push_back(Substitution{gp1->getArchetype(), arrayT, {}});
   subs.push_back(Substitution{gp2->getArchetype(), arrayU, {}});
   
-  auto args = {ManagedValue::forUnmanaged(temp->getAddress())};
+  auto args = {mv};
   
   auto emitApply = SGF.emitApplyOfLibraryIntrinsic(loc,
                                                    fn,
