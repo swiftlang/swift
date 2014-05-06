@@ -98,6 +98,10 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     Opts.PrintStats = true;
   }
 
+  if (Args.hasArg(OPT_print_clang_stats)) {
+    Opts.PrintClangStats = true;
+  }
+
   if (Args.hasArg(OPT_playground)) {
     Opts.Playground = true;
   }

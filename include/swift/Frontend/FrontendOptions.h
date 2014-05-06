@@ -155,6 +155,10 @@ public:
   /// termination.
   bool PrintStats = false;
 
+  /// Indicates whether or not the Clang importer should print statistics upon
+  /// termination.
+  bool PrintClangStats = false;
+
   /// Indicates whether the playground transformation should be applied.
   bool Playground = false;
 

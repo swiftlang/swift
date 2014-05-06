@@ -127,6 +127,11 @@ static bool performCompile(CompilerInstance &Instance,
   if (Context.hadError())
     return true;
 
+  // If we were asked to print Clang stats, do so.
+  if (Invocation.getFrontendOptions().PrintClangStats
+      && Context.getClangModuleLoader())
+    Context.getClangModuleLoader()->printStatistics();
+  
   // We've just been told to perform a parse, so we can return now.
   if (Action == FrontendOptions::Parse) {
     if (!opts.ObjCHeaderOutputPath.empty())

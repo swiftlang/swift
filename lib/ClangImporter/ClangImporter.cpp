@@ -34,6 +34,7 @@
 #include "clang/Basic/TargetInfo.h"
 #include "clang/Basic/Version.h"
 #include "clang/Frontend/FrontendActions.h"
+#include "clang/Serialization/ASTReader.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Parse/Parser.h"
 #include "clang/Sema/Lookup.h"
@@ -1750,6 +1751,10 @@ const clang::Module *ClangImporter::getClangOwningModule(ClangNode Node) const {
 
 std::string ClangImporter::getClangModuleHash() const {
   return Impl.Invocation->getModuleHash();
+}
+
+void ClangImporter::printStatistics() const {
+  Impl.Instance->getModuleManager()->PrintStats();
 }
 
 void ClangImporter::verifyAllModules() {

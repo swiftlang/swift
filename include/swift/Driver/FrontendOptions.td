@@ -139,6 +139,9 @@ def enable_source_import : Flag<["-"], "enable-source-import">,
 def print_stats : Flag<["-"], "print-stats">,
   HelpText<"Print various statistics">;
 
+def print_clang_stats : Flag<["-"], "print-clang-stats">,
+  HelpText<"Print Clang importer statistics">;
+
 def playground : Flag<["-"], "playground">,
   HelpText<"Apply the playground transformation">;
 

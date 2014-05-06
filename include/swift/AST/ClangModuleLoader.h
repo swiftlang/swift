@@ -26,6 +26,7 @@ class ClangModuleLoader : public ModuleLoader {
 public:
   virtual clang::ASTContext &getClangASTContext() const = 0;
   virtual clang::Preprocessor &getClangPreprocessor() const = 0;
+  virtual void printStatistics() const = 0;
 };
 
 } // namespace swift

@@ -138,6 +138,9 @@ public:
   clang::ASTContext &getClangASTContext() const override;
   clang::Preprocessor &getClangPreprocessor() const override;
   std::string getClangModuleHash() const;
+  
+  // Print statistics from the Clang AST reader.
+  void printStatistics() const override;
 };
 
 }
