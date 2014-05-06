@@ -2057,16 +2057,8 @@ StaticSpellingKind VarDecl::getCorrectStaticSpelling() const {
 static bool isObjCObjectOrBridgedType(Type type) {
   // FIXME: Bridged types info should be available here in the AST
   // library, rather than hard-coding them.
-  if (auto structTy = type->getAs<StructType>()) {
-    auto structDecl = structTy->getDecl();
-    const DeclContext *DC = structDecl->getDeclContext();
-    if (DC->isModuleScopeContext() && DC->getParentModule()->isStdlibModule()) {
-      if (structDecl->getName().str() == "String")
-        return true;
-    }
-   
-    return false;
-  }
+  if (auto structTy = type->getAs<StructType>())
+    return structTy->getDecl() == type->getASTContext().getStringDecl();
 
   // Unwrap metatypes for remaining checks.
   bool allowExistential = true;
