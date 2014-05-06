@@ -34,6 +34,7 @@ namespace {
     SILValue
     visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *UCCI);
     SILValue visitUncheckedRefCastInst(UncheckedRefCastInst *OPRI);
+    SILValue visitUncheckedAddrCastInst(UncheckedAddrCastInst *UACI);
     SILValue visitStructInst(StructInst *SI);
     SILValue visitTupleInst(TupleInst *SI);
     SILValue visitApplyInst(ApplyInst *AI);
@@ -225,6 +226,25 @@ visitUncheckedRefCastInst(UncheckedRefCastInst *OPRI) {
   if (auto *UI = dyn_cast<UpcastInst>(OPRI->getOperand()))
     if (UI->getOperand().getType() == OPRI->getType())
       return UI->getOperand();
+
+  // (unchecked-ref-cast X->X x) -> x
+  if (OPRI->getOperand().getType() == OPRI->getType())
+    return OPRI->getOperand();
+
+  return SILValue();
+}
+
+SILValue
+InstSimplifier::
+visitUncheckedAddrCastInst(UncheckedAddrCastInst *UACI) {
+  // (unchecked-addr-cast Y->X (unchecked-addr-cast x X->Y)) -> x
+  if (auto *OtherUACI = dyn_cast<UncheckedAddrCastInst>(&*UACI->getOperand()))
+    if (OtherUACI->getOperand().getType() == UACI->getType())
+      return OtherUACI->getOperand();
+
+  // (unchecked-addr-cast X->X x) -> x
+  if (UACI->getOperand().getType() == UACI->getType())
+    return UACI->getOperand();
 
   return SILValue();
 }

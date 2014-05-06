@@ -1140,3 +1140,17 @@ bb0(%0 : $*E, %1 : $E, %2 : $*B):
   store %5 to %2 : $*B
   return %4 : $B
 }
+
+// CHECK-LABEL: sil @dont_form_upcast_when_casts_are_identity : $@thin (@inout E, E, @inout E) -> E {
+// CHECK: bb0
+// CHECK-NEXT: load
+// CHECK-NEXT: store
+// CHECK-NEXT: return
+sil @dont_form_upcast_when_casts_are_identity : $@thin (@inout E, E, @inout E) -> E {
+bb0(%0 : $*E, %1 : $E, %2 : $*E):
+  %3 = unchecked_addr_cast %0 : $*E to $*E
+  %4 = unchecked_ref_cast %1 : $E to $E
+  %5 = load %3 : $*E
+  store %5 to %2 : $*E
+  return %4 : $E
+}
