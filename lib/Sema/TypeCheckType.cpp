@@ -2239,5 +2239,13 @@ void TypeChecker::fillObjCRepresentableTypeCache(const DeclContext *DC) {
     StdlibTypeNames.push_back(Context.getIdentifier("ObjCBool"));
     lookupLibraryTypes(*this, ObjCModule, StdlibTypeNames, ObjCMappedTypes);
   }
+
+  Identifier ID_Foundation = Context.getIdentifier(FOUNDATION_MODULE_NAME);
+  if (auto FoundationModule = Context.getLoadedModule(ID_Foundation)) {
+    StdlibTypeNames.clear();
+    StdlibTypeNames.push_back(Context.getIdentifier("NSZone"));
+    lookupLibraryTypes(*this, FoundationModule, StdlibTypeNames,
+                       ObjCMappedTypes);
+  }
 }
 

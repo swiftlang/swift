@@ -35,7 +35,11 @@ class ObjCPrinter : private DeclVisitor<ObjCPrinter>,
   friend TypeVisitor;
 
   llvm::DenseMap<std::pair<Identifier, Identifier>, StringRef> specialNames;
+  Identifier cConstPointerID;
+  Identifier cMutablePointerID;
+  Identifier objcMutablePointerID;
   Identifier unsafePointerID;
+  Identifier unmanagedID;
 
   ASTContext &ctx;
   raw_ostream &os;
@@ -350,11 +354,17 @@ private:
       MAP(UInt, "NSUInteger");
       MAP(Bool, "BOOL");
       MAP(String, "NSString *");
+
       MAP(COpaquePointer, "void *");
+      MAP(CMutableVoidPointer, "void *");
+      MAP(CConstVoidPointer, "void const *");
 
       Identifier ID_ObjectiveC = ctx.getIdentifier(OBJC_MODULE_NAME);
       specialNames[{ID_ObjectiveC, ctx.getIdentifier("ObjCBool")}] = "BOOL";
       specialNames[{ID_ObjectiveC, ctx.getIdentifier("Selector")}] = "SEL";
+
+      Identifier ID_Foundation = ctx.getIdentifier(FOUNDATION_MODULE_NAME);
+      specialNames[{ID_Foundation, ctx.getIdentifier("NSZone")}] = "NSZone *";
     }
 
     auto iter = specialNames.find({moduleName, name});
@@ -406,14 +416,31 @@ private:
       return true;
     }
 
-    if (unsafePointerID.empty())
+    // Everything from here on is some kind of pointer type.
+    if (unsafePointerID.empty()) {
+      cConstPointerID = ctx.getIdentifier("CConstPointer");
+      cMutablePointerID = ctx.getIdentifier("CMutablePointer");
+      objcMutablePointerID = ctx.getIdentifier("ObjCMutablePointer");
       unsafePointerID = ctx.getIdentifier("UnsafePointer");
-    if (SD->getName() != unsafePointerID)
+    }
+
+    bool isConst;
+    if (SD->getName() == cConstPointerID) {
+      isConst = true;
+    } else if (SD->getName() == cMutablePointerID ||
+               SD->getName() == objcMutablePointerID ||
+               SD->getName() == unsafePointerID) {
+      isConst = false;
+    } else {
+      // Not a pointer.
       return false;
+    }
 
     auto args = BGT->getGenericArgs();
     assert(args.size() == 1);
     visitPart(args.front());
+    if (isConst)
+      os << " const";
     os << " *";
     return true;
   }
