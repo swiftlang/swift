@@ -13,6 +13,13 @@ enum FakeOptional<T> {
   case Some(T)
 }
 
+struct StringData {
+  var size: Builtin.Word
+}
+
+class B { }
+class E : B { }
+
 //////////////////////
 // Simple DCE Tests //
 //////////////////////
@@ -103,9 +110,6 @@ bb2:
 //////////////////////////////////////////////////////////
 // Other DCE Tests taken from dead_code_elimination.sil //
 //////////////////////////////////////////////////////////
-
-class B { }
-class E : B { }
 
 sil @exit : $@thin @noreturn () -> () {
 bb0:
@@ -389,10 +393,6 @@ bb0(%0 : $*Builtin.Word, %1 : $Builtin.RawPointer):
   %3 = pointer_to_address %2 : $Builtin.RawPointer to $*Int32
   %4 = load %3 : $*Int32
   return %4 : $Int32
-}
-
-struct StringData {
-  var size: Builtin.Word
 }
 
 // CHECK-LABEL: sil @sil_extract_of_string
@@ -1102,4 +1102,16 @@ bb1:
 
 bb2:
   unreachable
+}
+
+
+sil @weird_function : $@thin (@inout E, E, Builtin.Int1) -> ()
+
+sil @convert_function_simplification : $@thin (@inout B, B, Builtin.Int1) -> () {
+bb0(%0 : $*B, %1 : $B, %2 : $Builtin.Int1):
+  %3 = function_ref @weird_function : $@thin (@inout E, E, Builtin.Int1) -> ()
+  %4 = convert_function %3 : $@thin (@inout E, E, Builtin.Int1) -> () to $@thin (@inout B, B, Builtin.Int1) -> ()
+  %5 = apply %4(%0, %1, %2) : $@thin (@inout B, B, Builtin.Int1) -> ()
+  %6 = tuple()
+  return %6 : $()
 }

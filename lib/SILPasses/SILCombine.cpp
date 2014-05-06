@@ -280,6 +280,8 @@ public:
   SILInstruction *optimizeBuiltinCanBeObjCClass(ApplyInst *AI);
   SILInstruction *optimizeApplyOfPartialApply(ApplyInst *AI,
                                               PartialApplyInst *PAI);
+  SILInstruction *optimizeApplyOfConvertFunctionInst(ApplyInst *AI,
+                                                     ConvertFunctionInst *CFI);
 
 private:
   /// Perform one SILCombine iteration.
@@ -837,6 +839,66 @@ SILInstruction *SILCombiner::optimizeBuiltinCanBeObjCClass(ApplyInst *AI) {
   }
 }
 
+SILInstruction *
+SILCombiner::optimizeApplyOfConvertFunctionInst(ApplyInst *AI,
+                                                ConvertFunctionInst *CFI) {
+  // We only handle simplification of static function references. If we don't
+  // have one, bail.
+  FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(CFI->getOperand());
+  if (!FRI)
+    return nullptr;
+
+  // Grab our relevant callee types...
+  CanSILFunctionType SubstCalleeTy = AI->getSubstCalleeType();
+  auto ConvertCalleeTy =
+      CFI->getOperand().getType().castTo<SILFunctionType>();
+
+  // ... and make sure they have no unsubstituted generics. If they do, bail.
+  if (hasUnboundGenericTypes(SubstCalleeTy) ||
+      hasUnboundGenericTypes(ConvertCalleeTy))
+    return nullptr;
+
+  // Ok, we can now perform our transformation. Grab AI's operands and the
+  // relevant types from the ConvertFunction function type and AI.
+  OperandValueArrayRef Ops = AI->getArgumentsWithoutIndirectResult();
+  auto OldOpTypes = SubstCalleeTy->getInterfaceParameterSILTypes();
+  auto NewOpTypes = ConvertCalleeTy->getInterfaceParameterSILTypes();
+
+  assert(Ops.size() == OldOpTypes.size() &&
+         "Ops and op types must have same size.");
+  assert(Ops.size() == NewOpTypes.size() &&
+         "Ops and op types must have same size.");
+
+  llvm::SmallVector<SILValue, 8> Args;
+  for (unsigned i = 0, e = Ops.size(); i != e; ++i) {
+    SILValue Op = Ops[i];
+    SILType OldOpType = OldOpTypes[i];
+    SILType NewOpType = NewOpTypes[i];
+
+    // Convert function takes refs to refs, address to addresses, and leaves
+    // other types alone.
+    if (OldOpType.isAddress()) {
+      assert(NewOpType.isAddress() && "Addresses should map to addresses.");
+      Args.push_back(Builder->createUncheckedAddrCast(AI->getLoc(),
+                                                      Op, NewOpType));
+    } else if (OldOpType.isHeapObjectReferenceType()) {
+      assert(NewOpType.isHeapObjectReferenceType() &&
+             "refs should map to refs.");
+      Args.push_back(Builder->createUncheckedRefCast(AI->getLoc(),
+                                                     Op, NewOpType));
+    } else {
+      Args.push_back(Op);
+    }
+  }  
+
+  SILType CCSILTy = SILType::getPrimitiveObjectType(ConvertCalleeTy);
+  // Create the new apply inst.
+  return ApplyInst::create(AI->getLoc(), FRI, CCSILTy,
+                           ConvertCalleeTy->getSILInterfaceResult(),
+                           ArrayRef<Substitution>(), Args, false,
+                           *FRI->getReferencedFunction());
+}
+
 SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
   // Optimize apply{partial_apply(x,y)}(z) -> apply(z,x,y).
   if (auto *PAI = dyn_cast<PartialApplyInst>(AI->getCallee()))
@@ -845,6 +907,9 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
   if (auto *BFRI = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee()))
     if (BFRI->getBuiltinInfo().ID == BuiltinValueKind::CanBeObjCClass)
       return optimizeBuiltinCanBeObjCClass(AI);
+
+  if (auto *CFI = dyn_cast<ConvertFunctionInst>(AI->getCallee()))
+    return optimizeApplyOfConvertFunctionInst(AI, CFI);
 
   return nullptr;
 }

@@ -116,3 +116,15 @@ ArrayRef<Substitution> SILType::gatherAllSubstitutions(SILModule &M) {
   return getSwiftRValueType()->gatherAllSubstitutions(M.getSwiftModule(),
                                                       nullptr);
 }
+
+bool SILType::isHeapObjectReferenceType() const {
+  auto &C = getASTContext();
+  if (getSwiftRValueType()->mayHaveSuperclass())
+    return true;
+  if (getSwiftRValueType()->isEqual(C.TheNativeObjectType))
+    return true;
+  if (getSwiftRValueType()->isEqual(C.TheUnknownObjectType))
+    return true;
+  // TODO: AnyObject type, @objc-only existentials in general
+  return false;
+}

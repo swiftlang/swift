@@ -1582,26 +1582,14 @@ public:
             "address-to-pointer result type must be RawPointer");
   }
   
-  bool isHeapObjectReferenceType(SILType silTy) {
-    auto &C = silTy.getASTContext();
-    if (silTy.getSwiftRValueType()->mayHaveSuperclass())
-      return true;
-    if (silTy.getSwiftRValueType()->isEqual(C.TheNativeObjectType))
-      return true;
-    if (silTy.getSwiftRValueType()->isEqual(C.TheUnknownObjectType))
-      return true;
-    // TODO: AnyObject type, @objc-only existentials in general
-    return false;
-  }
-
   void checkUncheckedRefCastInst(UncheckedRefCastInst *AI) {
     require(AI->getOperand().getType().isObject(),
             "unchecked_ref_cast operand must be a value");
-    require(isHeapObjectReferenceType(AI->getOperand().getType()),
+    require(AI->getOperand().getType().isHeapObjectReferenceType(),
             "unchecked_ref_cast operand must be a heap object reference");
     require(AI->getType().isObject(),
             "unchecked_ref_cast result must be an object");
-    require(isHeapObjectReferenceType(AI->getType()),
+    require(AI->getType().isHeapObjectReferenceType(),
             "unchecked_ref_cast result must be a heap object reference");
   }
   

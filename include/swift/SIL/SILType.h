@@ -355,6 +355,9 @@ public:
   /// generate it.
   ArrayRef<Substitution> gatherAllSubstitutions(SILModule &M);
 
+  /// Return true if this type references a "ref" type.
+  bool isHeapObjectReferenceType() const;
+
   //
   // Accessors for types used in SIL instructions:
   //
