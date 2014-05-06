@@ -87,16 +87,20 @@ public:
   bool isNot(tok K) const { return Kind != K; }
 
   // Predicates to check to see if the token is any of a list of tokens.
-  bool isAny(tok K1, tok K2) const {
-    return Kind == K1 || Kind == K2;
+
+  bool isAny(tok K1) const {
+    return is(K1);
   }
-  bool isAny(tok K1, tok K2, tok K3) const {
-    return Kind == K1 || Kind == K2 || Kind == K3;
+  template <typename ...T>
+  bool isAny(tok K1, tok K2, T... K) const {
+    if (is(K1))
+      return true;
+    return isAny(K2, K...);
   }
 
   // Predicates to check to see if the token is not the same as any of a list.
-  bool isNotAny(tok K1, tok K2) const { return !isAny(K1, K2); }
-  bool isNotAny(tok K1, tok K2, tok K3) const { return !isAny(K1, K2, K3); }
+  template <typename ...T>
+  bool isNotAny(tok K1, T... K) const { return !isAny(K1, K...); }
 
   bool isAnyOperator() const {
     return Kind == tok::oper_binary ||
