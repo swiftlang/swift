@@ -269,17 +269,19 @@ Bridging From Objective-C
   O(1)
 
 * ``NSArray`` and ``Array<AnyObject>`` can be *explicitly* converted
-  to ``Array<T>?`` using ``a as Array<T>``.  There are several cases,
-  all O(1):
+  to ``Array<T>?`` using ``a as Array<T>``.  There are several cases:
 
-  - If ``T`` is not *bridged*, conversion fails, yielding nil
+  - If ``T`` is not *bridged*, conversion fails in O(1), yielding nil
 
   - If the ``NSArray`` was originally created as a Swift *ArrayType*\
-    ``<U>``, conversion succeeds if ``U`` is ``T`` or a subclass
+    ``<U>``, conversion succeeds in O(1) if ``U`` is ``T`` or a subclass
     thereof. No further dynamic type checks are required.
 
-  - Otherwise, conversion succeeds, but type-checking of elements is
-    deferred and on-demand.  The result of subscripting is the result
-    of *bridging back* the corresponding stored ``NSArray`` element to
-    ``T``.  Failure to *bridge back* is a fatal error detected at
-    runtime.
+  - Otherwise, if ``T`` is a class or existential type, conversion
+    succeeds in O(1), but type-checking of elements is deferred and
+    on-demand.  The result of subscripting is the result of *bridging
+    back* the corresponding stored ``NSArray`` element to ``T``.
+    Failure to *bridge back* is a fatal error detected at runtime.
+
+  - Otherwise, conversion is O(N), and succeeds iff every element
+    *bridges back* to ``T``.
