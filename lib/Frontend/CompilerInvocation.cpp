@@ -518,9 +518,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.EnableExperimentalPatterns = true;
   }
 
-  if (Args.hasArg(OPT_import_cf_types)) {
-    Opts.ImportCFTypes = true;
-  }
+  Opts.ImportCFTypes = true;
 
   if (Args.hasArg(OPT_debug_constraints)) {
     Opts.DebugConstraintSolver = true;
