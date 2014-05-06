@@ -5129,15 +5129,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
 }
 
 void TypeChecker::addImplicitDestructor(ClassDecl *CD) {
-  bool FoundDestructor = false;
-  for (auto Member : CD->getMembers()) {
-    if (isa<DestructorDecl>(Member)) {
-      FoundDestructor = true;
-      break;
-    }
-  }
-
-  if (FoundDestructor)
+  if (CD->hasDestructor())
     return;
 
   Pattern *selfPat = buildImplicitSelfParameter(CD->getLoc(), CD);
@@ -5153,6 +5145,7 @@ void TypeChecker::addImplicitDestructor(ClassDecl *CD) {
   // Create an empty body for the destructor.
   DD->setBody(BraceStmt::create(Context, CD->getLoc(), { }, CD->getLoc()));
   CD->addMember(DD);
+  CD->setHasDestructor();
 }
 
 void TypeChecker::addImplicitStructConformances(StructDecl *SD) {

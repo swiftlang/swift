@@ -2161,6 +2161,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     theClass->setProtocols(protocols);
 
     theClass->setMemberLoader(this, DeclTypeCursor.GetCurrentBitNo());
+    theClass->setHasDestructor();
     skipRecord(DeclTypeCursor, decls_block::DECL_CONTEXT);
     theClass->setConformanceLoader(this, DeclTypeCursor.GetCurrentBitNo());
 

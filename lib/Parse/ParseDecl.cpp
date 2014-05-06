@@ -3278,8 +3278,11 @@ ParserResult<ClassDecl> Parser::parseDeclClass(SourceLoc ClassLoc,
   }
 
   CD->setBraces({LBLoc, RBLoc});
-  for (auto member : MemberDecls)
+  for (auto member : MemberDecls) {
     CD->addMember(member);
+    if (isa<DestructorDecl>(member))
+      CD->setHasDestructor();
+  }
 
   addToScope(CD);
 

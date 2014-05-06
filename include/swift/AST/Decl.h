@@ -478,8 +478,15 @@ class alignas(8) Decl {
 
     /// Whether this class is "foreign".
     unsigned Foreign : 1;
+    
+    /// Whether this class contains a destructor decl.
+    ///
+    /// A fully type-checked class always contains a destructor member, even if
+    /// it is implicit. This bit is used during parsing and type-checking to
+    /// control inserting the implicit destructor.
+    unsigned HasDestructorDecl : 1;
   };
-  enum { NumClassDeclBits = NumNominalTypeDeclBits + 6 };
+  enum { NumClassDeclBits = NumNominalTypeDeclBits + 7 };
   static_assert(NumClassDeclBits <= 32, "fits in an unsigned");
 
   class EnumDeclBitfields {
@@ -2837,6 +2844,16 @@ public:
     ClassDeclBits.Foreign = true;
   }
 
+  /// True if the class has a destructor.
+  ///
+  /// Fully type-checked classes always contain destructors, but during parsing
+  /// or type-checking, the implicit destructor may not have been synthesized
+  /// yet if one was not explicitly declared.
+  bool hasDestructor() const { return ClassDeclBits.HasDestructorDecl; }
+
+  /// Set the 'has destructor' flag.
+  void setHasDestructor() { ClassDeclBits.HasDestructorDecl = 1; }
+  
   /// Retrieve the destructor for this class.
   DestructorDecl *getDestructor();
 

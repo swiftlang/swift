@@ -458,9 +458,6 @@ DeclRange IterableDeclContext::getMembers() const {
 
 /// Add a member to this context.
 void IterableDeclContext::addMember(Decl *member) {
-  // Make sure we've loaded any existing members.
-  loadAllMembers();
-
   // Add the member to the list of declarations without notification.
   addMemberSilently(member);
 
@@ -509,10 +506,6 @@ void IterableDeclContext::setLoader(LazyMemberLoader *loader,
 void IterableDeclContext::loadAllMembers() const {
   if (!isLazy())
     return;
-
-  // For now, we can't load members if other members have already been
-  // added. This isn't hard to support, but we don't need it yet.
-  assert(FirstDecl == nullptr && "Already added members");
 
   // Don't try to load all members re-entrant-ly.
   auto resolver = getLoader();
