@@ -42,31 +42,9 @@ STATISTIC(NumDevirtualized, "Number of calls devirtualzied");
 STATISTIC(NumDynApply, "Number of dynamic apply devirtualzied");
 STATISTIC(NumAMI, "Number of witness_method devirtualzied");
 
-namespace {
-struct SILDevirtualizer {
-  /// The SIL Module.
-  SILModule *M = nullptr;
-
-  bool Changed = false;
-
-  /// The instruction to be deleted.
-  SILInstruction *toBeDeleted = nullptr;
-
-  /// True if another round of specialization may help.
-  bool AttemptToSpecialize = false;
-
-  SILDevirtualizer(SILModule *M)
-    : M(M), Changed(false) {}
-
-  void optimizeApplyInst(ApplyInst *Inst);
-  bool optimizeWitnessMethod(ApplyInst *AI, WitnessMethodInst *AMI);
-  bool optimizeProtocolMethod(ApplyInst *AI, ProtocolMethodInst *PMI);
-  bool optimizeClassMethod(ApplyInst *AI, ClassMethodInst *CMI);
-
-  bool run();
-};
-
-} // anonymous namespace.
+//===----------------------------------------------------------------------===//
+//                         Class Method Optimization
+//===----------------------------------------------------------------------===//
 
 /// Is this an instruction kind which allows us to conclude definitively what
 /// the class decls of its results are.
@@ -125,8 +103,7 @@ static ClassDecl *findClassDeclForOperand(SILValue S) {
 /// %YY = function_ref @...
 /// apply %YY(...)
 ///
-bool SILDevirtualizer::optimizeClassMethod(ApplyInst *AI,
-                                           ClassMethodInst *CMI) {
+static bool optimizeClassMethod(ApplyInst *AI, ClassMethodInst *CMI) {
   DEBUG(llvm::dbgs() << "    Trying to optimize : " << *CMI);
 
   // First attempt to lookup the origin for our class method. The origin should
@@ -263,101 +240,9 @@ bool SILDevirtualizer::optimizeClassMethod(ApplyInst *AI,
   return true;
 }
 
-/// \brief Scan the uses of the protocol object and return the initialization
-/// instruction, which can be copy_addr or init_existential.
-/// There needs to be only one initialization instruction and the
-/// object must not be captured by any instruction that may re-initialize it.
-static SILInstruction *
-findSingleInitNoCaptureProtocol(SILValue ProtocolObject) {
-  DEBUG(llvm::dbgs() << "        Checking if protocol object is captured: " << ProtocolObject);
-  SILInstruction *Init = 0;
-  for (auto UI = ProtocolObject->use_begin(), E = ProtocolObject->use_end();
-       UI != E; UI++) {
-    switch (UI.getUser()->getKind()) {
-    case ValueKind::CopyAddrInst: {
-      // If we are reading the content of the protocol (to initialize
-      // something else) then its okay.
-      if (cast<CopyAddrInst>(UI.getUser())->getSrc() == ProtocolObject)
-        continue;
-
-      // Fall through.
-      SWIFT_FALLTHROUGH;
-    }
-
-    case ValueKind::InitExistentialInst: {
-      // Make sure there is a single initialization:
-      if (Init) {
-        DEBUG(llvm::dbgs() << "            FAIL: Multiple Protocol initializers: "
-                           << *UI.getUser() << " and " << *Init);
-        return nullptr;
-      }
-      // This is the first initialization.
-      Init = UI.getUser();
-      continue;
-    }
-    case ValueKind::OpenExistentialInst:
-    case ValueKind::ProjectExistentialInst:
-    case ValueKind::ProtocolMethodInst:
-    case ValueKind::DeallocBoxInst:
-    case ValueKind::DeallocRefInst:
-    case ValueKind::DeallocStackInst:
-    case ValueKind::StrongReleaseInst:
-    case ValueKind::DestroyAddrInst:
-    case ValueKind::ReleaseValueInst:
-      continue;
-
-    // A thin apply inst that uses this object as a callee does not capture it.
-    case ValueKind::ApplyInst: {
-      auto *AI = cast<ApplyInst>(UI.getUser());
-      if (AI->isCalleeThin() && AI->getCallee() == ProtocolObject)
-        continue;
-
-      // Fallthrough
-      SWIFT_FALLTHROUGH;
-    }
-
-    default: {
-      DEBUG(llvm::dbgs() << "            FAIL: Protocol captured by: "
-                         << *UI.getUser());
-      return nullptr;
-    }
-    }
-  }
-  DEBUG(llvm::dbgs() << "            Protocol not captured.\n");
-  return Init;
-}
-
-/// \brief Replaces a virtual ApplyInst instruction with a new ApplyInst
-/// instruction that does not use a project_existential \p PEI and calls \p F
-/// directly. See visitApplyInst.
-static ApplyInst *replaceDynApplyWithStaticApply(ApplyInst *AI, SILFunction *F,
-                                                 ArrayRef<Substitution> Subs,
-                                                 InitExistentialInst *In,
-                                                 ProjectExistentialInst *PEI) {
-  // Creates a new FunctionRef Inst and inserts it to the basic block.
-  FunctionRefInst *FRI = new (AI->getModule()) FunctionRefInst(AI->getLoc(), F);
-  AI->getParent()->getInstList().insert(AI, FRI);
-  SmallVector<SILValue, 4> Args;
-
-  // Push all of the args and replace uses of PEI with the InitExistentional.
-  MutableArrayRef<Operand> OrigArgs = AI->getArgumentOperands();
-  for (unsigned i = 0; i < OrigArgs.size(); i++) {
-    SILValue A = OrigArgs[i].get();
-    Args.push_back(A.getDef() == PEI ? In : A);
-  }
-
-  // Create a new non-virtual ApplyInst.
-  SILType SubstFnTy = FRI->getType().substInterfaceGenericArgs(F->getModule(),
-                                                               Subs);
-  ApplyInst *SAI = ApplyInst::create(
-      AI->getLoc(), FRI, SubstFnTy,
-      SubstFnTy.castTo<SILFunctionType>()->getInterfaceResult().getSILType(),
-      Subs, Args, false, *F);
-  AI->getParent()->getInstList().insert(AI, SAI);
-  AI->replaceAllUsesWith(SAI);
-  AI->eraseFromParent();
-  return SAI;
-}
+//===----------------------------------------------------------------------===//
+//                        Witness Method Optimization
+//===----------------------------------------------------------------------===//
 
 namespace {
 
@@ -478,8 +363,7 @@ static bool optimizeInheritedConformanceWitnessMethod(ApplyInst *AI,
 ///   %8 = witness_method $Optional<UInt16>, #LogicValue.getLogicValue!1
 ///   %9 = apply %8<Self = CodeUnit?>(%6#1) : ...
 ///
-bool SILDevirtualizer::optimizeWitnessMethod(ApplyInst *AI,
-                                             WitnessMethodInst *AMI) {
+static bool optimizeWitnessMethod(ApplyInst *AI, WitnessMethodInst *AMI) {
   ProtocolConformance *C = AMI->getConformance();
   if (!C) {
     DEBUG(llvm::dbgs() << "        FAIL: Null conformance.\n");
@@ -521,6 +405,107 @@ bool SILDevirtualizer::optimizeWitnessMethod(ApplyInst *AI,
   return false;
 }
 
+//===----------------------------------------------------------------------===//
+//                        Protocol Method Optimization
+//===----------------------------------------------------------------------===//
+
+
+/// \brief Scan the uses of the protocol object and return the initialization
+/// instruction, which can be copy_addr or init_existential.
+/// There needs to be only one initialization instruction and the
+/// object must not be captured by any instruction that may re-initialize it.
+static SILInstruction *
+findSingleInitNoCaptureProtocol(SILValue ProtocolObject) {
+  DEBUG(llvm::dbgs() << "        Checking if protocol object is captured: " << ProtocolObject);
+  SILInstruction *Init = 0;
+  for (auto UI = ProtocolObject->use_begin(), E = ProtocolObject->use_end();
+       UI != E; UI++) {
+    switch (UI.getUser()->getKind()) {
+    case ValueKind::CopyAddrInst: {
+      // If we are reading the content of the protocol (to initialize
+      // something else) then its okay.
+      if (cast<CopyAddrInst>(UI.getUser())->getSrc() == ProtocolObject)
+        continue;
+
+      // Fall through.
+      SWIFT_FALLTHROUGH;
+    }
+
+    case ValueKind::InitExistentialInst: {
+      // Make sure there is a single initialization:
+      if (Init) {
+        DEBUG(llvm::dbgs() << "            FAIL: Multiple Protocol initializers: "
+                           << *UI.getUser() << " and " << *Init);
+        return nullptr;
+      }
+      // This is the first initialization.
+      Init = UI.getUser();
+      continue;
+    }
+    case ValueKind::OpenExistentialInst:
+    case ValueKind::ProjectExistentialInst:
+    case ValueKind::ProtocolMethodInst:
+    case ValueKind::DeallocBoxInst:
+    case ValueKind::DeallocRefInst:
+    case ValueKind::DeallocStackInst:
+    case ValueKind::StrongReleaseInst:
+    case ValueKind::DestroyAddrInst:
+    case ValueKind::ReleaseValueInst:
+      continue;
+
+    // A thin apply inst that uses this object as a callee does not capture it.
+    case ValueKind::ApplyInst: {
+      auto *AI = cast<ApplyInst>(UI.getUser());
+      if (AI->isCalleeThin() && AI->getCallee() == ProtocolObject)
+        continue;
+
+      // Fallthrough
+      SWIFT_FALLTHROUGH;
+    }
+
+    default: {
+      DEBUG(llvm::dbgs() << "            FAIL: Protocol captured by: "
+                         << *UI.getUser());
+      return nullptr;
+    }
+    }
+  }
+  DEBUG(llvm::dbgs() << "            Protocol not captured.\n");
+  return Init;
+}
+
+/// \brief Replaces a virtual ApplyInst instruction with a new ApplyInst
+/// instruction that does not use a project_existential \p PEI and calls \p F
+/// directly. See visitApplyInst.
+static ApplyInst *replaceDynApplyWithStaticApply(ApplyInst *AI, SILFunction *F,
+                                                 ArrayRef<Substitution> Subs,
+                                                 InitExistentialInst *In,
+                                                 ProjectExistentialInst *PEI) {
+  // Creates a new FunctionRef Inst and inserts it to the basic block.
+  FunctionRefInst *FRI = new (AI->getModule()) FunctionRefInst(AI->getLoc(), F);
+  AI->getParent()->getInstList().insert(AI, FRI);
+  SmallVector<SILValue, 4> Args;
+
+  // Push all of the args and replace uses of PEI with the InitExistentional.
+  MutableArrayRef<Operand> OrigArgs = AI->getArgumentOperands();
+  for (unsigned i = 0; i < OrigArgs.size(); i++) {
+    SILValue A = OrigArgs[i].get();
+    Args.push_back(A.getDef() == PEI ? In : A);
+  }
+
+  // Create a new non-virtual ApplyInst.
+  SILType SubstFnTy = FRI->getType().substInterfaceGenericArgs(F->getModule(),
+                                                               Subs);
+  ApplyInst *SAI = ApplyInst::create(
+      AI->getLoc(), FRI, SubstFnTy,
+      SubstFnTy.castTo<SILFunctionType>()->getInterfaceResult().getSILType(),
+      Subs, Args, false, *F);
+  AI->getParent()->getInstList().insert(AI, SAI);
+  AI->replaceAllUsesWith(SAI);
+  AI->eraseFromParent();
+  return SAI;
+}
+
 /// Devirtualize protocol_method + project_existential + init_existential
 /// instructions.  For example:
 ///
@@ -529,8 +514,7 @@ bool SILDevirtualizer::optimizeWitnessMethod(ApplyInst *AI,
 /// %4 = project_existential %0#1 : $*Pingable to $*@sil_self Pingable
 /// %5 = protocol_method %0#1 : $*Pingable, #Pingable.ping!1 :
 /// %8 = apply %5(ARGUMENTS ... , %4) :
-bool SILDevirtualizer::optimizeProtocolMethod(ApplyInst *AI,
-                                              ProtocolMethodInst *PMI) {
+static bool optimizeProtocolMethod(ApplyInst *AI, ProtocolMethodInst *PMI) {
   if (!PMI)
     return false;
 
@@ -603,7 +587,6 @@ bool SILDevirtualizer::optimizeProtocolMethod(ApplyInst *AI,
         replaceDynApplyWithStaticApply(AI, StaticRef, Subs, Init, PEI);
     DEBUG(llvm::dbgs() << "                To : " << *NewApply);
     NumDynApply++;
-    Changed = true;
     return true;
   }
 
@@ -612,7 +595,11 @@ bool SILDevirtualizer::optimizeProtocolMethod(ApplyInst *AI,
   return false;
 }
 
-void SILDevirtualizer::optimizeApplyInst(ApplyInst *AI) {
+//===----------------------------------------------------------------------===//
+//                              Top Level Driver
+//===----------------------------------------------------------------------===//
+
+static bool optimizeApplyInst(ApplyInst *AI) {
   DEBUG(llvm::dbgs() << "    Trying to optimize ApplyInst : " << *AI);
 
   // Devirtualize apply instructions that call witness_method instructions:
@@ -620,10 +607,8 @@ void SILDevirtualizer::optimizeApplyInst(ApplyInst *AI) {
   //   %8 = witness_method $Optional<UInt16>, #LogicValue.getLogicValue!1
   //   %9 = apply %8<Self = CodeUnit?>(%6#1) : ...
   //
-  if (auto *AMI = dyn_cast<WitnessMethodInst>(AI->getCallee())) {
-    Changed |= optimizeWitnessMethod(AI, AMI);
-    return;
-  }
+  if (auto *AMI = dyn_cast<WitnessMethodInst>(AI->getCallee()))
+    return optimizeWitnessMethod(AI, AMI);
 
   /// Optimize a class_method and alloc_ref pair into a direct function
   /// reference:
@@ -641,10 +626,8 @@ void SILDevirtualizer::optimizeApplyInst(ApplyInst *AI) {
   ///  into
   ///
   /// %YY = function_ref @...
-  if (auto *CMI = dyn_cast<ClassMethodInst>(AI->getCallee())) {
-    Changed |= optimizeClassMethod(AI, CMI);
-    return;
-  }
+  if (auto *CMI = dyn_cast<ClassMethodInst>(AI->getCallee()))
+    return optimizeClassMethod(AI, CMI);
 
   // Devirtualize protocol_method + project_existential + init_existential
   // instructions.  For example:
@@ -656,41 +639,41 @@ void SILDevirtualizer::optimizeApplyInst(ApplyInst *AI) {
   // %8 = apply %5(ARGUMENTS ... , %4) :
   ProtocolMethodInst *PMI = dyn_cast<ProtocolMethodInst>(AI->getCallee());
   if (!PMI)
-    return;
-  Changed |= optimizeProtocolMethod(AI, PMI);
-}
-
-bool SILDevirtualizer::run() {
-  // Perform devirtualization locally and compute potential polymorphic
-  // arguments for all existing functions.
-  for (auto &F : *M) {
-    DEBUG(llvm::dbgs() << "*** Devirtualizing Function: "
-                       << Demangle::demangleSymbolAsString(F.getName())
-                       << "\n");
-    for (auto &BB : F) {
-      for (auto II = BB.begin(), IE = BB.end(); II != IE;) {
-        SILInstruction *Inst = &*II;
-        ++II;
-        if (ApplyInst *AI = dyn_cast<ApplyInst>(Inst))
-          optimizeApplyInst(AI);
-      }
-    }
-
-    DEBUG(llvm::dbgs() << "\n");
-  }
-
-  return Changed;
+    return false;
+  return optimizeProtocolMethod(AI, PMI);
 }
 
 namespace {
+
 class SILDevirtualizationPass : public SILModuleTransform {
 public:
   virtual ~SILDevirtualizationPass() {}
 
   /// The entry point to the transformation.
   virtual void run() {
-    SILDevirtualizer DevirtImpl(getModule());
-    bool Changed = DevirtImpl.run();
+
+    bool Changed = false;
+
+    // Perform devirtualization locally and compute potential polymorphic
+    // arguments for all existing functions.
+    for (auto &F : *getModule()) {
+      DEBUG(llvm::dbgs() << "*** Devirtualizing Function: "
+                       << Demangle::demangleSymbolAsString(F.getName())
+                       << "\n");
+      for (auto &BB : F) {
+        for (auto II = BB.begin(), IE = BB.end(); II != IE;) {
+          ApplyInst *AI = dyn_cast<ApplyInst>(&*II);
+          ++II;
+
+          if (!AI)
+            continue;
+
+          Changed |= optimizeApplyInst(AI);
+        }
+      }
+      DEBUG(llvm::dbgs() << "\n");
+    }
+
     if (Changed) {
       PM->scheduleAnotherIteration();
       invalidateAnalysis(SILAnalysis::InvalidationKind::CallGraph);
@@ -699,6 +682,7 @@ public:
 
   StringRef getName() override { return "Devirtualization"; }
 };
+
 } // end anonymous namespace
 
 
