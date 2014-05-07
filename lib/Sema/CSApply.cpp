@@ -1726,7 +1726,7 @@ namespace {
         // If this is an application of a value type method, arrange for us to
         // check that it gets fully applied.
         FuncDecl *fn = nullptr;
-        unsigned kind;
+        Optional<unsigned> kind;
         if (auto apply = dyn_cast<ApplyExpr>(member)) {
           auto selfTy = apply->getArg()->getType()->getRValueType();
           auto fnDeclRef = dyn_cast<DeclRefExpr>(apply->getFn());
@@ -1757,7 +1757,7 @@ namespace {
           InvalidPartialApplications.insert({
             member,
             // We need to apply all of the non-self argument clauses.
-            {fn->getNaturalArgumentCount() - 1, kind},
+            {fn->getNaturalArgumentCount() - 1, kind.getValue() },
           });
 
       not_value_type_member:
