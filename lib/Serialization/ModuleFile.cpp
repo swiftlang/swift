@@ -17,6 +17,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/Range.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Serialization/BCReadingExtras.h"
 
 #include "llvm/ADT/StringExtras.h"
@@ -591,6 +592,12 @@ ModuleFile::ModuleFile(
           // else ignore the dependency...it'll show up as a linker error.
           break;
         }
+        case input_block::IMPORTED_HEADER: {
+          bool exported;
+          input_block::ImportedHeaderLayout::readRecord(scratch, exported);
+          Dependencies.push_back(Dependency::forHeader(blobData, exported));
+          break;
+        }
         default:
           // Unknown input kind, possibly for use by a future version of the
           // module format.
@@ -768,8 +775,17 @@ bool ModuleFile::associateWithFileContext(FileUnit *file) {
   for (auto &dependency : Dependencies) {
     assert(!dependency.isLoaded() && "already loaded?");
 
+    if (dependency.isHeader()) {
+      auto clangImporter =
+        static_cast<ClangImporter *>(ctx.getClangModuleLoader());
+      clangImporter->importHeader(dependency.RawPath, file->getParentModule());
+      Module *importedHeaderModule = clangImporter->getImportedHeaderModule();
+      dependency.Import = { {}, importedHeaderModule };
+      continue;
+    }
+
     StringRef modulePath, scopePath;
-    std::tie(modulePath, scopePath) = dependency.RawAccessPath.split('\0');
+    std::tie(modulePath, scopePath) = dependency.RawPath.split('\0');
 
     auto moduleID = ctx.getIdentifier(modulePath);
     assert(!moduleID.empty() &&
@@ -879,7 +895,7 @@ void ModuleFile::getImportedModules(
 
   for (auto &dep : Dependencies) {
     if (filter != Module::ImportFilter::All &&
-        (filter == Module::ImportFilter::Public) ^ dep.IsExported)
+        (filter == Module::ImportFilter::Public) ^ dep.isExported())
       continue;
     assert(dep.isLoaded());
     results.push_back(dep.Import);
@@ -890,8 +906,6 @@ void ModuleFile::getImportedModules(
       includeShadowedModule = false;
   }
 
-  // Make sure to go through getModule() instead of accessing ShadowedModule
-  // directly, to force loading it.
   if (includeShadowedModule)
     results.push_back({ {}, ShadowedModule });
 }
@@ -900,8 +914,13 @@ void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
   if (!Bits.ComputedImportDecls) {
     ASTContext &Ctx = getContext();
     for (auto &Dep : Dependencies) {
+      // FIXME: We need a better way to show headers, since they usually /are/
+      // re-exported. This isn't likely to come up much, though.
+      if (Dep.isHeader())
+        continue;
+
       StringRef ModulePath, ScopePath;
-      std::tie(ModulePath, ScopePath) = Dep.RawAccessPath.split('\0');
+      std::tie(ModulePath, ScopePath) = Dep.RawPath.split('\0');
 
       auto ModuleID = Ctx.getIdentifier(ModulePath);
       assert(!ModuleID.empty() &&
@@ -940,7 +959,7 @@ void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
 
       auto *ID = ImportDecl::create(Ctx, FileContext, SourceLoc(), Kind,
                                     SourceLoc(), AccessPath);
-      if (Dep.IsExported)
+      if (Dep.isExported())
         ID->getMutableAttrs().add(
             new (Ctx) ExportedAttr(/*IsImplicit=*/false));
       ImportDecls.push_back(ID);

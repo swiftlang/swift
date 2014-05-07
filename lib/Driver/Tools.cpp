@@ -99,6 +99,7 @@ static void addCommonFrontendArgs(const ToolChain &TC,
   inputArgs.AddLastArg(arguments, options::OPT_resource_dir);
   inputArgs.AddLastArg(arguments, options::OPT_module_cache_path);
   inputArgs.AddLastArg(arguments, options::OPT_enable_app_extension);
+  inputArgs.AddLastArg(arguments, options::OPT_import_objc_header);
 
   // Pass through the values passed to -Xfrontend.
   inputArgs.AddAllArgValues(arguments, options::OPT_Xfrontend);
@@ -261,7 +262,6 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
 
   Args.AddLastArg(Arguments, options::OPT_module_link_name);
   Args.AddLastArg(Arguments, options::OPT_import_underlying_module);
-  Args.AddLastArg(Arguments, options::OPT_import_objc_header);
 
   Args.AddLastArg(Arguments, options::OPT_split_objc_selectors);
   Args.AddLastArg(Arguments, options::OPT_implicit_objc_with);

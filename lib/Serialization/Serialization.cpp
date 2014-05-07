@@ -24,6 +24,7 @@
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Serialization/BCRecordLayout.h"
 
 #include "llvm/ADT/SmallString.h"
@@ -254,6 +255,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(input_block, SOURCE_FILE);
   BLOCK_RECORD(input_block, IMPORTED_MODULE);
   BLOCK_RECORD(input_block, LINK_LIBRARY);
+  BLOCK_RECORD(input_block, IMPORTED_HEADER);
 
   BLOCK(DECLS_AND_TYPES_BLOCK);
 #define RECORD(X) BLOCK_RECORD(decls_block, X);
@@ -417,11 +419,13 @@ static void flattenImportPath(const Module::ImportedModule &import,
 }
 
 void Serializer::writeInputFiles(FilenamesTy inputFiles,
-                                 StringRef moduleLinkName) {
+                                 StringRef moduleLinkName,
+                                 StringRef importedHeader) {
   BCBlockRAII restoreBlock(Out, INPUT_BLOCK_ID, 3);
   input_block::SourceFileLayout SourceFile(Out);
   input_block::ImportedModuleLayout ImportedModule(Out);
   input_block::LinkLibraryLayout LinkLibrary(Out);
+  input_block::ImportedHeaderLayout ImportedHeader(Out);
 
   for (auto filename : inputFiles) {
     llvm::SmallString<128> path(filename);
@@ -448,9 +452,20 @@ void Serializer::writeInputFiles(FilenamesTy inputFiles,
   publicImportSet.insert(publicImports.begin(), publicImports.end());
 
   removeDuplicateImports(allImports);
+  auto clangImporter =
+    static_cast<ClangImporter *>(M->Ctx.getClangModuleLoader());
+  Module *importedHeaderModule = clangImporter->getImportedHeaderModule();
+  Module *theBuiltinModule = M->Ctx.TheBuiltinModule;
   for (auto import : allImports) {
-    if (import.second == M->Ctx.TheBuiltinModule)
+    if (import.second == theBuiltinModule)
       continue;
+
+    if (import.second == importedHeaderModule) {
+      assert(!importedHeader.empty());
+      ImportedHeader.emit(ScratchRecord, publicImportSet.count(import),
+                          importedHeader);
+      continue;
+    }
 
     ImportPathBlob importPath;
     flattenImportPath(import, importPath);
@@ -2821,7 +2836,8 @@ Serializer::Serializer(const unsigned char (&signature)[N],
 void Serializer::writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
                                const SILModule *SILMod, bool serializeAllSIL,
                                FilenamesTy inputFiles,
-                               StringRef moduleLinkName) {
+                               StringRef moduleLinkName,
+                               StringRef importedHeader) {
   Serializer S{MODULE_SIGNATURE, DC};
 
   // FIXME: This is only really needed for debugging. We don't actually use it.
@@ -2830,7 +2846,7 @@ void Serializer::writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
   {
     BCBlockRAII moduleBlock(S.Out, MODULE_BLOCK_ID, 2);
     S.writeHeader();
-    S.writeInputFiles(inputFiles, moduleLinkName);
+    S.writeInputFiles(inputFiles, moduleLinkName, importedHeader);
     S.writeSIL(SILMod, serializeAllSIL);
     S.writeAST(DC);
   }
@@ -2861,7 +2877,8 @@ void Serializer::writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC) {
 void swift::serialize(ModuleOrSourceFile DC, const char *outputPath,
                       const char *docOutputPath,
                       const SILModule *M, bool serializeAllSIL,
-                      FilenamesTy inputFiles, StringRef moduleLinkName) {
+                      FilenamesTy inputFiles, StringRef moduleLinkName,
+                      StringRef importedHeader) {
   assert(outputPath && outputPath[0] != '\0');
 
   std::string errorInfo;
@@ -2875,7 +2892,7 @@ void swift::serialize(ModuleOrSourceFile DC, const char *outputPath,
   }
 
   Serializer::writeToStream(out, DC, M, serializeAllSIL, inputFiles,
-                            moduleLinkName);
+                            moduleLinkName, importedHeader);
 
   if (docOutputPath && docOutputPath[0] != '\0') {
     std::string errorInfo;

@@ -75,16 +75,30 @@ public:
   /// Represents another module that has been imported as a dependency.
   class Dependency {
   public:
-    Module::ImportedModule Import;
-    StringRef RawAccessPath;
-    bool IsExported;
+    Module::ImportedModule Import = {};
+    const StringRef RawPath;
 
-    Dependency(StringRef path, bool Exported)
-      : Import(), RawAccessPath(path), IsExported(Exported) {}
+  private:
+    const unsigned IsExported : 1;
+    const unsigned IsHeader : 1;
+
+    Dependency(StringRef path, bool exported, bool isHeader)
+      : RawPath(path), IsExported(exported), IsHeader(isHeader){}
+
+  public:
+    Dependency(StringRef path, bool exported)
+      : Dependency(path, exported, false) {}
+
+    static Dependency forHeader(StringRef headerPath, bool exported) {
+      return Dependency(headerPath, exported, true);
+    }
 
     bool isLoaded() const {
       return Import.second != nullptr;
     }
+
+    bool isExported() const { return IsExported; }
+    bool isHeader() const { return IsHeader; }
   };
 
 private:

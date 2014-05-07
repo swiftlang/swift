@@ -224,9 +224,9 @@ FileUnit *SerializedModuleLoader::loadAST(
                loadedModuleFile->getDependencies().end(),
                std::back_inserter(missing),
                [&duplicates](const ModuleFile::Dependency &dependency) -> bool {
-    if (dependency.isLoaded())
+    if (dependency.isLoaded() || dependency.isHeader())
       return false;
-    bool &seen = duplicates[dependency.RawAccessPath];
+    bool &seen = duplicates[dependency.RawPath];
     if (seen)
       return false;
     seen = true;
@@ -237,13 +237,13 @@ FileUnit *SerializedModuleLoader::loadAST(
   assert(!missing.empty() && "unknown missing dependency?");
   if (missing.size() == 1) {
     Ctx.Diags.diagnose(*diagLoc, diag::serialization_missing_single_dependency,
-                       missing.begin()->RawAccessPath);
+                       missing.begin()->RawPath);
   } else {
     llvm::SmallString<64> missingNames;
     missingNames += '\'';
     interleave(missing,
                [&](const ModuleFile::Dependency &next) {
-                 missingNames += next.RawAccessPath;
+                 missingNames += next.RawPath;
                },
                [&] { missingNames += "', '"; });
     missingNames += '\'';

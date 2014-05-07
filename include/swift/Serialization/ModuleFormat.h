@@ -40,7 +40,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// Serialized module format minor version number.
 ///
 /// When the format changes IN ANY WAY, this number should be incremented.
-const uint16_t VERSION_MINOR = 89;
+const uint16_t VERSION_MINOR = 90;
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -329,7 +329,8 @@ namespace input_block {
   enum {
     SOURCE_FILE = 1,
     IMPORTED_MODULE,
-    LINK_LIBRARY
+    LINK_LIBRARY,
+    IMPORTED_HEADER
   };
 
   using SourceFileLayout = BCRecordLayout<
@@ -347,6 +348,12 @@ namespace input_block {
     LINK_LIBRARY,
     LibraryKindField, // kind
     BCBlob // library name
+  >;
+
+  using ImportedHeaderLayout = BCRecordLayout<
+    IMPORTED_HEADER,
+    BCFixed<1>, // exported?
+    BCBlob // a header path suitable for #import
   >;
 }
 
