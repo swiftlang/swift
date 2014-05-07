@@ -115,6 +115,15 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
     }
   }
 
+  const unsigned CallsToCalleeThreshold = 1024;
+  // Calculate how many times a callee is called from this caller.
+  llvm::DenseMap<SILFunction *, unsigned> CalleeCount; 
+  for (auto AI : CallSites) {
+    SILFunction *Callee = getInlinableFunction(AI, Mode);
+    if (Callee)
+      CalleeCount[Callee]++;
+  }
+
   for (auto AI : CallSites) {
     DEBUG(llvm::dbgs() << "    Found call site:" <<  *AI);
 
@@ -127,6 +136,17 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
 
     DEBUG(llvm::dbgs() << "        Found callee:" <<  Callee->getName()
           << ".\n");
+
+    // To handle recursion and prevent massive code size expansion, we prevent
+    // inlining the same callee many times into the caller. The recursion
+    // detection logic in CallGraphAnalysis can't handle class_method in the
+    // callee. To avoid inlining the recursion too many times, we stop at the
+    // threshold (currently set to 1024).
+    if (CalleeCount[Callee] > CallsToCalleeThreshold) {
+      DEBUG(llvm::dbgs() <<
+        "        FAIL! Skipping callees that are called too many times.\n");
+      continue;
+    }
 
     // Prevent circular inlining.
     if (Callee == Caller) {
