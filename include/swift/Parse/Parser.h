@@ -1034,7 +1034,6 @@ public:
 
   Expr *parseExprAnonClosureArg();
   ParserResult<Expr> parseExprList(tok LeftTok, tok RightTok);
-  bool hasExprCallSuffix(bool isExprBasic);
   ParserResult<Expr> parseExprCallSuffix(ParserResult<Expr> fn,
                                          Identifier firstSelectorPiece
                                            = Identifier(),

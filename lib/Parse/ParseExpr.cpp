@@ -831,7 +831,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     Result = makeParserResult(parseExprIdentifier());
 
     // If there is an expr-call-suffix, parse it and form a call.
-    if (hasExprCallSuffix(isExprBasic)) {
+    if (Tok.isFollowingLParen()) {
       Result = parseExprCallSuffix(Result);
       break;
     }
@@ -1093,7 +1093,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
         }
 
         // If there is an expr-call-suffix, parse it and form a call.
-        if (hasExprCallSuffix(isExprBasic)) {
+        if (Tok.isFollowingLParen()) {
           Result = parseExprCallSuffix(Result);
           continue;
         }
@@ -1864,13 +1864,6 @@ ParserResult<Expr> Parser::parseExprList(tok LeftTok, tok RightTok) {
   return makeParserResult(
     TupleExpr::create(Context, LLoc, SubExprs, SubExprNames, SubExprNameLocs,
                       RLoc, /*hasTrailingClosure=*/false, /*Implicit=*/false));
-}
-
-/// Determine whether the parser is at an expr-call-suffix.
-///
-/// \param isExprBasic Whether we're in an expr-basic or not.
-bool Parser::hasExprCallSuffix(bool isExprBasic) {
-  return Tok.isFollowingLParen();
 }
 
 /// \brief Parse an expression call suffix.
