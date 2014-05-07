@@ -58,7 +58,7 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
   for (auto &Tok : Tokens) {
     SyntaxNodeKind Kind;
     SourceLoc Loc;
-    unsigned Length;
+    Optional<unsigned> Length;
     if (AttrLoc.isValid()) {
       // This token is following @, see if it's a known attribute name.
       bool IsAttr = llvm::StringSwitch<bool>(Tok.getText())
@@ -113,7 +113,7 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
     assert(Loc.isValid());
     assert(Nodes.empty() || SM.isBeforeInBuffer(Nodes.back().Range.getStart(),
                                                 Loc));
-    Nodes.emplace_back(Kind, CharSourceRange(Loc, Length));
+    Nodes.emplace_back(Kind, CharSourceRange(Loc, Length.getValue()));
   }
 
   Impl.TokenNodes = std::move(Nodes);
