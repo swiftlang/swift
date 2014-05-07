@@ -139,8 +139,8 @@ static SILDeclRef getBridgingFn(Optional<SILDeclRef> &cacheSlot,
   return fn;
 }
 
-static SILType getInOutStringTy(SILGenModule &SGM) {
-  return SGM.getLoweredType(InOutType::get(SGM.Types.getStringType()));
+static SILType getStringTy(SILGenModule &SGM) {
+  return SGM.getLoweredType(SGM.Types.getStringType());
 }
 
 static SILType getNSStringTy(SILGenModule &SGM) {
@@ -150,49 +150,14 @@ static SILType getNSStringTy(SILGenModule &SGM) {
 SILDeclRef SILGenModule::getNSStringToStringFn() {
   return getBridgingFn(NSStringToStringFn, *this,
                        FOUNDATION_MODULE_NAME, "_convertNSStringToString",
-                       {getNSStringTy(*this), getInOutStringTy(*this)},
-                       Types.getEmptyTupleType());
-}
-
-/// Find the default initializer for the given type.
-static ConstructorDecl *getDefaultInitFn(SILGenModule &sgm, CanType type) {
-  auto &C = sgm.getASTContext();
-  auto decl = type->getNominalOrBoundGenericNominal();
-  auto constructors = decl->lookupDirect(C.Id_init);
-  ConstructorDecl *defaultCtor = nullptr;
-  for (auto decl : constructors) {
-    auto ctor = dyn_cast<ConstructorDecl>(decl);
-    if (!ctor) continue;
-    auto argTy = ctor->getType()->castTo<AnyFunctionType>()
-      ->getResult()->castTo<AnyFunctionType>()->getInput();
-    if (!argTy->isEqual(C.TheEmptyTupleType))
-      continue;
-      
-    defaultCtor = ctor;
-    break;
-  }
-    
-  if (!defaultCtor) {
-    sgm.diagnose(SourceLoc(), diag::bridging_function_missing,
-                 STDLIB_NAME, type->getString() + ".init()");
-    llvm::report_fatal_error("unable to set up the ObjC bridge!");
-  }
-    
-  return defaultCtor;
-
-}
-
-SILDeclRef SILGenModule::getStringDefaultInitFn() {
-  return StringDefaultInitFn.cache([&] {
-      return SILDeclRef(getDefaultInitFn(*this, Types.getStringType()),
-                        SILDeclRef::Kind::Allocator); 
-  });
+                       {getNSStringTy(*this)},
+                       getStringTy(*this));
 }
 
 SILDeclRef SILGenModule::getStringToNSStringFn() {
   return getBridgingFn(StringToNSStringFn, *this,
                        FOUNDATION_MODULE_NAME, "_convertStringToNSString",
-                       {getInOutStringTy(*this)},
+                       {getStringTy(*this)},
                        getNSStringTy(*this));
 }
 

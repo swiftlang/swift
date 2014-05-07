@@ -4042,55 +4042,29 @@ RValue RValueEmitter::visitDefaultValueExpr(DefaultValueExpr *E, SGFContext C) {
 static ManagedValue emitBridgeStringToNSString(SILGenFunction &gen,
                                                SILLocation loc,
                                                ManagedValue str) {
-  // func _convertStringToNSString(inout String) -> NSString
+  // func _convertStringToNSString(String) -> NSString
   SILValue stringToNSStringFn
     = gen.emitGlobalFunctionRef(loc, gen.SGM.getStringToNSStringFn());
-  
-  // Materialize the string so we can pass a reference.
-  // Assume StringToNSString won't consume or modify the string, so leave the
-  // cleanup on the original value intact.
-  SILValue strTemp = gen.emitTemporaryAllocation(loc,
-                                                 str.getType());
-  gen.B.createStore(loc, str.getValue(), strTemp);
   
   SILValue nsstr = gen.B.createApply(loc, stringToNSStringFn,
                            stringToNSStringFn.getType(),
                            gen.getLoweredType(gen.SGM.Types.getNSStringType()),
-                           {}, strTemp);
+                           {}, str.forward(gen));
   return gen.emitManagedRValueWithCleanup(nsstr);
 }
 
 static ManagedValue emitBridgeNSStringToString(SILGenFunction &gen,
                                                SILLocation loc,
                                                ManagedValue nsstr) {
-  // func _convertNSStringToString(NSString, [inout] String) -> ()
+  // func _convertNSStringToString(NSString) -> String
   SILValue nsstringToStringFn
     = gen.emitGlobalFunctionRef(loc, gen.SGM.getNSStringToStringFn());
   
-  // Allocate and initialize a temporary to receive the result String.
-  SILValue strTemp = gen.emitTemporaryAllocation(loc,
-                             gen.getLoweredType(gen.SGM.Types.getStringType()));
-  // struct String { init() }
-  SILValue strInitFn
-    = gen.emitGlobalFunctionRef(loc, gen.SGM.getStringDefaultInitFn());
-  SILValue strMetaty
-    = gen.B.createMetatype(loc, gen.getLoweredLoadableType(
-                         CanMetatypeType::get(gen.SGM.Types.getStringType())));
-  SILValue strInit = gen.B.createApply(loc, strInitFn,
-                      strInitFn.getType(),
-                      gen.getLoweredLoadableType(gen.SGM.Types.getStringType()),
-                      {}, strMetaty);
-  gen.B.createStore(loc, strInit, strTemp);
-  
-  SILValue args[2] = {nsstr.forward(gen), strTemp};
-  gen.B.createApply(loc, nsstringToStringFn,
+  SILValue str = gen.B.createApply(loc, nsstringToStringFn,
                     nsstringToStringFn.getType(),
-                    gen.SGM.Types.getEmptyTupleType(),
-                    {}, args);
+                    gen.getLoweredType(gen.SGM.Types.getStringType()),
+                    {}, nsstr.forward(gen));
   
-  // Load the result string, taking ownership of the value. There's no cleanup
-  // on the value in the temporary allocation.
-  SILValue str = gen.B.createLoad(loc, strTemp);
   return gen.emitManagedRValueWithCleanup(str);
 }
 

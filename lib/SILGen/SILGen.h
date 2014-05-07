@@ -263,8 +263,6 @@ public:
   SILDeclRef getNSArrayToAnyObjectArrayFn();
   SILDeclRef getBoolToObjCBoolFn();
   SILDeclRef getObjCBoolToBoolFn();
-  SILDeclRef getStringDefaultInitFn();
-  SILDeclRef getAnyObjectArrayDefaultInitFn();
   SILDeclRef getObjCMutablePointerToUnsafePointerFn();
   SILDeclRef getCMutablePointerToUnsafePointerFn();
   SILDeclRef getCConstPointerToUnsafePointerFn();
