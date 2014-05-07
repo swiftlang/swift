@@ -372,6 +372,9 @@ public:
   
   /// Retrieve the simple upcast conversion function for Array<T>.
   FuncDecl *getArrayUpCast(LazyResolver *resolver) const;
+  
+  /// Retrieve the simple bridge conversion function for Array<T>.
+  FuncDecl *getArrayBridgeToObjectiveC(LazyResolver *resolver) const;
 
   /// Retrieve the declaration of
   /// Swift._does{,ImplicitlyUnwrapped}OptionalHaveValue.
@@ -592,6 +595,10 @@ public:
 
   /// Returns the protocol requirement decls for a conforming decl.
   ArrayRef<ValueDecl *> getConformances(const ValueDecl *D);
+  
+  /// \brief Retrieve the substitutions for a bound generic type, if known.
+  Optional<ArrayRef<Substitution>>
+        getSubstitutions(BoundGenericType *Bound) const;
 
 private:
   friend class Decl;
@@ -602,10 +609,6 @@ private:
   void setBriefComment(const Decl *D, StringRef Comment);
 
   friend class BoundGenericType;
-
-  /// \brief Retrieve the substitutions for a bound generic type, if known.
-  Optional<ArrayRef<Substitution>>
-  getSubstitutions(BoundGenericType *Bound) const;
 
   /// \brief Set the substitutions for the given bound generic type.
   void setSubstitutions(BoundGenericType *Bound,

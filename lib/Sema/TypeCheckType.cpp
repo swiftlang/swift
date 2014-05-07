@@ -120,6 +120,15 @@ Type TypeChecker::getBridgedType(DeclContext *dc, Type type) {
   return Type();
 }
 
+bool TypeChecker::isConditionallyBridgedType(DeclContext *dc, Type type) {
+  auto name = dc->getASTContext().getIdentifier("isBridgedToObjectiveC");
+  auto result = lookupMember(type, name,
+                             dc,
+                             true);
+  
+  return !result.empty();
+}
+
 void TypeChecker::forceExternalDeclMembers(NominalTypeDecl *nominalDecl) {
   // Force any delayed members added to the nominal type declaration.
   if (nominalDecl->hasDelayedProtocolDecls() ||

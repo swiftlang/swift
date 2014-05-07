@@ -3384,7 +3384,16 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       if (!expr) return nullptr;
       return coerceToType(expr, toType, locator);
     }
-        
+
+    case ConversionRestrictionKind::ArrayBridged: {
+      auto bridgedArrayConversion = new (tc.Context)
+                                      ArrayBridgedConversionExpr(expr, toType);
+      bridgedArrayConversion->isConditionallyBridged =
+                                  tc.isConditionallyBridgedType(dc, toType);
+      bridgedArrayConversion->setType(toType);
+      return bridgedArrayConversion;
+    }
+
     case ConversionRestrictionKind::ArrayUpcast: {
       auto arrayConversion = new (tc.Context)
                                   ArrayUpcastConversionExpr(expr, toType);

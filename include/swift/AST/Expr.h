@@ -2041,6 +2041,23 @@ public:
     return E->getKind() == ExprKind::ArrayUpcastConversion;
   }
 };
+  
+// ArrayBridgedConversionExpr - Convert an Array<U> to an Array<T>, where
+// T is bridged to U.
+class ArrayBridgedConversionExpr : public ImplicitConversionExpr {
+public:
+  
+  /// Keep track of whether or not the type being bridged to conforms to the
+  /// _ConditionallyBridgedToObjectiveC protocol.
+  bool isConditionallyBridged = false;
+  
+  ArrayBridgedConversionExpr(Expr *subExpr, Type type)
+  : ImplicitConversionExpr(ExprKind::ArrayBridgedConversion, subExpr, type) {}
+  
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::ArrayBridgedConversion;
+  }
+};
 
 /// AnyErasureExpr - An abstract class for implicit conversions that
 /// erase a type into an existential in some way.

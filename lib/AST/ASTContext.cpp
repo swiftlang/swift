@@ -75,6 +75,9 @@ struct ASTContext::Implementation {
   
   /// Array<T> simple upcast.
   FuncDecl *GetArrayUpCast = nullptr;
+  
+  /// Array<T> bridge conversion.
+  FuncDecl *GetArrayBridgeToObjectiveC = nullptr;
 
   /// func _doesOptionalHaveValue<T>(v : [inout] Optional<T>) -> T
   FuncDecl *DoesOptionalHaveValueDecls[NumOptionalTypeKinds] = {};
@@ -622,6 +625,20 @@ FuncDecl *ASTContext::getArrayUpCast(LazyResolver *resolver) const {
   // Look for a generic function.
   CanType input, output, param;
   auto decl = findLibraryIntrinsic(*this, "_arrayUpCast", resolver);
+  if (!decl)
+    return nullptr;
+  
+  cache = decl;
+  return decl;
+}
+
+FuncDecl *ASTContext::getArrayBridgeToObjectiveC(LazyResolver *resolver) const {
+  auto &cache = Impl.GetArrayBridgeToObjectiveC;
+  if (cache) return cache;
+  
+  // Look for a generic function.
+  CanType input, output, param;
+  auto decl = findLibraryIntrinsic(*this, "_arrayBridgeToObjectiveC", resolver);
   if (!decl)
     return nullptr;
   

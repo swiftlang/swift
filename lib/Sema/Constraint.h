@@ -163,6 +163,8 @@ enum class ConversionRestrictionKind {
   ForceUnchecked,
   /// Implicit upcast conversion of array types
   ArrayUpcast,
+  /// Implicit bridged conversion between array types
+  ArrayBridged,
   /// User-defined conversions.
   User
 };

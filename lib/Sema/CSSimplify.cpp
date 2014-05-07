@@ -1545,11 +1545,15 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       conversionsOrFixes.push_back(ConversionRestrictionKind::Superclass);
     }
     
-    // Array supertype conversions.
+    // Implicit array conversions.
     if (kind >= TypeMatchKind::Conversion) {      
       if (isArrayType(desugar1) && isArrayType(desugar2)) {
-        conversionsOrFixes.push_back(ConversionRestrictionKind::
-                                          ArrayUpcast);
+        
+        // Push both the upcast and bridged conversion kinds. We'll construct
+        // a disjunctive constraint out of them, favoring the upcast conversion
+        // should there be a tie.
+        conversionsOrFixes.push_back(ConversionRestrictionKind::ArrayUpcast);
+        conversionsOrFixes.push_back(ConversionRestrictionKind::ArrayBridged);
       }
     }
   }
@@ -2867,7 +2871,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
       
   // T < U ===> Array<T> <c Array<U>
   case ConversionRestrictionKind::ArrayUpcast: {
-    increaseScore(SK_ArrayConversion);
+    increaseScore(SK_ArrayUpcastConversion);
     
     addContextualScore();
     assert(matchKind >= TypeMatchKind::Conversion);
@@ -2892,21 +2896,69 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
       baseType2 = arrayType2->getGenericArgs()[0];
     }
     
-    // Allow assignments from Array<T> to Array<AnyObject> if T is a bridged
-    // type.
-    if (auto protoTy = baseType2->getAs<ProtocolType>()) {
-      if(protoTy->getDecl()->isSpecificProtocol(KnownProtocolKind::AnyObject)) {
-        if (TC.isTriviallyRepresentableInObjC(DC, baseType1)) {
-          return SolutionKind::Solved;
-        }
-      }
-    }
-    
     return matchTypes(baseType1,
                       baseType2,
                       TypeMatchKind::Subtype,
                       flags,
                       locator);
+  }
+      
+  // T < U ===> Array<T> is bridged to Array<U>
+  case ConversionRestrictionKind::ArrayBridged: {
+    addContextualScore();
+    assert(matchKind >= TypeMatchKind::Conversion);
+    
+    Type baseType1;
+    Type baseType2;
+    
+    auto t1 = type1->getDesugaredType();
+    auto t2 = type2->getDesugaredType();
+    
+    if (auto sliceType1 = dyn_cast<ArraySliceType>(t1)) {
+      baseType1 = sliceType1->getBaseType();
+    } else {
+      auto arrayType1 = cast<BoundGenericStructType>(t1);
+      baseType1 = arrayType1->getGenericArgs()[0];
+    }
+    
+    if (auto sliceType2 = dyn_cast<ArraySliceType>(t2)) {
+      baseType2 = sliceType2->getBaseType();
+    } else {
+      auto arrayType2 = cast<BoundGenericStructType>(t2);
+      baseType2 = arrayType2->getGenericArgs()[0];
+    }
+    
+    if (auto nominalType1 = dyn_cast<NominalType>(baseType1.getPointer())) {
+      auto bridgedType1 = TC.getBridgedType(DC, nominalType1);
+
+      // Allow assignments from Array<T> to Array<AnyObject> if T is a bridged
+      // type.
+      if (!bridgedType1.isNull()) {
+        if (auto protoTy = baseType2->getAs<ProtocolType>()) {
+          if(protoTy->getDecl()->isSpecificProtocol(KnownProtocolKind::
+                                                        AnyObject)) {
+            return SolutionKind::Solved;
+          }
+        }
+        
+        // If we're not converting to AnyObject, check if T.ObjectiveCType is U.
+        // We'll save the further check for conformance with
+        // _ConditionallyBridgedToObjectiveC until runtime.
+        if (bridgedType1.getPointer() == baseType2.getPointer()) {
+          return SolutionKind::Solved;
+        }
+        else {
+          // Check if T's bridged type is a subtype of U.
+          return matchTypes(bridgedType1,
+                            baseType2,
+                            TypeMatchKind::Subtype,
+                            flags,
+                            locator);
+        }
+      }
+    }
+    
+    return ConstraintSystem::SolutionKind::Error;
   }
 
   // T' < U, hasMember(T, conversion, T -> T') ===> T <c U

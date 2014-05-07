@@ -678,12 +678,14 @@ enum ScoreKind {
   SK_FunctionConversion,
   /// A literal expression bound to a non-default literal type.
   SK_NonDefaultLiteral,
-  /// An implicit conversion between array types.
-  SK_ArrayConversion,
+  /// An implicit upcast conversion between array types.
+  SK_ArrayUpcastConversion,
+  /// An implicit bridged conversion between array types.
+  SK_ArrayBridgedConversion,
 };
 
 /// The number of score kinds.
-const unsigned NumScoreKinds = 6;
+const unsigned NumScoreKinds = 7;
 
 /// Describes the fixed score of a solution to the constraint system.
 struct Score {

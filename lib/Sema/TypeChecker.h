@@ -688,6 +688,10 @@ public:
   /// \brief Return the bridged Objective-C type if possbile, otherwise return
   /// a null Type.
   Type getBridgedType(DeclContext *dc, Type type);
+  
+  /// \brief Return true if the type conforms to the
+  /// _ConditionallyBridgedToObjectiveC protocol
+  bool isConditionallyBridgedType(DeclContext *dc, Type type);
 
   /// \brief Type check the given expression as an array bound, which converts
   /// it to a builtin integer value.

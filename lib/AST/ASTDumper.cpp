@@ -1361,6 +1361,11 @@ public:
     printRec(E->getSubExpr());
     OS << ')';
   }
+  void visitArrayBridgedConversionExpr(ArrayBridgedConversionExpr *E) {
+    printCommon(E, "array_bridged_conversion_expr") << '\n';
+    printRec(E->getSubExpr());
+    OS << ')';
+  }
   void visitDerivedToBaseExpr(DerivedToBaseExpr *E) {
     printCommon(E, "derived_to_base_expr") << '\n';
     printRec(E->getSubExpr());
