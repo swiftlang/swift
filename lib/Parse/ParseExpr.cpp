@@ -1168,6 +1168,10 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
         Result = makeParserResult(new (Context) CallExpr(Result.get(), arg,
                                                        /*Implicit=*/true));
       }
+      
+      // We only allow a single trailing closure on a call.  This could be
+      // generalized in the future, but needs further design.
+      if (Tok.isFollowingLBrace()) break;
       continue;
     }
 
