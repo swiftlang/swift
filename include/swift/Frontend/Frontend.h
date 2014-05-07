@@ -348,7 +348,7 @@ public:
   void setTargetConfigurations(IRGenOptions &IRGenOpts, LangOptions &LangOpts);
 
   /// Parses and type-checks all input files.
-  void performParse();
+  void performSema();
 
   /// Parses all input files but does no type-checking or module imports.
   void performParseOnly();

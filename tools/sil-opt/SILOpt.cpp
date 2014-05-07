@@ -430,7 +430,7 @@ int main(int argc, char **argv) {
 
   if (CI.setup(Invocation))
     return 1;
-  CI.performParse();
+  CI.performSema();
 
   // If parsing produced an error, don't run any passes.
   if (CI.getASTContext().hadError())
@@ -440,7 +440,7 @@ int main(int argc, char **argv) {
   // creating the unfortunate double if statement.
   if (IsModule) {
     assert(!CI.hasSILModule() &&
-           "performParse() should not create a SILModule.");
+           "performSema() should not create a SILModule.");
     CI.setSILModule(SILModule::createEmptyModule(CI.getMainModule()));
     std::unique_ptr<SerializedSILLoader> SL = SerializedSILLoader::create(
         CI.getASTContext(), CI.getSILModule(), nullptr);

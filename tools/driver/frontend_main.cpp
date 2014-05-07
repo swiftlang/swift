@@ -89,7 +89,7 @@ static bool performCompile(CompilerInstance &Instance,
   if (Action == FrontendOptions::DumpParse)
     Instance.performParseOnly();
   else
-    Instance.performParse();
+    Instance.performSema();
 
   FrontendOptions::DebugCrashMode CrashMode = opts.CrashMode;
   if (CrashMode == FrontendOptions::DebugCrashMode::AssertAfterParse)
@@ -110,7 +110,7 @@ static bool performCompile(CompilerInstance &Instance,
   SourceFile *PrimarySourceFile = Instance.getPrimarySourceFile();
 
   // We've been told to dump the AST (either after parsing or type-checking,
-  // which is already differentiated in CompilerInstance::performParse()),
+  // which is already differentiated in CompilerInstance::performSema()),
   // so dump or print the main source file and return.
   if (Action == FrontendOptions::DumpParse ||
       Action == FrontendOptions::DumpAST ||
@@ -211,7 +211,7 @@ static bool performCompile(CompilerInstance &Instance,
   assert(Action >= FrontendOptions::Immediate &&
          "All actions not requiring IRGen must have been handled!");
   assert(Action != FrontendOptions::REPL &&
-         "REPL mode must be handled immediately after Instance.performParse()");
+         "REPL mode must be handled immediately after Instance.performSema()");
 
   // Check if we had any errors; if we did, don't proceed to IRGen.
   if (Context.hadError())

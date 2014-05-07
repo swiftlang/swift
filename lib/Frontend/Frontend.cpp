@@ -227,7 +227,7 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   return false;
 }
 
-void CompilerInstance::performParse() {
+void CompilerInstance::performSema() {
   const SourceFileKind Kind = Invocation.getInputKind();
   Identifier ID = Context->getIdentifier(Invocation.getModuleName());
   MainModule = Module::create(ID, *Context);
