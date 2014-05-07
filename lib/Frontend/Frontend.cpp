@@ -377,8 +377,7 @@ void CompilerInstance::performParse() {
       parseIntoSourceFile(MainFile, MainFile.getBufferID().getValue(), &Done,
                           TheSILModule ? &SILContext : nullptr,
                           &PersistentState, DelayedCB.get());
-      if (!Invocation.getParseOnly() && (PrimaryBufferID == NO_SUCH_BUFFER ||
-                                         MainBufferID == PrimaryBufferID))
+      if (PrimaryBufferID == NO_SUCH_BUFFER || MainBufferID == PrimaryBufferID)
         performTypeChecking(MainFile, PersistentState.getTopLevelContext(),
                             CurTUElem);
       CurTUElem = MainFile.Decls.size();
@@ -388,20 +387,18 @@ void CompilerInstance::performParse() {
       performPlaygroundTransform(MainFile);
   }
 
-  if (!Invocation.getParseOnly()) {
-    // Type-check each top-level input besides the main source file.
-    for (auto File : MainModule->getFiles())
-      if (auto SF = dyn_cast<SourceFile>(File))
-        if (PrimaryBufferID == NO_SUCH_BUFFER ||
-            (SF->getBufferID().hasValue() &&
-             SF->getBufferID().getValue() == PrimaryBufferID))
-          performTypeChecking(*SF, PersistentState.getTopLevelContext());
+  // Type-check each top-level input besides the main source file.
+  for (auto File : MainModule->getFiles())
+    if (auto SF = dyn_cast<SourceFile>(File))
+      if (PrimaryBufferID == NO_SUCH_BUFFER ||
+          (SF->getBufferID().hasValue() &&
+           SF->getBufferID().getValue() == PrimaryBufferID))
+        performTypeChecking(*SF, PersistentState.getTopLevelContext());
 
-    // Even if there were no source files, we should still record known
-    // protocols.
-    if (Context->getStdlibModule())
-      Context->recordKnownProtocols(Context->getStdlibModule());
-  }
+  // Even if there were no source files, we should still record known
+  // protocols.
+  if (Context->getStdlibModule())
+    Context->recordKnownProtocols(Context->getStdlibModule());
 
   if (DelayedCB) {
     performDelayedParsing(MainModule, PersistentState,
@@ -409,3 +406,59 @@ void CompilerInstance::performParse() {
   }
 }
 
+void CompilerInstance::performParseOnly() {
+  const SourceFileKind Kind = Invocation.getInputKind();
+  Identifier ID = Context->getIdentifier(Invocation.getModuleName());
+  MainModule = Module::create(ID, *Context);
+  Context->LoadedModules[ID.str()] = MainModule;
+
+  assert(Kind == SourceFileKind::Main || Kind == SourceFileKind::Library);
+
+  PersistentParserState PersistentState;
+
+  // Make sure the main file is the first file in the module.
+  if (MainBufferID != NO_SUCH_BUFFER) {
+    assert(Kind == SourceFileKind::Main);
+    SourceMgr.setHashbangBufferID(MainBufferID);
+
+    auto *MainFile = new (*Context) SourceFile(*MainModule, Kind, MainBufferID,
+                                               Invocation.getParseStdlib());
+    MainModule->addFile(*MainFile);
+
+    if (MainBufferID == PrimaryBufferID)
+      PrimarySourceFile = MainFile;
+  }
+
+  // Then parse all the library files.
+  for (auto BufferID : BufferIDs) {
+    if (BufferID == MainBufferID)
+      continue;
+
+    auto *NextInput = new (*Context) SourceFile(*MainModule,
+                                                SourceFileKind::Library,
+                                                BufferID,
+                                                Invocation.getParseStdlib());
+    MainModule->addFile(*NextInput);
+
+    if (BufferID == PrimaryBufferID)
+      PrimarySourceFile = NextInput;
+
+    bool Done;
+    parseIntoSourceFile(*NextInput, BufferID, &Done, nullptr,
+                        &PersistentState, nullptr);
+    assert(Done && "Parser returned early?");
+    (void) Done;
+  }
+  
+  // Parse the main file last.
+  if (MainBufferID != NO_SUCH_BUFFER) {
+    SourceFile &MainFile = MainModule->getMainSourceFile(Kind);
+    bool Done;
+    do {
+      // Pump the parser multiple times if necessary.  It will return early
+      // after parsing any top level code in a main module.
+      parseIntoSourceFile(MainFile, MainFile.getBufferID().getValue(), &Done,
+                          nullptr, &PersistentState, nullptr);
+    } while (!Done);
+  }
+}

@@ -183,14 +183,6 @@ public:
     return FrontendOpts.ParseStdlib;
   }
 
-  void setParseOnly() {
-    FrontendOpts.ParseOnly = true;
-  }
-
-  bool getParseOnly() const {
-    return FrontendOpts.ParseOnly;
-  }
-
   void setInputKind(SourceFileKind K) {
     FrontendOpts.InputKind = K;
   }
@@ -357,6 +349,9 @@ public:
 
   /// Parses and type-checks all input files.
   void performParse();
+
+  /// Parses all input files but does no type-checking or module imports.
+  void performParseOnly();
 };
 
 } // namespace swift

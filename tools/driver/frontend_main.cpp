@@ -86,7 +86,10 @@ static bool performCompile(CompilerInstance &Instance,
   FrontendOptions opts = Invocation.getFrontendOptions();
   FrontendOptions::ActionType Action = opts.RequestedAction;
 
-  Instance.performParse();
+  if (Action == FrontendOptions::DumpParse)
+    Instance.performParseOnly();
+  else
+    Instance.performParse();
 
   FrontendOptions::DebugCrashMode CrashMode = opts.CrashMode;
   if (CrashMode == FrontendOptions::DebugCrashMode::AssertAfterParse)

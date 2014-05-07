@@ -125,9 +125,6 @@ public:
   /// Indicates the action the user requested that the frontend perform.
   ActionType RequestedAction = Parse;
 
-  /// Indicates that type-checking should be disabled.
-  bool ParseOnly = false;
-
   /// Indicates that the input(s) should be parsed as the Swift stdlib.
   bool ParseStdlib = false;
 
