@@ -410,3 +410,24 @@ bb0:
   %12 = tuple (%9 : $Builtin.Int1, %10 : $Builtin.Int32, %11 : $Builtin.Int64)
   return %12 : $(Builtin.Int1, Builtin.Int32, Builtin.Int64)
 }
+
+// CHECK-LABEL: sil @constant_fold_indexing_inst_of_0 : $@thin (Builtin.RawPointer) -> (Builtin.Int8, Builtin.Int8) {
+// CHECK: bb0
+// CHECK-NEXT: pointer_to_address
+// CHECK-NEXT: pointer_to_address
+// CHECK-NEXT: load
+// CHECK-NEXT: load
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @constant_fold_indexing_inst_of_0 : $@thin (Builtin.RawPointer) -> (Builtin.Int8, Builtin.Int8) {
+bb0(%0 : $Builtin.RawPointer):
+  %1 = integer_literal $Builtin.Word, 0
+  %2 = pointer_to_address %0 : $Builtin.RawPointer to $*Builtin.Int8
+  %3 = index_addr %2 : $*Builtin.Int8, %1 : $Builtin.Word
+  %4 = index_raw_pointer %0 : $Builtin.RawPointer, %1 : $Builtin.Word
+  %5 = pointer_to_address %4 : $Builtin.RawPointer to $*Builtin.Int8
+  %6 = load %3 : $*Builtin.Int8
+  %7 = load %5 : $*Builtin.Int8
+  %8 = tuple(%6 : $Builtin.Int8, %7 : $Builtin.Int8)
+  return %8 : $(Builtin.Int8, Builtin.Int8)
+}

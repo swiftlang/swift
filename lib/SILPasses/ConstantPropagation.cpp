@@ -740,6 +740,12 @@ static SILValue constantFoldInstruction(SILInstruction &I,
       return Struct->getOperandForField(SEI->getField())->get();
   }
 
+  // Constant fold indexing insts of a 0 integer literal.
+  if (auto *II = dyn_cast<IndexingInst>(&I))
+    if (auto *IntLiteral = dyn_cast<IntegerLiteralInst>(II->getIndex()))
+      if (!IntLiteral->getValue())
+        return II->getBase();
+
   return SILValue();
 }
 
