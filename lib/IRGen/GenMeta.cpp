@@ -1566,7 +1566,7 @@ namespace {
       
       // Initialize the instantiated dependent value witness table, if we have
       // one.
-      llvm::Value *vwtableValue;
+      llvm::Value *vwtableValue = nullptr;
       if (HasDependentVWT) {
         assert(!AddressPoint.isInvalid() && "did not set valid address point!");
         assert(!DependentVWTPoint.isInvalid() && "did not set dependent VWT point!");
