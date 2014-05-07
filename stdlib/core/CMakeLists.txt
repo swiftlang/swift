@@ -59,6 +59,7 @@ set(SWIFTLIB_ESSENTIAL
   Range.swift
   Reflection.swift
   Repeat.swift
+  Shims.swift
   StaticString.swift
   String.swift
   StringBridge.swift
