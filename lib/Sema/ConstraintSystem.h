@@ -2148,9 +2148,6 @@ public:
 /// e.g., to produce a diagnostic.
 /// \param parameterBindings Will be populated with the arguments that are
 /// bound to each of the parameters.
-/// \param actualArgNames If the matching requires renaming the arguments,
-/// this vector will be populated with the new names.
-///
 /// \returns true if the call arguments could not be matched to the parameters.
 bool matchCallArguments(ArrayRef<TupleTypeElt> argTuple,
                         ArrayRef<TupleTypeElt> paramTuple,
