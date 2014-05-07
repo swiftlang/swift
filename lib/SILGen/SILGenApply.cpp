@@ -875,7 +875,7 @@ public:
     // If we need to perform dynamic dispatch for the given function,
     // emit class_method to do so.
     if (auto afd = dyn_cast<AbstractFunctionDecl>(e->getDecl())) {
-      SILDeclRef::Kind kind;
+      Optional<SILDeclRef::Kind> kind;
       bool isDynamicallyDispatched = false;
       bool requiresAllocRefDynamic = false;
 
@@ -925,7 +925,7 @@ public:
         }
 
         setSelfParam(std::move(self), thisCallSite);
-        SILDeclRef constant(afd, kind,
+        SILDeclRef constant(afd, kind.getValue(),
                             SILDeclRef::ConstructAtBestResilienceExpansion,
                             SILDeclRef::ConstructAtNaturalUncurryLevel,
                             gen.SGM.requiresObjCDispatch(afd));
