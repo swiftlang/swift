@@ -2095,6 +2095,67 @@ bool computeTupleShuffle(TupleType *fromTuple, TupleType *toTuple,
 /// elements.
 bool hasMandatoryTupleLabels(Expr *expr);
 
+
+/// Describes the arguments to which a parameter binds.
+/// FIXME: This is an awful data structure. We want the equivalent of a
+/// TinyPtrVector for unsigned values.
+typedef SmallVector<unsigned, 1> ParamBinding;
+
+/// Abstract class used as the base for listeners to the \c matchCallArguments
+/// process.
+///
+class MatchCallArgumentListener {
+protected:
+  virtual ~MatchCallArgumentListener();
+
+public:
+  /// Indicates that the argument at the given index does not match any
+  /// parameter.
+  ///
+  /// \param argIdx The index of the extra argument.
+  virtual void extraArgument(unsigned argIdx);
+
+  /// Indicates that no argument was provided for the parameter at the given
+  /// indices.
+  ///
+  /// \param paramIdx The index of the parameter that is missing an argument.
+  virtual void missingArgument(unsigned paramIdx);
+
+  /// Indicates that an argument is out-of-order with respect to a previously-
+  /// seen argument.
+  ///
+  /// \param argIdx The argument that came too late in the argument list.
+  /// \param prevArgIdx The argument that the \c argIdx should have preceded.
+  virtual void outOfOrderArgument(unsigned argIdx, unsigned prevArgIdx);
+
+  /// Indicates that the arguments need to be relabed to match the parameters.
+  ///
+  /// \returns true to indicate that this should cause a failure, false
+  /// otherwise.
+  virtual bool relabelArguments(ArrayRef<Identifier> newNames) = 0;
+};
+
+/// Match the call arguments (as described by the given argument type) to
+/// the parameters (as described by the given parameter type).
+///
+/// \param argTuple The elements in the argument tuple.
+/// \param paramTuple The elements in the parameter tuple.
+/// \param allowFixes Whether to allow fixes when matching arguments.
+///
+/// \param listener Listener that will be notified when certain problems occur,
+/// e.g., to produce a diagnostic.
+/// \param parameterBindings Will be populated with the arguments that are
+/// bound to each of the parameters.
+/// \param actualArgNames If the matching requires renaming the arguments,
+/// this vector will be populated with the new names.
+///
+/// \returns true if the call arguments could not be matched to the parameters.
+bool matchCallArguments(ArrayRef<TupleTypeElt> argTuple,
+                        ArrayRef<TupleTypeElt> paramTuple,
+                        bool allowFixes,
+                        MatchCallArgumentListener &listener,
+                        SmallVectorImpl<ParamBinding> &parameterBindings);
+
 /// Simplify the given locator by zeroing in on the most specific
 /// subexpression described by the locator.
 ///

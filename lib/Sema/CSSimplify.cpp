@@ -27,6 +27,16 @@ static bool hasMandatoryTupleLabels(const ConstraintLocatorBuilder &locator) {
   return false;
 }
 
+MatchCallArgumentListener::~MatchCallArgumentListener() { }
+
+void MatchCallArgumentListener::extraArgument(unsigned argIdx) { }
+
+void MatchCallArgumentListener::missingArgument(unsigned paramIdx) { }
+
+void MatchCallArgumentListener::outOfOrderArgument(unsigned argIdx,
+                                                   unsigned prevArgIdx) {
+}
+
 /// Produce a score (smaller is better) comparing a parameter name and
 /// potentially-typod argument name.
 ///
@@ -121,23 +131,16 @@ static ArrayRef<TupleTypeElt> decomposeArgParamType(Type type,
   }
 }
 
-// Match the argument of a call to the parameter.
-static ConstraintSystem::SolutionKind
-matchCallArguments(ConstraintSystem &cs, Type argType, Type paramType,
-                   ConstraintLocatorBuilder locator) {
-  // Extract the argument tuple fields.
-  TupleTypeElt argScalar;
-  ArrayRef<TupleTypeElt> argTuple = decomposeArgParamType(argType, argScalar);
-
-  // Extract the parameter tuple fields.
-  TupleTypeElt paramScalar;
-  ArrayRef<TupleTypeElt> paramTuple = decomposeArgParamType(paramType,
-                                                            paramScalar);
-
+bool constraints::matchCallArguments(
+       ArrayRef<TupleTypeElt> argTuple,
+       ArrayRef<TupleTypeElt> paramTuple,
+       bool allowFixes,
+       MatchCallArgumentListener &listener,
+       SmallVectorImpl<ParamBinding> &parameterBindings) {
   // Keep track of the parameter we're matching and what argument indices
   // got bound to each parameter.
   unsigned paramIdx, numParams = paramTuple.size();
-  llvm::SmallVector<SmallVector<unsigned, 1>, 4> parameterBindings; // FIXME:ick
+  parameterBindings.clear();
   parameterBindings.resize(numParams);
 
   // Keep track of which arguments we have claimed from the argument tuple.
@@ -287,7 +290,7 @@ matchCallArguments(ConstraintSystem &cs, Type argType, Type paramType,
     }
 
     // If we're not supposed to attempt any fixes, we're done.
-    if (!cs.shouldAttemptFixes())
+    if (!allowFixes)
       return Nothing;
 
     // Several things could have gone wrong here, and we'll check for each
@@ -364,17 +367,11 @@ matchCallArguments(ConstraintSystem &cs, Type argType, Type paramType,
   if (numClaimedArgs != numArgs) {
     // If we're not allowed to fix anything, or if we don't have any
     // unfulfilled parameters, fail.
-    if (!haveUnfulfilledParams || !cs.shouldAttemptFixes()) {
-      if (cs.shouldRecordFailures()) {
-        nextArgIdx = 0;
-        skipClaimedArgs();
-
-        cs.recordFailure(cs.getConstraintLocator(locator),
-                         Failure::ExtraArgument,
-                         nextArgIdx);
-      }
-
-      return ConstraintSystem::SolutionKind::Error;
+    if (!haveUnfulfilledParams || !allowFixes) {
+      nextArgIdx = 0;
+      skipClaimedArgs();
+      listener.extraArgument(nextArgIdx);
+      return true;
     }
 
     // Find all of the named, unclaimed arguments.
@@ -462,15 +459,10 @@ matchCallArguments(ConstraintSystem &cs, Type argType, Type paramType,
 
     // If we still haven't claimed all of the arguments, fail.
     if (numClaimedArgs != numArgs) {
-      if (cs.shouldRecordFailures()) {
-        nextArgIdx = 0;
-        skipClaimedArgs();
-
-        cs.recordFailure(cs.getConstraintLocator(locator),
-                         Failure::ExtraArgument,
-                         nextArgIdx);
-      }
-      return ConstraintSystem::SolutionKind::Error;
+      nextArgIdx = 0;
+      skipClaimedArgs();
+      listener.extraArgument(nextArgIdx);
+      return true;
     }
 
     // FIXME: If we had the actual parameters and knew the body names, those
@@ -494,13 +486,8 @@ matchCallArguments(ConstraintSystem &cs, Type argType, Type paramType,
       if (param.getDefaultArgKind() != DefaultArgumentKind::None)
         continue;
 
-      if (cs.shouldRecordFailures()) {
-        cs.recordFailure(cs.getConstraintLocator(locator),
-                         Failure::MissingArgument,
-                         paramType, paramIdx);
-      }
-
-      return ConstraintSystem::SolutionKind::Error;
+      listener.missingArgument(paramIdx);
+      return true;
     }
   }
 
@@ -536,43 +523,107 @@ matchCallArguments(ConstraintSystem &cs, Type argType, Type paramType,
             param.getDefaultArgKind() != DefaultArgumentKind::None)
           continue;
 
-        if (cs.shouldRecordFailures()) {
-          unsigned prevArgIdx = parameterBindings[i].front();
-          if (prevArgIdx == argIdx)
-            prevArgIdx = parameterBindings[i+1].front();
+        unsigned prevArgIdx = parameterBindings[i].front();
+        if (prevArgIdx == argIdx)
+          prevArgIdx = parameterBindings[i+1].front();
 
-          cs.recordFailure(cs.getConstraintLocator(locator),
-                           Failure::OutOfOrderArgument,
-                           argIdx, prevArgIdx);
-        }
-
-        return ConstraintSystem::SolutionKind::Error;
+        listener.outOfOrderArgument(argIdx, prevArgIdx);
+        return true;
       }
     }
   }
 
-  // If any arguments were renamed, the call is ill-formed.
-  if (!actualArgNames.empty()) {
-    if (!cs.shouldAttemptFixes()) {
-      // FIXME: record why this failed. We have renaming.
-      return ConstraintSystem::SolutionKind::Error;
+  // If no arguments were renamed, the call arguments match up with the
+  // parameters.
+  if (actualArgNames.empty())
+    return false;
+
+  // The arguments were relabeled; notify the listener.
+  return listener.relabelArguments(actualArgNames);
+}
+
+// Match the argument of a call to the parameter.
+static ConstraintSystem::SolutionKind
+matchCallArguments(ConstraintSystem &cs, Type argType, Type paramType,
+                   ConstraintLocatorBuilder locator) {
+  /// Listener used to produce failures if they should be produced.
+  class Listener : public MatchCallArgumentListener {
+    ConstraintSystem &CS;
+    Type ArgType;
+    Type ParamType;
+    ConstraintLocatorBuilder &Locator;
+
+  public:
+    Listener(ConstraintSystem &cs, Type argType, Type paramType,
+             ConstraintLocatorBuilder &locator)
+      : CS(cs), ArgType(argType), ParamType(paramType), Locator(locator) { }
+
+    virtual void extraArgument(unsigned argIdx) {
+      if (!CS.shouldRecordFailures())
+        return;
+
+      CS.recordFailure(CS.getConstraintLocator(Locator),
+                       Failure::ExtraArgument,
+                       argIdx);
     }
 
-    // Add a fix for the name. This is only responsible for recording the fix.
-    auto result = cs.simplifyFixConstraint(
-                    Fix::getRelabelTuple(cs, FixKind::RelabelCallTuple,
-                                         actualArgNames),
-                    argType, paramType,
-                    TypeMatchKind::ArgumentTupleConversion,
-                    ConstraintSystem::TMF_None,
-                    locator);
-    if (result != ConstraintSystem::SolutionKind::Solved)
-      return result;
-  }
+    virtual void missingArgument(unsigned paramIdx) {
+      if (!CS.shouldRecordFailures())
+        return;
+
+      CS.recordFailure(CS.getConstraintLocator(Locator),
+                       Failure::MissingArgument,
+                       ParamType, paramIdx);
+    }
+
+    virtual void outOfOrderArgument(unsigned argIdx, unsigned prevArgIdx) {
+      if (!CS.shouldRecordFailures())
+        return;
+
+      CS.recordFailure(CS.getConstraintLocator(Locator),
+                       Failure::OutOfOrderArgument,
+                       argIdx, prevArgIdx);
+    }
+
+    virtual bool relabelArguments(ArrayRef<Identifier> newNames) {
+      if (!CS.shouldAttemptFixes()) {
+        // FIXME: record why this failed. We have renaming.
+        return true;
+      }
+
+      // Add a fix for the name. This is only responsible for recording the fix.
+      auto result = CS.simplifyFixConstraint(
+                      Fix::getRelabelTuple(CS, FixKind::RelabelCallTuple,
+                                           newNames),
+                      ArgType, ParamType,
+                      TypeMatchKind::ArgumentTupleConversion,
+                      ConstraintSystem::TMF_None,
+                      Locator);
+      return result != ConstraintSystem::SolutionKind::Solved;
+    }
+  };
+
+  // Extract the argument tuple fields.
+  TupleTypeElt argScalar;
+  ArrayRef<TupleTypeElt> argTuple = decomposeArgParamType(argType, argScalar);
+
+  // Extract the parameter tuple fields.
+  TupleTypeElt paramScalar;
+  ArrayRef<TupleTypeElt> paramTuple = decomposeArgParamType(paramType,
+                                                            paramScalar);
+
+  // Match up the call arguments to the parameters.
+  Listener listener(cs, argType, paramType, locator);
+  SmallVector<ParamBinding, 4> parameterBindings;
+  if (constraints::matchCallArguments(argTuple, paramTuple,
+                                      cs.shouldAttemptFixes(), listener,
+                                      parameterBindings))
+    return ConstraintSystem::SolutionKind::Error;
 
   // Check the argument types for each of the parameters.
   unsigned subflags = ConstraintSystem::TMF_GenerateConstraints;
-  for (paramIdx = 0; paramIdx != numParams; ++paramIdx) {
+  for (unsigned paramIdx = 0, numParams = parameterBindings.size();
+       paramIdx != numParams; ++paramIdx){
     // Skip unfulfilled parameters. There's nothing to do for them.
     if (parameterBindings[paramIdx].empty())
       continue;
@@ -613,7 +664,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   // different than for normal tuple conversions.
   if (kind == TypeMatchKind::ArgumentTupleConversion &&
       getASTContext().LangOpts.StrictKeywordArguments) {
-    return matchCallArguments(*this, tuple1, tuple2, locator);
+    return ::matchCallArguments(*this, tuple1, tuple2, locator);
   }
 
   // Equality and subtyping have fairly strict requirements on tuple matching,
