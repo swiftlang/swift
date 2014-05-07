@@ -916,7 +916,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
   while (1) {
     // FIXME: Better recovery.
     if (Result.isNull())
-      return nullptr;
+      return Result;
 
     // Check for a .foo suffix.
     SourceLoc TokLoc = Tok.getLoc();
