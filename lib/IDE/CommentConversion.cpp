@@ -273,7 +273,6 @@ void CommentToXMLConverter::visitFullComment(const FullComment *FC) {
     PO.PrintDefaultParameterPlaceholder = true;
     PO.SkipImplicit = true;
     PO.PrintImplicitAttrs = false;
-    PO.PrintImplicitlyUnwrappedOptionalInImportedDecls = false;
     PO.PrintFunctionRepresentationAttrs = false;
     OS << "<Declaration>";
     D->print(OS, PO);

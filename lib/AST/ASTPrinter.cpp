@@ -278,10 +278,6 @@ public:
     if (!shouldPrint(D))
       return false;
 
-    llvm::SaveAndRestore<bool> SavePrintImplicitlyUnwrappedOptional(Options.PrintImplicitlyUnwrappedOptional);
-    if (!Options.PrintImplicitlyUnwrappedOptionalInImportedDecls && D->hasClangNode())
-      Options.PrintImplicitlyUnwrappedOptional = false;
-
     Printer.callPrintDeclPre(D);
     ASTVisitor::visit(D);
     Printer.printDeclPost(D);
@@ -1711,7 +1707,7 @@ public:
       }
       if (NT == Ctx.getImplicitlyUnwrappedOptionalDecl()) {
         printWithParensIfNotSimple(T->getGenericArgs()[0]);
-        Printer << (Options.PrintImplicitlyUnwrappedOptional ? "!" : "?");
+        Printer << "!";
         return;
       }
     }
@@ -1951,7 +1947,7 @@ public:
 
   void visitImplicitlyUnwrappedOptionalType(ImplicitlyUnwrappedOptionalType *T) {
     printWithParensIfNotSimple(T->getBaseType());
-    Printer <<  (Options.PrintImplicitlyUnwrappedOptional ? "!" : "?");
+    Printer <<  "!";
   }
 
   void visitProtocolType(ProtocolType *T) {
