@@ -354,7 +354,7 @@ void Serializer::writeDocBlockInfoBlock() {
 #undef BLOCK_RECORD
 }
 
-void Serializer::writeHeader(const Module *M) {
+void Serializer::writeHeader() {
   {
     BCBlockRAII restoreBlock(Out, CONTROL_BLOCK_ID, 3);
     control_block::ModuleNameLayout ModuleName(Out);
@@ -416,8 +416,7 @@ static void flattenImportPath(const Module::ImportedModule &import,
   out.append(accessPathElem.first.str());
 }
 
-void Serializer::writeInputFiles(const Module *M,
-                                 FilenamesTy inputFiles,
+void Serializer::writeInputFiles(FilenamesTy inputFiles,
                                  StringRef moduleLinkName) {
   BCBlockRAII restoreBlock(Out, INPUT_BLOCK_ID, 3);
   input_block::SourceFileLayout SourceFile(Out);
@@ -2803,77 +2802,68 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
   }
 }
 
+void Serializer::writeToStream(raw_ostream &os) {
+  os.write(Buffer.data(), Buffer.size());
+  os.flush();
+}
+
+template <size_t N>
+Serializer::Serializer(const unsigned char (&signature)[N],
+                       ModuleOrSourceFile DC) {
+  for (unsigned char byte : signature)
+    Out.Emit(byte, 8);
+
+  this->M = getModule(DC);
+  this->SF = DC.dyn_cast<SourceFile *>();
+}
+
+
 void Serializer::writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
                                const SILModule *SILMod, bool serializeAllSIL,
                                FilenamesTy inputFiles,
                                StringRef moduleLinkName) {
-  // Write the signature through the BitstreamWriter for alignment purposes.
-  for (unsigned char byte : MODULE_SIGNATURE)
-    Out.Emit(byte, 8);
+  Serializer S{MODULE_SIGNATURE, DC};
 
   // FIXME: This is only really needed for debugging. We don't actually use it.
-  writeBlockInfoBlock();
+  S.writeBlockInfoBlock();
 
   {
-    assert(!this->M && "already serializing a module");
-    this->M = getModule(DC);
-    this->SF = DC.dyn_cast<SourceFile *>();
-
-    BCBlockRAII moduleBlock(Out, MODULE_BLOCK_ID, 2);
-    writeHeader(M);
-    writeInputFiles(M, inputFiles, moduleLinkName);
-    writeSIL(SILMod, serializeAllSIL);
-    writeAST(DC);
-    Out.FlushToWord();
-
-#ifndef NDEBUG
-    this->M = nullptr;
-    this->SF = nullptr;
-#endif
+    BCBlockRAII moduleBlock(S.Out, MODULE_BLOCK_ID, 2);
+    S.writeHeader();
+    S.writeInputFiles(inputFiles, moduleLinkName);
+    S.writeSIL(SILMod, serializeAllSIL);
+    S.writeAST(DC);
   }
 
-  os.write(Buffer.data(), Buffer.size());
-  os.flush();
-  Buffer.clear();
+  S.writeToStream(os);
 }
 
 void Serializer::writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC) {
-  // Write the signature through the BitstreamWriter for alignment purposes.
-  for (unsigned char byte : MODULE_DOC_SIGNATURE)
-    Out.Emit(byte, 8);
+  Serializer S{MODULE_DOC_SIGNATURE, DC};
 
   // FIXME: This is only really needed for debugging. We don't actually use it.
-  writeDocBlockInfoBlock();
+  S.writeDocBlockInfoBlock();
 
   {
-    assert(!this->M && "already serializing a module");
-    this->M = getModule(DC);
-    this->SF = DC.dyn_cast<SourceFile *>();
-
-    BCBlockRAII moduleBlock(Out, MODULE_DOC_BLOCK_ID, 2);
-    writeHeader(M);
+    BCBlockRAII moduleBlock(S.Out, MODULE_DOC_BLOCK_ID, 2);
+    S.writeHeader();
     {
-      BCBlockRAII restoreBlock(Out, COMMENT_BLOCK_ID, 4);
+      BCBlockRAII restoreBlock(S.Out, COMMENT_BLOCK_ID, 4);
 
-      comment_block::DeclCommentListLayout DeclCommentList(Out);
-      writeDeclCommentTable(DeclCommentList, SF, M);
+      comment_block::DeclCommentListLayout DeclCommentList(S.Out);
+      writeDeclCommentTable(DeclCommentList, S.SF, S.M);
     }
-    Out.FlushToWord();
-
-#ifndef NDEBUG
-    this->M = nullptr;
-    this->SF = nullptr;
-#endif
   }
 
-  os.write(Buffer.data(), Buffer.size());
-  os.flush();
-  Buffer.clear();
+  S.writeToStream(os);
 }
 
 void swift::serialize(ModuleOrSourceFile DC, const char *outputPath,
+                      const char *docOutputPath,
                       const SILModule *M, bool serializeAllSIL,
                       FilenamesTy inputFiles, StringRef moduleLinkName) {
+  assert(outputPath && outputPath[0] != '\0');
+
   std::string errorInfo;
   llvm::raw_fd_ostream out(outputPath, errorInfo, llvm::sys::fs::F_None);
 
@@ -2884,28 +2874,21 @@ void swift::serialize(ModuleOrSourceFile DC, const char *outputPath,
     return;
   }
 
-  serializeToStream(DC, out, M, serializeAllSIL, inputFiles, moduleLinkName);
-}
+  Serializer::writeToStream(out, DC, M, serializeAllSIL, inputFiles,
+                            moduleLinkName);
 
-void swift::serializeToStream(ModuleOrSourceFile DC, raw_ostream &out,
-                              const SILModule *M, bool serializeAllSIL,
-                              FilenamesTy inputFiles,
-                              StringRef moduleLinkName) {
-  Serializer S;
-  S.writeToStream(out, DC, M, serializeAllSIL, inputFiles, moduleLinkName);
-}
+  if (docOutputPath && docOutputPath[0] != '\0') {
+    std::string errorInfo;
+    llvm::raw_fd_ostream docOut(docOutputPath, errorInfo,
+                                llvm::sys::fs::F_None);
 
-void swift::serializeModuleDoc(ModuleOrSourceFile DC, const char *outputPath) {
-  std::string errorInfo;
-  llvm::raw_fd_ostream out(outputPath, errorInfo, llvm::sys::fs::F_None);
+    if (docOut.has_error() || !errorInfo.empty()) {
+      getContext(DC).Diags.diagnose(SourceLoc(), diag::error_opening_output,
+                                    docOutputPath, errorInfo);
+      docOut.clear_error();
+      return;
+    }
 
-  if (out.has_error() || !errorInfo.empty()) {
-    getContext(DC).Diags.diagnose(SourceLoc(), diag::error_opening_output,
-                                  outputPath, errorInfo);
-    out.clear_error();
-    return;
+    Serializer::writeDocToStream(docOut, DC);
   }
-
-  Serializer S;
-  S.writeDocToStream(out, DC);
 }

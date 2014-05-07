@@ -172,12 +172,11 @@ private:
 
   /// Writes the Swift module file header, BLOCKINFO block, and
   /// non-module-specific metadata, other than the module name.
-  void writeHeader(const Module *M);
+  void writeHeader();
 
   /// Writes the dependencies used to build this module: its imported
   /// modules and its source files.
-  void writeInputFiles(const Module *M, FilenamesTy inputFiles,
-                       StringRef moduleLinkName);
+  void writeInputFiles(FilenamesTy inputFiles, StringRef moduleLinkName);
 
   /// Writes the given pattern, recursively.
   void writePattern(const Pattern *pattern);
@@ -277,16 +276,19 @@ private:
   /// Top-level entry point for serializing a module.
   void writeAST(ModuleOrSourceFile DC);
 
-public:
-  Serializer() = default;
+  void writeToStream(raw_ostream &os);
 
+  template <size_t N>
+  Serializer(const unsigned char (&signature)[N], ModuleOrSourceFile DC);
+
+public:
   /// Serialize a module to the given stream.
-  void writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
-                     const SILModule *M, bool serializeAllSIL,
-                     FilenamesTy inputFiles, StringRef moduleLinkName);
+  static void writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
+                            const SILModule *M, bool serializeAllSIL,
+                            FilenamesTy inputFiles, StringRef moduleLinkName);
 
   /// Serialize module documentation to the given stream.
-  void writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC);
+  static void writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC);
 
   /// Records the use of the given Type.
   ///

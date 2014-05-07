@@ -156,21 +156,11 @@ namespace swift {
 
   /// Serializes a module or single source file to the given output file.
   void serialize(ModuleOrSourceFile DC, const char *outputPath,
+                 const char *docOutputPath = nullptr,
                  const SILModule *M = nullptr,
                  bool serializeAllSIL = false,
                  ArrayRef<std::string> inputFilenames = {},
                  StringRef moduleLinkName = {});
-
-  /// Serializes a module or single source file to a stream.
-  void serializeToStream(ModuleOrSourceFile DC,
-                         llvm::raw_ostream &out,
-                         const SILModule *M = nullptr,
-                         bool serializeAllSIL = false,
-                         ArrayRef<std::string> inputFilenames = {},
-                         StringRef moduleLinkName = {});
-
-  /// Writes a module documentation file.
-  void serializeModuleDoc(ModuleOrSourceFile DC, const char *outputPath);
 
   /// Turn the given Swift module into either LLVM IR or native code
   /// and return the generated LLVM IR module.

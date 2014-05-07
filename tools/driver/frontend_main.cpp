@@ -131,8 +131,7 @@ static bool performCompile(CompilerInstance &Instance,
     return true;
 
   // If we were asked to print Clang stats, do so.
-  if (Invocation.getFrontendOptions().PrintClangStats
-      && Context.getClangModuleLoader())
+  if (opts.PrintClangStats && Context.getClangModuleLoader())
     Context.getClangModuleLoader()->printStatistics();
   
   // We've just been told to perform a parse, so we can return now.
@@ -188,12 +187,10 @@ static bool performCompile(CompilerInstance &Instance,
     auto DC = PrimarySourceFile ? ModuleOrSourceFile(PrimarySourceFile) :
                                   Instance.getMainModule();
     if (!opts.ModuleOutputPath.empty())
-      serialize(DC, opts.ModuleOutputPath.c_str(), SM.get(),
+      serialize(DC, opts.ModuleOutputPath.c_str(),
+                opts.ModuleDocOutputPath.c_str(), SM.get(),
                 opts.SILSerializeAll, opts.InputFilenames,
                 opts.ModuleLinkName);
-
-    if (!opts.ModuleDocOutputPath.empty())
-      serializeModuleDoc(DC, opts.ModuleDocOutputPath.c_str());
 
     if (Action == FrontendOptions::EmitModuleOnly)
       return false;
