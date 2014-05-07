@@ -211,13 +211,14 @@ enum LibraryKind : uint8_t {
 using LibraryKindField = BCFixed<1>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
-// VERSION_MAJOR. Adding a new ID requires adding a byte of overhead to the
-// identifier table in Serializer::writeAllIdentifiers.
-enum : uint8_t {
+// VERSION_MAJOR.
+enum SpecialModuleID : uint8_t {
   /// Special IdentifierID value for the Builtin module.
   BUILTIN_MODULE_ID = 0,
   /// Special IdentifierID value for the current module.
   CURRENT_MODULE_ID,
+  /// Special value for the module for imported Objective-C headers.
+  OBJC_HEADER_MODULE_ID,
 
   /// The number of special modules. This value should never be encoded;
   /// it should only be used to count the number of names above. As such, it

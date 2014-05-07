@@ -14,6 +14,7 @@
 #include "swift/Serialization/ModuleFormat.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Serialization/BCReadingExtras.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -1273,10 +1274,21 @@ DeclContext *ModuleFile::getDeclContext(DeclID DID) {
 }
 
 Module *ModuleFile::getModule(ModuleID MID) {
-  if (MID == BUILTIN_MODULE_ID)
-    return getContext().TheBuiltinModule;
-  if (MID == CURRENT_MODULE_ID)
-    return FileContext->getParentModule();
+  if (MID < NUM_SPECIAL_MODULES) {
+    switch (static_cast<SpecialModuleID>(static_cast<uint8_t>(MID))) {
+    case BUILTIN_MODULE_ID:
+      return getContext().TheBuiltinModule;
+    case CURRENT_MODULE_ID:
+      return FileContext->getParentModule();
+    case OBJC_HEADER_MODULE_ID: {
+      auto clangImporter =
+        static_cast<ClangImporter *>(getContext().getClangModuleLoader());
+      return clangImporter->getImportedHeaderModule();
+    }
+    case NUM_SPECIAL_MODULES:
+      llvm_unreachable("implementation detail only");
+    }
+  }
   return getModule(getIdentifier(MID));
 }
 

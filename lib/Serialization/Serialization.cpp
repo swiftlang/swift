@@ -197,10 +197,15 @@ IdentifierID Serializer::addIdentifierRef(Identifier ident) {
 }
 
 IdentifierID Serializer::addModuleRef(const Module *M) {
-  if (M == this->M->Ctx.TheBuiltinModule)
-    return BUILTIN_MODULE_ID;
   if (M == this->M)
     return CURRENT_MODULE_ID;
+  if (M == this->M->Ctx.TheBuiltinModule)
+    return BUILTIN_MODULE_ID;
+
+  auto clangImporter =
+    static_cast<ClangImporter *>(this->M->Ctx.getClangModuleLoader());
+  if (M == clangImporter->getImportedHeaderModule())
+    return OBJC_HEADER_MODULE_ID;
 
   assert(!M->Name.empty());
   return addIdentifierRef(M->Name);
