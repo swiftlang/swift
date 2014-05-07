@@ -37,6 +37,10 @@ void MatchCallArgumentListener::outOfOrderArgument(unsigned argIdx,
                                                    unsigned prevArgIdx) {
 }
 
+bool MatchCallArgumentListener::relabelArguments(ArrayRef<Identifier> newNames){
+  return true;
+}
+
 /// Produce a score (smaller is better) comparing a parameter name and
 /// potentially-typod argument name.
 ///
@@ -111,12 +115,8 @@ static bool paramIsTrailingClosure(ArrayRef<TupleTypeElt> paramTuple,
   return true;
 };
 
-/// Compute an argument or parameter type into an array of tuple type elements.
-///
-/// \param type The type to decompose.
-/// \param scalar A \c TupleTypeElt to be used for scratch space for scalars.
-static ArrayRef<TupleTypeElt> decomposeArgParamType(Type type,
-                                                    TupleTypeElt &scalar) {
+ArrayRef<TupleTypeElt> constraints::decomposeArgParamType(Type type,
+                                                          TupleTypeElt &scalar){
   switch (type->getKind()) {
   case TypeKind::Tuple:
       return cast<TupleType>(type.getPointer())->getFields();
@@ -467,6 +467,7 @@ bool constraints::matchCallArguments(
 
     // FIXME: If we had the actual parameters and knew the body names, those
     // matches would be best.
+    potentiallyOutOfOrder = true;
   }
 
   // If we have any unfulfilled parameters, check them now.
@@ -501,7 +502,8 @@ bool constraints::matchCallArguments(
         argumentBindings[argIdx] = paramIdx;
     }
 
-    // Walk through the arguments, det
+    // Walk through the arguments, determining if any were bound to parameters
+    // out-of-order where it is not permitted.
     unsigned prevParamIdx = argumentBindings[0];
     for (unsigned argIdx = 1; argIdx != numArgs; ++argIdx) {
       unsigned paramIdx = argumentBindings[argIdx];
@@ -523,10 +525,7 @@ bool constraints::matchCallArguments(
             param.getDefaultArgKind() != DefaultArgumentKind::None)
           continue;
 
-        unsigned prevArgIdx = parameterBindings[i].front();
-        if (prevArgIdx == argIdx)
-          prevArgIdx = parameterBindings[i+1].front();
-
+        unsigned prevArgIdx = parameterBindings[prevParamIdx].front();
         listener.outOfOrderArgument(argIdx, prevArgIdx);
         return true;
       }

@@ -886,6 +886,19 @@ namespace {
     Expr *coerceToType(Expr *expr, Type toType,
                        ConstraintLocatorBuilder locator);
 
+    /// \brief Coerce the given expression (which is the argument to a call) to
+    /// the given parameter type.
+    ///
+    /// This operation cannot fail.
+    ///
+    /// \param arg The argument expression.
+    /// \param paramType The parameter type.
+    /// \param locator Locator used to describe where in this expression we are.
+    ///
+    /// \returns the coerced expression, which will have type \c ToType.
+    Expr *coerceCallArguments(Expr *arg, Type paramType,
+                              ConstraintLocatorBuilder locator);
+
     /// \brief Coerce the given object argument (e.g., for the base of a
     /// member expression) to the given type.
     ///
@@ -1817,6 +1830,12 @@ namespace {
 
     Expr *visitIdentityExpr(IdentityExpr *expr) {
       expr->setType(expr->getSubExpr()->getType());
+      return expr;
+    }
+
+    Expr *visitParenExpr(ParenExpr *expr) {
+      expr->setType(ParenType::get(cs.getASTContext(),
+                                   expr->getSubExpr()->getType()));
       return expr;
     }
 
@@ -3261,6 +3280,264 @@ Expr *ExprRewriter::coerceImplicitlyUnwrappedOptionalToValue(Expr *expr, Type ob
   return expr;
 }
 
+Expr *ExprRewriter::coerceCallArguments(Expr *arg, Type paramType,
+                                        ConstraintLocatorBuilder locator) {
+  // If the types match exactly, there's nothing to do.
+  // FIXME: This is propping up string literals, but it feels wrong.
+  if (arg->getType()->isEqual(paramType))
+    return arg;
+
+  // Determine the parameter bindings.
+  MatchCallArgumentListener listener;
+  TupleTypeElt paramScalar;
+  ArrayRef<TupleTypeElt> paramTuple = decomposeArgParamType(paramType,
+                                                            paramScalar);
+  TupleTypeElt argScalar;
+  ArrayRef<TupleTypeElt> argTupleElts = decomposeArgParamType(arg->getType(),
+                                                              argScalar);
+  SmallVector<ParamBinding, 4> parameterBindings;
+  bool failed = constraints::matchCallArguments(argTupleElts, paramTuple,
+                                                /*allowFixes=*/false, listener,
+                                                parameterBindings);
+  assert(!failed && "Call arguments did not match up?");
+  (void)failed;
+
+  // We should either have parentheses or a tuple.
+  TupleExpr *argTuple = dyn_cast<TupleExpr>(arg);
+  ParenExpr *argParen = dyn_cast<ParenExpr>(arg);
+  // FIXME: Eventually, we want to enforce that we have either argTuple or
+  // argParen here.
+
+  // Local function to extract the ith argument expression, which papers
+  // over some of the weirdness with tuples vs. parentheses.
+  auto getArg = [&](unsigned i) -> Expr * {
+    if (argTuple)
+      return argTuple->getElements()[i];
+    assert(i == 0 && "Scalar only has a single argument");
+
+    if (argParen)
+      return argParen->getSubExpr();
+
+    return arg;
+  };
+
+  // Local function to extract the ith argument label, which papers over some
+  // of the weirdndess with tuples vs. parentheses.
+  auto getArgLabel = [&](unsigned i) -> Identifier {
+    if (argTuple)
+      return argTuple->getElementName(i);
+
+    assert(i == 0 && "Scalar only has a single argument");
+    return Identifier();
+  };
+
+  // Local function to produce a locator to refer to the ith element of the
+  // argument tuple.
+  auto getArgLocator = [&](unsigned i) -> ConstraintLocatorBuilder {
+    if (argTuple)
+      return locator.withPathElement(LocatorPathElt::getTupleElement(i));
+
+    assert(i == 0 && "Scalar only has a single argument");
+    if (paramTuple[0].hasName())
+      return locator.withPathElement(ConstraintLocator::ScalarToTuple);
+
+    return locator;
+  };
+
+  // Local function to set the ith argument of the argument.
+  auto setArgElement = [&](unsigned i, Expr *e) {
+    if (argTuple) {
+      argTuple->setElement(i, e);
+      return;
+    }
+
+    assert(i == 0 && "Scalar with more than one argument?");
+
+    if (argParen) {
+      argParen->setSubExpr(e);
+      return;
+    }
+
+    arg = e;
+  };
+
+  auto &tc = getConstraintSystem().getTypeChecker();
+  bool anythingShuffled = false;
+  SmallVector<TupleTypeElt, 4> toSugarFields;
+  SmallVector<TupleTypeElt, 4> fromTupleExprFields(
+                                 argTuple? argTuple->getNumElements() : 1);
+  SmallVector<ScalarToTupleExpr::Element, 4> scalarToTupleElements;
+  SmallVector<Expr *, 2> callerDefaultArgs;
+  AbstractFunctionDecl *defaultArgsOwner = nullptr;
+  Expr *injectionFn = nullptr;
+  SmallVector<int, 4> sources;
+  for (unsigned paramIdx = 0, numParams = parameterBindings.size();
+       paramIdx != numParams; ++paramIdx) {
+    // Extract the parameter.
+    const auto &param = paramTuple[paramIdx];
+
+    // Handle variadic parameters.
+    if (param.isVararg()) {
+      // FIXME: TupleShuffleExpr cannot handle variadics anywhere other than
+      // at the end.
+      if (paramIdx != numParams-1) {
+        tc.diagnose(arg->getLoc(), diag::tuple_conversion_not_expressible,
+                    arg->getType(), paramType);
+        return nullptr;
+      }
+
+      // Find the appropriate injection function.
+      ArraySliceType *sliceType
+        = cast<ArraySliceType>(param.getType().getPointer());
+      Type boundType = BuiltinIntegerType::getWordType(tc.Context);
+      injectionFn = tc.buildArrayInjectionFnRef(cs.DC,
+                                                sliceType, boundType,
+                                                arg->getStartLoc());
+      if (!injectionFn)
+        return nullptr;
+
+      // Record this parameter.
+      toSugarFields.push_back(param);
+      anythingShuffled = true;
+      sources.push_back(TupleShuffleExpr::FirstVariadic);
+
+      // Convert the arguments.
+      auto paramBaseType = param.getVarargBaseTy();
+      for (auto argIdx : parameterBindings[paramIdx]) {
+        auto arg = getArg(argIdx);
+        auto argType = arg->getType();
+
+        // If the argument type exactly matches, this just works.
+        if (argType->isEqual(paramBaseType)) {
+          sources.push_back(argIdx);
+          fromTupleExprFields[argIdx] = TupleTypeElt(argType,
+                                                     getArgLabel(argIdx));
+          scalarToTupleElements.push_back(ScalarToTupleExpr::Element());
+          continue;
+        }
+
+        // FIXME: If we're not converting directly from a tuple expression,
+        // we can't express this. LAME!
+        if (!argTuple && numParams > 1) {
+          tc.diagnose(arg->getLoc(),
+                      diag::tuple_conversion_not_expressible,
+                      arg->getType(), paramType);
+          return nullptr;
+        }
+
+        // Convert the argument.
+        auto convertedArg = coerceToType(arg, paramBaseType,
+                                         getArgLocator(argIdx));
+        if (!convertedArg)
+          return nullptr;
+
+        // Add the converted argument.
+        setArgElement(argIdx, convertedArg);
+        sources.push_back(argIdx);
+        fromTupleExprFields[argIdx] = TupleTypeElt(convertedArg->getType(),
+                                                   getArgLabel(argIdx));
+        scalarToTupleElements.push_back(ScalarToTupleExpr::Element());
+      }
+
+      continue;
+    }
+
+    // If we are using a default argument, handle it now.
+    if (parameterBindings[paramIdx].empty()) {
+      // Dig out the owner of the default arguments.
+      if (!defaultArgsOwner) {
+        defaultArgsOwner
+        = findDefaultArgsOwner(cs, solution,
+                               cs.getConstraintLocator(locator));
+        assert(defaultArgsOwner && "Missing default arguments owner?");
+      } else {
+        assert(findDefaultArgsOwner(cs, solution,
+                                    cs.getConstraintLocator(locator))
+               == defaultArgsOwner);
+      }
+
+      // Note that we'll be doing a shuffle involving default arguments.
+      anythingShuffled = true;
+      toSugarFields.push_back(param);
+
+      // Create a caller-side default argument, if we need one.
+      if (auto defArg = getCallerDefaultArg(tc, dc, arg->getLoc(),
+                                            defaultArgsOwner, paramIdx)) {
+        callerDefaultArgs.push_back(defArg);
+        sources.push_back(TupleShuffleExpr::CallerDefaultInitialize);
+        scalarToTupleElements.push_back(defArg);
+      } else {
+        sources.push_back(TupleShuffleExpr::DefaultInitialize);
+        scalarToTupleElements.push_back(defaultArgsOwner);
+      }
+      continue;
+    }
+
+    // Extract the argument used to initialize this parameter.
+    assert(parameterBindings[paramIdx].size() == 1);
+    unsigned argIdx = parameterBindings[paramIdx].front();
+    auto arg = getArg(argIdx);
+    auto argType = arg->getType();
+
+    // If the argument and parameter indices differ, this is a shuffle.
+    sources.push_back(argIdx);
+    if (argIdx != paramIdx) {
+      anythingShuffled = true;
+    }
+    scalarToTupleElements.push_back(ScalarToTupleExpr::Element());
+
+    // If the types exactly match, this is easy.
+    auto paramType = param.getType();
+    if (argType->isEqual(paramType)) {
+      toSugarFields.push_back(TupleTypeElt(argType, param.getName()));
+      fromTupleExprFields[argIdx] = TupleTypeElt(paramType, param.getName());
+      continue;
+    }
+
+    // Convert the argument.
+    auto convertedArg = coerceToType(arg, paramType, getArgLocator(argIdx));
+    if (!convertedArg)
+      return nullptr;
+
+    // Add the converted argument.
+    setArgElement(argIdx, convertedArg);
+    sources.push_back(argIdx);
+    fromTupleExprFields[argIdx] = TupleTypeElt(convertedArg->getType(),
+                                               getArgLabel(argIdx));
+    toSugarFields.push_back(TupleTypeElt(argType, param.getName()));
+  }
+
+  // Compute the updated 'from' tuple type, since we may have
+  // performed some conversions in place.
+  Type argTupleType = TupleType::get(fromTupleExprFields, tc.Context);
+  if (argTuple) {
+    argTuple->setType(anythingShuffled? argTupleType : paramType);
+  } else {
+    arg->setType(anythingShuffled? argTupleType : paramType);
+  }
+
+  // If we don't have to shuffle anything, we're done.
+  if (!anythingShuffled)
+    return arg;
+
+  // If we came from a scalar, create a scalar-to-tuple conversion.
+  if (!argTuple) {
+    auto elements = tc.Context.AllocateCopy(scalarToTupleElements);
+    return new (tc.Context) ScalarToTupleExpr(arg, paramType, elements,
+                                              injectionFn);
+  }
+
+  // Create the tuple shuffle.
+  ArrayRef<int> mapping = tc.Context.AllocateCopy(sources);
+  auto callerDefaultArgsCopy = tc.Context.AllocateCopy(callerDefaultArgs);
+  auto shuffle = new (tc.Context) TupleShuffleExpr(arg, mapping,
+                                                   defaultArgsOwner,
+                                                   callerDefaultArgsCopy,
+                                                   paramType);
+  shuffle->setVarargsInjectionFunction(injectionFn);
+  return shuffle;
+}
+
 Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                                  ConstraintLocatorBuilder locator) {
   auto &tc = cs.getTypeChecker();
@@ -3736,9 +4013,17 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   // the function.
   if (auto fnType = fn->getType()->getAs<FunctionType>()) {
     auto origArg = apply->getArg();
-    Expr *arg = coerceToType(origArg, fnType->getInput(),
-                             locator.withPathElement(
+
+    Expr *arg;
+    if (tc.Context.LangOpts.StrictKeywordArguments) {
+      arg = coerceCallArguments(origArg, fnType->getInput(),
+                                locator.withPathElement(
+                                  ConstraintLocator::ApplyArgument));
+    } else {
+      arg = coerceToType(origArg, fnType->getInput(),
+                         locator.withPathElement(
                            ConstraintLocator::ApplyArgument));
+    }
 
     if (!arg) {
       return nullptr;

@@ -2097,20 +2097,24 @@ bool computeTupleShuffle(TupleType *fromTuple, TupleType *toTuple,
 /// elements.
 bool hasMandatoryTupleLabels(Expr *expr);
 
+/// Compute an argument or parameter type into an array of tuple type elements.
+///
+/// \param type The type to decompose.
+/// \param scalar A \c TupleTypeElt to be used for scratch space for scalars.
+ArrayRef<TupleTypeElt> decomposeArgParamType(Type type, TupleTypeElt &scalar);
 
 /// Describes the arguments to which a parameter binds.
 /// FIXME: This is an awful data structure. We want the equivalent of a
 /// TinyPtrVector for unsigned values.
 typedef SmallVector<unsigned, 1> ParamBinding;
 
-/// Abstract class used as the base for listeners to the \c matchCallArguments
-/// process.
+/// Class used as the base for listeners to the \c matchCallArguments process.
 ///
+/// By default, none of the callbacks do anything.
 class MatchCallArgumentListener {
-protected:
+public:
   virtual ~MatchCallArgumentListener();
 
-public:
   /// Indicates that the argument at the given index does not match any
   /// parameter.
   ///
@@ -2134,7 +2138,7 @@ public:
   ///
   /// \returns true to indicate that this should cause a failure, false
   /// otherwise.
-  virtual bool relabelArguments(ArrayRef<Identifier> newNames) = 0;
+  virtual bool relabelArguments(ArrayRef<Identifier> newNames);
 };
 
 /// Match the call arguments (as described by the given argument type) to
@@ -2146,6 +2150,7 @@ public:
 ///
 /// \param listener Listener that will be notified when certain problems occur,
 /// e.g., to produce a diagnostic.
+///
 /// \param parameterBindings Will be populated with the arguments that are
 /// bound to each of the parameters.
 /// \returns true if the call arguments could not be matched to the parameters.
