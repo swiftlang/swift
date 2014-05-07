@@ -5,3 +5,8 @@ func getBaseClass() -> BaseClass {
 }
 
 func useBaseClass(_: BaseClass) {}
+
+@objc @class_protocol
+protocol BaseProto {}
+
+func useBaseProto(_: BaseProto) {}
