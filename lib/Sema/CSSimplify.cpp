@@ -78,10 +78,10 @@ static Optional<unsigned> scoreParamAndArgNameTypo(StringRef paramName,
 ///
 /// FIXME: This is the wrong question to ask. We should know when something is
 /// a trailing closure.
-static bool paramIsTrailingClosure(const TupleType *paramTuple,
+static bool paramIsTrailingClosure(ArrayRef<TupleTypeElt> paramTuple,
                                    unsigned paramIdx) {
-  for (unsigned i = paramIdx, n = paramTuple->getNumElements(); i != n; ++i) {
-    const auto &param = paramTuple->getFields()[i];
+  for (unsigned i = paramIdx, n = paramTuple.size(); i != n; ++i) {
+    const auto &param = paramTuple[i];
     auto type = param.isVararg() ? param.getVarargBaseTy() : param.getType();
     type = type->getRValueInstanceType();
 
@@ -101,19 +101,47 @@ static bool paramIsTrailingClosure(const TupleType *paramTuple,
   return true;
 };
 
-// Match the argument tuple of a call to the parameter tuple.
+/// Compute an argument or parameter type into an array of tuple type elements.
+///
+/// \param type The type to decompose.
+/// \param scalar A \c TupleTypeElt to be used for scratch space for scalars.
+static ArrayRef<TupleTypeElt> decomposeArgParamType(Type type,
+                                                    TupleTypeElt &scalar) {
+  switch (type->getKind()) {
+  case TypeKind::Tuple:
+      return cast<TupleType>(type.getPointer())->getFields();
+
+  case TypeKind::Paren:
+    scalar = cast<ParenType>(type.getPointer())->getUnderlyingType();
+    return scalar;
+
+  default:
+    scalar = type;
+    return scalar;
+  }
+}
+
+// Match the argument of a call to the parameter.
 static ConstraintSystem::SolutionKind
-matchCallArguments(ConstraintSystem &cs,
-                   TupleType *argTuple, TupleType *paramTuple,
+matchCallArguments(ConstraintSystem &cs, Type argType, Type paramType,
                    ConstraintLocatorBuilder locator) {
+  // Extract the argument tuple fields.
+  TupleTypeElt argScalar;
+  ArrayRef<TupleTypeElt> argTuple = decomposeArgParamType(argType, argScalar);
+
+  // Extract the parameter tuple fields.
+  TupleTypeElt paramScalar;
+  ArrayRef<TupleTypeElt> paramTuple = decomposeArgParamType(paramType,
+                                                            paramScalar);
+
   // Keep track of the parameter we're matching and what argument indices
   // got bound to each parameter.
-  unsigned paramIdx, numParams = paramTuple->getNumElements();
+  unsigned paramIdx, numParams = paramTuple.size();
   llvm::SmallVector<SmallVector<unsigned, 1>, 4> parameterBindings; // FIXME:ick
   parameterBindings.resize(numParams);
 
   // Keep track of which arguments we have claimed from the argument tuple.
-  unsigned nextArgIdx = 0, numArgs = argTuple->getNumElements();
+  unsigned nextArgIdx = 0, numArgs = argTuple.size();
   SmallVector<bool, 4> claimedArgs(numArgs, false);
   SmallVector<Identifier, 4> actualArgNames;
   unsigned numClaimedArgs = 0;
@@ -134,14 +162,14 @@ matchCallArguments(ConstraintSystem &cs,
     if (!actualArgNames.empty()) {
       // We're recording argument names; record this one.
       actualArgNames[nextArgIdx] = expectedName;
-    } else if (argTuple->getFields()[nextArgIdx].getName() != expectedName &&
+    } else if (argTuple[nextArgIdx].getName() != expectedName &&
                !ignoreNameClash) {
       // We have an argument name mismatch. Start recording argument names.
       actualArgNames.resize(numArgs);
 
       // Figure out previous argument names from the parameter bindings.
       for (unsigned i = 0; i != numParams; ++i) {
-        const auto &param = paramTuple->getFields()[i];
+        const auto &param = paramTuple[i];
         bool firstArg = true;
 
         for (auto argIdx : parameterBindings[i]) {
@@ -179,8 +207,7 @@ matchCallArguments(ConstraintSystem &cs,
       // Nothing to claim.
       if (nextArgIdx == numArgs ||
           claimedArgs[nextArgIdx] ||
-          (argTuple->getFields()[nextArgIdx].hasName() &&
-           !ignoreNameMismatch))
+          (argTuple[nextArgIdx].hasName() && !ignoreNameMismatch))
         return Nothing;
 
       return claim(name);
@@ -192,7 +219,7 @@ matchCallArguments(ConstraintSystem &cs,
     // If the name matches, claim this argument.
     if (nextArgIdx != numArgs &&
         (ignoreNameMismatch ||
-         argTuple->getFields()[nextArgIdx].getName() == name)) {
+         argTuple[nextArgIdx].getName() == name)) {
       return claim(name);
     }
 
@@ -201,7 +228,7 @@ matchCallArguments(ConstraintSystem &cs,
     Optional<unsigned> claimedWithSameName;
     for (unsigned i = nextArgIdx; i != numArgs; ++i) {
       // Skip arguments where the name doesn't match.
-      if (argTuple->getFields()[i].getName() != name)
+      if (argTuple[i].getName() != name)
         continue;
 
       // Skip claimed arguments.
@@ -222,7 +249,7 @@ matchCallArguments(ConstraintSystem &cs,
     // have the same name.
     for (unsigned i = 0; i != nextArgIdx; ++i) {
       // Skip arguments where the name doesn't match.
-      if (argTuple->getFields()[i].getName() != name)
+      if (argTuple[i].getName() != name)
         continue;
 
       // Skip claimed arguments.
@@ -247,7 +274,7 @@ matchCallArguments(ConstraintSystem &cs,
     // FIXME: This is a hack. We should know whether it's a trailing closure
     // or not.
     if (paramIsTrailingClosure(paramTuple, paramIdx)) {
-      return claim(argTuple->getFields()[nextArgIdx].getName(),
+      return claim(argTuple[nextArgIdx].getName(),
                    /*ignoreNameClash=*/true);
     }
 
@@ -255,7 +282,7 @@ matchCallArguments(ConstraintSystem &cs,
     // some other parameter that hasn't yet been processed. If so, there is
     // nothing to claim.
     for (unsigned i = paramIdx + 1; i != numParams; ++i) {
-      if (paramTuple->getFields()[i].getName() == name)
+      if (paramTuple[i].getName() == name)
         return Nothing;
     }
 
@@ -279,7 +306,7 @@ matchCallArguments(ConstraintSystem &cs,
     }
 
     // Missing a keyword argument name.
-    if (nextArgIdx != numArgs && !argTuple->getFields()[nextArgIdx].hasName()) {
+    if (nextArgIdx != numArgs && !argTuple[nextArgIdx].hasName()) {
       // Claim the next argument.
       return claim(name);
     }
@@ -292,7 +319,7 @@ matchCallArguments(ConstraintSystem &cs,
   // the list.
   bool haveUnfulfilledParams = false;
   auto bindNextParameter = [&](bool ignoreNameMismatch) {
-    const auto &param = paramTuple->getFields()[paramIdx];
+    const auto &param = paramTuple[paramIdx];
 
     // Handle variadic parameters.
     if (param.isVararg()) {
@@ -354,7 +381,7 @@ matchCallArguments(ConstraintSystem &cs,
     llvm::SmallVector<unsigned, 4> unclaimedNamedArgs;
     for (nextArgIdx = 0; skipClaimedArgs(), nextArgIdx != numArgs;
          ++nextArgIdx) {
-      if (argTuple->getFields()[nextArgIdx].hasName())
+      if (argTuple[nextArgIdx].hasName())
         unclaimedNamedArgs.push_back(nextArgIdx);
     }
 
@@ -364,7 +391,7 @@ matchCallArguments(ConstraintSystem &cs,
       bool hasUnfulfilledUnnamedParams = false;
       for (paramIdx = 0; paramIdx != numParams; ++paramIdx ) {
         if (parameterBindings[paramIdx].empty()) {
-          if (paramTuple->getFields()[paramIdx].hasName())
+          if (paramTuple[paramIdx].hasName())
             unfulfilledNamedParams.push_back(paramIdx);
           else
             hasUnfulfilledUnnamedParams = true;
@@ -376,14 +403,14 @@ matchCallArguments(ConstraintSystem &cs,
         // FIXME: There is undoubtedly a good dynamic-programming algorithm
         // to find the best assignment here.
         for (auto argIdx : unclaimedNamedArgs) {
-          auto argName = argTuple->getFields()[argIdx].getName();
+          auto argName = argTuple[argIdx].getName();
 
           // Find the closest matching unfulfilled named parameter.
           unsigned bestScore = 0;
           unsigned best = 0;
           for (unsigned i = 0, n = unfulfilledNamedParams.size(); i != n; ++i) {
             unsigned param = unfulfilledNamedParams[i];
-            auto paramName = paramTuple->getFields()[param].getName();
+            auto paramName = paramTuple[param].getName();
 
             if (auto score = scoreParamAndArgNameTypo(paramName.str(),
                                                       argName.str(),
@@ -457,7 +484,7 @@ matchCallArguments(ConstraintSystem &cs,
       if (!parameterBindings[paramIdx].empty())
         continue;
 
-      const auto &param = paramTuple->getFields()[paramIdx];
+      const auto &param = paramTuple[paramIdx];
 
       // Variadic parameters can be unfulfilled.
       if (param.isVararg())
@@ -470,7 +497,7 @@ matchCallArguments(ConstraintSystem &cs,
       if (cs.shouldRecordFailures()) {
         cs.recordFailure(cs.getConstraintLocator(locator),
                          Failure::MissingArgument,
-                         paramTuple, paramIdx);
+                         paramType, paramIdx);
       }
 
       return ConstraintSystem::SolutionKind::Error;
@@ -504,7 +531,7 @@ matchCallArguments(ConstraintSystem &cs,
       // those parameters up to (and including) the previously-bound parameter
       // are either variadic or have a default argument.
       for (unsigned i = paramIdx; i != prevParamIdx + 1; ++i) {
-        const auto &param = paramTuple->getFields()[i];
+        const auto &param = paramTuple[i];
         if (param.isVararg() ||
             param.getDefaultArgKind() != DefaultArgumentKind::None)
           continue;
@@ -535,7 +562,7 @@ matchCallArguments(ConstraintSystem &cs,
     auto result = cs.simplifyFixConstraint(
                     Fix::getRelabelTuple(cs, FixKind::RelabelCallTuple,
                                          actualArgNames),
-                    argTuple, paramTuple,
+                    argType, paramType,
                     TypeMatchKind::ArgumentTupleConversion,
                     ConstraintSystem::TMF_None,
                     locator);
@@ -551,7 +578,7 @@ matchCallArguments(ConstraintSystem &cs,
       continue;
 
     // Determine the parameter type.
-    const auto &param = paramTuple->getFields()[paramIdx];
+    const auto &param = paramTuple[paramIdx];
     auto paramTy = param.isVararg() ? param.getVarargBaseTy()
                                     : param.getType();
 
@@ -559,7 +586,7 @@ matchCallArguments(ConstraintSystem &cs,
     for (auto argIdx : parameterBindings[paramIdx]) {
       // FIXME: Add a special locator for matching a parameter to an argument,
       // because we need both indices to diagnose well.
-      switch (cs.matchTypes(argTuple->getElementType(argIdx), paramTy,
+      switch (cs.matchTypes(argTuple[argIdx].getType(), paramTy,
                             TypeMatchKind::Conversion, subflags,
                             locator.withPathElement(
                               LocatorPathElt::getTupleElement(argIdx)))) {
@@ -764,7 +791,7 @@ ConstraintSystem::matchScalarToTupleTypes(Type type1, TupleType *tuple2,
   if (kind == TypeMatchKind::ArgumentTupleConversion &&
       elt.hasName() && !elt.isVararg() &&
       getASTContext().LangOpts.StrictKeywordArguments &&
-      !paramIsTrailingClosure(tuple2, scalarFieldIdx) &&
+      !paramIsTrailingClosure(tuple2->getFields(), scalarFieldIdx) &&
       !isSingleElementTupleNamed(type1, elt.getName())) {
     return simplifyFixConstraint(
              Fix::getRelabelTuple(*this, FixKind::ScalarToTuple, elt.getName()),
