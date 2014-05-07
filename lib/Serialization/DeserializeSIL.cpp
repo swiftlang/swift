@@ -584,8 +584,9 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     return true;
 
   SILBuilder Builder(BB);
-  unsigned OpCode, TyCategory, TyCategory2, ValResNum, ValResNum2, Attr,
-          IsTransparent, NumSubs;
+  unsigned OpCode = 0, TyCategory = 0, TyCategory2 = 0, ValResNum = 0,
+           ValResNum2 = 0, Attr = 0,
+           IsTransparent = 0, NumSubs = 0;
   ValueID ValID, ValID2;
   TypeID TyID, TyID2;
   SourceLoc SLoc;
