@@ -18,6 +18,7 @@
 
 namespace swift {
   class DeclContext;
+  class Identifier;
   class SourceFile;
   class Module;
   class Decl;
@@ -80,6 +81,16 @@ public:
   /// refers to.
   virtual bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
                                   TypeDecl *CtorTyRef) { return true; }
+
+  /// This method is called for each keyword argument in a call expression.
+  /// If it returns false, the remaining traversal is terminated and returns
+  /// failure.
+  ///
+  /// \param Name the argument name.
+  /// \param Range the source range of the argument name.
+  /// \param D the referenced decl.
+  virtual bool visitCallArgName(Identifier Name, CharSourceRange Range,
+                                ValueDecl *D);
 
 protected:
   SourceEntityWalker() = default;

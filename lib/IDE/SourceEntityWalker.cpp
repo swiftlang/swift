@@ -53,6 +53,8 @@ private:
 
   bool passReference(ValueDecl *D, SourceLoc Loc);
 
+  bool passCallArgNames(Expr *Fn, TupleExpr *TupleE);
+
   TypeDecl *getTypeDecl(Type Ty);
 
   bool shouldIgnore(Decl *D, bool &ShouldVisitChildren);
@@ -60,6 +62,8 @@ private:
   ValueDecl *extractDecl(Expr *Fn) const {
     if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(Fn))
       return DRE->getDecl();
+    if (auto ApplyE = dyn_cast<ApplyExpr>(Fn))
+      return extractDecl(ApplyE->getFn());
     return nullptr;
   }
 };
@@ -175,6 +179,12 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
     if (!walkToExprPost(E))
       return { false, nullptr };
     return { false, E };
+
+  } else if (auto TupleE = dyn_cast<TupleExpr>(E)) {
+    if (auto CallE = dyn_cast_or_null<CallExpr>(Parent.getAsExpr())) {
+      if (!passCallArgNames(CallE->getFn(), TupleE))
+        return { false, nullptr };
+    }
   }
 
   return { true, E };
@@ -244,6 +254,31 @@ bool SemaAnnotator::passReference(ValueDecl *D, SourceLoc Loc) {
   return Continue;
 }
 
+bool SemaAnnotator::passCallArgNames(Expr *Fn, TupleExpr *TupleE) {
+  ValueDecl *D = extractDecl(Fn);
+  if (!D)
+    return true; // continue.
+
+  ArrayRef<Identifier> ArgNames = TupleE->getElementNames();
+  ArrayRef<SourceLoc> ArgLocs = TupleE->getElementNameLocs();
+  assert(ArgNames.size() == ArgLocs.size());
+  for (auto i : indices(ArgNames)) {
+    Identifier Name = ArgNames[i];
+    SourceLoc Loc = ArgLocs[i];
+    if (Name.empty() || Loc.isInvalid())
+      continue;
+
+    CharSourceRange Range{ Loc, Name.getLength() };
+    bool Continue = SEWalker.visitCallArgName(Name, Range, D);
+    if (!Continue) {
+      Cancelled = true;
+      return false;
+    }
+  }
+
+  return true;
+}
+
 TypeDecl *SemaAnnotator::getTypeDecl(Type Ty) {
   if (Ty.isNull())
     return nullptr;
@@ -279,6 +314,12 @@ bool SourceEntityWalker::walk(Decl *D) {
 bool SourceEntityWalker::walk(DeclContext *DC) {
   SemaAnnotator Annotator(*this);
   return DC->walkContext(Annotator);
+}
+
+bool SourceEntityWalker::visitCallArgName(Identifier Name,
+                                          CharSourceRange Range,
+                                          ValueDecl *D) {
+  return true;
 }
 
 void SourceEntityWalker::anchor() {}
