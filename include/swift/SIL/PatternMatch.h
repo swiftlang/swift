@@ -148,6 +148,27 @@ inline bind_ty<ValueBase> m_ValueBase(ValueBase *&V) {
   return V;
 }
 
+struct silvalue_bind {
+  SILValue &Value;
+
+  silvalue_bind(SILValue &V) : Value(V) { }
+
+  template <typename ITy>
+  bool match(ITy V) {
+    return false;
+  }
+
+  bool match(SILValue V) {
+    Value = V;
+    return true;
+  }
+};
+
+/// Match an arbitrary SILValue, capturing the SILValue if the match succeeds.
+inline silvalue_bind m_SILValue(SILValue &V) {
+  return V;
+}
+
 struct specificval_ty {
   const ValueBase *Val;
   specificval_ty(const ValueBase *V) : Val(V) {}
@@ -171,6 +192,132 @@ inline specificval_ty m_Specific(const ValueBase *V) { return V; }
   inline bind_ty<Class> m_##Class(Class *&V) { return V; }
 #include "swift/SIL/SILNodes.def"
 
+static inline APInt extendAPInt(const APInt &A, unsigned bitWidth,
+                                bool isSigned) {
+  if (isSigned)
+    return A.sext(bitWidth);
+  return A.zext(bitWidth);
+}
+
+static inline bool isSameAPIntValue(const APInt &I1, const APInt &I2,
+                                    bool isSigned) {
+  if (I1.getBitWidth() == I2.getBitWidth())
+    return I1 == I2;
+
+  if (I1.getBitWidth() > I2.getBitWidth())
+    return I1 == extendAPInt(I2, I1.getBitWidth(), isSigned);
+
+  return extendAPInt(I1, I2.getBitWidth(), isSigned) == I2;
+}
+
+// Builtin Integer Matcher
+struct integerliteral_ty {
+  APInt Value;
+  bool isSigned;
+  integerliteral_ty(APInt V, bool S) : Value(V), isSigned(S) { }
+
+  template<typename ITy>
+  bool match(ITy *V) {
+    auto *Literal = dyn_cast<IntegerLiteralInst>(V);
+    if (!Literal)
+      return false;
+
+    // This should eventually be refactored into APInt::isSameValue by giving it
+    // a signed flag.
+    return isSameAPIntValue(Value, Literal->getValue(), isSigned);
+  }
+};
+
+static inline integerliteral_ty m_IntegerLiteralInst(APInt V, bool isSigned) {
+  return {V, isSigned};
+}
+
+//===----------------------------------------------------------------------===//
+//                             Unary Instructions
+//===----------------------------------------------------------------------===//
+
+template<typename OpMatchTy, ValueKind Kind>
+struct UnaryOp_match {
+  OpMatchTy OpMatch;
+
+  UnaryOp_match(const OpMatchTy &Op) : OpMatch(Op) { }
+
+  template<typename OpTy>
+  bool match(OpTy *V) {
+    if (V->getKind() != Kind)
+      return false;
+
+    auto *I = dyn_cast<SILInstruction>(V);
+    if (!I || I->getNumOperands() != 1)
+      return false;
+
+    return OpMatch.match(I->getOperand(0));
+  }
+};
+
+
+template <typename Ty>
+UnaryOp_match<Ty, ValueKind::PointerToAddressInst>
+m_PointerToAddressInst(const Ty &T) {
+  return T;
+}
+
+//===----------------------------------------------------------------------===//
+//                            Binary Instructions
+//===----------------------------------------------------------------------===//
+
+template<typename LHSTy, typename RHSTy, ValueKind Kind>
+struct BinaryOp_match {
+  LHSTy L;
+  RHSTy R;
+
+  BinaryOp_match(const LHSTy &LHS, const RHSTy &RHS) : L(LHS), R(RHS) {}
+
+  template<typename OpTy>
+  bool match(OpTy *V) {
+    if (V->getKind() != Kind)
+      return false;
+
+    auto *I = dyn_cast<SILInstruction>(V);
+    if (!I || I->getNumOperands() != 2)
+      return false;
+
+    return L.match(I->getOperand(0).getDef()) &&
+           R.match(I->getOperand(1).getDef());
+  }
+};
+
+template <typename LTy, typename RTy>
+BinaryOp_match<LTy, RTy, ValueKind::IndexRawPointerInst>
+m_IndexRawPointerInst(const LTy &Left, const RTy &Right) {
+  return {Left, Right};
+}
+
+//===----------------------------------------------------------------------===//
+//                         Address/Struct Projections
+//===----------------------------------------------------------------------===//
+
+template <typename LTy>
+struct tupleextract_ty {
+  LTy L;
+  unsigned index;
+  tupleextract_ty(const LTy &Left, unsigned i) : L(Left), index(i) { }
+
+  template <typename ITy>
+  bool match(ITy *V) {
+    auto *TEI = dyn_cast<TupleExtractInst>(V);
+    if (!TEI)
+      return false;
+
+    return TEI->getFieldNo() == index && L.match(TEI->getOperand().getDef());
+  }
+};
+
+template <typename LTy>
+tupleextract_ty<LTy> m_TupleExtractInst(const LTy &Left, unsigned Index) {
+  return tupleextract_ty<LTy>(Left, Index);
+}
+
 //===----------------------------------------------------------------------===//
 //              Function/Builtin/Intrinsic Application Matchers
 //===----------------------------------------------------------------------===//
@@ -183,18 +330,22 @@ template <typename CalleeTy>
 struct Callee_match;
 
 template<>
-struct Callee_match<SILFunction *> {
-  const SILFunction *Fun;
+struct Callee_match<SILFunction &> {
+  const SILFunction &Fun;
 
-  Callee_match(const SILFunction *F) : Fun(F) {}
+  Callee_match(const SILFunction &F) : Fun(F) {}
 
   template <typename ITy>
   bool match(ITy *V) {
-    auto *FunctionRef = dyn_cast<FunctionRefInst>(V);
+    auto *AI = dyn_cast<ApplyInst>(V);
+    if (!AI)
+      return false;
+
+    auto *FunctionRef = dyn_cast<FunctionRefInst>(AI->getCallee());
     if (!FunctionRef)
       return false;
 
-    return FunctionRef->getReferencedFunction() == Fun;
+    return FunctionRef->getReferencedFunction() == &Fun;
   }
 };
 
@@ -202,11 +353,15 @@ template<>
 struct Callee_match<BuiltinValueKind> {
   BuiltinValueKind Kind;
 
-  Callee_match(const BuiltinValueKind K) : Kind(K) { }
+  Callee_match(BuiltinValueKind K) : Kind(K) { }
 
   template <typename ITy>
   bool match(ITy *V) {
-    auto *BuiltinRef = dyn_cast<BuiltinFunctionRefInst>(V);
+    auto *AI = dyn_cast<ApplyInst>(V);
+    if (!AI)
+      return false;
+
+    auto *BuiltinRef = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee());
     if (!BuiltinRef)
       return false;
 
@@ -218,11 +373,15 @@ template<>
 struct Callee_match<llvm::Intrinsic::ID> {
   llvm::Intrinsic::ID IntrinsicID;
 
-  Callee_match(const llvm::Intrinsic::ID  ID) : IntrinsicID(ID) { }
+  Callee_match(const llvm::Intrinsic::ID ID) : IntrinsicID(ID) { }
 
   template <typename ITy>
   bool match(ITy *V) {
-    auto *BuiltinRef = dyn_cast<BuiltinFunctionRefInst>(V);
+    auto *AI = dyn_cast<ApplyInst>(V);
+    if (!AI)
+      return false;
+
+    auto *BuiltinRef = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee());
     if (!BuiltinRef)
       return false;
 
@@ -234,9 +393,10 @@ struct Callee_match<llvm::Intrinsic::ID> {
 ///
 /// We use explicit specialization of Callee_match to handle SILFunctions,
 /// Builtins, and Intrinsics all with this one function.
-template <typename CalleeTy>
-inline Callee_match<CalleeTy> m_Callee(CalleeTy *Callee) {
-  return Callee_match<CalleeTy>(Callee);
+
+template<typename CalleeTy>
+inline Callee_match<CalleeTy> m_Callee(CalleeTy Callee) {
+  return Callee;
 }
 
 //===
@@ -255,7 +415,24 @@ struct Argument_match {
     if (!Apply)
       return false;
 
-    return Val.match(&*Apply->getOperand(OpI));
+    return Val.match(Apply->getArgument(OpI).getDef());
+  }
+};
+
+// Explicit specialization for silvalue.
+template <>
+struct Argument_match<silvalue_bind> {
+  unsigned OpI;
+  silvalue_bind Val;
+  Argument_match(unsigned OpIdx, const silvalue_bind &V) : OpI(OpIdx), Val(V) { }
+
+  template <typename ITy>
+  bool match(ITy *V) {
+    auto *Apply = dyn_cast<ApplyInst>(V);
+    if (!Apply)
+      return false;
+
+    return Val.match(Apply->getOperand(OpI));
   }
 };
 
@@ -292,24 +469,24 @@ struct Apply_match<CalleeTy, T0, Arguments ...> {
 
 /// Match only an ApplyInst's Callee.
 template <typename CalleeTy>
-inline typename Apply_match<Callee_match<CalleeTy>>::Ty
-m_ApplyInst(CalleeTy *Callee) {
-  return m_Callee(Callee);
+inline typename Apply_match<CalleeTy>::Ty
+m_ApplyInst(CalleeTy Callee) {
+  return Callee;
 }
 
 /// Match an ApplyInst's Callee and first argument.
-template <typename CalleeTy, typename T0, unsigned Index=0>
-inline typename Apply_match<Callee_match<CalleeTy>, T0>::Ty
-m_ApplyInst(CalleeTy *Callee, const T0 &Op0) {
+template <unsigned Index=0, typename CalleeTy, typename T0>
+inline typename Apply_match<CalleeTy, T0>::Ty
+m_ApplyInst(CalleeTy Callee, const T0 &Op0) {
   return m_CombineAnd(m_Callee(Callee), m_Argument<Index>(Op0));
 }
 
 /// Match an ApplyInst's Callee and up to the ApplyInsts Nth argument, where N
 /// is sizeof...(Arguments) + 1.
-template <typename CalleeTy, typename T0, unsigned Index=0,
+template <unsigned Index=0, typename CalleeTy, typename T0,
           typename ...Arguments>
-inline typename Apply_match<Callee_match<CalleeTy>, T0, Arguments ...>::Ty
-m_ApplyInst(CalleeTy *Callee, const T0 &Op0, const Arguments &...Args) {
+inline typename Apply_match<CalleeTy, T0, Arguments ...>::Ty
+m_ApplyInst(CalleeTy Callee, const T0 &Op0, const Arguments &...Args) {
   return m_CombineAnd(m_ApplyInst<Index+1>(Callee, Args...),
                       m_Argument<Index>(Op0));
 }

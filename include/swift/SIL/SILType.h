@@ -358,6 +358,12 @@ public:
   /// Return true if this type references a "ref" type.
   bool isHeapObjectReferenceType() const;
 
+  /// Return the SILType corresponding to the underlying type of the given
+  /// metatype type.
+  ///
+  /// *NOTE* Only call on SILTypes for metatype types.
+  SILType getMetatypeInstanceType() const;
+
   //
   // Accessors for types used in SIL instructions:
   //

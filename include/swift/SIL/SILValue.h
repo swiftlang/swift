@@ -286,6 +286,13 @@ public:
     insertIntoCurrent();
   }
 
+  /// Swap the given operand with the current one.
+  void swap(Operand &Op) {
+    SILValue OtherV = Op.get();
+    Op.set(get());
+    set(OtherV);
+  }
+
   /// \brief Remove this use of the operand.
   void drop() {
     removeFromCurrent();

@@ -128,3 +128,15 @@ bool SILType::isHeapObjectReferenceType() const {
   // TODO: AnyObject type, @objc-only existentials in general
   return false;
 }
+
+SILType SILType::getMetatypeInstanceType() const {
+  CanType MetatypeType = getSwiftRValueType();
+  assert(MetatypeType->is<AnyMetatypeType>() &&
+         "This method should only be called on SILTypes with an underlying "
+         "metatype type.");
+  assert(isObject() && "Should only be called on object types.");
+  Type instanceType =
+    MetatypeType->castTo<AnyMetatypeType>()->getInstanceType();
+
+  return SILType::getPrimitiveObjectType(instanceType->getCanonicalType());
+}

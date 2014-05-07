@@ -132,6 +132,9 @@ public:
   unsigned getNumOperands() const { return getAllOperands().size(); }
   SILValue getOperand(unsigned Num) const { return getAllOperands()[Num].get();}
   void setOperand(unsigned Num, SILValue V) { getAllOperands()[Num].set(V); }
+  void swapOperands(unsigned Num1, unsigned Num2) {
+    getAllOperands()[Num1].swap(getAllOperands()[Num2]);
+  }
 
   MemoryBehavior getMemoryBehavior() const;
 

@@ -911,6 +911,18 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
   if (auto *CFI = dyn_cast<ConvertFunctionInst>(AI->getCallee()))
     return optimizeApplyOfConvertFunctionInst(AI, CFI);
 
+  // Canonicalize multiplication by a stride to be such that the stride is
+  // always the second argument.
+  if (AI->getNumOperands() != 4)
+    return nullptr;
+
+  if (match(AI, m_ApplyInst(BuiltinValueKind::SMulOver,
+                            m_ApplyInst(BuiltinValueKind::Strideof),
+                            m_ValueBase(), m_IntegerLiteralInst()))) {
+    AI->swapOperands(1, 2);
+    return AI;
+  }
+
   return nullptr;
 }
 
@@ -1069,6 +1081,44 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
                                                          ATPI->getOperand(),
                                                          PTAI->getType());
   }
+
+  // Turn:
+  //
+  //   %stride = Builtin.strideof(T) * %distance
+  //   %ptr' = index_raw_pointer %ptr, %stride
+  //   %result = pointer_to_address %ptr, $T'
+  //
+  // To:
+  //
+  //   %addr = pointer_to_address %ptr, $T
+  //   %result = index_addr %addr, %distance
+  //
+  ApplyInst *Bytes;
+  MetatypeInst *Metatype;
+  if (match(PTAI->getOperand(),
+            m_IndexRawPointerInst(m_ValueBase(),
+                                  m_TupleExtractInst(m_ApplyInst(Bytes), 0)))) {
+    if (match(Bytes, m_ApplyInst(BuiltinValueKind::SMulOver, m_ValueBase(),
+                                 m_ApplyInst(BuiltinValueKind::Strideof,
+                                             m_MetatypeInst(Metatype)),
+                                 m_ValueBase()))) {
+      SILType InstanceType = Metatype->getType().getMetatypeInstanceType();
+
+      // Make sure that the type of the metatype matches the type that we are
+      // casting to so we stride by the correct amount.
+      if (InstanceType.getAddressType() != PTAI->getType())
+        return nullptr;
+
+      auto IRPI = cast<IndexRawPointerInst>(PTAI->getOperand().getDef());
+      SILValue Ptr = IRPI->getOperand(0);
+      SILValue Distance = Bytes->getArgument(0);
+      auto *NewPTAI =
+          Builder->createPointerToAddress(PTAI->getLoc(), Ptr, PTAI->getType());
+      return new (PTAI->getModule())
+          IndexAddrInst(PTAI->getLoc(), NewPTAI, Distance);
+    }
+  }
+
   return nullptr;
 }
 
