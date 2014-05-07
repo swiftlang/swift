@@ -59,8 +59,10 @@ enum class ConstraintKind : char {
   /// \brief The first type is an argument type (or tuple) that is convertible
   /// to the second type (which represents the parameter type/tuple).
   ArgumentTupleConversion,
+  /// An argument tuple conversion for operators.
+  OperatorArgumentTupleConversion,
   /// \brief The first type is convertible to the second type, including inout.
-  OperatorConversion,
+  OperatorArgumentConversion,
   /// \brief The first type can be converted to the second type or can be
   /// used as an argument to a constructor for the second (non-reference)
   /// type.
@@ -431,7 +433,8 @@ public:
     case ConstraintKind::Subtype:
     case ConstraintKind::Conversion:
     case ConstraintKind::ArgumentTupleConversion:
-    case ConstraintKind::OperatorConversion:
+    case ConstraintKind::OperatorArgumentTupleConversion:
+    case ConstraintKind::OperatorArgumentConversion:
     case ConstraintKind::Construction:
     case ConstraintKind::ConformsTo:
     case ConstraintKind::CheckedCast:

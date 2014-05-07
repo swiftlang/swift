@@ -628,7 +628,9 @@ enum class TypeMatchKind : char {
   /// which includes exact matches, both forms of subtyping, and inserting
   /// address-of to convert implicit lvalues to inout arguments.  This is
   /// used by assignment operators.
-  OperatorConversion
+  OperatorArgumentConversion,
+  /// Like \c ArgumentTupleConversion, but for operators.
+  OperatorArgumentTupleConversion,
 };
 
 /// \brief The result of comparing two constraint systems that are a solutions

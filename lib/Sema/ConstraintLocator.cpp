@@ -30,8 +30,12 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
   id.AddInteger(path.size());
   for (auto elt : path) {
     id.AddInteger(elt.getKind());
-    if (pathElementHasNumericValue(elt.getKind()))
+    unsigned numValues = numNumericValuesInPathElement(elt.getKind());
+    if (numValues > 0) {
       id.AddInteger(elt.getValue());
+      if (numValues > 1)
+        id.AddInteger(elt.getValue2());
+    }
     else if (elt.getKind() == ConstraintLocator::Archetype)
       id.AddPointer(elt.getArchetype()->getCanonicalType().getPointer());
   }
@@ -89,6 +93,11 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
 
     case ApplyFunction:
       out << "apply function";
+      break;
+
+    case ApplyArgToParam:
+      out << "comparing call argument #" << llvm::utostr(elt.getValue())
+          << " to parameter #" << llvm::utostr(elt.getValue2());
       break;
 
     case AssignDest:

@@ -276,7 +276,7 @@ bool constraints::matchCallArguments(
     // the name were always correct.
     // FIXME: This is a hack. We should know whether it's a trailing closure
     // or not.
-    if (paramIsTrailingClosure(paramTuple, paramIdx)) {
+    if (nextArgIdx != numArgs && paramIsTrailingClosure(paramTuple, paramIdx)) {
       return claim(argTuple[nextArgIdx].getName(),
                    /*ignoreNameClash=*/true);
     }
@@ -543,7 +543,8 @@ bool constraints::matchCallArguments(
 
 // Match the argument of a call to the parameter.
 static ConstraintSystem::SolutionKind
-matchCallArguments(ConstraintSystem &cs, Type argType, Type paramType,
+matchCallArguments(ConstraintSystem &cs, TypeMatchKind kind,
+                   Type argType, Type paramType,
                    ConstraintLocatorBuilder locator) {
   /// Listener used to produce failures if they should be produced.
   class Listener : public MatchCallArgumentListener {
@@ -621,6 +622,23 @@ matchCallArguments(ConstraintSystem &cs, Type argType, Type paramType,
 
   // Check the argument types for each of the parameters.
   unsigned subflags = ConstraintSystem::TMF_GenerateConstraints;
+  TypeMatchKind subKind;
+  switch (kind) {
+  case TypeMatchKind::ArgumentTupleConversion:
+    subKind = TypeMatchKind::Conversion;
+    break;
+
+  case TypeMatchKind::OperatorArgumentTupleConversion:
+    subKind = TypeMatchKind::OperatorArgumentConversion;
+    break;
+
+  case TypeMatchKind::OperatorArgumentConversion:
+  case TypeMatchKind::Conversion:
+  case TypeMatchKind::BindType:
+  case TypeMatchKind::SameType:
+  case TypeMatchKind::Subtype:
+    llvm_unreachable("Not an call argument constraint");
+  }
   for (unsigned paramIdx = 0, numParams = parameterBindings.size();
        paramIdx != numParams; ++paramIdx){
     // Skip unfulfilled parameters. There's nothing to do for them.
@@ -634,12 +652,11 @@ matchCallArguments(ConstraintSystem &cs, Type argType, Type paramType,
 
     // Compare each of the bound arguments for this parameter.
     for (auto argIdx : parameterBindings[paramIdx]) {
-      // FIXME: Add a special locator for matching a parameter to an argument,
-      // because we need both indices to diagnose well.
       switch (cs.matchTypes(argTuple[argIdx].getType(), paramTy,
-                            TypeMatchKind::Conversion, subflags,
+                            subKind, subflags,
                             locator.withPathElement(
-                              LocatorPathElt::getTupleElement(argIdx)))) {
+                              LocatorPathElt::getApplyArgToParam(argIdx,
+                                                                 paramIdx)))) {
       case ConstraintSystem::SolutionKind::Error:
         return ConstraintSystem::SolutionKind::Error;
 
@@ -658,13 +675,6 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
                                   TypeMatchKind kind, unsigned flags,
                                   ConstraintLocatorBuilder locator) {
   unsigned subFlags = flags | TMF_GenerateConstraints;
-
-  // If this is an argument tuple conversion, handle it directly. The rules are
-  // different than for normal tuple conversions.
-  if (kind == TypeMatchKind::ArgumentTupleConversion &&
-      getASTContext().LangOpts.StrictKeywordArguments) {
-    return ::matchCallArguments(*this, tuple1, tuple2, locator);
-  }
 
   // Equality and subtyping have fairly strict requirements on tuple matching,
   // requiring element names to either match up or be disjoint.
@@ -745,6 +755,26 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   }
 
   assert(kind >= TypeMatchKind::Conversion);
+  TypeMatchKind subKind;
+  switch (kind) {
+  case TypeMatchKind::ArgumentTupleConversion:
+    subKind = TypeMatchKind::Conversion;
+    break;
+
+  case TypeMatchKind::OperatorArgumentTupleConversion:
+    subKind = TypeMatchKind::OperatorArgumentConversion;
+    break;
+
+  case TypeMatchKind::OperatorArgumentConversion:
+  case TypeMatchKind::Conversion:
+    subKind = TypeMatchKind::Conversion;
+    break;
+
+  case TypeMatchKind::BindType:
+  case TypeMatchKind::SameType:
+  case TypeMatchKind::Subtype:
+    llvm_unreachable("Not a conversion");
+  }
 
   // Compute the element shuffles for conversions.
   SmallVector<int, 16> sources;
@@ -781,7 +811,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
     // Match up the types.
     const auto &elt1 = tuple1->getFields()[idx1];
     const auto &elt2 = tuple2->getFields()[idx2];
-    switch (matchTypes(elt1.getType(), elt2.getType(), kind, subFlags,
+    switch (matchTypes(elt1.getType(), elt2.getType(), subKind, subFlags,
                        locator.withPathElement(
                          LocatorPathElt::getTupleElement(idx1)))) {
     case SolutionKind::Error:
@@ -800,7 +830,8 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
     auto eltType2 = elt2.getVarargBaseTy();
 
     for (unsigned idx1 : variadicArguments) {
-      switch (matchTypes(tuple1->getElementType(idx1), eltType2, kind, subFlags,
+      switch (matchTypes(tuple1->getElementType(idx1), eltType2, subKind,
+                         subFlags,
                          locator.withPathElement(
                            LocatorPathElt::getTupleElement(idx1)))) {
       case SolutionKind::Error:
@@ -816,17 +847,6 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   return SolutionKind::Solved;
 }
 
-/// Check whether this is a single-element tuple whose element name is the
-/// given name.
-static bool isSingleElementTupleNamed(Type type, Identifier name) {
-  if (auto tupleTy = type->getAs<TupleType>()) {
-    if (tupleTy->getNumElements() == 1)
-      return tupleTy->getFields()[0].getName() == name;
-  }
-
-  return false;
-}
-
 ConstraintSystem::SolutionKind
 ConstraintSystem::matchScalarToTupleTypes(Type type1, TupleType *tuple2,
                                           TypeMatchKind kind, unsigned flags,
@@ -834,20 +854,6 @@ ConstraintSystem::matchScalarToTupleTypes(Type type1, TupleType *tuple2,
   int scalarFieldIdx = tuple2->getFieldForScalarInit();
   assert(scalarFieldIdx >= 0 && "Invalid tuple for scalar-to-tuple");
   const auto &elt = tuple2->getFields()[scalarFieldIdx];
-
-  // For an argument tuple conversion, provide a fix that adds the
-  // missing label (if it needs one).
-  // FIXME: Handle varargs.
-  if (kind == TypeMatchKind::ArgumentTupleConversion &&
-      elt.hasName() && !elt.isVararg() &&
-      getASTContext().LangOpts.StrictKeywordArguments &&
-      !paramIsTrailingClosure(tuple2->getFields(), scalarFieldIdx) &&
-      !isSingleElementTupleNamed(type1, elt.getName())) {
-    return simplifyFixConstraint(
-             Fix::getRelabelTuple(*this, FixKind::ScalarToTuple, elt.getName()),
-             type1, tuple2, TypeMatchKind::Conversion, flags, locator);
-  }
-
   auto scalarFieldTy = elt.isVararg()? elt.getVarargBaseTy() : elt.getType();
   return matchTypes(type1, scalarFieldTy, kind, flags,
                     locator.withPathElement(ConstraintLocator::ScalarToTuple));
@@ -860,19 +866,37 @@ ConstraintSystem::matchTupleToScalarTypes(TupleType *tuple1, Type type2,
   assert(tuple1->getNumElements() == 1 && "Wrong number of elements");
   assert(!tuple1->getFields()[0].isVararg() && "Should not be variadic");
 
-  // For an argument tuple conversion, provide a fix that removes the
-  // label.
-  if (kind == TypeMatchKind::ArgumentTupleConversion &&
-      shouldAttemptFixes() && !(flags & TMF_ApplyingFix)) {
-    return simplifyFixConstraint(
-             Fix::getRelabelTuple(*this, FixKind::TupleToScalar, Identifier()),
-             tuple1, type2, TypeMatchKind::Conversion, flags, locator);
-  }
-
   return matchTypes(tuple1->getElementType(0),
                     type2, kind, flags,
                     locator.withPathElement(
                       LocatorPathElt::getTupleElement(0)));
+}
+
+/// Determine whether this is a function type accepting no arguments as input.
+static bool isFunctionTypeAcceptingNoArguments(Type type) {
+  // The type must be a function type.
+  auto fnType = type->getAs<AnyFunctionType>();
+  if (!fnType)
+    return false;
+
+  // Only tuple arguments make sense.
+  auto tupleTy = fnType->getInput()->getAs<TupleType>();
+  if (!tupleTy) return false;
+
+  // Look for any non-defaulted, non-variadic elements.
+  for (const auto &elt : tupleTy->getFields()) {
+    // Defaulted arguments are okay.
+    if (elt.getDefaultArgKind() != DefaultArgumentKind::None)
+      continue;
+
+    // Variadic arguments are okay.
+    if (elt.isVararg())
+      continue;
+
+    return false;
+  }
+
+  return true;
 }
 
 ConstraintSystem::SolutionKind
@@ -883,6 +907,16 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   // non-@auto_closure function type.
   if (func1->isAutoClosure() != func2->isAutoClosure()) {
     if (func2->isAutoClosure() || kind < TypeMatchKind::Subtype) {
+      // If the second type is an autoclosure and the first type appears to
+      // accept no arguments, try to add the ().
+      if (func2->isAutoClosure() && shouldAttemptFixes() &&
+          kind >= TypeMatchKind::Conversion &&
+          isFunctionTypeAcceptingNoArguments(func1)) {
+        unsigned subFlags = (flags | TMF_GenerateConstraints) & ~TMF_ApplyingFix;
+        return simplifyFixConstraint(FixKind::NullaryCall, func1, func2, kind,
+                                     subFlags, locator);
+      }
+
       // Record this failure.
       if (shouldRecordFailures()) {
         recordFailure(getConstraintLocator(locator),
@@ -918,7 +952,8 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case TypeMatchKind::Subtype:
   case TypeMatchKind::Conversion:
   case TypeMatchKind::ArgumentTupleConversion:
-  case TypeMatchKind::OperatorConversion:
+  case TypeMatchKind::OperatorArgumentTupleConversion:
+  case TypeMatchKind::OperatorArgumentConversion:
     subKind = TypeMatchKind::Subtype;
     break;
   }
@@ -964,8 +999,9 @@ static Failure::FailureKind getRelationalFailureKind(TypeMatchKind kind) {
     return Failure::TypesNotSubtypes;
 
   case TypeMatchKind::Conversion:
-  case TypeMatchKind::OperatorConversion:
+  case TypeMatchKind::OperatorArgumentConversion:
   case TypeMatchKind::ArgumentTupleConversion:
+  case TypeMatchKind::OperatorArgumentTupleConversion:
     return Failure::TypesNotConvertible;
   }
 
@@ -1101,8 +1137,11 @@ static ConstraintKind getConstraintKind(TypeMatchKind kind) {
   case TypeMatchKind::ArgumentTupleConversion:
     return ConstraintKind::ArgumentTupleConversion;
 
-  case TypeMatchKind::OperatorConversion:
-    return ConstraintKind::OperatorConversion;
+  case TypeMatchKind::OperatorArgumentTupleConversion:
+    return ConstraintKind::OperatorArgumentTupleConversion;
+
+  case TypeMatchKind::OperatorArgumentConversion:
+    return ConstraintKind::OperatorArgumentConversion;
   }
 
   llvm_unreachable("unhandled type matching kind");
@@ -1134,7 +1173,8 @@ tryUserConversion(ConstraintSystem &cs, Type type, ConstraintKind kind,
   assert(kind != ConstraintKind::Construction &&
          kind != ConstraintKind::Conversion &&
          kind != ConstraintKind::ArgumentTupleConversion &&
-         kind != ConstraintKind::OperatorConversion &&
+         kind != ConstraintKind::OperatorArgumentTupleConversion &&
+         kind != ConstraintKind::OperatorArgumentConversion &&
          "Construction/conversion constraints create potential cycles");
   
   // If this isn't a type that can have user-defined conversions, there's
@@ -1195,33 +1235,6 @@ tryUserConversion(ConstraintSystem &cs, Type type, ConstraintKind kind,
   cs.increaseScore(SK_UserConversion);
 
   return ConstraintSystem::SolutionKind::Solved;
-}
-
-/// Determine whether this is a function type accepting no arguments as input.
-static bool isFunctionTypeAcceptingNoArguments(Type type) {
-  // The type must be a function type.
-  auto fnType = type->getAs<AnyFunctionType>();
-  if (!fnType)
-    return false;
-
-  // Only tuple arguments make sense.
-  auto tupleTy = fnType->getInput()->getAs<TupleType>();
-  if (!tupleTy) return false;
-
-  // Look for any non-defaulted, non-variadic elements.
-  for (const auto &elt : tupleTy->getFields()) {
-    // Defaulted arguments are okay.
-    if (elt.getDefaultArgKind() != DefaultArgumentKind::None)
-      continue;
-
-    // Variadic arguments are okay.
-    if (elt.isVararg())
-      continue;
-
-    return false;
-  }
-
-  return true;
 }
 
 ConstraintSystem::SolutionKind
@@ -1329,7 +1342,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     case TypeMatchKind::Subtype:
     case TypeMatchKind::Conversion:
     case TypeMatchKind::ArgumentTupleConversion:
-    case TypeMatchKind::OperatorConversion:
+    case TypeMatchKind::OperatorArgumentTupleConversion:
+    case TypeMatchKind::OperatorArgumentConversion:
       if (flags & TMF_GenerateConstraints) {
         // Add a new constraint between these types. We consider the current
         // type-matching problem to the "solved" by this addition, because
@@ -1353,6 +1367,29 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
 
   llvm::SmallVector<RestrictionOrFix, 4> conversionsOrFixes;
   bool concrete = !typeVar1 && !typeVar2;
+
+  // If this is an argument conversion, handle it directly. The rules are
+  // different than for normal conversions.
+  if ((kind == TypeMatchKind::ArgumentTupleConversion ||
+       kind == TypeMatchKind::OperatorArgumentTupleConversion) &&
+      getASTContext().LangOpts.StrictKeywordArguments) {
+    if (concrete) {
+      return ::matchCallArguments(*this, kind, type1, type2, locator);
+    }
+
+    if (flags & TMF_GenerateConstraints) {
+      // Add a new constraint between these types. We consider the current
+      // type-matching problem to the "solved" by this addition, because
+      // this new constraint will be solved at a later point.
+      // Obviously, this must not happen at the top level, or the algorithm
+      // would not terminate.
+      addConstraint(getConstraintKind(kind), type1, type2,
+                    getConstraintLocator(locator));
+      return SolutionKind::Solved;
+    }
+
+    return SolutionKind::Unsolved;
+  }
 
   // Decompose parallel structure.
   unsigned subFlags = (flags | TMF_GenerateConstraints) & ~TMF_ApplyingFix;
@@ -1462,7 +1499,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     
     case TypeKind::InOut:
       // If the RHS is an inout type, the LHS must be an @lvalue type.
-      if (kind >= TypeMatchKind::OperatorConversion) {
+      if (kind >= TypeMatchKind::OperatorArgumentConversion) {
         if (shouldRecordFailures())
           recordFailure(getConstraintLocator(locator),
                         Failure::IsForbiddenLValue, type1, type2);
@@ -1573,7 +1610,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     }
   }
 
-  if (concrete && kind >= TypeMatchKind::OperatorConversion) {
+  if (concrete && kind >= TypeMatchKind::OperatorArgumentConversion) {
     // If the RHS is an inout type, the LHS must be an @lvalue type.
     if (auto *iot = type2->getAs<InOutType>()) {
       return matchTypes(type1, LValueType::get(iot->getObjectType()),
@@ -2454,13 +2491,17 @@ ConstraintSystem::simplifyArchetypeConstraint(const Constraint &constraint) {
 
 /// Simplify the given type for use in a type property constraint.
 static Type simplifyForTypePropertyConstraint(ConstraintSystem &cs, Type type) {
-  if (auto tv = dyn_cast<TypeVariableType>(type.getPointer())) {
+  if (auto tv = type->getAs<TypeVariableType>()) {
     auto fixed = cs.getFixedType(tv);
     if (!fixed)
       return Type();
 
     // Continue with the fixed type.
     type = fixed;
+
+    // Look through parentheses.
+    while (auto paren = type->getAs<ParenType>())
+      type = paren->getUnderlyingType();
   }
 
   return type;
@@ -2626,7 +2667,7 @@ retry:
     TypeMatchKind ArgConv = TypeMatchKind::ArgumentTupleConversion;
     if (isa<PrefixUnaryExpr>(anchor) || isa<PostfixUnaryExpr>(anchor) ||
         isa<BinaryExpr>(anchor))
-      ArgConv = TypeMatchKind::OperatorConversion;
+      ArgConv = TypeMatchKind::OperatorArgumentTupleConversion;
     
     // The argument type must be convertible to the input type.
     if (matchTypes(func1->getInput(), func2->getInput(),
@@ -2718,8 +2759,10 @@ static TypeMatchKind getTypeMatchKind(ConstraintKind kind) {
   case ConstraintKind::Conversion: return TypeMatchKind::Conversion;
   case ConstraintKind::ArgumentTupleConversion:
     return TypeMatchKind::ArgumentTupleConversion;
-  case ConstraintKind::OperatorConversion:
-    return TypeMatchKind::OperatorConversion;
+  case ConstraintKind::OperatorArgumentTupleConversion:
+    return TypeMatchKind::OperatorArgumentTupleConversion;
+  case ConstraintKind::OperatorArgumentConversion:
+    return TypeMatchKind::OperatorArgumentConversion;
 
   case ConstraintKind::ApplicableFunction:
     llvm_unreachable("ApplicableFunction constraints don't involve "
@@ -3080,7 +3123,8 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   case ConstraintKind::Subtype:
   case ConstraintKind::Conversion:
   case ConstraintKind::ArgumentTupleConversion:
-  case ConstraintKind::OperatorConversion: {
+  case ConstraintKind::OperatorArgumentTupleConversion:
+  case ConstraintKind::OperatorArgumentConversion: {
     // For relational constraints, match up the types.
     auto matchKind = getTypeMatchKind(constraint.getKind());
 

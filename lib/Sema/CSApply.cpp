@@ -953,9 +953,15 @@ namespace {
       auto resultTy = subscriptTy->castTo<AnyFunctionType>()->getResult();
 
       // Coerce the index argument.
-      index = coerceToType(index, indexTy,
-                           locator.withPathElement(
-                             ConstraintLocator::SubscriptIndex));
+      if (cs.getASTContext().LangOpts.StrictKeywordArguments) {
+        index = coerceCallArguments(index, indexTy,
+                                    locator.withPathElement(
+                                      ConstraintLocator::SubscriptIndex));
+      } else {
+        index = coerceToType(index, indexTy,
+                             locator.withPathElement(
+                               ConstraintLocator::SubscriptIndex));
+      }
       if (!index)
         return nullptr;
 
@@ -1834,8 +1840,11 @@ namespace {
     }
 
     Expr *visitParenExpr(ParenExpr *expr) {
-      expr->setType(ParenType::get(cs.getASTContext(),
-                                   expr->getSubExpr()->getType()));
+      auto &ctx = cs.getASTContext();
+      if (ctx.LangOpts.StrictKeywordArguments)
+        expr->setType(ParenType::get(ctx, expr->getSubExpr()->getType()));
+      else
+        expr->setType(expr->getSubExpr()->getType());
       return expr;
     }
 
@@ -2760,6 +2769,27 @@ static Expr *getCallerDefaultArg(TypeChecker &tc, DeclContext *dc,
   return init;
 }
 
+/// Rebuild the ParenTypes for the given expression, whose underlying expression
+/// should be set to the given type.
+static Type rebuildParenType(ASTContext &ctx, Expr *expr, Type type) {
+  if (auto paren = dyn_cast<ParenExpr>(expr)) {
+    type = rebuildParenType(ctx, paren->getSubExpr(), type);
+    if (ctx.LangOpts.StrictKeywordArguments)
+      paren->setType(ParenType::get(ctx, type));
+    else
+      paren->setType(type);
+    return paren->getType();
+  }
+
+  if (auto ident = dyn_cast<IdentityExpr>(expr)) {
+    type = rebuildParenType(ctx, ident->getSubExpr(), type);
+    ident->setType(type);
+    return ident->getType();
+  }
+
+  return type;
+}
+
 Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
                                        TupleType *toTuple,
                                        ConstraintLocatorBuilder locator,
@@ -2939,9 +2969,7 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
     fromTupleExpr->setType(fromTupleType);
 
     // Update the types of parentheses around the tuple expression.
-    for (auto paren = dyn_cast<IdentityExpr>(expr); paren;
-         paren = dyn_cast<IdentityExpr>(paren->getSubExpr()))
-      paren->setType(fromTupleType);
+    rebuildParenType(cs.getASTContext(), expr, fromTupleType);
   }
 
   // Compute the re-sugared tuple type.
@@ -2953,9 +2981,7 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
     fromTupleExpr->setType(toSugarType);
 
     // Update the types of parentheses around the tuple expression.
-    for (auto paren = dyn_cast<IdentityExpr>(expr); paren;
-         paren = dyn_cast<IdentityExpr>(paren->getSubExpr()))
-      paren->setType(toSugarType);
+    rebuildParenType(cs.getASTContext(), expr, toSugarType);
 
     return expr;
   }
@@ -3333,15 +3359,10 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, Type paramType,
 
   // Local function to produce a locator to refer to the ith element of the
   // argument tuple.
-  auto getArgLocator = [&](unsigned i) -> ConstraintLocatorBuilder {
-    if (argTuple)
-      return locator.withPathElement(LocatorPathElt::getTupleElement(i));
-
-    assert(i == 0 && "Scalar only has a single argument");
-    if (paramTuple[0].hasName())
-      return locator.withPathElement(ConstraintLocator::ScalarToTuple);
-
-    return locator;
+  auto getArgLocator = [&](unsigned argIdx, unsigned paramIdx)
+                         -> ConstraintLocatorBuilder {
+    return locator.withPathElement(
+             LocatorPathElt::getApplyArgToParam(argIdx, paramIdx));
   };
 
   // Local function to set the ith argument of the argument.
@@ -3406,10 +3427,10 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, Type paramType,
       for (auto argIdx : parameterBindings[paramIdx]) {
         auto arg = getArg(argIdx);
         auto argType = arg->getType();
+        sources.push_back(argIdx);
 
         // If the argument type exactly matches, this just works.
         if (argType->isEqual(paramBaseType)) {
-          sources.push_back(argIdx);
           fromTupleExprFields[argIdx] = TupleTypeElt(argType,
                                                      getArgLabel(argIdx));
           scalarToTupleElements.push_back(ScalarToTupleExpr::Element());
@@ -3427,13 +3448,12 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, Type paramType,
 
         // Convert the argument.
         auto convertedArg = coerceToType(arg, paramBaseType,
-                                         getArgLocator(argIdx));
+                                         getArgLocator(argIdx, paramIdx));
         if (!convertedArg)
           return nullptr;
 
         // Add the converted argument.
         setArgElement(argIdx, convertedArg);
-        sources.push_back(argIdx);
         fromTupleExprFields[argIdx] = TupleTypeElt(convertedArg->getType(),
                                                    getArgLabel(argIdx));
         scalarToTupleElements.push_back(ScalarToTupleExpr::Element());
@@ -3479,9 +3499,10 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, Type paramType,
     auto arg = getArg(argIdx);
     auto argType = arg->getType();
 
-    // If the argument and parameter indices differ, this is a shuffle.
+    // If the argument and parameter indices differ, or if the names differ,
+    // this is a shuffle.
     sources.push_back(argIdx);
-    if (argIdx != paramIdx) {
+    if (argIdx != paramIdx || getArgLabel(argIdx) != param.getName()) {
       anythingShuffled = true;
     }
     scalarToTupleElements.push_back(ScalarToTupleExpr::Element());
@@ -3495,13 +3516,13 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, Type paramType,
     }
 
     // Convert the argument.
-    auto convertedArg = coerceToType(arg, paramType, getArgLocator(argIdx));
+    auto convertedArg = coerceToType(arg, paramType, getArgLocator(argIdx,
+                                                                   paramIdx));
     if (!convertedArg)
       return nullptr;
 
     // Add the converted argument.
     setArgElement(argIdx, convertedArg);
-    sources.push_back(argIdx);
     fromTupleExprFields[argIdx] = TupleTypeElt(convertedArg->getType(),
                                                getArgLabel(argIdx));
     toSugarFields.push_back(TupleTypeElt(argType, param.getName()));
@@ -4198,6 +4219,11 @@ static bool diagnoseRelabel(TypeChecker &tc, Expr *expr,
     // that we're inside a ParenExpr, because ParenExprs are required
     // by the syntax and locator resolution looks through on level of
     // them.
+
+    // Look through the paren expression, if there is one.
+    if (auto parenExpr = dyn_cast<ParenExpr>(expr))
+      expr = parenExpr->getSubExpr();
+
     llvm::SmallString<16> str;
     str += newNames[0].str();
     str += ": ";

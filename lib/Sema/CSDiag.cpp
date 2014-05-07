@@ -200,9 +200,13 @@ void constraints::simplifyLocator(Expr *&anchor,
         anchor = applyExpr->getArg();
         path = path.slice(1);
 
-        // Look through parentheses around the argument.
-        if (auto paren = dyn_cast<ParenExpr>(anchor))
-          anchor = paren->getSubExpr();
+        // FIXME: Egregious hack. Strict-keyword-arguments shouldn't need it.
+        if (!anchor->getType()->getASTContext()
+              .LangOpts.StrictKeywordArguments) {
+          // Look through parentheses around the argument.
+          if (auto paren = dyn_cast<ParenExpr>(anchor))
+            anchor = paren->getSubExpr();
+        }
 
         continue;
       }
@@ -254,6 +258,33 @@ void constraints::simplifyLocator(Expr *&anchor,
         anchor = tupleExpr->getElement(path[0].getValue());
         path = path.slice(1);
         continue;
+      }
+      break;
+
+    case ConstraintLocator::ApplyArgToParam:
+      // Extract tuple element.
+      if (auto tupleExpr = dyn_cast<TupleExpr>(anchor)) {
+        // Append this extraction to the target locator path.
+        if (targetAnchor) {
+          targetPath.push_back(path[0]);
+        }
+
+        anchor = tupleExpr->getElement(path[0].getValue());
+        path = path.slice(1);
+        continue;
+      }
+
+      // Extract subexpression in parentheses.
+      if (auto parenExpr = dyn_cast<ParenExpr>(anchor)) {
+        assert(path[0].getValue() == 0);
+
+        // Append this extraction to the target locator path.
+        if (targetAnchor) {
+          targetPath.push_back(path[0]);
+        }
+
+        anchor = parenExpr->getSubExpr();
+        path = path.slice(1);
       }
       break;
 
@@ -460,6 +491,20 @@ ResolvedLocator constraints::resolveLocatorToDecl(
     case ConstraintLocator::NamedTupleElement:
       if (parameterPattern) {
         unsigned index = path[0].getValue();
+        if (auto tuple = dyn_cast<TuplePattern>(
+                           parameterPattern->getSemanticsProvidingPattern())) {
+          parameterPattern = tuple->getFields()[index].getPattern();
+          impliesFullPattern = false;
+          path = path.slice(1);
+          continue;
+        }
+        parameterPattern = nullptr;
+      }
+      break;
+
+    case ConstraintLocator::ApplyArgToParam:
+      if (parameterPattern) {
+        unsigned index = path[0].getValue2();
         if (auto tuple = dyn_cast<TuplePattern>(
                            parameterPattern->getSemanticsProvidingPattern())) {
           parameterPattern = tuple->getFields()[index].getPattern();
@@ -685,9 +730,15 @@ static bool diagnoseFailure(ConstraintSystem &cs,
     return false;
 
   case Failure::MissingArgument: {
-    auto tupleTy = failure.getFirstType()->castTo<TupleType>();
+    Identifier name;
     unsigned idx = failure.getValue();
-    auto name = tupleTy->getFields()[idx].getName();
+    if (auto tupleTy = failure.getFirstType()->getAs<TupleType>()) {
+      name = tupleTy->getFields()[idx].getName();
+    } else {
+      // Scalar.
+      assert(idx == 0);
+    }
+
     if (name.empty())
       tc.diagnose(loc, diag::missing_argument_positional, idx+1);
     else

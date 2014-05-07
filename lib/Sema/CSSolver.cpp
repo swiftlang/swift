@@ -541,7 +541,8 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
     case ConstraintKind::Subtype:
     case ConstraintKind::Conversion:
     case ConstraintKind::ArgumentTupleConversion:
-    case ConstraintKind::OperatorConversion:
+    case ConstraintKind::OperatorArgumentTupleConversion:
+    case ConstraintKind::OperatorArgumentConversion:
       // Relational constraints: break out to look for types above/below.
       break;
 
@@ -718,7 +719,9 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
 
     // Don't deduce autoclosure types or single-element, non-variadic
     // tuples.
-    if (constraint->getKind() == ConstraintKind::OperatorConversion ||
+    if (constraint->getKind() == ConstraintKind::OperatorArgumentConversion ||
+        constraint->getKind()
+          == ConstraintKind::OperatorArgumentTupleConversion ||
         constraint->getKind() == ConstraintKind::ArgumentTupleConversion ||
         constraint->getKind() == ConstraintKind::Conversion ||
         constraint->getKind() == ConstraintKind::Subtype) {

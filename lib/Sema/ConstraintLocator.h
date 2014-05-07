@@ -58,6 +58,8 @@ public:
     ApplyArgument,
     /// \brief The function being applied.
     ApplyFunction,
+    /// Matching an argument to a parameter.
+    ApplyArgToParam,
     /// \brief An archetype being opened.
     ///
     /// Also contains the archetype itself.
@@ -134,9 +136,9 @@ public:
     NewArrayConstructor
   };
 
-  /// \brief Determine whether the given path element kind has an associated
-  /// value.
-  static bool pathElementHasNumericValue(PathElementKind kind) {
+  /// \brief Determine the number of numeric values used for the given path
+  /// element kind.
+  static unsigned numNumericValuesInPathElement(PathElementKind kind) {
     switch (kind) {
     case ApplyArgument:
     case ApplyFunction:
@@ -171,13 +173,16 @@ public:
     case AssignDest:
     case NewArrayElement:
     case NewArrayConstructor:
-      return false;
+      return 0;
 
     case GenericArgument:
     case InterpolationArgument:
     case NamedTupleElement:
     case TupleElement:
-      return true;
+      return 1;
+
+    case ApplyArgToParam:
+      return 2;
     }
   }
 
@@ -205,6 +210,7 @@ public:
     case AddressOf:
     case ApplyArgument:
     case ApplyFunction:
+    case ApplyArgToParam:
     case ArrayElementType:
     case ClosureResult:
     case ConstructorMember:
@@ -284,7 +290,18 @@ public:
     }
 
     PathElement(PathElementKind kind, unsigned value)
-      : storage(encodeStorage(kind, value), StoredKindAndValue) { }
+      : storage(encodeStorage(kind, value), StoredKindAndValue)
+    {
+      assert(numNumericValuesInPathElement(kind) == 1 &&
+             "Path element kind does not require 1 value");
+    }
+
+    PathElement(PathElementKind kind, unsigned value1, unsigned value2)
+      : storage(encodeStorage(kind, value1 << 16 | value2), StoredKindAndValue)
+    {
+      assert(numNumericValuesInPathElement(kind) == 2 &&
+             "Path element kind does not require 2 values");
+    }
 
     friend class ConstraintLocator;
     
@@ -292,7 +309,8 @@ public:
     PathElement(PathElementKind kind)
       : storage(encodeStorage(kind, 0), StoredKindAndValue)
     {
-      assert(!pathElementHasNumericValue(kind) &&"Path element requires value");
+      assert(numNumericValuesInPathElement(kind) == 0 &&
+             "Path element requires value");
     }
 
     PathElement(ArchetypeType *archetype)
@@ -308,6 +326,12 @@ public:
     /// its name.
     static PathElement getNamedTupleElement(unsigned position) {
       return PathElement(NamedTupleElement, position);
+    }
+
+    /// Retrieve a patch element for an argument/parameter comparison in a
+    /// function application.
+    static PathElement getApplyArgToParam(unsigned argIdx, unsigned paramIdx) {
+      return PathElement(ApplyArgToParam, argIdx, paramIdx);
     }
 
     /// \brief Retrieve a path element for a generic argument referred to by
@@ -337,10 +361,27 @@ public:
     /// \brief Retrieve the value associated with this path element,
     /// if it has one.
     unsigned getValue() const {
-      assert(pathElementHasNumericValue(getKind()) &&
-             "No value in path element!");
-      return decodeStorage(storage.getPointer().get<KindAndValueStorage>())
-               .second;
+      unsigned numValues = numNumericValuesInPathElement(getKind());
+      assert(numValues > 0 && "No value in path element!");
+
+      auto value = decodeStorage(
+                                 storage.getPointer().get<KindAndValueStorage>()).second;
+      if (numValues == 1) {
+        return value;
+      }
+
+      return value >> 16;
+    }
+
+    /// \brief Retrieve the second value associated with this path element,
+    /// if it has one.
+    unsigned getValue2() const {
+      unsigned numValues = numNumericValuesInPathElement(getKind());
+      assert(numValues == 2 && "No second value in path element!");
+
+      auto value = decodeStorage(
+                     storage.getPointer().get<KindAndValueStorage>()).second;
+      return value & 0x00FFFF;
     }
 
     /// \brief Retrieve the actual archetype for an archetype path element.

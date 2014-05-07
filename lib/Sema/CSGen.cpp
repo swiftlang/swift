@@ -487,6 +487,16 @@ namespace {
       return expr->getType();
     }
 
+    Type visitParenExpr(ParenExpr *expr) {
+      auto &ctx = CS.getASTContext();
+      if (ctx.LangOpts.StrictKeywordArguments) {
+        expr->setType(ParenType::get(ctx, expr->getSubExpr()->getType()));
+      } else {
+        expr->setType(expr->getSubExpr()->getType());
+      }
+      return expr->getType();
+    }
+
     Type visitTupleExpr(TupleExpr *expr) {
       // The type of a tuple expression is simply a tuple of the types of
       // its subexpressions.
