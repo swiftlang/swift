@@ -864,7 +864,7 @@ void IRGenDebugInfo::emitVariableDeclaration(IRBuilder& Builder,
 
   unsigned Line = Loc.Line;
   unsigned Flags = 0;
-  if (Artificial)
+  if (Artificial || DTy.isArtificial() || DTy == InternalType)
     Flags |= llvm::DIDescriptor::FlagArtificial;
 
   // Create the descriptor for the variable.
@@ -899,6 +899,14 @@ void IRGenDebugInfo::emitGlobalVariableDeclaration(llvm::GlobalValue *Var,
                                                    StringRef LinkageName,
                                                    DebugTypeInfo DebugType,
                                                    Optional<SILLocation> Loc) {
+  llvm::DIType Ty = getOrCreateType(DebugType);
+  if (Ty.isArtificial() || Ty == InternalType)
+    // FIXME: Really these should be marked as artificial, but LLVM
+    // currently has no support for flags to be put on global
+    // variables. In the mean time, elide these variables, they
+    // would confuse both the user and LLDB.
+    return;
+
   Location L = getLocation(SM, Loc).Loc;
 
   // Global variables in the top level compilation unit are emitted as
@@ -907,7 +915,7 @@ void IRGenDebugInfo::emitGlobalVariableDeclaration(llvm::GlobalValue *Var,
   auto File = getOrCreateFile(L.Filename);
   llvm::DIScope Context = IsLibrary ? MainModule : EntryPointFn;
   DBuilder.createStaticVariable(Context, Name, LinkageName, File,
-                                L.Line, getOrCreateType(DebugType),
+                                L.Line, Ty,
                                 Var->hasInternalLinkage(), Var, nullptr);
 }
 
@@ -1354,6 +1362,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   case TypeKind::ExistentialMetatype:
   case TypeKind::Metatype: {
     // Metatypes are (mostly) singleton type descriptors, often without storage.
+    Flags |= llvm::DIDescriptor::FlagArtificial;
     Location L = getLoc(SM, DbgTy.getDecl());
     auto File = getOrCreateFile(L.Filename);
     return DBuilder.createStructType(Scope, MangledName, File, L.Line,
