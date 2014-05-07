@@ -1140,7 +1140,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
           new (Context) SubscriptExpr(Result.get(), Idx.get()));
       continue;
     }
-    
+
     // Check for a trailing closure, if allowed.
     if (!isExprBasic && Tok.isFollowingLBrace() &&
         !isStartOfGetSetAccessor(*this)) {
@@ -1870,11 +1870,7 @@ ParserResult<Expr> Parser::parseExprList(tok LeftTok, tok RightTok) {
 ///
 /// \param isExprBasic Whether we're in an expr-basic or not.
 bool Parser::hasExprCallSuffix(bool isExprBasic) {
-  // FIXME: We're requiring the hanging brace here. That's probably
-  // not what we want.
-  return Tok.isFollowingLParen() || 
-    (!isExprBasic && Tok.isFollowingLBrace() && 
-     !isStartOfGetSetAccessor(*this));
+  return Tok.isFollowingLParen();
 }
 
 /// \brief Parse an expression call suffix.
@@ -1885,21 +1881,17 @@ bool Parser::hasExprCallSuffix(bool isExprBasic) {
 ///
 /// selector-arg:
 ///   identifier expr-paren
-///   identifier expr-closure
 ParserResult<Expr>
 Parser::parseExprCallSuffix(ParserResult<Expr> fn,
                             Identifier firstSelectorPiece,
                             SourceLoc firstSelectorPieceLoc) {
-  assert((Tok.isFollowingLParen() || Tok.isFollowingLBrace()) &&
-         "Not a call suffix?");
+  assert(Tok.isFollowingLParen() && "Not a call suffix?");
 
   // Parse the first argument.
-  bool firstArgIsClosure = !Tok.isFollowingLParen();
 
   // If there is a code completion token right after the '(', do a special case
   // callback.
-  if (!firstArgIsClosure && peekToken().is(tok::code_complete) &&
-      CodeCompletion) {
+  if (peekToken().is(tok::code_complete) && CodeCompletion) {
     consumeToken(tok::l_paren);
     CodeCompletion->completePostfixExprParen(fn.get());
     // Eat the code completion token because we handled it.
@@ -1907,28 +1899,17 @@ Parser::parseExprCallSuffix(ParserResult<Expr> fn,
     return makeParserCodeCompletionResult<Expr>();
   }
 
-  ParserResult<Expr> firstArg =
-      firstArgIsClosure ? parseExprClosure()
-                        : parseExprList(Tok.getKind(), tok::r_paren);
+  ParserResult<Expr> firstArg = parseExprList(Tok.getKind(), tok::r_paren);
   if (firstArg.hasCodeCompletion())
     return firstArg;
-
   if (fn.isParseError())
     return fn;
   if (firstArg.isParseError())
     return firstArg;
 
-  // If the argument was a closure, create a trailing closure argument.
-  Expr *arg = firstArg.get();
-  if (firstArgIsClosure) {
-    arg = createArgWithTrailingClosure(Context, SourceLoc(), { }, { }, { },
-                                       SourceLoc(), arg);
-  }
-
   // Form the call.
-  return makeParserResult(new (Context) CallExpr(
-                                          fn.get(), arg,
-                                          /*Implicit=*/firstArgIsClosure));
+  return makeParserResult(new (Context) CallExpr(fn.get(), firstArg.get(),
+                                                 /*Implicit=*/false));
 }
 
 /// parseExprCollection - Parse a collection literal expression.
