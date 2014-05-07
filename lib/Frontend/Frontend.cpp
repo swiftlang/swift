@@ -280,10 +280,13 @@ void CompilerInstance::performSema() {
     SF->setImports(Context->AllocateCopy(initialImportsBuf));
   };
 
+  SourceFile::ImplicitModuleImportKind ModImpKind =
+    Invocation.getParseStdlib() ? SourceFile::ImplicitModuleImportKind::Builtin
+                                : SourceFile::ImplicitModuleImportKind::Stdlib;
+
   if (Kind == SourceFileKind::REPL) {
     auto *SingleInputFile =
-      new (*Context) SourceFile(*MainModule, Kind, {},
-                                Invocation.getParseStdlib());
+      new (*Context) SourceFile(*MainModule, Kind, {}, ModImpKind);
     MainModule->addFile(*SingleInputFile);
     addAdditionalInitialImports(SingleInputFile);
     return;
@@ -310,7 +313,7 @@ void CompilerInstance::performSema() {
       SourceMgr.setHashbangBufferID(MainBufferID);
 
     auto *MainFile = new (*Context) SourceFile(*MainModule, Kind, MainBufferID,
-                                               Invocation.getParseStdlib());
+                                               ModImpKind);
     MainModule->addFile(*MainFile);
     addAdditionalInitialImports(MainFile);
 
@@ -336,7 +339,7 @@ void CompilerInstance::performSema() {
     auto *NextInput = new (*Context) SourceFile(*MainModule,
                                                 SourceFileKind::Library,
                                                 BufferID,
-                                                Invocation.getParseStdlib());
+                                                ModImpKind);
     MainModule->addFile(*NextInput);
     addAdditionalInitialImports(NextInput);
 
@@ -422,7 +425,7 @@ void CompilerInstance::performParseOnly() {
     SourceMgr.setHashbangBufferID(MainBufferID);
 
     auto *MainFile = new (*Context) SourceFile(*MainModule, Kind, MainBufferID,
-                                               Invocation.getParseStdlib());
+                                    SourceFile::ImplicitModuleImportKind::None);
     MainModule->addFile(*MainFile);
 
     if (MainBufferID == PrimaryBufferID)
@@ -437,7 +440,7 @@ void CompilerInstance::performParseOnly() {
     auto *NextInput = new (*Context) SourceFile(*MainModule,
                                                 SourceFileKind::Library,
                                                 BufferID,
-                                                Invocation.getParseStdlib());
+                                    SourceFile::ImplicitModuleImportKind::None);
     MainModule->addFile(*NextInput);
 
     if (BufferID == PrimaryBufferID)
@@ -461,4 +464,7 @@ void CompilerInstance::performParseOnly() {
                           nullptr, &PersistentState, nullptr);
     } while (!Done);
   }
+
+  assert(Context->LoadedModules.size() == 1 &&
+         "Loaded a module during parse-only");
 }

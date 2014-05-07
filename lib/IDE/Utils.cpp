@@ -100,7 +100,8 @@ ide::isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf) {
   auto ModName = Ctx.getIdentifier("input");
 
   Module &Mod = *Module::create(ModName, Ctx);
-  SourceFile &SF = *new (Ctx) SourceFile(Mod, SourceFileKind::Main, BufferID);
+  SourceFile &SF = *new (Ctx) SourceFile(Mod, SourceFileKind::Main, BufferID,
+                                    SourceFile::ImplicitModuleImportKind::None);
 
   PersistentParserState PersistentState;
   Parser P(BufferID, SF, /*SIL=*/nullptr, &PersistentState);

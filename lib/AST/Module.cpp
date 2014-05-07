@@ -1209,18 +1209,28 @@ SourceFile::getCachedVisibleDecls() const {
   return getCache().AllVisibleValues;
 }
 
-static void performAutoImport(SourceFile &SF, bool hasBuiltinModuleAccess) {
+static void performAutoImport(SourceFile &SF,
+                              SourceFile::ImplicitModuleImportKind ModImpKind) {
   if (SF.Kind == SourceFileKind::SIL)
     return;
 
-  // If we're building the standard library, import the magic Builtin module,
-  // otherwise, import the standard library.
   ASTContext &Ctx = SF.getASTContext();
-  Module *M;
-  if (hasBuiltinModuleAccess)
-    M = Ctx.TheBuiltinModule;
-  else
-    M = Ctx.getModule({ {Ctx.StdlibModuleName, SourceLoc()} });
+  Module *M = nullptr;
+
+  switch (ModImpKind) {
+  case SourceFile::ImplicitModuleImportKind::None:
+    return;
+
+  case SourceFile::ImplicitModuleImportKind::Builtin:
+  case SourceFile::ImplicitModuleImportKind::Stdlib:
+    // If we're building the standard library, import the magic Builtin module,
+    // otherwise, import the standard library.
+    if (ModImpKind == SourceFile::ImplicitModuleImportKind::Builtin)
+      M = Ctx.TheBuiltinModule;
+    else
+      M = Ctx.getModule({ {Ctx.StdlibModuleName, SourceLoc()} });
+    break;
+  }
 
   if (!M)
     return;
@@ -1234,11 +1244,12 @@ static void performAutoImport(SourceFile &SF, bool hasBuiltinModuleAccess) {
 }
 
 SourceFile::SourceFile(Module &M, SourceFileKind K,
-                       Optional<unsigned> bufferID, bool hasBuiltinModuleAccess)
+                       Optional<unsigned> bufferID,
+                       ImplicitModuleImportKind ModImpKind)
   : FileUnit(FileUnitKind::Source, M),
     BufferID(bufferID ? *bufferID : -1), Kind(K) {
   M.Ctx.addDestructorCleanup(*this);
-  performAutoImport(*this, hasBuiltinModuleAccess);
+  performAutoImport(*this, ModImpKind);
 }
 
 SourceFile::~SourceFile() {}

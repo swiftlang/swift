@@ -618,6 +618,13 @@ class SourceFile final : public FileUnit {
 public:
   class LookupCache;
 
+  /// The implicit module import that the SourceFile should get.
+  enum class ImplicitModuleImportKind {
+    None,
+    Builtin,
+    Stdlib
+  };
+
 private:
   std::unique_ptr<LookupCache> Cache;
   LookupCache &getCache() const;
@@ -672,7 +679,7 @@ public:
   ASTStage_t ASTStage = Parsing;
 
   SourceFile(Module &M, SourceFileKind K, Optional<unsigned> bufferID,
-             bool hasBuiltinModuleAccess = false);
+             ImplicitModuleImportKind ModImpKind);
 
   ArrayRef<std::pair<Module::ImportedModule, bool>>
   getImports(bool allowUnparsed = false) const {
