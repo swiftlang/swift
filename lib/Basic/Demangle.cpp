@@ -796,9 +796,9 @@ private:
     if (Mangled.nextIf('c'))
       return createSwiftType(Node::Kind::Structure, "UnicodeScalar");
     if (Mangled.nextIf('d'))
-      return createSwiftType(Node::Kind::Structure, "Float64");
+      return createSwiftType(Node::Kind::Structure, "Double");
     if (Mangled.nextIf('f'))
-      return createSwiftType(Node::Kind::Structure, "Float32");
+      return createSwiftType(Node::Kind::Structure, "Float");
     if (Mangled.nextIf('i'))
       return createSwiftType(Node::Kind::Structure, "Int");
     if (Mangled.nextIf('q'))
