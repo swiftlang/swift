@@ -266,6 +266,8 @@ public:
   }
   
   Decl *transformDecl(Decl *D) {
+    if (D->isImplicit())
+      return D;
     if (FuncDecl *FD = llvm::dyn_cast<FuncDecl>(D)) {
       if (BraceStmt *B = FD->getBody()) {
         TargetKindSetter TKS(BracePairs, BracePair::TargetKinds::Return);
