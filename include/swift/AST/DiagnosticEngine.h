@@ -376,8 +376,14 @@ namespace swift {
     /// HadAnyError - True if any error diagnostics have been emitted.
     bool HadAnyError;
 
+    enum class FatalErrorState {
+      None,
+      JustEmitted,
+      Fatal
+    };
+
     /// Sticky flag set to \c true when a fatal error is emitted.
-    bool FatalErrorOccurred = false;
+    FatalErrorState FatalState = FatalErrorState::None;
 
     bool ShowDiagnosticsAfterFatalError = false;
 
@@ -408,7 +414,9 @@ namespace swift {
       return HadAnyError;
     }
 
-    bool hasFatalErrorOccurred() const { return FatalErrorOccurred; }
+    bool hasFatalErrorOccurred() const {
+      return FatalState != FatalErrorState::None;
+    }
 
     void setShowDiagnosticsAfterFatalError(bool Val = true) {
       ShowDiagnosticsAfterFatalError = Val;
@@ -416,7 +424,7 @@ namespace swift {
 
     void resetHadAnyError() {
       HadAnyError = false;
-      FatalErrorOccurred = false;
+      FatalState = FatalErrorState::None;
     }
 
     /// \brief Add an additional DiagnosticConsumer to receive diagnostics.

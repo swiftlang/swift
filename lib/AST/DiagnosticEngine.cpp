@@ -342,9 +342,17 @@ void DiagnosticEngine::flushActiveDiagnostic() {
   const StoredDiagnosticInfo &StoredInfo
     = StoredDiagnosticInfos[(unsigned)ActiveDiagnostic->getID()];
 
-  if (FatalErrorOccurred && !ShowDiagnosticsAfterFatalError) {
-    ActiveDiagnostic.reset();
-    return;
+  if (FatalState != FatalErrorState::None) {
+    bool shouldIgnore = true;
+    if (StoredInfo.Kind == DiagnosticKind::Note)
+      shouldIgnore = (FatalState == FatalErrorState::Fatal);
+    else
+      FatalState = FatalErrorState::Fatal;
+
+    if (shouldIgnore && !ShowDiagnosticsAfterFatalError) {
+      ActiveDiagnostic.reset();
+      return;
+    }
   }
 
   // Check whether this is an error.
@@ -352,7 +360,7 @@ void DiagnosticEngine::flushActiveDiagnostic() {
   case DiagnosticKind::Error:
     HadAnyError = true;
     if (isDiagnosticFatal(ActiveDiagnostic->getID()))
-      FatalErrorOccurred = true;
+      FatalState = FatalErrorState::JustEmitted;
     break;
     
   case DiagnosticKind::Note:
