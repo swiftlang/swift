@@ -350,7 +350,8 @@ public:
   /// Parses and type-checks all input files.
   void performSema();
 
-  /// Parses all input files but does no type-checking or module imports.
+  /// Parses the input file but does no type-checking or module imports.
+  /// Note that this only supports parsing an invocation with a single file.
   void performParseOnly();
 };
 

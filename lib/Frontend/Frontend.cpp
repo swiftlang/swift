@@ -416,54 +416,23 @@ void CompilerInstance::performParseOnly() {
   Context->LoadedModules[ID.str()] = MainModule;
 
   assert(Kind == SourceFileKind::Main || Kind == SourceFileKind::Library);
+  assert(BufferIDs.size() == 1 && "only supports parsing a single file");
+
+  auto *Input = new (*Context) SourceFile(*MainModule,
+                                          Kind,
+                                          BufferIDs[0],
+                                    SourceFile::ImplicitModuleImportKind::None);
+  MainModule->addFile(*Input);
+  PrimarySourceFile = Input;
 
   PersistentParserState PersistentState;
-
-  // Make sure the main file is the first file in the module.
-  if (MainBufferID != NO_SUCH_BUFFER) {
-    assert(Kind == SourceFileKind::Main);
-    SourceMgr.setHashbangBufferID(MainBufferID);
-
-    auto *MainFile = new (*Context) SourceFile(*MainModule, Kind, MainBufferID,
-                                    SourceFile::ImplicitModuleImportKind::None);
-    MainModule->addFile(*MainFile);
-
-    if (MainBufferID == PrimaryBufferID)
-      PrimarySourceFile = MainFile;
-  }
-
-  // Then parse all the library files.
-  for (auto BufferID : BufferIDs) {
-    if (BufferID == MainBufferID)
-      continue;
-
-    auto *NextInput = new (*Context) SourceFile(*MainModule,
-                                                SourceFileKind::Library,
-                                                BufferID,
-                                    SourceFile::ImplicitModuleImportKind::None);
-    MainModule->addFile(*NextInput);
-
-    if (BufferID == PrimaryBufferID)
-      PrimarySourceFile = NextInput;
-
-    bool Done;
-    parseIntoSourceFile(*NextInput, BufferID, &Done, nullptr,
-                        &PersistentState, nullptr);
-    assert(Done && "Parser returned early?");
-    (void) Done;
-  }
-  
-  // Parse the main file last.
-  if (MainBufferID != NO_SUCH_BUFFER) {
-    SourceFile &MainFile = MainModule->getMainSourceFile(Kind);
-    bool Done;
-    do {
-      // Pump the parser multiple times if necessary.  It will return early
-      // after parsing any top level code in a main module.
-      parseIntoSourceFile(MainFile, MainFile.getBufferID().getValue(), &Done,
-                          nullptr, &PersistentState, nullptr);
-    } while (!Done);
-  }
+  bool Done;
+  do {
+    // Pump the parser multiple times if necessary.  It will return early
+    // after parsing any top level code in a main module.
+    parseIntoSourceFile(*Input, Input->getBufferID().getValue(), &Done,
+                        nullptr, &PersistentState, nullptr);
+  } while (!Done);
 
   assert(Context->LoadedModules.size() == 1 &&
          "Loaded a module during parse-only");
