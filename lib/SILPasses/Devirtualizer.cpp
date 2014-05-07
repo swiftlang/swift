@@ -216,7 +216,7 @@ static bool optimizeClassMethod(ApplyInst *AI, ClassMethodInst *CMI) {
   // Add in self to the end.
   NewArgs.push_back(Origin);
 
-  // If we have a direct return type, make sure we use the subst calle return
+  // If we have a direct return type, make sure we use the subst callee return
   // type. If we have an indirect return type, AI's return type of the empty
   // tuple should be ok.
   SILType ReturnType = AI->getType();
@@ -229,7 +229,24 @@ static bool optimizeClassMethod(ApplyInst *AI, ClassMethodInst *CMI) {
       B.createApply(AI->getLoc(), FRI, SubstCalleeSILType, ReturnType,
                     AI->getSubstitutions(), NewArgs);
 
-  AI->replaceAllUsesWith(NewAI);
+  // If our return type differs from AI's return type, then we know that we have
+  // a covariant return type. Cast it before we RAUW. This can not happen 
+  if (ReturnType != AI->getType()) {
+    assert((ReturnType.isAddress() || ReturnType.isHeapObjectReferenceType()) &&
+           "Only addresses and refs can have their types changed due to "
+           "covariant return types or contravariant argument types.");
+
+    SILValue CastedAI = NewAI;
+    if (ReturnType.isAddress()) {
+      CastedAI = B.createUncheckedAddrCast(AI->getLoc(), NewAI, AI->getType());
+    } else {
+      CastedAI = B.createUncheckedRefCast(AI->getLoc(), NewAI, AI->getType());
+    }
+    SILValue(AI).replaceAllUsesWith(CastedAI);
+  } else {
+    AI->replaceAllUsesWith(NewAI);
+  }
+
   AI->eraseFromParent();
   if (CMI->use_empty())
     CMI->eraseFromParent();
