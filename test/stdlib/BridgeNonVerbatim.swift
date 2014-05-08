@@ -1,4 +1,4 @@
-//===--- BridgeCache.swift - Array bridging implementation test -----------===//
+//===--- BridgeNonVerbatim.swift - Array bridging implementation test -----===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -13,13 +13,13 @@
 //  When a NativeArray<T> is bridged to Objective-C, and T isn't
 //  "bridged verbatim," Cocoa operations like objectAtIndex may have
 //  to conjure up an object to return, and this object is expected to
-//  outlive the array.  We cache these objects so that their lifetimes
-//  are guaranteed.  Here we test the cache.
+//  outlive the array.  
 //
 //===----------------------------------------------------------------------===//
 // RUN: %target-run-simple-swift %s | FileCheck %s
 
 import SwiftShims
+import ObjectiveC
 
 //===--- class Tracked ----------------------------------------------------===//
 // Instead of testing with Int elements, we use this wrapper class
@@ -29,7 +29,7 @@ var trackedCount = 0
 var nextTrackedSerialNumber = 0
 
 class Tracked : ReplPrintable, ForwardIndex, ObjCClassType {
-  init(value: Int) {
+  init(_ value: Int) {
     ++trackedCount
     serialNumber = ++nextTrackedSerialNumber
     self.value = value
@@ -58,7 +58,11 @@ func == (x: Tracked, y: Tracked) -> Bool {
   return x.value == y.value
 }
 
-struct X : BridgedToObjectiveC {
+struct X : _BridgedToObjectiveC {
+  init(_ value: Int) {
+    self.value = value
+  }
+
   func bridgeToObjectiveC() -> Tracked {
     return Tracked(value)
   }
@@ -72,8 +76,8 @@ func testScope() {
   let a = [X(1), X(2), X(3)]
   let nsx = a.asCocoaArray()
 
-  // construction of these tracked objects is lazy
-  // CHECK-NEXT: trackedCount = 0 .
+  // construction of these tracked objects is eager
+  // CHECK-NEXT: trackedCount = 3 .
   println("trackedCount = \(trackedCount) .")
 
   // We can get a single element out
@@ -86,17 +90,13 @@ func testScope() {
   var anotherOne = (nsx.objectAtIndex(0) as Tracked)!
   println("object identity matches: \(one === anotherOne)")
 
-  // We've only constructed one such object
-  // CHECK-NEXT: trackedCount = 1 .
-  println("trackedCount = \(trackedCount) .")
-
   // Because the elements come back at +0, we really don't want to
   // treat them as objects, or we'll get double deletion
   let objects: Word[] = [0, 0]
   
   nsx.getObjects(
     UnsafePointer(objects.buffer.elementStorage), // pointer cast
-    _SwiftNSRange(1, 2))
+    range: _SwiftNSRange(location: 1, length: 2))
 
   // CHECK-NEXT: getObjects yields them at +0: true
   var x = objects[0]
@@ -105,9 +105,11 @@ func testScope() {
   
   println("trackedCount = \(trackedCount) .")
 }
-testScope()
 
-// FIXME: should be "leaks = 0" but for <rdar://problem/16562426>
-// CHECK-NEXT: leaks = 1 .
+autoreleasepool() {
+  testScope()
+}
+
+// CHECK-NEXT: leaks = 0 .
 println("leaks = \(trackedCount) .")
 
