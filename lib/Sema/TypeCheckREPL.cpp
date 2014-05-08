@@ -553,15 +553,6 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
   // Always print rvalues, not lvalues.
   E = TC.coerceToMaterializable(E);
 
-  // If the caller didn't wrap the argument in a parenthese or make it a tuple,
-  // add the extra parentheses now.
-  if (!isa<ParenExpr>(E) && !isa<TupleExpr>(E)) {
-    if (TC.Context.LangOpts.StrictKeywordArguments) {
-      Type Ty = ParenType::get(TC.Context, E->getType());
-      E = new (TC.Context) ParenExpr(SourceLoc(), E, SourceLoc(), false, Ty);
-    }
-  }
-
   CanType T = E->getType()->getCanonicalType();
   SourceLoc Loc = E->getStartLoc();
   SourceLoc EndLoc = E->getEndLoc();
@@ -578,7 +569,7 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
   Pattern *ParamPat = new (Context) NamedPattern(Arg);
   ParamPat = new (Context) TypedPattern(ParamPat,
                                         TypeLoc::withoutLoc(Arg->getType()));
-  if (!isa<TupleType>(T) && !TC.Context.LangOpts.StrictKeywordArguments) {
+  if (TC.Context.LangOpts.StrictKeywordArguments) {
     TuplePatternElt elt{ParamPat};
     ParamPat = TuplePattern::create(Context, SourceLoc(), elt, SourceLoc());
   }
@@ -625,10 +616,19 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
   CE->setBody(Body, false);
   TC.typeCheckClosureBody(CE);
 
-  Expr *TheCall = new (Context) CallExpr(CE, E, /*Implicit=*/true);
+  // If the caller didn't wrap the argument in parentheses or make it a tuple,
+  // add the extra parentheses now.
+  Expr *TheArg = E;
+  if (TC.Context.LangOpts.StrictKeywordArguments) {
+    Type Ty = ParenType::get(TC.Context, TheArg->getType());
+    TheArg = new (TC.Context) ParenExpr(SourceLoc(), TheArg, SourceLoc(), false,
+                                        Ty);
+  }
+
+  Expr *TheCall = new (Context) CallExpr(CE, TheArg, /*Implicit=*/true);
   if (TC.typeCheckExpressionShallow(TheCall, Arg->getDeclContext()))
     return ;
-  
+
   // Inject the call into the top level stream by wrapping it with a TLCD.
   auto *BS = BraceStmt::create(Context, Loc, ASTNode(TheCall),
                                EndLoc);
