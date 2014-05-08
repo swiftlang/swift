@@ -99,11 +99,19 @@ invalidateAliasingLoads(SILInstruction *Inst,
 //                               Implementation
 //===----------------------------------------------------------------------===//
 
-/// \brief Promote stored values to loads, remove dead stores and merge
-/// duplicated loads.
-bool performLoadStoreOptimizations(SILBasicBlock *BB, AliasAnalysis *AA) {
-  bool Changed = false;
-  StoreInst *PrevStore = nullptr;
+namespace {
+
+/// State of the load store forwarder in one basic block.
+class LSBBForwarder {
+
+  /// The basic block that we are optimizing.
+  SILBasicBlock *BB;
+
+  /// The alias analysis that we are using for alias queries.
+  AliasAnalysis *AA;
+
+  /// The current dead store that we are tracking.
+  StoreInst *PrevStore;
 
   // This is a list of LoadInst instructions that reference memory locations
   // were not clobbered by instructions that write to memory. In other words
@@ -111,6 +119,31 @@ bool performLoadStoreOptimizations(SILBasicBlock *BB, AliasAnalysis *AA) {
   // pointer. The values in the list are potentially updated on each iteration
   // of the loop below.
   llvm::SmallPtrSet<LoadInst *, 8> Loads;
+
+  /// During the last run of the forwarder, did we make any changes.
+  bool Changed;
+public:
+  LSBBForwarder(SILBasicBlock *BB, AliasAnalysis *AA) : BB(BB), AA(AA),
+                                                    PrevStore(nullptr),
+                                                    Changed(false) {}
+
+  bool optimize();
+
+  /// Clear all state in the BB optimizer.
+  void clear() {
+    PrevStore = nullptr;
+    Loads.clear();
+    Changed = false;
+  }
+
+};
+
+} // end anonymous namespace
+
+/// \brief Promote stored values to loads, remove dead stores and merge
+/// duplicated loads.
+bool LSBBForwarder::optimize() {
+  clear();
 
   auto II = BB->begin(), E = BB->end();
   while (II != E) {
@@ -295,9 +328,11 @@ class LoadStoreOpts : public SILFunctionTransform {
 
     // Remove dead stores, merge duplicate loads, and forward stores to loads.
     bool Changed = false;
-    for (auto &BB : F)
-      while (performLoadStoreOptimizations(&BB, AA))
+    for (auto &BB : F) {
+      LSBBForwarder Forwarder(&BB, AA);
+      while (Forwarder.optimize())
         Changed = true;
+    }
 
     if (Changed)
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
