@@ -22,7 +22,8 @@ Latest
       convenience init() { self.init(42) } // convenience initializer
     }
 
-  Initializers in extensions are still implicitly convenience initializers.  
+  You still cannot declare designated initializers in extensions, only
+  convenience initializers are allowed.
 
 * Reference types using the CoreFoundation runtime are now imported as
   class types.  This means that Swift will automatically manage the
