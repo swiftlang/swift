@@ -145,6 +145,8 @@ Optional<std::pair<ImportedModule, bool>> NameBinder::addImport(ImportDecl *ID) 
     return Nothing;
   }
 
+  ID->setModule(M);
+
   auto result = std::make_pair(ImportedModule(ID->getDeclPath(), M),
                                ID->isExported());
 
@@ -163,6 +165,8 @@ Optional<std::pair<ImportedModule, bool>> NameBinder::addImport(ImportDecl *ID) 
                                declPath.back().second));
       return result;
     }
+
+    ID->setDecls(Context.AllocateCopy(decls));
 
     Optional<ImportKind> actualKind = ImportDecl::findBestImportKind(decls);
     if (!actualKind.hasValue()) {

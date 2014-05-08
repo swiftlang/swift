@@ -95,6 +95,17 @@ bool SemaAnnotator::walkToDeclPre(Decl *D) {
       Loc = SourceLoc();
     }
 
+  } else if (auto Import = dyn_cast<ImportDecl>(D)) {
+    if (auto Mod = Import->getModule()) {
+      if (!passReference(Mod, Import->getLoc()))
+        return false;
+    }
+    auto Decls = Import->getDecls();
+    if (Decls.size() == 1) {
+      if (!passReference(Decls.front(), Import->getEndLoc()))
+        return false;
+    }
+
   } else {
     return true;
   }

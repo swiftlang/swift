@@ -1296,6 +1296,11 @@ private:
   /// The number of elements in this path.
   unsigned NumPathElements;
 
+  /// The resolved module.
+  Module *Mod = nullptr;
+  /// The resolved decls if this is a decl import.
+  ArrayRef<ValueDecl *> Decls;
+
   AccessPathElement *getPathBuffer() {
     return reinterpret_cast<AccessPathElement*>(this+1);
   }
@@ -1349,6 +1354,12 @@ public:
   bool isExported() const {
     return getAttrs().hasAttribute<ExportedAttr>();
   }
+
+  Module *getModule() const { return Mod; }
+  void setModule(Module *M) { Mod = M; }
+
+  ArrayRef<ValueDecl *> getDecls() const { return Decls; }
+  void setDecls(ArrayRef<ValueDecl *> Ds) { Decls = Ds; }
 
   const clang::Module *getClangModule() const {
     if (ClangNode ClangN = getClangNode())
