@@ -1,6 +1,13 @@
 Latest
 ----------
 
+* ";" can no longer be used to demarkate an empty case in a switch statement,
+  use "break" instead.
+
+
+2014-05-07
+----------
+
 * The compiler's ability to diagnose many common kinds of type check errors has
   improved. ("expression does not type-check" has been retired.)
 
@@ -49,9 +56,6 @@ Latest
 
   The API of the Unmanaged type is still in flux, and your feedback
   would be greatly appreciated.
-
-* ";" can no longer be used to demarkate an empty case in a switch statement,
-  use "break" instead.
 
 2014-05-03
 ----------
