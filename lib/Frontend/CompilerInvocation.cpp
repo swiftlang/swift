@@ -694,6 +694,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   }
 
   // Parse the optimization level.
+  Opts.AssertConfig = SILOptions::Debug;
   if (const Arg *A = Args.getLastArg(OPT_O_Group)) {
     // The maximum optimization level we currently support.
     unsigned MaxLevel = 3;
@@ -707,6 +708,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       IRGenOpts.DisableAllRuntimeChecks = true;
       // Removal of cond_fail (overflow on binary operations).
       Opts.RemoveRuntimeAsserts = true;
+      Opts.AssertConfig = SILOptions::Fast;
     } else if (!StringRef(A->getValue()).size()) {
         // -O is an alias to -O3.
         IRGenOpts.OptLevel = MaxLevel;
@@ -736,6 +738,8 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       Opts.AssertConfig = SILOptions::Debug;
     } else if (Configuration == "Release") {
       Opts.AssertConfig = SILOptions::Release;
+    } else if (Configuration == "Fast") {
+      Opts.AssertConfig = SILOptions::Fast;
     } else {
         Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                        A->getAsString(Args), A->getValue());
@@ -745,8 +749,9 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     // Disable assertion configuration replacement when we build the standard
     // library.
     Opts.AssertConfig = SILOptions::DisableReplacement;
-  } else {
-    // Set the assert configuration according to the optimization level.
+  } else if (Opts.AssertConfig == SILOptions::Debug) {
+    // Set the assert configuration according to the optimization level if it
+    // has not been set by the "Ofast" flag.
     Opts.AssertConfig =
         IRGenOpts.OptLevel > 0 ? SILOptions::Release : SILOptions::Debug;
   }

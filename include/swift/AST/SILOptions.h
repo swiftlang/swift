@@ -68,8 +68,9 @@ public:
   enum AssertConfiguration: unsigned {
     // Used by standard library code to distinguish between a debug and release
     // build.
-    Debug = 0, // Enables asserts.
+    Debug = 0,   // Enables all asserts.
     Release = 1, // Disables asserts.
+    Fast = 2,    // Disables asserts, library precondition, and runtime checks.
 
     // Leave the assert_configuration instruction around.
     DisableReplacement = UINT_MAX
