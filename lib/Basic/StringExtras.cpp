@@ -203,4 +203,31 @@ StringRef camel_case::appendSentenceCase(SmallVectorImpl<char> &buffer,
   return StringRef(buffer.data(), buffer.size());
 }
 
+size_t camel_case::findWord(StringRef string, StringRef word) {
+  assert(!word.empty());
+  assert(clang::isUppercase(word[0]));
+
+  // Scan forward until we find the word as a complete word.
+  size_t startingIndex = 0;
+  while (true) {
+    size_t index = string.find(word, startingIndex);
+    if (index == StringRef::npos)
+      return StringRef::npos;
+
+    // If any of the following checks fail, we want to start searching
+    // past the end of the match.  (This assumes that the word doesn't
+    // end with a prefix of itself, e.g. "LikeableLike".)
+    startingIndex = index + word.size();
+
+    // We assume that we don't have to check if the match starts a new
+    // word in the string.
+
+    // If we find the word, check whether it's a valid match.
+    StringRef suffix = string.substr(index);
+    if (!suffix.empty() && clang::isLowercase(suffix[0]))
+      continue;
+
+    return index;
+  }
+}
 

@@ -235,6 +235,15 @@ namespace swift {
     /// \returns the contents of the buffer after appending.
     StringRef appendSentenceCase(SmallVectorImpl<char> &buffer,
                                  StringRef string);
+
+    /// Search the given camelCase string for the first occurrence of
+    /// the second string as a complete word.
+    ///
+    /// \param string The string to search.
+    /// \param word The string to search for; must be a single Title word
+    /// \returns the index of the start of the match, or String::npos if
+    ///   it was not found
+    size_t findWord(StringRef string, StringRef word);
   } // end namespace camel_case
 }
 
