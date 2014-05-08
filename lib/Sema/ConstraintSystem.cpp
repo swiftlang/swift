@@ -643,10 +643,9 @@ Type ConstraintSystem::openType(
 
 bool ConstraintSystem::isArrayType(Type t) {
   
-  // ArraySliceType<T> now desugars to Array<T>.
-  if (dyn_cast<ArraySliceType>(t.getPointer())) {
+  // ArraySliceType<T> desugars to Array<T>.
+  if (dyn_cast<ArraySliceType>(t.getPointer()))
     return true;
-  }
   if (auto boundStruct = dyn_cast<BoundGenericStructType>(t.getPointer())) {
     if (!boundStruct->getParent() &&
         boundStruct->getGenericArgs().size() == 1 &&
