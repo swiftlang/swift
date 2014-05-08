@@ -2,8 +2,8 @@
 #include <mach/mach_time.h>
 #include <stdio.h>
 #include "NSStringSort.h"
-// NOTE: compile with ARC enabled
-// clang -fobjc-arc -O3 NSStringSort.m -o NSStringSort.bin -framework Foundation
+// NOTE: compile with ARC disabled (no -fobjc-arc)!
+// clang -O3 NSStringSort.m -o NSStringSort.bin -framework Foundation
 
 @implementation Record
 - (NSString*) Firstname { return First; }
@@ -19,11 +19,11 @@
 
 - (NSComparisonResult)compare:(Record *)otherObject {
   NSComparisonResult FirstComp =
-    [self->Last compare:otherObject->Last];
+    [self.Lastname compare:otherObject.Lastname];
   if (FirstComp != NSOrderedSame)
     return FirstComp;
 
-  return [self->First compare:otherObject->First];
+  return [self.Firstname compare:otherObject.Firstname];
 }
 
 - (void) setFirst: (NSString*)input { First = input; }
@@ -65,7 +65,8 @@ int main(void) {
   uint64_t start = mach_absolute_time();
   for (unsigned i = 0; i < 100; i++) {
       NSMutableArray *NMA = [PhoneBook mutableCopy];
-      [NMA  sortUsingSelector: @selector(compare:)];
+      [NMA sortUsingSelector: @selector(compare:)];
+      [NMA release];
 #if 0
       for (int i=0; i < size; i++) {
         Record *rec = [NMA objectAtIndex: i];
