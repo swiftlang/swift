@@ -414,7 +414,7 @@ public:
   clang::Selector setObjectForKeyedSubscript;
 
 private:
-  Optional<bool> checkedFoundationModule;
+  Optional<Module *> checkedFoundationModule;
 
   /// External Decls that we have imported but not passed to the ASTContext yet.
   SmallVector<Decl *, 4> RegisteredExternalDecls;
@@ -654,6 +654,12 @@ public:
   /// After this has been called, the Foundation module will or won't be loaded
   /// into the ASTContext.
   bool hasFoundationModule();
+
+  /// \brief Returns the "Foundation" module.  Requires that it is already
+  /// loaded (such as being preceded by a call to hasFoundationModule()).
+  Module *getFoundationModule() {
+    return checkedFoundationModule.getValue();
+  }
 
   /// \brief Retrieves the Swift wrapper for the given Clang module, creating
   /// it if necessary.

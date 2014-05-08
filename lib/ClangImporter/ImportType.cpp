@@ -1005,14 +1005,12 @@ Module *ClangImporter::Implementation::getNamedModule(StringRef name) {
 }
 
 bool ClangImporter::Implementation::hasFoundationModule() {
-  if (!checkedFoundationModule) {
+  if (!checkedFoundationModule.hasValue()) {
     Identifier name = SwiftContext.getIdentifier(FOUNDATION_MODULE_NAME);
-    auto mod = SwiftContext.getModule({ {name, SourceLoc()} });
-    checkedFoundationModule = (mod != nullptr);
+    checkedFoundationModule = SwiftContext.getModule({ {name, SourceLoc()} });
   }
-  return checkedFoundationModule.getValue();
+  return checkedFoundationModule.getValue() != nullptr;
 }
-
 
 Type ClangImporter::Implementation::getNamedSwiftType(Module *module,
                                                       StringRef name) {
