@@ -271,7 +271,7 @@ public:
 
 
 
-static void _swift_zone_init_() {
+static void _swift_zone_initImpl() {
   assert(sizeof(pthread_key_t) == sizeof(long));
   malloc_zone_register(&zoneShims);
   pthread_key_t key, prev_key;
@@ -299,7 +299,7 @@ static void _swift_zone_init_() {
 }
 void swift::_swift_zone_init() {
   static pthread_once_t once = PTHREAD_ONCE_INIT;
-  int r = pthread_once(&once, _swift_zone_init_);
+  int r = pthread_once(&once, _swift_zone_initImpl);
   assert(r == 0);
 }
 SwiftZone::SwiftZone() {
