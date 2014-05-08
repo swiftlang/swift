@@ -72,8 +72,6 @@ ERROR(could_not_convert_argument,sema,none,
 // Name Binding
 //------------------------------------------------------------------------------
 
-ERROR(sema_submodules_disallowed,sema_nb,Fatal,
-      "submodules are not supported", ())
 ERROR(sema_no_import,sema_nb,Fatal,
       "no such module '%0'", (StringRef))
 ERROR(sema_no_import_submodule,sema_nb,Fatal,
