@@ -269,6 +269,10 @@ append_if(CXX_SUPPORTS_UNREACHABLE_CODE_FLAG "-Wunreachable-code" CMAKE_CXX_FLAG
 check_cxx_compiler_flag("-Werror -Woverloaded-virtual" CXX_SUPPORTS_OVERLOADED_VIRTUAL)
 append_if(CXX_SUPPORTS_OVERLOADED_VIRTUAL "-Woverloaded-virtual" CMAKE_CXX_FLAGS)
 
+# Check for '-fapplication-extension'.  On OSX/iOS we wish to link all
+# dynamic libraries with this flag.
+check_cxx_compiler_flag("-fapplication-extension" CXX_SUPPORTS_FAPPLICATION_EXTENSION)
+
 # Set sizeof(void*) if cross-compiling.
 if (CMAKE_CROSSCOMPILING AND NOT CMAKE_SIZEOF_VOID_P)
   if (CMAKE_SYSTEM_PROCESSOR MATCHES "64$")
@@ -738,6 +742,12 @@ macro(add_swift_library name)
     target_link_libraries(${name}
       "-Wl,-sectcreate,__TEXT,__info_plist,${CMAKE_CURRENT_BINARY_DIR}/${PLIST_INFO_PLIST_OUT}")
     configure_file("${SWIFT_SOURCE_DIR}/stdlib/${PLIST_INFO_PLIST}.in" "${PLIST_INFO_PLIST_OUT}" @ONLY)
+
+    # If Application Extensions are enabled, pass the linker flag marking
+    # the dylib as safe.
+    if (CXX_SUPPORTS_FAPPLICATION_EXTENSION)
+      target_link_libraries(${name} "-Wl,-application_extension")
+    endif()
 
     set(PLIST_INFO_UTI)
     set(PLIST_INFO_NAME)
