@@ -235,14 +235,11 @@ Bridging To Objective-C
   *bridged*.
 
 * An ``NSArray`` can be constructed from any *bridged* ``Array<T>`` or
-  ``NativeArray<T>`` in O(1), without allocation.  The elements of the
-  resulting ``NSArray`` have dynamic type ``U``, where ``T`` is
-  bridged to ``U``.
+  ``NativeArray<T>``.  The elements of the resulting ``NSArray`` have
+  dynamic type ``U``, where ``T`` is bridged to ``U``.
 
   .. Admonition:: Implementation Notes
 
-     This works because the buffer held by ``Array<T>`` or
-     ``NativeArray<T>`` always is-a ``NSArray``; we just extract it.
      We *could* also support construction of ``NSArray`` from
      ``Slice<T>`` at the cost of a single allocation
 
@@ -252,15 +249,13 @@ Bridging To Objective-C
   .. Admonition:: Implementation Note
 
      There are various ways to move this detection to compile-time
+
+* if ``T`` is *bridged verbatim*, the conversion is O(1)
   
 * if ``T`` is not *bridged verbatim*, the elements of the ``NSArray``
   (or ``Array<U>`` when bridging is used in array casting) are created
-  once, on-demand, by calling ``bridgeToObjectiveC()`` on the original
-  ``T``\ s, and will not be destroyed before the array from which they
-  were extracted.  We cache these objects both in order to satisfy
-  Cocoa users' expectations of stable element identity, and because
-  ``NSArray`` APIs such as ``getObjects:range:`` are required to
-  expose elements without lifetime management.
+  eagerly, by calling ``bridgeToObjectiveC()`` on the original
+  ``T``\ s, and a new ``NSArray`` is returned.
 
 Bridging From Objective-C
 -------------------------
