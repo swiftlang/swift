@@ -27,6 +27,7 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/PrimitiveParsing.h"
 #include "swift/Basic/STLExtras.h"
 #include "clang/AST/ASTContext.h"
@@ -287,6 +288,8 @@ public:
 } // unnamed namespace
 
 void PrintAST::printAttributes(const Decl *D) {
+  if (Options.SkipAttributes)
+    return;
   D->getAttrs().print(Printer, Options);
 }
 
@@ -425,7 +428,8 @@ void PrintAST::printPattern(const Pattern *pattern) {
     break;
 
   case PatternKind::Var:
-    Printer << "var ";
+    if (!Options.SkipIntroducerKeywords)
+      Printer << "var ";
     printPattern(cast<VarPattern>(pattern)->getSubPattern());
   }
 }
@@ -773,7 +777,8 @@ void PrintAST::visitIfConfigDecl(IfConfigDecl *ICD) {
 void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
-  Printer << "typealias ";
+  if (!Options.SkipIntroducerKeywords)
+    Printer << "typealias ";
   recordDeclLoc(decl);
   Printer.printName(decl->getName());
   if (Options.TypeDefinitions && decl->hasUnderlyingType()) {
@@ -791,7 +796,8 @@ void PrintAST::visitGenericTypeParamDecl(GenericTypeParamDecl *decl) {
 void PrintAST::visitAssociatedTypeDecl(AssociatedTypeDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
-  Printer << "typealias ";
+  if (!Options.SkipIntroducerKeywords)
+    Printer << "typealias ";
   recordDeclLoc(decl);
   Printer.printName(decl->getName());
   printInheritedWithSuperclass(decl);
@@ -805,7 +811,8 @@ void PrintAST::visitAssociatedTypeDecl(AssociatedTypeDecl *decl) {
 void PrintAST::visitEnumDecl(EnumDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
-  Printer << "enum ";
+  if (!Options.SkipIntroducerKeywords)
+    Printer << "enum ";
   recordDeclLoc(decl);
   printNominalDeclName(decl);
   printInherited(decl);
@@ -817,7 +824,8 @@ void PrintAST::visitEnumDecl(EnumDecl *decl) {
 void PrintAST::visitStructDecl(StructDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
-  Printer << "struct ";
+  if (!Options.SkipIntroducerKeywords)
+    Printer << "struct ";
   recordDeclLoc(decl);
   printNominalDeclName(decl);
   printInherited(decl);
@@ -829,7 +837,8 @@ void PrintAST::visitStructDecl(StructDecl *decl) {
 void PrintAST::visitClassDecl(ClassDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
-  Printer << "class ";
+  if (!Options.SkipIntroducerKeywords)
+    Printer << "class ";
   recordDeclLoc(decl);
   printNominalDeclName(decl);
   printInheritedWithSuperclass(decl);
@@ -841,7 +850,8 @@ void PrintAST::visitClassDecl(ClassDecl *decl) {
 void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
-  Printer << "protocol ";
+  if (!Options.SkipIntroducerKeywords)
+    Printer << "protocol ";
   recordDeclLoc(decl);
   printNominalDeclName(decl);
   printInherited(decl);
@@ -854,9 +864,11 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
   printOverrideKeyword(decl);
-  if (decl->isStatic())
-    printStaticKeyword(decl->getCorrectStaticSpelling());
-  Printer << (decl->isLet() ? "let " : "var ");
+  if (!Options.SkipIntroducerKeywords) {
+    if (decl->isStatic())
+      printStaticKeyword(decl->getCorrectStaticSpelling());
+    Printer << (decl->isLet() ? "let " : "var ");
+  }
   recordDeclLoc(decl);
   Printer.printName(decl->getName());
   if (decl->hasType()) {
@@ -909,33 +921,33 @@ void PrintAST::printOneParameter(Identifier ArgName,
     Printer.printName(BodyName);
     Printer << ": ";
   } else {
-    if (Options.PrintKeywordArgAndParam) {
+    auto printArg = [&]{
+      if (!ArgName.empty() && !ArgNameIsAPIByDefault)
+        Printer << "`";
       Printer.printName(ArgName);
-      Printer << " ";
-      Printer.printName(BodyName);
-      Printer << ": ";
-    } else if (ArgName == BodyName) {
-      if (!ArgName.empty()) {
-        // The argument and parameter names match, so we only have one thing to
-        // print.
-        if (!ArgNameIsAPIByDefault)
-          Printer << "`";
-        Printer.printName(ArgName);
-        Printer << ": ";
-      } else {
-        Printer << "_: ";
+    };
+
+    switch (Options.ArgAndParamPrinting) {
+    case PrintOptions::ArgAndParamPrintingMode::ArgumentOnly:
+      printArg();
+      break;
+    case PrintOptions::ArgAndParamPrintingMode::BothIfDifferent:
+      if (ArgName == BodyName) {
+        printArg();
+        break;
       }
-    } else if (ArgName.empty()) {
-      if (ArgNameIsAPIByDefault)
-        Printer << "_ ";
-      Printer.printName(BodyName);
-      Printer << ": ";
-    } else {
+      if (ArgName.empty() && !ArgNameIsAPIByDefault) {
+        Printer.printName(BodyName);
+        break;
+      }
+      SWIFT_FALLTHROUGH;
+    case PrintOptions::ArgAndParamPrintingMode::BothAlways:
       Printer.printName(ArgName);
       Printer << " ";
       Printer.printName(BodyName);
-      Printer << ": ";
+      break;
     }
+    Printer << ": ";
   }
 
   if (StripOuterSliceType && !TheTypeLoc.hasLocation()) {
@@ -1072,7 +1084,8 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
     printOverrideKeyword(decl);
     if (decl->isStatic() && !decl->isOperator())
       printStaticKeyword(decl->getCorrectStaticSpelling());
-    Printer << "func ";
+    if (!Options.SkipIntroducerKeywords)
+      Printer << "func ";
     recordDeclLoc(decl);
     if (!decl->hasName())
       Printer << "<anonymous>";

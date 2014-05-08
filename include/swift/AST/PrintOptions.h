@@ -76,6 +76,12 @@ struct PrintOptions {
   /// Whether to skip declarations that start with '_'.
   bool SkipLeadingUnderscoreDecls = false;
 
+  /// Whether to print attributes.
+  bool SkipAttributes = false;
+
+  /// Whether to print keywords like 'func'.
+  bool SkipIntroducerKeywords = false;
+
   bool PrintImplicitAttrs = true;
 
   /// List of attribute kinds that should not be printed.
@@ -96,8 +102,15 @@ struct PrintOptions {
   /// Whether to print 'override' keyword on overridden decls.
   bool PrintOverrideKeyword = true;
 
-  /// Whether to always print both the keyword argument and parameter name.
-  bool PrintKeywordArgAndParam = false;
+  enum class ArgAndParamPrintingMode {
+    ArgumentOnly,
+    BothIfDifferent,
+    BothAlways,
+  };
+
+  /// How to print the keyword argument and parameter name in functions.
+  ArgAndParamPrintingMode ArgAndParamPrinting =
+      ArgAndParamPrintingMode::BothIfDifferent;
 
   /// \brief Whether to print documentation comments attached to declarations.
   /// Note that this may print documentation comments from related declarations
