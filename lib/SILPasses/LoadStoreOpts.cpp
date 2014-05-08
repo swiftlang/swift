@@ -141,9 +141,45 @@ public:
       Loads.erase(LI);
     }
   }
+
+  /// Try to prove that SI is a dead store updating all current state. If SI is
+  /// dead, eliminate it.
+  void tryToEliminateDeadStore(StoreInst *SI);
 };
 
 } // end anonymous namespace
+
+void LSBBForwarder::tryToEliminateDeadStore(StoreInst *SI) {
+  // If we are storing a value that is available in the load list then we
+  // know that no one clobbered that address and the current store is
+  // redundant and we can remove it.
+  if (LoadInst *LdSrc = dyn_cast<LoadInst>(SI->getSrc())) {
+    // Check that the loaded value is live and that the destination address
+    // is the same as the loaded address.
+    if (Loads.count(LdSrc) && LdSrc->getOperand() == SI->getDest()) {
+      Changed = true;
+      deleteInstruction(SI);
+      NumDeadStores++;
+      return;
+    }
+  }
+
+  // Invalidate any load that we can not prove does not read from the stores
+  // destination.
+  invalidateAliasingLoads(SI);
+
+  // If we are storing to the previously stored address then delete the old
+  // store.
+  if (PrevStore && PrevStore->getDest() == SI->getDest()) {
+    DEBUG(llvm::dbgs() << "    Found a dead previous store... Removing...:"
+                       << *PrevStore);
+    Changed = true;
+    deleteInstruction(PrevStore);
+    NumDeadStores++;
+  }
+
+  PrevStore = SI;
+}
 
 /// \brief Promote stored values to loads, remove dead stores and merge
 /// duplicated loads.
@@ -158,37 +194,7 @@ bool LSBBForwarder::optimize() {
 
     // This is a StoreInst. Let's see if we can remove the previous stores.
     if (StoreInst *SI = dyn_cast<StoreInst>(Inst)) {
-
-      // If we are storing a value that is available in the load list then we
-      // know that no one clobbered that address and the current store is
-      // redundant and we can remove it.
-      if (LoadInst *LdSrc = dyn_cast<LoadInst>(SI->getSrc())) {
-        // Check that the loaded value is live and that the destination address
-        // is the same as the loaded address.
-        if (Loads.count(LdSrc) && LdSrc->getOperand() == SI->getDest()) {
-          Changed = true;
-          deleteInstruction(SI);
-          NumDeadStores++;
-          continue;
-        }
-      }
-
-      // Invalidate any load that we can not prove does not read from the stores
-      // destination.
-      invalidateAliasingLoads(Inst);
-
-      // If we are storing to the previously stored address then delete the old
-      // store.
-      if (PrevStore && PrevStore->getDest() == SI->getDest()) {
-        DEBUG(llvm::dbgs() << "    Found a dead previous store... Removing...:"
-              << *PrevStore);
-        Changed = true;
-        deleteInstruction(PrevStore);
-        PrevStore = SI;
-        NumDeadStores++;
-        continue;
-      }
-      PrevStore = SI;
+      tryToEliminateDeadStore(SI);
       continue;
     }
 
