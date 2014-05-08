@@ -126,14 +126,15 @@ void SILPassManager::run() {
                  << NumOptzIterations << ") ***\n";
     Mod->dump();
   }
-  // Keep optimizing the module untill no pass requested another iteration
-  // of the pass.
+  // Keep optimizing the module until no pass requested another iteration
+  // of the pass or we reach the maximum.
+  const unsigned IterationLimit = 20;
   do {
     anotherIteration = false;
 
     runOneIteration();
 
-  } while (anotherIteration);
+  } while (anotherIteration && NumOptzIterations < IterationLimit);
 }
 
 /// D'tor.
