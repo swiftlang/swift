@@ -80,6 +80,19 @@ static SILValue findExtractPathBetweenValues(LoadInst *PrevLI, LoadInst *LI) {
   return LastExtract;
 }
 
+/// Returns true if this is an instruction that may have side effects in a
+/// general sense but are inert from a load store perspective.
+static bool isLSForwardingInertInstruction(SILInstruction *Inst) {
+  switch (Inst->getKind()) {
+  case ValueKind::StrongRetainInst:
+  case ValueKind::DeallocStackInst:
+  case ValueKind::CondFailInst:
+    return true;
+  default:
+    return false;
+  }
+}
+
 //===----------------------------------------------------------------------===//
 //                               Implementation
 //===----------------------------------------------------------------------===//
@@ -260,17 +273,10 @@ bool LSBBForwarder::optimize() {
       continue;
     }
 
-    // Retains write to memory but they don't affect loads and stores.
-    if (isa<StrongRetainInst>(Inst)) {
-      DEBUG(llvm::dbgs() << "    Found strong retain, does not affect loads and"
-            " stores.\n");
-      continue;
-    }
-
-    // Dealloc stack does not affect loads and stores.
-    if (isa<DeallocStackInst>(Inst)) {
-      DEBUG(llvm::dbgs() << "Found a dealloc stack. Does not affect loads and "
-            "stores.\n");
+    // If this instruction has side effects, but is inert from a load store
+    // perspective, skip it.
+    if (isLSForwardingInertInstruction(Inst)) {
+      DEBUG(llvm::dbgs() << "    Found inert instruction: " << *Inst);
       continue;
     }
 
@@ -281,13 +287,6 @@ bool LSBBForwarder::optimize() {
                 "loads and stores.\n");
           continue;
         }
-
-    // cond_fail does not read/write memory in a manner that we care about.
-    if (isa<CondFailInst>(Inst)) {
-      DEBUG(llvm::dbgs() << "    Found a cond fail, does not affect "
-            "loads and stores.\n");
-      continue;
-    }
 
     // All other instructions that read from memory invalidate the store.
     if (Inst->mayReadFromMemory()) {
