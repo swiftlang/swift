@@ -145,6 +145,10 @@ public:
   /// Try to prove that SI is a dead store updating all current state. If SI is
   /// dead, eliminate it.
   void tryToEliminateDeadStore(StoreInst *SI);
+
+  /// Try to find a previously known value that we can forward to LI. This
+  /// includes from stores and loads.
+  void tryToForwardLoad(LoadInst *LI);
 };
 
 } // end anonymous namespace
@@ -181,6 +185,57 @@ void LSBBForwarder::tryToEliminateDeadStore(StoreInst *SI) {
   PrevStore = SI;
 }
 
+void LSBBForwarder::tryToForwardLoad(LoadInst *LI) {
+  // If we are loading a value that we just saved then use the saved value.
+  if (PrevStore && PrevStore->getDest() == LI->getOperand()) {
+    DEBUG(llvm::dbgs() << "    Forwarding store from: " << *PrevStore);
+    SILValue(LI, 0).replaceAllUsesWith(PrevStore->getSrc());
+    deleteInstruction(LI);
+    Changed = true;
+    NumForwardedLoads++;
+    return;
+  }
+
+  // Promote partial loads.
+  // Check that we are loading a struct element:
+  if (auto *SEAI = dyn_cast<StructElementAddrInst>(LI->getOperand())) {
+    // And that the previous store stores into that struct.
+    if (PrevStore && PrevStore->getDest() == SEAI->getOperand()) {
+      // And that the stored value is a struct construction instruction:
+      if (auto *SI = dyn_cast<StructInst>(PrevStore->getSrc())) {
+        DEBUG(llvm::dbgs() << "    Forwarding element store from: "
+                           << *PrevStore);
+        unsigned FieldNo = SEAI->getFieldNo();
+        SILValue(LI, 0).replaceAllUsesWith(SI->getOperand(FieldNo));
+        deleteInstruction(LI);
+        Changed = true;
+        NumForwardedLoads++;
+        return;
+      }
+    }
+  }
+
+  // Search the previous loads and replace the current load with one of the
+  // previous loads.
+  for (auto PrevLI : Loads) {
+    SILValue ForwardingExtract = findExtractPathBetweenValues(PrevLI, LI);
+    if (!ForwardingExtract)
+      continue;
+
+    DEBUG(llvm::dbgs() << "    Replacing with previous load: "
+                       << *ForwardingExtract);
+    SILValue(LI, 0).replaceAllUsesWith(ForwardingExtract);
+    deleteInstruction(LI);
+    Changed = true;
+    LI = nullptr;
+    NumDupLoads++;
+    break;
+  }
+
+  if (LI)
+    Loads.insert(LI);
+}
+
 /// \brief Promote stored values to loads, remove dead stores and merge
 /// duplicated loads.
 bool LSBBForwarder::optimize() {
@@ -198,55 +253,10 @@ bool LSBBForwarder::optimize() {
       continue;
     }
 
+    // This is a LoadInst. Let's see if we can find a previous loaded, stored
+    // value to use instead of this load.
     if (LoadInst *LI = dyn_cast<LoadInst>(Inst)) {
-      // If we are loading a value that we just saved then use the saved value.
-      if (PrevStore && PrevStore->getDest() == LI->getOperand()) {
-        DEBUG(llvm::dbgs() << "    Forwarding store from: " << *PrevStore);
-        SILValue(LI, 0).replaceAllUsesWith(PrevStore->getSrc());
-        deleteInstruction(LI);
-        Changed = true;
-        NumForwardedLoads++;
-        continue;
-      }
-
-      // Promote partial loads.
-      // Check that we are loading a struct element:
-      if (auto *SEAI = dyn_cast<StructElementAddrInst>(LI->getOperand())) {
-        // And that the previous store stores into that struct.
-        if (PrevStore && PrevStore->getDest() == SEAI->getOperand()) {
-          // And that the stored value is a struct construction instruction:
-          if (auto *SI = dyn_cast<StructInst>(PrevStore->getSrc())) {
-            DEBUG(llvm::dbgs() << "    Forwarding element store from: " <<
-                  *PrevStore);
-            unsigned FieldNo = SEAI->getFieldNo();
-            SILValue(LI, 0).replaceAllUsesWith(SI->getOperand(FieldNo));
-            deleteInstruction(LI);
-            Changed = true;
-            NumForwardedLoads++;
-            continue;
-          }
-        }
-      }
-
-      // Search the previous loads and replace the current load with one of the
-      // previous loads.
-      for (auto PrevLI : Loads) {
-        SILValue ForwardingExtract = findExtractPathBetweenValues(PrevLI, LI);
-        if (!ForwardingExtract)
-          continue;
-
-        DEBUG(llvm::dbgs() << "    Replacing with previous load: "
-              << *ForwardingExtract);
-        SILValue(LI, 0).replaceAllUsesWith(ForwardingExtract);
-        deleteInstruction(LI);
-        Changed = true;
-        LI = nullptr;
-        NumDupLoads++;
-        break;
-      }
-
-      if (LI)
-        Loads.insert(LI);
+      tryToForwardLoad(LI);
       continue;
     }
 
