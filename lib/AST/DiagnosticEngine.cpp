@@ -237,10 +237,16 @@ static void formatDiagnosticArgument(StringRef Modifier,
     Out << '\'' << Arg.getAsObjCSelector() << '\'';
     break;
 
-  case DiagnosticArgumentKind::Type:
+  case DiagnosticArgumentKind::Type: {
     assert(Modifier.empty() && "Improper modifier for Type argument");
-    Out << '\'' << Arg.getAsType() << '\'';
+    
+    // Strip extraneous parentheses; they add no value.
+    Type Ty = Arg.getAsType();
+    while (auto ParenTy = dyn_cast<ParenType>(Ty.getPointer()))
+      Ty = ParenTy->getUnderlyingType();
+    Out << '\'' << Ty << '\'';
     break;
+  }
   case DiagnosticArgumentKind::TypeRepr:
     assert(Modifier.empty() && "Improper modifier for TypeRepr argument");
     Out << '\'' << Arg.getAsTypeRepr() << '\'';
