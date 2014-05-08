@@ -80,21 +80,6 @@ static SILValue findExtractPathBetweenValues(LoadInst *PrevLI, LoadInst *LI) {
   return LastExtract;
 }
 
-static void
-invalidateAliasingLoads(SILInstruction *Inst,
-                        llvm::SmallPtrSetImpl<LoadInst *> &Loads,
-                        AliasAnalysis *AA) {
-  llvm::SmallVector<LoadInst *, 4> InvalidatedLoadList;
-  for (auto *LI : Loads)
-    if (AA->mayWriteToMemory(Inst, LI->getOperand()))
-      InvalidatedLoadList.push_back(LI);
-  for (auto *LI : InvalidatedLoadList) {
-    DEBUG(llvm::dbgs() << "    Found an instruction that writes to memory "
-          "such that a load is invalidated:" << *LI);
-    Loads.erase(LI);
-  }
-}
-
 //===----------------------------------------------------------------------===//
 //                               Implementation
 //===----------------------------------------------------------------------===//
@@ -143,6 +128,19 @@ public:
         Loads.erase(LI);
     });
   }
+
+  /// Invalidate any loads that we can not prove that Inst does not write to.
+  void invalidateAliasingLoads(SILInstruction *Inst) {
+    llvm::SmallVector<LoadInst *, 4> InvalidatedLoadList;
+    for (auto *LI : Loads)
+      if (AA->mayWriteToMemory(Inst, LI->getOperand()))
+        InvalidatedLoadList.push_back(LI);
+    for (auto *LI : InvalidatedLoadList) {
+      DEBUG(llvm::dbgs() << "    Found an instruction that writes to memory "
+                            "such that a load is invalidated:" << *LI);
+      Loads.erase(LI);
+    }
+  }
 };
 
 } // end anonymous namespace
@@ -177,7 +175,7 @@ bool LSBBForwarder::optimize() {
 
       // Invalidate any load that we can not prove does not read from the stores
       // destination.
-      invalidateAliasingLoads(Inst, Loads, AA);
+      invalidateAliasingLoads(Inst);
 
       // If we are storing to the previously stored address then delete the old
       // store.
@@ -288,7 +286,7 @@ bool LSBBForwarder::optimize() {
     if (Inst->mayWriteToMemory()) {
       // Invalidate any load that we can not prove does not read from one of the
       // writing instructions operands.
-      invalidateAliasingLoads(Inst, Loads, AA);
+      invalidateAliasingLoads(Inst);
       PrevStore = nullptr;
     }
   }
