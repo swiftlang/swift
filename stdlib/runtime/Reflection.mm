@@ -104,7 +104,7 @@ struct QuickLookObject {
   };
   
   union {
-    String Text;
+    String TextOrURL;
     int64_t Int;
     uint64_t UInt;
     double Float;
@@ -132,6 +132,7 @@ struct QuickLookObject {
     Range,
     View,
     Sprite,
+    URL,
     Raw,
   } Kind;
 };
@@ -144,7 +145,7 @@ struct OptionalQuickLookObject {
   union {
     struct {
       union {
-        String Text;
+        String TextOrURL;
         int64_t Int;
         uint64_t UInt;
         double Float;
