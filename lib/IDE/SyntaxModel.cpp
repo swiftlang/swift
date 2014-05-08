@@ -406,7 +406,27 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
       if (!passNonTokenNode({ SyntaxNodeKind::BuildConfigKeyword,
             CharSourceRange(ConfigD->getEndLoc(), 6/*'#endif'*/) }))
         return false;
+
+  } else if (auto OperD = dyn_cast<OperatorDecl>(D)) {
+    if (!passNonTokenNode({ SyntaxNodeKind::Keyword,
+          CharSourceRange(OperD->getOperatorLoc(), strlen("operator")) }))
+      return false;
+
+    if (auto Infix = dyn_cast<InfixOperatorDecl>(D)) {
+      if (!passNonTokenNode({ SyntaxNodeKind::Keyword,
+            CharSourceRange(Infix->getInfixLoc(), strlen("infix")) }))
+        return false;
+    } else if (auto Prefix = dyn_cast<PrefixOperatorDecl>(D)) {
+      if (!passNonTokenNode({ SyntaxNodeKind::Keyword,
+            CharSourceRange(Prefix->getPrefixLoc(), strlen("prefix")) }))
+        return false;
+    } else if (auto Postfix = dyn_cast<PostfixOperatorDecl>(D)) {
+      if (!passNonTokenNode({ SyntaxNodeKind::Keyword,
+            CharSourceRange(Postfix->getPostfixLoc(), strlen("postfix")) }))
+        return false;
+    }
   }
+
   return true;
 }
 
