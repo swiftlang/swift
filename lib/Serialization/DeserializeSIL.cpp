@@ -733,12 +733,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     switch ((ValueKind)OpCode) {
     default: assert(0 && "Out of sync with parent switch");
     case ValueKind::InitExistentialInst:
-      // FIXME: Conformances in InitExistentialInst needs to be serialized.
       ResultVal = Builder.createInitExistential(Loc, operand, Ty,
                                                 ctxConformances);
       break;
     case ValueKind::InitExistentialRefInst:
-      // FIXME: Conformances in InitExistentialRefInst needs to be serialized.
       ResultVal = Builder.createInitExistentialRef(Loc, Ty, operand,
                                                    ctxConformances);
       break;
