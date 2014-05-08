@@ -50,6 +50,9 @@ Latest
   The API of the Unmanaged type is still in flux, and your feedback
   would be greatly appreciated.
 
+* ";" can no longer be used to demarkate an empty case in a switch statement,
+  use "break" instead.
+
 2014-05-03
 ----------
 

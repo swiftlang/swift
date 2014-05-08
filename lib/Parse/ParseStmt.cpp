@@ -1600,35 +1600,19 @@ ParserResult<CaseStmt> Parser::parseStmtCase() {
   SmallVector<ASTNode, 8> BodyItems;
 
   SourceLoc StartOfBody = Tok.getLoc();
-  BraceStmt *Body = nullptr;
-  switch (Tok.getKind()) {
-  case tok::kw_case:
-  case tok::kw_default:
-  case tok::r_brace:
-    if (Status.isSuccess()) {
-      diagnose(CaseLoc, diag::case_stmt_without_body)
-          .highlight(SourceRange(CaseLoc, ColonLoc));
-    }
-    break;
-
-  case tok::semi:
-    // OK: 'case' has empty body explicitly marked with a semicolon.
-    consumeToken(tok::semi);
-    Body = BraceStmt::create(Context, Tok.getLoc(), {}, Tok.getLoc());
-    break;
-
-  default:
+  if (Tok.isNot(tok::kw_case) && Tok.isNot(tok::kw_default) &&
+      Tok.isNot(tok::r_brace)) {
     Status |= parseBraceItems(BodyItems, BraceItemListKind::Case);
-    break;
+  } else if (Status.isSuccess()) {
+    diagnose(CaseLoc, diag::case_stmt_without_body)
+        .highlight(SourceRange(CaseLoc, ColonLoc));
   }
-
-  if (!Body) {
-    if (BodyItems.empty()) {
-      Body = BraceStmt::create(Context, PreviousLoc, {}, PreviousLoc,
-                               /*implicit=*/true);
-    } else {
-      Body = BraceStmt::create(Context, StartOfBody, BodyItems, PreviousLoc);
-    }
+  BraceStmt *Body;
+  if (BodyItems.empty()) {
+    Body = BraceStmt::create(Context, PreviousLoc, ArrayRef<ASTNode>(),
+                             PreviousLoc, /*implicit=*/true);
+  } else {
+    Body = BraceStmt::create(Context, StartOfBody, BodyItems, PreviousLoc);
   }
 
   return makeParserResult(
