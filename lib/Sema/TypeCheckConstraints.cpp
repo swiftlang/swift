@@ -1532,6 +1532,17 @@ void Solution::dump(SourceManager *sm, raw_ostream &out) const {
     choice.first->dump(sm, out);
     out << " is #" << choice.second << "\n";
   }
+
+  if (!Fixes.empty()) {
+    out << "\nFixes:\n";
+    for (auto &fix : Fixes) {
+      out.indent(2);
+      fix.first.print(out, &getConstraintSystem());
+      out << " @ ";
+      fix.second->dump(sm, out);
+      out << "\n";
+    }
+  }
 }
 
 void ConstraintSystem::dump() {
