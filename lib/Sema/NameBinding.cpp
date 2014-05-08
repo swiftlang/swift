@@ -128,8 +128,15 @@ static const char *getImportKindString(ImportKind kind) {
   }
 }
 
-Optional<std::pair<ImportedModule, bool>> NameBinder::addImport(ImportDecl *ID) {
-  Module *M = getModule(ID->getModulePath());
+Optional<std::pair<ImportedModule, bool>>
+NameBinder::addImport(ImportDecl *ID) {
+  ArrayRef<ImportDecl::AccessPathElement> modulePath = ID->getModulePath();
+  if (modulePath.size() != 1) {
+    diagnose(ID->getLoc(), diag::sema_submodules_disallowed);
+    return Nothing;
+  }
+
+  Module *M = getModule(modulePath);
   if (M == 0) {
     // FIXME: print entire path regardless.
     if (ID->getModulePath().size() == 1) {
