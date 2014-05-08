@@ -745,7 +745,7 @@ macro(add_swift_library name)
 
     # If Application Extensions are enabled, pass the linker flag marking
     # the dylib as safe.
-    if (CXX_SUPPORTS_FAPPLICATION_EXTENSION)
+    if (CXX_SUPPORTS_FAPPLICATION_EXTENSION AND (NOT DISABLE_APPLICATION_EXTENSION))
       target_link_libraries(${name} "-Wl,-application_extension")
     endif()
 
