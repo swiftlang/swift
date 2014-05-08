@@ -553,6 +553,15 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
   // Always print rvalues, not lvalues.
   E = TC.coerceToMaterializable(E);
 
+  // If the caller didn't wrap the argument in a parenthese or make it a tuple,
+  // add the extra parentheses now.
+  if (!isa<ParenExpr>(E) && !isa<TupleExpr>(E)) {
+    if (TC.Context.LangOpts.StrictKeywordArguments) {
+      Type Ty = ParenType::get(TC.Context, E->getType());
+      E = new (TC.Context) ParenExpr(SourceLoc(), E, SourceLoc(), false, Ty);
+    }
+  }
+
   CanType T = E->getType()->getCanonicalType();
   SourceLoc Loc = E->getStartLoc();
   SourceLoc EndLoc = E->getEndLoc();
@@ -563,13 +572,13 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
   
   // Build function of type T->() which prints the operand.
   VarDecl *Arg = new (Context) ParamDecl(/*isLet=*/true,
-                                         Loc, Context.getIdentifier("arg"),
+                                         SourceLoc(), Identifier(),
                                          Loc, Context.getIdentifier("arg"),
                                          E->getType(), /*DC*/ nullptr);
   Pattern *ParamPat = new (Context) NamedPattern(Arg);
   ParamPat = new (Context) TypedPattern(ParamPat,
                                         TypeLoc::withoutLoc(Arg->getType()));
-  if (!isa<TupleType>(T)) {
+  if (!isa<TupleType>(T) && !TC.Context.LangOpts.StrictKeywordArguments) {
     TuplePatternElt elt{ParamPat};
     ParamPat = TuplePattern::create(Context, SourceLoc(), elt, SourceLoc());
   }
@@ -582,8 +591,12 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
       new (Context) ClosureExpr(ArrayRef<CaptureListEntry>(),
                                 ParamPat, SourceLoc(), TypeLoc(),
                                 discriminator, newTopLevel);
-  Type FuncTy = FunctionType::get(ParamPat->getType(),
-                                  TupleType::getEmpty(Context));
+
+  Type ParamTy = ParamPat->getType();
+  if (TC.Context.LangOpts.StrictKeywordArguments) {
+    ParamTy = ParamTy->getRelabeledType(TC.Context, { Identifier() });
+  }
+  Type FuncTy = FunctionType::get(ParamTy, TupleType::getEmpty(Context));
   CE->setType(FuncTy);
   
   // Convert the pattern to a string we can print.
