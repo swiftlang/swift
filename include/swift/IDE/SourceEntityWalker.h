@@ -92,6 +92,11 @@ public:
   virtual bool visitCallArgName(Identifier Name, CharSourceRange Range,
                                 ValueDecl *D);
 
+  /// This method is called when a Module is referenced in source.
+  virtual bool visitModuleReference(Module *Mod, CharSourceRange Range) {
+    return true;
+  }
+
 protected:
   SourceEntityWalker() = default;
   SourceEntityWalker(const SourceEntityWalker &) = default;

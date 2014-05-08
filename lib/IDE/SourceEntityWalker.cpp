@@ -52,6 +52,7 @@ private:
   std::pair<bool, Pattern *> walkToPatternPre(Pattern *P) override;
 
   bool passReference(ValueDecl *D, SourceLoc Loc);
+  bool passReference(Module *Mod, SourceLoc Loc);
 
   bool passCallArgNames(Expr *Fn, TupleExpr *TupleE);
 
@@ -199,6 +200,8 @@ bool SemaAnnotator::walkToTypeReprPre(TypeRepr *T) {
       return passReference(VD, IdT->getIdLoc());
     if (TypeDecl *TyD = getTypeDecl(IdT->getBoundType()))
       return passReference(TyD, IdT->getIdLoc());
+    if (auto Mod = IdT->getBoundModule())
+      return passReference(Mod, IdT->getIdLoc());
   }
   return true;
 }
@@ -249,6 +252,17 @@ bool SemaAnnotator::passReference(ValueDecl *D, SourceLoc Loc) {
   CharSourceRange Range = (Loc.isValid()) ? CharSourceRange(Loc, NameLen)
                                           : CharSourceRange();
   bool Continue = SEWalker.visitDeclReference(D, Range, CtorTyRef);
+  if (!Continue)
+    Cancelled = true;
+  return Continue;
+}
+
+bool SemaAnnotator::passReference(Module *Mod, SourceLoc Loc) {
+  if (Loc.isInvalid())
+    return true;
+  unsigned NameLen = Mod->getName().getLength();
+  CharSourceRange Range{ Loc, NameLen };
+  bool Continue = SEWalker.visitModuleReference(Mod, Range);
   if (!Continue)
     Cancelled = true;
   return Continue;
