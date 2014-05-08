@@ -1,0 +1,20 @@
+// RUN: %swift -target x86_64-apple-darwin10 %s -emit-ir | FileCheck %s
+
+// CHECK-LABEL: define void @archetype_metatype_cast
+// CHECK:         %0 = call %swift.type* @swift_dynamicCastMetatype(%swift.type* %T, %swift.type* %U) #0
+// CHECK:         %1 = icmp ne %swift.type* %0, null
+sil @archetype_metatype_cast : $@thin <T, U> () -> () {
+entry:
+  %0 = metatype $@thick T.Type
+  checked_cast_br archetype_to_archetype %0 : $@thick T.Type to $@thick U.Type, yes, no
+yes(%1 : $@thick U.Type):
+  br end
+
+no:
+  br end
+
+end:
+  return undef : $()
+}
+
+

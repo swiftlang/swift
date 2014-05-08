@@ -1853,6 +1853,19 @@ swift_dynamicCastIndirectUnconditional(const OpaqueValue *value,
                                        const Metadata *sourceType,
                                        const Metadata *targetType);
 
+extern "C" const Metadata *
+swift_dynamicCastMetatype(const Metadata *sourceType,
+                          const Metadata *targetType);
+extern "C" const Metadata *
+swift_dynamicCastMetatypeUnconditional(const Metadata *sourceType,
+                                       const Metadata *targetType);
+extern "C" const ClassMetadata *
+swift_dynamicCastObjCClassMetatype(const ClassMetadata *sourceType,
+                                   const ClassMetadata *targetType);
+extern "C" const ClassMetadata *
+swift_dynamicCastObjCClassMetatypeUnconditional(const ClassMetadata *sourceType,
+                                                const ClassMetadata *targetType);
+  
 /// \brief Standard 'typeof' value witness for types with static metatypes.
 ///
 /// \param obj  A pointer to the object. Ignored.

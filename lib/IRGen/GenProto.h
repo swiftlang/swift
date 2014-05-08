@@ -194,6 +194,12 @@ namespace irgen {
                                                              Explosion &value,
                                                              CanType type);
 
+  /// Emit a checked cast of a metatype.
+  llvm::Value *emitMetatypeDowncast(IRGenFunction &IGF,
+                                    llvm::Value *metatype,
+                                    CanMetatypeType toMetatype,
+                                    CheckedCastMode mode);
+  
   /// Emit a checked cast of an opaque archetype.
   Address emitOpaqueArchetypeDowncast(IRGenFunction &IGF,
                                       Address value,

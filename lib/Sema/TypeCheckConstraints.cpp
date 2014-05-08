@@ -1659,7 +1659,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   Type origFromType = fromType;
   Type origToType = toType;
 
-  // Strip optional wrappers off of the destination type in sync with
+  // Strip optional and metatype wrappers off of the destination type in sync with
   // stripping them off the origin type.
   while (auto toValueType = toType->getAnyOptionalObjectType()) {
     // Complain if we're trying to increase optionality, e.g.
@@ -1677,10 +1677,18 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     toType = toValueType;
     fromType = fromValueType;
   }
-
-  // Strip any remaining optional wrappers off the source type.
-  while (auto fromValueType = fromType->getAnyOptionalObjectType()) {
+  
+  // On the other hand, casts can decrease optionality monadically.
+  while (auto fromValueType = fromType->getAnyOptionalObjectType())
     fromType = fromValueType;
+  
+  while (auto toMetatype = toType->getAs<MetatypeType>()) {
+    auto fromMetatype = fromType->getAs<MetatypeType>();
+    if (!fromMetatype)
+      break;
+    
+    toType = toMetatype->getInstanceType();
+    fromType = fromMetatype->getInstanceType();
   }
 
   bool toArchetype = toType->is<ArchetypeType>();

@@ -2629,6 +2629,21 @@ static Address emitCheckedCast(IRGenSILFunction &IGF,
                                SILType destTy,
                                CheckedCastKind kind,
                                CheckedCastMode mode) {
+  if (operand.getType().is<MetatypeType>()) {
+    llvm::Value *metatypeVal;
+    if (operand.getType().isAddress()) {
+      auto fromAddr = IGF.getLoweredAddress(operand);
+      metatypeVal = IGF.Builder.CreateLoad(fromAddr);
+    } else {
+      auto fromEx = IGF.getLoweredExplosion(operand);
+      metatypeVal = fromEx.claimNext();
+    }
+    llvm::Value *cast = emitMetatypeDowncast(IGF, metatypeVal,
+                                             destTy.castTo<MetatypeType>(),
+                                             mode);
+    return Address(cast, Alignment(1));
+  }
+  
   switch (kind) {
   case CheckedCastKind::Unresolved:
   case CheckedCastKind::Coercion:

@@ -1985,6 +1985,26 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
 /// This routine does not attempt to check whether the cast can actually
 /// succeed; that's the caller's responsibility.
 static CheckedCastKind getCheckedCastKind(Type fromType, Type toType) {
+  // Peel off optionals metatypes from the types, because we might cast through
+  // them.
+  while (auto toValueType = toType->getAnyOptionalObjectType()) {
+    toType = toValueType;
+  }
+  
+  while (auto fromValueType = fromType->getAnyOptionalObjectType()) {
+    fromType = fromValueType;
+  }
+  
+  // Peel off metatypes, since if we can cast two types, we can cast their
+  // metatypes.
+  while (auto toMetatype = toType->getAs<MetatypeType>()) {
+    auto fromMetatype = fromType->getAs<MetatypeType>();
+    if (!fromMetatype)
+      break;
+    toType = toMetatype->getInstanceType();
+    fromType = fromMetatype->getInstanceType();
+  }
+  
   // Classify the from/to types.
   bool toArchetype = toType->is<ArchetypeType>();
   bool fromArchetype = fromType->is<ArchetypeType>();
@@ -2062,7 +2082,8 @@ ConstraintSystem::simplifyCheckedCastConstraint(
   if (typeVar2)
     return SolutionKind::Unsolved;
 
-  switch (getCheckedCastKind(fromType, toType)) {
+  auto kind = getCheckedCastKind(fromType, toType);
+  switch (kind) {
   case CheckedCastKind::ArchetypeToArchetype:
   case CheckedCastKind::ConcreteToUnrelatedExistential:
   case CheckedCastKind::ExistentialToArchetype:

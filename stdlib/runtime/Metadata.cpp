@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Support/MathExtras.h"
+#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Range.h"
 #include "swift/Runtime/HeapObject.h"
@@ -405,6 +406,135 @@ swift::swift_dynamicCastUnconditional(const void *object,
   }
 
   return swift_dynamicCastClassUnconditional(object, targetClassType);
+}
+
+const Metadata *
+swift::swift_dynamicCastMetatype(const Metadata *sourceType,
+                                 const Metadata *targetType) {
+  auto origSourceType = sourceType;
+
+  switch (targetType->getKind()) {
+  case MetadataKind::ObjCClassWrapper:
+    // Get the actual class object.
+    targetType = static_cast<const ObjCClassWrapperMetadata*>(targetType)
+      ->Class;
+    SWIFT_FALLTHROUGH;
+  case MetadataKind::Class:
+    // The source value must also be a class; otherwise the cast fails.
+    switch (sourceType->getKind()) {
+    case MetadataKind::ObjCClassWrapper:
+      // Get the actual class object.
+      sourceType = static_cast<const ObjCClassWrapperMetadata*>(sourceType)
+        ->Class;
+      SWIFT_FALLTHROUGH;
+    case MetadataKind::Class: {
+      // Check if the source is a subclass of the target.
+      // We go through ObjC lookup to deal with potential runtime magic in ObjC
+      // land.
+      if (swift_dynamicCastObjCClassMetatype((const ClassMetadata*)sourceType,
+                                             (const ClassMetadata*)targetType))
+        return origSourceType;
+      return nullptr;
+    }
+    case MetadataKind::ForeignClass: // FIXME
+    case MetadataKind::Existential:
+    case MetadataKind::ExistentialMetatype:
+    case MetadataKind::Function:
+    case MetadataKind::HeapArray:
+    case MetadataKind::HeapLocalVariable:
+    case MetadataKind::Metatype:
+    case MetadataKind::Enum:
+    case MetadataKind::Opaque:
+    case MetadataKind::PolyFunction:
+    case MetadataKind::Struct:
+    case MetadataKind::Tuple:
+      return nullptr;
+    }
+    break;
+      
+  case MetadataKind::ForeignClass: // FIXME
+  case MetadataKind::Existential:
+  case MetadataKind::ExistentialMetatype:
+  case MetadataKind::Function:
+  case MetadataKind::HeapArray:
+  case MetadataKind::HeapLocalVariable:
+  case MetadataKind::Metatype:
+  case MetadataKind::Enum:
+  case MetadataKind::Opaque:
+  case MetadataKind::PolyFunction:
+  case MetadataKind::Struct:
+  case MetadataKind::Tuple:
+    // The cast succeeds only if the metadata pointers are statically
+    // equivalent.
+    if (sourceType != targetType)
+      return nullptr;
+    return origSourceType;
+  }
+}
+
+const Metadata *
+swift::swift_dynamicCastMetatypeUnconditional(const Metadata *sourceType,
+                                              const Metadata *targetType) {
+  auto origSourceType = sourceType;
+
+  switch (targetType->getKind()) {
+  case MetadataKind::ObjCClassWrapper:
+    // Get the actual class object.
+    targetType = static_cast<const ObjCClassWrapperMetadata*>(targetType)
+      ->Class;
+    SWIFT_FALLTHROUGH;
+  case MetadataKind::Class:
+    // The source value must also be a class; otherwise the cast fails.
+    switch (sourceType->getKind()) {
+    case MetadataKind::ObjCClassWrapper:
+      // Get the actual class object.
+      sourceType = static_cast<const ObjCClassWrapperMetadata*>(sourceType)
+        ->Class;
+      SWIFT_FALLTHROUGH;
+    case MetadataKind::Class: {
+      // Check if the source is a subclass of the target.
+      // We go through ObjC lookup to deal with potential runtime magic in ObjC
+      // land.
+      swift_dynamicCastObjCClassMetatypeUnconditional(
+                                            (const ClassMetadata*)sourceType,
+                                            (const ClassMetadata*)targetType);
+      // If we returned, then the cast succeeded.
+      return origSourceType;
+    }
+    case MetadataKind::ForeignClass: // FIXME
+    case MetadataKind::Existential:
+    case MetadataKind::ExistentialMetatype:
+    case MetadataKind::Function:
+    case MetadataKind::HeapArray:
+    case MetadataKind::HeapLocalVariable:
+    case MetadataKind::Metatype:
+    case MetadataKind::Enum:
+    case MetadataKind::Opaque:
+    case MetadataKind::PolyFunction:
+    case MetadataKind::Struct:
+    case MetadataKind::Tuple:
+      swift::crash("Swift dynamic cast failed");
+    }
+    break;
+      
+  case MetadataKind::ForeignClass: // FIXME
+  case MetadataKind::Existential:
+  case MetadataKind::ExistentialMetatype:
+  case MetadataKind::Function:
+  case MetadataKind::HeapArray:
+  case MetadataKind::HeapLocalVariable:
+  case MetadataKind::Metatype:
+  case MetadataKind::Enum:
+  case MetadataKind::Opaque:
+  case MetadataKind::PolyFunction:
+  case MetadataKind::Struct:
+  case MetadataKind::Tuple:
+    // The cast succeeds only if the metadata pointers are statically
+    // equivalent.
+    if (sourceType != targetType)
+      swift::crash("Swift dynamic cast failed");
+    return origSourceType;
+  }
 }
 
 const OpaqueValue *

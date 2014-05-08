@@ -4785,6 +4785,54 @@ emitOpaqueDowncast(IRGenFunction &IGF,
   return destTI.getAddressForPointer(ptr);
 }
 
+/// Emit a checked cast of a metatype.
+llvm::Value *irgen::emitMetatypeDowncast(IRGenFunction &IGF,
+                                         llvm::Value *metatype,
+                                         CanMetatypeType toMetatype,
+                                         CheckedCastMode mode) {
+  // Pick a runtime entry point and target metadata based on what kind of
+  // representation we're casting.
+  llvm::Value *castFn;
+  llvm::Value *toMetadata;
+  
+  switch (toMetatype->getRepresentation()) {
+  case MetatypeRepresentation::Thick: {
+    // Get the Swift metadata for the type we're checking.
+    toMetadata = IGF.emitTypeMetadataRef(toMetatype.getInstanceType());
+    switch (mode) {
+    case CheckedCastMode::Unconditional:
+      castFn = IGF.IGM.getDynamicCastMetatypeUnconditionalFn();
+      break;
+    case CheckedCastMode::Conditional:
+      castFn = IGF.IGM.getDynamicCastMetatypeFn();
+      break;
+    }
+    break;
+  }
+    
+  case MetatypeRepresentation::ObjC: {
+    // Get the ObjC metadata for the type we're checking.
+    toMetadata = emitClassHeapMetadataRef(IGF, toMetatype.getInstanceType());
+    switch (mode) {
+    case CheckedCastMode::Unconditional:
+      castFn = IGF.IGM.getDynamicCastObjCClassMetatypeUnconditionalFn();
+      break;
+    case CheckedCastMode::Conditional:
+      castFn = IGF.IGM.getDynamicCastObjCClassMetatypeFn();
+      break;
+    }
+    break;
+  }
+
+  case MetatypeRepresentation::Thin:
+    llvm_unreachable("not implemented");
+  }
+  
+  auto call = IGF.Builder.CreateCall2(castFn, metatype, toMetadata);
+  call->setDoesNotThrow();
+  return call;
+}
+
 /// Emit a checked cast of an opaque archetype.
 Address irgen::emitOpaqueArchetypeDowncast(IRGenFunction &IGF,
                                            Address value,

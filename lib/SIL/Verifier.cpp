@@ -1352,6 +1352,27 @@ public:
     require(fromTy.isAddress() == toTy.isAddress(),
             "address-ness of checked cast src and dest must match");
 
+    // Peel off metatypes. If two types are checked-cast-able, so are their
+    // metatypes.
+    while (fromTy.is<MetatypeType>() && toTy.is<MetatypeType>()) {
+      auto fromMetaty = fromTy.castTo<MetatypeType>();
+      auto toMetaty = toTy.castTo<MetatypeType>();
+
+      // The representations must match.
+      require(fromMetaty->getRepresentation() == toMetaty->getRepresentation(),
+              "metatype checked cast cannot change metatype representation");
+      
+      // We can't handle the 'thin' case yet, but it shouldn't really even be
+      // interesting.
+      require(fromMetaty->getRepresentation() != MetatypeRepresentation::Thin,
+              "metatype checked cast cannot check thin metatypes");
+      
+      fromTy = SILType::getPrimitiveObjectType(
+        fromMetaty.getInstanceType());
+      toTy = SILType::getPrimitiveObjectType(
+        toMetaty.getInstanceType());
+    }
+    
     switch (kind) {
     case CheckedCastKind::Unresolved:
     case CheckedCastKind::Coercion:
