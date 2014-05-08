@@ -38,5 +38,8 @@ if "@SWIFT_ASAN_BUILD@" != "OFF" and "@SWIFT_ASAN_BUILD@" != "NO":
 
 config.available_features.add('swift_stdlib_asserts')
 
+if "@SWIFT_OPTIMIZED@" == "ON" or "@SWIFT_OPTIMIZED@" == "YES":
+  config.available_features.add("optimized_stdlib")
+
 # Let the main config do the real work.
 lit_config.load_config(config, "@SWIFT_SOURCE_DIR@/test/lit.cfg")
