@@ -37,8 +37,8 @@ extern "C" HeapObject *(*_swift_tryRetain)(HeapObject *object);
 extern "C" void (*_swift_release)(HeapObject *object);
 
 
-size_t _swift_indexToSize(unsigned idx);
-int _swift_sizeToIndex(size_t size);
+extern "C" size_t _swift_indexToSize(unsigned idx);
+extern "C" int _swift_sizeToIndex(size_t size);
 
 };
 
