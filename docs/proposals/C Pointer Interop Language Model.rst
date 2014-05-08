@@ -43,6 +43,7 @@ reassignment. Loading from any of the three kinds of pointer does a strong
 load, so there is no need for a separate ``AutoreleasingConstUnsafePointer``.
 
 Sugar for Pointer Types
+-----------------------
 
 We add syntactic sugar for the pointer types:
 
