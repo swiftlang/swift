@@ -376,6 +376,9 @@ public:
   /// Retrieve the simple bridge conversion function for Array<T>.
   FuncDecl *getArrayBridgeToObjectiveC(LazyResolver *resolver) const;
 
+  /// Retrieve the conditional bridge conversion function for Array<T>.
+  FuncDecl *getArrayConditionalBridgeToObjectiveC(LazyResolver *resolver) const;
+  
   /// Retrieve the declaration of
   /// Swift._does{,ImplicitlyUnwrapped}OptionalHaveValue.
   FuncDecl *getDoesOptionalHaveValueDecl(LazyResolver *resolver,

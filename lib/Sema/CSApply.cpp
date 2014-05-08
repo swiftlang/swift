@@ -3686,9 +3686,18 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     case ConversionRestrictionKind::ArrayBridged: {
       auto bridgedArrayConversion = new (tc.Context)
                                       ArrayBridgedConversionExpr(expr, toType);
-      bridgedArrayConversion->isConditionallyBridged =
-                                  tc.isConditionallyBridgedType(dc, toType);
+      
       bridgedArrayConversion->setType(toType);
+      
+      // For a conversion from Array<T> to Array<U>, check if T conforms to the
+      // _ConditionallyBridgedToObjectiveC protocol.
+      auto desugaredArray = fromType.getPointer()->getDesugaredType();
+      auto baseType = cs.getBaseTypeForArrayType(desugaredArray);
+      
+      if (tc.isConditionallyBridgedType(dc, baseType)) {
+        bridgedArrayConversion->isConditionallyBridged = true;
+      }
+      
       return bridgedArrayConversion;
     }
 

@@ -967,9 +967,12 @@ visitArrayBridgedConversionExpr(ArrayBridgedConversionExpr *E,
   
   // Get the intrinsic function.
   FuncDecl *fn = nullptr;
+  auto &ctx = SGF.getASTContext();
   
   if (typeName.str() == "Array") {
-    fn = SGF.getASTContext().getArrayBridgeToObjectiveC(nullptr);
+    fn = E->isConditionallyBridged ?
+            ctx.getArrayConditionalBridgeToObjectiveC(nullptr) :
+            ctx.getArrayBridgeToObjectiveC(nullptr);
   } else {
     llvm_unreachable("unsupported array bridge kind");
   }
@@ -988,7 +991,6 @@ visitArrayBridgedConversionExpr(ArrayBridgedConversionExpr *E,
   auto protocolDecls = archetype->getConformsTo();
   SmallVector<ProtocolConformance *, 1> conformances;
   
-  auto &ctx = SGF.getASTContext();
   auto dc = protocolDecls[0]->getDeclContext()->getModuleScopeContext();
 
   auto conformance = ctx.getConformsTo(arrayT->getCanonicalType(),

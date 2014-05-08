@@ -2799,6 +2799,17 @@ static TypeMatchKind getTypeMatchKind(ConstraintKind kind) {
   }
 }
 
+Type ConstraintSystem::getBaseTypeForArrayType(TypeBase *type) {
+  if (auto sliceType = dyn_cast<ArraySliceType>(type)) {
+    return sliceType->getBaseType();
+  }
+  if (auto arrayType = dyn_cast<BoundGenericType>(type)) {
+    return arrayType->getGenericArgs()[0];
+  }
+  
+  llvm_unreachable("attempted to extract a base type from a non-array type");
+}
+
 /// Given that we have a conversion constraint between two types, and
 /// that the given constraint-reduction rule applies between them at
 /// the top level, apply it and generate any necessary recursive
@@ -2918,25 +2929,11 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
     addContextualScore();
     assert(matchKind >= TypeMatchKind::Conversion);
     
-    Type baseType1;
-    Type baseType2;
-    
     auto t1 = type1->getDesugaredType();
     auto t2 = type2->getDesugaredType();
     
-    if (auto sliceType1 = dyn_cast<ArraySliceType>(t1)) {
-      baseType1 = sliceType1->getBaseType();
-    } else {
-        auto arrayType1 = cast<BoundGenericStructType>(t1);
-        baseType1 = arrayType1->getGenericArgs()[0];
-    }
-    
-    if (auto sliceType2 = dyn_cast<ArraySliceType>(t2)) {
-      baseType2 = sliceType2->getBaseType();
-    } else {
-      auto arrayType2 = cast<BoundGenericStructType>(t2);
-      baseType2 = arrayType2->getGenericArgs()[0];
-    }
+    Type baseType1 = this->getBaseTypeForArrayType(t1);
+    Type baseType2 = this->getBaseTypeForArrayType(t2);
     
     return matchTypes(baseType1,
                       baseType2,
@@ -2950,25 +2947,11 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
     addContextualScore();
     assert(matchKind >= TypeMatchKind::Conversion);
     
-    Type baseType1;
-    Type baseType2;
-    
     auto t1 = type1->getDesugaredType();
     auto t2 = type2->getDesugaredType();
     
-    if (auto sliceType1 = dyn_cast<ArraySliceType>(t1)) {
-      baseType1 = sliceType1->getBaseType();
-    } else {
-      auto arrayType1 = cast<BoundGenericStructType>(t1);
-      baseType1 = arrayType1->getGenericArgs()[0];
-    }
-    
-    if (auto sliceType2 = dyn_cast<ArraySliceType>(t2)) {
-      baseType2 = sliceType2->getBaseType();
-    } else {
-      auto arrayType2 = cast<BoundGenericStructType>(t2);
-      baseType2 = arrayType2->getGenericArgs()[0];
-    }
+    Type baseType1 = this->getBaseTypeForArrayType(t1);
+    Type baseType2 = this->getBaseTypeForArrayType(t2);
     
     if (auto nominalType1 = dyn_cast<NominalType>(baseType1.getPointer())) {
       auto bridgedType1 = TC.getBridgedType(DC, nominalType1);
