@@ -1244,13 +1244,19 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
   // If we have type variables that have been bound to fixed types, look through
   // to the fixed type.
   TypeVariableType *typeVar1;
+  bool isArgumentTupleConversion
+          = getASTContext().LangOpts.StrictKeywordArguments &&
+            (kind == TypeMatchKind::ArgumentTupleConversion ||
+             kind == TypeMatchKind::OperatorArgumentTupleConversion);
   type1 = getFixedTypeRecursive(type1, typeVar1,
-                                kind == TypeMatchKind::SameType);
+                                kind == TypeMatchKind::SameType,
+                                isArgumentTupleConversion);
   auto desugar1 = type1->getDesugaredType();
 
   TypeVariableType *typeVar2;
   type2 = getFixedTypeRecursive(type2, typeVar2,
-                                kind == TypeMatchKind::SameType);
+                                kind == TypeMatchKind::SameType,
+                                isArgumentTupleConversion);
   auto desugar2 = type2->getDesugaredType();
 
   // If the types are obviously equivalent, we're done.

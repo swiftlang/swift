@@ -1590,8 +1590,11 @@ public:
   ///
   /// \param wantRValue Whether this routine should look through
   /// lvalues at each step.
+  ///
+  /// param retainParens Whether to retain parentheses.
   Type getFixedTypeRecursive(Type type, TypeVariableType *&typeVar,
-                             bool wantRValue);
+                             bool wantRValue,
+                             bool retainParens = false);
 
   /// \brief Assign a fixed type to the given type variable.
   ///

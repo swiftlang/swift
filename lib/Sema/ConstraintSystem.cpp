@@ -586,6 +586,14 @@ namespace {
         if (!inputTy)
           return Type();
 
+        // If we didn't get something that structurally has the parentheses,
+        // add them back.
+        if (!isa<TupleType>(inputTy.getPointer()) &&
+            !isa<ParenType>(inputTy.getPointer()) &&
+            cs.getASTContext().LangOpts.StrictKeywordArguments) {
+          inputTy = ParenType::get(cs.getASTContext(), inputTy);
+        }
+
         Type resultTy = genericFn->getResult().transform(*this);
         if (!resultTy)
           return Type();
@@ -687,9 +695,18 @@ static Type getFixedTypeRecursiveHelper(ConstraintSystem &cs,
 
 Type ConstraintSystem::getFixedTypeRecursive(Type type, 
                                              TypeVariableType *&typeVar,
-                                             bool wantRValue) {
+                                             bool wantRValue,
+                                             bool retainParens) {
   if (wantRValue)
     type = type->getRValueType();
+
+  if (retainParens) {
+    if (auto parenTy = dyn_cast<ParenType>(type.getPointer())) {
+      type = getFixedTypeRecursive(parenTy->getUnderlyingType(), typeVar,
+                                   wantRValue, retainParens);
+      return ParenType::get(getASTContext(), type);
+    }
+  }
 
   auto desugar = type->getDesugaredType();
   typeVar = desugar->getAs<TypeVariableType>();
