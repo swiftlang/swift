@@ -42,6 +42,7 @@ class MacroInfo;
 class NamedDecl;
 class ObjCInterfaceDecl;
 class ObjCMethodDecl;
+class ObjCPropertyDecl;
 class ParmVarDecl;
 class Parser;
 class QualType;
@@ -127,6 +128,12 @@ enum class ImportTypeKind {
   ///
   /// This enables the conversion of bridged types.
   Property,
+
+  /// \brief Import the type of an audited ObjC property.
+  ///
+  /// This is just like Property, except it disables wrapping CF class
+  /// types in Unmanaged.
+  AuditedProperty,
 
   /// \brief Import the underlying type of an enum.
   ///
@@ -718,6 +725,8 @@ public:
                           ArrayRef<const clang::ParmVarDecl *> params,
                           bool isVariadic, bool isNoReturn,
                           SmallVectorImpl<Pattern*> &bodyPatterns);
+
+  Type importPropertyType(const clang::ObjCPropertyDecl *clangDecl);
 
   /// \brief Import the type of an Objective-C method.
   ///

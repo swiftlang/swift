@@ -589,7 +589,8 @@ static bool canBridgeTypes(ImportTypeKind importKind) {
   return importKind == ImportTypeKind::Parameter ||
          importKind == ImportTypeKind::Result ||
          importKind == ImportTypeKind::AuditedResult ||
-         importKind == ImportTypeKind::Property;
+         importKind == ImportTypeKind::Property ||
+         importKind == ImportTypeKind::AuditedProperty;
 }
 
 /// Wrap a type in the Optional type appropriate to the import kind.
@@ -684,7 +685,8 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
   if (hint == ImportHint::CFPointer &&
       !(importKind == ImportTypeKind::Parameter ||
         importKind == ImportTypeKind::AuditedResult ||
-        importKind == ImportTypeKind::AuditedVariable)) {
+        importKind == ImportTypeKind::AuditedVariable ||
+        importKind == ImportTypeKind::AuditedProperty)) {
     importedType = getUnmanagedType(impl, importedType);
   }
 
@@ -747,6 +749,23 @@ Type ClangImporter::Implementation::importType(clang::QualType type,
   // Now fix up the type based on we're concretely using it.
   return adjustTypeForConcreteImport(*this, type, importResult.AbstractType,
                                      importKind, importResult.Hint);
+}
+
+static bool isObjCMethodResultAudited(const clang::Decl *decl) {
+  return (decl->hasAttr<clang::CFReturnsRetainedAttr>() ||
+          decl->hasAttr<clang::CFReturnsNotRetainedAttr>() ||
+          decl->hasAttr<clang::ObjCReturnsInnerPointerAttr>());
+}
+
+Type ClangImporter::Implementation::importPropertyType(
+       const clang::ObjCPropertyDecl *decl) {
+  bool isAudited = false;
+  if (auto getter = decl->getGetterMethodDecl())
+    isAudited = isObjCMethodResultAudited(getter);
+
+  return importType(decl->getType(), (isAudited
+                                      ? ImportTypeKind::AuditedProperty
+                                      : ImportTypeKind::Property));
 }
 
 Type ClangImporter::Implementation::importFunctionType(
@@ -867,9 +886,7 @@ Type ClangImporter::Implementation::importMethodType(
   //     objects
   bool isAuditedResult =
     (SwiftContext.LangOpts.ImportCFTypes && clangDecl &&
-     (clangDecl->hasAttr<clang::CFReturnsRetainedAttr>() ||
-      clangDecl->hasAttr<clang::CFReturnsNotRetainedAttr>() ||
-      clangDecl->hasAttr<clang::ObjCReturnsInnerPointerAttr>()));
+     isObjCMethodResultAudited(clangDecl));
 
   // Import the result type.
   auto swiftResultTy = importType(resultType, (isAuditedResult

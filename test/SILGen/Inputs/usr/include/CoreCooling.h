@@ -45,4 +45,7 @@ void CCRefrigeratorDestroy(__attribute__((cf_consumed)) CCRefrigeratorRef);
 - (void) setRefrigerator: (CCRefrigeratorRef) refrigerator;
 // Attribute: managed +1 parameter
 - (void) giveRefrigerator: (__attribute__((cf_consumed)) CCRefrigeratorRef) refrigerator;
+
+@property CCRefrigeratorRef fridgeProp;
+- (CCRefrigeratorRef) fridgeProp __attribute__((cf_returns_not_retained));
 @end

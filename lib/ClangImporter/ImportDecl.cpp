@@ -3992,7 +3992,7 @@ namespace {
         }
       }
 
-      auto type = Impl.importType(decl->getType(), ImportTypeKind::Property);
+      Type type = Impl.importPropertyType(decl);
       if (!type)
         return nullptr;
 
