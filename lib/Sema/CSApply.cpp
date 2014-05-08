@@ -4238,8 +4238,8 @@ static bool diagnoseRelabel(TypeChecker &tc, Expr *expr,
   unsigned numExtra = 0, numMissing = 0, numWrong = 0;
   unsigned n = std::max(tuple->getNumElements(), (unsigned)newNames.size());
 
-  llvm::SmallString<16> missingStr;
-  llvm::SmallString<16> extraStr;
+  llvm::SmallString<16> missingBuffer;
+  llvm::SmallString<16> extraBuffer;
   for (unsigned i = 0; i != n; ++i) {
     Identifier oldName;
     if (i < tuple->getNumElements())
@@ -4253,12 +4253,12 @@ static bool diagnoseRelabel(TypeChecker &tc, Expr *expr,
 
     if (oldName.empty()) {
       ++numMissing;
-      missingStr += newName.str();
-      missingStr += ":";
+      missingBuffer += newName.str();
+      missingBuffer += ":";
     } else if (newName.empty()) {
       ++numExtra;
-      extraStr += oldName.str();
-      extraStr += ':';
+      extraBuffer += oldName.str();
+      extraBuffer += ':';
     } else
       ++numWrong;
   }
@@ -4270,33 +4270,37 @@ static bool diagnoseRelabel(TypeChecker &tc, Expr *expr,
   // If we had any wrong labels, or we have both missing and extra labels,
   // emit the catch-all "wrong labels" diagnostic.
   bool plural = (numMissing + numExtra + numWrong) > 1;
+  llvm::SmallString<16> haveBuffer; // note: diagOpt has references to this
+  llvm::SmallString<16> expectedBuffer; // note: diagOpt has references to this
   if (numWrong > 0 || (numMissing > 0 && numExtra > 0)) {
-    llvm::SmallString<16> haveStr;
     for(unsigned i = 0, n = tuple->getNumElements(); i != n; ++i) {
       auto haveName = tuple->getElementName(i);
       if (haveName.empty())
-        haveStr += '_';
+        haveBuffer += '_';
       else
-        haveStr += haveName.str();
-      haveStr += ':';
+        haveBuffer += haveName.str();
+      haveBuffer += ':';
     }
 
-    llvm::SmallString<16> expectedStr;
     for (auto expected : newNames) {
       if (expected.empty())
-        expectedStr += '_';
+        expectedBuffer += '_';
       else
-        expectedStr += expected.str();
-      expectedStr += ':';
+        expectedBuffer += expected.str();
+      expectedBuffer += ':';
     }
 
+    StringRef haveStr = haveBuffer;
+    StringRef expectedStr = expectedBuffer;
     diagOpt.emplace(tc.diagnose(expr->getLoc(), diag::wrong_argument_labels,
                                 plural, haveStr, expectedStr, isSubscript));
   } else if (numMissing > 0) {
+    StringRef missingStr = missingBuffer;
     diagOpt.emplace(tc.diagnose(expr->getLoc(), diag::missing_argument_labels,
                                 plural, missingStr, isSubscript));
   } else {
     assert(numExtra > 0);
+    StringRef extraStr = extraBuffer;
     diagOpt.emplace(tc.diagnose(expr->getLoc(), diag::extra_argument_labels,
                                 plural, extraStr, isSubscript));
   }
