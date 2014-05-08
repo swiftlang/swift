@@ -2935,6 +2935,13 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
     Type baseType1 = this->getBaseTypeForArrayType(t1);
     Type baseType2 = this->getBaseTypeForArrayType(t2);
     
+    if (baseType2->isAnyObject()) {
+      if (dyn_cast<ClassType>(baseType1.getPointer()) ||
+          dyn_cast<BoundGenericClassType>(baseType1.getPointer())) {
+        return SolutionKind::Solved;
+      }
+    }
+    
     return matchTypes(baseType1,
                       baseType2,
                       TypeMatchKind::Subtype,
@@ -2953,32 +2960,29 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
     Type baseType1 = this->getBaseTypeForArrayType(t1);
     Type baseType2 = this->getBaseTypeForArrayType(t2);
     
-    if (auto nominalType1 = dyn_cast<NominalType>(baseType1.getPointer())) {
-      auto bridgedType1 = TC.getBridgedType(DC, nominalType1);
+    if (!baseType2->isAnyObject()) {
+      if (auto nominalType1 = dyn_cast<NominalType>(baseType1.getPointer())) {
+        auto bridgedType1 = TC.getBridgedType(DC, nominalType1);
 
-      // Allow assignments from Array<T> to Array<AnyObject> if T is a bridged
-      // type.
-      if (!bridgedType1.isNull()) {
-        if (auto protoTy = baseType2->getAs<ProtocolType>()) {
-          if(protoTy->getDecl()->isSpecificProtocol(KnownProtocolKind::
-                                                        AnyObject)) {
+        // Allow assignments from Array<T> to Array<U> if T is bridged to type
+        // U.
+        if (!bridgedType1.isNull()) {
+          
+          // If we're not converting to AnyObject, check if T.ObjectiveCType is
+          // U.
+          // We'll save the further check for conformance with
+          // _ConditionallyBridgedToObjectiveC until runtime.
+          if (bridgedType1.getPointer() == baseType2.getPointer()) {
             return SolutionKind::Solved;
           }
-        }
-        
-        // If we're not converting to AnyObject, check if T.ObjectiveCType is U.
-        // We'll save the further check for conformance with
-        // _ConditionallyBridgedToObjectiveC until runtime.
-        if (bridgedType1.getPointer() == baseType2.getPointer()) {
-          return SolutionKind::Solved;
-        }
-        else {
-          // Check if T's bridged type is a subtype of U.
-          return matchTypes(bridgedType1,
-                            baseType2,
-                            TypeMatchKind::Subtype,
-                            flags,
-                            locator);
+          else {
+            // Check if T's bridged type is a subtype of U.
+            return matchTypes(bridgedType1,
+                              baseType2,
+                              TypeMatchKind::Subtype,
+                              flags,
+                              locator);
+          }
         }
       }
     }

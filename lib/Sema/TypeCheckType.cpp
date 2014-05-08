@@ -83,13 +83,10 @@ Type TypeChecker::getNSStringType(DeclContext *dc) {
 bool TypeChecker::isBridgedDynamicConversion(DeclContext *dc,
                                              Type protocolType,
                                              Type concreteType) {
-  if (auto protocol = protocolType->getAs<ProtocolType>()) {
-    if (protocol->getDecl()->
-        isSpecificProtocol(KnownProtocolKind::AnyObject)) {
-      if (auto nominalType = concreteType->getAs<NominalType>()) {
-        if (getBridgedType(dc, nominalType)) {
-          return true;
-        }
+  if (protocolType->isAnyObject()) {
+    if (auto nominalType = concreteType->getAs<NominalType>()) {
+      if (getBridgedType(dc, nominalType)) {
+        return true;
       }
     }
   }

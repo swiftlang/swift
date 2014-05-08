@@ -3157,7 +3157,8 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
         // to itself, the constraint solver won't have a conversion handy to
         // coerce to a user conversion, so we'll should avoid creating a new
         // expression node.
-        (bridgedType.getPointer() != fromType.getPointer())) {
+        (bridgedType.getPointer() != fromType.getPointer()) &&
+        (bridgedType.getPointer() != toType.getPointer())) {
       expr = coerceViaUserConversion(expr, bridgedType, locator);
       fromType = bridgedType;
     }
