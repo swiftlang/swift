@@ -1174,6 +1174,14 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     return DBuilder.createPointerType(llvm::DIType(),
                                       SizeInBits, AlignInBits, MangledName);
 
+  case TypeKind::DynamicSelf: {
+    // Self. We don't have a way to represent instancetype in DWARF,
+    // so we emit the static type instead. This is similar to what we
+    // do with instancetype in Objective-C.
+    auto DynamicSelfTy = BaseTy->castTo<DynamicSelfType>();
+    return getOrCreateDesugaredType(DynamicSelfTy->getSelfType(), DbgTy);
+  }
+
   // Even builtin swift types usually come boxed in a struct.
   case TypeKind::Struct: {
     auto StructTy = BaseTy->castTo<StructType>();
@@ -1514,8 +1522,6 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   case TypeKind::Error:
   case TypeKind::LValue:
   case TypeKind::TypeVariable:
-
-  case TypeKind::DynamicSelf:
   case TypeKind::Module:
   case TypeKind::SILBlockStorage:
 
