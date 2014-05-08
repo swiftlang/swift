@@ -60,8 +60,8 @@ private:
   SwiftZone &operator=(SwiftZone const &) = delete;
 
   SwiftZone();
-  static void threadExitCleanup(void *arg);
 public:
+  static void threadExitCleanup(void *arg);
   static malloc_introspection_t zoneInspection;
 
   // allocations are normally per-thread
@@ -269,17 +269,19 @@ public:
 
 } // end anonymous namespace
 
-SwiftZone::SwiftZone() {
+
+
+static void _swift_zone_init_() {
   assert(sizeof(pthread_key_t) == sizeof(long));
   malloc_zone_register(&zoneShims);
   pthread_key_t key, prev_key;
-  int r = pthread_key_create(&key, threadExitCleanup);
+  int r = pthread_key_create(&key, SwiftZone::threadExitCleanup);
   assert(r == 0);
   (void)r;
   prev_key = key;
   _swiftAllocOffset = key;
   for (unsigned i = 0; i < ALLOC_CACHE_COUNT; i++) {
-    int r = pthread_key_create(&key, threadExitCleanup);
+    int r = pthread_key_create(&key, SwiftZone::threadExitCleanup);
     assert(r == 0);
     (void)r;
     assert(key == prev_key + 1);
@@ -294,6 +296,14 @@ SwiftZone::SwiftZone() {
     _swift_dealloc = SwiftZone::dealloc_semi_optimized;
   }
   setAllocCacheEntry_slow(0, NULL);
+}
+void swift::_swift_zone_init() {
+  static pthread_once_t once = PTHREAD_ONCE_INIT;
+  int r = pthread_once(&once, _swift_zone_init_);
+  assert(r == 0);
+}
+SwiftZone::SwiftZone() {
+  _swift_zone_init();
 }
 
 size_t swift::_swift_zone_size(malloc_zone_t *zone, const void *pointer) {
