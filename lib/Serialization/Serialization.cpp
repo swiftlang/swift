@@ -802,8 +802,9 @@ Serializer::writeConformance(const ProtocolDecl *protocol,
     unsigned numInheritedConformances = conf->getInheritedConformances().size();
     unsigned abbrCode
       = abbrCodes[NormalProtocolConformanceLayout::Code];
+    auto moduleID = addModuleRef(conf->getDeclContext()->getParentModule());
     NormalProtocolConformanceLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                                addDeclRef(protocol),
+                                                addDeclRef(protocol), moduleID,
                                                 numValueWitnesses,
                                                 numTypeWitnesses,
                                                 numInheritedConformances,
