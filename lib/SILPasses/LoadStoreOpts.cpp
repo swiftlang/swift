@@ -136,6 +136,13 @@ public:
     Changed = false;
   }
 
+  void deleteInstruction(SILInstruction *I) {
+    recursivelyDeleteTriviallyDeadInstructions(I, true,
+                                               [&](SILInstruction *DeadI) {
+      if (LoadInst *LI = dyn_cast<LoadInst>(DeadI))
+        Loads.erase(LI);
+    });
+  }
 };
 
 } // end anonymous namespace
@@ -162,11 +169,7 @@ bool LSBBForwarder::optimize() {
         // is the same as the loaded address.
         if (Loads.count(LdSrc) && LdSrc->getOperand() == SI->getDest()) {
           Changed = true;
-          recursivelyDeleteTriviallyDeadInstructions(SI, true,
-                                [&](SILInstruction *DeadI) {
-                                  if (LoadInst *LI = dyn_cast<LoadInst>(DeadI))
-                                    Loads.erase(LI);
-                                });
+          deleteInstruction(SI);
           NumDeadStores++;
           continue;
         }
@@ -182,11 +185,7 @@ bool LSBBForwarder::optimize() {
         DEBUG(llvm::dbgs() << "    Found a dead previous store... Removing...:"
               << *PrevStore);
         Changed = true;
-        recursivelyDeleteTriviallyDeadInstructions(PrevStore, true,
-                                [&](SILInstruction *DeadI) {
-                                  if (LoadInst *LI = dyn_cast<LoadInst>(DeadI))
-                                    Loads.erase(LI);
-                                });
+        deleteInstruction(PrevStore);
         PrevStore = SI;
         NumDeadStores++;
         continue;
@@ -200,11 +199,7 @@ bool LSBBForwarder::optimize() {
       if (PrevStore && PrevStore->getDest() == LI->getOperand()) {
         DEBUG(llvm::dbgs() << "    Forwarding store from: " << *PrevStore);
         SILValue(LI, 0).replaceAllUsesWith(PrevStore->getSrc());
-        recursivelyDeleteTriviallyDeadInstructions(LI, true,
-                                [&](SILInstruction *DeadI) {
-                                  if (LoadInst *LI = dyn_cast<LoadInst>(DeadI))
-                                    Loads.erase(LI);
-                                });
+        deleteInstruction(LI);
         Changed = true;
         NumForwardedLoads++;
         continue;
@@ -221,11 +216,7 @@ bool LSBBForwarder::optimize() {
                   *PrevStore);
             unsigned FieldNo = SEAI->getFieldNo();
             SILValue(LI, 0).replaceAllUsesWith(SI->getOperand(FieldNo));
-            recursivelyDeleteTriviallyDeadInstructions(LI, true,
-                                [&](SILInstruction *DeadI) {
-                                  if (LoadInst *LI = dyn_cast<LoadInst>(DeadI))
-                                    Loads.erase(LI);
-                                });
+            deleteInstruction(LI);
             Changed = true;
             NumForwardedLoads++;
             continue;
@@ -243,11 +234,7 @@ bool LSBBForwarder::optimize() {
         DEBUG(llvm::dbgs() << "    Replacing with previous load: "
               << *ForwardingExtract);
         SILValue(LI, 0).replaceAllUsesWith(ForwardingExtract);
-        recursivelyDeleteTriviallyDeadInstructions(LI, true,
-                                [&](SILInstruction *DeadI) {
-                                  if (LoadInst *LI = dyn_cast<LoadInst>(DeadI))
-                                    Loads.erase(LI);
-                                });
+        deleteInstruction(LI);
         Changed = true;
         LI = nullptr;
         NumDupLoads++;
