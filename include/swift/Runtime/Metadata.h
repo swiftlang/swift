@@ -1548,6 +1548,12 @@ struct ExistentialTypeMetadata : public Metadata {
   /// by this metadata.
   const void * const *getWitnessTable(const OpaqueValue *container,
                                       unsigned i) const;
+
+  /// Return true iff all the protocol constraints are @objc.
+  bool isObjC() const {
+    return Flags.getClassConstraint() == ProtocolClassConstraint::Class 
+      && Flags.getNumWitnessTables() == 0;
+  }
 };
 
 /// The structure of metadata for existential metatypes.
