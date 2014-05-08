@@ -275,6 +275,7 @@ public:
   SILInstruction *visitRawPointerToRefInst(RawPointerToRefInst *RPTR);
   SILInstruction *
   visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *TEDAI);
+  SILInstruction *visitStrongReleaseInst(StrongReleaseInst *SRI);
 
   /// Instruction visitor helpers.
   SILInstruction *optimizeBuiltinCanBeObjCClass(ApplyInst *AI);
@@ -1219,6 +1220,18 @@ SILInstruction *SILCombiner::visitUncheckedTakeEnumDataAddrInst(
   // Just return nullptr without removing unchecked_take_enum_data_addr. The
   // reason why we do this is so that we ensure that the enum address is
   // properly invalidated.
+  return nullptr;
+}
+
+SILInstruction *SILCombiner::visitStrongReleaseInst(StrongReleaseInst *SRI) {
+  if (auto *TTTFI = dyn_cast<ThinToThickFunctionInst>(SRI->getOperand())) {
+    if (SILValue(TTTFI).hasOneUse()) {
+      eraseInstFromFunction(*SRI);
+      eraseInstFromFunction(*TTTFI);
+      return nullptr;
+    }
+  }
+
   return nullptr;
 }
 
