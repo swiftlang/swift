@@ -1189,6 +1189,24 @@ void ClangImporter::lookupValue(Identifier name, VisibleDeclConsumer &consumer){
   }
 }
 
+const clang::TypedefNameDecl *
+ClangImporter::Implementation::lookupTypedef(clang::DeclarationName name) {
+  clang::Sema &sema = Instance->getSema();
+  clang::LookupResult lookupResult(sema, name,
+                                   clang::SourceLocation(),
+                                   clang::Sema::LookupOrdinaryName);
+
+  if (sema.LookupName(lookupResult, /*scope=*/nullptr)) {
+    for (auto decl : lookupResult) {
+      if (auto typedefDecl =
+          dyn_cast<clang::TypedefNameDecl>(decl->getUnderlyingDecl()))
+        return typedefDecl;
+    }
+  }
+
+  return nullptr;
+}
+
 static bool isDeclaredInModule(const ClangModuleUnit *ModuleFilter,
                                const Decl *VD) {
   auto ContainingUnit = VD->getDeclContext()->getModuleScopeContext();

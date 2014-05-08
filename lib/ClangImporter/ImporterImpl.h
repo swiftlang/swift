@@ -754,6 +754,9 @@ public:
   Optional<MappedTypeNameKind>
   getSpecialTypedefKind(clang::TypedefNameDecl *decl);
 
+  /// \brief Look up a name, accepting only typedef results.
+  const clang::TypedefNameDecl *lookupTypedef(clang::DeclarationName);
+
   LazyResolver *getTypeResolver() const {
     return typeResolver;
   }

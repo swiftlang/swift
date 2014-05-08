@@ -689,6 +689,84 @@ static ConstructorDecl *makeOptionSetDefaultConstructor(StructDecl *optionSetDec
   return ctorDecl;
 }
 
+namespace {
+  class CFPointeeInfo {
+    bool IsValid;
+    bool IsConst;
+    const clang::RecordDecl *Decl;
+    CFPointeeInfo() = default;
+
+    static CFPointeeInfo forRecord(bool isConst, const clang::RecordDecl *decl) {
+      assert(decl);
+      CFPointeeInfo info;
+      info.IsValid = true;
+      info.IsConst = isConst;
+      info.Decl = decl;
+      return info;
+    }
+
+    static CFPointeeInfo forConstVoid() {
+      CFPointeeInfo info;
+      info.IsValid = true;
+      info.IsConst = true;
+      info.Decl = nullptr;
+      return info;
+    }
+
+    static CFPointeeInfo forInvalid() {
+      CFPointeeInfo info;
+      info.IsValid = false;
+      return info;
+    }
+
+  public:
+    static CFPointeeInfo classifyTypedef(const clang::TypedefNameDecl *decl);
+
+    bool isValid() const { return IsValid; }
+    explicit operator bool() const { return isValid(); }
+
+    bool isConst() const { return IsConst; }
+
+    bool isConstVoid() const {
+      assert(isValid());
+      return Decl == nullptr;
+    }
+
+    bool isRecord() const {
+      assert(isValid());
+      return Decl != nullptr;
+    }
+    const clang::RecordDecl *getRecord() const {
+      assert(isRecord());
+      return Decl;
+    }
+  };
+}
+
+/// Classify a potential CF typedef.
+CFPointeeInfo
+CFPointeeInfo::classifyTypedef(const clang::TypedefNameDecl *typedefDecl) {
+  clang::QualType type = typedefDecl->getUnderlyingType();
+  if (auto ptr = type->getAs<clang::PointerType>()) {
+    auto pointee = ptr->getPointeeType();
+
+    // Must be 'const' or nothing.
+    clang::Qualifiers quals = pointee.getQualifiers();
+    bool isConst = quals.hasConst();
+    quals.removeConst();
+    if (quals.empty()) {
+      if (auto record = pointee->getAs<clang::RecordType>()) {
+        if (!record->getDecl()->getDefinition()) {
+          return forRecord(isConst, record->getDecl());
+        }
+      } else if (isConst && pointee->isVoidType()) {
+        return forConstVoid();
+      }
+    }
+  }
+
+  return forInvalid();
+}
 
 namespace {
   typedef ClangImporter::Implementation::EnumKind EnumKind;
@@ -738,18 +816,80 @@ namespace {
       return nullptr;
     }
 
-    static bool isPointerToIncompleteType(clang::QualType type) {
-      if (auto ptr = type->getAs<clang::PointerType>()) {
-        if (auto record = ptr->getPointeeType()->getAs<clang::RecordType>()) {
-          if (!record->getDecl()->getDefinition()) {
-            return true;
-          }
-        }
-      }
-      return false;
+    /// Try to strip "Mutable" out of a type name.
+    clang::IdentifierInfo *
+    getImmutableCFSuperclassName(const clang::TypedefNameDecl *decl) {
+      StringRef name = decl->getName();
+
+      // Split at the first occurrence of "Mutable".
+      StringRef _mutable = "Mutable";
+      auto mutableIndex = camel_case::findWord(name, _mutable);
+      if (mutableIndex == StringRef::npos)
+        return nullptr;
+
+      StringRef namePrefix = name.substr(0, mutableIndex);
+      StringRef nameSuffix = name.substr(mutableIndex + _mutable.size());
+
+      // Abort if "Mutable" appears twice.
+      if (camel_case::findWord(nameSuffix, _mutable) != StringRef::npos)
+        return nullptr;
+
+      llvm::SmallString<128> buffer;
+      buffer += namePrefix;
+      buffer += nameSuffix;
+      return &Impl.getClangASTContext().Idents.get(buffer.str());
     }
 
-    Type importCFClassType(const clang::TypedefNameDecl *decl) {
+    /// Check whether this CF typedef is a Mutable type, and if so,
+    /// look for a non-Mutable typedef.
+    ///
+    /// If the "subclass" is:
+    ///   typedef struct __foo *XXXMutableYYY;
+    /// then we look for a "superclass" that matches:
+    ///   typedef const struct __foo *XXXYYY;
+    Type findImmutableCFSuperclass(const clang::TypedefNameDecl *decl,
+                                   CFPointeeInfo subclassInfo) {
+      // If this type is already immutable, it has no immutable
+      // superclass.
+      if (subclassInfo.isConst()) return Type();
+
+      // If this typedef name does not contain "Mutable", it has no
+      // immutable superclass.
+      auto superclassName = getImmutableCFSuperclassName(decl);
+      if (!superclassName) return Type();
+
+      // Look for a typedef that successfully classifies as a CF
+      // typedef with the same underlying record.
+      auto superclassTypedef = Impl.lookupTypedef(superclassName);
+      if (!superclassTypedef) return Type();
+      auto superclassInfo = CFPointeeInfo::classifyTypedef(superclassTypedef);
+      if (!superclassInfo || !superclassInfo.isRecord() ||
+          !declaresSameEntity(superclassInfo.getRecord(),
+                              subclassInfo.getRecord()))
+        return Type();
+
+      // Try to import the superclass.
+      Decl *importedSuperclassDecl = Impl.importDeclReal(superclassTypedef);
+      if (!importedSuperclassDecl) return Type();
+
+      auto importedSuperclass =
+        cast<TypeAliasDecl>(importedSuperclassDecl)->getDeclaredType();
+      assert(importedSuperclass->is<ClassType>());
+      return importedSuperclass;
+    }
+
+    /// Attempt to find a superclass for the given CF typedef.
+    Type findCFSuperclass(const clang::TypedefNameDecl *decl,
+                          CFPointeeInfo info) {
+      if (Type immutable = findImmutableCFSuperclass(decl, info))
+        return immutable;
+
+      // TODO: use NSObject if it exists?
+      return Type();
+    }
+
+    Type importCFClassType(const clang::TypedefNameDecl *decl,
+                           CFPointeeInfo info) {
       // Name the class 'CFString', not 'CFStringRef'.
       Identifier className =
         Impl.SwiftContext.getIdentifier(decl->getName().drop_back(3));
@@ -757,7 +897,7 @@ namespace {
       auto dc = Impl.importDeclContextOf(decl);
       if (!dc) return Type();
 
-      Type superclass = Type();
+      Type superclass = findCFSuperclass(decl, info);
 
       // TODO: maybe use NSObject as the superclass if we can find it?
       // TODO: try to find a non-mutable type to use as the superclass.
@@ -801,20 +941,24 @@ namespace {
         // Import 'typedef struct __Blah *BlahRef;' as a CF type.
         if (!SwiftType && Impl.SwiftContext.LangOpts.ImportCFTypes &&
             Decl->getName().endswith("Ref")) {
-          // Import 'CFTypeRef' specifically as AnyObject.
-          if (Decl->getName() == "CFTypeRef") {
-            auto proto = Impl.SwiftContext.getProtocol(
-                                               KnownProtocolKind::AnyObject);
-            if (!proto)
-              return nullptr;
-            SwiftType = proto->getDeclaredType();
+          if (auto pointee = CFPointeeInfo::classifyTypedef(Decl)) {
+            // If the pointee is a record, consider creating a class type.
+            if (pointee.isRecord()) {
+              SwiftType = importCFClassType(Decl, pointee);
+              if (!SwiftType) return nullptr;
+              NameMapping = MappedTypeNameKind::DefineOnly;
 
-          // Otherwise, consider creating a class type.
-          } else if (isPointerToIncompleteType(Decl->getUnderlyingType())) {
-            SwiftType = importCFClassType(Decl);
-            if (!SwiftType) return nullptr;
+            // If the pointee is 'const void', and the typedef is named
+            // 'CFTypeRef', bring it in specifically as AnyObject.
+            } else if (pointee.isConstVoid() && Decl->getName() == "CFTypeRef") {
+              auto proto = Impl.SwiftContext.getProtocol(
+                                               KnownProtocolKind::AnyObject);
+              if (!proto)
+                return nullptr;
+              SwiftType = proto->getDeclaredType();
+              NameMapping = MappedTypeNameKind::DefineOnly;
+            }
           }
-          NameMapping = MappedTypeNameKind::DefineOnly;
         }
 
         if (SwiftType) {

@@ -36,7 +36,7 @@ typedef struct __NSFastEnumerationState_s {
   unsigned long extra[5];
 } NSFastEnumerationState;
 
-typedef void *CFTypeRef;
+typedef const void *CFTypeRef;
 typedef void const *HWND;
 typedef struct __CFString *CFMutableStringRef;
 typedef struct __CFString const *CFStringRef;
