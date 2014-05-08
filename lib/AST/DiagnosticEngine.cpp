@@ -241,10 +241,7 @@ static void formatDiagnosticArgument(StringRef Modifier,
     assert(Modifier.empty() && "Improper modifier for Type argument");
     
     // Strip extraneous parentheses; they add no value.
-    Type Ty = Arg.getAsType();
-    while (auto ParenTy = dyn_cast<ParenType>(Ty.getPointer()))
-      Ty = ParenTy->getUnderlyingType();
-    Out << '\'' << Ty << '\'';
+    Out << '\'' << Arg.getAsType()->getWithoutParens() << '\'';
     break;
   }
   case DiagnosticArgumentKind::TypeRepr:

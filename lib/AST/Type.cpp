@@ -540,6 +540,13 @@ Type TypeBase::getWithoutDefaultArgs(const ASTContext &Context) {
                          /*defaultArgs=*/true);
 }
 
+Type TypeBase::getWithoutParens() {
+  Type Ty = this;
+  while (auto ParenTy = dyn_cast<ParenType>(Ty.getPointer()))
+    Ty = ParenTy->getUnderlyingType();
+  return Ty;
+}
+
 Type TypeBase::replaceCovariantResultType(Type newResultType,
                                           unsigned uncurryLevel) {
   if (uncurryLevel == 0) {

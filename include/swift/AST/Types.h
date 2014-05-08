@@ -498,6 +498,9 @@ public:
   /// \brief Retrieve the type without any default arguments.
   Type getWithoutDefaultArgs(const ASTContext &Context);
 
+  /// Retrieve the type without any parentheses around it.
+  Type getWithoutParens();
+
   /// Replace the base type of the result type of the given function
   /// type with a new result type, as per a DynamicSelf or other
   /// covariant return transformation.  The optionality of the
