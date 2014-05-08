@@ -2,6 +2,8 @@
 @import ExternIntX;
 #import "Protocols.h"
 
+#import "used-by-both-headers.h"
+
 @class ForwardClass;
 void doSomething(ForwardClass *arg);
 
@@ -46,8 +48,3 @@ void doSomethingPartialSub(PartialSubClass *arg);
 - (void)doPartialClassCategoryThing;
 @end
 
-struct Point {
-  float x, y;
-};
-
-#define CONSTANT 42
