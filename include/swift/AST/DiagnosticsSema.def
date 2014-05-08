@@ -172,9 +172,12 @@ ERROR(invalid_arg_count_for_operator,sema_nb,none,
 //------------------------------------------------------------------------------
 
 ERROR(tuple_conversion_not_expressible,sema_tcc,none,
-      "lame: cannot express tuple conversion %0 to %1", (Type, Type))
+      "cannot express tuple conversion %0 to %1", (Type, Type))
 ERROR(load_of_explicit_lvalue,sema_tcc,none,
       "%0 variable is not being passed by reference", (Type))
+ERROR(could_not_find_user_conversion,sema_tcc,none,
+      "could not find a user-defined conversion from type %0 to type %1",
+      (Type, Type))
 
 //------------------------------------------------------------------------------
 // Expression Type Checking Errors

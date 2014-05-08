@@ -878,10 +878,11 @@ bool diagnoseAmbiguity(ConstraintSystem &cs, ArrayRef<Solution> solutions) {
   return false;
 }
 
-Constraint *getDisjunctionChoice(Constraint *constraint,
+Constraint *getConstraintChoice(Constraint *constraint,
                                  ConstraintKind kind,
                                  bool takeAny = false) {
-  if (constraint->getKind() != ConstraintKind::Disjunction) {
+  if ((constraint->getKind() != ConstraintKind::Disjunction) &&
+      (constraint->getKind() != ConstraintKind::Conjunction)) {
     return nullptr;
   }
   
@@ -889,8 +890,20 @@ Constraint *getDisjunctionChoice(Constraint *constraint,
   
   for (auto nestedConstraint : nestedConstraints) {
     if (takeAny ||
-        (nestedConstraint->getKind() == kind))
+        (nestedConstraint->getKind() == kind)) {
+      
+      // If this is a last-chance search, and we have a conjunction or
+      // disjunction, look within.
+      if (takeAny &&
+          ((nestedConstraint->getKind() == ConstraintKind::Disjunction) ||
+           (nestedConstraint->getKind() == ConstraintKind::Conjunction))) {
+            return getConstraintChoice(nestedConstraint,
+                                       kind,
+                                       takeAny);
+          }
+      
       return nestedConstraint;
+    }
   }
   
   return nullptr;
@@ -946,7 +959,7 @@ bool ConstraintSystem::diagnoseFailureFromConstraints(Expr *expr) {
     // A missed argument conversion can result in better error messages when
     // a user passes the wrong arguments to a function application.
     if (!argumentConstraint) {
-      argumentConstraint = getDisjunctionChoice(constraint,
+      argumentConstraint = getConstraintChoice(constraint,
                                                 ConstraintKind::
                                                     ArgumentTupleConversion);
     }
@@ -954,7 +967,7 @@ bool ConstraintSystem::diagnoseFailureFromConstraints(Expr *expr) {
     // Overload resolution failures are often nicely descriptive, so store
     // off the first one we find.
     if (!overloadConstraint) {
-      overloadConstraint = getDisjunctionChoice(constraint,
+      overloadConstraint = getConstraintChoice(constraint,
                                                 ConstraintKind::BindOverload);
     }
     
@@ -966,10 +979,10 @@ bool ConstraintSystem::diagnoseFailureFromConstraints(Expr *expr) {
           conversionConstraint = constraint;
     }
     
-    // When all else fails, inspect a potential disjunction for a consituent
-    // conversion.
+    // When all else fails, inspect a potential conjunction or disjunction for a
+    // consituent conversion.
     if (!disjunctionConversionConstraint) {
-      disjunctionConversionConstraint = getDisjunctionChoice(constraint,
+      disjunctionConversionConstraint = getConstraintChoice(constraint,
                                                              ConstraintKind::
                                                                 Conversion,
                                                              true);

@@ -768,34 +768,6 @@ bool Parser::evaluateConfigConditionExpr(Expr *configExpr) {
     
     while (iOperand < numElements) {
       
-      // FIXME: This clause temporarily supports build configuration comparisons
-      // against the current compiler submit version.
-      // We'll need to remove this functionality for 1.0, per
-      // rdar://problem/16380797
-      if (auto *UDRE =dyn_cast<UnresolvedDeclRefExpr>(elements[iOperator - 1])){
-        auto name = UDRE->getName().str();
-        
-        if (name.equals("compiler_submit_version")) {
-          if (auto *UDREOp =
-                dyn_cast<UnresolvedDeclRefExpr>(elements[iOperator])) {
-            auto name = UDREOp->getName().str();
-            
-            if (auto *SLEp = dyn_cast<StringLiteralExpr>(elements[iOperand])) {
-              auto submitQuad = StringRef(version::getSwiftSubmitVersionQuad());
-              auto userSubmitQuad = SLEp->getValue();
-              auto compareResult = submitQuad.compare_numeric(userSubmitQuad);
-              
-              if (name.equals("==")) return !compareResult;
-              if (name.equals("!=")) return compareResult;
-              if (name.equals(">"))  return compareResult == 1;
-              if (name.equals("<"))  return compareResult == -1;
-              if (name.equals(">=")) return compareResult >= 0;
-              if (name.equals("<=")) return compareResult <= 0;
-            }
-          }
-        }
-      }
-      
       if (auto *UDREOp = dyn_cast<UnresolvedDeclRefExpr>(elements[iOperator])) {
         auto name = UDREOp->getName().str();
         

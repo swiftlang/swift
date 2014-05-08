@@ -3576,16 +3576,22 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes,
 
   // '{'
   if (Tok.is(tok::l_brace)) {
-    // Parse the body.
-    ParseFunctionBody CC(*this, CD);
-
-    if (!isDelayedParsingEnabled()) {
-      ParserResult<BraceStmt> Body = parseBraceItemList(diag::invalid_diagnostic);
-
-      if (!Body.isNull())
-        CD->setBody(Body.get());
+    
+    if (Flags.contains(PD_InProtocol)) {
+      diagnose(Tok, diag::protocol_init_with_body);
+      skipUntilDeclRBrace();
     } else {
-      consumeAbstractFunctionBody(CD, Attributes);
+      // Parse the body.
+      ParseFunctionBody CC(*this, CD);
+
+      if (!isDelayedParsingEnabled()) {
+        ParserResult<BraceStmt> Body = parseBraceItemList(diag::invalid_diagnostic);
+
+        if (!Body.isNull())
+          CD->setBody(Body.get());
+      } else {
+        consumeAbstractFunctionBody(CD, Attributes);
+      }
     }
   }
 

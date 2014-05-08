@@ -3232,7 +3232,13 @@ Expr *ExprRewriter::coerceViaUserConversion(Expr *expr, Type toType,
     = cs.getConstraintLocator(
         locator.withPathElement(ConstraintLocator::ConstructorMember));
   knownOverload = solution.overloadChoices.find(storedLocator);
-  assert(knownOverload != solution.overloadChoices.end());
+  
+  // Could not find a user conversion.
+  if(knownOverload == solution.overloadChoices.end()) {
+    tc.diagnose(expr->getLoc(), diag::could_not_find_user_conversion,
+                expr->getType(), toType);
+    return nullptr;
+  }
 
   auto selected = knownOverload->second;
 

@@ -303,7 +303,8 @@ ERROR(protocol_setter_name,decl_parsing,none,
     "setter in a protocol cannot have a name", ())
 ERROR(protocol_method_with_body,decl_parsing,none,
     "protocol methods may not have bodies", ())
-
+ERROR(protocol_init_with_body,decl_parsing,none,
+    "protocol initializers may not have bodies", ())
 
 // Subscripting
 ERROR(subscript_decl_wrong_scope,decl_parsing,none,
