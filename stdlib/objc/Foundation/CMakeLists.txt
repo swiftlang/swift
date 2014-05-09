@@ -8,7 +8,7 @@ set(SWIFTFOUNDATION_SOURCES
 
 add_swift_library(swiftFoundation INSTALL
   ${SWIFTFOUNDATION_SOURCES}
-  DEPENDS swift_stdlib_core swiftObjectiveC swiftCoreGraphics)
+  DEPENDS swift_stdlib_core swiftObjectiveC swiftCoreGraphics swiftDispatch)
 
 add_swift_optimization_flags(swiftFoundation)
 

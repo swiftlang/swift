@@ -5,6 +5,6 @@ set(SWIFTFOUNDATION_SOURCES
 
 add_swift_library(swiftDispatch INSTALL
   ${SWIFTFOUNDATION_SOURCES}
-  DEPENDS swift_stdlib_core swiftDarwin)
+  DEPENDS swift_stdlib_core swiftObjectiveC)
 
 add_swift_optimization_flags(swiftDispatch)

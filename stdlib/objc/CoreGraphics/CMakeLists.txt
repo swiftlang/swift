@@ -5,7 +5,7 @@ set(SWIFTCOREGRAPHICS_SOURCES
 
 add_swift_library(swiftCoreGraphics INSTALL
   ${SWIFTCOREGRAPHICS_SOURCES}
-  DEPENDS swift_stdlib_core swiftObjectiveC)
+  DEPENDS swift_stdlib_core swiftObjectiveC swiftDispatch)
 
 add_swift_optimization_flags(swiftCoreGraphics)
 
