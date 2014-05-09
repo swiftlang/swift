@@ -235,25 +235,17 @@ DerivedArgList *Driver::translateInputArgs(const InputArgList &ArgList) const {
 /// \brief Check that the file referenced by Value exists. If it doesn't,
 /// issue a diagnostic and return false.
 static bool diagnoseInputExistence(const Driver &D, const DerivedArgList &Args,
-                                   DiagnosticEngine &Diags, StringRef Value) {
+                                   DiagnosticEngine &Diags, StringRef Input) {
   // FIXME: provide opt-out for checking input file existence
 
   // stdin always exists.
-  if (Value == "-")
+  if (Input == "-")
     return true;
 
-  llvm::SmallString<64> Path(Value);
-  if (Arg *WorkDir = Args.getLastArg(options::OPT_working_directory)) {
-    if (!llvm::sys::path::is_absolute(Path.str())) {
-      Path.assign(WorkDir->getValue());
-      llvm::sys::path::append(Path, Value);
-    }
-  }
-
-  if (llvm::sys::fs::exists(Twine(Path)))
+  if (llvm::sys::fs::exists(Input))
     return true;
 
-  Diags.diagnose(SourceLoc(), diag::error_no_such_file_or_directory, Value);
+  Diags.diagnose(SourceLoc(), diag::error_no_such_file_or_directory, Input);
   return false;
 }
 

@@ -325,10 +325,4 @@ def target_feature : Separate<["-"], "target-feature">,
   HelpText<"Generate code with a particular CPU feature enabled or disabled">,
   MetaVarName<"[+-]<feature-name>">;
 
-def working_directory : Separate<["-"], "working-directory">,
-  Flags<[FrontendOption]>,
-  HelpText<"Resolve file paths relative to the specified directory">;
-def working_directory_EQ : Joined<["-"], "working-directory=">,
-  Alias<working_directory>;
-
 include "FrontendOptions.td"
