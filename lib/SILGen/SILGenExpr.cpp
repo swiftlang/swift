@@ -3227,6 +3227,8 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   ManagedValue initVal;
   SILType initTy;
   
+  Scope scope(Cleanups, CleanupLocation::getCleanupLocation(Loc));
+
   ArrayRef<Substitution> subs;
   if (ctor->hasClangNode()) {
     // If the constructor was imported from Clang, we perform dynamic dispatch
@@ -3239,8 +3241,6 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
     initTy = initVal.getType();
 
     // Bridge arguments.
-    Scope scope(Cleanups, CleanupLocation::getCleanupLocation(Loc));
-
     auto objcFnType = objcInfo.SILFnType;
 
     unsigned idx = 0;
@@ -3273,6 +3273,8 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
     B.createStrongRetainAutoreleased(Loc, initedSelfValue);
   }
 
+  scope.pop();
+  
   // Return the initialized 'self'.
   B.createReturn(ImplicitReturnLocation::getImplicitReturnLoc(Loc),
                  initedSelfValue);

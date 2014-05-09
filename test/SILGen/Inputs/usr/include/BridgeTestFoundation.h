@@ -25,6 +25,9 @@ typedef signed char BOOL;
 @end
 
 @interface NSArray : NSObject
+
+- (instancetype)initWithObjects:(const id *)objects count:(int)count;
+
 @end
 
 @interface Foo : NSObject
