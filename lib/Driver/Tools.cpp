@@ -266,7 +266,8 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
   Args.AddLastArg(Arguments, options::OPT_split_objc_selectors);
   Args.AddAllArgs(Arguments, options::OPT_implicit_objc_with,
                   options::OPT_no_implicit_objc_with);
-  Args.AddLastArg(Arguments, options::OPT_strict_keyword_arguments);
+  Args.AddAllArgs(Arguments, options::OPT_strict_keyword_arguments,
+                  options::OPT_no_strict_keyword_arguments);
 
   // Pass the optimization level down to the frontend.
   Args.AddLastArg(Arguments, options::OPT_O_Group);
