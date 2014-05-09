@@ -292,6 +292,9 @@ public:
       return digForVariable(LE->getSubExpr());
     } else if (ForceValueExpr *FVE = llvm::dyn_cast<ForceValueExpr>(E)) {
       return digForVariable(FVE->getSubExpr());
+    } else if (ImplicitConversionExpr *ICE =
+               llvm::dyn_cast<ImplicitConversionExpr>(E)) {
+      return digForVariable(ICE->getSubExpr());
     } else {
       return std::make_pair(nullptr, nullptr);
     }
