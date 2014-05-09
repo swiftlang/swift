@@ -435,7 +435,7 @@ void IRGenModule::addLinkLibrary(const LinkLibrary &linkLib) {
     if (!Module.getGlobalVariable(buf.str())) {
       (void)new llvm::GlobalVariable(Module, symbolAddr->getType(),
                                      /*constant=*/true,
-                                     llvm::GlobalAlias::LinkOnceAnyLinkage,
+                                     llvm::GlobalAlias::WeakAnyLinkage,
                                      symbolAddr, buf.str());
     }
   }
@@ -472,7 +472,7 @@ void IRGenModule::emitAutolinkInfo() {
     llvm::SmallString<64> buf;
     encodeForceLoadSymbolName(buf, Opts.ForceLoadSymbolName);
     (void)new llvm::GlobalVariable(Module, Int1Ty, /*constant=*/true,
-                                   llvm::GlobalVariable::LinkOnceAnyLinkage,
+                                   llvm::GlobalVariable::WeakAnyLinkage,
                                    llvm::Constant::getNullValue(Int1Ty),
                                    buf.str());
   }
