@@ -13,6 +13,12 @@ Latest
     Depending on `K` and `V` the operation can be `O(1)` without memory
     allocation, or `O(N)` with memory allocation.
 
+* Single-quoted literals are no longer recognized.  Use double-quoted literals
+  and an explicit type annotation to define Characters and UnicodeScalars:
+
+    var ch: Character = "a"
+    var us: UnicodeScalar = "a"
+
 2014-05-09
 ----------
 
