@@ -1061,7 +1061,7 @@ IRGenDebugInfo::createEnumType(DebugTypeInfo DbgTy,
   // FIXME: Is DW_TAG_union_type the right thing here?
   auto FwdDecl = DBuilder.createForwardDecl
     (llvm::dwarf::DW_TAG_union_type,
-     Name, Scope, File, Line, dwarf::DW_LANG_Swift, SizeInBits, AlignInBits);
+     Name, Scope, File, Line, DW_LANG_Swift, SizeInBits, AlignInBits);
 
   DITypeCache[DbgTy.getType()] = llvm::WeakVH(FwdDecl);
 
@@ -1069,7 +1069,7 @@ IRGenDebugInfo::createEnumType(DebugTypeInfo DbgTy,
     DBuilder.createUnionType(Scope, Name, File, Line,
                              SizeInBits, AlignInBits, Flags,
                              getEnumElements(DbgTy, Decl, Scope, File, Flags),
-                             dwarf::DW_LANG_Swift);
+                             DW_LANG_Swift);
   FwdDecl->replaceAllUsesWith(DITy);
   return DITy;
 }
