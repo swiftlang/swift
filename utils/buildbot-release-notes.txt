@@ -1,6 +1,65 @@
 Latest
 ----------
 
+* The use of keyword arguments is now strictly enforced at the call
+  site. For example, consider this method along with a call to it:
+
+    class MyColor {
+      func mixColorWithRed(red: Float, green: Float, blue: Float) { /* ... */ }
+    }
+
+    func mix(color: MyColor, r: Float, g: Float, b: Float) {
+      color.mixColorWithRed(r, g, b)
+    }
+
+  The compiler will now complain about the missing "green:" and
+  "blue:" labels, with a Fix-It to correct the code:
+
+    color.swift:6:24: error: missing argument labels 'green:blue:' in call
+      color.mixColorWithRed(r, g, b)
+                           ^
+                               green:  blue: 
+
+  The compiler handles missing, extraneous, and incorrectly-typed
+  argument labels in the same manner. Recall that one can make a
+  parameter a keyword argument with the back-tick or remove a keyword
+  argument with the underscore. 
+
+    class MyColor {
+      func mixColor(`red: Float, green: Float, blue: Float) { /* ... */ }
+      func mixColorGuess(red: Float, _ green: Float, _ blue: Float) { /* ... */ }
+    }
+
+    func mix(color: MyColor, r: Float, g: Float, b: Float) {
+      color.mixColor(red: r, green: g, blue: b) // okay: all keyword arguments
+      color.mixColorGuess(r, g, b) // okay: no keyword arguments
+    }
+
+  Arguments cannot be re-ordered unless the corresponding parameters
+  have default arguments. For example, given:
+
+    func printNumber(`number: Int, radix: Int = 10, separator: String = ",") { }
+
+  The following three calls are acceptable because only the arguments for
+  defaulted parameters are re-ordered relative to each other:
+
+    printNumber(number: 256, radix: 16, separator: "_")
+    printNumber(number: 256, separator: "_")
+    printNumber(number: 256, separator: ",", radix: 16)
+
+  However, this call:
+
+    printNumber(separator: ",", radix: 16, number: 256)
+
+  results in an error due to the re-ordering:
+
+    printnum.swift:7:40: error: argument 'number' must precede argument 'separator'
+    printNumber(separator: ",", radix: 16, number: 256)
+                ~~~~~~~~~~~~~~             ^       ~~~
+
+
+
+
 * ";" can no longer be used to demarkate an empty case in a switch statement,
   use "break" instead.
 

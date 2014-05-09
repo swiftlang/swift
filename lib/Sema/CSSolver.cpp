@@ -803,6 +803,9 @@ static bool tryTypeVariableBindings(
       if (!typeVar->getImpl().canBindToLValue())
         type = type->getRValueType();
 
+      // Remove parentheses. They're insignificant here.
+      type = type->getWithoutParens();
+
       if (tc.getLangOpts().DebugConstraintSolver) {
         auto &log = cs.getASTContext().TypeCheckerDebug->getStream();
         log.indent(depth * 2)

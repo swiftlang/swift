@@ -595,7 +595,7 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
   PrefixString += "// ";
   PrefixString += NameStr;
   PrefixString += " : ";
-  PrefixString += E->getType()->getString();
+  PrefixString += E->getType()->getWithoutParens()->getString();
   PrefixString += " = ";
   
   // Unique the type string into an identifier since PrintLiteralString is

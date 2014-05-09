@@ -72,8 +72,9 @@ namespace swift {
     bool ImportCFTypes = false;
     
     /// Be strict about the use of keyword arguments.
-    /// FIXME: This will become the default.
-    bool StrictKeywordArguments = false;
+    /// FIXME: This is the default, and the option will eventually be
+    /// removed.
+    bool StrictKeywordArguments = true;
 
     /// Implicit target configuration options.  There are currently two
     ///   supported target configuration values:
