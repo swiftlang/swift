@@ -2303,7 +2303,7 @@ namespace {
     ///
     /// \code
     /// // in objc: [[NSArray alloc] initWithCapacity:1024]
-    /// NSArray(withCapacity: 1024)
+    /// NSArray(capacity: 1024)
     /// \endcode
     ConstructorDecl *importConstructor(const clang::ObjCMethodDecl *objcMethod,
                                        DeclContext *dc,
@@ -2345,7 +2345,7 @@ namespace {
     ///
     /// \code
     /// // in objc: [[NSArray alloc] initWithCapacity:1024]
-    /// NSArray(withCapacity: 1024)
+    /// NSArray(capacity: 1024)
     /// \endcode
     ///
     /// This variant of the function is responsible for actually binding the

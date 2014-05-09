@@ -16,12 +16,12 @@ bb0:
   return %0 : $()                                 // id: %1
 }
 
-// CHECK-LABEL: define {{.*}} @_TFCSo4HiveCfMS_FT9withQueenGSQCSo1B__S_
-sil @_TFCSo4HiveCfMS_FT9withQueenGSQCSo1B__S_ : $@thin (@owned ImplicitlyUnwrappedOptional<B>, @thick Hive.Type) -> @owned Hive {
+// CHECK-LABEL: define {{.*}} @_TFCSo4HiveCfMS_FT5queenGSQCSo1B__S_
+sil @_TFCSo4HiveCfMS_FT5queenGSQCSo1B__S_ : $@thin (@owned ImplicitlyUnwrappedOptional<B>, @thick Hive.Type) -> @owned Hive {
 bb0(%0 : $ImplicitlyUnwrappedOptional<B>, %1 : $@thick Hive.Type):
   %2 = thick_to_objc_metatype %1 : $@thick Hive.Type to $@objc_metatype Hive.Type // users: %3, %4
   // CHECK: load i8** @"\01L_selector(hiveWithQueen:)"
-  %3 = class_method %2 : $@objc_metatype Hive.Type, #Hive.init!allocator.1.foreign : Hive.Type -> (withQueen: ImplicitlyUnwrappedOptional<B>) -> Hive , $@cc(objc_method) @thin (ImplicitlyUnwrappedOptional<B>, @objc_metatype Hive.Type) -> @autoreleased Hive // user: %4
+  %3 = class_method %2 : $@objc_metatype Hive.Type, #Hive.init!allocator.1.foreign : Hive.Type -> (queen: ImplicitlyUnwrappedOptional<B>) -> Hive , $@cc(objc_method) @thin (ImplicitlyUnwrappedOptional<B>, @objc_metatype Hive.Type) -> @autoreleased Hive // user: %4
   // CHECK: call {{.*}} @objc_msgSend 
   %4 = apply %3(%0, %2) : $@cc(objc_method) @thin (ImplicitlyUnwrappedOptional<B>, @objc_metatype Hive.Type) -> @autoreleased Hive // users: %5, %6
   // CHECK: call {{.*}} @objc_retainAutoreleasedReturnValue

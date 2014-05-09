@@ -1,12 +1,22 @@
 Latest
 ----------
 
+* The word "with" is now removed from the first keyword argument name
+  if an initialized imported from Objective-C. For example, instead of
+  building UIColor as:
+
+    UIColor(withRed: r, green: g, blue: b, alpha: a)
+
+  it will now be:
+
+    UIColor(red: r, green: g, blue: b, alpha: a)
+
 * `Dictionary` can be bridged to `NSDictionary` and vice versa:
 
-  - `NSDictionary` has an implicit convertion to `Dictionary<NSObject,
+  - `NSDictionary` has an implicit conversion to `Dictionary<NSObject,
     AnyObject>`.  It bridges in O(1), without memory allocation.
 
-  - `Dictionary<K, V>` has an implicit convertion to `NSDictionary`.
+  - `Dictionary<K, V>` has an implicit conversion to `NSDictionary`.
     `Dictionary<K, V>` bridges to `NSDictionary` iff both `K` and `V` are
     bridged.  Otherwise, a runtime error is raised.
 

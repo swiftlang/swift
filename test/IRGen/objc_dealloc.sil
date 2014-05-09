@@ -114,7 +114,7 @@ bb0(%0 : $SwiftGizmo):
   return %0 : $SwiftGizmo
 }
 
-sil @_TToFC12objc_dealloc10SwiftGizmocfMS0_FT11withBellsOnSi_S0_ : $@cc(objc_method) @thin (Int, @owned SwiftGizmo) -> @owned SwiftGizmo {
+sil @_TToFC12objc_dealloc10SwiftGizmocfMS0_FT7bellsOnSi_S0_ : $@cc(objc_method) @thin (Int, @owned SwiftGizmo) -> @owned SwiftGizmo {
 bb0(%0 : $Int, %1 : $SwiftGizmo):
   return %1 : $SwiftGizmo
 }

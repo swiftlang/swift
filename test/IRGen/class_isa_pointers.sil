@@ -51,7 +51,7 @@ sil private @_TToFC18class_isa_pointers7Mongrel6methodfS0_FT_T_ : $@thin @cc(obj
 entry(%0 : $Purebred):
   unreachable
 }
-sil private @_TToFC18class_isa_pointers7MongrelcfMS0_FT11withBellsOnSi_S0_ : $@thin @cc(objc_method) (Int, Purebred) -> () {
+sil private @_TToFC18class_isa_pointers7MongrelcfMS0_FT7bellsOnSi_S0_ : $@thin @cc(objc_method) (Int, Purebred) -> () {
 entry(%0 : $Int, %1 : $Purebred):
   unreachable
 }
