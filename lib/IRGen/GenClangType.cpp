@@ -126,7 +126,7 @@ clang::CanQualType GenClangType::visitStructType(CanStructType type) {
   //        probably be const char* for type encoding.
   CHECK_CLANG_TYPE_MATCH(type, "CString", clangCtx.VoidPtrTy);
   CHECK_CLANG_TYPE_MATCH(type, "Selector", getClangSelectorType(clangCtx));
-  // We import NZone* (a struct pointer) as NSZone.
+  // We import NSZone* (a struct pointer) as NSZone.
   CHECK_CLANG_TYPE_MATCH(type, "NSZone", clangCtx.VoidPtrTy);
   // We import NSString* (an Obj-C object pointer) as String.
   CHECK_CLANG_TYPE_MATCH(type, "String", getClangIdType(getClangASTContext()));
