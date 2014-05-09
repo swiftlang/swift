@@ -20,7 +20,9 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Optional.h"
 #include "swift/Basic/PrettyStackTrace.h"
+#include "swift/Basic/Punycode.h"
 #include "swift/Basic/QuotedString.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
 #include <functional>
@@ -714,40 +716,79 @@ private:
   NodePointer demangleIdentifier(Node::Kind kind = Node::Kind::Unknown) {
     if (!Mangled)
       return nullptr;
+    
+    bool isPunycoded = Mangled.nextIf('X');
+    llvm::SmallString<32> decodeBuffer;
+
+    auto decode = [&](StringRef s) -> StringRef {
+      if (!isPunycoded)
+        return s;
+      if (Punycode::decodePunycode(s, decodeBuffer))
+        return {};
+      return decodeBuffer;
+    };
+    
+    bool isOperator = false;
     if (Mangled.nextIf('o')) {
+      isOperator = true;
       // Operator identifiers aren't valid in the contexts that are
       // building more specific identifiers.
       if (kind != Node::Kind::Unknown) return nullptr;
 
       char op_mode = Mangled.next();
-      if (op_mode != 'p' && op_mode != 'P' && op_mode != 'i')
+      switch (op_mode) {
+      case 'p':
+        kind = Node::Kind::PrefixOperator;
+        break;
+      case 'P':
+        kind = Node::Kind::PostfixOperator;
+        break;
+      case 'i':
+        kind = Node::Kind::InfixOperator;
+        break;
+      default:
         return nullptr;
-      std::string operatr = demangleOperator();
-      if (operatr.size()) {
-        switch (op_mode) {
-        case 'p':
-          return Node::create(Node::Kind::PrefixOperator, operatr);
-        case 'P':
-          return Node::create(Node::Kind::PostfixOperator, operatr);
-        case 'i':
-          return Node::create(Node::Kind::InfixOperator, operatr);
-        default:
-          return nullptr;
-        }
       }
     }
 
     if (kind == Node::Kind::Unknown) kind = Node::Kind::Identifier;
 
     Node::IndexType length;
-    if (demangleNatural(length)) {
-      if (Mangled.hasAtLeast(length)) {
-        auto identifier = Mangled.slice(length);
-        Mangled.advanceOffset(length);
-        return Node::create(kind, identifier);
+    if (!demangleNatural(length))
+      return nullptr;
+    if (!Mangled.hasAtLeast(length))
+      return nullptr;
+    
+    StringRef identifier = Mangled.slice(length);
+    Mangled.advanceOffset(length);
+    
+    // Decode Unicode identifiers.
+    identifier = decode(identifier);
+    if (identifier.empty())
+      return nullptr;
+
+    // Decode operator names.
+    llvm::SmallString<32> opDecodeBuffer;
+    if (isOperator) {
+      static const char op_char_table[] = "& @/= >    <*!|+ %-~   ^ .";
+
+      for (signed char c : identifier) {
+        if (c < 0) {
+          // Pass through Unicode characters.
+          opDecodeBuffer.push_back(c);
+          continue;
+        }
+        if (c < 'a' || c > 'z')
+          return nullptr;
+        char o = op_char_table[c - 'a'];
+        if (o == ' ')
+          return nullptr;
+        opDecodeBuffer.push_back(o);
       }
+      identifier = opDecodeBuffer;
     }
-    return nullptr;
+    
+    return Node::create(kind, identifier);
   }
 
   bool demangleIndex(Node::IndexType &natural) {

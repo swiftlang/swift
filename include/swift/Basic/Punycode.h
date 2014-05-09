@@ -12,9 +12,9 @@
 //
 // These functions implement a variant of the Punycode algorithm from RFC3492,
 // originally designed for encoding international domain names, for the purpose
-// encoding Swift identifiers into mangled symbol names. This version differs
+// of encoding Swift identifiers into mangled symbol names. This version differs
 // from RFC3492 in the following respects:
-// - '_' is used as the encoding delimiter instead of the '-'.
+// - '_' is used as the encoding delimiter instead of '-'.
 // - Encoding digits are represented using [a-zA-J] instead of [a-z0-9], because
 //   symbol names are case-sensitive, and Swift mangled identifiers cannot begin
 //   with a digit.
@@ -35,10 +35,11 @@ namespace Punycode {
 void encodePunycode(StringRef inputUTF8,
                     SmallVectorImpl<char> &outPunycode);
 
-// FIXME: To be written
-///// Decodes a Punycode string into a UTF-8-encoded Unicode string.
-//void decodePunycode(StringRef inputPunycode,
-//                    SmallVectorImpl<char> &outUTF8);
+/// Decodes a Punycode string into a UTF-8-encoded Unicode string.
+///
+/// Returns true if the encoding failed, false if it succeeded.
+bool decodePunycode(StringRef inputPunycode,
+                    SmallVectorImpl<char> &outUTF8);
 
 } // end namespace Punycode
 } // end namespace swift

@@ -50,6 +50,13 @@ static char digit_value(int digit) {
   return 'A' - 26 + digit;
 }
 
+static int digit_index(char value) {
+  if (value >= 'a' && value <= 'z')
+    return value - 'a';
+  if (value >= 'A' && value <= 'J')
+    return value - 'A' + 26;
+  return -1;
+}
 
 // Section 6.1: Bias adaptation function
 
@@ -70,7 +77,77 @@ static int adapt(int delta, int numpoints, bool firsttime) {
 
 // Section 6.2: Decoding procedure
 
-// To be written
+bool Punycode::decodePunycode(StringRef inputPunycode,
+                              SmallVectorImpl<char> &outUTF8) {
+  // -- Build the decoded string as UTF32 first because we need random access.
+  SmallVector<UTF32, 32> output;
+
+  UTF32 n = initial_n;
+  int i = 0;
+  int bias = initial_bias;
+  /// let output = an empty string indexed from 0
+  // consume all code points before the last delimiter (if there is one)
+  //  and copy them to output,
+  size_t lastDelimiter = inputPunycode.find_last_of(delimiter);
+  if (lastDelimiter != StringRef::npos) {
+    for (char c : inputPunycode.slice(0, lastDelimiter)) {
+      // fail on any non-basic code point
+      if ((signed char)c < 0)
+        return true;
+      output.push_back((UTF32)c);
+    }
+    // if more than zero code points were consumed then consume one more
+    //  (which will be the last delimiter)
+    inputPunycode = inputPunycode.slice(lastDelimiter + 1, inputPunycode.size());
+  }
+  
+  while (!inputPunycode.empty()) {
+    int oldi = i;
+    int w = 1;
+    for (int k = base; ; k += base) {
+      // consume a code point, or fail if there was none to consume
+      if (inputPunycode.empty())
+        return true;
+      char codePoint = inputPunycode.front();
+      inputPunycode = inputPunycode.slice(1, inputPunycode.size());
+      // let digit = the code point's digit-value, fail if it has none
+      int digit = digit_index(codePoint);
+      if (digit < 0)
+        return true;
+      
+      i = i + digit * w;
+      int t = k <= bias ? tmin
+            : k >= bias + tmax ? tmax
+            : k - bias;
+      if (digit < t)
+        break;
+      w = w * (base - t);
+    }
+    bias = adapt(i - oldi, output.size() + 1, oldi == 0);
+    n = n + i / (output.size() + 1);
+    i = i % (output.size() + 1);
+    // if n is a basic code point then fail
+    if (n < 0x80)
+      return true;
+    // insert n into output at position i
+    output.insert(output.begin() + i, n);
+    i++;
+  }
+  
+  // -- Transcode to a UTF-8 result.
+  size_t reserve = outUTF8.size() + output.size()*4;
+  outUTF8.reserve(reserve);
+  const UTF32 *utf32_begin = output.begin();
+  UTF8 *utf8_begin = (UTF8*)outUTF8.end();
+  auto res = ConvertUTF32toUTF8(&utf32_begin, output.end(),
+                                &utf8_begin, (UTF8*)outUTF8.data() + reserve,
+                                lenientConversion);
+  assert(res == conversionOK && "wide-to-utf8 conversion failed!");
+  (void)res;
+  outUTF8.set_size(utf8_begin - (UTF8*)outUTF8.begin());
+  
+  return false;
+}
 
 // Section 6.3: Encoding procedure
 
