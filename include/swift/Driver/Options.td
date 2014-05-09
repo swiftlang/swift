@@ -175,7 +175,11 @@ def split_objc_selectors : Flag<["-"], "split-objc-selectors">,
 
 def implicit_objc_with : Flag<["-"], "implicit-objc-with">,
   Flags<[FrontendOption]>,
-  HelpText<"Make 'with' in the first initializer argument implicit">;
+  HelpText<"Make 'with' in the first keyword argument of an @objc method or initializer implicit">;
+
+def no_implicit_objc_with : Flag<["-"], "no-implicit-objc-with">,
+  Flags<[FrontendOption]>,
+  HelpText<"Do not make 'with' in the first keyword argument of an @objc method or initializer implicit">;
 
 def import_cf_types : Flag<["-"], "import-cf-types">,
   Flags<[FrontendOption]>,

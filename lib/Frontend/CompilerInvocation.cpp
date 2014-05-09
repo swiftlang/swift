@@ -549,7 +549,12 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.EnableAppExtensionRestrictions = Args.hasArg(OPT_enable_app_extension);
   Opts.SplitPrepositions = Args.hasArg(OPT_split_objc_selectors);
-  Opts.ImplicitObjCWith = Args.hasArg(OPT_implicit_objc_with);
+
+  if (auto A = Args.getLastArg(OPT_implicit_objc_with,
+                               OPT_no_implicit_objc_with)) {
+    Opts.ImplicitObjCWith
+      = A->getOption().matches(OPT_implicit_objc_with);
+  }
 
   if (auto A = Args.getLastArg(OPT_strict_keyword_arguments,
                                OPT_no_strict_keyword_arguments)) {
