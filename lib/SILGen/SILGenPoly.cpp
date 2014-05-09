@@ -1370,13 +1370,15 @@ static AbstractionPattern stripInputTupleLabels(AbstractionPattern p) {
   return AbstractionPattern(stripInputTupleLabels(p.getAsType()));
 }
 
-static SILValue getWitnessFunctionRef(SILGenModule &SGM, SILDeclRef witness,
-                                      SILBuilder &B, bool isFree,
+static SILValue getWitnessFunctionRef(SILGenFunction &gen, SILDeclRef witness,
+                                      bool isFree,
                                       SmallVectorImpl<ManagedValue> &origParams,
                                       SILType witnessSILTy, SILLocation loc) {
+  SILGenModule &SGM = gen.SGM;
+  
   // Free functions are always statically dispatched...
   if (isFree)
-    return B.createFunctionRef(loc, SGM.getFunction(witness, NotForDefinition));
+    return gen.emitGlobalFunctionRef(loc, witness);
 
   ManagedValue &selfParam = origParams.back();
   CanType selfInstanceType = selfParam.getType().getSwiftRValueType();
@@ -1385,7 +1387,7 @@ static SILValue getWitnessFunctionRef(SILGenModule &SGM, SILDeclRef witness,
   // final, we do not dynamic dispatch.
   ClassDecl *C = selfInstanceType.getClassOrBoundGenericClass();
   if (!C)
-    return B.createFunctionRef(loc, SGM.getFunction(witness, NotForDefinition));
+    return gen.emitGlobalFunctionRef(loc, witness);
 
   bool isVolatile = witness.isForeign;
   bool isObjC = C->isObjC();
@@ -1401,16 +1403,16 @@ static SILValue getWitnessFunctionRef(SILGenModule &SGM, SILDeclRef witness,
 
   // If we have a final method or a method from an extension that is not
   // objective c, emit a static reference.
-  //
-  // TODO: For now we don't handle objective c witnesses, but this at least gets
-  // us part of the way there.
+  // A natively ObjC method witness referenced this way will end up going
+  // through its native thunk, which will redispatch the method after doing
+  // bridging just like we want.
   if (isFinal || isExtension || isObjC)
-    return B.createFunctionRef(loc, SGM.getFunction(witness, NotForDefinition));
+    return gen.emitGlobalFunctionRef(loc, witness);
 
   // Otherwise emit a class method.
-  return B.createClassMethod(loc, selfParam.getValue(), witness,
-                             SGM.getConstantType(witness),
-                             isObjC | isVolatile);
+  return gen.B.createClassMethod(loc, selfParam.getValue(), witness,
+                                 SGM.getConstantType(witness),
+                                 isObjC | isVolatile);
 }
 
 void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
@@ -1564,7 +1566,7 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
   // Invoke the witness function calling a class method if we have a class and
   // calling the static function otherwise.
   // TODO: Collect forwarding substitutions from outer context of method.
-  SILValue witnessFnRef = getWitnessFunctionRef(SGM, witness, B, isFree,
+  SILValue witnessFnRef = getWitnessFunctionRef(*this, witness, isFree,
                                                 origParams, witnessSILTy, loc);
   SILValue witnessResultValue = B.createApply(
       loc, witnessFnRef, witnessSILTy,
