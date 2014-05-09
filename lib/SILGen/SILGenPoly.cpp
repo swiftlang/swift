@@ -1389,13 +1389,10 @@ static SILValue getWitnessFunctionRef(SILGenFunction &gen, SILDeclRef witness,
   if (!C)
     return gen.emitGlobalFunctionRef(loc, witness);
 
-  bool isVolatile = witness.isForeign;
-  bool isObjC = C->isObjC();
   bool isFinal = C->isFinal();
   bool isExtension = false;
 
   if (FuncDecl *fd = witness.getFuncDecl()) {
-    isObjC |= fd->isObjC();
     isFinal |= fd->isFinal();
     if (DeclContext *dc = fd->getDeclContext())
       isExtension = isa<ExtensionDecl>(dc);
@@ -1406,13 +1403,13 @@ static SILValue getWitnessFunctionRef(SILGenFunction &gen, SILDeclRef witness,
   // A natively ObjC method witness referenced this way will end up going
   // through its native thunk, which will redispatch the method after doing
   // bridging just like we want.
-  if (isFinal || isExtension || isObjC)
+  if (isFinal || isExtension || witness.isForeignThunk())
     return gen.emitGlobalFunctionRef(loc, witness);
 
   // Otherwise emit a class method.
   return gen.B.createClassMethod(loc, selfParam.getValue(), witness,
                                  SGM.getConstantType(witness),
-                                 isObjC | isVolatile);
+                                 /*volatile*/ false);
 }
 
 void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
