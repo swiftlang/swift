@@ -181,6 +181,7 @@ set(SWIFT_LIBRARY_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib)
 set(SWIFT_INCLUDE_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/include)
 
 option(SWIFT_OPTIMIZED "Enable optimization for Swift source files" YES)
+option(SWIFT_STDLIB_INTERNAL_CHECKS "Enable internal checks for the Swift standard library" NO)
 option(SWIFT_RUNTIME_CHECKS "Enable overflow checks for the Swift standard library" YES)
 option(SWIFT_VERIFY_ALL "Run SIL verification after each transform when building Swift files in the build process" NO)
 set(SWIFT_MODULE_CACHE_PATH "" CACHE PATH
@@ -346,6 +347,10 @@ function(compile_swift_files)
   if(NOT SWIFT_RUNTIME_CHECKS)
     # FIXME: Should this be exposed at the driver level?
     list(APPEND swift_flags "-Xfrontend" "-disable-all-runtime-checks")
+  endif()
+
+  if (SWIFT_STDLIB_INTERNAL_CHECKS)
+    list(APPEND swift_flags "-Xfrontend" "-D" "-Xfrontend" "INTERNAL_CHECKS_ENABLED")
   endif()
 
   if(SWIFT_VERIFY_ALL)
