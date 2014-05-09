@@ -2658,15 +2658,13 @@ ObjCSelector FuncDecl::getObjCSelector() const {
   // Attach the first parameter name to the base name.
   auto firstPiece = getName();
   bool didStringManipulation = false;
-  if (ctx.LangOpts.SplitPrepositions) {
-    llvm::SmallString<32> scratch;
-    scratch += firstPiece.str();
-    auto firstName = argNames[0];
-    if (!firstName.empty()) {
-      camel_case::appendSentenceCase(scratch, firstName.str());
-      firstPiece = ctx.getIdentifier(scratch);
-      didStringManipulation = true;
-    }
+  llvm::SmallString<32> scratch;
+  scratch += firstPiece.str();
+  auto firstName = argNames[0];
+  if (!firstName.empty()) {
+    camel_case::appendSentenceCase(scratch, firstName.str());
+    firstPiece = ctx.getIdentifier(scratch);
+    didStringManipulation = true;
   }
 
   // For every element beyond the first, add a selector component.

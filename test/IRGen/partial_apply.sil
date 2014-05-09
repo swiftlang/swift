@@ -88,7 +88,7 @@ entry(%f : $(Builtin.Word) -> (), %x : $Builtin.Word):
 // CHECK-NOT: swift_retain
 // CHECK:   [[SELF:%.*]] = load %C13partial_apply9ObjCClass** [[X_ADDR]], align 8
 // CHECK-NOT: swift_retain
-// CHECK:   [[CMD:%.*]] = load i8** @"\01L_selector(method:)", align 8
+// CHECK:   [[CMD:%.*]] = load i8** @"\01L_selector(methodX:)", align 8
 // CHECK:   [[I8PTRSELF:%.*]] = bitcast %C13partial_apply9ObjCClass* [[SELF]] to [[OPAQUE0:%.*]]*
 // CHECK-NOT: swift_retain
 // CHECK:   call void bitcast (void ()* @objc_msgSend to void ([[OPAQUE2:%.*]]*, i8*, i64)*)([[OPAQUE2]]* [[I8PTRSELF]], i8* [[CMD]], i64 %0)
@@ -132,7 +132,7 @@ entry(%x : $Int):
 // CHECK-LABEL: define { i8*, %swift.refcounted* } @dynamic_lookup_br_partial_apply(%objc_object*) {
 // CHECK:   phi i8* [ bitcast (void (i64)* @dummy to i8*), {{%.*}} ], [ bitcast (void (i64, %swift.refcounted*)* [[DYNAMIC_LOOKUP_BR_PARTIAL_APPLY_STUB:@_TPA[A-Za-z0-9_]*]] to i8*), {{%.*}} ]
 // CHECK: define internal void [[DYNAMIC_LOOKUP_BR_PARTIAL_APPLY_STUB]](i64, %swift.refcounted*) {
-// CHECK:   load i8** @"\01L_selector(method:)", align 8
+// CHECK:   load i8** @"\01L_selector(methodX:)", align 8
 
 sil @dynamic_lookup_br_partial_apply : $@thin Builtin.UnknownObject -> @callee_owned Int -> () {
 entry(%o : $Builtin.UnknownObject):
