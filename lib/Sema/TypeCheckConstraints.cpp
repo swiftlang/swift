@@ -1676,7 +1676,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   Type origFromType = fromType;
   Type origToType = toType;
 
-  // Strip optional and metatype wrappers off of the destination type in sync with
+  // Strip optional wrappers off of the destination type in sync with
   // stripping them off the origin type.
   while (auto toValueType = toType->getAnyOptionalObjectType()) {
     // Complain if we're trying to increase optionality, e.g.
@@ -1699,13 +1699,28 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   while (auto fromValueType = fromType->getAnyOptionalObjectType())
     fromType = fromValueType;
   
+  // Strip metatypes. If we can cast two types, we can cast their metatypes.
+  bool metatypeCast = false;
   while (auto toMetatype = toType->getAs<MetatypeType>()) {
     auto fromMetatype = fromType->getAs<MetatypeType>();
     if (!fromMetatype)
       break;
     
+    metatypeCast = true;
     toType = toMetatype->getInstanceType();
     fromType = fromMetatype->getInstanceType();
+  }
+  
+  // Strip an inner layer of potentially existential metatype.
+  bool toExistentialMetatype = false;
+  bool fromExistentialMetatype = false;
+  if (auto toMetatype = toType->getAs<AnyMetatypeType>()) {
+    if (auto fromMetatype = fromType->getAs<AnyMetatypeType>()) {
+      toExistentialMetatype = toMetatype->is<ExistentialMetatypeType>();
+      fromExistentialMetatype = fromMetatype->is<ExistentialMetatypeType>();
+      toType = toMetatype->getInstanceType();
+      fromType = fromMetatype->getInstanceType();
+    }
   }
 
   bool toArchetype = toType->is<ArchetypeType>();
@@ -1714,6 +1729,16 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   bool toExistential = toType->isExistentialType(toProtocols);
   SmallVector<ProtocolDecl*, 2> fromProtocols;
   bool fromExistential = fromType->isExistentialType(fromProtocols);
+  
+  // If we're doing a metatype cast, it can only be existential if we're
+  // casting to/from the existential metatype. 'T.self as P.Protocol'
+  // can only succeed if T is exactly the type P, so is a concrete cast,
+  // whereas 'T.self as P.Type' succeeds for types conforming to the protocol
+  // P, and is an existential cast.
+  if (metatypeCast) {
+    toExistential &= toExistentialMetatype;
+    fromExistential &= fromExistentialMetatype;
+  }
   
   // We can only downcast to an existential if the destination protocols are
   // objc and the source type is a class or an existential bounded by objc

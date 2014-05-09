@@ -1531,11 +1531,17 @@ SILValue SILGenFunction::emitUnconditionalCheckedCast(SILLocation loc,
   }
   
   // Get the cast destination type at the least common denominator abstraction
-  // level.
+  // level, thickening metatypes and falling back to address-only casting if
+  // needed.
   SILType destTy = castLowering.getLoweredType();
+  if (auto metaTy = destTy.getAs<MetatypeType>())
+    if (metaTy->getRepresentation() == MetatypeRepresentation::Thin)
+      destTy = SILType::getPrimitiveObjectType(
+                           CanMetatypeType::get(metaTy.getInstanceType(),
+                                                MetatypeRepresentation::Thick));
   if (origLowering.isAddressOnly())
     destTy = destTy.getAddressType();
-
+  
   // Emit the cast.
   SILValue result = B.createUnconditionalCheckedCast(loc, kind, original,
                                                      destTy);
@@ -1543,6 +1549,11 @@ SILValue SILGenFunction::emitUnconditionalCheckedCast(SILLocation loc,
   // Load from the address if casting from address-only to loadable.
   if (origLowering.isAddressOnly() && castLowering.isLoadable())
     result = B.createLoad(loc, result);
+
+  // Thin the metatype if we can.
+  if (auto metaTy = castLowering.getLoweredType().getAs<MetatypeType>())
+    if (metaTy->getRepresentation() == MetatypeRepresentation::Thin)
+      result = B.createMetatype(loc, castLowering.getLoweredType());
   
   return result;
 }
@@ -1598,8 +1609,15 @@ SILGenFunction::emitCheckedCastBranch(SILLocation loc,
     original = originalAbstracted;
   
   // Get the cast destination type at the least common denominator abstraction
-  // level.
+  // level, thickening metatypes and falling back to address-only casting if
+  // needed.
   SILType destTy = castLowering.getLoweredType();
+  if (auto metaTy = destTy.getAs<MetatypeType>())
+    if (metaTy->getRepresentation() == MetatypeRepresentation::Thin)
+      destTy = SILType::getPrimitiveObjectType(
+                           CanMetatypeType::get(metaTy.getInstanceType(),
+                                                MetatypeRepresentation::Thick));
+  
   if (origLowering.isAddressOnly())
     destTy = destTy.getAddressType();
 
@@ -1650,6 +1668,11 @@ visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *E,
     // Load the BB argument if casting from address-only to loadable type.
     if (castResult.getType().isAddress() && !castTL.isAddressOnly())
       castResult = SGF.B.createLoad(E, castResult);
+    
+    // Thin the metatype if we can.
+    if (auto metaTy = castTL.getLoweredType().getAs<MetatypeType>())
+      if (metaTy->getRepresentation() == MetatypeRepresentation::Thin)
+        castResult = SGF.B.createMetatype(E, castTL.getLoweredType());
 
     RValue castRV(SGF, E, castTy,
                   SGF.emitManagedRValueWithCleanup(castResult, castTL));

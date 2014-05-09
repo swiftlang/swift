@@ -28,6 +28,17 @@
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
+// Instruction-specific properties on SILValue
+//===----------------------------------------------------------------------===//
+
+Optional<SILLocation> SILValue::getLoc() const {
+  if (auto I = dyn_cast<SILInstruction>(*this)) {
+    return I->getLoc();
+  }
+  return Nothing;
+}
+
+//===----------------------------------------------------------------------===//
 // ilist_traits<SILInstruction> Implementation
 //===----------------------------------------------------------------------===//
 

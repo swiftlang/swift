@@ -2629,20 +2629,35 @@ static Address emitCheckedCast(IRGenSILFunction &IGF,
                                SILType destTy,
                                CheckedCastKind kind,
                                CheckedCastMode mode) {
-  if (operand.getType().is<MetatypeType>()) {
+  if (operand.getType().is<AnyMetatypeType>()) {
+    // FIXME: To-existential-metatype checks require a runtime function we don't
+    // have implemented yet.
+    if (destTy.is<ExistentialMetatypeType>())
+      IGF.unimplemented(operand.getLoc() ? operand.getLoc()->getSourceLoc()
+                                         : SourceLoc(),
+                        "downcast to existential metatype");
+
     llvm::Value *metatypeVal;
     if (operand.getType().isAddress()) {
       auto fromAddr = IGF.getLoweredAddress(operand);
+      // If the metatype is existential, there may be witness tables in the
+      // value, which we don't need. Narrow the address type to just load the
+      // type metadata.
+      fromAddr = IGF.Builder.CreateBitCast(fromAddr, IGF.IGM.TypeMetadataPtrTy);
       metatypeVal = IGF.Builder.CreateLoad(fromAddr);
     } else {
       auto fromEx = IGF.getLoweredExplosion(operand);
       metatypeVal = fromEx.claimNext();
+      // If the metatype is existential, there may be witness tables in the
+      // value, which we don't need.
+      fromEx.claimAll();
     }
     llvm::Value *cast = emitMetatypeDowncast(IGF, metatypeVal,
-                                             destTy.castTo<MetatypeType>(),
+                                             destTy.castTo<AnyMetatypeType>(),
                                              mode);
     return Address(cast, Alignment(1));
   }
+  
   
   switch (kind) {
   case CheckedCastKind::Unresolved:

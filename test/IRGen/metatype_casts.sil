@@ -16,3 +16,21 @@ no:
 end:
   return undef : $()
 }
+
+protocol P {}
+
+// CHECK-LABEL: define void @existential_archetype_metatype_cast(%swift.type*, %swift.type* %T)
+// CHECK:         %1 = call %swift.type* @swift_dynamicCastMetatype(%swift.type* %0, %swift.type* %T) #0
+// CHECK:         %2 = icmp ne %swift.type* %1, null
+sil @existential_archetype_metatype_cast : $@thin <T> (@thick P.Type) -> () {
+entry(%0 : $@thick P.Type):
+  checked_cast_br existential_to_archetype %0 : $@thick P.Type to $@thick T.Type, yes, no
+yes(%1 : $@thick T.Type):
+  br end
+
+no:
+  br end
+
+end:
+  return undef : $()
+}

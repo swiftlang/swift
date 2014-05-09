@@ -556,6 +556,8 @@ static CheckedCastKind getCheckedCastKind(unsigned Attr) {
   case (unsigned)CheckedCastKind::ExistentialToArchetype:
   case (unsigned)CheckedCastKind::ExistentialToConcrete:
   case (unsigned)CheckedCastKind::SuperToArchetype:
+  case (unsigned)CheckedCastKind::ConcreteToArchetype:
+  case (unsigned)CheckedCastKind::ConcreteToUnrelatedExistential:
     return (CheckedCastKind)Attr;
   default:
     llvm_unreachable("not a valid CheckedCastKind for SIL");

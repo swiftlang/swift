@@ -2011,6 +2011,14 @@ static CheckedCastKind getCheckedCastKind(Type fromType, Type toType) {
     fromType = fromMetatype->getInstanceType();
   }
   
+  // Peel off a potential layer of existential<->concrete metatype conversion.
+  if (auto toMetatype = toType->getAs<AnyMetatypeType>()) {
+    if (auto fromMetatype = fromType->getAs<MetatypeType>()) {
+      toType = toMetatype->getInstanceType();
+      fromType = fromMetatype->getInstanceType();
+    }
+  }
+  
   // Classify the from/to types.
   bool toArchetype = toType->is<ArchetypeType>();
   bool fromArchetype = fromType->is<ArchetypeType>();

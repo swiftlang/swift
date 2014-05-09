@@ -31,6 +31,7 @@ namespace swift {
   class ValueBaseUseIterator;
   class ValueUseIterator;
   class SILInstruction;
+  class SILLocation;
 
   enum class ValueKind {
 #define VALUE(Id, Parent) Id,
@@ -233,6 +234,9 @@ public:
     return SILValue(p);
   }
 
+  // Get the SILLocation associated with the value, if it has any.
+  Optional<SILLocation> getLoc() const;
+  
   enum {
     NumLowBitsAvailable =
       llvm::PointerLikeTypeTraits<decltype(ValueAndResultNumber)>::

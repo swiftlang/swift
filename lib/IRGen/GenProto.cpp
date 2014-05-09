@@ -4788,7 +4788,7 @@ emitOpaqueDowncast(IRGenFunction &IGF,
 /// Emit a checked cast of a metatype.
 llvm::Value *irgen::emitMetatypeDowncast(IRGenFunction &IGF,
                                          llvm::Value *metatype,
-                                         CanMetatypeType toMetatype,
+                                         CanAnyMetatypeType toMetatype,
                                          CheckedCastMode mode) {
   // Pick a runtime entry point and target metadata based on what kind of
   // representation we're casting.

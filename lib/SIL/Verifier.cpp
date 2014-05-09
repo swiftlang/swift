@@ -1354,9 +1354,9 @@ public:
 
     // Peel off metatypes. If two types are checked-cast-able, so are their
     // metatypes.
-    while (fromTy.is<MetatypeType>() && toTy.is<MetatypeType>()) {
-      auto fromMetaty = fromTy.castTo<MetatypeType>();
-      auto toMetaty = toTy.castTo<MetatypeType>();
+    while (fromTy.is<AnyMetatypeType>() && toTy.is<AnyMetatypeType>()) {
+      auto fromMetaty = fromTy.castTo<AnyMetatypeType>();
+      auto toMetaty = toTy.castTo<AnyMetatypeType>();
 
       // The representations must match.
       require(fromMetaty->getRepresentation() == toMetaty->getRepresentation(),

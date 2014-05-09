@@ -197,7 +197,7 @@ namespace irgen {
   /// Emit a checked cast of a metatype.
   llvm::Value *emitMetatypeDowncast(IRGenFunction &IGF,
                                     llvm::Value *metatype,
-                                    CanMetatypeType toMetatype,
+                                    CanAnyMetatypeType toMetatype,
                                     CheckedCastMode mode);
   
   /// Emit a checked cast of an opaque archetype.
