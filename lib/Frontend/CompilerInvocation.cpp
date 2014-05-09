@@ -143,9 +143,9 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
   FrontendOptions::ActionType Action;
   if (const Arg *A = Args.getLastArg(OPT_modes_Group)) {
     Option Opt = A->getOption();
-    if (Opt.matches(OPT_c)) {
+    if (Opt.matches(OPT_emit_object)) {
       Action = FrontendOptions::EmitObject;
-    } else if (Opt.matches(OPT_S)) {
+    } else if (Opt.matches(OPT_emit_assembly)) {
       Action = FrontendOptions::EmitAssembly;
     } else if (Opt.matches(OPT_emit_ir)) {
       Action = FrontendOptions::EmitIR;

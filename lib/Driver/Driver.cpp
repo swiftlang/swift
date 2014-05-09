@@ -346,11 +346,11 @@ void Driver::buildOutputInfo(const DerivedArgList &Args,
       OI.CompilerOutputType = types::TY_Object;
       break;
 
-    case options::OPT_c:
+    case options::OPT_emit_object:
       OI.CompilerOutputType = types::TY_Object;
       break;
 
-    case options::OPT_S:
+    case options::OPT_emit_assembly:
       OI.CompilerOutputType = types::TY_Assembly;
       break;
 
