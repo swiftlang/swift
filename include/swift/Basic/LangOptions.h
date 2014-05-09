@@ -64,6 +64,9 @@ namespace swift {
     /// a selector).
     bool ImplicitObjCWith = true;
 
+    /// Bridge Dictionary<K, V> to NSDictionary.
+    bool ObjCBridgeDictionary = false;
+
     /// Enables checking that uses of @objc require importing
     /// the ObjectiveC module.
     bool EnableObjCAttrRequiresObjCModule = false;

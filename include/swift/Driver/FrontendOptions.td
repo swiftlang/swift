@@ -140,6 +140,10 @@ def no_strict_keyword_arguments :
   Flag<["-"], "no-strict-keyword-arguments">,
   HelpText<"Don't be strict about keyword argument presence/absence/ordering">;
 
+def objc_bridge_dictionary :
+  Flag<["-"], "objc-bridge-dictionary">,
+  HelpText<"Bridge Swift's Dictionary<K, V> to NSDictionary">;
+
 def enable_source_import : Flag<["-"], "enable-source-import">,
   HelpText<"Enable importing of Swift source files">;
 
