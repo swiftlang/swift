@@ -1,4 +1,4 @@
-//===---- LoadStoreOpts.cpp - SIL Load/Store Optimizations Forwarding  ----===//
+//===---- LoadStoreOpts.cpp - SIL Load/Store Optimizations Forwarding -----===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -155,6 +155,30 @@ public:
     }
   }
 
+  void invalidateWriteToStores(SILInstruction *Inst) {
+    if (!PrevStore)
+      return;
+
+    if (!AA->mayWriteToMemory(Inst, PrevStore->getDest()))
+      return;
+
+    DEBUG(llvm::dbgs() << "    Found an instruction that writes to memory."
+                          " Invalidating store.\n");
+    PrevStore = nullptr;
+  }
+
+  void invalidateReadFromStores(SILInstruction *Inst) {
+    if (!PrevStore)
+      return;
+
+    if (!AA->mayReadFromMemory(Inst, PrevStore->getDest()))
+      return;
+
+    DEBUG(llvm::dbgs() << "    Found an instruction that reads from store."
+                          " Invalidating store.\n");
+    PrevStore = nullptr;
+  }
+
   /// Try to prove that SI is a dead store updating all current state. If SI is
   /// dead, eliminate it.
   void tryToEliminateDeadStore(StoreInst *SI);
@@ -288,11 +312,10 @@ bool LSBBForwarder::optimize() {
           continue;
         }
 
-    // All other instructions that read from memory invalidate the store.
+    // All other instructions that read from the memory location of the store
+    // invalidates the store.
     if (Inst->mayReadFromMemory()) {
-      DEBUG(llvm::dbgs() << "    Found an instruction that reads from memory."
-            " Invalidating store.\n");
-      PrevStore = nullptr;
+      invalidateReadFromStores(Inst);
     }
 
     // If we have an instruction that may write to memory and we can not prove
@@ -302,7 +325,9 @@ bool LSBBForwarder::optimize() {
       // Invalidate any load that we can not prove does not read from one of the
       // writing instructions operands.
       invalidateAliasingLoads(Inst);
-      PrevStore = nullptr;
+
+      // Invalidate our store if Inst writes to the destination location.
+      invalidateWriteToStores(Inst);
     }
   }
 

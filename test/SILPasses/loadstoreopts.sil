@@ -218,3 +218,31 @@ bb0(%0 : $*Agg2, %1 : $*Agg1):
   %7 = return %6 : $()
 }
 
+// CHECK-LABEL: sil @dead_store_removal_not_stopped_by_nonaliasing_readwrites : $@thin (@inout Builtin.Int32, @inout Builtin.Int32) -> (Builtin.Int32, Builtin.Int32, Builtin.Int32) {
+// CHECK: bb0([[INPUT_PTR1:%[0-9]+]] : $*Builtin.Int32, [[INPUT_PTR2:%[0-9]+]] : $*Builtin.Int32):
+// CHECK-NEXT: [[ALLOCA:%[0-9]+]] = alloc_stack $Builtin.Int32
+// CHECK-NEXT: [[INT_LITERAL:%[0-9]+]] = integer_literal
+// CHECK-NEXT: store [[INT_LITERAL]] to [[ALLOCA]]#1
+// CHECK-NEXT: [[INT_LOADED:%[0-9]+]] = load [[INPUT_PTR1]] : $*Builtin.Int32
+// CHECK-NEXT: store [[INT_LITERAL]] to [[INPUT_PTR2]] : $*Builtin.Int32
+// CHECK-NEXT: store [[INT_LITERAL]] to [[ALLOCA]]#1 : $*Builtin.Int32
+// CHECK-NEXT: store [[INT_LITERAL]] to [[INPUT_PTR2]] : $*Builtin.Int32
+// CHECK-NEXT: [[INT_LOADED2:%[0-9]+]] = load [[ALLOCA]]#1 : $*Builtin.Int32
+// CHECK-NEXT: dealloc_stack [[ALLOCA]]#0
+// CHECK-NEXT: tuple ([[INT_LOADED]] : $Builtin.Int32, [[INT_LOADED]] : $Builtin.Int32, [[INT_LOADED2]] : $Builtin.Int32)
+// CHECK-NEXT: return
+sil @dead_store_removal_not_stopped_by_nonaliasing_readwrites : $@thin (@inout Builtin.Int32, @inout Builtin.Int32) -> (Builtin.Int32, Builtin.Int32, Builtin.Int32) {
+bb0(%0 : $*Builtin.Int32, %1 : $*Builtin.Int32):
+  %2 = alloc_stack $Builtin.Int32
+  %3 = integer_literal $Builtin.Int32, 32
+  store %3 to %2#1 : $*Builtin.Int32
+  %4 = load %0 : $*Builtin.Int32
+  store %3 to %1 : $*Builtin.Int32
+  store %3 to %2#1 : $*Builtin.Int32
+  %5 = load %0 : $*Builtin.Int32
+  store %3 to %1 : $*Builtin.Int32
+  %6 = load %2#1 : $*Builtin.Int32
+  dealloc_stack %2#0 : $*@local_storage Builtin.Int32
+  %7 = tuple(%4 : $Builtin.Int32, %5 : $Builtin.Int32, %6 : $Builtin.Int32)
+  return %7 : $(Builtin.Int32, Builtin.Int32, Builtin.Int32)
+}
