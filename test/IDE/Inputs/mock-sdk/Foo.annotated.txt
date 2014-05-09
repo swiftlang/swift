@@ -196,3 +196,7 @@ class FooClassDerived : <ref:Class>FooClassBase</ref>, <ref:Protocol>FooProtocol
 <decl:Struct>struct _InternalStruct {
   <decl:Var>var x: <ref:TypeAlias>CInt</ref></decl>
 }</decl>
+<decl:Protocol>protocol _InternalProt {
+}</decl>
+<decl:Class>class ClassWithInternalProt : <ref:Protocol>_InternalProt</ref> {
+}</decl>

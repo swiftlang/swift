@@ -625,9 +625,15 @@ void PrintAST::printInherited(const Decl *decl,
     bool PrintedInherited = false;
 
     if (superclass) {
-      Printer << " : ";
-      superclass.print(Printer, Options);
-      PrintedInherited = true;
+      bool ShouldPrintSuper = true;
+      if (auto NTD = superclass->getAnyNominal()) {
+        ShouldPrintSuper = shouldPrint(NTD);
+      }
+      if (ShouldPrintSuper) {
+        Printer << " : ";
+        superclass.print(Printer, Options);
+        PrintedInherited = true;
+      }
     }
 
     bool UseProtocolCompositionSyntax =
@@ -637,6 +643,8 @@ void PrintAST::printInherited(const Decl *decl,
       PrintedColon = true;
     }
     for (auto Proto : protos) {
+      if (!shouldPrint(Proto))
+        continue;
       if (Proto->isSpecificProtocol(KnownProtocolKind::AnyObject))
         continue;
       if (auto Enum = dyn_cast<EnumDecl>(decl)) {
@@ -663,10 +671,21 @@ void PrintAST::printInherited(const Decl *decl,
     if (UseProtocolCompositionSyntax)
       Printer << ">";
   } else {
+    SmallVector<Type, 6> TypesToPrint;
+    for (auto TL : inherited) {
+      if (auto NTD = TL.getType()->getAnyNominal()) {
+        if (!shouldPrint(NTD))
+          continue;
+      }
+      TypesToPrint.push_back(TL.getType());
+    }
+    if (TypesToPrint.empty())
+      return;
+
     Printer << " : ";
 
-    interleave(inherited, [&](TypeLoc TL) {
-      TL.getType()->print(Printer, Options);
+    interleave(TypesToPrint, [&](Type Ty) {
+      Ty->print(Printer, Options);
     }, [&]() {
       Printer << ", ";
     });

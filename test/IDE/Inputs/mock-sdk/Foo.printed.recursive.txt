@@ -196,6 +196,10 @@ func _internalTopLevelFunc()
 struct _InternalStruct {
   var x: CInt
 }
+protocol _InternalProt {
+}
+class ClassWithInternalProt : _InternalProt {
+}
 func fooSubFunc1(a: CInt) -> CInt
 struct FooSubEnum1 {
   init(_ value: CUnsignedInt)

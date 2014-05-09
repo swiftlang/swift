@@ -218,4 +218,10 @@ struct _InternalStruct {
 -(id) _internalMeth3;
 @end
 
+@protocol _InternalProt
+@end
+
+@interface ClassWithInternalProt<_InternalProt>
+@end
+
 #endif /* ! __FOO_H__ */

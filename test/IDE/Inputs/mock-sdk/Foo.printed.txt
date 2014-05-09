@@ -218,3 +218,6 @@ extension FooClassBase {
   class func nonInternalMeth() -> AnyObject!
   func nonInternalMeth() -> AnyObject!
 }
+
+class ClassWithInternalProt {
+}
