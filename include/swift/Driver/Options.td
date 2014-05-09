@@ -77,13 +77,14 @@ def driver_skip_execution : Flag<["-"], "driver-skip-execution">,
 
 def help : Flag<["-", "--"], "help">, Flags<[DriverOption, FrontendOption]>,
   HelpText<"Display available options">;
+def h : Flag<["-"], "h">, Alias<help>;
 def help_hidden : Flag<["-", "--"], "help-hidden">,
   Flags<[HelpHidden, DriverOption, FrontendOption]>,
   HelpText<"Display available options, including hidden options">;
 
 def v : Flag<["-"], "v">,
   HelpText<"Show commands to run and use verbose output">;
-def _version : Flag<["--"], "version">;
+def version : Flag<["-", "--"], "version">;
 
 // Standard Options
 def _DASH_DASH : Option<["--"], "", KIND_REMAINING_ARGS>,
@@ -94,7 +95,7 @@ def o : JoinedOrSeparate<["-"], "o">,
   HelpText<"Write output to <file>">, MetaVarName<"<file>">;
 
 def j : JoinedOrSeparate<["-"], "j">, Flags<[DriverOption]>,
-  HelpText<"Number of commands to execute in parallel">;
+  HelpText<"Number of commands to execute in parallel">, MetaVarName<"<n>">;
 
 def arch : Separate<["-"], "arch">, Flags<[DriverOption]>,
   HelpText<"Compile for architecture <arch>">, MetaVarName<"<arch>">;
@@ -170,19 +171,19 @@ def emit_objc_header_path : Separate<["-"], "emit-objc-header-path">,
   HelpText<"Emit an Objective-C header file to <path>">;
 
 def split_objc_selectors : Flag<["-"], "split-objc-selectors">,
-  Flags<[FrontendOption]>,
+  Flags<[FrontendOption,HelpHidden]>,
   HelpText<"Split imported Objective-C selectors based on prepositions">;
 
 def implicit_objc_with : Flag<["-"], "implicit-objc-with">,
-  Flags<[FrontendOption]>,
+  Flags<[FrontendOption,HelpHidden]>,
   HelpText<"Make 'with' in the first keyword argument of an @objc method or initializer implicit">;
 
 def no_implicit_objc_with : Flag<["-"], "no-implicit-objc-with">,
-  Flags<[FrontendOption]>,
+  Flags<[FrontendOption,HelpHidden]>,
   HelpText<"Do not make 'with' in the first keyword argument of an @objc method or initializer implicit">;
 
 def import_cf_types : Flag<["-"], "import-cf-types">,
-  Flags<[FrontendOption]>,
+  Flags<[FrontendOption,HelpHidden]>,
   HelpText<"Recognize and import CF types as class types">;
 
 // Platform options.
@@ -207,6 +208,7 @@ def L_EQ : Joined<["-"], "L=">, Alias<L>;
 
 def link_objc_runtime : Flag<["-"], "link-objc-runtime">;
 def no_link_objc_runtime : Flag<["-"], "no-link-objc-runtime">,
+  Flags<[HelpHidden]>,
   HelpText<"Don't link in additions to the Objective-C runtime">;
 
 def Xlinker : Separate<["-"], "Xlinker">,
@@ -250,22 +252,21 @@ def emit_executable : Flag<["-"], "emit-executable">, Flags<[DriverOption]>,
   HelpText<"Emit a linked executable">, ModeOpt;
 def emit_library : Flag<["-"], "emit-library">, Flags<[DriverOption]>,
   HelpText<"Emit a linked library">, ModeOpt;
-def c : Flag<["-"], "c">, HelpText<"Emit object file(s)">,
-  Flags<[FrontendOption]>, ModeOpt;
-def emit_object : Flag<["-"], "emit-object">, Alias<c>, Flags<[FrontendOption]>,
-  ModeOpt;
-def S : Flag<["-"], "S">, HelpText<"Emit assembly file(s)">,
-  Flags<[FrontendOption]>, ModeOpt;
-def emit_assembly: Flag<["-"], "emit-assembly">, Alias<S>,
-  Flags<[FrontendOption]>, ModeOpt;
+def emit_object : Flag<["-"], "emit-object">, Flags<[FrontendOption]>,
+  HelpText<"Emit object file(s) (-c)">, ModeOpt;
+def emit_assembly : Flag<["-"], "emit-assembly">, Flags<[FrontendOption]>,
+  HelpText<"Emit assembly file(s) (-S)">, ModeOpt;
+def emit_bc : Flag<["-"], "emit-bc">,
+  HelpText<"Emit LLVM BC file(s)">, Flags<[FrontendOption]>, ModeOpt;
+def emit_ir : Flag<["-"], "emit-ir">,
+  HelpText<"Emit LLVM IR file(s)">, Flags<[FrontendOption]>, ModeOpt;
 def emit_sil : Flag<["-"], "emit-sil">, HelpText<"Emit canonical SIL file(s)">,
   Flags<[FrontendOption]>, ModeOpt;
 def emit_silgen : Flag<["-"], "emit-silgen">, HelpText<"Emit raw SIL file(s)">,
   Flags<[FrontendOption]>, ModeOpt;
-def emit_ir : Flag<["-"], "emit-ir">,
-  HelpText<"Emit LLVM IR file(s)">, Flags<[FrontendOption]>, ModeOpt;
-def emit_bc : Flag<["-"], "emit-bc">,
-  HelpText<"Emit LLVM BC file(s)">, Flags<[FrontendOption]>, ModeOpt;
+
+def c : Flag<["-"], "c">, Alias<emit_object>, Flags<[FrontendOption]>, ModeOpt;
+def S: Flag<["-"], "S">, Alias<emit_assembly>, Flags<[FrontendOption]>, ModeOpt;
 
 // No Output Modes
 def parse : Flag<["-"], "parse">, HelpText<"Parse input file(s)">,
@@ -304,16 +305,16 @@ def Xcc : Separate<["-"], "Xcc">, Flags<[DriverOption, FrontendOption]>,
 
 def Xllvm : Separate<["-"], "Xllvm">, Flags<[DriverOption, FrontendOption]>,
   MetaVarName<"<arg>">,
-  HelpText<"Pass <arg> to llvm.">;
+  HelpText<"Pass <arg> to LLVM.">;
 
 def resource_dir : Separate<["-"], "resource-dir">,
   Flags<[DriverOption, FrontendOption, HelpHidden]>,
   MetaVarName<"</usr/lib/swift>">,
   HelpText<"The directory that holds the compiler resource files">;
 
-def target : Joined<["--"], "target=">, Flags<[DriverOption, FrontendOption]>,
+def target : Separate<["-"], "target">, Flags<[DriverOption, FrontendOption]>,
   HelpText<"Generate code for the given target">;
-def target_legacy_spelling : Separate<["-"], "target">,
+def target_legacy_spelling : Joined<["--"], "target=">,
   Flags<[DriverOption, FrontendOption]>, Alias<target>;
 
 def target_cpu : Separate<["-"], "target-cpu">,

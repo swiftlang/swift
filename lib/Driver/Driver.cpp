@@ -588,7 +588,7 @@ bool Driver::handleImmediateArgs(const ArgList &Args, const ToolChain &TC) {
     return false;
   }
 
-  if (Args.hasArg(options::OPT__version)) {
+  if (Args.hasArg(options::OPT_version)) {
     // Follow gcc/clang behavior and use stdout for --version and stderr for -v.
     printVersion(TC, llvm::outs());
     return false;
