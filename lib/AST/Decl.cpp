@@ -2662,6 +2662,17 @@ ObjCSelector FuncDecl::getObjCSelector() const {
   scratch += firstPiece.str();
   auto firstName = argNames[0];
   if (!firstName.empty()) {
+    // If we're inferring with and the first argument name doesn't start with
+    // a preposition, and the method name doesn't end with a preposition, add
+    // "with".
+    if (ctx.LangOpts.ImplicitObjCWith &&
+        getPrepositionKind(camel_case::getFirstWord(firstName.str()))
+          == PK_None &&
+        getPrepositionKind(camel_case::getLastWord(firstPiece.str()))
+          == PK_None) {
+      camel_case::appendSentenceCase(scratch, "With");
+    }
+
     camel_case::appendSentenceCase(scratch, firstName.str());
     firstPiece = ctx.getIdentifier(scratch);
     didStringManipulation = true;

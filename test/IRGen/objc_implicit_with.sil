@@ -2,6 +2,8 @@
 // RUN: %swift -target x86_64-apple-darwin10 -module-cache-path %t/clang-module-cache -sdk %S/Inputs -I=%S/Inputs -implicit-objc-with -enable-source-import %s -emit-ir | FileCheck %s
 
 // CHECK: @"\01L_selector_data(initWithRed:green:blue:)"
+// CHECK: @"\01L_selector_data(colorWithRed:green:blue:)"
+// CHECK: @"\01L_selector_data(otherColorForRed:green:blue:)"
 
 sil_stage raw
 
@@ -11,6 +13,8 @@ import gizmo
 
 class SwiftGizmo : Gizmo {
   init(red: Float, green: Float, blue: Float) { }
+  func color(`red: Float, green: Float, blue: Float)
+  func otherColorFor(`red: Float, green: Float, blue: Float)
 }
 
 sil @_TToFC18objc_implicit_with10SwiftGizmocfMS0_FT3redSf5greenSf4blueSf_S0_ : $@cc(objc_method) @thin (Float, Float, Float, @owned SwiftGizmo) -> @owned SwiftGizmo {
@@ -26,4 +30,14 @@ bb0(%0 : $Int, %1 : $SwiftGizmo):
 sil @_TToFC18objc_implicit_with10SwiftGizmocfMS0_FT_S0_ : $@cc(objc_method) @thin (@owned SwiftGizmo) -> @owned SwiftGizmo {
 bb0(%0 : $SwiftGizmo):
   return %0 : $SwiftGizmo
+}
+
+sil @_TToFC18objc_implicit_with10SwiftGizmo5colorfS0_FT3redSf5greenSf4blueSf_T_ : $@cc(objc_method) @thin (Float, Float, Float, @owned SwiftGizmo) -> @owned SwiftGizmo {
+bb0(%0 : $Float, %1 : $Float, %2 : $Float, %3 : $SwiftGizmo):
+  return %3 : $SwiftGizmo
+}
+
+sil @_TToFC18objc_implicit_with10SwiftGizmo13otherColorForfS0_FT3redSf5greenSf4blueSf_T_ : $@cc(objc_method) @thin (Float, Float, Float, @owned SwiftGizmo) -> @owned SwiftGizmo {
+bb0(%0 : $Float, %1 : $Float, %2 : $Float, %3 : $SwiftGizmo):
+  return %3 : $SwiftGizmo
 }
