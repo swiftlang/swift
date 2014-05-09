@@ -1444,6 +1444,7 @@ public:
       Indent += 2;
       OS.indent(Indent) << "(capture '" << capture.Var->getName().str()
                         << "'\n";
+      printRec(capture.Var);
       printRec(capture.Init);
       Indent -= 2;
     }

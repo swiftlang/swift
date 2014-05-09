@@ -1088,19 +1088,19 @@ ERROR(dot_protocol_on_non_existential,sema_tct,none,
 
 // Ownership
 ERROR(invalid_ownership_decl,attribute_parsing,none,
-      "'%select{strong|weak|unowned}0' attribute only applies to 'var' "
-      "declarations", (unsigned))
+      "'%select{strong|weak|unowned}0' only applies to 'var' declarations",
+      (unsigned))
 ERROR(invalid_ownership_type,attribute_parsing,none,
-      "'%select{strong|weak|unowned}0' attribute cannot be applied to "
+      "'%select{strong|weak|unowned}0' cannot be applied to "
       "non-class type %1", (unsigned, Type))
 ERROR(invalid_ownership_opaque_type,attribute_parsing,none,
-      "'%select{strong|weak|unowned}0' attribute cannot be applied to "
+      "'%select{strong|weak|unowned}0' cannot be applied to "
       "non-class type %1; consider adding a class bound", (unsigned, Type))
 ERROR(invalid_weak_ownership_not_optional,attribute_parsing,none,
-      "'weak' variable should have Optional type %0", (Type))
+      "'weak' variable should have optional type %0", (Type))
 ERROR(invalid_weak_ownership_unchecked_optional,attribute_parsing,none,
-      "'weak' variable cannot have implicitly unwrapped optional type %0; did you mean "
-      "'unowned'?", (Type))
+      "'weak' variable cannot have implicitly unwrapped optional type %0; did"
+      " you mean 'unowned'?", (Type))
 
 // requires_stored_property_inits
 ERROR(requires_stored_property_inits_nonclass,attribute_parsing,none,
