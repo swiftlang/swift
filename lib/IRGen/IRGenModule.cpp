@@ -388,6 +388,19 @@ llvm::Constant *IRGenModule::getSize(Size size) {
   return llvm::ConstantInt::get(SizeTy, size.getValue());
 }
 
+static StringRef encodeForceLoadSymbolName(llvm::SmallVectorImpl<char> &buf,
+                                           StringRef name) {
+  llvm::raw_svector_ostream os{buf};
+  os << "_swift_FORCE_LOAD_$";
+  if (clang::isValidIdentifier(name)) {
+    os << "_" << name;
+  } else {
+    for (auto c : name)
+      os.write_hex(static_cast<uint8_t>(c));
+  }
+  return os.str();
+}
+
 void IRGenModule::addLinkLibrary(const LinkLibrary &linkLib) {
   llvm::LLVMContext &ctx = Module.getContext();
 
@@ -410,6 +423,22 @@ void IRGenModule::addLinkLibrary(const LinkLibrary &linkLib) {
     AutolinkEntries.push_back(llvm::MDNode::get(ctx, args));
     break;
   }
+
+  if (linkLib.shouldForceLoad()) {
+    llvm::SmallString<64> buf;
+    encodeForceLoadSymbolName(buf, linkLib.getName());
+    auto symbolAddr = Module.getOrInsertGlobal(buf.str(), Int1Ty);
+
+    buf += "_$_";
+    buf += Opts.ModuleName;
+
+    if (!Module.getGlobalVariable(buf.str())) {
+      (void)new llvm::GlobalVariable(Module, symbolAddr->getType(),
+                                     /*constant=*/true,
+                                     llvm::GlobalAlias::LinkOnceAnyLinkage,
+                                     symbolAddr, buf.str());
+    }
+  }
 }
 
 // FIXME: This should just be the implementation of
@@ -423,19 +452,6 @@ static int pointerPODSortComparator(T * const *lhs, T * const *rhs) {
   if (lt(*rhs, *lhs))
     return -1;
   return 0;
-}
-
-static StringRef encodeForceLoadSymbolName(llvm::SmallVectorImpl<char> &buf,
-                                           StringRef name) {
-  llvm::raw_svector_ostream os{buf};
-  os << "_swift_FORCE_LOAD_$";
-  if (clang::isValidIdentifier(name)) {
-    os << "_" << name;
-  } else {
-    for (auto c : name)
-      os.write_hex(static_cast<uint8_t>(c));
-  }
-  return os.str();
 }
 
 void IRGenModule::emitAutolinkInfo() {

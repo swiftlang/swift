@@ -424,8 +424,9 @@ static void flattenImportPath(const Module::ImportedModule &import,
 }
 
 void Serializer::writeInputFiles(FilenamesTy inputFiles,
+                                 StringRef importedHeader,
                                  StringRef moduleLinkName,
-                                 StringRef importedHeader) {
+                                 bool autolinkForceLoad) {
   BCBlockRAII restoreBlock(Out, INPUT_BLOCK_ID, 3);
   input_block::SourceFileLayout SourceFile(Out);
   input_block::ImportedModuleLayout ImportedModule(Out);
@@ -480,7 +481,7 @@ void Serializer::writeInputFiles(FilenamesTy inputFiles,
 
   if (!moduleLinkName.empty()) {
     LinkLibrary.emit(ScratchRecord, serialization::LibraryKind::Library,
-                     moduleLinkName);
+                     autolinkForceLoad, moduleLinkName);
   }
 }
 
@@ -2841,9 +2842,9 @@ Serializer::Serializer(const unsigned char (&signature)[N],
 
 void Serializer::writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
                                const SILModule *SILMod, bool serializeAllSIL,
-                               FilenamesTy inputFiles,
+                               FilenamesTy inputFiles, StringRef importedHeader,
                                StringRef moduleLinkName,
-                               StringRef importedHeader) {
+                               bool autolinkForceLoad) {
   Serializer S{MODULE_SIGNATURE, DC};
 
   // FIXME: This is only really needed for debugging. We don't actually use it.
@@ -2852,7 +2853,8 @@ void Serializer::writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
   {
     BCBlockRAII moduleBlock(S.Out, MODULE_BLOCK_ID, 2);
     S.writeHeader();
-    S.writeInputFiles(inputFiles, moduleLinkName, importedHeader);
+    S.writeInputFiles(inputFiles, importedHeader, moduleLinkName,
+                      autolinkForceLoad);
     S.writeSIL(SILMod, serializeAllSIL);
     S.writeAST(DC);
   }
@@ -2883,8 +2885,8 @@ void Serializer::writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC) {
 void swift::serialize(ModuleOrSourceFile DC, const char *outputPath,
                       const char *docOutputPath,
                       const SILModule *M, bool serializeAllSIL,
-                      FilenamesTy inputFiles, StringRef moduleLinkName,
-                      StringRef importedHeader) {
+                      FilenamesTy inputFiles, StringRef importedHeader,
+                      StringRef moduleLinkName, bool autolinkForceLoad) {
   assert(outputPath && outputPath[0] != '\0');
 
   std::string errorInfo;
@@ -2898,7 +2900,7 @@ void swift::serialize(ModuleOrSourceFile DC, const char *outputPath,
   }
 
   Serializer::writeToStream(out, DC, M, serializeAllSIL, inputFiles,
-                            moduleLinkName, importedHeader);
+                            importedHeader, moduleLinkName, autolinkForceLoad);
 
   if (docOutputPath && docOutputPath[0] != '\0') {
     std::string errorInfo;

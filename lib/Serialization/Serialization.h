@@ -176,8 +176,8 @@ private:
 
   /// Writes the dependencies used to build this module: its imported
   /// modules and its source files.
-  void writeInputFiles(FilenamesTy inputFiles, StringRef moduleLinkName,
-                       StringRef importedHeader);
+  void writeInputFiles(FilenamesTy inputFiles, StringRef importedHeader,
+                       StringRef moduleLinkName, bool autolinkForceLoad);
 
   /// Writes the given pattern, recursively.
   void writePattern(const Pattern *pattern);
@@ -286,8 +286,8 @@ public:
   /// Serialize a module to the given stream.
   static void writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
                             const SILModule *M, bool serializeAllSIL,
-                            FilenamesTy inputFiles, StringRef moduleLinkName,
-                            StringRef importedHeader);
+                            FilenamesTy inputFiles, StringRef importedHeader,
+                            StringRef moduleLinkName, bool autolinkForceLoad);
 
   /// Serialize module documentation to the given stream.
   static void writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC);

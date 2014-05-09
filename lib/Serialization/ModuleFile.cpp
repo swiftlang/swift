@@ -586,9 +586,11 @@ ModuleFile::ModuleFile(
         }
         case input_block::LINK_LIBRARY: {
           uint8_t rawKind;
-          input_block::ImportedModuleLayout::readRecord(scratch, rawKind);
+          bool shouldForceLink;
+          input_block::LinkLibraryLayout::readRecord(scratch, rawKind,
+                                                     shouldForceLink);
           if (auto libKind = getActualLibraryKind(rawKind))
-            LinkLibraries.push_back({blobData, *libKind});
+            LinkLibraries.push_back({blobData, *libKind, shouldForceLink});
           // else ignore the dependency...it'll show up as a linker error.
           break;
         }

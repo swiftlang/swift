@@ -160,8 +160,9 @@ namespace swift {
                  const SILModule *M = nullptr,
                  bool serializeAllSIL = false,
                  ArrayRef<std::string> inputFilenames = {},
+                 StringRef importedHeader = {},
                  StringRef moduleLinkName = {},
-                 StringRef importedHeader = {});
+                 bool autolinkForceLoad = false);
 
   /// Turn the given Swift module into either LLVM IR or native code
   /// and return the generated LLVM IR module.

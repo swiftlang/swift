@@ -31,13 +31,18 @@ enum class LibraryKind {
 class LinkLibrary {
 private:
   std::string Name;
-  LibraryKind Kind;
+  unsigned Kind : 1;
+  unsigned ForceLoad : 1;
 
 public:
-  LinkLibrary(StringRef N, LibraryKind K) : Name(N), Kind(K) {}
+  LinkLibrary(StringRef N, LibraryKind K, bool forceLoad = false)
+    : Name(N), Kind(static_cast<unsigned>(K)), ForceLoad(forceLoad) {
+    assert(getKind() == K && "not enough bits for the kind");
+  }
 
-  LibraryKind getKind() const { return Kind; }
+  LibraryKind getKind() const { return static_cast<LibraryKind>(Kind); }
   StringRef getName() const { return Name; }
+  bool shouldForceLoad() const { return ForceLoad; }
 };
 
 } // end namespace swift

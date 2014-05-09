@@ -100,6 +100,8 @@ static void addCommonFrontendArgs(const ToolChain &TC,
   inputArgs.AddLastArg(arguments, options::OPT_module_cache_path);
   inputArgs.AddLastArg(arguments, options::OPT_enable_app_extension);
   inputArgs.AddLastArg(arguments, options::OPT_import_objc_header);
+  inputArgs.AddLastArg(arguments, options::OPT_module_link_name);
+  inputArgs.AddLastArg(arguments, options::OPT_autolink_force_load);
 
   // Pass through the values passed to -Xfrontend.
   inputArgs.AddAllArgValues(arguments, options::OPT_Xfrontend);
@@ -260,12 +262,7 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
 
   addCommonFrontendArgs(getToolChain(), OI, Output.get(), Args, Arguments);
 
-  Args.AddLastArg(Arguments, options::OPT_module_link_name);
   Args.AddLastArg(Arguments, options::OPT_import_underlying_module);
-
-  // FIXME: Warn if -module-link-name is not present.
-  Args.AddLastArg(Arguments, options::OPT_autolink_force_load);
-
   Args.AddLastArg(Arguments, options::OPT_split_objc_selectors);
   Args.AddLastArg(Arguments, options::OPT_implicit_objc_with);
   Args.AddLastArg(Arguments, options::OPT_strict_keyword_arguments);

@@ -190,7 +190,8 @@ static bool performCompile(CompilerInstance &Instance,
       serialize(DC, opts.ModuleOutputPath.c_str(),
                 opts.ModuleDocOutputPath.c_str(), SM.get(),
                 opts.SILSerializeAll, opts.InputFilenames,
-                opts.ModuleLinkName, opts.ImplicitObjCHeaderPath);
+                opts.ImplicitObjCHeaderPath, opts.ModuleLinkName,
+                !IRGenOpts.ForceLoadSymbolName.empty());
 
     if (Action == FrontendOptions::EmitModuleOnly)
       return false;
