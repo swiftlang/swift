@@ -350,6 +350,11 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   Expr *visitClosureExpr(ClosureExpr *expr) {
+    for (auto c : expr->getCaptureList()) {
+      if (doIt(c.Var) || doIt(c.Init))
+        return nullptr;
+    }
+
     if (Pattern *Pat = doIt(expr->getParams()))
       expr->setParams(Pat);
     else

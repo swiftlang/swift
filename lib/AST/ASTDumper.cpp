@@ -1435,20 +1435,22 @@ public:
 
   void visitClosureExpr(ClosureExpr *expr) {
     printClosure(expr, "closure_expr");
+    if (expr->hasSingleExpressionBody())
+      OS << " single-expression";
+    OS << '\n';
 
-    auto captures = expr->getCaptureList();
-    if (!captures.empty()) {
-      OS << " capturelist=" << captures[0].Var->getName().str();
-      for (const auto &elt : captures.slice(1))
-        OS << ',' << elt.Var->getName().str();
+
+    for (auto capture : expr->getCaptureList()) {
+      Indent += 2;
+      OS.indent(Indent) << "(capture '" << capture.Var->getName().str()
+                        << "'\n";
+      printRec(capture.Init);
+      Indent -= 2;
     }
 
-
     if (expr->hasSingleExpressionBody()) {
-      OS << " single-expression\n";
       printRec(expr->getSingleExpressionBody());
     } else {
-      OS << '\n';
       printRec(expr->getBody());
     }
     OS << ')';

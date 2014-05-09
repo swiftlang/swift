@@ -409,48 +409,14 @@ namespace {
   public:
     PreCheckExpression(TypeChecker &tc, DeclContext *dc) : TC(tc), DC(dc) { }
 
+    bool walkToClosureExprPre(ClosureExpr *expr);
+
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
       // For closures, type-check the patterns and result type as written,
       // but do not walk into the body. That will be type-checked after
       // we've determine the complete function type.
-      if (auto closure = dyn_cast<ClosureExpr>(expr)) {
-        // Validate the parameters.
-        TypeResolutionOptions options;
-        options |= TR_AllowUnspecifiedTypes;
-        options |= TR_AllowUnboundGenerics;
-        options |= TR_ImmediateFunctionInput;
-        bool hadParameterError = false;
-        if (TC.typeCheckPattern(closure->getParams(), DC, options)) {
-          expr->setType(ErrorType::get(TC.Context));
-          
-          // If we encounter an error validating the parameter list, don't bail.
-          // Instead, go on to validate any potential result type, and bail
-          // afterwards.  This allows for better diagnostics, and keeps the
-          // closure expression type well-formed.
-          hadParameterError = true;
-        }
-
-        // Validate the result type, if present.
-        if (closure->hasExplicitResultType() &&
-            TC.validateType(closure->getExplicitResultTypeLoc(), DC)) {
-          expr->setType(ErrorType::get(TC.Context));
-          return { false, expr };
-        }
-        
-        if (hadParameterError)
-          return { false, expr };
-        
-        // If the closure has a multi-statement body, we don't walk into it
-        // here.
-        if (!closure->hasSingleExpressionBody())
-          return { false, expr };
-
-        // Update the current DeclContext to be the closure we're about to
-        // recurse into.
-        assert(DC == closure->getParent() && "Decl context isn't correct");
-        DC = closure;
-        return { true, expr };
-      }
+      if (auto closure = dyn_cast<ClosureExpr>(expr))
+        return { walkToClosureExprPre(closure), expr };
 
       if (auto unresolved = dyn_cast<UnresolvedDeclRefExpr>(expr))
         return { true, BindName(unresolved, DC, TC) };
@@ -514,6 +480,57 @@ namespace {
     /// type names.
     TypeExpr *simplifyTypeExpr(Expr *E);
   };
+}
+
+/// Perform prechecking of a ClosureExpr before we dive into it.  This returns
+/// true for single-expression closures, where we want the body to be considered
+/// part of this larger expression.
+bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
+  // Validate the capture list.
+  for (auto capture : closure->getCaptureList()) {
+    TC.typeCheckDecl(capture.Var, true);
+    TC.typeCheckDecl(capture.Var, false);
+
+    TC.typeCheckDecl(capture.Init, true);
+    TC.typeCheckDecl(capture.Init, false);
+  }
+
+  // Validate the parameters.
+  TypeResolutionOptions options;
+  options |= TR_AllowUnspecifiedTypes;
+  options |= TR_AllowUnboundGenerics;
+  options |= TR_ImmediateFunctionInput;
+  bool hadParameterError = false;
+  if (TC.typeCheckPattern(closure->getParams(), DC, options)) {
+    closure->setType(ErrorType::get(TC.Context));
+
+    // If we encounter an error validating the parameter list, don't bail.
+    // Instead, go on to validate any potential result type, and bail
+    // afterwards.  This allows for better diagnostics, and keeps the
+    // closure expression type well-formed.
+    hadParameterError = true;
+  }
+
+  // Validate the result type, if present.
+  if (closure->hasExplicitResultType() &&
+      TC.validateType(closure->getExplicitResultTypeLoc(), DC)) {
+    closure->setType(ErrorType::get(TC.Context));
+    return false;
+  }
+
+  if (hadParameterError)
+    return false;
+
+  // If the closure has a multi-statement body, we don't walk into it
+  // here.
+  if (!closure->hasSingleExpressionBody())
+    return false;
+
+  // Update the current DeclContext to be the closure we're about to
+  // recurse into.
+  assert(DC == closure->getParent() && "Decl context isn't correct");
+  DC = closure;
+  return true;
 }
 
 /// Simplify expressions which are type sugar productions that got parsed
