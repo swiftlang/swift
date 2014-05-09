@@ -604,6 +604,12 @@ struct GenericSpecializer {
 } // end anonymous namespace.
 
 void GenericSpecializer::collectApplyInst(SILFunction &F) {
+  // Don't collect apply inst from transparent functions since we do not want to
+  // expose shared functions in the mandatory inliner. We will specialize the
+  // relevant callsites after we inline.
+  if (F.isTransparent())
+    return;
+
   // Scan all of the instructions in this function in search of ApplyInsts.
   for (auto &BB : F)
     for (auto &I : BB) {
