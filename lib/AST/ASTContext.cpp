@@ -64,6 +64,9 @@ struct ASTContext::Implementation {
   /// The declaration of Swift.Array<T>.
   NominalTypeDecl *ArrayDecl = nullptr;
 
+  /// The declaration of Swift.Dictionary<T>.
+  NominalTypeDecl *DictionaryDecl = nullptr;
+
   /// The declaration of Swift.Optional<T>.
   EnumDecl *OptionalDecl = nullptr;
 
@@ -452,6 +455,27 @@ NominalTypeDecl *ASTContext::getArrayDecl() const {
     Impl.ArrayDecl = findSyntaxSugarImpl(*this, "Array");
 
   return Impl.ArrayDecl;
+}
+
+NominalTypeDecl *ASTContext::getDictionaryDecl() const {
+  if (!Impl.DictionaryDecl) {
+    // Find all of the declarations with this name in the Swift module.
+    SmallVector<ValueDecl *, 1> results;
+    lookupInSwiftModule("Dictionary", results);
+    for (auto result : results) {
+      if (auto nominal = dyn_cast<NominalTypeDecl>(result)) {
+        if (auto params = nominal->getGenericParams()) {
+          if (params->size() == 2) {
+            Impl.DictionaryDecl = nominal;
+            break;
+          }
+        }
+      }
+    }
+
+  }
+
+  return Impl.DictionaryDecl;
 }
 
 EnumDecl *ASTContext::getOptionalDecl() const {

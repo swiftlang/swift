@@ -2122,6 +2122,48 @@ bool TypeChecker::isRepresentableInObjC(const DeclContext *DC, Type T) {
     return true;
   }
 
+  // Dictionary<K, V> is representable when K is a class inheriting from
+  // NSObject and V is something compatible with AnyObject.
+  if (Context.LangOpts.ObjCBridgeDictionary) {
+    if (auto boundGeneric = T->getAs<BoundGenericType>()) {
+      if (boundGeneric->getDecl() == Context.getDictionaryDecl()) {
+        // The key type must be a class that inherits from NSObject.
+        auto keyType = boundGeneric->getGenericArgs()[0];
+        bool canBridgeKey = false;
+        if (auto keyClassDecl = keyType->getClassOrBoundGenericClass()) {
+          // Check whether keyClassType inherits from NSObject.
+          while (keyClassDecl) {
+            if (keyClassDecl->hasClangNode() &&
+                keyClassDecl->getName().str() == "NSObject") {
+              canBridgeKey = true;
+              break;
+            }
+
+            if (!keyClassDecl->hasSuperclass())
+              break;
+
+            keyClassDecl
+              = keyClassDecl->getSuperclass()->getClassOrBoundGenericClass();
+          }
+        }
+
+        // If we couldn't bridge the key type, we're done.
+        if (!canBridgeKey)
+          return false;
+
+        // The value type must be compatible with AnyObject.
+        auto valueType = boundGeneric->getGenericArgs()[1];
+        bool canBridgeValue = valueType->getClassOrBoundGenericClass() ||
+                              valueType->isClassExistentialType();
+
+        if (!canBridgeValue)
+          return false;
+
+        return true;
+      }
+    }
+  }
+
   // Check to see if this is a bridged type.  Note that some bridged
   // types are representable, but their optional type is not.
   fillObjCRepresentableTypeCache(DC);

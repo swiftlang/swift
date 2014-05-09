@@ -358,6 +358,9 @@ public:
   /// Retrieve the declaration of Swift.Array<T>.
   NominalTypeDecl *getArrayDecl() const;
 
+  /// Retrieve the declaration of Swift.Dictionary<K, V>.
+  NominalTypeDecl *getDictionaryDecl() const;
+
   /// Retrieve the declaration of Swift.Optional<T>.
   EnumDecl *getOptionalDecl() const;
 
