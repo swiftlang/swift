@@ -66,6 +66,7 @@ IDENTIFIER_WITH_NAME(ConvertFromBuiltinExtendedGraphemeClusterLiteral,
                      "_convertFromBuiltinExtendedGraphemeClusterLiteral")
 IDENTIFIER_WITH_NAME(ConvertFromExtendedGraphemeClusterLiteral,
                      "convertFromExtendedGraphemeClusterLiteral")
+IDENTIFIER(ExtendedGraphemeClusterLiteralType)
 IDENTIFIER_WITH_NAME(ConvertFromStringLiteral, "convertFromStringLiteral")
 IDENTIFIER_WITH_NAME(ConvertFromBuiltinUTF16StringLiteral,
                      "_convertFromBuiltinUTF16StringLiteral")

@@ -1295,12 +1295,14 @@ namespace {
 */
 
       ProtocolDecl *builtinProtocol;
+      Identifier literalType;
       Identifier literalFuncName;
       Identifier builtinLiteralFuncName;
       Diag<> brokenProtocolDiag;
       Diag<> brokenBuiltinProtocolDiag;
 
       if (isStringLiteral) {
+        literalType = tc.Context.Id_StringLiteralType;
         literalFuncName = tc.Context.Id_ConvertFromStringLiteral;
 
         // If the type can handle UTF-16 string literals, prefer them.
@@ -1338,6 +1340,7 @@ namespace {
         brokenProtocolDiag = diag::string_literal_broken_proto;
         brokenBuiltinProtocolDiag = diag::builtin_string_literal_broken_proto;
       } else {
+        literalType = tc.Context.Id_ExtendedGraphemeClusterLiteralType;
         literalFuncName =
             tc.Context.Id_ConvertFromExtendedGraphemeClusterLiteral;
         builtinLiteralFuncName =
@@ -1361,7 +1364,7 @@ namespace {
                             type,
                             expr->getType(),
                             protocol,
-                            tc.Context.Id_StringLiteralType,
+                            literalType,
                             literalFuncName,
                             builtinProtocol,
                             TupleType::get(elements, tc.Context),
