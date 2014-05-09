@@ -15,6 +15,7 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/SILUndef.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILPasses/Transforms.h"
 #include "llvm/ADT/STLExtras.h"
@@ -380,6 +381,21 @@ static bool isUserCode(const SILInstruction *I) {
   return false;
 }
 
+static void setOutsideBlockUsesToUndef(SILInstruction *I) {
+  if (I->use_empty())
+      return;
+
+  SILBasicBlock *BB = I->getParent();
+  SILModule &Mod = BB->getModule();
+
+  // Replace all uses outside of I's basic block by undef.
+  llvm::SmallVector<Operand *, 16> Uses(I->use_begin(), I->use_end());
+  for (auto *Use : Uses)
+    if (auto *User = dyn_cast<SILInstruction>(Use->getUser()))
+      if (User->getParent() != BB)
+        Use->set(SILUndef::get(Use->get().getType(), Mod));
+}
+
 static const ApplyInst *getAsCallToNoReturn(const SILInstruction *I,
                                             SILBasicBlock &BB) {
   if (const ApplyInst *AI = dyn_cast<ApplyInst>(I))
@@ -423,6 +439,13 @@ static bool simplifyBlocksWithCallsToNoReturn(SILBasicBlock &BB,
           DiagnosedUnreachableCode = true;
         }
       }
+
+      // We are going to bluntly remove these instructions. Change uses in
+      // different basic blocks to undef. This is safe because all control flow
+      // created by transparent inlining of functions applications after a call
+      // to a 'noreturn' function is control dependent on the call to the
+      // noreturn function and therefore dead.
+      setOutsideBlockUsesToUndef(CurrentInst);
 
       NumInstructionsRemoved++;
       continue;
