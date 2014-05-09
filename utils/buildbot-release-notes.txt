@@ -57,12 +57,20 @@ Latest
     printNumber(separator: ",", radix: 16, number: 256)
                 ~~~~~~~~~~~~~~             ^       ~~~
 
-
-
-
 * ";" can no longer be used to demarkate an empty case in a switch statement,
   use "break" instead.
 
+* `Dictionary` can be bridged to `NSDictionary` and vice versa:
+
+  - `NSDictionary` has an implicit convertion to `Dictionary<NSObject,
+    AnyObject>`.  It bridges in O(1), without memory allocation.
+
+  - `Dictionary<K, V>` has an implicit convertion to `NSDictionary`.
+    `Dictionary<K, V>` bridges to `NSDictionary` iff both `K` and `V` are
+    bridged.  Otherwise, a runtime error is raised.
+
+    Depending on `K` and `V` the operation can be `O(1)` without memory
+    allocation, or `O(N)` with memory allocation.
 
 2014-05-07
 ----------
