@@ -44,6 +44,10 @@
 #define VIRTUAL_ATTR(X) ATTR(X)
 #endif
 
+#ifndef AVAILABILITY_PLATFORM
+#define AVAILABILITY_PLATFORM(X)
+#endif
+
 // Type attributes
 TYPE_ATTR(auto_closure)
 TYPE_ATTR(cc)
@@ -154,6 +158,12 @@ VIRTUAL_ATTR(unowned_unsafe)
 ATTR(weak)
 ATTR(requires_stored_property_inits)
 
+AVAILABILITY_PLATFORM(ios)
+AVAILABILITY_PLATFORM(osx)
+AVAILABILITY_PLATFORM(ios_app_extension)
+AVAILABILITY_PLATFORM(osx_app_extension)
+
+#undef AVAILABILITY_PLATFORM
 #undef VIRTUAL_ATTR
 #undef IB_ATTR
 #undef VIRTUAL_DECL_ATTR

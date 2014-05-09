@@ -491,18 +491,25 @@ public:
 /// Defines the @availability attribute.
 class AvailabilityAttr : public DeclAttribute {
 public:
+  /// Available platforms for the availability attribute.
+  enum PlatformKind {
+    none,
+#define AVAILABILITY_PLATFORM(X) X,
+#include "swift/AST/Attr.def"
+  };
+
   AvailabilityAttr(SourceLoc AtLoc, SourceRange Range,
-                   StringRef Platform,
+                   PlatformKind Platform,
                    StringRef Message,
                    bool IsUnavailable,
                    bool Implicit)
     : DeclAttribute(DAK_availability, AtLoc, Range, Implicit),
-     Platform(Platform),
-     Message(Message),
-     IsUnvailable(IsUnavailable) {}
+      Platform(Platform),
+      Message(Message),
+      IsUnvailable(IsUnavailable) {}
 
   /// The platform of the availability.
-  const StringRef Platform;
+  const PlatformKind Platform;
 
   /// The optional message.
   const StringRef Message;
@@ -513,8 +520,19 @@ public:
   /// Returns true if the availability applies to a specific
   /// platform.
   bool hasPlatform() const {
-    return !Platform.empty();
+    return Platform != PlatformKind::none;
   }
+
+  /// Returns the human-readable string for the specified platform.
+  static StringRef platformString(PlatformKind Platform);
+
+  /// Returns the human-readable string for the platform of the attribute.
+  StringRef platformString() const {
+    return platformString(Platform);
+  }
+
+  /// Returns the PlatformKind for a given string.
+  static Optional<PlatformKind> platformFromString(StringRef);
 
   /// Create an AvailabilityAttr that indicates 'unavailable' for all platforms.
   /// This attribute is considered "implicit".

@@ -22,6 +22,7 @@
 #include "swift/AST/Types.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/ADT/StringSwitch.h"
 
 using namespace swift;
 
@@ -46,7 +47,7 @@ const AvailabilityAttr *DeclAttributes::getUnavailable() const {
   for (auto Attr : *this)
     if (auto AvAttr = dyn_cast<AvailabilityAttr>(Attr)) {
       // FIXME: Unify unavailabilty checking with that in MiscDiagnostics.cpp.
-      if (AvAttr->Platform.empty())
+      if (!AvAttr->hasPlatform())
         if (AvAttr->IsUnvailable)
           return AvAttr;
     }
@@ -122,13 +123,7 @@ void DeclAttribute::print(ASTPrinter &Printer) const {
   case DAK_availability: {
     Printer << "@availability(";
     auto Attr = cast<AvailabilityAttr>(this);
-    if (!Attr->hasPlatform())
-      Printer << "*";
-    else
-      Printer << Attr->Platform;
-
-    Printer << ", unavailable";
-
+    Printer << Attr->platformString() << ", unavailable";
     if (!Attr->Message.empty()) {
       Printer << ", message=\"" << Attr->Message << "\"";
     }
@@ -307,6 +302,28 @@ AvailabilityAttr *
 AvailabilityAttr::createImplicitUnavailableAttr(ASTContext &C,
                                                 StringRef Message) {
   return new (C) AvailabilityAttr(SourceLoc(), SourceRange(),
-                                  "", Message, /* isUnavailable */ true,
+                                  PlatformKind::none, Message,
+                                  /* isUnavailable */ true,
                                   /* isImplicit */ true);
 }
+
+StringRef
+AvailabilityAttr::platformString(AvailabilityAttr::PlatformKind platform) {
+  switch (platform) {
+    case none: return "*";
+#define AVAILABILITY_PLATFORM(X) case X: return #X;
+#include "swift/AST/Attr.def"
+  }
+}
+
+Optional<AvailabilityAttr::PlatformKind>
+AvailabilityAttr::platformFromString(StringRef Name) {
+  if (Name == "*")
+    return PlatformKind::none;
+  return
+    llvm::StringSwitch<Optional<AvailabilityAttr::PlatformKind>>(Name)
+#define AVAILABILITY_PLATFORM(X) .Case(#X, X)
+#include "swift/AST/Attr.def"
+    .Default(Optional<AvailabilityAttr::PlatformKind>());
+}
+

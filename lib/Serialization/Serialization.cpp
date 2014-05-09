@@ -1272,14 +1272,13 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
   case DAK_availability: {
     auto *theAttr = cast<AvailabilityAttr>(DA);
     llvm::SmallString<32> blob;
-    blob.append(theAttr->Platform);
     blob.append(theAttr->Message);
     auto abbrCode = DeclTypeAbbrCodes[AvailabilityDeclAttrLayout::Code];
     AvailabilityDeclAttrLayout::emitRecord(
         Out, ScratchRecord, abbrCode,
         theAttr->isImplicit(),
         theAttr->IsUnvailable,
-        theAttr->Platform.size(),
+        theAttr->Platform,
         theAttr->Message.size(),
         blob);
     return;

@@ -992,7 +992,7 @@ namespace decls_block {
     Availability_DECL_ATTR,
     BCFixed<1>, // implicit flag
     BCFixed<1>, // is unconditionally unavailable?
-    BCVBR<5>,   // number of bytes in platform string
+    BCVBR<5>,   // platform
     BCVBR<5>,   // number of bytes in message string
     BCBlob      // platform, followed by message
   >;

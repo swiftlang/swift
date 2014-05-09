@@ -292,32 +292,16 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     // platform:
     //   *
     //   identifier
-
-    StringRef Platform;
-
-    if (Tok.is(tok::identifier)) {
-      // FIXME: This is a hard coded list probably doesn't belong
-      // here.  Putting here now for bringup.
-      bool IsValid =
-        llvm::StringSwitch<bool>(Tok.getText())
-          .Case("ios", true)
-          .Case("macosx", true)
-          .Case("ios_app_extension", true)
-          .Case("macosx_app_extension", true)
-          .Default(false);
-      if (!IsValid) {
-        diagnose(Loc, diag::attr_availability_unknown_platform,
-                 Tok.getText(), AttrName)
-          .highlight(SourceRange(Tok.getLoc()));
-        return false;
-      }
-      Platform = Tok.getText();
-    }
-    else if (!(Tok.isAnyOperator() && Tok.getText() == "*")) {
+    if (!Tok.is(tok::identifier) &&
+        !(Tok.isAnyOperator() && Tok.getText() == "*")) {
       diagnose(Tok.getLoc(), diag::attr_availability_platform, AttrName)
         .highlight(SourceRange(Tok.getLoc()));
       return false;
     }
+
+    // Delay processing of platform until later, after we have
+    // parsed more of the attribute.
+    StringRef Platform = Tok.getText();
 
     consumeToken();
 
@@ -380,10 +364,20 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       return false;
     }
 
-    if (!DiscardAttribute)
-      Attributes.add(new (Context)
-                     AvailabilityAttr(AtLoc, R, Platform, Message, true,
-                                      /*Implicit=*/false));
+    if (!DiscardAttribute) {
+      auto PlatformKind = AvailabilityAttr::platformFromString(Platform);
+      if (PlatformKind.hasValue()) {
+        Attributes.add(new (Context)
+                       AvailabilityAttr(AtLoc, R, PlatformKind.getValue(),
+                                        Message, true,
+                                        /*Implicit=*/false));
+      }
+      else {
+        diagnose(Loc, diag::attr_availability_unknown_platform,
+                 Platform, AttrName);
+        return false;
+      }
+    }
     break;
   }
 

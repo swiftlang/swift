@@ -1425,15 +1425,14 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       case decls_block::Availability_DECL_ATTR: {
         bool isImplicit;
         bool isUnavailable;
-        unsigned platformSize;
+        unsigned platform;
         unsigned messageSize;
         serialization::decls_block::AvailabilityDeclAttrLayout::readRecord(
-            scratch, isImplicit, isUnavailable, platformSize, messageSize);
-        StringRef platform = blobData.substr(0, platformSize);
-        blobData = blobData.drop_front(platformSize);
+            scratch, isImplicit, isUnavailable, platform, messageSize);
         StringRef message = blobData;
-        Attr = new (ctx) AvailabilityAttr(SourceLoc(), SourceRange(), platform,
-                                          message, isUnavailable, isImplicit);
+        Attr = new (ctx) AvailabilityAttr(SourceLoc(), SourceRange(),
+                                       (AvailabilityAttr::PlatformKind)platform,
+                                       message, isUnavailable, isImplicit);
         break;
       }
 
