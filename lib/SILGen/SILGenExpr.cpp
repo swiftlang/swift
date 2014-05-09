@@ -1521,6 +1521,14 @@ SILValue SILGenFunction::emitUnconditionalCheckedCast(SILLocation loc,
     B.createStore(loc, original, temp);
     original = temp;
   }
+  // If we're casting a thin metatype, make it thick.
+  if (auto metatype = original.getType().getAs<MetatypeType>()) {
+    if (metatype->getRepresentation() == MetatypeRepresentation::Thin) {
+      auto thickTy = CanMetatypeType::get(metatype.getInstanceType(),
+                                          MetatypeRepresentation::Thick);
+      original = B.createMetatype(loc, SILType::getPrimitiveObjectType(thickTy));
+    }
+  }
   
   // Get the cast destination type at the least common denominator abstraction
   // level.
@@ -1544,6 +1552,16 @@ SILGenFunction::emitCheckedCastAbstractionChange(SILLocation loc,
                                        SILValue original,
                                        const TypeLowering &origTL,
                                        ArrayRef<const TypeLowering *> castTLs) {
+  // If we're casting a thin metatype, make it thick.
+  if (auto metatype = original.getType().getAs<MetatypeType>()) {
+    if (metatype->getRepresentation() == MetatypeRepresentation::Thin) {
+      auto thickTy = CanMetatypeType::get(metatype.getInstanceType(),
+                                          MetatypeRepresentation::Thick);
+      return B.createMetatype(loc, SILType::getPrimitiveObjectType(thickTy));
+    }
+    return original;
+  }
+  
   // If the original type is already address-only, we don't need to abstract
   // further.
   if (origTL.isAddressOnly()) {
@@ -1570,11 +1588,14 @@ SILGenFunction::emitCheckedCastBranch(SILLocation loc,
                                       const TypeLowering &origLowering,
                                       const TypeLowering &castLowering,
                                       CheckedCastKind kind) {
-  // Spill to a temporary if casting from loadable to address-only.
+  // Spill to a temporary if casting from loadable to address-only or from
+  // metatype to metatype.
   if (origLowering.isLoadable() && castLowering.isAddressOnly()) {
     assert(originalAbstracted && "no abstracted value for cast");
     original = originalAbstracted;
   }
+  if (original.getType().is<MetatypeType>())
+    original = originalAbstracted;
   
   // Get the cast destination type at the least common denominator abstraction
   // level.
