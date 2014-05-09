@@ -668,31 +668,6 @@ private:
     return specialization;
   }
   
-  std::string demangleOperator() {
-    static const char op_char_table[] = "& @/= >    <*!|+ %-~   ^ .";
-    Node::IndexType length;
-    if (demangleNatural(length)) {
-      if (Mangled.hasAtLeast(length)) {
-        std::string op_base = Mangled.slice(length);
-        Mangled.advanceOffset(length);
-        DemanglerPrinter op;
-        size_t op_base_size = op_base.size();
-        for (size_t idx = 0; idx < op_base_size; ++idx) {
-          char c = op_base[idx];
-          if (c < 'a' || c > 'z')
-            return "";
-          char o = op_char_table[c - 'a'];
-          if (o == ' ')
-            return "";
-          op << o;
-        }
-        return op.str();
-      } else
-        return "";
-    }
-    return "";
-  }
-
   NodePointer demangleDeclName() {
     // decl-name ::= local-decl-name
     // local-decl-name ::= 'L' index identifier
