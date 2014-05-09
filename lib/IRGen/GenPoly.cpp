@@ -221,6 +221,7 @@ namespace {
     }
 
     bool visitLeafType(CanType origTy, CanType substTy) {
+      if (origTy == substTy) return false;
       // The check in visit should make this impossible.
       llvm_unreachable("difference with leaf types");
     }
