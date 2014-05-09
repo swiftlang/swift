@@ -151,6 +151,9 @@ def module_link_name : Separate<["-"], "module-link-name">,
   HelpText<"Library to link against when using this module">;
 def module_link_name_EQ : Joined<["-"], "module-link-name=">,
   Flags<[FrontendOption]>, Alias<module_link_name>;
+def autolink_force_load : Flag<["-"], "autolink-force-load">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Force ld to link against this module even if no symbols are used">;
 
 def emit_module : Flag<["-"], "emit-module">, Flags<[FrontendOption]>,
   HelpText<"Emit an importable module">;

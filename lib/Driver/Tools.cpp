@@ -263,6 +263,9 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
   Args.AddLastArg(Arguments, options::OPT_module_link_name);
   Args.AddLastArg(Arguments, options::OPT_import_underlying_module);
 
+  // FIXME: Warn if -module-link-name is not present.
+  Args.AddLastArg(Arguments, options::OPT_autolink_force_load);
+
   Args.AddLastArg(Arguments, options::OPT_split_objc_selectors);
   Args.AddLastArg(Arguments, options::OPT_implicit_objc_with);
   Args.AddLastArg(Arguments, options::OPT_strict_keyword_arguments);

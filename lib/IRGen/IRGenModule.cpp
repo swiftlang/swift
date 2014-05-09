@@ -20,6 +20,7 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "clang/AST/ASTContext.h"
+#include "clang/Basic/CharInfo.h"
 #include "clang/Basic/TargetInfo.h"
 #include "clang/CodeGen/CodeGenABITypes.h"
 #include "clang/CodeGen/ModuleBuilder.h"
@@ -424,6 +425,19 @@ static int pointerPODSortComparator(T * const *lhs, T * const *rhs) {
   return 0;
 }
 
+static StringRef encodeForceLoadSymbolName(llvm::SmallVectorImpl<char> &buf,
+                                           StringRef name) {
+  llvm::raw_svector_ostream os{buf};
+  os << "_swift_FORCE_LOAD_$";
+  if (clang::isValidIdentifier(name)) {
+    os << "_" << name;
+  } else {
+    for (auto c : name)
+      os.write_hex(static_cast<uint8_t>(c));
+  }
+  return os.str();
+}
+
 void IRGenModule::emitAutolinkInfo() {
   // FIXME: This constant should be vended by LLVM somewhere.
   static const char * const LinkerOptionsFlagName = "Linker Options";
@@ -437,6 +451,15 @@ void IRGenModule::emitAutolinkInfo() {
   llvm::LLVMContext &ctx = Module.getContext();
   Module.addModuleFlag(llvm::Module::AppendUnique, LinkerOptionsFlagName,
                        llvm::MDNode::get(ctx, AutolinkEntries));
+
+  if (!Opts.ForceLoadSymbolName.empty()) {
+    llvm::SmallString<64> buf;
+    encodeForceLoadSymbolName(buf, Opts.ForceLoadSymbolName);
+    (void)new llvm::GlobalVariable(Module, Int1Ty, /*constant=*/true,
+                                   llvm::GlobalVariable::LinkOnceAnyLinkage,
+                                   llvm::Constant::getNullValue(Int1Ty),
+                                   buf.str());
+  }
 }
 
 void IRGenModule::finalize() {

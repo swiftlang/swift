@@ -858,6 +858,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.EnableDynamicValueTypeLayout = true;
   }
 
+  if (Args.hasArg(OPT_autolink_force_load))
+    Opts.ForceLoadSymbolName = Args.getLastArgValue(OPT_module_link_name);
+
   if (const Arg *A = Args.getLastArg(OPT_target)) {
     Opts.Triple = llvm::Triple::normalize(A->getValue());
   }

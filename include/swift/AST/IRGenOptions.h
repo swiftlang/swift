@@ -59,6 +59,10 @@ public:
   /// The libraries and frameworks specified on the command line.
   SmallVector<LinkLibrary, 4> LinkLibraries;
 
+  /// If non-empty, the (unmangled) name of a dummy symbol to emit that can be
+  /// used to force-load this module.
+  std::string ForceLoadSymbolName;
+
   /// The kind of compilation we should do.
   IRGenOutputKind OutputKind : 3;
 
@@ -87,7 +91,7 @@ public:
   /// \brief Whether we should omit dynamic safety checks from the emitted IR.
   unsigned DisableAllRuntimeChecks : 1;
 
-  // Disable frame pointer elimination?
+  /// Disable frame pointer elimination?
   unsigned DisableFPElim : 1;
 
   IRGenOptions() : OutputKind(IRGenOutputKind::LLVMAssembly), Verify(true),
