@@ -47,8 +47,8 @@ namespace {
     NameBinder(SourceFile &SF) : SF(SF), Context(SF.getASTContext()) {}
 
     template<typename ...ArgTypes>
-    InFlightDiagnostic diagnose(ArgTypes... Args) {
-      return Context.Diags.diagnose(Args...);
+    InFlightDiagnostic diagnose(ArgTypes &&...Args) {
+      return Context.Diags.diagnose(std::forward<ArgTypes>(Args)...);
     }
     
     Optional<std::pair<ImportedModule, bool>> addImport(ImportDecl *ID);

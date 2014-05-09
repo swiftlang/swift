@@ -301,8 +301,8 @@ public:
   LangOptions &getLangOpts() const { return Context.LangOpts; }
   
   template<typename ...ArgTypes>
-  InFlightDiagnostic diagnose(ArgTypes... Args) {
-    return Diags.diagnose(Args...);
+  InFlightDiagnostic diagnose(ArgTypes &&...Args) {
+    return Diags.diagnose(std::forward<ArgTypes>(Args)...);
   }
 
   Type getArraySliceType(SourceLoc loc, Type elementType);

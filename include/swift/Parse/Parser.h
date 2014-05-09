@@ -447,14 +447,15 @@ public:
 
   template<typename ...DiagArgTypes, typename ...ArgTypes>
   InFlightDiagnostic diagnose(SourceLoc Loc, Diag<DiagArgTypes...> DiagID,
-                              ArgTypes... Args) {
-    return diagnose(Loc, Diagnostic(DiagID, Args...));
+                              ArgTypes &&...Args) {
+    return diagnose(Loc, Diagnostic(DiagID, std::forward<ArgTypes>(Args)...));
   }
 
   template<typename ...DiagArgTypes, typename ...ArgTypes>
   InFlightDiagnostic diagnose(Token Tok, Diag<DiagArgTypes...> DiagID,
-                              ArgTypes... Args) {
-    return diagnose(Tok.getLoc(), Diagnostic(DiagID, Args...));
+                              ArgTypes &&...Args) {
+    return diagnose(Tok.getLoc(),
+                    Diagnostic(DiagID, std::forward<ArgTypes>(Args)...));
   }
   
   void diagnoseRedefinition(ValueDecl *Prev, ValueDecl *New);

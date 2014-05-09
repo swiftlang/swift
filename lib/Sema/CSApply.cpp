@@ -2647,9 +2647,10 @@ namespace {
       // Check that all value type methods were fully applied.
       auto &tc = cs.getTypeChecker();
       for (auto &unapplied : InvalidPartialApplications) {
+        unsigned kind = unapplied.second.kind;
         tc.diagnose(unapplied.first->getLoc(),
                     diag::partial_application_of_method_invalid,
-                    unapplied.second.kind);
+                    kind);
       }
 
       // We should have complained above if there were any
