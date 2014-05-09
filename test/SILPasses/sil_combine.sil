@@ -418,12 +418,12 @@ enum U {
 }
 
 // CHECK-LABEL: sil @sil_destroyvalue_of_enum
-// CHECK: bb0
+// CHECK: bb0([[TYPE_ARG:%[0-9]+]] : $@thin U.Type, [[CLASS_ARG:%[0-9]+]] : $C):
 // CHECK-NEXT: enum $U, #U.X!enumelt
 // CHECK-NEXT: integer_literal $Builtin.Int64, 32
 // CHECK-NEXT: enum $U, #U.Y!enumelt.1, {{%[0-9]+}} : $Builtin.Int64
 // CHECK-NEXT: [[INVALID_CASE:%[0-9]+]] = enum $U, #U.Z!enumelt.1, {{%[0-9]+}} : $C
-// CHECK-NEXT: release_value [[INVALID_CASE]] : $U
+// CHECK-NEXT: strong_release [[CLASS_ARG]] : $C
 // CHECK-NEXT: tuple ({{%[0-9]+}} : $U, {{%[0-9]+}} : $U, [[INVALID_CASE]] : $U)
 // CHECK-NEXT: return
 //
@@ -446,12 +446,12 @@ bb0(%0 : $@thin U.Type, %1 : $C):
 }
 
 // CHECK-LABEL: sil @sil_copyvalue_of_enum
-// CHECK: bb0
+// CHECK: bb0([[TYPE_ARG:%[0-9]+]] : $@thin U.Type, [[CLASS_ARG:%[0-9]+]] : $C):
 // CHECK-NEXT: enum $U, #U.X!enumelt
 // CHECK-NEXT: integer_literal $Builtin.Int64, 32
 // CHECK-NEXT: enum $U, #U.Y!enumelt.1, {{%[0-9]+}} : $Builtin.Int64
 // CHECK-NEXT: [[INVALID_CASE:%[0-9]+]] = enum $U, #U.Z!enumelt.1, {{%[0-9]+}} : $C
-// CHECK-NEXT: retain_value [[INVALID_CASE]] : $U
+// CHECK-NEXT: strong_retain [[CLASS_ARG]] : $C
 // CHECK-NEXT: tuple ({{%[0-9]+}} : $U, {{%[0-9]+}} : $U, [[INVALID_CASE]] : $U)
 // CHECK-NEXT: return
 //
@@ -1204,4 +1204,23 @@ bb0:
   strong_release %1 : $@callee_owned () -> ()
   %2 = tuple()
   return %2 : $()
+}
+
+// CHECK-LABEL: sil @ref_ops_of_enum_is_equivalent_to_ref_ops_of_payload : $@thin (Builtin.NativeObject) -> FakeOptional<Builtin.NativeObject> {
+// CHECK: bb0
+// CHECK-NEXT: enum
+// CHECK-NEXT: strong_retain
+// CHECK-NEXT: br bb1
+// CHECK: bb1
+// CHECK-NEXT: strong_release
+// CHECK-NEXT: return
+sil @ref_ops_of_enum_is_equivalent_to_ref_ops_of_payload : $@thin (Builtin.NativeObject) -> FakeOptional<Builtin.NativeObject> {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = enum $FakeOptional<Builtin.NativeObject>, #FakeOptional.Some!enumelt.1, %0 : $Builtin.NativeObject
+  retain_value %1 : $FakeOptional<Builtin.NativeObject>
+  br bb1
+  
+bb1:
+  release_value %1 : $FakeOptional<Builtin.NativeObject>
+  return %1 : $FakeOptional<Builtin.NativeObject>
 }

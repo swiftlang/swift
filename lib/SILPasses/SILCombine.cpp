@@ -652,23 +652,31 @@ SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
   return eraseInstFromFunction(*LI);
 }
 
-SILInstruction *SILCombiner::visitReleaseValueInst(ReleaseValueInst *DI) {
-  SILValue Operand = DI->getOperand();
+SILInstruction *SILCombiner::visitReleaseValueInst(ReleaseValueInst *RVI) {
+  SILValue Operand = RVI->getOperand();
   SILType OperandTy = Operand.getType();
 
   // Destroy value of an enum with a trivial payload or no-payload is a no-op.
-  if (auto *EI = dyn_cast<EnumInst>(Operand))
+  if (auto *EI = dyn_cast<EnumInst>(Operand)) {
     if (!EI->hasOperand() ||
         EI->getOperand().getType().isTrivial(EI->getModule()))
-      return eraseInstFromFunction(*DI);
+      return eraseInstFromFunction(*RVI);
+
+    // retain_value of an enum_inst where we know that it has a payload can be
+    // reduced to a retain_value on the payload.
+    if (EI->hasOperand()) {
+      return new (RVI->getModule()) ReleaseValueInst(RVI->getLoc(),
+                                                     EI->getOperand());
+    }
+  }
 
   // ReleaseValueInst of a reference type is a strong_release.
   if (OperandTy.hasReferenceSemantics())
-    return new (DI->getModule()) StrongReleaseInst(DI->getLoc(), Operand);
+    return new (RVI->getModule()) StrongReleaseInst(RVI->getLoc(), Operand);
 
   // ReleaseValueInst of a trivial type is a no-op.
-  if (OperandTy.isTrivial(DI->getModule()))
-    return eraseInstFromFunction(*DI);
+  if (OperandTy.isTrivial(RVI->getModule()))
+    return eraseInstFromFunction(*RVI);
 
   // Do nothing for non-trivial non-reference types.
   return nullptr;
@@ -680,16 +688,23 @@ SILInstruction *SILCombiner::visitRetainValueInst(RetainValueInst *RVI) {
 
   // retain_value of an enum with a trivial payload or no-payload is a no-op +
   // RAUW.
-  if (auto *EI = dyn_cast<EnumInst>(Operand))
+  if (auto *EI = dyn_cast<EnumInst>(Operand)) {
     if (!EI->hasOperand() ||
         EI->getOperand().getType().isTrivial(RVI->getModule())) {
       return eraseInstFromFunction(*RVI);
     }
 
+    // retain_value of an enum_inst where we know that it has a payload can be
+    // reduced to a retain_value on the payload.
+    if (EI->hasOperand()) {
+      return new (RVI->getModule()) RetainValueInst(RVI->getLoc(),
+                                                    EI->getOperand());
+    }
+  }
+
   // RetainValueInst of a reference type is a strong_release.
   if (OperandTy.hasReferenceSemantics()) {
-    Builder->createStrongRetain(RVI->getLoc(), Operand);
-    return eraseInstFromFunction(*RVI);
+    return new (RVI->getModule()) StrongRetainInst(RVI->getLoc(), Operand);
   }
 
   // RetainValueInst of a trivial type is a no-op + use propogation.
