@@ -113,11 +113,13 @@ public:
     if (isOperatorStartCodePoint(C))
       return true;
 
-    // Unicode combining characters.
+    // Unicode combining characters and variation selectors.
     return (C >= 0x0300 && C <= 0x036F)
         || (C >= 0x1DC0 && C <= 0x1DFF)
         || (C >= 0x20D0 && C <= 0x20FF)
-        || (C >= 0xFE20 && C <= 0xFE2F);
+        || (C >= 0xFE00 && C <= 0xFE0F)
+        || (C >= 0xFE20 && C <= 0xFE2F)
+        || (C >= 0xE0100 && C <= 0xE01EF);
   }
   
   void *getAsOpaquePointer() const { return (void *)Pointer; }
