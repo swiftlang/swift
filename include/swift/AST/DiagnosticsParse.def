@@ -561,12 +561,6 @@ ERROR(unsupported_unparenthesized_array_optional,type_parsing,none,
       "%select{|implicitly unwrapped }0optional array type requires "
       "parentheses", (unsigned))
 
-// Dynamic Self
-ERROR(init_expected_self,type_parsing,PointsToFirstBadToken,
-      "initializers can only specify a return type of 'Self'", ())
-ERROR(convenience_init_syntax_change,type_parsing,PointsToFirstBadToken,
-      "convenience initializers are spelled as 'convenience init' now", ())
-
 //------------------------------------------------------------------------------
 // Pattern parsing diagnostics
 //------------------------------------------------------------------------------
