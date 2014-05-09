@@ -14,7 +14,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "llvm/ADT/DenseMap.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/InstrumentsSupport.h"
 #include "swift/Runtime/Heap.h"
@@ -48,6 +47,98 @@ static void _swift_zone_statistics(malloc_zone_t *zone,
 static const AllocIndex badAllocIndex = AllocIndex(-1);
 
 namespace {
+
+void *mmapWrapper(size_t size, bool huge) {
+  int tag = VM_MAKE_TAG(huge ? VM_MEMORY_MALLOC_HUGE : VM_MEMORY_MALLOC_SMALL);
+  return mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_ANON|MAP_PRIVATE, tag, 0);
+}
+
+// HeapMap
+//
+// We need a trivial map that:
+// 1) doesn't use the system allocator
+// 2) is easy to programmatically introspect from outside of the process
+//
+// This is not on the critical path, so it doesn't need to be "perfect".
+//
+template <typename T, size_t (*hash)(const void *)>
+class HeapMap {
+private:
+  std::pair<const void *, T> *nodes;
+  size_t count;
+  size_t mask;
+  size_t bufSize() { return mask + 1; }
+  void grow() {
+    auto oldMask = mask;
+    auto oldNodes = nodes;
+    mask = mask * 2 + 1;
+    nodes = reinterpret_cast<std::pair<const void *, T> *>(
+      mmapWrapper(sizeof(nodes[0]) * bufSize(), false));
+    for (size_t i = 0; i < (oldMask + 1); i++) {
+      if (oldNodes[i].first == nullptr) continue;
+      insert(std::pair<const void *, T>(oldNodes[i].first, oldNodes[i].second));
+      oldNodes[i].second.~T();
+    }
+    int r = munmap(oldNodes, sizeof(oldNodes[0]) * (oldMask + 1));
+    assert(r == 0);
+  }
+public:
+  HeapMap() : count(0), mask(16-1) {
+    nodes = reinterpret_cast<std::pair<const void *, T> *>(
+      mmapWrapper(sizeof(nodes[0]) * bufSize(), false));
+    assert(nodes != nullptr);
+  }
+  ~HeapMap() {
+  }
+  void insert(std::pair<const void *, T> p) {
+    if (size() >= (bufSize() * 3 / 4)) {
+      grow();
+    }
+    size_t i = hash(p.first) & mask;
+    do {
+      if (nodes[i].first == nullptr) {
+        nodes[i].first = p.first;
+        new (&nodes[i].second) T(p.second);
+        ++count;
+        return;
+      }
+    } while (++i < bufSize());
+    for (i = 0; i < bufSize(); i++) {
+      if (nodes[i].first == nullptr) {
+        nodes[i].first = p.first;
+        new (&nodes[i].second) T(p.second);
+        ++count;
+        return;
+      }
+    }
+    abort();
+  }
+  std::pair<const void *, T> *find(const void *key) {
+    size_t i = hash(key) & mask;
+    do {
+      if (nodes[i].first == key) return &nodes[i];
+    } while (++i < bufSize());
+    for (i = 0; i < bufSize(); i++) {
+      if (nodes[i].first == key) return &nodes[i];
+    }
+    return nullptr;
+  }
+  void erase(std::pair<const void *, T> *p) {
+    --count;
+    p->first = nullptr;
+    p->second.~T();
+  }
+  size_t size() const { return count; }
+  T *operator [](const void *key) {
+    return &find(key)->second;
+  }
+  void forEach(std::function<void(const void *, T)> func) {
+    for (size_t i = 0, j = size(); j > 0; j--) {
+      while (nodes[i].first == nullptr) i++;
+      func(nodes[i].first, nodes[i].second);
+    }
+  }
+};
 
 class SwiftZone {
 private:
@@ -117,11 +208,6 @@ const size_t arenaMask =  0xFFFF;
 
 size_t roundToPage(size_t size) {
   return (size + pageMask) & ~pageMask;
-}
-
-void *mmapWrapper(size_t size, bool huge) {
-  int tag = VM_MAKE_TAG(huge ? VM_MEMORY_MALLOC_HUGE : VM_MEMORY_MALLOC_SMALL);
-  return mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_ANON|MAP_PRIVATE, tag, 0);
 }
 
 typedef struct AllocCacheEntry_s {
@@ -227,9 +313,16 @@ void SwiftZone::dealloc_semi_optimized(void *ptr, AllocIndex idx) {
 // !SWIFT_HAVE_FAST_ENTRY_POINTS
 #endif
 
+static size_t arenaHash(const void *pointer) {
+  return (size_t)pointer >> 16;
+}
+static size_t hugeAllocationHash(const void *pointer) {
+  return (size_t)pointer >> 12;
+}
+
 class Arena;
-static llvm::DenseMap<const void *, Arena> arenas;
-static llvm::DenseMap<const void *, size_t> hugeAllocations;
+static HeapMap<Arena, arenaHash> arenas;
+static HeapMap<size_t, hugeAllocationHash> hugeAllocations;
 
 class Arena {
 public:
@@ -311,11 +404,11 @@ size_t swift::_swift_zone_size(malloc_zone_t *zone, const void *pointer) {
   void *ptr = (void *)((unsigned long)pointer & ~arenaMask);
   size_t value = 0;
   auto it = arenas.find(ptr);
-  if (it != arenas.end()) {
+  if (it) {
     value = it->second.byteSize;
   } else {
     auto it2 = hugeAllocations.find(pointer);
-    if (it2 != hugeAllocations.end()) {
+    if (it2) {
       value = it2->second;
     }
   }
@@ -507,7 +600,7 @@ void SwiftZone::slowDealloc_optimized(void *ptr, size_t bytes) {
   AllocIndex idx = sizeToIndex(bytes);
   if (idx == badAllocIndex) {
     auto it2 = hugeAllocations.find(ptr);
-    assert(it2 != hugeAllocations.end());
+    assert(it2);
     int r = munmap(const_cast<void *>(it2->first), it2->second);
     assert(r != -1);
     hugeAllocations.erase(it2);
@@ -564,11 +657,15 @@ void _swift_vm_range_recorder(task_t task, void *, unsigned type,
     /* given a task and context, "records" the specified addresses */
 }
 
+static size_t boolHash(const void *pointer) {
+  return (size_t)pointer;
+}
+
 static void
 enumerateBlocks(std::function<void(const void *, size_t)> func) {
   // XXX switch to a bitmap or a set
   // FIXME scan other threads
-  llvm::DenseMap<const void *, bool> unusedBlocks;
+  HeapMap<bool, boolHash> unusedBlocks;
   for (unsigned i = 0; i < ALLOC_CACHE_COUNT; i++) {
     for (AllocCacheEntry pointer = globalCache[i]; pointer;
          pointer = pointer->next) {
@@ -581,8 +678,7 @@ enumerateBlocks(std::function<void(const void *, size_t)> func) {
   }
 
   SwiftZone::readLock();
-  for (auto &pair : arenas) {
-    Arena &arena = pair.second;
+  arenas.forEach([&](const void *key, Arena arena) {
     size_t count = arenaSize / arena.byteSize;
     for (size_t i = 0; i < count; i += arena.byteSize) {
       auto pointer = (const void *)((uint8_t *)arena.base + i);
@@ -590,10 +686,8 @@ enumerateBlocks(std::function<void(const void *, size_t)> func) {
         func(pointer, arena.byteSize);
       }
     }
-  }
-  for (auto &pair : hugeAllocations) {
-    func(pair.first, pair.second);
-  }
+  });
+  hugeAllocations.forEach(func);
   SwiftZone::readUnlock();
 }
 
@@ -614,9 +708,9 @@ void _swift_zone_statistics(malloc_zone_t *zone,
     }
   });
   statistics->size_allocated = arenas.size() * arenaSize;
-  for (auto &pair : hugeAllocations) {
-    statistics->size_allocated += pair.second;
-  }
+  hugeAllocations.forEach([&] (const void *key, size_t size) {
+    statistics->size_allocated += size;
+  });
 }
 
 malloc_zone_t swift::zoneShims = {
