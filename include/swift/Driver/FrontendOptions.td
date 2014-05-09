@@ -136,6 +136,10 @@ def strict_keyword_arguments :
   Flag<["-"], "strict-keyword-arguments">,
   HelpText<"Be strict about keyword argument presence/absence/ordering">;
 
+def no_strict_keyword_arguments :
+  Flag<["-"], "no-strict-keyword-arguments">,
+  HelpText<"Don't be strict about keyword argument presence/absence/ordering">;
+
 def enable_source_import : Flag<["-"], "enable-source-import">,
   HelpText<"Enable importing of Swift source files">;
 
