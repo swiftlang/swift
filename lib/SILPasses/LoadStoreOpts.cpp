@@ -108,8 +108,9 @@ class LSBBForwarder {
   /// The alias analysis that we are using for alias queries.
   AliasAnalysis *AA;
 
-  /// The current dead store that we are tracking.
-  StoreInst *PrevStore;
+  /// The current list of store instructions that stored to memory locations
+  /// that were not read/written to since the store was executed.
+  llvm::SmallPtrSet<StoreInst *, 8> Stores;
 
   // This is a list of LoadInst instructions that reference memory locations
   // were not clobbered by instructions that write to memory. In other words
@@ -122,14 +123,13 @@ class LSBBForwarder {
   bool Changed;
 public:
   LSBBForwarder(SILBasicBlock *BB, AliasAnalysis *AA) : BB(BB), AA(AA),
-                                                    PrevStore(nullptr),
-                                                    Changed(false) {}
+                                                        Changed(false) {}
 
   bool optimize();
 
   /// Clear all state in the BB optimizer.
   void clear() {
-    PrevStore = nullptr;
+    Stores.clear();
     Loads.clear();
     Changed = false;
   }
@@ -139,6 +139,8 @@ public:
                                                [&](SILInstruction *DeadI) {
       if (LoadInst *LI = dyn_cast<LoadInst>(DeadI))
         Loads.erase(LI);
+      if (StoreInst *SI = dyn_cast<StoreInst>(DeadI))
+        Stores.erase(SI);
     });
   }
 
@@ -156,32 +158,32 @@ public:
   }
 
   void invalidateWriteToStores(SILInstruction *Inst) {
-    if (!PrevStore)
-      return;
-
-    if (!AA->mayWriteToMemory(Inst, PrevStore->getDest()))
-      return;
-
-    DEBUG(llvm::dbgs() << "    Found an instruction that writes to memory."
-                          " Invalidating store.\n");
-    PrevStore = nullptr;
+    llvm::SmallVector<StoreInst *, 4> InvalidatedStoreList;
+    for (auto *SI : Stores)
+      if (AA->mayWriteToMemory(Inst, SI->getDest()))
+        InvalidatedStoreList.push_back(SI);
+    for (auto *SI : InvalidatedStoreList) {
+      DEBUG(llvm::dbgs() << "    Found an instruction that writes to memory "
+                            "such that a store is invalidated:" << *SI);
+      Stores.erase(SI);
+    }
   }
 
   void invalidateReadFromStores(SILInstruction *Inst) {
-    if (!PrevStore)
-      return;
-
-    if (!AA->mayReadFromMemory(Inst, PrevStore->getDest()))
-      return;
-
-    DEBUG(llvm::dbgs() << "    Found an instruction that reads from store."
-                          " Invalidating store.\n");
-    PrevStore = nullptr;
+    llvm::SmallVector<StoreInst *, 4> InvalidatedStoreList;
+    for (auto *SI : Stores)
+      if (AA->mayReadFromMemory(Inst, SI->getDest()))
+        InvalidatedStoreList.push_back(SI);
+    for (auto *SI : InvalidatedStoreList) {
+      DEBUG(llvm::dbgs() << "    Found an instruction that reads from memory "
+                            "such that a store is invalidated:" << *SI);
+      Stores.erase(SI);
+    }
   }
 
   /// Try to prove that SI is a dead store updating all current state. If SI is
   /// dead, eliminate it.
-  void tryToEliminateDeadStore(StoreInst *SI);
+  void tryToEliminateDeadStores(StoreInst *SI);
 
   /// Try to find a previously known value that we can forward to LI. This
   /// includes from stores and loads.
@@ -190,7 +192,7 @@ public:
 
 } // end anonymous namespace
 
-void LSBBForwarder::tryToEliminateDeadStore(StoreInst *SI) {
+void LSBBForwarder::tryToEliminateDeadStores(StoreInst *SI) {
   // If we are storing a value that is available in the load list then we
   // know that no one clobbered that address and the current store is
   // redundant and we can remove it.
@@ -209,22 +211,29 @@ void LSBBForwarder::tryToEliminateDeadStore(StoreInst *SI) {
   // destination.
   invalidateAliasingLoads(SI);
 
-  // If we are storing to the previously stored address then delete the old
+  // If we are storing to a previously stored address then delete the old
   // store.
-  if (PrevStore && PrevStore->getDest() == SI->getDest()) {
+  for (auto *PrevStore : Stores) {
+    if (SI->getDest() != PrevStore->getDest())
+      continue;
+
     DEBUG(llvm::dbgs() << "    Found a dead previous store... Removing...:"
-                       << *PrevStore);
+          << *PrevStore);
     Changed = true;
     deleteInstruction(PrevStore);
     NumDeadStores++;
   }
 
-  PrevStore = SI;
+  // Insert SI into our store list.
+  Stores.insert(SI);
 }
 
-void LSBBForwarder::tryToForwardLoad(LoadInst *LI) {
+void LSBBForwarder::tryToForwardLoad(LoadInst *LI) {  
   // If we are loading a value that we just saved then use the saved value.
-  if (PrevStore && PrevStore->getDest() == LI->getOperand()) {
+  for (auto *PrevStore : Stores) {
+    if (PrevStore->getDest() != LI->getOperand())
+      continue;
+
     DEBUG(llvm::dbgs() << "    Forwarding store from: " << *PrevStore);
     SILValue(LI, 0).replaceAllUsesWith(PrevStore->getSrc());
     deleteInstruction(LI);
@@ -236,19 +245,24 @@ void LSBBForwarder::tryToForwardLoad(LoadInst *LI) {
   // Promote partial loads.
   // Check that we are loading a struct element:
   if (auto *SEAI = dyn_cast<StructElementAddrInst>(LI->getOperand())) {
-    // And that the previous store stores into that struct.
-    if (PrevStore && PrevStore->getDest() == SEAI->getOperand()) {
+    for (auto *PrevStore : Stores) {
+      // And that the previous store stores into that struct.
+      if (PrevStore->getDest() != SEAI->getOperand())
+        continue;
+
       // And that the stored value is a struct construction instruction:
-      if (auto *SI = dyn_cast<StructInst>(PrevStore->getSrc())) {
-        DEBUG(llvm::dbgs() << "    Forwarding element store from: "
-                           << *PrevStore);
-        unsigned FieldNo = SEAI->getFieldNo();
-        SILValue(LI, 0).replaceAllUsesWith(SI->getOperand(FieldNo));
-        deleteInstruction(LI);
-        Changed = true;
-        NumForwardedLoads++;
-        return;
-      }
+      auto *SI = dyn_cast<StructInst>(PrevStore->getSrc());
+      if (!SI)
+        continue;
+
+      DEBUG(llvm::dbgs() << "    Forwarding element store from: "
+            << *PrevStore);
+      unsigned FieldNo = SEAI->getFieldNo();
+      SILValue(LI, 0).replaceAllUsesWith(SI->getOperand(FieldNo));
+      deleteInstruction(LI);
+      Changed = true;
+      NumForwardedLoads++;
+      return;
     }
   }
 
@@ -264,13 +278,11 @@ void LSBBForwarder::tryToForwardLoad(LoadInst *LI) {
     SILValue(LI, 0).replaceAllUsesWith(ForwardingExtract);
     deleteInstruction(LI);
     Changed = true;
-    LI = nullptr;
     NumDupLoads++;
-    break;
+    return;
   }
 
-  if (LI)
-    Loads.insert(LI);
+  Loads.insert(LI);
 }
 
 /// \brief Promote stored values to loads, remove dead stores and merge
@@ -286,7 +298,7 @@ bool LSBBForwarder::optimize() {
 
     // This is a StoreInst. Let's see if we can remove the previous stores.
     if (StoreInst *SI = dyn_cast<StoreInst>(Inst)) {
-      tryToEliminateDeadStore(SI);
+      tryToEliminateDeadStores(SI);
       continue;
     }
 
