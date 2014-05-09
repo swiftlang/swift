@@ -50,6 +50,7 @@ namespace swift {
   class ConstructorDecl;
   class SubstitutableType;
   class TypeDecl;
+  class PatternBindingDecl;
   
 enum class ExprKind : uint8_t {
 #define EXPR(Id, Parent) Id,
@@ -2408,16 +2409,11 @@ public:
 /// Instances of this structure represent elements of the capture list that can
 /// optionally occur in a capture expression.
 struct CaptureListEntry {
-  enum KindTy {
-    Strong, Weak, Unowned, UnownedSafe, UnownedUnsafe
-  } Kind;
+  VarDecl *Var;
+  PatternBindingDecl *Init;
   
-  SourceLoc Loc;
-  Identifier Name;
-  Expr *Init;
-  
-  CaptureListEntry(KindTy Kind, SourceLoc Loc, Identifier Name, Expr *Init)
-    : Kind(Kind), Loc(Loc), Name(Name), Init(Init) {
+  CaptureListEntry(VarDecl *Var, PatternBindingDecl *Init)
+    : Var(Var), Init(Init) {
   }
 };
   

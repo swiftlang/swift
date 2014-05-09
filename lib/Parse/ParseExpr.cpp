@@ -1466,20 +1466,20 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
       // Check for the strength specifier, "weak", "unowned", or
       // "unowned(safe/unsafe)".
       SourceLoc loc;
-      CaptureListEntry::KindTy kind;
+      AttrKind attrKind = AK_Count;
       if (Tok.isContextualKeyword("weak")){
         loc = consumeToken(tok::identifier);
-        kind = CaptureListEntry::Weak;
+        attrKind = AK_weak;
       } else if (Tok.isContextualKeyword("unowned")) {
         loc = consumeToken(tok::identifier);
-        kind = CaptureListEntry::Unowned;
+        attrKind = AK_unowned;
 
         // Skip over "safe" and "unsafe" if present.
         if (consumeIf(tok::l_paren)) {
           if (Tok.getText() == "safe")
-            kind = CaptureListEntry::UnownedSafe;
+            attrKind = AK_unowned; // FIXME: No "safe" variant.
           else if (Tok.getText() == "unsafe")
-            kind = CaptureListEntry::UnownedUnsafe;
+            attrKind = AK_unowned_unsafe;
           else
             diagnose(Tok, diag::attr_unowned_invalid_specifier);
           consumeIf(tok::identifier);
@@ -1490,7 +1490,6 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
                  peekToken().isAny(tok::equal, tok::comma, tok::r_square)) {
         // "x = 42", "x," and "x]" are all strong captures of x.
         loc = Tok.getLoc();
-        kind = CaptureListEntry::Strong;
       } else {
         diagnose(Tok, diag::expected_capture_specifier);
         skipUntil(tok::comma, tok::r_square);
@@ -1507,6 +1506,7 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
       // followed by an expression.
       Expr *initializer;
       Identifier name;
+      SourceLoc nameLoc = Tok.getLoc();
       if (peekToken().isNot(tok::equal)) {
         // If this is the simple case, then the identifier is both the name and
         // the expression to capture.
@@ -1523,7 +1523,30 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
         initializer = ExprResult.get();
       }
 
-      captureList.push_back(CaptureListEntry(kind, loc, name, initializer));
+      // Create the VarDecl and the PatternBindingDecl for the captured
+      // expression.  This uses the parent declcontext (not the closure) since
+      // the initializer expression is evaluated before the closure is formed.
+      auto *VD = new (Context) VarDecl(/*isStatic*/false,
+                                       /*isLet*/attrKind != AK_weak,
+                                       nameLoc, name, Type(), CurDeclContext);
+      // Attributes.
+      if (attrKind != AK_Count) {
+        DeclAttributes Attributes;
+        Attributes.setAttr(attrKind, loc);
+        VD->getMutableAttrs() = Attributes;
+      }
+      
+      auto pattern = new (Context) NamedPattern(VD, /*implicit*/true);
+      
+      auto *PBD = new (Context) PatternBindingDecl(/*staticloc*/SourceLoc(),
+                                                   StaticSpellingKind::None,
+                                                   nameLoc, pattern,initializer,
+                                                   /*isconditional*/false,
+                                                   CurDeclContext);
+                                                   
+      
+      
+      captureList.push_back(CaptureListEntry(VD, PBD));
     } while (consumeIf(tok::comma));
     
     // The capture list needs to be closed off with a ']'.
@@ -1669,6 +1692,10 @@ ParserResult<Expr> Parser::parseExprClosure() {
     // users who are refactoring code by adding names.
     AnonClosureVars.emplace_back();
   }
+  
+  // Add capture list variables to scope.
+  for (auto c : captureList)
+    addToScope(c.Var);
 
   // Parse the body.
   SmallVector<ASTNode, 4> bodyElements;

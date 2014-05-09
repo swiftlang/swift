@@ -1438,9 +1438,9 @@ public:
 
     auto captures = expr->getCaptureList();
     if (!captures.empty()) {
-      OS << " capturelist=" << captures[0].Name.str();
+      OS << " capturelist=" << captures[0].Var->getName().str();
       for (const auto &elt : captures.slice(1))
-        OS << ',' << elt.Name.str();
+        OS << ',' << elt.Var->getName().str();
     }
 
 
