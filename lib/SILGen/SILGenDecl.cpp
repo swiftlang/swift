@@ -607,37 +607,38 @@ SILGenFunction::emitInitializationForVarDecl(VarDecl *vd, bool isArgument,
   if (!vd->hasStorage())
     return InitializationPtr(new BlackHoleInitialization());
 
-  // If this is a global variable, initialize it without allocations or
-  // cleanups.
-  if (!vd->getDeclContext()->isLocalContext()) {
-    SILValue addr = B.createGlobalAddr(vd, vd,
-                                getLoweredType(vd->getType()).getAddressType());
-    
-    VarLocs[vd] = SILGenFunction::VarLoc::getAddress(addr);
-    return InitializationPtr(new GlobalInitialization(addr));
-  }
-
   CanType varType = vd->getType()->getCanonicalType();
 
   // If this is an inout parameter, set up the writeback variable.
   if (isa<InOutType>(varType))
     return InitializationPtr(new InOutInitialization(vd));
 
-  // Initializing a weak or unowned variable requires a change in type.
-  if (isa<ReferenceStorageType>(varType))
-    return InitializationPtr(new ReferenceStorageInitialization(
-                                            emitLocalVariableWithCleanup(vd)));
-
-  // If this is a 'let' initialization for a non-address-only type, set up a
+  // If this is a 'let' initialization for a non-global, set up a
   // let binding, which stores the initialization value into VarLocs directly.
-  if (vd->isLet())
+  if (vd->isLet() && vd->getDeclContext()->isLocalContext() &&
+      !isa<ReferenceStorageType>(varType))
     return InitializationPtr(new LetValueInitialization(vd, isArgument, *this));
 
-  // Otherwise, we have a normal local-variable initialization and the pattern
-  // type should match the type of the variable.
-  // FIXME: why do we ever get patterns without types here?
-  assert(!patternType || varType == patternType->getCanonicalType());
-  return emitLocalVariableWithCleanup(vd);
+
+  // If this is a global variable, initialize it without allocations or
+  // cleanups.
+  InitializationPtr Result;
+  if (!vd->getDeclContext()->isLocalContext()) {
+    SILValue addr = B.createGlobalAddr(vd, vd,
+                                getLoweredType(vd->getType()).getAddressType());
+    
+    VarLocs[vd] = SILGenFunction::VarLoc::getAddress(addr);
+    Result = InitializationPtr(new GlobalInitialization(addr));
+  } else {
+    Result = emitLocalVariableWithCleanup(vd);
+  }
+
+  // If we're initializing a weak or unowned variable, this requires a change in
+  // type.
+  if (isa<ReferenceStorageType>(varType))
+    Result = InitializationPtr(new
+                           ReferenceStorageInitialization(std::move(Result)));
+  return Result;
 }
 
 void SILGenFunction::visitPatternBindingDecl(PatternBindingDecl *D) {
