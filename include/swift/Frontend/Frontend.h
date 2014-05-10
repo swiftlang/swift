@@ -69,6 +69,11 @@ public:
   CompilerInvocation();
 
   /// \brief Initializes the compiler invocation for the list of arguments.
+  ///
+  /// All parsing should be additive, i.e. options should not be reset to their
+  /// default values given the /absence/ of a flag. This is because \c parseArgs
+  /// may be used to modify an already partially configured invocation.
+  ///
   /// \returns true if there was an error, false on success.
   bool parseArgs(ArrayRef<const char *> Args, DiagnosticEngine &Diags);
 

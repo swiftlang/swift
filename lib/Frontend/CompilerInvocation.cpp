@@ -86,25 +86,15 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     }
   }
 
-  if (Args.hasArg(OPT_emit_verbose_sil)) {
-    Opts.EmitVerboseSIL = true;
-  }
+  Opts.EmitVerboseSIL |= Args.hasArg(OPT_emit_verbose_sil);
 
-  if (Args.hasArg(OPT_delayed_function_body_parsing)) {
-    Opts.DelayedFunctionBodyParsing = true;
-  }
+  Opts.DelayedFunctionBodyParsing |= Args.hasArg(OPT_delayed_function_body_parsing);
 
-  if (Args.hasArg(OPT_print_stats)) {
-    Opts.PrintStats = true;
-  }
+  Opts.PrintStats |= Args.hasArg(OPT_print_stats);
 
-  if (Args.hasArg(OPT_print_clang_stats)) {
-    Opts.PrintClangStats = true;
-  }
+  Opts.PrintClangStats |= Args.hasArg(OPT_print_clang_stats);
 
-  if (Args.hasArg(OPT_playground)) {
-    Opts.Playground = true;
-  }
+  Opts.Playground |= Args.hasArg(OPT_playground);
 
   if (const Arg *A = Args.getLastArg(OPT_help, OPT_help_hidden)) {
     if (A->getOption().matches(OPT_help)) {
@@ -129,9 +119,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     }
   }
 
-  if (Args.hasArg(OPT_parse_stdlib)) {
-    Opts.ParseStdlib = true;
-  }
+  Opts.ParseStdlib |= Args.hasArg(OPT_parse_stdlib);
 
   if (const Arg *A = Args.getLastArg(OPT__DASH_DASH)) {
     for (unsigned i = 0, e = A->getNumValues(); i != e; ++i) {
@@ -172,7 +160,6 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     }
   } else {
     // We don't have a mode, so determine a default.
-    // TODO: add check for EmitModuleOnly, once we support -emit-module.
     if (Opts.InputFilenames.empty()) {
       // We don't have any input files, so default to the REPL.
       Action = FrontendOptions::REPL;
@@ -235,11 +222,11 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
   bool UserSpecifiedModuleName = false;
   {
     const Arg *A = Args.getLastArg(OPT_module_name);
-    std::string ModuleName;
+    StringRef ModuleName = Opts.ModuleName;
     if (A) {
       ModuleName = A->getValue();
       UserSpecifiedModuleName = true;
-    } else {
+    } else if (ModuleName.empty()) {
       // The user did not specify a module name, so determine a default fallback
       // based on other options.
 
@@ -385,20 +372,27 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     }
   }
 
-  auto determineOutputFilename = [&](OptSpecifier optWithoutPath,
+  auto determineOutputFilename = [&](std::string &output,
+                                     OptSpecifier optWithoutPath,
                                      OptSpecifier optWithPath,
                                      const char *extension,
-                                     bool useMainOutput) -> std::string {
+                                     bool useMainOutput) {
     if (const Arg *A = Args.getLastArg(optWithPath)) {
       Args.ClaimAllArgs(optWithoutPath);
-      return A->getValue();
+      output = A->getValue();
+      return;
     }
 
     if (!Args.hasArg(optWithoutPath))
-      return {};
+      return;
 
-    if (useMainOutput && !Opts.OutputFilename.empty())
-      return Opts.OutputFilename;
+    if (useMainOutput && !Opts.OutputFilename.empty()) {
+      output = Opts.OutputFilename;
+      return;
+    }
+
+    if (!output.empty())
+      return;
 
     StringRef OriginalPath;
     if (!Opts.OutputFilename.empty() && Opts.OutputFilename != "-")
@@ -416,31 +410,31 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
 
     llvm::SmallString<128> Path(OriginalPath);
     llvm::sys::path::replace_extension(Path, extension);
-    return Path.str();
+    output = Path.str();
   };
 
-  Opts.SerializedDiagnosticsPath =
-    determineOutputFilename(OPT_serialize_diagnostics,
-                            OPT_serialize_diagnostics_path,
-                            "dia", false);
-  Opts.ObjCHeaderOutputPath =
-    determineOutputFilename(OPT_emit_objc_header,
-                            OPT_emit_objc_header_path,
-                            "h", false);
+  determineOutputFilename(Opts.SerializedDiagnosticsPath,
+                          OPT_serialize_diagnostics,
+                          OPT_serialize_diagnostics_path,
+                          "dia", false);
+  determineOutputFilename(Opts.ObjCHeaderOutputPath,
+                          OPT_emit_objc_header,
+                          OPT_emit_objc_header_path,
+                          "h", false);
 
   bool canUseMainOutputForModule =
     Opts.RequestedAction == FrontendOptions::EmitModuleOnly;
-  Opts.ModuleOutputPath =
-    determineOutputFilename(OPT_emit_module,
-                            OPT_emit_module_path,
-                            SERIALIZED_MODULE_EXTENSION,
-                            canUseMainOutputForModule);
+  determineOutputFilename(Opts.ModuleOutputPath,
+                          OPT_emit_module,
+                          OPT_emit_module_path,
+                          SERIALIZED_MODULE_EXTENSION,
+                          canUseMainOutputForModule);
 
-  Opts.ModuleDocOutputPath =
-    determineOutputFilename(OPT_emit_module_doc,
-                            OPT_emit_module_doc_path,
-                            SERIALIZED_MODULE_DOC_EXTENSION,
-                            false);
+  determineOutputFilename(Opts.ModuleDocOutputPath,
+                          OPT_emit_module_doc,
+                          OPT_emit_module_doc_path,
+                          SERIALIZED_MODULE_DOC_EXTENSION,
+                          false);
 
   if (!Opts.ObjCHeaderOutputPath.empty()) {
     switch (Opts.RequestedAction) {
@@ -492,13 +486,17 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     Opts.ModuleLinkName = A->getValue();
   }
 
-  Opts.EnableSourceImport = Args.hasArg(OPT_enable_source_import);
-  Opts.SILSerializeAll = Args.hasArg(OPT_sil_serialize_all);
-  Opts.LLVMArgs = Args.getAllArgValues(OPT_Xllvm);
-  Opts.ImportUnderlyingModule = Args.hasArg(OPT_import_underlying_module);
+  Opts.EnableSourceImport |= Args.hasArg(OPT_enable_source_import);
+  Opts.SILSerializeAll |= Args.hasArg(OPT_sil_serialize_all);
+  Opts.ImportUnderlyingModule |= Args.hasArg(OPT_import_underlying_module);
 
   if (const Arg *A = Args.getLastArg(OPT_import_objc_header))
     Opts.ImplicitObjCHeaderPath = A->getValue();
+
+  for (const Arg *A : make_range(Args.filtered_begin(OPT_Xllvm),
+                                 Args.filtered_end())) {
+    Opts.LLVMArgs.push_back(A->getValue());
+  }
 
   return false;
 }
@@ -507,23 +505,13 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                           DiagnosticEngine &Diags) {
   using namespace options;
 
-  if (Args.hasArg(OPT_use_malloc)) {
-    Opts.UseMalloc = true;
-  }
+  Opts.UseMalloc |= Args.hasArg(OPT_use_malloc);
 
-  if (Args.hasArg(OPT_enable_experimental_patterns)) {
-    Opts.EnableExperimentalPatterns = true;
-  }
+  Opts.EnableExperimentalPatterns |= Args.hasArg(OPT_enable_experimental_patterns);
 
-  Opts.ImportCFTypes = true;
+  Opts.DebugConstraintSolver |= Args.hasArg(OPT_debug_constraints);
 
-  if (Args.hasArg(OPT_debug_constraints)) {
-    Opts.DebugConstraintSolver = true;
-  }
-
-  if (Args.hasArg(OPT_debugger_support)) {
-    Opts.DebuggerSupport = true;
-  }
+  Opts.DebuggerSupport |= Args.hasArg(OPT_debugger_support);
   
   if (auto A = Args.getLastArg(OPT_enable_objc_attr_requires_objc_module,
                                OPT_disable_objc_attr_requires_objc_module)) {
@@ -547,11 +535,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.addBuildConfigOption(A->getValue());
   }
 
-  Opts.EnableAppExtensionRestrictions = Args.hasArg(OPT_enable_app_extension);
-  Opts.SplitPrepositions = Args.hasArg(OPT_split_objc_selectors);
-
-  if (Args.hasArg(OPT_objc_bridge_dictionary))
-    Opts.ObjCBridgeDictionary = true;
+  Opts.EnableAppExtensionRestrictions |= Args.hasArg(OPT_enable_app_extension);
+  Opts.SplitPrepositions |= Args.hasArg(OPT_split_objc_selectors);
+  Opts.ObjCBridgeDictionary |= Args.hasArg(OPT_objc_bridge_dictionary);
 
   if (auto A = Args.getLastArg(OPT_implicit_objc_with,
                                OPT_no_implicit_objc_with)) {
@@ -565,9 +551,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       = A->getOption().matches(OPT_strict_keyword_arguments);
   }
 
-  if (Opts.SplitPrepositions) {
+  if (Opts.SplitPrepositions)
     Opts.addBuildConfigOption("OBJC_SELECTOR_SPLITTING");
-  }
+
   return false;
 }
 
@@ -584,9 +570,9 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
     Opts.ExtraArgs.push_back(A->getValue());
   }
 
-  Opts.InferImplicitProperties =
+  Opts.InferImplicitProperties |=
     Args.hasArg(OPT_enable_objc_implicit_properties);
-  Opts.ImportFactoryMethodsAsConstructors =
+  Opts.ImportFactoryMethodsAsConstructors |=
     Args.hasArg(OPT_enable_objc_factory_method_constructors);
 
   return false;
@@ -606,17 +592,13 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
     Opts.FrameworkSearchPaths.push_back(A->getValue());
   }
 
-  if (const Arg *A = Args.getLastArg(OPT_sdk)) {
+  if (const Arg *A = Args.getLastArg(OPT_sdk))
     Opts.SDKPath = A->getValue();
-  }
 
-  if (const Arg *A = Args.getLastArg(OPT_resource_dir)) {
+  if (const Arg *A = Args.getLastArg(OPT_resource_dir))
     Opts.RuntimeResourcePath = A->getValue();
-  }
 
-  if (Args.getLastArg(OPT_nostdimport)) {
-    Opts.SkipRuntimeLibraryImportPath = true;
-  }
+  Opts.SkipRuntimeLibraryImportPath |= Args.hasArg(OPT_nostdimport);
 
   // Opts.RuntimeIncludePath is set by calls to
   // setRuntimeIncludePath() or setMainExecutablePath().
@@ -634,17 +616,10 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
                                 DiagnosticEngine &Diags) {
   using namespace options;
 
-  if (Args.hasArg(OPT_verify)) {
-    Opts.VerifyDiagnostics = true;
-  }
-
-  if (Args.hasArg(OPT_disable_diagnostic_passes)) {
-    Opts.SkipDiagnosticPasses = true;
-  }
-
-  if (Args.hasArg(OPT_show_diagnostics_after_fatal)) {
-    Opts.ShowDiagnosticsAfterFatalError = true;
-  }
+  Opts.VerifyDiagnostics |= Args.hasArg(OPT_verify);
+  Opts.SkipDiagnosticPasses |= Args.hasArg(OPT_disable_diagnostic_passes);
+  Opts.ShowDiagnosticsAfterFatalError |=
+    Args.hasArg(OPT_show_diagnostics_after_fatal);
 
   return false;
 }
@@ -707,7 +682,6 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   }
 
   // Parse the optimization level.
-  Opts.AssertConfig = SILOptions::Debug;
   if (const Arg *A = Args.getLastArg(OPT_O_Group)) {
     // The maximum optimization level we currently support.
     unsigned MaxLevel = 3;
@@ -723,8 +697,8 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       Opts.RemoveRuntimeAsserts = true;
       Opts.AssertConfig = SILOptions::Fast;
     } else if (!StringRef(A->getValue()).size()) {
-        // -O is an alias to -O3.
-        IRGenOpts.OptLevel = MaxLevel;
+      // -O is an alias to -O3.
+      IRGenOpts.OptLevel = MaxLevel;
     } else {
       unsigned OptLevel;
       if (StringRef(A->getValue()).getAsInteger(10, OptLevel) ||
@@ -736,8 +710,6 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
 
       IRGenOpts.OptLevel = OptLevel;
     }
-  } else {
-    IRGenOpts.OptLevel = 0;
   }
 
   // Parse the build configuration identifier.
@@ -754,9 +726,9 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     } else if (Configuration == "Fast") {
       Opts.AssertConfig = SILOptions::Fast;
     } else {
-        Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                       A->getAsString(Args), A->getValue());
-        return true;
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+      return true;
     }
   } else if (FEOpts.ParseStdlib) {
     // Disable assertion configuration replacement when we build the standard
@@ -772,11 +744,11 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   // OFast might also set removal of runtime asserts (cond_fail).
   Opts.RemoveRuntimeAsserts |= Args.hasArg(OPT_remove_runtime_asserts);
 
-  Opts.EnableARCOptimizations = !Args.hasArg(OPT_disable_arc_opts);
-  Opts.VerifyAll = Args.hasArg(OPT_sil_verify_all);
-  Opts.PrintAll = Args.hasArg(OPT_sil_print_all);
-  Opts.TimeTransforms = Args.hasArg(OPT_sil_time_transforms);
-  Opts.DebugSerialization = Args.hasArg(OPT_sil_debug_serialization);
+  Opts.EnableARCOptimizations |= !Args.hasArg(OPT_disable_arc_opts);
+  Opts.VerifyAll |= Args.hasArg(OPT_sil_verify_all);
+  Opts.PrintAll |= Args.hasArg(OPT_sil_print_all);
+  Opts.TimeTransforms |= Args.hasArg(OPT_sil_time_transforms);
+  Opts.DebugSerialization |= Args.hasArg(OPT_sil_debug_serialization);
 
   return false;
 }
@@ -842,36 +814,27 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.LinkLibraries.push_back(LinkLibrary(A->getValue(), Kind));
   }
 
-  if (const Arg *A = Args.getLastArg(OPT_target_cpu)) {
+  if (const Arg *A = Args.getLastArg(OPT_target_cpu))
     Opts.TargetCPU = A->getValue();
-  }
-  if (const Arg *A = Args.getLastArg(OPT_target_abi)) {
+  if (const Arg *A = Args.getLastArg(OPT_target_abi))
     Opts.TargetABI = A->getValue();
-  }
-  Opts.TargetFeatures = Args.getAllArgValues(OPT_target_feature);
 
-  if (Args.hasArg(OPT_disable_all_runtime_checks)) {
-    Opts.DisableAllRuntimeChecks = true;
-  }
-
-  if (Args.hasArg(OPT_disable_llvm_optzns)) {
-    Opts.DisableLLVMOptzns = true;
+  for (const Arg *A : make_range(Args.filtered_begin(OPT_target_feature),
+                                 Args.filtered_end())) {
+    Opts.TargetFeatures.push_back(A->getValue());
   }
 
-  if (Args.hasArg(OPT_disable_llvm_arc_opts)) {
-    Opts.DisableLLVMARCOpts = true;
-  }
-
-  if (Args.hasArg(OPT_enable_dynamic_value_type_layout)) {
-    Opts.EnableDynamicValueTypeLayout = true;
-  }
+  Opts.DisableAllRuntimeChecks |= Args.hasArg(OPT_disable_all_runtime_checks);
+  Opts.DisableLLVMOptzns |= Args.hasArg(OPT_disable_llvm_optzns);
+  Opts.DisableLLVMARCOpts |= Args.hasArg(OPT_disable_llvm_arc_opts);
+  Opts.EnableDynamicValueTypeLayout |=
+    Args.hasArg(OPT_enable_dynamic_value_type_layout);
 
   if (Args.hasArg(OPT_autolink_force_load))
     Opts.ForceLoadSymbolName = Args.getLastArgValue(OPT_module_link_name);
 
-  if (const Arg *A = Args.getLastArg(OPT_target)) {
+  if (const Arg *A = Args.getLastArg(OPT_target))
     Opts.Triple = llvm::Triple::normalize(A->getValue());
-  }
 
   // TODO: investigate whether these should be removed, in favor of definitions
   // in other classes.

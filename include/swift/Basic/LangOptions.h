@@ -72,7 +72,7 @@ namespace swift {
     bool EnableObjCAttrRequiresObjCModule = false;
 
     /// Enables special importing of CF types.
-    bool ImportCFTypes = false;
+    bool ImportCFTypes = true;
     
     /// Be strict about the use of keyword arguments.
     /// FIXME: This is the default, and the option will eventually be

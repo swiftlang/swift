@@ -77,7 +77,7 @@ public:
   };
 
   /// The assert configuration controls how assertions behave.
-  unsigned AssertConfig = DisableReplacement;
+  unsigned AssertConfig = Debug;
 
 };
 
