@@ -57,6 +57,9 @@ namespace {
     /// The source type is 'NSString'.
     NSString,
 
+    /// The source type is 'NSDictionary'.
+    NSDictionary,
+
     /// The source type is 'NSUInteger'.
     NSUInteger,
 
@@ -483,6 +486,12 @@ namespace {
         return { importedType, ImportHint::NSString };
       }
 
+      if (imported->hasName() &&
+          Impl.SwiftContext.LangOpts.ObjCBridgeDictionary &&
+          imported->getName().str() == "NSDictionary") {
+        return { importedType, ImportHint::NSDictionary };
+      }
+
       return { importedType, ImportHint::ObjCPointer };
     }
 
@@ -697,9 +706,21 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
     importedType = impl.getNamedSwiftType(impl.getStdlibModule(), "String");
   }
 
+  // When NSDictionary* is the type of a function parameter or a function
+  // result type, map it to Dictionary<NSObject, AnyObject>.
+  if (hint == ImportHint::NSDictionary && canBridgeTypes(importKind) &&
+      impl.hasFoundationModule()) {
+    importedType = impl.getNamedSwiftTypeSpecialization(
+                     impl.getStdlibModule(), "Dictionary",
+                     { impl.getNSObjectType(),
+                       impl.getNamedSwiftType(impl.getStdlibModule(),
+                                              "AnyObject") });
+  }
+
   // Wrap class, class protocol, function, and metatype types in an
   // optional type.
   if (hint == ImportHint::NSString ||
+      hint == ImportHint::NSDictionary ||
       hint == ImportHint::ObjCPointer ||
       hint == ImportHint::CFPointer ||
       hint == ImportHint::Block) {
@@ -1032,12 +1053,11 @@ getNamedSwiftTypeSpecialization(Module *module, StringRef name,
     if (auto nominalDecl = dyn_cast<NominalTypeDecl>(typeDecl)) {
       if (auto params = nominalDecl->getGenericParams()) {
         if (params->size() == args.size()) {
+          // When we form the bound generic type, make sure we get the
+          // substitutions.
           auto *BGT = BoundGenericType::get(nominalDecl, Type(), args);
-          // FIXME: How do we ensure that this type gets validated?
-          // Instead of going through the type checker, we do this hack to
-          // create substitutions.
-          SwiftContext.createTrivialSubstitutions(
-              BGT->getCanonicalType()->castTo<BoundGenericType>());
+          BGT->getSubstitutions(BGT->getDecl()->getModuleContext(),
+                                typeResolver);
           return BGT;
         }
       }
