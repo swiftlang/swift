@@ -404,12 +404,14 @@ void Driver::buildOutputInfo(const DerivedArgList &Args,
                    diag::error_emit_objc_header_with_single_compile);
   }
 
+  OI.ShouldGenerateDebugInfo = Args.hasArg(options::OPT_g);
+
   if (Args.hasArg(options::OPT_emit_module, options::OPT_emit_module_path)) {
     // The user has requested a module, so generate one and treat it as
     // top-level output.
     OI.ShouldGenerateModule = true;
     OI.ShouldTreatModuleAsTopLevelOutput = true;
-  } else if ((Args.hasArg(options::OPT_g) && OI.shouldLink()) ||
+  } else if ((OI.ShouldGenerateDebugInfo && OI.shouldLink()) ||
              shouldEmitObjCHeader) {
     // An option has been passed which requires a module, but the user hasn't
     // requested one. Generate a module, but treat it as an intermediate output.
@@ -556,7 +558,7 @@ void Driver::buildActions(const ToolChain &TC,
       // LinkJobAction. It shares inputs with the LinkAction, so tell it that it
       // no longer owns its inputs.
       MergeModuleAction->setOwnsInputs(false);
-      if (Args.hasArg(options::OPT_g))
+      if (OI.ShouldGenerateDebugInfo)
         LinkAction->addInput(MergeModuleAction.release());
       else
         Actions.push_back(MergeModuleAction.release());
@@ -816,8 +818,9 @@ collectTemporaryFilesForAction(const Action &A, const Job &J,
 
       switch (output.getPrimaryOutputType()) {
         case types::TY_Object:
-          if (!outputMap || outputMap->lookup(types::TY_Object).empty())
-            callback(output.getPrimaryOutputFilename());
+          if (!OI.ShouldGenerateDebugInfo)
+            if (!outputMap || outputMap->lookup(types::TY_Object).empty())
+              callback(output.getPrimaryOutputFilename());
           break;
         case types::TY_SwiftModuleFile:
           if (!OI.ShouldTreatModuleAsTopLevelOutput) {

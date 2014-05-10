@@ -490,7 +490,7 @@ Job *darwin::Linker::constructJob(const JobAction &JA,
   addPrimaryInputsOfType(Arguments, Inputs.get(), types::TY_Object);
   addInputsOfType(Arguments, InputActions, types::TY_Object);
 
-  if (Args.hasArg(options::OPT_g)) {
+  if (OI.ShouldGenerateDebugInfo) {
     Arguments.push_back("-sectalign");
     Arguments.push_back(MachOASTSegmentName);
     Arguments.push_back(MachOASTSectionName);

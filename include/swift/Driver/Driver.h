@@ -79,6 +79,10 @@ public:
   /// Returns true if the linker will be invoked at all.
   bool shouldLink() const { return LinkAction != LinkKind::None; }
 
+  /// Whether or not the output should contain debug info.
+  // FIXME: Eventually this should be replaced by dSYM generation.
+  bool ShouldGenerateDebugInfo = false;
+
   /// Whether or not the driver should generate a module.
   bool ShouldGenerateModule = false;
 
