@@ -1848,8 +1848,7 @@ SILGenFunction::emitSiblingMethodRef(SILLocation loc,
                                      SILValue selfValue,
                                      SILDeclRef methodConstant,
                                      ArrayRef<Substitution> subs) {
-  SILValue methodValue = B.createFunctionRef(loc,
-                            SGM.getFunction(methodConstant, NotForDefinition));
+  SILValue methodValue = emitGlobalFunctionRef(loc, methodConstant);
 
   SILType methodTy = methodValue.getType();
   
@@ -3122,6 +3121,8 @@ bool Lowering::usesObjCAllocator(ClassDecl *theClass) {
 }
 
 void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
+  assert(!ctor->isFactoryInit() && "factories should not be emitted here");
+  
   // FIXME: Hack until all delegation is dispatched.
   isConvenienceInit = ctor->isConvenienceInit();
 
@@ -3156,34 +3157,8 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
 
   // Allocate the 'self' value.
   bool useObjCAllocation = usesObjCAllocator(selfClassDecl);
-  bool usesFactoryMethod;
-  switch (ctor->getInitKind()) {
-  case CtorInitializerKind::Convenience:
-  case CtorInitializerKind::Designated:
-    usesFactoryMethod = false;
-    break;
 
-  case CtorInitializerKind::ConvenienceFactory:
-  case CtorInitializerKind::Factory:
-    usesFactoryMethod = true;
-    break;
-  }
-
-  if (usesFactoryMethod) {
-    // If we're using an allocating initializer, the 'self' value is
-    // actually the metatype.
-
-    // When using Objective-C allocation, convert the metatype
-    // argument to an Objective-C metatype.
-    selfValue = selfMetaValue;
-    if (useObjCAllocation) {
-      auto metaTy = selfValue.getType().castTo<MetatypeType>();
-      metaTy = CanMetatypeType::get(metaTy.getInstanceType(),
-                                    MetatypeRepresentation::ObjC);
-      selfValue = B.createThickToObjCMetatype(Loc, selfValue,
-                                              getLoweredType(metaTy));
-    }
-  } else if (ctor->isConvenienceInit() || ctor->hasClangNode()) {
+  if (ctor->isConvenienceInit() || ctor->hasClangNode()) {
     // For a convenience initializer or an initializer synthesized
     // for an Objective-C class, allocate using the metatype.
     SILValue allocArg = selfMetaValue;
@@ -3208,66 +3183,29 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   }
   args.push_back(selfValue);
 
-  // Call the initializer.
+  // Call the initializer. Always use the Swift entry point, which will be a
+  // bridging thunk if we're calling ObjC.
   SILDeclRef initConstant =
     SILDeclRef(ctor,
-               usesFactoryMethod ? SILDeclRef::Kind::Allocator
-                                 : SILDeclRef::Kind::Initializer,
+               SILDeclRef::Kind::Initializer,
                SILDeclRef::ConstructAtBestResilienceExpansion,
                SILDeclRef::ConstructAtNaturalUncurryLevel,
-               /*isObjC=*/ctor->hasClangNode());
+               /*isObjC=*/false);
 
   ManagedValue initVal;
   SILType initTy;
   
-  Scope scope(Cleanups, CleanupLocation::getCleanupLocation(Loc));
-
   ArrayRef<Substitution> subs;
-  if (ctor->hasClangNode()) {
-    // If the constructor was imported from Clang, we perform dynamic dispatch
-    // to it because we can't refer directly to the Objective-C method.
-    auto method = initConstant.atUncurryLevel(1);
-    auto objcInfo = getConstantInfo(method);
-    SILValue methodRef = B.createClassMethod(Loc, selfValue, initConstant,
-                                             objcInfo.getSILType());
-    initVal = ManagedValue::forUnmanaged(methodRef);
-    initTy = initVal.getType();
-
-    // Bridge arguments.
-    auto objcFnType = objcInfo.SILFnType;
-
-    unsigned idx = 0;
-    for (auto &arg : args) {
-      auto nativeTy = arg.getType().getSwiftType();// FIXME: wrong for functions
-      auto bridgedTy =
-        objcFnType->getInterfaceParameters()[idx++].getSILType().getSwiftType();
-      arg = emitNativeToBridgedValue(Loc,
-                                     ManagedValue::forUnmanaged(arg),
-                                     AbstractCC::ObjCMethod,
-                                     nativeTy, nativeTy,
-                                     bridgedTy).forward(*this);
-    }
-  } else {
-    // Otherwise, directly call the constructor.
-    auto forwardingSubs
-      = buildForwardingSubstitutions(ctor->getGenericParamsOfContext());
-    std::tie(initVal, initTy, subs)
-      = emitSiblingMethodRef(Loc, selfValue, initConstant, forwardingSubs);
-  }
+  // Call the initializer.
+  auto forwardingSubs
+    = buildForwardingSubstitutions(ctor->getGenericParamsOfContext());
+  std::tie(initVal, initTy, subs)
+    = emitSiblingMethodRef(Loc, selfValue, initConstant, forwardingSubs);
 
   SILValue initedSelfValue
     = B.createApply(Loc, initVal.forward(*this), initTy, selfTy, subs, args,
                     initConstant.isTransparent());
 
-  // If we used a factory method that returns autoreleased, retain the result.
-  if (usesFactoryMethod &&
-      initTy.castTo<SILFunctionType>()->getInterfaceResult().getConvention()
-        == ResultConvention::Autoreleased) {
-    B.createStrongRetainAutoreleased(Loc, initedSelfValue);
-  }
-
-  scope.pop();
-  
   // Return the initialized 'self'.
   B.createReturn(ImplicitReturnLocation::getImplicitReturnLoc(Loc),
                  initedSelfValue);
@@ -3674,14 +3612,14 @@ static SILValue
 getThunkedForeignFunctionRef(SILGenFunction &gen,
                              SILLocation loc,
                              SILDeclRef foreign,
-                             ArrayRef<SILValue> args) {
+                             ArrayRef<ManagedValue> args) {
   assert(!foreign.isCurried
          && "should not thunk calling convention when curried");
   
   // Produce a class_method when thunking ObjC methods.
   auto foreignTy = gen.SGM.getConstantType(foreign);
   if (foreignTy.castTo<SILFunctionType>()->getAbstractCC() == AbstractCC::ObjCMethod) {
-    SILValue thisArg = args.back();
+    SILValue thisArg = args.back().getValue();
     
     return gen.B.createClassMethod(loc, thisArg, foreign,
                                    gen.SGM.getConstantType(foreign),
@@ -3697,16 +3635,35 @@ void SILGenFunction::emitForeignThunk(SILDeclRef thunk) {
   
   // Wrap the function in its original form.
 
-  auto fd = cast<FuncDecl>(thunk.getDecl());
+  auto fd = cast<AbstractFunctionDecl>(thunk.getDecl());
+  auto ci = getConstantInfo(thunk);
+  auto resultTy = ci.LoweredInterfaceType->getResult();
   
   // Forward the arguments.
   // FIXME: For native-to-foreign thunks, use emitObjCThunkArguments to retain
   // inputs according to the foreign convention.
   auto forwardedPatterns = fd->getBodyParamPatterns();
+  // For allocating constructors, 'self' is a metatype, not the 'self' value
+  // formally present in the constructor body.
+  Type allocatorSelfType;
+  if (thunk.kind == SILDeclRef::Kind::Allocator) {
+    allocatorSelfType = forwardedPatterns[0]->getType();
+    forwardedPatterns = forwardedPatterns.slice(1);
+  }
+  
   SmallVector<SILValue, 8> args;
   ArgumentForwardVisitor forwarder(*this, args);
   for (auto *paramPattern : reversed(forwardedPatterns))
     forwarder.visit(paramPattern);
+  
+  if (allocatorSelfType) {
+    auto selfMetatype = CanMetatypeType::get(allocatorSelfType->getCanonicalType(),
+                                             MetatypeRepresentation::Thick);
+    auto selfArg = new (F.getModule()) SILArgument(
+                                 SILType::getPrimitiveObjectType(selfMetatype),
+                                 F.begin(), fd->getImplicitSelfDecl());
+    args.push_back(selfArg);
+  }
   
   SILValue result;
   {
@@ -3733,10 +3690,9 @@ void SILGenFunction::emitForeignThunk(SILDeclRef thunk) {
 
     // Call the original.
     auto fn = getThunkedForeignFunctionRef(*this, fd, original,
-                                           args);
+                                           managedArgs);
     result = emitMonomorphicApply(fd, ManagedValue::forUnmanaged(fn),
-                                  managedArgs,
-                                  fd->getBodyResultType()->getCanonicalType())
+                                  managedArgs, resultTy->getCanonicalType())
       .forward(*this);
   }
   // FIXME: use correct convention for native-to-foreign return

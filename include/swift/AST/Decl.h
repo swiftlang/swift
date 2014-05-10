@@ -3665,7 +3665,7 @@ public:
   static bool classof(const DeclContext *DC) {
     return DC->getContextKind() == DeclContextKind::AbstractFunctionDecl;
   }
-
+  
   using DeclContext::operator new;
   using Decl::getASTContext;
 };
@@ -4229,7 +4229,15 @@ public:
 
   /// Whether this is a factory initializer.
   bool isFactoryInit() const {
-    return getInitKind() == CtorInitializerKind::Factory;
+    switch (getInitKind()) {
+    case CtorInitializerKind::Designated:
+    case CtorInitializerKind::Convenience:
+      return false;
+        
+    case CtorInitializerKind::Factory:
+    case CtorInitializerKind::ConvenienceFactory:
+      return true;
+    }
   }
 
   /// Determine whether this initializer is inheritable.

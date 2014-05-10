@@ -233,6 +233,13 @@ bool SILDeclRef::isForeignThunk() const {
   // Otherwise, match whether we have a clang node with whether we're foreign.
   if (isa<FuncDecl>(getDecl()) && getDecl()->hasClangNode())
     return !isForeign;
+  // ObjC initializing constructors and factories are foreign.
+  // We emit a special native allocating constructor though.
+  if (isa<ConstructorDecl>(getDecl())
+      && (kind == Kind::Initializer
+          || cast<ConstructorDecl>(getDecl())->isFactoryInit())
+      && getDecl()->hasClangNode())
+    return !isForeign;
   return false;
 }
 

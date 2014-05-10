@@ -1242,7 +1242,13 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
     break;
   }
   case DeclKind::Constructor: {
-    emitConstructor(cast<ConstructorDecl>(d));
+    auto C = cast<ConstructorDecl>(d);
+    // For factories, we don't need to emit a special thunk; the normal
+    // foreign-to-native thunk is sufficient.
+    if (C->isFactoryInit())
+      break;
+    
+    emitConstructor(C);
     break;
   }
   case DeclKind::Enum: {

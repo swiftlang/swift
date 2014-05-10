@@ -1156,6 +1156,16 @@ public:
             "operand must be of a class type");
     require(isClassOrClassMetatype(getMethodSelfType(methodType)),
             "result must be a method of a class");
+    /* TODO: We should enforce that ObjC methods are dispatched on ObjC
+       metatypes, but IRGen appears not to care right now.
+    if (auto metaTy = operandType.getAs<AnyMetatypeType>()) {
+      bool objcMetatype
+        = metaTy->getRepresentation() == MetatypeRepresentation::ObjC;
+      bool objcMethod = CMI->getMember().isForeign;
+      require(objcMetatype == objcMethod,
+              "objc class methods must be invoked on objc metatypes");
+    }
+     */
   }
 
   void checkSuperMethodInst(SuperMethodInst *CMI) {

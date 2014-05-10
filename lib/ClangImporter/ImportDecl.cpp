@@ -3509,9 +3509,16 @@ namespace {
           if (!ctor)
             continue;
 
-          // Don't inherit factory initializers.
-          if (ctor->isFactoryInit()) {
+          // Don't inherit (non-convenience) factory initializers.
+          // Note that convenience factories return instancetype and can be
+          // inherited.
+          switch (ctor->getInitKind()) {
+          case CtorInitializerKind::Factory:
             continue;
+          case CtorInitializerKind::ConvenienceFactory:
+          case CtorInitializerKind::Convenience:
+          case CtorInitializerKind::Designated:
+            break;
           }
 
           auto objcMethod
