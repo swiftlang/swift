@@ -67,7 +67,12 @@ static SILDeclRef getBridgingFn(Optional<SILDeclRef> &cacheSlot,
                                  StringRef moduleName,
                                  StringRef functionName,
                                  std::initializer_list<SILType> inputTypes,
-                                 SILType outputType) {
+                                 Optional<SILType> outputType,
+                                 bool trustInputTypes = false) {
+  // FIXME: the optionality of outputType and the presence of trustInputTypes
+  // are hacks for cases where coming up with those types is complicated, i.e.,
+  // when dealing with generic bridging functions.
+
   SILDeclRef fn = cacheSlot.cache([&] {
     Optional<UnqualifiedLookup> lookup
       = UnqualifiedLookup::forModuleAndName(SGM.M.getASTContext(),
@@ -112,17 +117,20 @@ static SILDeclRef getBridgingFn(Optional<SILDeclRef> &cacheSlot,
     // expected result type.
     SILDeclRef c(fd);
     auto funcInfo = SGM.getConstantType(c).castTo<SILFunctionType>();
-    
-    if (funcInfo->getInterfaceParameters().size() != inputTypes.size()
-        || !std::equal(funcInfo->getInterfaceParameterSILTypes().begin(),
-                       funcInfo->getInterfaceParameterSILTypes().end(),
-                       inputTypes.begin())) {
-      SGM.diagnose(fd->getLoc(), diag::bridging_function_not_correct_type,
-                   moduleName, functionName);
-      llvm::report_fatal_error("unable to set up the ObjC bridge!");
+
+    if (!trustInputTypes) {
+      if (funcInfo->getInterfaceParameters().size() != inputTypes.size()
+          || !std::equal(funcInfo->getInterfaceParameterSILTypes().begin(),
+                         funcInfo->getInterfaceParameterSILTypes().end(),
+                         inputTypes.begin())) {
+        SGM.diagnose(fd->getLoc(), diag::bridging_function_not_correct_type,
+                     moduleName, functionName);
+        llvm::report_fatal_error("unable to set up the ObjC bridge!");
+      }
     }
-    
-    if (funcInfo->getInterfaceResult().getSILType() != outputType) {
+
+    if (outputType &&
+        funcInfo->getInterfaceResult().getSILType() != *outputType) {
       SGM.diagnose(fd->getLoc(), diag::bridging_function_not_correct_type,
                    moduleName, functionName);
       llvm::report_fatal_error("unable to set up the ObjC bridge!");
