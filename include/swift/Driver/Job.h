@@ -159,7 +159,10 @@ public:
   const CommandOutput &getOutput() const { return *Output; }
 
   /// Print the command line for this Command to the given \p stream.
-  void printCommandLine(llvm::raw_ostream &Stream) const;
+  void printCommandLine(raw_ostream &Stream) const;
+
+  static void printArguments(raw_ostream &Stream,
+                             const llvm::opt::ArgStringList &Args);
 
   static bool classof(const Job *J) {
     return J->getKind() == CommandClass;

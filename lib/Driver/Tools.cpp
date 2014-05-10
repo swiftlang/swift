@@ -71,54 +71,6 @@ static void addPrimaryInputsOfType(ArgStringList &Arguments, const Job *J,
   }
 }
 
-/// Handle arguments common to all invocations of the frontend (compilation,
-/// module-merging, etc).
-static void addCommonFrontendArgs(const ToolChain &TC,
-                                  const OutputInfo &OI,
-                                  CommandOutput *output,
-                                  const ArgList &inputArgs,
-                                  ArgStringList &arguments) {
-  arguments.push_back("-target");
-  std::string TripleStr = TC.getTripleString();
-  arguments.push_back(inputArgs.MakeArgString(TripleStr));
-
-  arguments.push_back("-module-name");
-  arguments.push_back(inputArgs.MakeArgString(OI.ModuleName));
-
-  if (!OI.SDKPath.empty()) {
-    arguments.push_back("-sdk");
-    arguments.push_back(inputArgs.MakeArgString(OI.SDKPath));
-  }
-
-  inputArgs.AddAllArgs(arguments, options::OPT_I);
-  inputArgs.AddAllArgs(arguments, options::OPT_F);
-  inputArgs.AddLastArg(arguments, options::OPT_nostdimport);
-  inputArgs.AddLastArg(arguments, options::OPT_AssertConfig);
-
-  inputArgs.AddLastArg(arguments, options::OPT_g);
-  inputArgs.AddLastArg(arguments, options::OPT_resource_dir);
-  inputArgs.AddLastArg(arguments, options::OPT_module_cache_path);
-  inputArgs.AddLastArg(arguments, options::OPT_enable_app_extension);
-  inputArgs.AddLastArg(arguments, options::OPT_import_objc_header);
-  inputArgs.AddLastArg(arguments, options::OPT_module_link_name);
-  inputArgs.AddLastArg(arguments, options::OPT_autolink_force_load);
-
-  // Pass through the values passed to -Xfrontend.
-  inputArgs.AddAllArgValues(arguments, options::OPT_Xfrontend);
-
-  // Pass through any subsystem flags.
-  inputArgs.AddAllArgs(arguments, options::OPT_Xllvm);
-  inputArgs.AddAllArgs(arguments, options::OPT_Xcc);
-
-  const std::string &moduleDocOutputPath =
-      output->getAdditionalOutputForType(types::TY_SwiftModuleDocFile);
-  if (!moduleDocOutputPath.empty()) {
-    arguments.push_back("-emit-module-doc");
-    arguments.push_back("-emit-module-doc-path");
-    arguments.push_back(moduleDocOutputPath.c_str());
-  }
-}
-
 // Should this be done by the tool chain?
 static void configureDefaultCPU(const llvm::Triple &triple,
                                 ArgStringList &args) {
@@ -136,6 +88,75 @@ static void configureDefaultABI(const llvm::Triple &triple,
   if (triple.isOSDarwin() && triple.getArch() == llvm::Triple::arm64) {
     args.push_back("-target-abi");
     args.push_back("darwinpcs");
+  }
+}
+
+/// Handle arguments common to all invocations of the frontend (compilation,
+/// module-merging, LLDB's REPL, etc).
+static void addCommonFrontendArgs(const ToolChain &TC,
+                                  const OutputInfo &OI,
+                                  CommandOutput *output,
+                                  const ArgList &inputArgs,
+                                  ArgStringList &arguments) {
+  arguments.push_back("-target");
+  std::string TripleStr = TC.getTripleString();
+  arguments.push_back(inputArgs.MakeArgString(TripleStr));
+
+  // Handle the CPU and its preferences.
+  if (auto arg = inputArgs.getLastArg(options::OPT_target_cpu))
+    arg->render(inputArgs, arguments);
+  else
+    configureDefaultCPU(TC.getTriple(), arguments);
+  inputArgs.AddAllArgs(arguments, options::OPT_target_feature);
+
+  // Default the ABI based on the triple.
+  configureDefaultABI(TC.getTriple(), arguments);
+
+  arguments.push_back("-module-name");
+  arguments.push_back(inputArgs.MakeArgString(OI.ModuleName));
+
+  if (!OI.SDKPath.empty()) {
+    arguments.push_back("-sdk");
+    arguments.push_back(inputArgs.MakeArgString(OI.SDKPath));
+  }
+
+  inputArgs.AddAllArgs(arguments, options::OPT_I);
+  inputArgs.AddAllArgs(arguments, options::OPT_F);
+
+  inputArgs.AddLastArg(arguments, options::OPT_AssertConfig);
+  inputArgs.AddLastArg(arguments, options::OPT_autolink_force_load);
+  inputArgs.AddLastArg(arguments, options::OPT_enable_app_extension);
+  inputArgs.AddLastArg(arguments, options::OPT_g);
+  inputArgs.AddLastArg(arguments, options::OPT_import_objc_header);
+  inputArgs.AddLastArg(arguments, options::OPT_import_underlying_module);
+  inputArgs.AddLastArg(arguments, options::OPT_module_cache_path);
+  inputArgs.AddLastArg(arguments, options::OPT_module_link_name);
+  inputArgs.AddLastArg(arguments, options::OPT_nostdimport);
+  inputArgs.AddLastArg(arguments, options::OPT_parse_stdlib);
+  inputArgs.AddLastArg(arguments, options::OPT_resource_dir);
+  inputArgs.AddLastArg(arguments, options::OPT_split_objc_selectors);
+
+  inputArgs.AddLastArg(arguments, options::OPT_implicit_objc_with,
+                       options::OPT_no_implicit_objc_with);
+  inputArgs.AddLastArg(arguments, options::OPT_strict_keyword_arguments,
+                       options::OPT_no_strict_keyword_arguments);
+
+  // Pass on any build config options
+  inputArgs.AddAllArgs(arguments, options::OPT_D);
+
+  // Pass through the values passed to -Xfrontend.
+  inputArgs.AddAllArgValues(arguments, options::OPT_Xfrontend);
+
+  // Pass through any subsystem flags.
+  inputArgs.AddAllArgs(arguments, options::OPT_Xllvm);
+  inputArgs.AddAllArgs(arguments, options::OPT_Xcc);
+
+  const std::string &moduleDocOutputPath =
+      output->getAdditionalOutputForType(types::TY_SwiftModuleDocFile);
+  if (!moduleDocOutputPath.empty()) {
+    arguments.push_back("-emit-module-doc");
+    arguments.push_back("-emit-module-doc-path");
+    arguments.push_back(moduleDocOutputPath.c_str());
   }
 }
 
@@ -262,35 +283,14 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
 
   addCommonFrontendArgs(getToolChain(), OI, Output.get(), Args, Arguments);
 
-  Args.AddLastArg(Arguments, options::OPT_import_underlying_module);
-  Args.AddLastArg(Arguments, options::OPT_split_objc_selectors);
-  Args.AddLastArg(Arguments, options::OPT_implicit_objc_with,
-                  options::OPT_no_implicit_objc_with);
-  Args.AddLastArg(Arguments, options::OPT_strict_keyword_arguments,
-                  options::OPT_no_strict_keyword_arguments);
-
   // Pass the optimization level down to the frontend.
   Args.AddLastArg(Arguments, options::OPT_O_Group);
-
-  // Handle the CPU and its preferences.
-  if (auto arg = Args.getLastArg(options::OPT_target_cpu)) {
-    arg->render(Args, Arguments);
-  } else {
-    configureDefaultCPU(getToolChain().getTriple(), Arguments);
-  }
-  Args.AddAllArgs(Arguments, options::OPT_target_feature);
-
-  // Default the ABI based on the triple.
-  configureDefaultABI(getToolChain().getTriple(), Arguments);
 
   if (Args.hasArg(options::OPT_parse_as_library) ||
       Args.hasArg(options::OPT_emit_library))
     Arguments.push_back("-parse-as-library");
 
   Args.AddLastArg(Arguments, options::OPT_parse_sil);
-
-  Args.AddLastArg(Arguments, options::OPT_parse_stdlib);
-
   Args.AddAllArgs(Arguments, options::OPT_l, options::OPT_framework);
 
   const std::string &ModuleOutputPath =
@@ -307,13 +307,6 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
     Arguments.push_back("-serialize-diagnostics");
     Arguments.push_back("-serialize-diagnostics-path");
     Arguments.push_back(SerializedDiagnosticsPath.c_str());
-  }
-  
-  // Pass on any build config options
-  for (const Arg *A : make_range(Args.filtered_begin(options::OPT_D),
-                                 Args.filtered_end())) {
-    Arguments.push_back("-D");
-    Arguments.push_back(A->getValue());
   }
 
   // Add the output file argument if necessary.
@@ -418,10 +411,18 @@ Job *LLDB::constructJob(const JobAction &JA,
   assert(Inputs->empty());
   assert(InputActions.empty());
 
-  ArgStringList Arguments;
-  Arguments.push_back("--repl");
+  // Squash important frontend options into a single argument for LLDB.
+  ArgStringList FrontendArgs;
+  addCommonFrontendArgs(getToolChain(), OI, Output.get(), Args, FrontendArgs);
 
-  // FIXME: LLDB doesn't currently handle any Swift arguments.
+  std::string SingleArg = "--repl=";
+  {
+    llvm::raw_string_ostream os(SingleArg);
+    Command::printArguments(os, FrontendArgs);
+  }
+
+  ArgStringList Arguments;
+  Arguments.push_back(Args.MakeArgString(std::move(SingleArg)));
 
   const char *Exec;
   if (isPresentRelativeToDriver()) {

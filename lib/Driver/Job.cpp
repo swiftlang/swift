@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/Fallthrough.h"
+#include "swift/Basic/STLExtras.h"
 #include "swift/Driver/Job.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Program.h"
@@ -91,11 +92,17 @@ static void escapeAndPrintString(llvm::raw_ostream &os, StringRef Str) {
   os << '"';
 }
 
+void Command::printArguments(llvm::raw_ostream &os,
+                             const llvm::opt::ArgStringList &Args) {
+  interleave(Args,
+             [&](const char *Arg) { escapeAndPrintString(os, Arg); },
+             [&] { os << ' '; });
+}
+
+
 void Command::printCommandLine(llvm::raw_ostream &os) const {
   escapeAndPrintString(os, Executable);
-  for (const char *Arg : Arguments) {
-    os << ' ';
-    escapeAndPrintString(os, Arg);
-  }
+  os << ' ';
+  printArguments(os, Arguments);
   os << '\n';
 }
