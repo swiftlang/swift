@@ -538,6 +538,44 @@ namespace {
       return std::unique_ptr<LogicalPathComponent>(clone);
     }
   };
+
+  /// Remap an weak value to Optional<T>*, or unowned pointer to T*.
+  class OwnershipComponent : public LogicalPathComponent {
+    ManagedValue Address;
+  public:
+    OwnershipComponent(ManagedValue address, LValueTypeData typeData)
+      : LogicalPathComponent(typeData), Address(address) {
+    }
+
+
+    ManagedValue get(SILGenFunction &gen, SILLocation loc,
+                     ManagedValue base, SGFContext c) const override {
+      assert(!base && "ownership component must be root of lvalue path");
+      auto &TL = gen.getTypeLowering(getTypeData().TypeOfRValue);
+
+      // Load the original value.
+      ManagedValue result = gen.emitLoad(loc, Address.getValue(), TL,
+                                         SGFContext(), IsNotTake);
+      return result;
+    }
+
+    void set(SILGenFunction &gen, SILLocation loc,
+             RValue &&value, ManagedValue base) const override {
+      assert(!base && "ownership component must be root of lvalue path");
+      auto &TL = gen.getTypeLowering(Address.getType());
+
+      gen.emitSemanticStore(loc,
+                            std::move(value).forwardAsSingleValue(gen, loc),
+                            Address.getValue(), TL, IsNotInitialization);
+    }
+
+    std::unique_ptr<LogicalPathComponent>
+    clone(SILGenFunction &gen, SILLocation loc) const override {
+      LogicalPathComponent *clone
+        = new OwnershipComponent(Address, getTypeData());
+      return std::unique_ptr<LogicalPathComponent>(clone);
+    }
+  };
 }
 
 LValue SILGenFunction::emitLValue(Expr *e) {
@@ -601,7 +639,10 @@ static LValue emitLValueForNonMemberVarDecl(SILGenFunction &gen,
     auto address = gen.emitLValueForDecl(loc, var, isDirectPropertyAccess);
     assert(address.isLValue() &&
            "physical lvalue decl ref must evaluate to an address");
-    lv.add<ValueComponent>(address, typeData);
+    if (!address.getType().is<ReferenceStorageType>())
+      lv.add<ValueComponent>(address, typeData);
+    else
+      lv.add<OwnershipComponent>(address, typeData);
   }
   return std::move(lv);
 }
