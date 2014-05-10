@@ -1101,6 +1101,8 @@ ERROR(invalid_weak_ownership_not_optional,attribute_parsing,none,
 ERROR(invalid_weak_ownership_unchecked_optional,attribute_parsing,none,
       "'weak' variable cannot have implicitly unwrapped optional type %0; did"
       " you mean 'unowned'?", (Type))
+ERROR(invalid_weak_let,attribute_parsing,none,
+      "'weak' must be a mutable variable, because it may change at runtime", ())
 
 // requires_stored_property_inits
 ERROR(requires_stored_property_inits_nonclass,attribute_parsing,none,
