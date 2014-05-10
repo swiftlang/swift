@@ -465,6 +465,14 @@ void darwin::DarwinTool::AddDarwinArch(const ArgList &Args,
   CmdArgs.push_back(Args.MakeArgString(ArchName));
 }
 
+static void addVersionString(const ArgList &inputArgs, ArgStringList &arguments,
+                             unsigned major, unsigned minor, unsigned micro) {
+  llvm::SmallString<8> buf;
+  llvm::raw_svector_ostream os{buf};
+  os << major << '.' << minor << '.' << micro;
+  arguments.push_back(inputArgs.MakeArgString(os.str()));
+}
+
 Job *darwin::Linker::constructJob(const JobAction &JA,
                                   std::unique_ptr<JobList> Inputs,
                                   std::unique_ptr<CommandOutput> Output,
@@ -578,10 +586,14 @@ Job *darwin::Linker::constructJob(const JobAction &JA,
       Arguments.push_back("-ios_simulator_version_min");
     else
       Arguments.push_back("-iphoneos_version_min");
-    Arguments.push_back("7.0.0");
+    unsigned major, minor, micro;
+    Triple.getiOSVersion(major, minor, micro);
+    addVersionString(Args, Arguments, major, minor, micro);
   } else {
     Arguments.push_back("-macosx_version_min");
-    Arguments.push_back("10.8.0");
+    unsigned major, minor, micro;
+    Triple.getMacOSXVersion(major, minor, micro);
+    addVersionString(Args, Arguments, major, minor, micro);
   }
 
   Arguments.push_back("-no_objc_category_merging");
