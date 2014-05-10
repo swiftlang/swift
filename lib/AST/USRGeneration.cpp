@@ -31,6 +31,9 @@ static inline StringRef getUSRSpacePrefix() {
 bool ide::printDeclUSR(const ValueDecl *D, raw_ostream &OS) {
   using namespace Mangle;
 
+  if (isa<VarDecl>(D) && !D->hasName())
+    return true; // Ignore.
+
   ValueDecl *VD = const_cast<ValueDecl *>(D);
 
   if (ClangNode ClangN = VD->getClangNode()) {
