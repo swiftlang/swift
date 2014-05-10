@@ -1870,6 +1870,11 @@ bool TypeChecker::isRepresentableInObjC(const AbstractFunctionDecl *AFD,
         }
         return false;
       }
+
+      // FIXME: Egregious hack to avoid our conversion operations becoming
+      // @objc for bridged classes, which causes extraneous thunks.
+      if (FD->getAttrs().isConversion())
+        return false;
     }
 
     // willSet/didSet implementations are never exposed to objc, they are always
@@ -2124,10 +2129,9 @@ bool TypeChecker::isRepresentableInObjC(const DeclContext *DC, Type T) {
 
   // Dictionary<K, V> is representable when K is a class inheriting from
   // NSObject and V is something compatible with AnyObject.
-  if (Context.LangOpts.ObjCBridgeDictionary) {
+  if (auto dictDecl = Context.getDictionaryDecl()) {
     if (auto boundGeneric = T->getAs<BoundGenericType>()) {
-      auto dictDecl = Context.getDictionaryDecl();
-      if (dictDecl && boundGeneric->getDecl() == dictDecl) {
+      if (boundGeneric->getDecl() == dictDecl) {
         // The key type must be a class that inherits from NSObject.
         auto keyType = boundGeneric->getGenericArgs()[0];
         bool canBridgeKey = false;

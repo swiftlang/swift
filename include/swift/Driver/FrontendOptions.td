@@ -134,7 +134,7 @@ def no_strict_keyword_arguments :
 
 def objc_bridge_dictionary :
   Flag<["-"], "objc-bridge-dictionary">,
-  HelpText<"Bridge Swift's Dictionary<K, V> to NSDictionary">;
+  HelpText<"Import NSDictionary* as Dictionary<NSObject, AnyObject>">;
 
 def enable_source_import : Flag<["-"], "enable-source-import">,
   HelpText<"Enable importing of Swift source files">;

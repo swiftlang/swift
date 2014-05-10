@@ -212,6 +212,7 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
     CMutablePointer,
     CConstPointer,
     Array,
+    Dictionary,
     Unmanaged,
   } kind = llvm::StringSwitch<StructKind>(swiftStructDecl->getName().str())
     .Case("UnsafePointer", StructKind::UnsafePointer)
@@ -219,13 +220,12 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
     .Case("CMutablePointer", StructKind::CMutablePointer)
     .Case("CConstPointer", StructKind::CConstPointer)
     .Case("Array", StructKind::Array)
+    .Case("Dictionary", StructKind::Dictionary)
     .Case("Unmanaged", StructKind::Unmanaged)
     .Default(StructKind::Invalid);
   
   auto args = type->getGenericArgs();
-  assert(args.size() == 1 &&
-         "*Pointer<T> should have a single generic argument!");
-  
+
   switch (kind) {
   case StructKind::Invalid:
     llvm_unreachable("Unexpected non-pointer generic struct type in imported"
@@ -235,6 +235,8 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
   case StructKind::Unmanaged:
   case StructKind::ObjCMutablePointer:
   case StructKind::CMutablePointer: {
+    assert(args.size() == 1 &&
+           "*Pointer<T> should have a single generic argument!");
     auto clangCanTy = visit(args.front()->getCanonicalType());
     return getClangASTContext().getPointerType(clangCanTy);
   }
@@ -247,7 +249,10 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
     return getClangASTContext().getCanonicalType(
                                   getClangASTContext().getPointerType(clangTy));
   }
-  }  
+
+  case StructKind::Dictionary:
+    return getClangIdType(getClangASTContext());
+  }
 }
 
 clang::CanQualType GenClangType::visitEnumType(CanEnumType type) {
