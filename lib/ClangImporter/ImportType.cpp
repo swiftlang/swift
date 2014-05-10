@@ -572,18 +572,6 @@ static Type importParameterPointerType(ClangImporter::Implementation &impl,
   // ownership map to ObjCMutablePointer<T>.
   } else if (quals.getObjCLifetime() == clang::Qualifiers::OCL_Autoreleasing ||
              quals.getObjCLifetime() == clang::Qualifiers::OCL_ExplicitNone) {
-    // Special case NSError**.
-    if (impl.hasFoundationModule())
-      if (auto OP = clangPointeeType->getAs<clang::ObjCObjectPointerType>())
-        if (auto OI = OP->getPointeeType()->getAs<clang::ObjCInterfaceType>())
-          if (OI->getDecl()->getName() == "NSError") {
-            auto FM = impl.getFoundationModule();
-            auto Ty = impl.getNamedSwiftType(FM, "NSErrorResult");
-            if (Ty) {
-              return Ty;
-            }
-          }
-
     return impl.getNamedSwiftTypeSpecialization(impl.getStdlibModule(),
                                                 "ObjCMutablePointer", pointeeType);
 
@@ -1033,8 +1021,6 @@ Type ClangImporter::Implementation::getNamedSwiftType(Module *module,
   UnqualifiedLookup lookup(SwiftContext.getIdentifier(name), module,
                            getTypeResolver());
   if (auto type = lookup.getSingleTypeResult()) {
-    if (typeResolver)
-      typeResolver->resolveDeclSignature(type);
     return type->getDeclaredType();
   }
 
