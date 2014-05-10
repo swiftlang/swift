@@ -263,7 +263,7 @@ public:
     };
 
     /// \brief The type of storage used for a kind and numeric value.
-    typedef Fixnum<29> KindAndValueStorage;
+    typedef Fixnum<52> KindAndValueStorage;
 
     /// \brief The actual storage for the path element, which involves both a
     /// kind and (potentially) a value.
