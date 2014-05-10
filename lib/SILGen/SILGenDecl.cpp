@@ -623,23 +623,21 @@ SILGenFunction::emitInitializationForVarDecl(VarDecl *vd, bool isArgument,
   if (isa<InOutType>(varType))
     return InitializationPtr(new InOutInitialization(vd));
 
+  // Initializing a weak or unowned variable requires a change in type.
+  if (isa<ReferenceStorageType>(varType))
+    return InitializationPtr(new ReferenceStorageInitialization(
+                                            emitLocalVariableWithCleanup(vd)));
+
   // If this is a 'let' initialization for a non-address-only type, set up a
   // let binding, which stores the initialization value into VarLocs directly.
   if (vd->isLet())
     return InitializationPtr(new LetValueInitialization(vd, isArgument, *this));
 
-  // Otherwise, we have a normal local-variable initialization.
-  auto varInit = emitLocalVariableWithCleanup(vd);
-
-  // Initializing a @weak or @unowned variable requires a change in type.
-  if (isa<ReferenceStorageType>(varType))
-    return InitializationPtr(new ReferenceStorageInitialization(
-                                                       std::move(varInit)));
-
-  // Otherwise, the pattern type should match the type of the variable.
+  // Otherwise, we have a normal local-variable initialization and the pattern
+  // type should match the type of the variable.
   // FIXME: why do we ever get patterns without types here?
   assert(!patternType || varType == patternType->getCanonicalType());
-  return varInit;
+  return emitLocalVariableWithCleanup(vd);
 }
 
 void SILGenFunction::visitPatternBindingDecl(PatternBindingDecl *D) {

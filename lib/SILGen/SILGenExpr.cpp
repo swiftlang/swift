@@ -829,11 +829,7 @@ static SILValue getAddressForInPlaceInitialization(Initialization *I) {
     address = I->getAddress();
     break;
   }
-  // Don't emit directly into reference storage slots; these always require an
-  // additional semantic conversion.
-  if (address && !address.getType().is<ReferenceStorageType>())
-    return address;
-  return SILValue();
+  return address;
 }
 
 SILValue SILGenFunction::
