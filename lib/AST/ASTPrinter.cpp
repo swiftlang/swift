@@ -174,10 +174,34 @@ class PrintAST : public ASTVisitor<PrintAST> {
     }
   }
 
+  void printSwiftDocumentationComment(const Decl *D) {
+    auto RC = D->getRawComment();
+    if (RC.isEmpty())
+      return;
+
+    Printer.printNewline();
+    indent();
+
+    SmallVector<StringRef, 8> Lines;
+    for (const auto &SRC : RC.Comments) {
+      Lines.clear();
+
+      StringRef RawText = SRC.RawText.rtrim("\n\r");
+      unsigned WhitespaceToTrim = SRC.StartColumn - 1;
+      trimLeadingWhitespaceFromLines(RawText, WhitespaceToTrim, Lines);
+
+      for (auto Line : Lines) {
+        Printer << Line;
+        Printer.printNewline();
+      }
+    }
+  }
+
   void printDocumentationComment(Decl *D) {
     if (!Options.PrintDocumentationComments)
       return;
 
+    // Try to print a comment from Clang.
     auto MaybeClangNode = D->getClangNode();
     if (MaybeClangNode) {
       if (auto *CD = MaybeClangNode.getAsDecl())
@@ -185,7 +209,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
       return;
     }
 
-    // FIXME: print native Swift documentation comments.
+    printSwiftDocumentationComment(D);
   }
 
   void printStaticKeyword(StaticSpellingKind StaticSpelling) {
