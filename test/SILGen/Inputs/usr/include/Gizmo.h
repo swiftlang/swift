@@ -1,21 +1,12 @@
+#import "ObjectiveC.h"
+
 @protocol NSAnsing
 - (void) anse;
 @end
 
-@interface NSObject
-+ (NSObject*) alloc;
-- (NSObject*) init;
-+ (NSObject*) new;
-+ (void) load;
-@property Class classProp;
+@interface NSObject (NSAnsing)
 @property Class<NSAnsing> qualifiedClassProp;
 @end
-
-#define NS_RETURNS_INNER_POINTER __attribute__((objc_returns_inner_pointer))
-#define NS_RETURNS_RETAINED __attribute__((ns_returns_retained))
-#define NS_CONSUMES_SELF __attribute__((ns_consumes_self))
-#define NS_CONSUMED __attribute__((ns_consumed))
-#define OBJC_DESIGNATED_INITIALIZER __attribute__((objc_designated_initializer))
 
 struct Rect {
   float x;

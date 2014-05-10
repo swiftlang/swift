@@ -1,21 +1,4 @@
-typedef signed char BOOL;
-@class NSString;
-
-@protocol NSCopying
-- (id) copyWithZone: (void*)zone;
-@end
-
-@interface NSObject
-+ (NSObject*) alloc;
-- (NSObject*) init;
-+ (NSObject*) new;
-+ (void) load;
-
-- (NSString*) description;
-
-@property NSString *stringProperty;
-
-@end
+#import "ObjectiveC.h"
 
 @interface NSString : NSObject<NSCopying>
 
@@ -28,6 +11,9 @@ typedef signed char BOOL;
 
 - (instancetype)initWithObjects:(const id *)objects count:(int)count;
 
+@end
+
+@interface NSDictionary : NSObject
 @end
 
 @interface Foo : NSObject

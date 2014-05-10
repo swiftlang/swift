@@ -1,4 +1,20 @@
-module ansible { header "Ansible.h" }
-module gizmo { header "Gizmo.h" }
-module Foundation { header "BridgeTestFoundation.h" }
-module CoreCooling { header "CoreCooling.h" }
+module ansible { 
+  header "Ansible.h" 
+  export *
+}
+module gizmo { 
+  header "Gizmo.h" 
+  export *
+}
+module ObjectiveC { 
+  header "ObjectiveC.h" 
+  export *
+}
+module Foundation { 
+  header "BridgeTestFoundation.h" 
+  export *
+}
+module CoreCooling { 
+  header "CoreCooling.h" 
+  export *
+}
