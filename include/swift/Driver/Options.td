@@ -20,9 +20,6 @@ include "llvm/Option/OptParser.td"
 /////////
 // Flags
 
-// The option is a "driver" option, and should not be forwarded to other tools.
-def DriverOption : OptionFlag;
-
 // The option should be accepted by swift -frontend.
 def FrontendOption : OptionFlag;
 
@@ -60,7 +57,7 @@ def internal_debug_Group :
   Group<internal_Group>, HelpText<"DEBUG/DEVELOPMENT OPTIONS">;
 
 class InternalDebugOpt : Group<internal_debug_Group>,
-  Flags<[DriverOption, HelpHidden]>;
+  Flags<[HelpHidden]>;
 
 def driver_print_actions : Flag<["-"], "driver-print-actions">,
   InternalDebugOpt, HelpText<"Dump list of actions to perform">;
@@ -75,11 +72,11 @@ def driver_skip_execution : Flag<["-"], "driver-skip-execution">,
   InternalDebugOpt,
   HelpText<"Skip execution of subtasks when performing compilation">;
 
-def help : Flag<["-", "--"], "help">, Flags<[DriverOption, FrontendOption]>,
+def help : Flag<["-", "--"], "help">, Flags<[FrontendOption]>,
   HelpText<"Display available options">;
 def h : Flag<["-"], "h">, Alias<help>;
 def help_hidden : Flag<["-", "--"], "help-hidden">,
-  Flags<[HelpHidden, DriverOption, FrontendOption]>,
+  Flags<[HelpHidden, FrontendOption]>,
   HelpText<"Display available options, including hidden options">;
 
 def v : Flag<["-"], "v">,
@@ -88,18 +85,17 @@ def version : Flag<["-", "--"], "version">;
 
 // Standard Options
 def _DASH_DASH : Option<["--"], "", KIND_REMAINING_ARGS>,
-  Flags<[DriverOption, FrontendOption]>;
+  Flags<[FrontendOption]>;
 
-def o : JoinedOrSeparate<["-"], "o">,
-  Flags<[DriverOption, FrontendOption]>,
+def o : JoinedOrSeparate<["-"], "o">, Flags<[FrontendOption]>,
   HelpText<"Write output to <file>">, MetaVarName<"<file>">;
 
-def j : JoinedOrSeparate<["-"], "j">, Flags<[DriverOption]>,
+def j : JoinedOrSeparate<["-"], "j">,
   HelpText<"Number of commands to execute in parallel">, MetaVarName<"<n>">;
 
-def arch : Separate<["-"], "arch">, Flags<[DriverOption]>,
+def arch : Separate<["-"], "arch">,
   HelpText<"Compile for architecture <arch>">, MetaVarName<"<arch>">;
-def sdk : Separate<["-"], "sdk">, Flags<[DriverOption, FrontendOption]>,
+def sdk : Separate<["-"], "sdk">, Flags<[FrontendOption]>,
   HelpText<"Compile against <sdk>">, MetaVarName<"<sdk>">;
 def g : Flag<["-"], "g">, Flags<[FrontendOption]>,
   HelpText<"Emit debug info">;
@@ -109,13 +105,11 @@ def D : JoinedOrSeparate<["-"], "D">, Flags<[FrontendOption]>,
 
 def F : JoinedOrSeparate<["-"], "F">, Flags<[FrontendOption]>,
   HelpText<"Add directory to framework search path">;
-def F_EQ : Joined<["-"], "F=">, Flags<[FrontendOption]>,
-  Alias<F>;
+def F_EQ : Joined<["-"], "F=">, Flags<[FrontendOption]>, Alias<F>;
 
 def I : JoinedOrSeparate<["-"], "I">, Flags<[FrontendOption]>,
   HelpText<"Add directory to the import search path">;
-def I_EQ : Joined<["-"], "I=">, Flags<[FrontendOption]>,
-  Alias<I>;
+def I_EQ : Joined<["-"], "I=">, Flags<[FrontendOption]>, Alias<I>;
 
 def import_underlying_module : Flag<["-"], "import-underlying-module">,
   Flags<[FrontendOption]>,
@@ -124,22 +118,21 @@ def import_objc_header : Separate<["-"], "import-objc-header">,
   Flags<[FrontendOption,HelpHidden]>,
   HelpText<"Implicitly imports an Objective-C header file">;
 
-def nostdimport : Flag<["-"], "nostdimport">,
-  Flags<[DriverOption,FrontendOption]>,
+def nostdimport : Flag<["-"], "nostdimport">, Flags<[FrontendOption]>,
   HelpText<"Don't search the standard library import path for modules">;
 
-def output_file_map : Separate<["-"], "output-file-map">, Flags<[DriverOption]>,
+def output_file_map : Separate<["-"], "output-file-map">,
   HelpText<"A file which specifies the location of outputs">,
   MetaVarName<"<path>">;
 def output_file_map_EQ : Joined<["-"], "output-file-map=">,
-  Flags<[DriverOption]>, Alias<output_file_map>;
+  Alias<output_file_map>;
 
 def serialize_diagnostics : Flag<["-"], "serialize-diagnostics">,
-  Flags<[DriverOption, FrontendOption]>,
+  Flags<[FrontendOption]>,
   HelpText<"Serialize diagnostics in a binary format">;
 
 def module_cache_path : Separate<["-"], "module-cache-path">,
-  Flags<[DriverOption, FrontendOption]>,
+  Flags<[FrontendOption]>,
   HelpText<"Specifies the Clang module cache path">;
 
 def module_name : Separate<["-"], "module-name">, Flags<[FrontendOption]>,
@@ -188,7 +181,7 @@ def import_cf_types : Flag<["-"], "import-cf-types">,
 
 // Platform options.
 def enable_app_extension : Flag<["-"], "application-extension">,
-  Flags<[DriverOption, FrontendOption]>,
+  Flags<[FrontendOption]>,
   HelpText<"Restrict code to those available for App Extensions">;
 
 // Linker options
@@ -234,13 +227,12 @@ def AssertConfig : Separate<["-"], "assert-config">,
 // File types
 
 def parse_as_library : Flag<["-"], "parse-as-library">,
-  Flags<[DriverOption, FrontendOption]>,
+  Flags<[FrontendOption]>,
   HelpText<"Parse the input file(s) as libraries, not scripts">;
-def parse_sil : Flag<["-"], "parse-sil">,
-  Flags<[DriverOption, FrontendOption]>,
+def parse_sil : Flag<["-"], "parse-sil">, Flags<[FrontendOption]>,
   HelpText<"Parse the input file as SIL code, not Swift source">;
 def parse_stdlib : Flag<["-"], "parse-stdlib">,
-  Flags<[DriverOption, FrontendOption, HelpHidden]>,
+  Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Parse the input file(s) as the Swift standard library">;
 
 def modes_Group : OptionGroup<"<mode options>">, HelpText<"MODES">;
@@ -248,9 +240,9 @@ def modes_Group : OptionGroup<"<mode options>">, HelpText<"MODES">;
 class ModeOpt : Group<modes_Group>;
 
 // Output Modes
-def emit_executable : Flag<["-"], "emit-executable">, Flags<[DriverOption]>,
+def emit_executable : Flag<["-"], "emit-executable">,
   HelpText<"Emit a linked executable">, ModeOpt;
-def emit_library : Flag<["-"], "emit-library">, Flags<[DriverOption]>,
+def emit_library : Flag<["-"], "emit-library">,
   HelpText<"Emit a linked library">, ModeOpt;
 def emit_object : Flag<["-"], "emit-object">, Flags<[FrontendOption]>,
   HelpText<"Emit object file(s) (-c)">, ModeOpt;
@@ -294,34 +286,32 @@ def i : Flag<["-"], "i">, HelpText<"Immediate mode">, Flags<[FrontendOption]>,
 def force_single_frontend_invocation :
   Flag<["-"], "force-single-frontend-invocation">,
   HelpText<"Compile the module using a single frontend invocation">,
-  Flags<[DriverOption, HelpHidden]>;
+  Flags<[HelpHidden]>;
 
-def Xfrontend : Separate<["-"], "Xfrontend">, Flags<[DriverOption]>,
+def Xfrontend : Separate<["-"], "Xfrontend">,
   MetaVarName<"<arg>">, HelpText<"Pass <arg> to the Swift frontend">;
 
-def Xcc : Separate<["-"], "Xcc">, Flags<[DriverOption, FrontendOption]>,
+def Xcc : Separate<["-"], "Xcc">, Flags<[FrontendOption]>,
   MetaVarName<"<arg>">,
   HelpText<"Pass <arg> to the C/C++/Objective-C compiler">;
 
-def Xllvm : Separate<["-"], "Xllvm">, Flags<[DriverOption, FrontendOption]>,
+def Xllvm : Separate<["-"], "Xllvm">, Flags<[FrontendOption]>,
   MetaVarName<"<arg>">,
   HelpText<"Pass <arg> to LLVM.">;
 
 def resource_dir : Separate<["-"], "resource-dir">,
-  Flags<[DriverOption, FrontendOption, HelpHidden]>,
+  Flags<[FrontendOption, HelpHidden]>,
   MetaVarName<"</usr/lib/swift>">,
   HelpText<"The directory that holds the compiler resource files">;
 
-def target : Separate<["-"], "target">, Flags<[DriverOption, FrontendOption]>,
+def target : Separate<["-"], "target">, Flags<[FrontendOption]>,
   HelpText<"Generate code for the given target">;
 def target_legacy_spelling : Joined<["--"], "target=">,
-  Flags<[DriverOption, FrontendOption]>, Alias<target>;
+  Flags<[FrontendOption]>, Alias<target>;
 
-def target_cpu : Separate<["-"], "target-cpu">,
-  Flags<[DriverOption, FrontendOption]>,
+def target_cpu : Separate<["-"], "target-cpu">, Flags<[FrontendOption]>,
   HelpText<"Generate code for a particular CPU variant">;
-def target_feature : Separate<["-"], "target-feature">,
-  Flags<[DriverOption, FrontendOption]>,
+def target_feature : Separate<["-"], "target-feature">, Flags<[FrontendOption]>,
   HelpText<"Generate code with a particular CPU feature enabled or disabled">,
   MetaVarName<"[+-]<feature-name>">;
 

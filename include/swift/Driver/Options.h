@@ -27,9 +27,8 @@ namespace options {
   /// Flags specifically for Swift driver options.  Must not overlap with
   /// llvm::opt::DriverFlag.
   enum SwiftFlags {
-    DriverOption = (1 << 4),
-    FrontendOption = (1 << 5),
-    NoDriverOption = (1 << 6),
+    FrontendOption = (1 << 4),
+    NoDriverOption = (1 << 5),
   };
 
   enum ID {
