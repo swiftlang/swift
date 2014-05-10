@@ -17,9 +17,12 @@
 #ifndef SWIFT_DRIVER_COMPILATION_H
 #define SWIFT_DRIVER_COMPILATION_H
 
+#include "swift/Basic/LLVM.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/StringRef.h"
 
 #include <memory>
+#include <vector>
 
 namespace llvm {
 namespace opt {
@@ -64,11 +67,16 @@ class Compilation {
   /// The Jobs which will be performed by this compilation.
   std::unique_ptr<JobList> Jobs;
 
-  // The original (untranslated) input argument list.
+  /// The original (untranslated) input argument list.
   std::unique_ptr<llvm::opt::InputArgList> InputArgs;
 
-  // The translated input arg list.
+  /// The translated input arg list.
   std::unique_ptr<llvm::opt::DerivedArgList> TranslatedArgs;
+
+  /// Temporary files that should be cleaned up after the compilation finishes.
+  ///
+  /// These apply whether the compilation succeeds or fails.
+  std::vector<std::string> TempFilePaths;
 
   /// The number of commands which this compilation should attempt to run in
   /// parallel.
@@ -96,6 +104,9 @@ public:
 
   JobList &getJobs() const { return *Jobs; }
   void addJob(Job *J);
+  void addTemporaryFile(StringRef file) {
+    TempFilePaths.push_back(file.str());
+  }
 
   const llvm::opt::InputArgList &getInputArgs() const { return *InputArgs; }
 

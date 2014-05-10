@@ -127,6 +127,9 @@ def output_file_map : Separate<["-"], "output-file-map">,
 def output_file_map_EQ : Joined<["-"], "output-file-map=">,
   Alias<output_file_map>;
 
+def save_temps : Flag<["-"], "save-temps">,
+  HelpText<"Save intermediate compilation results">;
+
 def serialize_diagnostics : Flag<["-"], "serialize-diagnostics">,
   Flags<[FrontendOption]>,
   HelpText<"Serialize diagnostics in a binary format">;

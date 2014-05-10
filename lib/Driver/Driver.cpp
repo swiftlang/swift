@@ -649,8 +649,14 @@ void Driver::buildJobs(const ActionList &Actions, const OutputInfo &OI,
   }
 
   for (const Action *A : Actions) {
+    bool saveTemps = Args.hasArg(options::OPT_save_temps);
     Job *J = buildJobsForAction(C, A, OI, OFM, C.getDefaultToolChain(), true,
-                                JobCache);
+                                JobCache, [&C, saveTemps](StringRef path) {
+      if (saveTemps || path.empty())
+        return;
+      C.addTemporaryFile(path);
+    });
+
     C.addJob(J);
   }
 }
@@ -777,11 +783,69 @@ static StringRef getOutputFilename(const JobAction *JA,
   return Buffer.str();
 }
 
+static void
+collectTemporaryFilesForAction(const Action &A, const Job &J,
+                               const OutputInfo &OI, const OutputFileMap *OFM,
+                               std::function<void(StringRef)> callback) {
+  if (isa<MergeModuleJobAction>(A)) {
+    for (const Job *input : cast<Command>(J).getInputs()) {
+      auto cmd = dyn_cast<Command>(input);
+      if (!cmd)
+        continue;
+      const CommandOutput &output = cmd->getOutput();
+      const TypeToPathMap *outputMap = nullptr;
+      if (OFM)
+        outputMap = OFM->getOutputMapForInput(output.getBaseInput());
+      if (!outputMap || outputMap->lookup(types::TY_SwiftModuleFile).empty())
+        callback(output.getAnyOutputForType(types::TY_SwiftModuleFile));
+      if (!outputMap || outputMap->lookup(types::TY_SwiftModuleDocFile).empty())
+        callback(output.getAnyOutputForType(types::TY_SwiftModuleDocFile));
+    }
+    return;
+  }
+
+  if (isa<LinkJobAction>(A)) {
+    for (const Job *input : cast<Command>(J).getInputs()) {
+      auto cmd = dyn_cast<Command>(input);
+      if (!cmd)
+        continue;
+      const CommandOutput &output = cmd->getOutput();
+      const TypeToPathMap *outputMap = nullptr;
+      if (OFM)
+        outputMap = OFM->getOutputMapForInput(output.getBaseInput());
+
+      switch (output.getPrimaryOutputType()) {
+        case types::TY_Object:
+          if (!outputMap || outputMap->lookup(types::TY_Object).empty())
+            callback(output.getPrimaryOutputFilename());
+          break;
+        case types::TY_SwiftModuleFile:
+          if (!OI.ShouldTreatModuleAsTopLevelOutput) {
+            if (!outputMap ||
+                outputMap->lookup(types::TY_SwiftModuleFile).empty()) {
+              callback(output.getPrimaryOutputFilename());
+            }
+            if (!outputMap ||
+                outputMap->lookup(types::TY_SwiftModuleDocFile).empty()) {
+              callback(output.getAdditionalOutputForType(
+                  types::TY_SwiftModuleDocFile));
+            }
+          }
+          break;
+        default:
+          break;
+      }
+    }
+    return;
+  }
+}
+
 Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
                                 const OutputInfo &OI,
                                 const OutputFileMap *OFM,
                                 const ToolChain &TC, bool AtTopLevel,
-                                JobCacheMap &JobCache) const {
+                                JobCacheMap &JobCache,
+                                const TemporaryCallback &callback) const {
   // 1. See if we've already got this cached.
   std::pair<const Action *, const ToolChain *> Key(A, &TC);
   {
@@ -801,7 +865,7 @@ Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
     } else {
       InputJobs->addJob(buildJobsForAction(C, Input, OI, OFM,
                                            C.getDefaultToolChain(), false,
-                                           JobCache));
+                                           JobCache, callback));
     }
   }
 
@@ -1008,6 +1072,7 @@ Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
   // 5. Construct a Job which produces the right CommandOutput.
   Job *J = T->constructJob(*JA, std::move(InputJobs), std::move(Output),
                            InputActions, C.getArgs(), OI);
+  collectTemporaryFilesForAction(*JA, *J, OI, OFM, callback);
 
   // 6. Add it to the JobCache, so we don't construct the same Job multiple
   // times.

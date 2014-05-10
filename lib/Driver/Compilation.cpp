@@ -21,6 +21,7 @@
 #include "swift/Driver/Tool.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/Option/ArgList.h"
+#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
@@ -251,8 +252,7 @@ int Compilation::performJobs() {
   // TODO: determine if an option requires buffered output; right now, none do
   bool RequiresBufferedOutput = false;
   if (!RequiresBufferedOutput) {
-    const Command *OnlyCmd = getOnlyCommandInList(Jobs.get());
-    if (OnlyCmd)
+    if (const Command *OnlyCmd = getOnlyCommandInList(Jobs.get()))
       return performSingleCommand(OnlyCmd);
   }
 
@@ -269,5 +269,14 @@ int Compilation::performJobs() {
   // which have been determined that they don't need to run.
   CommandSet FinishedCommands;
 
-  return performJobsInList(*Jobs, ScheduledCommands, FinishedCommands);
+  int result = performJobsInList(*Jobs, ScheduledCommands, FinishedCommands);
+
+  // FIXME: Do we want to be deleting temporaries even when a child process
+  // crashes?
+  for (auto &path : TempFilePaths) {
+    // Ignore the error code for removing temporary files.
+    (void)llvm::sys::fs::remove(path);
+  }
+
+  return result;
 }
