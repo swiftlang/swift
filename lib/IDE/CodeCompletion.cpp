@@ -854,6 +854,40 @@ class CompletionLookup : public swift::VisibleDeclConsumer {
   Optional<SemanticContextKind> ForcedSemanticContext = {};
 
 public:
+  bool FoundFunctionCalls = false;
+  bool FoundFunctionsWithoutFirstKeyword = false;
+
+private:
+  void foundFunction(const AbstractFunctionDecl *AFD) {
+    FoundFunctionCalls = true;
+    DeclName Name = AFD->getFullName();
+    auto ArgNames = Name.getArgumentNames();
+    if (ArgNames.empty())
+      return;
+    if (ArgNames[0].empty())
+      FoundFunctionsWithoutFirstKeyword = true;
+  }
+
+  void foundFunction(const AnyFunctionType *AFT) {
+    FoundFunctionCalls = true;
+    Type In = AFT->getInput();
+    if (!In)
+      return;
+    if (isa<ParenType>(In.getPointer())) {
+      FoundFunctionsWithoutFirstKeyword = true;
+      return;
+    }
+    TupleType *InTuple = In->getAs<TupleType>();
+    if (!InTuple)
+      return;
+    auto Fields = InTuple->getFields();
+    if (Fields.empty())
+      return;
+    if (!Fields[0].hasName())
+      FoundFunctionsWithoutFirstKeyword = true;
+  }
+
+public:
   struct RequestedResultsTy {
     const Module *TheModule;
     bool OnlyTypes;
@@ -1165,6 +1199,7 @@ public:
   }
 
   void addFunctionCall(const AnyFunctionType *AFT) {
+    foundFunction(AFT);
     CodeCompletionResultBuilder Builder(
         Sink,
         CodeCompletionResult::ResultKind::Pattern,
@@ -1192,6 +1227,7 @@ public:
   }
 
   void addMethodCall(const FuncDecl *FD, DeclVisibilityKind Reason) {
+    foundFunction(FD);
     bool IsImplicitlyCurriedInstanceMethod;
     switch (Kind) {
     case LookupKind::ValueExpr:
@@ -1289,6 +1325,7 @@ public:
 
   void addConstructorCall(const ConstructorDecl *CD,
                           DeclVisibilityKind Reason) {
+    foundFunction(CD);
     CodeCompletionResultBuilder Builder(
         Sink,
         CodeCompletionResult::ResultKind::Declaration,
@@ -2107,8 +2144,12 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     if (ParsedExpr->getType())
       Lookup.getValueExprCompletions(ParsedExpr->getType());
 
-    Lookup.setHaveLParen(false);
-    DoPostfixExprBeginning();
+    if (!Lookup.FoundFunctionCalls ||
+        (Lookup.FoundFunctionCalls &&
+         Lookup.FoundFunctionsWithoutFirstKeyword)) {
+      Lookup.setHaveLParen(false);
+      DoPostfixExprBeginning();
+    }
     break;
   }
 
