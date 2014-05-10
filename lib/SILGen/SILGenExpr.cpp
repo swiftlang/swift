@@ -468,8 +468,16 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
              !It->second.getConstant().getType().isAddress() &&
              "LValue cases should be handled above");
 
-      auto Result = ManagedValue::forUnmanaged(It->second.getConstant());
-      
+      SILValue Scalar = It->second.getConstant();
+
+      // For weak and unowned types, convert the reference to the right
+      // pointer.
+      if (Scalar.getType().is<ReferenceStorageType>())
+        Scalar = emitConversionToSemanticRValue(loc, Scalar,
+                                                getTypeLowering(refType));
+
+      auto Result = ManagedValue::forUnmanaged(Scalar);
+
       // If the client can't handle a +0 result, retain it to get a +1.
       return C.isPlusZeroOk() ? Result : Result.copyUnmanaged(*this, loc);
     }
@@ -2309,7 +2317,7 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
 #endif
 
       // Non-address-only constants are passed at +1.
-      auto &tl = getTypeLowering(vd->getType());
+      auto &tl = getTypeLowering(vd->getType()->getReferenceStorageReferent());
       
       if (tl.isLoadable()) {
         SILValue Val;
@@ -2328,7 +2336,17 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
         // Use an RValue to explode Val if it is a tuple.
         RValue RV(*this, loc, vd->getType()->getCanonicalType(),
                   ManagedValue::forUnmanaged(Val));
-        std::move(RV).forwardAll(*this, capturedArgs);
+
+        // If we're capturing an unowned pointer by value, we will have just
+        // loaded it into a normal retained class pointer, but we capture it as
+        // an unowned pointer.  Convert back now.
+        if (vd->getType()->is<ReferenceStorageType>()) {
+          auto type = getTypeLowering(vd->getType()).getLoweredType();
+          auto val = std::move(RV).forwardAsSingleStorageValue(*this, type,loc);
+          capturedArgs.push_back(val);
+         } else {
+           std::move(RV).forwardAll(*this, capturedArgs);
+         }
         break;
       }
       
