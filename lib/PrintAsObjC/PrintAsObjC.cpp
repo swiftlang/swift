@@ -422,7 +422,7 @@ private:
       os << "NSDictionary *";
       return true;
     }
-    
+
     // Everything from here on is some kind of pointer type.
     if (unsafePointerID.empty()) {
       cConstPointerID = ctx.getIdentifier("CConstPointer");
