@@ -4285,13 +4285,13 @@ static bool diagnoseRelabel(TypeChecker &tc, Expr *expr,
 
   // Emit the diagnostic.
   assert(numMissing > 0 || numExtra > 0 || numWrong > 0);
+  llvm::SmallString<16> haveBuffer; // note: diagOpt has references to this
+  llvm::SmallString<16> expectedBuffer; // note: diagOpt has references to this
   Optional<InFlightDiagnostic> diagOpt;
 
   // If we had any wrong labels, or we have both missing and extra labels,
   // emit the catch-all "wrong labels" diagnostic.
   bool plural = (numMissing + numExtra + numWrong) > 1;
-  llvm::SmallString<16> haveBuffer; // note: diagOpt has references to this
-  llvm::SmallString<16> expectedBuffer; // note: diagOpt has references to this
   if (numWrong > 0 || (numMissing > 0 && numExtra > 0)) {
     for(unsigned i = 0, n = tuple->getNumElements(); i != n; ++i) {
       auto haveName = tuple->getElementName(i);
