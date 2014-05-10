@@ -147,10 +147,13 @@ DestroyAddrInst *SILBuilder::emitDestroyAddr(SILLocation Loc, SILValue Operand){
   return createDestroyAddr(Loc, Operand);
 }
 
-static bool couldReduceRefcount(SILInstruction *Inst) {
+static bool couldReduceStrongRefcount(SILInstruction *Inst) {
   // Simple memory accesses cannot reduce refcounts.
   if (isa<LoadInst>(Inst) || isa<StoreInst>(Inst) ||
-      isa<RetainValueInst>(Inst))
+      isa<RetainValueInst>(Inst) || isa<UnownedRetainInst>(Inst) ||
+      isa<UnownedReleaseInst>(Inst) || isa<StrongRetainUnownedInst>(Inst) ||
+      isa<StoreWeakInst>(Inst) ||
+      isa<AllocStackInst>(Inst) || isa<DeallocStackInst>(Inst))
     return false;
 
   // Assign and copyaddr of trivial types cannot drop refcounts, and 'inits'
@@ -200,8 +203,8 @@ StrongReleaseInst *SILBuilder::emitStrongRelease(SILLocation Loc,
       continue;
     }
 
-    // Scan past simple instructions that cannot reduce refcounts.
-    if (couldReduceRefcount(Inst))
+    // Scan past simple instructions that cannot reduce strong refcounts.
+    if (couldReduceStrongRefcount(Inst))
       break;
   }
 
@@ -230,7 +233,7 @@ SILBuilder::emitReleaseValue(SILLocation Loc, SILValue Operand) {
     }
 
     // Scan past simple instructions that cannot reduce refcounts.
-    if (couldReduceRefcount(Inst))
+    if (couldReduceStrongRefcount(Inst))
       break;
   }
 
