@@ -17,6 +17,7 @@
 + description;
 - (BOOL)allowsWeakReference __attribute__((unavailable));
 - (BOOL)isEqual:(NSObject *)other;
+@property (readonly) NSInteger hash;
 @end
 
 @interface A : NSObject

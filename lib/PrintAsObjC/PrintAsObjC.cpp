@@ -417,6 +417,12 @@ private:
       return true;
     }
 
+    if (SD == ctx.getDictionaryDecl()) {
+      // FIXME: IT'd be nice to put the element type here as well.
+      os << "NSDictionary *";
+      return true;
+    }
+    
     // Everything from here on is some kind of pointer type.
     if (unsafePointerID.empty()) {
       cConstPointerID = ctx.getIdentifier("CConstPointer");
