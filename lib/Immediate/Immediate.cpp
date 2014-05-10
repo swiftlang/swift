@@ -1295,11 +1295,11 @@ public:
   /// Tear down the REPL environment, running REPL exit hooks set up by the
   /// stdlib if available.
   void exitREPL() {
-    /// Invoke replExit() if available.
-    UnqualifiedLookup lookup(CI.getASTContext().getIdentifier("replExit"),
+    /// Invoke _replExit() if available.
+    UnqualifiedLookup lookup(CI.getASTContext().getIdentifier("_replExit"),
                              &REPLInputFile, nullptr);
     if (lookup.isSuccess()) {
-      executeSwiftSource("replExit()\n", CmdLine);
+      executeSwiftSource("_replExit()\n", CmdLine);
     }
   }
 };
