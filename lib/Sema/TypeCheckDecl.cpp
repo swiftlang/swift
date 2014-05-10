@@ -1960,6 +1960,12 @@ public:
                                  "_convertUnsafePointerToCConstPointer",
                                  "_convertCConstPointerToUnsafePointer");
     }
+
+    if (Module *module = TC.Context.LoadedModules.lookup("Foundation")) {
+      checkObjCBridgingFunctions(module, "NSDictionary",
+                                 "_convertNSDictionaryToDictionary",
+                                 "_convertDictionaryToNSDictionary");
+    }
   }
   
   void markAsObjC(ValueDecl *D, bool isObjC) {
@@ -3319,9 +3325,13 @@ public:
     } else if (outerGenericParams) {
       if (TC.validateGenericFuncSignature(FD))
         isInvalid = true;
-      else {
+      else if (!FD->hasType()) {
         // Revert all of the types within the signature of the function.
         TC.revertGenericFuncSignature(FD);
+      } else {
+        // Recursively satisfied.
+        // FIXME: This is an awful hack.
+        return;
       }
     }
 

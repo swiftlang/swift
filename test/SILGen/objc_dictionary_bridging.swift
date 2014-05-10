@@ -1,0 +1,59 @@
+// RUN: rm -rf %t/clang-module-cache
+// RUN: %swift -emit-silgen -module-cache-path %t/clang-module-cache -target x86_64-apple-darwin13 -sdk %S/Inputs -I %S/Inputs -objc-bridge-dictionary -enable-source-import %s | FileCheck %s
+
+import Foundation
+import gizmo
+
+@objc class Foo : NSObject, Hashable {
+  var hashValue: Int { return 5 }  
+
+  // Bridging dictionary parameters
+  // CHECK-LABEL: sil @_TToFC24objc_dictionary_bridging3Foo23bridge_Dictionary_param{{.*}} : $@cc(objc_method) @thin (NSDictionary, Foo) -> ()
+  func bridge_Dictionary_param(dict: Dictionary<Foo, Foo>) {
+    // CHECK: bb0([[NSDICT:%[0-9]+]] : $NSDictionary, [[SELF:%[0-9]+]] : $Foo):
+    // CHECK:   [[CONVERTER:%[0-9]+]] = function_ref @_TF10Foundation32_convertNSDictionaryToDictionary{{.*}} : $@thin <τ_0_0, τ_0_1 where τ_0_0 : NSObject, τ_0_0 : Hashable, τ_0_1 : AnyObject> (@owned NSDictionary) -> @owned Dictionary<τ_0_0, τ_0_1>
+    // CHECK-NEXT:   [[DICT:%[0-9]+]] = apply [[CONVERTER]]<Foo, Foo>([[NSDICT]]) : $@thin <τ_0_0, τ_0_1 where τ_0_0 : NSObject, τ_0_0 : Hashable, τ_0_1 : AnyObject> (@owned NSDictionary) -> @owned Dictionary<τ_0_0, τ_0_1>
+
+    // CHECK:   [[SWIFT_FN:%[0-9]+]] = function_ref @_TFC24objc_dictionary_bridging3Foo23bridge_Dictionary_paramfS0_FGVSs10DictionaryS0_S0__T_ : $@cc(method) @thin (@owned Dictionary<Foo, Foo>, @owned Foo) -> ()
+    // CHECK:   [[RESULT:%[0-9]+]] = apply [[SWIFT_FN]]([[DICT]], [[SELF]]) : $@cc(method) @thin (@owned Dictionary<Foo, Foo>, @owned Foo) -> ()
+    // CHECK:   return [[RESULT]] : $()
+  }
+
+  // Bridging dictionary results
+  // CHECK-LABEL: sil @_TToFC24objc_dictionary_bridging3Foo24bridge_Dictionary_result{{.*}} : $@cc(objc_method) @thin (Foo) -> @autoreleased NSDictionary
+  func bridge_Dictionary_result() -> Dictionary<Foo, Foo> { 
+    // CHECK: bb0([[SELF:%[0-9]+]] : $Foo):
+    // CHECK:   [[SWIFT_FN:%[0-9]+]] = function_ref @_TFC24objc_dictionary_bridging3Foo24bridge_Dictionary_result{{.*}} : $@cc(method) @thin (@owned Foo) -> @owned Dictionary<Foo, Foo>
+    // CHECK-NEXT:   [[DICT:%[0-9]+]] = apply [[SWIFT_FN]]([[SELF]]) : $@cc(method) @thin (@owned Foo) -> @owned Dictionary<Foo, Foo>
+
+    // CHECK:   [[CONVERTER:%[0-9]+]] = function_ref @_TF10Foundation32_convertDictionaryToNSDictionary{{.*}} : $@thin <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@owned Dictionary<τ_0_0, τ_0_1>) -> @owned NSDictionary
+    // CHECK-NEXT:   [[NSDICT:%[0-9]+]] = apply [[CONVERTER]]<Foo, Foo>([[DICT]]) : $@thin <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@owned Dictionary<τ_0_0, τ_0_1>) -> @owned NSDictionary
+    // CHECK:   release_value [[DICT]] : $Dictionary<Foo, Foo>
+    // CHECK-NEXT:   autorelease_return [[NSDICT]] : $NSDictionary
+  }
+
+  var property: Dictionary<Foo, Foo> = [:]
+
+  // Property getter
+  // CHECK-LABEL: sil [transparent] @_TToFC24objc_dictionary_bridging3Foog8propertyGVSs10DictionaryS0_S0__ : $@cc(objc_method) @thin (Foo) -> @autoreleased NSDictionary
+  // CHECK: bb0([[SELF:%[0-9]+]] : $Foo):
+  // CHECK:   [[GETTER:%[0-9]+]] = function_ref @_TFC24objc_dictionary_bridging3Foog8propertyGVSs10DictionaryS0_S0__ : $@cc(method) @thin (@owned Foo) -> @owned Dictionary<Foo, Foo>
+  // CHECK:   [[DICT:%[0-9]+]] = apply [transparent] [[GETTER]]([[SELF]]) : $@cc(method) @thin (@owned Foo) -> @owned Dictionary<Foo, Foo>
+  
+  // CHECK:   [[CONVERTER:%[0-9]+]] = function_ref @_TF10Foundation32_convertDictionaryToNSDictionary{{.*}} : $@thin <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@owned Dictionary<τ_0_0, τ_0_1>) -> @owned NSDictionary
+  // CHECK:   [[NSDICT:%[0-9]+]] = apply [[CONVERTER]]<Foo, Foo>([[DICT]]) : $@thin <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@owned Dictionary<τ_0_0, τ_0_1>) -> @owned NSDictionary
+  // CHECK:   autorelease_return [[NSDICT]] : $NSDictionary
+
+  // Property setter
+  // CHECK-LABEL: sil [transparent] @_TToFC24objc_dictionary_bridging3Foos8propertyGVSs10DictionaryS0_S0__ : $@cc(objc_method) @thin (NSDictionary, Foo) -> ()
+  // CHECK: bb0([[NSDICT:%[0-9]+]] : $NSDictionary, [[SELF:%[0-9]+]] : $Foo):
+// CHECK:   [[CONVERTER:%[0-9]+]] = function_ref @_TF10Foundation32_convertNSDictionaryToDictionary{{.*}} : $@thin <τ_0_0, τ_0_1 where τ_0_0 : NSObject, τ_0_0 : Hashable, τ_0_1 : AnyObject> (@owned NSDictionary) -> @owned Dictionary<τ_0_0, τ_0_1>
+// CHECK:   [[DICT:%[0-9]+]] = apply [[CONVERTER]]<Foo, Foo>([[NSDICT]]) : $@thin <τ_0_0, τ_0_1 where τ_0_0 : NSObject, τ_0_0 : Hashable, τ_0_1 : AnyObject> (@owned NSDictionary) -> @owned Dictionary<τ_0_0, τ_0_1>
+
+// CHECK:   [[SETTER:%[0-9]+]] = function_ref @_TFC24objc_dictionary_bridging3Foos8propertyGVSs10DictionaryS0_S0__ : $@cc(method) @thin (@owned Dictionary<Foo, Foo>, @owned Foo) -> ()
+// CHECK:   [[RESULT:%[0-9]+]] = apply [transparent] [[SETTER]]([[DICT]], [[SELF]]) : $@cc(method) @thin (@owned Dictionary<Foo, Foo>, @owned Foo) -> ()
+// CHECK:   return [[RESULT]] : $()
+  
+}
+
+func ==(x: Foo, y: Foo) -> Bool { }

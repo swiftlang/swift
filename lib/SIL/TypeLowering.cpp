@@ -2111,6 +2111,13 @@ Type TypeConverter::getLoweredCBridgedType(Type t) {
     }
   }
 
+  // Dictionary bridging.
+  if (auto dictDecl = Context.getDictionaryDecl()) {
+    if (t->getAnyNominal() == dictDecl) {
+      return getNSDictionaryType();
+    }
+  }
+
   return t;
 }
 

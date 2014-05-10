@@ -83,6 +83,8 @@ public:
   Optional<SILDeclRef> NSStringToStringFn;
   Optional<SILDeclRef> AnyObjectArrayToNSArrayFn;
   Optional<SILDeclRef> NSArrayToAnyObjectArrayFn;
+  Optional<SILDeclRef> DictionaryToNSDictionaryFn;
+  Optional<SILDeclRef> NSDictionaryToDictionaryFn;
   Optional<SILDeclRef> BoolToObjCBoolFn;
   Optional<SILDeclRef> ObjCBoolToBoolFn;
   Optional<SILDeclRef> CMutableVoidPointerToCOpaquePointerFn;
@@ -261,6 +263,8 @@ public:
   SILDeclRef getNSStringToStringFn();
   SILDeclRef getAnyObjectArrayToNSArrayFn();
   SILDeclRef getNSArrayToAnyObjectArrayFn();
+  SILDeclRef getDictionaryToNSDictionaryFn();
+  SILDeclRef getNSDictionaryToDictionaryFn();
   SILDeclRef getBoolToObjCBoolFn();
   SILDeclRef getObjCBoolToBoolFn();
   SILDeclRef getObjCMutablePointerToUnsafePointerFn();

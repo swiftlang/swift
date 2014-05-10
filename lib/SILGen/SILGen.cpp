@@ -191,6 +191,27 @@ SILDeclRef SILGenModule::getNSArrayToAnyObjectArrayFn() {
                        getAnyObjectArrayTy(*this));
 }
 
+static SILType getNSDictionaryTy(SILGenModule &SGM) {
+  return SGM.getLoweredType(SGM.Types.getNSDictionaryType());
+}
+
+SILDeclRef SILGenModule::getDictionaryToNSDictionaryFn() {
+  return getBridgingFn(DictionaryToNSDictionaryFn, *this,
+                       FOUNDATION_MODULE_NAME,
+                       "_convertDictionaryToNSDictionary",
+                       { /* FIXME: Dictionary<K, v> */},
+                       getNSDictionaryTy(*this),
+                       /*FIXME: trustInputTypes=*/true);
+}
+
+SILDeclRef SILGenModule::getNSDictionaryToDictionaryFn() {
+  return getBridgingFn(NSDictionaryToDictionaryFn, *this,
+                       FOUNDATION_MODULE_NAME,
+                       "_convertNSDictionaryToDictionary",
+                       { getNSDictionaryTy(*this) },
+                       Nothing /*FIXME: Dictionary<K, V>*/);
+}
+
 #define STANDARD_GET_BRIDGING_FN(Module, FromTy, ToTy) \
   SILDeclRef SILGenModule::get##FromTy##To##ToTy##Fn() { \
     return getBridgingFn(FromTy##To##ToTy##Fn, *this, \

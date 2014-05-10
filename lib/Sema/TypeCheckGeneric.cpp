@@ -611,6 +611,11 @@ bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
     return true;
   }
 
+  // If this triggered a recursive validation, back out: we're done.
+  // FIXME: This is an awful hack.
+  if (func->hasType())
+    return !func->isInvalid();
+
   // The archetype builder now has all of the requirements, although there might
   // still be errors that have not yet been diagnosed. Revert the generic
   // function signature and type-check it again, completely.

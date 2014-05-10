@@ -2126,7 +2126,8 @@ bool TypeChecker::isRepresentableInObjC(const DeclContext *DC, Type T) {
   // NSObject and V is something compatible with AnyObject.
   if (Context.LangOpts.ObjCBridgeDictionary) {
     if (auto boundGeneric = T->getAs<BoundGenericType>()) {
-      if (boundGeneric->getDecl() == Context.getDictionaryDecl()) {
+      auto dictDecl = Context.getDictionaryDecl();
+      if (dictDecl && boundGeneric->getDecl() == dictDecl) {
         // The key type must be a class that inherits from NSObject.
         auto keyType = boundGeneric->getGenericArgs()[0];
         bool canBridgeKey = false;
