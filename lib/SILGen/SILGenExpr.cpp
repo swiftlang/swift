@@ -3021,12 +3021,10 @@ namespace {
   {
     SILGenFunction &gen;
     SmallVectorImpl<SILValue> &args;
-    DeclContext *DC;
   public:
     ArgumentForwardVisitor(SILGenFunction &gen,
-                           SmallVectorImpl<SILValue> &args,
-                           DeclContext *DC)
-      : gen(gen), args(args), DC(DC) {}
+                           SmallVectorImpl<SILValue> &args)
+      : gen(gen), args(args) {}
     
     void makeArgument(Type ty, VarDecl *varDecl) {
       assert(ty && "no type?!");
@@ -3063,12 +3061,7 @@ namespace {
     }
     
     void visitAnyPattern(AnyPattern *P) {
-      auto &AC = gen.getASTContext();
-      auto VD = new (AC) ParamDecl(/*IsLet*/ true, SourceLoc(),
-                                   AC.getIdentifier("_"), SourceLoc(),
-                                   // FIXME: we should probably number them.
-                                   AC.getIdentifier("_"), P->getType(), DC);
-      makeArgument(P->getType(), VD);
+      llvm_unreachable("unnamed parameters should have a ParamDecl");
     }
     
     void visitNamedPattern(NamedPattern *P) {
@@ -3141,7 +3134,7 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   
   // Forward the constructor arguments.
   // FIXME: Handle 'self' along with the other body patterns.
-  ArgumentForwardVisitor(*this, args, ctor)
+  ArgumentForwardVisitor(*this, args)
     .visit(ctor->getBodyParamPatterns()[1]);
 
   SILValue selfMetaValue = emitConstructorMetatypeArg(*this, ctor);
@@ -3638,7 +3631,7 @@ void SILGenFunction::emitCurryThunk(FuncDecl *fd,
 
   // Forward the curried formal arguments.
   auto forwardedPatterns = fd->getBodyParamPatterns().slice(0, paramCount);
-  ArgumentForwardVisitor forwarder(*this, curriedArgs, fd);
+  ArgumentForwardVisitor forwarder(*this, curriedArgs);
   for (auto *paramPattern : reversed(forwardedPatterns))
     forwarder.visit(paramPattern);
 
@@ -3711,7 +3704,7 @@ void SILGenFunction::emitForeignThunk(SILDeclRef thunk) {
   // inputs according to the foreign convention.
   auto forwardedPatterns = fd->getBodyParamPatterns();
   SmallVector<SILValue, 8> args;
-  ArgumentForwardVisitor forwarder(*this, args, fd);
+  ArgumentForwardVisitor forwarder(*this, args);
   for (auto *paramPattern : reversed(forwardedPatterns))
     forwarder.visit(paramPattern);
   

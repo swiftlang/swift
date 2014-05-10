@@ -1566,17 +1566,15 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
       // Parse identifier (',' identifier)*
       SmallVector<TuplePatternElt, 4> elements;
       do {
-        if (Tok.is(tok::identifier)) {
+        if (Tok.is(tok::identifier) || Tok.is(tok::kw__)) {
+          Identifier name = Tok.is(tok::identifier) ?
+              Context.getIdentifier(Tok.getText()) : Identifier();
           auto var = new (Context) ParamDecl(/*IsLet*/ true,
                                              SourceLoc(), Identifier(),
                                              Tok.getLoc(),
-                                           Context.getIdentifier(Tok.getText()),
+                                             name,
                                              Type(), nullptr);
           elements.push_back(TuplePatternElt(new (Context) NamedPattern(var)));
-          consumeToken();
-        } else if (Tok.is(tok::kw__)) {
-          elements.push_back(TuplePatternElt(
-                               new (Context) AnyPattern(Tok.getLoc())));
           consumeToken();
         } else {
           diagnose(Tok, diag::expected_closure_parameter_name);

@@ -512,6 +512,12 @@ struct InitializationForPattern
   // Bind to a named pattern by creating a memory location and initializing it
   // with the initial value.
   InitializationPtr visitNamedPattern(NamedPattern *P) {
+    if (!P->getDecl()->hasName()) {
+      // Unnamed parameters don't require any storage. Any value bound here will
+      // just be dropped.
+      return InitializationPtr(new BlackHoleInitialization());
+    }
+
     return Gen.emitInitializationForVarDecl(P->getDecl(),
                                             ArgumentOrVar == Argument,
                                             P->hasType() ? P->getType() : Type());
@@ -769,25 +775,22 @@ struct ArgumentInitVisitor :
   }
 
   void visitAnyPattern(AnyPattern *P, Initialization *I) {
-    // A value bound to _ is unused and can be immediately released.
-    assert(I->kind == Initialization::Kind::Ignored &&
-           "any pattern should match a black-hole Initialization");
-    auto &lowering = gen.getTypeLowering(P->getType());
-
-    auto &AC = gen.getASTContext();
-    auto VD = new (AC) ParamDecl(/*IsLet*/ true, SourceLoc(),
-                                 AC.getIdentifier("_"), SourceLoc(),
-                                 // FIXME: we should probably number them.
-                                 AC.getIdentifier("_"), P->getType(),
-                                 f.getDeclContext());
-
-    SILValue arg =
-      makeArgument(P->getType(), f.begin(), VD).forwardAsSingleValue(gen, VD);
-    lowering.emitDestroyRValue(gen.B, P, arg);
+    llvm_unreachable("unnamed parameters should have a ParamDecl");
   }
 
   void visitNamedPattern(NamedPattern *P, Initialization *I) {
-    makeArgumentInto(P->getType(), f.begin(), P->getDecl(), I);
+    auto PD = P->getDecl();
+    if (!PD->hasName()) {
+      assert(I->kind == Initialization::Kind::Ignored &&
+             "unnamed param should match a black-hole Initialization");
+      // A value bound to _ is unused and can be immediately released.
+      auto &lowering = gen.getTypeLowering(P->getType());
+      SILValue arg =
+        makeArgument(P->getType(), f.begin(), PD).forwardAsSingleValue(gen, PD);
+      lowering.emitDestroyRValue(gen.B, P, arg);
+    } else {
+      makeArgumentInto(P->getType(), f.begin(), PD, I);
+    }
   }
   
 #define PATTERN(Id, Parent)

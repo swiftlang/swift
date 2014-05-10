@@ -137,26 +137,37 @@ getBuiltinFunction(Identifier Id,
   Type FnType;
   FnType = FunctionType::get(ArgType, ResType, Info);
 
+  Module *M = Context.TheBuiltinModule;
+  DeclContext *DC = &M->getMainFile(FileUnitKind::Builtin);
+
   SmallVector<TuplePatternElt, 4> ParamPatternElts;
   for (auto &ArgTupleElt : ArgTypes) {
-    ParamPatternElts.push_back(TuplePatternElt(
-        new (Context) TypedPattern(
-            new (Context) AnyPattern(SourceLoc()),
-            TypeLoc::withoutLoc(ArgTupleElt.getType()))));
+    auto PD = new (Context) ParamDecl(/*IsLet*/true, SourceLoc(),
+                                      Identifier(), SourceLoc(),
+                                      Identifier(), ArgTupleElt.getType(),
+                                      DC);
+    PD->setImplicit();
+    Pattern *Pat = new (Context) NamedPattern(PD, /*implicit=*/true);
+    Pat = new (Context) TypedPattern(Pat,
+            TypeLoc::withoutLoc(ArgTupleElt.getType()), /*implicit=*/true);
+    PD->setParamParentPattern(Pat);
+
+    ParamPatternElts.push_back(TuplePatternElt(Pat));
   }
 
   Pattern *ParamPattern = TuplePattern::createSimple(
       Context, SourceLoc(), ParamPatternElts, SourceLoc());
-  Module *M = Context.TheBuiltinModule;
 
   llvm::SmallVector<Identifier, 2> ArgNames(ParamPattern->numTopLevelVariables(),
                                             Identifier());
   DeclName Name(Context, Id, ArgNames);
-  return FuncDecl::create(Context, SourceLoc(), StaticSpellingKind::None,
+  auto FD = FuncDecl::create(Context, SourceLoc(), StaticSpellingKind::None,
                           SourceLoc(), Name, SourceLoc(),
                           /*GenericParams=*/nullptr, FnType, ParamPattern,
                           TypeLoc::withoutLoc(ResType),
-                          &M->getMainFile(FileUnitKind::Builtin));
+                          DC);
+  FD->setImplicit();
+  return FD;
 }
 
 /// Build a builtin function declaration.
@@ -193,17 +204,26 @@ getBuiltinGenericFunction(Identifier Id,
                                                 ArgParamType, ResType,
                                                 Info);
 
+  Module *M = Context.TheBuiltinModule;
+  DeclContext *DC = &M->getMainFile(FileUnitKind::Builtin);
+
   SmallVector<TuplePatternElt, 4> ParamPatternElts;
   for (auto &ArgTupleElt : ArgBodyTypes) {
-    ParamPatternElts.push_back(TuplePatternElt(
-                               new (Context) TypedPattern(
-                                  new (Context) AnyPattern(SourceLoc()),
-                                  TypeLoc::withoutLoc(ArgTupleElt.getType()))));
+    auto PD = new (Context) ParamDecl(/*IsLet*/true, SourceLoc(),
+                                      Identifier(), SourceLoc(),
+                                      Identifier(), ArgTupleElt.getType(),
+                                      DC);
+    PD->setImplicit();
+    Pattern *Pat = new (Context) NamedPattern(PD, /*implicit=*/true);
+    Pat = new (Context) TypedPattern(Pat,
+            TypeLoc::withoutLoc(ArgTupleElt.getType()), /*implicit=*/true);
+    PD->setParamParentPattern(Pat);
+
+    ParamPatternElts.push_back(TuplePatternElt(Pat));
   }
 
   Pattern *ParamPattern = TuplePattern::createSimple(
                           Context, SourceLoc(), ParamPatternElts, SourceLoc());
-  Module *M = Context.TheBuiltinModule;
   llvm::SmallVector<Identifier, 2> ArgNames(
                                      ParamPattern->numTopLevelVariables(),
                                      Identifier());
@@ -212,9 +232,10 @@ getBuiltinGenericFunction(Identifier Id,
                                SourceLoc(), Name,
                                SourceLoc(), GenericParams, FnType, ParamPattern,
                                TypeLoc::withoutLoc(ResBodyType),
-                               &M->getMainFile(FileUnitKind::Builtin));
+                               DC);
     
   func->setInterfaceType(InterfaceType);
+  func->setImplicit();
   
   return func;
 }

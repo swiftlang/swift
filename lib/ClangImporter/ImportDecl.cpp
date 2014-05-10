@@ -4562,9 +4562,11 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
     auto selfTy = dc->getDeclaredTypeInContext();
     if (isStatic)
       selfTy = MetatypeType::get(selfTy);
-    Pattern *anyP = new (context) AnyPattern(SourceLoc(), /*implicit*/ true);
-    anyP->setType(selfTy);
-    getterArgs.push_back(anyP);
+
+    getterArgs.push_back(
+      Pattern::buildImplicitSelfParameter(SourceLoc(), 
+                                          TypeLoc::withoutLoc(selfTy),
+                                          dc));
   }
   
   // empty tuple

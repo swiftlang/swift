@@ -821,20 +821,16 @@ Type ClangImporter::Implementation::importFunctionType(
 
     // Compute the pattern to put into the body.
     Pattern *bodyPattern;
-    if (bodyName.empty()) {
-      bodyPattern = new (SwiftContext) AnyPattern(SourceLoc());
-    } else {
-      // It doesn't actually matter which DeclContext we use, so just use the
-      // imported header unit.
-      auto bodyVar
-        = createDeclWithClangNode<ParamDecl>(param,
-                                       /*IsLet*/ true,
-                                       SourceLoc(), name,
-                                       importSourceLoc(param->getLocation()),
-                                       bodyName, swiftParamTy, 
-                                       ImportedHeaderUnit);
-      bodyPattern = new (SwiftContext) NamedPattern(bodyVar);
-    }
+    // It doesn't actually matter which DeclContext we use, so just use the
+    // imported header unit.
+    auto bodyVar
+      = createDeclWithClangNode<ParamDecl>(param,
+                                     /*IsLet*/ true,
+                                     SourceLoc(), name,
+                                     importSourceLoc(param->getLocation()),
+                                     bodyName, swiftParamTy, 
+                                     ImportedHeaderUnit);
+    bodyPattern = new (SwiftContext) NamedPattern(bodyVar);
     bodyPattern->setType(swiftParamTy);
     bodyPattern
       = new (SwiftContext) TypedPattern(bodyPattern,
@@ -931,19 +927,15 @@ Type ClangImporter::Implementation::importMethodType(
 
     // Compute the pattern to put into the body.
     Pattern *bodyPattern;
-    if (bodyName.empty()) {
-      bodyPattern = new (SwiftContext) AnyPattern(SourceLoc());
-    } else {
-      // It doesn't actually matter which DeclContext we use, so just use the
-      // imported header unit.
-      auto bodyVar
-        = createDeclWithClangNode<ParamDecl>(param,
-                                       /*IsLet*/ true, SourceLoc(), name,
-                                       importSourceLoc(param->getLocation()),
-                                       bodyName, swiftParamTy, 
-                                       ImportedHeaderUnit);
-      bodyPattern = new (SwiftContext) NamedPattern(bodyVar);
-    }
+    // It doesn't actually matter which DeclContext we use, so just use the
+    // imported header unit.
+    auto bodyVar
+      = createDeclWithClangNode<ParamDecl>(param,
+                                     /*IsLet*/ true, SourceLoc(), name,
+                                     importSourceLoc(param->getLocation()),
+                                     bodyName, swiftParamTy, 
+                                     ImportedHeaderUnit);
+    bodyPattern = new (SwiftContext) NamedPattern(bodyVar);
     bodyPattern->setType(swiftParamTy);
     bodyPattern
       = new (SwiftContext) TypedPattern(bodyPattern,

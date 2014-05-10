@@ -36,17 +36,14 @@ using namespace swift;
 static Pattern *buildImplicitSelfParameter(SourceLoc Loc,
                                            DeclContext *CurDeclContext,
                                            VarDecl **SelfDeclRet = nullptr) {
-  ASTContext &Ctx = CurDeclContext->getASTContext();
-  auto *SelfDecl = new (Ctx) ParamDecl(/*IsLet*/ true, SourceLoc(), 
-                                       Identifier(), Loc, Ctx.Id_self,
-                                       Type(), CurDeclContext);
+  auto Pat = Pattern::buildImplicitSelfParameter(Loc,TypeLoc(),CurDeclContext);
   // FIXME: Remove SelfDeclRet when we don't need it anymore.
-  if (SelfDeclRet)
-    *SelfDeclRet = SelfDecl;
-
-  SelfDecl->setImplicit();
-  Pattern *P = new (Ctx) NamedPattern(SelfDecl, /*Implicit=*/true);
-  return new (Ctx) TypedPattern(P, TypeLoc());
+  if (SelfDeclRet) {
+    Pat->forEachVariable([&](VarDecl *VD) {
+      *SelfDeclRet = VD;
+    });
+  }
+  return Pat;
 }
 
 

@@ -198,28 +198,29 @@ unsigned Pattern::numTopLevelVariables() const {
   return 1;
 }
 
+Pattern *Pattern::buildImplicitSelfParameter(SourceLoc Loc,
+                                             TypeLoc TyLoc,
+                                             DeclContext *CurDeclContext) {
+  ASTContext &Ctx = CurDeclContext->getASTContext();
+  auto *SelfDecl = new (Ctx) ParamDecl(/*IsLet*/ true, SourceLoc(), 
+                                       Identifier(), Loc, Ctx.Id_self,
+                                       TyLoc.getType(), CurDeclContext);
+
+  SelfDecl->setImplicit();
+  Pattern *P = new (Ctx) NamedPattern(SelfDecl, /*Implicit=*/true);
+  P->setType(TyLoc.getType());
+  P = new (Ctx) TypedPattern(P, TyLoc, /*Implicit=*/true);
+  P->setType(TyLoc.getType());
+  SelfDecl->setParamParentPattern(P);
+  return P;
+}
+
 Pattern *Pattern::clone(ASTContext &context,
                         OptionSet<CloneFlags> options) const {
   Pattern *result;
   switch (getKind()) {
   case PatternKind::Any: {
-    auto any = cast<AnyPattern>(this);
-    if (options & AlwaysNamed) {
-      VarDecl *var = new (context) ParamDecl(!(options & Pattern::IsVar),
-                                             any->getLoc(),
-                                             context.getIdentifier("_"),
-                                             any->getLoc(),
-                                             context.getIdentifier("_"),
-                                             any->hasType()? any->getType()
-                                                           : Type(),
-                                             nullptr);
-      if (options & Implicit)
-        var->setImplicit();
-
-      result = new (context) NamedPattern(var);
-    } else {
-      result = new (context) AnyPattern(cast<AnyPattern>(this)->getLoc());
-    }
+    result = new (context) AnyPattern(cast<AnyPattern>(this)->getLoc());
     break;
   }
 

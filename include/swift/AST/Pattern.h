@@ -146,6 +146,11 @@ public:
   /// of variables. If the pattern is not a tuple, the result is one.
   unsigned numTopLevelVariables() const;
 
+  /// \brief Build an implicit 'self' parameter for the specified DeclContext.
+  static Pattern *buildImplicitSelfParameter(SourceLoc Loc,
+                                             TypeLoc TyLoc,
+                                             DeclContext *CurDeclContext);
+
   /// Flags used to indicate how pattern cloning should operate.
   enum CloneFlags {
     /// The cloned pattern should be implicit.
@@ -153,11 +158,9 @@ public:
     /// The cloned pattern is for an inherited constructor; mark default
     /// arguments as inherited.
     Inherited = 0x02,
-    /// Replace 'any' patterns in the cloned pattern with named patterns.
-    AlwaysNamed = 0x04,
     /// Whether the named patterns produced from a cloned 'any' pattern is
     /// are 'var'.
-    IsVar = 0x08
+    IsVar = 0x04
   };
 
   Pattern *clone(ASTContext &context,

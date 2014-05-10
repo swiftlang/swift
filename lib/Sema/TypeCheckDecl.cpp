@@ -4747,8 +4747,7 @@ createdesignatedInitOverride(TypeChecker &tc,
   OptionSet<Pattern::CloneFlags> options = Pattern::Implicit;
   options |= Pattern::Inherited;
   Pattern *bodyParamPatterns
-    = superclassCtor->getBodyParamPatterns()[1]->clone(
-        ctx, options | Pattern::AlwaysNamed);
+    = superclassCtor->getBodyParamPatterns()[1]->clone(ctx, options);
 
   // Fix up the default arguments in the type to refer to inherited default
   // arguments.
