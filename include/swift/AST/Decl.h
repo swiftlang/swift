@@ -1762,6 +1762,11 @@ public:
   Identifier getName() const { return Name.getBaseName(); }
   bool isOperator() const { return Name.isOperator(); }
 
+  /// Returns the string for the base name, or "_" if this is unnamed.
+  StringRef getNameStr() const {
+    return hasName() ? getName().str() : "_";
+  }
+
   /// Retrieve the full name of the declaration.
   /// TODO: Rename to getName?
   DeclName getFullName() const { return Name; }

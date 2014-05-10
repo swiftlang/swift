@@ -5684,7 +5684,13 @@ void TypeChecker::fixAbstractFunctionNames(InFlightDiagnostic &diag,
           targetArgStr += ' ';
           diag.fixItInsert(param->getLoc(), targetArgStr);
         }
-        continue;
+
+        if (param->isImplicit()) {
+          needColon = true;
+          loc = origPattern->getLoc();
+        } else {
+          continue;
+        }
       }
       
       if (auto any = dyn_cast<AnyPattern>(

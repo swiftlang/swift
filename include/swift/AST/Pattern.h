@@ -691,7 +691,10 @@ public:
 
   SourceLoc getLoc() const { return VarLoc; }
   SourceRange getSourceRange() const {
-    return {VarLoc, SubPattern->getSourceRange().End};
+    SourceLoc EndLoc = SubPattern->getSourceRange().End;
+    if (EndLoc.isInvalid())
+      return VarLoc;
+    return {VarLoc, EndLoc};
   }
   
   const Pattern *getSubPattern() const { return SubPattern; }

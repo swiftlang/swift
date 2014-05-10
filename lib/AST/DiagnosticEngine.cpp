@@ -376,10 +376,15 @@ void DiagnosticEngine::flushActiveDiagnostic() {
   if (loc.isInvalid() && ActiveDiagnosticDecl) {
     // If a declaration was provided instead of a location, and that declaration
     // has a location we can point to, use that location.
-    if (!ActiveDiagnosticDecl->hasClangNode() &&
-        ActiveDiagnosticDecl->getLoc().isValid()) {
-      loc = ActiveDiagnosticDecl->getLoc();
-    } else {
+    loc = ActiveDiagnosticDecl->getLoc();
+    // With an implicit parameter try to point to its type.
+    if (loc.isInvalid() && isa<ParamDecl>(ActiveDiagnosticDecl)) {
+      if (auto Pat =
+            cast<ParamDecl>(ActiveDiagnosticDecl)->getParamParentPattern())
+        loc = Pat->getLoc();
+    }
+
+    if (loc.isInvalid()) {
       // There is no location we can point to. Pretty-print the declaration
       // so we can point to it.
       SourceLoc ppLoc = PrettyPrintedDeclarations[ActiveDiagnosticDecl];
@@ -455,7 +460,7 @@ void DiagnosticEngine::flushActiveDiagnostic() {
           }
 
           if (auto value = dyn_cast<ValueDecl>(ppDecl)) {
-            bufferName += value->getName().str();
+            bufferName += value->getNameStr();
           } else if (auto ext = dyn_cast<ExtensionDecl>(ppDecl)) {
             bufferName += ext->getExtendedType().getString();
           }

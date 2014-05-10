@@ -562,7 +562,7 @@ public:
     if (!IGM.DebugInfo || isAvailableExternally()) return;
     VarDecl *Decl = i->getDecl();
     if (!Decl) return;
-    StringRef Name = Decl->getName().str();
+    StringRef Name = Decl->getNameStr();
     auto SILVal = i->getOperand();
     auto Vals = getLoweredExplosion(SILVal).claimAll();
     // See also comment for SILArgument; it would be nice if we could
@@ -1163,7 +1163,7 @@ void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
         Arg->getType().is<ArchetypeType>())
       continue;
 
-    auto Name = Arg->getDecl()->getName().str();
+    auto Name = Arg->getDecl()->getNameStr();
     DebugTypeInfo DTI(const_cast<ValueDecl*>(Arg->getDecl()),
                       getTypeInfo(Arg->getType()));
     if (LoweredArg.isAddress())
@@ -2383,7 +2383,7 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
   StringRef dbgname =
 # ifndef NDEBUG
     // If this is a DEBUG build, use pretty names for the LLVM IR.
-    Decl ? Decl->getName().str() :
+    Decl ? Decl->getNameStr() :
 # endif
     "";
 

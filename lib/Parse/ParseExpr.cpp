@@ -2123,8 +2123,10 @@ ParserResult<Expr> Parser::parseExprDictionary(SourceLoc LSquareLoc,
 void Parser::addPatternVariablesToScope(ArrayRef<Pattern *> Patterns) {
   for (Pattern *Pat : Patterns) {
     Pat->forEachVariable([&](VarDecl *VD) {
-      // Add any variable declarations to the current scope.
-      addToScope(VD);
+      if (VD->hasName()) {
+        // Add any variable declarations to the current scope.
+        addToScope(VD);
+      }
     });
   }
 }
