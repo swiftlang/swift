@@ -27,7 +27,6 @@ def delayed_function_body_parsing :
 
 def primary_file : Separate<["-"], "primary-file">,
   HelpText<"Produce output for this file, not the whole module">;
-def primary_file_EQ : Joined<["-"], "primary-file=">, Alias<primary_file>;
 
 def emit_module_doc : Flag<["-"], "emit-module-doc">,
   HelpText<"Emit a module documentation file based on documentation "
@@ -35,16 +34,10 @@ def emit_module_doc : Flag<["-"], "emit-module-doc">,
 def emit_module_doc_path
   : Separate<["-"], "emit-module-doc-path">, MetaVarName<"<path>">,
     HelpText<"Output module documentation file <path>">;
-def emit_module_doc_path_EQ
-  : Joined<["-"], "emit-module-doc-path=">,
-    Alias<emit_module_doc_path_EQ>;
 
 def serialize_diagnostics_path
   : Separate<["-"], "serialize-diagnostics-path">, MetaVarName<"<path>">,
     HelpText<"Output serialized diagnostics to <path>">;
-def serialize_diagnostics_path_EQ
-  : Joined<["-"], "serialize-diagnostics-path=">,
-    Alias<serialize_diagnostics_path>;
 
 def verify : Flag<["-"], "verify">,
   HelpText<"Verify diagnostics against expected-{error|warning|note} "
@@ -71,6 +64,7 @@ def print_clang_stats : Flag<["-"], "print-clang-stats">,
 def debug_crash_Group : OptionGroup<"<automatic crashing options>">;
 class DebugCrashOpt : Group<debug_crash_Group>;
 
+// HIDDEN FLAGS
 let Flags = [FrontendOption, NoDriverOption, HelpHidden] in {
 
 def debug_constraints : Flag<["-"], "debug-constraints">,
@@ -78,8 +72,6 @@ def debug_constraints : Flag<["-"], "debug-constraints">,
 
 def debug_constraints_attempt : Separate<["-"], "debug-constraints-attempt">,
   HelpText<"Debug the constraint solver at a given attempt">;
-def debug_constraints_attempt_EQ : Joined<["-"], "debug-constraints-attempt=">,
-  Alias<debug_constraints_attempt>;
 
 def debug_assert_immediately : Flag<["-"], "debug-assert-immediately">,
   DebugCrashOpt, HelpText<"Force an assertion failure immediately">;
