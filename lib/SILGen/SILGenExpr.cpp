@@ -122,7 +122,7 @@ void SILGenFunction::emitExprInto(Expr *E, Initialization *I) {
     emitCopyLValueInto(E, lv, I);
     return;
   }
-  
+
   RValue result = emitRValue(E, SGFContext(I));
   if (result)
     std::move(result).forwardInto(*this, I, E);
@@ -634,7 +634,7 @@ emitRValueForPropertyLoad(SILLocation loc, ManagedValue base,
     Result = ManagedValue::forUnmanaged(Scalar);
 
     if (Result.getType().is<ReferenceStorageType>()) {
-      // For @weak and @unowned types, convert the reference to the right
+      // For weak and unowned types, convert the reference to the right
       // pointer, producing a +1.
       Scalar = emitConversionToSemanticRValue(loc, Scalar, lowering);
       Result = emitManagedRValueWithCleanup(Scalar, lowering);

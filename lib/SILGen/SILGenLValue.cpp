@@ -1325,7 +1325,7 @@ void SILGenFunction::emitCopyLValueInto(SILLocation loc, const LValue &src,
   // If the source is a physical lvalue, the destination is a single address,
   // and there's no semantic conversion necessary, do a copy_addr from the
   // lvalue into the destination.
-  if (!src.isPhysical() || dest->kind == Initialization::Kind::LetValue)
+  if (!src.isPhysical())
     return skipPeephole();
   auto destAddr = dest->getAddressOrNull();
   if (!destAddr)
