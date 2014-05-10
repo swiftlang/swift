@@ -65,6 +65,7 @@ enum class SyntaxStructureKind : uint8_t {
   InstanceVariable,
   Parameter,
   BraceStatement,
+  CallExpression,
 };
 
 struct SyntaxStructureNode {

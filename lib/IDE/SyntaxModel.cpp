@@ -125,11 +125,21 @@ SyntaxModelContext::~SyntaxModelContext() {
 
 namespace {
 
+typedef ASTWalker::ParentTy ASTNodeType;
+
+struct StructureElement {
+  SyntaxStructureNode StructureNode;
+  ASTNodeType ASTNode;
+  StructureElement(const SyntaxStructureNode &StructureNode,
+                   const ASTNodeType &ASTNode)
+    :StructureNode(StructureNode), ASTNode(ASTNode) { }
+};
+
 class ModelASTWalker : public ASTWalker {
   const LangOptions &LangOpts;
   const SourceManager &SM;
   unsigned BufferID;
-  std::vector<SyntaxStructureNode> SubStructureStack;
+  std::vector<StructureElement> SubStructureStack;
   SourceLoc LastLoc;
 
 public:
@@ -142,6 +152,8 @@ public:
 
   void visitSourceFile(SourceFile &SrcFile, ArrayRef<SyntaxNode> Tokens);
 
+  std::pair<bool, Expr *> walkToExprPre(Expr *E) override;
+  Expr *walkToExprPost(Expr *E) override;
   std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override;
   Stmt *walkToStmtPost(Stmt *S) override;
   bool walkToDeclPre(Decl *D) override;
@@ -168,8 +180,10 @@ private:
   bool passTokenNodesUntil(SourceLoc Loc, PassNodesBehavior Behavior);
   bool passNonTokenNode(const SyntaxNode &Node);
   bool passNode(const SyntaxNode &Node);
-  bool pushStructureNode(const SyntaxStructureNode &Node);
+  bool pushStructureNode(const SyntaxStructureNode &Node,
+                         const ASTNodeType& ASTNode);
   bool popStructureNode();
+  bool isCurrentCallArgExpr(const Expr *E);
 };
 
 SyntaxStructureKind syntaxStructureKindFromNominalTypeDecl(NominalTypeDecl *N) {
@@ -201,6 +215,32 @@ CharSourceRange innerCharSourceRangeFromSourceRange(const SourceManager &SM,
   return CharSourceRange(SM, SRS, (SR.End != SR.Start) ? SR.End : SRS);
 }
 
+CharSourceRange parameterNameRangeOfCallArg(const TupleExpr *TE,
+                                            const Expr *Arg) {
+  if (!TE->hasElementNameLocs() || !TE->hasElementNames())
+    return CharSourceRange();
+
+  // Loop over the elements to find the index representing Arg.
+  // This is somewhat inefficient but the only way to find the corresponding
+  // name without the index, and the number of parameters in a call is normally
+  // very low. If this becomes a performance problem, we could perhaps have
+  // ASTWalker visit the element name as well.
+  unsigned i = 0;
+  for (auto E : TE->getElements()) {
+    if (E == Arg) {
+      SourceLoc NL = TE->getElementNameLoc(i);
+      Identifier Name = TE->getElementName(i);
+      if (NL.isValid() && !Name.empty())
+        return CharSourceRange(NL, Name.getLength());
+
+      return CharSourceRange();
+    }
+    ++i;
+  }
+
+  return CharSourceRange();
+}
+
 } // anonymous namespace
 
 bool SyntaxModelContext::walk(SyntaxModelWalker &Walker) {
@@ -220,6 +260,59 @@ void ModelASTWalker::visitSourceFile(SourceFile &SrcFile,
     passNode(TokNode);
 }
 
+std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
+  if (E->isImplicit())
+    return { true, E };
+
+  if (auto *ParentTupleExpr = dyn_cast_or_null<TupleExpr>(Parent.getAsExpr())) {
+    if (isCurrentCallArgExpr(ParentTupleExpr)) {
+      CharSourceRange NR = parameterNameRangeOfCallArg(ParentTupleExpr, E);
+      SyntaxStructureNode SN;
+      SN.Kind = SyntaxStructureKind::Parameter;
+      SN.NameRange = NR;
+      SN.BodyRange = charSourceRangeFromSourceRange(SM, E->getSourceRange());
+      if (NR.isValid())
+        SN.Range = CharSourceRange(SM, NR.getStart(), E->getEndLoc());
+      else
+        SN.Range = SN.BodyRange;
+
+      pushStructureNode(SN, E);
+    }
+  }
+
+  if (auto *CE = dyn_cast<CallExpr>(E)) {
+    SyntaxStructureNode SN;
+    SN.Kind = SyntaxStructureKind::CallExpression;
+    SN.Range = charSourceRangeFromSourceRange(SM, E->getSourceRange());
+    if (CE->getFn() && CE->getFn()->getSourceRange().isValid())
+      SN.NameRange = charSourceRangeFromSourceRange(SM,
+                                                 CE->getFn()->getSourceRange());
+    if (CE->getArg() && CE->getArg()->getSourceRange().isValid())
+      SN.BodyRange = innerCharSourceRangeFromSourceRange(SM,
+                                                CE->getArg()->getSourceRange());
+    pushStructureNode(SN, CE);
+  }
+
+  return { true, E };
+}
+
+Expr *ModelASTWalker::walkToExprPost(Expr *E) {
+  if (E->isImplicit())
+    return E;
+
+  if (isa<CallExpr>(E)) {
+    popStructureNode();
+  }
+
+  if (dyn_cast_or_null<TupleExpr>(Parent.getAsExpr())) {
+    if (!SubStructureStack.empty() &&
+        SubStructureStack.back().ASTNode.getAsExpr() == E)
+      popStructureNode();
+  }
+
+  return E;
+}
+
 std::pair<bool, Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
   if (isa<BraceStmt>(S) && shouldPassBraceStructureNode(cast<BraceStmt>(S))) {
     // Pass BraceStatement structure node.
@@ -228,7 +321,7 @@ std::pair<bool, Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
     SN.Range = charSourceRangeFromSourceRange(SM, S->getSourceRange());
     SN.BodyRange = innerCharSourceRangeFromSourceRange(SM,
                                                        S->getSourceRange());
-    pushStructureNode(SN);
+    pushStructureNode(SN, S);
   } else if (auto *SW = dyn_cast<SwitchStmt>(S)) {
     if (SW->getLBraceLoc().isValid() && SW->getRBraceLoc().isValid()) {
       SourceRange BraceRange(SW->getLBraceLoc(), SW->getRBraceLoc());
@@ -236,7 +329,7 @@ std::pair<bool, Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
       SN.Kind = SyntaxStructureKind::BraceStatement;
       SN.Range = charSourceRangeFromSourceRange(SM, BraceRange);
       SN.BodyRange = innerCharSourceRangeFromSourceRange(SM, BraceRange);
-      pushStructureNode(SN);
+      pushStructureNode(SN, SW);
     }
 
   } else if (auto ConfigS = dyn_cast<IfConfigStmt>(S)) {
@@ -326,7 +419,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
       SN.NameRange = charSourceRangeFromSourceRange(SM,
                           AFD->getSignatureSourceRange());
       SN.Attrs = AFD->getAttrs();
-      pushStructureNode(SN);
+      pushStructureNode(SN, AFD);
     }
   } else if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
     SyntaxStructureNode SN;
@@ -345,7 +438,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
     }
 
     SN.Attrs = NTD->getAttrs();
-    pushStructureNode(SN);
+    pushStructureNode(SN, NTD);
 
   } else if (auto *PD = dyn_cast<ParamDecl>(D)) {
     SyntaxStructureNode SN;
@@ -354,7 +447,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
     SN.NameRange = charSourceRangeFromSourceRange(SM, PD->getSourceRange());
       SN.Range = SN.NameRange;
     SN.Attrs = PD->getAttrs();
-    pushStructureNode(SN);
+    pushStructureNode(SN, PD);
 
   } else if (auto *VD = dyn_cast<VarDecl>(D)) {
     const DeclContext *DC = VD->getDeclContext();
@@ -378,7 +471,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
 
       SN.Kind = SyntaxStructureKind::InstanceVariable;
       SN.Attrs = VD->getAttrs();
-      pushStructureNode(SN);
+      pushStructureNode(SN, VD);
     }
 
   } else if (auto *ConfigD = dyn_cast<IfConfigDecl>(D)) {
@@ -650,8 +743,9 @@ bool ModelASTWalker::passNode(const SyntaxNode &Node) {
   return true;
 }
 
-bool ModelASTWalker::pushStructureNode(const SyntaxStructureNode &Node) {
-  SubStructureStack.push_back(Node);
+bool ModelASTWalker::pushStructureNode(const SyntaxStructureNode &Node,
+                                       const ASTNodeType& ASTNode) {
+  SubStructureStack.emplace_back(Node, ASTNode);
 
   if (!passTokenNodesUntil(Node.Range.getStart(), ExcludeNodeAtLocation))
     return false;
@@ -663,11 +757,19 @@ bool ModelASTWalker::pushStructureNode(const SyntaxStructureNode &Node) {
 
 bool ModelASTWalker::popStructureNode() {
   assert(!SubStructureStack.empty());
-  SyntaxStructureNode Node = SubStructureStack.back();
+  SyntaxStructureNode Node = SubStructureStack.back().StructureNode;
   SubStructureStack.pop_back();
 
   if (!Walker.walkToSubStructurePost(Node))
     return false;
 
   return true;
+}
+
+bool ModelASTWalker::isCurrentCallArgExpr(const Expr *E) {
+  if (SubStructureStack.empty())
+    return false;
+  auto Current = SubStructureStack.back();
+  return (Current.StructureNode.Kind == SyntaxStructureKind::CallExpression &&
+          cast<CallExpr>(Current.ASTNode.getAsExpr())->getArg() == E);
 }
