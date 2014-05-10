@@ -223,6 +223,73 @@ static bool mayConformToKnownProtocol(const DeclTy *D) {
   return false;
 }
 
+static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
+  unsigned currentFunctionIdx = 0;
+  unsigned currentExternalDef = TC.Context.LastCheckedExternalDefinition;
+  do {
+    
+    for (unsigned n = TC.Context.ExternalDefinitions.size();
+         currentExternalDef != n;
+         ++currentExternalDef) {
+      auto decl = TC.Context.ExternalDefinitions[currentExternalDef];
+      
+      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(decl)) {
+        PrettyStackTraceDecl StackEntry("type-checking", AFD);
+        TC.typeCheckAbstractFunctionBody(AFD);
+        continue;
+      }
+      if (isa<NominalTypeDecl>(decl)) {
+        TC.handleExternalDecl(decl);
+        continue;
+      }
+      llvm_unreachable("Unhandled external definition kind");
+    }
+    
+    // Type check the body of each of the function in turn.  Note that outside
+    // functions must be visited before nested functions for type-checking to
+    // work correctly.
+    unsigned previousFunctionIdx = currentFunctionIdx;
+    for (unsigned n = TC.definedFunctions.size(); currentFunctionIdx != n;
+         ++currentFunctionIdx) {
+      auto *AFD = TC.definedFunctions[currentFunctionIdx];
+      PrettyStackTraceDecl StackEntry("type-checking", AFD);
+      TC.typeCheckAbstractFunctionBody(AFD);
+    }
+
+    // Compute captures for functions we visited, in the opposite order of type
+    // checking. i.e., the nested DefinedFunctions will be visited before the
+    // outer DefinedFunctions.
+    for (unsigned i = currentFunctionIdx; i > previousFunctionIdx; --i) {
+      if (auto *FD = dyn_cast<AbstractFunctionDecl>(TC.definedFunctions[i-1]))
+        TC.computeCaptures(FD);
+    }
+
+    // Type-check any referenced nominal types.
+    while (!TC.ValidatedTypes.empty()) {
+      auto nominal = TC.ValidatedTypes.back();
+      TC.ValidatedTypes.pop_back();
+      TC.typeCheckDecl(nominal, /*isFirstPass=*/true);
+    }
+
+    TC.definedFunctions.insert(TC.definedFunctions.end(),
+                               TC.implicitlyDefinedFunctions.begin(),
+                               TC.implicitlyDefinedFunctions.end());
+    TC.implicitlyDefinedFunctions.clear();
+
+  } while (currentFunctionIdx < TC.definedFunctions.size() ||
+           currentExternalDef < TC.Context.ExternalDefinitions.size());
+
+  // FIXME: Horrible hack. Store this somewhere more sane.
+  TC.Context.LastCheckedExternalDefinition = currentExternalDef;
+}
+
+void swift::typeCheckExternalDefinitions(SourceFile &SF) {
+  assert(SF.ASTStage == SourceFile::TypeChecked);
+  auto &Ctx = SF.getASTContext();
+  TypeChecker TC(Ctx);
+  typeCheckFunctionsAndExternalDecls(TC);
+}
+
 void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
                                 unsigned StartElem) {
   if (SF.ASTStage == SourceFile::TypeChecked)
@@ -314,63 +381,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
   if (SF.Kind == SourceFileKind::REPL && !TC.Context.hadError())
     TC.processREPLTopLevel(SF, TLC, StartElem);
 
-  unsigned currentFunctionIdx = 0;
-  unsigned currentExternalDef = TC.Context.LastCheckedExternalDefinition;
-  do {
-    
-    for (unsigned n = TC.Context.ExternalDefinitions.size();
-         currentExternalDef != n;
-         ++currentExternalDef) {
-      auto decl = TC.Context.ExternalDefinitions[currentExternalDef];
-      
-      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(decl)) {
-        PrettyStackTraceDecl StackEntry("type-checking", AFD);
-        TC.typeCheckAbstractFunctionBody(AFD);
-        continue;
-      }
-      if (isa<NominalTypeDecl>(decl)) {
-        TC.handleExternalDecl(decl);
-        continue;
-      }
-      llvm_unreachable("Unhandled external definition kind");
-    }
-    
-    // Type check the body of each of the function in turn.  Note that outside
-    // functions must be visited before nested functions for type-checking to
-    // work correctly.
-    unsigned previousFunctionIdx = currentFunctionIdx;
-    for (unsigned n = DefinedFunctions.size(); currentFunctionIdx != n;
-         ++currentFunctionIdx) {
-      auto *AFD = DefinedFunctions[currentFunctionIdx];
-      PrettyStackTraceDecl StackEntry("type-checking", AFD);
-      TC.typeCheckAbstractFunctionBody(AFD);
-    }
-
-    // Compute captures for functions we visited, in the opposite order of type
-    // checking. i.e., the nested DefinedFunctions will be visited before the
-    // outer DefinedFunctions.
-    for (unsigned i = currentFunctionIdx; i > previousFunctionIdx; --i) {
-      if (auto *FD = dyn_cast<AbstractFunctionDecl>(DefinedFunctions[i-1]))
-        TC.computeCaptures(FD);
-    }
-
-    // Type-check any referenced nominal types.
-    while (!TC.ValidatedTypes.empty()) {
-      auto nominal = TC.ValidatedTypes.back();
-      TC.ValidatedTypes.pop_back();
-      TC.typeCheckDecl(nominal, /*isFirstPass=*/true);
-    }
-
-    DefinedFunctions.insert(DefinedFunctions.end(),
-                            TC.implicitlyDefinedFunctions.begin(),
-                            TC.implicitlyDefinedFunctions.end());
-    TC.implicitlyDefinedFunctions.clear();
-
-  } while (currentFunctionIdx < DefinedFunctions.size() ||
-           currentExternalDef < TC.Context.ExternalDefinitions.size());
-
-  // FIXME: Horrible hack. Store this somewhere more sane.
-  TC.Context.LastCheckedExternalDefinition = currentExternalDef;
+  typeCheckFunctionsAndExternalDecls(TC);
 
   // Verify that we've checked types correctly.
   SF.ASTStage = SourceFile::TypeChecked;
