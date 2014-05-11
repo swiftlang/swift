@@ -1441,6 +1441,10 @@ namespace {
      
       return expr;
     }
+
+    /// \brief Ignore declarations.
+    bool walkToDeclPre(Decl *decl) override { return false; }
+
   };
 
   class ConstraintWalker : public ASTWalker {

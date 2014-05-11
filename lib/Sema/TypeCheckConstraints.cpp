@@ -488,11 +488,10 @@ namespace {
 bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
   // Validate the capture list.
   for (auto capture : closure->getCaptureList()) {
-    TC.typeCheckDecl(capture.Var, true);
-    TC.typeCheckDecl(capture.Var, false);
-
     TC.typeCheckDecl(capture.Init, true);
     TC.typeCheckDecl(capture.Init, false);
+    TC.typeCheckDecl(capture.Var, true);
+    TC.typeCheckDecl(capture.Var, false);
   }
 
   // Validate the parameters.
@@ -926,6 +925,7 @@ bool TypeChecker::typeCheckExpressionShallow(Expr *&expr, DeclContext *dc,
 }
 
 bool TypeChecker::typeCheckBinding(PatternBindingDecl *binding) {
+
   /// Type checking listener for pattern binding initializers.
   class BindingListener : public ExprTypeCheckListener {
     /// The pattern binding declaration whose initializer we're checking.
