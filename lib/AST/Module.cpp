@@ -1070,6 +1070,10 @@ bool Module::isStdlibModule() const {
   return !getParent() && Name == Ctx.StdlibModuleName;
 }
 
+bool Module::isBuiltinModule() const {
+  return this == Ctx.TheBuiltinModule;
+}
+
 bool Module::isSystemModule() const {
   if (isStdlibModule())
     return true;
