@@ -2352,36 +2352,27 @@ namespace {
       }
       
       // Allow for casts from AnyObject to a briged type.
-      if (tc.isBridgedDynamicConversion(cs.DC, fromType, toType)) {
-        auto bridgedType = tc.getBridgedType(cs.DC, toType);
+      if (auto bridgedType = tc.getDynamicBridgedThroughObjCClass(cs.DC, 
+                                                                  fromType, 
+                                                                  toType)) {
+        sub->setType(bridgedType);
         
-        if (!bridgedType.isNull()) {
-          sub->setType(bridgedType);
+        sub = tc.coerceToRValue(expr->getSubExpr());
+        if (!sub)
+          return nullptr;
+        expr->setSubExpr(sub);
+        expr->getCastTypeLoc().setType(bridgedType, true);
+        expr->setType(tc.getOptionalType(expr->getLoc(), bridgedType));
           
-          sub = tc.coerceToRValue(expr->getSubExpr());
-          if (!sub)
-            return nullptr;
-          expr->setSubExpr(sub);
+        auto optionalStringType = tc.getOptionalType(expr->getLoc(), toType);
+        auto OSTLoc = TypeLoc::withoutLoc(optionalStringType);
           
-          expr->getCastTypeLoc().setType(bridgedType,
-                                         true);
+        auto wrappedExpr
+          = new (tc.Context) ConditionalCheckedCastExpr(expr,
+                                                        expr->getLoc(),
+                                                        OSTLoc);
           
-          expr->setType(tc.getOptionalType(expr->getLoc(),
-                                           bridgedType));
-          
-          auto optionalStringType = tc.getOptionalType(expr->getLoc(),
-                                                       toType);
-          
-          auto OSTLoc = TypeLoc::withoutLoc(optionalStringType);
-          
-          auto wrappedExpr =
-              new (tc.Context)
-                  ConditionalCheckedCastExpr(expr,
-                                             expr->getLoc(),
-                                             OSTLoc);
-          
-          return visitConditionalCheckedCastExpr(wrappedExpr);
-        }
+        return visitConditionalCheckedCastExpr(wrappedExpr);
       }
       
       Type finalResultType = simplifyType(expr->getType());
@@ -3152,17 +3143,13 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
   auto &tc = solution.getConstraintSystem().getTypeChecker();
   Type fromType = expr->getType();
   
-  if (tc.isBridgedDynamicConversion(cs.DC, toType, fromType)) {
-    // Need to coerce to the briged type.
-    auto bridgedType = tc.getBridgedType(cs.DC, fromType);
-    
-    if (!bridgedType.isNull() &&
-        // Protect against "no-op" conversions. If the bridged type points back
-        // to itself, the constraint solver won't have a conversion handy to
-        // coerce to a user conversion, so we'll should avoid creating a new
-        // expression node.
-        (bridgedType.getPointer() != fromType.getPointer()) &&
-        (bridgedType.getPointer() != toType.getPointer())) {
+  if (auto bridgedType = tc.getDynamicBridgedThroughObjCClass(cs.DC, toType, 
+                                                              fromType)) {
+    // Protect against "no-op" conversions. If the bridged type points back
+    // to itself, the constraint solver won't have a conversion handy to
+    // coerce to a user conversion, so we'll should avoid creating a new
+    // expression node.
+    if (!bridgedType->isEqual(fromType) && !bridgedType->isEqual(toType)) {
       expr = coerceViaUserConversion(expr, bridgedType, locator);
       fromType = bridgedType;
     }
@@ -3705,10 +3692,9 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       auto desugaredArray = fromType.getPointer()->getDesugaredType();
       auto baseType = cs.getBaseTypeForArrayType(desugaredArray);
       
-      if (tc.isConditionallyBridgedType(dc, baseType)) {
-        bridgedArrayConversion->isConditionallyBridged = true;
-      }
-      
+      bool isConditionallyBridged = false;
+      tc.getBridgedToObjC(dc, baseType, &isConditionallyBridged);
+      bridgedArrayConversion->isConditionallyBridged = isConditionallyBridged;
       return bridgedArrayConversion;
     }
 

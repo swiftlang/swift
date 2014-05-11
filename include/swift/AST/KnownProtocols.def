@@ -48,6 +48,7 @@ PROTOCOL(Hashable)
 PROTOCOL(Comparable)
 
 PROTOCOL(_BridgedToObjectiveC)
+PROTOCOL(_ConditionallyBridgedToObjectiveC)
 
 LITERAL_CONVERTIBLE_PROTOCOL(ArrayLiteralConvertible)
 LITERAL_CONVERTIBLE_PROTOCOL(CharacterLiteralConvertible)

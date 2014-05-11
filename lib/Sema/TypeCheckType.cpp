@@ -80,50 +80,19 @@ Type TypeChecker::getNSStringType(DeclContext *dc) {
   return NSStringType;
 }
 
-bool TypeChecker::isBridgedDynamicConversion(DeclContext *dc,
-                                             Type protocolType,
-                                             Type concreteType) {
-  if (protocolType->isAnyObject()) {
-    if (auto nominalType = concreteType->getAs<NominalType>()) {
-      if (getBridgedType(dc, nominalType)) {
-        return true;
-      }
-    }
-  }
-  
-  return false;
-}
-
-Type TypeChecker::getBridgedType(DeclContext *dc, Type type) {
-  auto name = dc->getASTContext().getIdentifier("bridgeToObjectiveC");
-  auto result = lookupMember(type, name,
-                             dc,
-                             true);
-  
-  if (!result.empty()) {
-    auto memberDecl = result.front();
-    auto memberType = memberDecl->getType();
-    
-    // Unwrap the inner function from self -> () -> bridgedType.
-    if (auto functionType =
-            dyn_cast<FunctionType>(memberType.getPointer())) {
-      if (auto innerFunctionType =
-              dyn_cast<FunctionType>(functionType->getResult().getPointer())) {
-        return innerFunctionType->getResult();
-      }
-    }
+Type 
+TypeChecker::getDynamicBridgedThroughObjCClass(DeclContext *dc,
+                                               Type dynamicType,
+                                               Type valueType,
+                                               bool *isConditionallyBridged) {
+  if (dynamicType->isAnyObject()) {
+    // We only interested in types that bridge non-verbatim.
+    auto bridged = getBridgedToObjC(dc, valueType, isConditionallyBridged);
+    if (bridged.first && !bridged.second)
+      return bridged.first;
   }
   
   return Type();
-}
-
-bool TypeChecker::isConditionallyBridgedType(DeclContext *dc, Type type) {
-  auto name = dc->getASTContext().getIdentifier("isBridgedToObjectiveC");
-  auto result = lookupMember(type, name,
-                             dc,
-                             true);
-  
-  return !result.empty();
 }
 
 void TypeChecker::forceExternalDeclMembers(NominalTypeDecl *nominalDecl) {
@@ -2088,35 +2057,42 @@ bool TypeChecker::isTriviallyRepresentableInObjC(const DeclContext *DC,
   return false;
 }
 
-/// Retrieves the Objective-C type to which the given type is bridged along
-/// with a bit indicating whether it was bridged verbatim.
-///
-/// \returns a pair containing the bridged type (or a null type if the type
-/// cannot be bridged) and a bit indicating whether the type was bridged
-/// verbatim.
-static std::pair<Type, bool> getBridgedToObjC(TypeChecker &tc,
-                                              const DeclContext *dc,
-                                              Type type) {
+std::pair<Type, bool> 
+TypeChecker::getBridgedToObjC(const DeclContext *dc,
+                              Type type,
+                              bool *isConditionallyBridged) {
+  if (isConditionallyBridged)
+    *isConditionallyBridged = false;
+
   // Class types and ObjC existential types are always bridged verbatim.
   if (type->getClassOrBoundGenericClass() || type->isObjCExistentialType())
     return { type, true };
 
   // Retrieve the _BridgedToObjectiveC protocol.
   auto bridgedProto
-    = tc.Context.getProtocol(KnownProtocolKind::_BridgedToObjectiveC);
+    = Context.getProtocol(KnownProtocolKind::_BridgedToObjectiveC);
   if (!bridgedProto)
     return { nullptr, false };
 
   // Check whether the type conforms to _BridgedToObjectiveC.
   ProtocolConformance *conformance = nullptr;
-  if (!tc.conformsToProtocol(type, bridgedProto, const_cast<DeclContext *>(dc),
-                             &conformance))
+  if (!conformsToProtocol(type, bridgedProto, const_cast<DeclContext *>(dc),
+                          &conformance))
     return { nullptr, false };
 
-  // FIXME: Check conditional bridging if requested?
+  // Check conditional bridging if requested.
+  if (isConditionallyBridged) {
+    if (auto condBridgedProto
+          = Context.getProtocol(
+              KnownProtocolKind::_ConditionallyBridgedToObjectiveC)) {
+      *isConditionallyBridged
+        = conformsToProtocol(type, condBridgedProto,
+                             const_cast<DeclContext *>(dc));
+    }
+  }
 
-  return { tc.getWitnessType(type, bridgedProto, conformance,
-                             tc.Context.getIdentifier("ObjectiveCType"),
+  return { getWitnessType(type, bridgedProto, conformance,
+                          Context.getIdentifier("ObjectiveCType"),
                              diag::broken_bridged_to_objc_protocol),
            false };
 }
@@ -2160,19 +2136,18 @@ bool TypeChecker::isRepresentableInObjC(const DeclContext *DC, Type T) {
     return true;
   }
 
-  // Dictionary<K, V> is representable when K is a class inheriting from
-  // NSObject and V is something compatible with AnyObject.
+  // Dictionary<K, V> is representable when K and V are bridged to Objective-C.
   if (auto dictDecl = Context.getDictionaryDecl()) {
     if (auto boundGeneric = T->getAs<BoundGenericType>()) {
       if (boundGeneric->getDecl() == dictDecl) {
         // The key type must be bridged to Objective-C.
         auto keyType = boundGeneric->getGenericArgs()[0];
-        if (getBridgedToObjC(*this, DC, keyType).first.isNull())
+        if (getBridgedToObjC(DC, keyType).first.isNull())
           return false;
 
         // The value type must be bridged to Objective-C.
         auto valueType = boundGeneric->getGenericArgs()[1];
-        if (getBridgedToObjC(*this, DC, valueType).first.isNull())
+        if (getBridgedToObjC(DC, valueType).first.isNull())
           return false;
 
         return true;

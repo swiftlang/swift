@@ -1963,19 +1963,16 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   }
   
   // If possible, redirect the coercion to a bridged type.
-  if (TC.isBridgedDynamicConversion(DC, protocol->getDeclaredType(), type)) {
-    auto bridgedType = TC.getBridgedType(DC, type);
+  if (auto bridgedType = TC.getDynamicBridgedThroughObjCClass(
+                           DC, protocol->getDeclaredType(), type)) {
+    simplifyRestrictedConstraint(ConversionRestrictionKind::User,
+                                 type,
+                                 bridgedType,
+                                 TypeMatchKind::Conversion,
+                                 TMF_GenerateConstraints,
+                                 locator);
     
-    if (!bridgedType.isNull()) {
-      simplifyRestrictedConstraint(ConversionRestrictionKind::User,
-                                   type,
-                                   bridgedType,
-                                   TypeMatchKind::Conversion,
-                                   TMF_GenerateConstraints,
-                                   locator);
-      
-      return SolutionKind::Solved;
-    }
+    return SolutionKind::Solved;
   }
   
   // There's nothing more we can do; fail.
@@ -2835,13 +2832,12 @@ static TypeMatchKind getTypeMatchKind(ConstraintKind kind) {
 }
 
 Type ConstraintSystem::getBaseTypeForArrayType(TypeBase *type) {
-  if (auto sliceType = dyn_cast<ArraySliceType>(type)) {
-    return sliceType->getBaseType();
+  if (auto bound = type->getAs<BoundGenericStructType>()) {
+    if (bound->getDecl() == getASTContext().getArrayDecl()) {
+      return bound->getGenericArgs()[0];
+    }
   }
-  if (auto arrayType = dyn_cast<BoundGenericType>(type)) {
-    return arrayType->getGenericArgs()[0];
-  }
-  
+
   llvm_unreachable("attempted to extract a base type from a non-array type");
 }
 
@@ -2971,8 +2967,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
     Type baseType2 = this->getBaseTypeForArrayType(t2);
     
     if (baseType2->isAnyObject()) {
-      if (dyn_cast<ClassType>(baseType1.getPointer()) ||
-          dyn_cast<BoundGenericClassType>(baseType1.getPointer())) {
+      if (baseType1->getClassOrBoundGenericClass()) {
         return SolutionKind::Solved;
       }
     }
@@ -2996,28 +2991,22 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
     Type baseType2 = this->getBaseTypeForArrayType(t2);
     
     if (!baseType2->isAnyObject()) {
-      if (auto nominalType1 = dyn_cast<NominalType>(baseType1.getPointer())) {
-        auto bridgedType1 = TC.getBridgedType(DC, nominalType1);
-
-        // Allow assignments from Array<T> to Array<U> if T is bridged to type
+      // Allow assignments from Array<T> to Array<U> if T is bridged
+      // to type U.
+      if (auto bridgedType1 = TC.getBridgedToObjC(DC, baseType1).first) {
+        // If we're not converting to AnyObject, check if T.ObjectiveCType is
         // U.
-        if (!bridgedType1.isNull()) {
-          
-          // If we're not converting to AnyObject, check if T.ObjectiveCType is
-          // U.
-          // We'll save the further check for conformance with
-          // _ConditionallyBridgedToObjectiveC until runtime.
-          if (bridgedType1.getPointer() == baseType2.getPointer()) {
-            return SolutionKind::Solved;
-          }
-          else {
-            // Check if T's bridged type is a subtype of U.
-            return matchTypes(bridgedType1,
-                              baseType2,
-                              TypeMatchKind::Subtype,
-                              flags,
-                              locator);
-          }
+        // We'll save the further check for conformance with
+        // _ConditionallyBridgedToObjectiveC until runtime.
+        if (bridgedType1->isEqual(baseType2)) {
+          return SolutionKind::Solved;
+        } else {
+          // Check if T's bridged type is a subtype of U.
+          return matchTypes(bridgedType1,
+                            baseType2,
+                            TypeMatchKind::Subtype,
+                            flags,
+                            locator);
         }
       }
     }

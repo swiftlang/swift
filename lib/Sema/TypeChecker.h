@@ -679,19 +679,40 @@ public:
                                        SourceRange diagToRange,
                                        std::function<bool(Type)> convertToType);
   
-  /// \brief Determine if a given concrete type can be coerced to an existential
-  /// protocol type.
-  bool isBridgedDynamicConversion(DeclContext *dc,
-                                  Type protocolType,
-                                  Type concreteType);
-  
-  /// \brief Return the bridged Objective-C type if possbile, otherwise return
-  /// a null Type.
-  Type getBridgedType(DeclContext *dc, Type type);
-  
-  /// \brief Return true if the type conforms to the
-  /// _ConditionallyBridgedToObjectiveC protocol
-  bool isConditionallyBridgedType(DeclContext *dc, Type type);
+  /// Retrieves the Objective-C type to which the given value type is
+  /// bridged along with a bit indicating whether it was bridged
+  /// verbatim.
+  ///
+  /// \param dc The declaration context from which we will look for
+  /// bridging.
+  ///
+  /// \param type The value type being queried, e.g., String.
+  ///
+  /// \param isConditionallyBridged If non-null, will be set to
+  /// indicate whether the bridging is conditional.
+  ///
+  /// \returns a pair containing the bridged type (or a null type if the type
+  /// cannot be bridged) and a bit indicating whether the type was bridged
+  /// verbatim.
+  std::pair<Type, bool> getBridgedToObjC(const DeclContext *dc,
+                                         Type type,
+                                         bool *isConditionallyBridged=nullptr);
+
+  /// Find the Objective-C class that bridges between a value of the given
+  /// dynamic type and the given value type.
+  ///
+  /// \param dynamicType A dynamic type from which we are bridging. At
+  /// present, only \c AnyObject can be used here for a successful
+  /// bridge.
+  ///
+  /// \returns the Objective-C class type that represents the value
+  /// type as an Objective-C class, e.g., \c NSString represents \c
+  /// String, or a null type if there is no such type or if the
+  /// dynamic type isn't something we can start from.
+  Type getDynamicBridgedThroughObjCClass(DeclContext *dc,
+                                         Type dynamicType,
+                                         Type valueType,
+                                         bool *isConditionallyBridged=nullptr);
 
   /// \brief Type check the given expression as an array bound, which converts
   /// it to a builtin integer value.
