@@ -1,6 +1,25 @@
 Latest
 ----------
 
+* Closures can now specify a capture list to indicate with what strength they
+  want to capture a value, and to bind a particular field value if they want to.
+
+  Closure capture lists are square-bracket delimited and specified before the
+  optional argument list in a closure.  Each entry may be specified as "weak"
+  or "unowned" to capture the value with a weak or unowned pointer, and may
+  contain an explicit expression if desired.  Some examples:
+  
+    takeClosure { print(self.title) }                    // strong capture
+    takeClosure { [weak self] in print(self!.title) }    // weak capture
+    takeClosure { [unowned self] in print(self.title) }  // unowned capture
+
+  You can also bind arbitrary expression to named values in the capture list.
+  The expression is evaluated when the closure is formed, and captured with the
+  specified strength.  For example:
+  
+    // weak capture of "self.parent"
+    takeClosure { [weak tmp = self.parent] in print(tmp!.title) }
+
 * The word "with" is now removed from the first keyword argument name
   if an initialized imported from Objective-C. For example, instead of
   building UIColor as:
