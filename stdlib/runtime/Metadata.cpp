@@ -2532,6 +2532,98 @@ void swift::swift_printAny(OpaqueValue *value,
   type->getValueWitnesses()->destroy(value, type);
 }
 
+static const void *
+findWitnessTableForDynamicCastToExistential1(const Metadata *sourceType,
+                                             const Metadata *destType) {
+  if (destType->getKind() != MetadataKind::Existential)
+    swift::crash("Swift protocol conformance check failed: "
+                 "destination type is not an existential");
+
+  auto destExistentialMetadata =
+      static_cast<const ExistentialTypeMetadata *>(destType);
+
+  if (destExistentialMetadata->Protocols.NumProtocols != 1)
+    swift::crash("Swift protocol conformance check failed: "
+                 "destination type conforms more than to one protocol");
+
+  auto destProtocolDescriptor = destExistentialMetadata->Protocols[0];
+
+  return swift_conformsToProtocol(sourceType, destProtocolDescriptor, nullptr);
+}
+
+// func _stdlib_conformsToProtocol<SourceType, DestType>(
+//     value: SourceType, _: DestType.Type
+// ) -> Bool
+extern "C" bool
+swift_stdlib_conformsToProtocol(
+    OpaqueValue *sourceValue, const Metadata *_destType,
+    const Metadata *sourceType, const Metadata *destType) {
+  auto vw = findWitnessTableForDynamicCastToExistential1(sourceType, destType);
+  sourceType->vw_destroy(sourceValue);
+  return vw != nullptr;
+}
+
+// func _stdlib_dynamicCastToExistential1Unconditional<SourceType, DestType>(
+//     value: SourceType,
+//     _: DestType.Type
+// ) -> DestType
+extern "C" FixedOpaqueExistentialContainer<1>
+swift_stdlib_dynamicCastToExistential1Unconditional(
+    OpaqueValue *sourceValue, const Metadata *_destType,
+    const Metadata *sourceType, const Metadata *destType) {
+  auto vw = findWitnessTableForDynamicCastToExistential1(sourceType, destType);
+  if (!vw)
+    swift::crash("Swift dynamic cast failed: "
+                 "type does not conform to the protocol");
+
+  using box = OpaqueExistentialBox<1>;
+
+  box::Container outValue;
+  outValue.Header.Type = sourceType;
+  outValue.WitnessTables[0] = vw;
+  sourceType->vw_initializeBufferWithTake(outValue.getBuffer(), sourceValue);
+
+  return outValue;
+}
+
+// The return type is incorrect.  It is only important that it is
+// passed using 'sret'.
+extern "C" OpaqueExistentialContainer
+_TFSs24_injectValueIntoOptionalU__FQ_GSqQ__(OpaqueValue *value,
+                                            const Metadata *T);
+
+// The return type is incorrect.  It is only important that it is
+// passed using 'sret'.
+extern "C" OpaqueExistentialContainer
+_TFSs26_injectNothingIntoOptionalU__FT_GSqQ__(const Metadata *T);
+
+// func _stdlib_dynamicCastToExistential1<SourceType, DestType>(
+//     value: SourceType,
+//     _: DestType.Type
+// ) -> DestType?
+//
+// The return type is incorrect.  It is only important that it is
+// passed using 'sret'.
+extern "C" OpaqueExistentialContainer
+swift_stdlib_dynamicCastToExistential1(
+    OpaqueValue *sourceValue, const Metadata *_destType,
+    const Metadata *sourceType, const Metadata *destType) {
+  auto vw = findWitnessTableForDynamicCastToExistential1(sourceType, destType);
+  if (!vw) {
+    sourceType->vw_destroy(sourceValue);
+    return _TFSs26_injectNothingIntoOptionalU__FT_GSqQ__(destType);
+  }
+
+  using box = OpaqueExistentialBox<1>;
+
+  box::Container outValue;
+  outValue.Header.Type = sourceType;
+  outValue.WitnessTables[0] = vw;
+  sourceType->vw_initializeBufferWithTake(outValue.getBuffer(), sourceValue);
+
+  return _TFSs24_injectValueIntoOptionalU__FQ_GSqQ__(reinterpret_cast<OpaqueValue *>(&outValue), destType);
+}
+
 namespace llvm {
 namespace hashing {
 namespace detail {
