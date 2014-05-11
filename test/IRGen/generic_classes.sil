@@ -8,7 +8,6 @@ import gizmo
 // CHECK: [[ROOTGENERIC:%C15generic_classes11RootGeneric]] = type <{ %swift.refcounted, %VSs5UInt8 }>
 
 // -- offset of RootGeneric<T>.x
-// CHECK: @_TWvdvC15generic_classes11RootGeneric1xVSs5UInt8 = global i64 16, align 8
 // CHECK: [[ROOTGENERIC_NAME:@.*]] = private unnamed_addr constant [32 x i8] c"C15generic_classes11RootGeneric\00"
 // CHECK: [[ROOTGENERIC_FIELDS:@.*]] = private unnamed_addr constant [7 x i8] c"x\00y\00z\00\00"
 // CHECK: @_TMnC15generic_classes11RootGeneric = constant { {{.*}} i32 } {
@@ -27,7 +26,7 @@ import gizmo
 // --       generic parameter count, witness table counts
 // CHECK:   i32 1, i32 0
 // CHECK: }
-// CHECK: @_TMPdC15generic_classes11RootGeneric = global { {{.*}}* } {
+// CHECK: @_TMPdC15generic_classes11RootGeneric = global { {{.*}}* } } {
 // --       template fill function
 // CHECK:   void (i8*, i8*)* [[FILL_ROOTGENERIC:@fill_generic_metadata[0-9]*]],
 // --       nominal type descriptor
@@ -78,13 +77,13 @@ import gizmo
 // CHECK:   {{.*}}* @_TMnC15generic_classes14RootNonGeneric,
 // CHECK: }
 
-// CHECK: @_TMPdC15generic_classes22GenericInheritsGeneric = global { {{.*}}* } {
+// CHECK: @_TMPdC15generic_classes22GenericInheritsGeneric = global { {{.*}}* } } {
 // --       template fill function
 // CHECK:   void (i8*, i8*)* [[FILL_GENERICINHERITSGENERIC:@fill_generic_metadata[0-9]*]],
 // --       RootGeneric vtable
-//          @_TFC15generic_classes11RootGeneric3fooU__fGS0_Q__FT_T_,
-//          @_TFC15generic_classes11RootGeneric3barU__fGS0_Q__FT_T_,
-//          @_TFC15generic_classes11RootGeneric3basU__fGS0_Q__FT_T_,
+// CHECK:   @_TFC15generic_classes11RootGeneric3fooU__fGS0_Q__FT_T_,
+// CHECK:   @_TFC15generic_classes11RootGeneric3barU__fGS0_Q__FT_T_,
+// CHECK:   @_TFC15generic_classes11RootGeneric3basU__fGS0_Q__FT_T_,
 // --       RootGeneric field offset placeholders
 // CHECK:   i64 16, i64 0, i64 0
 // --       GenericInheritsGeneric vtable

@@ -24,5 +24,4 @@ bb0(%0 : $G<T>):
   return %1 : $()
 }
 
-// CHECK: _TMmC13ios_simulator1G = {{.*}}, [[OPAQUE]]* @_objc_empty_cache, [[OPAQUE]]* null,
-// CHECK: _TMPdC13ios_simulator1G = {{.*}}, [[OPAQUE]]* @_objc_empty_cache, [[OPAQUE]]* null,
+// CHECK: _TMPdC13ios_simulator1G = {{.*}}, [[OPAQUE]]* @_objc_empty_cache, [[OPAQUE]]* null, {{.*}} [[OPAQUE]]* @_objc_empty_cache

@@ -791,6 +791,7 @@ namespace {
       return TheEntity.is<ProtocolDecl*>();
     }
 
+    bool Generic = false;
     bool HasNonTrivialDestructor = false;
     bool HasNonTrivialConstructor = false;
     llvm::SmallString<16> CategoryName;
@@ -815,6 +816,7 @@ namespace {
                      unsigned firstField)
         : IGM(IGM), TheEntity(theClass), TheExtension(nullptr),
           Layout(&layout), FieldLayout(&fieldLayout),
+          Generic(theClass->isGenericContext()),
           FirstFieldIndex(firstField),
           NextFieldIndex(firstField)
     {
@@ -830,7 +832,8 @@ namespace {
     ClassDataBuilder(IRGenModule &IGM, ClassDecl *theClass,
                      ExtensionDecl *theExtension)
       : IGM(IGM), TheEntity(theClass), TheExtension(theExtension),
-        Layout(nullptr), FieldLayout(nullptr)
+        Layout(nullptr), FieldLayout(nullptr),
+        Generic(theClass->isGenericContext())
     {
       buildCategoryName(CategoryName);
 
@@ -891,7 +894,6 @@ namespace {
         visitObjCConformance(inherited.first, inherited.second);
     }
 
-    /// Build the metaclass stub object.
     void buildMetaclassStub() {
       assert(Layout && "can't build a metaclass from a category");
       // The isa is the metaclass pointer for the root class.
@@ -1016,7 +1018,7 @@ namespace {
       return buildGlobalVariable(fields, "_PROTOCOL_");
     }
 
-    llvm::Constant *emitROData(ForMetaClass_t forMeta) {
+    llvm::Constant *emitRODataFields(ForMetaClass_t forMeta) {
       assert(Layout && FieldLayout && "can't emit rodata for a category");
       SmallVector<llvm::Constant*, 11> fields;
       // struct _class_ro_t {
@@ -1030,6 +1032,7 @@ namespace {
       // two values.  If the instanceSize of the superclass equals the
       // stored instanceStart of the subclass, the ivar offsets
       // will not be changed.
+      // FIXME: This is totally bogus for generic classes with dynamic layout.
       Size instanceStart;
       Size instanceSize;
       if (forMeta) {
@@ -1090,6 +1093,12 @@ namespace {
 
       // };
 
+      return llvm::ConstantStruct::getAnon(IGM.getLLVMContext(), fields);
+    }
+    
+    llvm::Constant *emitROData(ForMetaClass_t forMeta) {
+      auto fields = emitRODataFields(forMeta);
+      
       auto dataSuffix = forMeta ? "_METACLASS_DATA_" : "_DATA_";
       return buildGlobalVariable(fields, dataSuffix);
     }
@@ -1117,6 +1126,12 @@ namespace {
     llvm::Constant *buildName() {
       if (Name) return Name;
 
+      // If the class is generic, we'll instantiate its name at runtime.
+      if (getClass()->isGenericContext()) {
+        Name = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+        return Name;
+      }
+      
       llvm::SmallString<64> buffer;
       Name = IGM.getAddrOfGlobalString(getClass()->getObjCRuntimeName(buffer));
       return Name;
@@ -1562,10 +1577,9 @@ namespace {
 
     /// Build a private global variable as a structure containing the
     /// given fields.
-    llvm::Constant *buildGlobalVariable(ArrayRef<llvm::Constant*> fields,
+    llvm::Constant *buildGlobalVariable(llvm::Constant *init,
                                         StringRef nameBase) {
       llvm::SmallString<64> nameBuffer;
-      auto init = llvm::ConstantStruct::getAnon(IGM.getLLVMContext(), fields);
       auto var = new llvm::GlobalVariable(IGM.Module, init->getType(),
                                         /*constant*/ true,
                                         llvm::GlobalVariable::PrivateLinkage,
@@ -1580,6 +1594,12 @@ namespace {
       return var;
     }
 
+    llvm::Constant *buildGlobalVariable(ArrayRef<llvm::Constant*> fields,
+                                        StringRef nameBase) {
+      auto init = llvm::ConstantStruct::getAnon(IGM.getLLVMContext(), fields);
+      return buildGlobalVariable(init, nameBase);
+    }
+    
   public:
     /// Member types don't get any representation.
     /// Maybe this should change for reflection purposes?
@@ -1625,6 +1645,24 @@ llvm::Constant *irgen::emitClassPrivateData(IRGenModule &IGM,
 
   // Then build the class RO-data.
   return builder.emitROData(ForClass);
+}
+  
+std::tuple<llvm::Constant * /*classData*/,
+           llvm::Constant * /*metaclassData*/,
+           Size>
+irgen::emitClassPrivateDataFields(IRGenModule &IGM, ClassDecl *cls) {
+  assert(IGM.ObjCInterop && "emitting RO-data outside of interop mode");
+  SILType selfType = getSelfType(cls);
+  auto &classTI = IGM.getTypeInfo(selfType).as<ClassTypeInfo>();
+  auto &fieldLayout = classTI.getLayout(IGM);
+  LayoutClass layout(IGM, ResilienceScope::Universal, cls, selfType);
+  ClassDataBuilder builder(IGM, cls, layout, fieldLayout,
+                           classTI.getInheritedStoredProperties(IGM).size());
+
+  auto classFields = builder.emitRODataFields(ForClass);
+  auto metaclassFields = builder.emitRODataFields(ForMetaClass);
+  Size size(IGM.DataLayout.getTypeAllocSize(classFields->getType()));
+  return {classFields, metaclassFields, size};
 }
   
 /// Emit the metadata for an ObjC category.
@@ -1674,4 +1712,10 @@ ClassDecl *IRGenModule::getSwiftRootClass() {
   SwiftRootClass->getMutableAttrs().add(ObjCAttr::createNullary(Context, name));
   SwiftRootClass->setImplicit();
   return SwiftRootClass;
+}
+
+ClassDecl *irgen::getRootClassForMetaclass(IRGenModule &IGM, ClassDecl *C) {
+  LayoutClass layout(IGM, ResilienceScope::Local, C, getSelfType(C));
+
+  return layout.getRootClassForMetaclass();
 }

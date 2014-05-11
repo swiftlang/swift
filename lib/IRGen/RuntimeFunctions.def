@@ -360,6 +360,14 @@ FUNCTION(GetExistentialMetadata,
               ProtocolDescriptorPtrTy->getPointerTo()),
          ATTRS(NoUnwind, ReadOnly))
 
+// const char *swift_getGenericClassObjCName(type_metadata_t *self,
+//                                           const char *basename);
+FUNCTION(GetGenericClassObjCName,
+         swift_getGenericClassObjCName, RuntimeCC,
+         RETURNS(Int8PtrTy),
+         ARGS(TypeMetadataPtrTy, Int8PtrTy),
+         ATTRS(NoUnwind))
+
 // void swift_initClassMetadata_UniversalStrategy(type_metadata_t *self,
 //                                          type_metadata_t *super,
 //                                          size_t numFields,

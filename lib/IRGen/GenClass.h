@@ -17,6 +17,8 @@
 #ifndef SWIFT_IRGEN_GENCLASS_H
 #define SWIFT_IRGEN_GENCLASS_H
 
+#include "llvm/ADT/SmallVector.h"
+
 namespace llvm {
   class Constant;
   class Value;
@@ -37,6 +39,7 @@ namespace irgen {
   class IRGenFunction;
   class IRGenModule;
   class OwnedAddress;
+  class Size;
   
   enum class ReferenceCounting : unsigned char;
   enum class IsaEncoding : unsigned char;
@@ -46,7 +49,19 @@ namespace irgen {
                                                  SILType baseType,
                                                  VarDecl *field);
 
+  std::tuple<llvm::Constant * /*classData*/,
+             llvm::Constant * /*metaclassData*/,
+             Size>
+  emitClassPrivateDataFields(IRGenModule &IGM, ClassDecl *cls);
+  
   llvm::Constant *emitClassPrivateData(IRGenModule &IGM, ClassDecl *theClass);
+  void emitGenericClassPrivateDataTemplate(IRGenModule &IGM,
+                                      ClassDecl *cls,
+                                      llvm::SmallVectorImpl<llvm::Constant*> &fields,
+                                      Size &metaclassOffset,
+                                      Size &classRODataOffset,
+                                      Size &metaclassRODataOffset,
+                                      Size &totalSize);
   llvm::Constant *emitCategoryData(IRGenModule &IGM, ExtensionDecl *ext);
   llvm::Constant *emitObjCProtocolData(IRGenModule &IGM, ProtocolDecl *ext);
 
@@ -92,6 +107,8 @@ namespace irgen {
   
   /// What isa-encoding mechanism does a type use?
   IsaEncoding getIsaEncodingForType(IRGenModule &IGM, CanType type);
+  
+  ClassDecl *getRootClassForMetaclass(IRGenModule &IGM, ClassDecl *C);
 } // end namespace irgen
 } // end namespace swift
 
