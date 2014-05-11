@@ -81,11 +81,6 @@ swift::isInstructionTriviallyDead(SILInstruction *I) {
   // mark_uninitialized is never dead.
   if (isa<MarkUninitializedInst>(I))
     return false;
-
-  // These invalidate enums so "write" memory, but that is not an essential
-  // operation so we can remove these if they are trivially dead.
-  if (isa<UncheckedTakeEnumDataAddrInst>(I))
-    return true;
   
   if (!I->mayHaveSideEffects())
     return true;

@@ -1089,6 +1089,7 @@ bb0(%0 : $E):
 // CHECK: bb1:
 // CHECK-NEXT: load
 // CHECK-NEXT: unchecked_enum_data
+// CHECK-NEXT: unchecked_take_enum_data_addr
 // CHECK-NEXT: return
 sil @unchecked_take_enum_data_addr_promotion : $@thin (@inout FakeOptional<B>) -> B {
 bb0(%0 : $*FakeOptional<B>):
