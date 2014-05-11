@@ -17,10 +17,7 @@ class RC4:
       self.swapByIndex(i, j)
 
   def swapByIndex(self, i, j):
-    T1 = self.state[i]
-    T2 = self.state[j]
-    self.state[i] = T2
-    self.state[j] = T1
+    self.state[i], self.state[j] = self.state[j], self.state[i]
 
   def next(self):
     self.I = (self.I + 1) % 256
@@ -46,8 +43,5 @@ def benchRC4_internal(messageLen, iterations):
 
   for i in xrange(iterations):
     Enc.encrypt(LongData)
-
-  #for i in xrange((messageLen)):
-  #    assert(LongData[i] == ord(Secret[i % len(Secret)]))
 
 benchRC4_internal(5000, 1000)
