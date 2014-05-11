@@ -208,6 +208,7 @@ namespace {
     RValue visitTupleShuffleExpr(TupleShuffleExpr *E, SGFContext C);
     RValue visitNewArrayExpr(NewArrayExpr *E, SGFContext C);
     RValue visitDynamicTypeExpr(DynamicTypeExpr *E, SGFContext C);
+    RValue visitClosureExpr(ClosureExpr *E, SGFContext C);
     RValue visitAbstractClosureExpr(AbstractClosureExpr *E, SGFContext C);
     RValue visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
                                               SGFContext C);
@@ -2265,7 +2266,7 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
 
   auto expectedType =
     cast<FunctionType>(TheClosure.getType()->getCanonicalType());
-  
+
   // Forward substitutions from the outer scope.
   
   auto pft = constantInfo.SILFnType;
@@ -2417,6 +2418,19 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
                                       AbstractionPattern(expectedType),
                                       expectedType);
 }
+
+RValue RValueEmitter::visitClosureExpr(ClosureExpr *E, SGFContext C) {
+  // ClosureExpr's are just like other AbstractClosureExprs, but they carry
+  // a list of explicitly bound captures.  Evaluate that now if present.
+  for (auto capture : E->getCaptureList()) {
+    SGF.visit(capture.Var);
+    SGF.visit(capture.Init);
+  }
+
+
+  return visitAbstractClosureExpr(E, C);
+}
+
 
 RValue RValueEmitter::visitAbstractClosureExpr(AbstractClosureExpr *e,
                                                SGFContext C) {
