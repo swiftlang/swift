@@ -444,11 +444,12 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
     SyntaxStructureNode SN;
     SN.Dcl = D;
     SN.Kind = SyntaxStructureKind::Parameter;
-    SN.NameRange = charSourceRangeFromSourceRange(SM, PD->getSourceRange());
-      SN.Range = SN.NameRange;
+    if (!PD->getArgumentName().empty())
+      SN.NameRange = CharSourceRange(PD->getStartLoc(),
+                                     PD->getArgumentName().getLength());
+    SN.Range = charSourceRangeFromSourceRange(SM, PD->getSourceRange());
     SN.Attrs = PD->getAttrs();
     pushStructureNode(SN, PD);
-
   } else if (auto *VD = dyn_cast<VarDecl>(D)) {
     const DeclContext *DC = VD->getDeclContext();
     if (DC->isTypeContext()) {
