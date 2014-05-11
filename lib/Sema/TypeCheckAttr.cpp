@@ -27,6 +27,9 @@ static bool isInClassContext(const Decl *D) {
 }
 
 namespace {
+/// This visits each attribute on a decl early, before the majority of type
+/// checking has been performed for the decl.  The visitor should return true if
+/// the attribute is invalid and should be marked as such.
 class AttributeEarlyChecker : public AttributeVisitor<AttributeEarlyChecker> {
   TypeChecker &TC;
   Decl *D;
@@ -34,143 +37,109 @@ class AttributeEarlyChecker : public AttributeVisitor<AttributeEarlyChecker> {
 public:
   AttributeEarlyChecker(TypeChecker &TC, Decl *D) : TC(TC), D(D) {}
 
+  /// This emits a diagnostic with a fixit to remove the attribute.
+  template<typename ...ArgTypes>
+  void diagnoseAndRemoveAttr(DeclAttribute *attr, ArgTypes &&...Args) {
+    TC.diagnose(attr->getLocation(), std::forward<ArgTypes>(Args)...)
+      .fixItRemove(attr->getRange());
+    attr->setInvalid();
+  }
+
   /// Deleting this ensures that all attributes are covered by the visitor
   /// below.
-  void visitDeclAttribute(DeclAttribute *A) = delete;
+  bool visitDeclAttribute(DeclAttribute *A) = delete;
+
+#define IGNORED_ATTR(X) void visit##X##Attr(X##Attr *) {}
+  IGNORED_ATTR(Asmname)
+  IGNORED_ATTR(Availability)
+  IGNORED_ATTR(ClassProtocol)
+  IGNORED_ATTR(Final)
+  IGNORED_ATTR(NSCopying)
+  IGNORED_ATTR(NSManaged)
+  IGNORED_ATTR(NoReturn)
+  IGNORED_ATTR(ObjC)
+  IGNORED_ATTR(RawDocComment)
+  IGNORED_ATTR(Required)
+#undef IGNORED_ATTR
 
   void visitIBActionAttr(IBActionAttr *attr);
-
   void visitLazyAttr(LazyAttr *attr);
-
   void visitIBDesignableAttr(IBDesignableAttr *attr);
-
   void visitIBInspectableAttr(IBInspectableAttr *attr);
-
   void visitIBOutletAttr(IBOutletAttr *attr);
-
-  void visitAsmnameAttr(AsmnameAttr *attr) {}
-
   void visitAssignmentAttr(AssignmentAttr *attr);
-
-  void visitAvailabilityAttr(AvailabilityAttr *attr) {}
-
-  void visitClassProtocolAttr(ClassProtocolAttr *attr) {}
-
   void visitExportedAttr(ExportedAttr *attr);
-
-  void visitFinalAttr(FinalAttr *attr) {}
-
-  void visitNSCopyingAttr(NSCopyingAttr *attr) {}
-
-  void visitNSManagedAttr(NSManagedAttr *attr) { }
-
-  void visitNoReturnAttr(NoReturnAttr *attr) {}
-
-  void visitObjCAttr(ObjCAttr *attr) {}
-
   void visitOverrideAttr(OverrideAttr *attr);
-
-  void visitRawDocCommentAttr(RawDocCommentAttr *attr) {}
-
-  void visitRequiredAttr(RequiredAttr *attr) {}
 };
 } // end anonymous namespace
 
 void AttributeEarlyChecker::visitIBActionAttr(IBActionAttr *attr) {
   // Only instance methods returning () can be IBActions.
   const FuncDecl *FD = dyn_cast<FuncDecl>(D);
-  if (!FD || !isInClassContext(D) || FD->isStatic() || FD->isAccessor()) {
-    TC.diagnose(attr->getLocation(), diag::invalid_ibaction_decl);
-    attr->setInvalid();
-    return;
-  }
+  if (!FD || !isInClassContext(D) || FD->isStatic() || FD->isAccessor())
+    return diagnoseAndRemoveAttr(attr, diag::invalid_ibaction_decl);
+
 }
 
 void AttributeEarlyChecker::visitIBDesignableAttr(IBDesignableAttr *attr) {
   // Only classes can be marked with 'IBDesignable'.
-  if (!isa<ClassDecl>(D)) {
-    TC.diagnose(attr->getLocation(), diag::invalid_ibdesignable_decl);
-    attr->setInvalid();
-    return;
-  }
+  if (!isa<ClassDecl>(D))
+    return diagnoseAndRemoveAttr(attr, diag::invalid_ibdesignable_decl);
+
 }
 
 void AttributeEarlyChecker::visitIBInspectableAttr(IBInspectableAttr *attr) {
   // Only instance properties can be 'IBInspectable'.
   auto *VD = dyn_cast<VarDecl>(D);
-  if (!VD || !isInClassContext(VD) || VD->isStatic()) {
-    TC.diagnose(attr->getLocation(), diag::invalid_ibinspectable);
-    attr->setInvalid();
-    return;
-  }
+  if (!VD || !isInClassContext(VD) || VD->isStatic())
+    return diagnoseAndRemoveAttr(attr, diag::invalid_ibinspectable);
+
 }
 
 void AttributeEarlyChecker::visitIBOutletAttr(IBOutletAttr *attr) {
   // Only instance properties can be 'IBOutlet'.
   auto *VD = dyn_cast<VarDecl>(D);
-  if (!VD || !isInClassContext(VD) || VD->isStatic()) {
-    TC.diagnose(attr->getLocation(), diag::invalid_iboutlet);
-    attr->setInvalid();
-    return;
-  }
+  if (!VD || !isInClassContext(VD) || VD->isStatic())
+    return diagnoseAndRemoveAttr(attr, diag::invalid_iboutlet);
+
 }
 
 void AttributeEarlyChecker::visitAssignmentAttr(AssignmentAttr *attr) {
   // Only function declarations can be assignments.
   auto *FD = dyn_cast<FuncDecl>(D);
-  if (!FD || !FD->isOperator()) {
-    TC.diagnose(attr->getLocation(), diag::invalid_decl_attribute,
-                attr->getKind())
-        .fixItRemove(attr->getRange());
-    attr->setInvalid();
-    return;
-  }
+  if (!FD || !FD->isOperator())
+    return diagnoseAndRemoveAttr(attr, diag::invalid_decl_attribute,
+                                 attr->getKind());
 }
 
 void AttributeEarlyChecker::visitExportedAttr(ExportedAttr *attr) {
-  if (!isa<ImportDecl>(D)) {
-    TC.diagnose(attr->getLocation(), diag::invalid_decl_attribute,
-                attr->getKind())
-        .fixItRemove(attr->getRange());
-    attr->setInvalid();
-  }
+  if (!isa<ImportDecl>(D))
+    return diagnoseAndRemoveAttr(attr, diag::invalid_decl_attribute,
+                attr->getKind());
+
 }
 
 void AttributeEarlyChecker::visitOverrideAttr(OverrideAttr *attr) {
   if (!isa<ClassDecl>(D->getDeclContext()) &&
-      !isa<ExtensionDecl>(D->getDeclContext())) {
-    TC.diagnose(D, diag::override_nonclass_decl)
-        .fixItRemove(attr->getRange());
-    attr->setInvalid();
-  }
+      !isa<ExtensionDecl>(D->getDeclContext()))
+    return diagnoseAndRemoveAttr(attr, diag::override_nonclass_decl);
 }
 
 void AttributeEarlyChecker::visitLazyAttr(LazyAttr *attr) {
   // @lazy may only be used on properties.
   auto *VD = dyn_cast<VarDecl>(D);
-  if (!VD) {
-    TC.diagnose(D, diag::lazy_not_on_var).fixItRemove(attr->getRange());
-    attr->setInvalid();
-    return;
-  }
+  if (!VD)
+    return diagnoseAndRemoveAttr(attr, diag::lazy_not_on_var);
 
   // It cannot currently be used on let's since we don't have a mutability model
   // that supports it.
-  if (VD->isLet()) {
-    TC.diagnose(D, diag::lazy_not_on_let).fixItRemove(attr->getRange());
-    attr->setInvalid();
-    return;
-  }
+  if (VD->isLet())
+    return diagnoseAndRemoveAttr(attr, diag::lazy_not_on_let);
 
   // It only works with stored properties.
-  if (!VD->hasStorage()) {
-    TC.diagnose(D, diag::lazy_not_on_computed).fixItRemove(attr->getRange());
-    attr->setInvalid();
-    return;
-  }
+  if (!VD->hasStorage())
+    return diagnoseAndRemoveAttr(attr, diag::lazy_not_on_computed);
 
-
-  
 }
 
 
