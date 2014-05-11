@@ -4247,6 +4247,25 @@ static void importAttributes(ASTContext &C, const clang::NamedDecl *ClangDecl,
       MappedDecl->getMutableAttrs().add(attr);
       return;
     }
+
+    // Ban the following from NSObject, as they remap to
+    // ".type" and ".dynamicType".
+    //
+    // - (Class)class;
+    // + (Class)class;
+    if (auto ID = dyn_cast<clang::NamedDecl>(MD->getDeclContext())) {
+      // Using a NamedDecl handles both the @protocol and @interface case.
+      if (ID->getName() == "NSObject") {
+        if (sel.getNumArgs() == 0 && sel.getNameForSlot(0) == "class") {
+          auto Str = MD->isClassMethod() ?
+                    "use 'type' instead" :
+                    "use 'dynamicType' instead";
+          auto attr = AvailabilityAttr::createImplicitUnavailableAttr(C, Str);
+          MappedDecl->getMutableAttrs().add(attr);
+          return;
+        }
+      }
+    }
   }
 
   // Ban NSInvocation.

@@ -6,6 +6,7 @@
 @protocol NSObject
 - description;
 - (instancetype)retain OBJC_ARC_UNAVAILABLE;
+- (Class)class;
 @end
 
 @interface NSObject <NSObject>
@@ -14,6 +15,7 @@
 + new;
 - performSelector:(SEL)selector withObject:(id)obj;
 - (Class)myClass;
++ (Class)class;
 + description;
 - (BOOL)allowsWeakReference __attribute__((unavailable));
 - (BOOL)isEqual:(NSObject *)other;
