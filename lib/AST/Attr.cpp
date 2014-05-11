@@ -102,24 +102,22 @@ void DeclAttributes::print(ASTPrinter &Printer,
 
 void DeclAttribute::print(ASTPrinter &Printer) const {
   switch (getKind()) {
-  case DAK_IBAction:
-    Printer << "@IBAction";
-    break;
-  case DAK_IBDesignable:
-    Printer << "@IBDesignable";
-    break;
-  case DAK_IBInspectable:
-    Printer << "@IBInspectable";
-    break;
-  case DAK_IBOutlet:
-    Printer << "@IBOutlet";
-    break;
+  case DAK_IBAction:       Printer << "@IBAction"; break;
+  case DAK_IBDesignable:   Printer << "@IBDesignable"; break;
+  case DAK_IBInspectable:  Printer << "@IBInspectable"; break;
+  case DAK_IBOutlet:       Printer << "@IBOutlet"; break;
+  case DAK_assignment:     Printer << "@assignment"; break;
+  case DAK_class_protocol: Printer << "@class_protocol"; break;
+  case DAK_exported:       Printer << "@exported"; break;
+  case DAK_final:          Printer << "@final"; break;
+  case DAK_noreturn:       Printer << "@noreturn"; break;
+  case DAK_NSCopying:      Printer << "@NSCopying"; break;
+  case DAK_NSManaged:      Printer << "@NSManaged"; break;
+  case DAK_lazy:           Printer << "@lazy"; break;
   case DAK_asmname:
     Printer << "@asmname(\"" << cast<AsmnameAttr>(this)->Name << "\")";
     break;
-  case DAK_assignment:
-    Printer << "@assignment";
-    break;
+
   case DAK_availability: {
     Printer << "@availability(";
     auto Attr = cast<AvailabilityAttr>(this);
@@ -130,24 +128,6 @@ void DeclAttribute::print(ASTPrinter &Printer) const {
     Printer << ")";
     break;
   }
-  case DAK_class_protocol:
-    Printer << "@class_protocol";
-    break;
-  case DAK_exported:
-    Printer << "@exported";
-    break;
-  case DAK_final:
-    Printer << "@final";
-    break;
-  case DAK_noreturn:
-    Printer << "@noreturn";
-    break;
-  case DAK_NSCopying:
-    Printer << "@NSCopying";
-    break;
-  case DAK_NSManaged:
-    Printer << "@NSManaged";
-    break;
 
   case DAK_objc: {
     Printer << "@objc";

@@ -734,6 +734,7 @@ ERROR(final_not_on_accessors,sema_tcd,none,
 ERROR(override_noreturn_with_return,sema_tcd,none,
       "an override of a 'noreturn' method should also be 'noreturn'", ())
 
+// NSCopying attribute
 ERROR(nscopying_only_on_class_properties,sema_tcd,none,
       "'NSCopying' attribute may only be used on properties in classes",
       ())
@@ -744,6 +745,15 @@ ERROR(nscopying_only_stored_property,sema_tcd,none,
 ERROR(nscopying_doesnt_conform,sema_tcd,none,
       "'NSCopying' attribute is only valid with types that conform to"
       " the NSCopying protocol", ())
+
+// lazy attribute
+ERROR(lazy_not_on_let,sema_tcd,none,
+      "'lazy' attribute cannot be used on a let", ())
+ERROR(lazy_not_on_var,sema_tcd,none,
+      "'lazy' attribute may only be used on 'var' declarations", ())
+ERROR(lazy_not_on_computed,sema_tcd,none,
+      "'lazy' attribute may not be used on a computed property", ())
+
 
 //------------------------------------------------------------------------------
 // Type Check Expressions

@@ -235,6 +235,10 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     if (!DiscardAttribute)
       Attributes.add(new (Context) IBOutletAttr(AtLoc, Loc));
     break;
+  case DAK_lazy:
+    if (!DiscardAttribute)
+      Attributes.add(new (Context) LazyAttr(AtLoc, Loc));
+    break;
 
   case DAK_asmname: {
     if (!consumeIf(tok::l_paren)) {

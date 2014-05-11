@@ -40,6 +40,8 @@ public:
 
   void visitIBActionAttr(IBActionAttr *attr);
 
+  void visitLazyAttr(LazyAttr *attr);
+
   void visitIBDesignableAttr(IBDesignableAttr *attr);
 
   void visitIBInspectableAttr(IBInspectableAttr *attr);
@@ -143,6 +145,35 @@ void AttributeEarlyChecker::visitOverrideAttr(OverrideAttr *attr) {
   }
 }
 
+void AttributeEarlyChecker::visitLazyAttr(LazyAttr *attr) {
+  // @lazy may only be used on properties.
+  auto *VD = dyn_cast<VarDecl>(D);
+  if (!VD) {
+    TC.diagnose(D, diag::lazy_not_on_var).fixItRemove(attr->getRange());
+    attr->setInvalid();
+    return;
+  }
+
+  // It cannot currently be used on let's since we don't have a mutability model
+  // that supports it.
+  if (VD->isLet()) {
+    TC.diagnose(D, diag::lazy_not_on_let).fixItRemove(attr->getRange());
+    attr->setInvalid();
+    return;
+  }
+
+  // It only works with stored properties.
+  if (!VD->hasStorage()) {
+    TC.diagnose(D, diag::lazy_not_on_computed).fixItRemove(attr->getRange());
+    attr->setInvalid();
+    return;
+  }
+
+
+  
+}
+
+
 void TypeChecker::checkDeclAttributesEarly(Decl *D) {
   AttributeEarlyChecker Checker(*this, D);
 
@@ -172,6 +203,7 @@ public:
     UNINTERESTING_ATTR(ObjC)
     UNINTERESTING_ATTR(Override)
     UNINTERESTING_ATTR(RawDocComment)
+    UNINTERESTING_ATTR(Lazy)  // checked early.
 
 #undef UNINTERESTING_ATTR
 
