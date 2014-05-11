@@ -1,9 +1,9 @@
 #import <Foundation/Foundation.h>
 #include <mach/mach_time.h>
 #include <stdio.h>
-#include "NSStringSort.h"
+#include "Phonebook.h"
 // NOTE: compile with ARC disabled (no -fobjc-arc)!
-// clang -O3 NSStringSort.m -o NSStringSort.bin -framework Foundation
+// clang -O3 Phonebook.m -o Phonebook.bin -framework Foundation
 
 @implementation Record
 - (NSString*) Firstname { return First; }
