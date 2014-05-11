@@ -4258,7 +4258,7 @@ static void importAttributes(ASTContext &C, const clang::NamedDecl *ClangDecl,
       if (ID->getName() == "NSObject") {
         if (sel.getNumArgs() == 0 && sel.getNameForSlot(0) == "class") {
           auto Str = MD->isClassMethod() ?
-                    "use 'type' instead" :
+                    "use 'self' instead" :
                     "use 'dynamicType' instead";
           auto attr = AvailabilityAttr::createImplicitUnavailableAttr(C, Str);
           MappedDecl->getMutableAttrs().add(attr);
