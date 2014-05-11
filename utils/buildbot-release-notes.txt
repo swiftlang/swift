@@ -5,7 +5,7 @@ Latest
   want to capture a value, and to bind a particular field value if they want to.
 
   Closure capture lists are square-bracket delimited and specified before the
-  optional argument list in a closure.  Each entry may be specified as "weak"
+  (optional) argument list in a closure.  Each entry may be specified as "weak"
   or "unowned" to capture the value with a weak or unowned pointer, and may
   contain an explicit expression if desired.  Some examples:
   
@@ -19,6 +19,15 @@ Latest
   
     // weak capture of "self.parent"
     takeClosure { [weak tmp = self.parent] in print(tmp!.title) }
+    
+  The full form of a closure can take a signature (an argument list and
+  optionally a return type) if needed.  To use either the capture list or the
+  signature, you must specify the context sensitive 'in' keyword.  Here is a
+  (weird because there is no need for unowned) example of a closure with both:
+  
+    myNSSet.enumerateObjectsUsingBlock { [unowned self] (obj, stop) in
+      self.considerWorkingWith(obj)
+    }
 
 * The word "with" is now removed from the first keyword argument name
   if an initialized imported from Objective-C. For example, instead of
