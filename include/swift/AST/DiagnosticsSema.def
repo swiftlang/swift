@@ -424,8 +424,9 @@ ERROR(attr_NSManaged_initial_value,sema_tcd,none,
 
 // Variables (var and let).
 ERROR(unimplemented_type_var,decl_parsing,none,
-     "static variables not yet supported in "
-     "%select{this context|generic types|classes|protocols}0", (unsigned))
+     "%select{ERROR|static|class}1 variables not yet supported"
+     "%select{ in this context| in generic types|| in protocols}0",
+     (unsigned, StaticSpellingKind))
 ERROR(let_requires_initializer,decl_parsing,none,
      "'let' declarations require an initializer expression", ())
 ERROR(observingprop_requires_initializer,decl_parsing,none,

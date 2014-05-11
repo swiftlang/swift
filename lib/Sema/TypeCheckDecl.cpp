@@ -1256,7 +1256,8 @@ static void validatePatternBindingDecl(TypeChecker &tc,
       
     auto unimplementedStatic = [&](unsigned diagSel) {
       auto staticLoc = binding->getStaticLoc();
-      tc.diagnose(staticLoc, diag::unimplemented_type_var, diagSel)
+      tc.diagnose(staticLoc, diag::unimplemented_type_var,
+                  diagSel, binding->getStaticSpelling())
         .highlight(SourceRange(staticLoc));
     };
 
@@ -2037,8 +2038,9 @@ public:
       }
     }
 
-    // In a protocol context, variables written as "var x : Int" are really
-    // computed properties with just a getter.  Create the getter decl now.
+    // In a protocol context, variables written as "var x : Int" are errors and
+    // recovered by building a computed property with just a getter.  Diagnose
+    // this and create the getter decl now.
     if (isa<ProtocolDecl>(VD->getDeclContext()) &&
         VD->getStorageKind() == VarDecl::Stored &&
         !VD->isLet()) {
@@ -2056,43 +2058,11 @@ public:
     if (auto ctx = VD->getDeclContext()->getDeclaredTypeOfContext())
       isClassMember = ctx->getClassOrBoundGenericClass();
 
-    // Checking for @NSManaged.
-    if (auto attr = VD->getMutableAttrs().getAttribute<NSManagedAttr>()) {
-      if (VD->isStatic() || !isClassMember) {
-        TC.diagnose(attr->getLocation(), diag::attr_NSManaged_not_property)
-          .fixItRemove(attr->getRange());
-        attr->setInvalid();
-      } else if (VD->isLet()) {
-        TC.diagnose(attr->getLocation(), diag::attr_NSManaged_let_property)
-          .fixItRemove(attr->getRange());
-        attr->setInvalid();
-      } else {
-        // @NSManaged properties must be written as stored.
-        switch (VD->getStorageKind()) {
-        case AbstractStorageDecl::Stored:
-          // @NSManaged properties end up being computed; complain if there is
-          // an initializer.
-          if (VD->getParentPattern()->hasInit()) {
-            TC.diagnose(attr->getLocation(), diag::attr_NSManaged_initial_value)
-              .highlight(VD->getParentPattern()->getInit()->getSourceRange());
-            VD->getParentPattern()->setInit(nullptr, false);
-          }
-
-          // Convert this property to a computed property.
-          convertNSManagedStoredVarToComputed(VD, TC);
-          break;
-
-        case AbstractStorageDecl::StoredWithTrivialAccessors:
-          llvm_unreachable("Already created accessors?");
-
-        case AbstractStorageDecl::Computed:
-        case AbstractStorageDecl::Observing:
-          TC.diagnose(attr->getLocation(), diag::attr_NSManaged_not_stored,
-                      VD->getStorageKind() == AbstractStorageDecl::Observing);
-          attr->setInvalid();
-          break;
-        }
-      }
+    // Synthesization for @NSManaged, all checking already performed.
+    if (VD->getAttrs().hasAttribute<NSManagedAttr>()) {
+      assert(VD->getStorageKind() == AbstractStorageDecl::Stored);
+      // Convert this property to a computed property.
+      convertNSManagedStoredVarToComputed(VD, TC);
     }
 
     // If this is a non-final stored property in a class, then synthesize getter

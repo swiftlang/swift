@@ -55,7 +55,6 @@ public:
   IGNORED_ATTR(ClassProtocol)
   IGNORED_ATTR(Final)
   IGNORED_ATTR(NSCopying)
-  IGNORED_ATTR(NSManaged)
   IGNORED_ATTR(NoReturn)
   IGNORED_ATTR(ObjC)
   IGNORED_ATTR(RawDocComment)
@@ -67,6 +66,7 @@ public:
   void visitIBDesignableAttr(IBDesignableAttr *attr);
   void visitIBInspectableAttr(IBInspectableAttr *attr);
   void visitIBOutletAttr(IBOutletAttr *attr);
+  void visitNSManagedAttr(NSManagedAttr *attr);
   void visitAssignmentAttr(AssignmentAttr *attr);
   void visitExportedAttr(ExportedAttr *attr);
   void visitOverrideAttr(OverrideAttr *attr);
@@ -103,6 +103,49 @@ void AttributeEarlyChecker::visitIBOutletAttr(IBOutletAttr *attr) {
     return diagnoseAndRemoveAttr(attr, diag::invalid_iboutlet);
 
 }
+
+void AttributeEarlyChecker::visitNSManagedAttr(NSManagedAttr *attr) {
+  // @NSManaged may only be used on properties.
+  auto *VD = dyn_cast<VarDecl>(D);
+
+  // NSManaged only applies to non-class properties within a class.
+  if (!VD)
+    return diagnoseAndRemoveAttr(attr, diag::attr_NSManaged_not_property);
+
+  bool isClassMember = false;
+  if (auto ctx = VD->getDeclContext()->getDeclaredTypeOfContext())
+    isClassMember = ctx->getClassOrBoundGenericClass();
+
+  if (VD->isStatic() || !isClassMember)
+    return diagnoseAndRemoveAttr(attr, diag::attr_NSManaged_not_property);
+
+  if (VD->isLet())
+    return diagnoseAndRemoveAttr(attr, diag::attr_NSManaged_let_property);
+
+  // @NSManaged properties must be written as stored.
+  switch (VD->getStorageKind()) {
+  case AbstractStorageDecl::Stored:
+    // @NSManaged properties end up being computed; complain if there is
+    // an initializer.
+    if (VD->getParentPattern()->hasInit()) {
+      TC.diagnose(attr->getLocation(), diag::attr_NSManaged_initial_value)
+        .highlight(VD->getParentPattern()->getInit()->getSourceRange());
+      VD->getParentPattern()->setInit(nullptr, false);
+    }
+    // Otherwise, ok.
+    break;
+
+  case AbstractStorageDecl::StoredWithTrivialAccessors:
+    llvm_unreachable("Already created accessors?");
+
+  case AbstractStorageDecl::Computed:
+  case AbstractStorageDecl::Observing:
+    TC.diagnose(attr->getLocation(), diag::attr_NSManaged_not_stored,
+                VD->getStorageKind() == AbstractStorageDecl::Observing);
+    return attr->setInvalid();
+  }
+}
+
 
 void AttributeEarlyChecker::visitAssignmentAttr(AssignmentAttr *attr) {
   // Only function declarations can be assignments.
@@ -151,7 +194,6 @@ void AttributeEarlyChecker::visitLazyAttr(LazyAttr *attr) {
       (varDC->isModuleScopeContext() &&
        !varDC->getParentSourceFile()->isScriptMode()))
     return diagnoseAndRemoveAttr(attr, diag::lazy_on_already_lazy_global);
-
 }
 
 
@@ -184,7 +226,8 @@ public:
     UNINTERESTING_ATTR(ObjC)
     UNINTERESTING_ATTR(Override)
     UNINTERESTING_ATTR(RawDocComment)
-    UNINTERESTING_ATTR(Lazy)  // checked early.
+    UNINTERESTING_ATTR(Lazy)      // checked early.
+    UNINTERESTING_ATTR(NSManaged) // checked early.
 
 #undef UNINTERESTING_ATTR
 
@@ -206,8 +249,6 @@ public:
   void visitFinalAttr(FinalAttr *attr);
 
   void visitNSCopyingAttr(NSCopyingAttr *attr);
-
-  void visitNSManagedAttr(NSManagedAttr *attr);
 
   void visitNoReturnAttr(NoReturnAttr *attr);
 
@@ -424,20 +465,6 @@ void AttributeChecker::visitNSCopyingAttr(NSCopyingAttr *attr) {
   // must conform to the NSCopying protocol.
   
 }
-
-void AttributeChecker::visitNSManagedAttr(NSManagedAttr *attr) {
-  // NSManaged only applies to non-class properties within a class.
-  if (!isa<VarDecl>(D)) {
-    TC.diagnose(attr->getLocation(), diag::attr_NSManaged_not_property)
-      .fixItRemove(attr->getRange());
-    attr->setInvalid();
-    return;
-  }
-
-  // Note: all other validation for @NSManaged occurs when the declaration is
-  // type-checked.
-}
-
 
 void AttributeChecker::visitNoReturnAttr(NoReturnAttr *attr) {
   auto *FD = dyn_cast<FuncDecl>(D);
