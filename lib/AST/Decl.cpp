@@ -26,6 +26,7 @@
 #include "swift/AST/Mangle.h"
 #include "swift/AST/TypeLoc.h"
 #include "clang/Lex/MacroInfo.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Support/raw_ostream.h"
 #include "swift/Basic/Range.h"
