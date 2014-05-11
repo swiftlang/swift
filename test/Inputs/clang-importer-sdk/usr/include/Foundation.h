@@ -14,7 +14,7 @@ typedef struct _NSZone NSZone;
 void *allocate(NSZone *zone);
 
 
-@class NSString, NSDictionary, NSEnumerator;
+@class NSString, NSArray, NSDictionary, NSEnumerator;
 
 /// Aaa.  NSArray.  Bbb.
 @interface NSArray : NSObject
@@ -23,6 +23,7 @@ void *allocate(NSZone *zone);
 
 @property NSString *nsstringProperty;
 @property BOOL boolProperty;
+@property NSArray *arrayProperty;
 @property NSDictionary *dictProperty;
 
 + (instancetype)arrayWithObjects:(const id[])objects count:(NSUInteger)count;
@@ -378,4 +379,5 @@ typedef NS_ENUM(NSInteger, NSByteCountFormatterCountStyle) {
 
 @end
 
+NSArray *arrayToArray(NSArray *arr);
 NSDictionary *dictToDict(NSDictionary *dict);

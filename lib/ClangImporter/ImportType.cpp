@@ -57,6 +57,9 @@ namespace {
     /// The source type is 'NSString'.
     NSString,
 
+    /// The source type is 'NSArray'.
+    NSArray,
+
     /// The source type is 'NSDictionary'.
     NSDictionary,
 
@@ -487,6 +490,12 @@ namespace {
       }
 
       if (imported->hasName() &&
+          Impl.SwiftContext.LangOpts.ObjCBridgeArray &&
+          imported->getName().str() == "NSArray") {
+        return { importedType, ImportHint::NSArray };
+      }
+
+      if (imported->hasName() &&
           Impl.SwiftContext.LangOpts.ObjCBridgeDictionary &&
           imported->getName().str() == "NSDictionary") {
         return { importedType, ImportHint::NSDictionary };
@@ -706,6 +715,17 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
     importedType = impl.getNamedSwiftType(impl.getStdlibModule(), "String");
   }
 
+
+  // When NSArray* is the type of a function parameter or a function
+  // result type, map it to AnyObject[].
+  if (hint == ImportHint::NSArray && canBridgeTypes(importKind) &&
+      impl.hasFoundationModule()) {
+    importedType = impl.getNamedSwiftTypeSpecialization(
+                     impl.getStdlibModule(), "Array",
+                     { impl.getNamedSwiftType(impl.getStdlibModule(),
+                                              "AnyObject") });
+  }
+
   // When NSDictionary* is the type of a function parameter or a function
   // result type, map it to Dictionary<NSObject, AnyObject>.
   if (hint == ImportHint::NSDictionary && canBridgeTypes(importKind) &&
@@ -720,6 +740,7 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
   // Wrap class, class protocol, function, and metatype types in an
   // optional type.
   if (hint == ImportHint::NSString ||
+      hint == ImportHint::NSArray ||
       hint == ImportHint::NSDictionary ||
       hint == ImportHint::ObjCPointer ||
       hint == ImportHint::CFPointer ||

@@ -64,7 +64,10 @@ namespace swift {
     /// a selector).
     bool ImplicitObjCWith = true;
 
-    /// Bridge Dictionary<K, V> to NSDictionary.
+    /// Import NSArray* as AnyObject[]
+    bool ObjCBridgeArray = false;
+
+    /// Import NSDictionary* as Dictionary<NSObject, AnyObject>
     bool ObjCBridgeDictionary = false;
 
     /// Enables checking that uses of @objc require importing
