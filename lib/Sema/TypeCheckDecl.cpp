@@ -1962,6 +1962,9 @@ public:
     }
 
     if (Module *module = TC.Context.LoadedModules.lookup("Foundation")) {
+      checkObjCBridgingFunctions(module, "NSArray",
+                                 "_convertNSArrayToArray",
+                                 "_convertArrayToNSArray");
       checkObjCBridgingFunctions(module, "NSDictionary",
                                  "_convertNSDictionaryToDictionary",
                                  "_convertDictionaryToNSDictionary");

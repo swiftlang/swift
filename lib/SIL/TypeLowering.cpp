@@ -2111,6 +2111,13 @@ Type TypeConverter::getLoweredCBridgedType(Type t) {
     }
   }
 
+  // Array bridging.
+  if (auto arrayDecl = Context.getArrayDecl()) {
+    if (t->getAnyNominal() == arrayDecl) {
+      return getNSArrayType();
+    }
+  }
+
   // Dictionary bridging.
   if (auto dictDecl = Context.getDictionaryDecl()) {
     if (t->getAnyNominal() == dictDecl) {

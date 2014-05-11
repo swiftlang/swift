@@ -4093,34 +4093,46 @@ static ManagedValue emitBridgeNSStringToString(SILGenFunction &gen,
   return gen.emitManagedRValueWithCleanup(str);
 }
 
-static ManagedValue emitBridgeAnyObjectArrayToNSArray(SILGenFunction &gen,
-                                                      SILLocation loc,
-                                                      ManagedValue arr) {
-  // func _convertAnyObjectArrayToNSArray(inout AnyObjectArray) -> NSArray
-  SILValue arrayToNSArrayFn
-    = gen.emitGlobalFunctionRef(loc, gen.SGM.getAnyObjectArrayToNSArrayFn());
-  
-  SILValue nsarr = gen.B.createApply(loc, arrayToNSArrayFn,
-                                     arrayToNSArrayFn.getType(),
-                                     gen.getLoweredType(
+static ManagedValue emitBridgeArrayToNSArray(SILGenFunction &gen,
+                                             SILLocation loc,
+                                             ManagedValue arr) {
+  SILValue arrToNSArrFn
+    = gen.emitGlobalFunctionRef(loc, gen.SGM.getArrayToNSArrayFn());
+
+  // Figure out the key and value types.
+  auto arrTy
+    = arr.getType().getSwiftRValueType()->castTo<BoundGenericType>();
+  auto subs = arrTy->getSubstitutions(gen.SGM.M.getSwiftModule(), nullptr);
+  auto substFnType
+    = arrToNSArrFn.getType().substInterfaceGenericArgs(gen.SGM.M, subs);
+  SILValue nsarr = gen.B.createApply(loc, arrToNSArrFn,
+                                     substFnType,
+                                     gen.SGM.getLoweredType(
                                        gen.SGM.Types.getNSArrayType()),
-                                     {}, arr.getValue());
+                                     subs,
+                                     { arr.getValue() });
+
   return gen.emitManagedRValueWithCleanup(nsarr);
 }
 
-static ManagedValue emitBridgeNSArrayToAnyObjectArray(SILGenFunction &gen,
-                                                      SILLocation loc,
-                                                      ManagedValue nsarr) {
-  // func _convertNSArrayToAnyObjectArray(NSArray, [inout] AnyObjectArray) -> ()
-  SILValue nsarrayToAnyObjectArrayFn
-    = gen.emitGlobalFunctionRef(loc, gen.SGM.getNSArrayToAnyObjectArrayFn());
-  
-  SILValue arr = gen.B.createApply(loc, nsarrayToAnyObjectArrayFn,
-                                   nsarrayToAnyObjectArrayFn.getType(),
-                                   gen.SGM.getLoweredType(
-                                     gen.SGM.Types.getAnyObjectArrayType()),
-                                   {}, {nsarr.forward(gen)});
-  
+static ManagedValue emitBridgeNSArrayToArray(SILGenFunction &gen,
+                                             SILLocation loc,
+                                             ManagedValue nsarr,
+                                             SILType nativeTy) {
+  SILValue nsarrToArrFn
+    = gen.emitGlobalFunctionRef(loc, gen.SGM.getNSArrayToArrayFn());
+
+  auto arrTy = nativeTy.getSwiftRValueType()->castTo<BoundGenericType>();
+  auto subs = arrTy->getSubstitutions(gen.SGM.M.getSwiftModule(), nullptr);
+  auto substFnType
+    = nsarrToArrFn.getType().substInterfaceGenericArgs(gen.SGM.M, subs);
+
+  SILValue arr = gen.B.createApply(loc, nsarrToArrFn,
+                                   substFnType,
+                                   nativeTy,
+                                   subs,
+                                   { nsarr.getValue() });
+
   return gen.emitManagedRValueWithCleanup(arr);
 }
 
@@ -4519,6 +4531,13 @@ static ManagedValue emitNativeToCBridgedValue(SILGenFunction &gen,
       return emitFuncToBlock(gen, loc, v, bridgedFTy);
   }
 
+  // Bridge Array to NSArray.
+  if (auto arrayDecl = gen.getASTContext().getArrayDecl()) {
+    if (v.getType().getSwiftRValueType().getAnyNominal() == arrayDecl) {
+      return emitBridgeArrayToNSArray(gen, loc, v);
+    }
+  }
+
   // Bridge Dictionary to NSDictionary.
   if (auto dictDecl = gen.getASTContext().getDictionaryDecl()) {
     if (v.getType().getSwiftRValueType().getAnyNominal() == dictDecl) {
@@ -4594,6 +4613,13 @@ static ManagedValue emitCBridgedToNativeValue(SILGenFunction &gen,
     
     if (nativeFTy->getRepresentation() != FunctionType::Representation::Block)
       return gen.emitBlockToFunc(loc, v, nativeFTy);
+  }
+
+  // Bridge NSArray to Array.
+  if (auto arrayDecl = gen.getASTContext().getArrayDecl()) {
+    if (nativeTy.getSwiftRValueType()->getAnyNominal() == arrayDecl) {
+      return emitBridgeNSArrayToArray(gen, loc, v, nativeTy);
+    }
   }
 
   // Bridge NSDictionary to Dictionary.

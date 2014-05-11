@@ -173,22 +173,21 @@ static SILType getNSArrayTy(SILGenModule &SGM) {
   return SGM.getLoweredType(SGM.Types.getNSArrayType());
 }
 
-static SILType getAnyObjectArrayTy(SILGenModule &SGM) {
-  return SGM.getLoweredType(SGM.Types.getAnyObjectArrayType());
+SILDeclRef SILGenModule::getArrayToNSArrayFn() {
+  return getBridgingFn(ArrayToNSArrayFn, *this,
+                       FOUNDATION_MODULE_NAME,
+                       "_convertArrayToNSArray",
+                       { /* FIXME: Array<T> */},
+                       getNSArrayTy(*this),
+                       /*FIXME: trustInputTypes=*/true);
 }
 
-SILDeclRef SILGenModule::getAnyObjectArrayToNSArrayFn() {
-  return getBridgingFn(AnyObjectArrayToNSArrayFn, *this,
-                       FOUNDATION_MODULE_NAME, "_convertAnyObjectArrayToNSArray",
-                       {getAnyObjectArrayTy(*this)},
-                       getNSArrayTy(*this));
-}
-
-SILDeclRef SILGenModule::getNSArrayToAnyObjectArrayFn() {
-  return getBridgingFn(NSArrayToAnyObjectArrayFn, *this,
-                       FOUNDATION_MODULE_NAME, "_convertNSArrayToAnyObjectArray",
-                       {getNSArrayTy(*this)},
-                       getAnyObjectArrayTy(*this));
+SILDeclRef SILGenModule::getNSArrayToArrayFn() {
+  return getBridgingFn(NSArrayToArrayFn, *this,
+                       FOUNDATION_MODULE_NAME,
+                       "_convertNSArrayToArray",
+                       { getNSArrayTy(*this) },
+                       Nothing /*FIXME: Array<T>*/);
 }
 
 static SILType getNSDictionaryTy(SILGenModule &SGM) {
@@ -199,7 +198,7 @@ SILDeclRef SILGenModule::getDictionaryToNSDictionaryFn() {
   return getBridgingFn(DictionaryToNSDictionaryFn, *this,
                        FOUNDATION_MODULE_NAME,
                        "_convertDictionaryToNSDictionary",
-                       { /* FIXME: Dictionary<K, v> */},
+                       { /* FIXME: Dictionary<K, V> */},
                        getNSDictionaryTy(*this),
                        /*FIXME: trustInputTypes=*/true);
 }

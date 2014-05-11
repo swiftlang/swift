@@ -242,7 +242,6 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
   }
       
   case StructKind::CConstPointer:
-  case StructKind::Array:
     {
     clang::QualType clangTy
       = visit(args.front()->getCanonicalType()).withConst();
@@ -250,6 +249,7 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
                                   getClangASTContext().getPointerType(clangTy));
   }
 
+  case StructKind::Array:
   case StructKind::Dictionary:
     return getClangIdType(getClangASTContext());
   }

@@ -81,8 +81,8 @@ public:
   
   Optional<SILDeclRef> StringToNSStringFn;
   Optional<SILDeclRef> NSStringToStringFn;
-  Optional<SILDeclRef> AnyObjectArrayToNSArrayFn;
-  Optional<SILDeclRef> NSArrayToAnyObjectArrayFn;
+  Optional<SILDeclRef> ArrayToNSArrayFn;
+  Optional<SILDeclRef> NSArrayToArrayFn;
   Optional<SILDeclRef> DictionaryToNSDictionaryFn;
   Optional<SILDeclRef> NSDictionaryToDictionaryFn;
   Optional<SILDeclRef> BoolToObjCBoolFn;
@@ -261,8 +261,8 @@ public:
   /// Known functions for bridging.
   SILDeclRef getStringToNSStringFn();
   SILDeclRef getNSStringToStringFn();
-  SILDeclRef getAnyObjectArrayToNSArrayFn();
-  SILDeclRef getNSArrayToAnyObjectArrayFn();
+  SILDeclRef getArrayToNSArrayFn();
+  SILDeclRef getNSArrayToArrayFn();
   SILDeclRef getDictionaryToNSDictionaryFn();
   SILDeclRef getNSDictionaryToDictionaryFn();
   SILDeclRef getBoolToObjCBoolFn();

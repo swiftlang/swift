@@ -2136,6 +2136,16 @@ bool TypeChecker::isRepresentableInObjC(const DeclContext *DC, Type T) {
     return true;
   }
 
+  // Array<T> is representable when T is bridged to Objective-C.
+  if (auto arrayDecl = Context.getArrayDecl()) {
+    if (auto boundGeneric = T->getAs<BoundGenericType>()) {
+      if (boundGeneric->getDecl() == arrayDecl) {
+        auto elementType = boundGeneric->getGenericArgs()[0];
+        return !getBridgedToObjC(DC, elementType).first.isNull();
+      }
+    }
+  }
+
   // Dictionary<K, V> is representable when K and V are bridged to Objective-C.
   if (auto dictDecl = Context.getDictionaryDecl()) {
     if (auto boundGeneric = T->getAs<BoundGenericType>()) {
