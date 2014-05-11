@@ -50,6 +50,14 @@ ASTContext &DeclContext::getASTContext() const {
   return getParentModule()->Ctx;
 }
 
+/// If this DeclContext is a class, or an extension on a class, return the
+/// ClassDecl, otherwise return null.
+ClassDecl *DeclContext::isClassOrClassExtensionContext() const {
+  if (auto ctx = getDeclaredTypeOfContext())
+    return ctx->getClassOrBoundGenericClass();
+  return nullptr;
+}
+
 Type DeclContext::getDeclaredTypeOfContext() const {
   switch (getContextKind()) {
   case DeclContextKind::Module:

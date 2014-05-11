@@ -44,6 +44,7 @@ namespace swift {
   class Module;
   class ValueDecl;
   class Initializer;
+  class ClassDecl;
 }
 
 namespace llvm {
@@ -155,6 +156,10 @@ public:
   bool isExtensionContext() const {
     return getContextKind() == DeclContextKind::ExtensionDecl;
   }
+
+  /// If this DeclContext is a class, or an extension on a class, return the
+  /// ClassDecl, otherwise return null.
+  ClassDecl *isClassOrClassExtensionContext() const;
 
   /// getDeclaredTypeOfContext - For a type context, retrieves the declared
   /// type of the context. Returns a null type for non-type contexts.
