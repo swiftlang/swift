@@ -1244,7 +1244,7 @@ static void validatePatternBindingDecl(TypeChecker &tc,
     });
   }
 
-  // For now, we only support 'type' variables in specific contexts.
+  // For now, we only support static/class variables in specific contexts.
   if (binding->isStatic()) {
     // Selector for unimplemented_type_var message.
     enum : unsigned {
@@ -2067,7 +2067,7 @@ public:
           .fixItRemove(attr->getRange());
         attr->setInvalid();
       } else {
-        // @NSManaged properties must be written as stored.
+        // @NSManaged properties must be written as stored.
         switch (VD->getStorageKind()) {
         case AbstractStorageDecl::Stored:
           // @NSManaged properties end up being computed; complain if there is
@@ -2170,7 +2170,7 @@ public:
     if (auto sourceFile = PBD->getDeclContext()->getParentSourceFile())
       isInSILMode = sourceFile->Kind == SourceFileKind::SIL;
 
-    // If this is a declaration with an initializer, reject code if
+    // If this is a declaration without an initializer, reject code if
     // uninitialized vars are not allowed.
     if (!PBD->hasInit() && !isInSILMode) {
       PBD->getPattern()->forEachVariable([&](VarDecl *var) {

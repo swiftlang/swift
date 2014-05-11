@@ -140,6 +140,18 @@ void AttributeEarlyChecker::visitLazyAttr(LazyAttr *attr) {
   if (!VD->hasStorage())
     return diagnoseAndRemoveAttr(attr, diag::lazy_not_on_computed);
 
+  // @lazy is not allowed on a protocol requirement.
+  auto varDC = VD->getDeclContext();
+  if (isa<ProtocolDecl>(varDC))
+    return diagnoseAndRemoveAttr(attr, diag::lazy_not_in_protocol);
+
+  // @lazy is not allowed on a lazily initiailized global variable or on a
+  // static property (which is already lazily initialized).
+  if (VD->isStatic() ||
+      (varDC->isModuleScopeContext() &&
+       !varDC->getParentSourceFile()->isScriptMode()))
+    return diagnoseAndRemoveAttr(attr, diag::lazy_on_already_lazy_global);
+
 }
 
 
