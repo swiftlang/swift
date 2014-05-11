@@ -1247,6 +1247,9 @@ ERROR(objc_override_name_mismatch,sema_objc,none,
       "declaration has a different @objc name from the declaration it "
       "overrides (%0 vs. %1)", (ObjCSelector, ObjCSelector))
 
+ERROR(broken_bridged_to_objc_protocol,sema_tcd,none,
+      "_BridgedToObjectiveC protocol is broken", ())
+
 //------------------------------------------------------------------------------
 // @availability
 //------------------------------------------------------------------------------

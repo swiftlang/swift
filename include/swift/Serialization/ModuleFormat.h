@@ -1122,7 +1122,9 @@ namespace index_block {
     RawOptionSet,
     Equatable,
     Hashable,
-    Comparable
+    Comparable,
+
+    _BridgedToObjectiveC,
   };
 
   using KnownProtocolLayout = BCGenericRecordLayout<

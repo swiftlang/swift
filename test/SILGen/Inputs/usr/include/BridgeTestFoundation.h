@@ -17,6 +17,9 @@
 @interface NSDictionary : NSObject
 @end
 
+@interface NSNumber : NSObject
+@end
+
 @interface Foo : NSObject
 
 - (NSString*) foo;

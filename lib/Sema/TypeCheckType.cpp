@@ -2088,6 +2088,39 @@ bool TypeChecker::isTriviallyRepresentableInObjC(const DeclContext *DC,
   return false;
 }
 
+/// Retrieves the Objective-C type to which the given type is bridged along
+/// with a bit indicating whether it was bridged verbatim.
+///
+/// \returns a pair containing the bridged type (or a null type if the type
+/// cannot be bridged) and a bit indicating whether the type was bridged
+/// verbatim.
+static std::pair<Type, bool> getBridgedToObjC(TypeChecker &tc,
+                                              const DeclContext *dc,
+                                              Type type) {
+  // Class types and ObjC existential types are always bridged verbatim.
+  if (type->getClassOrBoundGenericClass() || type->isObjCExistentialType())
+    return { type, true };
+
+  // Retrieve the _BridgedToObjectiveC protocol.
+  auto bridgedProto
+    = tc.Context.getProtocol(KnownProtocolKind::_BridgedToObjectiveC);
+  if (!bridgedProto)
+    return { nullptr, false };
+
+  // Check whether the type conforms to _BridgedToObjectiveC.
+  ProtocolConformance *conformance = nullptr;
+  if (!tc.conformsToProtocol(type, bridgedProto, const_cast<DeclContext *>(dc),
+                             &conformance))
+    return { nullptr, false };
+
+  // FIXME: Check conditional bridging if requested?
+
+  return { tc.getWitnessType(type, bridgedProto, conformance,
+                             tc.Context.getIdentifier("ObjectiveCType"),
+                             diag::broken_bridged_to_objc_protocol),
+           false };
+}
+
 bool TypeChecker::isRepresentableInObjC(const DeclContext *DC, Type T) {
   if (isTriviallyRepresentableInObjC(DC, T))
     return true;
@@ -2132,36 +2165,14 @@ bool TypeChecker::isRepresentableInObjC(const DeclContext *DC, Type T) {
   if (auto dictDecl = Context.getDictionaryDecl()) {
     if (auto boundGeneric = T->getAs<BoundGenericType>()) {
       if (boundGeneric->getDecl() == dictDecl) {
-        // The key type must be a class that inherits from NSObject.
+        // The key type must be bridged to Objective-C.
         auto keyType = boundGeneric->getGenericArgs()[0];
-        bool canBridgeKey = false;
-        if (auto keyClassDecl = keyType->getClassOrBoundGenericClass()) {
-          // Check whether keyClassType inherits from NSObject.
-          while (keyClassDecl) {
-            if (keyClassDecl->hasClangNode() &&
-                keyClassDecl->getName().str() == "NSObject") {
-              canBridgeKey = true;
-              break;
-            }
-
-            if (!keyClassDecl->hasSuperclass())
-              break;
-
-            keyClassDecl
-              = keyClassDecl->getSuperclass()->getClassOrBoundGenericClass();
-          }
-        }
-
-        // If we couldn't bridge the key type, we're done.
-        if (!canBridgeKey)
+        if (getBridgedToObjC(*this, DC, keyType).first.isNull())
           return false;
 
-        // The value type must be compatible with AnyObject.
+        // The value type must be bridged to Objective-C.
         auto valueType = boundGeneric->getGenericArgs()[1];
-        bool canBridgeValue = valueType->getClassOrBoundGenericClass() ||
-                              valueType->isClassExistentialType();
-
-        if (!canBridgeValue)
+        if (getBridgedToObjC(*this, DC, valueType).first.isNull())
           return false;
 
         return true;

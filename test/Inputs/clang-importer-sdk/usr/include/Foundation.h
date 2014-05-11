@@ -61,6 +61,8 @@ void *allocate(NSZone *zone);
 - (void)setObject:(id)obj forKeyedSubscript:(id <NSCopying>)key /*NS_AVAILABLE(10_8, 6_0)*/;
 @end
 
+@interface NSNumber : NSObject
+@end
 
 @interface NSError : NSObject
 @end
