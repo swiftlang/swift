@@ -32,6 +32,8 @@
 
 using namespace swift;
 
+static inline size_t indexToSize(AllocIndex idx);
+
 static kern_return_t _swift_zone_enumerator(task_t task, void *,
                                             unsigned type_mask,
                                             vm_address_t zone_address,
@@ -169,6 +171,12 @@ public:
   static void *tryAlloc_semi_optimized(AllocIndex idx);
   static void dealloc_semi_optimized(void *ptr, AllocIndex idx);
 
+  static void *alloc_gmalloc(AllocIndex idx);
+  static void *tryAlloc_gmalloc(AllocIndex idx);
+  static void *slowAlloc_gmalloc(size_t size, uintptr_t flags);
+  static void dealloc_gmalloc(void *ptr, AllocIndex idx);
+  static void slowDealloc_gmalloc(void *ptr, size_t bytes);
+
   static bool tryWriteLock() {
     int r = pthread_rwlock_trywrlock(&lock);
     assert(r == 0 || errno == EBUSY);
@@ -291,6 +299,12 @@ void *SwiftZone::alloc_semi_optimized(AllocIndex idx) {
   return globalAlloc(idx, 0);
 }
 
+void *SwiftZone::alloc_gmalloc(AllocIndex idx) {
+  assert(idx < ALLOC_CACHE_COUNT);
+  size_t size = indexToSize(idx);
+  return malloc(size);
+}
+
 void *SwiftZone::tryAlloc_semi_optimized(AllocIndex idx) {
   assert(idx < ALLOC_CACHE_COUNT);
   AllocCacheEntry r = getAllocCacheEntry_slow(idx);
@@ -301,6 +315,12 @@ void *SwiftZone::tryAlloc_semi_optimized(AllocIndex idx) {
   return globalAlloc(idx, SWIFT_TRYALLOC);
 }
 
+void *SwiftZone::tryAlloc_gmalloc(AllocIndex idx) {
+  assert(idx < ALLOC_CACHE_COUNT);
+  size_t size = indexToSize(idx);
+  return malloc(size);
+}
+
 void SwiftZone::dealloc_semi_optimized(void *ptr, AllocIndex idx) {
   assert(idx < ALLOC_CACHE_COUNT);
   auto cur = static_cast<AllocCacheEntry>(ptr);
@@ -308,6 +328,11 @@ void SwiftZone::dealloc_semi_optimized(void *ptr, AllocIndex idx) {
   assert(cur != prev && "trivial double free!");
   cur->next = prev;
   setAllocCacheEntry_slow(idx, cur);
+}
+
+void SwiftZone::dealloc_gmalloc(void *ptr, AllocIndex idx) {
+  assert(idx < ALLOC_CACHE_COUNT);
+  free(ptr);
 }
 
 // !SWIFT_HAVE_FAST_ENTRY_POINTS
@@ -389,6 +414,12 @@ static void _swift_zone_initImpl() {
     _swift_dealloc = SwiftZone::dealloc_semi_optimized;
   }
   setAllocCacheEntry_slow(0, NULL);
+  const char *dyldMagic = getenv("DYLD_INSERT_LIBRARIES");
+  if (dyldMagic && strstr(dyldMagic, "libgmalloc")) {
+    _swift_alloc = SwiftZone::alloc_gmalloc;
+    _swift_tryAlloc = SwiftZone::tryAlloc_gmalloc;
+    _swift_dealloc = SwiftZone::dealloc_gmalloc;
+  }
 }
 void swift::_swift_zone_init() {
   static pthread_once_t once = PTHREAD_ONCE_INIT;
@@ -592,6 +623,10 @@ void *SwiftZone::slowAlloc_optimized(size_t size, uintptr_t flags) {
   }
 }
 
+void *SwiftZone::slowAlloc_gmalloc(size_t size, uintptr_t flags) {
+  return malloc(size);
+}
+
 void SwiftZone::slowDealloc_optimized(void *ptr, size_t bytes) {
   if (bytes == 0) {
     bytes = zoneShims.size(NULL, ptr);
@@ -610,8 +645,11 @@ void SwiftZone::slowDealloc_optimized(void *ptr, size_t bytes) {
   dealloc_semi_optimized(ptr, idx);
 }
 
-void
-SwiftZone::threadExitCleanup(void *arg) {
+void SwiftZone::slowDealloc_gmalloc(void *ptr, size_t bytes) {
+  return free(ptr);
+}
+
+void SwiftZone::threadExitCleanup(void *arg) {
   (void)arg;
   AllocCacheEntry threadCache[ALLOC_CACHE_COUNT];
   AllocCacheEntry threadCacheTail[ALLOC_CACHE_COUNT];
