@@ -1718,8 +1718,8 @@ public:
 /// \code
 /// func parseInt(s : String) -> Int? { ... }
 ///
-/// var maybeInt = parseInt("5"); // returns an Int?
-/// var forcedInt = parseInt("5")!; // returns an Int; fails on empty optional
+/// var maybeInt = parseInt("5")     // returns an Int?
+/// var forcedInt = parseInt("5")!   // returns an Int; fails on empty optional
 /// \endcode
 ///
 class ForceValueExpr : public Expr {
