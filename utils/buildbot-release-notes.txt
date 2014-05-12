@@ -6,6 +6,27 @@ Latest
   the idiom of removing values from a dictionary using 'dict[key] = nil'.
   As part of this, 'deleteKey' is no longer available.
 
+* Stored properties may now be marked with the @lazy attribute, which causes
+  their initializer to be evaluated the first time the property is touched
+  instead of when the enclosing type is initialized.  For example:
+  
+    func myInitializer() -> Int { println("hello\n"); return 42 }
+    class MyClass {
+      @lazy var aProperty = myInitializer()
+    }
+    
+    var c = MyClass()     // doesn't print hello
+    var tmp = c.aProperty // prints hello on first access
+    tmp = c.aProperty     // doesn't print on subsequent loads.
+
+    c = MyClass()         // doesn't print hello
+    c.aProperty = 57      // overwriting the value prevents it from ever running
+
+  Because lazy properties inherently rely on mutation of the property, they
+  cannot be 'let's.  They are currently also limited to being members of structs
+  and classes (they aren't allowed as local or global variables yet) and cannot
+  be observed with willSet/didSet yet.
+
 * Closures can now specify a capture list to indicate with what strength they
   want to capture a value, and to bind a particular field value if they want to.
 
