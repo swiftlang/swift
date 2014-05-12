@@ -158,7 +158,7 @@ public:
   LValue visitExpr(Expr *e);
 
   // Nodes that form the root of lvalue paths
-
+  LValue visitDiscardAssignmentExpr(DiscardAssignmentExpr *e);
   LValue visitDeclRefExpr(DeclRefExpr *e);
 
   // Nodes that make up components of lvalue paths
@@ -646,6 +646,18 @@ static LValue emitLValueForNonMemberVarDecl(SILGenFunction &gen,
   }
   return std::move(lv);
 }
+
+
+LValue SILGenLValue::visitDiscardAssignmentExpr(DiscardAssignmentExpr *e) {
+  auto formalRValueType = getSubstFormalRValueType(e);
+  auto typeData = getUnsubstitutedTypeData(gen, formalRValueType);
+
+  SILValue address = gen.emitTemporaryAllocation(e, typeData.TypeOfRValue);
+  LValue lv;
+  lv.add<ValueComponent>(ManagedValue::forUnmanaged(address), typeData);
+  return std::move(lv);
+}
+
 
 LValue SILGenLValue::visitDeclRefExpr(DeclRefExpr *e) {
   // The only non-member decl that can be an lvalue is VarDecl.
