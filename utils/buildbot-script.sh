@@ -24,7 +24,6 @@ KNOWN_SETTINGS=(
     distcc                      ""               "use distcc in pump mode"
     config-args                 ""               "User-supplied arguments to cmake when used to do configuration"
     cmake-generator             "Unix Makefiles" "kind of build system to generate; see output of cmake --help for choices"
-    package                     ""               "set to build packages"
     prefix                      "/usr"           "installation prefix"
     skip-ios                    ""               "set to skip everything iOS-related"
     skip-build-llvm             ""               "set to skip building LLVM/Clang"
@@ -39,8 +38,6 @@ KNOWN_SETTINGS=(
     skip-test-ios-simulator     ""               "set to skip testing Swift stdlibs for iOS simulators (i.e. test devices only)"
     skip-test-sourcekit         ""               "set to skip testing SourceKit"
     skip-test-swift-performance ""               "set to skip testing Swift performance"
-    skip-package-swift          ""               "set to skip packaging Swift"
-    skip-package-sourcekit      ""               "set to skip packaging SourceKit"
     workspace                   "${HOME}/src"    "source directory containing llvm, clang, swift, and SourceKit"
     run-with-asan-compiler      ""               "the AddressSanitizer compiler to use (non-asan build if empty string is passed)"
 )
@@ -113,11 +110,8 @@ while [[ "$1" ]] ; do
             exit
             ;;
 
-        # The --release flag enables a release build, which will additionally build
-        # a package if the build-and-test succeeds.
         --release)
             BUILD_TYPE=RelWithDebInfo
-            PACKAGE=1
             # Include a custom name to avoid picking up stale module files.
             CUSTOM_VERSION_NAME="release $(date -j '+%Y-%m-%d %H-%M-%S')"
             ;;
@@ -166,12 +160,6 @@ INSTALL_PREFIX="${PREFIX}"
 # Set these to the paths of the OS X SDK and toolchain.
 SYSROOT="$(xcrun --show-sdk-path --sdk macosx10.10internal)"
 TOOLCHAIN="$(xcode-select -p)/Toolchains/XcodeDefault.xctoolchain"
-
-# Set this to the path on matte to which release packages should be delivered.
-PACKAGE_PATH=/Users/swift-discuss
-SOURCEKIT_PACKAGE_PATH=/Users/sourcekit-dev
-
-# Set this to the address to which release announcements should be sent.
 
 # WORKSPACE and BUILD_DIR must be absolute paths
 case "${WORKSPACE}" in
@@ -278,22 +266,6 @@ for product in "${IOS_BUILD_PRODUCTS[@]}" "${IOS_TEST_PRODUCTS[@]}" ; do
 done
 
 
-if [[ "$PACKAGE" ]]; then
-  # Make sure install-test-script.sh is available alongside us.
-  INSTALL_TEST_SCRIPT="$(dirname "$0")/install-test-script.sh"
-  RELEASE_NOTES_TXT="$(dirname "$0")/buildbot-release-notes.txt"
-
-  if [ \! -x "$INSTALL_TEST_SCRIPT" ]; then
-    echo "Install test script $INSTALL_TEST_SCRIPT is unavailable or not executable!"
-    exit 1
-  fi
-
-  if [ \! -f "$RELEASE_NOTES_TXT" ]; then
-    echo "Release notes file $RELEASE_NOTES_TXT is unavailable!"
-    exit 1
-  fi
-fi
-
 # Symlink clang into the llvm tree.
 CLANG_SOURCE_DIR="${LLVM_SOURCE_DIR}/tools/clang"
 CLANG_BUILD_DIR="${LLVM_BUILD_DIR}"
@@ -325,13 +297,16 @@ fi
 # CMake options used for all targets, including LLVM/Clang
 COMMON_CMAKE_OPTIONS=(
     "${CMAKE_COMPILER_OPTIONS[@]}"
-    -DCMAKE_BUILD_TYPE="$BUILD_TYPE"
     -DLLVM_ENABLE_ASSERTIONS="ON" 
 )
 
 case "${CMAKE_GENERATOR}" in
     'Unix Makefiles')
         BUILD_ARGS="${BUILD_ARGS:--j8}"
+        COMMON_CMAKE_OPTIONS=(
+            "${COMMON_CMAKE_OPTIONS[@]}"
+            "-DCMAKE_VERBOSE_MAKEFILE=1"
+        )
         ;;
     Xcode)
         BUILD_TARGET_FLAG=-target
@@ -356,6 +331,7 @@ if [ \! "$SKIP_BUILD_LLVM" ]; then
       # LLDB
       (cd "${LLVM_BUILD_DIR}" &&
           "$CMAKE" -G "${CMAKE_GENERATOR}" "${COMMON_CMAKE_OPTIONS[@]}" \
+              -DCMAKE_BUILD_TYPE="RelWithDebInfo" \
               -DCMAKE_CXX_FLAGS="-stdlib=libc++" \
               -DCMAKE_EXE_LINKER_FLAGS="-stdlib=libc++" \
               -DCMAKE_SHARED_LINKER_FLAGS="-stdlib=libc++" \
@@ -379,6 +355,7 @@ SWIFT_CMAKE_OPTIONS=(
     -DCMAKE_CXX_FLAGS="-isysroot${SYSROOT}"
     -DSWIFT_RUN_LONG_TESTS="ON"
     -DLLVM_CONFIG="${LLVM_BUILD_DIR}/bin/llvm-config"
+    -DCMAKE_BUILD_TYPE="RelWithDebInfo"
 )
 
 # set_ios_options options_var platform deployment_target internal_suffix arch
@@ -391,6 +368,7 @@ function set_ios_options {
     local sdkroot=$(xcrun -sdk ${platform}${internal_suffix} -show-sdk-path)
 
     local opts=(
+        -DCMAKE_BUILD_TYPE="Debug"
         -DCMAKE_TOOLCHAIN_FILE="${SWIFT_SOURCE_DIR}/cmake/${platform}.cmake"
         -DCMAKE_SYSTEM_PROCESSOR=${arch}
         -DCMAKE_OSX_ARCHITECTURES=${arch}
@@ -562,138 +540,3 @@ if [ \! "$SKIP_TEST_SWIFT_PERFORMANCE" ]; then
   fi
 fi
 
-if [ "$PACKAGE" -a \! "$SKIP_PACKAGE_SWIFT" ]; then
-  echo "--- Building Swift Package ---"
-  $DISTCC_PUMP "$CMAKE" --build "${SWIFT_BUILD_DIR}" -- ${BUILD_ARGS} ${BUILD_TARGET_FLAG} package
-
-  saw_package=
-  for package in "${SWIFT_BUILD_DIR}"/swift-*.tar.gz; do
-    if [ "$saw_package" ]; then
-      echo "More than one package file built!"
-      exit 1
-    fi
-    saw_package=1
-
-    echo "--- Testing $package ---"
-    if ! "$INSTALL_TEST_SCRIPT" "$package"; then
-      echo "$package failed test!"
-      exit 1
-    fi
-
-    echo "--- Delivering $package ---"
-    cp "$package" "$PACKAGE_PATH" || exit 1
-
-    echo "--- Announcing $package ---"
-    package_basename="$(basename "$package")"
-    sendmail -r "$PACKAGE_ANNOUNCEMENT_ADDRESS" "$PACKAGE_ANNOUNCEMENT_ADDRESS" <<EOM
-To: $PACKAGE_ANNOUNCEMENT_ADDRESS
-Subject: Swift package $package_basename now available
-
-A new Swift package is available at
-You can download and install it using the command line:
-
-          ~/Downloads
-        sudo darwinup install ~/Downloads/$package_basename
-
-where \$OD_USER is your Open Directory username.
-
-We recommend uninstalling any previous Swift packages you have installed
-before installing this package. Uninstall as follows:
-
-        darwinup list
-        sudo darwinup uninstall \$UUID_FROM_DARWINUP_LIST
-
-When you find bugs in Swift, please report them using the 'Swift' Radar
-component.
-
-=== GETTING STARTED WITH SWIFT ===
-
-Once installed, run 'swift' to bring up the interactive prompt:
-
-        swift
-
-Run Swift programs using the '-i' flag:
-
-        swift -i /usr/share/swift/examples/hello.swift
-
-Compile Swift programs just like C programs:
-
-        swift /usr/share/swift/examples/hello.swift -o hello
-        ./hello
-
-If you want to use Cocoa frameworks, run the Swift installed in Xcode using
-"xcrun swift", or pass an SDK explicitly:
-
-        swift -sdk \$(xcrun --show-sdk-path --sdk macosx)
-
-Language documentation and examples are installed under /usr/share/swift.
-
-Have fun!
-
-=== RECENT CHANGES ===
-
-$(cat "$RELEASE_NOTES_TXT")
-
-=== KNOWN ISSUES ===
-
-The Swift compiler is under active development and has a number of known
-problems. Here are some of the most commonly encountered issues:
-
-* Spectacularly poor error messages: the compiler will often report the
-  unhelpful errors "expression does not type-check" or "assignment does not
-  type-check", preceded by a debugging dump.
-
-* Run-time errors abort: run-time errors such as an out-of-bounds array access
-  are detected by the standard library, which immediately aborts without
-  reporting a problem. Moreover, such errors are not trapped in the REPL, and
-  will cause the REPL itself to crash.
-
-.
-EOM
-  done
-
-  if [ \! "$saw_package" ]; then
-    echo "No package file built!"
-    exit 1
-  fi
-fi
-
-if [ "$PACKAGE" -a \! "$SKIP_PACKAGE_SOURCEKIT" ]; then
-  echo "--- Building SourceKit Package ---"
-  (cd "${SOURCEKIT_BUILD_DIR}" &&
-    /bin/sh -ex "${SOURCEKIT_SOURCE_DIR}/utils/buildbot-package-sourcekit.sh") || exit 1
-
-  saw_package=
-  for package in "${SOURCEKIT_BUILD_DIR}"/SourceKit-*.tar.gz; do
-    if [ "$saw_package" ]; then
-      echo "More than one package file built!"
-      exit 1
-    fi
-    saw_package=1
-
-    echo "--- Delivering $package ---"
-    cp "$package" "$SOURCEKIT_PACKAGE_PATH" || exit 1
-
-    echo "--- Announcing $package ---"
-    package_basename="$(basename "$package")"
-    sendmail -r "$SOURCEKIT_PACKAGE_ANNOUNCEMENT_ADDRESS" "$SOURCEKIT_PACKAGE_ANNOUNCEMENT_ADDRESS" <<EOM
-To: $SOURCEKIT_PACKAGE_ANNOUNCEMENT_ADDRESS
-Subject: SourceKit package $package_basename now available
-
-A new SourceKit package is available at
-sftp://matte.apple.com$SOURCEKIT_PACKAGE_PATH/$package_basename .
-You can download it using the command line:
-
-        sftp \$OD_USER@matte.apple.com:$SOURCEKIT_PACKAGE_PATH/$package_basename \
-          ~/Downloads
-
-where \$OD_USER is your Open Directory username.
-
-EOM
-  done
-
-  if [ \! "$saw_package" ]; then
-    echo "No package file built!"
-    exit 1
-  fi
-fi
