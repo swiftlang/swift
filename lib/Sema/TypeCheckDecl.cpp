@@ -2001,7 +2001,7 @@ static void convertLazyStoredVarToComputed(VarDecl *VD, TypeChecker &TC) {
 namespace {
 
 /// The kind of designated initializer to synthesize.
-enum class designatedInitKind {
+enum class DesignatedInitKind {
   /// A stub initializer, which is not visible to name lookup and
   /// merely aborts at runtime.
   Stub,
@@ -2027,10 +2027,10 @@ enum class designatedInitKind {
 /// \returns the newly-created initializer that overrides \p
 /// superclassCtor.
 static ConstructorDecl *
-createdesignatedInitOverride(TypeChecker &tc,
+createDesignatedInitOverride(TypeChecker &tc,
                             ClassDecl *classDecl,
                             ConstructorDecl *superclassCtor,
-                            designatedInitKind kind);
+                            DesignatedInitKind kind);
 
 /// Configure the implicit 'self' parameter of a function, setting its type,
 /// pattern, etc.
@@ -3024,9 +3024,9 @@ public:
             continue;
 
           // Create an override for it.
-          if (auto ctor = createdesignatedInitOverride(
+          if (auto ctor = createDesignatedInitOverride(
                             TC, CD, superclassCtor,
-                            designatedInitKind::Stub)) {
+                            DesignatedInitKind::Stub)) {
             assert(ctor->getOverriddenDecl() == superclassCtor && 
                    "Not an override?");
             CD->addMember(ctor);
@@ -4925,10 +4925,10 @@ static void createStubBody(TypeChecker &tc, ConstructorDecl *ctor) {
 }
 
 static ConstructorDecl *
-createdesignatedInitOverride(TypeChecker &tc,
-                            ClassDecl *classDecl,
-                            ConstructorDecl *superclassCtor,
-                            designatedInitKind kind) {
+createDesignatedInitOverride(TypeChecker &tc,
+                             ClassDecl *classDecl,
+                             ConstructorDecl *superclassCtor,
+                             DesignatedInitKind kind) {
   // Determine the initializer parameters.
   Type superInitType = superclassCtor->getInitializerInterfaceType();
   if (superInitType->is<GenericFunctionType>() ||
@@ -5046,14 +5046,14 @@ createdesignatedInitOverride(TypeChecker &tc,
   // Wire up the overides.
   DeclChecker(tc, false, false).checkOverrides(ctor);
 
-  if (kind == designatedInitKind::Stub) {
+  if (kind == DesignatedInitKind::Stub) {
     // Make this a stub implementation.
     createStubBody(tc, ctor);
     return ctor;
   }
 
   // Form the body of a chaining designated initializer.
-  assert(kind == designatedInitKind::Chaining);
+  assert(kind == DesignatedInitKind::Chaining);
 
   // Reference to super.init.
   Expr *superRef = new (ctx) SuperRefExpr(selfDecl, SourceLoc(),
@@ -5311,9 +5311,9 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
         continue;
 
       // We have a designated initializer. Create an override of it.
-      if (auto ctor = createdesignatedInitOverride(
+      if (auto ctor = createDesignatedInitOverride(
                         *this, classDecl, superclassCtor,
-                        designatedInitKind::Chaining)) {
+                        DesignatedInitKind::Chaining)) {
         classDecl->addMember(ctor);
       }
     }
