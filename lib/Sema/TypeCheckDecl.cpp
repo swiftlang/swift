@@ -1011,9 +1011,10 @@ static bool isDefaultInitializable(PatternBindingDecl *pbd) {
   if (isLet)
     return false;
 
-  // If it is an IBOutlet, it is trivially true.
+  // If it is an IBOutlet or a @lazy variable, it is trivially true.
   if (auto var = pbd->getSingleVar()) {
-    if (var->getAttrs().hasAttribute<IBOutletAttr>())
+    if (var->getAttrs().hasAttribute<IBOutletAttr>() ||
+        var->getAttrs().hasAttribute<LazyAttr>())
       return true;
   }
 
@@ -5256,9 +5257,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
     }
 
     if (auto var = dyn_cast<VarDecl>(member)) {
-      if (var->hasStorage() && !var->isStatic() &&
-          // @lazy variables aren't initialized by the initializer.
-          !var->getAttrs().hasAttribute<LazyAttr>())
+      if (var->hasStorage() && !var->isStatic())
         FoundInstanceVar = true;
       continue;
     }

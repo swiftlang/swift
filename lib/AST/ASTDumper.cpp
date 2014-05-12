@@ -450,6 +450,9 @@ namespace {
         OS << "'observing'";
         break;
       }
+      if (VD->getAttrs().hasAttribute<LazyAttr>())
+        OS << " @lazy";
+
       if (FuncDecl *Get = VD->getGetter()) {
         OS << "\n";
         OS.indent(Indent + 2);
