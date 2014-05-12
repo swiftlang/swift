@@ -1145,7 +1145,7 @@ extension NSArray {
 
 extension NSDictionary {
   // - (instancetype)initWithObjectsAndKeys:(id)firstObject, ...
-  convenience init(ObjectsAndKeys objects: AnyObject...) {
+  convenience init(objectsAndKeys objects: AnyObject...) {
     // - (instancetype)initWithObjects:(NSArray *)objects forKeys:(NSArray *)keys;
     var values: AnyObject[] = []
     var keys:   AnyObject[] = []
