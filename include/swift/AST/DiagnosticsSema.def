@@ -243,7 +243,7 @@ ERROR(missing_address_of,sema_tcc,none,
       "passing value of type %0 to an inout parameter requires explicit '&'",
       (Type))
 ERROR(extra_call_nonfunction,sema_tcc,none,
-      "call to non-function of type %0; did you mean to leave off the '()'?",
+      "invalid use of '()' to call a value of non-function type %0",
       (Type))
 ERROR(extra_argument_labels,sema_tcc,none,
       "extraneous argument label%select{|s}0 '%1' in %select{call|subscript}2",
