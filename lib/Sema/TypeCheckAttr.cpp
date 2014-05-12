@@ -19,13 +19,6 @@
 
 using namespace swift;
 
-static bool isInClassContext(const Decl *D) {
-  Type ContextTy = D->getDeclContext()->getDeclaredTypeInContext();
-  if (!ContextTy)
-    return false;
-  return bool(ContextTy->getClassOrBoundGenericClass());
-}
-
 namespace {
 /// This visits each attribute on a decl early, before the majority of type
 /// checking has been performed for the decl.  The visitor should return true if
@@ -76,7 +69,8 @@ public:
 void AttributeEarlyChecker::visitIBActionAttr(IBActionAttr *attr) {
   // Only instance methods returning () can be IBActions.
   const FuncDecl *FD = dyn_cast<FuncDecl>(D);
-  if (!FD || !isInClassContext(D) || FD->isStatic() || FD->isAccessor())
+  if (!FD || !FD->getDeclContext()->isClassOrClassExtensionContext() ||
+      FD->isStatic() || FD->isAccessor())
     return diagnoseAndRemoveAttr(attr, diag::invalid_ibaction_decl);
 
 }
@@ -91,7 +85,8 @@ void AttributeEarlyChecker::visitIBDesignableAttr(IBDesignableAttr *attr) {
 void AttributeEarlyChecker::visitIBInspectableAttr(IBInspectableAttr *attr) {
   // Only instance properties can be 'IBInspectable'.
   auto *VD = dyn_cast<VarDecl>(D);
-  if (!VD || !isInClassContext(VD) || VD->isStatic())
+  if (!VD || !VD->getDeclContext()->isClassOrClassExtensionContext() ||
+      VD->isStatic())
     return diagnoseAndRemoveAttr(attr, diag::invalid_ibinspectable);
 
 }
@@ -99,7 +94,8 @@ void AttributeEarlyChecker::visitIBInspectableAttr(IBInspectableAttr *attr) {
 void AttributeEarlyChecker::visitIBOutletAttr(IBOutletAttr *attr) {
   // Only instance properties can be 'IBOutlet'.
   auto *VD = dyn_cast<VarDecl>(D);
-  if (!VD || !isInClassContext(VD) || VD->isStatic())
+  if (!VD || !VD->getDeclContext()->isClassOrClassExtensionContext() ||
+      VD->isStatic())
     return diagnoseAndRemoveAttr(attr, diag::invalid_iboutlet);
 
 }
@@ -112,11 +108,7 @@ void AttributeEarlyChecker::visitNSManagedAttr(NSManagedAttr *attr) {
   if (!VD)
     return diagnoseAndRemoveAttr(attr, diag::attr_NSManaged_not_property);
 
-  bool isClassMember = false;
-  if (auto ctx = VD->getDeclContext()->getDeclaredTypeOfContext())
-    isClassMember = ctx->getClassOrBoundGenericClass();
-
-  if (VD->isStatic() || !isClassMember)
+  if (VD->isStatic() || !VD->getDeclContext()->isClassOrClassExtensionContext())
     return diagnoseAndRemoveAttr(attr, diag::attr_NSManaged_not_property);
 
   if (VD->isLet())
