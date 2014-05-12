@@ -1790,6 +1790,30 @@ static void convertNSManagedStoredVarToComputed(VarDecl *VD, TypeChecker &TC) {
 }
 
 
+namespace {
+  /// This ASTWalker explores an expression tree looking for expressions (which
+  /// are DeclContext's) and changes their parent DeclContext to NewDC.
+  class RecontextualizeClosures : public ASTWalker {
+    DeclContext *NewDC;
+  public:
+    RecontextualizeClosures(DeclContext *NewDC) : NewDC(NewDC) {}
+
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      if (auto CE = dyn_cast<AbstractClosureExpr>(E)) {
+        CE->setParent(NewDC);
+        return { false, E };
+      }
+
+      return { true, E };
+    }
+
+    /// We don't want to recurse into declarations or statements.
+    bool walkToDeclPre(Decl *) override { return false; }
+    std::pair<bool, Stmt*> walkToStmtPre(Stmt *S) override { return {false,S}; }
+  };
+}
+
+
 /// Synthesize the getter for an @lazy property with the specified storage
 /// vardecl.
 static FuncDecl *createLazyPropertyGetter(VarDecl *VD, VarDecl *Storage,
@@ -1851,6 +1875,11 @@ static FuncDecl *createLazyPropertyGetter(VarDecl *VD, VarDecl *Storage,
   //   @lazy var (a,b) = foo()
   auto *InitValue = VD->getParentPattern()->getInit();
   VD->getParentPattern()->setInit(nullptr, true);
+
+  // Recontextualize any closure declcontexts nested in the initializer to
+  // realize that they are in the getter function.
+  InitValue->walk(RecontextualizeClosures(Get));
+
 
   Pattern *Tmp2PBDPattern = new (Ctx) NamedPattern(Tmp2VD, /*implicit*/true);
   Tmp2PBDPattern = new (Ctx) TypedPattern(Tmp2PBDPattern,

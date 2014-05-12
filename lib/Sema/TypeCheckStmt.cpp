@@ -92,12 +92,10 @@ namespace {
         if (CE->getParent() != ParentDC) {
           // If a closure is nested within an auto closure, we'll need to update
           // its parent to the auto closure parent.
-          if (ParentDC->getContextKind() ==
-                DeclContextKind::AbstractClosureExpr) {
-            CE->setParent(ParentDC);
-          } else {
-            llvm_unreachable("Incorrect parent decl context for closure");
-          }
+          assert(ParentDC->getContextKind() ==
+                 DeclContextKind::AbstractClosureExpr &&
+                 "Incorrect parent decl context for closure");
+          CE->setParent(ParentDC);
         }
 
         // If the closure has a single expression body, we need to
