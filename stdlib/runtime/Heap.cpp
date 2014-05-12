@@ -418,7 +418,9 @@ static void _swift_zone_initImpl() {
   if (dyldMagic && strstr(dyldMagic, "libgmalloc")) {
     _swift_alloc = SwiftZone::alloc_gmalloc;
     _swift_tryAlloc = SwiftZone::tryAlloc_gmalloc;
+    _swift_slowAlloc = SwiftZone::slowAlloc_gmalloc;
     _swift_dealloc = SwiftZone::dealloc_gmalloc;
+    _swift_slowDealloc = SwiftZone::slowDealloc_gmalloc;
   }
 }
 void swift::_swift_zone_init() {
