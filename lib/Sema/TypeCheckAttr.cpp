@@ -136,6 +136,11 @@ void AttributeEarlyChecker::visitNSManagedAttr(NSManagedAttr *attr) {
                 VD->getStorageKind() == AbstractStorageDecl::Observing);
     return attr->setInvalid();
   }
+
+  // @NSManaged properties cannot be @NSCopying
+  if (auto *NSCopy = VD->getMutableAttrs().getAttribute<NSCopyingAttr>())
+    return diagnoseAndRemoveAttr(NSCopy, diag::attr_NSManaged_NSCopying);
+
 }
 
 
@@ -186,6 +191,16 @@ void AttributeEarlyChecker::visitLazyAttr(LazyAttr *attr) {
       (varDC->isModuleScopeContext() &&
        !varDC->getParentSourceFile()->isScriptMode()))
     return diagnoseAndRemoveAttr(attr, diag::lazy_on_already_lazy_global);
+
+  // @lazy must have an initializer, and the pattern binding must be a simple
+  // one.
+  auto *PBD = VD->getParentPattern();
+  if (!PBD->getInit())
+    return diagnoseAndRemoveAttr(attr, diag::lazy_requires_initializer);
+
+  if (!PBD->getSingleVar())
+    return diagnoseAndRemoveAttr(attr, diag::lazy_requires_single_var);
+
 }
 
 

@@ -411,17 +411,6 @@ WARNING(unsupported_synthesize_init_variadic,sema_tcd,none,
 NOTE(variadic_superclass_init_here,sema_tcd,none,
      "variadic superclass initializer defined here", ())
 
-ERROR(attr_NSManaged_not_property,sema_tcd,none,
-      "'NSManaged' attribute only allowed on a property in a class", ())
-ERROR(attr_NSManaged_not_stored,sema_tcd,none,
-      "'NSManaged' not allowed on %select{computed|observing}0 properties",
-      (bool))
-ERROR(attr_NSManaged_let_property,sema_tcd,none,
-      "'NSManaged' attribute not allowed on a 'let' property", ())
-ERROR(attr_NSManaged_initial_value,sema_tcd,none,
-      "'NSManaged' property cannot have an initial value", ())
-
-
 // Variables (var and let).
 ERROR(unimplemented_type_var,decl_parsing,none,
      "%select{ERROR|static|class}1 variables not yet supported"
@@ -735,6 +724,20 @@ ERROR(final_not_on_accessors,sema_tcd,none,
 ERROR(override_noreturn_with_return,sema_tcd,none,
       "an override of a 'noreturn' method should also be 'noreturn'", ())
 
+// NSManaged attribute
+ERROR(attr_NSManaged_not_property,sema_tcd,none,
+      "'NSManaged' attribute only allowed on a property in a class", ())
+ERROR(attr_NSManaged_not_stored,sema_tcd,none,
+      "'NSManaged' not allowed on %select{computed|observing}0 properties",
+      (bool))
+ERROR(attr_NSManaged_let_property,sema_tcd,none,
+      "'NSManaged' attribute not allowed on a 'let' property", ())
+ERROR(attr_NSManaged_initial_value,sema_tcd,none,
+      "'NSManaged' property cannot have an initial value", ())
+ERROR(attr_NSManaged_NSCopying,sema_tcd,none,
+      "'NSManaged' property cannot also be marked @NSCopying", ())
+
+
 // NSCopying attribute
 ERROR(nscopying_only_on_class_properties,sema_tcd,none,
       "'NSCopying' attribute may only be used on properties in classes",
@@ -759,7 +762,11 @@ ERROR(lazy_on_already_lazy_global,sema_tcd,none,
       "'lazy' attribute may not be used on an already-lazy global", ())
 ERROR(lazy_not_in_protocol,sema_tcd,none,
       "'lazy' attribute isn't allowed on a protocol requirement", ())
+ERROR(lazy_requires_initializer,sema_tcd,none,
+      "@lazy properties must have an initializer", ())
 
+ERROR(lazy_requires_single_var,sema_tcd,none,
+      "'lazy' attribute cannot destructure an initializer", ())
 
 //------------------------------------------------------------------------------
 // Type Check Expressions

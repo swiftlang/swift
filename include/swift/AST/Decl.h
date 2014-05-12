@@ -1601,7 +1601,7 @@ public:
   bool isConditional() const { return PatternBindingDeclBits.Conditional; }
   
   /// When the pattern binding contains only a single variable with no
-  /// destructoring, retrieve that variable.
+  /// destructuring, retrieve that variable.
   VarDecl *getSingleVar() const;
 
   bool isStatic() const { return PatternBindingDeclBits.IsStatic; }
