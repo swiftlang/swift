@@ -1196,7 +1196,9 @@ public:
     // initializing constructor).
     auto nominal = ctorRef->getDecl()->getDeclContext()
                      ->getDeclaredTypeOfContext()->getAnyNominal();
-    bool useAllocatingCtor = isa<StructDecl>(nominal) || isa<EnumDecl>(nominal);
+    bool useAllocatingCtor = isa<StructDecl>(nominal) || 
+                             isa<EnumDecl>(nominal) ||
+                             ctorRef->getDecl()->isFactoryInit();
 
     // Load the 'self' argument.
     Expr *arg = expr->getArg();
@@ -1225,7 +1227,9 @@ public:
                   gen,
                   self.getValue(),
                   SILDeclRef(ctorRef->getDecl(),
-                             SILDeclRef::Kind::Initializer,
+                             useAllocatingCtor
+                               ? SILDeclRef::Kind::Allocator
+                               : SILDeclRef::Kind::Initializer,
                              SILDeclRef::ConstructAtBestResilienceExpansion,
                              SILDeclRef::ConstructAtNaturalUncurryLevel,
                              gen.SGM.requiresObjCDispatch(ctorRef->getDecl())),

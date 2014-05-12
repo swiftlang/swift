@@ -920,6 +920,40 @@ static bool isSelfInitUse(ApplyInst *AI) {
   return true;
 }
 
+/// Determine if this value_metatype instruction is part of a call to
+/// self.init when delegating to a factory initializer.
+///
+/// FIXME: This is only necessary due to our broken model for factory
+/// initializers.
+static bool isSelfInitUse(ValueMetatypeInst *Inst) {
+  // "Inst" is a ValueMetatype instruction.  Check to see if it is
+  // used by an apply that came from a call to self.init.
+  for (auto UI : Inst->getUses()) {
+    auto *User = UI->getUser();
+
+    // Check whether we're looking up a factory initializer with
+    // class_method.
+    if (auto *CMI = dyn_cast<ClassMethodInst>(User)) {
+      // Only works for allocating initializers...
+      auto Member = CMI->getMember();
+      if (Member.kind != SILDeclRef::Kind::Allocator)
+        return false;
+
+      // ... of factory initializers.
+      auto ctor = dyn_cast_or_null<ConstructorDecl>(Member.getDecl());
+      return ctor && ctor->isFactoryInit();
+    }
+
+    // Ignore the thick_to_objc_metatype instruction.
+    if (isa<ThickToObjCMetatypeInst>(User)) {
+      continue;
+    }
+
+    return false;
+  }
+
+  return false;
+}
 
 void ElementUseCollector::
 collectClassSelfUses(SILValue ClassPointer, SILType MemorySILType,
@@ -954,6 +988,13 @@ collectClassSelfUses(SILValue ClassPointer, SILType MemorySILType,
     // call in a delegating initializer.
     if (isa<ApplyInst>(User) && isSelfInitUse(cast<ApplyInst>(User)))
       Kind = DIUseKind::SelfInit;
+
+    // If this is a ValueMetatypeInst, check to see if it's part of a
+    // self.init call to a factory initializer in a delegating
+    // initializer.
+    if (auto *VMI = dyn_cast<ValueMetatypeInst>(User))
+      if (isSelfInitUse(VMI))
+        Kind = DIUseKind::SelfInit;
 
     Uses.push_back(DIMemoryUse(User, Kind, 0, TheMemory.NumElements));
   }
@@ -1023,6 +1064,13 @@ void ElementUseCollector::collectDelegatingClassInitSelfUses() {
         if (isa<ApplyInst>(User) && isSelfInitUse(cast<ApplyInst>(User)))
           Kind = DIUseKind::SelfInit;
 
+        // If this is a ValueMetatypeInst, check to see if it's part of a
+        // self.init call to a factory initializer in a delegating
+        // initializer.
+        if (auto *VMI = dyn_cast<ValueMetatypeInst>(User))
+          if (isSelfInitUse(VMI))
+            Kind = DIUseKind::SelfInit;
+
         // If this is an upcast instruction, it is a conversion of self to the
         // base.  This is either part of a super.init sequence, or a general
         // superclass access.
@@ -1065,10 +1113,17 @@ void ElementUseCollector::collectDelegatingValueTypeInitSelfUses() {
 
     // Stores *to* the allocation are writes.  If the value being stored is a
     // call to self.init()... then we have a self.init call.
-    if (auto *AI = dyn_cast<AssignInst>(User))
-      if (auto *Call = dyn_cast<ApplyInst>(AI->getOperand(0)))
+    if (auto *AI = dyn_cast<AssignInst>(User)) {
+      if (auto *Call = dyn_cast<ApplyInst>(AI->getOperand(0))) {
         if (isSelfInitUse(Call))
           Kind = DIUseKind::SelfInit;
+      }
+
+      if (auto *VMI = dyn_cast<ValueMetatypeInst>(AI->getOperand(0))) {
+        if (isSelfInitUse(VMI))
+          Kind = DIUseKind::SelfInit;
+      }
+    }
     
     // We can safely handle anything else as an escape.  They should all happen
     // after self.init is invoked.
