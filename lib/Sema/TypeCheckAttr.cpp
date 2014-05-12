@@ -205,7 +205,9 @@ void AttributeEarlyChecker::visitLazyAttr(LazyAttr *attr) {
   if (!VD->getDeclContext()->isTypeContext())
     return diagnoseAndRemoveAttr(attr, diag::lazy_must_be_property);
 
-
+  // TODO: Lazy properties can't yet be observed.
+  if (VD->getStorageKind() == VarDecl::Observing)
+    return diagnoseAndRemoveAttr(attr, diag::lazy_not_observable);
 }
 
 
