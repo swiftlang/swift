@@ -34,16 +34,8 @@ using namespace swift;
 
 /// \brief Build an implicit 'self' parameter for the specified DeclContext.
 static Pattern *buildImplicitSelfParameter(SourceLoc Loc,
-                                           DeclContext *CurDeclContext,
-                                           VarDecl **SelfDeclRet = nullptr) {
-  auto Pat = Pattern::buildImplicitSelfParameter(Loc,TypeLoc(),CurDeclContext);
-  // FIXME: Remove SelfDeclRet when we don't need it anymore.
-  if (SelfDeclRet) {
-    Pat->forEachVariable([&](VarDecl *VD) {
-      *SelfDeclRet = VD;
-    });
-  }
-  return Pat;
+                                           DeclContext *CurDeclContext) {
+  return Pattern::buildImplicitSelfParameter(Loc, TypeLoc(), CurDeclContext);
 }
 
 
@@ -1227,7 +1219,8 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
       break;
     case tok::kw_typealias:
       DeclResult = parseDeclTypeAlias(!(Flags & PD_DisallowTypeAliasDef),
-                                       Flags.contains(PD_InProtocol), Attributes);
+                                       Flags.contains(PD_InProtocol),
+                                      Attributes);
       Status = DeclResult;
       break;
     case tok::kw_enum:
@@ -2720,8 +2713,9 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
   if (parseAnyIdentifier(SimpleName, diag::expected_identifier_in_decl,
                          "function")) {
     ParserStatus NameStatus =
-        parseIdentifierDeclName(*this, SimpleName, NameLoc, tok::l_paren, tok::arrow,
-                                tok::l_brace, diag::invalid_diagnostic);
+        parseIdentifierDeclName(*this, SimpleName, NameLoc, tok::l_paren,
+                                tok::arrow, tok::l_brace,
+                                diag::invalid_diagnostic);
     if (NameStatus.isError())
       return nullptr;
   }
@@ -2737,7 +2731,8 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
   // '<T>' as expected.
   if (SimpleName.str().size() > 1 && SimpleName.str().back() == '<'
       && Tok.is(tok::identifier)) {
-    SimpleName = Context.getIdentifier(SimpleName.str().slice(0, SimpleName.str().size() - 1));
+    SimpleName = Context.getIdentifier(SimpleName.str().
+                                       slice(0, SimpleName.str().size() - 1));
     SourceLoc LAngleLoc = NameLoc.getAdvancedLoc(SimpleName.str().size());
     GenericParams = parseGenericParameters(LAngleLoc);
   } else {
@@ -3526,9 +3521,7 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes,
   if (ConvenienceLoc.isValid())
     initKind = CtorInitializerKind::Convenience;
 
-  VarDecl *SelfDecl;
-  auto *SelfPattern = buildImplicitSelfParameter(ConstructorLoc,
-                                                 CurDeclContext, &SelfDecl);
+  auto *SelfPattern = buildImplicitSelfParameter(ConstructorLoc,CurDeclContext);
 
   Scope S2(this, ScopeKind::ConstructorBody);
   auto *CD = new (Context) ConstructorDecl(FullName, ConstructorLoc,
@@ -3561,7 +3554,8 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes,
       ParseFunctionBody CC(*this, CD);
 
       if (!isDelayedParsingEnabled()) {
-        ParserResult<BraceStmt> Body = parseBraceItemList(diag::invalid_diagnostic);
+        ParserResult<BraceStmt> Body =
+          parseBraceItemList(diag::invalid_diagnostic);
 
         if (!Body.isNull())
           CD->setBody(Body.get());
@@ -3611,21 +3605,17 @@ parseDeclDeinit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     }
   }
 
-  VarDecl *SelfDecl;
-  auto *SelfPattern = buildImplicitSelfParameter(DestructorLoc,
-                                                 CurDeclContext, &SelfDecl);
+  auto *SelfPattern = buildImplicitSelfParameter(DestructorLoc, CurDeclContext);
 
   Scope S(this, ScopeKind::DestructorBody);
   auto *DD = new (Context) DestructorDecl(Context.Id_deinit, DestructorLoc,
                                           SelfPattern, CurDeclContext);
-  // No need to setLocalDiscriminator.
-  addToScope(SelfDecl);
 
   // Parse the body.
   if (Tok.is(tok::l_brace)) {
     ParseFunctionBody CC(*this, DD);
     if (!isDelayedParsingEnabled()) {
-      ParserResult<BraceStmt> Body = parseBraceItemList(diag::invalid_diagnostic);
+      ParserResult<BraceStmt> Body=parseBraceItemList(diag::invalid_diagnostic);
 
       if (!Body.isNull())
         DD->setBody(Body.get());
