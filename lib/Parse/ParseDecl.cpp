@@ -94,7 +94,7 @@ namespace {
       if (!debug_client)
         return;
       
-      globalize = debug_client->shouldGlobalize (Name, Kind);
+      globalize = debug_client->shouldGlobalize(Name, Kind);
         
       if (globalize)
         switchContext();
@@ -106,9 +106,9 @@ namespace {
     
     template <typename T>
     ParserResult<T>
-    fixupParserResult (ParserResult<T> &Result) {
+    fixupParserResult(ParserResult<T> &Result) {
       ParserStatus Status = Result;
-      return fixupParserResult (Status, Result.get());
+      return fixupParserResult(Status, Result.getPtrOrNull());
     }
     
     template <typename T>
@@ -3867,7 +3867,7 @@ Parser::parseDeclOperator(bool AllowTopLevel, DeclAttributes &Attributes) {
     return nullptr;
   }
   
-  return DCC.fixupParserResult (Result);
+  return DCC.fixupParserResult(Result);
 }
 
 ParserResult<OperatorDecl>
