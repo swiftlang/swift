@@ -98,6 +98,48 @@ void AttributeEarlyChecker::visitIBOutletAttr(IBOutletAttr *attr) {
       VD->isStatic())
     return diagnoseAndRemoveAttr(attr, diag::invalid_iboutlet);
 
+  // Verify that the field type is valid as an outlet.
+  auto type = VD->getType();
+
+  // Look through ownership types, and optionals.
+  type = type->getReferenceStorageReferent();
+  if (Type underlying = type->getAnyOptionalObjectType())
+    type = underlying;
+
+  auto nominal = type->getAnyNominal();
+  if (auto classDecl = dyn_cast_or_null<ClassDecl>(nominal)) {
+    // @objc class types are okay.
+    if (!classDecl->isObjC())
+      return diagnoseAndRemoveAttr(attr, diag::iboutlet_nonobjc_class,
+                                   /*array=*/false, type);
+  } else if (type->isObjCExistentialType()) {
+    // @objc existential types are okay
+    // Nothing to do.
+  } else if (nominal == TC.Context.getStringDecl()) {
+    // String is okay because it is bridged to NSString.
+    // FIXME: BridgesTypes.def is almost sufficient for this.
+  } else if (nominal == TC.Context.getArrayDecl()) {
+    // Handle Array<T>. T must be an Objective-C class or protocol.
+    auto boundTy = type->castTo<BoundGenericStructType>();
+    auto boundArgs = boundTy->getGenericArgs();
+    assert(boundArgs.size() == 1 && "invalid Array declaration");
+    Type elementTy = boundArgs.front();
+    if (auto classDecl = elementTy->getClassOrBoundGenericClass()) {
+      if (!classDecl->isObjC())
+        return diagnoseAndRemoveAttr(attr, diag::iboutlet_nonobjc_class,
+                                     /*array=*/true, type);
+    } else if (elementTy->isObjCExistentialType()) {
+      // okay
+    } else {
+      // No other element types are permitted.
+      return diagnoseAndRemoveAttr(attr, diag::iboutlet_nonobject_type,
+                                   /*array=*/true, type);
+    }
+  } else {
+    // No other types are permitted.
+    return diagnoseAndRemoveAttr(attr, diag::iboutlet_nonobject_type,
+                                 /*array=*/false, type);
+  }
 }
 
 void AttributeEarlyChecker::visitNSManagedAttr(NSManagedAttr *attr) {
@@ -615,16 +657,13 @@ void TypeChecker::checkOwnershipAttr(VarDecl *var, Ownership ownershipKind) {
 }
 
 void TypeChecker::checkIBOutlet(VarDecl *VD) {
-  assert(VD->getMutableAttrs().hasAttribute<IBOutletAttr>() &&
+  assert(VD->getAttrs().hasAttribute<IBOutletAttr>() &&
          "Only call when @IBOutlet is set");
   checkDeclAttributesEarly(VD);
 
+  // Check to see if prechecking removed the attribute because it was invalid.
   auto *attr = VD->getMutableAttrs().getAttribute<IBOutletAttr>();
   if (!attr)
-    return;
-
-  // If the variable has no type yet, we can't perform any validation.
-  if (!VD->hasType())
     return;
 
   // Validate the type of the @IBOutlet.
@@ -641,51 +680,6 @@ void TypeChecker::checkIBOutlet(VarDecl *VD) {
   if (auto optObjectType = type->getAnyOptionalObjectType()) {
     isOptional = true;
     type = optObjectType;
-  }
-
-  auto nominal = type->getAnyNominal();
-  if (auto classDecl = dyn_cast_or_null<ClassDecl>(nominal)) {
-    // @objc class types are okay.
-    if (!classDecl->isObjC()) {
-      diagnose(VD->getLoc(), diag::iboutlet_nonobjc_class,
-               /*array=*/false, type);
-      attr->setInvalid();
-      return;
-    }
-  } else if (type->isObjCExistentialType()) {
-    // @objc existential types are okay
-    // Nothing to do.
-  } else if (nominal == Context.getStringDecl()) {
-    // String is okay because it is bridged to NSString.
-    // FIXME: BridgesTypes.def is almost sufficient for this.
-  } else if (nominal == Context.getArrayDecl()) {
-    // Handle Array<T>. T must be an Objective-C class or protocol.
-    auto boundTy = type->castTo<BoundGenericStructType>();
-    auto boundArgs = boundTy->getGenericArgs();
-    assert(boundArgs.size() == 1 && "invalid Array declaration");
-    Type elementTy = boundArgs.front();
-    if (auto classDecl = elementTy->getClassOrBoundGenericClass()) {
-      if (!classDecl->isObjC()) {
-        diagnose(VD->getLoc(), diag::iboutlet_nonobjc_class,
-                 /*array=*/true, type);
-        attr->setInvalid();
-        return;
-      }
-    } else if (elementTy->isObjCExistentialType()) {
-      // okay
-    } else {
-      // No other element types are permitted.
-      diagnose(VD->getLoc(), diag::iboutlet_nonobject_type,
-               /*array=*/true, type);
-      attr->setInvalid();
-      return;
-    }
-  } else {
-    // No other types are permitted.
-    diagnose(VD->getLoc(), diag::iboutlet_nonobject_type,
-             /*array=*/false, type);
-    attr->setInvalid();
-    return;
   }
 
   // If the type wasn't optional before, turn it into an implicitly unwrapped
