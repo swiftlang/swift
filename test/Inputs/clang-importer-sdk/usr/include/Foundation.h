@@ -53,6 +53,10 @@ void *allocate(NSZone *zone);
 - (id)objectForKeyedSubscript:(id)key /*NS_AVAILABLE(10_8, 6_0)*/;
 @end
 
+@interface NSDictionary (Inits)
+- (instancetype)init;
+@end
+
 @interface NSMutableDictionary : NSDictionary
 - (void)removeObjectForKey:(id)aKey;
 - (void)setObject:(id)anObject forKey:(id <NSCopying>)aKey;

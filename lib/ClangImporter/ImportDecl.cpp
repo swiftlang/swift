@@ -2366,21 +2366,22 @@ namespace {
 
       // Find the interface, if we can.
       const clang::ObjCInterfaceDecl *interface = nullptr;
-      if (isa<clang::ObjCProtocolDecl>(objcMethod->getDeclContext())) {
-        // FIXME: Part of the mirroring hack.
-        if (auto classDecl = containerTy->getClassOrBoundGenericClass())
-          interface = dyn_cast_or_null<clang::ObjCInterfaceDecl>(
-                        classDecl->getClangDecl());
-      } else {
-        // For non-protocol methods, just look for the interface.
-        interface = objcMethod->getClassInterface();
+      if (auto classDecl = containerTy->getClassOrBoundGenericClass()) {
+        interface = dyn_cast_or_null<clang::ObjCInterfaceDecl>(
+                      classDecl->getClangDecl());
       }
 
       // If we weren't told what kind of initializer this should be,
       // figure it out now.
       CtorInitializerKind kind;
+
       if (kindIn) {
         kind = *kindIn;
+
+        // If we know this is a designated initializer, mark it as such.
+        if (interface && Impl.hasDesignatedInitializers(interface) &&
+            Impl.isDesignatedInitializer(interface, objcMethod))
+          kind = CtorInitializerKind::Designated;
       } else {
         // If the owning Objective-C class has designated initializers and this
         // is not one of them, treat it as a convenience initializer.

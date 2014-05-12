@@ -83,3 +83,17 @@ func checkInitWithCoder(coder: NSCoder) {
   MyTableViewController(coder: coder)
   MyOtherTableViewController(coder: coder)
 }
+
+// <rdar://problem/16838409>
+class MyDictionary1 : NSDictionary {}
+
+func getMyDictionary1() {
+  var nsd = MyDictionary1()
+}
+
+// <rdar://problem/16838515>
+class MyDictionary2 : NSDictionary {
+  init() {
+    super.init()
+  }
+}
