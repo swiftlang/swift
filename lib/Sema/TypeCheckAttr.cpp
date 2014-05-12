@@ -98,7 +98,7 @@ isAcceptableOutletType(Type type, bool &isArray, TypeChecker &TC) {
 
   auto nominal = type->getAnyNominal();
 
-  if (auto classDecl = dyn_cast<ClassDecl>(nominal)) {
+  if (auto classDecl = dyn_cast_or_null<ClassDecl>(nominal)) {
     if (classDecl->isObjC())
       return {}; // @objc class types are okay.
     return diag::iboutlet_nonobjc_class;
@@ -629,7 +629,8 @@ void TypeChecker::checkOwnershipAttr(VarDecl *var, Ownership ownershipKind) {
         }
         if (auto *typedPattern = dyn_cast<TypedPattern>(pattern)) {
           auto typeRepr = typedPattern->getTypeLoc().getTypeRepr();
-          if (auto unchecked = dyn_cast<ImplicitlyUnwrappedOptionalTypeRepr>(typeRepr)) {
+          if (auto unchecked =
+              dyn_cast<ImplicitlyUnwrappedOptionalTypeRepr>(typeRepr)) {
             bangLoc = unchecked->getExclamationLoc();
           }
         }
