@@ -91,6 +91,45 @@ void AttributeEarlyChecker::visitIBInspectableAttr(IBInspectableAttr *attr) {
 
 }
 
+static Optional<Diag<bool,Type>>
+isAcceptableOutletType(Type type, bool &isArray, TypeChecker &TC) {
+  if (type->isObjCExistentialType())
+    return {}; // @objc existential types are okay
+
+  auto nominal = type->getAnyNominal();
+
+  if (auto classDecl = dyn_cast<ClassDecl>(nominal)) {
+    if (classDecl->isObjC())
+      return {}; // @objc class types are okay.
+    return diag::iboutlet_nonobjc_class;
+  }
+
+  if (nominal == TC.Context.getStringDecl()) {
+    // String is okay because it is bridged to NSString.
+    // FIXME: BridgesTypes.def is almost sufficient for this.
+    return {};
+  }
+
+  if (nominal == TC.Context.getArrayDecl()) {
+    // Arrays of arrays are not allowed.
+    if (isArray)
+      return diag::iboutlet_nonobject_type;
+
+    isArray = true;
+
+    // Handle Array<T>. T must be an Objective-C class or protocol.
+    auto boundTy = type->castTo<BoundGenericStructType>();
+    auto boundArgs = boundTy->getGenericArgs();
+    assert(boundArgs.size() == 1 && "invalid Array declaration");
+    Type elementTy = boundArgs.front();
+    return isAcceptableOutletType(elementTy, isArray, TC);
+  }
+
+  // No other types are permitted.
+  return diag::iboutlet_nonobject_type;
+}
+
+
 void AttributeEarlyChecker::visitIBOutletAttr(IBOutletAttr *attr) {
   // Only instance properties can be 'IBOutlet'.
   auto *VD = dyn_cast<VarDecl>(D);
@@ -106,40 +145,11 @@ void AttributeEarlyChecker::visitIBOutletAttr(IBOutletAttr *attr) {
   if (Type underlying = type->getAnyOptionalObjectType())
     type = underlying;
 
-  auto nominal = type->getAnyNominal();
-  if (auto classDecl = dyn_cast_or_null<ClassDecl>(nominal)) {
-    // @objc class types are okay.
-    if (!classDecl->isObjC())
-      return diagnoseAndRemoveAttr(attr, diag::iboutlet_nonobjc_class,
-                                   /*array=*/false, type);
-  } else if (type->isObjCExistentialType()) {
-    // @objc existential types are okay
-    // Nothing to do.
-  } else if (nominal == TC.Context.getStringDecl()) {
-    // String is okay because it is bridged to NSString.
-    // FIXME: BridgesTypes.def is almost sufficient for this.
-  } else if (nominal == TC.Context.getArrayDecl()) {
-    // Handle Array<T>. T must be an Objective-C class or protocol.
-    auto boundTy = type->castTo<BoundGenericStructType>();
-    auto boundArgs = boundTy->getGenericArgs();
-    assert(boundArgs.size() == 1 && "invalid Array declaration");
-    Type elementTy = boundArgs.front();
-    if (auto classDecl = elementTy->getClassOrBoundGenericClass()) {
-      if (!classDecl->isObjC())
-        return diagnoseAndRemoveAttr(attr, diag::iboutlet_nonobjc_class,
-                                     /*array=*/true, type);
-    } else if (elementTy->isObjCExistentialType()) {
-      // okay
-    } else {
-      // No other element types are permitted.
-      return diagnoseAndRemoveAttr(attr, diag::iboutlet_nonobject_type,
-                                   /*array=*/true, type);
-    }
-  } else {
-    // No other types are permitted.
-    return diagnoseAndRemoveAttr(attr, diag::iboutlet_nonobject_type,
-                                 /*array=*/false, type);
-  }
+
+  bool isArray = false;
+  if (auto isError = isAcceptableOutletType(type, isArray, TC))
+    return diagnoseAndRemoveAttr(attr, isError.getValue(),
+                                 /*array=*/isArray, type);
 }
 
 void AttributeEarlyChecker::visitNSManagedAttr(NSManagedAttr *attr) {
@@ -668,7 +678,6 @@ void TypeChecker::checkIBOutlet(VarDecl *VD) {
 
   // Validate the type of the @IBOutlet.
   auto type = VD->getType();
-  bool isOptional = false;
   Ownership ownership = Ownership::Strong;
   if (auto refStorageType = type->getAs<ReferenceStorageType>()) {
     ownership = refStorageType->getOwnership();
@@ -677,19 +686,21 @@ void TypeChecker::checkIBOutlet(VarDecl *VD) {
     ownership = Ownership::Weak;
   }
 
-  if (auto optObjectType = type->getAnyOptionalObjectType()) {
-    isOptional = true;
+  OptionalTypeKind optionalKind;
+  if (auto optObjectType = type->getAnyOptionalObjectType(optionalKind))
     type = optObjectType;
-  }
 
   // If the type wasn't optional before, turn it into an implicitly unwrapped
   // optional now.
   // FIXME: Should arrays start out empty instead?
-  if (!isOptional) {
+  if (optionalKind == OptionalTypeKind::OTK_None) {
     if (ownership == Ownership::Weak)
       type = ReferenceStorageType::get(type, ownership, Context);
     else
       type = ImplicitlyUnwrappedOptionalType::get(type);
     VD->overwriteType(type);
   }
+
+
+
 }
