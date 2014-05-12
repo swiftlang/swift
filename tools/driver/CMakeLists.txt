@@ -10,6 +10,11 @@ add_swift_executable(swift
 find_library(CORE_FOUNDATION NAMES CoreFoundation)
 
 target_link_libraries(swift edit ${CORE_FOUNDATION})
+get_filename_component(ARCLITE ${CMAKE_CXX_COMPILER} DIRECTORY)
+get_filename_component(ARCLITE ${ARCLITE} DIRECTORY)
+set(ARCLITE "${ARCLITE}/lib/arc/libarclite_macosx.a")
+set_property(TARGET swift APPEND_STRING PROPERTY
+  LINK_FLAGS "-lobjc -Wl,-force_load,${ARCLITE}")
 
 if(MODULES_SDK)
   add_definitions( -DSWIFT_MODULES_SDK="${MODULES_SDK}" )
