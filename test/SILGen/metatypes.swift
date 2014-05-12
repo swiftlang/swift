@@ -9,7 +9,8 @@ protocol SomeProtocol {
   func static_method()
 }
 
-struct SomeStruct {}
+protocol Any {}
+struct SomeStruct : Any {}
 
 class SomeClass : SomeProtocol {
   typealias SomeAssociated = SomeStruct
@@ -20,64 +21,85 @@ class SomeClass : SomeProtocol {
 
 class SomeSubclass : SomeClass {}
 
-// CHECK: sil @_T9metatypes16static_metatypesFT_TMVS_10SomeStructMCS_9SomeClassMS1__ :
+// CHECK-LABEL: sil  @_TF9metatypes16static_metatypes
 func static_metatypes()
-  -> (SomeStruct.metatype, SomeClass.metatype, SomeClass.metatype)
+  -> (SomeStruct.Type, SomeClass.Type, SomeClass.Type)
 {
-  // CHECK: [[STRUCT:%[0-9]+]] = metatype $SomeStruct.metatype
-  // CHECK: [[CLASS:%[0-9]+]] = metatype $SomeClass.metatype
-  // CHECK: [[SUBCLASS:%[0-9]+]] = metatype $SomeSubclass.metatype
-  // CHECK: [[SUBCLASS_UPCAST:%[0-9]+]] = upcast [[SUBCLASS]] : ${{.*}} to $SomeClass.metatype
+  // CHECK: [[STRUCT:%[0-9]+]] = metatype $@thin SomeStruct.Type
+  // CHECK: [[CLASS:%[0-9]+]] = metatype $@thick SomeClass.Type
+  // CHECK: [[SUBCLASS:%[0-9]+]] = metatype $@thick SomeSubclass.Type
+  // CHECK: [[SUBCLASS_UPCAST:%[0-9]+]] = upcast [[SUBCLASS]] : ${{.*}} to $@thick SomeClass.Type
   // CHECK: tuple ([[STRUCT]] : {{.*}}, [[CLASS]] : {{.*}}, [[SUBCLASS_UPCAST]] : {{.*}})
-  return (SomeStruct, SomeClass, SomeSubclass)
+  return (SomeStruct.self, SomeClass.self, SomeSubclass.self)
 }
 
-// CHECK: sil @_T9metatypes16struct_metatypesFT1sVS_10SomeStruct_TMS0_MS0__ :
-func struct_metatypes(s:SomeStruct)
-  -> (SomeStruct.metatype, SomeStruct.metatype)
+// CHECK-LABEL: sil  @_TF9metatypes16struct_metatypes
+func struct_metatypes(s: SomeStruct)
+  -> (SomeStruct.Type, SomeStruct.Type)
 {
-  // CHECK: [[STRUCT1:%[0-9]+]] = metatype $SomeStruct.metatype
-  // CHECK: [[STRUCT2:%[0-9]+]] = metatype $SomeStruct.metatype
+  // CHECK: [[STRUCT1:%[0-9]+]] = metatype $@thin SomeStruct.Type
+  // CHECK: [[STRUCT2:%[0-9]+]] = metatype $@thin SomeStruct.Type
   // CHECK: tuple ([[STRUCT1]] : {{.*}}, [[STRUCT2]] : {{.*}})
-  return (Builtin.typeof(s), SomeStruct)
+  return (s.dynamicType, SomeStruct.self)
 }
 
-// CHECK: sil @_T9metatypes15class_metatypesFT1cCS_9SomeClass1sCS_12SomeSubclass_TMS0_MS0__ :
-func class_metatypes(c:SomeClass, s:SomeSubclass)
-  -> (SomeClass.metatype, SomeClass.metatype)
+// CHECK-LABEL: sil  @_TF9metatypes15class_metatypes
+func class_metatypes(c: SomeClass, s: SomeSubclass)
+  -> (SomeClass.Type, SomeClass.Type)
 {
-  // CHECK: [[CADDR:%[0-9]+]] = alloc_box $SomeClass
-  // CHECK: [[SADDR:%[0-9]+]] = alloc_box $SomeSubclass
-  // CHECK: [[C:%[0-9]+]] = load [[CADDR]]
-  // CHECK: [[CLASS:%[0-9]+]] = class_metatype $SomeClass.metatype, [[C]]
-  // CHECK: [[S:%[0-9]+]] = load [[SADDR]]
-  // CHECK: [[SUBCLASS:%[0-9]+]] = class_metatype $SomeSubclass.metatype, [[S]]
-  // CHECK: [[SUBCLASS_UPCAST:%[0-9]+]] = upcast [[SUBCLASS]] : ${{.*}} to $SomeClass.metatype
+  // CHECK: [[CLASS:%[0-9]+]] = value_metatype $@thick SomeClass.Type,
+  // CHECK: [[SUBCLASS:%[0-9]+]] = value_metatype $@thick SomeSubclass.Type,
+  // CHECK: [[SUBCLASS_UPCAST:%[0-9]+]] = upcast [[SUBCLASS]] : ${{.*}} to $@thick SomeClass.Type
   // CHECK: tuple ([[CLASS]] : {{.*}}, [[SUBCLASS_UPCAST]] : {{.*}})
-  return (Builtin.typeof(c), Builtin.typeof(s))
+  return (c.dynamicType, s.dynamicType)
 }
 
-// CHECK: sil @_T9metatypes19archetype_metatypesU__FT1tQ__TMQ_MQ__ :
-func archetype_metatypes<T>(t:T) -> (T.metatype, T.metatype) {
-  // CHECK: [[STATIC_T:%[0-9]+]] = metatype $T.metatype
-  // CHECK: [[T_VALUE:%[0-9]+]] = alloc_stack $T
-  // CHECK: [[DYN_T:%[0-9]+]] = archetype_metatype $T.metatype, [[T_VALUE]]
+// CHECK-LABEL: sil  @_TF9metatypes19archetype_metatypes
+// CHECK-NEXT: bb0(%0 : $*T):
+func archetype_metatypes<T>(t: T) -> (T.Type, T.Type) {
+  // CHECK: [[STATIC_T:%[0-9]+]] = metatype $@thick T.Type
+  // CHECK: [[DYN_T:%[0-9]+]] = value_metatype $@thick T.Type, %0
   // CHECK: tuple ([[STATIC_T]] : {{.*}}, [[DYN_T]] : {{.*}})
-  return (T, Builtin.typeof(t))
+  return (T.self, t.dynamicType)
 }
 
-// CHECK: sil @_T9metatypes18protocol_metatypesFT1pPS_12SomeProtocol__MPS0__ :
-func protocol_metatypes(p:SomeProtocol) -> SomeProtocol.metatype {
-  // CHECK: protocol_metatype $SomeProtocol.metatype
-  return Builtin.typeof(p)
+// CHECK-LABEL: sil  @_TF9metatypes21existential_metatypes
+func existential_metatypes(p: SomeProtocol) -> SomeProtocol.Type {
+  // CHECK: existential_metatype $@thick SomeProtocol.Type
+  return p.dynamicType
 }
 
 struct SomeGenericStruct<T> {}
 
-func generic_metatypes<T>(x:T)
-  -> (SomeGenericStruct<T>.metatype, SomeGenericStruct<SomeStruct>.metatype)
+func generic_metatypes<T>(x: T)
+  -> (SomeGenericStruct<T>.Type, SomeGenericStruct<SomeStruct>.Type)
 {
-  // CHECK: metatype $SomeGenericStruct<T>
-  // CHECK: metatype $SomeGenericStruct<SomeStruct>
-  return (SomeGenericStruct<T>, SomeGenericStruct<SomeStruct>)
+  // CHECK: metatype $@thin SomeGenericStruct<T>
+  // CHECK: metatype $@thin SomeGenericStruct<SomeStruct>
+  return (SomeGenericStruct<T>.self, SomeGenericStruct<SomeStruct>.self)
+}
+
+// rdar://16610078
+
+// CHECK:    sil @_TF9metatypes30existential_metatype_from_thinFT_PMPS_3Any_ : $@thin () -> @thick Any.Type
+// CHECK:      [[T0:%.*]] = metatype $@thin SomeStruct.Type
+// CHECK-NEXT: [[T1:%.*]] = metatype $@thick SomeStruct.Type
+// CHECK-NEXT: [[T2:%.*]] = upcast [[T1]] : $@thick SomeStruct.Type to $@thick Any.Type
+// CHECK-NEXT: return [[T2]] : $@thick Any.Type
+func existential_metatype_from_thin() -> Any.Type {
+  return SomeStruct.self
+}
+
+// CHECK:    sil @_TF9metatypes36existential_metatype_from_thin_valueFT_PMPS_3Any_ : $@thin () -> @thick Any.Type
+// CHECK:      [[T0:%.*]] = function_ref @_TFV9metatypes10SomeStructCfMS0_FT_S0_
+// CHECK-NEXT: [[T1:%.*]] = metatype $@thin SomeStruct.Type
+// CHECK-NEXT: [[T2:%.*]] = apply [[T0]]([[T1]])
+// CHECK-NEXT: debug_value [[T2]] : $SomeStruct  // let s
+// CHECK-NEXT: [[T0:%.*]] = metatype $@thin SomeStruct.Type
+// CHECK-NEXT: [[T1:%.*]] = metatype $@thick SomeStruct.Type
+// CHECK-NEXT: [[T2:%.*]] = upcast [[T1]] : $@thick SomeStruct.Type to $@thick Any.Type
+// CHECK-NEXT: return [[T2]] : $@thick Any.Type
+func existential_metatype_from_thin_value() -> Any.Type {
+  let s = SomeStruct()
+  return s.dynamicType
 }

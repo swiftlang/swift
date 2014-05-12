@@ -1,7 +1,7 @@
 // RUN: %swift -parse %s -verify
 
 // Test the use of 'as' for type coercion (which requires no checking).
-@class_protocol, @objc protocol P1 {
+@class_protocol @objc protocol P1 {
   func foo()
 }
 
@@ -32,7 +32,21 @@ class D : C {
 }
 
 
-func prefer_coercion(c: C) {
+func prefer_coercion(inout c: C) {
   var d = c as D
   c = d
 }
+
+// Coerce literals
+var i32 = 1 as Int32
+var i8 = -1 as Int8
+
+// Coerce to a superclass with generic parameter inference
+class C1<T> { 
+  func f(x: T) { }
+}
+class C2<T> : C1<Int> { }
+
+var c2 = C2<()>()
+var c1 = c2 as C1
+c1.f(5)

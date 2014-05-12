@@ -10,7 +10,8 @@
 
 // Verify that the mangled names end up in the debug info.
 // CHECK-DWARF: TAG_structure_type
-// CHECK-DWARF-NEXT: AT_name( "_TtC4main3foo" )
+// CHECK-DWARF-NEXT: AT_name( "foo" )
+// CHECK-DWARF-NEXT: AT_linkage_name( "_TtC4main3foo" )
 
 // Verify the IR interface:
 // CHECK: metadata !"_TtC4main3foo"} ; [ DW_TAG_structure_type ] [foo] [line [[@LINE+1]],

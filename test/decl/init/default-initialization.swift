@@ -1,4 +1,4 @@
-// RUN: %swift %s -verify
+// RUN: %swift %s -emit-sil -verify
 
 struct A {
   var i : Int
@@ -6,10 +6,10 @@ struct A {
 }
 
 struct B {
-  var a : A // expected-note{{'a' declared here}} expected-note{{'a' declared here}}
+  var a : A
 }
 
-def locals() {
+func locals() {
   var al : A
   var bl : B
 }
@@ -25,60 +25,62 @@ var c : C
 
 
 extension B {
-  init() { // expected-error{{cannot default-initialize instance variable 'a' of type 'A'}}
-  }
+  init() {
+    // The usage is that self.a is returned from init() as part of self.
+  } // expected-error {{variable 'self.a' used before being initialized}}
 
   init(inA : A) { // okay
     a = inA
   }
 
-  init(otherA : A) { // okay
+  init(otherA : A, x : Bool) { // okay
     self.a = otherA
   }
 
   init(i : Int) { // okay
-    a = A(i)
+    a = A(i: i)
   }
 
-  init(a : A) {
-    self.a = a 
+  init(a : A, x : Bool, y : Bool) {
+    self.a = a
   }
 
-  // FIXME: False positive. We're actually definitively initializing self.
-  init(j : Int) { // expected-error{{cannot default-initialize instance variable 'a' of type 'A'}}
-    if true { a = A(j) }
-  }
+  init(j : Int, x : Bool) {
+    if true { a = A(i: j) }
+  } // expected-error {{variable 'self.a' used before being initialized}}
 
-  // FIXME: False negative. We're reading before we're writing.
-  init(i : Int) {
-    a = A(a.i)
+  init(i : Int, x : Bool, y : Bool) {
+    a = A(i: a.i)    // expected-error {{variable 'self.a' used before being initialized}}
   }
 
   // Initializing the whole struct at once.
-  init(k : Int) {
-    var b : B
-    self = b
+  init(k : Int, x : Bool, y : Bool, z : Bool) {
+    var b : B     // expected-note {{variable defined here}}
+    self = b      // expected-error {{variable 'b' used before being initialized}}
   }
 }
 
 struct D {
-  var (a1, a2) : (A, A) = (A(1), A(2))
+  var (a1, a2) : (A, A) = (A(i: 1), A(i: 2))
 }
 
 var d : D // okay; uses initializer provided for a1, a2
 
 protocol P { }
-var p : P
+struct PImpl : P {}
+var p : P = PImpl()
 
 // Properties don't need to be default-initializable.
 var prop : P {
-get:
-  return p
+  get {
+    return p
+  }
 }
 
 var prop2 : (P) {
-get:
-  return p
+  get {
+    return p
+  }
 }
 
 class Base { }
@@ -92,5 +94,14 @@ class NoInitDerived : NoInitBase { }
 
 Base()
 Derived()
-NoInitBase() // expected-error{{does not type-check}}
-NoInitDerived() // expected-error{{'NoInitDerived' is not constructible with '()'}}
+
+class MultipleInitBase {
+  init() { }
+  init(i: Int) { }
+}
+
+class MultipleInitDerived : MultipleInitBase {
+  init() { } // expected-error{{super.init isn't called before returning from initializer}}
+}
+
+

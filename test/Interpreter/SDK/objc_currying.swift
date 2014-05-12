@@ -11,8 +11,10 @@ foo(x.componentsJoinedByString)
 // CHECK: foo, bar, bas
 // CHECK: foo • bar • bas
 
-// TODO
-// let a: AnyObject = x
-// if let componentsJoinedByString = a.componentsJoinedByString {
-//   foo(componentsJoinedByString)
-// }
+let a: AnyObject = x
+if let componentsJoinedByString = a.componentsJoinedByString {
+  foo(componentsJoinedByString)
+}
+// CHECK: foo, bar, bas
+// CHECK: foo • bar • bas
+

@@ -1,24 +1,19 @@
-// RUN: %swift -triple x86_64-apple-darwin10 %s -emit-llvm -g -o - | FileCheck %s
-// CHECK: @closure0
-// CHECK: , !dbg ![[DBG:.*]]
+// RUN: %swift -target x86_64-apple-darwin10 %s -emit-ir -g -o - | FileCheck %s
 
-func get_truth (input : Int) -> Int
-{
-    return input % 2
+func foldl1<T>(list: T[], function: (a: T, b: T) -> T) -> T {
+     assert(list.count > 1)
+     var accumulator = list[0]
+     for var i = 1; i < list.count; ++i {
+         accumulator = function(a: accumulator, b: list[i])
+     }
+     return accumulator
 }
 
-func call_me (input : Int) -> Void
-{
-// rdar://problem/14627460
-// A closure should have a line number in the debug info and a scope line of 0.
-// CHECK-DAG: "closure0"{{.*}}[ DW_TAG_subprogram ] [line [[@LINE+3]]] [def] [scope 0]
-// But not in the line table.
-// CHECK-DAG: ![[DBG]] = metadata !{i32 0, i32 0,
-    if input != 0 && ( get_truth (input * 2 + 1) > 0 )
-    {
-        println ("Whew, passed that test.")
-    }
-
-}
-
-call_me(5)
+var a = new Int[10]
+for i in 0...10 { a[i] = i }
+// A closure is not an artificial function (the last i32 0).
+// CHECK: metadata !"_TF7closureU_FTSiSi_Si", i32 [[@LINE+3]], metadata !{{[0-9]+}}, i1 false, i1 true, i32 0, i32 0, null, i32 0, i1 false, {{.*}}[ DW_TAG_subprogram ]
+// CHECK: [ DW_TAG_arg_variable ] [$0] [line [[@LINE+2]]]
+// CHECK: [ DW_TAG_arg_variable ] [$1] [line [[@LINE+1]]]
+var sum:Int = foldl1(a, { $0 + $1 })
+println(sum)

@@ -12,29 +12,29 @@ var closure3a : ()->()->(Int,Int) = {{ (4, 2) }} // multi-level closing.
 var closure3b : (Int,Int)->(Int)->(Int,Int) = {{ (4, 2) }} // FIXME: expected-error{{different number of elements}}
 var closure4 : (Int,Int) -> Int = { $0 + $1 }
 var closure5 : (Double) -> Int =
-   { // expected-error{{expression does not type-check}}
+   { // expected-error{{could not find an overload for '+' that accepts the supplied arguments}}
        $0 + 1.0 }
 
 var closure6 = $0  // expected-error {{anonymous closure argument not contained in a closure}}
 
 var closure7 : Int =
-   { 4 }  // expected-error {{'() -> $T0' is not convertible to 'Int'}}
+   { 4 }  // expected-error {{function produces expected type 'Int'; did you mean to call it with '()'?}}
 
-def funcdecl1(a: Int, y: Int) {}
-def funcdecl3() -> Int {}
-def funcdecl4(a: ((Int)->Int), b: Int) {} // expected-note{{in initialization of parameter 'a'}}
+func funcdecl1(a: Int, y: Int) {}
+func funcdecl3() -> Int {}
+func funcdecl4(a: ((Int)->Int), b: Int) {} // expected-note{{in initialization of parameter 'a'}}
 
-def funcdecl5(a: Int, y: Int) {
+func funcdecl5(a: Int, y: Int) {
   // Pass in a closure containing the call to funcdecl3.
-  funcdecl4({ funcdecl3() }, 12) // FIXME: expected-error{{'(Int)' is not a subtype of '()'}}
+  funcdecl4({ funcdecl3() }, 12) // FIXME: expected-error{{'Int' is not a subtype of '()'}}
   func6({$0 + $1})       // Closure with two named anonymous arguments
   func6({($0) + $1})    // Closure with sequence expr inferred type
-  func6({($0) + $0})    // FIXME: expected-error{{expression does not type-check}}
+  func6({($0) + $0})    // FIXME: expected-error{{could not find an overload for '+' that accepts the supplied arguments}}
 
 
   var testfunc : ((), Int) -> Int
   testfunc(          
-           {$0+1})  // expected-error {{'($0: $T2) -> $T1' is not convertible to '((), Int)'}}
+           {$0+1})  // expected-error {{missing argument for parameter #2 in call}}
 
   funcdecl5(1, 2) // recursion.
 
@@ -44,10 +44,10 @@ def funcdecl5(a: Int, y: Int) {
 
   // Tuple expressions with named elements.
   var i : (y : Int, x : Int) = (x : 42, y : 11)
-  funcdecl1(y : 123, a : 444)
+  funcdecl1(123, 444)
   
   // Calls.
-  4()  // expected-error {{expression does not type-check}}
+  4()  // expected-error {{invalid use of '()' to call a value of non-function type 'Int'}}
   
   
   // rdar://12017658 - Infer some argument types from func6.
@@ -62,37 +62,110 @@ def funcdecl5(a: Int, y: Int) {
   // Pattern doesn't need to name arguments.
   func6({ _,_ in 4 })
   
-  var fn = {} // FIXME: maybe? expected-error{{expression does not type-check}}
+  var fn = {} // FIXME: maybe? expected-error{{cannot convert the expression's type '() -> $T0' to type '$T1'}}
   var fn2 = { 4 }
   
   
-  var c : Int = { a,b-> Int in a+b} // expected-error{{'(a: $T0, b: $T1) -> Int' is not convertible to 'Int'}}
+  var c : Int = { a,b-> Int in a+b} // expected-error{{'($T0, $T1) -> Int' is not convertible to 'Int'}}
   
   
 }
 
 // rdar://11935352 - closure with no body.
-def closure_no_body(p: () -> ()) {
+func closure_no_body(p: () -> ()) {
   return closure_no_body({})
 }
 
 
 // rdar://12019415
-def t() {
-  var u8 : StringByte
+func t() {
+  var u8 : UInt8
   var x : Bool
 
-  if (0xA0..0xBF).contains(Int(u8)) && x {
+  if 0xA0...0xBF ~= Int(u8) && x {
   }
 }
 
 // <rdar://problem/11927184>
-def f0(a: Any) -> Int { return 1 }
+func f0(a: Any) -> Int { return 1 }
 assert(f0(1) == 1)
 
 
 var selfRef = { selfRef() } // expected-error {{variable used within its own initial value}}
-var nestedSelfRef = { // expected-error {{expression does not type-check}}
+var nestedSelfRef = { // expected-error {{cannot convert the expression's type '() -> $T0' to type '$T1'}}
   var recursive = { nestedSelfRef() } // expected-error {{variable used within its own initial value}}
   recursive()
 }
+
+func anonymousClosureArgsInClosureWithArgs() {
+  var a1 = { () in $0 } // expected-error {{anonymous closure arguments cannot be used inside a closure that has explicit arguments}}
+  var a2 = { () -> Int in $0 } // expected-error {{anonymous closure arguments cannot be used inside a closure that has explicit arguments}}
+  var a3 = { (z: Int) in $0 } // expected-error {{anonymous closure arguments cannot be used inside a closure that has explicit arguments}}
+}
+
+func doStuff(fn : () -> Int) {}
+
+// <rdar://problem/16193162> Require specifying self for locations in code where strong reference cycles are likely
+class ExplicitSelfRequiredTest {
+  var x = 42
+  func method() -> Int {
+    // explicit closure requires an explicit "self." base.
+    doStuff({ ++self.x })
+    doStuff({ ++x })    // expected-error {{reference to property 'x' in closure requires explicit 'self.' to make capture semantics explicit}}
+
+    // autoclosure use is ok.
+    func4(fn: print(x))
+
+    // Methods follow the same rules as properties, uses of 'self' must be marked with "self."
+    doStuff { method() }  // expected-error {{call to method 'method' in closure requires explicit 'self.' to make capture semantics explicit}}
+    doStuff { self.method() }
+    return 42
+  }
+}
+
+
+// rdar://16393849 - 'var' and 'let' should be usable in closure argument lists.
+var testClosureArgumentPatterns: (Int, Int) -> Int = { (var x, let y) in x+y+1 }
+
+
+class SomeClass {
+  var field : SomeClass?
+  func foo() -> Int {}
+}
+
+func testCaptureBehavior(ptr : SomeClass) {
+  // Test normal captures.
+  weak var wv : SomeClass? = ptr
+  unowned var uv : SomeClass = ptr
+  unowned(unsafe) var uv1 : SomeClass = ptr
+  unowned(safe) var uv2 : SomeClass = ptr
+  doStuff { wv!.foo() }
+  doStuff { uv.foo() }
+  doStuff { uv1.foo() }
+  doStuff { uv2.foo() }
+
+  
+  // Capture list tests
+  var v1 : SomeClass? = ptr
+  var v2 : SomeClass = ptr
+
+  doStuff { [weak v1] in v1!.foo() }
+  doStuff { [weak v1,                 // expected-note {{previous}}
+             weak v1] in v1!.foo() }  // expected-error {{definition conflicts with previous value}}
+  doStuff { [unowned v2] in v2.foo() }
+  doStuff { [unowned(unsafe) v2] in v2.foo() }
+  doStuff { [unowned(safe) v2] in v2.foo() }
+  doStuff { [weak v1, weak v2] in v1!.foo() + v2!.foo() }
+
+  var i = 42
+  doStuff { [weak i] in i! }   // expected-error {{'weak' cannot be applied to non-class type 'Int'}}
+}
+
+extension SomeClass {
+  func bar() {
+    doStuff { [unowned self] in self.foo() }
+    doStuff { [unowned xyz = self.field!] in xyz.foo() }
+    doStuff { [weak xyz = self.field] in xyz!.foo() }
+  }
+}
+

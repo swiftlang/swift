@@ -1,65 +1,197 @@
-// RUN: %swift -repl < %s 2>&1 | FileCheck %s
+// RUN: %swift -parse -verify %s
+
+import Swift
 
 struct X {
-  func f0(i : Int) -> X { }
+  func f0(i: Int) -> X { }
 
-  func f1(i : Int) { }
-  func f1(f : Float) { }
+  func f1(i: Int) { }
+  mutating
+  func f1(f: Float) { }
 
-  func f2<T>(x : T) -> T { }
+  func f2<T>(x: T) -> T { }
+}
+
+struct Y<T> {
+  func f0(_: T) -> T {}
+  func f1<U>(x: U, y: T) -> (T, U) {}
 }
 
 var i : Int
 var x : X
+var yf : Y<Float>
 
-func g0(_ : ([byref] X) -> (Float) -> ()) {}
+func g0(_: (inout X) -> (Float) -> ()) {}
 
-// Simple member function access
-// CHECK: Constraints:
-// CHECK:   [byref(heap)] X[.f0: value] == $T0
-// CHECK:   $T0 == $T1 -> $T2
-// CHECK:   [byref(heap)] Int << $T1
-// CHECK: Type Variables:
-// CHECK:   $T0 as $T1 -> $T2
-// CHECK:   $T1 as (i : Int64)
-// CHECK:   $T2 as X
-// CHECK: SOLVED (completely)
-// CHECK: Unique solution found.
-:dump_constraints x.f0(i)
+x.f0(i)
+x.f0(i).f1(i)
+g0(X.f1)
+x.f0(x.f2(1))
+x.f0(1).f2(i)
+yf.f0(1)
+yf.f1(i, y: 1)
 
-// Overloaded member function access
-// CHECK: Constraints:
-// CHECK:   [byref(heap)] X[.f0: value] == $T0
-// CHECK:   $T0 == $T1 -> $T2
-// CHECK:   [byref(heap)] Int << $T1
-// CHECK:   $T2[.f1: value] == $T3
-// CHECK:   $T3 == $T4 -> $T5
-// CHECK:   [byref(heap)] Int << $T4
-// CHECK: ---Child system #1---
-// CHECK: Assumptions:
-// CHECK:     selected overload set #0 choice #0 for X.f1: $T3 == [byref] X -> (i : Int) -> ()
-// CHECK: Type Variables:
-// CHECK:   $T0 as $T1 -> $T2
-// CHECK:   $T1 as (i : Int64)
-// CHECK:   $T2 as X
-// CHECK:   $T3 as $T4 -> $T5
-// CHECK:   $T4 as (i : Int64)
-// CHECK:   $T5 as ()
-// CHECK: SOLVED (completely)
-// CHECK: Unique solution found.
-:dump_constraints x.f0(i).f1(i)
+// Module
+Swift.print(3)
 
-// CHECK: Constraints:
-// CHECK:   metatype<X>[.f1: value] == $T0
-// CHECK:   ([byref] X) -> (Float) -> () -> () == $T1 -> $T2
-// CHECK:   $T0 << $T1
-// CHECK: ---Child system #1---
-// CHECK: Assumptions:
-// CHECK:     selected overload set #0 choice #1 for metatype<X>.f1: $T0 == [byref] X -> (f : Float) -> ()
-// CHECK: Type Variables:
-// CHECK:   $T0 as [byref] X -> (f : Float) -> ()
-// CHECK:   $T1 as [byref] X -> Float -> ()
-// CHECK:   $T2 as ()
-// CHECK: SOLVED (completely)
-// CHECK: Unique solution found.
-:dump_constraints g0(X.f1)
+var format : String
+format.splitFirstIf({ $0.isAlpha() })
+
+// Archetypes
+func doReplPrint<T : ReplPrintable>(t: T) {
+  t.replPrint()
+}
+
+// Members referenced from inside the class
+struct Z {
+  var i : Int
+  func getI() -> Int { return i }
+
+  func curried(x: Int)(y: Int) -> Int { return x + y }
+
+  subscript (k : Int) -> Int {
+    get {
+      return i + k
+    }
+    mutating
+    set {
+      i -= k
+    }
+  }
+}
+
+struct GZ<T> {
+  var i : T
+  func getI() -> T { return i }
+
+  func f1<U>(a: T, b: U) -> (T, U) { 
+    return (a, b)
+  }
+  
+  func f2() {
+    var f : Float
+    var t = f1(i, b: f)
+    f = t.1
+
+    var zi = Z.i; // expected-error{{'Z.Type' does not have a member named 'i'}}
+  }
+}
+
+// Members of literals
+// FIXME: Crappy diagnostic
+"foo".lower() // expected-error{{could not find member 'lower'}}
+var tmp = "foo".lowercase
+
+// Members of modules
+var myTrue = Swift.true
+
+enum W {
+  case Omega
+
+  func foo(x: Int) {}
+  func curried(x: Int)(y: Int) {}
+}
+
+// Partial applications of struct or enum methods are not allowed
+var z = Z(i: 0)
+var getI = z.getI // expected-error{{partial application of struct method is not allowed}}
+var zi = z.getI()
+var zcurried1 = z.curried // expected-error{{partial application of struct method is not allowed}}
+var zcurried2 = z.curried(0) // expected-error{{partial application of struct method is not allowed}}
+var zcurriedFull = z.curried(0)(y: 1)
+
+var w = W.Omega
+var foo = w.foo // expected-error{{partial application of enum method is not allowed}}
+var fooFull : () = w.foo(0)
+var wcurried1 = w.curried // expected-error{{partial application of enum method is not allowed}}
+var wcurried2 = w.curried(0) // expected-error{{partial application of enum method is not allowed}}
+var wcurriedFull : () = w.curried(0)(y: 1)
+
+// Member of enum Type
+func enumMetatypeMember(opt: Int?) {
+  opt.None // expected-error{{'Int?' does not have a member named 'None'}}
+}
+
+// Reference a Type member. <rdar://problem/15034920>
+class G<T> {
+  class In {
+    class func foo() {}
+  }
+}
+
+func goo() {
+  G<Int>.In.foo()
+}
+
+protocol P {
+  func bar(x: Int)
+}
+
+func generic<T: P>(t: T) {
+  var bar = t.bar // expected-error{{partial application of generic method is not allowed}}
+  var barFull : () = t.bar(0)
+}
+
+func existential(p: P) {
+  var bar = p.bar // expected-error{{partial application of protocol method is not allowed}}
+  var barFull : () = p.bar(0)
+}
+
+@class_protocol protocol ClassP {
+  func bas(x: Int)
+}
+
+func genericClassP<T: ClassP>(t: T) {
+  var bas = t.bas
+  var barFull : () = t.bas(0)
+}
+
+func existentialClassP(p: ClassP) {
+  var bas = p.bas
+  var basFull : () = p.bas(0)
+}
+
+// <rdar://problem/15537772>
+struct DefaultArgs {
+  static func f(a: Int = 0) -> DefaultArgs {
+    return DefaultArgs()
+  }
+  init() {
+    self = .f()
+  }
+}
+
+
+class InstanceOrClassMethod {
+  func method() -> Bool { return true }
+  class func method(other: InstanceOrClassMethod) -> Bool { return false }
+}
+
+func testPreferClassMethodToCurriedInstanceMethod(obj: InstanceOrClassMethod) {
+  let result = InstanceOrClassMethod.method(obj)
+  let resultChecked: Bool = result // no-warning
+  let curried = InstanceOrClassMethod.method(obj) as () -> Bool
+}
+
+/* FIXME: We can't check this directly, but it can happen with
+multiple modules.
+
+class PropertyOrMethod {
+  func member() -> Int { return 0 }
+  let member = false
+
+  class func methodOnClass(obj: PropertyOrMethod) -> Int { return 0 }
+  let methodOnClass = false
+}
+
+func testPreferPropertyToMethod(obj: PropertyOrMethod) {
+  let result = obj.member
+  let resultChecked: Bool = result
+  let called = obj.member()
+  let calledChecked: Int = called
+  let curried = obj.member as () -> Int
+
+  let methodOnClass = PropertyOrMethod.methodOnClass
+  let methodOnClassChecked: (PropertyOrMethod) -> Int = methodOnClass
+}
+*/

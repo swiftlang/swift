@@ -21,3 +21,14 @@ func _makeSwiftNSFastEnumerationState() -> _SwiftNSFastEnumerationState {
       extra: (0, 0, 0, 0, 0))
 }
 
+/// A dummy value that is be used as the target for `mutationsPtr` in fast
+/// enumeration implementations.
+var _fastEnumerationStorageMutationsTarget: CUnsignedLong = 0
+
+/// A dummy pointer to be used as `mutationsPtr` in fast enumeration
+/// implementations.
+var _fastEnumerationStorageMutationsPtr: UnsafePointer<CUnsignedLong> {
+  return UnsafePointer(
+      Builtin.addressof(&_fastEnumerationStorageMutationsTarget))
+}
+

@@ -13,7 +13,7 @@ struct Y {
   init(i : Int, f : Float) {}
 }
 
-Y(1, 1.5)
+Y(i: 1, f: 1.5)
 
 // User-written memberwise constructor with default
 struct Z {
@@ -26,7 +26,7 @@ struct Z {
   }
 }
 
-Z(1, 2)
+Z(a: 1, b: 2)
 
 // User-written init suppresses implicit constructors.
 struct A {
@@ -38,13 +38,13 @@ struct A {
   }
 }
 
-A() // expected-error{{expression does not type-check}}
-A(1)
-A(1, 1) // expected-error{{expression does not type-check}}
+A() // expected-error{{missing argument for parameter 'x'}}
+A(x: 1)
+A(1, 1) // expected-error{{extra argument in call}}
 
 // No user-written constructors; implicit constructors are available.
 struct B {
-  var i : Int, j : Float
+  var i : Int = 0, j : Float = 0.0
 }
 extension B {
   init(x : Int) {
@@ -53,8 +53,8 @@ extension B {
   }
 }
 B()
-B(1)
-B(1, 2.5)
+B(x: 1)
+B(i: 1, j: 2.5)
 
 
 struct F {
@@ -77,16 +77,23 @@ extension D {
   init() { i = 17 }
 }
 
-F() // expected-error{{expression does not type-check}}
+F() // expected-error{{missing argument for parameter 'd'}}
 D() // okay
 B() // okay
-C() // expected-error{{expression does not type-check}}
+C() // expected-error{{missing argument for parameter 'd'}}
 
 struct E {
   init(x : Wonka) { } // expected-error{{use of undeclared type 'Wonka'}}
 }
 
 var e : E
+
+//----------------------------------------------------------------------------
+// Argument/parameter name separation
+//----------------------------------------------------------------------------
+class ArgParamSep {
+  init(_ b: Int, Int, forInt int: Int, c _: Int, d: Int) { }
+}
 
 //===---
 //===--- Tests for crashes.
@@ -95,7 +102,10 @@ var e : E
 //===--- rdar://14082378
 
 struct NoCrash1a {
-  init(NoCrash1b) {} // expected-error {{type annotation missing in pattern}}
+  init(NoCrash1b) {} // expected-error {{use of undeclared type 'NoCrash1b'}}
 }
 var noCrash1c : NoCrash1a
 
+class MissingDef {
+  init() // expected-error{{initializer requires a body}}
+}

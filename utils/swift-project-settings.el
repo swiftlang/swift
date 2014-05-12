@@ -175,6 +175,41 @@ LLVM header should look like.
 ")
     ))
 
+(define-skeleton llvm-divider
+  "Insert an llvm //===--- ... ---===// divider
+"
+  ;; prompt
+  "Text (RET for none): "
+
+  ;; v1 is comment-start without trailing whitespace.  Presumably
+  ;; nobody is crazy enough to define a language where whitespace
+  ;; determines whether something is a comment, but c++ mode and
+  ;; friends have a space at the end of comment-start, which messes up
+  ;; the LLVM header format.
+  ;;
+  ;; When there's no comment syntax defined, we use "//"; precedent is
+  ;; in the project's README file.
+  '(setq v1 (replace-regexp-in-string " +\\'" "" (or comment-start "//")))
+  
+  ;; v2 is either comment-end stripped of leading whitespace, or if it
+  ;; is non-empty, v1 all over again
+  '(setq v2
+         (replace-regexp-in-string "\\` +" ""
+          (if (and comment-end (> (length comment-end) 0)) comment-end  v1)))
+  
+  v1 "===--- "
+  str & " " | -1
+  '(setq v3 (length str))
+  
+  ;; Generate dashes to fill out the rest of the top line
+  (make-string
+   (max 3
+        (- 77 (current-column) (length v2)))
+   ?-)
+  
+  "===" v2
+  )
+
 (defvar swift-project-auto-insert-alist
   ;; Currently we match any file and insert the LLVM header.  We can
   ;; make the regexp more specific or filter based on mode if this

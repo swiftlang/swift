@@ -1,17 +1,25 @@
-// RUN: %swift -repl < %s 2>&1 | FileCheck %s
+// RUN: %swift -parse -verify %s
 
-func f0(x : [byref] Int);
-func f1<T>(x : [byref] T);
+func f0(inout x: Int) {}
+func f1<T>(inout x: T) {}
+func f2(inout x: X) {}
+func f2(inout x: Double) {}
+
+class Reftype {
+  var property: Double { get {} set {} }
+}
 
 struct X {
-  subscript (i : Int) -> Float { get {} set {} }
+  subscript(i: Int) -> Float { get {} set {} }
 
-  var property : Double { get {} set {} }
+  var property: Double { get {} set {} }
+
+  func genuflect() {}
 }
 
 struct Y {
-  subscript (i : Int) -> Float { get {} set {} }
-  subscript (f : Float) -> Int { get {} set {} }
+  subscript(i: Int) -> Float { get {} set {} }
+  subscript(f: Float) -> Int { get {} set {} }
 }
 
 var i : Int
@@ -19,73 +27,145 @@ var f : Float
 var x : X
 var y : Y
 
-// CHECK: Constraints:
-// CHECK:   (x : [byref] Int) -> () == $T0 -> $T1
-// CHECK:   [byref(heap)] Int << $T0
-// CHECK: ---Simplified constraints---
-// CHECK: Type Variables:
-// CHECK:   $T0 as (x : [byref] Int64)
-// CHECK:   $T1 as ()
-// CHECK: SOLVED (completely)
-// CHECK: Unique solution found.
-:dump_constraints f0(&i)
+@assignment func +=(inout lhs: X, rhs : X) {}
+@assignment func +=(inout lhs: Double, rhs : Double) {}
+@assignment @prefix func ++(inout rhs: X) {}
+@assignment @postfix func ++(inout lhs: X) {}
 
-// CHECK: Constraints:
-// CHECK:   (x : [byref] $T0) -> () == $T1 -> $T2
-// CHECK:   [byref(heap)] Int << $T1
-// CHECK: ---Simplified constraints---
-// CHECK: Type Variables:
-// CHECK:   $T0 as Int64
-// CHECK:   $T1 as (x : [byref] $T0)
-// CHECK:   $T2 as ()
-// CHECK: SOLVED (completely)
-// CHECK: Unique solution found.
-:dump_constraints f1(&i)
+f0(&i)
+f1(&i)
+f1(&x[i])
+f1(&x.property)
+f1(&y[i])
 
-// CHECK: Constraints:
-// CHECK:   [byref(heap)] X[.__subscript: value] == $T1 -> [byref] $T2
-// CHECK:   [byref(heap)] Int << $T1
-// CHECK:   (x : [byref] $T0) -> () == $T3 -> $T4
-// CHECK:   [byref] $T2 << $T3
-// CHECK: Type Variables:
-// CHECK:   $T0 equivalent to $T2
-// CHECK:   $T1 as (i : Int64)
-// CHECK:   $T2 as Float
-// CHECK:   $T3 as (x : [byref] $T0)
-// CHECK:   $T4 as ()
-// CHECK: SOLVED (completely)
-// CHECK: Unique solution found.
-:dump_constraints f1(&x[i])
+// Missing '&'
+f0(i) // expected-error{{passing value of type 'Int' to an inout parameter requires explicit '&'}}{{4-4=&}}
+f1(y[i]) // expected-error{{passing value of type 'Float' to an inout parameter requires explicit '&'}}
 
-// CHECK: Constraints:
-// CHECK:   [byref(heap)] X[.property: value] == $T1
-// CHECK:   (x : [byref] $T0) -> () == $T2 -> $T3
-// CHECK:   $T1 << $T2
-// CHECK: ---Simplified constraints---
-// CHECK: Type Variables:
-// CHECK:   $T0 as Double
-// CHECK:   $T1 as [byref(heap)] Double
-// CHECK:   $T2 as (x : [byref] $T0)
-// CHECK:   $T3 as ()
-// CHECK: SOLVED (completely)
-// CHECK: Unique solution found.
-:dump_constraints f1(&x.property)
+// Assignment operators
+x += x
+++x
 
-// CHECK: Constraints:
-// CHECK:   [byref(heap)] Int << $T1
-// CHECK: Unresolved overload sets:
-// CHECK:   set #0 binds $T1 -> [byref] $T2:
-// CHECK:     [byref(heap)] Y.__subscript: (i : Int) -> Float
-// CHECK:     [byref(heap)] Y.__subscript: (f : Float) -> Int
-// CHECK: ---Child system #1---
-// CHECK: Assumptions:
-// CHECK:     selected overload set #0 choice #0 for [byref(heap)] Y.__subscript: $T1 -> [byref] $T2 == (i : Int) -> Float
-// CHECK: Type Variables:
-// CHECK:   $T0 equivalent to $T2
-// CHECK:   $T1 as (i : Int64)
-// CHECK:   $T2 as Float
-// CHECK:   $T3 as (x : [byref] $T0)
-// CHECK:   $T4 as ()
-// CHECK: SOLVED (completely)
-// CHECK: Unique solution found.
-:dump_constraints f1(&y[i])
+var yi = y[i]
+
+// Non-settable lvalues
+// FIXME: better diagnostic!
+
+var non_settable_x : X {
+  return x
+}
+
+struct Z {
+  var non_settable_x: X { get {} }
+  var non_settable_reftype: Reftype { get {} }
+  var settable_x : X
+
+  subscript(i: Int) -> Double { get {} }
+  subscript((i: Int, j: Int)) -> X { get {} }
+}
+
+var z : Z
+
+func fz() -> Z {}
+func fref() -> Reftype {}
+
+// non-settable var is non-settable:
+// - assignment
+non_settable_x = x // expected-error{{}}
+// - inout (mono)
+f2(&non_settable_x) // expected-error{{}}
+// - inout (generic)
+f1(&non_settable_x) // expected-error{{}}
+// - inout assignment
+non_settable_x += x // expected-error{{}}
+++non_settable_x // expected-error{{}}
+
+// non-settable property is non-settable:
+z.non_settable_x = x // expected-error{{}}
+f2(&z.non_settable_x) // expected-error{{}}
+f1(&z.non_settable_x) // expected-error{{}}
+z.non_settable_x += x // expected-error{{}}
+++z.non_settable_x // expected-error{{}}
+
+// non-settable subscript is non-settable:
+z[0] = 0.0 // expected-error{{}}
+f2(&z[0]) // expected-error{{}}
+f1(&z[0]) // expected-error{{}}
+z[0] += 0.0 // expected-error{{}}
+++z[0] // expected-error{{}}
+
+// settable property of an rvalue value type is non-settable:
+fz().settable_x = x // expected-error{{}}
+f2(&fz().settable_x) // expected-error{{}}
+f1(&fz().settable_x) // expected-error{{}}
+fz().settable_x += x // expected-error{{}}
+++fz().settable_x // expected-error{{}}
+
+// settable property of an rvalue reference type IS SETTABLE:
+fref().property = 0.0
+f2(&fref().property)
+f1(&fref().property)
+fref().property += 0.0
+++fref().property
+
+// settable property of a non-settable value type is non-settable:
+z.non_settable_x.property = 1.0 // expected-error{{}}
+f2(&z.non_settable_x.property) // expected-error{{}}
+f1(&z.non_settable_x.property) // expected-error{{}}
+z.non_settable_x.property += 1.0 // expected-error{{}}
+++z.non_settable_x.property // expected-error{{}}
+
+// settable property of a non-settable reference type IS SETTABLE:
+z.non_settable_reftype.property = 1.0
+f2(&z.non_settable_reftype.property)
+f1(&z.non_settable_reftype.property)
+z.non_settable_reftype.property += 1.0
+++z.non_settable_reftype.property
+
+// regressions with non-settable subscripts in value contexts
+z[0] == 0
+var d : Double
+d = z[0]
+
+// regressions with subscripts that return generic types
+var xs:X[]
+var _ = xs[0].property
+
+struct A<T> {
+    subscript(i: Int) -> T { get {} }
+}
+
+struct B {
+    subscript(i: Int) -> Int { get {} }
+}
+
+var a:A<B>
+
+var _ = a[0][0]
+
+// Instance members of struct metatypes.
+struct FooStruct {
+  func instanceFunc0() {}
+}
+
+struct FooBarStruct {
+  @conversion func __conversion() -> FooStruct { }
+}
+
+func testFooStruct() {
+  FooStruct.instanceFunc0(FooStruct())()
+  FooStruct.instanceFunc0(FooBarStruct())()
+}
+
+// Don't load from explicit lvalues.
+func takesInt(x: Int) {} // expected-note{{in initialization of parameter 'x'}}
+func testInOut(inout arg: Int) {
+  var x : Int
+  takesInt(&x) // expected-error{{'inout Int' is not convertible to 'Int'}}
+}
+
+// Don't infer inout types.
+var ir = &i // expected-error{{type 'inout Int' of variable is not materializable}} \
+            // expected-error{{reference to 'Int' not used to initialize a inout parameter}}
+var ir2 = ((&i)) // expected-error{{type 'inout Int' of variable is not materializable}} \
+                 // expected-error{{reference to 'Int' not used to initialize a inout parameter}}

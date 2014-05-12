@@ -15,7 +15,7 @@ protocol SomeProtocol {
   typealias Foo
 }
 class SomeProtocolImpl : SomeProtocol {}
-typealias SomeTypealias = swift.Int
+typealias SomeTypealias = Swift.Int
 var someGlobal: Int
 func someFunc() {}
 

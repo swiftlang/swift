@@ -15,28 +15,20 @@ import SwiftShims
 // The empty array prototype.  We use the same object for all empty
 // [Native]Array<T>s.
 let emptyNSSwiftArray : NSSwiftArray
-  = reinterpretCast(NativeArrayBuffer<Int>(0,0))
+  = reinterpretCast(NativeArrayBuffer<Int>(count: 0, minimumCapacity: 0))
 
 // The class that implements the storage for a NativeArray<T>
 @final class NativeArrayStorage<T> : NSSwiftArray {
-  typealias Masquerade = HeapBufferStorage<ArrayBody,T>
+  typealias Buffer = NativeArrayBuffer<T>
+  
   deinit {
-    let b = HeapBuffer(
-      reinterpretCast(self) as Masquerade
-    )
-    for i in 0...b.value.count {
-      (b.elementStorage + i).destroy()
-    }
-    b._value.destroy()
+    let b = Buffer(self)
+    b.elementStorage.destroy(b.count)
+    b.base._value.destroy()
   }
 
-  @override func _objectAtIndex(indexAndUnused: (Int, Bool)) -> AnyObject {
-    let index = indexAndUnused.0
-    let b = HeapBuffer(
-      reinterpretCast(self) as Masquerade
-    )
-
-    return bridgeToObjectiveC((b.elementStorage + index).get())!
+  override var dynamicElementType: Any.Type {
+    return T.self
   }
 }
 
@@ -49,22 +41,22 @@ struct NativeArrayBuffer<T> : ArrayBufferType, LogicValue {
   {
     base = HeapBuffer(
       NativeArrayStorage<T>.self,
-      ArrayBody(),
+      _ArrayBody(),
       max(count, minimumCapacity))
 
-    base.value = ArrayBody(
-      count, base._capacity(), isBridgedVerbatimToObjectiveC(T.self))
+    var bridged = false
+    if _canBeClass(T.self) {
+      bridged = isBridgedVerbatimToObjectiveC(T.self)
+    }
+
+    base.value = _ArrayBody(count: count, capacity: base._capacity(),  
+                            elementTypeIsBridgedVerbatim: bridged)
   }
 
-  init(storage: NativeArrayStorage<T>?) {
+  init(_ storage: NativeArrayStorage<T>?) {
     base = reinterpretCast(storage)
   }
   
-  /// Append x to this buffer, growing it by 1 element.
-  mutating func append(x: T) {
-    self += x
-  }
-
   func getLogicValue() -> Bool {
     return base.getLogicValue()
   }
@@ -73,6 +65,12 @@ struct NativeArrayBuffer<T> : ArrayBufferType, LogicValue {
   /// element. Otherwise, nil.
   var elementStorage: UnsafePointer<T> {
     return base ? base.elementStorage : nil
+  }
+
+  /// A pointer to the first element, assuming that the elements are stored
+  /// contiguously.
+  var _unsafeElementStorage: UnsafePointer<T> {
+    return base.elementStorage
   }
 
   func withUnsafePointerToElements<R>(body: (UnsafePointer<T>)->R) -> R {
@@ -100,10 +98,10 @@ struct NativeArrayBuffer<T> : ArrayBufferType, LogicValue {
   }
 
   /// Adopt the storage of x
-  init(other: NativeArrayBuffer) {
-    self = other
+  init(_ buffer: NativeArrayBuffer) {
+    self = buffer
   }
-
+  
   mutating func requestUniqueMutableBuffer(minimumCapacity: Int)
     -> NativeArrayBuffer<Element>?
   {
@@ -117,21 +115,24 @@ struct NativeArrayBuffer<T> : ArrayBufferType, LogicValue {
     return self
   }
   
-  /// Convert to a NativeArrayBuffer storing the same elements.
-  func toNativeBuffer() -> NativeArrayBuffer<Element> {
-    return self
-  }
-  
   /// Get/set the value of the ith element
   subscript(i: Int) -> T {
     get {
       assert(i >= 0 && i < count, "Array index out of range")
-      return elementStorage[i]
+      // If the index is in bounds, we can assume we have storage.
+      return _unsafeElementStorage[i]
     }
-    @!mutating
-    set {
+    nonmutating set {
       assert(i >= 0 && i < count, "Array index out of range")
-      elementStorage[i] = newValue
+      // If the index is in bounds, we can assume we have storage.
+
+      // FIXME: Manually swap because it makes the ARC optimizer happy.  See
+      // <rdar://problem/16831852> check retain/release order
+      // _unsafeElementStorage[i] = newValue
+      var nv = newValue
+      let tmp = nv
+      nv = _unsafeElementStorage[i]
+      _unsafeElementStorage[i] = tmp
     }
   }
 
@@ -140,8 +141,7 @@ struct NativeArrayBuffer<T> : ArrayBufferType, LogicValue {
     get {
       return base ? base.value.count : 0
     }
-    @!mutating
-    set {
+    nonmutating set {
       assert(newValue >= 0)
       
       assert(
@@ -176,6 +176,7 @@ struct NativeArrayBuffer<T> : ArrayBufferType, LogicValue {
     for i in subRange {
       dst++.initialize(src++.get())
     }
+    _fixLifetime(owner)
     return dst
   }
   
@@ -184,10 +185,10 @@ struct NativeArrayBuffer<T> : ArrayBufferType, LogicValue {
   subscript(subRange: Range<Int>) -> SliceBuffer<T>
   {
     return SliceBuffer(
-      base.storage,
-      elementStorage + subRange.startIndex,
-      subRange.endIndex - subRange.startIndex,
-      true)
+      owner: base.storage,
+      start: elementStorage + subRange.startIndex,
+      count: subRange.endIndex - subRange.startIndex,
+      hasNativeBuffer: true)
   }
   
   /// Return true iff this buffer's storage is uniquely-referenced.
@@ -204,18 +205,36 @@ struct NativeArrayBuffer<T> : ArrayBufferType, LogicValue {
     return true
   }
 
-  /// Convert to an NSArray in O(1).  
-  /// Precondition: isBridgedToObjectiveC(Element.self)
+  /// Convert to an NSArray.
+  /// Precondition: T is bridged to Objective-C
+  /// O(1) if T is bridged verbatim, O(N) otherwise
   func asCocoaArray() -> CocoaArray {
     assert(
       isBridgedToObjectiveC(T.self),
       "Array element type is not bridged to ObjectiveC")
-    return count > 0 ? reinterpretCast(base.storage) : emptyNSSwiftArray
+    if count == 0 {
+      return emptyNSSwiftArray
+    }
+    if _fastPath(base.value.elementTypeIsBridgedVerbatim) {
+      return reinterpretCast(base.storage)
+    }
+    return NativeArray(self).map { bridgeToObjectiveC($0)! }.buffer.storage!
   }
   
   /// An object that keeps the elements stored in this buffer alive
   var owner: AnyObject? {
     return storage
+  }
+
+  /// A value that identifies first mutable element, if any.  Two
+  /// arrays compare === iff they are both empty, or if their buffers
+  /// have the same identity and count.
+  var identity: Word {
+    return reinterpretCast(elementStorage)
+  }
+  
+  var dynamicElementType: Any.Type {
+    return storage ? storage!.dynamicElementType : T.self
   }
   
   //===--- private --------------------------------------------------------===//
@@ -223,7 +242,7 @@ struct NativeArrayBuffer<T> : ArrayBufferType, LogicValue {
     return reinterpretCast(base.storage)
   }
   
-  typealias Base = HeapBuffer<ArrayBody,T>
+  typealias Base = HeapBuffer<_ArrayBody, T>
   var base: Base
 }
 
@@ -241,9 +260,11 @@ func += <
     (lhs.elementStorage + oldCount).initializeFrom(rhs)
   }
   else {
-    let newLHS = NativeArrayBuffer<T>(newCount, lhs.capacity * 2)
+    let newLHS = NativeArrayBuffer<T>(count: newCount, 
+                                      minimumCapacity: lhs.capacity * 2)
     if lhs.base {
-      newLHS.elementStorage.moveInitializeFrom(lhs.elementStorage, oldCount)
+      newLHS.elementStorage.moveInitializeFrom(lhs.elementStorage, 
+                                               count: oldCount)
       lhs.base.value.count = 0
     }
     lhs.base = newLHS.base
@@ -283,7 +304,7 @@ extension NativeArrayBuffer : Collection {
 func ~> <
   S: _Sequence_
 >(
-  source: S, _: (_AsNativeArrayBuffer,())
+  source: S, _: (_CopyToNativeArrayBuffer,())
 ) -> NativeArrayBuffer<S.GeneratorType.Element>
 {
   var result = NativeArrayBuffer<S.GeneratorType.Element>()
@@ -291,23 +312,21 @@ func ~> <
   // Using GeneratorSequence here essentially promotes the sequence to
   // a Sequence from _Sequence_ so we can iterate the elements
   for x in GeneratorSequence(source.generate()) {
-    result.append(x)
+    result += x
   }
   return result.take()
 }
 
 func ~> <  
-  // FIXME: <rdar://problem/16466357> prevents this from being ":
-  // Collection"
-  C: protocol<_Collection,_Sequence_>
+  C: Collection
 >(
-  source: C, _:(_AsNativeArrayBuffer, ())
+  source: C, _:(_CopyToNativeArrayBuffer, ())
 ) -> NativeArrayBuffer<C.GeneratorType.Element>
 {
-  return _collectionAsNativeArrayBuffer(source)
+  return _copyCollectionToNativeArrayBuffer(source)
 }
 
-func _collectionAsNativeArrayBuffer<C: protocol<_Collection,_Sequence_>>(
+func _copyCollectionToNativeArrayBuffer<C: protocol<_Collection,_Sequence_>>(
   source: C
 ) -> NativeArrayBuffer<C.GeneratorType.Element>
 {
@@ -334,22 +353,4 @@ protocol _ArrayType : Collection {
 
   typealias Buffer : ArrayBufferType
   var buffer: Buffer {get}
-}
-
-/*
-// FIXME: Disabled pending <rdar://problem/16509573>
-func ~> <
-  A: _ArrayType where A.Buffer.Element == A.Buffer.GeneratorType.Element
->(
-  source: A, _:(_AsNativeArrayBuffer,())
-) -> NativeArrayBuffer<A.Buffer.Element>
-{
-  return _toNativeArrayBuffer(source.buffer)
-}
-*/
-
-func asNativeArrayBuffer<S: Sequence>(source: S)
-  -> NativeArrayBuffer<S.GeneratorType.Element>
-{
-  return source~>_asNativeArrayBuffer()
 }

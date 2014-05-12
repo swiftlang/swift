@@ -1,10 +1,11 @@
-// RUN: rm -rf %t/clang-module-cache
-// RUN: %swift -module-cache-path=%t/clang-module-cache -sdk=%sdk -i %s | FileCheck %s
-// REQUIRES: sdk
+// RUN: %target-build-swift %s
+
+// FIXME: iOS does not have Cocoa.framework
+// REQUIRES: OS=macosx
 
 import Cocoa
 
 // Make sure the ObjectiveC adapter module gets imported, including ObjCSel.
-func rdar14759044(button : NSButton) -> Bool {
-  return button.action() == "abc" // no-warning
+func rdar14759044(obj: NSObject) -> Bool {
+  return obj.respondsToSelector("abc") // no-warning
 }

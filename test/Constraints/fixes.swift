@@ -43,3 +43,37 @@ func forgotCall() {
   var b = f7(f4, f1) // expected-error{{function produces expected type 'B'; did you mean to call it with '()'?}}{{16-16=()}}
   b.iAmAB()
 }
+
+/// Forgot the '!' to unwrap an optional.
+func parseInt() -> Int? { }
+
+func forgotOptionalBang(a: A, obj: AnyObject) {
+  var i: Int = parseInt() // expected-error{{value of optional type 'Int?' not unwrapped; did you mean to use '!' or '?'?}}{{26-26=!}}
+
+  var a = A(), b = B()
+  b = a as B  // expected-error{{value of optional type 'B?' not unwrapped; did you mean to use '!' or '?'?}}{{13-13=!}}
+}
+
+func forgotAnyObjectBang(obj: AnyObject) {
+  var a = A()
+  a = obj // expected-error{{type 'AnyObject' cannot be implicitly downcast; did you mean to use '!'?}}{{10-10=!}}
+}
+
+func increment(inout x: Int) { }
+
+func forgotAmpersand() {
+  var i = 5
+  increment(i) // expected-error{{passing value of type 'Int' to an inout parameter requires explicit '&'}}{{13-13=&}}
+
+  var array = [1,2,3]
+  increment(array[1]) // expected-error{{passing value of type 'Int' to an inout parameter requires explicit '&'}}{{13-13=&}}
+}
+
+func maybeFn() -> (Int -> Int)? { }
+
+func extraCall() {
+  var i = 7
+  i = i() // expected-error{{invalid use of '()' to call a value of non-function type 'Int'}}{{8-10=}}
+
+  maybeFn()(5) // expected-error{{value of optional type '(Int -> Int)?' not unwrapped; did you mean to use '!' or '?'?}}{{12-12=!}}
+}

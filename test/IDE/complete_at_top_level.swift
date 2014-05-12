@@ -3,16 +3,49 @@
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_CHECKED_EXPR_3 | FileCheck %s -check-prefix=TYPE_CHECKED_EXPR_3
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_CHECKED_EXPR_4 | FileCheck %s -check-prefix=TYPE_CHECKED_EXPR_4
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_CHECKED_EXPR_5 | FileCheck %s -check-prefix=TYPE_CHECKED_EXPR_5
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_CHECKED_EXPR_6 | FileCheck %s -check-prefix=PLAIN_TOP_LEVEL
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_VAR_INIT_1 | FileCheck %s -check-prefix=TOP_LEVEL_VAR_INIT_1
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_VAR_INIT_1 | FileCheck %s -check-prefix=TOP_LEVEL_VAR_INIT_1_NEGATIVE
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_VAR_INIT_1 | FileCheck %s -check-prefix=NEGATIVE
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_CHECKED_EXPR_KW_1 | FileCheck %s -check-prefix=TYPE_CHECKED_EXPR_KW_1
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE_CHECKED_EXPR_WITH_ERROR_IN_INIT_1 | FileCheck %s -check-prefix=TYPE_CHECKED_EXPR_WITH_ERROR_IN_INIT_1
+
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_VAR_INIT_1 > %t.toplevel.txt
+// RUN: FileCheck %s -check-prefix=TOP_LEVEL_VAR_INIT_1 < %t.toplevel.txt
+// RUN: FileCheck %s -check-prefix=TOP_LEVEL_VAR_INIT_1_NEGATIVE < %t.toplevel.txt
+// RUN: FileCheck %s -check-prefix=NEGATIVE < %t.toplevel.txt
+
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_VAR_INIT_2 | FileCheck %s -check-prefix=TOP_LEVEL_VAR_INIT_2
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=PLAIN_TOP_LEVEL_1 | FileCheck %s -check-prefix=PLAIN_TOP_LEVEL_1
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=PLAIN_TOP_LEVEL_1 | FileCheck %s -check-prefix=PLAIN_TOP_LEVEL
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=PLAIN_TOP_LEVEL_1 | FileCheck %s -check-prefix=NEGATIVE
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=PLAIN_TOP_LEVEL_2 | FileCheck %s -check-prefix=PLAIN_TOP_LEVEL_2
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=PLAIN_TOP_LEVEL_2 | FileCheck %s -check-prefix=PLAIN_TOP_LEVEL
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=PLAIN_TOP_LEVEL_2 | FileCheck %s -check-prefix=NEGATIVE
+
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_VAR_TYPE_1 > %t.toplevel.txt
+// RUN: FileCheck %s -check-prefix=TOP_LEVEL_VAR_TYPE_1 < %t.toplevel.txt
+// RUN: FileCheck %s -check-prefix=NEGATIVE < %t.toplevel.txt
+
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_STMT_1 | FileCheck %s -check-prefix=PLAIN_TOP_LEVEL
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_STMT_2 | FileCheck %s -check-prefix=PLAIN_TOP_LEVEL
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_STMT_3 | FileCheck %s -check-prefix=PLAIN_TOP_LEVEL
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_STMT_4 | FileCheck %s -check-prefix=PLAIN_TOP_LEVEL
+
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_STMT_5 > %t.toplevel.txt
+// RUN: FileCheck %s -check-prefix=PLAIN_TOP_LEVEL < %t.toplevel.txt
+// RUN: FileCheck %s -check-prefix=TOP_LEVEL_STMT_5 < %t.toplevel.txt
+
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_STMT_6 > %t.toplevel.txt
+// RUN: FileCheck %s -check-prefix=PLAIN_TOP_LEVEL < %t.toplevel.txt
+// RUN: FileCheck %s -check-prefix=TOP_LEVEL_STMT_6 < %t.toplevel.txt
+
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_STMT_7 > %t.toplevel.txt
+// RUN: FileCheck %s -check-prefix=PLAIN_TOP_LEVEL < %t.toplevel.txt
+// RUN: FileCheck %s -check-prefix=TOP_LEVEL_STMT_7 < %t.toplevel.txt
+
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_STMT_8 > %t.toplevel.txt
+// RUN: FileCheck %s -check-prefix=PLAIN_TOP_LEVEL < %t.toplevel.txt
+// RUN: FileCheck %s -check-prefix=TOP_LEVEL_STMT_8 < %t.toplevel.txt
+
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_STMT_9 | FileCheck %s -check-prefix=PLAIN_TOP_LEVEL
 
 // Test code completion in top-level code.
 //
@@ -20,12 +53,15 @@
 // completion results in general; that should be tested elsewhere.
 
 struct FooStruct {
-  var instanceVar : Int
+  var instanceVar = 0
 
-    // Add more stuff as needed.
+  func instanceFunc(a: Int) {}
+  // Add more stuff as needed.
 }
 
 var fooObject : FooStruct
+
+func erroneous1(x: Undeclared) {}
 
 //===--- Test code completions of expressions that can be typechecked.
 
@@ -36,8 +72,8 @@ func resyncParser1() {}
 
 fooObject#^TYPE_CHECKED_EXPR_1^#
 // TYPE_CHECKED_EXPR_1: Begin completions
-// TYPE_CHECKED_EXPR_1-NEXT: SwiftDecl: .instanceVar[#Int#]{{$}}
-// TYPE_CHECKED_EXPR_1-NEXT: Keyword: .metatype[#[byref(implicit)] FooStruct.metatype#]{{$}}
+// TYPE_CHECKED_EXPR_1-NEXT: Decl[InstanceVar]/CurrNominal: .instanceVar[#Int#]{{$}}
+// TYPE_CHECKED_EXPR_1-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc({#Int#})[#Void#]{{$}}
 // TYPE_CHECKED_EXPR_1-NEXT: End completions
 
 func resyncParser2() {}
@@ -47,67 +83,83 @@ var _tmpVar1 : FooStruct
 
 fooObject#^TYPE_CHECKED_EXPR_2^#
 // TYPE_CHECKED_EXPR_2: Begin completions
-// TYPE_CHECKED_EXPR_2-NEXT: SwiftDecl: .instanceVar[#Int#]{{$}}
-// TYPE_CHECKED_EXPR_2-NEXT: Keyword: .metatype[#[byref(implicit)] FooStruct.metatype#]{{$}}
+// TYPE_CHECKED_EXPR_2-NEXT: Decl[InstanceVar]/CurrNominal: .instanceVar[#Int#]{{$}}
+// TYPE_CHECKED_EXPR_2-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc({#Int#})[#Void#]{{$}}
 // TYPE_CHECKED_EXPR_2-NEXT: End completions
 
 func resyncParser3() {}
 
 fooObject#^TYPE_CHECKED_EXPR_3^#.bar
 // TYPE_CHECKED_EXPR_3: Begin completions
-// TYPE_CHECKED_EXPR_3-NEXT: SwiftDecl: .instanceVar[#Int#]{{$}}
-// TYPE_CHECKED_EXPR_3-NEXT: Keyword: .metatype[#[byref(implicit)] FooStruct.metatype#]{{$}}
+// TYPE_CHECKED_EXPR_3-NEXT: Decl[InstanceVar]/CurrNominal: .instanceVar[#Int#]{{$}}
+// TYPE_CHECKED_EXPR_3-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc({#Int#})[#Void#]{{$}}
 // TYPE_CHECKED_EXPR_3-NEXT: End completions
 
 func resyncParser4() {}
 
 fooObject.#^TYPE_CHECKED_EXPR_4^#
 // TYPE_CHECKED_EXPR_4: Begin completions
-// TYPE_CHECKED_EXPR_4-NEXT: SwiftDecl: instanceVar[#Int#]{{$}}
-// TYPE_CHECKED_EXPR_4-NEXT: Keyword: metatype[#[byref(implicit)] FooStruct.metatype#]{{$}}
+// TYPE_CHECKED_EXPR_4-NEXT: Decl[InstanceVar]/CurrNominal: instanceVar[#Int#]{{$}}
+// TYPE_CHECKED_EXPR_4-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc({#Int#})[#Void#]{{$}}
 // TYPE_CHECKED_EXPR_4-NEXT: End completions
 
 func resyncParser5() {}
 
 fooObject.#^TYPE_CHECKED_EXPR_5^#.bar
 // TYPE_CHECKED_EXPR_5: Begin completions
-// TYPE_CHECKED_EXPR_5-NEXT: SwiftDecl: instanceVar[#Int#]{{$}}
-// TYPE_CHECKED_EXPR_5-NEXT: Keyword: metatype[#[byref(implicit)] FooStruct.metatype#]{{$}}
+// TYPE_CHECKED_EXPR_5-NEXT: Decl[InstanceVar]/CurrNominal: instanceVar[#Int#]{{$}}
+// TYPE_CHECKED_EXPR_5-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc({#Int#})[#Void#]{{$}}
 // TYPE_CHECKED_EXPR_5-NEXT: End completions
 
-func resyncParser5a() {}
+func resyncParser6() {}
+
+fooObject.instanceFunc(#^TYPE_CHECKED_EXPR_6^#
+
+func resyncParser6() {}
 
 fooObject.is#^TYPE_CHECKED_EXPR_KW_1^#
 // TYPE_CHECKED_EXPR_KW_1: found code completion token
 // TYPE_CHECKED_EXPR_KW_1-NOT: Begin completions
 
-func resyncParser6() {}
+func resyncParser7() {}
+
+// We have an error in the initializer here, but the type is explicitly written
+// in the source.
+var fooObjectWithErrorInInit : FooStruct = unknown_var
+
+fooObjectWithErrorInInit.#^TYPE_CHECKED_EXPR_WITH_ERROR_IN_INIT_1^#
+// TYPE_CHECKED_EXPR_WITH_ERROR_IN_INIT_1: Begin completions
+// TYPE_CHECKED_EXPR_WITH_ERROR_IN_INIT_1-NEXT: Decl[InstanceVar]/CurrNominal: instanceVar[#Int#]{{$}}
+// TYPE_CHECKED_EXPR_WITH_ERROR_IN_INIT_1-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc({#Int#})[#Void#]{{$}}
+// TYPE_CHECKED_EXPR_WITH_ERROR_IN_INIT_1-NEXT: End completions
+
+func resyncParser6a() {}
 
 var topLevelVar1 = #^TOP_LEVEL_VAR_INIT_1^#
 // TOP_LEVEL_VAR_INIT_1: Begin completions
-// TOP_LEVEL_VAR_INIT_1-DAG: SwiftDecl: FooStruct[#FooStruct.metatype#]{{$}}
-// TOP_LEVEL_VAR_INIT_1-DAG: SwiftDecl: fooObject[#FooStruct#]{{$}}
+// TOP_LEVEL_VAR_INIT_1-DAG: Decl[Struct]/CurrModule: FooStruct[#FooStruct#]{{$}}
+// TOP_LEVEL_VAR_INIT_1-DAG: Decl[GlobalVar]/CurrModule: fooObject[#FooStruct#]{{$}}
 // TOP_LEVEL_VAR_INIT_1: End completions
 
 // Check that the variable itself does not show up.
-// TOP_LEVEL_VAR_INIT_1_NEGATIVE-NOT: SwiftDecl: topLevelVar1
+// TOP_LEVEL_VAR_INIT_1_NEGATIVE-NOT: topLevelVar1
 
 func resyncParser7() {}
 
 var topLevelVar2 = FooStruct#^TOP_LEVEL_VAR_INIT_2^#
 // TOP_LEVEL_VAR_INIT_2: Begin completions
-// TOP_LEVEL_VAR_INIT_2-NEXT: SwiftDecl: ({#instanceVar: Int#})[#FooStruct#]{{$}}
-// TOP_LEVEL_VAR_INIT_2-NEXT: SwiftDecl: ()[#FooStruct#]{{$}}
-// TOP_LEVEL_VAR_INIT_2-NEXT: Keyword: .metatype[#FooStruct.metatype.metatype#]{{$}}
+// TOP_LEVEL_VAR_INIT_2-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc({#self: FooStruct#})[#(Int) -> Void#]{{$}}
+// TOP_LEVEL_VAR_INIT_2-NEXT: Decl[Constructor]/CurrNominal: ({#instanceVar: Int#})[#FooStruct#]{{$}}
+// TOP_LEVEL_VAR_INIT_2-NEXT: Decl[Constructor]/CurrNominal: ()[#FooStruct#]{{$}}
 // TOP_LEVEL_VAR_INIT_2-NEXT: End completions
 
 func resyncParser8() {}
 
 #^PLAIN_TOP_LEVEL_1^#
-// PLAIN_TOP_LEVEL_1: Begin completions
-// PLAIN_TOP_LEVEL_1-DAG: SwiftDecl: FooStruct[#FooStruct.metatype#]{{$}}
-// PLAIN_TOP_LEVEL_1-DAG: SwiftDecl: fooObject[#FooStruct#]{{$}}
-// PLAIN_TOP_LEVEL_1: End completions
+// PLAIN_TOP_LEVEL: Begin completions
+// PLAIN_TOP_LEVEL-DAG: Decl[Struct]/CurrModule: FooStruct[#FooStruct#]{{$}}
+// PLAIN_TOP_LEVEL-DAG: Decl[GlobalVar]/CurrModule: fooObject[#FooStruct#]{{$}}
+// PLAIN_TOP_LEVEL: End completions
 
 func resyncParser9() {}
 
@@ -115,21 +167,103 @@ func resyncParser9() {}
 func _tmpFuncWithSyntaxError() { if return }
 
 #^PLAIN_TOP_LEVEL_2^#
-// PLAIN_TOP_LEVEL_2: Begin completions
-// PLAIN_TOP_LEVEL_2-DAG: SwiftDecl: FooStruct[#FooStruct.metatype#]{{$}}
-// PLAIN_TOP_LEVEL_2-DAG: SwiftDecl: fooObject[#FooStruct#]{{$}}
-// PLAIN_TOP_LEVEL_2: End completions
 
 func resyncParser10() {}
+
+//===--- Test code completions of types.
+
+func resyncParserA1() {}
+
+var topLevelVarType1 : #^TOP_LEVEL_VAR_TYPE_1^#
+// TOP_LEVEL_VAR_TYPE_1: Begin completions
+// TOP_LEVEL_VAR_TYPE_1-DAG: Decl[Struct]/CurrModule: FooStruct[#FooStruct#]{{$}}
+// TOP_LEVEL_VAR_TYPE_1: End completions
+
+func resyncParserA2() {}
+
+//===--- Test code completion in statements.
+
+func resyncParserB1() {}
+
+if (true) {
+  #^TOP_LEVEL_STMT_1^#
+}
+
+func resyncParserB2() {}
+
+while (true) {
+  #^TOP_LEVEL_STMT_2^#
+}
+
+func resyncParserB3() {}
+
+do {
+  #^TOP_LEVEL_STMT_3^#
+} while true
+
+func resyncParserB4() {}
+
+for ; ; {
+  #^TOP_LEVEL_STMT_4^#
+}
+
+func resyncParserB5() {}
+
+for var i = 0; ; {
+  #^TOP_LEVEL_STMT_5^#
+// TOP_LEVEL_STMT_5: Begin completions
+// TOP_LEVEL_STMT_5: Decl[LocalVar]/Local: i[#Int#]{{$}}
+// TOP_LEVEL_STMT_5: End completions
+}
+
+func resyncParserB6() {}
+
+for i in [] {
+  #^TOP_LEVEL_STMT_6^#
+// TOP_LEVEL_STMT_6: Begin completions
+// TOP_LEVEL_STMT_6: Decl[LocalVar]/Local: i[#<<error type>>#]{{$}}
+// TOP_LEVEL_STMT_6: End completions
+}
+
+func resyncParserB7() {}
+
+for i in [1, 2, 3] {
+  #^TOP_LEVEL_STMT_7^#
+// TOP_LEVEL_STMT_7: Begin completions
+// TOP_LEVEL_STMT_7: Decl[LocalVar]/Local: i[#Int#]{{$}}
+// TOP_LEVEL_STMT_7: End completions
+}
+
+func resyncParserB8() {}
+
+for i in unknown_var {
+  #^TOP_LEVEL_STMT_8^#
+// TOP_LEVEL_STMT_8: Begin completions
+// TOP_LEVEL_STMT_8: Decl[LocalVar]/Local: i[#<<error type>>#]{{$}}
+// TOP_LEVEL_STMT_8: End completions
+}
+
+func resyncParserB9() {}
+
+switch (0, 42) {
+  case (0, 0):
+    #^TOP_LEVEL_STMT_9^#
+}
+
+func resyncParserB10() {}
 
 //===--- Don't add any tests after this line.
 // These declarations should not show up in top-level code completion results
 // because forward references are not allowed at the top level.
+
+struct StructAtEOF {}
+// NEGATIVE-NOT: StructAtEOF
+
 extension FooStruct {
   func instanceFuncAtEOF() {}
-// NEGATIVE-NOT: SwiftDecl: {{.*}}instanceFuncAtEOF
+// NEGATIVE-NOT: instanceFuncAtEOF
 }
 
 var varAtEOF : Int
-// NEGATIVE-NOT: SwiftDecl: {{.*}}varAtEOF
+// NEGATIVE-NOT: varAtEOF
 

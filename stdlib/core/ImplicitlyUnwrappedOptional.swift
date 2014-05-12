@@ -27,7 +27,7 @@ struct ImplicitlyUnwrappedOptional<T>: LogicValue, Reflectable {
   var value: T? = .None
 
   init() { value = .None }
-  init(v : T?) { value = v }
+  init(_ v : T?) { value = v }
 
   static var None : ImplicitlyUnwrappedOptional {
     @transparent get {

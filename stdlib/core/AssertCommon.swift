@@ -1,21 +1,86 @@
-/// True if we are going to print a message about a failed assertion.
-///
-/// FIXME: this should be an atomic bool.
-var _in_assert_fail : Bool = false
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
 
-func _assert_fail(message: String, file: String, line: Int) {
-  if _in_assert_fail {
-    // Prevent recursive assertions.  This can happen if the original one was
-    // triggered by String or print().
-    //
-    // FIXME: this should be implemented with compare-and-exchange.
-    abort()
-  }
-  _in_assert_fail = true
-  if message.isEmpty() {
-    print("assertion failed: file \(file), line \(line)\n")
-  } else {
-    print("assertion failed: \(message): file \(file), line \(line)\n")
-  }
+// Implementation Note: this file intentionally uses very LOW-LEVEL
+// CONSTRUCTS, so that assert and fatal may be used liberally in
+// building library abstractions without fear of infinite recursion.
+//
+// FIXME: We could go farther with this simplification, e.g. avoiding
+// UnsafePointer
+
+@transparent
+func _isDebug() -> Bool {
+  // The values for the assert_configuration call are:
+  // 0 .. Debug
+  // 1 .. Release
+  // 2 .. Fast
+  return Int32(Builtin.assert_configuration()) == 0;
 }
 
+@transparent
+func _isRelease() -> Bool {
+  // The values for the assert_configuration call are:
+  // 0 .. Debug
+  // 1 .. Release
+  // 2 .. Fast
+  return Int32(Builtin.assert_configuration()) == 1;
+}
+
+@transparent
+func _isFast() -> Bool {
+  // The values for the assert_configuration call are:
+  // 0 .. Debug
+  // 1 .. Release
+  // 2 .. Fast
+  return Int32(Builtin.assert_configuration()) == 2;
+}
+
+@asmname("swift_reportFatalError")
+func _reportFatalError(
+  header: Builtin.RawPointer, headerLength: Builtin.Word, 
+  message: Builtin.RawPointer, messageLength: Builtin.Word,
+  file: Builtin.RawPointer, fileLength: Builtin.Word, 
+  line: UWord)
+
+@asmname("swift_reportUnimplementedInitializer")
+func _reportUnimplementedInitializer(
+  className: Builtin.RawPointer, classNameLength: Builtin.Word, 
+  file: Builtin.RawPointer, fileLength: Builtin.Word, 
+  line: UWord, column: UWord, 
+  initName: Builtin.RawPointer, initNameLength: Builtin.Word)
+
+@noreturn
+func _fatal_error_message(header: StaticString, message: StaticString, 
+                          file: StaticString, line: UWord) 
+{
+  _reportFatalError(header.start, header.byteSize, 
+                    message.start, message.byteSize, 
+                    file.start, file.byteSize, line)
+  
+  Builtin.int_trap()
+}
+
+/// Prints a fatal error message when a unimplemented initializer gets
+/// called by the Objective-C runtime.
+@noreturn
+func _unimplemented_initializer(className: StaticString,
+                                file: StaticString = __FILE__,
+                                line: UWord = __LINE__,
+                                column: UWord = __LINE__,
+                                initName: StaticString = __FUNCTION__) 
+{
+  _reportUnimplementedInitializer(className.start, className.byteSize, 
+                                 file.start, file.byteSize, line, column, 
+                                 initName.start, initName.byteSize)
+  
+  Builtin.int_trap()
+}

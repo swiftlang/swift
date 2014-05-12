@@ -2,20 +2,32 @@
 
 import Foundation
 
-val opaqueNil: COpaquePointer = nil
+let opaqueNil: COpaquePointer = nil
 if opaqueNil == nil {
   println("ok opaqueNil == nil")
   // CHECK: ok opaqueNil == nil
 }
 
-val unsafeNil: UnsafePointer<Int> = nil
+let unsafeNil: UnsafePointer<Int> = nil
 if unsafeNil == nil {
   println("ok unsafeNil == nil")
   // CHECK: ok unsafeNil == nil
 }
 
-val removed = NSFileManager.defaultManager().removeItemAtURL(NSURL(withString:"/this/file/does/not/exist"), error:nil)
+let removed = NSFileManager.defaultManager().removeItemAtURL(NSURL(string:"/this/file/does/not/exist"), error:nil)
 if !removed {
   println("ok !removed")
   // CHECK: ok !removed
 }
+
+var selNil: Selector = nil
+if selNil == nil { 
+  println("ok selNil == nil")
+  // CHECK: ok selNil == nil
+}
+selNil = Selector(nil)
+if selNil == nil { 
+  println("ok selNil == nil")
+  // CHECK: ok selNil == nil
+}
+

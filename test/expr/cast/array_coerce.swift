@@ -16,25 +16,30 @@ var ca: Array<C> = [c1]
 var da: Array<D> = [d1]
 
 ca = da
-da = ca // expected-error{{expression does not type-check}}
+da = ca // expected-error{{cannot convert the expression's type '()' to type 'Array<D>'}}
+
+var caa = [ca]
+var daa = [da]
+
+caa = daa // expected-error{{cannot convert the expression's type '()' to type 'Array<Array<C>>'}}
 
 // Array slice type
 var cas: C[] = [c1]
 var das: D[] = [d1]
 
 cas = das
-das = cas // expected-error{{expression does not type-check}}
+das = cas // expected-error{{cannot convert the expression's type '()' to type 'D[]'}}
 
 // Slice<T>
 var cs = ca[0..0]
 var ds = da[0..0]
 
-cs = ds
-ds = cs // expected-error{{expression does not type-check}}
+cs = ds // expected-error{{cannot convert the expression's type '()' to type 'Slice<C>'}}
+ds = cs // expected-error{{cannot convert the expression's type '()' to type 'Slice<D>'}}
 
 // NativeArray<T>
 var cna: NativeArray<C> = [c1]
 var dna: NativeArray<D> = [d1]
 
-cna = dna
-dna = cna // expected-error{{expression does not type-check}}}
+cna = dna // expected-error{{cannot convert the expression's type '()' to type 'NativeArray<C>'}}
+dna = cna // expected-error{{cannot convert the expression's type '()' to type 'NativeArray<D>'}}

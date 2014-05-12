@@ -40,6 +40,8 @@ func test1b(b : Bool) {
 enum MaybeInt {
   case None
   case Some(Int)
+
+  init(_ i: Int) { self = MaybeInt.Some(i) }
 }
 
 func test2(a: Int, b: Int, c: MaybeInt) {
@@ -56,6 +58,10 @@ enum ZeroOneTwoThree {
   case Two(Int, Int)
   case Three(Int,Int,Int)
   case Unknown(MaybeInt, MaybeInt, MaybeInt)
+
+  init (_ i: Int) { self = .One(i) }
+  init (_ i: Int, _ j: Int, _ k: Int) { self = .Three(i, j, k) }
+  init (_ i: MaybeInt, _ j: MaybeInt, _ k: MaybeInt) { self = .Unknown(i, j, k) }
 }
 
 func test3(a: ZeroOneTwoThree) {
@@ -75,22 +81,22 @@ func test3(a: ZeroOneTwoThree) {
   
   var h : ZeroOneTwoThree = .One(4)
   
-  var inf : (Int,Int) -> ZeroOneTwoThree = .Two // expected-error{{'((Int, Int) -> ZeroOneTwoThree).metatype' does not have a member named 'Two'}}
+  var inf : (Int,Int) -> ZeroOneTwoThree = .Two // expected-error{{'((Int, Int) -> ZeroOneTwoThree).Type' does not have a member named 'Two'}}
 }
 
 func test3a(a: ZeroOneTwoThree) {
   var e : ZeroOneTwoThree = (.Three(1, 2, 3))
   var f = ZeroOneTwoThree.Unknown(.None, .Some(4), .Some(32))
 
-  var g = .None  // expected-error {{expression does not type-check}}
+  var g = .None  // expected-error {{could not find member 'None'}}
 
   // Overload resolution can resolve this to the right constructor.
   var h = ZeroOneTwoThree(1)
 
   test3a;  // expected-error {{unused function}}
-  .Zero   // expected-error {{expression does not type-check}}
+  .Zero   // expected-error {{could not find member 'Zero'}}
   test3a   // expected-error {{unused function}}
-  (.Zero) // expected-error {{expression does not type-check}}
+  (.Zero) // expected-error {{could not find member 'Zero'}}
   test3a(.Zero)
 }
 
@@ -102,14 +108,11 @@ func test4() {
   var a : CGPoint
   // Note: we reject the following because it conflicts with the current
   // "init" hack.
-  var b = CGPoint.CGPoint(1, 2) // expected-error {{'CGPoint.metatype' does not have a member named 'CGPoint'}}
-  var c = CGPoint(y : 1, x : 2)   // Using injected name.
+  var b = CGPoint.CGPoint(1, 2) // expected-error {{'CGPoint.Type' does not have a member named 'CGPoint'}}
+  var c = CGPoint(x: 2, y : 1)   // Using injected name.
 
-  var d : Int =
-    CGPoint(y : 1, x : 2)   // expected-error {{'CGPoint' is not convertible to 'Int'}}
-
-  var e = CGPoint.x // expected-error {{'CGPoint.metatype' does not have a member named 'x'}}
-  var f = OtherPoint.x  // expected-error {{'OtherPoint.metatype' does not have a member named 'x'}}
+  var e = CGPoint.x // expected-error {{'CGPoint.Type' does not have a member named 'x'}}
+  var f = OtherPoint.x  // expected-error {{'OtherPoint.Type' does not have a member named 'x'}}
 }
 
 
@@ -141,12 +144,12 @@ func area(r: CGRect) -> Int {
 
 extension CGRect {
   func search(x: Int) -> CGSize {}
-  func bad_search(Int) -> CGSize {} // expected-error {{type annotation missing in pattern}}
+  func bad_search(Int) -> CGSize {}
 }
 
 func test5(myorigin: CGPoint) {
-  var x1 = CGRect(myorigin, CGSize(42, 123))
-  var x2 = CGRect(size : CGSize(width : 42, height:123), origin : myorigin)
+  var x1 = CGRect(origin: myorigin, size: CGSize(width: 42, height: 123))
+  var x2 = x1
 
   4+5
 
@@ -177,7 +180,6 @@ struct StructTest1 {
 
   typealias ElementType = Int
 }
-func +() {} // expected-error {{operators must have one or two arguments}}
 
 enum UnionTest1 {
   case x
@@ -190,18 +192,15 @@ enum UnionTest1 {
 
 
 extension UnionTest1 {
-  func foo() {}
+  func food() {}
   func bar() {}
 
-  // metatype method.
-  type func baz() {}
+  // Type method.
+  static func baz() {}
 }
 
 struct EmptyStruct {
   func foo() {}
-}
-
-type func global_static_func() {  // expected-error {{type functions may only be declared on a type}} {{1-6=}}
 }
 
 func f() { 
@@ -215,10 +214,10 @@ func f() {
 }
 
 func union_error(a: ZeroOneTwoThree) {
-  var t1 : ZeroOneTwoThree = .Zero(1) // expected-error {{'$T0 -> ZeroOneTwoThree' is not identical to 'ZeroOneTwoThree'}}
-  var t2 : ZeroOneTwoThree = .One // expected-error {{expression does not type-check}}
-  var t3 : ZeroOneTwoThree = .foo // expected-error {{'ZeroOneTwoThree.metatype' does not have a member named 'foo'}}
-  var t4 : ZeroOneTwoThree = .foo() // expected-error {{'ZeroOneTwoThree.metatype' does not have a member named 'foo'}}
+  var t1 : ZeroOneTwoThree = .Zero(1) // expected-error {{'($T0) -> $T3' is not identical to 'ZeroOneTwoThree'}}
+  var t2 : ZeroOneTwoThree = .One // expected-error {{could not find member 'One'}}
+  var t3 : ZeroOneTwoThree = .foo // expected-error {{'ZeroOneTwoThree.Type' does not have a member named 'foo'}}
+  var t4 : ZeroOneTwoThree = .foo() // expected-error {{'ZeroOneTwoThree.Type' does not have a member named 'foo'}}
 }
 
 func local_struct() {
@@ -248,6 +247,6 @@ var %% : distance -> distance // expected-error {{expected pattern}}
 
 func badTupleElement() {
   typealias X = (x : Int, y : Int)
-  var y = X.y // expected-error{{'X.metatype' does not have a member named 'y'}}
-  var z = X.z // expected-error{{'X.metatype' does not have a member named 'z'}}
+  var y = X.y // expected-error{{'X.Type' does not have a member named 'y'}}
+  var z = X.z // expected-error{{'X.Type' does not have a member named 'z'}}
 }

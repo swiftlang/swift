@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+/// Buffer type for Slice<T>
 struct SliceBuffer<T> : ArrayBufferType {
   typealias Element = T
   typealias NativeStorage = NativeArrayStorage<T>
@@ -33,10 +34,10 @@ struct SliceBuffer<T> : ArrayBufferType {
     _invariantCheck()
   }
   
-  init(x: NativeBuffer) {
-    owner = x.storage
-    start = x.elementStorage
-    _countAndFlags = (UInt(x.count) << 1) | 1
+  init(_ buffer: NativeBuffer) {
+    owner = buffer.storage
+    start = buffer.elementStorage
+    _countAndFlags = (UInt(buffer.count) << 1) | 1
     _invariantCheck()
   }
 
@@ -62,33 +63,53 @@ struct SliceBuffer<T> : ArrayBufferType {
     return NativeBuffer(owner as NativeStorage)
   }
   
+  /// A value that identifies first mutable element, if any.  Two
+  /// arrays compare === iff they are both empty, or if their buffers
+  /// have the same identity and count.
+  var identity: Word {
+    return reinterpretCast(start)
+  }
+  
+  
+  /// An object that keeps the elements stored in this buffer alive
   var owner: AnyObject?
   var start: UnsafePointer<T>
   var _countAndFlags: UInt
 
   //===--- Non-essential bits ---------------------------------------------===//
-  //extension SliceBuffer : ArrayBufferType {
   
   func asCocoaArray() -> CocoaArray {
-    // It's tempting to allocate a new instance of an NSArray subclass
-    // that just wraps this Slice.  However, since we don't have a
-    // managedByCopyOnWrite bit in the dynamically-allocated storage,
-    // and we are in principle part of a mutable object, we need to
-    // copy eagerly in most cases.  The one exception is when our
-    // owner is nil.  We could think about doing that optimization
-    // someday.
     assert(
       isBridgedToObjectiveC(T.self),
       "Array element type is not bridged to ObjectiveC")
     _invariantCheck()
-    
-    // FIXME: can't write this pending <rdar://problem/16397774>:
-    // return asArray(UnsafeArray(start, count)) as NativeArray<T>
-    var result = NativeArrayBuffer<T>()
-    result += UnsafeArray(start, count)
-    return result.asCocoaArray()
+
+    return _extractOrCopyToNativeArrayBuffer(self).asCocoaArray()
   }
 
+  mutating func requestUniqueMutableBuffer(minimumCapacity: Int)
+    -> NativeBuffer?
+  {
+    _invariantCheck()
+    if _fastPath(_hasNativeBuffer && Swift.isUniquelyReferenced(&owner)) {
+      if capacity >= minimumCapacity {
+        return reinterpretCast(owner) as NativeBuffer
+      }
+    }
+    return nil
+  }
+
+  /// If this buffer is backed by a NativeArrayBuffer, return it.
+  /// Otherwise, return nil.  Note: the result's elementStorage may
+  /// not match ours, since we are a SliceBuffer.
+  func requestNativeBuffer() -> NativeArrayBuffer<Element>? {
+    _invariantCheck()
+    if _fastPath(_hasNativeBuffer) {
+      return  reinterpretCast(owner) as NativeBuffer
+    }
+    return nil
+  }
+  
   func _uninitializedCopy(
     subRange: Range<Int>, var target: UnsafePointer<T>
   ) -> UnsafePointer<T> {
@@ -100,6 +121,10 @@ struct SliceBuffer<T> : ArrayBufferType {
       target++.initialize(start[i])
     }
     return target
+  }
+
+  var elementStorage: UnsafePointer<T> {
+    return start
   }
 
   var count: Int {
@@ -133,20 +158,15 @@ struct SliceBuffer<T> : ArrayBufferType {
     return Swift.isUniquelyReferenced(&owner)
   }
 
-  func isMutable() -> Bool {
-    return _hasNativeBuffer
-  }
-  
   subscript(i: Int) -> T {
     get {
       assert(i >= 0, "negative slice index is out of range")
       assert(i < count, "slice index out of range")
       return start[i]
     }
-    set {
+    nonmutating set {
       assert(i >= 0, "negative slice index is out of range")
       assert(i < count, "slice index out of range")
-      assert(isMutable())
       start[i] = newValue
     }
   }
@@ -156,7 +176,27 @@ struct SliceBuffer<T> : ArrayBufferType {
     assert(subRange.endIndex >= subRange.startIndex)
     assert(subRange.endIndex <= count)
     return SliceBuffer(
-      owner, start + subRange.startIndex,
-      subRange.endIndex - subRange.startIndex, _hasNativeBuffer)
+      owner: owner, start: start + subRange.startIndex,
+      count: subRange.endIndex - subRange.startIndex, 
+      hasNativeBuffer: _hasNativeBuffer)
+  }
+
+  //===--- Collection conformance -----------------------------------------===//
+  var startIndex: Int {
+    return 0
+  }
+  
+  var endIndex: Int {
+    return count
+  }
+
+  func generate() -> IndexingGenerator<SliceBuffer> {
+    return IndexingGenerator(self)
+  }
+
+  //===--- misc -----------------------------------------------------------===//
+  func withUnsafePointerToElements<R>(body: (UnsafePointer<T>)->R) -> R {
+    let start = self.start
+    return owner ? withExtendedLifetime(owner!) { body(start) } : body(start)
   }
 }

@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// \brief Wrapper for a contiguous array of T.  UnsafeArray is both a
+/// Wrapper for a contiguous array of T.  UnsafeArray is both a
 /// Collection—which is multi-pass if you use indices or call
 /// generate() on it—and a Generator, which can only be assumed to be
 /// single-pass.  It's not clear how well this combination will work
@@ -18,10 +18,6 @@
 /// this an experiment.
 struct UnsafeArray<T> : Collection, Generator {
 
-  func countElements() -> Int {
-    return endIndex - startIndex
-  }
-  
   var startIndex: Int {
     return 0
   }

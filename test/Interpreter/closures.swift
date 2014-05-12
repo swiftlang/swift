@@ -1,14 +1,14 @@
-// RUN: %swift -i %s | FileCheck %s
+// RUN: %target-run-simple-swift | FileCheck %s
 
-func localFunc(x:Int) -> Int {
-  func addToX(y:Int) -> Int {
+func localFunc(x: Int) -> Int {
+  func addToX(y: Int) -> Int {
     return x + y
   }
   return addToX(1)
 }
 
-func localFunc2(x:Int) -> (y:Int) -> Int {
-  func addToX(y:Int) -> Int {
+func localFunc2(x: Int) -> (y: Int) -> Int {
+  func addToX(y: Int) -> Int {
     return x + y
   }
   return addToX
@@ -19,7 +19,7 @@ func test() {
   // CHECK: 3
   println(localFunc(2))
   // CHECK: 5
-  println(localFunc2(2)(3))
+  println(localFunc2(2)(y: 3))
 
   var lf = localFunc
   // CHECK: 8
@@ -28,7 +28,7 @@ func test() {
   var lf2 = localFunc2
   var lf2_ = lf2(5)
   // CHECK: 13
-  println(lf2_(8))
+  println(lf2_(y: 8))
 }
 
 test()

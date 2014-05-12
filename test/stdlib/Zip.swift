@@ -1,25 +1,27 @@
-// RUN: %swift -i -constraint-checker %s
+// RUN: %target-run-simple-swift | FileCheck %s
+
 var n = [2, 3, 5, 7, 11]
 var s = ["two", "three", "five", "seven", "eleven", "thirteen"]
 
 var i = 0
+var prefix = ""
 for p in Zip2(n, s) {
-    println("\(p.0)\t\(p.1)")
-    assert( p.0 == n[i] )
-    assert( p.1 == s[i] )
+    print("\(prefix)\(p.0) => \(p.1)")
     ++i
+    prefix = ", "
 }
-
-assert(i == n.length)
+println(" (\(i) items)")
+// CHECK: 2 => two, 3 => three, 5 => five, 7 => seven, 11 => eleven (5 items)
 
 i = 0
+prefix = ""
 for p in Zip2(s, n) {
-    println("\(p.0)\t\(p.1)")
-    assert( p.1 == n[i] )
-    assert( p.0 == s[i] )
+    print("\(prefix)\(p.0) => \(p.1)")
     ++i
+    prefix = ", "
 }
-assert(i == n.length)
+println(" (\(i) items)")
+// CHECK: two => 2, three => 3, five => 5, seven => 7, eleven => 11 (5 items)
 
 println("done.")
 

@@ -5,22 +5,22 @@
 //===----------------------------------------------------------------------===//
 
 struct X {
-  @conversion def __conversion(value: Int = 17) -> Y { }
+  @conversion func __conversion(value: Int = 17) -> Y { }
 }
 
 struct Y {
-  @conversion def __conversion() -> String {}
+  @conversion func __conversion() -> String {}
 }
 
-def produce_X() -> X {}
+func produce_X() -> X {}
 
-def produce_X(x: Int) -> X {}
-def produce_X(x: X) -> X {}
+func produce_X(x: Int) -> X {}
+func produce_X(x: X) -> X {}
 
-def accept_y(y: Y) {}
+func accept_y(y: Y) {}
 
-def test(x: X, y: Y) {
-  accept_y(x);
+func test(x: X, inout y: Y) {
+  accept_y(x)
   accept_y(y)
   y = x
   var y2 : Y = x
@@ -34,21 +34,21 @@ def test(x: X, y: Y) {
 // Test string conversions
 //===----------------------------------------------------------------------===//
 struct OtherString {
-  @conversion def __conversion() -> String { }
+  @conversion func __conversion() -> String { }
 
-  static def convertFromStringLiteral(s: String) -> OtherString {
+  static func convertFromStringLiteral(s: String) -> OtherString {
     return s
   }
 }
 
 extension String {
-  @conversion def __conversion() -> OtherString { }
+  @conversion func __conversion() -> OtherString { }
 }
 
-def acceptOtherString(other: OtherString) {}
-def acceptString(s: String) {}
+func acceptOtherString(other: OtherString) {}
+func acceptString(s: String) {}
 
-def testStrings(s: String, other: OtherString) {
+func testStrings(s: String, other: OtherString) {
   acceptOtherString(other)
   acceptOtherString(s)
   acceptString(s)
@@ -61,39 +61,40 @@ def testStrings(s: String, other: OtherString) {
 // Errors in the declaration of conversion functions
 //===----------------------------------------------------------------------===//
 struct Z {
-  @conversion static def conv() -> Int {} // expected-error{{conversion function 'conv' is not an instance method}}
+  @conversion static func conv() -> Int {} // expected-error{{conversion function 'conv' is not an instance method}}
 
-  @conversion def conv(i: Int) -> Float {} // expected-error{{conversion function 'conv' has non-defaulted parameters}}
+  @conversion func conv(i: Int) -> Float {} // expected-error{{conversion function 'conv' has non-defaulted parameters}}
 }
 
 //===----------------------------------------------------------------------===//
 // Errors in the semantic analysis of conversions
 //===----------------------------------------------------------------------===//
 struct Chain1 {
-  @conversion def __conversion() -> Chain2 {}
+  @conversion func __conversion() -> Chain2 {}
 }
 
 struct Chain2 {
-  @conversion def __conversion() -> Chain3 {}
+  @conversion func __conversion() -> Chain3 {}
 }
 
 struct Chain3 {
 }
 
-def getChain1() -> Chain1 {}
+func getChain1() -> Chain1 {}
 
-def test_chain(c1: Chain1, c2: Chain2, c3: Chain3) {
+func test_chain(var c1: Chain1, inout c2: Chain2, inout c3: Chain3) {
   c2 = c1; // okay
-  c3 = c1; // expected-error{{'Chain2' is not a subtype of 'Chain3'}}
+  c3 = c1; // expected-error{{cannot convert the expression's type '()' to type 'Chain3'}}
   var c3a : Chain2 = c1; // okay
-  var c3b : Chain3 = c1; // expected-error{{'Chain2' is not a subtype of 'Chain3'}}
+  var c3b : Chain3 = c1; // expected-error{{cannot convert the expression's type '@lvalue Chain1' to type 'Chain3'}}
   c2 = getChain1(); // okay
   c3 = getChain1(); // expected-error{{'Chain2' is not a subtype of 'Chain3'}}
 }
 
-def acceptYReference(y : @inout Y) {} // expected-note{{in initialization of parameter 'y'}}
+func acceptYReference(inout y: Y) {} // expected-note {{in initialization of parameter 'y'}}
 
-def testInOut(x: X) {
-  acceptYReference(x) // expected-error{{expression does not type-check}}
-  acceptYReference(&x) // expected-error{{'X' is not identical to 'Y'}}
+func testInOut(x: X) {
+  var x2 = x
+  acceptYReference(x2) // expected-error{{cannot convert the expression's type '()' to type 'inout Y'}}
+  acceptYReference(&x2) // expected-error{{'X' is not identical to 'Y'}}
 }

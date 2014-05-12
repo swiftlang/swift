@@ -1,6 +1,6 @@
-// RUN: %swift -parse %s -module-name themodule -I=%S/.. -sdk= -verify
+// RUN: %swift -parse %s -module-name themodule -enable-source-import -I=%S/../decl -sdk "" -verify -show-diagnostics-after-fatal
 
-import swift
+import Swift
 import nonexistentimport  // expected-error {{no such module 'nonexistentimport'}}
 
 //===----------------------------------------------------------------------===//
@@ -10,8 +10,8 @@ import nonexistentimport  // expected-error {{no such module 'nonexistentimport'
 // Imported from swift stdlib.
 var importedtype : Int
 
-// Imported from data module.
-import union data.unionSearchFlags
+// Imported from enumtest module.
+import enum enumtest.unionSearchFlags
 var importedunion : unionSearchFlags = .Backwards
 
 
@@ -22,17 +22,17 @@ var notimported : MaybeInt // expected-error {{use of undeclared type 'MaybeInt'
 // Name binding stress test
 //===----------------------------------------------------------------------===//
 
-var callee1 : () -> (Int,Int,Int)           // expected-error{{default-initialize}} Takes nothing, returns tuple.
+var callee1 : () -> (Int,Int,Int)           // Takes nothing, returns tuple.
 
 func test_shadowing() {
   // Shadow Int.
-  union Int { case xyz; case abc }
+  enum Int { case xyz; case abc }
   // We get the shadowed version of Int.
   var x : Int = .abc
 }
 
 func unknown_member() {
-  var error = swift.nonexistent_member // expected-error {{'module<swift>' does not have a member named 'nonexistent_member'}}
+  var error = Swift.nonexistent_member // expected-error {{module 'Swift' has no member named 'nonexistent_member'}}
 }
 
 //===----------------------------------------------------------------------===//
@@ -50,8 +50,8 @@ func test_varname_binding() {
   var (d, e) = (c.1, c.0)
   var ((), (g1, g2), h) = ((), (e, d), e)
   var (j, k, l) = callee1()
-  var (m, n) = callee1() // expected-error{{tuple pattern has the wrong length for tuple type '(Int, Int, Int)'}}
-  var (o, p, q, r) = callee1() // expected-error{{tuple pattern has the wrong length for tuple type '(Int, Int, Int)'}}
+  var (m, n) = callee1() // expected-error{{different number of elements}}
+  var (o, p, q, r) = callee1() // expected-error{{different number of elements}}
 }
 
 //===----------------------------------------------------------------------===//
@@ -63,7 +63,7 @@ func test_varname_binding() {
 var x : x_ty  // expected-error {{use of undeclared type 'x_ty'}}
 typealias x_ty = Int
 
-// We allow namebinding to look forward past a func declaration (and other
+// We allow namebinding to look forward past a function declaration (and other
 // declarations which never have side-effects) in the main module
 func fy() -> y_ty { return 1 }
 typealias y_ty = Int
@@ -73,7 +73,7 @@ typealias y_ty = Int
 
 // FIXME: Should reject this (has infinite size or is tautological depend on
 // how you look at it).
-union y {
+enum y {
   case y
   case Int
 }
@@ -98,21 +98,7 @@ func func3() {
 // Overloading
 //===----------------------------------------------------------------------===//
 
-// Valid overload set.
-var ov_fn : (Int) -> () {} // expected-error{{default-initialize}} 
-var ov_fn : () -> () {} // expected-error{{default-initialize}} 
-
-var ov_var : Int
-var ov_var : ()
-
- var ov_var_use : Int = ov_var
-
-func [infix] fn_binary(lhs : Int, rhs : Int) {}  // expected-error {{only operator functions may be declared with an infix attribute}}
-
-
-// Redefinition of the same function.
-typealias name_redef = Int // expected-note {{'name_redef' previously declared here}}
-func name_redef() {} // expected-error {{invalid redeclaration}}
+@infix func fn_binary(lhs: Int, rhs: Int) {}  // expected-error {{only operator functions may be declared with an infix attribute}}
 
 struct a_struct { var x : Int }
 
@@ -121,32 +107,20 @@ operator infix *** {
   precedence 97
 }
 
-func ***(lhs : Int, rhs : Int) -> Int {
+func ***(lhs: Int, rhs: Int) -> Int {
   return 4
 }
-func ***(lhs : a_struct, rhs : a_struct) {}
-func ***(lhs : a_struct, rhs : (Int) -> Int) {}
+func ***(lhs: a_struct, rhs: a_struct) {}
+func ***(lhs: a_struct, rhs: (Int) -> Int) {}
 
-
-var ov_fn2 : (Int) -> (Int) -> Int // expected-error{{default-initialize}} 
-var ov_fn2 : (Int) -> (a_struct) -> Int // expected-error{{default-initialize}} 
 
 func ov_fn_result() -> Int {}
 func ov_fn_result() -> Double {}
 
+func ov_fn_result2() -> (Int) -> (Int) -> Int {}
+func ov_fn_result2() -> (Int) -> (a_struct) -> Int {}
 
-func overloadtest(x : Int) {
-  // These resolve to the right thing, based on context.
-  var a : Int = ov_var
-  var b : () = ov_var
-  var c : Int = 4*ov_var
-  var d : Int = ov_var*4
-  var e : (Int) -> Int = { $0 + ov_var }  // closure.
-
-  // These resolve to the right thing, based on their argument.
-  ov_fn(x)
-  ov_fn()
-
+func overloadtest(x: Int) {
   var f1 : Int = ((ov_fn_result))()
   var f2 : Double = ((ov_fn_result))()
 
@@ -156,8 +130,8 @@ func overloadtest(x : Int) {
   s *** s     // Resolved to the *** operator that takes a_struct.
   s *** {$0 + 4}     // Closure obviously not a struct.
 
-  ov_fn2(4)(4)  // picks the ov_fn2 taking an Int.
-  ov_fn2(4)(s)  // picks the ov_fn2 taking a_struct.  
+  ov_fn_result2()(4)(4)  // picks the ov_fn_result2 taking an Int.
+  ov_fn_result2()(4)(s)  // picks the ov_fn_result2 taking a_struct.
 }
 
 func localtest() {
@@ -194,3 +168,42 @@ for _ in [1] { }
 //===----------------------------------------------------------------------===//
 var qualifiedvalue : Int = themodule.importedtype
 var qualifiedtype : themodule.x_ty = 5
+
+
+operator prefix +++ {}
+operator postfix +++ {}
+
+operator prefix ++ {}
+operator postfix ++ {}
+
+@assignment @prefix func +++(inout a: Int) { a += 2 }
+@assignment @postfix func +++(inout a: Int) { a += 2 }
+
+var test = 0
++++test
+test+++
+
+
+//===----------------------------------------------------------------------===//
+// Forward references to local variables.
+//===----------------------------------------------------------------------===//
+
+func forwardReference() {
+  x = 0 // expected-error{{use of local variable 'x' before its declaration}}
+  var x: Float = 0.0 // expected-note{{'x' declared here}}
+}
+
+class ForwardReference {
+  var x: Int = 0
+
+  func test() {
+    x = 0 // expected-error{{use of local variable 'x' before its declaration}}
+    var x: Float = 0.0 // expected-note{{'x' declared here}}
+  }
+}
+
+func questionablyValidForwardReference() { print(qvfrVar); }; var qvfrVar: Int = 0
+
+// FIXME: This should warn too.
+print(forwardReferenceVar); var forwardReferenceVar: Int = 0
+

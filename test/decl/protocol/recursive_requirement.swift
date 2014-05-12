@@ -1,7 +1,7 @@
 // RUN: %swift -parse %s -verify
 
 protocol Foo {
-  typealias Bar : Foo // expected-note {{protocol requires nested type 'Bar'}} expected-error 2 {{type may not reference itself as a requirement}}
+  typealias Bar : Foo // expected-note {{protocol requires nested type 'Bar'}}
 }
 
 struct Oroborous : Foo { // expected-error {{type 'Oroborous' does not conform to protocol 'Foo'}}

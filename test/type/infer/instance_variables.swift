@@ -6,7 +6,7 @@ struct X {
   var d : Dictionary = [0 : "Zero", 1 : "One", 2 : "Two" ]
 }
 
-def testX(x : X) {
+func testX(inout x: X) {
   x.b = false
   x.i = 5
   x.d[3] = "Three"

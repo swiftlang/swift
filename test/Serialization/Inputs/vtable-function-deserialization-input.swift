@@ -17,7 +17,7 @@ class A {
 
   init() {
     y = Y()
-    x = X<Y>(y)
+    x = X<Y>(_a: y)
   }
 
   func doSomething() {

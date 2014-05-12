@@ -13,7 +13,7 @@
 // RUN-DISABLED: %target-run-simple-swift | FileCheck %s
 // RUN: rm -rf %t && mkdir -p %t && %S/../../utils/gyb %s -o %t/NewArray.swift
 // RUN: %S/../../utils/line-directive %t/NewArray.swift -- %target-build-swift -module-cache-path %t/clang-module-cache %t/NewArray.swift -o %t/a.out
-// RUN: %target-run %t/a.out | FileCheck %s
+// RUN: %target-run %t/a.out | %S/../../utils/line-directive %t/NewArray.swift -- FileCheck %t/NewArray.swift
 
 var xCount = 0
 var xSerial = 0
@@ -21,8 +21,8 @@ var xSerial = 0
 // Instead of testing with Int elements, we use this wrapper class
 // that can help us track allocations and find issues with object
 // lifetime inside Array implementations.
-class X : ReplPrintable, ForwardIndex {
-  init(value: Int) {
+class X : ReplPrintable, ForwardIndex, Comparable {
+  init(_ value: Int) {
     ++xCount
     serial = ++xSerial
     self.value = value
@@ -49,6 +49,10 @@ class X : ReplPrintable, ForwardIndex {
 
 func == (x: X, y: X) -> Bool {
   return x.value == y.value
+}
+
+func < (x: X, y: X) -> Bool {
+  return x.value < y.value
 }
 
 extension Int {
@@ -110,9 +114,7 @@ where T.GeneratorType.Element == T.Buffer.Element,
 >(_: T.Type, label: String) {
   print("test: \(label)...")
 
-  let rdar16443423 = xCount
   var x: T = [1, 2, 3, 4, 5]
-  xCount = rdar16443423
   
   checkEqual(x, 1..5, true)
 
@@ -133,8 +135,19 @@ where T.GeneratorType.Element == T.Buffer.Element,
 
   let y = x
   x[x.endIndex.pred()] = 17
-  let bufferId3 = checkReallocation(x, bufferId2, true)
+  let bufferId3 = checkReallocation(x, bufferId2, false)
+  checkEqual(x, y, true)
+
+  if x !== y {
+    println("unexpectedly, x !== y")
+  }
+
+  x += 42
   checkEqual(x, y, false)
+  if x === y {
+    println("unexpectedly, x === y")
+  }
+  
   println("done.")
 }
 
@@ -144,7 +157,7 @@ println("testing...")
 test(NativeArray<X>.self, "NativeArray")
 // CHECK-NEXT: test: NativeArray...done
 
-test(NewArray<X>.self, "Array")
+test(Array<X>.self, "Array")
 // CHECK-NEXT: test: Array...done
 
 test(Slice<X>.self, "Slice")
@@ -152,69 +165,99 @@ test(Slice<X>.self, "Slice")
 
 func testAsArray() {
   println("== AsArray ==")
-  let rdar16443423 = xCount
   var w: NativeArray<X> = [4, 2, 1]
-  xCount = rdar16443423
   // CHECK: == AsArray == 
   
-  let x: NativeArray<X> = asArray(w)
+  let x = NativeArray(w)
   println(bufferID(w) == bufferID(x))
-  // CHECK-NEXT: true
+  // CHECK-NEXT: false
   
-  let y: NewArray<X> = asArray(x)
+  let y = Array(x)
   println(bufferID(x) == bufferID(y))
-  // CHECK-NEXT: true
-  
-  let z: Slice<X> = asArray(y)
-  println(bufferID(y) == bufferID(z))
-  // CHECK-NEXT: true
+  // CHECK-NEXT: false
 
-  w = asArray(z)
+  // Because of their indirection, arrays of classes can share
+  // buffers.  
+  let y1 = Array(y)
+  println(bufferID(y1) == bufferID(y))
+  // However, I'm not implementing that optimization yet, thus false.
+  // CHECK-NEXT: false
+  
+  let z = Slice(y)
+  println(bufferID(y) == bufferID(z))
+  // CHECK-NEXT: false
+
+  w = NativeArray(z)
   println(bufferID(w) == bufferID(z))
-  // CHECK-NEXT: true
+  // CHECK-NEXT: false
 }
 testAsArray()
 
 import Foundation
 
-func nsArrayOfStrings() -> CocoaArray {
+func nsArrayOfStrings() -> Array<NSString> {
   let src: NativeArray<NSString> = ["foo", "bar", "baz"]
 
   let ns =  NSArray(
-    withObjects: UnsafePointer(src.buffer.elementStorage),
+    objects: UnsafePointer(src.buffer.elementStorage),
     count: src.count)
 
-  return reinterpretCast(ns) as CocoaArray
+  return Array(ArrayBuffer(reinterpretCast(ns) as CocoaArray))
 }
 
 func testCocoa() {
   println("== Cocoa ==")
+  // CHECK: == Cocoa ==
 
-  var a = NewArray<NSString>(.Cocoa(nsArrayOfStrings()))
+  var a = nsArrayOfStrings()
   printSequence(a)
+  // CHECK-NEXT: [foo, bar, baz]
+  
   a += "qux"
   printSequence(a)
+  // CHECK-NEXT: [foo, bar, baz, qux]
 
-  a = NewArray<NSString>(.Cocoa(nsArrayOfStrings()))
+  a = nsArrayOfStrings()
   printSequence(a)
+  // CHECK-NEXT: [foo, bar, baz]
+  
+  var b = a
+  
   a[1] = "garply"
   printSequence(a)
+  // CHECK-NEXT: [foo, garply, baz]
+
+  // Mutating an element in a changes b, too
+  printSequence(b)
+  // CHECK-NEXT: [foo, garply, baz]
+  
+  a = nsArrayOfStrings()
+  a.insert(2, newElement: "bag")
+  printSequence(a)
+  // CHECK-NEXT: [foo, bar, bag, baz]
+
+  a = nsArrayOfStrings()
+  a.reserve(30)
+  printSequence(a)
+  // CHECK-NEXT: [foo, bar, baz]
+  
+  println(a.capacity >= 30)
+  // CHECK-NEXT: true
 }
 testCocoa()
-// CHECK: == Cocoa ==
-// CHECK-NEXT: [foo, bar, baz]
-// CHECK-NEXT: [foo, bar, baz, qux]
-// CHECK-NEXT: [foo, bar, baz]
-// CHECK-NEXT: [foo, garply, baz]
+
+extension Slice {
+  mutating func qsort(compare: (T,T)->Bool) {
+    quickSort(&self, indices(self), compare)
+  }
+}
 
 func testSlice() {
   println("== Slice ==")
   // CHECK: == Slice ==
-  var a0: NativeArray<X> = asArray(X(0)...X(7))
-
-  // Grab the buffer, which we can manipulate without inducing COW, and do some
-  // tests on the shared semantics
-  var b: NativeArrayBuffer<X> = a0.buffer
+  
+  // do some tests on the shared semantics
+  var b = NativeArray(X(0)...X(7))
 
   // Slice it
   var bSlice = b[3...5]
@@ -234,20 +277,26 @@ func testSlice() {
   printSequence(bSlice) 
   printSequence(b)                // CHECK-NEXT: [0, 1, 2, 3, 42, 5, 6]
 
-  // Now test Slice itself, which has value semantics
-  var a = NewArray<NSString>(.Cocoa(nsArrayOfStrings()))
+  var c = b
+  b[4...b.count].qsort(<)
+  printSequence(b)                // CHECK-NEXT: [0, 1, 2, 3, 5, 6, 42]
+  printSequence(c)                // CHECK-NEXT: [0, 1, 2, 3, 5, 6, 42]
+
+  // Now a bridged slice
+  var a = Array<NSString>(
+    ArrayBuffer(nsArrayOfStrings().asCocoaArray()))
   
   printSequence(a)                // CHECK-NEXT: [foo, bar, baz]
   
   var aSlice = a[1...3]           // CHECK-NEXT: [bar, baz]
   printSequence(aSlice)  
 
-  // Writing into aSlice doesn't change a
+  // Writing into aSlice works
   aSlice[0] = "buzz"              // CHECK-NEXT: [buzz, baz]
   printSequence(aSlice)  
 
-  // And doesn't change a
-  printSequence(a)                // CHECK-NEXT: [foo, bar, baz]
+  // ...and also changes a with reference semantics
+  printSequence(a)                // CHECK-NEXT: [foo, buzz, baz]
 
   // Appending to aSlice works...
   aSlice += "fodder"              
@@ -255,18 +304,24 @@ func testSlice() {
   printSequence(aSlice)           // CHECK-NEXT: [buzz, baz, fodder]
 
   // And doesn't change a
-  printSequence(a)                // CHECK-NEXT: [foo, bar, baz]
+  printSequence(a)                // CHECK-NEXT: [foo, buzz, baz]
 }
 testSlice()
 
-%for A in ['NativeArray', 'NewArray', 'Slice']:
+//===--- sub-range replacement --------------------------------------------===//
+
+// Size of the array on which we're going to test "replace."
+// testing time grows roughly as the cube of this constant
+let testWidth = 11
+
+%for A in ['NativeArray', 'Array', 'Slice']:
 
 // FIXME: When <rdar://problem/16530674> is handled we can stop
 // gybbing and go back to using a generic function here
 func testReplace/*<
   A: ArrayType
   where A.GeneratorType.Element == X, A.Buffer.Element == X, A.IndexType == Int
->*/(expectUnique: Bool, make: ()->${A}<X>) {
+>*/(make: ()->${A}<X>) {
 
   typealias A = ${A}<X>
 
@@ -295,12 +350,6 @@ func testReplace/*<
         }
 
         var a = make()
-        if (a.buffer.isUniquelyReferenced() != expectUnique) {
-          reportFailure(
-            &a, "unexpected "
-                + (expectUnique ? " multi-" : "single ") 
-                + "reference")
-        }
      
         replace(&a, i...j, newValues)
         let growth = newCount - oldCount
@@ -326,24 +375,71 @@ func testReplace/*<
   }
 }
 
-func testReplace${A}() {
-  func make() -> ${A}<X> { return asArray(X(0)...X(7)) }
-  
-  testReplace(true, make)
-  
+func testReplace${A}(
+  makeOne: ()->${A}<X> = {
+    var x = ${A}<X>()
+    // make sure some - but not all - replacements will have to grow the buffer
+    x.reserve(testWidth * 3 / 2)
+    x += X(0)...X(testWidth)
+    return x
+  }
+) {
+  testReplace(makeOne)
+
   // Create one that will not be uniquely-referenced so we can test
-  // the other code paths.
-  let r = make()
-  testReplace(false, { r })
+  // the out-of-place code paths.
+  let r = makeOne()
+  testReplace({ r })
   
   // This test should ensure r's retain isn't dropped before we start testing.
-  if (r.count != 7) {
+  if (r.count != testWidth) {
     println("something bad happened!")
   }
 }
 
+println("testing subrange replacement in ${A}")
 testReplace${A}()
 %end
+
+// Also test with a sub-slice of some larger buffer.  The "trailing"
+// case is interesting because when the buffer is uniquely referenced
+// we can expect to expand the slice in-place
+for (maxValue, label) in [(testWidth, "trailing"), (testWidth*2, "interior")] {
+  println("testing subrange replacement in \(label) Sub-Slice")
+  testReplaceSlice {
+    var a = NativeArray(X(-testWidth)...X(maxValue))
+    a.reserve(a.count * 3 / 2)
+    return a[testWidth...(2 * testWidth)]
+  }
+}
+
+// CHECK-NEXT: testing subrange replacement in NativeArray
+// CHECK-NEXT: testing subrange replacement in Array
+// CHECK-NEXT: testing subrange replacement in Slice
+// CHECK-NEXT: testing subrange replacement in trailing Sub-Slice
+// CHECK-NEXT: testing subrange replacement in interior Sub-Slice
+
+//===--- single-element modifiers -----------------------------------------===//
+
+%for A in ['NativeArray', 'Array', 'Slice']:
+
+func testSingleElementModifiers${A}() {
+  println("testing ${A} single-argument modifiers")
+  // CHECK-NEXT: testing ${A} single-argument modifiers
+  
+  var a = ${A}(X(0)...10)
+  println(a.popLast().value)     // CHECK-NEXT: 9
+  printSequence(a)               // CHECK-NEXT: [0, 1, 2, 3, 4, 5, 6, 7, 8]
+  
+  a.insert(4, newElement: 42)
+  printSequence(a)               // CHECK-NEXT: [0, 1, 2, 3, 42, 4, 5, 6, 7, 8]
+  
+  println(a.removeAt(2).value)   // CHECK-NEXT: 2
+  printSequence(a)               // CHECK-NEXT: [0, 1, 3, 42, 4, 5, 6, 7, 8]
+}
+testSingleElementModifiers${A}()
+%end
+
 println("leaks = \(xCount)")
 // CHECK-NEXT: leaks = 0
 

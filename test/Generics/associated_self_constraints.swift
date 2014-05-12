@@ -11,17 +11,17 @@ protocol Observer {
 protocol Observable {
     typealias Value
 
-    func subscribe<O: Observer where O.Value == Value>(observer: O) -> Any // expected-note {{protocol requires function 'subscribe' with type '<O> (observer: O) -> Any'}}
+    func subscribe<O: Observer where O.Value == Value>(observer: O) -> Any
 }
 
-class Subject<T>: Observer, Observable { // expected-error {{type 'Subject<T>' does not conform to protocol 'Observable'}}
+class Subject<T>: Observer, Observable {
     typealias Value = T
     
     // Observer implementation
     
-    var onNextFunc: ((T) -> Void)?
-    var onCompletedFunc: (() -> Void)?
-    var onErrorFunc: ((String) -> Void)?
+    var onNextFunc: ((T) -> Void)? = nil
+    var onCompletedFunc: (() -> Void)? = nil
+    var onErrorFunc: ((String) -> Void)? = nil
     
     func onNext(item: T) -> Void {
         onNextFunc?(item)
@@ -37,8 +37,8 @@ class Subject<T>: Observer, Observable { // expected-error {{type 'Subject<T>' d
     
     // Observable implementation
     
-    func subscribe<O: Observer where O.Value == T>(observer: O) -> Any { // expected-note {{candidate has non-matching type '<T, O> (observer: O) -> Any'}}
-        self.onNextFunc = { (item: T) -> Void  in // expected-error {{expression does not type-check}}
+    func subscribe<O: Observer where O.Value == T>(observer: O) -> Any {
+        self.onNextFunc = { (item: T) -> Void  in
             observer.onNext(item)
         }
         
@@ -52,4 +52,31 @@ class Subject<T>: Observer, Observable { // expected-error {{type 'Subject<T>' d
         
         return self;
     }
+}
+
+struct X<T> {
+
+  mutating func replace<C: _Collection where C._Element == T>(a: C) {
+    for i in a.startIndex...a.endIndex {
+      var x: T = a[i]
+    }
+  }
+}
+
+protocol P {
+    typealias A
+    
+    func onNext(item: A) -> Void
+}
+
+struct IP<T> : P {
+    typealias A = T
+
+    init<O:P where O.A == IP.A>(x:O) {
+       _onNext = { (item: A) in x.onNext(item) }
+    }
+
+    func onNext(item: A) { _onNext(item) }
+
+    var _onNext: (A)->()
 }

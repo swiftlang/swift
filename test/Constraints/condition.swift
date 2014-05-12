@@ -1,7 +1,7 @@
 // RUN: %swift -parse %s -verify
 
 // Basic support for Bool
-func simpleIf(b : Bool) {
+func simpleIf(b: Bool) {
   if b { }
 }
 
@@ -15,7 +15,7 @@ func otherIf(b : OtherLogicValue) {
 }
 
 // Support for arbitrary logic values in generics
-func doIf<T : LogicValue>(t : T) {
+func doIf<T : LogicValue>(t: T) {
   if t { }
 }
 doIf(true)
@@ -25,5 +25,5 @@ func getValue() -> OtherLogicValue {}
 func getValue() -> Int {}
 
 func testLogicValueOverloading() {
-  if getValue() { }  
+  if getValue() { }
 }

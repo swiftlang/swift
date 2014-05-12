@@ -116,6 +116,13 @@ func briefMixed2() {}
 */
 func briefMixed3() {}
 
+struct Indentation {
+  /**
+   * Aaa.
+   */
+  func briefBlockWithASCIIArt1() {}
+}
+
 
 // CHECK: Func/briefLine1 {{.*}} BriefComment=none
 // CHECK-NEXT: Func/briefLine2 {{.*}} BriefComment=[Aaa.]
@@ -139,4 +146,6 @@ func briefMixed3() {}
 // CHECK-NEXT: Func/briefMixed1 {{.*}} BriefComment=[Aaa. Bbb. ]
 // CHECK-NEXT: Func/briefMixed2 {{.*}} BriefComment=[Aaa.]
 // CHECK-NEXT: Func/briefMixed3 {{.*}} BriefComment=[Aaa.]
+// CHECK-NEXT: Struct/Indentation RawComment=none
+// CHECK-NEXT: Func/Indentation.briefBlockWithASCIIArt1 {{.*}} BriefComment=[Aaa.]
 

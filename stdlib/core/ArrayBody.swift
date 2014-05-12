@@ -15,8 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-struct ArrayBody {
-  
+struct _ArrayBody {
   init(count: Int, capacity: Int, elementTypeIsBridgedVerbatim: Bool = false) {
     assert(count >= 0)
     assert(capacity >= 0)

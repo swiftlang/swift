@@ -1,10 +1,11 @@
-// RUN: %swift -triple x86_64-apple-darwin10 %s -emit-llvm | FileCheck %s
+// RUN: %swift -target x86_64-apple-darwin10 %s -emit-ir | FileCheck %s
 
 // <rdar://problem/13793646>
-struct OptionalEnumeratorAdaptor<T: Enumerator> {
-  // CHECK: define { i8*, i64, %swift.refcounted* } @_TV15generic_ternary25OptionalEnumeratorAdaptor4nextUSs10Enumerator___fRGS0_Q__FT_GVSs8OptionalQ0__(%V15generic_ternary25OptionalEnumeratorAdaptor*, %swift.type* %This)
+struct OptionalStreamAdaptor<T: Generator> {
+  // CHECK: define void @_TFV15generic_ternary21OptionalStreamAdaptor4nextUSs9Generator_U__fRGS0_Q__FT_GSqQQ_7Element_(%Sq{{.*}}* noalias sret, %V15generic_ternary21OptionalStreamAdaptor* noalias, %swift.type* %Self)
+  mutating
   func next() -> Optional<T.Element> {
-    return x[0].isEmpty() ? +None : Some(x[0].next())
+    return x[0].next()
   }
   var x: T[]
 }

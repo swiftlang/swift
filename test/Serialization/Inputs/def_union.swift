@@ -1,27 +1,26 @@
-union Basic {
+enum Basic {
   case Untyped
   case HasType(Int)
-  
-  constructor() {
-    this = .Untyped
+
+  init() {
+    self = .Untyped
   }
   func doSomething() {}
 }
 
-union Generic<A> {
+enum Generic<A> {
   case Left(A)
   case Right(A)
 }
-
 
 protocol Computable {
   func compute()
 }
 
-union Lazy<T> : Computable {
+enum Lazy<T> : Computable {
   case Thunk(() -> T)
   case Value(T)
-  
+
   func compute() {
 //    if (this ~= .Thunk(var fn)) {
 //      this = .Value(fn())

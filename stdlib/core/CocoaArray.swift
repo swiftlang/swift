@@ -30,14 +30,14 @@ import SwiftShims
 protocol CocoaArray : ObjCClassType {
   func objectAtIndex(index: Int) -> AnyObject
   
-  func getObjects(UnsafePointer<AnyObject>) range(_SwiftNSRange)
+  func getObjects(UnsafePointer<AnyObject>, range: _SwiftNSRange)
   
   func countByEnumeratingWithState(
-    state: UnsafePointer<_SwiftNSFastEnumerationState>)
-    objects(buffer: UnsafePointer<AnyObject>)
-    count(len: Int) -> Int
+         state: UnsafePointer<_SwiftNSFastEnumerationState>,
+         objects buffer: UnsafePointer<AnyObject>,
+         count len: Int) -> Int
 
-  func copyWithZone(zone: COpaquePointer) -> CocoaArray
+  func copyWithZone(COpaquePointer) -> CocoaArray
   
   var count: Int {get}
 }
@@ -71,10 +71,8 @@ struct CocoaArrayWrapper : Collection {
   /// implementation of countByEnumeratingWithState.
   func contiguousStorage(subRange: Range<Int>) -> UnsafePointer<AnyObject>
   {
-    var enumerationState = _SwiftNSFastEnumerationState(
-      0, nil, nil, (0,0,0,0,0))
+    var enumerationState = _makeSwiftNSFastEnumerationState()
 
-    
     // This function currently returns nil unless the first
     // subRange.endIndex items are stored contiguously.  This is an
     // acceptable conservative behavior, but could potentially be
@@ -86,7 +84,12 @@ struct CocoaArrayWrapper : Collection {
     return contiguousCount >= subRange.endIndex
     ? reinterpretCast(enumerationState.itemsPtr) + subRange.startIndex : nil
   }
-  
+
+  @transparent
+  init(_ buffer: CocoaArray) {
+    self.buffer = buffer
+  }
+
   var buffer: CocoaArray
 }
 

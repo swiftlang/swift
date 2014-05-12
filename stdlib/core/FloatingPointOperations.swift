@@ -1,4 +1,16 @@
-enum IEEEFloatingPointClass {
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+enum FloatingPointClassification {
   case SignalingNaN
   case QuietNaN
   case NegativeInfinity
@@ -12,50 +24,48 @@ enum IEEEFloatingPointClass {
 }
 
 
-extension IEEEFloatingPointClass : Equatable {}
-func ==(lhs: IEEEFloatingPointClass, rhs: IEEEFloatingPointClass) -> Bool {
+extension FloatingPointClassification : Equatable {}
+func ==(lhs: FloatingPointClassification, rhs: FloatingPointClassification) -> Bool {
   switch (lhs, rhs) {
-    case (.SignalingNaN, .SignalingNaN):
-    case (.QuietNaN, .QuietNaN):
-    case (.NegativeInfinity, .NegativeInfinity):
-    case (.NegativeNormal, .NegativeNormal):
-    case (.NegativeSubnormal, .NegativeSubnormal):
-    case (.NegativeZero, .NegativeZero):
-    case (.PositiveZero, .PositiveZero):
-    case (.PositiveSubnormal, .PositiveSubnormal):
-    case (.PositiveNormal, .PositiveNormal):
-    case (.PositiveInfinity, .PositiveInfinity):
+  case (.SignalingNaN, .SignalingNaN),
+       (.QuietNaN, .QuietNaN),
+       (.NegativeInfinity, .NegativeInfinity),
+       (.NegativeNormal, .NegativeNormal),
+       (.NegativeSubnormal, .NegativeSubnormal),
+       (.NegativeZero, .NegativeZero),
+       (.PositiveZero, .PositiveZero),
+       (.PositiveSubnormal, .PositiveSubnormal),
+       (.PositiveNormal, .PositiveNormal),
+       (.PositiveInfinity, .PositiveInfinity):
     return true
 
-    default:
+  default:
     return false
   }
 }
 
 
-protocol IEEEFloatingPointNumber {
+protocol FloatingPointNumber {
   typealias _BitsType
-  static func _fromBitPattern(bits: _BitsType) -> Self
+  class func _fromBitPattern(bits: _BitsType) -> Self
   func _toBitPattern() -> _BitsType
 
   // FIXME: make these readonly static properties.
 
   /// Returns positive infinity.
-  static func inf() -> Self
+  class func inf() -> Self
 
   /// Returns a quiet NaN.
-  static func NaN() -> Self
+  class func NaN() -> Self
 
-  static func quietNaN() -> Self
-  static func signalingNaN() -> Self
+  class func quietNaN() -> Self
 
   /// @{
   /// IEEE 754-2008 Non-computational operations.
 
   // IEEE 754 calls this 'class', but this name is a keyword, and is too
   // general.
-  // FIXME: make readonly.
-  var floatingPointClass: IEEEFloatingPointClass
+  var floatingPointClass: FloatingPointClassification { get }
 
   /// Returns true if this number has a negative sign.
   func isSignMinus() -> Bool

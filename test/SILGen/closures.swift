@@ -1,14 +1,29 @@
-// RUN: %swift -parse-as-library -emit-silgen %s | FileCheck %s
+// RUN: %swift -parse-stdlib -parse-as-library -emit-silgen %s | FileCheck %s
+import Swift
 
-// CHECK: sil @_T8closures17read_only_captureFT1xSi_Si
-func read_only_capture(x:Int) -> Int {
-  // CHECK: bb0([[X:%[0-9]+]] : $Int64):
-  // CHECK: [[XBOX:%[0-9]+]] = alloc_box $Int64
+var zero = 0
+
+// <rdar://problem/15921334>
+// CHECK-LABEL: sil @_TF8closures46return_local_generic_function_without_capturesU___FT_FQ_Q0_ : $@thin <A, R> () -> @owned @callee_owned (@out R, @in A) -> () {
+func return_local_generic_function_without_captures<A, R>() -> A -> R {
+  func f(_: A) -> R {
+    Builtin.int_trap()
+  }
+  // CHECK:  [[FN:%.*]] = function_ref @_TFF8closures46return_local_generic_function_without_capturesU___FT_FQ_Q0_L_1fFQ_Q0_ : $@thin <τ_0_0, τ_0_1> (@out τ_0_1, @in τ_0_0) -> ()
+  // CHECK:  [[FN_WITH_GENERIC_PARAMS:%.*]] = partial_apply [[FN]]<A, R>() : $@thin <τ_0_0, τ_0_1> (@out τ_0_1, @in τ_0_0) -> ()
+  // CHECK:  return [[FN_WITH_GENERIC_PARAMS]] : $@callee_owned (@out R, @in A) -> ()
+  return f
+}
+
+// CHECK-LABEL: sil  @_TF8closures17read_only_capture
+func read_only_capture(var x: Int) -> Int {
+  // CHECK: bb0([[X:%[0-9]+]] : $Int):
+  // CHECK: [[XBOX:%[0-9]+]] = alloc_box $Int
 
   func cap() -> Int {
     return x
   }
-  // CHECK: [[CAP:%[0-9]+]] = function_ref @[[CAP_NAME:closure[0-9]*]] : $[thin] ((), (Builtin.ObjectPointer, [byref] Int64)) -> Int64
+  // CHECK: [[CAP:%[0-9]+]] = function_ref @[[CAP_NAME:_TFF8closures17read_only_capture.*]] : $@thin (@owned Builtin.NativeObject, @inout Int) -> Int
   // CHECK: [[CAP_CLOSURE:%[0-9]+]] = partial_apply [[CAP]]([[XBOX]]#0, [[XBOX]]#1)
 
   return cap()
@@ -19,92 +34,89 @@ func read_only_capture(x:Int) -> Int {
   // CHECK: return [[RET]]
 }
 
-// CHECK: sil internal @[[CAP_NAME]]
-// CHECK: bb0([[XBOX:%[0-9]+]] : $Builtin.ObjectPointer, [[XADDR:%[0-9]+]] : $*Int64):
+// CHECK: sil shared @[[CAP_NAME]]
+// CHECK: bb0([[XBOX:%[0-9]+]] : $Builtin.NativeObject, [[XADDR:%[0-9]+]] : $*Int):
 // CHECK: [[X:%[0-9]+]] = load [[XADDR]]
 // CHECK: release [[XBOX]]
 // CHECK: return [[X]]
 
-// CHECK: sil @_T8closures16write_to_captureFT1xSi_Si
-func write_to_capture(x:Int) -> Int {
-  // CHECK: bb0([[X:%[0-9]+]] : $Int64):
-  // CHECK: [[XBOX:%[0-9]+]] = alloc_box $Int64
+// CHECK-LABEL: sil  @_TF8closures16write_to_capture
+func write_to_capture(var x: Int) -> Int {
+  // CHECK: bb0([[X:%[0-9]+]] : $Int):
+  // CHECK: [[XBOX:%[0-9]+]] = alloc_box $Int
+  // CHECK: [[X2BOX:%[0-9]+]] = alloc_box $Int
+  var x2 = x
 
   func scribble() {
-    x = 1
+    x2 = zero
   }
-  // -- FIXME: [[SCRIB:%[0-9]+]] = function_ref @_TL8closures16write_to_captureFT1xSi_Si8scribblefT_T_
-  // CHECK: [[SCRIB:%[0-9]+]] = function_ref @[[SCRIB_NAME:closure[0-9]*]] : $[thin] ((), (Builtin.ObjectPointer, [byref] Int64)) -> ()
-  // CHECK: [[SCRIB_CLOSURE:%[0-9]+]] = partial_apply [[SCRIB]]([[XBOX]]#0, [[XBOX]]#1)
+  // -- FIXME: [[SCRIB:%[0-9]+]] = function_ref @_TFL8closures16write_to_capture
+  // CHECK: [[SCRIB:%[0-9]+]] = function_ref @[[SCRIB_NAME:_TFF8closures16write_to_capture.*]] : $@thin (@owned Builtin.NativeObject, @inout Int) -> ()
+  // CHECK: [[SCRIB_CLOSURE:%[0-9]+]] = partial_apply [[SCRIB]]([[X2BOX]]#0, [[X2BOX]]#1)
 
   scribble()
   // CHECK: retain [[SCRIB_CLOSURE]]
   // CHECK: apply [[SCRIB_CLOSURE]]()
-  // CHECK: [[RET:%[0-9]+]] = load [[XBOX]]#1
+  // CHECK: [[RET:%[0-9]+]] = load [[X2BOX]]#1
   // CHECK: release [[SCRIB_CLOSURE]]
+  // CHECK: release [[X2BOX]]#0
   // CHECK: release [[XBOX]]#0
   // CHECK: return [[RET]]
-  return x
+  return x2
 }
 
-// CHECK: sil internal @[[SCRIB_NAME]]
-// CHECK: bb0([[XBOX:%[0-9]+]] : $Builtin.ObjectPointer, [[XADDR:%[0-9]+]] : $*Int64):
-// CHECK: store {{%[0-9]+}} to [[XADDR]]
+// CHECK: sil shared @[[SCRIB_NAME]]
+// CHECK: bb0([[XBOX:%[0-9]+]] : $Builtin.NativeObject, [[XADDR:%[0-9]+]] : $*Int):
+// CHECK: copy_addr {{%[0-9]+}} to [[XADDR]]
 // CHECK: release [[XBOX]]
 // CHECK: return
 
-// CHECK: sil @_T8closures21multiple_closure_refsFT1xSi_TFT_SiFT_Si_
-func multiple_closure_refs(x:Int) -> (() -> Int, () -> Int) {
+// CHECK-LABEL: sil  @_TF8closures21multiple_closure_refs
+func multiple_closure_refs(var x: Int) -> (() -> Int, () -> Int) {
   func cap() -> Int {
     return x
   }
-  // CHECK: [[CAP:%[0-9]+]] = function_ref @[[CAP_NAME:closure[0-9]*]] : $[thin] ((), (Builtin.ObjectPointer, [byref] Int64)) -> Int64
+  // CHECK: [[CAP:%[0-9]+]] = function_ref @[[CAP_NAME:_TFF8closures21multiple_closure_refs.*]] : $@thin (@owned Builtin.NativeObject, @inout Int) -> Int
   // CHECK: [[CAP_CLOSURE:%[0-9]+]] = partial_apply [[CAP]]
 
   return (cap, cap)
   // CHECK: retain [[CAP_CLOSURE]]
-  // CHECK: retain [[CAP_CLOSURE]]
   // CHECK: [[RET:%[0-9]+]] = tuple ([[CAP_CLOSURE]] : {{.*}}, [[CAP_CLOSURE]] : {{.*}})
-  // CHECK: release [[CAP_CLOSURE]]
   // CHECK: return [[RET]]
 }
 
-// CHECK: sil @_T8closures18capture_local_funcFT1xSi_FT_FT_Si
-func capture_local_func(x:Int) -> () -> () -> Int {
-  // CHECK: [[XBOX:%[0-9]+]] = alloc_box $Int64
+// CHECK-LABEL: sil  @_TF8closures18capture_local_func
+func capture_local_func(var x: Int) -> () -> () -> Int {
+  // CHECK: [[XBOX:%[0-9]+]] = alloc_box $Int
 
   func aleph() -> Int { return x }
-  // CHECK: [[ALEPH_REF:%[0-9]+]] = function_ref @[[ALEPH_NAME:closure[0-9]*]] : $[thin] ((), (Builtin.ObjectPointer, [byref] Int64)) -> Int64
+  // CHECK: [[ALEPH_REF:%[0-9]+]] = function_ref @[[ALEPH_NAME:_TFF8closures18capture_local_func.*]] : $@thin (@owned Builtin.NativeObject, @inout Int) -> Int
   // CHECK: [[ALEPH_CLOSURE:%[0-9]+]] = partial_apply [[ALEPH_REF]]([[XBOX]]#0, [[XBOX]]#1)
 
   func beth() -> () -> Int { return aleph }
-  // CHECK: [[BETH_REF:%[0-9]+]] = function_ref @[[BETH_NAME:closure[0-9]*]] : $[thin] ((), () -> Int64) -> () -> Int64
+  // CHECK: [[BETH_REF:%[0-9]+]] = function_ref @[[BETH_NAME:_TFF8closures18capture_local_func.*]] : $@thin (@owned @callee_owned () -> Int) -> @owned @callee_owned () -> Int
   // CHECK: [[BETH_CLOSURE:%[0-9]+]] = partial_apply [[BETH_REF]]([[ALEPH_CLOSURE]])
 
   return beth
-  // CHECK: retain [[BETH_CLOSURE]]
-  // CHECK: release [[BETH_CLOSURE]]
   // CHECK: release [[ALEPH_CLOSURE]]
   // CHECK: release [[XBOX]]#0
   // CHECK: return [[BETH_CLOSURE]]
 }
-// CHECK: sil internal @[[ALEPH_NAME]]
-// CHECK: bb0([[XBOX:%[0-9]+]] : $Builtin.ObjectPointer, [[XADDR:%[0-9]+]] : $*Int64):
+// CHECK: sil shared @[[ALEPH_NAME]]
+// CHECK: bb0([[XBOX:%[0-9]+]] : $Builtin.NativeObject, [[XADDR:%[0-9]+]] : $*Int):
 
-// CHECK: sil internal @[[BETH_NAME]]
-// CHECK: bb0([[ALEPH:%[0-9]+]] : $() -> Int64):
-// CHECK: retain [[ALEPH]]
-// CHECK: release [[ALEPH]]
+// CHECK: sil shared @[[BETH_NAME]]
+// CHECK: bb0([[ALEPH:%[0-9]+]] : $@callee_owned () -> Int):
 // CHECK: return [[ALEPH]]
 
-// CHECK: sil @_T8closures22anon_read_only_captureFT1xSi_Si
-func anon_read_only_capture(x:Int) -> Int {
-  // CHECK: bb0([[X:%[0-9]+]] : $Int64):
-  // CHECK: [[XBOX:%[0-9]+]] = alloc_box $Int64
+// CHECK-LABEL: sil  @_TF8closures22anon_read_only_capture
+func anon_read_only_capture(var x: Int) -> Int {
+  // CHECK: bb0([[X:%[0-9]+]] : $Int):
+  // CHECK: [[XBOX:%[0-9]+]] = alloc_box $Int
 
   return ({ x })()
   // -- func expression
-  // CHECK: [[ANON:%[0-9]+]] = function_ref @[[CLOSURE_NAME:closure[0-9]*]] : $[thin] ((), (Builtin.ObjectPointer, [byref] Int64)) -> Int64
+  // CHECK: [[ANON:%[0-9]+]] = function_ref @[[CLOSURE_NAME:_TFF8closures22anon_read_only_capture.*]] : $@thin (@owned Builtin.NativeObject, @inout Int) -> Int
   // CHECK: retain [[XBOX]]#0
   // CHECK: [[ANON_CLOSURE:%[0-9]+]] = partial_apply [[ANON]]([[XBOX]]#0, [[XBOX]]#1)
   // -- apply expression
@@ -113,20 +125,20 @@ func anon_read_only_capture(x:Int) -> Int {
   // CHECK: release [[XBOX]]#0
   // CHECK: return [[RET]]
 }
-// CHECK: sil internal @[[CLOSURE_NAME]]
-// CHECK: bb0([[XBOX:%[0-9]+]] : $Builtin.ObjectPointer, [[XADDR:%[0-9]+]] : $*Int64):
+// CHECK: sil shared @[[CLOSURE_NAME]]
+// CHECK: bb0([[XBOX:%[0-9]+]] : $Builtin.NativeObject, [[XADDR:%[0-9]+]] : $*Int):
 // CHECK: [[X:%[0-9]+]] = load [[XADDR]]
 // CHECK: release [[XBOX]]
 // CHECK: return [[X]]
 
-// CHECK: sil @_T8closures21small_closure_captureFT1xSi_Si
-func small_closure_capture(x:Int) -> Int {
-  // CHECK: bb0([[X:%[0-9]+]] : $Int64):
-  // CHECK: [[XBOX:%[0-9]+]] = alloc_box $Int64
+// CHECK-LABEL: sil  @_TF8closures21small_closure_capture
+func small_closure_capture(var x: Int) -> Int {
+  // CHECK: bb0([[X:%[0-9]+]] : $Int):
+  // CHECK: [[XBOX:%[0-9]+]] = alloc_box $Int
 
   return { x }()
   // -- func expression
-  // CHECK: [[ANON:%[0-9]+]] = function_ref @[[CLOSURE_NAME:closure[0-9]*]] : $[thin] ((), (Builtin.ObjectPointer, [byref] Int64)) -> Int64
+  // CHECK: [[ANON:%[0-9]+]] = function_ref @[[CLOSURE_NAME:_TFF8closures21small_closure_capture.*]] : $@thin (@owned Builtin.NativeObject, @inout Int) -> Int
   // CHECK: retain [[XBOX]]#0
   // CHECK: [[ANON_CLOSURE:%[0-9]+]] = partial_apply [[ANON]]([[XBOX]]#0, [[XBOX]]#1)
   // -- apply expression
@@ -135,58 +147,142 @@ func small_closure_capture(x:Int) -> Int {
   // CHECK: release [[XBOX]]#0
   // CHECK: return [[RET]]
 }
-// CHECK: sil internal @[[CLOSURE_NAME]]
-// CHECK: bb0([[XBOX:%[0-9]+]] : $Builtin.ObjectPointer, [[XADDR:%[0-9]+]] : $*Int64):
+// CHECK: sil shared @[[CLOSURE_NAME]]
+// CHECK: bb0([[XBOX:%[0-9]+]] : $Builtin.NativeObject, [[XADDR:%[0-9]+]] : $*Int):
 // CHECK: [[X:%[0-9]+]] = load [[XADDR]]
 // CHECK: release [[XBOX]]
 // CHECK: return [[X]]
 
 
-// CHECK: sil @_T8closures35small_closure_capture_with_argumentFT1xSi_FT1ySi_Si
-func small_closure_capture_with_argument(x:Int) -> (y:Int) -> Int {
-  // CHECK: [[XBOX:%[0-9]+]] = alloc_box $Int64
+// CHECK-LABEL: sil  @_TF8closures35small_closure_capture_with_argument
+func small_closure_capture_with_argument(var x: Int) -> (y: Int) -> Int {
+  // CHECK: [[XBOX:%[0-9]+]] = alloc_box $Int
 
   return { x + $0 }
   // -- func expression
-  // CHECK: [[ANON:%[0-9]+]] = function_ref @[[CLOSURE_NAME:closure[0-9]*]] : $[thin] (($0 : Int64), (Builtin.ObjectPointer, [byref] Int64)) -> Int64
+  // CHECK: [[ANON:%[0-9]+]] = function_ref @[[CLOSURE_NAME:_TFF8closures35small_closure_capture_with_argument.*]] : $@thin (Int, @owned Builtin.NativeObject, @inout Int) -> Int
   // CHECK: retain [[XBOX]]#0
   // CHECK: [[ANON_CLOSURE_APP:%[0-9]+]] = partial_apply [[ANON]]([[XBOX]]#0, [[XBOX]]#1)
-  // CHECK: [[ANON_CLOSURE:%[0-9]+]] = convert_function [[ANON_CLOSURE_APP]] : ${{.*}} to $(y : Int64) -> Int64
   // -- return
   // CHECK: release [[XBOX]]#0
   // CHECK: return [[ANON_CLOSURE]]
 }
-// CHECK: sil internal @[[CLOSURE_NAME]] : $[thin] (($0 : Int64), (Builtin.ObjectPointer, [byref] Int64)) -> Int64
-// CHECK: bb0([[DOLLAR0:%[0-9]+]] : $Int64, [[XBOX:%[0-9]+]] : $Builtin.ObjectPointer, [[XADDR:%[0-9]+]] : $*Int64):
-// CHECK: [[DOLLAR0ADDR:%[0-9]+]] = alloc_box $Int64
-// CHECK: store [[DOLLAR0]] to [[DOLLAR0ADDR]]
-// CHECK: [[PLUS:%[0-9]+]] = function_ref @_TSsoi1pFT3lhsSi3rhsSi_Si
+// CHECK: sil shared @[[CLOSURE_NAME]] : $@thin (Int, @owned Builtin.NativeObject, @inout Int) -> Int
+// CHECK: bb0([[DOLLAR0:%[0-9]+]] : $Int, [[XBOX:%[0-9]+]] : $Builtin.NativeObject, [[XADDR:%[0-9]+]] : $*Int):
+// CHECK: [[PLUS:%[0-9]+]] = function_ref @_TFSsoi1pFTSiSi_Si{{.*}}
 // CHECK: [[LHS:%[0-9]+]] = load [[XADDR]]
-// CHECK: [[RHS:%[0-9]+]] = load [[DOLLAR0ADDR]]
-// CHECK: [[RET:%[0-9]+]] = apply [[PLUS]]([[LHS]], [[RHS]])
+// CHECK: [[RET:%[0-9]+]] = apply [transparent] [[PLUS]]([[LHS]], [[DOLLAR0]])
 // CHECK: release [[XBOX]]
 // CHECK: return [[RET]]
 
-// CHECK: sil @_T8closures24small_closure_no_captureFT_FT1ySi_Si
-func small_closure_no_capture() -> (y:Int) -> Int {
-  // CHECK:   [[ANON:%[0-9]+]] = function_ref @[[CLOSURE_NAME:closure[0-9]*]] : $[thin] ($0 : Int64) -> Int64
-  // CHECK:   [[ANON_CONV:%[0-9]+]] = convert_function [[ANON]] : ${{.*}} to $[thin] (y : Int64) -> Int64
-  // CHECK:   [[ANON_THICK:%[0-9]+]] = thin_to_thick_function [[ANON_CONV]] : ${{.*}} to $(y : Int64) -> Int64
+// CHECK-LABEL: sil  @_TF8closures24small_closure_no_capture
+func small_closure_no_capture() -> (y: Int) -> Int {
+  // CHECK:   [[ANON:%[0-9]+]] = function_ref @[[CLOSURE_NAME:_TFF8closures24small_closure_no_captureFT_FT1ySi_SiU_FSiSi]] : $@thin (Int) -> Int
+  // CHECK:   [[ANON_THICK:%[0-9]+]] = thin_to_thick_function [[ANON]] : ${{.*}} to $@callee_owned (Int) -> Int
   // CHECK:   return [[ANON_THICK]]
   return { $0 }
 }
-// CHECK: sil internal @[[CLOSURE_NAME]] : $[thin] ($0 : Int64) -> Int64
-// CHECK: bb0([[YARG:%[0-9]+]] : $Int64):
+// CHECK: sil shared @[[CLOSURE_NAME]] : $@thin (Int) -> Int
+// CHECK: bb0([[YARG:%[0-9]+]] : $Int):
 
-// CHECK: sil @_T8closures17uncaptured_localsFT1xSi_TSiSi_ :
-func uncaptured_locals(x:Int) -> (Int, Int) {
+// CHECK-LABEL: sil  @_TF8closures17uncaptured_locals{{.*}} :
+func uncaptured_locals(var x: Int) -> (Int, Int) {
   // -- locals without captures are stack-allocated
-  // CHECK: bb0([[XARG:%[0-9]+]] : $Int64):
-  // CHECK:   [[XADDR:%[0-9]+]] = alloc_box $Int64
+  // CHECK: bb0([[XARG:%[0-9]+]] : $Int):
+  // CHECK:   [[XADDR:%[0-9]+]] = alloc_box $Int
   // CHECK:   store [[XARG]] to [[XADDR]]
 
-  var y = 1
-  // CHECK:   [[YADDR:%[0-9]+]] = alloc_box $Int64
+  var y = zero
+  // CHECK:   [[YADDR:%[0-9]+]] = alloc_box $Int
   return (x, y)
 
 }
+
+class SomeClass {
+  var x : Int = zero
+
+  init() {
+    x = { self.x }()   // Closing over self.
+  }
+}
+
+// Closures within destructors <rdar://problem/15883734>
+class SomeGenericClass<T> {
+  deinit {
+    var i: Int = zero
+    // CHECK: [[C1REF:%[0-9]+]] = function_ref @_TFFC8closures16SomeGenericClassd{{.*}} : $@thin <τ_0_0> (@owned Builtin.NativeObject, @inout Int) -> Int
+    // CHECK: [[C1SPEC:%[0-9]+]] = partial_apply [[C1REF]]<T>([[IBOX:%[0-9]+]]#0, [[IBOX]]#1) : $@thin <τ_0_0> (@owned Builtin.NativeObject, @inout Int) -> Int
+    // CHECK: apply [[C1SPEC]]() : $@callee_owned () -> Int
+    var x = { i + zero } ()
+
+    // CHECK: [[C2REF:%[0-9]+]] = function_ref @_TFFC8closures16SomeGenericClassdU0_FT{{.*}} : $@thin <τ_0_0> () -> Int
+    // CHECK: [[C2SPEC:%[0-9]+]] = partial_apply [[C2REF]]<T>() : $@thin <τ_0_0> () -> Int
+    // CHECK: apply [[C2SPEC]]() : $@callee_owned () -> Int
+    var y = { zero } ()
+  }
+
+  // CHECK-LABEL: sil shared @_TFFC8closures16SomeGenericClassdU{{.*}} : $@thin <T> (@owned Builtin.NativeObject, @inout Int) -> Int
+
+  // CHECK-LABEL: sil shared @_TFFC8closures16SomeGenericClassdU0_FT{{.*}} : $@thin <T> () -> Int
+}
+
+// This is basically testing that the constraint system ranking
+// function conversions as worse than others, and therefore performs
+// the conversion within closures when possible.
+class SomeSpecificClass : SomeClass {}
+func takesSomeClassGenerator(fn : () -> SomeClass) {}
+func generateWithConstant(x : SomeSpecificClass) {
+  takesSomeClassGenerator({ x })
+}
+// CHECK-LABEL: sil shared @_TFF8closures20generateWithConstant
+// CHECK:    bb0([[T0:%.*]] : $SomeSpecificClass):
+// CHECK-NEXT: [[T1:%.*]] = upcast [[T0]] : $SomeSpecificClass to $SomeClass
+// CHECK-NEXT: return [[T1]]
+
+
+// Check the annoying case of capturing 'self' in a derived class 'init'
+// method. We allocate a mutable box to deal with 'self' potentially being
+// rebound by super.init, but 'self' is formally immutable and so is captured
+// by value. <rdar://problem/15599464>
+class Base {}
+
+class SelfCapturedInInit : Base {
+  var foo : () -> SelfCapturedInInit
+
+  // CHECK-LABEL: sil @_TFC8closures18SelfCapturedInInitcfMS0_FT_S0_ : $@cc(method) @thin (@owned SelfCapturedInInit) -> @owned SelfCapturedInInit {
+  // CHECK:         [[VAL:%.*]] = load {{%.*}}#1 : $*SelfCapturedInInit
+  // CHECK:         [[VAL:%.*]] = load {{%.*}}#1 : $*SelfCapturedInInit
+  // CHECK:         strong_retain [[VAL]] : $SelfCapturedInInit
+  // CHECK:         partial_apply {{%.*}}([[VAL]]) : $@thin (@owned SelfCapturedInInit) -> @owned SelfCapturedInInit
+  init() {
+    super.init()
+    foo = { self }
+  }
+}
+
+func takeClosure(fn: () -> Int) -> Int { return fn() }
+
+class TestCaptureList {
+  var x = zero
+
+  func testUnowned() {
+    let aLet = self
+    takeClosure { aLet.x }
+    takeClosure { [unowned aLet] in aLet.x }
+    takeClosure { [weak aLet] in aLet!.x }
+
+    var aVar = self
+    takeClosure { aVar.x }
+    takeClosure { [unowned aVar] in aVar.x }
+    takeClosure { [weak aVar] in aVar!.x }
+
+    takeClosure { self.x }
+    takeClosure { [unowned self] in self.x }
+    takeClosure { [weak self] in self!.x }
+
+    takeClosure { [unowned newVal = TestCaptureList()] in newVal.x }
+    takeClosure { [weak newVal = TestCaptureList()] in newVal!.x }
+  }
+}
+
+

@@ -1,15 +1,20 @@
-// RUN: %swift -i %s | FileCheck %s
-// REQUIRES: swift_interpreter
+// RUN: %target-run-simple-swift | FileCheck %s
+
+println("testing...")
+// CHECK: testing
+
+println(sizeofValue([ 0 ]) - sizeofValue(0))
+// CHECK-NEXT: 0
 
 func testCountAndIsEmpty() {
   var emptyVec = Array<String>()
-  // CHECK: {{^}}emptyVec: 0 true{{$}}
+  // CHECK-NEXT: {{^}}emptyVec: 0 true{{$}}
   println("emptyVec: \(emptyVec.count) \(emptyVec.isEmpty)")
 
   var nonEmptyVec = Array<String>()
   nonEmptyVec.append("1")
   nonEmptyVec.append("2")
-  // CHECK: {{^}}nonEmptyVec: 2 false{{$}}
+  // CHECK-NEXT: {{^}}nonEmptyVec: 2 false{{$}}
   println("nonEmptyVec: \(nonEmptyVec.count) \(nonEmptyVec.isEmpty)")
 }
 
@@ -23,24 +28,56 @@ func testTakeActualArray() {
   for x in primes0 { primes1.append(x) }
 
   // Take the elements of primes1 in an Array
-  var primes2 : Int[] = primes1.takeArray()
+  var primes2 : Int[] = primes1
 
-  // Check that takeArray leaves primes1 empty
-  // CHECK: <0>
-  println("<\(primes1.count)>")
-
-  // Check that we got the right elements from takeArray
-  // CHECK: <2> <3> <5> <7> <11> .
+  // Check that the copy worked
+  // CHECK-NEXT: <2> <3> <5> <7> <11> .
   for x in primes2 { print("<\(x)> ") }
   println(".")
 }
 
 testTakeActualArray()
-println("done.") // CHECK: done.
+println("done.") // CHECK-NEXT: done.
 
 // Check that we loop over the size of the vector, not its capacity.
 // Found by Anna.
 var fullButStarvingArray = Array<String>()
-fullButStarvingArray.reserve(4)
 for x in fullButStarvingArray { print("\(x) ") }
-println("done!") // CHECK: {{^done!$}}
+
+func testArrayFromStream() {
+  var x = Array(3...7)
+  // CHECK-NEXT: <3> <4> <5> <6> .
+  for y in x { print("<\(y)> ") }
+  println(".")
+}
+testArrayFromStream()
+
+func testMap() {
+  var floatPrimes = primes0.map { Float($0) }
+  // CHECK-NEXT: <2.0> <3.0> <5.0> <7.0> <11.0> .
+  for y in floatPrimes { print("<\(y)> ") }
+  println(".")
+}
+testMap()
+
+func testUnshare() {
+  var x = [35]
+  var y = x
+  y.unshare()
+  x[0] = 8
+  print("<\(y[0])>\n")
+  // CHECK-NEXT: <35>
+}
+testUnshare()
+
+func testCopy() {
+  var x = [320]
+  var y = x.copy()
+  x[0] = 7
+  print("<\(y[0])>\n")
+  // CHECK-NEXT: <320>
+}
+testCopy()
+
+println("done!") // CHECK-NEXT: {{^done!$}}
+

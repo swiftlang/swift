@@ -9,7 +9,11 @@ println()
 println()
 
 struct Unprintable {
-  val x: Int
+  let x: Int
+
+  init(_ x: Int) {
+    self.x = x
+  }
 }
 
 // CHECK: [<something>, <something>, <something>]
@@ -17,7 +21,12 @@ struct Unprintable {
 println()
 
 struct CanBePrinted : Printable {
-  val x: Int
+  let x: Int
+
+  init(_ x: Int) {
+    self.x = x
+  }
+
   func printSelf() {
     print("►\(x)◀︎")
   }
@@ -25,4 +34,10 @@ struct CanBePrinted : Printable {
 
 // CHECK: [►1◀︎, ►2◀︎, ►3◀︎]
 [CanBePrinted(1), CanBePrinted(2), CanBePrinted(3)].printSelf()
+println()
+
+// CHECK: [(1, two, <something>), (11, twenty-two, <something>), (111, two hundred twenty-two, <something>)]
+[(1, "two", Unprintable(3)),
+ (11, "twenty-two", Unprintable(33)),
+ (111, "two hundred twenty-two", Unprintable(333))].printSelf()
 println()

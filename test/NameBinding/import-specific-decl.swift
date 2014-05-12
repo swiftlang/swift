@@ -1,17 +1,26 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
+// RUN: %swift -emit-module -o %t %S/Inputs/asdf.swift
 // RUN: %swift -emit-module -o %t %S/Inputs/abcde.swift
 // RUN: %swift -emit-module -o %t %S/Inputs/aeiou.swift
-// RUN: %swift -parse %s -I=%t -sdk= -verify
+// RUN: %swift -parse %s -I=%t -sdk "" -verify
+// RUN: not %swift -parse %s -I=%t -sdk "" 2>&1 | FileCheck %s
 
 import struct aeiou.U
+import struct aeiou.E
 import abcde
+import asdf
 
-var a : A = abcde.A()
+var a : A // expected-error {{'A' is ambiguous for type lookup in this context}}
+// CHECK: error: 'A' is ambiguous for type lookup in this context
+// CHECK-DAG: abcde{{.+}}note: found this candidate
+// CHECK-DAG: asdf{{.+}}note: found this candidate
+
 var b : B = abcde.B()
+var e : E = aeiou.E()
 
 var u : U = aeiou.U()
 var o : O // expected-error {{use of undeclared type 'O'}}
 
-// FIXME: This should be an error because of the access path.
-var o2 = aeiou.O() // no-warning
+var o2 = aeiou.O() // expected-error {{module 'aeiou' has no member named 'O'}}
+

@@ -1,44 +1,60 @@
 // RUN: %swift -parse-as-library -emit-silgen %s | FileCheck %s
 
 class C {
-  var member : Int
+  var member: Int = 0
 
   // Methods have method calling convention.
-  // CHECK: sil @_TC5types1C3foofS0_FT1xSi_T_ : $[cc(method), thin] ((x : Int64), C) -> ()
-  func foo(x:Int) {
-    // CHECK: bb0([[X:%[0-9]+]] : $Int64, [[THIS:%[0-9]+]] : $C):
+  // CHECK-LABEL: sil  @{{.*}}C3foo{{.*}} : $@cc(method) @thin (Int, @owned C) -> ()
+  func foo(`x: Int) {
+    // CHECK: bb0([[X:%[0-9]+]] : $Int, [[THIS:%[0-9]+]] : $C):
     member = x
-    // CHECK: [[XADDR:%[0-9]+]] = alloc_box $Int64
-    // CHECK: [[THISADDR:%[0-9]+]] = alloc_box $C
-    // CHECK: [[X1:%[0-9]+]] = load [[XADDR]]
-    // CHECK: [[THIS1:%[0-9]+]] = load [[THISADDR]]
-    // CHECK: [[MEMBER:%[0-9]+]] = ref_element_addr [[THIS1]] : {{.*}}, #member
-    // CHECK: store [[X1]] to [[MEMBER]]
+
+    // CHECK: strong_retain %1 : $C
+    // CHECK: [[FN:%[0-9]+]] = class_method %1 : $C, #C.member!setter.1
+    // CHECK: apply [[FN]](%0, %1) : $@cc(method) @thin (Int, @owned C) -> ()
+    // CHECK: strong_release %1 : $C
+
+
   }
 }
 
 struct S {
-  var member : Int
+  var member: Int
 
-  // CHECK: sil @_TV5types1S3foofRS0_FT1xSi_T_ : $[cc(method), thin] ((x : Int64), [byref] S) -> () 
-  func foo(x:Int) {
-    // CHECK: bb0([[X:%[0-9]+]] : $Int64, [[THIS:%[0-9]+]] : $*S):
+  // CHECK-LABEL: sil  @{{.*}}foo{{.*}} : $@cc(method) @thin (Int, @inout S) -> ()
+  mutating
+  func foo(var `x: Int) {
+    // CHECK: bb0([[X:%[0-9]+]] : $Int, [[THIS:%[0-9]+]] : $*S):
     member = x
-    // CHECK: [[XADDR:%[0-9]+]] = alloc_box $Int64
-    // CHECK: [[X1:%[0-9]+]] = load [[XADDR]]
-    // CHECK: [[MEMBER:%[0-9]+]] = struct_element_addr [[THIS]] : $*S, #member
-    // CHECK: store [[X1]] to [[MEMBER]]
+    // CHECK: [[XADDR:%[0-9]+]] = alloc_box $Int
+    // CHECK: [[THIS_LOCAL:%[0-9]+]] = alloc_box $S
+    // CHECK: [[MEMBER:%[0-9]+]] = struct_element_addr [[THIS_LOCAL]]#1 : $*S, #S.member
+    // CHECK: copy_addr [[XADDR]]#1 to [[MEMBER]]
   }
 
   class SC {
-    // CHECK: sil @_TCV5types1S2SC3barfS1_FT_T_
+    // CHECK-LABEL: sil  @_TFCV5types1S2SC3barfS1_FT_T_
     func bar() {}
   }
 }
 
 func f() {
   class FC {
-    // CHECK: sil internal @_TLC5types1fFT_T_2FC3zimfS0_FT_T_
+    // CHECK-LABEL: sil shared @_TFCF5types1fFT_T_L_2FC3zimfS0_FT_T_
     func zim() {}
+  }
+}
+
+func g(`b : Bool) {
+  if (b) {
+    class FC {
+      // CHECK-LABEL: sil shared @_TFCF5types1gFT1bSb_T_L_2FC3zimfS0_FT_T_
+      func zim() {}
+    }
+  } else {
+    class FC {
+      // CHECK-LABEL: sil shared @_TFCF5types1gFT1bSb_T_L0_2FC3zimfS0_FT_T_
+      func zim() {}
+    }
   }
 }

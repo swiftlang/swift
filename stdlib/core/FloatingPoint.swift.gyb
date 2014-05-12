@@ -1,6 +1,6 @@
-@# -*- mode: swift -*-
+%# -*- mode: swift -*-
 
-@# Ignore the following admonition; it applies to the resulting .swift file only
+%# Ignore the following admonition; it applies to the resulting .swift file only
 //// Automatically Generated From FloatingPoint.gyb.  Do Not Edit Directly
 //===----------------------------------------------------------------------===//
 //
@@ -14,7 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-@{
+%{
 #
 # Utility code for later in this template
 #
@@ -49,7 +49,12 @@ def intName(name, signed):
     return ('' if signed else 'U') + baseIntName(name)
 
 def floatName(bits):
-    return 'Float' + str(bits)
+    if bits == 32:
+        return 'Float'
+    if bits == 64:
+        return 'Double'
+    if bits == 80:
+        return 'Float80'
 
 def cFuncSuffix(bits):
     if bits == 32:
@@ -116,37 +121,40 @@ def getInfinityExponent(bits):
         return '0x7ff'
     return 'error'
 
-}@
+}%
 
-@ for bits in allFloatBits:
-@   Self = floatName(bits)
+% for bits in allFloatBits:
+%   Self = floatName(bits)
 
 struct ${Self} : ReplPrintable {
   var value: Builtin.FPIEEE${bits}
 
-  @@transparent
+  @transparent
   init() {
     var zero: Int64 = 0
     value = Builtin.uitofp_Int64_FPIEEE${bits}(zero.value)
   }
 
-  @@transparent
-  init(v: Builtin.FPIEEE${bits}) {
+  @transparent
+  init(_ v: Builtin.FPIEEE${bits}) {
     value = v
   }
 
   func replPrint() {
-@if bits == 64:
+%if bits == 64:
     print(self)
-@else:
+%else:
     print(Double(self))
-@end
+%end
   }
+
+  @transparent
+  init(_ value: ${Self}) { self = value }
 }
 
-@ if bits in allIntBits:
+% if bits in allIntBits:
 // Not transparent because the compiler crashes in that case.
-//@@transparent
+//@transparent
 extension ${Self} : FloatingPointNumber {
   typealias _BitsType = UInt${bits}
 
@@ -283,10 +291,10 @@ extension ${Self} /* : FloatingPointNumber */ {
     }
   }
 }
-@ end
+% end
 
-@@transparent
-extension ${Self} : BuiltinIntegerLiteralConvertible, IntegerLiteralConvertible {
+@transparent
+extension ${Self} : _BuiltinIntegerLiteralConvertible, IntegerLiteralConvertible {
   static func _convertFromBuiltinIntegerLiteral(value: Builtin.Int${builtinIntLiteralBits}) -> ${Self} {
     return ${Self}(Builtin.itofp_with_overflow_Int${builtinIntLiteralBits}_FPIEEE${bits}(value))
   }
@@ -296,65 +304,65 @@ extension ${Self} : BuiltinIntegerLiteralConvertible, IntegerLiteralConvertible 
   }
 }
 
-@@transparent
-extension ${Self} : BuiltinFloatLiteralConvertible {
+@transparent
+extension ${Self} : _BuiltinFloatLiteralConvertible {
   static func _convertFromBuiltinFloatLiteral(value: Builtin.FPIEEE${builtinFloatLiteralBits}) -> ${Self} {
-@   if bits == builtinFloatLiteralBits:
+%   if bits == builtinFloatLiteralBits:
     return ${Self}(value)
-@   elif bits < builtinFloatLiteralBits:
+%   elif bits < builtinFloatLiteralBits:
     return ${Self}(Builtin.fptrunc_FPIEEE${builtinFloatLiteralBits}_FPIEEE${bits}(value))
-@   else:
+%   else:
     // FIXME: This is actually losing precision <rdar://problem/14073102>.
     return ${Self}(Builtin.fpext_FPIEEE${builtinFloatLiteralBits}_FPIEEE${bits}(value))
-@   end
+%   end
   }
 }
 
-@@transparent
+@transparent
 extension ${Self} : FloatLiteralConvertible {
   static func convertFromFloatLiteral(value: ${Self}) -> ${Self} {
     return value
   }
 }
 
-@@transparent
+@transparent
 func ==(lhs: ${Self}, rhs: ${Self}) -> Bool {
   return Bool(Builtin.fcmp_oeq_FPIEEE${bits}(lhs.value, rhs.value))
 }
 
-@@transparent
+@transparent
 func <(lhs: ${Self}, rhs: ${Self}) -> Bool {
   return Bool(Builtin.fcmp_olt_FPIEEE${bits}(lhs.value, rhs.value))
 }
 
-@@transparent
+@transparent
 extension ${Self} : Comparable {
 }
 
 extension ${Self} : Hashable {
-  func hashValue() -> Int {
+  var hashValue: Int {
     var asBuiltinInt = Builtin.bitcast_FPIEEE${bits}_Int${bits}(value)
-@   if bits >= 64:
+%   if bits >= 64:
     return Int(Builtin.truncOrBitCast_Int${bits}_Word(asBuiltinInt))
-@   elif bits <= 32:
+%   elif bits <= 32:
     return Int(Builtin.sextOrBitCast_Int${bits}_Word(asBuiltinInt))
-@   else:
+%   else:
     error unhandled float size ${bits}
-@   end
+%   end
   }
 }
 
-extension ${Self} : SignedNumber {
-  @@transparent
-  static func negate(rhs: ${Self}) -> (${Self}, Bool) {
-    return (${Self}(Builtin.fneg_FPIEEE${bits}(rhs.value)), false)
+@transparent
+extension ${Self} : AbsoluteValuable {
+  @transparent
+  static func abs(x: ${Self}) -> ${Self} {
+    return ${Self}(Builtin.int_fabs_FPIEEE${bits}(x.value))
   }
-  @@transparent
-  static func abs(rhs: ${Self}) -> (${Self}, Bool) {
-    return (${Self}(Builtin.int_fabs_FPIEEE${bits}(rhs.value)), false)
-  }
-  @@transparent
-  func isNegative() -> Bool { return self < 0 }
+}
+
+@prefix @transparent 
+func -(x: ${Self}) -> ${Self} {
+  return ${Self}(Builtin.fneg_FPIEEE${bits}(x.value))
 }
 
 //===----------------------------------------------------------------------===//
@@ -362,33 +370,33 @@ extension ${Self} : SignedNumber {
 //===----------------------------------------------------------------------===//
 
 // Construction from integers.
-@@transparent
+@transparent
 extension ${Self} {
-@ for (srcBits, srcSigned) in allInts():
-@    That = intName(srcBits, srcSigned)
-@    ThatBuiltinName = builtinIntName(srcBits)
-@    sign = 's' if srcSigned else 'u'
-  init(v: ${That}) {
+% for (srcBits, srcSigned) in allInts():
+%    That = intName(srcBits, srcSigned)
+%    ThatBuiltinName = builtinIntName(srcBits)
+%    sign = 's' if srcSigned else 'u'
+  init(_ v: ${That}) {
     value = Builtin.${sign}itofp_${ThatBuiltinName}_FPIEEE${bits}(v.value)
   }
-@ end
+% end
 }
 
 // Construction from other floating point numbers.
-@@transparent
+@transparent
 extension ${Self} {
-@ for srcBits in allFloatBits:
-@   That = floatName(srcBits)
-@   if Self != That:
-  init(v: ${That}) {
-@     if srcBits > bits:
-  value = Builtin.fptrunc_FPIEEE${srcBits}_FPIEEE${bits}(v.value)
-@     else:
-  value = Builtin.fpext_FPIEEE${srcBits}_FPIEEE${bits}(v.value)
-@     end
+% for srcBits in allFloatBits:
+%   That = floatName(srcBits)
+%   if Self != That:
+  init(_ v: ${That}) {
+%     if srcBits > bits:
+    value = Builtin.fptrunc_FPIEEE${srcBits}_FPIEEE${bits}(v.value)
+%     else:
+    value = Builtin.fpext_FPIEEE${srcBits}_FPIEEE${bits}(v.value)
+%     end
   }
-@   end
-@ end
+%   end
+% end
 }
 
 //===----------------------------------------------------------------------===//
@@ -396,31 +404,57 @@ extension ${Self} {
 //===----------------------------------------------------------------------===//
 
 // Unary plus
-@@transparent @@prefix
+@transparent @prefix
 func + (rhs: ${Self}) -> ${Self} { return rhs }
 
-@@transparent @@prefix @@assignment
+@transparent @prefix @assignment
 func ++ (inout rhs: ${Self}) -> ${Self} { rhs += 1.0; return rhs }
-@@transparent @@prefix @@assignment
+@transparent @prefix @assignment
 func -- (inout rhs: ${Self}) -> ${Self} { rhs -= 1.0; return rhs }
-@@transparent @@postfix @@assignment
+@transparent @postfix @assignment
 func ++ (inout lhs: ${Self}) -> ${Self} { let tmp = lhs; lhs += 1.0; return tmp }
-@@transparent @@postfix @@assignment
+@transparent @postfix @assignment
 func -- (inout lhs: ${Self}) -> ${Self} { let tmp = lhs; lhs -= 1.0; return tmp }
 
-@ for op, name in ('+','fadd'), ('-','fsub'),('*','fmul'), ('/','fdiv'):
-@@transparent
+
+
+@transparent
+extension ${Self} : RandomAccessIndex {
+  @transparent
+  func succ() -> ${Self} {
+    return self + 1.0
+  }
+  @transparent
+  func pred() -> ${Self} {
+    return self - 1.0
+  }
+  
+  @transparent
+  func distanceTo(other: ${Self}) -> ${Self}.DistanceType {
+    return Int(other-self)
+  }
+  
+  @transparent
+  func advancedBy(amount: ${Self}.DistanceType) -> ${Self} {
+    return self + ${Self}(amount)
+  }
+}
+
+
+
+% for op, name in ('+','fadd'), ('-','fsub'),('*','fmul'), ('/','fdiv'):
+@transparent
 func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
   return ${Self}(Builtin.${name}_FPIEEE${bits}(lhs.value, rhs.value))
 }
-@ end
+% end
 
 // Binary Remainder.
 // The sign of the result matches the sign of the dividend.
 // 1) This is consistent with '%' in C#, D, Java, and JavaScript
 // 2) C99 requires this behavior for fmod*()
 // 3) C++11 requires this behavior for std::fmod*()
-@@asmname="fmod${cFuncSuffix(bits)}"
+@asmname("fmod${cFuncSuffix(bits)}")
 func % (lhs: ${Self}, rhs: ${Self}) -> ${Self}
 
 // See Bool.swift for && and ||
@@ -430,26 +464,32 @@ func % (lhs: ${Self}, rhs: ${Self}) -> ${Self}
 // In C, 100 is ?:
 // In C, 90 is =, *=, += etc.
 
-@ for op in '+', '-', '*', '/', '%':
-@@transparent @@assignment
+% for op in '+', '-', '*', '/', '%':
+@transparent @assignment
 func ${op}= (inout lhs: ${Self}, rhs: ${Self}) { lhs = lhs ${op} rhs }
-@ end
+% end
 
-@ end # for bits in allFloatBits
+% end # for bits in allFloatBits
 
 // Construction of integers from floating point numbers.
-@ for (bits, signed) in allInts():
-@   sign = 's' if signed else 'u'
-@   Self = intName(bits, signed)
-@   BuiltinName = builtinIntName(bits)
-@@transparent
+% for (bits, signed) in allInts():
+%   sign = 's' if signed else 'u'
+%   Self = intName(bits, signed)
+%   BuiltinName = builtinIntName(bits)
+@transparent
 extension ${Self} {
-@   for srcBits in allFloatBits:
-@     That = floatName(srcBits)
-  init(v: ${That}) {
+%   for srcBits in allFloatBits:
+%     That = floatName(srcBits)
+  init(_ v: ${That}) {
+    assert(v >= ${That}(${Self}.min))
+    assert(v <= ${That}(${Self}.max))
     value = Builtin.fpto${sign}i_FPIEEE${srcBits}_${BuiltinName}(v.value)
   }
-@   end
+%   end
 }
 
-@ end
+% end
+
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:

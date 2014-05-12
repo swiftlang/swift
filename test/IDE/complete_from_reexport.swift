@@ -11,6 +11,8 @@
 // TOP_LEVEL_1: Decl[FreeFunction]/OtherModule:     overlayedFoo()[#Void#]{{$}}
 // TOP_LEVEL_1: Decl[FreeFunction]/OtherModule:     onlyInFooOverlay()[#Void#]{{$}}
 
+// FIXME: there should be only one instance of this completion result.
+// NO_DUPLICATES: overlayedFoo
 // NO_DUPLICATES: overlayedFoo
 // NO_DUPLICATES-NOT: overlayedFoo
 

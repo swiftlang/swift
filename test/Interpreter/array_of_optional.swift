@@ -1,5 +1,4 @@
-// RUN: %swift -i %s | FileCheck %s
-// REQUIRES: swift_interpreter
+// RUN: %target-run-simple-swift | FileCheck %s
 
 // <rdar://problem/15609900>
 

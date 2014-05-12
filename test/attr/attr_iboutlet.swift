@@ -144,3 +144,31 @@ class NonObjC {}
    let o2 = outlet2
   }
 }
+
+
+
+@objc class C {
+}
+
+@objc protocol Proto {
+}
+
+class SwiftGizmo {
+  @IBOutlet var a : C
+  @IBOutlet var b : C[]
+  @IBOutlet var c : String
+  @IBOutlet var d : String[]  // expected-error {{property cannot be marked @IBOutlet because its type cannot be represented in Objective-C}}
+  @IBOutlet var e : Proto
+
+  @IBOutlet var f : C?
+  @IBOutlet var g : C!
+
+  @IBOutlet weak var h : C?
+  @IBOutlet weak var i : C!
+  //  @IBOutlet unowned var j : C
+
+
+  @IBOutlet var bad1 : Int  // expected-error {{'IBOutlet' property cannot have non-object type 'Int'}}
+
+  init() {}
+}

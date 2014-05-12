@@ -74,7 +74,7 @@ extension BarClass {
 }
 
 protocol BarProtocol {
-  init() {}
+  init() {} // expected-error {{protocol initializers may not have bodies}}
   deinit {} // expected-error {{'deinitializer' functions may only be declared within a class}}
 }
 
@@ -100,6 +100,3 @@ func barFunc() {
   } ()
 }
 
-class DestructorRename {
-  destructor () { } // expected-error{{'destructor ()' is now written as 'deinit'}}{{3-16=deinit}}
-}

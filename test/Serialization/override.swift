@@ -29,13 +29,13 @@ let newSetter = OverrideAddsSetter()
 newSetter.readOnly = newSetter.value
 
 
-let simpleSubscript = OverrideSimpleSubscript()
-println(simpleSubscript[4])
+let simpleSubscript1 = OverrideSimpleSubscript()
+println(simpleSubscript1[4])
 
 let newSetterSubscript = OverrideAddsSubscriptSetter()
 newSetterSubscript[4] = newSetterSubscript[5]
 
 
-let simpleSubscript = OverrideComplexSubscript()
-simpleSubscript[4, true] = 5
-println(simpleSubscript[4, true])
+let simpleSubscript2 = OverrideComplexSubscript()
+simpleSubscript2[4, true] = 5
+println(simpleSubscript2[4, true])

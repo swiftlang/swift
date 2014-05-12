@@ -1,3 +1,4 @@
+%# -*- mode: swift -*-
 //===--- NSSwiftXXXBase.mm.gyb - Cocoa bases for Swift container buffers --===//
 //
 // This source file is part of the Swift.org open source project
@@ -43,7 +44,7 @@ extern "C" id _objc_rootAutorelease(id);
 
 using namespace swift;
 
-% for Class in ('Array','Dictionary'):
+% for Class in ('Array','Dictionary','Enumerator'):
 @interface NSSwift${Class}Base : NS${Class}
 {
   SWIFT_HEAPOBJECT_NON_OBJC_MEMBERS;
@@ -54,9 +55,10 @@ using namespace swift;
 + (void)load {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-  class_setSuperclass(
-    objc_getClass("NSSwift${Class}"),
-    [NSSwift${Class}Base class]);
+  char buffer[64];
+  snprintf(buffer, 64, "_TtCSs%d%s", (int)strlen("NSSwift${Class}"), 
+           "NSSwift${Class}");
+  class_setSuperclass(objc_getClass(buffer), [NSSwift${Class}Base class]);
 #pragma clang diagnostic pop
 }
 

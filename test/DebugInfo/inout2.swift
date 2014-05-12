@@ -18,13 +18,13 @@ struct Struct {
 	init() { ivar = 4567 }
 }
 
-func foo (x : @inout Class) {
+func foo (inout x : Class) {
 // CHECK: i32 0, i32 0} ; [ DW_TAG_arg_variable ] [x] [line [[@LINE-1]]]
 	println(x.ivar)
 	x.ivar++ // Set breakpoint here
 }
 
-func foo(x : @inout Struct) {
+func foo(inout x : Struct) {
 // CHECK: i32 0, i32 0} ; [ DW_TAG_arg_variable ] [x] [line [[@LINE-1]]]
 	println(x.ivar)
 	x.ivar++ // Set breakpoint here

@@ -11,5 +11,5 @@ protocol Proto {
 }
 
 protocol Proto2 {
-  def f() // expected-note {{protocol requires function 'f' with type '() -> ()'}}
+  func f() // expected-note {{protocol requires function 'f()' with type '() -> ()'}}
 }

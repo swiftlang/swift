@@ -1,6 +1,6 @@
-var funcOrVar : ()
+var funcOrVar : Int = Int()
 
 struct SomeStruct {}
-var someVar : ()
+var someVar : () = ()
 
-func overloadedFunc(x : Int) {}
+func overloadedFunc(x: Int) {}

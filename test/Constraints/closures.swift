@@ -1,34 +1,61 @@
-// RUN: %swift -repl < %s 2>&1 | FileCheck %s
+// RUN: %swift -parse -verify %s
 
-func myMap<T1, T2>(array : T1[], fn : (T1) -> T2) -> T2[] {}
+func myMap<T1, T2>(array: T1[], fn: (T1) -> T2) -> T2[] {}
 
 var intArray : Int[]
 
-func toString<T>(x : T) -> String { }
+myMap(intArray, { String($0) })
+myMap(intArray, { x -> String in String(x) } )
 
-// CHECK: Constraints:
-// CHECK:   (x : $T4) -> String == $T5 -> $T6
-// CHECK:   [byref(heap)] $T2 << $T5
-// CHECK:   $T6 << $T3
-// CHECK:   (array : $T0[], fn : $T0 -> $T1) -> $T1[] == $T7 -> $T8
-// CHECK:   ([byref(heap)] Int[], ($T2) -> $T3) << $T7
-// CHECK: ---Child system #1---
-// CHECK: Assumptions:
-// CHECK:     assuming $T3 == String
-// CHECK:     assuming $T2 == Int64
-// CHECK:     assuming $T4 == Int64
-// CHECK:     assuming $T1 == String
-// CHECK: Type Variables:
-// CHECK:   $T0 as Int64
-// CHECK:   $T1 as String
-// CHECK:   $T2 as Int64
-// CHECK:   $T3 as String
-// CHECK:   $T4 as Int64
-// CHECK:   $T5 as (x : $T4)
-// CHECK:   $T6 as String
-// CHECK:   $T7 as (array : Slice<$T0>, fn : $T0 -> $T1)
-// CHECK:   $T8 as Slice<$T1>
-// CHECK: SOLVED (completely)
-// CHECK: Unique solution found.
-// FIXME: Would like to use String() constructor here.
-:dump_constraints myMap(intArray, { toString($0) })
+// Closures with too few parameters.
+func foo(x: (Int, Int) -> Int) {}
+foo({$0}) // expected-error{{cannot convert the expression's type '()' to type 'Int'}}
+
+struct X {}
+func mySort(array: String[], pred: (String, String) -> Bool) -> String[] {}
+func mySort(array: X[], pred: (X, X) -> Bool) -> X[] {}
+var strings : String[]
+mySort(strings, { x, y in x < y })
+
+// Closures with inout arguments.
+func f0<T, U>(t: T, f: (inout T) -> U) -> U {
+  var t2 = t;
+  return f(&t2)
+}
+
+struct X2 {
+  func g() -> Float { return 0 }  
+}
+
+f0(X2(), {$0.g()})  // expected-error {{could not find member 'g'}}
+
+// Autoclosure
+func f1(`f: @auto_closure () -> Int) { }
+func f2() -> Int { }
+f1(f: f2) // expected-error{{function produces expected type 'Int'; did you mean to call it with '()'?}}{{9-9=()}}
+f1(f: 5)
+
+// Ternary in closure
+var evenOrOdd : Int -> String = {$0 % 2 == 0 ? "even" : "odd"}
+
+// <rdar://problem/15367882>
+func foo() {
+  not_declared({ $0 + 1 }) // expected-error{{use of unresolved identifier 'not_declared'}}
+}
+
+// <rdar://problem/15536725>
+struct X3<T> {
+  init(_: (T)->()) {}
+}
+
+func testX3(var x: Int) {
+  var q = X3({ x = $0 })
+}
+
+// <rdar://problem/13811882>
+func test13811882() {
+  var f : (Int) -> (Int, Int) = {($0, $0)}
+  var x = 1
+  var g : (Int) -> (Int, Int) = {($0, x)}
+}
+

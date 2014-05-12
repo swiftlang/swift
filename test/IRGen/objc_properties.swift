@@ -1,89 +1,117 @@
 // RUN: rm -rf %t/clang-module-cache
-// RUN: %swift -triple x86_64-apple-darwin10 -module-cache-path=%t/clang-module-cache -sdk=%S/Inputs %s -emit-llvm | FileCheck %s
+// RUN: %swift -target x86_64-apple-darwin10 %s -emit-ir | FileCheck %s
 
-class [objc] SomeObject {
+@objc class SomeObject {
   var readonly : SomeObject {
-  get:
-    return this
+    get {
+      return self
+    }
   }
 
-  var _readwrite : SomeObject
-
   var readwrite : SomeObject {
-  get:
-    return _readwrite
-  set:
-    _readwrite = readwrite
+    get {
+      return bareIvar
+    }
+    set {
+      bareIvar = newValue
+    }
   }
 
   var bareIvar : SomeObject
+
+  init() { 
+    bareIvar = SomeObject()
+  }
 }
 
 extension SomeObject {
   var extensionProperty : SomeObject {
-  get:
-    return this
-  set:
-    bareIvar = this
+    get {
+      return self
+    }
+    set {
+      bareIvar = self
+    }
   }
 }
 
-// CHECK: [[GETTER_SIGNATURE:@.*]] = private unnamed_addr constant [4 x i8] c"@@:\00"
 
 // CHECK: [[READONLY_NAME:@.*]] = private unnamed_addr constant [9 x i8] c"readonly\00"
 // CHECK: [[READONLY_ATTRS:@.*]] = private unnamed_addr constant [29 x i8] c"T@\22SomeObject\22,R,N,Vreadonly\00"
 
+// CHECK: [[GETTER_SIGNATURE:@.*]] = private unnamed_addr constant [8 x i8] c"@16@0:8\00"
+
 // CHECK: [[READWRITE_NAME:@.*]] = private unnamed_addr constant [10 x i8] c"readwrite\00"
 // CHECK: [[READWRITE_ATTRS:@.*]] = private unnamed_addr constant [30 x i8] c"T@\22SomeObject\22,&,N,Vreadwrite\00"
 
-// CHECK: @_INSTANCE_METHODS_SomeObject = private constant { {{.*}}] } {
+// CHECK: [[SETTER_SIGNATURE:@.*]] = private unnamed_addr constant [11 x i8] c"v24@0:8@16\00"
+
+// CHECK: [[BAREIVAR_NAME:@.*]] = private unnamed_addr constant [9 x i8] c"bareIvar\00"
+// CHECK: [[BAREIVAR_ATTRS:@.*]] = private unnamed_addr constant [29 x i8] c"T@\22SomeObject\22,&,N,VbareIvar\00"
+
+// CHECK: @_INSTANCE_METHODS__TtC15objc_properties10SomeObject = private constant { {{.*}}] } {
 // CHECK:   i32 24,
-// CHECK:   i32 3,
-// CHECK:   [3 x { i8*, i8*, i8* }] [{
+// CHECK:   i32 6,
+// CHECK:   [6 x { i8*, i8*, i8* }] [{
 // CHECK:     i8* getelementptr inbounds ([9 x i8]* @"\01L_selector_data(readonly)", i64 0, i64 0),
-// CHECK:     i8* getelementptr inbounds ([4 x i8]* [[GETTER_SIGNATURE]], i64 0, i64 0),
-// CHECK:     i8* bitcast (%CSo10SomeObject* (%CSo10SomeObject*, i8*)* @_TToCSo10SomeObject8readonlyS_g to i8*)
+// CHECK:     i8* getelementptr inbounds ([8 x i8]* [[GETTER_SIGNATURE]], i64 0, i64 0),
+// CHECK:     i8* bitcast ([[OPAQUE0:%.*]]* ([[OPAQUE1:%.*]]*, i8*)* @_TToFC15objc_properties10SomeObjectg8readonlyS0_ to i8*)
 // CHECK:   }, {
 // CHECK:     i8* getelementptr inbounds ([10 x i8]* @"\01L_selector_data(readwrite)", i64 0, i64 0),
-// CHECK:     i8* getelementptr inbounds ([4 x i8]* [[GETTER_SIGNATURE]], i64 0, i64 0),
-// CHECK:     i8* bitcast (%CSo10SomeObject* (%CSo10SomeObject*, i8*)* @_TToCSo10SomeObject9readwriteS_g to i8*)
+// CHECK:     i8* getelementptr inbounds ([8 x i8]* [[GETTER_SIGNATURE]], i64 0, i64 0),
+// CHECK:     i8* bitcast ([[OPAQUE0]]* ([[OPAQUE1]]*, i8*)* @_TToFC15objc_properties10SomeObjectg9readwriteS0_ to i8*)
 // CHECK:   }, {
 // CHECK:     i8* getelementptr inbounds ([14 x i8]* @"\01L_selector_data(setReadwrite:)", i64 0, i64 0),
-// CHECK:     i8* null,
-// CHECK:     i8* bitcast (void (%CSo10SomeObject*, i8*, %CSo10SomeObject*)* @_TToCSo10SomeObject9readwriteS_s to i8*)
+// CHECK:     i8* getelementptr inbounds ([11 x i8]* [[SETTER_SIGNATURE]], i64 0, i64 0),
+// CHECK:     i8* bitcast (void ([[OPAQUE3:%.*]]*, i8*, [[OPAQUE4:%.*]]*)* @_TToFC15objc_properties10SomeObjects9readwriteS0_ to i8*)
+// CHECK:   }, {
+// CHECK:     i8* getelementptr inbounds ([9 x i8]* @"\01L_selector_data(bareIvar)", i64 0, i64 0),
+// CHECK:     i8* getelementptr inbounds ([8 x i8]* [[GETTER_SIGNATURE]], i64 0, i64 0),
+// CHECK:     i8* bitcast ([[OPAQUE0]]* ([[OPAQUE1]]*, i8*)* @_TToFC15objc_properties10SomeObjectg8bareIvarS0_ to i8*)
+// CHECK:   }, {
+// CHECK:     i8* getelementptr inbounds ([13 x i8]* @"\01L_selector_data(setBareIvar:)", i64 0, i64 0),
+// CHECK:     i8* getelementptr inbounds ([11 x i8]* [[SETTER_SIGNATURE]], i64 0, i64 0),
+// CHECK:     i8* bitcast (void ([[OPAQUE3]]*, i8*, [[OPAQUE4]]*)* @_TToFC15objc_properties10SomeObjects8bareIvarS0_ to i8*)
+// CHECK:   }, {
+// CHECK:     i8* getelementptr inbounds ([5 x i8]* @"\01L_selector_data(init)", i64 0, i64 0), 
+// CHECK:     i8* getelementptr inbounds ([8 x i8]* @2, i64 0, i64 0), 
+// CHECK:     i8* bitcast ([[OPAQUE5:%.*]]* ([[OPAQUE6:%.*]]*, i8*)* @_TToFC15objc_properties10SomeObjectcfMS0_FT_S0_ to i8*)
 // CHECK:   }]
 // CHECK: }, section "__DATA, __objc_const", align 8
 
-// CHECK: @_PROPERTIES_SomeObject = private constant { {{.*}}] } {
+// CHECK: @_PROPERTIES__TtC15objc_properties10SomeObject = private constant { {{.*}}] } {
 // CHECK:   i32 16,
-// CHECK:   i32 2,
-// CHECK:   [2 x { i8*, i8* }] [{
+// CHECK:   i32 3,
+// CHECK:   [3 x { i8*, i8* }] [{
 // CHECK:     i8* getelementptr inbounds ([9 x i8]* [[READONLY_NAME]], i64 0, i64 0),
 // CHECK:     i8* getelementptr inbounds ([29 x i8]* [[READONLY_ATTRS]], i64 0, i64 0)
 // CHECK:   }, {
 // CHECK:     i8* getelementptr inbounds ([10 x i8]* [[READWRITE_NAME]], i64 0, i64 0),
 // CHECK:     i8* getelementptr inbounds ([30 x i8]* [[READWRITE_ATTRS]], i64 0, i64 0)
+// CHECK:   }, {
+// CHECK:     i8* getelementptr inbounds ([9 x i8]* [[BAREIVAR_NAME]], i64 0, i64 0),
+// CHECK:     i8* getelementptr inbounds ([29 x i8]* [[BAREIVAR_ATTRS]], i64 0, i64 0)
 // CHECK:   }]
 // CHECK: }, section "__DATA, __objc_const", align 8
 
 // CHECK: [[EXTENSIONPROPERTY_NAME:@.*]] = private unnamed_addr constant [18 x i8] c"extensionProperty\00"
 // CHECK: [[EXTENSIONPROPERTY_ATTRS:@.*]] = private unnamed_addr constant [38 x i8] c"T@\22SomeObject\22,&,N,VextensionProperty\00"
 
-// CHECK: @"_CATEGORY_INSTANCE_METHODS_SomeObject_$_objc_properties" = private constant { {{.*}}] } {
+// CHECK: @"_CATEGORY_INSTANCE_METHODS__TtC15objc_properties10SomeObject_$_objc_properties" = private constant { {{.*}}] } {
 // CHECK:   i32 24,
 // CHECK:   i32 2,
 // CHECK:   [2 x { i8*, i8*, i8* }] [{
 // CHECK:     { i8* getelementptr inbounds ([18 x i8]* @"\01L_selector_data(extensionProperty)", i64 0, i64 0),
-// CHECK:     i8* getelementptr inbounds ([4 x i8]* [[GETTER_SIGNATURE]], i64 0, i64 0),
-// CHECK:     i8* bitcast (%CSo10SomeObject* (%CSo10SomeObject*, i8*)* @_TToCSo10SomeObject17extensionPropertyS_g to i8*)
+// CHECK:     i8* getelementptr inbounds ([8 x i8]* [[GETTER_SIGNATURE]], i64 0, i64 0),
+// CHECK:     i8* bitcast ([[OPAQUE0]]* ([[OPAQUE1]]*, i8*)* @_TToFC15objc_properties10SomeObjectg17extensionPropertyS0_ to i8*)
 // CHECK:   }, {
 // CHECK:     i8* getelementptr inbounds ([22 x i8]* @"\01L_selector_data(setExtensionProperty:)", i64 0, i64 0),
-// CHECK:     i8* null,
-// CHECK:     i8* bitcast (void (%CSo10SomeObject*, i8*, %CSo10SomeObject*)* @_TToCSo10SomeObject17extensionPropertyS_s to i8*)
+// CHECK:     i8* getelementptr inbounds ([11 x i8]* [[SETTER_SIGNATURE]], i64 0, i64 0),
+// CHECK:     i8* bitcast (void ([[OPAQUE3]]*, i8*, [[OPAQUE4]]*)* @_TToFC15objc_properties10SomeObjects17extensionPropertyS0_ to i8*)
 // CHECK:   }]
 // CHECK: }, section "__DATA, __objc_const", align 8
 
-// CHECK: @"_CATEGORY_PROPERTIES_SomeObject_$_objc_properties" = private constant { {{.*}}] } {
+// CHECK: @"_CATEGORY_PROPERTIES__TtC15objc_properties10SomeObject_$_objc_properties" = private constant { {{.*}}] } {
 // CHECK:   i32 16,
 // CHECK:   i32 1,
 // CHECK:   [1 x { i8*, i8* }] [{

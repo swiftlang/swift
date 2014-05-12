@@ -4,16 +4,16 @@
 
 // Initializer delegation: classes
 class C0 {
-  init() {
-    self.init(5)
+  convenience init() {
+    self.init(value: 5)
   }
 
   init(value: Int) { /* ... */ }
 }
 
 class C1 {
-  init() {
-    self.init(5)
+  convenience init() {
+    self.init(value: 5)
   }
 
   init(value: Int) { /* ... */ }
@@ -23,7 +23,7 @@ class C1 {
 // Initializer delegation: structs
 struct S0 {
   init() {
-    self.init(5)
+    self.init(value: 5)
   }
 
   init(value: Int) { /* ... */ }
@@ -31,7 +31,7 @@ struct S0 {
 
 struct S1 {
   init() {
-    self.init(5)
+    self.init(value: 5)
   }
 
   init(value: Int) { /* ... */ }
@@ -44,7 +44,7 @@ enum E0 {
   case B
 
   init() {
-    self.init(5)
+    self.init(value: 5)
   }
 
   init(value: Int) { /* ... */ }
@@ -55,7 +55,7 @@ enum E1 {
   case B
 
   init() {
-    self.init(5)
+    self.init(value: 5)
   }
 
   init(value: Int) { /* ... */ }
@@ -65,7 +65,7 @@ enum E1 {
 // Ill-formed initializer delegation: no matching constructor
 class Z0 {
   init() {
-    self.init(5, 5) // expected-error{{expression does not type-check}}
+    self.init(5, 5) // expected-error{{could not find an overload for 'init' that accepts the supplied arguments}}
   }
 
   init(value: Int) { /* ... */ }
@@ -74,7 +74,7 @@ class Z0 {
 
 struct Z1 {
   init() {
-    self.init(5, 5) // expected-error{{expression does not type-check}}
+    self.init(5, 5) // expected-error{{could not find an overload for 'init' that accepts the supplied arguments}}
   }
 
   init(value: Int) { /* ... */ }
@@ -86,7 +86,7 @@ enum Z2 {
   case B
 
   init() {
-    self.init(5, 5) // expected-error{{expression does not type-check}}
+    self.init(5, 5) // expected-error{{could not find an overload for 'init' that accepts the supplied arguments}}
   }
 
   init(value: Int) { /* ... */ }
@@ -96,7 +96,7 @@ enum Z2 {
 // Ill-formed initialization: wrong context.
 class Z3 {
   func f() {
-    self.init() // expected-error{{initializer delegation can only occur within an initiailizer}}
+    self.init() // expected-error{{initializer delegation can only occur within an initializer}}
   }
 
   init() { }
@@ -106,7 +106,7 @@ class Z3 {
 class Z4 {
   init() {}
 
-  init(other: Z4) {
+  convenience init(other: Z4) {
     other.init() // expected-error{{'init' can only refer to the initializers of 'self'}}
   }
 }
@@ -114,7 +114,52 @@ class Z4 {
 class Z5 : Z4 {
   init() { }
 
-  init(other: Z5) {
+  convenience init(other: Z5) {
     other.init() // expected-error{{'init' can only refer to the initializers of 'self' or 'super'}}
   }
 }
+
+// Ill-formed initialization: failure to call initializer.
+class Z6 {
+  convenience init() {
+    var f : () -> Z6 = self.init // expected-error{{initializer cannot be referenced without arguments}}
+  }
+
+  init(other: Z6) { }
+}
+
+// Ill-formed initialization: both superclass and delegating.
+class Z7Base { }
+
+class Z7 : Z7Base {
+  init() { }
+
+  init(b: Bool) {
+    if b { super.init() } // expected-note{{previous chaining call is here}}
+    else { self.init() } // expected-error{{initializer cannot both delegate ('self.init') and chain to a }}
+  }
+}
+
+struct RDar16603812 {
+   var i = 42
+   init() {}
+   func foo() {
+      self.init() // expected-error {{could not find a user-defined conversion from type 'RDar16603812' to type 'inout RDar16603812'}} expected-error {{initializer delegation can only occur within an initializer}}
+   }
+}
+
+class RDar16666631 {
+   var i: Int
+   var d: Double
+   var s: String
+   init(i: Int, d: Double, s: String) {
+      self.i = i
+      self.d = d
+      self.s = s
+   }
+   convenience init(i: Int, s: String) {
+      self.init(i: i, d: 0.1, s: s)
+   }
+}
+let rdar16666631 = RDar16666631(i: 5, d: 6) // expected-error {{missing argument for parameter 's' in call}}
+

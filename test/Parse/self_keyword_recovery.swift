@@ -1,63 +1,102 @@
 // RUN: %swift %s -verify
 //
+// XFAIL: *
+//
 // Test recovery for 'self' and 'Self' keywords used in inappropriate places.
 
-func self() {} // expected-error {{expected identifier in func declaration}}
-func Self() {} // expected-error {{expected identifier in func declaration}}
+//===--- Helper types used in tests below.
 
-struct Self {} // FIXME
+protocol FooProtocol {}
 
-func freeFunc1() -> self {} // expected-error {{expected type}} expected-error {{consecutive statements on a line must be separated by ';'}} expected-error {{use of unresolved identifier 'self'}}
-func freeFunc2() -> Self {} // FIXME
+//===--- Tests.
 
-func freeFunc3(self: Int) {} // expected-error {{expected pattern is a keyword}}
-func freeFunc4(Self: Int) {} // expected-error {{expected pattern is a keyword}}
+func self() {} // expected-error {{expected identifier in function declaration}}
+func Self() {} // expected-error {{expected identifier in function declaration}}
 
-func freeFunc5(a: self) {} // expected-error {{expected pattern is a keyword}} expected-error {{expected type}} expected-error {{expected ',' separator}}
-func freeFunc6(a: Self) {} // FIXME
+func super {} // expected-error {{expected identifier in function declaration}} expected-error {{expected '(' in argument list of function declaration}}
+func weak -> Int {} // expected-error {{expected identifier in function declaration}} expected-error {{expected '(' in argument list of function declaration}}
+
+func freeFunc1() -> self {} // expected-error {{expected type}}
+func freeFunc2() -> Self {} // expected-error {{global function cannot return 'Self'}}
+
+func freeFunc3(self: Int) {} // expected-error {{keyword 'self' cannot be used as an identifier}}
+func freeFunc4(Self: Int) {} // expected-error {{keyword 'Self' cannot be used as an identifier}}
+
+func freeFunc5(a: self) {} // expected-error {{expected type}}
+func freeFunc6(a: Self) {} // expected-error {{use of undeclared type 'Self'}}
 
 struct Structs {
-  struct self {} // FIXME
-  struct Self {} // FIXME
+  struct self {}                  // expected-error {{expected identifier in struct declaration}}
+  struct self : FooProtocol {}    // expected-error {{expected identifier in struct declaration}}
+  struct self<T> {}               // expected-error {{expected identifier in struct declaration}}
+  struct self<T> : FooProtocol {} // expected-error {{expected identifier in struct declaration}}
+
+  struct Self {}                  // expected-error {{expected identifier in struct declaration}}
 }
 
-struct Unions {
-  union self {} // FIXME
-  union Self {} // FIXME
+struct Enums {
+  enum self {} // expected-error {{expected identifier in enum declaration}}
+  enum Self {} // expected-error {{expected identifier in enum declaration}}
 }
 
-struct Classes { // expected-note {{to match this opening '{'}}
-  class self {} // FIXME
-  class Self {} // FIXME
-  extension self {} // expected-error {{consecutive declarations on a line must be separated by ';'}} expected-error {{expected declaration}} expected-error {{expected type}}
-  extension Self {} // expected-error {{expected '}' in struct}} FIXME: what about Self?
-} //expected-error {{extraneous '}' at top level}}
+struct Classes {
+  class self {}                  // expected-error {{expected identifier in class declaration}}
+  class self : FooProtocol {}    // expected-error {{expected identifier in class declaration}}
+  class self<T> {}               // expected-error {{expected identifier in class declaration}}
+  class self<T> : FooProtocol {} // expected-error {{expected identifier in class declaration}}
+
+  class Self {} // expected-error {{expected identifier in class declaration}}
+
+  extension self {} // expected-error {{expected type}} expected-error {{declaration is only valid at file scope}}
+  // FIXME: this errors out for the wrong reason
+  extension Self {} // expected-error {{declaration is only valid at file scope}}
+
+  extension super {} // expected-error {{expected type}} expected-error {{declaration is only valid at file scope}}
+  extension func {} // expected-error {{expected type}} expected-error {{declaration is only valid at file scope}}
+}
+
+protocol SelfExtensionA {
+  extension self {} // expected-error {{expected type}} expected-error {{declaration is only valid at file scope}}
+}
+
+protocol SelfExtensionB {
+  // FIXME: this errors out for the wrong reason
+  extension Self {} // expected-error {{declaration is only valid at file scope}}
+}
+
+// FIXME: this errors out for the wrong reason
+extension Self {} // expected-error {{use of undeclared type 'Self'}}
 
 struct Protocols {
-  // FIXME: this errors out for the wrong reason
-  protocol self {} // expected-error {{declaration is only valid at file scope}}
-  protocol Self {} // expected-error {{declaration is only valid at file scope}}
+  protocol self {}               // expected-error {{expected identifier in protocol declaration}} expected-error {{declaration is only valid at file scope}}
+  protocol self : FooProtocol {} // expected-error {{expected identifier in protocol declaration}} expected-error {{declaration is only valid at file scope}}
+
+  protocol Self {} // expected-error {{expected identifier in protocol declaration}} expected-error {{declaration is only valid at file scope}}
 }
 
 struct Typealiases {
-  typealias self = Int // FIXME
-  typealias Self = Int // FIXME
+  typealias self = Int               // expected-error {{expected identifier in typealias declaration}}
+
+  typealias Self = Int               // expected-error {{expected identifier in typealias declaration}}
 }
 
-var self = 123 // expected-error {{expected pattern is a keyword}}
-var Self = 123 // expected-error {{expected pattern is a keyword}}
-
-struct FooStruct {
-  var self : Int // expected-error {{expected pattern is a keyword}}
-  var Self : Int // expected-error {{expected pattern is a keyword}}
+enum FooEnum1 {
+  case self // expected-error {{expected identifier in enum case declaration}}
+  case Self // expected-error {{expected identifier in enum case declaration}}
 }
 
-//union FooUnion {
-  // FIXME: this diagnostic is misleading.
-//  case self(Int) // e/xpected-error {{'case' label can only appear inside a 'switch' statement}}
-//  case Self(Int)
-//}
-// FIXME: this diagnostic is produced on a line after the last one, thus the
-// whole union testcase is disabled.
-// e/xpected-error {{expected declaration}}
+enum FooEnum2 {
+  case self: // expected-error {{'case' label can only appear inside a 'switch' statement}}
+  case Self: // expected-error {{'case' label can only appear inside a 'switch' statement}}
+}
+
+enum FooEnum3 {
+  case self(Int) // expected-error {{expected identifier in enum case declaration}}
+  case Self(Int) // expected-error {{expected identifier in enum case declaration}}
+}
+
+enum FooEnum4 {
+  case self(Int): // expected-error {{expected identifier in enum case declaration}} expected-error {{'case' label can only appear inside a 'switch' statement}}
+  case Self(Int): // expected-error {{expected identifier in enum case declaration}} expected-error {{'case' label can only appear inside a 'switch' statement}}
+}
 

@@ -1,26 +1,33 @@
-// RUN: %swift -parse-as-library -emit-silgen %s | FileCheck %s
+// RUN: %swift -parse-stdlib -parse-as-library -emit-silgen %s | FileCheck %s
 
-func standalone_function(x:Int, y:Int) -> Int {
+typealias Int = Builtin.Int64
+typealias Int64 = Builtin.Int64
+typealias Bool = Builtin.Int1
+
+var zero = getInt()
+func getInt() -> Int { return zero }
+
+func standalone_function(x: Int, y: Int) -> Int {
   return x
 }
 
-func higher_order_function(f:(x:Int, y:Int) -> Int, x:Int, y:Int) -> Int {
-  return f(x, y)
+func higher_order_function(f: (x: Int, y: Int) -> Int, x: Int, y: Int) -> Int {
+  return f(x: x, y: y)
 }
 
-func higher_order_function2(f:(Int, Int) -> Int, x:Int, y:Int) -> Int {
+func higher_order_function2(f: (Int, Int) -> Int, x: Int, y: Int) -> Int {
   return f(x, y)
 }
 
 // -- Entry point BBs correspond to curried arguments in left-to-right order.
-// CHECK: sil @_T9functions16curried_functionfT1xSi_FT1ySi_Si : $[thin] ((y : Int64), (x : Int64)) -> Int64
-func curried_function(x:Int)(y:Int) -> Int {
-  // CHECK: bb0(%0 : $Int64, %1 : $Int64):
-  // CHECK: [[YADDR:%[0-9]+]] = alloc_box $Int64
-  // CHECK: [[XADDR:%[0-9]+]] = alloc_box $Int64
+// CHECK-LABEL: sil  @_TF9functions16curried_function{{.*}} : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
+func curried_function(var x: Int)(var y: Int) -> Int {
+  // CHECK: bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
+  // CHECK: [[YADDR:%[0-9]+]] = alloc_box $Builtin.Int64
+  // CHECK: [[XADDR:%[0-9]+]] = alloc_box $Builtin.Int64
 
   return standalone_function(x, y)
-  // CHECK: [[FUNC:%[0-9]+]] = function_ref @_T9functions19standalone_functionFT1xSi1ySi_Si : $[thin] (x : Int64, y : Int64) -> Int64
+  // CHECK: [[FUNC:%[0-9]+]] = function_ref @_TF9functions19standalone_function{{.*}} : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
   // CHECK: [[X:%[0-9]+]] = load [[XADDR]]
   // CHECK: [[Y:%[0-9]+]] = load [[YADDR]]
   // CHECK: apply [[FUNC]]([[X]], [[Y]])
@@ -28,132 +35,152 @@ func curried_function(x:Int)(y:Int) -> Int {
   // CHECK: return
 }
 
-// -- Curried entry points
-// CHECK: sil @_T9functions16curried_functionFT1xSi_FT1ySi_Si : $[thin] (x : Int64) -> (y : Int64) -> Int64
-// CHECK: bb0([[X:%[0-9]+]] : $Int64):
-// CHECK:   [[FUNC:%[0-9]+]] = function_ref @_T9functions16curried_functionfT1xSi_FT1ySi_Si  : $[thin] ((y : Int64), (x : Int64)) -> Int64
-// CHECK:   [[CLOSURE:%[0-9]+]] = partial_apply [[FUNC]]([[X]])
-// CHECK:   return [[CLOSURE]]
+// -- Curried generic function needs to forward archetypes through entry points
+func generic_curried_function<T, U>(x: T)(y: U) { }
 
 // -- Curried function that returns a function uncurries to the right "natural" level
-// CHECK: sil @_T9functions33curried_function_returns_functionfT1xSi_FT1ySi_FT1zSi_Si :  $[thin] ((y : Int64), (x : Int64)) -> (z : Int64) -> Int64
-func curried_function_returns_function(x:Int)(y:Int) -> (z:Int) -> Int {
-  // CHECK: bb0(%0 : $Int64, %1 : $Int64):
+// CHECK-LABEL: sil  @_TF9functions33curried_function_returns_function{{.*}} :  $@thin (Builtin.Int64, Builtin.Int64) -> @owned @callee_owned (Builtin.Int64) -> Builtin.Int64
+func curried_function_returns_function(var x:Int)(var y:Int) -> (z:Int) -> Int {
+  // CHECK: bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
   return { z in standalone_function(standalone_function(x, y), z) }
 }
 // -- Local function has extra uncurry level with context
-// CHECK: sil internal @closure0 : $[thin] ((z : Int64), (Builtin.ObjectPointer, [byref] Int64, Builtin.ObjectPointer, [byref] Int64)) -> Int64
-// bb0(%0 : $Builtin.ObjectPointer, %1 : $*Int64, %2 : $Builtin.ObjectPointer, %3 : $*Int64, %4 : $Int64):
+// CHECK-LABEL: sil shared @_TFF9functions33curried_function_returns_function{{.*}} : $@thin (Builtin.Int64, @owned Builtin.NativeObject, @inout Builtin.Int64, @owned Builtin.NativeObject, @inout Builtin.Int64) -> Builtin.Int64
+// bb0(%0 : $Builtin.NativeObject, %1 : $*Builtin.Int64, %2 : $Builtin.NativeObject, %3 : $*Builtin.Int64, %4 : $Builtin.Int64):
 
-class SomeClass {
-  // -- Constructors and methods are uncurried in 'this'
+struct SomeStruct {
+  // -- Constructors and methods are uncurried in 'self'
   // -- Instance methods use 'method' cc
 
-  // CHECK: sil @_TC9functions9SomeClassCfMS0_FT1xSi1ySi_S0_ : $[thin] ((x : Int64, y : Int64), SomeClass.metatype) -> SomeClass
-  // CHECK: bb0(%0 : $Int64, %1 : $Int64, %2 : $SomeClass.metatype):
-  // CHECK: sil @_TC9functions9SomeClasscfMS0_FT1xSi1ySi_S0_ : $[cc(method), thin] ((x : Int64, y : Int64), SomeClass) -> SomeClass
-  // CHECK: bb0(%0 : $Int64, %1 : $Int64, %2 : $SomeClass):
-  constructor(x:Int, y:Int) {}
+  init(x:Int, y:Int) {}
 
-  // CHECK: sil @_TC9functions9SomeClass6methodfS0_FT1xSi_T_ : $[cc(method), thin] ((x : Int64), SomeClass) -> () 
-  // CHECK: bb0(%0 : $Int64, %1 : $SomeClass):
-  func method(x:Int) {}
+  mutating
+  func method(x: Int) {}
 
-  // CHECK: sil @_TC9functions9SomeClass14curried_methodfS0_fT1xSi_FT1ySi_T_ : $[cc(method), thin] ((y : Int64), (x : Int64), SomeClass) -> ()
-  // CHECK: bb0(%0 : $Int64, %1 : $Int64, %2 : $SomeClass):
-  func curried_method(x:Int)(y:Int) {}
+  mutating
+  func curried_method(x: Int)(y: Int) {}
 
-  // CHECK: sil @_TC9functions9SomeClass13static_methodfMS0_FT1xSi_T_ : $[thin] ((x : Int64), SomeClass.metatype) -> ()
-  // CHECK: bb0(%0 : $Int64, %1 : $SomeClass.metatype):
-  static func static_method(x:Int) {}
+  static func static_method(x: Int) {}
 
-  // CHECK: sil @_TC9functions9SomeClass21static_curried_methodfMS0_fT1xSi_FT1ySi_T_ : $[thin] ((y : Int64), (x : Int64), SomeClass.metatype) -> ()
-  // CHECK: bb0(%0 : $Int64, %1 : $Int64, %2 : $SomeClass.metatype):
-  static func static_curried_method(x:Int)(y:Int) {}
+  static func static_curried_method(x: Int)(y: Int) {}
 
-  var someProperty : Int {
-  get:
-    return 0
-  set:
+  func generic_method<T>(x: T) {}
+}
+
+class SomeClass {
+  // -- Constructors and methods are uncurried in 'self'
+  // -- Instance methods use 'method' cc
+
+  // CHECK-LABEL: sil  @_TFC9functions9SomeClasscfMS0_FT1xBi64_1yBi64__S0_ : $@cc(method) @thin (Builtin.Int64, Builtin.Int64, @owned SomeClass) -> @owned SomeClass
+  // CHECK: bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $SomeClass):
+
+  // CHECK-LABEL: sil  @_TFC9functions9SomeClassCfMS0_FT1xBi64_1yBi64__S0_ : $@thin (Builtin.Int64, Builtin.Int64, @thick SomeClass.Type) -> @owned SomeClass
+  // CHECK: bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $@thick SomeClass.Type):
+  init(x:Int, y:Int) {}
+
+  // CHECK-LABEL: sil  @_TFC9functions9SomeClass6method{{.*}} : $@cc(method) @thin (Builtin.Int64, @owned SomeClass) -> () 
+  // CHECK: bb0(%0 : $Builtin.Int64, %1 : $SomeClass):
+  func method(x: Int) {}
+
+  // CHECK-LABEL: sil  @_TFC9functions9SomeClass14curried_method{{.*}} : $@cc(method) @thin (Builtin.Int64, Builtin.Int64, @owned SomeClass) -> ()
+  // CHECK: bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $SomeClass):
+  func curried_method(x: Int)(y: Int) {}
+
+  // CHECK-LABEL: sil  @_TFC9functions9SomeClass13static_method{{.*}} : $@thin (Builtin.Int64, @thick SomeClass.Type) -> ()
+  // CHECK: bb0(%0 : $Builtin.Int64, %1 : $@thick SomeClass.Type):
+  class func static_method(x: Int) {}
+
+  // CHECK-LABEL: sil  @_TFC9functions9SomeClass21static_curried_method{{.*}} : $@thin (Builtin.Int64, Builtin.Int64, @thick SomeClass.Type) -> ()
+  // CHECK: bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $@thick SomeClass.Type):
+  class func static_curried_method(x: Int)(y: Int) {}
+
+  var someProperty: Int {
+    get {
+      return zero
+    }
+    set {}
   }
 
   subscript(x:Int, y:Int) -> Int {
-  get:
-    return 0
-  set:
+    get {
+      return zero
+    }
+    set {}
   }
 
-  func generic<T>(x:T) -> T {
+  func generic<T>(x: T) -> T {
     return x
   }
 }
 
-func SomeClassWithBenefits() -> SomeClass.metatype {
-  return SomeClass
+func SomeClassWithBenefits() -> SomeClass.Type {
+  return SomeClass.self
 }
 
 protocol SomeProtocol {
-  func method(x:Int)
-  static func static_method(x:Int)
+  func method(x: Int)
+  class func static_method(x: Int)
 }
 
 struct ConformsToSomeProtocol : SomeProtocol {
-  func method(x : Int) { }
-  static func static_method(x : Int) { }
+  func method(x: Int) { }
+  static func static_method(x: Int) { }
 }
 
 class SomeGeneric<T> {
-  func method(x:T) -> T { return x }
+  init() { }
+  func method(x: T) -> T { return x }
 
-  func generic<U>(x:U) -> U { return x }
+  func generic<U>(x: U) -> U { return x }
 }
 
-// CHECK: sil @_T9functions5callsFT1iSi1jSi1kSi_T_ : $[thin] (i : Int64, j : Int64, k : Int64) -> ()
-func calls(i:Int, j:Int, k:Int) {
-  // CHECK: bb0(%0 : $Int64, %1 : $Int64, %2 : $Int64):
-  // CHECK: [[IADDR:%[0-9]+]] = alloc_box $Int64
-  // CHECK: [[JADDR:%[0-9]+]] = alloc_box $Int64
-  // CHECK: [[KADDR:%[0-9]+]] = alloc_box $Int64
+// CHECK-LABEL: sil  @_TF9functions5calls{{.*}} : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int64) -> ()
+func calls(var i:Int, var j:Int, var k:Int) {
+  // CHECK: bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $Builtin.Int64):
+  // CHECK: [[IADDR:%[0-9]+]] = alloc_box $Builtin.Int64
+  // CHECK: [[JADDR:%[0-9]+]] = alloc_box $Builtin.Int64
+  // CHECK: [[KADDR:%[0-9]+]] = alloc_box $Builtin.Int64
 
-  // CHECK: [[FUNC:%[0-9]+]] = function_ref @_T9functions19standalone_functionFT1xSi1ySi_Si : $[thin] (x : Int64, y : Int64) -> Int64
+  // CHECK: [[FUNC:%[0-9]+]] = function_ref @_TF9functions19standalone_function{{.*}} : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
   // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
   // CHECK: [[J:%[0-9]+]] = load [[JADDR]]
   // CHECK: apply [[FUNC]]([[I]], [[J]])
   standalone_function(i, j)
 
-  // CHECK: [[FUNC:%[0-9]+]] = function_ref @_T9functions16curried_functionfT1xSi_FT1ySi_Si : $[thin] ((y : Int64), (x : Int64)) -> Int64
+  // CHECK: [[FUNC:%[0-9]+]] = function_ref @_TF9functions16curried_function{{.*}} : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
   // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
   // CHECK: [[J:%[0-9]+]] = load [[JADDR]]
   // CHECK: apply [[FUNC]]([[J]], [[I]])
-  curried_function(i)(j)
+  curried_function(i)(y: j)
 
   // -- Paren exprs shouldn't affect the uncurrying optimization.
-  // CHECK: [[FUNC:%[0-9]+]] = function_ref @_T9functions16curried_functionfT1xSi_FT1ySi_Si : $[thin] ((y : Int64), (x : Int64)) -> Int64
+  // CHECK: [[FUNC:%[0-9]+]] = function_ref @_TF9functions16curried_function{{.*}} : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
   // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
   // CHECK: [[J:%[0-9]+]] = load [[JADDR]]
   // CHECK: apply [[FUNC]]([[J]], [[I]])
-  (curried_function)(i)(j)
+  (curried_function)(i)(y: j)
 
   // -- Coercions and function conversions shouldn't affect the uncurrying
   //    optimization.
-  // CHECK: [[FUNC:%[0-9]+]] = function_ref @_T9functions16curried_functionfT1xSi_FT1ySi_Si : $[thin] ((y : Int64), (x : Int64)) -> Int64
+  // CHECK: [[FUNC:%[0-9]+]] = function_ref @_TF9functions16curried_function{{.*}} : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
   // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
   // CHECK: [[J:%[0-9]+]] = load [[JADDR]]
   // CHECK: apply [[FUNC]]([[J]], [[I]])
-  (curried_function as (x:Int) -> (y:Int) -> Int)(i)(j)
+  (curried_function)(i)(y: j)
 
-  // CHECK: [[FUNC1:%[0-9]+]] = function_ref @_T9functions33curried_function_returns_functionfT1xSi_FT1ySi_FT1zSi_Si : $[thin] ((y : Int64), (x : Int64)) -> (z : Int64) -> Int64
+  // CHECK: [[FUNC1:%[0-9]+]] = function_ref @_TF9functions33curried_function_returns_function{{.*}} : $@thin (Builtin.Int64, Builtin.Int64) -> @owned @callee_owned (Builtin.Int64) -> Builtin.Int64
   // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
   // CHECK: [[J:%[0-9]+]] = load [[JADDR]]
   // CHECK: [[FUNC2:%[0-9]+]] = apply [[FUNC1]]([[J]], [[I]])
   // CHECK: [[K:%[0-9]+]] = load [[KADDR]]
   // CHECK: apply [[FUNC2]]([[K]])
-  curried_function_returns_function(i)(j)(k)
+  curried_function_returns_function(i)(y: j)(z: k)
 
+  generic_curried_function(i)(y: j)
   // -- Use of curried entry points as values.
 
-  // CHECK: [[F1ADDR:%[0-9]+]] = alloc_box $(y : Int64) -> Int64
-  // CHECK: [[FUNC:%[0-9]+]] = function_ref @_T9functions16curried_functionFT1xSi_FT1ySi_Si : $[thin] (x : Int64) -> (y : Int64) -> Int64
+  // CHECK: [[F1ADDR:%[0-9]+]] = alloc_box $@callee_owned (Builtin.Int64) -> Builtin.Int64
+  // CHECK: [[FUNC:%[0-9]+]] = function_ref @_TF9functions16curried_function{{.*}} : $@thin (Builtin.Int64) -> @owned @callee_owned (Builtin.Int64) -> Builtin.Int64
   // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
   // CHECK: [[FUNC_CURRY:%[0-9]+]] = apply [[FUNC]]([[I]])
   // CHECK: store [[FUNC_CURRY]] to [[F1ADDR]]
@@ -161,11 +188,11 @@ func calls(i:Int, j:Int, k:Int) {
   // CHECK: [[F1:%[0-9]+]] = load [[F1ADDR]]
   // CHECK: [[J:%[0-9]+]] = load [[JADDR]]
   // CHECK: apply [[F1]]([[J]])
-  f1(j)
+  f1(y: j)
 
-  // CHECK: [[F2ADDR:%[0-9]+]] = alloc_box $(x : Int64) -> (y : Int64) -> Int64
-  // CHECK: [[FUNC:%[0-9]+]] = function_ref @_T9functions16curried_functionFT1xSi_FT1ySi_Si : $[thin] (x : Int64) -> (y : Int64) -> Int64
-  // CHECK: [[FUNC_THICK:%[0-9]+]] = thin_to_thick_function [[FUNC]] : ${{.*}} to $(x : Int64) -> (y : Int64) -> Int64
+  // CHECK: [[F2ADDR:%[0-9]+]] = alloc_box $@callee_owned (Builtin.Int64) -> @owned @callee_owned (Builtin.Int64) -> Builtin.Int64
+  // CHECK: [[FUNC:%[0-9]+]] = function_ref @_TF9functions16curried_function{{.*}} : $@thin (Builtin.Int64) -> @owned @callee_owned (Builtin.Int64) -> Builtin.Int64
+  // CHECK: [[FUNC_THICK:%[0-9]+]] = thin_to_thick_function [[FUNC]] : ${{.*}} to $@callee_owned (Builtin.Int64) -> @owned @callee_owned (Builtin.Int64) -> Builtin.Int64
   // CHECK: store [[FUNC_THICK]] to [[F2ADDR]]
   var f2 = curried_function
   // CHECK: [[F2:%[0-9]+]] = load [[F2ADDR]]
@@ -173,17 +200,41 @@ func calls(i:Int, j:Int, k:Int) {
   // CHECK: [[F2_I:%[0-9]+]] = apply [[F2]]([[I]])
   // CHECK: [[J:%[0-9]+]] = load [[JADDR]]
   // CHECK: apply [[F2_I]]([[J]])
-  f2(i)(j)
+  f2(i)(y: j)
+
+  var gcf1: Int -> () = generic_curried_function(i)
+  gcf1(j)
+
+  // -- Curry 'self' onto struct method argument lists.
+
+  // CHECK: [[ST_ADDR:%.*]] = alloc_box $SomeStruct
+  // CHECK: [[CTOR:%.*]] = function_ref @_TFV9functions10SomeStructCfMS0_FT1xBi64_1yBi64__S0_ : $@thin (Builtin.Int64, Builtin.Int64, @thin SomeStruct.Type) -> SomeStruct
+  // CHECK: [[METATYPE:%.*]] = metatype $@thin SomeStruct.Type
+  // CHECK: [[I:%.*]] = load [[IADDR]]
+  // CHECK: [[J:%.*]] = load [[JADDR]]
+  // CHECK: apply [[CTOR]]([[I]], [[J]], [[METATYPE]]) : $@thin (Builtin.Int64, Builtin.Int64, @thin SomeStruct.Type) -> SomeStruct
+  var st = SomeStruct(x: i, y: j)
+
+  // -- Use of unapplied struct methods as values.
+
+  // CHECK: [[THUNK:%.*]] = function_ref @_TFV9functions10SomeStruct6method{{.*}}
+  // CHECK: [[THUNK_THICK:%.*]] = thin_to_thick_function [[THUNK]]
+  var stm1 = SomeStruct.method
+  stm1(&st)(i)
+  // CHECK: [[THUNK:%.*]] = function_ref @_TFV9functions10SomeStruct14curried_method{{.*}}
+  // CHECK: [[THUNK_THICK:%.*]] = thin_to_thick_function [[THUNK]]
+  var stm2 = SomeStruct.curried_method
+  stm2(&st)(i)(y: j)
+
+  // -- Curry 'self' onto method argument lists dispatched using class_method.
 
   // CHECK: [[CADDR:%[0-9]+]] = alloc_box $SomeClass
-  // CHECK: [[FUNC:%[0-9]+]] = function_ref @_TC9functions9SomeClassCfMS0_FT1xSi1ySi_S0_ : $[thin] ((x : Int64, y : Int64), SomeClass.metatype) -> SomeClass
-  // CHECK: [[META:%[0-9]+]] = metatype $SomeClass.metatype
+  // CHECK: [[FUNC:%[0-9]+]] = function_ref @_TFC9functions9SomeClassCfMS0_FT1xBi64_1yBi64__S0_ : $@thin (Builtin.Int64, Builtin.Int64, @thick SomeClass.Type) -> @owned SomeClass
+  // CHECK: [[META:%[0-9]+]] = metatype $@thick SomeClass.Type
   // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
   // CHECK: [[J:%[0-9]+]] = load [[JADDR]]
   // CHECK: [[C:%[0-9]+]] = apply [[FUNC]]([[I]], [[J]], [[META]])
-  var c = SomeClass(i, j)
-
-  // -- Curry 'this' onto method argument lists dispatched using class_method.
+  var c = SomeClass(x: i, y: j)
 
   // CHECK: [[C:%[0-9]+]] = load [[CADDR]]
   // CHECK: [[METHOD:%[0-9]+]] = class_method [[C]] : {{.*}}, #SomeClass.method!1
@@ -196,9 +247,13 @@ func calls(i:Int, j:Int, k:Int) {
   // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
   // CHECK: [[J:%[0-9]+]] = load [[JADDR]]
   // CHECK: apply [[METHOD]]([[J]], [[I]], [[C]])
-  c.curried_method(i)(j)
+  c.curried_method(i)(y: j)
 
-  // -- Curry 'this' onto unapplied methods dispatched using class_method.
+  // -- Curry 'self' onto unapplied methods dispatched using class_method.
+  // CHECK: [[METHOD_CURRY_THUNK:%.*]] = function_ref @_TFC9functions9SomeClass6method{{.*}}
+  // CHECK: apply [[METHOD_CURRY_THUNK]]
+  var cm1 = SomeClass.method(c)
+  cm1(i)
 
   // CHECK: [[C:%[0-9]+]] = load [[CADDR]]
   // CHECK: [[METHOD:%[0-9]+]] = class_method [[C]] : {{.*}}, #SomeClass.method!1
@@ -211,33 +266,33 @@ func calls(i:Int, j:Int, k:Int) {
   // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
   // CHECK: [[J:%[0-9]+]] = load [[JADDR]]
   // CHECK: apply [[METHOD]]([[J]], [[I]], [[C]])
-  SomeClass.curried_method(c)(i)(j)
+  SomeClass.curried_method(c)(i)(y: j)
 
-  // -- Curry 'this' onto unapplied methods, after applying side effects from a metatype expression.
+  // -- Curry 'self' onto unapplied methods, after applying side effects from a Type expression.
 
   // CHECK: [[C:%[0-9]+]] = load [[CADDR]]
-  // CHECK: [[SIDEFUNC:%[0-9]+]] = function_ref @_T9functions21SomeClassWithBenefitsFT_MCS_9SomeClass : $[thin] () -> SomeClass.metatype
+  // CHECK: [[SIDEFUNC:%[0-9]+]] = function_ref @_TF9functions21SomeClassWithBenefitsFT_MCS_9SomeClass : $@thin () -> @thick SomeClass.Type
   // CHECK: apply [[SIDEFUNC]]()
   // CHECK: [[METHOD:%[0-9]+]] = class_method [[C]] : {{.*}}, #SomeClass.curried_method!2
   // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
   // CHECK: [[J:%[0-9]+]] = load [[JADDR]]
   // CHECK: apply [[METHOD]]([[J]], [[I]], [[C]])
-  SomeClassWithBenefits().curried_method(c)(i)(j)
+  SomeClassWithBenefits().curried_method(c)(i)(y: j)
 
-  // -- Curry the metatype onto static method argument lists.
+  // -- Curry the Type onto static method argument lists.
   
   // CHECK: [[C:%[0-9]+]] = load [[CADDR]]
   // CHECK: [[METHOD:%[0-9]+]] = class_method [[META:%[0-9]+]] : {{.*}}, #SomeClass.static_method!1
   // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
   // CHECK: apply [[METHOD]]([[I]], [[META]])
-  typeof(c).static_method(i)
+  c.dynamicType.static_method(i)
 
   // CHECK: [[C:%[0-9]+]] = load [[CADDR]]
   // CHECK: [[METHOD:%[0-9]+]] = class_method [[META:%[0-9]+]] : {{.*}}, #SomeClass.static_curried_method!2
   // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
   // CHECK: [[J:%[0-9]+]] = load [[JADDR]]
   // CHECK: apply [[METHOD]]([[J]], [[I]], [[META]])
-  typeof(c).static_curried_method(i)(j)
+  c.dynamicType.static_curried_method(i)(y: j)
 
   // FIXME: use of curried method entry points as values
   //var m1 = c.curried_method(i)
@@ -246,41 +301,41 @@ func calls(i:Int, j:Int, k:Int) {
   //m2(i)(j)
   //var m3 = SomeClass.curried_method
   //m3(c)(i)(j)
-  //var s1 = c.metatype.static_curried_method(i)
+  //var s1 = c.Type.static_curried_method(i)
   //s1(j)
-  //var s2 = c.metatype.static_curried_method
+  //var s2 = c.Type.static_curried_method
   //s2(i)(j)
 
   // -- Curry property accesses.
 
   // -- FIXME: class_method-ify class getters.
   // CHECK: [[C:%[0-9]+]] = load [[CADDR]]
-  // CHECK: [[GETTER:%[0-9]+]] = function_ref @_TC9functions9SomeClass12somePropertySig : $[cc(method), thin] ((), SomeClass) -> Int64
+  // CHECK: [[GETTER:%[0-9]+]] = class_method {{.*}} : $SomeClass, #SomeClass.someProperty!getter.1
   // CHECK: apply [[GETTER]]([[C]])
   i = c.someProperty
 
-  // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
   // CHECK: [[C:%[0-9]+]] = load [[CADDR]]
-  // CHECK: [[SETTER:%[0-9]+]] = function_ref @_TC9functions9SomeClass12somePropertySis : $[cc(method), thin] ((value : Int64), SomeClass) -> ()
+  // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
+  // CHECK: [[SETTER:%[0-9]+]] = class_method [[C]] : $SomeClass, #SomeClass.someProperty!setter.1 : SomeClass -> (Int) -> ()
   // CHECK: apply [[SETTER]]([[I]], [[C]])
   c.someProperty = i
 
   // CHECK: [[C:%[0-9]+]] = load [[CADDR]]
   // CHECK: [[J:%[0-9]+]] = load [[JADDR]]
   // CHECK: [[K:%[0-9]+]] = load [[KADDR]]
-  // CHECK: [[GETTER:%[0-9]+]] = function_ref @_TC9functions9SomeClass11__subscriptFT1xSi1ySi_Sig : $[cc(method), thin] ((), (x : Int64, y : Int64), SomeClass) -> Int64
+  // CHECK: [[GETTER:%[0-9]+]] = class_method [[C]] : $SomeClass, #SomeClass.subscript!getter.1 : SomeClass -> (Int, Int) -> Int , $@cc(method) @thin (Builtin.Int64, Builtin.Int64, @owned SomeClass) -> Builtin.Int64
   // CHECK: apply [[GETTER]]([[J]], [[K]], [[C]])
   i = c[j, k]
 
-  // CHECK: [[K:%[0-9]+]] = load [[KADDR]]
   // CHECK: [[C:%[0-9]+]] = load [[CADDR]]
+  // CHECK: [[K:%[0-9]+]] = load [[KADDR]]
   // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
   // CHECK: [[J:%[0-9]+]] = load [[JADDR]]
-  // CHECK: [[SETTER:%[0-9]+]] = function_ref @_TC9functions9SomeClass11__subscriptFT1xSi1ySi_Sis : $[cc(method), thin] ((value : Int64), (x : Int64, y : Int64), SomeClass) -> ()
+  // CHECK: [[SETTER:%[0-9]+]] = class_method [[C]] : $SomeClass, #SomeClass.subscript!setter.1 : SomeClass -> (Int, Int, Int) -> () , $@cc(method) @thin (Builtin.Int64, Builtin.Int64, Builtin.Int64, @owned SomeClass) -> () 
   // CHECK: apply [[SETTER]]([[K]], [[I]], [[J]], [[C]])
   c[i, j] = k
 
-  // -- Curry the projected concrete value in an existential (or its metatype)
+  // -- Curry the projected concrete value in an existential (or its Type)
   // -- onto protocol type methods dispatched using protocol_method.
 
   // CHECK: [[PADDR:%[0-9]+]] = alloc_box $SomeProtocol
@@ -296,43 +351,42 @@ func calls(i:Int, j:Int, k:Int) {
   // CHECK: [[PMETHOD:%[0-9]+]] = protocol_method [[PADDR]] : {{.*}}, #SomeProtocol.method!1
   // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
   // CHECK: apply [[PMETHOD]]([[I]], [[PVALUE]])
-  // -- Protocol methods do not consume 'this' container
-  // CHECK: destroy_addr [[PADDR]]
-  (ConformsToSomeProtocol() as SomeProtocol).method(i)
+  var sp : SomeProtocol = ConformsToSomeProtocol()
+  sp.method(i)
 
-  // CHECK: [[PMETHOD:%[0-9]+]] = protocol_method [[PMETA:%[0-9]+]] : {{.*}}, #SomeProtocol.static_method!1
-  // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
-  // CHECK: apply [[PMETHOD]]([[I]], [[PMETA]])
-  typeof(p).static_method(i)
+  // FIXME: [[PMETHOD:%[0-9]+]] = protocol_method [[PMETA:%[0-9]+]] : {{.*}}, #SomeProtocol.static_method!1
+  // FIXME: [[I:%[0-9]+]] = load [[IADDR]]
+  // FIXME: apply [[PMETHOD]]([[I]], [[PMETA]])
+  // Either this shouldn't type-check, or we need to change the representation of existential metatypes
+  //p.dynamicType.static_method(i)
 
-  // -- Use a specialize instruction to bind type parameters of a generic.
+  // -- Use an apply or partial_apply instruction to bind type parameters of a generic.
 
-  // CHECK: [[GADDR:%[0-9]+]] = alloc_box $SomeGeneric<Int64>
-  // CHECK: [[CTOR_GEN:%[0-9]+]] = function_ref @_TC9functions11SomeGenericCU__fMGS0_Q__FT_GS0_Q__ : $[thin] <T> ((), SomeGeneric<T>.metatype) -> SomeGeneric<T>
-  // CHECK: [[CTOR_SPEC:%[0-9]+]] = specialize [[CTOR_GEN]] : {{.*}}, $[thin] ((), SomeGeneric<Int64>.metatype) -> SomeGeneric<Int64>, T = Int64
-  // CHECK: [[META:%[0-9]+]] = metatype $SomeGeneric<Int64>.metatype
-  // CHECK: apply [[CTOR_SPEC]]([[META]])
-  var g = SomeGeneric<Int64>()
+  // CHECK: [[GADDR:%[0-9]+]] = alloc_box $SomeGeneric<Builtin.Int64>
+  // CHECK: [[CTOR_GEN:%[0-9]+]] = function_ref @_TFC9functions11SomeGenericCU__fMGS0_Q__FT_GS0_Q__ : $@thin <τ_0_0> (@thick SomeGeneric<τ_0_0>.Type) -> @owned SomeGeneric<τ_0_0>
+  // CHECK: [[META:%[0-9]+]] = metatype $@thick SomeGeneric<Builtin.Int64>.Type
+  // CHECK: apply [[CTOR_GEN]]<Int64>([[META]])
+  var g = SomeGeneric<Builtin.Int64>()
 
   // CHECK: [[G:%[0-9]+]] = load [[GADDR]]
   // CHECK: [[METHOD_GEN:%[0-9]+]] = class_method [[G]] : {{.*}}, #SomeGeneric.method!1
-  // CHECK: [[METHOD_SPEC:%[0-9]+]] = specialize [[METHOD_GEN]] : {{.*}}, $[cc(method), thin] ((x : Int64), SomeGeneric<Int64>) -> Int64, T = Int64
-  // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
-  // CHECK: apply [[METHOD_SPEC]]([[I]], [[G]])
+  // CHECK: [[TMPI:%.*]] = alloc_stack $Builtin.Int64
+  // CHECK: [[TMPR:%.*]] = alloc_stack $Builtin.Int64
+  // CHECK: apply [[METHOD_GEN]]<{{.*}}>([[TMPR]]#1, [[TMPI]]#1, [[G]])
   g.method(i)
 
   // CHECK: [[G:%[0-9]+]] = load [[GADDR]]
   // CHECK: [[METHOD_GEN:%[0-9]+]] = class_method [[G]] : {{.*}}, #SomeGeneric.generic!1
-  // CHECK: [[METHOD_SPEC:%[0-9]+]] = specialize [[METHOD_GEN]] : {{.*}}, $[cc(method), thin] ((x : Int64), SomeGeneric<Int64>) -> Int64, T = Int64, U = Int
-  // CHECK: [[J:%[0-9]+]] = load [[JADDR]]
-  // CHECK: apply [[METHOD_SPEC]]([[J]], [[G]])
+  // CHECK: [[TMPJ:%.*]] = alloc_stack $Builtin.Int64
+  // CHECK: [[TMPR:%.*]] = alloc_stack $Builtin.Int64
+  // CHECK: apply [[METHOD_GEN]]<{{.*}}>([[TMPR]]#1, [[TMPJ]]#1, [[G]])
   g.generic(j)
 
   // CHECK: [[C:%[0-9]+]] = load [[CADDR]]
   // CHECK: [[METHOD_GEN:%[0-9]+]] = class_method [[C]] : {{.*}}, #SomeClass.generic!1
-  // CHECK: [[METHOD_SPEC:%[0-9]+]] = specialize [[METHOD_GEN]] : {{.*}}, $[cc(method), thin] ((x : Int64), SomeClass) -> Int64, T = Int
-  // CHECK: [[K:%[0-9]+]] = load [[KADDR]]
-  // CHECK: apply [[METHOD_SPEC]]([[K]], [[C]])
+  // CHECK: [[TMPK:%.*]] = alloc_stack $Builtin.Int64
+  // CHECK: [[TMPR:%.*]] = alloc_stack $Builtin.Int64
+  // CHECK: apply [[METHOD_GEN]]<{{.*}}>([[TMPR]]#1, [[TMPK]]#1, [[C]])
   c.generic(k)
 
   // FIXME: curried generic entry points
@@ -348,8 +402,8 @@ func calls(i:Int, j:Int, k:Int) {
   // SIL-level "thin" function values need to be able to convert to
   // "thick" function values when stored, returned, or passed as arguments.
 
-  // CHECK: [[FADDR:%[0-9]+]] = alloc_box $(x : Int64, y : Int64) -> Int64
-  // CHECK: [[FUNC_THIN:%[0-9]+]] = function_ref @_T9functions19standalone_functionFT1xSi1ySi_Si : $[thin] (x : Int64, y : Int64) -> Int64
+  // CHECK: [[FADDR:%[0-9]+]] = alloc_box $@callee_owned (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
+  // CHECK: [[FUNC_THIN:%[0-9]+]] = function_ref @_TF9functions19standalone_function{{.*}} : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
   // CHECK: [[FUNC_THICK:%[0-9]+]] = thin_to_thick_function [[FUNC_THIN]]
   // CHECK: store [[FUNC_THICK]] to [[FADDR]]
   var f = standalone_function
@@ -359,68 +413,111 @@ func calls(i:Int, j:Int, k:Int) {
   // CHECK: apply [[F]]([[I]], [[J]])
   f(i, j)
 
-  // CHECK: [[HOF:%[0-9]+]] = function_ref @_T9functions21higher_order_functionFT1fFT1xSi1ySi_Si1xSi1ySi_Si : $[thin] {{.*}}
-  // CHECK: [[FUNC_THIN:%[0-9]+]] = function_ref @_T9functions19standalone_functionFT1xSi1ySi_Si : $[thin] (x : Int64, y : Int64) -> Int64
+  // CHECK: [[HOF:%[0-9]+]] = function_ref @_TF9functions21higher_order_function{{.*}} : $@thin {{.*}}
+  // CHECK: [[FUNC_THIN:%[0-9]+]] = function_ref @_TF9functions19standalone_function{{.*}} : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
+  // CHECK: [[FUNC_THICK:%[0-9]+]] = thin_to_thick_function [[FUNC_THIN]]
   // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
   // CHECK: [[J:%[0-9]+]] = load [[JADDR]]
-  // CHECK: [[FUNC_THICK:%[0-9]+]] = thin_to_thick_function [[FUNC_THIN]]
   // CHECK: apply [[HOF]]([[FUNC_THICK]], [[I]], [[J]])
   higher_order_function(standalone_function, i, j)
 
-  // CHECK: [[HOF2:%[0-9]+]] = function_ref @_T9functions22higher_order_function2FT1fFTSiSi_Si1xSi1ySi_Si : $[thin] {{.*}}
-  // CHECK: [[FUNC_THIN:%[0-9]+]] = function_ref @_T9functions19standalone_functionFT1xSi1ySi_Si : $[thin] (x : Int64, y : Int64) -> Int64
-  // CHECK: [[FUNC_CONV:%[0-9]+]] = convert_function [[FUNC_THIN]] : ${{.*}} to $[thin] (Int64, Int64) -> Int64
+  // CHECK: [[HOF2:%[0-9]+]] = function_ref @_TF9functions22higher_order_function2{{.*}} : $@thin {{.*}}
+  // CHECK: [[FUNC_THIN:%[0-9]+]] = function_ref @_TF9functions19standalone_function{{.*}} : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
+  // CHECK: [[FUNC_THICK:%.*]] = thin_to_thick_function [[FUNC_THIN]]
   // CHECK: [[I:%[0-9]+]] = load [[IADDR]]
   // CHECK: [[J:%[0-9]+]] = load [[JADDR]]
-  // CHECK: [[FUNC_THICK:%[0-9]+]] = thin_to_thick_function [[FUNC_CONV]]
   // CHECK: apply [[HOF2]]([[FUNC_THICK]], [[I]], [[J]])
   higher_order_function2(standalone_function, i, j)
 }
 
-func return_func() -> (x:Int64, y:Int64) -> Int64 {
-  // CHECK: [[FUNC_THIN:%[0-9]+]] = function_ref @_T9functions19standalone_functionFT1xSi1ySi_Si : $[thin] (x : Int64, y : Int64) -> Int64
+// -- Curried entry points
+// CHECK-LABEL: sil shared @_TF9functions16curried_function{{.*}} : $@thin (Builtin.Int64) -> @owned @callee_owned (Builtin.Int64) -> Builtin.Int64
+// CHECK: bb0([[X:%[0-9]+]] : $Builtin.Int64):
+// CHECK:   [[FUNC:%[0-9]+]] = function_ref @_TF9functions16curried_function{{.*}}  : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
+// CHECK:   [[CLOSURE:%[0-9]+]] = partial_apply [[FUNC]]([[X]])
+// CHECK:   return [[CLOSURE]]
+
+// CHECK-LABEL: sil shared @_TF9functions24generic_curried_function{{.*}} : $@thin <T, U> (@in T) -> @owned @callee_owned (@in U) -> () {
+// CHECK: bb0([[X:%.*]] : $*T):
+// CHECK:   [[UNCURRIED:%.*]] = function_ref @_TF9functions24generic_curried_function{{.*}}
+// CHECK:   [[CURRIED:%.*]] = partial_apply [[UNCURRIED]]<T, U>([[X]])
+// CHECK:   return [[CURRIED]] : $@callee_owned (@in U) -> ()
+
+// CHECK-LABEL: sil shared @_TFV9functions10SomeStruct6method{{.*}} : $@thin (@inout SomeStruct) -> @owned @callee_owned (Builtin.Int64) -> () {
+// CHECK:   [[UNCURRIED:%.*]] = function_ref @_TFV9functions10SomeStruct6method{{.*}} : $@cc(method) @thin (Builtin.Int64, @inout SomeStruct) -> () // user: %2
+// CHECK:   [[CURRIED:%.*]] = partial_apply [[UNCURRIED]]
+// CHECK:   return [[CURRIED]]
+
+// CHECK-LABEL: sil shared @_TFC9functions9SomeClass6method{{.*}} : $@thin (@owned SomeClass) -> @owned @callee_owned (Builtin.Int64) -> ()
+// CHECK: bb0(%0 : $SomeClass):
+// CHECK:   %1 = class_method %0 : $SomeClass, #SomeClass.method!1
+// CHECK:   %2 = partial_apply %1(%0)
+// CHECK:   return %2
+
+func return_func() -> (x: Builtin.Int64, y: Builtin.Int64) -> Builtin.Int64 {
+  // CHECK: [[FUNC_THIN:%[0-9]+]] = function_ref @_TF9functions19standalone_function{{.*}} : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
   // CHECK: [[FUNC_THICK:%[0-9]+]] = thin_to_thick_function [[FUNC_THIN]]
   // CHECK: return [[FUNC_THICK]]
   return standalone_function
 }
 
-func standalone_generic<T>(x:T, y:T) -> T { return x }
+func standalone_generic<T>(x: T, y: T) -> T { return x }
 
-// CHECK: sil @_T9functions14return_genericFT_FT1xSi1ySi_Si
-func return_generic() -> (x:Int64, y:Int64) -> Int64 {
-  // CHECK: [[GEN:%.*]] = function_ref @_T9functions18standalone_genericU__FT1xQ_1yQ__Q_ : $[thin] <T> (x : T, y : T) -> T
-  // CHECK: [[SPEC:%.*]] = specialize [[GEN]] : {{.*}}, $[thin] (x : Int64, y : Int64) -> Int64, T = Int64
-  // CHECK: [[THICK:%.*]] = thin_to_thick_function [[SPEC]] : ${{.*}} to $(x : Int64, y : Int64) -> Int64
-  // CHECK: return [[THICK]]
+// CHECK-LABEL: sil  @_TF9functions14return_genericFT_FT1xBi64_1yBi64__Bi64_
+func return_generic() -> (x:Builtin.Int64, y:Builtin.Int64) -> Builtin.Int64 {
+  // CHECK: [[GEN:%.*]] = function_ref @_TF9functions18standalone_generic{{.*}} : $@thin <τ_0_0> (@out τ_0_0, @in τ_0_0, @in τ_0_0) -> ()
+  // CHECK: [[SPEC:%.*]] = partial_apply [[GEN]]<Int64>()
+  // CHECK: [[THUNK:%.*]] = function_ref  @{{.*}} : $@thin (Builtin.Int64, Builtin.Int64, @owned @callee_owned (@out Builtin.Int64, @in Builtin.Int64, @in Builtin.Int64) -> ()) -> Builtin.Int64
+  // CHECK: [[T0:%.*]] = partial_apply [[THUNK]]([[SPEC]])
+  // CHECK: return [[T0]]
   return standalone_generic
 }
 
-// CHECK: sil @_T9functions20return_generic_tupleFT_FT1xTSiSi_1yTSiSi__TSiSi_
+// CHECK-LABEL: sil  @_TF9functions20return_generic_tuple{{.*}}
 func return_generic_tuple()
--> (x:(Int64, Int64), y:(Int64, Int64)) -> (Int64, Int64) {
-  // CHECK: [[GEN:%.*]] = function_ref @_T9functions18standalone_genericU__FT1xQ_1yQ__Q_  : $[thin] <T> (x : T, y : T) -> T
-  // CHECK: [[SPEC:%.*]] = specialize [[GEN]] : {{.*}}, $[thin] (x : (Int64, Int64), y : (Int64, Int64)) -> (Int64, Int64), T = (Int64, Int64)
-  // CHECK: [[THICK:%.*]] = thin_to_thick_function [[SPEC]] : ${{.*}} to $(x : (Int64, Int64), y : (Int64, Int64)) -> (Int64, Int64)
-  // CHECK: return [[THICK]]
+-> (x: (Builtin.Int64, Builtin.Int64), y: (Builtin.Int64, Builtin.Int64)) -> (Builtin.Int64, Builtin.Int64) {
+  // CHECK: [[GEN:%.*]] = function_ref @_TF9functions18standalone_generic{{.*}}  : $@thin <τ_0_0> (@out τ_0_0, @in τ_0_0, @in τ_0_0) -> ()
+  // CHECK: [[SPEC:%.*]] = partial_apply [[GEN]]<(Int64, Int64)>()
+  // CHECK: [[THUNK:%.*]] = function_ref @{{.*}} : $@thin (Builtin.Int64, Builtin.Int64, Builtin.Int64, Builtin.Int64, @owned @callee_owned (@out (Builtin.Int64, Builtin.Int64), @in (Builtin.Int64, Builtin.Int64), @in (Builtin.Int64, Builtin.Int64)) -> ()) -> (Builtin.Int64, Builtin.Int64)
+  // CHECK: [[T0:%.*]] = partial_apply [[THUNK]]([[SPEC]])
+  // CHECK: return [[T0]]
   return standalone_generic
 }
 
-// CHECK: sil @_T9functions16testNoReturnAttrFT_T_ : $[thin, noreturn] () -> ()
-func [noreturn] testNoReturnAttr() -> () {}
-// CHECK: sil @_T9functions20testNoReturnAttrPolyU__FT1xQ__T_ : $[thin, noreturn] <T> (x : T) -> ()
-func [noreturn] testNoReturnAttrPoly<T>(x : T) -> () {}
+// CHECK-LABEL: sil  @_TF9functions16testNoReturnAttrFT_T_ : $@thin @noreturn () -> ()
+@noreturn func testNoReturnAttr() -> () {}
+// CHECK-LABEL: sil  @_TF9functions20testNoReturnAttrPoly{{.*}} : $@thin @noreturn <T> (@in T) -> ()
+@noreturn func testNoReturnAttrPoly<T>(x: T) -> () {}
 
-// CHECK: sil @_T9functions21testNoReturnAttrParamFT4fptrFT_T__T_ : $[thin] (fptr : [noreturn] () -> ()) -> ()
-func testNoReturnAttrParam(fptr : [noreturn] ()->()) -> () {}
+// CHECK-LABEL: sil  @_TF9functions21testNoReturnAttrParam{{.*}} : $@thin (@owned @noreturn @callee_owned () -> ()) -> ()
+func testNoReturnAttrParam(fptr: @noreturn ()->()) -> () {}
 
-// CHECK: sil @_T9functions15testForceInlineFT1xSb_Sb : $[thin] (x : Bool) -> Bool
-func [force_inline] testForceInline(x : Bool) -> Bool {
+// CHECK-LABEL: sil [transparent] @_TF9functions15testTransparent{{.*}} : $@thin (Builtin.Int1) -> Builtin.Int1
+@transparent func testTransparent(x: Bool) -> Bool {
   return x
 }
 
-// CHECK: sil @_T9functions16applyForceInlineFT1xSb_Sb : $[thin] (x : Bool) -> Bool {
-func applyForceInline(x : Bool) -> Bool {
-  // CHECK: [[FUNC:%[0-9]+]] = function_ref @_T9functions15testForceInlineFT1xSb_Sb : $[thin] (x : Bool) -> Bool
-  // CHECK: apply [force_inline] [[FUNC]]({{%[0-9]+}}) : $[thin] (x : Bool) -> Bool
-  return testForceInline(x)
+// CHECK-LABEL: sil  @_TF9functions16applyTransparent{{.*}} : $@thin (Builtin.Int1) -> Builtin.Int1 {
+func applyTransparent(x: Bool) -> Bool {
+  // CHECK: [[FUNC:%[0-9]+]] = function_ref @_TF9functions15testTransparent{{.*}} : $@thin (Builtin.Int1) -> Builtin.Int1
+  // CHECK: apply [transparent] [[FUNC]]({{%[0-9]+}}) : $@thin (Builtin.Int1) -> Builtin.Int1
+  return testTransparent(x)
+}
+
+// CHECK-LABEL: sil @_TF9functions11funcToBlock{{.*}} : $@thin (@owned @callee_owned () -> ()) -> @owned @cc(cdecl) @objc_block () -> ()
+// CHECK:         [[BLOCK_STORAGE:%.*]] = alloc_stack $@block_storage
+// CHECK:         [[BLOCK:%.*]] = init_block_storage_header [[BLOCK_STORAGE]]
+// CHECK:         [[COPY:%.*]] = copy_block [[BLOCK]] : $@cc(cdecl) @objc_block () -> ()
+// CHECK:         return [[COPY]]
+func funcToBlock(x: () -> ()) -> @objc_block () -> () {
+  return x
+}
+
+// CHECK-LABEL: sil @_TF9functions11blockToFunc{{.*}} : $@thin (@owned @cc(cdecl) @objc_block () -> ()) -> @owned @callee_owned () -> ()
+// CHECK:         [[COPIED:%.*]] = copy_block %0
+// CHECK:         [[THUNK:%.*]] = function_ref @_TTRXFdCb__dT__XFo__dT__
+// CHECK:         [[FUNC:%.*]] = partial_apply [[THUNK]]([[COPIED]])
+// CHECK:         return [[FUNC]]
+func blockToFunc(x: @objc_block () -> ()) -> () -> () {
+  return x
 }

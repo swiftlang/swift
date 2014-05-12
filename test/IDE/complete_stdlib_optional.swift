@@ -4,31 +4,49 @@
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=OPT_NO_DOT_2 > %t.opt.txt
 // RUN: FileCheck %s -check-prefix=OPT_NO_DOT_FOOSTRUCT < %t.opt.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=OPT_NO_DOT_3 > %t.opt.txt
-// RUN: FileCheck %s -check-prefix=OPT_NO_DOT_INT < %t.opt.txt
-
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=OPT_DOT_1 > %t.opt.txt
 // RUN: FileCheck %s -check-prefix=OPT_DOT_FOOSTRUCT < %t.opt.txt
+
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=OPT_DOT_1_SPACES > %t.opt.txt
+// RUN: FileCheck %s -check-prefix=OPT_DOT_FOOSTRUCT_SPACES < %t.opt.txt
 
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=OPT_DOT_2 > %t.opt.txt
 // RUN: FileCheck %s -check-prefix=OPT_DOT_FOOSTRUCT < %t.opt.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=OPT_DOT_3 > %t.opt.txt
-// RUN: FileCheck %s -check-prefix=OPT_DOT_INT < %t.opt.txt
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=UN_OPT_NO_DOT_1 > %t.opt.txt
+// RUN: FileCheck %s -check-prefix=UN_OPT_NO_DOT_FOOSTRUCT < %t.opt.txt
+
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=UN_OPT_NO_DOT_2 > %t.opt.txt
+// RUN: FileCheck %s -check-prefix=UN_OPT_NO_DOT_FOOSTRUCT < %t.opt.txt
+
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=UN_OPT_NO_DOT_3 > %t.opt.txt
+// RUN: FileCheck %s -check-prefix=UN_OPT_NO_DOT_INT < %t.opt.txt
+
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=UN_OPT_DOT_1 > %t.opt.txt
+// RUN: FileCheck %s -check-prefix=UN_OPT_DOT_FOOSTRUCT < %t.opt.txt
+
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=UN_OPT_DOT_2 > %t.opt.txt
+// RUN: FileCheck %s -check-prefix=UN_OPT_DOT_FOOSTRUCT < %t.opt.txt
+
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=UN_OPT_DOT_3 > %t.opt.txt
+// RUN: FileCheck %s -check-prefix=UN_OPT_DOT_INT < %t.opt.txt
 
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=OPT_DL_NO_DOT_1 > %t.opt.txt
-// RUN: FileCheck %s -check-prefix=OBCCLASS_MEMBERS_NO_DOT < %t.opt.txt
+// RUN: FileCheck %s -check-prefix=OBJCCLASS_MEMBERS_NO_DOT < %t.opt.txt
 
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=OPT_DL_NO_DOT_2 > %t.opt.txt
-// RUN: FileCheck %s -check-prefix=OBCCLASS_MEMBERS_NO_DOT < %t.opt.txt
+// RUN: FileCheck %s -check-prefix=OBJCCLASS_MEMBERS_NO_DOT < %t.opt.txt
 
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=OPT_DL_DOT_1 > %t.opt.txt
-// RUN: FileCheck %s -check-prefix=OBCCLASS_MEMBERS_DOT < %t.opt.txt
+// RUN: FileCheck %s -check-prefix=OBJCCLASS_MEMBERS_DOT < %t.opt.txt
 
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=OPT_DL_DOT_2 > %t.opt.txt
-// RUN: FileCheck %s -check-prefix=OBCCLASS_MEMBERS_DOT < %t.opt.txt
+// RUN: FileCheck %s -check-prefix=OBJCCLASS_MEMBERS_DOT < %t.opt.txt
 
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=OPT_DL_FORCE_RETURN_OPTIONAL_1 > %t.opt.txt
+// RUN: FileCheck %s -check-prefix=OPT_NO_DOT_OBJCCLASS < %t.opt.txt
+
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=OPT_CAST_AS_RESULT_1 > %t.opt.txt
 // RUN: FileCheck %s -check-prefix=OPT_NO_DOT_OBJCCLASS < %t.opt.txt
 
 //===---
@@ -40,73 +58,94 @@
 //===---
 
 struct FooStruct {
-  var instanceVar: Int
+  var instanceVar: Int = 0
   func instanceFunc() {}
 }
 
-func returnsOptional() -> Optional<FooStruct> {
+func returnsOptional() -> FooStruct? {
+  return FooStruct()
+}
+
+func returnsImplicitlyUnwrappedOptional() -> FooStruct! {
   return FooStruct()
 }
 
 @objc
 class ObjcClass {
-  var instanceVar: Int
-  func instanceFunc() -> ObjcClass {}
+  var instanceVar: Int = 0
+  func instanceFunc() -> ObjcClass { return self }
 }
 
-// OPT_NO_DOT_FOOSTRUCT: Begin completions, 4 items
-// OPT_NO_DOT_FOOSTRUCT-NEXT: Pattern/ExprSpecific: ![#FooStruct#]{{$}}
-// OPT_NO_DOT_FOOSTRUCT-NEXT: Pattern/ExprSpecific: ?[#FooStruct#]{{$}}
-// OPT_NO_DOT_FOOSTRUCT-NEXT: Decl/CurrNominal:     .getLogicValue()[#Bool#]{{$}}
-// OPT_NO_DOT_FOOSTRUCT-NEXT: Keyword/None:         .metatype[#Optional<FooStruct>.metatype#]{{$}}
-// OPT_NO_DOT_FOOSTRUCT-NEXT: End completions
+// OPT_NO_DOT_FOOSTRUCT: Begin completions
+// OPT_NO_DOT_FOOSTRUCT-DAG: Decl[InstanceVar]/CurrNominal:    ?.instanceVar[#Int#]{{$}}
+// OPT_NO_DOT_FOOSTRUCT-DAG: Decl[InstanceMethod]/CurrNominal: ?.instanceFunc()[#Void#]{{$}}
+// OPT_NO_DOT_FOOSTRUCT: End completions
 
-// OPT_DOT_FOOSTRUCT: Begin completions, 2 items
-// OPT_DOT_FOOSTRUCT-NEXT: Decl/CurrNominal: getLogicValue()[#Bool#]{{$}}
-// OPT_DOT_FOOSTRUCT-NEXT: Keyword/None:     metatype[#Optional<FooStruct>.metatype#]{{$}}
-// OPT_DOT_FOOSTRUCT-NEXT: End completions
+// OPT_DOT_FOOSTRUCT: Begin completions
+// OPT_DOT_FOOSTRUCT-DAG: Decl[InstanceVar]/CurrNominal/Erase[1]:    ?.instanceVar[#Int#]{{$}}
+// OPT_DOT_FOOSTRUCT-DAG: Decl[InstanceMethod]/CurrNominal/Erase[1]: ?.instanceFunc()[#Void#]{{$}}
+// OPT_DOT_FOOSTRUCT: End completions
 
-// OPT_NO_DOT_INT: Begin completions, 4 items
-// OPT_NO_DOT_INT-NEXT: Pattern/ExprSpecific: ![#Int#]{{$}}
-// OPT_NO_DOT_INT-NEXT: Pattern/ExprSpecific: ?[#Int#]{{$}}
-// OPT_NO_DOT_INT-NEXT: Decl/CurrNominal:     .getLogicValue()[#Bool#]{{$}}
-// OPT_NO_DOT_INT-NEXT: Keyword/None:         .metatype[#Optional<Int64>.metatype#]{{$}}
-// OPT_NO_DOT_INT-NEXT: End completions
+// OPT_DOT_FOOSTRUCT_SPACES: Begin completions
+// OPT_DOT_FOOSTRUCT_SPACES-DAG: Decl[InstanceVar]/CurrNominal/Erase[3]:    ?.instanceVar[#Int#]{{$}}
+// OPT_DOT_FOOSTRUCT_SPACES-DAG: Decl[InstanceMethod]/CurrNominal/Erase[3]: ?.instanceFunc()[#Void#]{{$}}
+// OPT_DOT_FOOSTRUCT_SPACES: End completions
 
-// OPT_DOT_INT: Begin completions, 2 items
-// OPT_DOT_INT-NEXT: Decl/CurrNominal: getLogicValue()[#Bool#]{{$}}
-// OPT_DOT_INT-NEXT: Keyword/None:     metatype[#Optional<Int64>.metatype#]{{$}}
-// OPT_DOT_INT-NEXT: End completions
+// UN_OPT_NO_DOT_FOOSTRUCT: Begin completions
+// UN_OPT_NO_DOT_FOOSTRUCT-DAG: Decl[InstanceVar]/CurrNominal:    .instanceVar[#Int#]{{$}}
+// UN_OPT_NO_DOT_FOOSTRUCT-DAG: Decl[InstanceMethod]/CurrNominal: .instanceFunc()[#Void#]{{$}}
+// UN_OPT_NO_DOT_FOOSTRUCT: End completions
 
-// OPT_NO_DOT_OBJCCLASS: Begin completions, 4 items
-// OPT_NO_DOT_OBJCCLASS-NEXT: Pattern/ExprSpecific: ![#ObjcClass#]{{$}}
-// OPT_NO_DOT_OBJCCLASS-NEXT: Pattern/ExprSpecific: ?[#ObjcClass#]{{$}}
-// OPT_NO_DOT_OBJCCLASS-NEXT: Decl/CurrNominal:     .getLogicValue()[#Bool#]{{$}}
-// OPT_NO_DOT_OBJCCLASS-NEXT: Keyword/None:         .metatype[#Optional<ObjcClass>.metatype#]{{$}}
-// OPT_NO_DOT_OBJCCLASS-NEXT: End completions
+// UN_OPT_DOT_FOOSTRUCT: Begin completions
+// UN_OPT_DOT_FOOSTRUCT-DAG: Decl[InstanceVar]/CurrNominal:    instanceVar[#Int#]{{$}}
+// UN_OPT_DOT_FOOSTRUCT-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc()[#Void#]{{$}}
+// UN_OPT_DOT_FOOSTRUCT: End completions
 
-// OBCCLASS_MEMBERS_NO_DOT: Begin completions, 3 items
-// OBCCLASS_MEMBERS_NO_DOT-NEXT: Decl/CurrNominal:  .instanceVar[#Int#]
-// OBCCLASS_MEMBERS_NO_DOT-NEXT: Decl/CurrNominal:  .instanceFunc()[#ObjcClass#]
-// OBCCLASS_MEMBERS_NO_DOT-NEXT: Keyword/None:      .metatype[#ObjcClass.metatype#]
-// OBCCLASS_MEMBERS_NO_DOT-NEXT: End completions
+// UN_OPT_NO_DOT_INT: Begin completions
+// UN_OPT_NO_DOT_INT-DAG: Decl[InstanceMethod]/CurrNominal: .succ()[#Int#]{{$}}
+// UN_OPT_NO_DOT_INT: End completions
 
-// OBCCLASS_MEMBERS_DOT: Begin completions, 3 items
-// OBCCLASS_MEMBERS_DOT-NEXT: Decl/CurrNominal:  instanceVar[#Int#]
-// OBCCLASS_MEMBERS_DOT-NEXT: Decl/CurrNominal:  instanceFunc()[#ObjcClass#]
-// OBCCLASS_MEMBERS_DOT-NEXT: Keyword/None:      metatype[#ObjcClass.metatype#]
-// OBCCLASS_MEMBERS_DOT-NEXT: End completions
+// UN_OPT_DOT_INT: Begin completions
+// UN_OPT_DOT_INT-DAG: Decl[InstanceMethod]/CurrNominal: succ()[#Int#]{{$}}
+// UN_OPT_DOT_INT: End completions
+
+// OPT_NO_DOT_OBJCCLASS: Begin completions
+// OPT_NO_DOT_OBJCCLASS-DAG: Decl[InstanceVar]/CurrNominal:    ?.instanceVar[#Int#]{{$}}
+// OPT_NO_DOT_OBJCCLASS-DAG: Decl[InstanceMethod]/CurrNominal: ?.instanceFunc()[#ObjcClass#]{{$}}
+// OPT_NO_DOT_OBJCCLASS: End completions
+
+// OBJCCLASS_MEMBERS_NO_DOT: Begin completions
+// OBJCCLASS_MEMBERS_NO_DOT-NEXT: Decl[InstanceVar]/CurrNominal:    .instanceVar[#Int#]
+// OBJCCLASS_MEMBERS_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc()[#ObjcClass#]
+// OBJCCLASS_MEMBERS_NO_DOT-NEXT: End completions
+
+// OBJCCLASS_MEMBERS_DOT: Begin completions
+// OBJCCLASS_MEMBERS_DOT-NEXT: Decl[InstanceVar]/CurrNominal:    instanceVar[#Int#]
+// OBJCCLASS_MEMBERS_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc()[#ObjcClass#]
+// OBJCCLASS_MEMBERS_DOT-NEXT: End completions
 
 //===---
 //===--- Tests.
 //===---
 
-func testOptionalVar1(a: Optional<FooStruct>) {
+func testOptionalVar1(a: FooStruct?) {
   a#^OPT_NO_DOT_1^#
 }
 
-func testOptionalVar2(a: Optional<FooStruct>) {
+func testOptionalVar2(a: FooStruct?) {
   a.#^OPT_DOT_1^#
+}
+
+func testOptionalVar3(a: FooStruct?) {
+  a.  #^OPT_DOT_1_SPACES^#
+}
+
+func testImplicitlyUnwrappedOptionalVar1(a: FooStruct!) {
+  a#^UN_OPT_NO_DOT_1^#
+}
+
+func testImplicitlyUnwrappedOptionalVar2(a: FooStruct!) {
+  a.#^UN_OPT_DOT_1^#
 }
 
 func testOptionalReturnValue1() {
@@ -117,31 +156,43 @@ func testOptionalReturnValue2() {
   returnsOptional().#^OPT_DOT_2^#
 }
 
-func testDynamicLookup1(a: DynamicLookup) {
-  a.instanceVar#^OPT_NO_DOT_3^#
+func testImplicitlyUnwrappedOptionalReturnValue1() {
+  returnsImplicitlyUnwrappedOptional()#^UN_OPT_NO_DOT_2^#
 }
 
-func testDynamicLookup2(a: DynamicLookup) {
-  a.instanceVar.#^OPT_DOT_3^#
+func testImplicitlyUnwrappedOptionalReturnValue2() {
+  returnsImplicitlyUnwrappedOptional().#^UN_OPT_DOT_2^#
 }
 
-func testDynamicLookup3(a: DynamicLookup) {
+func testAnyObject1(a: AnyObject) {
+  a.instanceVar#^UN_OPT_NO_DOT_3^#
+}
+
+func testAnyObject2(a: AnyObject) {
+  a.instanceVar.#^UN_OPT_DOT_3^#
+}
+
+func testAnyObject3(a: AnyObject) {
   a.instanceFunc!()#^OPT_DL_NO_DOT_1^#
 }
 
-func testDynamicLookup4(a: DynamicLookup) {
+func testAnyObject4(a: AnyObject) {
   a.instanceFunc?()#^OPT_DL_NO_DOT_2^#
 }
 
-func testDynamicLookup5(a: DynamicLookup) {
+func testAnyObject5(a: AnyObject) {
   a.instanceFunc!().#^OPT_DL_DOT_1^#
 }
 
-func testDynamicLookup6(a: DynamicLookup) {
+func testAnyObject6(a: AnyObject) {
   a.instanceFunc?().#^OPT_DL_DOT_2^#
 }
 
-func testDynamicLookup7(a: DynamicLookup) {
+func testAnyObject7(a: AnyObject) {
   (a.instanceFunc?())#^OPT_DL_FORCE_RETURN_OPTIONAL_1^#
+}
+
+func testAnyObject8(a: AnyObject) {
+  (a as ObjcClass)#^OPT_CAST_AS_RESULT_1^#
 }
 

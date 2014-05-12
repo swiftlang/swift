@@ -1,9 +1,16 @@
-// RUN: %swift -triple x86_64-apple-darwin10 %s -emit-llvm | FileCheck %s
+// RUN: %swift -target x86_64-apple-darwin10 %s -emit-ir | FileCheck %s
 
 protocol A { func a() }
 protocol B { func b() }
 @class_protocol protocol C { func c() }
-@objc, @class_protocol protocol O { func o() }
+@objc @class_protocol protocol O { func o() }
+@objc @class_protocol protocol OPT { 
+  @optional func opt()
+  @optional class func static_opt()
+
+  @optional var prop: O { get }
+  @optional subscript (x: O) -> O { get }
+}
 
 protocol AB : A, B { func ab() }
 protocol ABO : A, B, O { func abo() }
@@ -24,10 +31,20 @@ protocol ABO : A, B, O { func abo() }
 // CHECK: }
 
 // -- @objc protocol O uses ObjC symbol mangling and layout
-// CHECK: @_PROTOCOL_O = private constant { {{.*}} i32 } {
-// CHECK:   @_PROTOCOL_INSTANCE_METHODS_O,
+// CHECK: @_PROTOCOL__TtP17protocol_metadata1O_ = private constant { {{.*}} i32, { [1 x i8*] }* } {
+// CHECK:   @_PROTOCOL_INSTANCE_METHODS__TtP17protocol_metadata1O_,
 // -- flags: 1 = Swift
-// CHECK:   i32 72, i32 1
+// CHECK:   i32 80, i32 1
+// CHECK: @_PROTOCOL_METHOD_TYPES__TtP17protocol_metadata1O_
+// CHECK: }
+
+// -- @objc protocol OPT uses ObjC symbol mangling and layout
+// CHECK: @_PROTOCOL__TtP17protocol_metadata3OPT_ = private constant { {{.*}} i32, { [2 x i8*] }* } {
+// CHECK:   @_PROTOCOL_INSTANCE_METHODS_OPT__TtP17protocol_metadata3OPT_,
+// CHECK:   @_PROTOCOL_CLASS_METHODS_OPT__TtP17protocol_metadata3OPT_,
+// CHECK:   i32 80, i32 1
+// CHECK:   @_PROTOCOL_METHOD_TYPES__TtP17protocol_metadata3OPT_
+// -- flags: 1 = Swift
 // CHECK: }
 
 // -- inheritance lists for refined protocols
@@ -46,28 +63,30 @@ protocol ABO : A, B, O { func abo() }
 // CHECK:   i64 3,
 // CHECK:   %swift.protocol* @_TMp17protocol_metadata1A,
 // CHECK:   %swift.protocol* @_TMp17protocol_metadata1B,
-// CHECK:   {{.*}}* @_PROTOCOL_O
+// CHECK:   {{.*}}* @_PROTOCOL__TtP17protocol_metadata1O_
 // CHECK: }
 
-/* TODO existential metadata
-func reify_metadata<T>(x:T) {}
+func reify_metadata<T>(x: T) {}
 
-func protocol_types(a: A, b: B, c: C, o: O,
-                    ab: protocol<A, B>,
-                    ba: protocol<B, A>,
-                    ac: protocol<A, C>,
+// CHECK: define void @_TF17protocol_metadata14protocol_types
+func protocol_types(a: A,
                     abc: protocol<A, B, C>,
-                    abco: protocol<A, B, C, O>,
-                    co: protocol<C, O>) {
+                    abco: protocol<A, B, C, O>) {
+  // CHECK: store %swift.protocol* @_TMp17protocol_metadata1A
+  // CHECK: call %swift.type* @swift_getExistentialTypeMetadata(i64 1, %swift.protocol** {{%.*}})
   reify_metadata(a)
-  reify_metadata(b)
-  reify_metadata(c)
-  reify_metadata(o)
-  reify_metadata(ab)
-  reify_metadata(ba)
-  reify_metadata(ac)
+  // CHECK: store %swift.protocol* @_TMp17protocol_metadata1A
+  // CHECK: store %swift.protocol* @_TMp17protocol_metadata1B
+  // CHECK: store %swift.protocol* @_TMp17protocol_metadata1C
+  // CHECK: call %swift.type* @swift_getExistentialTypeMetadata(i64 3, %swift.protocol** {{%.*}})
   reify_metadata(abc)
+  // CHECK: store %swift.protocol* @_TMp17protocol_metadata1A
+  // CHECK: store %swift.protocol* @_TMp17protocol_metadata1B
+  // CHECK: store %swift.protocol* @_TMp17protocol_metadata1C
+  // CHECK: [[O_REF:%.*]] = load i8** @"\01l_OBJC_PROTOCOL_REFERENCE_$__TtP17protocol_metadata1O_"
+  // CHECK: [[O_REF_BITCAST:%.*]] = bitcast i8* [[O_REF]] to %swift.protocol*
+  // CHECK: store %swift.protocol* [[O_REF_BITCAST]]
+  // CHECK: call %swift.type* @swift_getExistentialTypeMetadata(i64 4, %swift.protocol** {{%.*}})
   reify_metadata(abco)
-  reify_metadata(co)
 }
-*/
+

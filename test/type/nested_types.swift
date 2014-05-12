@@ -2,24 +2,24 @@
 
 struct X {
   typealias MyInt = Int
-  def getInt() -> MyInt { return 7 }
+  func getInt() -> MyInt { return 7 }
 }
 
 extension X {
   typealias MyReal = Double
-  def getFloat() -> MyReal { return 3.14 }
+  func getFloat() -> MyReal { return 3.14 }
 }
 
-struct GeneratorTypeGeneratorType<S : Generator> {
+struct GeneratorTypeGeneratorType<G : Generator> {
   var index : Int
-  var elements : S
+  var elements : G
 }
 
-struct GeneratorType<T : Enumerable> {
+struct GeneratorType<T : Sequence> {
   var input : T
 
   typealias GeneratorType = GeneratorTypeGeneratorType<T.GeneratorType>
-  def enumerate() -> GeneratorType {
-    return GeneratorType(0, input.enumerate())
+  func generate() -> GeneratorType {
+    return GeneratorType(index: 0, elements: input.generate())
   }
 }

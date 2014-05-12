@@ -1,4 +1,1 @@
-
-import swift
-
 benchObjInst()

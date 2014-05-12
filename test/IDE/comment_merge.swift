@@ -103,8 +103,8 @@ func is_doc19() {}
 // WRONG-NOT: IS_DOC_NOT_ATTACHED
 
 // Ensure we don't pick up extra comments.
-// WRONG-NOT: IS_DOC_START{{.*}}IS_DOC_START
-// WRONG-NOT: IS_DOC_END{{.*}}IS_DOC_END
+// WRONG-NOT: RawComment={{.*}}IS_DOC_START{{.*}}IS_DOC_START{{.*}}BriefComment=
+// WRONG-NOT: RawComment={{.*}}IS_DOC_END{{.*}}IS_DOC_END{{.*}}BriefComment=
 
 // CHECK: comment_merge.swift:14:6: Func/not_doc1 RawComment=none
 // CHECK-NEXT: comment_merge.swift:17:6: Func/not_doc2 RawComment=none

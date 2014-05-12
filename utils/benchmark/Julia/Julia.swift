@@ -30,13 +30,13 @@ func drawJulia(context : CGContextRef, frame : CGRect) {
 
   var gradedColorSet : Array<NSColor> = Array()
   var aColor = NSColor.colorWithRed(0.5, green:0.5, blue:0.5, alpha:1.0)
-  for c in 100.0...255.0 {
-    gradedColorSet.append(NSColor.colorWithRed(c/255.0, green: c/255.0, blue:c/255.0, alpha:1.0))
+  for c in 100...255 {
+    gradedColorSet.append(NSColor.colorWithRed(Double(c)/255.0, green: Double(c)/255.0, blue: Double(c)/255.0, alpha:1.0))
   }
 
   var psychedelicColorSet : Array<NSColor> = Array()
-  for c in 0.0...100.0 {
-    psychedelicColorSet.append(NSColor.colorWithHue(c/100.0, saturation:1.0, brightness:1.0, alpha:1.0))
+  for c in 0...100 {
+    psychedelicColorSet.append(NSColor.colorWithHue(Double(c)/100.0, saturation:1.0, brightness:1.0, alpha:1.0))
   }
   var colorSet : Array<NSColor> = Array()
 
@@ -79,8 +79,8 @@ func drawJulia(context : CGContextRef, frame : CGRect) {
   var rh : Double = 0.0
 
   let methodStart : NSDate = NSDate()
-  let xMax = frame.size.width
-  let yMax = frame.size.height
+  let xMax : Int = Int(frame.size.width)
+  let yMax : Int = Int(frame.size.height)
   for x in 1...xMax {
     for y in 1...yMax {
       r = (Double(x)/mag) + xloc
@@ -119,16 +119,16 @@ func drawJulia(context : CGContextRef, frame : CGRect) {
   }
   println("Total loop count: \(loopCountForPerf)")
   let methodFinish : NSDate = NSDate()
-  var executionTime : NSTimeInterval = methodFinish.timeIntervalSinceDate(anotherDate: methodStart)
+  var executionTime : NSTimeInterlet = methodFinish.timeIntervalSinceDate(anotherDate: methodStart)
   println("Execution time: \(executionTime)")
 }
 
 // Create the image bitmap context.
 print("Initializing CGBitmapContext.\n")
-var colorSpace =  NSColor.redColor().colorSpace().CGColorSpace()
+var colorSpace =  NSColor.redColor().colorSpace.CGColorSpace
 assert(colorSpace != CGColorSpaceRef())
-let width : size_t = 500
-let height : size_t = 500
+let width : Swift.UInt = 500
+let height : Swift.UInt = 500
 var bitmapInfo = CGBitmapInfo.fromRaw(CGImageAlphaInfo.PremultipliedLast.toRaw())!
 var data = malloc(width*4*height)
 var context = CGBitmapContextCreate(data, width, height, 8, width*4, colorSpace, bitmapInfo)
@@ -148,7 +148,7 @@ let CFStringEncoding_ASCII : UInt32 = 0x0600
 // Write the image to disk.
 func writeImageToDisk(context : CGContextRef, outPath : NSString) -> Bool {
   var image = CGBitmapContextCreateImage(context)
-  let encoding : NSStringEncoding = NSUInteger(NSASCIIStringEncoding)
+  let encoding : NSStringEncoding = NSASCIIStringEncoding
   let path = CFStringCreateWithCString(CFAllocatorRef(), outPath.cStringUsingEncoding(encoding), CFStringEncoding_ASCII)
   assert(path != CFStringRef())
   var url = CFURLCreateWithString(CFAllocatorRef(), path, CFURLRef())
@@ -163,8 +163,8 @@ func writeImageToDisk(context : CGContextRef, outPath : NSString) -> Bool {
   return (true)
 }
 
-var outPath = NSURL.fileURLWithPath("out.png").absoluteString()
-writeImageToDisk(context, outPath)
+var outPath = NSURL.fileURLWithPath("out.png").absoluteString
+writeImageToDisk(context, outPath! as NSString)
 
 // Cleanup.
 free(data)

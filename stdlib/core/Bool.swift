@@ -1,36 +1,64 @@
 //===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
 // Bool Datatype and Supporting Operators
 //===----------------------------------------------------------------------===//
 
 // Bool is the standard way to reason about truth values.
-oneof Bool {
-  false, true
+struct Bool {
+  var value: Builtin.Int1
 
   /// \brief Default-initialize Boolean value to \c false.
-  constructor() { this = .false }
+  @transparent
+  init() { value = Builtin.trunc_Word_Int1(0.value) }
+  
+  @transparent
+  init(_ v : Builtin.Int1) { value = v }
+
+  static var false : Bool {
+    @transparent
+    get {
+      return Bool()
+    }
+  }
+  static var true : Bool {
+    @transparent
+    get {
+      return Bool(Builtin.trunc_Word_Int1(1.value))
+    }
+  }
 }
 
-// FIXME: Convert these to immutable vars when we have them.
 var true : Bool {
-  return Bool.true
+  @transparent
+  get {
+    return Bool.true
+  }
 }
 var false : Bool {
-  return Bool.false
+  @transparent
+  get {
+    return Bool.false
+  }
 }
 
+extension Bool : LogicValue, ReplPrintable {
+  @transparent func _getBuiltinLogicValue() -> Builtin.Int1 {
+    return value
+  }
 
-// *private* helper function for forming Bools
-func [asmname="swift_getBool"] _getBool(v : Builtin.Int1) -> Bool;
-
-
-extension Bool : LogicValue {
-  // FIXME: Implement pattern matching or equality testing to implement this.
-  func [asmname="_TSb13getLogicValuefRSbFT_Bi1_"] _getBuiltinLogicValue() -> Builtin.Int1
-
-  func getLogicValue() -> Bool { return this }
+  @transparent func getLogicValue() -> Bool { return self }
 
   func replPrint() {
-    if this {
+    if self {
       print("true")
     } else {
       print("false")
@@ -38,80 +66,68 @@ extension Bool : LogicValue {
   }
   
   // Bool can be constructed from LogicValue
-  constructor(v : LogicValue) {
-    this = v.getLogicValue()
+  init(_ v : LogicValue) {
+    self = v.getLogicValue()
   }
 }
+
+
+// This is a magic entrypoint known to the compiler.
+@transparent func _getBool(v: Builtin.Int1) -> Bool { return Bool(v) }
 
 //===----------------------------------------------------------------------===//
 // Standard Operators
 //===----------------------------------------------------------------------===//
 
 // Unary bitwise complement.
-func [prefix] ~(a : Bool) -> Bool {
+@prefix @transparent func ~(a: Bool) -> Bool {
   return a ^ true
 }
 
 // Unary logical complement.
-func [prefix] !(a : Bool) -> Bool {
+@prefix @transparent func !(a: Bool) -> Bool {
   return ~a
 }
 
+@transparent
+func ==(lhs: Bool, rhs: Bool) -> Bool {
+  return Bool(Builtin.cmp_eq_Int1(lhs.value, rhs.value))
+}
+
+@transparent
 extension Bool : Equatable, Hashable {
-  func __equal__(rhs: Bool) -> Bool {
-    return _getBool(Builtin.cmp_eq_Int1(_getBuiltinLogicValue(), 
-                                        rhs._getBuiltinLogicValue()))
-  }
-  func hashValue() -> Int {
-    return this? 1 : 0
+  var hashValue: Int {
+    return self ? 1 : 0
   }
 }
 
 // Bitwise 'and'.
-func & (lhs : Bool, rhs : Bool) -> Bool {
-  return _getBool(Builtin.and_Int1(lhs._getBuiltinLogicValue(), 
-                                   rhs._getBuiltinLogicValue()))
+@transparent func & (lhs: Bool, rhs: Bool) -> Bool {
+  return Bool(Builtin.and_Int1(lhs.value, rhs.value))
 }
 
 // Bitwise 'xor'.
-func ^ (lhs : Bool, rhs : Bool) -> Bool {
-  return _getBool(Builtin.xor_Int1(lhs._getBuiltinLogicValue(),
-                                   rhs._getBuiltinLogicValue()))
+@transparent func ^ (lhs: Bool, rhs: Bool) -> Bool {
+  return Bool(Builtin.xor_Int1(lhs.value, rhs.value))
 }
 
 // Bitwise 'or'.
-func | (lhs : Bool, rhs : Bool) -> Bool {
-  return _getBool(Builtin.or_Int1(lhs._getBuiltinLogicValue(),
-                                  rhs._getBuiltinLogicValue()))
-}
-
-// Short circuiting logical operators.
-func && (lhs: Bool, rhs: [auto_closure] ()->Bool) -> Bool {
-  if lhs {
-    return rhs()
-  }
-
-  return false
-}
-func || (lhs: Bool, rhs: [auto_closure] ()->Bool) -> Bool {
-  if lhs {
-    return true
-  }
-
-  return rhs()
+@transparent func | (lhs: Bool, rhs: Bool) -> Bool {
+  return Bool(Builtin.or_Int1(lhs.value, rhs.value))
 }
 
 // Compound assignment (with bitwise and)
-func [assignment] &= (lhs : [byref] Bool, rhs : Bool) {
+@assignment @transparent func &= (inout lhs: Bool, rhs: Bool) {
   lhs = lhs & rhs
 }
 
 // Compound assignment (with bitwise or)
-func [assignment] |= (lhs : [byref] Bool, rhs : Bool) {
+@assignment @transparent func |= (inout lhs: Bool, rhs: Bool) {
   lhs = lhs | rhs
 }
 
 // Compound assignment (with bitwise xor)
-func [assignment] ^= (lhs : [byref] Bool, rhs : Bool) {
+@assignment @transparent func ^= (inout lhs: Bool, rhs: Bool) {
   lhs = lhs ^ rhs
 }
+

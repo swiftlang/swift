@@ -10,12 +10,11 @@ var t11, t12 : Int = 20 // expected-error {{type annotation missing in pattern}}
 var t13 = 2.0, t14 : Int
 var (x : Int = 123, // expected-error {{default argument is only permitted for a non-curried function parameter}}
      y : Int = 456) // expected-error{{default argument is only permitted for a non-curried function parameter}}
-@born_fragile
-var bfx : Int, bfy : Int // no attribute error
+var bfx : Int, bfy : Int
 
 var _ = 10
 
-def _(x: Int) {} // expected-error {{expected identifier in function declaration}}
+func _(x: Int) {} // expected-error {{expected identifier in function declaration}}
 
 
 var self1 = self1 // expected-error {{variable used within its own initial value}}
@@ -27,7 +26,7 @@ var self6 = !self6 // expected-error {{variable used within its own initial valu
 var (self7a : Int, self7b : Int) = (self7b, self7a) // expected-error 2 {{variable used within its own initial value}}
 
 var self8 = 0
-def testShadowing() {
+func testShadowing() {
   var self8 = self8 // expected-error {{variable used within its own initial value}}
 }
 
@@ -37,3 +36,30 @@ var paren2: Int = paren
 struct Broken {
   var b : Bool = True // expected-error{{use of unresolved identifier 'True'}}
 }
+
+// rdar://16252090 - Warning when inferring empty tuple type for declarations
+var emptyTuple = testShadowing()  // expected-warning {{variable 'emptyTuple' inferred to have type '()'}} \
+                                  // expected-note {{add an explicit type annotation to silence this warning}}
+
+// rdar://15263687 - Diagnose variables inferenced to 'AnyObject'
+var ao1 : AnyObject
+var ao2 = ao1          // expected-warning {{variable 'ao2' inferred to have type 'AnyObject', which may be unexpected}} \
+                       // expected-note {{add an explicit type annotation to silence this warning}}
+
+var aot1 : AnyObject.Type
+var aot2 = aot1          // expected-warning {{variable 'aot2' inferred to have type 'AnyObject.Type', which may be unexpected}} \
+                       // expected-note {{add an explicit type annotation to silence this warning}}
+
+// <rdar://problem/16574105> Type inference of _Nil very coherent but kind of useless
+var ptr = nil // expected-error {{variable 'ptr' inferred to nil with unspecified type; use a type annotation to specify which nil}}
+
+func testAnyObjectOptional() -> AnyObject? {
+  var x = testAnyObjectOptional() // expected-warning {{variable 'x' inferred to have type 'AnyObject?', which may be unexpected}} expected-note {{add an explicit type annotation to silence this warning}}
+  return x
+}
+
+class SomeClass {}
+
+// <rdar://problem/16877304> weak let's should be rejected
+weak let V = SomeClass()  // expected-error {{'weak' must be a mutable variable, because it may change at runtime}}
+

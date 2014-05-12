@@ -2,9 +2,9 @@
 // using existing methods on a class.
 
 class Bas {
-  def runce() {}
+  func runce() {}
 }
 
 class Zang {
-  def funge() {}
+  func funge() {}
 }

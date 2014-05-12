@@ -3,3 +3,7 @@
 
 var x = 4 + 5
 println(x)
+
+// Check implicit visibility.
+libraryFunction()
+ThisModule.libraryFunction()

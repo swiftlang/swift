@@ -1,30 +1,29 @@
 // RUN: %swift %s -emit-sil -emit-verbose-sil | FileCheck %s
 
-func searchForMe(x : Float) -> Float {
+func searchForMe(x: Float) -> Float {
   return x
 }
 
-func [transparent] baz(x : Float) -> Float {
+@transparent func baz(x: Float) -> Float {
   return searchForMe(x);
 }
 
-func [transparent] bar(x : Float, b: Bool) -> Float {
+@transparent func bar(x: Float, b: Bool) -> Float {
   if b {
     return baz(x)
   }
   return x
-  // CHECK-LABEL: _T13sil_locations3barFT1xSf1bSb_Sf
-  // CHECK: function_ref @_T13sil_locations11searchForMeFT1xSf_Sf {{.*}} line:13:15:inlined
-  // CHECK: apply {{.*}} line:13:15:inlined
+  // CHECK-LABEL: _TF13sil_locations3bar
+  // CHECK: function_ref @_TF13sil_locations11searchForMe{{.*}} line:13:12:minlined
+  // CHECK: apply {{.*}} line:13:12:minlined
 }
 
-func testMandatoryInlining(x : Float, b : Bool) -> Float {
-  return bar(x, b);
-// CHECK-LABEL: _T13sil_locations21testMandatoryInliningFT1xSf1bSb_Sf
-// CHECK: alloc_stack {{.*}} line:21:28
-// CHECK: function_ref @_T13sil_locations11searchForMeFT1xSf_Sf {{.*}} line:22:13:inlined
-// CHECK: apply                                                 {{.*}} line:22:13:inlined
-// CHECK: br                                                    {{.*}} line:22:13:inlined
-// CHECK: br                                                    {{.*}} line:22:13:inlined
+func testMandatoryInlining(x: Float, b: Bool) -> Float {
+  return bar(x, b)
+// CHECK-LABEL: _TF13sil_locations21testMandatoryInlining
+// CHECK: function_ref @_TF13sil_locations11searchFor{{.*}} line:22:10:minlined
+// CHECK: apply                                                  {{.*}} line:22:10:minlined
+// CHECK: br                                                     {{.*}} line:22:10:minlined
+// CHECK: br                                                     {{.*}} line:22:10:minlined
 }
 

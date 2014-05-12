@@ -22,6 +22,13 @@
 
 // BCANALYZER-NOT: UnknownCode
 
+/// first_decl_generic_class_1 Aaa.
+class first_decl_generic_class_1<T> {
+  /// deinit of first_decl_generic_class_1 Aaa.
+  deinit {
+  }
+}
+
 /// first_decl_class_1 Aaa.
 class first_decl_class_1 {
 
@@ -38,10 +45,12 @@ class first_decl_class_1 {
   func decl_func_3() {}
 }
 
-// FIRST: first_decl_class_1 RawComment=[/// first_decl_class_1 Aaa.\n]
-// FIRST: decl_func_1 RawComment=[/// decl_func_1 Aaa.\n]
-// FIRST: decl_func_2 RawComment=[/**\n   * decl_func_3 Aaa.\n   */]
-// FIRST: decl_func_3 RawComment=[/// decl_func_3 Aaa.\n/** Bbb. */]
+// FIRST: Class/first_decl_generic_class_1 RawComment=[/// first_decl_generic_class_1 Aaa.\n]
+// FIRST: Destructor/first_decl_generic_class_1.deinit RawComment=[/// deinit of first_decl_generic_class_1 Aaa.\n]
+// FIRST: Class/first_decl_class_1 RawComment=[/// first_decl_class_1 Aaa.\n]
+// FIRST: Func/first_decl_class_1.decl_func_1 RawComment=[/// decl_func_1 Aaa.\n]
+// FIRST: Func/first_decl_class_1.decl_func_2 RawComment=[/**\n   * decl_func_3 Aaa.\n   */]
+// FIRST: Func/first_decl_class_1.decl_func_3 RawComment=[/// decl_func_3 Aaa.\n/** Bbb. */]
 
-// SECOND: second_decl_class_1 RawComment=[/// second_decl_class_1 Aaa.\n]
+// SECOND: Class/second_decl_class_1 RawComment=[/// second_decl_class_1 Aaa.\n]
 

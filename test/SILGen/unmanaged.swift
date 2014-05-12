@@ -3,7 +3,7 @@
 class C {}
 
 struct Holder {
-  @unowned(unsafe) var value: C
+  unowned(unsafe) var value: C
 }
 // CHECK-LABEL:sil @_TFV9unmanaged6HolderCfMS0_FT5valueCS_1C_S0_ : $@thin (@owned C, @thin Holder.Type) -> Holder
 // CHECK-NEXT: bb0([[T0:%.*]] : $C,
@@ -12,7 +12,7 @@ struct Holder {
 // CHECK-NEXT:   [[T2:%.*]] = struct $Holder ([[T1]] : $@sil_unmanaged C)
 // CHECK-NEXT:   return [[T2]] : $Holder
 
-func set(inout holder: Holder) {
+func set(inout `holder: Holder) {
   holder.value = C()
 }
 // CHECK-LABEL:sil @_TF9unmanaged3setFT6holderRVS_6Holder_T_ : $@thin (@inout Holder) -> ()
@@ -26,7 +26,7 @@ func set(inout holder: Holder) {
 // CHECK-NEXT:   tuple ()
 // CHECK-NEXT:   return
 
-func get(inout holder: Holder) -> C {
+func get(inout `holder: Holder) -> C {
   return holder.value
 }
 // CHECK-LABEL:sil @_TF9unmanaged3getFT6holderRVS_6Holder_CS_1C : $@thin (@inout Holder) -> @owned C
@@ -37,7 +37,7 @@ func get(inout holder: Holder) -> C {
 // CHECK-NEXT:   strong_retain [[T2]]
 // CHECK-NEXT:   return [[T2]]
 
-func project(fn: () -> Holder) -> C {
+func project(`fn: () -> Holder) -> C {
   return fn().value
 }
 // CHECK-LABEL:sil @_TF9unmanaged7projectFT2fnFT_VS_6Holder_CS_1C : $@thin (@owned @callee_owned () -> Holder) -> @owned C

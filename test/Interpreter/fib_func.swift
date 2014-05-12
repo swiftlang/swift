@@ -1,4 +1,4 @@
-// RUN: %swift -i %s | FileCheck %s
+// RUN: %target-run-simple-swift | FileCheck %s
 
 func fib() {
   var (a, b) = (0, 1)

@@ -1,8 +1,7 @@
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=BUILTIN_1 | FileCheck %s -check-prefix=NO_CRASH
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=BUILTIN_2 | FileCheck %s -check-prefix=NO_CRASH
 
-// NO_CRASH: Begin completions
-// NO_CRASH: End completions
+// NO_CRASH-NOT: Begin completions
 
 //===---
 //===--- Test code completion for types from Builtin module.

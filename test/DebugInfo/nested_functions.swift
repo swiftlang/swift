@@ -1,5 +1,4 @@
-// RUN: %swift -triple x86_64-apple-darwin10 %s -emit-llvm -g -o - | FileCheck %s
-
+// RUN: %swift -target x86_64-apple-darwin10 %s -emit-ir -g -o - | FileCheck %s
 func outer(a: Int) -> Int {
      // Inner functions have a linkage name of "closure[0-9]+", but
      // their DW_AT_name is preserved.

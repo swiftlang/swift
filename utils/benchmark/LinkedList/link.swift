@@ -1,10 +1,10 @@
 @asmname("mach_absolute_time") func __mach_absolute_time__() -> UInt64
 
 @final class Node {
-  var next : Optional<Node>
-  var data : Int
+  var next: Node?
+  var data: Int
 
-  init(n : Optional<Node>, d : Int) {
+  init(n: Node?, d: Int) {
     next = n
     data = d
   }
@@ -12,19 +12,22 @@
 
 print("Creating list\n")
 var head = Node(nil, 0)
-for i in 0...1000000 {
+for i in 0...100 {
   head = Node(head, i)
 }
 
 let start = __mach_absolute_time__()
 print("Summing list\n")
 var sum = 0
-while let nxt = head.next {
-  sum += head.data
-  head = nxt
+var ptr = head
+for i in 0...100000 {
+  ptr = head
+  while let nxt = ptr.next {
+    sum += ptr.data
+    ptr = nxt
+  }
 }
 
 let delta = __mach_absolute_time__() - start
 print("sum = \(sum)\n")
 println("\(delta) nanoseconds.")
-

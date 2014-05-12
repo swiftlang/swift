@@ -1,13 +1,15 @@
 // RUN: rm -rf %t
 // RUN: mkdir %t
-
-// RUN: %swift_driver -frontend -c -emit-module -o %t %s
-// RUN: %ld %t/ASTSection.o -sectcreate __SWIFT __ast %t/ASTSection.swiftmodule -o %t/ASTSection.dylib -L%libdir/swift/macosx -dylib -lSystem
-// RUN: %lldb-moduleimport-test %t/ASTSection.dylib | FileCheck %s
-
-// RUN: %swift_driver -target x86_64-apple-darwin10 %s -g -o %t/ASTSection
-// RUN: %lldb-moduleimport-test %t/ASTSection | FileCheck %s
-// REQUIRES: X86
+//
+// RUN: %target-build-swift %s -g -o %t/ASTSection
+// RUN: lldb-moduleimport-test %t/ASTSection | FileCheck %s
+//
+// FIXME: lldb-moduleimport-test does not support 32-bit executables
+// rdar://16244944
+// XFAIL: PTRSIZE=32
+//
+// Test ASTSection_linker.swift builds this code 
+// with separate compile and link steps.
 
 // A type that should be serialized.
 class Foo {

@@ -5,11 +5,11 @@ struct SpecialInt {
 operator prefix +++ {}
 operator postfix +++ {}
 
-@prefix func +++(base: @inout SpecialInt) {
+@prefix func +++(inout base: SpecialInt) {
   base.value += 2
 }
 
-@postfix func +++(base: @inout SpecialInt) {
+@postfix func +++(inout base: SpecialInt) {
   println("use the prefix form instead")
 }
 

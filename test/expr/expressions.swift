@@ -22,7 +22,7 @@ func1()
 var bind_test1 : () -> () = func1
 var bind_test2 : Int = 4; func1 // expected-error {{expression resolves to an unused l-value}}
 
-def basictest() {
+func basictest() {
   // Simple integer variables.
   var x : Int
   var x2 = 4              // Simple Type inference.
@@ -33,7 +33,7 @@ def basictest() {
 
   var x4 : Bool = true
   var x5 : Bool =
-        4 // expected-error {{does not type-check}}
+        4 // expected-error {{cannot convert the expression's type 'Int' to type 'Bool'}}
 
   //var x6 : Float = 4+5
 
@@ -44,8 +44,8 @@ def basictest() {
   x8 = x8 + 1
   x8 + 1
   0 + x8
-  1.0 + x8 // expected-error{{expression does not type-check}}
-  var x9 : Int16 = x8 + 1 // expected-error{{expression does not type-check}}
+  1.0 + x8 // expected-error{{could not find an overload for '+' that accepts the supplied arguments}}
+  var x9 : Int16 = x8 + 1 // expected-error{{could not find an overload for '+' that accepts the supplied arguments}}
 
   // Various tuple types.
   var tuple1 : ()
@@ -60,18 +60,18 @@ def basictest() {
 
   // Brace expressions.
   // FIXME: Defaulting to () -> () for function expressions?
-  var brace3 = { // expected-error{{does not type-check}}
+  var brace3 = { // expected-error{{cannot convert the expression's type '() -> $T0' to type '$T1'}}
     var brace2 = 42  // variable shadowing.
     brace2+7
   }
 
   // Function calls.
-  var call1 = func1()
+  var call1 : () = func1()
   var call2 = func2(1)
-  var call3 = func3()()
+  var call3 : () = func3()()
 
   // Cannot call an integer.
-  bind_test2() // expected-error {{'$T1 -> $T2' is not identical to 'Int'}}
+  bind_test2() // expected-error {{invalid use of '()' to call a value of non-function type 'Int'}}
 }
 
 // Infix operators and attribute lists.
@@ -80,42 +80,36 @@ operator infix %% {
   precedence 2
 }
 
-def %%(a: Int, b: Int) -> () {}
+func %%(a: Int, b: Int) -> () {}
 var infixtest : () = 4 % 2 + 27 %% 123
 
-operator infix %%% {}
-operator infix %%%% {}
-
-def %%%() {} // expected-error {{operators must have one or two arguments}}
-def %%%%(a: Int, b: Int, c: Int) {} // expected-error {{operators must have one or two arguments}}
 
 
-
-// The 'def' keyword gives a nice simplification for function definitions.
-def funcdecl1(a: Int, y: Int) {}
-def funcdecl2() {
+// The 'func' keyword gives a nice simplification for function definitions.
+func funcdecl1(a: Int, y: Int) {}
+func funcdecl2() {
   return funcdecl1(4, 2)
 }
-def funcdecl3() -> Int {
+func funcdecl3() -> Int {
   return 12
 }
-def funcdecl4(a: ((Int) -> Int), b: Int) {}
-def signal(sig: Int, f : (Int) -> Void) -> (Int) -> Void {}
+func funcdecl4(a: ((Int) -> Int), b: Int) {}
+func signal(sig: Int, f: (Int) -> Void) -> (Int) -> Void {}
 
 // Doing fun things with named arguments.  Basic stuff first.
-def funcdecl6(a: Int, b: Int) -> Int { a+b }
+func funcdecl6(a: Int, b: Int) -> Int { a+b }
 
 // Can dive into tuples, 'b' is a reference to a whole tuple, c and d are
 // fields in one.  Cannot dive into functions or through aliases.
-def funcdecl7(a: Int, b: (c: Int, d: Int), (c: Int, d: Int)) -> Int {
-  a + b.0 + b.c + c + d
+func funcdecl7(a: Int, b: (c: Int, d: Int), third: (c: Int, d: Int)) -> Int {
+  a + b.0 + b.c + third.0 + third.1
   b.foo // expected-error {{'(c: Int, d: Int)' does not have a member named 'foo'}}
 }
 
 // Error recovery.
-def testfunc2 (_: ((), Int) -> Int) -> Int {}
-def errorRecovery() {
-  testfunc2({  // expected-error{{expression does not type-check}}
+func testfunc2 (_: ((), Int) -> Int) -> Int {}
+func errorRecovery() {
+  testfunc2({  // expected-error{{could not find an overload for '+' that accepts the supplied arguments}}
      $0 + 1})
 
   enum union1 {
@@ -123,10 +117,10 @@ def errorRecovery() {
     case baz
   }
   var a: Int =
-      .hello // expected-error {{expression does not type-check}}
+      .hello // expected-error {{'Int.Type' does not have a member named 'hello'}}
   var b: union1 = .bar // ok
   var c: union1 =
-      .xyz  // expected-error {{expression does not type-check}}
+      .xyz  // expected-error {{'union1.Type' does not have a member named 'xyz'}}
   var d: (Int,Int,Int) =
       (1,2) // expected-error {{different number of elements}}
   var e: (Int,Int) =
@@ -136,7 +130,7 @@ def errorRecovery() {
       (1, 2, f : 3) // expected-error {{different number of elements}}
 }
 
-def acceptsInt(x: Int) {}
+func acceptsInt(x: Int) {}
 acceptsInt(unknown_var) // expected-error {{use of unresolved identifier 'unknown_var'}}
 
 // TODO: Result can be named as well, but is writeonly.  Need to model lvalues
@@ -144,27 +138,27 @@ acceptsInt(unknown_var) // expected-error {{use of unresolved identifier 'unknow
 
 
 // FIXME: Bogus error
-var test1a: (Int) -> (Int) -> Int = { { $0 } } // expected-error{{'(Int)' is not a subtype of '()'}}
+var test1a: (Int) -> (Int) -> Int = { { $0 } } // expected-error{{'Int' is not a subtype of '()'}}
 var test1b = { 42 }
 var test1c = { { 42 } }
 var test1d = { { { 42 } } }
 
-def test2 (a: Int)(b: Int) -> (c: Int) {
+func test2(a: Int)(b: Int) -> (c: Int) {
  a+b
  a+b+c // expected-error{{use of unresolved identifier 'c'}}
  return a+b
 }
 
 
-def test3(arg1: Int, arg2: Int) -> Int {
+func test3(arg1: Int, arg2: Int) -> Int {
   return 4
 }
 
-def test4() -> ((arg1: Int, arg2: Int) -> Int) {
+func test4() -> ((arg1: Int, arg2: Int) -> Int) {
   return test3
 }
 
-def test5() {
+func test5() {
   var a: (Int, Int)
   var
      b: ((Int) -> Int, Int) = a  // expected-error {{'Int' is not convertible to '(Int) -> Int'}}
@@ -176,24 +170,24 @@ def test5() {
 
 
 // Functions can obviously take and return values.
-def w3(a: Int) -> Int { return a }
-def w4(_: Int) -> Int { return 4 }
+func w3(a: Int) -> Int { return a }
+func w4(_: Int) -> Int { return 4 }
 
 
 
-def b1() {}
+func b1() {}
 
-def foo1(a: Int, b: Int) -> Int {}
-def foo2(a: Int) -> (b: Int) -> Int {}
-def foo3(a: Int = 2, b: Int = 3) {}
+func foo1(a: Int, b: Int) -> Int {}
+func foo2(a: Int) -> (b: Int) -> Int {}
+func foo3(a: Int = 2, b: Int = 3) {}
 
 operator prefix ^^ {}
 
-@prefix def ^^(a: Int) -> Int {
+@prefix func ^^(a: Int) -> Int {
   return a + 1
 }
 
-def test_unary1() {
+func test_unary1() {
   var x: Int
 
   x = ^^(^^x)
@@ -202,28 +196,28 @@ def test_unary1() {
   x = +(-x)
   x = + -x // expected-error {{unary operator cannot be separated from its operand}} {{8-9=}}
 }
-def test_unary2() {
+func test_unary2() {
   var x: Int
   // FIXME: second diagnostic is redundant.
   x = &; // expected-error {{expected expression after unary operator}} expected-error {{expected expression in assignment}}
 }
-def test_unary3() {
+func test_unary3() {
   var x: Int
   // FIXME: second diagnostic is redundant.
   x = &, // expected-error {{expected expression after unary operator}} expected-error {{expected expression in assignment}}
 }
 
-def test_as_1() {
+func test_as_1() {
   var x: Int
 }
-def test_as_2() {
+func test_as_2() {
   var x: Int
   x as [] // expected-error {{expected type after 'as'}}
 }
 
-def test_lambda() {
-  // A simple lambda.
-  var a = { (val: Int) -> () in print(val+1) }
+func test_lambda() {
+  // A simple closure.
+  var a = { (value: Int) -> () in print(value+1) }
 
   // A recursive lambda.
   // FIXME: This should definitely be accepted.
@@ -236,31 +230,31 @@ def test_lambda() {
   }
 }
 
-def test_lambda2() {
+func test_lambda2() {
   { () -> protocol<Int> in // expected-error {{non-protocol type 'Int' cannot be used within 'protocol<...>'}}
     return 1
   }()
 }
 
-def test_floating_point() {
+func test_floating_point() {
   var x = 0.0
   var y = 100.1
   var x1: Float = 0.0
   var x2: Double = 0.0
 }
 
-def test_nonassoc(x: Int, y: Int) -> Bool {
+func test_nonassoc(x: Int, y: Int) -> Bool {
   // FIXME: the second error and note here should arguably disappear
-  return x == y == x // expected-error {{non-associative operator is adjacent to operator of same precedence}}  expected-error {{expression does not type-check}}
+  return x == y == x // expected-error {{non-associative operator is adjacent to operator of same precedence}}  expected-error {{could not find an overload for '==' that accepts the supplied arguments}}
 }
 
-def test_module_member() {
-  var x = swift.true
+func test_module_member() {
+  var x = Swift.true
 }
 
 // More realistic examples.
 
-def fib(n: Int) -> Int {
+func fib(n: Int) -> Int {
   if (n < 2) {
     return n
   }
@@ -274,55 +268,55 @@ def fib(n: Int) -> Int {
 
 // FIXME: Should warn about integer constants being too large <rdar://problem/14070127>
 var
-   il_a: Bool = 4  // expected-error {{expression does not type-check}}
+   il_a: Bool = 4  // expected-error {{cannot convert the expression's type 'Int' to type 'Bool'}}
 var il_b: Int8
    = 123123
 var il_c: Int8 = 4  // ok
 
 struct int_test1 {
   // FIXME: Will be diagnosed when we switch to formal protocols
-  static def convertFromIntegerLiteral() {}
+  static func convertFromIntegerLiteral() {}
 }
 
-var il_d: int_test1 = 4 // expected-error{{expression does not type-check}}
+var il_d: int_test1 = 4 // expected-error{{cannot convert the expression's type 'Int' to type 'int_test1'}}
 
 
 struct int_test2 {
-  static def convertFromIntegerLiteral(val: Int32) {}
-  static def convertFromIntegerLiteral(val: Int8) {}
+  static func convertFromIntegerLiteral(_: Int32) {}
+  static func convertFromIntegerLiteral(_: Int8) {}
 }
 
-var il_e: int_test2 = 4 // expected-error {{expression does not type-check}}
+var il_e: int_test2 = 4 // expected-error {{cannot convert the expression's type 'Int' to type 'int_test2'}}
 
 struct int_test3 {
-  def convertFromIntegerLiteral() {}
+  func convertFromIntegerLiteral() {}
 }
 
-var il_f: int_test3 = 4  // expected-error{{expression does not type-check}}
+var il_f: int_test3 = 4  // expected-error{{cannot convert the expression's type 'Int' to type 'int_test3'}}
 
 struct int_test4 : IntegerLiteralConvertible {
   typealias IntegerLiteralType = Int
-  static def convertFromIntegerLiteral(val: Int) -> int_test4 {} // user type.
+  static func convertFromIntegerLiteral(value: Int) -> int_test4 {} // user type.
 }
 
-var il_f: int_test4 = 4
+var il_g: int_test4 = 4
 
 
 // Defined conversion function's argument isn't compatible with literals.
 struct int_test5 {
-  static def convertFromIntegerLiteral(val: Bool) -> int_test5 {}
+  static func convertFromIntegerLiteral(_: Bool) -> int_test5 {}
 }
 
-var il_g: int_test5 =
-   4 //expected-error {{expression does not type-check}}
+var il_h: int_test5 =
+   4 //expected-error {{cannot convert the expression's type 'Int' to type 'int_test5'}}
 
 // This just barely fits in Int64.
-var il_h: Int64  = 18446744073709551615
+var il_i: Int64  = 18446744073709551615
 
 // This constant is too large to fit in an Int64, but it is fine for Int128.
 // FIXME: Should warn about the first. <rdar://problem/14070127>
-var il_i: Int64  = 18446744073709551616
-// var il_j: Int128 = 18446744073709551616
+var il_j: Int64  = 18446744073709551616
+// var il_k: Int128 = 18446744073709551616
 
 var bin_literal: Int64 = 0b100101
 var hex_literal: Int64 = 0x100101
@@ -346,7 +340,7 @@ var negative_int32: Int32 = -1
 var tupleelemvar = 1
 print((tupleelemvar, tupleelemvar).1)
 
-def int_literals() {
+func int_literals() {
   // Fits exactly in 64-bits - rdar://11297273
   var a = 1239123123123123
   // Overly large integer.
@@ -356,13 +350,13 @@ def int_literals() {
 }
 
 // <rdar://problem/12830375>
-def tuple_of_rvalues(a:Int, b:Int) -> Int {
+func tuple_of_rvalues(a:Int, b:Int) -> Int {
   return (a, b).1
 }
 
 extension Int {
-  def testLexingMethodAfterIntLiteral() {}
-  def _0() {}
+  func testLexingMethodAfterIntLiteral() {}
+  func _0() {}
 }
 
 123.testLexingMethodAfterIntLiteral()
@@ -421,44 +415,6 @@ var fl_bad_separator1: Double = 1e_ // expected-error {{expected a digit in floa
 var fl_bad_separator2: Double = 0x1p_ // expected-error {{expected a digit in floating point exponent}}
 
 //===----------------------------------------------------------------------===//
-// Character Literals
-//===----------------------------------------------------------------------===//
-
-var ch_nul = '\0'
-var ch_1 = '\1'     // expected-error {{invalid escape sequence in literal}}
-var ch_at = '\@'    // expected-error {{invalid escape sequence in literal}}
-var ch_1_ = '\1     // expected-error {{invalid escape sequence in literal}}
-var ch_01_ = '\01   // expected-error {{unterminated character literal}}
-var ch_01a_ = '\01a // expected-error {{unterminated character literal}}
-var ch_at_ = '\@    // expected-error {{invalid escape sequence in literal}}
-var ch_01 = '\01'   // expected-error {{invalid multiple-code-point character literal}}
-var ch_011 = '\011' // expected-error {{invalid multiple-code-point character literal}}
-var ch_0a = '\0a'   // expected-error {{invalid multiple-code-point character literal}}
-var ch_01a = '\01a' // expected-error {{invalid multiple-code-point character literal}}
-var ch_0z = '\0z'   // expected-error {{invalid multiple-code-point character literal}}
-var ch_01z = '\01z' // expected-error {{invalid multiple-code-point character literal}}
-var ch_0a = '\0@'   // expected-error {{invalid multiple-code-point character literal}}
-var ch_01a = '\01@' // expected-error {{invalid multiple-code-point character literal}}
-var ch_US = '🇺🇸'    // expected-error {{invalid multiple-code-point character literal}}
-
-var ch_Joker = '🃏'
-
-var ch_n = '\n'
-var ch_r = '\r'
-var ch_t = '\t'
-var ch_x = '\x7f'   // DEL
-var ch_q = ''     // expected-error {{unprintable ASCII character found in source file}}
-var ch_u = '\u014d' // 'ō'
-var ch_U = '\U0001D41F' // '𝐁' a.k.a. "Math alphanumeric B"
-
-var ch_x_too_big = '\x80' // expected-error {{invalid hex escape, use \u00XX for values over \x7F}}
-var ch_U_too_big = '\U12345678' // expected-error {{invalid unicode code point}}
-
-var ch_x_too_short = '\x1' // expected-error {{\x escape sequence expects 2 hex digits to follow it}}
-var ch_u_too_short = '\u1' // expected-error {{\u escape sequence expects 4 hex digits to follow it}}
-var ch_U_too_short = '\U1' // expected-error {{\U escape sequence expects 8 hex digits to follow it}}
-
-//===----------------------------------------------------------------------===//
 // String Literals
 //===----------------------------------------------------------------------===//
 
@@ -481,7 +437,7 @@ var st_u9 = " \xFF "    // expected-error {{invalid hex escape}}
 var st_u10 = " \U0010FFFD "  // Last valid codepoint, 0xFFFE and 0xFFFF are reserved in each plane
 var st_u11 = " \U00110000 "  // expected-error {{invalid unicode code point}}
 
-def stringliterals() {
+func stringliterals() {
  var ch_a = 'ab // expected-error {{unterminated character literal}}
 
   // rdar://11385385
@@ -494,33 +450,35 @@ def stringliterals() {
   ;
 
   // FIXME: bad diagnostics.
-  /* expected-error {{unterminated string literal}} expected-note {{to match this opening '('}}  */ var x2 = ("hello" + "
-  ; // expected-error {{expected ',' separator}} expected-error {{expected ',' separator}} expected-error {{expected expression in list of expressions}}
+  /* expected-error {{unterminated string literal}} expected-error 2{{expected ',' separator}} expected-note {{to match this opening '('}}  */ var x2 : () = ("hello" + "
+  ; // expected-error {{expected expression in list of expressions}}
 } // expected-error {{expected ')' in expression list}}
 
 //===----------------------------------------------------------------------===//
 // InOut arguments
 //===----------------------------------------------------------------------===//
 
-def takesInt(x: Int) {} // expected-note{{in initialization of parameter 'x'}}
-def takesExplicitInt(x: @inout Int) {}
+func takesInt(x: Int) {} // expected-note{{in initialization of parameter 'x'}}
+func takesExplicitInt(inout x: Int) { }
 
-def testInOut(arg: @inout Int) {
+func testInOut(inout arg: Int) {
   var x: Int
-  takesExplicitInt(x) // expected-error{{expression does not type-check}}
+  takesExplicitInt(x) // expected-error{{passing value of type 'Int' to an inout parameter requires explicit '&'}}
   takesExplicitInt(&x)
-  takesInt(&x) // expected-error{{'@inout Int' is not convertible to 'Int'}}
-  var y = &x // expected-error{{expression does not type-check}}
-  var z = &arg // expected-error{{expression does not type-check}}
+  takesInt(&x) // expected-error{{'inout Int' is not convertible to 'Int'}}
+  var y = &x // expected-error{{reference to 'Int' not used to initialize a inout parameter}} \
+             // expected-error {{type 'inout Int' of variable is not materializable}}
+  var z = &arg // expected-error{{reference to 'Int' not used to initialize a inout parameter}} \
+             // expected-error {{type 'inout Int' of variable is not materializable}}
 
-  takesExplicitInt(5) // expected-error {{expression does not type-check}}
+  takesExplicitInt(5) // expected-error {{cannot convert the expression's type '()' to type 'inout Int'}}
 }
 
 //===----------------------------------------------------------------------===//
 // Bool operators
 //===----------------------------------------------------------------------===//
 
-def boolTest(a: Bool, b: Bool) {
+func boolTest(a: Bool, b: Bool) {
   var t1 = a != b
   var t2 = a == b
   var t3 = !a
@@ -531,33 +489,47 @@ def boolTest(a: Bool, b: Bool) {
 // Conversions
 //===----------------------------------------------------------------------===//
 
-var pi: Float
-var pi: Double
+var pi_f: Float
+var pi_d: Double
+
+struct SpecialPi {} // Type with no implicit construction.
+
+var pi_s: SpecialPi
+
+func getPi() -> Float {} // expected-note 3 {{found this candidate}}
+func getPi() -> Double {} // expected-note 3 {{found this candidate}}
+func getPi() -> SpecialPi {}
 
 enum Empty { }
 
 extension Empty {
-  init(f: Float) { }
+  init(_ f: Float) { }
 }
 
-def conversionTest(a: Double, b: Int) {
+func conversionTest(inout a: Double, inout b: Int) {
   var f: Float
   var d: Double
   a = Double(b)
   a = Double(f)
-  a = Double(d) // FIXME: new type checker allows this, temporarily
+  a = Double(d) // no-warning
   b = Int(a)
   f = Float(b)
 
-  var pi_f = Float(pi)
-  var pi_d = Double(pi)
+  var pi_f1 = Float(pi_f)
+  var pi_d1 = Double(pi_d)
+  var pi_s1 = SpecialPi(pi_s) // expected-error {{cannot convert the expression's type 'SpecialPi' to type '$T3'}}
 
-  var float = Float
-  var pi_f2 = float(pi) // expected-error{{'$T2 -> $T3' is not identical to 'Float.metatype'}}
-  var pi_f3 = float(pi_f) // expected-error{{'$T2 -> $T3' is not identical to 'Float.metatype'}}
+  var pi_f2 = Float(getPi()) // expected-error {{ambiguous use of 'getPi'}}
+  var pi_d2 = Double(getPi()) // expected-error {{ambiguous use of 'getPi'}}
+  var pi_s2: SpecialPi = getPi() // no-warning
+  
+  var float = Float.self
+  var pi_f3 = float(getPi()) // expected-error {{ambiguous use of 'getPi'}}
+  var pi_f4 = float(pi_f)
 
   var e = Empty(f)
-  var e2 = Empty(d) // expected-error{{expression does not type-check}}
+  // FIXME: Need note pointing back to the initializer.
+  var e2 = Empty(d) // expected-error{{'Double' is not convertible to 'Float'}}
   var e3 = Empty(Float(d))
 }
 
@@ -567,28 +539,32 @@ struct Rule {
 }
 
 var ruleVar: Rule
-ruleVar = Rule("a") // expected-error {{expression does not type-check}}
+ruleVar = Rule("a") // expected-error {{cannot convert the expression's type '()' to type '(target: String, dependencies: String)'}}
 
 //===----------------------------------------------------------------------===//
 // Unary Operators
 //===----------------------------------------------------------------------===//
 
-def unaryOps(i8: Int8, i64: Int64) {
+func unaryOps(inout i8: Int8, inout i64: Int64) {
   i8 = ~i8
   ++i64
   --i8
 
   // FIXME: Weird diagnostic.
-  ++Int64(5) // expected-error{{'Int64' is not convertible to '@inout (implicit)$T1'}}
+  ++Int64(5) // expected-error{{could not find an overload for '++' that accepts the supplied arguments}}
 }
 
 //===----------------------------------------------------------------------===//
 // Iteration
 //===----------------------------------------------------------------------===//
 
-def iterators() {
-  var a = 0..42
-  var b = (0.0 .. 42.0).by(1.0)
+func ... (x: Double, y: Double) -> Double {
+   return x + y
+}
+
+func iterators() {
+  var a = 0...42
+  var b = 0.0...42.0
 }
 
 //===----------------------------------------------------------------------===//
@@ -598,23 +574,26 @@ def iterators() {
 struct TypeWithoutSlice {}
 struct TypeWithBadSlice {}
 struct SliceTypeWithBadSlice {}
+struct Dummy {}
 
-def newTest() {
+func newTest() {
   var t1 = new Int[5]
 
   var i: Int
   var t2 = new Int[5][]
-  var t3 = new Int[][5] // expected-error {{must specify length of array to allocate}}
-  var t4 = new Int[5][i] // expected-error {{array has non-constant size}}
+  var t3 = new Int[] // expected-error {{must specify length of array to allocate}}
+  var t4 = new Int[5][i] // expected-error {{sized multidimensional arrays are not supported}}
   var t5 = new Int[i]
 
-  var i2: Int8
-  var t6 = new Int[i2] // expected-error {{type 'Int8' does not conform to protocol 'ArrayBound'}}
+  var i2: Dummy
+  var t6 = new Int[i2] // expected-error {{type 'Dummy' does not conform to protocol 'ArrayBound'}}
 
   var t9 = new Int[100+1]
+
+  var t10 = new Int[5][5] // expected-error{{sized multidimensional arrays are not supported}}
 }
 
-def arraySubscript(a: Int[], i: Int, value: Int, aa: Int[][]) {
+func arraySubscript(inout a: Int[], i: Int, inout value: Int, inout aa: Int[][]) {
   a[i] = value
   value = a[i+1]
 
@@ -628,9 +607,74 @@ def arraySubscript(a: Int[], i: Int, value: Int, aa: Int[][]) {
 // Magic literal expressions
 //===----------------------------------------------------------------------===//
 
-def magic_literals() {
+func magic_literals() {
   var x = __FILE__
   var y = __LINE__ + __COLUMN__
   var z: UInt8 = __LINE__ + __COLUMN__
+}
+
+//===----------------------------------------------------------------------===//
+// lvalue processing
+//===----------------------------------------------------------------------===//
+
+
+operator infix +-+= {}
+@assignment @infix func +-+= (inout x: Int, y: Int) -> Int { return 0}
+
+func lvalue_processing() {
+  var i = 0
+  ++i   // obviously ok
+
+  var fn = (+-+=)
+
+  var n = 42
+  fn(n, 12)  // expected-error {{passing value of type 'Int' to an inout parameter requires explicit '&'}}
+  fn(&n, 12)
+
+  n +-+= 12
+
+  (+-+=)(&n, 12)  // ok.
+  (+-+=)(n, 12) // expected-error {{passing value of type 'Int' to an inout parameter requires explicit '&'}}
+}
+
+struct Foo {
+  func method() {}
+}
+
+func test() {
+  var x = int_test3()
+
+  // rdar://15708430
+  (&x).convertFromIntegerLiteral()  // expected-error {{could not find member 'convertFromIntegerLiteral'}}
+}
+
+
+
+//===----------------------------------------------------------------------===//
+// Collection Literals
+//===----------------------------------------------------------------------===//
+
+func arrayLiterals() { 
+  var a = [1,2,3]
+  var b : Int[] = []
+  var c = []  // expected-error {{cannot convert the expression's type 'Array' to type '$T2'}}
+}
+
+func dictionaryLiterals() {
+  var a = [1 : "foo",2 : "bar",3 : "baz"]
+  var b : Dictionary<Int, String> = [:]
+  var c = [:]  // expected-error {{cannot convert the expression's type 'Dictionary' to type '$T3'}}
+}
+
+func invalidDictionaryLiteral() {
+  // FIXME: lots of unnecessary diagnostics.
+
+  var a = [1: ??? // expected-error {{expected value in dictionary literal}} expected-error 2{{expected ',' separator}} expected-error {{expected key expression in dictionary literal}} expected-error {{expected ']' in container literal expression}} expected-note {{to match this opening '['}}
+  var b = [1: ???] // expected-error {{expected value in dictionary literal}} expected-error 2{{expected ',' separator}} expected-error {{expected key expression in dictionary literal}}
+  var c = [1: "one" ???] // expected-error {{expected key expression in dictionary literal}} expected-error 2{{expected ',' separator}} expected-error {{expected expression after '?' in ternary expression}}
+  var d = [1: "one", ???] // expected-error {{expected key expression in dictionary literal}} expected-error {{expected ',' separator}}
+  var e = [1: "one", 2] // expected-error {{expected ':' in dictionary literal}}
+  var f = [1: "one", 2 ???] // expected-error {{expected expression after '?' in ternary expression}} expected-error 2{{expected ',' separator}} expected-error {{expected key expression in dictionary literal}}
+  var g = [1: "one", 2: ???] // expected-error {{expected value in dictionary literal}} expected-error 2{{expected ',' separator}} expected-error {{expected key expression in dictionary literal}}
 }
 

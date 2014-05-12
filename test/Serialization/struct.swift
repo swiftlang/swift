@@ -1,71 +1,71 @@
 // RUN: rm -rf %t
 // RUN: mkdir %t
-// RUN: %swift -emit-module -o %t/def_struct.swiftmodule %S/Inputs/def_struct.swift
+// RUN: %swift -emit-module -o %t %S/Inputs/def_struct.swift
 // RUN: llvm-bcanalyzer %t/def_struct.swiftmodule | FileCheck %s
-// RUN: %swift -emit-llvm -I=%t %s | FileCheck %s -check-prefix=LLVM
+// RUN: %swift -emit-silgen -I=%t %s -o /dev/null
+
+// CHECK-NOT: UnknownCode
 
 import def_struct
 
-// LLVM: define {{.*}} @top_level_code() {
-// LLVM: call void @_TV10def_struct5EmptyCfMS0_FT_S0_
-// LLVM: }
 var a : Empty
+var b = TwoInts(x: 1, y: 2)
+var c : ComputedProperty
+var sum = b.x + b.y + c.value
 
-// CHECK:   # Toplevel Blocks: 5
+var intWrapper = ResettableIntWrapper(value: b.x)
+var r : Resettable = intWrapper
+r.reset()
 
-// CHECK:  Block ID #0 (BLOCKINFO_BLOCK):
-// CHECK-NEXT:      Num Instances: 1
+struct AnotherIntWrapper : SpecialResettable {
+  var value : Int
+  mutating
+  func reset() {
+    value = 0
+  }
+  mutating
+  func compute() {
+    value = 42
+  }
+}
 
-// CHECK:  Block ID #8 (CONTROL_BLOCK):
-// CHECK-NEXT:      Num Instances: 1
-// CHECK-NEXT:         Total Size:
-// CHECK-NEXT:    Percent of file:
-// CHECK-NEXT:      Num SubBlocks: 0
-// CHECK-NEXT:        Num Abbrevs: 1
-// CHECK-NEXT:        Num Records: 1
-// CHECK-NEXT:    Percent Abbrevs: 100.0000%
+var intWrapper2 = AnotherIntWrapper(value: 42)
+r = intWrapper2
+r.reset()
 
-// CHECK:  Block ID #9 (INPUT_BLOCK):
-// CHECK-NEXT:      Num Instances: 1
-// CHECK-NEXT:         Total Size:
-// CHECK-NEXT:    Percent of file:
-// CHECK-NEXT:      Num SubBlocks: 0
-// CHECK-NEXT:        Num Abbrevs: 1
-// CHECK-NEXT:        Num Records: 1
-// CHECK-NEXT:    Percent Abbrevs: 100.0000%
-// CHECK:    		  Count    # Bits   %% Abv  Record Kind
-// CHECK-NEXT: 		      1  {{[0-9]+}} 100.00  SOURCE_FILE
+var cached : Cacheable = intWrapper2
+cached.compute()
+cached.reset()
 
-// CHECK:  Block ID #10 (DECLS_AND_TYPES_BLOCK):
-// CHECK-NEXT:      Num Instances: 1
-// CHECK-NEXT:         Total Size:
-// CHECK-NEXT:    Percent of file:
-// CHECK-NEXT:      Num SubBlocks: 0
-// CHECK-NEXT:        Num Abbrevs:
-// CHECK-NEXT:        Num Records: 7
-// CHECK-NEXT:    Percent Abbrevs: 100.0000%
 
-// CHECK:    		  Count    # Bits   %% Abv  Record Kind
-// CHECK-NEXT:		      2  {{[0-9]+}} 100.00  NAME_HACK
-// CHECK-NEXT:		      1  {{[0-9]+}} 100.00  DECL_CONTEXT
-// CHECK-NEXT:		      1  {{[0-9]+}} 100.00  VAR_DECL
-// CHECK-NEXT:		      1  {{[0-9]+}} 100.00  CONSTRUCTOR_DECL
-// CHECK-NEXT:		      1  {{[0-9]+}} 100.00  STRUCT_DECL
-// CHECK-NEXT:		      1  {{[0-9]+}} 100.00  STRUCT_TYPE
+var p = Pair(a: 1, b: 2.5)
+p.first = 2
+p.second = 5.0
 
-// CHECK:  Block ID #11 (INDEX_BLOCK):
-// CHECK-NEXT:      Num Instances: 1
-// CHECK-NEXT:         Total Size:
-// CHECK-NEXT:    Percent of file:
-// CHECK-NEXT:      Num SubBlocks: 0
-// CHECK-NEXT:        Num Abbrevs: 2
-// CHECK-NEXT:        Num Records: 3
-// CHECK-NEXT:    Percent Abbrevs: 100.0000%
+var gc = GenericCtor<Int>()
+gc.doSomething()
+var funnyPair : VoidPairTuple = gc
 
-// CHECK:     		  Count    # Bits   %% Abv  Record Kind
-// CHECK-NEXT:		      1  {{[0-9]+}} 100.00  TOP_LEVEL_DECLS
-// CHECK-NEXT:		      1  {{[0-9]+}} 100.00  DECL_OFFSETS
-// CHECK-NEXT:		      1  {{[0-9]+}} 100.00  TYPE_OFFSETS
 
-// CHECK-NOT: FALL_BACK_TO_TRANSLATION_UNIT
+var wrappedTypeVar : ComputableWrapper<AnotherIntWrapper>.ComputableType
+wrappedTypeVar = intWrapper2
 
+cacheViaWrappers(ComputableWrapper<AnotherIntWrapper>(),
+                 ResettableWrapper<AnotherIntWrapper>())
+
+
+var simpleSub = ReadonlySimpleSubscript()
+var subVal = simpleSub[4]
+
+var complexSub = ComplexSubscript()
+complexSub[4, false] = complexSub[3, true]
+
+a.doAbsolutelyNothing()
+var comp : Computable = UnComputable(x: 42)
+var condition = UnComputable.canCompute()
+var revP = p.swap()
+
+
+func testMasterConformanceMap(x: Int32) -> Bool {
+  return x != -1
+}

@@ -1,10 +1,32 @@
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=FUNC_SELF_NO_DOT_1 | FileCheck %s -check-prefix=FUNC_SELF_NO_DOT_1
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=FUNC_SELF_DOT_1 | FileCheck %s -check-prefix=FUNC_SELF_DOT_1
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=FUNC_STATIC_SELF_NO_DOT_1 | FileCheck %s -check-prefix=FUNC_STATIC_SELF_NO_DOT_1
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=FUNC_STATIC_SELF_DOT_1 | FileCheck %s -check-prefix=FUNC_STATIC_SELF_DOT_1
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=CONSTRUCTOR_SELF_NO_DOT_1 > %t.self.txt
+// RUN: FileCheck %s -check-prefix=CONSTRUCTOR_SELF_NO_DOT_1 < %t.self.txt
+// RUN: FileCheck %s -check-prefix=COMMON_SELF_NO_DOT_1 < %t.self.txt
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=CONSTRUCTOR_SELF_NO_DOT_1 | FileCheck %s -check-prefix=CONSTRUCTOR_SELF_NO_DOT_1
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=CONSTRUCTOR_SELF_DOT_1 | FileCheck %s -check-prefix=CONSTRUCTOR_SELF_DOT_1
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=CONSTRUCTOR_SELF_DOT_1 > %t.self.txt
+// RUN: FileCheck %s -check-prefix=CONSTRUCTOR_SELF_DOT_1 < %t.self.txt
+// RUN: FileCheck %s -check-prefix=COMMON_SELF_DOT_1 < %t.self.txt
+
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=DESTRUCTOR_SELF_NO_DOT_1 > %t.self.txt
+// RUN: FileCheck %s -check-prefix=DESTRUCTOR_SELF_NO_DOT_1 < %t.self.txt
+// RUN: FileCheck %s -check-prefix=COMMON_SELF_NO_DOT_1 < %t.self.txt
+
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=DESTRUCTOR_SELF_DOT_1 > %t.self.txt
+// RUN: FileCheck %s -check-prefix=DESTRUCTOR_SELF_DOT_1 < %t.self.txt
+// RUN: FileCheck %s -check-prefix=COMMON_SELF_DOT_1 < %t.self.txt
+
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=FUNC_SELF_NO_DOT_1 > %t.self.txt
+// RUN: FileCheck %s -check-prefix=FUNC_SELF_NO_DOT_1 < %t.self.txt
+// RUN: FileCheck %s -check-prefix=COMMON_SELF_NO_DOT_1 < %t.self.txt
+
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=FUNC_SELF_DOT_1 > %t.self.txt
+// RUN: FileCheck %s -check-prefix=FUNC_SELF_DOT_1 < %t.self.txt
+// RUN: FileCheck %s -check-prefix=COMMON_SELF_DOT_1 < %t.self.txt
+
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=FUNC_STATIC_SELF_NO_DOT_1 > %t.self.txt
+// RUN: FileCheck %s -check-prefix=FUNC_STATIC_SELF_NO_DOT_1 < %t.self.txt
+
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=FUNC_STATIC_SELF_DOT_1 > %t.self.txt
+// RUN: FileCheck %s -check-prefix=FUNC_STATIC_SELF_DOT_1 < %t.self.txt
 
 //===---
 //===--- Tests for code completion after 'self'.
@@ -17,33 +39,44 @@ class ThisBase1 {
   func baseFunc1(a: Int) {}
 
   subscript(i: Int) -> Double {
-  get:
-    return Double(i)
-  set(val):
-    baseInstanceVar = i
+    get {
+      return Double(i)
+    }
+    set(v) {
+      baseInstanceVar = i
+    }
   }
 
-  // FIXME: uncomment when we have static vars.
-  // static var baseStaticVar : Int
+  class var baseStaticVar: Int = 12
 
-  static func baseStaticFunc0() {}
+  class func baseStaticFunc0() {}
 }
 
 extension ThisBase1 {
   var baseExtProp : Int {
-  get:
-    return 42
-  set(val):
+    get {
+      return 42
+    }
+    set(v) {}
   }
 
   func baseExtInstanceFunc0() {}
 
-  static func baseExtStaticFunc0() {}
+  var baseExtStaticVar: Int
+
+  var baseExtStaticProp: Int {
+    get {
+      return 42
+    }
+    sel(v) {}
+  }
+
+  class func baseExtStaticFunc0() {}
 
   struct BaseExtNestedStruct {}
   class BaseExtNestedClass {}
-  union BaseExtNestedUnion {
-    case BaseExtUnionX(Int)
+  enum BaseExtNestedEnum {
+    case BaseExtEnumX(Int)
   }
 
   typealias BaseExtNestedTypealias = Int
@@ -55,190 +88,176 @@ class ThisDerived1 : ThisBase1 {
   func derivedFunc0() {}
 
   subscript(i: Double) -> Int {
-  get:
-    return Int(i)
-  set(val):
-    baseInstanceVar = Int(i)
+    get {
+      return Int(i)
+    }
+    set(v) {
+      baseInstanceVar = Int(i)
+    }
   }
 
-  static func derivedStaticFunc0() {}
+  class var derivedStaticVar: Int = 42
 
-  constructor() {
+  class func derivedStaticFunc0() {}
+
+// COMMON_SELF_NO_DOT_1: Begin completions
+// COMMON_SELF_NO_DOT_1-DAG: Decl[InstanceVar]/CurrNominal:    .derivedInstanceVar[#Int#]{{$}}
+// COMMON_SELF_NO_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal: .derivedFunc0()[#Void#]{{$}}
+// COMMON_SELF_NO_DOT_1-DAG: Decl[Subscript]/CurrNominal:       [{#i: Double#}][#Int#]{{$}}
+// COMMON_SELF_NO_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal: .test1()[#Void#]{{$}}
+// COMMON_SELF_NO_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal: .test2()[#Void#]{{$}}
+// COMMON_SELF_NO_DOT_1-DAG: Decl[InstanceVar]/CurrNominal:    .derivedExtProp[#Int#]{{$}}
+// COMMON_SELF_NO_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal: .derivedExtInstanceFunc0()[#Void#]{{$}}
+// COMMON_SELF_NO_DOT_1-DAG: Decl[InstanceVar]/CurrNominal:    .derivedExtStaticVar[#Int#]{{$}}
+// COMMON_SELF_NO_DOT_1-DAG: Decl[InstanceVar]/CurrNominal:    .derivedExtStaticProp[#Int#]{{$}}
+// COMMON_SELF_NO_DOT_1-DAG: Decl[InstanceVar]/Super:          .baseInstanceVar[#Int#]{{$}}
+// COMMON_SELF_NO_DOT_1-DAG: Decl[InstanceMethod]/Super:       .baseFunc0()[#Void#]{{$}}
+// COMMON_SELF_NO_DOT_1-DAG: Decl[InstanceMethod]/Super:       .baseFunc1({#Int#})[#Void#]{{$}}
+// COMMON_SELF_NO_DOT_1-DAG: Decl[Subscript]/Super:            [{#i: Int#}][#Double#]{{$}}
+// COMMON_SELF_NO_DOT_1-DAG: Decl[InstanceVar]/Super:          .baseExtProp[#Int#]{{$}}
+// COMMON_SELF_NO_DOT_1-DAG: Decl[InstanceMethod]/Super:       .baseExtInstanceFunc0()[#Void#]{{$}}
+// COMMON_SELF_NO_DOT_1-DAG: Decl[InstanceVar]/Super:          .baseExtStaticVar[#Int#]{{$}}
+// COMMON_SELF_NO_DOT_1-DAG: Decl[InstanceVar]/Super:          .baseExtStaticProp[#Int#]{{$}}
+// COMMON_SELF_NO_DOT_1: End completions
+
+// COMMON_SELF_DOT_1: Begin completions
+// COMMON_SELF_DOT_1-DAG: Decl[InstanceVar]/CurrNominal:    derivedInstanceVar[#Int#]{{$}}
+// COMMON_SELF_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal: derivedFunc0()[#Void#]{{$}}
+// COMMON_SELF_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal: test1()[#Void#]{{$}}
+// COMMON_SELF_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal: test2()[#Void#]{{$}}
+// COMMON_SELF_DOT_1-DAG: Decl[InstanceVar]/CurrNominal:    derivedExtProp[#Int#]{{$}}
+// COMMON_SELF_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal: derivedExtInstanceFunc0()[#Void#]{{$}}
+// COMMON_SELF_DOT_1-DAG: Decl[InstanceVar]/CurrNominal:    derivedExtStaticVar[#Int#]{{$}}
+// COMMON_SELF_DOT_1-DAG: Decl[InstanceVar]/CurrNominal:    derivedExtStaticProp[#Int#]{{$}}
+// COMMON_SELF_DOT_1-DAG: Decl[InstanceVar]/Super:          baseInstanceVar[#Int#]{{$}}
+// COMMON_SELF_DOT_1-DAG: Decl[InstanceMethod]/Super:       baseFunc0()[#Void#]{{$}}
+// COMMON_SELF_DOT_1-DAG: Decl[InstanceMethod]/Super:       baseFunc1({#Int#})[#Void#]{{$}}
+// COMMON_SELF_DOT_1-DAG: Decl[InstanceVar]/Super:          baseExtProp[#Int#]{{$}}
+// COMMON_SELF_DOT_1-DAG: Decl[InstanceMethod]/Super:       baseExtInstanceFunc0()[#Void#]{{$}}
+// COMMON_SELF_DOT_1-DAG: Decl[InstanceVar]/Super:          baseExtStaticVar[#Int#]{{$}}
+// COMMON_SELF_DOT_1-DAG: Decl[InstanceVar]/Super:          baseExtStaticProp[#Int#]{{$}}
+// COMMON_SELF_DOT_1: End completions
+
+  init() {
     self#^CONSTRUCTOR_SELF_NO_DOT_1^#
-// CONSTRUCTOR_SELF_NO_DOT_1: Begin completions
-// CONSTRUCTOR_SELF_NO_DOT_1-NEXT: SwiftDecl: .derivedInstanceVar[#Int#]{{$}}
-// CONSTRUCTOR_SELF_NO_DOT_1-NEXT: SwiftDecl: .derivedFunc0()[#Void#]{{$}}
-// CONSTRUCTOR_SELF_NO_DOT_1-NEXT: SwiftDecl: [{#i: Double#}][#Int#]{{$}}
-// CONSTRUCTOR_SELF_NO_DOT_1-NEXT: SwiftDecl: .test1()[#Void#]{{$}}
-// CONSTRUCTOR_SELF_NO_DOT_1-NEXT: SwiftDecl: .test2()[#Void#]{{$}}
-// CONSTRUCTOR_SELF_NO_DOT_1-NEXT: SwiftDecl: .derivedExtProp[#Int#]{{$}}
-// CONSTRUCTOR_SELF_NO_DOT_1-NEXT: SwiftDecl: .derivedExtInstanceFunc0()[#Void#]{{$}}
-// CONSTRUCTOR_SELF_NO_DOT_1-NEXT: SwiftDecl: .DerivedExtNestedStruct[#ThisDerived1.DerivedExtNestedStruct.metatype#]{{$}}
-// CONSTRUCTOR_SELF_NO_DOT_1-NEXT: SwiftDecl: .DerivedExtNestedClass[#ThisDerived1.DerivedExtNestedClass.metatype#]{{$}}
-// CONSTRUCTOR_SELF_NO_DOT_1-NEXT: SwiftDecl: .DerivedExtNestedUnion[#ThisDerived1.DerivedExtNestedUnion.metatype#]{{$}}
-// CONSTRUCTOR_SELF_NO_DOT_1-NEXT: SwiftDecl: .baseInstanceVar[#Int#]{{$}}
-// CONSTRUCTOR_SELF_NO_DOT_1-NEXT: SwiftDecl: .baseFunc0()[#Void#]{{$}}
-// CONSTRUCTOR_SELF_NO_DOT_1-NEXT: SwiftDecl: .baseFunc1({#a: Int#})[#Void#]{{$}}
-// CONSTRUCTOR_SELF_NO_DOT_1-NEXT: SwiftDecl: [{#i: Int#}][#Double#]{{$}}
-// CONSTRUCTOR_SELF_NO_DOT_1-NEXT: SwiftDecl: .baseExtProp[#Int#]{{$}}
-// CONSTRUCTOR_SELF_NO_DOT_1-NEXT: SwiftDecl: .baseExtInstanceFunc0()[#Void#]{{$}}
-// CONSTRUCTOR_SELF_NO_DOT_1-NEXT: SwiftDecl: .BaseExtNestedStruct[#ThisBase1.BaseExtNestedStruct.metatype#]{{$}}
-// CONSTRUCTOR_SELF_NO_DOT_1-NEXT: SwiftDecl: .BaseExtNestedClass[#ThisBase1.BaseExtNestedClass.metatype#]{{$}}
-// CONSTRUCTOR_SELF_NO_DOT_1-NEXT: SwiftDecl: .BaseExtNestedUnion[#ThisBase1.BaseExtNestedUnion.metatype#]{{$}}
-// CONSTRUCTOR_SELF_NO_DOT_1-NEXT: Keyword: .metatype[#ThisDerived1.metatype#]{{$}}
-// CONSTRUCTOR_SELF_NO_DOT_1-NEXT: End completions
+// CONSTRUCTOR_SELF_NO_DOT_1: Begin completions, 17 items
+// CONSTRUCTOR_SELF_NO_DOT_1: End completions
   }
 
-  constructor(a : Int) {
+  init(a : Int) {
     self.#^CONSTRUCTOR_SELF_DOT_1^#
-// CONSTRUCTOR_SELF_DOT_1: Begin completions
-// CONSTRUCTOR_SELF_DOT_1-NEXT: SwiftDecl: derivedInstanceVar[#Int#]{{$}}
-// CONSTRUCTOR_SELF_DOT_1-NEXT: SwiftDecl: derivedFunc0()[#Void#]{{$}}
-// CONSTRUCTOR_SELF_DOT_1-NEXT: SwiftDecl: test1()[#Void#]{{$}}
-// CONSTRUCTOR_SELF_DOT_1-NEXT: SwiftDecl: test2()[#Void#]{{$}}
-// CONSTRUCTOR_SELF_DOT_1-NEXT: SwiftDecl: derivedExtProp[#Int#]{{$}}
-// CONSTRUCTOR_SELF_DOT_1-NEXT: SwiftDecl: derivedExtInstanceFunc0()[#Void#]{{$}}
-// CONSTRUCTOR_SELF_DOT_1-NEXT: SwiftDecl: DerivedExtNestedStruct[#ThisDerived1.DerivedExtNestedStruct.metatype#]{{$}}
-// CONSTRUCTOR_SELF_DOT_1-NEXT: SwiftDecl: DerivedExtNestedClass[#ThisDerived1.DerivedExtNestedClass.metatype#]{{$}}
-// CONSTRUCTOR_SELF_DOT_1-NEXT: SwiftDecl: DerivedExtNestedUnion[#ThisDerived1.DerivedExtNestedUnion.metatype#]{{$}}
-// CONSTRUCTOR_SELF_DOT_1-NEXT: SwiftDecl: baseInstanceVar[#Int#]{{$}}
-// CONSTRUCTOR_SELF_DOT_1-NEXT: SwiftDecl: baseFunc0()[#Void#]{{$}}
-// CONSTRUCTOR_SELF_DOT_1-NEXT: SwiftDecl: baseFunc1({#a: Int#})[#Void#]{{$}}
-// CONSTRUCTOR_SELF_DOT_1-NEXT: SwiftDecl: baseExtProp[#Int#]{{$}}
-// CONSTRUCTOR_SELF_DOT_1-NEXT: SwiftDecl: baseExtInstanceFunc0()[#Void#]{{$}}
-// CONSTRUCTOR_SELF_DOT_1-NEXT: SwiftDecl: BaseExtNestedStruct[#ThisBase1.BaseExtNestedStruct.metatype#]{{$}}
-// CONSTRUCTOR_SELF_DOT_1-NEXT: SwiftDecl: BaseExtNestedClass[#ThisBase1.BaseExtNestedClass.metatype#]{{$}}
-// CONSTRUCTOR_SELF_DOT_1-NEXT: SwiftDecl: BaseExtNestedUnion[#ThisBase1.BaseExtNestedUnion.metatype#]{{$}}
-// CONSTRUCTOR_SELF_DOT_1-NEXT: Keyword: metatype[#ThisDerived1.metatype#]{{$}}
-// CONSTRUCTOR_SELF_DOT_1-NEXT: End completions
+// CONSTRUCTOR_SELF_DOT_1: Begin completions, 15 items
+// CONSTRUCTOR_SELF_DOT_1: End completions
+  }
+
+  deinit {
+    self#^DESTRUCTOR_SELF_NO_DOT_1^#
+// DESTRUCTOR_SELF_NO_DOT_1: Begin completions, 17 items
+// DESTRUCTOR_SELF_NO_DOT_1: End completions
+
+    self.#^DESTRUCTOR_SELF_DOT_1^#
+// DESTRUCTOR_SELF_DOT_1: Begin completions, 15 items
+// DESTRUCTOR_SELF_DOT_1: End completions
   }
 
   func test1() {
     self#^FUNC_SELF_NO_DOT_1^#
-// FUNC_SELF_NO_DOT_1: Begin completions
-// FUNC_SELF_NO_DOT_1-NEXT: SwiftDecl: .derivedInstanceVar[#Int#]{{$}}
-// FUNC_SELF_NO_DOT_1-NEXT: SwiftDecl: .derivedFunc0()[#Void#]{{$}}
-// FUNC_SELF_NO_DOT_1-NEXT: SwiftDecl: [{#i: Double#}][#Int#]{{$}}
-// FUNC_SELF_NO_DOT_1-NEXT: SwiftDecl: .test1()[#Void#]{{$}}
-// FUNC_SELF_NO_DOT_1-NEXT: SwiftDecl: .test2()[#Void#]{{$}}
-// FUNC_SELF_NO_DOT_1-NEXT: SwiftDecl: .derivedExtProp[#Int#]{{$}}
-// FUNC_SELF_NO_DOT_1-NEXT: SwiftDecl: .derivedExtInstanceFunc0()[#Void#]{{$}}
-// FUNC_SELF_NO_DOT_1-NEXT: SwiftDecl: .DerivedExtNestedStruct[#ThisDerived1.DerivedExtNestedStruct.metatype#]{{$}}
-// FUNC_SELF_NO_DOT_1-NEXT: SwiftDecl: .DerivedExtNestedClass[#ThisDerived1.DerivedExtNestedClass.metatype#]{{$}}
-// FUNC_SELF_NO_DOT_1-NEXT: SwiftDecl: .DerivedExtNestedUnion[#ThisDerived1.DerivedExtNestedUnion.metatype#]{{$}}
-// FUNC_SELF_NO_DOT_1-NEXT: SwiftDecl: .baseInstanceVar[#Int#]{{$}}
-// FUNC_SELF_NO_DOT_1-NEXT: SwiftDecl: .baseFunc0()[#Void#]{{$}}
-// FUNC_SELF_NO_DOT_1-NEXT: SwiftDecl: .baseFunc1({#a: Int#})[#Void#]{{$}}
-// FUNC_SELF_NO_DOT_1-NEXT: SwiftDecl: [{#i: Int#}][#Double#]{{$}}
-// FUNC_SELF_NO_DOT_1-NEXT: SwiftDecl: .baseExtProp[#Int#]{{$}}
-// FUNC_SELF_NO_DOT_1-NEXT: SwiftDecl: .baseExtInstanceFunc0()[#Void#]{{$}}
-// FUNC_SELF_NO_DOT_1-NEXT: SwiftDecl: .BaseExtNestedStruct[#ThisBase1.BaseExtNestedStruct.metatype#]{{$}}
-// FUNC_SELF_NO_DOT_1-NEXT: SwiftDecl: .BaseExtNestedClass[#ThisBase1.BaseExtNestedClass.metatype#]{{$}}
-// FUNC_SELF_NO_DOT_1-NEXT: SwiftDecl: .BaseExtNestedUnion[#ThisBase1.BaseExtNestedUnion.metatype#]{{$}}
-// FUNC_SELF_NO_DOT_1-NEXT: Keyword: .metatype[#ThisDerived1.metatype#]{{$}}
-// FUNC_SELF_NO_DOT_1-NEXT: End completions
+// FUNC_SELF_NO_DOT_1: Begin completions, 17 items
+// FUNC_SELF_NO_DOT_1: End completions
   }
 
   func test2() {
     self.#^FUNC_SELF_DOT_1^#
-// FUNC_SELF_DOT_1: Begin completions
-// FUNC_SELF_DOT_1-NEXT: SwiftDecl: derivedInstanceVar[#Int#]{{$}}
-// FUNC_SELF_DOT_1-NEXT: SwiftDecl: derivedFunc0()[#Void#]{{$}}
-// FUNC_SELF_DOT_1-NEXT: SwiftDecl: test1()[#Void#]{{$}}
-// FUNC_SELF_DOT_1-NEXT: SwiftDecl: test2()[#Void#]{{$}}
-// FUNC_SELF_DOT_1-NEXT: SwiftDecl: derivedExtProp[#Int#]{{$}}
-// FUNC_SELF_DOT_1-NEXT: SwiftDecl: derivedExtInstanceFunc0()[#Void#]{{$}}
-// FUNC_SELF_DOT_1-NEXT: SwiftDecl: DerivedExtNestedStruct[#ThisDerived1.DerivedExtNestedStruct.metatype#]{{$}}
-// FUNC_SELF_DOT_1-NEXT: SwiftDecl: DerivedExtNestedClass[#ThisDerived1.DerivedExtNestedClass.metatype#]{{$}}
-// FUNC_SELF_DOT_1-NEXT: SwiftDecl: DerivedExtNestedUnion[#ThisDerived1.DerivedExtNestedUnion.metatype#]{{$}}
-// FUNC_SELF_DOT_1-NEXT: SwiftDecl: baseInstanceVar[#Int#]{{$}}
-// FUNC_SELF_DOT_1-NEXT: SwiftDecl: baseFunc0()[#Void#]{{$}}
-// FUNC_SELF_DOT_1-NEXT: SwiftDecl: baseFunc1({#a: Int#})[#Void#]{{$}}
-// FUNC_SELF_DOT_1-NEXT: SwiftDecl: baseExtProp[#Int#]{{$}}
-// FUNC_SELF_DOT_1-NEXT: SwiftDecl: baseExtInstanceFunc0()[#Void#]{{$}}
-// FUNC_SELF_DOT_1-NEXT: SwiftDecl: BaseExtNestedStruct[#ThisBase1.BaseExtNestedStruct.metatype#]{{$}}
-// FUNC_SELF_DOT_1-NEXT: SwiftDecl: BaseExtNestedClass[#ThisBase1.BaseExtNestedClass.metatype#]{{$}}
-// FUNC_SELF_DOT_1-NEXT: SwiftDecl: BaseExtNestedUnion[#ThisBase1.BaseExtNestedUnion.metatype#]{{$}}
-// FUNC_SELF_DOT_1-NEXT: Keyword: metatype[#ThisDerived1.metatype#]{{$}}
-// FUNC_SELF_DOT_1-NEXT: End completions
+// FUNC_SELF_DOT_1: Begin completions, 15 items
+// FUNC_SELF_DOT_1: End completions
   }
 
-  static func staticTest1() {
+  class func staticTest1() {
     self#^FUNC_STATIC_SELF_NO_DOT_1^#
 // FUNC_STATIC_SELF_NO_DOT_1: Begin completions
-// FUNC_STATIC_SELF_NO_DOT_1-NEXT: SwiftDecl: .derivedFunc0()[#Void#]{{$}}
-// FUNC_STATIC_SELF_NO_DOT_1-NEXT: SwiftDecl: [{#i: Double#}][#Int#]{{$}}
-// FUNC_STATIC_SELF_NO_DOT_1-NEXT: SwiftDecl: .derivedStaticFunc0()[#Void#]{{$}}
-// FUNC_STATIC_SELF_NO_DOT_1-NEXT: SwiftDecl: .test1()[#Void#]{{$}}
-// FUNC_STATIC_SELF_NO_DOT_1-NEXT: SwiftDecl: .test2()[#Void#]{{$}}
-// FUNC_STATIC_SELF_NO_DOT_1-NEXT: SwiftDecl: .staticTest1()[#Void#]{{$}}
-// FUNC_STATIC_SELF_NO_DOT_1-NEXT: SwiftDecl: .staticTest2()[#Void#]{{$}}
-// FUNC_STATIC_SELF_NO_DOT_1-NEXT: SwiftDecl: .derivedExtInstanceFunc0()[#Void#]{{$}}
-// FUNC_STATIC_SELF_NO_DOT_1-NEXT: SwiftDecl: .derivedExtStaticFunc0()[#Void#]{{$}}
-// FUNC_STATIC_SELF_NO_DOT_1-NEXT: SwiftDecl: .DerivedExtNestedStruct[#ThisDerived1.DerivedExtNestedStruct.metatype#]{{$}}
-// FUNC_STATIC_SELF_NO_DOT_1-NEXT: SwiftDecl: .DerivedExtNestedClass[#ThisDerived1.DerivedExtNestedClass.metatype#]{{$}}
-// FUNC_STATIC_SELF_NO_DOT_1-NEXT: SwiftDecl: .DerivedExtNestedUnion[#ThisDerived1.DerivedExtNestedUnion.metatype#]{{$}}
-// FUNC_STATIC_SELF_NO_DOT_1-NEXT: SwiftDecl: .DerivedExtNestedTypealias[#Int.metatype#]{{$}}
-// FUNC_STATIC_SELF_NO_DOT_1-NEXT: SwiftDecl: .baseFunc0()[#Void#]{{$}}
-// FUNC_STATIC_SELF_NO_DOT_1-NEXT: SwiftDecl: .baseFunc1({#a: Int#})[#Void#]{{$}}
-// FUNC_STATIC_SELF_NO_DOT_1-NEXT: SwiftDecl: [{#i: Int#}][#Double#]{{$}}
-// FUNC_STATIC_SELF_NO_DOT_1-NEXT: SwiftDecl: .baseStaticFunc0()[#Void#]{{$}}
-// FUNC_STATIC_SELF_NO_DOT_1-NEXT: SwiftDecl: .baseExtInstanceFunc0()[#Void#]{{$}}
-// FUNC_STATIC_SELF_NO_DOT_1-NEXT: SwiftDecl: .baseExtStaticFunc0()[#Void#]{{$}}
-// FUNC_STATIC_SELF_NO_DOT_1-NEXT: SwiftDecl: .BaseExtNestedStruct[#ThisBase1.BaseExtNestedStruct.metatype#]{{$}}
-// FUNC_STATIC_SELF_NO_DOT_1-NEXT: SwiftDecl: .BaseExtNestedClass[#ThisBase1.BaseExtNestedClass.metatype#]{{$}}
-// FUNC_STATIC_SELF_NO_DOT_1-NEXT: SwiftDecl: .BaseExtNestedUnion[#ThisBase1.BaseExtNestedUnion.metatype#]{{$}}
-// FUNC_STATIC_SELF_NO_DOT_1-NEXT: SwiftDecl: .BaseExtNestedTypealias[#Int.metatype#]{{$}}
-// Yes, '.metatype.metatype' is correct because we are in a static method.
-// FUNC_STATIC_SELF_NO_DOT_1-NEXT: Keyword: .metatype[#ThisDerived1.metatype.metatype#]{{$}}
+// FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[InstanceMethod]/CurrNominal:   .derivedFunc0({#self: ThisDerived1#})[#() -> Void#]
+// FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[StaticVar]/CurrNominal:        .derivedStaticVar[#Int#]
+// FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[StaticMethod]/CurrNominal:     .derivedStaticFunc0()[#Void#]
+// FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[Constructor]/CurrNominal:      ()[#ThisDerived1#]
+// FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[Constructor]/CurrNominal:      ({#a: Int#})[#ThisDerived1#]
+// FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[InstanceMethod]/CurrNominal:   .test1({#self: ThisDerived1#})[#() -> Void#]
+// FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[InstanceMethod]/CurrNominal:   .test2({#self: ThisDerived1#})[#() -> Void#]
+// FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[StaticMethod]/CurrNominal:     .staticTest1()[#Void#]
+// FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[StaticMethod]/CurrNominal:     .staticTest2()[#Void#]
+// FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[InstanceMethod]/CurrNominal:   .derivedExtInstanceFunc0({#self: ThisDerived1#})[#() -> Void#]
+// FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[StaticMethod]/CurrNominal:     .derivedExtStaticFunc0()[#Void#]
+// FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[Struct]/CurrNominal:           .DerivedExtNestedStruct[#ThisDerived1.DerivedExtNestedStruct#]
+// FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[Class]/CurrNominal:            .DerivedExtNestedClass[#ThisDerived1.DerivedExtNestedClass#]
+// FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[Enum]/CurrNominal:             .DerivedExtNestedEnum[#ThisDerived1.DerivedExtNestedEnum#]
+// FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[TypeAlias]/CurrNominal:        .DerivedExtNestedTypealias[#Int#]
+// FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[InstanceMethod]/Super:         .baseFunc0({#self: ThisBase1#})[#() -> Void#]
+// FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[InstanceMethod]/Super:         .baseFunc1({#self: ThisBase1#})[#(Int) -> Void#]
+// FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[StaticVar]/Super:              .baseStaticVar[#Int#]
+// FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[StaticMethod]/Super:           .baseStaticFunc0()[#Void#]
+// FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[InstanceMethod]/Super:         .baseExtInstanceFunc0({#self: ThisBase1#})[#() -> Void#]
+// FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[StaticMethod]/Super:           .baseExtStaticFunc0()[#Void#]
+// FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[Struct]/Super:                 .BaseExtNestedStruct[#ThisBase1.BaseExtNestedStruct#]
+// FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[Class]/Super:                  .BaseExtNestedClass[#ThisBase1.BaseExtNestedClass#]
+// FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[Enum]/Super:                   .BaseExtNestedEnum[#ThisBase1.BaseExtNestedEnum#]
+// FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[TypeAlias]/Super:              .BaseExtNestedTypealias[#Int#]
 // FUNC_STATIC_SELF_NO_DOT_1-NEXT: End completions
   }
 
-  static func staticTest2() {
+  class func staticTest2() {
     self.#^FUNC_STATIC_SELF_DOT_1^#
 // FUNC_STATIC_SELF_DOT_1: Begin completions
-// FUNC_STATIC_SELF_DOT_1-NEXT: SwiftDecl: derivedFunc0()[#Void#]{{$}}
-// FUNC_STATIC_SELF_DOT_1-NEXT: SwiftDecl: derivedStaticFunc0()[#Void#]{{$}}
-// FUNC_STATIC_SELF_DOT_1-NEXT: SwiftDecl: test1()[#Void#]{{$}}
-// FUNC_STATIC_SELF_DOT_1-NEXT: SwiftDecl: test2()[#Void#]{{$}}
-// FUNC_STATIC_SELF_DOT_1-NEXT: SwiftDecl: staticTest1()[#Void#]{{$}}
-// FUNC_STATIC_SELF_DOT_1-NEXT: SwiftDecl: staticTest2()[#Void#]{{$}}
-// FUNC_STATIC_SELF_DOT_1-NEXT: SwiftDecl: derivedExtInstanceFunc0()[#Void#]{{$}}
-// FUNC_STATIC_SELF_DOT_1-NEXT: SwiftDecl: derivedExtStaticFunc0()[#Void#]{{$}}
-// FUNC_STATIC_SELF_DOT_1-NEXT: SwiftDecl: DerivedExtNestedStruct[#ThisDerived1.DerivedExtNestedStruct.metatype#]{{$}}
-// FUNC_STATIC_SELF_DOT_1-NEXT: SwiftDecl: DerivedExtNestedClass[#ThisDerived1.DerivedExtNestedClass.metatype#]{{$}}
-// FUNC_STATIC_SELF_DOT_1-NEXT: SwiftDecl: DerivedExtNestedUnion[#ThisDerived1.DerivedExtNestedUnion.metatype#]{{$}}
-// FUNC_STATIC_SELF_DOT_1-NEXT: SwiftDecl: DerivedExtNestedTypealias[#Int.metatype#]{{$}}
-// FUNC_STATIC_SELF_DOT_1-NEXT: SwiftDecl: baseFunc0()[#Void#]{{$}}
-// FUNC_STATIC_SELF_DOT_1-NEXT: SwiftDecl: baseFunc1({#a: Int#})[#Void#]{{$}}
-// FUNC_STATIC_SELF_DOT_1-NEXT: SwiftDecl: baseStaticFunc0()[#Void#]{{$}}
-// FUNC_STATIC_SELF_DOT_1-NEXT: SwiftDecl: baseExtInstanceFunc0()[#Void#]{{$}}
-// FUNC_STATIC_SELF_DOT_1-NEXT: SwiftDecl: baseExtStaticFunc0()[#Void#]{{$}}
-// FUNC_STATIC_SELF_DOT_1-NEXT: SwiftDecl: BaseExtNestedStruct[#ThisBase1.BaseExtNestedStruct.metatype#]{{$}}
-// FUNC_STATIC_SELF_DOT_1-NEXT: SwiftDecl: BaseExtNestedClass[#ThisBase1.BaseExtNestedClass.metatype#]{{$}}
-// FUNC_STATIC_SELF_DOT_1-NEXT: SwiftDecl: BaseExtNestedUnion[#ThisBase1.BaseExtNestedUnion.metatype#]{{$}}
-// FUNC_STATIC_SELF_DOT_1-NEXT: SwiftDecl: BaseExtNestedTypealias[#Int.metatype#]{{$}}
-// Yes, '.metatype.metatype' is correct because we are in a static method.
-// FUNC_STATIC_SELF_DOT_1-NEXT: Keyword: metatype[#ThisDerived1.metatype.metatype#]{{$}}
+// FUNC_STATIC_SELF_DOT_1-NEXT: Decl[InstanceMethod]/CurrNominal:   derivedFunc0({#self: ThisDerived1#})[#() -> Void#]
+// FUNC_STATIC_SELF_DOT_1-NEXT: Decl[StaticVar]/CurrNominal:        derivedStaticVar[#Int#]
+// FUNC_STATIC_SELF_DOT_1-NEXT: Decl[StaticMethod]/CurrNominal:     derivedStaticFunc0()[#Void#]
+// FUNC_STATIC_SELF_DOT_1-NEXT: Decl[InstanceMethod]/CurrNominal:   test1({#self: ThisDerived1#})[#() -> Void#]
+// FUNC_STATIC_SELF_DOT_1-NEXT: Decl[InstanceMethod]/CurrNominal:   test2({#self: ThisDerived1#})[#() -> Void#]
+// FUNC_STATIC_SELF_DOT_1-NEXT: Decl[StaticMethod]/CurrNominal:     staticTest1()[#Void#]
+// FUNC_STATIC_SELF_DOT_1-NEXT: Decl[StaticMethod]/CurrNominal:     staticTest2()[#Void#]
+// FUNC_STATIC_SELF_DOT_1-NEXT: Decl[InstanceMethod]/CurrNominal:   derivedExtInstanceFunc0({#self: ThisDerived1#})[#() -> Void#]
+// FUNC_STATIC_SELF_DOT_1-NEXT: Decl[StaticMethod]/CurrNominal:     derivedExtStaticFunc0()[#Void#]
+// FUNC_STATIC_SELF_DOT_1-NEXT: Decl[Struct]/CurrNominal:           DerivedExtNestedStruct[#ThisDerived1.DerivedExtNestedStruct#]
+// FUNC_STATIC_SELF_DOT_1-NEXT: Decl[Class]/CurrNominal:            DerivedExtNestedClass[#ThisDerived1.DerivedExtNestedClass#]
+// FUNC_STATIC_SELF_DOT_1-NEXT: Decl[Enum]/CurrNominal:             DerivedExtNestedEnum[#ThisDerived1.DerivedExtNestedEnum#]
+// FUNC_STATIC_SELF_DOT_1-NEXT: Decl[TypeAlias]/CurrNominal:        DerivedExtNestedTypealias[#Int#]
+// FUNC_STATIC_SELF_DOT_1-NEXT: Decl[InstanceMethod]/Super:         baseFunc0({#self: ThisBase1#})[#() -> Void#]
+// FUNC_STATIC_SELF_DOT_1-NEXT: Decl[InstanceMethod]/Super:         baseFunc1({#self: ThisBase1#})[#(Int) -> Void#]
+// FUNC_STATIC_SELF_DOT_1-NEXT: Decl[StaticVar]/Super:              baseStaticVar[#Int#]
+// FUNC_STATIC_SELF_DOT_1-NEXT: Decl[StaticMethod]/Super:           baseStaticFunc0()[#Void#]
+// FUNC_STATIC_SELF_DOT_1-NEXT: Decl[InstanceMethod]/Super:         baseExtInstanceFunc0({#self: ThisBase1#})[#() -> Void#]
+// FUNC_STATIC_SELF_DOT_1-NEXT: Decl[StaticMethod]/Super:           baseExtStaticFunc0()[#Void#]
+// FUNC_STATIC_SELF_DOT_1-NEXT: Decl[Struct]/Super:                 BaseExtNestedStruct[#ThisBase1.BaseExtNestedStruct#]
+// FUNC_STATIC_SELF_DOT_1-NEXT: Decl[Class]/Super:                  BaseExtNestedClass[#ThisBase1.BaseExtNestedClass#]
+// FUNC_STATIC_SELF_DOT_1-NEXT: Decl[Enum]/Super:                   BaseExtNestedEnum[#ThisBase1.BaseExtNestedEnum#]
+// FUNC_STATIC_SELF_DOT_1-NEXT: Decl[TypeAlias]/Super:              BaseExtNestedTypealias[#Int#]
 // FUNC_STATIC_SELF_DOT_1-NEXT: End completions
   }
 }
 
 extension ThisDerived1 {
   var derivedExtProp : Int {
-  get:
-    return 42
-  set(val):
+    get {
+      return 42
+    }
+    set(v) {}
   }
 
   func derivedExtInstanceFunc0() {}
 
-  static func derivedExtStaticFunc0() {}
+  var derivedExtStaticVar: Int
+
+  var derivedExtStaticProp: Int {
+    get {
+      return 42
+    }
+    set(v) {}
+  }
+
+  class func derivedExtStaticFunc0() {}
 
   struct DerivedExtNestedStruct {}
   class DerivedExtNestedClass {}
-  union DerivedExtNestedUnion {
-    case DerivedExtUnionX(Int)
+  enum DerivedExtNestedEnum {
+    case DerivedExtEnumX(Int)
   }
 
   typealias DerivedExtNestedTypealias = Int

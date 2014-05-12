@@ -1,5 +1,5 @@
 
-@asmname="evil" func _evil()
+@asmname("evil") func _evil()
 
 func id<U>(u : U) -> U {
   _evil()

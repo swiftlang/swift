@@ -1,109 +1,180 @@
-/* Optional<T>
-
-   Until we have working oneof types, we have this library-based oneof.
-
-*/
-
-// Users should never touch this type directly.
-struct __NoneType {
-  func getLogicValue() -> Bool { return false }
-}
-func [prefix] !(x: __NoneType) -> Bool { return true }
-
-extension __NoneType : Equatable {
-  func __equal__(rhs: __NoneType) -> Bool { 
-    return true 
-  }
-}
-
-// This constant is for public consumption
-var None: __NoneType {
-  return __NoneType()
-}
-
-/*
-
+//===----------------------------------------------------------------------===//
 //
-// FIXME: Until Swift supports partial ordering of generic functions,
-// these will cause ambiguities against more useful overloads like
-// those interactions with Optional<T>.  Keep them on ice until then.
+// This source file is part of the Swift.org open source project
 //
-func == <T>(lhs: __NoneType, rhs: T) -> Bool {
-  return rhs.isNone()
-}
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
 
-func != <T>(lhs: __NoneType, rhs: Optional<T>) -> Bool {
-  return !rhs.isNone()
-}
+// The compiler has special knowledge of Optional<T>, including the fact that
+// it is an enum with cases named 'None' and 'Some'.
+enum Optional<T>: LogicValue,Reflectable {
+  case None
+  case Some(T)
 
-func == <T>(lhs: Optional<T>, rhs: __NoneType) -> Bool {
-  return lhs.isNone()
-}
+  init() { self = .None }
 
-func != <T>(lhs: Optional<T>, rhs: __NoneType) -> Bool {
-  return !lhs.isNone()
-}
+  init(_ some: T) { self = .Some(some) }
 
-*/
-
-struct Optional<T>: Enumerable, LogicValue {
-  typealias EnumeratorType = Slice<T>
-  func getEnumeratorType() -> Slice<T> { return value }
-
-  constructor() {}
-
-  constructor(x: T) {
-    value = new T[1]
-    value[0] = x
-  }
-
-  constructor(x: __NoneType) {}
-
-  /// \brief Allow use in a Boolean context.
+  /// Allow use in a Boolean context.
+  @transparent
   func getLogicValue() -> Bool {
-    return value.length > 0
+    switch self {
+    case .Some:
+      return true
+    case .None:
+      return false
+    }
   }
 
-  func isNone() -> Bool {
-    return !getLogicValue()
+  /// Haskell's fmap, which was mis-named
+  func map<U>(f: (T)->U) -> U? {
+    switch self {
+    case .Some(var y):
+      return .Some(f(y))
+    case .None:
+      return .None
+    }
   }
 
-  func get() -> T {
-    assert(value.length > 0)
-    return value[0]
-  }
-
-  var value: T[]
-}
-
-// Emulate .Some(x) tag constructor to be delivered by oneof
-func Some<T>(x: T) -> Optional<T> {
-  return Optional(x)
-}
-
-// FIXME: Has no effect pending <rdar://problem/13785669>
-extension __NoneType {
-  func [conversion] __conversion<T> () -> Optional<T> {
-    return Optional(None)
+  func getMirror() -> Mirror {
+    return _OptionalMirror(self)
   }
 }
 
-func [prefix] ! <T>(x: Optional<T>) -> Bool { 
-  return !x.getLogicValue()
+// While this free function may seem obsolete, since an optional is
+// often expressed as (x as T), it can lead to cleaner usage, i.e.
+//
+//   map(x as T) { ... }
+// vs
+//   (x as T).map { ... }
+//
+/// Haskell's fmap for Optionals.
+func map<T, U>(x: T?, f: (T)->U) -> U? {
+  switch x {
+    case .Some(var y):
+    return .Some(f(y))
+    case .None:
+    return .None
+  }
 }
 
-func == <T>(lhs: __NoneType, rhs: Optional<T>) -> Bool {
-  return rhs.isNone()
+// Intrinsics for use by language features.
+@transparent
+func _doesOptionalHaveValue<T>(inout v: T?) -> Builtin.Int1 {
+  return v.getLogicValue().value
 }
 
-func != <T>(lhs: __NoneType, rhs: Optional<T>) -> Bool {
-  return !rhs.isNone()
+@transparent
+func _getOptionalValue<T>(v: T?) -> T {
+  switch v {
+  case .Some(var x):
+    return x
+  case .None:
+    fatal("Can't unwrap Optional.None")
+  }
 }
 
-func == <T>(lhs: Optional<T>, rhs: __NoneType) -> Bool {
-  return lhs.isNone()
+@transparent
+func _injectValueIntoOptional<T>(v: T) -> Optional<T> {
+  return .Some(v)
 }
 
-func != <T>(lhs: Optional<T>, rhs: __NoneType) -> Bool {
-  return !lhs.isNone()
+@transparent
+func _injectNothingIntoOptional<T>() -> Optional<T> {
+  return .None
+}
+
+// Comparisons
+func == <T: Equatable> (lhs: T?, rhs: T?) -> Bool {
+  switch (lhs,rhs) {
+  case (.Some(let l), .Some(let r)):
+    return l == r
+  case (.None, .None):
+    return true
+  default:
+    return false
+  }
+}
+
+func != <T: Equatable> (lhs: T?, rhs: T?) -> Bool {
+  return !(lhs == rhs)
+}
+
+struct _OptionalMirror<T> : Mirror {
+  let _value : Optional<T>
+
+  init(_ x : Optional<T>) {
+    _value = x
+  }
+
+  var value: Any { return _value }
+
+  var valueType: Any.Type { return (_value as Any).dynamicType }
+
+  var objectIdentifier: ObjectIdentifier? { return .None }
+
+  var count: Int { return _value ? 1 : 0 }
+
+  subscript(i: Int) -> (String, Mirror) { 
+    switch (_value,i) {
+    case (.Some(let contents),0) : return ("Some",reflect(contents))
+    default: fatal("cannot extract this child index")
+    }
+  }
+
+  var summary: String { 
+    switch _value {
+      case .Some(let contents): return reflect(contents).summary
+      default: return "nil"
+    }
+  }
+
+  var quickLookObject: QuickLookObject? { return .None }
+
+  var disposition: MirrorDisposition { return .Optional }
+}
+
+
+// FIXME: ordering comparison of Optionals disabled pending
+func < <T: _Comparable> (lhs: T?, rhs: T?) -> Bool {
+  switch (lhs,rhs) {
+  case (.Some(let l), .Some(let r)):
+    return l < r
+  case (.None, .Some):
+    return true
+  default:
+    return false
+  }
+}
+
+func > <T: _Comparable>(lhs: T?, rhs: T?) -> Bool {
+  switch (lhs,rhs) {
+  case (.Some(let l), .Some(let r)):
+    return l > r
+  default:
+    return rhs < lhs
+  }
+}
+
+func <= <T: _Comparable>(lhs: T?, rhs: T?) -> Bool {
+  switch (lhs,rhs) {
+  case (.Some(let l), .Some(let r)):
+    return l <= r
+  default:
+    return !(rhs < lhs)
+  }
+}
+
+func >= <T: _Comparable>(lhs: T?, rhs: T?) -> Bool {
+  switch (lhs,rhs) {
+  case (.Some(let l), .Some(let r)):
+    return l >= r
+  default:
+    return !(lhs < rhs)
+  }
 }

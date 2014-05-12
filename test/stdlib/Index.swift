@@ -13,6 +13,11 @@
 
 struct F : ForwardIndex {
   var x: Int
+
+  init(_ x: Int) {
+    self.x = x
+  }
+
   func succ() -> F {
     println("F.succ: \(x)")
     return F(x + 1)
@@ -25,6 +30,11 @@ func ==(a: F, b: F) -> Bool {
 
 struct B : BidirectionalIndex {
   var x: Int
+
+  init(_ x: Int) {
+    self.x = x
+  }
+
   func succ() -> B {
     println("B.succ: \(x)")
     return B(x + 1)
@@ -41,6 +51,11 @@ func ==(a: B, b: B) -> Bool {
 
 struct R : RandomAccessIndex {
   var x: Int
+
+  init(_ x: Int) {
+    self.x = x
+  }
+
   func succ() -> R {
     println("R.succ: \(x)")
     return R(x + 1)

@@ -2,12 +2,12 @@
 // RUN: mkdir %t
 //
 // RUN: echo "typealias TestFloat = Float" > %t/float_type.swift
-// RUN: %swift -I %t -i %s | FileCheck %s
-//
+// RUN: %target-build-swift %s -I %t -Xfrontend -enable-source-import -o %t/float.out
+// RUN: %target-run %t/float.out | FileCheck %s
+
 // RUN: echo "typealias TestFloat = Double" > %t/float_type.swift
-// RUN: %swift -I %t -i %s | FileCheck %s
-//
-// REQUIRES: swift_interpreter
+// RUN: %target-build-swift %s -I %t -Xfrontend -enable-source-import -o %t/double.out
+// RUN: %target-run %t/double.out | FileCheck %s
 
 import Darwin
 import float_type
@@ -24,41 +24,37 @@ func noinlineMinusZero() -> TestFloat {
   return -0.0
 }
 
-func noinlineSNaN() -> TestFloat {
-  return TestFloat.signalingNaN()
-}
-
 //===---
 // Normals
 //===---
 
 func checkNormal(normal: TestFloat) {
-  alwaysTrap(normal.isNormal())
-  alwaysTrap(normal.isFinite())
-  alwaysTrap(!normal.isZero())
-  alwaysTrap(!normal.isSubnormal())
-  alwaysTrap(!normal.isInfinite())
-  alwaysTrap(!normal.isNaN())
-  alwaysTrap(!normal.isSignaling())
+  securityCheck(normal.isNormal())
+  securityCheck(normal.isFinite())
+  securityCheck(!normal.isZero())
+  securityCheck(!normal.isSubnormal())
+  securityCheck(!normal.isInfinite())
+  securityCheck(!normal.isNaN())
+  securityCheck(!normal.isSignaling())
 }
 
 func testNormal() {
   var positiveNormal: TestFloat = 42.0
   checkNormal(positiveNormal)
-  alwaysTrap(!positiveNormal.isSignMinus())
-  alwaysTrap(positiveNormal.floatingPointClass == .PositiveNormal)
+  securityCheck(!positiveNormal.isSignMinus())
+  securityCheck(positiveNormal.floatingPointClass == .PositiveNormal)
 
   var negativeNormal: TestFloat = -42.0
   checkNormal(negativeNormal)
-  alwaysTrap(negativeNormal.isSignMinus())
-  alwaysTrap(negativeNormal.floatingPointClass == .NegativeNormal)
+  securityCheck(negativeNormal.isSignMinus())
+  securityCheck(negativeNormal.floatingPointClass == .NegativeNormal)
 
-  alwaysTrap(positiveNormal == positiveNormal)
-  alwaysTrap(negativeNormal == negativeNormal)
-  alwaysTrap(positiveNormal != negativeNormal)
-  alwaysTrap(negativeNormal != positiveNormal)
-  alwaysTrap(positiveNormal == -negativeNormal)
-  alwaysTrap(negativeNormal == -positiveNormal)
+  securityCheck(positiveNormal == positiveNormal)
+  securityCheck(negativeNormal == negativeNormal)
+  securityCheck(positiveNormal != negativeNormal)
+  securityCheck(negativeNormal != positiveNormal)
+  securityCheck(positiveNormal == -negativeNormal)
+  securityCheck(negativeNormal == -positiveNormal)
 
   println("testNormal done")
 }
@@ -70,32 +66,32 @@ testNormal()
 //===---
 
 func checkZero(zero: TestFloat) {
-  alwaysTrap(!zero.isNormal())
-  alwaysTrap(zero.isFinite())
-  alwaysTrap(zero.isZero())
-  alwaysTrap(!zero.isSubnormal())
-  alwaysTrap(!zero.isInfinite())
-  alwaysTrap(!zero.isNaN())
-  alwaysTrap(!zero.isSignaling())
+  securityCheck(!zero.isNormal())
+  securityCheck(zero.isFinite())
+  securityCheck(zero.isZero())
+  securityCheck(!zero.isSubnormal())
+  securityCheck(!zero.isInfinite())
+  securityCheck(!zero.isNaN())
+  securityCheck(!zero.isSignaling())
 }
 
 func testZero() {
   var plusZero = noinlinePlusZero()
   checkZero(plusZero)
-  alwaysTrap(!plusZero.isSignMinus())
-  alwaysTrap(plusZero.floatingPointClass == .PositiveZero)
+  securityCheck(!plusZero.isSignMinus())
+  securityCheck(plusZero.floatingPointClass == .PositiveZero)
 
   var minusZero = noinlineMinusZero()
   checkZero(minusZero)
-  alwaysTrap(minusZero.isSignMinus())
-  alwaysTrap(minusZero.floatingPointClass == .NegativeZero)
+  securityCheck(minusZero.isSignMinus())
+  securityCheck(minusZero.floatingPointClass == .NegativeZero)
 
-  alwaysTrap(plusZero == 0.0)
-  alwaysTrap(plusZero == plusZero)
-  alwaysTrap(plusZero == minusZero)
-  alwaysTrap(minusZero == -0.0)
-  alwaysTrap(minusZero == plusZero)
-  alwaysTrap(minusZero == minusZero)
+  securityCheck(plusZero == 0.0)
+  securityCheck(plusZero == plusZero)
+  securityCheck(plusZero == minusZero)
+  securityCheck(minusZero == -0.0)
+  securityCheck(minusZero == plusZero)
+  securityCheck(minusZero == minusZero)
 
   println("testZero done")
 }
@@ -107,13 +103,13 @@ testZero()
 //===---
 
 func checkSubnormal(subnormal: TestFloat) {
-  alwaysTrap(!subnormal.isNormal())
-  alwaysTrap(subnormal.isFinite())
-  alwaysTrap(!subnormal.isZero())
-  alwaysTrap(subnormal.isSubnormal())
-  alwaysTrap(!subnormal.isInfinite())
-  alwaysTrap(!subnormal.isNaN())
-  alwaysTrap(!subnormal.isSignaling())
+  securityCheck(!subnormal.isNormal())
+  securityCheck(subnormal.isFinite())
+  securityCheck(!subnormal.isZero())
+  securityCheck(subnormal.isSubnormal())
+  securityCheck(!subnormal.isInfinite())
+  securityCheck(!subnormal.isNaN())
+  securityCheck(!subnormal.isSignaling())
 }
 
 func asUInt64(a: UInt64) -> UInt64 {
@@ -132,25 +128,25 @@ func testSubnormal() {
     case asUInt64(UInt32.max):
       iterations = 127
     default:
-      alwaysTrap("unhandled float kind")
+      fatal("unhandled float kind")
   }
   var positiveSubnormal: TestFloat = 1.0
   for var i = 0; i < iterations; i++ {
     positiveSubnormal /= 2.0 as TestFloat
   }
   checkSubnormal(positiveSubnormal)
-  alwaysTrap(!positiveSubnormal.isSignMinus())
-  alwaysTrap(positiveSubnormal.floatingPointClass == .PositiveSubnormal)
-  alwaysTrap(positiveSubnormal != 0.0)
+  securityCheck(!positiveSubnormal.isSignMinus())
+  securityCheck(positiveSubnormal.floatingPointClass == .PositiveSubnormal)
+  securityCheck(positiveSubnormal != 0.0)
 
   var negativeSubnormal: TestFloat = -1.0
   for var i = 0; i < iterations; i++ {
     negativeSubnormal /= 2.0 as TestFloat
   }
   checkSubnormal(negativeSubnormal)
-  alwaysTrap(negativeSubnormal.isSignMinus())
-  alwaysTrap(negativeSubnormal.floatingPointClass == .NegativeSubnormal)
-  alwaysTrap(negativeSubnormal != -0.0)
+  securityCheck(negativeSubnormal.isSignMinus())
+  securityCheck(negativeSubnormal.floatingPointClass == .NegativeSubnormal)
+  securityCheck(negativeSubnormal != -0.0)
 
   println("testSubnormal done")
 }
@@ -162,41 +158,41 @@ testSubnormal()
 //===---
 
 func checkInf(inf: TestFloat) {
-  alwaysTrap(!inf.isNormal())
-  alwaysTrap(!inf.isFinite())
-  alwaysTrap(!inf.isZero())
-  alwaysTrap(!inf.isSubnormal())
-  alwaysTrap(inf.isInfinite())
-  alwaysTrap(!inf.isNaN())
-  alwaysTrap(!inf.isSignaling())
+  securityCheck(!inf.isNormal())
+  securityCheck(!inf.isFinite())
+  securityCheck(!inf.isZero())
+  securityCheck(!inf.isSubnormal())
+  securityCheck(inf.isInfinite())
+  securityCheck(!inf.isNaN())
+  securityCheck(!inf.isSignaling())
 }
 
 func testInf() {
   var stdlibPlusInf = TestFloat.inf()
   checkInf(stdlibPlusInf)
-  alwaysTrap(!stdlibPlusInf.isSignMinus())
-  alwaysTrap(stdlibPlusInf.floatingPointClass == .PositiveInfinity)
+  securityCheck(!stdlibPlusInf.isSignMinus())
+  securityCheck(stdlibPlusInf.floatingPointClass == .PositiveInfinity)
 
   var stdlibMinusInf = -TestFloat.inf()
   checkInf(stdlibMinusInf)
-  alwaysTrap(stdlibMinusInf.isSignMinus())
-  alwaysTrap(stdlibMinusInf.floatingPointClass == .NegativeInfinity)
+  securityCheck(stdlibMinusInf.isSignMinus())
+  securityCheck(stdlibMinusInf.floatingPointClass == .NegativeInfinity)
 
   var computedPlusInf = 1.0 / noinlinePlusZero()
   checkInf(computedPlusInf)
-  alwaysTrap(!computedPlusInf.isSignMinus())
-  alwaysTrap(computedPlusInf.floatingPointClass == .PositiveInfinity)
+  securityCheck(!computedPlusInf.isSignMinus())
+  securityCheck(computedPlusInf.floatingPointClass == .PositiveInfinity)
 
   var computedMinusInf = -1.0 / noinlinePlusZero()
   checkInf(computedMinusInf)
-  alwaysTrap(computedMinusInf.isSignMinus())
-  alwaysTrap(computedMinusInf.floatingPointClass == .NegativeInfinity)
+  securityCheck(computedMinusInf.isSignMinus())
+  securityCheck(computedMinusInf.floatingPointClass == .NegativeInfinity)
 
-  alwaysTrap(stdlibPlusInf == computedPlusInf)
-  alwaysTrap(stdlibMinusInf == computedMinusInf)
+  securityCheck(stdlibPlusInf == computedPlusInf)
+  securityCheck(stdlibMinusInf == computedMinusInf)
 
-  alwaysTrap(stdlibPlusInf != computedMinusInf)
-  alwaysTrap(stdlibMinusInf != computedPlusInf)
+  securityCheck(stdlibPlusInf != computedMinusInf)
+  securityCheck(stdlibMinusInf != computedPlusInf)
 
   println("testInf done")
 }
@@ -208,48 +204,29 @@ testInf()
 //===---
 
 func checkNaN(nan: TestFloat) {
-  alwaysTrap(!nan.isSignMinus())
-  alwaysTrap(!nan.isNormal())
-  alwaysTrap(!nan.isFinite())
-  alwaysTrap(!nan.isZero())
-  alwaysTrap(!nan.isSubnormal())
-  alwaysTrap(!nan.isInfinite())
-  alwaysTrap(nan.isNaN())
+  securityCheck(!nan.isSignMinus())
+  securityCheck(!nan.isNormal())
+  securityCheck(!nan.isFinite())
+  securityCheck(!nan.isZero())
+  securityCheck(!nan.isSubnormal())
+  securityCheck(!nan.isInfinite())
+  securityCheck(nan.isNaN())
 }
 
 func checkQNaN(qnan: TestFloat) {
   checkNaN(qnan)
-  alwaysTrap(!qnan.isSignaling())
-  alwaysTrap(qnan.floatingPointClass == .QuietNaN)
-}
-
-func checkSNaN(snan: TestFloat) {
-  checkNaN(snan)
-  alwaysTrap(snan.isSignaling())
-  alwaysTrap(snan.floatingPointClass == .SignalingNaN)
+  securityCheck(!qnan.isSignaling())
+  securityCheck(qnan.floatingPointClass == .QuietNaN)
 }
 
 func testNaN() {
   var stdlibDefaultNaN = TestFloat.NaN()
   checkQNaN(stdlibDefaultNaN)
-  alwaysTrap(stdlibDefaultNaN != stdlibDefaultNaN)
+  securityCheck(stdlibDefaultNaN != stdlibDefaultNaN)
 
   var stdlibQNaN = TestFloat.quietNaN()
   checkQNaN(stdlibQNaN)
-  alwaysTrap(stdlibQNaN != stdlibQNaN)
-
-  var stdlibSNaN = noinlineSNaN()
-  checkSNaN(stdlibSNaN)
-  alwaysTrap(stdlibSNaN != stdlibSNaN)
-
-  feclearexcept(FE_ALL_EXCEPT)
-  var previousExceptions = fetestexcept(FE_ALL_EXCEPT)
-  println("\(Float.signalingNaN() + 0.0)")
-  alwaysTrap(fetestexcept(FE_ALL_EXCEPT) != previousExceptions)
-
-  feclearexcept(FE_ALL_EXCEPT)
-  checkSNaN(stdlibSNaN)
-  alwaysTrap(fetestexcept(FE_ALL_EXCEPT) == previousExceptions)
+  securityCheck(stdlibQNaN != stdlibQNaN)
 
   println("testNaN done")
 }

@@ -7,10 +7,10 @@ class Foo : Pingable {
   func ping(x : Int) { var t : Int }
 }
 
+// Everything gets devirtualized, inlined, and promoted to the stack.
 //CHECK: @_TF24devirtualize_existential17interesting_stuffFT_T_
-//CHECK: init_existential
-//CHECK: function_ref @_TTWC24devirtualize_existential3FooS_8PingableS_FS1_4pingU_fRQPS1_FT1xSi_T_
-//CHECK: apply
+//CHECK-NOT: init_existential
+//CHECK-NOT: apply
 //CHECK: return
 func interesting_stuff() {
  var x : Pingable = Foo()

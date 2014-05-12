@@ -1,14 +1,129 @@
-// RUN: %swift -dump-parse %s 2>&1 | FileCheck %s
-func r13756261(c0:UInt8) -> Int {
+// RUN: %swift -dump-ast %s 2>&1 | FileCheck %s
+
+// CHECK: (func_decl "r13756261(_:_:)"
+func r13756261(x: Bool, y: Int) -> Int {
   // CHECK: (if_expr
-  // CHECK:   (paren_expr
-  // CHECK:   (integer_literal_expr
+  // CHECK:   (call_expr
+  // CHECK:   (declref_expr
   // CHECK:   (if_expr
-  // CHECK:     (paren_expr
-  // CHECK:     (integer_literal_expr
+  // CHECK:     (call_expr
+  // CHECK:     (declref_expr
   // CHECK:     (if_expr
-  // CHECK:       (paren_expr
-  // CHECK:       (integer_literal_expr
-  // CHECK:       (integer_literal_expr
-  return (c0 < 0x80) ? 1 : (c0 < 0xE0) ? 2 : (c0 < 0xF0) ? 3 : 4
+  // CHECK:       (call_expr
+  // CHECK:       (declref_expr
+  // CHECK:       (declref_expr
+  return (x) ? y : (x) ? y : (x) ? y : y
 }
+
+// CHECK: (func_decl "r13756221(_:_:)"
+func r13756221(x: Bool, y: Int) -> Int {
+  // CHECK: (if_expr
+  // CHECK:   (call_expr
+  // CHECK:   (declref_expr
+  // CHECK:   (if_expr
+  // CHECK:     (call_expr
+  // CHECK:     (declref_expr
+  // CHECK:     (if_expr
+  // CHECK:       (call_expr
+  // CHECK:       (declref_expr
+  // CHECK:       (declref_expr
+  return (x) ? y
+       : (x) ? y
+       : (x) ? y
+       : y
+}
+
+// CHECK: (func_decl "telescoping_if(_:_:)"
+func telescoping_if(x: Bool, y: Int) -> Int {
+  // CHECK: (if_expr
+  // CHECK:   (call_expr
+  // CHECK:   (if_expr
+  // CHECK:     (call_expr
+  // CHECK:     (if_expr
+  // CHECK:       (call_expr
+  // CHECK:       (declref_expr
+  // CHECK:       (declref_expr
+  // CHECK:     (declref_expr
+  // CHECK:   (declref_expr
+  return (x) ? (x) ? (x) ? y : y : y : y
+}
+
+// Operator with precedence above ? :
+operator infix +>> {
+  associativity left
+  precedence 110
+}
+
+// Operator with precedence below ? :
+operator infix +<< {
+  associativity left
+  precedence 90
+}
+
+// Operator with precedence equal to ? :
+operator infix +== {
+  associativity right
+  precedence 100
+}
+
+func +>> (x: Bool, y: Bool) -> Bool {}
+func +<< (x: Bool, y: Bool) -> Bool {}
+func +== (x: Bool, y: Bool) -> Bool {}
+
+// CHECK: (func_decl "prec_above(_:_:_:)"
+func prec_above(x: Bool, y: Bool, z: Bool) -> Bool {
+  // (x +>> y) ? (y +>> z) : ((x +>> y) ? (y +>> z) : (x +>> y))
+  // CHECK: (if_expr
+  // CHECK:   (binary_expr
+  // CHECK:   (binary_expr
+  // CHECK:   (if_expr
+  // CHECK:     (binary_expr
+  // CHECK:     (binary_expr
+  // CHECK:     (binary_expr
+  return x +>> y ? y +>> z : x +>> y ? y +>> z : x +>> y
+}
+
+// CHECK: (func_decl "prec_below(_:_:_:)"
+func prec_below(x: Bool, y: Bool, z: Bool) -> Bool {
+  // The middle arm of the ternary is max-munched, so this is:
+  // ((x +<< (y ? (y +<< z) : x)) +<< (y ? (y +<< z) : x)) +<< y
+  // CHECK: (binary_expr
+  // CHECK:   (binary_expr
+  // CHECK:     (binary_expr
+  // CHECK:       (declref_expr
+  // CHECK:       (if_expr
+  // CHECK:         (call_expr
+  // CHECK:         (binary_expr
+  // CHECK:         (declref_expr
+  // CHECK:     (if_expr
+  // CHECK:       (call_expr
+  // CHECK:       (binary_expr
+  // CHECK:       (declref_expr
+  // CHECK:   (declref_expr
+  return x +<< y ? y +<< z : x +<< y ? y +<< z : x +<< y
+}
+
+// CHECK: (func_decl "prec_equal(_:_:_:)"
+func prec_equal(x: Bool, y: Bool, z: Bool) -> Bool {
+  // The middle arm of the ternary is max-munched, so this is:
+  // x +== (y ? (y +== z) : (x +== (y ? (y +== z) : (x +== y))))
+  // CHECK: (binary_expr
+  // CHECK:   (declref_expr
+  // CHECK:   (if_expr
+  // CHECK:     (call_expr
+  // CHECK:     (binary_expr
+  // CHECK:       (declref_expr
+  // CHECK:       (declref_expr
+  // CHECK:     (binary_expr
+  // CHECK:       (declref_expr
+  // CHECK:       (if_expr
+  // CHECK:         (call_expr
+  // CHECK:         (binary_expr
+  // CHECK:           (declref_expr
+  // CHECK:           (declref_expr
+  // CHECK:         (binary_expr
+  // CHECK:           (declref_expr
+  // CHECK:           (declref_expr
+  return x +== y ? y +== z : x +== y ? y +== z : x +== y
+}
+

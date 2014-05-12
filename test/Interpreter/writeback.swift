@@ -1,28 +1,31 @@
-// RUN: %swift %s -i | FileCheck %s
+// RUN: %target-run-simple-swift | FileCheck %s
 
 struct Foo {
-  var _x : (Int, Char, String)
+  var _x : (Int, UnicodeScalar, String)
 
-  var x : (Int, String, Char) {
-  get:
-    var (a, b, c) = _x
-    return (a, c, b)
+  var x : (Int, String, UnicodeScalar) {
+    get {
+      var (a, b, c) = _x
+      return (a, c, b)
+    }
 
-  set:
-    var (a, b, c) = value
-    _x = (a, c, b)
+    mutating
+    set {
+      var (a, b, c) = newValue
+      _x = (a, c, b)
+    }
   }
 
-  constructor(a:Int, b:String, c:Char) {
+  init(a:Int, b:String, c:UnicodeScalar) {
     _x = (a, c, b)
   }
 }
 
-var foo = Foo(1, "two", '3')
+var foo = Foo(a: 1, b: "two", c: "3")
 
 foo.x.0 = 4
 foo.x.1 = "five"
-foo.x.2 = '6'
+foo.x.2 = "6"
 
 // CHECK: 4
 // CHECK: five
@@ -35,19 +38,22 @@ struct Bar {
   var _foo : Foo
 
   var foo : Foo {
-  get:
-    return _foo
+    get {
+      return _foo
+    }
 
-  set:
-    _foo = value
+    mutating
+    set {
+      _foo = newValue
+    }
   }
 }
 
-var bar = Bar(Foo(1, "two", '3'))
+var bar = Bar(_foo: Foo(a: 1, b: "two", c: "3"))
 
 bar.foo.x.0 = 7
 bar.foo.x.1 = "eight"
-bar.foo.x.2 = '9'
+bar.foo.x.2 = "9"
 
 // CHECK: 7
 // CHECK: eight

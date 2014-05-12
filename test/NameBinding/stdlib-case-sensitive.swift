@@ -1,9 +1,9 @@
 // RUN: not %swift %s -parse
 // RUN: not %swift -parse-stdlib %s -parse
 
-// Just don't crash when accidentally importing "Swift" instead of "swift".
+// Just don't crash when accidentally importing "SWIFT" instead of "Swift".
 
-import Swift
+import SWIFT
 
 print("hi")
-Swift.print("hi")
+SWIFT.print("hi")

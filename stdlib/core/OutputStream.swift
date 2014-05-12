@@ -1,113 +1,109 @@
 //===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
 // OutputStream and Formatting logic
 //===----------------------------------------------------------------------===//
 
 extension Bool : FormattedPrintable {
-  func format(kind : Char, layout : String) -> String {
-    alwaysTrap(kind == 'v')
-    return Format(layout).printToString(String(this))
+  func format(kind: UnicodeScalar, layout: String) -> String {
+    securityCheck(kind == "v")
+    return Format(layout).printToString(String(self))
   }
 }
 
 extension Int8 : FormattedPrintable {
-  func format(kind : Char, layout : String) -> String {
-    return Int64(this).format(kind, layout)
+  func format(kind: UnicodeScalar, layout: String) -> String {
+    return IntMax(self).format(kind, layout: layout)
   }
 }
 
 extension UInt8 : FormattedPrintable {
-  func format(kind : Char, layout : String) -> String {
-    return UInt64(this).format(kind, layout)
+  func format(kind: UnicodeScalar, layout: String) -> String {
+    return UIntMax(self).format(kind, layout: layout)
   }
 }
 
 extension Int16 : FormattedPrintable {
-  func format(kind : Char, layout : String) -> String {
-    return Int64(this).format(kind, layout)
+  func format(kind: UnicodeScalar, layout: String) -> String {
+    return IntMax(self).format(kind, layout: layout)
   }
 }
 
 extension UInt16 : FormattedPrintable {
-  func format(kind : Char, layout : String) -> String {
-    return UInt64(this).format(kind, layout)
+  func format(kind: UnicodeScalar, layout: String) -> String {
+    return UIntMax(self).format(kind, layout: layout)
   }
 }
 
 extension Int32 : FormattedPrintable {
-  func format(kind : Char, layout : String) -> String {
-    return Int64(this).format(kind, layout)
+  func format(kind: UnicodeScalar, layout: String) -> String {
+    return IntMax(self).format(kind, layout: layout)
   }
 }
 
 extension UInt32 : FormattedPrintable {
-  func format(kind : Char, layout : String) -> String {
-    return UInt64(this).format(kind, layout)
+  func format(kind: UnicodeScalar, layout: String) -> String {
+    return UIntMax(self).format(kind, layout: layout)
   }
 }
 
-extension Int64 : FormattedPrintable {
-  func format(kind : Char, layout : String) -> String {
-    var radix = 10
-    var uppercase = false
-    if kind == 'X' { uppercase = true; radix = 16 }
-    else if kind == 'x' { radix = 16 }
-    else if kind == 'o' { radix = 8 }
-    else if kind != 'v' { alwaysTrap() }
-    return Format(layout).printToString(
-      String(this, radix : radix, uppercase : uppercase))
+extension Int : FormattedPrintable {
+  func format(kind: UnicodeScalar, layout: String) -> String {
+    return IntMax(self).format(kind, layout: layout)
   }
 }
 
-extension UInt64 : FormattedPrintable {
-  func format(kind : Char, layout : String) -> String {
-    var radix = 10
-    var uppercase = false
-    if kind == 'X' { uppercase = true; radix = 16 }
-    else if kind == 'x' { radix = 16 }
-    else if kind == 'o' { radix = 8 }
-    else if kind != 'v' { alwaysTrap() }
-    return Format(layout).printToString(
-      String(this, radix : radix, uppercase : uppercase))
+extension UInt : FormattedPrintable {
+  func format(kind: UnicodeScalar, layout: String) -> String {
+    return UIntMax(self).format(kind, layout: layout)
   }
 }
 
-extension Int128 : FormattedPrintable {
-  func format(kind : Char, layout : String) -> String {
+extension IntMax : FormattedPrintable {
+  func format(kind: UnicodeScalar, layout: String) -> String {
     var radix = 10
     var uppercase = false
-    if kind == 'X' { uppercase = true; radix = 16 }
-    else if kind == 'x' { radix = 16 }
-    else if kind == 'o' { radix = 8 }
-    else if kind != 'v' { alwaysTrap() }
+    if kind == "X" { uppercase = true; radix = 16 }
+    else if kind == "x" { radix = 16 }
+    else if kind == "o" { radix = 8 }
+    else if kind != "v" { fatal("Invalid format chacacter") }
     return Format(layout).printToString(
-      String(this, radix : radix, uppercase : uppercase))
+      String(self, radix : radix, uppercase : uppercase))
   }
 }
 
-extension UInt128 : FormattedPrintable {
-  func format(kind : Char, layout : String) -> String {
+extension UIntMax : FormattedPrintable {
+  func format(kind: UnicodeScalar, layout: String) -> String {
     var radix = 10
     var uppercase = false
-    if kind == 'X' { uppercase = true; radix = 16 }
-    else if kind == 'x' { radix = 16 }
-    else if kind == 'o' { radix = 8 }
-    else if kind != 'v' { alwaysTrap() }
+    if kind == "X" { uppercase = true; radix = 16 }
+    else if kind == "x" { radix = 16 }
+    else if kind == "o" { radix = 8 }
+    else if kind != "v" { fatal("Invalid format chacacter") }
     return Format(layout).printToString(
-      String(this, radix : radix, uppercase : uppercase))
+      String(self, radix : radix, uppercase : uppercase))
   }
 }
 
 extension Float : FormattedPrintable {
-  func format(kind : Char, layout : String) -> String {
-    alwaysTrap(kind == 'v')
-    return Format(layout).printToString(String(this))
+  func format(kind: UnicodeScalar, layout: String) -> String {
+    securityCheck(kind == "v")
+    return Format(layout).printToString(String(self))
   }
 }
 
 extension Double : FormattedPrintable {
-  func format(kind : Char, layout : String) -> String {
-    alwaysTrap(kind == 'v')
-    return Format(layout).printToString(String(this))
+  func format(kind: UnicodeScalar, layout: String) -> String {
+    securityCheck(kind == "v")
+    return Format(layout).printToString(String(self))
   }
 }
 
@@ -115,35 +111,32 @@ extension Double : FormattedPrintable {
 // Formatted Printing
 //===----------------------------------------------------------------------===//
 
-struct Format {
+struct Format : ReplPrintable {
   var width : Int
   var isValid : Bool
   var leftJustify : Bool
 
-  constructor(layout : String) {
+  init(_ layout: String) {
     isValid = true
     leftJustify = false
     width = 0
 
     if !layout.isEmpty() {
-      if layout[0] == '-' {
-        leftJustify = true
-        layout = layout.substr(1)
-      }
-
-      if !layout.isEmpty() {
-        for c in layout.chars {
+      leftJustify = layout.startsWith("-")
+      var layoutSansJustification = layout.substr(leftJustify ? 1 : 0)
+      if !layoutSansJustification.isEmpty() {
+        for c in layoutSansJustification.unicodeScalars {
           if !c.isDigit() {
             isValid = false
             break
           }
-          width = width * 10 + Int(UInt32(c) - UInt32('0'))
+          width = width * 10 + Int(UInt32(c) - UInt32("0"))
         }
       }
     }
   }
 
-  func printString(s : String) {
+  func printString(s: String) {
 
 /*  Causes problems due to <rdar://problem/11529601>
     if !isValid {
@@ -153,26 +146,28 @@ struct Format {
 */
     var padding = max(width - s.size(), 0)
     if !leftJustify {
-      for i in 0..padding { print(' ') }
+      for i in 0...padding { print(" ") }
     }
     print(s)
     if leftJustify {
-      for i in 0..padding { print(' ') }
+      for i in 0...padding { print(" ") }
     }
   }
 
-  func printToString(s : String) -> String {
+  func printToString(s: String) -> String {
     if !isValid {
       return s
     }
-    var r : String
+    var r: String
     var padding = max(width - s.size(), 0)
     if !leftJustify {
-      r = String(padding, ' ')
+      r = String(count: padding, character: " ")
+    } else {
+      r = String()
     }
     r = r + s
     if leftJustify {
-      r = r + String(padding, ' ')
+      r = r + String(count: padding, character: " ")
     }
     return r
   }
@@ -184,84 +179,120 @@ struct Format {
 
 // Terminal input & output
 
-class Console : Object {
-  func write(buf : UInt8[]) -> Int {
-    var r = posix_write(1, buf.base.value, buf.length)
-    alwaysTrap(r != -1)
+@final class Console : OutputStreamable {
+  init() { }
+
+  func write(inout buf: UInt8[]) -> Int {
+    let count = buf.count
+    var r = 0
+    for var start = 0; start < count; start += 1024 {
+      let slice = buf[start...min(start + 1024, count)]
+      r = slice.withUnsafePointerToElements {
+        posix_write(1, $0.value, slice.count)
+      }
+      if r == -1 {
+        break
+      }
+    }
     return r
   }
 
-  func write(buf : String) -> Int {
-    var r = posix_write(1, buf.str_value.base.value, buf.length)
-    alwaysTrap(r != -1)
+  func write(buf: String) -> Int {
+    var r = 0
+    let p = buf.contiguousUTF8
+    
+    if p != nil {
+      let r = posix_write(1, p.value, buf.core.count)
+    }
+    else {
+      var a = NativeArray<UInt8>(count: 1024, value: 0)
+      var count = 0
+      
+      for u in buf.utf8 {
+        a[count++] = u
+        if count == a.count {
+          r = a.withUnsafePointerToElements {
+            posix_write(1, $0.value, count)
+          }
+          if r == -1 {
+            break
+          }
+        }
+      }
+      
+      if count != 0 {
+        r = a.withUnsafePointerToElements {
+          posix_write(1, $0.value, count)
+        }
+      }
+    }
+    
+    securityCheck(r != -1)
     return r
   }
 
-  func write(c : UInt8) {
+  func write(c: UInt8) {
     var buf = new UInt8[1]
     buf[0] = c
-    var r = write(buf)
-    alwaysTrap(r == 1)
+    var r = write(&buf)
+    securityCheck(r == 1)
   }
 }
 
 var con : Console = Console()
 
 protocol FormattedPrintable {
-  func format(kind : Char, layout : String) -> String
+  func format(kind: UnicodeScalar, layout: String) -> String
 }
 
-func splitFormat(format : String) -> (String, String, Char, String) {
-  var (before, afterPercent, foundPercent) = format.splitFirst('%')
+func splitFormat(format: String) -> (String, String, UnicodeScalar, String) {
+  var (before, afterPercent, foundPercent) = format.splitFirst("%")
   if !foundPercent {
-    return (before, "", Char(0), afterPercent)
+    return (before, "", UnicodeScalar(0), afterPercent)
   }
 
   var (layout, kind, after, found) = afterPercent.splitFirstIf({ $0.isAlpha() })
   if !found {
-    return (before, "", Char(0), afterPercent)
+    return (before, "", UnicodeScalar(0), afterPercent)
   }
 
   return (before, layout, kind, after)
 }
 
 protocol OutputStreamable {
-  func write(buf : UInt8[]) -> Int
+  func write(inout buf: UInt8[]) -> Int
   // FIXME:  Add default implementation when language allows it:
-  func write(buf : String) -> Int
-  // {return write(buf.asUInt8())}
+  func write(buf: String) -> Int
+  // {return write(buf.asUTF8())}
 }
 
 // FIXME:  Remove the FormattedPrintable[] overload if/when we can forward
 //         variadic arguments.
 // BLOCKED: <rdar://problem/12134482> Can't forward variadic arguments
-func printf(out : OutputStreamable, format : String, args : FormattedPrintable[]) {
+func printf(out: OutputStreamable, format: String, args: FormattedPrintable[]) {
   var index = 0
-  while !format.isEmpty() {
-    var (before, layout, kind, after) = splitFormat(format)
+  var remainingFormat = format
+  while !remainingFormat.isEmpty() {
+    var (before, layout, kind, after) = splitFormat(remainingFormat)
     out.write(before)
-    if kind != Char(0) {
-      out.write(args[index++].format(kind, layout))
+    if kind != UnicodeScalar(0) {
+      out.write(args[index++].format(kind, layout: layout))
     }
-    format = after
+    remainingFormat = after
   }
 }
 
-func printf(out : OutputStreamable, format : String, args : FormattedPrintable...) {
+func printf(out: OutputStreamable, format: String, args: FormattedPrintable...) {
   printf(out, format, args)
 }
 
-func printf(format : String, args : FormattedPrintable...) {
+func printf(format: String, args: FormattedPrintable...) {
   printf(con, format, args)
 }
 
-// NOTE: the repl has builtin knowledge of this protocol
-protocol ReplPrintable {
-  func replPrint()
-}
 // FIXME: This function shouldn't be necessary!
-func replPrint<E : Enumerable requires E.EnumeratorType.Element: ReplPrintable>(s : E) {
-  print('[')
+func replPrint<E : Sequence where E.GeneratorType.Element: ReplPrintable>(s: E) {
+  print("[")
   var first = true
   var total = 0
   for i in s {
@@ -277,25 +308,42 @@ func replPrint<E : Enumerable requires E.EnumeratorType.Element: ReplPrintable>(
       return
     }
   }
-  print(']')
+  print("]")
 }
 
-func print<E : Enumerable requires E.EnumeratorType.Element: ReplPrintable>(s : E) {
+func print<E : Sequence where E.GeneratorType.Element: ReplPrintable>(s: E) {
   replPrint(s)
 }
 
 // Some very basic output functions.
-func [asmname="_TSs5printFT3valSi_T_"] print(val : Int)
-func [asmname="_TSs5printFT3valSu_T_"] print(val : UInt64)
-func [asmname="_TSs5printFT3valSd_T_"] print(val : Double)
-func print(val : String) {
-  var len = val.byteLength()
-  for var i = 0; i < len; ++i {
-    c_putchar(Int32(val.str_value[i]))
-  }
+@asmname("print_Int64") func print(value: Int64)
+@asmname("print_UInt64") func print(value: UInt64)
+@asmname("print_Double") func print(value: Double)
+
+func print(value: Int) {
+  print(Int64(value))
 }
-func print(val : Char) {
-  var wc = UInt32(val)
+
+func print(value: UInt) {
+  print(UInt64(value))
+}
+
+func print(value: Float) {
+  print(Double(value))
+}
+
+func print(value: String) {
+  value._encode(UTF8.self, output: SinkOf<UTF8.CodeUnit> { 
+    c_putchar(Int32($0)) 
+  })
+}
+
+func print(value: Character) {
+  print(String(value))
+}
+
+func print(value: UnicodeScalar) {
+  var wc = UInt32(value)
   if wc < 0x000080 {
     c_putchar(Int32(wc))
     return
@@ -317,12 +365,12 @@ func print(val : Char) {
     c_putchar(Int32(0x80 |  (wc & 0x00003F)))
     return
   }
-  // print(Char(0xFFFD))
-  alwaysTrap()
+  // print(UnicodeScalar(0xFFFD))
+  fatal("Invalid Unicode scalar")
 }
 
-func print(val : Bool) {
-  if val {
+func print(value: Bool) {
+  if value {
     print("true")
   } else {
     print("false")
@@ -330,40 +378,97 @@ func print(val : Bool) {
 }
 
 // Some derived output functions.
-func println(val : Bool) {
-  print(val)
-  print('\n')
+func println(value: Bool) {
+  print(value)
+  print("\n")
 }
-func println(val : Int) {
-  print(val)
-  print('\n')
+func println(value: Int) {
+  print(Int64(value))
+  print("\n")
 }
-func println(val : UInt8) {
-  print(UInt64(val))
-  print('\n')
+func println(value: UInt) {
+  print(UInt64(value))
+  print("\n")
 }
-func println(val : UInt16) {
-  print(UInt64(val))
-  print('\n')
+func println(value: UInt8) {
+  print(UInt64(value))
+  print("\n")
 }
-func println(val : UInt32) {
-  print(UInt64(val))
-  print('\n')
+func println(value: UInt16) {
+  print(UInt64(value))
+  print("\n")
 }
-func println(val : UInt64) {
-  print(val)
-  print('\n')
+func println(value: UInt32) {
+  print(UInt64(value))
+  print("\n")
 }
-func println(val : Double) {
-  print(val)
-  print('\n')
+func println(value: UInt64) {
+  print(value)
+  print("\n")
 }
-func println(val : String) {
-  print(val)
-  print('\n')
+func println(value: Float) {
+  print(value)
+  print("\n")
+}
+func println(value: Double) {
+  print(value)
+  print("\n")
+}
+func println(value: String) {
+  print(value)
+  print("\n")
 }
 
-func println(val : Char) {
-  print(val)
-  print('\n')
+func println(value: Character) {
+  print(value)
+  print("\n")
 }
+
+func println(value: UnicodeScalar) {
+  print(value)
+  print("\n")
+}
+
+func println() {
+  print("\n")
+}
+
+// FIXME: Proof-of-concept kludge to test the runtime basis for a generic
+// print method.
+
+/// The runtime has disgustingly inappropriate knowledge of this protocol. If
+/// you change this, you must also change swift_printAny.
+protocol Printable {
+  func printSelf()
+}
+
+extension Int : Printable {
+  func printSelf() {
+    print(self)
+  }
+}
+
+extension String : Printable {
+  func printSelf() {
+    print(self)
+  }
+}
+
+/// Print any Swift object, using its Printable conformance if it has one,
+/// falling back to a default implementation.
+@asmname("swift_printAny") func printAny<T>(x: T)
+
+extension Array : Printable {
+  func printSelf() {
+    print("[")
+    if !isEmpty {
+      printAny(self[0])
+      for x in self[1...count] {
+        print(", ")
+        printAny(x)
+      }
+    }
+    print("]")
+  }
+}
+

@@ -1,8 +1,9 @@
-// RUN: %swift -i %s | FileCheck %s
-// REQUIRES: swift_interpreter
+// RUN: rm -rf %t  &&  mkdir %t
+// RUN: %target-build-swift -Xfrontend -enable-experimental-patterns %s -o %t/a.out
+// RUN: %target-run %t/a.out | FileCheck %s
 
 enum Singleton {
-  case x(Int, Char)
+  case x(Int, UnicodeScalar)
 }
 
 enum NoPayload {
@@ -12,18 +13,18 @@ enum NoPayload {
 }
 
 enum SinglePayloadTrivial {
-  case x(Char, Int)
+  case x(UnicodeScalar, Int)
   case y
   case z
 }
 
 enum MultiPayloadTrivial {
-  case x(Char, Int)
+  case x(UnicodeScalar, Int)
   case y(Int, Double)
   case z
 }
 
-var s = Singleton.x(1, 'a')
+var s = Singleton.x(1, "a")
 switch s {
 case .x(var int, var char):
   // CHECK: 1
@@ -32,7 +33,7 @@ case .x(var int, var char):
   println(char)
 }
 
-func printNoPayload(v:NoPayload) {
+func printNoPayload(v: NoPayload) {
   switch v {
   case .x:
     println("NoPayload.x")
@@ -50,7 +51,7 @@ printNoPayload(.y)
 // CHECK: NoPayload.z
 printNoPayload(.z)
 
-func printSinglePayloadTrivial(v:SinglePayloadTrivial) {
+func printSinglePayloadTrivial(v: SinglePayloadTrivial) {
   switch v {
   case .x(var char, var int):
     println("SinglePayloadTrivial.x(\(char), \(int))")
@@ -62,13 +63,13 @@ func printSinglePayloadTrivial(v:SinglePayloadTrivial) {
 }
 
 // CHECK: SinglePayloadTrivial.x(b, 2)
-printSinglePayloadTrivial(.x('b', 2))
+printSinglePayloadTrivial(.x("b", 2))
 // CHECK: SinglePayloadTrivial.y
 printSinglePayloadTrivial(.y)
 // CHECK: SinglePayloadTrivial.z
 printSinglePayloadTrivial(.z)
 
-func printMultiPayloadTrivial(v:MultiPayloadTrivial) {
+func printMultiPayloadTrivial(v: MultiPayloadTrivial) {
   switch v {
   case .x(var char, var int):
     println("MultiPayloadTrivial.x(\(char), \(int))")
@@ -80,7 +81,7 @@ func printMultiPayloadTrivial(v:MultiPayloadTrivial) {
 }
 
 // CHECK: MultiPayloadTrivial.x(c, 3)
-printMultiPayloadTrivial(.x('c', 3))
+printMultiPayloadTrivial(.x("c", 3))
 // CHECK: MultiPayloadTrivial.y(4, 5.5)
 printMultiPayloadTrivial(.y(4, 5.5))
 // CHECK: MultiPayloadTrivial.z
@@ -91,12 +92,12 @@ protocol Runcible {
 }
 
 struct Spoon : Runcible {
-  var xxx : Int
+  var xxx = 0
   func runce() { println("Spoon!") }
 }
 
 struct Hat : Runcible {
-  var xxx : Float
+  var xxx : Float = 0
   func runce() { println("Hat!") }
 }
 
@@ -105,7 +106,7 @@ enum SinglePayloadAddressOnly {
   case y
 }
 
-func printSinglePayloadAddressOnly(v:SinglePayloadAddressOnly) {
+func printSinglePayloadAddressOnly(v: SinglePayloadAddressOnly) {
   switch v {
   case .x(var runcible):
     runcible.runce()
@@ -114,15 +115,10 @@ func printSinglePayloadAddressOnly(v:SinglePayloadAddressOnly) {
   }
 }
 
-// FIXME: Explicit 'as Runcible' conversions because of
-// <rdar://problem/14885865>
-
 // CHECK: Spoon!
-var runSpoon : Runcible = Spoon()
-printSinglePayloadAddressOnly(.x(runSpoon))
+printSinglePayloadAddressOnly(.x(Spoon()))
 // CHECK: Hat!
-var runHat : Runcible = Hat()
-printSinglePayloadAddressOnly(.x(runHat))
+printSinglePayloadAddressOnly(.x(Hat()))
 // CHECK: Why?
 printSinglePayloadAddressOnly(.y)
 
@@ -132,7 +128,7 @@ enum MultiPayloadAddressOnly {
   case z
 }
 
-func printMultiPayloadAddressOnly(v:MultiPayloadAddressOnly) {
+func printMultiPayloadAddressOnly(v: MultiPayloadAddressOnly) {
   switch v {
   case .x(var runcible):
     runcible.runce()
@@ -145,9 +141,9 @@ func printMultiPayloadAddressOnly(v:MultiPayloadAddressOnly) {
 }
 
 // CHECK: Spoon!
-printMultiPayloadAddressOnly(.x(runSpoon))
+printMultiPayloadAddressOnly(.x(Spoon()))
 // CHECK: Porkpie Hat!
-printMultiPayloadAddressOnly(.y("Porkpie", runHat))
+printMultiPayloadAddressOnly(.y("Porkpie", Hat()))
 // CHECK: Zed.
 printMultiPayloadAddressOnly(.z)
 
@@ -155,16 +151,15 @@ enum TrivialGeneric<T, U> {
   case x(T, U)
 }
 
-func unwrapTrivialGeneric<T, U>(tg:TrivialGeneric<T, U>) -> (T, U) {
+func unwrapTrivialGeneric<T, U>(tg: TrivialGeneric<T, U>) -> (T, U) {
   switch tg {
   case .x(var t, var u):
     return (t, u)
   }
 }
 
-func wrapTrivialGeneric<T, U>(t:T, u:U) -> TrivialGeneric<T, U> {
-  // FIXME: full qualification required because of <rdar://problem/14994273>
-  return TrivialGeneric<T, U>.x(t, u)
+func wrapTrivialGeneric<T, U>(t: T, u: U) -> TrivialGeneric<T, U> {
+  return .x(t, u)
 }
 
 var tg : TrivialGeneric<Int, String> = .x(23, "skidoo")
@@ -186,11 +181,11 @@ case .x(var t, var u):
   println("\(t) \(u)")
 }
 
-enum Ensemble<S:Runcible, H:Runcible> {
+enum Ensemble<S : Runcible, H : Runcible> {
   case x(S, H)
 }
 
-func concreteEnsemble(e:Ensemble<Spoon, Hat>) {
+func concreteEnsemble(e: Ensemble<Spoon, Hat>) {
   switch e {
   case .x(var spoon, var hat):
     spoon.runce()
@@ -198,7 +193,7 @@ func concreteEnsemble(e:Ensemble<Spoon, Hat>) {
   }
 }
 
-func genericEnsemble<T:Runcible, U:Runcible>(e:Ensemble<T, U>) {
+func genericEnsemble<T : Runcible, U : Runcible>(e: Ensemble<T, U>) {
   switch e {
   case .x(var t, var u):
     t.runce()
@@ -224,9 +219,10 @@ enum Optionable<T> {
   case Nought
 
   init() { self = .Nought }
+  init(_ x:T) { self = .Mere(x) }
 }
 
-func tryRunce<T:Runcible>(x:Optionable<T>) {
+func tryRunce<T : Runcible>(x: Optionable<T>) {
   switch x {
   case .Mere(var r):
     r.runce()
@@ -243,13 +239,18 @@ tryRunce(.Mere(Hat()))
 tryRunce(Optionable<Spoon>.Nought)
 // CHECK: nought
 tryRunce(Optionable<Hat>.Nought)
+// CHECK: Spoon!
+tryRunce(Optionable(Spoon()))
+// CHECK: Hat!
+tryRunce(Optionable(Hat()))
 
 func optionableInts() {
-  var optionables = new Optionable<Int>[4]
-  optionables[0] = .Mere(219)
-  optionables[1] = .Nought
-  optionables[2] = .Nought
-  optionables[3] = .Mere(20721)
+  var optionables: Optionable<Int>[] = [
+    .Mere(219),
+    .Nought,
+    .Nought,
+    .Mere(20721)
+  ]
 
   for o in optionables {
     switch o {
@@ -266,12 +267,52 @@ func optionableInts() {
 // CHECK: 20721
 optionableInts()
 
-func optionableRuncibles<T:Runcible>(x:T) {
-  var optionables = new Optionable<T>[4]
-  optionables[0] = .Mere(x)
-  optionables[1] = .Nought
-  optionables[2] = .Mere(x)
-  optionables[3] = .Nought
+enum Suit { case Spades, Hearts, Diamonds, Clubs }
+
+func println(suit: Suit) {
+  switch suit {
+  case .Spades:
+    println("♠")
+  case .Hearts:
+    println("♡")
+  case .Diamonds:
+    println("♢")
+  case .Clubs:
+    println("♣")
+  }
+}
+
+func optionableSuits() {
+  var optionables: Optionable<Suit>[] = [
+    .Mere(.Spades),
+    .Mere(.Diamonds),
+    .Nought,
+    .Mere(.Hearts)
+  ]
+
+  for o in optionables {
+    switch o {
+    case .Mere(var x):
+      println(x)
+    case .Nought:
+      println("---")
+    }
+  }
+}
+
+// CHECK: ♠
+// CHECK: ♢
+// CHECK: ---
+// CHECK: ♡
+optionableSuits()
+
+func optionableRuncibles<T : Runcible>(x: T) {
+  var optionables: Optionable<T>[] = [
+    .Mere(x),
+    .Nought,
+    .Mere(x),
+    .Nought
+  ]
 
   for o in optionables {
     switch o {
@@ -292,3 +333,121 @@ optionableRuncibles(Spoon())
 // CHECK: Hat!
 // CHECK: ---
 optionableRuncibles(Hat())
+
+// <rdar://problem/15383966>
+
+@class_protocol protocol ClassProtocol {}
+
+class Rdar15383966 : ClassProtocol
+{
+    var id : Int
+
+    init(_ anID : Int) {
+      println("X(\(anID))")
+      id = anID
+    }
+
+    deinit {
+       println("~X(\(id))")
+    }
+}
+
+
+func generic<T>(x: T?) { }
+func generic_over_classes<T : ClassProtocol>(x: T?) { }
+func nongeneric(x: Rdar15383966?) { }
+
+func test_generic()
+{
+    var x: Rdar15383966? = Rdar15383966(1)
+    generic(x)
+    x = .None
+    generic(x)
+}
+// CHECK: X(1)
+// CHECK: ~X(1)
+test_generic()
+
+func test_nongeneric()
+{
+    var x: Rdar15383966? = Rdar15383966(2)
+    nongeneric(x)
+    x = .None
+    nongeneric(x)
+}
+// CHECK: X(2)
+// CHECK: ~X(2)
+test_nongeneric()
+
+func test_generic_over_classes()
+{
+    var x: Rdar15383966? = Rdar15383966(3)
+    generic_over_classes(x)
+    x = .None
+    generic_over_classes(x)
+}
+// CHECK: X(3)
+// CHECK: ~X(3)
+test_generic_over_classes()
+
+struct S { 
+  var a: Int32; var b: Int64 
+
+  init(_ a: Int32, _ b: Int64) {
+    self.a = a
+    self.b = b
+  }
+}
+
+enum MultiPayloadSpareBitAggregates {
+  case x(Int32, Int64)
+  case y(Rdar15383966, Rdar15383966)
+  case z(S)
+}
+
+func test_spare_bit_aggregate(x: MultiPayloadSpareBitAggregates) {
+  switch x {
+  case .x(var i32, var i64):
+    println(".x(\(i32), \(i64))")
+  case .y(var a, var b):
+    println(".y(\(a.id), \(b.id))")
+  case .z(S(a: var a, b: var b)):
+    println(".z(\(a), \(b))")
+  }
+}
+
+println("---")
+// CHECK: .x(22, 44)
+test_spare_bit_aggregate(.x(22, 44))
+// CHECK: X(222)
+// CHECK: X(444)
+// CHECK: .y(222, 444)
+// CHECK: ~X(222)
+// CHECK: ~X(444)
+test_spare_bit_aggregate(.y(Rdar15383966(222), Rdar15383966(444)))
+// CHECK: .z(333, 666)
+test_spare_bit_aggregate(.z(S(333, 666)))
+
+println("---")
+struct OptionalTuple<T> {
+  var value : (T, T)?
+
+  init(_ value: (T, T)?) {
+    self.value = value
+  }
+}
+func test_optional_generic_tuple<T>(a: OptionalTuple<T>) -> T {
+  println("optional pair is same size as pair: \(sizeofValue(a) == sizeof(T)*2)")
+  return a.value!.0
+}
+println("Int result: \(test_optional_generic_tuple(OptionalTuple<Int>((5, 6))))")
+// CHECK: optional pair is same size as pair: false
+// CHECK: Int result: 5
+
+class AnyOldClass {
+  var x: Int
+  init(_ value: Int) { x = value }
+}
+println("class result: \(test_optional_generic_tuple(OptionalTuple((AnyOldClass(10), AnyOldClass(11)))).x)")
+// CHECK: optional pair is same size as pair: true
+// CHECK: class result: 10

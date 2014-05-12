@@ -6,10 +6,12 @@ swift - the amazingly new programming language
 
 =head1 SYNOPSIS
 
-B<swift> [B<-c>|B<-S>|B<-i>] B<-sdk=>I<SDK-path> B<-g>
-  [B<-O0>|B<-O1>|B<-O2>|B<-O3>]
+B<swift> [B<-emit-object>|B<-emit-assembly>|B<-emit-library>|B<-i>] 
+  [-help]
   B<-o> I<output-file>
   I<input-filenames>
+
+The full list of supported options is available via "swift -help".
 
 =head1 DESCRIPTION
 

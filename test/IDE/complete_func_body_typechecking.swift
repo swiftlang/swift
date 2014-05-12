@@ -6,97 +6,199 @@
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_VAR_6 | FileCheck %s -check-prefix=FOO_STRUCT_COMMON
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_VAR_7 | FileCheck %s -check-prefix=ERROR_COMMON
 
-// FIXME: Disabled because code completing after an expr confuses the parser
-// and it suggests to continue the expression from the previous line.
-//
-// FIXME: %swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_POSTFIX_BEGIN_1 | FileCheck %s -check-prefix=EXPR_POSTFIX_BEGIN_1
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_VAR_IN_CONSTRUCTOR_1 | FileCheck %s -check-prefix=FOO_STRUCT_COMMON
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_VAR_IN_CONSTRUCTOR_2 | FileCheck %s -check-prefix=FOO_STRUCT_COMMON
 
-// FIXME: Disabled because name lookup is wrong.
-// FIXME: %swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_POSTFIX_BEGIN_2 | FileCheck %s -check-prefix=EXPR_POSTFIX_BEGIN_2
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_VAR_IN_DESTRUCTOR_1 | FileCheck %s -check-prefix=FOO_STRUCT_COMMON
+
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_VAR_IF_1 | FileCheck %s -check-prefix=LOCALS_COMMON
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_VAR_IF_2 | FileCheck %s -check-prefix=LOCALS_COMMON
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_VAR_IF_3 | FileCheck %s -check-prefix=LOCALS_COMMON
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_VAR_IF_4 | FileCheck %s -check-prefix=LOCALS_COMMON
+
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_VAR_IF_IN_CONSTRUCTOR_1 | FileCheck %s -check-prefix=LOCALS_COMMON
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_VAR_IF_IN_DESTRUCTOR_1 | FileCheck %s -check-prefix=LOCALS_COMMON
+
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_POSTFIX_BEGIN_1 | FileCheck %s -check-prefix=LOCALS_COMMON
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_POSTFIX_BEGIN_2 | FileCheck %s -check-prefix=LOCALS_COMMON
+
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_POSTFIX_BEGIN_IN_CONSTRUCTOR_1 | FileCheck %s -check-prefix=LOCALS_COMMON
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_POSTFIX_BEGIN_IN_DESTRUCTOR_1 | FileCheck %s -check-prefix=LOCALS_COMMON
 
 struct FooStruct {
-  var instanceVar : Int
-
+  var instanceVar = 0
+  init(_ instanceVar: Int = 0) { }
   func instanceFunc0() {}
 
   func builderFunc1() -> FooStruct {
-    return this
+    return self
   }
 
   func builderFunc2(a: Int) -> FooStruct {
-    return this
+    return self
   }
 }
 
 // FOO_STRUCT_COMMON: Begin completions
-// FOO_STRUCT_COMMON-NEXT: SwiftDecl: instanceVar[#Int#]{{$}}
-// FOO_STRUCT_COMMON-NEXT: SwiftDecl: instanceFunc0()[#Void#]{{$}}
-// FOO_STRUCT_COMMON-NEXT: SwiftDecl: builderFunc1()[#FooStruct#]{{$}}
-// FOO_STRUCT_COMMON-NEXT: SwiftDecl: builderFunc2({#a: Int#})[#FooStruct#]{{$}}
-// FOO_STRUCT_COMMON-NEXT: Keyword: metatype[#FooStruct.metatype#]{{$}}
+// FOO_STRUCT_COMMON-NEXT: Decl[InstanceVar]/CurrNominal:    instanceVar[#Int#]{{$}}
+// FOO_STRUCT_COMMON-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc0()[#Void#]{{$}}
+// FOO_STRUCT_COMMON-NEXT: Decl[InstanceMethod]/CurrNominal: builderFunc1()[#FooStruct#]{{$}}
+// FOO_STRUCT_COMMON-NEXT: Decl[InstanceMethod]/CurrNominal: builderFunc2({#Int#})[#FooStruct#]{{$}}
 // FOO_STRUCT_COMMON-NEXT: End completions
 
 // ERROR_COMMON: found code completion token
 // ERROR_COMMON-NOT: Begin completions
 
+// LOCALS_COMMON: Begin completions
+// LOCALS_COMMON-DAG: Decl[LocalVar]/Local: localInt[#Int#]{{$}}
+// LOCALS_COMMON-DAG: Decl[LocalVar]/Local: localFooObject[#FooStruct#]{{$}}
+// LOCALS_COMMON: End completions
+
 func testTypecheckVar1() {
-  var foo = FooStruct()
-  foo.#^TC_VAR_1^#
+  var localFooObject = FooStruct()
+  localFooObject.#^TC_VAR_1^#
 }
 
 func testTypecheckVar2() {
-  var foo = FooStruct(42)
-  foo.#^TC_VAR_2^#
+  var localFooObject = FooStruct(42)
+  localFooObject.#^TC_VAR_2^#
 }
 
 func testTypecheckVar3() {
-  // We don't display any useful completions here, although we could -- it is
-  // obvious that 'foo' could only have type 'FooStruct'.
+  // FIXME: We don't display any useful completions here, although we could --
+  // it is obvious that 'foo' could only have type 'FooStruct'.
   //
   // In any case, ensure that we don't crash.
-  var foo = FooStruct(unknown_var)
-  foo.#^TC_VAR_3^#
+  var localFooObject = FooStruct(unknown_var)
+  localFooObject.#^TC_VAR_3^#
 }
 
 func testTypecheckVar4() {
-  var z = 42
-  var foo = FooStruct(z)
-  foo.#^TC_VAR_4^#
+  var localInt = 42
+  var localFooObject = FooStruct(localInt)
+  localFooObject.#^TC_VAR_4^#
 }
 
 func testTypecheckVar5() {
-  var z = 42
-  FooStruct(z).#^TC_VAR_5^#
+  var localInt = 42
+  FooStruct(localInt).#^TC_VAR_5^#
 }
 
 func testTypecheckVar6() {
-  var z = 42
-  FooStruct(z).builderFunc1().#^TC_VAR_6^#
+  var localInt = 42
+  FooStruct(localInt).builderFunc1().#^TC_VAR_6^#
 }
 
 func testTypecheckVar7() {
-  // We don't display any useful completions here, although we could -- it is
-  // obvious that the expression could only have type 'FooStruct'.
+  // FIXME: We don't display any useful completions here, although we could --
+  // it is obvious that the expression could only have type 'FooStruct'.
   //
   // In any case, ensure that we don't crash.
-  var z = 42
-  FooStruct(z).builderFunc2(unknown_var).#^TC_VAR_7^#
+  var localInt = 42
+  FooStruct(localInt).builderFunc2(unknown_var).#^TC_VAR_7^#
+}
+
+class TestTypeCheckVarInConstructor1 {
+  init() {
+    var localFooObject = FooStruct()
+    localFooObject.#^TC_VAR_IN_CONSTRUCTOR_1^#
+  }
+}
+
+class TestTypeCheckVarInConstructor2 {
+  init { // Missing parameters
+    var localFooObject = FooStruct()
+    localFooObject.#^TC_VAR_IN_CONSTRUCTOR_2^#
+  }
+}
+
+class TestTypeCheckVarInDestructor1 {
+  deinit {
+    var localFooObject = FooStruct()
+    localFooObject.#^TC_VAR_IN_DESTRUCTOR_1^#
+  }
+}
+
+func testTypecheckVarInIf1() {
+  var localInt = 42
+  var localFooObject = FooStruct(localInt)
+  if true {
+    #^TC_VAR_IF_1^#
+  }
+}
+
+func testTypecheckVarInIf2() {
+  var localInt = 42
+  var localFooObject = FooStruct(localInt)
+  if true {
+  } else {
+    #^TC_VAR_IF_2^#
+  }
+}
+
+func testTypecheckVarInIf3() {
+  var localInt = 42
+  var localFooObject = FooStruct(localInt)
+  if {
+    #^TC_VAR_IF_3^#
+  }
+}
+
+func testTypecheckVarInIf4() {
+  var localInt = 42
+  var localFooObject = FooStruct(localInt)
+  if {
+  } else {
+    #^TC_VAR_IF_4^#
+  }
+}
+
+class TestTypeCheckVarInIfInConstructor1 {
+  init() {
+    var localInt = 42
+    var localFooObject = FooStruct(localInt)
+    if true {
+      #^TC_VAR_IF_IN_CONSTRUCTOR_1^#
+    }
+  }
+}
+
+class TestTypeCheckVarInIfInDestructor1 {
+  deinit {
+    var localInt = 42
+    var localFooObject = FooStruct(localInt)
+    if true {
+      #^TC_VAR_IF_IN_DESTRUCTOR_1^#
+    }
+  }
 }
 
 func testExprPostfixBegin1() {
-  var z = 42
-  var foo = FooStruct(z)
+  var localInt = 42
+  var localFooObject = FooStruct(localInt)
   #^EXPR_POSTFIX_BEGIN_1^#
-// EXPR_POSTFIX_BEGIN_1: SwiftDecl: z
-// EXPR_POSTFIX_BEGIN_1: SwiftDecl: foo
 }
 
 func testExprPostfixBegin2() {
-  var z = 42
-  var foo = FooStruct(z)
+  var localInt = 42
+  var localFooObject = FooStruct(localInt)
   if true {}
   #^EXPR_POSTFIX_BEGIN_2^#
-// EXPR_POSTFIX_BEGIN_2: SwiftDecl: z
-// EXPR_POSTFIX_BEGIN_2: SwiftDecl: foo
+}
+
+class TestTypeCheckExprPostfixBeginInConstructor1 {
+  init() {
+    var localInt = 42
+    var localFooObject = FooStruct(localInt)
+    #^EXPR_POSTFIX_BEGIN_IN_CONSTRUCTOR_1^#
+  }
+}
+
+class TestTypeCheckExprPostfixBeginInDestructor1 {
+  deinit {
+    var localInt = 42
+    var localFooObject = FooStruct(localInt)
+    #^EXPR_POSTFIX_BEGIN_IN_DESTRUCTOR_1^#
+  }
 }
 

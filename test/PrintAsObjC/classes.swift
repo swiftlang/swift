@@ -2,15 +2,27 @@
 
 // RUN: rm -rf %t
 // RUN: mkdir %t
-// RUN: %swift %clang-importer-sdk -enable-source-import -module-cache-path %t/clang-module-cache -emit-module -o %t %s
-// RUN: %swift-ide-test %clang-importer-sdk -enable-source-import -module-cache-path %t/clang-module-cache -print-as-objc %t/classes.swiftmodule -source-filename %s > %t/classes.h
+// RUN: %swift %clang-importer-sdk -module-cache-path %t/clang-module-cache -enable-source-import -emit-module -o %t  %s
+// RUN: %swift %clang-importer-sdk -module-cache-path %t/clang-module-cache -parse-as-library %t/classes.swiftmodule -parse -emit-objc-header-path %t/classes.h
 // RUN: FileCheck %s < %t/classes.h
 // RUN: FileCheck --check-prefix=NEGATIVE %s < %t/classes.h
 // RUN: %check-in-clang %t/classes.h
+// RUN: not %check-in-clang -fno-modules %t/classes.h
+// RUN: %check-in-clang -fno-modules %t/classes.h -include Foundation.h -include ctypes.h
 
+// CHECK-NOT: AppKit;
+// CHECK-NOT: Properties;
+// CHECK-NOT: Swift;
 // CHECK-LABEL: @import Foundation;
-// CHECK-NEXT: @import swift;
+// CHECK-NEXT: @import CoreGraphics;
+// CHECK-NEXT: @import ctypes;
+// CHECK-NOT: AppKit;
+// CHECK-NOT: Properties;
+// CHECK-NOT: Swift;
 import Foundation
+import AppKit // only used in implementations
+import ctypes
+import Properties // completely unused
 
 // CHECK-LABEL: @interface A1{{$}}
 // CHECK-NEXT: init
@@ -22,20 +34,34 @@ import Foundation
 // CHECK-NEXT: @end
 @objc class B1 : A1 {}
 
+// CHECK-LABEL: @interface BridgedTypes
+// CHECK-NEXT: - (NSDictionary *)dictBridge:(NSDictionary *)x;
+// CHECK-NEXT: init
+// CHECK-NEXT: @end
+@objc class BridgedTypes {
+  func dictBridge(x: Dictionary<NSObject, AnyObject>) -> Dictionary<NSObject, AnyObject> { 
+    return x 
+  }
+}
+
+// CHECK-LABEL: @interface ClassWithNSObjectProtocol : NSObject <NSObject>
+// CHECK-NEXT: - (instancetype)init OBJC_DESIGNATED_INITIALIZER;
+// CHECK-NEXT: @end
+class ClassWithNSObjectProtocol : NSObject, NSObjectProtocol {}
+
 // CHECK-LABEL: @interface Initializers
-// CHECK-NEXT: - (instancetype)init;
-// CHECK-DISABLED: - (instancetype)initWithInt:(NSInteger)_;
+// CHECK-NEXT: - (instancetype)init OBJC_DESIGNATED_INITIALIZER;
+// CHECK-NEXT: - (instancetype)initWithInt:(NSInteger)_;
 // CHECK-NEXT: - (instancetype)initWithFloat:(float)f;
 // CHECK-NEXT: - (instancetype)initWithString:(NSString *)s boolean:(BOOL)b;
 // CHECK-NEXT: @end
 @objc class Initializers {
   init() {}
 
-  // FIXME: Breaks SILGen! <rdar://problem/15997403>
-  //init withInt(_: Int) {}
+  convenience init(int _: Int) { self.init() }
 
-  init withFloat(f: Float) {}
-  init withString(s: String) boolean(b: ObjCBool) {}
+  convenience init(float f: Float) { self.init() }
+  convenience init(string s: String, boolean b: ObjCBool) { self.init() }
 }
 
 // NEGATIVE-NOT: NotObjC
@@ -44,7 +70,7 @@ class NotObjC {}
 // CHECK-LABEL: @interface Methods{{$}}
 // CHECK-NEXT: - (void)test;
 // CHECK-NEXT: + (void)test2;
-// CHECK-NEXT: - (void *)testPrimitives:(BOOL)b i:(NSInteger)i f:(float)f d:(double)d;
+// CHECK-NEXT: - (void *)testPrimitives:(BOOL)b i:(NSInteger)i f:(float)f d:(double)d u:(NSUInteger)u;
 // CHECK-NEXT: - (void)testString:(NSString *)s;
 // CHECK-NEXT: - (void)testSelector:(SEL)sel boolean:(BOOL)b;
 // CHECK-NEXT: - (void)testCSignedTypes:(signed char)a b:(short)b c:(int)c d:(long)d e:(long long)e;
@@ -55,39 +81,55 @@ class NotObjC {}
 // CHECK-NEXT: - (void)testSizedSignedTypes:(int8_t)a b:(int16_t)b c:(int32_t)c d:(int64_t)d;
 // CHECK-NEXT: - (void)testSizedUnsignedTypes:(uint8_t)a b:(uint16_t)b c:(uint32_t)c d:(uint64_t)d;
 // CHECK-NEXT: - (void)testSizedFloats:(float)a b:(double)b;
-// CHECK-NEXT: - (instancetype)getSelf;
+// CHECK-NEXT: - (instancetype)getDynamicSelf;
 // CHECK-NEXT: + (SWIFT_METATYPE(Methods))getSelf;
+// CHECK-NEXT: - (Methods *)maybeGetSelf;
+// CHECK-NEXT: + (SWIFT_METATYPE(Methods))maybeGetSelf;
+// CHECK-NEXT: - (Methods *)uncheckedGetSelf;
+// CHECK-NEXT: + (SWIFT_METATYPE(Methods))uncheckedGetSelf;
 // CHECK-NEXT: - (void)testParens:(NSInteger)a;
 // CHECK-NEXT: - (void)testIgnoredParam:(NSInteger)_;
 // CHECK-NEXT: - (void)testIgnoredParams:(NSInteger)_ again:(NSInteger)_;
+// CHECK-NEXT: - (void)testArrayBridging:(NSArray *)a;
+// CHECK-NEXT: - (void)testArrayBridging2:(NSArray *)a;
+// CHECK-NEXT: - (void)testArrayBridging3:(NSArray *)a;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class Methods {
   func test() {}
-  type func test2() {}
+  class func test2() {}
 
-  func testPrimitives(b: Bool) i(i: Int) f(f: Float) d(d: Double)
+  func testPrimitives(b: Bool, i: Int, f: Float, d: Double, u: UInt)
     -> COpaquePointer { return COpaquePointer() }
   func testString(s: String) {}
-  func testSelector(sel: Selector) boolean(b: ObjCBool) {}
+  func testSelector(sel: Selector, boolean b: ObjCBool) {}
 
-  func testCSignedTypes(a: CSignedChar) b(b: CShort) c(c: CInt) d(d: CLong) e(e: CLongLong) {}
-  func testCUnsignedTypes(a: CUnsignedChar) b(b: CUnsignedShort) c(c: CUnsignedInt) d(d: CUnsignedLong) e(e: CUnsignedLongLong) {}
-  func testCChars(basic: CChar) wchar(wide: CWideChar) char16(char16: CChar16) char32(char32: CChar32) {}
-  func testCFloats(a: CFloat) b(b: CDouble) {}
+  func testCSignedTypes(a: CSignedChar, b: CShort, c: CInt, d: CLong, e: CLongLong) {}
+  func testCUnsignedTypes(a: CUnsignedChar, b: CUnsignedShort, c: CUnsignedInt, d: CUnsignedLong, e: CUnsignedLongLong) {}
+  func testCChars(basic: CChar, wchar wide: CWideChar, char16: CChar16, char32: CChar32) {}
+  func testCFloats(a: CFloat, b: CDouble) {}
   func testCBool(a: CBool) {}
 
-  func testSizedSignedTypes(a: Int8) b(b: Int16) c(c: Int32) d(d: Int64) {}
-  func testSizedUnsignedTypes(a: UInt8) b(b: UInt16) c(c: UInt32) d(d: UInt64) {}
-  func testSizedFloats(a: Float32) b(b: Float64) {}
+  func testSizedSignedTypes(a: Int8, b: Int16, c: Int32, d: Int64) {}
+  func testSizedUnsignedTypes(a: UInt8, b: UInt16, c: UInt32, d: UInt64) {}
+  func testSizedFloats(a: Float32, b: Float64) {}
 
-  func getSelf() -> DynamicSelf { return self }
-  type func getSelf() -> Methods.metatype { return self }
+  func getDynamicSelf() -> Self { return self }
+  class func getSelf() -> Methods.Type { return self }
+
+  func maybeGetSelf() -> Methods? { return nil }
+  class func maybeGetSelf() -> Methods.Type? { return self }
+  func uncheckedGetSelf() -> Methods! { return self }
+  class func uncheckedGetSelf() -> Methods.Type! { return self }
 
   func testParens(a: ((Int))) {}
 
   func testIgnoredParam(_: Int) {}
-  func testIgnoredParams(_: Int) again(_: Int) {}
+  func testIgnoredParams(_: Int, again _: Int) {}
+
+  func testArrayBridging(a: Methods[]) {}
+  func testArrayBridging2(a: AnyObject[]) {}
+  func testArrayBridging3(a: String[]) {}
 }
 
 typealias AliasForNSRect = NSRect
@@ -97,7 +139,11 @@ typealias AliasForNSRect = NSRect
 // CHECK-NEXT: - (CGFloat)getOriginX:(NSRect)r;
 // CHECK-NEXT: - (CGFloat)getOriginY:(CGRect)r;
 // CHECK-NEXT: - (NSArray *)emptyArray;
+// CHECK-NEXT: - (NSArray *)maybeArray;
 // CHECK-NEXT: - (NSRuncingMode)someEnum;
+// CHECK-NEXT: - (NSZone *)zone;
+// CHECK-NEXT: - (CFTypeRef)cf:(CFTreeRef)x str:(CFStringRef)str str2:(CFMutableStringRef)str2;
+// CHECK-NEXT: - (void)appKitInImplementation;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class MethodsWithImports {
@@ -106,19 +152,33 @@ typealias AliasForNSRect = NSRect
   func getOriginY(r: CGRect) -> CGFloat { return r.origin.y }
 
   func emptyArray() -> NSArray { return NSArray() }
+  func maybeArray() -> NSArray? { return nil }
 
   func someEnum() -> NSRuncingMode { return .Mince }
+
+  func zone() -> NSZone { return NSZone(pointer: COpaquePointer()) }
+
+  func cf(x: CFTree, str: CFString, str2: CFMutableString) -> CFTypeRef? { return nil }
+
+  func appKitInImplementation() {
+    let _ : NSResponder? = nil
+  }
 }
 
 // CHECK-LABEL: @interface MethodsWithPointers
 // CHECK-NEXT: - (id *)test:(NSInteger *)a;
 // CHECK-NEXT: - (void)testNested:(NSInteger * *)a;
+// CHECK-NEXT: - (void)testBridging:(NSInteger const *)a b:(NSInteger *)b c:(Methods * *)c;
+// CHECK-NEXT: - (void)testBridgingVoid:(void *)a b:(void const *)b;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class MethodsWithPointers {
   func test(a: UnsafePointer<Int>) -> UnsafePointer<AnyObject> { return UnsafePointer() }
 
   func testNested(a: UnsafePointer<UnsafePointer<Int>>) {}
+
+  func testBridging(a: CConstPointer<Int>, b: CMutablePointer<Int>, c: ObjCMutablePointer<Methods>) {}
+  func testBridgingVoid(a: CMutableVoidPointer, b: CConstVoidPointer) {}
 }
 
 // CHECK-LABEL: @interface MyObject : NSObject
@@ -127,6 +187,10 @@ typealias AliasForNSRect = NSRect
 // NEGATIVE-NOT: @interface NSObject
 // NEGATIVE-NOT: @class NSObject
 class MyObject : NSObject {}
+
+// CHECK-LABEL: @protocol MyProtocol <NSObject>
+// CHECK-NEXT: @end
+@objc protocol MyProtocol : NSObjectProtocol {}
 
 // CHECK-LABEL: @interface Properties
 // CHECK-NEXT: @property (nonatomic) NSInteger i;
@@ -142,9 +206,12 @@ class MyObject : NSObject {}
   }
   let pi = 3.14
   var computed: Int {
-    return 42
-  set:
-    println("it doesn't change")
+    get {
+      return 42
+    }
+    set {
+      println("it doesn't change")
+    }
   }
 }
 
@@ -153,17 +220,21 @@ class MyObject : NSObject {}
 // CHECK-NEXT: - (instancetype)init
 // CHECK-NEXT: @end
 @objc class PropertiesOverridden : Hive {
-  var bees : NSArray {
-    return super.bees
-  set:
-    println("can't change that")
+  override var bees : NSArray! {
+    get {
+      return super.bees
+    }
+    set {
+      println("can't change that")
+    }
   }
 }
 
 // CHECK-LABEL: @interface ReversedOrder2{{$}}
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
-// CHECK: @interface ReversedOrder1 : ReversedOrder2
+// CHECK: SWIFT_CLASS("_TtC7classes14ReversedOrder1")
+// CHECK-NEXT: @interface ReversedOrder1 : ReversedOrder2
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class ReversedOrder1 : ReversedOrder2 {}
@@ -187,22 +258,28 @@ class MyObject : NSObject {}
 
 // CHECK-LABEL: @interface Subscripts2
 // CHECK-NEXT: - (Subscripts2 *)objectAtIndexedSubscript:(int16_t)i;
-// CHECK-NEXT: - (void)setObject:(Subscripts2 *)value atIndexedSubscript:(int16_t)i;
+// CHECK-NEXT: - (void)setObject:(Subscripts2 *)newValue atIndexedSubscript:(int16_t)i;
 // CHECK-NEXT: - (NSObject *)objectForKeyedSubscript:(NSObject *)o;
-// CHECK-NEXT: - (void)setObject:(NSObject *)value forKeyedSubscript:(NSObject *)o;
+// CHECK-NEXT: - (void)setObject:(NSObject *)newValue forKeyedSubscript:(NSObject *)o;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class Subscripts2 {
   subscript (i: Int16) -> Subscripts2 {
-    return self
-  set:
-    println("nope")
+    get {
+      return self
+    }
+    set {
+      println("nope")
+    }
   }
 
   subscript (o: NSObject) -> NSObject {
-    return o
-  set:
-    println("nope")
+    get {
+      return o
+    }
+    set {
+      println("nope")
+    }
   }
 }
 

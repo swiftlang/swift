@@ -1,6 +1,7 @@
 // RUN: rm -rf %t/clang-module-cache
-// RUN: %swift -module-cache-path=%t/clang-module-cache -sdk=%S/Inputs %s -emit-llvm -o - | FileCheck %s
-// RUN: ls -lR %t/clang-module-cache | grep cvars.pcm
+// RUN: %swift %clang-importer-sdk -module-cache-path %t/clang-module-cache -target x86_64-apple-darwin13 %s -emit-ir -o - | FileCheck %s
+// RUN: ls -lR %t/clang-module-cache | FileCheck %s --check-prefix=CHECK-LS
+// CHECK-LS: cvars{{.*}}.pcm
 
 import cvars
 

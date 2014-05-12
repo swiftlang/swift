@@ -3,25 +3,25 @@
 /* block comments */
 /* /* nested too */ */
 
-def f1(a: Int, y: Int) {}
-def f2() {}
-def f3() -> Int {}
+func f1(a: Int, y: Int) {}
+func f2() {}
+func f3() -> Int {}
 
-def invalid_semi() {
+func invalid_semi() {
   ; // expected-error {{';' statements are not allowed}} {{3-4=}}
 }
 
-def nested1(x: Int) {
+func nested1(x: Int) {
   var y : Int
   
-  def nested2(z: Int) -> Int {
+  func nested2(z: Int) -> Int {
     return x+y+z
   }
   
   nested2(1)
 }
 
-def funcdecl5(a: Int, y: Int) {
+func funcdecl5(a: Int, y: Int) {
   var x : Int
 
   // a few statements
@@ -34,13 +34,13 @@ def funcdecl5(a: Int, y: Int) {
   }
 
   // Assignment statement.
-  x = x
-  (x) = x
+  x = y
+  (x) = y
 
   // FIXME: Can we provide nicer diagnostics for this case?
-  1 = x        // expected-error {{expression does not type-check}}
-  (1) = x      // expected-error {{expression does not type-check}}
-  (x:1).x = 1 // expected-error {{expression does not type-check}}
+  1 = x        // expected-error {{cannot convert the expression's type '()' to type '@lvalue Int'}}
+  (1) = x      // expected-error {{cannot assign to the result of this expression}}
+  (x:1).x = 1 // expected-error {{cannot convert the expression's type '()' to type '$T1'}}
   var tup : (x:Int, y:Int)
   tup.x = 1
 
@@ -86,20 +86,23 @@ def funcdecl5(a: Int, y: Int) {
 }
 
 struct infloopbool {
-  def getLogicValue() -> infloopbool {
+  func getLogicValue() -> infloopbool {
     return self
   }
 }
 
-def infloopbooltest() {
+func infloopbooltest() {
   if (infloopbool()) {} // expected-error {{type 'infloopbool' does not conform to protocol 'LogicValue'}}
 }
 
 // test "builder" API style
+extension Int {
+  static func builder() { }
+}
 Int
-  .min()
+  .builder()
 
-def for_loop() {
+func for_loop() {
   var x = 0
   for ;; { }
   for x = 1; x != 42; ++x { }
@@ -116,34 +119,36 @@ def for_loop() {
   for (var (a,b) = (0,12); a != b; --b) {}
   var j, k : Int
   for ((j,k) = (0,10); j != k; --k) {}
+  for var i = 0, j = 0; i * j < 10; i++, j++ {}
+  for j = 0, k = 52; j < k; ++j, --k { }
 }
 
 break // expected-error {{'break' is only allowed inside a loop}}
 continue // expected-error {{'continue' is only allowed inside a loop}}
 while true {
-  def f() {
+  func f() {
     break // expected-error {{'break' is only allowed inside a loop}}
     continue // expected-error {{'continue' is only allowed inside a loop}}
   }
 }
 
-def tuple_assign() {
+func tuple_assign() {
   var a,b,c,d : Int
   (a,b) = (1,2)
-  def f() -> (Int,Int) { return (1,2) }
+  func f() -> (Int,Int) { return (1,2) }
   ((a,b), (c,d)) = (f(), f())
 }
 
-def missing_semicolons() {
+func missing_semicolons() {
   var a = new Int[4]a[0]  // expected-error{{expression resolves to an unused l-value}} expected-error{{consecutive statements}} {{21-21=;}}
   var w = 321
-  def g() {}
+  func g() {}
   g() ++w             // expected-error{{consecutive statements}} {{6-6=;}}
-  var y = w'g'        // expected-error{{consecutive statements}} {{12-12=;}}
+  var y = w'g'        // expected-error{{consecutive statements}} {{12-12=;}} // expected-error {{cannot convert the expression's type '$T0' to type 'CharacterLiteralConvertible'}}
   var z = w"hello"    // expected-error{{consecutive statements}} {{12-12=;}}
   class  C {}class  C2 {} // expected-error{{consecutive statements}} {{14-14=;}}
   struct S {}struct S2 {} // expected-error{{consecutive statements}} {{14-14=;}}
-  def j() {}def k() {}  // expected-error{{consecutive statements}} {{13-13=;}}
+  func j() {}func k() {}  // expected-error{{consecutive statements}} {{14-14=;}}
 }
 
 //===--- Return statement.
@@ -152,36 +157,36 @@ return 42 // expected-error {{return invalid outside of a func}}
 
 return // expected-error {{return invalid outside of a func}}
 
-def NonVoidReturn1() -> Int {
+func NonVoidReturn1() -> Int {
   return // expected-error {{non-void function should return a value}}
 }
 
-def NonVoidReturn2() -> Int {
+func NonVoidReturn2() -> Int {
   return + // expected-error {{unary operator cannot be separated from its operand}} expected-error {{expected expression in 'return' statement}}
 }
 
-def VoidReturn1() {
+func VoidReturn1() {
   if true { return }
   // Semicolon should be accepted -- rdar://11344875
   return; // no-error
 }
 
-def VoidReturn2() {
+func VoidReturn2() {
   return () // no-error
 }
 
-def VoidReturn3() {
+func VoidReturn3() {
   return VoidReturn2() // no-error
 }
 
 //===--- If statement.
 
-def IfStmt1() {
+func IfStmt1() {
   if 1 > 0 // expected-error {{expected '{' after 'if' condition}}
   var x = 42
 }
 
-def IfStmt2() {
+func IfStmt2() {
   if 1 > 0 {
   } else // expected-error {{expected '{' after 'else'}}
   var x = 42
@@ -189,14 +194,14 @@ def IfStmt2() {
 
 //===--- While statement.
 
-def WhileStmt1() {
+func WhileStmt1() {
   while 1 > 0 // expected-error {{expected '{' after 'while' condition}}
   var x = 42
 }
 
 //===--- Do-while statement.
 
-def DoWhileStmt1() {
+func DoWhileStmt1() {
   do {} while true
 
   do {} while false
@@ -205,17 +210,59 @@ def DoWhileStmt1() {
   do { continue } while true
 }
 
-def DoWhileStmt2() {
+func DoWhileStmt2() {
   do // expected-error {{expected '{' after 'do'}} expected-error {{expected 'while' in 'do-while' loop}}
 }
 
-def DoWhileStmt3() {
+func DoWhileStmt3() {
   do {
   } // expected-error {{expected 'while' in 'do-while' loop}}
 }
 
-def DoWhileStmt4() {
+func DoWhileStmt4() {
   do {
   } while + // expected-error {{unary operator cannot be separated from its operand}} expected-error {{expected expression in 'do-while' condition}}
+}
+
+func brokenSwitch(x: Int) -> Int {
+  switch x {
+  case .Blah(var rep): // expected-error{{enum case pattern cannot match values of the non-enum type 'Int'}}
+    return rep
+  }
+}
+
+func breakContinue(x : Int) -> Int {
+
+Outer:
+  for a in 0..1000 {
+
+  Switch:
+    switch x {
+    case 42: break Outer
+    case 97: continue Outer
+    case 102: break Switch
+    case 13: continue
+    case 139: break   // <rdar://problem/16563853> 'break' should be able to break out of switch statements
+    }
+  }
+  
+  // <rdar://problem/16692437> shadowing loop labels should be an error
+Loop:  // expected-note {{previously declared here}}
+  for i in 0..2 {
+  Loop:  // expected-error {{label 'Loop' cannot be reused on an inner statement}}
+    for j in 0..2 {
+    }
+  }
+
+
+  // <rdar://problem/16798323> Following a 'break' statment by another statement on a new line result in an error/fit-it
+  switch 5 {
+  case 5:
+    println("before the break")
+    break
+    println("after the break")    // println is not a label for the break.
+  default:
+    println("")
+  }
 }
 

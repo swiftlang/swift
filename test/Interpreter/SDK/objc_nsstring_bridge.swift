@@ -1,5 +1,4 @@
-// RUN: rm -rf %t/clang-module-cache
-// RUN: %swift -nsstring-is-string -i -module-cache-path=%t/clang-module-cache %s | FileCheck %s
+// RUN: %target-run-simple-swift | FileCheck %s
 
 import Foundation
 
@@ -7,23 +6,28 @@ import Foundation
 // implicitly converted from an NSString, since method lookup doesn't see through
 // implicit conversions.
 extension String {
-  func reallyAString() -> String { return this }
+  func reallyAString() -> String { return self }
 }
 
-func printString(x:String) {
+func printString(x: String) {
   println(x)
 }
 
-func printDescription(o:NSObject) {
-  println(o.description().reallyAString())
+func printDescription(o: AnyObject) {
+  // FIXME: This is picking up the class method.
+#if os(OSX)
+  println(o.description!.reallyAString())
+#else
+  println(o.description()!.reallyAString())
+#endif
 }
 
 class Pootie : NSObject {
-  func description() -> String {
+  override var description : String {
     return "cole me down on the panny sty"
   }
 
-  func sinePittyOnRunnyKine(x:String) -> String {
+  func sinePittyOnRunnyKine(x: String) -> String {
     return "\(x). sa-da-tay"
   }
 }
@@ -40,7 +44,21 @@ var s1:String = "wa-da-ta"
 var s2s:String = "kappa-chow"
 var s2:NSString = s2s
 printDescription(s2) // CHECK: kappa-chow
-printDescription(p.performSelector("sinePittyOnRunnyKine:", withObject:s2)) // CHECK: kappa-chow. sa-da-tay
+printDescription(p.sinePittyOnRunnyKine(s2)) // CHECK: kappa-chow. sa-da-tay
 
 var s3:String = s2.stringByAppendingPathComponent(s1).reallyAString()
 printDescription(s3) // CHECK: kappa-chow/wa-da-ta
+
+// Unicode conversion
+var s4 : String = NSString.stringWithString("\uf8ff\ufffd")
+printDescription(s4) // CHECK: �
+
+// NSCFConstantString conversion
+var s5 : String = NSRangeException
+printDescription(s5) // CHECK: NSRangeException
+
+// Check conversions to AnyObject
+var s6: NSString = "foo"
+var ao: AnyObject = s6.copy()
+var s7 = (ao as NSString)!
+var s8 = ao as String

@@ -1,7 +1,7 @@
 @exported import def_class
 
 class OverrideComputedProperty : ComputedProperty {
-  @override var value : Int {
+  override var value : Int {
     get {
       return super.value + 1
     }
@@ -11,26 +11,26 @@ class OverrideComputedProperty : ComputedProperty {
     }
   }
 
-  @override var readOnly : Int {
+  override var readOnly : Int {
     return super.readOnly + 1
   }
 }
 
 class OverrideAddsSetter : ComputedProperty {
-  @override var readOnly : Int {
+  override var readOnly : Int {
     get { return 1 }
     set { /* do nothing */ }
   }
 }
 
 class OverrideSimpleSubscript : ReadonlySimpleSubscript {
-  @override subscript(x: Int) -> Bool {
+  override subscript(x: Int) -> Bool {
     return false
   }
 }
 
 class OverrideAddsSubscriptSetter : ReadonlySimpleSubscript {
-  @override subscript(x: Int) -> Bool {
+  override subscript(x: Int) -> Bool {
     set(newValue) {
       // do nothing!
     }
@@ -41,7 +41,7 @@ class OverrideAddsSubscriptSetter : ReadonlySimpleSubscript {
 }
 
 class OverrideComplexSubscript : ComplexSubscript {
-  @override subscript(x : Int, y : Bool) -> Int {
+  override subscript(x : Int, y : Bool) -> Int {
     set(newValue) {
       // do nothing!
     }
@@ -52,7 +52,7 @@ class OverrideComplexSubscript : ComplexSubscript {
 }
 
 class OverrideFunc : StillEmpty {
-  @override func reset() {
+  override func reset() {
     println("ha!")
   }
 }

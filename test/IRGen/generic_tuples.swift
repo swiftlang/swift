@@ -1,46 +1,94 @@
-// RUN: %swift -triple x86_64-apple-darwin10 -emit-llvm %s | FileCheck %s
+// RUN: %swift -target x86_64-apple-darwin10 -emit-ir %s | FileCheck %s
 
-// CHECK: [[OPAQUE:%swift.opaque]] = type opaque
+// Make sure that optimization passes don't choke on storage types for generic tuples
+// RUN: %swift -target x86_64-apple-darwin10 -emit-ir -O2 %s
+
 // CHECK: [[TYPE:%swift.type]] = type {
+// CHECK: [[OPAQUE:%swift.opaque]] = type opaque
 // CHECK: [[TUPLE_TYPE:%swift.tuple_type]] = type { [[TYPE]], i64, i8*, [0 x %swift.tuple_element_type] }
 // CHECK: %swift.tuple_element_type = type { [[TYPE]]*, i64 }
 
-func dup<T>(x : T) -> (T, T) { return (x,x) }
-// CHECK:    define void @_T14generic_tuples3dupU__FT1xQ__TQ_Q__({ [[OPAQUE]] }* noalias sret
-// CHECK:      [[ELTS:%.*]] = alloca [2 x [[TYPE]]*], align 8
-//   Get value witnesses for T.
+func dup<T>(var x: T) -> (T, T) { return (x,x) }
+// CHECK:    define void @_TF14generic_tuples3dup{{.*}}(<{}>* noalias sret
+// CHECK:    entry:
+//   Allocate a local variable for 'x'.
+// CHECK-NEXT: alloca %swift.type*, align 8
+// CHECK-NEXT: [[XBUF:%.*]] = alloca [[BUFFER:.*]], align 8
+// CHECK-NEXT: store %swift.type*
 // CHECK-NEXT: [[T0:%.*]] = bitcast [[TYPE]]* %T to i8***
 // CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds i8*** [[T0]], i64 -1
-// CHECK-NEXT: %T.value = load i8*** [[T1]], align 8
+// CHECK-NEXT: [[T_VALUE:%.*]] = load i8*** [[T1]], align 8
+// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds i8** [[T_VALUE]], i32 11
+// CHECK-NEXT: [[T1:%.*]] = load i8** [[T0]], align 8
+// CHECK-NEXT: [[ALLOCATE_FN:%.*]] = bitcast i8* [[T1]] to [[OPAQUE]]* ([[BUFFER]]*, [[TYPE]]*)*
+// CHECK-NEXT: [[X:%.*]] = call [[OPAQUE]]* [[ALLOCATE_FN]]([[BUFFER]]* [[XBUF]], [[TYPE]]* %T)
+//   Get value witnesses for T.
 //   Project to first element of tuple.
-// CHECK-NEXT: [[FST:%.*]] = bitcast { [[OPAQUE]] }* [[RET:%.*]] to [[OPAQUE]]*
+// CHECK: [[FST:%.*]] = bitcast <{}>* [[RET:%.*]] to [[OPAQUE]]*
 //   Get the tuple metadata.
 //   FIXME: maybe this should get passed in?
-// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [2 x [[TYPE]]*]* [[ELTS]], i32 0, i32 0
-// CHECK-NEXT: store [[TYPE]]* %T, [[TYPE]]** [[T0]], align 8
-// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds [2 x [[TYPE]]*]* [[ELTS]], i32 0, i32 1
-// CHECK-NEXT: store [[TYPE]]* %T, [[TYPE]]** [[T1]], align 8
-// CHECK-NEXT: [[TT_PAIR:%.*]] = call [[TYPE]]* @swift_getTupleTypeMetadata(i64 2, [[TYPE]]** [[T0]], i8* null, i8** null)
+// CHECK-NEXT: [[TT_PAIR:%.*]] = call [[TYPE]]* @swift_getTupleTypeMetadata2([[TYPE]]* %T, [[TYPE]]* %T, i8* null, i8** null)
 //   Pull out the offset of the second element and GEP to that.
 // CHECK-NEXT: [[T0:%.*]] = bitcast [[TYPE]]* [[TT_PAIR]] to [[TUPLE_TYPE]]*
 // CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds [[TUPLE_TYPE]]* [[T0]], i64 0, i32 3, i64 1, i32 1
 // CHECK-NEXT: [[T2:%.*]] = load i64* [[T1]], align 8
-// CHECK-NEXT: [[T3:%.*]] = bitcast { [[OPAQUE]] }* [[RET]] to i8*
+// CHECK-NEXT: [[T3:%.*]] = bitcast <{}>* [[RET]] to i8*
 // CHECK-NEXT: [[T4:%.*]] = getelementptr inbounds i8* [[T3]], i64 [[T2]]
 // CHECK-NEXT: [[SND:%.*]] = bitcast i8* [[T4]] to [[OPAQUE]]*
 //   Copy 'x' into the first element.
-// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds i8** %T.value, i32 6
+// CHECK-NEXT: [[T0:%.*]] = bitcast [[TYPE]]* %T to i8***
+// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds i8*** [[T0]], i64 -1
+// CHECK-NEXT: [[T_VALUE:%.*]] = load i8*** [[T1]], align 8
+// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds i8** [[T_VALUE]], i32 6
 // CHECK-NEXT: [[T1:%.*]] = load i8** [[T0]], align 8
 // CHECK-NEXT: [[COPY_FN:%.*]] = bitcast i8* [[T1]] to [[OPAQUE]]* ([[OPAQUE]]*, [[OPAQUE]]*, [[TYPE]]*)*
-// CHECK-NEXT: call [[OPAQUE]]* [[COPY_FN]]([[OPAQUE]]* [[FST]], [[OPAQUE]]* [[X:%.*]], [[TYPE]]* %T)
+// CHECK-NEXT: call [[OPAQUE]]* [[COPY_FN]]([[OPAQUE]]* [[FST]], [[OPAQUE]]* [[X]], [[TYPE]]* %T)
 //   Copy 'x' into the second element.
-// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds i8** %T.value, i32 6
-// CHECK-NEXT: [[T1:%.*]] = load i8** [[T0]], align 8
-// CHECK-NEXT: [[COPY_FN:%.*]] = bitcast i8* [[T1]] to [[OPAQUE]]* ([[OPAQUE]]*, [[OPAQUE]]*, [[TYPE]]*)*
-// CHECK-NEXT: call [[OPAQUE]]* [[COPY_FN]]([[OPAQUE]]* [[SND]], [[OPAQUE]]* [[X]], [[TYPE]]* %T)
-//   Destroy 'x'.
-// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds i8** %T.value, i32 4
-// CHECK-NEXT: [[T1:%.*]] = load i8** [[T0]], align 8
-// CHECK-NEXT: [[DESTROY_FN:%.*]] = bitcast i8* [[T1]] to void ([[OPAQUE]]*, [[TYPE]]*)*
-// CHECK-NEXT: call void [[DESTROY_FN]]([[OPAQUE]]* [[X]], [[TYPE]]* %T)
-// CHECK-NEXT: ret void
+// CHECK-NEXT: [[T0:%.*]] = bitcast [[TYPE]]* %T to i8***
+// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds i8*** [[T0]], i64 -1
+// CHECK-NEXT: [[T_VALUE:%.*]] = load i8*** [[T1]], align 8
+
+// CHECK: ret void
+
+// CHECK: define void @_TF14generic_tuples4lump{{.*}}(<{ %Si }>* noalias sret, %swift.opaque* noalias, %swift.type* %T)
+func lump<T>(x: T) -> (Int, T, T) { return (0,x,x) }
+// CHECK: define void @_TF14generic_tuples5lump2{{.*}}(<{ %Si, %Si }>* noalias sret, %swift.opaque* noalias, %swift.type* %T)
+func lump2<T>(x: T) -> (Int, Int, T) { return (0,0,x) }
+// CHECK: define void @_TF14generic_tuples5lump3{{.*}}(<{}>* noalias sret, %swift.opaque* noalias, %swift.type* %T)
+func lump3<T>(x: T) -> (T, T, T) { return (x,x,x) }
+// CHECK: define void @_TF14generic_tuples5lump4{{.*}}(<{}>* noalias sret, %swift.opaque* noalias, %swift.type* %T)
+func lump4<T>(x: T) -> (T, Int, T) { return (x,0,x) }
+
+// CHECK: define i64 @_TF14generic_tuples6unlump{{.*}}(i64, %swift.opaque* noalias, %swift.opaque* noalias, %swift.type* %T)
+func unlump<T>(x: (Int, T, T)) -> Int { return x.0 }
+// CHECK: define void @_TF14generic_tuples7unlump{{.*}}(%swift.opaque* noalias sret, i64, %swift.opaque* noalias, %swift.opaque* noalias, %swift.type* %T)
+func unlump1<T>(x: (Int, T, T)) -> T { return x.1 }
+// CHECK: define void @_TF14generic_tuples7unlump2{{.*}}(%swift.opaque* noalias sret, %swift.opaque* noalias, i64, %swift.opaque* noalias, %swift.type* %T)
+func unlump2<T>(x: (T, Int, T)) -> T { return x.0 }
+// CHECK: define i64 @_TF14generic_tuples7unlump3{{.*}}(%swift.opaque* noalias, i64, %swift.opaque* noalias, %swift.type* %T)
+func unlump3<T>(x: (T, Int, T)) -> Int { return x.1 }
+
+
+// CHECK: tuple_existentials
+func tuple_existentials() {
+  // Empty tuple:
+  var a : Any = ()
+  // CHECK: store %swift.type* getelementptr inbounds (%swift.full_type* @_TMdT_, i32 0, i32 1),
+
+  // 2 element tuple
+  var t2 = (1,2.0)
+  a = t2
+  // CHECK: call %swift.type* @swift_getTupleTypeMetadata2({{.*}}@_TMdSi{{.*}},{{.*}}@_TMdSd{{.*}}, i8* null, i8** null)
+
+
+  // 3 element tuple
+  var t3 = ((),(),())
+  a = t3
+  // CHECK: call %swift.type* @swift_getTupleTypeMetadata3({{.*}}@_TMdT_{{.*}},{{.*}}@_TMdT_{{.*}},{{.*}}@_TMdT_{{.*}}, i8* null, i8** null)
+
+  // 4 element tuple
+  var t4 = (1,2,3,4)
+  a = t4
+  // CHECK: call %swift.type* @swift_getTupleTypeMetadata(i64 4, {{.*}}, i8* null, i8** null)
+}
+

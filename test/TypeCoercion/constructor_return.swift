@@ -1,10 +1,10 @@
-// RUN: %swift %s -parse
+// RUN: %swift -parse %s -verify
 
 func foo() {}
 func bar() {}
 
 struct S {
-  constructor(b:Bool) {
+  init(b:Bool) {
     foo()
     if b { return }
     bar()
@@ -13,14 +13,14 @@ struct S {
 
 class C {
   var b:Bool
-  constructor(b:Bool) {
-    this.b = b
+  init(b:Bool) {
+    self.b = b
     foo()
     if b { return }
     bar()
   }
 
-  destructor {
+  deinit {
     foo()
     if b { return }
     bar()

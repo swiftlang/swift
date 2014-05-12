@@ -1,8 +1,8 @@
 
-func [transparent] negate_bad(x : Int) -> Int {
+@transparent func negate_bad(x: Int) -> Int {
   return !x
 }
 
-func negate(x : Int) -> Int {
+func negate(x: Int) -> Int {
   return !x
 }

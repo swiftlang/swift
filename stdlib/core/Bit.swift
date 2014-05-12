@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  Used to index T? and SequenceOfOne<T>
+//  Used to index SequenceOfOne<T>
 //
 //===----------------------------------------------------------------------===//
 enum Bit : Int, RandomAccessIndex {
@@ -25,6 +25,14 @@ enum Bit : Int, RandomAccessIndex {
     assert(self == .one, "Can't decrement past zero")
     return .zero
   }
+
+  func distanceTo(other: Bit) -> Int {
+    return toRaw().distanceTo(other.toRaw())
+  }
+
+  func advancedBy(distance: Int) -> Bit {
+    return toRaw().advancedBy(distance) > 0 ? one : zero
+  }
 }
 
 func == (lhs: Bit, rhs: Bit) -> Bool {
@@ -35,38 +43,32 @@ func < (lhs: Bit, rhs: Bit) -> Bool {
   return lhs.toRaw() < rhs.toRaw()
 }
 
-extension Bit : NumericOperations {
-  static func _withOverflow(x: Int, b: Bool) -> (Bit, Bool) {
+extension Bit : IntegerArithmetic {
+  static func _withOverflow(x: Int, _ b: Bool) -> (Bit, Bool) {
     return (Bit.fromRaw(x)!, b)
   }
   
-  static func add(lhs: Bit, rhs: Bit) -> (Bit, Bool) {
-    return _withOverflow(Int.add(lhs.toRaw(), rhs.toRaw()))
+  static func uncheckedAdd(lhs: Bit, _ rhs: Bit) -> (Bit, Bool) {
+    return _withOverflow(Int.uncheckedAdd(lhs.toRaw(), rhs.toRaw()))
   }
 
-  static func sub(lhs: Bit, rhs: Bit) -> (Bit, Bool) {
-    return _withOverflow(Int.add(lhs.toRaw(), rhs.toRaw()))
+  static func uncheckedSubtract(lhs: Bit, _ rhs: Bit) -> (Bit, Bool) {
+    return _withOverflow(Int.uncheckedSubtract(lhs.toRaw(), rhs.toRaw()))
   }
 
-  static func mul(lhs: Bit, rhs: Bit) -> (Bit, Bool) {
-    return _withOverflow(Int.add(lhs.toRaw(), rhs.toRaw()))
+  static func uncheckedMultiply(lhs: Bit, _ rhs: Bit) -> (Bit, Bool) {
+    return _withOverflow(Int.uncheckedMultiply(lhs.toRaw(), rhs.toRaw()))
   }
 
-  static func div(lhs: Bit, rhs: Bit) -> (Bit, Bool) {
-    return _withOverflow(Int.add(lhs.toRaw(), rhs.toRaw()))
+  static func uncheckedDivide(lhs: Bit, _ rhs: Bit) -> (Bit, Bool) {
+    return _withOverflow(Int.uncheckedDivide(lhs.toRaw(), rhs.toRaw()))
   }
 
-  static func rem(lhs: Bit, rhs: Bit) -> (Bit, Bool) {
-    return _withOverflow(Int.add(lhs.toRaw(), rhs.toRaw()))
+  static func uncheckedModulus(lhs: Bit, _ rhs: Bit) -> (Bit, Bool) {
+    return _withOverflow(Int.uncheckedModulus(lhs.toRaw(), rhs.toRaw()))
   }
 
   func toIntMax() -> IntMax {
     return IntMax(toRaw())
   }
-}
-
-// This overload is needed to work around the ambiguity of the two
-// generic "-" operators for RandomAccessIndex.
-func - (lhs: Bit, rhs: Bit) -> Bit {
-  return Bit.fromRaw( lhs.toRaw() - rhs.toRaw() )!
 }

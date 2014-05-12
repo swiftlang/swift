@@ -3,7 +3,7 @@
 // RUN: rm -rf %t
 // RUN: mkdir %t
 // RUN: %swift %clang-importer-sdk -module-cache-path %t/clang-module-cache -emit-module -o %t %s
-// RUN: %swift-ide-test %clang-importer-sdk -module-cache-path %t/clang-module-cache -print-as-objc %t/blocks.swiftmodule -source-filename %s > %t/blocks.h
+// RUN: %swift %clang-importer-sdk -module-cache-path %t/clang-module-cache -parse-as-library %t/blocks.swiftmodule -parse -emit-objc-header-path %t/blocks.h
 // RUN: FileCheck %s < %t/blocks.h
 // RUN: %check-in-clang %t/blocks.h
 
@@ -19,18 +19,18 @@ import ObjectiveC
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class Callbacks {
-  func voidBlocks(input: @objc_block () -> ()) -> @objc_block () -> () {
+  func voidBlocks(input: () -> ()) -> () -> () {
     return input
   }
-  func manyArguments(input: @objc_block (Float, Float, Double, Double) -> ()) {}
+  func manyArguments(input: (Float, Float, Double, Double) -> ()) {}
 
-  func blockTakesBlock(input: @objc_block (@objc_block () -> ()) -> ()) {}
-  func blockReturnsBlock(input: @objc_block () -> @objc_block () -> ()) {}
+  func blockTakesBlock(input: (() -> ()) -> ()) {}
+  func blockReturnsBlock(input: () -> () -> ()) {}
   func blockTakesAndReturnsBlock(input:
-    @objc_block (@objc_block (Int16) -> (UInt16)) ->
-                (@objc_block (Int8) -> (UInt8))) {}
+    ((Int16) -> (UInt16)) ->
+                ((Int8) -> (UInt8))) {}
   func blockTakesTwoBlocksAndReturnsBlock(input:
-    @objc_block (@objc_block (Int16) -> (UInt16),
-                 @objc_block (Int32) -> (UInt32)) ->
-                (@objc_block (Int8) -> (UInt8))) {}
+    ((Int16) -> (UInt16),
+                 (Int32) -> (UInt32)) ->
+                ((Int8) -> (UInt8))) {}
 }

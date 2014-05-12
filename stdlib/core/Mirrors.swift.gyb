@@ -19,7 +19,7 @@
 % for FloatSize in [32,64]:
 %   Types.append( ('Float'+str(FloatSize),'.Float','Double($0)') )
 % Types.append(('String','.Text','$0'))
-% Types.append(('Bool','.Text','"\($0)"'))
+% Types.append(('Bool','.Logical','$0'))
 % Types.append(('Int','.Int','Int64($0)'))
 
 % for Type in Types:

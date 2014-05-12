@@ -3,7 +3,7 @@
 func foo() -> Int? { return .None }
 func nonOptional() -> Int { return 0 }
 func use(x: Int) {}
-func modify(x: @inout Int) {}
+func modify(inout x: Int) {}
 
 if let x = foo() {
   use(x)

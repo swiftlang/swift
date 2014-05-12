@@ -1,10 +1,12 @@
-// RUN: %swift -enable-dynamic-value-type-layout -i %s | FileCheck %s
+// RUN: rm -rf %t  &&  mkdir %t
+// RUN: %target-build-swift -Xfrontend -enable-dynamic-value-type-layout %s -o %t/a.out
+// RUN: %target-run %t/a.out | FileCheck %s
 
 struct BufferedPair<T, U> {
-  var front : UInt8
-  var first : T
-  var second : U
-  var back : UInt8
+  var front: UInt8
+  var first: T
+  var second: U
+  var back: UInt8
 }
 
 enum State : ReplPrintable {
@@ -22,7 +24,7 @@ enum State : ReplPrintable {
   }
 }
 
-func printPair<A:ReplPrintable, B:ReplPrintable>(p:BufferedPair<A,B>) {
+func printPair<A : ReplPrintable, B : ReplPrintable>(p: BufferedPair<A,B>) {
   print("\(p.front) ")
   p.first.replPrint()
   print(" ")
@@ -30,6 +32,7 @@ func printPair<A:ReplPrintable, B:ReplPrintable>(p:BufferedPair<A,B>) {
   println(" \(p.back)")
 }
 
-var p = BufferedPair(219, State.OR, "Idaho's Portugal", 17)
+var p = BufferedPair(front: 219, first: State.OR, second: "Idaho's Portugal", 
+                     back: 17)
 // CHECK: 219 Oregon "Idaho\'s Portugal" 17
 printPair(p)

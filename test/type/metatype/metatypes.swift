@@ -2,19 +2,19 @@
 
 struct Test0 {}
 
-var test0 : Test0.metatype = Test0
-test0 = Test0
+var test0 : Test0.Type = Test0.self
+test0 = Test0.self
 
 class Test1a { 
   init() { }
-  static def foo() {}
+  class func foo() {}
 }
 class Test1b : Test1a { 
   init() { super.init() }
 }
 
 Test1b.foo()
-var test1 = Test1a
-test1 = Test1b
-var x = Test1b();
-test1 = typeof(x)
+var test1 = Test1a.self
+test1 = Test1b.self
+var x = Test1b()
+test1 = x.dynamicType

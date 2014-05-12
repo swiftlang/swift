@@ -1,4 +1,16 @@
-import swift
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+@exported
 import ObjectiveC
 
 //===----------------------------------------------------------------------===//
@@ -7,43 +19,6 @@ import ObjectiveC
 // FIXME: Objective-C types belong in a layer below the Objective-C support
 // libraries, not here.
 
-/// \brief The Objective-C BOOL type.
-///
-/// The Objective-C BOOL type is typically a typedef of "signed char".  Clang
-/// importer imports it as ObjCBool.
-///
-/// Note: When BOOL is a typedef of C's _Bool/C++'s bool, this struct goes away
-/// and simply becomes a typealias for CBool.
-///
-/// The compiler has special knowledge of this type.
-struct ObjCBool {
-  var value : UInt8
-
-  /// \brief Allow use in a Boolean context.
-  func getLogicValue() -> Bool {
-    return value != 0
-  }
-
-  /// \brief Implicit conversion from C Boolean type to Swift Boolean
-  /// type.
-  func [conversion] __conversion() -> Bool {
-    return this.getLogicValue()
-  }
-
-  func replPrint() {
-    // Dispatch to Bool.
-    this.getLogicValue().replPrint()
-  }
-}
-
-extension Bool {
-  /// \brief Implicit conversion from Swift Boolean type to
-  /// Objective-C Boolean type.
-  func [conversion] __conversion() -> ObjCBool {
-    return ObjCBool(this ? 1 : 0)
-  }
-}
-
 /// \brief The Objective-C SEL type.
 ///
 /// The Objective-C SEL type is typically an opaque pointer. Swift
@@ -51,53 +26,91 @@ extension Bool {
 /// convert between C strings and selectors.
 ///
 /// The compiler has special knowledge of this type.
-struct ObjCSel : StringLiteralConvertible {
+struct Selector : StringLiteralConvertible, ReplPrintable {
   var ptr : COpaquePointer
 
   /// \brief Create a selector from a string.
-  constructor(str : String) {
-    var LM = LifetimeManager()
-    ptr = sel_registerName(LM.getCString(str)).ptr
-    LM.release()
+  init(_ str : String) {
+    ptr = str.withCString { sel_registerName($0).ptr }
   }
 
-  typealias StringLiteralType = CString
+  /// \brief Construct a selector from a string literal.
+  static func convertFromExtendedGraphemeClusterLiteral(
+    value: CString) -> Selector {
+
+    return convertFromStringLiteral(value)
+  }
 
   /// \brief Construct a selector from a string literal.
   ///
   /// FIXME: Fast-path this in the compiler, so we don't end up with
   /// the sel_registerName call at compile time.
-  static func convertFromStringLiteral(str : CString) -> ObjCSel {
-    return sel_registerName(str)
+  static func convertFromStringLiteral(value: CString) -> Selector {
+    return sel_registerName(value)
+  }
+
+  init(_: _Nil) {
+    ptr = nil
   }
 
   func replPrint() {
-    print(String(this))
+    print(String(self))
   }
 }
 
-extension ObjCSel : Equatable, Hashable {
-  func __equal__ (rhs : ObjCSel) -> Bool {
-    return sel_isEqual(this, rhs)
-  }
-  func hashValue() -> Int {
-    return ptr.hashValue()
+func ==(lhs: Selector, rhs: Selector) -> Bool {
+  return sel_isEqual(lhs, rhs)
+}
+
+extension Selector : Equatable, Hashable {
+  var hashValue: Int {
+    return ptr.hashValue
   }
 }
 
 extension String {
   /// \brief Construct the C string representation of an Objective-C selector.
-  constructor(sel : ObjCSel) {
+  init(_ sel: Selector) {
     // FIXME: This misses the ASCII optimization.
-    this = String.fromCString(sel_getName(sel))
+    self = String.fromCString(sel_getName(sel))
   }
 }
 
 // Functions used to implicitly bridge ObjCBool types to Swift's Bool type.
 
-func convertBoolToObjCBool(x:Bool) -> ObjCBool {
+func _convertBoolToObjCBool(x: Bool) -> ObjCBool {
   return x
 }
-func convertObjCBoolToBool(x:ObjCBool) -> Bool {
+func _convertObjCBoolToBool(x: ObjCBool) -> Bool {
   return x
 }
+
+extension _Nil {
+  @conversion func __conversion() -> Selector {
+    return Selector(nil)
+  }
+}
+
+func ~=(x: NSObject, y: NSObject) -> Bool {
+  return x.isEqual(y)
+}
+
+//===----------------------------------------------------------------------===//
+// FIXME: @autoreleasepool substitute
+//===----------------------------------------------------------------------===//
+@asmname("objc_autoreleasePoolPush") func __pushAutoreleasePool() -> COpaquePointer
+@asmname("objc_autoreleasePoolPop") func __popAutoreleasePool(pool: COpaquePointer)
+
+func autoreleasepool(code: () -> ()) {
+  var pool = __pushAutoreleasePool()
+  code()
+  __popAutoreleasePool(pool)
+}
+
+//===----------------------------------------------------------------------===//
+// Mark YES and NO unavailable.
+//===----------------------------------------------------------------------===//
+
+@availability(*, unavailable, message="Use 'Bool' value 'true' instead") var YES : ObjCBool = Bool.true
+@availability(*, unavailable, message="Use 'Bool' value 'false' instead") var NO : ObjCBool = Bool.false
+

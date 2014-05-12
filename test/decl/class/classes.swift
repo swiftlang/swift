@@ -2,38 +2,46 @@
 
 class B : A {
   init() { super.init() }
-  def f() {}
-  def g() -> (B, B) { return (B(), B()) } // expected-error {{declaration cannot override more than one superclass declaration}}
-  def h() -> (A, B) { return (B(), B()) }
-  def h() -> (B, A) { return (B(), B()) } // expected-error {{declaration cannot be overridden by more than one subclass declaration}}
-  def i() {} // expected-error {{declarations from extensions cannot be overridden yet}}
-  def j() -> Int { return 0 } 
-  def j() -> Float { return 0.0 } 
-  def k() -> Float { return 0.0 } // expected-error {{cannot overload a declaration from a superclass}}
-  def l(l: Int) {}
-  def l(ll: Float) {}
-  def m(x: Int) {}
-  def m(z: Int) {}
-  subscript(i : Int) -> Int { get: set: }
+  override func f() {}
+  func g() -> (B, B) { return (B(), B()) } // expected-error {{declaration 'g()' cannot override more than one superclass declaration}}
+  override func h() -> (A, B) { return (B(), B()) }
+  override func h() -> (B, A) { return (B(), B()) }
+  func i() {} // expected-error {{declarations from extensions cannot be overridden yet}}
+  override func j() -> Int { return 0 }
+  func j() -> Float { return 0.0 }
+  func k() -> Float { return 0.0 }
+  override func l(l: Int) {}
+  override func l(l: Float) {}
+  override func m(x: Int) {}
+  func m(x: Float) {} // not an override of anything
+  func n(x: Float) {}
+  override subscript(i : Int) -> Int {
+    get {}
+    set {}
+  }
 }
 class A {
   init() { }
-  def f() {}
-  def g() -> (B, A) { return (B(), B()) }
-  def g() -> (A, B) { return (B(), B()) }
-  def h() -> (A, A) { return (B(), B()) }
-  def j() -> Int { return 0 } 
-  def k() -> Int { return 0 }
-  def l(l: Int) {}
-  def l(l: Float) {}
-  def m(x: Int) {}
-  def m(y: Int) {}
-  subscript(i : Int) -> Int { get: set: }
+  func f() {}
+  func g() -> (B, A) { return (B(), B()) } // expected-note{{overridden declaration is here}}
+  func g() -> (A, B) { return (B(), B()) } // expected-note{{overridden declaration is here}}
+  func h() -> (A, A) { return (B(), B()) }
+  func j() -> Int { return 0 }
+  func k() -> Int { return 0 }
+  func l(l: Int) {}
+  func l(l: Float) {}
+  func m(x: Int) {}
+  func m(`y: Int) {}
+  func n(x: Int) {}
+  subscript(i : Int) -> Int {
+    get {}
+    set {}
+  }
 }
 extension A {
-  def i() {} // expected-note{{overridden declaration is here}}
+  func i() {} // expected-note{{overridden declaration is here}}
 }
-def f() {
+func f() {
   var x = B()
   var y : () = x.f()
   var z : Int = x[10]
@@ -41,27 +49,39 @@ def f() {
 
 class C<T> {
   init() { }
-  def f(v: T) -> T { return v }
-}     
-class D : C<Int> {
-  init() { super.init() }
-  def f(v: Int) -> Int { return v+1 }
+  func f(v: T) -> T { return v }
 }
-def f2() {
+class D : C<Int> { // expected-error{{classes derived from generic classes must also be generic}}
+  init() { super.init() }
+  override func f(v: Int) -> Int { return v+1 }
+}
+func f2() {
   var x = D()
   var y = x.f(10)
 }
 
 class E<T> {
-  def f(v: T) -> T { return v }
+  func f(v: T) -> T { return v }
 }
-class F : E<Int> {}
+class F : E<Int> {} // expected-error{{classes derived from generic classes must also be generic}}
 class G : F {
-    def f(v: Int) -> Int { return v+1 }
+    override func f(v: Int) -> Int { return v+1 }
 }
 
 // Explicit downcasting
-def test_explicit_downcasting(f: F, ei: E<Int>) {
+func test_explicit_downcasting(f: F, ei: E<Int>) {
   var g = (f as G)!
   g = (ei as G)!
 }
+
+// Type and instance functions with the same name
+class H {
+  func f(x: Int) { }
+  class func f(x: Int) { }
+}
+
+class HDerived : H {
+  override func f(x: Int) { }
+  override class func f(x: Int) { }
+}
+

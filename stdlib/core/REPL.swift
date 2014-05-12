@@ -1,18 +1,32 @@
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
 // FIXME: Function types don't work yet as generic parameters
-struct REPLExitHandler {
+struct _REPLExitHandler {
   var f : () -> ()
+
+  init(_ f: () -> ()) {
+    self.f = f
+  }
 }
 
-var replExitHandlers : Vector<REPLExitHandler> = Vector<REPLExitHandler>()
+var _replExitHandlers = _REPLExitHandler[]()
 
-func atREPLExit(handler:() -> ()) {
-  replExitHandlers.append(REPLExitHandler(handler))
+func _atREPLExit(handler: () -> ()) {
+  _replExitHandlers.append(_REPLExitHandler(handler))
 }
 
-func replExit() {
-  while replExitHandlers.length > 0 {
-    var handler = replExitHandlers[replExitHandlers.length-1]
-    replExitHandlers.popBack()
+func _replExit() {
+  for handler in Reverse(_replExitHandlers) {
     handler.f()
   }
 }

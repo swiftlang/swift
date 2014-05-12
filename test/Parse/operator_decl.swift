@@ -23,6 +23,15 @@ operator infix &&& {
 }
 
 
+operator prefix // expected-error {{expected operator name after fixity in 'operator' declaration}}
+
+operator prefix %%+ // expected-error {{expected '{' after operator name in 'operator' declaration}}
+
+operator prefix %%/ {
+  + // expected-error {{expected operator attribute identifier in 'operator' declaration body}}
+}
+
+
 operator prefix %%% {
   associativity none // expected-error{{'associativity' is not a valid prefix operator attribute}}
 }
@@ -59,3 +68,8 @@ operator infix !<> {
 class Foo {
   operator infix ||| {} // expected-error{{'operator' may only be declared at file scope}}
 }
+
+
+// rdar://14690497
+operator infix ~> { precedence 99999 }   // expected-error {{'precedence' must be in the range of 0 to 255}}
+

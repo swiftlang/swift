@@ -1,20 +1,15 @@
-// RUN: %swift -I %S/.. %s -i | FileCheck %s
+// RUN: %target-run-simple-swift | FileCheck %s
 
 // From http://rosettacode.org/wiki/Factorial
-func factorial(x:int) -> int {
+func factorial(x: Int) -> Int {
   if (x == 0) { return 1 }
   return x * factorial(x-1)
 }
 
 // From http://rosettacode.org/wiki/Towers_of_Hanoi
-// FIXME: this can be simplified with printf(), once it exists.
-func TowersOfHanoi(ndisks:int, from:int, to:int, via:int) -> void {
+func TowersOfHanoi(ndisks: Int, from: Int, to: Int, via: Int) -> Void {
   if (ndisks == 1) {
-    print("Move disk from pole ")
-    print(from)
-    print(" to pole ")
-    print(to)
-    print("\n")
+    print("Move disk from pole \(from) to pole \(to)\n")
   }
   else {
     TowersOfHanoi(ndisks-1, from, via, to);
@@ -24,9 +19,8 @@ func TowersOfHanoi(ndisks:int, from:int, to:int, via:int) -> void {
 }
 
 // Driver code.
-print("Factorial of 10 = ")
-print(factorial(10))
-print("\n\nTowers of Hanoi, 4 disks\n")
+print("Factorial of 10 = \(factorial(10))\n\n")
+print("Towers of Hanoi, 4 disks\n")
 TowersOfHanoi(4, 1, 2, 3);
 
 // CHECK: Factorial of 10 = 3628800

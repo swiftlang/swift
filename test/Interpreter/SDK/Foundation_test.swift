@@ -1,18 +1,21 @@
-// RUN: %swift -sdk=%sdk -i %s | FileCheck %s
-// REQUIRES: sdk
+// RUN: %target-run-simple-swift | FileCheck %s
 
 import Foundation
+
+func asNSString(s: String) -> NSString { return s }
+func asString(ns: NSString) -> String { return ns }
 
 //===----------------------------------------------------------------------===//
 // Strings
 //===----------------------------------------------------------------------===//
 var str = "Hello"
 var nsStr : NSString = str
-// FIXME: Comparisons between imported enums
-assert(nsStr.compare(str).value == NSOrderedSame.value)
+assert(nsStr.compare(str).toRaw() == NSComparisonResult.OrderedSame.toRaw())
+assert(nsStr.compare(str) == NSComparisonResult.OrderedSame)
 nsStr = "World"
 str = nsStr
-assert(str == nsStr)
+// FIXME: Shouldn't need coercion here to resolve ambiguity. <rdar://problem/14637688>
+assert(str == asString(nsStr))
 
 //===----------------------------------------------------------------------===//
 // Numbers
@@ -47,39 +50,114 @@ assert(Bool(nsNum) == false)
 
 // Literals
 var nsArr : NSArray = [1, 2.5, "Hello"]
-assert(nsArr.count() == 3)
+assert(nsArr.count == 3)
 
 // Subscripting
-assert(Int(NSNumber(nsArr[0])) == 1)
-assert(Double(NSNumber(nsArr[1])) == 2.5)
-assert(NSString(nsArr[2]).isEqualTo("Hello"))
+assert(Int((nsArr[0] as NSNumber)!) == 1)
+assert(Double((nsArr[1] as NSNumber)!) == 2.5)
+assert((nsArr[2] as NSString)!.isEqual("Hello"))
 
 // Iteration
-for x in nsArr { 
-  print("Element = \(x.description())\n")
+for x : AnyObject in nsArr { 
+  // FIXME: InterpolatedStringExpr fails to type-check with NSString because
+  // of ambiguous NSString constructors.
+  print("Element = ")
+  // FIXME: There is an ambiguity between the class method in NSObject
+  // and the property in NSObject which using 'x' as AnyObject.
+  // This crashes the type checker.
+  print((x as NSObject!).description)
+  print("\n")
 }
 // CHECK: Element = 1
 // CHECK: Element = 2.5
 // CHECK: Element = Hello
 
+// Mutation
+var nsMutableArr : NSMutableArray = ["Constant", "Moon"]
+nsMutableArr[0] = "Inconstant"
+println("mutable array \(nsMutableArr[0] as NSString!) \(nsMutableArr[1] as NSString!)")
+assert(nsMutableArr.count == 2)
+// CHECK: mutable array Inconstant Moon
+
+// Coercions
+var nsa = NSArray()
+var aoa: Array<AnyObject> = []
+
+nsa as Array<AnyObject>
+var nsa2 = NSArray()
+var aoa2: Array<AnyObject> = nsa2
+
+var nsaoa = aoa as NSArray
+
+func nsArrayToAnyObjectArray(nsa: NSArray) -> AnyObject[] {
+  return nsa
+}
+
+nsArrayToAnyObjectArray(nsa)
+nsArrayToAnyObjectArray(aoa)
+
+
 //===----------------------------------------------------------------------===//
 // Dictionaries
 //===----------------------------------------------------------------------===//
 var nsDict : NSDictionary = [1 : "Hello", 2 : "World"]
-assert(NSString(nsDict[1]).isEqualTo("Hello"))
-assert(NSString(nsDict[2]).isEqualTo("World"))
+assert((nsDict[1] as NSString)!.isEqual("Hello"))
+assert((nsDict[2] as NSString)!.isEqual("World"))
+
+let nsMutableDict: NSMutableDictionary = ["Hello" : 1, "World" : 2]
+assert(nsMutableDict["Hello"].isEqual(1))
+assert(nsMutableDict["World"].isEqual(2))
 
 //===----------------------------------------------------------------------===//
 // Ranges
 //===----------------------------------------------------------------------===//
-var nsRange : NSRange = 1..5
-
-//===----------------------------------------------------------------------===//
-// NSRect
-//===----------------------------------------------------------------------===//
-var nsRect = NSRect(1, 5, 20, 30)
+var nsRange = NSRange(1...5)
+println(NSStringFromRange(nsRange))
+// CHECK: {1, 4}
 
 //===----------------------------------------------------------------------===//
 // URLs
 //===----------------------------------------------------------------------===//
-var nsURL : NSURL = "http://llvm.org"
+var nsURL = NSURL(string:"http://llvm.org")
+println(nsURL.description)
+// CHECK: http://llvm.org
+
+
+//===----------------------------------------------------------------------===//
+// Pattern-matching
+//===----------------------------------------------------------------------===//
+
+func matchesEither(input: NSNumber, a: NSNumber, b: NSNumber) -> Bool {
+  switch input {
+  case a, b:
+    return true
+  default:
+    return false
+  }
+}
+
+var one, two, three, oneAgain : NSNumber
+one = .numberWithInt(1)
+two = .numberWithInt(2)
+three = .numberWithInt(3)
+oneAgain = .numberWithInt(1)
+print(matchesEither(one, two, three))
+print(" ")
+print(matchesEither(one, oneAgain, three))
+print(" ")
+print(matchesEither(one, two, oneAgain))
+println()
+// CHECK: false true true
+
+
+//===----------------------------------------------------------------------===//
+// Miscellaneous
+//===----------------------------------------------------------------------===//
+
+// <rdar://problem/14474701>
+class ClassWithDtor : NSObject {
+  deinit {
+    var noteCenter = NSNotificationCenter.defaultCenter()
+    noteCenter.removeObserver(self, name: "ReceivedContentNotification", object: nil)
+  }
+}

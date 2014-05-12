@@ -1,6 +1,6 @@
-@# -*- mode: swift -*-
+%# -*- mode: swift -*-
 
-@# Ignore the following admonition; it applies to the resulting .swift file only
+%# Ignore the following admonition; it applies to the resulting .swift file only
 //// Automatically Generated From FixedPoint.gyb.  Do Not Edit Directly!
 //===----------------------------------------------------------------------===//
 //
@@ -14,7 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-@{
+%{
 #
 # Utility code for later in this template
 #
@@ -65,62 +65,109 @@ def intName(name, signed):
 
 def otherIntName(name, signed):
     return ('U' if signed else '') + baseIntName(name)
-}@
+}%
 
 typealias IntMax = Int${maxBits}
 typealias UIntMax = UInt${maxBits}
 
-@ for (name, bits, signed) in allInts():
-@   (sign, ext) = ('s', 'sext') if signed else ('u', 'zext')
-@   BuiltinName = builtinIntName(name)
-@   Self = intName(name, signed)
-@   OtherSelf = otherIntName(name, signed)
-@   ConstructIntType = 'Int' if Self != 'Int' else ''
-@   ArrayBound = 'ArrayBound, ' if bits <= 64 else ''
+protocol _Integer
+  : _BuiltinIntegerLiteralConvertible,
+    IntegerLiteralConvertible,
+    ReplPrintable, 
+    ArrayBound,
+    Hashable,
+    IntegerArithmetic,
+    BitwiseOperations,
+    _Incrementable
+{
+}
 
-struct ${Self} : BuiltinIntegerLiteralConvertible, IntegerLiteralConvertible,
-                ${ArrayBound}ReplPrintable {
+protocol Integer : _Integer, RandomAccessIndex {
+}
+
+protocol _SignedInteger : _Integer, SignedNumber {
+  func toIntMax() -> IntMax
+  class func from(IntMax) -> Self
+}
+
+protocol SignedInteger : _SignedInteger, Integer {
+}
+
+protocol _UnsignedInteger : _Integer {
+  func toUIntMax() -> UIntMax
+  class func from(UIntMax) -> Self
+}
+
+protocol UnsignedInteger : _UnsignedInteger, Integer {
+}
+
+func numericCast<T : _SignedInteger, U : _SignedInteger>(x: T) -> U {
+  return .from(x.toIntMax())
+}
+
+func numericCast<T : _UnsignedInteger, U : _UnsignedInteger>(x: T) -> U {
+  return .from(x.toUIntMax())
+}
+
+func numericCast<T : _SignedInteger, U : _UnsignedInteger>(x: T) -> U {
+  return .from(UIntMax(x.toIntMax()))
+}
+
+func numericCast<T : _UnsignedInteger, U : _SignedInteger>(x: T) -> U {
+  return .from(IntMax(x.toUIntMax()))
+}
+
+% for (name, bits, signed) in allInts():
+%   (sign, ext) = ('s', 'sext') if signed else ('u', 'zext')
+%   BuiltinName = builtinIntName(name)
+%   Self = intName(name, signed)
+%   OtherSelf = otherIntName(name, signed)
+%   ConstructIntType = 'Int' if Self != 'Int' else ''
+
+struct ${Self} : ${'SignedInteger' if sign == 's' else 'UnsignedInteger'}
+{
   var value: Builtin.${BuiltinName}
 
-  @@transparent
+  @transparent
   init() {
     var maxWidthZero: IntMax = 0
     value = Builtin.truncOrBitCast_Int${maxBits}_${BuiltinName}(maxWidthZero.value)
   }
 
-  @@transparent
-  init(v: Builtin.${BuiltinName}) {
+  @transparent
+  init(_ v: Builtin.${BuiltinName}) {
     value = v
   }
 
-  @@transparent
+  @transparent
+  init(_ value: ${Self}) { self = value }
+
+  @transparent
   static func _convertFromBuiltinIntegerLiteral(value: Builtin.Int${builtinIntLiteralBits}) -> ${Self} {
     return ${Self}(Builtin.s_to_${sign}_checked_trunc_Int${builtinIntLiteralBits}_${BuiltinName}(value).0)
   }
 
-  @@transparent
+  @transparent
   static func convertFromIntegerLiteral(value: ${Self}) -> ${Self} {
     return value
   }
-@ if ArrayBound:
-  @@transparent
+  @transparent
   func _getBuiltinArrayBoundValue() -> Builtin.Word {
-@  if bits < wordBits:
+%  if bits < wordBits:
     return Builtin.${ext}OrBitCast_${BuiltinName}_Word(self.value)
-@  elif bits > wordBits:
+%  elif bits > wordBits:
     return Builtin.truncOrBitCast_${BuiltinName}_Word(self.value)
-@  elif BuiltinName == 'Word':
+%  elif BuiltinName == 'Word':
     return self.value
-@  else:
+%  else:
     return Builtin.${CastToWord}(self.value)
-@  end
+%  end
   }
 
   typealias ArrayBoundType = ${Self}
   func getArrayBoundValue() -> ${Self} {
     return self
   }
-@ end
 
   func replPrint() {
     print(${
@@ -128,247 +175,236 @@ struct ${Self} : BuiltinIntegerLiteralConvertible, IntegerLiteralConvertible,
       else (('String' if bits > 64 else 'Int64' if signed else 'UInt64') + '(self)')})
   }
 
-@ max = maskBits((bits - 1) if signed else bits)
-  @@transparent
+% max = maskBits((bits - 1) if signed else bits)
+  @transparent
   static var max: ${Self} { return ${max} }
-  @@transparent
+  @transparent
   static var min: ${Self} { return ${'-%s-1' % max if signed else '0'} }
 }
 
 extension ${Self} : Hashable {
-  func hashValue() -> Int {
-@ if bits < wordBits: 
+  var hashValue: Int {
+% if bits < wordBits: 
     return Int(Builtin.sextOrBitCast_${BuiltinName}_Word(self.value))
-@ elif bits > wordBits:
+% elif bits > wordBits:
     var result: Int = 0
-    for var i = 0; i < (sizeof(self) * 8); i += sizeof(Int.self) * 8 {
+    for var i = 0; i < (sizeofValue(self) * 8); i += sizeof(Int.self) * 8 {
       result ^= Int(self >> ${Self}(i)) & ~0
     }
     return result
-@ elif BuiltinName == 'Word':
+% elif BuiltinName == 'Word':
     return Int(self.value)
-@ else:
+% else:
     return Int(Builtin.${CastToWord}(self.value))
-@ end
+% end
   }
 }
 
-@@transparent
+@transparent
 extension ${Self} : RandomAccessIndex {
-  @@transparent
+  @transparent
   func succ() -> ${Self} {
     return self + 1
   }
-  @@transparent
+  @transparent
   func pred() -> ${Self} {
     return self - 1
   }
-  @@transparent
-  func distanceTo(other: ${Self}) -> Int {
-    return ${ConstructIntType}(other - self)
-  }  
-  typealias DistanceType = ${Self}
-  @@transparent
-  static func sub(lhs: ${Self}, rhs: ${Self}, reportOverflow: Bool) -> (DistanceType, Bool) {
-    var tmp = Builtin.${sign}sub_with_overflow_${BuiltinName}(lhs.value, rhs.value, reportOverflow.value)
-    return (${Self}(tmp.0), Bool(tmp.1))
+  
+  @transparent
+  func distanceTo(other: ${Self}) -> ${Self}.DistanceType {
+    return numericCast((numericCast(other) as IntMax) - numericCast(self))
   }
-  @@transparent
-  static func add(lhs: ${Self}, rhs: DistanceType, reportOverflow: Bool) -> (${Self}, Bool) {
-    var tmp = Builtin.${sign}add_with_overflow_${BuiltinName}(lhs.value, rhs.value, reportOverflow.value)
-    return (${Self}(tmp.0), Bool(tmp.1))
-  }
-  @@transparent
-  static func mul(lhs: ${Self}, rhs: ${Self}, reportOverflow: Bool) -> (${Self}, Bool) {
-    var tmp = Builtin.${sign}mul_with_overflow_${BuiltinName}(lhs.value, rhs.value, reportOverflow.value)
-    return (${Self}(tmp.0), Bool(tmp.1))
-  }
-  @@transparent
-  static func div(lhs: ${Self}, rhs: ${Self}, reportOverflow: Bool) -> (${Self}, Bool) {
-    if rhs == 0 {
-      return (0, true)
-    }
-@ if signed:
-    if lhs == ${Self}.min && rhs == -1 {
-      return (lhs, true)
-    }
-@ end
-    var tmp = Builtin.${sign}div_${BuiltinName}(lhs.value, rhs.value)
-    return (${Self}(tmp), false)
-  }
-  @@transparent
-  static func rem(lhs: ${Self}, rhs: ${Self}, reportOverflow: Bool) -> (${Self}, Bool) {
-    if rhs == 0 {
-      return (0, true)
-    }
-@ if signed:
-    if lhs == ${Self}.min && rhs == -1 {
-      return (0, true)
-    }
-@ end
-    var tmp = Builtin.${sign}rem_${BuiltinName}(lhs.value, rhs.value)
-    return (${Self}(tmp), false)
+  
+  @transparent
+  func advancedBy(amount: ${Self}.DistanceType) -> ${Self} {
+    return numericCast((numericCast(self) as IntMax) + numericCast(amount))
   }
 
-  @@transparent
-  static func sub(lhs: ${Self}, rhs: ${Self}) -> (DistanceType, Bool) {
-    return sub(lhs, rhs, true)
+% for Method,op in [('Add', 'add'), ('Subtract', 'sub'), ('Multiply', 'mul')]:
+  @transparent
+  static func unchecked${Method}(lhs: ${Self}, _ rhs: ${Self}) -> (${Self}, Bool) {
+    var tmp = Builtin.${sign}${op}_with_overflow_${BuiltinName}(lhs.value, rhs.value, false.value)
+    return (${Self}(tmp.0), Bool(tmp.1))
   }
-  @@transparent
-  static func add(lhs: ${Self}, rhs: DistanceType) -> (${Self}, Bool) {
-    return add(lhs, rhs, true)
+% end
+  
+% for Method,op in [('Divide', 'div'), ('Modulus', 'rem')]:
+  @transparent
+  static func unchecked${Method}(lhs: ${Self}, _ rhs: ${Self}) -> (${Self}, Bool) {
+    if rhs == 0 {
+      return (0, true)
+    }
+% if signed:
+    if lhs == ${Self}.min && rhs == -1 {
+      return (0, true)
+    }
+% end
+    // FIXME: currently doesn't detect overflow -- blocked by:
+    // <rdar://15735295> Need [su]{div,rem}_with_overflow IR
+    var tmp = Builtin.${sign}${op}_${BuiltinName}(lhs.value, rhs.value)
+    return (${Self}(tmp), false)
   }
-  @@transparent
-  static func mul(lhs: ${Self}, rhs: ${Self}) -> (${Self}, Bool) {
-    return mul(lhs, rhs, true)
+%end
+
+% U = '' if signed else 'U'
+  @transparent
+  func to${U}IntMax() -> ${U}IntMax {
+    return ${'self' if Self == U+'Int%s'%maxBits else U+'IntMax(self)'}
   }
-  @@transparent
-  static func div(lhs: ${Self}, rhs: ${Self}) -> (${Self}, Bool) {
-    return div(lhs, rhs, true)
-  }
-  @@transparent
-  static func rem(lhs: ${Self}, rhs: ${Self}) -> (${Self}, Bool) {
-    return rem(lhs, rhs, true)
-  }
-  @@transparent
+% if not signed:
   func toIntMax() -> IntMax {
-    return ${'self' if Self == 'Int%s' % maxBits else 'IntMax(self)'}
+    return IntMax(toUIntMax())
+  }
+% end
+  @transparent
+  static func from(x: ${U}IntMax) -> ${Self} {
+    return ${'x' if Self == U+'Int%s'%maxBits else Self+'(x)'}
   }
 }
 
-@ if signed:
-@@transparent
-extension ${Self} : SignedNumber {
-  @@transparent
-  static func negate(rhs: ${Self}) -> (${Self}, Bool) {
-    return ${Self}.sub(0, rhs)
-  }
-  @@transparent
-  static func abs(rhs: ${Self}) -> (${Self}, Bool) {
-    return rhs.isNegative() ? ${Self}.negate(rhs) : (rhs, false)
-  }
-  @@transparent
-  func isNegative() -> Bool { return self < 0 }
-}
-@ end
+% if signed:
+@transparent
+extension ${Self} : SignedNumber {}
+% end
 
-@# FIXME: checked conversions of Word types
+%# FIXME: checked conversions of Word types
 // construction from other integer types
-@@transparent
+@transparent
 extension ${Self} {
-@ for (srcName, srcBits, srcSigned) in allInts():
-@    Src = intName(srcName, srcSigned)
-@    srcBuiltinName = builtinIntName(srcName)
-@    (srcSign, srcExt) = ('s', 'sext') if srcSigned else ('u', 'zext')
-@    if Self != Src:
-  init(v: ${Src}) {
-@
-@       if srcBuiltinName == 'Word':
+% for (srcName, srcBits, srcSigned) in allInts():
+%    Src = intName(srcName, srcSigned)
+%    srcBuiltinName = builtinIntName(srcName)
+%    (srcSign, srcExt) = ('s', 'sext') if srcSigned else ('u', 'zext')
+%    if Self != Src:
+  init(_ v: ${Src}) {
+%
+%       if srcBuiltinName == 'Word':
     var srcNotWord = Builtin.${CastFromWord}(v.value)
-@       else:
+%       else:
     var srcNotWord = v.value
-@       end
-@
-@       if srcBits == bits and srcSign == sign:
+%       end
+%
+%       if srcBits == bits and srcSign == sign:
     var dstNotWord = srcNotWord
-@
-@       elif srcBits == bits:
+%
+%       elif srcBits == bits:
     var tmp = Builtin.${srcSign}_to_${sign}_checked_conversion_Int${srcBits}(srcNotWord)
     Builtin.condfail(tmp.1)
     var dstNotWord = tmp.0
-@
-@       elif srcBits > bits:
+%
+%       elif srcBits > bits:
     var tmp = Builtin.${srcSign}_to_${sign}_checked_trunc_Int${srcBits}_Int${bits}(srcNotWord)
     Builtin.condfail(tmp.1)
     var dstNotWord = tmp.0
-@
-@       elif srcSigned and not signed:
+%
+%       elif srcSigned and not signed:
     var tmp = Builtin.s_to_u_checked_conversion_Int${srcBits}(srcNotWord)
     Builtin.condfail(tmp.1)
     var dstNotWord = Builtin.${srcExt}_Int${srcBits}_Int${bits}(tmp.0)
-@
-@       else:
+%
+%       else:
     var dstNotWord = Builtin.${srcExt}_Int${srcBits}_Int${bits}(srcNotWord)
-@       end
-@
-@       if BuiltinName == 'Word':
+%       end
+%
+%       if BuiltinName == 'Word':
     value = Builtin.${CastToWord}(dstNotWord)
-@       else:
+%       else:
     value = dstNotWord
-@       end
+%       end
   }
 
-@    end
-@ end
+%    end
+% end
   func as${'Unsigned' if signed else 'Signed'}() -> ${OtherSelf} {
     return ${OtherSelf}(value)
   }
 }
 
-// Operations with masking and non-masking versions
-@ for op,method in ('+','add'), ('*','mul'), ('-','sub'):
-@@transparent
-func &${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
-  return ${Self}.${method}(lhs, rhs, false).0
-}
-@@transparent
+// Operations with potentially-static overflow checking
+//
+// FIXME: must use condfail in these operators, rather than
+// overflowChecked, pending <rdar://problem/16271923> so that we don't
+// foil static checking for numeric overflows.
+% for op,method in ('+','add'), ('*','mul'), ('-','sub'):
+@transparent
 func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
-  var tmp = ${Self}.${method}(lhs, rhs)
-  Builtin.condfail(tmp.1.value)
-  return tmp.0
+  let (result, error) = Builtin.${sign}${method}_with_overflow_${BuiltinName}(
+    lhs.value, rhs.value, true.value)
+  // return overflowChecked((${Self}(result), Bool(error)))
+  Builtin.condfail(error)
+  return ${Self}(result)
 }
-@ end
+% end
+
+% for op,inst in [('/', 'div'), ('%', 'rem')]:
+@transparent
+func ${op}(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+    Builtin.condfail((rhs == 0).value)
+% if signed:
+    Builtin.condfail(((lhs == ${Self}.min) & (rhs == -1)).value)
+% end
+    // FIXME: currently doesn't detect overflow -- blocked by:
+    // <rdar://15735295> Need [su]{div,rem}_with_overflow IR
+    var tmp = Builtin.${sign}${inst}_${BuiltinName}(lhs.value, rhs.value)
+    return ${Self}(tmp)
+  }
+%end
 
 // Bitwise negate
-@@transparent @@prefix
+@transparent @prefix
 func ~(rhs: ${Self}) -> ${Self} {
-  let mask = ${Self}.sub(0, 1).0
+  let mask = ${Self}.uncheckedSubtract(0, 1).0
   return ${Self}(Builtin.xor_${BuiltinName}(rhs.value, mask.value))
 }
 
-@ for op, name in (
-@  ('==','eq'), ('!=','ne'),
-@  ('<',sign+'lt'), ('<=',sign+'le'),
-@  ('>',sign+'gt'), ('>=',sign+'ge')):
-@@transparent
+% for op, name in (
+%  ('==','eq'), ('!=','ne'),
+%  ('<',sign+'lt'), ('<=',sign+'le'),
+%  ('>',sign+'gt'), ('>=',sign+'ge')):
+@transparent
 func ${op} (lhs: ${Self}, rhs: ${Self}) -> Bool {
   return Bool(Builtin.cmp_${name}_${BuiltinName}(lhs.value, rhs.value))
 }
-@ end
+% end
 
-@ for op, name in (('<<','shl'), ('>>','ashr' if signed else 'lshr')):
-@@transparent
+% for op, name in (('<<','shl'), ('>>','ashr' if signed else 'lshr')):
+@transparent
 func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
-@ if signed:
-  assert(U${Self}(rhs) < U${Self}(sizeof(rhs) * 8))
-@ else:
-  assert(rhs < ${Self}(sizeof(rhs) * 8))
-@ end
+% if signed:
+  assert(U${Self}(rhs) < U${Self}(sizeofValue(rhs) * 8))
+% else:
+  assert(rhs < ${Self}(sizeofValue(rhs) * 8))
+% end
   return ${Self}(Builtin.${name}_${BuiltinName}(lhs.value, rhs.value))
 }
-@ end
+% end
 
-@ for op, name in (('&','and'), ('^','xor'), ('|','or')):
-@@transparent
+% for op, name in (('&','and'), ('^','xor'), ('|','or')):
+@transparent
 func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
   return ${Self}(Builtin.${name}_${BuiltinName}(lhs.value, rhs.value))
 }
-@ end
+% end
 
 // bitwise operations
-@@transparent
+@transparent
 extension ${Self} : BitwiseOperations {
   static func allZeros() -> ${Self} { return 0 }
 }
 
 // Compound assignments
-@ for op in '+', '-', '*', '<<', '>>', '&', '|', '^':
-@@transparent @@assignment
+% for op in '+', '-', '*', '<<', '>>', '&', '|', '^':
+@transparent @assignment
 func ${op}=(inout lhs: ${Self}, rhs: ${Self}) {
   lhs = lhs ${op} rhs
 }
-@ end
-@ end  # for bits in allInts
+% end
+% end  # for bits in allInts
 
 typealias Word = Int
 typealias UWord = UInt
+
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:

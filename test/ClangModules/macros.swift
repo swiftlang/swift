@@ -1,19 +1,27 @@
 // RUN: rm -rf %t/clang-module-cache
-// RUN: %swift -constraint-checker -parse -verify -module-cache-path=%t/clang-module-cache -sdk=%S/Inputs %s
-// RUN: ls -lR %t/clang-module-cache | grep macros.pcm
-import macros
+// RUN: %swift %clang-importer-sdk -parse -verify -module-cache-path %t/clang-module-cache -target x86_64-apple-darwin13 %s
+// RUN: ls -lR %t/clang-module-cache | FileCheck %s
+// CHECK: macros{{.*}}.pcm
 
-// FIXME: Decide the type macros should map to.
+@exported import macros
 
-func circle_area(radius:Double) -> Double {
+func circle_area(radius: CDouble) -> CDouble {
   return M_PI * radius * radius
 }
 
-func convertGLBool(b:Int) -> Bool {
+func circle_area2(radius: CDouble) -> CDouble {
+  return A_PI * radius * radius
+}
+
+func circle_area3(radius: CFloat) -> CFloat {
+  return M_PIf * radius * radius
+}
+
+func convertGLBool(b: CInt) -> Bool {
   return b != GL_FALSE
 }
 
-func pixelFormat(alpha:Bool) -> Int {
+func pixelFormat(alpha: Bool) -> CInt {
   if alpha {
     return GL_RGBA
   } else {
@@ -21,14 +29,69 @@ func pixelFormat(alpha:Bool) -> Int {
   }
 }
 
-func boundsCheckU32(x:Int) -> Bool {
+func boundsCheckU32(x: CUnsignedInt) -> Bool {
   return x >= 0 && x <= UINT32_MAX
 }
 
-func boundsCheckS64(x:Int) -> Bool {
-  return x >= INT64_MIN && x <= INT64_MAX
+func boundsCheckS64(x: CLongLong) -> Bool {
+  return x <= INT64_MAX
 }
 
-func isEOF(c:Int) -> Bool {
+func isEOF(c: CInt) -> Bool {
   return c == EOF
+}
+
+func subThree(x: CInt) -> CInt {
+  return x + MINUS_THREE
+}
+
+// We skip importing true/false, because we want the Swift definitions
+func testTrueFalse() {
+  var x : Bool = true
+  var y : Bool = false
+}
+
+func testCStrings() -> Bool {
+  var str: CString = UTF8_STRING
+  str = VERSION_STRING
+  return !VERSION_STRING.isNull() && !UTF8_STRING.isNull()
+}
+
+func testObjCString() -> Int {
+  let str: String = OBJC_STRING
+  return str._encodedLength(UTF8.self)
+}
+
+func testInvalidIntegerLiterals() {
+  var l1 = INVALID_INTEGER_LITERAL_1 // expected-error {{use of unresolved identifier 'INVALID_INTEGER_LITERAL_1'}}
+  // FIXME: <rdar://problem/16445608> Swift should set up a DiagnosticConsumer for Clang
+  // var l2 = INVALID_INTEGER_LITERAL_2 // FIXME {{use of unresolved identifier 'INVALID_INTEGER_LITERAL_2'}}
+}
+
+func testUsesMacroFromOtherModule() {
+  let m1 = USES_MACRO_FROM_OTHER_MODULE_1
+  let m2 = macros.USES_MACRO_FROM_OTHER_MODULE_1
+  let m3 = USES_MACRO_FROM_OTHER_MODULE_2 // expected-error {{use of unresolved identifier 'USES_MACRO_FROM_OTHER_MODULE_2'}}
+  let m4 = macros.USES_MACRO_FROM_OTHER_MODULE_2 // expected-error {{module 'macros' has no member named 'USES_MACRO_FROM_OTHER_MODULE_2'}}
+}
+
+func testSuppressed() {
+  let m1 = NS_BLOCKS_AVAILABLE // expected-error {{use of unresolved identifier 'NS_BLOCKS_AVAILABLE'}}
+}
+
+func testNil() {
+  var localNil: _Nil
+  localNil = NULL_VIA_NAME
+  localNil = NULL_VIA_VALUE
+  localNil = NULL_AS_NIL
+  localNil = NULL_AS_CLASS_NIL
+
+  localNil = Nil // expected-error {{use of unresolved identifier 'Nil'}}
+}
+
+func testBitwiseOps() {
+  let maxUnsigned: CUnsignedLongLong = DISPATCH_TIME_FOREVER
+  let mask: CInt = BIT_SHIFT_1 | BIT_SHIFT_2
+  let _: CLongLong = BIT_SHIFT_3
+  let _: CUnsignedInt = BIT_SHIFT_4
 }

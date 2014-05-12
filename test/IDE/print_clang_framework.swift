@@ -1,37 +1,26 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 
-// RUN: %swift-ide-test -print-module -source-filename %s -module-to-print=Foo -F %S/Inputs/mock-sdk -module-cache-path=%t/clang-module-cache -function-definitions=false -prefer-type-repr=true > %t.printed.txt
-// RUN: FileCheck %s -check-prefix=CHECK_FOO -strict-whitespace < %t.printed.txt
+// RUN: %swift-ide-test -print-module -source-filename %s -module-to-print=Foo -F %S/Inputs/mock-sdk -module-cache-path %t/clang-module-cache -function-definitions=false -print-regular-comments -skip-leading-underscore-decls > %t/Foo.printed.txt
+// RUN: diff %t/Foo.printed.txt %S/Inputs/mock-sdk/Foo.printed.txt
 
-// RUN: %swift-ide-test -print-module -source-filename %s -module-to-print=FooHelper -F %S/Inputs/mock-sdk -module-cache-path=%t/clang-module-cache -function-definitions=false -prefer-type-repr=true > %t.printed.txt
-// RUN: FileCheck %s -check-prefix=CHECK_FOO_HELPER -strict-whitespace < %t.printed.txt
+// RUN: %swift-ide-test -print-module -source-filename %s -module-to-print=Foo -F %S/Inputs/mock-sdk -module-cache-path %t/clang-module-cache -function-definitions=false -prefer-type-repr=true -module-print-submodules > %t/Foo.printed.recursive.txt
+// RUN: diff %t/Foo.printed.recursive.txt %S/Inputs/mock-sdk/Foo.printed.recursive.txt
 
-// CHECK_FOO: typealias Class = DynamicLookup.metatype
-// CHECK_FOO-NEXT: struct FooSubEnum1 {
-// CHECK_FOO-NEXT:   init(value: CUnsignedInt)
-// CHECK_FOO-NEXT:   var value: CUnsignedInt
-// CHECK_FOO-NEXT: }
-// CHECK_FOO-NEXT: var FooSubEnum1X: FooSubEnum1
-// CHECK_FOO-NEXT: var FooSubEnum1Y: FooSubEnum1
-// CHECK_FOO-NEXT: var FooSubUnnamedEnumeratorA1: CUnsignedInt
-// CHECK_FOO-NEXT: typealias __builtin_va_list = (__va_list_tag)
-// CHECK_FOO-NEXT: var __swift: CInt
-// CHECK_FOO-NEXT: func fooFrameworkFunc1(a: CInt) -> CInt
-// CHECK_FOO-NEXT: func fooSubFrameworkFunc1(a: CInt) -> CInt
-// CHECK_FOO-NEXT: typealias id = DynamicLookup
+// RUN: %swift-ide-test -print-module -source-filename %s -module-to-print=Foo.FooSub -F %S/Inputs/mock-sdk -module-cache-path %t/clang-module-cache -function-definitions=false -prefer-type-repr=true > %t/Foo.FooSub.printed.txt
+// RUN: diff %t/Foo.FooSub.printed.txt %S/Inputs/mock-sdk/Foo.FooSub.printed.txt
 
-// CHECK_FOO_HELPER: typealias Class = DynamicLookup.metatype
-// CHECK_FOO_HELPER-NEXT: struct FooHelperSubEnum1 {
-// CHECK_FOO_HELPER-NEXT:   init(value: CUnsignedInt)
-// CHECK_FOO_HELPER-NEXT:   var value: CUnsignedInt
-// CHECK_FOO_HELPER-NEXT: }
-// CHECK_FOO_HELPER-NEXT: var FooHelperSubEnum1X: FooHelperSubEnum1
-// CHECK_FOO_HELPER-NEXT: var FooHelperSubEnum1Y: FooHelperSubEnum1
-// CHECK_FOO_HELPER-NEXT: var FooHelperSubUnnamedEnumeratorA1: CUnsignedInt
-// CHECK_FOO_HELPER-NEXT: typealias __builtin_va_list = (__va_list_tag)
-// CHECK_FOO_HELPER-NEXT: var __swift: CInt
-// CHECK_FOO_HELPER-NEXT: func fooHelperFrameworkFunc1(a: CInt) -> CInt
-// CHECK_FOO_HELPER-NEXT: func fooHelperSubFrameworkFunc1(a: CInt) -> CInt
-// CHECK_FOO_HELPER-NEXT: typealias id = DynamicLookup
+// RUN: %swift-ide-test -print-module -source-filename %s -module-to-print=FooHelper -F %S/Inputs/mock-sdk -module-cache-path %t/clang-module-cache -function-definitions=false -prefer-type-repr=true > %t/FooHelper.printed.txt
+// RUN: diff %t/FooHelper.printed.txt %S/Inputs/mock-sdk/FooHelper.printed.txt
+
+// RUN: %swift-ide-test -print-module -source-filename %s -module-to-print=FooHelper.FooHelperSub -F %S/Inputs/mock-sdk -module-cache-path %t/clang-module-cache -function-definitions=false -prefer-type-repr=true > %t/FooHelper.FooHelperSub.printed.txt
+// RUN: diff %t/FooHelper.FooHelperSub.printed.txt %S/Inputs/mock-sdk/FooHelper.FooHelperSub.printed.txt
+
+// RUN: %swift-ide-test -print-module -source-filename %s -module-to-print=FooHelper.FooHelperExplicit -F %S/Inputs/mock-sdk -module-cache-path %t/clang-module-cache -function-definitions=false -prefer-type-repr=true > %t/FooHelper.FooHelperExplicit.printed.txt
+// FIXME: diff
+// FIXME: we cannot yet print explicit submodules because we don't import them.
+
+// RUN: %swift-ide-test -print-module -source-filename %s -module-to-print=Foo -F %S/Inputs/mock-sdk -module-cache-path %t/clang-module-cache -function-definitions=false -prefer-type-repr=true -annotate-print > %t/Foo.annotated.txt
+// RUN: diff %t/Foo.annotated.txt %S/Inputs/mock-sdk/Foo.annotated.txt
+
 

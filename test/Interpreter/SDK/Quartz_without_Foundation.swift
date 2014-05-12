@@ -1,10 +1,10 @@
-// RUN: rm -rf %t/clang-module-cache
-// RUN: %swift -module-cache-path=%t/clang-module-cache -sdk=%sdk -i %s | FileCheck %s
-// REQUIRES: sdk
+// RUN: %target-run-simple-swift | FileCheck %s
+// REQUIRES: OS=macosx
+// FIXME: iOS doesn't have CIVector?
 
 import QuartzCore
 // Do NOT add anything that publicly imports Foundation here!
 
-var v = CIVector(withX:7);
+var v = CIVector(x:7);
 // CHECK: x = 7
 println("x = \(v.X())");

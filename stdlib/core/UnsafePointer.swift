@@ -1,4 +1,16 @@
-/// \brief A wrapper around a C pointer to type T.
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+/// A wrapper around a C pointer to type T.
 ///
 /// This wrapper stores a C pointer to an object of type T, and is
 /// intended to be used to interface with C libraries. It provides no
@@ -8,163 +20,329 @@
 /// For C pointers for which the pointed-to type cannot be represented
 /// directly in Swift, the \c COpaquePointer will be used instead.
 struct UnsafePointer<T> : BidirectionalIndex, Comparable, Hashable {
-  /// \brief The underlying raw (untyped) pointer.
+  /// The underlying raw (untyped) pointer.
   var value : Builtin.RawPointer
 
-  /// \brief Construct a null pointer.
-  constructor() {
-    this.value = Builtin.inttoptr_Int64(0.value)
+  /// Construct a null pointer.
+  init() {
+    self.value = Builtin.inttoptr_Word(0.value)
   }
 
-  /// \brief Construct an UnsafePointer from a builtin raw pointer.
-  constructor(value : Builtin.RawPointer) {
-    this.value = value
+  /// Construct an UnsafePointer from a builtin raw pointer.
+  init(_ value : Builtin.RawPointer) {
+    self.value = value
   }
 
-  /// \brief Convert from an opaque C pointer to a typed C pointer.
+  /// Convert from an opaque C pointer to a typed C pointer.
   ///
   /// This is a fundamentally unsafe conversion.
-  constructor(other : COpaquePointer) {
+  init(_ other : COpaquePointer) {
     value = other.value
   }
 
-  /// \brief Convert from a pointer of a different type.
+  /// Construct an UnsafePointer from a given address in memory.
   ///
   /// This is a fundamentally unsafe conversion.
-  constructor<U>(from : UnsafePointer<U>) {
+  init(_ value : Int) {
+    self.value = Builtin.inttoptr_Word(value.value)
+  }
+
+  /// Convert from a pointer of a different type.
+  ///
+  /// This is a fundamentally unsafe conversion.
+  init<U>(_ from : UnsafePointer<U>) {
     value = from.value
   }
 
-  static func null() -> UnsafePointer<T> {
+  static func null() -> UnsafePointer {
     return UnsafePointer()
   }
 
-  /// \brief Get the address of an lvalue.
-  ///
-  /// This is a fundamentally unsafe operation. The validity of the address
-  /// cannot be guaranteed beyond the scope of the statement containing the
-  /// constructed pointer. If the lvalue is a logical property, any value
-  /// written to the pointer will be written back to the property, and the
-  /// pointer will be invalidated at the end of the statement.
-  static func addressOf(lv : [byref] T) -> UnsafePointer<T> {
-    return UnsafePointer(Builtin.addressof(&lv))
-  }
-
-  static func alloc(num : Int) -> UnsafePointer<T> {
+  static func alloc(num: Int) -> UnsafePointer {
     // Don't both with overflow checking.
-    var size = Int(Builtin.strideof(T)) * num
-    return UnsafePointer(Builtin.allocRaw(size.value, Builtin.alignof(T)))
+    var size = Int(Builtin.strideof(T.self)) * num
+    return UnsafePointer(Builtin.allocRaw(size.value, Builtin.alignof(T.self)))
   }
 
-  func dealloc(num : Int) {
+  func dealloc(num: Int) {
     // Overflow checking is actually not required here.
-    var size = Int(Builtin.strideof(T)) * num
+    var size = Int(Builtin.strideof(T.self)) * num
     Builtin.deallocRaw(value, size.value)
   }
 
 
-  /// \brief Retrieve the value the pointer points to.
+  /// Retrieve the value the pointer points to.
+  @transparent
   func get() -> T {
-    debugTrap(!isNull())
     return Builtin.load(value)
   }
 
-  /// \brief Set the value the pointer points to, copying over the
+  /// Set the value the pointer points to, copying over the
   /// previous value.
-  func set(newvalue : T) {
-    debugTrap(!isNull())
+  func set(newvalue: T) {
     Builtin.assign(newvalue, value)
   }
 
-  /// \brief Initialize the value the pointer points to, to construct
+  /// Initialize the value the pointer points to, to construct
   /// an object where there was no object previously stored.
-  func init(newvalue : T) {
-    debugTrap(!isNull())
-    Builtin.init(newvalue, value)
+  func initialize(newvalue: T) {
+    Builtin.initialize(newvalue, value)
   }
 
-  /// \brief Retrieve the value the pointer points to, moving it away
+  /// Retrieve the value the pointer points to, moving it away
   /// from the location referenced in memory.
   ///
-  /// The object in memory should not be used again (except perhaps to
-  /// initialize or destroy it).
+  /// Postcondition: The value has been destroyed and the memory must
+  /// be initialized before being used again.
   func move() -> T {
-    debugTrap(!isNull())
-    return Builtin.move(value)
+    return Builtin.take(value)
   }
 
-  /// \brief Destroy the object the pointer points to.
+  /// Move count values beginning at source into uninitialized memory,
+  /// transforming the source values into raw memory, proceeding from
+  /// the last value to the first.  Use this for copying ranges into
+  /// later memory that may overlap with the source range.
+  ///
+  /// Requires: either `source` precedes `self` or follows `self + count`.
+  func moveInitializeBackwardFrom(source: UnsafePointer, count: Int) {
+    assert(
+      source <= self || source > self + count,
+      "moveInitializeBackwardFrom non-preceding overlapping range; use moveInitializeFrom instead")
+    var src = source + count
+    var dst = self + count
+    while dst != self {
+      (--dst).initialize((--src).move())
+    }
+  }
+
+  /// Assign from count values beginning at source into initialized
+  /// memory, transforming the source values into raw memory.
+  func moveAssignFrom(source: UnsafePointer, count: Int) {
+    assert(
+      source > self || source < self - count,
+      "moveAssignFrom non-following overlapping range")
+    for i in 0...count {
+      self[i] = (source + i).move()
+    }
+  }
+
+  /// Move count values beginning at source into raw memory,
+  /// transforming the source values into raw memory.
+  func moveInitializeFrom(source: UnsafePointer, count: Int) {
+    assert(
+      source >= self || source < self - count,
+      "moveInitializeFrom non-following overlapping range; use moveInitializeBackwardFrom")
+    for i in 0...count {
+      (self + i).initialize((source + i).move())
+    }
+  }
+
+  /// Copy count values beginning at source into raw memory.
+  func initializeFrom(source: UnsafePointer, count: Int) {
+    assert(
+      source >= self || source < self - count,
+      "initializeFrom non-following overlapping range")
+    for i in 0...count {
+      (self + i).initialize(source[i])
+    }
+  }
+
+  /// Copy the elements of `C` into raw memory.
+  func initializeFrom<
+    C: Collection where C._Element == T
+  >(
+    source: C
+  ) {
+    var p = self
+    for x in source {
+      p++.initialize((x as T)!)
+    }
+  }
+
+  /// Destroy the object the pointer points to.
   func destroy() {
-    debugTrap(!isNull())
-    Builtin.destroy(T, value)
+    Builtin.destroy(T.self, value)
+  }
+
+  /// Destroy the `count` objects the pointer points to.
+  func destroy(count: Int) {
+    Builtin.destroyArray(T.self, value, count.value)
   }
 
   func isNull() -> Bool {
-    return this == UnsafePointer.null()
+    return self == UnsafePointer.null()
   }
 
   subscript (i : Int) -> T {
-  get:
-    debugTrap(!isNull())
-    return (this + i).get()
-  set:
-    debugTrap(!isNull())
-    (this + i).set(value)
+    @transparent
+    get {
+      return (self + i).get()
+    }
+    @transparent
+    nonmutating set {
+      (self + i).set(newValue)
+    }
   }
 
   //
   // Protocol conformance
   //
-  func __equal__(rhs: UnsafePointer<T>) -> Bool {
-    return _getBool(Builtin.cmp_eq_RawPointer(value, rhs.value))
+  var hashValue: Int {
+    return Int(Builtin.ptrtoint_Word(value))
   }
-  func __less__(rhs: UnsafePointer<T>) -> Bool {
-    return _getBool(Builtin.cmp_ult_RawPointer(value, rhs.value))
+  func succ() -> UnsafePointer {
+    return self + 1
   }
-  func hashValue() -> Int {
-    return Int(Builtin.ptrtoint_Int64(value))
+  func pred() -> UnsafePointer {
+    return self - 1
   }
-  func succ() -> UnsafePointer<T> {
-    return this + 1
+
+  //
+  // Conversion to C argument pointers
+  //
+
+  // FIXME: Should be in an extension, but that doesn't work yet.
+  @transparent @conversion
+  func __conversion() -> CMutablePointer<T> {
+    return CMutablePointer(owner: _nilNativeObject, value: value)
   }
-  func pred() -> UnsafePointer<T> {
-    return this - 1
+  func __conversion() -> CMutableVoidPointer {
+    return CMutableVoidPointer(owner: _nilNativeObject, value: value)
+  }
+  @transparent @conversion
+  func __conversion() -> CConstPointer<T> {
+    return CConstPointer(_nilNativeObject, value)
+  }
+  @transparent @conversion
+  func __conversion() -> CConstVoidPointer {
+    return CConstVoidPointer(_nilNativeObject, value)
+  }
+  @transparent @conversion
+  func __conversion() -> ObjCMutablePointer<T> {
+    return ObjCMutablePointer(value)
+  }
+
+  /// Construct from a CConstPointer.
+  ///
+  /// This is an explicit construction because it is not always safe.
+  /// It is only allowed to convert an unscoped pointer, that is, one
+  /// that does not have a lifetime-guaranteeing owner reference. To use
+  /// a scoped pointer as an UnsafePointer, the withUnsafePointer method
+  /// must be used instead.
+  init(_ cp: CConstPointer<T>) {
+    assert(!cp.scoped,
+      "scoped CConstPointers must be converted using withUnsafePointer")
+    self.value = cp.value
+  }
+
+  /// Construct from a CMutablePointer.
+  ///
+  /// This is an explicit construction because it is not always safe.
+  /// It is only allowed to convert an unscoped pointer, that is, one
+  /// that does not have a lifetime-guaranteeing owner reference. To use
+  /// a scoped pointer as an UnsafePointer, the withUnsafePointer method
+  /// must be used instead.
+  init(_ cm: CMutablePointer<T>) {
+    assert(!cm.scoped,
+      "scoped CMutablePointers must be converted using withUnsafePointer")
+    self.value = cm.value
+  }
+
+  /// Construct from an ObjCMutablePointer.
+  ///
+  /// This is an explicit construction
+  /// because it is unsafe--UnsafePointer's store operations assume that
+  /// the pointed-to storage has strong ownership, whereas ObjCMutablePointers
+  /// reference +0 storage. Any values stored through the resulting
+  /// UnsafePointer must be autoreleased.
+  init(_ op: ObjCMutablePointer<T>) {
+    self.value = op.value
+  }
+
+  /// Construct from a CConstVoidPointer.
+  ///
+  /// This is an explicit construction because it is not always safe.
+  /// It is only allowed to convert an unscoped pointer, that is, one
+  /// that does not have a lifetime-guaranteeing owner reference. To use
+  /// a scoped pointer as an UnsafePointer, the withUnsafePointer method
+  /// must be used instead.
+  init(_ cp: CConstVoidPointer) {
+    assert(!cp.scoped,
+      "scoped CConstPointers must be converted using withUnsafePointer")
+    self.value = cp.value
+  }
+
+  /// Construct from a CMutableVoidPointer.
+  ///
+  /// This is an explicit construction because it is not always safe.
+  /// It is only allowed to convert an unscoped pointer, that is, one
+  /// that does not have a lifetime-guaranteeing owner reference. To use
+  /// a scoped pointer as an UnsafePointer, the withUnsafePointer method
+  /// must be used instead.
+  init(_ cp: CMutableVoidPointer) {
+    assert(!cp.scoped,
+      "scoped CMutableVoidPointers must be converted using withUnsafePointer")
+    self.value = cp.value
   }
 }
 
-// FIXME: Should we expose/use size_t and ptrdiff_t?
+@transparent
+func == <T> (lhs: UnsafePointer<T>, rhs: UnsafePointer<T>) -> Bool {
+  return Bool(Builtin.cmp_eq_RawPointer(lhs.value, rhs.value))
+}
 
-func + <T>(lhs : UnsafePointer<T>,
-           rhs : Int64) -> UnsafePointer<T> {
-  debugTrap(!lhs.isNull())
+@transparent
+func < <T>(lhs: UnsafePointer<T>, rhs: UnsafePointer<T>) -> Bool {
+  return Bool(Builtin.cmp_ult_RawPointer(lhs.value, rhs.value))
+}
+
+@transparent
+func + <T>(lhs: UnsafePointer<T>, rhs: Int) -> UnsafePointer<T> {
   return UnsafePointer(
-             Builtin.gep_Int64(lhs.value,
-                               (rhs * Int(Builtin.strideof(T))).value))
+    Builtin.gep_Word(lhs.value, (rhs * Int(Builtin.strideof(T.self))).value))
 }
 
-func + <T>(lhs : Int64,
-           rhs : UnsafePointer<T>) -> UnsafePointer<T> {
+@transparent
+func + <T>(lhs: Int,
+           rhs: UnsafePointer<T>) -> UnsafePointer<T> {
   return rhs + lhs
 }
 
-func - <T>(lhs : UnsafePointer<T>,
-           rhs : Int64) -> UnsafePointer<T> {
+@transparent
+func - <T>(lhs: UnsafePointer<T>, rhs: Int) -> UnsafePointer<T> {
   return lhs + -rhs
 }
 
-func - <T>(lhs : UnsafePointer<T>,
-           rhs : UnsafePointer<T>) -> Int {
-  debugTrap((!lhs.isNull() && !rhs.isNull()) ||
-            (lhs.isNull() && rhs.isNull()),
-            "subtracting unrelated pointers")
-  return Int(Builtin.sub_Int64(Builtin.ptrtoint_Int64(lhs.value),
-                               Builtin.ptrtoint_Int64(rhs.value)))
+@transparent
+func - <T>(lhs: UnsafePointer<T>, rhs: UnsafePointer<T>) -> Int {
+  return
+    Int(Builtin.sub_Word(Builtin.ptrtoint_Word(lhs.value),
+                         Builtin.ptrtoint_Word(rhs.value)))
+    / Int(Builtin.strideof(T.self))
 }
 
-func [assignment] += <T>(lhs : [byref] UnsafePointer<T>, rhs : Int64) {
+@transparent
+@assignment func += <T>(inout lhs: UnsafePointer<T>, rhs: Int) {
   lhs = lhs + rhs
 }
 
-func [assignment] -= <T>(lhs : [byref] UnsafePointer<T>, rhs : Int64) {
+@transparent
+@assignment func -= <T>(inout lhs: UnsafePointer<T>, rhs: Int) {
   lhs = lhs - rhs
 }
+
+/// A byte-sized thing that isn't designed to interoperate with
+/// any other types; it makes a decent parameter to UnsafePointer when
+/// you just want to do bytewise pointer arithmetic.
+struct RawByte {
+  let _inaccessible: UInt8
+}
+
+// Make nil work with UnsafePointer
+extension _Nil {
+  @transparent
+  @conversion func __conversion<T>() -> UnsafePointer<T> {
+    return .null()
+  }
+}
+

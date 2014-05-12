@@ -10,10 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// Serves as the buffer for an ArrayType.  An ArrayBufferType does
-/// not impose value semantics on its elements, and whether its
-/// elements are actually being managed by copy-on-write (COW) is, in
-/// principle, unknown to the buffer.
+/// The underlying buffer for an ArrayType conforms to ArrayBufferType
 protocol ArrayBufferType : MutableCollection {
   /// The type of elements stored in the buffer
   typealias Element
@@ -22,42 +19,58 @@ protocol ArrayBufferType : MutableCollection {
   init()
 
   /// Adopt the storage of x
-  init(x: NativeArrayBuffer<Element>)
-
+  init(_ buffer: NativeArrayBuffer<Element>)
+  
   /// Copy the given subRange of this buffer into uninitialized memory
   /// starting at target.  Return a pointer past-the-end of the
   /// just-initialized memory.
   func _uninitializedCopy(subRange: Range<Int>, target: UnsafePointer<Element>)
     -> UnsafePointer<Element>
 
-  /// Convert to an NSArray in O(1).  
+  /// Convert to an NSArray.
   /// Precondition: isBridgedToObjectiveC(Element.self)
+  /// O(1) if the element type is bridged verbatim, O(N) otherwise
   func asCocoaArray() -> CocoaArray
 
-  /// Convert to a NativeArrayBuffer storing the same elements.
-  /// managedByCopyOnWrite is destined to be removed soon, but it
-  /// indicates whether the buffer is to be marked for copying in
-  /// copyWithZone.
-  func toNativeBuffer(managedByCopyOnWrite: Bool)
-    -> NativeArrayBuffer<Element>
-  
-  /// Return true iff this buffer's storage is uniquely-referenced.
-  /// NOTE: this does not mean the buffer is mutable.  Other factors
-  /// may need to be considered, such as whether the buffer could be
-  /// some immutable Cocoa container.
-  mutating func isUniquelyReferenced() -> Bool
+  /// Get/set the index'th element
+  subscript(index: Int) -> Element { get nonmutating set}
 
-  /// Returns true iff this buffer is mutable. NOTE: a true result
-  /// does not mean the buffer is uniquely-referenced.
-  func isMutable() -> Bool
+  /// If this buffer is backed by a uniquely-referenced mutable
+  /// NativeArrayBuffer that can be grown in-place to allow the self
+  /// buffer store minimumCapacity elements, returns that buffer.
+  /// Otherwise, returns nil.  Note: the result's elementStorage may
+  /// not match ours, if we are a SliceBuffer.
+  ///
+  /// Note: this function must remain mutating; otherwise the buffer
+  /// may acquire spurious extra references, which will cause
+  /// unnecessary reallocation.
+  mutating func requestUniqueMutableBuffer(minimumCapacity: Int)
+    -> NativeArrayBuffer<Element>?
+
+  /// If this buffer is backed by a NativeArrayBuffer, return it.
+  /// Otherwise, return nil.  Note: the result's elementStorage may
+  /// not match ours, if we are a SliceBuffer.
+  func requestNativeBuffer() -> NativeArrayBuffer<Element>?
   
   /// Return a SliceBuffer containing the given subRange of values
   /// from this buffer.
   subscript(subRange: Range<Int>) -> SliceBuffer<Element> {get}
-  
+
   /// How many elements the buffer stores
   var count: Int {get set}
 
   /// How many elements the buffer can store without reallocation
   var capacity: Int {get}
+
+  /// An object that keeps the elements stored in this buffer alive
+  var owner: AnyObject? {get}
+  
+  /// If the elements are stored contiguously, a pointer to the first
+  /// element. Otherwise, nil.
+  var elementStorage: UnsafePointer<Element> {get}
+
+  /// A value that identifies first mutable element, if any.  Two
+  /// arrays compare === iff they are both empty, or if their buffers
+  /// have the same identity and count.
+  var identity: Word {get}
 }

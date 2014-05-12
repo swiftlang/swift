@@ -1,22 +1,27 @@
-// RUN: %swift -i %s | FileCheck %s
+// RUN: %target-run-simple-swift | FileCheck %s
 
 struct Interval {
   var lo, hi : Int
+
+  init(_ lo: Int, _ hi: Int) {
+    self.lo = lo
+    self.hi = hi
+  }
 }
 
-func +(a:Interval, b:Interval) -> Interval {
+func +(a: Interval, b: Interval) -> Interval {
   return Interval(a.lo + b.lo, a.hi + b.hi)
 }
 
-func -(a:Interval, b:Interval) -> Interval {
+func -(a: Interval, b: Interval) -> Interval {
   return Interval(a.lo - b.hi, a.hi - b.lo)
 }
 
-func [prefix] -(a:Interval) -> Interval {
+@prefix func -(a: Interval) -> Interval {
   return Interval(-a.hi, -a.lo)
 }
 
-func println(a:Interval) {
+func println(a: Interval) {
   println("[\(a.lo), \(a.hi)]")
 }
 
@@ -35,7 +40,7 @@ struct BigStruct {
 }
 
 func returnBigStruct() -> BigStruct {
-  return BigStruct(1,6,1,8,0,3,4,0)
+  return BigStruct(a: 1, b: 6, c: 1, d: 8, e: 0, f: 3, g: 4, h: 0)
 }
 
 // CHECK: 1
@@ -58,6 +63,12 @@ println(bs.h)
 
 struct GenStruct<T> {
   var a, b : Int
+
+  init(_ a: Int, _ b: Int) {
+    self.a = a
+    self.b = b
+  }
+
 }
 
 // CHECK: 19

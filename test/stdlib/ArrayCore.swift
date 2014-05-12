@@ -11,11 +11,58 @@
 //===----------------------------------------------------------------------===//
 // RUN: %target-run-simple-swift
 
+//===--- class Tracked ----------------------------------------------------===//
+// Instead of testing with Int elements, we use this wrapper class
+// that can help us track allocations and find issues with object
+// lifetime inside Array implementations.
+var trackedCount = 0
+var nextTrackedSerialNumber = 0
+
+class Tracked : ReplPrintable, ForwardIndex {
+  init(_ value: Int) {
+    ++trackedCount
+    serialNumber = ++nextTrackedSerialNumber
+    self.value = value
+  }
+  
+  deinit {
+    assert(serialNumber > 0, "double destruction!")
+    --trackedCount
+    serialNumber = -serialNumber
+  }
+
+  func replPrint() {
+    assert(serialNumber > 0, "dead Tracked!")
+    value.replPrint()
+  }
+
+  func succ() -> Tracked {
+    return Tracked(self.value.succ())
+  }
+
+  var value: Int
+  var serialNumber: Int
+}
+
+func == (x: Tracked, y: Tracked) -> Bool {
+  return x.value == y.value
+}
+
+//===--- struct MrMcRange -------------------------------------------------===//
+// A wrapper around Range<Tracked> that allows us to detect when it is
+// being treated as a Collection rather than merely a Sequence, which
+// helps us to prove that an optimization is being used.  In
+// particular, when constructing a NativeArrayBuffer from a
+// Collection, the necessary storage should be pre-allocated.
 struct MrMcRange : Collection {
   typealias Base = Range<Int>
 
-  func generate() -> Base.GeneratorType {
-    return base.generate()
+  init(_ base: Base) {
+    self.base = base
+  }
+
+  func generate() -> IndexingGenerator<MrMcRange> {
+    return IndexingGenerator(self)
   }
   
   var startIndex: Int {
@@ -27,22 +74,27 @@ struct MrMcRange : Collection {
     return base.endIndex
   }
 
-  subscript(i: Int) -> Int {
-    return base[i]
+  subscript(i: Int) -> Tracked {
+    return Tracked(base[i])
   }
   
   var base: Base
 }
 
+//===--- struct MrMcArray<T> ----------------------------------------------===//
+// A faux ArrayType that allows us to detect that, rather than being
+// treated as an arbitrary Collection when converting to a
+// NativeArrayBuffer, it is first asked for its underlying
+// NativeArrayBuffer.
 struct MrMcArray<T> : Collection, _ArrayType {
-  typealias Base = NativeArrayBuffer<GeneratorType.Element>
+  typealias Buffer = NativeArrayBuffer<T>
 
-  init(base: Base) {
-    self.base = base
+  init(_ buffer: Buffer) {
+    self.buffer = buffer
   }
   
   var count: Int {
-    return base.count
+    return buffer.count
   }
 
   typealias GeneratorType = IndexingGenerator<MrMcArray>
@@ -55,63 +107,60 @@ struct MrMcArray<T> : Collection, _ArrayType {
   }
   
   var endIndex: Int {
-    return base.count
+    return buffer.count
   }
 
-  subscript(i: Int) -> Int {
-    return base[i]
+  subscript(i: Int) -> T {
+    return buffer[i]
   }
 
-  func _asNativeBuffer() -> Base {
-    return base
-  }
-
-  var base: Base
+  var buffer: Buffer
 }
 
-func printBuffer<T: ReplPrintable>(buf: NativeArrayBuffer<T>) {
+func printSequence<
+  T: Sequence
+  where T.GeneratorType.Element : ReplPrintable
+>(x: T) {
   print("<")
-  for i in 0...buf.count {
-    if i != 0 {
-      print(" ")
-    }
-    buf[i].replPrint()
+  var prefix = ""
+  for a in x {
+    print(prefix)
+    a.replPrint()
+    prefix = " "
   }
   println(">")
 }
 
 
+
 // CHECK: testing...
 println("testing...")
 
-//===--- Sequences can be converted ---------------------------------------===//
+func test() {
+  //===--- Sequences can be converted -------------------------------------===//
 
-let n0 = asNativeArrayBuffer((10...27).generate(), false)
-// CHECK-NEXT: <10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26>
-printBuffer(n0)
+  let n0 = ((Tracked(10)...Tracked(27)).generate())~>_copyToNativeArrayBuffer()
+  // CHECK-NEXT: <10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26>
+  printSequence(n0)
 
-//===--- Collections get measured -----------------------------------------===//
+  //===--- Collections get measured ---------------------------------------===//
 
-// CHECK-NEXT: using collection API
-let n1 = asNativeArrayBuffer(MrMcRange(3...23), false)
-// CHECK-NEXT: <3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22>
-printBuffer(n1)
+  // CHECK-NEXT: using collection API
+  let n1 = MrMcRange(3...23)~>_copyToNativeArrayBuffer()
+  // CHECK-NEXT: <3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22>
+  printSequence(n1)
 
-//===--- _ArrayTypes get asked for a NativeBuffer -------------------------===//
+  //===--- _ArrayTypes get asked for a NativeBuffer -----------------------===//
 
-let a0 = MrMcArray<Int>(n1)
+  let a0 = MrMcArray<Tracked>(n1)
 
-// If we ask for a COW-compatible buffer, it is provided
-let n2 = asNativeArrayBuffer(a0, false)
-// CHECK-NEXT: true
-println(n1 === n2)
+  let n2 = a0~>_copyToNativeArrayBuffer()
+  // CHECK-NEXT: true
+  println(n1 === n2)
+}
 
-// Otherwise, we get a copy
-let n3 = asNativeArrayBuffer(a0, true)
-// CHECK-NEXT: false
-println(n1 === n3)
-// CHECK-NEXT: <3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22>
-printBuffer(n3)
+// CHECK-NEXT: trackedCount = 0
+println("trackedCount = \(trackedCount)")
 
 // CHECK-NEXT: done.
 println("done.")

@@ -1,7 +1,7 @@
 // RUN: %swift -parse %s -verify
 
-func takeIntToInt(f : (Int) -> Int) { }
-func takeIntIntToInt(f : (Int, Int) -> Int) { }
+func takeIntToInt(f: (Int) -> Int) { }
+func takeIntIntToInt(f: (Int, Int) -> Int) { }
 
 // Simple closures with anonymous arguments
 func simple() {

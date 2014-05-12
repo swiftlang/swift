@@ -21,14 +21,20 @@ struct Z: Barrable {
   var bar: Y { return Y() }
 }
 
+protocol TestSameTypeRequirement {
+  func foo<F1: Fooable where F1.Foo == X>(f: F1)
+}
+struct SatisfySameTypeRequirement : TestSameTypeRequirement {
+  func foo<F2: Fooable where F2.Foo == X>(f: F2) {}
+}
+
 func test1<T: Fooable where T.Foo == X>(fooable: T) -> X {
   return fooable.foo
 }
 
 struct NestedConstraint<T> {
   func tFoo<U: Fooable where U.Foo == T>(fooable: U) -> T {
-    // TODO: The type-checker refuses to consider U.Foo == T here...
-    return fooable.foo // expected-error{{does not type-check}}
+    return fooable.foo
   }
 }
 
@@ -69,7 +75,7 @@ func fail2<
   where
   T.Foo == U.Foo, T.Foo == X, U.Foo == Y // expected-error{{generic parameter Foo cannot be equal to both 'X' and 'Y'}}
 >(t: T, u: U) -> (X, Y) {
-  return (t.foo, u.foo) // expected-error{{does not type-check}}
+  return (t.foo, u.foo) // expected-error{{cannot convert the expression's type '($T1, $T5)' to type 'Y'}}
 }
 
 func test4<T: Barrable where T.Bar == Y>(t: T) -> Y {
@@ -81,7 +87,7 @@ func fail3<
   where
   T.Bar == X // expected-error{{'X' does not conform to required protocol 'Fooable'}}
 >(t: T) -> X {
-  return t.bar // expected-error{{does not type-check}}
+  return t.bar // expected-error{{cannot convert the expression's type 'T.Bar' to type 'X'}}
 }
 
 func test5<T: Barrable where T.Bar.Foo == X>(t: T) -> X {
@@ -102,7 +108,7 @@ func fail4<
   T.Bar == Y,
   T.Bar.Foo == Z // expected-error{{generic parameter Foo cannot be equal to both 'X' and 'Z'}}
 >(t: T) -> (Y, Z) {
-  return (t.bar, t.bar.foo) // expected-error{{does not type-check}}
+  return (t.bar, t.bar.foo) // expected-error{{cannot convert the expression's type '($T1, $T8)' to type 'Z'}}
 }
 
 // TODO: repeat diagnostic
@@ -112,7 +118,7 @@ func fail5<
   T.Bar.Foo == Z,
   T.Bar == Y // expected-error{{generic parameter Foo cannot be equal to both 'Z' and 'X'}} expected-error{{generic parameter Foo cannot be equal to both 'Z' and 'X'}}
 >(t: T) -> (Y, Z) {
-  return (t.bar, t.bar.foo) // expected-error{{does not type-check}}
+  return (t.bar, t.bar.foo) // expected-error{{cannot convert the expression's type '($T1, $T8)' to type 'Z'}}
 }
 
 func test8<T: Fooable where T.Foo == X, T.Foo == Y>(t: T) {} // expected-error{{generic parameter Foo cannot be equal to both 'X' and 'Y'}}

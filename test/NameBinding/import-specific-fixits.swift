@@ -5,67 +5,49 @@
 // RUN: %swift -emit-module -o %t %S/Inputs/ambiguous_right.swift
 // RUN: %swift -emit-module -o %t -I %t %S/Inputs/ambiguous.swift
 
-// RUN: %swift -parse -I=%t --serialize-diagnostics %t.dia %s -verify
+// RUN: %swift -parse -I=%t -serialize-diagnostics-path %t.dia %s -verify
 // RUN: c-index-test -read-diagnostics %t.dia > %t.deserialized_diagnostics.txt 2>&1
 // RUN: FileCheck --input-file=%t.deserialized_diagnostics.txt %s
 
-import typealias swift.Int
-import struct swift.Int
+import typealias Swift.Int
+import struct Swift.Int
 
-import class swift.Int // expected-error {{'Int' was imported as 'class', but is a struct}}
-import func swift.Int // expected-error {{'Int' was imported as 'func', but is a struct}}
-import var swift.Int // expected-error {{'Int' was imported as 'var', but is a struct}}
+import class Swift.Int // expected-error {{'Int' was imported as 'class', but is a struct}} {{8-13=struct}}
+import func Swift.Int // expected-error {{'Int' was imported as 'func', but is a struct}} {{8-12=struct}}
+import var Swift.Int // expected-error {{'Int' was imported as 'var', but is a struct}} {{8-11=struct}}
 
 // CHECK: [[@LINE-4]]:14: error: 'Int' was imported as 'class', but is a struct
 // CHECK-NEXT: Number FIXITs = 1
 // CHECK-NEXT: FIXIT: ([[FILE:.*import-specific-fixits.swift]]:[[@LINE-6]]:8 - [[FILE]]:[[@LINE-6]]:13): "struct"
+// CHECK-NEXT: note: 'Int' declared here
 
-import typealias swift.Enumerator // expected-error {{'Enumerator' was imported as 'typealias', but is a protocol}}
-import struct swift.Enumerator // expected-error {{'Enumerator' was imported as 'struct', but is a protocol}}
-import func swift.Enumerator // expected-error {{'Enumerator' was imported as 'func', but is a protocol}}
+import typealias Swift.Generator // expected-error {{'Generator' was imported as 'typealias', but is a protocol}} {{8-17=protocol}}
+import struct Swift.Generator // expected-error {{'Generator' was imported as 'struct', but is a protocol}} {{8-14=protocol}}
+import func Swift.Generator // expected-error {{'Generator' was imported as 'func', but is a protocol}} {{8-12=protocol}}
 
-// CHECK: [[@LINE-4]]:18: error: 'Enumerator' was imported as 'typealias', but is a protocol
-// CHECK-NEXT: Number FIXITs = 1
-// CHECK-NEXT: FIXIT: ([[FILE]]:[[@LINE-6]]:8 - [[FILE]]:[[@LINE-6]]:17): "protocol"
+import class Swift.Int64 // expected-error {{'Int64' was imported as 'class', but is a struct}} {{8-13=struct}}
 
-import class swift.Int64 // expected-error {{'Int64' was imported as 'class', but is a struct}}
+import class Swift.Bool // expected-error {{'Bool' was imported as 'class', but is a struct}} {{8-13=struct}}
 
-// CHECK: [[@LINE-2]]:14: error: 'Int64' was imported as 'class', but is a struct
-// CHECK-NEXT: Number FIXITs = 1
-// CHECK-NEXT: FIXIT: ([[FILE:.*import-specific-fixits.swift]]:[[@LINE-4]]:8 - [[FILE]]:[[@LINE-4]]:13): "struct"
+import struct Swift.true // expected-error {{'true' was imported as 'struct', but is a variable}} {{8-14=var}}
 
-import class swift.Bool // expected-error {{'Bool' was imported as 'class', but is a union}}
+import struct Swift.println // expected-error {{'println' was imported as 'struct', but is a function}} {{8-14=func}}
 
-// CHECK: [[@LINE-2]]:14: error: 'Bool' was imported as 'class', but is a union
-// CHECK-NEXT: Number FIXITs = 1
-// CHECK-NEXT: FIXIT: ([[FILE:.*import-specific-fixits.swift]]:[[@LINE-4]]:8 - [[FILE]]:[[@LINE-4]]:13): "union"
-
-import struct swift.true // expected-error {{'true' was imported as 'struct', but is a variable}}
-
-// CHECK: [[@LINE-2]]:15: error: 'true' was imported as 'struct', but is a variable
-// CHECK-NEXT: Number FIXITs = 1
-// CHECK-NEXT: FIXIT: ([[FILE]]:[[@LINE-4]]:8 - [[FILE]]:[[@LINE-4]]:14): "var"
-
-import struct swift.max // expected-error {{'max' was imported as 'struct', but is a function}}
-
-// CHECK: [[@LINE-2]]:15: error: 'max' was imported as 'struct', but is a function
+// CHECK: [[@LINE-2]]:15: error: 'println' was imported as 'struct', but is a function
 // CHECK-NEXT: Number FIXITs = 1
 // CHECK-NEXT: FIXIT: ([[FILE]]:[[@LINE-4]]:8 - [[FILE]]:[[@LINE-4]]:14): "func"
+// CHECK-NOT: note: 'println' declared here
 
-
-import struct swift.min, swift.max // expected-error {{'min' was imported as 'struct', but is a function}} expected-error {{'max' was imported as 'struct', but is a function}}
-
-// CHECK: [[@LINE-2]]:15: error: 'min' was imported as 'struct', but is a function
-// CHECK-NEXT: Range: [[FILE]]:[[@LINE-3]]:21 [[FILE]]:[[@LINE-3]]:24
-// CHECK-NEXT: Number FIXITs = 0
-
-// CHECK: [[@LINE-6]]:26: error: 'max' was imported as 'struct', but is a function
-// CHECK-NEXT: Range: [[FILE]]:[[@LINE-7]]:32 [[FILE]]:[[@LINE-7]]:35
-// CHECK-NEXT: Number FIXITs = 0
 
 import func ambiguous.funcOrVar // expected-error{{ambiguous name 'funcOrVar' in module 'ambiguous'}}
 import var ambiguous.funcOrVar // expected-error{{ambiguous name 'funcOrVar' in module 'ambiguous'}}
 import struct ambiguous.funcOrVar // expected-error{{ambiguous name 'funcOrVar' in module 'ambiguous'}}
+
+// CHECK: [[@LINE-4]]:13: error: ambiguous name 'funcOrVar' in module 'ambiguous'
+// CHECK-NEXT: Number FIXITs = 0
+// CHECK-NEXT: note: found this candidate
+// CHECK-NEXT: Number FIXITs = 0
+// CHECK-NEXT: note: found this candidate
 
 import func ambiguous.someVar // expected-error{{ambiguous name 'someVar' in module 'ambiguous'}}
 import var ambiguous.someVar // expected-error{{ambiguous name 'someVar' in module 'ambiguous'}}

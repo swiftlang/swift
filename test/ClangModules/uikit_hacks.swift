@@ -5,14 +5,14 @@ import Foundation
 
 // Check that we drop the variadic parameter from certain UIKit initializers.
 func makeAnActionSheet() -> SomeActionSheet {
-  return SomeActionSheet(withTitle: "Error",
+  return SomeActionSheet(title: "Error",
                          delegate: nil,
                          cancelButtonTitle: "Cancel",
                          destructiveButtonTitle: "OK")
 }
 
 func makeAnAlertView() -> SomeAlertView {
-  return SomeAlertView(withTitle: "Error",
+  return SomeAlertView(title: "Error",
                        message: "The operation completed successfully.",
                        delegate: nil,
                        cancelButtonTitle: "Abort")

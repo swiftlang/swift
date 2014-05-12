@@ -1,36 +1,60 @@
-// RUN: %swift -i %s | FileCheck %s
+// RUN: %target-run-simple-swift | FileCheck %s
+
+println("testing...")
+// CHECK: testing...
 
 struct Bundle {
-  constructor() {
-    locations = Vector()
+  init() {
+    locations = Array()
   }
-  var name: String
-  var locations: Vector<String>
+  var name = String()
+  var locations: String[]
 }
 
-var a = HeapBuffer<Bundle,Int>.create(Bundle(), 10)
+var a = HeapBuffer<Bundle,Int>(HeapBufferStorage<Bundle,Int>.self, Bundle(), 10)
 var b = a.value
 a.value.name = "DaveA"
 a.value.locations.append("Princeton")
 a.value.locations.append("San Jose")
-for x in 0..10 {
-  (a.elementStorage + x).init(x)
+for x in 0...10 {
+  (a.elementStorage + x).initialize(x)
 }
 
-println("name=\(a.value.name)")
-// CHECK: name=DaveA
+println("buffer has storage: \(a.storage.getLogicValue())")
+// CHECK-NEXT: buffer has storage: true
 
-println("length=\(a.value.locations.length)")
-// CHECK: length=2
+func testUnique() {
+  println("buffer is unique: \(a.isUniquelyReferenced())")
+  // CHECK-NEXT: buffer is unique: true
+  
+  var addRef = [ a ]
+  println("copied buffer is unique: \(a.isUniquelyReferenced())")
+  // CHECK-NEXT: copied buffer is unique: false
+}
+testUnique()
+
+println("a == a: \(a == a)")
+// CHECK-NEXT: a == a: true
+
+let other = HeapBuffer<Bundle,Int>(
+  HeapBufferStorage<Bundle,Int>.self, Bundle(), 0)
+println("a == other: \(a == other)")
+// CHECK-NEXT: a == other: false
+
+println("name=\(a.value.name)")
+// CHECK-NEXT: name=DaveA
+
+println("length=\(a.value.locations.count)")
+// CHECK-NEXT: length=2
 
 println("locations[0]=\(a.value.locations[0])")
-// CHECK: locations[0]=Princeton
+// CHECK-NEXT: locations[0]=Princeton
 
 println("locations[1]=\(a.value.locations[1])")
-// CHECK: locations[1]=San Jose
+// CHECK-NEXT: locations[1]=San Jose
 
-for x in 0..10 {
+for x in 0...10 {
   print(a.elementStorage[x])
 }
 println("")
-// CHECK: 0123456789
+// CHECK-NEXT: 0123456789

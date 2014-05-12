@@ -23,64 +23,68 @@ import SwiftShims
 // design.  
 @objc
 class NSSwiftArray : HeapBufferStorageBase, CocoaArray {
-  typealias Buffer = HeapBuffer<ArrayBody, AnyObject>
+  typealias Buffer = HeapBuffer<_ArrayBody, AnyObject>
   
-  // Note: This method must be overridden by subclasses, and would be
-  // marked @abstract if we had such a feature. Moreover, those
-  // subclasses must be generic, so we can't allow this method to be @objc
-  // (methods of generic classes can't be @objc), so we use a tuple in the
-  // signature to prevent the inference of @objc here.
-  func _objectAtIndex(indexAndUnused: (Int, Bool)) -> AnyObject {
-    assert(false, "_objectAtIndex must be overridden")
-    return self
+  var dynamicElementType: Any.Type {
+    fatal("This var must be overridden")
+  }
+  
+  /// Returns the object located at the specified index.
+  func objectAtIndex(index: Int) -> AnyObject {
+    let buffer = reinterpretCast(self) as Buffer
+    // If used as an NSArray, the element type can have no fancy
+    // bridging; just get it and return it
+    assert(buffer.value.elementTypeIsBridgedVerbatim)
+    return buffer[index]
   }
 
-  func objectAtIndex(index: Int) -> AnyObject {
-    return _objectAtIndex((index, true))
-  }
-  
-  func getObjects(
-    objects: UnsafePointer<AnyObject>)range(range: _SwiftNSRange) {
-    var dst = objects
+  // Copies the objects contained in the array that fall within the
+  // specified range to aBuffer.
+  func getObjects(aBuffer: UnsafePointer<AnyObject>, range: _SwiftNSRange) {
+
+    // These objects are "returned" at +0, so treat them as values to
+    // avoid retains.
+    var dst = UnsafePointer<Word>(aBuffer)
+
+    let buffer = reinterpretCast(self) as Buffer
+    // If used as an NSArray, the element type can have no fancy
+    // bridging; just get it and return it
+    assert(buffer.value.elementTypeIsBridgedVerbatim)
+    
+    if _fastPath(buffer.value.elementTypeIsBridgedVerbatim) {
+      dst.initializeFrom(
+        UnsafePointer(buffer.elementStorage + range.location),
+        count: range.length)
+    }
+    
     for i in range.location...range.location + range.length {
-      dst++.initialize(_objectAtIndex((i, true)))
+      dst++.initialize(reinterpretCast(buffer[i]))
     }
   }
 
   func copyWithZone(_: COpaquePointer) -> CocoaArray {
-    // Copy-on-write keeps us from modifying this as long as Cocoa can
-    // see it.
     return self
   }
 
   func countByEnumeratingWithState(
-    state: UnsafePointer<_SwiftNSFastEnumerationState>)
-    objects(UnsafePointer<AnyObject>) count(bufferSize: Int)
-  -> Int {
+    state: UnsafePointer<_SwiftNSFastEnumerationState>,
+    objects: UnsafePointer<AnyObject>, count bufferSize: Int
+  ) -> Int {
     var enumerationState = state.get()
 
-    let my = reinterpretCast(self) as Buffer
-    if _fastPath(my.value.elementTypeIsBridgedVerbatim) {
-      if enumerationState.state != 0 {
-        return 0
-      }
-      enumerationState.mutationsPtr = reinterpretCast(self)
-      enumerationState.itemsPtr = reinterpretCast(my.elementStorage)
-      enumerationState.state = 1
-      state.set(enumerationState)
-      return my.value.count
-    }
+    let buffer = reinterpretCast(self) as Buffer
+    // If used as an NSArray, the element type can have no fancy
+    // bridging; just get it and return it
+    assert(buffer.value.elementTypeIsBridgedVerbatim)
     
-    // FIXME: Could optimize away this copy if we have a buffer that
-    // already contains AnyObjects.
-    let firstItem = Int(enumerationState.state)
-    let numItemsToCopy = min(self.count - firstItem, bufferSize)
-    getObjects(objects, range:_SwiftNSRange(firstItem, numItemsToCopy))
-    enumerationState.mutationsPtr = reinterpretCast(self)
-    enumerationState.itemsPtr = reinterpretCast(objects)
-    enumerationState.state += CUnsignedLong(numItemsToCopy)
+    if enumerationState.state != 0 {
+      return 0
+    }
+    enumerationState.mutationsPtr = _fastEnumerationStorageMutationsPtr
+    enumerationState.itemsPtr = reinterpretCast(buffer.elementStorage)
+    enumerationState.state = 1
     state.set(enumerationState)
-    return numItemsToCopy
+    return buffer.value.count
   }
   
   var count: Int {

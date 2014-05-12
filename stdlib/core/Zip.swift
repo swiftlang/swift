@@ -1,42 +1,49 @@
-struct ZipEnumerator2<E0 : Enumerator, E1 : Enumerator> : Enumerator
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+struct ZipGenerator2<E0 : Generator, E1 : Generator> : Generator
 {
   typealias Element = (E0.Element,E1.Element)
 
-  constructor(e0: E0, e1: E1) {
-    baseEnumerators.value = (e0,e1)
+  init(_ e0: E0, _ e1: E1) {
+    baseStreams = (e0,e1)
   }
 
-  func isEmpty() -> Bool {
-    if baseEnumerators.value.0.isEmpty() {
-      return true
-    }
-    return baseEnumerators.value.1.isEmpty()
+  mutating func next() -> Element? {
+    var e0 = baseStreams.0.next()
+    if !e0 { return .None }
+    var e1 = baseStreams.1.next()
+    if !e1 { return .None }
+    return .Some((e0!, e1!))
   }
 
-  func next() -> Element {
-    return (
-      baseEnumerators.value.0.next(), 
-      baseEnumerators.value.1.next())
-  }
-
-  var baseEnumerators : GenericIVar<(E0,E1)>
+  var baseStreams : (E0,E1)
 }
 
-struct Zip2<S0: Enumerable, S1: Enumerable> : Enumerable
+struct Zip2<S0: Sequence, S1: Sequence> : Sequence
 {
-  typealias Enumerator1 = S0.EnumeratorType
-  typealias Enumerator2 = S1.EnumeratorType
-  typealias EnumeratorType = ZipEnumerator2<Enumerator1, Enumerator2>
+  typealias Stream1 = S0.GeneratorType
+  typealias Stream2 = S1.GeneratorType
+  typealias GeneratorType = ZipGenerator2<Stream1, Stream2>
 
-  constructor(s0: S0, s1: S1) {
-    sequences.value = (s0,s1)
+  init(_ s0: S0, _ s1: S1) {
+    sequences = (s0,s1)
   }
 
-  func getEnumeratorType() -> EnumeratorType {
-    return EnumeratorType(
-      sequences.value.0.getEnumeratorType(), 
-      sequences.value.1.getEnumeratorType())
+  func generate() -> GeneratorType {
+    return GeneratorType(
+      sequences.0.generate(), 
+      sequences.1.generate())
   }
 
-  var sequences: GenericIVar<(S0,S1)>
+  var sequences: (S0,S1)
 }

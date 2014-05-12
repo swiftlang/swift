@@ -1,23 +1,11 @@
-// RUN: %swift -I %S/.. %s -i | FileCheck %s
+// RUN: ulimit -c unlimited && %swift -I %S -enable-source-import -i %s | tee /var/tmp/fractal.out | FileCheck %s
+// REQUIRES: swift_interpreter
 
-// Define a Complex number.
-struct Complex {
-  Real : Double,
-  Imaginary : Double
-  func magnitude() -> Double {
-    return Real * Real + Imaginary * Imaginary
-  }
-}
+// FIXME: iOS: -enable-source-import plus %target-build-swift equals link errors
 
-func [infix_left=200] * (lhs : Complex, rhs : Complex) -> Complex {
-  return Complex(lhs.Real * rhs.Real - lhs.Imaginary * rhs.Imaginary,
-                 lhs.Real * rhs.Imaginary + lhs.Imaginary * rhs.Real)
-}
-func [infix_left=190] + (lhs: Complex, rhs: Complex) -> Complex {
-  return Complex(lhs.Real + rhs.Real, lhs.Imaginary + rhs.Imaginary)
-}
+import complex
 
-func printDensity(d : Int) {
+func printDensity(d: Int) {
   if (d > 40) {
      print(" ")
   } else if d > 6 {
@@ -31,22 +19,24 @@ func printDensity(d : Int) {
   }
 }
 
-func absolute(x:Double) -> Double {
-  if (x >= 0.0) { return x }
-  return x * -1.0;
+extension Double {
+  func abs() -> Double {
+    if (self >= 0.0) { return self }
+    return self * -1.0
+  }
 }
 
-func getMandelbrotIterations(c:Complex, maxIterations:Int) -> Int {
-  var n : Int
-  var z : Complex 
+func getMandelbrotIterations(c: Complex, maxIterations: Int) -> Int {
+  var n = 0
+  var z = Complex()
   while (n < maxIterations && z.magnitude() < 4.0) {
     z = z*z + c
-    n = n + 1
+    ++n
   }
   return n
 }
 
-func fractal (densityFunc:(c:Complex, maxIterations:Int) -> Int)
+func fractal (densityFunc:(c: Complex, maxIterations: Int) -> Int)
              (xMin:Double, xMax:Double,
               yMin:Double, yMax:Double,
               rows:Int, cols:Int,
@@ -56,19 +46,18 @@ func fractal (densityFunc:(c:Complex, maxIterations:Int) -> Int)
   var dY = (yMax - yMin) / Double(cols)
   // Iterate over the points an determine if they are in the
   // Mandelbrot set.
-  var row : Double
-  var col : Double
-  for (row = xMin; row < xMax; row = row + dX) {
-    for (col = yMin; col < yMax; col = col + dY) {
-      var c = Complex(col, row)
-      printDensity(densityFunc(c, maxIterations))
+  for var row = xMin; row < xMax ; row += dX {
+    for var col = yMin; col < yMax; col += dY {
+      var c = Complex(real: col, imag: row)
+      printDensity(densityFunc(c: c, maxIterations: maxIterations))
     }
     print("\n")
   }
 }
 
 var mandelbrot = fractal(getMandelbrotIterations)
-mandelbrot(-1.35, 1.4, -2.0, 1.05, 40, 80, 200)
+mandelbrot(xMin: -1.35, xMax: 1.4, yMin: -2.0, yMax: 1.05, rows: 40, cols: 80,
+           maxIterations: 200)
 
 // CHECK: ################################################################################
 // CHECK: ##############################********************##############################
@@ -112,13 +101,13 @@ mandelbrot(-1.35, 1.4, -2.0, 1.05, 40, 80, 200)
 // CHECK: ################################################################################
 
 
-func getBurningShipIterations(c:Complex, maxIterations:Int) -> Int {
-  var n : Int
-  var z : Complex 
+func getBurningShipIterations(c: Complex, maxIterations: Int) -> Int {
+  var n = 0
+  var z = Complex()
   while (n < maxIterations && z.magnitude() < 4.0) {
-    var zTmp = Complex(absolute(z.Real), absolute(z.Imaginary))
+    var zTmp = Complex(real: z.real.abs(), imag: z.imag.abs())
     z = zTmp*zTmp + c
-    n = n + 1
+    ++n
   }
   return n
 }
@@ -126,7 +115,8 @@ func getBurningShipIterations(c:Complex, maxIterations:Int) -> Int {
 print("\n== BURNING SHIP ==\n\n")
 
 var burningShip = fractal(getBurningShipIterations)
-burningShip(-2.0, 1.2, -2.1, 1.2, 40, 80, 200)
+burningShip(xMin: -2.0, xMax: 1.2, yMin: -2.1, yMax: 1.2, rows: 40, cols: 80, 
+            maxIterations: 200)
 
 // CHECK: ################################################################################
 // CHECK: ################################################################################

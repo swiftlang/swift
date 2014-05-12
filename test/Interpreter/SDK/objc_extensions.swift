@@ -1,5 +1,4 @@
-// RUN: %swift -sdk=%sdk -i %s | FileCheck %s
-// REQUIRES: sdk
+// RUN: %target-run-simple-swift | FileCheck %s
 
 import Foundation
 
@@ -9,21 +8,23 @@ extension NSObject {
   }
 
   var asHerself : NSObject {
-    return this
+    return self
   }
 
-  var blackHoleWithHawkingRadiation : NSObject {
-  get:
-    println("e+")
-    return nil
-  set:
-    println("e-")
+  var blackHoleWithHawkingRadiation : NSObject? {
+    get {
+      println("e+")
+      return nil
+    }
+    set {
+      println("e-")
+    }
   }
 }
 
-var o = new NSObject()
+var o = NSObject()
 
-func drop(x:NSObject) {}
+func drop(x: NSObject?) {}
 
 // CHECK: true
 println(o.respondsToSelector("frob"))
@@ -43,4 +44,4 @@ println(o === o.asHerself)
 // CHECK: e+
 drop(o.blackHoleWithHawkingRadiation)
 // CHECK: e-
-o.blackHoleWithHawkingRadiation = new NSObject()
+o.blackHoleWithHawkingRadiation = NSObject()

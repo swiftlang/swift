@@ -1,40 +1,70 @@
 // RUN: %swift -parse %s -verify -parse-as-library
 
-class A { 
-  def f1() { } // expected-note{{overridden declaration is here}}
-  def f2() -> A { } // expected-note{{overridden declaration is here}}
+@objc class ObjCClassA {}
+@objc class ObjCClassB : ObjCClassA {}
 
-  @objc def f3() { }
-  @objc def f4() -> A { }
+class A { 
+  func f1() { } // expected-note{{overridden declaration is here}}
+  func f2() -> A { } // expected-note{{overridden declaration is here}}
+
+  @objc func f3() { }
+  @objc func f4() -> ObjCClassA { }
 }
 
 extension A {
-  def f5() { } // expected-note{{overridden declaration is here}}
-  def f6() -> A { } // expected-note{{overridden declaration is here}}
+  func f5() { } // expected-note{{overridden declaration is here}}
+  func f6() -> A { } // expected-note{{overridden declaration is here}}
 
-  @objc def f7() { }
-  @objc def f8() -> A { }
+  @objc func f7() { }
+  @objc func f8() -> ObjCClassA { }
 }
 
 class B : A { }
 
 extension B { 
-  def f1() { }  // expected-error{{declarations in extensions cannot override yet}}
-  def f2() -> B { } // expected-error{{declarations in extensions cannot override yet}}
+  func f1() { }  // expected-error{{declarations in extensions cannot override yet}}
+  func f2() -> B { } // expected-error{{declarations in extensions cannot override yet}}
 
-  def f3() { }
-  def f4() -> B { }
+  override func f3() { }
+  override func f4() -> ObjCClassB { }
 
-  def f5() { }  // expected-error{{declarations from extensions cannot be overridden yet}}
-  def f6() -> A { }  // expected-error{{declarations from extensions cannot be overridden yet}}
+  func f5() { }  // expected-error{{declarations in extensions cannot override yet}}
+  func f6() -> A { }  // expected-error{{declarations in extensions cannot override yet}}
 
-  @objc def f7() { }
-  @objc def f8() -> A { }
+  @objc override func f7() { }
+  @objc override func f8() -> ObjCClassA { }
 }
 
-def callOverridden(b : B) {
+func callOverridden(b: B) {
   b.f3()
   b.f4()
   b.f7()
   b.f8()
+}
+
+@objc
+class Base {
+  func meth(x: Undeclared) {} // expected-error {{use of undeclared type 'Undeclared'}}
+}
+@objc
+class Sub : Base {
+  func meth(x: Undeclared) {} // expected-error {{use of undeclared type 'Undeclared'}}
+}
+
+// Objective-C method overriding
+
+@objc class ObjCSuper {
+  func method(x: Int, withInt y: Int) { }
+
+  func method2(x: Sub, withInt y: Int) { }
+
+  func method3(x: Base, withInt y: Int) { } // expected-note{{overridden declaration here has type '(Base, Int) -> ()'}}
+}
+
+class ObjCSub : ObjCSuper {
+  override func method(x: Int, withInt y: Int) { } // okay, overrides exactly
+
+  override func method2(x: Base, withInt y: Int) { } // okay, overrides trivially
+
+  func method3(x: Sub, withInt y: Int) { } // expected-error{{overriding method with selector 'method3:withInt:' has incompatible type '(Sub, Int) -> ()'}}
 }

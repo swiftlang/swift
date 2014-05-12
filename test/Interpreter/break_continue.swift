@@ -1,4 +1,4 @@
-// RUN: %swift -i %s | FileCheck %s
+// RUN: %target-run-simple-swift | FileCheck %s
 
 func test1() {
   println("test1")
@@ -33,7 +33,7 @@ func test3() {
 }
 func test4() {
   println("test4")
-  for i in 0..10 {
+  for i in 0...10 {
     if i > 2 {
       break
     }
@@ -42,7 +42,7 @@ func test4() {
 }
 func test5() {
   println("test5")
-  for i in 0..10 {
+  for i in 0...10 {
     if i < 2 {
       println(i)
       continue
@@ -78,7 +78,7 @@ func test8() {
   println("test8")
   var i : Int
   for i=0;;++i {
-    for j in 0..10 {
+    for j in 0...10 {
       if j > 1 {
         break
       }

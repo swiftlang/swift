@@ -1,6 +1,6 @@
 // Verify errors in this file to ensure that parse and type checker errors
 // occur where we expect them.
-// RUN: %swift -parse -verify %s
+// RUN: %swift -parse -verify -show-diagnostics-after-fatal %s
 
 // RUN: %swift-ide-test -print-ast-typechecked -source-filename %s -prefer-type-repr=false > %t.printed.txt
 // RUN: FileCheck %s -strict-whitespace < %t.printed.txt
@@ -17,7 +17,7 @@ class BarClass {}
 
 protocol FooProtocol {}
 protocol BarProtocol {}
-protocol BazProtocol { func baz() } // expected-note {{protocol requires function 'baz' with type '() -> ()'}}
+protocol BazProtocol { func baz() }
 protocol QuxProtocol {
   typealias Qux
 }
@@ -35,10 +35,10 @@ import not_existent_module_a // expected-error{{no such module 'not_existent_mod
 import not_existent_module_a.submodule // expected-error{{no such module}}
 // CHECK-NEXT: {{^}}import not_existent_module_a.submodule{{$}}
 
-import [exported] not_existent_module_b // expected-error{{no such module 'not_existent_module_b'}}
-// CHECK-NEXT: {{^}}import [exported] not_existent_module_b{{$}}
-import [exported] not_existent_module_b.submodule // expected-error{{no such module}}
-// CHECK-NEXT: {{^}}import [exported] not_existent_module_b.submodule{{$}}
+@exported import not_existent_module_b // expected-error{{no such module 'not_existent_module_b'}}
+// CHECK-NEXT: {{^}}@exported import not_existent_module_b{{$}}
+@exported import not_existent_module_b.submodule // expected-error{{no such module}}
+// CHECK-NEXT: {{^}}@exported import not_existent_module_b.submodule{{$}}
 
 import struct   not_existent_module_c.foo // expected-error{{no such module 'not_existent_module_c'}}
 // CHECK-NEXT: {{^}}import struct not_existent_module_c.foo{{$}}
@@ -83,16 +83,16 @@ class ClassWithInheritance5 : FooProtocol, BarProtocol, FooClass {} // expected-
 // CHECK: {{^}}class ClassWithInheritance5 : FooProtocol, BarProtocol, FooClass {{{$}}
 
 class ClassWithInheritance6 : FooClass, BarClass {} // expected-error {{multiple inheritance from classes 'FooClass' and 'BarClass'}}
-// CHECK: {{^}}class ClassWithInheritance6 : FooClass, BarClass {{{$}}
+// CHECK: {{^}}class ClassWithInheritance6 : FooClass, <<error type>> {{{$}}
 
 class ClassWithInheritance7 : FooClass, BarClass, FooProtocol {} // expected-error {{multiple inheritance from classes 'FooClass' and 'BarClass'}}
-// CHECK: {{^}}class ClassWithInheritance7 : FooClass, BarClass, FooProtocol {{{$}}
+// CHECK: {{^}}class ClassWithInheritance7 : FooClass, <<error type>>, FooProtocol {{{$}}
 
 class ClassWithInheritance8 : FooClass, BarClass, FooProtocol, BarProtocol {} // expected-error {{multiple inheritance from classes 'FooClass' and 'BarClass'}}
-// CHECK: {{^}}class ClassWithInheritance8 : FooClass, BarClass, FooProtocol, BarProtocol {{{$}}
+// CHECK: {{^}}class ClassWithInheritance8 : FooClass, <<error type>>, FooProtocol, BarProtocol {{{$}}
 
 class ClassWithInheritance9 : FooClass, BarClass, FooProtocol, BarProtocol, FooNonExistentProtocol {} // expected-error {{multiple inheritance from classes 'FooClass' and 'BarClass'}} expected-error {{use of undeclared type 'FooNonExistentProtocol'}}
-// CHECK: {{^}}class ClassWithInheritance9 : FooClass, BarClass, FooProtocol, BarProtocol, <<error type>> {{{$}}
+// CHECK: {{^}}class ClassWithInheritance9 : FooClass, <<error type>>, FooProtocol, BarProtocol, <<error type>> {{{$}}
 
 //===---
 //===--- Inheritance list in enums.
@@ -104,14 +104,14 @@ enum EnumWithInheritance1 : FooNonExistentProtocol {} // expected-error {{use of
 enum EnumWithInheritance2 : FooNonExistentProtocol, BarNonExistentProtocol {} // expected-error {{use of undeclared type 'FooNonExistentProtocol'}} expected-error {{use of undeclared type 'BarNonExistentProtocol'}}
 // CHECK: {{^}}enum EnumWithInheritance2 : <<error type>>, <<error type>> {{{$}}
 
-enum EnumWithInheritance3 : FooClass {} // expected-error {{raw type 'FooClass' is not integer-, float-, char-, or string-literal-convertible}}
-// CHECK: {{^}}enum EnumWithInheritance3 : FooClass {{{$}}
+enum EnumWithInheritance3 : FooClass { case X } // expected-error {{raw type 'FooClass' is not convertible from any literal}} expected-error{{enum cases require explicit raw values when the raw type is not integer literal convertible}}
+// CHECK: {{^}}enum EnumWithInheritance3 : <<error type>> {{{$}}
 
-enum EnumWithInheritance4 : FooClass, FooProtocol {} // expected-error {{raw type 'FooClass' is not integer-, float-, char-, or string-literal-convertible}}
-// CHECK: {{^}}enum EnumWithInheritance4 : FooClass, FooProtocol {{{$}}
+enum EnumWithInheritance4 : FooClass, FooProtocol { case X } // expected-error {{raw type 'FooClass' is not convertible from any literal}} expected-error{{enum cases require explicit raw values when the raw type is not integer literal convertible}}
+// CHECK: {{^}}enum EnumWithInheritance4 : <<error type>>, FooProtocol {{{$}}
 
-enum EnumWithInheritance5 : FooClass, BarClass {} // expected-error {{raw type 'FooClass' is not integer-, float-, char-, or string-literal-convertible}} expected-error {{multiple enum raw types 'FooClass' and 'BarClass'}}
-// CHECK: {{^}}enum EnumWithInheritance5 : FooClass, BarClass {{{$}}
+enum EnumWithInheritance5 : FooClass, BarClass { case X } // expected-error {{raw type 'FooClass' is not convertible from any literal}} expected-error {{multiple enum raw types 'FooClass' and 'BarClass'}} expected-error{{enum cases require explicit raw values when the raw type is not integer literal convertible}}
+// CHECK: {{^}}enum EnumWithInheritance5 : <<error type>>, <<error type>> {{{$}}
 
 //===---
 //===--- Inheritance list in protocols.
@@ -124,13 +124,13 @@ protocol ProtocolWithInheritance2 : FooNonExistentProtocol, BarNonExistentProtoc
 // CHECK: {{^}}protocol ProtocolWithInheritance2 : <<error type>>, <<error type>> {{{$}}
 
 protocol ProtocolWithInheritance3 : FooClass {} // expected-error {{non-class type 'ProtocolWithInheritance3' cannot inherit from class 'FooClass'}}
-// CHECK: {{^}}protocol ProtocolWithInheritance3 : FooClass {{{$}}
+// CHECK: {{^}}protocol ProtocolWithInheritance3 : <<error type>> {{{$}}
 
 protocol ProtocolWithInheritance4 : FooClass, FooProtocol {} // expected-error {{non-class type 'ProtocolWithInheritance4' cannot inherit from class 'FooClass'}}
-// CHECK: {{^}}protocol ProtocolWithInheritance4 : FooClass, FooProtocol {{{$}}
+// CHECK: {{^}}protocol ProtocolWithInheritance4 : <<error type>>, FooProtocol {{{$}}
 
 protocol ProtocolWithInheritance5 : FooClass, BarClass {} // expected-error {{non-class type 'ProtocolWithInheritance5' cannot inherit from class 'FooClass'}} expected-error {{non-class type 'ProtocolWithInheritance5' cannot inherit from class 'BarClass'}}
-// CHECK: {{^}}protocol ProtocolWithInheritance5 : FooClass, BarClass {{{$}}
+// CHECK: {{^}}protocol ProtocolWithInheritance5 : <<error type>>, <<error type>> {{{$}}
 
 //===---
 //===--- Typealias printing.
@@ -138,28 +138,19 @@ protocol ProtocolWithInheritance5 : FooClass, BarClass {} // expected-error {{no
 
 // Normal typealiases.
 
-typealias TypealiasWithInheritance1 : BazProtocol = FooClass // expected-error {{type 'TypealiasWithInheritance1' does not conform to protocol 'BazProtocol'}}
-// CHECK: {{^}}typealias TypealiasWithInheritance1 : BazProtocol = FooClass{{$}}
-
-typealias TypealiasWithInheritance2 : FooNonExistentProtocol = FooProtocol // expected-error {{use of undeclared type 'FooNonExistentProtocol'}}
-// CHECK: {{^}}typealias TypealiasWithInheritance2 : <<error type>> = FooProtocol{{$}}
-
-typealias TypealiasWithInheritance3 : FooNonExistentProtocol, BarNonExistentProtocol = FooProtocol // expected-error {{use of undeclared type 'FooNonExistentProtocol'}} expected-error {{use of undeclared type 'BarNonExistentProtocol'}}
-// CHECK: {{^}}typealias TypealiasWithInheritance3 : <<error type>>, <<error type>> = FooProtocol{{$}}
-
-typealias TypealiasWithInheritance4 : FooClass = FooProtocol // expected-error {{non-class type 'TypealiasWithInheritance4' cannot inherit from class 'FooClass'}}
-// CHECK: {{^}}typealias TypealiasWithInheritance4 : FooClass = FooProtocol{{$}}
+typealias Typealias1 = FooNonExistentProtocol // expected-error {{use of undeclared type 'FooNonExistentProtocol'}}
+// CHECK: {{^}}typealias Typealias1 = <<error type>>{{$}}
 
 // Associated types.
 
 protocol AssociatedType1 {
 // CHECK-LABEL: AssociatedType1 {
 
-  typealias AssociatedTypeDecl1 : FooProtocol = FooClass // expected-error {{typealias 'AssociatedTypeDecl1' in protocol cannot have a definition}}
-// CHECK: {{^}}  typealias AssociatedTypeDecl1 : FooProtocol{{$}}
+  typealias AssociatedTypeDecl1 : FooProtocol = FooClass
+// CHECK: {{^}}  typealias AssociatedTypeDecl1 : FooProtocol = FooClass{{$}}
 
-  typealias AssociatedTypeDecl2 : BazProtocol = FooClass // expected-error {{typealias 'AssociatedTypeDecl2' in protocol cannot have a definition}}
-// CHECK: {{^}}  typealias AssociatedTypeDecl2 : BazProtocol{{$}}
+  typealias AssociatedTypeDecl2 : BazProtocol = FooClass
+// CHECK: {{^}}  typealias AssociatedTypeDecl2 : BazProtocol = FooClass{{$}}
 
   typealias AssociatedTypeDecl3 : FooNonExistentProtocol // expected-error {{use of undeclared type 'FooNonExistentProtocol'}}
 // CHECK: {{^}}  typealias AssociatedTypeDecl3 : <<error type>>{{$}}
@@ -167,7 +158,16 @@ protocol AssociatedType1 {
   typealias AssociatedTypeDecl4 : FooNonExistentProtocol, BarNonExistentProtocol // expected-error {{use of undeclared type 'FooNonExistentProtocol'}} expected-error {{use of undeclared type 'BarNonExistentProtocol'}}
 // CHECK: {{^}}  typealias AssociatedTypeDecl4 : <<error type>>, <<error type>>{{$}}
 
-  typealias AssociatedTypeDecl5 : FooClass // expected-error {{non-class type 'AssociatedTypeDecl5' cannot inherit from class 'FooClass'}}
+  typealias AssociatedTypeDecl5 : FooClass
 // CHECK: {{^}}  typealias AssociatedTypeDecl5 : FooClass{{$}}
 }
+
+//===---
+//===--- Variable declaration printing.
+//===---
+
+var topLevelVar1 = 42
+// CHECK: {{^}}var topLevelVar1{{$}}
+// CHECK-NOT: topLevelVar1
+
 

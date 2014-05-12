@@ -38,14 +38,14 @@
 
 extension Keyboard {
   func getline() -> String {
-    return getline('\n')
+    return getline("\n")
   }
 
-  func getline(delim: UnicodeScalar) -> String {
+  func getline(delim: Character) -> String {
     var r = String()
     var i = read()
     while i != -1 {
-      var c = UnicodeScalar(i)
+      var c = Character(UnicodeScalar(i))
       if c == delim {
         break
       }

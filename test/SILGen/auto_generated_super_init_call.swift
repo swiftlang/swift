@@ -21,13 +21,13 @@ class SomeDerivedClass : Parent {
 // CHECK-NEXT: function_ref auto_generated_super_init_call.Parent.init
 // CHECK-NEXT: [[INITCALL1:%[0-9]+]] = function_ref @_TFC30auto_generated_super_init_call6ParentcfMS0_FT_S0_
 // CHECK-NEXT: [[RES1:%[0-9]+]] = apply [[INITCALL1]]([[PARENT]])
-// CHECK-NEXT: [[DOWNCAST:%[0-9]+]] = unconditional_checked_cast downcast [[RES1]] : $Parent to $SomeDerivedClass
+// CHECK-NEXT: [[DOWNCAST:%[0-9]+]] = unchecked_ref_cast [[RES1]] : $Parent to $SomeDerivedClass
 // CHECK-NEXT: assign [[DOWNCAST]] to [[SELF]]#1 : $*SomeDerivedClass 
   }
   
   init(x: Int) {
     y = x
-// CHECK-LABEL:sil @_TFC30auto_generated_super_init_call16SomeDerivedClasscfMS0_FT1xSi_S0_ : $@cc(method) @thin (Int64, @owned SomeDerivedClass) -> @owned SomeDerivedClass
+// CHECK-LABEL:sil @_TFC30auto_generated_super_init_call16SomeDerivedClasscfMS0_FT1xSi_S0_ : $@cc(method) @thin (Int, @owned SomeDerivedClass) -> @owned SomeDerivedClass
 // CHECK: function_ref @_TFC30auto_generated_super_init_call6ParentcfMS0_FT_S0_ : $@cc(method) @thin (@owned Parent) -> @owned Parent
   }
 
@@ -44,7 +44,7 @@ class SomeDerivedClass : Parent {
 // CHECK-LABEL: sil @_TFC30auto_generated_super_init_call16SomeDerivedClasscfMS0_FT1bSb_S0_ : $@cc(method) @thin (Bool, @owned SomeDerivedClass) -> @owned SomeDerivedClass    
 // CHECK: function_ref @_TFC30auto_generated_super_init_call6ParentcfMS0_FT_S0_ : $@cc(method) @thin (@owned Parent) -> @owned Parent
 // CHECK-NEXT: apply
-// CHECK-NEXT: unconditional_checked_cast downcast
+// CHECK-NEXT: unchecked_ref_cast
 // CHECK-NEXT: assign
 // CHECK-NEXT: load
 // CHECK-NEXT: strong_retain
@@ -61,7 +61,7 @@ class SomeDerivedClass : Parent {
     }
       
     super.init()
-// CHECK-LABEL: sil @_TFC30auto_generated_super_init_call16SomeDerivedClasscfMS0_FT1bSb1iSi_S0_ : $@cc(method) @thin (Bool, Int64, @owned SomeDerivedClass) -> @owned SomeDerivedClass    
+// CHECK-LABEL: sil @_TFC30auto_generated_super_init_call16SomeDerivedClasscfMS0_FT1bSb1iSi_S0_ : $@cc(method) @thin (Bool, Int, @owned SomeDerivedClass) -> @owned SomeDerivedClass    
 // CHECK: function_ref @_TFC30auto_generated_super_init_call6ParentcfMS0_FT_S0_ : $@cc(method) @thin (@owned Parent) -> @owned Parent
 // CHECK-NOT: function_ref @_TFC30auto_generated_super_init_call6ParentcfMS0_FT_S0_
 // CHECK: return
@@ -125,21 +125,6 @@ class ChildOfParentWithNoDefaultInit : ParentWithNoDefaultInit {
   var y: Int
   init() {
 // CHECK-LABEL: sil @_TFC30auto_generated_super_init_call30ChildOfParentWithNoDefaultInitcfMS0_FT_S0_ : $@cc(method) @thin (@owned ChildOfParentWithNoDefaultInit) -> @owned ChildOfParentWithNoDefaultInit
-// CHECK: bb0
-// CHECK-NOT: apply
-// CHECK: return
-  }
-}
-
-// This is a non-constructable parent, so don't insert the call.
-// FIXME: We should warn about the non-constructable classes.
-class ParentWithNoDefaultInit2 {
-  var i: Int
-}
-class ChildOfParentWithNoDefaultInit2 : ParentWithNoDefaultInit2 {
-  var y: Int
-  init() {
-// CHECK-LABEL: sil @_TFC30auto_generated_super_init_call31ChildOfParentWithNoDefaultInit2cfMS0_FT_S0_ : $@cc(method) @thin (@owned ChildOfParentWithNoDefaultInit2) -> @owned ChildOfParentWithNoDefaultInit2
 // CHECK: bb0
 // CHECK-NOT: apply
 // CHECK: return

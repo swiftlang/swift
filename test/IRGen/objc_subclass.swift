@@ -1,33 +1,194 @@
 // RUN: rm -rf %t/clang-module-cache
-// RUN: %swift -triple x86_64-apple-darwin10 -module-cache-path=%t/clang-module-cache -sdk=%S/Inputs %s -emit-llvm | FileCheck %s
+// RUN: %swift -target x86_64-apple-darwin10 -module-cache-path %t/clang-module-cache -sdk %S/Inputs -I=%S/Inputs -enable-source-import %s -emit-ir | FileCheck %s
 
+// CHECK: [[SGIZMO:C13objc_subclass10SwiftGizmo]] = type
 // CHECK: [[TYPE:%swift.type]] = type
-// CHECK: [[SGIZMO:%_T13objc_subclass10SwiftGizmo]] = type
-// CHECK: [[INT:%_TSs5Int64]] = type { i64 }
+// CHECK: [[INT:%Si]] = type <{ i64 }>
+// CHECK: [[OBJC_CLASS:%objc_class]] = type
+// CHECK: [[OPAQUE:%swift.opaque]] = type
+// CHECK: [[GIZMO:%CSo5Gizmo]] = type opaque
 // CHECK: [[OBJC:%objc_object]] = type opaque
+
+// CHECK: @_TWvdvC13objc_subclass10SwiftGizmo1xSi = global i64 16, align 8
+// CHECK: @"OBJC_METACLASS_$__TtC13objc_subclass10SwiftGizmo" = global [[OBJC_CLASS]] { [[OBJC_CLASS]]* @"OBJC_METACLASS_$_NSObject", [[OBJC_CLASS]]* @"OBJC_METACLASS_$_Gizmo", [[OPAQUE]]* @_objc_empty_cache, [[OPAQUE]]* @_objc_empty_vtable, i64 ptrtoint ({{.*}} @_METACLASS_DATA__TtC13objc_subclass10SwiftGizmo to i64) }
+// CHECK: [[STRING_X:@.*]] = private unnamed_addr constant [2 x i8] c"x\00"
+// CHECK: [[METHOD_TYPE_ENCODING1:@.*]] = private unnamed_addr constant [8 x i8] c"q16@0:8\00"
+// CHECK: [[METHOD_TYPE_ENCODING2:@.*]] = private unnamed_addr constant [11 x i8] c"v24@0:8q16\00"
+// CHECK: [[GETTER_ENCODING:@.*]] = private unnamed_addr constant [8 x i8] c"@16@0:8\00"
+// CHECK: [[INIT_ENCODING:@.*]] = private unnamed_addr constant [14 x i8] c"@32@0:8q16@24\00"
+// CHECK: [[DEALLOC_ENCODING:@.*]] = private unnamed_addr constant [11 x i8] c"v24@0:8@16\00"
+// CHECK: [[STRING_SWIFTGIZMO:@.*]] = private unnamed_addr constant [32 x i8] c"_TtC13objc_subclass10SwiftGizmo\00"
+// CHECK: @_METACLASS_DATA__TtC13objc_subclass10SwiftGizmo = private constant { {{.*}}* } {
+// CHECK:   i32 129,
+// CHECK:   i32 40,
+// CHECK:   i32 40,
+// CHECK:   i32 0,
+// CHECK:   i8* null,
+// CHECK:   i8* getelementptr inbounds ([{{[0-9]+}} x i8]* [[STRING_SWIFTGIZMO]], i64 0, i64 0),
+// CHECK:   i8* null,
+// CHECK:   i8* null,
+// CHECK:   i8* null,
+// CHECK:   i8* null,
+// CHECK:   i8* null
+// CHECK: }, section "__DATA, __objc_const", align 8
+// CHECK: @_INSTANCE_METHODS__TtC13objc_subclass10SwiftGizmo = private constant { {{.*}}] } {
+// CHECK:   i32 24,
+// CHECK:   i32 11,
+// CHECK:   [11 x { i8*, i8*, i8* }] [{
+// CHECK:      i8* getelementptr inbounds ([2 x i8]* @"\01L_selector_data(x)", i64 0, i64 0),
+// CHECK:      i8* getelementptr inbounds ([8 x i8]* [[METHOD_TYPE_ENCODING1]], i64 0, i64 0)
+// CHECK:      i8* bitcast (i64 ([[OPAQUE2:%.*]]*, i8*)* @_TToFC13objc_subclass10SwiftGizmog1xSi to i8*)
+// CHECK:   }, {
+// CHECK:      i8* getelementptr inbounds ([6 x i8]* @"\01L_selector_data(setX:)", i64 0, i64 0),
+// CHECK:      i8* getelementptr inbounds ([11 x i8]* [[METHOD_TYPE_ENCODING2]], i64 0, i64 0)
+// CHECK:      i8* bitcast (void ([[OPAQUE3:%.*]]*, i8*, i64)* @_TToFC13objc_subclass10SwiftGizmos1xSi to i8*)
+// CHECK:   }, {
+// CHECK:      i8* getelementptr inbounds ([5 x i8]* @"\01L_selector_data(getX)", i64 0, i64 0),
+// CHECK:      i8* getelementptr inbounds ([8 x i8]* [[METHOD_TYPE_ENCODING1]], i64 0, i64 0)
+// CHECK:      i8* bitcast (i64 ([[OPAQUE2]]*, i8*)* @_TToFC13objc_subclass10SwiftGizmo4getXfS0_FT_Si to i8*)
+// CHECK:   }, {
+// CHECK:     i8* getelementptr inbounds ([10 x i8]* @"\01L_selector_data(duplicate)", i64 0, i64 0),
+// CHECK:     i8* getelementptr inbounds ([8 x i8]* [[GETTER_ENCODING]], i64 0, i64 0),
+// CHECK:     i8* bitcast ([[OPAQUE1:.*]]* ([[OPAQUE0:%.*]]*, i8*)* @_TToFC13objc_subclass10SwiftGizmo9duplicatefS0_FT_CSo5Gizmo to i8*)
+// CHECK:   }, {
+// CHECK:     i8* getelementptr inbounds ([5 x i8]* @"\01L_selector_data(init)", i64 0, i64 0), 
+// CHECK:     i8* getelementptr inbounds ([8 x i8]* [[GETTER_ENCODING]], i64 0, i64 0),
+// CHECK:     i8* bitcast ([[OPAQUE5:.*]]* ([[OPAQUE6:.*]]*, i8*)* @_TToFC13objc_subclass10SwiftGizmocfMS0_FT_S0_ to i8*)
+// CHECK:   }, {
+// CHECK:     i8* getelementptr inbounds ([20 x i8]* @"\01L_selector_data(initWithInt:string:)", i64 0, i64 0), 
+// CHECK:     i8* getelementptr inbounds ([14 x i8]* [[INIT_ENCODING]], i64 0, i64 0),
+// CHECK:     i8* bitcast ([[OPAQUE7:%.*]]* ([[OPAQUE8:%.*]]*, i8*, i64, [[OPAQUEONE:.*]]*)* @_TToFC13objc_subclass10SwiftGizmocfMS0_FT3intSi6stringSS_S0_ to i8*)
+// CHECK:   }, {
+// CHECK:     i8* getelementptr inbounds ([8 x i8]* @"\01L_selector_data(dealloc)", i64 0, i64 0), 
+// CHECK:     i8* getelementptr inbounds ([11 x i8]* @9, i64 0, i64 0),
+// CHECK:     i8* bitcast (void ([[OPAQUE10:%.*]]*, i8*)* @_TToFC13objc_subclass10SwiftGizmoD to i8*)
+// CHECK:   }, {
+// CHECK:     i8* getelementptr inbounds ([10 x i8]* @"\01L_selector_data(isEnabled)", i64 0, i64 0), 
+// CHECK:     i8* getelementptr inbounds ([8 x i8]* @10, i64 0, i64 0), 
+// CHECK:     i8* bitcast (i8 ([[OPAQUE11:%.*]]*, i8*)* @_TToFC13objc_subclass10SwiftGizmog7enabledSb to i8*)
+// CHECK:   }, {
+// CHECK:     i8* getelementptr inbounds ([14 x i8]* @"\01L_selector_data(setIsEnabled:)", i64 0, i64 0), 
+// CHECK:     i8* getelementptr inbounds ([11 x i8]* @11, i64 0, i64 0), 
+// CHECK:     i8* bitcast (void ([[OPAQUE12:%.*]]*, i8*, i8)* @_TToFC13objc_subclass10SwiftGizmos7enabledSb to i8*)
+// CHECK:   }, {
+// CHECK:     i8* getelementptr inbounds ([17 x i8]* @"\01L_selector_data(initWithBellsOn:)", i64 0, i64 0), 
+// CHECK:     i8* getelementptr inbounds ([11 x i8]* @12, i64 0, i64 0), 
+// CHECK:     i8* bitcast ([[OPAQUE11:%.*]]* ([[OPAQUE12:%.*]]*, i8*, i64)* @_TToFC13objc_subclass10SwiftGizmocfMS0_FT7bellsOnSi_S0_ to i8*)
+// CHECK:   }, {
+// CHECK:     i8* getelementptr inbounds ([15 x i8]* @"\01L_selector_data(.cxx_construct)", i64 0, i64 0),
+// CHECK:     i8* getelementptr inbounds ([3 x i8]* @13, i64 0, i64 0),
+// CHECK:     i8* bitcast ([[OPAQUE5]]* ([[OPAQUE6]]*, i8*)* @_TToFC13objc_subclass10SwiftGizmoe to i8*)
+// CHECK:   }]
+// CHECK: }, section "__DATA, __objc_const", align 8
+// CHECK: @_IVARS__TtC13objc_subclass10SwiftGizmo = private constant { {{.*}}] } {
+// CHECK:   i32 32,
+// CHECK:   i32 1,
+// CHECK:   [1 x { i64*, i8*, i8*, i32, i32 }] [{ i64*, i8*, i8*, i32, i32 } {
+// CHECK:     i64* @_TWvdvC13objc_subclass10SwiftGizmo1xSi,
+// CHECK:     i8* getelementptr inbounds ([2 x i8]* [[STRING_X]], i64 0, i64 0),
+// CHECK:     i8* null,
+// CHECK:     i32 8,
+// CHECK:     i32 8 }]
+// CHECK: }, section "__DATA, __objc_const", align 8
+// CHECK: @_DATA__TtC13objc_subclass10SwiftGizmo = private constant { {{.*}}* } {
+// CHECK:    i32 132,
+// CHECK:    i32 16,
+// CHECK:    i32 24,
+// CHECK:    i32 0,
+// CHECK:    i8* null,
+// CHECK:    i8* getelementptr inbounds ([{{[0-9]+}} x i8]* [[STRING_SWIFTGIZMO]], i64 0, i64 0),
+// CHECK:    @_INSTANCE_METHODS__TtC13objc_subclass10SwiftGizmo,
+// CHECK:    i8* null,
+// CHECK:    @_IVARS__TtC13objc_subclass10SwiftGizmo,
+// CHECK:    i8* null,
+// CHECK:    i8* null
+// CHECK:  }, section "__DATA, __objc_const", align 8
+// CHECK-NOT: @_TMdCSo13SwiftGizmo = {{.*NSObject}}
+
+// CHECK: @_INSTANCE_METHODS__TtC13objc_subclass11SwiftGizmo2 = private constant { i32, {{.*}}] } { 
+// CHECK:   i32 24, 
+// CHECK:   i32 5, 
+// CHECK:   [5 x { i8*, i8*, i8* }] [
+// CHECK:     { 
+// CHECK:       i8* getelementptr inbounds ([3 x i8]* @"\01L_selector_data(sg)", i64 0, i64 0), 
+// CHECK:       i8* getelementptr inbounds ([8 x i8]* [[GETTER_ENCODING]], i64 0, i64 0),
+// CHECK:       i8* bitcast ([[OPAQUE13:%.*]]* ([[OPAQUE14:%.*]]*, i8*)* @_TToFC13objc_subclass11SwiftGizmo2g2sgCS_10SwiftGizmo to i8*)
+// CHECK:     }, { 
+// CHECK:       i8* getelementptr inbounds ([7 x i8]* @"\01L_selector_data(setSg:)", i64 0, i64 0), 
+// CHECK:       i8* getelementptr inbounds ([11 x i8]* [[DEALLOC_ENCODING]], i64 0, i64 0),
+// CHECK:       i8* bitcast (void ([[OPAQUE15:%.*]]*, i8*, [[OPAQUE16:%.*]]*)* @_TToFC13objc_subclass11SwiftGizmo2s2sgCS_10SwiftGizmo to i8*)
+// CHECK:     }, { 
+// CHECK:       i8* getelementptr inbounds ([5 x i8]* @"\01L_selector_data(init)", i64 0, i64 0), 
+// CHECK:       i8* getelementptr inbounds ([8 x i8]* [[GETTER_ENCODING]], i64 0, i64 0),
+// CHECK:       i8* bitcast ([[OPAQUE18:%.*]]* ([[OPAQUE19:%.*]]*, i8*)* @_TToFC13objc_subclass11SwiftGizmo2cfMS0_FT_S0_ to i8*)
+// CHECK:     }, {
+// CHECK:       i8* getelementptr inbounds ([17 x i8]* @"\01L_selector_data(initWithBellsOn:)", i64 0, i64 0), 
+// CHECK:       i8* getelementptr inbounds ([11 x i8]* @12, i64 0, i64 0), 
+// CHECK:       i8* bitcast ([[OPAQUE21:%.*]]* ([[OPAQUE22:%.*]]*, i8*, i64)* @_TToFC13objc_subclass11SwiftGizmo2cfMS0_FT7bellsOnSi_S0_ to i8*)
+// CHECK:     }, { 
+// CHECK:       i8* getelementptr inbounds ([14 x i8]* @"\01L_selector_data(.cxx_destruct)", i64 0, i64 0), 
+// CHECK:       i8* getelementptr inbounds ([3 x i8]* @13, i64 0, i64 0)
+// CHECK:       i8* bitcast (void ([[OPAQUE20:%.*]]*, i8*)* @_TToFC13objc_subclass11SwiftGizmo2E to i8*)
+// CHECK:     }
+// CHECK: ] }
+
+// CHECK: @objc_classes = internal global [2 x i8*] [i8* bitcast (%swift.type* getelementptr inbounds (%swift.full_heapmetadata* bitcast ({{.*}}* @_TMdC13objc_subclass10SwiftGizmo to %swift.full_heapmetadata*), i32 0, i32 2) to i8*), i8* bitcast (%swift.type* getelementptr inbounds (%swift.full_heapmetadata* bitcast ({{.*}}* @_TMdC13objc_subclass11SwiftGizmo2 to %swift.full_heapmetadata*), i32 0, i32 2) to i8*)], section "__DATA, __objc_classlist, regular, no_dead_strip", align 8
+
+// CHECK: @objc_non_lazy_classes = internal global [2 x i8*] [i8* bitcast (%swift.type* getelementptr inbounds (%swift.full_heapmetadata* bitcast ({{.*}}* @_TMdC13objc_subclass10SwiftGizmo to %swift.full_heapmetadata*), i32 0, i32 2) to i8*), i8* bitcast (%swift.type* getelementptr inbounds (%swift.full_heapmetadata* bitcast ({{.*}}* @_TMdC13objc_subclass11SwiftGizmo2 to %swift.full_heapmetadata*), i32 0, i32 2) to i8*)], section "__DATA, __objc_nlclslist, regular, no_dead_strip", align 8
 
 import gizmo
 
+@requires_stored_property_inits
 class SwiftGizmo : Gizmo {
-  var x : Int
+  var x = Int()
 
   func getX() -> Int {
     return x;
   }
+
+  override func duplicate() -> Gizmo {
+    return SwiftGizmo()
+  }
+
+  init() {
+    super.init(bellsOn:0)
+  }
+
+  init(int i: Int, string str : String) {
+    super.init(bellsOn:i)
+  }
+
+  deinit { var x = 10 }
+
+  var enabled: Bool {
+    @objc(isEnabled) get {
+      return true
+    }
+
+    @objc(setIsEnabled:) set {
+    }  
+  }
 }
 
+class GenericGizmo<T> : Gizmo {
+  func foo() {}
 
-// CHECK:    define i64 @_TC13objc_subclass10SwiftGizmo4getXfS0_FT_Si([[SGIZMO]]* %this) {
-// CHECK:      [[RET:%.*]] = alloca [[INT]], align 8
-// CHECK-NEXT: [[THIS:%.*]] = alloca [[SGIZMO]]*, align 8
-// CHECK-NEXT: store [[SGIZMO]]* %this, [[SGIZMO]]** [[THIS]], align 8
-// CHECK-NEXT: [[T0:%.*]] = load [[SGIZMO]]** [[THIS]], align 8
-// CHECK-NEXT: call [[SGIZMO]]* bitcast ([[OBJC]]* ([[OBJC]]*)* @objc_retain to [[SGIZMO]]* ([[SGIZMO]]*)*)([[SGIZMO]]* [[T0]]) nounwind
-// CHECK-NEXT: [[T1:%.*]] = load i64* @_TWvdC13objc_subclass10SwiftGizmo1xSi, align 8
-// CHECK-NEXT: [[T2:%.*]] = bitcast [[SGIZMO]]* [[T0]] to i8*
-// CHECK-NEXT: [[T3:%.*]] = getelementptr inbounds i8* [[T2]], i64 [[T1]]
-// CHECK-NEXT: [[T4:%.*]] = bitcast i8* [[T3]] to [[INT]]*
-// CHECK-NEXT: [[T5:%.*]] = getelementptr inbounds [[INT]]* [[T4]], i32 0, i32 0
-// CHECK-NEXT: [[T6:%.*]] = load i64* [[T5]], align 8
-// CHECK-NEXT: [[T7:%.*]] = getelementptr inbounds [[INT]]* [[RET]], i32 0, i32 0
-// CHECK-NEXT: store i64 [[T6]], i64* [[T7]], align 8
+  var x : Int {
+    return 0
+  }
+}
+// CHECK: define i64 @_TFC13objc_subclass12GenericGizmog1xSi(
+
+var sg = SwiftGizmo()
+sg.duplicate()
+
+class SwiftGizmo2 : Gizmo {
+  var sg : SwiftGizmo
+
+  init() { 
+    sg = SwiftGizmo()
+    super.init()
+  }
+
+  deinit { }
+}

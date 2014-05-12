@@ -1,29 +1,40 @@
-// RUN: %swift %s -dump-parse -verify
+// RUN: %swift %s -parse -verify
 
 class B {
-  var foo : (bar:Int)
+  var foo: (bar: Int)
   func bar() {}
 
-  constructor() {}
-  constructor(x:Int) {}
+  init() {}
+  init(x: Int) {}
 
-  subscript(x:Int) -> Int {get:}
+  subscript(x: Int) -> Int {
+    get {}
+    set {}
+  }
 }
 
-class D {
+class D : B {
+  init() {
+    super.init()
+  }
+
+  init(x:Int) {
+    super.init //  expected-error {{'super.init' cannot be referenced without arguments}} expected-error {{could not find an overload for 'init' that accepts the supplied arguments}}
+  }
+
   func super_calls() {
-    super.foo
-    super.foo.bar
-    super.bar
+    super.foo        // expected-error {{expression resolves to an unused l-value}}
+    super.foo.bar    // expected-error {{expression resolves to an unused l-value}}
+    super.bar        // expected-error {{expression resolves to an unused function}}
     super.bar()
-    super.constructor
-    super.constructor()
-    super.constructor(0)
-    super[0]
+    super.init // expected-error{{'super.init' cannot be called outside of an initializer}}
+    super.init() // expected-error{{'super.init' cannot be called outside of an initializer}}
+    super.init(0) // expected-error{{'super.init' cannot be called outside of an initializer}}
+    super[0]        // expected-error {{expression resolves to an unused l-value}}
   }
 
   func bad_super_1() {
-    super.$0 // expected-error{{expected identifier or 'constructor'}}
+    super.$0 // expected-error{{expected identifier or 'init'}}
   }
 
   func bad_super_2() {

@@ -1,11 +1,11 @@
 // RUN: %swift -dump-ast %s 2>&1 | FileCheck %s
 
-// CHECK: func_decl "foo"
-func foo(x:Int) -> (Int) -> (Int) -> Int {
-  // CHECK: func_expr type='(bar : Int) -> (Int) -> Int' captures=(x)
-  return func(bar:Int) -> (Int) -> Int {
-    // CHECK: func_expr type='(bas : Int) -> Int' captures=(x, bar)
-    return func(bas:Int) -> Int {
+// CHECK: func_decl "foo2(_:)"
+func foo2(x: Int) -> (Int) -> (Int) -> Int {
+  // CHECK: closure_expr type='(Int) -> (Int) -> Int' discriminator=0 captures=(x)
+  return {(bar: Int) -> (Int) -> Int in
+    // CHECK: closure_expr type='(Int) -> Int' discriminator=0 captures=(x, bar)
+    return {(bas: Int) -> Int in
       return x + bar + bas
     }
   }

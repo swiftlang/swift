@@ -1,7 +1,7 @@
 // RUN: %swift -parse %s -verify
 
-// A [inout] parameter cannot be captured.
-func foo(x : [inout] Int) {
+// An inout parameter can be captured.
+func foo(inout x: Int) {
   func bar() -> Int {
     return x
   }

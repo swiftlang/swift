@@ -25,9 +25,9 @@ protocol P5 {
   func f5() -> Self
 }
 
-// Inheritable: method returning DynamicSelf
+// Inheritable: method returning Self
 protocol P6 {
-  func f6() -> DynamicSelf
+  func f6() -> Self
 }
 
 // Inheritable: method involving associated type.
@@ -36,10 +36,15 @@ protocol P7 {
   func f7() -> Assoc
 }
 
+// Inheritable: initializer requirement.
+protocol P8 {
+  init(int: Int)
+}
+
 // Class A conforms to everything.
-class A : P1, P2, P3, P4, P5, P6, P7 {
+class A : P1, P2, P3, P4, P5, P6, P7, P8 {
   // P1
-  func f1(a: A) -> Bool { return true }
+  func f1(x: A) -> Bool { return true }
 
   // P2
   var prop2: A {
@@ -48,24 +53,29 @@ class A : P1, P2, P3, P4, P5, P6, P7 {
 
   // P3
   subscript (i: Int) -> A {
-  get:
-    return self
+    get {
+     return self
+    }
   }
-  
+
   // P4
   subscript (a: A) -> Int { 
-  get: 
-    return 5
+    get {
+      return 5
+    }
   }
 
-  // P5 
+  // P5
   func f5() -> A { return self }
 
-  // P6 
-  func f6() -> DynamicSelf { return self }
+  // P6
+  func f6() -> Self { return self }
 
   // P7
   func f7() -> Int { return 5 }
+
+  // P8
+  init(int: Int) { }
 }
 
 // Class B inherits A; gets all of its inheritable conformances.
@@ -79,12 +89,13 @@ func testB(b: B) {
   var p5: P5 = b // expected-error{{type 'B' does not conform to protocol 'P5'}}
   var p6: P6 = b
   var p7: P7 = b
+  var p8: P8 = b // expected-error{{type 'B' does not conform to protocol 'P8'}}
 }
 
 // Class A5 conforms to P5 in an inheritable manner.
 class A5 : P5 {
   // P5 
-  func f5() -> DynamicSelf { return self }
+  func f5() -> Self { return self }
 }
 
 // Class B5 inherits A5; gets all of its inheritable conformances.
@@ -92,4 +103,17 @@ class B5 : A5 { }
 
 func testB5(b5: B5) {
   var p5: P5 = b5 // okay
+}
+
+// Class A8 conforms to P8 in an inheritable manner.
+class A8 : P8 {
+  @required init(int: Int) { }
+}
+
+class B8 : A8 {
+  @required init(int: Int) { }
+}
+
+func testB8(b8: B8) {
+  var p8: P8 = b8 // okay
 }

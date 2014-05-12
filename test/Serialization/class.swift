@@ -1,23 +1,26 @@
 // RUN: rm -rf %t
 // RUN: mkdir %t
-// RUN: %swift -emit-module -o %t/def_class.swiftmodule %S/Inputs/def_class.swift
+// RUN: %swift -emit-module -o %t %S/Inputs/def_class.swift
 // RUN: llvm-bcanalyzer %t/def_class.swiftmodule | FileCheck %s
-// RUN: %swift -emit-silgen -I=%t %s -o /dev/null
+// RUN: %swift -emit-sil -sil-debug-serialization -I=%t %s | FileCheck %s -check-prefix=SIL
+// RUN: echo "import def_class; struct A : ClassProto {}" | not %swift -I=%t - 2>&1 | FileCheck %s -check-prefix=CHECK-STRUCT
 
-// CHECK-NOT: FALL_BACK_TO_TRANSLATION_UNIT
+// CHECK-NOT: UnknownCode
+// CHECK-STRUCT: non-class type 'A' cannot conform to class protocol 'ClassProto'
 
 import def_class
 
 var a : Empty
-var b = TwoInts(1, 2)
-var c : ComputedProperty
-var sum = b.x + b.y + c.value
+var b = TwoInts(a: 1, b: 2)
+var computedProperty : ComputedProperty
+var sum = b.x + b.y + computedProperty.value
 
 var intWrapper = ResettableIntWrapper()
-var r = intWrapper as Resettable
+var r : Resettable = intWrapper
 r.reset()
 
-class AnotherIntWrapper : SpecialResettable {
+class AnotherIntWrapper : SpecialResettable, ClassProto {
+  init() { value = 0 }
   var value : Int
   func reset() {
     value = 0
@@ -31,12 +34,12 @@ var intWrapper2 = AnotherIntWrapper()
 r = intWrapper2
 r.reset()
 
-var c = intWrapper2 as Cacheable
+var c : Cacheable = intWrapper2
 c.compute()
 c.reset()
 
 
-var p = Pair(1, 2.5)
+var p = Pair(a: 1, b: 2.5)
 p.first = 2
 p.second = 5.0
 
@@ -49,7 +52,7 @@ gc.doSomething()
 a = StillEmpty()
 r = StillEmpty()
 
-var bp = BoolPair()
+var bp = BoolPair<Bool>()
 bp.bothTrue()
 
 var rawBP : Pair<Bool, Bool>
@@ -59,3 +62,23 @@ rawBP = bp
 var rev : SpecialPair<Double>
 rev.first = 42
 var comp : Computable = rev
+
+var simpleSub = ReadonlySimpleSubscript()
+var subVal = simpleSub[4]
+
+var complexSub = ComplexSubscript()
+complexSub[4, false] = complexSub[3, true]
+
+var rsrc = Resource()
+
+getReqPairLike()
+
+// SIL-LABEL: sil public_external [transparent] @_TFSsoi1pFTSiSi_Si : $@thin (Int, Int) -> Int {
+
+func test(sharer: ResourceSharer) {}
+
+class HasNoOptionalReqs : ObjCProtoWithOptional { }
+
+HasNoOptionalReqs()
+OptionalImplementer().unrelated()
+

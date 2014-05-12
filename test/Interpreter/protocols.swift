@@ -1,4 +1,4 @@
-// RUN: %swift -i %s | FileCheck %s
+// RUN: %target-run-simple-swift | FileCheck %s
 
 protocol RollCallable {
   func rollCall() -> String
@@ -22,11 +22,11 @@ struct Crow : RollCallable, Snarker {
   func snark() -> String { return "That's one O!" }
 }
 
-func printRollCall(x:RollCallable) {
+func printRollCall(x: RollCallable) {
   println(x.rollCall())
 }
 
-func printRollCallWithSnark(x:protocol<RollCallable, Snarker>) {
+func printRollCallWithSnark(x: protocol<RollCallable, Snarker>) {
   printRollCall(x)
   println("(\(x.snark()))")
 }

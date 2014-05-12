@@ -1,3 +1,4 @@
+// RUN: rm -rf %t/clang-module-cache
 // RUN: %swift-ide-test -code-completion -source-filename %s %clang-importer-sdk -target x86_64-apple-darwin13 -module-cache-path %t/clang-module-cache -code-completion-token=CLANG_UNQUAL_1 > %t.compl.txt
 // RUN: FileCheck %s -check-prefix=CLANG_CTYPES < %t.compl.txt
 // RUN: FileCheck %s -check-prefix=CLANG_MACROS < %t.compl.txt

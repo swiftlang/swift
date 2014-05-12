@@ -1,33 +1,57 @@
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
 protocol CVarArg {
   func encode() -> Word[]
 }
 
+#if arch(x86_64)
 let _x86_64CountGPRegisters = 6
 let _x86_64CountSSERegisters = 8
 let _x86_64SSERegisterWords = 2
 let _x86_64RegisterSaveWords = _x86_64CountGPRegisters + _x86_64CountSSERegisters * _x86_64SSERegisterWords
+#endif
 
-@asmname="swift_runningOnX86_64" func swift_runningOnX86_64() -> Bool
-
-func withVaList<R>(args: CVarArg[], f: (CVaList)->R) -> R {
-  var argList: C_va_list = makeC_va_list()
+func withVaList<R>(args: CVarArg[], f: (CVaListPointer)->R) -> R {
+  var builder = VaListBuilder()
   for a in args {
-    argList.append(a)
+    builder.append(a)
   }
-  return f(argList)
+  return withVaList(builder, f)
 }
 
+func withVaList<R>(builder: VaListBuilder, f: (CVaListPointer)->R) -> R {
+  let result = f(builder.va_list())
+  _fixLifetime(builder)
+  return result
+}
 
-// FIXME: workaround for <rdar://problem/15715225>
-func sizeof(_:Word.metatype) -> Int {
-  return Int(Word(Builtin.sizeof(Word)))
+func getVaList(args: CVarArg[]) -> CVaListPointer {
+  var builder = VaListBuilder()
+  for a in args {
+    builder.append(a)
+  }
+  // FIXME: Use some Swift equivalent of NS_RETURNS_INNER_POINTER if we get one.
+  Builtin.retain(builder)
+  Builtin.autorelease(builder)
+  return builder.va_list()
 }
 
 func encodeBitsAsWords<T: CVarArg>(x: T) -> Word[] {
-  var result = Array<Word>(
-    (sizeof(T) + sizeof(Word) - 1) / sizeof(Word), 0)
-
-  c_memcpy(result.base, addressof(&x), UInt64(sizeof(T)))
+  var result = Word[](count: (sizeof(T.self) + sizeof(Word.self) - 1) / sizeof(Word.self), value: 0)
+  var tmp = x
+  c_memcpy(dest: UnsafePointer(result.elementStorage),
+           src: UnsafePointer(Builtin.addressof(&tmp)),
+           size: UInt(sizeof(T.self)))
   return result
 }
 
@@ -36,6 +60,12 @@ func encodeBitsAsWords<T: CVarArg>(x: T) -> Word[] {
 // encoding.
 
 // Signed types
+extension Int : CVarArg {
+  func encode() -> Word[] {
+    return encodeBitsAsWords(self)
+  }
+}
+
 extension Int64 : CVarArg {
   func encode() -> Word[] {
     return encodeBitsAsWords(self)
@@ -61,6 +91,12 @@ extension Int8 : CVarArg {
 }
 
 // Unsigned types
+extension UInt : CVarArg {
+  func encode() -> Word[] {
+    return encodeBitsAsWords(self)
+  }
+}
+
 extension UInt64 : CVarArg {
   func encode() -> Word[] {
     return encodeBitsAsWords(self)
@@ -103,14 +139,10 @@ extension Double : CVarArg {
   }
 }
 
-protocol C_va_list {
-  func append(arg: CVarArg)
+#if !arch(x86_64)
 
-  @conversion
-  func __conversion() -> COpaquePointer
-}
-
-struct BasicC_va_list : C_va_list {
+@final
+class VaListBuilder {
   
   func append(arg: CVarArg) {
     for x in arg.encode() {
@@ -118,43 +150,41 @@ struct BasicC_va_list : C_va_list {
     }
   }
   
-  @conversion
-  func __conversion() -> COpaquePointer {
-    return COpaquePointer(storage.base)
+  func va_list() -> CVaListPointer {
+    return CVaListPointer(fromUnsafePointer: UnsafePointer<Void>(storage.elementStorage))
   }
 
-  var storage: Word[] = Array<Word>()
+  var storage = Word[]()
 }
 
-func &&<T: LogicValue>(a: T, b: @auto_closure () -> T) -> T {
-  return a ? b() : a
-}
+#else
 
-func ||<T: LogicValue>(a: T, b: @auto_closure () -> T) -> T {
-  return a ? a : b()
-}
-
-struct X86_64_va_list : C_va_list {
+@final
+class VaListBuilder {
 
   struct Header {
     var gp_offset = CUnsignedInt(0)
-    var fp_offset = CUnsignedInt(_x86_64CountGPRegisters * sizeof(Word))
+    var fp_offset = CUnsignedInt(_x86_64CountGPRegisters * strideof(Word.self))
     var overflow_arg_area: UnsafePointer<Word> = UnsafePointer<Word>.null()
     var reg_save_area: UnsafePointer<Word> = UnsafePointer<Word>.null()
   }
   
   init() {
     // prepare the register save area
-    storage = Array(_x86_64RegisterSaveWords, Word(0))
+    storage = Array(count: _x86_64RegisterSaveWords, value: 0)
   }
-  
+
   func append(arg: CVarArg) {
     var encoded = arg.encode()
     
-    if ((arg as Float) || (arg as Double)) && sseRegistersUsed < _x86_64CountSSERegisters {
-      var startIndex = _x86_64CountGPRegisters + (sseRegistersUsed * _x86_64SSERegisterWords)
-      var endIndex = startIndex + encoded.count
-      storage[startIndex..endIndex] = encoded
+    if ((arg as Float) || (arg as Double))
+    && sseRegistersUsed < _x86_64CountSSERegisters {
+      var startIndex = _x86_64CountGPRegisters
+           + (sseRegistersUsed * _x86_64SSERegisterWords)
+      for w in encoded {
+        storage[startIndex] = w
+        ++startIndex
+      }
       ++sseRegistersUsed
     }
     else if encoded.count == 1 && gpRegistersUsed < _x86_64CountGPRegisters {
@@ -167,24 +197,20 @@ struct X86_64_va_list : C_va_list {
     }
   }
 
-  @conversion
-  func __conversion() -> COpaquePointer {
-    header.reg_save_area = storage.base
-    header.overflow_arg_area = storage.base + _x86_64RegisterSaveWords
-    return COpaquePointer(addressof(&self.header))
+  func va_list() -> CVaListPointer {
+    header.reg_save_area = storage.elementStorage
+    header.overflow_arg_area = storage.elementStorage + _x86_64RegisterSaveWords
+    return CVaListPointer(
+             fromUnsafePointer: UnsafePointer<Void>(
+               Builtin.addressof(&self.header)))
   }
 
   var gpRegistersUsed = 0
   var sseRegistersUsed = 0
+
+  @final  // Property must be final since it is used by Builtin.addressof.
   var header = Header()
   var storage: Word[]
 }
 
-func makeC_va_list() -> C_va_list {
-  if swift_runningOnX86_64() {
-    return X86_64_va_list()
-  }
-  else {
-    return BasicC_va_list()
-  }
-}
+#endif

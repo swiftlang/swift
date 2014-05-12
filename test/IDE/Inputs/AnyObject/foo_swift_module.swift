@@ -6,7 +6,7 @@
       return 0
     }
   }
-  var foo_TopLevelObjcClass_Property1: Int
+  var foo_TopLevelObjcClass_Property1: Int = 0
 }
 
 class Foo_TopLevelClass {
@@ -17,7 +17,7 @@ class Foo_TopLevelClass {
       return 0
     }
   }
-  @objc var foo_TopLevelClass_ObjcProperty1: Int
+  @objc var foo_TopLevelClass_ObjcProperty1: Int = 0
 }
 
 @class_protocol @objc protocol Foo_TopLevelObjcProtocol {
@@ -31,7 +31,7 @@ class Foo_ContainerForNestedClass1 {
   class Foo_Nested1 {
     @objc func foo_Nested1_ObjcInstanceFunc1() {}
     @objc class func foo_Nested1_ObjcClassFunc1() {}
-    @objc var foo_Nested1_Property1: Int
+    @objc var foo_Nested1_Property1: Int = 0
     func ERROR() {}
   }
   func ERROR() {}
@@ -41,7 +41,7 @@ struct Foo_ContainerForNestedClass2 {
   class Foo_Nested2 {
     @objc func foo_Nested2_ObjcInstanceFunc1() {}
     @objc class func foo_Nested2_ObjcClassFunc1() {}
-    @objc var foo_Nested2_Property1: Int
+    @objc var foo_Nested2_Property1: Int = 0
     func ERROR() {}
   }
   func ERROR() {}

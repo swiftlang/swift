@@ -1,51 +1,66 @@
 //===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
 // UnicodeScalar Type
 //===----------------------------------------------------------------------===//
 
-struct UnicodeScalar : BuiltinCharacterLiteralConvertible, CharacterLiteralConvertible, 
-              ReplPrintable {
-  var _value : Builtin.Int21
+struct UnicodeScalar :
+    ExtendedGraphemeClusterLiteralConvertible, ReplPrintable {
 
-  var value : UInt32 {
-    get:
-      var zextValue = Builtin.zext_Int21_Int32(_value)
-      return UInt32(zextValue)
+  var _value: Builtin.Int32
+
+  var value: UInt32 {
+    get {
+      return UInt32(_value)
+    }
   }
 
-  static func _convertFromBuiltinCharacterLiteral(val: Builtin.Int21) -> UnicodeScalar {
-    return UnicodeScalar(val)
-  }
-
-  static func convertFromCharacterLiteral(value: UnicodeScalar) -> UnicodeScalar {
-    return value
+  static func convertFromExtendedGraphemeClusterLiteral(
+      value: String) -> UnicodeScalar {
+    let unicodeScalars = value.unicodeScalars
+    return unicodeScalars[unicodeScalars.startIndex]
   }
 
   init() {
-    self._value = Builtin.trunc_Int32_Int21(Int32(0).value)
+    self._value = Int32(0).value
   }
 
-  init(value : Builtin.Int21) {
+  init(_ value : Builtin.Int32) {
     self._value = value
   }
 
-  init(v : UInt32) {
+  init(_ v : UInt32) {
     var lowHalf = v & 0xFFFF
     // reserved in each plane
-    debugTrap(lowHalf != 0xFFFE && lowHalf != 0xFFFF)
+    assert(lowHalf != 0xFFFE && lowHalf != 0xFFFF)
     // UTF-16 surrogate pair values are not valid code points
-    debugTrap(v < 0xD800 || v > 0xDFFF)
+    assert(v < 0xD800 || v > 0xDFFF)
     // U+FDD0...U+FDEF are also reserved
-    debugTrap(v < 0xFDD0 || v > 0xFDEF)
+    assert(v < 0xFDD0 || v > 0xFDEF)
     // beyond what is defined to be valid
-    debugTrap(v < 0x10FFFF)
+    assert(v < 0x10FFFF)
 
-    self._value = Builtin.trunc_Int32_Int21(v.value)
+    self._value = v.value
+  }
+
+  init(_ v: UnicodeScalar) {
+    // This constructor allows one to provide necessary type context to
+    // disambiguate between function overloads on 'String' and 'UnicodeScalar'.
+    self = v
   }
 
   func replPrint() {
-    print('\'')
+    print("\"")
     print(escape())
-    print('\'')
+    print("\"")
   }
 
   func escape() -> String {
@@ -57,22 +72,22 @@ struct UnicodeScalar : BuiltinCharacterLiteralConvertible, CharacterLiteralConve
         return String(UnicodeScalar(nibble-10+65)) // 65 = 'A'
       }
     }
-    
-    if self == '\\' {
+
+    if self == "\\" {
       return "\\\\"
-    } else if self == '"' {
-      return "\\\""
-    } else if self == '\'' {
+    } else if self == "\'" {
       return "\\\'"
+    } else if self == "\"" {
+      return "\\\""
     } else if isPrint() {
       return String(self)
-    } else if self == '\0' {
+    } else if self == "\0" {
       return "\\0"
-    } else if self == '\n' {
+    } else if self == "\n" {
       return "\\n"
-    } else if self == '\r' {
+    } else if self == "\r" {
       return "\\r"
-    } else if self == '\t' {
+    } else if self == "\t" {
       return "\\t"
     } else if UInt32(self) < 128 {
       return "\\x"  
@@ -110,19 +125,19 @@ struct UnicodeScalar : BuiltinCharacterLiteralConvertible, CharacterLiteralConve
 
   // FIXME: Locales make this interesting
   func isAlpha() -> Bool {
-    return (self >= 'A' && self <= 'Z') || (self >= 'a' && self <= 'z')
+    return (self >= "A" && self <= "Z") || (self >= "a" && self <= "z")
   }
 
   // FIXME: Locales make this interesting
   func isDigit() -> Bool {
-    return self >= '0' && self <= '9'
+    return self >= "0" && self <= "9"
   }
 
   // FIXME: Locales make this interesting
   var uppercase : UnicodeScalar {
-    if self >= 'a' && self <= 'z' {
+    if self >= "a" && self <= "z" {
       return UnicodeScalar(UInt32(self) - 32)
-    } else if self >= 'à' && self <= 'þ' && self != '÷' {
+    } else if self >= "à" && self <= "þ" && self != "÷" {
       return UnicodeScalar(UInt32(self) - 32)
     }
     return self
@@ -130,9 +145,9 @@ struct UnicodeScalar : BuiltinCharacterLiteralConvertible, CharacterLiteralConve
 
   // FIXME: Locales make this interesting
   var lowercase : UnicodeScalar {
-    if self >= 'A' && self <= 'Z' {
+    if self >= "A" && self <= "Z" {
       return UnicodeScalar(UInt32(self) + 32)
-    } else if self >= 'À' && self <= 'Þ' && self != '×' {
+    } else if self >= "À" && self <= "Þ" && self != "×" {
       return UnicodeScalar(UInt32(self) + 32)
     }
     return self
@@ -143,43 +158,43 @@ struct UnicodeScalar : BuiltinCharacterLiteralConvertible, CharacterLiteralConve
     // FIXME: The constraint-based type checker goes painfully exponential
     // when we turn this into one large expression. Break it up for now,
     // until we can optimize the constraint solver better.
-    if self == ' '  || self == '\t' { return true }
-    if self == '\n' || self == '\r' { return true }
-    return self == '\x0B' || self == '\x0C'
+    if self == " "  || self == "\t" { return true }
+    if self == "\n" || self == "\r" { return true }
+    return self == "\x0B" || self == "\x0C"
   }
 }
 
 extension UnicodeScalar : FormattedPrintable {
   func format(kind: UnicodeScalar, layout: String) -> String {
-    return String(self).format(kind, layout)
+    return String(self).format(kind, layout: layout)
   }
 }
 
 extension UnicodeScalar : Hashable {
-  func hashValue() -> Int {
+  var hashValue: Int {
     return Int(self.value)
   }
 }
 
 extension UnicodeScalar {
-  init(v : Int) {
+  init(_ v : Int) {
     self = UnicodeScalar(UInt32(v))
   }
 }
 
 extension UInt8 {
-  init(v : UnicodeScalar) {
-    debugTrap(v.value <= UInt32(UInt8.max), "Code point value does not fit into UInt8")
+  init(_ v : UnicodeScalar) {
+    assert(v.value <= UInt32(UInt8.max), "Code point value does not fit into UInt8")
     self = UInt8(v.value)
   }
 }
 extension UInt32 {
-  init(v : UnicodeScalar) {
+  init(_ v : UnicodeScalar) {
     self = v.value
   }
 }
 extension UInt64 {
-  init(v : UnicodeScalar) {
+  init(_ v : UnicodeScalar) {
     self = UInt64(v.value)
   }
 }
@@ -216,3 +231,19 @@ extension UnicodeScalar {
     return (self >= UnicodeScalar(0o040) && self <= UnicodeScalar(0o176))
   }
 }
+
+/// Helpers to provide type context to guide type inference in code like::
+///
+///   var zero = _asUnicodeCodePoint('0')
+func _asUnicodeCodePoint(us: UnicodeScalar) -> Builtin.Int32 {
+  return us._value
+}
+func _asUnicodeCodePoint(us: UnicodeScalar) -> UInt32 {
+  return us.value
+}
+func _asUTF16CodeUnit(us: UnicodeScalar) -> UTF16.CodeUnit {
+  var codePoint = us.value
+  assert(codePoint <= UInt32(UInt16.max))
+  return UTF16.CodeUnit(codePoint)
+}
+

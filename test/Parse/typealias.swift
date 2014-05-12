@@ -1,22 +1,23 @@
 // RUN: %swift %s -verify
 
-typealias Recovery1
+//===--- Simple positive tests.
 
-func flushDiagnostics1() {} // expected-error {{expected '=' in typealias declaration}}
+typealias IntPair = (Int, Int)
+typealias IntTriple = (Int, Int, Int)
+typealias FiveInts = (IntPair, IntTriple)
+var fiveInts : FiveInts = ((4,2), (1,2,3))
 
-typealias Recovery2 :
+//===--- Tests for error recovery.
 
-func flushDiagnostics2() {} // expected-error {{expected '=' in typealias declaration}} expected-error {{expected identifier for type name}}
+typealias Recovery1 // expected-error {{expected '=' in typealias declaration}}
 
-typealias Recovery3 =
+typealias Recovery2 : // expected-error {{expected '=' in typealias declaration}}
 
-func flushDiagnostics3() {} // expected-error {{expected type in typealias declaration}}
+typealias Recovery3 = // expected-error {{expected type in typealias declaration}}
 
-typealias Recovery4 : Int
+typealias Recovery4 : Int // expected-error {{expected '=' in typealias declaration}}
 
-func flushDiagnostics4() {} // expected-error {{expected '=' in typealias declaration}}
+typealias Recovery5 : Int, Float // expected-error {{expected '=' in typealias declaration}}
 
-typealias Recovery4 : Int, Float
-
-func flushDiagnostics5() {} // expected-error {{expected '=' in typealias declaration}}
+typealias Recovery6 = = // expected-error {{expected type in typealias declaration}}
 

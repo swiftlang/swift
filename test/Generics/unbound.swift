@@ -29,7 +29,63 @@ class MyDict : Dict { } // expected-error{{reference to generic type 'Dict' requ
 var x : Dict // expected-error{{reference to generic type 'Dict' requires arguments in <...>}}
 
 // Cannot create parameters of generic type without arguments.
-func f(x : Dict) {} // expected-error{{reference to generic type 'Dict' requires arguments in <...>}}
+func f(x: Dict) {} // expected-error{{reference to generic type 'Dict' requires arguments in <...>}}
+
+
+// ---------------------------------------------
+// Unbound name references within a generic type
+// ---------------------------------------------
+struct GS<T> {
+  func f() -> GS {
+    var gs = GS()
+    return gs
+  }
+
+  struct Nested {
+    func ff() -> GS {
+      var gs = GS()
+      return gs
+    }
+  }
+
+  struct NestedGeneric<U> { // expected-note{{generic type 'NestedGeneric' declared here}}
+    func fff() -> (GS, NestedGeneric) {
+      var gs = GS()
+      var ns = NestedGeneric()
+      return (gs, ns)
+    }
+  }
+
+  // FIXME: We're losing some sugar here by performing the substitution.
+  func ng() -> NestedGeneric { } // expected-error{{reference to generic type 'GS<T>.NestedGeneric' requires arguments in <...>}}
+}
+
+extension GS {
+  func g() -> GS {
+    var gs = GS()
+    return gs
+  }
+
+  func h() {
+    var gs : GS<Int> = GS() // expected-error{{'T' is not identical to 'Int'}}
+  }
+}
+
+class GC<T, U> {
+  init() {} 
+
+  func f() -> GC {
+    var gc = GC()
+    return gc
+  }
+}
+
+extension GC {
+  func g() -> GC {
+    var gc = GC()
+    return gc
+  }
+}
 
 
 

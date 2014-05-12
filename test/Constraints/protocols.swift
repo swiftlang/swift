@@ -1,22 +1,22 @@
-// RUN: %swift -repl < %s 2>&1 | FileCheck %s
+// RUN: %swift -parse -verify %s
 
 protocol Fooable { func foo() }
-protocol Barable { func bar() } 
+protocol Barable { func bar() }
 
 extension Int : Fooable, Barable {
   func foo() {}
   func bar() {}
 }
 
-extension Float : Barable {
+extension Float32 : Barable {
   func bar() {}
 }
 
-func f0(_ : Barable) {}
-func f1(_ : protocol<Fooable, Barable>) {}
-func f2(_ : Float) {}
+func f0(_: Barable) {}
+func f1(x: protocol<Fooable, Barable>) {} // expected-note 2{{in initialization of parameter 'x'}}
+func f2(_: Float) {}
 
-func g(_ : (protocol<Barable, Fooable>) -> ()) {}
+func g(_: (protocol<Barable, Fooable>) -> ()) {} // expected-note{{in call to function 'g'}}
 
 var i : Int
 var f : Float
@@ -26,101 +26,65 @@ var b : Barable
 // Conversion to and among existential types
 //===--------------------------------------------------------------------===//
 
-// CHECK: Constraints:
-// CHECK:   Barable -> () == $T0 -> $T1
-// CHECK:   [byref(heap)] Int << $T0
-// CHECK: Type Variables:
-// CHECK:   $T0 as Barable
-// CHECK:   $T1 as ()
-// CHECK: SOLVED (completely)
-// CHECK: Unique solution found.
-:dump_constraints f0(i)
+f0(i)
+f0(f)
+f0(b)
+f1(i)
 
-// CHECK: Constraints:
-// CHECK:   Barable -> () == $T0 -> $T1
-// CHECK:   [byref(heap)] Float << $T0
-// CHECK: Type Variables:
-// CHECK:   $T0 as Barable
-// CHECK:   $T1 as ()
-// CHECK: SOLVED (completely)
-// CHECK: Unique solution found.
-:dump_constraints f0(f)
-
-// CHECK: Constraints:
-// CHECK:   Barable -> () == $T0 -> $T1
-// CHECK:   [byref(heap)] Barable << $T0
-// CHECK: Type Variables:
-// CHECK:   $T0 as Barable
-// CHECK:   $T1 as ()
-// CHECK: SOLVED (completely)
-// CHECK: Unique solution found.
-:dump_constraints f0(b)
-
-// CHECK: Constraints:
-// CHECK:   protocol<Fooable, Barable> -> () == $T0 -> $T1
-// CHECK:   [byref(heap)] Int << $T0
-// CHECK: Type Variables:
-// CHECK:   $T0 as protocol<Barable, Fooable>
-// CHECK:   $T1 as ()
-// CHECK: SOLVED (completely)
-// CHECK: Unique solution found.
-:dump_constraints f1(i)
-
-// CHECK: Constraints:
-// CHECK:   protocol<Fooable, Barable> -> () == $T0 -> $T1
-// CHECK:   [byref(heap)] Float << $T0
-// CHECK: UNSOLVED
-// CHECK: Type Variables:
-// CHECK:   $T0 as protocol<Barable, Fooable>
-// CHECK:   $T1 as ()
-// CHECK: UNSOLVED
-// CHECK: No solution found.
-:dump_constraints f1(f)
-
-// CHECK: Constraints:
-// CHECK:   protocol<Fooable, Barable> -> () == $T0 -> $T1
-// CHECK:   [byref(heap)] Barable << $T0
-// CHECK: Type Variables:
-// CHECK:   $T0 as protocol<Barable, Fooable>
-// CHECK:   $T1 as ()
-// CHECK: UNSOLVED
-// CHECK: No solution found.
-:dump_constraints f1(b)
+f1(f) // expected-error{{type 'Float' does not conform to protocol 'Fooable'}}
+f1(b) // expected-error{{type 'Barable' does not conform to protocol 'Fooable'}}
 
 //===--------------------------------------------------------------------===//
 // Subtyping
 //===--------------------------------------------------------------------===//
+g(f0)
+g(f1)
 
-// CHECK: Constraints:
-// CHECK:   (protocol<Barable, Fooable>) -> () -> () == $T0 -> $T1
-// CHECK:   Barable -> () << $T0
-// CHECK: UNSOLVED
-// CHECK: Type Variables:
-// CHECK:   $T0 as protocol<Barable, Fooable> -> ()
-// CHECK:   $T1 as ()
-// CHECK: SOLVED (completely)
-// CHECK: Unique solution found.
-:dump_constraints g(f0)
+g(f2) // expected-error{{'protocol<Barable, Fooable>' is not a subtype of 'Float'}}
 
-// CHECK: Constraints:
-// CHECK:   (protocol<Barable, Fooable>) -> () -> () == $T0 -> $T1
-// CHECK:   protocol<Fooable, Barable> -> () << $T0
-// CHECK: UNSOLVED
-// CHECK: Type Variables:
-// CHECK:   $T0 as protocol<Barable, Fooable> -> ()
-// CHECK:   $T1 as ()
-// CHECK: SOLVED (completely)
-// CHECK: Unique solution found.
-:dump_constraints g(f1)
+//===--------------------------------------------------------------------===//
+// User-defined conversions
+//===--------------------------------------------------------------------===//
+struct X { }
 
-// CHECK: Constraints:
-// CHECK:   (protocol<Barable, Fooable>) -> () -> () == $T0 -> $T1
-// CHECK:   Float -> () << $T0
-// CHECK: UNSOLVED
-// CHECK: Type Variables:
-// CHECK:   $T0 as protocol<Barable, Fooable> -> ()
-// CHECK:   $T1 as ()
-// CHECK: Constraints:
-// CHECK: UNSOLVED
-// CHECK: No solution found.
-:dump_constraints g(f2)
+protocol P {
+  @conversion func __conversion() -> Q
+}
+
+protocol Q { }
+
+func testUserConvert(p: P) {
+  var q : Q = p
+}
+
+
+printf("hello", i, f, 3.14159)
+
+// FIXME: Customize diagnostic
+Fooable() // expected-error{{'Fooable' is not constructible with '()'}}
+
+protocol P2 { }
+
+class Y : P2 { }
+
+class Z {
+  @conversion func __conversion () -> Y { return Y() }
+}
+
+var x: P2 = Z()
+
+//===--------------------------------------------------------------------===//
+// Dynamic self
+//===--------------------------------------------------------------------===//
+protocol Clonable {
+  func maybeClone() -> Self?
+  func badMaybeClone() -> Self??
+}
+
+func testClonable(v : Clonable) {
+  let v2 = v.maybeClone()
+
+  // FIXME: this is a terrible diagnostic; the problem is that that
+  // method is unavailable on existentials
+  let v3 = v.badMaybeClone() // expected-error {{'Clonable' does not have a member named 'badMaybeClone'}}
+}

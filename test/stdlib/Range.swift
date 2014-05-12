@@ -14,23 +14,21 @@
 // CHECK: testing...
 println("testing...")
 
-var x: Range<Int> = 3...5
+var x: Range<Int> = 3...10
 
-// CHECK-NEXT: 4...6
-var y = x + 1
-println("\(y.startIndex)...\(y.endIndex)")
+// CHECK-NEXT: 3579.
+for a in x.by(2) {
+  print(a)
+}
+println(".")
 
-// CHECK-NEXT: 5...7
-y = 2 + x
-println("\(y.startIndex)...\(y.endIndex)")
+for i in 1.4 .. 3.4 { println(i) }
+// CHECK-NEXT: 1.4
+// CHECK-NEXT: 2.4
+// CHECK-NEXT: 3.4
 
-// CHECK-NEXT: 6...8
-x += 3
-println("\(x.startIndex)...\(x.endIndex)")
 
-// CHECK-NEXT: 4...6
-x -= 2
-println("\(x.startIndex)...\(x.endIndex)")
+
 
 // CHECK-NEXT: done.
 println("done.")

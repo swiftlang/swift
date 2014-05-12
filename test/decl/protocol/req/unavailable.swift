@@ -15,7 +15,7 @@ class Foo : Proto {
 // Reject protocols with 'unavailable' requirements
 // if a protocol is not marked @objc.
 protocol NonObjCProto {
-  @availability(*,unavailable) func bad() // expected-error {{protocol members can only be marked unavailable in an @objc protocol}} expected-note {{protocol requires function 'bad'}}
+  @availability(*,unavailable) func bad() // expected-error {{protocol members can only be marked unavailable in an @objc protocol}} expected-note {{protocol requires function 'bad()'}}
   func good()
 }
 

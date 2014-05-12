@@ -1,37 +1,99 @@
-// RUN: %swift -O3 %s -emit-sil -sil-inline-threshold 0 | FileCheck %s
+// RUN: %swift -O3 %s -emit-sil -sil-inline-threshold 1000 | FileCheck %s
 
-// CHECK-LABEL: sil shared @_TTSC28devirt_inherited_conformance2B2S0_S_1P___TF28devirt_inherited_conformance11doSomethingUS_1P__FT1tQ__T_ : $@thin (@in B2) -> () {
-// CHECK: bb0([[INPUT_PTR:%[0-9]+]] : $*B2):
-// CHECK-NEXT: function_ref protocol witness for devirt_inherited_conformance.P.doSomething <A : devirt_inherited_conformance.P>(@inout devirt_inherited_conformance.P.Self)() -> () in conformance devirt_inherited_conformance.B : devirt_inherited_conformance.P
-// CHECK-NEXT: [[FUNCTION_REF:%[0-9]+]] = function_ref @_TTWC28devirt_inherited_conformance1BS_1PFS1_11doSomethingUS1___fRQPS1_FT_T_ : $@cc(witness_method) @thin (@inout B) -> ()
-// CHECK-NEXT: [[CAST_PTR:%[0-9]+]] = upcast [[INPUT_PTR]] : $*B2 to $*B
-// CHECK-NEXT: apply [[FUNCTION_REF]]([[CAST_PTR]]) : $@cc(witness_method) @thin (@inout B) -> ()
-// CHECK-NEXT: load
-// CHECK-NEXT: strong_release
+// Make sure that we can dig all the way through the class hierarchy and
+// protocol conformances.
+
+// CHECK-LABEL: sil @_TF28devirt_inherited_conformance6driverFT_T_ : $@thin () -> () {
+// CHECK: bb0
+// CHECK-NEXT: function_ref unknown2a
+// CHECK-NEXT: function_ref @unknown2a : $@thin () -> ()
+// CHECK-NEXT: apply
+// CHECK-NEXT: apply
+// CHECK-NEXT: function_ref unknown3a
+// CHECK-NEXT: function_ref @unknown3a : $@thin () -> ()
+// CHECK-NEXT: apply
+// CHECK-NEXT: apply
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
 
-@asmname("unknown1")
-func unknown1() -> ()
+@asmname("unknown1a")
+func unknown1a() -> ()
+@asmname("unknown1b")
+func unknown1b() -> ()
+@asmname("unknown2a")
+func unknown2a() -> ()
+@asmname("unknown2b")
+func unknown2b() -> ()
+@asmname("unknown3a")
+func unknown3a() -> ()
+@asmname("unknown3b")
+func unknown3b() -> ()
 
 protocol P {
+  // We do not specialize typealias's correctly now.
+  //typealias X
   func doSomething()
+
+  // This exposes a SILGen bug. FIXME: Fix up this test in the future.
+  // class func doSomethingMeta()
 }
 
 class B : P {
+  // We do not specialize typealias's correctly now.
+  //typealias X = B
   func doSomething() {
-    unknown1()
+    unknown1a()
   }
+
+  // See comment in protocol P
+  //class func doSomethingMeta() {
+  //  unknown1b()
+  //}
 }
 
 class B2 : B {
+  // When we have covariance in protocols, change this to B2.
+  // We do not specialize typealias correctly now.
+  //typealias X = B
+  override func doSomething() {
+    unknown2a()
+  }
 
+  // See comment in protocol P
+  //override class func doSomethingMeta() {
+  //  unknown2b()
+  //}
 }
 
-func doSomething<T : P>(t : T) {
+class B3 : B {
+  // When we have covariance in protocols, change this to B3.
+  // We do not specialize typealias correctly now.
+  //typealias X = B
+  override func doSomething() {
+    unknown3a()
+  }
+
+  // See comment in protocol P
+  //override class func doSomethingMeta() {
+  //unknown3b()
+  //}
+}
+
+func WhatShouldIDo<T : P>(t : T) {
   t.doSomething()
 }
+func WhatShouldIDo2(p : P) {
+  p.doSomething()
+}
 
-var b2 = B2()
+func driver() -> () {
+  var b2 = B2()
+  var b3 = B3()
 
-doSomething(b2)
+  WhatShouldIDo(b2)
+  WhatShouldIDo2(b2)
+  WhatShouldIDo(b3)
+  WhatShouldIDo2(b3)
+}
+
+driver()

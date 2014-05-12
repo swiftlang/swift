@@ -1,5 +1,8 @@
-// RUN: %swift %s -parse -I=%S/Inputs -verify
+// RUN: not %swift %s -parse -I=%S/Inputs -show-diagnostics-after-fatal 2>&1 | FileCheck %s
 
-import too_new // expected-error{{module file was created by a newer version of the compiler}}
+// CHECK: :[[@LINE+1]]:8: error: module file was created by a newer version of the compiler: {{.*}}too_new.swiftmodule{{$}}
+import too_new
 
-too_new // no-warning (but empty)
+// Compiler thinks that the module is empty.
+// CHECK: :[[@LINE+1]]:1: error: module 'too_new' has no member named 'foo'
+too_new.foo()

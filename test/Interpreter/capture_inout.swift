@@ -1,7 +1,6 @@
-// RUN: %swift -i %s | FileCheck %s
-// REQUIRES: swift_interpreter
+// RUN: %target-run-simple-swift | FileCheck %s
 
-func foo(x:[inout] Int) -> () -> Int {
+func foo(inout x: Int) -> () -> Int {
   func bar() -> Int {
     x += 1
     return x

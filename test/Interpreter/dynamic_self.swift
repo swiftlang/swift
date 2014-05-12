@@ -1,15 +1,15 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 
-// Test IR generation via execution for DynamicSelf.
+// Test IR generation via execution for Self.
 
 protocol P {
-  func f() -> DynamicSelf
-  func g() -> DynamicSelf
+  func f() -> Self
+  func g() -> Self
 }
 
 @class_protocol protocol CP {
-  func f() -> DynamicSelf
-  func g() -> DynamicSelf
+  func f() -> Self
+  func g() -> Self
 }
 
 func callDynamicSelfExistential(p: P) {
@@ -45,16 +45,16 @@ class C : P, CP {
     println("Allocating C")
   }
 
-  destructor() {
+  deinit {
     println("Destroying C")
   }
 
-  func f() -> DynamicSelf {
+  func f() -> Self {
     println("C.f()")
     return self
   }
 
-  func g() -> DynamicSelf {
+  func g() -> Self {
     println("C.g()")
     return self
   }

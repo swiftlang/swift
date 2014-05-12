@@ -2,16 +2,34 @@
 struct X { }
 
 class A {
+  // CHECK-LABEL: sil @_TFC20complete_object_init1AcfMS0_FT_S0_ : $@cc(method) @thin (@owned A) -> @owned A
+// CHECK: bb0([[SELF_PARAM:%[0-9]+]] : $A):
+// CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box $A
+// CHECK:   [[SELF:%[0-9]+]] = mark_uninitialized [delegatingself] [[SELF_PARAM]] : $A
+// CHECK:   store [[SELF]] to [[SELF_BOX]]#1 : $*A
+// CHECK:   [[SELF:%[0-9]+]] = load [[SELF_BOX]]#1 : $*A
+// CHECK:   strong_retain [[SELF]] : $A
+// CHECK:   [[INIT:%[0-9]+]] = class_method [[SELF]] : $A, #A.init!initializer.1 : A.Type -> (x: X) -> A , $@cc(method) @thin (X, @owned A) -> @owned A
+// CHECK:   [[X_INIT:%[0-9]+]] = function_ref @_TFV20complete_object_init1XCfMS0_FT_S0_ : $@thin (@thin X.Type) -> X
+// CHECK:   [[X_META:%[0-9]+]] = metatype $@thin X.Type
+// CHECK:   [[X:%[0-9]+]] = apply [[X_INIT]]([[X_META]]) : $@thin (@thin X.Type) -> X
+// CHECK:   [[INIT_RESULT:%[0-9]+]] = apply [[INIT]]([[X]], [[SELF]]) : $@cc(method) @thin (X, @owned A) -> @owned A
+// CHECK:   assign [[INIT_RESULT]] to [[SELF_BOX]]#1 : $*A
+// CHECK:   [[RESULT:%[0-9]+]] = load [[SELF_BOX]]#1 : $*A
+// CHECK:   strong_retain [[RESULT]] : $A
+// CHECK:   strong_release [[SELF_BOX]]#0 : $Builtin.NativeObject
+// CHECK:   return [[RESULT]] : $A
+
   // CHECK-LABEL: sil @_TFC20complete_object_init1ACfMS0_FT_S0_ : $@thin (@thick A.Type) -> @owned A
-  init() -> Self {
+  convenience init() {
     // CHECK: bb0([[SELF_META:%[0-9]+]] : $@thick A.Type):
     // CHECK:   [[SELF:%[0-9]+]] = alloc_ref_dynamic [[SELF_META]] : $@thick A.Type, $A
     // CHECK:   [[OTHER_INIT:%[0-9]+]] = function_ref @_TFC20complete_object_init1AcfMS0_FT_S0_ : $@cc(method) @thin (@owned A) -> @owned A
     // CHECK:   [[RESULT:%[0-9]+]] = apply [[OTHER_INIT]]([[SELF]]) : $@cc(method) @thin (@owned A) -> @owned A
     // CHECK:   return [[RESULT]] : $A
-    self.init withX(X())
+    self.init(x: X())
   }
 
-  init withX(X) { }
+  init(x: X) { }
 }
 

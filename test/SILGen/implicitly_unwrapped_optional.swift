@@ -26,7 +26,7 @@ func foo(var `f: (()->())!) {
 // CHECK-NEXT: dealloc_stack [[TEMP_UOPTFN]]#0
 // CHECK-NEXT: dealloc_stack [[TEMP_FN]]#0
 // CHECK-NEXT: br bb3
-//   If it does, pull the value out of the unchecked optional...
+//   If it does, pull the value out of the implicitly unwrapped optional...
 // CHECK:    bb2:
 // CHECK-NEXT: function_ref
 // CHECK-NEXT: [[T0:%.*]] = function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueU__FGSQQ__Q_ : $@thin <τ_0_0> (@out τ_0_0, @in ImplicitlyUnwrappedOptional<τ_0_0>) -> ()
@@ -64,7 +64,7 @@ func wrap<T>(`x: T) -> T! { return x }
 func wrap_then_unwrap<T>(`x: T) -> T {
   // CHECK: [[FORCE:%.*]] = function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueU__FGSQQ__Q_
   // CHECK: apply [transparent] [[FORCE]]<{{.*}}>(%0, {{%.*}})
-  return wrap(x)!
+  return wrap(x: x)!
 }
 
 // CHECK: sil @_TF29implicitly_unwrapped_optional10tuple_bindFT1xGSQTSiSS___GSqSS_ : $@thin (@owned ImplicitlyUnwrappedOptional<(Int, String)>) -> @owned Optional<String> {

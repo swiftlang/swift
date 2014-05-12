@@ -1,62 +1,53 @@
-// RUN: %swift -emit-module -o %t.swiftmodule %s
-// RUN: llvm-bcanalyzer %t.swiftmodule | FileCheck %s
+// RUN: rm -rf %t
+// RUN: mkdir %t
+// RUN: %target-build-swift -module-name alias -emit-module -o %t %S/Inputs/alias.swift
+// RUN: llvm-bcanalyzer %t/alias.swiftmodule | FileCheck %s
+// RUN: %target-build-swift -I %t %s -o %t/a.out
+// RUN: %target-run %t/a.out | FileCheck -check-prefix=OUTPUT %s
 
-import Builtin
-typealias MyInt64 = Builtin.Int64
-typealias AnotherInt64 = MyInt64
+// CHECK-NOT: UnknownCode
 
-// CHECK:   # Toplevel Blocks: 5
+import alias
 
-// CHECK:  Block ID #0 (BLOCKINFO_BLOCK):
-// CHECK-NEXT:      Num Instances: 1
+var i : MyInt64
+i = 42
+var j : AnotherInt64 = i
+print("\(j)\n")
 
-// CHECK:  Block ID #8 (CONTROL_BLOCK):
-// CHECK-NEXT:      Num Instances: 1
-// CHECK-NEXT:         Total Size:
-// CHECK-NEXT:    Percent of file:
-// CHECK-NEXT:      Num SubBlocks: 0
-// CHECK-NEXT:        Num Abbrevs: 1
-// CHECK-NEXT:        Num Records: 1
-// CHECK-NEXT:    Percent Abbrevs: 100.0000%
+// OUTPUT: 42
 
-// CHECK:  Block ID #9 (INPUT_BLOCK):
-// CHECK-NEXT:      Num Instances: 1
-// CHECK-NEXT:         Total Size:
-// CHECK-NEXT:    Percent of file:
-// CHECK-NEXT:      Num SubBlocks: 0
-// CHECK-NEXT:        Num Abbrevs: 1
-// CHECK-NEXT:        Num Records: 1
-// CHECK-NEXT:    Percent Abbrevs: 100.0000%
-// CHECK:    		  Count    # Bits   %% Abv  Record Kind
-// CHECK-NEXT: 		      1  {{[0-9]+}} 100.00  SOURCE_FILE
+var both : TwoInts
+both = (i, j)
 
-// CHECK:  Block ID #10 (DECLS_AND_TYPES_BLOCK):
-// CHECK-NEXT:      Num Instances: 1
-// CHECK-NEXT:         Total Size:
-// CHECK-NEXT:    Percent of file:
-// CHECK-NEXT:      Num SubBlocks: 0
-// CHECK-NEXT:        Num Abbrevs:
-// CHECK-NEXT:        Num Records: 6
-// CHECK-NEXT:    Percent Abbrevs: 100.0000%
+var named : ThreeNamedInts
+named.b = 64
+print("\(named.b)\n")
 
-// CHECK:    		  Count    # Bits   %% Abv  Record Kind
-// CHECK-NEXT:		      2  {{[0-9]+}} 100.00  NAME_HACK
-// CHECK-NEXT:		      2  {{[0-9]+}} 100.00  TYPE_ALIAS_DECL
-// CHECK-NEXT:		      1  {{[0-9]+}} 100.00  NAME_ALIAS_TYPE
-// CHECK-NEXT:		      1  {{[0-9]+}} 100.00  BUILTIN_TYPE
+// OUTPUT: 64
 
-// CHECK:  Block ID #11 (INDEX_BLOCK):
-// CHECK-NEXT:      Num Instances: 1
-// CHECK-NEXT:         Total Size:
-// CHECK-NEXT:    Percent of file:
-// CHECK-NEXT:      Num SubBlocks: 0
-// CHECK-NEXT:        Num Abbrevs: 1
-// CHECK-NEXT:        Num Records: 2
-// CHECK-NEXT:    Percent Abbrevs: 100.0000%
+var none : None
+none = ()
 
-// CHECK:     		  Count    # Bits   %% Abv  Record Kind
-// CHECK-NEXT:		      1  {{[0-9]+}} 100.00  DECL_OFFSETS
-// CHECK-NEXT:		      1  {{[0-9]+}} 100.00  TYPE_OFFSETS
+func doNothing() {}
+var nullFn : NullFunction = doNothing
 
-// CHECK-NOT: FALL_BACK_TO_TRANSLATION_UNIT
+func negate(x: MyInt64) -> AnotherInt64 {
+  return -x
+}
+var monadic : IntFunction = negate
+print("\(monadic(i))\n")
+
+// OUTPUT: -42
+
+func subtract(x: MyInt64, y: MyInt64) -> MyInt64 {
+  return x - y
+}
+var dyadic : TwoIntFunction = subtract
+print("\(dyadic((named.b, i))) \(dyadic(both))\n")
+
+// OUTPUT: 22 0
+
+// Used for tests that only need to be type-checked.
+func check(_: BaseAlias) {
+}
 

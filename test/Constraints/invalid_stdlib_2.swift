@@ -9,4 +9,5 @@ class Dictionary<K, V> : DictionaryLiteralConvertible { // expected-error {{type
 func useDict<K, V>(d: Dictionary<K,V>) {}
 
 useDict(["Hello" : 1])
+useDict(["Hello" : 1, "World" : 2])
 

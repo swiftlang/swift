@@ -1,33 +1,47 @@
 // RUN: rm -rf %t/clang-module-cache
-// RUN: %swift -triple x86_64-apple-darwin10 -module-cache-path=%t/clang-module-cache -sdk=%S/Inputs %s -emit-llvm | FileCheck %s
+// RUN: %swift -target x86_64-apple-darwin10 -module-cache-path %t/clang-module-cache -sdk %S/Inputs -I=%S/Inputs -enable-source-import %s -emit-ir | FileCheck %s
 
+import Foundation
 import gizmo
 
-// CHECK: [[METHOD_TYPE:@.*]] = private unnamed_addr constant [4 x i8] c"@@:\00"
+// CHECK: [[METHOD_TYPE:@.*]] = private unnamed_addr constant [8 x i8] c"v16@0:8\00"
 // CHECK: [[CATEGORY_NAME:@.*]] = private unnamed_addr constant [16 x i8] c"objc_extensions\00"
 
-// CHECK: @"_CATEGORY_Gizmo_$_objc_extensions" = private constant
+// CHECK-LABEL: @"_CATEGORY_PROTOCOLS_Gizmo_$_objc_extensions" = private constant
+// CHECK:   i64 1,
+// CHECK:   @_PROTOCOL__TtP15objc_extensions11NewProtocol_
+
+// CHECK-LABEL: @"_CATEGORY_Gizmo_$_objc_extensions" = private constant
 // CHECK:   i8* getelementptr inbounds ([16 x i8]* [[CATEGORY_NAME]], i64 0, i64 0),
-// CHECK:   %swift.type* @"OBJC_CLASS_$_Gizmo",
+// CHECK:   %objc_class* @"OBJC_CLASS_$_Gizmo",
 // CHECK:   @"_CATEGORY_INSTANCE_METHODS_Gizmo_$_objc_extensions",
 // CHECK:   @"_CATEGORY_CLASS_METHODS_Gizmo_$_objc_extensions",
-// CHECK:   i8* null,
+// CHECK:   @"_CATEGORY_PROTOCOLS_Gizmo_$_objc_extensions",
 // CHECK:   i8* null
 // CHECK: }, section "__DATA, __objc_const", align 8
 
-extension Gizmo {
+@objc protocol NewProtocol {
+  func brandNewInstanceMethod()
+}
+
+extension NSObject {
+  func someMethod() -> String { return "Hello" }
+}
+
+extension Gizmo: NewProtocol {
   func brandNewInstanceMethod() {
   }
 
-  static func brandNewClassMethod() {
+  class func brandNewClassMethod() {
   }
 
   // Overrides an instance method of NSObject
-  func init() -> NSObject {
+  override func someMethod() -> String {
+    return super.someMethod()
   }
 
   // Overrides a class method of NSObject
-  static func load() {
+  override class func load() {
   }
 
   // Shadows an original instance method of Gizmo
@@ -35,7 +49,7 @@ extension Gizmo {
   }
 
   // Shadows an original class method of Gizmo
-  static func runce() {
+  class func runce() {
   }
 }
 
@@ -48,7 +62,7 @@ extension Gizmo {
 
 // CHECK: @"_CATEGORY_Gizmo_$_objc_extensions1" = private constant
 // CHECK:   i8* getelementptr inbounds ([17 x i8]* [[CATEGORY_NAME_1]], i64 0, i64 0),
-// CHECK:   %swift.type* @"OBJC_CLASS_$_Gizmo",
+// CHECK:   %objc_class* @"OBJC_CLASS_$_Gizmo",
 // CHECK:   {{.*}} @"_CATEGORY_INSTANCE_METHODS_Gizmo_$_objc_extensions1",
 // CHECK:   {{.*}} @"_CATEGORY_CLASS_METHODS_Gizmo_$_objc_extensions1",
 // CHECK:   i8* null,
@@ -59,7 +73,7 @@ extension Gizmo {
   func brandSpankingNewInstanceMethod() {
   }
 
-  static func brandSpankingNewClassMethod() {
+  class func brandSpankingNewClassMethod() {
   }
 }
 
@@ -70,71 +84,52 @@ extension Gizmo {
 class Hoozit : NSObject {
 }
 
-// CHECK: @"_CATEGORY_INSTANCE_METHODS_Hoozit_$_objc_extensions" = private constant
+// CHECK: @"_CATEGORY_INSTANCE_METHODS__TtC15objc_extensions6Hoozit_$_objc_extensions" = private constant
 // CHECK:   i32 24,
 // CHECK:   i32 1,
 // CHECK:   [1 x { i8*, i8*, i8* }] [{ i8*, i8*, i8* } {
 // CHECK:     i8* getelementptr inbounds ([8 x i8]* @"\01L_selector_data(blibble)", i64 0, i64 0),
-// CHECK:     i8* null,
-// CHECK:     i8* bitcast (void (%CSo6Hoozit*, i8*)* @_TToCSo6Hoozit7blibblefS_FT_T_ to i8*)
+// CHECK:     i8* getelementptr inbounds ([8 x i8]* [[STR:@.*]], i64 0, i64 0),
+// CHECK:     i8* bitcast (void ([[OPAQUE:%.*]]*, i8*)* @_TToFC15objc_extensions6Hoozit7blibblefS0_FT_T_ to i8*)
 // CHECK:   }]
 // CHECK: }, section "__DATA, __objc_const", align 8
 
-// CHECK: @"_CATEGORY_CLASS_METHODS_Hoozit_$_objc_extensions" = private constant
+// CHECK: @"_CATEGORY_CLASS_METHODS__TtC15objc_extensions6Hoozit_$_objc_extensions" = private constant
 // CHECK:   i32 24,
 // CHECK:   i32 1,
 // CHECK:   [1 x { i8*, i8*, i8* }] [{ i8*, i8*, i8* } {
 // CHECK:     i8* getelementptr inbounds ([8 x i8]* @"\01L_selector_data(blobble)", i64 0, i64 0),
-// CHECK:     i8* null,
-// CHECK:     i8* bitcast (void (%swift.type*, i8*)* @_TToCSo6Hoozit7blobblefMS_FT_T_ to i8*)
+// CHECK:     i8* getelementptr inbounds ([8 x i8]* [[STR]], i64 0, i64 0),
+// CHECK:     i8* bitcast (void (i8*, i8*)* @_TToFC15objc_extensions6Hoozit7blobblefMS0_FT_T_ to i8*)
 // CHECK:   }]
 // CHECK: }, section "__DATA, __objc_const", align 8
 
-// CHECK: @"_CATEGORY_Hoozit_$_objc_extensions" = private constant
+// CHECK: @"_CATEGORY__TtC15objc_extensions6Hoozit_$_objc_extensions" = private constant
 // CHECK:   i8* getelementptr inbounds ([16 x i8]* [[CATEGORY_NAME]], i64 0, i64 0),
-// CHECK:   %swift.type* getelementptr inbounds ({{.*}} @_TMdCSo6Hoozit {{.*}}),
-// CHECK:   {{.*}} @"_CATEGORY_INSTANCE_METHODS_Hoozit_$_objc_extensions",
-// CHECK:   {{.*}} @"_CATEGORY_CLASS_METHODS_Hoozit_$_objc_extensions",
+// CHECK:   %swift.type* getelementptr inbounds ({{.*}} @_TMdC15objc_extensions6Hoozit {{.*}}),
+// CHECK:   {{.*}} @"_CATEGORY_INSTANCE_METHODS__TtC15objc_extensions6Hoozit_$_objc_extensions",
+// CHECK:   {{.*}} @"_CATEGORY_CLASS_METHODS__TtC15objc_extensions6Hoozit_$_objc_extensions",
 // CHECK:   i8* null,
 // CHECK:   i8* null
 // CHECK: }, section "__DATA, __objc_const", align 8
 
 extension Hoozit {
   func blibble() { }
-  static func blobble() { }
+  class func blobble() { }
 }
 
-/*
- * Check that extension methods get called as ObjC methods.
- */
+class SwiftOnly { }
 
-// CHECK: define void @_T15objc_extensions13messWithGizmoFT1gCSo5Gizmo_T_(%CSo5Gizmo* %g) {
-func messWithGizmo(g:Gizmo) {
-  // CHECK: load i8** @"\01L_selector(brandNewInstanceMethod)"
-  g.brandNewInstanceMethod()
-  // CHECK: load i8** @"\01L_selector(brandSpankingNewInstanceMethod)"
-  g.brandSpankingNewInstanceMethod()
-  // FIXME: typechecks as ambiguous
-  // C/HECK: load i8** @"\01L_selector(init)"
-  //g.init()
-  // CHECK: load i8** @"\01L_selector(frob)"
-  g.frob()
-
-  // CHECK: load i8** @"\01L_selector(brandNewClassMethod)"
-  Gizmo.brandNewClassMethod()
-  // CHECK: load i8** @"\01L_selector(brandSpankingNewClassMethod)"
-  Gizmo.brandSpankingNewClassMethod()
-  // FIXME: typechecks as ambiguous
-  // C/HECK: load i8** @"\01L_selector(load)"
-  //Gizmo.load()
-  // CHECK: load i8** @"\01L_selector(runce)"
-  Gizmo.runce()
+// CHECK: @"_CATEGORY_INSTANCE_METHODS__TtC15objc_extensions9SwiftOnly_$_objc_extensions" = private constant
+// CHECK:   i32 24,
+// CHECK:   i32 1,
+// CHECK:   [1 x { i8*, i8*, i8* }] [{ i8*, i8*, i8* } {
+// CHECK:     i8* getelementptr inbounds ([7 x i8]* @"\01L_selector_data(wibble)", i64 0, i64 0),
+// CHECK:     i8* getelementptr inbounds ([8 x i8]* [[STR]], i64 0, i64 0),
+// CHECK:     i8* bitcast (void (i8*, i8*)* @_TToFC15objc_extensions9SwiftOnly6wibblefS0_FT_T_ to i8*)
+// CHECK:   }] }, section "__DATA, __objc_const", align 8
+extension SwiftOnly {
+  @objc func wibble() { }
 }
 
-// CHECK: define void @_T15objc_extensions14messWithHoozitFT1hCSo6Hoozit_T_(%CSo6Hoozit* %h) {
-func messWithHoozit(h:Hoozit) {
-  // CHECK: load i8** @"\01L_selector(blibble)"
-  h.blibble()
-  // CHECK: load i8** @"\01L_selector(blobble)"
-  Hoozit.blobble()
-}
+

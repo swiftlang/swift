@@ -1,5 +1,5 @@
 // RUN: %swift -parse -verify %s
 
-val x: Int = 1
-val y: Int = x.self
-val int: Int.Type = Int.self
+let x: Int = 1
+let y: Int = x.self
+let int: Int.Type = Int.self

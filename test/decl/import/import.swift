@@ -1,46 +1,51 @@
 // RUN: rm -rf %t
 // RUN: mkdir %t
-// RUN: echo "var x : Builtin.Int32" | %swift -module-name import_builtin -parse-stdlib -emit-module -o %t -
-// RUN: echo "def foo() -> Int { return false }" > %t/import_text.swift
-// RUN: echo "def pho$(printf '\xC3\xBB')x() -> Int { return false }" > %t/fran$(printf '\xC3\xA7')ais.swift
-// RUN: %swift %s -I=%t -sdk= -verify
-// RUN: not %swift %s -I=%t -sdk= 2>&1 | FileCheck %s
+// RUN: echo "struct X {}; var x = X()" | %swift -module-name import_builtin -parse-stdlib -emit-module -o %t -
+// RUN: echo "func foo() -> Int { return false }" > %t/import_text.swift
+// RUN: echo "func pho$(printf '\xC3\xBB')x() -> Int { return false }" > %t/fran$(printf '\xC3\xA7')ais.swift
+// RUN: %swift %s -I=%t -sdk "" -enable-source-import -verify -show-diagnostics-after-fatal
+// RUN: not %swift %s -I=%t -sdk "" -enable-source-import 2>&1 | FileCheck %s
 
 import Builtin  // expected-error {{no such module 'Builtin'}}
 
 import import_builtin
-def indirectBuiltin() {
+
+extension Int32 {
+  init(_: import_builtin.X) { }
+}
+
+func indirectBuiltin() {
   println(Int(Int32(import_builtin.x)))
 }
 
-def f0() {
-  import swift // expected-error{{declaration is only valid at file scope}}
+func f0() {
+  import Swift // expected-error{{declaration is only valid at file scope}}
 }
 
-import def swift.print
-def f1(a: swift.Int) -> swift.Void { print(a) }
+import func Swift.print
+func f1(a: Swift.Int) -> Swift.Void { print(a) }
 
-import def swift.print
+import func Swift.print
 
 // rdar://14418336
 #import something_nonexistant // expected-error {{invalid character in source file}} expected-error {{no such module 'something_nonexistant'}}
 
 // Import specific decls
-import typealias swift.Int
-import struct swift.Int
-import typealias swift.Object
-import class swift.Object
-import typealias swift.Bool
-import enum swift.Bool
-import protocol swift.Generator
-import var swift.true
-import def swift.min
+import typealias Swift.Int
+import struct Swift.Int
+import typealias Swift.HeapBufferStorage
+import class Swift.HeapBufferStorage
+import typealias Swift.Bool
+import struct Swift.Bool
+import protocol Swift.Generator
+import var Swift.true
+import func Swift.min
 
 import var x // expected-error {{expected module name}}
-import struct swift.nonexistent // expected-error {{no such decl in module}}
+import struct Swift.nonexistent // expected-error {{no such decl in module}}
 
-import swift.import.abc // expected-error 2 {{expected identifier}}
-import where swift.Int // expected-error {{expected identifier}}
+import Swift.import.abc // expected-error 2 {{expected identifier}}
+import where Swift.Int // expected-error {{expected identifier}}
 import 2 // expected-error {{expected identifier}}
 
 // CHECK-NOT: no such module 'really'
@@ -51,4 +56,4 @@ import import_text // no-warning despite function body problems
 var _ : Int = foo()
 
 import français
-import def français.phoûx
+import func français.phoûx

@@ -1,27 +1,29 @@
 protocol Fooable {
-  func foo<T>(x:T)
+  func foo<T>(x: T)
 }
 
 class FooClass : Fooable {
-  func foo<U>(x:U) {}
+  init() { }
+  func foo<U>(x: U) {}
 }
 
 struct FooStruct : Fooable {
-  func foo<V>(x:V) {}
+  func foo<V>(x: V) {}
 }
 
 
 protocol Barrable {
-  func bar<T>(x:This, y:T)
+  func bar<T>(x: Self, y: T)
 }
 
 class BarClass : Barrable {
-  func bar<U>(x:BarClass, y:U) { }
+  init() { }
+  func bar<U>(x: BarClass, y: U) { }
 }
 
 struct BarStruct : Barrable {
-  var x:Int
-  func bar<V>(x:BarStruct, y:V) { }
+  var x = 0
+  func bar<V>(x: BarStruct, y: V) { }
 }
 
 
@@ -30,13 +32,31 @@ protocol HasAssociatedType {
 }
 
 protocol Bassable {
-  func bas<T:HasAssociatedType>(x:T, y:T.Foo)
+  func bas<T : HasAssociatedType>(x: T, y: T.Foo)
 }
 
 class BasClass : Bassable {
-  func bas<U:HasAssociatedType>(x:U, y:U.Foo) {}
+  init() { }
+  func bas<U : HasAssociatedType>(x: U, y: U.Foo) {}
 }
 
 struct BasStruct : Bassable {
-  func bas<V:HasAssociatedType>(x:V, y:V.Foo) {}
+  func bas<V : HasAssociatedType>(x: V, y: V.Foo) {}
+}
+
+
+operator prefix ~~~ {}
+
+protocol _CyclicAssociatedType {
+  typealias Assoc = CyclicImpl
+}
+
+protocol CyclicAssociatedType : _CyclicAssociatedType {
+  @prefix func ~~~(_: Self.Type)
+}
+
+@prefix func ~~~ <T: _CyclicAssociatedType>(_: T.Type) {}
+
+struct CyclicImpl : CyclicAssociatedType {
+  typealias Assoc = CyclicImpl
 }

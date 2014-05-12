@@ -19,13 +19,13 @@
 %    (x[:-1], x[-1]) for x in 
 %     'Add+ Subtract- Multiply* Divide/ Modulus%'.split()]
 
-protocol _NumericOperations {
+protocol _IntegerArithmetic {
 % for name,_ in integerBinaryOps:
-  class func unchecked${name}(lhs: Self, rhs: Self) -> (Self, Bool)
+  class func unchecked${name}(lhs: Self, _ rhs: Self) -> (Self, Bool)
 % end
 }
 
-protocol NumericOperations : _NumericOperations, Comparable {
+protocol IntegerArithmetic : _IntegerArithmetic, Comparable {
   // Checked arithmetic functions.  Specific implementations in
   // FixedPoint.swift.gyb support static checking for integer types.
 % for _,op in integerBinaryOps:
@@ -38,40 +38,82 @@ protocol NumericOperations : _NumericOperations, Comparable {
 
 % for name,op in integerBinaryOps:
 @transparent
-func ${op} <T: _NumericOperations>(lhs: T, rhs: T) -> T {
+func ${op} <T: _IntegerArithmetic>(lhs: T, rhs: T) -> T {
   return overflowChecked(T.unchecked${name}(lhs, rhs))
 }
 
 @transparent
-func &${op} <T: _NumericOperations>(lhs: T, rhs: T) -> T {
+func &${op} <T: _IntegerArithmetic>(lhs: T, rhs: T) -> T {
   return T.unchecked${name}(lhs, rhs).0
 }
 
 @assignment @transparent
-func ${op}= <T: _NumericOperations>(inout lhs: T, rhs: T) {
+func ${op}= <T: _IntegerArithmetic>(inout lhs: T, rhs: T) {
   lhs = lhs ${op} rhs
 }
 % end
 
-protocol SignedNumber {
-  class func uncheckedNegate(_: Self) -> (Self, Bool)
-  class func uncheckedAbs(_: Self) -> (Self, Bool)
-  func isNegative() -> Bool
+//===--- SignedNumber -----------------------------------------------------===//
+// A numeric type that supports abs(x), +x and -x
+//===----------------------------------------------------------------------===//
+
+// Base protocol containing all the non-defaulted implentations.  This
+// protocol should be presented to users as part of SignedNumber.
+protocol _SignedNumber : Comparable, IntegerLiteralConvertible {
+  // Subtraction is a requirement for SignedNumber
+  @infix func - (lhs: Self, rhs: Self) -> Self
 }
 
-@transparent
-func abs <T: SignedNumber>(x: T) -> T {
-  return overflowChecked(T.uncheckedAbs(x))
+// SignedNumber itself contains only operator requirements having
+// default implementations on the base protocol.
+protocol SignedNumber : _SignedNumber {
+  @prefix func - (x: Self) -> Self
+
+  // Do not use this operator directly; call abs(x) instead
+  func ~> (_:Self,_:(_Abs, ())) -> Self
 }
 
+// Unary negation in terms of subtraction.  This is a default
+// implementation; models of SignedNumber can provide their own
+// implementations.
 @prefix @transparent
-func - <T: SignedNumber>(x: T) -> T {
-  return overflowChecked(T.uncheckedNegate(x))
+func - <T : _SignedNumber>(x: T) -> T {
+  return 0 - x
 }
 
+// Unary +
 @prefix @transparent
-func + <T: SignedNumber>(x: T) -> T {
+func + <T: _SignedNumber>(x: T) -> T {
   return x
+}
+
+//===--- abs(x) -----------------------------------------------------------===//
+struct _Abs {}
+func _abs<Args>(args: Args) -> (_Abs, Args) {
+  return (_Abs(), args)
+}
+
+// Do not use this operator directly; call abs(x) instead
+@transparent
+func ~> <T : _SignedNumber>(x:T,_:(_Abs, ())) -> T {
+  return x < 0 ? -x : x
+}
+
+protocol AbsoluteValuable : SignedNumber {
+  class func abs(_:Self) -> Self
+}
+
+// Do not use this operator directly; call abs(x) instead
+@transparent
+func ~> <T : AbsoluteValuable>(x:T,_:(_Abs, ())) -> T {
+  return T.abs(x)
+}
+
+// Absolute value.  Concrete instances of SignedNumber can specialize
+// this function by conforming to AbsoluteValuable.
+@transparent
+func abs<T : SignedNumber>(x: T) -> T {
+  return x~>_abs()
 }
 
 // ${'Local Variables'}:

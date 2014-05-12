@@ -1,4 +1,4 @@
 struct FooStruct {
-  var instanceVar : Int
+  var instanceVar: Int = 17
   func instanceFunc0() {}
 }

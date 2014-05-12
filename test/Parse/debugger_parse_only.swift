@@ -5,6 +5,8 @@
 // after parse, and the rest of the toolchain is not required to handle
 // them without asserting (and in fact doesn't.)
 
+// XFAIL: *
+
 func imports_allowed () {
-    import swift
+    import Swift
 }

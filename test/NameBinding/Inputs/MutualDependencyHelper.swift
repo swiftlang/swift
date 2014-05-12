@@ -1,5 +1,5 @@
 import MutualDependency
 
 protocol MyDelegate {
-  func doSomething(sender : MyClass)
+  func doSomething(sender: MyClass)
 }

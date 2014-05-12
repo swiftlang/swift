@@ -1,46 +1,46 @@
-// RUN: %swift -i %s | FileCheck %s
+// RUN: %target-run-simple-swift | FileCheck %s
 
 class Interval {
   var lo, hi : Int
 
-  constructor(lo:Int, hi:Int) {
-    this.lo = lo
-    this.hi = hi
+  init(_ lo:Int, _ hi:Int) {
+    self.lo = lo
+    self.hi = hi
   }
 
   func show() {
     println("[\(lo), \(hi)]")
   }
   
-  static func like(lo:Int, hi:Int) -> Interval {
+  class func like(lo: Int, _ hi: Int) -> Interval {
     return Interval(lo, hi)
   }
 }
 
 class OpenInterval : Interval {
-  constructor(lo:Int, hi:Int) {
-    super.constructor(lo, hi)
+  init(_ lo:Int, _ hi:Int) {
+    super.init(lo, hi)
   }
 
-  func show() {
+  override func show() {
     println("(\(lo), \(hi))")
   }
 
-  static func like(lo:Int, hi:Int) -> Interval {
+  override class func like(lo:Int, _ hi:Int) -> Interval {
     return OpenInterval(lo, hi)
   }
 }
 
-func +(a:Interval, b:Interval) -> Interval {
+func +(a: Interval, b: Interval) -> Interval {
   return Interval(a.lo + b.lo, a.hi + b.hi)
 }
 
-func -(a:Interval, b:Interval) -> Interval {
+func -(a: Interval, b: Interval) -> Interval {
   return Interval(a.lo - b.hi, a.hi - b.lo)
 }
 
-func [prefix] -(a:Interval) -> Interval {
-  return typeof(a).like(-a.hi, -a.lo)
+@prefix func -(a: Interval) -> Interval {
+  return a.dynamicType.like(-a.hi, -a.lo)
 }
 
 // CHECK: [-2, -1]
@@ -57,4 +57,11 @@ func [prefix] -(a:Interval) -> Interval {
 // CHECK: false
 println(Interval(1,2) is OpenInterval)
 // CHECK: true
-println((OpenInterval(1,2) as Interval) is OpenInterval)
+var i12 : Interval = OpenInterval(1,2)
+println(i12 is OpenInterval)
+
+class RDar16563763_A {}
+class RDar16563763_B : RDar16563763_A {}
+println("self is Type = \(RDar16563763_A.self is RDar16563763_B.Type)")
+// CHECK: self is Type = false
+

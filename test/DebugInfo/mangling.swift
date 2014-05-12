@@ -1,30 +1,30 @@
-// RUN: %swift -triple x86_64-apple-darwin10 %s -emit-llvm -g -o - | FileCheck %s
-// mangling.myDict : swift.Dictionary<swift.Int64, swift.String>
-// CHECK: _T8mangling6myDictGCSs10DictionarySiSS_
-var myDict = Dictionary<Int, String>()
-myDict.add(12, "Hello!")
+// RUN: %swift -target x86_64-apple-darwin10 %s -emit-ir -g -o - | FileCheck %s
 
-// mangling.myTuple1 : (Name : swift.String, Id : swift.Int64)
-// CHECK: _T8mangling8myTuple1T4NameSS2IdSi_
+// Type:
+// Swift.Dictionary<Swift.Int64, Swift.String>
+// CHECK: null, null, metadata ![[DT:.*]]} ; [ DW_TAG_structure_type ] [Dictionary]
+// CHECK: null, null, metadata ![[TT1:.*]]} ; [ DW_TAG_structure_type ] [_TtT4NameSS2IdSi_]
+// CHECK: null, null, metadata ![[TT2:.*]]} ; [ DW_TAG_structure_type ] [_TtTSS2IdSi_]
+
+// Variable:
+// mangling.myDict : Swift.Dictionary<Swift.Int64, Swift.String>
+// CHECK: metadata !"myDict", metadata !"_Tv8mangling6myDictGVSs10DictionarySiSS_", metadata !{{.*}}, i32 [[@LINE+1]], metadata ![[DT]], i32 0, {{.*}} [ DW_TAG_variable ] [myDict]
+var myDict = Dictionary<Int, String>()
+myDict.add(12, value: "Hello!")
+
+// mangling.myTuple1 : (Name : Swift.String, Id : Swift.Int64)
+// CHECK: metadata !"myTuple1", metadata !"_Tv8mangling8myTuple1T4NameSS2IdSi_", metadata !{{.*}}, i32 [[@LINE+1]], metadata ![[TT1]], i32 0, {{.*}} [ DW_TAG_variable ] [myTuple1]
 var myTuple1 : (Name: String, Id: Int) = ("A", 1)
-// mangling.myTuple2 : (swift.String, Id : swift.Int64)
-// CHECK: _T8mangling8myTuple2TSS2IdSi_
+// mangling.myTuple2 : (Swift.String, Id : Swift.Int64)
+// CHECK: metadata !"myTuple2", metadata !"_Tv8mangling8myTuple2TSS2IdSi_", metadata !{{.*}}, i32 [[@LINE+1]], metadata ![[TT2]], i32 0, {{.*}} [ DW_TAG_variable ] [myTuple2]
 var myTuple2 : (      String, Id: Int) = ("B", 2)
-// mangling.myTuple3 : (swift.String, swift.Int64)
-// CHECK: _T8mangling8myTuple3TSSSi_
-var myTuple3 : (      String,     Int) = ("C", 3)
+// mangling.myTuple3 : (Swift.String, Swift.Int64)
+
+// FIXME: Pending <rdar://problem/16860038>
+// FIXME: metadata !"myTuple3", metadata !"_Tv8mangling8myTuple3TSSSi_", metadata !{{.*}}, i32 [[@LINE+1]], metadata ![[TT3]], i32 0, {{.*}} [ DW_TAG_variable ] [myTuple3]
+// var myTuple3 : (      String,     Int) = ("C", 3)
+// println({ $$0.1 }(myTuple3))
 
 println(myTuple1.Id)
 println(myTuple2.Id)
-println({ $1 }(myTuple3))
-
-// mangling.ExistentialTuple <A : swift.RandomAccessIndex, B>(x : A, y : A) -> B
-// CHECK: _T8mangling16ExistentialTupleUSs17RandomAccessIndex___FT1xQ_1yQ__Q0_
-func ExistentialTuple<T: RandomAccessIndex>(x: T, y: T) -> T.DistanceType {
-  // (B, swift.Bool)
-  // CHECK: _TtTQ0_Sb_
-  var tmp : (T.DistanceType, Bool) = T.sub(x, y)
-  alwaysTrap(tmp.1 == false)
-  return tmp.0
-}
 

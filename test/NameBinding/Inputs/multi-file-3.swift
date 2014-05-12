@@ -4,10 +4,22 @@ func ~~~(x: Int, y: Int) -> Bool { // expected-error{{operator implementation wi
   return x <= y
 }
 
-func test() {
+func test3() {
   var a = funcOrVar // expected-error{{use of unresolved identifier 'funcOrVar'}}
 
-  var s = SomeStruct(42) // use the SomeStruct from multi-file.swift
+  var s = SomeStruct(value: 42) // use the SomeStruct from multi-file.swift
 
   var tilde: Bool = 1 ~~~ 2 // expected-error{{operator is not a known binary operator}}
+}
+
+protocol P3 {
+  func foo()
+}
+
+class Superclass {
+  func method() { }
+}
+
+class Subclass : Superclass {
+  override func method() { }
 }

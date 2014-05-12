@@ -9,10 +9,16 @@
 // RUN: %swift-ide-test -test-input-complete -source-filename %S/Inputs/func_incomplete7.swift | FileCheck %s -check-prefix=INCOMPLETE
 // RUN: %swift-ide-test -test-input-complete -source-filename %S/Inputs/func_incomplete8.swift | FileCheck %s -check-prefix=INCOMPLETE
 // RUN: %swift-ide-test -test-input-complete -source-filename %S/Inputs/func_incomplete9.swift | FileCheck %s -check-prefix=INCOMPLETE
+// RUN: %swift-ide-test -test-input-complete -source-filename %S/Inputs/func_incomplete10.swift | FileCheck %s -check-prefix=INCOMPLETE
+// RUN: %swift-ide-test -test-input-complete -source-filename %S/Inputs/func_incomplete11.swift | FileCheck %s -check-prefix=INCOMPLETE
+// RUN: %swift-ide-test -test-input-complete -source-filename %S/Inputs/func_incomplete12.swift | FileCheck %s -check-prefix=INCOMPLETE
 // RUN: %swift-ide-test -test-input-complete -source-filename %S/Inputs/nominal_complete.swift | FileCheck %s -check-prefix=COMPLETE
 // RUN: %swift-ide-test -test-input-complete -source-filename %S/Inputs/nominal_incomplete.swift | FileCheck %s -check-prefix=INCOMPLETE
 // RUN: %swift-ide-test -test-input-complete -source-filename %S/Inputs/nominal_incomplete2.swift | FileCheck %s -check-prefix=INCOMPLETE
 // RUN: %swift-ide-test -test-input-complete -source-filename %S/Inputs/nominal_incomplete3.swift | FileCheck %s -check-prefix=INCOMPLETE
+// RUN: %swift-ide-test -test-input-complete -source-filename %S/Inputs/switch_incomplete.swift | FileCheck %s -check-prefix=INCOMPLETE
+// RUN: %swift-ide-test -test-input-complete -source-filename %S/Inputs/switch_incomplete2.swift | FileCheck %s -check-prefix=INCOMPLETE
+// RUN: %swift-ide-test -test-input-complete -source-filename %S/Inputs/switch_incomplete3.swift | FileCheck %s -check-prefix=INCOMPLETE
 // RUN: %swift-ide-test -test-input-complete -source-filename %S/Inputs/toplevel_complete.swift | FileCheck %s -check-prefix=COMPLETE
 // RUN: %swift-ide-test -test-input-complete -source-filename %S/Inputs/toplevel_incomplete.swift | FileCheck %s -check-prefix=INCOMPLETE
 // RUN: %swift-ide-test -test-input-complete -source-filename %S/Inputs/toplevel_incomplete2.swift | FileCheck %s -check-prefix=INCOMPLETE

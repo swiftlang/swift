@@ -1,1 +1,1 @@
-var fooObject : FooStruct
+var fooObject: FooStruct = FooStruct()

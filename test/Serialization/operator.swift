@@ -1,14 +1,18 @@
 // RUN: rm -rf %t
 // RUN: mkdir %t
-// RUN: %swift -emit-module -o %t/def_operator.swiftmodule %S/Inputs/def_operator.swift
+// RUN: %swift -emit-module -o %t %S/Inputs/def_operator.swift
 // RUN: llvm-bcanalyzer %t/def_operator.swiftmodule | FileCheck %s
 // RUN: %swift -i -I=%t %s | FileCheck --check-prefix=OUTPUT %s
+// REQUIRES: swift_interpreter
 
-// CHECK-NOT: FALL_BACK_TO_TRANSLATION_UNIT
+// FIXME: iOS doesn't work because this test needs the interpreter to handle 
+// func typeCheckOnly (which causes link errors if built as an executable).
+
+// CHECK-NOT: UnknownCode
 
 import def_operator
 
-func [prefix] ~~~(x : Int) -> (Int, Int, Int) {
+@prefix func ~~~(x: Int) -> (Int, Int, Int) {
   return (x, x, x)
 }
 
@@ -16,9 +20,35 @@ var triple = (~~~42)
 println("(\(triple.0), \(triple.1), \(triple.2))")
 // OUTPUT: (42, 42, 42)
 
-func [postfix] ^^(x : Int) -> Int {
+@postfix func ^^(x: Int) -> Int {
   return x ^ x
 }
 
 println("\(1^^)")
 // OUTPUT: 0
+
+
+func *-(lhs: Int, rhs: Int) -> Int {
+  return lhs - rhs
+}
+func -*(lhs: Int, rhs: Int) -> Int {
+  return lhs - rhs
+}
+func *-*(lhs: Int, rhs: Int) -> Int {
+  return lhs - rhs
+}
+
+println("\(5 *- 3 *- 2) \(5 -* 3 -* 2)")
+// OUTPUT: 0 4
+println("\(5 *- 3 -* 2) \(5 -* 3 *- 2)")
+// OUTPUT: 0 4
+println("\(5 *- 3 *-* 2) \(5 *-* 3 *- 2)")
+// OUTPUT: 0 4
+
+func typeCheckOnly() {
+  ~~~true
+  var b = false
+  b^^
+  true *-* false
+  b *- false
+}

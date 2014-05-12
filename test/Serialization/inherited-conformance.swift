@@ -7,4 +7,4 @@
 import User
 
 var test = User.OneToAThousand()
-println(test.__getitem__(test.startIndex()))
+println(test[test.startIndex])

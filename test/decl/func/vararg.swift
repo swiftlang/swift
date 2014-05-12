@@ -1,38 +1,40 @@
 // RUN: %swift %s -verify
 
-var t1: (Int...) = ()
-var t1: (Int, Int...) = () // expected-error {{expression does not type-check}}
+var t1a: (Int...) = ()
+var t1b: (Int, Int...) = () // expected-error {{cannot convert the expression's type '()' to type '(Int, Int...)'}}
 
-var t2: (Int...) = 1
-var t2: (Int, Int ...) = 1
-var t2: (Int, Int, Int...) = 1  // expected-error {{expression does not type-check}}
-var t2: (Double = 0.0, Int...) = 1 // expected-error {{default argument not permitted in a tuple type}}
+var t2a: (Int...) = 1
+var t2b: (Int, Int ...) = 1
+var t2c: (Int, Int, Int...) = 1  // expected-error {{cannot convert the expression's type 'Int' to type '(Int, Int, Int...)'}}
+var t2d: (Double = 0.0, Int...) = 1 // expected-error {{default argument not permitted in a tuple type}}
 
-var t3: (Int...) = (1,2)
-var t3: (Int, Int...) = (1,2)
-var t3: (Int, Int, Int...) = (1,2)
-var t3: (Int, Int, Int, Int...) = (1,2) // expected-error {{different number of elements}}
+var t3a: (Int...) = (1,2)
+var t3b: (Int, Int...) = (1,2)
+var t3c: (Int, Int, Int...) = (1,2)
+var t3d: (Int, Int, Int, Int...) = (1,2) // expected-error {{different number of elements}}
 
 var t4: (Int...) -> Int
 var t5: (a: Int...) -> Int = t4
-var t6: (a: Int[]) -> Int = t4 // expected-error {{does not type-check}}
+var t6: (a: Int[]) -> Int = t4 // expected-error {{cannot convert the expression's type '@lvalue (Int...) -> Int' to type '(a: Int[]) -> Int'}}
 
 var t7: Int
 var t8: (Int, String...) = (t7)
 
-def f1(a: Int...) { for x in a {} }
+func f1(a: Int...) { for x in a {} }
 f1()
 f1(1)
 f1(1,2)
-def f2(a: Int, b: Int...) { for x in b {} }
+func f2(a: Int, b: Int...) { for x in b {} }
 f2(1)
 f2(1,2)
 f2(1,2,3)
 
-def f3(a: (String) -> Void) { }
+func f3(a: (String) -> Void) { }
 f3({ printf("%s\n", $0) })
 
 
-def f4(a: Int..., b: Int) { } // expected-error{{variadic arguments '...' must come at the end of the pattern}}
+func f4(a: Int..., b: Int) { } // expected-error{{'...' must be on the last parameter}}
 
-def f5(a: Int, (b, c): (Int, Int)...) {} // expected-error {{tuple pattern cannot match values of the non-tuple type '(Int, Int)[]'}}
+// rdar://16008564
+func inout_variadic(inout i: Int...) {  // expected-error {{inout arguments cannot be variadic}}
+}

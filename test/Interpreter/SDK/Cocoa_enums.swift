@@ -5,6 +5,6 @@ import Foundation
 let opts: NSBinarySearchingOptions = .FirstEqual | .InsertionIndex
 
 // CHECK: true
-println((opts & (.LastEqual | .InsertionIndex)).getLogicValue())
+println(opts & (.LastEqual | .InsertionIndex) == .InsertionIndex)
 // CHECK: false
 println((opts & .LastEqual).getLogicValue())

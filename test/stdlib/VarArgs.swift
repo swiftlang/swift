@@ -1,14 +1,17 @@
 // RUN: rm -rf %t/clang-module-cache
-// RUN: %swift -i -parse-stdlib -module-cache-path=%t/clang-module-cache -sdk=%sdk %s | FileCheck %s
+// RUN: %swift -i -parse-stdlib -module-cache-path %t/clang-module-cache -sdk %sdk %s | FileCheck %s
 // REQUIRES: swift_interpreter
-import swift
+
+// FIXME: iOS fails: target-run-stdlib-swift gets 'unknown identifier VarArgs'
+
+import Swift
 
 func hexAddr(x: AnyObject) -> String {
-  return hexAddr(Builtin.bridgeToRawPointer(Builtin.castToObjectPointer(x)))
+  return hexAddr(Builtin.bridgeToRawPointer(Builtin.castToNativeObject(x)))
 }
 
 func hexAddr(x: Builtin.RawPointer) -> String {
-  return "@0x" + Int(Builtin.ptrtoint_Int64(x)).format('x', "")
+  return "@0x" + Int(Builtin.ptrtoint_Word(x)).format("x", layout: "")
 }
 
 func hexAddr<T>(p: UnsafePointer<T>) -> String {
@@ -19,15 +22,14 @@ func hexAddr(p: COpaquePointer) -> String {
   return hexAddr(p.value)
 }
 
-@asmname="vprintf"
-func c_vprintf(format: CString, args: COpaquePointer)
+@asmname("vprintf")
+func c_vprintf(format: CString, args: CVaListPointer)
 
 func printf(format: String, arguments: CVarArg...) {
   format.withCString {
     format in
     withVaList(arguments) {
-      arguments in
-      c_vprintf(format, arguments)
+      c_vprintf(format, $0)
     }
   }
 }
@@ -41,17 +43,21 @@ func test_varArgs0() {
 test_varArgs0()
 
 func test_varArgs1() {
-  var args = makeC_va_list()
+  var args = VaListBuilder()
 
   var format = "dig it: "
-  for i in 0..12 {
+  for i in 0...12 {
     args.append(Int16(-i))
     args.append(Float(i))
     format += "%d %2g "
   }
+  
   // CHECK: dig it: 0  0 -1  1 -2  2 -3  3 -4  4 -5  5 -6  6 -7  7 -8  8 -9  9 -10 10 -11 11
   (format + "\n").withCString {
-    c_vprintf($0, args)
+    formatString in
+    withVaList(args) {
+      c_vprintf(formatString, $0)
+    }
   }
 }
 test_varArgs1()

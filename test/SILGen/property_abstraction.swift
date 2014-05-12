@@ -1,14 +1,19 @@
 // RUN: %swift -parse-stdlib -emit-silgen %s | FileCheck %s
 
-struct Int {}
+struct Int {
+  mutating func foo() {}
+}
 
 struct Foo<T, U> {
   var f: T -> U
+
+  var g: T
 }
 
-// CHECK-LABEL: sil @_TF20property_abstraction4getFFT1xGVS_3FooVS_3IntS1___FS1_S1_ : $@thin (@owned Foo<Int, Int>) -> @owned @callee_owned (Int) -> Int
-// CHECK:         [[F_ADDR:%.*]] = struct_element_addr {{%.*}} : $*Foo<Int, Int>, #f
-// CHECK:         [[F_ORIG:%.*]] = load [[F_ADDR]]
+// CHECK-LABEL: sil @_TF20property_abstraction4getF
+// CHECK:         bb0([[X_ORIG:%.*]] : $Foo<Int, Int>):
+// CHECK:         [[F_ORIG:%.*]] = struct_extract [[X_ORIG]] : $Foo<Int, Int>, #Foo.f
+// CHECK:         strong_retain [[F_ORIG]]
 // CHECK:         [[REABSTRACT_FN:%.*]] = function_ref @_TTRXFo_iV20property_abstraction3Int_iS0__XFo_dS0__dS0__ : $@thin (Int, @owned @callee_owned (@out Int, @in Int) -> ()) -> Int
 // CHECK:         [[F_SUBST:%.*]] = partial_apply [[REABSTRACT_FN]]([[F_ORIG]])
 // CHECK:         return [[F_SUBST]]
@@ -16,20 +21,20 @@ func getF(x: Foo<Int, Int>) -> Int -> Int {
   return x.f
 }
 
-// CHECK-LABEL: sil @_TF20property_abstraction4setFFT1xRGVS_3FooVS_3IntS1__1fFS1_S1__T_ : $@thin (@inout Foo<Int, Int>, @owned @callee_owned (Int) -> Int) -> ()
-// CHECK:         [[F_ADDR:%.*]] = struct_element_addr {{%.*}} : $*Foo<Int, Int>, #f
+// CHECK-LABEL: sil @_TF20property_abstraction4setF
+// CHECK:         [[F_ADDR:%.*]] = struct_element_addr {{%.*}} : $*Foo<Int, Int>, #Foo.f
 // CHECK:         [[REABSTRACT_FN:%.*]] = function_ref @_TTRXFo_dV20property_abstraction3Int_dS0__XFo_iS0__iS0__ : $@thin (@out Int, @in Int, @owned @callee_owned (Int) -> Int) -> ()
 // CHECK:         [[F_ORIG:%.*]] = partial_apply [[REABSTRACT_FN]]({{%.*}})
 // CHECK:         assign [[F_ORIG]] to [[F_ADDR]]
-func setF(x: @inout Foo<Int, Int>, f: Int -> Int) {
+func setF(inout x: Foo<Int, Int>, f: Int -> Int) {
   x.f = f
 }
 
-func inOutFunc(f: @inout (Int -> Int)) { }
+func inOutFunc(inout f: (Int -> Int)) { }
 
-// CHECK-LABEL: sil @_TF20property_abstraction6inOutFFT1xGVS_3FooVS_3IntS1___T_ : $@thin (@owned Foo<Int, Int>) -> () {
-// CHECK:         [[INOUTFUNC:%.*]] = function_ref @_TF20property_abstraction9inOutFuncFT1fRFVS_3IntS0__T_ : $@thin (@inout @callee_owned (Int) -> Int) -> ()
-// CHECK:         [[F_ADDR:%.*]] = struct_element_addr {{%.*}} : $*Foo<Int, Int>, #f
+// CHECK-LABEL: sil @_TF20property_abstraction6inOutF
+// CHECK:         [[INOUTFUNC:%.*]] = function_ref @_TF20property_abstraction9inOutFunc
+// CHECK:         [[F_ADDR:%.*]] = struct_element_addr {{%.*}} : $*Foo<Int, Int>, #Foo.f
 // CHECK:         [[F_ORIG:%.*]] = load [[F_ADDR]]
 // CHECK:         [[REABSTRACT_FN:%.*]] = function_ref @_TTRXFo_iV20property_abstraction3Int_iS0__XFo_dS0__dS0__ : $@thin (Int, @owned @callee_owned (@out Int, @in Int) -> ()) -> Int
 // CHECK:         [[F_SUBST_IN:%.*]] = partial_apply [[REABSTRACT_FN]]([[F_ORIG]])
@@ -40,8 +45,17 @@ func inOutFunc(f: @inout (Int -> Int)) { }
 // CHECK:         [[REABSTRACT_FN:%.*]] = function_ref @_TTRXFo_dV20property_abstraction3Int_dS0__XFo_iS0__iS0__ : $@thin (@out Int, @in Int, @owned @callee_owned (Int) -> Int) -> ()
 // CHECK:         [[F_ORIG:%.*]] = partial_apply [[REABSTRACT_FN]]([[F_SUBST_OUT]])
 // CHECK:         assign [[F_ORIG]] to [[F_ADDR]]
-func inOutF(x: Foo<Int, Int>) {
+func inOutF(var x: Foo<Int, Int>) {
   inOutFunc(&x.f)
+}
+
+// Don't produce a writeback for generic lvalues when there's no real
+// abstraction difference. <rdar://problem/16530674>
+// CHECK-LABEL: sil @_TF20property_abstraction23noAbstractionDifference
+func noAbstractionDifference(var x: Foo<Int, Int>) {
+  // CHECK: [[ADDR:%.*]] = struct_element_addr {{%.*}}, #Foo.g
+  // CHECK: apply {{%.*}}([[ADDR]])
+  x.g.foo()
 }
 
 /*

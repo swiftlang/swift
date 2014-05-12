@@ -1,30 +1,38 @@
-// RUN: %swift %s -constraint-checker -parse-as-library -verify
+// RUN: %swift %s -parse-as-library -verify
 
 struct S {
-  constructor() {
-    super.constructor() // expected-error{{'super.constructor' cannot be called in a constructor for a non-class type}}
+  init() {
+    super.init() // expected-error{{'super' members cannot be referenced in a non-class type}}
   }
 }
 
 class D : B {
   func foo() {
-    super.constructor() // expected-error{{'super.constructor' cannot be called outside of a constructor}}
+    super.init() // expected-error{{'super.init' cannot be called outside of an initializer}}
   }
 
-  constructor(a:Int) {
-    super.constructor()
+  init(a:Int) {
+    super.init()
   }
 
-  constructor(e:Int) {
-    super.constructor('x') // expected-error{{}}
+  init(e:Int) {
+    super.init('x') // expected-error{{could not find an overload for 'init' that accepts the supplied arguments}}
   }
 
-  constructor(f:Int) {
-    super.constructor(a='x')
+  init(f:Int) {
+    super.init(a: "x")
   }
 
-  constructor(g:Int) {
-    super.constructor("aoeu") // expected-error{{}}
+  init(g:Int) {
+    super.init("aoeu") // expected-error{{}}
+  }
+
+  init(h:Int) {
+    var y : B = super.init() // expected-error{{}}
+  }
+
+  init(d:Double) {
+    super.init()
   }
 }
 
@@ -32,19 +40,19 @@ class B {
   var foo : (bar:Int)
   func bar() {}
 
-  constructor() {
+  init() {
   }
 
-  constructor(x:Int) {
+  init(x:Int) {
   }
 
-  constructor(a:Char) {
+  init(a:UnicodeScalar) {
   }
-  constructor(b:Char) {
+  init(b:UnicodeScalar) {
   }
 
-  constructor(z:Float) {
-    super.constructor() // expected-error{{'super.constructor' cannot be called in a root class constructor}}
+  init(z:Float) {
+    super.init() // expected-error{{'super' members cannot be referenced in a root class}}
   }
 }
 

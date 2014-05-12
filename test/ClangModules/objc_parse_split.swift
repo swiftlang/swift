@@ -1,6 +1,7 @@
 // RUN: rm -rf %t/clang-module-cache
 // RUN: %swift %clang-importer-sdk -emit-sil -module-cache-path %t/clang-module-cache -I %S/Inputs/custom-modules -target x86_64-apple-darwin13 -split-objc-selectors %s -verify
-// RUN: ls -lR %t/clang-module-cache | grep ObjectiveC.pcm
+// RUN: ls -lR %t/clang-module-cache | FileCheck %s
+// CHECK: ObjectiveC{{.*}}.pcm
 
 import AppKit
 import objc_ext
@@ -22,27 +23,28 @@ func treatBAsA(b: B) -> A {
 
 // Instance method invocation
 func instanceMethods(b: B) {
-  var i = b.method(1, withFloat:2.5)
-  i = i + b.method(1, withDouble:2.5)
+  var i = b.method(1, float:2.5)
+  i = i + b.method(1, double:2.5)
 
   // BOOL
   b.setEnabled(true)
 
   // SEL
-  b.performSelector("isEqual:", withObject:b)
+  b.performSelector("isEqual:", object:b) // expected-error {{'performSelector' is unavailable: 'performSelector' methods are unavailable}}
 
   // Renaming of redundant parameters.
-  b.performAdd(1, withValue:2, withValue2:3, withValue:4)
+  b.performAdd(1, value:2, value2:3, value:4) // expected-error{{argument 'value' must precede argument 'value2'}}
+  b.performAdd(1, value:2, value:4, value2:3)
 
   // Renaming of redundant parameters.
-  b.performMultiply(withValue:1, value:2)
+  b.performMultiply(value:1, value:2)
   
   b.move(`for`: 5)
 
   // Both class and instance methods exist.
-  b.description()
+  b.description
   b.instanceTakesObjectClassTakesFloat(b)
-  b.instanceTakesObjectClassTakesFloat(2.0) // expected-error{{does not type-check}}
+  b.instanceTakesObjectClassTakesFloat(2.0) // expected-error{{cannot convert the expression's type 'Void' to type 'AnyObject!'}}
 
 }
 
@@ -50,14 +52,14 @@ func instanceMethods(b: B) {
 func classMethods(b: B, other: NSObject) {
   var i = B.classMethod()
   i += B.classMethod(1)
-  i += B.classMethod(1, withInt:2)
+  i += B.classMethod(1, int:2)
 
   i += b.classMethod() // expected-error{{'B' does not have a member named 'classMethod'}}
     
   // Both class and instance methods exist.
-  B.description()
+  let x : AnyObject = B.description()!
   B.instanceTakesObjectClassTakesFloat(2.0)
-  B.instanceTakesObjectClassTakesFloat(other) // expected-error{{does not type-check}}
+  B.instanceTakesObjectClassTakesFloat(other) // expected-error{{could not find an overload for 'instanceTakesObjectClassTakesFloat' that accepts the supplied arguments}}
 
   // Call an instance method of NSObject.
   var c: AnyClass = B.myClass() // no-warning
@@ -71,22 +73,22 @@ func instanceMethodsInExtensions(b: B) {
   b.method(1, onExtB:2.5)
   b.method(1, separateExtMethod:3.5)
 
-  let m1 = b.method:onCat1: // expected-error{{partial application of Objective-C method is not allowed}}
-  m1(1, 2.5)
+  let m1 = b.method:_:onCat1:
+  m1(1, onCat1: 2.5)
 
-  let m2 = b.method:onExtA: // expected-error{{partial application of Objective-C method is not allowed}}
-  m2(1, 2.5)
+  let m2 = b.method:_:onExtA:
+  m2(1, onExtA: 2.5)
 
-  let m3 = b.method:onExtB: // expected-error{{partial application of Objective-C method is not allowed}}
-  m3(1, 2.5)
+  let m3 = b.method:_:onExtB:
+  m3(1, onExtB: 2.5)
 
-  let m4 = b.method:separateExtMethod: // expected-error{{partial application of Objective-C method is not allowed}}
-  m4(1, 2.5)
+  let m4 = b.method:_:separateExtMethod:
+  m4(1, separateExtMethod: 2.5)
 }
 
 func dynamicLookupMethod(b: AnyObject) {
-  if let m5 = b.method:separateExtMethod: {
-    m5(1, 2.5)
+  if let m5 = b.method:_:separateExtMethod: {
+    m5(1, separateExtMethod: 2.5)
   }
 }
 
@@ -95,7 +97,7 @@ func properties(b: B) {
   var i = b.counter
   b.counter = i + 1
   i = i + b.readCounter
-  b.readCounter = i + 1 // expected-error{{cannot assign to the result of this expression}}
+  b.readCounter = i + 1 // expected-error{{cannot assign to 'readCounter' in 'b'}}
 
   b.setCounter(5) // expected-error{{'B' does not have a member named 'setCounter'}}
 
@@ -105,7 +107,7 @@ func properties(b: B) {
   // An informal property cannot be made formal in a subclass. The
   // formal property is simply ignored.
   b.informalMadeFormal()
-  b.informalMadeFormal = i // expected-error{{cannot assign to the result of this expression}}
+  b.informalMadeFormal = i // expected-error{{cannot assign to 'informalMadeFormal' in 'b'}}
   b.setInformalMadeFormal(5)
 
   b.overriddenProp = 17
@@ -121,14 +123,14 @@ func properties(b: B) {
 // Construction.
 func newConstruction(a: A, aproxy: AProxy) {
   var b : B = B()
-  b = B(17)
-  b = B(withInt:17)
-  b = B(withDouble:17.5, 3.14159)
+  b = B(int: 17)
+  b = B(int:17)
+  b = B(double:17.5, 3.14159)
   b = B(BBB:b)
-  b = B(forWorldDomination:())
-  b = B(17, andDouble : 3.14159)
+  b = B(worldDomination:()) // expected-error{{incorrect argument label in call (have 'worldDomination:', expected 'forWorldDomination:')}}
+  b = B(int: 17, andDouble : 3.14159)
 
-  b = B.`new`(withA:a)
+  b = B.`new`(a: a)
   B.alloc()._initFoo()
   b.notAnInit()
 
@@ -136,7 +138,7 @@ func newConstruction(a: A, aproxy: AProxy) {
   b.initWithInt(17) // expected-error{{'B' does not have a member named 'initWithInt'}}
 
   // init methods on non-NSObject-rooted classes
-  AProxy(5)
+  AProxy(int: 5)
 }
 
 // Indexed subscripting
@@ -154,15 +156,15 @@ func keyedSubscripting(b: B, idx: A, a: A) {
 // Typed indexed subscripting
 func checkHive(hive: Hive, b: B) {
   var b2 = (hive.bees[5] as B)!
-  b2.method(1, withFloat:1.5)
+  b2.method(1, float:1.5)
 }
 
 // Protocols
 func testProtocols(b: B, bp: BProto) {
   var bp2 : BProto = b
   var b2 : B = bp // expected-error{{'BProto' is not convertible to 'B'}}
-  bp.method(1, withFloat:2.5)
-  bp.method(1, withDouble:2.5) // expected-error{{expression does not type-check}}
+  bp.method(1, float:2.5)
+  bp.method(1, double:2.5) // expected-error{{incorrect argument label in call (have '_:double:', expected '_:float:')}}
   bp2 = b.getAsProto()
 
   var c1 : Cat1Proto = b
@@ -173,31 +175,27 @@ func testProtocols(b: B, bp: BProto) {
 
 // Methods only defined in a protocol
 func testProtocolMethods(b: B, p2m: P2.Type) {
-  b.otherMethod(1, withFloat:3.14159)
+  b.otherMethod(1, float:3.14159)
   b.p2Method()
   b.initViaP2(3.14159, second:3.14159) // expected-error{{'B' does not have a member named 'initViaP2'}}
 
   // Imported constructor.
-  var b2 = B(3.14159, second:3.14159)
+  var b2 = B(viaP2: 3.14159, second:3.14159)
 
   // Constructor in protocol.
   p2m(viaP2:3.14159, second: 3.14159) 
 }
 
-func testId(x: AnyObject) {
-  x.performSelector!("foo:", x)
-}
-
 class MySubclass : B {
   // Override a regular method.
-  @override func anotherMethodOnB() {}
+  override func anotherMethodOnB() {}
 
   // Override a category method
-  @override func anotherCategoryMethod() {}
+  override func anotherCategoryMethod() {}
 }
 
 func getDescription(array: NSArray) {
-  array.description()
+  array.description
 }
 
 // Method overriding with unfortunate ordering.
@@ -220,18 +218,18 @@ func almostSubscriptableKeyMismatch(bc: BadCollection, key: NSString) {
 func almostSubscriptableKeyMismatchInherited(bc: BadCollectionChild,
                                              key: String) {
   var value : AnyObject = bc[key] // no-warning, inherited from parent
-  bc[key] = value // expected-error{{expression does not type-check}}
+  bc[key] = value // expected-error{{cannot assign to the result of this expression}}
 }
 
 func almostSubscriptableKeyMismatchInherited(roc: ReadOnlyCollectionChild,
                                              key: String) {
   var value : AnyObject = roc[key] // no-warning, inherited from parent
-  roc[key] = value // expected-error{{expression does not type-check}}
+  roc[key] = value // expected-error{{cannot assign to the result of this expression}}
 }
 
 // Use of 'Class' via dynamic lookup.
 func classAnyObject(obj: NSObject) {
-  obj.myClass().description!()
+  obj.myClass().description()
 }
 
 // Protocol conformances
@@ -242,8 +240,8 @@ class Wobbler : NSWobbling {
 
 func optionalMemberAccess(w: NSWobbling) {
   w.wobble()
-  w.wibble() // expected-error{{'() -> $T3' is not identical to '(() -> Void)?'}}
-  var x: AnyObject = w[5] // expected-error{{type '(@unchecked AnyObject?)?' does not conform to protocol 'AnyObject'}}
+  w.wibble() // expected-error{{value of optional type '(() -> Void)?' not unwrapped; did you mean to use '!' or '?'?}}
+  var x: AnyObject = w[5] // expected-error{{value of optional type '(AnyObject!)?' not unwrapped; did you mean to use '!' or '?'?}}
 }
 
 func protocolInheritance(s: NSString) {
@@ -251,12 +249,12 @@ func protocolInheritance(s: NSString) {
 }
 
 func ivars(hive: Hive) {
-  hive.bees.description() // no-warning
-  hive.queen.description() // expected-error{{'Hive' does not have a member named 'queen'}}
+  hive.bees.description // no-warning
+  hive.queen.description // expected-error{{'Hive' does not have a member named 'queen'}}
 }
 
 class NSObjectable : NSObjectProtocol {
-  @objc func description() -> AnyObject { }
+  @objc var description : AnyObject { return self }
 }
 
 
@@ -276,7 +274,7 @@ func testDynamicSelf(queen: B, wobbler: NSWobbling) {
   var hive = Hive()
 
   // Factory method with instancetype result.
-  var hive1 = Hive.hive(withQueen: queen)
+  var hive1 = Hive.hive(queen: queen)
   hive1 = hive
   hive = hive1
 
@@ -292,7 +290,7 @@ func testDynamicSelf(queen: B, wobbler: NSWobbling) {
 }
 
 func testRepeatedProtocolAdoption(w: NSWindow) {
-  w.description()
+  w.description
 }
 
 class ProtocolAdopter1 : FooProto {
@@ -318,62 +316,17 @@ class ProtocolAdopterBad3 : FooProto { // expected-error{{type 'ProtocolAdopterB
   }
 }
 
-// Subclassing and designated initializers
-func testNSInterestingDesignated() {
-  NSInterestingDesignated()
-  NSInterestingDesignated(withString:"hello")
-  NSInterestingDesignatedSub()
-  NSInterestingDesignatedSub(withString:"hello")
-}
-
-class MyDocument1 : NSDocument {
-  init() { 
-    super.init()
-  }
-}
-
-func createMyDocument1() {
-  var md = MyDocument1()
-  md = MyDocument1(withURL: "http://llvm.org")
-}
-
-class MyDocument2 : NSDocument {
-  init withURL(url: String) {
-    return super.init(withURL: url) // expected-error{{must call a designated initializer of the superclass 'NSDocument'}}
-  }
-}
-
-class MyDocument3 : NSAwesomeDocument {
-  init() { 
-    super.init()
-  }
-}
-
-func createMyDocument3() {
-  var md = MyDocument3()
-  md = MyDocument3(withURL: "http://llvm.org")
-}
-
-class MyInterestingDesignated : NSInterestingDesignatedSub { 
-  init withString(str: String) {
-    super.init(withString: str)
-  }
-
-  init withInt(i: Int) {
-    super.init() // expected-error{{must call a designated initializer of the superclass 'NSInterestingDesignatedSub'}}
-  }
-}
-
-func createMyInterestingDesignated() {
-  var md = MyInterestingDesignated(withURL: "http://llvm.org")
-}
-
-func testNoReturn(a : NSAwesomeDocument) -> Int {
-  a.noReturnMethod(42)
-  return 17    // TODO: In principle, we should produce an unreachable code diagnostic here.
-}
-
-func splitting(doc: NSDocument, url: NSURL) {
+func splitting(doc: NSDocument, url: NSURL, delegate: MyDelegate) {
   doc.copyDocument(fromURL: url, toURL: url)
   doc.scaleX(by: 5)
+  delegate.receiverShouldJumpOnTable(doc)
+}
+
+func builtinMapping(view: NSScrollView) {
+  view.scrollItemToTop(atIndex: 5)
+}
+
+// Multi-word splitting
+func multiWordSplit(attrString: NSAttributedString) {
+  attrString.sliceAttributedString(5) // note: don't break up "attributed" "string"
 }

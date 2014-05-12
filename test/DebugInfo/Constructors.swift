@@ -1,10 +1,10 @@
-// RUN: %swift -triple x86_64-apple-darwin10 %s -emit-llvm -g -o - | FileCheck %s
+// RUN: %swift -target x86_64-apple-darwin10 %s -emit-ir -g -o - | FileCheck %s
 struct Foo {
-// CHECK: [ DW_TAG_subprogram ] [line [[@LINE+1]]] [def] [constructor]
-	constructor (x : Int) {}
-	func bar (x : Int) {}
+  // Allocating constructor - should have no line table info.
+  // CHECK: _TFV12Constructors3FooCfMS0_FT1xSi_S0_{{.*}}[ DW_TAG_subprogram ] [line [[@LINE+1]]] [def] [scope 0] [init]
+  init(x: Int) {}
+  func bar(x: Int) {}
 }
 
-var f = Foo(1)
+var f = Foo(x: 1)
 f.bar(2)
-

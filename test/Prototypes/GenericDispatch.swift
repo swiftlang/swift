@@ -20,95 +20,133 @@
 // CHECK: testing...
 println("testing...")
 
-// A generic dispatch point with a default implementation
-operator infix --- {}
-
+//===----------------------------------------------------------------------===//
+//===--- Think of this code as being "in the library" ---------------------===//
 //===----------------------------------------------------------------------===//
 
-// Think of F as ForwardIndex and "---" as the O(N) distance measuring function
-protocol F : F_ {
-  func --- (x: Self, y: Self)
-}
+//===--- F "base" protocol (like ForwardIndex) ----------------------------===//
 
+// Protocols with default implementations are broken into two parts, a
+// base and a more-refined part.  From the user's point-of-view,
+// however, F_ and F should look like a single protocol.  This
+// technique gets used throughout the standard library to break
+// otherwise-cyclic protocol dependencies, which the compiler isn't
+// yet smart enough to handle.
 protocol F_ {
   // Non-defaulted requirements of F go here
+  func succ() -> Self
 }
 
-// Default implementation of --- for Fs
-func --- <I: F_>(x: I, y: I) {
-  println("slow")
+protocol F : F_ {
+  // This requirement allows generic distance() to find default
+  // implementations.  Only the author of F and the author of a
+  // refinement of F having a non-default distance implementation need
+  // to know about it.  These refinements are expected to be rare
+  // (which is why defaulted requirements are a win)
+  func ~> (Self, (_Distance, (Self))) -> Int
 }
 
-//===----------------------------------------------------------------------===//
+// Operation tag for distance
+//
+// Operation tags allow us to use a single operator (~>) for
+// dispatching every generic function with a default implementation.
+// Only authors of specialized distance implementations need to touch
+// this tag.
+struct _Distance {}
 
-// Think of R as RandomAccessIndex
-protocol R : F, R_ {
+// This function cleans up the syntax of invocations
+func _distance<I>(other: I) -> (_Distance, (I)) {
+  return (_Distance(), (other))
 }
 
-// Default impelementation of --- for Rs, which is O(1)
-func --- <I: R_>(x: I, y: I) {
-  println("fast")
-  I.sub(x, y)
+// Default Implementation of distance for F's
+func ~> <I: F_>(self_:I, (_Distance, (I))) -> Int {
+  self_.succ() // Use an F-specific operation
+  println("F")
+  return 0
 }
 
-// R_ refines F_ so its --- overload will be preferred.
+//===--- Dispatching distance() function ----------------------------------===//
+
+// This generic function is for user consumption; it dispatches to the
+// appropriate implementation for T.
+func distance<T: F>(x: T, y: T) -> Int {
+  return x~>_distance(y)
+}
+
+//===--- R refined protocol (like RandomAccessIndex) ----------------------===//
 protocol R_ : F_ {
   // Non-defaulted requirements of R go here, e.g. something to
   // measure the distance in O(1)
   class func sub(x: Self, y: Self)
 }
 
+protocol R : F, R_ {}
+
+// R has its own default implementation of distance, which is O(1).
+// Only the author of R needs to see this implementation.
+func ~> <I: R_>(x: I, args: (_Distance, (I))) -> Int {
+  let other = args.1
+  I.sub(other, y: x)
+  println("R")
+  return 1
+}
+
+//===--- D refined protocol (like R, but with a custom distance) ----------===//
+// Users who want to provide a custom distance function will use this protocol
+protocol D_ : R_ {
+  func distance(y: Self) -> Int
+}
+
+protocol D : R, D_ {}
+
+// Dispatch to D's distance() requirement
+// Only the author of D needs to see this implementation.
+func ~> <I: D_>(x:I, args: (_Distance, (I))) -> Int {
+  let other = args.1
+  return x.distance(other)
+}
+
+//===----------------------------------------------------------------------===//
+//===--- Think of this as being "user code" -------------------------------===//
 //===----------------------------------------------------------------------===//
 
-// A couple of types conforming to F
-struct SlowIndex : F {}
+// This model of F automatically gets F's default implementation of distance
+struct SlowIndex : F {
+  func succ() -> SlowIndex { return self }
+}
 
+// This model of R automatically gets R's default implementation of distance
 struct FastIndex : R {
-  static func sub(a: FastIndex, b: FastIndex) {
+  func succ() -> FastIndex { return self }
+  static func sub(x: FastIndex, y: FastIndex) {}
+}
+
+struct X : D {
+  // Customized distance implementation
+  func distance(y: X) -> Int {
+    println("X")
+    return 3
   }
+  // Inherited requirements
+  func succ() -> X { return self }
+  static func sub(x: X, y: X) {}
 }
 
-// A generic function operating on F's
-func f<T: F>(x: T) {
-  x --- x // In here, we don't know whether T is an R or just an F
+// Here's a generic function that uses our dispatching distance
+func sort<T: F>(x: T) {
+  // In here, we don't know whether T is an R or just a plain F, or
+  // whether it has its own specialized impelementation of
+  distance(x, x)
 }
+// CHECK-NEXT: F
+sort(SlowIndex())
 
-// CHECK-NEXT: slow
-f(SlowIndex())
+// CHECK-NEXT: R
+sort(FastIndex())
 
-// CHECK-NEXT: fast
-f(FastIndex())
+// CHECK-NEXT: X
+sort(X())
 
-//===----------------------------------------------------------------------===//
-
-// Just to prove our point, demonstrate the effect on associated types
-
-// Think of C as Collection
-protocol C {
-  typealias I : F  // I is the IndexType
-  func s() -> I
-}
-
-struct FastCollection : C {
-  typealias I = FastIndex
-  func s() -> I {
-    return I()
-  }
-}
-
-struct SlowCollection : C {
-  typealias I = SlowIndex
-  func s() -> I {
-    return I()
-  }
-}
-
-func f<T: C>(x: T) {
-  x.s() --- x.s()
-}
-
-// CHECK-NEXT: slow
-f(SlowCollection())
-
-// CHECK-NEXT: fast
-f(FastCollection())
+// CHECK-NEXT: done
+println("done.")

@@ -1,9 +1,23 @@
 // RUN: rm -rf %t
 // RUN: mkdir %t
-// RUN: %swift-ide-test %clang-importer-sdk -module-cache-path %t/clang-module-cache -print-as-objc %s -source-filename %s > %t/empty.h
+// RUN: %swift %clang-importer-sdk -module-cache-path %t/clang-module-cache %s -parse -emit-objc-header-path %t/empty.h
 // RUN: FileCheck %s < %t/empty.h
 // RUN: %check-in-clang %t/empty.h
+// RUN: %check-in-clang -fno-modules %t/empty.h
+// RUN: not %check-in-clang -I %S/Inputs/clang-headers %t/empty.h 2>&1 | FileCheck %s --check-prefix=CUSTOM-OBJC-PROLOGUE
 
-// CHECK: @import swift;
+// CHECK-NOT: @import Swift;
 
-// CHECK-NOT: {{.}}
+// CHECK-LABEL: #include <objc/NSObject.h>
+// CHECK: #include <stdint.h>
+// CHECK: #include <stddef.h>
+// CHECK: #include <stdbool.h>
+
+// CHECK: # define SWIFT_METATYPE(X)
+// CHECK: # define SWIFT_CLASS
+// CHECK: # define SWIFT_PROTOCOL
+// CHECK: # define OBJC_DESIGNATED_INITIALIZER
+
+// CHECK-NOT: {{[@;{}]}}
+
+// CUSTOM-OBJC-PROLOGUE: swift/objc-prologue.h:1:2: error: "Prologue included"

@@ -51,7 +51,7 @@ enum Color : Int, RawRepresentable {
   case Red
   case Blue
 
-  static func fromRaw(x: Double) -> Color? {
+  static func fromRaw(raw: Double) -> Color? {
     return .None
   }
 

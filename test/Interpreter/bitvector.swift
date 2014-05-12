@@ -1,40 +1,40 @@
-// RUN: %swift -I %S/.. %s -i | FileCheck %s
-import swift
+// RUN: %target-run-simple-swift | FileCheck %s
+
+import Swift
 
 struct BitVector64 {
-  bits : Int64
+  var bits : Int64
 
   subscript (bit : Int) -> Bool {
-    get {      
-      if (bits & (1 << bit)) != 0 {
+    get {
+      if (bits & (1 << Int64(bit))) != 0 {
         return true
       }
-      return false;
+      return false
     }
-
     set {
-      var mask = 1 << bit
-      if value {
+      var mask = 1 << Int64(bit)
+      if newValue {
         bits = bits | mask
       } else {
         bits = bits & ~mask
-      }  
+      }
     }
   }
 }
 
 // Create an empty bitvector
-var vec = BitVector64(0)
+var vec = BitVector64(bits: 0)
 
 // Set even elements to 'true'.
-foreach i in 0..64 {
+for i in 0...64 {
   if i % 2 == 0 {
     vec[i] = true
   }
 }
 
 // Print all elements
-foreach i in 0..64 {
+for i in 0...64 {
   println(String(vec[i]))
 }
 // CHECK: true

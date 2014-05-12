@@ -15,7 +15,7 @@
 /// When you use this type, you become partially responsible for
 /// keeping the object alive.
 struct Unmanaged<T: AnyObject> {
-  @unowned(unsafe) var _value: T
+  unowned(unsafe) var _value: T
 
   @transparent
   init(_private: T) { _value = _private }
@@ -85,13 +85,19 @@ struct Unmanaged<T: AnyObject> {
 
   /// Get the value of this unmanaged reference as a managed
   /// reference without consuming an unbalanced retain of it.
-  var unretainedValue: T {
+  ///
+  /// This is useful when a function returns an unmanaged reference
+  /// and you know that you're not responsible for releasing the result.
+  func takeUnretainedValue() -> T {
     return _value
   }
 
   /// Get the value of this unmanaged reference as a managed
   /// reference and consume an unbalanced retain of it.
-  var retainedValue: T {
+  ///
+  /// This is useful when a function returns an unmanaged reference
+  /// and you know that you're responsible for releasing the result.
+  func takeRetainedValue() -> T {
     let result = _value
     release()
     return result
@@ -103,7 +109,7 @@ struct Unmanaged<T: AnyObject> {
   /// for ensuring that the types are actually compatible at
   /// runtime.
   func bridgeUnretainedValueTo<U: AnyObject>() -> U {
-    return reinterpretCast(unretainedValue)
+    return reinterpretCast(takeUnretainedValue())
   }
 
   /// Get the value of this unmanaged reference as an managed
@@ -112,7 +118,7 @@ struct Unmanaged<T: AnyObject> {
   /// for ensuring that the types are actually compatible at
   /// runtime.
   func bridgeRetainedValueTo<U: AnyObject>() -> U {
-    return reinterpretCast(retainedValue)
+    return reinterpretCast(takeRetainedValue())
   }
 
   /// Perform an unbalanced retain of the object.

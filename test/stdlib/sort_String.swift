@@ -1,4 +1,4 @@
-// RUN: %swift %s -i | FileCheck %s
+// RUN: %target-run-simple-swift | FileCheck %s
 
 func test() {
   var array = new String[5]
@@ -11,7 +11,7 @@ func test() {
   for i in array {
     println(i)
   }
-  print('\n')
+  print("\n")
 }
 
 test()

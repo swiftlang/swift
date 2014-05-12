@@ -5,8 +5,8 @@ import AppKit
 
 func testAnimatorProxy(constraint:NSLayoutConstraint) {
   // Rely on warning on 'AnyObject' as an inferred type to check
-  // if the result of 'animator' is getting papered over.
-  let x = constraint.animator()! // expected-warning {{constant 'x' inferred to have type 'AnyObject', which may be unexpected}} expected-note {{add an explicit type annotation to silence this warning}}
+  // if the result of 'animator' is being treated as instancetype.
+  let x = constraint.animator()! // no-warning
   let y = x.constant
 }
 

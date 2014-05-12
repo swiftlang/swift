@@ -2,9 +2,12 @@
 
 // Default initialization of variables.
 
+class X { }
+
 struct CanDefaultInit {
   var opt1: Int?
   var (opt2, (opt3, opt4)): (Int?, (Float?, Double?))
+  weak var opt5: X?
 }
 
 func testCanDefaultInit() {

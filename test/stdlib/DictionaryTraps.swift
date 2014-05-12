@@ -7,7 +7,7 @@
 // RUN: %target-run %t/a.out ValueTypeNotBridged 2>&1 | FileCheck %s -check-prefix=CHECK
 
 // CHECK: OK
-// CHECK-NEXT: CRASHED: SIG{{ILL|TRAP}}
+// CHECK: CRASHED: SIG{{ILL|TRAP}}
 
 import Foundation
 

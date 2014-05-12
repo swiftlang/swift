@@ -1,4 +1,4 @@
-// RUN: %swift %s -verify
+// RUN: %swift %s -verify -parse
 
 // Parser used to crash while parsing a file where the last token was an
 // interpolated string literal.

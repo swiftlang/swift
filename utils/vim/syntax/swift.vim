@@ -12,9 +12,9 @@ syn keyword swiftImport import skipwhite nextgroup=swiftImportModule
 syn match swiftImportModule /\<[A-Za-z_][A-Za-z_0-9]*\>/ contained nextgroup=swiftImportComponent
 syn match swiftImportComponent /\.\<[A-Za-z_][A-Za-z_0-9]*\>/ contained nextgroup=swiftImportComponent
 
-syn keyword swiftKeyword requires static subscript break continue do else if for return while skipwhite
+syn keyword swiftKeyword break case continue default do else for if in static switch return where while skipwhite
 
-syn keyword swiftTypeDefinition class extension oneof protocol struct typealias var skipwhite nextgroup=swiftTypeName
+syn keyword swiftTypeDefinition class extension protocol struct typealias enum skipwhite nextgroup=swiftTypeName
 syn region swiftTypeAttributes start="\[" end="\]" skipwhite contained nextgroup=swiftTypeName
 syn match swiftTypeName /\<[A-Za-z_][A-Za-z_0-9\.]*\>/ contained nextgroup=swiftTypeParameters
 
@@ -23,9 +23,10 @@ syn region swiftTypeParameters start="<" end=">" skipwhite contained
 syn keyword swiftFuncDefinition func skipwhite nextgroup=swiftFuncAttributes,swiftFuncName,swiftOperator
 syn region swiftFuncAttributes start="\[" end="\]" skipwhite contained nextgroup=swiftFuncName,swiftOperator
 syn match swiftFuncName /\<[A-Za-z_][A-Za-z_0-9]*\>/ skipwhite contained nextgroup=swiftTypeParameters
-syn keyword swiftFuncKeyword constructor destructor nextgroup=swiftTypeParameters
+syn keyword swiftFuncKeyword subscript init destructor nextgroup=swiftTypeParameters
 
 syn keyword swiftVarDefinition var skipwhite nextgroup=swiftVarName
+syn keyword swiftVarDefinition let skipwhite nextgroup=swiftVarName
 syn match swiftVarName /\<[A-Za-z_][A-Za-z_0-9]*\>/ skipwhite contained
 
 syn keyword swiftDefinitionModifier static
@@ -35,7 +36,7 @@ syn match swiftImplicitVarName /\$\<[A-Za-z_0-9]\+\>/
 syn match swiftTypeDeclaration /:/ nextgroup=swiftTypeAttributes,swiftTypeName skipwhite
 syn match swiftTypeDeclaration /->/ nextgroup=swiftTypeAttributes,swiftTypeName skipwhite
 
-syn keyword swiftIdentifierKeyword metatype super this This
+syn keyword swiftIdentifierKeyword metatype super self Self
 
 syn keyword swiftNew new skipwhite nextgroup=swiftTypeName
 

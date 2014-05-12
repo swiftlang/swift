@@ -1,7 +1,7 @@
 // RUN: %swift -parse %s -verify
 
 protocol P1 {
-  init() // expected-note{{protocol requires initializer 'init' with type '()'}}
+  init() // expected-note{{protocol requires initializer 'init()' with type '()'}}
 }
 
 // ------------------------------------------------------------------------

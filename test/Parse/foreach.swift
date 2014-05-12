@@ -1,34 +1,36 @@
-// RUN: %swift -I %S/../ %s -parse -verify
+// RUN: %swift %s -parse -verify
 
-import swift
+struct IntRange<Int> : Sequence, Generator {
+  typealias Element = (Int, Int)
+  func next() -> (Int, Int)? {}
 
-struct IntTupleRange {
-  // FIXME: fill in details
+  typealias GeneratorType = IntRange<Int>
+  func generate() -> IntRange<Int> { return self }
 }
 
-func for_each(r : Range) {
+func for_each(r: Range<Int>, iir: IntRange<Int>) {
   var sum = 0
 
   // Simple foreach loop, using the variable in the body
-  foreach i in r {
+  for i in r {
     sum = sum + i
   }
   // Check scoping of variable introduced with foreach loop
   i = 0 // expected-error{{use of unresolved identifier 'i'}}
 
-  // Foreach loops with two variables and varying degrees of typedness
-  foreach (i, j) in r {
+  // For-each loops with two variables and varying degrees of typedness
+  for (i, j) in iir {
     sum = sum + i + j
   }
-  foreach (i, j) in r {
+  for (i, j) in iir {
     sum = sum + i + j
   }
-  foreach (i, j) : (Int, Int) in r {
+  for (i, j) : (Int, Int) in iir {
     sum = sum + i + j
   }
 
   // Parse errors
-  foreach i r { // expected-error{{expected 'in' after foreach pattern}}
+  for i r { // expected-error 2{{expected ';' in 'for' statement}} expected-error {{use of unresolved identifier 'i'}}
   }
-  foreach i in r sum = sum + i; // expected-error{{expected '{' to start the body of foreach loop}}
+  for i in r sum = sum + i; // expected-error{{expected '{' to start the body of for-each loop}}
 }

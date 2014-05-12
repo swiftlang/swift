@@ -1,4 +1,4 @@
-// RUN: %swift -O3 -enable-arc-opts=false -sil-inline-threshold=0 -emit-sil %s | FileCheck %s
+// RUN: %swift -O3 -disable-arc-opts -sil-inline-threshold 0 -emit-sil %s | FileCheck %s
 // We can't deserialize apply_inst with subst lists. When radar://14443304
 // is fixed then we should convert this test to a SIL test.
 
@@ -10,17 +10,29 @@ class ABC : pingable {
   func ping() {}
 }
 
-func generic_call<T : pingable>(x: T) {
+func generic_call<T : pingable>(`x: T) {
   x.ping()
 }
 
-//CHECK: sil @_TF21spec_archetype_method21interesting_code_hereFT_T_
-//CHECK: function_ref @_TF21spec_archetype_method12generic_callUS_8pingable__FT1xQ__T__spec0
+struct A<B> : pingable {
+  func ping() {}
+}
+
+func useFoo<T>(`x: T) {
+  var a = A<T>()
+  generic_call(x: a)
+}
+
+//CHECK-LABEL: sil @_TF21spec_archetype_method21interesting_code_hereFT_T_
+//CHECK: function_ref @_TTSC21spec_archetype_method3ABCS0_S_8pingable___TF21spec_archetype_method12generic_callUS_8pingable__FT1xQ__T_
+//CHECK-NEXT: apply
+//CHECK:  function_ref @_TTSC21spec_archetype_method3ABC___TF21spec_archetype_method6useFooU__FT1xQ__T_ : $@thin (@in ABC) -> ()
 //CHECK-NEXT: apply
 //CHECK: return
 func interesting_code_here() {
   var x = ABC()
   // Make sure that we can specialize the function generic_call that has a
   // generic call to x.ping().
-  generic_call(x)
+  generic_call(x: x)
+  useFoo(x: x)
 }

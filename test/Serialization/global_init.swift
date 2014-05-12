@@ -16,7 +16,7 @@
 let MyConst = 42
 var MyVar = 3
 
-// CHECK: let MyConst: Int { get }
+// CHECK: let MyConst: Int
 // CHECK: var MyVar: Int
 
 // CHECK-DAG: sil public [global_init] @_TF11global_inita7MyConstSi : $@thin () -> Builtin.RawPointer

@@ -1,22 +1,21 @@
-// RUN: %swift -i %s | FileCheck %s
-// REQUIRES: swift_interpreter
+// RUN: %target-run-simple-swift | FileCheck %s
 
-def test()
+func test()
 {
-    print('[')
-   for i in reverse(0 .. 10) {
+    print("[")
+   for i in Reverse(0...10) {
         print(i)
-        print(' ')
+        print(" ")
     }
     print("]\n")
 }
 
-def testr()
+func testr()
 {
-    print('[')
-   for i in reverse(reverse(0 .. 10)) {
+    print("[")
+   for i in Reverse(Reverse(0...10)) {
         print(i)
-        print(' ')
+        print(" ")
     }
     print("]\n")
 }

@@ -1,7 +1,18 @@
-// RUN: %swift -emit-silgen %s | FileCheck %s
+// RUN: %swift -module-name=Swift -parse-stdlib -emit-silgen %s | FileCheck %s
 
-// CHECK: sil @_T14break_continue5test1FT1bSb_T_
-func test1(b:Bool) {
+protocol LogicValue {
+  func getLogicValue() -> Bool
+}
+
+struct Bool : LogicValue {
+  var value: Builtin.Int1
+  func _getBuiltinLogicValue() -> Builtin.Int1 { return value }
+  func getLogicValue() -> Bool { return self }
+}
+
+// CHECK-LABEL: sil  @_TFSs5test1
+func test1(bi: Bool) {
+  var b = bi
   for var c = b; b; b = c {
     if b {
       break

@@ -1,45 +1,89 @@
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+// Swift's String bridges NSString via this protocol and these
+// variables, allowing the core stdlib to remain decoupled from
+// Foundation.
+
+/// \brief Effectively a proxy for NSString that doesn't mention it by
+/// name.  NSString's conformance to this protocol is declared in
+/// Foundation.
+@class_protocol @objc protocol _CocoaString {}
+
 /// \brief Loading Foundation initializes these function variables
 /// with useful values
 
-func _cocoaStringBridgeNotInitialized<A,R>() -> (A)->R {
-  // FIXME: returning a closure as a workaround for
-  // <rdar://problem/15921334>
-  return {
-    (args:A) -> R in
-    fatal("Swift <==> Cocoa string bridge not initialized")
-    return (.None as R?)!
-  }
-}
-
-/// \brief produces a ContiguousString from a given subrange of a source
+/// \brief produces a _StringBuffer from a given subrange of a source
 /// _CocoaString, having the given minimum capacity.
-var __swift_cocoaStringToContiguousString : (
+var _cocoaStringToContiguous: (
   source: _CocoaString, range: Range<Int>, minimumCapacity: Int
-) -> ContiguousString = _cocoaStringBridgeNotInitialized()
+) -> _StringBuffer = _cocoaStringToContiguousNotInitialized
+
+func _cocoaStringToContiguousNotInitialized(
+  source: _CocoaString, range: Range<Int>, minimumCapacity: Int
+) -> _StringBuffer {
+  fatal("_cocoaStringToContiguous not initialized")
+}
 
 /// \brief reads the entire contents of a _CocoaString into contiguous
 /// storage of sufficient capacity.
-var __swift_cocoaStringReadAll : (
+var _cocoaStringReadAll: (
   source: _CocoaString, destination: UnsafePointer<UTF16.CodeUnit>
-) -> Void = _cocoaStringBridgeNotInitialized()
+) -> Void = _cocoaStringReadAllNotInitialized
 
-// FIXME: This will probably go away but is needed at least
-// temporarily as a bridge to StringCore
-var __swift_cocoaStringLength: (
+func _cocoaStringReadAllNotInitialized(
+  source: _CocoaString, destination: UnsafePointer<UTF16.CodeUnit>
+) -> Void {
+  fatal("_cocoaStringReadAll not initialized")
+}
+
+var _cocoaStringLength: (
   source: _CocoaString
-) -> Int = _cocoaStringBridgeNotInitialized()
+) -> Int = _cocoaStringLengthNotInitialized
 
-var _appendCocoaString : (
-  target: @inout String, rhs: String
-) -> Void
-// FIXME: Explicit default value is a workaround for <rdar://problem/15921520> 
-= { x,y in fatal("Swift <==> Cocoa string bridge not initialized") }
+func _cocoaStringLengthNotInitialized(
+  source: _CocoaString
+) -> Int {
+  fatal("_cocoaStringLength not initialized")
+}
 
-var _sliceCocoaString : (
-  target: StringCore, subRange: Range<Int>
-) -> StringCore = _cocoaStringBridgeNotInitialized()
+var _cocoaStringSlice: (
+  target: _StringCore, subRange: Range<Int>
+) -> _StringCore = _cocoaStringSliceNotInitialized
 
-var _indexCocoaString : (
-  target: StringCore, position: Int
-) -> UTF16.CodeUnit = _cocoaStringBridgeNotInitialized()
+func _cocoaStringSliceNotInitialized(
+  target: _StringCore, subRange: Range<Int>
+) -> _StringCore {
+  fatal("_cocoaStringSlice not initialized")
+}
+
+var _cocoaStringSubscript: (
+  target: _StringCore, position: Int
+) -> UTF16.CodeUnit = _cocoaStringSubscriptNotInitialized
+
+func _cocoaStringSubscriptNotInitialized(
+  target: _StringCore, position: Int
+) -> UTF16.CodeUnit {
+  fatal("_cocoaStringSubscript not initialized")
+}
+
+var _cocoaStringEncodeSomeUTF8: (
+  target: _StringCore, position: Int
+) -> (_StringCore.IndexType, _StringCore.UTF8Chunk)
+  = _cocoaStringEncodeSomeUTF8NotInitialized
+
+func _cocoaStringEncodeSomeUTF8NotInitialized(
+  target: _StringCore, position: Int 
+) -> (_StringCore.IndexType, _StringCore.UTF8Chunk) {
+  fatal("_cocoaStringEncodeSomeUTF8 not initialized")
+}
 

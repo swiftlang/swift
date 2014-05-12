@@ -29,12 +29,20 @@ extension Bool {
   }
 }
 
+struct Selector : StringLiteralConvertible {
+  var ptr : COpaquePointer
+
+  static func convertFromStringLiteral(str: CString) -> Selector {
+    return sel_registerName(str)
+  }
+}
+
 // Functions used to implicitly bridge ObjCBool types to Swift's Bool type.
 
-func convertBoolToObjCBool(x: Bool) -> ObjCBool {
+func _convertBoolToObjCBool(x: Bool) -> ObjCBool {
   return x
 }
-func convertObjCBoolToBool(x: ObjCBool) -> Bool {
+func _convertObjCBoolToBool(x: ObjCBool) -> Bool {
   return x
 }
 

@@ -1,15 +1,15 @@
-// RUN: %swift -i %s | FileCheck %s
+// RUN: %target-run-simple-swift | FileCheck %s
 
 class C {
-  constructor() {}
 
-  destructor {
+  deinit {
     println("boom! roasted")
   }
 }
 
 class D : C {
-  destructor {
+
+  deinit {
     println("i can't decide between a fat joke and a dumb joke")
   }
 }

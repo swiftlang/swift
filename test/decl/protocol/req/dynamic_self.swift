@@ -1,28 +1,36 @@
 // RUN: %swift -parse %s -verify
 protocol P {
-  func f() -> DynamicSelf // expected-note 3{{protocol requires function 'f' with type '() -> DynamicSelf'}}
+  func f() -> Self // expected-note 2{{protocol requires function 'f()' with type '() -> Self'}}
 }
 
-// Okay: DynamicSelf method in class.
+// Okay: Self method in class.
 class X : P {
-  func f() -> DynamicSelf { return self }
+  func f() -> Self { return self }
 }
 
 class Y {
-  func f() -> DynamicSelf { return self }
+  func f() -> Self { return self }
 }
 
-// Okay: DynamicSelf method in superclass.
+class GX<T> : P {
+  func f() -> Self { return self }
+}
+
+// Okay: dynamic Self method in superclass.
 class Z : Y, P { }
 
-// Error: Z is not DynamicSelf, so subclass would not conform if Z did.
-class ZError : P { // expected-error{{type 'ZError' does not conform to protocol 'P'}}
-  func f() -> ZError { return self } // expected-error{{candidate result type is not 'DynamicSelf'}}
+// Okay: Z2 conforms, subclass would not
+class Z2 : P {
+  func f() -> Z2 { return self }
 }
 
 // Okay: struct conforms by returning itself
 struct S : P {
   func f() -> S { return self }
+}
+
+struct GS<T> : P {
+  func f() -> GS { return self }
 }
 
 struct SError : P { // expected-error{{type 'SError' does not conform to protocol 'P'}}
@@ -32,6 +40,10 @@ struct SError : P { // expected-error{{type 'SError' does not conform to protoco
 // Okay: enum conforms by returning itself
 enum E : P {
   func f() -> E { return self }
+}
+
+enum GE<T> : P {
+  func f() -> GE { return self }
 }
 
 enum EError : P { // expected-error{{type 'EError' does not conform to protocol 'P'}}

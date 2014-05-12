@@ -16,12 +16,33 @@ func hangCanary(o: AnyObject) {
                      objc_AssociationPolicy(OBJC_ASSOCIATION_RETAIN_NONATOMIC))
 }
 
+// CHECK-LABEL: NSData:
+println("NSData:")
 autoreleasepool {
-  let data = NSData(withBytes: [2, 3, 5, 7] as UInt8[], length: 4)
-  hangCanary(data)
-  let bytes = UnsafePointer<UInt8>(data.bytes)
+  var bytes: UnsafePointer<UInt8>
+  do {
+    let data = NSData(bytes: [2, 3, 5, 7] as UInt8[], length: 4)
+    hangCanary(data)
+    bytes = UnsafePointer<UInt8>(data.bytes)
+  } while false // CHECK-NOT: died
   println(bytes[0]) // CHECK:      2
   println(bytes[1]) // CHECK-NEXT: 3
   println(bytes[2]) // CHECK-NEXT: 5
   println(bytes[3]) // CHECK-NEXT: 7
+} // CHECK-NEXT: died
+
+// CHECK-LABEL: AnyObject:
+println("AnyObject:")
+autoreleasepool {
+  var bytes: UnsafePointer<UInt8>
+  do {
+    let data = NSData(bytes: [11, 13, 17, 19] as UInt8[], length: 4)
+    hangCanary(data)
+    let dataAsAny: AnyObject = data
+    bytes = UnsafePointer<UInt8>(dataAsAny.bytes!)
+  } while false // CHECK-NOT: died
+  println(bytes[0]) // CHECK:      11
+  println(bytes[1]) // CHECK-NEXT: 13
+  println(bytes[2]) // CHECK-NEXT: 17
+  println(bytes[3]) // CHECK-NEXT: 19
 } // CHECK-NEXT: died

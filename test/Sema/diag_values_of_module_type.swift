@@ -1,41 +1,42 @@
-// RUN: %swift %s -parse -verify -I=%S/Inputs
+// RUN: %swift %s -parse -verify -I=%S/Inputs -enable-source-import
 
 import diag_values_of_module_type_foo
 
 //===--- Allowed uses of module names.
 
-var goodGlobal1: swift.Int
-var goodGlobal2 = swift.Int(0)
-var goodGlobal3 = diag_values_of_module_type_foo.SomeStruct(0)
+var zero: Int8 = 0
+var goodGlobal1: Swift.Int
+var goodGlobal2 = Swift.Int(zero)
+var goodGlobal3 = diag_values_of_module_type_foo.SomeStruct(a: 0)
 
 class GoodClass1 : diag_values_of_module_type_foo.SomeClass {}
 
 struct GoodStruct1 : diag_values_of_module_type_foo.SomeProtocol {
-  typealias Foo = swift.Int
+  typealias Foo = Swift.Int
 }
 
 struct GoodStruct2 {
-  var instanceVar1: swift.Int
-  var instanceVar2 = swift.Int(0)
-  var instanceVar2 = diag_values_of_module_type_foo.SomeStruct(0)
+  var instanceVar1: Swift.Int
+  var instanceVar2 = Swift.Int(zero)
+  var instanceVar3 = diag_values_of_module_type_foo.SomeStruct(a: 0)
 
-  static var staticVar1: swift.Int
-  static var staticVar2 = swift.Int(0)
-  static var staticVar2 = diag_values_of_module_type_foo.SomeStruct(0)
+  static var staticVar1: Swift.Int = 42
+  static var staticVar2 = Swift.Int(zero)
+  static var staticVar3 = diag_values_of_module_type_foo.SomeStruct(a: 0)
 }
 
 enum GoodEnum {
-  case Foo1(swift.Int)
+  case Foo1(Swift.Int)
 }
 
 protocol GoodProtocol1 : diag_values_of_module_type_foo.SomeProtocol {
   typealias GoodTypealias1 : diag_values_of_module_type_foo.SomeProtocol
 }
 
-typealias GoodTypealias1 = swift.Int
+typealias GoodTypealias1 = Swift.Int
 
 func goodTest1() {
-  var a1 = swift.Int(0)
+  var a1 = Swift.Int(zero)
 
   var b1 : diag_values_of_module_type_foo.SomeClass
   var b2 : diag_values_of_module_type_foo.SomeClass.NestedClass
@@ -62,54 +63,50 @@ func goodTest1() {
   diag_values_of_module_type_foo.someFunc()
 }
 
-func goodTest2a(a: swift.Int) {}
-func goodTest2b(a: swift.Int) withInt(b: swift.Int) {}
+func goodTest2a(a: Swift.Int) {}
+func goodTest2b(a: Swift.Int, withInt b: Swift.Int) {}
 
-func goodTest3() -> swift.Int {}
+func goodTest3() -> Swift.Int {}
 
 func goodTest4<T : diag_values_of_module_type_foo.SomeProtocol>() {}
 
-// We don't support this requirement now, but if (when) we do, this should
-// work.
 func goodTest5<T : diag_values_of_module_type_foo.SomeProtocol
-              where T.Foo == swift.Int>() {}
-// expected-error@-1 {{second type 'swift.Int' in same-type requirement does not refer to a generic parameter or associated type}}
+               where T.Foo == Swift.Int>() {}
 
 //===--- Disallowed uses of module names.
 
-var badGlobal1 = swift // expected-error {{expected module member name after module name}}
+var badGlobal1 = Swift // expected-error {{expected module member name after module name}}
 
 class BadClass1 {
-  // FIXME: should be only a single diagnostic.
-  var instanceVar1 = swift // expected-error 2{{expected module member name after module name}}
+  var instanceVar1 = Swift // expected-error {{expected module member name after module name}}
   func instanceFunc1() {
-    instanceVar1 = swift // expected-error {{expected module member name after module name}}
+    instanceVar1 = Swift // expected-error {{expected module member name after module name}}
   }
 }
 
 func badTest1() {
-  var x = swift // expected-error {{expected module member name after module name}}
-  x = swift // expected-error {{expected module member name after module name}}
+  var x = Swift // expected-error {{expected module member name after module name}}
+  x = Swift // expected-error {{expected module member name after module name}}
 }
 func badTest2() {
   var x = 0
-  x = swift // expected-error {{expected module member name after module name}} expected-error {{'module<swift>' is not convertible to 'Int'}}
+  x = Swift // expected-error {{expected module member name after module name}} expected-error {{'module<Swift>' is not convertible to 'Int'}}
 }
 func badTest3() {
-  var x = swift. // expected-error {{postfix '.' is reserved}} expected-error {{expected member name following '.'}}
+  var x = Swift. // expected-error {{postfix '.' is reserved}} expected-error {{expected member name following '.'}}
 }
 func badTest4() {
-  swift // expected-error {{expected module member name after module name}}
+  Swift // expected-error {{expected module member name after module name}}
 }
 func badTest5() {
-  swift. // expected-error {{postfix '.' is reserved}} expected-error {{expected member name following '.'}}
+  Swift. // expected-error {{postfix '.' is reserved}} expected-error {{expected member name following '.'}}
 }
 func badTest6() {
   // FIXME: should be only a single diagnostic.
   var a = { () -> Int in
-            var x = swift // expected-error 2{{expected module member name after module name}}
+            var x = Swift // expected-error 2{{expected module member name after module name}}
             return 42 }()
-  var b = { swift }() // expected-error {{expected module member name after module name}}
-  var c = { { swift }() }() // expected-error {{expected module member name after module name}}
+  var b = { Swift }() // expected-error {{expected module member name after module name}}
+  var c = { { Swift }() }() // expected-error {{expected module member name after module name}}
 }
 

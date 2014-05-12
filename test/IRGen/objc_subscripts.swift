@@ -1,7 +1,7 @@
 // RUN: rm -rf %t/clang-module-cache
-// RUN: %swift -triple x86_64-apple-darwin10 -module-cache-path=%t/clang-module-cache -sdk=%S/Inputs %s -emit-llvm | FileCheck %s
+// RUN: %swift -target x86_64-apple-darwin10 %s -emit-ir | FileCheck %s
 
-// CHECK: @_INSTANCE_METHODS_SomeObject = 
+// CHECK: @_INSTANCE_METHODS__TtC15objc_subscripts10SomeObject = 
 // CHECK:   private constant { i32, i32, [5 x { i8*, i8*, i8* }] } 
 // CHECK:   { i32 24, i32 5, [5 x { i8*, i8*, i8* }] 
 // CHECK:     [
@@ -9,52 +9,56 @@
 // CHECK:         { 
 // CHECK:           i8* getelementptr inbounds ([26 x i8]* @"\01L_selector_data(objectAtIndexedSubscript:)", i64 0, i64 0), 
 // CHECK:           i8* null, 
-// CHECK:           i8* bitcast (%CSo10SomeObject* (%CSo10SomeObject*, i8*, i64)* @_TToCSo10SomeObject11__subscriptFT1iSi_S_g to i8*) 
+// CHECK:           i8* bitcast ([[OPAQUE0:%.*]]* ([[OPAQUE1:%.*]]*, i8*, i64)* @_TToFC15objc_subscripts10SomeObjectg9subscriptFSiS0_ to i8*)
 // CHECK:         }, 
 // CHECK:       { i8*, i8*, i8* } 
 // CHECK:         { 
 // CHECK:           i8* getelementptr inbounds ([30 x i8]* @"\01L_selector_data(setObject:atIndexedSubscript:)", i64 0, i64 0), 
 // CHECK:           i8* null, 
-// CHECK:           i8* bitcast (void (%CSo10SomeObject*, i8*, %CSo10SomeObject*, i64)* @_TToCSo10SomeObject11__subscriptFT1iSi_S_s to i8*) 
+// CHECK:           i8* bitcast (void ([[OPAQUE2:%.*]]*, i8*, [[OPAQUE3:%.*]]*, i64)* @_TToFC15objc_subscripts10SomeObjects9subscriptFSiS0_ to i8*)
 // CHECK:         },
 // CHECK:       { i8*, i8*, i8* } 
 // CHECK:         { 
 // CHECK:           i8* getelementptr inbounds ([25 x i8]* @"\01L_selector_data(objectForKeyedSubscript:)", i64 0, i64 0), 
 // CHECK:           i8* null, 
-// CHECK:           i8* bitcast (i64 (%CSo10SomeObject*, i8*, %CSo10SomeObject*)* @_TToCSo10SomeObject11__subscriptFT1sS__Sig to i8*) 
+// CHECK:           i8* bitcast (i64 ([[OPAQUE4:%.*]]*, i8*, [[OPAQUE5:%.*]]*)* @_TToFC15objc_subscripts10SomeObjectg9subscriptFS0_Si to i8*)
 // CHECK:         }, 
 // CHECK:       { i8*, i8*, i8* } 
 // CHECK:         { 
 // CHECK:           i8* getelementptr inbounds ([29 x i8]* @"\01L_selector_data(setObject:forKeyedSubscript:)", i64 0, i64 0), 
 // CHECK:           i8* null, 
-// CHECK:           i8* bitcast (void (%CSo10SomeObject*, i8*, i64, %CSo10SomeObject*)* @_TToCSo10SomeObject11__subscriptFT1sS__Sis to i8*) 
+// CHECK:           i8* bitcast (void ([[OPAQUE6:%.*]]*, i8*, i64, [[OPAQUE7:%.*]]*)* @_TToFC15objc_subscripts10SomeObjects9subscriptFS0_Si to i8*)
 // CHECK:         },
 // CHECK:       { i8*, i8*, i8* } 
-// CHECK:         { i8* getelementptr inbounds ([5 x i8]* @"\01L_selector_data(init)", i64 0, i64 0), i8* getelementptr inbounds ([4 x i8]* @0, i64 0, i64 0), i8* bitcast (%CSo10SomeObject* (%CSo10SomeObject*, i8*)* @_TToCSo10SomeObjectcfMS_FT_S_ to i8*) }
+// CHECK:         { i8* getelementptr inbounds ([5 x i8]* @"\01L_selector_data(init)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8]* @0, i64 0, i64 0), i8* bitcast ([[OPAQUE8:%.*]]* ([[OPAQUE9:%.*]]*, i8*)* @_TToFC15objc_subscripts10SomeObjectcfMS0_FT_S0_ to i8*) }
 // CHECK:    ]
 // CHECK:  }, section "__DATA, __objc_const", align 8
 
-class [objc] SomeObject {
+@objc class SomeObject {
   subscript (i : Int) -> SomeObject {
-  // CHECK-LABEL: define internal %CSo10SomeObject* @_TToCSo10SomeObject11__subscriptFT1iSi_S_g(%CSo10SomeObject*, i8*, i64) unnamed_addr
-  get:
-    // CHECK: call %CSo10SomeObject* @_TCSo10SomeObject11__subscriptFT1iSi_S_g
-    return self
+    // CHECK: define internal [[OPAQUE0:%.*]]* @_TToFC15objc_subscripts10SomeObjectg9subscriptFSiS0_([[OPAQUE1]]*, i8*, i64) unnamed_addr
+    get {
+      // CHECK: call %C15objc_subscripts10SomeObject* @_TFC15objc_subscripts10SomeObjectg9subscriptFSiS0_
+      return self
+    }
 
-  // CHECK-LABEL: define internal void @_TToCSo10SomeObject11__subscriptFT1iSi_S_s(%CSo10SomeObject*, i8*, %CSo10SomeObject*, i64) unnamed_addr
-  set:
-    // CHECK: void @_TCSo10SomeObject11__subscriptFT1iSi_S_s
+    // CHECK-LABEL: define internal void @_TToFC15objc_subscripts10SomeObjects9subscriptFSiS0_
+    set {
+      // CHECK: void @_TFC15objc_subscripts10SomeObjects9subscriptFSiS0_
+    }
   }
 
   subscript (s : SomeObject) -> Int {
-  // CHECK-LABEL: define internal i64 @_TToCSo10SomeObject11__subscriptFT1sS__Sig(%CSo10SomeObject*, i8*, %CSo10SomeObject*) unnamed_addr 
-  get:
-    // CHECK: call i64 @_TCSo10SomeObject11__subscriptFT1sS__Sig
-    return 5
+  // CHECK-LABEL: define internal i64 @_TToFC15objc_subscripts10SomeObjectg9subscriptFS0_Si
+    get {
+      // CHECK: call i64 @_TFC15objc_subscripts10SomeObjectg9subscriptFS0_Si
+      return 5
+    }
 
-  // CHECK-LABEL: define internal void @_TToCSo10SomeObject11__subscriptFT1sS__Sis
-  set:
-    // CHECK: call void @_TCSo10SomeObject11__subscriptFT1sS__Sis
+    // CHECK-LABEL: define internal void @_TToFC15objc_subscripts10SomeObjects9subscriptFS0_Si
+    set {
+      // CHECK: call void @_TFC15objc_subscripts10SomeObjects9subscriptFS0_Si
+    }
   }
 }
 

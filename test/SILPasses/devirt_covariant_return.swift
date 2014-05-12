@@ -12,11 +12,16 @@
 // CHECK-NEXT: function_ref unknown1a
 // CHECK-NEXT: function_ref @unknown1a : $@thin () -> ()
 // CHECK-NEXT: apply
+// CHECK-NEXT: function_ref defrenestrate
+// CHECK-NEXT: function_ref @defrenestrate : $@thin () -> ()
+// CHECK-NEXT: apply
 // CHECK-NEXT: function_ref unknown2a
 // CHECK-NEXT: function_ref @unknown2a : $@thin () -> ()
 // CHECK-NEXT: apply
+// CHECK-NEXT: apply
 // CHECK-NEXT: function_ref unknown3a
 // CHECK-NEXT: function_ref @unknown3a : $@thin () -> ()
+// CHECK-NEXT: apply
 // CHECK-NEXT: apply
 // CHECK-NEXT: strong_release
 // CHECK-NEXT: strong_release

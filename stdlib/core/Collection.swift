@@ -1,42 +1,86 @@
-protocol _Collection  {
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+struct _CountElements {}
+func _countElements<Args>(a: Args) -> (_CountElements, Args) {
+  return (_CountElements(), a)
+}
+// Default implementation of countElements for Collections
+// Do not use this operator directly; call countElements(x) instead
+func ~> <T: _Collection>(x:T, _:(_CountElements,()))
+  -> T.IndexType.DistanceType
+{
+  return distance(x.startIndex, x.endIndex)
+}
+
+/// Return the number of elements in x.  O(1) if T.IndexType is
+/// RandomAccessIndex; O(N) otherwise.
+func countElements <T: _Collection>(x: T) -> T.IndexType.DistanceType {
+  return x~>_countElements()
+}
+
+protocol _Collection : _Sequence {
   typealias IndexType : ForwardIndex
 
-  func startIndex() -> IndexType
-  func endIndex() -> IndexType
+  var startIndex: IndexType {get}
+  var endIndex: IndexType {get}
 
   // The declaration of Element and _subscript here is a trick used to
   // break a cyclic conformance/deduction that Swift can't handle.  We
-  // need something other than a Collection.StreamType.Element that can
-  // be used as ContainedStream<T>'s Element.  Here we arrange for the
+  // need something other than a Collection.GeneratorType.Element that can
+  // be used as IndexingGenerator<T>'s Element.  Here we arrange for the
   // Collection itself to have an Element type that's deducible from
-  // its __getitem__ function.  Ideally we'd like to constrain this
-  // Element to be the same as Collection.StreamType.Element (see
+  // its subscript.  Ideally we'd like to constrain this
+  // Element to be the same as Collection.GeneratorType.Element (see
   // below), but we have no way of expressing it today.
   typealias _Element
-  func __getitem__(i: IndexType) -> _Element
+  subscript(i: IndexType) -> _Element {get}
 }
 
 protocol Collection : _Collection, Sequence {
-  func __getitem__(i: IndexType) -> StreamType.Element
+  subscript(i: IndexType) -> GeneratorType.Element {get}
+  
+  // Do not use this operator directly; call countElements(x) instead
+  func ~> (_:Self, _:(_CountElements, ())) -> IndexType.DistanceType
 }
 
-/// \brief A stream type that could serve for a Collection given that
-/// it already had an IndexType.  Because of <rdar://problem/14396120>
-/// we've had to factor _Collection out of Collection to make it useful
-struct ContainedStream<C: _Collection> : Stream {
-  init(seq: C) {
+// Default implementation of underestimateCount for Collections.  Do not
+// use this operator directly; call underestimateCount(s) instead
+func ~> <T: _Collection>(x:T,_:(_UnderestimateCount,())) -> Int {
+  return numericCast(x~>_countElements())
+}
+
+protocol MutableCollection : Collection {
+  subscript(i: IndexType) -> GeneratorType.Element {get set}
+}
+
+/// A stream type that could serve for a Collection given that
+/// it already had an IndexType.
+struct IndexingGenerator<C: _Collection> : Generator, Sequence {
+  // Because of <rdar://problem/14396120> we've had to factor _Collection out
+  // of Collection to make it useful.
+
+  init(_ seq: C) {
     self._elements = seq
-    self._position = seq.startIndex()
+    self._position = seq.startIndex
   }
   
-  func generate() -> ContainedStream {
+  func generate() -> IndexingGenerator {
     return self
   }
   
-  @mutating
-  func next() -> C._Element? {
-    return _position == _elements.endIndex() 
-    ? .None : .Some(_elements.__getitem__(_position++))
+  mutating func next() -> C._Element? {
+    return _position == _elements.endIndex
+    ? .None : .Some(_elements[_position++])
   }
   var _elements: C
   var _position: C.IndexType
@@ -44,98 +88,42 @@ struct ContainedStream<C: _Collection> : Stream {
 
 func indices<
     Seq : Collection>(seq: Seq) -> Range<Seq.IndexType> {
-  return Range(seq.startIndex(), seq.endIndex())
+  return Range(start: seq.startIndex, end: seq.endIndex)
 }
 
-struct IndexedStream<
+struct IndexedGenerator<
   Seq: Collection, Indices: Sequence
-  where Seq.IndexType == Indices.StreamType.Element
-  // FIXME: Commenting out "Stream," below causes all kinds of deserialization crashes
-> : Stream, Sequence, MultiPassStream {
+  where Seq.IndexType == Indices.GeneratorType.Element
+> : Generator, Sequence {
   var seq : Seq
-  var indices : Indices.StreamType
+  var indices : Indices.GeneratorType
 
-  typealias Element = Seq.StreamType.Element
+  typealias Element = Seq.GeneratorType.Element
 
-  @mutating
-  func next() -> Element? {
+  mutating func next() -> Element? {
     var result = indices.next()
-    return result ? seq.__getitem__(result!) : .None
+    return result ? seq[result!] : .None
   }
 
-  // Every Stream is also a single-pass Sequence
-  typealias StreamType = IndexedStream
-  func generate() -> StreamType {
+  // Every Generator is also a single-pass Sequence
+  typealias GeneratorType = IndexedGenerator
+  func generate() -> GeneratorType {
     return self
   }
 
-  init(seq: Seq, indices: Indices) {
+  init(sequence seq: Seq, indices: Indices) {
     self.seq = seq
     self.indices = indices.generate()
   }
 }
 
-
-/*
-/// \brief Adapt an Collection into an Sequence
-struct CollectionSequence<Seq: Collection> 
-  : Sequence {
-  var seq : Seq
-
-  typealias StreamType = ForwardCollectionStream<Seq>
-  func generate() -> StreamType {
-    return StreamType(self.seq)
-  }
-
-  init(seq: Seq) {
-    self.seq = seq
-  }
-}
-
-struct ReverseCollection<
-  Seq: Collection 
-  where Seq.IndexType: BidirectionalIndex
-> : Collection {
-  var seq : Seq
-
-  typealias StreamType = CollectionStream<Seq>
-  func generate() -> StreamType {
-    return StreamType(self.seq)
-  }
-
-  init(seq: Seq) {
-    self.seq = seq
-  }
-}
-
-func elements<
-  Seq: Collection>(seq: Seq) -> CollectionSequence<Seq> {
-  return CollectionSequence(seq)
-}
-
-func reverse<
-  Seq: Collection where Seq.IndexType: BidirectionalIndex
->(seq: Seq) -> ReverseCollectionSequence<Seq> {
-  return ReverseCollectionSequence(seq)
-}
-
-func reverse<
-  Seq: Collection where Seq.IndexType: BidirectionalIndex
->(e: CollectionSequence<Seq>) -> ReverseCollectionSequence<Seq> {
-  return ReverseCollectionSequence(e.seq)
-}
-
-func reverse<
-  Seq: Collection where Seq.IndexType: BidirectionalIndex
->(e: ReverseCollectionSequence<Seq>) -> CollectionSequence<Seq> {
-  return CollectionSequence(e.seq)
-}
-*/
-/// \brief A wrapper for a BidirectionalIndex that reverses its
+/// A wrapper for a BidirectionalIndex that reverses its
 /// direction of traversal
 struct ReverseIndex<I: BidirectionalIndex> : BidirectionalIndex {
   var _base: I
-  
+
+  init(_ base: I) { self._base = base }
+
   func succ() -> ReverseIndex {
     return ReverseIndex(_base.pred())
   }
@@ -151,171 +139,53 @@ func == <I> (lhs: ReverseIndex<I>, rhs: ReverseIndex<I>) -> Bool {
 
 struct Reverse<T: Collection where T.IndexType: BidirectionalIndex> : Collection {
   typealias IndexType = ReverseIndex<T.IndexType>
-  typealias StreamType = ContainedStream<Reverse>
-  
-  func generate() -> ContainedStream<Reverse> {
-    return ContainedStream(self)
-  }
-  
-  func startIndex() -> IndexType {
-    return ReverseIndex(_base.endIndex())
-  }
-  
-  func endIndex() -> IndexType {
-    return ReverseIndex(_base.startIndex())
+  typealias GeneratorType = IndexingGenerator<Reverse>
+
+  init(_ base: T) {
+    self._base = base 
   }
 
-  func __getitem__(i: IndexType) -> T.StreamType.Element {
-    return _base.__getitem__(i._base.pred())
+  func generate() -> IndexingGenerator<Reverse> {
+    return IndexingGenerator(self)
+  }
+  
+  var startIndex: IndexType {
+    return ReverseIndex(_base.endIndex)
+  }
+  
+  var endIndex: IndexType {
+    return ReverseIndex(_base.startIndex)
+  }
+
+  subscript(i: IndexType) -> T.GeneratorType.Element {
+    return _base[i._base.pred()]
   }
   
   var _base: T
 }
 
-protocol Sliceable: Collection {
-  func __slice__(start: IndexType, finish: IndexType) -> Self
+protocol _Sliceable : Collection {}
+
+protocol Sliceable : _Sliceable {
+  // FIXME: SliceType should also be Sliceable but we can't express
+  // that constraint (<rdar://problem/14375973> Include associated
+  // type information in protocol witness tables) Instead we constrain
+  // to _Sliceable; at least error messages will be more informative.
+  typealias SliceType: _Sliceable
+  subscript(_: Range<IndexType>) -> SliceType {get}
 }
 
-func dropFirst<Seq : Sliceable>(seq: Seq) -> Seq {
-  return seq.__slice__(seq.startIndex().succ(), seq.endIndex())
+protocol MutableSliceable : Sliceable, MutableCollection {
+  subscript(_: Range<IndexType>) -> SliceType {get set}
+}
+
+func dropFirst<Seq : Sliceable>(seq: Seq) -> Seq.SliceType {
+  return seq[seq.startIndex.succ()...seq.endIndex]
 }
 
 func dropLast<
   Seq: Sliceable 
   where Seq.IndexType: BidirectionalIndex
->(seq: Seq) -> Seq {
-  return seq.__slice__(seq.startIndex(), seq.endIndex().pred())
-}
-
-protocol ForwardIndex : Equatable {
-  func succ() -> Self
-}
-
-@prefix @assignment @transparent
-func ++ <T : ForwardIndex> (x: @inout T) -> T {
-  x = x.succ()
-  return x
-}
-
-@postfix @assignment @transparent
-func ++ <T : ForwardIndex> (x: @inout T) -> T {
-  var ret = x
-  x = x.succ()
-  return ret
-}
-
-protocol BidirectionalIndex : ForwardIndex {
-  func pred() -> Self
-}
-
-@prefix @assignment @transparent
-func -- <T: BidirectionalIndex> (x: @inout T) -> T {
-  x = x.pred()
-  return x
-}
-
-
-@postfix @assignment @transparent
-func -- <T: BidirectionalIndex> (x: @inout T) -> T {
-  var ret = x
-  x = x.pred()
-  return ret
-}
-
-protocol RandomAccessIndex : BidirectionalIndex, NumericOperations {
-  typealias DistanceType
-  type func sub(lhs: Self, rhs: Self) -> (DistanceType, Bool)
-  type func sub(lhs: Self, rhs: DistanceType) -> (Self, Bool)
-  type func add(lhs: Self, rhs: DistanceType) -> (Self, Bool)
-  // FIXME: Disabled pending <rdar://problem/14011860> (Default
-  // implementations in protocols)
-  func <(lhs: Self, rhs: Self) -> Bool /* {
-      return (lhs.sub(rhs)).isNegative()
-
-  } */
-}
-
-@transparent
-func - <T : RandomAccessIndex>(x: T, y: T) -> T.DistanceType {
-  var tmp : (T.DistanceType, Bool) = T.sub(x, y)
-  alwaysTrap(tmp.1 == false)
-  return tmp.0
-}
-
-@transparent
-func &- <T : RandomAccessIndex>(x: T, y: T) -> T.DistanceType {
-  return T.sub(x, y).0
-}
-
-@transparent
-func - <T : RandomAccessIndex>(x: T, y: T.DistanceType) -> T {
-  var tmp = T.sub(x, y)
-  alwaysTrap(tmp.1 == false)
-  return tmp.0
-}
-
-@transparent
-func &- <T : RandomAccessIndex>(x: T, y: T.DistanceType) -> T {
-  return T.sub(x, y).0
-}
-
-@infix @assignment @transparent
-func += <T : RandomAccessIndex> (lhs: @inout T, rhs: T.DistanceType) {
-  var tmp = T.add(lhs, rhs)
-  alwaysTrap(tmp.1 == false)
-  lhs = tmp.0
-}
-
-@infix @assignment @transparent
-func -= <
-  T: RandomAccessIndex where T.DistanceType: SignedNumber
-> (lhs: @inout T, rhs: T.DistanceType) {
-  var tmp = T.add(lhs, -rhs)
-  alwaysTrap(tmp.1 == false)
-  lhs = tmp.0
-}
-
-@transparent
-func + <T : RandomAccessIndex> (lhs: T, rhs: T.DistanceType) -> T {
-  var tmp = T.add(lhs, rhs)
-  alwaysTrap(tmp.1 == false)
-  return tmp.0
-}
-
-@transparent
-func + <T : RandomAccessIndex> (lhs: T.DistanceType, rhs: T) -> T {
-  var tmp = T.add(rhs, lhs)
-  alwaysTrap(tmp.1 == false)
-  return tmp.0
-}
-
-@transparent
-func &+ <T : RandomAccessIndex> (lhs: T, rhs: T) -> T {
-  return T.add(lhs, rhs).0
-}
-
-@transparent
-func &+ <T : RandomAccessIndex> (lhs: T, rhs: T.DistanceType) -> T {
-  return T.add(lhs, rhs).0
-}
-
-@transparent
-func &+ <T : RandomAccessIndex> (lhs: T.DistanceType, rhs: T) -> T {
-  return T.add(rhs, lhs).0
-}
-
-@transparent
-func - <T : RandomAccessIndex where T.DistanceType : SignedNumber> (
-  lhs: T, rhs: T.DistanceType)
--> T {
-  var tmp = T.add(lhs, -rhs)
-  alwaysTrap(tmp.1 == false)
-  return tmp.0
-}
-
-@transparent
-func &- <T : RandomAccessIndex where T.DistanceType : SignedNumber> (
-  lhs: T, rhs: T.DistanceType)
--> T {
-  return T.add(lhs, -rhs).0
+>(seq: Seq) -> Seq.SliceType {
+  return seq[seq.startIndex...seq.endIndex.pred()]
 }

@@ -1,28 +1,22 @@
-// RUN: %swift -triple x86_64-apple-darwin13 %s -emit-llvm -g -o - | FileCheck %s
+// RUN: %swift %clang-importer-sdk -enable-source-import -target x86_64-apple-darwin13 %s -emit-ir -g -o - | FileCheck %s
 
 import Foundation
 
 protocol Named {
-    var name : String
+    var name : String { get }
 }
 
-// initializer.Person.__allocating_init (initializer.Person.metatype)() -> initializer.Person
-// CHECK: define %C11initializer6Person* @_TC11initializer6PersonCfMS0_FT_S0_(%swift.type*) {
-// CHECK:  call %C11initializer6Person* @_TC11initializer6PersoncfMS0_FT_S0_(%C11initializer6Person* %2), !dbg ![[BEGIN:.*]]
-// CHECK:   ret %C11initializer6Person* %3, !dbg ![[END1:.*]]
+// initializer.Person.init (initializer.Person.Type)() -> initializer.Person
+// CHECK: define %C11initializer6Person* @_TFC11initializer6PersoncfMS0_FT_S0_(%C11initializer6Person*) {
 
-// initializer.Person.init (initializer.Person.metatype)() -> initializer.Person
-// CHECK: define %C11initializer6Person* @_TC11initializer6PersoncfMS0_FT_S0_(%C11initializer6Person*) {
-// CHECK: call { i8*, i64, %swift.refcounted* } @_TSS32_convertFromBuiltinStringLiteralfMSSFT5valueBp8byteSizeBi64_7isASCIIBi1__SS(i8* getelementptr inbounds ([8 x i8]* @0, i64 0, i64 0), i64 7, i1 true), !dbg ![[NAMEINIT:.*]]
-// CHECK: ret %C11initializer6Person* %0, !dbg ![[END2:.*]]
+// initializer.Person.__allocating_init (initializer.Person.Type)() -> initializer.Person
+// CHECK: define %C11initializer6Person* @_TFC11initializer6PersonCfMS0_FT_S0_(%swift.type*) {
+// CHECK:  call %C11initializer6Person* @_TFC11initializer6PersoncfMS0_FT_S0_(%C11initializer6Person* %2), !dbg ![[ALLOCATING_INIT:.*]]
 
-// CHECK-DAG: ![[BEGIN]] = metadata !{i32 [[@LINE+1]],
+// CHECK-DAG: ![[ALLOCATING_INIT]] = metadata !{i32 0, i32 0
 class Person : Named {
-// CHECK-DAG: ![[NAMEINIT]] = metadata !{i32 [[@LINE+1]],
-    var name = "No Name"
+    var name : String { get { return "No Name" } }
     var age = 0
-// CHECK-DAG: ![[END2]] = metadata !{i32 [[@LINE+2]],
-// CHECK-DAG: ![[END1]] = metadata !{i32 [[@LINE+1]],
 }
 
 struct Pair<T> {
@@ -64,15 +58,15 @@ func test() {
 
     var suitEnum = Suits.Clubs
 
-    var pair = Pair(Suits.Hearts, Suits.Diamonds)
+    var pair = Pair(first: Suits.Hearts, second: Suits.Diamonds)
 
     var function = test
-    var range = 0..100
+    var range = 0...100
     var optionalNone : Float? = .None
     var optionalSome : Float? = 100
     var tuple = (i8, i16, i32, i64, string)
     var person = Person()
-    var point = Point(10.0, 20.0)
+    var point = Point(x: 10.0, y: 20.0)
     var object = NSObject()
 
     var arrayInt = [10, 20, 30]

@@ -6,24 +6,24 @@ func constantArray() -> Int[] {
 }
 
 // Basic support for non-constant array bounds.
-func simpleArray(n : Int) -> Int[] {
+func simpleArray(n: Int) -> Int[] {
   return new Int[n]
 }
 
 // Support for non-stdlib array bounds.
 struct MyArrayBound : ArrayBound {
-  typealias ArrayBoundType = UInt
-  func getArrayBoundValue() -> UInt {
+  typealias ArrayBoundType = UInt64
+  func getArrayBoundValue() -> UInt64 {
     return 17
   }
 }
 
-func nonStdlibArray(n : MyArrayBound) -> Int[] {
+func nonStdlibArray(n: MyArrayBound) -> Int[] {
   return new Int[n]
 }
 
 // Support for arbitrary array bounds in generics.
-func genericArray<T : ArrayBound>(n : T) -> Int[] {
+func genericArray<T : ArrayBound>(n: T) -> Int[] {
   return new Int[n]
 }
 

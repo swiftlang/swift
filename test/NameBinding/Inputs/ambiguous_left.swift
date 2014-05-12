@@ -1,6 +1,6 @@
 func funcOrVar() {}
 
 struct SomeStruct {}
-var someVar : ()
+var someVar : () = ()
 
 func overloadedFunc() {}

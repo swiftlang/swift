@@ -1,4 +1,4 @@
-// RUN: %swift -i %s | FileCheck %s
+// RUN: %target-run-simple-swift | FileCheck %s
 
 protocol Showable {
   func show()
@@ -6,13 +6,13 @@ protocol Showable {
 
 extension Int : Showable {
   func show() {
-    println(this)
+    println(self)
   }
 }
 
 /*FIXME crashes irgen
 
-func show_slice<T:Showable>(xs:T[]) {
+func show_slice<T : Showable>(xs: T[]) {
   for x in xs {
     x.show()
   }
@@ -45,7 +45,7 @@ for x in [9, 8, 1, 0, 5] {
 // CHECK: 0
 // CHECK: 5
 
-func slice_from_varargs(xs:Int...) {
+func slice_from_varargs(xs: Int...) {
   for x in xs {
     x.show()
   }

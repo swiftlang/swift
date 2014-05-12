@@ -1,14 +1,15 @@
 // RUN: rm -rf %t/clang-module-cache
-// RUN: not %swift -parse  -module-cache-path=%t/clang-module-cache -sdk=%S/Inputs %s 2> %t.out
+// RUN: not %swift %clang-importer-sdk -parse -module-cache-path %t/clang-module-cache -target x86_64-apple-darwin13 %s -debug-constraints 2> %t.out
 // RUN: FileCheck %s < %t.out
-import objc
 
-func instanceMethod(b : B) {
-  // CHECK: error: no candidates found for call
-  // CHECK: func [objc] method(i : CInt, onExtB : CDouble) -> id
-  // CHECK: func [objc] method(arg : CInt, withFloat : CFloat) -> CInt
-  // CHECK: func [objc] method(i : CInt, onExtA : CDouble) -> id
-  // CHECK: func [objc] method(i : CInt, onCat1 : CDouble) -> id
-  // CHECK: func [objc] method(arg : CInt, withDouble : CDouble) -> CInt
+import ObjectiveC
+
+func instanceMethod(b: B) {
+  // CHECK: found solution
+  // CHECK: found solution
+  // CHECK: found solution
+  // CHECK: found solution
+  // CHECK: found solution
+  // FIXME: improve this diagnostic
   b.method(1, 2.5)
 }

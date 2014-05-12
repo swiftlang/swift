@@ -2,11 +2,10 @@
 
 // The Objective-C runtime does not implement the autorelease
 // optimization on i386, even in the iOS simulator.
-// XFAIL: i386
+// XFAIL: CPU=i386
 
 import Foundation
 
-// rdar://16565958
 class PrintOnDeinit: NSObject {
   // Result should get autoreleased.
   @objc class func create() -> PrintOnDeinit {

@@ -1,13 +1,27 @@
-// This is just here to provide a type off of which to hang swift_bufferAllocate.
-class RawBuffer {}
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
 
-func [asmname="swift_isUniquelyReferenced"] 
-swift_isUniquelyReferenced(objPtr: Builtin.ObjectPointer) -> CBool
+import SwiftShims
+typealias _HeapObject = SwiftShims.HeapObject
 
-func [asmname="swift_bufferAllocate"]
-swift_bufferAllocate(bufferType: RawBuffer.metatype, size: Int) -> RawBuffer
+// Provides a common type off of which to hang swift_bufferAllocate.
+@objc class HeapBufferStorageBase {}
 
-func [asmname="swift_bufferHeaderSize"] swift_bufferHeaderSize() -> Int
+@asmname("swift_bufferAllocate")
+func swift_bufferAllocate(
+  bufferType: HeapBufferStorageBase.Type, size: Int) -> AnyObject
+
+@asmname("malloc_size")
+func c_malloc_size(heapMemory: UnsafePointer<Void>) -> Int
 
 /// \brief a class containing an ivar "value" of type Value, and
 /// containing storage for an array of Element whose size is
@@ -18,7 +32,8 @@ func [asmname="swift_bufferHeaderSize"] swift_bufferHeaderSize() -> Int
 ///   template <class Value, class Element>
 ///   struct HeapBuffer {
 ///     Value value;
-///     Element[];             // length determined at creation time
+///     Element elementStorage[];        // length determined at creation time
+///
 ///     HeapBuffer() = delete
 ///     static shared_ptr<HeapBuffer> create(Value init, int capacity);
 ///   }
@@ -27,66 +42,162 @@ func [asmname="swift_bufferHeaderSize"] swift_bufferHeaderSize() -> Int
 /// construct and---if necessary---destroy Elements there yourself,
 /// either in a derived class, or it can be in some manager object
 /// that owns the HeapBuffer.
-///
-/// If you need to construct and destroy Elements, using a derived
-/// class is a natural choice. However, don't add any ivars because we
-/// have no way in the runtime to get the base allocation size of an
-/// arbitrary class.  As a result, we will fail to allocate memory for
-/// them, and their storage will collide with that of the stored
-/// Value.
-class HeapBuffer<Value,Element> : RawBuffer {
-
-  typealias Self = HeapBuffer<Value,Element>
-
-  static func roundUpToAlignment(offset: Int, alignment: Int) -> Int {
-    return (offset + alignment - 1) / alignment * alignment
+@objc class HeapBufferStorage<Value,Element> : HeapBufferStorageBase {
+  typealias Buffer = HeapBuffer<Value, Element>
+  deinit {
+    Buffer(self)._value.destroy()
   }
+}
 
+@asmname("_swift_isUniquelyReferenced")
+func _swift_isUniquelyReferenced(_: UnsafePointer<HeapObject>) -> Bool
+
+// Return true if x is the only (strong) reference to the given RawBuffer
+// 
+// This is an inout function for two reasons:
+// 
+// 1. You should only call it when about to mutate the object.
+//    Doing so otherwise implies a race condition if the buffer is
+//    shared across threads.
+//
+// 2. When it is not an inout function, self is passed by
+//    value... thus bumping the reference count and disturbing the
+//    result we are trying to observe, Dr. Heisenberg!
+//
+// NOTE: this is not as safe as it could be; class types that come
+// from Cocoa don't have a reference count stored inline where we're
+// checking for it.  However, we have no way to restrict T to being a
+// native Swift class, and in fact we have no reasonable way of
+// getting a class pointer out of some other types, such as an enum
+// whose first case is a native Swift object and is statically known
+// to be in that case, without affecting its reference count.  Instead
+// we accept everything; reinterpretCast will at least catch
+// inappropriately-sized things at runtime.
+func isUniquelyReferenced<T>(inout x: T) -> Bool {
+  return _swift_isUniquelyReferenced(reinterpretCast(x))
+}
+
+struct HeapBuffer<Value, Element> : LogicValue, Equatable {
+  typealias Storage = HeapBufferStorage<Value, Element>
+  let storage: Storage?
+  
   static func _valueOffset() -> Int {
-    return roundUpToAlignment(
-      swift_bufferHeaderSize(), Int(Builtin.alignof(Value)))
+    return roundUpToAlignment(sizeof(_HeapObject.self), alignof(Value.self))
   }
 
   static func _elementOffset() -> Int {
-    return roundUpToAlignment(
-      _valueOffset() + Int(Builtin.sizeof(Value)), Int(Builtin.alignof(Element)))
+    return roundUpToAlignment(_valueOffset() + sizeof(Value.self),
+                              alignof(Element.self))
   }
 
   var _address: UnsafePointer<Int8> {
-    return UnsafePointer<Int8>(
-      Builtin.bridgeToRawPointer(Builtin.castToObjectPointer(this)))
+    return UnsafePointer(
+      Builtin.bridgeToRawPointer(self as Builtin.NativeObject))
   }
 
   var _value: UnsafePointer<Value> {
-    return UnsafePointer<Value>(
-      Self._valueOffset() + _address)
+    return UnsafePointer(
+      HeapBuffer._valueOffset() + _address)
   }
 
   var elementStorage: UnsafePointer<Element> {
-    return UnsafePointer<Element>(Self._elementOffset() + _address)
+    return UnsafePointer(HeapBuffer._elementOffset() + _address)
   }
 
-  static func create(initializer: Value, capacity: Int) -> Self {
+  /// \brief Return the actual number of Elements we can possibly
+  /// store.
+  func _capacity() -> Int {
+    let allocatedSize = c_malloc_size(UnsafePointer(_address))
+    return (allocatedSize - HeapBuffer._elementOffset())
+      / Int(Builtin.strideof(Element.self))
+  }
+
+  init() {
+    self.storage = .None
+  }
+  
+  init(_ storage: Storage) {
+    self.storage = storage
+  }
+  
+  /// \brief Create a HeapBuffer with self.value = initializer and
+  /// self._capacity() >= capacity.
+  init(
+    _ storageClass: HeapBufferStorageBase.Type,
+    _ initializer: Value, _ capacity: Int
+  ) {
     assert(capacity >= 0)
 
-    var totalSize = Self._elementOffset() + (
-        capacity == 0 ? 0 
-        : (capacity - 1) * Int(Builtin.strideof(Element)) 
-          + Int(Builtin.sizeof(Element)))
+    let totalSize = HeapBuffer._elementOffset() +
+        capacity * Int(Builtin.strideof(Element.self))
 
-    var self = swift_bufferAllocate(Self, totalSize) as! Self
-    self._value.init(initializer)
-    return self
-  }
-
-  destructor {
-    this._value.destroy()
+    self.storage = reinterpretCast(
+      swift_bufferAllocate(storageClass, totalSize))
+    self._value.initialize(initializer)
   }
 
   var value : Value {
-  get:
-    return _value.get()
-  set(newValue):
-    _value.set(newValue)
+    get {
+      return _value.get()
+    }
+    nonmutating set(newValue) {
+      _value.set(newValue)
+    }
   }
+
+  func getLogicValue() -> Bool {
+    return storage.getLogicValue()
+  }
+
+  subscript(i: Int) -> Element {
+    get {
+      return elementStorage[i]
+    }
+    nonmutating set(newValue) {
+      elementStorage[i] = newValue
+    }
+  }
+
+  @conversion
+  func __conversion() -> Builtin.NativeObject {
+    return reinterpretCast(storage)
+  }
+
+  static func fromNativeObject(x: Builtin.NativeObject) -> HeapBuffer {
+    return HeapBuffer(Builtin.castFromNativeObject(x) as Storage)
+  }
+
+  mutating func isUniquelyReferenced() -> Bool {
+    if !storage {
+      return false
+    }
+    var workaroundForRadar16119895 = reinterpretCast(storage) as COpaquePointer
+    return Swift.isUniquelyReferenced(&workaroundForRadar16119895)
+  }
+}
+
+// HeapBuffers are equal when they reference the same buffer
+func == <Value, Element> (
+  lhs: HeapBuffer<Value, Element>,
+  rhs: HeapBuffer<Value, Element>) -> Bool {
+  return (lhs as Builtin.NativeObject) == (rhs as Builtin.NativeObject)
+}
+
+// OnHeap<T>
+// 
+// A way to store a value on the heap.  These values are likely to be
+// implicitly shared, so it's safest if they're immutable.
+//
+struct OnHeap<T> {
+  typealias Buffer = HeapBuffer<T, Void>
+  
+  init(_ value: T) {
+    _storage = HeapBuffer(Buffer.Storage.self, value, 0)
+  }
+  
+  @conversion func __conversion() -> T {
+    return _storage._value.get()
+  }
+  
+  var _storage: Buffer
 }

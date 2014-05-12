@@ -1,43 +1,54 @@
-// RUN: swift -i %s | FileCheck %s
+// RUN: %target-run-simple-swift | FileCheck %s
 
-protocol Fooable { static func foo() }
+protocol Fooable { class func foo() }
 
 class B : Fooable {
-  static func foo() { println("Beads?!") }
+  class func foo() { println("Beads?!") }
 }
 
 class D : B {
-  static func foo() { println("Deeds?!") }
+  override class func foo() { println("Deeds?!") }
 }
 
 struct S : Fooable {
   static func foo() { println("Seeds?!") }
 }
 
-func classMetatype(b:B.metatype) {
+func classMetatype(b: B.Type) {
   b.foo()
 }
 
-func structMetatype(s:S.metatype) {
+func structMetatype(s: S.Type) {
   s.foo()
 }
 
-func archeMetatype<T:Fooable>(t:T.metatype) {
+func archeMetatype<T : Fooable>(t: T.Type) {
   t.foo()
 }
 
-// CHECK: Beads?
-classMetatype(typeof(B()))
-// CHECK: Deeds?
-classMetatype(typeof(D()))
-
-// CHECK: Seeds?
-structMetatype(typeof(S()))
+func archeMetatype2<T : Fooable>(t: T) {
+  t.dynamicType.foo()
+}
 
 // CHECK: Beads?
-archeMetatype(typeof(B()))
+classMetatype(B().dynamicType)
 // CHECK: Deeds?
-archeMetatype(typeof(D()))
+classMetatype(D().dynamicType)
+
 // CHECK: Seeds?
-archeMetatype(typeof(S()))
+structMetatype(S().dynamicType)
+
+// CHECK: Beads?
+archeMetatype(B().dynamicType)
+// FIXME: Deeds? <rdar://problem/14620454>
+archeMetatype(D().dynamicType)
+// CHECK: Seeds?
+archeMetatype(S().dynamicType)
+
+// CHECK: Beads?
+archeMetatype2(B())
+// FIXME: Deeds? <rdar://problem/14620454>
+archeMetatype2(D())
+// CHECK: Seeds?
+archeMetatype2(S())
 

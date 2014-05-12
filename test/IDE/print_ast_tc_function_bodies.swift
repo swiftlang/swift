@@ -10,43 +10,55 @@
 struct FooStruct {
 // CHECK-LABEL: {{^}}struct FooStruct {{{$}}
 
-  var instanceVar : Int
-// CHECK-NEXT: {{^}}  var instanceVar : Int{{$}}
+  var instanceVar: Int
+// CHECK-NEXT: {{^}}  var instanceVar: Int{{$}}
 
   subscript(i: Int) -> Double {
-  get:
-    return Double(i)
-  set(val):
-    instanceVar = i
+    get {
+      return Double(i)
+    }
+    set(v) {
+      instanceVar = i
+    }
   }
-// CHECK-NEXT: {{^}}  subscript (i : Int) -> Double {{{$}}
-// CHECK-NEXT: {{^}}    get:{{$}}
-// CHECK:      {{^}}    set(val):{{$}}
+// CHECK-NEXT: {{^}}  subscript (i: Int) -> Double {{{$}}
+// CHECK-NEXT: {{^}}    get {{{$}}
+// CHECK-NEXT: {{^}}      return {{$}}
+// CHECK-NEXT: {{^}}    }{{$}}
+// CHECK:      {{^}}    set(v) {{{$}}
+// CHECK:      {{^}}    }{{$}}
 // CHECK:      {{^}}  }{{$}}
 
   subscript(i: Int, j: Int) -> Double {
-  get:
-    return Double(i + j)
-  set(val):
-    instanceVar = i + j
+    get {
+      return Double(i + j)
+    }
+    set(v) {
+      instanceVar = i + j
+    }
   }
-// CHECK-NEXT: {{^}}  subscript (i : Int, j : Int) -> Double {{{$}}
-// CHECK-NEXT: {{^}}    get:{{$}}
-// CHECK:      {{^}}    set(val):{{$}}
+// CHECK-NEXT: {{^}}  subscript (i: Int, j: Int) -> Double {{{$}}
+// CHECK-NEXT: {{^}}    get {{{$}}
+// CHECK-NEXT: {{^}}      return {{$}}
+// CHECK-NEXT: {{^}}    }{{$}}
+// CHECK:      {{^}}    set(v) {{{$}}
+// CHECK:      {{^}}    }{{$}}
 // CHECK:      {{^}}  }{{$}}
 }
 
 extension FooStruct {
 // CHECK-LABEL: {{^}}extension FooStruct {{{$}}
-  var extProp : Int {
-  get:
-    return 42
-  set(val):
+  var extProp: Int {
+    get {
+      return 42
+    }
+    set(v) {}
   }
-// CHECK-NEXT: {{^}}  var extProp : Int {{{$}}
-// CHECK-NEXT: {{^}}  get:{{$}}
-// CHECK-NEXT: {{^}}    return {{$}}
-// CHECK:      {{^}}  set(val):{{$}}
+// CHECK-NEXT: {{^}}  var extProp: Int {{{$}}
+// CHECK-NEXT: {{^}}    get {{{$}}
+// CHECK-NEXT: {{^}}      return {{$}}
+// CHECK-NEXT: {{^}}    }{{$}}
+// CHECK:      {{^}}    set(v) {}{{$}}
 // CHECK-NEXT: {{^}}  }{{$}}
 }
 
@@ -54,37 +66,52 @@ extension FooStruct {
 //===--- Variable declaration printing.
 //===---
 
-var topLevelVar1 : Int {
-get: return 42
+var topLevelVar1: Int {
+  get {
+    return 42
+  }
 }
-// CHECK: {{^}}var topLevelVar1 : Int {{{$}}
-// CHECK-NEXT: {{^}}get:{{$}}
-// CHECK-NEXT: {{^}}  return {{$}}
+// CHECK: {{^}}var topLevelVar1: Int {{{$}}
+// CHECK-NEXT: {{^}}  get {{{$}}
+// CHECK-NEXT: {{^}}    return {{$}}
+// CHECK-NEXT: {{^}}  }{{$}}
 // CHECK-NEXT: {{^}}}{{$}}
 // CHECK-NOT: topLevelVar1
 
-var topLevelVar2 : Int {
-get: return 22
-set: if true {}
+var topLevelVar2: Int {
+  get {
+    return 22
+  }
+  set {
+    if true {}
+  }
 }
-// CHECK: {{^}}var topLevelVar2 : Int {{{$}}
-// CHECK-NEXT: {{^}}get:{{$}}
-// CHECK-NEXT: {{^}}  return {{$}}
-// CHECK: {{^}}set:{{$}}
-// CHECK-NEXT: {{^}}  if  {{{$}}
+// CHECK: {{^}}var topLevelVar2: Int {{{$}}
+// CHECK-NEXT: {{^}}  get {{{$}}
+// CHECK-NEXT: {{^}}    return {{$}}
+// CHECK-NEXT: {{^}}  }{{$}}
+// CHECK: {{^}}  set {{{$}}
+// CHECK-NEXT: {{^}}    if  {{{$}}
+// CHECK-NEXT: {{^}}    }{{$}}
 // CHECK-NEXT: {{^}}  }{{$}}
 // CHECK-NEXT: {{^}}}{{$}}
 // CHECK-NOT: topLevelVar2
 
-var topLevelVar3 : Int {
-get: return 42
-set(foo): if true {}
+var topLevelVar3: Int {
+  get {
+    return 42
+  }
+  set(foo) {
+    if true {}
+  }
 }
-// CHECK: {{^}}var topLevelVar3 : Int {{{$}}
-// CHECK-NEXT: {{^}}get:{{$}}
-// CHECK-NEXT: {{^}}  return {{$}}
-// CHECK: {{^}}set(foo):{{$}}
-// CHECK: {{^}}  if  {{{$}}
+// CHECK: {{^}}var topLevelVar3: Int {{{$}}
+// CHECK-NEXT: {{^}}  get {{{$}}
+// CHECK-NEXT: {{^}}    return {{$}}
+// CHECK-NEXT: {{^}}  }{{$}}
+// CHECK: {{^}}  set(foo) {{{$}}
+// CHECK-NEXT: {{^}}    if  {{{$}}
+// CHECK-NEXT: {{^}}    }{{$}}
 // CHECK-NEXT: {{^}}  }{{$}}
 // CHECK-NEXT: {{^}}}{{$}}
 // CHECK-NOT: topLevelVar3
@@ -92,37 +119,52 @@ set(foo): if true {}
 class InClassVar1 {
 // CHECK-LABEL: InClassVar1
 
-  var instanceVar1 : Int {
-  get: return 12
+  var instanceVar1: Int {
+    get {
+      return 12
+    }
   }
-// CHECK: {{^}}  var instanceVar1 : Int {{{$}}
-// CHECK-NEXT: {{^}}  get:{{$}}
-// CHECK-NEXT: {{^}}    return {{$}}
+// CHECK: {{^}}  var instanceVar1: Int {{{$}}
+// CHECK-NEXT: {{^}}    get {{{$}}
+// CHECK-NEXT: {{^}}      return {{$}}
+// CHECK-NEXT: {{^}}    }{{$}}
 // CHECK-NEXT: {{^}}  }{{$}}
 // CHECK-NOT: instanceVar1
 
-  var instanceVar2 : Int {
-  get: return 42
-  set: if true {}
+  var instanceVar2: Int {
+    get {
+      return 42
+    }
+    set {
+      if true {}
+    }
   }
-// CHECK-NEXT: {{^}}  var instanceVar2 : Int {{{$}}
-// CHECK-NEXT: {{^}}  get:{{$}}
-// CHECK-NEXT: {{^}}    return {{$}}
-// CHECK: {{^}}  set:{{$}}
-// CHECK-NEXT: {{^}}    if  {{{$}}
+// CHECK-NEXT: {{^}}  var instanceVar2: Int {{{$}}
+// CHECK-NEXT: {{^}}    get {{{$}}
+// CHECK-NEXT: {{^}}      return {{$}}
+// CHECK-NEXT: {{^}}    }{{$}}
+// CHECK: {{^}}    set {{{$}}
+// CHECK-NEXT: {{^}}      if  {{{$}}
+// CHECK-NEXT: {{^}}      }{{$}}
 // CHECK-NEXT: {{^}}    }{{$}}
 // CHECK-NEXT: {{^}}  }{{$}}
 // CHECK-NOT: instanceVar2
 
-  var instanceVar3 : Int {
-  get: return 42
-  set(foo): if true {}
+  var instanceVar3: Int {
+    get {
+      return 42
+    }
+    set(foo) {
+      if true {}
+    }
   }
-// CHECK: {{^}}  var instanceVar3 : Int {{{$}}
-// CHECK-NEXT: {{^}}  get:{{$}}
-// CHECK-NEXT: {{^}}    return {{$}}
-// CHECK: {{^}}  set(foo):{{$}}
-// CHECK: {{^}}    if  {{{$}}
+// CHECK: {{^}}  var instanceVar3: Int {{{$}}
+// CHECK-NEXT: {{^}}    get {{{$}}
+// CHECK-NEXT: {{^}}      return {{$}}
+// CHECK-NEXT: {{^}}    }{{$}}
+// CHECK: {{^}}    set(foo) {{{$}}
+// CHECK-NEXT: {{^}}      if  {{{$}}
+// CHECK-NEXT: {{^}}      }{{$}}
 // CHECK-NEXT: {{^}}    }{{$}}
 // CHECK-NEXT: {{^}}  }{{$}}
 // CHECK-NOT: instanceVar3
@@ -134,48 +176,65 @@ class InClassVar1 {
 
 class InClassSubscript1 {
 // CHECK-LABEL: InClassSubscript1
-  subscript(i : Int) -> Int {
-  get: return 42
-  set: if true {}
+  subscript(i: Int) -> Int {
+    get {
+      return 42
+    }
+    set {
+      if true {}
+    }
   }
-// CHECK: {{^}}  subscript (i : Int) -> Int {{{$}}
-// CHECK-NEXT: {{^}}    get:{{$}}
+// CHECK: {{^}}  subscript (i: Int) -> Int {{{$}}
+// CHECK-NEXT: {{^}}    get {{{$}}
 // CHECK-NEXT: {{^}}      return {{$}}
-// CHECK: {{^}}    set:{{$}}
+// CHECK: {{^}}    set {{{$}}
 // CHECK-NEXT: {{^}}      if  {{{$}}
 // CHECK-NEXT: {{^}}      }{{$}}
+// CHECK-NEXT: {{^}}    }{{$}}
 // CHECK-NEXT: {{^}}  }{{$}}
 // CHECK-NOT: subscript
 }
 
 class InClassSubscript2 {
 // CHECK-LABEL: InClassSubscript2
-  subscript(i : Int) -> Int {
-  get: return 42
-  set(value): if true {}
+  subscript(i: Int) -> Int {
+    get {
+      return 42
+    }
+    set(value) {
+      if true {}
+    }
   }
-// CHECK: {{^}}  subscript (i : Int) -> Int {{{$}}
-// CHECK-NEXT: {{^}}    get:{{$}}
+// CHECK: {{^}}  subscript (i: Int) -> Int {{{$}}
+// CHECK-NEXT: {{^}}    get {{{$}}
 // CHECK-NEXT: {{^}}      return {{$}}
-// CHECK: {{^}}    set(value):{{$}}
+// CHECK-NEXT: {{^}}    }{{$}}
+// CHECK: {{^}}    set(value) {{{$}}
 // CHECK-NEXT: {{^}}      if  {{{$}}
 // CHECK-NEXT: {{^}}      }{{$}}
+// CHECK-NEXT: {{^}}    }{{$}}
 // CHECK-NEXT: {{^}}  }{{$}}
 // CHECK-NOT: subscript
 }
 
 class InClassSubscript3 {
 // CHECK-LABEL: InClassSubscript3
-  subscript(i : Int) -> Int {
-  get: return 42
-  set(foo): if true {}
+  subscript(i: Int) -> Int {
+    get {
+      return 42
+    }
+    set(foo) {
+      if true {}
+    }
   }
-// CHECK: {{^}}  subscript (i : Int) -> Int {{{$}}
-// CHECK-NEXT: {{^}}    get:{{$}}
+// CHECK: {{^}}  subscript (i: Int) -> Int {{{$}}
+// CHECK-NEXT: {{^}}    get {{{$}}
 // CHECK-NEXT: {{^}}      return {{$}}
-// CHECK: {{^}}    set(foo):{{$}}
+// CHECK-NEXT: {{^}}    }{{$}}
+// CHECK: {{^}}    set(foo) {{{$}}
 // CHECK-NEXT: {{^}}      if  {{{$}}
 // CHECK-NEXT: {{^}}      }{{$}}
+// CHECK-NEXT: {{^}}    }{{$}}
 // CHECK-NEXT: {{^}}  }{{$}}
 // CHECK-NOT: subscript
 }

@@ -1,17 +1,17 @@
 // RUN: rm -rf %t/clang-module-cache
-// RUN: %swift -module-cache-path=%t/clang-module-cache -sdk=%S/Inputs %s -emit-silgen | FileCheck %s
+// RUN: %swift -module-cache-path %t/clang-module-cache -target x86_64-apple-darwin13 -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-silgen | FileCheck %s
 
 import gizmo
 import objc_protocols_Bas
 
-protocol [class_protocol, objc] NSRuncing {
+@objc protocol NSRuncing {
   func runce() -> NSObject
   func copyRuncing() -> NSObject
 
   func foo()
 }
 
-protocol [class_protocol, objc] NSFunging {
+@objc protocol NSFunging {
   func funge()
 
   func foo()
@@ -21,54 +21,52 @@ protocol Ansible {
   func anse()
 }
 
-// CHECK: sil @_T14objc_protocols12objc_genericUSo9NSRuncing__FT1xQ__TCSo8NSObjectS1__
-func objc_generic<T:NSRuncing>(x:T) -> (NSObject, NSObject) {
+// CHECK-LABEL: sil  @_TF14objc_protocols12objc_generic
+func objc_generic<T : NSRuncing>(x: T) -> (NSObject, NSObject) {
   return (x.runce(), x.copyRuncing())
   // -- Result of runce is retain_autoreleased according to default objc conv
-  // CHECK: [[METHOD:%.*]] = archetype_method [volatile] {{\$.*}},  #NSRuncing.runce!1.objc
-  // CHECK: [[RESULT1:%.*]] = apply [[METHOD]]([[THIS1:%.*]]) : $[cc(objc_method), thin] (T, ()) -> NSObject
+  // CHECK: [[METHOD:%.*]] = witness_method [volatile] {{\$.*}},  #NSRuncing.runce!1.foreign
+  // CHECK: [[RESULT1:%.*]] = apply [[METHOD]]<T>([[THIS1:%.*]]) : $@cc(objc_method) @thin <τ_0_0 where τ_0_0 : NSRuncing> (τ_0_0) -> @autoreleased NSObject
   // CHECK: retain_autoreleased [[RESULT1]] : $NSObject
 
   // -- Result of copyRuncing is received retained according to -copy family
-  // CHECK: [[METHOD:%.*]] = archetype_method [volatile] {{\$.*}},  #NSRuncing.copyRuncing!1.objc
-  // CHECK: [[RESULT2:%.*]] = apply [[METHOD]]([[THIS2:%.*]]) : $[cc(objc_method), thin] (T, ()) -> NSObject
+  // CHECK: [[METHOD:%.*]] = witness_method [volatile] {{\$.*}},  #NSRuncing.copyRuncing!1.foreign
+  // CHECK: [[RESULT2:%.*]] = apply [[METHOD]]<T>([[THIS2:%.*]]) : $@cc(objc_method) @thin <τ_0_0 where τ_0_0 : NSRuncing> (τ_0_0) -> @owned NSObject
   // CHECK-NOT: retain_autoreleased
 
   // -- Arguments are not consumed by objc calls
   // CHECK: release [[THIS2]]
-  // CHECK: release [[THIS1]]
 }
 
-// CHECK: sil @_T14objc_protocols13objc_protocolFT1xPSo9NSRuncing__TCSo8NSObjectS1__
-func objc_protocol(x:NSRuncing) -> (NSObject, NSObject) {
+// CHECK-LABEL: sil  @_TF14objc_protocols13objc_protocol
+func objc_protocol(x: NSRuncing) -> (NSObject, NSObject) {
   return (x.runce(), x.copyRuncing())
   // -- Result of runce is retain_autoreleased according to default objc conv
   // CHECK: [[THIS1:%.*]] = project_existential_ref [[THIS1_ORIG:%.*]] :
-  // CHECK: [[METHOD:%.*]] = protocol_method [volatile] [[THIS1_ORIG]] : {{.*}}, #NSRuncing.runce!1.objc
-  // CHECK: [[RESULT1:%.*]] = apply [[METHOD]]([[THIS1]]) : $[cc(objc_method), thin] (Builtin.ObjCPointer, ()) -> NSObject
+  // CHECK: [[METHOD:%.*]] = protocol_method [volatile] [[THIS1_ORIG]] : {{.*}}, #NSRuncing.runce!1.foreign
+  // CHECK: [[RESULT1:%.*]] = apply [[METHOD]]([[THIS1]]) : $@cc(objc_method) @thin (Self) -> @autoreleased NSObject
   // CHECK: retain_autoreleased [[RESULT1]] : $NSObject
 
   // -- Result of copyRuncing is received retained according to -copy family
   // CHECK: [[THIS2:%.*]] = project_existential_ref [[THIS2_ORIG:%.*]] :
-  // CHECK: [[METHOD:%.*]] = protocol_method [volatile] [[THIS2_ORIG]] : {{.*}}, #NSRuncing.copyRuncing!1.objc
-  // CHECK: [[RESULT2:%.*]] = apply [[METHOD]]([[THIS2:%.*]]) : $[cc(objc_method), thin] (Builtin.ObjCPointer, ()) -> NSObject
+  // CHECK: [[METHOD:%.*]] = protocol_method [volatile] [[THIS2_ORIG]] : {{.*}}, #NSRuncing.copyRuncing!1.foreign
+  // CHECK: [[RESULT2:%.*]] = apply [[METHOD]]([[THIS2:%.*]]) : $@cc(objc_method) @thin (Self) -> @owned NSObject
   // CHECK-NOT: retain_autoreleased
 
   // -- Arguments are not consumed by objc calls
   // CHECK: release [[THIS2_ORIG]]
-  // CHECK: release [[THIS1_ORIG]]
 }
 
-// CHECK: sil @_T14objc_protocols25objc_protocol_compositionFT1xPSo9NSFungingSo9NSRuncing__T_
-func objc_protocol_composition(x:protocol<NSRuncing, NSFunging>) {
+// CHECK-LABEL: sil  @_TF14objc_protocols25objc_protocol_composition
+func objc_protocol_composition(x: protocol<NSRuncing, NSFunging>) {
   // CHECK: [[THIS:%.*]] = project_existential_ref [[THIS_ORIG:%.*]] : $protocol<NSFunging, NSRuncing>
-  // CHECK: [[METHOD:%.*]] = protocol_method [volatile] [[THIS_ORIG]] : {{.*}}, #NSRuncing.runce!1.objc
-  // CHECK: apply [[METHOD]]([[THIS]]) : $[cc(objc_method), thin] (Builtin.ObjCPointer, ()) -> NSObject
+  // CHECK: [[METHOD:%.*]] = protocol_method [volatile] [[THIS_ORIG]] : {{.*}}, #NSRuncing.runce!1.foreign
+  // CHECK: apply [[METHOD]]([[THIS]]) : $@cc(objc_method) @thin (Self) -> @autoreleased NSObject
   x.runce()
 
   // CHECK: [[THIS:%.*]] = project_existential_ref [[THIS_ORIG:%.*]] : $protocol<NSFunging, NSRuncing>
-  // CHECK: [[METHOD:%.*]] = protocol_method [volatile] [[THIS_ORIG]] : {{.*}}, #NSFunging.funge!1.objc
-  // CHECK: apply [[METHOD]]([[THIS]]) : $[cc(objc_method), thin] (Builtin.ObjCPointer, ()) -> ()
+  // CHECK: [[METHOD:%.*]] = protocol_method [volatile] [[THIS_ORIG]] : {{.*}}, #NSFunging.funge!1.foreign
+  // CHECK: apply [[METHOD]]([[THIS]]) : $@cc(objc_method) @thin (Self) -> ()
   x.funge()
 }
 // -- ObjC thunks get emitted for ObjC protocol conformances
@@ -88,11 +86,11 @@ class Foo : NSRuncing, NSFunging, Ansible {
   func anse() {}
 }
 
-// CHECK: sil @_TToC14objc_protocols3Foo5runcefS0_FT_CSo8NSObject
-// CHECK: sil @_TToC14objc_protocols3Foo11copyRuncingfS0_FT_CSo8NSObject
-// CHECK: sil @_TToC14objc_protocols3Foo5fungefS0_FT_T_
-// CHECK: sil @_TToC14objc_protocols3Foo3foofS0_FT_T_
-// CHECK-NOT: sil @_TTo{{.*}}anse{{.*}}
+// CHECK-LABEL: sil  @_TToFC14objc_protocols3Foo5runcefS0_FT_CSo8NSObject
+// CHECK-LABEL: sil  @_TToFC14objc_protocols3Foo11copyRuncingfS0_FT_CSo8NSObject
+// CHECK-LABEL: sil  @_TToFC14objc_protocols3Foo5fungefS0_FT_T_
+// CHECK-LABEL: sil  @_TToFC14objc_protocols3Foo3foofS0_FT_T_
+// CHECK-NOT: sil @_TToF{{.*}}anse{{.*}}
 
 class Bar { }
 
@@ -102,9 +100,9 @@ extension Bar : NSRuncing {
   func foo() {}
 }
 
-// CHECK: sil @_TToC14objc_protocols3Bar5runcefS0_FT_CSo8NSObject
-// CHECK: sil @_TToC14objc_protocols3Bar11copyRuncingfS0_FT_CSo8NSObject
-// CHECK: sil @_TToC14objc_protocols3Bar3foofS0_FT_T_
+// CHECK-LABEL: sil  @_TToFC14objc_protocols3Bar5runcefS0_FT_CSo8NSObject
+// CHECK-LABEL: sil  @_TToFC14objc_protocols3Bar11copyRuncingfS0_FT_CSo8NSObject
+// CHECK-LABEL: sil  @_TToFC14objc_protocols3Bar3foofS0_FT_T_
 
 // class Bas from objc_protocols_Bas module
 extension Bas : NSRuncing {
@@ -113,9 +111,8 @@ extension Bas : NSRuncing {
   func foo() {}
 }
 
-// CHECK: sil @_TToC18objc_protocols_Bas3Bas11copyRuncingfS0_FT_CSo8NSObject
-// CHECK: sil @_TToC18objc_protocols_Bas3Bas3foofS0_FT_T_
-// CHECK: sil @_TToC18objc_protocols_Bas3Bas5runcefS0_FT_CSo8NSObject
+// CHECK-LABEL: sil  @_TToFC18objc_protocols_Bas3Bas11copyRuncingfS0_FT_CSo8NSObject
+// CHECK-LABEL: sil  @_TToFC18objc_protocols_Bas3Bas3foofS0_FT_T_
 
 // -- Inherited objc protocols
 
@@ -126,8 +123,8 @@ class Zim : Fungible {
   func foo() {}
 }
 
-// CHECK: sil @_TToC14objc_protocols3Zim5fungefS0_FT_T_
-// CHECK: sil @_TToC14objc_protocols3Zim3foofS0_FT_T_
+// CHECK-LABEL: sil  @_TToFC14objc_protocols3Zim5fungefS0_FT_T_
+// CHECK-LABEL: sil  @_TToFC14objc_protocols3Zim3foofS0_FT_T_
 
 // class Zang from objc_protocols_Bas module
 extension Zang : Fungible {
@@ -135,5 +132,63 @@ extension Zang : Fungible {
   func foo() {}
 }
 
-// CHECK: sil @_TToC18objc_protocols_Bas4Zang3foofS0_FT_T_
-// CHECK: sil @_TToC18objc_protocols_Bas4Zang5fungefS0_FT_T_
+// CHECK-LABEL: sil  @_TToFC18objc_protocols_Bas4Zang3foofS0_FT_T_
+
+// -- objc protocols with property requirements in extensions
+//    <rdar://problem/16284574>
+
+@objc protocol NSCounting {
+  var count: Int {get}
+}
+
+class StoredPropertyCount {
+  let count = 0
+}
+
+extension StoredPropertyCount: NSCounting {}
+// CHECK-LABEL: sil [transparent] @_TToFC14objc_protocols19StoredPropertyCountg5countSi
+
+class ComputedPropertyCount {
+  var count: Int { return 0 }
+}
+
+extension ComputedPropertyCount: NSCounting {}
+// CHECK-LABEL: sil @_TToFC14objc_protocols21ComputedPropertyCountg5countSi
+
+// -- adding @objc protocol conformances to native ObjC classes should not
+//    emit thunks since the methods are already available to ObjC.
+
+// Gizmo declared in Inputs/usr/include/Gizmo.h
+extension Gizmo : NSFunging { }
+
+// CHECK-NOT: _TTo{{.*}}5Gizmo{{.*}}
+
+@objc class InformallyFunging {
+  @objc func funge() {}
+  @objc func foo() {}
+}
+
+extension InformallyFunging: NSFunging { }
+
+@objc protocol Initializable {
+  init(int: Int)
+}
+
+// CHECK-LABEL: sil @_TF14objc_protocols28testInitializableExistential
+func testInitializableExistential(im: Initializable.Type, i: Int) -> Initializable {
+  // CHECK: bb0([[META:%[0-9]+]] : $@thick Initializable.Type, [[I:%[0-9]+]] : $Int):
+// CHECK:   [[I2_BOX:%[0-9]+]] = alloc_box $Initializable
+// CHECK:   [[ARCHETYPE_META:%[0-9]+]] = open_existential_ref [[META]] : $@thick Initializable.Type to $@thick @opened(0) Initializable.Type
+// CHECK:   [[ARCHETYPE_META_OBJC:%[0-9]+]] = thick_to_objc_metatype [[ARCHETYPE_META]] : $@thick @opened(0) Initializable.Type to $@objc_metatype @opened(0) Initializable.Type
+// CHECK:   [[I2_ALLOC:%[0-9]+]] = alloc_ref_dynamic [objc] [[ARCHETYPE_META_OBJC]] : $@objc_metatype @opened(0) Initializable.Type, $@opened(0) Initializable
+// CHECK:   [[INIT_WITNESS:%[0-9]+]] = witness_method [volatile] $@opened(0) Initializable, #Initializable.init!initializer.1.foreign : $@cc(objc_method) @thin <τ_0_0 where τ_0_0 : Initializable> (Int, @owned τ_0_0) -> @owned τ_0_0
+// CHECK:   [[I2:%[0-9]+]] = apply [[INIT_WITNESS]]<@opened(0) Initializable>([[I]], [[I2_ALLOC]]) : $@cc(objc_method) @thin <τ_0_0 where τ_0_0 : Initializable> (Int, @owned τ_0_0) -> @owned τ_0_0
+// CHECK:   [[I2_EXIST_CONTAINER:%[0-9]+]] = init_existential_ref [[I2]] : $@opened(0) Initializable, $Initializable
+// CHECK:   store [[I2_EXIST_CONTAINER]] to [[I2_BOX]]#1 : $*Initializable
+// CHECK:   [[I2:%[0-9]+]] = load [[I2_BOX]]#1 : $*Initializable
+// CHECK:   strong_retain [[I2]] : $Initializable
+// CHECK:   strong_release [[I2_BOX]]#0 : $Builtin.NativeObject
+// CHECK:   return [[I2]] : $Initializable
+  var i2 = im(int: i)
+  return i2
+}

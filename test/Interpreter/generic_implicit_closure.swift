@@ -1,6 +1,6 @@
-// RUN: %swift -i %s | FileCheck %s
+// RUN: %target-run-simple-swift | FileCheck %s
 
-func andc<T:LogicValue>(x:Bool, y:T) -> Bool {
+func andc<T : LogicValue>(x: Bool, y: T) -> Bool {
   return x && !y.getLogicValue()
 }
 
@@ -21,10 +21,10 @@ println(andc(false, Truthy())) // CHECK: false
 println(andc(true, Falselike())) // CHECK: true
 println(andc(false, Falselike())) // CHECK: false
 
-func must<T:LogicValue>(x:T) {
+func must<T : LogicValue>(x: T) {
   assert(x.getLogicValue())
 }
-func shant<T:LogicValue>(x:T) {
+func shant<T : LogicValue>(x: T) {
   assert(!x.getLogicValue())
 }
 

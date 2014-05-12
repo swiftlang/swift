@@ -43,4 +43,7 @@ func useEmAll(model: CCMagnetismModel) {
 
 // CHECK: class_method [volatile] %0 : $CCMagnetismModel, #CCMagnetismModel.giveRefrigerator!1.foreign : CCMagnetismModel -> (CCRefrigerator!) -> Void , $@cc(objc_method) @thin (@owned ImplicitlyUnwrappedOptional<CCRefrigerator>, CCMagnetismModel) -> ()
   model.giveRefrigerator(copy)
+
+  // rdar://16846555
+  let prop: CCRefrigerator = model.fridgeProp
 }

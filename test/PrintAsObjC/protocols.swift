@@ -3,7 +3,7 @@
 // RUN: rm -rf %t
 // RUN: mkdir %t
 // RUN: %swift %clang-importer-sdk -module-cache-path %t/clang-module-cache -emit-module -o %t %s
-// RUN: %swift-ide-test %clang-importer-sdk -module-cache-path %t/clang-module-cache -print-as-objc %t/protocols.swiftmodule -source-filename %s > %t/protocols.h
+// RUN: %swift %clang-importer-sdk -module-cache-path %t/clang-module-cache -parse-as-library %t/protocols.swiftmodule -parse -emit-objc-header-path %t/protocols.h
 // RUN: FileCheck %s < %t/protocols.h
 // RUN: FileCheck --check-prefix=NEGATIVE %s < %t/protocols.h
 // RUN: %check-in-clang %t/protocols.h
@@ -26,23 +26,30 @@ import Foundation
 // CHECK-NEXT: - (void)testSingleProtocolTypes:(id <A>)a aAgain:(id <A>)a2 b:(id <B>)b bAgain:(id <B>)b2 both:(id <B>)both;
 // CHECK-NEXT: - (void)testSingleProtocolClassTypes:(Class <A>)a aAgain:(Class <A>)a2 b:(Class <B>)b bAgain:(Class <B>)b2 both:(Class <B>)both;
 // CHECK-NEXT: - (void)testComposition:(id <A, ZZZ>)x meta:(Class <A, ZZZ>)xClass;
+// CHECK-NEXT: - (void)testOptional:(id <A>)opt meta:(Class <A>)m;
 // CHECK-NEXT: @end
 @objc @class_protocol protocol Methods {
   func test()
-  type func test2()
+  class func test2()
 
-  func testRawAnyTypes(any: DynamicLookup) other(other: DynamicLookup.metatype)
+  func testRawAnyTypes(any: AnyObject, other: AnyObject.Type)
 
-  func testSingleProtocolTypes(a : A) aAgain(a2: protocol<A>) b(b: B) bAgain(b2: protocol<B>) both(both: protocol<A, B>)
-  func testSingleProtocolClassTypes(a : A.metatype) aAgain(a2: protocol<A>.metatype) b(b: B.metatype) bAgain(b2: protocol<B>.metatype) both(both: protocol<A, B>.metatype)
-  func testComposition(x: protocol<A, ZZZ>) meta(xClass: protocol<A, ZZZ>.metatype)
+  func testSingleProtocolTypes(a : A, aAgain a2: protocol<A>, b: B, bAgain b2: protocol<B>, both: protocol<A, B>)
+  func testSingleProtocolClassTypes(a : A.Type, aAgain a2: protocol<A>.Type, b: B.Type, bAgain b2: protocol<B>.Type, both: protocol<A, B>.Type)
+  func testComposition(x: protocol<A, ZZZ>, meta xClass: protocol<A, ZZZ>.Type)
+
+  func testOptional(opt: A?, meta m: A.Type?)
 }
 
 // CHECK-LABEL: @interface MyObject : NSObject <NSCoding>
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 // NEGATIVE-NOT: @protocol NSCoding
-class MyObject : NSObject, NSCoding {}
+class MyObject : NSObject, NSCoding {
+  init(coder aCoder: NSCoder) {
+    super.init()
+  }
+}
 
 // NEGATIVE-NOT: NotObjC
 @class_protocol protocol NotObjC {}
@@ -78,10 +85,23 @@ extension NSString : A, ZZZ {}
   @optional func f()
 }
 
+// CHECK-LABEL: @protocol Properties
+// CHECK-NEXT: @property (nonatomic, readonly) NSInteger a;
+// CHECK-NEXT: @property (nonatomic) id <Properties> b;
+// CHECK-NEXT: @optional
+// CHECK-NEXT: @property (nonatomic, readonly) NSString * c;
+// CHECK-NEXT: @end
+@objc @class_protocol protocol Properties {
+  var a: Int { get }
+  var b: Properties? { get set }
+  @optional var c: String { get }
+}
+
 
 // CHECK-LABEL: @protocol ReversedOrder2{{$}}
 // CHECK-NEXT: @end
-// CHECK: @protocol ReversedOrder1 <ReversedOrder2>
+// CHECK: SWIFT_PROTOCOL
+// CHECK-NEXT: @protocol ReversedOrder1 <ReversedOrder2>
 // CHECK-NEXT: @end
 @objc @class_protocol protocol ReversedOrder1 : ReversedOrder2 {}
 @objc @class_protocol protocol ReversedOrder2 {}

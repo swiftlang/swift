@@ -1,25 +1,25 @@
 // RUN: %swift %s -verify
 
-def canonical_empty_protocol() -> protocol<> {
+func canonical_empty_protocol() -> protocol<> {
   return 1
 }
 
 protocol P1 { 
-  def p1()
-  def f(_: Int) -> Int
+  func p1()
+  func f(_: Int) -> Int
 }
 
 protocol P2 : P1 { 
-  def p2()
+  func p2()
 }
 
 protocol P3 { 
-  def p3()
+  func p3()
 }
 
 protocol P4 : P3 { 
-  def p4()
-  def f(_: Double) -> Double
+  func p4()
+  func f(_: Double) -> Double
 }
 
 typealias Any = protocol<>
@@ -32,7 +32,7 @@ extension Int : P5 { }
 
 typealias Bogus = protocol<P1, Int> // expected-error{{non-protocol type 'Int' cannot be used within 'protocol<...>'}}
 
-def testEquality() {
+func testEquality() {
   // Remove duplicates from protocol-conformance types. 
   var x1 : (_ : protocol<P2, P4>) -> ()
   var x2 : (_ : protocol<P3, P4, P2, P1>) -> ()
@@ -51,11 +51,11 @@ def testEquality() {
 
   var x7 : (_ : protocol<P1, P3>) -> ()
   var x8 : (_ : protocol<P2>) -> ()
-  x7 = x8 // expected-error{{does not type-check}}
+  x7 = x8 // expected-error{{'protocol<P1, P3>' does not conform to protocol 'P2'}}
 }
 
 // Name lookup into protocol-conformance types
-def testLookup() {
+func testLookup() {
   var x1 : protocol<P2, P1, P4>
   x1.p1()
   x1.p2()
@@ -66,26 +66,26 @@ def testLookup() {
 }
 
 protocol REPLPrintable {
-  def replPrint()
+  func replPrint()
 }
 
 protocol SuperREPLPrintable : REPLPrintable {
-  def superReplPrint()
+  func superReplPrint()
 }
 
 struct SuperPrint : REPLPrintable, FormattedPrintable, SuperREPLPrintable {
-  def replPrint() {}
-  def superReplPrint() {}
-  def format(kind: Char, layout: String) -> String {}
+  func replPrint() {}
+  func superReplPrint() {}
+  func format(kind: UnicodeScalar, layout: String) -> String {}
 }
 
 extension Int : REPLPrintable, FormattedPrintable { }
 
-def accept_manyPrintable(_: protocol<REPLPrintable, FormattedPrintable>) {}
+func accept_manyPrintable(_: protocol<REPLPrintable, FormattedPrintable>) {}
 
-def return_superPrintable() -> protocol<FormattedPrintable, SuperREPLPrintable> {}
+func return_superPrintable() -> protocol<FormattedPrintable, SuperREPLPrintable> {}
 
-def testConversion() {
+func testConversion() {
   // Conversions for literals.
   var x : protocol<REPLPrintable, FormattedPrintable> = 1
   accept_manyPrintable(1)
@@ -97,7 +97,7 @@ def testConversion() {
   
   // Conversions among existential types.
   var x2 : protocol<SuperREPLPrintable, FormattedPrintable>
-  x2 = x // expected-error{{'protocol<REPLPrintable, FormattedPrintable>' does not conform to protocol 'SuperREPLPrintable'}}
+  x2 = x // expected-error{{'protocol<FormattedPrintable, REPLPrintable>' does not conform to protocol 'SuperREPLPrintable'}}
   x = x2
 
   // Subtyping

@@ -23,11 +23,12 @@ extension NSObject {
             forKeyPath keyPath: String!,
                     kvoContext: KVOContext)
   {
-     let ptr = CMutableVoidPointer(kvoContext, reinterpretCast(kvoContext))
+     let ptr = CMutableVoidPointer(owner: kvoContext, 
+                                   value: reinterpretCast(kvoContext))
      self.removeObserver(observer,
                          forKeyPath: keyPath,
                             context: ptr)
-     Unmanaged(kvoContext).release()
+     Unmanaged(_private: kvoContext).release()
   }
 
   func addObserver(observer: NSObject!,
@@ -35,8 +36,9 @@ extension NSObject {
                     options: NSKeyValueObservingOptions,
                  kvoContext: KVOContext)
   {
-     let ptr = CMutableVoidPointer(kvoContext, reinterpretCast(kvoContext))
-     Unmanaged(kvoContext).retain()
+     let ptr = CMutableVoidPointer(owner: kvoContext, 
+                                   value: reinterpretCast(kvoContext))
+     Unmanaged(_private: kvoContext).retain()
      self.addObserver(observer,
                       forKeyPath: keyPath,
                          options: options,

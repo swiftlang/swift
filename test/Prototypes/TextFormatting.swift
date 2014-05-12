@@ -1,5 +1,4 @@
-// RUN: %swift -i %s | FileCheck %s
-// REQUIRES: swift_interpreter
+// RUN: %target-run-simple-swift | FileCheck %s
 
 // Text Formatting Prototype
 //
@@ -11,11 +10,13 @@ operator infix ~> { precedence 255 }
 
 /// \brief A thing into which we can stream text
 protocol OutputStream {
-  func append(s: String)
+  mutating
+  func append(text: String)
 }
 
 /// \brief Strings are OutputStreams
 extension String: OutputStream {
+  mutating
   func append(text: String) {
     self += text
   }
@@ -23,7 +24,7 @@ extension String: OutputStream {
 
 /// \brief A thing that can be written to an OutputStream
 protocol Streamable {
-  func writeTo<Target: OutputStream>(target: @inout Target)
+  func writeTo<Target: OutputStream>(inout target: Target)
 }
 
 /// \brief A thing that can be printed in the REPL and the Debugger
@@ -55,7 +56,7 @@ protocol DebugPrintable {
 
 /// \brief Strings are Streamable
 extension String : Streamable {
-  func writeTo<Target: OutputStream>(target: @inout Target) {
+  func writeTo<Target: OutputStream>(inout target: Target) {
     target.append(self)
   }
 }
@@ -123,13 +124,13 @@ func toString<T: Printable>(x: T) -> String {
 // surrounding quotes and escapes special characters.
 struct EscapedStringFormat : Streamable {
 
-  init(s: String) {
+  init(_ s: String) {
     self._value = s
   }
 
-  func writeTo<Target: OutputStream>(target: @inout Target) {
+  func writeTo<Target: OutputStream>(inout target: Target) {
     target.append("\"")
-    for c in CodePoints(_value) {
+    for c in _value.unicodeScalars {
       target.append(c.escape())
     }
     target.append("\"")
@@ -158,7 +159,7 @@ protocol PrintableInteger : IntegerLiteralConvertible, Comparable, SignedNumber,
 
   // FIXME: Stand-in for constructor pending <rdar://problem/13695680>
   // (Constructor requirements in protocols)
-  static func fromInt(x: Int) -> Self
+  class func fromInt(x: Int) -> Self
   func toInt() -> Int
 }
 
@@ -175,10 +176,6 @@ extension Int : PrintableInteger {
   }
 }
 
-func abs<T: SignedNumber>(x: T) -> T {
-  return x.isNegative() ? -x : x
-}
-
 struct _formatArgs {
   var radix: Int, fill: String, width: Int
 }
@@ -191,7 +188,7 @@ func format(radix: Int = 10, fill: String = " ", width: Int = 0) -> _formatArgs 
 // <rdar://problem/15525229> (SIL verification failed: operand of
 // 'apply' doesn't match function input type) changed all that.
 func _writePositive<T:PrintableInteger, S: OutputStream>( 
-  value: T, stream: @inout S, args: _formatArgs) -> Int
+  value: T, inout stream: S, args: _formatArgs) -> Int
 {
 
   if value == 0 {
@@ -202,8 +199,8 @@ func _writePositive<T:PrintableInteger, S: OutputStream>(
   var rest: T = value / radix
   var nDigits = _writePositive(rest, &stream, args)
   var digit = UInt32((value % radix).toInt())
-  var baseCharOrd : UInt32 = digit <= 9 ? '0'.value : 'A'.value - 10
-  stream.append(String(Char(baseCharOrd + digit)))
+  var baseCharOrd : UInt32 = digit <= 9 ? "0".value : "A".value - 10
+  stream.append(String(UnicodeScalar(baseCharOrd + digit)))
   return nDigits + 1
 }
 
@@ -211,7 +208,7 @@ func _writePositive<T:PrintableInteger, S: OutputStream>(
 // <rdar://problem/15525229> (SIL verification failed: operand of
 // 'apply' doesn't match function input type) changed all that.
 func _writeSigned<T:PrintableInteger, S: OutputStream>(
-  value: T, target: @inout S, args: _formatArgs
+  value: T, inout target: S, args: _formatArgs
 ) {
   var width = 0
   var result = ""
@@ -242,7 +239,7 @@ struct RadixFormat<T: PrintableInteger> : Streamable {
     self.args = args
   }
 
-  func writeTo<S: OutputStream>(target: @inout S) {
+  func writeTo<S: OutputStream>(inout target: S) {
     _writeSigned(value, &target, args)
   }
 
@@ -256,11 +253,11 @@ struct RadixFormat<T: PrintableInteger> : Streamable {
 }
 
 @infix func ~> <T:PrintableInteger> (x: T, _: __PrintedFormat) -> RadixFormat<T> {
-  return RadixFormat(x, format())
+  return RadixFormat(value: x, args: format())
 }
 
 @infix func ~> <T:PrintableInteger> (x: T, args: _formatArgs) -> RadixFormat<T> {
-  return RadixFormat(x, args)
+  return RadixFormat(value: x, args: args)
 }
 
 // ==========
@@ -270,18 +267,18 @@ struct RadixFormat<T: PrintableInteger> : Streamable {
 //
 
 struct StdoutStream : OutputStream {
-  func append(s: String) { swift.print(s) }
+  func append(text: String) { Swift.print(text) }
   // debugging only
   func dump() -> String {
     return "<StdoutStream>"
   }
 }
 
-func print<Target: OutputStream, T: Streamable>(target: @inout Target, x: T) {
+func print<Target: OutputStream, T: Streamable>(inout target: Target, x: T) {
   x.writeTo(&target)
 }
 
-func print<Target: OutputStream, T: Printable>(target: @inout Target, x: T) {
+func print<Target: OutputStream, T: Printable>(inout target: Target, x: T) {
   print(&target, x~>format())
 }
 
@@ -295,12 +292,12 @@ func print<T: Streamable>(x: T) {
   print(&target, x)
 }
 
-func println<Target: OutputStream, T: Printable>(target: @inout Target, x: T) {
+func println<Target: OutputStream, T: Printable>(inout target: Target, x: T) {
   print(&target, x)
   target.append("\n")
 }
 
-func println<Target: OutputStream, T: Streamable>(target: @inout Target, x: T) {
+func println<Target: OutputStream, T: Streamable>(inout target: Target, x: T) {
   print(&target, x)
   target.append("\n")
 }
@@ -316,7 +313,7 @@ func println<T: Streamable>(x: T) {
 }
 
 extension String {
-  init <T: Streamable>(x: T) {
+  init <T: Streamable>(_ x: T) {
     self = ""
     print(&self, x)
   }
@@ -343,5 +340,9 @@ println("|\(-434343~>format(width:8, fill:zero))|")
 println("|\(-42~>format(radix:13, width:8))|")
 // CHECK-NEXT: |-     33|
 
-println(0xDEADBEEF~>format(radix:16))
-// CHECK-NEXT: DEADBEEF
+println(0x1EADBEEF~>format(radix:16))
+// CHECK-NEXT: 1EADBEEF
+
+// FIXME: rdar://16168414 this doesn't work in 32-bit
+// println(0xDEADBEEF~>format(radix:16))
+// CHECK-NEXT-not: DEADBEEF

@@ -1,305 +1,199 @@
-struct RangeEnumerator<T: ForwardIndex> : Enumerator, Enumerable {
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+struct RangeGenerator<T: ForwardIndex> : Generator, Sequence {
   typealias Element = T
 
-  constructor(begin: T, end: T) {
-    this.begin_.value = begin
-    this.end_.value = end
+  @transparent
+  init(_ bounds: Range<T>) {
+    self.startIndex = bounds.startIndex
+    self.endIndex = bounds.endIndex
   }
 
-  func isEmpty() -> Bool {
-    return begin_.value == end_.value
+  mutating func next() -> Element? {
+    if startIndex == endIndex {
+      return .None
+    }
+    return startIndex++
   }
 
-  func next() -> Element {
-    var ret = begin_.value
-    begin_.value = begin_.value.succ()
+  // Every Generator is also a single-pass Sequence
+  typealias GeneratorType = RangeGenerator<T>
+  func generate() -> GeneratorType {
+    return self
+  }
+
+  var startIndex: T
+  var endIndex: T
+}
+
+struct StridedRangeGenerator<T: ForwardIndex> : Generator, Sequence {
+  typealias Element = T
+
+  @transparent
+  init(_ bounds: Range<T>, stride: T.DistanceType) {
+    self._bounds = bounds
+    self._stride = stride
+  }
+
+  mutating func next() -> Element? {
+    if !_bounds {
+      return .None
+    }
+    let ret = _bounds.startIndex
+    _bounds.startIndex = advance(_bounds.startIndex, _stride, _bounds.endIndex)
     return ret
   }
 
-  // Every Enumerator is also a single-pass Enumerable
-  typealias EnumeratorType = RangeEnumerator<T>
-  func getEnumeratorType() -> EnumeratorType {
-    return this
+  // Every Generator is also a single-pass Sequence
+  typealias GeneratorType = StridedRangeGenerator
+  func generate() -> GeneratorType {
+    return self
   }
 
-  var begin_, end_: GenericIVar<T>
+  var _bounds: Range<T>
+  var _stride: T.DistanceType
 }
 
-struct Range<T: ForwardIndex> : Enumerable {  
-  constructor(begin: T, end: T) {
-    this.begin_.value = begin
-    this.end_.value = end
+struct Range<T: ForwardIndex> : LogicValue, Sliceable {  
+  @transparent
+  init(start: T, end: T) {
+    _startIndex = start
+    _endIndex = end
   }
 
   func isEmpty() -> Bool {
-    return begin_.value == end_.value
+    return startIndex == endIndex
   }
 
-  func begin() -> T {
-    return begin_.value
-  }
-  func end() -> T {
-    return end_.value
+  func getLogicValue() -> Bool {
+    return !isEmpty()
   }
 
-  typealias EnumeratorType = RangeEnumerator<T>
-  func getEnumeratorType() -> EnumeratorType {
-    return EnumeratorType(begin_.value, end_.value)
+  subscript(i: T) -> T {
+    return i
   }
 
-  var begin_, end_: GenericIVar<T>
+  subscript(x: Range<T>) -> Range {
+    return Range(start: x.startIndex, end: x.endIndex)
+  }
+
+  typealias GeneratorType = RangeGenerator<T>
+  func generate() -> RangeGenerator<T> {
+    return GeneratorType(self)
+  }
+
+  func by(stride: T.DistanceType) -> StridedRangeGenerator<T> {
+    return StridedRangeGenerator(self, stride: stride)
+  }
+
+  var startIndex: T {
+    get {
+      return _startIndex
+    }
+    set(newValue) {
+      _startIndex = newValue
+    }
+  }
+
+  var endIndex: T {
+    get {
+      return _endIndex
+    }
+    set(newValue) {
+      _endIndex = newValue
+    }
+  }
+  
+  var _startIndex: T
+  var _endIndex: T
 }
 
-/// \brief Any model of ForwardIndex can be turned into a Range with min..max
-func .. <Pos: ForwardIndex> (min : Pos, max : Pos) -> Range<Pos> {
-  return Range(min, max)
+func count<I: RandomAccessIndex>(r: Range<I>) -> I.DistanceType {
+  return r.startIndex.distanceTo(r.endIndex)
 }
 
-struct ReverseRangeEnumerator<T: BidirectionalIndex> : Enumerator, Enumerable {
+/// \brief Any model of ForwardIndex can be turned into a Range with min...max
+@transparent
+func ... <Pos : ForwardIndex> (min: Pos, max: Pos) -> Range<Pos> {
+  return Range(start: min, end: max)
+}
+
+@transparent
+func .. <Pos : ForwardIndex> (min: Pos, max: Pos) -> Range<Pos> {
+  return Range(start: min, end: max.succ())
+}
+
+struct ReverseRangeGenerator<T: BidirectionalIndex> : Generator, Sequence {
   typealias Element = T
 
-  constructor(begin: T, end: T) {
-    this.begin_.value = begin
-    this.end_.value = end
+  @transparent
+  init(start: T, pastEnd: T) {
+    self._bounds = (start,pastEnd)
+  }
+
+  mutating func next() -> Element? {
+    if _bounds.0 == _bounds.1 { return .None }
+    _bounds.1 = _bounds.1.pred()
+    return _bounds.1
+  }
+
+  // Every Generator is also a single-pass Sequence
+  typealias GeneratorType = ReverseRangeGenerator<T>
+  func generate() -> GeneratorType {
+    return self
+  }
+
+  var _bounds: (T, T)
+}
+
+struct ReverseRange<T: BidirectionalIndex> : Sequence {
+  init(start: T, pastEnd: T) {
+    self._bounds = (start, pastEnd)
+  }
+
+  init(range fwd: Range<T>) {
+    self._bounds = (fwd.startIndex, fwd.endIndex)
   }
 
   func isEmpty() -> Bool {
-    return begin_.value == end_.value
+    return _bounds.0 == _bounds.1
   }
 
-  func next() -> Element {
-    end_.value = end_.value.pred()
-    return end_.value
+  func bounds() -> (T, T) {
+    return _bounds
   }
 
-  // Every Enumerator is also a single-pass Enumerable
-  typealias EnumeratorType = ReverseRangeEnumerator<T>
-  func getEnumeratorType() -> EnumeratorType {
-    return this
+  typealias GeneratorType = ReverseRangeGenerator<T>
+  func generate() -> GeneratorType {
+    return GeneratorType(start: _bounds.0, pastEnd: _bounds.1)
   }
 
-  var begin_, end_: GenericIVar<T>
+  var _bounds: (T, T)
 }
 
-struct ReverseRange<T: BidirectionalIndex> : Enumerable {  
-  constructor(begin: T, end: T) {
-    this.begin_.value = begin
-    this.end_.value = end
-  }
+//
+// Pattern matching support for ranges
+//
+// Ranges can be used to match values contained within the range, e.g.:
+// switch x {
+// case 0...10:
+//   println("single digit")
+// case _:
+//   println("too big")
+// }
 
-  constructor(fwd: Range<T>) {
-    this.begin_.value = fwd.begin()
-    this.end_.value = fwd.end()
-  }
-
-  func isEmpty() -> Bool {
-    return begin_.value == end_.value
-  }
-
-  func begin() -> T {
-    return begin_.value
-  }
-
-  func end() -> T {
-    return end_.value
-  }
-
-  typealias EnumeratorType = ReverseRangeEnumerator<T>
-  func getEnumeratorType() -> EnumeratorType {
-    return EnumeratorType(begin_.value, end_.value)
-  }
-
-  var begin_, end_: GenericIVar<T>
-}
-
-// FIXME: make generic
-// BLOCKED: <rdar://problem/12780068> Crash while trying to make iteration generic
-struct IntEnumeratorType : Enumerator, Enumerable {
-  typealias Element = Int
-  var min : Int
-  var max : Int
-  var stride : Int
-
-  // FIXME: each/reduce should be moved out to generic methods, or methods that
-  // take the range as a protocol'd "enumeration/iterator" value.
-  func each(f : (Int) -> Void) {
-    for i in this { f(i) }
-  }
-
-  func reduce(val : Int, f : (Int, Int) -> Int) -> Int {
-    for i in this { val = f(val, i) }
-    return val
-  }
-
-  func by(s : Int) -> IntEnumeratorType {
-    var result = this
-    result.stride = s
-    return result
-  }
-
-  func isEmpty() -> Bool {
-    return min >= max
-  }
-  func contains(x : Int) -> Bool {
-    return min <= x && x < max
-  }
-
-  func next() -> Int {
-    var prev = min
-    min += stride
-    return prev
-  }
-
-  typealias EnumeratorType = IntEnumeratorType
-  func getEnumeratorType() -> IntEnumeratorType {
-    return this
-  }
-
-  func replPrint() {
-    print("\(min)..\(max)")
-    if stride != 1 {
-      print(" by \(stride)")
-    }
-  }
-}
-
-extension IntEnumeratorType : Equatable, Hashable {
-  func __equal__(rhs: IntEnumeratorType) -> Bool {
-    return min == rhs.min && max == rhs.max && stride == rhs.stride
-  }
-  func hashValue() -> Int {
-    return min ^ max
-  }
-}
-
-// FIXME: make generic
-// BLOCKED: <rdar://problem/12780068> Crash while trying to make iteration generic
-struct ReverseIntEnumeratorType : Enumerator, Enumerable {
-  typealias Element = Int
-  var min : Int
-  var max : Int
-  var stride : Int
-
-  // FIXME: each/reduce should be moved out to generic methods, or methods that
-  // take the range as a protocol'd "enumeration/iterator" value.
-  func each(f : (Int) -> Void) {
-    for i in this { f(i) }
-  }
-
-  func reduce(val : Int, f : (Int, Int) -> Int) -> Int {
-    for i in this { val = f(val, i) }
-    return val
-  }
-
-  func isEmpty() -> Bool {
-    return min >= max
-  }
-  func contains(x : Int) -> Bool {
-    return min <= x && x < max
-  }
-  func next() -> Int {
-    max -= stride
-    return max
-  }
-
-  typealias EnumeratorType = ReverseIntEnumeratorType
-  func getEnumeratorType() -> ReverseIntEnumeratorType {
-    return this
-  }
-
-  func replPrint() {
-    print("reverse(\(min)..\(max))")
-    if stride != 1 {
-      print(" by \(stride)")
-    }
-  }
-}
-
-extension ReverseIntEnumeratorType : Equatable, Hashable {
-  func __equal__(rhs: ReverseIntEnumeratorType) -> Bool {
-    return min == rhs.min && max == rhs.max && stride == rhs.stride
-  }
-  func hashValue() -> Int {
-    return min ^ max
-  }
-}
-
-func reverse<T: BidirectionalIndex>(rng: Range<T>) -> ReverseRange<T> {
-  return ReverseRange(rng.begin(), rng.end())
-}
-
-func reverse<T: BidirectionalIndex>(rng: ReverseRange<T>) -> Range<T> {
-  return Range(rng.begin(), rng.end())
-}
-
-func reverse(rng : IntEnumeratorType) -> ReverseIntEnumeratorType {
-  return ReverseIntEnumeratorType(rng.min, rng.max, rng.stride)
-}
-
-func reverse(rng : ReverseIntEnumeratorType) -> IntEnumeratorType {
-  return IntEnumeratorType(rng.min, rng.max, rng.stride)
-}
-
-func .. (min : Int, max : Int) -> IntEnumeratorType {
-  return IntEnumeratorType(min, max, 1)
-}
-
-// FIXME: make generic
-// BLOCKED: <rdar://problem/12780068> Crash while trying to make iteration generic
-struct DoubleEnumeratorType : Enumerator, Enumerable {
-  typealias Element = Double
-  var min : Double,
-  max : Double,
-  stride : Double
-
-  // FIXME: each/reduce should be moved out to generic methods, or methods that
-  // take the range as a protocol'd "enumeration/iterator" value.
-  func each(f : (Double) -> Void) {
-    for i in this { f(i) }
-  }
-
-  func reduce(val : Double, f : (Double, Double) -> Double) -> Double {
-    for i in this { val = f(val, i) }
-    return val
-  }
-
-  func by(s : Double) -> DoubleEnumeratorType {
-    var result = this
-    result.stride = s
-    return result
-  }
-
-  func isEmpty() -> Bool {
-    return min >= max
-  }
-  func next() -> Double {
-    var prev = min
-    min += stride
-    return prev
-  }
-
-  typealias EnumeratorType = DoubleEnumeratorType
-  func getEnumeratorType() -> DoubleEnumeratorType {
-    return this
-  }
-
-  func replPrint() {
-    print("\(min)..\(max)")
-    if stride != 1.0 {
-      print(" by \(stride)")
-    }
-  }
-}
-
-extension DoubleEnumeratorType : Equatable, Hashable {
-  func __equal__(rhs: DoubleEnumeratorType) -> Bool {
-    return min == rhs.min && max == rhs.max && stride == rhs.stride
-  }
-  func hashValue() -> Int {
-    return min.hashValue() ^ max.hashValue()
-  }
-}
-
-func .. (min : Double, max : Double) -> DoubleEnumeratorType {
-  return DoubleEnumeratorType(min, max, 1.0)
+@infix func ~= <T: RandomAccessIndex where T.DistanceType : SignedInteger>(x: Range<T>, y: T) -> Bool {
+  let a = x.startIndex.distanceTo(y) >= 0
+  let b = y.distanceTo(x.endIndex) > 0
+  return a && b
 }

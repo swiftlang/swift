@@ -1,12 +1,14 @@
 // RUN: %swift %s -emit-silgen -o - | FileCheck %s
 
-func standalone_generic<T>(x:T, y:T) -> T { return x }
+func standalone_generic<T>(x: T, y: T) -> T { return x }
 
-// CHECK: sil @_T16specialize_thunk21return_specializationFT_FT1xSi1ySi_Si : $[thin] () -> (x : Int64, y : Int64) -> Int64 {
-func return_specialization() -> (x:Int64, y:Int64) -> Int64 {
-// CHECK:   %1 = function_ref @_T16specialize_thunk18standalone_genericU__FT1xQ_1yQ__Q_ : $[thin] <T> (x : T, y : T) -> T
-// CHECK:   %2 = partial_apply %1<T = Int64>() : $[thin] <T> (x : T, y : T) -> T // user: %3
-// CHECK:   return %2 : $(x : Int64, y : Int64) -> Int64
+// CHECK: sil @_TF16specialize_thunk21return_specialization
+func return_specialization() -> (x: Int, y: Int) -> Int {
+// CHECK:      [[T0:%.*]] = function_ref @_TF16specialize_thunk18standalone_genericU__FTQ_Q__Q_ : $@thin <τ_0_0> (@out τ_0_0, @in τ_0_0, @in τ_0_0) -> ()
+// CHECK-NEXT: [[T1:%.*]] = partial_apply [[T0]]<Int>() : $@thin <τ_0_0> (@out τ_0_0, @in τ_0_0, @in τ_0_0) -> ()
+// CHECK:      [[T2:%.*]] = function_ref @[[THUNK:.*]] : $@thin (Int, Int, @owned @callee_owned (@out Int, @in Int, @in Int) -> ()) -> Int
+// CHECK-NEXT: [[T3:%.*]] = partial_apply [[T2]]([[T1]])
+// CHECK-NEXT: return [[T3]] : $@callee_owned (Int, Int) -> Int
   return standalone_generic
 }
 

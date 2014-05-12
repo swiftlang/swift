@@ -1,4 +1,4 @@
-// RUN: %swift %s -i | FileCheck %s
+// RUN: %target-run-simple-swift | FileCheck %s
 
 func StringPrint() {
   var str = String()
@@ -10,5 +10,6 @@ func StringPrint() {
 }
 
 StringPrint()
+println()  // FIXME: iOS simulator needs newline
 
 // CHECK: µ

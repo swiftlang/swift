@@ -1,31 +1,31 @@
 // RUN: %swift -parse-as-library -emit-silgen %s | FileCheck %s
 
-func bar(x:Int) {}
-func foo(x:Int, y:Bool) {}
+func bar(x: Int) {}
+func foo(x: Int, y: Bool) {}
 
-func assignment(x : Int, y : Int) {
+func assignment(var x: Int, var y: Int) {
   x = 42
   y = 57
   
   (x, y) = (1,2)
 }
 
-// CHECK: sil @_T10statements10assignmentFT1xSi1ySi_T_
-// CHECK: integer_literal $Builtin.Int128, 42
-// CHECK: store
-// CHECK: integer_literal $Builtin.Int128, 57
-// CHECK: store
+// CHECK-LABEL: sil  @{{.*}}assignment
+// CHECK: integer_literal $Builtin.Int2048, 42
+// CHECK: assign
+// CHECK: integer_literal $Builtin.Int2048, 57
+// CHECK: assign
 
-func if_test(x:Int, y:Bool) {
+func if_test(x: Int, y: Bool) {
   if (y) {
    bar(x);
   }
   bar(x);
 }
 
-// CHECK: sil @_T10statements7if_testFT1xSi1ySb_T_
+// CHECK-LABEL: sil  @_TF10statements7if_test
 
-func if_else(x:Int, y:Bool) {
+func if_else(x: Int, y: Bool) {
   if (y) {
    bar(x);
   } else {
@@ -34,9 +34,9 @@ func if_else(x:Int, y:Bool) {
   bar(x);
 }
 
-// CHECK: sil @_T10statements7if_elseFT1xSi1ySb_T_
+// CHECK-LABEL: sil  @_TF10statements7if_else
 
-func nested_if(x:Int, y:Bool, z:Bool) {
+func nested_if(x: Int, y: Bool, z: Bool) {
   if (y) {
     if (z) {
       bar(x);
@@ -49,9 +49,9 @@ func nested_if(x:Int, y:Bool, z:Bool) {
   bar(x);
 }
 
-// CHECK: sil @_T10statements9nested_ifFT1xSi1ySb1zSb_T_
+// CHECK-LABEL: sil  @_TF10statements9nested_if
 
-func nested_if_merge_noret(x:Int, y:Bool, z:Bool) {
+func nested_if_merge_noret(x: Int, y: Bool, z: Bool) {
   if (y) {
     if (z) {
       bar(x);
@@ -63,9 +63,9 @@ func nested_if_merge_noret(x:Int, y:Bool, z:Bool) {
   }
 }
 
-// CHECK: sil @_T10statements21nested_if_merge_noretFT1xSi1ySb1zSb_T_
+// CHECK-LABEL: sil  @_TF10statements21nested_if_merge_noret
 
-func nested_if_merge_ret(x:Int, y:Bool, z:Bool) -> Int {
+func nested_if_merge_ret(x: Int, y: Bool, z: Bool) -> Int {
   if (y) {
     if (z) {
       bar(x);
@@ -79,9 +79,9 @@ func nested_if_merge_ret(x:Int, y:Bool, z:Bool) -> Int {
   return 2;
 }
 
-// CHECK: sil @_T10statements19nested_if_merge_retFT1xSi1ySb1zSb_Si
+// CHECK-LABEL: sil  @_TF10statements19nested_if_merge_ret
 
-func else_break(x:Int, y:Bool, z:Bool) {
+func else_break(x: Int, y: Bool, z: Bool) {
   while z {
     if y {
     } else {
@@ -90,9 +90,9 @@ func else_break(x:Int, y:Bool, z:Bool) {
   }
 }
 
-// CHECK: sil @_T10statements10else_breakFT1xSi1ySb1zSb_T_
+// CHECK-LABEL: sil  @_TF10statements10else_break
 
-func loop_with_break(x:Int, y:Bool, z:Bool) -> Int {
+func loop_with_break(x: Int, y: Bool, z: Bool) -> Int {
   while (x > 2) {
    if (y) {
      bar(x);
@@ -101,9 +101,9 @@ func loop_with_break(x:Int, y:Bool, z:Bool) -> Int {
   }
 }
 
-// CHECK: sil @_T10statements15loop_with_breakFT1xSi1ySb1zSb_Si
+// CHECK-LABEL: sil  @_TF10statements15loop_with_break
 
-func loop_with_continue(x:Int, y:Bool, z:Bool) -> Int {
+func loop_with_continue(x: Int, y: Bool, z: Bool) -> Int {
   while (x > 2) {
     if (y) {
      bar(x);
@@ -114,9 +114,9 @@ func loop_with_continue(x:Int, y:Bool, z:Bool) -> Int {
   bar(x);
 }
 
-// CHECK: sil @_T10statements18loop_with_continueFT1xSi1ySb1zSb_Si
+// CHECK-LABEL: sil  @_TF10statements18loop_with_continue
 
-func do_loop_with_continue(x:Int, y:Bool, z:Bool) -> Int {
+func do_loop_with_continue(x: Int, y: Bool, z: Bool) -> Int {
   do {
     if (x < 42) {
      bar(x);
@@ -128,11 +128,11 @@ func do_loop_with_continue(x:Int, y:Bool, z:Bool) -> Int {
   bar(x);
 }
 
-// CHECK: sil @_T10statements21do_loop_with_continueFT1xSi1ySb1zSb_Si
+// CHECK-LABEL: sil  @_TF10statements21do_loop_with_continue 
 
 
-func for_loops(x:Int, c : Bool) {
-  for i in 1..100 {
+func for_loops(var x: Int, c: Bool) {
+  for i in 1...100 {
     println(i)
   }
   
@@ -146,7 +146,7 @@ func for_loops(x:Int, c : Bool) {
   
   return 
 }
-// CHECK: sil @_T10statements9for_loopsFT1xSi1cSb_T_
+// CHECK-LABEL: sil  @{{.*}}for_loops
 
 func void_return() {
   var b:Bool
@@ -154,8 +154,8 @@ func void_return() {
     return
   }
 }
-// CHECK: sil @_T10statements11void_returnFT_T_
-// CHECK: condbranch {{%[0-9]+}}, [[BB1:bb[0-9]+]], [[BB2:bb[0-9]+]]
+// CHECK-LABEL: sil  @_TF10statements11void_return
+// CHECK: cond_br {{%[0-9]+}}, [[BB1:bb[0-9]+]], [[BB2:bb[0-9]+]]
 // CHECK: [[BB1]]:
 // CHECK:   br [[EPILOG:bb[0-9]+]]
 // CHECK: [[BB2]]:
@@ -167,10 +167,10 @@ func void_return() {
 func foo() {}
 
 // <rdar://problem/13549626>
-// CHECK: sil @_T10statements14return_from_ifFT1aSb_Si
-func return_from_if(a:Bool) -> Int {
+// CHECK-LABEL: sil  @_TF10statements14return_from_if
+func return_from_if(a: Bool) -> Int {
   // CHECK: bb0(%0 : $Bool):
-  // CHECK: condbranch {{.*}}, [[THEN:bb.*]], [[ELSE:bb.*]]
+  // CHECK: cond_br {{.*}}, [[THEN:bb[0-9]+]], [[ELSE:bb[0-9]+]]
   if a {
     // CHECK: [[THEN]]:
     // CHECK: br [[EPILOG:bb[0-9]+]]({{%.*}})
@@ -181,7 +181,38 @@ func return_from_if(a:Bool) -> Int {
     return 0
   }
   // CHECK-NOT: function_ref @foo
-  // CHECK: [[EPILOG]]([[RET:%.*]] : $Int64):
+  // CHECK: [[EPILOG]]([[RET:%.*]] : $Int):
   // CHECK:   return [[RET]]
-  foo()
+  foo()  // expected-warning {{will never be executed}}
 }
+
+class C {}
+
+func use(c: C) {}
+
+func for_each_loop(x: C[]) {
+  for i in x {
+    use(i)
+  }
+  var y = 0
+}
+
+// <rdar://problem/16650625>
+func for_ignored_lvalue_init() {
+  var i = 0
+  for i; i < 10; ++i {}
+}
+
+
+// CHECK-LABEL: sil @{{.*}}test_break
+func test_break(i : Int) {
+  switch i {
+  case (let x) where x != 17: 
+    if x == 42 { break } 
+    print(x)
+  default:
+    break
+  }
+}
+
+

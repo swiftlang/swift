@@ -1,8 +1,8 @@
-var something : Int
+var something : Int = 1
 
-var ambiguousWithVar : Int
-var scopedVar : Int
-var localVar : Int
-var scopedFunction : Int
+var ambiguousWithVar : Int = 2
+var scopedVar : Int = 3
+var localVar : Int = 4
+var scopedFunction : Int = 5
 
-var typeNameWins : Int
+var typeNameWins : Int = 6

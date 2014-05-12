@@ -1,25 +1,25 @@
-protocol [class_protocol, objc] ObjCProto {
+@class_protocol @objc protocol ObjCProto {
   func doSomething()
 }
 
-class [objc] ObjCClass {
-  static func classMethod() {}
+@objc class ObjCClass {
+  class func classMethod() {}
   func implicitlyObjC() {}
 
-  var [iboutlet] outlet : ObjCClass
-  func [ibaction] performAction() {}
+  @IBOutlet var outlet : ObjCClass = ObjCClass()
+  @IBAction func performAction(_: AnyObject?) {}
 }
 
 class NonObjCClass : ObjCProto {
   func doSomething() {}
-  
-  func [objc] objcMethod() {}
-  var [objc] objcProp : ObjCClass
-  
-  subscript [objc] (i : Int) -> () {
-    return ()
+
+  @objc func objcMethod() {}
+  @objc var objcProp : ObjCClass = ObjCClass()
+
+  @objc subscript (i : Int) -> Int {
+    return 5
   }
 
-  var [iboutlet] outlet : ObjCClass
-  func [ibaction] performAction() {}
+  @IBOutlet var outlet : ObjCClass = ObjCClass()
+  @IBAction func performAction(_: AnyObject?) {}
 }

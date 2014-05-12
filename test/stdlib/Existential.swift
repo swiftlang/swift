@@ -1,22 +1,21 @@
-// RUN: %swift -i %s | FileCheck %s
-// REQUIRES: swift_interpreter
+// RUN: %target-run-simple-swift | FileCheck %s
 
-def pipe<T>(input: EnumerableOf<T>, output: SinkOf<T>) {
+func pipe<T>(input: SequenceOf<T>, output: SinkOf<T>) {
   for x in input {
     output.put(x)
   }
 }
 
 struct Print<T: FormattedPrintable> : Sink {
-  def put(x: T) {
-    print(x.format('v', " "))
+  func put(x: T) {
+    print(x.format("v", layout: " "))
   }
 }
 
 var z = [ 1, 2, 3 ]
 
-def printArray<T: FormattedPrintable>(x: T[]) {
-  pipe(existential(x), existential(Print<T>()))
+func printArray<T: FormattedPrintable>(x: T[]) {
+  pipe(SequenceOf(x), SinkOf(Print<T>()))
   println()
 }
 

@@ -7,5 +7,5 @@ import AppKit
 
 let encoding: UInt = NSUTF8StringEncoding
 
-let point: Redeclaration.NSPoint = AppKit.NSPoint(0, 0)
+let point: Redeclaration.NSPoint = AppKit.NSPoint(x: 0, y: 0)
 Redeclaration.NSStringToNSString(AppKit.NSStringToNSString("abc"))

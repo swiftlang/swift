@@ -1,12 +1,12 @@
 // RUN: %swift %s -verify
 
 struct S {
-  constructor(a:Bool) {
+  init(a:Bool) {
     return
   }
 
-  constructor(b:Bool) {
-    return 1 // expected-error{{}}
+  init(b:Bool) {
+    return 1 // expected-error {{cannot convert the expression's type 'Int' to type '()'}}
   }
 }
 

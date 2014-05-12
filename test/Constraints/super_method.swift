@@ -1,4 +1,4 @@
-// RUN: %swift %s -constraint-checker -parse-as-library -verify
+// RUN: %swift %s -parse-as-library -verify
 
 struct S {
   func foo() {
@@ -9,21 +9,27 @@ struct S {
 class D : B {
   func b_foo() -> Int { return super.foo }
 
-  func bar(a:Float) -> Int { return super.bar(a) }
+  override func bar(a: Float) -> Int { return super.bar(a) }
 
-  func bas() -> (Int, Char, String) {
+  func bas() -> (Int, UnicodeScalar, String) {
     return (super.zim(), super.zang(), super.zung())
   }
 
-  var zippity : Int { return super.zippity }
+  override var zippity : Int { return super.zippity }
+}
+
+extension D {
+  func d_ext_foo() -> Int {
+    return super.foo
+  }
 }
 
 class B {
-  var foo : Int
-  func bar(a:Float) -> Int {}
+  var foo : Int = 0
+  func bar(a: Float) -> Int {}
 
   func zim() -> Int {}
-  func zang() -> Char {}
+  func zang() -> UnicodeScalar {}
   func zung() -> String {}
 
   var zippity : Int { return 123 }
@@ -32,7 +38,17 @@ class B {
 
 }
 
-func use_d(d:D) -> Int {
+class X<T> {
+  func method<U>(x: T, y: U) { }
+}
+
+class Y<U> : X<Int> {
+  func otherMethod<U>(x: Int, y: U) {
+    super.method(x, y: y)
+  }
+}
+
+func use_d(d: D) -> Int {
   d.b_foo()
   d.bar(1.0)
   d.bas()

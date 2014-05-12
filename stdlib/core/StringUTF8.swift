@@ -1,4 +1,4 @@
-//===--- StringUTF8.swift - A UTF8 view of StringCore ---------------------===//
+//===--- StringUTF8.swift - A UTF8 view of _StringCore ---------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,14 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  StringCore currently has three representations: Native ASCII,
+//  _StringCore currently has three representations: Native ASCII,
 //  Native UTF16, and Opaque Cocoa.  Expose each of these as UTF8 in a
 //  way that will hopefully be efficient to traverse
 //
 //===----------------------------------------------------------------------===//
 
 
-extension StringCore {
+extension _StringCore {
   // An integral type that holds a chunk of UTF8, starting in its low
   // byte
   typealias UTF8Chunk = UInt64
@@ -38,9 +38,9 @@ extension StringCore {
       var result: UTF8Chunk = ~0 // start with all bits set
       
       c_memcpy(
-        UnsafePointer(Builtin.addressof(&result)), 
-        UnsafePointer(startASCII + i), 
-        numericCast(utf16Count))
+        dest: UnsafePointer(Builtin.addressof(&result)), 
+        src: UnsafePointer(startASCII + i), 
+        size: numericCast(utf16Count))
       
       return (i + utf16Count, result)
     }
@@ -125,17 +125,22 @@ extension StringCore {
       return (nextIndex, result)
     }
     else {
-      return _cocoaStringEncodeSomeUTF8(self, i)
+      return _cocoaStringEncodeSomeUTF8(target: self, position: i)
     }
   }
 }
 
 extension String {
   struct UTF8View : Collection {
-    let _core: StringCore
+    let _core: _StringCore
     
+    init(_ _core: _StringCore) {
+      self._core = _core
+    }
+
     struct Index : ForwardIndex {
-      init(_core: StringCore, _coreIndex: Int, _buffer: StringCore.UTF8Chunk) {
+      init(_ _core: _StringCore, _ _coreIndex: Int, 
+           _ _buffer: _StringCore.UTF8Chunk) {
         self._core = _core
         self._coreIndex = _coreIndex
         self._buffer = _buffer
@@ -158,9 +163,9 @@ extension String {
         return Index(_core, _coreIndex, ~0)
       }
       
-      let _core: StringCore
+      let _core: _StringCore
       let _coreIndex: Int
-      let _buffer: StringCore.UTF8Chunk
+      let _buffer: _StringCore.UTF8Chunk
     }
   
     var startIndex: Index {

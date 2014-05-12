@@ -1,7 +1,12 @@
-// RUN: %swift -emit-silgen %s | FileCheck %s
+// RUN: %swift -parse-stdlib -emit-silgen %s | FileCheck %s
 
-var a = 2
+class C {}
 
-// CHECK: assign {{%.*}} to {{%.*}} : $*Int64
-// CHECK: destroy_value {{%.*}} : $String
-(a, _) = (2, "three")
+struct A {}
+struct B { var owner: C }
+
+var a = A()
+
+// CHECK: assign {{%.*}} to {{%.*}} : $*A
+// CHECK: release_value {{%.*}} : $B
+(a, _) = (A(), B(owner: C()))

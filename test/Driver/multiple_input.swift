@@ -1,10 +1,6 @@
-// RUN: %swift -parse %S/Inputs/main.swift %S/Inputs/empty.swift %s
-// RUN: %swift -parse %s %S/Inputs/empty.swift %S/Inputs/main.swift
+// RUN: %swift -parse %S/Inputs/main.swift %S/Inputs/lib.swift %s -module-name ThisModule
+// RUN: %swift -parse %s %S/Inputs/lib.swift %S/Inputs/main.swift -module-name ThisModule
 
-// RUN: not %swift -parse -parse-as-library %S/Inputs/main.swift %S/Inputs/empty.swift %s 2>&1 | FileCheck %s
+// RUN: not %swift -parse -parse-as-library %S/Inputs/main.swift %S/Inputs/lib.swift %s 2>&1 | FileCheck %s
 // CHECK: main.swift:
 // CHECK: expressions are not allowed at the top level
-
-func someLibraryFunction() {}
-
-var someGlobal = 42 + 20

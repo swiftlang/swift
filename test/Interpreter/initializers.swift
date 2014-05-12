@@ -12,23 +12,23 @@ class A {
   var int: Int
   var string: String
 
-  init() -> Self {
+  convenience init() {
     printAtDepth("Starting A.init()")
     ++depth
-    self.init(withInt:5)
+    self.init(int:5)
     --depth
     printAtDepth("Ending A.init()")
   }
 
-  init withInt(i:Int) -> Self {
+  convenience init(int i:Int) {
     printAtDepth("Starting A.init withInt(\(i))")
     ++depth
-    self.init(withInt:i, string:"hello")
+    self.init(int:i, string:"hello")
     --depth
     printAtDepth("Ending A.init withInt(\(i))")
   }
 
-  init withInt(i:Int) string(String) {
+  init(int i:Int, string: String) {
     printAtDepth("Starting A.init withInt(\(i)) string(\(string))")
     self.int = i
     self.string = string
@@ -43,19 +43,19 @@ class A {
 class B : A {
   var double: Double
 
-  init withInt(i:Int) string(String) -> Self {
+  convenience init(int i:Int, string: String) {
     printAtDepth("Starting B.init withInt(\(i)) string(\(string))")
     ++depth
-    self.init(withInt: i, string:string, double:3.14159)
+    self.init(int: i, string:string, double:3.14159)
     --depth
     printAtDepth("Ending B.init withInt(\(i)) string(\(string))")
   }
 
-  init withInt(i:Int) string(String) double(Double) {
+  init(int i:Int, string: String, double:Double) {
     printAtDepth("Starting B.init withInt(\(i)) string(\(string)) double(\(double))")
     self.double = double
     ++depth
-    super.init(withInt: i, string: string)
+    super.init(int: i, string: string)
     --depth
     printAtDepth("Ending B.init withInt(\(i)) string(\(string)) double(\(double))")
   }
@@ -66,10 +66,10 @@ class B : A {
 }
 
 class C : B {
-  init withInt(i:Int) string(String) double(Double) {
+  init(int i:Int, string: String, double: Double) {
     printAtDepth("Starting C.init withInt(\(i)) string(\(string)) double(\(double))")
     ++depth
-    super.init(withInt: i, string: string, double: double)
+    super.init(int: i, string: string, double: double)
     --depth
     printAtDepth("Ending C.init withInt(\(i)) string(\(string)) double(\(double))")
   }

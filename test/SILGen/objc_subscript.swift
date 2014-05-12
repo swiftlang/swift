@@ -1,22 +1,40 @@
 // RUN: %swift %s -emit-silgen -emit-verbose-sil | FileCheck %s
 
-class A {
-  subscript [objc] (i : Int) -> A {
-  get:
-    return self
+@objc class ObjCClass {}
 
-  set:
+class A {
+  @objc subscript (i: Int) -> ObjCClass {
+    get {
+      return ObjCClass()
+    }
+    set {}
   }
 }
 
-// CHECK-LABEL: sil @_T14objc_subscript16testSubscriptGetFT1aCS_1A1iSi_S0_ : $[thin] (a : A, i : Int64) -> A
-func testSubscriptGet(a : A, i : Int) -> A {
-  // CHECK: class_method [volatile] [[OBJ:%[0-9]+]] : $A, #A.__subscript!getter.2.foreign : $[cc(objc_method), thin] ((), (i : Int64), A) -> A
+// CHECK-LABEL: sil @_TF14objc_subscript16testSubscriptGet
+func testSubscriptGet(a: A, i: Int) -> ObjCClass {
+  // CHECK: class_method [volatile] [[OBJ:%[0-9]+]] : $A, #A.subscript!getter.1.foreign : A -> (Int) -> ObjCClass , $@cc(objc_method) @thin (Int, A) -> @autoreleased ObjCClass
   return a[i]
 }
 
-// CHECK-LABEL: sil @_T14objc_subscript16testSubscriptSetFT1aCS_1A1iSi_T_ : $[thin] (a : A, i : Int64) -> ()
-func testSubscriptSet(a : A, i : Int) {
-  // CHECK: class_method [volatile] [[OBJ:%[0-9]+]] : $A, #A.__subscript!setter.2.foreign : $[cc(objc_method), thin] ((value : A), (i : Int64), A) -> ()
-  a[i] = a
+// CHECK-LABEL: sil @_TF14objc_subscript16testSubscriptSet
+func testSubscriptSet(a: A, i: Int, v: ObjCClass) {
+  // CHECK: class_method [volatile] [[OBJ:%[0-9]+]] : $A, #A.subscript!setter.1.foreign : A -> (ObjCClass, Int) -> () , $@cc(objc_method) @thin (ObjCClass, Int, A) -> ()
+  a[i] = v
+}
+
+// 'super' subscript usage
+class B : A {
+  @objc override subscript (i: Int) -> ObjCClass {
+    // CHECK-LABEL: sil @_TFC14objc_subscript1Bg9subscriptFSiCS_9ObjCClass : $@cc(method) @thin (Int, @owned B) -> @owned ObjCClass
+    get {
+      // CHECK: super_method [volatile] [[SELF:%[0-9]+]] : $B, #A.subscript!getter.1.foreign : A -> (Int) -> ObjCClass , $@cc(objc_method) @thin (Int, A) -> @autoreleased ObjCClass
+      return super[i]
+    }
+    // CHECK-LABEL: sil @_TFC14objc_subscript1Bs9subscriptFSiCS_9ObjCClass : $@cc(method) @thin (@owned ObjCClass, Int, @owned B) -> ()
+    set(value) {
+      // CHECK: super_method [volatile] [[SELF:%[0-9]+]] : $B, #A.subscript!setter.1.foreign : A -> (ObjCClass, Int) -> () , $@cc(objc_method) @thin (ObjCClass, Int, A) -> ()
+      super[i] = value
+    }
+  }
 }

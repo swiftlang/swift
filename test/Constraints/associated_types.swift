@@ -4,14 +4,20 @@ protocol Runcible {
   typealias Runcee 
 }
 
-class Mince {}
+class Mince { 
+  init() {} 
+}
 
 class Spoon : Runcible {
+  init() {} 
+
   typealias Runcee = Mince
 }
 
 class Owl<T:Runcible> {
-  func eat(what:T.Runcee, with:T) { }
+  init() {} 
+
+  func eat(what: T.Runcee, with: T) { }
 }
 
 func owl1() -> Owl<Spoon> {
@@ -22,8 +28,6 @@ func owl2() -> Owl<Spoon> {
   return Owl()
 }
 
-/*
 func owl3() {
   Owl<Spoon>().eat(Mince(), with:Spoon())
 }
- */

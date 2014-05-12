@@ -1,23 +1,24 @@
-// RUN: %swift -i %s | FileCheck %s
+// RUN: %target-run-simple-swift | FileCheck %s
 
 class Foo<T:ReplPrintable> {
-  constructor<U:ReplPrintable>(t:T, u:U) {
-    print("constructor ")
+  init<U:ReplPrintable>(_ t:T, _ u:U) {
+    print("init ")
     t.replPrint()
     print(" ")
     u.replPrint()
     println("")
   }
 
-  func bar<U:ReplPrintable>(u:U) {
+  func bar<U : ReplPrintable>(u: U) {
     print("bar ")
     u.replPrint()
     println("")
   }
 }
 
-typealias FooInt = Foo<Int>
-// CHECK: constructor 1 "two"
-var foo = new FooInt(1, "two")
-// CHECK: bar '3'
-foo.bar('3')
+
+// CHECK: init 1 "two"
+var foo = Foo<Int>(1, "two")
+// CHECK: bar "3"
+var c = "3"
+foo.bar(c)

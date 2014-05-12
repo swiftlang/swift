@@ -1,6 +1,6 @@
 #!/bin/sh
 # Runs swift (found on the path) with -use-malloc and GuardMalloc enabled.
-# Command-line arguments are forwarded to the Swift compiler untouched.
+# Command-line arguments are forwarded to the swift compiler untouched.
 # This script can be used to run the test suite with memory debugging enabled
 # by setting the SWIFT environment variable to point to the script, as in:
 #

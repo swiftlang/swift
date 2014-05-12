@@ -1,11 +1,11 @@
 // RUN: rm -rf %t
 // RUN: mkdir %t
-// RUN: %swift -emit-module -o %t/has_array.swiftmodule %S/Inputs/has_array.swift
+// RUN: %swift -emit-module -o %t %S/Inputs/has_array.swift
 // RUN: llvm-bcanalyzer %t/has_array.swiftmodule | FileCheck %s
 // RUN: %swift -emit-silgen -I=%t %s -o /dev/null
 // XFAIL: *
 
-// CHECK-NOT: FALL_BACK_TO_TRANSLATION_UNIT
+// CHECK-NOT: UnknownCode
 
 import has_array
 

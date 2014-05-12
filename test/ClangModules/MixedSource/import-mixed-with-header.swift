@@ -10,3 +10,12 @@ func testReexportedClangModules(foo : FooProto) {
   let _: CInt = foo.bar
   let _: CInt = ExternIntX.x
 }
+
+func testCrossReferences(derived: Derived) {
+  let obj: Base = derived
+  let _: NSObject = obj.safeOverride(ForwardClass())
+  let _: NSObject = obj.safeOverrideProto(ForwardProtoAdopter())
+
+  testProtocolWrapper(ProtoConformer())
+  testStruct(Point(x: 2,y: 3))
+}

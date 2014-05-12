@@ -9,7 +9,7 @@
 
 // CHECK: func unknown()
 
-// CHECK: sil public @_TFVSs1XCfMS_FT_S_ : $@thin (@thin X.metatype) -> X
+// CHECK: sil public @_TFVSs1XCfMS_FT_S_ : $@thin (@thin X.Type) -> X
 // CHECK-NOT: bb0
 
 // CHECK: sil @unknown : $@thin () -> ()
@@ -22,7 +22,7 @@
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
 
-@asmname="unknown"
+@asmname("unknown")
 func unknown() -> ()
 
 struct X {

@@ -1,7 +1,7 @@
 // RUN: %swift %s -o /dev/null -verify
 
 func ifFalse() -> Int {
-  if false {
+  if false { // expected-note {{always evaluates to false}}
     return 0 // expected-warning {{will never be executed}}
   } else {
     return 1  
@@ -10,7 +10,7 @@ func ifFalse() -> Int {
 
 func ifTrue() -> Int {
   var x = 0
-  if true {
+  if true { // expected-note {{always evaluates to true}}
     return 1
   }
   return 0 // expected-warning {{will never be executed}}
@@ -19,7 +19,7 @@ func ifTrue() -> Int {
 
 func whileTrue() {
   var x = 0
-  while true {
+  while true { // expected-note {{always evaluates to true}}
     x++
   }
   x-- // expected-warning {{will never be executed}}
@@ -39,7 +39,7 @@ func whileTrueReachable(v: Int) -> () {
 func whileTrueTwoPredecessorsEliminated() -> () {
     var x = 0
     var v = 0
-    while (true) {
+    while (true) { // expected-note {{always evaluates to true}}
       if false {
         break
       }
@@ -49,9 +49,11 @@ func whileTrueTwoPredecessorsEliminated() -> () {
 }
 
 func unreachableBranch() -> Int {
-  if false {
-    if true { // expected-warning {{will never be executed}}
-      return 0
+  if false { // expected-note {{always evaluates to false}}
+    // FIXME: It'd be nice if the warning were on 'if true' instead of the 
+    // body.
+    if true {
+      return 0 // expected-warning {{will never be executed}}
     } 
   } else {
     return 1  
@@ -60,7 +62,7 @@ func unreachableBranch() -> Int {
 
 // We should not report unreachable user code inside inlined transparent function.
 @transparent
-func ifTrueTransparent(b : Bool) -> Int {
+func ifTrueTransparent(b: Bool) -> Int {
   var x = 0
   if b {
     return 1
@@ -92,7 +94,93 @@ func ifTrueGeneric<T : HavingGetCond>(x: T) -> Int {
   }
   return 0
 }
-func testIfTrueGeneric(b1 : ReturnsOpaque, b2 : ReturnsTrue) {
+func testIfTrueGeneric(b1: ReturnsOpaque, b2: ReturnsTrue) {
   ifTrueGeneric(b1)  // no-warning
   ifTrueGeneric(b2)  // no-warning
 }
+
+// Test switch_enum folding/diagnostic.
+enum X {
+  case One
+  case Two
+  case Three
+}
+
+func testSwitchEnum(xi: Int) -> Int {
+  var x = xi
+  var cond: X = .Two
+  switch cond { // expected-warning {{switch condition evaluates to a constant}}
+  case .One:
+    x++ // expected-note {{will never be executed}}
+  case .Two:
+    x--  
+  case .Three:
+    x--  
+  }
+
+  switch cond { // no warning
+  default:
+    x++
+  }
+
+  switch cond { // no warning
+  case .Two: 
+    x++
+  }
+
+  switch cond {
+  case .One:
+    x++
+  } // expected-error{{switch must be exhaustive}}
+
+  switch cond {
+  case .One:
+    x++
+  case .Three:
+    x++
+  } // expected-error{{switch must be exhaustive}}
+
+  switch cond { // expected-warning{{switch condition evaluates to a constant}}
+  case .Two: 
+    x++
+  default: 
+    x-- // expected-note{{will never be executed}}
+  }
+
+  switch cond { // expected-warning{{switch condition evaluates to a constant}}
+  case .One: 
+    x++ // expected-note{{will never be executed}}
+  default: 
+    x--
+  }
+  
+  return x;
+}
+
+@noreturn @asmname("exit") func exit() -> ()
+func reachableThroughNonFoldedPredecessor(fn: @auto_closure () -> Bool = false) {
+  if !_branchHint(fn(), true) {
+    exit()
+  }
+  var x: Int = 0 // no warning
+}
+
+func intConstantTest() -> Int{
+  var y: Int = 1
+  if y == 1 { // expected-note {{condition always evaluates to true}}
+    return y
+  }
+  
+  return 1 // expected-warning {{will never be executed}}
+}
+
+func intConstantTest2() -> Int{
+  var y:Int = 1
+  var x:Int = y 
+
+  if x != 1 { // expected-note {{condition always evaluates to false}}
+    return y // expected-warning {{will never be executed}}
+  }
+  return 3
+}
+

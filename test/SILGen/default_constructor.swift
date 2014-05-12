@@ -7,45 +7,57 @@ struct B {
 
 struct C {
   var x : Int
-  constructor() { x = 17 }
+  init() { x = 17 }
 }
-
-// CHECK: sil @_TV19default_constructor1BCfMS0_FT_S0_ : $[thin] ((), B.metatype) -> B {
-// CHECK: bb0([[metaThis:%[0-9]+]] : $B.metatype):
-// CHECK: [[this:%[0-9]+]] = alloc_box $B
-// Initialize i
-// CHECK: [[Int64Ctor:%[0-9]+]] = function_ref @_TSiCfMSiFT_Si : $[thin] ((), Int64.metatype) -> Int64
-// CHECK: [[Int64Meta:%[0-9]+]] = metatype $Int64.metatype
-// CHECK: [[Int64Construct:%[0-9]+]] = apply [[Int64Ctor]]([[Int64Meta]])
-// CHECK: [[i:%[0-9]+]] = struct_element_addr [[this]]#1 : $*B, #i
-// CHECK: store [[Int64Construct]] to [[i]]
-// Initialize j
-// CHECK: [[Float32Ctor:%[0-9]+]] = function_ref @_TSfCfMSfFT_Sf : $[thin] ((), Float32.metatype) -> Float32
-// CHECK: [[Float32Meta:%[0-9]+]] = metatype $Float32.metatype
-// CHECK: [[Float32Construct:%[0-9]+]] = apply [[Float32Ctor]]([[Float32Meta]])
-// CHECK: [[i:%[0-9]+]] = struct_element_addr [[this]]#1 : $*B, #j
-// CHECK: store [[Float32Construct]] to [[i]]
-// Initialize c
-// CHECK: [[CCtor:%[0-9]+]] = function_ref @_TV19default_constructor1CCfMS0_FT_S0_ : $[thin] ((), C.metatype) -> C
-// CHECK: [[CMeta:%[0-9]+]] = metatype $C.metatype
-// CHECK: [[CConstruct:%[0-9]+]] = apply [[CCtor]]([[CMeta]])
-// CHECK: [[i:%[0-9]+]] = struct_element_addr [[this]]#1 : $*B, #c
-// CHECK: store [[CConstruct]] to [[i]]
 
 struct D {
   var (i, j) : (Int, Double) = (2, 3.5)
 }
-// CHECK: sil @_TV19default_constructor1DCfMS0_FT_S0_ : $[thin] ((), D.metatype) -> D
-// CHECK: [[THIS:%[0-9]+]] = alloc_box $D
-// CHECK: [[INTCONV:%[0-9]+]] = function_ref @_TSi33_convertFromBuiltinIntegerLiteralfMSiFT3valBi128__Si : $[thin] ((val : Builtin.Int128), Int64.metatype) -> Int64
-// CHECK: [[INTMETA:%[0-9]+]] = metatype $Int64.metatype
-// CHECK: [[INTLIT:%[0-9]+]] = integer_literal $Builtin.Int128, 2
-// CHECK: [[INTVAL:%[0-9]+]] = apply [[INTCONV]]([[INTLIT]], [[INTMETA]])
-// CHECK: [[FLOATCONV:%[0-9]+]] = function_ref @_TSd31_convertFromBuiltinFloatLiteralfMSdFT5valueBf64__Sd : $[thin] ((value : Builtin.FPIEEE64), Float64.metatype) -> Float64
-// CHECK: [[FLOATMETA:%[0-9]+]] = metatype $Float64.metatype
+// CHECK-LABEL: sil  @_TFV19default_constructor1DCfMS0_FT_S0_ : $@thin (@thin D.Type) -> D
+// CHECK: [[THISBOX:%[0-9]+]] = alloc_box $D
+// CHECK: [[THIS:%[0-9]+]] = mark_uninit
+// CHECK: [[INTCONV:%[0-9]+]] = function_ref @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBi2048_Si : $@thin (Builtin.Int2048, @thin Int.Type) -> Int
+// CHECK: [[INTMETA:%[0-9]+]] = metatype $@thin Int.Type
+// CHECK: [[INTLIT:%[0-9]+]] = integer_literal $Builtin.Int2048, 2
+// CHECK: [[INTVAL:%[0-9]+]] = apply [transparent] [[INTCONV]]([[INTLIT]], [[INTMETA]])
+// CHECK: [[FLOATCONV:%[0-9]+]] = function_ref @_TFSd31_convertFromBuiltinFloatLiteralfMSdFBf64_Sd : $@thin (Builtin.FPIEEE64, @thin Double.Type) -> Double
+// CHECK: [[FLOATMETA:%[0-9]+]] = metatype $@thin Double.Type
 // CHECK: [[FLOATLIT:%[0-9]+]] = float_literal $Builtin.FPIEEE64, 0x400C000000000000
-// CHECK: [[FLOATVAL:%[0-9]+]] = apply [[FLOATCONV]]([[FLOATLIT]], [[FLOATMETA]])
-// CHECK: [[IADDR:%[0-9]+]] = struct_element_addr [[THIS]]#1 : $*D, #i
-// CHECK: store [[INTVAL]] to [[IADDR]]
-// CHECK: [[JADDR:%[0-9]+]] = struct_element_addr [[THIS]]#1 : $*D, #j
-// CHECK: store [[FLOATVAL]] to [[JADDR]]
+// CHECK: [[FLOATVAL:%[0-9]+]] = apply [transparent] [[FLOATCONV]]([[FLOATLIT]], [[FLOATMETA]])
+// CHECK: [[IADDR:%[0-9]+]] = struct_element_addr [[THIS]] : $*D, #D.i
+// CHECK: assign [[INTVAL]] to [[IADDR]]
+// CHECK: [[JADDR:%[0-9]+]] = struct_element_addr [[THIS]] : $*D, #D.j
+// CHECK: assign [[FLOATVAL]] to [[JADDR]]
+
+class E {
+  var i = Int64()
+}
+
+// CHECK-LABEL: sil @_TFC19default_constructor1EcfMS0_FT_S0_ : $@cc(method) @thin (@owned E) -> @owned E
+// CHECK-NEXT: bb0([[SELFIN:%[0-9]+]] : $E)
+// CHECK: [[SELF:%[0-9]+]] = mark_uninitialized
+// CHECK: [[INT64_CTOR:%[0-9]+]] = function_ref @_TFVSs5Int64CfMS_FT_S_ : $@thin (@thin Int64.Type) -> Int64
+// CHECK-NEXT: [[INT64:%[0-9]+]] = metatype $@thin Int64.Type
+// CHECK-NEXT: [[ZERO:%[0-9]+]] = apply [transparent] [[INT64_CTOR]]([[INT64]]) : $@thin (@thin Int64.Type) -> Int64
+// CHECK-NEXT: [[IREF:%[0-9]+]] = ref_element_addr [[SELF]] : $E, #E.i
+// CHECK-NEXT: assign [[ZERO]] to [[IREF]] : $*Int64
+// CHECK-NEXT: return [[SELF]] : $E
+
+class F : E { }
+
+// CHECK-LABEL: sil @_TFC19default_constructor1FcfMS0_FT_S0_ : $@cc(method) @thin (@owned F) -> @owned F
+// CHECK-NEXT: bb0([[SELF:%[0-9]+]] : $F)
+// CHECK-NEXT: [[SELF_BOX:%[0-9]+]] = alloc_box $F
+// CHECK-NEXT: [[SELF:%[0-9]+]] = mark_uninitialized [derivedself]
+// CHECK-NEXT: store [[SELF]] to [[SELF_BOX]]#1 : $*F
+// CHECK-NEXT: [[SELF:%[0-9]+]] = load [[SELF_BOX]]#1 : $*F
+// CHECK-NEXT: strong_retain [[SELF]] : $F
+// CHECK-NEXT: [[E:%[0-9]]] = upcast [[SELF]] : $F to $E
+// CHECK: [[E_CTOR:%[0-9]+]] = function_ref @_TFC19default_constructor1EcfMS0_FT_S0_ : $@cc(method) @thin (@owned E) -> @owned E
+// CHECK-NEXT: [[ESELF:%[0-9]]] = apply [[E_CTOR]]([[E]]) : $@cc(method) @thin (@owned E) -> @owned E
+// CHECK-NEXT: [[ESELFW:%[0-9]+]] = unchecked_ref_cast [[ESELF]] : $E to $F
+// CHECK-NEXT: assign [[ESELFW]] to [[SELF_BOX]]#1 : $*F
+// CHECK-NEXT: [[SELF:%[0-9]+]] = load [[SELF_BOX]]#1 : $*F
+// CHECK-NEXT: strong_retain [[SELF]] : $F
+// CHECK-NEXT: strong_release [[SELF_BOX]]#0 : $Builtin.NativeObject
+// CHECK-NEXT: return [[SELF]] : $F

@@ -5,4 +5,4 @@
 
 import ProtoWithInitializer
 
-let obj: InitProto = Impl(withInt: 42)
+let obj: InitProto = Impl(int: 42)

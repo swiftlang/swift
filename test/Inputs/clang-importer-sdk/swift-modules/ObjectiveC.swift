@@ -1,7 +1,41 @@
 @exported import ObjectiveC // Clang module
 
+// The iOS/arm64 target uses _Bool for Objective C's BOOL.  We include
+// x86_64 here as well because the iOS simulator also uses _Bool.
+#if os(iOS) && (arch(arm64) || arch(x86_64))
+struct ObjCBool : LogicValue {
+  var value : Bool
+
+  init(_ value: Bool) {
+    self.value = value
+  }
+
+  /// \brief Allow use in a Boolean context.
+  func getLogicValue() -> Bool {
+    return value
+  }
+
+  /// \brief Implicit conversion from C Boolean type to Swift Boolean
+  /// type.
+  @conversion func __conversion() -> Bool {
+    return self.getLogicValue()
+  }
+}
+
+extension Bool {
+  /// \brief Implicit conversion from Swift Boolean type to
+  /// Objective-C Boolean type.
+  @conversion func __conversion() -> ObjCBool {
+    return ObjCBool(self ? Bool.true : Bool.false)
+  }
+}
+#else
 struct ObjCBool : LogicValue {
   var value : UInt8
+
+  init(_ value: UInt8) {
+    self.value = value
+  }
 
   /// \brief Allow use in a Boolean context.
   func getLogicValue() -> Bool {
@@ -20,36 +54,43 @@ extension Bool {
   /// \brief Implicit conversion from Swift Boolean type to
   /// Objective-C Boolean type.
   @conversion func __conversion() -> ObjCBool {
-    var result : ObjCBool
-    if self { result.value = 1 }
-    else { result.value = 0 }
-    return result
+    return ObjCBool(self ? 1 : 0)
   }
 }
+#endif
 
-struct ObjCSel : StringLiteralConvertible {
+struct Selector : StringLiteralConvertible {
   var ptr : COpaquePointer
 
-  typealias StringLiteralType = CString
-  static func convertFromStringLiteral(val: CString) -> ObjCSel {
-    var sel : ObjCSel
-    sel.ptr = COpaquePointer(val._bytesPtr)
-    return sel
+  static func convertFromExtendedGraphemeClusterLiteral(
+    value: CString) -> Selector {
+
+    return convertFromStringLiteral(value)
+  }
+
+  static func convertFromStringLiteral(value: CString) -> Selector {
+    return sel_registerName(value)
   }
 }
 
-@asmname="swift_BoolToObjCBool"
-func convertBoolToObjCBool(x: Bool) -> ObjCBool
+func _convertBoolToObjCBool(x: Bool) -> ObjCBool {
+  return x
+}
 
-@asmname="swift_ObjCBoolToBool"
-func convertObjCBoolToBool(x: ObjCBool) -> Bool
-
-/* FIXME: This breaks enum import; decls created by the Clang importer
-   from the 'Foundation' module are able to see definitions from this Swift
-   overlay, but are not able to see into the standard library.
-   <rdar://problem/15410928>
+func _convertObjCBoolToBool(x: ObjCBool) -> Bool {
+  return x
+}
 
 func ~=(x: NSObject, y: NSObject) -> Bool {
   return true
 }
- */
+
+extension NSObject : Equatable, Hashable {
+  var hashValue: Int {
+    return hash
+  }
+}
+
+func == (lhs: NSObject, rhs: NSObject) -> Bool {
+  return lhs.isEqual(rhs)
+}

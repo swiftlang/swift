@@ -1,20 +1,53 @@
 //===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
 // CString Type
 //===----------------------------------------------------------------------===//
 
 // XXX FIXME: we need a clean memory management story here
 
-struct CString : BuiltinStringLiteralConvertible, StringLiteralConvertible{
+struct CString :
+    _BuiltinExtendedGraphemeClusterLiteralConvertible,
+    ExtendedGraphemeClusterLiteralConvertible,
+    _BuiltinStringLiteralConvertible, StringLiteralConvertible,
+    ReplPrintable {
   var _bytesPtr : UnsafePointer<UInt8>
 
-  static func _convertFromBuiltinStringLiteral(value : Builtin.RawPointer,
-                                               byteSize : Builtin.Int64,
-                                               isASCII : Builtin.Int1) -> CString {
-    return CString(UnsafePointer(value))
+  @transparent
+  init(_ _bytesPtr : UnsafePointer<UInt8>) {
+    self._bytesPtr = _bytesPtr
   }
 
-  typealias StringLiteralType = CString
-  static func convertFromStringLiteral(value : CString) -> CString {
+  static func _convertFromBuiltinExtendedGraphemeClusterLiteral(
+    start: Builtin.RawPointer,
+    byteSize: Builtin.Word,
+    isASCII: Builtin.Int1) -> CString {
+
+    return _convertFromBuiltinStringLiteral(start, byteSize: byteSize,
+                                            isASCII: isASCII)
+  }
+
+  static func convertFromExtendedGraphemeClusterLiteral(
+    value: CString) -> CString {
+
+    return convertFromStringLiteral(value)
+  }
+
+  static func _convertFromBuiltinStringLiteral(start: Builtin.RawPointer,
+                                               byteSize: Builtin.Word,
+                                               isASCII: Builtin.Int1) -> CString {
+    return CString(UnsafePointer(start))
+  }
+
+  static func convertFromStringLiteral(value: CString) -> CString {
     return value
   }
 
@@ -23,63 +56,63 @@ struct CString : BuiltinStringLiteralConvertible, StringLiteralConvertible{
   }
 
   func replPrint() {
-    print('"')
+    print("\"")
     var i = 0
     while _bytesPtr[i] != 0 {
-      var c = Char(UInt32(_bytesPtr[i]))
-      c.replPrintCharBody()
+      var c = UnicodeScalar(UInt32(_bytesPtr[i]))
+      print(c.escape())
       i++
     }
-    print('"')
+    print("\"")
+  }
+
+  /// \brief From a CString with possibly-transient lifetime, create a
+  /// nul-terminated array of 'C' char.
+  func persist() -> CChar[] {
+    var length = _strlen(self)
+    var result = new CChar[length + 1]
+    for var i = 0; i < length; ++i {
+      result[i] = CChar(_bytesPtr[i])
+    }
+    return result
   }
 }
 
-func [asmname="strlen"] _strlen(arg : CString) -> Word
-func [asmname="strcpy"] _strcpy(dest : CString, src : CString) -> CString
+@asmname("strlen")
+func _strlen(arg : CString) -> Int
+@asmname("strcpy")
+func _strcpy(dest: CString, src: CString) -> CString
+@asmname("strcmp")
+func _strcmp(dest: CString, src: CString) -> Int
+
+@transparent
+func ==(lhs: CString, rhs: CString) -> Bool {
+  if lhs._bytesPtr == rhs._bytesPtr { return true }
+  return _strcmp(lhs, rhs) == 0
+}
+
+@transparent
+func <(lhs: CString, rhs: CString) -> Bool {
+  return _strcmp(lhs, rhs) < 0
+}
+
+extension CString : Equatable, Hashable, Comparable {
+  @transparent
+  var hashValue: Int {
+    return String.fromCString(self).hashValue
+  }
+}
 
 extension String {
   /// Creates a new String by copying the null-terminated data referenced by
   /// a CString.
-  static func fromCString(cs : CString) -> String {
+  static func fromCString(cs: CString) -> String {
     var len = Int(_strlen(cs))
-    var buf = StringByteData.getNew(len + 1)
-    _strcpy(CString(buf.base), cs)
-    buf.length = len
-    buf.setASCII(false)
-    buf.setCString(true)
-    return String(buf)
+    return String(UTF8.self, 
+                  input: UnsafeArray(start: cs._bytesPtr, length: len))
   }
 
-  static func fromCString(up : UnsafePointer<CChar>) -> String {
+  static func fromCString(up: UnsafePointer<CChar>) -> String {
     return fromCString(CString(UnsafePointer<UInt8>(up)))
   }
-
-  func _toCString() -> CString {
-    assert(str_value.isCString())
-    return CString(str_value.base)
-  }
-
-  func _toUnsafePointer() -> UnsafePointer<CChar> {
-    assert(str_value.isCString())
-    return UnsafePointer(str_value.base)
-  }
 }
-
-extension LifetimeManager {
-  /// \brief Returns an equivalent CString; lifetime of the underlying storage
-  /// is extended until the call to \c release().
-  func getCString(s : String) -> CString {
-    s._makeNulTerminated()
-    this.put(s.str_value.owner)
-    return s._toCString()
-  }
-
-  /// \brief Returns an equivalent UnsafePointer<CChar>; lifetime of the
-  /// underlying storage is extended until the call to \c release().
-  func getCString(s : String) -> UnsafePointer<CChar> {
-    s._makeNulTerminated()
-    this.put(s.str_value.owner)
-    return s._toUnsafePointer()
-  }
-}
-

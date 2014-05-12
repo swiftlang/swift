@@ -1,7 +1,6 @@
-// RUN: %swift -i -parse-stdlib %s | FileCheck %s
-// REQUIRES: swift_interpreter
+// RUN: %target-run-stdlib-swift | FileCheck %s
 //
-// General Mutable, Indexable, Value-Type Containers
+// General Mutable, Collection, Value-Type Collections
 // =================================================
 //
 // Basic copy-on-write (COW) requires a container's data to be copied
@@ -15,7 +14,7 @@
 // an open-addressing hash table) are not traversable with a fixed
 // size offset, so incrementing/decrementing indices requires looking
 // at the contents of the container.  The current interface for
-// incrementing/decrementing indices of an Indexable is the usual ++i,
+// incrementing/decrementing indices of an Collection is the usual ++i,
 // --i. Therefore, for memory safety, the indices need to keep a
 // reference to the container's underlying data so that it can be
 // inspected.  But having multiple outstanding references to the
@@ -100,40 +99,51 @@
 // to anyone familiar with the C++ standard library.  Note that
 // because all accesses to a dictionary buffer are bounds-checked,
 // this scheme never compromises memory safety.
-import swift
+import Swift
 
-class FixedSizedRefArrayOfOptional<T> : HeapBuffer<Int, T?>
-{
-  func initialize() -> FixedSizedRefArrayOfOptional<T> {
-    for var i = 0; i < count; ++i {
-      (elementStorage + i).initialize(.None)
+class FixedSizedRefArrayOfOptionalStorage<T> : HeapBufferStorage<Int, T?> {
+  deinit {
+    let buffer = Buffer(self)
+    for i in 0...buffer.value {
+      (buffer.elementStorage + i).destroy()
     }
-    return self
   }
+}
 
-  static func create1(capacity: Int)
-    -> FixedSizedRefArrayOfOptional<T>
+struct FixedSizedRefArrayOfOptional<T>
+{
+  typealias Storage = FixedSizedRefArrayOfOptionalStorage<T>
+  let buffer: Storage.Buffer
+  
+  init(capacity: Int)
   {
-    typealias Buffer = FixedSizedRefArrayOfOptional<T>
-    return (Buffer.create(capacity, capacity) as Buffer)!.initialize()
+    buffer = Storage.Buffer(Storage.self, capacity, capacity)
+    for var i = 0; i < capacity; ++i {
+      (buffer.elementStorage + i).initialize(.None)
+    }
+
+    buffer.value = capacity
   }
 
   subscript(i: Int) -> T? {
-  get:
-    assert(i >= 0 && i < count)
-    return (elementStorage + i).get()
-  set:
-    assert(i >= 0 && i < count)
-    (elementStorage + i).set(value)
+    get {
+      assert(i >= 0 && i < buffer.value)
+      return (buffer.elementStorage + i).get()
+    }
+    nonmutating
+    set {
+      assert(i >= 0 && i < buffer.value)
+      (buffer.elementStorage + i).set(newValue)
+    }
   }
 
-  var count : Int {
-    return value
-  }
-
-  destructor() {
-    for var i = 0; i < count; ++i {
-      (elementStorage + i).destroy()
+  var count: Int {
+    get {
+      return buffer.value
+    }
+    nonmutating
+    set(newValue) {
+      buffer.value = newValue
     }
   }
 }
@@ -155,24 +165,24 @@ class DictionaryBufferOwner<KeyType: Hashable, ValueType> {
     while capacity < minimumCapacity {
       capacity <<= 1
     }
-    buffer = .create1(capacity)
+    buffer = Buffer(capacity: capacity)
   }
 
   var buffer: Buffer
 }
 
+func == <Element>(lhs: DictionaryIndex<Element>, rhs: DictionaryIndex<Element>) -> Bool {
+  return lhs.offset == rhs.offset
+}
+
 struct DictionaryIndex<Element> : BidirectionalIndex {
   typealias Index = DictionaryIndex<Element>
-
-  func __equal__(rhs: Index) -> Bool {
-    return self.offset == rhs.offset
-  }
 
   func pred() -> Index {
     var j = self.offset
     while --j > 0 {
       if buffer[j] {
-        return Index(buffer, j)
+        return Index(buffer: buffer, offset: j)
       }
     }
     return self
@@ -190,14 +200,14 @@ struct DictionaryIndex<Element> : BidirectionalIndex {
       // end workaround
       ++i
     }
-    return Index(buffer, i)
+    return Index(buffer: buffer, offset: i)
   }
 
   var buffer: FixedSizedRefArrayOfOptional<Element>
   var offset: Int
 }
 
-struct Dictionary<KeyType: Hashable, ValueType> : Indexable, Enumerable {
+struct Dictionary<KeyType: Hashable, ValueType> : Collection, Sequence {
   typealias _Self = Dictionary<KeyType, ValueType>
   typealias BufferOwner = DictionaryBufferOwner<KeyType, ValueType>
   typealias Buffer = BufferOwner.Buffer
@@ -208,57 +218,63 @@ struct Dictionary<KeyType: Hashable, ValueType> : Indexable, Enumerable {
   /// elements worth of storage. The actual capacity will be the
   /// smallest power of 2 that's >= minimumCapacity.
   init(minimumCapacity: Int = 2) {
-    _owner = BufferOwner(minimumCapacity)
+    _owner = BufferOwner(minimumCapacity: minimumCapacity)
   }
 
-  func startIndex() -> Index {
-    return Index(_buffer, -1).succ()
+  var startIndex: Index {
+    return Index(buffer: _buffer, offset: -1).succ()
   }
 
-  func endIndex() -> Index {
-    return Index(_buffer, _buffer.count)
-  }
-
-  func __getitem__(i: Index) -> Element {
-    return _buffer[i.offset]!
+  var endIndex: Index {
+    return Index(buffer: _buffer, offset: _buffer.count)
   }
 
   subscript(i: Index) -> Element {
-    return __getitem__(i)
-  set(keyValue):
-    assert(keyValue.key == self[i].key)
-    _buffer[i.offset] = .Some(keyValue)
+    get {
+      return  _buffer[i.offset]!
+    }
+    set(keyValue) {
+      assert(keyValue.key == self[i].key)
+      _buffer[i.offset] = .Some(keyValue)
+    }
   }
 
   var _maxLoadFactorInverse = 1.0 / 0.75
 
   var maxLoadFactor : Double {
-    return 1.0 / _maxLoadFactorInverse
-  set(newValue):
-    // 1.0 might be useful for testing purposes; anything more is
-    // crazy
-    assert(newValue <= 1.0)
-    _maxLoadFactorInverse = 1.0 / newValue
+    get {
+      return 1.0 / _maxLoadFactorInverse
+    }
+    mutating
+    set(newValue) {
+      // 1.0 might be useful for testing purposes; anything more is
+      // crazy
+      assert(newValue <= 1.0)
+      _maxLoadFactorInverse = 1.0 / newValue
+    }
   }
 
   subscript(key: KeyType) -> ValueType {
-  get:
-    return __getitem__(find(key).0).value
-  set(value):
-    var (i, found) = find(key)
-
-    // count + 2 below ensures that we don't fill in the last hole
-    var minCapacity = found
-      ? capacity
-      : max(Int(Double(count + 1) * _maxLoadFactorInverse), count + 2)
-
-    if (_ensureUniqueBuffer(minCapacity)) {
-      i = find(key).0
+    get {
+      return self[find(key).0].value
     }
-    _buffer[i.offset] = Element(key, value)
+    mutating
+    set(value) {
+      var (i, found) = find(key)
 
-    if !found {
-      ++_count
+      // count + 2 below ensures that we don't fill in the last hole
+      var minCapacity = found
+        ? capacity
+        : max(Int(Double(count + 1) * _maxLoadFactorInverse), count + 2)
+
+      if (_ensureUniqueBuffer(minCapacity)) {
+        i = find(key).0
+      }
+      _buffer[i.offset] = Element(key: key, value: value)
+
+      if !found {
+        ++_count
+      }
     }
   }
 
@@ -273,14 +289,14 @@ struct Dictionary<KeyType: Hashable, ValueType> : Indexable, Enumerable {
   /// \brief Ensure this Dictionary holds a unique reference to its
   /// buffer having at least minimumCapacity elements.  Return true
   /// iff this results in a change of capacity.
-  func _ensureUniqueBuffer(minimumCapacity: Int) -> Bool {
-    var isUnique: Bool = swift_isUniquelyReferenced(Builtin.castToObjectPointer(_owner))
+  mutating func _ensureUniqueBuffer(minimumCapacity: Int) -> Bool {
+    var isUnique: Bool = isUniquelyReferenced(&_owner)
 
     if !isUnique || capacity < minimumCapacity {
-      var newOwner = _Self(minimumCapacity)
+      var newOwner = _Self(minimumCapacity: minimumCapacity)
       println("reallocating with isUnique: \(isUnique) and capacity \(capacity)=>\(newOwner.capacity)")
 
-      for i in 0..capacity {
+      for i in 0...capacity {
         var x = _buffer[i]
         if x {
           if capacity == newOwner.capacity {
@@ -293,14 +309,14 @@ struct Dictionary<KeyType: Hashable, ValueType> : Indexable, Enumerable {
       }
 
       newOwner._count = count
-      swift.swap(&self, &newOwner)
+      Swift.swap(&self, &newOwner)
       return self.capacity != newOwner.capacity
     }
     return false
   }
 
   func _bucket(k: KeyType) -> Int {
-    return k.hashValue() & _bucketMask
+    return k.hashValue & _bucketMask
   }
 
   func _next(bucket: Int) -> Int {
@@ -319,19 +335,20 @@ struct Dictionary<KeyType: Hashable, ValueType> : Indexable, Enumerable {
     while true {
       var keyVal = _buffer[bucket]
       if !keyVal || keyVal!.key == k {
-        return (Index(_buffer, bucket), Bool(keyVal))
+        return (Index(buffer: _buffer, offset: bucket), Bool(keyVal))
       }
       bucket = _next(bucket)
     }
   }
 
   func find(k: KeyType) -> (Index,Bool) {
-    return _find(k, _bucket(k))
+    return _find(k, startBucket: _bucket(k))
   }
 
+  mutating
   func deleteKey(k: KeyType) -> Bool {
     var start = _bucket(k)
-    var (pos, found) = _find(k, start)
+    var (pos, found) = _find(k, startBucket: start)
 
     if !found {
       return false
@@ -394,9 +411,9 @@ struct Dictionary<KeyType: Hashable, ValueType> : Indexable, Enumerable {
     return _owner.buffer
   }
 
-  // Satisfying Enumerable
-  func enumerate() -> IndexableGenerator<_Self, Range<Index>> {
-    return IndexableGenerator(self, indices(self))
+  // Satisfying Sequence
+  func generate() -> IndexingGenerator<_Self> {
+    return IndexingGenerator(self)
   }
 }
 
@@ -464,21 +481,21 @@ println("deleting that key makes them equal again: \(d1 == d0)")
 class X
 {
    var constructed : Bool
-   var id : Int
+   var id = 0
 
    init() {println("X()"); constructed = true}
-   init(anID : Int) {
+   init(_ anID : Int) {
       print("X("); print(anID); println(")")
      id = anID; constructed = true}
 
-   destructor () {
+   deinit {
       print("~X("); print(id); println(")")
       constructed = false
    }
 }
 
 extension String {
-  init(x: X) {
+  init(_ x: X) {
     self = "X(\(x.id))"
   }
 }

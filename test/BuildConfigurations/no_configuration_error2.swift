@@ -2,7 +2,7 @@
 
 // No space next to the '#if'
 
-// expected-error@+1{{expected expression, var, or let in 'if' condition}}
-#if// expected-error 2{{invalid character in source file}}
-class D {}
+#if // expected-error {{expected a build configuration expression to follow the #if clause}}
+class D {} // expected-error {{expected #else or #endif at end of configuration block}}
 #endif
+// expected-error @-1{{unexpected configuration block terminator}}

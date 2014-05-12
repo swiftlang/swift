@@ -1,86 +1,110 @@
 // RUN: rm -rf %t
 // RUN: mkdir %t
-// RUN: %swift -emit-module -o %t/def_func.swiftmodule %S/Inputs/def_func.swift
+// RUN: %swift -emit-module -o %t %S/Inputs/def_func.swift
 // RUN: llvm-bcanalyzer %t/def_func.swiftmodule | FileCheck %s
-// RUN: %swift -emit-llvm -I=%t %s | FileCheck %s -check-prefix=LLVM
+// RUN: %swift -emit-silgen -I=%t %s | FileCheck %s -check-prefix=SIL
+
+// CHECK-NOT: FALL_BACK_TO_TRANSLATION_UNIT
+// CHECK-NOT: UnknownCode
 
 import def_func
 
-// LLVM: define {{.*}} @top_level_code() {
-// LLVM:   [[VAL:%.*]] = call i64 @_T8def_func7getZeroFT_Bi64_()
-// LLVM:   store i64 [[VAL]], i64* @_T8function3rawBi64_, align 8
-// LLVM: }
+func useEq<T: EqualOperator>(x: T, y: T) -> Bool {
+  return x == y
+}
+
+// SIL: sil private @top_level_code : $@thin () -> () {
+// SIL:   [[RAW:%.+]] = global_addr #raw : $*Int
+// SIL:   [[ZERO:%.+]] = function_ref @_TF8def_func7getZeroFT_Si : $@thin () -> Int
+// SIL:   [[RESULT:%.+]] = apply [[ZERO]]() : $@thin () -> Int
+// SIL:   store [[RESULT]] to [[RAW]] : $*Int
 var raw = getZero()
 
-// Check that 'raw' is a Builtin.Int64
-var cooked = Int64(raw)
+// Check that 'raw' is an Int
+var cooked : Int = raw
 
-// CHECK:   # Toplevel Blocks: 6
 
-// CHECK:  Block ID #0 (BLOCKINFO_BLOCK):
-// CHECK-NEXT:      Num Instances: 1
+// SIL:   [[GET_INPUT:%.+]] = function_ref @_TF8def_func8getInputFT1xSi_Si : $@thin (Int) -> Int
+// SIL:   {{%.+}} = apply [[GET_INPUT]]({{%.+}}) : $@thin (Int) -> Int
+var raw2 = getInput(x: raw)
 
-// CHECK:  Block ID #8 (CONTROL_BLOCK):
-// CHECK-NEXT:      Num Instances: 1
-// CHECK-NEXT:         Total Size:
-// CHECK-NEXT:    Percent of file:
-// CHECK-NEXT:      Num SubBlocks: 0
-// CHECK-NEXT:        Num Abbrevs: 1
-// CHECK-NEXT:        Num Records: 1
-// CHECK-NEXT:    Percent Abbrevs: 100.0000%
+// SIL:   [[GET_SECOND:%.+]] = function_ref @_TF8def_func9getSecondFTSi1ySi_Si : $@thin (Int, Int) -> Int
+// SIL:   {{%.+}} = apply [[GET_SECOND]]({{%.+}}, {{%.+}}) : $@thin (Int, Int) -> Int
+var raw3 = getSecond(raw, y: raw2)
 
-// CHECK:  Block ID #9 (INPUT_BLOCK):
-// CHECK-NEXT:      Num Instances: 1
-// CHECK-NEXT:         Total Size:
-// CHECK-NEXT:    Percent of file:
-// CHECK-NEXT:      Num SubBlocks: 0
-// CHECK-NEXT:        Num Abbrevs: 1
-// CHECK-NEXT:        Num Records: 1
-// CHECK-NEXT:    Percent Abbrevs: 100.0000%
-// CHECK:    		  Count    # Bits   %% Abv  Record Kind
-// CHECK-NEXT: 		      1  {{[0-9]+}} 100.00  SOURCE_FILE
+// SIL:   [[USE_NESTED:%.+]] = function_ref @_TF8def_func9useNestedFTT1xSi1ySi_1nSi_T_ : $@thin (Int, Int, Int) -> ()
+// SIL:   {{%.+}} = apply [[USE_NESTED]]({{%.+}}, {{%.+}}, {{%.+}}) : $@thin (Int, Int, Int) -> ()
+useNested((raw, raw2), n: raw3)
 
-// CHECK:  Block ID #10 (DECLS_AND_TYPES_BLOCK):
-// CHECK-NEXT:      Num Instances: 1
-// CHECK-NEXT:         Total Size:
-// CHECK-NEXT:    Percent of file:
-// CHECK-NEXT:      Num SubBlocks: 0
-// CHECK-NEXT:        Num Abbrevs:
-// CHECK-NEXT:        Num Records:
-// CHECK-NEXT:    Percent Abbrevs: 100.0000%
+// SIL:   [[VARIADIC:%.+]] = function_ref @_TF8def_func8variadicFt1xSdGSaSi__T_ : $@thin (Double, @owned Array<Int>) -> ()
+// SIL:   [[VA_SIZE:%.+]] = integer_literal $Builtin.Word, 2
+// SIL:   {{%.+}} = alloc_array $Int, [[VA_SIZE]] : $Builtin.Word
+// SIL:   {{%.+}} = apply [[VARIADIC]]({{%.+}}, {{%.+}}) : $@thin (Double, @owned Array<Int>) -> ()
+variadic(x: 2.5, 4, 5)
 
-// CHECK:    		  Count    # Bits   %% Abv  Record Kind
-// CHECK-NEXT:		     1  {{[0-9]+}} 100.00  FUNC_DECL
-// CHECK-NEXT:		      1  {{[0-9]+}} 100.00  FUNCTION_TYPE
-// CHECK-NEXT:		      1  {{[0-9]+}} 100.00  IDENTIFIER_TYPE
-// CHECK-NEXT:		      1  {{[0-9]+}} 100.00  TUPLE_TYPE
-// CHECK-NEXT:		      1  {{[0-9]+}} 100.00  BUILTIN_TYPE
+// SIL:   [[SLICE:%.+]] = function_ref @_TF8def_func5sliceFT1xGSaSi__T_ : $@thin (@owned Array<Int>) -> ()
+// SIL:   [[SLICE_SIZE:%.+]] = integer_literal $Builtin.Word, 3
+// SIL:   {{%.+}} = alloc_array $Int, [[SLICE_SIZE]] : $Builtin.Word
+// SIL:   {{%.+}} = apply [[SLICE]]({{%.+}}) : $@thin (@owned Array<Int>) -> ()
+slice(x: [2, 4, 5])
 
-// CHECK:  Block ID #11 (IDENTIFIER_DATA_BLOCK):
-// CHECK-NEXT:      Num Instances: 1
-// CHECK-NEXT:         Total Size:
-// CHECK-NEXT:    Percent of file:
-// CHECK-NEXT:      Num SubBlocks: 0
-// CHECK-NEXT:        Num Abbrevs: 1
-// CHECK-NEXT:        Num Records: 1
-// CHECK-NEXT:    Percent Abbrevs: 100.0000%
-// CHECK:    		  Count    # Bits   %% Abv  Record Kind
-// CHECK-NEXT: 		      1  {{[0-9]+}} 100.00  IDENTIFIER_DATA
+optional(x: .Some(23))
+optional(x: .None)
 
-// CHECK:  Block ID #12 (INDEX_BLOCK):
-// CHECK-NEXT:      Num Instances: 1
-// CHECK-NEXT:         Total Size:
-// CHECK-NEXT:    Percent of file:
-// CHECK-NEXT:      Num SubBlocks: 0
-// CHECK-NEXT:        Num Abbrevs: 2
-// CHECK-NEXT:        Num Records: 4
-// CHECK-NEXT:    Percent Abbrevs: 100.0000%
 
-// CHECK:     		  Count    # Bits   %% Abv  Record Kind
-// CHECK-NEXT:		      1  {{[0-9]+}} 100.00  TOP_LEVEL_DECLS
-// CHECK-NEXT:		      1  {{[0-9]+}} 100.00  IDENTIFIER_OFFSETS
-// CHECK-NEXT:		      1  {{[0-9]+}} 100.00  DECL_OFFSETS
-// CHECK-NEXT:		      1  {{[0-9]+}} 100.00  TYPE_OFFSETS
+// SIL:   [[MAKE_PAIR:%.+]] = function_ref @_TF8def_func8makePairU___FT1aQ_1bQ0__TQ_Q0__ : $@thin <τ_0_0, τ_0_1> (@out (τ_0_0, τ_0_1), @in τ_0_0, @in τ_0_1) -> ()
+// SIL:   {{%.+}} = apply [[MAKE_PAIR]]<Int, Double>({{%.+}}, {{%.+}})
 
-// CHECK-NOT: FALL_BACK_TO_TRANSLATION_UNIT
+var pair : (Int, Double) = makePair(a: 1, b: 2.5)
+
+// SIL:   [[DIFFERENT_A:%.+]] = function_ref @_TF8def_func9differentUSs9Equatable__FT1aQ_1bQ__Sb : $@thin <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0) -> Bool
+// SIL:   [[DIFFERENT_B:%.+]] = function_ref @_TF8def_func9differentUSs9Equatable__FT1aQ_1bQ__Sb : $@thin <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0) -> Bool
+
+different(a: 1, b: 2)
+different(a: false, b: false)
+
+// SIL:   [[DIFFERENT2_A:%.+]] = function_ref @_TF8def_func10different2USs9Equatable__FT1aQ_1bQ__Sb : $@thin <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0) -> Bool
+// SIL:   [[DIFFERENT2_B:%.+]] = function_ref @_TF8def_func10different2USs9Equatable__FT1aQ_1bQ__Sb : $@thin <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0) -> Bool
+different2(a: 1, b: 2)
+different2(a: false, b: false)
+
+
+struct IntWrapper1 : Wrapped {
+  typealias ValueType = Int
+  func getValue() -> Int { return 1 }
+}
+struct IntWrapper2 : Wrapped {
+  typealias ValueType = Int
+  func getValue() -> Int { return 2 }
+}
+
+// SIL:   [[DIFFERENT_WRAPPED:%.+]] = function_ref @_TF8def_func16differentWrappedUS_7Wrapped_S0__USs9Equatable__FT1aQ_1bQ0__Sb : $@thin <τ_0_0, τ_0_1 where τ_0_0 : Wrapped, τ_0_1 : Wrapped, τ_0_0.ValueType : Equatable, τ_0_0.ValueType == τ_0_1.ValueType> (@in τ_0_0, @in τ_0_1) -> Bool
+
+differentWrapped(a: IntWrapper1(), b: IntWrapper2())
+
+
+// SIL:   {{%.+}} = function_ref @_TF8def_func10overloadedFT1xSi_T_ : $@thin (Int) -> ()
+// SIL:   {{%.+}} = function_ref @_TF8def_func10overloadedFT1xSb_T_ : $@thin (Bool) -> ()
+
+overloaded(x: 1)
+overloaded(x: false)
+
+
+// SIL:   {{%.+}} = function_ref @primitive : $@thin () -> ()
+primitive()
+
+
+if raw == 5 {
+  testNoReturnAttr()
+  testNoReturnAttrPoly(x: 5)
+}
+// SIL: {{%.+}} = function_ref @_TF8def_func16testNoReturnAttrFT_T_ : $@thin @noreturn () -> ()
+// SIL: {{%.+}} = function_ref @_TF8def_func20testNoReturnAttrPolyU__FT1xQ__T_ : $@thin @noreturn <τ_0_0> (@in τ_0_0) -> ()
+
+
+// SIL: sil @_TF8def_func16testNoReturnAttrFT_T_ : $@thin @noreturn () -> ()
+// SIL: sil @_TF8def_func20testNoReturnAttrPolyU__FT1xQ__T_ : $@thin @noreturn <τ_0_0> (@in τ_0_0) -> ()
+
+
+// LLVM: }
 

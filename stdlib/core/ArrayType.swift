@@ -11,46 +11,107 @@
 //===----------------------------------------------------------------------===//
 
 protocol ArrayType
-  // FIXME: must start with Collection; see <rdar://problem/16465340> 
-  : Collection, 
-    _ArrayType,
-    MutableCollection, 
-    Sliceable,
-    ArrayLiteralConvertible,
-    ConditionallyBridgedToObjectiveC
+  : _ArrayType,
+    Collection,     
+    MutableSliceable, 
+    ArrayLiteralConvertible
 {
   //===--- public interface -----------------------------------------------===//
+  /// Construct an empty Array
   init()
+
+  /// Construct an array of count elements, each initialized to value
+  init(count: Int, value: Self.GeneratorType.Element)
   
+  /// How many elements the Array stores
   var count: Int {get}
+  
+  /// How many elements the Array can store without reallocation
   var capacity: Int {get}
   
-  mutating func reserve(n: Int)
-  mutating func append(element: Self.GeneratorType.Element)
+  /// true if and only if the Array is empty
+  var isEmpty: Bool {get}
 
+  /// An object that guarantees the lifetime of this array's elements
+  var owner: AnyObject? {get}
+
+  /// If the elements are stored contiguously, a pointer to the first
+  /// element. Otherwise, nil.
+  var elementStorage: UnsafePointer<Element> {get}
+
+  subscript(index: Int) -> Self.GeneratorType.Element {get nonmutating set}
+  
+  //===--- basic mutations ------------------------------------------------===//
+
+  /// Reserve enough space to store newCapacity elements in O(N).  If
+  /// newCapacity is less than count, has no effect.  PostCondition:
+  /// the array has mutable contiguous storage
+  mutating func reserve(newCapacity: Int)
+  
+  /// Append newElement to the Array in O(1) (amortized)
+  mutating func append(newElement: Self.GeneratorType.Element)
+  
+  /// Remove an element from the end of the Array in O(1).  Returns:
+  /// the removed element. Requires: count > 0
+  mutating func popLast() -> Self.GeneratorType.Element
+  
+  /// Insert an element at the given index in O(N).  Requires: atIndex
+  /// <= count
+  mutating func insert(atIndex: Int, newElement: Self.GeneratorType.Element)
+
+  /// Remove the element at the given index.  Returns: the removed
+  /// element.  Worst case complexity: O(N).  Requires: count > index
+  mutating func removeAt(index: Int) -> Self.GeneratorType.Element
+
+  /// Erase all the elements and release the storage
+  mutating func clear()
+  
+  /// Erase all the elements.  If keepStorage is true, capacity will not change
+  mutating func clear(keepStorage: Bool)
+  
+  //===--- algorithms -----------------------------------------------------===//
+  func reduce<U>(initial: U, combine: (U, Self.GeneratorType.Element) -> U) -> U
+
+  mutating func sort(
+    isOrderedBefore: (
+      Self.GeneratorType.Element, Self.GeneratorType.Element
+    ) -> Bool
+  )
+  
   //===--- implementation detail  -----------------------------------------===//
 
   typealias Buffer : ArrayBufferType
-  init(_: Buffer)
-  
-  mutating func _adopt(
-    newBuffer: NativeArrayBuffer<Self.GeneratorType.Element>)
-  
-  // Returns true iff Self can allow its buffer to be directly
-  // mutated.  *Must* remain a mutating function and not a get-only
-  // property if we are to have a hope of accurate uniqueness checks
-  mutating func _hasMutableBuffer() -> Bool
-
-  // Copy elements from the given subRange into the range starting at
-  // target, returning a pointer past-the-end of the target range
-  func _uninitializedCopy(
-    subRange: Range<Self.IndexType>,
-    target: UnsafePointer<Self.GeneratorType.Element>
-  ) -> UnsafePointer<Self.GeneratorType.Element>
-
-  // Update this Array's idea of its count.  Does NOT construct or
-  // destroy elements to ensure that count is accurate.
-  mutating func _updateCount(newCount: Int)
+  init(_ buffer: Buffer)
   
   var buffer: Buffer {get set}
+}
+
+struct _ArrayTypeMirror<T : ArrayType> : Mirror {
+  let _value : T
+  
+  init(_ v : T) { _value = v }
+  
+  var value: Any { return (_value as Any) }
+
+  var valueType: Any.Type { return (_value as Any).dynamicType }
+
+  var objectIdentifier: ObjectIdentifier? { return nil }
+
+  var count: Int { return _value.count }
+
+  subscript(i: Int) -> (String, Mirror) {
+    if (i >= 0) && (i < count) {
+      return ("[\(i)]",reflect(_value[i]))
+    }
+    fatal("don't ask")
+  }
+
+  var summary: String {
+    if count == 1 { return "1 element" }
+    return "\(count) elements"
+  }
+
+  var quickLookObject: QuickLookObject? { return nil }
+
+  var disposition: MirrorDisposition { return .IndexContainer }
 }

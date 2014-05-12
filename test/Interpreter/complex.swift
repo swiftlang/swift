@@ -1,19 +1,16 @@
-// RUN: %swift -I %S/.. %s -verify 
-
-import swift
+// RUN: %swift -verify -parse %s
 
 struct Complex {
-  Real : Double,
-  Imaginary : Double
+  var real = 0.0, imag = 0.0
   func magnitude() -> Double {
-    return Real * Real + Imaginary * Imaginary
+    return real * real + imag * imag
   }
 }
 
-func [infix_left=200] * (lhs : Complex, rhs : Complex) -> Complex {
-  return Complex(lhs.Real * rhs.Real - lhs.Imaginary * rhs.Imaginary,
-                 lhs.Real * rhs.Imaginary + lhs.Imaginary * rhs.Real)
+func * (lhs: Complex, rhs: Complex) -> Complex {
+  return Complex(real: lhs.real * rhs.real - lhs.imag * rhs.imag,
+                 imag: lhs.real * rhs.imag + lhs.imag * rhs.real)
 }
-func [infix_left=190] + (lhs: Complex, rhs: Complex) -> Complex {
-  return Complex(lhs.Real + rhs.Real, lhs.Imaginary + rhs.Imaginary)
+func + (lhs: Complex, rhs: Complex) -> Complex {
+  return Complex(real: lhs.real + rhs.real, imag: lhs.imag + rhs.imag)
 }

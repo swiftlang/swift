@@ -4,9 +4,9 @@
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_D | FileCheck %s -check-prefix=TEST_D
 
 class A {
-  init withInt(i: Int) {}
-  init withDouble(d: Double) {}
-  init withFloat(f: Float) -> Self {
+  init(withInt i: Int) {}
+  init(withDouble d: Double) {}
+  convenience init(withFloat f: Float) {
     self.init(Double(f))
   }
 }
@@ -30,10 +30,10 @@ class B : A {
 // TEST_B-NEXT: End completions
 
 class C : B {
-  init withInt(i: Int) {
+  init(withInt i: Int) {
     super.init(withInt: i)
   }
-  init withC(other: C) -> Self {
+  convenience init(withC other: C) {
     self.init(withInt: 0)
   }
   // No initializers are inherited.
@@ -50,7 +50,7 @@ class D : C {
   // C's complete object initializers are inherited.
   // Initializers from A are not included in D's interface.
 
-  init withD(other: D) -> Self {
+  convenience init(withD other: D) {
     self.init(withInt: 0)
   }
 }

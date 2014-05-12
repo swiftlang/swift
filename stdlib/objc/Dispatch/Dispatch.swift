@@ -31,7 +31,13 @@ let DISPATCH_QUEUE_PRIORITY_HIGH       = dispatch_queue_priority_t(2)
 let DISPATCH_QUEUE_PRIORITY_DEFAULT    = dispatch_queue_priority_t(0)
 let DISPATCH_QUEUE_PRIORITY_LOW        = dispatch_queue_priority_t(-2)
 let DISPATCH_QUEUE_PRIORITY_BACKGROUND = dispatch_queue_priority_t(-32768)
-// FIXME: DISPATCH_QUEUE_CONCURRENT
+
+var DISPATCH_QUEUE_CONCURRENT : dispatch_queue_attr_t { 
+  get { return _swift_dispatch_queue_concurrent() } 
+}
+
+@asmname("_swift_dispatch_queue_concurrent") 
+func _swift_dispatch_queue_concurrent() -> dispatch_queue_attr_t
 
 // dispatch/source.h
 // FIXME: DISPATCH_SOURCE_TYPE_*
@@ -51,6 +57,63 @@ let DISPATCH_VNODE_LINK   = dispatch_source_vnode_flags_t(0x10)
 let DISPATCH_VNODE_RENAME = dispatch_source_vnode_flags_t(0x20)
 let DISPATCH_VNODE_REVOKE = dispatch_source_vnode_flags_t(0x40)
 let DISPATCH_TIMER_STRICT = dispatch_source_timer_flags_t(1)
+
+var DISPATCH_SOURCE_TYPE_DATA_ADD : dispatch_source_type_t { 
+  get { return _swift_dispatch_source_type_data_add() } 
+}
+var DISPATCH_SOURCE_TYPE_DATA_OR : dispatch_source_type_t { 
+  get { return _swift_dispatch_source_type_data_or() } 
+}
+var DISPATCH_SOURCE_TYPE_MACH_SEND : dispatch_source_type_t { 
+  get { return _swift_dispatch_source_type_mach_send() } 
+}
+var DISPATCH_SOURCE_TYPE_MACH_RECV : dispatch_source_type_t { 
+  get { return _swift_dispatch_source_type_mach_recv() } 
+}
+var DISPATCH_SOURCE_TYPE_MEMORYPRESSURE : dispatch_source_type_t { 
+  get { return _swift_dispatch_source_type_memorypressure() } 
+}
+var DISPATCH_SOURCE_TYPE_READ : dispatch_source_type_t { 
+  get { return _swift_dispatch_source_type_read() } 
+}
+var DISPATCH_SOURCE_TYPE_PROC : dispatch_source_type_t { 
+  get { return _swift_dispatch_source_type_proc() } 
+}
+var DISPATCH_SOURCE_TYPE_SIGNAL : dispatch_source_type_t { 
+  get { return _swift_dispatch_source_type_signal() } 
+}
+var DISPATCH_SOURCE_TYPE_TIMER : dispatch_source_type_t { 
+  get { return _swift_dispatch_source_type_timer() } 
+}
+var DISPATCH_SOURCE_TYPE_VNODE : dispatch_source_type_t { 
+  get { return _swift_dispatch_source_type_vnode() } 
+}
+var DISPATCH_SOURCE_TYPE_WRITE : dispatch_source_type_t { 
+  get { return _swift_dispatch_source_type_write() } 
+}
+
+@asmname("_swift_dispatch_source_type_DATA_ADD") 
+func _swift_dispatch_source_type_data_add() -> dispatch_source_type_t
+@asmname("_swift_dispatch_source_type_DATA_OR") 
+func _swift_dispatch_source_type_data_or() -> dispatch_source_type_t
+@asmname("_swift_dispatch_source_type_MACH_SEND") 
+func _swift_dispatch_source_type_mach_send() -> dispatch_source_type_t
+@asmname("_swift_dispatch_source_type_MACH_RECV") 
+func _swift_dispatch_source_type_mach_recv() -> dispatch_source_type_t
+@asmname("_swift_dispatch_source_type_MEMORYPRESSURE") 
+func _swift_dispatch_source_type_memorypressure() -> dispatch_source_type_t
+@asmname("_swift_dispatch_source_type_PROC") 
+func _swift_dispatch_source_type_proc() -> dispatch_source_type_t
+@asmname("_swift_dispatch_source_type_READ") 
+func _swift_dispatch_source_type_read() -> dispatch_source_type_t
+@asmname("_swift_dispatch_source_type_SIGNAL") 
+func _swift_dispatch_source_type_signal() -> dispatch_source_type_t
+@asmname("_swift_dispatch_source_type_TIMER") 
+func _swift_dispatch_source_type_timer() -> dispatch_source_type_t
+@asmname("_swift_dispatch_source_type_VNODE") 
+func _swift_dispatch_source_type_vnode() -> dispatch_source_type_t
+@asmname("_swift_dispatch_source_type_WRITE") 
+func _swift_dispatch_source_type_write() -> dispatch_source_type_t
 
 // dispatch/time.h
 // DISPATCH_TIME_NOW: ok

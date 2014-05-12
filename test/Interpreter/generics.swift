@@ -1,20 +1,20 @@
-// RUN: %swift -i %s | FileCheck %s
+// RUN: %target-run-simple-swift | FileCheck %s
 
 struct BigStruct { var a,b,c,d,e,f,g,h:Int }
 
 // FIXME: missing symbol for Object destructor?
 //class SomeClass : Object { }
 
-func id<T>(x:T) -> T {
+func id<T>(x: T) -> T {
   return x
 }
 
 var int = id(1)
-var bigStruct = id(BigStruct(1,2,3,4,5,6,7,8))
+var bigStruct = id(BigStruct(a: 1, b: 2,c: 3, d: 4, e: 5, f: 6, g: 7, h: 8))
 //var someClass = SomeClass()
 //var someClass2 = id(someClass)
 
-func println(bs:BigStruct) {
+func println(bs: BigStruct) {
   // FIXME: typechecker is too slow to handle this as an interpolated literal
   print("BigStruct(")
   print(bs.a)

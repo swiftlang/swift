@@ -4,7 +4,7 @@ class 你好 {
   class שלום {
     class வணக்கம் {
       class Γειά {
-        static func привет() {
+        class func привет() {
           println("hello")
         }
       }
@@ -15,7 +15,7 @@ class 你好 {
 你好.שלום.வணக்கம்.Γειά.привет()
 
 // Identifiers cannot start with combining chars.
-.́duh() // expected-error{{an identifier cannot begin with this character}} //expected-error{{an identifier cannot begin with this character}} //expected-error{{expected identifier after '.' expression}}
+.́duh() // expected-error 2{{an identifier cannot begin with this character}} // expected-error{{expected identifier after '.' expression}}
 
 // Combining characters can be used within identifiers.
 func s̈pin̈al_tap̈() {}

@@ -12,12 +12,12 @@ struct S : P  {
 }
 
 func foo<T : P>(t : T) {
-  print("\(t.scale(7)(13))\n")
+  print("\(t.scale(7)(y: 13))\n")
 }
 
-foo(S(4))
+foo(S(offset: 4))
 // CHECK: 95
 
-val p : P = S(4)
-print("\(p.scale(5)(7))\n")
+let p : P = S(offset: 4)
+print("\(p.scale(5)(y: 7))\n")
 // CHECK: 39

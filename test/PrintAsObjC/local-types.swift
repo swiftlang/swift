@@ -3,7 +3,7 @@
 // RUN: rm -rf %t
 // RUN: mkdir %t
 // RUN: %swift %clang-importer-sdk -module-cache-path %t/clang-module-cache -emit-module -o %t %s -module-name local
-// RUN: %swift-ide-test %clang-importer-sdk -module-cache-path %t/clang-module-cache -print-as-objc %t/local.swiftmodule -source-filename %s > %t/local.h
+// RUN: %swift %clang-importer-sdk -module-cache-path %t/clang-module-cache -parse-as-library %t/local.swiftmodule -parse -emit-objc-header-path %t/local.h
 // RUN: FileCheck %s < %t/local.h
 // RUN: %check-in-clang %t/local.h
 
@@ -40,7 +40,6 @@ class ANonObjCClass {}
 // CHECK-NEXT: - (void)e2:(id <ZForwardProtocol2>)e;
 // CHECK-NEXT: - (void)f:(id <ZForwardProtocol5> (^)(id <ZForwardProtocol3>, id <ZForwardProtocol4>))f;
 // CHECK-NEXT: - (void)g:(id <ZForwardProtocol6, ZForwardProtocol7>)g;
-// CHECK-NEXT: - (Class)h:(id)h;
 // CHECK-NEXT: - (void)i:(id <ZForwardProtocol8>)_;
 // CHECK-NEXT: @property (nonatomic, readonly) ZForwardClass3 * j;
 // CHECK-NEXT: @property (nonatomic, readonly) SWIFT_METATYPE(ZForwardClass4) k;
@@ -55,16 +54,16 @@ class ANonObjCClass {}
   func c(c: ZForwardAlias) {}
 
   func d(d: (ZForwardProtocol1)) {}
-  func e(e: ZForwardProtocol2.metatype) {}
+  func e(e: ZForwardProtocol2.Type) {}
   func e2(e: ZForwardProtocol2) {}
-  func f(f: @objc_block (ZForwardProtocol3, ZForwardProtocol4) -> ZForwardProtocol5) {}
+  func f(f: (ZForwardProtocol3, ZForwardProtocol4) -> ZForwardProtocol5) {}
   func g(g: protocol<ZForwardProtocol6, ZForwardProtocol7>) {}
 
-  func h(h: ANonObjCClass) -> ANonObjCClass.metatype { return typeof(h) }
+  func h(h: ANonObjCClass) -> ANonObjCClass.Type { return h.dynamicType }
   func i(_: ZForwardProtocol8) {}
 
   var j: ZForwardClass3 { return ZForwardClass3() }
-  var k: ZForwardClass4.metatype { return ZForwardClass4 }
+  var k: ZForwardClass4.Type { return ZForwardClass4.self }
 }
 
 // CHECK-NOT: @class ZForwardClass1;

@@ -1,17 +1,16 @@
-// RUN: %swift -I %S/.. %s -i | FileCheck %s
+// RUN: %target-run-simple-swift | FileCheck %s
 
-// CHECK: 123ABC
+// CHECK: 123ABCD
+// CHECK: Hello ☃
+// CHECK: Hello ☃
 
-// FIXME: The "import" shouldn't be necessary
-import swift
-
-// FIXME: main() should be implicitly defined.
-func main() {
-  if (true) {
-    print(123)
-    printChar(65)
-    printChar(66)
-    printChar(67)
-    printChar(10)
-  }
+if (true) {
+  print(123)
+  print(UnicodeScalar(65))
+  print(UnicodeScalar(66))
+  print(UnicodeScalar(67))
+  print(UnicodeScalar(0o104))
+  print(UnicodeScalar(10))
+  print("Hello \u2603\n")  // Hi Snowman!
+  print("Hello ☃\n")
 }

@@ -1,40 +1,41 @@
-// RUN: %swift -triple x86_64-apple-darwin10 %s -emit-llvm | FileCheck %s
+// RUN: %swift -target x86_64-apple-darwin10 %s -emit-ir | FileCheck %s
 
-// CHECK: [[REFCOUNT:%.*]] = type { [[TYPE:%swift.type]]*, i64 }
-// CHECK: [[INT:%Si]] = type { i64 }
+// CHECK: [[REFCOUNT:%.*]] = type { [[TYPE:%swift.type]]*, i32, i32 }
 // CHECK: [[OPAQUE:%swift.opaque]] = type opaque
 
-func make_array<T>(n : Int) -> T[] {
-  return new T[n]
+func make_array<T>(var n: Int, var x: T) -> T[] {
+  return new T[n] {i in x}
 }
 
-// CHECK:    define { i8*, i64, [[REFCOUNT]]* } @_T10heaparrays10make_arrayU__FT1nSi_GVSs5SliceQ__(
+// CHECK: define i64 @_TF10heaparrays10make_array{{.*}}(i64, %swift.opaque* noalias, %swift.type* %T)
 
-//   Pull out the value witness tables for T.
-// CHECK:      [[T0:%.*]] = bitcast [[TYPE]]* %T to i8***
-// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds i8*** [[T0]], i64 -1
-// CHECK-NEXT: %T.value = load i8*** [[T1]], align 8
-
-// CHECK:      [[BOUND:%.*]] = call i64 @_TSi18getArrayBoundValuefRSiFT_Bi64_([[INT]]*
+// CHECK: call [[OPAQUE]]* %allocateBuffer(
+// CHECK: call [[OPAQUE]]* %initializeWithTake(
 
 //   Grab alignof(T) and use it to compute the alignment.
-// CHECK:      [[T0:%.*]] = getelementptr inbounds i8** %T.value, i32 13
+// CHECK:      [[T0:%.*]] = bitcast [[TYPE]]* %T to i8***
+// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds i8*** [[T0]], i64 -1
+// CHECK-NEXT: [[T_VALUE:%.*]] = load i8*** [[T1]], align 8
+// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds i8** [[T_VALUE]], i32 18
 // CHECK-NEXT: [[T1:%.*]] = load i8** [[T0]], align 8
-// CHECK-NEXT: [[T_ALIGN:%.*]] = ptrtoint i8* [[T1]] to i64
-// CHECK-NEXT: [[T0:%.*]] = sub i64 [[T_ALIGN]], 1
-// CHECK-NEXT: [[T1:%.*]] = add i64 32, [[T0]]
-// CHECK-NEXT: [[T2:%.*]] = xor i64 [[T0]], -1
-// CHECK-NEXT: [[HEADER_SIZE:%.*]] = and i64 [[T1]], [[T2]]
+// CHECK-NEXT: [[T2:%.*]] = ptrtoint i8* [[T1]] to i64
+// CHECK-NEXT: [[T_ALIGNMASK:%.*]] = and i64 [[T2]], 65535
+// CHECK-NEXT: [[T0:%.*]] = add i64 32, [[T_ALIGNMASK]]
+// CHECK-NEXT: [[T1:%.*]] = xor i64 [[T_ALIGNMASK]], -1
+// CHECK-NEXT: [[HEADER_SIZE:%.*]] = and i64 [[T0]], [[T1]]
 
 //   Compute the required alignment.
-// CHECK-NEXT: [[T0:%.*]] = icmp ugt i64 [[T_ALIGN]], 8
-// CHECK-NEXT: [[ALLOC_ALIGN:%.*]] = select i1 [[T0]], i64 [[T_ALIGN]], i64 8
+// CHECK-NEXT: [[T0:%.*]] = icmp ugt i64 [[T_ALIGNMASK]], 7
+// CHECK-NEXT: [[ALLOC_ALIGNMASK:%.*]] = select i1 [[T0]], i64 [[T_ALIGNMASK]], i64 7
 
 //   Grab the stride, compute the allocation size, and allocate.
-// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds i8** %T.value, i32 14
+// CHECK-NEXT: [[T0:%.*]] = bitcast [[TYPE]]* %T to i8***
+// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds i8*** [[T0]], i64 -1
+// CHECK-NEXT: [[T_VALUE:%.*]] = load i8*** [[T1]], align 8
+// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds i8** [[T_VALUE]], i32 19
 // CHECK-NEXT: [[T1:%.*]] = load i8** [[T0]], align 8
 // CHECK-NEXT: [[T_STRIDE:%.*]] = ptrtoint i8* [[T1]] to i64
-// CHECK-NEXT: [[T0:%.*]] = call { i64, i1 } @llvm.umul.with.overflow.i64(i64 [[BOUND]], i64 [[T_STRIDE]])
+// CHECK-NEXT: [[T0:%.*]] = call { i64, i1 } @llvm.umul.with.overflow.i64(i64 [[BOUND:%0]], i64 [[T_STRIDE]])
 // CHECK-NEXT: [[T1:%.*]] = extractvalue { i64, i1 } [[T0]], 0
 // CHECK-NEXT: [[T2:%.*]] = extractvalue { i64, i1 } [[T0]], 1
 // CHECK-NEXT: [[T3:%.*]] = select i1 [[T2]], i64 -1, i64 [[T1]]
@@ -51,10 +52,9 @@ func make_array<T>(n : Int) -> T[] {
 // CHECK-NEXT: store [[TYPE]]* %T, [[TYPE]]** [[T2]], align 8
 
 //   Initialize the length.
-//   FIXME: this should be storing [[BOUND]]!
 // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[REFCOUNT]]* [[ALLOC]], i32 1
 // CHECK-NEXT: [[T1:%.*]] = bitcast [[REFCOUNT]]* [[T0]] to i64*
-// CHECK-NEXT: store i64 0, i64* [[T1]], align 8
+// CHECK-NEXT: store i64 [[BOUND]], i64* [[T1]], align 8
 
 //   Zero-initialize the elements.
 // CHECK-NEXT: [[T0:%.*]] = bitcast [[REFCOUNT]]* [[ALLOC]] to i8*
@@ -64,33 +64,37 @@ func make_array<T>(n : Int) -> T[] {
 // CHECK-NEXT: [[T4:%.*]] = bitcast [[OPAQUE]]* [[T2]] to i8*
 // CHECK-NEXT: call void @llvm.memset.p0i8.i64(i8* [[T4]], i8 0, i64 [[T3]], i32 8, i1 false)
 
-//   Create the slice.
+//   Create the array.
 // CHECK-NEXT: [[T5:%.*]] = bitcast [[OPAQUE]]* [[T2]] to i8*
-// CHECK-NEXT: call { i8*, i64, %swift.refcounted* } @_TVSs5Slice20convertFromHeapArrayU__fMGS_Q__FT4baseBp5ownerBo6lengthBi64__GS_Q__(i8* [[T5]], [[REFCOUNT]]* [[ALLOC]], i64 [[BOUND]], [[TYPE]]* %T)
+// CHECK-NEXT: call [[arrayLayout:[^@]*]] @_TFSa20convertFromHeapArray{{.*}}(i8* [[T5]], [[REFCOUNT]]* [[ALLOC]], i64 [[BOUND]], [[TYPE]]* %T)
 
-// CHECK:    define internal i64 @arraydestroy([[REFCOUNT]]*
+// CHECK:    define internal void @arraydestroy([[REFCOUNT]]*
 //   Load the binding.
 // CHECK:      [[T0:%.*]] = bitcast [[REFCOUNT]]* [[ALLOC:%.*]] to i8*
 // CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds i8* [[T0]], i32 24
 // CHECK-NEXT: [[T2:%.*]] = bitcast i8* [[T1]] to [[TYPE]]**
 // CHECK-NEXT: %T = load [[TYPE]]** [[T2]], align 8
+// CHECK:  store [[TYPE]]*
+//   Compute the header size.
 // CHECK-NEXT: [[T0:%.*]] = bitcast [[TYPE]]* %T to i8***
 // CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds i8*** [[T0]], i64 -1
-// CHECK-NEXT: %T.value = load i8*** [[T1]], align 8
-//   Compute the header size.
-// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds i8** %T.value, i32 13
+// CHECK-NEXT: [[T_VALUE:%.*]] = load i8*** [[T1]], align 8
+// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds i8** [[T_VALUE]], i32 18
 // CHECK-NEXT: [[T1:%.*]] = load i8** [[T0]], align 8
-// CHECK-NEXT: [[T_ALIGN:%.*]] = ptrtoint i8* [[T1]] to i64
-// CHECK-NEXT: [[T0:%.*]] = sub i64 [[T_ALIGN]], 1
-// CHECK-NEXT: [[T1:%.*]] = add i64 32, [[T0]]
-// CHECK-NEXT: [[T2:%.*]] = xor i64 [[T0]], -1
-// CHECK-NEXT: [[HEADER_SIZE:%.*]] = and i64 [[T1]], [[T2]]
+// CHECK-NEXT: [[T2:%.*]] = ptrtoint i8* [[T1]] to i64
+// CHECK-NEXT: [[T_ALIGNMASK:%.*]] = and i64 [[T2]], 65535
+// CHECK-NEXT: [[T0:%.*]] = add i64 32, [[T_ALIGNMASK]]
+// CHECK-NEXT: [[T1:%.*]] = xor i64 [[T_ALIGNMASK]], -1
+// CHECK-NEXT: [[HEADER_SIZE:%.*]] = and i64 [[T0]], [[T1]]
 //   Load the length.
 // CHECK:      [[T0:%.*]] = getelementptr inbounds [[REFCOUNT]]* [[ALLOC]], i32 1
 // CHECK-NEXT: [[T1:%.*]] = bitcast [[REFCOUNT]]* [[T0]] to i64*
 // CHECK-NEXT: [[BOUND:%.*]] = load i64* [[T1]], align 8
 //   Load the stride and find the limits of the array.
-// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds i8** %T.value, i32 14
+// CHECK-NEXT: [[T0:%.*]] = bitcast [[TYPE]]* %T to i8***
+// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds i8*** [[T0]], i64 -1
+// CHECK-NEXT: [[T_VALUE:%.*]] = load i8*** [[T1]], align 8
+// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds i8** [[T_VALUE]], i32 19
 // CHECK-NEXT: [[T1:%.*]] = load i8** [[T0]], align 8
 // CHECK-NEXT: [[T_STRIDE:%.*]] = ptrtoint i8* [[T1]] to i64
 // CHECK-NEXT: [[T0:%.*]] = bitcast [[REFCOUNT]]* [[ALLOC:%.*]] to i8*
@@ -103,3 +107,9 @@ func make_array<T>(n : Int) -> T[] {
 //   Loop over the elements.
 // CHECK-NEXT: icmp eq [[OPAQUE]]* [[BEGIN]], [[END]]
 // CHECK-NEXT: br i1
+
+// CHECK: define [[arrayLayout]] @_TF10heaparrays22make_array_enumerators{{.*}}(i64, %swift.opaque* noalias, %swift.type* [[T:%[0-9a-zA-Z]*]],
+func make_array_enumerators<T : Generator>(n: Int, x: T) -> T[] {
+  // CHECK: call [[arrayLayout]] @_TFSa20convertFromHeapArray{{.*}}(i8* [[STORAGE:%[0-9a-zA-Z]*]], %swift.refcounted* [[OWNER:%[0-9a-zA-Z]*]], i64 [[LENGTH:%[0-9a-zA-Z]*]], %swift.type* [[T]])
+  return new T[n] { i in x }
+}

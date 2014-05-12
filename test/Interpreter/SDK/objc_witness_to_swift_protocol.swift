@@ -10,7 +10,7 @@ extension NSObject: Hashish {}
 
 func getHash<T: Hashish>(x: T) -> Int { return x.hash }
 
-let u = NSURL(withString: "http://www.example.com")
+let u = NSURL(string: "http://www.example.com")
 
 // CHECK: true
 println(u.hash == getHash(u))

@@ -1,5 +1,4 @@
-// RUN: %swift -parse %s -verify -D FOO -D BAR
-// REQUIRES: X86
+// RUN: %swift -parse %s -verify -D FOO -D BAR -target x86_64-apple-darwin11.3.0
 
 class A {}
 
@@ -62,4 +61,22 @@ protocol P1 {
 class P : P1 {
 	func fFOO() -> Int { return 0; }
 	func fBAR() -> Int { return 0; }
+}
+
+func constants1() -> Int {
+#if true
+	return 1
+#else
+	return "1" // should not result in an error
+#endif
+}
+
+func constants2() -> Int {
+#if false
+	return "1" // should not result in an error
+#elseif ((false || false))
+	return "1" // should not result in an error
+#else
+	return 1
+#endif
 }

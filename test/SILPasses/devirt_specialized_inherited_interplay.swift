@@ -1,15 +1,30 @@
 // RUN: %swift -sil-verify-all -O3 %s -emit-sil | FileCheck %s
+// XFAIL: *
 
 // This file consists of tests for making sure that protocol conformances and
-// inherited conformances work well together when applied to each other.
+// inherited conformances work well together when applied to each other. The
+// check works by making sure we can blow through a long class hierarchy and
+// expose the various "unknown" functions.
 //
 // *NOTE* If something like templated protocols is ever implemented this file
 // needs to be updated.
 
 // CHECK-LABEL: sil private @top_level_code : $@thin () -> () {
 // CHECK: bb0:
-// CHECK-NEXT: %0 = tuple ()
-// CHECK-NEXT: return %0 : $()
+// CHECK-NEXT: alloc_ref $A4<S>
+// CHECK-NEXT: alloc_ref $B2<S>
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: function_ref @unknown3 : $@thin () -> ()
+// CHECK-NEXT: apply
+// CHECK-NEXT: apply
+// CHECK-NEXT: strong_release
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: function_ref @unknown5 : $@thin () -> ()
+// CHECK-NEXT: apply
+// CHECK-NEXT: apply
+// CHECK-NEXT: strong_release
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
 
 @asmname("unknown0")
 func unknown0() -> ()
@@ -90,3 +105,5 @@ func driver() {
   WhatShouldIDo(b)
   WhatShouldIDo2(b)
 }
+
+driver()

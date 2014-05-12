@@ -1,4 +1,4 @@
-//===--- SwiftTargetInfo.cpp --------------------------------------------*-===//
+//===--- SwiftTargetInfo.cpp ----------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -19,63 +19,137 @@
 #include "IRGenModule.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/IR/DataLayout.h"
-#include "swift/IRGen/Options.h"
+#include "swift/ABI/System.h"
+#include "swift/AST/IRGenOptions.h"
 
 using namespace swift;
 using namespace irgen;
 
-/// Creates a generic SwiftTargetInfo with conservative values that should
-/// be valid for any platform absent more specific information.
-static SwiftTargetInfo getGenericSwiftTargetInfo(IRGenModule &IGM) {
-  auto pointerSize = IGM.DataLayout.getPointerSizeInBits();
-  
-  // Assume no spare bits in pointers.
-  llvm::BitVector pointerSpareBits(pointerSize, false);
-  // Assume all bit patterns are reserved by the ObjC runtime.
-  llvm::BitVector objcReservedBits(pointerSize, true);
-  // Assume no special alignment of heap objects.
-  Alignment heapObjectAlignment(1);
-  // Assume only zero is an invalid pointer.
-  uint64_t leastValidPointerValue = 1;
-  
-  return SwiftTargetInfo(std::move(pointerSpareBits),
-                         std::move(objcReservedBits),
-                         heapObjectAlignment,
-                         leastValidPointerValue);
+/// Initialize a bit vector to be equal to the given bit-mask.
+static void setToMask(llvm::BitVector &bits, uint64_t mask) {
+  // This is a ridiculously inefficient way of doing this.
+  for (unsigned i = 0, e = bits.size(); i != e; ++i) {
+    if (mask & (1ULL << i)) {
+      bits.set(i);
+    } else {
+      bits.reset(i);
+    }
+  }
 }
 
-/// Creates SwiftTargetInfo for X86-64 platforms.
-static SwiftTargetInfo getX86_64SwiftTargetInfo(IRGenModule &IGM) {
-  // User space only uses the low 47 bits of a pointer.
-  // FIXME: In kernel mode, the highest bit is occupied.
-  llvm::BitVector pointerSpareBits(47, false);
-  pointerSpareBits.resize(64, true);
+/// Configures target-specific information for arm64 platforms.
+static void configureARM64(IRGenModule &IGM, const llvm::Triple &triple,
+                           SwiftTargetInfo &target) {
+  setToMask(target.PointerSpareBits,
+            SWIFT_ABI_ARM64_SWIFT_SPARE_BITS_MASK);
+  setToMask(target.ObjCPointerReservedBits,
+            SWIFT_ABI_ARM64_OBJC_RESERVED_BITS_MASK);
   
-  // Objective-C reserves the lowest and highest bits for tagged pointers.
-  llvm::BitVector objcReservedBits(64, false);
-  objcReservedBits[0] = true;
-  objcReservedBits[63] = true;
+  if (triple.isOSDarwin()) {
+    target.LeastValidPointerValue =
+      SWIFT_ABI_DARWIN_ARM64_LEAST_VALID_POINTER;
+  }
+
+  // CGPoint and CGRect are both returned in registers.
+  target.MaxScalarsForDirectResult = 4;
+
+  // arm64 has no special objc_msgSend variants, not even stret.
+  target.ObjCUseStret = false;
+
+  // arm64 requires marker assembly for objc_retainAutoreleasedReturnValue.
+  target.ObjCRetainAutoreleasedReturnValueMarker =
+    "mov\tfp, fp\t\t; marker for objc_retainAutoreleaseReturnValue";
+}
+
+/// Configures target-specific information for x86-64 platforms.
+static void configureX86_64(IRGenModule &IGM, const llvm::Triple &triple,
+                            SwiftTargetInfo &target) {
+  setToMask(target.PointerSpareBits,
+            SWIFT_ABI_X86_64_SWIFT_SPARE_BITS_MASK);
+  setToMask(target.ObjCPointerReservedBits,
+            SWIFT_ABI_X86_64_OBJC_RESERVED_BITS_MASK);
   
-  // Heap objects are 16-byte-aligned.
-  Alignment heapObjectAlignment(16);
+  if (triple.isOSDarwin()) {
+    target.LeastValidPointerValue =
+      SWIFT_ABI_DARWIN_X86_64_LEAST_VALID_POINTER;
+  }
+
+  // On simulator targets, use null instead of &_objc_empty_vtable.
+  if (triple.isiOS())
+    target.ObjCUseNullForEmptyVTable = true;
   
-  // The null 4K page is always unmapped.
-  // FIXME: Are additional null pages always unmapped on some platforms?
-  uint64_t leastValidPointerValue = 4096;
+  // x86-64 has every objc_msgSend variant known to humankind.
+  target.ObjCUseFPRet = true;
+  target.ObjCUseFP2Ret = true;
+}
+
+/// Configures target-specific information for 32-bit x86 platforms.
+static void configureX86(IRGenModule &IGM, const llvm::Triple &triple,
+                         SwiftTargetInfo &target) {
+  // On simulator targets, use null instead of &_objc_empty_vtable.
+  if (triple.isiOS())
+    target.ObjCUseNullForEmptyVTable = true;
   
-  return SwiftTargetInfo(std::move(pointerSpareBits),
-                         std::move(objcReservedBits),
-                         heapObjectAlignment,
-                         leastValidPointerValue);
+  // x86 uses objc_msgSend_fpret but not objc_msgSend_fp2ret.
+  target.ObjCUseFPRet = true;
+}
+
+/// Configures target-specific information for 32-bit arm platforms.
+static void configureARM(IRGenModule &IGM, const llvm::Triple &triple,
+                         SwiftTargetInfo &target) {
+  // ARM requires marker assembly for objc_retainAutoreleasedReturnValue.
+  target.ObjCRetainAutoreleasedReturnValueMarker =
+    "mov\tr7, r7\t\t@ marker for objc_retainAutoreleaseReturnValue";
+}
+
+/// Configure a default target.
+SwiftTargetInfo::SwiftTargetInfo(unsigned numPointerBits)
+  : PointerSpareBits(numPointerBits, false),
+    ObjCPointerReservedBits(numPointerBits, true),
+    HeapObjectAlignment(numPointerBits / 8),
+    LeastValidPointerValue(SWIFT_ABI_DEFAULT_LEAST_VALID_POINTER)
+{
+  setToMask(PointerSpareBits,
+            SWIFT_ABI_DEFAULT_SWIFT_SPARE_BITS_MASK);
+  setToMask(ObjCPointerReservedBits,
+            SWIFT_ABI_DEFAULT_OBJC_RESERVED_BITS_MASK);
 }
 
 SwiftTargetInfo SwiftTargetInfo::get(IRGenModule &IGM) {
   llvm::Triple triple(IGM.Opts.Triple);
+  auto pointerSize = IGM.DataLayout.getPointerSizeInBits();
+
+  /// Prepare generic target information.
+  SwiftTargetInfo target(pointerSize);
   
   switch (triple.getArch()) {
   case llvm::Triple::x86_64:
-    return getX86_64SwiftTargetInfo(IGM);
+    configureX86_64(IGM, triple, target);
+    break;
+
+  case llvm::Triple::x86:
+    configureX86(IGM, triple, target);
+    break;
+
+  case llvm::Triple::arm:
+    configureARM(IGM, triple, target);
+    break;
+
+  case llvm::Triple::arm64:
+    configureARM64(IGM, triple, target);
+    break;
+
   default:
-    return getGenericSwiftTargetInfo(IGM);
+    // FIXME: Complain here? Default target info is unlikely to be correct.
+    break;
   }
+
+  // The JIT does not support absolute symbols, so we have to use null
+  // for &objc_empty_vtable.
+  if (IGM.Opts.UseJIT) {
+    target.ObjCUseNullForEmptyVTable = true;
+  }
+
+  return target;
 }
+

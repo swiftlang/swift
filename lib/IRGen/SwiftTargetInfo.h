@@ -26,40 +26,52 @@ namespace irgen {
   class IRGenModule;
 
 class SwiftTargetInfo {
+  explicit SwiftTargetInfo(unsigned numPointerBits);
+
 public:
-  SwiftTargetInfo(llvm::BitVector &&pointerSpareBits,
-                  llvm::BitVector &&objcPointerReservedBits,
-                  Alignment heapObjectAlignment,
-                  uint64_t leastValidPointerValue)
-    : PointerSpareBits(std::move(pointerSpareBits)),
-      ObjCPointerReservedBits(std::move(objcPointerReservedBits)),
-      HeapObjectAlignment(heapObjectAlignment),
-      LeastValidPointerValue(leastValidPointerValue)
-  {}
-  
+
   /// Produces a SwiftTargetInfo object appropriate to the target.
   static SwiftTargetInfo get(IRGenModule &IGM);
 
   /// The spare bit mask for pointers. Bits set in this mask are unused by
   /// pointers of any alignment.
-  const llvm::BitVector PointerSpareBits;
+  llvm::BitVector PointerSpareBits;
   
   /// The reserved bit mask for Objective-C pointers. Pointer values with
   /// bits from this mask set are reserved by the ObjC runtime and cannot be
   /// used for Swift value layout when a reference type may reference ObjC
   /// objects.
-  const llvm::BitVector ObjCPointerReservedBits;
+  llvm::BitVector ObjCPointerReservedBits;
   
-  /// The alignment of heap objects.
-  const Alignment HeapObjectAlignment;
+  /// The alignment of heap objects.  By default, assume pointer alignment.
+  Alignment HeapObjectAlignment;
   
   /// The least integer value that can theoretically form a valid pointer.
-  /// This excludes addresses in the null page(s) guaranteed to be unmapped by
-  /// the platform.
-  const uint64_t LeastValidPointerValue;
+  /// By default, assume that there's an entire page free.
+  ///
+  /// This excludes addresses in the null page(s) guaranteed to be
+  /// unmapped by the platform.
+  ///
+  /// Changes to this must be kept in sync with swift/Runtime/Metadata.h.
+  uint64_t LeastValidPointerValue;
+
+  /// The maximum number of scalars that we allow to be returned directly.
+  /// FIXME Until rdar://14679857, this must be set such that 
+  /// NSRect and NSPoint structs are returned correctly.
+  unsigned MaxScalarsForDirectResult = 3;
+
+  /// Inline assembly to mark a call to objc_retainAutoreleasedReturnValue.
+  llvm::StringRef ObjCRetainAutoreleasedReturnValueMarker;
+
+  /// Some architectures have specialized objc_msgSend variants.
+  bool ObjCUseStret = true;
+  bool ObjCUseFPRet = false;
+  bool ObjCUseFP2Ret = false;
+  bool ObjCUseNullForEmptyVTable = false;
 };
 
 }
 }
 
 #endif
+

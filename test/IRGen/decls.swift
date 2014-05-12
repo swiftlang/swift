@@ -1,9 +1,21 @@
-// RUN: %swift -triple x86_64-apple-darwin10 %s -emit-llvm | FileCheck %s
+// RUN: %swift -target x86_64-apple-darwin10 %s -emit-ir | FileCheck %s
 
 // Multiple local decls.
 func test1() {
-  class a { var x, y : Int }
-  class b { var a, b : Int }
+  class a { 
+    var x, y : Int
+    init() {
+      x = 0
+      y = 0
+    }
+  }
+  class b { 
+    var a, b : Int 
+    init() {
+      a = 0
+      b = 0
+    }
+  }
   var _ : a, _ : b
 }
 

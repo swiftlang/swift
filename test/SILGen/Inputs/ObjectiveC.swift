@@ -1,5 +1,7 @@
 // Fake ObjectiveC module for testing String/NSString bridging.
 
+@exported import ObjectiveC
+
 struct ObjCBool : LogicValue {
   var value : UInt8
 
@@ -16,8 +18,8 @@ struct ObjCBool : LogicValue {
   }
 }
 
-@asmname="swift_BoolToObjCBool"
-func convertBoolToObjCBool(x: Bool) -> ObjCBool
+@asmname("swift_BoolToObjCBool")
+func _convertBoolToObjCBool(x: Bool) -> ObjCBool
 
-@asmname="swift_ObjCBoolToBool"
-func convertObjCBoolToBool(x: ObjCBool) -> Bool
+@asmname("swift_ObjCBoolToBool")
+func _convertObjCBoolToBool(x: ObjCBool) -> Bool

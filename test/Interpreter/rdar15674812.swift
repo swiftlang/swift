@@ -1,5 +1,4 @@
-// RUN: %swift -i %s | FileCheck %s
-// REQUIRES: swift_interpreter
+// RUN: %target-run-simple-swift | FileCheck %s
 
 class HeapBuf<Element> {}
 
@@ -9,12 +8,12 @@ struct XBuffer {
 
 class Q {}
 
-func hexAddr(x: DynamicLookup) -> Q {
+func hexAddr(x: AnyObject) -> Q {
  return Q()
 }
 
 func crash() {
- hexAddr(XBuffer(HeapBuf<()>())._storage)
+ hexAddr(XBuffer(_storage: HeapBuf<()>())._storage)
 }
 
 crash()

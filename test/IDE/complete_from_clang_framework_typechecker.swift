@@ -1,4 +1,7 @@
-// RUN: %swift -parse -verify %s -F %S/Inputs/mock-sdk
+// RUN: rm -rf %t
+// RUN: mkdir -p %t
+
+// RUN: %swift -parse -verify %s -F %S/Inputs/mock-sdk -module-cache-path %t/clang-module-cache
 
 import Foo
 // Don't import 'FooHelper'.

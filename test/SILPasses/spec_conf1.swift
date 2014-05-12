@@ -1,4 +1,4 @@
-// RUN: %swift -O3 -sil-inline-threshold=0 -emit-sil %s | FileCheck %s
+// RUN: %swift -O3 -disable-arc-opts -sil-inline-threshold 0 -emit-sil %s | FileCheck %s
 // We can't deserialize apply_inst with subst lists. When radar://14443304
 // is fixed then we should convert this test to a SIL test.
 
@@ -10,12 +10,12 @@ class Foo: P, Q {
   func q() {}
 }
 
-func inner_function<T : P>(In : T) { }
-func outer_function<T : P>(In : T) { inner_function(In) }
+func inner_function<T : P>(`In : T) { }
+func outer_function<T : P>(`In : T) { inner_function(In: In) }
 
-//CHECK: sil private @_TF10spec_conf114outer_functionUS_1P__FT2InQ__T__spec0
-//CHECK: function_ref @_TF10spec_conf114inner_functionUS_1P__FT2InQ__T__spec0
+//CHECK: sil shared @_TTSC10spec_conf13FooS0_S_1P___TF10spec_conf114outer_functionUS_1P__FT2InQ__T_
+//CHECK: function_ref @_TTSC10spec_conf13FooS0_S_1P___TF10spec_conf114inner_functionUS_1P__FT2InQ__T_
 //CHECK-NEXT: apply
 //CHECK: return
 
-outer_function(Foo())
+outer_function(In: Foo())

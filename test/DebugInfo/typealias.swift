@@ -1,4 +1,4 @@
-// RUN: %swift -triple x86_64-apple-darwin13 %s -emit-llvm -g -o - | FileCheck %s
+// RUN: %swift -target x86_64-apple-darwin13 %s -emit-ir -g -o - | FileCheck %s
 class DWARF
 {
 // CHECK-DAG: ![[DIEOFFSET:.*]] = {{.*}}[ DW_TAG_typedef ] [_TtaC9typealias5DWARF9DIEOffset] [line [[@LINE+1]], size 0, align 0, offset 0] [from _TtVSs6UInt32]
@@ -7,8 +7,11 @@ class DWARF
 
 func main () {
   // CHECK-DAG: metadata ![[DIEOFFSET]], i32 0, i32 0} ; [ DW_TAG_auto_variable ] [a] [line [[@LINE+1]]]
-    var a = DWARF.DIEOffset(123)
+    var a : DWARF.DIEOffset = 123
     println("a is \(a)")
+  // CHECK-DAG: metadata ![[DIEOFFSET]], i32 0, i32 0} ; [ DW_TAG_auto_variable ] [b] [line [[@LINE+1]]]
+    var b = DWARF.DIEOffset(456) as DWARF.DIEOffset
+    println("b is \(b)")
 }
 
 main();

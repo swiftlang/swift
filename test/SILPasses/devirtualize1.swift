@@ -7,10 +7,10 @@ class Bar<T> {
 }
 
 //CHECK: function_with_interesting_stuff
-//CHECK: function_ref @_TFC13devirtualize13Bar4pingU__fGS0_Q__FT_T_
+//CHECK-NOT: class_method
 //CHECK: return 
 func function_with_interesting_stuff() {
-  var x = Bar<Int>(3)
+  var x = Bar<Int>(x: 3)
   x.ping()
 }
 

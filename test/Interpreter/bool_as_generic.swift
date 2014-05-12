@@ -1,15 +1,15 @@
-// RUN: %swift -i %s | FileCheck %s
+// RUN: %target-run-simple-swift | FileCheck %s
 // <rdar://problem/13986638> Missing Bool metadata when Bool is used as a generic
 // parameter or existential value
 
 operator prefix !! {}
 operator infix &&& {}
 
-func [prefix] !!<T:LogicValue>(x:T) -> Bool {
+@prefix func !!<T : LogicValue>(x: T) -> Bool {
   return x.getLogicValue()
 }
 
-func &&&(x:LogicValue, y:[auto_closure] () -> LogicValue) -> Bool {
+func &&&(x: LogicValue, y: @auto_closure () -> LogicValue) -> Bool {
   return x.getLogicValue() ? y().getLogicValue() : false
 }
 

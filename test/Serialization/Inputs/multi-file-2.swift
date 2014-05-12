@@ -4,3 +4,7 @@
 enum TheEnum {
   case A, B, C(MyClass)
 }
+
+enum EquatableEnum {
+  case A
+}

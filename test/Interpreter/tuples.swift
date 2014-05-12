@@ -1,25 +1,25 @@
-// RUN: %swift -i %s | FileCheck %s
+// RUN: %target-run-simple-swift | FileCheck %s
 
-typealias Interval = (lo:Int, hi:Int)
+typealias Interval = (lo: Int, hi: Int)
 
 operator infix <+> {}
 operator infix <-> {}
 operator infix <+>= {}
 
-func <+>(a:Interval, b:Interval) -> Interval {
+func <+>(a: Interval, b: Interval) -> Interval {
   return (a.lo + b.lo, a.hi + b.hi)
 }
 
-func <->(a:Interval, b:Interval) -> Interval {
+func <->(a: Interval, b: Interval) -> Interval {
   return (a.lo - b.hi, a.hi - b.lo)
 }
 
-func [assignment] <+>=(a:[byref] Interval, b:Interval) {
+@assignment func <+>=(inout a: Interval, b: Interval) {
   a.lo += b.lo
   a.hi += b.hi
 }
 
-func println(x:Interval) {
+func println(x: Interval) {
   println("(lo=\(x.lo), hi=\(x.hi))")
 }
 
@@ -38,8 +38,8 @@ func mutate() {
 }
 mutate()
 
-func printInts(ints:Int...) {
-  print("\(ints.length) ints: ")
+func printInts(ints: Int...) {
+  print("\(ints.count) ints: ")
   for int in ints {
     print("\(int) ")
   }

@@ -2,7 +2,7 @@
 // RUN: FileCheck %s < %t.simple.txt
 // RUN: FileCheck -check-prefix SIMPLE %s < %t.simple.txt
 
-// RUN: %swift_driver -driver-print-jobs -emit-module %s -sdk %S/../Inputs/clang-importer-sdk -Xfrontend -foo -Xfrontend -bar -o sdk.out 2>&1 > %t.complex.txt
+// RUN: %swift_driver -driver-print-jobs -emit-module %s -sdk %S/../Inputs/clang-importer-sdk -Xfrontend -foo -Xfrontend -bar -o sdk.out -emit-objc-header-path path/to/header.h -F /path/to/frameworks -F /path/to/more/frameworks -I /path/to/headers -I path/to/more/headers -module-cache-path /tmp/modules 2>&1 > %t.complex.txt
 // RUN: FileCheck %s < %t.complex.txt
 // RUN: FileCheck -check-prefix COMPLEX %s < %t.complex.txt
 
@@ -10,26 +10,76 @@
 // RUN: FileCheck %s < %t.complex.txt
 // RUN: FileCheck -check-prefix TWO-OUTPUTS %s < %t.complex.txt
 
-// CHECK: bin/swift
+// RUN: %swift_driver -driver-print-jobs -c %s -emit-objc-header -o sdk.foo.out 2>&1 > %t.complex.txt
+// RUN: FileCheck %s < %t.complex.txt
+// RUN: FileCheck -check-prefix THREE-OUTPUTS %s < %t.complex.txt
+
+// CHECK: bin/swift -frontend
 // CHECK: -o [[OBJECTFILE:.*]]
 
-// CHECK-NEXT: bin/swift
+// CHECK-NEXT: bin/swift -frontend
 // CHECK: -emit-module
 // CHECK: -o {{[^ ]+}}
 
 
-// SIMPLE: bin/swift
+// SIMPLE: bin/swift -frontend
+// SIMPLE: -emit-module
+// SIMPLE: -primary-file
+// SIMPLE: -emit-module-doc -emit-module-doc-path {{[^ ]*}}/merge-module-{{[^ ]*}}.swiftdoc
+// SIMPLE: -o {{[^ ]*}}/merge-module-{{[^ ]*}}.swiftmodule
+// SIMPLE: bin/swift -frontend
 // SIMPLE: -emit-module
 // SIMPLE: -o main.swiftmodule
 
 
-// COMPLEX: bin/swift
+// COMPLEX: bin/swift -frontend
 // COMPLEX: -emit-module
+// COMPLEX-DAG: -emit-module-doc -emit-module-doc-path {{[^ ]*}}/merge-module-{{[^ ]*}}.swiftdoc
 // COMPLEX-DAG: -sdk {{.*}}/Inputs/clang-importer-sdk
 // COMPLEX-DAG: -foo -bar
+// COMPLEX-DAG: -F /path/to/frameworks -F /path/to/more/frameworks
+// COMPLEX-DAG: -I /path/to/headers -I path/to/more/headers
+// COMPLEX-DAG: -module-cache-path /tmp/modules
+// COMPLEX: bin/swift -frontend
+// COMPLEX: -emit-module
+// COMPLEX-DAG: -F /path/to/frameworks -F /path/to/more/frameworks
+// COMPLEX-DAG: -I /path/to/headers -I path/to/more/headers
+// COMPLEX-DAG: -emit-objc-header-path path/to/header.h
 // COMPLEX: -o sdk.out
 
 
-// TWO-OUTPUTS: bin/swift
-// TWO-OUTPUTS: -emit-module
+// TWO-OUTPUTS: bin/swift -frontend
+// TWO-OUTPUTS: -emit-module-doc -emit-module-doc-path {{[^ ]*}}/merge-module-{{[^ ]*}}.swiftdoc
+// TWO-OUTPUTS: -emit-module -emit-module-path [[MODULE:[^ ]+]]
+// TWO-OUTPUTS: -o {{[^ ]*}}/merge-module-{{[^ ]*}}.o
+// TWO-OUTPUTS: bin/swift -frontend
+// TWO-OUTPUTS: -emit-module [[MODULE]]
 // TWO-OUTPUTS: -o main.swiftmodule
+
+// THREE-OUTPUTS: bin/swift -frontend
+// THREE-OUTPUTS: -emit-module-doc -emit-module-doc-path {{[^ ]*}}/merge-module-{{[^ ]*}}.swiftdoc
+// THREE-OUTPUTS: -emit-module -emit-module-path [[MODULE:[^ ]+]]
+// THREE-OUTPUTS: -o {{[^ ]*}}/merge-module-{{[^ ]*}}.o
+// THREE-OUTPUTS: bin/swift -frontend
+// THREE-OUTPUTS: -emit-module [[MODULE]]
+// THREE-OUTPUTS: -emit-objc-header -emit-objc-header-path sdk.foo.h
+// THREE-OUTPUTS: -o sdk.foo.out
+
+// RUN: %swift_driver -driver-print-jobs -emit-module %S/Inputs/main.swift %S/Inputs/lib.swift -module-name merge -o /tmp/modules > %t.complex.txt
+// RUN: FileCheck %s < %t.complex.txt
+// RUN: FileCheck -check-prefix MERGE_1 %s < %t.complex.txt
+
+// MERGE_1: bin/swift -frontend -emit-module -primary-file {{[^ ]+}}/Inputs/main.swift {{[^ ]+}}/Inputs/lib.swift
+// MERGE_1: -module-name merge
+// MERGE_1: -emit-module-doc -emit-module-doc-path [[PARTIAL_MODULE_A:[^ ]+]].swiftdoc
+// MERGE_1: -o [[PARTIAL_MODULE_A]].swiftmodule
+// MERGE_1: bin/swift -frontend -emit-module {{[^ ]+}}/Inputs/main.swift -primary-file {{[^ ]+}}/Inputs/lib.swift
+// MERGE_1: -module-name merge
+// MERGE_1: -emit-module-doc -emit-module-doc-path [[PARTIAL_MODULE_B:[^ ]+]].swiftdoc
+// MERGE_1: -o [[PARTIAL_MODULE_B]].swiftmodule
+// MERGE_1: bin/swift -frontend -emit-module [[PARTIAL_MODULE_A]].swiftmodule [[PARTIAL_MODULE_B]].swiftmodule
+// MERGE_1: -parse-as-library
+// MERGE_1: -module-name merge
+// MERGE_1: -emit-module-doc -emit-module-doc-path /tmp/modules.swiftdoc
+// MERGE_1: -o /tmp/modules
+

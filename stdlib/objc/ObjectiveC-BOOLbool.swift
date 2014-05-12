@@ -1,4 +1,16 @@
-@exported 
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+@exported
 import ObjectiveC
 
 /// \brief The Objective-C BOOL type.
@@ -11,6 +23,10 @@ import ObjectiveC
 /// FIXME: It may be possible to replace this with `typealias ObjCBool = Bool`.
 struct ObjCBool : ReplPrintable {
   var value : Bool
+
+  init(_ value: Bool) {
+    self.value = value
+  }
 
   /// \brief Allow use in a Boolean context.
   func getLogicValue() -> Bool {

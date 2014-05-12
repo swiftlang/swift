@@ -1,5 +1,5 @@
 // RUN: rm -rf %t/clang-module-cache
-// RUN: %swift -emit-silgen -module-cache-path %t/clang-module-cache -target x86_64-apple-darwin13 -sdk %S/Inputs -I %S/Inputs -objc-bridge-dictionary -enable-source-import %s | FileCheck %s
+// RUN: %swift -emit-silgen -module-cache-path %t/clang-module-cache -target x86_64-apple-darwin13 -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | FileCheck %s
 
 import Foundation
 import gizmo
@@ -28,7 +28,6 @@ import gizmo
 
     // CHECK:   [[CONVERTER:%[0-9]+]] = function_ref @_TF10Foundation32_convertDictionaryToNSDictionary{{.*}} : $@thin <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@owned Dictionary<τ_0_0, τ_0_1>) -> @owned NSDictionary
     // CHECK-NEXT:   [[NSDICT:%[0-9]+]] = apply [[CONVERTER]]<Foo, Foo>([[DICT]]) : $@thin <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@owned Dictionary<τ_0_0, τ_0_1>) -> @owned NSDictionary
-    // CHECK:   release_value [[DICT]] : $Dictionary<Foo, Foo>
     // CHECK-NEXT:   autorelease_return [[NSDICT]] : $NSDictionary
   }
 
@@ -53,7 +52,11 @@ import gizmo
 // CHECK:   [[SETTER:%[0-9]+]] = function_ref @_TFC24objc_dictionary_bridging3Foos8propertyGVSs10DictionaryS0_S0__ : $@cc(method) @thin (@owned Dictionary<Foo, Foo>, @owned Foo) -> ()
 // CHECK:   [[RESULT:%[0-9]+]] = apply [transparent] [[SETTER]]([[DICT]], [[SELF]]) : $@cc(method) @thin (@owned Dictionary<Foo, Foo>, @owned Foo) -> ()
 // CHECK:   return [[RESULT]] : $()
-  
+
+  // CHECK-LABEL: sil [transparent] @_TToFC24objc_dictionary_bridging3Foog19nonVerbatimProperty{{.*}} : $@cc(objc_method) @thin (Foo) -> @autoreleased NSDictionary
+
+  // CHECK-LABEL: sil [transparent] @_TToFC24objc_dictionary_bridging3Foos19nonVerbatimProperty{{.*}} : $@cc(objc_method) @thin (NSDictionary, Foo) -> ()
+  @objc var nonVerbatimProperty: Dictionary<String, Int> = [:]
 }
 
 func ==(x: Foo, y: Foo) -> Bool { }

@@ -7,7 +7,7 @@
       return 0
     }
   }
-  var bar_ImportedObjcClass_Property1: Int
+  var bar_ImportedObjcClass_Property1: Int = 0
 }
 
 // Don't import this class in the test.

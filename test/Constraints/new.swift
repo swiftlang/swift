@@ -1,22 +1,40 @@
-// RUN: %swift -repl < %s 2>&1 | FileCheck %s
+// RUN: %swift -parse -verify %s
 
 struct X<T> { }
 var i : Int
-func acceptXIntArray(xia : X<Int>[]) {}
+func acceptXIntArray(xia: X<Int>[]) {}
 
-// CHECK: SOLVED (completely)
-// CHECK: Unique solution found.
-:dump_constraints new Int[i]
+class SlowPoint {
+  init(i : Int, s : String) {}
+}
 
-// CHECK: Constraints:
-// CHECK:   (xia : X<Int>[]) -> () == $T1 -> $T2
-// CHECK:   X<$T0>[] << $T1
-// CHECK: ---Simplified constraints---
-// CHECK: Type Variables:
-// CHECK:   $T0 as Int64
-// CHECK:   $T1 as (xia : Slice<X<Int64>>)
-// CHECK:   $T2 as ()
-// CHECK: SOLVED (completely)
-// CHECK: Unique solution found.
-:dump_constraints acceptXIntArray(new X[i])
+class Dict<Key, Value> {
+  init() {} 
+}
 
+func acceptDictStringInt(_: Dict<String, Int>) {}
+
+class OvlCtor {
+  init(i : Int) { }
+  init(s : String) { }
+}
+
+new Int[i]
+acceptXIntArray(new X[i])
+SlowPoint(i: 1, s: "hello")
+acceptDictStringInt(Dict())
+
+OvlCtor(i: 1)
+OvlCtor(s: "")
+
+class ArrayLike<T> {
+  init() { length = 0 }
+
+  var length : Int
+  func clone(x: T) -> ArrayLike<T> {
+    new T[length] {i in x}
+  }
+}
+
+// <rdar://problem/15653973>
+{ new Int[$0] }(5)

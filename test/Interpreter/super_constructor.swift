@@ -1,12 +1,12 @@
-// RUN: %swift -i %s | FileCheck %s
+// RUN: %target-run-simple-swift | FileCheck %s
 
 struct S {
   var a, b : Int
-  constructor(a : Int, b : Int) {
-    this.a = a
-    this.b = b
+  init(_ a : Int, _ b : Int) {
+    self.a = a
+    self.b = b
   }
-  constructor(x:Char) {
+  init(_ x:UnicodeScalar) {
     a = 219
     b = 912
     println("constructed \(x)")
@@ -15,7 +15,7 @@ struct S {
 
 class C {
   var a, b : Int
-  constructor(x:Char) {
+  init(x:UnicodeScalar) {
     a = 20721
     b = 12702
     println("constructed \(x)")
@@ -23,17 +23,17 @@ class C {
 }
 
 class D : C {
-  constructor() {
-    super.constructor('z')
+  init() {
+    super.init(x: "z")
     println("...in bed")
   }
 }
 
-func println(s:S) {
+func println(s: S) {
   println("S(a=\(s.a), b=\(s.b))")
 }
 
-func println(c:C) {
+func println(c: C) {
   println("C(a=\(c.a), b=\(c.b))")
 }
 
@@ -41,11 +41,11 @@ func println(c:C) {
 println(S(1, 2))
 // CHECK: constructed x
 // CHECK: S(a=219, b=912)
-println(S('x'))
+println(S("x"))
 
 // CHECK: constructed y
 // CHECK: C(a=20721, b=12702)
-println(C('y'))
+println(C(x: "y"))
 
 // CHECK: constructed z
 // CHECK: ...in bed

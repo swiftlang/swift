@@ -1,4 +1,4 @@
-// RUN: %swift %s -verify
+// RUN: %swift %s -verify -parse
 
 /* outer block comment starts here expected-note{{comment started here}}
   /* inner block comment starts and ends here */

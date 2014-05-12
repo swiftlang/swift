@@ -1,46 +1,46 @@
-// RUN: %swift -i %s | FileCheck %s
+// RUN: %target-run-simple-swift | FileCheck %s
 
 class A {
-  constructor() { println("a") }
-  constructor(x:Int) { println("b") }
-  constructor<T>(x:Int, y:T) { println("c") }
+  init() { println("a") }
+  init(_ x:Int) { println("b") }
+  init<T>(_ x:Int, _ y:T) { println("c") }
 }
 
 class B<T> {
-  constructor() { println("d") }
-  constructor(x:Int) { println("e") }
-  constructor(x:T) { println("f") }
+  init() { println("d") }
+  init(_ x:Int) { println("e") }
+  init(_ x:T) { println("f") }
 
-  constructor<U>(x:Int, y:U) { println("g") }
-  constructor<U>(x:T, y:U) { println("h") }
+  init<U>(_ x:Int, _ y:U) { println("g") }
+  init<U>(_ x:T, _ y:U) { println("h") }
 }
 
 protocol Runcible {}
 
 class C<T : Runcible> {
-  constructor() { println("i") }
-  constructor(x:Int) { println("j") }
-  constructor(x:T) { println("k") }
+  init() { println("i") }
+  init(_ x:Int) { println("j") }
+  init(_ x:T) { println("k") }
 }
 
 // CHECK: a
-new A()
+A()
 // CHECK: b
-new A(1)
+A(1)
 // CHECK: c
-new A(1, '2')
+A(1, "2")
 
-typealias BChar = B<Char>
+typealias BChar = B<UnicodeScalar>
 // CHECK: d
-new BChar()
+BChar()
 // CHECK: e
-new BChar(1)
+BChar(1)
 // CHECK: f
-new BChar('2')
+BChar("2")
 // CHECK: g
-new BChar(1, "2")
+BChar(1, "2")
 // CHECK: h
-new BChar('1', "2")
+BChar("1", "2")
 
 // <rdar://problem/12965934> Destructors for classes with constrained type parameters
 
@@ -48,8 +48,8 @@ struct Hat : Runcible {}
 
 typealias CHat = C<Hat>
 // CHECK: i
-new CHat()
+CHat()
 // CHECK: j
-new CHat(1)
+CHat(1)
 // CHECK: k
-new CHat(Hat())
+CHat(Hat())

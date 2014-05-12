@@ -1,4 +1,4 @@
-// RUN: %swift -triple x86_64-apple-darwin13 %s -emit-llvm -g -o - | FileCheck %s
+// RUN: %swift -target x86_64-apple-darwin13 %s -emit-ir -g -o - | FileCheck %s
 class DeepThought {
   func query() -> Int { return 42 }
 }

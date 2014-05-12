@@ -9,20 +9,26 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-struct MapGenerator<Base: Generator, T> : Generator, Sequence {
+
+struct _MapGenerator<Base: Generator, T> : Generator, Sequence {
   mutating func next() -> T? {
     return base.next().map(transform)
   }
   
-  func generate() -> MapGenerator {
+  func generate() -> _MapGenerator {
     return self
+  }
+
+  init(_ base: Base, _ transform: (Base.Element)->T) {
+    self.base = base
+    self.transform = transform
   }
 
   var base: Base
   var transform: (Base.Element)->T
 }
 
-struct Map<Base: Collection, T> : Collection {
+struct _Map<Base: Collection, T> : Collection {
   var startIndex: Base.IndexType {
     return base.startIndex
   }
@@ -35,8 +41,13 @@ struct Map<Base: Collection, T> : Collection {
     return transform(base[index])
   }
 
-  func generate() -> MapGenerator<Base.GeneratorType, T> {
-    return MapGenerator(base.generate(), transform)
+  func generate() -> _MapGenerator<Base.GeneratorType, T> {
+    return _MapGenerator(base.generate(), transform)
+  }
+
+  init(_ base: Base, transform: (Base.GeneratorType.Element)->T) {
+    self.base = base
+    self.transform = transform
   }
   
   var base: Base

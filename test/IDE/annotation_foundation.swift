@@ -1,10 +1,9 @@
-// RUN: %swift-ide-test -annotate -source-filename %s -sdk %sdk | FileCheck %s
+// RUN: %swift-ide-test -annotate -source-filename %s | FileCheck %s
 
-// REQUIRES: sdk
-
+// CHECK: import <iMod>Foundation</iMod>
 import Foundation
 
 func foo(c1: NSObject, c2: NSObject) {
-  // CHECK: <Var@[[@LINE-1]]:10>c1</Var> <iFunc@>==</Func> <Var@[[@LINE-1]]:24>c2</Var>
+  // CHECK: <Param@[[@LINE-1]]:10>c1</Param> <iFunc@>==</iFunc> <Param@[[@LINE-1]]:24>c2</Param>
   c1 == c2
 }

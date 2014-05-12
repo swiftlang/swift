@@ -1,5 +1,4 @@
-// RUN: %swift -i %s | FileCheck %s
-// REQUIRES: swift_interpreter
+// RUN: %target-run-simple-swift | FileCheck %s
 
 enum Bewl : LogicValue {
   case False, True

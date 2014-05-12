@@ -40,7 +40,7 @@ func printIdentity(lhs: AnyObject, rhs: AnyObject, lhsName: String, rhsName: Str
 
 println("NoisyEqual ==")
 class NoisyEqual : NSObject {
-  @override func isEqual(rhs: AnyObject) -> Bool {
+  override func isEqual(rhs: AnyObject) -> Bool {
     println("wow much equal")
     return super.isEqual(rhs)
   }
@@ -90,8 +90,8 @@ println("done NSObject ==")
 
 
 println("NSMutableString ==")
-let s1 = NSMutableString.init(withString:"hazcam")
-let s2 = NSMutableString.init(withString:"hazcam")
+let s1 = NSMutableString.init(string:"hazcam")
+let s2 = NSMutableString.init(string:"hazcam")
 printIdentity(s1, s2, "s1", "s2")
 printEquality(s1, s2, "s1", "s2")
 println("mutate")
@@ -113,20 +113,20 @@ println("done NSMutableString ==")
 
 
 //===----------------------------------------------------------------------===//
-// NSObject hashValue()
+// NSObject hashValue
 //===----------------------------------------------------------------------===//
 
 func printHashValue<T: Hashable>(x: T, name: String) {
-  println("\(name) hashes to \(x.hashValue())")
+  println("\(name) hashes to \(x.hashValue)")
 }
 
 
 println("NSMutableString hashValue")
-println("\(s1.hashValue())")
-println("\(s1.hash())")
+println("\(s1.hashValue)")
+println("\(s1.hash)")
 s1.appendString("pancam")
-println("\(s1.hashValue())")
-println("\(s1.hash())")
+println("\(s1.hashValue)")
+println("\(s1.hash)")
 println("done NSMutableString hashValue")
 // CHECK: NSMutableString hashValue
 // CHECK-NEXT: [[H1:[0-9]+]]
@@ -137,9 +137,9 @@ println("done NSMutableString hashValue")
 
 
 class NoisyHash : NSObject {
-  @override func hash() -> Int {
+  override var hash : Int {
     println("so hash")
-    return super.hash()
+    return super.hash
   }
 }
 
@@ -156,42 +156,42 @@ println("done NoisyHash hashValue")
 class ValueLike : NSObject {
   var x: Int
 
-  init(withInt: Int) {
-    x = withInt
+  init(int: Int) {
+    x = int
     super.init()
   }
 
-  @override func isEqual(rhs: AnyObject) -> Bool {
+  override func isEqual(_ rhs: AnyObject) -> Bool {
     if let rhs2 = rhs as ValueLike {
       return x == rhs2.x
     }
     return false
   }
 
-  @override func hash() -> Int {
+  override var hash : Int {
     return x
   }
 }
 
 println("ValueLike hashValue")
-let sh1 = ValueLike.init(withInt:10)
-let sh2 = ValueLike.init(withInt:20)
-let sh3 = ValueLike.init(withInt:10)
+let sh1 = ValueLike.init(int:10)
+let sh2 = ValueLike.init(int:20)
+let sh3 = ValueLike.init(int:10)
 printIdentity(sh1, sh2, "sh1", "sh2")
 printIdentity(sh1, sh3, "sh1", "sh3")
 printIdentity(sh2, sh3, "sh2", "sh3")
 printEquality(sh1, sh2, "sh1", "sh2")
 printEquality(sh1, sh3, "sh1", "sh3")
 printEquality(sh2, sh3, "sh2", "sh3")
-printEquality(sh1.hashValue(), sh2.hashValue(), "sh1 hash", "sh2 hash")
-printEquality(sh1.hashValue(), sh3.hashValue(), "sh1 hash", "sh3 hash")
-printEquality(sh2.hashValue(), sh3.hashValue(), "sh2 hash", "sh3 hash")
+printEquality(sh1.hashValue, sh2.hashValue, "sh1 hash", "sh2 hash")
+printEquality(sh1.hashValue, sh3.hashValue, "sh1 hash", "sh3 hash")
+printEquality(sh2.hashValue, sh3.hashValue, "sh2 hash", "sh3 hash")
 var dict = Dictionary<ValueLike, Int>()
 dict[sh1] = sh1.x
 dict[sh2] = sh2.x
-println("sh1 \(dict[sh1])")
-println("sh2 \(dict[sh2])")
-println("sh3 \(dict[sh3])")
+println("sh1 \(dict[sh1]!)")
+println("sh2 \(dict[sh2]!)")
+println("sh3 \(dict[sh3]!)")
 println("done ValueLike hashValue")
 // CHECK: ValueLike hashValue
 // CHECK-NEXT: sh1 === sh1

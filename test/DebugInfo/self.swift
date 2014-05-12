@@ -16,6 +16,6 @@ func f() {
 // CHECK-NEXT: entry:
 // CHECK-NEXT: %[[ALLOCA:.*]] = alloca %V4self11stuffStruct, align 8
 // CHECK:  call void @llvm.dbg.declare(metadata !{%V4self11stuffStruct* %[[ALLOCA]]}, metadata ![[SELF:.*]]), !dbg
-// CHECK: ![[STUFFSTRUCT:[0-9]+]] = {{.*}} [ DW_TAG_structure_type ] [_TtV4self11stuffStruct]
+// CHECK: null, null, metadata ![[STUFFSTRUCT:.*]]} ; [ DW_TAG_structure_type ] [stuffStruct]
 // CHECK: ![[SELF]] = {{.*}}, metadata ![[STUFFSTRUCT]], i32 0, i32 0} ; [ DW_TAG_auto_variable ] [self]
 

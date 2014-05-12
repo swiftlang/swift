@@ -20,3 +20,16 @@ var errno : Int32 {
     __error().set(newValue)
   }
 }
+
+@availability(*, unavailable, message="Please use threads or posix_spawn*()")
+func fork() -> Int32 {
+  errno = ENOSYS
+  return -1
+}
+
+@availability(*, unavailable, message="Please use threads or posix_spawn*()")
+func vfork() -> Int32 {
+  errno = ENOSYS
+  return -1
+}
+

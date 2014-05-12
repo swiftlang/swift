@@ -1,9 +1,9 @@
-// RUN: rm -rf %t/clang-module-cache
-// RUN: %swift -module-cache-path=%t/clang-module-cache -sdk=%sdk -i %s | FileCheck %s
-// RUN: %swift -module-cache-path=%t/clang-module-cache -sdk=%sdk -sil-irgen -i %s | FileCheck %s
-// REQUIRES: sdk
+// RUN: %target-run-simple-swift | FileCheck %s
 
 import Darwin
 
 // CHECK: Hello world
 puts("Hello world")
+
+// CHECK: 4294967295
+println("\(UINT32_MAX)")

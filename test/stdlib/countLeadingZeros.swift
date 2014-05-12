@@ -1,8 +1,8 @@
-// RUN: %swift -i %s | FileCheck %s
-// REQUIRES: swift_interpreter
+// RUN: %target-run-simple-swift | FileCheck %s
 
-def computeCountLeadingZeroes(x : Int) -> Int {
-   var r = 64
+func computeCountLeadingZeroes(xi: Int64) -> Int64 {
+   var r : Int64 = 64
+   var x = xi
    while (x != 0) {
       x >>= 1
       r--
@@ -10,8 +10,8 @@ def computeCountLeadingZeroes(x : Int) -> Int {
    return r
 }
 
-def testeCountLeadingZeroes() {
-  for var i = 1; i < 1000; i++ {
+func testeCountLeadingZeroes() {
+  for var i : Int64 = 1; i < 1000; i++ {
      assert(countLeadingZeros(i) == computeCountLeadingZeroes(i))
   }
 }
