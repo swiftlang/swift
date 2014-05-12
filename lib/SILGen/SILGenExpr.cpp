@@ -4104,7 +4104,7 @@ static ManagedValue emitBridgeArrayToNSArray(SILGenFunction &gen,
                                      gen.SGM.getLoweredType(
                                        gen.SGM.Types.getNSArrayType()),
                                      subs,
-                                     { arr.getValue() });
+                                     { arr.forward(gen) });
 
   return gen.emitManagedRValueWithCleanup(nsarr);
 }
@@ -4125,7 +4125,7 @@ static ManagedValue emitBridgeNSArrayToArray(SILGenFunction &gen,
                                    substFnType,
                                    nativeTy,
                                    subs,
-                                   { nsarr.getValue() });
+                                   { nsarr.forward(gen) });
 
   return gen.emitManagedRValueWithCleanup(arr);
 }
@@ -4147,7 +4147,7 @@ static ManagedValue emitBridgeDictionaryToNSDictionary(SILGenFunction &gen,
                                       gen.SGM.getLoweredType(
                                         gen.SGM.Types.getNSDictionaryType()),
                                       subs,
-                                      { dict.getValue() });
+                                      { dict.forward(gen) });
 
   return gen.emitManagedRValueWithCleanup(nsdict);
 }
@@ -4168,7 +4168,7 @@ static ManagedValue emitBridgeNSDictionaryToDictionary(SILGenFunction &gen,
                                     substFnType,
                                     nativeTy,
                                     subs,
-                                    { nsdict.getValue() });
+                                    { nsdict.forward(gen) });
 
   return gen.emitManagedRValueWithCleanup(dict);
 }
