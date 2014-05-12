@@ -305,5 +305,5 @@ entry(%c : $RootGeneric<Int32>):
 // -- initialize our own dependent field offsets
 // CHECK:   call void @swift_initClassMetadata_UniversalStrategy(%swift.type* {{%.*}}, %swift.type* {{%.*}}, i64 1, %swift.type** {{%.*}}, i64* {{%.*}})
 // -- hack to initialize the ObjC class
-// CHECK:   call void @swift_forceInitializeObjCClass
+// CHECK:   call void @swift_instantiateObjCClass
 // CHECK: }

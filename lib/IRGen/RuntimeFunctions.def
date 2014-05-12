@@ -550,7 +550,7 @@ FUNCTION(Once, swift_once, RuntimeCC,
          ARGS(OnceTy->getPointerTo(), Int8PtrTy, RefCountedPtrTy),
          ATTRS())
 
-FUNCTION(ForceInitializeObjCClass, swift_forceInitializeObjCClass, RuntimeCC,
+FUNCTION(InstantiateObjCClass, swift_instantiateObjCClass, RuntimeCC,
          RETURNS(VoidTy),
          ARGS(TypeMetadataPtrTy),
          ATTRS(NoUnwind))

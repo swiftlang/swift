@@ -2350,13 +2350,10 @@ namespace {
                                 metadata, superMetadata, numFields,
                                 fields.getAddress(), fieldVector);
       }
-      
-      // FIXME: Crudely invoke a runtime function on the class to force the
-      // ObjC runtime to do minimal initialization of the class.
-      // We should really register the class pair with the runtime through an
-      // approved channel.
-      llvm::Value *forceInit = IGF.IGM.getForceInitializeObjCClassFn();
-      IGF.Builder.CreateCall(forceInit, metadata);
+
+      // Register the class with the ObjC runtime.
+      llvm::Value *instantiateObjC = IGF.IGM.getInstantiateObjCClassFn();
+      IGF.Builder.CreateCall(instantiateObjC, metadata);
     }
     
   };
