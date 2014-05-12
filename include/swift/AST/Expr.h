@@ -2359,6 +2359,9 @@ public:
   const Pattern *getParams() const { return ParamPattern; }
   void setParams(Pattern *P);
 
+  // Expose this to users.
+  using DeclContext::setParent;
+
   /// Returns a discriminator which determines this expression's index
   /// in the sequence of closure expressions within the current
   /// function.
@@ -2463,9 +2466,6 @@ public:
     Body.setInt(isSingleExpression);
   }
   
-  // Expose this to users.
-  using DeclContext::setParent;
-
   ArrayRef<CaptureListEntry> getCaptureList() { return CaptureList; }
 
   /// \brief Determine whether the parameters of this closure are actually

@@ -1874,6 +1874,7 @@ static FuncDecl *createLazyPropertyGetter(VarDecl *VD, VarDecl *Storage,
   // TODO: This doesn't work with complicated patterns like:
   //   @lazy var (a,b) = foo()
   auto *InitValue = VD->getParentPattern()->getInit();
+  bool wasChecked = VD->getParentPattern()->wasInitChecked();
   VD->getParentPattern()->setInit(nullptr, true);
 
   // Recontextualize any closure declcontexts nested in the initializer to
@@ -1892,7 +1893,7 @@ static FuncDecl *createLazyPropertyGetter(VarDecl *VD, VarDecl *Storage,
                                                Tmp2PBDPattern, nullptr,
                                                /*isConditional*/false,
                                                Get);
-  Tmp2PBD->setInit(InitValue, /*already type checked*/true);
+  Tmp2PBD->setInit(InitValue, /*already type checked*/wasChecked);
   Body.push_back(Tmp2PBD);
   Body.push_back(Tmp2VD);
 
