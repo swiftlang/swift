@@ -1345,16 +1345,20 @@ static FuncDecl *createGetterPrototype(VarDecl *VD, TypeChecker &TC) {
   SourceLoc Loc = VD->getLoc();
 
   // Create the parameter list for the getter.
-  Pattern *GetterParams[] = {
-    // The implicit 'self' argument.
-    buildImplicitSelfParameter(Loc, VD->getDeclContext()),
+  SmallVector<Pattern *, 2> GetterParams;
+
+  // The implicit 'self' argument if in a type context.
+  if (VD->getDeclContext()->isTypeContext())
+    GetterParams.push_back(buildImplicitSelfParameter(Loc,
+                                                      VD->getDeclContext()));
     
     // Add a no-parameters clause.
-    TuplePattern::create(VD->getASTContext(), Loc, ArrayRef<TuplePatternElt>(),
-                         Loc, /*hasVararg=*/false, SourceLoc(),
-                         /*Implicit=*/true)
-  };
-  
+  GetterParams.push_back(TuplePattern::create(VD->getASTContext(), Loc,
+                                              ArrayRef<TuplePatternElt>(),
+                                              Loc, /*hasVararg=*/false,
+                                              SourceLoc(),
+                                              /*Implicit=*/true));
+
   SourceLoc StaticLoc = VD->isStatic() ? VD->getLoc() : SourceLoc();
 
   auto Ty = TC.getTypeOfRValue(VD, /*want interface type*/false);
@@ -1373,13 +1377,16 @@ static FuncDecl *createSetterPrototype(VarDecl *VD, VarDecl *&ValueDecl,
   SourceLoc Loc = VD->getLoc();
 
   // Create the parameter list for the setter.
-  Pattern *SetterParams[] = {
-    // The implicit 'self' argument.
-    buildImplicitSelfParameter(Loc, VD->getDeclContext()),
-    
+  SmallVector<Pattern *, 2> SetterParams;
+
+  // The implicit 'self' argument if in a type context.
+  if (VD->getDeclContext()->isTypeContext())
+    SetterParams.push_back(buildImplicitSelfParameter(Loc,
+                                                      VD->getDeclContext()));
+
     // Add a "(value : T)" pattern.
-    buildSetterValueArgumentPattern(VD, &ValueDecl, TC)
-  };
+  SetterParams.push_back(buildSetterValueArgumentPattern(VD, &ValueDecl, TC));
+
   Type SetterRetTy = TupleType::getEmpty(Context);
   auto *Set = FuncDecl::create(
       Context, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None, Loc,
