@@ -1704,6 +1704,11 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
   if (concrete && kind >= TypeMatchKind::Conversion &&
       shouldTryUserConversion(*this, type1)) {
     conversionsOrFixes.push_back(ConversionRestrictionKind::User);
+    
+    // Favor array conversions to non-array types (such as NSArray).
+    if (this->isArrayType(desugar1) && !this->isArrayType(desugar2)) {
+      this->increaseScore(SK_UserConversion);
+    }
   }
 
 commit_to_conversions:
@@ -1987,7 +1992,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
 ///
 /// This routine does not attempt to check whether the cast can actually
 /// succeed; that's the caller's responsibility.
-static CheckedCastKind getCheckedCastKind(Type fromType, Type toType) {
+static CheckedCastKind getCheckedCastKind(ConstraintSystem *cs,
+                                          Type fromType,
+                                          Type toType) {
   // Peel off optionals metatypes from the types, because we might cast through
   // them.
   while (auto toValueType = toType->getAnyOptionalObjectType()) {
@@ -2021,6 +2028,11 @@ static CheckedCastKind getCheckedCastKind(Type fromType, Type toType) {
   bool fromArchetype = fromType->is<ArchetypeType>();
   bool toExistential = toType->isExistentialType();
   bool fromExistential = fromType->isExistentialType();
+  
+  // Array downcasts are handled specially.
+  if (cs->isArrayType(fromType) && cs->isArrayType(toType)) {
+    return CheckedCastKind::ArrayDowncast;
+  }
 
   // We can only downcast to an existential if the destination protocols are
   // objc and the source type is an objc class or an existential bounded by objc
@@ -2093,8 +2105,16 @@ ConstraintSystem::simplifyCheckedCastConstraint(
   if (typeVar2)
     return SolutionKind::Unsolved;
 
-  auto kind = getCheckedCastKind(fromType, toType);
+  auto kind = getCheckedCastKind(this, fromType, toType);
   switch (kind) {
+  case CheckedCastKind::ArrayDowncast: {
+    auto fromBaseType = getBaseTypeForArrayType(fromType.getPointer());
+    auto toBaseType = getBaseTypeForArrayType(toType.getPointer());
+    
+    addConstraint(ConstraintKind::Subtype, toBaseType, fromBaseType,
+                  getConstraintLocator(locator));
+    return SolutionKind::Solved;
+  }
   case CheckedCastKind::ArchetypeToArchetype:
   case CheckedCastKind::ConcreteToUnrelatedExistential:
   case CheckedCastKind::ExistentialToArchetype:

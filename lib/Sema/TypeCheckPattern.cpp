@@ -874,6 +874,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
                IP->getCastTypeLoc().getType());
       return nullptr;
     // Valid checks.
+    case CheckedCastKind::ArrayDowncast:
     case CheckedCastKind::Downcast:
     case CheckedCastKind::SuperToArchetype:
     case CheckedCastKind::ArchetypeToArchetype:

@@ -87,6 +87,8 @@ enum class CheckedCastKind : unsigned {
   /// A cast from a concrete type to an existential type it is not statically
   /// known to conform to.
   ConcreteToUnrelatedExistential,
+  // A downcast from an array type to another array type.
+  ArrayDowncast,
   
   Last_CheckedCastKind = ConcreteToUnrelatedExistential,
 };
@@ -2040,6 +2042,18 @@ public:
   
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::ArrayUpcastConversion;
+  }
+};
+  
+// ArrayDowncastConversionExpr - Convert an Array<T> to an Array<U>, where
+// T is a subtype of U.
+class ArrayDowncastConversionExpr : public ImplicitConversionExpr {
+public:
+  ArrayDowncastConversionExpr(Expr *subExpr, Type type)
+  : ImplicitConversionExpr(ExprKind::ArrayDowncastConversion, subExpr, type) {}
+  
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::ArrayDowncastConversion;
   }
 };
   

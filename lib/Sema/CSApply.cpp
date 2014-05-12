@@ -2274,7 +2274,11 @@ namespace {
                     expr->getCastTypeLoc().getType());
         expr->setCastKind(castKind);
         break;
-      
+      case CheckedCastKind::ArrayDowncast: {
+        // Re-write to a coercion.
+        expr->setCastKind(CheckedCastKind::Coercion);
+        break;
+      }
       case CheckedCastKind::Downcast:
       case CheckedCastKind::SuperToArchetype:
       case CheckedCastKind::ArchetypeToArchetype:
@@ -2339,6 +2343,7 @@ namespace {
       }
 
       // Valid casts.
+      case CheckedCastKind::ArrayDowncast:
       case CheckedCastKind::Downcast:
       case CheckedCastKind::SuperToArchetype:
       case CheckedCastKind::ArchetypeToArchetype:
@@ -2349,6 +2354,19 @@ namespace {
       case CheckedCastKind::ConcreteToUnrelatedExistential:
         expr->setCastKind(castKind);
         break;
+      }
+      
+      // Allow for down casts between array types. Because of its dependence on
+      // library functionality, this is handled separately from other checked
+      // cast kinds.
+      if (castKind == CheckedCastKind::ArrayDowncast) {
+        toType = tc.getOptionalType(sub->getLoc(), toType);
+        auto arrayConversion = new (tc.Context)
+                                  ArrayDowncastConversionExpr(
+                                                          sub,
+                                                          toType);
+        arrayConversion->setType(toType);
+        return arrayConversion;
       }
       
       // Allow for casts from AnyObject to a briged type.
@@ -2364,8 +2382,8 @@ namespace {
         expr->getCastTypeLoc().setType(bridgedType, true);
         expr->setType(tc.getOptionalType(expr->getLoc(), bridgedType));
           
-        auto optionalStringType = tc.getOptionalType(expr->getLoc(), toType);
-        auto OSTLoc = TypeLoc::withoutLoc(optionalStringType);
+        auto optType = tc.getOptionalType(expr->getLoc(), toType);
+        auto OSTLoc = TypeLoc::withoutLoc(optType);
           
         auto wrappedExpr
           = new (tc.Context) ConditionalCheckedCastExpr(expr,

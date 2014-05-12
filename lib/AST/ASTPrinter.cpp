@@ -2168,6 +2168,8 @@ StringRef swift::getCheckedCastKindName(CheckedCastKind kind) {
     return "concrete_to_archetype";
   case CheckedCastKind::ConcreteToUnrelatedExistential:
     return "concrete_to_unrelated_existential";
+  case CheckedCastKind::ArrayDowncast:
+    return "array_downcast";
   }
   llvm_unreachable("bad checked cast name");
 }

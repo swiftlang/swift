@@ -2684,8 +2684,8 @@ static Address emitCheckedCast(IRGenSILFunction &IGF,
   switch (kind) {
   case CheckedCastKind::Unresolved:
   case CheckedCastKind::Coercion:
+  case CheckedCastKind::ArrayDowncast:      
     llvm_unreachable("invalid for sil");
-    
   case CheckedCastKind::Downcast: {
     // If we have an address, load the value and use the emitDowncast code to
     // make the check. Then just bitcast addr appropriately.

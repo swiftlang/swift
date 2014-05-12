@@ -1412,9 +1412,6 @@ private:
   DeclName simplifyFailureArg(DeclName arg) {
     return arg;
   }
-  
-  /// \brief Determine if the type in question is an Array<T>.
-  bool isArrayType(Type t);
 
 public:
   /// \brief Whether we should be recording failures.
@@ -1607,6 +1604,9 @@ public:
   /// a complete solution from partial solutions.
   void assignFixedType(TypeVariableType *typeVar, Type type,
                        bool updateState = true);
+  
+  /// \brief Determine if the type in question is an Array<T>.
+  bool isArrayType(Type t);
 
 private:
   /// Introduce the constraints associated with the given type variable

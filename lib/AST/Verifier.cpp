@@ -746,6 +746,11 @@ struct ASTNodeBase {};
       verifyCheckedBase(E);
     }
     
+    void verifyChecked(ArrayDowncastConversionExpr *E) {
+      verifyChecked(E->getSubExpr());
+      verifyCheckedBase(E);
+    }
+    
     void verifyChecked(ArrayBridgedConversionExpr *E) {
       verifyChecked(E->getSubExpr());
       verifyCheckedBase(E);

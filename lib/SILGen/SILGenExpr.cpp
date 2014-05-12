@@ -177,6 +177,8 @@ namespace {
                                        SGFContext C);
     RValue visitArrayUpcastConversionExpr(ArrayUpcastConversionExpr *E,
                                           SGFContext C);
+    RValue visitArrayDowncastConversionExpr(ArrayDowncastConversionExpr *E,
+                                          SGFContext C);
     RValue visitArrayBridgedConversionExpr(ArrayBridgedConversionExpr *E,
                                            SGFContext C);
     RValue visitArchetypeToSuperExpr(ArchetypeToSuperExpr *E, SGFContext C);
@@ -955,6 +957,57 @@ visitArrayUpcastConversionExpr(ArrayUpcastConversionExpr *E,
 }
 
 RValue RValueEmitter::
+visitArrayDowncastConversionExpr(ArrayDowncastConversionExpr *E,
+                                 SGFContext C) {
+  
+  SILLocation loc = RegularLocation(E);
+  
+  // Get the sub expression argument as a managed value
+  auto mv = SGF.emitRValueAsSingleValue(E->getSubExpr());
+  
+  // Compute substitutions for the intrinsic call.
+  auto canTypeT = E->getSubExpr()->getType().getPointer()->getCanonicalType();
+  auto canTypeU = E->getType().getPointer()->getCanonicalType();
+  auto optTypeU = cast<BoundGenericEnumType>(canTypeU)->getGenericArgs()[0];
+  auto arrayTypeU = optTypeU->getCanonicalType();
+  auto arrayT = cast<BoundGenericStructType>(canTypeT)->getGenericArgs()[0];
+  auto arrayU = cast<BoundGenericStructType>(arrayTypeU)->getGenericArgs()[0];
+  auto typeName = cast<BoundGenericStructType>(canTypeT)->getDecl()->getName();
+  
+  // Get the intrinsic function.
+  FuncDecl *fn = nullptr;
+  
+  if (typeName.str() == "Array") {
+    fn = SGF.getASTContext().getArrayDownCast(nullptr);
+  } else {
+    llvm_unreachable("unsupported array upcast kind");
+  }
+  
+  // Compute type parameter substitutions.
+  SmallVector<Substitution, 2> subs;
+  
+  auto polyFnType = cast<PolymorphicFunctionType>
+  (fn->getType()->getCanonicalType());
+  auto genericParams = polyFnType->getGenericParameters();
+  
+  
+  auto gp1 = genericParams[0].getAsTypeParam();
+  auto gp2 = genericParams[1].getAsTypeParam();
+  subs.push_back(Substitution{gp1->getArchetype(), arrayT, {}});
+  subs.push_back(Substitution{gp2->getArchetype(), arrayU, {}});
+  
+  auto args = {mv};
+  
+  auto emitApply = SGF.emitApplyOfLibraryIntrinsic(loc,
+                                                   fn,
+                                                   subs,
+                                                   args,
+                                                   C);
+  
+  return RValue(SGF, E, emitApply);
+}
+
+RValue RValueEmitter::
 visitArrayBridgedConversionExpr(ArrayBridgedConversionExpr *E,
                                 SGFContext C) {
   
@@ -975,9 +1028,7 @@ visitArrayBridgedConversionExpr(ArrayBridgedConversionExpr *E,
   auto &ctx = SGF.getASTContext();
   
   if (typeName.str() == "Array") {
-    fn = E->isConditionallyBridged ?
-            ctx.getArrayConditionalBridgeToObjectiveC(nullptr) :
-            ctx.getArrayBridgeToObjectiveC(nullptr);
+    fn = ctx.getArrayBridgeToObjectiveC(nullptr);
   } else {
     llvm_unreachable("unsupported array bridge kind");
   }

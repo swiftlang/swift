@@ -1196,7 +1196,8 @@ static bool shortCircuitDisjunctionAt(Constraint *constraint,
   if (auto restriction = constraint->getRestriction()) {
     if (*restriction == ConversionRestrictionKind::OptionalToOptional ||
         *restriction == ConversionRestrictionKind::ImplicitlyUnwrappedOptionalToOptional ||
-        *restriction == ConversionRestrictionKind::OptionalToImplicitlyUnwrappedOptional)
+        *restriction == ConversionRestrictionKind::OptionalToImplicitlyUnwrappedOptional ||
+        *restriction == ConversionRestrictionKind::ArrayBridged)
       return true;
   }
 

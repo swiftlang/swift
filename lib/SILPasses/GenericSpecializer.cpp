@@ -278,6 +278,7 @@ private:
     switch (Kind) {
     case CheckedCastKind::Unresolved:
     case CheckedCastKind::Coercion:
+    case CheckedCastKind::ArrayDowncast:
       llvm_unreachable("invalid for SIL");
 
     // These are not affected by specialization.
@@ -397,6 +398,7 @@ private:
     switch (Kind) {
     case CheckedCastKind::Unresolved:
     case CheckedCastKind::Coercion:
+    case CheckedCastKind::ArrayDowncast:        
       llvm_unreachable("invalid for SIL");
 
     // These are not affected by specialization.

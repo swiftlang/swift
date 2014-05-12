@@ -1293,6 +1293,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       .Case("archetype_to_concrete", CheckedCastKind::ArchetypeToConcrete)
       .Case("existential_to_archetype", CheckedCastKind::ExistentialToArchetype)
       .Case("existential_to_concrete", CheckedCastKind::ExistentialToConcrete)
+      .Case("array_to_array", CheckedCastKind::ArrayDowncast)
       .Default(CheckedCastKind::Unresolved);
     
     if (kind == CheckedCastKind::Unresolved)

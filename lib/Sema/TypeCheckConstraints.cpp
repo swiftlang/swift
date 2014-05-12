@@ -1836,6 +1836,12 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   assert(!toArchetype && "archetypes should have been handled above");
   assert(!fromExistential && "existentials should have been handled above");
   assert(!toExistential && "existentials should have been handled above");
+  
+  ConstraintSystem cs(*this, dc, ConstraintSystemOptions());
+  
+  if (cs.isArrayType(toType) && cs.isArrayType(fromType)) {
+    return CheckedCastKind::ArrayDowncast;
+  }
 
   // The destination type must be a subtype of the source type.
   if (!isSubtypeOf(toType, fromType, dc)) {
