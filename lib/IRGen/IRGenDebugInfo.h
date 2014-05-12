@@ -157,7 +157,8 @@ public:
   /// Emit a dbg.declare instrinsic at the current insertion point and
   /// the Builder's current debug location.
   /// \param Tag The DWARF tag that should be used.
-  void emitVariableDeclaration(IRBuilder &Builder, llvm::Value *Storage,
+  void emitVariableDeclaration(IRBuilder &Builder,
+                               ArrayRef<llvm::Value*> Storage,
                                DebugTypeInfo Ty, SILDebugScope *DS,
                                StringRef Name, unsigned Tag, unsigned ArgNo = 0,
                                IndirectionKind = DirectValue,
@@ -165,13 +166,15 @@ public:
 
   /// Convenience function for stack-allocated variables. Calls
   /// emitVariableDeclaration internally.
-  void emitStackVariableDeclaration(IRBuilder &Builder, llvm::Value *Storage,
+  void emitStackVariableDeclaration(IRBuilder &Builder,
+                                    ArrayRef<llvm::Value*> Storage,
                                     DebugTypeInfo Ty, SILDebugScope *DS,
                                     StringRef Name,
                                     IndirectionKind Indirection = DirectValue);
 
   /// Convenience function for variables that are function arguments.
-  void emitArgVariableDeclaration(IRBuilder &Builder, llvm::Value *Storage,
+  void emitArgVariableDeclaration(IRBuilder &Builder,
+                                  ArrayRef<llvm::Value*> Storage,
                                   DebugTypeInfo Ty, SILDebugScope *DS,
                                   StringRef Name, unsigned ArgNo,
                                   IndirectionKind = DirectValue,
@@ -224,13 +227,15 @@ private:
                            SILType CanTy, DeclContext *DeclCtx);
   llvm::DIArray getTupleElements(TupleType *TupleTy, llvm::DIDescriptor Scope,
                                  llvm::DIFile File, unsigned Flags,
-                                 DeclContext *DeclContext);
+                                 DeclContext *DeclContext,
+                                 unsigned &SizeInBits);
   llvm::DIFile getFile(llvm::DIDescriptor Scope);
   llvm::DIModule getOrCreateModule(llvm::DIScope Parent, std::string Name,
                                    llvm::DIFile File);
   llvm::DIScope getModule(StringRef MangledName);
   llvm::DIArray getStructMembers(NominalTypeDecl *D, llvm::DIDescriptor Scope,
-                                 llvm::DIFile File, unsigned Flags);
+                                 llvm::DIFile File, unsigned Flags,
+                                 unsigned &SizeInBits);
   llvm::DICompositeType
   createStructType(DebugTypeInfo DbgTy, NominalTypeDecl *Decl, StringRef Name,
                    llvm::DIDescriptor Scope, llvm::DIFile File, unsigned Line,

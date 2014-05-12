@@ -765,26 +765,28 @@ emitTypeMetadata(IRGenFunction &IGF, llvm::Value *Metadata, StringRef Name) {
                           DirectValue, ArtificialValue);
 }
 
-void IRGenDebugInfo::emitStackVariableDeclaration(IRBuilder& B,
-                                                  llvm::Value *Storage,
-                                                  DebugTypeInfo DbgTy,
-                                                  SILDebugScope *DS,
-                                                  StringRef Name,
-                                                  IndirectionKind Indirection) {
+void IRGenDebugInfo::
+emitStackVariableDeclaration(IRBuilder& B,
+                             ArrayRef<llvm::Value*> Storage,
+                             DebugTypeInfo DbgTy,
+                             SILDebugScope *DS,
+                             StringRef Name,
+                             IndirectionKind Indirection) {
   emitVariableDeclaration(B, Storage, DbgTy, DS, Name,
                           llvm::dwarf::DW_TAG_auto_variable,
                           0, Indirection, RealValue);
 }
 
 
-void IRGenDebugInfo::emitArgVariableDeclaration(IRBuilder& Builder,
-                                                llvm::Value *Storage,
-                                                DebugTypeInfo DbgTy,
-                                                SILDebugScope *DS,
-                                                StringRef Name,
-                                                unsigned ArgNo,
-                                                IndirectionKind Indirection,
-                                                ArtificialKind IsArtificial) {
+void IRGenDebugInfo::
+emitArgVariableDeclaration(IRBuilder& Builder,
+                           ArrayRef<llvm::Value*> Storage,
+                           DebugTypeInfo DbgTy,
+                           SILDebugScope *DS,
+                           StringRef Name,
+                           unsigned ArgNo,
+                           IndirectionKind Indirection,
+                           ArtificialKind IsArtificial) {
   assert(ArgNo > 0);
   if (Name == IGM.Context.Id_self.str())
     emitVariableDeclaration(Builder, Storage, DbgTy, DS, Name,
@@ -817,8 +819,67 @@ llvm::DIFile IRGenDebugInfo::getFile(llvm::DIDescriptor Scope) {
   return File;
 }
 
+/// Return the storage size of an explosion value.
+static uint64_t
+getSizeFromExplosionValue(const clang::TargetInfo &TI, llvm::Value *V) {
+  llvm::Type *Ty = V->getType();
+  if (unsigned PrimitiveSize = Ty->getPrimitiveSizeInBits())
+    return PrimitiveSize;
+  else if (Ty->isPointerTy())
+    return TI.getPointerWidth(0);
+  else
+    llvm_unreachable("unhandled type of explosion value");
+}
+
+/// A generator that recursively returns the size of each element of a
+/// composite type.
+class ElementSizes {
+  const llvm::DITypeIdentifierMap &DIRefMap;
+  SmallVector<const llvm::MDNode *, 12> Stack;
+public:
+  ElementSizes(const llvm::MDNode *DITy,
+               const llvm::DITypeIdentifierMap &DIRefMap)
+    : DIRefMap(DIRefMap), Stack(1, DITy) { }
+
+  struct SizeAlign {
+    uint64_t Size, Align;
+  };
+
+  struct SizeAlign getNext() {
+    if (Stack.empty())
+      return {0, 0};
+
+    llvm::DIType Cur(Stack.pop_back_val());
+    if (Cur.isCompositeType() &&
+        Cur.getTag() != llvm::dwarf::DW_TAG_subroutine_type) {
+      llvm::DICompositeType CTy(Cur);
+      llvm::DIArray Elts = CTy.getTypeArray();
+      // Push all elements in reverse order. TODO: With a little more
+      // state we don't need to actually store them on the Stack.
+      unsigned N = Cur.getTag() == llvm::dwarf::DW_TAG_union_type
+        ? 1 // For unions, pick any one.
+        : Elts.getNumElements();
+      for (unsigned I = N; I > 0; --I)
+        Stack.push_back(Elts.getElement(I-1));
+
+      return getNext();
+    }
+    switch (Cur.getTag()) {
+      case llvm::dwarf::DW_TAG_member:
+      case llvm::dwarf::DW_TAG_typedef: {
+        // Replace top of stack.
+        llvm::DIDerivedType DTy(Cur);
+        Stack.push_back(DTy.getTypeDerivedFrom().resolve(DIRefMap));
+        return getNext();
+      }
+      default:
+        return { Cur.getSizeInBits(), Cur.getAlignInBits() };
+    }
+  }
+};
+
 void IRGenDebugInfo::emitVariableDeclaration(IRBuilder& Builder,
-                                             llvm::Value *Storage,
+                                             ArrayRef<llvm::Value*> Storage,
                                              DebugTypeInfo DbgTy,
                                              SILDebugScope *DS,
                                              StringRef Name,
@@ -826,11 +887,6 @@ void IRGenDebugInfo::emitVariableDeclaration(IRBuilder& Builder,
                                              unsigned ArgNo,
                                              IndirectionKind Indirection,
                                              ArtificialKind Artificial) {
-  // There are variables without storage, such as "struct { func foo() {} }".
-  // Emit them as constant 0.
-  if (isa<llvm::UndefValue>(Storage))
-    Storage = llvm::ConstantInt::get(llvm::Type::getInt64Ty(M.getContext()), 0);
-
   // FIXME: enable this assertion.
   //assert(DS);
   llvm::DIDescriptor Scope = getOrCreateScope(DS);
@@ -876,7 +932,7 @@ void IRGenDebugInfo::emitVariableDeclaration(IRBuilder& Builder,
     SmallVector<llvm::Value *, 1> Addr;
     while (Derefs--)
       Addr.push_back(llvm::ConstantInt::get(Int64Ty, llvm::DIBuilder::OpDeref));
-    assert(Flags == 0 && "Complex variables cannot have flags");
+    // FIXME: assert(Flags == 0 && "Complex variables cannot have flags");
     Descriptor = DBuilder.createComplexVariable(Tag, Scope, Name,
                                                 Unit, Line, DITy, Addr, ArgNo);
   } else {
@@ -885,13 +941,49 @@ void IRGenDebugInfo::emitVariableDeclaration(IRBuilder& Builder,
                                               Opts.OptLevel > 0, Flags, ArgNo);
   }
   // Insert a debug intrinsic into the current block.
+  unsigned Offset = 0;
   auto BB = Builder.GetInsertBlock();
-  auto Call = isa<llvm::AllocaInst>(Storage)
-    ? DBuilder.insertDeclare(Storage, Descriptor, BB)
-    : DBuilder.insertDbgValueIntrinsic(Storage, 0, Descriptor, BB);
+  bool IsPiece = Storage.size() > 1;
+  uint64_t SizeOfByte = CI.getTargetInfo().getCharWidth();
+  ElementSizes EltSizes(DITy, DIRefMap);
+  for (llvm::Value *Piece : Storage) {
+    // FIXME: enable this assertion.
+    // assert(Piece && "already-claimed explosion value?");
+    if (!Piece)
+      return;
 
-  // Set the location/scope of the intrinsic.
-  Call->setDebugLoc(llvm::DebugLoc::get(Line, Loc.Col, Scope));
+    // There are variables without storage, such as "struct { func foo() {} }".
+    // Emit them as constant 0.
+    if (isa<llvm::UndefValue>(Piece))
+      Piece = llvm::ConstantInt::get(llvm::Type::getInt64Ty(M.getContext()), 0);
+
+    llvm::DIVariable Var = Descriptor;
+    if (IsPiece) {
+      // Try to get the size from the type if possible.
+      auto Dim = EltSizes.getNext();
+      auto StorageSize = getSizeFromExplosionValue(CI.getTargetInfo(), Piece);
+      // FIXME: Occasionally, there is a discrepancy between the AST
+      // type and the Storage type. Usually this is due to reference
+      // counting.
+      if (!Dim.Size || (StorageSize && Dim.Size > StorageSize))
+        Dim.Size = StorageSize;
+      if (!Dim.Align)
+        Dim.Align = SizeOfByte;
+
+      unsigned Size =
+        llvm::RoundUpToAlignment(Dim.Size, Dim.Align) / SizeOfByte;
+
+      assert(Offset*8+Dim.Size<=Var.getSizeInBits(DIRefMap) && "pars > totum");
+      Var = DBuilder.createVariablePiece(Descriptor, Offset, Size);
+      Offset += Size;
+    }
+    auto Call = isa<llvm::AllocaInst>(Piece)
+      ? DBuilder.insertDeclare(Piece, Var, BB)
+      : DBuilder.insertDbgValueIntrinsic(Piece, 0, Var, BB);
+
+    // Set the location/scope of the intrinsic.
+    Call->setDebugLoc(llvm::DebugLoc::get(Line, Loc.Col, Scope));
+  }
 }
 
 void IRGenDebugInfo::emitGlobalVariableDeclaration(llvm::GlobalValue *Var,
@@ -932,6 +1024,16 @@ StringRef IRGenDebugInfo::getMangledName(DebugTypeInfo DbgTy) {
   return BumpAllocatedString(Buffer);
 }
 
+static unsigned getSizeInBits(llvm::DIType Ty,
+                              const llvm::DITypeIdentifierMap &Map) {
+  // Follow derived types until we reach a type that
+  // reports back a size.
+  while (Ty.isDerivedType() && !Ty.getSizeInBits()) {
+    llvm::DIDerivedType DT(&*Ty);
+    Ty = DT.getTypeDerivedFrom().resolve(Map);
+  }
+  return Ty.getSizeInBits();
+}
 
 /// Create a member of a struct, class, tuple, or enum.
 llvm::DIDerivedType IRGenDebugInfo::createMemberType(DebugTypeInfo DbgTy,
@@ -946,7 +1048,7 @@ llvm::DIDerivedType IRGenDebugInfo::createMemberType(DebugTypeInfo DbgTy,
                                        SizeOfByte*DbgTy.size.getValue(),
                                        SizeOfByte*DbgTy.align.getValue(),
                                        OffsetInBits, Flags, Ty);
-  OffsetInBits += Ty.getSizeInBits();
+  OffsetInBits += getSizeInBits(Ty, DIRefMap);
   OffsetInBits = llvm::RoundUpToAlignment(OffsetInBits,
                                           SizeOfByte*DbgTy.align.getValue());
   return DITy;
@@ -957,7 +1059,8 @@ llvm::DIArray IRGenDebugInfo::getTupleElements(TupleType *TupleTy,
                                                llvm::DIDescriptor Scope,
                                                llvm::DIFile File,
                                                unsigned Flags,
-                                               DeclContext *DeclContext) {
+                                               DeclContext *DeclContext,
+                                               unsigned &SizeInBits) {
   SmallVector<llvm::Value *, 16> Elements;
   unsigned OffsetInBits = 0;
   for (auto ElemTy : TupleTy->getElementTypes()) {
@@ -965,6 +1068,7 @@ llvm::DIArray IRGenDebugInfo::getTupleElements(TupleType *TupleTy,
     Elements.push_back(createMemberType(DbgTy, StringRef(), OffsetInBits,
                                         Scope, File, Flags));
   }
+  SizeInBits = OffsetInBits;
   return DBuilder.getOrCreateArray(Elements);
 }
 
@@ -972,7 +1076,8 @@ llvm::DIArray IRGenDebugInfo::getTupleElements(TupleType *TupleTy,
 llvm::DIArray IRGenDebugInfo::getStructMembers(NominalTypeDecl *D,
                                                llvm::DIDescriptor Scope,
                                                llvm::DIFile File,
-                                               unsigned Flags) {
+                                               unsigned Flags,
+                                               unsigned &SizeInBits) {
   SmallVector<llvm::Value *, 16> Elements;
   unsigned OffsetInBits = 0;
   for (auto Decl : D->getMembers())
@@ -983,6 +1088,7 @@ llvm::DIArray IRGenDebugInfo::getStructMembers(NominalTypeDecl *D,
         Elements.push_back(createMemberType(DbgTy, VD->getName().str(),
                                             OffsetInBits, Scope, File, Flags));
       }
+  SizeInBits = OffsetInBits;
   return DBuilder.getOrCreateArray(Elements);
 }
 
@@ -1014,10 +1120,10 @@ IRGenDebugInfo::createStructType(DebugTypeInfo DbgTy,
 #endif
 
   DITypeCache[DbgTy.getType()] = llvm::WeakVH(FwdDecl);
+  auto Members = getStructMembers(Decl, Scope, File, Flags, SizeInBits);
   auto DITy = DBuilder.createStructType
-    (Scope, Name, File, Line, SizeInBits, AlignInBits, Flags, DerivedFrom,
-     getStructMembers(Decl, Scope, File, Flags), RuntimeLang,
-     llvm::DIType(), UniqueID);
+    (Scope, Name, File, Line, SizeInBits, AlignInBits,
+     Flags, DerivedFrom, Members, RuntimeLang, llvm::DIType(), UniqueID);
 
   FwdDecl->replaceAllUsesWith(DITy);
   return DITy;
@@ -1095,6 +1201,38 @@ uint64_t IRGenDebugInfo::getSizeOfBasicType(DebugTypeInfo DbgTy) {
   // This type is too large to fit in a register.
   assert(BitWidth > IGM.DataLayout.getLargestLegalIntTypeSize());
   return BitWidth;
+}
+
+/// Create subroutine type with size and alignment.
+static
+llvm::DICompositeType
+createIndirectSubroutineType(llvm::LLVMContext &VMContext,
+                             llvm::DIFile File,
+                             llvm::DIArray ParameterTypes,
+                             unsigned SizeInBits,
+                             unsigned AlignInBits,
+                             unsigned Flags) {
+  // TAG_subroutine_type is encoded in DICompositeType format.
+  llvm::Value *Elts[] = {
+    llvm::ConstantInt::get(llvm::Type::getInt32Ty(VMContext),
+                           llvm::dwarf::DW_TAG_subroutine_type
+                           | llvm::LLVMDebugVersion),
+    llvm::Constant::getNullValue(llvm::Type::getInt32Ty(VMContext)),
+    nullptr,
+    llvm::MDString::get(VMContext, ""),
+    llvm::ConstantInt::get(llvm::Type::getInt32Ty(VMContext), 0), // Line
+    llvm::ConstantInt::get(llvm::Type::getInt64Ty(VMContext), SizeInBits),
+    llvm::ConstantInt::get(llvm::Type::getInt64Ty(VMContext), AlignInBits),
+    llvm::ConstantInt::get(llvm::Type::getInt64Ty(VMContext), 0), // Offset
+    llvm::ConstantInt::get(llvm::Type::getInt32Ty(VMContext), Flags), // Flags
+    nullptr,
+    ParameterTypes,
+    llvm::ConstantInt::get(llvm::Type::getInt32Ty(VMContext), 0),
+    nullptr,
+    nullptr,
+    nullptr  // Type Identifer
+  };
+  return llvm::DICompositeType(llvm::MDNode::get(VMContext, Elts));
 }
 
 /// Construct a DIType from a DebugTypeInfo object.
@@ -1327,12 +1465,14 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     Location L = getLoc(SM, DbgTy.getDecl());
     auto File = getOrCreateFile(L.Filename);
     // Tuples are also represented as structs.
+    unsigned RealSize;
+    auto Elements = getTupleElements(TupleTy, Scope, File, Flags,
+                                     DbgTy.getDeclContext(), RealSize);
     return DBuilder.
       createStructType(Scope, MangledName, File, L.Line,
-                       SizeInBits, AlignInBits, Flags,
+                       RealSize, AlignInBits, Flags,
                        llvm::DIType(), // DerivedFrom
-                       getTupleElements(TupleTy, Scope, File, Flags,
-                                        DbgTy.getDeclContext()),
+                       Elements,
                        DW_LANG_Swift, llvm::DIType(), MangledName);
   }
 
@@ -1403,8 +1543,16 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     } else
       FunctionTy = IGM.SILMod->Types.getLoweredType(BaseTy)
                               .castTo<SILFunctionType>();
-    auto Params=createParameterTypes(FunctionTy, DbgTy.getDeclContext());
-    return DBuilder.createSubroutineType(MainFile, Params);
+    auto Params = createParameterTypes(FunctionTy, DbgTy.getDeclContext());
+
+    // Functions are actually stored as a Pointer or a FunctionPairTy:
+    // { i8*, %swift.refcounted* }
+    unsigned PtrSize = CI.getTargetInfo().getPointerWidth(0);
+    unsigned PtrAlign = CI.getTargetInfo().getPointerAlign(0);
+    auto FnTy = createIndirectSubroutineType(M.getContext(),
+                                             MainFile, Params,
+                                             2*PtrSize, PtrAlign, Flags);
+    return FnTy;
   }
 
   case TypeKind::Enum:

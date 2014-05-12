@@ -460,7 +460,8 @@ public:
 
   /// At -O0, emit a shadow copy of an Address in an alloca, so the
   /// register allocator doesn't elide the dbg.value intrinsic when
-  /// register pressure is high.
+  /// register pressure is high.  There is a trade-off to this: With
+  /// shadow copies, we loose the precise lifetime.
   llvm::Value *emitShadowCopy(llvm::Value *Storage,
                               StringRef Name,
                               Alignment Align = Alignment(0)) {
@@ -494,11 +495,11 @@ public:
     if (N != ArgNo.end()) {
       PrologueLocation AutoRestore(IGM.DebugInfo, Builder);
       IGM.DebugInfo->
-        emitArgVariableDeclaration(Builder, emitShadowCopy(Storage, Name),
+        emitArgVariableDeclaration(Builder, Storage,
                                    Ty, DS, Name, N->second, DirectValue);
     } else
       IGM.DebugInfo->
-        emitStackVariableDeclaration(Builder, emitShadowCopy(Storage, Name),
+        emitStackVariableDeclaration(Builder, Storage,
                                      Ty, DS, Name, DirectValue);
   }
 
@@ -527,6 +528,7 @@ public:
   //===--------------------------------------------------------------------===//
 
   void visitSILBasicBlock(SILBasicBlock *BB);
+  llvm::Value *getLoweredArgValue(SILArgument *Arg, StringRef Name);
   void emitFunctionArgDebugInfo(SILBasicBlock *BB);
 
   void visitAllocStackInst(AllocStackInst *i);
@@ -565,13 +567,9 @@ public:
     StringRef Name = Decl->getNameStr();
     auto SILVal = i->getOperand();
     auto Vals = getLoweredExplosion(SILVal).claimAll();
-    // See also comment for SILArgument; it would be nice if we could
-    // DW_OP_piece larger values together.
-    if (Vals.size() == 1)
-      emitDebugVariableDeclaration
-        (Builder, Vals[0],
-         DebugTypeInfo(Decl, getTypeInfo(SILVal.getType())),
-         i->getDebugScope(), Name);
+    DebugTypeInfo DbgTy(Decl, getTypeInfo(SILVal.getType()));
+    emitDebugVariableDeclaration(Builder, Vals, DbgTy,
+                                 i->getDebugScope(), Name);
   }
   void visitDebugValueAddrInst(DebugValueAddrInst *i) {
     if (!IGM.DebugInfo || isAvailableExternally()) return;
@@ -1140,6 +1138,21 @@ void IRGenSILFunction::emitSILFunction() {
       LoweredBBs[&bb].bb->eraseFromParent();
 }
 
+llvm::Value *IRGenSILFunction::
+getLoweredArgValue(SILArgument *Arg, StringRef Name) {
+  const LoweredValue &LoweredArg = getLoweredValue(Arg);
+  if (LoweredArg.isAddress())
+    return emitShadowCopy(LoweredArg.getAddress(), Name);
+  else if (LoweredArg.kind == LoweredValue::Kind::Explosion) {
+    auto Val = LoweredArg.getExplosion(*this).claimAll();
+    // FIXME: What are the semantics of a multi-value explosion
+    // argument, shouldn't it be exploded already?
+    if (Val.size() == 1)
+      return Val[0];
+  }
+  return nullptr;
+}
+
 void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
   assert(BB->pred_empty());
   if (!IGM.DebugInfo || isAvailableExternally())
@@ -1149,9 +1162,11 @@ void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
   // trivial arguments and any captured and promoted [inout]
   // variables.
   int N = 0;
-  for (auto Arg : BB->getBBArgs()) {
+  for (auto I = BB->getBBArgs().begin(), E=BB->getBBArgs().end();
+       I != E; ++I) {
+    SILArgument *Arg = *I;
     ++N;
-    const LoweredValue &LoweredArg = getLoweredValue(Arg);
+
     if (!Arg->getDecl())
       continue;
 
@@ -1166,27 +1181,34 @@ void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
     auto Name = Arg->getDecl()->getNameStr();
     DebugTypeInfo DTI(const_cast<ValueDecl*>(Arg->getDecl()),
                       getTypeInfo(Arg->getType()));
-    if (LoweredArg.isAddress())
-      IGM.DebugInfo->
-        emitArgVariableDeclaration(Builder,
-                                   emitShadowCopy(LoweredArg.getAddress(),Name),
-                                   DTI, getDebugScope(), Name, N, DirectValue);
-    else if (LoweredArg.kind == LoweredValue::Kind::Explosion) {
-      // FIXME: Handle multi-value explosions.
-      //
-      // In theory, it would be nice to encode them using DW_OP_piece,
-      // but this is not possible with the current LLVM debugging
-      // infrastructure.  We can piece together a DWARF expression
-      // using DIBuilder::createComplexVariable(), but we can only
-      // associate it with a single llvm::Value via a dbg.value or
-      // dbg.declare intrinsic. An we can't reference an llvm::Value
-      // from within a DWARF expression MDNode.
-      auto Vals = getLoweredExplosion(Arg).claimAll();
-      if (Vals.size() == 1)
-        IGM.DebugInfo->emitArgVariableDeclaration(Builder, Vals[0], DTI,
-                                                  getDebugScope(), Name, N,
-                                                  DirectValue, RealValue);
+
+    // Consolidate all pieces of an exploded multi-argument into one list.
+    llvm::SmallVector<llvm::Value *, 8> Vals;
+      Vals.push_back(getLoweredArgValue(Arg, Name));
+    for (auto Next = I+1; Next != E; ++Next, ++I) {
+      if ((*Next)->getDecl() != Arg->getDecl())
+        break;
+
+      // Don't bother emitting swift.refcounted* for now.
+      if (Arg->getType().hasReferenceSemantics())
+        break;
+
+      llvm::Value *Val = getLoweredArgValue(*I, Name);
+      if (!Val)
+        break;
+
+      Vals.push_back(Val);
     }
+    auto Direct = DirectValue;
+    // ByRef capture.  FIXME: Consider wrapping this in a
+    // reference_type, otherwise we loose Flags such as artificial.
+    if (Arg->getType().hasReferenceSemantics() &&
+        DTI.getType()->getKind() != TypeKind::InOut)
+      Direct = IndirectValue;
+
+    IGM.DebugInfo->emitArgVariableDeclaration
+      (Builder, Vals, DTI, getDebugScope(), Name, N,
+       Direct, RealValue);
   }
 }
 
@@ -2398,7 +2420,7 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
                              Decl->getType()->getLValueOrInOutObjectType(),
                              type);
     auto Name = Decl->getName().str();
-    emitDebugVariableDeclaration(Builder, addr.getAddress(),
+    emitDebugVariableDeclaration(Builder, addr.getAddress().getAddress(),
                                  DTI, i->getDebugScope(), Name);
   }
 
