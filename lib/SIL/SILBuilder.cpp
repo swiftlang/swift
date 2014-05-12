@@ -152,7 +152,7 @@ static bool couldReduceStrongRefcount(SILInstruction *Inst) {
   if (isa<LoadInst>(Inst) || isa<StoreInst>(Inst) ||
       isa<RetainValueInst>(Inst) || isa<UnownedRetainInst>(Inst) ||
       isa<UnownedReleaseInst>(Inst) || isa<StrongRetainUnownedInst>(Inst) ||
-      isa<StoreWeakInst>(Inst) ||
+      isa<StoreWeakInst>(Inst) || isa<StrongRetainInst>(Inst) ||
       isa<AllocStackInst>(Inst) || isa<DeallocStackInst>(Inst))
     return false;
 
@@ -161,14 +161,20 @@ static bool couldReduceStrongRefcount(SILInstruction *Inst) {
   // value drops a retain.  We would have to do more alias analysis to be able
   // to safely ignore one of those.
   if (auto AI = dyn_cast<AssignInst>(Inst)) {
-    if (AI->getOperand(0).getType().isTrivial(Inst->getModule()))
+    auto StoredType = AI->getOperand(0).getType();
+    if (StoredType.isTrivial(Inst->getModule()) ||
+        StoredType.is<ReferenceStorageType>())
       return false;
   }
 
   if (auto *CAI = dyn_cast<CopyAddrInst>(Inst)) {
-    if (CAI->isInitializationOfDest() ||
-        CAI->getOperand(0).getType().getObjectType().
-          isTrivial(Inst->getModule()))
+    // Initializations can only increase refcounts.
+    if (CAI->isInitializationOfDest())
+      return false;
+
+    SILType StoredType = CAI->getOperand(0).getType().getObjectType();
+    if (StoredType.isTrivial(Inst->getModule()) ||
+        StoredType.is<ReferenceStorageType>())
       return false;
   }
 
