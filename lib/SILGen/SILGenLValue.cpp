@@ -637,7 +637,7 @@ static LValue emitLValueForNonMemberVarDecl(SILGenFunction &gen,
     auto address = gen.emitLValueForDecl(loc, var, isDirectPropertyAccess);
     assert(address.isLValue() &&
            "physical lvalue decl ref must evaluate to an address");
-      lv.add<ValueComponent>(address, typeData);
+    lv.add<ValueComponent>(address, typeData);
 
     if (address.getType().is<ReferenceStorageType>())
       lv.add<OwnershipComponent>(typeData);
@@ -785,6 +785,14 @@ LValue SILGenFunction::emitDirectIVarLValue(SILLocation loc, ManagedValue base,
     lv.add<RefElementComponent>(ivar, varStorageType, typeData);
   else
     lv.add<StructElementComponent>(ivar, varStorageType, typeData);
+
+  if (varStorageType.is<ReferenceStorageType>()) {
+    auto formalRValueType =
+      ivar->getType()->getRValueType()->getReferenceStorageReferent();
+    auto typeData =
+      getUnsubstitutedTypeData(*this, formalRValueType->getCanonicalType());
+    lv.add<OwnershipComponent>(typeData);
+  }
 
   return std::move(lv);
 }
