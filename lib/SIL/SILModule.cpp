@@ -447,7 +447,12 @@ public:
   }
 
   bool visitFunctionRefInst(FunctionRefInst *FRI) {
-    if (!isLinkAll())
+    // Needed to handle closures which are no longer applied, but are left
+    // behind as dead code. This shouldn't happen, but if it does don't get into
+    // an inconsistent state.
+    SILFunction *Callee = FRI->getReferencedFunction();
+    if (!isLinkAll() && !Callee->isTransparent() &&
+        Callee->getLinkage() != SILLinkage::Shared)
       return false;
 
     addFunctionToWorklist(FRI->getReferencedFunction());
