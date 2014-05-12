@@ -1860,9 +1860,10 @@ static FuncDecl *createLazyPropertyGetter(VarDecl *VD, VarDecl *Storage,
   auto *Tmp2PBD = new (Ctx) PatternBindingDecl(/*StaticLoc*/SourceLoc(),
                                                StaticSpellingKind::None,
                                                InitValue->getStartLoc(),
-                                               Tmp2PBDPattern, InitValue,
+                                               Tmp2PBDPattern, nullptr,
                                                /*isConditional*/false,
                                                Get);
+  Tmp2PBD->setInit(InitValue, /*already type checked*/true);
   Body.push_back(Tmp2PBD);
   Body.push_back(Tmp2VD);
 
