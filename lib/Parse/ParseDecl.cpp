@@ -20,6 +20,8 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/DebuggerClient.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/Basic/Fallthrough.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -38,6 +40,142 @@ static Pattern *buildImplicitSelfParameter(SourceLoc Loc,
   return Pattern::buildImplicitSelfParameter(Loc, TypeLoc(), CurDeclContext);
 }
 
+namespace {
+  /// A RAII object for deciding whether this DeclKind needs special
+  /// treatment when parsing in the "debugger context", and implementing
+  /// that treatment.  The problem arises because, when lldb
+  /// uses swift to parse expressions, it needs to emulate the current
+  /// frame's scope. We do that, for instance, by making a class extension
+  /// and running the code in a function in that extension.
+  ///
+  /// This causes two kinds of issues:
+  /// 1) Some DeclKinds require to be parsed in TopLevel contexts only.
+  /// 2) Sometimes the debugger wants a Decl to live beyond the current
+  /// function invocation, in which case it should be parsed at the
+  /// file scope level so it will be set up correctly for this purpose.
+  ///
+  /// Creating an instance of this object will cause it to figure out
+  /// whether we are in the debugger function, whether it needs to swap 
+  /// the Decl that is currently being parsed.
+  /// If you have created the object, instead of returning the result
+  /// with makeParserResult, use the object's fixupParserResult.  If
+  /// no swap has occurred, these methods will work the same.  
+  /// If the decl has been moved, then Parser::markWasHandled will be
+  /// called on the Decl, and you should call declWasHandledAlready
+  /// before you consume the Decl to see if you actually need to
+  /// consume it.
+  /// If you are making one of these objects to address issue 1, call
+  /// the constructor that only takes a DeclKind, and it will be moved
+  /// unconditionally.  Otherwise pass in the Name and DeclKind and the
+  /// DebuggerClient will be asked whether to move it or not.
+
+  class DebuggerContextChange {
+  protected:
+    Parser &P;
+    Identifier Name;
+    SourceFile *SF;
+    Optional<Parser::ContextChange> CC;
+  public:
+    DebuggerContextChange (Parser &P)
+      : P(P), SF(nullptr) {
+      if (!inDebuggerContext())
+        return;
+      else
+        switchContext();
+    }
+    
+    DebuggerContextChange (Parser &P, Identifier &Name, DeclKind Kind)
+      : P(P), Name(Name), SF(nullptr) {
+      if (!inDebuggerContext())
+        return;
+      bool globalize = false;
+        
+      DebuggerClient *debug_client = getDebuggerClient();
+      if (!debug_client)
+        return;
+      
+      globalize = debug_client->shouldGlobalize (Name, Kind);
+        
+      if (globalize)
+        switchContext();
+    }
+    
+    bool movedToTopLevel() {
+      return CC.hasValue();
+    }
+    
+    template <typename T>
+    ParserResult<T>
+    fixupParserResult (ParserResult<T> &Result) {
+      ParserStatus Status = Result;
+      return fixupParserResult (Status, Result.get());
+    }
+    
+    template <typename T>
+    ParserResult<T>
+    fixupParserResult(T *D) {
+      if (CC.hasValue()) {
+        swapDecl(D);
+      }
+      return ParserResult<T>(D);
+    }
+    
+    template <typename T>
+    ParserResult<T>
+    fixupParserResult(ParserStatus Status, T *D) {
+      if (CC.hasValue() && !Status.isError()) {
+        // If there is an error, don't do our splicing trick,
+        // just return the Decl and the status for reporting.
+        swapDecl(D);
+      }
+      return makeParserResult(Status, D);
+    }
+
+    // The destructor doesn't need to do anything, the CC's destructor will
+    // pop the context if we set it.
+    ~DebuggerContextChange () {}
+  protected:
+  
+    DebuggerClient *getDebuggerClient()
+    {
+      Module *PM = P.CurDeclContext->getParentModule();
+      if (!PM)
+          return nullptr;
+      else
+           return PM->getDebugClient();
+    }
+    
+    bool inDebuggerContext() {
+      if (!P.Context.LangOpts.DebuggerSupport)
+        return false;
+      if (!P.CurDeclContext)
+        return false;
+      FuncDecl *func_decl = dyn_cast<FuncDecl>(P.CurDeclContext);
+      if (!func_decl)
+        return false;
+        
+      if (!func_decl->getAttrs().hasAttribute<LLDBDebuggerFunctionAttr>())
+        return false;
+      
+      return true;
+    }
+    
+    void switchContext () {
+      SF = P.CurDeclContext->getParentSourceFile();
+      CC.emplace (P, SF);
+    }
+    
+    void swapDecl (Decl *D)
+    {
+      assert (SF);
+      DebuggerClient *debug_client = getDebuggerClient();
+      assert (debug_client);
+      debug_client->didGlobalize(D);
+      SF->Decls.push_back(D);
+      P.markWasHandled(D);
+    }
+  };
+}
 
 /// \brief Main entrypoint for the parser.
 ///
@@ -232,6 +370,11 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       Attributes.add(new (Context) LazyAttr(AtLoc, Loc));
     break;
 
+  case DAK_LLDBDebuggerFunction:
+    if (!DiscardAttribute)
+        Attributes.add (new (Context) LLDBDebuggerFunctionAttr(AtLoc, Loc));
+    break;
+    
   case DAK_asmname: {
     if (!consumeIf(tok::l_paren)) {
       diagnose(Loc, diag::attr_expected_lparen, AttrName);
@@ -1312,8 +1455,11 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
     return makeParserSuccess();
   }
 
-  if (DeclResult.isNonNull())
-    Entries.push_back(DeclResult.get());
+  if (DeclResult.isNonNull()) {
+    Decl *D = DeclResult.get();
+    if (!declWasHandledAlready(D))
+      Entries.push_back(DeclResult.get());
+  }
 
   if (Status.isSuccess() && Tok.is(tok::semi))
     Entries.back()->TrailingSemiLoc = consumeToken(tok::semi);
@@ -1400,7 +1546,9 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
   if (Attributes.hasNonVirtualAttributes())
     diagnose(Attributes.AtLoc, diag::import_attributes);
 
-  if (!Context.LangOpts.DebuggerSupport && !(Flags & PD_AllowTopLevel)) {
+  DebuggerContextChange DCC (*this);
+  
+  if (!DCC.movedToTopLevel() && !(Flags & PD_AllowTopLevel)) {
     diagnose(ImportLoc, diag::decl_inner_scope);
     return nullptr;
   }
@@ -1455,7 +1603,7 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
                                 KindLoc, ImportPath);
   if (Attributes.shouldSaveInAST())
     ID->getMutableAttrs() = Attributes;
-  return makeParserResult(ID);
+  return DCC.fixupParserResult(ID);
 }
 
 /// \brief Parse an inheritance clause.
@@ -1574,6 +1722,8 @@ parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &L,
 ParserResult<ExtensionDecl>
 Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   SourceLoc ExtensionLoc = consumeToken(tok::kw_extension);
+  
+  DebuggerContextChange DCC (*this);
 
   ParserResult<TypeRepr> Ty = parseTypeIdentifierWithRecovery(
       diag::expected_type, diag::expected_ident_type_in_extension);
@@ -1640,7 +1790,7 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   for (auto member : MemberDecls)
     ED->addMember(member);
 
-  if (!(Flags & PD_AllowTopLevel)) {
+  if (!DCC.movedToTopLevel() && !(Flags & PD_AllowTopLevel)) {
     diagnose(ExtensionLoc, diag::decl_inner_scope);
     Status.setIsParseError();
 
@@ -1648,7 +1798,7 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     ED->setInvalid();
   }
 
-  return makeParserResult(Status, ED);
+  return DCC.fixupParserResult(Status, ED);
 }
 
 ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
@@ -1753,6 +1903,8 @@ ParserResult<TypeDecl> Parser::parseDeclTypeAlias(bool WantDefinition,
                               diag::expected_identifier_in_decl, "typealias");
   if (Status.isError())
     return nullptr;
+    
+  DebuggerContextChange DCC(*this, Id, DeclKind::TypeAlias);
 
   // Parse optional inheritance clause.
   SmallVector<TypeLoc, 2> Inherited;
@@ -2720,6 +2872,8 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
       return nullptr;
   }
 
+  DebuggerContextChange DCC(*this, SimpleName, DeclKind::Func);
+  
   // Parse the generic-params, if present.
   Optional<Scope> GenericsScope;
   GenericsScope.emplace(this, ScopeKind::Generics);
@@ -2783,7 +2937,12 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
                           FuncLoc, FullName, NameLoc, GenericParams,
                           Type(), BodyParams, FuncRetTy,
                           CurDeclContext);
-
+                          
+    // Add the attributes here so if we need them while parsing the body
+    // they are available.
+    if (Attributes.shouldSaveInAST())
+      FD->getMutableAttrs() = Attributes;
+      
     // Pass the function signature to code completion.
     if (SignatureStatus.hasCodeCompletion())
       CodeCompletion->setDelayedParsedDecl(FD);
@@ -2822,10 +2981,8 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
   // Exit the scope introduced for the generic parameters.
   GenericsScope.reset();
 
-  if (Attributes.shouldSaveInAST())
-    FD->getMutableAttrs() = Attributes;
   addToScope(FD);
-  return makeParserResult(FD);
+  return DCC.fixupParserResult(FD);
 }
 
 bool Parser::parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD) {
@@ -2896,6 +3053,8 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
   if (Status.isError())
     return nullptr;
 
+  DebuggerContextChange DCC(*this, EnumName, DeclKind::Enum);
+  
   // Parse the generic-params, if present.
   GenericParamList *GenericParams = nullptr;
   {
@@ -2946,7 +3105,7 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
     Status.setIsParseError();
   }
 
-  return makeParserResult(Status, UD);
+  return DCC.fixupParserResult(Status, UD);
 }
 
 /// \brief Parse a 'case' of an enum.
@@ -3147,6 +3306,8 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
   if (Status.isError())
     return nullptr;
 
+  DebuggerContextChange DCC (*this, StructName, DeclKind::Struct);
+  
   // Parse the generic-params, if present.
   GenericParamList *GenericParams = nullptr;
   {
@@ -3199,7 +3360,7 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
     Status.setIsParseError();
   }
 
-  return makeParserResult(Status, SD);
+  return DCC.fixupParserResult(Status, SD);
 }
 
 /// \brief Parse a 'class' declaration, doing no token skipping on error.
@@ -3225,6 +3386,8 @@ ParserResult<ClassDecl> Parser::parseDeclClass(SourceLoc ClassLoc,
   if (Status.isError())
     return nullptr;
 
+  DebuggerContextChange DCC (*this, ClassName, DeclKind::Class);
+  
   // Parse the generic-params, if present.
   GenericParamList *GenericParams = nullptr;
   {
@@ -3281,7 +3444,7 @@ ParserResult<ClassDecl> Parser::parseDeclClass(SourceLoc ClassLoc,
     Status.setIsParseError();
   }
 
-  return makeParserResult(Status, CD);
+  return DCC.fixupParserResult(Status, CD);
 }
 
 /// \brief Parse a 'protocol' declaration, doing no token skipping on error.
@@ -3313,6 +3476,8 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   if (Status.isError())
     return nullptr;
 
+  DebuggerContextChange DCC (*this);
+  
   // Parse optional inheritance clause.
   SmallVector<TypeLoc, 4> InheritedProtocols;
   if (Tok.is(tok::colon))
@@ -3362,12 +3527,12 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   if (Flags & PD_DisallowNominalTypes) {
     diagnose(ProtocolLoc, diag::disallowed_type);
     Status.setIsParseError();
-  } else if (!(Flags & PD_AllowTopLevel)) {
+  } else if (!DCC.movedToTopLevel() && !(Flags & PD_AllowTopLevel)) {
     diagnose(ProtocolLoc, diag::decl_inner_scope);
     Status.setIsParseError();
   }
 
-  return makeParserResult(Status, Proto);
+  return DCC.fixupParserResult(Status, Proto);
 }
 
 /// \brief Parse a 'subscript' declaration.
@@ -3638,8 +3803,8 @@ parseDeclDeinit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   return makeParserResult(DD);
 }
 
-ParserResult<OperatorDecl> Parser::parseDeclOperator(bool AllowTopLevel,
-                                                  DeclAttributes &Attributes) {
+ParserResult<OperatorDecl> 
+Parser::parseDeclOperator(bool AllowTopLevel, DeclAttributes &Attributes) {
   assert(Tok.isContextualKeyword("operator") &&
          "no 'operator' at start of operator decl?!");
 
@@ -3663,6 +3828,8 @@ ParserResult<OperatorDecl> Parser::parseDeclOperator(bool AllowTopLevel,
     return nullptr;
   }
 
+  DebuggerContextChange DCC (*this);
+  
   Identifier Name = Context.getIdentifier(Tok.getText());
   SourceLoc NameLoc = consumeToken();
 
@@ -3695,12 +3862,12 @@ ParserResult<OperatorDecl> Parser::parseDeclOperator(bool AllowTopLevel,
   if (Tok.is(tok::r_brace))
     consumeToken();
   
-  if (!AllowTopLevel) {
+  if (!DCC.movedToTopLevel() && !AllowTopLevel) {
     diagnose(OperatorLoc, diag::operator_decl_inner_scope);
     return nullptr;
   }
   
-  return Result;
+  return DCC.fixupParserResult (Result);
 }
 
 ParserResult<OperatorDecl>

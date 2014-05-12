@@ -114,6 +114,9 @@ void DeclAttribute::print(ASTPrinter &Printer) const {
   case DAK_NSCopying:      Printer << "@NSCopying"; break;
   case DAK_NSManaged:      Printer << "@NSManaged"; break;
   case DAK_lazy:           Printer << "@lazy"; break;
+  case DAK_LLDBDebuggerFunction:
+    Printer << "@LLDBDebuggerFunction";
+    break;
   case DAK_asmname:
     Printer << "@asmname(\"" << cast<AsmnameAttr>(this)->Name << "\")";
     break;

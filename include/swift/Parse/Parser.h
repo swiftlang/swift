@@ -84,6 +84,7 @@ public:
   CodeCompletionCallbacks *CodeCompletion = nullptr;
   std::vector<std::vector<VarDecl*>> AnonClosureVars;
   std::pair<const DeclContext *, ArrayRef<VarDecl *>> CurVars;
+  llvm::SmallPtrSet<Decl *, 2> AlreadyHandledDecls;
   enum {
     IVOLP_NotInVarOrLet,
     IVOLP_InVar,
@@ -609,6 +610,24 @@ public:
 
   void consumeDecl(ParserPosition BeginParserPosition, ParseDeclOptions Flags,
                    bool IsTopLevel);
+
+  // When compiling for the Debugger, some Decl's need to be moved from the
+  // current scope.  In which case although the Decl will be returned in the
+  // ParserResult, it should not be inserted into the Decl list for the current
+  // context.  markWasHandled asserts that the Decl is already where it
+  // belongs, and declWasHandledAlready is used to check this assertion.
+  // To keep the handled decl array small, we remove the Decl when it is
+  // checked, so you can only call declWasAlreadyHandled once for a given
+  // decl.
+
+  void markWasHandled(Decl *D) {
+    AlreadyHandledDecls.insert(D);
+  }
+
+  bool declWasHandledAlready(Decl *D) {
+    return AlreadyHandledDecls.erase(D);
+  }
+
   ParserStatus parseDecl(SmallVectorImpl<Decl*> &Entries, ParseDeclOptions Flags);
   void parseDeclDelayed();
 

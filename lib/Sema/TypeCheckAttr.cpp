@@ -59,6 +59,7 @@ public:
   void visitIBDesignableAttr(IBDesignableAttr *attr);
   void visitIBInspectableAttr(IBInspectableAttr *attr);
   void visitIBOutletAttr(IBOutletAttr *attr);
+  void visitLLDBDebuggerFunctionAttr (LLDBDebuggerFunctionAttr *attr);
   void visitNSManagedAttr(NSManagedAttr *attr);
   void visitAssignmentAttr(AssignmentAttr *attr);
   void visitExportedAttr(ExportedAttr *attr);
@@ -195,6 +196,24 @@ void AttributeEarlyChecker::visitNSManagedAttr(NSManagedAttr *attr) {
 
 }
 
+void AttributeEarlyChecker::visitLLDBDebuggerFunctionAttr (LLDBDebuggerFunctionAttr *attr) {
+  // Only function declarations can be can have this attribute,
+  // and it is only legal when debugger support is on.
+  auto *FD = dyn_cast<FuncDecl>(D);
+  if (!FD) {
+    TC.diagnose(attr->getLocation(), diag::invalid_decl_attribute,
+                attr->getKind())
+        .fixItRemove(attr->getRange());
+    attr->setInvalid();
+    return;
+  }
+  else if (!D->getASTContext().LangOpts.DebuggerSupport)
+  {
+      TC.diagnose(attr->getLocation(), diag::attr_for_debugger_support_only);
+      attr->setInvalid();
+      return;
+  }
+}
 
 void AttributeEarlyChecker::visitAssignmentAttr(AssignmentAttr *attr) {
   // Only function declarations can be assignments.
@@ -302,6 +321,8 @@ public:
   void visitIBInspectableAttr(IBInspectableAttr *attr) {}
 
   void visitIBOutletAttr(IBOutletAttr *attr);
+  
+    void visitLLDBDebuggerFunctionAttr (LLDBDebuggerFunctionAttr *attr) {};
 
   void visitAvailabilityAttr(AvailabilityAttr *attr) {
     // FIXME: Check that this declaration is at least as available as the
