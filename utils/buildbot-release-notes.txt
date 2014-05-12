@@ -1,6 +1,13 @@
 Latest
 ----------
 
+* weak pointers now work with implicitly unchecked optionals, enabling usecases
+  where you don't want to ! every use of a weak pointer.  For example:
+  
+     weak var myView : NSView!
+     
+  of course, they still work with explicitly checked optionals like "NSView?"
+
 * Dictionary subscripting now takes/returns an optional type.  This allows
   querying a dictionary via subscripting to gracefully fail.  It also enables
   the idiom of removing values from a dictionary using 'dict[key] = nil'.
