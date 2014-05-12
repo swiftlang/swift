@@ -3151,9 +3151,6 @@ bool Lowering::usesObjCAllocator(ClassDecl *theClass) {
 void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   assert(!ctor->isFactoryInit() && "factories should not be emitted here");
   
-  // FIXME: Hack until all delegation is dispatched.
-  isConvenienceInit = ctor->isConvenienceInit();
-
   // Emit the prolog. Since we're just going to forward our args directly
   // to the initializer, don't allocate local variables for them.
   RegularLocation Loc(ctor);
@@ -3242,9 +3239,6 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
 void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   MagicFunctionName = getMagicFunctionName(ctor);
   
-  // FIXME: Hack until all delegation is dispatched.
-  isConvenienceInit = ctor->isConvenienceInit();
-
   assert(ctor->getBody() && "Class constructor without a body?");
 
   // True if this constructor delegates to a peer constructor with self.init().
