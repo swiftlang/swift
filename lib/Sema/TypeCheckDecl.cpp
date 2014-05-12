@@ -185,6 +185,16 @@ static Type getDeclaredType(Decl *decl) {
   return cast<ExtensionDecl>(decl)->getExtendedType();
 }
 
+
+static void addMemberToContext(Decl *D, DeclContext *DC) {
+  if (auto *ntd = dyn_cast<NominalTypeDecl>(DC))
+    ntd->addMember(D);
+  else if (auto *ed = dyn_cast<ExtensionDecl>(DC))
+    ed->addMember(D);
+  else
+    assert(isa<AbstractFunctionDecl>(DC) && "Unknown declcontext");
+}
+
 // Add implicit conformances to the given declaration.
 static void addImplicitConformances(
               TypeChecker &tc, Decl *decl,
@@ -1392,32 +1402,13 @@ static void convertStoredVarInProtocolToComputed(VarDecl *VD, TypeChecker &TC) {
   
   // We've added some members to our containing class, add them to the members
   // list.
-  ProtocolDecl *PD = cast<ProtocolDecl>(VD->getDeclContext());
-  PD->addMember(Get);
+  addMemberToContext(Get, VD->getDeclContext());
+
+  // Type check the getter declaration.
+  TC.typeCheckDecl(VD->getGetter(), true);
+  TC.typeCheckDecl(VD->getGetter(), false);
 }
 
-static void convertNSManagedStoredVarToComputed(VarDecl *VD, TypeChecker &TC) {
-  // Create the getter.
-  auto *Get = createGetterPrototype(VD, TC);
-
-  // Create the setter.
-  VarDecl *SetValueDecl = nullptr;
-  auto *Set = createSetterPrototype(VD, SetValueDecl, TC);
-
-  // Okay, we have both the getter and setter.  Set them in VD.
-  VD->makeComputed(VD->getLoc(), Get, Set, VD->getLoc());
-
-  // We've added some members to our containing class/extension, add them to
-  // the members list.
-  if (auto classDecl = dyn_cast<ClassDecl>(VD->getDeclContext())) {
-    classDecl->addMember(Get);
-    classDecl->addMember(Set);
-  } else {
-    auto ext = cast<ExtensionDecl>(VD->getDeclContext());
-    ext->addMember(Get);
-    ext->addMember(Set);
-  }
-}
 
 /// Load the value of VD.  If VD is an @override of another value, we call the
 /// superclass getter.  Otherwise, we do a direct load of the value.
@@ -1571,7 +1562,8 @@ static void createPropertyStoreOrCallSuperclassSetter(Expr *Val, VarDecl *VD,
 /// storage load.  For an override of a base member property, it chains up to
 /// super.
 ///
-static void synthesizeTrivialGetter(FuncDecl *Get, VarDecl *VD) {
+static void synthesizeTrivialGetter(FuncDecl *Get, VarDecl *VD,
+                                    TypeChecker &TC) {
   auto &Ctx = VD->getASTContext();
   VarDecl *SelfDecl = Get->getImplicitSelfDecl();
   
@@ -1592,55 +1584,64 @@ static void synthesizeTrivialGetter(FuncDecl *Get, VarDecl *VD) {
     Get->getMutableAttrs().add(new (Ctx) FinalAttr(/*IsImplicit=*/true));
 }
 
+/// Synthesize the body of a trivial setter.
+static void synthesizeTrivialSetter(FuncDecl *Set, VarDecl *VD,
+                                    VarDecl *ValueDecl, TypeChecker &TC) {
+  auto &Ctx = VD->getASTContext();
+  SourceLoc Loc = VD->getLoc();
+
+  VarDecl *SelfDecl = Set->getImplicitSelfDecl();
+
+  auto *ValueDRE = new (Ctx) DeclRefExpr(ValueDecl, SourceLoc(), true);
+  SmallVector<ASTNode, 1> SetterBody;
+  createPropertyStoreOrCallSuperclassSetter(ValueDRE, VD, SelfDecl,
+                                            SetterBody, TC);
+  Set->setBody(BraceStmt::create(Ctx, Loc, SetterBody, Loc));
+
+  // Mark it transparent, there is no user benefit to this actually existing.
+  Set->getMutableAttrs().setAttr(AK_transparent, Loc);
+
+  if (VD->isFinal())
+    Set->getMutableAttrs().add(new (Ctx) FinalAttr(/*IsImplicit=*/true));
+
+}
+
+
 /// Given a "Stored" property that needs to be converted to
 /// StoredWithTrivialAccessors, create the trivial getter and setter, and switch
 /// the storage kind.
 static void addAccessorsToStoredVar(VarDecl *VD, TypeChecker &TC) {
   assert(VD->getStorageKind() == VarDecl::Stored && "Isn't a stored vardecl");
-  auto &Context = VD->getASTContext();
-  SourceLoc Loc = VD->getLoc();
-  
+
   auto *Get = createGetterPrototype(VD, TC);
-  synthesizeTrivialGetter(Get, VD);
+  synthesizeTrivialGetter(Get, VD, TC);
 
   FuncDecl *Set = nullptr;
   if (!VD->isLet()) {
     // Okay, the getter is set up, create the setter next.
     VarDecl *ValueDecl = nullptr;
-
     Set = createSetterPrototype(VD, ValueDecl, TC);
-
-    VarDecl *SelfDecl = Set->getImplicitSelfDecl();
-
-    auto *ValueDRE = new (Context) DeclRefExpr(ValueDecl, SourceLoc(), true);
-    SmallVector<ASTNode, 1> SetterBody;
-    createPropertyStoreOrCallSuperclassSetter(ValueDRE, VD, SelfDecl,
-                                              SetterBody, TC);
-    Set->setBody(BraceStmt::create(Context, Loc, SetterBody, Loc));
-
-    // Mark it transparent, there is no user benefit to this actually existing.
-    Set->getMutableAttrs().setAttr(AK_transparent, Loc);
-
-    if (VD->isFinal())
-      Set->getMutableAttrs().add(new (Context) FinalAttr(/*IsImplicit=*/true));
+    synthesizeTrivialSetter(Set, VD, ValueDecl, TC);
   }
   
   // Okay, we have both the getter and setter.  Set them in VD.
   VD->makeStoredWithTrivialAccessors(Get, Set);
-  
-  // We've added some members to our containing type, add them to the
-  // members list.
-  if (auto ext = dyn_cast<ExtensionDecl>(VD->getDeclContext())) {
-    ext->addMember(Get);
-    if (Set) ext->addMember(Set);
-    return;
+
+  // Type check the body of the getter.
+  TC.typeCheckDecl(Get, true);
+  TC.typeCheckDecl(Get, false);
+
+  if (Set) {
+    TC.typeCheckDecl(Set, true);
+    TC.typeCheckDecl(Set, false);
   }
 
-  auto nominal = cast<NominalTypeDecl>(VD->getDeclContext());
-  nominal->addMember(Get);
-  if (Set) nominal->addMember(Set);
+  // We've added some members to our containing type, add them to the
+  // members list.
+  addMemberToContext(Get, VD->getDeclContext());
+  if (Set)
+    addMemberToContext(Set, VD->getDeclContext());
 }
-
 
 
 /// The specified VarDecl with "Stored" StorageKind was just found to satisfy
@@ -1651,13 +1652,10 @@ void TypeChecker::synthesizeWitnessAccessorsForStoredVar(VarDecl *VD) {
   addAccessorsToStoredVar(VD, *this);
 
   // Type check the body of the getter and setter.
-  validateDecl(VD->getGetter(), true);
   definedFunctions.push_back(VD->getGetter());
 
-  if (auto *setter = VD->getSetter()) {
-    validateDecl(setter, true);
+  if (auto *setter = VD->getSetter())
     definedFunctions.push_back(setter);
-  }
 }
 
 
@@ -1675,7 +1673,7 @@ static void synthesizeObservingAccessors(VarDecl *VD, TypeChecker &TC) {
   // The getter is always trivial: just perform a (direct!) load of storage, or
   // a call of a superclass getter if this is an override.
   auto *Get = VD->getGetter();
-  synthesizeTrivialGetter(Get, VD);
+  synthesizeTrivialGetter(Get, VD, TC);
 
   // Okay, the getter is done, create the setter now.  Start by finding the
   // decls for 'self' and 'value'.
@@ -1731,9 +1729,9 @@ static void synthesizeObservingAccessors(VarDecl *VD, TypeChecker &TC) {
     }
     SetterBody.push_back(new (Ctx) CallExpr(Callee, ValueDRE, true));
 
-    // Make sure the didSet/willSet accessors are marked @final.
-    if (!willSet->isFinal() && willSet->getExtensionType() &&
-        willSet->getExtensionType()->getClassOrBoundGenericClass())
+    // Make sure the didSet/willSet accessors are marked @final if in a class.
+    if (!willSet->isFinal() &&
+        VD->getDeclContext()->isClassOrClassExtensionContext())
       willSet->getMutableAttrs().add(new (Ctx) FinalAttr(/*IsImplicit=*/true));
   }
   
@@ -1758,14 +1756,210 @@ static void synthesizeObservingAccessors(VarDecl *VD, TypeChecker &TC) {
     }
     SetterBody.push_back(new (Ctx) CallExpr(Callee, OldValueExpr, true));
 
-    // Make sure the didSet/willSet accessors are marked @final.
-    if (!didSet->isFinal() && didSet->getExtensionType() &&
-        didSet->getExtensionType()->getClassOrBoundGenericClass())
+    // Make sure the didSet/willSet accessors are marked @final if in a class.
+    if (!didSet->isFinal() &&
+        VD->getDeclContext()->isClassOrClassExtensionContext())
       didSet->getMutableAttrs().add(new (Ctx) FinalAttr(/*IsImplicit=*/true));
   }
 
   Set->setBody(BraceStmt::create(Ctx, Loc, SetterBody, Loc));
+
+  // Type check the body of the getter and setter.
+  TC.typeCheckDecl(Get, true);
+  TC.typeCheckDecl(Set, true);
 }
+
+
+static void convertNSManagedStoredVarToComputed(VarDecl *VD, TypeChecker &TC) {
+  assert(VD->getStorageKind() == AbstractStorageDecl::Stored);
+
+  // Create the getter.
+  auto *Get = createGetterPrototype(VD, TC);
+
+  // Create the setter.
+  VarDecl *SetValueDecl = nullptr;
+  auto *Set = createSetterPrototype(VD, SetValueDecl, TC);
+
+  // Okay, we have both the getter and setter.  Set them in VD.
+  VD->makeComputed(VD->getLoc(), Get, Set, VD->getLoc());
+
+  // We've added some members to our containing class/extension, add them to
+  // the members list.
+  addMemberToContext(Get, VD->getDeclContext());
+  addMemberToContext(Set, VD->getDeclContext());
+}
+
+
+/// Synthesize the getter for an @lazy property with the specified storage
+/// vardecl.
+static FuncDecl *createLazyPropertyGetter(VarDecl *VD, VarDecl *Storage,
+                                          TypeChecker &TC) {
+  auto &Ctx = VD->getASTContext();
+
+  // The getter checks the optional, storing the initial value in if nil.  The
+  // specific pattern we generate is:
+  //   get {
+  //     let tmp1 = storage
+  //     if tmp1 {
+  //       return tmp1!
+  //     }
+  //     let tmp2 : Ty = <<initializer expression>>
+  //     storage = tmp2
+  //     return tmp2
+  //   }
+  auto *Get = createGetterPrototype(VD, TC);
+  VarDecl *SelfDecl = Get->getImplicitSelfDecl();
+
+  SmallVector<ASTNode, 6> Body;
+
+  // Load the existing storage and store it into the 'tmp1' temporary.
+  auto *Tmp1VD = new (Ctx) VarDecl(/*isStatic*/false, /*isLet*/true,SourceLoc(),
+                                   Ctx.getIdentifier("tmp1"), Type(), Get);
+
+  auto *Tmp1PBDPattern = new (Ctx) NamedPattern(Tmp1VD, /*implicit*/true);
+  auto *Tmp1Init = createPropertyLoadOrCallSuperclassGetter(Storage, SelfDecl);
+  auto *Tmp1PBD = new (Ctx) PatternBindingDecl(/*StaticLoc*/SourceLoc(),
+                                               StaticSpellingKind::None,
+                                               /*VarLoc*/SourceLoc(),
+                                               Tmp1PBDPattern, Tmp1Init,
+                                               /*isConditional*/false,
+                                               Get);
+  Body.push_back(Tmp1PBD);
+  Body.push_back(Tmp1VD);
+
+  // Build the early return inside the if.
+  auto *Tmp1DRE = new (Ctx) DeclRefExpr(Tmp1VD, SourceLoc(), /*Implicit*/true,
+                                        /*directpropertyaccess*/true);
+  auto *EarlyReturnVal = new (Ctx) ForceValueExpr(Tmp1DRE, SourceLoc());
+  auto *Return = new (Ctx) ReturnStmt(SourceLoc(), EarlyReturnVal,
+                                      /*implicit*/true);
+
+  // Build the "if" around the early return.
+  Tmp1DRE = new (Ctx) DeclRefExpr(Tmp1VD, SourceLoc(), /*Implicit*/true,
+                                  /*directpropertyaccess*/true);
+  Body.push_back(new (Ctx) IfStmt(SourceLoc(), Tmp1DRE, Return,
+                                  /*elseloc*/SourceLoc(), /*else*/nullptr,
+                                  /*implicit*/ true));
+
+
+  auto *Tmp2VD = new (Ctx) VarDecl(/*isStatic*/false, /*isLet*/true,
+                                   SourceLoc(), Ctx.getIdentifier("tmp2"),
+                                   VD->getType(), Get);
+
+  // Take the initializer from the PatternBindingDecl for VD.
+  // TODO: This doesn't work with complicated patterns like:
+  //   @lazy var (a,b) = foo()
+  auto *InitValue = VD->getParentPattern()->getInit();
+  VD->getParentPattern()->setInit(nullptr, true);
+
+  Pattern *Tmp2PBDPattern = new (Ctx) NamedPattern(Tmp2VD, /*implicit*/true);
+  Tmp2PBDPattern = new (Ctx) TypedPattern(Tmp2PBDPattern,
+                                          TypeLoc::withoutLoc(VD->getType()),
+                                          /*implicit*/true);
+
+  auto *Tmp2PBD = new (Ctx) PatternBindingDecl(/*StaticLoc*/SourceLoc(),
+                                               StaticSpellingKind::None,
+                                               InitValue->getStartLoc(),
+                                               Tmp2PBDPattern, InitValue,
+                                               /*isConditional*/false,
+                                               Get);
+  Body.push_back(Tmp2PBD);
+  Body.push_back(Tmp2VD);
+
+  // Assign tmp2 into storage.
+  auto Tmp2DRE = new (Ctx) DeclRefExpr(Tmp2VD, SourceLoc(), /*Implicit*/true,
+                                       /*directpropertyaccess*/true);
+  auto StorageDRE = new (Ctx) DeclRefExpr(Storage, SourceLoc(),/*Implicit*/true,
+                                          /*directpropertyaccess*/true);
+
+  Body.push_back(new (Ctx) AssignExpr(StorageDRE, SourceLoc(), Tmp2DRE, true));
+
+  // Return tmp2.
+  Tmp2DRE = new (Ctx) DeclRefExpr(Tmp2VD, SourceLoc(), /*Implicit*/true,
+                                  /*directpropertyaccess*/true);
+
+  Body.push_back(new (Ctx) ReturnStmt(SourceLoc(), Tmp2DRE, /*implicit*/true));
+
+  Get->setBody(BraceStmt::create(Ctx, VD->getLoc(), Body, VD->getLoc(),
+                                 /*implicit*/true));
+
+  // Mark it transparent, there is no user benefit to this actually existing, we
+  // just want it for abstraction purposes (i.e., to make access to the variable
+  // uniform and to be able to put the getter in a vtable).
+  Get->getMutableAttrs().setAttr(AK_transparent, VD->getLoc());
+
+  // If the var is marked @final, then so is the getter.
+  if (VD->isFinal())
+    Get->getMutableAttrs().add(new (Ctx) FinalAttr(/*IsImplicit=*/true));
+
+  // @lazy getters are mutating on an enclosing struct.
+  Get->setMutating();
+  return Get;
+}
+
+
+/// @lazy properties get a storage variable synthesized for them.
+static void convertLazyStoredVarToComputed(VarDecl *VD, TypeChecker &TC) {
+  assert(VD->getStorageKind() == AbstractStorageDecl::Stored);
+  assert(!VD->isStatic() && "Static vars are already lazy on their own");
+  auto &Ctx = VD->getASTContext();
+
+  // Create the storage property as an optional of VD's type.
+  auto StorageName = Ctx.getIdentifier((VD->getName().str()+".storage").str());
+  auto StorageTy = OptionalType::get(VD->getType());
+
+  auto *Storage = new (Ctx) VarDecl(/*isStatic*/false, /*isLet*/false,
+                                    VD->getLoc(), StorageName, StorageTy,
+                                    VD->getDeclContext());
+
+  // Mark the vardecl to be final and implicit.  In a class, this prevents it
+  // from being dynamically dispatched.
+  if (VD->getDeclContext()->isClassOrClassExtensionContext())
+    Storage->getMutableAttrs().add(new (Ctx) FinalAttr(true));
+  Storage->setImplicit();
+
+  addMemberToContext(Storage, VD->getDeclContext());
+
+  // Create the pattern binding decl for the storage decl.  This will get
+  // default initialized to nil.
+  Pattern *PBDPattern = new (Ctx) NamedPattern(Storage, /*implicit*/true);
+  PBDPattern = new (Ctx) TypedPattern(PBDPattern,
+                                      TypeLoc::withoutLoc(StorageTy),
+                                      /*implicit*/true);
+  auto *PBD = new (Ctx) PatternBindingDecl(/*staticloc*/SourceLoc(),
+                                           StaticSpellingKind::None,
+                                           /*varloc*/VD->getLoc(),
+                                           PBDPattern, /*init*/nullptr,
+                                           /*isConditional*/false,
+                                           VD->getDeclContext());
+  addMemberToContext(PBD, VD->getDeclContext());
+
+
+  // Now that we've got the storage squared away, synthesize the getter.
+  auto *Get = createLazyPropertyGetter(VD, Storage, TC);
+
+
+  // The setter just forwards on to storage without materializing the initial
+  // value.
+  VarDecl *SetValueDecl = nullptr;
+  auto *Set = createSetterPrototype(VD, SetValueDecl, TC);
+  // FIXME: This is wrong for observed properties.
+  synthesizeTrivialSetter(Set, Storage, SetValueDecl, TC);
+
+  // Okay, we have both the getter and setter.  Set them in VD.
+  VD->makeComputed(VD->getLoc(), Get, Set, VD->getLoc());
+
+
+  TC.typeCheckDecl(Get, true);
+  TC.typeCheckDecl(Get, false);
+
+  TC.typeCheckDecl(Set, true);
+  TC.typeCheckDecl(Set, false);
+
+  addMemberToContext(Get, VD->getDeclContext());
+  addMemberToContext(Set, VD->getDeclContext());
+}
+
 
 namespace {
 
@@ -2047,56 +2241,38 @@ public:
       TC.diagnose(VD->getLoc(), diag::protocol_property_must_be_computed);
       
       convertStoredVarInProtocolToComputed(VD, TC);
-
-      // Type check the getter declaration.
-      TC.typeCheckDecl(VD->getGetter(), true);
-      TC.typeCheckDecl(VD->getGetter(), false);
     }
 
-    // Is this a class member?
-    bool isClassMember = false;
-    if (auto ctx = VD->getDeclContext()->getDeclaredTypeOfContext())
-      isClassMember = ctx->getClassOrBoundGenericClass();
 
-    // Synthesization for @NSManaged, all checking already performed.
-    if (VD->getAttrs().hasAttribute<NSManagedAttr>()) {
-      assert(VD->getStorageKind() == AbstractStorageDecl::Stored);
-      // Convert this property to a computed property.
+    // Synthesize accessors for @NSManaged, all checking has already been
+    // performed.
+    if (VD->getAttrs().hasAttribute<NSManagedAttr>())
       convertNSManagedStoredVarToComputed(VD, TC);
-    }
+
+    // Synthesize accessors for @lazy, all checking already been performed.
+    if (VD->getAttrs().hasAttribute<LazyAttr>())
+      convertLazyStoredVarToComputed(VD, TC);
 
     // If this is a non-final stored property in a class, then synthesize getter
     // and setter accessors and change its storage kind.  This allows it to be
     // overriden and provide objc entrypoints if needed.
-    if (VD->getStorageKind() == VarDecl::Stored && !VD->isStatic()) {
+    if (VD->getStorageKind() == VarDecl::Stored && !VD->isStatic() &&
+        !VD->isImplicit()) {
       // Variables in SIL mode don't get auto-synthesized getters.
       bool isInSILMode = false;
       if (auto sourceFile = VD->getDeclContext()->getParentSourceFile())
         isInSILMode = sourceFile->Kind == SourceFileKind::SIL;
 
-      if (isClassMember && !isInSILMode) {
+      if (VD->getDeclContext()->isClassOrClassExtensionContext() &&
+          !isInSILMode)
         addAccessorsToStoredVar(VD, TC);
-
-        // Type check the body of the getter and setter.
-        TC.typeCheckDecl(VD->getGetter(), true);
-        TC.typeCheckDecl(VD->getGetter(), false);
-        if (VD->getSetter()) {
-          TC.typeCheckDecl(VD->getSetter(), true);
-          TC.typeCheckDecl(VD->getSetter(), false);
-        }
-      }
     }
 
     // If this is a willSet/didSet property, synthesize the getter and setter
     // decl.
     if (VD->getStorageKind() == VarDecl::Observing &&
-        !VD->getGetter()->getBody()) {
+        !VD->getGetter()->getBody())
       synthesizeObservingAccessors(VD, TC);
-
-      // Type check the body of the getter and setter.
-      TC.typeCheckDecl(VD->getGetter(), true);
-      TC.typeCheckDecl(VD->getSetter(), true);
-    }
 
     // If this variable is marked @final and has a getter or setter, mark the
     // getter and setter as final as well.
@@ -4541,6 +4717,14 @@ static ConstructorDecl *createImplicitConstructor(TypeChecker &tc,
 
       auto varType = tc.getTypeOfRValue(var);
 
+      // If var is a @lazy property, its value is provided for the underlying
+      // storage.  We thus take an optional of the properties type.  We only
+      // need to do this because the implicit constructor is added before all
+      // the properties are type checked.  Perhaps init() synth should be moved
+      // later.
+      if (var->getAttrs().hasAttribute<LazyAttr>())
+        varType = OptionalType::get(varType);
+
       // Create the parameter.
       auto *arg = new (context) ParamDecl(/*IsLet*/true, Loc, var->getName(),
                                           Loc, var->getName(), varType, decl);
@@ -5036,7 +5220,9 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
     }
 
     if (auto var = dyn_cast<VarDecl>(member)) {
-      if (var->hasStorage() && !var->isStatic())
+      if (var->hasStorage() && !var->isStatic() &&
+          // @lazy variables aren't initialized by the initializer.
+          !var->getAttrs().hasAttribute<LazyAttr>())
         FoundInstanceVar = true;
       continue;
     }
