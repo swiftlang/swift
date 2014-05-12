@@ -616,37 +616,8 @@ void TypeChecker::checkOwnershipAttr(VarDecl *var, Ownership ownershipKind) {
       return;
     }
 
-    if (objType) {
+    if (objType)
       type = objType;
-
-      // Cannot use an implicitly unwrapped optional with @weak.
-      if (kind == OTK_ImplicitlyUnwrappedOptional) {
-        // Find the location of the '!'.
-        SourceLoc bangLoc;
-        auto *pattern = var->getParentPattern()->getPattern();
-        if (auto *varPattern = dyn_cast<VarPattern>(pattern)) {
-          pattern = varPattern->getSubPattern();
-        }
-        if (auto *typedPattern = dyn_cast<TypedPattern>(pattern)) {
-          auto typeRepr = typedPattern->getTypeLoc().getTypeRepr();
-          if (auto unchecked =
-              dyn_cast<ImplicitlyUnwrappedOptionalTypeRepr>(typeRepr)) {
-            bangLoc = unchecked->getExclamationLoc();
-          }
-        }
-
-        SourceLoc weakLoc = var->getAttrs().getLoc(AK_weak);
-        diagnose(var->getStartLoc(), 
-                 diag::invalid_weak_ownership_unchecked_optional,
-                 type)
-          .fixItReplace(weakLoc, "unowned")
-          .fixItRemove(bangLoc);
-        var->getMutableAttrs().clearOwnership();
-
-        // FIXME: Fix the AST here.
-        return;
-      }
-    }
   }
 
   if (!type->allowsOwnership()) {
