@@ -1,6 +1,11 @@
 Latest
 ----------
 
+* Dictionary subscripting now takes/returns an optional type.  This allows
+  querying a dictionary via subscripting to gracefully fail.  It also enables
+  the idiom of removing values from a dictionary using 'dict[key] = nil'.
+  As part of this, 'deleteKey' is no longer available.
+
 * Closures can now specify a capture list to indicate with what strength they
   want to capture a value, and to bind a particular field value if they want to.
 
