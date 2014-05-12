@@ -768,6 +768,9 @@ ERROR(lazy_requires_initializer,sema_tcd,none,
 ERROR(lazy_requires_single_var,sema_tcd,none,
       "'lazy' attribute cannot destructure an initializer", ())
 
+ERROR(lazy_must_be_property,sema_tcd,none,
+      "@lazy is only valid members of a struct or class", ())
+
 //------------------------------------------------------------------------------
 // Type Check Expressions
 //------------------------------------------------------------------------------

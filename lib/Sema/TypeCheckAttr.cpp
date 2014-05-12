@@ -201,6 +201,11 @@ void AttributeEarlyChecker::visitLazyAttr(LazyAttr *attr) {
   if (!PBD->getSingleVar())
     return diagnoseAndRemoveAttr(attr, diag::lazy_requires_single_var);
 
+  // TODO: we can't currently support lazy properties on non-type-contexts.
+  if (!VD->getDeclContext()->isTypeContext())
+    return diagnoseAndRemoveAttr(attr, diag::lazy_must_be_property);
+
+
 }
 
 
