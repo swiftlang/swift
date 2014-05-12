@@ -3,7 +3,7 @@
 
 import macros
 
-// CHECK-DAG: [[OBJC_STRING:@[0-9]+]] = private unnamed_addr constant [8 x i16] [i16 83, i16 104, i16 105, i16 110, i16 121, i16 32, i16 10024, i16 0]
+// CHECK-DAG: [[OBJC_STRING:@[0-9]+]] = private unnamed_addr constant [8 x i16] [i16 83, i16 119, i16 105, i16 102, i16 116, i16 32, i16 10024, i16 0]
 // CHECK-DAG: [[UTF8_STRING:@[0-9]+]] = private unnamed_addr constant [10 x i8] c"Swift \E2\9C\A8\00"
 // CHECK-DAG: [[VERSION_STRING:@[0-9]+]] = private unnamed_addr constant [10 x i8] c"Swift 1.0\00"
 
