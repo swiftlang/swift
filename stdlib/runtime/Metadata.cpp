@@ -272,21 +272,6 @@ instantiateGenericMetadata(GenericMetadata *pattern,
   return adjustAddressPoint(canonFullMetadata, pattern->AddressPoint);
 }
 
-#if SWIFT_OBJC_INTEROP
-const ClassMetadata *
-swift::swift_getClassMetadata(const void *object) {
-  auto isa = reinterpret_cast<const ClassMetadata *>(object_getClass(object));
-  while (isa->isPureObjC()) {
-    isa = isa->SuperClass;
-    if (isa == nullptr) {
-      swift::crash("Not a Swift class!");
-    }
-  }
-  return isa;
-}
-#endif
-
-
 static size_t
 _setupClassMask() {
   void *handle = dlopen(nullptr, RTLD_LAZY);
