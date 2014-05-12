@@ -11,10 +11,12 @@ find_library(CORE_FOUNDATION NAMES CoreFoundation)
 
 target_link_libraries(swift edit ${CORE_FOUNDATION})
 
-get_filename_component(ARCLITE_BASE ${CMAKE_CXX_COMPILER} PATH)
+execute_process(
+  COMMAND xcrun --toolchain default -f clang
+  OUTPUT_VARIABLE default_toolchain_compiler)
+get_filename_component(ARCLITE_BASE ${default_toolchain_compiler} PATH)
 get_filename_component(ARCLITE_BASE ${ARCLITE_BASE} PATH)
-set(SWIFT_REPL_ARCLITE "${ARCLITE_BASE}/lib/arc/libarclite_macosx.a" 
-    CACHE FILEPATH "Path to arclite to be linked into the compiler for the REPL")
+set(SWIFT_REPL_ARCLITE "${ARCLITE_BASE}/lib/arc/libarclite_macosx.a")
 if (SWIFT_REPL_ARCLITE)
   set_property(TARGET swift APPEND_STRING PROPERTY
     LINK_FLAGS "-lobjc -Wl,-force_load,${SWIFT_REPL_ARCLITE}")
