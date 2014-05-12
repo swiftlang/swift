@@ -128,7 +128,7 @@ IRGenDebugInfo::IRGenDebugInfo(const IRGenOptions &Opts,
   llvm::sys::path::append(MainFilename, Filename);
   MainFile = getOrCreateFile(MainFilename.c_str());
 
-  unsigned Lang = DW_LANG_Swift;
+  unsigned Lang = llvm::dwarf::DW_LANG_Swift;
 
   StringRef Producer = BumpAllocatedString(version::getSwiftFullVersion());
 
@@ -508,7 +508,7 @@ llvm::DIScope IRGenDebugInfo::getOrCreateContext(DeclContext *DC) {
     auto FwdDecl = DBuilder.createForwardDecl
       (llvm::dwarf::DW_TAG_structure_type,
        TyDecl->getName().str(), getOrCreateContext(DC->getParent()),
-       File, Line, DW_LANG_Swift, 0, 0);
+       File, Line, llvm::dwarf::DW_LANG_Swift, 0, 0);
 
     return FwdDecl;
   }
@@ -1109,7 +1109,8 @@ IRGenDebugInfo::createStructType(DebugTypeInfo DbgTy,
   // Forward declare this first because types may be recursive.
   auto FwdDecl = DBuilder.createForwardDecl
     (llvm::dwarf::DW_TAG_structure_type,
-     Name, Scope, File, Line, DW_LANG_Swift, SizeInBits, AlignInBits);
+     Name, Scope, File, Line, llvm::dwarf::DW_LANG_Swift,
+     SizeInBits, AlignInBits);
 
 #ifndef NDEBUG
   if (UniqueID.empty())
@@ -1167,7 +1168,8 @@ IRGenDebugInfo::createEnumType(DebugTypeInfo DbgTy,
   // FIXME: Is DW_TAG_union_type the right thing here?
   auto FwdDecl = DBuilder.createForwardDecl
     (llvm::dwarf::DW_TAG_union_type,
-     Name, Scope, File, Line, DW_LANG_Swift, SizeInBits, AlignInBits);
+     Name, Scope, File, Line, llvm::dwarf::DW_LANG_Swift,
+     SizeInBits, AlignInBits);
 
   DITypeCache[DbgTy.getType()] = llvm::WeakVH(FwdDecl);
 
@@ -1175,7 +1177,7 @@ IRGenDebugInfo::createEnumType(DebugTypeInfo DbgTy,
     DBuilder.createUnionType(Scope, Name, File, Line,
                              SizeInBits, AlignInBits, Flags,
                              getEnumElements(DbgTy, Decl, Scope, File, Flags),
-                             DW_LANG_Swift);
+                             llvm::dwarf::DW_LANG_Swift);
   FwdDecl->replaceAllUsesWith(DITy);
   return DITy;
 }
@@ -1271,7 +1273,8 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
       StringRef Name = "<internal>";
       InternalType = DBuilder.
         createForwardDecl(llvm::dwarf::DW_TAG_structure_type, Name, Scope, File,
-                          /*Line*/ 0, DW_LANG_Swift, SizeInBits, AlignInBits);
+                          /*Line*/ 0, llvm::dwarf::DW_LANG_Swift,
+                          SizeInBits, AlignInBits);
     }
     return llvm::DIType(InternalType);
   }
@@ -1297,7 +1300,8 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     // an Objective-C type through swift.
     auto IdTy = DBuilder.
       createStructType(Scope, MangledName, File, 0, 0, 0, 0,
-                       llvm::DIType(), llvm::DIArray(), DW_LANG_Swift,
+                       llvm::DIType(), llvm::DIArray(),
+                       llvm::dwarf::DW_LANG_Swift,
                        llvm::DIType(), MangledName);
     return DBuilder.createPointerType(IdTy, SizeInBits, AlignInBits);
   }
@@ -1329,7 +1333,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
                               getOrCreateFile(L.Filename), L.Line,
                               SizeInBits, AlignInBits, Flags,
                               llvm::DIType(),  // DerivedFrom
-                              DW_LANG_Swift, MangledName);
+                              llvm::dwarf::DW_LANG_Swift, MangledName);
     }
     DEBUG(llvm::dbgs() << "Struct without Decl: "; DbgTy.getType()->dump();
           llvm::dbgs() << "\n");
@@ -1345,7 +1349,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
       Location L = getLoc(SM, Decl);
       // TODO: We may want to peek at Decl->isObjC() and set this
       // attribute accordingly.
-      auto RuntimeLang = DW_LANG_Swift;
+      auto RuntimeLang = llvm::dwarf::DW_LANG_Swift;
       if (auto *ClangDecl = Decl->getClangDecl()) {
         auto ClangSrcLoc = ClangDecl->getLocStart();
         clang::SourceManager &ClangSM =
@@ -1386,7 +1390,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
                               getOrCreateFile(L.Filename), L.Line,
                               SizeInBits, AlignInBits, Flags,
                               llvm::DIType(),  // DerivedFrom
-                              DW_LANG_Swift, MangledName);
+                              llvm::dwarf::DW_LANG_Swift, MangledName);
     }
     break;
   }
@@ -1403,7 +1407,8 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
                          SizeInBits, AlignInBits, Flags,
                          llvm::DIType(), // DerivedFrom
                          llvm::DIArray(),
-                         DW_LANG_Swift, llvm::DIType(), MangledName);
+                         llvm::dwarf::DW_LANG_Swift,
+                         llvm::DIType(), MangledName);
     }
     DEBUG(llvm::dbgs() << "ProtocolCompositionType without Decl: ";
           DbgTy.getType()->dump(); llvm::dbgs() << "\n");
@@ -1420,7 +1425,8 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
                          SizeInBits, AlignInBits, Flags,
                          llvm::DIType(), // DerivedFrom
                          llvm::DIArray(),
-                         DW_LANG_Swift, llvm::DIType(), MangledName);
+                         llvm::dwarf::DW_LANG_Swift,
+                         llvm::DIType(), MangledName);
     }
     DEBUG(llvm::dbgs() << "Unbound generic without Decl: ";
           DbgTy.getType()->dump(); llvm::dbgs() << "\n");
@@ -1435,7 +1441,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
                               getOrCreateFile(L.Filename), L.Line,
                               SizeInBits, AlignInBits, Flags,
                               llvm::DIType(), // DerivedFrom
-                              DW_LANG_Swift, MangledName);
+                              llvm::dwarf::DW_LANG_Swift, MangledName);
     }
     DEBUG(llvm::dbgs() << "Bound Generic struct without Decl: ";
           DbgTy.getType()->dump(); llvm::dbgs() << "\n");
@@ -1448,7 +1454,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
       Location L = getLoc(SM, Decl);
       // TODO: We may want to peek at Decl->isObjC() and set this
       // attribute accordingly.
-      auto RuntimeLang = DW_LANG_Swift;
+      auto RuntimeLang = llvm::dwarf::DW_LANG_Swift;
       return createStructType(DbgTy, Decl, Decl->getName().str(), Scope,
                               getOrCreateFile(L.Filename), L.Line,
                               SizeInBits, AlignInBits, Flags,
@@ -1473,7 +1479,7 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
                        RealSize, AlignInBits, Flags,
                        llvm::DIType(), // DerivedFrom
                        Elements,
-                       DW_LANG_Swift, llvm::DIType(), MangledName);
+                       llvm::dwarf::DW_LANG_Swift, llvm::DIType(), MangledName);
   }
 
   case TypeKind::InOut: {
@@ -1492,8 +1498,8 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     auto DITy = DBuilder.createStructType(Scope, MangledName, File, L.Line,
                                           SizeInBits, AlignInBits, Flags,
                                           DerivedFrom, llvm::DIArray(),
-                                          DW_LANG_Swift, llvm::DIType(),
-                                          MangledName);
+                                          llvm::dwarf::DW_LANG_Swift,
+                                          llvm::DIType(), MangledName);
     // Emit the protocols the archetypes conform to.
     SmallVector<llvm::Value *, 4> Protocols;
     for (auto ProtocolDecl : Archetype->getConformsTo()) {
@@ -1516,8 +1522,8 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     return DBuilder.createStructType(Scope, MangledName, File, L.Line,
                                      SizeInBits, AlignInBits, Flags,
                                      llvm::DIType(), llvm::DIArray(),
-                                     DW_LANG_Swift, llvm::DIType(),
-                                     MangledName);
+                                     llvm::dwarf::DW_LANG_Swift,
+                                     llvm::DIType(), MangledName);
   }
 
   case TypeKind::SILFunction:
