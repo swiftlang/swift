@@ -1870,10 +1870,8 @@ static FuncDecl *createLazyPropertyGetter(VarDecl *VD, VarDecl *Storage,
   // Assign tmp2 into storage.
   auto Tmp2DRE = new (Ctx) DeclRefExpr(Tmp2VD, SourceLoc(), /*Implicit*/true,
                                        /*directpropertyaccess*/true);
-  auto StorageDRE = new (Ctx) DeclRefExpr(Storage, SourceLoc(),/*Implicit*/true,
-                                          /*directpropertyaccess*/true);
-
-  Body.push_back(new (Ctx) AssignExpr(StorageDRE, SourceLoc(), Tmp2DRE, true));
+  createPropertyStoreOrCallSuperclassSetter(Tmp2DRE, Storage, SelfDecl,
+                                            Body, TC);
 
   // Return tmp2.
   Tmp2DRE = new (Ctx) DeclRefExpr(Tmp2VD, SourceLoc(), /*Implicit*/true,
