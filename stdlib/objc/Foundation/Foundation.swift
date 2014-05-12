@@ -497,8 +497,7 @@ extension NSArray : ArrayLiteralConvertible {
   class func convertFromArrayLiteral(elements: AnyObject...) -> Self {
     // + (instancetype)arrayWithObjects:(const id [])objects count:(NSUInteger)cnt;
     let x = _extractOrCopyToNativeArrayBuffer(elements.buffer)
-    let result = self.arrayWithObjects(
-      UnsafePointer(x.elementStorage), count: x.count)
+    let result = self(objects: UnsafePointer(x.elementStorage), count: x.count)
     _fixLifetime(x)
     return result
   }
@@ -558,8 +557,7 @@ extension NSDictionary : DictionaryLiteralConvertible {
       objects[i] = elements[i].1
     }
 
-    return self.dictionaryWithObjects(objects, forKeys: keys,
-                                      count: elements.count)
+    return self(objects: objects, forKeys: keys, count: elements.count)
   }
 }
 
@@ -1069,26 +1067,17 @@ func NSLog(format: String, args: CVarArg...) {
 
 extension NSPredicate {
   // + (NSPredicate *)predicateWithFormat:(NSString *)predicateFormat, ...;
-  class func predicateWithFormat(predicateFormat: String,
-                                  _ args: CVarArg...) -> NSPredicate {
-    
-    // + (NSPredicate *)predicateWithFormat:(NSString *)predicateFormat 
-    //                                      arguments:(va_list)argList;
+  convenience init(format predicateFormat: String, _ args: CVarArg...) {
     let va_args = getVaList(args)
-    return
-      self.predicateWithFormat(predicateFormat, arguments: va_args)
+    return self.init(format: predicateFormat, arguments: va_args)
   }
 }
 
 extension NSExpression {
   // + (NSExpression *) expressionWithFormat:(NSString *)expressionFormat, ...;
-  class func expressionWithFormat(expressionFormat: String,
-                                  _ args: CVarArg...) -> NSExpression {
-    // + (NSExpression *) expressionWithFormat:(NSString *)expressionFormat 
-    //                                         arguments:(va_list)argList;
+  convenience init(format expressionFormat: String, _ args: CVarArg...) {
     let va_args = getVaList(args)
-    return
-      self.expressionWithFormat(expressionFormat, arguments: va_args)
+    return self.init(format: expressionFormat, arguments: va_args)
   }
 }
 

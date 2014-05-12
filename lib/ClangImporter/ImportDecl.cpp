@@ -1911,9 +1911,6 @@ namespace {
                                      const clang::ObjCMethodDecl *decl,
                                      ObjCSelector selector,
                                      DeclContext *dc) {
-      if (!Impl.ImportFactoryMethodsAsConstructors)
-        return Nothing;
-
       // Only class methods can be mapped to constructors.
       if (!decl->isClassMethod())
         return Nothing;

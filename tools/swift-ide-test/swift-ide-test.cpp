@@ -1597,8 +1597,6 @@ int main(int argc, char *argv[]) {
   InitInvok.getClangImporterOptions().InferImplicitProperties
     = options::ImplicitProperties;
   InitInvok.getLangOptions().ImplicitObjCWith = options::ImplicitObjCWith;
-  InitInvok.getClangImporterOptions().ImportFactoryMethodsAsConstructors
-    = options::FactoryMethodsAsConstructors;
   InitInvok.getLangOptions().ObjCBridgeDictionary
     = options::ObjCBridgeDictionary;
 

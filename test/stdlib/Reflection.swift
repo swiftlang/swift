@@ -492,7 +492,7 @@ case _:
   println("got something else")
 }
 
-let path = NSBezierPath.bezierPath()! // FIXME: unnecessary bang
+let path = NSBezierPath()
 switch reflect(path).quickLookObject {
 case .Some(.BezierPath(let path2 as NSBezierPath)) where path === path2:
   println("got the expected quick look bezier path")

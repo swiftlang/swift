@@ -274,7 +274,7 @@ func testDynamicSelf(queen: B, wobbler: NSWobbling) {
   var hive = Hive()
 
   // Factory method with instancetype result.
-  var hive1 = Hive.hive(queen: queen)
+  var hive1 = Hive(queen: queen)
   hive1 = hive
   hive = hive1
 

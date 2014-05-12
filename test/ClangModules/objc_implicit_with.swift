@@ -1,5 +1,5 @@
 // RUN: rm -rf %t/clang-module-cache
-// RUN: %swift %clang-importer-sdk -parse -module-cache-path %t/clang-module-cache -enable-objc-factory-method-constructors -implicit-objc-with %s -verify
+// RUN: %swift %clang-importer-sdk -parse -module-cache-path %t/clang-module-cache -implicit-objc-with %s -verify
 
 import AppKit
 

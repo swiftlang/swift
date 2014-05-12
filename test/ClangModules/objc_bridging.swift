@@ -39,7 +39,7 @@ func allocateMagic(zone: NSZone) -> COpaquePointer {
 }
 
 func constPointerToObjC(objects: (AnyObject?)[]) -> NSArray {
-  return NSArray.arrayWithObjects(objects, count: objects.count)
+  return NSArray(objects: objects, count: objects.count)
 }
 
 func mutablePointerToObjC(path: String) -> NSString {

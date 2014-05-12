@@ -4183,6 +4183,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   // the referenced constructor must be abstract.
   if ((ty->getClassOrBoundGenericClass() || ty->is<DynamicSelfType>()) &&
       !fn->isStaticallyDerivedMetatype() &&
+      !decl->hasClangNode() &&
       !cast<ConstructorDecl>(decl)->isRequired()) {
     tc.diagnose(apply->getLoc(), diag::dynamic_construct_class, ty)
       .highlight(fn->getSourceRange());

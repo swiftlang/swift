@@ -46,7 +46,7 @@ extension NSArray {
 }
 
 func _toNSArray<T, U:AnyObject>(a: T[], f: (T)->U) -> NSArray {
-  var result = NSMutableArray.arrayWithCapacity(a.count)
+  var result = NSMutableArray(capacity: a.count)
   for s in a {
     result.addObject(f(s))
   }

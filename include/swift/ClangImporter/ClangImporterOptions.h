@@ -33,9 +33,6 @@ public:
   /// If true, matched getter-like and setter-like methods will be imported as
   /// properties.
   bool InferImplicitProperties = false;
-
-  /// If true, import factory methods as constructors.
-  bool ImportFactoryMethodsAsConstructors = false;
 };
 
 } // end namespace swift

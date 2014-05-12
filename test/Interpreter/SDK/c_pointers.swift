@@ -20,7 +20,7 @@ typealias XXColor = UIColor
 let rgb = CGColorSpaceCreateDeviceRGB()
 let cgRed = CGColorCreate(rgb, [1.0, 0.0, 0.0, 1.0])
 
-let nsRed = XXColor.colorWithCGColor(cgRed)
+let nsRed = XXColor(CGColor: cgRed)
 
 CGColorRelease(cgRed)
 CGColorSpaceRelease(rgb)
@@ -39,8 +39,8 @@ println(a) // CHECK-NEXT: 1.0
 // Void C pointers
 //
 
-let data = NSData.dataWithBytes([1.5, 2.25, 3.125],
-                                length: sizeof(Double.self) * 3)
+let data = NSData(bytes: [1.5, 2.25, 3.125], 
+                  length: sizeof(Double.self) * 3)
 var fromData = [0.25, 0.25, 0.25]
 let notFromData = fromData
 data.getBytes(&fromData, length: sizeof(Double.self) * 3)
@@ -99,10 +99,10 @@ autoreleasepool {
 // CHECK-NEXT: died
 
 class DumbString: NSString {
-  override func characterAtIndex(_ x: Int) -> unichar { fatal("nope") }
+  override func characterAtIndex(x: Int) -> unichar { fatal("nope") }
   override var length: Int { return 0 }
 
-  override class func stringWithContentsOfFile(_ s: String,
+  override class func stringWithContentsOfFile(s: String,
                                   encoding: NSStringEncoding,
                                   error: ObjCMutablePointer<NSError?>)
   -> DumbString? {

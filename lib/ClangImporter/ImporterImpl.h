@@ -217,7 +217,6 @@ public:
 
   const bool SplitPrepositions;
   const bool InferImplicitProperties;
-  const bool ImportFactoryMethodsAsConstructors;
 
 private:
   /// \brief A count of the number of load module operations.

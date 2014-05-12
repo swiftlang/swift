@@ -573,8 +573,6 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
 
   Opts.InferImplicitProperties |=
     Args.hasArg(OPT_enable_objc_implicit_properties);
-  Opts.ImportFactoryMethodsAsConstructors |=
-    Args.hasArg(OPT_enable_objc_factory_method_constructors);
 
   return false;
 }

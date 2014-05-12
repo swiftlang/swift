@@ -46,10 +46,7 @@ class Canary {
 autoreleasepool {
   println("making array")
 
-  var b: NSArray = NSArray.arrayWithObjects(
-    [Canary(1), Canary(2), Canary(3)],
-    count: 3
-  )
+  var b: NSArray = NSArray(objects: [Canary(1), Canary(2), Canary(3)], count: 3)
 
   println("iterating array")
 
@@ -89,11 +86,11 @@ for (key, value) in d_m {
 #endif
 }
 
-var s = NSSet.setWithObject("the most forward-thinking test yet")
-var s_m = NSMutableSet.setWithObject("the next most forward-thinking test yet")
+var s = NSSet(object: "the most forward-thinking test yet")
+var s_m = NSMutableSet(object: "the next most forward-thinking test yet")
 
 // CHECK: the most forward-thinking test yet
-for x: AnyObject in s! { // FIXME: shouldn't need ! here
+for x: AnyObject in s {
 #if os(OSX)
   println(x.description!)
 #else
@@ -102,7 +99,7 @@ for x: AnyObject in s! { // FIXME: shouldn't need ! here
 }
 
 // CHECK: the next most forward-thinking test yet
-for x: AnyObject in s_m! { // FIXME: shouldn't need ! here
+for x: AnyObject in s_m {
 #if os(OSX)
   println(x.description!)
 #else

@@ -1,5 +1,5 @@
 // RUN: rm -rf %t
-// RUN: %swift -target x86_64-apple-darwin10 -module-cache-path %t/clang-module-cache %clang-importer-sdk -enable-objc-factory-method-constructors %s -emit-ir | FileCheck %s
+// RUN: %swift -target x86_64-apple-darwin10 -module-cache-path %t/clang-module-cache %clang-importer-sdk %s -emit-ir | FileCheck %s
 
 // CHECK: [[HIVE:%CSo4Hive]] = type opaque
 // CHECK: [[SWIFT_TYPE:%swift.type]] = type { i64 }

@@ -462,8 +462,7 @@ ClangImporter::Implementation::Implementation(ASTContext &ctx,
                                               const ClangImporterOptions &opts)
   : SwiftContext(ctx),
     SplitPrepositions(ctx.LangOpts.SplitPrepositions),
-    InferImplicitProperties(opts.InferImplicitProperties),
-    ImportFactoryMethodsAsConstructors(opts.ImportFactoryMethodsAsConstructors)
+    InferImplicitProperties(opts.InferImplicitProperties)
 {
 }
 ClangImporter::Implementation::~Implementation() {
