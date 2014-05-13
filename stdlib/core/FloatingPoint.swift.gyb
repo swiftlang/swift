@@ -144,12 +144,6 @@ struct ${Self} {
   init(_ value: ${Self}) { self = value }
 }
 
-extension ${Self} : ReplPrintable {
-  func replPrint() {
-    print(self)
-  }
-}
-
 extension ${Self} : Printable {
   var description: String {
 % if bits == 64:

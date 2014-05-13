@@ -1,7 +1,7 @@
 // This is an overlay Swift module.
 @exported import ObjectiveC
 
-struct ObjCBool : ReplPrintable {
+struct ObjCBool : Printable {
   var value : UInt8
 
   /// \brief Allow use in a Boolean context.
@@ -15,9 +15,9 @@ struct ObjCBool : ReplPrintable {
     return self.getLogicValue()
   }
 
-  func replPrint() {
+  var description: String {
     // Dispatch to Bool.
-    self.getLogicValue().replPrint()
+    return self.getLogicValue().description
   }
 }
 

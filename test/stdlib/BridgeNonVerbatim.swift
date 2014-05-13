@@ -28,7 +28,7 @@ import ObjectiveC
 var trackedCount = 0
 var nextTrackedSerialNumber = 0
 
-class Tracked : ReplPrintable, ForwardIndex, ObjCClassType {
+class Tracked : ForwardIndex, ObjCClassType, Printable {
   init(_ value: Int) {
     ++trackedCount
     serialNumber = ++nextTrackedSerialNumber
@@ -41,9 +41,9 @@ class Tracked : ReplPrintable, ForwardIndex, ObjCClassType {
     serialNumber = -serialNumber
   }
 
-  func replPrint() {
+  var description: String {
     assert(serialNumber > 0, "dead Tracked!")
-    value.replPrint()
+    return value.description
   }
 
   func succ() -> Tracked {

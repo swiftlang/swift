@@ -221,10 +221,3 @@ protocol StringInterpolationConvertible {
   class func convertFromStringInterpolation(strings: Self...) -> Self
 }
 
-//===----------------------------------------------------------------------===//
-// REPL protocols
-//===----------------------------------------------------------------------===//
-
-protocol ReplPrintable {
-  func replPrint()
-}

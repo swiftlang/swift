@@ -100,7 +100,7 @@ var array = [1, 2, 3, 4, 5]
 // CHECK: array : Array<Int> = [1, 2, 3, 4, 5]
 
 var dict = [ "Hello" : 1.5, "World" : 3.0 ]
-// CHECK: Dictionary<String, Double> = Dictionary<String, Double>(<unprintable value>)
+// CHECK: Dictionary<String, Double> = ["Hello": 1.5, "World": 3]
 
 0...10
 // FIXME: Disabled CHECK for Range<Int> = 0...10 until we get general printing going
@@ -156,21 +156,19 @@ var a : int[]
 var a = Int[]()
 var b = a.slice[3...5]
 
-// Generic argument substitution when printing. <rdar://problem/13216570>
 struct Inner<T> {}
 struct Outer<T> { var inner : Inner<T> }
-Outer<Int>(inner: Inner()) // CHECK: Outer<Int> = Outer<Int>(Inner<Int>())
+Outer<Int>(inner: Inner()) // CHECK: Outer<Int> = V4REPL5Outer (has 1 child)
 
-// Printing containers as struct elements. <rdar://problem/14211671>
 struct ContainsSlice { var slice : Int[] }
-ContainsSlice(slice: [1, 2, 3]) // CHECK: ContainsSlice = ContainsSlice([1, 2, 3])
+ContainsSlice(slice: [1, 2, 3]) // CHECK: ContainsSlice = V4REPL13ContainsSlice (has 1 child)
 
 struct ContainsGenericSlice<T> { var slice : T[] }
-ContainsGenericSlice(slice: [1, 2, 3]) // CHECK: ContainsGenericSlice<Int> = ContainsGenericSlice<Int>([1, 2, 3])
-ContainsGenericSlice(slice: [(1, 2), (3, 4)]) // CHECK: ContainsGenericSlice<(Int, Int)> = ContainsGenericSlice<(Int, Int)>([(1, 2), (3, 4)])
+ContainsGenericSlice(slice: [1, 2, 3]) // CHECK: ContainsGenericSlice<Int> = V4REPL20ContainsGenericSlice (has 1 child)
+ContainsGenericSlice(slice: [(1, 2), (3, 4)]) // CHECK: ContainsGenericSlice<(Int, Int)> = V4REPL20ContainsGenericSlice (has 1 child)
 
 struct ContainsContainsSlice { var containsSlice : ContainsSlice }
-ContainsContainsSlice(containsSlice: ContainsSlice(slice: [1, 2, 3])) // CHECK: ContainsContainsSlice = ContainsContainsSlice(ContainsSlice([1, 2, 3]))
+ContainsContainsSlice(containsSlice: ContainsSlice(slice: [1, 2, 3])) // CHECK: ContainsContainsSlice = V4REPL21ContainsContainsSlice (has 1 child)
 
 protocol Proto {
   func foo()

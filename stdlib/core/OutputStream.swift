@@ -47,8 +47,13 @@ protocol DebugPrintable {
 // protocol requirement of type 'String'
 protocol _PrintableNSObject {
   var description: String! { get }
+  var debugDescription: String! { get }
 }
 // end workaround
+
+//===----------------------------------------------------------------------===//
+// `print`
+//===----------------------------------------------------------------------===//
 
 /// Do our best to print a value that can not be printed directly, using one of
 /// its conformances to `Streamable`, `Printable` or `DebugPrintable`.
@@ -172,6 +177,58 @@ func toString<T>(object: T) -> String {
   var result = ""
   print(object, &result)
   return result
+}
+
+//===----------------------------------------------------------------------===//
+// `debugPrint`
+//===----------------------------------------------------------------------===//
+
+func debugPrint<T, TargetStream : OutputStream>(
+    object: T, inout target: TargetStream
+) {
+  if let debugPrintableObject =
+      _stdlib_dynamicCastToExistential1(object, DebugPrintable.self) {
+    debugPrintableObject.debugDescription.writeTo(&target)
+    return
+  }
+
+  if var printableObject =
+      _stdlib_dynamicCastToExistential1(object, Printable.self) {
+    printableObject.description.writeTo(&target)
+    return
+  }
+
+  if let anNSObject =
+      _stdlib_dynamicCastToExistential1(object, _PrintableNSObject.self) {
+    anNSObject.debugDescription.writeTo(&target)
+    return
+  }
+
+  if let streamableObject =
+      _stdlib_dynamicCastToExistential1(object, Streamable.self) {
+    streamableObject.writeTo(&target)
+    return
+  }
+
+  _adHocPrint(object, &target)
+}
+
+func debugPrintln<T, TargetStream : OutputStream>(
+    object: T, inout target: TargetStream
+) {
+  debugPrint(object, &target)
+  target.write("\n")
+}
+
+func debugPrint<T>(object: T) {
+  var stdoutStream = _Stdout()
+  debugPrint(object, &stdoutStream)
+}
+
+func debugPrintln<T>(object: T) {
+  var stdoutStream = _Stdout()
+  debugPrint(object, &stdoutStream)
+  stdoutStream.write("\n")
 }
 
 //===----------------------------------------------------------------------===//

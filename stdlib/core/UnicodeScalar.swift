@@ -157,12 +157,6 @@ struct UnicodeScalar : ExtendedGraphemeClusterLiteralConvertible {
   }
 }
 
-extension UnicodeScalar : ReplPrintable {
-  func replPrint() {
-    print(description)
-  }
-}
-
 extension UnicodeScalar : Printable {
   var description: String {
     return "\"\(escape())\""

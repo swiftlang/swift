@@ -21,7 +21,7 @@ var xSerial = 0
 // Instead of testing with Int elements, we use this wrapper class
 // that can help us track allocations and find issues with object
 // lifetime inside Array implementations.
-class X : ReplPrintable, ForwardIndex, Comparable {
+class X : ForwardIndex, Comparable, Printable {
   init(_ value: Int) {
     ++xCount
     serial = ++xSerial
@@ -34,9 +34,9 @@ class X : ReplPrintable, ForwardIndex, Comparable {
     serial = -serial
   }
 
-  func replPrint() {
+  var description: String {
     assert(serial > 0, "dead X!")
-    value.replPrint()
+    return value.description
   }
 
   func succ() -> X {
@@ -64,15 +64,12 @@ extension Int {
 
 //===----------------------------------------------------------------------===//
 
-func printSequence<
-  T: Sequence
-  where T.GeneratorType.Element : ReplPrintable
->(x: T) {
+func printSequence<T: Sequence>(x: T) {
   print("[")
   var prefix = ""
   for a in x {
     print(prefix)
-    a.replPrint()
+    print(a)
     prefix = ", "
   }
   println("]")
@@ -263,7 +260,7 @@ func testSlice() {
   var bSlice = b[3...5]
   println("<\(bSlice.count)>")
   // CHECK-NEXT: <2>
-  printSequence(bSlice)                
+  printSequence(bSlice)
   // CHECK-NEXT: [3, 4]
 
   // bSlice += X(11)..X(13)

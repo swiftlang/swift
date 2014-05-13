@@ -28,7 +28,7 @@ var keySerial = 0
 
 // A wrapper class that can help us track allocations and find issues with
 // object lifetime.
-class TestKeyTy : Equatable, Hashable, ReplPrintable {
+class TestKeyTy : Equatable, Hashable, Printable {
   init(_ value: Int) {
     ++keyCount
     serial = ++keySerial
@@ -47,9 +47,9 @@ class TestKeyTy : Equatable, Hashable, ReplPrintable {
     serial = -serial
   }
 
-  func replPrint() {
+  var description: String {
     assert(serial > 0, "dead TestKeyTy")
-    value.replPrint()
+    return value.description
   }
 
   var hashValue: Int {
@@ -68,7 +68,7 @@ func == (lhs: TestKeyTy, rhs: TestKeyTy) -> Bool {
 var valueCount = 0
 var valueSerial = 0
 
-class TestValueTy : ReplPrintable {
+class TestValueTy : Printable {
   init(_ value: Int) {
     ++valueCount
     serial = ++valueSerial
@@ -81,16 +81,16 @@ class TestValueTy : ReplPrintable {
     serial = -serial
   }
 
-  func replPrint() {
+  var description: String {
     assert(serial > 0, "dead TestValueTy")
-    value.replPrint()
+    return value.description
   }
 
   var value: Int
   var serial: Int
 }
 
-class TestEquatableValueTy : Equatable, ReplPrintable {
+class TestEquatableValueTy : Equatable, Printable {
   init(_ value: Int) {
     ++valueCount
     serial = ++valueSerial
@@ -103,9 +103,9 @@ class TestEquatableValueTy : Equatable, ReplPrintable {
     serial = -serial
   }
 
-  func replPrint() {
-    assert(serial > 0, "dead TestValueTy")
-    value.replPrint()
+  var description: String {
+    assert(serial > 0, "dead TestEquatableValueTy")
+    return value.description
   }
 
   var value: Int
@@ -658,9 +658,7 @@ func isCocoaNSDictionary(d: NSDictionary) -> Bool {
 var objcKeyCount = 0
 var objcKeySerial = 0
 
-// FIXME: can not conform to ReplPrintable because of
-// <rdar://problem/16808043> Compiler crashes when overriding replPrint in classes derived from NSObject
-class TestObjCKeyTy : NSObject, NSCopying /*, ReplPrintable*/ {
+class TestObjCKeyTy : NSObject, NSCopying, Printable {
   init(_ value: Int) {
     ++keyCount
     serial = ++keySerial
@@ -684,10 +682,10 @@ class TestObjCKeyTy : NSObject, NSCopying /*, ReplPrintable*/ {
     return TestObjCKeyTy(value)
   }
 
-  /*override func replPrint() {
+  override var description: String {
     assert(serial > 0, "dead TestObjCKeyTy")
-    value.replPrint()
-  }*/
+    return value.description
+  }
 
   override func isEqual(object: AnyObject!) -> Bool {
     if let other: AnyObject = object {
@@ -714,9 +712,7 @@ class TestObjCKeyTy : NSObject, NSCopying /*, ReplPrintable*/ {
 var objcValueCount = 0
 var objcValueSerial = 0
 
-// FIXME: can not conform to ReplPrintable because of
-// <rdar://problem/16808043> Compiler crashes when overriding replPrint in classes derived from NSObject
-class TestObjCValueTy : NSObject /*, ReplPrintable*/ {
+class TestObjCValueTy : NSObject, Printable {
   init(_ value: Int) {
     ++valueCount
     serial = ++valueSerial
@@ -729,10 +725,10 @@ class TestObjCValueTy : NSObject /*, ReplPrintable*/ {
     serial = -serial
   }
 
-  /*override func replPrint() {
-    assert(serial > 0, "dead TestValueTy")
-    value.replPrint()
-  }*/
+  override var description: String {
+    assert(serial > 0, "dead TestObjCValueTy")
+    return value.description
+  }
 
   var value: Int
   var serial: Int
@@ -1374,7 +1370,7 @@ test_BridgedToObjC_FastEnumeration_Empty()
 var bridgedKeyCount = 0
 var bridgedKeySerial = 0
 
-struct TestBridgedKeyTy : Equatable, Hashable, ReplPrintable, _BridgedToObjectiveC {
+struct TestBridgedKeyTy : Equatable, Hashable, Printable, _BridgedToObjectiveC {
   init(_ value: Int) {
     ++bridgedKeyCount
     serial = ++bridgedKeySerial
@@ -1382,9 +1378,9 @@ struct TestBridgedKeyTy : Equatable, Hashable, ReplPrintable, _BridgedToObjectiv
     self._hashValue = value
   }
 
-  func replPrint() {
+  var description: String {
     assert(serial > 0, "dead TestBridgedKeyTy")
-    value.replPrint()
+    return value.description
   }
 
   var hashValue: Int {
@@ -1407,16 +1403,16 @@ func == (lhs: TestBridgedKeyTy, rhs: TestBridgedKeyTy) -> Bool {
 var bridgedValueCount = 0
 var bridgedValueSerial = 0
 
-struct TestBridgedValueTy : ReplPrintable, _BridgedToObjectiveC {
+struct TestBridgedValueTy : Printable, _BridgedToObjectiveC {
   init(_ value: Int) {
     ++bridgedValueCount
     serial = ++bridgedValueSerial
     self.value = value
   }
 
-  func replPrint() {
+  var description: String {
     assert(serial > 0, "dead TestBridgedValueTy")
-    value.replPrint()
+    return value.description
   }
 
   func bridgeToObjectiveC() -> TestObjCValueTy {

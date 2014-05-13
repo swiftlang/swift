@@ -17,8 +17,7 @@
 struct CString :
     _BuiltinExtendedGraphemeClusterLiteralConvertible,
     ExtendedGraphemeClusterLiteralConvertible,
-    _BuiltinStringLiteralConvertible, StringLiteralConvertible,
-    ReplPrintable {
+    _BuiltinStringLiteralConvertible, StringLiteralConvertible {
   var _bytesPtr : UnsafePointer<UInt8>
 
   @transparent
@@ -53,17 +52,6 @@ struct CString :
 
   func isNull() -> Bool {
     return _bytesPtr.isNull()
-  }
-
-  func replPrint() {
-    print("\"")
-    var i = 0
-    while _bytesPtr[i] != 0 {
-      var c = UnicodeScalar(UInt32(_bytesPtr[i]))
-      print(c.escape())
-      i++
-    }
-    print("\"")
   }
 
   /// \brief From a CString with possibly-transient lifetime, create a

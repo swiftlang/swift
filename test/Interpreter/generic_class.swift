@@ -5,6 +5,28 @@
 // TODO: Nongeneric subclasses of generic classes
 // TODO: Generic subclasses of ObjC classes
 
+protocol MyPrintable {
+  func myPrint()
+}
+
+extension Int : MyPrintable {
+  func myPrint() {
+    print(self.description)
+  }
+}
+
+extension Double : MyPrintable {
+  func myPrint() {
+    print(self.description)
+  }
+}
+
+extension String : MyPrintable {
+  func myPrint() {
+    print(self.debugDescription)
+  }
+}
+
 class BufferedPair<T, U> {
   var front: UInt8
   var first: T
@@ -19,10 +41,10 @@ class BufferedPair<T, U> {
   }
 }
 
-enum State : ReplPrintable {
+enum State : MyPrintable {
   case CA, OR, WA
 
-  func replPrint() {
+  func myPrint() {
     switch self {
     case .CA:
       print("California")
@@ -34,11 +56,11 @@ enum State : ReplPrintable {
   }
 }
 
-func printPair<A: ReplPrintable, B: ReplPrintable>(p: BufferedPair<A,B>) {
+func printPair<A: MyPrintable, B: MyPrintable>(p: BufferedPair<A,B>) {
   print("\(p.front) ")
-  p.first.replPrint()
+  p.first.myPrint()
   print(" ")
-  p.second.replPrint()
+  p.second.myPrint()
   println(" \(p.back)")
 }
 
@@ -57,15 +79,15 @@ class AwkwardTriple<V, W, X> : BufferedPair<V, W> {
 }
 
 func printTriple
-  <D: ReplPrintable, E: ReplPrintable, F: ReplPrintable>
+  <D: MyPrintable, E: MyPrintable, F: MyPrintable>
   (p: AwkwardTriple<D, E, F>)
 {
   print("\(p.front) ")
-  p.first.replPrint()
+  p.first.myPrint()
   print(" ")
-  p.second.replPrint()
+  p.second.myPrint()
   print(" \(p.back) ")
-  p.third.replPrint()
+  p.third.myPrint()
   println()
 }
 
@@ -87,17 +109,17 @@ class FourthWheel<P, Q, R, S> : AwkwardTriple<P, Q, R> {
 }
 
 func printQuad
-  <G: ReplPrintable, H: ReplPrintable, I: ReplPrintable, J: ReplPrintable>
+  <G: MyPrintable, H: MyPrintable, I: MyPrintable, J: MyPrintable>
   (p: FourthWheel<G, H, I, J>)
 {
   print("\(p.front) ")
-  p.first.replPrint()
+  p.first.myPrint()
   print(" ")
-  p.second.replPrint()
+  p.second.myPrint()
   print(" \(p.back) ")
-  p.third.replPrint()
+  p.third.myPrint()
   print(" ")
-  p.fourth.replPrint()
+  p.fourth.myPrint()
   println()
 }
 
@@ -137,9 +159,9 @@ func printConcretePair(p: ConcretePair) {
   println("\(p.first) \(p.second)")
 }
 
-func printSemiTriple<O : ReplPrintable>(p: SemiConcreteTriple<O>) {
+func printSemiTriple<O : MyPrintable>(p: SemiConcreteTriple<O>) {
   print("\(p.first) \(p.second) ")
-  p.third.replPrint()
+  p.third.myPrint()
   println()
 }
 

@@ -73,7 +73,6 @@ typealias UIntMax = UInt${maxBits}
 protocol _Integer
   : _BuiltinIntegerLiteralConvertible,
     IntegerLiteralConvertible,
-    ReplPrintable,
     Printable,
     ArrayBound,
     Hashable,
@@ -191,12 +190,6 @@ extension ${Self} : Hashable {
 % else:
     return Int(Builtin.${CastToWord}(self.value))
 % end
-  }
-}
-
-extension ${Self} : ReplPrintable {
-  func replPrint() {
-    print(self)
   }
 }
 

@@ -13,13 +13,13 @@
 @exported
 import ObjectiveC
 
-/// \brief The Objective-C BOOL type.
+/// The Objective-C BOOL type.
 ///
 /// On OS X, the Objective-C BOOL type is a typedef of "signed char".  Clang
 /// importer imports it as ObjCBool.
 ///
 /// The compiler has special knowledge of this type.
-struct ObjCBool : ReplPrintable {
+struct ObjCBool {
   var value : Int8
 
   init(_ value: Int8) {
@@ -35,11 +35,6 @@ struct ObjCBool : ReplPrintable {
   /// type.
   @conversion func __conversion() -> Bool {
     return self.getLogicValue()
-  }
-
-  func replPrint() {
-    // Dispatch to Bool.
-    self.getLogicValue().replPrint()
   }
 }
 

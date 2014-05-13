@@ -1,24 +1,39 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 
-class Foo<T:ReplPrintable> {
-  init<U:ReplPrintable>(_ t:T, _ u:U) {
+protocol MyPrintable {
+  func print()
+}
+
+struct PrintableValue : MyPrintable {
+  init(_ value: String) {
+    self.value = value
+  }
+
+  func print() {
+    Swift.print(value)
+  }
+
+  var value: String
+}
+
+class Foo<T : MyPrintable> {
+  init<U : MyPrintable>(_ t: T, _ u: U) {
     print("init ")
-    t.replPrint()
+    t.print()
     print(" ")
-    u.replPrint()
+    u.print()
     println("")
   }
 
-  func bar<U : ReplPrintable>(u: U) {
+  func bar<U : MyPrintable>(u: U) {
     print("bar ")
-    u.replPrint()
+    u.print()
     println("")
   }
 }
 
-
-// CHECK: init 1 "two"
-var foo = Foo<Int>(1, "two")
-// CHECK: bar "3"
-var c = "3"
+// CHECK: init 1 two
+var foo = Foo<PrintableValue>(PrintableValue("1"), PrintableValue("two"))
+// CHECK: bar 3
+var c = PrintableValue("3")
 foo.bar(c)

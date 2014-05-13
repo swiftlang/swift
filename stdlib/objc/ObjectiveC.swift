@@ -26,7 +26,7 @@ import ObjectiveC
 /// convert between C strings and selectors.
 ///
 /// The compiler has special knowledge of this type.
-struct Selector : StringLiteralConvertible, ReplPrintable {
+struct Selector : StringLiteralConvertible {
   var ptr : COpaquePointer
 
   /// \brief Create a selector from a string.
@@ -51,10 +51,6 @@ struct Selector : StringLiteralConvertible, ReplPrintable {
 
   init(_: _Nil) {
     ptr = nil
-  }
-
-  func replPrint() {
-    print(String(self))
   }
 }
 

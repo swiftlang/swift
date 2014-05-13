@@ -63,12 +63,6 @@ extension Bool : LogicValue {
   }
 }
 
-extension Bool : ReplPrintable {
-  func replPrint() {
-    print(self)
-  }
-}
-
 extension Bool : Printable {
   var description: String {
     return self ? "true" : "false"

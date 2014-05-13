@@ -74,16 +74,6 @@ extension String {
   }
 }
 
-extension String : ReplPrintable {
-  func replPrint() {
-    print("\"")
-    for c in unicodeScalars {
-      print(c.escape())
-    }
-    print("\"")
-  }
-}
-
 extension String {
   // FIXME: Locales make this interesting
   var uppercase : String {

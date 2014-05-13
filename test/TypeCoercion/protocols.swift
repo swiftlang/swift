@@ -1,6 +1,6 @@
 // RUN: %swift %s -verify
 
-protocol Printable {
+protocol MyPrintable {
   func print()
 }
 
@@ -42,12 +42,12 @@ func testPrintableCoercion(ip1: IsPrintable1,
                            inp1: IsNotPrintable1,
                            inp2: IsNotPrintable2,
                            op: OtherPrintable) {
-  var p : Printable = ip1 // okay
+  var p : MyPrintable = ip1 // okay
   p = ip1 // okay
   p = ip2 // okay
-  p = inp1 // expected-error{{'IsNotPrintable1' does not conform to protocol 'Printable'}}
-  p = inp2 // expected-error{{'IsNotPrintable2' does not conform to protocol 'Printable'}}
-  p = op // expected-error{{type 'OtherPrintable' does not conform to protocol 'Printable'}}
+  p = inp1 // expected-error{{'IsNotPrintable1' does not conform to protocol 'MyPrintable'}}
+  p = inp2 // expected-error{{'IsNotPrintable2' does not conform to protocol 'MyPrintable'}}
+  p = op // expected-error{{type 'OtherPrintable' does not conform to protocol 'MyPrintable'}}
 }
 
 func testTitledCoercion(ip1: IsPrintable1, book: Book, lackey: Lackey,
@@ -63,7 +63,7 @@ func testTitledCoercion(ip1: IsPrintable1, book: Book, lackey: Lackey,
 
 
 
-extension IsPrintable2 : Printable {
+extension IsPrintable2 : MyPrintable {
   func print() {}
 }
 
@@ -73,7 +73,7 @@ protocol OtherPrintable {
 
 struct TestFormat {}
 
-protocol FormattedPrintable : Printable { 
+protocol FormattedPrintable : MyPrintable { 
   func print(_: TestFormat)
 }
 
@@ -84,7 +84,7 @@ struct NotFormattedPrintable1 {
 func testFormattedPrintableCoercion(ip1: IsPrintable1,
                                     ip2: IsPrintable2,
                                     inout fp: FormattedPrintable,
-                                    inout p: Printable,
+                                    inout p: MyPrintable,
                                     inout op: OtherPrintable,
                                     nfp1: NotFormattedPrintable1) {
   fp = ip1
@@ -95,7 +95,7 @@ func testFormattedPrintableCoercion(ip1: IsPrintable1,
   fp = op // expected-error{{'OtherPrintable' does not conform to protocol 'FormattedPrintable'}}
 }
 
-protocol Document : Titled, Printable {
+protocol Document : Titled, MyPrintable {
 }
 
 func testMethodsAndVars(fp: FormattedPrintable, f: TestFormat, inout doc: Document) {
@@ -111,14 +111,14 @@ func testDocumentCoercion(inout doc: Document, ip1: IsPrintable1, l: Lackey) {
 }
 
 // Check coercion of references.
-func refCoercion(inout p: Printable) { } // expected-note 2{{in initialization of parameter 'p'}}
-var p : Printable = IsPrintable1()
+func refCoercion(inout p: MyPrintable) { } // expected-note 2{{in initialization of parameter 'p'}}
+var p : MyPrintable = IsPrintable1()
 var fp : FormattedPrintable = IsPrintable1()
 var ip1 : IsPrintable1
 
 refCoercion(&p)
-refCoercion(&fp) // expected-error{{'FormattedPrintable' is not identical to 'Printable'}}
-refCoercion(&ip1) // expected-error{{'IsPrintable1' is not identical to 'Printable'}}
+refCoercion(&fp) // expected-error{{'FormattedPrintable' is not identical to 'MyPrintable'}}
+refCoercion(&ip1) // expected-error{{'IsPrintable1' is not identical to 'MyPrintable'}}
 
 protocol IntSubscriptable {
   subscript(i: Int) -> Int { get }
@@ -148,20 +148,24 @@ func testIntSubscripting(inout i_s: IntSubscriptable,
   i_s = iiss // expected-error{{'IsIntToStringSubscriptable' does not conform to protocol 'IntSubscriptable'}}
 }
 
-protocol REPLPrintable {
-  func replPrint()
+protocol MyREPLPrintable {
+  func myReplPrint()
 }
 
-extension Int : REPLPrintable { }
-extension String : REPLPrintable { }
+extension Int : MyREPLPrintable {
+  func myReplPrint() {}
+}
+extension String : MyREPLPrintable {
+  func myReplPrint() {}
+}
 
-func doREPLPrint(p: REPLPrintable) {
-  p.replPrint()
+func doREPLPrint(p: MyREPLPrintable) {
+  p.myReplPrint()
 }
 
 func testREPLPrintable() {
   var i : Int
-  var rp : REPLPrintable = i
+  var rp : MyREPLPrintable = i
   doREPLPrint(i)
   doREPLPrint(1)
   doREPLPrint("foo")

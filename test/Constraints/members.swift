@@ -38,8 +38,8 @@ var format : String
 format.splitFirstIf({ $0.isAlpha() })
 
 // Archetypes
-func doReplPrint<T : ReplPrintable>(t: T) {
-  t.replPrint()
+func doGetLogicValue<T : LogicValue>(t: T) {
+  t.getLogicValue()
 }
 
 // Members referenced from inside the class

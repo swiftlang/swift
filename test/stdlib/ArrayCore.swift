@@ -18,7 +18,7 @@
 var trackedCount = 0
 var nextTrackedSerialNumber = 0
 
-class Tracked : ReplPrintable, ForwardIndex {
+class Tracked : ForwardIndex, Printable {
   init(_ value: Int) {
     ++trackedCount
     serialNumber = ++nextTrackedSerialNumber
@@ -31,9 +31,9 @@ class Tracked : ReplPrintable, ForwardIndex {
     serialNumber = -serialNumber
   }
 
-  func replPrint() {
+  var description: String {
     assert(serialNumber > 0, "dead Tracked!")
-    value.replPrint()
+    return value.description
   }
 
   func succ() -> Tracked {
@@ -117,15 +117,12 @@ struct MrMcArray<T> : Collection, _ArrayType {
   var buffer: Buffer
 }
 
-func printSequence<
-  T: Sequence
-  where T.GeneratorType.Element : ReplPrintable
->(x: T) {
+func printSequence<T: Sequence>(x: T) {
   print("<")
   var prefix = ""
   for a in x {
     print(prefix)
-    a.replPrint()
+    print(a)
     prefix = " "
   }
   println(">")

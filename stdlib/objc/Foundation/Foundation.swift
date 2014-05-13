@@ -674,45 +674,6 @@ extension NSDictionary : Reflectable {
 // General objects
 //===----------------------------------------------------------------------===//
 
-
-extension NSObject : ReplPrintable {
-
-  /// \brief Print NSObjects in the REPL
-  func replPrint() {
-    if self === nil {
-      print("<<nil>>")
-      return
-    }
-
-    var desc : String
-
-    if NSJSONSerialization.isValidJSONObject(self) {
-      // FIXME: <rdar://problem/15463479> Contextual lookup of static properties
-      var jsonData = NSJSONSerialization.dataWithJSONObject(self,
-                      options: .PrettyPrinted,
-                      error: UnsafePointer.null())
-
-      if jsonData === nil {
-        desc = description
-      } else {
-        desc = String(NSString(data:jsonData, encoding:NSUTF8StringEncoding))
-      }
-    } else {
-      desc = description
-    }
-
-    var first = true
-    for line in desc.split("\n") {
-      if first {
-        first = false
-      } else {
-        print("\n// ")
-      }
-      print(line)
-    }
-  }
-}
-
 extension NSObject : CVarArg {
   func encode() -> Word[] {
     _autorelease(self)
