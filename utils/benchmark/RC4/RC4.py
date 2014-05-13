@@ -44,4 +44,4 @@ def benchRC4_internal(messageLen, iterations):
   for i in xrange(iterations):
     Enc.encrypt(LongData)
 
-benchRC4_internal(5000, 1000)
+benchRC4_internal(5000, 100000)

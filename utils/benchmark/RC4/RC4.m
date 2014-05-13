@@ -96,6 +96,6 @@ void benchRC4(int messageLen, int numIterations, bool validate) {
 }
 
 int main(int argc, char **argv) {
-  benchRC4(5000, 1000, false);
+  benchRC4(5000, 100000, false);
   return 0;
 }

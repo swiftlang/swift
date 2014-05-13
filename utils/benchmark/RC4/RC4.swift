@@ -78,7 +78,7 @@ func benchRC4_internal(messageLen : Int, iterations : Int) {
 
 
 func benchRC4() {
-  benchRC4_internal(5000, 1000)
+  benchRC4_internal(5000, 100000)
 }
 
 benchRC4()
