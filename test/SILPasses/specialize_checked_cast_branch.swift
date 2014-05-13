@@ -304,6 +304,13 @@ SuperToArchetypeCastC(c: c, t: b)
 // CHECK: bb1
 SuperToArchetypeCastD(d: d, t: c)
 
+// CHECK-LABEL: sil shared @_TTSC30specialize_checked_cast_branch1D___TF30specialize_checked_cast_branch21SuperToArchetypeCastDU__FT1dCS_1D1tQ__Q_ : $@thin (@out D, @owned D, @in D) -> () {
+// CHECK: bb0
+// CHECK: function_ref @_TTSC30specialize_checked_cast_branch1D___TFSs24_injectValueIntoOptionalU__FQ_GSqQ__ : $@thin (@out Optional<D>, @in D) -> ()
+// CHECK-NOT: checked_cast_br super_to_archetype
+// CHECK: bb1
+SuperToArchetypeCastD(d: d, t: d)
+
 //////////////////////////////
 // Existential To Archetype //
 //////////////////////////////

@@ -300,6 +300,15 @@ SuperToArchetypeC(c: c, t: b)
 // CHECK-NOT: unconditional_checked_cast super_to_archetype
 SuperToArchetypeD(d: d, t: c)
 
+// CHECK-LABEL: sil shared @_TTSC37specialize_unconditional_checked_cast1D___TF37specialize_unconditional_checked_cast17SuperToArchetypeDU__FT1dCS_1D1tQ__Q_ : $@thin (@out D, @owned D, @in D) -> () {
+// CHECK: bb0
+// CHECK-NEXT: store
+// CHECK-NEXT: load
+// CHECK-NEXT: strong_release
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+SuperToArchetypeD(d: d, t: d)
+
 //////////////////////////////
 // Existential To Archetype //
 //////////////////////////////
