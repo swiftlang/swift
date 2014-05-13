@@ -842,7 +842,7 @@ public:
     : DIRefMap(DIRefMap), Stack(1, DITy) { }
 
   struct SizeAlign {
-    uint64_t Size, Align;
+    uint64_t SizeInBits, AlignInBits;
   };
 
   struct SizeAlign getNext() {
@@ -854,15 +854,18 @@ public:
         Cur.getTag() != llvm::dwarf::DW_TAG_subroutine_type) {
       llvm::DICompositeType CTy(Cur);
       llvm::DIArray Elts = CTy.getTypeArray();
-      // Push all elements in reverse order. TODO: With a little more
-      // state we don't need to actually store them on the Stack.
       unsigned N = Cur.getTag() == llvm::dwarf::DW_TAG_union_type
         ? 1 // For unions, pick any one.
         : Elts.getNumElements();
-      for (unsigned I = N; I > 0; --I)
-        Stack.push_back(Elts.getElement(I-1));
 
-      return getNext();
+      if (N) {
+        // Push all elements in reverse order.
+        // FIXME: With a little more state we don't need to actually
+        // store them on the Stack.
+        for (unsigned I = N; I > 0; --I)
+          Stack.push_back(Elts.getElement(I-1));
+        return getNext();
+      }
     }
     switch (Cur.getTag()) {
       case llvm::dwarf::DW_TAG_member:
@@ -941,7 +944,7 @@ void IRGenDebugInfo::emitVariableDeclaration(IRBuilder& Builder,
                                               Opts.OptLevel > 0, Flags, ArgNo);
   }
   // Insert a debug intrinsic into the current block.
-  unsigned Offset = 0;
+  unsigned OffsetInBytes = 0;
   auto BB = Builder.GetInsertBlock();
   bool IsPiece = Storage.size() > 1;
   uint64_t SizeOfByte = CI.getTargetInfo().getCharWidth();
@@ -965,22 +968,30 @@ void IRGenDebugInfo::emitVariableDeclaration(IRBuilder& Builder,
       // FIXME: Occasionally, there is a discrepancy between the AST
       // type and the Storage type. Usually this is due to reference
       // counting.
-      if (!Dim.Size || (StorageSize && Dim.Size > StorageSize))
-        Dim.Size = StorageSize;
-      if (!Dim.Align)
-        Dim.Align = SizeOfByte;
+      if (!Dim.SizeInBits || (StorageSize && Dim.SizeInBits > StorageSize))
+        Dim.SizeInBits = StorageSize;
+      if (!Dim.AlignInBits)
+        Dim.AlignInBits = SizeOfByte;
 
-      unsigned Size =
-        llvm::RoundUpToAlignment(Dim.Size, Dim.Align) / SizeOfByte;
+      unsigned SizeInBytes =
+        llvm::RoundUpToAlignment(Dim.SizeInBits, Dim.AlignInBits) / SizeOfByte;
+      // FIXME: Occasionally we miss out that the Storage is acually a
+      // refcount wrapper. Silently skip these for now.
+      if ((OffsetInBytes+SizeInBytes)*SizeOfByte > Var.getSizeInBits(DIRefMap))
+        break;
+      if ((OffsetInBytes==0) &&
+          SizeInBytes*SizeOfByte == Var.getSizeInBits(DIRefMap))
+        break;
+      if (SizeInBytes == 0)
+        break;
 
-      // FIXME: Make this an assertion again.
-      if (Offset*8+Dim.Size > Var.getSizeInBits(DIRefMap))
-        break;
-      assert(Offset*8+Dim.Size<=Var.getSizeInBits(DIRefMap) && "pars > totum");
-      if (Size == 0)
-        break;
-      Var = DBuilder.createVariablePiece(Descriptor, Offset, Size);
-      Offset += Size;
+      assert(SizeInBytes < Var.getSizeInBits(DIRefMap)
+             && "piece covers entire var");
+      assert((OffsetInBytes+SizeInBytes)*SizeOfByte<=Var.getSizeInBits(DIRefMap)
+             && "pars > totum");
+      Var = DBuilder.
+        createVariablePiece(Descriptor, OffsetInBytes, SizeInBytes);
+      OffsetInBytes += SizeInBytes;
     }
     auto Call = isa<llvm::AllocaInst>(Piece)
       ? DBuilder.insertDeclare(Piece, Var, BB)
@@ -1095,7 +1106,8 @@ llvm::DIArray IRGenDebugInfo::getStructMembers(NominalTypeDecl *D,
     Elements.push_back(createMemberType(DbgTy, VD->getName().str(),
                                         OffsetInBits, Scope, File, Flags));
   }
-  SizeInBits = OffsetInBits;
+  if (OffsetInBits > SizeInBits)
+    SizeInBits = OffsetInBits;
   return DBuilder.getOrCreateArray(Elements);
 }
 
@@ -1307,6 +1319,8 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   case TypeKind::BuiltinUnknownObject: {
     // The builtin opaque Objective-C pointer type. Useful for pushing
     // an Objective-C type through swift.
+    if (!SizeInBits)
+      SizeInBits = CI.getTargetInfo().getPointerWidth(0);
     auto IdTy = DBuilder.
       createStructType(Scope, MangledName, File, 0, 0, 0, 0,
                        llvm::DIType(), llvm::DIArray(),
@@ -1387,6 +1401,8 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     auto Decl = ProtocolTy->getDecl();
     // FIXME: (LLVM branch) Should be DW_TAG_interface_type
     Location L = getLoc(SM, Decl);
+    if (!SizeInBits)
+      SizeInBits = CI.getTargetInfo().getPointerWidth(0);
     return createStructType(DbgTy, Decl, ProtocolTy, Scope,
                             getOrCreateFile(L.Filename), L.Line,
                             SizeInBits, AlignInBits, Flags,
@@ -1401,6 +1417,8 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
 
       // FIXME: emit types
       //auto ProtocolCompositionTy = BaseTy->castTo<ProtocolCompositionType>();
+      if (!SizeInBits)
+        SizeInBits = CI.getTargetInfo().getPointerWidth(0);
       return DBuilder.
         createStructType(Scope, Decl->getName().str(), File, L.Line,
                          SizeInBits, AlignInBits, Flags,
@@ -1418,6 +1436,8 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     auto UnboundTy = BaseTy->castTo<UnboundGenericType>();
     auto Decl = UnboundTy->getDecl();
     Location L = getLoc(SM, Decl);
+    if (!SizeInBits)
+      SizeInBits = CI.getTargetInfo().getPointerWidth(0);
     return DBuilder.
         createStructType(Scope, Decl->getName().str(),
                          getOrCreateFile(L.Filename), L.Line,
@@ -1432,6 +1452,8 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     auto StructTy = BaseTy->castTo<BoundGenericStructType>();
     auto Decl = StructTy->getDecl();
     Location L = getLoc(SM, Decl);
+    if (!SizeInBits)
+      SizeInBits = CI.getTargetInfo().getPointerWidth(0);
     return createStructType(DbgTy, Decl, StructTy, Scope,
                             getOrCreateFile(L.Filename), L.Line,
                             SizeInBits, AlignInBits, Flags,
@@ -1446,6 +1468,8 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     // TODO: We may want to peek at Decl->isObjC() and set this
     // attribute accordingly.
     auto RuntimeLang = llvm::dwarf::DW_LANG_Swift;
+    if (!SizeInBits)
+      SizeInBits = CI.getTargetInfo().getPointerWidth(0);
     return createStructType(DbgTy, Decl, ClassTy, Scope,
                             getOrCreateFile(L.Filename), L.Line,
                             SizeInBits, AlignInBits, Flags,
