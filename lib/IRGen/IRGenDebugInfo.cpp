@@ -973,6 +973,9 @@ void IRGenDebugInfo::emitVariableDeclaration(IRBuilder& Builder,
       unsigned Size =
         llvm::RoundUpToAlignment(Dim.Size, Dim.Align) / SizeOfByte;
 
+      // FIXME: Make this an assertion again.
+      if (Offset*8+Dim.Size > Var.getSizeInBits(DIRefMap))
+        break;
       assert(Offset*8+Dim.Size<=Var.getSizeInBits(DIRefMap) && "pars > totum");
       if (Size == 0)
         break;
