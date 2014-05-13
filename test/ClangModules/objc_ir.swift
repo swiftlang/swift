@@ -7,6 +7,7 @@ import ObjectiveC
 import Foundation
 import objc_ext
 import TestProtocols
+import ObjCIRExtras
 
 // CHECK: @"\01L_selector_data(method:withFloat:)" = internal constant [18 x i8] c"method:withFloat:\00"
 // CHECK: @"\01L_selector_data(method:withDouble:)" = internal constant [19 x i8] c"method:withDouble:\00"
@@ -93,6 +94,16 @@ func getset(#p: FooProto) {
   // CHECK: load i8** @"\01L_selector(setBar:)"
   let prop = p.bar
   p.bar = prop
+}
+
+// CHECK-LABEL: define void @_TF7objc_ir17pointerPropertiesFCSo14PointerWrapperT_(%CSo14PointerWrapper*) {
+func pointerProperties(obj: PointerWrapper) {
+  // CHECK: load i8** @"\01L_selector(setVoidPtr:)"
+  // CHECK: load i8** @"\01L_selector(setIntPtr:)"
+  // CHECK: load i8** @"\01L_selector(setIdPtr:)"
+  obj.voidPtr = COpaquePointer()
+  obj.intPtr = UnsafePointer()
+  obj.idPtr = UnsafePointer()
 }
 
 // CHECK: linkonce_odr hidden [[B]]* @_TTOFCSo1BcfMS_FT3intVSs5Int32_S_

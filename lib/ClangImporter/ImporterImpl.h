@@ -115,6 +115,7 @@ enum class ImportTypeKind {
   /// This provides special treatment for C++ references (which become
   /// [inout] parameters) and C pointers (which become magic [inout]-able types),
   /// among other things, and enables the conversion of bridged types.
+  /// Parameters are always considered CF-audited.
   Parameter,
   
   /// \brief Import the type pointed to by a pointer or reference.
@@ -126,14 +127,14 @@ enum class ImportTypeKind {
 
   /// \brief Import the type of an ObjC property.
   ///
-  /// This enables the conversion of bridged types.
+  /// This enables the conversion of bridged types. Properties are always
+  /// considered CF-audited.
   Property,
 
-  /// \brief Import the type of an audited ObjC property.
+  /// \brief Import the type of an ObjC property accessor.
   ///
-  /// This is just like Property, except it disables wrapping CF class
-  /// types in Unmanaged.
-  AuditedProperty,
+  /// This behaves exactly like Property except that it accepts Void.
+  PropertyAccessor,
 
   /// \brief Import the underlying type of an enum.
   ///
@@ -178,6 +179,7 @@ enum class MappedLanguages {
 enum class SpecialMethodKind {
   Regular,
   Constructor,
+  PropertyAccessor,
   NSDictionarySubscriptGetter
 };
 

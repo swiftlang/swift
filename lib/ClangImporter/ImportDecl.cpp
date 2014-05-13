@@ -2047,7 +2047,10 @@ namespace {
       bodyPatterns.push_back(selfPat);
 
       SpecialMethodKind kind = SpecialMethodKind::Regular;
-      if (isNSDictionaryMethod(decl, Impl.objectForKeyedSubscript))
+      // FIXME: This doesn't handle implicit properties.
+      if (decl->isPropertyAccessor())
+        kind = SpecialMethodKind::PropertyAccessor;
+      else if (isNSDictionaryMethod(decl, Impl.objectForKeyedSubscript))
         kind = SpecialMethodKind::NSDictionarySubscriptGetter;
 
       // Import the type that this method will have.

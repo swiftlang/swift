@@ -604,11 +604,40 @@ static Type importParameterPointerType(ClangImporter::Implementation &impl,
 /// function result type, and can thus safely apply representation
 /// conversions for bridged types.
 static bool canBridgeTypes(ImportTypeKind importKind) {
-  return importKind == ImportTypeKind::Parameter ||
-         importKind == ImportTypeKind::Result ||
-         importKind == ImportTypeKind::AuditedResult ||
-         importKind == ImportTypeKind::Property ||
-         importKind == ImportTypeKind::AuditedProperty;
+  switch (importKind) {
+  case ImportTypeKind::Abstract:
+  case ImportTypeKind::Value:
+  case ImportTypeKind::Variable:
+  case ImportTypeKind::AuditedVariable:
+  case ImportTypeKind::Pointee:
+  case ImportTypeKind::Enum:
+    return false;
+  case ImportTypeKind::Result:
+  case ImportTypeKind::AuditedResult:
+  case ImportTypeKind::Parameter:
+  case ImportTypeKind::Property:
+  case ImportTypeKind::PropertyAccessor:
+    return true;
+  }
+}
+
+/// True if the type has known CoreFoundation reference counting semantics.
+static bool isCFAudited(ImportTypeKind importKind) {
+  switch (importKind) {
+  case ImportTypeKind::Abstract:
+  case ImportTypeKind::Value:
+  case ImportTypeKind::Variable:
+  case ImportTypeKind::Result:
+  case ImportTypeKind::Pointee:
+  case ImportTypeKind::Enum:
+    return false;
+  case ImportTypeKind::AuditedVariable:
+  case ImportTypeKind::AuditedResult:
+  case ImportTypeKind::Parameter:
+  case ImportTypeKind::Property:
+  case ImportTypeKind::PropertyAccessor:
+    return true;
+  }
 }
 
 /// Wrap a type in the Optional type appropriate to the import kind.
@@ -649,7 +678,8 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
   // 'void' can only be imported as a function result type.
   if (hint == ImportHint::Void &&
       (importKind == ImportTypeKind::AuditedResult ||
-       importKind == ImportTypeKind::Result)) {
+       importKind == ImportTypeKind::Result ||
+       importKind == ImportTypeKind::PropertyAccessor)) {
     return impl.getNamedSwiftType(impl.getStdlibModule(), "Void");
   }
 
@@ -700,11 +730,7 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
 
   // Wrap CF pointers up as unmanaged types, unless this is an audited
   // context.
-  if (hint == ImportHint::CFPointer &&
-      !(importKind == ImportTypeKind::Parameter ||
-        importKind == ImportTypeKind::AuditedResult ||
-        importKind == ImportTypeKind::AuditedVariable ||
-        importKind == ImportTypeKind::AuditedProperty)) {
+  if (hint == ImportHint::CFPointer && !isCFAudited(importKind)) {
     importedType = getUnmanagedType(impl, importedType);
   }
 
@@ -793,21 +819,9 @@ Type ClangImporter::Implementation::importType(clang::QualType type,
                                      importKind, importResult.Hint);
 }
 
-static bool isObjCMethodResultAudited(const clang::Decl *decl) {
-  return (decl->hasAttr<clang::CFReturnsRetainedAttr>() ||
-          decl->hasAttr<clang::CFReturnsNotRetainedAttr>() ||
-          decl->hasAttr<clang::ObjCReturnsInnerPointerAttr>());
-}
-
 Type ClangImporter::Implementation::importPropertyType(
        const clang::ObjCPropertyDecl *decl) {
-  bool isAudited = false;
-  if (auto getter = decl->getGetterMethodDecl())
-    isAudited = isObjCMethodResultAudited(getter);
-
-  return importType(decl->getType(), (isAudited
-                                      ? ImportTypeKind::AuditedProperty
-                                      : ImportTypeKind::Property));
+  return importType(decl->getType(), ImportTypeKind::Property);
 }
 
 Type ClangImporter::Implementation::importFunctionType(
@@ -902,6 +916,14 @@ Type ClangImporter::Implementation::importFunctionType(
   return FunctionType::get(argTy, swiftResultTy, extInfo);
 }
 
+static bool isObjCMethodResultAudited(const clang::Decl *decl) {
+  if (!decl)
+    return false;
+  return (decl->hasAttr<clang::CFReturnsRetainedAttr>() ||
+          decl->hasAttr<clang::CFReturnsNotRetainedAttr>() ||
+          decl->hasAttr<clang::ObjCReturnsInnerPointerAttr>());
+}
+
 Type ClangImporter::Implementation::importMethodType(
        const clang::Decl *clangDecl,
        clang::QualType resultType,
@@ -922,14 +944,17 @@ Type ClangImporter::Implementation::importMethodType(
   //   - objc_returns_inner_pointer is sometimes used on methods
   //     returning CF types as a workaround for ARC not managing CF
   //     objects
-  bool isAuditedResult =
-    (SwiftContext.LangOpts.ImportCFTypes && clangDecl &&
-     isObjCMethodResultAudited(clangDecl));
+  ImportTypeKind resultKind;
+  if (kind == SpecialMethodKind::PropertyAccessor)
+    resultKind = ImportTypeKind::PropertyAccessor;
+  else if (SwiftContext.LangOpts.ImportCFTypes &&
+           isObjCMethodResultAudited(clangDecl))
+    resultKind = ImportTypeKind::AuditedResult;
+  else
+    resultKind = ImportTypeKind::Result;
 
   // Import the result type.
-  auto swiftResultTy = importType(resultType, (isAuditedResult
-                                               ? ImportTypeKind::AuditedResult
-                                               : ImportTypeKind::Result));
+  auto swiftResultTy = importType(resultType, resultKind);
   if (!swiftResultTy)
     return Type();
 
@@ -952,9 +977,11 @@ Type ClangImporter::Implementation::importMethodType(
         paramTy->isObjCIdType()) {
       swiftParamTy = getOptionalType(getNSCopyingType(),
                                      ImportTypeKind::Parameter);
-    }
-    if (!swiftParamTy)
+    } else if (kind == SpecialMethodKind::PropertyAccessor) {
+      swiftParamTy = importType(paramTy, ImportTypeKind::PropertyAccessor);
+    } else {
       swiftParamTy = importType(paramTy, ImportTypeKind::Parameter);
+    }
     if (!swiftParamTy)
       return Type();
 

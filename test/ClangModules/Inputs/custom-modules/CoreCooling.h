@@ -18,3 +18,7 @@ typedef struct __CCRefrigerator *CCMutableRefrigeratorRef;
 CCMutableRefrigeratorRef CCRefrigeratorCreateMutable(CCPowerSupplyRef power);
 
 void CCRefrigeratorInsert(CCMutableRefrigeratorRef fridge, CCItemRef ref);
+
+@interface Kitchen
+@property CCRefrigeratorRef fridge;
+@end

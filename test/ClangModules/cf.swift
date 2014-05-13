@@ -64,3 +64,9 @@ func test9() {
   CCRefrigeratorInsert(fridge, item)
   CCRefrigeratorClose(fridge)
 }
+
+func testProperty(k: Kitchen) {
+  k.fridge = CCRefrigeratorCreate(kCCPowerStandard).takeRetainedValue()
+  CCRefrigeratorOpen(k.fridge)
+  CCRefrigeratorClose(k.fridge)
+}

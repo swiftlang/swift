@@ -51,6 +51,11 @@ module CoreCooling {
   export *
 }
 
+module ObjCIRExtras {
+  header "ObjCIRExtras.h"
+  export *
+}
+
 module ObjCParseExtras {
   header "ObjCParseExtras.h"
   export *

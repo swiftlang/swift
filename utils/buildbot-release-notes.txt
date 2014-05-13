@@ -90,6 +90,8 @@ Latest
     var ch: Character = "a"
     var us: UnicodeScalar = "a"
 
+* Objective-C properties of some CF type are no longer imported as Unmanaged.
+
 2014-05-09
 ----------
 
