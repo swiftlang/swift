@@ -1,6 +1,25 @@
 Latest
 ----------
 
+* The pound sign (#) is now used instead of the back-tick (`) to mark
+  an argument name as a keyword argument, e.g.,
+
+    func moveTo(#x: Int, #y: Int) { ... }
+    moveTo(x: 5, y: 7)
+
+* Objective-C factory methods are now imported as initializers. For
+  example, NSColor's +colorWithRed:green:blue:alpha becomes
+
+    init(red: CGFloat, green: CGFloat, blue: CGFloat, alpha: CGFloat)
+
+  which allows an NSColor to be created as, e.g.,
+
+    NSColor(red: 0.5, green: 0.25, blue: 0.25, alpha: 0.5)
+
+  Factory methods are identified by their kind (class methods), name
+  (starts with words that match the words that end the class name),
+  and result type (instancetype or the class type).
+
 * weak pointers now work with implicitly unchecked optionals, enabling usecases
   where you don't want to ! every use of a weak pointer.  For example:
   
