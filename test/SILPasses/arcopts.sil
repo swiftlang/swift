@@ -341,3 +341,40 @@ bb0(%0 : $Builtin.NativeObject):
   %2 = tuple()
   return %2 : $()
 }
+
+// Make sure that we clear state and don't do anything in the fact of
+// autorelease push/pop.
+sil @objc_autoreleasePoolPush : $@thin () -> Builtin.RawPointer
+sil @objc_autoreleasePoolPop : $@thin (Builtin.RawPointer) -> ()
+
+// CHECK-LABEL: sil @clear_state_in_fact_of_autorelease_pool_ops : $@thin (Builtin.RawPointer) -> () {
+// CHECK: bb0
+// CHECK-NEXT: function_ref objc_autoreleasePoolPush
+// CHECK-NEXT: function_ref @objc_autoreleasePoolPush
+// CHECK-NEXT: function_ref objc_autoreleasePoolPop
+// CHECK-NEXT: function_ref @objc_autoreleasePoolPop
+// CHECK-NEXT: alloc_box
+// CHECK-NEXT: retain
+// CHECK-NEXT: apply
+// CHECK-NEXT: release
+// CHECK-NEXT: retain
+// CHECK-NEXT: apply
+// CHECK-NEXT: release
+// CHECK-NEXT: release
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @clear_state_in_fact_of_autorelease_pool_ops : $@thin (Builtin.RawPointer) -> () {
+bb0(%0 : $Builtin.RawPointer):
+  %1 = function_ref @objc_autoreleasePoolPush : $@thin () -> Builtin.RawPointer
+  %2 = function_ref @objc_autoreleasePoolPop : $@thin (Builtin.RawPointer) -> ()
+  %3 = alloc_box $Builtin.Int32
+  strong_retain %3#0 : $Builtin.NativeObject
+  apply %1() : $@thin () -> Builtin.RawPointer
+  strong_release %3#0 : $Builtin.NativeObject
+  strong_retain %3#0 : $Builtin.NativeObject
+  apply %2(%0) : $@thin (Builtin.RawPointer) -> ()
+  strong_release %3#0 : $Builtin.NativeObject
+  strong_release %3#0 : $Builtin.NativeObject
+  %4 = tuple()
+  return %4 : $()
+}

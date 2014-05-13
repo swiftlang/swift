@@ -22,6 +22,7 @@
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/MapVector.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/CommandLine.h"
@@ -290,6 +291,21 @@ static bool isInterestingInstruction(ValueKind Kind) {
 }
 #endif
 
+static bool isAutoreleasePoolCall(SILInstruction &I) {
+  ApplyInst *AI = dyn_cast<ApplyInst>(&I);
+  if (!AI)
+    return false;
+
+  FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(AI->getCallee());
+  if (!FRI)
+    return false;
+
+  return llvm::StringSwitch<bool>(FRI->getReferencedFunction()->getName())
+    .Case("objc_autoreleasePoolPush", true)
+    .Case("objc_autoreleasePoolPop", true)
+    .Default(false);
+}
+
 /// Analyze a single BB for refcount inc/dec instructions.
 ///
 /// If anything was found it will be added to DecToIncStateMap.
@@ -340,6 +356,10 @@ processBBTopDown(SILBasicBlock &BB,
   for (auto &I : BB) {
 
     DEBUG(llvm::dbgs() << "VISITING:\n    " << I);
+
+    // If we have an autorelease pool call, clear all tracked state.
+    if (isAutoreleasePoolCall(I))
+      BBState.clear();
 
     // If I is a ref count increment instruction...
     if (isRefCountIncrement(I)) {
