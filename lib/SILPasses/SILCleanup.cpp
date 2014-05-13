@@ -21,7 +21,6 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILPasses/Transforms.h"
-#include "llvm/ADT/SmallString.h"
 
 using namespace swift;
 
