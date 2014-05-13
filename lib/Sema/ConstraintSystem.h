@@ -1802,6 +1802,9 @@ public:
 
     /// Indicates that we are applying a fix.
     TMF_ApplyingFix = 0x02,
+    
+    /// Indicates we're matching an operator parameter.
+    TMF_ApplyingOperatorParameter = 0x4,
   };
 
 private:

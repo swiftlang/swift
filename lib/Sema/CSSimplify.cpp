@@ -541,6 +541,23 @@ bool constraints::matchCallArguments(
   return listener.relabelArguments(actualArgNames);
 }
 
+/// Determine whether we should attempt a user-defined conversion.
+static bool shouldTryUserConversion(ConstraintSystem &cs, Type type) {
+  // Strip the l-value qualifier if present.
+  type = type->getRValueType();
+  
+  // If this isn't a type that can have user-defined conversions, there's
+  // nothing to do.
+  if (!type->getNominalOrBoundGenericNominal() && !type->is<ArchetypeType>())
+    return false;
+  
+  // If there are no user-defined conversions, there's nothing to do.
+  // FIXME: lame name!
+  auto &ctx = cs.getASTContext();
+  auto name = ctx.getIdentifier("__conversion");
+  return static_cast<bool>(cs.lookupMember(type, name));
+}
+
 // Match the argument of a call to the parameter.
 static ConstraintSystem::SolutionKind
 matchCallArguments(ConstraintSystem &cs, TypeMatchKind kind,
@@ -639,6 +656,10 @@ matchCallArguments(ConstraintSystem &cs, TypeMatchKind kind,
   case TypeMatchKind::Subtype:
     llvm_unreachable("Not an call argument constraint");
   }
+  
+  auto haveOneNonUserConversion =
+          (subKind != TypeMatchKind::OperatorArgumentConversion);
+  
   for (unsigned paramIdx = 0, numParams = parameterBindings.size();
        paramIdx != numParams; ++paramIdx){
     // Skip unfulfilled parameters. There's nothing to do for them.
@@ -652,11 +673,53 @@ matchCallArguments(ConstraintSystem &cs, TypeMatchKind kind,
 
     // Compare each of the bound arguments for this parameter.
     for (auto argIdx : parameterBindings[paramIdx]) {
-      switch (cs.matchTypes(argTuple[argIdx].getType(), paramTy,
+      auto loc = locator.withPathElement(LocatorPathElt::
+                                            getApplyArgToParam(argIdx,
+                                                               paramIdx));
+      auto argTy = argTuple[argIdx].getType();
+
+      
+      auto isOptionalConversion = false;
+      auto tryUser = false;
+      
+      if (!haveOneNonUserConversion) {
+        tryUser = !(isa<TypeVariableType>(argTy->getDesugaredType()) ||
+                         isa<TypeVariableType>(paramTy->getDesugaredType()));
+        
+        // We'll bypass optional conversions because of the implicit conversions
+        // that take place - there will always be a ValueToOptional disjunctive
+        // choice.
+        if (tryUser) {
+          if(auto boundGenericType = paramTy->getAs<BoundGenericType>()) {
+            auto typeDecl = boundGenericType->getDecl();
+            isOptionalConversion = typeDecl->classifyAsOptionalType();
+          }
+        }
+        
+        haveOneNonUserConversion = !tryUser ||
+                                   isOptionalConversion ||
+                                   haveOneNonUserConversion;
+      }
+      
+      // If at least one operator argument can be applied to without a user
+      // conversion, there's no need to check the others.
+      if (!haveOneNonUserConversion) {
+        auto applyFlags = subflags |
+                          ConstraintSystem::TMF_ApplyingOperatorParameter;
+        auto nonConversionResult = cs.matchTypes(argTy,
+                                                 paramTy,
+                                                 subKind,
+                                                 applyFlags,
+                                                 loc);
+        if (nonConversionResult == ConstraintSystem::SolutionKind::Solved) {
+          haveOneNonUserConversion = true;
+          continue;
+        }
+      }
+      
+      switch (cs.matchTypes(argTy,paramTy,
                             subKind, subflags,
-                            locator.withPathElement(
-                              LocatorPathElt::getApplyArgToParam(argIdx,
-                                                                 paramIdx)))) {
+                            loc)) {
       case ConstraintSystem::SolutionKind::Error:
         return ConstraintSystem::SolutionKind::Error;
 
@@ -665,6 +728,10 @@ matchCallArguments(ConstraintSystem &cs, TypeMatchKind kind,
         break;
       }
     }
+  }
+  
+  if (!haveOneNonUserConversion) {
+    return ConstraintSystem::SolutionKind::Error;
   }
 
   return ConstraintSystem::SolutionKind::Solved;
@@ -1145,23 +1212,6 @@ static ConstraintKind getConstraintKind(TypeMatchKind kind) {
   }
 
   llvm_unreachable("unhandled type matching kind");
-}
-
-/// Determine whether we should attempt a user-defined conversion.
-static bool shouldTryUserConversion(ConstraintSystem &cs, Type type) {
-  // Strip the l-value qualifier if present.
-  type = type->getRValueType();
-  
-  // If this isn't a type that can have user-defined conversions, there's
-  // nothing to do.
-  if (!type->getNominalOrBoundGenericNominal() && !type->is<ArchetypeType>())
-    return false;
-
-  // If there are no user-defined conversions, there's nothing to do.
-  // FIXME: lame name!
-  auto &ctx = cs.getASTContext();
-  auto name = ctx.getIdentifier("__conversion");
-  return static_cast<bool>(cs.lookupMember(type, name));
 }
 
 /// If the given type has user-defined conversions, introduce new
@@ -1702,6 +1752,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
   // A nominal type can be converted to another type via a user-defined
   // conversion function.
   if (concrete && kind >= TypeMatchKind::Conversion &&
+      !(flags & TMF_ApplyingOperatorParameter) &&
       shouldTryUserConversion(*this, type1)) {
     conversionsOrFixes.push_back(ConversionRestrictionKind::User);
     
@@ -2881,6 +2932,12 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
       increaseScore(SK_FunctionConversion);
     }
   };
+  
+  // We'll apply user conversions for operator arguments at the application
+  // site.
+  if (matchKind == TypeMatchKind::OperatorArgumentConversion) {
+    flags |= TMF_ApplyingOperatorParameter;
+  }
 
   switch (restriction) {
   // for $< in { <, <c, <oc }:

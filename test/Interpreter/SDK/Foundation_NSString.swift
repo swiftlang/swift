@@ -48,7 +48,7 @@ assert(!NSString.instancesRespondToSelector("wobble"))
 var array2 : NSArray = [hello, hello]
 
 // Switch on strings
-switch asNSString("world").uppercaseString {
+switch asNSString("world").uppercaseString! {
 case "WORLD":
   print("Found it\n")
 
