@@ -152,7 +152,7 @@ extension String {
   /// taken from a given array of Unicode characters.
   static func stringWithCharacters(chars: unichar[]) -> String {
     var local = chars
-    return NSString.stringWithCharacters(local, length: local.count)
+    return NSString(characters: local, length: local.count)
   }
 
   // + (instancetype)stringWithContentsOfFile:(NSString *)path encoding:(NSStringEncoding)enc error:(NSError **)error
@@ -279,7 +279,7 @@ extension String {
   static func stringWithCString(
     s: CString, encoding: NSStringEncoding) -> String {
 
-    return NSString.stringWithCString(s, encoding: encoding)
+    return NSString(CString:s, encoding: encoding)
   }
 
   // + (instancetype)stringWithFormat:(NSString *)format,, ...
@@ -305,7 +305,7 @@ extension String {
   /// \brief Returns a string created by copying the data from a given
   /// C array of UTF8-encoded bytes.
   static func stringWithUTF8String(bytes: CString) -> String {
-    return NSString.stringWithUTF8String(bytes)
+    return NSString(UTF8String: bytes)
   }
 
   //

@@ -85,7 +85,7 @@ if  (obj as SwiftObjCProto) { abort() }
 
 // Test instance of a tagged pointer type
 
-obj = NSNumber.numberWithInt(1234567)
+obj = NSNumber(int: 1234567)
 _ = (obj as NSNumber)!
 _ = (obj as NSValue)!
 _ = (obj as NSObject)!

@@ -28,7 +28,7 @@ class SuperString : NSString {
 // CHECK: 0123456789
 println(SuperString(10))
 // CHECK: 0123456789
-println(NSString.stringWithString(SuperString(10)))
+println(NSString(string: SuperString(10)))
 // CHECK: 012
 println(SuperString(10).substringWithRange(NSRange(location: 0, length: 3)))
 // CHECK: 345

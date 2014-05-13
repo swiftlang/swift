@@ -19,26 +19,22 @@ func == (lhs: NSObject, rhs: NSObject) -> Bool {
 let NSUTF8StringEncoding: UInt = 8
 
 // NSArray bridging entry points
-func _convertNSArrayToArray<T>(nsarr: NSArray) -> T[] {
-  return T[]()
-}
+@asmname("swift_convertNSArrayToArray")
+func _convertNSArrayToArray<T>(nsarr: NSArray) -> T[]
 
-func _convertArrayToNSArray<T>(arr: T[]) -> NSArray {
-  return NSArray()
-}
+@asmname("swift_convertArrayToNSArray")
+func _convertArrayToNSArray<T>(arr: T[]) -> NSArray
 
 // NSDictionary bridging entry points
+@asmname("swift_convertDictionaryToNSDictionary")
 func _convertDictionaryToNSDictionary<KeyType, ValueType>(
     d: Dictionary<KeyType, ValueType>
-) -> NSDictionary {
-  return NSDictionary()
-}
+) -> NSDictionary
 
+@asmname("swift_convertNSDictionaryToDictionary")
 func _convertNSDictionaryToDictionary<K: NSObject, V: AnyObject>(
        d: NSDictionary
-     ) -> Dictionary<K, V> {
-  return Dictionary<K, V>()
-}
+     ) -> Dictionary<K, V>
 
 extension String : _BridgedToObjectiveC {
   func bridgeToObjectiveC() -> NSString {

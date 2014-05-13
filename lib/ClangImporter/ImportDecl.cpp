@@ -2393,13 +2393,43 @@ namespace {
         }
       }
 
+      // Add the implicit 'self' parameter patterns.
+      SmallVector<Pattern *, 4> bodyPatterns;
+      auto selfTy = getSelfTypeForContext(dc);
+      auto selfMetaVar = createSelfDecl(dc, true);
+      Pattern *selfPat = createTypedNamedPattern(selfMetaVar);
+      bodyPatterns.push_back(selfPat);
+
+      // Import the type that this method will have.
+      auto type = Impl.importMethodType(objcMethod,
+                                        objcMethod->getReturnType(),
+                                        args,
+                                        variadic,
+                                        objcMethod->hasAttr<clang::NoReturnAttr>(),
+                                        bodyPatterns,
+                                        name,
+                                        SpecialMethodKind::Constructor);
+      if (!type)
+        return nullptr;
+
+      // A constructor returns an object of the type, not 'id'.
+      type = FunctionType::get(type->castTo<FunctionType>()->getInput(),
+                               selfTy);
+
       // Look for other constructors that occur in this context with
       // the same name.
       for (auto other : nominalOwner->lookupDirect(name)) {
         auto ctor = dyn_cast<ConstructorDecl>(other);
         if (!ctor || ctor->isInvalid() || ctor->getAttrs().isUnavailable())
           continue;
-        
+
+        // If the types don't match, this is a different constructor with
+        // the same selector. This can happen when an overlay overloads an
+        // existing selector with a Swift-only signature.
+        if (!ctor->getType()->isEqual(type)) {
+          continue;
+        }
+
         // If the existing constructor has a less-desirable kind, mark
         // the existing constructor unavailable.
         if (static_cast<unsigned>(kind) < 
@@ -2446,36 +2476,10 @@ namespace {
         return nullptr;
       }
 
-      // Add the implicit 'self' parameter patterns.
-      SmallVector<Pattern *, 4> bodyPatterns;
-      auto selfTy = getSelfTypeForContext(dc);
-      auto selfMetaVar = createSelfDecl(dc, true);
-      Pattern *selfPat = createTypedNamedPattern(selfMetaVar);
-      bodyPatterns.push_back(selfPat);
-
-      // Import the type that this method will have.
-      auto type = Impl.importMethodType(objcMethod,
-                                        objcMethod->getReturnType(),
-                                        args,
-                                        variadic,
-                                  objcMethod->hasAttr<clang::NoReturnAttr>(),
-                                        bodyPatterns,
-                                        name,
-                                        SpecialMethodKind::Constructor);
-      if (!type)
-        return nullptr;
-
       // Check whether we've already created the constructor.
       auto known = Impl.Constructors.find({objcMethod, dc});
       if (known != Impl.Constructors.end())
         return known->second;
-
-      // A constructor returns an object of the type, not 'id'.
-      // This is effectively implementing related-result-type semantics.
-      // FIXME: Perhaps actually check whether the routine has a related result
-      // type?
-      type = FunctionType::get(type->castTo<FunctionType>()->getInput(),
-                               selfTy);
 
       // Add the 'self' parameter to the function types.
       Type allocType = FunctionType::get(selfMetaVar->getType(), type);

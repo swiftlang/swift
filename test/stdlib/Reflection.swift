@@ -453,8 +453,7 @@ case _:
 }
 
 // CHECK-NEXT: got the expected quick look uint
-switch reflect(NSNumber.numberWithUnsignedLongLong(UInt64.max)!) // FIXME: unnecessary bang
-  .quickLookObject {
+switch reflect(NSNumber(unsignedLongLong: UInt64.max)).quickLookObject {
 case .Some(.UInt(UInt64.max)):
   println("got the expected quick look uint")
 case _:

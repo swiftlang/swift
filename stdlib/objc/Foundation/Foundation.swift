@@ -100,7 +100,7 @@ extension NSString : StringLiteralConvertible {
         Bool(value.isASCII) ? NSASCIIStringEncoding : NSUTF8StringEncoding,
       freeWhenDone: false)
     
-    return self.stringWithString(immutableResult)
+    return self(string: immutableResult)
   }
 }
 
@@ -412,7 +412,7 @@ extension Int : _BridgedToObjectiveC {
   }
 
   @conversion func __conversion() -> NSNumber {
-    return .numberWithInteger(self)
+    return NSNumber(integer: self)
   }
 
   func bridgeToObjectiveC() -> NSNumber {
@@ -428,7 +428,7 @@ extension UInt : _BridgedToObjectiveC {
   @conversion func __conversion() -> NSNumber {
     // FIXME: Need a blacklist for certain methods that should not
     // import NSUInteger as Int.
-    return .numberWithUnsignedInteger(Int(value))
+    return NSNumber(unsignedInteger: Int(value))
   }
 
   typealias ObjectiveCType = NSNumber
@@ -443,7 +443,7 @@ extension Float : _BridgedToObjectiveC {
   }
 
   @conversion func __conversion() -> NSNumber {
-    return .numberWithFloat(self)
+    return NSNumber(float: self)
   }
 
   func bridgeToObjectiveC() -> NSNumber {
@@ -457,7 +457,7 @@ extension Double : _BridgedToObjectiveC {
   }
 
   @conversion func __conversion() -> NSNumber {
-    return .numberWithDouble(self)
+    return NSNumber(double: self)
   }
 
   func bridgeToObjectiveC() -> NSNumber {
@@ -472,7 +472,7 @@ extension Bool: _BridgedToObjectiveC {
   }
 
   @conversion func __conversion() -> NSNumber {
-    return .numberWithBool(self)
+    return NSNumber(bool: self)
   }
 
   func bridgeToObjectiveC() -> NSNumber {
@@ -483,11 +483,11 @@ extension Bool: _BridgedToObjectiveC {
 // Literal support for NSNumber
 extension NSNumber : FloatLiteralConvertible, IntegerLiteralConvertible, ObjCClassType {
   class func convertFromIntegerLiteral(value: Int) -> NSNumber {
-    return self.numberWithInteger(value)
+    return NSNumber(integer: value)
   }
 
   class func convertFromFloatLiteral(value: Double) -> NSNumber {
-    return self.numberWithDouble(value)
+    return NSNumber(double: value)
   }
 }
 

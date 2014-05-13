@@ -79,6 +79,11 @@ println("mutable array \(nsMutableArr[0] as NSString!) \(nsMutableArr[1] as NSSt
 assert(nsMutableArr.count == 2)
 // CHECK: mutable array Inconstant Moon
 
+// Construction
+var variadicArray = NSArray(objects: "A", "B", "C")
+// CHECK: variadic count = 3
+print("variadic count = \(variadicArray.count)")
+
 // Coercions
 var nsa = NSArray()
 var aoa: Array<AnyObject> = []
@@ -137,10 +142,10 @@ func matchesEither(input: NSNumber, a: NSNumber, b: NSNumber) -> Bool {
 }
 
 var one, two, three, oneAgain : NSNumber
-one = .numberWithInt(1)
-two = .numberWithInt(2)
-three = .numberWithInt(3)
-oneAgain = .numberWithInt(1)
+one = NSNumber(int: 1)
+two = NSNumber(int: 2)
+three = NSNumber(int: 3)
+oneAgain = NSNumber(int: 1)
 print(matchesEither(one, two, three))
 print(" ")
 print(matchesEither(one, oneAgain, three))

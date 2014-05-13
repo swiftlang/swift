@@ -103,8 +103,7 @@ class DumbString: NSString {
                                   encoding: NSStringEncoding,
                                   error: ObjCMutablePointer<NSError?>)
   -> DumbString? {
-    error.set(NSError.errorWithDomain("Malicious Mischief", code: 594,
-                                      userInfo: nil))
+    error.set(NSError(domain: "Malicious Mischief", code: 594, userInfo: nil))
     return nil
   }
 }
