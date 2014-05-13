@@ -654,19 +654,21 @@ namespace {
       src = IGF.Builder.CreateBitCast(src, payloadTy->getPointerTo());
       llvm::Value *val = IGF.Builder.CreateLoad(src);
       
+      // Convert to i32.
+      val = IGF.Builder.CreateZExtOrTrunc(val, IGF.IGM.Int32Ty);
+      
       // Subtract the number of cases.
       val = IGF.Builder.CreateSub(val,
-              llvm::ConstantInt::get(payloadTy, ElementsWithNoPayload.size()));
+              llvm::ConstantInt::get(IGF.IGM.Int32Ty, ElementsWithNoPayload.size()));
       
       // If signed less than zero, we have a valid value. Otherwise, we have
       // an extra inhabitant.
       auto valid
-        = IGF.Builder.CreateICmpSLT(val, llvm::ConstantInt::get(payloadTy, 0));
+        = IGF.Builder.CreateICmpSLT(val,
+                                    llvm::ConstantInt::get(IGF.IGM.Int32Ty, 0));
       val = IGF.Builder.CreateSelect(valid,
-                                     llvm::ConstantInt::getSigned(payloadTy, -1),
-                                     val);
+                        llvm::ConstantInt::getSigned(IGF.IGM.Int32Ty, -1), val);
       
-      val = IGF.Builder.CreateZExtOrTrunc(val, IGF.IGM.Int32Ty);
       return val;
     }
     

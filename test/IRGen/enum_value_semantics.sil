@@ -78,6 +78,12 @@ import Builtin
 // CHECK:   %swift.type** null
 // CHECK: }
 
+enum NoPayload {
+  case a
+  case b
+  case c
+}
+
 enum SinglePayloadTrivial {
   case payload(Builtin.Int64)
   case a
@@ -117,6 +123,15 @@ bb0(%0 : $SinglePayloadNontrivial):
 // CHECK-NEXT: call void @swift_release(%swift.refcounted* [[T0]])
 // CHECK-NEXT: br label [[NOT_PRESENT]]
 // CHECK:      ret void
+
+// -- NoPayload getExtraInhabitants
+// CHECK: define linkonce_odr hidden i32 @_TwxgO20enum_value_semantics9NoPayload
+// CHECK:   [[VALUE:%.*]] = load i8* {{%.*}}, align 1
+// CHECK:   [[ZEXT:%.*]] = zext i8 [[VALUE]] to i32
+// CHECK:   [[SUB:%.*]] = sub i32 [[ZEXT]], 3
+// CHECK:   [[EXTRA:%.*]] = icmp slt i32 [[SUB]], 0
+// CHECK:   [[RES:%.*]] = select i1 [[EXTRA]], i32 -1, i32 [[SUB]]
+// CHECK:   ret i32 [[RES]]
 
 // -- SinglePayloadNontrivial destroyBuffer
 // CHECK: define linkonce_odr hidden void @_TwxxO20enum_value_semantics23SinglePayloadNontrivial(%swift.opaque* [[OBJ:%.*]], %swift.type* %Self) {

@@ -261,10 +261,12 @@ func optionableInts() {
     }
   }
 }
+// CHECK-LABEL: Optionable ints:
 // CHECK: 219
 // CHECK: ---
 // CHECK: ---
 // CHECK: 20721
+println("Optionable ints:")
 optionableInts()
 
 enum Suit { case Spades, Hearts, Diamonds, Clubs }
@@ -451,3 +453,12 @@ class AnyOldClass {
 println("class result: \(test_optional_generic_tuple(OptionalTuple((AnyOldClass(10), AnyOldClass(11)))).x)")
 // CHECK: optional pair is same size as pair: true
 // CHECK: class result: 10
+
+// <rdar://problem/16887421>
+// CHECK-LABEL: Optional equality:
+println("Optional equality:")
+// CHECK: true
+println((NoPayload.x as NoPayload?) == NoPayload.x)
+// CHECK: false
+println((NoPayload.x as NoPayload?) == NoPayload.y)
+
