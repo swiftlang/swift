@@ -36,22 +36,22 @@ class PX : P {
 }
 
 // Default arguments imply keyword arguments
-func f3(a: Int, b: Int = 5, `c: Int = 6) { } // expected-warning{{extraneous '`' in parameter; default argument implies keyword argument}}{{29-30=}}
+func f3(a: Int, b: Int = 5, #c: Int = 6) { } // expected-warning{{extraneous '#' in parameter; default argument implies keyword argument}}{{29-30=}}
 // expected-note@-1{{'f3(_:b:c:)' previously declared here}}
-func f3(a: Int, `b: Int, `c: Int) { } 
+func f3(a: Int, #b: Int, #c: Int) { } 
 // expected-error@-1{{invalid redeclaration of 'f3(_:b:c:)'}}
 
 class DefArg {
   func f(a: Int = 17) { } // expected-note{{'f(a:)' previously declared here}}
-  func f(`a: Int) { } // expected-error{{nvalid redeclaration of 'f(a:)'}}
+  func f(#a: Int) { } // expected-error{{nvalid redeclaration of 'f(a:)'}}
 }
 
 struct Subscripts1 {
-  subscript (`i: Int) -> Int {
+  subscript (#i: Int) -> Int {
     get { return i }
   }
 
-  subscript (`j: Int) -> Int {
+  subscript (#j: Int) -> Int {
     get { return j }
   }
 }

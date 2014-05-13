@@ -145,4 +145,4 @@ var C_ARGC : CInt = CInt()
 var C_ARGV : UnsafePointer<CString> = UnsafePointer<CString>()
 
 @asmname("memcpy")
-func c_memcpy(`dest: UnsafePointer<Void>, `src: UnsafePointer<Void>, `size: UInt)
+func c_memcpy(#dest: UnsafePointer<Void>, #src: UnsafePointer<Void>, #size: UInt)

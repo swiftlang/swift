@@ -43,7 +43,7 @@ class A {
 // CHECK-NEXT: dealloc_stack [[TMP_OPTNSSTR]]
 // CHECK-NEXT: autorelease_return [[T0]]
 
-  @objc func bar(`x : String?) {}
+  @objc func bar(#x : String?) {}
 // CHECK:    sil @_TToFC8optional1A3barfS0_FT1xGSqSS__T_ : $@cc(objc_method) @thin (Optional<NSString>, A) -> ()
 // CHECK:      [[TMP_OPTSTR:%.*]] = alloc_stack $Optional<String>
 // CHECK-NEXT: [[TMP_OPTNSSTR:%.*]] = alloc_stack $Optional<NSString>

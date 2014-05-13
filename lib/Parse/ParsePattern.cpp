@@ -177,6 +177,11 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
       param.BackTickLoc = consumeToken(tok::backtick);
     }
 
+    // '#'?
+    if (Tok.is(tok::pound)) {
+      param.BackTickLoc = consumeToken(tok::pound);
+    }
+
     if (param.BackTickLoc.isValid() || startsParameterName(*this, isClosure)) {
       // identifier-or-none for the first name
       if (Tok.is(tok::identifier)) {
@@ -247,7 +252,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
                                                           param.FirstNameLoc);
         diagnose(param.FirstNameLoc, diag::parameter_two_equivalent_names,
                  name)
-          .fixItInsert(param.FirstNameLoc, "`")
+          .fixItInsert(param.FirstNameLoc, "#")
           .fixItRemove(SourceRange(afterFirst, param.SecondNameLoc));
       }
 
@@ -450,7 +455,7 @@ mapParsedParameters(Parser &parser,
 
           // If this isn't a keyword argument by default, add a back-tick back.
           if (!isKeywordArgumentByDefault) {
-            diag.fixItInsert(param.SecondNameLoc, "`");
+            diag.fixItInsert(param.SecondNameLoc, "#");
           }
         } else {
           // There were two names and the second one doesn't match, so just fix

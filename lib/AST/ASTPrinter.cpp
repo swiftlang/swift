@@ -966,7 +966,7 @@ void PrintAST::printOneParameter(Identifier ArgName,
   } else {
     auto printArg = [&]{
       if (!ArgName.empty() && !ArgNameIsAPIByDefault)
-        Printer << "`";
+        Printer << "#";
       Printer.printName(ArgName);
     };
 

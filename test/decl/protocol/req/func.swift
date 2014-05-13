@@ -50,7 +50,7 @@ struct X2e : P2 {
 // Select among overloads distinguished by name.
 struct X2f : P2 {
   typealias Assoc = X1a
-  func f1(`y: X1a) { }
+  func f1(#y: X1a) { }
   func f1(x: X1a) { }
 }
 
@@ -67,13 +67,13 @@ struct X2w : P2 { // expected-error{{type 'X2w' does not conform to protocol 'P2
 
 // Deduction of type that doesn't meet requirements
 struct X2x : P2 { // expected-error{{type 'X2x' does not conform to protocol 'P2'}}
-  func f1(`x: Int) { } // expected-note{{candidate has non-matching type '(x: Int) -> ()'}}
+  func f1(#x: Int) { } // expected-note{{candidate has non-matching type '(x: Int) -> ()'}}
 }
 
 // Mismatch in parameter types
 struct X2y : P2 { // expected-error{{type 'X2y' does not conform to protocol 'P2'}}
   typealias Assoc = X1a
-  func f1(`x: X1b) { } // expected-note{{candidate has non-matching type '(x: X1b) -> ()'}}
+  func f1(#x: X1b) { } // expected-note{{candidate has non-matching type '(x: X1b) -> ()'}}
 }
 
 // Ambiguous deduction
@@ -152,9 +152,9 @@ class X5c : P5 {
 
 // Cannot change name of the selector.
 class X5d : P5 { // expected-error{{type 'X5d' does not conform to protocol 'P5'}}
-  @objc func f2(`y: Int, withInt a: Int) {} // expected-note{{candidate has non-matching type '(y: Int, withInt: Int) -> ()'}} 
+  @objc func f2(#y: Int, withInt a: Int) {} // expected-note{{candidate has non-matching type '(y: Int, withInt: Int) -> ()'}} 
   // expected-error @-1{{method 'f2(y:withInt:)' has different argument names from those required by protocol 'P5' ('f2(_:withInt:)')}}
-  @objc func f2(`y: Int, withOtherValue a: Int) {} // expected-note{{candidate has non-matching type '(y: Int, withOtherValue: Int) -> ()'}}
+  @objc func f2(#y: Int, withOtherValue a: Int) {} // expected-note{{candidate has non-matching type '(y: Int, withOtherValue: Int) -> ()'}}
 }
 
 // Distinguish names within tuple arguments.
@@ -187,7 +187,7 @@ extension Int : Crankable {}
 // Invalid witnesses.
 protocol P6 {
   func foo(x: Int)
-  func bar(`x: Int) // expected-note{{protocol requires function 'bar(x:)' with type '(x: Int) -> ()'}}
+  func bar(#x: Int) // expected-note{{protocol requires function 'bar(x:)' with type '(x: Int) -> ()'}}
 }
 struct X6 : P6 { // expected-error{{type 'X6' does not conform to protocol 'P6'}}
   func foo(x: Missing) { } // expected-error{{use of undeclared type 'Missing'}}

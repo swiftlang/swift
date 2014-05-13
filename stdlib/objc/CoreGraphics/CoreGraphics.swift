@@ -193,20 +193,20 @@ extension CGRect : Equatable {
   }
 
 
-  func rectByInsetting(`dx: CGFloat, dy: CGFloat) -> CGRect {
+  func rectByInsetting(#dx: CGFloat, dy: CGFloat) -> CGRect {
     return CGRectInset(self, dx, dy)
   }
 
-  mutating func inset(`dx: CGFloat, dy: CGFloat) {
+  mutating func inset(#dx: CGFloat, dy: CGFloat) {
     self = self.rectByInsetting(dx: dx, dy: dy)
   }
 
 
-  func rectByOffsetting(`dx: CGFloat, dy: CGFloat) -> CGRect {
+  func rectByOffsetting(#dx: CGFloat, dy: CGFloat) -> CGRect {
     return CGRectOffset(self, dx, dy)
   }
 
-  mutating func offset(`dx: CGFloat, dy: CGFloat) {
+  mutating func offset(#dx: CGFloat, dy: CGFloat) {
     self = self.rectByOffsetting(dx: dx, dy: dy)
   }
 

@@ -130,7 +130,7 @@ extension NSString {
   func nsstrResult() -> NSString { return NSS }
 
   // CHECK: define internal void @_TToFCSo8NSString8nsstrArgfS_FT1sS__T_([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*) unnamed_addr
-  func nsstrArg(`s: NSString) { }
+  func nsstrArg(#s: NSString) { }
 }
 
 class Bas : NSObject {
@@ -163,12 +163,12 @@ class Bas : NSObject {
   // CHECK: define internal [[OPAQUE:.*]]* @_TToFC20objc_nsstring_bridge3Bas9strResultfS0_FT_SS([[OPAQUE:.*]]*, i8*) unnamed_addr {
   func strResult() -> String { return "" }
   // CHECK: define internal void @_TToFC20objc_nsstring_bridge3Bas6strArgfS0_FT1sSS_T_([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*) unnamed_addr {
-  func strArg(`s: String) { }
+  func strArg(#s: String) { }
 
   // CHECK: define internal [[OPAQUE:.*]]* @_TToFC20objc_nsstring_bridge3Bas11nsstrResultfS0_FT_CSo8NSString([[OPAQUE:.*]]*, i8*) unnamed_addr {
   func nsstrResult() -> NSString { return NSS }
   // CHECK: define internal void @_TToFC20objc_nsstring_bridge3Bas8nsstrArgfS0_FT1sCSo8NSString_T_([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*) unnamed_addr {
-  func nsstrArg(`s: NSString) { }
+  func nsstrArg(#s: NSString) { }
 
   init() { 
     strRealProp = String()

@@ -5,9 +5,9 @@
 // CHECK: @"\01L_selector_data(fooWithInt:)" = internal constant [12 x i8] c"fooWithInt:\00", section "__TEXT,__objc_methname,cstring_literals", align 1
 
 class Foo {
-  @objc func baz(`int: Int) {}
+  @objc func baz(#int: Int) {}
 
-  @objc(fooWithInt:) func foo(`int: Int) {}
+  @objc(fooWithInt:) func foo(#int: Int) {}
 }
 
 

@@ -11,7 +11,7 @@ import macros
 // FIXME: Decide the type macros should map to.
 
 // CHECK-LABEL: define double @_TF9macros_ir11circle_areaFT6radiusSd_Sd
-func circle_area(`radius: CDouble) -> CDouble {
+func circle_area(#radius: CDouble) -> CDouble {
   // CHECK: call double @_TFSCg4M_PISd
   return M_PI * radius * radius
 }

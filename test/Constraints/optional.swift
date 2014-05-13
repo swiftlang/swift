@@ -6,8 +6,8 @@ class A {
   @objc func do_b(x: Int) {}
   @objc func do_b(x: Float) {}
 
-  @objc func do_c(`x: Int) {}
-  @objc func do_c(`y: Int) {}
+  @objc func do_c(#x: Int) {}
+  @objc func do_c(#y: Int) {}
 }
 
 func test0(a: AnyObject) {

@@ -30,7 +30,7 @@ struct X2 {
 f0(X2(), {$0.g()})  // expected-error {{could not find member 'g'}}
 
 // Autoclosure
-func f1(`f: @auto_closure () -> Int) { }
+func f1(#f: @auto_closure () -> Int) { }
 func f2() -> Int { }
 f1(f: f2) // expected-error{{function produces expected type 'Int'; did you mean to call it with '()'?}}{{9-9=()}}
 f1(f: 5)

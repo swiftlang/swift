@@ -118,15 +118,15 @@ class OverloadStaticFromBase_Derived : OverloadStaticFromBase {
 
 
 // Overloading of functions based on argument names only.
-func ovl_argname1(`x: Int, `y: Int) { }
-func ovl_argname1(`y: Int, `x: Int) { }
-func ovl_argname1(`a: Int, `b: Int) { }
+func ovl_argname1(#x: Int, #y: Int) { }
+func ovl_argname1(#y: Int, #x: Int) { }
+func ovl_argname1(#a: Int, #b: Int) { }
 
 // Overloading with generics
 protocol P1 { }
 protocol P2 { }
-func ovl_generic1<T: protocol<P1, P2>>(`t: T) { } // expected-note{{previous}}
-func ovl_generic1<U: protocol<P1, P2>>(`t: U) { } // expected-error{{invalid redeclaration of 'ovl_generic1(t:)'}}
+func ovl_generic1<T: protocol<P1, P2>>(#t: T) { } // expected-note{{previous}}
+func ovl_generic1<U: protocol<P1, P2>>(#t: U) { } // expected-error{{invalid redeclaration of 'ovl_generic1(t:)'}}
 
 // Redeclarations within nominal types
 struct X { }
@@ -137,17 +137,17 @@ struct Z {
 }
 
 struct X1 {
-  func f(`a : Int) {}  // expected-note{{previously declared here}}
-  func f(`a : Int) {} // expected-error{{invalid redeclaration of 'f(a:)'}}
+  func f(#a : Int) {}  // expected-note{{previously declared here}}
+  func f(#a : Int) {} // expected-error{{invalid redeclaration of 'f(a:)'}}
 }
 struct X2 {
-  func f(`a : Int) {} // expected-note{{previously declared here}}
+  func f(#a : Int) {} // expected-note{{previously declared here}}
   typealias IntAlias = Int
-  func f(`a : IntAlias) {} // expected-error{{invalid redeclaration of 'f(a:)'}}
+  func f(#a : IntAlias) {} // expected-error{{invalid redeclaration of 'f(a:)'}}
 }
 struct X3 { 
-  func f(`a : Int) {} // expected-note{{previously declared here}}
-  func f(`a : IntAlias) {} // expected-error{{invalid redeclaration of 'f(a:)'}}
+  func f(#a : Int) {} // expected-note{{previously declared here}}
+  func f(#a : IntAlias) {} // expected-error{{invalid redeclaration of 'f(a:)'}}
   typealias IntAlias = Int
 }
 
@@ -184,8 +184,8 @@ class Initializers {
 
 // Default arguments
 // <rdar://problem/13338746>
-func sub(`x:Int64, `y:Int64) -> Int64 { return x - y } // expected-note 2{{'sub(x:y:)' previously declared here}}
-func sub(`x:Int64, y:Int64 = 1) -> Int64 { return x - y } // expected-error{{invalid redeclaration of 'sub(x:y:)'}}
+func sub(#x:Int64, #y:Int64) -> Int64 { return x - y } // expected-note 2{{'sub(x:y:)' previously declared here}}
+func sub(#x:Int64, y:Int64 = 1) -> Int64 { return x - y } // expected-error{{invalid redeclaration of 'sub(x:y:)'}}
 func sub(x:Int64 = 0, y:Int64 = 1) -> Int64 { return x - y } // expected-error{{invalid redeclaration of 'sub(x:y:)'}}
 
 // <rdar://problem/13783231>
@@ -210,26 +210,26 @@ func &&(lhs: LogicValue, rhs: @auto_closure ()->LogicValue) -> Bool { // expecte
 }
 
 // @noreturn
-func noreturn(`code: Int) { } // expected-note{{previously declared}}
-@noreturn func noreturn(`code: Int) { } // expected-error{{invalid redeclaration of 'noreturn(code:)'}}
+func noreturn(#code: Int) { } // expected-note{{previously declared}}
+@noreturn func noreturn(#code: Int) { } // expected-error{{invalid redeclaration of 'noreturn(code:)'}}
 
-func noreturn_1(`x: @noreturn (Int) -> Int) { }
-func noreturn_1(`x: (Int) -> Int) { } 
+func noreturn_1(#x: @noreturn (Int) -> Int) { }
+func noreturn_1(#x: (Int) -> Int) { } 
 
 // @autoclosure
-func autoclosure(`f: () -> Int) { }
-func autoclosure(`f: @auto_closure () -> Int) { }
+func autoclosure(#f: () -> Int) { }
+func autoclosure(#f: @auto_closure () -> Int) { }
 
 // inout
-func inout(`x: Int) { }
+func inout(#x: Int) { }
 func inout(inout `x: Int) { }
 
 // optionals
-func optional(`x: Int?) { } // expected-note{{previously declared}}
-func optional(`x: Int!) { } // expected-error{{invalid redeclaration of 'optional(x:)'}}
+func optional(#x: Int?) { } // expected-note{{previously declared}}
+func optional(#x: Int!) { } // expected-error{{invalid redeclaration of 'optional(x:)'}}
 
-func optional_2(`x: (Int?) -> Int) { } // expected-note{{previously declared}}
-func optional_2(`x: (Int!) -> Int) { } // expected-error{{invalid redeclaration of 'optional_2(x:)'}}
+func optional_2(#x: (Int?) -> Int) { } // expected-note{{previously declared}}
+func optional_2(#x: (Int!) -> Int) { } // expected-error{{invalid redeclaration of 'optional_2(x:)'}}
 
 func optional_3() -> Int? { } // expected-note{{previously declared}}
 func optional_3() -> Int! { } // expected-error{{invalid redeclaration of 'optional_3()'}}
