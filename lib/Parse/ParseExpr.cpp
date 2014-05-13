@@ -1687,7 +1687,8 @@ ParserResult<Expr> Parser::parseExprClosure() {
 
   // Create the closure expression and enter its context.
   auto *closure = new (Context) ClosureExpr(Context.AllocateCopy(captureList),
-                                            params, arrowLoc,explicitResultType,
+                                            params, arrowLoc, inLoc,
+                                            explicitResultType,
                                             discriminator, CurDeclContext);
   // The arguments to the func are defined in their own scope.
   Scope S(this, ScopeKind::ClosureParams);

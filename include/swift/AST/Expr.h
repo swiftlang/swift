@@ -2450,6 +2450,9 @@ class ClosureExpr : public AbstractClosureExpr {
   /// if present.
   SourceLoc ArrowLoc;
 
+  /// The location of the "in", if present.
+  SourceLoc InLoc;
+
   /// \brief The explicitly-specified result type.
   TypeLoc ExplicitResultType;
 
@@ -2459,12 +2462,12 @@ class ClosureExpr : public AbstractClosureExpr {
   
 public:
   ClosureExpr(ArrayRef<CaptureListEntry> captureList,
-              Pattern *params, SourceLoc arrowLoc,
+              Pattern *params, SourceLoc arrowLoc, SourceLoc inLoc,
               TypeLoc explicitResultType, unsigned discriminator,
               DeclContext *parent)
     : AbstractClosureExpr(ExprKind::Closure, Type(), /*Implicit=*/false,
                           discriminator, parent),
-      CaptureList(captureList), ArrowLoc(arrowLoc),
+      CaptureList(captureList), ArrowLoc(arrowLoc), InLoc(inLoc),
       ExplicitResultType(explicitResultType),
       Body(nullptr) {
     setParams(params);
@@ -2503,6 +2506,11 @@ public:
   SourceLoc getArrowLoc() const {
     assert(hasExplicitResultType() && "No arrow location");
     return ArrowLoc;
+  }
+
+  /// retrieve the location of the \c in for a closure that has it.
+  SourceLoc getInLoc() const {
+    return InLoc;
   }
 
   /// \brief Retrieve the explicit result type location information.

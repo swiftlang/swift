@@ -649,13 +649,33 @@ Expr *TypeChecker::foldSequence(SequenceExpr *expr, DeclContext *dc) {
 
 namespace {
   class FindCapturedVars : public ASTWalker {
+    TypeChecker &TC;
     llvm::SetVector<ValueDecl*> &captures;
     DeclContext *CurExprAsDC;
+    SourceLoc CaptureLoc;
+    llvm::SmallPtrSet<ValueDecl *, 2> Diagnosed;
 
   public:
-    FindCapturedVars(llvm::SetVector<ValueDecl*> &captures,
+    FindCapturedVars(TypeChecker &tc,
+                     llvm::SetVector<ValueDecl*> &captures,
                      AnyFunctionRef AFR)
-        : captures(captures), CurExprAsDC(AFR.getAsDeclContext()) {}
+        : TC(tc), captures(captures), CurExprAsDC(AFR.getAsDeclContext()) {
+      if (auto AFD = AFR.getAbstractFunctionDecl())
+        CaptureLoc = AFD->getLoc();
+      else {
+        auto ACE = AFR.getAbstractClosureExpr();
+        if (auto closure = dyn_cast<ClosureExpr>(ACE))
+          CaptureLoc = closure->getInLoc();
+
+        if (CaptureLoc.isInvalid())
+          CaptureLoc = ACE->getLoc();
+      }
+
+      // If we have capture info, move the capture location after it.
+      if (!AFR.getCaptureInfo().empty()) {
+
+      }
+    }
 
     void doWalk(Expr *E) {
       E->walk(*this);
@@ -694,6 +714,20 @@ namespace {
           !DRE->getDecl()->getDeclContext()->isLocalContext())
         return { false, DRE };
 
+      // Can only capture a local that is declared before the capturing entity.
+      if (DRE->getDecl()->getDeclContext()->isLocalContext() &&
+          CaptureLoc.isValid() && DRE->getDecl()->getLoc().isValid() &&
+          TC.Context.SourceMgr.isBeforeInBuffer(CaptureLoc,
+                                                DRE->getDecl()->getLoc())) {
+        if (Diagnosed.insert(DRE->getDecl())) {
+          TC.diagnose(DRE->getLoc(), diag::capture_before_declaration,
+                      DRE->getDecl()->getName());
+          TC.diagnose(DRE->getDecl()->getLoc(), diag::decl_declared_here,
+                      DRE->getDecl()->getName());
+        }
+        return { false, DRE };
+      }
+
       captures.insert(D);
       return { false, DRE };
     }
@@ -703,7 +737,7 @@ namespace {
 
 void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
   llvm::SetVector<ValueDecl *> Captures;
-  FindCapturedVars finder(Captures, AFR);
+  FindCapturedVars finder(*this, Captures, AFR);
   finder.doWalk(AFR.getBody());
   ValueDecl **CaptureCopy =
       Context.AllocateCopy<ValueDecl *>(Captures.begin(), Captures.end());

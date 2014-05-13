@@ -244,7 +244,7 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
 
   ClosureExpr *CE =
       new (Context) ClosureExpr(ArrayRef<CaptureListEntry>(),
-                                ParamPat, SourceLoc(), TypeLoc(),
+                                ParamPat, SourceLoc(), SourceLoc(), TypeLoc(),
                                 discriminator, newTopLevel);
 
   Type ParamTy = ParamPat->getType();
