@@ -1494,10 +1494,28 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   }
 
   case TypeKind::InOut: {
-    // This is an inout type.
+    // This is an inout type. Naturally we would be emitting them as
+    // DW_TAG_reference_type types, but LLDB can deal better with pointer-sized
+    // struct that has the appropriate mangled name. 
+    auto Decl = DbgTy.getDecl();
+    Location L = getLoc(SM, Decl);
     auto ObjectTy = BaseTy->castTo<InOutType>()->getObjectType();
     auto DT = getOrCreateDesugaredType(ObjectTy, DbgTy);
-    return DBuilder.createReferenceType(llvm::dwarf::DW_TAG_reference_type, DT);
+    auto File = getOrCreateFile(L.Filename);
+    unsigned PtrSize = CI.getTargetInfo().getPointerWidth(0);
+    unsigned PtrAlign = CI.getTargetInfo().getPointerAlign(0);
+    auto PtrTy = DBuilder.createPointerType(DT, PtrSize, PtrAlign);
+    llvm::Value *Elements[] = {
+      DBuilder.createMemberType(Scope, "pointer", File, 0, 
+                                PtrSize, PtrAlign, 0, Flags, PtrTy)
+    };
+    llvm::Twine Name = Decl ? "inout "+Decl->getNameStr() : MangledName;
+    return DBuilder.
+      createStructType(Scope, Name.str(), File, L.Line,
+                       PtrSize, PtrAlign, Flags,
+                       llvm::DIType(), // DerivedFrom
+                       DBuilder.getOrCreateArray(Elements),
+                       llvm::dwarf::DW_LANG_Swift, llvm::DIType(), MangledName);
   }
 
   case TypeKind::Archetype: {
