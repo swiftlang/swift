@@ -649,7 +649,7 @@ func !==<T: ArrayType, U: ArrayType>(lhs: T, rhs: U) -> Bool {
 /// O(1). Requires: Base is a base class or base @objc protocol (such
 /// as AnyObject) of Derived.
 func _arrayUpCast<Derived, Base>(a: Array<Derived>) -> Array<Base> {
-  return Array(ArrayBuffer<Base>(castFrom: a.buffer, direction: .Up))
+  return Array(ArrayBuffer<Base>(castFrom: a.buffer, castKind: .Up))
 }
 
 /// Returns an Array<Derived> containing the same elements as a in
@@ -657,13 +657,45 @@ func _arrayUpCast<Derived, Base>(a: Array<Derived>) -> Array<Base> {
 /// Derived, and Base is a base class or base @objc protocol (such as
 /// AnyObject) of Derived.
 func _arrayDownCast<Base, Derived>(a: Array<Base>) -> Array<Derived> {
-  return Array(ArrayBuffer<Derived>(castFrom: a.buffer, direction: .Down))
+  return Array(ArrayBuffer<Derived>(castFrom: a.buffer, castKind: .Down))
 }
 
 /// Return the most-derived element type known to be stored in a's
 /// buffer. O(1)
 func _arrayElementType<T>(a: Array<T>) -> Any.Type {
   return a.buffer.dynamicElementType
+}
+
+/// Implement the semantics of (a as Array<T>), where a is an
+/// AnyObject[].
+func _arrayBridgedDownCast<T>(a: AnyObject[]) -> T[]? {
+  // If T is not bridged, conversion fails in O(1), yielding nil
+  if !isBridgedToObjectiveC(T.self) {
+    return nil
+  }
+
+  // Otherwise, the semantics are the same as bridging from Objective-C
+  return _arrayBridgeFromObjectiveC(a)
+}
+
+/// Conversion used when Objective-C APIs using NSArray are expressed
+/// in Swift as T[], where T != AnyObject.
+func _arrayBridgeFromObjectiveC<T>(a: AnyObject[]) -> T[] {
+  // If the NSArray was originally created as a Swift ArrayType<U>,
+  // conversion succeeds in O(1) if U is T or a subclass thereof. No
+  // further dynamic type checks are required.
+  if let n = a.buffer.requestNativeBuffer() {
+    if let n2 = n.asBufferOf(T.self) {
+      return Array(ArrayBuffer(n2))
+    }
+  }
+
+  // Otherwise, if T is a class or existential type, conversion
+  // succeeds in O(1), but type-checking of elements is deferred and
+  // on-demand. The result of subscripting is the result of bridging
+  // back the corresponding stored NSArray element to T. Failure to
+  // bridge back is a fatal error detected at runtime.
+  return Array(ArrayBuffer(castFrom: a.buffer, castKind: .DeferredDown))
 }
 
 /// Returns an Array<Derived> containing the same elements as a in

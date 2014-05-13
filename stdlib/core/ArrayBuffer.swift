@@ -17,26 +17,26 @@
 
 import SwiftShims
 
-enum _ArrayCastDirection { case Up, Down }
+enum _ArrayCastKind { case Up, Down, DeferredDown }
 
 @final
 class IndirectArrayBuffer {
   
-  init<T>(_ buffer: NativeArrayBuffer<T>, _ mutable: Bool) {
-    self.buffer = buffer.storage
-    self.isMutable = mutable
+  init<T>(nativeBuffer: NativeArrayBuffer<T>, isMutable: Bool) {
+    self.buffer = nativeBuffer.storage
+    self.isMutable = isMutable
     self.isCocoa = false
   }
     
-  init(_ x: CocoaArray) {
-    self.buffer = x
+  init(cocoa: CocoaArray) {
+    self.buffer = cocoa
     self.isMutable = false
     self.isCocoa = true
   }
 
-  init(castFrom: IndirectArrayBuffer, direction: _ArrayCastDirection) {
+  init(castFrom: IndirectArrayBuffer, castKind: _ArrayCastKind) {
     self.buffer = castFrom.buffer
-    self.isMutable = direction == .Down
+    self.isMutable = castKind == .Down
     self.isCocoa = castFrom.isCocoa
   }
   
@@ -78,21 +78,23 @@ struct ArrayBuffer<T> : ArrayBufferType {
   init() {
     storage = !_isClassOrObjCExistential(T.self)
       ? nil : Builtin.castToNativeObject(
-      IndirectArrayBuffer(NativeArrayBuffer<T>(), false))
+      IndirectArrayBuffer(
+        nativeBuffer: NativeArrayBuffer<T>(),
+        isMutable: false))
   }
 
   init(_ cocoa: CocoaArray) {
     assert(_isClassOrObjCExistential(T.self))
-    storage = Builtin.castToNativeObject(IndirectArrayBuffer(cocoa))
+    storage = Builtin.castToNativeObject(IndirectArrayBuffer(cocoa: cocoa))
   }
 
   /// An ArrayBuffer<T> containing the same elements.
   /// Requires: the elements actually have dynamic type T.
-  init<U>(castFrom: ArrayBuffer<U>, direction: _ArrayCastDirection) {
+  init<U>(castFrom: ArrayBuffer<U>, castKind: _ArrayCastKind) {
     assert(_canBeClass(T.self))
     assert(_canBeClass(U.self))
     storage = Builtin.castToNativeObject(
-      IndirectArrayBuffer(castFrom: castFrom.indirect, direction: direction))
+      IndirectArrayBuffer(castFrom: castFrom.indirect, castKind: castKind))
   }
   
   var dynamicElementType: Any.Type {
@@ -109,7 +111,7 @@ extension ArrayBuffer {
     }
     else {
       self.storage = Builtin.castToNativeObject(
-        IndirectArrayBuffer(buffer, true))
+        IndirectArrayBuffer(nativeBuffer: buffer, isMutable: true))
     }
   }
   
@@ -256,6 +258,8 @@ extension ArrayBuffer {
       if _fastPath(_isNative) {
         return _native[i]
       }
+      // FIXME: Should be possible to use "as" + "!" instead of
+      // reinterpretCast; <rdar://problem/16898943>
       return reinterpretCast(_nonNative!.objectAtIndex(i))
     }
     
