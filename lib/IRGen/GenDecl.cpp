@@ -385,6 +385,46 @@ void IRGenModule::emitSourceFile(SourceFile &SF, unsigned StartElem) {
   mainIGF.Builder.CreateRet(mainIGF.Builder.getInt32(0));
 }
 
+void IRGenModule::emitDebuggerInitializers() {
+  SILFunction *DebuggerSILFunction = nullptr;
+    
+  for (SILFunction &SF : *SILMod) {
+    if (Decl* D = SF.getLocation().getAsASTNode<Decl>()) {
+      if (FuncDecl *FD = dyn_cast<FuncDecl>(D)) {
+        if (FD->getAttrs().hasAttribute<LLDBDebuggerFunctionAttr>()) {
+          DebuggerSILFunction = &SF;
+          break;
+        }
+      }
+    }
+  }
+    
+  if (!DebuggerSILFunction)
+    return;
+    
+  llvm::StringRef DebuggerFunctionMangledName = DebuggerSILFunction->getName();
+    
+  llvm::Function *DebuggerFunction = nullptr;
+    
+  for (llvm::Function &F : Module) {
+    if (F.getName() == DebuggerFunctionMangledName) {
+      DebuggerFunction = &F;
+      break;
+    }
+  }
+    
+  if (DebuggerFunction) {
+    llvm::BasicBlock *EntryBB = &DebuggerFunction->getEntryBlock();
+    llvm::BasicBlock::iterator IP = EntryBB->getFirstInsertionPt();
+    IRBuilder Builder(getLLVMContext());
+    Builder.llvm::IRBuilderBase::SetInsertPoint(EntryBB, IP);
+    
+    for (llvm::WeakVH &ObjCClass : ObjCClasses) {
+      Builder.CreateCall(getInstantiateObjCClassFn(), ObjCClass);
+    }
+  }
+}
+
 /// Add the given global value to @llvm.used.
 void IRGenModule::addUsedGlobal(llvm::GlobalValue *global) {
   assert(!global->isDeclaration() &&

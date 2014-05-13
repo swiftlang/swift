@@ -156,6 +156,11 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
     }
   }
 
+  // Emit intializers for debugger functions if needed
+  if (IGM.ObjCInterop && Opts.UseJIT) {
+    IGM.emitDebuggerInitializers();
+  }
+
   // Okay, emit any definitions that we suddenly need.
   IGM.emitLazyDefinitions();
 
