@@ -334,10 +334,8 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
 
   SmallVector<char, 128> buffer;
   StringRef name = constant.mangle(buffer);
-
   // If this is an allocating constructor, we may have both
-
-  auto *F = SILFunction::create(M, linkage, constant.mangle(buffer),
+  auto *F = SILFunction::create(M, linkage, name,
                                 constantType, nullptr,
                                 Nothing, IsNotBare, IsTrans);
 
