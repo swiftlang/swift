@@ -792,6 +792,10 @@ ERROR(expected_capture_specifier_name,attribute_parsing,none,
       "expected name of in closure capture list", ())
 ERROR(expected_init_capture_specifier,attribute_parsing,none,
       "expected initializer for closure capture specifier", ())
+ERROR(expected_capture_list_end_rsquare,attribute_parsing,none,
+      "expected ']' at end of capture list", ())
+ERROR(cannot_capture_fields,attribute_parsing,none,
+      "fields may only be captured by assigning to a specific name", ())
 
 ERROR(expected_closure_result_type,expr_parsing,none,
       "expected closure result type after '->'", ())

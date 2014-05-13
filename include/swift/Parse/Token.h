@@ -100,11 +100,10 @@ public:
 
   // Predicates to check to see if the token is not the same as any of a list.
   template <typename ...T>
-  bool isNotAny(tok K1, T... K) const { return !isAny(K1, K...); }
+  bool isNot(tok K1, T... K) const { return !isAny(K1, K...); }
 
   bool isAnyOperator() const {
-    return Kind == tok::oper_binary ||
-           Kind == tok::oper_postfix ||
+    return Kind == tok::oper_binary || Kind == tok::oper_postfix ||
            Kind == tok::oper_prefix;
   }
   bool isNotAnyOperator() const {

@@ -1496,7 +1496,7 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
         continue;
       }
 
-      if (Tok.isNotAny(tok::identifier, tok::kw_self)) {
+      if (Tok.isNot(tok::identifier, tok::kw_self)) {
         diagnose(Tok, diag::expected_capture_specifier_name);
         skipUntil(tok::comma, tok::r_square);
         continue;
@@ -1512,6 +1512,15 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
         // the expression to capture.
         name = Context.getIdentifier(Tok.getText());
         initializer = parseExprIdentifier();
+
+        // It is a common error to try to capture a nested field instead of just
+        // a local name, reject it with a specific error message.
+        if (Tok.isAny(tok::period, tok::exclaim_postfix,tok::question_postfix)){
+          diagnose(Tok, diag::cannot_capture_fields);
+          skipUntil(tok::comma, tok::r_square);
+          continue;
+        }
+
       } else {
         // Otherwise, the name is a new declaration.
         consumeIdentifier(&name);
@@ -1550,7 +1559,12 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
     } while (consumeIf(tok::comma));
     
     // The capture list needs to be closed off with a ']'.
-    consumeToken(tok::r_square);
+    if (!consumeIf(tok::r_square)) {
+      diagnose(Tok, diag::expected_capture_list_end_rsquare);
+      skipUntil(tok::r_square);
+      if (Tok.is(tok::r_square))
+        consumeToken(tok::r_square);
+    }
   }
   
   bool invalid = false;

@@ -166,6 +166,11 @@ extension SomeClass {
     doStuff { [unowned self] in self.foo() }
     doStuff { [unowned xyz = self.field!] in xyz.foo() }
     doStuff { [weak xyz = self.field] in xyz!.foo() }
+
+    // rdar://16889886 - Assert when trying to weak capture a property of self in a lazy closure
+    doStuff { [weak self.field] in field!.foo() }   // expected-error {{fields may only be captured by assigning to a specific name}} expected-error {{reference to property 'field' in closure requires explicit 'self.' to make capture semantics explicit}}
+    doStuff { [weak self&field] in 42 }  // expected-error {{expected ']' at end of capture list}}
+
   }
 }
 
