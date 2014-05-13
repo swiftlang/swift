@@ -473,7 +473,7 @@ NOTE(protocol_witness_exact_match,sema_tcd,none,
 NOTE(protocol_witness_renamed,sema_tcd,none,
      "candidate matches (with renaming)%0", (StringRef))
 NOTE(protocol_witness_kind_conflict,sema_tcd,none,
-     "candidate has is not %select{an initializer|a function|a variable|"
+     "candidate is not %select{an initializer|a function|a variable|"
      "a subscript}0", (RequirementKind))
 NOTE(protocol_witness_type_conflict,sema_tcd,none,
      "candidate has non-matching type %0%1", (Type, StringRef))

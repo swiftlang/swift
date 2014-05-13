@@ -9,7 +9,7 @@ func bad_containers_1(bc: BadContainer1) {
 }
 
 struct BadContainer2 : Sequence { // expected-error{{type 'BadContainer2' does not conform to protocol '_Sequence_'}} expected-error{{type 'BadContainer2' does not conform to protocol 'Sequence'}}
-  var generate : Int // expected-note{{candidate has is not a function}} expected-note{{candidate has is not a function}}
+  var generate : Int // expected-note{{candidate is not a function}} expected-note{{candidate is not a function}}
 }
 
 func bad_containers_2(bc: BadContainer2) {
