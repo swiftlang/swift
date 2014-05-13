@@ -283,6 +283,13 @@ void AttributeEarlyChecker::visitLazyAttr(LazyAttr *attr) {
 
 
 void TypeChecker::checkDeclAttributesEarly(Decl *D) {
+  // Don't perform early attribute validation more than once.
+  // FIXME: Crummy way to get idempotency.
+  if (D->didEarlyAttrValidation())
+    return;
+
+  D->setEarlyAttrValidation();
+
   AttributeEarlyChecker Checker(*this, D);
 
   for (auto attr : D->getMutableAttrs()) {

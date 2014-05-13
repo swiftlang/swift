@@ -794,6 +794,7 @@ public:
     void *DeclPtr = reinterpret_cast<void **>(Mem) + 1;
     auto D = ::new (DeclPtr) DeclTy(std::forward<Targs>(Args)...);
     D->setClangNode(ClangN);
+    D->setEarlyAttrValidation(true);
     return D;
   }
 };

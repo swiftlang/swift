@@ -2283,11 +2283,11 @@ public:
 
     // Synthesize accessors for @NSManaged, all checking has already been
     // performed.
-    if (VD->getAttrs().hasAttribute<NSManagedAttr>())
+    if (VD->getAttrs().hasAttribute<NSManagedAttr>() && !VD->getGetter())
       convertNSManagedStoredVarToComputed(VD, TC);
 
     // Synthesize accessors for @lazy, all checking already been performed.
-    if (VD->getAttrs().hasAttribute<LazyAttr>())
+    if (VD->getAttrs().hasAttribute<LazyAttr>() && !VD->getGetter())
       convertLazyStoredVarToComputed(VD, TC);
 
     // If this is a non-final stored property in a class, then synthesize getter
