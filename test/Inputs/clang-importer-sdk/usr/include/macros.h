@@ -19,8 +19,8 @@
 #define A_PI M_PI
 
 #define VERSION_STRING "Swift 1.0"
-#define UTF8_STRING u8"Swift ✨"
-#define OBJC_STRING @"Swift ✨"
+#define UTF8_STRING u8"Swift 🏃"
+#define OBJC_STRING @"Unicode! ✨"
 
 #define INVALID_INTEGER_LITERAL_1 10_9
 #define INVALID_INTEGER_LITERAL_2 10abc
