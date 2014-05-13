@@ -19,6 +19,7 @@
 #include <sys/resource.h>
 #include <sys/errno.h>
 #include <unistd.h>
+#include <limits.h>
 #include <cstring>
 #include <cstdint>
 #include <cstdio>
