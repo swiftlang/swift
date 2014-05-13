@@ -27,6 +27,10 @@ class MyManagedObject : NSManagedObject {
   }
 }
 
+func getOtherManagedObject() -> OtherManagedObject {
+  return OtherManagedObject()
+}
+
 func accessOther(om: OtherManagedObject) -> String {
   return om.managed
 }

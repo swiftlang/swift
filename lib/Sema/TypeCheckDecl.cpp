@@ -1011,9 +1011,11 @@ static bool isDefaultInitializable(PatternBindingDecl *pbd) {
   if (isLet)
     return false;
 
-  // If it is an IBOutlet or a @lazy variable, it is trivially true.
+  // If it is an IBOutlet, is NSManaged, or is a @lazy variable, it is trivially
+  // true.
   if (auto var = pbd->getSingleVar()) {
     if (var->getAttrs().hasAttribute<IBOutletAttr>() ||
+        var->getAttrs().hasAttribute<NSManagedAttr>() ||
         var->getAttrs().hasAttribute<LazyAttr>())
       return true;
   }
