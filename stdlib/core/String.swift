@@ -88,6 +88,16 @@ extension String : StringLiteralConvertible {
   }
 }
 
+extension String : DebugPrintable {
+  var debugDescription: String {
+    var result = "\""
+    for us in self.unicodeScalars {
+      result += us.escape()
+    }
+    result += "\""
+    return result
+  }
+}
 
 extension String {
   /// \brief return the number of code units occupied by this string

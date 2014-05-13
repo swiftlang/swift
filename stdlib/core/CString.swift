@@ -78,6 +78,12 @@ struct CString :
   }
 }
 
+extension CString : DebugPrintable {
+  var debugDescription: String {
+    return String.fromCString(self).debugDescription
+  }
+}
+
 @asmname("strlen")
 func _strlen(arg : CString) -> Int
 @asmname("strcpy")

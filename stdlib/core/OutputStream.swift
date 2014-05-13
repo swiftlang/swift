@@ -331,3 +331,9 @@ extension UnicodeScalar : Streamable {
   }
 }
 
+extension CString : Streamable {
+  func writeTo<Target : OutputStream>(inout target: Target) {
+    target.write(String.fromCString(self))
+  }
+}
+

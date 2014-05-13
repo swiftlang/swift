@@ -90,12 +90,21 @@ func test_StdlibTypesPrinted() {
 
   var s: String = "abc"
   printedIs(s, "abc")
+  printedIs(s.debugDescription, "\"abc\"")
+  s = "\\ \' \" \0 \n \r \t \x05"
+  printedIs(s.debugDescription, "\"\\\\ \\\' \\\" \\0 \\n \\r \\t \\x05\"")
 
   var ch: Character = "a"
   printedIs(ch, "a")
 
   var us: UnicodeScalar = "a"
   printedIs(us, "a")
+
+  var cstr: CString = "abc"
+  printedIs(cstr, "abc")
+  printedIs(cstr.debugDescription, "\"abc\"")
+  cstr = "\\ \' \" \n \r \t \x05"
+  printedIs(cstr.debugDescription, "\"\\\\ \\\' \\\" \\n \\r \\t \\x05\"")
 
   var implicitlyUnwrappedString: String! = nil
   printedIs(implicitlyUnwrappedString, "nil")
