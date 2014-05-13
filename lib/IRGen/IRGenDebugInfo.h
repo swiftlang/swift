@@ -233,15 +233,16 @@ private:
   llvm::DIModule getOrCreateModule(llvm::DIScope Parent, std::string Name,
                                    llvm::DIFile File);
   llvm::DIScope getModule(StringRef MangledName);
-  llvm::DIArray getStructMembers(NominalTypeDecl *D, llvm::DIDescriptor Scope,
+  llvm::DIArray getStructMembers(NominalTypeDecl *D, Type BaseTy,
+                                 llvm::DIDescriptor Scope,
                                  llvm::DIFile File, unsigned Flags,
                                  unsigned &SizeInBits);
   llvm::DICompositeType
-  createStructType(DebugTypeInfo DbgTy, NominalTypeDecl *Decl, StringRef Name,
-                   llvm::DIDescriptor Scope, llvm::DIFile File, unsigned Line,
-                   unsigned SizeInBits, unsigned AlignInBits, unsigned Flags,
-                   llvm::DIType DerivedFrom, unsigned RuntimeLang,
-                   StringRef UniqueID);
+  createStructType(DebugTypeInfo DbgTy, NominalTypeDecl *Decl, Type BaseTy,
+                   llvm::DIDescriptor Scope, llvm::DIFile File,
+                   unsigned Line, unsigned SizeInBits, unsigned AlignInBits,
+                   unsigned Flags, llvm::DIType DerivedFrom,
+                   unsigned RuntimeLang, StringRef UniqueID);
   llvm::DIDerivedType createMemberType(DebugTypeInfo DTI, StringRef Name,
                                        unsigned &OffsetInBits,
                                        llvm::DIDescriptor Scope,
