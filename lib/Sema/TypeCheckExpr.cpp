@@ -670,11 +670,6 @@ namespace {
         if (CaptureLoc.isInvalid())
           CaptureLoc = ACE->getLoc();
       }
-
-      // If we have capture info, move the capture location after it.
-      if (!AFR.getCaptureInfo().empty()) {
-
-      }
     }
 
     void doWalk(Expr *E) {
