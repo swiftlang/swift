@@ -668,7 +668,7 @@ func _arrayElementType<T>(a: Array<T>) -> Any.Type {
 
 /// Implement the semantics of (a as Array<T>), where a is an
 /// AnyObject[].
-func _arrayBridgedDownCast<T>(a: AnyObject[]) -> T[]? {
+func _arrayBridgedDownCast<T>(a: AnyObject[]) -> (T[])? {
   // If T is not bridged, conversion fails in O(1), yielding nil
   if !isBridgedToObjectiveC(T.self) {
     return nil

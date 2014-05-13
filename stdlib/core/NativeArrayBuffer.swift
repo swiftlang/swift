@@ -233,6 +233,14 @@ struct NativeArrayBuffer<T> : ArrayBufferType, LogicValue {
     return reinterpretCast(elementStorage)
   }
   
+  func asBufferOf<U>(_: U.Type) -> NativeArrayBuffer<U>? {
+    if !(dynamicElementType is U.Type) {
+     return nil
+    }
+    return NativeArrayBuffer<U>(
+      reinterpretCast(storage) as NativeArrayStorage<U>)
+  }
+   
   var dynamicElementType: Any.Type {
     return storage ? storage!.dynamicElementType : T.self
   }
