@@ -1447,10 +1447,6 @@ Restart:
                              TokStart);
 
   case '#': {
-    // # is only a token in SIL mode.
-    if (InSILMode)
-      return formToken(tok::sil_pound, TokStart);
-
     if (getSubstring(TokStart + 1, 2).equals("if") &&
         isWhitespace(CurPtr[2])) {
       CurPtr += 2;
@@ -1481,10 +1477,9 @@ Restart:
         diagnose(CurPtr, diag::lex_hashbang_not_allowed);
       skipHashbang();
       goto Restart;
-    } else {
-      diagnose(CurPtr-1, diag::lex_invalid_character);
     }
-    goto Restart;
+
+    return formToken(tok::pound, TokStart);
   }
 
   // Operator characters.

@@ -1,9 +1,8 @@
 // RUN: %swift -parse -verify %s
 
 func foo(a: Int) {
-  foo(<#a#>) // expected-error {{'<' is not a prefix unary operator}} \
-             // expected-error 2{{invalid character}} \
-             // expected-error {{'>' is not a postfix unary operator}}
+  foo(<#a#>) // expected-error 2 {{expected ',' separator}} \
+             // expected-error 2 {{expected expression in list of expressions}} 
   foo(<\a\>) // expected-error 2 {{invalid character in source file}} \
              // expected-error 3 {{expected ',' separator}} \
              // expected-error {{operator with postfix spacing cannot start a subexpression}} \

@@ -101,7 +101,7 @@ PUNCTUATOR(colon,         ":")
 PUNCTUATOR(semi,          ";")
 PUNCTUATOR(equal,         "=")
 PUNCTUATOR(at_sign,       "@")
-PUNCTUATOR(sil_pound,     "#")    // Only in SIL mode.
+PUNCTUATOR(pound,         "#")
 
 PUNCTUATOR(amp_prefix,    "&")
 PUNCTUATOR(arrow,         "->")

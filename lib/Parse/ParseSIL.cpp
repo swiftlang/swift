@@ -773,7 +773,7 @@ bool SILParser::parseSILType(SILType &Result, GenericParamList *&GenericParams,
 
 bool SILParser::parseSILDottedPath(ValueDecl *&Decl,
                                    SmallVectorImpl<ValueDecl *> &values) {
-  if (P.parseToken(tok::sil_pound, diag::expected_sil_constant))
+  if (P.parseToken(tok::pound, diag::expected_sil_constant))
     return true;
 
   // Handle sil-dotted-path.
@@ -950,7 +950,7 @@ bool SILParser::parseValueName(UnresolvedValueName &Result) {
     return true;
 
   // If the result value specifier is present, parse it.
-  if (P.consumeIf(tok::sil_pound)) {
+  if (P.consumeIf(tok::pound)) {
     unsigned Value = 0;
     if (P.Tok.isNot(tok::integer_literal) ||
         P.Tok.getText().getAsInteger(10, Value)) {
@@ -2291,7 +2291,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   case ValueKind::GlobalAddrInst: {
     Identifier GlobalName;
     SILType Ty;
-    if (P.parseToken(tok::sil_pound, diag::expected_sil_constant) ||
+    if (P.parseToken(tok::pound, diag::expected_sil_constant) ||
         parseSILIdentifier(GlobalName, diag::expected_sil_constant) ||
         P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":") ||
         parseSILType(Ty))
