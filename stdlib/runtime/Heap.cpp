@@ -48,6 +48,10 @@ static void _swift_zone_statistics(malloc_zone_t *zone,
 
 static const AllocIndex badAllocIndex = AllocIndex(-1);
 
+typedef struct AllocCacheEntry_s {
+  struct AllocCacheEntry_s *next;
+} *AllocCacheEntry;
+
 namespace {
 
 void *mmapWrapper(size_t size, bool huge) {
@@ -65,7 +69,7 @@ void *mmapWrapper(size_t size, bool huge) {
 //
 template <typename T, size_t (*hash)(const void *)>
 class HeapMap {
-private:
+public:
   std::pair<const void *, T> *nodes;
   size_t count;
   size_t mask;
@@ -84,7 +88,7 @@ private:
     int r = munmap(oldNodes, sizeof(oldNodes[0]) * (oldMask + 1));
     assert(r == 0);
   }
-public:
+
   HeapMap() : count(0), mask(16-1) {
     nodes = reinterpret_cast<std::pair<const void *, T> *>(
       mmapWrapper(sizeof(nodes[0]) * bufSize(), false));
@@ -135,25 +139,51 @@ public:
     return &find(key)->second;
   }
   void forEach(std::function<void(const void *, T)> func) {
-    for (size_t i = 0, j = size(); j > 0; j--) {
+    for (size_t i = 0, j = size(); j > 0; i++, j--) {
       while (nodes[i].first == nullptr) i++;
       func(nodes[i].first, nodes[i].second);
     }
   }
 };
 
-class SwiftZone {
-private:
-  static SwiftZone swiftZone;
-  static pthread_rwlock_t lock;
+static size_t arenaHash(const void *pointer) {
+  return (size_t)pointer >> 16;
+}
+static size_t hugeAllocationHash(const void *pointer) {
+  return (size_t)pointer >> 12;
+}
 
-  void *operator new(size_t size) = delete;
-  void operator delete(void *pointer) = delete;
-  SwiftZone(SwiftZone const &) = delete;
-  SwiftZone &operator=(SwiftZone const &) = delete;
+class Arena;
+class SwiftZone {
+public:
+  malloc_zone_t zoneShims = {
+    nullptr,
+    nullptr,
+    _swift_zone_size,
+    _swift_zone_malloc,
+    _swift_zone_calloc,
+    _swift_zone_valloc,
+    _swift_zone_free,
+    _swift_zone_realloc,
+    _swift_zone_destroy,
+    "SwiftZone",
+    nullptr,
+    nullptr,
+    &SwiftZone::zoneInspection,
+    0,
+    nullptr,
+    nullptr,
+    nullptr,
+  };
+  pthread_rwlock_t lock;
+  pthread_key_t keyOffset;
+  HeapMap<Arena, arenaHash> arenas;
+  HeapMap<size_t, hugeAllocationHash> hugeAllocations;
+  AllocCacheEntry globalCache[ALLOC_CACHE_COUNT];
 
   SwiftZone();
-public:
+  SwiftZone(SwiftZone const &) = delete;
+  SwiftZone &operator=(SwiftZone const &) = delete;
   static void threadExitCleanup(void *arg);
   static malloc_introspection_t zoneInspection;
 
@@ -177,35 +207,37 @@ public:
   static void dealloc_gmalloc(void *ptr, AllocIndex idx);
   static void slowDealloc_gmalloc(void *ptr, size_t bytes);
 
-  static bool tryWriteLock() {
+  bool tryWriteLock() {
     int r = pthread_rwlock_trywrlock(&lock);
     assert(r == 0 || errno == EBUSY);
     return r == 0;
   }
-  static void writeLock() {
+  void writeLock() {
     int r = pthread_rwlock_wrlock(&lock);
     assert(r == 0);
     (void)r;
   }
-  static void writeUnlock() {
+  void writeUnlock() {
     int r = pthread_rwlock_unlock(&lock);
     assert(r == 0);
     (void)r;
   }
-  static void readLock() {
+  void readLock() {
     int r = pthread_rwlock_rdlock(&lock);
     assert(r == 0);
     (void)r;
   }
-  static void readUnlock() {
+  void readUnlock() {
     int r = pthread_rwlock_unlock(&lock);
     assert(r == 0);
     (void)r;
   }
-  void debug() {
-    malloc_zone_print(&zoneShims, true);
-  }
+  void debug();
 };
+
+void SwiftZone::debug() {
+  malloc_zone_print(&zoneShims, true);
+}
 
 extern "C" pthread_key_t _swiftAllocOffset = -1;
 
@@ -217,12 +249,6 @@ const size_t arenaMask =  0xFFFF;
 size_t roundToPage(size_t size) {
   return (size + pageMask) & ~pageMask;
 }
-
-typedef struct AllocCacheEntry_s {
-  struct AllocCacheEntry_s *next;
-} *AllocCacheEntry;
-
-AllocCacheEntry globalCache[ALLOC_CACHE_COUNT];
 
 #if __has_include(<os/tsd.h>)
 // OS X and iOS internal version
@@ -338,66 +364,64 @@ void SwiftZone::dealloc_gmalloc(void *ptr, AllocIndex idx) {
 // !SWIFT_HAVE_FAST_ENTRY_POINTS
 #endif
 
-static size_t arenaHash(const void *pointer) {
-  return (size_t)pointer >> 16;
-}
-static size_t hugeAllocationHash(const void *pointer) {
-  return (size_t)pointer >> 12;
-}
-
-class Arena;
-static HeapMap<Arena, arenaHash> arenas;
-static HeapMap<size_t, hugeAllocationHash> hugeAllocations;
-
 class Arena {
 public:
   void *base;
   uint16_t byteSize; // max 4096
   uint8_t  index;    // max 56 or 64
-  Arena(size_t idx, size_t size) : byteSize(size), index(idx) {
-    assert(size > 0);
-    base = mmapWrapper(arenaSize * 2, /*huge*/ false);
-    assert(base != MAP_FAILED);
-    void *newBase = (void *)(((size_t)base & ~arenaMask) + arenaSize);
-    size_t frontSlop = (size_t)newBase - (size_t)base;
-    size_t backSlop = arenaSize - frontSlop;
-    int r = munmap(base, frontSlop);
-    assert(r != -1);
-    if (backSlop) {
-      r = munmap((uint8_t *)newBase + arenaSize, backSlop);
-      assert(r != -1);
-    }
-    base = newBase;
-    auto headNode = (AllocCacheEntry)base;
-    auto node = headNode;
-    size_t allocations = arenaSize / size;
-    for (unsigned i = 1; i < allocations; i++) {
-      auto nextNode = (AllocCacheEntry)((uint8_t *)base + i * size);
-      node->next = nextNode;
-      node = nextNode;
-    }
-    assert(globalCache[idx] == NULL);
-    globalCache[idx] = headNode;
-  }
-  static void newArena(size_t idx, size_t size) {
-    auto arena = Arena(idx, size);
-    arenas.insert(std::pair<void *, Arena>(arena.base, arena));
-  }
+  Arena(size_t idx, size_t size);
+  static void newArena(size_t idx, size_t size);
 };
 
 } // end anonymous namespace
 
+static SwiftZone swiftZone;
+
+Arena::Arena(size_t idx, size_t size) : byteSize(size), index(idx) {
+  assert(size > 0);
+  base = mmapWrapper(arenaSize * 2, /*huge*/ false);
+  assert(base != MAP_FAILED);
+  void *newBase = (void *)(((size_t)base & ~arenaMask) + arenaSize);
+  size_t frontSlop = (size_t)newBase - (size_t)base;
+  size_t backSlop = arenaSize - frontSlop;
+  int r = munmap(base, frontSlop);
+  assert(r != -1);
+  if (backSlop) {
+    r = munmap((uint8_t *)newBase + arenaSize, backSlop);
+    assert(r != -1);
+  }
+  base = newBase;
+  auto headNode = (AllocCacheEntry)base;
+  auto node = headNode;
+  size_t allocations = arenaSize / size;
+  for (unsigned i = 1; i < allocations; i++) {
+    auto nextNode = (AllocCacheEntry)((uint8_t *)base + i * size);
+    node->next = nextNode;
+    node = nextNode;
+  }
+  assert(swiftZone.globalCache[idx] == NULL);
+  swiftZone.globalCache[idx] = headNode;
+}
+
+void Arena::newArena(size_t idx, size_t size) {
+  auto arena = Arena(idx, size);
+  swiftZone.arenas.insert(std::pair<void *, Arena>(arena.base, arena));
+}
+
+malloc_zone_t *swift::_swift_zone_get_shims() {
+  return &swiftZone.zoneShims;
+}
 
 
 static void _swift_zone_initImpl() {
   assert(sizeof(pthread_key_t) == sizeof(long));
-  malloc_zone_register(&zoneShims);
+  malloc_zone_register(&swiftZone.zoneShims);
   pthread_key_t key, prev_key;
   int r = pthread_key_create(&key, SwiftZone::threadExitCleanup);
   assert(r == 0);
   (void)r;
   prev_key = key;
-  _swiftAllocOffset = key;
+  swiftZone.keyOffset = _swiftAllocOffset = key;
   for (unsigned i = 0; i < ALLOC_CACHE_COUNT; i++) {
     int r = pthread_key_create(&key, SwiftZone::threadExitCleanup);
     assert(r == 0);
@@ -428,24 +452,24 @@ void swift::_swift_zone_init() {
   int r = pthread_once(&once, _swift_zone_initImpl);
   assert(r == 0);
 }
-SwiftZone::SwiftZone() {
+SwiftZone::SwiftZone() : lock(PTHREAD_RWLOCK_INITIALIZER) {
   _swift_zone_init();
 }
 
 size_t swift::_swift_zone_size(malloc_zone_t *zone, const void *pointer) {
-  SwiftZone::readLock();
+  swiftZone.readLock();
   void *ptr = (void *)((unsigned long)pointer & ~arenaMask);
   size_t value = 0;
-  auto it = arenas.find(ptr);
+  auto it = swiftZone.arenas.find(ptr);
   if (it) {
     value = it->second.byteSize;
   } else {
-    auto it2 = hugeAllocations.find(pointer);
+    auto it2 = swiftZone.hugeAllocations.find(pointer);
     if (it2) {
       value = it2->second;
     }
   }
-  SwiftZone::readUnlock();
+  swiftZone.readUnlock();
   return value;
 }
 
@@ -481,11 +505,95 @@ void swift::_swift_zone_destroy(malloc_zone_t *zone) {
   swift::crash("The Swift heap cannot be destroyed");
 }
 
+static kern_return_t
+defaultReader(task_t task, vm_address_t address, vm_size_t size, void **ptr) {
+  *ptr = (void *)address;
+  return 0;
+}
+
+template <typename T>
+static void readAndDuplicate(task_t task, vm_address_t where,
+                             memory_reader_t reader,
+                             size_t size, T **mem) {
+  void *temp = nullptr;
+  kern_return_t error = reader(task, (vm_address_t)where, size, (void **)&temp);
+  assert(error == KERN_SUCCESS);
+  void *out = malloc(size);
+  memcpy(out, temp, size);
+  *mem = reinterpret_cast<T*>(out);
+}
+
 kern_return_t
-_swift_zone_enumerator(task_t task, void *, unsigned type_mask,
+_swift_zone_enumerator(task_t task, void *context, unsigned type_mask,
                        vm_address_t zone_address, memory_reader_t reader,
                        vm_range_recorder_t recorder) {
-  swift::crash("Swift Zone enumerator is unimplemented");
+  SwiftZone *zone = nullptr;
+
+  if (!reader) {
+    reader = defaultReader;
+  }
+
+  readAndDuplicate(task, zone_address, reader, sizeof(SwiftZone), &zone);
+
+  if ((type_mask & MALLOC_ADMIN_REGION_RANGE_TYPE)
+                == MALLOC_ADMIN_REGION_RANGE_TYPE) {
+    vm_range_t buffer[2] = {
+      {
+        (vm_address_t)zone->arenas.nodes,
+        sizeof(*zone->arenas.nodes) * zone->arenas.bufSize()
+      },
+      {
+        (vm_address_t)zone->hugeAllocations.nodes,
+        sizeof(*zone->hugeAllocations.nodes) * zone->hugeAllocations.bufSize()
+      }
+    };
+    recorder(task, context, MALLOC_ADMIN_REGION_RANGE_TYPE, buffer, 2);
+  }
+
+  readAndDuplicate(task, (vm_address_t)zone->arenas.nodes, reader,
+                   sizeof(*zone->arenas.nodes) * zone->arenas.bufSize(),
+                   &zone->arenas.nodes);
+
+  readAndDuplicate(task, (vm_address_t)zone->hugeAllocations.nodes, reader,
+                   sizeof(*zone->hugeAllocations.nodes)
+                   * zone->hugeAllocations.bufSize(),
+                   &zone->hugeAllocations.nodes);
+
+  if ((type_mask & MALLOC_PTR_REGION_RANGE_TYPE)
+                == MALLOC_PTR_REGION_RANGE_TYPE) {
+    zone->arenas.forEach([&] (const void *pointer, Arena arena) {
+      vm_range_t buffer = { (vm_address_t)arena.base, arenaSize };
+      recorder(task, context, MALLOC_PTR_REGION_RANGE_TYPE, &buffer, 1);
+    });
+
+    zone->hugeAllocations.forEach([&] (const void *pointer, size_t size) {
+      vm_range_t buffer = { (vm_address_t)pointer, size };
+      recorder(task, context, MALLOC_PTR_REGION_RANGE_TYPE, &buffer, 1);
+    });
+  }
+
+  if ((type_mask & MALLOC_PTR_IN_USE_RANGE_TYPE)
+                != MALLOC_PTR_IN_USE_RANGE_TYPE) {
+    return KERN_SUCCESS;
+  }
+  // handle MALLOC_PTR_IN_USE_RANGE_TYPE
+
+  zone->arenas.forEach([&] (const void *pointer, Arena arena) {
+    const size_t size = arena.byteSize;
+    for (size_t i = 0; i < arenaSize; i += size) {
+      auto pointer = (const void *)((uint8_t *)arena.base + i);
+      vm_range_t buffer = { (vm_address_t)pointer, size };
+      // FIXME -- do not record freed blocks
+      recorder(task, context, MALLOC_PTR_IN_USE_RANGE_TYPE, &buffer, 1);
+    }
+  });
+
+  zone->hugeAllocations.forEach([&] (const void *pointer, size_t size) {
+    vm_range_t buffer = { (vm_address_t)pointer, size };
+    recorder(task, context, MALLOC_PTR_IN_USE_RANGE_TYPE, &buffer, 1);
+  });
+
+  return KERN_SUCCESS;
 }
 
 size_t _swift_zone_good_size(malloc_zone_t *zone, size_t size) {
@@ -571,12 +679,12 @@ void *SwiftZone::globalAlloc(AllocIndex idx, uintptr_t flags)
   size_t size;
 
 again:
-  writeLock();
-  if ((ptr = globalCache[idx])) {
-    globalCache[idx] = globalCache[idx]->next;
+  swiftZone.writeLock();
+  if ((ptr = swiftZone.globalCache[idx])) {
+    swiftZone.globalCache[idx] = swiftZone.globalCache[idx]->next;
   }
   // we should probably refill the cache in bulk
-  writeUnlock();
+  swiftZone.writeUnlock();
 
   if (ptr) {
     return ptr;
@@ -609,7 +717,7 @@ void *SwiftZone::slowAlloc_optimized(size_t size, uintptr_t flags) {
       }
       swift::crash("Address space exhausted");
     }
-    hugeAllocations.insert(std::pair<void *, size_t>(r, size));
+    swiftZone.hugeAllocations.insert(std::pair<void *, size_t>(r, size));
     return r;
   }
 
@@ -631,16 +739,16 @@ void *SwiftZone::slowAlloc_gmalloc(size_t size, uintptr_t flags) {
 
 void SwiftZone::slowDealloc_optimized(void *ptr, size_t bytes) {
   if (bytes == 0) {
-    bytes = zoneShims.size(NULL, ptr);
+    bytes = swiftZone.zoneShims.size(NULL, ptr);
   }
   assert(bytes != 0);
   AllocIndex idx = sizeToIndex(bytes);
   if (idx == badAllocIndex) {
-    auto it2 = hugeAllocations.find(ptr);
+    auto it2 = swiftZone.hugeAllocations.find(ptr);
     assert(it2);
     int r = munmap(const_cast<void *>(it2->first), it2->second);
     assert(r != -1);
-    hugeAllocations.erase(it2);
+    swiftZone.hugeAllocations.erase(it2);
     return;
   }
 
@@ -668,15 +776,15 @@ void SwiftZone::threadExitCleanup(void *arg) {
     }
     threadCacheTail[i] = temp;
   }
-  writeLock();
+  swiftZone.writeLock();
   for (unsigned i = 0; i < ALLOC_CACHE_COUNT; i++) {
     if (threadCache[i] == NULL) {
       continue;
     }
-    threadCacheTail[i]->next = globalCache[i];
-    globalCache[i] = threadCache[i];
+    threadCacheTail[i]->next = swiftZone.globalCache[i];
+    swiftZone.globalCache[i] = threadCache[i];
   }
-  writeUnlock();
+  swiftZone.writeUnlock();
 }
 
 kern_return_t _swift_memory_reader(task_t task,
@@ -707,7 +815,7 @@ enumerateBlocks(std::function<void(const void *, size_t)> func) {
   // FIXME scan other threads
   HeapMap<bool, boolHash> unusedBlocks;
   for (unsigned i = 0; i < ALLOC_CACHE_COUNT; i++) {
-    for (AllocCacheEntry pointer = globalCache[i]; pointer;
+    for (AllocCacheEntry pointer = swiftZone.globalCache[i]; pointer;
          pointer = pointer->next) {
       unusedBlocks.insert(std::pair<void *, bool>(pointer, true));
     }
@@ -717,18 +825,17 @@ enumerateBlocks(std::function<void(const void *, size_t)> func) {
     }
   }
 
-  SwiftZone::readLock();
-  arenas.forEach([&](const void *key, Arena arena) {
-    size_t count = arenaSize / arena.byteSize;
-    for (size_t i = 0; i < count; i += arena.byteSize) {
+  swiftZone.readLock();
+  swiftZone.arenas.forEach([&](const void *key, Arena arena) {
+    for (size_t i = 0; i < arenaSize; i += arena.byteSize) {
       auto pointer = (const void *)((uint8_t *)arena.base + i);
       if (!unusedBlocks[pointer]) {
         func(pointer, arena.byteSize);
       }
     }
   });
-  hugeAllocations.forEach(func);
-  SwiftZone::readUnlock();
+  swiftZone.hugeAllocations.forEach(func);
+  swiftZone.readUnlock();
 }
 
 void _swift_zone_print(malloc_zone_t *zone, boolean_t verbose) {
@@ -747,31 +854,11 @@ void _swift_zone_statistics(malloc_zone_t *zone,
       statistics->max_size_in_use = size;
     }
   });
-  statistics->size_allocated = arenas.size() * arenaSize;
-  hugeAllocations.forEach([&] (const void *key, size_t size) {
+  statistics->size_allocated = swiftZone.arenas.size() * arenaSize;
+  swiftZone.hugeAllocations.forEach([&] (const void *key, size_t size) {
     statistics->size_allocated += size;
   });
 }
-
-malloc_zone_t swift::zoneShims = {
-  nullptr,
-  nullptr,
-  _swift_zone_size,
-  _swift_zone_malloc,
-  _swift_zone_calloc,
-  _swift_zone_valloc,
-  _swift_zone_free,
-  _swift_zone_realloc,
-  _swift_zone_destroy,
-  "SwiftZone",
-  nullptr,
-  nullptr,
-  &SwiftZone::zoneInspection,
-  0,
-  nullptr,
-  nullptr,
-  nullptr,
-};
 
 malloc_introspection_t SwiftZone::zoneInspection = {
   _swift_zone_enumerator,
@@ -780,15 +867,15 @@ malloc_introspection_t SwiftZone::zoneInspection = {
   _swift_zone_print,
   _swift_zone_log,
   [] (malloc_zone_t *zone) {
-    writeLock();
+    swiftZone.writeLock();
   },
   [] (malloc_zone_t *zone) {
-    writeUnlock();
+    swiftZone.writeUnlock();
   },
   _swift_zone_statistics,
   [] (malloc_zone_t *zone) -> boolean_t {
-      if (tryWriteLock()) {
-      writeUnlock(); return false;
+    if (swiftZone.tryWriteLock()) {
+      swiftZone.writeUnlock(); return false;
     }
     return true;
   },
@@ -798,9 +885,6 @@ malloc_introspection_t SwiftZone::zoneInspection = {
   NULL, // discharge
   NULL, // enumerate_discharged_pointers
 };
-
-SwiftZone SwiftZone::swiftZone;
-pthread_rwlock_t SwiftZone::lock = PTHREAD_RWLOCK_INITIALIZER;
 
 // Shims to select between the fast and
 // introspectable/debugging paths at runtime

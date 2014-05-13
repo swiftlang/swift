@@ -178,7 +178,7 @@ static NSString *_getDescription(SwiftObject *obj) {
 }
 
 - (struct _NSZone *)zone {
-  return (struct _NSZone *)&swift::zoneShims;
+  return (struct _NSZone *)_swift_zone_get_shims();
 }
 
 - (void)doesNotRecognizeSelector: (SEL) sel {

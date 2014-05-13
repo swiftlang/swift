@@ -23,7 +23,7 @@
 namespace swift {
 
 LLVM_LIBRARY_VISIBILITY
-extern malloc_zone_t zoneShims;
+extern malloc_zone_t *_swift_zone_get_shims();
 
 LLVM_LIBRARY_VISIBILITY
 size_t _swift_zone_size   (malloc_zone_t *zone, const void *pointer);
