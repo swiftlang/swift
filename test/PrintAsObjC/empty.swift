@@ -18,6 +18,10 @@
 // CHECK: # define SWIFT_PROTOCOL
 // CHECK: # define OBJC_DESIGNATED_INITIALIZER
 
+// CHECK-LABEL: #if defined(__has_feature) && __has_feature(modules)
+// CHECK-NEXT: #endif
+
+
 // CHECK-NOT: {{[@;{}]}}
 
 // CUSTOM-OBJC-PROLOGUE: swift/objc-prologue.h:1:2: error: "Prologue included"

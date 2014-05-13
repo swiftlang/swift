@@ -707,7 +707,6 @@ class ModuleWriter {
   llvm::DenseMap<const TypeDecl *, std::pair<EmissionState, bool>> seenTypes;
   std::vector<const Decl *> declsToWrite;
   llvm::SmallSetVector<Module *, 8> imports;
-  llvm::StringSet<> seenImports;
 
   std::string bodyBuffer;
   llvm::raw_string_ostream os{bodyBuffer};
@@ -943,14 +942,21 @@ public:
 
   void writeImports(raw_ostream &out) {
     out << "#if defined(__has_feature) && __has_feature(modules)\n";
+
+    llvm::DenseSet<Identifier> seenImports;
+    bool includeUmbrella = false;
     for (auto import : imports) {
-      auto Name = import->Name.str();
-      if (seenImports.find(Name) == seenImports.end()) {
-        seenImports.insert(Name);
-        out << "@import " << Name << ";\n";
-      }
+      auto Name = import->Name;
+      if (Name == M.Name)
+        includeUmbrella = true;
+      else if (seenImports.insert(Name).second)
+        out << "@import " << Name.str() << ";\n";
     }
-    out << "\n#endif\n";
+
+    out << "#endif\n\n";
+
+    if (includeUmbrella)
+      out << "#import <" << M.Name.str() << '/' << M.Name.str() << ".h>\n\n";
   }
 
   bool writeToStream(raw_ostream &out) {
