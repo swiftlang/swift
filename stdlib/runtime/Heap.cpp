@@ -152,6 +152,9 @@ static size_t arenaHash(const void *pointer) {
 static size_t hugeAllocationHash(const void *pointer) {
   return (size_t)pointer >> 12;
 }
+static size_t pthreadHash(const void *pointer) {
+  return (size_t)pointer >> 4;
+}
 static size_t boolHash(const void *pointer) {
   return (size_t)pointer;
 }
@@ -182,6 +185,7 @@ public:
   pthread_key_t keyOffset;
   HeapMap<Arena, arenaHash> arenas;
   HeapMap<size_t, hugeAllocationHash> hugeAllocations;
+  HeapMap<bool, pthreadHash> threads;
   AllocCacheEntry globalCache[ALLOC_CACHE_COUNT];
 
   SwiftZone();
@@ -236,6 +240,18 @@ public:
     (void)r;
   }
   void debug();
+  void registerThread() {
+    auto it = threads.find(pthread_self());
+    if (!it) {
+      threads.insert(std::pair<pthread_t, bool>(pthread_self(), true));
+    }
+  }
+  void unregisterThread() {
+    auto it = threads.find(pthread_self());
+    if (it) {
+      threads.erase(it);
+    }
+  }
 };
 
 void SwiftZone::debug() {
@@ -425,11 +441,11 @@ static void _swift_zone_initImpl() {
   (void)r;
   prev_key = key;
   swiftZone.keyOffset = _swiftAllocOffset = key;
-  for (unsigned i = 0; i < ALLOC_CACHE_COUNT; i++) {
+  for (unsigned i = 1; i < ALLOC_CACHE_COUNT; i++) {
     int r = pthread_key_create(&key, SwiftZone::threadExitCleanup);
     assert(r == 0);
     (void)r;
-    assert(key == prev_key + 1);
+    assert(key == (prev_key + 1));
     prev_key = key;
   }
 
@@ -540,7 +556,7 @@ _swift_zone_enumerator(task_t task, void *context, unsigned type_mask,
 
   if ((type_mask & MALLOC_ADMIN_REGION_RANGE_TYPE)
                 == MALLOC_ADMIN_REGION_RANGE_TYPE) {
-    vm_range_t buffer[2] = {
+    vm_range_t buffer[] = {
       {
         (vm_address_t)zone->arenas.nodes,
         sizeof(*zone->arenas.nodes) * zone->arenas.bufSize()
@@ -548,9 +564,14 @@ _swift_zone_enumerator(task_t task, void *context, unsigned type_mask,
       {
         (vm_address_t)zone->hugeAllocations.nodes,
         sizeof(*zone->hugeAllocations.nodes) * zone->hugeAllocations.bufSize()
+      },
+      {
+        (vm_address_t)zone->threads.nodes,
+        sizeof(*zone->threads.nodes) * zone->threads.bufSize()
       }
     };
-    recorder(task, context, MALLOC_ADMIN_REGION_RANGE_TYPE, buffer, 2);
+    recorder(task, context, MALLOC_ADMIN_REGION_RANGE_TYPE,
+             buffer, sizeof(buffer) / sizeof(buffer[0]));
   }
 
   readAndDuplicate(task, (vm_address_t)zone->arenas.nodes, reader,
@@ -581,8 +602,12 @@ _swift_zone_enumerator(task_t task, void *context, unsigned type_mask,
   }
   // handle MALLOC_PTR_IN_USE_RANGE_TYPE
 
-  // FIXME -- do not record per-thread freed blocks
+  readAndDuplicate(task, (vm_address_t)zone->threads.nodes, reader,
+                   sizeof(*zone->threads.nodes) * zone->threads.bufSize(),
+                   &zone->threads.nodes);
+
   HeapMap<bool, boolHash> unusedBlocks;
+
   for (unsigned i = 0; i < ALLOC_CACHE_COUNT; i++) {
     AllocCacheEntry pointer = zone->globalCache[i];
     kern_return_t error;
@@ -596,7 +621,29 @@ _swift_zone_enumerator(task_t task, void *context, unsigned type_mask,
     }
   }
 
-  zone->arenas.forEach([&] (const void *pointer, Arena arena) {
+  zone->threads.forEach([&] (const void *thread, bool) {
+    for (unsigned i = 0; i < ALLOC_CACHE_COUNT; i++) {
+      void **temp = nullptr;
+      kern_return_t error;
+      // FIXME deduce the magic constant in the inferior, and then save it
+      // for us to look at later
+      error = reader(task, (vm_address_t)
+                     &((AllocCacheEntry**)thread)[28 + zone->keyOffset + i],
+                     sizeof(AllocCacheEntry), (void **)&temp);
+      assert(error == KERN_SUCCESS);
+      auto pointer = reinterpret_cast<AllocCacheEntry>(*temp);
+      while (pointer) {
+        unusedBlocks.insert(std::pair<void *, bool>(pointer, true));
+        void **temp;
+        error = reader(task, (vm_address_t)&pointer->next,
+                       sizeof(AllocCacheEntry), (void **)&temp);
+        assert(error == KERN_SUCCESS);
+        pointer = reinterpret_cast<AllocCacheEntry>(*temp);
+      }
+    }
+  });
+
+  zone->arenas.forEach([&] (const void *arenaBase, Arena arena) {
     const size_t size = arena.byteSize;
     for (size_t i = 0; i < arenaSize; i += size) {
       auto pointer = (const void *)((uint8_t *)arena.base + i);
@@ -699,6 +746,7 @@ void *SwiftZone::globalAlloc(AllocIndex idx, uintptr_t flags)
 
 again:
   swiftZone.writeLock();
+  swiftZone.registerThread();
   if ((ptr = swiftZone.globalCache[idx])) {
     swiftZone.globalCache[idx] = swiftZone.globalCache[idx]->next;
   }
@@ -803,6 +851,7 @@ void SwiftZone::threadExitCleanup(void *arg) {
     threadCacheTail[i]->next = swiftZone.globalCache[i];
     swiftZone.globalCache[i] = threadCache[i];
   }
+  swiftZone.unregisterThread();
   swiftZone.writeUnlock();
 }
 
