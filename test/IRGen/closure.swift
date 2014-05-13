@@ -4,7 +4,7 @@
 
 // CHECK: [[METADATA:@.*]] = internal constant %swift.full_heapmetadata { void (%swift.refcounted*)* [[DESTROY:@objectdestroy1]], i8** null, %swift.type { i64 64 } }
 
-func a(var `i: Int) -> (Int) -> Int {
+func a(var #i: Int) -> (Int) -> Int {
   return {x in i }
 }
 
@@ -19,7 +19,7 @@ protocol Ordinable {
   func ord() -> Int
 }
 
-func b<T : Ordinable>(var `seq: T) -> (Int) -> Int {
+func b<T : Ordinable>(var #seq: T) -> (Int) -> Int {
   return {i in i + seq.ord() }
 }
 
@@ -45,7 +45,7 @@ func b<T : Ordinable>(var `seq: T) -> (Int) -> Int {
 
 // -- <rdar://problem/14443343> Boxing of tuples with generic elements
 // CHECK: define { i8*, %swift.refcounted* } @_TF7closure14captures_tupleU___FT1xTQ_Q0___FT_TQ_Q0__(%swift.opaque* noalias, %swift.opaque* noalias, %swift.type* %T, %swift.type* %U)
-func captures_tuple<T, U>(var `x: (T, U)) -> () -> (T, U) {
+func captures_tuple<T, U>(var #x: (T, U)) -> () -> (T, U) {
   // CHECK: [[METADATA:%.*]] = call %swift.type* @swift_getTupleTypeMetadata2(%swift.type* %T, %swift.type* %U, i8* null, i8** null)
   // CHECK: [[BOX:%.*]] = call { %swift.refcounted*, %swift.opaque* } @swift_allocBox(%swift.type* [[METADATA]])
   // CHECK: [[ADDR:%.*]] = extractvalue { %swift.refcounted*, %swift.opaque* } [[BOX]], 1

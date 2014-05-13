@@ -222,7 +222,7 @@ func autoclosure(#f: @auto_closure () -> Int) { }
 
 // inout
 func inout(#x: Int) { }
-func inout(inout `x: Int) { }
+func inout(inout #x: Int) { }
 
 // optionals
 func optional(#x: Int?) { } // expected-note{{previously declared}}

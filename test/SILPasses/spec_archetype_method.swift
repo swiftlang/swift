@@ -10,7 +10,7 @@ class ABC : pingable {
   func ping() {}
 }
 
-func generic_call<T : pingable>(`x: T) {
+func generic_call<T : pingable>(#x: T) {
   x.ping()
 }
 
@@ -18,7 +18,7 @@ struct A<B> : pingable {
   func ping() {}
 }
 
-func useFoo<T>(`x: T) {
+func useFoo<T>(#x: T) {
   var a = A<T>()
   generic_call(x: a)
 }

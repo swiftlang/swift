@@ -34,7 +34,7 @@ struct AddressOnly {
 // CHECK: }
 
 // CHECK-LABEL:    sil @_TF7unowned5test0FT1cCS_1C_T_ : $@thin (@owned C) -> () {
-func test0(let `c: C) {
+func test0(let #c: C) {
 // CHECK:    bb0(%0 : $C):
 
   var a: A

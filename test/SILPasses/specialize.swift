@@ -7,7 +7,7 @@
 struct XXX<T> {
   init(t : T) {m_t = t}
   mutating
-  func foo(`t : T) -> Int {m_t = t; return 4}
+  func foo(#t : T) -> Int {m_t = t; return 4}
   var m_t : T
 }
 
@@ -35,11 +35,11 @@ func exp2() {
 // CHECK-LABEL: sil @_TF10specialize24specializePartialAppliesFT_VSs5UInt8 : $@thin () -> UInt8 {
 // CHECK: function_ref @_TTSVSs5UInt8___TF10specialize17getGenericClosureU__FT1tQ__FT_Q_
 // CHECK: function_ref @_TTSVSs5UInt8___TF10specialize10useClosureU__FT3funFT_Q__Q_
-func useClosure<T>(`fun : () -> T) -> T {
+func useClosure<T>(#fun : () -> T) -> T {
   return fun()
 }
 
-func getGenericClosure<T>(`t : T) -> (() -> T){
+func getGenericClosure<T>(#t : T) -> (() -> T){
   func tmp() -> T {
     return t
   }

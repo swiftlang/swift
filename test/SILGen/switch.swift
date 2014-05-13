@@ -343,7 +343,7 @@ struct Y : P { func p() {} }
 struct Z : P { func p() {} }
 
 // CHECK-LABEL: sil  @_TF6switch10test_isa_1FT1pPS_1P__T_
-func test_isa_1(`p: P) {
+func test_isa_1(#p: P) {
   switch p {
   // CHECK:   checked_cast_br existential_to_concrete [[P:%.*]] : $*P to $*X, [[IS_X:bb[0-9]+]], [[IS_NOT_X:bb[0-9]+]]
 
@@ -391,7 +391,7 @@ func test_isa_1(`p: P) {
 }
 
 // CHECK-LABEL: sil  @_TF6switch10test_isa_2FT1pPS_1P__T_
-func test_isa_2(`p: P) {
+func test_isa_2(#p: P) {
   switch (p, foo()) {
   // CHECK:   checked_cast_br existential_to_concrete [[P:%.*]] : $*P to $*X, [[IS_X:bb[0-9]+]], [[IS_NOT_X:bb[0-9]+]]
   // CHECK: [[IS_NOT_X]]:
@@ -462,7 +462,7 @@ class D2 : D1 {}
 class E : C {}
 
 // CHECK-LABEL: sil @_TF6switch16test_isa_class_1FT1xCS_1B_T_
-func test_isa_class_1(let `x: B) {
+func test_isa_class_1(let #x: B) {
   // CHECK: strong_retain %0
   switch x {
   // CHECK:   checked_cast_br downcast [[X:%.*]] : $B to $D1, [[IS_D1:bb[0-9]+]], [[IS_NOT_D1:bb[0-9]+]]
@@ -541,7 +541,7 @@ func test_isa_class_1(let `x: B) {
 }
 
 // CHECK-LABEL: sil @_TF6switch16test_isa_class_2FT1xCS_1B_PSs9AnyObject_
-func test_isa_class_2(`x: B) -> AnyObject {
+func test_isa_class_2(#x: B) -> AnyObject {
   // CHECK: strong_retain %0
   switch x {
   // CHECK:   checked_cast_br downcast [[X:%.*]] : $B to $D1, [[IS_D1:bb[0-9]+]], [[IS_NOT_D1:bb[0-9]+]]
@@ -624,7 +624,7 @@ enum MaybePair {
 }
 
 // CHECK-LABEL: sil  @_TF6switch12test_union_1FT1uOS_9MaybePair_T_
-func test_union_1(`u: MaybePair) {
+func test_union_1(#u: MaybePair) {
   switch u {
   // CHECK: switch_enum [[SUBJECT:%.*]] : $MaybePair,
   // CHECK:   case #MaybePair.Neither!enumelt: [[IS_NEITHER:bb[0-9]+]],
@@ -676,7 +676,7 @@ func test_union_1(`u: MaybePair) {
 }
 
 // CHECK-LABEL: sil  @_TF6switch12test_union_2FT1uOS_9MaybePair_T_
-func test_union_2(`u: MaybePair) {
+func test_union_2(#u: MaybePair) {
   switch u {
   // CHECK: switch_enum {{%.*}} : $MaybePair,
   // CHECK:   case #MaybePair.Neither!enumelt: [[IS_NEITHER:bb[0-9]+]],
@@ -719,7 +719,7 @@ func test_union_2(`u: MaybePair) {
 }
 
 // CHECK-LABEL: sil  @_TF6switch12test_union_3FT1uOS_9MaybePair_T_
-func test_union_3(`u: MaybePair) {
+func test_union_3(#u: MaybePair) {
   switch u {
   // CHECK: switch_enum [[SUBJECT:%.*]] : $MaybePair,
   // CHECK:   case #MaybePair.Neither!enumelt: [[IS_NEITHER:bb[0-9]+]],
@@ -770,7 +770,7 @@ func test_union_3(`u: MaybePair) {
 }
 
 // CHECK-LABEL: sil  @_TF6switch12test_union_4FT1uOS_9MaybePair_T_
-func test_union_4(`u: MaybePair) {
+func test_union_4(#u: MaybePair) {
   switch u {
   // CHECK: switch_enum {{%.*}} : $MaybePair,
   // CHECK:   case #MaybePair.Neither!enumelt: [[IS_NEITHER:bb[0-9]+]],
@@ -817,7 +817,7 @@ func test_union_4(`u: MaybePair) {
 }
 
 // CHECK-LABEL: sil  @_TF6switch12test_union_5FT1uOS_9MaybePair_T_
-func test_union_5(`u: MaybePair) {
+func test_union_5(#u: MaybePair) {
   switch u {
   // CHECK: switch_enum {{%.*}} : $MaybePair,
   // CHECK:   case #MaybePair.Neither!enumelt: [[IS_NEITHER:bb[0-9]+]],
@@ -870,7 +870,7 @@ enum MaybeAddressOnlyPair {
   case Both(P, String)
 }
 
-func test_union_addr_only_1(`u: MaybeAddressOnlyPair) {
+func test_union_addr_only_1(#u: MaybeAddressOnlyPair) {
   switch u {
   // CHECK: switch_enum_addr [[ENUM_ADDR:%.*]] : $*MaybeAddressOnlyPair,
   // CHECK:   case #MaybeAddressOnlyPair.Neither!enumelt: [[IS_NEITHER:bb[0-9]+]],
@@ -927,7 +927,7 @@ enum Generic<T, U> {
 }
 
 // Check that switching over a generic instance generates verified SIL.
-func test_union_generic_instance(`u: Generic<Int, String>) {
+func test_union_generic_instance(#u: Generic<Int, String>) {
   switch u {
   case .Foo(var x):
     a()
@@ -940,7 +940,7 @@ func test_union_generic_instance(`u: Generic<Int, String>) {
 enum Foo { case A, B }
 
 // CHECK: sil @_TF6switch22test_switch_two_unionsFT1xOS_3Foo1yS0__T_
-func test_switch_two_unions(`x: Foo, `y: Foo) {
+func test_switch_two_unions(#x: Foo, #y: Foo) {
   // CHECK:   switch_enum {{%.*}} : $Foo, case #Foo.A!enumelt: [[IS_CASE1:bb[0-9]+]], case #Foo.B!enumelt: [[IS_B:bb[0-9]+]]
   switch (x, y) {
   // CHECK: [[IS_CASE1]]:
@@ -975,7 +975,7 @@ struct StructPatternTest {
 }
 
 // CHECK: sil @_TF6switch19test_struct_patternFT1sVS_17StructPatternTest_T_
-func test_struct_pattern(`s: StructPatternTest) {
+func test_struct_pattern(#s: StructPatternTest) {
   switch s {
   // CHECK:   [[X:%.*]] = struct_extract [[S:%.*]] : $StructPatternTest, #StructPatternTest.x
   // CHECK:   [[Y:%.*]] = struct_extract [[S]] : $StructPatternTest, #StructPatternTest.y
@@ -1028,7 +1028,7 @@ struct StructPatternTestAO {
 func ~=(a: P, b: P) -> Bool { return true }
 
 // CHECK: sil @_TF6switch22test_struct_pattern_aoFT1sVS_19StructPatternTestAO1pPS_1P__T_
-func test_struct_pattern_ao(`s: StructPatternTestAO, `p: P) {
+func test_struct_pattern_ao(#s: StructPatternTestAO, #p: P) {
   switch s {
   // CHECK:   [[XA:%.*]] = struct_element_addr [[S:%.*]] : $*StructPatternTestAO, #StructPatternTestAO.x
   // CHECK:   [[X:%.*]] = load [[XA]]
@@ -1084,7 +1084,7 @@ class ClassPatternTest {
 
 // CHECK-LABEL: sil @_TF6switch18test_class_patternFT1kCS_16ClassPatternTest_T_
 // CHECK-NEXT: bb0([[C:%.*]] : $ClassPatternTest):
-func test_class_pattern(`k: ClassPatternTest) {
+func test_class_pattern(#k: ClassPatternTest) {
   switch k {
   // CHECK: [[XM:%.*]] = class_method %0 : $ClassPatternTest, #ClassPatternTest.x!getter.1
   // CHECK: [[X:%.*]]= apply [[XM:%.*]](%0)
@@ -1137,7 +1137,7 @@ class SubclassTestB : ClassPatternTest {}
 // CHECK-LABEL: sil @{{.*}}test_class_pattern_with_isa_1
 // CHECK-NEXT: bb0([[C:%.*]] : $ClassPatternTest):
 
-func test_class_pattern_with_isa_1(`k: ClassPatternTest) {
+func test_class_pattern_with_isa_1(#k: ClassPatternTest) {
   switch k {
   // CHECK: [[XM:%.*]] = class_method %0 : $ClassPatternTest, #ClassPatternTest.x!getter.1
   // CHECK: [[X:%.*]]= apply [[XM:%.*]](%0)
@@ -1213,7 +1213,7 @@ func test_class_pattern_with_isa_1(`k: ClassPatternTest) {
   e()
 }
 
-func test_class_pattern_with_isa_2(`k: ClassPatternTest) {
+func test_class_pattern_with_isa_2(#k: ClassPatternTest) {
   switch k {
   case is SubclassTestA:
     a()
@@ -1228,7 +1228,7 @@ func test_class_pattern_with_isa_2(`k: ClassPatternTest) {
 }
 
 // <rdar://problem/14826416>
-func rdar14826416<T, U>(`t: T, `u: U) {
+func rdar14826416<T, U>(#t: T, #u: U) {
   switch t {
   case is Int: println("Int")
   case is U: println("U")
@@ -1245,7 +1245,7 @@ class Rdar14835992 {}
 class SubRdar14835992 : Rdar14835992 {}
 
 // CHECK-LABEL: sil @_TF6switch12rdar14835992U___FT1tCS_12Rdar148359922ttQ_2uuQ0__T_
-func rdar14835992<T, U>(`t: Rdar14835992, `tt: T, `uu: U) {
+func rdar14835992<T, U>(#t: Rdar14835992, #tt: T, #uu: U) {
   switch t {
   case is SubRdar14835992: println("Sub")
   case is T: println("T")
@@ -1262,7 +1262,7 @@ struct StructWithComputedProperty {
 // rdar://15859432
 // CHECK-LABEL: sil @{{.*}}StructWithComputedProperty
 // CHECK: function_ref{{.*}}StructWithComputedProperty.foo.getter
-func testStructWithComputedProperty(`s : StructWithComputedProperty) {
+func testStructWithComputedProperty(#s : StructWithComputedProperty) {
   switch s {
   case let StructWithComputedProperty(foo: a):
     println(a)

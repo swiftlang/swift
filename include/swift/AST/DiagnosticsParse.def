@@ -598,6 +598,8 @@ ERROR(parameter_backtick_missing_name,decl_parsing,PointsToFirstBadToken,
       "expected parameter name after '#'", ())
 ERROR(parameter_backtick_empty_name,decl_parsing,none,
       "expected non-empty parameter name after '#'", ())
+ERROR(parameter_backtick_to_pound,decl_parsing,none,
+      "the back-tick ('`') has been replaced by '#'", ())
 WARNING(parameter_backtick_two_names,decl_parsing,none,
       "extraneous '#' in parameter; keyword argument and parameter name "
       "already specified separately", ())

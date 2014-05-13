@@ -1,4 +1,4 @@
-@transparent func testTransparent(`x: Bool) -> Bool {
+@transparent func testTransparent(#x: Bool) -> Bool {
   return x
 }
 
@@ -8,13 +8,13 @@
   return y
 }
 
-@transparent func standalone_function(`x: Int, `y: Int) -> Int {
+@transparent func standalone_function(#x: Int, #y: Int) -> Int {
   return x
 }
-@transparent func curried_function(`x: Int)(y: Int) -> Int {
+@transparent func curried_function(#x: Int)(y: Int) -> Int {
   return standalone_function(x: x, y: y)
 }
-@transparent func calls(`i: Int, `j: Int) {
+@transparent func calls(#i: Int, #j: Int) {
   var f1 = curried_function(x: i)
   f1(y: j);
 }
@@ -43,7 +43,7 @@ enum MaybePair {
   case Right(String)
   case Both(Int, String)
 }
-func do_switch(`u: MaybePair) {
+func do_switch(#u: MaybePair) {
   switch u {
   case .Neither:
     a()
@@ -91,7 +91,7 @@ protocol P {
 }
 
 @transparent 
-func open_existentials(`p: P, `cp: CP) {
+func open_existentials(#p: P, #cp: CP) {
   p.f()
   cp.f()
 }

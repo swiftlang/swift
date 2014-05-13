@@ -65,3 +65,8 @@ struct Subscripts2 {
     get { return j }
   }
 }
+
+
+// FIXME: Test for transition from back-tick syntax.
+func backtick(`a: Int) { } // expected-error{{the back-tick ('`') has been replaced by '#'}}{{15-16=#}}
+

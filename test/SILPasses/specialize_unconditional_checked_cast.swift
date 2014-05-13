@@ -19,7 +19,7 @@ var o : AnyObject = c
 // Archetype To Archetype //
 ////////////////////////////
 
-func ArchetypeToArchetype<T1, T2>(`t: T1, `t2: T2) -> T2 {
+func ArchetypeToArchetype<T1, T2>(#t: T1, #t2: T2) -> T2 {
   return (t as T2)!
 }
 
@@ -87,16 +87,16 @@ ArchetypeToArchetype(t: b, t2: f)
 // Archetype To Concrete //
 ///////////////////////////
 
-func ArchetypeToConcreteConvertUInt8<T>(`t: T) -> UInt8 {
+func ArchetypeToConcreteConvertUInt8<T>(#t: T) -> UInt8 {
   return (t as UInt8)!
 }
-func ArchetypeToConcreteConvertC<T>(`t: T) -> C {
+func ArchetypeToConcreteConvertC<T>(#t: T) -> C {
   return (t as C)!
 }
-func ArchetypeToConcreteConvertD<T>(`t: T) -> D {
+func ArchetypeToConcreteConvertD<T>(#t: T) -> D {
   return (t as D)!
 }
-func ArchetypeToConcreteConvertE<T>(`t: T) -> E {
+func ArchetypeToConcreteConvertE<T>(#t: T) -> E {
   return (t as E)!
 }
 
@@ -175,13 +175,13 @@ ArchetypeToConcreteConvertD(t: c)
 // Concrete to Archetype //
 ///////////////////////////
 
-func ConcreteToArchetypeConvertUInt8<T>(`t: UInt8, `t2: T) -> T {
+func ConcreteToArchetypeConvertUInt8<T>(#t: UInt8, #t2: T) -> T {
   return (t as T)!
 }
-func ConcreteToArchetypeConvertC<T>(`t: C, `t2: T) -> T {
+func ConcreteToArchetypeConvertC<T>(#t: C, #t2: T) -> T {
   return (t as T)!
 }
-func ConcreteToArchetypeConvertD<T>(`t: D, `t2: T) -> T {
+func ConcreteToArchetypeConvertD<T>(#t: D, #t2: T) -> T {
   return (t as T)!
 }
 
@@ -261,11 +261,11 @@ ConcreteToArchetypeConvertD(t: d, t2: c)
 // Super To Archetype //
 ////////////////////////
 
-func SuperToArchetypeC<T>(`c : C, `t : T) -> T {
+func SuperToArchetypeC<T>(#c : C, #t : T) -> T {
   return (c as T)!
 }
 
-func SuperToArchetypeD<T>(`d : D, `t : T) -> T {
+func SuperToArchetypeD<T>(#d : D, #t : T) -> T {
   return (d as T)!
 }
 
@@ -304,7 +304,7 @@ SuperToArchetypeD(d: d, t: c)
 // Existential To Archetype //
 //////////////////////////////
 
-func ExistentialToArchetype<T>(`o : AnyObject, `t : T) -> T {
+func ExistentialToArchetype<T>(#o : AnyObject, #t : T) -> T {
   return (o as T)!
 }
 

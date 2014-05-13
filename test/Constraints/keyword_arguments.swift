@@ -247,7 +247,7 @@ trailingclosure1(x: 1, { return 5 })
 func trailingclosure2(#x: Int, #f: (() -> Int)!...) {}
 trailingclosure2(x: 5) { return 5 }
 
-func trailingclosure3(#x: Int, var `f: (() -> Int)!) {}
+func trailingclosure3(#x: Int, var #f: (() -> Int)!) {}
 trailingclosure3(x: 5) { return 5 }
 
 func trailingclosure4(#f: () -> Int) {}

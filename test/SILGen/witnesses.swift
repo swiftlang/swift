@@ -2,7 +2,7 @@
 
 operator infix <~> {}
 
-func archetype_method<T: X>(var `x: T, var `y: T) -> T {
+func archetype_method<T: X>(var #x: T, var #y: T) -> T {
   return x.selfTypes(x: y)
 }
 // CHECK-LABEL: sil @_TF9witnesses16archetype_methodUS_1X__FT1xQ_1yQ__Q_ : $@thin <T where T : X> (@out T, @in T, @in T) -> () {
@@ -10,7 +10,7 @@ func archetype_method<T: X>(var `x: T, var `y: T) -> T {
 // CHECK:         apply [[METHOD]]<T>({{%.*}}, {{%.*}}, {{%.*}}) : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : X> (@out τ_0_0, @in τ_0_0, @inout τ_0_0) -> ()
 // CHECK:       }
 
-func archetype_generic_method<T: X>(var `x: T, `y: Loadable) -> Loadable {
+func archetype_generic_method<T: X>(var #x: T, #y: Loadable) -> Loadable {
   return x.generic(x: y)
 }
 // CHECK-LABEL: sil @_TF9witnesses24archetype_generic_methodUS_1X__FT1xQ_1yVS_8Loadable_S1_ : $@thin <T where T : X> (@in T, Loadable) -> Loadable {
@@ -20,14 +20,14 @@ func archetype_generic_method<T: X>(var `x: T, `y: Loadable) -> Loadable {
 
 // CHECK-LABEL: sil @_TF9witnesses32archetype_associated_type_methodUS_13WithAssocType_U__FT1xQ_1yQQ_9AssocType_Q_ : $@thin <T where T : WithAssocType> (@out T, @in T, @in T.AssocType) -> ()
 // CHECK:         apply %{{[0-9]+}}<T, T.AssocType>
-func archetype_associated_type_method<T: WithAssocType>(`x: T, `y: T.AssocType) -> T {
+func archetype_associated_type_method<T: WithAssocType>(#x: T, #y: T.AssocType) -> T {
   return x.useAssocType(x: y)
 }
 
 protocol StaticMethod { class func staticMethod() }
 
 // CHECK-LABEL: sil @_TF9witnesses23archetype_static_methodUS_12StaticMethod__FT1xQ__T_ : $@thin <T where T : StaticMethod> (@in T) -> ()
-func archetype_static_method<T: StaticMethod>(`x: T) {
+func archetype_static_method<T: StaticMethod>(#x: T) {
   // CHECK: [[METHOD:%.*]] = witness_method $T, #StaticMethod.staticMethod!1 : $@cc(witness_method) @thin <τ_0_0 where τ_0_0 : StaticMethod> (@thick τ_0_0.Type) -> ()
   // CHECK: apply [[METHOD]]<T>
   T.staticMethod()
@@ -38,7 +38,7 @@ protocol Existentiable {
   func generic<T>() -> T
 }
 
-func protocol_method(`x: Existentiable) -> Loadable {
+func protocol_method(#x: Existentiable) -> Loadable {
   return x.foo()
 }
 // CHECK-LABEL: sil @_TF9witnesses15protocol_methodFT1xPS_13Existentiable__VS_8Loadable : $@thin (@in Existentiable) -> Loadable {
@@ -46,7 +46,7 @@ func protocol_method(`x: Existentiable) -> Loadable {
 // CHECK:         apply [[METHOD]]({{%.*}}) : $@cc(witness_method) @callee_owned (@inout Self) -> Loadable
 // CHECK:       }
 
-func protocol_generic_method(`x: Existentiable) -> Loadable {
+func protocol_generic_method(#x: Existentiable) -> Loadable {
   return x.generic()
 }
 // CHECK-LABEL: sil @_TF9witnesses23protocol_generic_methodFT1xPS_13Existentiable__VS_8Loadable : $@thin (@in Existentiable) -> Loadable {
@@ -60,7 +60,7 @@ func protocol_generic_method(`x: Existentiable) -> Loadable {
 
 // CHECK-LABEL: sil @_TF9witnesses20protocol_objc_methodFT1xPS_8ObjCAble__T_ : $@thin (@owned ObjCAble) -> ()
 // CHECK:         protocol_method [volatile] %{{[0-9]+}} : $ObjCAble, #ObjCAble.foo!1.foreign : <`Self` : ObjCAble> Self -> () -> (), $@cc(objc_method) @thin (Self) -> ()
-func protocol_objc_method(`x: ObjCAble) {
+func protocol_objc_method(#x: ObjCAble) {
   x.foo()
 }
 
@@ -70,31 +70,31 @@ protocol AddrOnly {}
 
 protocol X {
   mutating
-  func selfTypes(`x: Self) -> Self
+  func selfTypes(#x: Self) -> Self
   mutating
-  func loadable(`x: Loadable) -> Loadable
+  func loadable(#x: Loadable) -> Loadable
   mutating
-  func addrOnly(`x: AddrOnly) -> AddrOnly
+  func addrOnly(#x: AddrOnly) -> AddrOnly
   mutating
-  func generic<A>(`x: A) -> A
+  func generic<A>(#x: A) -> A
   mutating
-  func classes<A2: Classes>(`x: A2) -> A2
+  func classes<A2: Classes>(#x: A2) -> A2
   func <~>(x: Self, y: Self) -> Self
 }
 protocol Y {}
 
 protocol WithAssocType {
   typealias AssocType
-  func useAssocType(`x: AssocType) -> Self
+  func useAssocType(#x: AssocType) -> Self
 }
 
 @class_protocol protocol ClassBounded {
-  func selfTypes(`x: Self) -> Self
+  func selfTypes(#x: Self) -> Self
 }
 
 struct ConformingStruct : X {
   mutating
-  func selfTypes(`x: ConformingStruct) -> ConformingStruct { return x }
+  func selfTypes(#x: ConformingStruct) -> ConformingStruct { return x }
   // CHECK-LABEL: sil @_TTWV9witnesses16ConformingStructS_1XFS1_9selfTypesUS1___fRQPS1_FT1xS2__S2_ : $@cc(witness_method) @thin (@out ConformingStruct, @in ConformingStruct, @inout ConformingStruct) -> () {
   // CHECK-NEXT:  bb0(%0 : $*ConformingStruct, %1 : $*ConformingStruct, %2 : $*ConformingStruct):
   // CHECK-NEXT:    %3 = load %1 : $*ConformingStruct
@@ -107,7 +107,7 @@ struct ConformingStruct : X {
   // CHECK-NEXT:  }
   
   mutating
-  func loadable(`x: Loadable) -> Loadable { return x }
+  func loadable(#x: Loadable) -> Loadable { return x }
   // CHECK-LABEL: sil @_TTWV9witnesses16ConformingStructS_1XFS1_8loadableUS1___fRQPS1_FT1xVS_8Loadable_S3_ : $@cc(witness_method) @thin (Loadable, @inout ConformingStruct) -> Loadable {
   // CHECK-NEXT:  bb0(%0 : $Loadable, %1 : $*ConformingStruct):
   // CHECK-NEXT:    // function_ref
@@ -117,7 +117,7 @@ struct ConformingStruct : X {
   // CHECK-NEXT:  }
   
   mutating
-  func addrOnly(`x: AddrOnly) -> AddrOnly { return x }
+  func addrOnly(#x: AddrOnly) -> AddrOnly { return x }
   // CHECK-LABEL: sil @_TTWV9witnesses16ConformingStructS_1XFS1_8addrOnlyUS1___fRQPS1_FT1xPS_8AddrOnly__PS3__ : $@cc(witness_method) @thin (@out AddrOnly, @in AddrOnly, @inout ConformingStruct) -> () {
   // CHECK-NEXT:  bb0(%0 : $*AddrOnly, %1 : $*AddrOnly, %2 : $*ConformingStruct):
   // CHECK-NEXT:    // function_ref
@@ -127,7 +127,7 @@ struct ConformingStruct : X {
   // CHECK-NEXT:  }
   
   mutating
-  func generic<C>(`x: C) -> C { return x }
+  func generic<C>(#x: C) -> C { return x }
   // CHECK-LABEL: sil @_TTWV9witnesses16ConformingStructS_1XFS1_7genericUS1___fRQPS1_U__FT1xQ__Q_ : $@cc(witness_method) @thin <A> (@out A, @in A, @inout ConformingStruct) -> () {
   // CHECK-NEXT:  bb0(%0 : $*A, %1 : $*A, %2 : $*ConformingStruct):
   // CHECK-NEXT:    // function_ref
@@ -136,7 +136,7 @@ struct ConformingStruct : X {
   // CHECK-NEXT:    return %4 : $()
   // CHECK-NEXT:  }
   mutating
-  func classes<C2: Classes>(`x: C2) -> C2 { return x }
+  func classes<C2: Classes>(#x: C2) -> C2 { return x }
   // CHECK-LABEL: sil @_TTWV9witnesses16ConformingStructS_1XFS1_7classesUS1___fRQPS1_US_7Classes__FT1xQ__Q_ : $@cc(witness_method) @thin <A2 where A2 : Classes> (@owned A2, @inout ConformingStruct) -> @owned A2 {
   // CHECK-NEXT:  bb0(%0 : $A2, %1 : $*ConformingStruct):
   // CHECK-NEXT:    // function_ref
@@ -159,7 +159,7 @@ func <~>(x: ConformingStruct, y: ConformingStruct) -> ConformingStruct { return 
 // CHECK-NEXT:  }
 
 class ConformingClass : X {
-  func selfTypes(`x: ConformingClass) -> ConformingClass { return x }
+  func selfTypes(#x: ConformingClass) -> ConformingClass { return x }
   // CHECK-LABEL: sil @_TTWC9witnesses15ConformingClassS_1XFS1_9selfTypesUS1___fRQPS1_FT1xS2__S2_ : $@cc(witness_method) @thin (@out ConformingClass, @in ConformingClass, @inout ConformingClass) -> () {
   // CHECK-NEXT:  bb0(%0 : $*ConformingClass, %1 : $*ConformingClass, %2 : $*ConformingClass):
   // -- load and retain 'self' from inout witness 'self' parameter
@@ -172,10 +172,10 @@ class ConformingClass : X {
   // CHECK-NEXT:    %9 = tuple ()
   // CHECK-NEXT:    return %9 : $()
   // CHECK-NEXT:  }
-  func loadable(`x: Loadable) -> Loadable { return x }
-  func addrOnly(`x: AddrOnly) -> AddrOnly { return x }
-  func generic<D>(`x: D) -> D { return x }
-  func classes<D2: Classes>(`x: D2) -> D2 { return x }
+  func loadable(#x: Loadable) -> Loadable { return x }
+  func addrOnly(#x: AddrOnly) -> AddrOnly { return x }
+  func generic<D>(#x: D) -> D { return x }
+  func classes<D2: Classes>(#x: D2) -> D2 { return x }
 }
 func <~>(x: ConformingClass, y: ConformingClass) -> ConformingClass { return x }
 
@@ -191,7 +191,7 @@ struct ConformingAOStruct : X {
   var makeMeAO : AddrOnly
 
   mutating
-  func selfTypes(`x: ConformingAOStruct) -> ConformingAOStruct { return x }
+  func selfTypes(#x: ConformingAOStruct) -> ConformingAOStruct { return x }
   // CHECK-LABEL: sil @_TTWV9witnesses18ConformingAOStructS_1XFS1_9selfTypesUS1___fRQPS1_FT1xS2__S2_ : $@cc(witness_method) @thin (@out ConformingAOStruct, @in ConformingAOStruct, @inout ConformingAOStruct) -> () {
   // CHECK-NEXT:  bb0(%0 : $*ConformingAOStruct, %1 : $*ConformingAOStruct, %2 : $*ConformingAOStruct):
   // CHECK-NEXT:    // function_ref
@@ -199,10 +199,10 @@ struct ConformingAOStruct : X {
   // CHECK-NEXT:    %4 = apply %3(%0, %1, %2) : $@cc(method) @thin (@out ConformingAOStruct, @in ConformingAOStruct, @inout ConformingAOStruct) -> ()
   // CHECK-NEXT:    return %4 : $()
   // CHECK-NEXT:  }
-  func loadable(`x: Loadable) -> Loadable { return x }
-  func addrOnly(`x: AddrOnly) -> AddrOnly { return x }
-  func generic<D>(`x: D) -> D { return x }
-  func classes<D2: Classes>(`x: D2) -> D2 { return x }
+  func loadable(#x: Loadable) -> Loadable { return x }
+  func addrOnly(#x: AddrOnly) -> AddrOnly { return x }
+  func generic<D>(#x: D) -> D { return x }
+  func classes<D2: Classes>(#x: D2) -> D2 { return x }
 }
 func <~>(x: ConformingAOStruct, y: ConformingAOStruct) -> ConformingAOStruct { return x }
 
@@ -212,7 +212,7 @@ func <~>(x: ConformingAOStruct, y: ConformingAOStruct) -> ConformingAOStruct { r
 
 struct ConformsWithMoreGeneric : X, Y {
   mutating
-  func selfTypes<E>(`x: E) -> E { return x }
+  func selfTypes<E>(#x: E) -> E { return x }
   // CHECK-LABEL: sil @_TTWV9witnesses23ConformsWithMoreGenericS_1XFS1_9selfTypesUS1___fRQPS1_FT1xS2__S2_ : $@cc(witness_method) @thin (@out ConformsWithMoreGeneric, @in ConformsWithMoreGeneric, @inout ConformsWithMoreGeneric) -> () {
   // CHECK-NEXT:  bb0(%0 : $*ConformsWithMoreGeneric, %1 : $*ConformsWithMoreGeneric, %2 : $*ConformsWithMoreGeneric):
   // CHECK-NEXT:    %3 = load %1 : $*ConformsWithMoreGeneric
@@ -229,9 +229,9 @@ struct ConformsWithMoreGeneric : X, Y {
   // CHECK-NEXT:    dealloc_stack %4#0 : $*@local_storage ConformsWithMoreGeneric
   // CHECK-NEXT:    return %11 : $()
   // CHECK-NEXT:  }
-  func loadable<F>(`x: F) -> F { return x }
+  func loadable<F>(#x: F) -> F { return x }
   mutating
-  func addrOnly<G>(`x: G) -> G { return x }
+  func addrOnly<G>(#x: G) -> G { return x }
   // CHECK-LABEL: sil @_TTWV9witnesses23ConformsWithMoreGenericS_1XFS1_8addrOnlyUS1___fRQPS1_FT1xPS_8AddrOnly__PS3__ : $@cc(witness_method) @thin (@out AddrOnly, @in AddrOnly, @inout ConformsWithMoreGeneric) -> () {
   // CHECK-NEXT:  bb0(%0 : $*AddrOnly, %1 : $*AddrOnly, %2 : $*ConformsWithMoreGeneric):
   // CHECK-NEXT:    // function_ref
@@ -241,7 +241,7 @@ struct ConformsWithMoreGeneric : X, Y {
   // CHECK-NEXT:  }
 
   mutating
-  func generic<H>(`x: H) -> H { return x }
+  func generic<H>(#x: H) -> H { return x }
   // CHECK-LABEL: sil @_TTWV9witnesses23ConformsWithMoreGenericS_1XFS1_7genericUS1___fRQPS1_U__FT1xQ__Q_ : $@cc(witness_method) @thin <A> (@out A, @in A, @inout ConformsWithMoreGeneric) -> () {
   // CHECK-NEXT:  bb0(%0 : $*A, %1 : $*A, %2 : $*ConformsWithMoreGeneric):
   // CHECK-NEXT:    // function_ref
@@ -251,7 +251,7 @@ struct ConformsWithMoreGeneric : X, Y {
   // CHECK-NEXT:  }
 
   mutating
-  func classes<I>(`x: I) -> I { return x }
+  func classes<I>(#x: I) -> I { return x }
   // CHECK-LABEL: sil @_TTWV9witnesses23ConformsWithMoreGenericS_1XFS1_7classesUS1___fRQPS1_US_7Classes__FT1xQ__Q_ : $@cc(witness_method) @thin <A2 where A2 : Classes> (@owned A2, @inout ConformsWithMoreGeneric) -> @owned A2 {
   // CHECK-NEXT:  bb0(%0 : $A2, %1 : $*ConformsWithMoreGeneric):
   // CHECK-NEXT:    %2 = alloc_stack $A2
@@ -289,7 +289,7 @@ func <~> <J: Y, K: Y>(x: J, y: K) -> K { return y }
 // CHECK-NEXT:  }
 
 protocol LabeledRequirement {
-  func method(`x: Loadable)
+  func method(#x: Loadable)
 }
 
 struct UnlabeledWitness : LabeledRequirement {
@@ -298,7 +298,7 @@ struct UnlabeledWitness : LabeledRequirement {
 }
 
 protocol LabeledSelfRequirement {
-  func method(`x: Self)
+  func method(#x: Self)
 }
 
 struct UnlabeledSelfWitness : LabeledSelfRequirement {
@@ -312,7 +312,7 @@ protocol UnlabeledRequirement {
 
 struct LabeledWitness : UnlabeledRequirement {
   // CHECK-LABEL: sil @_TTWV9witnesses14LabeledWitnessS_20UnlabeledRequirementFS1_6methodUS1___fRQPS1_FT1xVS_8Loadable_T_ : $@cc(witness_method) @thin (Loadable, @inout LabeledWitness) -> ()
-  func method(`x: Loadable) {}
+  func method(#x: Loadable) {}
 }
 
 protocol UnlabeledSelfRequirement {

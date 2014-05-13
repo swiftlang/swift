@@ -20,7 +20,7 @@
 // CHECK: [[LEN:%[0-9]+]] = integer_literal $Builtin.Word, 5
 // CHECK: [[RESULT:%[0-9]+]] = apply [[CVT]]([[LIT]], [[LEN]], [[STRING]]) : $@thin
 // CHECK: return [[RESULT]] : $String
-func defarg1(i: Int = 17, `d: Double, s: String = "Hello") { }
+func defarg1(i: Int = 17, #d: Double, s: String = "Hello") { }
 
 // CHECK-LABEL: sil  @_TF17default_arguments15testDefaultArg1FT_T_
 func testDefaultArg1() {

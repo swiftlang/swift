@@ -1,6 +1,6 @@
 // RUN: %swift -emit-silgen %s | FileCheck %s
 
-func foo(var `f: (()->())!) {
+func foo(var #f: (()->())!) {
   f?()
 }
 // CHECK:    sil @{{.*}}foo{{.*}} : $@thin (@owned ImplicitlyUnwrappedOptional<() -> ()>) -> () {
@@ -58,17 +58,17 @@ func foo(var `f: (()->())!) {
 // CHECK-NEXT: br bb4
 //   The rest of this is tested in optional.swift
 
-func wrap<T>(`x: T) -> T! { return x }
+func wrap<T>(#x: T) -> T! { return x }
 
 // CHECK: sil @_TF29implicitly_unwrapped_optional16wrap_then_unwrapU__FT1xQ__Q_
-func wrap_then_unwrap<T>(`x: T) -> T {
+func wrap_then_unwrap<T>(#x: T) -> T {
   // CHECK: [[FORCE:%.*]] = function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueU__FGSQQ__Q_
   // CHECK: apply [transparent] [[FORCE]]<{{.*}}>(%0, {{%.*}})
   return wrap(x: x)!
 }
 
 // CHECK: sil @_TF29implicitly_unwrapped_optional10tuple_bindFT1xGSQTSiSS___GSqSS_ : $@thin (@owned ImplicitlyUnwrappedOptional<(Int, String)>) -> @owned Optional<String> {
-func tuple_bind(`x: (Int, String)!) -> String? {
+func tuple_bind(#x: (Int, String)!) -> String? {
   return x?.1
   // CHECK:   cond_br {{%.*}}, [[NONNULL:bb[0-9]+]], [[NULL:bb[0-9]+]]
   // CHECK: [[NONNULL]]:
@@ -76,7 +76,7 @@ func tuple_bind(`x: (Int, String)!) -> String? {
   // CHECK-NOT: release_value [[STRING]]
 }
 
-func tuple_bind_implicitly_unwrapped(`x: (Int, String)!) -> String {
+func tuple_bind_implicitly_unwrapped(#x: (Int, String)!) -> String {
   return x.1
 }
 

@@ -173,8 +173,11 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
     }
 
     // '`'?
+    // FIXME: Accepting temporarily.
     if (Tok.is(tok::backtick)) {
       param.BackTickLoc = consumeToken(tok::backtick);
+      diagnose(param.BackTickLoc, diag::parameter_backtick_to_pound)
+        .fixItReplace(param.BackTickLoc, "#");
     }
 
     // '#'?

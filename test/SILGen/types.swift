@@ -5,7 +5,7 @@ class C {
 
   // Methods have method calling convention.
   // CHECK-LABEL: sil  @{{.*}}C3foo{{.*}} : $@cc(method) @thin (Int, @owned C) -> ()
-  func foo(`x: Int) {
+  func foo(#x: Int) {
     // CHECK: bb0([[X:%[0-9]+]] : $Int, [[THIS:%[0-9]+]] : $C):
     member = x
 
@@ -23,7 +23,7 @@ struct S {
 
   // CHECK-LABEL: sil  @{{.*}}foo{{.*}} : $@cc(method) @thin (Int, @inout S) -> ()
   mutating
-  func foo(var `x: Int) {
+  func foo(var #x: Int) {
     // CHECK: bb0([[X:%[0-9]+]] : $Int, [[THIS:%[0-9]+]] : $*S):
     member = x
     // CHECK: [[XADDR:%[0-9]+]] = alloc_box $Int
@@ -45,7 +45,7 @@ func f() {
   }
 }
 
-func g(`b : Bool) {
+func g(#b : Bool) {
   if (b) {
     class FC {
       // CHECK-LABEL: sil shared @_TFCF5types1gFT1bSb_T_L_2FC3zimfS0_FT_T_

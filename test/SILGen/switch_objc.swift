@@ -4,7 +4,7 @@
 import Foundation
 
 // CHECK-LABEL: sil @_TF11switch_objc13matchesEitherFT5inputCSo4Hive1aS0_1bS0__Sb :
-func matchesEither(`input: Hive, `a: Hive, `b: Hive) -> Bool {
+func matchesEither(#input: Hive, #a: Hive, #b: Hive) -> Bool {
   switch input {
   // CHECK:   function_ref @_TF10ObjectiveCoi2teFTCSo8NSObjectS0__Sb
   // CHECK:   cond_br {{%.*}}, [[YES_CASE1:bb[0-9]+]], [[NOT_CASE1:bb[0-9]+]]
