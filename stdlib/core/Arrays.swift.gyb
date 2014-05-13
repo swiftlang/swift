@@ -236,6 +236,23 @@ extension ${Self} : Reflectable {
   }
 }
 
+extension ${Self} : Printable {
+  var description: String {
+    var result = "["
+    var first = true
+    for item in self {
+      if first {
+        first = false
+      } else {
+        result += ", "
+      }
+      print(item, &result)
+    }
+    result += "]"
+    return result
+  }
+}
+
 extension ${Self} {
   @transparent
   func _cPointerArgs() -> (AnyObject?, Builtin.RawPointer) {

@@ -181,15 +181,6 @@ extension String {
   func isSpace() -> Bool { return _isAll({ $0.isSpace() }) }
 }
 
-extension String : FormattedPrintable {
-  func format(kind: UnicodeScalar, layout: String) -> String {
-    var toPrint = self
-    if kind == "u" { toPrint = uppercase }
-    else if kind == "l" { toPrint = lowercase }
-    return Format(layout).printToString(toPrint)
-  }
-}
-
 /// \brief Represent a positive integer value in the given radix,
 /// writing each ASCII character into stream.  The value of `ten'
 /// should be either "A" or "a", depending on whether you want upper-
@@ -288,16 +279,9 @@ extension String {
   }
 
   init(_ v : Double) {
-    var cCharBuf = UInt8[](count: 256, value: 0)
-    var n = Int(c_print_double(cCharBuf.elementStorage.value, v))
-    var buffer = _StringBuffer(capacity: n, initialSize: n, elementWidth: 1)
-    var p = UnsafePointer<UTF8.CodeUnit>(buffer.start)
-    for i in 0...n {
-      p++.set(cCharBuf[i])
-    }
-    self = String(buffer)
+    self = _doubleToString(v)
   }
-  
+
   init(_ v : Float) {
     self = String(Double(v))
   }

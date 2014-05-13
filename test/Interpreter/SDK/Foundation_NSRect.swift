@@ -21,10 +21,10 @@ func printRect(r: NSRect) {
 
 var r = NSRect(x: 0, y: 0, width: 100, height: 50)
 
-// CHECK: NSRect(20.0, 10.0, 60.0, 30.0)
+// CHECK: NSRect(20, 10, 60, 30)
 printRect(NSInsetRect(r, 20, 10))
 
-// CHECK: NSRect(100.0, 100.0, 50.0, 50.0)
+// CHECK: NSRect(100, 100, 50, 50)
 printRect(NSMakeRect(100,100,50,50))
 
 // CHECK: {0, 0}, {100, 50}

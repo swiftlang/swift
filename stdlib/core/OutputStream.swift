@@ -9,466 +9,325 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// OutputStream and Formatting logic
-//===----------------------------------------------------------------------===//
-
-extension Bool : FormattedPrintable {
-  func format(kind: UnicodeScalar, layout: String) -> String {
-    securityCheck(kind == "v")
-    return Format(layout).printToString(String(self))
-  }
-}
-
-extension Int8 : FormattedPrintable {
-  func format(kind: UnicodeScalar, layout: String) -> String {
-    return IntMax(self).format(kind, layout: layout)
-  }
-}
-
-extension UInt8 : FormattedPrintable {
-  func format(kind: UnicodeScalar, layout: String) -> String {
-    return UIntMax(self).format(kind, layout: layout)
-  }
-}
-
-extension Int16 : FormattedPrintable {
-  func format(kind: UnicodeScalar, layout: String) -> String {
-    return IntMax(self).format(kind, layout: layout)
-  }
-}
-
-extension UInt16 : FormattedPrintable {
-  func format(kind: UnicodeScalar, layout: String) -> String {
-    return UIntMax(self).format(kind, layout: layout)
-  }
-}
-
-extension Int32 : FormattedPrintable {
-  func format(kind: UnicodeScalar, layout: String) -> String {
-    return IntMax(self).format(kind, layout: layout)
-  }
-}
-
-extension UInt32 : FormattedPrintable {
-  func format(kind: UnicodeScalar, layout: String) -> String {
-    return UIntMax(self).format(kind, layout: layout)
-  }
-}
-
-extension Int : FormattedPrintable {
-  func format(kind: UnicodeScalar, layout: String) -> String {
-    return IntMax(self).format(kind, layout: layout)
-  }
-}
-
-extension UInt : FormattedPrintable {
-  func format(kind: UnicodeScalar, layout: String) -> String {
-    return UIntMax(self).format(kind, layout: layout)
-  }
-}
-
-extension IntMax : FormattedPrintable {
-  func format(kind: UnicodeScalar, layout: String) -> String {
-    var radix = 10
-    var uppercase = false
-    if kind == "X" { uppercase = true; radix = 16 }
-    else if kind == "x" { radix = 16 }
-    else if kind == "o" { radix = 8 }
-    else if kind != "v" { fatal("Invalid format chacacter") }
-    return Format(layout).printToString(
-      String(self, radix : radix, uppercase : uppercase))
-  }
-}
-
-extension UIntMax : FormattedPrintable {
-  func format(kind: UnicodeScalar, layout: String) -> String {
-    var radix = 10
-    var uppercase = false
-    if kind == "X" { uppercase = true; radix = 16 }
-    else if kind == "x" { radix = 16 }
-    else if kind == "o" { radix = 8 }
-    else if kind != "v" { fatal("Invalid format chacacter") }
-    return Format(layout).printToString(
-      String(self, radix : radix, uppercase : uppercase))
-  }
-}
-
-extension Float : FormattedPrintable {
-  func format(kind: UnicodeScalar, layout: String) -> String {
-    securityCheck(kind == "v")
-    return Format(layout).printToString(String(self))
-  }
-}
-
-extension Double : FormattedPrintable {
-  func format(kind: UnicodeScalar, layout: String) -> String {
-    securityCheck(kind == "v")
-    return Format(layout).printToString(String(self))
-  }
-}
 
 //===----------------------------------------------------------------------===//
-// Formatted Printing
+// Input/Output interfaces
 //===----------------------------------------------------------------------===//
 
-struct Format : ReplPrintable {
-  var width : Int
-  var isValid : Bool
-  var leftJustify : Bool
-
-  init(_ layout: String) {
-    isValid = true
-    leftJustify = false
-    width = 0
-
-    if !layout.isEmpty() {
-      leftJustify = layout.startsWith("-")
-      var layoutSansJustification = layout.substr(leftJustify ? 1 : 0)
-      if !layoutSansJustification.isEmpty() {
-        for c in layoutSansJustification.unicodeScalars {
-          if !c.isDigit() {
-            isValid = false
-            break
-          }
-          width = width * 10 + Int(UInt32(c) - UInt32("0"))
-        }
-      }
-    }
-  }
-
-  func printString(s: String) {
-
-/*  Causes problems due to <rdar://problem/11529601>
-    if !isValid {
-      print(s)
-      return
-    }
-*/
-    var padding = max(width - s.size(), 0)
-    if !leftJustify {
-      for i in 0...padding { print(" ") }
-    }
-    print(s)
-    if leftJustify {
-      for i in 0...padding { print(" ") }
-    }
-  }
-
-  func printToString(s: String) -> String {
-    if !isValid {
-      return s
-    }
-    var r: String
-    var padding = max(width - s.size(), 0)
-    if !leftJustify {
-      r = String(count: padding, character: " ")
-    } else {
-      r = String()
-    }
-    r = r + s
-    if leftJustify {
-      r = r + String(count: padding, character: " ")
-    }
-    return r
-  }
-
-  func replPrint() {
-    print("valid = \(isValid), leftJustify = \(leftJustify), width=\(width)")
-  }
+/// Models an object into into which we can stream text.
+protocol OutputStream {
+  mutating
+  func write(string: String)
 }
 
-// Terminal input & output
-
-@final class Console : OutputStreamable {
-  init() { }
-
-  func write(inout buf: UInt8[]) -> Int {
-    let count = buf.count
-    var r = 0
-    for var start = 0; start < count; start += 1024 {
-      let slice = buf[start...min(start + 1024, count)]
-      r = slice.withUnsafePointerToElements {
-        posix_write(1, $0.value, slice.count)
-      }
-      if r == -1 {
-        break
-      }
-    }
-    return r
-  }
-
-  func write(buf: String) -> Int {
-    var r = 0
-    let p = buf.contiguousUTF8
-    
-    if p != nil {
-      let r = posix_write(1, p.value, buf.core.count)
-    }
-    else {
-      var a = NativeArray<UInt8>(count: 1024, value: 0)
-      var count = 0
-      
-      for u in buf.utf8 {
-        a[count++] = u
-        if count == a.count {
-          r = a.withUnsafePointerToElements {
-            posix_write(1, $0.value, count)
-          }
-          if r == -1 {
-            break
-          }
-        }
-      }
-      
-      if count != 0 {
-        r = a.withUnsafePointerToElements {
-          posix_write(1, $0.value, count)
-        }
-      }
-    }
-    
-    securityCheck(r != -1)
-    return r
-  }
-
-  func write(c: UInt8) {
-    var buf = new UInt8[1]
-    buf[0] = c
-    var r = write(&buf)
-    securityCheck(r == 1)
-  }
+/// Models an object that can be written to an `OutputStream` in a single,
+/// immediately obvious, way.
+///
+/// For example: `String`, `Character`, `UnicodeScalar`.
+protocol Streamable {
+  func writeTo<Target : OutputStream>(inout target: Target)
 }
 
-var con : Console = Console()
-
-protocol FormattedPrintable {
-  func format(kind: UnicodeScalar, layout: String) -> String
-}
-
-func splitFormat(format: String) -> (String, String, UnicodeScalar, String) {
-  var (before, afterPercent, foundPercent) = format.splitFirst("%")
-  if !foundPercent {
-    return (before, "", UnicodeScalar(0), afterPercent)
-  }
-
-  var (layout, kind, after, found) = afterPercent.splitFirstIf({ $0.isAlpha() })
-  if !found {
-    return (before, "", UnicodeScalar(0), afterPercent)
-  }
-
-  return (before, layout, kind, after)
-}
-
-protocol OutputStreamable {
-  func write(inout buf: UInt8[]) -> Int
-  // FIXME:  Add default implementation when language allows it:
-  func write(buf: String) -> Int
-  // {return write(buf.asUTF8())}
-}
-
-// FIXME:  Remove the FormattedPrintable[] overload if/when we can forward
-//         variadic arguments.
-// BLOCKED: <rdar://problem/12134482> Can't forward variadic arguments
-func printf(out: OutputStreamable, format: String, args: FormattedPrintable[]) {
-  var index = 0
-  var remainingFormat = format
-  while !remainingFormat.isEmpty() {
-    var (before, layout, kind, after) = splitFormat(remainingFormat)
-    out.write(before)
-    if kind != UnicodeScalar(0) {
-      out.write(args[index++].format(kind, layout: layout))
-    }
-    remainingFormat = after
-  }
-}
-
-func printf(out: OutputStreamable, format: String, args: FormattedPrintable...) {
-  printf(out, format, args)
-}
-
-func printf(format: String, args: FormattedPrintable...) {
-  printf(con, format, args)
-}
-
-// FIXME: This function shouldn't be necessary!
-func replPrint<E : Sequence where E.GeneratorType.Element: ReplPrintable>(s: E) {
-  print("[")
-  var first = true
-  var total = 0
-  for i in s {
-    if first {
-      first = false
-    } else {
-      print(", ")
-    }
-    i.replPrint()
-    total = total + 1
-    if total > 50 {
-      print(" ...]")
-      return
-    }
-  }
-  print("]")
-}
-
-func print<E : Sequence where E.GeneratorType.Element: ReplPrintable>(s: E) {
-  replPrint(s)
-}
-
-// Some very basic output functions.
-@asmname("print_Int64") func print(value: Int64)
-@asmname("print_UInt64") func print(value: UInt64)
-@asmname("print_Double") func print(value: Double)
-
-func print(value: Int) {
-  print(Int64(value))
-}
-
-func print(value: UInt) {
-  print(UInt64(value))
-}
-
-func print(value: Float) {
-  print(Double(value))
-}
-
-func print(value: String) {
-  value._encode(UTF8.self, output: SinkOf<UTF8.CodeUnit> { 
-    c_putchar(Int32($0)) 
-  })
-}
-
-func print(value: Character) {
-  print(String(value))
-}
-
-func print(value: UnicodeScalar) {
-  var wc = UInt32(value)
-  if wc < 0x000080 {
-    c_putchar(Int32(wc))
-    return
-  } else if wc < 0x000800 {
-    c_putchar(Int32(0xC0 | (wc >> 6)))
-    c_putchar(Int32(0x80 | (wc & 0x03F)))
-    return
-  } else if wc < 0x010000 {
-    if !(0x00D800 <= wc && wc < 0x00E000) {
-      c_putchar(Int32(0xE0 |  (wc >> 12)))
-      c_putchar(Int32(0x80 | ((wc & 0x0FC0) >> 6)))
-      c_putchar(Int32(0x80 |  (wc & 0x003F)))
-      return
-    }
-  } else if wc < 0x110000 {
-    c_putchar(Int32(0xF0 |  (wc >> 18)))
-    c_putchar(Int32(0x80 | ((wc & 0x03F000) >> 12)))
-    c_putchar(Int32(0x80 | ((wc & 0x000FC0) >> 6)))
-    c_putchar(Int32(0x80 |  (wc & 0x00003F)))
-    return
-  }
-  // print(UnicodeScalar(0xFFFD))
-  fatal("Invalid Unicode scalar")
-}
-
-func print(value: Bool) {
-  if value {
-    print("true")
-  } else {
-    print("false")
-  }
-}
-
-// Some derived output functions.
-func println(value: Bool) {
-  print(value)
-  print("\n")
-}
-func println(value: Int) {
-  print(Int64(value))
-  print("\n")
-}
-func println(value: UInt) {
-  print(UInt64(value))
-  print("\n")
-}
-func println(value: UInt8) {
-  print(UInt64(value))
-  print("\n")
-}
-func println(value: UInt16) {
-  print(UInt64(value))
-  print("\n")
-}
-func println(value: UInt32) {
-  print(UInt64(value))
-  print("\n")
-}
-func println(value: UInt64) {
-  print(value)
-  print("\n")
-}
-func println(value: Float) {
-  print(value)
-  print("\n")
-}
-func println(value: Double) {
-  print(value)
-  print("\n")
-}
-func println(value: String) {
-  print(value)
-  print("\n")
-}
-
-func println(value: Character) {
-  print(value)
-  print("\n")
-}
-
-func println(value: UnicodeScalar) {
-  print(value)
-  print("\n")
-}
-
-func println() {
-  print("\n")
-}
-
-// FIXME: Proof-of-concept kludge to test the runtime basis for a generic
-// print method.
-
-/// The runtime has disgustingly inappropriate knowledge of this protocol. If
-/// you change this, you must also change swift_printAny.
+/// This protocol should be adopted by types that wish to customize their
+/// textual representation.  This textual representation is used when objects
+/// are written to an `OutputStream`.
 protocol Printable {
-  func printSelf()
+  var description: String { get }
 }
 
-extension Int : Printable {
-  func printSelf() {
-    print(self)
-  }
+/// This protocol should be adopted by types that wish to customize their
+/// textual representation used for debugging purposes.  This textual
+/// representation is used when objects are written to an `OutputStream`.
+protocol DebugPrintable {
+  var debugDescription: String { get }
 }
 
-extension String : Printable {
-  func printSelf() {
-    print(self)
-  }
+// This protocol is adopted only by NSObject.  This is a workaround for:
+// <rdar://problem/16883288> Property of type 'String!' does not satisfy
+// protocol requirement of type 'String'
+protocol _PrintableNSObject {
+  var description: String! { get }
 }
+// end workaround
 
-/// Print any Swift object, using its Printable conformance if it has one,
-/// falling back to a default implementation.
-@asmname("swift_printAny") func printAny<T>(x: T)
-
-extension Array : Printable {
-  func printSelf() {
-    print("[")
-    if !isEmpty {
-      printAny(self[0])
-      for x in self[1...count] {
-        print(", ")
-        printAny(x)
+/// Do our best to print a value that can not be printed directly, using one of
+/// its conformances to `Streamable`, `Printable` or `DebugPrintable`.
+func _adHocPrint<T, TargetStream : OutputStream>(
+    object: T, inout target: TargetStream
+) {
+  var mirror = reflect(object)
+  // Checking the mirror kind is not a good way to implement this, but we don't
+  // have a more expressive reflection API now.
+  if mirror is _TupleMirror {
+    print("(", &target)
+    var first = true
+    for i in 0...mirror.count {
+      if first {
+        first = false
+      } else {
+        print(", ", &target)
       }
+      var (label, elementMirror) = mirror[i]
+      var elt = elementMirror.value
+      // FIXME: uncomment for a compiler crash:
+      //_adHocPrint(elt, &target)
+      // workaround:
+      print(elt, &target)
     }
-    print("]")
+    print(")", &target)
+    return
+  }
+  print(mirror.summary, &target)
+}
+
+/// Writes the textual representation of `object` into the stream `target`.
+///
+/// The textual representation is obtained from the `object` using its protocol
+/// conformances, in the following order of preference: `Streamable`,
+/// `Printable`, `DebugPrintable`.
+///
+/// Do not overload this function for your type.  Instead, adopt one of the
+/// protocols mentioned above.
+func print<T, TargetStream : OutputStream>(
+    object: T, inout target: TargetStream
+) {
+  if let streamableObject =
+      _stdlib_dynamicCastToExistential1(object, Streamable.self) {
+    streamableObject.writeTo(&target)
+    return
+  }
+
+  if var printableObject =
+      _stdlib_dynamicCastToExistential1(object, Printable.self) {
+    printableObject.description.writeTo(&target)
+    return
+  }
+
+  if let debugPrintableObject =
+      _stdlib_dynamicCastToExistential1(object, DebugPrintable.self) {
+    debugPrintableObject.debugDescription.writeTo(&target)
+    return
+  }
+
+  if let anNSObject =
+      _stdlib_dynamicCastToExistential1(object, _PrintableNSObject.self) {
+    anNSObject.description.writeTo(&target)
+    return
+  }
+
+  _adHocPrint(object, &target)
+}
+
+/// Writes the textual representation of `object` and a newline character into
+/// the stream `target`.
+///
+/// The textual representation is obtained from the `object` using its protocol
+/// conformances, in the following order of preference: `Streamable`,
+/// `Printable`, `DebugPrintable`.
+///
+/// Do not overload this function for your type.  Instead, adopt one of the
+/// protocols mentioned above.
+func println<T, TargetStream : OutputStream>(
+    object: T, inout target: TargetStream
+) {
+  print(object, &target)
+  target.write("\n")
+}
+
+/// Writes the textual representation of `object` into the stream `target`.
+///
+/// The textual representation is obtained from the `object` using its protocol
+/// conformances, in the following order of preference: `Streamable`,
+/// `Printable`, `DebugPrintable`.
+///
+/// Do not overload this function for your type.  Instead, adopt one of the
+/// protocols mentioned above.
+func print<T>(object: T) {
+  var stdoutStream = _Stdout()
+  print(object, &stdoutStream)
+}
+
+/// Writes the textual representation of `object` and a newline character into
+/// the stream `target`.
+///
+/// The textual representation is obtained from the `object` using its protocol
+/// conformances, in the following order of preference: `Streamable`,
+/// `Printable`, `DebugPrintable`.
+///
+/// Do not overload this function for your type.  Instead, adopt one of the
+/// protocols mentioned above.
+func println<T>(object: T) {
+  var stdoutStream = _Stdout()
+  print(object, &stdoutStream)
+  stdoutStream.write("\n")
+}
+
+/// Writes a single newline charater into stdout.
+func println() {
+  var stdoutStream = _Stdout()
+  stdoutStream.write("\n")
+}
+
+func toString<T>(object: T) -> String {
+  var result = ""
+  print(object, &result)
+  return result
+}
+
+//===----------------------------------------------------------------------===//
+// Conversion of primitive types to `String`
+//===----------------------------------------------------------------------===//
+
+/// A 32 byte buffer.
+struct _Buffer32 {
+  var x0: UInt64 = 0
+  var x1: UInt64 = 0
+  var x2: UInt64 = 0
+  var x3: UInt64 = 0
+}
+
+/// A 72 byte buffer.
+struct _Buffer72 {
+  var x0: UInt64 = 0
+  var x1: UInt64 = 0
+  var x2: UInt64 = 0
+  var x3: UInt64 = 0
+  var x4: UInt64 = 0
+  var x5: UInt64 = 0
+  var x6: UInt64 = 0
+  var x7: UInt64 = 0
+  var x8: UInt64 = 0
+}
+
+@asmname("swift_doubleToString")
+func _doubleToStringImpl(
+    buffer: UnsafePointer<UTF8.CodeUnit>, bufferLength: UWord, value: Double
+) -> UWord
+
+func _doubleToString(value: Double) -> String {
+  assert(sizeof(_Buffer32.self) == 32)
+  assert(sizeof(_Buffer72.self) == 72)
+
+  var buffer = _Buffer32()
+  return withUnsafePointer(&buffer) {
+    (bufferPtr) in
+    let bufferUTF8Ptr = UnsafePointer<UTF8.CodeUnit>(bufferPtr)
+    let actualLength = _doubleToStringImpl(bufferUTF8Ptr, 32, value)
+    return String(
+        UTF8.self,
+        input: UnsafeArray(start: bufferUTF8Ptr, length: Int(actualLength)))
+  }
+}
+
+@asmname("swift_int64ToString")
+func _int64ToStringImpl(
+    buffer: UnsafePointer<UTF8.CodeUnit>, bufferLength: UWord, value: Int64,
+    radix: Int64, uppercase: Bool
+) -> UWord
+
+func _int64ToString(
+    value: Int64, radix: Int64 = 10, uppercase: Bool = false
+) -> String {
+  if radix >= 10 {
+    var buffer = _Buffer32()
+    return withUnsafePointer(&buffer) {
+      (bufferPtr) in
+      let bufferUTF8Ptr = UnsafePointer<UTF8.CodeUnit>(bufferPtr)
+      let actualLength =
+          _int64ToStringImpl(bufferUTF8Ptr, 32, value, radix, uppercase)
+      return String(
+          UTF8.self,
+          input: UnsafeArray(start: bufferUTF8Ptr, length: Int(actualLength)))
+    }
+  } else {
+    var buffer = _Buffer72()
+    return withUnsafePointer(&buffer) {
+      (bufferPtr) in
+      let bufferUTF8Ptr = UnsafePointer<UTF8.CodeUnit>(bufferPtr)
+      let actualLength =
+          _int64ToStringImpl(bufferUTF8Ptr, 72, value, radix, uppercase)
+      return String(
+          UTF8.self,
+          input: UnsafeArray(start: bufferUTF8Ptr, length: Int(actualLength)))
+    }
+  }
+}
+
+@asmname("swift_uint64ToString")
+func _uint64ToStringImpl(
+    buffer: UnsafePointer<UTF8.CodeUnit>, bufferLength: UWord, value: UInt64,
+    radix: Int64, uppercase: Bool
+) -> UWord
+
+func _uint64ToString(
+    value: UInt64, radix: Int64 = 10, uppercase: Bool = false
+) -> String {
+  if radix >= 10 {
+    var buffer = _Buffer32()
+    return withUnsafePointer(&buffer) {
+      (bufferPtr) in
+      let bufferUTF8Ptr = UnsafePointer<UTF8.CodeUnit>(bufferPtr)
+      let actualLength =
+          _uint64ToStringImpl(bufferUTF8Ptr, 32, value, radix, uppercase)
+      return String(
+          UTF8.self,
+          input: UnsafeArray(start: bufferUTF8Ptr, length: Int(actualLength)))
+    }
+  } else {
+    var buffer = _Buffer72()
+    return withUnsafePointer(&buffer) {
+      (bufferPtr) in
+      let bufferUTF8Ptr = UnsafePointer<UTF8.CodeUnit>(bufferPtr)
+      let actualLength =
+          _uint64ToStringImpl(bufferUTF8Ptr, 72, value, radix, uppercase)
+      return String(
+          UTF8.self,
+          input: UnsafeArray(start: bufferUTF8Ptr, length: Int(actualLength)))
+    }
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// OutputStreams
+//===----------------------------------------------------------------------===//
+
+struct _Stdout : OutputStream {
+  mutating func write(string: String) {
+    // FIXME: buffering?
+    // It is important that we use stdio routines in order to correctly
+    // interoperate with stdio buffering.
+    string._encode(UTF8.self, output: SinkOf<UTF8.CodeUnit> {
+      c_putchar(Int32($0))
+    })
+  }
+}
+
+extension String : OutputStream {
+  mutating
+  func write(string: String) {
+    self += string
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Streamables
+//===----------------------------------------------------------------------===//
+
+extension String : Streamable {
+  func writeTo<Target : OutputStream>(inout target: Target) {
+    target.write(self)
+  }
+}
+
+extension Character : Streamable {
+  func writeTo<Target : OutputStream>(inout target: Target) {
+    target.write(String(self))
+  }
+}
+
+extension UnicodeScalar : Streamable {
+  func writeTo<Target : OutputStream>(inout target: Target) {
+    target.write(String(Character(self)))
   }
 }
 

@@ -57,8 +57,8 @@ func testUserConvert(p: P) {
   var q : Q = p
 }
 
-
-printf("hello", i, f, 3.14159)
+func myPrintf(format: String, args: Any...) {}
+myPrintf("hello", i, f, 3.14159)
 
 // FIXME: Customize diagnostic
 Fooable() // expected-error{{'Fooable' is not constructible with '()'}}

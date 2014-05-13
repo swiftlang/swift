@@ -30,7 +30,7 @@ f2(1,2)
 f2(1,2,3)
 
 func f3(a: (String) -> Void) { }
-f3({ printf("%s\n", $0) })
+f3({ print($0) })
 
 
 func f4(a: Int..., b: Int) { } // expected-error{{'...' must be on the last parameter}}

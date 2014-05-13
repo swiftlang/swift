@@ -12,8 +12,7 @@
 // UnicodeScalar Type
 //===----------------------------------------------------------------------===//
 
-struct UnicodeScalar :
-    ExtendedGraphemeClusterLiteralConvertible, ReplPrintable {
+struct UnicodeScalar : ExtendedGraphemeClusterLiteralConvertible {
 
   var _value: Builtin.Int32
 
@@ -55,12 +54,6 @@ struct UnicodeScalar :
     // This constructor allows one to provide necessary type context to
     // disambiguate between function overloads on 'String' and 'UnicodeScalar'.
     self = v
-  }
-
-  func replPrint() {
-    print("\"")
-    print(escape())
-    print("\"")
   }
 
   func escape() -> String {
@@ -164,9 +157,15 @@ struct UnicodeScalar :
   }
 }
 
-extension UnicodeScalar : FormattedPrintable {
-  func format(kind: UnicodeScalar, layout: String) -> String {
-    return String(self).format(kind, layout: layout)
+extension UnicodeScalar : ReplPrintable {
+  func replPrint() {
+    print(description)
+  }
+}
+
+extension UnicodeScalar : Printable {
+  var description: String {
+    return "\"\(escape())\""
   }
 }
 

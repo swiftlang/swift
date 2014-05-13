@@ -1,12 +1,22 @@
 // RUN: %swift %s -verify
 
-struct S<T : FormattedPrintable> {
+protocol MyFormattedPrintable {
+  func myFormat() -> String
+}
+
+func myPrintf(format: String, args: MyFormattedPrintable...) {}
+
+extension Int : MyFormattedPrintable {
+  func myFormat() -> String { return "" }
+}
+
+struct S<T : MyFormattedPrintable> {
   var c : T
   static func f(a: T) -> T {
     return a
   }
   func f(a: T, b: Int) {
-    return printf("%v %v %v", a, b, c)
+    return myPrintf("%v %v %v", a, b, c)
   }
 }
 
@@ -25,7 +35,7 @@ struct S2<T> {
 
 struct X { }
 
-var d : S<X> // expected-error{{type 'X' does not conform to protocol 'FormattedPrintable'}}
+var d : S<X> // expected-error{{type 'X' does not conform to protocol 'MyFormattedPrintable'}}
 
 enum Optional<T> {
   case Element(T)
@@ -43,10 +53,10 @@ var uniontest3 = OptionalInt(1)
 // var uniontest4 : OptInt = .None
 // var uniontest5 : OptInt = .Some(1)
 
-func formattedTest<T : FormattedPrintable>(a: T) {
-  printf("%v", a)
+func formattedTest<T : MyFormattedPrintable>(a: T) {
+  myPrintf("%v", a)
 }
-struct formattedTestS<T : FormattedPrintable> {
+struct formattedTestS<T : MyFormattedPrintable> {
   func f(a: T) {
     formattedTest(a)
   }
@@ -125,13 +135,13 @@ d1["hello"] = d2["world"]
 i = d2["blarg"]
 
 struct RangeOfPrintables<R : Sequence
-         where R.GeneratorType.Element : FormattedPrintable> {
+         where R.GeneratorType.Element : MyFormattedPrintable> {
   var r : R
 
-  func format(kind: UnicodeScalar, layout: String) -> String {
+  func format() -> String {
     var s : String
     for e in r {
-      s = s + e.format(kind, layout: layout) + " "
+      s = s + e.myFormat() + " "
     }
     return s
   }
@@ -148,7 +158,7 @@ struct SequenceY : Sequence, Generator {
 
 func useRangeOfPrintables(roi : RangeOfPrintables<Int[]>) {
   var rop : RangeOfPrintables<X> // expected-error{{type 'X' does not conform to protocol 'Sequence'}}
-  var rox : RangeOfPrintables<SequenceY> // expected-error{{type 'Element' does not conform to protocol 'FormattedPrintable'}}
+  var rox : RangeOfPrintables<SequenceY> // expected-error{{type 'Element' does not conform to protocol 'MyFormattedPrintable'}}
 }
 
 struct HasNested<T> {

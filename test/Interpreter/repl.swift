@@ -32,25 +32,25 @@ var aString = String() // CHECK: aString : String = ""
 
 String(-1) // CHECK: String = "-1"
 String(-112312312)  // CHECK: String = "-112312312"
-String(4.0)  // CHECK: String = "4.0"
+String(4.0)  // CHECK: String = "4"
 
 1 +
 44
-// CHECK: Int = 45
+// CHECK: Int = 45{{$}}
 
 123 .
 hashValue
-// CHECK: Int = 123
+// CHECK: Int = 123{{$}}
 
 // Check that we handle unmatched parentheses in REPL.
 1+1)
 
 var z = 44
 +z
-// CHECK: Int = 44
+// CHECK: Int = 44{{$}}
 
 +44
-// CHECK: Int = 44
+// CHECK: Int = 44{{$}}
 
 typealias Foo = Int
 
@@ -59,24 +59,24 @@ var f44 : Foo = 44
 f1 +
   f44
 // FIXME: <rdar://problem/16860940> QoI: Strict keyword arguments loses type sugar in calls
-// CHECK: Int = 45
+// CHECK: Int = 45{{$}}
 +(f44)
-// CHECK: Foo = 44
+// CHECK: Foo = 44{{$}}
 
 1.5
-// CHECK: Double = 1.5
+// CHECK: Double = 1.5{{$}}
 1.5+2.25
-// CHECK: Double = 3.75
+// CHECK: Double = 3.75{{$}}
 +1.75
-// CHECK: Double = 1.75
+// CHECK: Double = 1.75{{$}}
 -1.75
-// CHECK: Double = -1.75
+// CHECK: Double = -1.75{{$}}
 
 func r13792487(x: Float64) -> Float64 { return x }
 r13792487(1234.0)
-// CHECK: Double = 1234.0
+// CHECK: Double = 1234{{$}}
 r13792487(1234)
-// CHECK: Double = 1234
+// CHECK: Double = 1234{{$}}
 
 var ab = (1,
 2)

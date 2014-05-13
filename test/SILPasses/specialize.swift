@@ -11,23 +11,25 @@ struct XXX<T> {
   var m_t : T
 }
 
+func acceptsInt(x: Int) {}
+
 func exp1() {
   var II = XXX<Int>(t: 5)
-  print(II.foo(t: 4))
+  acceptsInt(II.foo(t: 4))
 }
 //CHECK: exp1
 //CHECK-NOT: apply
 //CHECK: [[CTOR:%[0-9]+]] = function_ref @_TTSSi___TFV10specialize3XXXCU__fMGS0_Q__FT1tQ__GS0_Q__
 //CHECK: apply [[CTOR]]
-//CHECK: [[PRINT:%[0-9]+]] = function_ref @_TFSs5printFSiT_ 
+//CHECK: [[ACCEPTS_INT:%[0-9]+]] = function_ref @_TF10specialize10acceptsIntFSiT_
 //CHECK: [[FOO:%[0-9]+]] = function_ref @_TTSSi___TFV10specialize3XXX3fooU__fRGS0_Q__FT1tQ__Si
 //CHECK: apply [[FOO]]
-//CHECK: apply [[PRINT]]
+//CHECK: apply [[ACCEPTS_INT]]
 //CHECK: return
 
 func exp2() {
  var II8 = XXX<UInt8>(t: UInt8(5))
- print(II8.foo(t: UInt8(4)))
+ acceptsInt(II8.foo(t: UInt8(4)))
 }
 
 

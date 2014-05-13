@@ -12,14 +12,17 @@ func implicitProperties(obj: ImplicitProperties, other: AnyObject) {
   println(Int(obj.anotherImplicitProperty)) // no-warning
 }
 
+func acceptsInt(_: Int) {}
+func acceptsInt(_: UInt) {}
+
 func badImplicitProperties(obj: BadImplicitProperties) {
-  println(obj.nonVoidReturn) // expected-error {{could not find an overload for 'println' that accepts the supplied arguments}}
-  println(obj.nonMatchingType) // expected-error {{could not find an overload for 'println' that accepts the supplied arguments}}
-  println(obj.wrongGetterArgs) // expected-error {{could not find an overload for 'println' that accepts the supplied arguments}}
-  println(obj.wrongSetterArgs) // expected-error {{could not find an overload for 'println' that accepts the supplied arguments}}
-  println(obj.wrongSetterArgs2) // expected-error {{could not find an overload for 'println' that accepts the supplied arguments}}
-  println(obj.getterOnly) // expected-error {{could not find an overload for 'println' that accepts the supplied arguments}}
-  println(obj.setterOnly) // expected-error {{'BadImplicitProperties' does not have a member named 'setterOnly'}}
+  acceptsInt(obj.nonVoidReturn) // expected-error {{could not find an overload for 'acceptsInt' that accepts the supplied arguments}}
+  acceptsInt(obj.nonMatchingType) // expected-error {{could not find an overload for 'acceptsInt' that accepts the supplied arguments}}
+  acceptsInt(obj.wrongGetterArgs) // expected-error {{could not find an overload for 'acceptsInt' that accepts the supplied arguments}}
+  acceptsInt(obj.wrongSetterArgs) // expected-error {{could not find an overload for 'acceptsInt' that accepts the supplied arguments}}
+  acceptsInt(obj.wrongSetterArgs2) // expected-error {{could not find an overload for 'acceptsInt' that accepts the supplied arguments}}
+  acceptsInt(obj.getterOnly) // expected-error {{could not find an overload for 'acceptsInt' that accepts the supplied arguments}}
+  acceptsInt(obj.setterOnly) // expected-error {{'BadImplicitProperties' does not have a member named 'setterOnly'}}
 
   // But we should still import all of the methods as methods.
   let x: CInt = obj.setNonVoidReturn(obj.nonVoidReturn())

@@ -176,21 +176,6 @@ func testStringToInt() {
   // CHECK-NEXT: ....................lower than max
 }
 
-func testFloats() {
-  println("\(1.0)")
-  println("\(1.5)")
-  println("\(1.0 / (1000000000000))")
-  // CHECK: {{^}}1.0{{$}}
-  // CHECK-NEXT: {{^}}1.5{{$}}
-  // CHECK-NEXT: {{^}}1e-12{{$}}
-  println("\(1 / 0.0)")
-  println("\(-1 / 0.0)")
-  println("\(0 / 0.0)")
-  // CHECK-NEXT: {{^}}inf{{$}}
-  // CHECK-NEXT: {{^}}-inf{{$}}
-  // CHECK-NEXT: {{^}}nan{{$}}
-}
-
 // Make sure strings don't grow unreasonably quickly when appended-to
 func testGrowth() {
   var s = ""
@@ -205,7 +190,6 @@ func testGrowth() {
 }
 
 testStringToInt()
-testFloats()
 testGrowth()
 
 func testCompare() {

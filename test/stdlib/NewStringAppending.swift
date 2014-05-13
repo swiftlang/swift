@@ -13,7 +13,7 @@ import Foundation
 import Swift
 
 func hexAddrVal<T>(x: T) -> String {
-  return "@0x" + (reinterpretCast(x) as Int).format("x", layout: "")
+  return "@0x" + _uint64ToString(UInt64(reinterpretCast(x) as Word), radix: 16)
 }
 
 func hexAddr(x: AnyObject?) -> String {

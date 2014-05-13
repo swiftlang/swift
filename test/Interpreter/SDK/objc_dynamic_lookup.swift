@@ -6,7 +6,7 @@ import Foundation
 // CHECK: 3
 var array : AnyObject = [1, 2, 3, 4, 5]
 #if os(OSX)
-println(array[2]!.description!)
+println(array[2].description)
 #else
 println(array[2]!.description!())
 #endif
@@ -16,7 +16,7 @@ println(array[2]!.description!())
 var optVal1 = array["Hello"]
 if optVal1 {
 #if os(OSX)
-   println(optVal1!.description!)
+   println(optVal1.description)
 #else
    println(optVal1!.description!())
 #endif
@@ -29,7 +29,7 @@ if optVal1 {
 var nsdict : NSDictionary = ["Hello" : 1, "World" : 2]
 var dict : AnyObject = nsdict
 #if os(OSX)
-println(dict["World"]!.description!)
+println(dict["World"].description)
 #else
 println(dict["World"]!.description!())
 #endif
@@ -39,7 +39,7 @@ println(dict["World"]!.description!())
 var optVal2 = dict[1]
 if optVal2 {
 #if os(OSX)
-   println(optVal2!.description!)
+   println(optVal2.description)
 #else
    println(optVal2!.description!())
 #endif

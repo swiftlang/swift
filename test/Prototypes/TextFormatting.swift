@@ -9,22 +9,22 @@
 operator infix ~> { precedence 255 }
 
 /// \brief A thing into which we can stream text
-protocol OutputStream {
+protocol XOutputStream {
   mutating
   func append(text: String)
 }
 
-/// \brief Strings are OutputStreams
-extension String: OutputStream {
+/// \brief Strings are XOutputStreams
+extension String: XOutputStream {
   mutating
   func append(text: String) {
     self += text
   }
 }
 
-/// \brief A thing that can be written to an OutputStream
-protocol Streamable {
-  func writeTo<Target: OutputStream>(inout target: Target)
+/// \brief A thing that can be written to an XOutputStream
+protocol XStreamable {
+  func writeTo<Target: XOutputStream>(inout target: Target)
 }
 
 /// \brief A thing that can be printed in the REPL and the Debugger
@@ -32,16 +32,16 @@ protocol Streamable {
 /// Everything compiler-magically conforms to this protocol.  To
 /// change the debug representation for a type, you don't need to
 /// declare conformance: simply give the type a debugFormat().
-protocol DebugPrintable {
+protocol XDebugPrintable {
 
-  typealias DebugRepresentation : Streamable // = String
+  typealias DebugRepresentation : XStreamable // = String
 
   /// \brief Produce a textual representation for the REPL and
   /// Debugger.
   ///
-  /// Because String is a Streamable, your implementation of
+  /// Because String is a XStreamable, your implementation of
   /// debugRepresentation can just return a String.  If you want to write
-  /// directly to the OutputStream for efficiency reasons,
+  /// directly to the XOutputStream for efficiency reasons,
   /// (e.g. if your representation is huge), you can return a custom
   /// DebugRepresentation type.
   ///
@@ -54,42 +54,42 @@ protocol DebugPrintable {
   func debugFormat() -> DebugRepresentation
 }
 
-/// \brief Strings are Streamable
-extension String : Streamable {
-  func writeTo<Target: OutputStream>(inout target: Target) {
+/// \brief Strings are XStreamable
+extension String : XStreamable {
+  func writeTo<Target: XOutputStream>(inout target: Target) {
     target.append(self)
   }
 }
 
-// FIXME: Should be a method of DebugPrintable once
+// FIXME: Should be a method of XDebugPrintable once
 // <rdar://problem/14692224> (Default Implementations in Protocols) is
 // handled
-func toDebugString <T:DebugPrintable> (x: T) -> String {
+func toDebugString <T:XDebugPrintable> (x: T) -> String {
   var result = ""
   x.debugFormat().writeTo(&result)
   return result
 }
 
-// FIXME: The following should be a method of Printable once
+// FIXME: The following should be a method of XPrintable once
 // <rdar://problem/14692224> (Default Implementations in Protocols) is
 // handled
 struct __PrintedFormat {}
-func format() -> __PrintedFormat { 
+func format() -> __PrintedFormat {
   return __PrintedFormat()
 }
-@infix func ~> <T:DebugPrintable> (x: T, _: __PrintedFormat) -> T.DebugRepresentation {
+@infix func ~> <T:XDebugPrintable> (x: T, _: __PrintedFormat) -> T.DebugRepresentation {
   return x.debugFormat()
 }
 
-/// \brief A thing that can be print()ed and toString()ed.
+/// \brief A thing that can be xprint()ed and toString()ed.
 ///
-/// Conformance to Printable is explicit, but if you want to use the
+/// Conformance to XPrintable is explicit, but if you want to use the
 /// debugFormat() results for your type's format(), all you need
-/// to do is declare conformance to Printable, and there's nothing to
+/// to do is declare conformance to XPrintable, and there's nothing to
 /// implement.
-protocol Printable: DebugPrintable {
-  typealias PrintRepresentation: Streamable // = DebugRepresentation
-  
+protocol XPrintable: XDebugPrintable {
+  typealias PrintRepresentation: XStreamable // = DebugRepresentation
+
   /// \brief produce a "pretty" textual representation that can be
   /// distinct from the debug format.  For example,
   /// String.printRepresentation returns the string itself, without quoting.
@@ -97,13 +97,13 @@ protocol Printable: DebugPrintable {
   /// In general you can return a String here, but if you need more
   /// control, we strongly recommend returning a custom Representation
   /// type, e.g. a nested struct of your type.  If you're lazy, you
-  /// can conform to Streamable directly and just implement its
+  /// can conform to XStreamable directly and just implement its
   /// write() func.
   @infix func ~> (x: Self, _: __PrintedFormat) -> PrintRepresentation
 }
 
 
-// FIXME: The following should be a method of Printable once
+// FIXME: The following should be a method of XPrintable once
 // <rdar://problem/14692224> (Default Implementations in Protocols) is
 // handled
 
@@ -113,22 +113,22 @@ protocol Printable: DebugPrintable {
 /// If you must reimplement toString(), make sure its results are
 /// consistent with those of format() (i.e. you shouldn't
 /// change the behavior).
-func toString<T: Printable>(x: T) -> String {
+func toString<T: XPrintable>(x: T) -> String {
   var result = ""
   (x~>format()).writeTo(&result)
   return result
 }
 
 // \brief Streamer for the debug representation of String. When an
-// EscapedStringFormat is written to a OutputStream, it adds
+// EscapedStringFormat is written to a XOutputStream, it adds
 // surrounding quotes and escapes special characters.
-struct EscapedStringFormat : Streamable {
+struct EscapedStringFormat : XStreamable {
 
   init(_ s: String) {
     self._value = s
   }
 
-  func writeTo<Target: OutputStream>(inout target: Target) {
+  func writeTo<Target: XOutputStream>(inout target: Target) {
     target.append("\"")
     for c in _value.unicodeScalars {
       target.append(c.escape())
@@ -140,20 +140,20 @@ struct EscapedStringFormat : Streamable {
 }
 
 // FIXME: In theory, this shouldn't be needed
-extension String: DebugPrintable {}
+extension String: XDebugPrintable {}
 
-extension String : Printable {
+extension String : XPrintable {
   func debugFormat() -> EscapedStringFormat {
-    return EscapedStringFormat(self) 
+    return EscapedStringFormat(self)
   }
 
-  func format() -> String { 
+  func format() -> String {
     return self
   }
 }
 
 /// \brief An integral type that can be printed
-protocol PrintableInteger : IntegerLiteralConvertible, Comparable, SignedNumber, Printable {
+protocol XPrintableInteger : IntegerLiteralConvertible, Comparable, SignedNumber, XPrintable {
   func %(lhs: Self, rhs: Self) -> Self
   func /(lhs: Self, rhs: Self) -> Self
 
@@ -163,11 +163,11 @@ protocol PrintableInteger : IntegerLiteralConvertible, Comparable, SignedNumber,
   func toInt() -> Int
 }
 
-extension Int : DebugPrintable {
+extension Int : XDebugPrintable {
   func debugFormat() -> String { return String(self) }
 }
 
-extension Int : PrintableInteger {
+extension Int : XPrintableInteger {
   static func fromInt(x: Int) -> Int { return x }
   func toInt() -> Int { return self }
 
@@ -187,7 +187,7 @@ func format(radix: Int = 10, fill: String = " ", width: Int = 0) -> _formatArgs 
 // FIXME: this function was a member of RadixFormat, but
 // <rdar://problem/15525229> (SIL verification failed: operand of
 // 'apply' doesn't match function input type) changed all that.
-func _writePositive<T:PrintableInteger, S: OutputStream>( 
+func _writePositive<T:XPrintableInteger, S: XOutputStream>(
   value: T, inout stream: S, args: _formatArgs) -> Int
 {
 
@@ -207,7 +207,7 @@ func _writePositive<T:PrintableInteger, S: OutputStream>(
 // FIXME: this function was a member of RadixFormat, but
 // <rdar://problem/15525229> (SIL verification failed: operand of
 // 'apply' doesn't match function input type) changed all that.
-func _writeSigned<T:PrintableInteger, S: OutputStream>(
+func _writeSigned<T:XPrintableInteger, S: XOutputStream>(
   value: T, inout target: S, args: _formatArgs
 ) {
   var width = 0
@@ -233,13 +233,13 @@ func _writeSigned<T:PrintableInteger, S: OutputStream>(
   target.append(result)
 }
 
-struct RadixFormat<T: PrintableInteger> : Streamable {
+struct RadixFormat<T: XPrintableInteger> : XStreamable {
   init(value: T, args: _formatArgs) {
     self.value = value
     self.args = args
   }
 
-  func writeTo<S: OutputStream>(inout target: S) {
+  func writeTo<S: XOutputStream>(inout target: S) {
     _writeSigned(value, &target, args)
   }
 
@@ -252,21 +252,21 @@ struct RadixFormat<T: PrintableInteger> : Streamable {
   var args: _formatArgs
 }
 
-@infix func ~> <T:PrintableInteger> (x: T, _: __PrintedFormat) -> RadixFormat<T> {
+@infix func ~> <T:XPrintableInteger> (x: T, _: __PrintedFormat) -> RadixFormat<T> {
   return RadixFormat(value: x, args: format())
 }
 
-@infix func ~> <T:PrintableInteger> (x: T, args: _formatArgs) -> RadixFormat<T> {
+@infix func ~> <T:XPrintableInteger> (x: T, args: _formatArgs) -> RadixFormat<T> {
   return RadixFormat(value: x, args: args)
 }
 
 // ==========
 
 //
-// print and println
+// xprint and xprintln
 //
 
-struct StdoutStream : OutputStream {
+struct StdoutStream : XOutputStream {
   func append(text: String) { Swift.print(text) }
   // debugging only
   func dump() -> String {
@@ -274,48 +274,54 @@ struct StdoutStream : OutputStream {
   }
 }
 
-func print<Target: OutputStream, T: Streamable>(inout target: Target, x: T) {
+func xprint<Target: XOutputStream, T: XStreamable>(inout target: Target, x: T) {
   x.writeTo(&target)
 }
 
-func print<Target: OutputStream, T: Printable>(inout target: Target, x: T) {
-  print(&target, x~>format())
+func xprint<Target: XOutputStream, T: XPrintable>(inout target: Target, x: T) {
+  xprint(&target, x~>format())
 }
 
-func print<T: Printable>(x: T) {
+func xprint<T: XPrintable>(x: T) {
   var target = StdoutStream()
-  print(&target, x)
+  xprint(&target, x)
 }
 
-func print<T: Streamable>(x: T) {
+func xprint<T: XStreamable>(x: T) {
   var target = StdoutStream()
-  print(&target, x)
+  xprint(&target, x)
 }
 
-func println<Target: OutputStream, T: Printable>(inout target: Target, x: T) {
-  print(&target, x)
+func xprintln<Target: XOutputStream, T: XPrintable>(inout target: Target, x: T) {
+  xprint(&target, x)
   target.append("\n")
 }
 
-func println<Target: OutputStream, T: Streamable>(inout target: Target, x: T) {
-  print(&target, x)
+func xprintln<Target: XOutputStream, T: XStreamable>(inout target: Target, x: T) {
+  xprint(&target, x)
   target.append("\n")
 }
 
-func println<T: Printable>(x: T) {
+func xprintln<T: XPrintable>(x: T) {
   var target = StdoutStream()
-  println(&target, x)
+  xprintln(&target, x)
 }
 
-func println<T: Streamable>(x: T) {
+func xprintln<T: XStreamable>(x: T) {
   var target = StdoutStream()
-  println(&target, x)
+  xprintln(&target, x)
+}
+
+func xprintln(x: String) {
+  var target = StdoutStream()
+  x.writeTo(&target)
+  "\n".writeTo(&target)
 }
 
 extension String {
-  init <T: Streamable>(_ x: T) {
+  init <T: XStreamable>(_ x: T) {
     self = ""
-    print(&self, x)
+    xprint(&self, x)
   }
 }
 
@@ -323,26 +329,26 @@ extension String {
 
 var x = "fubar\n\tbaz"
 
-println(x)
+xprintln(x)
 // CHECK: fubar
 // CHECK-NEXT: 	baz
 
-println(toDebugString(x))
+xprintln(toDebugString(x))
 // CHECK-NEXT: "fubar\n\tbaz"
 
-println("|\(424242~>format(radix:16, width:8))|") 
+xprintln("|\(424242~>format(radix:16, width:8))|")
 // CHECK-NEXT: |   67932|
 
 var zero = "0"
-println("|\(-434343~>format(width:8, fill:zero))|")
+xprintln("|\(-434343~>format(width:8, fill:zero))|")
 // CHECK-NEXT: |-0434343|
 
-println("|\(-42~>format(radix:13, width:8))|")
+xprintln("|\(-42~>format(radix:13, width:8))|")
 // CHECK-NEXT: |-     33|
 
-println(0x1EADBEEF~>format(radix:16))
+xprintln(0x1EADBEEF~>format(radix:16))
 // CHECK-NEXT: 1EADBEEF
 
 // FIXME: rdar://16168414 this doesn't work in 32-bit
-// println(0xDEADBEEF~>format(radix:16))
+// xprintln(0xDEADBEEF~>format(radix:16))
 // CHECK-NEXT-not: DEADBEEF

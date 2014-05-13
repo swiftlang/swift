@@ -126,7 +126,7 @@ def getInfinityExponent(bits):
 % for bits in allFloatBits:
 %   Self = floatName(bits)
 
-struct ${Self} : ReplPrintable {
+struct ${Self} {
   var value: Builtin.FPIEEE${bits}
 
   @transparent
@@ -140,16 +140,24 @@ struct ${Self} : ReplPrintable {
     value = v
   }
 
-  func replPrint() {
-%if bits == 64:
-    print(self)
-%else:
-    print(Double(self))
-%end
-  }
-
   @transparent
   init(_ value: ${Self}) { self = value }
+}
+
+extension ${Self} : ReplPrintable {
+  func replPrint() {
+    print(self)
+  }
+}
+
+extension ${Self} : Printable {
+  var description: String {
+% if bits == 64:
+    return _doubleToString(self)
+% else:
+    return _doubleToString(Double(self))
+% end
+  }
 }
 
 % if bits in allIntBits:

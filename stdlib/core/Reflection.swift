@@ -198,47 +198,61 @@ protocol Mirror {
   ptr: UnsafePointer<T>
 ) -> Mirror
 
-/// Dump an object's contents using its mirror.
-func dump<T>(x: T, name: String? = nil, indent: Int = 0,
-             maxDepth: Int = .max, maxItems: Int = .max) -> T {
+
+/// Dump an object's contents using its mirror to the specified output stream.
+func dump<T, TargetStream : OutputStream>(
+    x: T, name: String? = nil, indent: Int = 0,
+    maxDepth: Int = .max, maxItems: Int = .max,
+    inout targetStream: TargetStream
+) -> T {
   var maxItemCounter = maxItems
   var visitedItems = Dictionary<ObjectIdentifier, Int>()
   _dumpWithMirror(reflect(x), name, indent, maxDepth,
-                  &maxItemCounter, &visitedItems)
+                  &maxItemCounter, &visitedItems, &targetStream)
   return x
 }
 
+/// Dump an object's contents using its mirror to standard output.
+func dump<T>(x: T, name: String? = nil, indent: Int = 0,
+             maxDepth: Int = .max, maxItems: Int = .max) -> T {
+  var stdoutStream = _Stdout()
+  return dump(x, name: name, indent: indent, maxDepth: maxDepth,
+              maxItems: maxItems, &stdoutStream)
+}
+
 /// Dump an object's contents using a mirror. User code should use dump().
-func _dumpWithMirror(mirror: Mirror, name: String?,
-                     indent: Int, maxDepth: Int,
-                     inout maxItemCounter: Int,
-                     inout visitedItems: Dictionary<ObjectIdentifier, Int>) {
+func _dumpWithMirror<TargetStream : OutputStream>(
+    mirror: Mirror, name: String?, indent: Int, maxDepth: Int,
+    inout maxItemCounter: Int,
+    inout visitedItems: Dictionary<ObjectIdentifier, Int>,
+    inout targetStream: TargetStream
+) {
   if maxItemCounter <= 0 { return }
   --maxItemCounter
 
   for _ in 0...indent { print(" ") }
-  
+
   let count = mirror.count
   let bullet = count == 0    ? "-"
              : maxDepth <= 0 ? "▹" : "▿"
-  print("\(bullet) ")
+  print("\(bullet) ", &targetStream)
 
   if let nam = name {
-    print("\(nam): ")
+    print("\(nam): ", &targetStream)
   }
   print(mirror.summary)
 
   if let id = mirror.objectIdentifier {
     if let previous = visitedItems.find(id) {
-      println(" #\(previous)")
+      println(" #\(previous)", &targetStream)
       return
     }
     let identifier = visitedItems.count
     visitedItems[id] = identifier
-    print(" #\(identifier)")
+    print(" #\(identifier)", &targetStream)
   }
 
-  println()
+  println("", &targetStream)
 
   if maxDepth <= 0 { return }
 
@@ -246,23 +260,31 @@ func _dumpWithMirror(mirror: Mirror, name: String?,
     if maxItemCounter <= 0 {
       for _ in 0...(indent+4) { print(" ") }
       let remainder = count - i
-      print("(\(remainder)")
-      if i > 0 { print(" more") }
+      print("(\(remainder)", &targetStream)
+      if i > 0 { print(" more", &targetStream) }
       if remainder == 1 {
-        println(" child)")
+        println(" child)", &targetStream)
       } else {
-        println(" children)")
+        println(" children)", &targetStream)
       }
       return
     }
 
     let (name, child) = mirror[i]
     _dumpWithMirror(child, name, indent + 2, maxDepth - 1,
-                    &maxItemCounter, &visitedItems)
+                    &maxItemCounter, &visitedItems, &targetStream)
   }
 }
 
 // -- Mirror implementations for basic data types
+
+func _formatNumChildren(count: Int) -> String {
+  if count == 1 {
+    return " (has 1 child)"
+  } else {
+    return " (has \(count) children)"
+  }
+}
 
 /// A mirror for a value that is represented as a simple value with no
 /// children.
@@ -357,8 +379,9 @@ struct _StructMirror: Mirror {
     @asmname("swift_StructMirror_subscript") get
   }
 
-  // FIXME: put the type name here
-  var summary: String { return "(\(count) elements)" }
+  var summary: String {
+    return "\(_stdlib_getTypeName(value))\(_formatNumChildren(count))"
+  }
   var quickLookObject: QuickLookObject? { return nil }
   var disposition: MirrorDisposition { return .Struct }
 }
@@ -382,9 +405,9 @@ struct _ClassMirror: Mirror {
   subscript(i: Int) -> (String, Mirror) {
     return _getClassChild(i, data)
   }
-  
-  // FIXME: put the type name here
-  var summary: String { return "(\(count) elements)" }
+  var summary: String {
+    return "\(_stdlib_getTypeName(value))\(_formatNumChildren(count))"
+  }
   var quickLookObject: QuickLookObject? { return nil }
   var disposition: MirrorDisposition { return .Class }
 }
@@ -405,8 +428,10 @@ struct _ClassSuperMirror: Mirror {
   subscript(i: Int) -> (String, Mirror) {
     return _getClassChild(i, data)
   }
-  // FIXME: put the type name here
-  var summary: String { return "(\(count) elements)" }
+  var summary: String {
+    return "\(_stdlib_getTypeName(value))\(_formatNumChildren(count))"
+  }
   var quickLookObject: QuickLookObject? { return nil }
   var disposition: MirrorDisposition { return .Class }
 }
+

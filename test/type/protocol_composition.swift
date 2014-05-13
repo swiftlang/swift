@@ -4,20 +4,20 @@ func canonical_empty_protocol() -> protocol<> {
   return 1
 }
 
-protocol P1 { 
+protocol P1 {
   func p1()
   func f(_: Int) -> Int
 }
 
-protocol P2 : P1 { 
+protocol P2 : P1 {
   func p2()
 }
 
-protocol P3 { 
+protocol P3 {
   func p3()
 }
 
-protocol P4 : P3 { 
+protocol P4 : P3 {
   func p4()
   func f(_: Double) -> Double
 }
@@ -33,7 +33,7 @@ extension Int : P5 { }
 typealias Bogus = protocol<P1, Int> // expected-error{{non-protocol type 'Int' cannot be used within 'protocol<...>'}}
 
 func testEquality() {
-  // Remove duplicates from protocol-conformance types. 
+  // Remove duplicates from protocol-conformance types.
   var x1 : (_ : protocol<P2, P4>) -> ()
   var x2 : (_ : protocol<P3, P4, P2, P1>) -> ()
   x1 = x2
@@ -73,37 +73,46 @@ protocol SuperREPLPrintable : REPLPrintable {
   func superReplPrint()
 }
 
-struct SuperPrint : REPLPrintable, FormattedPrintable, SuperREPLPrintable {
+protocol FooProtocol {
+  func format(kind: UnicodeScalar, layout: String) -> String
+}
+
+struct SuperPrint : REPLPrintable, FooProtocol, SuperREPLPrintable {
   func replPrint() {}
   func superReplPrint() {}
   func format(kind: UnicodeScalar, layout: String) -> String {}
 }
 
-extension Int : REPLPrintable, FormattedPrintable { }
+struct Struct1 {}
+extension Struct1 : REPLPrintable, FooProtocol {
+  func replPrint() {}
+  func format(kind: UnicodeScalar, layout: String) -> String {}
+}
 
-func accept_manyPrintable(_: protocol<REPLPrintable, FormattedPrintable>) {}
+func accept_manyPrintable(_: protocol<REPLPrintable, FooProtocol>) {}
 
-func return_superPrintable() -> protocol<FormattedPrintable, SuperREPLPrintable> {}
+func return_superPrintable() -> protocol<FooProtocol, SuperREPLPrintable> {}
 
 func testConversion() {
   // Conversions for literals.
-  var x : protocol<REPLPrintable, FormattedPrintable> = 1
-  accept_manyPrintable(1)
+  var x : protocol<REPLPrintable, FooProtocol> = Struct1()
+  accept_manyPrintable(Struct1())
 
   // Conversions for nominal types that conform to a number of protocols.
   var sp : SuperPrint
   x = sp
   accept_manyPrintable(sp)
-  
+
   // Conversions among existential types.
-  var x2 : protocol<SuperREPLPrintable, FormattedPrintable>
-  x2 = x // expected-error{{'protocol<FormattedPrintable, REPLPrintable>' does not conform to protocol 'SuperREPLPrintable'}}
+  var x2 : protocol<SuperREPLPrintable, FooProtocol>
+  x2 = x // expected-error{{'protocol<FooProtocol, REPLPrintable>' does not conform to protocol 'SuperREPLPrintable'}}
   x = x2
 
   // Subtyping
-  var f1 : () -> protocol<FormattedPrintable, SuperREPLPrintable> = return_superPrintable
-  var f2 : () -> protocol<FormattedPrintable, REPLPrintable> = return_superPrintable
+  var f1 : () -> protocol<FooProtocol, SuperREPLPrintable> = return_superPrintable
+  var f2 : () -> protocol<FooProtocol, REPLPrintable> = return_superPrintable
 }
 
 // Test the parser's splitting of >= into > and =.
 var x : protocol<P5>=17
+

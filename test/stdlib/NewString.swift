@@ -6,7 +6,7 @@ import Swift
 // ==== Tests =====
 
 func hexAddrVal<T>(x: T) -> String {
-  return "@0x" + (reinterpretCast(x) as Int).format("x", layout: "")
+  return "@0x" + _uint64ToString(UInt64(reinterpretCast(x) as Word), radix: 16)
 }
 
 func hexAddr(x: AnyObject?) -> String {
@@ -227,11 +227,15 @@ let winter = "🏂☃❅❆❄︎⛄️❄️"
 let summer = "school's out!"
 
 func printHexSequence<
-  S:Sequence where S.GeneratorType.Element : FormattedPrintable
+  S:Sequence where S.GeneratorType.Element : Integer
 >(s: S) {
   print("[")
   var prefix = ""
-  for x in s { print(prefix); print(x.format("x", layout:"")); prefix = " " }
+  for x in s {
+    print(prefix);
+    print(_int64ToString(x.toIntMax(), radix: 16))
+    prefix = " "
+  }
   println("]")
 }
 

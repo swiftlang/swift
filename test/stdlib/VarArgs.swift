@@ -11,7 +11,7 @@ func hexAddr(x: AnyObject) -> String {
 }
 
 func hexAddr(x: Builtin.RawPointer) -> String {
-  return "@0x" + Int(Builtin.ptrtoint_Word(x)).format("x", layout: "")
+  return "@0x" + _uint64ToString(UInt64(UWord(Builtin.ptrtoint_Word(x))), radix: 16)
 }
 
 func hexAddr<T>(p: UnsafePointer<T>) -> String {

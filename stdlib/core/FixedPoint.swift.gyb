@@ -73,7 +73,8 @@ typealias UIntMax = UInt${maxBits}
 protocol _Integer
   : _BuiltinIntegerLiteralConvertible,
     IntegerLiteralConvertible,
-    ReplPrintable, 
+    ReplPrintable,
+    Printable,
     ArrayBound,
     Hashable,
     IntegerArithmetic,
@@ -124,8 +125,7 @@ func numericCast<T : _UnsignedInteger, U : _SignedInteger>(x: T) -> U {
 %   OtherSelf = otherIntName(name, signed)
 %   ConstructIntType = 'Int' if Self != 'Int' else ''
 
-struct ${Self} : ${'SignedInteger' if sign == 's' else 'UnsignedInteger'}
-{
+struct ${Self} : ${'SignedInteger' if sign == 's' else 'UnsignedInteger'} {
   var value: Builtin.${BuiltinName}
 
   @transparent
@@ -169,12 +169,6 @@ struct ${Self} : ${'SignedInteger' if sign == 's' else 'UnsignedInteger'}
     return self
   }
 
-  func replPrint() {
-    print(${
-      'self' if BuiltinName == 'Int64'
-      else (('String' if bits > 64 else 'Int64' if signed else 'UInt64') + '(self)')})
-  }
-
 % max = maskBits((bits - 1) if signed else bits)
   @transparent
   static var max: ${Self} { return ${max} }
@@ -196,6 +190,22 @@ extension ${Self} : Hashable {
     return Int(self.value)
 % else:
     return Int(Builtin.${CastToWord}(self.value))
+% end
+  }
+}
+
+extension ${Self} : ReplPrintable {
+  func replPrint() {
+    print(self)
+  }
+}
+
+extension ${Self} : Printable {
+  var description: String {
+% if signed:
+    return _int64ToString(self.toIntMax())
+% else:
+    return _uint64ToString(self.toUIntMax())
 % end
   }
 }

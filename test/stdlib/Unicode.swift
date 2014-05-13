@@ -4,7 +4,7 @@ import Foundation
 import Swift
 
 protocol TestableUnicodeCodec : UnicodeCodec {
-  typealias CodeUnit : FormattedPrintable, IntegerLiteralConvertible, Equatable
+  typealias CodeUnit : Integer
   class func encodingId() -> NSStringEncoding
   class func name() -> NSString
 }
@@ -94,8 +94,8 @@ func nsEncode<CodeUnit>(
 }
 
 // Convert the given numeric value to a hexidecimal string
-func hex<T : FormattedPrintable>(x: T) -> String {
-  return "0x" + x.format("x", layout: "")
+func hex<T : Integer>(x: T) -> String {
+  return "0x" + _int64ToString(x.toIntMax(), radix: 16)
 }
 
 // Convert the given sequence of numeric values to a string
@@ -103,7 +103,7 @@ func hex<T : FormattedPrintable>(x: T) -> String {
 func hex<
   S: Sequence
 where
-  S.GeneratorType.Element : FormattedPrintable
+  S.GeneratorType.Element : Integer
 >(x: S) -> String {
   var r = "["
   var prefix = ""

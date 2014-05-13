@@ -7,7 +7,7 @@ class B : A {
   override func printA() { print("B") }
 }
 
-func print(v: A) { v.printA() }
+func printA(v: A) { v.printA() }
 func printOpt<T>(subprint: T->())(x: T?) {
   switch (x) {
   case .Some(let y): print(".Some("); subprint(y); print(")")
@@ -16,9 +16,9 @@ func printOpt<T>(subprint: T->())(x: T?) {
 }
 
 func test(v: A????, cast: (A????) -> B?) {
-  printOpt(printOpt(printOpt(printOpt(print))))(x: v)
+  printOpt(printOpt(printOpt(printOpt(printA))))(x: v)
   print(" as B: ")
-  printOpt(print)(x: cast(v))
+  printOpt(printA)(x: cast(v))
   print("\n")
 }
 test(.Some(.Some(.Some(.Some(A())))), { $0 as B })
@@ -35,9 +35,9 @@ test(.None, { $0 as B })
 // CHECK: .None as B: .None
 
 func test(v: A????, cast: (A????) -> B??) {
-  printOpt(printOpt(printOpt(printOpt(print))))(x: v)
+  printOpt(printOpt(printOpt(printOpt(printA))))(x: v)
   print(" as B?: ")
-  printOpt(printOpt(print))(x: cast(v))
+  printOpt(printOpt(printA))(x: cast(v))
   print("\n")
 }
 test(.Some(.Some(.Some(.Some(A())))), { $0 as B? })
@@ -54,9 +54,9 @@ test(.None, { $0 as B? })
 // CHECK: .None as B?: .None
 
 func test(v: A????, cast: (A????) -> B???) {
-  printOpt(printOpt(printOpt(printOpt(print))))(x: v)
+  printOpt(printOpt(printOpt(printOpt(printA))))(x: v)
   print(" as B??: ")
-  printOpt(printOpt(printOpt(print)))(x: cast(v))
+  printOpt(printOpt(printOpt(printA)))(x: cast(v))
   print("\n")
 }
 test(.Some(.Some(.Some(.Some(A())))), { $0 as B?? })

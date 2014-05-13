@@ -63,6 +63,5 @@ func uncurry (a: Int) (b: Int) -> (Int, Int) {
 // CHECK: i32 16{{.*}} [ DW_TAG_arg_variable ] [x] [line [[@LINE+2]]]
 // CHECK: i32 33{{.*}} [ DW_TAG_arg_variable ] [y] [line [[@LINE+1]]]
 func tuple(x: Int, y: (Int, Float, String)) -> Int {
-  printf(y.2)
   return x+y.0;
 }

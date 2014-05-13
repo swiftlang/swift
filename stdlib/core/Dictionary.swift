@@ -1599,14 +1599,28 @@ func != <KeyType : Equatable, ValueType : Equatable>(
   return !(lhs == rhs)
 }
 
-func replPrint(x: Dictionary<String, Int>) {
-  print("[")
-  var prefix = ""
-  for (k, v) in x {
-      print("\(prefix)\"\(k)\": \(v)")
-      prefix = ", "
+extension Dictionary : Printable {
+  var description: String {
+    if count == 0 {
+      return "[:]"
+    }
+
+    var result = "["
+    var first = true
+    for (k, v) in self {
+      if first {
+        first = false
+      } else {
+        result += ", "
+      }
+      result += "\""
+      print(k, &result)
+      result += "\": "
+      print(v, &result)
+    }
+    result += "]"
+    return result
   }
-  print("]")
 }
 
 // this should be nested within _DictionaryMirror, but that causes

@@ -60,6 +60,12 @@ struct ImplicitlyUnwrappedOptional<T>: LogicValue, Reflectable {
   }
 }
 
+extension ImplicitlyUnwrappedOptional : Printable {
+  var description: String {
+    return value.description
+  }
+}
+
 // Intrinsics for use by language features.
 @transparent
 func _doesImplicitlyUnwrappedOptionalHaveValue<T>(inout v: T!) -> Builtin.Int1 {

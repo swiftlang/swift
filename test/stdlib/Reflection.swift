@@ -27,10 +27,10 @@ struct Matte {
 println("Matte:")
 // Build a String around an interpolation as a way of smoke-testing that
 // the internal Mirror implementation gets memory management right.
-// CHECK-NEXT:    (1 elements)
+// CHECK-NEXT:    V10Reflection5Matte (has 1 child)
 // CHECK-NEXT:      s: 123
 dump(Matte("\(123)"))
-// CHECK-NEXT:    (1 elements)
+// CHECK-NEXT:    V10Reflection5Matte (has 1 child)
 // CHECK-NEXT:      s: 456
 dump(Matte("456"))
 
@@ -49,19 +49,19 @@ struct Complex<T> {
 }
 // CHECK-LABEL: Complex:
 println("Complex:")
-// CHECK-NEXT:    (2 elements)
+// CHECK-NEXT:    V10Reflection7Complex (has 2 children)
 // CHECK-NEXT:      real: 1.5
 // CHECK-NEXT:      imag: 0.75
 dump(Complex<Double>(real: 1.5, imag: 0.75))
-// CHECK-NEXT:    (2 elements)
+// CHECK-NEXT:    V10Reflection7Complex (has 2 children)
 // CHECK-NEXT:      real: -1.5
 // CHECK-NEXT:      imag: -0.75
 dump(Complex<Double>(real: -1.5, imag: -0.75))
-// CHECK-NEXT:    (2 elements)
+// CHECK-NEXT:    V10Reflection7Complex (has 2 children)
 // CHECK-NEXT:      real: 22
 // CHECK-NEXT:      imag: 44
 dump(Complex<Int>(real: 22, imag: 44))
-// CHECK-NEXT:    (2 elements)
+// CHECK-NEXT:    V10Reflection7Complex (has 2 children)
 // CHECK-NEXT:      real: is this the real life?
 // CHECK-NEXT:      imag: is it just fantasy?
 dump(Complex<String>(real: "is this the real life?", 
@@ -167,7 +167,7 @@ println("Tuple:")
 // CHECK-NEXT:        first: 384
 // CHECK-NEXT:        second: seven six eight
 // CHECK-NEXT:        self: Brilliant(384, seven six eight) #0
-// CHECK-NEXT:     .1: (1 elements)
+// CHECK-NEXT:     .1: V10Reflection5Matte (has 1 child)
 // CHECK-NEXT:        s: nine
 dump(tuple)
 // CHECK-NEXT: false
@@ -239,16 +239,16 @@ class Best: Better {
 }
 
 // CHECK-LABEL: Root class:
-// CHECK-NEXT:    (2 elements) #0
+// CHECK-NEXT:    C10Reflection4Good (has 2 children) #0
 // CHECK-NEXT:      x: 11
 // CHECK-NEXT:      y: 222
 println("Root class:")
 dump(Good())
 
 // CHECK-LABEL: Subclass:
-// CHECK-NEXT:    (2 elements) #0
-// CHECK-NEXT:      super: (2 elements)
-// CHECK-NEXT:        super: (2 elements)
+// CHECK-NEXT:    C10Reflection4Best (has 2 children) #0
+// CHECK-NEXT:      super: C10Reflection6Better (has 2 children)
+// CHECK-NEXT:        super: C10Reflection4Good (has 2 children)
 // CHECK-NEXT:          x: 11
 // CHECK-NEXT:          y: 222
 // CHECK-NEXT:        z: 333.5
@@ -264,9 +264,9 @@ var any: Any = 1
 dump(any)
 
 // CHECK-LABEL: Any class:
-// CHECK-NEXT:    (2 elements) #0
-// CHECK-NEXT:      super: (2 elements)
-// CHECK-NEXT:        super: (2 elements)
+// CHECK-NEXT:    C10Reflection4Best (has 2 children) #0
+// CHECK-NEXT:      super: C10Reflection6Better (has 2 children)
+// CHECK-NEXT:        super: C10Reflection4Good (has 2 children)
 // CHECK-NEXT:          x: 11
 // CHECK-NEXT:          y: 222
 // CHECK-NEXT:        z: 333.5
@@ -275,7 +275,7 @@ println("Any class:")
 any = Best()
 dump(any)
 // CHECK-LABEL: second verse
-// CHECK-NEXT:    (2 elements)
+// CHECK-NEXT:    C10Reflection4Best (has 2 children) #0
 println("second verse same as the first:")
 dump(any)
 
@@ -305,9 +305,9 @@ dump(fooable)
 extension Best: Barrable {}
 
 // CHECK-LABEL: Barrable class:
-// CHECK-NEXT:    (2 elements) #0
-// CHECK-NEXT:      super: (2 elements)
-// CHECK-NEXT:        super: (2 elements)
+// CHECK-NEXT:    C10Reflection4Best (has 2 children) #0
+// CHECK-NEXT:      super: C10Reflection6Better (has 2 children)
+// CHECK-NEXT:        super: C10Reflection4Good (has 2 children)
 // CHECK-NEXT:          x: 11
 // CHECK-NEXT:          y: 222
 // CHECK-NEXT:        z: 333.5
@@ -316,7 +316,7 @@ println("Barrable class:")
 var barrable: Barrable = Best()
 dump(barrable)
 // CHECK-LABEL: second verse
-// CHECK-NEXT:    (2 elements)
+// CHECK-NEXT:    C10Reflection4Best (has 2 children) #0
 println("second verse same as the first:")
 dump(barrable)
 
@@ -400,8 +400,8 @@ class NSBetter: NSGood {
 }
 
 // CHECK-LABEL: Swift ObjC subclass:
-// CHECK-NEXT:    (2 elements) #0
-// CHECK-NEXT:      super: (2 elements)
+// CHECK-NEXT:    C10Reflection8NSBetter (has 2 children) #0
+// CHECK-NEXT:      super: C10Reflection6NSGood (has 2 children)
 // CHECK-NEXT:        super: <_TtC10Reflection8NSBetter: {{0x[0-9a-f]+}}>
 println("Swift ObjC subclass:")
 dump(NSBetter())

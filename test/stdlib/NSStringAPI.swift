@@ -11,7 +11,7 @@ func testFindFileAndURL(path: String) {
   var content = String.stringWithContentsOfFile(
     path, usedEncoding: &usedEncoding, error: &err)
   
-  println("error: " + (err ? err!.description : "<no error>"))
+  println("error: " + (err ? err.description : "<no error>"))
   println("content: " + (content ? content!.lines[0] : "<no content>"))
 
   var url = NSURL.URLWithString("file://" + path)
@@ -20,7 +20,7 @@ func testFindFileAndURL(path: String) {
   content = String.stringWithContentsOfURL(
     url, usedEncoding: &usedEncoding, error: &err)
   
-  println("error: " + (err ? err!.description : "<no error>"))
+  println("error: " + (err ? err.description : "<no error>"))
   println("content: " + (content ? content!.lines[0] : "<no content>"))
   
 }

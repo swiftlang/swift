@@ -25,8 +25,6 @@ func c_print_int(p: Builtin.RawPointer, buf_len: Int, x: Int64, Radix: Int,
 @asmname("print_uint")
 func c_print_uint(p: Builtin.RawPointer, buf_len: Int, x: UInt64, Radix: Int,
                   uppercase: Bool) -> UInt64
-@asmname("print_double")
-func c_print_double(p: Builtin.RawPointer, x: Double) -> UInt64
 
 @asmname("swift_replOutputIsUTF8") func _isUTF8() -> Bool
 
@@ -52,6 +50,8 @@ func __llvm_ctlz(value: Builtin.Int64, isZeroUndef: Builtin.Int1) -> Builtin.Int
 
 /// Check if a given object (of value or reference type) conforms to the given
 /// protocol.
+///
+/// Limitation: `DestType` should be a protocol defined in the `Swift` module.
 @asmname("swift_stdlib_conformsToProtocol")
 func _stdlib_conformsToProtocol<SourceType, DestType>(
     value: SourceType, _: DestType.Type
@@ -59,6 +59,8 @@ func _stdlib_conformsToProtocol<SourceType, DestType>(
 
 /// Cast the given object (of value or reference type) to the given protocol
 /// type.  Traps if the object does not conform to the protocol.
+///
+/// Limitation: `DestType` should be a protocol defined in the `Swift` module.
 @asmname("swift_stdlib_dynamicCastToExistential1Unconditional")
 func _stdlib_dynamicCastToExistential1Unconditional<SourceType, DestType>(
     value: SourceType, _: DestType.Type
@@ -66,8 +68,22 @@ func _stdlib_dynamicCastToExistential1Unconditional<SourceType, DestType>(
 
 /// Cast the given object (of value or reference type) to the given protocol
 /// type.  Returns `.None` if the object does not conform to the protocol.
+///
+/// Limitation: `DestType` should be a protocol defined in the `Swift` module.
 @asmname("swift_stdlib_dynamicCastToExistential1")
 func _stdlib_dynamicCastToExistential1<SourceType, DestType>(
     value: SourceType, _: DestType.Type
 ) -> DestType?
+
+@asmname("swift_stdlib_getTypeName")
+func _stdlib_getTypeNameImpl<T>(value: T, result: UnsafePointer<String>)
+
+/// Returns the mangled type name for the given value.
+func _stdlib_getTypeName<T>(value: T) -> String {
+  var resultPtr = UnsafePointer<String>.alloc(1)
+  _stdlib_getTypeNameImpl(value, resultPtr)
+  let result = resultPtr.get()
+  resultPtr.dealloc(1)
+  return result
+}
 

@@ -50,27 +50,30 @@ var false : Bool {
   }
 }
 
-extension Bool : LogicValue, ReplPrintable {
+extension Bool : LogicValue {
   @transparent func _getBuiltinLogicValue() -> Builtin.Int1 {
     return value
   }
 
   @transparent func getLogicValue() -> Bool { return self }
 
-  func replPrint() {
-    if self {
-      print("true")
-    } else {
-      print("false")
-    }
-  }
-  
   // Bool can be constructed from LogicValue
   init(_ v : LogicValue) {
     self = v.getLogicValue()
   }
 }
 
+extension Bool : ReplPrintable {
+  func replPrint() {
+    print(self)
+  }
+}
+
+extension Bool : Printable {
+  var description: String {
+    return self ? "true" : "false"
+  }
+}
 
 // This is a magic entrypoint known to the compiler.
 @transparent func _getBool(v: Builtin.Int1) -> Bool { return Bool(v) }

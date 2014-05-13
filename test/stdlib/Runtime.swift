@@ -2,6 +2,17 @@
 
 import Foundation
 
+func assertEquals(
+    expected: String, actual: String,
+    file: StaticString = __FILE__, line: UWord = __LINE__
+) {
+  if expected != actual {
+    println("expected: \"\(expected)\"")
+    println("actual: \"\(actual)\"")
+    assert(expected == actual, file: file, line: line)
+  }
+}
+
 @objc class ClassA {}
 
 struct NotBridgedValueType {
@@ -106,4 +117,44 @@ func test_dynamicCastToExistential1() {
 }
 test_dynamicCastToExistential1()
 // CHECK: test_dynamicCastToExistential1 done
+
+class SomeClass {}
+@objc class SomeObjCClass {}
+class SomeNSObjectSubclass : NSObject {}
+struct SomeStruct {}
+enum SomeEnum {
+  case A
+  init() { self = .A }
+}
+
+func test_getTypeName() {
+  assertEquals("C1a9SomeClass", _stdlib_getTypeName(SomeClass()))
+  assertEquals("C1a13SomeObjCClass", _stdlib_getTypeName(SomeObjCClass()))
+  assertEquals("C1a20SomeNSObjectSubclass", _stdlib_getTypeName(SomeNSObjectSubclass()))
+  assertEquals("NSObject", _stdlib_getTypeName(NSObject()))
+  assertEquals("V1a10SomeStruct", _stdlib_getTypeName(SomeStruct()))
+  assertEquals("O1a8SomeEnum", _stdlib_getTypeName(SomeEnum()))
+
+  var a: Any = SomeClass()
+  assertEquals("C1a9SomeClass", _stdlib_getTypeName(a))
+
+  a = SomeObjCClass()
+  assertEquals("C1a13SomeObjCClass", _stdlib_getTypeName(a))
+
+  a = SomeNSObjectSubclass()
+  assertEquals("C1a20SomeNSObjectSubclass", _stdlib_getTypeName(a))
+
+  a = NSObject()
+  assertEquals("NSObject", _stdlib_getTypeName(a))
+
+  a = SomeStruct()
+  assertEquals("V1a10SomeStruct", _stdlib_getTypeName(a))
+
+  a = SomeEnum()
+  assertEquals("O1a8SomeEnum", _stdlib_getTypeName(a))
+
+  println("test_getTypeName done")
+}
+test_getTypeName()
+// CHECK: test_getTypeName done
 

@@ -12,7 +12,7 @@
 
 // The compiler has special knowledge of Optional<T>, including the fact that
 // it is an enum with cases named 'None' and 'Some'.
-enum Optional<T>: LogicValue,Reflectable {
+enum Optional<T>: LogicValue, Reflectable {
   case None
   case Some(T)
 
@@ -43,6 +43,17 @@ enum Optional<T>: LogicValue,Reflectable {
 
   func getMirror() -> Mirror {
     return _OptionalMirror(self)
+  }
+}
+
+extension Optional : Printable {
+  var description: String {
+    switch self {
+    case .Some(var value):
+      return toString(value)
+    case .None:
+      return "nil"
+    }
   }
 }
 

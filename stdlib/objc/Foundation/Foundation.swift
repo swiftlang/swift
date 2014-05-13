@@ -67,6 +67,10 @@ func == (lhs: NSObject, rhs: NSObject) -> Bool {
   return lhs.isEqual(rhs)
 }
 
+// This is a workaround for:
+// <rdar://problem/16883288> Property of type 'String!' does not satisfy
+// protocol requirement of type 'String'
+extension NSObject : _PrintableNSObject {}
 
 //===----------------------------------------------------------------------===//
 // Strings

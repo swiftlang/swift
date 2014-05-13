@@ -966,3 +966,77 @@ Mirror swift::swift_unsafeReflectAny(HeapObject *owner,
   ::new (&result) MagicMirror(owner, mirrorValue, mirrorType);
   return result;
 }
+
+static void swift_stdlib_getTypeNameImpl(OpaqueValue *value,
+                                         const Metadata *T,
+                                         const Metadata *dynamicType,
+                                         String *result) {
+  switch (dynamicType->getKind()) {
+  case MetadataKind::Tuple:
+    // FIXME: reconstruct the type name.
+    new (result) String("");
+    return;
+
+  case MetadataKind::Class:
+  case MetadataKind::Struct:
+  case MetadataKind::Enum: {
+    auto *descriptor = dynamicType->getNominalTypeDescriptor();
+    if (!descriptor) {
+      new (result) String("");
+      return;
+    }
+    new (result) String(descriptor->Name);
+    return;
+  }
+
+  case MetadataKind::Opaque:
+    new (result) String("");
+    return;
+
+  case MetadataKind::Function:
+    // FIXME: reconstruct the type name.
+    new (result) String("");
+    return;
+
+  case MetadataKind::Existential: {
+    auto existentialMetadata =
+        static_cast<const ExistentialTypeMetadata *>(dynamicType);
+    swift_stdlib_getTypeNameImpl(
+        value, T, existentialMetadata->getDynamicType(value), result);
+    return;
+  }
+
+  case MetadataKind::ExistentialMetatype:
+  case MetadataKind::Metatype:
+    // FIXME: reconstruct the type name.
+    new (result) String("");
+    return;
+
+  case MetadataKind::ObjCClassWrapper: {
+    auto wrapperMetadata =
+        static_cast<const ObjCClassWrapperMetadata *>(dynamicType);
+    new (result) String(object_getClassName((id)wrapperMetadata->Class));
+    return;
+  }
+
+  case MetadataKind::ForeignClass:
+    // FIXME: reconstruct the type name.
+    new (result) String("");
+    return;
+
+  // Values should never use these metadata kinds.
+  case MetadataKind::PolyFunction:
+  case MetadataKind::HeapLocalVariable:
+  case MetadataKind::HeapArray:
+    assert(false);
+    new (result) String("");
+    return;
+  }
+}
+
+extern "C" void swift_stdlib_getTypeName(OpaqueValue *value, String *result,
+                                         const Metadata *T) {
+  swift_stdlib_getTypeNameImpl(value, T, T, result);
+  T->vw_destroy(value);
+}
+

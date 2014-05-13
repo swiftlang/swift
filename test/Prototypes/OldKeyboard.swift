@@ -9,8 +9,7 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// InputStream
-//===----------------------------------------------------------------------===//
+
 // RUN: %target-run-simple-swift
 
 // XXX FIXME -- replace and flush this out with parsing logic
@@ -57,3 +56,67 @@ extension Keyboard {
 }
 
 var kbd : Keyboard = Keyboard()
+
+@final class Console {
+  init() { }
+
+  func write(inout buf: UInt8[]) -> Int {
+    let count = buf.count
+    var r = 0
+    for var start = 0; start < count; start += 1024 {
+      let slice = buf[start...min(start + 1024, count)]
+      r = slice.withUnsafePointerToElements {
+        posix_write(1, $0.value, slice.count)
+      }
+      if r == -1 {
+        break
+      }
+    }
+    return r
+  }
+
+  func write(buf: String) -> Int {
+    var r = 0
+    let p = buf.contiguousUTF8
+
+    if p != nil {
+      let r = posix_write(1, p.value, buf.core.count)
+    }
+    else {
+      var a = NativeArray<UInt8>(count: 1024, value: 0)
+      var count = 0
+
+      for u in buf.utf8 {
+        a[count++] = u
+        if count == a.count {
+          r = a.withUnsafePointerToElements {
+            posix_write(1, $0.value, count)
+          }
+          if r == -1 {
+            break
+          }
+        }
+      }
+
+      if count != 0 {
+        r = a.withUnsafePointerToElements {
+          posix_write(1, $0.value, count)
+        }
+      }
+    }
+
+    securityCheck(r != -1)
+    return r
+  }
+
+  func write(c: UInt8) {
+    var buf = new UInt8[1]
+    buf[0] = c
+    var r = write(&buf)
+    securityCheck(r == 1)
+  }
+}
+
+var con: Console = Console()
+
+
