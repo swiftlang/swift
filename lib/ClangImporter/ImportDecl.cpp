@@ -2404,9 +2404,39 @@ namespace {
         // the existing constructor unavailable.
         if (static_cast<unsigned>(kind) < 
               static_cast<unsigned>(ctor->getInitKind())) {
-          auto attr 
+          // Show exactly where this constructor came from.
+          llvm::SmallString<32> errorStr;
+          errorStr += "superseded by import of ";
+          if (objcMethod->isClassMethod())
+            errorStr += "+[";
+          else
+            errorStr += "-[";
+
+          auto objcDC = objcMethod->getDeclContext();
+          if (auto objcClass = dyn_cast<clang::ObjCInterfaceDecl>(objcDC)) {
+            errorStr += objcClass->getName();
+            errorStr += ' ';
+          } else if (auto objcCat = dyn_cast<clang::ObjCCategoryDecl>(objcDC)) {
+            errorStr += objcCat->getClassInterface()->getName();
+            auto catName = objcCat->getName();
+            if (!catName.empty()) {
+              errorStr += '(';
+              errorStr += catName;
+              errorStr += ')';
+            }
+            errorStr += ' ';
+          } else if (auto objcProto=dyn_cast<clang::ObjCProtocolDecl>(objcDC)) {
+            errorStr += objcProto->getName();
+            errorStr += ' ';
+          }
+
+          errorStr += objcMethod->getSelector().getAsString();
+          errorStr += ']';
+
+          auto attr
             = AvailabilityAttr::createImplicitUnavailableAttr(
-                Impl.SwiftContext, "superseded");
+                Impl.SwiftContext,
+                Impl.SwiftContext.AllocateCopy(errorStr.str()));
           ctor->getMutableAttrs().add(attr);
           continue;
         }
