@@ -21,6 +21,7 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILPasses/Transforms.h"
+#include "llvm/ADT/SmallString.h"
 
 using namespace swift;
 
@@ -44,6 +45,12 @@ static void cleanFunction(SILFunction &Fn) {
           }
         }
     }
+  }
+
+  // Rename functions with public_external linkage to prevent symbol conflict
+  // with stdlib.
+  if (Fn.isDefinition() && Fn.getLinkage() == SILLinkage::PublicExternal) {
+    Fn.setLinkage(SILLinkage::Shared);
   }
 }
 
