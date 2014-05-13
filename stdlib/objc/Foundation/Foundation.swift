@@ -1150,3 +1150,45 @@ extension NSSet {
   }
 }
 
+struct _NSSetMirror : Mirror {
+  var _s : NSSet
+  var _a : NSArray!
+  
+  init(_ s : NSSet) {
+    _s = s
+    _a = _s.allObjects
+  }
+  
+  var value : Any { get { return _s } }
+  
+  var valueType : Any.Type { get { return (_s as Any).dynamicType } }
+  
+  var objectIdentifier: ObjectIdentifier? { get { return .None } }
+  
+  var count: Int { 
+    if _a {
+      return _a.count
+    }
+    return 0
+  }
+  
+  subscript(i: Int) -> (String,Mirror) {
+    if i >= 0 && i < count {
+      return ("[\(i)]",reflect(_a[i]))
+    }
+    fatal("don't ask")
+  }
+  
+  var summary: String { return "\(count) elements" }
+  
+  var quickLookObject: QuickLookObject? { return nil }
+  
+  var disposition : MirrorDisposition { return .MembershipContainer }
+}
+
+extension NSSet : Reflectable {
+  func getMirror() -> Mirror {
+    return _NSSetMirror(self)
+  }
+}
+

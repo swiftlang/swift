@@ -537,6 +537,28 @@ println("\(intNSArrayMirror[0].0): \(intNSArrayMirror[0].1.summary)")
 println("\(intNSArrayMirror[4].0): \(intNSArrayMirror[4].1.summary)")
 #endif
 
+
+#if os(OSX) || os(iOS)
+let numset = NSSet(objects: 1,2,3,4)
+let numsetMirror = reflect(numset)
+// CHECK-NEXT: 4 elements
+println(numsetMirror.summary)
+// CHECK-NEXT: I see all four elements
+let num0 = (numsetMirror[0].1.summary)
+let num1 = (numsetMirror[1].1.summary)
+let num2 = (numsetMirror[2].1.summary)
+let num3 = (numsetMirror[3].1.summary)
+let have1 = (num0 == "1" || num1 == "1" || num2 == "1" || num3 == "1")
+let have2 = (num0 == "2" || num1 == "2" || num2 == "2" || num3 == "2")
+let have3 = (num0 == "3" || num1 == "3" || num2 == "3" || num3 == "3")
+let have4 = (num0 == "4" || num1 == "4" || num2 == "4" || num3 == "4")
+if have1 && have2 && have3 && have4 {
+  println("I see all four elements")
+} else {
+  println("I see \(num0), \(num1), \(num2), \(num3)")
+}
+#endif
+
 // CHECK-LABEL: and now our song is done
 println("and now our song is done")
 
