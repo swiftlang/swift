@@ -218,6 +218,9 @@ public:
   StringRef getFirstTextChunk() const;
   Optional<unsigned> getFirstTextChunkIndex() const;
 
+  /// Concatenates all text chunks considered part of the name to \p OS.
+  void getName(raw_ostream &OS) const;
+
   /// Print a debug representation of the code completion string to \p OS.
   void print(raw_ostream &OS) const;
   void dump() const;

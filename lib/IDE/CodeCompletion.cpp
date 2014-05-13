@@ -642,17 +642,35 @@ StringRef CodeCompletionString::getFirstTextChunk() const {
   return StringRef();
 }
 
+void CodeCompletionString::getName(raw_ostream &OS) const {
+  for (auto C : getChunks().slice(*getFirstTextChunkIndex())) {
+    if (C.getKind() == CodeCompletionString::Chunk::ChunkKind::BraceStmtWithCursor)
+      break;
+    if (C.getKind() == CodeCompletionString::Chunk::ChunkKind::TypeAnnotation)
+      continue;
+    if (C.hasText()) {
+      OS << C.getText();
+    }
+  }
+}
+
 void CodeCompletionContext::sortCompletionResults(
     MutableArrayRef<CodeCompletionResult *> Results) {
   std::sort(Results.begin(), Results.end(),
             [](CodeCompletionResult *LHS, CodeCompletionResult *RHS) {
-    StringRef LHSChunk = LHS->getCompletionString()->getFirstTextChunk();
-    StringRef RHSChunk = RHS->getCompletionString()->getFirstTextChunk();
-    int Result = LHSChunk.compare_lower(RHSChunk);
+    llvm::SmallString<64> LSS;
+    llvm::SmallString<64> RSS;
+    {
+      llvm::raw_svector_ostream LOS(LSS);
+      LHS->getCompletionString()->getName(LOS);
+      llvm::raw_svector_ostream ROS(RSS);
+      RHS->getCompletionString()->getName(ROS);
+    }
+    int Result = LSS.compare_lower(RSS);
     // If the case insensitive comparison is equal, then secondary sort order
     // should be case sensitive.
     if (Result == 0)
-      Result = LHSChunk.compare(RHSChunk);
+      Result = LSS.compare(RSS);
     return Result < 0;
   });
 }
