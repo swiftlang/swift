@@ -83,6 +83,10 @@ func anyClassToCOrE(x: protocol<Class>) -> C {
   return E()
 }
 
+func allToAll<T, U>(t: T, _: U.Type) -> Bool {
+  return t is U
+}
+
 func allMetasToAllMetas<T, U>(_: T.Type, _: U.Type) -> Bool {
   return T.self is U.Type
 }
@@ -137,3 +141,9 @@ println(u is C.Type) // CHECK: true
 println(u is D.Type) // CHECK: true
 println(u is E.Type) // CHECK: false
 println(u is Int.Type) // CHECK: false
+
+// FIXME: Can't spell AnyObject.Protocol
+// CHECK-LABEL: AnyObject casts:
+println("AnyObject casts:")
+println(allToAll(C(), AnyObject.self)) // CHECK: true
+println(allToAll(0, AnyObject.self)) // CHECK: false

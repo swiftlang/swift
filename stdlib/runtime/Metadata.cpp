@@ -324,6 +324,48 @@ swift::swift_dynamicCastClassUnconditional(const void *object,
   return value;
 }
 
+static const OpaqueValue *
+_dynamicCastToExistential(const OpaqueValue *value,
+                          const Metadata *sourceType,
+                          const ExistentialTypeMetadata *targetType) {
+  // TODO: We don't have the runtime infrastructure to support casts to protocol
+  // types generally. For now, only handle the case of classes "conforming" to
+  // AnyObject.
+  if (targetType->Protocols.NumProtocols != 1
+      || strcmp(targetType->Protocols[0]->Name, "_TtPSs9AnyObject_") != 0)
+    return nullptr;
+    
+  switch (sourceType->getKind()) {
+  case MetadataKind::Class:
+  case MetadataKind::ObjCClassWrapper:
+  case MetadataKind::ForeignClass: // FIXME
+    return value;
+
+  case MetadataKind::Existential: {
+    auto sourceExistential
+      = static_cast<const ExistentialTypeMetadata*>(sourceType);
+    // The existential conforms to AnyObject if it's class-constrained.
+    if (sourceExistential->Flags.getClassConstraint()
+          != ProtocolClassConstraint::Class)
+      return nullptr;
+    break;
+  }
+    
+  case MetadataKind::ExistentialMetatype:
+  case MetadataKind::Function:
+  case MetadataKind::HeapArray:
+  case MetadataKind::HeapLocalVariable:
+  case MetadataKind::Metatype:
+  case MetadataKind::Enum:
+  case MetadataKind::Opaque:
+  case MetadataKind::PolyFunction:
+  case MetadataKind::Struct:
+  case MetadataKind::Tuple:
+    return nullptr;
+  }
+  return value;
+}
+
 const void *
 swift::swift_dynamicCast(const void *object, const Metadata *targetType) {
   const ClassMetadata *targetClassType;
@@ -343,9 +385,16 @@ swift::swift_dynamicCast(const void *object, const Metadata *targetType) {
       = static_cast<const ObjCClassWrapperMetadata *>(targetType)->Class;
     break;
 
-  case MetadataKind::ForeignClass: // FIXME
-  case MetadataKind::Existential:
+  case MetadataKind::Existential: {
+    auto r = _dynamicCastToExistential((const OpaqueValue*)&object,
+                                     object_getClass(object),
+                                     (const ExistentialTypeMetadata*)targetType);
+    if (!r)
+      return nullptr;
+    return object;
+  }
   case MetadataKind::ExistentialMetatype:
+  case MetadataKind::ForeignClass: // FIXME
   case MetadataKind::Function:
   case MetadataKind::HeapArray:
   case MetadataKind::HeapLocalVariable:
@@ -375,8 +424,15 @@ swift::swift_dynamicCastUnconditional(const void *object,
       = static_cast<const ObjCClassWrapperMetadata *>(targetType)->Class;
     break;
 
+  case MetadataKind::Existential: {
+    auto r = _dynamicCastToExistential((const OpaqueValue*)&object,
+                                     object_getClass(object),
+                                     (const ExistentialTypeMetadata*)targetType);
+    if (!r)
+      swift::crash("Swift dynamic cast failed");
+    return object;
+  }
   case MetadataKind::ForeignClass: // FIXME
-  case MetadataKind::Existential:
   case MetadataKind::ExistentialMetatype:
   case MetadataKind::Function:
   case MetadataKind::HeapArray:
@@ -555,9 +611,12 @@ swift::swift_dynamicCastIndirect(const OpaqueValue *value,
       return nullptr;
     }
     break;
-      
-  case MetadataKind::ForeignClass: // FIXME
+
   case MetadataKind::Existential:
+    return _dynamicCastToExistential(value, sourceType,
+                                   (const ExistentialTypeMetadata*)targetType);
+    
+  case MetadataKind::ForeignClass: // FIXME
   case MetadataKind::ExistentialMetatype:
   case MetadataKind::Function:
   case MetadataKind::HeapArray:
@@ -610,9 +669,16 @@ swift::swift_dynamicCastIndirectUnconditional(const OpaqueValue *value,
       swift::crash("Swift dynamic cast failed");
     }
     break;
-      
+
+  case MetadataKind::Existential: {
+    auto r = _dynamicCastToExistential(value, sourceType,
+                                   (const ExistentialTypeMetadata*)targetType);
+    if (!r)
+      swift::crash("Swift dynamic cast failed");
+    return r;
+  }
+    
   case MetadataKind::ForeignClass: // FIXME
-  case MetadataKind::Existential:
   case MetadataKind::ExistentialMetatype:
   case MetadataKind::Function:
   case MetadataKind::HeapArray:
