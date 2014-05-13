@@ -429,7 +429,7 @@ Job *LLDB::constructJob(const JobAction &JA,
     Exec = Path.c_str();
   } else {
     auto &TC = getToolChain();
-    Exec = TC.getDriver().getProgramPath("lldb", TC).c_str();
+    Exec = Args.MakeArgString(TC.getDriver().getProgramPath("lldb", TC));
   }
 
   return new Command(JA, *this, std::move(Inputs), std::move(Output), Exec,
