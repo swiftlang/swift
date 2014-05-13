@@ -787,24 +787,6 @@ void SwiftZone::threadExitCleanup(void *arg) {
   swiftZone.writeUnlock();
 }
 
-kern_return_t _swift_memory_reader(task_t task,
-                                   vm_address_t remote_address,
-                                   vm_size_t size, void **local_memory) {
-    /* given a task, "reads" the memory at the given address and size
-local_memory: set to a contiguous chunk of memory; validity of local_memory is assumed to be limited (until next call) */
-
-#define MALLOC_PTR_IN_USE_RANGE_TYPE    1   /* for allocated pointers */
-#define MALLOC_PTR_REGION_RANGE_TYPE    2   /* for region containing pointers */
-#define MALLOC_ADMIN_REGION_RANGE_TYPE  4   /* for region used internally */
-#define MALLOC_ZONE_SPECIFIC_FLAGS  0xff00  /* bits reserved for zone-specific purposes */
-  swift::crash("Swift Zone memory reader not implemented");
-}
-
-void _swift_vm_range_recorder(task_t task, void *, unsigned type,
-                              vm_range_t *, unsigned) {
-    /* given a task and context, "records" the specified addresses */
-}
-
 static size_t boolHash(const void *pointer) {
   return (size_t)pointer;
 }
