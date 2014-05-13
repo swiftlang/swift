@@ -975,6 +975,13 @@ void IRGenDebugInfo::emitVariableDeclaration(IRBuilder& Builder,
 
       unsigned SizeInBytes =
         llvm::RoundUpToAlignment(Dim.SizeInBits, Dim.AlignInBits) / SizeOfByte;
+
+      if (Var.getName() == "i" && Var.getLineNumber()==694) {
+        ElementSizes EltSizes(DITy, DIRefMap);
+        EltSizes.getNext();
+        EltSizes.getNext();
+      }
+
       // FIXME: Occasionally we miss out that the Storage is acually a
       // refcount wrapper. Silently skip these for now.
       if ((OffsetInBytes+SizeInBytes)*SizeOfByte > Var.getSizeInBits(DIRefMap))
@@ -1226,6 +1233,46 @@ uint64_t IRGenDebugInfo::getSizeOfBasicType(DebugTypeInfo DbgTy) {
   return BitWidth;
 }
 
+/// Convenience function that creates a forward declaration for PointeeTy.
+llvm::DIType IRGenDebugInfo::createPointerSizedStruct(llvm::DIDescriptor Scope,
+                                                      StringRef Name,
+                                                      llvm::DIFile File,
+                                                      unsigned Line,
+                                                      unsigned Flags,
+                                                      StringRef MangledName) {
+  auto FwdDecl =
+    DBuilder.createForwardDecl(llvm::dwarf::DW_TAG_structure_type,
+                               Name, Scope, File, Line,
+                               llvm::dwarf::DW_LANG_Swift, 0, 0);
+  return createPointerSizedStruct(Scope, Name, FwdDecl,
+                                  File, Line, Flags, MangledName);
+}
+
+
+/// Create a pointer-sized struct with a mangled name and a single
+/// member of PointeeTy.
+llvm::DIType IRGenDebugInfo::createPointerSizedStruct(llvm::DIDescriptor Scope,
+                                                      StringRef Name,
+                                                      llvm::DIType PointeeTy,
+                                                      llvm::DIFile File,
+                                                      unsigned Line,
+                                                      unsigned Flags,
+                                                      StringRef MangledName) {
+  unsigned PtrSize = CI.getTargetInfo().getPointerWidth(0);
+  unsigned PtrAlign = CI.getTargetInfo().getPointerAlign(0);
+  auto PtrTy = DBuilder.createPointerType(PointeeTy, PtrSize, PtrAlign);
+  llvm::Value *Elements[] = {
+    DBuilder.createMemberType(Scope, "pointer", File, 0, 
+                              PtrSize, PtrAlign, 0, Flags, PtrTy)
+  };
+  return DBuilder.
+    createStructType(Scope, Name, File, Line,
+                     PtrSize, PtrAlign, Flags,
+                     llvm::DIType(), // DerivedFrom
+                     DBuilder.getOrCreateArray(Elements),
+                     llvm::dwarf::DW_LANG_Swift, llvm::DIType(), MangledName);
+}
+
 /// Create subroutine type with size and alignment.
 static
 llvm::DICompositeType
@@ -1399,66 +1446,42 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   case TypeKind::Protocol: {
     auto ProtocolTy = BaseTy->castTo<ProtocolType>();
     auto Decl = ProtocolTy->getDecl();
-    // FIXME: (LLVM branch) Should be DW_TAG_interface_type
+    // FIXME: (LLVM branch) This should probably be a DW_TAG_interface_type.
     Location L = getLoc(SM, Decl);
-    if (!SizeInBits)
-      SizeInBits = CI.getTargetInfo().getPointerWidth(0);
-    return createStructType(DbgTy, Decl, ProtocolTy, Scope,
-                            getOrCreateFile(L.Filename), L.Line,
-                            SizeInBits, AlignInBits, Flags,
-                            llvm::DIType(),  // DerivedFrom
-                            llvm::dwarf::DW_LANG_Swift, MangledName);
+    auto File = getOrCreateFile(L.Filename);
+    return createPointerSizedStruct(Scope,
+                                    Decl ? Decl->getNameStr() : MangledName,
+                                    File, L.Line, Flags, MangledName);
   }
 
   case TypeKind::ProtocolComposition: {
-    if (auto Decl = DbgTy.getDecl()) {
-      Location L = getLoc(SM, Decl);
-      auto File = getOrCreateFile(L.Filename);
+    auto Decl = DbgTy.getDecl();
+    Location L = getLoc(SM, Decl);
+    auto File = getOrCreateFile(L.Filename);
 
-      // FIXME: emit types
-      //auto ProtocolCompositionTy = BaseTy->castTo<ProtocolCompositionType>();
-      if (!SizeInBits)
-        SizeInBits = CI.getTargetInfo().getPointerWidth(0);
-      return DBuilder.
-        createStructType(Scope, Decl->getName().str(), File, L.Line,
-                         SizeInBits, AlignInBits, Flags,
-                         llvm::DIType(), // DerivedFrom
-                         llvm::DIArray(),
-                         llvm::dwarf::DW_LANG_Swift,
-                         llvm::DIType(), MangledName);
-    }
-    DEBUG(llvm::dbgs() << "ProtocolCompositionType without Decl: ";
-          DbgTy.getType()->dump(); llvm::dbgs() << "\n");
-    break;
+    // FIXME: emit types
+    //auto ProtocolCompositionTy = BaseTy->castTo<ProtocolCompositionType>();
+    return createPointerSizedStruct(Scope,
+                                    Decl ? Decl->getNameStr() : MangledName,
+                                    File, L.Line, Flags, MangledName);
   }
 
   case TypeKind::UnboundGeneric: {
     auto UnboundTy = BaseTy->castTo<UnboundGenericType>();
     auto Decl = UnboundTy->getDecl();
     Location L = getLoc(SM, Decl);
-    if (!SizeInBits)
-      SizeInBits = CI.getTargetInfo().getPointerWidth(0);
-    return DBuilder.
-        createStructType(Scope, Decl->getName().str(),
-                         getOrCreateFile(L.Filename), L.Line,
-                         SizeInBits, AlignInBits, Flags,
-                         llvm::DIType(), // DerivedFrom
-                         llvm::DIArray(),
-                         llvm::dwarf::DW_LANG_Swift,
-                         llvm::DIType(), MangledName);
+    return createPointerSizedStruct(Scope,
+                                    Decl ? Decl->getNameStr() : MangledName,
+                                    File, L.Line, Flags, MangledName);
   }
 
   case TypeKind::BoundGenericStruct: {
     auto StructTy = BaseTy->castTo<BoundGenericStructType>();
     auto Decl = StructTy->getDecl();
     Location L = getLoc(SM, Decl);
-    if (!SizeInBits)
-      SizeInBits = CI.getTargetInfo().getPointerWidth(0);
-    return createStructType(DbgTy, Decl, StructTy, Scope,
-                            getOrCreateFile(L.Filename), L.Line,
-                            SizeInBits, AlignInBits, Flags,
-                            llvm::DIType(), // DerivedFrom
-                            llvm::dwarf::DW_LANG_Swift, MangledName);
+    return createPointerSizedStruct(Scope,
+                                    Decl ? Decl->getNameStr() : MangledName,
+                                    File, L.Line, Flags, MangledName);
   }
 
   case TypeKind::BoundGenericClass: {
@@ -1467,14 +1490,9 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     Location L = getLoc(SM, Decl);
     // TODO: We may want to peek at Decl->isObjC() and set this
     // attribute accordingly.
-    auto RuntimeLang = llvm::dwarf::DW_LANG_Swift;
-    if (!SizeInBits)
-      SizeInBits = CI.getTargetInfo().getPointerWidth(0);
-    return createStructType(DbgTy, Decl, ClassTy, Scope,
-                            getOrCreateFile(L.Filename), L.Line,
-                            SizeInBits, AlignInBits, Flags,
-                            llvm::DIType(),  // DerivedFrom
-                            RuntimeLang, MangledName);
+    return createPointerSizedStruct(Scope,
+                                    Decl ? Decl->getNameStr() : MangledName,
+                                    File, L.Line, Flags, MangledName);
   }
 
   case TypeKind::Tuple: {
@@ -1501,21 +1519,9 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     Location L = getLoc(SM, Decl);
     auto ObjectTy = BaseTy->castTo<InOutType>()->getObjectType();
     auto DT = getOrCreateDesugaredType(ObjectTy, DbgTy);
-    auto File = getOrCreateFile(L.Filename);
-    unsigned PtrSize = CI.getTargetInfo().getPointerWidth(0);
-    unsigned PtrAlign = CI.getTargetInfo().getPointerAlign(0);
-    auto PtrTy = DBuilder.createPointerType(DT, PtrSize, PtrAlign);
-    llvm::Value *Elements[] = {
-      DBuilder.createMemberType(Scope, "pointer", File, 0, 
-                                PtrSize, PtrAlign, 0, Flags, PtrTy)
-    };
     llvm::Twine Name = Decl ? "inout "+Decl->getNameStr() : MangledName;
-    return DBuilder.
-      createStructType(Scope, Name.str(), File, L.Line,
-                       PtrSize, PtrAlign, Flags,
-                       llvm::DIType(), // DerivedFrom
-                       DBuilder.getOrCreateArray(Elements),
-                       llvm::dwarf::DW_LANG_Swift, llvm::DIType(), MangledName);
+    return createPointerSizedStruct(Scope, Name.str(), DT, File, L.Line, Flags,
+                                    MangledName);
   }
 
   case TypeKind::Archetype: {

@@ -254,6 +254,19 @@ private:
                                        StringRef Name, llvm::DIDescriptor Scope,
                                        llvm::DIFile File, unsigned Line,
                                        unsigned Flags);
+  llvm::DIType createPointerSizedStruct(llvm::DIDescriptor Scope,
+                                        StringRef Name,
+                                        llvm::DIFile File,
+                                        unsigned Line,
+                                        unsigned Flags,
+                                        StringRef MangledName);
+  llvm::DIType createPointerSizedStruct(llvm::DIDescriptor Scope,
+                                        StringRef Name,
+                                        llvm::DIType PointeeTy,
+                                        llvm::DIFile File,
+                                        unsigned Line,
+                                        unsigned Flags,
+                                        StringRef MangledName);
   uint64_t getSizeOfBasicType(DebugTypeInfo DbgTy);
   TypeAliasDecl *getMetadataType();
 };
