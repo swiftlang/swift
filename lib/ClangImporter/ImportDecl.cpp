@@ -2416,6 +2416,10 @@ namespace {
       type = FunctionType::get(type->castTo<FunctionType>()->getInput(),
                                selfTy);
 
+      // Add the 'self' parameter to the function types.
+      Type allocType = FunctionType::get(selfMetaVar->getType(), type);
+      Type initType = FunctionType::get(selfTy, type);
+
       // Look for other constructors that occur in this context with
       // the same name.
       for (auto other : nominalOwner->lookupDirect(name)) {
@@ -2426,7 +2430,7 @@ namespace {
         // If the types don't match, this is a different constructor with
         // the same selector. This can happen when an overlay overloads an
         // existing selector with a Swift-only signature.
-        if (!ctor->getType()->isEqual(type)) {
+        if (!ctor->getType()->isEqual(allocType)) {
           continue;
         }
 
@@ -2480,10 +2484,6 @@ namespace {
       auto known = Impl.Constructors.find({objcMethod, dc});
       if (known != Impl.Constructors.end())
         return known->second;
-
-      // Add the 'self' parameter to the function types.
-      Type allocType = FunctionType::get(selfMetaVar->getType(), type);
-      Type initType = FunctionType::get(selfTy, type);
 
       VarDecl *selfVar = createSelfDecl(dc, false);
       selfPat = createTypedNamedPattern(selfVar);
