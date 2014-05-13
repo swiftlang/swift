@@ -152,6 +152,9 @@ static size_t arenaHash(const void *pointer) {
 static size_t hugeAllocationHash(const void *pointer) {
   return (size_t)pointer >> 12;
 }
+static size_t boolHash(const void *pointer) {
+  return (size_t)pointer;
+}
 
 class Arena;
 class SwiftZone {
@@ -533,6 +536,18 @@ _swift_zone_enumerator(task_t task, void *context, unsigned type_mask,
     reader = defaultReader;
   }
 
+  // XXX should we do this?
+#if 0
+  if ((type_mask & MALLOC_ADMIN_REGION_RANGE_TYPE)
+                == MALLOC_ADMIN_REGION_RANGE_TYPE) {
+    vm_range_t buffer = {
+      zone_address + offsetof(SwiftZone, globalCache),
+      sizeof(AllocCacheEntry) * ALLOC_CACHE_COUNT
+    };
+    recorder(task, context, MALLOC_ADMIN_REGION_RANGE_TYPE, &buffer, 1);
+  }
+#endif
+
   readAndDuplicate(task, zone_address, reader, sizeof(SwiftZone), &zone);
 
   if ((type_mask & MALLOC_ADMIN_REGION_RANGE_TYPE)
@@ -578,13 +593,29 @@ _swift_zone_enumerator(task_t task, void *context, unsigned type_mask,
   }
   // handle MALLOC_PTR_IN_USE_RANGE_TYPE
 
+  // FIXME -- do not record per-thread freed blocks
+  HeapMap<bool, boolHash> unusedBlocks;
+  for (unsigned i = 0; i < ALLOC_CACHE_COUNT; i++) {
+    AllocCacheEntry pointer = zone->globalCache[i];
+    kern_return_t error;
+    while (pointer) {
+      unusedBlocks.insert(std::pair<void *, bool>(pointer, true));
+      void **temp;
+      error = reader(task, (vm_address_t)&pointer->next,
+                     sizeof(AllocCacheEntry), (void **)&temp);
+      assert(error == KERN_SUCCESS);
+      pointer = reinterpret_cast<AllocCacheEntry>(*temp);
+    }
+  }
+
   zone->arenas.forEach([&] (const void *pointer, Arena arena) {
     const size_t size = arena.byteSize;
     for (size_t i = 0; i < arenaSize; i += size) {
       auto pointer = (const void *)((uint8_t *)arena.base + i);
-      vm_range_t buffer = { (vm_address_t)pointer, size };
-      // FIXME -- do not record freed blocks
-      recorder(task, context, MALLOC_PTR_IN_USE_RANGE_TYPE, &buffer, 1);
+      if (!unusedBlocks.find(pointer)) {
+        vm_range_t buffer = { (vm_address_t)pointer, size };
+        recorder(task, context, MALLOC_PTR_IN_USE_RANGE_TYPE, &buffer, 1);
+      }
     }
   });
 
@@ -785,10 +816,6 @@ void SwiftZone::threadExitCleanup(void *arg) {
     swiftZone.globalCache[i] = threadCache[i];
   }
   swiftZone.writeUnlock();
-}
-
-static size_t boolHash(const void *pointer) {
-  return (size_t)pointer;
 }
 
 static void
