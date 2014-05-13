@@ -1199,10 +1199,18 @@ visitRawPointerToRefInst(RawPointerToRefInst *RawToRef) {
 /// (load (unchecked_take_enum_data_addr x)) -> (unchecked_enum_data (load x))
 ///
 /// FIXME: Implement this for address projections.
-SILInstruction *SILCombiner::visitUncheckedTakeEnumDataAddrInst(
-    UncheckedTakeEnumDataAddrInst *TEDAI) {
+SILInstruction *
+SILCombiner::
+visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *TEDAI) {
   // If our TEDAI has no users, there is nothing to do.
   if (TEDAI->use_empty())
+    return nullptr;
+
+  // If our enum type is address only, we can not do anything here. The key
+  // thing to remember is that an enum is address only if any of its cases are
+  // address only. So we *could* have a loadable payload resulting from the
+  // TEDAI without the TEDAI being loadable itself.
+  if (TEDAI->getOperand().getType().isAddressOnly(TEDAI->getModule()))
     return nullptr;
 
   // For each user U of the take_enum_data_addr...

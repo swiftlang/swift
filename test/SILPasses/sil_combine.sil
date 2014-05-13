@@ -20,6 +20,11 @@ struct StringData {
 class B { }
 class E : B { }
 
+enum AddressOnlyEnum {
+  case Loadable(Builtin.Int32)
+  case AddressOnly(Any)
+}
+
 //////////////////////
 // Simple DCE Tests //
 //////////////////////
@@ -1224,4 +1229,16 @@ bb0(%0 : $Builtin.NativeObject):
 bb1:
   release_value %1 : $FakeOptional<Builtin.NativeObject>
   return %1 : $FakeOptional<Builtin.NativeObject>
+}
+
+// CHECK-LABEL: sil @loadable_payload_address_only_enum_payload_promotion : $@thin (@in AddressOnlyEnum) -> Builtin.Int32 {
+// CHECK: bb0
+// CHECK-NEXT: unchecked_take_enum_data_addr
+// CHECK-NEXT: load
+// CHECK-NEXT: return
+sil @loadable_payload_address_only_enum_payload_promotion : $@thin (@in AddressOnlyEnum) -> Builtin.Int32 {
+bb0(%0 : $*AddressOnlyEnum):
+  %1 = unchecked_take_enum_data_addr %0 : $*AddressOnlyEnum, #AddressOnlyEnum.Loadable!enumelt.1
+  %2 = load %1 : $*Builtin.Int32
+  return %2 : $Builtin.Int32
 }
