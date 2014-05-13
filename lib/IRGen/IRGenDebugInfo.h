@@ -36,7 +36,7 @@
 #include <set>
 
 namespace llvm {
-  class DIBuilder;
+class DIBuilder;
 }
 
 namespace swift {
@@ -158,7 +158,7 @@ public:
   /// the Builder's current debug location.
   /// \param Tag The DWARF tag that should be used.
   void emitVariableDeclaration(IRBuilder &Builder,
-                               ArrayRef<llvm::Value*> Storage,
+                               ArrayRef<llvm::Value *> Storage,
                                DebugTypeInfo Ty, SILDebugScope *DS,
                                StringRef Name, unsigned Tag, unsigned ArgNo = 0,
                                IndirectionKind = DirectValue,
@@ -167,14 +167,14 @@ public:
   /// Convenience function for stack-allocated variables. Calls
   /// emitVariableDeclaration internally.
   void emitStackVariableDeclaration(IRBuilder &Builder,
-                                    ArrayRef<llvm::Value*> Storage,
+                                    ArrayRef<llvm::Value *> Storage,
                                     DebugTypeInfo Ty, SILDebugScope *DS,
                                     StringRef Name,
                                     IndirectionKind Indirection = DirectValue);
 
   /// Convenience function for variables that are function arguments.
   void emitArgVariableDeclaration(IRBuilder &Builder,
-                                  ArrayRef<llvm::Value*> Storage,
+                                  ArrayRef<llvm::Value *> Storage,
                                   DebugTypeInfo Ty, SILDebugScope *DS,
                                   StringRef Name, unsigned ArgNo,
                                   IndirectionKind = DirectValue,
@@ -234,15 +234,14 @@ private:
                                    llvm::DIFile File);
   llvm::DIScope getModule(StringRef MangledName);
   llvm::DIArray getStructMembers(NominalTypeDecl *D, Type BaseTy,
-                                 llvm::DIDescriptor Scope,
-                                 llvm::DIFile File, unsigned Flags,
-                                 unsigned &SizeInBits);
+                                 llvm::DIDescriptor Scope, llvm::DIFile File,
+                                 unsigned Flags, unsigned &SizeInBits);
   llvm::DICompositeType
   createStructType(DebugTypeInfo DbgTy, NominalTypeDecl *Decl, Type BaseTy,
-                   llvm::DIDescriptor Scope, llvm::DIFile File,
-                   unsigned Line, unsigned SizeInBits, unsigned AlignInBits,
-                   unsigned Flags, llvm::DIType DerivedFrom,
-                   unsigned RuntimeLang, StringRef UniqueID);
+                   llvm::DIDescriptor Scope, llvm::DIFile File, unsigned Line,
+                   unsigned SizeInBits, unsigned AlignInBits, unsigned Flags,
+                   llvm::DIType DerivedFrom, unsigned RuntimeLang,
+                   StringRef UniqueID);
   llvm::DIDerivedType createMemberType(DebugTypeInfo DTI, StringRef Name,
                                        unsigned &OffsetInBits,
                                        llvm::DIDescriptor Scope,
@@ -255,18 +254,13 @@ private:
                                        llvm::DIFile File, unsigned Line,
                                        unsigned Flags);
   llvm::DIType createPointerSizedStruct(llvm::DIDescriptor Scope,
-                                        StringRef Name,
-                                        llvm::DIFile File,
-                                        unsigned Line,
-                                        unsigned Flags,
+                                        StringRef Name, llvm::DIFile File,
+                                        unsigned Line, unsigned Flags,
                                         StringRef MangledName);
   llvm::DIType createPointerSizedStruct(llvm::DIDescriptor Scope,
-                                        StringRef Name,
-                                        llvm::DIType PointeeTy,
-                                        llvm::DIFile File,
-                                        unsigned Line,
-                                        unsigned Flags,
-                                        StringRef MangledName);
+                                        StringRef Name, llvm::DIType PointeeTy,
+                                        llvm::DIFile File, unsigned Line,
+                                        unsigned Flags, StringRef MangledName);
   uint64_t getSizeOfBasicType(DebugTypeInfo DbgTy);
   TypeAliasDecl *getMetadataType();
 };
