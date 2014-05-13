@@ -326,3 +326,12 @@ ExistentialToArchetypeCast(o: o, t: c)
 // CHECK: checked_cast_br existential_to_concrete
 // CHECK: bb1
 ExistentialToArchetypeCast(o: o, t: b)
+
+// CHECK-LABEL: sil shared @_TTSPSs9AnyObject____TF30specialize_checked_cast_branch26ExistentialToArchetypeCastU__FT1oPSs9AnyObject_1tQ__Q_ : $@thin (@out AnyObject, @owned AnyObject, @in AnyObject) -> () {
+// CHECK: bb0
+// CHECK-NOT: checked_cast_br existential_to_archetype
+// CHECK-NOT: checked_cast_br existential_to_concrete
+// CHECK: function_ref @_TTSPSs9AnyObject____TFSs24_injectValueIntoOptionalU__FQ_GSqQ__ : $@thin (@out Optional<AnyObject>, @in AnyObject) -> ()
+// CHECK-NOT: checked_cast_br existential_to_archetype
+// CHECK-NOT: checked_cast_br existential_to_concrete
+ExistentialToArchetypeCast(o: o, t: o)

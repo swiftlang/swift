@@ -317,3 +317,13 @@ ExistentialToArchetype(o: o, t: c)
 // CHECK-LABEL: sil shared @_TTSVSs5UInt8___TF37specialize_unconditional_checked_cast22ExistentialToArchetypeU__FT1oPSs9AnyObject_1tQ__Q_ : $@thin (@out UInt8, @owned AnyObject, @in UInt8) -> () {
 // CHECK: unconditional_checked_cast existential_to_concrete
 ExistentialToArchetype(o: o, t: b)
+
+// AnyObject -> AnyObject
+// CHECK-LABEL: sil shared @_TTSPSs9AnyObject____TF37specialize_unconditional_checked_cast22ExistentialToArchetypeU__FT1oPSs9AnyObject_1tQ__Q_ : $@thin (@out AnyObject, @owned AnyObject, @in AnyObject) -> () {
+// CHECK: bb0
+// CHECK-NEXT: store
+// CHECK-NEXT: load
+// CHECK-NEXT: strong_release
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+ExistentialToArchetype(o: o, t: o)

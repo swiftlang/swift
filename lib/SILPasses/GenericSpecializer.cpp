@@ -306,17 +306,28 @@ private:
       convertArchetypeConcreteCastToConcreteCast(Inst);
       return;
     case CheckedCastKind::ExistentialToArchetype: {
-      // Just convert to ExistentialToConcrete.
-      // Just change the type of cast to an unconditional_checked_cast downcast
-      SILLocation OpLoc = getOpLocation(Inst->getLoc());
       SILValue OpValue = getOpValue(Inst->getOperand());
-      SILType OpType = getOpType(Inst->getType());
+      SILType OpFromTy = OpValue.getType();
+      SILType OpToTy = getOpType(Inst->getType());
+
+      // If the from/to type is the same, just propagate the operand along to
+      // all uses.
+      if (OpFromTy == OpToTy) {
+        auto Pair = std::make_pair(SILValue(Inst),
+                                   OpValue);
+        ValueMap.insert(Pair);
+        return;
+      }
+
+      // Otherwise we assume that we are performing an ExistentialToConcrete
+      // cast.
+      SILLocation OpLoc = getOpLocation(Inst->getLoc());
       CheckedCastKind OpCastKind = CheckedCastKind::ExistentialToConcrete;
       doPostProcess(Inst,
                     getBuilder().createUnconditionalCheckedCast(OpLoc,
                                                                 OpCastKind,
                                                                 OpValue,
-                                                                OpType));
+                                                                OpToTy));
       return;
     }
     }
@@ -430,19 +441,30 @@ private:
       visitCheckedCastBrArchToArchCast(Inst);
       return;
     case CheckedCastKind::ExistentialToArchetype: {
-      // Just convert to ExistentialToConcrete.
-      // Just change the type of cast to a checked_cast_br downcast
       SILLocation OpLoc = getOpLocation(Inst->getLoc());
       SILValue OpValue = getOpValue(Inst->getOperand());
-      SILType OpType = getOpType(Inst->getCastType());
+      SILType OpFromTy = OpValue.getType();
+      SILType OpToTy = getOpType(Inst->getCastType());
       SILBasicBlock *OpSuccBB = getOpBasicBlock(Inst->getSuccessBB());
+
+      // If the from/to type is the same, insert a branch to the success basic
+      // block with the relevant argument.
+      if (OpFromTy == OpToTy) {
+        auto Args = ArrayRef<SILValue>(getOpValue(Inst->getOperand()));
+        auto *Br = Builder.createBranch(OpLoc, OpSuccBB, Args);
+        doPostProcess(Inst, Br);
+        return;
+      }
+
+      // Otherwise we assume that we are performing an ExistentialToConcrete
+      // cast.
       SILBasicBlock *OpFailBB = getOpBasicBlock(Inst->getFailureBB());
       CheckedCastKind OpCastKind = CheckedCastKind::ExistentialToConcrete;
       doPostProcess(Inst,
                     getBuilder().createCheckedCastBranch(OpLoc,
                                                          OpCastKind,
                                                          OpValue,
-                                                         OpType,
+                                                         OpToTy,
                                                          OpSuccBB,
                                                          OpFailBB));
       return;
