@@ -536,18 +536,6 @@ _swift_zone_enumerator(task_t task, void *context, unsigned type_mask,
     reader = defaultReader;
   }
 
-  // XXX should we do this?
-#if 0
-  if ((type_mask & MALLOC_ADMIN_REGION_RANGE_TYPE)
-                == MALLOC_ADMIN_REGION_RANGE_TYPE) {
-    vm_range_t buffer = {
-      zone_address + offsetof(SwiftZone, globalCache),
-      sizeof(AllocCacheEntry) * ALLOC_CACHE_COUNT
-    };
-    recorder(task, context, MALLOC_ADMIN_REGION_RANGE_TYPE, &buffer, 1);
-  }
-#endif
-
   readAndDuplicate(task, zone_address, reader, sizeof(SwiftZone), &zone);
 
   if ((type_mask & MALLOC_ADMIN_REGION_RANGE_TYPE)
