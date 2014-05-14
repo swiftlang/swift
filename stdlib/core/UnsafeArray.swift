@@ -11,8 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 /// Wrapper for a contiguous array of T.  UnsafeArray is both a
-/// Collection—which is multi-pass if you use indices or call
-/// generate() on it—and a Generator, which can only be assumed to be
+/// Collection-which is multi-pass if you use indices or call
+/// generate() on it-and a Generator, which can only be assumed to be
 /// single-pass.  It's not clear how well this combination will work
 /// out, or whether all Collections should also be Streams; consider
 /// this an experiment.
