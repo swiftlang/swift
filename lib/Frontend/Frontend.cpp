@@ -105,10 +105,11 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
 
   if (Invocation.getFrontendOptions().EnableSourceImport) {
     bool immediate = Invocation.getFrontendOptions().actionIsImmediate();
-    Context->addModuleLoader(SourceLoader::create(*Context, !immediate));
+    Context->addModuleLoader(SourceLoader::create(*Context, !immediate,
+                                                  DepTracker));
   }
   
-  auto SML = SerializedModuleLoader::create(*Context);
+  auto SML = SerializedModuleLoader::create(*Context, DepTracker);
   this->SML = SML.get();
   Context->addModuleLoader(std::move(SML));
 
@@ -117,7 +118,7 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   // knowledge.
   auto clangImporter =
     ClangImporter::create(*Context, Invocation.getClangImporterOptions(),
-                          Invocation.getIRGenOptions());
+                          Invocation.getIRGenOptions(), DepTracker);
   if (!clangImporter) {
     Diagnostics.diagnose(SourceLoc(), diag::error_clang_importer_create_fail);
     return true;
@@ -167,6 +168,9 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
 
   for (unsigned i = 0, e = Invocation.getInputFilenames().size(); i != e; ++i) {
     auto &File = Invocation.getInputFilenames()[i];
+
+    if (DepTracker)
+      DepTracker->addDependency(File);
 
     // FIXME: Working with filenames is fragile, maybe use the real path
     // or have some kind of FileManager.

@@ -26,14 +26,15 @@ private:
   ASTContext &Ctx;
   bool SkipBodies;
 
-  explicit SourceLoader(ASTContext &ctx, bool skipBodies)
-    : Ctx(ctx), SkipBodies(skipBodies) {}
+  explicit SourceLoader(ASTContext &ctx, bool skipBodies, DependencyTracker *tracker)
+    : ModuleLoader(tracker), Ctx(ctx), SkipBodies(skipBodies) {}
 
 public:
   static std::unique_ptr<SourceLoader>
-  create(ASTContext &ctx, bool skipBodies) {
+  create(ASTContext &ctx, bool skipBodies,
+         DependencyTracker *tracker = nullptr) {
     return std::unique_ptr<SourceLoader>{
-      new SourceLoader(ctx, skipBodies)
+      new SourceLoader(ctx, skipBodies, tracker)
     };
   }
 

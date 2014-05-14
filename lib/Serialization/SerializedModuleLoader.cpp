@@ -30,7 +30,9 @@ typedef std::pair<Identifier, SourceLoc> AccessPathElem;
 } // end unnamed namespace
 
 // Defined out-of-line so that we can see ~ModuleFile.
-SerializedModuleLoader::SerializedModuleLoader(ASTContext &ctx) : Ctx(ctx) {}
+SerializedModuleLoader::SerializedModuleLoader(ASTContext &ctx,
+                                               DependencyTracker *tracker)
+  : ModuleLoader(tracker), Ctx(ctx) {}
 SerializedModuleLoader::~SerializedModuleLoader() = default;
 
 static llvm::error_code
@@ -297,6 +299,8 @@ Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
 
       return nullptr;
     }
+
+    addDependency(moduleInputBuffer->getBufferIdentifier());
   }
 
   assert(moduleInputBuffer);

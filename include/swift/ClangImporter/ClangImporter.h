@@ -49,7 +49,8 @@ public:
 private:
   Implementation &Impl;
 
-  ClangImporter(ASTContext &ctx, const ClangImporterOptions &clangImporterOpts);
+  ClangImporter(ASTContext &ctx, const ClangImporterOptions &clangImporterOpts,
+                DependencyTracker *tracker);
 
 public:
   /// \brief Create a new Clang importer that can import a suitable Clang
@@ -62,11 +63,13 @@ public:
   ///
   /// \param irGenOpts The options for Swift's IRGen, to keep them in sync.
   ///
+  /// \param tracker The object tracking files this compilation depends on.
+  ///
   /// \returns a new Clang module importer, or null (with a diagnostic) if
   /// an error occurred.
   static std::unique_ptr<ClangImporter>
   create(ASTContext &ctx, const ClangImporterOptions &clangImporterOpts,
-         const IRGenOptions &irGenOpts);
+         const IRGenOptions &irGenOpts, DependencyTracker *tracker = nullptr);
 
   ClangImporter(const ClangImporter &) = delete;
   ClangImporter(ClangImporter &&) = delete;
@@ -138,6 +141,8 @@ public:
   clang::ASTContext &getClangASTContext() const override;
   clang::Preprocessor &getClangPreprocessor() const override;
   std::string getClangModuleHash() const;
+
+  using ClangModuleLoader::addDependency;
   
   // Print statistics from the Clang AST reader.
   void printStatistics() const override;

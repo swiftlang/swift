@@ -115,6 +115,8 @@ namespace {
                                     StringRef RelativePath,
                                     const clang::Module *Imported) override {
       handleImport(Imported);
+      if (!Imported && File)
+        Importer.addDependency(File->getName());
     }
 
     virtual void moduleImport(clang::SourceLocation ImportLoc,
@@ -123,11 +125,28 @@ namespace {
       handleImport(Imported);
     }
   };
+
+  class ASTReaderCallbacks : public clang::ASTReaderListener {
+    ClangImporter &Importer;
+  public:
+    explicit ASTReaderCallbacks(ClangImporter &importer) : Importer(importer) {}
+
+    bool needsInputFileVisitation() override { return true; }
+
+    bool visitInputFile(StringRef file, bool isSystem,
+                        bool isOverridden) override {
+      if (!isOverridden)
+        Importer.addDependency(file);
+      return true;
+    }
+  };
 }
 
 ClangImporter::ClangImporter(ASTContext &ctx,
-                             const ClangImporterOptions &clangImporterOpts)
-  : Impl(*new Implementation(ctx, clangImporterOpts))
+                             const ClangImporterOptions &clangImporterOpts,
+                             DependencyTracker *tracker)
+  : ClangModuleLoader(tracker),
+    Impl(*new Implementation(ctx, clangImporterOpts))
 {
 }
 
@@ -148,9 +167,10 @@ void ClangImporter::clearTypeResolver() {
 std::unique_ptr<ClangImporter>
 ClangImporter::create(ASTContext &ctx,
                       const ClangImporterOptions &importerOpts,
-                      const IRGenOptions &irGenOpts) {
+                      const IRGenOptions &irGenOpts,
+                      DependencyTracker *tracker) {
   std::unique_ptr<ClangImporter> importer{
-    new ClangImporter(ctx, importerOpts)
+    new ClangImporter(ctx, importerOpts, tracker)
   };
 
   // Get the SearchPathOptions to use when creating the Clang importer.
@@ -307,6 +327,9 @@ ClangImporter::create(ASTContext &ctx,
   clang::Preprocessor &clangPP = instance.getPreprocessor();
   clangPP.enableIncrementalProcessing();
   clangPP.addPPCallbacks(new HeaderImportCallbacks(*importer, importer->Impl));
+
+  instance.createModuleManager();
+  instance.getModuleManager()->addListener(new ASTReaderCallbacks(*importer));
 
   // Manually run the action, so that the TU stays open for additional parsing.
   instance.createSema(action->getTranslationUnitKind(), nullptr);

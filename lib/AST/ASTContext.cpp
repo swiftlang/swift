@@ -37,6 +37,7 @@ using namespace swift;
 
 LazyResolver::~LazyResolver() = default;
 void ModuleLoader::anchor() {}
+void DependencyTracker::anchor() {}
 
 llvm::StringRef swift::getProtocolName(KnownProtocolKind kind) {
   switch (kind) {

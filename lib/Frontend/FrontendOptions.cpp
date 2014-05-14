@@ -16,7 +16,7 @@
 
 using namespace swift;
 
-bool FrontendOptions::actionHasOutput() {
+bool FrontendOptions::actionHasOutput() const {
   switch (RequestedAction) {
   case Parse:
   case DumpParse:
@@ -39,7 +39,7 @@ bool FrontendOptions::actionHasOutput() {
   llvm_unreachable("Unknown ActionType");
 }
 
-bool FrontendOptions::actionIsImmediate() {
+bool FrontendOptions::actionIsImmediate() const {
   switch (RequestedAction) {
   case Parse:
   case DumpParse:
@@ -59,4 +59,21 @@ bool FrontendOptions::actionIsImmediate() {
     return false;
   }
   llvm_unreachable("Unknown ActionType");
+}
+
+void FrontendOptions::forAllOutputPaths(
+    std::function<void(const std::string &)> fn) const {
+  const std::string *outputs[] = {
+    &OutputFilename,
+    &ModuleOutputPath,
+    &ModuleDocOutputPath,
+    &ObjCHeaderOutputPath
+  };
+  for (const std::string *next : outputs) {
+    if (RequestedAction == FrontendOptions::EmitModuleOnly &&
+        next == &OutputFilename)
+      continue;
+    if (!next->empty())
+      fn(*next);
+  }
 }

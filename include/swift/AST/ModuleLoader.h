@@ -20,7 +20,6 @@
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
-#include "llvm/ADT/IntrusiveRefCntPtr.h"
 
 namespace swift {
 
@@ -29,9 +28,27 @@ class NominalTypeDecl;
 
 enum class KnownProtocolKind : uint8_t;
 
+class DependencyTracker {
+  virtual void anchor();
+protected:
+  DependencyTracker() = default;
+public:
+  virtual ~DependencyTracker() = default;
+  virtual void addDependency(StringRef file) {}
+};
+
 /// \brief Abstract interface that loads named modules into the AST.
 class ModuleLoader {
+  DependencyTracker * const dependencyTracker;
   virtual void anchor();
+
+protected:
+  ModuleLoader(DependencyTracker *tracker) : dependencyTracker(tracker) {}
+
+  void addDependency(StringRef file) {
+    if (dependencyTracker)
+      dependencyTracker->addDependency(file);
+  }
 
 public:
   virtual ~ModuleLoader() = default;

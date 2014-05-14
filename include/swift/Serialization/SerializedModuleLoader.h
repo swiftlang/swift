@@ -56,14 +56,15 @@ private:
   using LoadedModulePair = std::pair<std::unique_ptr<ModuleFile>, unsigned>;
   std::vector<LoadedModulePair> LoadedModuleFiles;
 
-  explicit SerializedModuleLoader(ASTContext &ctx);
+  explicit SerializedModuleLoader(ASTContext &ctx, DependencyTracker *tracker);
 
 public:
   /// \brief Create a new importer that can load serialized Swift modules
   /// into the given ASTContext.
-  static std::unique_ptr<SerializedModuleLoader> create(ASTContext &ctx) {
+  static std::unique_ptr<SerializedModuleLoader>
+  create(ASTContext &ctx, DependencyTracker *tracker = nullptr) {
     return std::unique_ptr<SerializedModuleLoader>{
-      new SerializedModuleLoader(ctx)
+      new SerializedModuleLoader(ctx, tracker)
     };
   }
 

@@ -179,10 +179,12 @@ public:
   DebugCrashMode CrashMode = DebugCrashMode::None;
 
   /// Indicates whether the RequestedAction has output.
-  bool actionHasOutput();
+  bool actionHasOutput() const;
 
   /// Indicates whether the RequestedAction will immediately run code.
-  bool actionIsImmediate();
+  bool actionIsImmediate() const;
+
+  void forAllOutputPaths(std::function<void(const std::string &)> fn) const;
 };
 
 }

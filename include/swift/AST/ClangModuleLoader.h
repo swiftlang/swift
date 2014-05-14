@@ -23,6 +23,8 @@ class Preprocessor;
 namespace swift {
 
 class ClangModuleLoader : public ModuleLoader {
+protected:
+  using ModuleLoader::ModuleLoader;
 public:
   virtual clang::ASTContext &getClangASTContext() const = 0;
   virtual clang::Preprocessor &getClangPreprocessor() const = 0;

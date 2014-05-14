@@ -81,6 +81,8 @@ Module *SourceLoader::loadModule(SourceLoc importLoc,
     return nullptr;
   }
 
+  addDependency(inputFile->getBufferIdentifier());
+
   // Turn off debugging while parsing other modules.
   llvm::SaveAndRestore<bool> turnOffDebug(Ctx.LangOpts.DebugConstraintSolver,
                                           false);

@@ -270,6 +270,7 @@ class CompilerInstance {
   DiagnosticEngine Diagnostics{SourceMgr};
   std::unique_ptr<ASTContext> Context;
   std::unique_ptr<SILModule> TheSILModule;
+  DependencyTracker *DepTracker = nullptr;
 
   Module *MainModule = nullptr;
   SerializedModuleLoader *SML = nullptr;
@@ -299,12 +300,20 @@ public:
 
   DiagnosticEngine &getDiags() { return Diagnostics; }
 
+  ASTContext &getASTContext() {
+    return *Context;
+  }
+
   void addDiagnosticConsumer(DiagnosticConsumer *DC) {
     Diagnostics.addConsumer(*DC);
   }
 
-  ASTContext &getASTContext() {
-    return *Context;
+  void setDependencyTracker(DependencyTracker *DT) {
+    assert(!Context && "must be called before setup()");
+    DepTracker = DT;
+  }
+  DependencyTracker *getDependencyTracker() {
+    return DepTracker;
   }
 
   /// Set the SIL module for this compilation instance.

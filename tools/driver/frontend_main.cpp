@@ -22,6 +22,7 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Driver/Options.h"
+#include "swift/Frontend/DependencyFileGenerator.h"
 #include "swift/Frontend/DiagnosticVerifier.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
@@ -47,6 +48,26 @@ static std::string displayName(StringRef MainExecutablePath) {
   std::string Name = llvm::sys::path::stem(MainExecutablePath);
   Name += " -frontend";
   return Name;
+}
+
+static bool emitDependencies(DiagnosticEngine &Diags,
+                             DependencyFileGenerator &DFG,
+                             const FrontendOptions &opts) {
+  opts.forAllOutputPaths([&DFG](StringRef target) { DFG.addTarget(target); });
+
+  std::string errorInfo;
+  llvm::raw_fd_ostream out(opts.DependenciesFilePath.c_str(), errorInfo,
+                           llvm::sys::fs::F_None);
+
+  if (out.has_error() || !errorInfo.empty()) {
+    Diags.diagnose(SourceLoc(), diag::error_opening_output,
+                   opts.DependenciesFilePath, errorInfo);
+    out.clear_error();
+    return true;
+  }
+
+  DFG.writeToStream(out);
+  return false;
 }
 
 /// Writes SIL out to the given file.
@@ -133,6 +154,11 @@ static bool performCompile(CompilerInstance &Instance,
   // If we were asked to print Clang stats, do so.
   if (opts.PrintClangStats && Context.getClangModuleLoader())
     Context.getClangModuleLoader()->printStatistics();
+
+  if (DependencyTracker *DT = Instance.getDependencyTracker()) {
+    auto &DFG = *static_cast<DependencyFileGenerator*>(DT);
+    (void)emitDependencies(Context.Diags, DFG, opts);
+  }
   
   // We've just been told to perform a parse, so we can return now.
   if (Action == FrontendOptions::Parse) {
@@ -342,6 +368,10 @@ int frontend_main(ArrayRef<const char *>Args,
   if (Invocation.getDiagnosticOptions().VerifyDiagnostics) {
     enableDiagnosticVerifier(Instance.getSourceMgr());
   }
+
+  DependencyFileGenerator DFG;
+  if (!Invocation.getFrontendOptions().DependenciesFilePath.empty())
+    Instance.setDependencyTracker(&DFG);
 
   if (Instance.setup(Invocation)) {
     return 1;
