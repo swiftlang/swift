@@ -82,6 +82,7 @@ IDENTIFIER_WITH_NAME(GetLogicValue, "getLogicValue")
 IDENTIFIER_WITH_NAME(GetBuiltinLogicValue, "_getBuiltinLogicValue")
 IDENTIFIER_WITH_NAME(GetArrayBoundValue, "getArrayBoundValue")
 IDENTIFIER_WITH_NAME(GetBuiltinArrayBoundValue, "_getBuiltinArrayBoundValue")
+IDENTIFIER_WITH_NAME(Conversion, "__conversion")
 
 #undef IDENTIFIER
 #undef IDENTIFIER_WITH_NAME

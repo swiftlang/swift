@@ -546,7 +546,7 @@ static bool shouldTryUserConversion(ConstraintSystem &cs, Type type) {
   // If there are no user-defined conversions, there's nothing to do.
   // FIXME: lame name!
   auto &ctx = cs.getASTContext();
-  auto name = ctx.getIdentifier("__conversion");
+  auto name = ctx.Id_Conversion;
   return static_cast<bool>(cs.lookupMember(type, name));
 }
 
@@ -1237,7 +1237,7 @@ tryUserConversion(ConstraintSystem &cs, Type type, ConstraintKind kind,
                     /*options=*/0);
 
   auto &ctx = cs.getASTContext();
-  auto name = ctx.getIdentifier("__conversion");
+  auto name = ctx.Id_Conversion;
 
   // The conversion function will have function type TI -> TO, for fresh
   // type variables TI and TO.

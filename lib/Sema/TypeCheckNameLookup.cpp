@@ -41,7 +41,7 @@ LookupResult TypeChecker::lookupMember(Type type, DeclName name,
   assert(!type->is<TupleType>());
 
   // Conversion lookups never permit dynamic lookup.
-  if (name.isSimpleName("__conversion")) {
+  if (name.isSimpleName(Context.Id_Conversion)) {
     options = options & ~NL_DynamicLookup;
   }
 
