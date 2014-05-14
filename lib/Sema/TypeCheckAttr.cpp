@@ -572,6 +572,9 @@ void AttributeChecker::visitNSCopyingAttr(NSCopyingAttr *attr) {
 }
 
 void AttributeChecker::visitUIApplicationMainAttr(UIApplicationMainAttr *attr) {
+  //if (attr->isInvalid())
+  //  return;
+  
   auto *CD = dyn_cast<ClassDecl>(D);
   
   // The applicant not being a class should have been diagnosed by the early
@@ -610,7 +613,13 @@ void AttributeChecker::visitUIApplicationMainAttr(UIApplicationMainAttr *attr) {
     attr->setInvalid();
   }
   
-  // TODO: Save the class in the module, and diagnose duplicates.
+  if (attr->isInvalid())
+    return;
+  
+  // Register the class as the main class in the module. If there are multiples
+  // they will be diagnosed.
+  if (CD->getModuleContext()->registerMainClass(CD, attr->getLocation()))
+    attr->setInvalid();
 }
 
 void AttributeChecker::visitNoReturnAttr(NoReturnAttr *attr) {

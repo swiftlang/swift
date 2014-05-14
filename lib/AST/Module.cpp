@@ -1074,6 +1074,27 @@ bool Module::isBuiltinModule() const {
   return this == Ctx.TheBuiltinModule;
 }
 
+bool Module::registerMainClass(ClassDecl *mainClass, SourceLoc diagLoc) {
+  if (mainClass == MainClass)
+    return false;
+  
+  if (MainClass) {
+    // If we already have a main class, and we haven't diagnosed it, do so now.
+    if (!DiagnosedMultipleMainClasses) {
+      getASTContext().Diags.diagnose(MainClassDiagLoc,
+                                     diag::attr_UIApplicationMain_multiple);
+      DiagnosedMultipleMainClasses = true;
+    }
+    getASTContext().Diags.diagnose(diagLoc,
+                                   diag::attr_UIApplicationMain_multiple);
+    return true;
+  }
+  
+  MainClass = mainClass;
+  MainClassDiagLoc = diagLoc;
+  return false;
+}
+
 bool Module::isSystemModule() const {
   if (isStdlibModule())
     return true;

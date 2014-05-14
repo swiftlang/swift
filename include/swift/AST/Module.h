@@ -184,6 +184,15 @@ private:
   DebuggerClient *DebugClient = nullptr;
 
   SmallVector<FileUnit *, 2> Files;
+  
+  /// The class in this module marked @UIApplicationMain.
+  ClassDecl *MainClass = nullptr;
+  
+  /// The source location of the main class.
+  SourceLoc MainClassDiagLoc;
+  
+  /// Did we complain about multiple main classes yet?
+  bool DiagnosedMultipleMainClasses = false;
 
   Module(Identifier name, ASTContext &ctx);
 public:
@@ -407,6 +416,17 @@ public:
   static bool classof(const DeclContext *DC) {
     return DC->getContextKind() == DeclContextKind::Module;
   }
+  
+  /// Get the "main" class for the module, which has been decorated with one of
+  /// the @\{UI,NS}ApplicationMain attributes. Returns null if there is no
+  /// main class.
+  ClassDecl *getMainClass() const {
+    return MainClass;
+  }
+  
+  /// Register a "main" class for the module, complaining if there is more than
+  /// one. Can only be called during type-checking.
+  bool registerMainClass(ClassDecl *mainClass, SourceLoc diagLoc);
 
 private:
   // Make placement new and vanilla new/delete illegal for Modules.
