@@ -750,6 +750,16 @@ ERROR(nscopying_doesnt_conform,sema_tcd,none,
       "'NSCopying' attribute is only valid with types that conform to"
       " the NSCopying protocol", ())
 
+// UIApplicationMain attribute
+ERROR(attr_UIApplicationMain_not_class,sema_tcd,none,
+      "'UIApplicationMain' attribute may only be used on classes", ())
+ERROR(attr_UIApplicationMain_not_UIApplicationDelegate,sema_tcd,none,
+      "'UIApplicationMain' class must conform to the 'UIApplicationDelegate' protocol",
+      ())
+ERROR(attr_generic_UIApplicationMain_not_supported,sema_tcd,none,
+      "generic 'UIApplicationMain' classes are not supported",
+      ())
+
 // lazy attribute
 ERROR(lazy_not_on_let,sema_tcd,none,
       "'lazy' attribute cannot be used on a let", ())

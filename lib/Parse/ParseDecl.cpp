@@ -537,6 +537,10 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     if (!DiscardAttribute)
       Attributes.add(new (Context) NSManagedAttr(AtLoc, Loc));
     break;
+  case DAK_UIApplicationMain:
+    if (!DiscardAttribute)
+      Attributes.add(new (Context) UIApplicationMainAttr(AtLoc, Loc));
+    break;
   case DAK_noreturn:
     if (!DiscardAttribute)
       Attributes.add(new (Context) NoReturnAttr(AtLoc, Loc));

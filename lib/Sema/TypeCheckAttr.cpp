@@ -61,6 +61,7 @@ public:
   void visitIBOutletAttr(IBOutletAttr *attr);
   void visitLLDBDebuggerFunctionAttr (LLDBDebuggerFunctionAttr *attr);
   void visitNSManagedAttr(NSManagedAttr *attr);
+  void visitUIApplicationMainAttr(UIApplicationMainAttr *attr);
   void visitAssignmentAttr(AssignmentAttr *attr);
   void visitExportedAttr(ExportedAttr *attr);
   void visitOverrideAttr(OverrideAttr *attr);
@@ -194,6 +195,14 @@ void AttributeEarlyChecker::visitNSManagedAttr(NSManagedAttr *attr) {
   if (auto *NSCopy = VD->getMutableAttrs().getAttribute<NSCopyingAttr>())
     return diagnoseAndRemoveAttr(NSCopy, diag::attr_NSManaged_NSCopying);
 
+}
+
+void AttributeEarlyChecker::visitUIApplicationMainAttr(UIApplicationMainAttr *A) {
+  // @UIApplicationMain can only be applied to classes.
+  auto CD = dyn_cast<ClassDecl>(D);
+  
+  if (!CD)
+    return diagnoseAndRemoveAttr(A, diag::attr_UIApplicationMain_not_class);
 }
 
 void AttributeEarlyChecker::visitLLDBDebuggerFunctionAttr (LLDBDebuggerFunctionAttr *attr) {
@@ -345,6 +354,8 @@ public:
   void visitNSCopyingAttr(NSCopyingAttr *attr);
 
   void visitNoReturnAttr(NoReturnAttr *attr);
+
+  void visitUIApplicationMainAttr(UIApplicationMainAttr *attr);
 
   void visitRequiredAttr(RequiredAttr *attr);
 };
@@ -558,6 +569,48 @@ void AttributeChecker::visitNSCopyingAttr(NSCopyingAttr *attr) {
   // class, AnyObject, or classbound protocol.
   // must conform to the NSCopying protocol.
   
+}
+
+void AttributeChecker::visitUIApplicationMainAttr(UIApplicationMainAttr *attr) {
+  auto *CD = dyn_cast<ClassDecl>(D);
+  
+  // The applicant not being a class should have been diagnosed by the early
+  // checker.
+  if (!CD) return;
+
+  // The class cannot be generic.
+  if (CD->isGenericContext()) {
+    TC.diagnose(attr->getLocation(),
+                diag::attr_generic_UIApplicationMain_not_supported);
+    attr->setInvalid();
+    return;
+  }
+  
+  // @UIApplicationMain classes must conform to UIKit's UIApplicationDelegate
+  // protocol.
+  Identifier Id_UIApplicationDelegate
+    = D->getASTContext().getIdentifier("UIApplicationDelegate");
+  Identifier Id_UIKit
+  = D->getASTContext().getIdentifier("UIKit");
+  
+  bool conformsToDelegate = false;
+  for (auto proto : CD->getProtocols()) {
+    if (proto->getName() != Id_UIApplicationDelegate)
+      continue;
+    if (proto->getModuleContext()->Name != Id_UIKit)
+      continue;
+    
+    conformsToDelegate = true;
+    break;
+  }
+  
+  if (!conformsToDelegate) {
+    TC.diagnose(attr->getLocation(),
+                diag::attr_UIApplicationMain_not_UIApplicationDelegate);
+    attr->setInvalid();
+  }
+  
+  // TODO: Save the class in the module, and diagnose duplicates.
 }
 
 void AttributeChecker::visitNoReturnAttr(NoReturnAttr *attr) {

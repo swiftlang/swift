@@ -143,6 +143,9 @@ SIMPLE_DECL_ATTR(lazy, Lazy, OnVar, 15)
 SIMPLE_DECL_ATTR(LLDBDebuggerFunction, LLDBDebuggerFunction,
                  OnFunc, 16)
 
+SIMPLE_DECL_ATTR(UIApplicationMain, UIApplicationMain,
+                 OnClass, 17)
+
 VIRTUAL_DECL_ATTR(override, Override,
                   OnFunc | OnVar | OnSubscript,
                   /* Not serialized */ 65535)
