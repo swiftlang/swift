@@ -157,9 +157,6 @@ be copied upon its first mutation:
 
 The specific rules for casting are as follows:
 
-* An ``Array<T>`` references a buffer of elements dynamically
-  known to have type ``T``
-
 * In O(1), ``Array<T>`` implicitly converts to ``Array<U>`` iff ``T``
   is derived from ``U`` or if ``T`` is *bridged* to ``U`` or a
   subclass thereof, including ``AnyObject``\ —see below__.  The
@@ -254,7 +251,7 @@ Bridging To Objective-C
   
 * if ``T`` is not *bridged verbatim*, the elements of the ``NSArray``
   (or ``Array<U>`` when bridging is used in array casting) are created
-  eagerly, by calling ``bridgeToObjectiveC()`` on the original
+  eagerly in O(N), by calling ``bridgeToObjectiveC()`` on the original
   ``T``\ s, and a new ``NSArray`` is returned.
 
 Bridging From Objective-C
