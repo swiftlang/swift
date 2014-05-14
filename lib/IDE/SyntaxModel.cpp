@@ -445,7 +445,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
     SN.Dcl = D;
     SN.Kind = SyntaxStructureKind::Parameter;
     if (!PD->getArgumentName().empty())
-      SN.NameRange = CharSourceRange(PD->getStartLoc(),
+      SN.NameRange = CharSourceRange(PD->getSourceRange().Start,
                                      PD->getArgumentName().getLength());
     SN.Range = charSourceRangeFromSourceRange(SM, PD->getSourceRange());
     SN.Attrs = PD->getAttrs();
