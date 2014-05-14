@@ -113,6 +113,7 @@ void DeclAttribute::print(ASTPrinter &Printer) const {
   case DAK_noreturn:       Printer << "@noreturn"; break;
   case DAK_NSCopying:      Printer << "@NSCopying"; break;
   case DAK_NSManaged:      Printer << "@NSManaged"; break;
+  case DAK_UIApplicationMain: Printer << "@UIApplicationMain"; break;
   case DAK_lazy:           Printer << "@lazy"; break;
   case DAK_LLDBDebuggerFunction:
     Printer << "@LLDBDebuggerFunction";
