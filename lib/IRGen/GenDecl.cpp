@@ -389,11 +389,13 @@ void IRGenModule::emitDebuggerInitializers() {
   SILFunction *DebuggerSILFunction = nullptr;
     
   for (SILFunction &SF : *SILMod) {
-    if (Decl* D = SF.getLocation().getAsASTNode<Decl>()) {
-      if (FuncDecl *FD = dyn_cast<FuncDecl>(D)) {
-        if (FD->getAttrs().hasAttribute<LLDBDebuggerFunctionAttr>()) {
-          DebuggerSILFunction = &SF;
-          break;
+    if (SF.hasLocation()) {
+      if (Decl* D = SF.getLocation().getAsASTNode<Decl>()) {
+        if (FuncDecl *FD = dyn_cast<FuncDecl>(D)) {
+          if (FD->getAttrs().hasAttribute<LLDBDebuggerFunctionAttr>()) {
+            DebuggerSILFunction = &SF;
+            break;
+          }
         }
       }
     }
