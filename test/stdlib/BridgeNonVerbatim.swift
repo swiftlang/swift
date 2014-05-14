@@ -71,7 +71,7 @@ struct X : _BridgedToObjectiveC {
     return Tracked(value)
   }
 
-  static func bridgeFromObjectiveC(x: Tracked) -> X {
+  static func bridgeFromObjectiveC(x: Tracked) -> X? {
     fatal("implement")
   }
 

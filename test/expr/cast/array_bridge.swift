@@ -11,7 +11,7 @@ class B : A, _BridgedToObjectiveC {
   func bridgeToObjectiveC() -> A {
     return A()
   }
-  class func bridgeFromObjectiveC(x: A) -> B {
+  class func bridgeFromObjectiveC(x: A) -> B? {
     fatal("implement")
   }
 }
@@ -42,7 +42,7 @@ class F : E, _BridgedToObjectiveC {
   func bridgeToObjectiveC() -> E {
     return self
   }
-  class func bridgeFromObjectiveC(x: E) -> F {
+  class func bridgeFromObjectiveC(x: E) -> F? {
     fatal("implement")
   }
 }
@@ -64,7 +64,7 @@ class H : G, _ConditionallyBridgedToObjectiveC {
   func bridgeToObjectiveC() -> G {
     return self
   }
-  class func bridgeFromObjectiveC(x: G) -> H {
+  class func bridgeFromObjectiveC(x: G) -> H? {
     fatal("implement")
   }
   class func isBridgedToObjectiveC() -> Bool {
@@ -85,7 +85,7 @@ class I : _BridgedToObjectiveC {
   func bridgeToObjectiveC() -> AnyObject {
     return self
   }
-  class func bridgeFromObjectiveC(x: AnyObject) -> I {
+  class func bridgeFromObjectiveC(x: AnyObject) -> I? {
     fatal("implement")
   }
 }

@@ -35,12 +35,55 @@ struct BridgedValueType : _BridgedToObjectiveC {
     return ClassA(value: value)
   }
 
-  static func bridgeFromObjectiveC(x: ClassA) -> BridgedValueType {
-    return BridgedValueType(value: x.value)
+  static func bridgeFromObjectiveC(x: ClassA) -> BridgedValueType? {
+    if x.value % 2 == 0 {
+      return BridgedValueType(value: x.value)
+    }
+    return .None
   }
 
   var value: Int
 }
+
+struct BridgedLargeValueType : _BridgedToObjectiveC {
+  init(value: Int) {
+    value0 = value
+    value1 = value
+    value2 = value
+    value3 = value
+    value4 = value
+    value5 = value
+    value6 = value
+    value7 = value
+  }
+
+  static func getObjectiveCType() -> Any.Type {
+    return ClassA.self
+  }
+
+  func bridgeToObjectiveC() -> ClassA {
+    assert(value == value0)
+    return ClassA(value: value0)
+  }
+
+  static func bridgeFromObjectiveC(x: ClassA) -> BridgedLargeValueType? {
+    if x.value % 2 == 0 {
+      return BridgedLargeValueType(value: x.value)
+    }
+    return .None
+  }
+
+  var value: Int {
+    let x = value0
+    assert(value0 == x && value1 == x && value2 == x && value3 == x &&
+           value4 == x && value5 == x && value6 == x && value7 == x)
+    return x
+  }
+
+  var (value0, value1, value2, value3): (Int, Int, Int, Int)
+  var (value4, value5, value6, value7): (Int, Int, Int, Int)
+}
+
 
 struct ConditionallyBridgedValueType<T> : _ConditionallyBridgedToObjectiveC {
   static func getObjectiveCType() -> Any.Type {
@@ -51,8 +94,11 @@ struct ConditionallyBridgedValueType<T> : _ConditionallyBridgedToObjectiveC {
     return ClassA(value: value)
   }
 
-  static func bridgeFromObjectiveC(x: ClassA) -> ConditionallyBridgedValueType {
-    return ConditionallyBridgedValueType(value: x.value)
+  static func bridgeFromObjectiveC(x: ClassA) -> ConditionallyBridgedValueType? {
+    if x.value % 2 == 0 {
+      return ConditionallyBridgedValueType(value: x.value)
+    }
+    return .None
   }
 
   static func isBridgedToObjectiveC() -> Bool {
@@ -77,8 +123,11 @@ class BridgedRefType : _BridgedToObjectiveC {
     return ClassA(value: value)
   }
 
-  class func bridgeFromObjectiveC(x: ClassA) -> BridgedRefType {
-    return BridgedRefType(value: x.value)
+  class func bridgeFromObjectiveC(x: ClassA) -> BridgedRefType? {
+    if x.value % 2 == 0 {
+      return BridgedRefType(value: x.value)
+    }
+    return .None
   }
 
   var value: Int
@@ -97,8 +146,11 @@ class ConditionallyBridgedRefType<T> : _ConditionallyBridgedToObjectiveC {
     return ClassA(value: value)
   }
 
-  class func bridgeFromObjectiveC(x: ClassA) -> ConditionallyBridgedRefType {
-    return ConditionallyBridgedRefType(value: x.value)
+  class func bridgeFromObjectiveC(x: ClassA) -> ConditionallyBridgedRefType? {
+    if x.value % 2 == 0 {
+      return ConditionallyBridgedRefType(value: x.value)
+    }
+    return .None
   }
 
   class func isBridgedToObjectiveC() -> Bool {
@@ -112,6 +164,8 @@ func test_bridgeToObjectiveC() {
   assert(!bridgeToObjectiveC(NotBridgedValueType()))
 
   assert((bridgeToObjectiveC(BridgedValueType(value: 42)) as ClassA)!.value == 42)
+
+  assert((bridgeToObjectiveC(BridgedLargeValueType(value: 42)) as ClassA)!.value == 42)
 
   assert((bridgeToObjectiveC(ConditionallyBridgedValueType<Int>(value: 42)) as ClassA)!.value == 42)
 
@@ -135,6 +189,9 @@ func test_bridgeFromObjectiveC() {
 
   // Bridge back using NotBridgedValueType.
   assert(!bridgeFromObjectiveC(
+      ClassA(value: 21), NotBridgedValueType.self))
+
+  assert(!bridgeFromObjectiveC(
       ClassA(value: 42), NotBridgedValueType.self))
 
   assert(!bridgeFromObjectiveC(
@@ -150,6 +207,9 @@ func test_bridgeFromObjectiveC() {
       ConditionallyBridgedRefType<String>(value: 42), NotBridgedValueType.self))
 
   // Bridge back using BridgedValueType.
+  assert(!bridgeFromObjectiveC(
+      ClassA(value: 21), BridgedValueType.self))
+
   assert(bridgeFromObjectiveC(
       ClassA(value: 42), BridgedValueType.self)!.value == 42)
 
@@ -165,7 +225,29 @@ func test_bridgeFromObjectiveC() {
   assert(!bridgeFromObjectiveC(
       ConditionallyBridgedRefType<String>(value: 42), BridgedValueType.self))
 
+  // Bridge back using BridgedLargeValueType.
+  assert(!bridgeFromObjectiveC(
+      ClassA(value: 21), BridgedLargeValueType.self))
+
+  assert(bridgeFromObjectiveC(
+      ClassA(value: 42), BridgedLargeValueType.self)!.value == 42)
+
+  assert(!bridgeFromObjectiveC(
+      BridgedVerbatimRefType(), BridgedLargeValueType.self))
+
+  assert(!bridgeFromObjectiveC(
+      BridgedRefType(value: 42), BridgedLargeValueType.self))
+
+  assert(!bridgeFromObjectiveC(
+      ConditionallyBridgedRefType<Int>(value: 42), BridgedLargeValueType.self))
+
+  assert(!bridgeFromObjectiveC(
+      ConditionallyBridgedRefType<String>(value: 42), BridgedLargeValueType.self))
+
   // Bridge back using BridgedVerbatimRefType.
+  assert(!bridgeFromObjectiveC(
+      ClassA(value: 21), BridgedVerbatimRefType.self))
+
   assert(!bridgeFromObjectiveC(
       ClassA(value: 42), BridgedVerbatimRefType.self))
 
@@ -183,6 +265,9 @@ func test_bridgeFromObjectiveC() {
       ConditionallyBridgedRefType<String>(value: 42), BridgedVerbatimRefType.self))
 
   // Bridge back using BridgedRefType.
+  assert(!bridgeFromObjectiveC(
+      ClassA(value: 21), BridgedRefType.self))
+
   assert(bridgeFromObjectiveC(
       ClassA(value: 42), BridgedRefType.self)!.value == 42)
 
@@ -199,6 +284,9 @@ func test_bridgeFromObjectiveC() {
       ConditionallyBridgedRefType<String>(value: 42), BridgedRefType.self))
 
   // Bridge back using ConditionallyBridgedRefType<Int>.
+  assert(!bridgeFromObjectiveC(
+      ClassA(value: 21), ConditionallyBridgedRefType<Int>.self))
+
   assert(bridgeFromObjectiveC(
       ClassA(value: 42), ConditionallyBridgedRefType<Int>.self)!.value == 42)
 
@@ -215,6 +303,9 @@ func test_bridgeFromObjectiveC() {
       ConditionallyBridgedRefType<String>(value: 42), ConditionallyBridgedRefType<Int>.self))
 
   // Bridge back using ConditionallyBridgedRefType<String>.
+  assert(!bridgeFromObjectiveC(
+      ClassA(value: 21), ConditionallyBridgedRefType<String>.self))
+
   assert(!bridgeFromObjectiveC(
       ClassA(value: 42), ConditionallyBridgedRefType<String>.self))
 

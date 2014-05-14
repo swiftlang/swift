@@ -38,7 +38,7 @@ extension String : _BridgedToObjectiveC {
   func bridgeToObjectiveC() -> NSString {
     return NSString()
   }
-  static func bridgeFromObjectiveC(x: NSString) -> String {
+  static func bridgeFromObjectiveC(x: NSString) -> String? {
     fatal("implement")
   }
 }
@@ -50,7 +50,7 @@ extension Int : _BridgedToObjectiveC {
   func bridgeToObjectiveC() -> NSNumber {
     return NSNumber()
   }
-  static func bridgeFromObjectiveC(x: NSNumber) -> Int {
+  static func bridgeFromObjectiveC(x: NSNumber) -> Int? {
     fatal("implement")
   }
 }

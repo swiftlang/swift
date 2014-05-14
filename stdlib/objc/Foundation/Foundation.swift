@@ -397,7 +397,7 @@ extension String : _BridgedToObjectiveC {
     return self
   }
 
-  static func bridgeFromObjectiveC(x: NSString) -> String {
+  static func bridgeFromObjectiveC(x: NSString) -> String? {
     return String(x)
   }
 }
@@ -427,7 +427,7 @@ extension Int : _BridgedToObjectiveC {
     return self
   }
 
-  static func bridgeFromObjectiveC(x: NSNumber) -> Int {
+  static func bridgeFromObjectiveC(x: NSNumber) -> Int? {
     fatal("implement")
   }
 }
@@ -451,7 +451,7 @@ extension UInt : _BridgedToObjectiveC {
     return self
   }
 
-  static func bridgeFromObjectiveC(x: NSNumber) -> UInt {
+  static func bridgeFromObjectiveC(x: NSNumber) -> UInt? {
     fatal("implement")
   }
 }
@@ -473,7 +473,7 @@ extension Float : _BridgedToObjectiveC {
     return self
   }
 
-  static func bridgeFromObjectiveC(x: NSNumber) -> Float {
+  static func bridgeFromObjectiveC(x: NSNumber) -> Float? {
     fatal("implement")
   }
 }
@@ -495,7 +495,7 @@ extension Double : _BridgedToObjectiveC {
     return self
   }
 
-  static func bridgeFromObjectiveC(x: NSNumber) -> Double {
+  static func bridgeFromObjectiveC(x: NSNumber) -> Double? {
     fatal("implement")
   }
 }
@@ -518,7 +518,7 @@ extension Bool: _BridgedToObjectiveC {
     return self
   }
 
-  static func bridgeFromObjectiveC(x: NSNumber) -> Bool {
+  static func bridgeFromObjectiveC(x: NSNumber) -> Bool? {
     fatal("implement")
   }
 }
@@ -579,7 +579,7 @@ extension Array : _ConditionallyBridgedToObjectiveC {
     return reinterpretCast(self.buffer.asCocoaArray())
   }
 
-  static func bridgeFromObjectiveC(x: NSArray) -> Array<T> {
+  static func bridgeFromObjectiveC(x: NSArray) -> Array<T>? {
     fatal("implement")
   }
 
@@ -699,7 +699,7 @@ extension Dictionary : _ConditionallyBridgedToObjectiveC {
     return _convertDictionaryToNSDictionary(self)
   }
 
-  static func bridgeFromObjectiveC(x: NSDictionary) -> Dictionary {
+  static func bridgeFromObjectiveC(x: NSDictionary) -> Dictionary? {
     fatal("implement")
   }
 }
