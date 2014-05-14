@@ -99,8 +99,7 @@ extension String {
   func withCString<Result>(
     f: (CString)->Result
   ) -> Result {
-    var u8 = self.nulTerminatedUTF8()
-    return u8.buffer.withUnsafePointerToElements {
+    return self.nulTerminatedUTF8.withUnsafePointerToElements {
       f(CString($0))
     }
   }
@@ -111,8 +110,7 @@ extension String {
   func withCString<Result>(
     f: (UnsafePointer<CChar>)->Result
   ) -> Result {
-    var u8 = self.nulTerminatedUTF8()
-    return u8.buffer.withUnsafePointerToElements {
+    return self.nulTerminatedUTF8.withUnsafePointerToElements {
       f(UnsafePointer($0))
     }
   }

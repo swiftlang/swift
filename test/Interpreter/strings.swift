@@ -4,7 +4,7 @@
 // String Splits
 //===----------------------------------------------------------------------===//
 if true {
-  var (before, after, found) = "foo.bar".splitFirst(".")
+  var (before, after, found) = "foo.bar"._splitFirst(".")
   assert(found)
   assert(before == "foo")
   assert(after == "bar")
@@ -18,7 +18,7 @@ println("OKAY")
 //===----------------------------------------------------------------------===//
 if true {
   // CHECK-NEXT: {{^}}FOOBAR.WIBBLE{{$}}
-  println("FooBar.Wibble".uppercase)
+  println("FooBar.Wibble".uppercaseString)
   // CHECK-NEXT: {{^}}foobar.wibble{{$}}
-  println("FooBar.Wibble".lowercase)
+  println("FooBar.Wibble".lowercaseString)
 }

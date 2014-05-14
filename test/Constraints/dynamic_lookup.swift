@@ -182,7 +182,7 @@ var sub1Result : String = obj[5]!
 var sub2Result : Int = obj[A()]!
 
 // Subscript then call without the '!'
-var sub1ResultNE = obj[5].startsWith("foo")
+var sub1ResultNE = obj[5].hasPrefix("foo")
 var sub2ResultNE = obj[A()].hashValue
 
 // Property/function ambiguities.

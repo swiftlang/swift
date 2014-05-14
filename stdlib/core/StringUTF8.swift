@@ -197,7 +197,7 @@ extension String {
     return core.elementWidth == 1 ? core.startASCII : nil
   }
 
-  func nulTerminatedUTF8() -> NativeArray<UTF8.CodeUnit> {
+  var nulTerminatedUTF8: NativeArray<UTF8.CodeUnit> {
     var result = NativeArray<UTF8.CodeUnit>()
     result.reserve(countElements(utf8) + 1)
     result += utf8

@@ -75,8 +75,7 @@ extension String {
 }
 
 extension String {
-  // FIXME: Locales make this interesting
-  var uppercase : String {
+  var uppercaseString : String {
     let end = utf8.endIndex
     var resultArray = NativeArray<UTF8.CodeUnit>(count: countElements(utf8), 
                                                  value: 0)
@@ -112,7 +111,7 @@ extension String {
     return String(UTF8.self, input: resultArray)
   }
 
-  var lowercase : String {
+  var lowercaseString : String {
     let end = utf8.endIndex
     var resultArray = NativeArray<UTF8.CodeUnit>(count: countElements(utf8), 
                                                  value: 0)
@@ -158,17 +157,17 @@ extension String {
     return true
   }
 
-  func startsWith(prefix: String) -> Bool {
+  func hasPrefix(prefix: String) -> Bool {
     return Swift.startsWith(self, prefix)
   }
   
-  func endsWith(suffix: String) -> Bool {
+  func hasSuffix(suffix: String) -> Bool {
     return Swift.startsWith(Reverse(self), Reverse(suffix))
   }
 
-  func isAlpha() -> Bool { return _isAll({ $0.isAlpha() }) }
-  func isDigit() -> Bool { return _isAll({ $0.isDigit() }) }
-  func isSpace() -> Bool { return _isAll({ $0.isSpace() }) }
+  func _isAlpha() -> Bool { return _isAll({ $0.isAlpha() }) }
+  func _isDigit() -> Bool { return _isAll({ $0.isDigit() }) }
+  func _isSpace() -> Bool { return _isAll({ $0.isSpace() }) }
 }
 
 /// \brief Represent a positive integer value in the given radix,
@@ -215,9 +214,9 @@ func _formatSignedInteger(
 // Conversions to string from other types.
 extension String {
 
-  init(_ v: Int64, radix: Int = 10, uppercase: Bool = false) {
+  init(_ v: Int64, radix: Int = 10, _uppercase: Bool = false) {
     var format = _formatSignedInteger(v, UInt64(radix), 
-                                      ten: uppercase ? "A" : "a")
+                                      ten: _uppercase ? "A" : "a")
     var asciiCount = 0
     format(stream: { _ in ++asciiCount;() })
     var buffer = _StringBuffer(
@@ -228,9 +227,9 @@ extension String {
   }
 
   // FIXME: This function assumes UTF16
-  init(_ v: UInt64, radix: Int = 10, uppercase: Bool = false) {
+  init(_ v: UInt64, radix: Int = 10, _uppercase: Bool = false) {
     var format = _formatPositiveInteger(v, UInt64(radix), 
-                                        ten: uppercase ? "A" : "a")
+                                        ten: _uppercase ? "A" : "a")
     var asciiCount = v == 0 ? 1 : 0
     format(stream: { _ in ++asciiCount;() })
     var buffer = _StringBuffer(
@@ -243,40 +242,44 @@ extension String {
     self = String(buffer)
   }
 
-  init(_ v : Int8, radix : Int = 10, uppercase : Bool = false) {
-    self = String(Int64(v), radix: radix, uppercase: uppercase)
+  init(_ v : Int8, radix : Int = 10, _uppercase : Bool = false) {
+    self = String(Int64(v), radix: radix, _uppercase: _uppercase)
   }
-  init(_ v : Int16, radix : Int = 10, uppercase : Bool = false) {
-    self = String(Int64(v), radix: radix, uppercase: uppercase)
+  init(_ v : Int16, radix : Int = 10, _uppercase : Bool = false) {
+    self = String(Int64(v), radix: radix, _uppercase: _uppercase)
   }
-  init(_ v : Int32, radix : Int = 10, uppercase : Bool = false) {
-    self = String(Int64(v), radix: radix, uppercase: uppercase)
+  init(_ v : Int32, radix : Int = 10, _uppercase : Bool = false) {
+    self = String(Int64(v), radix: radix, _uppercase: _uppercase)
   }
-  init(_ v : Int, radix : Int = 10, uppercase : Bool = false) {
-    self = String(Int64(v), radix: radix, uppercase: uppercase)
+  init(_ v : Int, radix : Int = 10, _uppercase : Bool = false) {
+    self = String(Int64(v), radix: radix, _uppercase: _uppercase)
   }
-  init(_ v : UInt8, radix : Int = 10, uppercase : Bool = false) {
-    self = String(UInt64(v), radix: radix, uppercase: uppercase)
+  init(_ v : UInt8, radix : Int = 10, _uppercase : Bool = false) {
+    self = String(UInt64(v), radix: radix, _uppercase: _uppercase)
   }
-  init(_ v : UInt16, radix : Int = 10, uppercase : Bool = false) {
-    self = String(UInt64(v), radix: radix, uppercase: uppercase)
+  init(_ v : UInt16, radix : Int = 10, _uppercase : Bool = false) {
+    self = String(UInt64(v), radix: radix, _uppercase: _uppercase)
   }
-  init(_ v : UInt32, radix : Int = 10, uppercase : Bool = false) {
-    self = String(UInt64(v), radix: radix, uppercase: uppercase)
+  init(_ v : UInt32, radix : Int = 10, _uppercase : Bool = false) {
+    self = String(UInt64(v), radix: radix, _uppercase: _uppercase)
   }
-  init(_ v : UInt, radix : Int = 10, uppercase : Bool = false) {
-    self = String(UInt64(v), radix: radix, uppercase: uppercase)
+  init(_ v : UInt, radix : Int = 10, _uppercase : Bool = false) {
+    self = String(UInt64(v), radix: radix, _uppercase: _uppercase)
   }
 
-  init(_ v : Double) {
+  typealias _Double = Double
+  typealias _Float = Float
+  typealias _Bool = Bool
+  
+  init(_ v : _Double) {
     self = _doubleToString(v)
   }
 
-  init(_ v : Float) {
+  init(_ v : _Float) {
     self = String(Double(v))
   }
 
-  init(_ b : Bool) {
+  init(_ b : _Bool) {
     if b {
       self = "true"
     } else {
@@ -344,7 +347,7 @@ extension String {
 extension String {
   /// \brief Produce a substring of the given string from the given character
   /// index to the end of the string.
-  func substr(start: Int) -> String {
+  func _substr(start: Int) -> String {
     var rng = unicodeScalars
     var startIndex = rng.startIndex
     for i in 0..start {
@@ -356,7 +359,7 @@ extension String {
   /// \brief Split the given string at the given delimiter character, returning 
   /// the strings before and after that character (neither includes the character
   /// found) and a boolean value indicating whether the delimiter was found.
-  func splitFirst(delim: UnicodeScalar)
+  func _splitFirst(delim: UnicodeScalar)
     -> (before: String, after: String, wasFound : Bool)
   {
     var rng = unicodeScalars
@@ -372,7 +375,7 @@ extension String {
   /// predicate returns true. Returns the string before that character, the 
   /// character that matches, the string after that character, and a boolean value
   /// indicating whether any character was found.
-  func splitFirstIf(pred: (UnicodeScalar) -> Bool)
+  func _splitFirstIf(pred: (UnicodeScalar) -> Bool)
     -> (before: String, found: UnicodeScalar, after: String, wasFound: Bool)
   {
     var rng = unicodeScalars
@@ -387,7 +390,7 @@ extension String {
   /// \brief Split the given string at each occurrence of a character for which
   /// the given predicate evaluates true, returning an array of strings that
   /// before/between/after those delimiters.
-  func splitIf(pred: (UnicodeScalar) -> Bool) -> String[] {
+  func _splitIf(pred: (UnicodeScalar) -> Bool) -> String[] {
     var scalarSlices = Swift.split(unicodeScalars, pred)
     return scalarSlices.map { $0 as String }
   }

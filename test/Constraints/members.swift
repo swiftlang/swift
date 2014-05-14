@@ -35,7 +35,7 @@ yf.f1(i, y: 1)
 Swift.print(3)
 
 var format : String
-format.splitFirstIf({ $0.isAlpha() })
+format._splitFirstIf({ $0.isAlpha() })
 
 // Archetypes
 func doGetLogicValue<T : LogicValue>(t: T) {
@@ -80,7 +80,7 @@ struct GZ<T> {
 // Members of literals
 // FIXME: Crappy diagnostic
 "foo".lower() // expected-error{{could not find member 'lower'}}
-var tmp = "foo".lowercase
+var tmp = "foo".lowercaseString
 
 // Members of modules
 var myTrue = Swift.true

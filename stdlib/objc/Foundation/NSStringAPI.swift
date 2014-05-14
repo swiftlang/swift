@@ -738,25 +738,6 @@ extension String {
     return _ns.hash
   }
 
-  // - (BOOL)hasPrefix:(NSString *)aString
-  
-  /// \brief Returns a Boolean value that indicates whether a given
-  /// string matches the beginning characters of the receiver.
-
-  func hasPrefix(aString: String) -> Bool {
-    return _ns.hasPrefix(aString)
-  }
-
-  // - (BOOL)hasSuffix:(NSString *)aString
-
-  /// \brief Returns a Boolean value that indicates whether a given
-  /// string matches the ending characters of the receiver.
-
-  func hasSuffix(aString: String) -> Bool {
-    return _ns.hasSuffix(aString)
-  }
-
-
   /*
   Nothing to do here; already provided for String
   
@@ -1073,13 +1054,6 @@ extension String {
   /// \brief Returns the long long value of the receiver’s text.
   var longLongValue: Int64 {
     return self.longLongValue
-  }
-
-  // @property NSString * lowercaseString
-  
-  /// \brief Returns lowercased representation of the receiver.
-  var lowercaseString: String {
-    return _ns.lowercaseString
   }
 
   // - (NSString *)lowercaseStringWithLocale:(NSLocale *)locale
@@ -1481,12 +1455,6 @@ extension String {
     return _ns.substringWithRange(aRange)
   }
 
-  // @property NSString* uppercaseString;
-  
-  /// \brief Returns a uppercased representation of the receiver.
-  var uppercaseString: String {
-    return _ns.uppercaseString
-  }
 
   // - (NSString *)uppercaseStringWithLocale:(NSLocale *)locale
 

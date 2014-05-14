@@ -28,6 +28,6 @@ println(xxx)
 
 // FIXME: compilation fails without the temporary yyy
 var yyy = sort(["apple", "Banana", "cherry"],
-               { $0.lowercase > $1.lowercase })
+               { $0.lowercaseString > $1.lowercaseString })
 println(yyy)
 // CHECK-NEXT: [cherry, Banana, apple]

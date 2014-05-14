@@ -208,9 +208,11 @@ println("so < tocks => \(so < tocks)")
 // CHECK-NEXT: true
 println("sox < tocks => \(sox < tocks)")
 
+let qqq = nonASCIILiteral.hasPrefix("🏂☃")
+let rrr = nonASCIILiteral.hasPrefix("☃")
 let zz = (
-  nonASCIILiteral.startsWith("🏂☃"), nonASCIILiteral.startsWith("☃"),
-  nonASCIILiteral.endsWith("⛄️❄️"), nonASCIILiteral.endsWith("☃"))
+  nonASCIILiteral.hasPrefix("🏂☃"), nonASCIILiteral.hasPrefix("☃"),
+  nonASCIILiteral.hasSuffix("⛄️❄️"), nonASCIILiteral.hasSuffix("☃"))
 
 // CHECK-NEXT: <true, false, true, false>
 println("<\(zz.0), \(zz.1), \(zz.2), \(zz.3)>")

@@ -66,9 +66,9 @@ extension Selector : Equatable, Hashable {
 
 extension String {
   /// \brief Construct the C string representation of an Objective-C selector.
-  init(_ sel: Selector) {
+  init(_sel: Selector) {
     // FIXME: This misses the ASCII optimization.
-    self = String.fromCString(sel_getName(sel))
+    self = String.fromCString(sel_getName(_sel))
   }
 }
 

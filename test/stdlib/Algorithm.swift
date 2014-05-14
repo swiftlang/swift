@@ -1,6 +1,6 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 
-typealias CodePoints = UnicodeScalarView
+typealias CodePoints = String.UnicodeScalarView
 
 extension CodePoints {
   init(_ x: String) {
@@ -39,7 +39,7 @@ func testSplit() {
 
   // FIXME: Disabled pending <rdar://problem/15736729> and <rdar://problem/15733855>
   // CHECK-NEXT-DISABLED: [ "", "", "foo   bar baz " ]
-  // println(split(CodePoints("  foo   bar baz "), { $0.isSpace() }, true, maxSplit:2))
+  // println(split(CodePoints("  foo   bar baz "), { $0._isSpace() }, true, maxSplit:2))
 
   println("done.")
 }
