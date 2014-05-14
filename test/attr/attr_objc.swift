@@ -281,17 +281,17 @@ protocol subject_containerObjCProtocol2 {
 
 func concreteContext1() {
   @objc
-  class subject_inConcreteContext {} // expected-error {{only classes at file scope can be declared 'objc'}}
+  class subject_inConcreteContext {}
 }
 
 class ConcreteContext2 {
   @objc
-  class subject_inConcreteContext {} // expected-error {{only classes at file scope can be declared 'objc'}}
+  class subject_inConcreteContext {}
 }
 
 func genericContext1<T>() {
   @objc
-  class subject_inGenericContext {} // expected-error {{only classes at file scope can be declared 'objc'}}
+  class subject_inGenericContext {}
 
   class subject_constructor_inGenericContext {
     @objc
@@ -311,7 +311,7 @@ func genericContext1<T>() {
 
 class GenericContext2<T> {
   @objc
-  class subject_inGenericContext {} // expected-error {{only classes at file scope can be declared 'objc'}}
+  class subject_inGenericContext {}
 
   @objc
   func f() {} // expected-error{{method in a generic class cannot be represented in Objective-C}}
@@ -320,7 +320,7 @@ class GenericContext2<T> {
 class GenericContext3<T> {
   class MoreNested {
     @objc
-    class subject_inGenericContext {} // expected-error {{only classes at file scope can be declared 'objc'}}
+    class subject_inGenericContext {}
 
     @objc
     func f() {} // expected-error{{method in a generic class cannot be represented in Objective-C}}
