@@ -281,14 +281,6 @@ bool constraints::matchCallArguments(
                    /*ignoreNameClash=*/true);
     }
 
-    // If the next argument has a name, check whether that name applies to
-    // some other parameter that hasn't yet been processed. If so, there is
-    // nothing to claim.
-    for (unsigned i = paramIdx + 1; i != numParams; ++i) {
-      if (paramTuple[i].getName() == name)
-        return Nothing;
-    }
-
     // If we're not supposed to attempt any fixes, we're done.
     if (!allowFixes)
       return Nothing;
