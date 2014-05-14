@@ -122,12 +122,15 @@ func count<I: RandomAccessIndex>(r: Range<I>) -> I.DistanceType {
   return r.startIndex.distanceTo(r.endIndex)
 }
 
-/// \brief Any model of ForwardIndex can be turned into a Range with min...max
+
+/// Forms a half open range including the minimum value but excluding the
+/// maximum value.
 @transparent
 func .. <Pos : ForwardIndex> (min: Pos, max: Pos) -> Range<Pos> {
   return Range(start: min, end: max)
 }
 
+/// Forms a closed range including both the minimum and maximum values.
 @transparent
 func ... <Pos : ForwardIndex> (min: Pos, max: Pos) -> Range<Pos> {
   return Range(start: min, end: max.succ())
