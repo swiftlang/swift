@@ -4151,12 +4151,18 @@ class ConstructorDecl : public AbstractFunctionDecl {
   /// both the overriding and the overridden constructors are abstract.
   ConstructorDecl *OverriddenDecl = nullptr;
 
+  /// The location of the 'convenience' contextual keyword if one is present.
+  SourceLoc ConvenienceLoc;
+
 public:
   ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc, 
                   Pattern *SelfBodyParam, Pattern *BodyParams,
                   GenericParamList *GenericParams, DeclContext *Parent);
 
   void setBodyParams(Pattern *selfPattern, Pattern *bodyParams);
+
+  /// The location of the 'convenience' contextual keyword if one is present.
+  SourceLoc getConvenienceLoc() const { return ConvenienceLoc; }
 
   SourceLoc getConstructorLoc() const { return getNameLoc(); }
   SourceLoc getStartLoc() const { return getConstructorLoc(); }
@@ -4227,6 +4233,9 @@ public:
   /// Set whether this is a convenience initializer.
   void setInitKind(CtorInitializerKind kind) {
     ConstructorDeclBits.InitKind = static_cast<unsigned>(kind);
+  }
+  void setConvenienceLoc(SourceLoc Loc) {
+    ConvenienceLoc = Loc;
   }
 
   /// Whether this is a designated initializer.

@@ -3697,6 +3697,7 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes,
                                            SelfPattern, BodyPattern,
                                            GenericParams, CurDeclContext);
   CD->setInitKind(initKind);
+  CD->setConvenienceLoc(ConvenienceLoc);
 
   // No need to setLocalDiscriminator.
 

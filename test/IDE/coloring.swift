@@ -229,6 +229,9 @@ func test4(inout a: Int) {}
 class MySubClass : MyCls {
     // CHECK: <attr-builtin>override</attr-builtin> <kw>func</kw> foo(x: <type>Int</type>) {}
     override func foo(x: Int) {}
+
+    // CHECK: <kw>convenience</kw> <kw>init</kw>(a: <type>Int</type>) {}
+    convenience init(a: Int) {}
 }
 
 // CHECK: <kw>operator</kw> <kw>infix</kw> ~~ {

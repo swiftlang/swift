@@ -381,6 +381,15 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
     return false;
 
   if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
+    if (auto CtorD = dyn_cast<ConstructorDecl>(D)) {
+      SourceLoc ConvenienceLoc = CtorD->getConvenienceLoc();
+      if (ConvenienceLoc.isValid())
+        if (!passNonTokenNode({ SyntaxNodeKind::Keyword,
+                                CharSourceRange(ConvenienceLoc,
+                                                strlen("convenience"))}))
+          return false;
+    }
+
     FuncDecl *FD = dyn_cast<FuncDecl>(AFD);
     if (FD && FD->isAccessor()) {
       // Pass context sensitive keyword token.

@@ -2722,15 +2722,26 @@ SourceRange EnumElementDecl::getSourceRange() const {
   return {getStartLoc(), getNameLoc()};
 }
 SourceRange ConstructorDecl::getSourceRange() const {
+  if (isImplicit())
+    return getConstructorLoc();
+
   if (getBodyKind() == BodyKind::Unparsed ||
       getBodyKind() == BodyKind::Skipped)
     return { getConstructorLoc(), BodyRange.End };
 
-  auto body = getBody();
-  if (!body || !body->getEndLoc().isValid())
-      return getSignatureSourceRange();
+  SourceLoc Start;
+  if (ConvenienceLoc.isValid())
+    Start = ConvenienceLoc;
+  else
+    Start = getConstructorLoc();
 
-  return { getConstructorLoc(), body->getEndLoc() };
+  SourceLoc End;
+  if (auto body = getBody())
+    End = body->getEndLoc();
+  if (End.isInvalid())
+    End = getSignatureSourceRange().End;
+
+  return { Start, End };
 }
 
 Type ConstructorDecl::getArgumentType() const {
