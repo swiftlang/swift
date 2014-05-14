@@ -1298,23 +1298,28 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   case TypeKind::BuiltinUnknownObject: {
     // The builtin opaque Objective-C pointer type. Useful for pushing
     // an Objective-C type through swift.
-    if (!SizeInBits)
-      SizeInBits = CI.getTargetInfo().getPointerWidth(0);
-    auto IdTy = DBuilder.createStructType(
-        Scope, MangledName, File, 0, 0, 0, 0, llvm::DIType(), llvm::DIArray(),
-        llvm::dwarf::DW_LANG_Swift, llvm::DIType(), MangledName);
-    return DBuilder.createPointerType(IdTy, SizeInBits, AlignInBits);
+    unsigned PtrSize = CI.getTargetInfo().getPointerWidth(0);
+    unsigned PtrAlign = CI.getTargetInfo().getPointerAlign(0);
+    auto IdTy = DBuilder.createForwardDecl(
+      llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, File, 0,
+        llvm::dwarf::DW_LANG_ObjC, 0, 0);
+    return DBuilder.createPointerType(IdTy, PtrSize, PtrAlign, MangledName);
   }
 
   case TypeKind::BuiltinNativeObject: {
-    auto PTy = DBuilder.createPointerType(llvm::DIType(), SizeInBits,
-                                          AlignInBits, MangledName);
+    unsigned PtrSize = CI.getTargetInfo().getPointerWidth(0);
+    unsigned PtrAlign = CI.getTargetInfo().getPointerAlign(0);
+    auto PTy = DBuilder.createPointerType(llvm::DIType(), PtrSize, PtrAlign,
+                                          MangledName);
     return DBuilder.createObjectPointerType(PTy);
   }
 
-  case TypeKind::BuiltinRawPointer:
-    return DBuilder.createPointerType(llvm::DIType(), SizeInBits, AlignInBits,
+  case TypeKind::BuiltinRawPointer: {
+    unsigned PtrSize = CI.getTargetInfo().getPointerWidth(0);
+    unsigned PtrAlign = CI.getTargetInfo().getPointerAlign(0);
+    return DBuilder.createPointerType(llvm::DIType(), PtrSize, PtrAlign,
                                       MangledName);
+  }
 
   case TypeKind::DynamicSelf: {
     // Self. We don't have a way to represent instancetype in DWARF,
