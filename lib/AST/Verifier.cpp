@@ -2141,12 +2141,16 @@ struct ASTNodeBase {};
 }
 
 void swift::verify(SourceFile &SF) {
+#ifndef NDEBUG
   Verifier verifier(SF, &SF);
   SF.walk(verifier);
+#endif
 }
 
 void swift::verify(Decl *D) {
+#ifndef NDEBUG
   Verifier V = Verifier::forDecl(D);
   D->walk(V);
+#endif
 }
 
