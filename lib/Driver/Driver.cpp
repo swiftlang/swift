@@ -519,16 +519,11 @@ void Driver::buildActions(const ToolChain &TC,
       return;
     }
 
-    // FIXME: Change this to PreferLLDB and drop the -experimental-prefer-lldb
-    // option once LLDB is ready.
-    REPLJobAction::Mode Mode = REPLJobAction::Mode::Integrated;
+    REPLJobAction::Mode Mode = REPLJobAction::Mode::PreferLLDB;
     if (const Arg *A = Args.getLastArg(options::OPT_lldb_repl,
-                                       options::OPT_integrated_repl,
-                                       options::OPT_experimental_prefer_lldb)) {
+                                       options::OPT_integrated_repl)) {
       if (A->getOption().matches(options::OPT_lldb_repl))
         Mode = REPLJobAction::Mode::RequireLLDB;
-      else if (A->getOption().matches(options::OPT_experimental_prefer_lldb))
-        Mode = REPLJobAction::Mode::PreferLLDB;
       else
         Mode = REPLJobAction::Mode::Integrated;
     }

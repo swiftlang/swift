@@ -284,8 +284,6 @@ def lldb_repl : Flag<["-"], "lldb-repl">, HelpText<"LLDB-enhanced REPL mode">,
   ModeOpt;
 def integrated_repl : Flag<["-"], "integrated-repl">, Flags<[FrontendOption]>,
   HelpText<"Integrated REPL mode">, ModeOpt;
-def experimental_prefer_lldb : Flag<["-"], "experimental-prefer-lldb">,
-  Flags<[HelpHidden]>;
 
 def i : Flag<["-"], "i">, HelpText<"Immediate mode">, Flags<[FrontendOption]>,
   ModeOpt;
