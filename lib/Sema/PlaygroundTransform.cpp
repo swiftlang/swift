@@ -43,7 +43,7 @@ private:
   ASTContext &Context;
   DeclContext *TypeCheckDC;
   unsigned TmpNameIndex = 0;
-  const unsigned int LineOffset = 9;
+  const unsigned int LineOffset = 10;
 
   struct BracePair {
   public:
