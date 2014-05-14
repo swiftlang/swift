@@ -328,6 +328,7 @@ public:
 
   VarDecl *getDecl() const { return Var; }
   Identifier getBoundName() const { return Var->getName(); }
+  StringRef getNameStr() const { return Var->getNameStr(); }
 
   SourceLoc getLoc() const { return Var->getLoc(); }
   SourceRange getSourceRange() const { return Var->getSourceRange(); }

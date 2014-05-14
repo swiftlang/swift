@@ -150,7 +150,7 @@ namespace {
       OS << ')';
     }
     void visitNamedPattern(NamedPattern *P) {
-      printCommon(P, "pattern_named")<< " '" << P->getBoundName().str() << "')";
+      printCommon(P, "pattern_named")<< " '" << P->getNameStr() << "')";
     }
     void visitAnyPattern(AnyPattern *P) {
       printCommon(P, "pattern_any") << ')';
