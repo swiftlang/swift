@@ -1185,19 +1185,20 @@ void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
     // Consolidate all pieces of an exploded multi-argument into one list.
     llvm::SmallVector<llvm::Value *, 8> Vals;
     getLoweredArgValue(Vals, Arg, Name);
+    // Don't bother emitting swift.refcounted* for now.
+    if (Vals.size() && Vals.back()->getType() == IGM.RefCountedPtrTy)
+      Vals.pop_back();
+
     for (auto Next = I+1; Next != E; ++Next, ++I) {
       if ((*Next)->getDecl() != Arg->getDecl())
         break;
-
-      // Don't bother emitting swift.refcounted* for now.
-      if (Arg->getType().hasReferenceSemantics())
-        break;
-
-      getLoweredArgValue(Vals, *I, Name);
+      getLoweredArgValue(Vals, *Next, Name);
     }
     auto Direct = DirectValue;
-    // ByRef capture.  FIXME: Consider wrapping this in a
-    // reference_type, otherwise we loose Flags such as artificial.
+
+    // ByRef capture.
+    // FIXME: Consider wrapping this in a reference_type, otherwise we
+    // loose flags such as artificial.
     if (Arg->getType().hasReferenceSemantics() &&
         DTI.getType()->getKind() != TypeKind::InOut)
       Direct = IndirectValue;

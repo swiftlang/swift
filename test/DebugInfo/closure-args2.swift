@@ -8,6 +8,7 @@ func main () -> Void
     var backward_ptr  =
         { (lhs : String, rhs : String) -> Bool in
 
+    // CHECK-NOT: llvm.dbg.{{.*}}%swift.refcounted*
     // CHECK: [ DW_TAG_arg_variable ] [lhs]
     // CHECK: [ DW_TAG_arg_variable ] [rhs]
     // CHECK: [ DW_TAG_arg_variable ] [random_string]
