@@ -17,6 +17,7 @@
 #include "swift/AST/TypeVisitor.h"
 #include "swift/AST/Comment.h"
 #include "swift/Basic/Version.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/CommentConversion.h"
@@ -940,6 +941,12 @@ public:
            "\n";
   }
 
+  static bool isClangHeaderModule(Module *import) {
+    auto importer =
+      static_cast<ClangImporter *>(import->Ctx.getClangModuleLoader());
+    return import == importer->getImportedHeaderModule();
+  }
+
   void writeImports(raw_ostream &out) {
     out << "#if defined(__has_feature) && __has_feature(modules)\n";
 
@@ -947,9 +954,16 @@ public:
     bool includeUmbrella = false;
     for (auto import : imports) {
       auto Name = import->Name;
-      if (Name == M.Name)
+      if (Name == M.Name) {
         includeUmbrella = true;
-      else if (seenImports.insert(Name).second)
+        continue;
+      }
+      if (isClangHeaderModule(import)) {
+        // FIXME: Should we at least emit the header provided on the command
+        // line with -import-objc-header?
+        continue;
+      }
+      if (seenImports.insert(Name).second)
         out << "@import " << Name.str() << ";\n";
     }
 
