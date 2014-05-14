@@ -297,16 +297,13 @@ fi
 # CMake options used for all targets, including LLVM/Clang
 COMMON_CMAKE_OPTIONS=(
     "${CMAKE_COMPILER_OPTIONS[@]}"
+    -DCMAKE_BUILD_TYPE="RelWithDebInfo"
     -DLLVM_ENABLE_ASSERTIONS="ON" 
 )
 
 case "${CMAKE_GENERATOR}" in
     'Unix Makefiles')
         BUILD_ARGS="${BUILD_ARGS:--j8}"
-        COMMON_CMAKE_OPTIONS=(
-            "${COMMON_CMAKE_OPTIONS[@]}"
-            "-DCMAKE_VERBOSE_MAKEFILE=1"
-        )
         ;;
     Xcode)
         BUILD_TARGET_FLAG=-target
@@ -331,7 +328,6 @@ if [ \! "$SKIP_BUILD_LLVM" ]; then
       # LLDB
       (cd "${LLVM_BUILD_DIR}" &&
           "$CMAKE" -G "${CMAKE_GENERATOR}" "${COMMON_CMAKE_OPTIONS[@]}" \
-              -DCMAKE_BUILD_TYPE="RelWithDebInfo" \
               -DCMAKE_CXX_FLAGS="-stdlib=libc++" \
               -DCMAKE_EXE_LINKER_FLAGS="-stdlib=libc++" \
               -DCMAKE_SHARED_LINKER_FLAGS="-stdlib=libc++" \
@@ -355,7 +351,6 @@ SWIFT_CMAKE_OPTIONS=(
     -DCMAKE_CXX_FLAGS="-isysroot${SYSROOT}"
     -DSWIFT_RUN_LONG_TESTS="ON"
     -DLLVM_CONFIG="${LLVM_BUILD_DIR}/bin/llvm-config"
-    -DCMAKE_BUILD_TYPE="RelWithDebInfo"
 )
 
 # set_ios_options options_var platform deployment_target internal_suffix arch
@@ -368,7 +363,6 @@ function set_ios_options {
     local sdkroot=$(xcrun -sdk ${platform}${internal_suffix} -show-sdk-path)
 
     local opts=(
-        -DCMAKE_BUILD_TYPE="Debug"
         -DCMAKE_TOOLCHAIN_FILE="${SWIFT_SOURCE_DIR}/cmake/${platform}.cmake"
         -DCMAKE_SYSTEM_PROCESSOR=${arch}
         -DCMAKE_OSX_ARCHITECTURES=${arch}
