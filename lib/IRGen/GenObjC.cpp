@@ -839,6 +839,7 @@ static llvm::Constant *findSwiftAsObjCThunk(IRGenModule &IGM, SILDeclRef ref) {
   auto fn = IGM.getAddrOfSILFunction(ref, NotForDefinition);
   assert(fn && "no IR function for swift-as-objc thunk");
   // FIXME: Should set the linkage of the SILFunction to 'internal'.
+  fn->setVisibility(llvm::GlobalValue::DefaultVisibility);
   fn->setLinkage(llvm::GlobalValue::InternalLinkage);
   fn->setUnnamedAddr(true);
 
