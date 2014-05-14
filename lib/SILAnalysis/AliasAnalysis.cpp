@@ -27,14 +27,52 @@
 
 using namespace swift;
 
+//===----------------------------------------------------------------------===//
+//                                AA Debugging
+//===----------------------------------------------------------------------===//
+
 #ifndef NDEBUG
-/// This is meant to be used during AA bring up. If AA has been brought up, feel
-/// free to remove this.
-static llvm::cl::opt<bool>
-DisableAliasAnalysis("disable-aa", llvm::cl::init(false),
-                     llvm::cl::Hidden,
-                     llvm::cl::desc("Always return most conservative AA "
-                                    "result."));
+
+namespace {
+
+enum class AAKind : unsigned {
+  None=0,
+  BasicAA=1,
+  TypedAccessTBAA=2,
+  All=3,
+};
+
+} // end anonymous namespace
+
+static llvm::cl::opt<AAKind>
+DebugAAKinds("aa", llvm::cl::desc("Alias Analysis Kinds:"),
+             llvm::cl::init(AAKind::All),
+             llvm::cl::values(clEnumValN(AAKind::None,
+                                         "none",
+                                         "Do not perform any AA"),
+                              clEnumValN(AAKind::BasicAA,
+                                         "basic-aa",
+                                         "basic-aa"),
+                              clEnumValN(AAKind::TypedAccessTBAA,
+                                         "typed-access-tb-aa",
+                                         "typed-access-tb-aa"),
+                              clEnumValN(AAKind::All,
+                                         "all",
+                                         "all"),
+                              clEnumValEnd));
+
+static inline bool shouldRunAA() {
+  return unsigned(AAKind(DebugAAKinds));
+}
+
+static inline bool shouldRunTypedAccessTBAA() {
+  return unsigned(AAKind(DebugAAKinds)) & unsigned(AAKind::TypedAccessTBAA);
+}
+
+static inline bool shouldRunBasicAA() {
+  return unsigned(AAKind(DebugAAKinds)) & unsigned(AAKind::BasicAA);
+}
+
 #endif
 
 //===----------------------------------------------------------------------===//
@@ -289,8 +327,15 @@ static bool aggregateContainsRecord(NominalTypeDecl *Aggregate, Type Record,
 }
 
 /// \brief return True if the types \p T1 and \p T2 may alias.
-/// See the TBAA section in the SIL reference manual.
+///
+/// Currently this only implements typed access based TBAA. See the TBAA section
+/// in the SIL reference manual.
 static bool typesMayAlias(SILType T1, SILType T2, SILModule &Mod) {
+#ifndef NDEBUG
+  if (!shouldRunTypedAccessTBAA())
+    return true;
+#endif
+
   if (T1 == T2)
     return true;
 
@@ -364,7 +409,7 @@ static bool typesMayAlias(SILType T1, SILType T2, SILModule &Mod) {
 AliasAnalysis::AliasResult AliasAnalysis::alias(SILValue V1, SILValue V2) {
 #ifndef NDEBUG
   // If alias analysis is disabled, always return may alias.
-  if (DisableAliasAnalysis)
+  if (!shouldRunAA())
     return AliasResult::MayAlias;
 #endif
 
@@ -376,7 +421,12 @@ AliasAnalysis::AliasResult AliasAnalysis::alias(SILValue V1, SILValue V2) {
         << "    V2: " << *V2.getDef());
 
   if (!typesMayAlias(V1.getType(), V2.getType(), *Mod))
-   return AliasResult::NoAlias;
+    return AliasResult::NoAlias;
+
+#ifndef NDEBUG
+  if (!shouldRunBasicAA())
+    return AliasResult::MayAlias;
+#endif
 
   // Strip off any casts on V1, V2.
   V1 = V1.stripCasts();
