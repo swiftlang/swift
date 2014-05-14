@@ -66,7 +66,7 @@ func _adHocPrint<T, TargetStream : OutputStream>(
   if mirror is _TupleMirror {
     print("(", &target)
     var first = true
-    for i in 0...mirror.count {
+    for i in 0..mirror.count {
       if first {
         first = false
       } else {

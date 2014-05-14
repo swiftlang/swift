@@ -20,7 +20,7 @@ func testArithmeticOverflow() {
   var x : UInt8 = 230 - 240 // expected-error {{arithmetic operation '230 - 240' (on type 'UInt8') results in an overflow}}
   
   var xu8_3 : UInt8 = 240   // Global (cross block) analysis.
-  for i in 0...10 {}
+  for i in 0..10 {}
   xu8_3 += 40 // expected-error {{arithmetic operation '240 + 40' (on type 'UInt8') results in an overflow}}
   var cadd : UInt8 = 240 + 5 + 15 // expected-error {{arithmetic operation '245 + 15' (on type 'UInt8') results in an overflow}}
 //  DISABLED FOR NOW

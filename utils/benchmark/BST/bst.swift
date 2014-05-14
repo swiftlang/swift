@@ -127,7 +127,7 @@ import liblfsr
 func test(N:Int) {
   var bst = BST()
   var lfsr = LFSR()
-  for i in 0...N {
+  for i in 0..N {
     bst.insert(lfsr.randInt())
   }
   println("Size \(bst.size())")

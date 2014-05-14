@@ -249,7 +249,7 @@ extension UTF16 {
         size: UInt(count) * UInt(Builtin.strideof(U.self)))
     }
     else {
-      for i in 0...count {
+      for i in 0..count {
         let u16 = T.toUTF16CodeUnit((source + i).get())
         (destination + i).set(U.fromUTF16CodeUnit(u16))
       }

@@ -104,7 +104,7 @@ import Swift
 class FixedSizedRefArrayOfOptionalStorage<T> : HeapBufferStorage<Int, T?> {
   deinit {
     let buffer = Buffer(self)
-    for i in 0...buffer.value {
+    for i in 0..buffer.value {
       (buffer.elementStorage + i).destroy()
     }
   }
@@ -296,7 +296,7 @@ struct Dictionary<KeyType: Hashable, ValueType> : Collection, Sequence {
       var newOwner = _Self(minimumCapacity: minimumCapacity)
       println("reallocating with isUnique: \(isUnique) and capacity \(capacity)=>\(newOwner.capacity)")
 
-      for i in 0...capacity {
+      for i in 0..capacity {
         var x = _buffer[i]
         if x {
           if capacity == newOwner.capacity {

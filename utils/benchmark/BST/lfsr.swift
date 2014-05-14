@@ -12,7 +12,7 @@ class LFSR {
   }
   func randInt() -> Int {
     var result = 0
-    for i in 0...32 {
+    for i in 0..32 {
       result = (result << 1) | lfsr & 1
       shift()
     }
@@ -23,7 +23,7 @@ class LFSR {
 func test() {
   var lfsr = LFSR()
   var rands = Dictionary<Int, Bool>()
-  for i in 0...1000 {
+  for i in 0..1000 {
     let r = lfsr.randInt()
     assert(!rands.find(r))
     rands[r] = true

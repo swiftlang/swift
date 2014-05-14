@@ -234,7 +234,7 @@ func brokenSwitch(x: Int) -> Int {
 func breakContinue(x : Int) -> Int {
 
 Outer:
-  for a in 0..1000 {
+  for a in 0...1000 {
 
   Switch:
     switch x {
@@ -248,9 +248,9 @@ Outer:
   
   // <rdar://problem/16692437> shadowing loop labels should be an error
 Loop:  // expected-note {{previously declared here}}
-  for i in 0..2 {
+  for i in 0...2 {
   Loop:  // expected-error {{label 'Loop' cannot be reused on an inner statement}}
-    for j in 0..2 {
+    for j in 0...2 {
     }
   }
 

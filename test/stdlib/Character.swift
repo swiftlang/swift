@@ -15,7 +15,7 @@ var fragments = [
 func randomString(minSize: Int, maxSize: Int) -> String {
     var n = Int(random()) % (maxSize - minSize) + minSize
     var result = ""
-    for i in 0...n {
+    for i in 0..n {
       result += fragments[Int(random()) % fragments.count]
     }
     return result
@@ -118,7 +118,7 @@ func testStringRoundTripping() {
    // Random tests
    // Seed the random number generator
    srandomdev()
-   for x in 0...500 {
+   for x in 0..500 {
      // Character's small representation variant has 63 bits. Making
      // the maximum length 9 fragments tests both sides of the limit.
      var s = randomString(1,9)

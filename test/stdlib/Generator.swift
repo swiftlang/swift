@@ -2,7 +2,7 @@
 
 // Check to make sure we are actually getting Optionals out of this
 // Generator
-var w = (1...2).generate()
+var w = (1..2).generate()
 var maybe_one = w.next()
 
 var is_ = "is"
@@ -23,15 +23,15 @@ println("w.next() \(!w.next() ? is_ : is_not) None")
 // CHECK: w.next() is None
 
 // Test Sequence protocol
-w = (1...2).generate()
+w = (1..2).generate()
 for x in w { 
   println("x is \(x)") 
 }
 
 // Test round-trip Generator/Generator adaptation
-var x = (1...7).generate()
+var x = (1..7).generate()
 var y = x
-var z = ZipGenerator2(y, (1...7).generate())
+var z = ZipGenerator2(y, (1..7).generate())
 
 for a in GeneratorSequence(z) {
   println("\(a.0), \(a.1)")

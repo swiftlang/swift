@@ -133,5 +133,5 @@ func f1<
 func count16078944<C: Collection>(x: C) -> Int { return 0 }
 
 func test16078944 <T: ForwardIndex>(lhs: T, args: T) -> Int {
-    return count16078944(lhs...args) // don't crash
+    return count16078944(lhs..args) // don't crash
 }

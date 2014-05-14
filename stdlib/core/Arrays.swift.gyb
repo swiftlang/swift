@@ -100,7 +100,7 @@ extension ${Self} : ArrayType {
     buffer = Buffer()
     reserve(count)
     var p = buffer.elementStorage
-    for _ in 0...count {
+    for _ in 0..count {
       p++.initialize(value)
     }
     buffer.count = count
@@ -156,7 +156,7 @@ extension ${Self} : ArrayType {
   mutating func reserve(newCapacity: Int) {
     if !buffer.requestUniqueMutableBuffer(newCapacity) {
       var newBuffer = NativeArrayBuffer<T>(count: count, minimumCapacity: newCapacity)
-      buffer._uninitializedCopy(0...count, target: newBuffer.elementStorage)
+      buffer._uninitializedCopy(0..count, target: newBuffer.elementStorage)
       buffer = Buffer(newBuffer)
     }
     assert(capacity >= newCapacity)
@@ -173,21 +173,21 @@ extension ${Self} : ArrayType {
     assert(count > 0, "can't pop from an empty ${Self}")
     let c = count
     let result = self[c - 1]
-    replace(&self, (c - 1)...c, EmptyCollection())
+    replace(&self, (c - 1)..c, EmptyCollection())
     return result
   }
   
   /// Insert an element at the given index in O(N).  Requires: atIndex
   /// <= count
   mutating func insert(atIndex: Int, newElement: T) {
-    replace(&self, atIndex...atIndex, CollectionOfOne(newElement))
+    replace(&self, atIndex..atIndex, CollectionOfOne(newElement))
   }
 
   /// Remove the element at the given index.  Worst case complexity:
   /// O(N).  Requires: index < count
   mutating func removeAt(index: Int) -> T {
     let result = self[index]
-    replace(&self, index...(index + 1), EmptyCollection())
+    replace(&self, index..(index + 1), EmptyCollection())
     return result
   }
 
@@ -221,7 +221,7 @@ extension ${Self} : ArrayType {
     let count = self.count
     result.reserve(count)
     var p = result.buffer.elementStorage
-    for i in 0...count {
+    for i in 0..count {
       p++.initialize( transform(self[i]) )
     }
     result.buffer.count = count
@@ -356,7 +356,7 @@ func replace<
         elements[j] = newValues[i++]
       }
       // Initialize the hole left by sliding the tail forward
-      for j in oldTailIndex...newTailIndex {
+      for j in oldTailIndex..newTailIndex {
         (elements + j).initialize(newValues[i++])
       }
     }
@@ -535,9 +535,9 @@ func _arrayOutOfPlaceUpdate<
     backing.count = 0
   }
   else {
-    let newStart = source._uninitializedCopy(0...headCount, target: destStart)
+    let newStart = source._uninitializedCopy(0..headCount, target: destStart)
     initializeNewElements.call(newStart)
-    source._uninitializedCopy(headCount + oldCount...sourceCount, 
+    source._uninitializedCopy(headCount + oldCount..sourceCount, 
                               target: newEnd)
   }
   source = Buffer(dest!)

@@ -167,12 +167,12 @@ assert(valueCount == 0, "value leak")
 
 func testValueDestruction() {
   var d1 = Dictionary<Int, TestValueTy>()
-  for i in 100..110 {
+  for i in 100...110 {
     d1.add(i, value: TestValueTy(i))
   }
 
   var d2 = Dictionary<TestKeyTy, TestValueTy>()
-  for i in 100..110 {
+  for i in 100...110 {
     d2.add(TestKeyTy(i), value: TestValueTy(i))
   }
 
@@ -752,14 +752,14 @@ func slurpFastEnumeration(
     if returnedCount == 0 {
       break
     }
-    for i in 0...returnedCount {
+    for i in 0..returnedCount {
       let key: AnyObject = state.itemsPtr[i]!
       let value: AnyObject = d.objectForKey(key)
       pairs += ((key as TestObjCKeyTy!).value, (value as TestObjCValueTy!).value)
     }
   }
 
-  for i in 0...3 {
+  for i in 0..3 {
     let returnedCount = fe.countByEnumeratingWithState(
         &state, objects: stackBuf.elementStorage,
         count: stackBufLength)
@@ -817,7 +817,7 @@ func getEmptyBridgedDictionary() -> Dictionary<NSObject, AnyObject> {
 func getHugeBridgedDictionary() -> Dictionary<NSObject, AnyObject> {
   let keys = NSMutableArray()
   let values = NSMutableArray()
-  for i in 1..32 {
+  for i in 1...32 {
     keys.addObject(TestObjCKeyTy(i))
     values.addObject(TestObjCValueTy(1000 + i))
   }
@@ -1130,7 +1130,7 @@ func test_BridgedFromObjC_Generate_Huge() {
     pairs += ((key as TestObjCKeyTy)!.value, (value as TestObjCValueTy)!.value)
   }
   var expectedPairs = Array<(Int, Int)>()
-  for i in 1..32 {
+  for i in 1...32 {
     expectedPairs += (i, 1000 + i)
   }
   assert(equalsUnordered(pairs, expectedPairs))

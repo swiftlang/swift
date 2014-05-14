@@ -1038,12 +1038,12 @@ struct RC4 {
 
   mutating
   func initialize(inout Key: UInt8[]) {
-    for i in 0...256 {
+    for i in 0..256 {
       State[i] = UInt8(i)
     }
 
     var j : UInt8 = 0
-    for i in 0...256 {
+    for i in 0..256 {
       var K : UInt8 = Key[i % Key.count]
       var S : UInt8 = State[i]
       j = j &+ S &+ K
@@ -1070,7 +1070,7 @@ struct RC4 {
   mutating
   func encrypt(inout Data: UInt8[]) {
     var cnt = Data.count
-    for i in 0...cnt {
+    for i in 0..cnt {
       Data[i] = Data[i] ^ next()
     }
   }
@@ -1082,7 +1082,7 @@ func benchStringSort_internal(var words: String[]) {
 
 func benchStringSort() {
   let start = __mach_absolute_time__()
-  for i in 0...50 {  // do not change '50', we have historic perf data
+  for i in 0..50 {  // do not change '50', we have historic perf data
     // Notice that we _copy_ the array of words before we sort it.
     benchStringSort_internal(stringBenchmarkWords)
   }
@@ -1101,7 +1101,7 @@ func benchRC4_internal(messageLen : Int, iterations : Int, validate : Bool) {
   var LongData : UInt8[] = new UInt8[messageLen]
 
   // Generate a long message. 
-  for i in 0...messageLen {
+  for i in 0..messageLen {
     LongData[i] = SecretData[i % SecretData.count]
   }
 
@@ -1114,7 +1114,7 @@ func benchRC4_internal(messageLen : Int, iterations : Int, validate : Bool) {
 
   let start = __mach_absolute_time__()
 
-  for i in 0...iterations {
+  for i in 0..iterations {
     Enc.encrypt(&LongData)
     Dec.encrypt(&LongData)
   }
@@ -1126,7 +1126,7 @@ func benchRC4_internal(messageLen : Int, iterations : Int, validate : Bool) {
 
   if (validate) {
     println("Validating ...")
-    for i in 0...messageLen {
+    for i in 0..messageLen {
       if (LongData[i] != SecretData[i % SecretData.count]) {
         println("Error at \(i)");
       }
@@ -1146,7 +1146,7 @@ func benchStringComplexWalk() -> Int {
   let start = __mach_absolute_time__()
   var count = 0
   let laps = 10000 // do not change this, we have historic perf data
-  for i in 0...laps {
+  for i in 0..laps {
     for c in s.unicodeScalars {
       count++
     }
@@ -1163,7 +1163,7 @@ func benchStringWalk() -> Int {
   let start = __mach_absolute_time__()
   var count = 0
   let laps = 100000 // do not change this, we have historic perf data
-  for i in 0...laps {
+  for i in 0..laps {
     for c in s.unicodeScalars {
       count++
     }
@@ -1217,7 +1217,7 @@ func benchObjInst_internal(n : Int) {
   //  println(toggle1.activate().value())
   //}
 
-  for i in 0...5 {
+  for i in 0..5 {
     var t = Toggle(true)
   }
 
@@ -1226,7 +1226,7 @@ func benchObjInst_internal(n : Int) {
   //  println(ntoggle1.activate().value())
   //}
 
-  for i in 0...n {
+  for i in 0..n {
     var toggle = NthToggle(true, 3)
   }
 }

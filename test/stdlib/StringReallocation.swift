@@ -8,7 +8,7 @@ func testReallocation() {
   var laps = 1000
 
   var reallocations = 0
-  for i in 0...laps {
+  for i in 0..laps {
     for s in x {
       var lastBase = story.core._baseAddress
       story += " "

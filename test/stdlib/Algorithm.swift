@@ -137,13 +137,13 @@ func testEqual() {
   println("testing equal")
   var _0_4 = [0, 1, 2, 3]
   // CHECK-NEXT: false
-  println(equal(_0_4, 0...3))
+  println(equal(_0_4, 0..3))
   // CHECK-NEXT: true
-  println(equal(_0_4, 0...4))
+  println(equal(_0_4, 0..4))
   // CHECK-NEXT: false
-  println(equal(_0_4, 0...5))
+  println(equal(_0_4, 0..5))
   // CHECK-NEXT: false
-  println(equal(_0_4, 1...4))
+  println(equal(_0_4, 1..4))
   println("done.")
 }
 testEqual()

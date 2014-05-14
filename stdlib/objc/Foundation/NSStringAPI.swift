@@ -30,7 +30,7 @@ extension NSArray {
     var length: Int = count
     var result = T[]()
     result.reserve(length)
-    for i in 0...length {
+    for i in 0..length {
       result.append(body(objectAtIndex(i)))
     }
     return result

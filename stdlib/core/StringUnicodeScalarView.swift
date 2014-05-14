@@ -72,11 +72,11 @@ struct UnicodeScalarView : Sliceable, Sequence {
   }
 
   func __slice__(start: IndexType, end: IndexType) -> UnicodeScalarView {
-    return UnicodeScalarView(_base[start._position...end._position])
+    return UnicodeScalarView(_base[start._position..end._position])
   }
 
   subscript(r: Range<IndexType>) -> UnicodeScalarView {
-    return UnicodeScalarView(_base[r.startIndex._position...r.endIndex._position])
+    return UnicodeScalarView(_base[r.startIndex._position..r.endIndex._position])
   }
 
   struct GeneratorType : Generator {

@@ -42,11 +42,11 @@ var _unicodeScalarRanges  = Array<Range<UInt32>>()
 // The valid ranges of Unicode scalar values
 var unicodeScalarRanges : Range<UInt32>[] {
   if _unicodeScalarRanges.count == 0 {
-    for r in [UInt32(0)...0xD800, 0xE000...0xFDD0, 0xFDF0...0xFFFE] {
+    for r in [UInt32(0)..0xD800, 0xE000..0xFDD0, 0xFDF0..0xFFFE] {
       _unicodeScalarRanges.append(r)
     }
-    for base in UInt32(0x1)...0x11 {
-      _unicodeScalarRanges.append((base << 16)...((base << 16)+0xFFFE))
+    for base in UInt32(0x1)..0x11 {
+      _unicodeScalarRanges.append((base << 16)..((base << 16)+0xFFFE))
     }
   }
   return _unicodeScalarRanges
@@ -128,7 +128,7 @@ class ArraySink<T: IntegerLiteralConvertible> : Sink {
     count = 0
   }
   var elements : Slice<T> {
-    return storage[0...count]
+    return storage[0..count]
   }
   var count = 0
   var storage: T[] = Array()
@@ -174,7 +174,7 @@ class CodecTest<Codec: TestableUnicodeCodec> {
     
     // Use Cocoa to encode the scalar
     nsEncode(scalar.value, Codec.encodingId(), &nsEncodeBuffer, &used)
-    let nsEncoded = nsEncodeBuffer[0...(used/sizeof(CodeUnit.self))]
+    let nsEncoded = nsEncodeBuffer[0..(used/sizeof(CodeUnit.self))]
 
     var g = nsEncoded.generate()
     var decoded = Codec.decode(&g)
@@ -191,7 +191,7 @@ class CodecTest<Codec: TestableUnicodeCodec> {
   
   func run() {
     println("testing \(Codec.name())")
-    for i in minScalarOrd...maxScalarOrd {
+    for i in minScalarOrd..maxScalarOrd {
       testOne(nthUnicodeScalar(UInt32(i)))
     }
     println("done.")

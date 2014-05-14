@@ -17,7 +17,7 @@ struct _Process {
     // FIXME: Use a by-index-initializing constructor of Array here when we
     // have that, so we don't need this awkward closure initialization.
     var _args = new String[Int(C_ARGC)]
-    for i in 0...Int(C_ARGC) {
+    for i in 0..Int(C_ARGC) {
       _args[i] = String.fromCString(C_ARGV[i])
     }
     return _args

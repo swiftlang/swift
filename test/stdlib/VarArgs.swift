@@ -46,7 +46,7 @@ func test_varArgs1() {
   var args = VaListBuilder()
 
   var format = "dig it: "
-  for i in 0...12 {
+  for i in 0..12 {
     args.append(Int16(-i))
     args.append(Float(i))
     format += "%d %2g "

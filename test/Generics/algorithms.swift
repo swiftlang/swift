@@ -166,9 +166,9 @@ func lowerBound<R : RandomAccessStreamType where R.Element : Comparable>
   while range.size() > 1 {
     var mid = range.size() / 2
     if range.getNth(mid) < value {
-      range = range[mid + 1...range.size()]
+      range = range[mid + 1..range.size()]
     } else {
-      range = range[0...mid]
+      range = range[0..mid]
     }
   }
   return range
@@ -180,9 +180,9 @@ func upperBound<R : RandomAccessStreamType where R.Element : Comparable>
   while range.size() > 1 {
     var mid = range.size() / 2
     if value < range.getNth(mid) {
-      range = range[0...mid]
+      range = range[0..mid]
     } else {
-      range = range[mid + 1...range.size()]
+      range = range[mid + 1..range.size()]
     }
   }
   return range

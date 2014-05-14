@@ -45,7 +45,7 @@ var fullButStarvingArray = Array<String>()
 for x in fullButStarvingArray { print("\(x) ") }
 
 func testArrayFromStream() {
-  var x = Array(3...7)
+  var x = Array(3..7)
   // CHECK-NEXT: <3> <4> <5> <6> .
   for y in x { print("<\(y)> ") }
   println(".")

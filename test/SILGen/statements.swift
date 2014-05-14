@@ -132,7 +132,7 @@ func do_loop_with_continue(x: Int, y: Bool, z: Bool) -> Int {
 
 
 func for_loops(var x: Int, c: Bool) {
-  for i in 1...100 {
+  for i in 1..100 {
     println(i)
   }
   

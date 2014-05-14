@@ -145,8 +145,8 @@ func _quickSort<C: MutableCollection where C.IndexType: SignedInteger>(
 
    // Partition and sort.
   let part_idx : C.IndexType = partition(&elements, range, &less)
-  _quickSort(&elements, range.startIndex...part_idx, &less);
-  _quickSort(&elements, part_idx...range.endIndex, &less);
+  _quickSort(&elements, range.startIndex..part_idx, &less);
+  _quickSort(&elements, part_idx..range.endIndex, &less);
 }
 
 struct Less<T: Comparable> {
@@ -156,7 +156,7 @@ struct Less<T: Comparable> {
 }
 
 func sort<T>(var array: T[], pred: (T, T) -> Bool) -> T[] {
-  quickSort(&array, 0...array.count, pred)
+  quickSort(&array, 0..array.count, pred)
   return array
 }
 
@@ -164,7 +164,7 @@ func sort<T>(var array: T[], pred: (T, T) -> Bool) -> T[] {
 /// they don't accept a predicate and they are hardcoded to use the less-than
 /// comparator.
 func sort<T : Comparable>(var array: T[]) -> T[] {
-  quickSort(&array, 0...array.count)
+  quickSort(&array, 0..array.count)
   return array
 }
 
@@ -254,8 +254,8 @@ func _quickSort<C: MutableCollection where C.GeneratorType.Element: Comparable, 
   }
    // Partition and sort.
   let part_idx : C.IndexType = partition(&elements, range)
-  _quickSort(&elements, range.startIndex...part_idx);
-  _quickSort(&elements, part_idx...range.endIndex);
+  _quickSort(&elements, range.startIndex..part_idx);
+  _quickSort(&elements, part_idx..range.endIndex);
 }
 //// End of non-predicate sort functions.
 
@@ -320,7 +320,7 @@ func split<Seq: Sliceable, R:LogicValue>(
     if isSeparator(seq[j]) {
       if startIndex {
         var i = startIndex!
-        result.append(seq[i...j])
+        result.append(seq[i..j])
         startIndex = .Some(j.succ())
         if ++splits >= maxSplit {
           break
@@ -339,7 +339,7 @@ func split<Seq: Sliceable, R:LogicValue>(
 
   switch startIndex {
   case .Some(var i):
-    result.append(seq[i...seq.endIndex])
+    result.append(seq[i..seq.endIndex])
   default:
     ()
   }

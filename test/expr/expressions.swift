@@ -558,13 +558,13 @@ func unaryOps(inout i8: Int8, inout i64: Int64) {
 // Iteration
 //===----------------------------------------------------------------------===//
 
-func ... (x: Double, y: Double) -> Double {
+func..(x: Double, y: Double) -> Double {
    return x + y
 }
 
 func iterators() {
-  var a = 0...42
-  var b = 0.0...42.0
+  var a = 0..42
+  var b = 0.0..42.0
 }
 
 //===----------------------------------------------------------------------===//

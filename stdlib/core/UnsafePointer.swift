@@ -121,7 +121,7 @@ struct UnsafePointer<T> : BidirectionalIndex, Comparable, Hashable {
     assert(
       source > self || source < self - count,
       "moveAssignFrom non-following overlapping range")
-    for i in 0...count {
+    for i in 0..count {
       self[i] = (source + i).move()
     }
   }
@@ -132,7 +132,7 @@ struct UnsafePointer<T> : BidirectionalIndex, Comparable, Hashable {
     assert(
       source >= self || source < self - count,
       "moveInitializeFrom non-following overlapping range; use moveInitializeBackwardFrom")
-    for i in 0...count {
+    for i in 0..count {
       (self + i).initialize((source + i).move())
     }
   }
@@ -142,7 +142,7 @@ struct UnsafePointer<T> : BidirectionalIndex, Comparable, Hashable {
     assert(
       source >= self || source < self - count,
       "initializeFrom non-following overlapping range")
-    for i in 0...count {
+    for i in 0..count {
       (self + i).initialize(source[i])
     }
   }

@@ -102,7 +102,7 @@ var array = [1, 2, 3, 4, 5]
 var dict = [ "Hello" : 1.5, "World" : 3.0 ]
 // CHECK: Dictionary<String, Double> = ["Hello": 1.5, "World": 3]
 
-0...10
+0..10
 // FIXME: Disabled CHECK for Range<Int> = 0...10 until we get general printing going
 // FIXME: Disabled CHECK for 0...10 pending <rdar://problem/11510876>
 // (Implement overload resolution)
@@ -116,7 +116,7 @@ var dict = [ "Hello" : 1.5, "World" : 3.0 ]
 String(0)
 // CHECK: "0"
 
-for i in 0...10 { println(i); }
+for i in 0..10 { println(i); }
 // CHECK: 0
 // CHECK-NEXT: 1
 // CHECK-NEXT: 2
@@ -128,7 +128,7 @@ for i in 0...10 { println(i); }
 // CHECK-NEXT: 8
 // CHECK-NEXT: 9
 
-for i in 0...10 { println(i); }
+for i in 0..10 { println(i); }
 // CHECK: 0
 // CHECK-NEXT: 1
 // CHECK-NEXT: 2
@@ -154,7 +154,7 @@ var vec = Array<String>()
 // Error recovery
 var a : int[]
 var a = Int[]()
-var b = a.slice[3...5]
+var b = a.slice[3..5]
 
 struct Inner<T> {}
 struct Outer<T> { var inner : Inner<T> }

@@ -56,7 +56,7 @@ for first in words {
 
 func benchStringSort() {
   let start = __mach_absolute_time__()
-  for i in 0...100 {
+  for i in 0..100 {
     var t = Names.copy()
     sort(t)
   }

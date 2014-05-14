@@ -10,7 +10,7 @@ func foldl1<T>(list: T[], function: (a: T, b: T) -> T) -> T {
 }
 
 var a = new Int[10]
-for i in 0...10 { a[i] = i }
+for i in 0..10 { a[i] = i }
 // A closure is not an artificial function (the last i32 0).
 // CHECK: metadata !"_TF7closureU_FTSiSi_Si", i32 [[@LINE+3]], metadata !{{[0-9]+}}, i1 false, i1 true, i32 0, i32 0, null, i32 0, i1 false, {{.*}}[ DW_TAG_subprogram ]
 // CHECK: [ DW_TAG_arg_variable ] [$0] [line [[@LINE+2]]]

@@ -16,7 +16,7 @@ var b = a.value
 a.value.name = "DaveA"
 a.value.locations.append("Princeton")
 a.value.locations.append("San Jose")
-for x in 0...10 {
+for x in 0..10 {
   (a.elementStorage + x).initialize(x)
 }
 
@@ -53,7 +53,7 @@ println("locations[0]=\(a.value.locations[0])")
 println("locations[1]=\(a.value.locations[1])")
 // CHECK-NEXT: locations[1]=San Jose
 
-for x in 0...10 {
+for x in 0..10 {
   print(a.elementStorage[x])
 }
 println("")

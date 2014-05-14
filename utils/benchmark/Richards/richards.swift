@@ -368,7 +368,7 @@ struct Richards {
       default:
         assert("Task value is not a count")
     }
-    for i in 0...BufSize {
+    for i in 0..BufSize {
       ++v2.count
       if v2.count > 26 {
         v2.count = 1

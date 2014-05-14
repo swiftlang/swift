@@ -350,12 +350,12 @@ func tuple_test() -> Int {
 
   t.1 = 4
 
-  for i in 0...45 {
+  for i in 0..45 {
   }
 
   t.0 = 1
 
-  for i in 0...45 {
+  for i in 0..45 {
   }
   
   return t.1+t.0  // No diagnostic, everything is fully initialized.
@@ -566,7 +566,7 @@ class rdar16119509_Derived : rdar16119509_Base {
 // <rdar://problem/16797372> Bogus error: self.init called multiple times in initializer
 extension Foo {
   convenience init() {
-    for i in 0...42 {
+    for i in 0..42 {
     }
     self.init(a: 4)
   }

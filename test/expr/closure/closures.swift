@@ -82,7 +82,7 @@ func t() {
   var u8 : UInt8
   var x : Bool
 
-  if 0xA0...0xBF ~= Int(u8) && x {
+  if 0xA0..0xBF ~= Int(u8) && x {
   }
 }
 

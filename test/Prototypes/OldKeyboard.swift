@@ -64,7 +64,7 @@ var kbd : Keyboard = Keyboard()
     let count = buf.count
     var r = 0
     for var start = 0; start < count; start += 1024 {
-      let slice = buf[start...min(start + 1024, count)]
+      let slice = buf[start..min(start + 1024, count)]
       r = slice.withUnsafePointerToElements {
         posix_write(1, $0.value, slice.count)
       }

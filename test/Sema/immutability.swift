@@ -16,7 +16,7 @@ let no_initializer : Int    // expected-error {{'let' declarations require an in
 
 
 func foreach_variable() {
-  for i in 0...42 {
+  for i in 0..42 {
     i = 11   // expected-error {{cannot assign to 'let' value 'i'}}
   }
 }

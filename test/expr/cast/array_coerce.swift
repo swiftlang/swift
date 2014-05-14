@@ -31,8 +31,8 @@ cas = das
 das = cas // expected-error{{cannot convert the expression's type '()' to type 'D[]'}}
 
 // Slice<T>
-var cs = ca[0..0]
-var ds = da[0..0]
+var cs = ca[0...0]
+var ds = da[0...0]
 
 cs = ds // expected-error{{cannot convert the expression's type '()' to type 'Slice<C>'}}
 ds = cs // expected-error{{cannot convert the expression's type '()' to type 'Slice<D>'}}

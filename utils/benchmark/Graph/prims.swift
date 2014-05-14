@@ -105,7 +105,7 @@ class PriorityQueue {
 
     // Make sure that each element in the graph that is not in the heap has
     // its index set to .None
-    for i in 0...graph.count {
+    for i in 0..graph.count {
       if contains(i) {
         assert(graphIndexToHeapIndexMap[i] != .None,
           "All items contained in the heap must have an index assigned in map.")
@@ -225,7 +225,7 @@ func prim(
   treeEdges.append(.Some(0))
 
   // Create the graph.
-  for i in 1...graph.count {
+  for i in 1..graph.count {
     queue.append(.Some(NodeCost(i, Double.inf())))
     treeEdges.append(.None)
   }
@@ -260,7 +260,7 @@ extension Edge : Hashable {
 }
 
 func benchPrimsInternal(iterations: Int) {
-  for i in 0...iterations {
+  for i in 0..iterations {
     var graph = Array<Node>()
 
     var nodes : Int[] = [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,

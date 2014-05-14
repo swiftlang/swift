@@ -341,7 +341,7 @@ func printSinglePayloadAddressOnly(v:SinglePayloadAddressOnly) {
 
 func testStringForEachStmt() {
   var i = 0;
-  for index in 1...20 {
+  for index in 1..20 {
     i++
     if i == 15 {
       break

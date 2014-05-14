@@ -14,7 +14,7 @@
 // CHECK: testing...
 println("testing...")
 
-var x: Range<Int> = 3...10
+var x: Range<Int> = 3..10
 
 // CHECK-NEXT: 3579.
 for a in x.by(2) {
@@ -22,7 +22,7 @@ for a in x.by(2) {
 }
 println(".")
 
-for i in 1.4 .. 3.4 { println(i) }
+for i in 1.4...3.4 { println(i) }
 // CHECK-NEXT: 1.4
 // CHECK-NEXT: 2.4
 // CHECK-NEXT: 3.4

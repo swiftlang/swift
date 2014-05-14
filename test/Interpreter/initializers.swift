@@ -4,7 +4,7 @@
 var depth = 0
 
 func printAtDepth(s: String) {
-  for i in 0...depth { print("*") }
+  for i in 0..depth { print("*") }
   println(s)
 }
 

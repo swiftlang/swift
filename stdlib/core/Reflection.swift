@@ -230,7 +230,7 @@ func _dumpWithMirror<TargetStream : OutputStream>(
   if maxItemCounter <= 0 { return }
   --maxItemCounter
 
-  for _ in 0...indent { print(" ") }
+  for _ in 0..indent { print(" ") }
 
   let count = mirror.count
   let bullet = count == 0    ? "-"
@@ -256,9 +256,9 @@ func _dumpWithMirror<TargetStream : OutputStream>(
 
   if maxDepth <= 0 { return }
 
-  for i in 0...count {
+  for i in 0..count {
     if maxItemCounter <= 0 {
-      for _ in 0...(indent+4) { print(" ") }
+      for _ in 0..(indent+4) { print(" ") }
       let remainder = count - i
       print("(\(remainder)", &targetStream)
       if i > 0 { print(" more", &targetStream) }

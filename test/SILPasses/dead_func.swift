@@ -4,7 +4,7 @@
 var a : String[] = ["foo"]
 
 fatal("unreachable")
-for i in 0..a.count {
+for i in 0...a.count {
   let x = 0
 }
 

@@ -177,8 +177,8 @@ class C6 {
 
 func test5() {
   var x: Int
-  // CHECK: for <Var>i</Var> in 1<iFunc@>...</iFunc>100 {
-  for i in 1...100 {
+  // CHECK: for <Var>i</Var> in 1<iFunc@>..</iFunc>100 {
+  for i in 1..100 {
     // CHECK: <Var@[[@LINE-3]]:7>x</Var> = <Var@[[@LINE-1]]:7>i</Var>
     x = i
   }

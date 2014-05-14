@@ -125,7 +125,7 @@ func testStringToInt() {
 
   // Test values lower than min.
   var ui = UInt(Int.max) + 1
-  for index in 0...20 {
+  for index in 0..20 {
     ui = ui + UInt(index)
     if ("-\(ui)".toInt()) {
       print(".")
@@ -138,7 +138,7 @@ func testStringToInt() {
 
   // Test values greater than min.
   ui = UInt(Int.max)
-  for index in 0...20 {
+  for index in 0..20 {
     ui = ui - UInt(index)
     if ("-\(ui)".toInt()! == -Int(ui)) {
       print(".")
@@ -151,7 +151,7 @@ func testStringToInt() {
 
   // Test values greater than max.
   ui = UInt(Int.max)
-  for index in 0...20 {
+  for index in 0..20 {
     ui = ui + UInt(index)
     if (String(ui).toInt()) {
       print(".")
@@ -164,7 +164,7 @@ func testStringToInt() {
 
   // Test values lower than max.
   ui = UInt(Int.max)
-  for index in 0...20 {
+  for index in 0..20 {
     ui = ui - UInt(index)
     if (String(ui).toInt()! == Int(ui)) {
       print(".")
@@ -181,7 +181,7 @@ func testGrowth() {
   var s = ""
   var s2 = s
 
-  for i in 0...20 {
+  for i in 0..20 {
     s += "x"
     s2 = s
   }

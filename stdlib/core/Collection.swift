@@ -180,12 +180,12 @@ protocol MutableSliceable : Sliceable, MutableCollection {
 }
 
 func dropFirst<Seq : Sliceable>(seq: Seq) -> Seq.SliceType {
-  return seq[seq.startIndex.succ()...seq.endIndex]
+  return seq[seq.startIndex.succ()..seq.endIndex]
 }
 
 func dropLast<
   Seq: Sliceable 
   where Seq.IndexType: BidirectionalIndex
 >(seq: Seq) -> Seq.SliceType {
-  return seq[seq.startIndex...seq.endIndex.pred()]
+  return seq[seq.startIndex..seq.endIndex.pred()]
 }

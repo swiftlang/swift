@@ -30,12 +30,12 @@ func drawJulia(context : CGContextRef, frame : CGRect) {
 
   var gradedColorSet : Array<NSColor> = Array()
   var aColor = NSColor.colorWithRed(0.5, green:0.5, blue:0.5, alpha:1.0)
-  for c in 100...255 {
+  for c in 100..255 {
     gradedColorSet.append(NSColor.colorWithRed(Double(c)/255.0, green: Double(c)/255.0, blue: Double(c)/255.0, alpha:1.0))
   }
 
   var psychedelicColorSet : Array<NSColor> = Array()
-  for c in 0...100 {
+  for c in 0..100 {
     psychedelicColorSet.append(NSColor.colorWithHue(Double(c)/100.0, saturation:1.0, brightness:1.0, alpha:1.0))
   }
   var colorSet : Array<NSColor> = Array()
@@ -81,8 +81,8 @@ func drawJulia(context : CGContextRef, frame : CGRect) {
   let methodStart : NSDate = NSDate()
   let xMax : Int = Int(frame.size.width)
   let yMax : Int = Int(frame.size.height)
-  for x in 1...xMax {
-    for y in 1...yMax {
+  for x in 1..xMax {
+    for y in 1..yMax {
       r = (Double(x)/mag) + xloc
       i = (Double(y)/mag) + yloc
       // cr = r ; ci = i
@@ -90,7 +90,7 @@ func drawJulia(context : CGContextRef, frame : CGRect) {
       // Initial color white
       color = NSColor.whiteColor()
       var countA=1;
-      for iter in 1...maxc {
+      for iter in 1..maxc {
         rh = r*r - i*i
         i = 2*r*i
         r = rh

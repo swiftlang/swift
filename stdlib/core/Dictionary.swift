@@ -665,7 +665,7 @@ class _NativeDictionaryStorageOwnerBase
         nativeStorage: nativeStorage, offset: Int(theState.extra.0))
     let endIndex = nativeStorage.endIndex
     var stored = 0
-    for i in 0...count {
+    for i in 0..count {
       if (currIndex == endIndex) {
         break
       }
@@ -803,7 +803,7 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
       let newNativeStorage = newNativeOwner.nativeStorage
       let newCapacity = newNativeStorage.capacity
 
-      for i in 0...oldCapacity {
+      for i in 0..oldCapacity {
         var x = oldNativeStorage[i]
         if x {
           if oldCapacity == newCapacity {

@@ -61,7 +61,7 @@ func test() {
     var pair = Pair(first: Suits.Hearts, second: Suits.Diamonds)
 
     var function = test
-    var range = 0...100
+    var range = 0..100
     var optionalNone : Float? = .None
     var optionalSome : Float? = 100
     var tuple = (i8, i16, i32, i64, string)

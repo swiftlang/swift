@@ -27,14 +27,14 @@ struct BitVector64 {
 var vec = BitVector64(bits: 0)
 
 // Set even elements to 'true'.
-for i in 0...64 {
+for i in 0..64 {
   if i % 2 == 0 {
     vec[i] = true
   }
 }
 
 // Print all elements
-for i in 0...64 {
+for i in 0..64 {
   println(String(vec[i]))
 }
 // CHECK: true

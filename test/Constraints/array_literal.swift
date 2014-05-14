@@ -68,7 +68,7 @@ var a2 : Int[] = a
 var b = [1,2,3.0]
 var b2 : Double[] = b
 
-var arrayOfStreams = [1...2, 3...4]
+var arrayOfStreams = [1..2, 3..4]
 
 struct MyDouble { }
 
