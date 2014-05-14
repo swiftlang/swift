@@ -508,7 +508,7 @@ void *swift::_swift_zone_valloc(malloc_zone_t *zone, size_t size) {
 }
 
 void swift::_swift_zone_free(malloc_zone_t *zone, void *pointer) {
-  swift::swift_slowDealloc(pointer, 0);
+  swift::swift_slowDealloc(pointer, swift::_swift_zone_size(zone, pointer));
 }
 
 void *swift::_swift_zone_realloc(malloc_zone_t *zone,
@@ -805,9 +805,6 @@ void *SwiftZone::slowAlloc_gmalloc(size_t size, uintptr_t flags) {
 }
 
 void SwiftZone::slowDealloc_optimized(void *ptr, size_t bytes) {
-  if (bytes == 0) {
-    bytes = swiftZone.zoneShims.size(NULL, ptr);
-  }
   assert(bytes != 0);
   AllocIndex idx = sizeToIndex(bytes);
   if (idx == badAllocIndex) {

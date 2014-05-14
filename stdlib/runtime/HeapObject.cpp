@@ -279,7 +279,8 @@ void swift::swift_weakRelease(HeapObject *object) {
     assert(0 && "weak retain count underflow");
   }
   if (newCount == 0) {
-    swift_slowDealloc(object, 0);
+    swift_slowDealloc(object,
+                      _swift_zone_size(_swift_zone_get_shims(), object));
   }
 }
 
