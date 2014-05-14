@@ -528,7 +528,9 @@ public:
   //===--------------------------------------------------------------------===//
 
   void visitSILBasicBlock(SILBasicBlock *BB);
-  llvm::Value *getLoweredArgValue(SILArgument *Arg, StringRef Name);
+  void getLoweredArgValue(llvm::SmallVectorImpl<llvm::Value *> &Vals,
+                          SILArgument *Arg, StringRef Name);
+
   void emitFunctionArgDebugInfo(SILBasicBlock *BB);
 
   void visitAllocStackInst(AllocStackInst *i);
@@ -566,9 +568,9 @@ public:
     if (!Decl) return;
     StringRef Name = Decl->getNameStr();
     auto SILVal = i->getOperand();
-    auto Vals = getLoweredExplosion(SILVal).claimAll();
+    Explosion e = getLoweredExplosion(SILVal);
     DebugTypeInfo DbgTy(Decl, getTypeInfo(SILVal.getType()));
-    emitDebugVariableDeclaration(Builder, Vals, DbgTy,
+    emitDebugVariableDeclaration(Builder, e.claimAll(), DbgTy,
                                  i->getDebugScope(), Name);
   }
   void visitDebugValueAddrInst(DebugValueAddrInst *i) {
@@ -1138,19 +1140,17 @@ void IRGenSILFunction::emitSILFunction() {
       LoweredBBs[&bb].bb->eraseFromParent();
 }
 
-llvm::Value *IRGenSILFunction::
-getLoweredArgValue(SILArgument *Arg, StringRef Name) {
+void IRGenSILFunction::
+getLoweredArgValue(llvm::SmallVectorImpl<llvm::Value *> &Vals,
+                   SILArgument *Arg, StringRef Name) {
   const LoweredValue &LoweredArg = getLoweredValue(Arg);
   if (LoweredArg.isAddress())
-    return emitShadowCopy(LoweredArg.getAddress(), Name);
+    Vals.push_back(emitShadowCopy(LoweredArg.getAddress(), Name));
   else if (LoweredArg.kind == LoweredValue::Kind::Explosion) {
-    auto Val = LoweredArg.getExplosion(*this).claimAll();
-    // FIXME: What are the semantics of a multi-value explosion
-    // argument, shouldn't it be exploded already?
-    if (Val.size() == 1)
-      return Val[0];
+    Explosion e = LoweredArg.getExplosion(*this);
+    auto EVals = e.claimAll();
+    Vals.append(EVals.begin(), EVals.end());
   }
-  return nullptr;
 }
 
 void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
@@ -1184,7 +1184,7 @@ void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
 
     // Consolidate all pieces of an exploded multi-argument into one list.
     llvm::SmallVector<llvm::Value *, 8> Vals;
-      Vals.push_back(getLoweredArgValue(Arg, Name));
+    getLoweredArgValue(Vals, Arg, Name);
     for (auto Next = I+1; Next != E; ++Next, ++I) {
       if ((*Next)->getDecl() != Arg->getDecl())
         break;
@@ -1193,11 +1193,7 @@ void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
       if (Arg->getType().hasReferenceSemantics())
         break;
 
-      llvm::Value *Val = getLoweredArgValue(*I, Name);
-      if (!Val)
-        break;
-
-      Vals.push_back(Val);
+      getLoweredArgValue(Vals, *I, Name);
     }
     auto Direct = DirectValue;
     // ByRef capture.  FIXME: Consider wrapping this in a
