@@ -52,11 +52,6 @@ func withUnsafePointers<A0, A1, A2, Result>(
   }
 }
 
-/// FIXME: workaround for <rdar://problem/15637771> Need a way to
-/// constrain a generic argument to being a class
-@class_protocol @objc 
-protocol ObjCClassType {}
-
 /// \brief Invokes body with an UnsafePointer to a nil T, sets arg to
 /// the value of that T (or .None if the T is still nil), and returns
 /// the result of the invocation
@@ -81,7 +76,13 @@ func withUnsafePointerToObject<T: AnyObject, Result>(
 /// on each elmeent of the source container.
 protocol _BridgedToObjectiveC {
   typealias ObjectiveCType: AnyObject
+
+  // Workaround: right now protocol witness tables don't include associated
+  // types, so we can not find 'ObjectiveCType' from them.
+  class func getObjectiveCType() -> Any.Type
+
   func bridgeToObjectiveC() -> ObjectiveCType
+  class func bridgeFromObjectiveC(x: ObjectiveCType) -> Self
 }
 
 /// Whether a given type conforming to this protocol bridges to
@@ -91,16 +92,39 @@ protocol _ConditionallyBridgedToObjectiveC : _BridgedToObjectiveC {
   class func isBridgedToObjectiveC() -> Bool
 }
 
-/// Attempt to convert x to its ObjectiveC representation.  If T
-/// conforms to _BridgedToObjectiveC, returns the result of calling its
-/// bridgeToObjectiveC() method.  Otherwise, if T is a class type,
-/// returns x.  Otherwise, the result is empty.
+/// Attempt to convert `x` to its Objective-C representation.
+///
+/// - If `T` conforms to `_BridgedToObjectiveC`:
+///   + if `T` conforms to `_ConditionallyBridgedToObjectiveC` and
+///     `T.isBridgedToObjectiveC()` returns `false`, then the result is empty;
+///   + otherwise, returns the result of `x.bridgeToObjectiveC()`;
+/// - otherwise, if `T` is a class type (bridged verbatim), returns `x`;
+/// - otherwise, the result is empty.
 @asmname("swift_bridgeToObjectiveC")
 func bridgeToObjectiveC<T>(x: T) -> AnyObject?
 
-/// If T conforms to _ConditionallyBridgedToObjectiveC, returns
-/// T.isBridgedToObjectiveC().  Otherwise, if T conforms to
-/// _BridgedToObjectiveC or T is a class type, returns true
+/// Attempt to convert `x` from its Objective-C representation to its Swift
+/// representation.
+///
+/// - If `T` conforms to `_BridgedToObjectiveC`:
+///   + if `T` conforms to `_ConditionallyBridgedToObjectiveC` and
+///     `T.isBridgedToObjectiveC()` returns `false`, then the result is empty;
+///   + otherwise, if the dynamic type of `x` is not `T.getObjectiveCType()`
+///     or a subclass of it, the result is empty;
+///   + otherwise, returns the result of `T.bridgeFromObjectiveC(x)`;
+/// - otherwise, if `T` is a class type (bridged verbatim), and the dynamic
+///   type of `x` is `T` or a subclass of it, returns `x`;
+/// - otherwise, the result is empty.
+@asmname("swift_bridgeFromObjectiveC")
+func bridgeFromObjectiveC<T>(x: AnyObject, nativeType: T.Type) -> T?
+
+/// Determines if values of a given type can be converted to an Objective-C
+/// representation.
+///
+/// - If `T` conforms to `_ConditionallyBridgedToObjectiveC`, returns
+///   `T.isBridgedToObjectiveC()`;
+/// - otherwise, if `T` conforms to `_BridgedToObjectiveC` or `T` is a class
+///   type, returns `true`.
 @asmname("swift_isBridgedToObjectiveC")
 func isBridgedToObjectiveC<T>(_: T.Type) -> Bool
 

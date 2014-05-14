@@ -3,8 +3,7 @@
 // CHECK: testing...
 println("testing...")
 
-class C: ObjCClassType {}
-
+class C {}
 
 func bridgedStatus<T>(_: T.Type) -> String {
   let bridged = isBridgedToObjectiveC(T.self)
@@ -32,8 +31,14 @@ func testBridging<T>(x: T, name: String) {
 
 //===----------------------------------------------------------------------===//
 struct BridgedValueType : _BridgedToObjectiveC {
+  static func getObjectiveCType() -> Any.Type {
+    return C.self
+  }
   func bridgeToObjectiveC() -> C {
     return C()
+  }
+  static func bridgeFromObjectiveC(x: C) -> BridgedValueType {
+    fatal("implement")
   }
 }
 
@@ -57,8 +62,14 @@ testBridging(PlainClass(), "PlainClass")
 
 //===----------------------------------------------------------------------===//
 class BridgedClass : _BridgedToObjectiveC {
+  class func getObjectiveCType() -> Any.Type {
+    return C.self
+  }
   func bridgeToObjectiveC() -> C {
     return C()
+  }
+  class func bridgeFromObjectiveC(x: C) -> BridgedClass {
+    fatal("implement")
   }
 }
 
@@ -69,8 +80,14 @@ testBridging(BridgedClass(), "BridgedClass")
 //===----------------------------------------------------------------------===//
 struct ConditionallyBridged<T>
   : _BridgedToObjectiveC, _ConditionallyBridgedToObjectiveC {
+  static func getObjectiveCType() -> Any.Type {
+    return C.self
+  }
   func bridgeToObjectiveC() -> C {
     return C()
+  }
+  static func bridgeFromObjectiveC(x: C) -> ConditionallyBridged<T> {
+    fatal("implement")
   }
   static func isBridgedToObjectiveC() -> Bool {
     return !((T.self as Any) as String.Type)

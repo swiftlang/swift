@@ -32,13 +32,25 @@ func _convertNSDictionaryToDictionary<K: NSObject, V: AnyObject>(
 }
 
 extension String : _BridgedToObjectiveC {
+  static func getObjectiveCType() -> Any.Type {
+    return NSString.self
+  }
   func bridgeToObjectiveC() -> NSString {
     return NSString()
+  }
+  static func bridgeFromObjectiveC(x: NSString) -> String {
+    fatal("implement")
   }
 }
 
 extension Int : _BridgedToObjectiveC {
+  static func getObjectiveCType() -> Any.Type {
+    return NSNumber.self
+  }
   func bridgeToObjectiveC() -> NSNumber {
     return NSNumber()
+  }
+  static func bridgeFromObjectiveC(x: NSNumber) -> Int {
+    fatal("implement")
   }
 }

@@ -28,7 +28,7 @@ import ObjectiveC
 var trackedCount = 0
 var nextTrackedSerialNumber = 0
 
-class Tracked : ForwardIndex, ObjCClassType, Printable {
+class Tracked : ForwardIndex, Printable {
   init(_ value: Int) {
     ++trackedCount
     serialNumber = ++nextTrackedSerialNumber
@@ -63,9 +63,18 @@ struct X : _BridgedToObjectiveC {
     self.value = value
   }
 
+  static func getObjectiveCType() -> Any.Type {
+    return Tracked.self
+  }
+
   func bridgeToObjectiveC() -> Tracked {
     return Tracked(value)
   }
+
+  static func bridgeFromObjectiveC(x: Tracked) -> X {
+    fatal("implement")
+  }
+
   var value: Int
 }
 

@@ -114,7 +114,7 @@ extension NSString {
 //===----------------------------------------------------------------------===//
 // New Strings
 //===----------------------------------------------------------------------===//
-extension NSString : _CocoaString, ObjCClassType {}
+extension NSString : _CocoaString {}
 
 /// \brief Sets variables in Swift's core stdlib that allow it to
 /// bridge Cocoa strings properly.  Currently invoked by a HACK in
@@ -342,10 +342,6 @@ extension String {
   }
 }
 
-/// FIXME: workaround for <rdar://problem/15637771> Need a way to
-/// constrain a generic argument to being a class
-extension NSString : ObjCClassType {}
-
 //
 // Conversion from NSString to Swift's native representation
 //
@@ -393,8 +389,16 @@ extension String {
 }
 
 extension String : _BridgedToObjectiveC {
+  static func getObjectiveCType() -> Any.Type {
+    return NSString.self
+  }
+
   func bridgeToObjectiveC() -> NSString {
     return self
+  }
+
+  static func bridgeFromObjectiveC(x: NSString) -> String {
+    fatal("implement")
   }
 }
 
@@ -415,8 +419,16 @@ extension Int : _BridgedToObjectiveC {
     return NSNumber(integer: self)
   }
 
+  static func getObjectiveCType() -> Any.Type {
+    return NSNumber.self
+  }
+
   func bridgeToObjectiveC() -> NSNumber {
     return self
+  }
+
+  static func bridgeFromObjectiveC(x: NSNumber) -> Int {
+    fatal("implement")
   }
 }
 
@@ -431,9 +443,16 @@ extension UInt : _BridgedToObjectiveC {
     return NSNumber(unsignedInteger: Int(value))
   }
 
-  typealias ObjectiveCType = NSNumber
+  static func getObjectiveCType() -> Any.Type {
+    return NSNumber.self
+  }
+
   func bridgeToObjectiveC() -> NSNumber {
     return self
+  }
+
+  static func bridgeFromObjectiveC(x: NSNumber) -> UInt {
+    fatal("implement")
   }
 }
 
@@ -446,8 +465,16 @@ extension Float : _BridgedToObjectiveC {
     return NSNumber(float: self)
   }
 
+  static func getObjectiveCType() -> Any.Type {
+    return NSNumber.self
+  }
+
   func bridgeToObjectiveC() -> NSNumber {
     return self
+  }
+
+  static func bridgeFromObjectiveC(x: NSNumber) -> Float {
+    fatal("implement")
   }
 }
 
@@ -460,8 +487,16 @@ extension Double : _BridgedToObjectiveC {
     return NSNumber(double: self)
   }
 
+  static func getObjectiveCType() -> Any.Type {
+    return NSNumber.self
+  }
+
   func bridgeToObjectiveC() -> NSNumber {
     return self
+  }
+
+  static func bridgeFromObjectiveC(x: NSNumber) -> Double {
+    fatal("implement")
   }
 }
 
@@ -475,13 +510,21 @@ extension Bool: _BridgedToObjectiveC {
     return NSNumber(bool: self)
   }
 
+  static func getObjectiveCType() -> Any.Type {
+    return NSNumber.self
+  }
+
   func bridgeToObjectiveC() -> NSNumber {
     return self
+  }
+
+  static func bridgeFromObjectiveC(x: NSNumber) -> Bool {
+    fatal("implement")
   }
 }
 
 // Literal support for NSNumber
-extension NSNumber : FloatLiteralConvertible, IntegerLiteralConvertible, ObjCClassType {
+extension NSNumber : FloatLiteralConvertible, IntegerLiteralConvertible {
   class func convertFromIntegerLiteral(value: Int) -> NSNumber {
     return NSNumber(integer: value)
   }
@@ -524,14 +567,20 @@ func _convertArrayToNSArray<T>(arr: T[]) -> NSArray {
 }
 
 extension Array : _ConditionallyBridgedToObjectiveC {
-  typealias ObjectiveCType = NSArray
-  
   static func isBridgedToObjectiveC() -> Bool {
     return Swift.isBridgedToObjectiveC(T.self)
   }
 
+  static func getObjectiveCType() -> Any.Type {
+    return NSArray.self
+  }
+
   func bridgeToObjectiveC() -> NSArray {
     return reinterpretCast(self.buffer.asCocoaArray())
+  }
+
+  static func bridgeFromObjectiveC(x: NSArray) -> Array<T> {
+    fatal("implement")
   }
 
   @conversion func __conversion() -> NSArray {
@@ -637,15 +686,21 @@ func _convertDictionaryToNSDictionary<KeyType, ValueType>(
 
 // Dictionary<KeyType, ValueType> is conditionally bridged to NSDictionary
 extension Dictionary : _ConditionallyBridgedToObjectiveC {
-  typealias ObjectiveCType = NSDictionary
-
   static func isBridgedToObjectiveC() -> Bool {
     return KeyType.self is NSObject.Type &&
            Swift.isBridgedVerbatimToObjectiveC(ValueType.self)
   }
 
+  static func getObjectiveCType() -> Any.Type {
+    return NSDictionary.self
+  }
+
   func bridgeToObjectiveC() -> NSDictionary {
     return _convertDictionaryToNSDictionary(self)
+  }
+
+  static func bridgeFromObjectiveC(x: NSDictionary) -> Dictionary {
+    fatal("implement")
   }
 }
 

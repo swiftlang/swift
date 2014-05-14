@@ -1387,8 +1387,16 @@ struct TestBridgedKeyTy : Equatable, Hashable, Printable, _BridgedToObjectiveC {
     return _hashValue
   }
 
+  static func getObjectiveCType() -> Any.Type {
+    return TestObjCKeyTy.self
+  }
+
   func bridgeToObjectiveC() -> TestObjCKeyTy {
     return TestObjCKeyTy(value)
+  }
+
+  static func bridgeFromObjectiveC(x: TestObjCKeyTy) -> TestBridgedKeyTy {
+    fatal("implement")
   }
 
   var value: Int
@@ -1415,8 +1423,16 @@ struct TestBridgedValueTy : Printable, _BridgedToObjectiveC {
     return value.description
   }
 
+  static func getObjectiveCType() -> Any.Type {
+    return TestObjCValueTy.self
+  }
+
   func bridgeToObjectiveC() -> TestObjCValueTy {
     return TestObjCValueTy(value)
+  }
+
+  static func bridgeFromObjectiveC(x: TestObjCValueTy) -> TestBridgedValueTy {
+    fatal("implement")
   }
 
   var value: Int

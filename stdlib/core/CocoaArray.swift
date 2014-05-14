@@ -27,7 +27,7 @@ import SwiftShims
 /// NSArray.  It is safe to convert between NSArray and CocoaArray via
 /// reinterpretCast.
 @objc @class_protocol
-protocol CocoaArray : ObjCClassType {
+protocol CocoaArray {
   func objectAtIndex(index: Int) -> AnyObject
   
   func getObjects(UnsafePointer<AnyObject>, range: _SwiftNSRange)

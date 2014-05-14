@@ -1,13 +1,19 @@
 // RUN: %swift -parse %s -verify
 
 class A {
-	var x = 0
+  var x = 0
 }
 
 class B : A, _BridgedToObjectiveC {
-	func bridgeToObjectiveC() -> A {
-		return A()
-	}
+  class func getObjectiveCType() -> Any.Type {
+    return A.self
+  }
+  func bridgeToObjectiveC() -> A {
+    return A()
+  }
+  class func bridgeFromObjectiveC(x: A) -> B {
+    fatal("implement")
+  }
 }
 
 var a: A[] = []
@@ -22,18 +28,23 @@ var bb: B[][] = []
 aa = bb // expected-error {{cannot convert the expression's type '()' to type '(A[])[]'}}
 
 class C {
-	
 }
 
 // In this case, bridged conversion should win
 class E {
-	var x = 0
+  var x = 0
 }
 
 class F : E, _BridgedToObjectiveC {
-	func bridgeToObjectiveC() -> E {
-		return self
-	}
+  class func getObjectiveCType() -> Any.Type {
+    return E.self
+  }
+  func bridgeToObjectiveC() -> E {
+    return self
+  }
+  class func bridgeFromObjectiveC(x: E) -> F {
+    fatal("implement")
+  }
 }
 
 var e: E[] = []
@@ -43,17 +54,22 @@ e = f
 f = e // expected-error {{cannot convert the expression's type '()' to type 'F[]'}}
 
 class G {
-	var x = 0
+  var x = 0
 }
 
 class H : G, _ConditionallyBridgedToObjectiveC {
-	func bridgeToObjectiveC() -> G {
-		return self
-	}
-
-	class func isBridgedToObjectiveC() -> Bool {
-		return false
-	}
+  class func getObjectiveCType() -> Any.Type {
+    return G.self
+  }
+  func bridgeToObjectiveC() -> G {
+    return self
+  }
+  class func bridgeFromObjectiveC(x: G) -> H {
+    fatal("implement")
+  }
+  class func isBridgedToObjectiveC() -> Bool {
+    return false
+  }
 }
 
 var g: G[] = []
@@ -63,9 +79,15 @@ g = h // should type check, but cause a failure at runtime
 
 
 class I : _BridgedToObjectiveC {
-	func bridgeToObjectiveC() -> AnyObject {
-		return self
-	}
+  class func getObjectiveCType() -> Any.Type {
+    return AnyObject.self
+  }
+  func bridgeToObjectiveC() -> AnyObject {
+    return self
+  }
+  class func bridgeFromObjectiveC(x: AnyObject) -> I {
+    fatal("implement")
+  }
 }
 
 var aoa: AnyObject[] = []
