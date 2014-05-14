@@ -398,7 +398,7 @@ extension String : _BridgedToObjectiveC {
   }
 
   static func bridgeFromObjectiveC(x: NSString) -> String {
-    fatal("implement")
+    return String(x)
   }
 }
 
