@@ -192,7 +192,10 @@ private:
   SourceLoc MainClassDiagLoc;
   
   /// Did we complain about multiple main classes yet?
-  bool DiagnosedMultipleMainClasses = false;
+  bool DiagnosedMultipleMainClasses: 1;
+  
+  /// Did we complain about a main class and a script together yet?
+  bool DiagnosedMainClassWithScript: 1;
 
   Module(Identifier name, ASTContext &ctx);
 public:

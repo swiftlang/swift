@@ -290,7 +290,10 @@ void SourceLookupCache::lookupClassMember(AccessPathTy accessPath,
 //===----------------------------------------------------------------------===//
 
 Module::Module(Identifier name, ASTContext &ctx)
-    : DeclContext(DeclContextKind::Module, nullptr), Ctx(ctx), Name(name) {
+    : DeclContext(DeclContextKind::Module, nullptr), Ctx(ctx), Name(name),
+      DiagnosedMultipleMainClasses(false),
+      DiagnosedMainClassWithScript(false)
+{
   ctx.addDestructorCleanup(*this);
 }
 
@@ -1088,6 +1091,20 @@ bool Module::registerMainClass(ClassDecl *mainClass, SourceLoc diagLoc) {
     getASTContext().Diags.diagnose(diagLoc,
                                    diag::attr_UIApplicationMain_multiple);
     return true;
+  }
+  
+  // Complain if there is also a script file in this module.
+  if (!DiagnosedMainClassWithScript) {
+    DiagnosedMainClassWithScript = true;
+    for (auto file : getFiles()) {
+      auto sf = dyn_cast<SourceFile>(file);
+      if (!sf)
+        continue;
+      if (sf->isScriptMode()) {
+        getASTContext().Diags.diagnose(diagLoc, diag::attr_UIApplicationMain_with_script);
+        break;
+      }
+    }
   }
   
   MainClass = mainClass;

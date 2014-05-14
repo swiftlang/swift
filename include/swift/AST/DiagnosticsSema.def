@@ -762,6 +762,10 @@ ERROR(attr_generic_UIApplicationMain_not_supported,sema_tcd,none,
 ERROR(attr_UIApplicationMain_multiple,sema_tcd,none,
       "'UIApplicationMain' attribute can only apply to one class in a module",
       ())
+ERROR(attr_UIApplicationMain_with_script,sema_tcd,none,
+      "'UIApplicationMain' attribute cannot be used in a module that has a "
+      "'main.swift' file",
+      ())
 
 // lazy attribute
 ERROR(lazy_not_on_let,sema_tcd,none,
