@@ -69,6 +69,8 @@ ERROR(error_immediate_mode_missing_library,frontend,none,
 ERROR(error_immediate_mode_primary_file,frontend,none,
   "immediate mode is incompatible with -primary-file", ())
 
+ERROR(error_mode_cannot_emit_dependencies,frontend,none,
+  "this mode does not support emitting dependency files", ())
 ERROR(error_mode_cannot_emit_header,frontend,none,
   "this mode does not support emitting Objective-C headers", ())
 ERROR(error_mode_cannot_emit_module,frontend,none,

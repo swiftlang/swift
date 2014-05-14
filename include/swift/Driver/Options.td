@@ -130,6 +130,10 @@ def output_file_map_EQ : Joined<["-"], "output-file-map=">,
 def save_temps : Flag<["-"], "save-temps">,
   HelpText<"Save intermediate compilation results">;
 
+def emit_dependencies : Flag<["-"], "emit-dependencies">,
+  Flags<[FrontendOption]>,
+  HelpText<"Emit Make-compatible dependencies files">;
+
 def serialize_diagnostics : Flag<["-"], "serialize-diagnostics">,
   Flags<[FrontendOption]>,
   HelpText<"Serialize diagnostics in a binary format">;

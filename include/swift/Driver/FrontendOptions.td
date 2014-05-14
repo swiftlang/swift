@@ -35,6 +35,10 @@ def emit_module_doc_path
   : Separate<["-"], "emit-module-doc-path">, MetaVarName<"<path>">,
     HelpText<"Output module documentation file <path>">;
 
+def emit_dependencies_path
+  : Separate<["-"], "emit-dependencies-path">, MetaVarName<"<path>">,
+    HelpText<"Output dependencies file to <path>">;
+
 def serialize_diagnostics_path
   : Separate<["-"], "serialize-diagnostics-path">, MetaVarName<"<path>">,
     HelpText<"Output serialized diagnostics to <path>">;

@@ -25,7 +25,7 @@
 // SIMPLE: bin/swift -frontend
 // SIMPLE: -emit-module
 // SIMPLE: -primary-file
-// SIMPLE: -emit-module-doc -emit-module-doc-path {{[^ ]*}}/merge-module-{{[^ ]*}}.swiftdoc
+// SIMPLE: -emit-module-doc-path {{[^ ]*}}/merge-module-{{[^ ]*}}.swiftdoc
 // SIMPLE: -o {{[^ ]*}}/merge-module-{{[^ ]*}}.swiftmodule
 // SIMPLE: bin/swift -frontend
 // SIMPLE: -emit-module
@@ -34,7 +34,7 @@
 
 // COMPLEX: bin/swift -frontend
 // COMPLEX: -emit-module
-// COMPLEX-DAG: -emit-module-doc -emit-module-doc-path {{[^ ]*}}/merge-module-{{[^ ]*}}.swiftdoc
+// COMPLEX-DAG: -emit-module-doc-path {{[^ ]*}}/merge-module-{{[^ ]*}}.swiftdoc
 // COMPLEX-DAG: -sdk {{.*}}/Inputs/clang-importer-sdk
 // COMPLEX-DAG: -foo -bar
 // COMPLEX-DAG: -F /path/to/frameworks -F /path/to/more/frameworks
@@ -49,20 +49,20 @@
 
 
 // TWO-OUTPUTS: bin/swift -frontend
-// TWO-OUTPUTS: -emit-module-doc -emit-module-doc-path {{[^ ]*}}/merge-module-{{[^ ]*}}.swiftdoc
-// TWO-OUTPUTS: -emit-module -emit-module-path [[MODULE:[^ ]+]]
+// TWO-OUTPUTS: -emit-module-doc-path {{[^ ]*}}/merge-module-{{[^ ]*}}.swiftdoc
+// TWO-OUTPUTS: -emit-module-path [[MODULE:[^ ]+]]
 // TWO-OUTPUTS: -o {{[^ ]*}}/merge-module-{{[^ ]*}}.o
 // TWO-OUTPUTS: bin/swift -frontend
 // TWO-OUTPUTS: -emit-module [[MODULE]]
 // TWO-OUTPUTS: -o main.swiftmodule
 
 // THREE-OUTPUTS: bin/swift -frontend
-// THREE-OUTPUTS: -emit-module-doc -emit-module-doc-path {{[^ ]*}}/merge-module-{{[^ ]*}}.swiftdoc
-// THREE-OUTPUTS: -emit-module -emit-module-path [[MODULE:[^ ]+]]
+// THREE-OUTPUTS: -emit-module-doc-path {{[^ ]*}}/merge-module-{{[^ ]*}}.swiftdoc
+// THREE-OUTPUTS: -emit-module-path [[MODULE:[^ ]+]]
 // THREE-OUTPUTS: -o {{[^ ]*}}/merge-module-{{[^ ]*}}.o
 // THREE-OUTPUTS: bin/swift -frontend
 // THREE-OUTPUTS: -emit-module [[MODULE]]
-// THREE-OUTPUTS: -emit-objc-header -emit-objc-header-path sdk.foo.h
+// THREE-OUTPUTS: -emit-objc-header-path sdk.foo.h
 // THREE-OUTPUTS: -o sdk.foo.out
 
 // RUN: %swift_driver -driver-print-jobs -emit-module %S/Inputs/main.swift %S/Inputs/lib.swift -module-name merge -o /tmp/modules > %t.complex.txt
@@ -71,15 +71,15 @@
 
 // MERGE_1: bin/swift -frontend -emit-module -primary-file {{[^ ]+}}/Inputs/main.swift {{[^ ]+}}/Inputs/lib.swift
 // MERGE_1: -module-name merge
-// MERGE_1: -emit-module-doc -emit-module-doc-path [[PARTIAL_MODULE_A:[^ ]+]].swiftdoc
+// MERGE_1: -emit-module-doc-path [[PARTIAL_MODULE_A:[^ ]+]].swiftdoc
 // MERGE_1: -o [[PARTIAL_MODULE_A]].swiftmodule
 // MERGE_1: bin/swift -frontend -emit-module {{[^ ]+}}/Inputs/main.swift -primary-file {{[^ ]+}}/Inputs/lib.swift
 // MERGE_1: -module-name merge
-// MERGE_1: -emit-module-doc -emit-module-doc-path [[PARTIAL_MODULE_B:[^ ]+]].swiftdoc
+// MERGE_1: -emit-module-doc-path [[PARTIAL_MODULE_B:[^ ]+]].swiftdoc
 // MERGE_1: -o [[PARTIAL_MODULE_B]].swiftmodule
 // MERGE_1: bin/swift -frontend -emit-module [[PARTIAL_MODULE_A]].swiftmodule [[PARTIAL_MODULE_B]].swiftmodule
 // MERGE_1: -parse-as-library
 // MERGE_1: -module-name merge
-// MERGE_1: -emit-module-doc -emit-module-doc-path /tmp/modules.swiftdoc
+// MERGE_1: -emit-module-doc-path /tmp/modules.swiftdoc
 // MERGE_1: -o /tmp/modules
 

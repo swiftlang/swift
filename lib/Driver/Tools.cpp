@@ -154,7 +154,6 @@ static void addCommonFrontendArgs(const ToolChain &TC,
   const std::string &moduleDocOutputPath =
       output->getAdditionalOutputForType(types::TY_SwiftModuleDocFile);
   if (!moduleDocOutputPath.empty()) {
-    arguments.push_back("-emit-module-doc");
     arguments.push_back("-emit-module-doc-path");
     arguments.push_back(moduleDocOutputPath.c_str());
   }
@@ -296,7 +295,6 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
   const std::string &ModuleOutputPath =
     Output->getAdditionalOutputForType(types::ID::TY_SwiftModuleFile);
   if (!ModuleOutputPath.empty()) {
-    Arguments.push_back("-emit-module");
     Arguments.push_back("-emit-module-path");
     Arguments.push_back(ModuleOutputPath.c_str());
   }
@@ -304,9 +302,15 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
   const std::string &SerializedDiagnosticsPath =
     Output->getAdditionalOutputForType(types::TY_SerializedDiagnostics);
   if (!SerializedDiagnosticsPath.empty()) {
-    Arguments.push_back("-serialize-diagnostics");
     Arguments.push_back("-serialize-diagnostics-path");
     Arguments.push_back(SerializedDiagnosticsPath.c_str());
+  }
+
+  const std::string &DependenciesPath =
+    Output->getAdditionalOutputForType(types::TY_Dependencies);
+  if (!DependenciesPath.empty()) {
+    Arguments.push_back("-emit-dependencies-path");
+    Arguments.push_back(DependenciesPath.c_str());
   }
 
   // Add the output file argument if necessary.
@@ -361,7 +365,6 @@ Job *MergeModule::constructJob(const JobAction &JA,
   const std::string &ObjCHeaderOutputPath =
     Output->getAdditionalOutputForType(types::TY_ObjCHeader);
   if (!ObjCHeaderOutputPath.empty()) {
-    Arguments.push_back("-emit-objc-header");
     Arguments.push_back("-emit-objc-header-path");
     Arguments.push_back(ObjCHeaderOutputPath.c_str());
   }

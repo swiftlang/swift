@@ -843,6 +843,35 @@ collectTemporaryFilesForAction(const Action &A, const Job &J,
   }
 }
 
+static void addAuxiliaryOutput(CommandOutput &output, types::ID outputType,
+                               const OutputInfo &OI,
+                               const TypeToPathMap *outputMap) {
+  StringRef outputMapPath;
+  if (outputMap) {
+    auto iter = outputMap->find(outputType);
+    if (iter != outputMap->end())
+      outputMapPath = iter->second;
+  }
+
+  if (!outputMapPath.empty()) {
+    // Prefer a path from the OutputMap.
+    output.setAdditionalOutputForType(outputType, outputMapPath);
+  } else {
+    // Put the auxiliary output file next to the primary output file.
+    llvm::SmallString<128> path;
+    if (output.getPrimaryOutputType() != types::TY_Nothing)
+      path = output.getPrimaryOutputFilename();
+    else if (!output.getBaseInput().empty())
+      path = llvm::sys::path::stem(output.getBaseInput());
+    else
+      path = OI.ModuleName;
+
+    llvm::sys::path::replace_extension(path,
+                                       types::getTypeTempSuffix(outputType));
+    output.setAdditionalOutputForType(outputType, path);
+  }
+}
+
 Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
                                 const OutputInfo &OI,
                                 const OutputFileMap *OFM,
@@ -973,41 +1002,24 @@ Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
     }
   }
 
-  // Choose the serialized diagnostics output path.
-  if (C.getArgs().hasArg(options::OPT_serialize_diagnostics) &&
-      isa<CompileJobAction>(JA)) {
-    StringRef OFMSerializeDiagnosticsPath;
-    if (OutputMap) {
-      auto iter = OutputMap->find(types::TY_SerializedDiagnostics);
-      if (iter != OutputMap->end())
-        OFMSerializeDiagnosticsPath = iter->second;
+  if (isa<CompileJobAction>(JA)) {
+    // Choose the serialized diagnostics output path.
+    if (C.getArgs().hasArg(options::OPT_serialize_diagnostics)) {
+      addAuxiliaryOutput(*Output, types::TY_SerializedDiagnostics, OI,
+                         OutputMap);
+
+      // Remove any existing diagnostics files so that clients can detect their
+      // presence to determine if a command was run.
+      StringRef OutputPath =
+        Output->getAnyOutputForType(types::TY_SerializedDiagnostics);
+      if (llvm::sys::fs::is_regular_file(OutputPath))
+        llvm::sys::fs::remove(OutputPath);
     }
 
-    if (!OFMSerializeDiagnosticsPath.empty()) {
-      // Prefer a path from the OutputMap.
-      Output->setAdditionalOutputForType(types::TY_SerializedDiagnostics,
-                                         OFMSerializeDiagnosticsPath);
-    } else {
-      // Put the serialized diagnostics next to the primary output file.
-      llvm::SmallString<128> Path;
-      if (Output->getPrimaryOutputType() != types::TY_Nothing)
-        Path = Output->getPrimaryOutputFilename();
-      else if (!Output->getBaseInput().empty())
-        Path = llvm::sys::path::stem(Output->getBaseInput());
-      else
-        Path = OI.ModuleName;
-
-      llvm::sys::path::replace_extension(Path, "dia");
-      Output->setAdditionalOutputForType(types::TY_SerializedDiagnostics, Path);
+    // Choose the dependencies file output path.
+    if (C.getArgs().hasArg(options::OPT_emit_dependencies)) {
+      addAuxiliaryOutput(*Output, types::TY_Dependencies, OI, OutputMap);
     }
-
-    // Remove any existing diagnostics files so that clients can detect their
-    // presence to determine if a command was run.
-    StringRef OutputPath =
-      Output->getAnyOutputForType(types::TY_SerializedDiagnostics);
-    if (llvm::sys::fs::can_write(OutputPath) &&
-        llvm::sys::fs::is_regular_file(OutputPath))
-      llvm::sys::fs::remove(OutputPath);
   }
 
   // Choose the Objective-C header output path.

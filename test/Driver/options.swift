@@ -20,6 +20,12 @@
 // RUN: %swift_driver -emit-silgen -parse-as-library %s -module-name "Swift" -parse-stdlib -###
 // STDLIB_MODULE: error: module name "Swift" is reserved for the standard library{{$}}
 
+// RUN: not %swift -parse -emit-module %s 2>&1 | FileCheck -check-prefix=PARSE_NO_MODULE %s
+// PARSE_NO_MODULE: error: this mode does not support emitting modules{{$}}
+
+// RUN: not %swift -dump-ast -emit-dependencies %s 2>&1 | FileCheck -check-prefix=DUMP_NO_DEPS %s
+// DUMP_NO_DEPS: error: this mode does not support emitting dependency files{{$}}
+
 // Should not fail with non-zero exit code.
 // RUN: %swift -emit-silgen %S/Inputs/invalid-module-name.swift > /dev/null
 // RUN: %swift -emit-silgen -parse-as-library %S/Inputs/invalid-module-name.swift -module-name foo > /dev/null

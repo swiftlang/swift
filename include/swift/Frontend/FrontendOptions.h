@@ -95,6 +95,9 @@ public:
   /// frontend invocation.
   std::string SerializedDiagnosticsPath;
 
+  /// The path to which we should output a Make-style dependencies file.
+  std::string DependenciesFilePath;
+
   /// Arguments which should be passed in immediate mode.
   std::vector<std::string> ImmediateArgv;
 

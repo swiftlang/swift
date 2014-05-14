@@ -413,6 +413,10 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     output = Path.str();
   };
 
+  determineOutputFilename(Opts.DependenciesFilePath,
+                          OPT_emit_dependencies,
+                          OPT_emit_dependencies_path,
+                          "d", false);
   determineOutputFilename(Opts.SerializedDiagnosticsPath,
                           OPT_serialize_diagnostics,
                           OPT_serialize_diagnostics_path,
@@ -435,6 +439,27 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
                           OPT_emit_module_doc_path,
                           SERIALIZED_MODULE_DOC_EXTENSION,
                           false);
+
+  if (!Opts.DependenciesFilePath.empty()) {
+    switch (Opts.RequestedAction) {
+    case FrontendOptions::DumpParse:
+    case FrontendOptions::DumpAST:
+    case FrontendOptions::PrintAST:
+    case FrontendOptions::Immediate:
+    case FrontendOptions::REPL:
+      Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_dependencies);
+      return true;
+    case FrontendOptions::Parse:
+    case FrontendOptions::EmitModuleOnly:
+    case FrontendOptions::EmitSILGen:
+    case FrontendOptions::EmitSIL:
+    case FrontendOptions::EmitIR:
+    case FrontendOptions::EmitBC:
+    case FrontendOptions::EmitAssembly:
+    case FrontendOptions::EmitObject:
+      break;
+    }
+  }
 
   if (!Opts.ObjCHeaderOutputPath.empty()) {
     switch (Opts.RequestedAction) {
