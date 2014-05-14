@@ -1,6 +1,6 @@
 // RUN: %swift-ide-test -structure -source-filename %s | FileCheck %s
 
-// CHECK: Class at [[@LINE+1]]:1 - [[@LINE+22]]:2, name at [[@LINE+1]]:7 - [[@LINE+1]]:12, inherited types at [[@LINE+1]]:15 - [[@LINE+1]]:25
+// CHECK: Class at [[@LINE+1]]:1 - [[@LINE+25]]:2, name at [[@LINE+1]]:7 - [[@LINE+1]]:12, inherited types at [[@LINE+1]]:15 - [[@LINE+1]]:25
 class MyCls : OtherClass {
   // CHECK: Property at [[@LINE+1]]:3 - [[@LINE+1]]:16, name at [[@LINE+1]]:7 - [[@LINE+1]]:10
   var bar : Int
@@ -22,4 +22,7 @@ class MyCls : OtherClass {
     }
   }
 
+  // CHECK: Func at [[@LINE+2]]:3 - [[@LINE+2]]:16, name at [[@LINE+2]]:3 - [[@LINE+2]]:16
+  // CHECK: Parameter at [[@LINE+1]]:9 - [[@LINE+1]]:10, name at [[@LINE+1]]:9 - [[@LINE+1]]:10
+  init (x: Int)
 }

@@ -2400,6 +2400,9 @@ SourceRange AbstractFunctionDecl::getBodySourceRange() const {
 }
 
 SourceRange AbstractFunctionDecl::getSignatureSourceRange() const {
+  if (isImplicit())
+    return SourceRange();
+
   auto Pats = getBodyParamPatterns();
   if (Pats.empty())
     return getNameLoc();
@@ -2724,19 +2727,9 @@ SourceRange ConstructorDecl::getSourceRange() const {
     return { getConstructorLoc(), BodyRange.End };
 
   auto body = getBody();
-  if (!body || !body->getEndLoc().isValid()) {
-    const DeclContext *DC = getDeclContext();
-    switch (DC->getContextKind()) {
-    case DeclContextKind::ExtensionDecl:
-      return cast<ExtensionDecl>(DC)->getSourceRange();
-    case DeclContextKind::NominalTypeDecl:
-      return cast<NominalTypeDecl>(DC)->getSourceRange();
-    default:
-      if (isInvalid())
-        return getConstructorLoc();
-      llvm_unreachable("Unhandled decl kind");
-    }
-  }
+  if (!body || !body->getEndLoc().isValid())
+      return getSignatureSourceRange();
+
   return { getConstructorLoc(), body->getEndLoc() };
 }
 
