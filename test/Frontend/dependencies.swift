@@ -6,8 +6,8 @@
 // CHECK-BASIC-LABEL: - :
 // CHECK-BASIC: Inputs/empty.swift
 // CHECK-BASIC: Swift.swiftmodule
-// CHECK-BASIC: shims/shims.h
-// CHECK-BASIC: shims/module.map
+// CHECK-BASIC-DAG: shims/shims.h
+// CHECK-BASIC-DAG: shims/module.map
 // CHECK-BASIC-NOT: :
 // CHECK-BASIC-NOT: /
 
@@ -28,15 +28,15 @@
 
 // CHECK-IMPORT-LABEL: - :
 // CHECK-IMPORT: dependencies.swift
-// CHECK-IMPORT: Inputs/dependencies/extra-header.h
-// CHECK-IMPORT: Swift.swiftmodule
-// CHECK-IMPORT: shims/shims.h
-// CHECK-IMPORT: shims/module.map
-// CHECK-IMPORT: Foundation.swift
-// CHECK-IMPORT: ObjectiveC.swift
-// CHECK-IMPORT: CoreGraphics.swift
-// CHECK-IMPORT: Inputs/dependencies/UserClangModule.h
-// CHECK-IMPORT: Inputs/dependencies/module.modulemap
+// CHECK-IMPORT-DAG: Inputs/dependencies/extra-header.h
+// CHECK-IMPORT-DAG: Swift.swiftmodule
+// CHECK-IMPORT-DAG: shims/shims.h
+// CHECK-IMPORT-DAG: shims/module.map
+// CHECK-IMPORT-DAG: Foundation.swift
+// CHECK-IMPORT-DAG: ObjectiveC.swift
+// CHECK-IMPORT-DAG: CoreGraphics.swift
+// CHECK-IMPORT-DAG: Inputs/dependencies/UserClangModule.h
+// CHECK-IMPORT-DAG: Inputs/dependencies/module.modulemap
 // CHECK-IMPORT-NOT: :
 
 import Foundation
