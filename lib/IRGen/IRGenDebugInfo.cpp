@@ -1459,8 +1459,11 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     auto DerivedFrom = Superclass.isNull()
                            ? llvm::DIType()
                            : getOrCreateDesugaredType(Superclass, DbgTy);
+    // Essentially a %swift.opaque pointer.
+    unsigned PtrSize = CI.getTargetInfo().getPointerWidth(0);
+    unsigned PtrAlign = CI.getTargetInfo().getPointerAlign(0);
     auto DITy = DBuilder.createStructType(
-        Scope, MangledName, File, L.Line, SizeInBits, AlignInBits, Flags,
+        Scope, MangledName, File, L.Line, PtrSize, PtrAlign, Flags,
         DerivedFrom, llvm::DIArray(), llvm::dwarf::DW_LANG_Swift,
         llvm::DIType(), MangledName);
     // Emit the protocols the archetypes conform to.
