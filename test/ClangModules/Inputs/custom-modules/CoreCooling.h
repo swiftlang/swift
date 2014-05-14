@@ -22,3 +22,12 @@ void CCRefrigeratorInsert(CCMutableRefrigeratorRef fridge, CCItemRef ref);
 @interface Kitchen
 @property CCRefrigeratorRef fridge;
 @end
+
+@interface Duct
+@end
+
+@interface MutableDuct : Duct
+@end
+
+typedef const struct __attribute__((objc_bridge(Duct))) __CCDuct *CCDuctRef;
+typedef struct __attribute__((objc_bridge_mutable(MutableDuct))) __CCDuct *CCMutableDuctRef;

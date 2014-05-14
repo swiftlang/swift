@@ -689,6 +689,66 @@ static ConstructorDecl *makeOptionSetDefaultConstructor(StructDecl *optionSetDec
   return ctorDecl;
 }
 
+/// Create a call to a builtin name.
+static Expr *emitBuiltinCast(ASTContext &C, Expr *op, StringRef builtinName) {
+  SmallVector<ValueDecl*, 4> results;
+  C.TheBuiltinModule->lookupValue({}, C.getIdentifier(builtinName),
+                                  NLKind::QualifiedLookup, results);
+  assert(results.size() == 1 && "lookup for builtin didn't find anything?");
+  auto builtin = new (C) DeclRefExpr(results[0], SourceLoc(), /*implicit*/true);
+  return new (C) CallExpr(builtin, op, /*implicit*/ true);
+}
+
+// Build the implicit conversion from a CF type to an NS type or vice versa.
+//
+// extension FromType : ToType {
+//   var value: RawType
+//   func __conversion() -> Bool {
+//     return self.value != 0
+//   }
+// }
+static FuncDecl *makeClassToClassImplicitConversion(ClassDecl *fromDecl,
+                                                    ClassDecl *toDecl) {
+  ASTContext &C = fromDecl->getASTContext();
+
+  auto resultType = toDecl->getDeclaredType();
+
+  VarDecl *selfDecl = createSelfDecl(fromDecl, /*isStaticMethod*/false);
+  Pattern *selfParam = createTypedNamedPattern(selfDecl);
+  Pattern *methodParam = TuplePattern::create(C, SourceLoc(),{},SourceLoc());
+  methodParam->setType(TupleType::getEmpty(C));
+  Pattern *params[] = {selfParam, methodParam};
+
+  DeclName name(C, C.Id_Conversion, { });
+  FuncDecl *conversionDecl = FuncDecl::create(
+      C, SourceLoc(), StaticSpellingKind::None, SourceLoc(),
+      name, SourceLoc(), nullptr, Type(),
+      params, TypeLoc::withoutLoc(resultType), fromDecl);
+  conversionDecl->setImplicit();
+  conversionDecl->getMutableAttrs().add(new (C) FinalAttr(/*implicit*/ true));
+
+  auto argType = TupleType::getEmpty(C);
+  Type fnType = FunctionType::get(argType, resultType);
+  fnType = FunctionType::get(fromDecl->getDeclaredTypeInContext(), fnType);
+  conversionDecl->setType(fnType);
+  conversionDecl->setBodyResultType(resultType);
+
+  Expr *op = new (C) DeclRefExpr(selfDecl, SourceLoc(), /*implicit*/ true);
+  op = emitBuiltinCast(C, op, "castToNativeObject");
+  op = emitBuiltinCast(C, op, "castFromNativeObject");
+  auto ret = new (C) ReturnStmt(SourceLoc(), op);
+
+  auto body = BraceStmt::create(C, SourceLoc(), ASTNode(ret),
+                                SourceLoc(),
+                                /*implicit*/ true);
+  conversionDecl->setBody(body);
+
+  // Add as an external definition.
+  C.addedExternalDecl(conversionDecl);
+
+  return conversionDecl;
+}
+
 namespace {
   class CFPointeeInfo {
     bool IsValid;
@@ -888,6 +948,20 @@ namespace {
       return Type();
     }
 
+    void addClassToClassConversions(ClassDecl *fromClass,
+                                    const clang::IdentifierInfo *toClassName) {
+      // Just bail out if we can't find a class by that name.
+      ClassDecl *toClass = dyn_cast_or_null<ClassDecl>(
+                                Impl.importDeclByName(toClassName->getName()));
+      if (!toClass) return;
+
+      auto toConversion = makeClassToClassImplicitConversion(fromClass, toClass);
+      fromClass->addMember(toConversion);
+
+      auto fromConversion = makeClassToClassImplicitConversion(toClass, fromClass);
+      toClass->addMember(fromConversion);
+    }
+
     Type importCFClassType(const clang::TypedefNameDecl *decl,
                            CFPointeeInfo info) {
       // Name the class 'CFString', not 'CFStringRef'.
@@ -918,6 +992,20 @@ namespace {
       SmallVector<ProtocolDecl *, 4> protocols;
       theClass->getImplicitProtocols(protocols);
       addObjCProtocolConformances(theClass, protocols);
+
+      // Look for bridging attributes on the clang record.  We can
+      // just check the most recent redeclaration, which will inherit
+      // any attributes from earlier declarations.
+      auto record = info.getRecord()->getMostRecentDecl();
+      if (info.isConst()) {
+        if (auto attr = record->getAttr<clang::ObjCBridgeAttr>()) {
+          addClassToClassConversions(theClass, attr->getBridgedType());
+        }
+      } else {
+        if (auto attr = record->getAttr<clang::ObjCBridgeMutableAttr>()) {
+          addClassToClassConversions(theClass, attr->getBridgedType());
+        }
+      }
 
       return theClass->getDeclaredType();
     }

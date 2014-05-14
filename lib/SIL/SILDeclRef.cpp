@@ -192,8 +192,8 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
       return ClangLinkage;
 
     if (auto *FD = dyn_cast<FuncDecl>(d))
-      if (FD->isGetterOrSetter() || isa<EnumDecl>(d->getDeclContext()) ||
-          isa<StructDecl>(d->getDeclContext()))
+      if (FD->isGetterOrSetter() ||
+          isa<NominalTypeDecl>(d->getDeclContext()))
         return ClangLinkage;
   }
   // Declarations that were derived on behalf of types in Clang modules get

@@ -1115,30 +1115,36 @@ getNamedSwiftTypeSpecialization(Module *module, StringRef name,
   return Type();
 }
 
-Type ClangImporter::Implementation::getNSObjectType() {
-  if (NSObjectTy)
-    return NSObjectTy;
-
+Decl *ClangImporter::Implementation::importDeclByName(StringRef name) {
   auto &sema = Instance->getSema();
 
   // Map the name. If we can't represent the Swift name in Clang, bail out now.
-  auto clangName = &getClangASTContext().Idents.get("NSObject");
+  auto clangName = &getClangASTContext().Idents.get(name);
 
   // Perform name lookup into the global scope.
   // FIXME: Map source locations over.
   clang::LookupResult lookupResult(sema, clangName, clang::SourceLocation(),
                                    clang::Sema::LookupOrdinaryName);
   if (!sema.LookupName(lookupResult, /*Scope=*/0)) {
-    return Type();
+    return nullptr;
   }
 
   for (auto decl : lookupResult) {
     if (auto swiftDecl = importDecl(decl->getUnderlyingDecl())) {
-      if (auto classDecl = dyn_cast<ClassDecl>(swiftDecl)) {
-        NSObjectTy = classDecl->getDeclaredType();
-        return NSObjectTy;
-      }
+      return swiftDecl;
     }
+  }
+
+  return nullptr;
+}
+
+Type ClangImporter::Implementation::getNSObjectType() {
+  if (NSObjectTy)
+    return NSObjectTy;
+
+  if (auto decl = dyn_cast_or_null<ClassDecl>(importDeclByName("NSObject"))) {
+    NSObjectTy = decl->getDeclaredType();
+    return NSObjectTy;
   }
 
   return Type();

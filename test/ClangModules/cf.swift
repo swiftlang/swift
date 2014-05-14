@@ -70,3 +70,17 @@ func testProperty(k: Kitchen) {
   CCRefrigeratorOpen(k.fridge)
   CCRefrigeratorClose(k.fridge)
 }
+
+func testTollFree0(mduct: MutableDuct) {
+  let ccmduct: CCMutableDuct = mduct
+
+  let duct: Duct = mduct
+  let ccduct: CCDuct = duct
+}
+
+func testTollFree1(ccmduct: CCMutableDuct) {
+  let mduct: MutableDuct = ccmduct
+
+  let ccduct: CCDuct = ccmduct
+  let duct: Duct = ccduct
+}

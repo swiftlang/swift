@@ -700,6 +700,10 @@ public:
   /// \brief Retrieve the NSCopying protocol type.
   Type getNSCopyingType();
 
+  /// \brief Look up and attempt to import a Clang declaration with
+  /// the given name.
+  Decl *importDeclByName(StringRef name);
+
   /// \brief Import the given Clang type into Swift.
   ///
   /// \param type The Clang type to import.
