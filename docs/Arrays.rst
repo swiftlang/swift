@@ -44,7 +44,7 @@ element type: when it is statically known that the element type is not
 a class, code and checks accounting for the possibility of wrapping an
 ``NSArray`` are eliminated.  An ``Array`` of Swift value types always
 uses the most efficient possible representation, identical to that of
-``NativeArray``.
+``ContiguousArray``.
 
 Components
 ----------
@@ -53,25 +53,25 @@ Swift provides three generic array types, all of which have amortized
 O(1) growth.  In this document, statements about **ArrayType** apply
 to all three of the components.
 
-* ``NativeArray<T>`` is the fastest and simplest of the three—use this
+* ``ContiguousArray<T>`` is the fastest and simplest of the three—use this
   when you need "C array" performance.  The elements of a
-  ``NativeArray`` are always stored contiguously in memory.
+  ``ContiguousArray`` are always stored contiguously in memory.
 
-  .. image:: NativeArray.png
+  .. image:: ContiguousArray.png
 
-* ``Array<T>`` is like ``NativeArray<T>``, but optimized for efficient
+* ``Array<T>`` is like ``ContiguousArray<T>``, but optimized for efficient
   conversions from Cocoa and back—when ``T`` can be a class type,
   ``Array<T>`` can be backed by the (potentially non-contiguous)
   storage of an arbitrary ``NSArray`` rather than by a Swift
-  ``NativeArray``.  ``Array<T>`` also supports up- and down- casts
+  ``ContiguousArray``.  ``Array<T>`` also supports up- and down- casts
   between arrays of related class types.  When ``T`` is known to be a
   non-class type, the performance of ``Array<T>`` is identical to that
-  of ``NativeArray<T>``.
+  of ``ContiguousArray<T>``.
 
   .. image:: Array.png
 
 * ``Slice<T>`` is a subrange of some ``Array<T>`` or
-  ``NativeArray<T>``; it's the result of using slice notation,
+  ``ContiguousArray<T>``; it's the result of using slice notation,
   e.g. ``a[7...21]`` on any Swift array ``a``.  A slice always has
   contiguous storage and "C array" performance.  Slicing an
   *ArrayType* is O(1) unless the source is an ``Array<T>`` backed by
@@ -248,7 +248,7 @@ Bridging To Objective-C
   bridged_.
 
 * An ``NSArray`` can be constructed from any bridged_ ``Array<T>`` or
-  ``NativeArray<T>``.  The elements of the resulting ``NSArray`` have
+  ``ContiguousArray<T>``.  The elements of the resulting ``NSArray`` have
   dynamic type ``U``, where ``T`` is bridged to ``U``.
 
   .. Admonition:: Implementation Notes
