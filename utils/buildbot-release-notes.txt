@@ -35,6 +35,12 @@ Latest
 
   If you do have a need for the previous REPL, pass -integrated-repl.
 
+* In a UIKit-based application, you can now apply the '@UIApplicationMain'
+  attribute to your UIApplicationDelegate class. This will cause the 'main'
+  entry point to the application to be automatically generated as follows:
+
+    UIApplicationMain(argc, argv, nil,
+                      NSStringFromClass(YourApplicationDelegate.self))
 
 2014-05-13
 ----------
