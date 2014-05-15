@@ -251,7 +251,9 @@ func test_CTypesPrinting() {
 test_CTypesPrinting()
 // CHECK: test_CTypesPrinting done
 
-struct StructPrintable : Printable {
+protocol ProtocolUnrelatedToPrinting {}
+
+struct StructPrintable : Printable, ProtocolUnrelatedToPrinting {
   let x: Int
 
   init(_ x: Int) {
@@ -275,6 +277,22 @@ struct StructDebugPrintable : DebugPrintable {
   }
 }
 
+struct StructVeryPrintable : Printable, DebugPrintable, ProtocolUnrelatedToPrinting {
+  let x: Int
+
+  init(_ x: Int) {
+    self.x = x
+  }
+
+  var description: String {
+    return "<description: \(x)>"
+  }
+
+  var debugDescription: String {
+    return "<debugDescription: \(x)>"
+  }
+}
+
 struct WithoutDescription {
   let x: Int
 
@@ -282,6 +300,116 @@ struct WithoutDescription {
     self.x = x
   }
 }
+
+class ClassPrintable : Printable, ProtocolUnrelatedToPrinting {
+  let x: Int
+
+  init(_ x: Int) {
+    self.x = x
+  }
+
+  var description: String {
+    return "►\(x)◀︎"
+  }
+}
+
+class ClassVeryPrintable : Printable, DebugPrintable, ProtocolUnrelatedToPrinting {
+  let x: Int
+
+  init(_ x: Int) {
+    self.x = x
+  }
+
+  var description: String {
+    return "<description: \(x)>"
+  }
+
+  var debugDescription: String {
+    return "<debugDescription: \(x)>"
+  }
+}
+
+func test_ObjectPrinting() {
+  if true {
+    let s = StructPrintable(1)
+    printedIs(s, "►1◀︎")
+  }
+  if true {
+    let s: ProtocolUnrelatedToPrinting = StructPrintable(1)
+    printedIs(s, "►1◀︎")
+  }
+  if true {
+    let s: Printable = StructPrintable(1)
+    printedIs(s, "►1◀︎")
+  }
+  if true {
+    let s: Any = StructPrintable(1)
+    printedIs(s, "►1◀︎")
+  }
+
+  if true {
+    let s = StructVeryPrintable(1)
+    printedIs(s, "<description: 1>")
+  }
+  if true {
+    let s: ProtocolUnrelatedToPrinting = StructVeryPrintable(1)
+    printedIs(s, "<description: 1>")
+  }
+  if true {
+    let s: Printable = StructVeryPrintable(1)
+    printedIs(s, "<description: 1>")
+  }
+  if true {
+    let s: DebugPrintable = StructVeryPrintable(1)
+    printedIs(s, "<description: 1>")
+  }
+  if true {
+    let s: Any = StructVeryPrintable(1)
+    printedIs(s, "<description: 1>")
+  }
+
+  if true {
+    let c = ClassPrintable(1)
+    printedIs(c, "►1◀︎")
+  }
+  if true {
+    let c: ProtocolUnrelatedToPrinting = ClassPrintable(1)
+    printedIs(c, "►1◀︎")
+  }
+  if true {
+    let c: Printable = ClassPrintable(1)
+    printedIs(c, "►1◀︎")
+  }
+  if true {
+    let c: Any = ClassPrintable(1)
+    printedIs(c, "►1◀︎")
+  }
+
+  if true {
+    let c = ClassVeryPrintable(1)
+    printedIs(c, "<description: 1>")
+  }
+  if true {
+    let c: ProtocolUnrelatedToPrinting = ClassVeryPrintable(1)
+    printedIs(c, "<description: 1>")
+  }
+  if true {
+    let c: Printable = ClassVeryPrintable(1)
+    printedIs(c, "<description: 1>")
+  }
+  if true {
+    let c: DebugPrintable = ClassVeryPrintable(1)
+    printedIs(c, "<description: 1>")
+  }
+  if true {
+    let c: Any = ClassVeryPrintable(1)
+    printedIs(c, "<description: 1>")
+  }
+
+  println("test_ObjectPrinting done")
+}
+test_ObjectPrinting()
+// CHECK: test_ObjectPrinting done
 
 func test_ArrayPrinting() {
   var arrayOfInts: Int[] = []
@@ -298,6 +426,14 @@ func test_ArrayPrinting() {
             "[►1◀︎, ►2◀︎, ►3◀︎]")
 
   printedIs([ StructDebugPrintable(1) ], "[►1◀︎]")
+
+  printedIs([ ClassPrintable(1), ClassPrintable(2),
+              ClassPrintable(3) ],
+            "[►1◀︎, ►2◀︎, ►3◀︎]")
+
+  printedIs([ ClassPrintable(1), ClassPrintable(2),
+              ClassPrintable(3) ] as Array<AnyObject>,
+            "[►1◀︎, ►2◀︎, ►3◀︎]")
 
   println("test_ArrayPrinting done")
 }
@@ -320,13 +456,13 @@ func test_TuplePrinting() {
   var arrayOfTuples1 =
       [ (1, "two", StructPrintable(3), StructDebugPrintable(4),
          WithoutDescription(5)) ]
-  printedIs(arrayOfTuples1, "[(1, two, V1a15StructPrintable (has 1 child), V1a20StructDebugPrintable (has 1 child), V1a18WithoutDescription (has 1 child))]")
+  printedIs(arrayOfTuples1, "[(1, two, ►3◀︎, ►4◀︎, V1a18WithoutDescription (has 1 child))]")
 
   var arrayOfTuples2 =
       [ (1, "two", WithoutDescription(3)),
         (11, "twenty-two", WithoutDescription(33)),
         (111, "two hundred twenty-two", WithoutDescription(333)) ]
-  printedIs(arrayOfTuples1, "[(1, two, V1a15StructPrintable (has 1 child), V1a20StructDebugPrintable (has 1 child), V1a18WithoutDescription (has 1 child))]")
+  printedIs(arrayOfTuples2, "[(1, two, V1a18WithoutDescription (has 1 child)), (11, twenty-two, V1a18WithoutDescription (has 1 child)), (111, two hundred twenty-two, V1a18WithoutDescription (has 1 child))]")
 
   println("test_TuplePrinting done")
 }

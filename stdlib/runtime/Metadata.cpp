@@ -2512,7 +2512,8 @@ recur:
 }
 
 static const void *
-findWitnessTableForDynamicCastToExistential1(const Metadata *sourceType,
+findWitnessTableForDynamicCastToExistential1(OpaqueValue *sourceValue,
+                                             const Metadata *sourceType,
                                              const Metadata *destType) {
   if (destType->getKind() != MetadataKind::Existential)
     swift::crash("Swift protocol conformance check failed: "
@@ -2527,6 +2528,15 @@ findWitnessTableForDynamicCastToExistential1(const Metadata *sourceType,
 
   auto destProtocolDescriptor = destExistentialMetadata->Protocols[0];
 
+  if (sourceType->getKind() == MetadataKind::Existential) {
+    const auto sourceExistentialMetadata =
+        static_cast<const ExistentialTypeMetadata *>(sourceType);
+    // Existentials don't carry complete type information about the value, but
+    // it is necessary to find the witness tables.  Find the dynamic type and
+    // use it instead.
+    sourceType = sourceExistentialMetadata->getDynamicType(sourceValue);
+  }
+
   return swift_conformsToProtocol(sourceType, destProtocolDescriptor, nullptr);
 }
 
@@ -2537,7 +2547,8 @@ extern "C" bool
 swift_stdlib_conformsToProtocol(
     OpaqueValue *sourceValue, const Metadata *_destType,
     const Metadata *sourceType, const Metadata *destType) {
-  auto vw = findWitnessTableForDynamicCastToExistential1(sourceType, destType);
+  auto vw = findWitnessTableForDynamicCastToExistential1(sourceValue,
+                                                         sourceType, destType);
   sourceType->vw_destroy(sourceValue);
   return vw != nullptr;
 }
@@ -2550,7 +2561,8 @@ extern "C" FixedOpaqueExistentialContainer<1>
 swift_stdlib_dynamicCastToExistential1Unconditional(
     OpaqueValue *sourceValue, const Metadata *_destType,
     const Metadata *sourceType, const Metadata *destType) {
-  auto vw = findWitnessTableForDynamicCastToExistential1(sourceType, destType);
+  auto vw = findWitnessTableForDynamicCastToExistential1(sourceValue,
+                                                         sourceType, destType);
   if (!vw)
     swift::crash("Swift dynamic cast failed: "
                  "type does not conform to the protocol");
@@ -2586,7 +2598,8 @@ _TFSs26_injectNothingIntoOptionalU__FT_GSqQ__(const Metadata *T);
 extern "C" OpaqueExistentialContainer swift_stdlib_dynamicCastToExistential1(
     OpaqueValue *sourceValue, const Metadata *_destType,
     const Metadata *sourceType, const Metadata *destType) {
-  auto vw = findWitnessTableForDynamicCastToExistential1(sourceType, destType);
+  auto vw = findWitnessTableForDynamicCastToExistential1(sourceValue,
+                                                         sourceType, destType);
   if (!vw) {
     sourceType->vw_destroy(sourceValue);
     return _TFSs26_injectNothingIntoOptionalU__FT_GSqQ__(destType);
