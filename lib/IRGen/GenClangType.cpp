@@ -256,6 +256,7 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
 }
 
 clang::CanQualType GenClangType::visitEnumType(CanEnumType type) {
+  type->dump();
   auto *clangDecl = type->getDecl()->getClangDecl();
   assert(clangDecl && "Imported enum without Clang decl!");
 

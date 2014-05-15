@@ -58,4 +58,10 @@ println()
 // CHECK: dead
 { [Canary(), Canary(), Canary()] }()
 
-
+// Create an array of (String, Bool) pairs. <rdar://problem/16916422>
+do {
+  let x: (String, Bool)[] = [("foo", true)]
+  println(x[0].0) // CHECK: foo
+  println(x[0].1) // CHECK: true
+} while false
+println("still alive") // CHECK: still alive

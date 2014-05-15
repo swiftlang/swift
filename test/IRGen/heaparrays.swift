@@ -91,22 +91,14 @@ func make_array<T>(var n: Int, var x: T) -> T[] {
 // CHECK-NEXT: [[T1:%.*]] = bitcast [[REFCOUNT]]* [[T0]] to i64*
 // CHECK-NEXT: [[BOUND:%.*]] = load i64* [[T1]], align 8
 //   Load the stride and find the limits of the array.
-// CHECK-NEXT: [[T0:%.*]] = bitcast [[TYPE]]* %T to i8***
-// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds i8*** [[T0]], i64 -1
-// CHECK-NEXT: [[T_VALUE:%.*]] = load i8*** [[T1]], align 8
-// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds i8** [[T_VALUE]], i32 19
-// CHECK-NEXT: [[T1:%.*]] = load i8** [[T0]], align 8
-// CHECK-NEXT: [[T_STRIDE:%.*]] = ptrtoint i8* [[T1]] to i64
-// CHECK-NEXT: [[T0:%.*]] = bitcast [[REFCOUNT]]* [[ALLOC:%.*]] to i8*
-// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds i8* [[T0]], i64 [[HEADER_SIZE]]
-// CHECK-NEXT: [[BEGIN:%.*]] = bitcast i8* [[T1]] to [[OPAQUE]]*
-// CHECK-NEXT: [[T0:%.*]] = bitcast [[OPAQUE]]* [[BEGIN]] to i8*
-// CHECK-NEXT: [[T1:%.*]] = mul i64 [[T_STRIDE]], [[BOUND]]
-// CHECK-NEXT: [[T2:%.*]] = getelementptr inbounds i8* [[T0]], i64 [[T1]]
-// CHECK-NEXT: [[END:%.*]] = bitcast i8* [[T2]] to [[OPAQUE]]*
-//   Loop over the elements.
-// CHECK-NEXT: icmp eq [[OPAQUE]]* [[BEGIN]], [[END]]
-// CHECK-NEXT: br i1
+// CHECK:      [[BEGINP:%.*]] = getelementptr inbounds i8* {{%.*}}, i64 [[HEADER_SIZE]]
+// CHECK:      [[BEGIN:%.*]] = bitcast i8* [[BEGINP]] to [[OPAQUE]]*
+// CHECK:      %stride = ptrtoint i8* {{%.*}} to i64
+// CHECK:      [[DISTANCE:%.*]] = mul nsw i64 [[BOUND]], %stride
+// CHECK:      [[ENDP:%.*]] = getelementptr inbounds i8* {{%.*}}, i64 [[DISTANCE]]
+// CHECK:      [[END:%.*]] = bitcast i8* [[ENDP]] to [[OPAQUE]]*
+// CHECK:      icmp eq [[OPAQUE]]* [[BEGIN]], [[END]]
+
 
 // CHECK: define [[arrayLayout]] @_TF10heaparrays22make_array_enumerators{{.*}}(i64, %swift.opaque* noalias, %swift.type* [[T:%[0-9a-zA-Z]*]],
 func make_array_enumerators<T : Generator>(n: Int, x: T) -> T[] {

@@ -262,8 +262,7 @@ HeapArrayInfo::Layout HeapArrayInfo::getLayout(IRGenFunction &IGF) const {
 static void emitArrayDestroy(IRGenFunction &IGF,
                              llvm::Value *begin, llvm::Value *end,
                              CanType elementType,
-                             const TypeInfo &elementTI,
-                             llvm::Value *elementSize) {
+                             const TypeInfo &elementTI) {
   assert(!elementTI.isPOD(ResilienceScope::Local));
 
   llvm::BasicBlock *endBB = IGF.createBasicBlock("end");
@@ -285,11 +284,12 @@ static void emitArrayDestroy(IRGenFunction &IGF,
 
   // 'prev' points one past the end of the valid array; make something
   // that points at the end.
-  llvm::Value *cur = IGF.Builder.CreateBitCast(prev, IGF.IGM.Int8PtrTy);
-  llvm::Value *strideBytes = IGF.Builder.CreateNeg(elementSize);
-  cur = IGF.Builder.CreateInBoundsGEP(cur, strideBytes);
-  cur = IGF.Builder.CreateBitCast(cur, prev->getType());
-  
+  llvm::Value *cur = elementTI.indexArray(IGF,
+                            elementTI.getAddressForPointer(prev),
+                            llvm::ConstantInt::getSigned(IGF.IGM.IntPtrTy, -1),
+                            elementType)
+    .getAddress();
+    
   // Destroy this element.
   elementTI.destroy(IGF, elementTI.getAddressForPointer(cur), elementType);
 
@@ -333,20 +333,12 @@ createArrayDtorFn(IRGenModule &IGM,
 
   // If the layout isn't known to be POD, we actually have to do work here.
   if (!eltTI.isPOD(ResilienceScope::Local)) {
-    llvm::Value *elementSize = eltTI.getStride(IGF, eltTy);
-
     llvm::Value *begin = arrayInfo.getBeginPointer(IGF, layout, header);
-    llvm::Value *end;
-    if (isa<FixedTypeInfo>(eltTI)) {
-      end = IGF.Builder.CreateInBoundsGEP(begin, length, "end");
-    } else {
-      end = IGF.Builder.CreateBitCast(begin, IGF.IGM.Int8PtrTy);
-      llvm::Value *lengthBytes = IGF.Builder.CreateMul(elementSize, length);
-      end = IGF.Builder.CreateInBoundsGEP(end, lengthBytes);
-      end = IGF.Builder.CreateBitCast(end, begin->getType());
-    }
+    llvm::Value *end = eltTI.indexArray(IGF, eltTI.getAddressForPointer(begin),
+                                        length, eltTy)
+      .getAddress();
 
-    emitArrayDestroy(IGF, begin, end, eltTy, eltTI, elementSize);
+    emitArrayDestroy(IGF, begin, end, eltTy, eltTI);
   }
 
   llvm::Value *size =
