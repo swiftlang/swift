@@ -209,7 +209,6 @@ void AttributedTypeRepr::printAttrs(ASTPrinter &Printer) const {
   if (Attrs.has(TAK_objc_block))   Printer << "@objc_block ";
   if (Attrs.has(TAK_thin))         Printer << "@thin ";
   if (Attrs.has(TAK_thick))        Printer << "@thick ";
-  if (Attrs.has(TAK_unchecked))    Printer << "@unchecked ";
   if (Attrs.cc.hasValue()) {
     switch (Attrs.cc.getValue()) {
     case AbstractCC::C:             Printer << "@cc(cdecl)"; break;

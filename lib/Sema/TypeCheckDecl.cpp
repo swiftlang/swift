@@ -3385,10 +3385,9 @@ public:
 
     // Look through attributes.
     if (auto attrRepr = dyn_cast<AttributedTypeRepr>(typeRepr)) {
-      // Only allow @unchecked.
       TypeAttributes attrs = attrRepr->getAttrs();
-      attrs.clearAttribute(TAK_unchecked);
-      if (!attrs.empty()) return false;
+      if (!attrs.empty())
+        return false;
       return checkDynamicSelfReturn(func, attrRepr->getTypeRepr(),
                                     optionalDepth);
     }

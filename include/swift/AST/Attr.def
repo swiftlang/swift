@@ -55,7 +55,6 @@ TYPE_ATTR(noreturn)
 TYPE_ATTR(objc_block)
 TYPE_ATTR(thin)
 TYPE_ATTR(thick)
-TYPE_ATTR(unchecked)
 
 // SIL-specific attributes
 TYPE_ATTR(block_storage)
