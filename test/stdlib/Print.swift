@@ -344,6 +344,10 @@ test_ArbitraryStructPrinting()
 // CHECK: test_ArbitraryStructPrinting done
 
 func test_StringInterpolation() {
+  assertEquals("1", "\(1)")
+  assertEquals("2", "\(1 + 1)")
+  assertEquals("aaa1bbb2ccc", "aaa\(1)bbb\(2)ccc")
+
   assertEquals("1", "\(1.0)")
   assertEquals("1.5", "\(1.5)")
   assertEquals("1e-12", "\(1.0 / (1000000000000))")
@@ -352,10 +356,50 @@ func test_StringInterpolation() {
   assertEquals("-inf", "\(-1 / 0.0)")
   assertEquals("nan", "\(0 / 0.0)")
 
+  assertEquals("<[►1◀︎, ►2◀︎, ►3◀︎]>", "<\([ StructPrintable(1), StructPrintable(2), StructPrintable(3) ])>")
+  assertEquals("V1a18WithoutDescription (has 1 child)", "\(WithoutDescription(1))")
+
   println("test_StringInterpolation done")
 }
 test_StringInterpolation()
 // CHECK: test_StringInterpolation done
 
+struct MyString : StringLiteralConvertible, StringInterpolationConvertible {
+  init(str: String) {
+    value = str
+  }
+
+  var value: String
+
+  static func convertFromExtendedGraphemeClusterLiteral(
+      value: String) -> MyString {
+    return MyString(str: value)
+  }
+
+  static func convertFromStringLiteral(value: String) -> MyString {
+    return MyString(str: value)
+  }
+
+  static func convertFromStringInterpolation(strings: MyString...) -> MyString {
+    var result = ""
+    for s in strings {
+      result += s.value
+    }
+    return MyString(str: result)
+  }
+
+  static func convertFromStringInterpolationSegment<T>(expr: T) -> MyString {
+    return MyString(str: "<segment " + toString(expr) + ">")
+  }
+}
+
+func test_CustomStringInterpolation() {
+  assertEquals("<segment aaa><segment 1><segment bbb>",
+               ("aaa\(1)bbb" as MyString).value)
+
+  println("test_CustomStringInterpolation done")
+}
+test_CustomStringInterpolation()
+// CHECK: test_CustomStringInterpolation done
 
 

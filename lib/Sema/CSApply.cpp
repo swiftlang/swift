@@ -1387,16 +1387,22 @@ namespace {
 
       // Find the string interpolation protocol we need.
       auto &tc = cs.getTypeChecker();
+      auto &C = tc.Context;
       auto interpolationProto
         = tc.getProtocol(expr->getLoc(),
                          KnownProtocolKind::StringInterpolationConvertible);
       assert(interpolationProto && "Missing string interpolation protocol?");
 
       // FIXME: Cache name,
-      auto name = tc.Context.Id_ConvertFromStringInterpolation;
-      auto member = findNamedWitness(tc, dc, type, interpolationProto, name,
-                                     diag::interpolation_broken_proto);
-      if (!member)
+      auto member =
+          findNamedWitness(tc, dc, type, interpolationProto,
+                           C.Id_ConvertFromStringInterpolation,
+                           diag::interpolation_broken_proto);
+      auto segmentMember =
+         findNamedWitness(tc, dc, type, interpolationProto,
+                          C.Id_ConvertFromStringInterpolationSegment,
+                          diag::interpolation_broken_proto);
+      if (!member || !segmentMember)
         return nullptr;
 
       // Build a reference to the convertFromStringInterpolation member.
@@ -1412,18 +1418,27 @@ namespace {
       assert(!failed && "Could not reference string interpolation witness");
       (void)failed;
 
-      // Create a tuple containing all of the coerced segments.
+      // Create a tuple containing all of the segments.
       SmallVector<Expr *, 4> segments;
+
       unsigned index = 0;
       ConstraintLocatorBuilder locatorBuilder(cs.getConstraintLocator(expr));
       for (auto segment : expr->getSegments()) {
-        segment = coerceToType(segment, type,
-                               locatorBuilder.withPathElement(
-                                 LocatorPathElt::getInterpolationArgument(
-                                   index++)));
-        if (!segment)
-          return nullptr;
+        auto locator = cs.getConstraintLocator(
+                      locatorBuilder.withPathElement(
+                          LocatorPathElt::getInterpolationArgument(index++)));
 
+        // Find the conversion method we chose.
+        auto choice = getOverloadChoice(locator);
+
+        auto memberRef = buildMemberRef(
+            typeRef, choice.openedFullType,
+            segment->getStartLoc(), choice.choice.getDecl(),
+            segment->getStartLoc(), choice.openedType,
+            locatorBuilder, /*Implicit=*/true, /*directPropertyAccess=*/false);
+        ApplyExpr *apply =
+            new (tc.Context) CallExpr(memberRef, segment, /*Implicit=*/true);
+        segment = finishApply(apply, openedType, locatorBuilder);
         segments.push_back(segment);
       }
 

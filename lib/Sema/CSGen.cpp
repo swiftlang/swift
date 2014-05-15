@@ -161,6 +161,7 @@ namespace {
     visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *expr) {
       // Dig out the StringInterpolationConvertible protocol.
       auto &tc = CS.getTypeChecker();
+      auto &C = CS.getASTContext();
       auto interpolationProto
         = tc.getProtocol(expr->getLoc(),
                          KnownProtocolKind::StringInterpolationConvertible);
@@ -176,22 +177,30 @@ namespace {
       CS.addConstraint(ConstraintKind::ConformsTo, tv,
                        interpolationProto->getDeclaredType());
 
-      // Each of the segments needs to be either convertible to the underlying
-      // string type or there must be a string constructor from the segment.
+      // Each of the segments is passed as an argument to
+      // convertFromStringInterpolationSegment().
       unsigned index = 0;
+      auto tvMeta = MetatypeType::get(tv);
       for (auto segment : expr->getSegments()) {
         auto locator = CS.getConstraintLocator(
                          expr,
                          LocatorPathElt::getInterpolationArgument(index++));
-        Constraint *constraints[2] = {
-          Constraint::create(CS, ConstraintKind::Conversion, segment->getType(),
-                             tv, Identifier(), locator),
-          Constraint::create(CS, ConstraintKind::Construction, 
-                             segment->getType(), tv, Identifier(), locator)
-        };
+        auto segmentTyV = CS.createTypeVariable(locator, /*options=*/0);
+        auto returnTyV = CS.createTypeVariable(locator, /*options=*/0);
+        auto methodTy = FunctionType::get(segmentTyV, returnTyV);
 
-        CS.addConstraint(Constraint::createDisjunction(CS, constraints,
-                                                       locator));
+        CS.addConstraint(Constraint::create(CS, ConstraintKind::Conversion,
+                                            segment->getType(),
+                                            segmentTyV,
+                                            Identifier(),
+                                            locator));
+
+        CS.addConstraint(Constraint::create(CS, ConstraintKind::ValueMember,
+                                            tvMeta,
+                                            methodTy,
+                                            C.Id_ConvertFromStringInterpolationSegment,
+                                            locator));
+
       }
       
       return tv;

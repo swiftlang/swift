@@ -13,8 +13,8 @@ var HW = "\(hello), World!";
 println("Nested \"\(HW)\" with Pi = \(pi)!")
 
 
-// CHECK: value = 1099226349619 hex = 0xFFEEFF0033 oct = 0o17775677600063
+// CHECK: value = 1099226349619
 var someval = 0xFFeeFF0033
-println("value = \(someval) hex = 0x\(someval, radix:16, _uppercase : true) oct = 0o\(someval, radix:8)")
+println("value = \(someval)")
 
 

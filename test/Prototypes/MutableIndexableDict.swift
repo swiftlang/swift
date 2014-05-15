@@ -478,8 +478,7 @@ println("deleting that key makes them equal again: \(d1 == d0)")
 
 // ---------
 
-class X
-{
+class X : Printable {
    var constructed : Bool
    var id = 0
 
@@ -491,6 +490,10 @@ class X
    deinit {
       print("~X("); print(id); println(")")
       constructed = false
+   }
+
+   var description: String {
+     return "X(\(id))"
    }
 }
 

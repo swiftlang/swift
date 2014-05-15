@@ -182,6 +182,10 @@ extension String : StringInterpolationConvertible {
     }
     return result
   }
+
+  static func convertFromStringInterpolationSegment<T>(expr: T) -> String {
+    return toString(expr)
+  }
 }
 
 func +(var lhs: String, rhs: String) -> String {

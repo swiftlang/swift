@@ -75,6 +75,8 @@ IDENTIFIER_WITH_NAME(ConvertFromBuiltinStringLiteral,
 IDENTIFIER(StringLiteralType)
 IDENTIFIER_WITH_NAME(ConvertFromStringInterpolation,
                      "convertFromStringInterpolation")
+IDENTIFIER_WITH_NAME(ConvertFromStringInterpolationSegment,
+                     "convertFromStringInterpolationSegment")
 IDENTIFIER_WITH_NAME(ConvertFromArrayLiteral, "convertFromArrayLiteral")
 IDENTIFIER_WITH_NAME(ConvertFromDictionaryLiteral,
                      "convertFromDictionaryLiteral")

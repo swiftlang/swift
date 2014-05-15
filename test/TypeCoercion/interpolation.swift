@@ -13,8 +13,3 @@ func string_literals(s: String, i: Int) -> String {
   return "outer \(s)\(i) close"
 }
 
-struct Unprintable {}
-
-func unprintable(up: Unprintable) {
-  "\(up)" // expected-error{{cannot convert the expression's type 'String' to type 'StringInterpolationConvertible'}}
-}

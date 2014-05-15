@@ -325,6 +325,13 @@ extension String {
   }
 }
 
+func toPrettyString<T: XStreamable>(x: T) -> String {
+  var result = "|"
+  xprint(&result, x)
+  result += "|"
+  return result
+}
+
 // ===========
 
 var x = "fubar\n\tbaz"
@@ -336,14 +343,14 @@ xprintln(x)
 xprintln(toDebugString(x))
 // CHECK-NEXT: "fubar\n\tbaz"
 
-xprintln("|\(424242~>format(radix:16, width:8))|")
+xprintln(toPrettyString(424242~>format(radix:16, width:8)))
 // CHECK-NEXT: |   67932|
 
 var zero = "0"
-xprintln("|\(-434343~>format(width:8, fill:zero))|")
+xprintln(toPrettyString(-434343~>format(width:8, fill:zero)))
 // CHECK-NEXT: |-0434343|
 
-xprintln("|\(-42~>format(radix:13, width:8))|")
+xprintln(toPrettyString(-42~>format(radix:13, width:8)))
 // CHECK-NEXT: |-     33|
 
 xprintln(0x1EADBEEF~>format(radix:16))

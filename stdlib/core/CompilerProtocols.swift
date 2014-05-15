@@ -219,5 +219,6 @@ protocol DictionaryLiteralConvertible {
 
 protocol StringInterpolationConvertible {
   class func convertFromStringInterpolation(strings: Self...) -> Self
+  class func convertFromStringInterpolationSegment<T>(expr: T) -> Self
 }
 
