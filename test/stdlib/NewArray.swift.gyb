@@ -437,6 +437,21 @@ func testSingleElementModifiers${A}() {
 testSingleElementModifiers${A}()
 %end
 
+//===--- Regression Tests -------------------------------------------------===//
+import Cocoa
+
+class Rdar16914909 : NSObject {
+  var basicColorSet = NSColor[]()
+  
+  func doColorStuff() {
+    basicColorSet.append(NSColor.lightGrayColor())
+    println("appended")
+  }
+}
+
+Rdar16914909().doColorStuff()
+// CHECK-NEXT: appended
+
 println("leaks = \(xCount)")
 // CHECK-NEXT: leaks = 0
 

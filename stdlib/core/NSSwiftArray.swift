@@ -47,9 +47,12 @@ class NSSwiftArray : HeapBufferStorageBase, CocoaArray {
     var dst = UnsafePointer<Word>(aBuffer)
 
     let buffer = reinterpretCast(self) as Buffer
+    
     // If used as an NSArray, the element type can have no fancy
-    // bridging; just get it and return it
-    assert(buffer.value.elementTypeIsBridgedVerbatim)
+    // bridging; just get it and return it.  Note however that if
+    // we're empty we might be emptyNSSwiftArray so don't assert in
+    // that case.
+    assert(count == 0 || buffer.value.elementTypeIsBridgedVerbatim)
     
     if _fastPath(buffer.value.elementTypeIsBridgedVerbatim) {
       dst.initializeFrom(
