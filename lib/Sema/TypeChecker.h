@@ -498,7 +498,8 @@ public:
   }
 
   virtual void resolveImplicitConstructors(NominalTypeDecl *nominal) override {
-    addImplicitConstructors(nominal);
+    SmallVector<Decl*, 2> NewDecls;
+    addImplicitConstructors(nominal, NewDecls);
   }
 
   virtual void
@@ -556,7 +557,8 @@ public:
 
   /// \brief Add any implicitly-defined constructors required for the given
   /// struct or class.
-  void addImplicitConstructors(NominalTypeDecl *typeDecl);
+  void addImplicitConstructors(NominalTypeDecl *typeDecl,
+                               SmallVectorImpl<Decl*> &Results);
 
   /// \brief Add an implicitly-defined destructor, if there is no
   /// user-provided destructor.
@@ -591,7 +593,7 @@ private:
   
 public:
   /// \brief Define the default constructor for the given struct or class.
-  void defineDefaultConstructor(NominalTypeDecl *decl);
+  ConstructorDecl *defineDefaultConstructor(NominalTypeDecl *decl);
 
   /// \brief Fold the given sequence expression into an (unchecked) expression
   /// tree.

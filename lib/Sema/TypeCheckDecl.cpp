@@ -2762,14 +2762,28 @@ public:
       TC.ValidatedTypes.remove(SD);
     }
 
-    if (!IsSecondPass)
-      TC.addImplicitConstructors(SD);
-
+    if (!IsSecondPass) {
+      SmallVector<Decl*, 2> NewDecls;
+      TC.addImplicitConstructors(SD, NewDecls);
+    }
+    
     // Visit each of the members.
     for (Decl *Member : SD->getMembers())
       visit(Member);
     for (Decl *global : SD->getDerivedGlobalDecls())
       visit(global);
+
+#if 0
+    if (!IsSecondPass) {
+      SmallVector<Decl*, 2> NewDecls;
+      TC.addImplicitConstructors(SD, NewDecls);
+      
+      // Type check any generated initializers.
+      for (auto D : NewDecls)
+        visit(D);
+    }
+#endif
+
 
     if (!IsFirstPass) {
       checkExplicitConformance(SD, SD->getDeclaredTypeInContext());
@@ -2927,9 +2941,13 @@ public:
       }
     }
 
+    
+    // If this class needs an implicit constructor, add it.
     if (!IsFirstPass) {
-      TC.addImplicitConstructors(CD);
+      SmallVector<Decl*, 2> ImplicitInits;
+      TC.addImplicitConstructors(CD, ImplicitInits);
     }
+
     TC.addImplicitDestructor(CD);
 
     // Mark all members of @final classes as @final.
@@ -2950,6 +2968,16 @@ public:
       checkRequiredInClassInits(CD);
 
     if (!IsFirstPass) {
+#if 0
+      // If this class needs an implicit constructor, add it.
+      SmallVector<Decl*, 2> ImplicitInits;
+      TC.addImplicitConstructors(CD, ImplicitInits);
+      
+      // Type check any generated initializers.
+      for (auto D : ImplicitInits)
+        visit(D);
+#endif
+
       // Check that we don't inherit from a final class.
       if (auto superclassTy = CD->getSuperclass()) {
         ClassDecl *Super = superclassTy->getClassOrBoundGenericClass();
@@ -5241,10 +5269,11 @@ static void diagnoseClassWithoutInitializers(TypeChecker &tc,
   }
 }
 
-void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
+void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl,
+                                          SmallVectorImpl<Decl*> &Results) {
   // We can only synthesize implicit constructors for classes and structs.
-  if (!isa<ClassDecl>(decl) && !isa<StructDecl>(decl))
-    return;
+ if (!isa<ClassDecl>(decl) && !isa<StructDecl>(decl))
+   return;
 
   // If we already added implicit initializers, we're done.
   if (decl->addedImplicitInitializers())
@@ -5290,10 +5319,11 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
     auto ctor = createImplicitConstructor(*this, decl,
                                           ImplicitConstructorKind::Memberwise);
     decl->addMember(ctor);
+    Results.push_back(ctor);
 
     // If we found a stored property, add a default constructor.
     if (FoundInstanceVar && !FoundUninitializedVars)
-      defineDefaultConstructor(decl);
+      Results.push_back(defineDefaultConstructor(decl));
 
     return;
   }
@@ -5323,6 +5353,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
                         *this, classDecl, superclassCtor,
                         DesignatedInitKind::Chaining)) {
         classDecl->addMember(ctor);
+        Results.push_back(classDecl);
       }
     }
 
@@ -5338,7 +5369,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
     return;
   }
 
-  defineDefaultConstructor(decl);
+  Results.push_back(defineDefaultConstructor(decl));
 }
 
 void TypeChecker::addImplicitDestructor(ClassDecl *CD) {
@@ -5385,14 +5416,14 @@ void TypeChecker::addImplicitEnumConformances(EnumDecl *ED) {
     .checkExplicitConformance(ED, ED->getDeclaredTypeInContext());
 }
 
-void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
+ConstructorDecl *TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
   PrettyStackTraceDecl stackTrace("defining default constructor for",
                                   decl);
 
   // Clang-imported types should never get a default constructor, just a
   // memberwise one.
   if (decl->hasClangNode())
-    return;
+    return nullptr;
 
   // Verify that all of the instance variables of this type have default
   // constructors.
@@ -5415,7 +5446,7 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
     // If there is a stored ivar without an initializer, we can't generate a
     // default initializer for this.
     if (CantBuildInitializer)
-      return;
+      return nullptr;
   }
 
   // For a class, check whether the superclass (if it exists) is
@@ -5426,7 +5457,7 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
       // If there are no default ctors for our supertype, we can't do anything.
       auto ctors = lookupConstructors(superTy, decl);
       if (!ctors)
-        return;
+        return nullptr;
 
       // Check whether we have a constructor that can be called with an empty
       // tuple.
@@ -5442,7 +5473,7 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
           // A designated initializer other than a default initializer
           // means we can't call super.init().
           if (ctor->isDesignatedInit())
-            return;
+            return nullptr;
 
           continue;
         }
@@ -5460,7 +5491,7 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
           // A designated initializer other than a default initializer
           // means we can't call super.init().
           if (ctor->isDesignatedInit())
-            return;
+            return nullptr;
 
           continue;
         }
@@ -5476,7 +5507,7 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
       }
 
       // If our superclass isn't default constructible, we aren't either.
-      if (!foundDefaultConstructor) return;
+      if (!foundDefaultConstructor) return nullptr;
     }
   }
 
@@ -5490,6 +5521,7 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
   // Create an empty body for the default constructor. The type-check of the
   // constructor body will introduce default initializations of the members.
   ctor->setBody(BraceStmt::create(Context, SourceLoc(), { }, SourceLoc()));
+  return ctor;
 }
 
 static bool isDeclOfOperator(const Decl *D) {
