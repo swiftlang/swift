@@ -18,6 +18,7 @@
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Range.h"
+#include "swift/Runtime/Enum.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
 #include <algorithm>
@@ -2668,9 +2669,81 @@ static inline bool swift_isClassOrObjCExistentialImpl(const Metadata *T) {
           static_cast<const ExistentialTypeMetadata *>(T)->isObjC());
 }
 
-// func bridgeToObjectiveC<T>(x: T) -> AnyObject?
-extern "C" HeapObject *swift_bridgeToObjectiveC(OpaqueValue *value,
-                                                const Metadata *T) {
+namespace {
+  /// Describes the result of attempting to unwrap an implicitly
+  /// unwrapped optional.
+  enum class ImplicitUnwrapResult {
+    /// The source was not an implicitly unwrapped optional type.
+    NotOptional,
+    /// The optional was empty (None).
+    Empty,
+    /// The optional was unwrapped (.Some(T)).
+    Unwrapped
+  };
+}
+
+/// Determine the stored element type within an implicitly unwrapped
+/// optional type.
+///
+/// \returns the metadata for the element type of the given implicitly
+/// unwrapped optional type, or null if the given type is not an IUO.
+static inline const Metadata *swift_getImplicitlyUnwrappedOptionalElementType(
+                                const Metadata *wrapperT) {
+  // Implicitly unchecked optional is a struct.
+  if (wrapperT->getKind() != MetadataKind::Struct)
+    return nullptr;
+
+  // ... with the special mangling "SQ".
+  const StructMetadata *structT = static_cast<const StructMetadata *>(wrapperT);
+  auto *Name = structT->getNominalTypeDescriptor()->Name;
+  if (Name[0] != 'S' || Name[1] != 'Q' || Name[2] != 0)
+    return nullptr;
+
+  // Dig out the element type.
+  return structT->getGenericArgs()[0];
+}
+
+
+/// If the given value is an implicitly unwrapped optional, unwrap it
+/// and return the inner type and its value.
+///
+/// The stored value is always at offset zero within the implicitly
+/// unwrapped optional object, so we don't bother to return it
+/// separately.
+///
+/// \returns a pair containing the result (not optional, empty
+/// optional, unwrapped optional) and the stored value's metadata.
+static inline std::pair<ImplicitUnwrapResult, const Metadata *>
+swift_implicitlyUnwrapOptional(OpaqueValue *value, const Metadata *wrapperT) {
+  // Check whether this is an IUO, and get its element type.
+  auto *elementT = swift_getImplicitlyUnwrappedOptionalElementType(wrapperT);
+
+  // If it's not an IUO, we're done.
+  if (!elementT) {
+    return { ImplicitUnwrapResult::NotOptional, nullptr };
+  }
+
+  // If the element type is a class or an Objective-C existential type, we can 
+  // just check for nil.
+  bool isEmpty;
+  if (swift_isClassOrObjCExistentialImpl(elementT)) {
+    HeapObject *object = *reinterpret_cast<HeapObject **>(value);
+    isEmpty = (object == 0);
+  } else {
+    // Determine which case of the optional is active.
+    int whichCase = swift_getEnumCaseSinglePayload(value, elementT, 
+                                                   /*emptyCases=*/1);
+    isEmpty = (whichCase == 1);
+  }
+
+  return { isEmpty ? ImplicitUnwrapResult::Empty
+                   : ImplicitUnwrapResult::Unwrapped, 
+           elementT };
+}
+
+static HeapObject *swift_bridgeToObjectiveCImpl(OpaqueValue *value,
+                                                const Metadata *T,
+                                                bool allowUnwrap) {
   auto const bridgeWitness = findBridgeWitness(T);
 
   if (bridgeWitness) {
@@ -2686,8 +2759,35 @@ extern "C" HeapObject *swift_bridgeToObjectiveC(OpaqueValue *value,
 
   if (swift_isClassOrObjCExistentialImpl(T))
     return *reinterpret_cast<HeapObject **>(value);
+
+  if (allowUnwrap) {
+    ImplicitUnwrapResult unwrapResult;
+    const Metadata *elementT;
+    std::tie(unwrapResult, elementT) = swift_implicitlyUnwrapOptional(value, T);
+
+    switch (unwrapResult) {
+    case ImplicitUnwrapResult::NotOptional:
+      break;
+
+    case ImplicitUnwrapResult::Empty:
+      swift::crash(
+        "bridging empty implicitly unwrapped optional to Objective-C");
+
+    case ImplicitUnwrapResult::Unwrapped:
+      // Recurse with the element type.
+      return swift_bridgeToObjectiveCImpl(value, elementT, 
+                                          /*allowUnwrap=*/false);
+    }
+  }
+
   return nullptr;
 }
+
+extern "C" HeapObject *swift_bridgeToObjectiveC(OpaqueValue *value, 
+                                                const Metadata *T) {
+  return swift_bridgeToObjectiveCImpl(value, T, /*allowUnwrao=*/true);
+}
+
 
 // @asmname("swift_bridgeFromObjectiveC")
 // func bridgeFromObjectiveC<NativeType>(
@@ -2759,9 +2859,10 @@ swift_bridgeFromObjectiveC(HeapObject *sourceValue, const Metadata *nativeType,
   return _TFSs26_injectNothingIntoOptionalU__FT_GSqQ__(nativeType);
 }
 
-// func isBridgedToObjectiveC<T>(x: T.Type) -> Bool
-extern "C" bool swift_isBridgedToObjectiveC(const Metadata *value,
-                                            const Metadata *T) {
+/// Determine whether the given type is bridged to Objective-C.
+static bool swift_isBridgedToObjectiveCImpl(const Metadata *value,
+                                            const Metadata *T,
+                                            bool allowUnwrap) {
   auto bridgeWitness = findBridgeWitness(T);
 
   if (bridgeWitness) {
@@ -2769,7 +2870,27 @@ extern "C" bool swift_isBridgedToObjectiveC(const Metadata *value,
     return !conditionalWitness ||
            conditionalWitness->isBridgedToObjectiveC(value, T);
   }
-  return swift_isClassOrObjCExistentialImpl(T);
+
+  if (swift_isClassOrObjCExistentialImpl(T))
+    return true;
+
+  if (allowUnwrap) {
+    // If this is an implicitly unwrapped optional type, check whether
+    // its element type is bridged.
+    if (const Metadata *elementT
+          = swift_getImplicitlyUnwrappedOptionalElementType(T)) {
+      return swift_isBridgedToObjectiveCImpl(value, elementT, 
+                                             /*allowUnwrap=*/false);
+    }
+  }
+
+  return false;
+}
+
+// func isBridgedToObjectiveC<T>(x: T.Type) -> Bool
+extern "C" bool swift_isBridgedToObjectiveC(const Metadata *value,
+                                            const Metadata *T) {
+  return swift_isBridgedToObjectiveCImpl(value, T, /*allowUnwrap=*/true);
 }
 
 // func isBridgedVerbatimToObjectiveC<T>(x: T.Type) -> Bool

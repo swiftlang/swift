@@ -1271,7 +1271,15 @@ struct StructMetadata : public Metadata {
     return getter(this);
   }
 
-  // This is followed by the generics information, if this type is generic.
+  /// Retrieve the generic arguments of this struct.
+  const Metadata * const *getGenericArgs() const {
+    const void* const *asWords = reinterpret_cast<const void * const *>(this);
+    if (Description->GenericParams.NumParams == 0)
+      return nullptr;
+
+    asWords += Description->GenericParams.Offset;
+    return reinterpret_cast<const Metadata * const *>(asWords);
+  }
 };
 
 /// The structure of function type metadata.
