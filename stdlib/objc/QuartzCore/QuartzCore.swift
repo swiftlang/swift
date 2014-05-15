@@ -14,7 +14,7 @@
 
 // sdk overlays:
 extension CIFilter {
-  convenience init(fileterName : String!, elements: (NSCopying, AnyObject)...) {
+  convenience init(name : String!, elements: (NSCopying, AnyObject)...) {
     var dict =  NSMutableDictionary()
     for i in 0..elements.count {
       dict[i] = NSMutableDictionary(object: elements[i].1, forKey: elements[i].0)
@@ -23,7 +23,7 @@ extension CIFilter {
     // @objc(filterWithName:withInputParameters:)
     //    init(name: String!,
     //         withInputParameters params: NSDictionary!) -> CIFilter
-    self.init(name: fileterName, withInputParameters: dict)
+    self.init(name: name, withInputParameters: dict)
   }
 }
 
