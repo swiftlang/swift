@@ -659,11 +659,32 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
       continue;
     }
 
+    // If one type is an implicitly unwrapped optional of the other,
+    // prefer the non-optional.    
+    bool type1Better = false;
+    bool type2Better = false;
+    if (auto type1Obj = type1->getImplicitlyUnwrappedOptionalObjectType()) {
+      if (type1Obj->isEqual(type2))
+        type2Better = true;
+    }
+    if (auto type2Obj = type2->getImplicitlyUnwrappedOptionalObjectType()) {
+      if (type2Obj->isEqual(type1))
+        type1Better = true;
+    }
+
+    if (type1Better || type2Better) {
+      if (type1Better)
+        ++score1;
+      if (type2Better)
+        ++score2;
+      continue;
+    }
+
     // If one type is a subtype of the other, but not vice-verse,
     // we prefer the system with the more-constrained type.
     // FIXME: Collapse this check into the second check.
-    bool type1Better = tc.isSubtypeOf(type1, type2, cs.DC);
-    bool type2Better = tc.isSubtypeOf(type2, type1, cs.DC);
+    type1Better = tc.isSubtypeOf(type1, type2, cs.DC);
+    type2Better = tc.isSubtypeOf(type2, type1, cs.DC);
     if (type1Better || type2Better) {
       if (type1Better)
         ++score1;
@@ -711,6 +732,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
         ++score1;
       continue;
     }
+
   }
 
   // FIXME: There are type variables and overloads not common to both solutions

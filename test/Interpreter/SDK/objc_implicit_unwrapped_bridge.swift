@@ -114,6 +114,55 @@ func testConvertArrayOfImplicitUnwrappedArray() {
 
 testConvertArrayOfImplicitUnwrappedArray()
 
+#if false
+// Bridge an NSArray to an array of implicitly unwrapped class type.
+func testConvertToArrayOfImplicitUnwrappedClass() {
+  println("Converting an NSArray to an array of X!")
+  var nsarr = NSMutableArray()
+  nsarr.addObject(X(value: 1))
+  nsarr.addObject(X(value: 2))
+
+  var arr: (X!)[] = _convertNSArrayToArray(nsarr)
+  
+  // CHECK-DISABLED: Class array count = 2
+  // CHECK-DISABLED: Element 0 has value X(1)
+  // CHECK-DISABLED: Element 1 has value X(2)
+  println("Class array count = \(arr.count)")
+  for (index, opt) in enumerate(arr) {
+    if let x = opt {
+      println("Element \(index) has value X(\(x.value))")
+    } else {
+      println("Element \(index) is empty")
+    }
+  }
+}
+
+testConvertToArrayOfImplicitUnwrappedClass()
+
+// Bridge an NSArray to an array of implicitly unwrapped string type.
+func testConvertToArrayOfImplicitUnwrappedString() {
+  println("Converting an NSArray to an array of String!")
+  var nsarr = NSMutableArray()
+  nsarr.addObject(NSString(string: "Hello"))
+  nsarr.addObject(NSString(string: "World"))
+
+  var arr: (String!)[] = _convertNSArrayToArray(nsarr)
+  
+  // CHECK-DISABLED: String array count = 2
+  // CHECK-DISABLED: Element 0 has value Hello
+  // CHECK-DISABLED: Element 1 has value World
+  println("String array count = \(arr.count)")
+  for (index, opt) in enumerate(arr) {
+    if let str = opt {
+      println("Element \(index) has value X(str)")
+    } else {
+      println("Element \(index) is empty")
+    }
+  }
+}
+
+testConvertToArrayOfImplicitUnwrappedString()
+#endif
 
 // FIXME: Negative tests will need their own path.
 

@@ -93,3 +93,34 @@ extension _Nil {
     return .None
   }
 }
+
+extension ImplicitlyUnwrappedOptional : _ConditionallyBridgedToObjectiveC {
+  typealias ObjectiveCType = AnyObject
+
+  static func getObjectiveCType() -> Any.Type {
+    return getBridgedObjectiveCType(T.self)!
+  }
+
+  func bridgeToObjectiveC() -> AnyObject {
+    switch self.value {
+    case .None:
+      fatal("attempt to bridge an implicitly unwrapped optional containing nil")
+
+    case .Some(let x):
+      return Swift.bridgeToObjectiveC(x)!
+    }
+  }
+
+  static func bridgeFromObjectiveC(x: AnyObject) -> T!? {
+    let bridged: T? = Swift.bridgeFromObjectiveC(x, T.self)
+    if let value = bridged {
+      return value
+    }
+
+    return .None
+  }
+
+  static func isBridgedToObjectiveC() -> Bool {
+    return Swift.isBridgedToObjectiveC(T.self)
+  }
+}

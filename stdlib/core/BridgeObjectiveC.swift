@@ -136,6 +136,10 @@ func isBridgedToObjectiveC<T>(_: T.Type) -> Bool
 @asmname("swift_isBridgedVerbatimToObjectiveC")
 func isBridgedVerbatimToObjectiveC<T>(_: T.Type) -> Bool
 
+/// Retrieve the Objective-C type to which the given type is bridged.
+@asmname("swift_getBridgedObjectiveCType")
+func getBridgedObjectiveCType<T>(_: T.Type) -> Any.Type?
+
 // -- Pointer argument bridging
 
 @transparent

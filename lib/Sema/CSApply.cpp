@@ -3236,7 +3236,7 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
                                                               fromType)) {
     // Protect against "no-op" conversions. If the bridged type points back
     // to itself, the constraint solver won't have a conversion handy to
-    // coerce to a user conversion, so we'll should avoid creating a new
+    // coerce to a user conversion, so we should avoid creating a new
     // expression node.
     if (!bridgedType->isEqual(fromType) && !bridgedType->isEqual(toType)) {
       expr = coerceViaUserConversion(expr, bridgedType, locator);
@@ -3244,6 +3244,19 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
     }
   }
   
+  // Handle existential coercions that implicitly look through ImplicitlyUnwrappedOptional<T>.
+  if (auto ty = cs.lookThroughImplicitlyUnwrappedOptionalType(fromType)) {
+    expr = coerceImplicitlyUnwrappedOptionalToValue(expr, ty, locator);
+    if (!expr) return nullptr;
+    
+    fromType = expr->getType();
+    
+    // FIXME: Hack. We shouldn't try to coerce existential when there is no
+    // existential upcast to perform.
+    if (fromType->isEqual(toType))
+      return expr;
+  }
+
   auto conformances =
     collectExistentialConformances(tc, fromType, toType, cs.DC);
   return new (tc.Context) ErasureExpr(expr, toType, conformances);
