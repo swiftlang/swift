@@ -1189,43 +1189,6 @@ static void validatePatternBindingDecl(TypeChecker &tc,
     return;
   }
 
-  // If we have a type but no initializer on an @IBOutlet, check
-  // whether the type is default-initializable. If so, do it.
-  if (binding->getPattern()->hasType() && binding->hasStorage() &&
-      !binding->hasInit() &&
-      !binding->getPattern()->getType()->is<ErrorType>()) {
-
-    // If we have a type-adjusting attribute, apply it now.
-    if (auto var = binding->getSingleVar()) {
-      if (var->getAttrs().hasAttribute<IBOutletAttr>())
-        tc.checkIBOutlet(var);
-
-      // FIXME: Ugly hack to get the pattern type to reflect the
-      // updated variable type. Not cool.
-      binding->getPattern()->setType(var->getType());
-
-      if (var->getAttrs().hasOwnership())
-        tc.checkOwnershipAttr(var, var->getAttrs().getOwnership());
-    }
-
-    // Make sure we don't have a 'let' or an @NSManaged property.
-    bool isLet = false;
-    bool hasNSManaged = false;
-    binding->getPattern()->forEachVariable([&](VarDecl *var) {
-      if (var->isLet())
-        isLet = true;
-      if (var->getAttrs().hasAttribute<NSManagedAttr>())
-        hasNSManaged = true;
-    });
-
-    if (!isLet && !hasNSManaged) {
-      auto type = binding->getPattern()->getType();
-      if (auto defaultInit = buildDefaultInitializer(tc, type)) {
-        binding->setInit(defaultInit, /*checked=*/false);
-      }
-    }
-  }
-
   // If the pattern didn't get a type, it's because we ran into some
   // unknown types along the way. We'll need to check the initializer.
   if (!binding->getPattern()->hasType()) {
@@ -2409,8 +2372,50 @@ public:
       });
     }
 
-    if (!IsSecondPass)
+    if (!IsSecondPass) {
+      // Type check each VarDecl in that his PatternBinding handles.
       visitBoundVars(PBD->getPattern());
+
+
+      // If we have a type but no initializer on an @IBOutlet, check
+      // whether the type is default-initializable. If so, do it.
+      if (PBD->getPattern()->hasType() && !PBD->hasInit() &&
+          PBD->hasStorage() && !PBD->getPattern()->getType()->is<ErrorType>()) {
+
+        // If we have a type-adjusting attribute, apply it now.
+        if (auto var = PBD->getSingleVar()) {
+          if (var->getAttrs().hasAttribute<IBOutletAttr>())
+            TC.checkIBOutlet(var);
+
+          // FIXME: Ugly hack to get the pattern type to reflect the
+          // updated variable type. Not cool.
+          PBD->getPattern()->setType(var->getType());
+
+          if (var->getAttrs().hasOwnership())
+            TC.checkOwnershipAttr(var, var->getAttrs().getOwnership());
+        }
+
+        // Make sure we don't have a 'let' or an @NSManaged property.
+        bool isLet = false;
+        bool hasNSManaged = false;
+        PBD->getPattern()->forEachVariable([&](VarDecl *var) {
+          if (var->isLet())
+            isLet = true;
+          if (var->getAttrs().hasAttribute<NSManagedAttr>())
+            hasNSManaged = true;
+        });
+
+        if (!isLet && !hasNSManaged) {
+          auto type = PBD->getPattern()->getType();
+          if (auto defaultInit = buildDefaultInitializer(TC, type)) {
+            // If we got a default initializer, install it and re-type-check it
+            // to make sure it is properly coerced to the pattern type.
+            PBD->setInit(defaultInit, /*checked=*/false);
+            TC.typeCheckBinding(PBD);
+          }
+        }
+      }
+    }
     TC.checkDeclAttributes(PBD);
   }
 

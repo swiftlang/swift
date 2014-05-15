@@ -774,3 +774,16 @@ struct VariadicSubscript {
   }
 }
 
+
+//<rdar://problem/16620121> Initializing constructor tries to initialize computed property overridden with willSet/didSet
+class ObservedBase {
+     var printInfo: Ref!
+}
+class ObservedDerived : ObservedBase {
+  init() {}
+  override var printInfo: Ref! {
+    didSet { }
+  }
+}
+
+

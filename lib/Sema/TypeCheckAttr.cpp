@@ -697,6 +697,7 @@ void TypeChecker::checkOwnershipAttr(VarDecl *var, Ownership ownershipKind) {
   if (type->is<ReferenceStorageType>())
     return;
 
+
   // A weak variable must have type R? for some ownership-capable
   // type R.
   if (ownershipKind == Ownership::Weak) {
@@ -706,21 +707,16 @@ void TypeChecker::checkOwnershipAttr(VarDecl *var, Ownership ownershipKind) {
       return;
     }
 
-    OptionalTypeKind kind;
-    Type objType = type->getAnyOptionalObjectType(kind);
-    
-    // Use this special diagnostic if it's actually a reference type
-    // but just isn't Optional.
-    if (!objType && type->allowsOwnership()) {
-      diagnose(var->getStartLoc(),
-               diag::invalid_weak_ownership_not_optional,
+    if (Type objType = type->getAnyOptionalObjectType())
+      type = objType;
+    else if (type->allowsOwnership()) {
+      // Use this special diagnostic if it's actually a reference type but just
+      // isn't Optional.
+      diagnose(var->getStartLoc(), diag::invalid_weak_ownership_not_optional,
                OptionalType::get(type));
       var->getMutableAttrs().clearOwnership();
       return;
     }
-
-    if (objType)
-      type = objType;
   }
 
   if (!type->allowsOwnership()) {
