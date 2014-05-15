@@ -121,6 +121,7 @@ TEST_F(LexerTest, CharacterLiterals) {
 
   MemoryBuffer *Buf = MemoryBuffer::getMemBuffer(Source);
   LangOptions LangOpts;
+  LangOpts.EnableCharacterLiterals = true;
   SourceManager SourceMgr;
   unsigned BufferID = SourceMgr.addNewSourceBuffer(Buf);
 

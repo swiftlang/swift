@@ -1,4 +1,4 @@
-// RUN: %swift -parse-stdlib -emit-silgen %s | FileCheck %s
+// RUN: %swift -parse-stdlib -emit-silgen %s -enable-character-literals | FileCheck %s
 import Swift
 
 typealias CharacterLiteralType = SillyCharacter

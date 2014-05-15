@@ -1,4 +1,4 @@
-// RUN: %swift %s -verify
+// RUN: %swift %s -verify -enable-character-literals
 
 //===----------------------------------------------------------------------===//
 // Tests and samples.

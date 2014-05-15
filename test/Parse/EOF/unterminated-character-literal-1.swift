@@ -1,4 +1,4 @@
-// RUN: %swift %s -verify -parse
+// RUN: %swift %s -verify -parse -enable-character-literals
 
 // Check that we correctly process an unterminated character literal right near
 // EOF.

@@ -105,10 +105,10 @@ class Attributes {
 }
 
 func stringLikeLiterals() {
-// CHECK: <kw>var</kw> us1: <type>UnicodeScalar</type> = <char>'a'</char>
-  var us1: UnicodeScalar = 'a'
-// CHECK: <kw>var</kw> us2: <type>UnicodeScalar</type> = <char>'ы'</char>
-  var us2: UnicodeScalar = 'ы'
+// CHECK: <kw>var</kw> us1: <type>UnicodeScalar</type> = <str>"a"</str>
+  var us1: UnicodeScalar = "a"
+// CHECK: <kw>var</kw> us2: <type>UnicodeScalar</type> = <str>"ы"</str>
+  var us2: UnicodeScalar = "ы"
 
 // CHECK: <kw>var</kw> ch1: <type>Character</type> = <str>"a"</str>
   var ch1: Character = "a"

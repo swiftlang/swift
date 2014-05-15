@@ -1,4 +1,4 @@
-// RUN: %swift -target x86_64-apple-darwin10 %s -emit-ir -parse-stdlib | FileCheck %s
+// RUN: %swift -target x86_64-apple-darwin10 %s -emit-ir -parse-stdlib -enable-character-literals | FileCheck %s
 
 import Swift
 

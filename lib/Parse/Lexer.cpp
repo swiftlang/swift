@@ -1371,7 +1371,12 @@ Restart:
   const char *TokStart = CurPtr;
   
   switch (*CurPtr++) {
-  default: {
+    case '\'':
+      if (LangOpts.EnableCharacterLiterals)
+        return lexCharacterLiteral();
+    SWIFT_FALLTHROUGH;
+
+    default: {
     char const *tmp = CurPtr-1;
     if (advanceIfValidStartOfIdentifier(tmp, BufferEnd))
       return lexIdentifier();
@@ -1542,8 +1547,6 @@ Restart:
   case '5': case '6': case '7': case '8': case '9':
     return lexNumber();
 
-  case '\'':
-    return lexCharacterLiteral();
   case '"':
     return lexStringLiteral();
       
