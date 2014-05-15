@@ -30,6 +30,24 @@
 #include <errno.h>
 #include <unistd.h>
 
+// FIXME when we start building with the internal SDK
+//#if __has_include(<pthread/tsd_private.h>)
+//#include <pthread/tsd_private.h>
+//#else
+#if 1
+__OSX_AVAILABLE_STARTING(__MAC_10_10,__IPHONE_8_0)
+extern const struct pthread_layout_offsets_s {
+  // always add new fields at the end
+  const uint16_t plo_version;
+  // either of the next two fields may be 0; use whichever is set
+  // bytes from pthread_t to base of tsd
+  const uint16_t plo_pthread_tsd_base_offset;
+  // bytes from pthread_t to a pointer to base of tsd
+  const uint16_t plo_pthread_tsd_base_address_offset;
+  const uint16_t plo_pthread_tsd_entry_size;
+} pthread_layout_offsets;
+#endif
+
 using namespace swift;
 
 static inline size_t indexToSize(AllocIndex idx);
@@ -51,6 +69,34 @@ static const AllocIndex badAllocIndex = AllocIndex(-1);
 typedef struct AllocCacheEntry_s {
   struct AllocCacheEntry_s *next;
 } *AllocCacheEntry;
+
+
+static void *pthreadTSDTable() {
+  pthread_t self = pthread_self();
+  const struct pthread_layout_offsets_s *details = &pthread_layout_offsets;
+  if (details) {
+    assert(details->plo_pthread_tsd_entry_size == sizeof(void *));
+    assert((bool)details->plo_pthread_tsd_base_offset
+           != (bool)details->plo_pthread_tsd_base_address_offset);
+    if (details->plo_pthread_tsd_base_offset) {
+      return (void *)((size_t)self + details->plo_pthread_tsd_base_offset);
+    }
+    return *(void **)((size_t)self
+                      + details->plo_pthread_tsd_base_address_offset);
+  }
+  // tested empirically on OSX 10.9 and iOS 7.1
+#if __x86_64__
+  return (void *)((size_t)self + 28 * sizeof(void *));
+#elif __i386__
+  return (void *)((size_t)self + 44 * sizeof(void *));
+#elif __arm64__
+  return (void *)((size_t)self + 28 * sizeof(void *));
+#elif __arm__
+  return (void *)((size_t)self + 41 * sizeof(void *));
+#else
+  abort();
+#endif
+}
 
 namespace {
 
@@ -249,13 +295,14 @@ public:
   }
   void debug();
   void registerThread() {
-    auto it = threads.find(pthread_self());
+    void *table = pthreadTSDTable();
+    auto it = threads.find(table);
     if (!it) {
-      threads.insert(std::pair<pthread_t, bool>(pthread_self(), true));
+      threads.insert(std::pair<void *, bool>(table, true));
     }
   }
   void unregisterThread() {
-    auto it = threads.find(pthread_self());
+    auto it = threads.find(pthreadTSDTable());
     if (it) {
       threads.erase(it);
     }
