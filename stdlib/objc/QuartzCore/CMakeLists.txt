@@ -1,7 +1,7 @@
 set(SHARED_LIBRARY ON)
 add_swift_library(swiftQuartzCore INSTALL
   QuartzCore.swift
-  DEPENDS swift_stdlib_core swiftObjectiveC)
+  DEPENDS swift_stdlib_core swiftFoundation)
 
 add_swift_optimization_flags(swiftQuartzCore)
 
