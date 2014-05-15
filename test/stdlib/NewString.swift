@@ -105,7 +105,7 @@ func nonASCII() {
 
   // Representing a slice as an NSString requires a new object
   // CHECK-NOT: NSString@[[utf16address]] = "❅❆❄︎⛄️"
-  // CHECK-NEXT: NSContiguousString@[[nsContiguousStringAddress:[x0-9a-f]+]] = "❅❆❄︎⛄️"
+  // CHECK-NEXT: _NSContiguousString@[[nsContiguousStringAddress:[x0-9a-f]+]] = "❅❆❄︎⛄️"
   var nsSliceUTF16: NSString = newNSUTF16[i2..i8]
   println("  \(repr(nsSliceUTF16))")
 
@@ -151,11 +151,11 @@ func ascii() {
 
   // Representing a slice as an NSString requires a new object
   // XCHECK-NOT: NSString@[[asciiaddress]] = "bar"
-  // XCHECK-NEXT: NSOpaqueString@[[nsOpaqueSliceAddress:[x0-9a-f]+]] = "bar"
+  // XCHECK-NEXT: _NSOpaqueString@[[nsOpaqueSliceAddress:[x0-9a-f]+]] = "bar"
   var nsSliceASCII: NSString = newNSASCII[i3..i6]
   println("  \(repr(nsSliceASCII))")
 
-  // When round-tripped back to Swift, the NSOpaqueString object is the new owner
+  // When round-tripped back to Swift, the _NSOpaqueString object is the new owner
   // XCHECK-NEXT: String(Opaque(buffer: @[[nsOpaqueSliceAddress]][0...3]))
   println("  \(repr(String(nsSliceASCII)))")
 }

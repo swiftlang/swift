@@ -178,7 +178,7 @@ func _cocoaStringLengthImpl(source: _CocoaString) -> Int {
 func _cocoaStringSliceImpl(
   target: _StringCore, subRange: Range<Int>) -> _StringCore {
   
-  let buffer = NSOpaqueString(
+  let buffer = _NSOpaqueString(
     owner: String(target), 
     subRange:
       NSRange(location: subRange.startIndex, length: countElements(subRange)))
@@ -205,11 +205,11 @@ func _cocoaStringSubscriptImpl(
 //
 
 /// An NSString built around a slice of contiguous Swift String storage
-class NSContiguousString : NSString {
+class _NSContiguousString : NSString {
   init(_ value: _StringCore) {
     assert(
       value.hasContiguousStorage,
-      "NSContiguousString requires contiguous storage")
+      "_NSContiguousString requires contiguous storage")
     self.value = value
     super.init()
   }
@@ -247,15 +247,15 @@ class NSContiguousString : NSString {
   // Implement sub-slicing without adding layers of wrapping
   // 
   override func substringFromIndex(start: Int) -> String {
-    return NSContiguousString(value[Int(start)..Int(value.count)])
+    return _NSContiguousString(value[Int(start)..Int(value.count)])
   }
 
   override func substringToIndex(end: Int) -> String {
-    return NSContiguousString(value[0..Int(end)])
+    return _NSContiguousString(value[0..Int(end)])
   }
 
   override func substringWithRange(aRange: NSRange) -> String {
-    return NSContiguousString(
+    return _NSContiguousString(
       value[Int(aRange.location)..Int(aRange.location + aRange.length)])
   }
 
@@ -270,7 +270,7 @@ class NSContiguousString : NSString {
 
 // A substring of an arbitrary immutable NSString.  The underlying
 // NSString is assumed to not provide contiguous UTF16 storage.
-class NSOpaqueString : NSString {
+class _NSOpaqueString : NSString {
   func length() -> Int {
     return subRange.length
   }
@@ -292,20 +292,20 @@ class NSOpaqueString : NSString {
   // Implement sub-slicing without adding layers of wrapping
   // 
   override func substringFromIndex(start: Int) -> String {
-    return NSOpaqueString(
+    return _NSOpaqueString(
              owner: owner, 
              subRange: NSRange(location: subRange.location + start, 
                                length: subRange.length - start))
   }
 
   override func substringToIndex(end: Int) -> String {
-    return NSOpaqueString(
+    return _NSOpaqueString(
              owner: owner, 
              subRange: NSRange(location: subRange.location, length: end))
   }
 
   override func substringWithRange(aRange: NSRange) -> String {
-    return NSOpaqueString(
+    return _NSOpaqueString(
              owner: owner, 
              subRange: NSRange(location: aRange.location + subRange.location, 
                                length: aRange.length))
@@ -338,7 +338,7 @@ extension String {
       }
     }
     assert(core.hasContiguousStorage)
-    return NSContiguousString(core)
+    return _NSContiguousString(core)
   }
 }
 
@@ -347,7 +347,7 @@ extension String {
 //
 extension String {
   init(_ value: NSString) {
-    if let wrapped = value as NSContiguousString {
+    if let wrapped = value as _NSContiguousString {
       self.core = wrapped.value
       return
     }
