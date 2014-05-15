@@ -139,12 +139,45 @@ func testBridgedVerbatim() {
   // CHECK-NEXT: [[derived0]]
   println(derivedAsBases)
 
+  // CHECK-NEXT: [[derived0]]
   if let roundTripDerived = derivedAsBases as Derived[] {
-    // CHECK-NEXT: [[derived0]]
     println(roundTripDerived)
   }
   else {
-    println("upcast failed")
+    println("roundTripDerived upcast failed")
+  }
+
+  // CHECK-NEXT: [[derived2:\[Derived#[0-9]+\(44\), Derived#[0-9]+\(55\)\]{1}]]
+  let derivedInBaseBuffer: Base[] = [Derived(44), Derived(55)]
+  println(derivedInBaseBuffer)
+  
+  // CHECK-NEXT: Downcast-ability is based on buffer type, not individual element types
+  if let downcastBaseBuffer = derivedInBaseBuffer as Derived[] {
+    println("Unexpected downcast success: \(downcastBaseBuffer)")
+  }
+  else {
+    println("Downcast-ability is based on buffer type, not individual element types")
+  }
+
+  // We can up-cast to array of AnyObject
+  // CHECK-NEXT: [[derived2]]
+  let derivedAsAnyObjectArray: AnyObject[] = derivedInBaseBuffer
+  println(derivedAsAnyObjectArray)
+
+  // CHECK-NEXT: downcastBackToBase = [[derived2]]
+  if let downcastBackToBase = derivedAsAnyObjectArray as Base[] {
+    println("downcastBackToBase = \(downcastBackToBase)")
+  }
+  else {
+    println("downcastBackToBase failed")
+  }
+
+  // CHECK-NEXT: downcastBackToDerived failed
+  if let downcastBackToDerived = derivedAsAnyObjectArray as Derived[] {
+    println("downcastBackToDerived = \(downcastBackToDerived)")
+  }
+  else {
+    println("downcastBackToDerived failed")
   }
 }
 testBridgedVerbatim()
