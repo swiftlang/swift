@@ -19,6 +19,12 @@ import ObjectiveC
 // FIXME: Objective-C types belong in a layer below the Objective-C support
 // libraries, not here.
 
+extension ObjCBool : Printable {
+  var description: String {
+    return self.getLogicValue().description
+  }
+}
+
 /// \brief The Objective-C SEL type.
 ///
 /// The Objective-C SEL type is typically an opaque pointer. Swift
