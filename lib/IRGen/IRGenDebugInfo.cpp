@@ -1204,38 +1204,15 @@ llvm::DIType IRGenDebugInfo::createPointerSizedStruct(
   unsigned PtrSize = CI.getTargetInfo().getPointerWidth(0);
   unsigned PtrAlign = CI.getTargetInfo().getPointerAlign(0);
   auto PtrTy = DBuilder.createPointerType(PointeeTy, PtrSize, PtrAlign);
-  llvm::Value *Elements[] = {DBuilder.createMemberType(
-      Scope, "pointer", File, 0, PtrSize, PtrAlign, 0, Flags, PtrTy)};
+  llvm::Value *Elements[] = {
+    DBuilder.createMemberType(Scope, "pointer", File, 0,
+                              PtrSize, PtrAlign, 0, Flags, PtrTy)
+  };
   return DBuilder.createStructType(
       Scope, Name, File, Line, PtrSize, PtrAlign, Flags,
       llvm::DIType(), // DerivedFrom
       DBuilder.getOrCreateArray(Elements), llvm::dwarf::DW_LANG_Swift,
       llvm::DIType(), MangledName);
-}
-
-/// Create subroutine type with size and alignment.
-static llvm::DICompositeType
-createIndirectSubroutineType(llvm::LLVMContext &VMContext, llvm::DIFile File,
-                             llvm::DIArray ParameterTypes, unsigned SizeInBits,
-                             unsigned AlignInBits, unsigned Flags) {
-  // TAG_subroutine_type is encoded in DICompositeType format.
-  llvm::Value *Elts[] = {
-      llvm::ConstantInt::get(llvm::Type::getInt32Ty(VMContext),
-                             llvm::dwarf::DW_TAG_subroutine_type |
-                                 llvm::LLVMDebugVersion),
-      llvm::Constant::getNullValue(llvm::Type::getInt32Ty(VMContext)), nullptr,
-      llvm::MDString::get(VMContext, ""),
-      llvm::ConstantInt::get(llvm::Type::getInt32Ty(VMContext), 0), // Line
-      llvm::ConstantInt::get(llvm::Type::getInt64Ty(VMContext), SizeInBits),
-      llvm::ConstantInt::get(llvm::Type::getInt64Ty(VMContext), AlignInBits),
-      llvm::ConstantInt::get(llvm::Type::getInt64Ty(VMContext), 0), // Offset
-      llvm::ConstantInt::get(llvm::Type::getInt32Ty(VMContext), Flags), // Flags
-      nullptr, ParameterTypes,
-      llvm::ConstantInt::get(llvm::Type::getInt32Ty(VMContext), 0), nullptr,
-      nullptr,
-      nullptr // Type Identifer
-  };
-  return llvm::DICompositeType(llvm::MDNode::get(VMContext, Elts));
 }
 
 /// Construct a DIType from a DebugTypeInfo object.
@@ -1521,11 +1498,10 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
 
     // Functions are actually stored as a Pointer or a FunctionPairTy:
     // { i8*, %swift.refcounted* }
-    unsigned PtrSize = CI.getTargetInfo().getPointerWidth(0);
-    unsigned PtrAlign = CI.getTargetInfo().getPointerAlign(0);
-    auto FnTy = createIndirectSubroutineType(M.getContext(), MainFile, Params,
-                                             2 * PtrSize, PtrAlign, Flags);
-    return FnTy;
+    auto FnTy = DBuilder.createSubroutineType(MainFile, Params, Flags);
+    return createPointerSizedStruct(Scope, MangledName, FnTy,
+                                    MainFile, 0, Flags, MangledName);
+
   }
 
   case TypeKind::Enum: {
@@ -1642,11 +1618,9 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
 /// Determine if there exists a name mangling for the given type.
 static bool canMangle(TypeBase *Ty) {
   switch (Ty->getKind()) {
-  case TypeKind::SILFunction:
-  case TypeKind::Function:
-  case TypeKind::PolymorphicFunction:
-  case TypeKind::GenericFunction:
-  case TypeKind::SILBlockStorage:
+  case TypeKind::PolymorphicFunction: // Mangler crashes.
+  case TypeKind::GenericFunction:     // Not yet supported.
+  case TypeKind::SILBlockStorage:     // Not suported at all.
     return false;
   case TypeKind::InOut: {
     auto *ObjectTy = Ty->castTo<InOutType>()->getObjectType().getPointer();
