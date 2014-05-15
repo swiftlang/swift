@@ -14,17 +14,8 @@
 
 // FIXME: Once we have an FFI interface, make these have proper function bodies
 
-// The C "abort" function
-@asmname("abort") func _abort()
-
 @asmname("putchar")
 func c_putchar(value: Int32)
-@asmname("print_int")
-func c_print_int(p: Builtin.RawPointer, buf_len: Int, x: Int64, Radix: Int,
-                 uppercase: Bool) -> UInt64
-@asmname("print_uint")
-func c_print_uint(p: Builtin.RawPointer, buf_len: Int, x: UInt64, Radix: Int,
-                  uppercase: Bool) -> UInt64
 
 @asmname("swift_replOutputIsUTF8") func _isUTF8() -> Bool
 
