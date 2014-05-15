@@ -83,7 +83,7 @@ var kbd : Keyboard = Keyboard()
       let r = posix_write(1, p.value, buf.core.count)
     }
     else {
-      var a = NativeArray<UInt8>(count: 1024, value: 0)
+      var a = ContiguousArray<UInt8>(count: 1024, value: 0)
       var count = 0
 
       for u in buf.utf8 {

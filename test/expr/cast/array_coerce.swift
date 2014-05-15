@@ -37,9 +37,9 @@ var ds = da[0...0]
 cs = ds // expected-error{{cannot convert the expression's type '()' to type 'Slice<C>'}}
 ds = cs // expected-error{{cannot convert the expression's type '()' to type 'Slice<D>'}}
 
-// NativeArray<T>
-var cna: NativeArray<C> = [c1]
-var dna: NativeArray<D> = [d1]
+// ContiguousArray<T>
+var cna: ContiguousArray<C> = [c1]
+var dna: ContiguousArray<D> = [d1]
 
-cna = dna // expected-error{{cannot convert the expression's type '()' to type 'NativeArray<C>'}}
-dna = cna // expected-error{{cannot convert the expression's type '()' to type 'NativeArray<D>'}}
+cna = dna // expected-error{{cannot convert the expression's type '()' to type 'ContiguousArray<C>'}}
+dna = cna // expected-error{{cannot convert the expression's type '()' to type 'ContiguousArray<D>'}}

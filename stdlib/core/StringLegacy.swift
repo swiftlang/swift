@@ -77,7 +77,7 @@ extension String {
 extension String {
   var uppercaseString : String {
     let end = utf8.endIndex
-    var resultArray = NativeArray<UTF8.CodeUnit>(count: countElements(utf8), 
+    var resultArray = ContiguousArray<UTF8.CodeUnit>(count: countElements(utf8), 
                                                  value: 0)
     
     var i = utf8.startIndex
@@ -113,7 +113,7 @@ extension String {
 
   var lowercaseString : String {
     let end = utf8.endIndex
-    var resultArray = NativeArray<UTF8.CodeUnit>(count: countElements(utf8), 
+    var resultArray = ContiguousArray<UTF8.CodeUnit>(count: countElements(utf8), 
                                                  value: 0)
     
     var i = utf8.startIndex

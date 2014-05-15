@@ -15,11 +15,11 @@ import SwiftShims
 // The empty array prototype.  We use the same object for all empty
 // [Native]Array<T>s.
 let emptyNSSwiftArray : NSSwiftArray
-  = reinterpretCast(NativeArrayBuffer<Int>(count: 0, minimumCapacity: 0))
+  = reinterpretCast(ContiguousArrayBuffer<Int>(count: 0, minimumCapacity: 0))
 
-// The class that implements the storage for a NativeArray<T>
-@final class NativeArrayStorage<T> : NSSwiftArray {
-  typealias Buffer = NativeArrayBuffer<T>
+// The class that implements the storage for a ContiguousArray<T>
+@final class ContiguousArrayStorage<T> : NSSwiftArray {
+  typealias Buffer = ContiguousArrayBuffer<T>
   
   deinit {
     let b = Buffer(self)
@@ -32,7 +32,7 @@ let emptyNSSwiftArray : NSSwiftArray
   }
 }
 
-struct NativeArrayBuffer<T> : ArrayBufferType, LogicValue {
+struct ContiguousArrayBuffer<T> : ArrayBufferType, LogicValue {
   
   /// Make a buffer with uninitialized elements.  After using this
   /// method, you must either initialize the count elements at the
@@ -40,7 +40,7 @@ struct NativeArrayBuffer<T> : ArrayBufferType, LogicValue {
   init(count: Int, minimumCapacity: Int)
   {
     base = HeapBuffer(
-      NativeArrayStorage<T>.self,
+      ContiguousArrayStorage<T>.self,
       _ArrayBody(),
       max(count, minimumCapacity))
 
@@ -53,7 +53,7 @@ struct NativeArrayBuffer<T> : ArrayBufferType, LogicValue {
                             elementTypeIsBridgedVerbatim: bridged)
   }
 
-  init(_ storage: NativeArrayStorage<T>?) {
+  init(_ storage: ContiguousArrayStorage<T>?) {
     base = reinterpretCast(storage)
   }
   
@@ -78,9 +78,9 @@ struct NativeArrayBuffer<T> : ArrayBufferType, LogicValue {
     return withExtendedLifetime(base) { body(p) }
   }
 
-  mutating func take() -> NativeArrayBuffer {
+  mutating func take() -> ContiguousArrayBuffer {
     if !base {
-      return NativeArrayBuffer()
+      return ContiguousArrayBuffer()
     }
     assert(base.isUniquelyReferenced(), "Can't \"take\" a shared array buffer")
     let result = self
@@ -98,20 +98,20 @@ struct NativeArrayBuffer<T> : ArrayBufferType, LogicValue {
   }
 
   /// Adopt the storage of x
-  init(_ buffer: NativeArrayBuffer) {
+  init(_ buffer: ContiguousArrayBuffer) {
     self = buffer
   }
   
   mutating func requestUniqueMutableBuffer(minimumCapacity: Int)
-    -> NativeArrayBuffer<Element>?
+    -> ContiguousArrayBuffer<Element>?
   {
     return isUniquelyReferenced() && capacity >= minimumCapacity ? self : nil
   }
 
-  /// If this buffer is backed by a NativeArrayBuffer, return it.
+  /// If this buffer is backed by a ContiguousArrayBuffer, return it.
   /// Otherwise, return nil.  Note: the result's elementStorage may
   /// not match ours, if we are a SliceBuffer.
-  func requestNativeBuffer() -> NativeArrayBuffer<Element>? {
+  func requestNativeBuffer() -> ContiguousArrayBuffer<Element>? {
     return self
   }
   
@@ -218,7 +218,7 @@ struct NativeArrayBuffer<T> : ArrayBufferType, LogicValue {
     if _fastPath(base.value.elementTypeIsBridgedVerbatim) {
       return reinterpretCast(base.storage)
     }
-    return NativeArray(self).map { bridgeToObjectiveC($0)! }.buffer.storage!
+    return ContiguousArray(self).map { bridgeToObjectiveC($0)! }.buffer.storage!
   }
   
   /// An object that keeps the elements stored in this buffer alive
@@ -233,12 +233,12 @@ struct NativeArrayBuffer<T> : ArrayBufferType, LogicValue {
     return reinterpretCast(elementStorage)
   }
   
-  func asBufferOf<U>(_: U.Type) -> NativeArrayBuffer<U>? {
+  func asBufferOf<U>(_: U.Type) -> ContiguousArrayBuffer<U>? {
     if !(dynamicElementType is U.Type) {
      return nil
     }
-    return NativeArrayBuffer<U>(
-      reinterpretCast(storage) as NativeArrayStorage<U>)
+    return ContiguousArrayBuffer<U>(
+      reinterpretCast(storage) as ContiguousArrayStorage<U>)
   }
    
   var dynamicElementType: Any.Type {
@@ -246,7 +246,7 @@ struct NativeArrayBuffer<T> : ArrayBufferType, LogicValue {
   }
   
   //===--- private --------------------------------------------------------===//
-  var storage: NativeArrayStorage<T>? {
+  var storage: ContiguousArrayStorage<T>? {
     return reinterpretCast(base.storage)
   }
   
@@ -258,7 +258,7 @@ struct NativeArrayBuffer<T> : ArrayBufferType, LogicValue {
 func += <
   T, C: Collection where C._Element == T
 > (
-  inout lhs: NativeArrayBuffer<T>, rhs: C
+  inout lhs: ContiguousArrayBuffer<T>, rhs: C
 ) {
   let oldCount = lhs.count
   let newCount = oldCount + numericCast(countElements(rhs))
@@ -268,7 +268,7 @@ func += <
     (lhs.elementStorage + oldCount).initializeFrom(rhs)
   }
   else {
-    let newLHS = NativeArrayBuffer<T>(count: newCount, 
+    let newLHS = ContiguousArrayBuffer<T>(count: newCount, 
                                       minimumCapacity: lhs.capacity * 2)
     if lhs.base {
       newLHS.elementStorage.moveInitializeFrom(lhs.elementStorage, 
@@ -281,30 +281,30 @@ func += <
 }
 
 /// Append rhs to lhs
-func += <T> (inout lhs: NativeArrayBuffer<T>, rhs: T) {
+func += <T> (inout lhs: ContiguousArrayBuffer<T>, rhs: T) {
   lhs += CollectionOfOne(rhs)
 }
 
 func === <T>(
-  lhs: NativeArrayBuffer<T>, rhs: NativeArrayBuffer<T>
+  lhs: ContiguousArrayBuffer<T>, rhs: ContiguousArrayBuffer<T>
 ) -> Bool {
   return lhs.base == rhs.base
 }
 
 func !== <T>(
-  lhs: NativeArrayBuffer<T>, rhs: NativeArrayBuffer<T>
+  lhs: ContiguousArrayBuffer<T>, rhs: ContiguousArrayBuffer<T>
 ) -> Bool {
   return lhs.base != rhs.base
 }
 
-extension NativeArrayBuffer : Collection {
+extension ContiguousArrayBuffer : Collection {
   var startIndex: Int {
     return 0
   }
   var endIndex: Int {
     return count
   }
-  func generate() -> IndexingGenerator<NativeArrayBuffer> {
+  func generate() -> IndexingGenerator<ContiguousArrayBuffer> {
     return IndexingGenerator(self)
   }
 }
@@ -313,9 +313,9 @@ func ~> <
   S: _Sequence_
 >(
   source: S, _: (_CopyToNativeArrayBuffer,())
-) -> NativeArrayBuffer<S.GeneratorType.Element>
+) -> ContiguousArrayBuffer<S.GeneratorType.Element>
 {
-  var result = NativeArrayBuffer<S.GeneratorType.Element>()
+  var result = ContiguousArrayBuffer<S.GeneratorType.Element>()
 
   // Using GeneratorSequence here essentially promotes the sequence to
   // a Sequence from _Sequence_ so we can iterate the elements
@@ -329,21 +329,21 @@ func ~> <
   C: Collection
 >(
   source: C, _:(_CopyToNativeArrayBuffer, ())
-) -> NativeArrayBuffer<C.GeneratorType.Element>
+) -> ContiguousArrayBuffer<C.GeneratorType.Element>
 {
   return _copyCollectionToNativeArrayBuffer(source)
 }
 
 func _copyCollectionToNativeArrayBuffer<C: protocol<_Collection,_Sequence_>>(
   source: C
-) -> NativeArrayBuffer<C.GeneratorType.Element>
+) -> ContiguousArrayBuffer<C.GeneratorType.Element>
 {
   let count = countElements(source)
   if count == 0 {
-    return NativeArrayBuffer()
+    return ContiguousArrayBuffer()
   }
   
-  var result = NativeArrayBuffer<C.GeneratorType.Element>(
+  var result = ContiguousArrayBuffer<C.GeneratorType.Element>(
     count: numericCast(count),
     minimumCapacity: 0
   )

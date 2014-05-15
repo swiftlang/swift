@@ -50,7 +50,7 @@ set(SWIFTLIB_ESSENTIAL
   Mirrors.swift.gyb
   Misc.swift
   NSSwiftArray.swift
-  NativeArrayBuffer.swift
+  ContiguousArrayBuffer.swift
   Nil.swift
   Optional.swift
   OutputStream.swift

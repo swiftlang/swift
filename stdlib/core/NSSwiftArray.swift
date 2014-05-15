@@ -1,4 +1,4 @@
-//===--- NSSwiftArray.swift - Links NSArray and NativeArrayStorage --------===//
+//===--- NSSwiftArray.swift - Links NSArray and ContiguousArrayStorage --------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -11,8 +11,8 @@
 //===----------------------------------------------------------------------===//
 //
 //  NSSwiftArray supplies the implementation of the CocoaArray API
-//  (and thus, NSArray the API) for our NativeArrayStorage<T>.  We
-//  can't put this implementation directly on NativeArrayStorage
+//  (and thus, NSArray the API) for our ContiguousArrayStorage<T>.  We
+//  can't put this implementation directly on ContiguousArrayStorage
 //  because generic classes can't override Objective-C selectors.
 //
 //===----------------------------------------------------------------------===//

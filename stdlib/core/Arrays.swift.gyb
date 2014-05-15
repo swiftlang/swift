@@ -1,5 +1,5 @@
 %# -*- mode: swift -*-
-//===--- Arrays.swift.gyb - NativeArray, Array, and Slice -----------------===//
+//===--- Arrays.swift.gyb - ContiguousArray, Array, and Slice -----------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -13,18 +13,18 @@
 //
 //  Three generic, mutable array-like types with value semantics.
 //
-//  - NativeArray<T> is a fast, contiguous array of T with a known
+//  - ContiguousArray<T> is a fast, contiguous array of T with a known
 //    backing store.
 //
 //  - Slice<T> presents an arbitrary subsequence of some contiguous sequence
 //    of Ts.
 //
-//  - Array<T> is like NativeArray<T> when T is not an ObjC type.
+//  - Array<T> is like ContiguousArray<T> when T is not an ObjC type.
 //    Otherwise, it may use an NSArray bridged from Cocoa for storage
 //
 //===----------------------------------------------------------------------===//
 
-% for Self in ['NativeArray', 'Slice', 'Array']:
+% for Self in ['ContiguousArray', 'Slice', 'Array']:
 struct ${Self}<T> : MutableCollection, Sliceable {
   typealias Element = T
   var startIndex: Int {
@@ -155,7 +155,7 @@ extension ${Self} : ArrayType {
   /// Complexity: O(N)
   mutating func reserve(newCapacity: Int) {
     if !buffer.requestUniqueMutableBuffer(newCapacity) {
-      var newBuffer = NativeArrayBuffer<T>(count: count, minimumCapacity: newCapacity)
+      var newBuffer = ContiguousArrayBuffer<T>(count: count, minimumCapacity: newCapacity)
       buffer._uninitializedCopy(0..count, target: newBuffer.elementStorage)
       buffer = Buffer(newBuffer)
     }
@@ -451,7 +451,7 @@ func += <
 }
 
 //===--- generic helpers --------------------------------------------------===//
-/// Ensure there's a NativeArrayBuffer capable of storing
+/// Ensure there's a ContiguousArrayBuffer capable of storing
 /// max(newCount, minimumCapacity) elements, with count set to
 /// newCount.
 ///
@@ -464,7 +464,7 @@ func += <
 /// needs to be corrected before the buffer can go back into circulation.
 func _demandUniqueMutableBuffer<Buffer: ArrayBufferType>(
   inout source: Buffer, newCount: Int, minimumCapacity: Int = 0)
--> NativeArrayBuffer<Buffer.Element>? {
+-> ContiguousArrayBuffer<Buffer.Element>? {
 
   assert(newCount >= 0)
   
@@ -479,7 +479,7 @@ func _demandUniqueMutableBuffer<Buffer: ArrayBufferType>(
     requiredCapacity,
     newCount > source.capacity ? source.capacity * 2 : source.capacity)
 
-  return NativeArrayBuffer(count: newCount, minimumCapacity: newCapacity)
+  return ContiguousArrayBuffer(count: newCount, minimumCapacity: newCapacity)
 }
 
 protocol PointerFunction {
@@ -499,7 +499,7 @@ func _arrayOutOfPlaceUpdate<
     where Initializer.Element == Buffer.Element
 >(
   inout source: Buffer, 
-  inout dest: NativeArrayBuffer<Buffer.Element>?,
+  inout dest: ContiguousArrayBuffer<Buffer.Element>?,
   headCount: Int, // Count of initial source elements to copy/move
   newCount: Int,  // Count of new elements to insert
   initializeNewElements: Initializer
@@ -600,7 +600,7 @@ func _arrayReserve<Buffer: ArrayBufferType>(
 func _extractOrCopyToNativeArrayBuffer<
   Buffer: ArrayBufferType where Buffer.GeneratorType.Element == Buffer.Element
 >(source: Buffer) 
-  -> NativeArrayBuffer<Buffer.Element> 
+  -> ContiguousArrayBuffer<Buffer.Element> 
 {
   if let n = source.requestNativeBuffer() {
     return n
@@ -704,7 +704,7 @@ func _arrayBridgedDownCast<T>(a: AnyObject[]) -> (T[])? {
 
   // Otherwise, conversion is O(N), and succeeds iff every element
   // bridges back to T
-  let n = NativeArrayBuffer<T>(count: a.count, minimumCapacity: 0)
+  let n = ContiguousArrayBuffer<T>(count: a.count, minimumCapacity: 0)
   for (i, srcElement: AnyObject) in enumerate(a) {
     if let dstElement = bridgeFromObjectiveC(srcElement, T.self) {
       (n._unsafeElementStorage + i).initialize(dstElement)

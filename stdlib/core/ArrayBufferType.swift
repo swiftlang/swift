@@ -19,7 +19,7 @@ protocol ArrayBufferType : MutableCollection {
   init()
 
   /// Adopt the storage of x
-  init(_ buffer: NativeArrayBuffer<Element>)
+  init(_ buffer: ContiguousArrayBuffer<Element>)
   
   /// Copy the given subRange of this buffer into uninitialized memory
   /// starting at target.  Return a pointer past-the-end of the
@@ -36,7 +36,7 @@ protocol ArrayBufferType : MutableCollection {
   subscript(index: Int) -> Element { get nonmutating set}
 
   /// If this buffer is backed by a uniquely-referenced mutable
-  /// NativeArrayBuffer that can be grown in-place to allow the self
+  /// ContiguousArrayBuffer that can be grown in-place to allow the self
   /// buffer store minimumCapacity elements, returns that buffer.
   /// Otherwise, returns nil.  Note: the result's elementStorage may
   /// not match ours, if we are a SliceBuffer.
@@ -45,12 +45,12 @@ protocol ArrayBufferType : MutableCollection {
   /// may acquire spurious extra references, which will cause
   /// unnecessary reallocation.
   mutating func requestUniqueMutableBuffer(minimumCapacity: Int)
-    -> NativeArrayBuffer<Element>?
+    -> ContiguousArrayBuffer<Element>?
 
-  /// If this buffer is backed by a NativeArrayBuffer, return it.
+  /// If this buffer is backed by a ContiguousArrayBuffer, return it.
   /// Otherwise, return nil.  Note: the result's elementStorage may
   /// not match ours, if we are a SliceBuffer.
-  func requestNativeBuffer() -> NativeArrayBuffer<Element>?
+  func requestNativeBuffer() -> ContiguousArrayBuffer<Element>?
   
   /// Return a SliceBuffer containing the given subRange of values
   /// from this buffer.

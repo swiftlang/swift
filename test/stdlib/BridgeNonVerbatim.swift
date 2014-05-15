@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  When a NativeArray<T> is bridged to Objective-C, and T isn't
+//  When a ContiguousArray<T> is bridged to Objective-C, and T isn't
 //  "bridged verbatim," Cocoa operations like objectAtIndex may have
 //  to conjure up an object to return, and this object is expected to
 //  outlive the array.  

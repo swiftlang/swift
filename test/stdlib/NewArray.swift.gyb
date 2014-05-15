@@ -151,8 +151,8 @@ where T.GeneratorType.Element == T.Buffer.Element,
 println("testing...")
 // CHECK: testing...
 
-test(NativeArray<X>.self, "NativeArray")
-// CHECK-NEXT: test: NativeArray...done
+test(ContiguousArray<X>.self, "ContiguousArray")
+// CHECK-NEXT: test: ContiguousArray...done
 
 test(Array<X>.self, "Array")
 // CHECK-NEXT: test: Array...done
@@ -162,10 +162,10 @@ test(Slice<X>.self, "Slice")
 
 func testAsArray() {
   println("== AsArray ==")
-  var w: NativeArray<X> = [4, 2, 1]
+  var w: ContiguousArray<X> = [4, 2, 1]
   // CHECK: == AsArray == 
   
-  let x = NativeArray(w)
+  let x = ContiguousArray(w)
   println(bufferID(w) == bufferID(x))
   // CHECK-NEXT: false
   
@@ -184,7 +184,7 @@ func testAsArray() {
   println(bufferID(y) == bufferID(z))
   // CHECK-NEXT: false
 
-  w = NativeArray(z)
+  w = ContiguousArray(z)
   println(bufferID(w) == bufferID(z))
   // CHECK-NEXT: false
 }
@@ -193,7 +193,7 @@ testAsArray()
 import Foundation
 
 func nsArrayOfStrings() -> Array<NSString> {
-  let src: NativeArray<NSString> = ["foo", "bar", "baz"]
+  let src: ContiguousArray<NSString> = ["foo", "bar", "baz"]
 
   let ns =  NSArray(
     objects: UnsafePointer(src.buffer.elementStorage),
@@ -254,7 +254,7 @@ func testSlice() {
   // CHECK: == Slice ==
   
   // do some tests on the shared semantics
-  var b = NativeArray(X(0)..X(7))
+  var b = ContiguousArray(X(0)..X(7))
 
   // Slice it
   var bSlice = b[3..5]
@@ -311,7 +311,7 @@ testSlice()
 // testing time grows roughly as the cube of this constant
 let testWidth = 11
 
-%for A in ['NativeArray', 'Array', 'Slice']:
+%for A in ['ContiguousArray', 'Array', 'Slice']:
 
 // FIXME: When <rdar://problem/16530674> is handled we can stop
 // gybbing and go back to using a generic function here
@@ -324,7 +324,7 @@ func testReplace/*<
 
   // First make an independent copy of the array that we can use for
   // comparison later.
-  var source = NativeArray<A.GeneratorType.Element>()
+  var source = ContiguousArray<A.GeneratorType.Element>()
   for x in make() {
     source += x
   }
@@ -404,13 +404,13 @@ testReplace${A}()
 for (maxValue, label) in [(testWidth, "trailing"), (testWidth*2, "interior")] {
   println("testing subrange replacement in \(label) Sub-Slice")
   testReplaceSlice {
-    var a = NativeArray(X(-testWidth)..X(maxValue))
+    var a = ContiguousArray(X(-testWidth)..X(maxValue))
     a.reserve(a.count * 3 / 2)
     return a[testWidth..(2 * testWidth)]
   }
 }
 
-// CHECK-NEXT: testing subrange replacement in NativeArray
+// CHECK-NEXT: testing subrange replacement in ContiguousArray
 // CHECK-NEXT: testing subrange replacement in Array
 // CHECK-NEXT: testing subrange replacement in Slice
 // CHECK-NEXT: testing subrange replacement in trailing Sub-Slice
@@ -418,7 +418,7 @@ for (maxValue, label) in [(testWidth, "trailing"), (testWidth*2, "interior")] {
 
 //===--- single-element modifiers -----------------------------------------===//
 
-%for A in ['NativeArray', 'Array', 'Slice']:
+%for A in ['ContiguousArray', 'Array', 'Slice']:
 
 func testSingleElementModifiers${A}() {
   println("testing ${A} single-argument modifiers")

@@ -13,8 +13,8 @@
 /// Buffer type for Slice<T>
 struct SliceBuffer<T> : ArrayBufferType {
   typealias Element = T
-  typealias NativeStorage = NativeArrayStorage<T>
-  typealias NativeBuffer = NativeArrayBuffer<T>
+  typealias NativeStorage = ContiguousArrayStorage<T>
+  typealias NativeBuffer = ContiguousArrayBuffer<T>
 
   init(
     owner: AnyObject?,
@@ -99,10 +99,10 @@ struct SliceBuffer<T> : ArrayBufferType {
     return nil
   }
 
-  /// If this buffer is backed by a NativeArrayBuffer, return it.
+  /// If this buffer is backed by a ContiguousArrayBuffer, return it.
   /// Otherwise, return nil.  Note: the result's elementStorage may
   /// not match ours, since we are a SliceBuffer.
-  func requestNativeBuffer() -> NativeArrayBuffer<Element>? {
+  func requestNativeBuffer() -> ContiguousArrayBuffer<Element>? {
     _invariantCheck()
     if _fastPath(_hasNativeBuffer) {
       return  reinterpretCast(owner) as NativeBuffer
