@@ -27,6 +27,15 @@ Latest
 
 * Objective-C properties of some CF type are no longer imported as Unmanaged.
 
+* REPL mode now uses LLDB, for a greatly-expanded set of features. The colon
+  prefix now treats the rest of the line as a command for LLDB, and entering
+  a single colon will drop you into the debugging command prompt. Most
+  importantly, crashes in the REPL will now drop you into debugging mode to
+  see what went wrong.
+
+  If you do have a need for the previous REPL, pass -integrated-repl.
+
+
 2014-05-13
 ----------
 
