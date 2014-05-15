@@ -2306,6 +2306,21 @@ namespace {
         expr->setCastKind(castKind);
         break;
       }
+      
+      // Allow for casts from AnyObject to a bridged type.
+      if (tc.getDynamicBridgedThroughObjCClass(cs.DC, fromType, toType)) {
+        sub = tc.coerceToRValue(expr->getSubExpr());
+        if (!sub)
+          return nullptr;
+     
+        auto OSTLoc = TypeLoc::withoutLoc(toType /*optType*/);
+        
+        auto wrappedExpr
+                  = new (tc.Context) ConditionalCheckedCastExpr(sub,
+                                                                sub->getLoc(),
+                                                                OSTLoc);
+        return visitConditionalCheckedCastExpr(wrappedExpr);
+      }
 
       // SIL-generation magically turns this into a Bool; make sure it can.
       if (!cs.getASTContext().getGetBoolDecl(&cs.getTypeChecker())) {
@@ -2404,7 +2419,9 @@ namespace {
           = new (tc.Context) ConditionalCheckedCastExpr(expr,
                                                         expr->getLoc(),
                                                         OSTLoc);
-          
+
+        // The original expression now represents the wrapped conversion.
+        expr->setImplicit();
         return visitConditionalCheckedCastExpr(wrappedExpr);
       }
       
@@ -2607,6 +2624,7 @@ namespace {
       // If the subexpression is of AnyObject type, introduce a conditional
       // cast to the value type. This cast produces a value of optional type.
       Expr *subExpr = expr->getSubExpr();
+      
       if (isAnyObjectDowncast) {
         // Coerce the subexpression to an rvalue.
         subExpr = tc.coerceToRValue(subExpr);
@@ -2623,18 +2641,56 @@ namespace {
 
         // At this point, we should have an AnyObject.
         assert(isDynamicLookupType(subExpr->getType()));
-
-        // Create a conditional checked cast to the value type, e.g., x as T.
-        bool isArchetype = valueType->is<ArchetypeType>();
-        auto cast = new (tc.Context) ConditionalCheckedCastExpr(
-                                       subExpr,
-                                       SourceLoc(),
-                                       TypeLoc::withoutLoc(valueType));
-        cast->setImplicit(true);
-        cast->setType(OptionalType::get(valueType));
-        cast->setCastKind(isArchetype? CheckedCastKind::ExistentialToArchetype
-                                     : CheckedCastKind::ExistentialToConcrete);
-        subExpr = cast;
+        
+        auto fromType = subExpr->getType().getPointer()->getRValueObjectType();
+        
+        // Allow for casts from AnyObject through a bridged type.
+        auto bridgedType = tc.getDynamicBridgedThroughObjCClass(cs.DC,
+                                                                fromType,
+                                                                valueType);
+        if (bridgedType) {
+          // Create a checked cast from AnyObject to the bridged type.
+          auto optType = tc.getOptionalType(expr->getLoc(), bridgedType);
+          auto OSTLoc = TypeLoc::withoutLoc(bridgedType);
+          
+          auto wrappedExpr = new (tc.Context)
+                                ConditionalCheckedCastExpr(subExpr,
+                                                           subExpr->getLoc(),
+                                                           OSTLoc);
+          wrappedExpr->setImplicit(true);
+          wrappedExpr->setType(optType);
+          wrappedExpr->setCastKind(CheckedCastKind::ExistentialToArchetype);
+          
+          // Force the inner checked cast.
+          subExpr = visitConditionalCheckedCastExpr(wrappedExpr);
+          
+          subExpr = new (tc.Context) ForceValueExpr(subExpr,
+                                                    expr->getExclaimLoc());
+          subExpr->setType(bridgedType);
+          subExpr->setImplicit(true);
+          
+          // Now perform the final coercion to the result type.
+          optType = OptionalType::get(valueType);
+          
+          subExpr = coerceToType(subExpr, optType,
+                                 cs.getConstraintLocator(expr));
+          
+          expr->setSubExpr(subExpr);
+          expr->setType(valueType);
+          return expr;
+        } else {
+          // Create a conditional checked cast to the value type, e.g., x as T.
+          bool isArchetype = valueType->is<ArchetypeType>();
+          auto cast = new (tc.Context) ConditionalCheckedCastExpr(
+                                         subExpr,
+                                         SourceLoc(),
+                                         TypeLoc::withoutLoc(valueType));
+          cast->setImplicit(true);
+          cast->setType(OptionalType::get(valueType));
+          cast->setCastKind(isArchetype? CheckedCastKind::ExistentialToArchetype
+                                       : CheckedCastKind::ExistentialToConcrete);
+          subExpr = cast;
+        }
       } else {
         Type optType = OptionalType::get(valueType);
         

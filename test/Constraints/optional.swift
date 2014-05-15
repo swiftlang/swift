@@ -89,5 +89,5 @@ func test7(x : A) {
 }
 
 func test8(x : AnyObject?) {
-  let y : A = x!
+  let y : A = (x as A)!
 }

@@ -121,4 +121,15 @@ if  (obj as NSArray)        { abort() }
 if  (obj as SwiftSub)       { abort() }
 if !(obj as SwiftSuper)     { abort() }
 
+// Test optional and non-optional bridged conversions
+var ao: AnyObject = "s"
+ao as String
+ao is String
+
+var auo: AnyObject! = "s"
+var s: String = auo!
+
+var auoo: AnyObject? = "s"
+auoo! as String
+
 println("ok")  // CHECK: ok

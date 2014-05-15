@@ -72,6 +72,10 @@ void Failure::dump(SourceManager *sm, raw_ostream &out) const {
   case IsNotClass:
     out << getFirstType().getString() << " is not a class";
     break;
+      
+  case IsNotBridgedToObjectiveC:
+    out << getFirstType().getString() << "is not bridged to Objective-C";
+    break;
 
   case IsNotDynamicLookup:
     out << getFirstType().getString() << " is not a dynamic lookup value";

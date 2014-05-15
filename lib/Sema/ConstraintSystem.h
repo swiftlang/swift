@@ -372,6 +372,8 @@ public:
     IsNotArchetype,
     /// \brief The type is not a class.
     IsNotClass,
+    /// \brief The type is not bridged to an Objective-C type.
+    IsNotBridgedToObjectiveC,
     /// \brief The type is not a dynamic lookup value.
     IsNotDynamicLookup,
     /// \brief The type is not allowed to be an l-value.
@@ -473,6 +475,7 @@ public:
 
     case IsNotArchetype:
     case IsNotClass:
+    case IsNotBridgedToObjectiveC:
     case IsNotDynamicLookup:
     case MissingArgument:
       return Profile(id, locator, kind, resolvedOverloadSets, getFirstType(),
@@ -1805,6 +1808,10 @@ public:
     
     /// Indicates we're matching an operator parameter.
     TMF_ApplyingOperatorParameter = 0x4,
+    
+    /// Indicates we're unwrapping an optional type for an value-to-optional
+    /// conversion.
+    TMF_UnwrappingOptional = 0x8,
   };
 
 private:
@@ -1932,6 +1939,7 @@ private:
   /// types).
   SolutionKind simplifyConformsToConstraint(Type type, ProtocolDecl *protocol,
                                             ConstraintLocatorBuilder locator,
+                                            unsigned flags,
                                             bool allowNonConformingExistential);
 
   /// Attempt to simplify a checked-cast constraint.
@@ -1952,6 +1960,10 @@ private:
 
   /// \brief Attempt to simplify the given class constraint.
   SolutionKind simplifyClassConstraint(const Constraint &constraint);
+  
+  /// \brief Attempt to simplify the given bridge constraint.
+  SolutionKind simplifyBridgedToObjectiveCConstraint(const Constraint
+                                                                &constraint);
 
   /// \brief Attempt to simplify the given dynamic lookup constraint.
   SolutionKind simplifyDynamicLookupConstraint(const Constraint &constraint);

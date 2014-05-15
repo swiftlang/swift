@@ -1160,7 +1160,7 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
   type2->getAnyExistentialTypeProtocols(protocols);
 
   for (auto proto : protocols) {
-    switch (simplifyConformsToConstraint(type1, proto, locator, false)) {
+    switch (simplifyConformsToConstraint(type1, proto, locator, flags, false)) {
       case SolutionKind::Solved:
         break;
 
@@ -1697,6 +1697,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
   // that there is no implicit conversion from T? to T!.
   {
     BoundGenericType *boundGenericType2;
+    
     if (concrete && kind >= TypeMatchKind::Subtype &&
         (boundGenericType2 = type2->getAs<BoundGenericType>())) {
       auto decl2 = boundGenericType2->getDecl();
@@ -1852,6 +1853,11 @@ commit_to_conversions:
   // Handle restrictions.
   if (auto restriction = conversionsOrFixes[0].getRestriction()) {
     ConstraintRestrictions.push_back({type1, type2, *restriction});
+    
+    if (flags & TMF_UnwrappingOptional) {
+      subFlags |= TMF_UnwrappingOptional;
+    }
+    
     return simplifyRestrictedConstraint(*restriction, type1, type2,
                                         kind, subFlags, locator);
   }
@@ -1983,6 +1989,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
                                  Type type,
                                  ProtocolDecl *protocol,
                                  ConstraintLocatorBuilder locator,
+                                 unsigned flags,
                                  bool allowNonConformingExistential) {
   // Dig out the fixed type to which this type refers.
   TypeVariableType *typeVar;
@@ -2010,17 +2017,29 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
       return SolutionKind::Solved;
   }
   
+  auto isExplicitCheckedCast = false;
+  auto baseLocator = locator.getBaseLocator();
+  if (baseLocator) {
+    isExplicitCheckedCast =
+    baseLocator->getAnchor() &&
+    isa<ConditionalCheckedCastExpr>(baseLocator->getAnchor()) &&
+    !baseLocator->getAnchor()->isImplicit();
+  }
+  
   // If possible, redirect the coercion to a bridged type.
-  if (auto bridgedType = TC.getDynamicBridgedThroughObjCClass(
-                           DC, protocol->getDeclaredType(), type)) {
-    simplifyRestrictedConstraint(ConversionRestrictionKind::User,
-                                 type,
-                                 bridgedType,
-                                 TypeMatchKind::Conversion,
-                                 TMF_GenerateConstraints,
-                                 locator);
-    
-    return SolutionKind::Solved;
+  // Don't implicitly unwrap, though - that can lead to bogus casts.
+  if (!(flags & TMF_UnwrappingOptional)) {
+    if (auto bridgedType = TC.getDynamicBridgedThroughObjCClass(
+                             DC, protocol->getDeclaredType(), type)) {
+      simplifyRestrictedConstraint(ConversionRestrictionKind::User,
+                                   type,
+                                   bridgedType,
+                                   TypeMatchKind::Conversion,
+                                   TMF_GenerateConstraints,
+                                   locator);
+      
+      return SolutionKind::Solved;
+    }
   }
   
   // There's nothing more we can do; fail.
@@ -2169,13 +2188,15 @@ ConstraintSystem::simplifyCheckedCastConstraint(
     // FIXME: Check substitutability.
     return SolutionKind::Solved;
 
-  case CheckedCastKind::Downcast:
+  case CheckedCastKind::Downcast: {
     addConstraint(ConstraintKind::Subtype, toType, fromType,
                   getConstraintLocator(locator));
-    return SolutionKind::Solved;
+  }
+  return SolutionKind::Solved;
 
   case CheckedCastKind::ExistentialToConcrete:
-    addConstraint(ConstraintKind::Subtype, toType, fromType);
+    addConstraint(ConstraintKind::Subtype, toType, fromType,
+                  getConstraintLocator(locator));
     return SolutionKind::Solved;
 
   case CheckedCastKind::Coercion:
@@ -2623,6 +2644,38 @@ ConstraintSystem::simplifyClassConstraint(const Constraint &constraint){
 }
 
 ConstraintSystem::SolutionKind
+ConstraintSystem::simplifyBridgedToObjectiveCConstraint(const Constraint
+                                                                  &constraint){
+  auto baseTy = simplifyForTypePropertyConstraint(*this,
+                                                  constraint.getFirstType());
+  if (!baseTy)
+    return SolutionKind::Unsolved;
+  
+  if (auto bridgedType = TC.getBridgedToObjC(DC, baseTy).first) {
+    return simplifyRestrictedConstraint(ConversionRestrictionKind::User,
+                                        bridgedType,
+                                        baseTy,
+                                        TypeMatchKind::Conversion,
+                                        TMF_GenerateConstraints,
+                                        constraint.getLocator());
+  }
+  
+  if (baseTy->getClassOrBoundGenericClass())
+    return SolutionKind::Solved;
+  
+  if (auto archetype = baseTy->getAs<ArchetypeType>()) {
+    if (archetype->requiresClass())
+      return SolutionKind::Solved;
+  }
+  
+  // Record this failure.
+  recordFailure(constraint.getLocator(),
+                Failure::IsNotBridgedToObjectiveC,
+                baseTy);
+  return SolutionKind::Error;
+}
+
+ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyDynamicLookupConstraint(const Constraint &constraint){
   auto baseTy = simplifyForTypePropertyConstraint(*this,
                                                   constraint.getFirstType());
@@ -2885,6 +2938,7 @@ static TypeMatchKind getTypeMatchKind(ConstraintKind kind) {
 
   case ConstraintKind::Archetype:
   case ConstraintKind::Class:
+  case ConstraintKind::BridgedToObjectiveC:
   case ConstraintKind::DynamicLookupValue:
     llvm_unreachable("Type properties don't involve type matches");
 
@@ -2978,7 +3032,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
     auto generic2 = type2->castTo<BoundGenericType>();
     assert(generic2->getDecl()->classifyAsOptionalType());
     return matchTypes(type1, generic2->getGenericArgs()[0],
-                      matchKind, flags, locator);
+                      matchKind, (flags | TMF_UnwrappingOptional), locator);
   }
 
   // for $< in { <, <c, <oc }:
@@ -3272,6 +3326,7 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
              constraint.getFirstType(),
              constraint.getProtocol(),
              constraint.getLocator(),
+             TMF_None,
              constraint.getKind() == ConstraintKind::SelfObjectOfProtocol);
 
   case ConstraintKind::CheckedCast:
@@ -3285,6 +3340,9 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
 
   case ConstraintKind::Archetype:
     return simplifyArchetypeConstraint(constraint);
+  
+  case ConstraintKind::BridgedToObjectiveC:
+    return simplifyBridgedToObjectiveCConstraint(constraint);
 
   case ConstraintKind::Class:
     return simplifyClassConstraint(constraint);

@@ -84,7 +84,7 @@ Type
 TypeChecker::getDynamicBridgedThroughObjCClass(DeclContext *dc,
                                                Type dynamicType,
                                                Type valueType,
-                                               bool *isConditionallyBridged) {
+                                               bool *isConditionallyBridged) {  
   if (dynamicType->isAnyObject()) {
     // We only interested in types that bridge non-verbatim.
     auto bridged = getBridgedToObjC(dc, valueType, isConditionallyBridged);

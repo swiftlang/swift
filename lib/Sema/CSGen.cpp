@@ -1254,6 +1254,7 @@ namespace {
 
       // Add a checked cast constraint.
       auto fromType = expr->getSubExpr()->getType();
+      
       CS.addConstraint(ConstraintKind::CheckedCast, fromType, toType,
                        CS.getConstraintLocator(expr));
 
@@ -1357,20 +1358,23 @@ namespace {
       Type optTy = getOptionalType(expr->getSubExpr()->getLoc(), valueTy);
       if (!optTy)
         return Type();
-
+      
       auto locator = CS.getConstraintLocator(expr);
+      
+      auto bridgeConstraint = Constraint::create(CS, ConstraintKind::BridgedToObjectiveC,
+                                                 valueTy,
+                                                 Type(),
+                                                 Identifier(),
+                                                 locator);
       Constraint *downcastConstraints[2] = {
         Constraint::create(CS, ConstraintKind::DynamicLookupValue,
                            expr->getSubExpr()->getType(),
                            Type(),
                            Identifier(),
                            locator),
-        Constraint::create(CS, ConstraintKind::Class,
-                           valueTy,
-                           Type(),
-                           Identifier(),
-                           locator)
+        bridgeConstraint
       };
+      
       Constraint *constraints[2] = {
         // The subexpression is convertible to T?
         Constraint::create(CS, ConstraintKind::Conversion,

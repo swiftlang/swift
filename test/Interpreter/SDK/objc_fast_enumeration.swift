@@ -69,7 +69,7 @@ var d : NSDictionary = [415 : "Giants", 510 : "A's"]
 var d_m : NSMutableDictionary = [1415 : "Big Giants", 11510 : "B's"]
 
 // CHECK: 510 => A's
-for (key, value) in d {
+for (key: AnyObject, value: AnyObject) in d {
 #if os(OSX)
   println("\(key.description!) => \(value.description!)")
 #else
@@ -78,7 +78,7 @@ for (key, value) in d {
 }
 
 // CHECK: 11510 => B's
-for (key, value) in d_m {
+for (key: AnyObject, value: AnyObject) in d_m {
 #if os(OSX)
   println("\(key.description!) => \(value.description!)")
 #else
@@ -112,7 +112,7 @@ for x: AnyObject in s_m {
 // CHECK: bridged
 // CHECK: array
 var a2 = ["hello", "bridged", "array"]
-var nsa2 : NSArray = (a2.asCocoaArray() as AnyObject)!
+var nsa2 : NSArray = ((a2.asCocoaArray() as AnyObject) as NSArray)!
 for x: AnyObject in nsa2 {
 #if os(OSX)
   println(x.description!)
