@@ -91,8 +91,8 @@ struct ArrayBuffer<T> : ArrayBufferType {
   /// An ArrayBuffer<T> containing the same elements.
   /// Requires: the elements actually have dynamic type T.
   init<U>(castFrom: ArrayBuffer<U>, castKind: _ArrayCastKind) {
-    assert(_canBeClass(T.self))
-    assert(_canBeClass(U.self))
+    assert(_isClassOrObjCExistential(T.self))
+    assert(_isClassOrObjCExistential(U.self))
     storage = Builtin.castToNativeObject(
       IndirectArrayBuffer(castFrom: castFrom.indirect, castKind: castKind))
   }
