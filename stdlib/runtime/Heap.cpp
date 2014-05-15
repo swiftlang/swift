@@ -146,17 +146,25 @@ public:
   }
 };
 
-static size_t arenaHash(const void *pointer) {
-  return (size_t)pointer >> 16;
+static size_t arenaPointerHash(const void *pointer) {
+  return (size_t)pointer >> 16; // arenas are always 64KB and 64KB aligned
 }
-static size_t hugeAllocationHash(const void *pointer) {
-  return (size_t)pointer >> 12;
+static size_t hugeAllocationPointerHash(const void *pointer) {
+#ifdef __arm64__
+  return (size_t)pointer >> 14; // page size/alignment is 16k
+#else
+  return (size_t)pointer >> 12; // page size/alignment is 4k
+#endif
 }
-static size_t pthreadHash(const void *pointer) {
-  return (size_t)pointer >> 4;
+static size_t pthreadPointerHash(const void *pointer) {
+  return (size_t)pointer >> 4; // system heap is always 16-byte aligned
 }
-static size_t boolHash(const void *pointer) {
-  return (size_t)pointer;
+static size_t pointerHash(const void *pointer) {
+#if __LP64__
+  return (size_t)pointer >> 3;
+#else
+  return (size_t)pointer >> 2;
+#endif
 }
 
 class Arena;
@@ -183,9 +191,9 @@ public:
   };
   pthread_rwlock_t lock;
   pthread_key_t keyOffset;
-  HeapMap<Arena, arenaHash> arenas;
-  HeapMap<size_t, hugeAllocationHash> hugeAllocations;
-  HeapMap<bool, pthreadHash> threads;
+  HeapMap<Arena, arenaPointerHash> arenas;
+  HeapMap<size_t, hugeAllocationPointerHash> hugeAllocations;
+  HeapMap<bool, pthreadPointerHash> threads;
   AllocCacheEntry globalCache[ALLOC_CACHE_COUNT];
 
   SwiftZone();
@@ -606,7 +614,7 @@ _swift_zone_enumerator(task_t task, void *context, unsigned type_mask,
                    sizeof(*zone->threads.nodes) * zone->threads.bufSize(),
                    &zone->threads.nodes);
 
-  HeapMap<bool, boolHash> unusedBlocks;
+  HeapMap<bool, pointerHash> unusedBlocks;
 
   for (unsigned i = 0; i < ALLOC_CACHE_COUNT; i++) {
     AllocCacheEntry pointer = zone->globalCache[i];
@@ -856,7 +864,7 @@ static void
 enumerateBlocks(std::function<void(const void *, size_t)> func) {
   // XXX switch to a bitmap or a set
   // FIXME scan other threads
-  HeapMap<bool, boolHash> unusedBlocks;
+  HeapMap<bool, pointerHash> unusedBlocks;
   for (unsigned i = 0; i < ALLOC_CACHE_COUNT; i++) {
     for (AllocCacheEntry pointer = swiftZone.globalCache[i]; pointer;
          pointer = pointer->next) {
