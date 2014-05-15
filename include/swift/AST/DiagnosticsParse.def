@@ -445,6 +445,8 @@ ERROR(sil_witness_method_not_protocol,decl_parsing,none,
       "witness_method is not a protocol method", ())
 ERROR(sil_witness_method_type_does_not_conform,decl_parsing,none,
       "witness_method type does not conform to protocol", ())
+ERROR(sil_witness_archetype_not_found,decl_parsing,none,
+      "archetype name not found in specialized protocol conformance", ())
 
 // SIL Basic Blocks
 ERROR(expected_sil_block_name, decl_parsing,none,

@@ -97,6 +97,10 @@ namespace {
     bool parseApplySubstitutions(
                    SmallVectorImpl<ParsedSubstitution> &parsed);
     bool handleGenericParams(TypeLoc &T, ArchetypeBuilder *builder);
+    bool parseSpecConformanceSubstitutions(
+                   SmallVectorImpl<ParsedSubstitution> &parsed);
+    ProtocolConformance *parseProtocolConformanceHelper(ProtocolDecl *&proto,
+                                                        bool localScope);
   public:
 
     SILParser(Parser &P) : P(P), SILMod(*P.SIL->M), TUState(*P.SIL->S) {}
@@ -237,6 +241,15 @@ namespace {
     bool parseSILBasicBlock();
     
     bool isStartOfSILInstruction();
+
+    ProtocolConformance *parseProtocolConformance(ProtocolDecl *&proto,
+                             GenericParamList *&generics,
+                             ArchetypeBuilder &builder, bool localScope);
+    ProtocolConformance *parseProtocolConformance(ArchetypeBuilder &builder) {
+      ProtocolDecl *dummy;
+      GenericParamList *gp;
+      return parseProtocolConformance(dummy, gp, builder, true);
+    }
   };
 } // end anonymous namespace.
 
@@ -2983,7 +2996,7 @@ static AssociatedTypeDecl *parseAssociatedTypeDecl(Parser &P, SILParser &SP,
 }
 
 static NormalProtocolConformance *parseNormalProtocolConformance(Parser &P,
-           SILParser &SP, SILType ConformingTy, ProtocolDecl *&proto) {
+           SILParser &SP, Type ConformingTy, ProtocolDecl *&proto) {
   Identifier ModuleKeyword, ModuleName;
   SourceLoc Loc, KeywordLoc;
   proto = parseProtocolDecl(P, SP);
@@ -3001,9 +3014,14 @@ static NormalProtocolConformance *parseNormalProtocolConformance(Parser &P,
     return nullptr;
   }
 
-  // Find the NormalProtocolConformance.
+  // Calling lookupConformance on a BoundGenericType will return a specialized
+  // conformance. We use UnboundGenericType to find the normal conformance.
+  Type lookupTy = ConformingTy;
+  if (auto bound = dyn_cast<BoundGenericType>(lookupTy.getPointer()))
+    lookupTy = UnboundGenericType::get(bound->getDecl(), bound->getParent(),
+                                       P.Context);
   auto lookup = P.SF.getParentModule()->lookupConformance(
-                         ConformingTy.getSwiftRValueType(), proto, nullptr);
+                         lookupTy, proto, nullptr);
   NormalProtocolConformance *theConformance =
       dyn_cast<NormalProtocolConformance>(lookup.getPointer());
   if (!theConformance)
@@ -3011,22 +3029,146 @@ static NormalProtocolConformance *parseNormalProtocolConformance(Parser &P,
   return theConformance;
 }
 
-static ProtocolConformance *parseProtocolConformance(Parser &P, SILParser &SP,
-           ProtocolDecl *&proto) {
-  // FIXME: parse generic params.
-  SILType ConformingTy;
-  TypeAttributes emptyAttrs;
-  if (SP.parseSILTypeWithoutQualifiers(ConformingTy,
-                                       SILValueCategory::Object,
-                                       emptyAttrs) ||
-      P.parseToken(tok::colon, diag::expected_sil_witness_colon))
+/// Parse the substitution list for a specialized conformance.
+bool SILParser::parseSpecConformanceSubstitutions(
+                              SmallVectorImpl<ParsedSubstitution> &parsed) {
+  // Check for an opening '<' bracket.
+  if (!P.Tok.isContextualPunctuator("<"))
+    return false;
+ 
+  P.consumeToken();
+ 
+  // Parse a list of Substitutions: Archetype = Replacement.
+  do {
+    SourceLoc Loc = P.Tok.getLoc();
+    Substitution Sub;
+    Identifier ArcheId;
+
+    if (parseSILIdentifier(ArcheId, diag::expected_sil_type) ||
+        P.parseToken(tok::equal, diag::expected_tok_in_sil_instr, "="))
+      return true;
+
+    // Parse substitution as AST type.
+    ParserResult<TypeRepr> TyR = P.parseType();
+    if (TyR.isNull())
+      return true;
+    TypeLoc Ty = TyR.get();
+    if (performTypeLocChecking(Ty, false))
+      return true;
+    parsed.push_back({Loc, ArcheId, Ty.getType()});
+  } while (P.consumeIf(tok::comma));
+
+  // Consume the closing '>'.
+  if (!P.Tok.isContextualPunctuator(">")) {
+    P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, ">");
+    return true;
+  }
+  P.consumeToken();
+  return false;
+}
+
+/// Reconstruct AST substitutions from parsed substitutions using archetypes
+/// from a BoundGenericType.
+static bool getSpecConformanceSubstitutionsFromParsed(
+                             Parser &P,
+                             GenericParamList *gp,
+                             ArrayRef<ParsedSubstitution> parses,
+                             SmallVectorImpl<Substitution> &subs) {
+  ArrayRef<ArchetypeType *> allArchetypes = gp->getAllArchetypes();
+  for (auto &parsed : parses) {
+    Substitution sub;
+    // Find the corresponding ArchetypeType.
+    for (auto archetype : allArchetypes)
+      if (archetype->getName() == parsed.name) {
+        sub.Archetype = archetype;
+        break;
+      }
+    if (!sub.Archetype) {
+      P.diagnose(parsed.loc, diag::sil_witness_archetype_not_found);
+      return true;
+    }
+    sub.Replacement = parsed.replacement;
+    subs.push_back(sub);
+  }
+  return false;
+}
+
+ProtocolConformance *SILParser::parseProtocolConformance(
+           ProtocolDecl *&proto, GenericParamList *&generics,
+           ArchetypeBuilder &builder, bool localScope) {
+  // Parse generic params for the protocol conformance. We need to make sure
+  // they have the right scope.
+  Optional<Scope> GenericsScope;
+  if (localScope)
+    GenericsScope.emplace(&P, ScopeKind::Generics);
+
+  generics = P.maybeParseGenericParams();
+  if (generics) {
+    generics->setBuilder(&builder);
+    handleSILGenericParams(P.Context, generics, &P.SF, &builder);
+  }
+
+  ProtocolConformance *retVal = parseProtocolConformanceHelper(proto,
+                                                               localScope);
+
+  if (localScope) {
+    GenericsScope.reset();
+    if (generics)
+      generics->setBuilder(nullptr);
+  }
+  return retVal;
+}
+
+ProtocolConformance *SILParser::parseProtocolConformanceHelper(
+                                    ProtocolDecl *&proto,
+                                    bool localScope) {
+  // Parse AST type.
+  ParserResult<TypeRepr> TyR = P.parseType();
+  if (TyR.isNull())
+    return nullptr;
+  TypeLoc Ty = TyR.get();
+  if (performTypeLocChecking(Ty, false))
+    return nullptr;
+  auto ConformingTy = Ty.getType();
+
+  if (P.parseToken(tok::colon, diag::expected_sil_witness_colon))
     return nullptr;
 
-  auto peek = P.peekToken();
-  if (peek.getText() == "specialize" || peek.getText() == "inherit")
-    // FIXME: handle specialize and inherit.
+  if (P.Tok.is(tok::identifier) && P.Tok.getText() == "specialize") {
+    P.consumeToken();
+
+    // Parse substitutions for specialized conformance.
+    SmallVector<ParsedSubstitution, 4> parsedSubs;
+    if (parseSpecConformanceSubstitutions(parsedSubs))
+      return nullptr;
+
+    if (P.parseToken(tok::l_paren, diag::expected_sil_witness_lparen))
+      return nullptr;
+    ProtocolDecl *dummy;
+    ArchetypeBuilder genericBuilder(*P.SF.getParentModule(), P.Diags);
+    GenericParamList *gp;
+    auto genericConform = parseProtocolConformance(dummy, gp,
+                                                   genericBuilder, localScope);
+    if (!genericConform)
+      return nullptr;
+    if (P.parseToken(tok::r_paren, diag::expected_sil_witness_rparen))
+      return nullptr;
+
+    SmallVector<Substitution, 4> subs;
+    if (getSpecConformanceSubstitutionsFromParsed(P, gp, parsedSubs, subs))
+      return nullptr;
+
+    auto result = P.Context.getSpecializedConformance(
+      ConformingTy, genericConform, subs);
+    return result;
+  }
+
+  if (P.Tok.is(tok::identifier) && P.Tok.getText() == "inherit")
+    // FIXME: handle inherit.
     return nullptr;
-  return parseNormalProtocolConformance(P, SP, ConformingTy, proto);
+
+  auto retVal = parseNormalProtocolConformance(P, *this, ConformingTy, proto);
+  return retVal;
 }
 
 /// decl-sil-witness: [[only in SIL mode]]
@@ -3050,11 +3192,24 @@ bool Parser::parseSILWitnessTable() {
   parseSILLinkage(Linkage, *this);
   
   Scope S(this, ScopeKind::TopLevel);
+  // We should use WitnessTableBody. This ensures that the generic params
+  // are visible.
+  Optional<Scope> BodyScope;
+  BodyScope.emplace(this, ScopeKind::FunctionBody);
+
   // Parse the protocol conformance.
   ProtocolDecl *proto;
+  GenericParamList *dummy;
+  ArchetypeBuilder builder(*SF.getParentModule(), Diags);
+  auto conf = WitnessState.parseProtocolConformance(proto, dummy, builder,
+                                                    false/*localScope*/);
+  if (!conf) {
+    diagnose(Tok, diag::sil_witness_protocol_conformance_not_found);
+    return true;
+  }
+
   NormalProtocolConformance *theConformance =
-      dyn_cast<NormalProtocolConformance>(
-          parseProtocolConformance(*this, WitnessState, proto));
+      dyn_cast<NormalProtocolConformance>(conf);
 
   // If we don't have an lbrace, then this witness table is a declaration.
   if (Tok.getKind() != tok::l_brace) {
@@ -3062,6 +3217,7 @@ bool Parser::parseSILWitnessTable() {
     if (!Linkage)
       Linkage = SILLinkage::PublicExternal;
     SILWitnessTable::create(*SIL->M, *Linkage, theConformance);
+    BodyScope.reset();
     return false;
   }
 
@@ -3087,9 +3243,9 @@ bool Parser::parseSILWitnessTable() {
           return true;
         if (parseToken(tok::colon, diag::expected_sil_witness_colon))
           return true;
-        ProtocolDecl *dummy;
-        ProtocolConformance *conform = parseProtocolConformance(*this,
-                                           WitnessState, dummy);
+        ArchetypeBuilder builder(*SF.getParentModule(), Diags);
+        ProtocolConformance *conform = WitnessState.parseProtocolConformance(
+                                           builder);
         if (!conform) // Ignore this witness entry for now.
           continue;
 
@@ -3118,9 +3274,8 @@ bool Parser::parseSILWitnessTable() {
         auto peek = peekToken();
         ProtocolConformance *conform = nullptr;
         if (peek.getText() != "dependent") {
-          ProtocolDecl *dummy;
-          conform = parseProtocolConformance(*this,
-                                             WitnessState, dummy);
+          ArchetypeBuilder builder(*SF.getParentModule(), Diags);
+          conform = WitnessState.parseProtocolConformance(builder);
           if (!conform) // Ignore this witness entry for now.
             continue;
         }
@@ -3138,15 +3293,17 @@ bool Parser::parseSILWitnessTable() {
           return true;
         if (parseToken(tok::colon, diag::expected_sil_witness_colon))
           return true;
-        SILType Ty;
-        TypeAttributes emptyAttrs;
-        if (WitnessState.parseSILTypeWithoutQualifiers(Ty,
-                                                       SILValueCategory::Object,
-                                                       emptyAttrs))
+
+        // Parse AST type.
+        ParserResult<TypeRepr> TyR = parseType();
+        if (TyR.isNull())
+          return true;
+        TypeLoc Ty = TyR.get();
+        if (swift::performTypeLocChecking(Context, Ty, false, &SF))
           return true;
 
         witnessEntries.push_back(SILWitnessTable::AssociatedTypeWitness{
-          assoc, Ty.getSwiftRValueType()
+          assoc, Ty.getType()->getCanonicalType()
         });
         continue;
       }
@@ -3185,5 +3342,6 @@ bool Parser::parseSILWitnessTable() {
     Linkage = SILLinkage::Public;
 
   SILWitnessTable::create(*SIL->M, *Linkage, theConformance, witnessEntries);
+  BodyScope.reset();
   return false;
 }
