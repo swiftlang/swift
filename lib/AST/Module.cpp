@@ -1101,7 +1101,14 @@ bool Module::registerMainClass(ClassDecl *mainClass, SourceLoc diagLoc) {
       if (!sf)
         continue;
       if (sf->isScriptMode()) {
-        getASTContext().Diags.diagnose(diagLoc, diag::attr_UIApplicationMain_with_script);
+        getASTContext().Diags.diagnose(diagLoc,
+                                     diag::attr_UIApplicationMain_with_script);
+        // Note the source file we're reading top-level code from.
+        if (auto bufID = sf->getBufferID()) {
+          auto fileLoc = getASTContext().SourceMgr.getLocForBufferStart(*bufID);
+          getASTContext().Diags.diagnose(fileLoc,
+                                     diag::attr_UIApplicationMain_script_here);
+        }
         break;
       }
     }

@@ -6,7 +6,7 @@
 
 import UIKit
 
-@UIApplicationMain // expected-error{{'UIApplicationMain' attribute cannot be used in a module that has a 'main.swift' file}}
+@UIApplicationMain // expected-error{{'UIApplicationMain' attribute cannot be used in a module that contains top-level code}}
 class MyDelegate: NSObject, UIApplicationDelegate {
 }
 
