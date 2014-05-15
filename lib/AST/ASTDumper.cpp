@@ -1248,6 +1248,14 @@ public:
     if (E->hasTrailingClosure())
       OS << " trailing-closure";
 
+    if (E->hasElementNames()) {
+      OS << " names=";
+
+      interleave(E->getElementNames(),
+                 [&](Identifier name) { OS << (name.empty()?"''":name.str());},
+                 [&] { OS << ","; });
+    }
+
     for (unsigned i = 0, e = E->getNumElements(); i != e; ++i) {
       OS << '\n';
       if (E->getElement(i))
