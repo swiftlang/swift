@@ -284,8 +284,8 @@ Bridging To Objective-C
   - If ``T`` is not bridged_, conversion fails in O(1), yielding nil
 
   - If the ``NSArray`` was originally created as a Swift *ArrayType*\
-    ``<U>``, conversion succeeds in O(1) if ``U`` is ``T`` or a subclass
-    thereof. No further dynamic type checks are required.
+    ``<U>`` and ``U`` is ``T`` or a subclass thereof, conversion
+    succeeds in O(1). No further dynamic type checks are required.
 
   .. _deferred:
 
