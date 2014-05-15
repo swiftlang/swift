@@ -19,11 +19,11 @@
 #include <sys/resource.h>
 #include <sys/errno.h>
 #include <unistd.h>
-#include <limits.h>
-#include <cstring>
+#include <climits>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include "llvm/ADT/StringExtras.h"
 #include "Debug.h"
 
