@@ -330,12 +330,13 @@ static bool aggregateContainsRecord(NominalTypeDecl *Aggregate, Type Record,
 ///
 /// Currently this only implements typed access based TBAA. See the TBAA section
 /// in the SIL reference manual.
-static bool typesMayAlias(SILType T1, SILType T2, SILModule &Mod) {
+static bool typedAccessTBAAMayAlias(SILType T1, SILType T2, SILModule &Mod) {
 #ifndef NDEBUG
   if (!shouldRunTypedAccessTBAA())
     return true;
 #endif
 
+  // If the two types are the same
   if (T1 == T2)
     return true;
 
@@ -400,13 +401,26 @@ static bool typesMayAlias(SILType T1, SILType T2, SILModule &Mod) {
   return true;
 }
 
+static bool typesMayAlias(SILType T1, SILType T2, SILType TBAA1Ty,
+                          SILType TBAA2Ty, SILModule &Mod) {
+  // Perform type access based TBAA if we have TBAA info.
+  if (TBAA1Ty && TBAA2Ty)
+    return typedAccessTBAAMayAlias(TBAA1Ty, TBAA2Ty, Mod);
+
+  // Otherwise perform class based TBAA. This is not implemented currently so
+  // just return true.
+  return true;
+}
+
 //===----------------------------------------------------------------------===//
 //                                Entry Points
 //===----------------------------------------------------------------------===//
 
 /// The main AA entry point. Performs various analyses on V1, V2 in an attempt
 /// to disambiguate the two values.
-AliasAnalysis::AliasResult AliasAnalysis::alias(SILValue V1, SILValue V2) {
+AliasAnalysis::AliasResult AliasAnalysis::alias(SILValue V1, SILValue V2,
+                                                SILType TBAAType1,
+                                                SILType TBAAType2) {
 #ifndef NDEBUG
   // If alias analysis is disabled, always return may alias.
   if (!shouldRunAA())
@@ -420,7 +434,9 @@ AliasAnalysis::AliasResult AliasAnalysis::alias(SILValue V1, SILValue V2) {
   DEBUG(llvm::dbgs() << "ALIAS ANALYSIS:\n    V1: " << *V1.getDef()
         << "    V2: " << *V2.getDef());
 
-  if (!typesMayAlias(V1.getType(), V2.getType(), *Mod))
+  // Pass in both the TBAA types so we can perform typed access TBAA and the
+  // actual types of V1, V2 so we can perform class based TBAA.
+  if (!typesMayAlias(V1.getType(), V2.getType(), TBAAType1, TBAAType2, *Mod))
     return AliasResult::NoAlias;
 
 #ifndef NDEBUG
@@ -523,6 +539,7 @@ public:
     return Inst->getMemoryBehavior();
   }
 
+  MemBehavior visitLoadInst(LoadInst *LI);
   MemBehavior visitStoreInst(StoreInst *SI);
   MemBehavior visitApplyInst(ApplyInst *AI);
 
@@ -544,7 +561,6 @@ public:
     return MemBehavior::None;                                           \
   }
 
-  OPERANDALIAS_MEMBEHAVIOR_INST(LoadInst)
   OPERANDALIAS_MEMBEHAVIOR_INST(InjectEnumAddrInst)
   OPERANDALIAS_MEMBEHAVIOR_INST(UncheckedTakeEnumDataAddrInst)
   OPERANDALIAS_MEMBEHAVIOR_INST(InitExistentialInst)
@@ -584,10 +600,60 @@ public:
 
 } // end anonymous namespace
 
+/// Is this an instruction that can act as a type "oracle" allowing typed access
+/// TBAA to know what the real types associated with the SILInstruction are.
+static bool isTypedAccessOracle(SILInstruction *I) {
+  switch (I->getKind()) {
+  case ValueKind::RefElementAddrInst:
+  case ValueKind::StructElementAddrInst:
+  case ValueKind::TupleElementAddrInst:
+  case ValueKind::UncheckedTakeEnumDataAddrInst:
+  case ValueKind::LoadInst:
+  case ValueKind::StoreInst:
+    return true;
+  default:
+    return false;
+  }
+}
+
+/// Look at the origin/user ValueBase of V to see if any of them are
+/// TypedAccessOracle which enable one to ascertain via undefined behavior the
+/// "true" type of the instruction.
+static SILType findTypedAccessType(SILValue V) {
+  // First look at the origin of V and see if we have any instruction that is a
+  // typed oracle.
+  if (auto *I = dyn_cast<SILInstruction>(V))
+    if (isTypedAccessOracle(I))
+      return V.getType();
+
+  // Then look at any uses of V that potentially could act as a typed access
+  // oracle.
+  for (auto Use : V.getUses())
+    if (isTypedAccessOracle(Use->getUser()))
+      return V.getType();
+
+  // Otherwise return an empty SILType
+  return SILType();
+}
+
+MemBehavior MemoryBehaviorVisitor::visitLoadInst(LoadInst *LI) {
+  if (AA.isNoAlias(LI->getOperand(), V, LI->getOperand().getType(),
+                   findTypedAccessType(V))) {
+    DEBUG(llvm::dbgs() << "  Load Operand does not alias inst. Returning "
+                          "None.\n");
+    return MemBehavior::None;
+  }
+
+  DEBUG(llvm::dbgs() << "  Could not prove that load inst does not alias "
+        "pointer. Returning may read.");
+  return MemBehavior::MayRead;
+}
+
 MemBehavior MemoryBehaviorVisitor::visitStoreInst(StoreInst *SI) {
   // If the store dest cannot alias the pointer in question, then the
   // specified value can not be modified by the store.
-  if (AA.isNoAlias(SI->getDest(), V)) {
+  if (AA.isNoAlias(SI->getDest(), V, SI->getDest().getType(),
+                   findTypedAccessType(V))) {
     DEBUG(llvm::dbgs() << "  Store Dst does not alias inst. Returning "
                           "None.\n");
     return MemBehavior::None;
@@ -618,12 +684,17 @@ MemBehavior MemoryBehaviorVisitor::visitApplyInst(ApplyInst *AI) {
                           " None.\n");
     return MemBehavior::None;
   }
+
   // If the builtin is side effect free, then it can only read memory.
   if (isSideEffectFree(BFR)) {
     DEBUG(llvm::dbgs() << "  Found apply of side effect free builtin. "
                           "Returning MayRead.\n");
     return MemBehavior::MayRead;
   }
+
+  // FIXME: If the value (or any other values from the instruction that the
+  // value comes from) that we are tracking does not escape and we don't alias
+  // any of the arguments of the apply inst, we should be ok.
 
   // Otherwise be conservative and return that we may have side effects.
   DEBUG(llvm::dbgs() << "  Found apply of side effect builtin. "
