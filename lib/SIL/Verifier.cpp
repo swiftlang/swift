@@ -1572,9 +1572,14 @@ public:
     if (UI->getType().is<ExistentialMetatypeType>()) {
       require(UI->getOperand().getType().is<AnyMetatypeType>(),
               "must upcast existential metatype from metatype");
-      require(UI->getOperand().getType().castTo<AnyMetatypeType>()
-                ->getRepresentation() == MetatypeRepresentation::Thick,
+      auto operandRep = UI->getOperand().getType().castTo<AnyMetatypeType>()
+        ->getRepresentation();
+      auto resultRep = UI->getType().castTo<AnyMetatypeType>()
+        ->getRepresentation();
+      require(operandRep != MetatypeRepresentation::Thin,
               "must upcast existential metatype from thick metatype");
+      require(operandRep == resultRep,
+              "upcast cannot change metatype representation");
       return;
     }
     

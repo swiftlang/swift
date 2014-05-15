@@ -801,6 +801,17 @@ public:
       return false;
     }
   }
+  
+  /// True if this source file contains the main class for the module.
+  bool hasMainClass() const;
+  
+  /// True if this source file has an application entry point.
+  ///
+  /// This is true if the source file either is in script mode or contains
+  /// a designated main class.
+  bool hasEntryPoint() const {
+    return isScriptMode() || hasMainClass();
+  }
 };
 
 

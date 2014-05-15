@@ -611,8 +611,13 @@ public:
   void dropReferencedFunction();
 
   /// getType() is ok since this is known to only have one type.
+  /// The type is always a lowered function type.
   SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
 
+  CanSILFunctionType getFunctionType() const {
+    return getType().castTo<SILFunctionType>();
+  }
+  
   ArrayRef<Operand> getAllOperands() const { return {}; }
   MutableArrayRef<Operand> getAllOperands() { return {}; }
 

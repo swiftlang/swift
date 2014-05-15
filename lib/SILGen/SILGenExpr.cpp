@@ -13,6 +13,7 @@
 #include "SILGen.h"
 #include "Scope.h"
 #include "swift/AST/AST.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/Expr.h"
@@ -2578,6 +2579,155 @@ void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
                    autoclosure->getSingleExpressionBody());
   }
   emitEpilog(ace);
+}
+
+void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
+  auto findStdlibDecl = [&](StringRef name) -> ValueDecl* {
+    SmallVector<ValueDecl*, 1> lookupBuffer;
+    getASTContext().getStdlibModule()->lookupValue({},
+                                       getASTContext().getIdentifier(name),
+                                       NLKind::QualifiedLookup,
+                                       lookupBuffer);
+    assert(lookupBuffer.size() == 1 && "stdlib has more than one?!");
+    return lookupBuffer[0];
+  };
+
+  // Load argc and argv from their global addressors.
+  auto argcDecl = findStdlibDecl("C_ARGC");
+  SILDeclRef argcRef(argcDecl, SILDeclRef::Kind::GlobalAccessor);
+  auto argcGetterFn = SGM.getFunction(argcRef, NotForDefinition);
+  auto argcGetter = B.createFunctionRef(mainClass, argcGetterFn);
+  SILValue argc = B.createApply(mainClass, argcGetter, argcGetter->getType(),
+              argcGetter->getFunctionType()->getInterfaceResult().getSILType(),
+              {}, {});
+  argc = B.createPointerToAddress(mainClass, argc,
+     SILType::getPrimitiveAddressType(argcDecl->getType()->getCanonicalType()));
+  argc = B.createLoad(mainClass, argc);
+  
+  auto argvDecl = findStdlibDecl("C_ARGV");
+  SILDeclRef argvRef(argvDecl, SILDeclRef::Kind::GlobalAccessor);
+  auto argvGetterFn = SGM.getFunction(argvRef, NotForDefinition);
+  auto argvGetter = B.createFunctionRef(mainClass, argvGetterFn);
+  SILValue argv = B.createApply(mainClass, argvGetter, argvGetter->getType(),
+              argvGetter->getFunctionType()->getInterfaceResult().getSILType(),
+              {}, {});
+  argv = B.createPointerToAddress(mainClass, argv,
+     SILType::getPrimitiveAddressType(argvDecl->getType()->getCanonicalType()));
+  argv = B.createLoad(mainClass, argv);
+  
+  if (mainClass->getAttrs().has(DAK_UIApplicationMain)) {
+    // Emit a UIKit main.
+    // return UIApplicationMain(C_ARGC, C_ARGV, nil, ClassName);
+    
+    CanType NSStringTy = SGM.Types.getNSStringType();
+    CanType OptNSStringTy = OptionalType::get(NSStringTy)->getCanonicalType();
+    CanType IUOptNSStringTy
+      = ImplicitlyUnwrappedOptionalType::get(NSStringTy)->getCanonicalType();
+    
+    // Get the class name as a string using NSStringFromClass.
+    CanType mainClassTy = mainClass->getDeclaredTypeInContext()->getCanonicalType();
+    CanType mainClassMetaty = CanMetatypeType::get(mainClassTy,
+                                                   MetatypeRepresentation::ObjC);
+    CanType anyObjectTy = getASTContext()
+      .getProtocol(KnownProtocolKind::AnyObject)
+      ->getDeclaredTypeInContext()
+      ->getCanonicalType();
+    CanType anyObjectMetaTy = CanExistentialMetatypeType::get(anyObjectTy,
+                                                  MetatypeRepresentation::ObjC);
+    CanType optAnyObjectMetaty = OptionalType::get(anyObjectMetaTy)
+          ->getCanonicalType();
+    CanType IUOptAnyObjectMetaty
+      = ImplicitlyUnwrappedOptionalType::get(anyObjectMetaTy)
+          ->getCanonicalType();
+    
+    auto NSStringFromClassType = SILFunctionType::get(nullptr,
+                  AnyFunctionType::ExtInfo()
+                    .withRepresentation(AnyFunctionType::Representation::Thin)
+                    .withCallingConv(AbstractCC::C),
+                  ParameterConvention::Direct_Unowned,
+                  SILParameterInfo(IUOptAnyObjectMetaty,
+                                   ParameterConvention::Direct_Unowned),
+                  SILResultInfo(IUOptNSStringTy,
+                                ResultConvention::Autoreleased),
+                  getASTContext());
+    auto NSStringFromClassFn
+      = SGM.M.getOrCreateFunction(mainClass, "NSStringFromClass",
+                                  SILLinkage::PublicExternal,
+                                  NSStringFromClassType,
+                                  IsBare, IsTransparent);
+    auto NSStringFromClass = B.createFunctionRef(mainClass, NSStringFromClassFn);
+    SILValue metaTy = B.createMetatype(mainClass,
+                             SILType::getPrimitiveObjectType(mainClassMetaty));
+    metaTy = B.createUpcast(mainClass, metaTy,
+                          SILType::getPrimitiveObjectType(anyObjectMetaTy));
+    SILValue optMetaTy = B.createEnum(mainClass, metaTy,
+                          getASTContext().getOptionalSomeDecl(),
+                          SILType::getPrimitiveObjectType(optAnyObjectMetaty));
+    SILValue iuoptMetaTy = B.createStruct(mainClass,
+                          SILType::getPrimitiveObjectType(IUOptAnyObjectMetaty),
+                          optMetaTy);
+    SILValue iuoptName = B.createApply(mainClass,
+                               NSStringFromClass,
+                               NSStringFromClass->getType(),
+                               SILType::getPrimitiveObjectType(IUOptNSStringTy),
+                               {}, iuoptMetaTy);
+    VarDecl *IUOValueField = nullptr;
+    for (auto field : IUOptAnyObjectMetaty->getNominalOrBoundGenericNominal()
+           ->getStoredProperties()) {
+      assert(!IUOValueField && "IUO has more than one field?!");
+      IUOValueField = field;
+    }
+    assert(IUOValueField && "IUO has no fields?!");
+    
+    SILValue optName = B.createStructExtract(mainClass, iuoptName,
+                               IUOValueField,
+                               SILType::getPrimitiveObjectType(OptNSStringTy));
+    
+    // Call UIApplicationMain.
+    SILParameterInfo argTypes[] = {
+      SILParameterInfo(argc.getType().getSwiftRValueType(),
+                       ParameterConvention::Direct_Unowned),
+      SILParameterInfo(argv.getType().getSwiftRValueType(),
+                       ParameterConvention::Direct_Unowned),
+      // FIXME: Should be unowned, but we overlay UIApplicationMain with
+      // an asmname'd definition that we apply Swift conventions to.
+      SILParameterInfo(OptNSStringTy, ParameterConvention::Direct_Owned),
+      SILParameterInfo(OptNSStringTy, ParameterConvention::Direct_Owned),
+    };
+    auto UIApplicationMainType = SILFunctionType::get(nullptr,
+                  AnyFunctionType::ExtInfo()
+                    .withRepresentation(AnyFunctionType::Representation::Thin)
+      // FIXME: Should be ::C, but we overlay UIApplicationMain with
+      // an asmname'd definition that we apply Swift conventions to.
+                    .withCallingConv(AbstractCC::Freestanding),
+                  ParameterConvention::Direct_Unowned,
+                  argTypes,
+                  SILResultInfo(argc.getType().getSwiftRValueType(),
+                                ResultConvention::Unowned),
+                  getASTContext());
+    
+    auto UIApplicationMainFn
+      = SGM.M.getOrCreateFunction(mainClass, "UIApplicationMain",
+                                  SILLinkage::PublicExternal,
+                                  UIApplicationMainType,
+                                  IsBare, IsTransparent);
+    
+    auto UIApplicationMain = B.createFunctionRef(mainClass, UIApplicationMainFn);
+    auto nil = B.createEnum(mainClass, SILValue(),
+                            getASTContext().getOptionalNoneDecl(),
+                            SILType::getPrimitiveObjectType(OptNSStringTy));
+
+    SILValue args[] = { argc, argv, nil, optName };
+    
+    B.createApply(mainClass, UIApplicationMain,
+                  UIApplicationMain->getType(),
+                  argc.getType(), {}, args);
+    auto r = B.createTuple(mainClass, SGM.Types.getEmptyTupleType(), {});
+    B.createReturn(mainClass, r);
+    return;
+  }
+  
+  llvm_unreachable("no *ApplicationMain attribute on main class?!");
 }
 
 std::pair<Optional<SILValue>, SILLocation>

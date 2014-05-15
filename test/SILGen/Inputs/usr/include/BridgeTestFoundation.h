@@ -34,6 +34,9 @@ NSString *bar(void);
 void setBar(NSString *s);
 
 NSString *NSStringFromString(NSString *s);
+NSString *NSStringFromClass(Class c);
 
 #define CF_ENUM(_type, _name) enum _name : _type _name; enum _name : _type
 #define NS_ENUM(_type, _name) CF_ENUM(_type, _name)
+
+

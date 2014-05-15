@@ -1325,6 +1325,11 @@ StringRef SourceFile::getFilename() const  {
   return SM->getMemoryBuffer(BufferID)->getBufferIdentifier();
 }
 
+bool SourceFile::hasMainClass() const {
+  auto mainClass = getParentModule()->getMainClass();
+  if (!mainClass) return false;
+  return mainClass->getParentSourceFile() == this;
+}
 
 //===----------------------------------------------------------------------===//
 // Miscellaneous

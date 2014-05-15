@@ -18,3 +18,7 @@ module CoreCooling {
   header "CoreCooling.h" 
   export *
 }
+module UIKit {
+  header "UIKit.h" 
+  export *
+}

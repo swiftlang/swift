@@ -296,7 +296,7 @@ void IRGenModule::emitSourceFile(SourceFile &SF, unsigned StartElem) {
   });
 
   // Library files have no entry point.
-  if (!SF.isScriptMode()) {
+  if (!SF.hasEntryPoint()) {
     return;
   }
   

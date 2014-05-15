@@ -220,13 +220,12 @@ lookUpWitnessTable(const ProtocolConformance *C, bool deserializeLazily) {
   return {wT, Subs};
 }
 
-SILFunction *SILModule::getOrCreateSharedFunction(SILLocation loc,
-                                                  StringRef name,
-                                                  CanSILFunctionType type,
-                                                  IsBare_t isBareSILFunction,
-                                                IsTransparent_t isTransparent) {
-  auto linkage = SILLinkage::Shared;
-
+SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
+                                            StringRef name,
+                                            SILLinkage linkage,
+                                            CanSILFunctionType type,
+                                            IsBare_t isBareSILFunction,
+                                            IsTransparent_t isTransparent) {
   if (auto fn = lookUpFunction(name)) {
     assert(fn->getLoweredFunctionType() == type);
     assert(fn->getLinkage() == linkage);
@@ -235,6 +234,15 @@ SILFunction *SILModule::getOrCreateSharedFunction(SILLocation loc,
 
   return SILFunction::create(*this, linkage, name, type, nullptr,
                              loc, isBareSILFunction, isTransparent);
+}
+
+SILFunction *SILModule::getOrCreateSharedFunction(SILLocation loc,
+                                                  StringRef name,
+                                                  CanSILFunctionType type,
+                                                  IsBare_t isBareSILFunction,
+                                                  IsTransparent_t isTransparent) {
+  return getOrCreateFunction(loc, name, SILLinkage::Shared,
+                             type, isBareSILFunction, isTransparent);
 }
 
 ArrayRef<SILType> ValueBase::getTypes() const {

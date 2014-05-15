@@ -320,6 +320,15 @@ public:
                                          IsBare_t isBareSILFunction,
                                          IsTransparent_t isTransparent);
 
+  /// \brief Return the declaration of a function, or create it if it doesn't
+  /// exist..
+  SILFunction *getOrCreateFunction(SILLocation loc,
+                                   StringRef name,
+                                   SILLinkage linkage,
+                                   CanSILFunctionType type,
+                                   IsBare_t isBareSILFunction,
+                                   IsTransparent_t isTransparent);
+
   /// Look up the SILWitnessTable representing the lowering of a protocol
   /// conformance, and collect the substitutions to apply to the referenced
   /// witnesses, if any.

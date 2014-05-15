@@ -807,8 +807,9 @@ namespace {
 /// An RAII class to scope source file codegen.
 class SourceFileScope {
   SILGenModule &sgm;
+  SourceFile *sf;
 public:
-  SourceFileScope(SILGenModule &sgm, SourceFile *sf) : sgm(sgm) {
+  SourceFileScope(SILGenModule &sgm, SourceFile *sf) : sgm(sgm), sf(sf) {
     // If this is the script-mode file for the module, create a toplevel.
     if (sf->isScriptMode()) {
       assert(!sgm.TopLevelSGF && "already emitted toplevel?!");
@@ -839,6 +840,23 @@ public:
             toplevel->print(llvm::dbgs()));
       toplevel->verify();
       sgm.TopLevelSGF = nullptr;
+    }
+    
+    // If the source file contains the main class, emit the implicit toplevel
+    // code.
+    if (sf->hasMainClass()) {
+      ClassDecl *mainClass = sf->getParentModule()->getMainClass();
+      assert(!sgm.M.lookUpFunction(SWIFT_ENTRY_POINT_FUNCTION)
+             && "already emitted toplevel before main class?!");
+
+      RegularLocation TopLevelLoc = RegularLocation::getModuleLocation();
+      SILFunction *toplevel = sgm.emitTopLevelFunction(TopLevelLoc);
+
+      // Assign a debug scope pointing into the void to the top level function.
+      toplevel->setDebugScope(new (sgm.M) SILDebugScope(TopLevelLoc));
+      
+      SILGenFunction(sgm, *toplevel)
+        .emitArtificialTopLevel(mainClass);
     }
   }
 };

@@ -591,12 +591,14 @@ void AttributeChecker::visitUIApplicationMainAttr(UIApplicationMainAttr *attr) {
   
   // @UIApplicationMain classes must conform to UIKit's UIApplicationDelegate
   // protocol.
+  auto &C = D->getASTContext();
   Identifier Id_UIApplicationDelegate
-    = D->getASTContext().getIdentifier("UIApplicationDelegate");
+    = C.getIdentifier("UIApplicationDelegate");
   Identifier Id_UIKit
-  = D->getASTContext().getIdentifier("UIKit");
+    = C.getIdentifier("UIKit");
   
   bool conformsToDelegate = false;
+  Module *UIKit = nullptr;
   for (auto proto : CD->getProtocols()) {
     if (proto->getName() != Id_UIApplicationDelegate)
       continue;
@@ -604,6 +606,7 @@ void AttributeChecker::visitUIApplicationMainAttr(UIApplicationMainAttr *attr) {
       continue;
     
     conformsToDelegate = true;
+    UIKit = proto->getModuleContext();
     break;
   }
   
@@ -620,6 +623,16 @@ void AttributeChecker::visitUIApplicationMainAttr(UIApplicationMainAttr *attr) {
   // they will be diagnosed.
   if (CD->getModuleContext()->registerMainClass(CD, attr->getLocation()))
     attr->setInvalid();
+  
+  // Check that we have the needed symbols in the frameworks.
+  SmallVector<ValueDecl*, 4> results;
+  UIKit->lookupValue({}, C.getIdentifier("UIApplicationMain"),
+                     NLKind::QualifiedLookup, results);
+  auto Foundation = TC.Context.LoadedModules.lookup("Foundation");
+  Foundation->lookupValue({}, C.getIdentifier("NSStringFromClass"),
+                          NLKind::QualifiedLookup, results);
+  for (auto D : results)
+    TC.validateDecl(D);
 }
 
 void AttributeChecker::visitNoReturnAttr(NoReturnAttr *attr) {

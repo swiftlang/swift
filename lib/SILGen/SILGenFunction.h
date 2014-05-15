@@ -309,6 +309,10 @@ public:
   /// destructor, then implicitly releases the elements of the class.
   void emitDestroyingDestructor(DestructorDecl *dd);
 
+  /// Generates code for an artificial top-level function that starts an
+  /// application based on a main class.
+  void emitArtificialTopLevel(ClassDecl *mainClass);
+  
   /// Generates code for a class deallocating destructor. This
   /// calls the destroying destructor and then deallocates 'self'.
   void emitDeallocatingDestructor(DestructorDecl *dd);
