@@ -52,7 +52,7 @@ static bool gatherValues(SILFunction &Fn, std::vector<SILValue> &Values) {
 namespace {
 
 class SILAADumper : public SILFunctionTransform {
-  
+
   void run() {
     SILFunction &Fn = *getFunction();
     llvm::outs() << "@" << Fn.getName() << "\n";
@@ -63,12 +63,33 @@ class SILAADumper : public SILFunctionTransform {
 
     AliasAnalysis *AA = PM->getAnalysis<AliasAnalysis>();
 
+    // A cache
+    llvm::DenseMap<uint64_t, AliasAnalysis::AliasResult> Results;
+
     // Emit the N^2 alias evaluation of the values.
     unsigned PairCount = 0;
-    for (auto V1 : Values)
-      for (auto V2 : Values)
-        llvm::outs() << "PAIR #" << PairCount++ << ".\n" << V1 << V2 
-                     << AA->alias(V1, V2) << "\n";
+    for (unsigned i1 = 0, e1 = Values.size(); i1 != e1; ++i1) {
+      for (unsigned i2 = 0, e2 = Values.size(); i2 != e2; ++i2) {
+        auto V1 = Values[i1];
+        auto V2 = Values[i2];
+
+        auto Result = AA->alias(V1, V2);
+
+        // Results should always be the same. But if they are different print it
+        // out so we find the error. This should make our test results less
+        // verbose.
+        uint64_t Key = uint64_t(i1) | (uint64_t(i2) << 32);
+        uint64_t OpKey = uint64_t(i2) | (uint64_t(i1) << 32);
+        auto R = Results.find(OpKey);
+        if (R != Results.end() && R->second == Result)
+          continue;
+
+        Results[Key] = Result;
+        llvm::outs() << "PAIR #" << PairCount++ << ".\n" << V1 << V2 << Result
+                     << "\n";
+      }
+    }
+
     llvm::outs() << "\n";
   }
 
@@ -77,8 +98,4 @@ class SILAADumper : public SILFunctionTransform {
 
 } // end anonymous namespace
 
-SILTransform *swift::createSILAADumper() {
-  return new SILAADumper();
-}
-
-
+SILTransform *swift::createSILAADumper() { return new SILAADumper(); }
