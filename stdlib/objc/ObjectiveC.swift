@@ -70,6 +70,12 @@ extension Selector : Equatable, Hashable {
   }
 }
 
+extension Selector : Printable {
+  var description: String {
+    return String.fromCString(sel_getName(self))
+  }
+}
+
 extension String {
   /// \brief Construct the C string representation of an Objective-C selector.
   init(_sel: Selector) {

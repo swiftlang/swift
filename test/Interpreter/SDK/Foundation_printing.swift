@@ -32,3 +32,16 @@ func test_ObjCBoolPrinting() {
 test_ObjCBoolPrinting()
 // CHECK: test_ObjCBoolPrinting done
 
+func test_SelectorPrinting() {
+  printedIs(Selector(""), "")
+  printedIs(Selector(":"), ":")
+  printedIs(Selector("a"), "a")
+  printedIs(Selector("abc"), "abc")
+  printedIs(Selector("abc:"), "abc:")
+  printedIs(Selector("abc:def:"), "abc:def:")
+
+  println("test_SelectorPrinting done")
+}
+test_SelectorPrinting()
+// CHECK: test_SelectorPrinting done
+
