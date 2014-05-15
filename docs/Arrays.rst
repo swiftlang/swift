@@ -18,6 +18,10 @@ The Swift Array Design
     list-style-image: none;
     list-style-type: disc;
     }
+   a:link {
+       color: #AB6023;
+       font-weight: normal
+   }
    </style>
 
 Goals
@@ -149,9 +153,10 @@ see its subscript mutations.
 
 Therefore, casting ``Array<T>`` to ``Array<U>`` is akin to resizing:
 the new copy becomes independent.  To avoid an O(N) conversion cost,
-we use a layer of indirection in the data structure.  The indirection
-object is marked to prevent in-place mutation of the buffer; it will
-be copied upon its first mutation:
+we use a layer of indirection in the data structure.  When ``T`` is a
+subclass of ``U``, the intermediate object is marked to prevent
+in-place mutation of the buffer; it will be copied upon its first
+mutation:
 
 .. image:: ArrayCast.png
 
@@ -160,15 +165,17 @@ The specific rules for casting are as follows:
 * In O(1), ``Array<T>`` implicitly converts to ``Array<U>`` iff ``T``
   is derived from ``U`` or if ``T`` is *bridged* to ``U`` or a
   subclass thereof, including ``AnyObject``\ —see below__.  The
-  resulting array references the same buffer as the original.
+  resulting array references the same buffer as the original.  If
+  element type checking has been deferred_ in the original array, it
+  is deferred_ in the result.
 
   __ `bridging to objective-c`_
 
 * In O(1), ``Array<U>`` explicitly converts to ``Array<T>?`` via ``x
   as Array<T>``.  The cast succeeds, yielding a non-nil result, iff
-  the array buffer elements are dynamically known to have type ``T``
-  or a type derived from ``T``.  The resulting ``Array<T>`` references
-  the same buffer as the original.
+  the array buffer is dynamically known to contain only elements of
+  type ``T`` or a type derived from ``T``.  The resulting ``Array<T>``
+  references the same buffer as the original.
 
 Bridging Rules and Terminology for all Types
 --------------------------------------------
@@ -200,6 +207,8 @@ Bridging Rules and Terminology for all Types
       class func isBridgedToObjectiveC() -> Bool
     }
 
+.. _bridged:
+
 * A type ``T`` is formally considered **bridged** (to type ``U``) if
   either:
 
@@ -209,29 +218,36 @@ Bridging Rules and Terminology for all Types
     - ``T`` does not conform to ``_ConditionallyBridgedToObjectiveC``
     - or, ``T.isBridgedToObjectiveC()`` is ``true``
 
+  .. _bridged verbatim:
+
   - or ``T`` is a class type that does not conform to
     ``BridgedToObjectiveC`` and ``T`` == ``U``.  In this case ``T`` is
     **bridged verbatim**.
 
-* For a type ``T`` that is *bridged*, a value ``x`` of class type
+.. _bridges back:
+.. _bridge back:
+
+* For a type ``T`` that is bridged_, a value ``x`` of class type
   **bridges back** to ``T`` as the first of these values that is
   non-``nil``:
 
   - if ``T`` conforms to ``BridgedToObjectiveC``, ::
        T.bridgeFromObjectiveC((x as T.ObjectiveCType)!)
 
-  - if ``T`` is a class type, ::
-      ``(x as T)``
+  - if ``T`` is a class type or ``@objc`` existential (such as
+    ``AnyObject``), ::
+ 
+        ``(x as T)``
 
-  Otherwise, ``x`` does not *bridge back* to ``T``.
+  Otherwise, ``x`` does not `bridge back`_ to ``T``.
 
 Bridging To Objective-C
 -----------------------
 
-* *ArrayType*\ ``<T>`` is *bridged* to ``NSArray`` iff ``T`` is
-  *bridged*.
+* *ArrayType*\ ``<T>`` is bridged_ to ``NSArray`` iff ``T`` is
+  bridged_.
 
-* An ``NSArray`` can be constructed from any *bridged* ``Array<T>`` or
+* An ``NSArray`` can be constructed from any bridged_ ``Array<T>`` or
   ``NativeArray<T>``.  The elements of the resulting ``NSArray`` have
   dynamic type ``U``, where ``T`` is bridged to ``U``.
 
@@ -240,22 +256,24 @@ Bridging To Objective-C
      We *could* also support construction of ``NSArray`` from
      ``Slice<T>`` at the cost of a single allocation
 
-* Constructing an ``NSArray`` from an array of un-\ *bridged* element
+* Constructing an ``NSArray`` from an array of un-\ bridged_ element
   type is a fatal error detected at runtime.
 
   .. Admonition:: Implementation Note
 
      There are various ways to move this detection to compile-time
 
-* if ``T`` is *bridged verbatim*, the conversion is O(1)
+* if ``T`` is `bridged verbatim`_, the conversion is O(1)
   
-* if ``T`` is not *bridged verbatim*, the elements of the ``NSArray``
+* if ``T`` is not `bridged verbatim`_, the elements of the ``NSArray``
   (or ``Array<U>`` when bridging is used in array casting) are created
   eagerly in O(N), by calling ``bridgeToObjectiveC()`` on the original
   ``T``\ s, and a new ``NSArray`` is returned.
 
-Bridging From Objective-C
--------------------------
+.. _bridging back:
+
+**Bridging Back** From Objective-C
+----------------------------------
 
 * ``NSArray`` can be implicitly converted to ``Array<AnyObject>`` in
   O(1)
@@ -263,17 +281,20 @@ Bridging From Objective-C
 * ``NSArray`` and ``Array<AnyObject>`` can be *explicitly* converted
   to ``Array<T>?`` using ``a as Array<T>``.  There are several cases:
 
-  - If ``T`` is not *bridged*, conversion fails in O(1), yielding nil
+  - If ``T`` is not bridged_, conversion fails in O(1), yielding nil
 
   - If the ``NSArray`` was originally created as a Swift *ArrayType*\
     ``<U>``, conversion succeeds in O(1) if ``U`` is ``T`` or a subclass
     thereof. No further dynamic type checks are required.
 
+  .. _deferred:
+
   - Otherwise, if ``T`` is a class or existential type, conversion
-    succeeds in O(1), but type-checking of elements is deferred and
-    on-demand.  The result of subscripting is the result of *bridging
-    back* the corresponding stored ``NSArray`` element to ``T``.
-    Failure to *bridge back* is a fatal error detected at runtime.
+    succeeds in O(1), but type-checking of elements is **deferred**
+    and on-demand.  The result of subscripting is the result of
+    `bridging back`_ the corresponding stored ``NSArray`` element to
+    ``T``.  Failure to `bridge back`_ is a fatal error detected at
+    runtime.
 
   - Otherwise, conversion is O(N), and succeeds iff every element
-    *bridges back* to ``T``.
+    `bridges back`_ to ``T``.
