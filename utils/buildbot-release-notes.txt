@@ -35,12 +35,17 @@ Latest
 
   If you do have a need for the previous REPL, pass -integrated-repl.
 
-* In a UIKit-based application, you can now apply the '@UIApplicationMain'
-  attribute to your UIApplicationDelegate class. This will cause the 'main'
-  entry point to the application to be automatically generated as follows:
+* In a UIKit-based application, you can now eliminate your 'main.swift' file
+  and instead apply the '@UIApplicationMain' attribute to your
+  UIApplicationDelegate class. This will cause the 'main' entry point to the
+  application to be automatically generated as follows:
 
     UIApplicationMain(argc, argv, nil,
                       NSStringFromClass(YourApplicationDelegate.self))
+
+  If you need nontrivial logic in your application entry point, you can still
+  write out a main.swift. Note that @UIApplicationMain and main.swift are
+  mutually exclusive.
 
 2014-05-13
 ----------
