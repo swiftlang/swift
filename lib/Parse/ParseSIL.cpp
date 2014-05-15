@@ -3119,6 +3119,14 @@ ProtocolConformance *SILParser::parseProtocolConformance(
   return retVal;
 }
 
+///  protocol-conformance ::= normal-protocol-conformance
+///  protocol-conformance ::=
+///    generic-parameter-list? 'inherit' '(' protocol-conformance ')'
+///  protocol-conformance ::=
+///    generic-parameter-list? 'specialize' '<' substitution* '>'
+///    '(' protocol-conformance ')'
+///  normal-protocol-conformance ::=
+///    generic-parameter-list? type: protocolName module ModuleName
 ProtocolConformance *SILParser::parseProtocolConformanceHelper(
                                     ProtocolDecl *&proto,
                                     bool localScope) {
@@ -3163,18 +3171,29 @@ ProtocolConformance *SILParser::parseProtocolConformanceHelper(
     return result;
   }
 
-  if (P.Tok.is(tok::identifier) && P.Tok.getText() == "inherit")
-    // FIXME: handle inherit.
-    return nullptr;
+  if (P.Tok.is(tok::identifier) && P.Tok.getText() == "inherit") {
+    P.consumeToken();
+
+    if (P.parseToken(tok::l_paren, diag::expected_sil_witness_lparen))
+      return nullptr;
+    ArchetypeBuilder baseBuilder(*P.SF.getParentModule(), P.Diags);
+    auto baseConform = parseProtocolConformance(baseBuilder);
+    if (!baseConform)
+      return nullptr;
+    if (P.parseToken(tok::r_paren, diag::expected_sil_witness_rparen))
+      return nullptr;
+
+    return P.Context.getInheritedConformance(ConformingTy, baseConform);
+  }
 
   auto retVal = parseNormalProtocolConformance(P, *this, ConformingTy, proto);
   return retVal;
 }
 
-/// decl-sil-witness: [[only in SIL mode]]
-///   'sil_witness_table' sil-linkage? normal-conformance decl-sil-witness-body
-/// normal-conformance:
-///   [generic params] type: protocol module ModuleName
+/// decl-sil-witness ::= 'sil_witness_table' sil-linkage?
+///                      normal-protocol-conformance decl-sil-witness-body
+/// normal-protocol-conformance ::=
+///   generic-parameter-list? type: protocolName module ModuleName
 /// decl-sil-witness-body:
 ///   '{' sil-witness-entry* '}'
 /// sil-witness-entry:
