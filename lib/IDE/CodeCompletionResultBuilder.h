@@ -88,6 +88,11 @@ public:
     addChunkWithText(CodeCompletionString::Chunk::ChunkKind::Text, Text);
   }
 
+  void addAnnotatedLeftParen() {
+    addLeftParen();
+    getLastChunk().setIsAnnotation();
+  }
+
   void addLeftParen() {
     addChunkWithTextNoCopy(
         CodeCompletionString::Chunk::ChunkKind::LeftParen, "(");

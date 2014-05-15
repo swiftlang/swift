@@ -12,6 +12,7 @@
 
 #include "swift/IDE/CodeCompletion.h"
 #include "swift/Basic/Cache.h"
+#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/ThreadSafeRefCounted.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
@@ -119,6 +120,7 @@ CodeCompletionString::CodeCompletionString(ArrayRef<Chunk> Chunks) {
 void CodeCompletionString::print(raw_ostream &OS) const {
   unsigned PrevNestingLevel = 0;
   for (auto C : getChunks()) {
+    bool AnnotatedTextChunk = false;
     if (C.getNestingLevel() < PrevNestingLevel) {
       OS << "#}";
     }
@@ -137,16 +139,22 @@ void CodeCompletionString::print(raw_ostream &OS) const {
     case Chunk::ChunkKind::ExclamationMark:
     case Chunk::ChunkKind::QuestionMark:
     case Chunk::ChunkKind::Ampersand:
+      AnnotatedTextChunk = C.isAnnotation();
+      SWIFT_FALLTHROUGH;
     case Chunk::ChunkKind::CallParameterName:
     case Chunk::ChunkKind::CallParameterColon:
     case Chunk::ChunkKind::CallParameterType:
     case CodeCompletionString::Chunk::ChunkKind::GenericParameterName:
+      if (AnnotatedTextChunk)
+        OS << "['";
       for (char Ch : C.getText()) {
         if (Ch == '\n')
           OS << "\\n";
         else
           OS << Ch;
       }
+      if (AnnotatedTextChunk)
+        OS << "']";
       break;
     case Chunk::ChunkKind::OptionalBegin:
     case Chunk::ChunkKind::CallParameterBegin:
@@ -1184,6 +1192,8 @@ public:
       }
       if (!IsTopLevel || !HaveLParen)
         Builder.addLeftParen();
+      else
+        Builder.addAnnotatedLeftParen();
       bool NeedComma = false;
       for (auto TupleElt : TT->getFields()) {
         if (NeedComma)
@@ -1198,6 +1208,8 @@ public:
     if (auto *PT = dyn_cast<ParenType>(T.getPointer())) {
       if (IsTopLevel && !HaveLParen)
         Builder.addLeftParen();
+      else if (IsTopLevel)
+        Builder.addAnnotatedLeftParen();
       Builder.addCallParameter(Identifier(), PT->getUnderlyingType());
       if (IsTopLevel)
         Builder.addRightParen();
@@ -1206,6 +1218,8 @@ public:
 
     if (IsTopLevel && !HaveLParen)
       Builder.addLeftParen();
+    else if (IsTopLevel)
+      Builder.addAnnotatedLeftParen();
 
     Builder.addCallParameter(Label, T);
     if (IsTopLevel)
@@ -1224,6 +1238,8 @@ public:
         SemanticContextKind::ExpressionSpecific);
     if (!HaveLParen)
       Builder.addLeftParen();
+    else
+      Builder.addAnnotatedLeftParen();
     bool NeedComma = false;
     if (auto *TT = AFT->getInput()->getAs<TupleType>()) {
       for (auto TupleElt : TT->getFields()) {

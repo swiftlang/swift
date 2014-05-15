@@ -33,7 +33,7 @@ func testImplicitConstructors1() {
 func testImplicitConstructors1P() {
   ImplicitConstructors1(#^IMPLICIT_CONSTRUCTORS_1P^#
 // IMPLICIT_CONSTRUCTORS_1P: Begin completions
-// IMPLICIT_CONSTRUCTORS_1P-NEXT: Decl[Constructor]/CurrNominal: )[#ImplicitConstructors1#]{{$}}
+// IMPLICIT_CONSTRUCTORS_1P-NEXT: Decl[Constructor]/CurrNominal: ['('])[#ImplicitConstructors1#]{{$}}
 // IMPLICIT_CONSTRUCTORS_1P-NEXT: End completions
 }
 
@@ -51,8 +51,8 @@ func testImplicitConstructors2() {
 func testImplicitConstructors2P() {
   ImplicitConstructors2(#^IMPLICIT_CONSTRUCTORS_2P^#
 // IMPLICIT_CONSTRUCTORS_2P: Begin completions
-// IMPLICIT_CONSTRUCTORS_2P-NEXT: Decl[Constructor]/CurrNominal: {#instanceVar: Int#})[#ImplicitConstructors2#]{{$}}
-// IMPLICIT_CONSTRUCTORS_2P-NEXT: Decl[Constructor]/CurrNominal: )[#ImplicitConstructors2#]{{$}}
+// IMPLICIT_CONSTRUCTORS_2P-NEXT: Decl[Constructor]/CurrNominal: ['(']{#instanceVar: Int#})[#ImplicitConstructors2#]{{$}}
+// IMPLICIT_CONSTRUCTORS_2P-NEXT: Decl[Constructor]/CurrNominal: ['('])[#ImplicitConstructors2#]{{$}}
 // IMPLICIT_CONSTRUCTORS_2P-NEXT: End completions
 }
 
@@ -73,9 +73,9 @@ func testExplicitConstructors1() {
 func testExplicitConstructors1P() {
   ExplicitConstructors1(#^EXPLICIT_CONSTRUCTORS_1P^#
 // EXPLICIT_CONSTRUCTORS_1P: Begin completions
-// EXPLICIT_CONSTRUCTORS_1P-NEXT: Decl[Constructor]/CurrNominal: )[#ExplicitConstructors1#]{{$}}
-// EXPLICIT_CONSTRUCTORS_1P-NEXT: Decl[Constructor]/CurrNominal: {#a: Int#})[#ExplicitConstructors1#]{{$}}
-// EXPLICIT_CONSTRUCTORS_1P-NEXT: Decl[Constructor]/CurrNominal: {#a: Int#}, {#b: Float#})[#ExplicitConstructors1#]{{$}}
+// EXPLICIT_CONSTRUCTORS_1P-NEXT: Decl[Constructor]/CurrNominal: ['('])[#ExplicitConstructors1#]{{$}}
+// EXPLICIT_CONSTRUCTORS_1P-NEXT: Decl[Constructor]/CurrNominal: ['(']{#a: Int#})[#ExplicitConstructors1#]{{$}}
+// EXPLICIT_CONSTRUCTORS_1P-NEXT: Decl[Constructor]/CurrNominal: ['(']{#a: Int#}, {#b: Float#})[#ExplicitConstructors1#]{{$}}
 // EXPLICIT_CONSTRUCTORS_1P-NEXT: End completions
 }
 
@@ -90,9 +90,9 @@ ExplicitConstructors1#^EXPLICIT_CONSTRUCTORS_2^#
 ExplicitConstructors1(#^EXPLICIT_CONSTRUCTORS_2P^#
 
 // EXPLICIT_CONSTRUCTORS_2P: Begin completions
-// EXPLICIT_CONSTRUCTORS_2P-DAG: Decl[Constructor]/CurrNominal: )[#ExplicitConstructors1#]
-// EXPLICIT_CONSTRUCTORS_2P-DAG: Decl[Constructor]/CurrNominal: {#a: Int#})[#ExplicitConstructors1#]
-// EXPLICIT_CONSTRUCTORS_2P-DAG: Decl[Constructor]/CurrNominal: {#a: Int#}, {#b: Float#})[#ExplicitConstructors1#]
+// EXPLICIT_CONSTRUCTORS_2P-DAG: Decl[Constructor]/CurrNominal: ['('])[#ExplicitConstructors1#]
+// EXPLICIT_CONSTRUCTORS_2P-DAG: Decl[Constructor]/CurrNominal: ['(']{#a: Int#})[#ExplicitConstructors1#]
+// EXPLICIT_CONSTRUCTORS_2P-DAG: Decl[Constructor]/CurrNominal: ['(']{#a: Int#}, {#b: Float#})[#ExplicitConstructors1#]
 // EXPLICIT_CONSTRUCTORS_2P: End completions
 
 
@@ -105,9 +105,9 @@ struct ExplicitConstructors3 {
 func testExplicitConstructors3P() {
   ExplicitConstructors3(#^EXPLICIT_CONSTRUCTORS_3P^#
 // EXPLICIT_CONSTRUCTORS_3P: Begin completions
-// EXPLICIT_CONSTRUCTORS_3P-DAG: Decl[Constructor]/CurrNominal: )[#ExplicitConstructors3#]{{$}}
-// EXPLICIT_CONSTRUCTORS_3P-DAG: Decl[Constructor]/CurrNominal: {#Int#})[#ExplicitConstructors3#]{{$}}
-// EXPLICIT_CONSTRUCTORS_3P-DAG: Decl[Constructor]/CurrNominal: {#a: Int#}, {#b: Float#})[#ExplicitConstructors3#]{{$}}
+// EXPLICIT_CONSTRUCTORS_3P-DAG: Decl[Constructor]/CurrNominal: ['('])[#ExplicitConstructors3#]{{$}}
+// EXPLICIT_CONSTRUCTORS_3P-DAG: Decl[Constructor]/CurrNominal: ['(']{#Int#})[#ExplicitConstructors3#]{{$}}
+// EXPLICIT_CONSTRUCTORS_3P-DAG: Decl[Constructor]/CurrNominal: ['(']{#a: Int#}, {#b: Float#})[#ExplicitConstructors3#]{{$}}
 // EXPLICIT_CONSTRUCTORS_3P-DAG: Decl[FreeFunction]/CurrModule: freeFunc()[#Void#]{{$}}
 // EXPLICIT_CONSTRUCTORS_3P: End completions
 }

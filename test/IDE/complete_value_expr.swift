@@ -699,7 +699,7 @@ func testInsideFunctionCall1() {
 // There should be no other results here because the function call
 // unambigously resolves to overload that takes 0 arguments.
 // INSIDE_FUNCTION_CALL_1: Begin completions
-// INSIDE_FUNCTION_CALL_1-NEXT: Pattern/ExprSpecific: )[#Void#]{{$}}
+// INSIDE_FUNCTION_CALL_1-NEXT: Pattern/ExprSpecific: ['('])[#Void#]{{$}}
 // INSIDE_FUNCTION_CALL_1-NEXT: End completions
 }
 
@@ -707,7 +707,7 @@ func testInsideFunctionCall2() {
   var a = FooStruct()
   a.instanceFunc1(#^INSIDE_FUNCTION_CALL_2^#
 // INSIDE_FUNCTION_CALL_2: Begin completions
-// INSIDE_FUNCTION_CALL_2-DAG: Pattern/ExprSpecific:       {#Int#})[#Void#]{{$}}
+// INSIDE_FUNCTION_CALL_2-DAG: Pattern/ExprSpecific:       ['(']{#Int#})[#Void#]{{$}}
 // INSIDE_FUNCTION_CALL_2-DAG: Decl[GlobalVar]/CurrModule: fooObject[#FooStruct#]{{$}}
 // INSIDE_FUNCTION_CALL_2: End completions
 }
@@ -725,7 +725,7 @@ func testInsideFunctionCall4() {
   var a = FooStruct()
   a.instanceFunc2(#^INSIDE_FUNCTION_CALL_4^#
 // INSIDE_FUNCTION_CALL_4: Begin completions
-// INSIDE_FUNCTION_CALL_4-DAG: Pattern/ExprSpecific:       {#Int#}, {#b: &Double#})[#Void#]{{$}}
+// INSIDE_FUNCTION_CALL_4-DAG: Pattern/ExprSpecific:       ['(']{#Int#}, {#b: &Double#})[#Void#]{{$}}
 // INSIDE_FUNCTION_CALL_4-DAG: Decl[GlobalVar]/CurrModule: fooObject[#FooStruct#]{{$}}
 // INSIDE_FUNCTION_CALL_4: End completions
 }
@@ -741,7 +741,7 @@ func testInsideFunctionCall6() {
   var a = FooStruct()
   a.instanceFunc7(#^INSIDE_FUNCTION_CALL_6^#
 // INSIDE_FUNCTION_CALL_6: Begin completions
-// INSIDE_FUNCTION_CALL_6-NEXT: Pattern/ExprSpecific: {#a: Int#})[#Void#]{{$}}
+// INSIDE_FUNCTION_CALL_6-NEXT: Pattern/ExprSpecific: ['(']{#a: Int#})[#Void#]{{$}}
 // INSIDE_FUNCTION_CALL_6-NEXT: End completions
 }
 
@@ -749,7 +749,7 @@ func testInsideVarargFunctionCall1() {
   var a = FooStruct()
   a.varargInstanceFunc0(#^INSIDE_VARARG_FUNCTION_CALL_1^#
 // INSIDE_VARARG_FUNCTION_CALL_1: Begin completions
-// INSIDE_VARARG_FUNCTION_CALL_1-DAG: Pattern/ExprSpecific:       {#Int[]#})[#Void#]{{$}}
+// INSIDE_VARARG_FUNCTION_CALL_1-DAG: Pattern/ExprSpecific:       ['(']{#Int[]#})[#Void#]{{$}}
 // INSIDE_VARARG_FUNCTION_CALL_1-DAG: Decl[GlobalVar]/CurrModule: fooObject[#FooStruct#]{{$}}
 // INSIDE_VARARG_FUNCTION_CALL_1: End completions
 }
@@ -781,14 +781,14 @@ func testInsideCurriedFunctionCall1() {
   var a = FooStruct()
   a.curriedVoidFunc4(42)(#^INSIDE_CURRIED_FUNCTION_CALL_1^#
 // INSIDE_CURRIED_FUNCTION_CALL_1: Begin completions
-// INSIDE_CURRIED_FUNCTION_CALL_1-DAG: Pattern/ExprSpecific: {#b: Int#})[#Void#]{{$}}
+// INSIDE_CURRIED_FUNCTION_CALL_1-DAG: Pattern/ExprSpecific: ['(']{#b: Int#})[#Void#]{{$}}
 // INSIDE_CURRIED_FUNCTION_CALL_1: End completions
 }
 
 func testInsideFunctionCallOnClassInstance1(a: FooClass) {
   a.fooClassInstanceFunc1(#^INSIDE_FUNCTION_CALL_ON_CLASS_INSTANCE_1^#
 // INSIDE_FUNCTION_CALL_ON_CLASS_INSTANCE_1: Begin completions
-// INSIDE_FUNCTION_CALL_ON_CLASS_INSTANCE_1-DAG: Pattern/ExprSpecific:       {#Int#})[#Void#]{{$}}
+// INSIDE_FUNCTION_CALL_ON_CLASS_INSTANCE_1-DAG: Pattern/ExprSpecific:       ['(']{#Int#})[#Void#]{{$}}
 // INSIDE_FUNCTION_CALL_ON_CLASS_INSTANCE_1-DAG: Decl[GlobalVar]/CurrModule: fooObject[#FooStruct#]{{$}}
 // INSIDE_FUNCTION_CALL_ON_CLASS_INSTANCE_1: End completions
 }
