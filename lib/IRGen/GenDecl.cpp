@@ -1026,7 +1026,6 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILDeclRef fnRef,
   llvm::SmallString<32> name;
   fnRef.mangle(name);
   SILFunction *fn = SILMod->lookUpFunction(name);
-#ifndef NDEBUG
   if (!fn) {
     assert(!forDefinition &&
            "defining a SILFunction that's not in the SILModule?");
@@ -1035,7 +1034,6 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILDeclRef fnRef,
     fn = SILFunction::create(*SILMod, linkage, name, type, nullptr,
                              Nothing, IsNotBare, IsNotTransparent);
   }
-#endif
   return getAddrOfSILFunction(fn, forDefinition);
 }
 
