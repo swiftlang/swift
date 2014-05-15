@@ -156,7 +156,9 @@ extension ArrayBuffer {
   /// Otherwise, return nil.  Note: the result's elementStorage may
   /// not match ours, if we are a SliceBuffer.
   func requestNativeBuffer() -> NativeBuffer? {
-    return self._native
+    let result = self._native
+    if result { return result }
+    return nil
   }
   
   /// Copy the given subRange of this buffer into uninitialized memory
