@@ -945,7 +945,7 @@ DeclName ClangImporter::Implementation::mapSelectorToDeclName(
   // If we haven't computed any selector mappings before, load the
   // default mappings.
   if (SelectorMappings.empty() && SplitPrepositions) {
-    // Function object that 
+    // Function object that creates a selector.
     CreateSelector createSelector(SwiftContext);
 
 #define MAP_SELECTOR(Selector, ForMethod, ForInitializer, BaseName, ArgNames) \
@@ -1058,14 +1058,52 @@ DeclName ClangImporter::Implementation::mapFactorySelectorToInitializerName(
   return DeclName(SwiftContext, SwiftContext.Id_init, argumentNames);
 }
 
-void ClangImporter::Implementation::populateKnownDesignatedInits() {
-  if (!KnownDesignatedInits.empty())
+// Namespace of options used for known methods.
+namespace known_methods {
+namespace {
+  // DesignatedInit flag
+  enum DesignatedInitKind { DesignatedInit };
+  KnownObjCMethod operator|(KnownObjCMethod known, DesignatedInitKind) {
+    known.DesignatedInit = true;
+    return known;
+  }
+}
+}
+
+void ClangImporter::Implementation::populateKnownObjCMethods() {
+  if (!KnownInstanceMethods.empty())
     return;
 
+  // Add a known method.
+  auto addMethod = [&](Identifier className, ObjCSelector selector,
+                       bool isInstanceMethod, KnownObjCMethod known) {
+    auto &knownMethods = isInstanceMethod ? KnownInstanceMethods
+                                          : KnownClassMethods;
+    assert(knownMethods.find({className, selector}) == knownMethods.end() &&
+           "Method is already known!?");
+
+    // Record this known method.
+    knownMethods[{className, selector}] = known;
+
+    // If this method is a designated initializer, note that we know
+    // about the class's designated initializers.
+    if (known.DesignatedInit) {
+      HasKnownDesignatedInits.insert(className);
+    }
+  };
+
+  using namespace known_methods;
+
+  // Function object that creates a selector.
   CreateSelector createSelector(SwiftContext);
-#define DESIGNATED_INIT(ClassName, Selector)                            \
-  KnownDesignatedInits[#ClassName].push_back(createSelector Selector);
-#include "DesignatedInits.def"
+
+#define INSTANCE_METHOD(ClassName, Selector, Options)                   \
+  addMethod(SwiftContext.getIdentifier(#ClassName), createSelector Selector, \
+            /*isInstanceMethod=*/true, KnownObjCMethod() | Options);
+#define CLASS_METHOD(ClassName, Selector, Options)  \
+  addMethod(SwiftContext.getIdentifier(#ClassName), createSelector Selector, \
+            /*isInstanceMethod=*/false, KnownObjCMethod() | Options);
+#include "KnownObjCMethods.def"
 }
 
 bool ClangImporter::Implementation::hasDesignatedInitializers(
@@ -1073,8 +1111,9 @@ bool ClangImporter::Implementation::hasDesignatedInitializers(
   if (classDecl->hasDesignatedInitializers())
     return true;
 
-  populateKnownDesignatedInits();
-  return KnownDesignatedInits.count(classDecl->getName());
+  populateKnownObjCMethods();
+  auto className = SwiftContext.getIdentifier(classDecl->getName());
+  return HasKnownDesignatedInits.count(className) > 0;
 }
 
 bool ClangImporter::Implementation::isDesignatedInitializer(
@@ -1084,13 +1123,12 @@ bool ClangImporter::Implementation::isDesignatedInitializer(
   if (classDecl->hasDesignatedInitializers())
     return method->hasAttr<clang::ObjCDesignatedInitializerAttr>();
 
-  populateKnownDesignatedInits();
-  auto known = KnownDesignatedInits.find(classDecl->getName());
-  assert(known != KnownDesignatedInits.end() && 
-         "Check hasDesignatedInitializers() first!");
-  return std::find(known->second.begin(), known->second.end(),
-                   importSelector(method->getSelector()))
-           != known->second.end();
+  populateKnownObjCMethods();
+  auto className = SwiftContext.getIdentifier(classDecl->getName());
+  auto selector = importSelector(method->getSelector());
+  auto known = KnownInstanceMethods.find({className, selector});
+  return known != KnownInstanceMethods.end() &&
+         known->second.DesignatedInit;
 }
 
 #pragma mark Name lookup

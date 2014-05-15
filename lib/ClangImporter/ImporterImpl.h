@@ -185,6 +185,15 @@ enum class SpecialMethodKind {
 
 #define SWIFT_NATIVE_ANNOTATION_STRING "__swift native"
 
+/// Describes an Objective-C method for which the we have special knowledge, as
+/// described in \c KnownObjCMethods.def.
+struct LLVM_LIBRARY_VISIBILITY KnownObjCMethod {
+  /// Whether this is a designated initializer of its class.
+  unsigned DesignatedInit : 1;
+
+  KnownObjCMethod() : DesignatedInit(false) { }
+};
+
 /// \brief Implementation of the Clang importer.
 class LLVM_LIBRARY_VISIBILITY ClangImporter::Implementation 
   : public LazyMemberLoader 
@@ -265,18 +274,23 @@ public:
   /// Mapping from Objective-C selectors to method names.
   llvm::DenseMap<std::pair<ObjCSelector, char>, DeclName> SelectorMappings;
 
-  /// Mapping that describes the designated initializers of
-  /// Objective-C classes.
-  ///
-  /// This table, generated from DesignatedInits.def, describes the
-  /// designated initializers for a specific set of known
-  /// classes. When this information is available, and the class
-  llvm::StringMap<llvm::SmallVector<ObjCSelector, 1> >
-    KnownDesignatedInits;
+  /// Classes for which we know the set of designated
+  /// initializers a priori.
+  llvm::DenseSet<Identifier> HasKnownDesignatedInits;
 
-  /// Populate the table of known designated initializers from the
-  /// DesignatedInits.def file.
-  void populateKnownDesignatedInits();
+  /// A map from (class name, selector) pairs to a prior information
+  /// about that instance method of an Objective-C class.
+  llvm::DenseMap<std::pair<Identifier, ObjCSelector>, KnownObjCMethod>
+    KnownInstanceMethods;
+
+  /// A map from (class name, selector) pairs to a prior information
+  /// about that class method of an Objective-C class.
+  llvm::DenseMap<std::pair<Identifier, ObjCSelector>, KnownObjCMethod>
+    KnownClassMethods;
+
+  /// Populate the tables of known methods, if it hasn't been done
+  /// already.
+  void populateKnownObjCMethods();
 
   /// Determine whether the given class has designated initializers,
   /// consulting 

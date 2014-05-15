@@ -1,0 +1,283 @@
+//===--- KnownMethods.def - Designated Initializers -------------*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This file defines the database of known methods for various
+// Objective-C classes, along with flags that describe how their
+// import into Swift should be altered.
+// ===---------------------------------------------------------------------===//
+
+// INSTANCE_METHOD(ClassName, Selector, Options)
+// CLASS_METHOD(ClassName, Selector, Options)
+// 
+//   Describes an instance or class method.
+//
+//   ClassName: The name of the class.
+//
+//   Selector: A parenthesized sequence containing the # of selector
+//   pieces followed by strings containing the selector pieces.
+//
+//   Options: A set of OR'd options describing what specific behavior
+//   should be applied to this method. The possibilities are:
+//     DesignatedInit: Mark this as a designated initializer of its class
+
+#ifndef INSTANCE_METHOD
+#  error define INSTANCE_METHOD before including KnownMethods.def
+#endif
+
+#ifndef CLASS_METHOD
+#  error define CLASS_METHOD before including KnownMethods.def
+#endif
+
+// ObjectiveC
+INSTANCE_METHOD(NSObject, (0, "init"), DesignatedInit)
+
+// Foundation
+INSTANCE_METHOD(NSArray, (0, "init"), DesignatedInit)
+INSTANCE_METHOD(NSArray, (1, "initWithObjects"), DesignatedInit)
+INSTANCE_METHOD(NSArray, (2, "initWithObjects", "count"), DesignatedInit)
+
+INSTANCE_METHOD(NSCountedSet, (1, "initWithCapacity"), DesignatedInit)
+
+INSTANCE_METHOD(NSDate, (0, "init"), DesignatedInit)
+INSTANCE_METHOD(NSDate, (1, "initWithTimeIntervalSinceReferenceDate"),
+                DesignatedInit)
+
+INSTANCE_METHOD(NSDecimalNumber, (1, "initWithDecimal"), DesignatedInit)
+
+INSTANCE_METHOD(NSDictionary, (0, "init"), DesignatedInit)
+INSTANCE_METHOD(NSDictionary, (3, "initWithObjects", "forKeys", "count"),
+                DesignatedInit)
+
+INSTANCE_METHOD(NSError, (3, "initWithDomain", "code", "userInfo"), 
+                DesignatedInit)
+
+INSTANCE_METHOD(NSException, (3, "initWithName", "reason", "userInfo"),
+                DesignatedInit)
+
+INSTANCE_METHOD(NSExpression, (1, "initWithExpressionType"), DesignatedInit)
+
+INSTANCE_METHOD(NSFileWrapper, (3, "initWithURL", "options", "error"), 
+                DesignatedInit)
+INSTANCE_METHOD(NSFileWrapper, (1, "initDirectoryWithFileWrappers"),
+                DesignatedInit)
+INSTANCE_METHOD(NSFileWrapper, (1, "initRegularFileWithContents"), 
+                DesignatedInit)
+INSTANCE_METHOD(NSFileWrapper, (1, "initSymbolicLinkWithDestinationURL"),
+                DesignatedInit)
+INSTANCE_METHOD(NSFileWrapper, (1, "initWithSerializedRepresentation"), 
+                DesignatedInit)
+
+INSTANCE_METHOD(NSIndexPath, (0, "init"), DesignatedInit)
+INSTANCE_METHOD(NSIndexPath, (2, "initWithIndexes", "length"), DesignatedInit)
+
+INSTANCE_METHOD(NSIndexSet, (0, "init"), DesignatedInit)
+INSTANCE_METHOD(NSIndexSet, (1, "initWithIndexesInRange"), DesignatedInit)
+INSTANCE_METHOD(NSIndexSet, (1, "initWithIndexSet"), DesignatedInit)
+
+INSTANCE_METHOD(NSInvocationOperation, (1, "initWithInvocation"), 
+                DesignatedInit)
+
+INSTANCE_METHOD(NSMachPort, (1, "initWithMachPort"), DesignatedInit)
+
+INSTANCE_METHOD(NSMutableArray, (0, "init"), DesignatedInit)
+INSTANCE_METHOD(NSMutableArray, (1, "initWithCapacity"), DesignatedInit)
+
+INSTANCE_METHOD(NSMutableDictionary, (0, "init"), DesignatedInit)
+INSTANCE_METHOD(NSMutableDictionary, (1, "initWithCapacity"), DesignatedInit)
+
+INSTANCE_METHOD(NSMutableOrderedSet, (0, "init"), DesignatedInit)
+INSTANCE_METHOD(NSMutableOrderedSet, (1, "initWithCapacity"), DesignatedInit)
+
+INSTANCE_METHOD(NSMutableSet, (0, "init"), DesignatedInit)
+INSTANCE_METHOD(NSMutableSet, (1, "initWithCapacity"), DesignatedInit)
+
+INSTANCE_METHOD(NSNetService, (4, "initWithDomain", "type", "name", "port"),
+                DesignatedInit)
+
+INSTANCE_METHOD(NSNotificationQueue, (1, "initWithNotificationCenter"),
+                DesignatedInit)
+
+INSTANCE_METHOD(NSOrderedSet, (0, "init"), DesignatedInit)
+INSTANCE_METHOD(NSOrderedSet, (2, "initWithObjects", "count"), DesignatedInit)
+
+INSTANCE_METHOD(NSPortMessage, 
+                (3, "initWithSendPort", "receivePort", "components"),
+                DesignatedInit)
+
+INSTANCE_METHOD(NSScriptObjectSpecifier, 
+                (3, "initWithContainerClassDescription", "containerSpecifier",
+                 "key"), DesignatedInit)
+
+INSTANCE_METHOD(NSSet, (0, "init"), DesignatedInit)
+INSTANCE_METHOD(NSSet, (2, "initWithObjects", "count"), DesignatedInit)
+
+INSTANCE_METHOD(NSThread, (0, "init"), DesignatedInit)
+
+INSTANCE_METHOD(NSURL, (2, "initWithString", "relativeToURL"), DesignatedInit)
+
+INSTANCE_METHOD(NSURLProtocol, 
+                (3, "initWithRequest", "cachedResponse", "client"), 
+                DesignatedInit)
+
+INSTANCE_METHOD(NSURLRequest, 
+                (3, "initWithURL", "cachePolicy", "timeoutInterval"),
+                DesignatedInit)
+
+INSTANCE_METHOD(NSURLResponse, 
+                (4, "initWithURL", "MIMEType", "expectedContentLength", 
+                 "textEncodingName"), DesignatedInit)
+
+INSTANCE_METHOD(NSValue, (2, "initWithBytes", "objCType"), DesignatedInit)
+
+INSTANCE_METHOD(NSXMLDocument, (3, "initWithData", "options", "error"),
+                DesignatedInit)
+
+INSTANCE_METHOD(NSXMLDTD, (3, "initWithData", "options", "error"),
+                DesignatedInit)
+
+INSTANCE_METHOD(NSXMLParser, (1, "initWithData"), DesignatedInit)
+
+// AppKit
+INSTANCE_METHOD(NSCell, (0, "init"), DesignatedInit)
+INSTANCE_METHOD(NSCell, (1, "initWithCoder"), DesignatedInit)
+INSTANCE_METHOD(NSCell, (1, "initTextCell"), DesignatedInit)
+INSTANCE_METHOD(NSCell, (1, "initImageCell"), DesignatedInit)
+
+INSTANCE_METHOD(NSControl, (1, "initWithFrame"), DesignatedInit)
+
+INSTANCE_METHOD(NSCursor, (2, "initWithImage", "hotSpot"), DesignatedInit)
+
+INSTANCE_METHOD(NSDocument, (0, "init"), DesignatedInit)
+
+INSTANCE_METHOD(NSDocumentController, (0, "init"), DesignatedInit)
+
+INSTANCE_METHOD(NSDraggingImageComponent, (1, "initWithKey"), DesignatedInit)
+
+INSTANCE_METHOD(NSDraggingItem, (1, "initWithPasteboardWriter"), DesignatedInit)
+
+INSTANCE_METHOD(NSFontManager, (0, "init"), DesignatedInit)
+
+INSTANCE_METHOD(NSFormCell, (1, "initTextCell"), DesignatedInit)
+
+INSTANCE_METHOD(NSGradient, (3, "initWithColors", "atLocations", "colorSpace"),
+                DesignatedInit)
+
+INSTANCE_METHOD(NSImageCell, (0, "init"), DesignatedInit)
+INSTANCE_METHOD(NSImageCell, (1, "initWithCoder"), DesignatedInit)
+INSTANCE_METHOD(NSImageCell, (1, "initTextCell"), DesignatedInit)
+INSTANCE_METHOD(NSImageCell, (1, "initImageCell"), DesignatedInit)
+
+INSTANCE_METHOD(NSLayoutManager, (0, "init"), DesignatedInit)
+
+INSTANCE_METHOD(NSMatrix, 
+                (5, "initWithFrame", "mode", "cellClass", "numberOfRows", 
+                    "numberOfColumns"), DesignatedInit)
+INSTANCE_METHOD(NSMatrix, 
+                (5, "initWithFrame", "prototype", "cellClass", "numberOfRows", 
+                    "numberOfColumns"), DesignatedInit)
+
+INSTANCE_METHOD(NSMenu, (1, "initWithTitle"), DesignatedInit)
+
+INSTANCE_METHOD(NSMenuView, (1, "initWithFrame"), DesignatedInit)
+
+INSTANCE_METHOD(NSPopUpButtonCell, (2, "initTextCell", "pullsDown"),
+                DesignatedInit)
+
+INSTANCE_METHOD(NSPrintInfo, (1, "initWithDictionary"), DesignatedInit)
+
+INSTANCE_METHOD(NSRulerMarker, 
+                (4, "initWithRulerView", "markerLocation", "image", 
+                 "imageOrigin"), DesignatedInit)
+
+INSTANCE_METHOD(NSRulerView, (2, "initWithScrollView", "orientation"),
+                DesignatedInit)
+
+INSTANCE_METHOD(NSTableColumn, (1, "initWithIdentifier"), DesignatedInit)
+
+// FIXME: Differs from UIKit
+// INSTANCE_METHOD(NSTextAttachment, (1, "initWithFileWrapper"), DesignatedInit)
+
+INSTANCE_METHOD(NSTextBlock, (0, "init"), DesignatedInit)
+
+// FIXME: Differs from UIKit
+// INSTANCE_METHOD(NSTextContainer, (1, "initWithContainerSize"), 
+//                 DesignatedInit)
+
+INSTANCE_METHOD(NSTextFieldCell, (1, "initWithCoder"), DesignatedInit)
+INSTANCE_METHOD(NSTextFieldCell, (1, "initTextCell"), DesignatedInit)
+INSTANCE_METHOD(NSTextFieldCell, (1, "initImageCell"), DesignatedInit)
+
+INSTANCE_METHOD(NSTextFinder, (0, "init"), DesignatedInit)
+
+INSTANCE_METHOD(NSTextInputContext, (1, "initWithClient"), DesignatedInit)
+
+INSTANCE_METHOD(NSTextTableBlock, 
+                (5, "initWithTable", "startingRow", "rowSpan", 
+                 "startingColumn", "columnSpan"), DesignatedInit)
+
+INSTANCE_METHOD(NSTextView, (2, "initWithFrame", "textContainer"), 
+                DesignatedInit)
+
+INSTANCE_METHOD(NSUserDefaultsController, 
+                (2, "initWithDefaults", "initialValues"), DesignatedInit)
+
+INSTANCE_METHOD(NSTextView, (1, "initWithFrame"), DesignatedInit)
+
+INSTANCE_METHOD(NSWindow, 
+                (4, "initWithContentRect", "styleMask", "backing", "defer"), 
+                DesignatedInit)
+
+INSTANCE_METHOD(NSWindowController, (1, "initWithWindow"), DesignatedInit)
+
+// UIKit
+
+// FIXME: Differs from AppKit
+// INSTANCE_METHOD(NSTextAttachment, (2, "initWithData", "ofType"), 
+//                 DesignatedInit)
+
+INSTANCE_METHOD(NSTextContainer, (1, "initWithSize"), DesignatedInit)
+
+INSTANCE_METHOD(UIAttachmentBehavior, 
+                (4, "initWithItem", "offsetFromCenter", "attachedToItem", 
+                 "offsetFromCenter"), DesignatedInit)
+
+INSTANCE_METHOD(UICollectionView, (2, "initWithFrame", "collectionViewLayout"),
+                DesignatedInit)
+
+INSTANCE_METHOD(UIDocument, (1, "initWithFileURL"), DesignatedInit)
+
+INSTANCE_METHOD(UIGestureRecognizer, (2, "initWithTarget", "action"), 
+                DesignatedInit)
+
+INSTANCE_METHOD(UIInputView, (2, "initWithFrame", "inputViewStyle"),
+                DesignatedInit)
+
+INSTANCE_METHOD(UINavigationItem, (1, "initWithTitle"), DesignatedInit)
+
+INSTANCE_METHOD(UIStoryboardSegue, 
+                (3, "initWithIdentifier", "source", "destination"), 
+                DesignatedInit)
+
+INSTANCE_METHOD(UITableViewCell, (2, "initWithStyle", "reuseIdentifier"), 
+                DesignatedInit)
+
+INSTANCE_METHOD(UITextView, (2, "initWithFrame", "textContainer"),
+                DesignatedInit)
+
+INSTANCE_METHOD(UIView, (1, "initWithFrame"), DesignatedInit)
+
+INSTANCE_METHOD(UIViewController, (2, "initWithNibName", "bundle"), 
+                DesignatedInit)
+
+
+#undef INSTANCE_METHOD
+#undef CLASS_METHOD
