@@ -269,7 +269,20 @@ public:
            "existing mapping for local type data");
     LocalTypeDataMap.insert(std::make_pair(key, data));
   }
+  
+  /// The kind of value LocalSelf is.
+  enum LocalSelfKind {
+    /// An object reference.
+    ObjectReference,
+    /// A Swift metatype.
+    SwiftMetatype,
+    /// An ObjC metatype.
+    ObjCMetatype,
+  };
 
+  llvm::Value *getLocalSelfMetadata();
+  void setLocalSelfMetadata(llvm::Value *value, LocalSelfKind kind);
+  
 private:
   typedef unsigned LocalTypeDataDepth;
   typedef std::pair<TypeBase*,unsigned> LocalTypeDataPair;
@@ -278,6 +291,11 @@ private:
   }
 
   llvm::DenseMap<LocalTypeDataPair, llvm::Value*> LocalTypeDataMap;
+  
+  /// The value that satisfies metadata lookups for dynamic Self.
+  llvm::Value *LocalSelf = nullptr;
+  
+  LocalSelfKind SelfKind;
 };
 
 } // end namespace irgen

@@ -1024,6 +1024,44 @@ static void emitEntryPointArgumentsCOrObjC(IRGenSILFunction &IGF,
   }
 }
 
+/// Get metadata for the dynamic Self type if we have it.
+static void emitLocalSelfMetadata(IRGenSILFunction &IGF) {
+  // Self is the final SIL argument, if any.
+  if (IGF.CurSILFn->begin()->bbarg_empty())
+    return;
+  
+  SILArgument *selfArg = IGF.CurSILFn->begin()->getBBArgs().back();
+  
+  // If the argument is a class or class metatype value, we can use it for Self's
+  // metadata.
+  auto selfSILTy = selfArg->getType();
+  if (!selfSILTy.isObject())
+    return;
+  CanType instanceTy = selfSILTy.getSwiftRValueType();
+  CanMetatypeType metaTy = dyn_cast<MetatypeType>(instanceTy);
+  if (metaTy)
+    instanceTy = metaTy.getInstanceType();
+  
+  if (!instanceTy->getClassOrBoundGenericClass())
+    return;
+
+  IRGenFunction::LocalSelfKind selfKind;
+  if (!metaTy)
+    selfKind = IRGenFunction::ObjectReference;
+  else switch (metaTy->getRepresentation()) {
+  case MetatypeRepresentation::Thin:
+    llvm_unreachable("class metatypes are never thin");
+  case MetatypeRepresentation::Thick:
+    selfKind = IRGenFunction::SwiftMetatype;
+    break;
+  case MetatypeRepresentation::ObjC:
+    selfKind = IRGenFunction::ObjCMetatype;
+    break;
+  }
+  
+  llvm::Value *value = IGF.getLoweredExplosion(selfArg).claimNext();
+  IGF.setLocalSelfMetadata(value, selfKind);
+}
 
 /// Emit the definition for the given SIL constant.
 void IRGenModule::emitSILFunction(SILFunction *f) {
@@ -1075,6 +1113,7 @@ void IRGenSILFunction::emitSILFunction() {
     emitEntryPointArgumentsCOrObjC(*this, entry->first, params, funcTy);
     break;
   }
+  emitLocalSelfMetadata(*this);
   
   assert(params.empty() && "did not map all llvm params to SIL params?!");
 
@@ -2626,17 +2665,10 @@ void IRGenSILFunction::visitObjCToThickMetatypeInst(
   Explosion from = getLoweredExplosion(i->getOperand());
   llvm::Value *classPtr = from.claimNext();
   
-  // Clang uses i8* for Class types; bitcast to the more-precise objc_class*.
-  if (classPtr->getType() == IGM.Int8PtrTy)
-    classPtr = Builder.CreateBitCast(classPtr, IGM.ObjCClassPtrTy);
-  
   // Fetch the metadata for that class.
   Explosion to(ResilienceExpansion::Maximal);
-  auto call = Builder.CreateCall(IGM.getGetObjCClassMetadataFn(), classPtr);
-  call->setDoesNotThrow();
-  call->setDoesNotAccessMemory();
-  call->setCallingConv(IGM.RuntimeCC);
-  to.add(call);
+  auto metadata = emitObjCMetadataRefForMetadata(*this, classPtr);
+  to.add(metadata);
   setLoweredExplosion(SILValue(i, 0), to);  
 }
 

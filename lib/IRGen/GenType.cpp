@@ -24,6 +24,7 @@
 #include "llvm/Support/ErrorHandling.h"
 
 #include "LoadableTypeInfo.h"
+#include "GenMeta.h"
 #include "GenType.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
@@ -1731,6 +1732,25 @@ unsigned IRGenModule::getBuiltinIntegerWidth(BuiltinIntegerWidth w) {
   llvm_unreachable("impossible width value");
 }
 
+llvm::Value *IRGenFunction::getLocalSelfMetadata() {
+  assert(LocalSelf && "no local self metadata");
+  switch (SelfKind) {
+  case SwiftMetatype:
+    return LocalSelf;
+  case ObjCMetatype:
+    return emitObjCMetadataRefForMetadata(*this, LocalSelf);
+  case ObjectReference:
+    return emitTypeMetadataRefForOpaqueHeapObject(*this, LocalSelf);
+  }
+}
+
+void IRGenFunction::setLocalSelfMetadata(llvm::Value *value,
+                                         IRGenFunction::LocalSelfKind kind) {
+  assert(!LocalSelf && "already have local self metadata");
+  LocalSelf = value;
+  SelfKind = kind;
+}
+
 #ifndef NDEBUG
 CanType TypeConverter::getTypeThatLoweredTo(llvm::Type *t) const {
   for (auto &mapping : Types.IndependentCache) {
@@ -1749,5 +1769,5 @@ bool TypeConverter::isExemplarArchetype(ArchetypeType *arch) const {
     if (ea.Archetype == arch) return true;
   return false;
 }
-
 #endif
+

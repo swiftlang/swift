@@ -189,6 +189,9 @@ namespace irgen {
   llvm::Value *emitProtocolDescriptorRef(IRGenFunction &IGF,
                                          ProtocolDecl *protocol);
   
+  llvm::Value *emitObjCMetadataRefForMetadata(IRGenFunction &IGF,
+                                              llvm::Value *classPtr);
+  
   /// Adjustment indices for the address points of various metadata.
   /// Size is in words.
   namespace MetadataAdjustmentIndex {

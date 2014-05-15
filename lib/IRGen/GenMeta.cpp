@@ -79,12 +79,10 @@ static llvm::Constant *getMangledTypeName(IRGenModule &IGM, CanType type) {
   return IGM.getAddrOfGlobalString(mangling);
 }
 
-/// Emit a reference to the Swift metadata for an Objective-C class.
-static llvm::Value *emitObjCMetadataRef(IRGenFunction &IGF,
-                                        ClassDecl *theClass) {
-  // Derive a pointer to the Objective-C class.
-  auto classPtr = IGF.IGM.getAddrOfObjCClass(theClass, NotForDefinition);
-
+llvm::Value *irgen::emitObjCMetadataRefForMetadata(IRGenFunction &IGF,
+                                                   llvm::Value *classPtr) {
+  classPtr = IGF.Builder.CreateBitCast(classPtr, IGF.IGM.ObjCClassPtrTy);
+  
   // Fetch the metadata for that class.
   auto call = IGF.Builder.CreateCall(IGF.IGM.getGetObjCClassMetadataFn(),
                                      classPtr);
@@ -92,6 +90,15 @@ static llvm::Value *emitObjCMetadataRef(IRGenFunction &IGF,
   call->setDoesNotAccessMemory();
   call->setCallingConv(IGF.IGM.RuntimeCC);
   return call;
+}
+
+/// Emit a reference to the Swift metadata for an Objective-C class.
+static llvm::Value *emitObjCMetadataRef(IRGenFunction &IGF,
+                                        ClassDecl *theClass) {
+  // Derive a pointer to the Objective-C class.
+  auto classPtr = IGF.IGM.getAddrOfObjCClass(theClass, NotForDefinition);
+  
+  return emitObjCMetadataRefForMetadata(IGF, classPtr);
 }
 
 namespace {
@@ -561,8 +568,7 @@ namespace {
     }
 
     llvm::Value *visitDynamicSelfType(CanDynamicSelfType type) {
-      IGF.unimplemented(SourceLoc(), "metadata ref for DynamicSelf type");
-      return llvm::UndefValue::get(IGF.IGM.TypeMetadataPtrTy);
+      return IGF.getLocalSelfMetadata();
     }
       
     llvm::Value *emitExistentialTypeMetadata(CanType type) {
