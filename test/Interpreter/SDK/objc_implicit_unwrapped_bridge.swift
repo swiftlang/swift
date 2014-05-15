@@ -114,7 +114,6 @@ func testConvertArrayOfImplicitUnwrappedArray() {
 
 testConvertArrayOfImplicitUnwrappedArray()
 
-#if false
 // Bridge an NSArray to an array of implicitly unwrapped class type.
 func testConvertToArrayOfImplicitUnwrappedClass() {
   println("Converting an NSArray to an array of X!")
@@ -124,9 +123,9 @@ func testConvertToArrayOfImplicitUnwrappedClass() {
 
   var arr: (X!)[] = _convertNSArrayToArray(nsarr)
   
-  // CHECK-DISABLED: Class array count = 2
-  // CHECK-DISABLED: Element 0 has value X(1)
-  // CHECK-DISABLED: Element 1 has value X(2)
+  // CHECK: Class array count = 2
+  // CHECK: Element 0 has value X(1)
+  // CHECK: Element 1 has value X(2)
   println("Class array count = \(arr.count)")
   for (index, opt) in enumerate(arr) {
     if let x = opt {
@@ -148,13 +147,13 @@ func testConvertToArrayOfImplicitUnwrappedString() {
 
   var arr: (String!)[] = _convertNSArrayToArray(nsarr)
   
-  // CHECK-DISABLED: String array count = 2
-  // CHECK-DISABLED: Element 0 has value Hello
-  // CHECK-DISABLED: Element 1 has value World
+  // CHECK: String array count = 2
+  // CHECK: Element 0 has value Hello
+  // CHECK: Element 1 has value World
   println("String array count = \(arr.count)")
   for (index, opt) in enumerate(arr) {
     if let str = opt {
-      println("Element \(index) has value X(str)")
+      println("Element \(index) has value \(str)")
     } else {
       println("Element \(index) is empty")
     }
@@ -162,7 +161,6 @@ func testConvertToArrayOfImplicitUnwrappedString() {
 }
 
 testConvertToArrayOfImplicitUnwrappedString()
-#endif
 
 // FIXME: Negative tests will need their own path.
 

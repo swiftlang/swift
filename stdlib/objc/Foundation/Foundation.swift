@@ -557,7 +557,10 @@ func asNSArray<T>(array: T[]) -> NSArray {
 
 /// The entry point for bridging `NSArray` to `Array`.
 func _convertNSArrayToArray<T>(nsarr: NSArray) -> T[] {
-  return T[](ArrayBuffer(reinterpretCast(nsarr) as CocoaArray))
+  if let arr = T[].bridgeFromObjectiveC(nsarr) {
+    return arr
+  }
+  fatal("NSArray does not bridge to array")
 }
 
 /// The entry point for bridging 'Array' to 'NSArray'.
@@ -580,7 +583,8 @@ extension Array : _ConditionallyBridgedToObjectiveC {
   }
 
   static func bridgeFromObjectiveC(x: NSArray) -> Array<T>? {
-    fatal("implement")
+    let anyArr = AnyObject[](ArrayBuffer(reinterpretCast(x) as CocoaArray))
+    return _arrayBridgedDownCast(anyArr)
   }
 
   @conversion func __conversion() -> NSArray {
