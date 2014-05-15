@@ -36,3 +36,7 @@ func testUseOfFactoryMethod(queen: B) {
 func testNonsplittableFactoryMethod() {
   var of5 = NSObjectFactory.factoryBuildingWidgets()
 }
+
+func testFactoryMethodBlacklist() {
+  var x = NCWidgetController.widgetController()
+}

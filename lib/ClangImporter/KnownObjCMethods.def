@@ -28,6 +28,7 @@
 //   Options: A set of OR'd options describing what specific behavior
 //   should be applied to this method. The possibilities are:
 //     DesignatedInit: Mark this as a designated initializer of its class
+//     NotFactory: Mark this class method as not being a factory method
 
 #ifndef INSTANCE_METHOD
 #  error define INSTANCE_METHOD before including KnownMethods.def
@@ -56,6 +57,9 @@ INSTANCE_METHOD(NSDecimalNumber, (1, "initWithDecimal"), DesignatedInit)
 INSTANCE_METHOD(NSDictionary, (0, "init"), DesignatedInit)
 INSTANCE_METHOD(NSDictionary, (3, "initWithObjects", "forKeys", "count"),
                 DesignatedInit)
+
+CLASS_METHOD(NSDistributedNotificationCenter, (1, "notificationCenterForType"),
+             FactoryAsClassMethod)
 
 INSTANCE_METHOD(NSError, (3, "initWithDomain", "code", "userInfo"), 
                 DesignatedInit)
@@ -237,6 +241,9 @@ INSTANCE_METHOD(NSWindow,
                 DesignatedInit)
 
 INSTANCE_METHOD(NSWindowController, (1, "initWithWindow"), DesignatedInit)
+
+// NotificationCenter
+CLASS_METHOD(NCWidgetController, (0, "widgetController"), FactoryAsClassMethod)
 
 // UIKit
 

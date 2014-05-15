@@ -2008,6 +2008,21 @@ namespace {
       if (!objcClass)
         return Nothing;
 
+      // Check whether we're allowed to try.
+      switch (Impl.getFactoryAsInit(objcClass, decl)) {
+      case FactoryAsInitKind::Infer:
+        break;
+
+      case FactoryAsInitKind::AsInitializer:
+        // FIXME: Should allow this to provide the name of the
+        // initializer, since we'll almost surely need remapping for
+        // this to work.
+        break;
+          
+      case FactoryAsInitKind::AsClassMethod:
+        return Nothing;
+      }
+
       // Check whether the name fits the pattern.
       DeclName initName
         = Impl.mapFactorySelectorToInitializerName(selector,

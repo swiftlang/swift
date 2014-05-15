@@ -1062,9 +1062,16 @@ DeclName ClangImporter::Implementation::mapFactorySelectorToInitializerName(
 namespace known_methods {
 namespace {
   // DesignatedInit flag
-  enum DesignatedInitKind { DesignatedInit };
-  KnownObjCMethod operator|(KnownObjCMethod known, DesignatedInitKind) {
+  enum DesignatedInitFlag { DesignatedInit };
+  KnownObjCMethod operator|(KnownObjCMethod known, DesignatedInitFlag) {
     known.DesignatedInit = true;
+    return known;
+  }
+
+  // FactoryAsClassMethod flag
+  enum FactoryAsClassMethodFlag { FactoryAsClassMethod };
+  KnownObjCMethod operator|(KnownObjCMethod known, FactoryAsClassMethodFlag) {
+    known.setFactoryAsInitKind(FactoryAsInitKind::AsClassMethod);
     return known;
   }
 }
@@ -1129,6 +1136,19 @@ bool ClangImporter::Implementation::isDesignatedInitializer(
   auto known = KnownInstanceMethods.find({className, selector});
   return known != KnownInstanceMethods.end() &&
          known->second.DesignatedInit;
+}
+
+FactoryAsInitKind ClangImporter::Implementation::getFactoryAsInit(
+                    const clang::ObjCInterfaceDecl *classDecl,
+                    const clang::ObjCMethodDecl *method) {
+  populateKnownObjCMethods();
+  auto className = SwiftContext.getIdentifier(classDecl->getName());
+  auto selector = importSelector(method->getSelector());
+  auto known = KnownClassMethods.find({className, selector});
+  if (known == KnownClassMethods.end())
+    return FactoryAsInitKind::Infer;
+
+  return known->second.getFactoryAsInitKind();
 }
 
 #pragma mark Name lookup

@@ -185,13 +185,36 @@ enum class SpecialMethodKind {
 
 #define SWIFT_NATIVE_ANNOTATION_STRING "__swift native"
 
+/// Describes whether to classify a factory method as an initializer.
+enum class FactoryAsInitKind {
+  /// Infer based on name and type (the default).
+  Infer,
+  /// Treat as a class method.
+  AsClassMethod,
+  /// Treat as an initializer.
+  AsInitializer
+};
+
 /// Describes an Objective-C method for which the we have special knowledge, as
 /// described in \c KnownObjCMethods.def.
 struct LLVM_LIBRARY_VISIBILITY KnownObjCMethod {
   /// Whether this is a designated initializer of its class.
   unsigned DesignatedInit : 1;
 
-  KnownObjCMethod() : DesignatedInit(false) { }
+  /// Whether to treat this method as a factory or initializer.
+  unsigned FactoryAsInit : 2;
+
+  KnownObjCMethod() 
+    : DesignatedInit(false),
+      FactoryAsInit(static_cast<unsigned>(FactoryAsInitKind::Infer)) { }
+
+  FactoryAsInitKind getFactoryAsInitKind() const {
+    return static_cast<FactoryAsInitKind>(FactoryAsInit);
+  }
+
+  void setFactoryAsInitKind(FactoryAsInitKind kind) {
+    FactoryAsInit = static_cast<unsigned>(kind);
+  }
 };
 
 /// \brief Implementation of the Clang importer.
@@ -300,6 +323,11 @@ public:
   /// of the given class.
   bool isDesignatedInitializer(const clang::ObjCInterfaceDecl *classDecl,
                                const clang::ObjCMethodDecl *method);
+
+  /// Determine whether the given class method should be imported as
+  /// an initializer.
+  FactoryAsInitKind getFactoryAsInit(const clang::ObjCInterfaceDecl *classDecl,
+                                     const clang::ObjCMethodDecl *method);
 
   /// \brief Typedefs that we should not be importing.  We should be importing
   /// underlying decls instead.

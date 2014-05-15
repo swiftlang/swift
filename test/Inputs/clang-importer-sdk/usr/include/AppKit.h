@@ -70,3 +70,6 @@
 @interface NSObjectFactorySub : NSObjectFactory
 @end
 
+@interface NCWidgetController : NSObject
++ (instancetype)widgetController;
+@end
