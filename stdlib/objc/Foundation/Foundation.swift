@@ -1143,7 +1143,6 @@ extension NSMutableString {
   }
 }
 
-// FIXME. Writing test to use the initializer is blocked by rdar://16801456
 extension NSArray {
   // Overlay: - (instancetype)initWithObjects:(id)firstObj, ...
   convenience init(objects elements: AnyObject...) {
