@@ -36,6 +36,7 @@ namespace swift {
   class Decl;
   class DeclContext;
   class DelayedParsingCallbacks;
+  class GenericParamList;
   class IRGenOptions;
   class LangOptions;
   class Module;
@@ -143,7 +144,8 @@ namespace swift {
                               bool ProduceDiagnostics = true);
 
   /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
-  bool handleSILGenericParams(ASTContext &Ctx, TypeLoc &T, DeclContext *DC,
+  bool handleSILGenericParams(ASTContext &Ctx, GenericParamList *gp,
+                              DeclContext *DC,
                               ArchetypeBuilder *builder);
 
   /// Turn the given module into SIL IR.

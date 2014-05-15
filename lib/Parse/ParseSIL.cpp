@@ -96,6 +96,7 @@ namespace {
     bool performTypeLocChecking(TypeLoc &T, bool IsSIL = true);
     bool parseApplySubstitutions(
                    SmallVectorImpl<ParsedSubstitution> &parsed);
+    bool handleGenericParams(TypeLoc &T, ArchetypeBuilder *builder);
   public:
 
     SILParser(Parser &P) : P(P), SILMod(*P.SIL->M), TUState(*P.SIL->S) {}
@@ -691,6 +692,16 @@ static ValueDecl *lookupMember(Parser &P, Type Ty, Identifier Name) {
                       false/*ExpectMultipleResults*/);
 }
 
+bool SILParser::handleGenericParams(TypeLoc &T, ArchetypeBuilder *builder) {
+  if (T.wasValidated() || !T.getType().isNull())
+     return false;
+
+  if (auto fnType = dyn_cast<FunctionTypeRepr>(T.getTypeRepr()))
+    if (auto gp = fnType->getGenericParams())
+      handleSILGenericParams(P.Context, gp, &P.SF, builder);
+  return false;
+}
+
 bool SILParser::parseSILTypeWithoutQualifiers(SILType &Result,
                                               SILValueCategory category,
                                               const TypeAttributes &attrs,
@@ -718,7 +729,7 @@ bool SILParser::parseSILTypeWithoutQualifiers(SILType &Result,
     if (auto generics = fnType->getGenericParams()) {
       generics->setBuilder(&builder);
       TypeLoc TyLoc = TyR.get();
-      handleSILGenericParams(P.Context, TyLoc, &P.SF, &builder);
+      handleGenericParams(TyLoc, &builder);
       GenericParams = generics;
     }
   }
@@ -1151,7 +1162,7 @@ bool SILParser::parseApplySubstitutions(
   
   P.consumeToken();
   
-  // Parse a list of Substitutions: Archetype = Replacement.
+  // Parse a list of Substitutions.
   do {
     SourceLoc Loc = P.Tok.getLoc();
     Substitution Sub;
@@ -1180,7 +1191,7 @@ bool SILParser::parseApplySubstitutions(
 }
 
 /// Reconstruct AST substitutions from parsed substitutions using archetypes
-/// from a PolymorphicFunctionType.
+/// from a SILFunctionType.
 bool getApplySubstitutionsFromParsed(
                              SILParser &SP,
                              GenericParamList *params,
@@ -2061,7 +2072,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       if (auto generics = fnType->getGenericParams()) {
         generics->setBuilder(&builder);
         TypeLoc TyLoc = TyR.get();
-        handleSILGenericParams(P.Context, TyLoc, &P.SF, &builder);
+        handleGenericParams(TyLoc, &builder);
       }
     }
 

@@ -915,18 +915,11 @@ static void finalizeGenericParamList(ArchetypeBuilder &builder,
 }
 
 /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
-bool TypeChecker::handleSILGenericParams(ArchetypeBuilder *builder, TypeLoc &T,
+bool TypeChecker::handleSILGenericParams(ArchetypeBuilder *builder,
+                                         GenericParamList *gp,
                                          DeclContext *DC) {
-  if (T.wasValidated() || !T.getType().isNull())
-    return false;
-
-  if (auto fnType = dyn_cast<FunctionTypeRepr>(T.getTypeRepr())) {
-    if (auto gp = fnType->getGenericParams()) {
-      // What should the DeclContext be for the following callsites?
-      checkGenericParamList(*builder, gp, *this, DC);
-      finalizeGenericParamList(*builder, gp, DC, *this);
-    }
-  }
+  checkGenericParamList(*builder, gp, *this, DC);
+  finalizeGenericParamList(*builder, gp, DC, *this);
   return false;
 }
 

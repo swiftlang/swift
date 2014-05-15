@@ -427,9 +427,10 @@ bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
 }
 
 /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
-bool swift::handleSILGenericParams(ASTContext &Ctx, TypeLoc &T, DeclContext *DC,
+bool swift::handleSILGenericParams(ASTContext &Ctx, GenericParamList *gp,
+                                   DeclContext *DC,
                                    ArchetypeBuilder *builder) {
-  return TypeChecker(Ctx).handleSILGenericParams(builder, T, DC);
+  return TypeChecker(Ctx).handleSILGenericParams(builder, gp, DC);
 }
 
 bool swift::typeCheckCompletionDecl(Decl *D) {
