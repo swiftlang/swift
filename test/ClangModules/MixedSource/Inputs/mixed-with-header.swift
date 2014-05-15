@@ -32,3 +32,6 @@ class Derived : Base {
       return ForwardClass()
    }
 }
+
+func rdar16923405(a: AALevel) {}
+

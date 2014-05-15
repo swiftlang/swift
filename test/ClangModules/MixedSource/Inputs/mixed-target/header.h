@@ -1,4 +1,4 @@
-@import ObjectiveC;
+@import Foundation;
 @import ExternIntX;
 #import "Protocols.h"
 
@@ -47,4 +47,10 @@ void doSomethingPartialSub(PartialSubClass *arg);
 @interface PartialSubClass ()
 - (void)doPartialClassCategoryThing;
 @end
+
+
+typedef NS_ENUM(short, AALevel) {
+  AAA = 1,
+  BBB = 2
+};
 

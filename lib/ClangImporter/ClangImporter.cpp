@@ -1640,6 +1640,10 @@ static int pointerPODSortComparator(T * const *lhs, T * const *rhs) {
 void ClangModuleUnit::getImportedModules(
     SmallVectorImpl<Module::ImportedModule> &imports,
     Module::ImportFilter filter) const {
+  if (filter != Module::ImportFilter::Public)
+    imports.push_back({Module::AccessPathTy(),
+                       getASTContext().getStdlibModule()});
+
   if (!clangModule) {
     // This is the special "imported headers" module.
     if (filter != Module::ImportFilter::Private) {
@@ -1687,10 +1691,6 @@ void ClangModuleUnit::getImportedModules(
 
     imports.push_back({Module::AccessPathTy(), actualMod});
   }
-
-  if (filter != Module::ImportFilter::Public)
-    imports.push_back({Module::AccessPathTy(),
-                       getASTContext().getStdlibModule()});
 }
 
 static void lookupClassMembersImpl(ClangImporter::Implementation &Impl,
