@@ -49,6 +49,19 @@ func printedIs<T>(
   }
 }
 
+func debugPrintedIs<T>(
+    object: T, expected: String,
+    file: StaticString = __FILE__, line: UWord = __LINE__
+) {
+  var actual = ""
+  debugPrint(object, &actual)
+  if expected != actual {
+    println("expected: \"\(expected)\"")
+    println("actual: \"\(actual)\"")
+    assert(expected == actual, file: file, line: line)
+  }
+}
+
 func assertEquals(
     expected: String, actual: String,
     file: StaticString = __FILE__, line: UWord = __LINE__
@@ -90,9 +103,9 @@ func test_StdlibTypesPrinted() {
 
   var s: String = "abc"
   printedIs(s, "abc")
-  printedIs(s.debugDescription, "\"abc\"")
+  debugPrintedIs(s, "\"abc\"")
   s = "\\ \' \" \0 \n \r \t \x05"
-  printedIs(s.debugDescription, "\"\\\\ \\\' \\\" \\0 \\n \\r \\t \\x05\"")
+  debugPrintedIs(s, "\"\\\\ \\\' \\\" \\0 \\n \\r \\t \\x05\"")
 
   var ch: Character = "a"
   printedIs(ch, "a")
@@ -419,7 +432,9 @@ func test_ArrayPrinting() {
   printedIs([ 1, 2 ], "[1, 2]")
   printedIs([ 1, 2, 3 ], "[1, 2, 3]")
 
+  var arrayOfStrings = [ "foo", "bar", "bas" ]
   printedIs([ "foo", "bar", "bas" ], "[foo, bar, bas]")
+  debugPrintedIs([ "foo", "bar", "bas" ], "[\"foo\", \"bar\", \"bas\"]")
 
   printedIs([ StructPrintable(1), StructPrintable(2),
               StructPrintable(3) ],
@@ -441,11 +456,21 @@ test_ArrayPrinting()
 // CHECK: test_ArrayPrinting done
 
 func test_DictionaryPrinting() {
-  var dict: Dictionary<String, Int> = [:]
-  printedIs(dict, "[:]")
+  var dictSI: Dictionary<String, Int> = [:]
+  printedIs(dictSI, "[:]")
+  debugPrintedIs(dictSI, "[:]")
 
-  printedIs([ "aaa": 1 ], "[\"aaa\": 1]")
-  printedIs([ "aaa": 1, "bbb": 2 ], "[\"aaa\": 1, \"bbb\": 2]")
+  dictSI = [ "aaa": 1 ]
+  printedIs(dictSI, "[aaa: 1]")
+  debugPrintedIs(dictSI, "[\"aaa\": 1]")
+
+  dictSI = [ "aaa": 1, "bbb": 2 ]
+  printedIs(dictSI, "[aaa: 1, bbb: 2]")
+  debugPrintedIs(dictSI, "[\"aaa\": 1, \"bbb\": 2]")
+
+  var dictSS = [ "aaa": "bbb" ]
+  printedIs(dictSS, "[aaa: bbb]")
+  debugPrintedIs(dictSS, "[\"aaa\": \"bbb\"]")
 
   println("test_DictionaryPrinting done")
 }

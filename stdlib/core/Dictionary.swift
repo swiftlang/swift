@@ -1599,8 +1599,8 @@ func != <KeyType : Equatable, ValueType : Equatable>(
   return !(lhs == rhs)
 }
 
-extension Dictionary : Printable {
-  var description: String {
+extension Dictionary : Printable, DebugPrintable {
+  func _makeDescription(#isDebug: Bool) -> String {
     if count == 0 {
       return "[:]"
     }
@@ -1613,13 +1613,28 @@ extension Dictionary : Printable {
       } else {
         result += ", "
       }
-      result += "\""
-      print(k, &result)
-      result += "\": "
-      print(v, &result)
+      if isDebug {
+        debugPrint(k, &result)
+      } else {
+        print(k, &result)
+      }
+      result += ": "
+      if isDebug {
+        debugPrint(v, &result)
+      } else {
+        print(v, &result)
+      }
     }
     result += "]"
     return result
+  }
+
+  var description: String {
+    return _makeDescription(isDebug: false)
+  }
+
+  var debugDescription: String {
+    return _makeDescription(isDebug: true)
   }
 }
 

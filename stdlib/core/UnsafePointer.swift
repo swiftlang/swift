@@ -331,6 +331,12 @@ func - <T>(lhs: UnsafePointer<T>, rhs: UnsafePointer<T>) -> Int {
   lhs = lhs - rhs
 }
 
+extension UnsafePointer : Printable {
+  var description: String {
+    return ""
+  }
+}
+
 /// A byte-sized thing that isn't designed to interoperate with
 /// any other types; it makes a decent parameter to UnsafePointer when
 /// you just want to do bytewise pointer arithmetic.

@@ -236,8 +236,8 @@ extension ${Self} : Reflectable {
   }
 }
 
-extension ${Self} : Printable {
-  var description: String {
+extension ${Self} : Printable, DebugPrintable {
+  func _makeDescription(#isDebug: Bool) -> String {
     var result = "["
     var first = true
     for item in self {
@@ -246,10 +246,22 @@ extension ${Self} : Printable {
       } else {
         result += ", "
       }
-      print(item, &result)
+      if isDebug {
+        debugPrint(item, &result)
+      } else {
+        print(item, &result)
+      }
     }
     result += "]"
     return result
+  }
+
+  var description: String {
+    return _makeDescription(isDebug: false)
+  }
+
+  var debugDescription: String {
+    return _makeDescription(isDebug: true)
   }
 }
 
