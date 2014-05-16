@@ -325,6 +325,10 @@ const size_t  pageMask = getpagesize() - 1;
 const size_t arenaSize = 0x10000;
 const size_t arenaMask =  0xFFFF;
 
+static const void *pointerToArena(const void *pointer) {
+  return (const void *)((size_t)pointer & ~arenaMask);
+}
+
 size_t roundToPage(size_t size) {
   return (size + pageMask) & ~pageMask;
 }
@@ -539,7 +543,7 @@ size_t swift::_swift_zone_size(malloc_zone_t *zone, const void *pointer) {
   swiftZone.readLock();
   void *ptr = (void *)((unsigned long)pointer & ~arenaMask);
   size_t value = 0;
-  auto it = swiftZone.arenas.find(ptr);
+  auto it = swiftZone.arenas.find(pointerToArena(ptr));
   if (it) {
     value = it->second.byteSize;
   } else {
