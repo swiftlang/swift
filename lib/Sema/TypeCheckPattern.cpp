@@ -668,10 +668,34 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
         if (options & TR_OverrideType) {
           TP->overwriteType(type);
         } else {
+          auto allowTPtype = false;
+          
+          // Accept implicitly unwrapped optional type annotations on iterator
+          // variables.
+          if (type.getPointer()->isAnyObject() &&
+              (options & TR_EnumerationVariable)) {
+            auto tpType = TP->getType().getPointer()->getDesugaredType();
+            if(auto bgt = dyn_cast<BoundGenericType>(tpType)) {
+              if (bgt->getDecl()->classifyAsOptionalType() ==
+                                            OTK_ImplicitlyUnwrappedOptional) {
+                
+                auto wrappedType = bgt->getGenericArgs()[0];
+                
+                if (wrappedType->getClassOrBoundGenericClass() ||
+                    this->getDynamicBridgedThroughObjCClass(dc,
+                                                            type,
+                                                            wrappedType)) {
+                  allowTPtype = true;
+                }
+              }
+            }
+          }
           // Complain if the types don't match exactly.
           // TODO: allow implicit conversions?
-          diagnose(P->getLoc(), diag::pattern_type_mismatch_context, type);
-          hadError = true;
+          if (!allowTPtype) {
+            diagnose(P->getLoc(), diag::pattern_type_mismatch_context, type);
+            hadError = true;
+          }
         }
       }
     }

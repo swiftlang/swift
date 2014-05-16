@@ -502,7 +502,7 @@ public:
     // FIXME: Could allow unbound generic types in this pattern, then override
     // here.
     Pattern *pattern = S->getPattern();
-    if (TC.coercePatternToType(pattern, DC, ElementTy, None))
+    if (TC.coercePatternToType(pattern, DC, ElementTy, TR_EnumerationVariable))
       return nullptr;
     S->setPattern(pattern);
     

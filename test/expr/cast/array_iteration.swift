@@ -14,6 +14,14 @@ for view in (rootView.subviews as View[])! {
 	println("found subview")
 }
 
+for view:View! in rootView.subviews {
+	println("found subview")
+}
+
+for view:View in rootView.subviews { // expected-error{{type annotation does not match contextual type 'AnyObject'}}
+	println("found subview")
+}
+
 (rootView.subviews!) as View[]
 
 (rootView.subviews) as View[]
