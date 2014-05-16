@@ -505,10 +505,7 @@ void AttributeChecker::visitFinalAttr(FinalAttr *attr) {
 
   // The @final attribute only makes sense in the context of a class
   // declaration.  Reject it on global functions, structs, enums, etc.
-  auto typeContext = D->getDeclContext()->getDeclaredTypeInContext();
-  auto contextTypeDecl =
-    typeContext ? typeContext->getNominalOrBoundGenericNominal() : nullptr;
-  if (!contextTypeDecl || !isa<ClassDecl>(contextTypeDecl)) {
+  if (!D->getDeclContext()->isClassOrClassExtensionContext()) {
     TC.diagnose(attr->getLocation(), diag::member_cannot_be_final);
     return;
   }

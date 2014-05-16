@@ -214,3 +214,23 @@ func testLazyProperties() {
 
 testLazyProperties()
 
+
+
+/// rdar://16805609 - <rdar://problem/16805609> Providing a 'didSet' in a generic override doesn't work
+class rdar16805609Base<T> {
+    var value : String = ""
+}
+
+class rdar16805609Derived<T> : rdar16805609Base<String>{
+    override var value : String {
+        didSet(val) {
+          println("reached me")
+        }
+    }
+}
+
+let person = rdar16805609Derived<Int>()
+println("testing rdar://16805609")    // CHECK: testing rdar://16805609
+person.value = "foo"                  // CHECK-NEXT: reached me
+println("done rdar://16805609")       // CHECK-NEXT: done rdar://16805609
+

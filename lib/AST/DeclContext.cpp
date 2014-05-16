@@ -53,7 +53,7 @@ ASTContext &DeclContext::getASTContext() const {
 /// If this DeclContext is a class, or an extension on a class, return the
 /// ClassDecl, otherwise return null.
 ClassDecl *DeclContext::isClassOrClassExtensionContext() const {
-  if (auto ctx = getDeclaredTypeOfContext())
+  if (auto ctx = getDeclaredTypeInContext())
     return ctx->getClassOrBoundGenericClass();
   return nullptr;
 }

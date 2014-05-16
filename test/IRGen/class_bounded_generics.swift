@@ -232,9 +232,9 @@ func class_protocol_field_struct_fields
 func class_generic_field_class_fields<T : ClassBound>
 (x:ClassGenericFieldClass<T>) -> (Int, T, Int) {
   return (x.x, x.y, x.z)
-  // CHECK: getelementptr inbounds %C22class_bounded_generics22ClassGenericFieldClass* {{%.*}}, i32 0, i32 1
-  // CHECK: getelementptr inbounds %C22class_bounded_generics22ClassGenericFieldClass* {{%.*}}, i32 0, i32 2
-  // CHECK: getelementptr inbounds %C22class_bounded_generics22ClassGenericFieldClass* {{%.*}}, i32 0, i32 3
+  // CHECK: call i64 @_TFC22class_bounded_generics22ClassGenericFieldClassg1xSi(%C22class_bounded_generics22ClassGenericFieldClass* %0)
+  // CHECK: call %objc_object* @_TFC22class_bounded_generics22ClassGenericFieldClassg1yQ_(%C22class_bounded_generics22ClassGenericFieldClass* %0)
+  // CHECK: call i64 @_TFC22class_bounded_generics22ClassGenericFieldClassg1zSi(%C22class_bounded_generics22ClassGenericFieldClass* %0)
 }
 
 // CHECK-LABEL: define void @_TF22class_bounded_generics33class_protocol_field_class_fields{{.*}}(<{ %Si, %P22class_bounded_generics10ClassBound_, %Si }>* noalias sret, %C22class_bounded_generics23ClassProtocolFieldClass*)
