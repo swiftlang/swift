@@ -126,7 +126,7 @@ struct HeapBuffer<Value, Element> : LogicValue, Equatable {
     _ storageClass: HeapBufferStorageBase.Type,
     _ initializer: Value, _ capacity: Int
   ) {
-    assert(capacity >= 0)
+    _sanityCheck(capacity >= 0)
 
     let totalSize = HeapBuffer._elementOffset() +
         capacity * Int(Builtin.strideof(Element.self))

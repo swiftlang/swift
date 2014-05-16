@@ -39,7 +39,7 @@ protocol IntegerArithmetic : _IntegerArithmetic, Comparable {
 % for name,op in integerBinaryOps:
 @transparent
 func ${op} <T: _IntegerArithmetic>(lhs: T, rhs: T) -> T {
-  return overflowChecked(T.unchecked${name}(lhs, rhs))
+  return _overflowChecked(T.unchecked${name}(lhs, rhs))
 }
 
 @transparent

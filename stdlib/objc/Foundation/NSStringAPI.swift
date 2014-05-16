@@ -894,7 +894,7 @@ extension String {
   /// format string as a template into which the remaining argument
   /// values are substituted according to the user’s default locale.
   init(format: String, arguments: CVarArg[]) {
-    securityCheck(_countFormatSpecifiers(format) <= arguments.count)
+    _precondition(_countFormatSpecifiers(format) <= arguments.count)
     self = withVaList(arguments) {
       NSString(format: format, arguments: $0)
     }
@@ -915,7 +915,7 @@ extension String {
   /// format string as a template into which the remaining argument
   /// values are substituted according to given locale information.
   init(format: String, locale: NSLocale, arguments: CVarArg[]) {
-    securityCheck(_countFormatSpecifiers(format) <= arguments.count, "More format specifiers than arguments")
+    _precondition(_countFormatSpecifiers(format) <= arguments.count, "More format specifiers than arguments")
     self = withVaList(arguments) {
       NSString(format: format, locale: locale, arguments: $0)
     }

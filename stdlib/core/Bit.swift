@@ -17,12 +17,12 @@ enum Bit : Int, RandomAccessIndex {
   case zero = 0, one = 1
 
   func succ() -> Bit {
-    assert(self == .zero, "Can't increment past one")
+    _precondition(self == .zero, "Can't increment past one")
     return .one
   }
 
   func pred() -> Bit {
-    assert(self == .one, "Can't decrement past zero")
+    _precondition(self == .one, "Can't decrement past zero")
     return .zero
   }
 

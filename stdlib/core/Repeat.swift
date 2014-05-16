@@ -30,7 +30,7 @@ struct Repeat<T> : Collection {
   }
 
   subscript(i: Int) -> T {
-    assert(i < count, "Index out of range")
+    _precondition(i < count, "Index out of range")
     return repeatedValue
   }
 

@@ -192,7 +192,7 @@ struct CMutablePointer<T> : Equatable {
   /// Conversion from an inout array.
   @transparent
   static func __inout_conversion(inout a: Array<T>) -> CMutablePointer {
-    assert(a.elementStorage != nil || a.count == 0)
+    _debugPrecondition(a.elementStorage != nil || a.count == 0)
 
     // TODO: Putting a canary at the end of the array in checked builds might
     // be a good idea
@@ -272,7 +272,7 @@ struct CMutableVoidPointer : Equatable {
   @transparent
   static func __inout_conversion<T>(inout a: Array<T>)
   -> CMutableVoidPointer {
-    assert(a.elementStorage != nil || a.count == 0)
+    _debugPrecondition(a.elementStorage != nil || a.count == 0)
 
     // TODO: Putting a canary at the end of the array in checked builds might
     // be a good idea.
@@ -371,7 +371,7 @@ struct ObjCMutablePointer<T /* TODO : class */> : Equatable {
   var pointee : T {
     /// Retrieve the value the pointer points to.
     @transparent get {
-      assert(!isNull())
+      _debugPrecondition(!isNull())
       // We can do a strong load normally.
       return UnsafePointer<T>(self).pointee
     }
@@ -381,7 +381,7 @@ struct ObjCMutablePointer<T /* TODO : class */> : Equatable {
     /// ownership semantics, like 'NSFoo**' in ARC. This autoreleases the
     /// argument before trivially storing it to the referenced memory.    
     @transparent nonmutating set {
-      assert(!isNull())
+      _debugPrecondition(!isNull())
       // Autorelease the object reference.
       Builtin.retain(reinterpretCast(newValue) as AnyObject?)
       Builtin.autorelease(reinterpretCast(newValue) as AnyObject?)

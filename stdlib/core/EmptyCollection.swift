@@ -43,7 +43,7 @@ struct EmptyCollection<T> : Collection {
   }
 
   subscript(i: IndexType) -> T {
-    fatal("Index out of range")
+    _preconditionFailure("Index out of range")
   }
 }
 

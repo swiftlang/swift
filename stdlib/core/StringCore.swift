@@ -44,24 +44,24 @@ struct _StringCore {
   }
 
   func _invariantCheck() {
-    assert(count >= 0)
+    _sanityCheck(count >= 0)
     
     if _baseAddress == .null() {
-      assert(cocoaBuffer,
+      _sanityCheck(cocoaBuffer,
         "Only opaque cocoa strings may have a null base pointer")
-      assert(elementWidth == 2,
+      _sanityCheck(elementWidth == 2,
         "Opaque cocoa strings should have an elementWidth of 2")
     }
     else if _baseAddress == _emptyStringBase {
-      assert(count == 0, "Empty string storage with non-zero length")
-      assert(!_owner, "String pointing at empty storage has owner")
+      _sanityCheck(count == 0, "Empty string storage with non-zero length")
+      _sanityCheck(!_owner, "String pointing at empty storage has owner")
     }
     else if let buffer = nativeBuffer {
-      assert(elementWidth == buffer.elementWidth,
+      _sanityCheck(elementWidth == buffer.elementWidth,
         "_StringCore elementWidth doesn't match its buffer's")
-      assert(UnsafePointer(_baseAddress) >= buffer.start)
-      assert(UnsafePointer(_baseAddress) <= buffer.usedEnd)
-      assert(UnsafePointer(_pointerToNth(count)) <= buffer.usedEnd)
+      _sanityCheck(UnsafePointer(_baseAddress) >= buffer.start)
+      _sanityCheck(UnsafePointer(_baseAddress) <= buffer.usedEnd)
+      _sanityCheck(UnsafePointer(_pointerToNth(count)) <= buffer.usedEnd)
     }
   }
 
@@ -87,7 +87,7 @@ struct _StringCore {
   /// element may be 1 or 2 bytes wide, depending on elementWidth; the
   /// result may be null if the string is empty.
   func _pointerToNth(n: Int) -> COpaquePointer {
-    assert(hasContiguousStorage && n >= 0 && n <= count)
+    _sanityCheck(hasContiguousStorage && n >= 0 && n <= count)
     return COpaquePointer(
       UnsafePointer<RawByte>(_baseAddress) + (n << elementShift))
   }
@@ -134,7 +134,7 @@ struct _StringCore {
     hasCocoaBuffer: Bool,
     owner: AnyObject?
   ) {
-    assert(elementShift == 0 || elementShift == 1)
+    _sanityCheck(elementShift == 0 || elementShift == 1)
     self._baseAddress = baseAddress
     
     self._countAndFlags
@@ -143,7 +143,7 @@ struct _StringCore {
       | UWord(count)
     
     self._owner = owner
-    assert(UWord(count) & _flagMask == 0, "String too long to represent")
+    _sanityCheck(UWord(count) & _flagMask == 0, "String too long to represent")
     _invariantCheck()
   }
 
@@ -176,7 +176,7 @@ struct _StringCore {
       return Int(_countAndFlags & _countMask)
     }
     set(newValue) {
-      assert(UWord(newValue) & _flagMask == 0)
+      _sanityCheck(UWord(newValue) & _flagMask == 0)
       _countAndFlags = (_countAndFlags & _flagMask) | UWord(newValue)
     }
   }
@@ -202,12 +202,12 @@ struct _StringCore {
   }
 
   var startASCII: UnsafePointer<UTF8.CodeUnit> {
-    assert(elementWidth == 1, "String does not contain contiguous ASCII")
+    _sanityCheck(elementWidth == 1, "String does not contain contiguous ASCII")
     return UnsafePointer(_baseAddress)
   }
 
   var startUTF16: UnsafePointer<UTF16.CodeUnit> {
-    assert(
+    _sanityCheck(
       count == 0 || elementWidth == 2,
       "String does not contain contiguous UTF16")
     return UnsafePointer(_baseAddress)
@@ -239,11 +239,11 @@ struct _StringCore {
   /// Return the given sub-_StringCore
   subscript(subRange: Range<Int>) -> _StringCore {
     
-    assert(subRange.startIndex >= 0)
-    assert(subRange.endIndex <= count)
+    _sanityCheck(subRange.startIndex >= 0)
+    _sanityCheck(subRange.endIndex <= count)
 
     let newCount = subRange.endIndex - subRange.startIndex
-    assert(UWord(newCount) & _flagMask == 0)
+    _sanityCheck(UWord(newCount) & _flagMask == 0)
 
     if hasContiguousStorage {
       return _StringCore(
@@ -265,8 +265,8 @@ struct _StringCore {
 
   /// Get the Nth UTF16 Code Unit stored
   subscript(position: Int) -> UTF16.CodeUnit {
-    assert(position >= 0)
-    assert(position <= count)
+    _sanityCheck(position >= 0)
+    _sanityCheck(position <= count)
 
     if (_baseAddress != .null()) {
       return _nthContiguous(position)
@@ -381,7 +381,7 @@ struct _StringCore {
       // we've allocated for 2-byte elements.
       // FIXME: can we get Cocoa to tell us quickly that an opaque
       // string is ASCII?  Do we care much about that edge case?
-      assert(newStorage.elementShift == 1)
+      _sanityCheck(newStorage.elementShift == 1)
       _cocoaStringReadAll(source: cocoaBuffer!, 
                           destination: UnsafePointer(newStorage.start))
     }
@@ -402,7 +402,7 @@ struct _StringCore {
                                   minElementWidth: minBytesPerCodeUnit)
 
     if _fastPath(elementWidth == 1) {
-      assert(
+      _sanityCheck(
         _pointerToNth(count) 
         == COpaquePointer(UnsafePointer<RawByte>(destination) + 1))
 
@@ -411,11 +411,11 @@ struct _StringCore {
     else {
       let destination16 = UnsafePointer<UTF16.CodeUnit>(destination.value)
       if _fastPath(utf16Width == 1) {
-        assert(_pointerToNth(count) == COpaquePointer(destination16 + 1))
+        _sanityCheck(_pointerToNth(count) == COpaquePointer(destination16 + 1))
         destination16.pointee = UTF16.CodeUnit(c.value)
       }
       else {
-        assert(_pointerToNth(count) == COpaquePointer(destination16 + 2))
+        _sanityCheck(_pointerToNth(count) == COpaquePointer(destination16 + 2))
         destination16.pointee = UTF16.leadSurrogate(c)
         (destination16 + 1).pointee = UTF16.trailSurrogate(c)
       }
@@ -438,7 +438,7 @@ struct _StringCore {
         dstStart: destination, dstElementWidth:elementWidth, count: rhs.count)
     }
     else {
-      assert(elementWidth == 2)
+      _sanityCheck(elementWidth == 2)
       _cocoaStringReadAll(source: rhs.cocoaBuffer!, 
                           destination: UnsafePointer(destination))
     }

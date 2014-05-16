@@ -230,12 +230,12 @@ extension UTF16 {
   }
 
   static func leadSurrogate(x: UnicodeScalar) -> UTF16.CodeUnit {
-    assert(width(x) == 2)
+    _precondition(width(x) == 2)
     return (UTF16.CodeUnit(x.value - 0x1_0000) >> 10) + 0xD800
   }
   
   static func trailSurrogate(x: UnicodeScalar) -> UTF16.CodeUnit {
-    assert(width(x) == 2)
+    _precondition(width(x) == 2)
     return (UTF16.CodeUnit(x.value - 0x1_0000) & ((1 << 10) - 1)) + 0xDC00
   }
 

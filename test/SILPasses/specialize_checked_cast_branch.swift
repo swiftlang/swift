@@ -19,7 +19,7 @@ func ArchetypeToArchetypeCast<T1, T2>(#t1 : T1, #t2 : T2) -> T2 {
   if let x = t1 as T2 {
     return x
   }
-  fatal("??? Profit?")
+  _preconditionFailure("??? Profit?")
 }
 
 // x -> x where x is a class.
@@ -88,28 +88,28 @@ func ArchetypeToConcreteCastUInt8<T>(#t : T) -> UInt8 {
   if let x = t as UInt8 {
     return x
   }
-  fatal("??? Profit?")
+  _preconditionFailure("??? Profit?")
 }
 
 func ArchetypeToConcreteCastC<T>(#t : T) -> C {
   if let x = t as C {
     return x
   }
-  fatal("??? Profit?")
+  _preconditionFailure("??? Profit?")
 }
 
 func ArchetypeToConcreteCastD<T>(#t : T) -> D {
   if let x = t as D {
     return x
   }
-  fatal("??? Profit?")
+  _preconditionFailure("??? Profit?")
 }
 
 func ArchetypeToConcreteCastE<T>(#t : T) -> E {
   if let x = t as E {
     return x
   }
-  fatal("??? Profit?")
+  _preconditionFailure("??? Profit?")
 }
 
 // CHECK-LABEL: sil shared @_TTSVSs5UInt8___TF30specialize_checked_cast_branch28ArchetypeToConcreteCastUInt8U__FT1tQ__VSs5UInt8 : $@thin (@in UInt8) -> UInt8 {
@@ -185,19 +185,19 @@ func ConcreteToArchetypeCastUInt8<T>(#t: UInt8, #t2: T) -> T {
   if let x = t as T {
     return x
   }
-  fatal("??? Profit?")
+  _preconditionFailure("??? Profit?")
 }
 func ConcreteToArchetypeCastC<T>(#t: C, #t2: T) -> T {
   if let x = t as T {
     return x
   }
-  fatal("??? Profit?")
+  _preconditionFailure("??? Profit?")
 }
 func ConcreteToArchetypeCastD<T>(#t: D, #t2: T) -> T {
   if let x = t as T {
     return x
   }
-  fatal("??? Profit?") 
+  _preconditionFailure("??? Profit?")
 }
 
 // CHECK-LABEL: sil shared @_TTSVSs5UInt8___TF30specialize_checked_cast_branch28ConcreteToArchetypeCastUInt8U__FT1tVSs5UInt82t2Q__Q_ : $@thin (@out UInt8, UInt8, @in UInt8) -> () {
@@ -264,14 +264,14 @@ func SuperToArchetypeCastC<T>(#c : C, #t : T) -> T {
   if let x = c as T {
     return x
   }
-  fatal("??? Profit?") 
+  _preconditionFailure("??? Profit?")
 }
 
 func SuperToArchetypeCastD<T>(#d : D, #t : T) -> T {
   if let x = d as T {
     return x
   }
-  fatal("??? Profit?")
+  _preconditionFailure("??? Profit?")
 }
 
 // CHECK-LABEL: sil shared @_TTSC30specialize_checked_cast_branch1C___TF30specialize_checked_cast_branch21SuperToArchetypeCastCU__FT1cCS_1C1tQ__Q_ : $@thin (@out C, @owned C, @in C) -> () {
@@ -319,7 +319,7 @@ func ExistentialToArchetypeCast<T>(#o : AnyObject, #t : T) -> T {
   if let x = o as T {
     return x
   }
-  fatal("??? Profit?") 
+  _preconditionFailure("??? Profit?")
 }
 
 // CHECK-LABEL: sil shared @_TTSC30specialize_checked_cast_branch1C___TF30specialize_checked_cast_branch26ExistentialToArchetypeCastU__FT1oPSs9AnyObject_1tQ__Q_ : $@thin (@out C, @owned AnyObject, @in C) -> () {

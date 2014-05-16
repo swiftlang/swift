@@ -31,7 +31,7 @@ var _cocoaStringToContiguous: (
 func _cocoaStringToContiguousNotInitialized(
   source: _CocoaString, range: Range<Int>, minimumCapacity: Int
 ) -> _StringBuffer {
-  fatal("_cocoaStringToContiguous not initialized")
+  _fatalError("_cocoaStringToContiguous not initialized")
 }
 
 /// \brief reads the entire contents of a _CocoaString into contiguous
@@ -43,7 +43,7 @@ var _cocoaStringReadAll: (
 func _cocoaStringReadAllNotInitialized(
   source: _CocoaString, destination: UnsafePointer<UTF16.CodeUnit>
 ) -> Void {
-  fatal("_cocoaStringReadAll not initialized")
+  _fatalError("_cocoaStringReadAll not initialized")
 }
 
 var _cocoaStringLength: (
@@ -53,7 +53,7 @@ var _cocoaStringLength: (
 func _cocoaStringLengthNotInitialized(
   source: _CocoaString
 ) -> Int {
-  fatal("_cocoaStringLength not initialized")
+  _fatalError("_cocoaStringLength not initialized")
 }
 
 var _cocoaStringSlice: (
@@ -63,7 +63,7 @@ var _cocoaStringSlice: (
 func _cocoaStringSliceNotInitialized(
   target: _StringCore, subRange: Range<Int>
 ) -> _StringCore {
-  fatal("_cocoaStringSlice not initialized")
+  _fatalError("_cocoaStringSlice not initialized")
 }
 
 var _cocoaStringSubscript: (
@@ -73,7 +73,7 @@ var _cocoaStringSubscript: (
 func _cocoaStringSubscriptNotInitialized(
   target: _StringCore, position: Int
 ) -> UTF16.CodeUnit {
-  fatal("_cocoaStringSubscript not initialized")
+  _fatalError("_cocoaStringSubscript not initialized")
 }
 
 var _cocoaStringEncodeSomeUTF8: (
@@ -84,6 +84,6 @@ var _cocoaStringEncodeSomeUTF8: (
 func _cocoaStringEncodeSomeUTF8NotInitialized(
   target: _StringCore, position: Int 
 ) -> (_StringCore.IndexType, _StringCore.UTF8Chunk) {
-  fatal("_cocoaStringEncodeSomeUTF8 not initialized")
+  _fatalError("_cocoaStringEncodeSomeUTF8 not initialized")
 }
 

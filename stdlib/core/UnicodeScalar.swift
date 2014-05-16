@@ -39,13 +39,13 @@ struct UnicodeScalar : ExtendedGraphemeClusterLiteralConvertible {
   init(_ v : UInt32) {
     var lowHalf = v & 0xFFFF
     // reserved in each plane
-    assert(lowHalf != 0xFFFE && lowHalf != 0xFFFF)
+    _precondition(lowHalf != 0xFFFE && lowHalf != 0xFFFF)
     // UTF-16 surrogate pair values are not valid code points
-    assert(v < 0xD800 || v > 0xDFFF)
+    _precondition(v < 0xD800 || v > 0xDFFF)
     // U+FDD0...U+FDEF are also reserved
-    assert(v < 0xFDD0 || v > 0xFDEF)
+    _precondition(v < 0xFDD0 || v > 0xFDEF)
     // beyond what is defined to be valid
-    assert(v < 0x10FFFF)
+    _precondition(v < 0x10FFFF)
 
     self._value = v.value
   }
@@ -177,7 +177,7 @@ extension UnicodeScalar {
 
 extension UInt8 {
   init(_ v : UnicodeScalar) {
-    assert(v.value <= UInt32(UInt8.max), "Code point value does not fit into UInt8")
+    _precondition(v.value <= UInt32(UInt8.max), "Code point value does not fit into UInt8")
     self = UInt8(v.value)
   }
 }
@@ -236,7 +236,7 @@ func _asUnicodeCodePoint(us: UnicodeScalar) -> UInt32 {
 }
 func _asUTF16CodeUnit(us: UnicodeScalar) -> UTF16.CodeUnit {
   var codePoint = us.value
-  assert(codePoint <= UInt32(UInt16.max))
+  _precondition(codePoint <= UInt32(UInt16.max))
   return UTF16.CodeUnit(codePoint)
 }
 

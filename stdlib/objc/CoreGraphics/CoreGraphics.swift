@@ -48,7 +48,7 @@ struct _CGPointMirror : Mirror {
     switch i {
     case 0: return ("x",reflect(_value.x))
     case 1: return ("y",reflect(_value.y))
-    default: fatal("cannot extract this child index")
+    default: _preconditionFailure("cannot extract this child index")
     }
   }
 
@@ -101,7 +101,7 @@ struct _CGSizeMirror : Mirror {
     switch i {
     case 0: return ("x",reflect(_value.width))
     case 1: return ("y",reflect(_value.height))
-    default: fatal("cannot extract this child index")
+    default: _preconditionFailure("cannot extract this child index")
     }
   }
 
@@ -270,7 +270,7 @@ struct _CGRectMirror : Mirror {
     switch i {
     case 0: return ("x",reflect(_value.origin))
     case 1: return ("y",reflect(_value.size))
-    default: fatal("cannot extract this child index")
+    default: _preconditionFailure("cannot extract this child index")
     }
   }
 

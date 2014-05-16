@@ -104,7 +104,7 @@ extension ImplicitlyUnwrappedOptional : _ConditionallyBridgedToObjectiveC {
   func bridgeToObjectiveC() -> AnyObject {
     switch self.value {
     case .None:
-      fatal("attempt to bridge an implicitly unwrapped optional containing nil")
+      _preconditionFailure("attempt to bridge an implicitly unwrapped optional containing nil")
 
     case .Some(let x):
       return Swift.bridgeToObjectiveC(x)!

@@ -12,7 +12,7 @@ class B : A, _BridgedToObjectiveC {
     return A()
   }
   class func bridgeFromObjectiveC(x: A) -> B? {
-    fatal("implement")
+    _preconditionFailure("implement")
   }
 }
 
@@ -43,7 +43,7 @@ class F : E, _BridgedToObjectiveC {
     return self
   }
   class func bridgeFromObjectiveC(x: E) -> F? {
-    fatal("implement")
+    _preconditionFailure("implement")
   }
 }
 
@@ -65,7 +65,7 @@ class H : G, _ConditionallyBridgedToObjectiveC {
     return self
   }
   class func bridgeFromObjectiveC(x: G) -> H? {
-    fatal("implement")
+    _preconditionFailure("implement")
   }
   class func isBridgedToObjectiveC() -> Bool {
     return false
@@ -86,7 +86,7 @@ class I : _BridgedToObjectiveC {
     return self
   }
   class func bridgeFromObjectiveC(x: AnyObject) -> I? {
-    fatal("implement")
+    _preconditionFailure("implement")
   }
 }
 

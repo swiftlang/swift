@@ -48,7 +48,7 @@ struct CollectionOfOne<T> : Collection {
   }
 
   subscript(i: IndexType) -> T {
-    assert(i == .zero, "Index out of range")
+    _precondition(i == .zero, "Index out of range")
     return element
   }
   

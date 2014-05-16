@@ -26,7 +26,7 @@ class _NSSwiftArray : HeapBufferStorageBase, CocoaArray {
   typealias Buffer = HeapBuffer<_ArrayBody, AnyObject>
   
   var dynamicElementType: Any.Type {
-    fatal("This var must be overridden")
+    _fatalError("This var must be overridden")
   }
   
   /// Returns the object located at the specified index.
@@ -34,7 +34,7 @@ class _NSSwiftArray : HeapBufferStorageBase, CocoaArray {
     let buffer = reinterpretCast(self) as Buffer
     // If used as an NSArray, the element type can have no fancy
     // bridging; just get it and return it
-    assert(buffer.value.elementTypeIsBridgedVerbatim)
+    _sanityCheck(buffer.value.elementTypeIsBridgedVerbatim)
     return buffer[index]
   }
 
@@ -52,7 +52,7 @@ class _NSSwiftArray : HeapBufferStorageBase, CocoaArray {
     // bridging; just get it and return it.  Note however that if
     // we're empty we might be emptyNSSwiftArray so don't assert in
     // that case.
-    assert(count == 0 || buffer.value.elementTypeIsBridgedVerbatim)
+    _sanityCheck(count == 0 || buffer.value.elementTypeIsBridgedVerbatim)
     
     if _fastPath(buffer.value.elementTypeIsBridgedVerbatim) {
       dst.initializeFrom(
@@ -78,7 +78,7 @@ class _NSSwiftArray : HeapBufferStorageBase, CocoaArray {
     let buffer = reinterpretCast(self) as Buffer
     // If used as an NSArray, the element type can have no fancy
     // bridging; just get it and return it
-    assert(buffer.value.elementTypeIsBridgedVerbatim)
+    _sanityCheck(buffer.value.elementTypeIsBridgedVerbatim)
     
     if enumerationState.state != 0 {
       return 0

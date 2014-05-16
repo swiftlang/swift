@@ -21,7 +21,7 @@
     buf.reserve(0) // ensure uniqueness before we allow buf to be modified
     var r = posix_read(0, buf.elementStorage.value, buf.count)
     if r < 0 {
-      fatal("read failed")
+      _preconditionFailure("read failed")
     }
     return r
   }
@@ -105,7 +105,7 @@ var kbd : Keyboard = Keyboard()
       }
     }
 
-    securityCheck(r != -1)
+    _precondition(r != -1)
     return r
   }
 
@@ -113,7 +113,7 @@ var kbd : Keyboard = Keyboard()
     var buf = new UInt8[1]
     buf[0] = c
     var r = write(&buf)
-    securityCheck(r == 1)
+    _precondition(r == 1)
   }
 }
 

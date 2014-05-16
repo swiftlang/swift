@@ -18,7 +18,7 @@ class REPLApplication : NSApplication {
 
 /// Initializes and runs a REPLApplication on the main thread asynchronously.
 func replApplicationMain() {
-  assert(NSApp === nil)
+  _precondition(NSApp === nil)
   // Create a REPLApplication as the NSApp.
   let app = (REPLApplication.sharedApplication() as REPLApplication)!
 
@@ -46,7 +46,7 @@ struct _NSViewMirror : Mirror {
   
   var count: Int { get { return 0 } }
   
-  subscript(_: Int) -> (String,Mirror) { get { fatal("don't ask") } }
+  subscript(_: Int) -> (String,Mirror) { get { _fatalError("don't ask") } }
   
   var summary: String { get { return ""} }
   

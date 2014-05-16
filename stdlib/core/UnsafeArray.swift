@@ -27,8 +27,8 @@ struct UnsafeArray<T> : Collection, Generator {
   }
 
   subscript(i: Int) -> T {
-    assert(i >= 0)
-    assert(i < endIndex)
+    _precondition(i >= 0)
+    _precondition(i < endIndex)
     return (_position + i).pointee
   }
   

@@ -304,7 +304,7 @@ struct _LeafMirror<T>: Mirror {
   var valueType: Any.Type { return value.dynamicType }
   var objectIdentifier: ObjectIdentifier? { return nil }
   var count: Int { return 0 }
-  subscript(i: Int) -> (String, Mirror) { fatal("no children") }
+  subscript(i: Int) -> (String, Mirror) { _preconditionFailure("no children") }
   var summary: String { return summaryFunction(_value) }
   var quickLookObject: QuickLookObject? { return quickLookFunction(_value) }
   var disposition: MirrorDisposition { return .Aggregate }
@@ -343,7 +343,7 @@ struct _OpaqueMirror: Mirror {
   var valueType: Any.Type { return data.valueType }
   var objectIdentifier: ObjectIdentifier? { return nil }
   var count: Int { return 0 }
-  subscript(i: Int) -> (String, Mirror) { fatal("no children") }
+  subscript(i: Int) -> (String, Mirror) { _preconditionFailure("no children") }
   var summary: String { return "<opaque>" }
   var quickLookObject: QuickLookObject? { return nil }
   var disposition: MirrorDisposition { return .Aggregate }

@@ -135,7 +135,7 @@ func ~> <T: _ForwardIndex>(
 }
 
 func _advanceForward<T: _ForwardIndex>(start: T, n: T.DistanceType) -> T {
-  assert(n >= 0, "Only BidirectionalIndex can be advanced by a negative amount")
+  _precondition(n >= 0, "Only BidirectionalIndex can be advanced by a negative amount")
   var p = start
   for var i: T.DistanceType = 0; i != n; ++i {
     ++p
@@ -154,7 +154,7 @@ func ~> <T: _ForwardIndex>(
 func _advanceForward<T: _ForwardIndex>(
   start: T, n: T.DistanceType, end: T
 ) -> T {
-  assert(n >= 0, "Only BidirectionalIndex can be advanced by a negative amount")
+  _precondition(n >= 0, "Only BidirectionalIndex can be advanced by a negative amount")
   var p = start
   for var i: T.DistanceType = 0; i != n && p != end; ++i {
     ++p

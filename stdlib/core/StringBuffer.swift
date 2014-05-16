@@ -12,7 +12,7 @@
 
 struct _StringBufferIVars {
   init(_ elementWidth: Int) {
-    assert(elementWidth == 1 || elementWidth == 2)
+    _sanityCheck(elementWidth == 1 || elementWidth == 2)
     usedEnd = .null()
     capacityAndElementShift = elementWidth - 1
   }
@@ -22,8 +22,8 @@ struct _StringBufferIVars {
     byteCapacity: Int,
     elementWidth: Int
   ) {
-    assert(elementWidth == 1 || elementWidth == 2)
-    assert((byteCapacity & 0x1) == 0)
+    _sanityCheck(elementWidth == 1 || elementWidth == 2)
+    _sanityCheck((byteCapacity & 0x1) == 0)
     self.usedEnd = usedEnd
     self.capacityAndElementShift = byteCapacity + (elementWidth - 1)
   }
@@ -58,7 +58,7 @@ struct _StringBuffer {
   }
 
   init(capacity: Int, initialSize: Int, elementWidth: Int) {
-    assert(elementWidth == 1 || elementWidth == 2)
+    _sanityCheck(elementWidth == 1 || elementWidth == 2)
     let elementShift = elementWidth - 1
     
     // We need at least 1 extra byte if we're storing 8-bit elements,

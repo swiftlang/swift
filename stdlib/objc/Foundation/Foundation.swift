@@ -153,7 +153,7 @@ func _cocoaStringToContiguousImpl(
   source: _CocoaString, range: Range<Int>, minimumCapacity: Int
 ) -> _StringBuffer {
   let cfSelf: CFString = reinterpretCast(source)
-  assert(CFStringGetCharactersPtr(cfSelf).isNull(),
+  _sanityCheck(CFStringGetCharactersPtr(cfSelf).isNull(),
     "Known contiguously-stored strings should already be converted to Swift")
 
   var startIndex = range.startIndex
@@ -207,7 +207,7 @@ func _cocoaStringSubscriptImpl(
 /// An NSString built around a slice of contiguous Swift String storage
 class _NSContiguousString : NSString {
   init(_ value: _StringCore) {
-    assert(
+    _sanityCheck(
       value.hasContiguousStorage,
       "_NSContiguousString requires contiguous storage")
     self.value = value
@@ -224,7 +224,7 @@ class _NSContiguousString : NSString {
 
   override func getCharacters(buffer: CMutablePointer<unichar>,
                               range aRange: NSRange) {
-    assert(aRange.location + aRange.length <= Int(value.count))
+    _precondition(aRange.location + aRange.length <= Int(value.count))
 
     if value.elementWidth == 2 {
       UTF16.copy(
@@ -337,7 +337,7 @@ extension String {
         return (ns as NSString)!
       }
     }
-    assert(core.hasContiguousStorage)
+    _sanityCheck(core.hasContiguousStorage)
     return _NSContiguousString(core)
   }
 }
@@ -428,7 +428,7 @@ extension Int : _BridgedToObjectiveC {
   }
 
   static func bridgeFromObjectiveC(x: NSNumber) -> Int? {
-    fatal("implement")
+    _fatalError("implement")
   }
 }
 
@@ -452,7 +452,7 @@ extension UInt : _BridgedToObjectiveC {
   }
 
   static func bridgeFromObjectiveC(x: NSNumber) -> UInt? {
-    fatal("implement")
+    _fatalError("implement")
   }
 }
 
@@ -474,7 +474,7 @@ extension Float : _BridgedToObjectiveC {
   }
 
   static func bridgeFromObjectiveC(x: NSNumber) -> Float? {
-    fatal("implement")
+    _fatalError("implement")
   }
 }
 
@@ -496,7 +496,7 @@ extension Double : _BridgedToObjectiveC {
   }
 
   static func bridgeFromObjectiveC(x: NSNumber) -> Double? {
-    fatal("implement")
+    _fatalError("implement")
   }
 }
 
@@ -519,7 +519,7 @@ extension Bool: _BridgedToObjectiveC {
   }
 
   static func bridgeFromObjectiveC(x: NSNumber) -> Bool? {
-    fatal("implement")
+    _fatalError("implement")
   }
 }
 
@@ -560,7 +560,7 @@ func _convertNSArrayToArray<T>(nsarr: NSArray) -> T[] {
   if let arr = T[].bridgeFromObjectiveC(nsarr) {
     return arr
   }
-  fatal("NSArray does not bridge to array")
+  _fatalError("NSArray does not bridge to array")
 }
 
 /// The entry point for bridging 'Array' to 'NSArray'.
@@ -631,9 +631,9 @@ func _convertDictionaryToNSDictionary<KeyType, ValueType>(
 ) -> NSDictionary {
   switch d._variantStorage {
   case .Native(let nativeOwner):
-    securityCheck(isBridgedToObjectiveC(KeyType.self),
+    _precondition(isBridgedToObjectiveC(KeyType.self),
                   "KeyType is not bridged to Objective-C")
-    securityCheck(isBridgedToObjectiveC(ValueType.self),
+    _precondition(isBridgedToObjectiveC(ValueType.self),
                   "ValueType is not bridged to Objective-C")
 
     let isKeyBridgedVerbatim = isBridgedVerbatimToObjectiveC(KeyType.self)
@@ -676,7 +676,7 @@ func _convertDictionaryToNSDictionary<KeyType, ValueType>(
       if let nsCopyingKey = bridgedKey as NSCopying {
         result[nsCopyingKey] = bridgedValue
       } else {
-        fatal("key bridged to an object that does not conform to NSCopying")
+        _fatalError("key bridged to an object that does not conform to NSCopying")
       }
     }
     return reinterpretCast(result)
@@ -704,7 +704,7 @@ extension Dictionary : _ConditionallyBridgedToObjectiveC {
   }
 
   static func bridgeFromObjectiveC(x: NSDictionary) -> Dictionary? {
-    fatal("implement")
+    _fatalError("implement")
   }
 }
 
@@ -983,7 +983,7 @@ struct _NSURLMirror : Mirror {
   
   var count: Int { get { return 0 } }
   
-  subscript(_: Int) -> (String,Mirror) { get { fatal("don't ask") } }
+  subscript(_: Int) -> (String,Mirror) { get { _fatalError("don't ask") } }
   
   var summary: String { get { return _u.absoluteString } }
   
@@ -1015,7 +1015,7 @@ struct _NSRangeMirror : Mirror {
     switch i {
       case 0: return ("location",reflect(_r.location))
       case 1: return ("length",reflect(_r.length))
-      default: fatal("don't ask")
+      default: _fatalError("don't ask")
     }
   }
   
@@ -1056,7 +1056,7 @@ struct _NSDateMirror : Mirror {
   var count: Int { get { return 0 } }
   
   subscript(i: Int) -> (String,Mirror) {
-    fatal("don't ask")
+    _fatalError("don't ask")
   }
   
   var summary: String {
@@ -1251,7 +1251,7 @@ struct _NSSetMirror : Mirror {
     if i >= 0 && i < count {
       return ("[\(i)]",reflect(_a[i]))
     }
-    fatal("don't ask")
+    _fatalError("don't ask")
   }
   
   var summary: String { return "\(count) elements" }

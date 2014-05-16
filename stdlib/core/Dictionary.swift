@@ -289,7 +289,7 @@ struct _NativeDictionaryStorage<KeyType : Hashable, ValueType> :
 
   init(minimumCapacity: Int = 2) {
     // Make sure there's a representable power of 2 >= minimumCapacity
-    assert(minimumCapacity <= (Int.max >> 1) + 1)
+    _sanityCheck(minimumCapacity <= (Int.max >> 1) + 1)
 
     var capacity = 2
     while capacity < minimumCapacity {
@@ -337,7 +337,7 @@ struct _NativeDictionaryStorage<KeyType : Hashable, ValueType> :
     set(newValue) {
       // 1.0 might be useful for testing purposes; anything more is
       // crazy
-      assert(newValue <= 1.0)
+      _sanityCheck(newValue <= 1.0)
       maxLoadFactorInverse = 1.0 / newValue
     }
   }
@@ -345,12 +345,12 @@ struct _NativeDictionaryStorage<KeyType : Hashable, ValueType> :
   subscript(i: Int) -> Element? {
     @transparent
     get {
-      assert(i >= 0 && i < capacity)
+      _precondition(i >= 0 && i < capacity)
       return (elements + i).pointee
     }
     @transparent
     nonmutating set {
-      assert(i >= 0 && i < capacity)
+      _precondition(i >= 0 && i < capacity)
       (elements + i).pointee = newValue
     }
   }
@@ -435,7 +435,7 @@ struct _NativeDictionaryStorage<KeyType : Hashable, ValueType> :
 
   func assertingGet(key: KeyType) -> ValueType {
     let e = self[_find(key, _bucket(key)).pos.offset]
-    assert(e, "key not found in Dictionary")
+    _precondition(e, "key not found in Dictionary")
     return e!.value
   }
 
@@ -448,11 +448,11 @@ struct _NativeDictionaryStorage<KeyType : Hashable, ValueType> :
   }
 
   mutating func updateValue(value: ValueType, forKey: KeyType) -> ValueType? {
-    fatal("don't call mutating methods on _NativeDictionaryStorage")
+    _fatalError("don't call mutating methods on _NativeDictionaryStorage")
   }
 
   mutating func deleteKey(key: KeyType) -> Bool {
-    fatal("don't call mutating methods on _NativeDictionaryStorage")
+    _fatalError("don't call mutating methods on _NativeDictionaryStorage")
   }
 
   static func fromArray(
@@ -484,7 +484,7 @@ class _NativeDictionaryStorageKeyNSEnumeratorBase
   init(dummy: (Int, ())) {}
 
   func bridgingNextObject(dummy: ()) -> AnyObject? {
-    fatal("'bridgingNextObject' should be overridden")
+    _fatalError("'bridgingNextObject' should be overridden")
   }
 
   // Don't implement a custom `bridgingCountByEnumeratingWithState` function.
@@ -503,7 +503,7 @@ class _NativeDictionaryStorageKeyNSEnumeratorBase
 
   @objc
   init() {
-    fatal("don't call this designated initializer")
+    _fatalError("don't call this designated initializer")
   }
 
   @objc
@@ -520,7 +520,7 @@ class _NativeDictionaryStorageKeyNSEnumerator<KeyType : Hashable, ValueType>
   typealias Index = _NativeDictionaryIndex<KeyType, ValueType>
 
   init(_ nativeStorage: NativeStorage) {
-    assert(isBridgedVerbatimToObjectiveC(KeyType.self) &&
+    _precondition(isBridgedVerbatimToObjectiveC(KeyType.self) &&
            isBridgedVerbatimToObjectiveC(ValueType.self),
            "native Dictionary storage can be used as NSDictionary only when both key and value are bridged verbatim to Objective-C")
 
@@ -560,26 +560,26 @@ class _NativeDictionaryStorageOwnerBase
   // <rdar://problem/16824792> Overriding functions and properties in a generic
   // subclass of an @objc class has no effect
   var bridgingCount: (Int, ()) {
-    fatal("'bridgingCount' should be overridden")
+    _fatalError("'bridgingCount' should be overridden")
   }
 
   // Empty tuple is a workaround for
   // <rdar://problem/16824792> Overriding functions and properties in a generic
   func bridgingObjectForKey(aKey: AnyObject, dummy: ()) -> AnyObject? {
-    fatal("'bridgingObjectForKey' should be overridden")
+    _fatalError("'bridgingObjectForKey' should be overridden")
   }
 
   // Empty tuple is a workaround for
   // <rdar://problem/16824792> Overriding functions and properties in a generic
   func bridgingKeyEnumerator(dummy: ()) -> _SwiftNSEnumerator {
-    fatal("'bridgingKeyEnumerator' should be overridden")
+    _fatalError("'bridgingKeyEnumerator' should be overridden")
   }
 
   func bridgingCountByEnumeratingWithState(
          state: UnsafePointer<_SwiftNSFastEnumerationState>,
          objects: UnsafePointer<AnyObject>, count: Int, dummy: ()
   ) -> Int {
-    fatal("'countByEnumeratingWithState' should be overridden")
+    _fatalError("'countByEnumeratingWithState' should be overridden")
   }
 
   //
@@ -592,7 +592,7 @@ class _NativeDictionaryStorageOwnerBase
   @objc
   init(objects: CConstPointer<AnyObject?>, forKeys: CConstVoidPointer,
        count: Int) {
-    fatal("don't call this designated initializer")
+    _fatalError("don't call this designated initializer")
   }
 
   @objc
@@ -668,9 +668,9 @@ class _NativeDictionaryStorageOwnerBase
   }
 
   override func bridgingObjectForKey(aKey: AnyObject, dummy: ()) -> AnyObject? {
-    assert(isBridgedVerbatimToObjectiveC(KeyType.self) &&
-           isBridgedVerbatimToObjectiveC(ValueType.self),
-           "native Dictionary storage can be used as NSDictionary only when both key and value are bridged verbatim to Objective-C")
+    _sanityCheck(isBridgedVerbatimToObjectiveC(KeyType.self) &&
+                 isBridgedVerbatimToObjectiveC(ValueType.self),
+                 "native Dictionary storage can be used as NSDictionary only when both key and value are bridged verbatim to Objective-C")
     let nativeKey = reinterpretCast(aKey) as KeyType
     if let nativeValue = nativeStorage.maybeGet(nativeKey) {
       return _reinterpretCastToAnyObject(nativeValue)
@@ -692,9 +692,9 @@ class _NativeDictionaryStorageOwnerBase
          state: UnsafePointer<_SwiftNSFastEnumerationState>,
          objects: UnsafePointer<AnyObject>, count: Int, dummy: ()
   ) -> Int {
-    assert(isBridgedVerbatimToObjectiveC(KeyType.self) &&
-           isBridgedVerbatimToObjectiveC(ValueType.self),
-           "native Dictionary storage can be used as NSDictionary only when both key and value are bridged verbatim to Objective-C")
+    _sanityCheck(isBridgedVerbatimToObjectiveC(KeyType.self) &&
+                 isBridgedVerbatimToObjectiveC(ValueType.self),
+                 "native Dictionary storage can be used as NSDictionary only when both key and value are bridged verbatim to Objective-C")
 
     var theState = state.pointee
     if theState.state == 0 {
@@ -759,7 +759,7 @@ struct _CocoaDictionaryStorage : _DictionaryStorage {
 
   func assertingGet(key: AnyObject) -> AnyObject {
     let value: AnyObject? = cocoaDictionary.objectForKey(key)
-    assert(value, "key not found in underlying NSDictionary")
+    _precondition(value, "key not found in underlying NSDictionary")
     return value!
   }
 
@@ -768,11 +768,11 @@ struct _CocoaDictionaryStorage : _DictionaryStorage {
   }
 
   mutating func updateValue(value: AnyObject, forKey: AnyObject) -> AnyObject? {
-    fatal("can not mutate NSDictionary")
+    _fatalError("can not mutate NSDictionary")
   }
 
   mutating func deleteKey(key: AnyObject) -> Bool {
-    fatal("can not mutate NSDictionary")
+    _fatalError("can not mutate NSDictionary")
   }
 
   var count: Int {
@@ -782,7 +782,7 @@ struct _CocoaDictionaryStorage : _DictionaryStorage {
   static func fromArray(
       elements: Array<(AnyObject, AnyObject)>
   ) -> _CocoaDictionaryStorage {
-    fatal("this function should never be called")
+    _fatalError("this function should never be called")
   }
 }
 
@@ -824,14 +824,14 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
     case .Native(let owner):
       return owner.nativeStorage
     case .Cocoa:
-      fatal("internal error: not backed by native storage")
+      _fatalError("internal error: not backed by native storage")
     }
   }
 
   var cocoa: CocoaStorage {
     switch self {
     case .Native:
-      fatal("internal error: not backed by NSDictionary")
+      _fatalError("internal error: not backed by NSDictionary")
     case .Cocoa(let cocoaStorage):
       return cocoaStorage
     }
@@ -900,6 +900,7 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
         cocoaStorage.count, _dictionaryDefaultMaxLoadFactorInverse)
     var allocated = ensureUniqueNativeStorage(minCapacity).reallocated
     assert(allocated, "failed to allocate native dictionary storage")
+    _sanityCheck(allocated, "failed to allocate native dictionary storage")
   }
 
   //
@@ -1050,7 +1051,7 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
     if capacityChanged {
       start = nativeStorage._bucket(key)
       (pos, found) = nativeStorage._find(key, start)
-      assert(found)
+      _sanityCheck(found)
     }
 
     // remove the element
@@ -1140,7 +1141,7 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
   static func fromArray(
       elements: Array<(KeyType, ValueType)>
   ) -> _VariantDictionaryStorage<KeyType, ValueType> {
-    fatal("this function should never be called")
+    _fatalError("this function should never be called")
   }
 }
 
@@ -1223,20 +1224,20 @@ struct _CocoaDictionaryIndex : BidirectionalIndex {
   }
 
   func pred() -> Index {
-    assert(nextKeyIndex >= 1, "can not advance startIndex backwards")
+    _precondition(nextKeyIndex >= 1, "can not advance startIndex backwards")
     return _CocoaDictionaryIndex(cocoaDictionary, allKeys, nextKeyIndex - 1)
   }
 
   func succ() -> Index {
-    assert(nextKeyIndex < allKeys.count, "can not advance endIndex forward")
+    _precondition(nextKeyIndex < allKeys.count, "can not advance endIndex forward")
     return _CocoaDictionaryIndex(cocoaDictionary, allKeys, nextKeyIndex + 1)
   }
 }
 
 func ==(lhs: _CocoaDictionaryIndex, rhs: _CocoaDictionaryIndex) -> Bool {
-  assert(lhs.cocoaDictionary === rhs.cocoaDictionary,
+  _precondition(lhs.cocoaDictionary === rhs.cocoaDictionary,
       "can not compare indexes pointing to different dictionaries")
-  assert(lhs.allKeys.count == rhs.allKeys.count,
+  _precondition(lhs.allKeys.count == rhs.allKeys.count,
       "one or both of the indexes have been invalidated")
 
   return lhs.nextKeyIndex == rhs.nextKeyIndex
@@ -1266,7 +1267,7 @@ enum DictionaryIndex<KeyType : Hashable, ValueType> : BidirectionalIndex {
     case ._Native(let nativeIndex):
       return nativeIndex
     case ._Cocoa:
-      fatal("internal error: does not contain a native index")
+      _fatalError("internal error: does not contain a native index")
     }
   }
 
@@ -1274,7 +1275,7 @@ enum DictionaryIndex<KeyType : Hashable, ValueType> : BidirectionalIndex {
   var _cocoaIndex: _CocoaIndex {
     switch self {
     case ._Native:
-      fatal("internal error: does not contain a Cocoa index")
+      _fatalError("internal error: does not contain a Cocoa index")
     case ._Cocoa(let cocoaIndex):
       return cocoaIndex
     }
@@ -1323,7 +1324,7 @@ func == <KeyType : Hashable, ValueType> (
   case (._Cocoa(let lhsCocoa), ._Cocoa(let rhsCocoa)):
     return lhsCocoa == rhsCocoa
   default:
-    fatal("comparing indexes from different dictionaries")
+    _preconditionFailure("comparing indexes from different dictionaries")
   }
 }
 
@@ -1369,7 +1370,7 @@ struct _CocoaFastEnumerationStackBuf {
     item14 = item0
     item15 = item0
 
-    assert(sizeofValue(self) >= sizeof(Builtin.RawPointer.self) * length)
+    _sanityCheck(sizeofValue(self) >= sizeof(Builtin.RawPointer.self) * length)
   }
 }
 
@@ -1455,7 +1456,7 @@ enum DictionaryGenerator<KeyType : Hashable, ValueType> : Generator {
       self = ._Native(start: startIndex.succ(), end: endIndex)
       return result
     case ._Cocoa:
-      fatal("internal error: not baked by NSDictionary")
+      _fatalError("internal error: not baked by NSDictionary")
     }
   }
 
@@ -1649,12 +1650,12 @@ func == <KeyType : Equatable, ValueType : Equatable>(
     }
     // FIXME: implement when we have dictionary casts.
     //return lhsCocoa.cocoaDictionary.isEqual(rhsCocoa.cocoaDictionary)
-    fatal("dictionaries backed by Cocoa storage are not Equatable when obtained using public interface")
+    _fatalError("dictionaries backed by Cocoa storage are not Equatable when obtained using public interface")
 
   case (.Native(let lhsNativeOwner), .Cocoa(let rhsCocoa)):
     // FIXME: compare elements.
     // FIXME: implement when we have dictionary casts.
-    fatal("dictionaries backed by Cocoa storage are not Equatable when obtained using public interface")
+    _fatalError("dictionaries backed by Cocoa storage are not Equatable when obtained using public interface")
 
   case (.Cocoa, .Native):
     return rhs == lhs
@@ -1775,7 +1776,7 @@ class _DictionaryMirror<Key : Hashable,Value> : Mirror {
       }
       return ("[\(_pos._intPos)]",reflect(_dict[_pos._dicPos]))
     }
-    fatal("don't ask")
+    _fatalError("don't ask")
   }
 
   var summary: String {

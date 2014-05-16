@@ -103,7 +103,7 @@ struct UnsafePointer<T> : BidirectionalIndex, Comparable, Hashable {
   ///
   /// Requires: either `source` precedes `self` or follows `self + count`.
   func moveInitializeBackwardFrom(source: UnsafePointer, count: Int) {
-    assert(
+    _debugPrecondition(
       source <= self || source > self + count,
       "moveInitializeBackwardFrom non-preceding overlapping range; use moveInitializeFrom instead")
     var src = source + count
@@ -116,7 +116,7 @@ struct UnsafePointer<T> : BidirectionalIndex, Comparable, Hashable {
   /// Assign from count values beginning at source into initialized
   /// memory, transforming the source values into raw memory.
   func moveAssignFrom(source: UnsafePointer, count: Int) {
-    assert(
+    _debugPrecondition(
       source > self || source < self - count,
       "moveAssignFrom non-following overlapping range")
     for i in 0..count {
@@ -127,7 +127,7 @@ struct UnsafePointer<T> : BidirectionalIndex, Comparable, Hashable {
   /// Move count values beginning at source into raw memory,
   /// transforming the source values into raw memory.
   func moveInitializeFrom(source: UnsafePointer, count: Int) {
-    assert(
+    _debugPrecondition(
       source >= self || source < self - count,
       "moveInitializeFrom non-following overlapping range; use moveInitializeBackwardFrom")
     for i in 0..count {
@@ -137,7 +137,7 @@ struct UnsafePointer<T> : BidirectionalIndex, Comparable, Hashable {
 
   /// Copy count values beginning at source into raw memory.
   func initializeFrom(source: UnsafePointer, count: Int) {
-    assert(
+    _debugPrecondition(
       source >= self || source < self - count,
       "initializeFrom non-following overlapping range")
     for i in 0..count {
@@ -228,7 +228,7 @@ struct UnsafePointer<T> : BidirectionalIndex, Comparable, Hashable {
   /// a scoped pointer as an UnsafePointer, the withUnsafePointer method
   /// must be used instead.
   init(_ cp: CConstPointer<T>) {
-    assert(!cp.scoped,
+    _precondition(!cp.scoped,
       "scoped CConstPointers must be converted using withUnsafePointer")
     self.value = cp.value
   }
@@ -241,7 +241,7 @@ struct UnsafePointer<T> : BidirectionalIndex, Comparable, Hashable {
   /// a scoped pointer as an UnsafePointer, the withUnsafePointer method
   /// must be used instead.
   init(_ cm: CMutablePointer<T>) {
-    assert(!cm.scoped,
+    _precondition(!cm.scoped,
       "scoped CMutablePointers must be converted using withUnsafePointer")
     self.value = cm.value
   }
@@ -265,7 +265,7 @@ struct UnsafePointer<T> : BidirectionalIndex, Comparable, Hashable {
   /// a scoped pointer as an UnsafePointer, the withUnsafePointer method
   /// must be used instead.
   init(_ cp: CConstVoidPointer) {
-    assert(!cp.scoped,
+    _precondition(!cp.scoped,
       "scoped CConstPointers must be converted using withUnsafePointer")
     self.value = cp.value
   }
@@ -278,7 +278,7 @@ struct UnsafePointer<T> : BidirectionalIndex, Comparable, Hashable {
   /// a scoped pointer as an UnsafePointer, the withUnsafePointer method
   /// must be used instead.
   init(_ cp: CMutableVoidPointer) {
-    assert(!cp.scoped,
+    _precondition(!cp.scoped,
       "scoped CMutableVoidPointers must be converted using withUnsafePointer")
     self.value = cp.value
   }

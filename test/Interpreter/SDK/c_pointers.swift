@@ -81,7 +81,7 @@ autoreleasepool {
   if let s = NSString.stringWithContentsOfFile("/hopefully/does/not/exist\x1B",
                                                encoding: NSUTF8StringEncoding,
                                                error: &err) {
-    fatal("file should not actually exist")
+    _preconditionFailure("file should not actually exist")
   } else if let err_ = err {
     // The original value should have died
     // CHECK-NEXT: died
@@ -89,14 +89,14 @@ autoreleasepool {
     hangCanary(err_)
     err = nil
   } else {
-    fatal("should have gotten an error")
+    _preconditionFailure("should have gotten an error")
   }
 }
 // The result error should have died with the autorelease pool
 // CHECK-NEXT: died
 
 class DumbString: NSString {
-  override func characterAtIndex(x: Int) -> unichar { fatal("nope") }
+  override func characterAtIndex(x: Int) -> unichar { _preconditionFailure("nope") }
   override var length: Int { return 0 }
 
   override class func stringWithContentsOfFile(s: String,

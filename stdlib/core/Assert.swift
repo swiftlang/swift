@@ -10,74 +10,17 @@
 //
 //===----------------------------------------------------------------------===//
 
-//
-// Fatal errors, which always stop the program regardless of build
-// configuration.
-//
+/// User code assertions.
+///
+/// User code assertions and fatal errors are only enabled in debug mode. In
+/// release or fast mode these checks are disabled. This means they may have no
+/// effect on program semantics, depending on the assert configuration.
 
-/// A fatal error occurred and program execution must stop.  In
-/// builds with assertions enabled, currently prints message to the
-/// console and executes a minimal debugger trap.  In non-assert
-/// builds, just executes a minimal debugger trap.
-@transparent
-@noreturn
-func fatal(
-  message: StaticString,
-  file: StaticString = __FILE__, line: UWord = __LINE__
-) {
-  if _isDebugAssertConfiguration() {
-    _fatal_error_message("fatal error", message, file, line)
-  } else if _isFastAssertConfiguration() {
-    _conditionallyUnreachable()
-  } else {
-    Builtin.int_trap()
-  }
-}
-
-/// If condition is false, invoke `fatal(message)`
-@transparent
-func securityCheck<L: LogicValue>(
-  condition: L,
-  _ message: StaticString = StaticString(),
-  file: StaticString = __FILE__, line: UWord = __LINE__
-) {
-  if _isDebugAssertConfiguration() {
-    if !_branchHint(condition.getLogicValue(), true) {
-      _fatal_error_message("fatal error", message, file, line)
-    }
-  } else {
-    if !_branchHint(condition.getLogicValue(), true) {
-      Builtin.int_trap()
-    }
-  }
-}
-
-/// If `error` is true, executes `fatal("Overflow/underflow")`.
-/// Otherwise returns `result`.
-@transparent
-func overflowChecked<T>(
-  args: (T, Bool),
-  file: StaticString = __FILE__, line: UWord = __LINE__
-) -> T {
-  let (result, error) = args
-  if _isDebugAssertConfiguration() {
-    if _branchHint(error, false) {
-      fatal("Overflow/underflow", file: file, line: line)
-    }
-  } else {
-    Builtin.condfail(error.value)
-    return result
-  }
-  return result
-}
-
-//
-// Assertions, which may have no effect on program semantics,
-// depending on the build configuration
-//
-
-// FIXME: Dispatching to this overload is needed as a workaround for
-// <rdar://problem/15889294>
+/// \brief Traditional C-style assert with an optional message.
+/// When assertions are enabled and `condition` is false, stop program
+/// execution in a debuggable state after printing a message.  When
+/// assertions are disabled in release and fast builds, `condition` is not even
+/// evaluated.
 @transparent
 func assert(
   condition: @auto_closure () -> Bool, _ message: StaticString = StaticString(),
@@ -90,63 +33,65 @@ func assert(
     }
   }
 }
-
-/// Traditional C-style assert with an optional message.
-///
-/// When assertions are enabled and `condition` is false, stop program
-/// execution in a debuggable state after printing a message.  When
-/// assertions are disabled, `condition` is not even evaluated.
 @transparent
 func assert<T : LogicValue>(
   condition: @auto_closure () -> T, _ message: StaticString = StaticString(),
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
-  // Only in debug mode.
+  // Only assert in debug mode.
   if _isDebugAssertConfiguration() {
-    assert(condition().getLogicValue(), message, file: file, line: line)
+    if !_branchHint(condition(), true) {
+      _fatal_error_message("assertion failed", message, file, line)
+    }
   }
 }
 
-/// Internal checks are to be used for checking correctness conditions in the
-/// standard library. They are only enable when the standard library is built
-/// with the build configuration INTERNAL_CHECKS_ENABLED enabled. Otherwise, the
-/// call to this function is a noop.
+/// \brief A fatal error occurred and program execution should stop in debug mode. In
+/// optimized builds this is a noop.
 @transparent
-func _internal_check(
-  condition: @auto_closure () -> Bool, _ message: StaticString = StaticString(),
+@noreturn
+func fatalError(
+  message: StaticString,
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
-#if INTERNAL_CHECKS_ENABLED
-  if !_branchHint(condition(), true) {
-      _fatal_error_message("internal check failed", message, file, line)
+  if _isDebugAssertConfiguration() {
+    _fatal_error_message("fatal error", message, file, line)
   }
-#endif
+  _conditionallyUnreachable()
 }
 
-@transparent
-func _internal_check<T : LogicValue>(
-  condition: @auto_closure () -> T, _ message: StaticString = StaticString(),
-  file: StaticString = __FILE__, line: UWord = __LINE__
-) {
-#if INTERNAL_CHECKS_ENABLED
-  if !_branchHint(condition(), true) {
-    _internal_check(condition().getLogicValue(), message, file: file, line: line)
-  }
-#endif
-}
 
-/// Library precondition checks are enabled in debug and release mode but not in
-/// fast mode. In release mode they don't print an error message but just trap.
-/// In debug mode they print an error message and abort.
+/// Library precondition checks
+///
+/// Library precondition checks are enabled in debug mode and release mode. When
+/// building in fast mode they are disabled.  In release mode they don't print
+/// an error message but just trap. In debug mode they print an error message
+/// and abort.
 @transparent
-func _precondition_safety_check(
+func _precondition(
   condition: @auto_closure () -> Bool, _ message: StaticString = StaticString(),
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
   // Only check in debug and release mode. In release mode just trap.
   if _isDebugAssertConfiguration() {
     if !_branchHint(condition(), true) {
-      _fatal_error_message("precondition failed", message, file, line)
+      _fatal_error_message("fatal error", message, file, line)
+    }
+  } else if _isReleaseAssertConfiguration() {
+    if !_branchHint(condition(), true) {
+      Builtin.int_trap()
+    }
+  }
+}
+@transparent
+func _precondition<T : LogicValue>(
+  condition: @auto_closure () -> T, _ message: StaticString = StaticString(),
+  file: StaticString = __FILE__, line: UWord = __LINE__
+) {
+  // Only check in debug and release mode. In release mode just trap.
+  if _isDebugAssertConfiguration() {
+    if !_branchHint(condition(), true) {
+      _fatal_error_message("fatal error", message, file, line)
     }
   } else if _isReleaseAssertConfiguration() {
     if !_branchHint(condition(), true) {
@@ -156,38 +101,116 @@ func _precondition_safety_check(
 }
 
 @transparent
-func _precondition_safety_check<T : LogicValue>(
-  condition: @auto_closure () -> T, _ message: StaticString = StaticString(),
-  file: StaticString = __FILE__, line: UWord = __LINE__
-) {
-  // Only in debug and release mode.
-  if _isDebugAssertConfiguration() || _isReleaseAssertConfiguration() {
-    _precondition_safety_check(condition().getLogicValue(), message, file: file, line: line)
-  }
+@noreturn
+func _preconditionFailure(
+  _ message: StaticString = StaticString(),
+  file: StaticString = __FILE__, line: UWord = __LINE__) {
+
+  _precondition(false, message, file:file, line: line)
+
+  _conditionallyUnreachable()
 }
 
-/// Library partial safety checks are only enabled in debug mode and print an
-/// error message on failure.
+/// If `error` is true, prints an error message in debug mode, traps in release
+/// mode, and returns an undefined error otherwise.
+/// Otherwise returns `result`.
 @transparent
-func _partial_safety_check(
+func _overflowChecked<T>(
+  args: (T, Bool),
+  file: StaticString = __FILE__, line: UWord = __LINE__
+) -> T {
+  let (result, error) = args
+  if _isDebugAssertConfiguration() {
+    if _branchHint(error, false) {
+      _fatal_error_message("fatal error", "Overflow/underflow", file, line)
+    }
+  } else {
+    Builtin.condfail(error.value)
+  }
+  return result
+}
+
+
+/// Debug library precondition checks
+///
+/// Debug library precondition checks are only on in debug mode. In release and
+/// in fast mode they are disabled. In debug mode they print an error message
+/// and abort.
+/// They are meant to be used when the check is not comprehensively checking for
+/// all possible errors.
+@transparent
+func _debugPrecondition(
   condition: @auto_closure () -> Bool, _ message: StaticString = StaticString(),
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
-  // Only assert in debug and release mode.
+  // Only check in debug mode.
   if _isDebugAssertConfiguration() {
     if !_branchHint(condition(), true) {
-      _fatal_error_message("safety check failed", message, file, line)
+      _fatal_error_message("fatal error", message, file, line)
     }
   }
 }
 
 @transparent
-func _partial_safety_check<T : LogicValue>(
+func _debugPrecondition<T : LogicValue>(
   condition: @auto_closure () -> T, _ message: StaticString = StaticString(),
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
-  // Only in debug mode.
+  // Only check in debug mode.
   if _isDebugAssertConfiguration() {
-    _partial_safety_check(condition().getLogicValue(), message, file: file, line: line)
+    if !_branchHint(condition(), true) {
+      _fatal_error_message("fatal error", message, file, line)
+    }
   }
+}
+
+@transparent
+@noreturn
+func _debugPreconditionFailure(
+  _ message: StaticString = StaticString(),
+  file: StaticString = __FILE__, line: UWord = __LINE__) {
+  if _isDebugAssertConfiguration() {
+    _precondition(false, message, file: file, line: line)
+  }
+  _conditionallyUnreachable()
+}
+
+/// Internal checks
+///
+/// Internal checks are to be used for checking correctness conditions in the
+/// standard library. They are only enable when the standard library is built
+/// with the build configuration INTERNAL_CHECKS_ENABLED enabled. Otherwise, the
+/// call to this function is a noop.
+@transparent
+func _sanityCheck(
+  condition: @auto_closure () -> Bool, _ message: StaticString = StaticString(),
+  file: StaticString = __FILE__, line: UWord = __LINE__
+) {
+#if INTERNAL_CHECKS_ENABLED
+  if !_branchHint(condition(), true) {
+    _fatal_error_message("fatal error", message, file, line)
+  }
+#endif
+}
+
+@transparent
+func _sanityCheck<T : LogicValue>(
+  condition: @auto_closure () -> T, _ message: StaticString = StaticString(),
+  file: StaticString = __FILE__, line: UWord = __LINE__
+) {
+#if INTERNAL_CHECKS_ENABLED
+  if !_branchHint(condition(), true) {
+    _fatal_error_message("fatal error", message, file, line)
+  }
+#endif
+}
+
+@transparent
+@noreturn
+func _fatalError(
+  _ message: StaticString = StaticString(),
+  file: StaticString = __FILE__, line: UWord = __LINE__
+) {
+  _sanityCheck(false, message, file: file, line: line)
+  _conditionallyUnreachable();
 }

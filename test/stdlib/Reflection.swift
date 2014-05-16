@@ -100,7 +100,7 @@ struct BrilliantMirror : Mirror {
     case 2:
       return ("self", self)
     case _:
-      fatal("child index out of bounds")
+      _preconditionFailure("child index out of bounds")
     }
   }
 

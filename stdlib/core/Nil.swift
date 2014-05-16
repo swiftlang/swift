@@ -35,7 +35,7 @@ struct _NilMirror : Mirror {
 
   var count: Int { return 0 }
 
-  subscript(i: Int) -> (String, Mirror) { fatal("a _NilMirror has no children") }
+  subscript(i: Int) -> (String, Mirror) { _preconditionFailure("a _NilMirror has no children") }
 
   var summary: String { return "nil" }
 

@@ -17,8 +17,8 @@
 
 struct _ArrayBody {
   init(count: Int, capacity: Int, elementTypeIsBridgedVerbatim: Bool = false) {
-    assert(count >= 0)
-    assert(capacity >= 0)
+    _sanityCheck(count >= 0)
+    _sanityCheck(capacity >= 0)
     self.count = count
     self._capacityAndFlags
       = (UInt(capacity) << 1) | (elementTypeIsBridgedVerbatim ? 1 : 0)

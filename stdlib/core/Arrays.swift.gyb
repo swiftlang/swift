@@ -762,7 +762,7 @@ func _arrayBridgeFromObjectiveC<T>(a: AnyObject[]) -> T[] {
   if let b = (_arrayBridgedDownCast(a) as T[]?) {
     return b
   }
-  fatal("Failed to bridge NSArray from Objective-C")
+  _fatalError("Failed to bridge NSArray from Objective-C")
 }
 
 /// Returns an Array<Derived> containing the same elements as a in

@@ -1676,7 +1676,7 @@ struct TestBridgedKeyTy : Equatable, Hashable, Printable, _BridgedToObjectiveC {
   }
 
   static func bridgeFromObjectiveC(x: TestObjCKeyTy) -> TestBridgedKeyTy? {
-    fatal("implement")
+    _fatalError("implement")
   }
 
   var value: Int
@@ -1712,7 +1712,7 @@ struct TestBridgedValueTy : Printable, _BridgedToObjectiveC {
   }
 
   static func bridgeFromObjectiveC(x: TestObjCValueTy) -> TestBridgedValueTy? {
-    fatal("implement")
+    _fatalError("implement")
   }
 
   var value: Int

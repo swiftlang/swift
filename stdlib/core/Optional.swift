@@ -86,7 +86,7 @@ func _getOptionalValue<T>(v: T?) -> T {
   case .Some(var x):
     return x
   case .None:
-    fatal("Can't unwrap Optional.None")
+    _preconditionFailure("Can't unwrap Optional.None")
   }
 }
 
@@ -134,7 +134,7 @@ struct _OptionalMirror<T> : Mirror {
   subscript(i: Int) -> (String, Mirror) { 
     switch (_value,i) {
     case (.Some(let contents),0) : return ("Some",reflect(contents))
-    default: fatal("cannot extract this child index")
+    default: _preconditionFailure("cannot extract this child index")
     }
   }
 

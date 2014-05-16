@@ -29,32 +29,32 @@ func noinlineMinusZero() -> TestFloat {
 //===---
 
 func checkNormal(normal: TestFloat) {
-  securityCheck(normal.isNormal())
-  securityCheck(normal.isFinite())
-  securityCheck(!normal.isZero())
-  securityCheck(!normal.isSubnormal())
-  securityCheck(!normal.isInfinite())
-  securityCheck(!normal.isNaN())
-  securityCheck(!normal.isSignaling())
+  _precondition(normal.isNormal())
+  _precondition(normal.isFinite())
+  _precondition(!normal.isZero())
+  _precondition(!normal.isSubnormal())
+  _precondition(!normal.isInfinite())
+  _precondition(!normal.isNaN())
+  _precondition(!normal.isSignaling())
 }
 
 func testNormal() {
   var positiveNormal: TestFloat = 42.0
   checkNormal(positiveNormal)
-  securityCheck(!positiveNormal.isSignMinus())
-  securityCheck(positiveNormal.floatingPointClass == .PositiveNormal)
+  _precondition(!positiveNormal.isSignMinus())
+  _precondition(positiveNormal.floatingPointClass == .PositiveNormal)
 
   var negativeNormal: TestFloat = -42.0
   checkNormal(negativeNormal)
-  securityCheck(negativeNormal.isSignMinus())
-  securityCheck(negativeNormal.floatingPointClass == .NegativeNormal)
+  _precondition(negativeNormal.isSignMinus())
+  _precondition(negativeNormal.floatingPointClass == .NegativeNormal)
 
-  securityCheck(positiveNormal == positiveNormal)
-  securityCheck(negativeNormal == negativeNormal)
-  securityCheck(positiveNormal != negativeNormal)
-  securityCheck(negativeNormal != positiveNormal)
-  securityCheck(positiveNormal == -negativeNormal)
-  securityCheck(negativeNormal == -positiveNormal)
+  _precondition(positiveNormal == positiveNormal)
+  _precondition(negativeNormal == negativeNormal)
+  _precondition(positiveNormal != negativeNormal)
+  _precondition(negativeNormal != positiveNormal)
+  _precondition(positiveNormal == -negativeNormal)
+  _precondition(negativeNormal == -positiveNormal)
 
   println("testNormal done")
 }
@@ -66,32 +66,32 @@ testNormal()
 //===---
 
 func checkZero(zero: TestFloat) {
-  securityCheck(!zero.isNormal())
-  securityCheck(zero.isFinite())
-  securityCheck(zero.isZero())
-  securityCheck(!zero.isSubnormal())
-  securityCheck(!zero.isInfinite())
-  securityCheck(!zero.isNaN())
-  securityCheck(!zero.isSignaling())
+  _precondition(!zero.isNormal())
+  _precondition(zero.isFinite())
+  _precondition(zero.isZero())
+  _precondition(!zero.isSubnormal())
+  _precondition(!zero.isInfinite())
+  _precondition(!zero.isNaN())
+  _precondition(!zero.isSignaling())
 }
 
 func testZero() {
   var plusZero = noinlinePlusZero()
   checkZero(plusZero)
-  securityCheck(!plusZero.isSignMinus())
-  securityCheck(plusZero.floatingPointClass == .PositiveZero)
+  _precondition(!plusZero.isSignMinus())
+  _precondition(plusZero.floatingPointClass == .PositiveZero)
 
   var minusZero = noinlineMinusZero()
   checkZero(minusZero)
-  securityCheck(minusZero.isSignMinus())
-  securityCheck(minusZero.floatingPointClass == .NegativeZero)
+  _precondition(minusZero.isSignMinus())
+  _precondition(minusZero.floatingPointClass == .NegativeZero)
 
-  securityCheck(plusZero == 0.0)
-  securityCheck(plusZero == plusZero)
-  securityCheck(plusZero == minusZero)
-  securityCheck(minusZero == -0.0)
-  securityCheck(minusZero == plusZero)
-  securityCheck(minusZero == minusZero)
+  _precondition(plusZero == 0.0)
+  _precondition(plusZero == plusZero)
+  _precondition(plusZero == minusZero)
+  _precondition(minusZero == -0.0)
+  _precondition(minusZero == plusZero)
+  _precondition(minusZero == minusZero)
 
   println("testZero done")
 }
@@ -103,13 +103,13 @@ testZero()
 //===---
 
 func checkSubnormal(subnormal: TestFloat) {
-  securityCheck(!subnormal.isNormal())
-  securityCheck(subnormal.isFinite())
-  securityCheck(!subnormal.isZero())
-  securityCheck(subnormal.isSubnormal())
-  securityCheck(!subnormal.isInfinite())
-  securityCheck(!subnormal.isNaN())
-  securityCheck(!subnormal.isSignaling())
+  _precondition(!subnormal.isNormal())
+  _precondition(subnormal.isFinite())
+  _precondition(!subnormal.isZero())
+  _precondition(subnormal.isSubnormal())
+  _precondition(!subnormal.isInfinite())
+  _precondition(!subnormal.isNaN())
+  _precondition(!subnormal.isSignaling())
 }
 
 func asUInt64(a: UInt64) -> UInt64 {
@@ -128,25 +128,25 @@ func testSubnormal() {
     case asUInt64(UInt32.max):
       iterations = 127
     default:
-      fatal("unhandled float kind")
+      _preconditionFailure("unhandled float kind")
   }
   var positiveSubnormal: TestFloat = 1.0
   for var i = 0; i < iterations; i++ {
     positiveSubnormal /= 2.0 as TestFloat
   }
   checkSubnormal(positiveSubnormal)
-  securityCheck(!positiveSubnormal.isSignMinus())
-  securityCheck(positiveSubnormal.floatingPointClass == .PositiveSubnormal)
-  securityCheck(positiveSubnormal != 0.0)
+  _precondition(!positiveSubnormal.isSignMinus())
+  _precondition(positiveSubnormal.floatingPointClass == .PositiveSubnormal)
+  _precondition(positiveSubnormal != 0.0)
 
   var negativeSubnormal: TestFloat = -1.0
   for var i = 0; i < iterations; i++ {
     negativeSubnormal /= 2.0 as TestFloat
   }
   checkSubnormal(negativeSubnormal)
-  securityCheck(negativeSubnormal.isSignMinus())
-  securityCheck(negativeSubnormal.floatingPointClass == .NegativeSubnormal)
-  securityCheck(negativeSubnormal != -0.0)
+  _precondition(negativeSubnormal.isSignMinus())
+  _precondition(negativeSubnormal.floatingPointClass == .NegativeSubnormal)
+  _precondition(negativeSubnormal != -0.0)
 
   println("testSubnormal done")
 }
@@ -158,41 +158,41 @@ testSubnormal()
 //===---
 
 func checkInf(inf: TestFloat) {
-  securityCheck(!inf.isNormal())
-  securityCheck(!inf.isFinite())
-  securityCheck(!inf.isZero())
-  securityCheck(!inf.isSubnormal())
-  securityCheck(inf.isInfinite())
-  securityCheck(!inf.isNaN())
-  securityCheck(!inf.isSignaling())
+  _precondition(!inf.isNormal())
+  _precondition(!inf.isFinite())
+  _precondition(!inf.isZero())
+  _precondition(!inf.isSubnormal())
+  _precondition(inf.isInfinite())
+  _precondition(!inf.isNaN())
+  _precondition(!inf.isSignaling())
 }
 
 func testInf() {
   var stdlibPlusInf = TestFloat.inf()
   checkInf(stdlibPlusInf)
-  securityCheck(!stdlibPlusInf.isSignMinus())
-  securityCheck(stdlibPlusInf.floatingPointClass == .PositiveInfinity)
+  _precondition(!stdlibPlusInf.isSignMinus())
+  _precondition(stdlibPlusInf.floatingPointClass == .PositiveInfinity)
 
   var stdlibMinusInf = -TestFloat.inf()
   checkInf(stdlibMinusInf)
-  securityCheck(stdlibMinusInf.isSignMinus())
-  securityCheck(stdlibMinusInf.floatingPointClass == .NegativeInfinity)
+  _precondition(stdlibMinusInf.isSignMinus())
+  _precondition(stdlibMinusInf.floatingPointClass == .NegativeInfinity)
 
   var computedPlusInf = 1.0 / noinlinePlusZero()
   checkInf(computedPlusInf)
-  securityCheck(!computedPlusInf.isSignMinus())
-  securityCheck(computedPlusInf.floatingPointClass == .PositiveInfinity)
+  _precondition(!computedPlusInf.isSignMinus())
+  _precondition(computedPlusInf.floatingPointClass == .PositiveInfinity)
 
   var computedMinusInf = -1.0 / noinlinePlusZero()
   checkInf(computedMinusInf)
-  securityCheck(computedMinusInf.isSignMinus())
-  securityCheck(computedMinusInf.floatingPointClass == .NegativeInfinity)
+  _precondition(computedMinusInf.isSignMinus())
+  _precondition(computedMinusInf.floatingPointClass == .NegativeInfinity)
 
-  securityCheck(stdlibPlusInf == computedPlusInf)
-  securityCheck(stdlibMinusInf == computedMinusInf)
+  _precondition(stdlibPlusInf == computedPlusInf)
+  _precondition(stdlibMinusInf == computedMinusInf)
 
-  securityCheck(stdlibPlusInf != computedMinusInf)
-  securityCheck(stdlibMinusInf != computedPlusInf)
+  _precondition(stdlibPlusInf != computedMinusInf)
+  _precondition(stdlibMinusInf != computedPlusInf)
 
   println("testInf done")
 }
@@ -204,29 +204,29 @@ testInf()
 //===---
 
 func checkNaN(nan: TestFloat) {
-  securityCheck(!nan.isSignMinus())
-  securityCheck(!nan.isNormal())
-  securityCheck(!nan.isFinite())
-  securityCheck(!nan.isZero())
-  securityCheck(!nan.isSubnormal())
-  securityCheck(!nan.isInfinite())
-  securityCheck(nan.isNaN())
+  _precondition(!nan.isSignMinus())
+  _precondition(!nan.isNormal())
+  _precondition(!nan.isFinite())
+  _precondition(!nan.isZero())
+  _precondition(!nan.isSubnormal())
+  _precondition(!nan.isInfinite())
+  _precondition(nan.isNaN())
 }
 
 func checkQNaN(qnan: TestFloat) {
   checkNaN(qnan)
-  securityCheck(!qnan.isSignaling())
-  securityCheck(qnan.floatingPointClass == .QuietNaN)
+  _precondition(!qnan.isSignaling())
+  _precondition(qnan.floatingPointClass == .QuietNaN)
 }
 
 func testNaN() {
   var stdlibDefaultNaN = TestFloat.NaN()
   checkQNaN(stdlibDefaultNaN)
-  securityCheck(stdlibDefaultNaN != stdlibDefaultNaN)
+  _precondition(stdlibDefaultNaN != stdlibDefaultNaN)
 
   var stdlibQNaN = TestFloat.quietNaN()
   checkQNaN(stdlibQNaN)
-  securityCheck(stdlibQNaN != stdlibQNaN)
+  _precondition(stdlibQNaN != stdlibQNaN)
 
   println("testNaN done")
 }

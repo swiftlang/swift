@@ -28,7 +28,7 @@ extension _StringCore {
   /// low byte.  Any unused high bytes in the result will be set to
   /// 0xFF.
   func _encodeSomeUTF8(i: Int) -> (Int, UTF8Chunk) {
-    assert(i <= count)
+    _sanityCheck(i <= count)
     
     if _fastPath(elementWidth == 1) {
       // How many UTF16 code units might we use before we've filled up
@@ -52,7 +52,7 @@ extension _StringCore {
   /// Helper for _encodeSomeUTF8, above.  Handles the case where we
   /// don't have contiguous ASCII storage.
   func _encodeSomeUTF16AsUTF8(i: Int) -> (Int, UTF8Chunk) {
-    assert(elementWidth == 2)
+    _sanityCheck(elementWidth == 2)
     
     if _fastPath(_baseAddress != nil) {
       
@@ -144,8 +144,8 @@ extension String {
         self._core = _core
         self._coreIndex = _coreIndex
         self._buffer = _buffer
-        assert(_coreIndex >= 0)
-        assert(_coreIndex <= _core.count)
+        _sanityCheck(_coreIndex >= 0)
+        _sanityCheck(_coreIndex <= _core.count)
       }
       
       func succ() -> Index {
@@ -157,7 +157,7 @@ extension String {
         }
         if _fastPath(_coreIndex != _core.endIndex) {
           let (newCoreIndex, newBuffer1) = _core._encodeSomeUTF8(_coreIndex)
-          assert(newCoreIndex > _coreIndex)
+          _sanityCheck(newCoreIndex > _coreIndex)
           return Index(_core, newCoreIndex, newBuffer1)
         }
         return Index(_core, _coreIndex, ~0)

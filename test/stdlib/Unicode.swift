@@ -68,7 +68,7 @@ func nthUnicodeScalar(n: UInt32) -> UnicodeScalar {
       return UnicodeScalar(r.endIndex - (count - n))
     }
   }
-  fatal("Index out of range")
+  _preconditionFailure("Index out of range")
 }
   
 // buffer should have a length >= 4

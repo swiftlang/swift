@@ -69,7 +69,7 @@ enum Character :
     // one-byte code points there, we simplify decoding by banning
     // starting a code point in the last byte, and assuming that its
     // high bit is 1.
-    securityCheck(
+    _precondition(
       s.core.count != 0, "Can't form a Character from an empty String")
 
     var (count, initialUTF8) = s.core._encodeSomeUTF8(0)

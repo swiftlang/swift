@@ -624,9 +624,9 @@ class DerivedUsingConvenienceInits : BaseWithConvenienceInits {
   }
 }
 
-// <rdar://problem/16660680> QoI: fatal() in init method complains about super.init being called multiple times
+// <rdar://problem/16660680> QoI: _preconditionFailure() in init method complains about super.init being called multiple times
 class ClassWhoseInitDoesntReturn : BaseWithConvenienceInits {
   init() {  
-    fatal("leave me alone dude"); 
+    _preconditionFailure("leave me alone dude");
   }
 }

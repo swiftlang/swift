@@ -53,13 +53,13 @@ class IndirectArrayBuffer {
   var isCocoa: Bool
   
   func getNative<T>() -> ContiguousArrayBuffer<T> {
-    assert(!isCocoa)
+    _sanityCheck(!isCocoa)
     return ContiguousArrayBuffer(
       buffer ? reinterpretCast(buffer) as ContiguousArrayStorage<T> : nil)
   }
 
   func getCocoa() -> CocoaArray {
-    assert(isCocoa)
+    _sanityCheck(isCocoa)
     return reinterpretCast(buffer!) as CocoaArray
   }
 }
@@ -68,7 +68,7 @@ struct ArrayBuffer<T> : ArrayBufferType {
   var storage: Builtin.NativeObject?
 
   var indirect: IndirectArrayBuffer {
-    assert(_isClassOrObjCExistential(T.self))
+    _sanityCheck(_isClassOrObjCExistential(T.self))
     return Builtin.castFromNativeObject(storage!)
   }
   
@@ -84,15 +84,15 @@ struct ArrayBuffer<T> : ArrayBufferType {
   }
 
   init(_ cocoa: CocoaArray) {
-    assert(_isClassOrObjCExistential(T.self))
+    _sanityCheck(_isClassOrObjCExistential(T.self))
     storage = Builtin.castToNativeObject(IndirectArrayBuffer(cocoa: cocoa))
   }
 
   /// An ArrayBuffer<T> containing the same elements.
   /// Requires: the elements actually have dynamic type T.
   init<U>(castFrom: ArrayBuffer<U>, castKind: _ArrayCastKind) {
-    assert(_isClassOrObjCExistential(T.self))
-    assert(_isClassOrObjCExistential(U.self))
+    _sanityCheck(_isClassOrObjCExistential(T.self))
+    _sanityCheck(_isClassOrObjCExistential(U.self))
     storage = Builtin.castToNativeObject(
       IndirectArrayBuffer(castFrom: castFrom.indirect, castKind: castKind))
   }
@@ -124,7 +124,7 @@ extension ArrayBuffer {
   /// Precondition: isBridgedToObjectiveC(Element.self)
   /// O(1) if the element type is bridged verbatim, O(N) otherwise
   func asCocoaArray() -> CocoaArray {
-    assert(
+    _sanityCheck(
       isBridgedToObjectiveC(T.self),
       "Array element type is not bridged to ObjectiveC")
 
@@ -240,11 +240,11 @@ extension ArrayBuffer {
     set {
       // Allow zero here for the case where elements have been moved
       // out of the buffer during reallocation
-      assert(
+      _sanityCheck(
         newValue == 0 || newValue >= count,
         "We don't yet know how to shrink an array")
       
-      assert(_isNative, "attempting to update count of Cocoa array")
+      _sanityCheck(_isNative, "attempting to update count of Cocoa array")
       _native.count = newValue
     }
   }

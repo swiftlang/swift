@@ -82,7 +82,7 @@ struct ContiguousArrayBuffer<T> : ArrayBufferType, LogicValue {
     if !base {
       return ContiguousArrayBuffer()
     }
-    assert(base.isUniquelyReferenced(), "Can't \"take\" a shared array buffer")
+    _sanityCheck(base.isUniquelyReferenced(), "Can't \"take\" a shared array buffer")
     let result = self
     base = Base()
     return result
@@ -118,12 +118,12 @@ struct ContiguousArrayBuffer<T> : ArrayBufferType, LogicValue {
   /// Get/set the value of the ith element
   subscript(i: Int) -> T {
     get {
-      assert(i >= 0 && i < count, "Array index out of range")
+      _sanityCheck(i >= 0 && i < count, "Array index out of range")
       // If the index is in bounds, we can assume we have storage.
       return _unsafeElementStorage[i]
     }
     nonmutating set {
-      assert(i >= 0 && i < count, "Array index out of range")
+      _sanityCheck(i >= 0 && i < count, "Array index out of range")
       // If the index is in bounds, we can assume we have storage.
 
       // FIXME: Manually swap because it makes the ARC optimizer happy.  See
@@ -142,13 +142,13 @@ struct ContiguousArrayBuffer<T> : ArrayBufferType, LogicValue {
       return base ? base.value.count : 0
     }
     nonmutating set {
-      assert(newValue >= 0)
+      _sanityCheck(newValue >= 0)
       
-      assert(
+      _sanityCheck(
         newValue <= capacity,
         "Can't grow an array buffer past its capacity")
 
-      assert(base || newValue == 0)
+      _sanityCheck(base || newValue == 0)
       
       if base {
         base.value.count = newValue
@@ -167,9 +167,9 @@ struct ContiguousArrayBuffer<T> : ArrayBufferType, LogicValue {
   func _uninitializedCopy(
     subRange: Range<Int>, target: UnsafePointer<T>
   ) -> UnsafePointer<T> {
-    assert(subRange.startIndex >= 0)
-    assert(subRange.endIndex >= subRange.startIndex)
-    assert(subRange.endIndex <= count)
+    _sanityCheck(subRange.startIndex >= 0)
+    _sanityCheck(subRange.endIndex >= subRange.startIndex)
+    _sanityCheck(subRange.endIndex <= count)
     
     var dst = target
     var src = elementStorage + subRange.startIndex
@@ -209,7 +209,7 @@ struct ContiguousArrayBuffer<T> : ArrayBufferType, LogicValue {
   /// Precondition: T is bridged to Objective-C
   /// O(1) if T is bridged verbatim, O(N) otherwise
   func asCocoaArray() -> CocoaArray {
-    assert(
+    _sanityCheck(
       isBridgedToObjectiveC(T.self),
       "Array element type is not bridged to ObjectiveC")
     if count == 0 {

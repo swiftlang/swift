@@ -262,8 +262,8 @@ func _doubleToStringImpl(
 ) -> UWord
 
 func _doubleToString(value: Double) -> String {
-  assert(sizeof(_Buffer32.self) == 32)
-  assert(sizeof(_Buffer72.self) == 72)
+  _sanityCheck(sizeof(_Buffer32.self) == 32)
+  _sanityCheck(sizeof(_Buffer72.self) == 72)
 
   var buffer = _Buffer32()
   return withUnsafePointer(&buffer) {

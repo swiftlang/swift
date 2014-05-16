@@ -36,7 +36,7 @@ class LifetimeManager {
 
   deinit {
     if !_releaseCalled {
-      fatal("release() should have been called")
+      _fatalError("release() should have been called")
     }
   }
 

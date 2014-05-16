@@ -43,23 +43,23 @@ struct SliceBuffer<T> : ArrayBufferType {
 
   func _invariantCheck() {
     let isNative = _hasNativeBuffer
-    assert(
+    _sanityCheck(
       (owner as NativeStorage).getLogicValue() == isNative
     )
     if isNative {
-      assert(count <= nativeBuffer.count)
+      _sanityCheck(count <= nativeBuffer.count)
     }
   }
   
   var _hasNativeBuffer: Bool {
-    assert(
+    _sanityCheck(
       owner || (_countAndFlags & 1) == 0,
       "Something went wrong: an unowned buffer cannot have a native buffer")
     return (_countAndFlags & 1) != 0
   }
 
   var nativeBuffer: NativeBuffer {
-    assert(_hasNativeBuffer)
+    _sanityCheck(_hasNativeBuffer)
     return NativeBuffer(owner as NativeStorage)
   }
   
@@ -79,7 +79,7 @@ struct SliceBuffer<T> : ArrayBufferType {
   //===--- Non-essential bits ---------------------------------------------===//
   
   func asCocoaArray() -> CocoaArray {
-    assert(
+    _sanityCheck(
       isBridgedToObjectiveC(T.self),
       "Array element type is not bridged to ObjectiveC")
     _invariantCheck()
@@ -114,9 +114,9 @@ struct SliceBuffer<T> : ArrayBufferType {
     subRange: Range<Int>, var target: UnsafePointer<T>
   ) -> UnsafePointer<T> {
     _invariantCheck()
-    assert(subRange.startIndex >= 0)
-    assert(subRange.endIndex >= subRange.startIndex)
-    assert(subRange.endIndex <= count)
+    _sanityCheck(subRange.startIndex >= 0)
+    _sanityCheck(subRange.endIndex >= subRange.startIndex)
+    _sanityCheck(subRange.endIndex <= count)
     for i in subRange {
       target++.initialize(start[i])
     }
@@ -160,21 +160,21 @@ struct SliceBuffer<T> : ArrayBufferType {
 
   subscript(i: Int) -> T {
     get {
-      assert(i >= 0, "negative slice index is out of range")
-      assert(i < count, "slice index out of range")
+      _sanityCheck(i >= 0, "negative slice index is out of range")
+      _sanityCheck(i < count, "slice index out of range")
       return start[i]
     }
     nonmutating set {
-      assert(i >= 0, "negative slice index is out of range")
-      assert(i < count, "slice index out of range")
+      _sanityCheck(i >= 0, "negative slice index is out of range")
+      _sanityCheck(i < count, "slice index out of range")
       start[i] = newValue
     }
   }
 
   subscript (subRange: Range<Int>) -> SliceBuffer {
-    assert(subRange.startIndex >= 0)
-    assert(subRange.endIndex >= subRange.startIndex)
-    assert(subRange.endIndex <= count)
+    _sanityCheck(subRange.startIndex >= 0)
+    _sanityCheck(subRange.endIndex >= subRange.startIndex)
+    _sanityCheck(subRange.endIndex <= count)
     return SliceBuffer(
       owner: owner, start: start + subRange.startIndex,
       count: subRange.endIndex - subRange.startIndex, 

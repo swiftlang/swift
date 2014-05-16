@@ -38,14 +38,14 @@ func test_fatalIsNoreturn() {
     case .A(let res):
       return res
     case .B:
-      fatal("can not happen")
+      _preconditionFailure("can not happen")
       // Don't need a return statement here because fatal() is @noreturn.
     }
   }
 }
 
 func test_fatal() {
-  fatal("this should fail")
+  _preconditionFailure("this should fail")
   // CHECK_FATAL: fatal error: this should fail: file {{.*}}Assert.swift, line [[@LINE-1]]
   // CHECK_FATAL: CRASHED: SIG{{ILL|TRAP}}
 }
@@ -57,10 +57,10 @@ if (Process.arguments[1] == "fatal") {
 
 func test_securityCheckBool() {
   var x = 2
-  securityCheck(x * 21 == 42, "should not fail")
+  _precondition(x * 21 == 42, "should not fail")
   println("OK")
   // CHECK_BOOL: OK
-  securityCheck(x == 42, "this should fail")
+  _precondition(x == 42, "this should fail")
   // CHECK_BOOL-NEXT: fatal error: this should fail: file {{.*}}Assert.swift, line [[@LINE-1]]
   // CHECK_BOOL-NEXT: CRASHED: SIG{{ILL|TRAP}}
 }
@@ -70,10 +70,10 @@ if (Process.arguments[1] == "Bool") {
 }
 
 func test_securityCheckLogicValue() {
-  securityCheck(truthie, "should not fail")
+  _precondition(truthie, "should not fail")
   println("OK")
   // CHECK_LOGICVALUE: OK
-  securityCheck(falsie, "this should fail")
+  _precondition(falsie, "this should fail")
   // CHECK_LOGICVALUE-NEXT: fatal error: this should fail: file {{.*}}Assert.swift, line [[@LINE-1]]
   // CHECK_LOGICVALUE-NEXT: CRASHED: SIG{{ILL|TRAP}}
 }

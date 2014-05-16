@@ -13,7 +13,7 @@ typealias SKColor = UIColor
 // since that method only exists in a private header in SpriteKit, the lookup
 // mechanism by default fails to accept it as a valid AnyObject call
 @objc class _SpriteKitMethodProvider : NSObject {
-  init() { fatal("don't touch me") }
+  init() { _fatalError("don't touch me") }
   @objc func _copyImageData() -> NSData! { return nil }
 }
 
@@ -35,7 +35,7 @@ struct _SKShapeNodeMirror : Mirror {
   
   var count: Int { return 0 }
   
-  subscript(_: Int) -> (String,Mirror) { fatal("don't ask") }
+  subscript(_: Int) -> (String,Mirror) { _fatalError("don't ask") }
 
   var summary: String { return _value.description }
   
@@ -70,7 +70,7 @@ struct _SKSpriteNodeMirror : Mirror {
   
   var count: Int { return 0 }
   
-  subscript(_: Int) -> (String,Mirror) { fatal("don't ask") }
+  subscript(_: Int) -> (String,Mirror) { _fatalError("don't ask") }
 
   var summary: String { return _value.description }
   
@@ -105,7 +105,7 @@ struct _SKTextureAtlasMirror : Mirror {
   
   var count: Int { return 0 }
   
-  subscript(_: Int) -> (String,Mirror) { fatal("don't ask") }
+  subscript(_: Int) -> (String,Mirror) { _fatalError("don't ask") }
 
   var summary: String { return _value.description }
   
@@ -140,7 +140,7 @@ struct _SKTextureMirror : Mirror {
   
   var count: Int { return 0 }
   
-  subscript(_: Int) -> (String,Mirror) { fatal("don't ask") }
+  subscript(_: Int) -> (String,Mirror) { _fatalError("don't ask") }
 
   var summary: String { return _value.description }
   
