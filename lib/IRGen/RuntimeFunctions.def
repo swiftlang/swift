@@ -554,7 +554,10 @@ FUNCTION(InstantiateObjCClass, swift_instantiateObjCClass, RuntimeCC,
          RETURNS(VoidTy),
          ARGS(TypeMetadataPtrTy),
          ATTRS(NoUnwind))
-
+FUNCTION(GetInitializedObjCClass, swift_getInitializedObjCClass, RuntimeCC,
+         RETURNS(ObjCClassPtrTy),
+         ARGS(ObjCClassPtrTy),
+         ATTRS(NoUnwind))
 FUNCTION(ObjCRetain, objc_retain, C_CC,
          RETURNS(ObjCPtrTy), ARGS(ObjCPtrTy), ATTRS(NoUnwind))
 FUNCTION(ObjCRelease, objc_release, C_CC,
@@ -587,6 +590,18 @@ FUNCTION(ClassReplaceMethod, class_replaceMethod, C_CC,
 FUNCTION(ClassAddProtocol, class_addProtocol, C_CC,
          RETURNS(VoidTy),
          ARGS(ObjCClassPtrTy, Int8PtrTy),
+         ATTRS(NoUnwind))
+FUNCTION(ObjCGetClass, objc_getClass, C_CC,
+         RETURNS(ObjCClassPtrTy),
+         ARGS(Int8PtrTy),
+         ATTRS(NoUnwind))
+FUNCTION(ObjCGetMetaClass, objc_getMetaClass, C_CC,
+         RETURNS(ObjCClassPtrTy),
+         ARGS(Int8PtrTy),
+         ATTRS(NoUnwind))
+FUNCTION(ObjCClassGetName, class_getName, C_CC,
+         RETURNS(Int8PtrTy),
+         ARGS(ObjCClassPtrTy),
          ATTRS(NoUnwind))
 
 // void *_Block_copy(void *block);

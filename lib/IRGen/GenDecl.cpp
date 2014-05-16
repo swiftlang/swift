@@ -110,7 +110,8 @@ namespace {
 class CategoryInitializerVisitor
   : public ClassMemberVisitor<CategoryInitializerVisitor>
 {
-  IRGenFunction &IGF;
+  IRGenModule &IGM;
+  IRBuilder &Builder;
   
   llvm::Constant *class_replaceMethod;
   llvm::Constant *class_addProtocol;
@@ -119,31 +120,37 @@ class CategoryInitializerVisitor
   llvm::Constant *metaclassMetadata;
   
 public:
-  CategoryInitializerVisitor(IRGenFunction &IGF, ExtensionDecl *ext)
-    : IGF(IGF)
+  CategoryInitializerVisitor(IRGenModule &I, IRBuilder &B, ExtensionDecl *ext)
+    : IGM(I), Builder(B)
   {
-    class_replaceMethod = IGF.IGM.getClassReplaceMethodFn();
-    class_addProtocol = IGF.IGM.getClassAddProtocolFn();
+    class_replaceMethod = IGM.getClassReplaceMethodFn();
+    class_addProtocol = IGM.getClassAddProtocolFn();
 
     CanType origTy = ext->getDeclaredTypeOfContext()->getCanonicalType();
-    classMetadata = tryEmitConstantHeapMetadataRef(IGF.IGM, origTy);
+    classMetadata = tryEmitConstantHeapMetadataRef(IGM, origTy);
     assert(classMetadata &&
            "extended objc class doesn't have constant metadata?!");
     classMetadata = llvm::ConstantExpr::getBitCast(classMetadata,
-                                                   IGF.IGM.ObjCClassPtrTy);
-    metaclassMetadata = IGF.IGM.getAddrOfMetaclassObject(
+                                                   IGM.ObjCClassPtrTy);
+    metaclassMetadata = IGM.getAddrOfMetaclassObject(
                                        origTy.getClassOrBoundGenericClass(),
                                                          NotForDefinition);
     metaclassMetadata = llvm::ConstantExpr::getBitCast(metaclassMetadata,
-                                                   IGF.IGM.ObjCClassPtrTy);
+                                                   IGM.ObjCClassPtrTy);
+
+    // We need to make sure the Objective C runtime has initialized our
+    // class. If you try to add or replace a method to a class that isn't
+    // initialized yet, the Objective C runtime will crash in the calls
+    // to class_replaceMethod or class_addProtocol.
+    Builder.CreateCall(IGM.getGetInitializedObjCClassFn(), classMetadata);
 
     // Register ObjC protocol conformances.
     for (auto *p : ext->getProtocols()) {
       if (!p->isObjC())
         continue;
       
-      auto proto = IGF.IGM.getAddrOfObjCProtocolRecord(p, NotForDefinition);
-      IGF.Builder.CreateCall2(class_addProtocol, classMetadata, proto);
+      auto proto = IGM.getAddrOfObjCProtocolRecord(p, NotForDefinition);
+      Builder.CreateCall2(class_addProtocol, classMetadata, proto);
     }
   }
   
@@ -155,12 +162,12 @@ public:
   void visitFuncDecl(FuncDecl *method) {
     if (!requiresObjCMethodDescriptor(method)) return;
     llvm::Constant *name, *imp, *types;
-    emitObjCMethodDescriptorParts(IGF.IGM, method, name, types, imp);
+    emitObjCMethodDescriptorParts(IGM, method, name, types, imp);
     
     // When generating JIT'd code, we need to call sel_registerName() to force
     // the runtime to unique the selector.
-    llvm::Value *sel = IGF.Builder.CreateCall(IGF.IGM.getObjCSelRegisterNameFn(),
-                                              name);
+    llvm::Value *sel = Builder.CreateCall(IGM.getObjCSelRegisterNameFn(),
+                                          name);
     
     llvm::Value *args[] = {
       method->isStatic() ? metaclassMetadata : classMetadata,
@@ -169,18 +176,18 @@ public:
       types
     };
     
-    IGF.Builder.CreateCall(class_replaceMethod, args);
+    Builder.CreateCall(class_replaceMethod, args);
   }
 
   void visitConstructorDecl(ConstructorDecl *constructor) {
     if (!requiresObjCMethodDescriptor(constructor)) return;
     llvm::Constant *name, *imp, *types;
-    emitObjCMethodDescriptorParts(IGF.IGM, constructor, name, types, imp);
+    emitObjCMethodDescriptorParts(IGM, constructor, name, types, imp);
 
     // When generating JIT'd code, we need to call sel_registerName() to force
     // the runtime to unique the selector.
-    llvm::Value *sel = IGF.Builder.CreateCall(IGF.IGM.getObjCSelRegisterNameFn(),
-                                              name);
+    llvm::Value *sel = Builder.CreateCall(IGM.getObjCSelRegisterNameFn(),
+                                          name);
 
     llvm::Value *args[] = {
       classMetadata,
@@ -189,11 +196,11 @@ public:
       types
     };
 
-    IGF.Builder.CreateCall(class_replaceMethod, args);
+    Builder.CreateCall(class_replaceMethod, args);
   }
 
   void visitVarDecl(VarDecl *prop) {
-    if (!requiresObjCPropertyDescriptor(IGF.IGM, prop)) return;
+    if (!requiresObjCPropertyDescriptor(IGM, prop)) return;
 
     // FIXME: register property metadata in addition to the methods.
 
@@ -202,47 +209,47 @@ public:
       return;
 
     llvm::Constant *name, *imp, *types;
-    emitObjCGetterDescriptorParts(IGF.IGM, prop,
+    emitObjCGetterDescriptorParts(IGM, prop,
                                   name, types, imp);
     // When generating JIT'd code, we need to call sel_registerName() to force
     // the runtime to unique the selector.
-    llvm::Value *sel = IGF.Builder.CreateCall(IGF.IGM.getObjCSelRegisterNameFn(),
-                                              name);
+    llvm::Value *sel = Builder.CreateCall(IGM.getObjCSelRegisterNameFn(),
+                                          name);
     llvm::Value *getterArgs[] = {classMetadata, sel, imp, types};
-    IGF.Builder.CreateCall(class_replaceMethod, getterArgs);
+    Builder.CreateCall(class_replaceMethod, getterArgs);
 
     if (prop->isSettable(prop->getDeclContext())) {
-      emitObjCSetterDescriptorParts(IGF.IGM, prop,
+      emitObjCSetterDescriptorParts(IGM, prop,
                                     name, types, imp);
-      sel = IGF.Builder.CreateCall(IGF.IGM.getObjCSelRegisterNameFn(),
-                                   name);
+      sel = Builder.CreateCall(IGM.getObjCSelRegisterNameFn(),
+                               name);
       llvm::Value *setterArgs[] = {classMetadata, sel, imp, types};
       
-      IGF.Builder.CreateCall(class_replaceMethod, setterArgs);
+      Builder.CreateCall(class_replaceMethod, setterArgs);
     }
   }
 
   void visitSubscriptDecl(SubscriptDecl *subscript) {
-    if (!requiresObjCSubscriptDescriptor(IGF.IGM, subscript)) return;
+    if (!requiresObjCSubscriptDescriptor(IGM, subscript)) return;
     
     llvm::Constant *name, *imp, *types;
-    emitObjCGetterDescriptorParts(IGF.IGM, subscript,
+    emitObjCGetterDescriptorParts(IGM, subscript,
                                   name, types, imp);
     // When generating JIT'd code, we need to call sel_registerName() to force
     // the runtime to unique the selector.
-    llvm::Value *sel = IGF.Builder.CreateCall(IGF.IGM.getObjCSelRegisterNameFn(),
-                                              name);
+    llvm::Value *sel = Builder.CreateCall(IGM.getObjCSelRegisterNameFn(),
+                                          name);
     llvm::Value *getterArgs[] = {classMetadata, sel, imp, types};
-    IGF.Builder.CreateCall(class_replaceMethod, getterArgs);
+    Builder.CreateCall(class_replaceMethod, getterArgs);
 
     if (subscript->isSettable()) {
-      emitObjCSetterDescriptorParts(IGF.IGM, subscript,
+      emitObjCSetterDescriptorParts(IGM, subscript,
                                     name, types, imp);
-      sel = IGF.Builder.CreateCall(IGF.IGM.getObjCSelRegisterNameFn(),
-                                   name);
+      sel = Builder.CreateCall(IGM.getObjCSelRegisterNameFn(),
+                               name);
       llvm::Value *setterArgs[] = {classMetadata, sel, imp, types};
       
-      IGF.Builder.CreateCall(class_replaceMethod, setterArgs);
+      Builder.CreateCall(class_replaceMethod, setterArgs);
     }
   }
 };
@@ -262,7 +269,7 @@ static llvm::Function *emitObjCCategoryInitializer(IRGenModule &IGM,
     IGM.DebugInfo->emitArtificialFunction(initIGF, initFn);
   
   for (ExtensionDecl *ext : categories) {
-    CategoryInitializerVisitor(initIGF, ext).visitMembers(ext);
+    CategoryInitializerVisitor(IGM, initIGF.Builder, ext).visitMembers(ext);
   }
   
   initIGF.Builder.CreateRetVoid();
@@ -423,6 +430,10 @@ void IRGenModule::emitDebuggerInitializers() {
     
     for (llvm::WeakVH &ObjCClass : ObjCClasses) {
       Builder.CreateCall(getInstantiateObjCClassFn(), ObjCClass);
+    }
+      
+    for (ExtensionDecl *ext : ObjCCategoryDecls) {
+      CategoryInitializerVisitor(*this, Builder, ext).visitMembers(ext);
     }
   }
 }
