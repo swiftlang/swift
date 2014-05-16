@@ -13,7 +13,6 @@ struct CErrorOr<T>
     value = .None
   }
   func isError() -> Bool {
-  // CHECK-DAG: [ DW_TAG_union_type ] [_TtGSqQq_Sq_]
     assert(value, "the object should not contain an error")
     return false
   }

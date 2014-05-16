@@ -1124,10 +1124,21 @@ llvm::DIArray IRGenDebugInfo::getEnumElements(DebugTypeInfo DbgTy, EnumDecl *D,
   for (auto ElemDecl : D->getAllElements()) {
     // FIXME <rdar://problem/14845818> Support enums.
     // Swift Enums can be both like DWARF enums and DWARF unions.
-    // We currently cannot represent the enum-like subset of enums.
+    // They should probably be emitted as DW_TAG_variant_type.
     if (ElemDecl->hasType()) {
       // Use Decl as DeclContext.
-      DebugTypeInfo ElemDbgTy(ElemDecl, DbgTy.size, DbgTy.align);
+      DebugTypeInfo ElemDbgTy;
+      if (ElemDecl->hasArgumentType())
+        ElemDbgTy = DebugTypeInfo(ElemDecl->getArgumentType(),
+                                  DbgTy.size, DbgTy.align, D);
+      else
+        if (D->hasRawType())
+          ElemDbgTy = DebugTypeInfo(D->getRawType(),
+                                    DbgTy.size, DbgTy.align, D);
+        else
+          // Fallback to Int as the element type.
+          ElemDbgTy = DebugTypeInfo(IGM.Context.getIntDecl()->getDeclaredType(),
+                                    DbgTy.size, DbgTy.align, D);
       unsigned Offset = 0;
       auto MTy = createMemberType(ElemDbgTy, ElemDecl->getName().str(), Offset,
                                   Scope, File, Flags);
