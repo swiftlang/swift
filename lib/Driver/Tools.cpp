@@ -85,10 +85,32 @@ static void configureDefaultCPU(const llvm::Triple &triple,
 // Configure the ABI default
 static void configureDefaultABI(const llvm::Triple &triple,
                                 ArgStringList &args) {
-  if (triple.isOSDarwin() && triple.getArch() == llvm::Triple::arm64) {
-    args.push_back("-target-abi");
-    args.push_back("darwinpcs");
+  if (!triple.isOSDarwin())
+    return;
+
+  const char *ABIName = nullptr;
+
+  switch (triple.getArch()) {
+  case llvm::Triple::arm64:
+    ABIName = "darwinpcs";
+    break;
+  case llvm::Triple::arm:
+  case llvm::Triple::armeb:
+  case llvm::Triple::thumb:
+  case llvm::Triple::thumbeb:
+    // FIXME: We should use aapcs for M-class processors, EABI,
+    //        etc. See Clang's driver. For current targets we just
+    //        need to support apcs-gnu.
+    ABIName = "apcs-gnu";
+    break;
+  default:
+    // We do not need to specify a -target-abi for other architectures
+    // we currently care about.
+    return;
   }
+
+  args.push_back("-target-abi");
+  args.push_back(ABIName);
 }
 
 /// Handle arguments common to all invocations of the frontend (compilation,

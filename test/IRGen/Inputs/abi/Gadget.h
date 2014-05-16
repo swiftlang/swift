@@ -56,3 +56,16 @@ enum RawEnum {
   Intergalactic,
   Planetary
 };
+
+typedef struct One {
+  float first;
+  float second;
+} One;
+
+static inline One makeOne(float f, float s) {
+  One one;
+  one.first = f;
+  one.second = s;
+
+  return one;
+}

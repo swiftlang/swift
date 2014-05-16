@@ -345,4 +345,12 @@ class Foo {
   @objc func callJustReturn(r: StructReturns, with v: BigStruct) -> BigStruct {
     return r.justReturn(v)
   }
+
+  // Test that the makeOne() that we generate somewhere below doesn't
+  // use arm_aapcscc for armv7.
+  func callInline() -> Float {
+    return makeOne(3,5).second;
+  }
 }
+
+// armv7-ios: define internal void @makeOne(%struct.One* noalias sret %agg.result, float %f, float %s)
