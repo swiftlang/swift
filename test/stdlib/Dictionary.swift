@@ -8,6 +8,10 @@
 // RUN: FileCheck %s < %t.txt
 // RUN: FileCheck --check-prefix=CHECK-PTR%target-ptrsize %s < %t.txt
 
+// FIXME: rdar://16946936 C++ compile uses wrong objc ABI on 32-bit simulator
+// XFAIL: CPU=i386
+
+
 //===---
 // Utilities.
 //===---
