@@ -24,6 +24,7 @@
 #include <stdlib.h>
 #include <cassert>
 #include <pthread.h>
+#include <dlfcn.h>
 #include <vector>
 #include <functional>
 #include <sys/mman.h>
@@ -32,11 +33,10 @@
 
 // FIXME when we start building with the internal SDK
 //#if __has_include(<pthread/tsd_private.h>)
-//#include <pthread/tsd_private.h>
-//#else
-#if 1
-__OSX_AVAILABLE_STARTING(__MAC_10_10,__IPHONE_8_0)
-extern const struct pthread_layout_offsets_s {
+#if 0
+#include <pthread/tsd_private.h>
+#else
+struct pthread_layout_offsets_s {
   // always add new fields at the end
   const uint16_t plo_version;
   // either of the next two fields may be 0; use whichever is set
@@ -45,7 +45,7 @@ extern const struct pthread_layout_offsets_s {
   // bytes from pthread_t to a pointer to base of tsd
   const uint16_t plo_pthread_tsd_base_address_offset;
   const uint16_t plo_pthread_tsd_entry_size;
-} pthread_layout_offsets;
+} /*pthread_layout_offsets*/;
 #endif
 
 using namespace swift;
@@ -73,7 +73,11 @@ typedef struct AllocCacheEntry_s {
 
 static void *pthreadTSDTable() {
   pthread_t self = pthread_self();
-  const struct pthread_layout_offsets_s *details = &pthread_layout_offsets;
+  void *handle = dlopen(nullptr, RTLD_LAZY);
+  assert(handle);
+  const auto details = reinterpret_cast<struct pthread_layout_offsets_s *>(
+    dlsym(handle, "pthread_layout_offsets"));
+
   if (details) {
     assert(details->plo_pthread_tsd_entry_size == sizeof(void *));
     assert((bool)details->plo_pthread_tsd_base_offset
