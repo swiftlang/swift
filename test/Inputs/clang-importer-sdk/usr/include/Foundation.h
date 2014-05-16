@@ -8,13 +8,7 @@
 
 typedef struct objc_object { void *isa; } *id;
 
-// FIXME: should be this, but we don't have TARGET_OS_IPHONE
-// #if TARGET_OS_IPHONE && __LP64__
-#if defined(__arm64__)
-typedef _Bool BOOL;
-#else
 typedef signed char BOOL;
-#endif
 
 typedef struct _NSZone NSZone;
 void *allocate(NSZone *zone);
