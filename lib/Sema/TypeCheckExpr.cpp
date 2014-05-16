@@ -236,6 +236,16 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS) {
   return new (TC.Context) BinaryExpr(Op, Arg, Op->isImplicit());
 }
 
+bool TypeChecker::isAsteriskRef(Expr *E) {
+  if (auto UDRE = dyn_cast<UnresolvedDeclRefExpr>(E))
+    return UDRE->getName().str() == "*";
+  if (auto DRE = dyn_cast<DeclRefExpr>(E))
+    return DRE->getDecl()->getName().str() == "*";
+  if (auto ODRE = dyn_cast<OverloadedDeclRefExpr>(E))
+    return ODRE->getDecls()[0]->getName().str() == "*";
+  return false;
+}
+
 /// foldSequence - Take a sequence of expressions and fold a prefix of
 /// it into a tree of BinaryExprs using precedence parsing.
 static Expr *foldSequence(TypeChecker &TC, DeclContext *DC,
@@ -267,12 +277,41 @@ static Expr *foldSequence(TypeChecker &TC, DeclContext *DC,
   // Extract out the first operator.
   Op Op1 = getNextOperator();
   if (!Op1) return LHS;
-  
+    
   // We will definitely be consuming at least one operator.
   // Pull out the prospective RHS and slice off the first two elements.
   Expr *RHS = S[1];
   S = S.slice(2);
   
+  // If the LHS is a TypeExpr and the operator is a '*', this is an
+  // unsafe pointer. If the RHS is something that would have been
+  // handled as postfix, handle it now.
+  if (isa<TypeExpr>(LHS) && TypeChecker::isAsteriskRef(Op1.op)) {
+    // Local function that forms an unsafe pointer TypeExpr.
+    auto formUnsafePointerRef = [&](TypeExpr *Base, Expr *Op) -> TypeExpr * {
+      auto *InnerTypeRepr = Base->getTypeRepr();
+      auto *NewTypeRepr 
+        = new (TC.Context) UnsafePointerTypeRepr(InnerTypeRepr, Op->getLoc());
+      return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
+    };
+
+    // If the right-hand side is a tuple or parentheses, we're
+    // constructing an unsafe pointer.
+    // FIXME: Check that the start of the parentheses isn't on a new line.
+    if (isa<TupleExpr>(RHS) || isa<ParenExpr>(RHS)) {
+      LHS = formUnsafePointerRef(cast<TypeExpr>(LHS), Op1.op);
+      LHS = new (TC.Context) CallExpr(LHS, RHS, /*Implicit=*/false);
+      if (S.empty())
+        return LHS;
+
+      Op1 = getNextOperator();
+      if (!Op1) return LHS;
+    }
+
+    // FIXME: More cases we should be able to handle, e.g.,
+    // subscripting.
+  }
+
   while (!S.empty()) {
     assert(!S.empty());
     assert((S.size() & 1) == 0);
