@@ -128,6 +128,11 @@ public:
 llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
                               AliasAnalysis::AliasResult R);
 
+/// Look at the origin/user ValueBase of V to see if any of them are
+/// TypedAccessOracle which enable one to ascertain via undefined behavior the
+/// "true" type of the instruction.
+SILType findTypedAccessType(SILValue V);
+
 } // end namespace swift
 
 #endif

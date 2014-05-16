@@ -73,7 +73,8 @@ class SILAADumper : public SILFunctionTransform {
         auto V1 = Values[i1];
         auto V2 = Values[i2];
 
-        auto Result = AA->alias(V1, V2);
+        auto Result =
+            AA->alias(V1, V2, findTypedAccessType(V1), findTypedAccessType(V2));
 
         // Results should always be the same. But if they are different print it
         // out so we find the error. This should make our test results less

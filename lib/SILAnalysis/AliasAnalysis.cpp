@@ -289,115 +289,144 @@ aliasAddressProjection(AliasAnalysis &AA, SILValue V1, SILValue V2, SILValue O1,
 //                                TBAA
 //===----------------------------------------------------------------------===//
 
-/// \brief return True if the aggregate type \p Aggregate contains the type
-/// \p Record.
-static bool aggregateContainsRecord(NominalTypeDecl *Aggregate, Type Record,
-                                    SILModule &Mod) {
-  CanType CanRecordType = Record->getCanonicalType();
-  llvm::SmallVector<NominalTypeDecl *, 8> Worklist;
-  Worklist.push_back(Aggregate);
-  while (!Worklist.empty()) {
-    NominalTypeDecl *T = Worklist.back();
-    Worklist.pop_back();
-    for (auto Var : T->getStoredProperties()) {
-      // The record type could be generic. In here we find the the substituted
-      // record type.
-      Type RecTy =
-          T->getType()->getTypeOfMember(Mod.getSwiftModule(), Var, nullptr);
-      CanType CanRecTy = RecTy->getCanonicalType();
+static bool typedAccessTBAABuiltinTypesMayAlias(SILType LTy, SILType RTy,
+                                                SILModule &Mod) {
+  assert(LTy != RTy && "LTy should have already been shown to not equal RTy to "
+         "call this function.");
 
-      // Is this the record we were looking for ?
-      if (CanRecTy == CanRecordType)
-        return true;
+  // If either of our types are raw pointers, they may alias any builtin.
+  if (LTy.isBuiltinRawPointerType() || RTy.isBuiltinRawPointerType())
+    return true;
 
-      // If the record is a nominal type add it to the worklist.
-      if (auto D = CanRecTy->getNominalOrBoundGenericNominal()) {
-        Worklist.push_back(D);
-        continue;
-      }
-
-      // We don't handle unbound generic typed records.
-      if (hasUnboundGenericTypes(CanRecTy))
-        return true;
-    }
-  }
-
-  // Could not find the record in the aggregate.
+  // At this point, we have 3 possibilities:
+  //
+  // 1. (Pointer, Scalar): A pointer to a pointer can never alias a scalar.
+  //
+  // 2. (Pointer, Pointer): If we have two pointers to pointers, since we know
+  // that the two values do not equal due to previous AA calculations, one must
+  // be a native object and the other is an unknown object type (i.e. an objc
+  // object) which can not alias.
+  //
+  // 3. (Scalar, Scalar): If we have two scalar pointers, since we know that the
+  // types are already not equal, we know that they can not alias. For those
+  // unfamiliar even though BuiltinIntegerType/BuiltinFloatType are single
+  // classes, the AST represents each integer/float of different bit widths as
+  // different types, so equality of SILTypes allows us to know that they have
+  // different bit widths.
+  //
+  // Thus we can just return false since in none of the aforementioned cases we
+  // can not alias, so return false.
   return false;
 }
 
-/// \brief return True if the types \p T1 and \p T2 may alias.
+/// \brief return True if the types \p LTy and \p RTy may alias.
 ///
 /// Currently this only implements typed access based TBAA. See the TBAA section
 /// in the SIL reference manual.
-static bool typedAccessTBAAMayAlias(SILType T1, SILType T2, SILModule &Mod) {
+static bool typedAccessTBAAMayAlias(SILType LTy, SILType RTy, SILModule &Mod) {
 #ifndef NDEBUG
   if (!shouldRunTypedAccessTBAA())
     return true;
 #endif
 
-  // If the two types are the same
-  if (T1 == T2)
+  // If the two types are the same they may alias.
+  if (LTy == RTy)
     return true;
 
-  // We only operate on address types.
-  if(!T1.isAddress() || !T2.isAddress())
-    return true;
-
-  CanType CT1 = T1.getSwiftRValueType();
-  CanType CT2 = T2.getSwiftRValueType();
-
-  bool IsObjPtr1 = isa<BuiltinNativeObjectType>(CT1);
-  bool IsRawPtr1 = isa<BuiltinRawPointerType>(CT1);
-  NominalTypeDecl *AsNominal1 = CT1.getNominalOrBoundGenericNominal();
-  ClassDecl *AsClass1 = CT1.getClassOrBoundGenericClass();
-  StructDecl *AsStruct1 = CT1.getStructOrBoundGenericStruct();
-  EnumDecl *AsEnum1 = CT1.getEnumOrBoundGenericEnum();
-
-  bool IsObjPtr2 = isa<BuiltinNativeObjectType>(CT2);
-  bool IsRawPtr2 = isa<BuiltinRawPointerType>(CT2);
-  NominalTypeDecl *AsNominal2 = CT2.getNominalOrBoundGenericNominal();
-  ClassDecl *AsClass2 = CT2.getClassOrBoundGenericClass();
-  StructDecl *AsStruct2 = CT2.getStructOrBoundGenericStruct();
-  EnumDecl *AsEnum2 = CT2.getEnumOrBoundGenericEnum();
-
-  // Raw pointers may alias anything.
-  if (IsRawPtr1 || IsRawPtr2)
+  // Typed access based TBAA only occurs on pointers. If we reach this point and
+  // do not have a pointer, be conservative and return that the two types may
+  // alias. *NOTE* This ensures we return may alias for local_storage.
+  if(!LTy.isAddress() || !RTy.isAddress())
     return true;
 
   // If the types have unbound generic arguments then we don't know the possible
   // range of the type. A type such as $Array<Int> may alias $Array<T>.
   // Right now we are conservative and we assume that $UnsafePointer<T> and $Int
   // may alias.
-  if (hasUnboundGenericTypes(CT1) || hasUnboundGenericTypes(CT2))
+  if (LTy.isGenericType() || RTy.isGenericType())
     return true;
 
-  // Builtin.NativeObject is the root of the class hierarchy may alias classes.
-  if ((IsObjPtr1 && AsClass2)||
-      (IsObjPtr2 && AsClass1))
+  // If either type is a protocol type, we don't know the underlying type so
+  // return may alias.
+  //
+  // FIXME: We could be significantly smarter here by using the protocol
+  // hierarchy.
+  if (LTy.isAnyExistentialType() || RTy.isAnyExistentialType())
     return true;
 
-  // If one type is an aggregate and it contains the other type then
-  // the record reference may alias the aggregate reference.
-  if ((AsNominal1 && aggregateContainsRecord(AsNominal1, CT2, Mod)) ||
-      (AsNominal2 && aggregateContainsRecord(AsNominal2, CT1, Mod)))
+  // If either type is an address only type, bail so we are conservative.
+  if (LTy.isAddressOnly(Mod) || RTy.isAddressOnly(Mod))
     return true;
 
-  // Structs don't alias non-structs.
-  if (AsStruct1 || AsStruct2)
+  // If both types are builtin types, handle them separately.
+  if (LTy.isBuiltinType() && RTy.isBuiltinType())
+    return typedAccessTBAABuiltinTypesMayAlias(LTy, RTy, Mod);
+
+  // Otherwise, we know that at least one of our types is not a builtin
+  // type. If we have a builtin type, canonicalize it on the right.
+  if (LTy.isBuiltinType())
+    std::swap(LTy, RTy);
+
+  // If RTy is a builtin raw pointer type, it can alias anything.
+  if (RTy.isBuiltinRawPointerType())
+    return true;
+
+  ClassDecl *LTyClass = LTy.getClassOrBoundGenericClass();
+
+  // If RTy is a Builtin unknown object address type...
+  if (RTy.isBuiltinUnknownObjectType()) {
+    // And LTy is a swift class address type, they can not alias since swift
+    // classes and objective-c classes are allocated differently.
+    if (LTyClass)
+      return false;
+
+    // Otherwise bail and assume that the two values can alias.
+    return true;
+  }
+
+  // If RTy is a Builtin Native Object Type, since Builtin Native Object is the
+  // root of the class hierarchy, it may alias any class.
+  if (RTy.isBuiltinNativeObjectType() && LTyClass)
+    return true;
+
+  // If one type is an aggregate and it contains the other type then the record
+  // reference may alias the aggregate reference.
+  if (LTy.aggregateContainsRecord(RTy, Mod) ||
+      RTy.aggregateContainsRecord(LTy, Mod))
+    return true;
+
+  // FIXME: All the code following could be made significantly more aggressive
+  // by saying that aggregates of the same type that do not contain each other
+  // can not alias.
+
+  // Tuples do not alias non-tuples.
+  bool LTyTT = LTy.is<TupleType>();
+  bool RTyTT = RTy.is<TupleType>();
+  if ((LTyTT && !RTyTT) || (!LTyTT && RTyTT))
     return false;
 
-  // Enums don't alias non-enums.
-  if (AsEnum1 || AsEnum2)
+  // Structs do not alias non-structs.
+  StructDecl *LTyStruct = LTy.getStructOrBoundGenericStruct();
+  StructDecl *RTyStruct = RTy.getStructOrBoundGenericStruct();
+  if ((LTyStruct && !RTyStruct) || (!LTyStruct && RTyStruct))
     return false;
 
-  // Classes don't alias non-classes. At the moment we don't follow the
-  // class hierarchy so we can't tell if two classes inherit from one another.
-  if ((AsClass1 && !AsClass2) ||
-      (AsClass2 && !AsClass1))
+  // Enums do not alias non-enums.
+  EnumDecl *LTyEnum = LTy.getEnumOrBoundGenericEnum();
+  EnumDecl *RTyEnum = RTy.getEnumOrBoundGenericEnum();
+  if ((LTyEnum && !RTyEnum) || (!LTyEnum && RTyEnum))
     return false;
 
-  // MayAlias.
+  // Classes do not alias non-classes.
+  ClassDecl *RTyClass = RTy.getClassOrBoundGenericClass();
+  if ((LTyClass && !RTyClass) || (!LTyClass && RTyClass))
+    return false;
+
+  // Classes with separate class hierarchies do not alias.
+  if (!LTy.isSuperclassOf(RTy) && !RTy.isSuperclassOf(LTy))
+    return false;
+
+  // Otherwise be conservative and return that the two types may alias.
   return true;
 }
 
@@ -407,8 +436,9 @@ static bool typesMayAlias(SILType T1, SILType T2, SILType TBAA1Ty,
   if (TBAA1Ty && TBAA2Ty)
     return typedAccessTBAAMayAlias(TBAA1Ty, TBAA2Ty, Mod);
 
-  // Otherwise perform class based TBAA. This is not implemented currently so
-  // just return true.
+  // Otherwise perform class based TBAA on the passed in refs.
+  //
+  // FIXME: Implement class based TBAA.
   return true;
 }
 
@@ -610,6 +640,11 @@ static bool isTypedAccessOracle(SILInstruction *I) {
   case ValueKind::UncheckedTakeEnumDataAddrInst:
   case ValueKind::LoadInst:
   case ValueKind::StoreInst:
+  case ValueKind::AllocStackInst:
+  case ValueKind::AllocBoxInst:
+  case ValueKind::AllocArrayInst:
+  case ValueKind::DeallocStackInst:
+  case ValueKind::DeallocBoxInst:
     return true;
   default:
     return false;
@@ -619,7 +654,7 @@ static bool isTypedAccessOracle(SILInstruction *I) {
 /// Look at the origin/user ValueBase of V to see if any of them are
 /// TypedAccessOracle which enable one to ascertain via undefined behavior the
 /// "true" type of the instruction.
-static SILType findTypedAccessType(SILValue V) {
+SILType swift::findTypedAccessType(SILValue V) {
   // First look at the origin of V and see if we have any instruction that is a
   // typed oracle.
   if (auto *I = dyn_cast<SILInstruction>(V))
