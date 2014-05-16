@@ -130,14 +130,23 @@ test_StdlibTypesPrinted()
 // CHECK: test_StdlibTypesPrinted done
 
 func test_IntegerPrinting() {
-  printedIs(Int.min, "-9223372036854775808")
-  printedIs(Int.max, "9223372036854775807")
+  if (Int.max > 0x1_0000_0000) {
+    printedIs(Int.min, "-9223372036854775808")
+    printedIs(Int.max, "9223372036854775807")
+  } else {
+    printedIs(Int.min, "-2147483648")
+    printedIs(Int.max, "2147483647")
+  }
   printedIs(Int(0), "0")
   printedIs(Int(42), "42")
   printedIs(Int(-42), "-42")
 
+  if (UInt.max > 0x1_0000_0000) {
+    printedIs(UInt.max, "18446744073709551615")
+  } else {
+    printedIs(UInt.max, "4294967295")
+  }
   printedIs(UInt.min, "0")
-  printedIs(UInt.max, "18446744073709551615")
   printedIs(UInt(0), "0")
   printedIs(UInt(42), "42")
 
