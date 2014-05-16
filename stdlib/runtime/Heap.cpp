@@ -194,9 +194,10 @@ public:
     return &find(key)->second;
   }
   void forEach(std::function<void(const void *, T)> func) {
-    for (size_t i = 0, j = size(); j > 0; i++, j--) {
-      while (nodes[i].first == nullptr) i++;
-      func(nodes[i].first, nodes[i].second);
+    for (size_t i = 0; i < bufSize(); i++) {
+      if (nodes[i].first != nullptr && nodes[i].first != tombstoneptr) {
+        func(nodes[i].first, nodes[i].second);
+      }
     }
   }
 };
