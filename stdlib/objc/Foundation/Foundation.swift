@@ -1086,6 +1086,23 @@ func NSLog(format: String, args: CVarArg...) {
 }
 
 //===----------------------------------------------------------------------===//
+// NSUndoManager
+//===----------------------------------------------------------------------===//
+
+// We need a typed overlay for -prepareWithInvocationTarget:.
+// The method returns a proxy, and swift_dynamicCastClass() doesn't 
+// allow a proxy to be cast to its proxied type.
+@asmname("_swift_undoProxy")
+func _swift_undoProxy<T: NSObject>(undoManager: NSUndoManager, target: T) -> T
+
+extension NSUndoManager {
+  func prepareWithInvocationTarget<T: NSObject>(target: T) -> T {
+    return _swift_undoProxy(self, target)
+  }
+}
+
+
+//===----------------------------------------------------------------------===//
 // Variadic initializers and methods
 //===----------------------------------------------------------------------===//
 

@@ -39,3 +39,12 @@ void* const __swift_cocoaStringBridge = __swift_initializeCocoaStringBridge();
 extern "C" NSDate *swift_createDate(void) {
   return [NSDate date];
 }
+
+// NSUndoManager support
+extern "C" id _swift_undoProxy(NSUndoManager *undoManager, id target)
+{
+    id result = [undoManager prepareWithInvocationTarget:target];
+    [undoManager release];
+    [target release];
+    return [result retain];
+}
