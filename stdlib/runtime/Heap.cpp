@@ -687,7 +687,7 @@ _swift_zone_enumerator(task_t task, void *context, unsigned type_mask,
       // FIXME deduce the magic constant in the inferior, and then save it
       // for us to look at later
       error = reader(task, (vm_address_t)
-                     &((AllocCacheEntry**)thread)[28 + zone->keyOffset + i],
+                     &((AllocCacheEntry**)thread)[zone->keyOffset + i],
                      sizeof(AllocCacheEntry), (void **)&temp);
       assert(error == KERN_SUCCESS);
       auto pointer = reinterpret_cast<AllocCacheEntry>(*temp);
