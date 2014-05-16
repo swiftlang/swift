@@ -65,7 +65,7 @@ func withUnsafePointerToObject<T: AnyObject, Result>(
   var buffer: Builtin.RawPointer = Builtin.inttoptr_Word(0.value)
   var address = UnsafePointer<ImplicitlyUnwrappedOptional<T>>(Builtin.addressof(&buffer))
   var result = body(address)
-  arg = address.get()
+  arg = address.pointee
   return result
 }
 
@@ -364,30 +364,31 @@ struct ObjCMutablePointer<T /* TODO : class */> : Equatable {
     return UnsafePointer<T>(self).isNull()
   }
   
-  /// Retrieve the value the pointer points to.
-  @transparent
-  func get() -> T {
-    assert(!isNull())
-    // We can do a strong load normally.
-    return UnsafePointer<T>(self).get()
-  }
-
-  /// Set the value the pointer points to, copying over the previous value.
-  ///
-  /// ObjCMutablePointers are assumed to reference a value with __autoreleasing
-  /// ownership semantics, like 'NSFoo**' in ARC. This autoreleases the
-  /// argument before trivially storing it to the referenced memory.
-  @transparent
-  func set(newValue: T) {
-    assert(!isNull())
-    // Autorelease the object reference.
-    Builtin.retain(reinterpretCast(newValue) as AnyObject?)
-    Builtin.autorelease(reinterpretCast(newValue) as AnyObject?)
-    // Trivially assign it as a COpaquePointer; the pointer references an
-    // autoreleasing slot, so retains/releases of the original value are
-    // unneeded.
-    UnsafePointer<COpaquePointer>(UnsafePointer<T>(self))
-      .set(reinterpretCast(newValue))
+  /// Access the underlying raw memory, getting and
+  /// setting values.
+  var pointee : T {
+    /// Retrieve the value the pointer points to.
+    @transparent get {
+      assert(!isNull())
+      // We can do a strong load normally.
+      return UnsafePointer<T>(self).pointee
+    }
+    /// Set the value the pointer points to, copying over the previous value.
+    ///
+    /// ObjCMutablePointers are assumed to reference a value with __autoreleasing
+    /// ownership semantics, like 'NSFoo**' in ARC. This autoreleases the
+    /// argument before trivially storing it to the referenced memory.    
+    @transparent nonmutating set {
+      assert(!isNull())
+      // Autorelease the object reference.
+      Builtin.retain(reinterpretCast(newValue) as AnyObject?)
+      Builtin.autorelease(reinterpretCast(newValue) as AnyObject?)
+      // Trivially assign it as a COpaquePointer; the pointer references an
+      // autoreleasing slot, so retains/releases of the original value are
+      // unneeded.
+      let p = UnsafePointer<COpaquePointer>(UnsafePointer<T>(self))
+      p.pointee = reinterpretCast(newValue)
+    }
   }
 }
 

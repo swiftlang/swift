@@ -849,11 +849,11 @@ class ParallelArrayDictionary : NSDictionary {
       state: CMutablePointer<NSFastEnumerationState>,
       objects: ObjCMutablePointer<AnyObject?>, count: Int) -> Int {
     var stateUP = UnsafePointer(state)
-    var theState = stateUP.get()
+    var theState = stateUP.pointee
     if theState.state == 0 {
       theState.state = 1
       theState.itemsPtr = UnsafePointer(keys.elementStorage)
-      stateUP.set(theState)
+      stateUP.pointee = theState
       return 4
     }
     return 0

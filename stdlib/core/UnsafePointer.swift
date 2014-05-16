@@ -70,17 +70,15 @@ struct UnsafePointer<T> : BidirectionalIndex, Comparable, Hashable {
     Builtin.deallocRaw(value, size.value, Builtin.alignof(T.self))
   }
 
-
-  /// Retrieve the value the pointer points to.
-  @transparent
-  func get() -> T {
-    return Builtin.load(value)
-  }
-
-  /// Set the value the pointer points to, copying over the
-  /// previous value.
-  func set(newvalue: T) {
-    Builtin.assign(newvalue, value)
+  /// Access the underlying raw memory, getting and
+  /// setting values.
+  var pointee : T {
+    @transparent get {
+      return Builtin.load(value)
+    }
+    @transparent nonmutating set {
+      Builtin.assign(newValue, value)
+    }
   }
 
   /// Initialize the value the pointer points to, to construct
@@ -176,11 +174,11 @@ struct UnsafePointer<T> : BidirectionalIndex, Comparable, Hashable {
   subscript (i : Int) -> T {
     @transparent
     get {
-      return (self + i).get()
+      return (self + i).pointee
     }
     @transparent
     nonmutating set {
-      (self + i).set(newValue)
+      (self + i).pointee = newValue
     }
   }
 

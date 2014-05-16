@@ -97,13 +97,13 @@ struct _StringBuffer {
     if isAscii {
       var p = UnsafePointer<UTF8.CodeUnit>(start)
       transcode(encoding, UTF32.self, input.generate(), SinkOf {
-          (p++).set(UTF8.CodeUnit($0))
+          (p++).pointee = UTF8.CodeUnit($0)
         })
     }
     else {
       var p = _storage.elementStorage
       transcode(encoding, UTF16.self, input.generate(), SinkOf {
-          (p++).set($0)
+          (p++).pointee = $0
         })
     }
   }

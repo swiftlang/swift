@@ -222,7 +222,7 @@ extension String {
     var buffer = _StringBuffer(
       capacity: asciiCount, initialSize: asciiCount, elementWidth: 1)
     var p = UnsafePointer<UTF8.CodeUnit>(buffer.start)
-    format(stream: { p++.set($0) })
+    format(stream: { p++.pointee = $0 })
     self = String(buffer)
   }
 
@@ -235,9 +235,9 @@ extension String {
     var buffer = _StringBuffer(
       capacity: asciiCount, initialSize: asciiCount, elementWidth: 1)
     var p = UnsafePointer<UTF8.CodeUnit>(buffer.start)
-    format(stream: { p++.set($0) })
+    format(stream: { p++.pointee = $0 })
     if v == 0 {
-      p++.set(UTF8.CodeUnit("0"))
+      p++.pointee = UTF8.CodeUnit("0")
     }
     self = String(buffer)
   }

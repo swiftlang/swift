@@ -174,7 +174,7 @@ struct ContiguousArrayBuffer<T> : ArrayBufferType, LogicValue {
     var dst = target
     var src = elementStorage + subRange.startIndex
     for i in subRange {
-      dst++.initialize(src++.get())
+      dst++.initialize(src++.pointee)
     }
     _fixLifetime(owner)
     return dst

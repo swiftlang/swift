@@ -2,6 +2,6 @@
 
 // CHECK: define void @_TF15indirect_return11generic_get
 func generic_get<T>(p: UnsafePointer<T>) -> T {
-  // CHECK: call void @_TFVSs13UnsafePointer3get{{.*}}(%swift.opaque* noalias sret {{%.*}}, i8* {{.*}}, %swift.type* {{%.*}})
-  return p.get()
+  // CHECK: call void @_TFVSs13UnsafePointerg7pointeeQ_(%swift.opaque* noalias sret %0, i8* %1, %swift.type* %T)
+  return p.pointee
 }

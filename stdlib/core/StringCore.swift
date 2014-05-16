@@ -111,7 +111,7 @@ struct _StringCore {
       var src = UnsafePointer<UTF8.CodeUnit>(srcStart)
       let srcEnd = src + count
       while (src != srcEnd) {
-        dest++.set(UTF16.CodeUnit(src++.get()))
+        dest++.pointee = UTF16.CodeUnit(src++.pointee)
       }
     }
     else {
@@ -120,7 +120,7 @@ struct _StringCore {
       var src = UnsafePointer<UTF16.CodeUnit>(srcStart)
       let srcEnd = src + count
       while (src != srcEnd) {
-        dest++.set(UTF8.CodeUnit(src++.get()))
+        dest++.pointee = UTF8.CodeUnit(src++.pointee)
       }
     }
   }
@@ -259,8 +259,8 @@ struct _StringCore {
     let p = UnsafePointer<UInt8>(_pointerToNth(position).value)
       // Always dereference two bytes, but when elements are 8 bits we
       // multiply the high byte by 0.
-      return UTF16.CodeUnit(p.get())
-      + UTF16.CodeUnit((p + 1).get()) * _highByteMultiplier
+      return UTF16.CodeUnit(p.pointee)
+      + UTF16.CodeUnit((p + 1).pointee) * _highByteMultiplier
   }
 
   /// Get the Nth UTF16 Code Unit stored
@@ -406,18 +406,18 @@ struct _StringCore {
         _pointerToNth(count) 
         == COpaquePointer(UnsafePointer<RawByte>(destination) + 1))
 
-      UnsafePointer<UTF8.CodeUnit>(destination).set(UTF8.CodeUnit(c.value))
+      UnsafePointer<UTF8.CodeUnit>(destination).pointee = UTF8.CodeUnit(c.value)
     }
     else {
       let destination16 = UnsafePointer<UTF16.CodeUnit>(destination.value)
       if _fastPath(utf16Width == 1) {
         assert(_pointerToNth(count) == COpaquePointer(destination16 + 1))
-        destination16.set(UTF16.CodeUnit(c.value))
+        destination16.pointee = UTF16.CodeUnit(c.value)
       }
       else {
         assert(_pointerToNth(count) == COpaquePointer(destination16 + 2))
-        destination16.set(UTF16.leadSurrogate(c))
-        (destination16 + 1).set(UTF16.trailSurrogate(c))
+        destination16.pointee = UTF16.leadSurrogate(c)
+        (destination16 + 1).pointee = UTF16.trailSurrogate(c)
       }
     }
     _invariantCheck()
