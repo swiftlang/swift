@@ -326,6 +326,13 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
   if (AllDeclRefs) {
     // Diagnose uses of operators that found no matching candidates.
     if (ResultValues.empty()) {
+      // If this is a postfix '*', it might be part of type sugar for
+      // an unsafe pointer, so delay resolution of this declaration
+      // reference.
+      if (UDRE->getRefKind() == DeclRefKind::PostfixOperator &&
+          UDRE->getName().str() == "*")
+        return UDRE;
+
       assert(UDRE->getRefKind() != DeclRefKind::Ordinary);
       TC.diagnose(Loc, diag::use_nonmatching_operator, Name,
                   UDRE->getRefKind() == DeclRefKind::BinaryOperator ? 0 :
@@ -532,6 +539,16 @@ bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
   return true;
 }
 
+static bool isAsteriskRef(Expr *E) {
+  if (auto UDRE = dyn_cast<UnresolvedDeclRefExpr>(E))
+    return UDRE->getName().str() == "*";
+  if (auto DRE = dyn_cast<DeclRefExpr>(E))
+    return DRE->getDecl()->getName().str() == "*";
+  if (auto ODRE = dyn_cast<OverloadedDeclRefExpr>(E))
+    return ODRE->getDecls()[0]->getName().str() == "*";
+  return false;
+}
+
 /// Simplify expressions which are type sugar productions that got parsed
 /// as expressions due to the parser not knowing which identifiers are
 /// type names.
@@ -579,7 +596,23 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
       new (TC.Context) OptionalTypeRepr(InnerTypeRepr, QuestionLoc);
     return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
   }
-  
+
+  // Fold T* into an unsafe pointer type with T is a TypeExpr, postfix
+  // case.
+  if (auto *PUE = dyn_cast<PostfixUnaryExpr>(E)) {
+    auto *TyExpr = dyn_cast<TypeExpr>(PUE->getArg());
+    if (!TyExpr) return nullptr;
+
+    if (!isAsteriskRef(PUE->getFn()))
+      return nullptr;
+
+    auto *InnerTypeRepr = TyExpr->getTypeRepr();
+    auto *NewTypeRepr 
+      = new (TC.Context) UnsafePointerTypeRepr(InnerTypeRepr, 
+                                               PUE->getFn()->getLoc());
+    return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
+  }
+
   // Fold (T) into a type T with parens around it.
   if (auto *PE = dyn_cast<ParenExpr>(E)) {
     auto *TyExpr = dyn_cast<TypeExpr>(PE->getSubExpr());
