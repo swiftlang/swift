@@ -202,10 +202,7 @@ protocol _DictionaryStorage {
   func assertingGet(i: Index) -> (KeyType, ValueType)
   func assertingGet(key: KeyType) -> ValueType
   func maybeGet(key: KeyType) -> ValueType?
-  /// Returns `true` if the key was already present in the dictionary.
-  mutating func addOrUpdate(key: KeyType, _ value: ValueType) -> Bool
-  /// Returns `true` if the key was already present in the dictionary.
-  mutating func add(key: KeyType, _ value: ValueType) -> Bool
+  mutating func updateValue(value: ValueType, forKey: KeyType) -> ValueType?
   mutating func deleteKey(key: KeyType) -> Bool
   var count: Int { get }
 }
@@ -422,11 +419,7 @@ struct _NativeDictionaryStorage<KeyType : Hashable, ValueType> :
     return .None
   }
 
-  mutating func addOrUpdate(key: KeyType, _ value: ValueType) -> Bool {
-    fatal("don't call mutating methods on _NativeDictionaryStorage")
-  }
-
-  mutating func add(key: KeyType, _ value: ValueType) -> Bool {
+  mutating func updateValue(value: ValueType, forKey: KeyType) -> ValueType? {
     fatal("don't call mutating methods on _NativeDictionaryStorage")
   }
 
@@ -710,11 +703,7 @@ struct _CocoaDictionaryStorage : _DictionaryStorage {
     return cocoaDictionary.objectForKey(key)
   }
 
-  mutating func addOrUpdate(key: AnyObject, _ value: AnyObject) -> Bool {
-    fatal("can not mutate NSDictionary")
-  }
-
-  mutating func add(key: AnyObject, _ value: AnyObject) -> Bool {
+  mutating func updateValue(value: AnyObject, forKey: AnyObject) -> AnyObject? {
     fatal("can not mutate NSDictionary")
   }
 
@@ -779,24 +768,24 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
   }
 
   /// The `key` should not be present in the dictionary.
+  /// Does *not* update `count`.
   func nativeUnsafeAdd(
       nativeStorage: NativeStorage, key: KeyType, value: ValueType) {
     var (i, found) = nativeStorage._find(key, nativeStorage._bucket(key))
     assert(!found)
     nativeStorage[i.offset] = _NativeStorageElement(key: key, value: value)
-    ++nativeStorage.count
   }
 
   /// Ensure this we hold a unique reference to a native storage
-  /// having at least minimumCapacity elements.  Return true
-  /// iff this results in a capacity change.
-  mutating func ensureUniqueNativeStorage(minimumCapacity: Int) -> Bool {
+  /// having at least `minimumCapacity` elements.
+  mutating func ensureUniqueNativeStorage(minimumCapacity: Int)
+      -> (reallocated: Bool, capacityChanged: Bool) {
     switch self {
     case .Native:
       let oldNativeStorage = native
       let oldCapacity = oldNativeStorage.capacity
       if isUniquelyReferenced() && oldCapacity >= minimumCapacity {
-        return false
+        return (reallocated: false, capacityChanged: false)
       }
 
       let newNativeOwner = NativeStorageOwner(minimumCapacity: minimumCapacity)
@@ -817,9 +806,11 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
           }
         }
       }
+      newNativeStorage.count = oldNativeStorage.count
 
       self = .Native(newNativeOwner)
-      return oldCapacity != newNativeStorage.capacity
+      return (reallocated: true,
+              capacityChanged: oldCapacity != newNativeStorage.capacity)
 
     case .Cocoa(let cocoaStorage):
       let cocoaDictionary = cocoaStorage.cocoaDictionary
@@ -836,15 +827,17 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
             newNativeStorage, key: reinterpretCast(key) as KeyType,
             value: reinterpretCast(value) as ValueType)
       }
+      newNativeStorage.count = cocoaDictionary.count
+
       self = .Native(newNativeOwner)
-      return true
+      return (reallocated: true, capacityChanged: true)
     }
   }
 
   mutating func migrateDataToNativeStorage(cocoaStorage: _CocoaDictionaryStorage) {
     var minCapacity = getMinCapacity(
         cocoaStorage.count, _dictionaryDefaultMaxLoadFactorInverse)
-    var allocated = ensureUniqueNativeStorage(minCapacity)
+    var allocated = ensureUniqueNativeStorage(minCapacity).reallocated
     assert(allocated, "failed to allocate native dictionary storage")
   }
 
@@ -928,59 +921,45 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
                requestedCount + 1)
   }
 
-  /// Returns `true` if the key was already present in the dictionary.
-  mutating func nativeAddOrUpdate(key: KeyType, _ value: ValueType) -> Bool {
+  mutating func nativeUpdateValue(
+      value: ValueType, forKey key: KeyType
+  ) -> ValueType? {
     var nativeStorage = native
     var (i, found) = nativeStorage._find(key, nativeStorage._bucket(key))
 
-    var minCapacity = found
+    let minCapacity = found
         ? nativeStorage.capacity
         : getMinCapacity(
               nativeStorage.count + 1,
               nativeStorage.maxLoadFactorInverse)
 
-    if (ensureUniqueNativeStorage(minCapacity)) {
+    let (reallocated, capacityChanged) = ensureUniqueNativeStorage(minCapacity)
+    if reallocated {
       nativeStorage = native
+    }
+    if capacityChanged {
       i = nativeStorage._find(key, nativeStorage._bucket(key)).pos
     }
+    let oldValue: ValueType? = found ? nativeStorage[i.offset]!.value : .None
     nativeStorage[i.offset] = _NativeStorageElement(key: key, value: value)
 
     if !found {
       ++nativeStorage.count
     }
-    return found
+    return oldValue
   }
 
-  mutating func addOrUpdate(key: KeyType, _ value: ValueType) -> Bool {
-    switch self {
-    case .Native:
-      return nativeAddOrUpdate(key, value)
-    case .Cocoa(let cocoaStorage):
-      migrateDataToNativeStorage(cocoaStorage)
-      return nativeAddOrUpdate(key, value)
-    }
-  }
-
-  mutating func nativeAdd(key: KeyType, _ value: ValueType) -> Bool {
-    var nativeStorage = native
-    var (i, found) = nativeStorage._find(key, nativeStorage._bucket(key))
-    if !found {
-      nativeAddOrUpdate(key, value)
-    }
-    return found
-  }
-
-  mutating func add(key: KeyType, _ value: ValueType) -> Bool {
+  mutating func updateValue(value: ValueType, forKey key: KeyType) -> ValueType? {
     if _fastPath(guaranteedNative) {
-      return nativeAdd(key, value)
+      return nativeUpdateValue(value, forKey: key)
     }
 
     switch self {
     case .Native:
-      return nativeAdd(key, value)
+      return nativeUpdateValue(value, forKey: key)
     case .Cocoa(let cocoaStorage):
       migrateDataToNativeStorage(cocoaStorage)
-      return nativeAdd(key, value)
+      return nativeUpdateValue(value, forKey: key)
     }
   }
 
@@ -993,8 +972,12 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
       return false
     }
 
-    if (ensureUniqueNativeStorage(nativeStorage.capacity)) {
+    let (reallocated, capacityChanged) =
+        ensureUniqueNativeStorage(nativeStorage.capacity)
+    if reallocated {
       nativeStorage = native
+    }
+    if capacityChanged {
       start = nativeStorage._bucket(key)
       (pos, found) = nativeStorage._find(key, start)
       assert(found)
@@ -1463,7 +1446,7 @@ struct Dictionary<KeyType : Hashable, ValueType> : Collection,
     }
     set(newValue) {
       if let x = newValue {
-        _variantStorage.addOrUpdate(key, x)
+        _variantStorage.updateValue(x, forKey: key)
       }
       else {
         _deleteKey(key)
@@ -1471,12 +1454,13 @@ struct Dictionary<KeyType : Hashable, ValueType> : Collection,
     }
   }
 
-  /// Add a new key-value pair to the dictionary.  If the key is already
-  /// present, do nothing.
+  /// Update the value stored in the dictionary for the given key, or, if they
+  /// key does not exist, add a new key-value pair to the dictionary.
   ///
-  /// Returns `true` if the key was already present in the dictionary.
-  mutating func add(key: KeyType, value: ValueType) -> Bool {
-    return _variantStorage.add(key, value)
+  /// Returns the value that was replaced, or `nil` if a new key-value pair
+  /// was added.
+  mutating func updateValue(value: ValueType, forKey key: KeyType) -> ValueType? {
+    return _variantStorage.updateValue(value, forKey: key)
   }
 
   /// Returns `true` if the key was present in the dictionary, `false` if the
@@ -1536,7 +1520,7 @@ struct Dictionary<KeyType : Hashable, ValueType> : Collection,
                 -> Dictionary {
     var dict = Dictionary()
     for (k, v) in elements {
-      dict.add(k, value: v)
+      dict.updateValue(v, forKey: k)
     }
     return dict
   }

@@ -168,12 +168,12 @@ assert(valueCount == 0, "value leak")
 func testValueDestruction() {
   var d1 = Dictionary<Int, TestValueTy>()
   for i in 100...110 {
-    d1.add(i, value: TestValueTy(i))
+    d1[i] = TestValueTy(i)
   }
 
   var d2 = Dictionary<TestKeyTy, TestValueTy>()
   for i in 100...110 {
-    d2.add(TestKeyTy(i), value: TestValueTy(i))
+    d2[TestKeyTy(i)] = TestValueTy(i)
   }
 
   println("testValueDestruction done")
@@ -189,18 +189,18 @@ func testCOW_Smoke() {
   var d1 = Dictionary<TestKeyTy, TestValueTy>(minimumCapacity: 10)
   var identity1: Word = reinterpretCast(d1)
 
-  d1.add(TestKeyTy(10), value: TestValueTy(1010))
-  d1.add(TestKeyTy(20), value: TestValueTy(1020))
-  d1.add(TestKeyTy(30), value: TestValueTy(1030))
+  d1[TestKeyTy(10)] = TestValueTy(1010)
+  d1[TestKeyTy(20)] = TestValueTy(1020)
+  d1[TestKeyTy(30)] = TestValueTy(1030)
 
   var d2 = d1
   acceptsAnyDictionary(d2)
   assert(identity1 == reinterpretCast(d2))
 
-  d2.add(TestKeyTy(40), value: TestValueTy(2040))
+  d2[TestKeyTy(40)] = TestValueTy(2040)
   assert(identity1 != reinterpretCast(d2))
 
-  d1.add(TestKeyTy(50), value: TestValueTy(1050))
+  d1[TestKeyTy(50)] = TestValueTy(1050)
   assert(identity1 == reinterpretCast(d1))
 
   // Keep variables alive.
@@ -217,26 +217,26 @@ assert(valueCount == 0, "value leak")
 
 func getCOWFastDictionary() -> Dictionary<Int, Int> {
   var d = Dictionary<Int, Int>(minimumCapacity: 10)
-  d.add(10, value: 1010)
-  d.add(20, value: 1020)
-  d.add(30, value: 1030)
+  d[10] = 1010
+  d[20] = 1020
+  d[30] = 1030
   return d
 }
 
 func getCOWSlowDictionary() -> Dictionary<TestKeyTy, TestValueTy> {
   var d = Dictionary<TestKeyTy, TestValueTy>(minimumCapacity: 10)
-  d.add(TestKeyTy(10), value: TestValueTy(1010))
-  d.add(TestKeyTy(20), value: TestValueTy(1020))
-  d.add(TestKeyTy(30), value: TestValueTy(1030))
+  d[TestKeyTy(10)] = TestValueTy(1010)
+  d[TestKeyTy(20)] = TestValueTy(1020)
+  d[TestKeyTy(30)] = TestValueTy(1030)
   return d
 }
 
 func getCOWSlowEquatableDictionary()
     -> Dictionary<TestKeyTy, TestEquatableValueTy> {
   var d = Dictionary<TestKeyTy, TestEquatableValueTy>(minimumCapacity: 10)
-  d.add(TestKeyTy(10), value: TestEquatableValueTy(1010))
-  d.add(TestKeyTy(20), value: TestEquatableValueTy(1020))
-  d.add(TestKeyTy(30), value: TestEquatableValueTy(1030))
+  d[TestKeyTy(10)] = TestEquatableValueTy(1010)
+  d[TestKeyTy(20)] = TestEquatableValueTy(1020)
+  d[TestKeyTy(30)] = TestEquatableValueTy(1030)
   return d
 }
 
@@ -250,7 +250,7 @@ func testCOW_Fast_IndexesDontAffectUniquenessCheck() {
   assert(startIndex != endIndex)
   assert(identity1 == reinterpretCast(d))
 
-  d.add(40, value: 2040)
+  d[40] = 2040
   assert(identity1 == reinterpretCast(d))
 
   // Keep indexes alive during the calls above.
@@ -271,7 +271,7 @@ func testCOW_Slow_IndexesDontAffectUniquenessCheck() {
   assert(startIndex != endIndex)
   assert(identity1 == reinterpretCast(d))
 
-  d.add(TestKeyTy(40), value: TestValueTy(2040))
+  d[TestKeyTy(40)] = TestValueTy(2040)
   assert(identity1 == reinterpretCast(d))
 
   // Keep indexes alive during the calls above.
@@ -347,49 +347,160 @@ func testCOW_Slow_SubscriptWithKeyDoesNotReallocate() {
 testCOW_Slow_SubscriptWithKeyDoesNotReallocate()
 // CHECK: testCOW_Slow_SubscriptWithKeyDoesNotReallocate done
 
+func testCOW_Fast_UpdateValueForKeyDoesNotReallocate() {
+  if true {
+    var d1 = getCOWFastDictionary()
+    var identity1: Word = reinterpretCast(d1)
 
-func testCOW_Fast_AddDoesNotReallocate() {
-  var d1 = getCOWFastDictionary()
-  var identity1: Word = reinterpretCast(d1)
+    // Insert a new key-value pair.
+    assert(d1.updateValue(2040, forKey: 40) == .None)
+    assert(identity1 == reinterpretCast(d1))
+    assert(d1[40]! == 2040)
 
-  d1.add(40, value: 1040)
-  assert(identity1 == reinterpretCast(d1))
-  assert(d1[40]! == 1040)
+    // Overwrite a value in existing binding.
+    assert(d1.updateValue(2010, forKey: 10)! == 1010)
+    assert(identity1 == reinterpretCast(d1))
+    assert(d1[10]! == 2010)
+  }
 
-  var d2 = d1
-  d2.add(50, value: 1050)
-  assert(identity1 == reinterpretCast(d1))
-  assert(identity1 != reinterpretCast(d2))
-  assert(d1.find(50) == .None)
-  assert(d2[50]! == 1050)
+  if true {
+    var d1 = getCOWFastDictionary()
+    var identity1: Word = reinterpretCast(d1)
 
-  // Keep variables alive.
-  acceptsAnyDictionary(d1)
-  acceptsAnyDictionary(d2)
+    var d2 = d1
+    assert(identity1 == reinterpretCast(d1))
+    assert(identity1 == reinterpretCast(d2))
 
-  println("testCOW_Fast_AddDoesNotReallocate done")
+    // Insert a new key-value pair.
+    d2.updateValue(2040, forKey: 40)
+    assert(identity1 == reinterpretCast(d1))
+    assert(identity1 != reinterpretCast(d2))
+
+    assert(d1.count == 3)
+    assert(d1[10]! == 1010)
+    assert(d1[20]! == 1020)
+    assert(d1[30]! == 1030)
+    assert(d1[40] == .None)
+
+    assert(d2.count == 4)
+    assert(d2[10]! == 1010)
+    assert(d2[20]! == 1020)
+    assert(d2[30]! == 1030)
+    assert(d2[40]! == 2040)
+
+    // Keep variables alive.
+    acceptsAnyDictionary(d1)
+    acceptsAnyDictionary(d2)
+  }
+
+  if true {
+    var d1 = getCOWFastDictionary()
+    var identity1: Word = reinterpretCast(d1)
+
+    var d2 = d1
+    assert(identity1 == reinterpretCast(d1))
+    assert(identity1 == reinterpretCast(d2))
+
+    // Overwrite a value in existing binding.
+    d2.updateValue(2010, forKey: 10)
+    assert(identity1 == reinterpretCast(d1))
+    assert(identity1 != reinterpretCast(d2))
+
+    assert(d1.count == 3)
+    assert(d1[10]! == 1010)
+    assert(d1[20]! == 1020)
+    assert(d1[30]! == 1030)
+
+    assert(d2.count == 3)
+    assert(d2[10]! == 2010)
+    assert(d2[20]! == 1020)
+    assert(d2[30]! == 1030)
+
+    // Keep variables alive.
+    acceptsAnyDictionary(d1)
+    acceptsAnyDictionary(d2)
+  }
+
+  println("testCOW_Fast_UpdateValueForKeyDoesNotReallocate done")
 }
-testCOW_Fast_AddDoesNotReallocate()
-// CHECK: testCOW_Fast_AddDoesNotReallocate done
+testCOW_Fast_UpdateValueForKeyDoesNotReallocate()
+// CHECK: testCOW_Fast_UpdateValueForKeyDoesNotReallocate done
 
 func testCOW_Slow_AddDoesNotReallocate() {
-  var d1 = getCOWSlowDictionary()
-  var identity1: Word = reinterpretCast(d1)
+  if true {
+    var d1 = getCOWSlowDictionary()
+    var identity1: Word = reinterpretCast(d1)
 
-  d1.add(TestKeyTy(40), value: TestValueTy(1040))
-  assert(identity1 == reinterpretCast(d1))
-  assert(d1[TestKeyTy(40)]!.value == 1040)
+    // Insert a new key-value pair.
+    assert(!d1.updateValue(TestValueTy(2040), forKey: TestKeyTy(40)))
+    assert(identity1 == reinterpretCast(d1))
+    assert(d1.count == 4)
+    assert(d1[TestKeyTy(40)]!.value == 2040)
 
-  var d2 = d1
-  d2.add(TestKeyTy(50), value: TestValueTy(1050))
-  assert(identity1 == reinterpretCast(d1))
-  assert(identity1 != reinterpretCast(d2))
-  assert(!d1.find(TestKeyTy(50)))
-  assert(d2[TestKeyTy(50)]!.value == 1050)
+    // Overwrite a value in existing binding.
+    assert(d1.updateValue(TestValueTy(2010), forKey: TestKeyTy(10))!.value == 1010)
+    assert(identity1 == reinterpretCast(d1))
+    assert(d1.count == 4)
+    assert(d1[TestKeyTy(10)]!.value == 2010)
+  }
 
-  // Keep variables alive.
-  acceptsAnyDictionary(d1)
-  acceptsAnyDictionary(d2)
+  if true {
+    var d1 = getCOWSlowDictionary()
+    var identity1: Word = reinterpretCast(d1)
+
+    var d2 = d1
+    assert(identity1 == reinterpretCast(d1))
+    assert(identity1 == reinterpretCast(d2))
+
+    // Insert a new key-value pair.
+    d2.updateValue(TestValueTy(2040), forKey: TestKeyTy(40))
+    assert(identity1 == reinterpretCast(d1))
+    assert(identity1 != reinterpretCast(d2))
+
+    assert(d1.count == 3)
+    assert(d1[TestKeyTy(10)]!.value == 1010)
+    assert(d1[TestKeyTy(20)]!.value == 1020)
+    assert(d1[TestKeyTy(30)]!.value == 1030)
+    assert(!d1[TestKeyTy(40)])
+
+    assert(d2.count == 4)
+    assert(d2[TestKeyTy(10)]!.value == 1010)
+    assert(d2[TestKeyTy(20)]!.value == 1020)
+    assert(d2[TestKeyTy(30)]!.value == 1030)
+    assert(d2[TestKeyTy(40)]!.value == 2040)
+
+    // Keep variables alive.
+    acceptsAnyDictionary(d1)
+    acceptsAnyDictionary(d2)
+  }
+
+  if true {
+    var d1 = getCOWSlowDictionary()
+    var identity1: Word = reinterpretCast(d1)
+
+    var d2 = d1
+    assert(identity1 == reinterpretCast(d1))
+    assert(identity1 == reinterpretCast(d2))
+
+    // Overwrite a value in existing binding.
+    d2.updateValue(TestValueTy(2010), forKey: TestKeyTy(10))
+    assert(identity1 == reinterpretCast(d1))
+    assert(identity1 != reinterpretCast(d2))
+
+    assert(d1.count == 3)
+    assert(d1[TestKeyTy(10)]!.value == 1010)
+    assert(d1[TestKeyTy(20)]!.value == 1020)
+    assert(d1[TestKeyTy(30)]!.value == 1030)
+
+    assert(d2.count == 3)
+    assert(d2[TestKeyTy(10)]!.value == 2010)
+    assert(d2[TestKeyTy(20)]!.value == 1020)
+    assert(d2[TestKeyTy(30)]!.value == 1030)
+
+    // Keep variables alive.
+    acceptsAnyDictionary(d1)
+    acceptsAnyDictionary(d2)
+  }
 
   println("testCOW_Slow_AddDoesNotReallocate done")
 }
@@ -556,7 +667,7 @@ func testCOW_Fast_EqualityTestDoesNotReallocate() {
   assert(identity1 == reinterpretCast(d1))
   assert(identity2 == reinterpretCast(d2))
 
-  d2.add(40, value: 2040)
+  d2[40] = 2040
   assert(d1 != d2)
   assert(identity1 == reinterpretCast(d1))
   assert(identity2 == reinterpretCast(d2))
@@ -577,7 +688,7 @@ func testCOW_Slow_EqualityTestDoesNotReallocate() {
   assert(identity1 == reinterpretCast(d1))
   assert(identity2 == reinterpretCast(d2))
 
-  d2.add(TestKeyTy(40), value: TestEquatableValueTy(2040))
+  d2[TestKeyTy(40)] = TestEquatableValueTy(2040)
   assert(d1 != d2)
   assert(identity1 == reinterpretCast(d1))
   assert(identity2 == reinterpretCast(d2))
@@ -595,9 +706,9 @@ testCOW_Slow_EqualityTestDoesNotReallocate()
 func helperDeleteThree(k1: TestKeyTy, k2: TestKeyTy, k3: TestKeyTy) {
   var d1 = Dictionary<TestKeyTy, TestValueTy>(minimumCapacity: 10)
 
-  d1.add(k1, value: TestValueTy(1010))
-  d1.add(k2, value: TestValueTy(1020))
-  d1.add(k3, value: TestValueTy(1030))
+  d1[k1] = TestValueTy(1010)
+  d1[k2] = TestValueTy(1020)
+  d1[k3] = TestValueTy(1030)
 
   assert(d1[k1]!.value == 1010)
   assert(d1[k2]!.value == 1020)
@@ -976,40 +1087,51 @@ test_BridgedFromObjC_SubscriptWithKey()
 // CHECK: test_BridgedFromObjC_SubscriptWithKey done
 
 
-func test_BridgedFromObjC_Add() {
-  var d = getBridgedDictionary()
-  var identity1: Word = reinterpretCast(d)
-  assert(isCocoaDictionary(d))
-
+func test_BridgedFromObjC_UpdateValueForKey() {
   // Insert a new key-value pair.
-  var alreadyPresent = d.add(TestObjCKeyTy(40), value: TestObjCValueTy(2040))
-  assert(!alreadyPresent)
-  var identity2: Word = reinterpretCast(d)
-  assert(identity1 != identity2)
-  assert(isNativeDictionary(d))
-  assert(d.count == 4)
+  if true {
+    var d = getBridgedDictionary()
+    var identity1: Word = reinterpretCast(d)
+    assert(isCocoaDictionary(d))
 
-  assert(d.find(TestObjCKeyTy(10))!.value == 1010)
-  assert(d.find(TestObjCKeyTy(20))!.value == 1020)
-  assert(d.find(TestObjCKeyTy(30))!.value == 1030)
-  assert(d.find(TestObjCKeyTy(40))!.value == 2040)
+    var oldValue: AnyObject? =
+        d.updateValue(TestObjCValueTy(2040), forKey: TestObjCKeyTy(40))
+    assert(!oldValue)
+    var identity2: Word = reinterpretCast(d)
+    assert(identity1 != identity2)
+    assert(isNativeDictionary(d))
+    assert(d.count == 4)
 
-  // Try to overwrite a value in existing binding (and fail to do so).
-  alreadyPresent = d.add(TestObjCKeyTy(10), value: TestObjCValueTy(2010))
-  assert(alreadyPresent)
-  assert(identity2 == reinterpretCast(d))
-  assert(isNativeDictionary(d))
-  assert(d.count == 4)
+    assert(d.find(TestObjCKeyTy(10))!.value == 1010)
+    assert(d.find(TestObjCKeyTy(20))!.value == 1020)
+    assert(d.find(TestObjCKeyTy(30))!.value == 1030)
+    assert(d.find(TestObjCKeyTy(40))!.value == 2040)
+  }
 
-  assert(d.find(TestObjCKeyTy(10))!.value == 1010)
-  assert(d.find(TestObjCKeyTy(20))!.value == 1020)
-  assert(d.find(TestObjCKeyTy(30))!.value == 1030)
-  assert(d.find(TestObjCKeyTy(40))!.value == 2040)
+  // Overwrite a value in existing binding.
+  if true {
+    var d = getBridgedDictionary()
+    var identity1: Word = reinterpretCast(d)
+    assert(isCocoaDictionary(d))
 
-  println("test_BridgedFromObjC_Add done")
+    var oldValue: AnyObject? =
+        d.updateValue(TestObjCValueTy(2010), forKey: TestObjCKeyTy(10))
+    assert((oldValue as TestObjCValueTy)!.value == 1010)
+
+    var identity2: Word = reinterpretCast(d)
+    assert(identity1 != identity2)
+    assert(isNativeDictionary(d))
+    assert(d.count == 3)
+
+    assert(d.find(TestObjCKeyTy(10))!.value == 2010)
+    assert(d.find(TestObjCKeyTy(20))!.value == 1020)
+    assert(d.find(TestObjCKeyTy(30))!.value == 1030)
+  }
+
+  println("test_BridgedFromObjC_UpdateValueForKey done")
 }
-test_BridgedFromObjC_Add()
-// CHECK: test_BridgedFromObjC_Add done
+test_BridgedFromObjC_UpdateValueForKey()
+// CHECK: test_BridgedFromObjC_UpdateValueForKey done
 
 
 func test_BridgedFromObjC_Find() {
@@ -1217,9 +1339,9 @@ func getBridgedNSDictionaryOfRefTypesBridgedVerbatim() -> NSDictionary {
   assert(isBridgedVerbatimToObjectiveC(TestObjCValueTy.self))
 
   var d = Dictionary<TestObjCKeyTy, TestObjCValueTy>(minimumCapacity: 32)
-  d.add(TestObjCKeyTy(10), value: TestObjCValueTy(1010))
-  d.add(TestObjCKeyTy(20), value: TestObjCValueTy(1020))
-  d.add(TestObjCKeyTy(30), value: TestObjCValueTy(1030))
+  d[TestObjCKeyTy(10)] = TestObjCValueTy(1010)
+  d[TestObjCKeyTy(20)] = TestObjCValueTy(1020)
+  d[TestObjCKeyTy(30)] = TestObjCValueTy(1030)
 
   let bridged =
       reinterpretCast(_convertDictionaryToNSDictionary(d)) as NSDictionary
@@ -1444,9 +1566,9 @@ func getBridgedNSDictionaryOfKeyValue_ValueTypesCustomBridged() -> NSDictionary 
   assert(!isBridgedVerbatimToObjectiveC(TestBridgedValueTy.self))
 
   var d = Dictionary<TestBridgedKeyTy, TestBridgedValueTy>()
-  d.add(TestBridgedKeyTy(10), value: TestBridgedValueTy(1010))
-  d.add(TestBridgedKeyTy(20), value: TestBridgedValueTy(1020))
-  d.add(TestBridgedKeyTy(30), value: TestBridgedValueTy(1030))
+  d[TestBridgedKeyTy(10)] = TestBridgedValueTy(1010)
+  d[TestBridgedKeyTy(20)] = TestBridgedValueTy(1020)
+  d[TestBridgedKeyTy(30)] = TestBridgedValueTy(1030)
 
   let bridged =
       reinterpretCast(_convertDictionaryToNSDictionary(d)) as NSDictionary
@@ -1477,9 +1599,9 @@ func getBridgedNSDictionaryOfKey_ValueTypeCustomBridged() -> NSDictionary {
   assert(isBridgedVerbatimToObjectiveC(TestObjCValueTy.self))
 
   var d = Dictionary<TestBridgedKeyTy, TestObjCValueTy>()
-  d.add(TestBridgedKeyTy(10), value: TestObjCValueTy(1010))
-  d.add(TestBridgedKeyTy(20), value: TestObjCValueTy(1020))
-  d.add(TestBridgedKeyTy(30), value: TestObjCValueTy(1030))
+  d[TestBridgedKeyTy(10)] = TestObjCValueTy(1010)
+  d[TestBridgedKeyTy(20)] = TestObjCValueTy(1020)
+  d[TestBridgedKeyTy(30)] = TestObjCValueTy(1030)
 
   let bridged =
       reinterpretCast(_convertDictionaryToNSDictionary(d)) as NSDictionary
@@ -1510,9 +1632,9 @@ func getBridgedNSDictionaryOfValue_ValueTypeCustomBridged() -> NSDictionary {
   assert(!isBridgedVerbatimToObjectiveC(TestBridgedValueTy.self))
 
   var d = Dictionary<TestObjCKeyTy, TestBridgedValueTy>()
-  d.add(TestObjCKeyTy(10), value: TestBridgedValueTy(1010))
-  d.add(TestObjCKeyTy(20), value: TestBridgedValueTy(1020))
-  d.add(TestObjCKeyTy(30), value: TestBridgedValueTy(1030))
+  d[TestObjCKeyTy(10)] = TestBridgedValueTy(1010)
+  d[TestObjCKeyTy(20)] = TestBridgedValueTy(1020)
+  d[TestObjCKeyTy(30)] = TestBridgedValueTy(1030)
 
   let bridged =
       reinterpretCast(_convertDictionaryToNSDictionary(d)) as NSDictionary
@@ -1611,9 +1733,9 @@ test_NSDictionaryToDictionaryCoversion()
 
 func test_DictionaryToNSDictionaryCoversion() {
   var d = Dictionary<TestObjCKeyTy, TestObjCValueTy>(minimumCapacity: 32)
-  d.add(TestObjCKeyTy(10), value: TestObjCValueTy(1010))
-  d.add(TestObjCKeyTy(20), value: TestObjCValueTy(1020))
-  d.add(TestObjCKeyTy(30), value: TestObjCValueTy(1030))
+  d[TestObjCKeyTy(10)] = TestObjCValueTy(1010)
+  d[TestObjCKeyTy(20)] = TestObjCValueTy(1020)
+  d[TestObjCKeyTy(30)] = TestObjCValueTy(1030)
   let nsd: NSDictionary = d
 
   var pairs = slurpFastEnumeration(d, d)

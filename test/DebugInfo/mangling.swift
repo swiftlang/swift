@@ -10,7 +10,7 @@
 // mangling.myDict : Swift.Dictionary<Swift.Int64, Swift.String>
 // CHECK: metadata !"myDict", metadata !"_Tv8mangling6myDictGVSs10DictionarySiSS_", metadata !{{.*}}, i32 [[@LINE+1]], metadata ![[DT]], i32 0, {{.*}} [ DW_TAG_variable ] [myDict]
 var myDict = Dictionary<Int, String>()
-myDict.add(12, value: "Hello!")
+myDict[12] = "Hello!"
 
 // mangling.myTuple1 : (Name : Swift.String, Id : Swift.Int64)
 // CHECK: metadata !"myTuple1", metadata !"_Tv8mangling8myTuple1T4NameSS2IdSi_", metadata !{{.*}}, i32 [[@LINE+1]], metadata ![[TT1]], i32 0, {{.*}} [ DW_TAG_variable ] [myTuple1]
