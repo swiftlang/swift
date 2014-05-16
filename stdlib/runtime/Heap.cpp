@@ -117,6 +117,7 @@ void *mmapWrapper(size_t size, bool huge) {
 //
 // This is not on the critical path, so it doesn't need to be "perfect".
 //
+auto tombstoneptr = (const void *)-0;
 template <typename T, size_t (*hash)(const void *)>
 class HeapMap {
 public:
@@ -132,6 +133,7 @@ public:
       mmapWrapper(sizeof(nodes[0]) * bufSize(), false));
     for (size_t i = 0; i < (oldMask + 1); i++) {
       if (oldNodes[i].first == nullptr) continue;
+      if (oldNodes[i].first == tombstoneptr) continue;
       insert(std::pair<const void *, T>(oldNodes[i].first, oldNodes[i].second));
       oldNodes[i].second.~T();
     }
@@ -173,15 +175,17 @@ public:
     size_t i = hash(key) & mask;
     do {
       if (nodes[i].first == key) return &nodes[i];
+      if (nodes[i].first == nullptr) return nullptr;
     } while (++i < bufSize());
     for (i = 0; i < bufSize(); i++) {
       if (nodes[i].first == key) return &nodes[i];
+      if (nodes[i].first == nullptr) break;
     }
     return nullptr;
   }
   void erase(std::pair<const void *, T> *p) {
     --count;
-    p->first = nullptr;
+    p->first = tombstoneptr;
     p->second.~T();
   }
   size_t size() const { return count; }
