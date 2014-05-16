@@ -14,11 +14,11 @@ import SwiftShims
 
 // The empty array prototype.  We use the same object for all empty
 // [Native]Array<T>s.
-let emptyNSSwiftArray : NSSwiftArray
+let emptyNSSwiftArray : _NSSwiftArray
   = reinterpretCast(ContiguousArrayBuffer<Int>(count: 0, minimumCapacity: 0))
 
 // The class that implements the storage for a ContiguousArray<T>
-@final class ContiguousArrayStorage<T> : NSSwiftArray {
+@final class ContiguousArrayStorage<T> : _NSSwiftArray {
   typealias Buffer = ContiguousArrayBuffer<T>
   
   deinit {

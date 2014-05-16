@@ -642,7 +642,7 @@ func _convertDictionaryToNSDictionary<KeyType, ValueType>(
     // If both `KeyType` and `ValueType` can be bridged verbatim, return the
     // underlying storage.
     if _fastPath(isKeyBridgedVerbatim && isValueBridgedVerbatim) {
-      let anNSSwiftDictionary: NSSwiftDictionary = nativeOwner
+      let anNSSwiftDictionary: _NSSwiftDictionary = nativeOwner
       return reinterpretCast(anNSSwiftDictionary)
     }
 

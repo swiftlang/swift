@@ -441,7 +441,7 @@ struct _NativeDictionaryStorage<KeyType : Hashable, ValueType> :
 /// `_NativeDictionaryStorageKeyNSEnumerator`.
 @objc
 class _NativeDictionaryStorageKeyNSEnumeratorBase
-    : NSSwiftEnumerator, _SwiftNSEnumerator {
+    : _NSSwiftEnumerator, _SwiftNSEnumerator {
 
   init(dummy: (Int, ())) {}
 
@@ -514,7 +514,7 @@ class _NativeDictionaryStorageKeyNSEnumerator<KeyType : Hashable, ValueType>
 /// `_NativeDictionaryStorageOwner`.
 @objc
 class _NativeDictionaryStorageOwnerBase
-    : NSSwiftDictionary, _SwiftNSDictionaryRequiredOverrides {
+    : _NSSwiftDictionary, _SwiftNSDictionaryRequiredOverrides {
 
   init() {}
 
@@ -1782,21 +1782,21 @@ protocol _SwiftNSDictionary : _SwiftNSDictionaryRequiredOverrides {
   func isEqual(anObject: AnyObject) -> Bool
 }
 
-/// This class is derived from `NSSwiftDictionaryBase` (through runtime magic),
+/// This class is derived from `_NSSwiftDictionaryBase` (through runtime magic),
 /// which is derived from `NSDictionary`.
 ///
 /// This allows us to subclass an Objective-C class and use the fast Swift
 /// memory allocator.
 @objc
-class NSSwiftDictionary {}
+class _NSSwiftDictionary {}
 
-/// This class is derived from `NSSwiftEnumeratorBase` (through runtime magic),
+/// This class is derived from `_NSSwiftEnumeratorBase` (through runtime magic),
 /// which is derived from `NSEnumerator`.
 ///
 /// This allows us to subclass an Objective-C class and use the fast Swift
 /// memory allocator.
 @objc
-class NSSwiftEnumerator {}
+class _NSSwiftEnumerator {}
 
 //===--- Hacks and workarounds --------------------------------------------===//
 

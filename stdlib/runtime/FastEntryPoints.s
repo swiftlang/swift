@@ -61,7 +61,7 @@ $0:
 //   mov   %rdi, %rcx     // backup %rdi without spilling
 //   mov   $5, %rdi
 //   call  swift_alloc
-//   lea   NSSwiftStringClass(%rip), %r8
+//   lea   _NSSwiftStringClass(%rip), %r8
 //   mov   %r8,    (%rax) // vtable/isa
 //   mov   $1,    8(%rax) // ref count
 //   mov   %rcx, 16(%rax) // owner
