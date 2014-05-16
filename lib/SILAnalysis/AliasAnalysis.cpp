@@ -295,7 +295,7 @@ static bool typedAccessTBAABuiltinTypesMayAlias(SILType LTy, SILType RTy,
          "call this function.");
 
   // If either of our types are raw pointers, they may alias any builtin.
-  if (LTy.isBuiltinRawPointerType() || RTy.isBuiltinRawPointerType())
+  if (LTy.is<BuiltinRawPointerType>() || RTy.is<BuiltinRawPointerType>())
     return true;
 
   // At this point, we have 3 possibilities:
@@ -359,22 +359,22 @@ static bool typedAccessTBAAMayAlias(SILType LTy, SILType RTy, SILModule &Mod) {
     return true;
 
   // If both types are builtin types, handle them separately.
-  if (LTy.isBuiltinType() && RTy.isBuiltinType())
+  if (LTy.is<BuiltinType>() && RTy.is<BuiltinType>())
     return typedAccessTBAABuiltinTypesMayAlias(LTy, RTy, Mod);
 
   // Otherwise, we know that at least one of our types is not a builtin
   // type. If we have a builtin type, canonicalize it on the right.
-  if (LTy.isBuiltinType())
+  if (LTy.is<BuiltinType>())
     std::swap(LTy, RTy);
 
   // If RTy is a builtin raw pointer type, it can alias anything.
-  if (RTy.isBuiltinRawPointerType())
+  if (RTy.is<BuiltinRawPointerType>())
     return true;
 
   ClassDecl *LTyClass = LTy.getClassOrBoundGenericClass();
 
   // If RTy is a Builtin unknown object address type...
-  if (RTy.isBuiltinUnknownObjectType()) {
+  if (RTy.is<BuiltinUnknownObjectType>()) {
     // And LTy is a swift class address type, they can not alias since swift
     // classes and objective-c classes are allocated differently.
     if (LTyClass)
@@ -386,7 +386,7 @@ static bool typedAccessTBAAMayAlias(SILType LTy, SILType RTy, SILModule &Mod) {
 
   // If RTy is a Builtin Native Object Type, since Builtin Native Object is the
   // root of the class hierarchy, it may alias any class.
-  if (RTy.isBuiltinNativeObjectType() && LTyClass)
+  if (RTy.is<BuiltinNativeObjectType>() && LTyClass)
     return true;
 
   // If one type is an aggregate and it contains the other type then the record
