@@ -634,6 +634,87 @@ testCOW_Slow_IndexForKeyDoesNotReallocate()
 // CHECK: testCOW_Slow_IndexForKeyDoesNotReallocate done
 
 
+func testCOW_Fast_RemoveAtIndexDoesNotReallocate() {
+  if true {
+    var d = getCOWFastDictionary()
+    var identity1: Word = reinterpretCast(d)
+
+    let foundIndex1 = d.indexForKey(10)!
+    assert(identity1 == reinterpretCast(d))
+
+    assert(d[foundIndex1].0 == 10)
+    assert(d[foundIndex1].1 == 1010)
+
+    d.removeAtIndex(foundIndex1)
+    assert(identity1 == reinterpretCast(d))
+    assert(!d.indexForKey(10))
+  }
+
+  if true {
+    var d1 = getCOWFastDictionary()
+    var identity1: Word = reinterpretCast(d1)
+
+    var d2 = d1
+    assert(identity1 == reinterpretCast(d1))
+    assert(identity1 == reinterpretCast(d2))
+
+    var foundIndex1 = d2.indexForKey(10)!
+    assert(d2[foundIndex1].0 == 10)
+    assert(d2[foundIndex1].1 == 1010)
+    assert(identity1 == reinterpretCast(d1))
+    assert(identity1 == reinterpretCast(d2))
+
+    d2.removeAtIndex(foundIndex1)
+    assert(identity1 == reinterpretCast(d1))
+    assert(identity1 != reinterpretCast(d2))
+    assert(!d2.indexForKey(10))
+  }
+
+  println("testCOW_Fast_RemoveAtIndexDoesNotReallocate done")
+}
+testCOW_Fast_RemoveAtIndexDoesNotReallocate()
+// CHECK: testCOW_Fast_RemoveAtIndexDoesNotReallocate done
+
+func testCOW_Slow_RemoveAtIndexDoesNotReallocate() {
+  if true {
+    var d = getCOWSlowDictionary()
+    var identity1: Word = reinterpretCast(d)
+
+    var foundIndex1 = d.indexForKey(TestKeyTy(10))!
+    assert(identity1 == reinterpretCast(d))
+
+    assert(d[foundIndex1].0 == TestKeyTy(10))
+    assert(d[foundIndex1].1.value == 1010)
+
+    d.removeAtIndex(foundIndex1)
+    assert(identity1 == reinterpretCast(d))
+    assert(!d.indexForKey(TestKeyTy(10)))
+  }
+
+  if true {
+    var d1 = getCOWSlowDictionary()
+    var identity1: Word = reinterpretCast(d1)
+
+    var d2 = d1
+    assert(identity1 == reinterpretCast(d1))
+    assert(identity1 == reinterpretCast(d2))
+
+    var foundIndex1 = d2.indexForKey(TestKeyTy(10))!
+    assert(d2[foundIndex1].0 == TestKeyTy(10))
+    assert(d2[foundIndex1].1.value == 1010)
+
+    d2.removeAtIndex(foundIndex1)
+    assert(identity1 == reinterpretCast(d1))
+    assert(identity1 != reinterpretCast(d2))
+    assert(!d2.indexForKey(TestKeyTy(10)))
+  }
+
+  println("testCOW_Slow_RemoveAtIndexDoesNotReallocate done")
+}
+testCOW_Slow_RemoveAtIndexDoesNotReallocate()
+// CHECK: testCOW_Slow_RemoveAtIndexDoesNotReallocate done
+
+
 func testCOW_Fast_DeleteKeyDoesNotReallocate() {
   var d1 = getCOWFastDictionary()
   var identity1: Word = reinterpretCast(d1)
@@ -1130,6 +1211,35 @@ func getParallelArrayBridgedDictionary() -> Dictionary<NSObject, AnyObject> {
   return _convertNSDictionaryToDictionary(nsd)
 }
 
+func test_BridgedFromObjC_IndexForKey() {
+  var d = getBridgedDictionary()
+  var identity1: Word = reinterpretCast(d)
+  assert(isCocoaDictionary(d))
+
+  // Find an existing key.
+  if true {
+    var kv = d[d.indexForKey(TestObjCKeyTy(10))!]
+    assert(kv.0 == TestObjCKeyTy(10))
+    assert(kv.1.value == 1010)
+
+    kv = d[d.indexForKey(TestObjCKeyTy(20))!]
+    assert(kv.0 == TestObjCKeyTy(20))
+    assert(kv.1.value == 1020)
+
+    kv = d[d.indexForKey(TestObjCKeyTy(30))!]
+    assert(kv.0 == TestObjCKeyTy(30))
+    assert(kv.1.value == 1030)
+  }
+
+  // Try to find a key that does not exist.
+  assert(!d.indexForKey(TestObjCKeyTy(40)))
+  assert(identity1 == reinterpretCast(d))
+
+  println("test_BridgedFromObjC_IndexForKey done")
+}
+test_BridgedFromObjC_IndexForKey()
+// CHECK: test_BridgedFromObjC_IndexForKey done
+
 func test_BridgedFromObjC_SubscriptWithIndex() {
   var d = getBridgedDictionary()
   var identity1: Word = reinterpretCast(d)
@@ -1284,33 +1394,25 @@ test_BridgedFromObjC_UpdateValueForKey()
 // CHECK: test_BridgedFromObjC_UpdateValueForKey done
 
 
-func test_BridgedFromObjC_Find() {
+func test_BridgedFromObjC_RemoveAtIndex() {
   var d = getBridgedDictionary()
   var identity1: Word = reinterpretCast(d)
   assert(isCocoaDictionary(d))
 
-  // Find an existing key.
-  if true {
-    var kv = d[d.indexForKey(TestObjCKeyTy(10))!]
-    assert(kv.0 == TestObjCKeyTy(10))
-    assert(kv.1.value == 1010)
-
-    kv = d[d.indexForKey(TestObjCKeyTy(20))!]
-    assert(kv.0 == TestObjCKeyTy(20))
-    assert(kv.1.value == 1020)
-
-    kv = d[d.indexForKey(TestObjCKeyTy(30))!]
-    assert(kv.0 == TestObjCKeyTy(30))
-    assert(kv.1.value == 1030)
-  }
-
-  assert(!d.indexForKey(TestObjCKeyTy(40)))
+  let foundIndex1 = d.indexForKey(TestObjCKeyTy(10))!
+  assert(d[foundIndex1].0 == TestObjCKeyTy(10))
+  assert(d[foundIndex1].1.value == 1010)
   assert(identity1 == reinterpretCast(d))
 
-  println("test_BridgedFromObjC_Find done")
+  d.removeAtIndex(foundIndex1)
+  assert(identity1 != reinterpretCast(d))
+  assert(isNativeDictionary(d))
+  assert(!d.indexForKey(10))
+
+  println("test_BridgedFromObjC_RemoveAtIndex done")
 }
-test_BridgedFromObjC_Find()
-// CHECK: test_BridgedFromObjC_Find done
+test_BridgedFromObjC_RemoveAtIndex()
+// CHECK: test_BridgedFromObjC_RemoveAtIndex done
 
 
 func test_BridgedFromObjC_DeleteKey() {
@@ -1680,7 +1782,7 @@ struct TestBridgedKeyTy : Equatable, Hashable, Printable, _BridgedToObjectiveC {
   }
 
   static func bridgeFromObjectiveC(x: TestObjCKeyTy) -> TestBridgedKeyTy? {
-    _fatalError("implement")
+    _preconditionFailure("implement")
   }
 
   var value: Int
@@ -1716,7 +1818,7 @@ struct TestBridgedValueTy : Printable, _BridgedToObjectiveC {
   }
 
   static func bridgeFromObjectiveC(x: TestObjCValueTy) -> TestBridgedValueTy? {
-    _fatalError("implement")
+    _preconditionFailure("implement")
   }
 
   var value: Int

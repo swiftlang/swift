@@ -204,6 +204,7 @@ protocol _DictionaryStorage {
   func assertingGet(key: KeyType) -> ValueType
   func maybeGet(key: KeyType) -> ValueType?
   mutating func updateValue(value: ValueType, forKey: KeyType) -> ValueType?
+  mutating func removeAtIndex(index: Index)
   mutating func deleteKey(key: KeyType) -> Bool
   var count: Int { get }
 
@@ -406,7 +407,7 @@ struct _NativeDictionaryStorage<KeyType : Hashable, ValueType> :
   /// This function does *not* update `count`.
   mutating func unsafeAddNew(#key: KeyType, value: ValueType) {
     var (i, found) = _find(key, _bucket(key))
-    assert(!found, "unsafeAddNew was called, but the key is already present")
+    _sanityCheck(!found, "unsafeAddNew was called, but the key is already present")
     self[i.offset] = Element(key: key, value: value)
   }
 
@@ -430,7 +431,9 @@ struct _NativeDictionaryStorage<KeyType : Hashable, ValueType> :
   }
 
   func assertingGet(i: Index) -> (KeyType, ValueType) {
-    return self[i.offset]!
+    let e = self[i.offset]
+    _precondition(e, "attempting to access Dictionary elements using an invalid Index")
+    return e!
   }
 
   func assertingGet(key: KeyType) -> ValueType {
@@ -451,6 +454,10 @@ struct _NativeDictionaryStorage<KeyType : Hashable, ValueType> :
     _fatalError("don't call mutating methods on _NativeDictionaryStorage")
   }
 
+  mutating func removeAtIndex(index: Index) {
+    _fatalError("don't call mutating methods on _NativeDictionaryStorage")
+  }
+
   mutating func deleteKey(key: KeyType) -> Bool {
     _fatalError("don't call mutating methods on _NativeDictionaryStorage")
   }
@@ -465,7 +472,7 @@ struct _NativeDictionaryStorage<KeyType : Hashable, ValueType> :
         minimumCapacity: requiredCapacity)
     for (key, value) in elements {
       var (i, found) = nativeStorage._find(key, nativeStorage._bucket(key))
-      assert(!found, "dictionary literal contains duplicate keys")
+      _precondition(!found, "dictionary literal contains duplicate keys")
       nativeStorage[i.offset] = Element(key: key, value: value)
     }
     nativeStorage.count = elements.count
@@ -771,6 +778,10 @@ struct _CocoaDictionaryStorage : _DictionaryStorage {
     _fatalError("can not mutate NSDictionary")
   }
 
+  mutating func removeAtIndex(index: Index) {
+    _fatalError("can not mutate NSDictionary")
+  }
+
   mutating func deleteKey(key: AnyObject) -> Bool {
     _fatalError("can not mutate NSDictionary")
   }
@@ -795,6 +806,7 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
   typealias NativeStorageOwner =
       _NativeDictionaryStorageOwner<KeyType, ValueType>
   typealias CocoaStorage = _CocoaDictionaryStorage
+  typealias NativeIndex = _NativeDictionaryIndex<KeyType, ValueType>
 
   case Native(NativeStorageOwner)
   case Cocoa(CocoaStorage)
@@ -857,9 +869,9 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
         var x = oldNativeStorage[i]
         if x {
           if oldCapacity == newCapacity {
-            // FIXME: optimize this case further: we don't have to initialize
-            // the buffer first and then copy over the buckets, we should
-            // initialize the new buffer with buckets directly.
+            // FIXME(performance): optimize this case further: we don't have to
+            // initialize the buffer first and then copy over the buckets, we
+            // should initialize the new buffer with buckets directly.
             newNativeStorage[i] = x
           }
           else {
@@ -899,7 +911,6 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
     var minCapacity = NativeStorage.getMinCapacity(
         cocoaStorage.count, _dictionaryDefaultMaxLoadFactorInverse)
     var allocated = ensureUniqueNativeStorage(minCapacity).reallocated
-    assert(allocated, "failed to allocate native dictionary storage")
     _sanityCheck(allocated, "failed to allocate native dictionary storage")
   }
 
@@ -1034,33 +1045,18 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
     }
   }
 
-  mutating func nativeDeleteKey(key: KeyType) -> Bool {
-    var nativeStorage = native
-    var start = nativeStorage._bucket(key)
-    var (pos, found) = nativeStorage._find(key, start)
-
-    if !found {
-      return false
-    }
-
-    let (reallocated, capacityChanged) =
-        ensureUniqueNativeStorage(nativeStorage.capacity)
-    if reallocated {
-      nativeStorage = native
-    }
-    if capacityChanged {
-      start = nativeStorage._bucket(key)
-      (pos, found) = nativeStorage._find(key, start)
-      _sanityCheck(found)
-    }
-
+  /// :param: start The offset of the beginning of the chain.
+  /// :param: offset The offset of the element that will be deleted.
+  mutating func nativeDeleteImpl(
+      nativeStorage: NativeStorage, start: Int, offset: Int
+  ) {
     // remove the element
-    nativeStorage[pos.offset] = .None
+    nativeStorage[offset] = .None
     --nativeStorage.count
 
     // If we've put a hole in a chain of contiguous elements, some
     // element after the hole may belong where the new hole is.
-    var hole = pos.offset
+    var hole = offset
 
     // Find the last bucket in the contiguous chain
     var lastInChain = hole
@@ -1097,8 +1093,71 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
       nativeStorage[b] = .None
       hole = b
     }
+  }
 
+  mutating func nativeDeleteKey(key: KeyType) -> Bool {
+    var nativeStorage = native
+    var start = nativeStorage._bucket(key)
+    var (index, found) = nativeStorage._find(key, start)
+
+    // Fast path: if the key is not present, we will not mutate the dictionary,
+    // so don't force unique storage.
+    if !found {
+      return false
+    }
+
+    let (reallocated, capacityChanged) =
+        ensureUniqueNativeStorage(nativeStorage.capacity)
+    if reallocated {
+      nativeStorage = native
+    }
+    if capacityChanged {
+      start = nativeStorage._bucket(key)
+      (index, found) = nativeStorage._find(key, start)
+      _sanityCheck(found, "key was lost during storage migration")
+    }
+
+    nativeDeleteImpl(nativeStorage, start: start, offset: index.offset)
     return true
+  }
+
+  mutating func nativeRemoveAtIndex(nativeIndex: NativeIndex) {
+    var nativeStorage = native
+
+    // The provided index should be valid, so we will always mutating the
+    // dictionary storage.  Request unique storage.
+    let (reallocated, capacityChanged) =
+        ensureUniqueNativeStorage(nativeStorage.capacity)
+    if reallocated {
+      nativeStorage = native
+    }
+
+    let key = nativeStorage.assertingGet(nativeIndex).0
+    let start = nativeStorage._bucket(key)
+    nativeDeleteImpl(nativeStorage, start: start, offset: nativeIndex.offset)
+  }
+
+  mutating func removeAtIndex(index: Index) {
+    if _fastPath(guaranteedNative) {
+      nativeRemoveAtIndex(index._nativeIndex)
+    }
+
+    switch self {
+    case .Native:
+      nativeRemoveAtIndex(index._nativeIndex)
+    case .Cocoa(let cocoaStorage):
+      // We have to migrate the data first.  But after we do so, the Cocoa
+      // index becomes useless, so get the key first.
+      //
+      // FIXME(performance): fuse data migration and element deletion into one
+      // operation.
+      let cocoaIndex = index._cocoaIndex
+      let key: AnyObject =
+          cocoaIndex.allKeys.objectAtIndex(cocoaIndex.nextKeyIndex)
+      migrateDataToNativeStorage(cocoaStorage)
+      // FIXME: This assumes that KeyType is bridged verbatim.
+      nativeDeleteKey(reinterpretCast(key) as KeyType)
+    }
   }
 
   mutating func deleteKey(key: KeyType) -> Bool {
@@ -1565,6 +1624,10 @@ struct Dictionary<KeyType : Hashable, ValueType> : Collection,
     return _variantStorage.updateValue(value, forKey: key)
   }
 
+  mutating func removeAtIndex(index: Index) {
+    _variantStorage.removeAtIndex(index)
+  }
+
   mutating func _deleteKey(key: KeyType) -> Bool {
     return _variantStorage.deleteKey(key)
   }
@@ -1620,7 +1683,8 @@ func == <KeyType : Equatable, ValueType : Equatable>(
   case (.Native(let lhsNativeOwner), .Native(let rhsNativeOwner)):
     let lhsNative = lhsNativeOwner.nativeStorage
     let rhsNative = rhsNativeOwner.nativeStorage
-    // FIXME: early exit if lhs and rhs reference the same storage?
+    // FIXME(performance): early exit if lhs and rhs reference the same
+    // storage?
 
     if lhsNative.count != rhsNative.count {
       return false

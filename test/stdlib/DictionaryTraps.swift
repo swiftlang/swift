@@ -8,6 +8,10 @@
 // RUN: %target-run %t/a.out DuplicateKeys1 2>&1 | FileCheck %s -check-prefix=CHECK
 // RUN: %target-run %t/a.out DuplicateKeys2 2>&1 | FileCheck %s -check-prefix=CHECK
 // RUN: %target-run %t/a.out DuplicateKeys3 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out RemoveInvalidIndex1 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out RemoveInvalidIndex2 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out RemoveInvalidIndex3 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out RemoveInvalidIndex4 2>&1 | FileCheck %s -check-prefix=CHECK
 
 // CHECK: OK
 // CHECK: CRASHED: SIG{{ILL|TRAP}}
@@ -87,6 +91,36 @@ if arg == "DuplicateKeys2" {
 if arg == "DuplicateKeys3" {
   println("OK")
   var d = [ 10: 1010, 10: 0 ]
+}
+
+if arg == "RemoveInvalidIndex1" {
+  var d = Dictionary<Int, Int>()
+  let index = d.startIndex
+  println("OK")
+  d.removeAtIndex(index)
+}
+
+if arg == "RemoveInvalidIndex2" {
+  var d = Dictionary<Int, Int>()
+  let index = d.endIndex
+  println("OK")
+  d.removeAtIndex(index)
+}
+
+if arg == "RemoveInvalidIndex3" {
+  var d = [ 10: 1010, 20: 1020, 30: 1030 ]
+  let index = d.endIndex
+  println("OK")
+  d.removeAtIndex(index)
+}
+
+if arg == "RemoveInvalidIndex4" {
+  var d = [ 10: 1010 ]
+  let index = d.indexForKey(10)!
+  d.removeAtIndex(index)
+  assert(!d[10])
+  println("OK")
+  d.removeAtIndex(index)
 }
 
 println("BUSTED: should have crashed already")
