@@ -19,10 +19,19 @@ func testCanDefaultInit() {
 // Cases where we cannot perform default initialization.
 class NotInitializable1 { // expected-error{{class 'NotInitializable1' has no initializers}}
   var (opt1, int1) : (Int?, Int) // expected-note{{stored properties 'opt1' and 'int1' without initial values prevent synthesized initializers}}
-  let opt2: Int? // expected-note{{stored property 'opt2' without initial value prevents synthesized initializers}}
+  let opt2: Int?
 }
 
 func localDefaultInit() -> Int? {
   var i: Int?
   return i
+}
+
+
+// <rdar://problem/16906000> Implicitly unwrapped optional let is not considered initialized, but var is
+class DefaultInitOfLetProperty {
+   let property: DefaultInitOfLetProperty!
+   init(x: DefaultInitOfLetProperty) {
+      self.property = DefaultInitOfLetProperty(x: self)
+   }
 }

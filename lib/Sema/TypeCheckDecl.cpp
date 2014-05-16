@@ -995,15 +995,6 @@ static bool isDefaultInitializable(PatternBindingDecl *pbd) {
   if (pbd->hasInit())
     return true;
 
-  // A 'let' variable is not default-initializable, because it cannot change.
-  bool isLet = false;
-  pbd->getPattern()->forEachVariable([&](VarDecl *var) {
-      if (var->isLet())
-        isLet = true;
-    });
-  if (isLet)
-    return false;
-
   // If it is an IBOutlet, is NSManaged, or is a @lazy variable, it is trivially
   // true.
   if (auto var = pbd->getSingleVar()) {
@@ -2388,17 +2379,14 @@ public:
             TC.checkOwnershipAttr(var, var->getAttrs().getOwnership());
         }
 
-        // Make sure we don't have a 'let' or an @NSManaged property.
-        bool isLet = false;
+        // Make sure we don't have a @NSManaged property.
         bool hasNSManaged = false;
         PBD->getPattern()->forEachVariable([&](VarDecl *var) {
-          if (var->isLet())
-            isLet = true;
           if (var->getAttrs().hasAttribute<NSManagedAttr>())
             hasNSManaged = true;
         });
 
-        if (!isLet && !hasNSManaged) {
+        if (!hasNSManaged) {
           auto type = PBD->getPattern()->getType();
           if (auto defaultInit = buildDefaultInitializer(TC, type)) {
             // If we got a default initializer, install it and re-type-check it
