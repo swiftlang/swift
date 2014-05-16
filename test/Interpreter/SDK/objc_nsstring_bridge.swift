@@ -14,12 +14,7 @@ func printString(x: String) {
 }
 
 func printDescription(o: AnyObject) {
-  // FIXME: This is picking up the class method.
-#if os(OSX)
   println(o.description!.reallyAString())
-#else
-  println(o.description()!.reallyAString())
-#endif
 }
 
 class Pootie : NSObject {

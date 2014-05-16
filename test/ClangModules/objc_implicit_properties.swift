@@ -6,7 +6,7 @@ import ObjCImplicitProperties
 
 func implicitProperties(obj: ImplicitProperties, other: AnyObject) {
   obj.implicitProperty = other // no-warning
-  obj.implicitProperty.description() // no-warning
+  obj.implicitProperty.description // no-warning
 
   obj.anotherImplicitProperty = 42 // no-warning
   println(Int(obj.anotherImplicitProperty)) // no-warning

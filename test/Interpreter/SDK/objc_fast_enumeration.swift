@@ -13,11 +13,7 @@ var a_m: NSMutableArray = ["two", 12, [11,12,13]]
 // CHECK:   3
 // CHECK: )
 for x: AnyObject in a {
-#if os(OSX)
   println(x.description!)
-#else
-  println(x.description!())
-#endif
 }
 
 // CHECK: two
@@ -28,11 +24,7 @@ for x: AnyObject in a {
 // CHECK:   13
 // CHECK: )
 for x: AnyObject in a_m {
-#if os(OSX)
   println(x.description!)
-#else
-  println(x.description!())
-#endif
 }
 
 class Canary {
@@ -70,20 +62,12 @@ var d_m : NSMutableDictionary = [1415 : "Big Giants", 11510 : "B's"]
 
 // CHECK: 510 => A's
 for (key: AnyObject, value: AnyObject) in d {
-#if os(OSX)
   println("\(key.description!) => \(value.description!)")
-#else
-  println("\(key.description!()) => \(value.description!())")
-#endif
 }
 
 // CHECK: 11510 => B's
 for (key: AnyObject, value: AnyObject) in d_m {
-#if os(OSX)
   println("\(key.description!) => \(value.description!)")
-#else
-  println("\(key.description!()) => \(value.description!())")
-#endif
 }
 
 var s = NSSet(object: "the most forward-thinking test yet")
@@ -91,20 +75,12 @@ var s_m = NSMutableSet(object: "the next most forward-thinking test yet")
 
 // CHECK: the most forward-thinking test yet
 for x: AnyObject in s {
-#if os(OSX)
   println(x.description!)
-#else
-  println(x.description!())
-#endif
 }
 
 // CHECK: the next most forward-thinking test yet
 for x: AnyObject in s_m {
-#if os(OSX)
   println(x.description!)
-#else
-  println(x.description!())
-#endif
 }
 
 // Enumeration over an NSSwiftArray
@@ -114,9 +90,5 @@ for x: AnyObject in s_m {
 var a2 = ["hello", "bridged", "array"]
 var nsa2 : NSArray = ((a2.asCocoaArray() as AnyObject) as NSArray)!
 for x: AnyObject in nsa2 {
-#if os(OSX)
   println(x.description!)
-#else
-  println(x.description!())
-#endif
 }

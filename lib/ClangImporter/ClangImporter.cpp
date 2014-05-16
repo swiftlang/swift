@@ -1724,20 +1724,21 @@ static void lookupClassMembersImpl(ClangImporter::Implementation &Impl,
       if (!VD)
         continue;
 
-      if (isSubscript || !name) {
-        // When searching for a subscript, we may have found a getter.  If so,
-        // use the subscript instead.
-        if (auto func = dyn_cast<FuncDecl>(VD)) {
+      if (auto func = dyn_cast<FuncDecl>(VD)) {
+        if (auto storage = func->getAccessorStorageDecl()) {
+          consumer.foundDecl(storage, DeclVisibilityKind::DynamicLookup);
+          continue;
+        } else if (isSubscript || !name) {
           auto known = Impl.Subscripts.find({func, nullptr});
           if (known != Impl.Subscripts.end()) {
             consumer.foundDecl(known->second,
                                DeclVisibilityKind::DynamicLookup);
           }
-        }
 
-        // If we were looking only for subscripts, don't report the getter.
-        if (isSubscript)
-          continue;
+          // If we were looking only for subscripts, don't report the getter.
+          if (isSubscript)
+            continue;
+        }
       }
 
       consumer.foundDecl(VD, DeclVisibilityKind::DynamicLookup);

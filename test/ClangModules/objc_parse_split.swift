@@ -264,8 +264,8 @@ func customAccessors(hive: Hive, bee: B) {
   println(hive.isMakingHoney()) // expected-error{{'Hive' does not have a member named 'isMakingHoney'}}
   hive.setMakingHoney(true) // expected-error{{'Hive' does not have a member named 'setMakingHoney'}}
 
-  hive.guard.description() // okay
-  hive.guard.description!() // no-warning
+  hive.guard.description // okay
+  hive.guard.description! // no-warning
   hive.guard = bee // no-warning
 }
 

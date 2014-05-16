@@ -17,11 +17,7 @@ println(anyBar.description())
 // CHECK: _TtC10MangleTest6Wibble
 @objc class Wibble : NSObject { }
 var anyWibble: AnyObject = Wibble()
-#if os(OSX)
 println(anyWibble.description)
-#else
-println(anyWibble.description())
-#endif
 
 // Check whether we can lookup the class with this name.
 var anyWibbleClass: AnyClass = NSClassFromString("_TtC10MangleTest6Wibble")
