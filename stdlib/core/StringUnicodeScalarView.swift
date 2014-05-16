@@ -107,12 +107,24 @@ extension String {
       var BIdx = other._base.startIndex
       var AEnd = self._base.endIndex
       var BEnd = other._base.endIndex
+
+      // If this is not a contiguous UTF-16 then use the slow path.
+      // TODO: when we fix rdar://16740011 we'll need to optimize the ascii
+      // path.
+      if ((self._base.elementShift != 1) |
+         (other._base.elementShift != 1) |
+         (!self._base.hasContiguousStorage) |
+         (!other._base.hasContiguousStorage)) {
+        return _compareUnicode(other)
+      }
+
       while true {
         if AIdx < AEnd {
           if BIdx < BEnd {
-            let e1 = self._base[AIdx]
-            let e2 = other._base[BIdx]
-            if (e1 >= 0x80 || e2 >= 0x80) {
+            let e1 = self._base._NthContiguous(AIdx)
+            let e2 = other._base._NthContiguous(BIdx)
+
+            if _slowPath((e1 >= 0x80) | (e2 >= 0x80)) {
               // Use slow unicode comparator if
               // we found multi-byte scalar.
               return _compareUnicode(other)
