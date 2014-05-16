@@ -1222,7 +1222,21 @@ Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
   if (auto generics = repr->getGenericParams()) {
     return PolymorphicFunctionType::get(inputTy, outputTy, generics, extInfo);
   }
-  return FunctionType::get(inputTy, outputTy, extInfo);
+
+  auto fnTy = FunctionType::get(inputTy, outputTy, extInfo);
+  // If the type is @objc_block, it must be representable in ObjC.
+  switch (extInfo.getRepresentation()) {
+  case AnyFunctionType::Representation::Block:
+    if (!TC.isRepresentableInObjC(DC, fnTy)) {
+      TC.diagnose(repr->getStartLoc(), diag::objc_block_invalid);
+    }
+    break;
+
+  case AnyFunctionType::Representation::Thin:
+  case AnyFunctionType::Representation::Thick:
+    break;
+  }
+  return fnTy;
 }
 
 Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,

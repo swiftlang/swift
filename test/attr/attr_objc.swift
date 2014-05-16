@@ -1680,3 +1680,7 @@ struct NotObjCStruct {}
   // CHECK: {{^}}  func zangImplicit
   func zangImplicit(f: (NotObjCEnum, NotObjCStruct) -> ()) {}
 }
+
+typealias GoodBlock = @objc_block Int -> ()
+typealias BadBlock = @objc_block NotObjCEnum -> () // expected-error{{@objc_block type is not representable in Objective-C}}
+
