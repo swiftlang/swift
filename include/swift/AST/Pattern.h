@@ -156,7 +156,7 @@ public:
     /// The cloned pattern should be implicit.
     Implicit = 0x01,
     /// The cloned pattern is for an inherited constructor; mark default
-    /// arguments as inherited.
+    /// arguments as inherited, and mark unnamed arguments as named.
     Inherited = 0x02,
     /// Whether the named patterns produced from a cloned 'any' pattern is
     /// are 'var'.

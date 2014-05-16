@@ -2754,7 +2754,6 @@ public:
       TC.validateDecl(SD);
       TC.ValidatedTypes.remove(SD);
     }
-
     if (!IsSecondPass) {
       SmallVector<Decl*, 2> NewDecls;
       TC.addImplicitConstructors(SD, NewDecls);
@@ -2934,7 +2933,6 @@ public:
       }
     }
 
-    
     // If this class needs an implicit constructor, add it.
     if (!IsFirstPass) {
       SmallVector<Decl*, 2> ImplicitInits;
@@ -4838,16 +4836,20 @@ static Expr *forwardArguments(TypeChecker &tc, ClassDecl *classDecl,
 #include "swift/AST/PatternNodes.def"
     return nullptr;
     
-  case PatternKind::Paren:
-    if (auto subExpr = forwardArguments(
-                         tc, classDecl, toDecl,
-                         cast<ParenPattern>(bodyPattern)->getSubPattern(),
-                         { })) {
+  case PatternKind::Paren: {
+    auto subExpr = forwardArguments(tc, classDecl, toDecl,
+                              cast<ParenPattern>(bodyPattern)->getSubPattern(),
+                                    { });
+    if (!subExpr) return nullptr;
+
+    // If there is a name for this single-argument thing, then form a tupleexpr.
+    if (argumentNames.size() != 1 || argumentNames[0].empty())
       return new (tc.Context) ParenExpr(SourceLoc(), subExpr, SourceLoc(),
                                         /*hasTrailingClosure=*/false);
-    }
 
-    return nullptr;
+    return TupleExpr::createImplicit(tc.Context, subExpr, argumentNames);
+  }
+
 
   case PatternKind::Tuple: {
     auto bodyTuple = cast<TuplePattern>(bodyPattern);
@@ -4901,10 +4903,9 @@ static Expr *forwardArguments(TypeChecker &tc, ClassDecl *classDecl,
     auto decl = cast<NamedPattern>(bodyPattern)->getDecl();
     Expr *declRef = new (tc.Context) DeclRefExpr(decl, SourceLoc(),
                                                  /*Implicit=*/true);
-    if (decl->getType()->is<InOutType>()) {
+    if (decl->getType()->is<InOutType>())
       declRef = new (tc.Context) InOutExpr(SourceLoc(), declRef,
-                                               Type(), /*isImplicit=*/true);
-    }
+                                           Type(), /*isImplicit=*/true);
     return declRef;
   }
 
@@ -5003,7 +5004,7 @@ createDesignatedInitOverride(TypeChecker &tc,
       if (!eltTy)
         return Type();
 
-      // If nothing has changd, just keep going.
+      // If nothing has changed, just keep going.
       if (!anyChanged && eltTy.getPointer() == elt.getType().getPointer() &&
           (elt.getDefaultArgKind() == DefaultArgumentKind::None ||
            elt.getDefaultArgKind() == DefaultArgumentKind::Inherited)) {

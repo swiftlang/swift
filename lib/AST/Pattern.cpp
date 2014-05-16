@@ -228,11 +228,18 @@ Pattern *Pattern::clone(ASTContext &context,
     auto named = cast<NamedPattern>(this);
     VarDecl *var;
     if (auto param = dyn_cast<ParamDecl>(named->getDecl())) {
+
+      auto name = param->getName();
+      // If the argument isn't named, and we're cloning for an inherited
+      // constructor, give the parameter a name so that silgen will produce a
+      // value for it.
+      if (name.empty() && (options & Inherited))
+        name = context.getIdentifier("argument");
+
       var = new (context) ParamDecl(param->isLet(),
                                     param->getArgumentNameLoc(),
                                     param->getArgumentName(),
-                                    param->getLoc(),
-                                    param->getName(),
+                                    param->getLoc(), name,
                                     param->hasType()
                                       ? param->getType()
                                       : Type(),
