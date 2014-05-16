@@ -1,6 +1,10 @@
 Latest
 ----------
 
+* Removed shorthand "x as T!"; instead use "(x as T)!"
+
+  - "x as T!" now means "x as implicitly unwrapped optional".
+
 * Range operators ".." and "..." have been switched.
 
   - 1..3 now means 1,2

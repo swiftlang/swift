@@ -91,12 +91,6 @@ public:
     IVOLP_InLet
   } InVarOrLetPattern = IVOLP_NotInVarOrLet;
 
-  /// Indicates if we should parse '!' as an @implicitly unwrapped optional.
-  enum {
-    TUO_AllowImplicitlyUnwrappedOptional,
-    TUO_NoImplicitlyUnwrappedOptional
-  } TUO_ImplicitlyUnwrappedOptionalCtx = TUO_AllowImplicitlyUnwrappedOptional;
-
   bool GreaterThanIsOperator = true;
 
   /// FIXME: Temporary hack to keep the selector-style declaration
@@ -784,8 +778,7 @@ public:
     parseTypeImplicitlyUnwrappedOptional(TypeRepr *Base);
 
   bool isImplicitlyUnwrappedOptionalToken() const {
-    return TUO_ImplicitlyUnwrappedOptionalCtx == TUO_AllowImplicitlyUnwrappedOptional &&
-           Tok.is(tok::exclaim_postfix);
+    return Tok.is(tok::exclaim_postfix);
   }
 
   TypeRepr *applyAttributeToType(TypeRepr *Ty, const TypeAttributes &Attr);

@@ -118,7 +118,7 @@ func testBridgedVerbatim() {
 
   // ...with the same elements
   // CHECK-NEXT: [[base42]]
-  println(nsArrayOfBaseConvertedToAnyObjectArray[0] as Base!)
+  println((nsArrayOfBaseConvertedToAnyObjectArray[0] as Base)!)
 
   //===--- Up- and Down-casts -----------------------------------------------===//
   let derived: Derived[] = [Derived(11), Derived(22)]

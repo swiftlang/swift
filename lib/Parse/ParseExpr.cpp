@@ -135,18 +135,7 @@ ParserResult<Expr> Parser::parseExprIs() {
 ///     'as' type '!'?
 ParserResult<Expr> Parser::parseExprAs() {
   SourceLoc asLoc = consumeToken(tok::kw_as);
-
-  ParserResult<TypeRepr> type;
-  {
-    // Disable looking for implicitly unwrapped optional, treating '!' as
-    // a forced value expression later.  Do a lookahead for '(' to see
-    // if we are declaring a type within '()' where implicitly unwrapped optional
-    // is allowed.
-    llvm::SaveAndRestore<decltype(TUO_ImplicitlyUnwrappedOptionalCtx)>
-      T(TUO_ImplicitlyUnwrappedOptionalCtx, Tok.isFollowingLParen()
-        ? TUO_AllowImplicitlyUnwrappedOptional : TUO_NoImplicitlyUnwrappedOptional);
-    type = parseType(diag::expected_type_after_as);
-  }
+  ParserResult<TypeRepr> type = parseType(diag::expected_type_after_as);
 
   if (type.hasCodeCompletion())
     return makeParserCodeCompletionResult<Expr>();
@@ -154,12 +143,6 @@ ParserResult<Expr> Parser::parseExprAs() {
     return nullptr;
   
   auto *parsed = new (Context) ConditionalCheckedCastExpr(asLoc, type.get());
-  
-  // As a special case, parse '!' after the type. We'll resolve it to a
-  // ForceValueExpr after sequence resolution.
-  if (Tok.is(tok::exclaim_postfix))
-    parsed->setForceLoc(consumeToken(tok::exclaim_postfix));
-  
   return makeParserResult(parsed);
 }
 

@@ -14,14 +14,14 @@ var pair : (Int, Double) = (1, 2)
 var closure : (Int, Int) -> Int = { $0 + $1 }
 
 var d_as_b : B = D()
-var b_as_d = B() as D!
+var b_as_d = (B() as D)!
 var bad_b_as_d : D = B()  // expected-error{{}}
 
 var d = D()
 var b = B()
 
 var d_as_b_2 : B = d 
-var b_as_d_2 = b as D!
+var b_as_d_2 = (b as D)!
 
 var b_is_d:Bool = B() is D
 // FIXME: Poor diagnostic below.
@@ -29,18 +29,18 @@ var bad_d_is_b:Bool = D() is B // expected-error{{'B' is not a subtype of 'D'}}
 
 func base_class_archetype_casts<T : B>(t: T) {
   var t_as_b : B = t
-  var b_as_t = B() as T!
+  var b_as_t = (B() as T)!
   var bad_b_as_t : T = B() // expected-error{{}}
 
   var b = B()
 
-  var b_as_t_2 = b as T!
+  var b_as_t_2 = (b as T)!
 
   var b_is_t:Bool = B() is T
   var b_is_t_2:Bool = b is T
   var bad_t_is_b:Bool = t is B // expected-error{{}}
 
-  var t_as_d = t as D!
+  var t_as_d = (t as D)!
 }
 
 protocol P1 { func p1() }
@@ -71,16 +71,16 @@ func protocol_archetype_casts<T : P1>(t: T, p1: P1, p2: P2, p12: protocol<P1, P2
   var t_as_p2 : P2 = t // expected-error{{}}
 
   // Checked unconditional casts.
-  var p1_as_t = p1 as T!
-  var p2_as_t = p2 as T!
-  var p12_as_t = p12 as T!
+  var p1_as_t = (p1 as T)!
+  var p2_as_t = (p2 as T)!
+  var p12_as_t = (p12 as T)!
 
-  var t_as_s1 = t as S1!
-  var t_as_s12 = t as S12!
-  var t_as_c1 = t as C1!
-  var t_as_d1 = t as D1!
+  var t_as_s1 = (t as S1)!
+  var t_as_s12 = (t as S12)!
+  var t_as_c1 = (t as C1)!
+  var t_as_d1 = (t as D1)!
 
-  var t_as_s2 = t as S2! // expected-error{{}}
+  var t_as_s2 = (t as S2)! // expected-error{{}}
 
   var s1_as_t = S1() as T
   var s12_as_t = S12() as T
@@ -104,19 +104,19 @@ func protocol_archetype_casts<T : P1>(t: T, p1: P1, p2: P2, p12: protocol<P1, P2
 
 func protocol_concrete_casts(p1: P1, p2: P2, p12: protocol<P1, P2>) {
   // Checked unconditional casts.
-  var p1_as_s1 = p1 as S1!
-  var p1_as_c1 = p1 as C1!
-  var p1_as_d1 = p1 as D1!
-  var p1_as_s12 = p1 as S12!
+  var p1_as_s1 = (p1 as S1)!
+  var p1_as_c1 = (p1 as C1)!
+  var p1_as_d1 = (p1 as D1)!
+  var p1_as_s12 = (p1 as S12)!
 
-  var p1_as_p12 = p1 as protocol<P1, P2>! // expected-error{{}}
+  var p1_as_p12 = (p1 as protocol<P1, P2>)! // expected-error{{}}
 
-  var p2_as_s1 = p2 as S1!  // expected-error{{}}
+  var p2_as_s1 = (p2 as S1)!  // expected-error{{}}
 
-  var p12_as_s1 = p12 as S1! // expected-error{{}}
-  var p12_as_s2 = p12 as S2! // expected-error{{}}
-  var p12_as_s12 = p12 as S12!
-  var p12_as_s3 = p12 as S3! // expected-error{{}}
+  var p12_as_s1 = (p12 as S1)! // expected-error{{}}
+  var p12_as_s2 = (p12 as S2)! // expected-error{{}}
+  var p12_as_s12 = (p12 as S12)!
+  var p12_as_s3 = (p12 as S3)! // expected-error{{}}
 
   // Type queries.
   var p1_is_s1:Bool = p1 is S1

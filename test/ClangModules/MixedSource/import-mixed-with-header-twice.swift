@@ -12,7 +12,7 @@ func testLine(line: Line) {
 }
 
 func useOriginal(a: ForwardClass, b: Derived, c: ForwardClassUser) {
-  let conformer = c as ProtoConformer!
+  let conformer = (c as ProtoConformer)!
   testOriginal(a, b, conformer)
   doSomething(a)
 }

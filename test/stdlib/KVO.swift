@@ -100,7 +100,7 @@ class ObserverKVO : NSObject {
                                        change:NSDictionary,
                                        context:CMutableVoidPointer) {
     target!.print()
-    let myContext = KVOContext.fromVoidContext(context) as MyContext!
+    let myContext = (KVOContext.fromVoidContext(context) as MyContext)!
     myContext.sayHello()
   }
 }
