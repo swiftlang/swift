@@ -18,7 +18,7 @@
 // UnsafePointer
 
 @transparent
-func _isDebug() -> Bool {
+func _isDebugAssertConfiguration() -> Bool {
   // The values for the assert_configuration call are:
   // 0 .. Debug
   // 1 .. Release
@@ -27,7 +27,7 @@ func _isDebug() -> Bool {
 }
 
 @transparent
-func _isRelease() -> Bool {
+func _isReleaseAssertConfiguration() -> Bool {
   // The values for the assert_configuration call are:
   // 0 .. Debug
   // 1 .. Release
@@ -36,7 +36,7 @@ func _isRelease() -> Bool {
 }
 
 @transparent
-func _isFast() -> Bool {
+func _isFastAssertConfiguration() -> Bool {
   // The values for the assert_configuration call are:
   // 0 .. Debug
   // 1 .. Release

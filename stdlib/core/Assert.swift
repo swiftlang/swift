@@ -25,9 +25,9 @@ func fatal(
   message: StaticString,
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
-  if _isDebug() {
+  if _isDebugAssertConfiguration() {
     _fatal_error_message("fatal error", message, file, line)
-  } else if _isFast() {
+  } else if _isFastAssertConfiguration() {
     _conditionallyUnreachable()
   } else {
     Builtin.int_trap()
@@ -41,7 +41,7 @@ func securityCheck<L: LogicValue>(
   _ message: StaticString = StaticString(),
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
-  if _isDebug() {
+  if _isDebugAssertConfiguration() {
     if !_branchHint(condition.getLogicValue(), true) {
       _fatal_error_message("fatal error", message, file, line)
     }
@@ -60,7 +60,7 @@ func overflowChecked<T>(
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) -> T {
   let (result, error) = args
-  if _isDebug() {
+  if _isDebugAssertConfiguration() {
     if _branchHint(error, false) {
       fatal("Overflow/underflow", file: file, line: line)
     }
@@ -84,7 +84,7 @@ func assert(
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
   // Only assert in debug mode.
-  if _isDebug() {
+  if _isDebugAssertConfiguration() {
     if !_branchHint(condition(), true) {
       _fatal_error_message("assertion failed", message, file, line)
     }
@@ -102,7 +102,7 @@ func assert<T : LogicValue>(
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
   // Only in debug mode.
-  if _isDebug() {
+  if _isDebugAssertConfiguration() {
     assert(condition().getLogicValue(), message, file: file, line: line)
   }
 }
@@ -144,11 +144,11 @@ func _precondition_safety_check(
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
   // Only check in debug and release mode. In release mode just trap.
-  if _isDebug() {
+  if _isDebugAssertConfiguration() {
     if !_branchHint(condition(), true) {
       _fatal_error_message("precondition failed", message, file, line)
     }
-  } else if _isRelease() {
+  } else if _isReleaseAssertConfiguration() {
     if !_branchHint(condition(), true) {
       Builtin.int_trap()
     }
@@ -161,7 +161,7 @@ func _precondition_safety_check<T : LogicValue>(
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
   // Only in debug and release mode.
-  if _isDebug() || _isRelease() {
+  if _isDebugAssertConfiguration() || _isReleaseAssertConfiguration() {
     _precondition_safety_check(condition().getLogicValue(), message, file: file, line: line)
   }
 }
@@ -174,7 +174,7 @@ func _partial_safety_check(
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
   // Only assert in debug and release mode.
-  if _isDebug() {
+  if _isDebugAssertConfiguration() {
     if !_branchHint(condition(), true) {
       _fatal_error_message("safety check failed", message, file, line)
     }
@@ -187,7 +187,7 @@ func _partial_safety_check<T : LogicValue>(
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
   // Only in debug mode.
-  if _isDebug() {
+  if _isDebugAssertConfiguration() {
     _partial_safety_check(condition().getLogicValue(), message, file: file, line: line)
   }
 }
