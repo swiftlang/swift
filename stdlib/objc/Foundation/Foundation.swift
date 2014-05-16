@@ -143,7 +143,7 @@ func __swift_initializeCocoaStringBridge() -> COpaquePointer {
 // buffer copying.
 //
 func _cocoaStringReadAllImpl(
-  source: _CocoaString, destination: UnsafePointer<UTF16.CodeUnit>) {
+  source: _CocoaString, destination: UTF16.CodeUnit*) {
   let cfSelf: CFString = reinterpretCast(source)
   CFStringGetCharacters(
   cfSelf, CFRange(location: 0, length: CFStringGetLength(cfSelf)), destination)
@@ -239,7 +239,7 @@ class _NSContiguousString : NSString {
   }
 
   @objc
-  func _fastCharacterContents() -> UnsafePointer<unichar> {
+  func _fastCharacterContents() -> unichar* {
     return value.elementWidth == 2 ? UnsafePointer(value.startUTF16) : nil
   }
 

@@ -18,7 +18,7 @@ struct SliceBuffer<T> : ArrayBufferType {
 
   init(
     owner: AnyObject?,
-    start: UnsafePointer<T>,
+    start: T*,
     count: Int,
     hasNativeBuffer: Bool
   ) {
@@ -73,7 +73,7 @@ struct SliceBuffer<T> : ArrayBufferType {
   
   /// An object that keeps the elements stored in this buffer alive
   var owner: AnyObject?
-  var start: UnsafePointer<T>
+  var start: T*
   var _countAndFlags: UInt
 
   //===--- Non-essential bits ---------------------------------------------===//
@@ -111,8 +111,8 @@ struct SliceBuffer<T> : ArrayBufferType {
   }
   
   func _uninitializedCopy(
-    subRange: Range<Int>, var target: UnsafePointer<T>
-  ) -> UnsafePointer<T> {
+    subRange: Range<Int>, var target: T*
+  ) -> T* {
     _invariantCheck()
     _sanityCheck(subRange.startIndex >= 0)
     _sanityCheck(subRange.endIndex >= subRange.startIndex)
@@ -123,7 +123,7 @@ struct SliceBuffer<T> : ArrayBufferType {
     return target
   }
 
-  var elementStorage: UnsafePointer<T> {
+  var elementStorage: T* {
     return start
   }
 

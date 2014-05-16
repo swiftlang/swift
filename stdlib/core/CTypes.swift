@@ -111,7 +111,7 @@ extension COpaquePointer {
   // FIXME: This shouldn't have to be in an extension.
   //
   /// Convert a typed UnsafePointer to an opaque C pointer.
-  init<T>(_ from : UnsafePointer<T>) {
+  init<T>(_ from : T*) {
     value = from.value;
   }
 }

@@ -305,7 +305,7 @@ extension Array {
     count: Builtin.Word
   ) -> Array {
     let elements = UnsafeArray(
-      start: reinterpretCast(base) as UnsafePointer<T>,
+      start: reinterpretCast(base) as T*,
       length: reinterpretCast(count) as Int
     )
     let r = Array(elements)
@@ -556,7 +556,7 @@ func _arrayOutOfPlaceUpdate<
 }
 
 struct InitializePointer<T> : PointerFunction {
-  func call(rawMemory: UnsafePointer<T>) {
+  func call(rawMemory: T*) {
     // FIXME: maybe we should move here instead of copying?
     rawMemory.initialize(newValue)
   }

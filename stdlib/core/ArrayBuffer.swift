@@ -165,8 +165,8 @@ extension ArrayBuffer {
   /// starting at target.  Return a pointer past-the-end of the
   /// just-initialized memory.
   func _uninitializedCopy(
-    subRange: Range<Int>, target: UnsafePointer<T>
-  ) -> UnsafePointer<T> {
+    subRange: Range<Int>, target: T*
+  ) -> T* {
     if _fastPath(_isNative) {
       return _native._uninitializedCopy(subRange, target: target)
     }
@@ -225,7 +225,7 @@ extension ArrayBuffer {
 
   /// If the elements are stored contiguously, a pointer to the first
   /// element. Otherwise, nil.
-  var elementStorage: UnsafePointer<T> {
+  var elementStorage: T* {
     if (_fastPath(_isNative)) {
       return _native.elementStorage
     }

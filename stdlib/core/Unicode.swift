@@ -240,7 +240,7 @@ extension UTF16 {
   }
 
   static func copy<T: StringElement, U: StringElement>(
-    source: UnsafePointer<T>, destination: UnsafePointer<U>, count: Int
+    source: T*, destination: UnsafePointer<U>, count: Int
   ) {
     if UWord(Builtin.strideof(T.self)) == UWord(Builtin.strideof(U.self)) {
       c_memcpy(
