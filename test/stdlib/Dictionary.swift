@@ -571,31 +571,63 @@ testCOW_Slow_AddDoesNotReallocate()
 // CHECK: testCOW_Slow_AddDoesNotReallocate done
 
 
-func testCOW_Fast_FindDoesNotReallocate() {
+func testCOW_Fast_IndexForKeyDoesNotReallocate() {
   var d = getCOWFastDictionary()
   var identity1: Word = reinterpretCast(d)
 
-  var found = d.find(10)
-  assert(found == 1010)
-  assert(identity1 == reinterpretCast(d))
+  // Find an existing key.
+  if true {
+    var foundIndex1 = d.indexForKey(10)!
+    assert(identity1 == reinterpretCast(d))
 
-  println("testCOW_Fast_FindDoesNotReallocate done")
+    var foundIndex2 = d.indexForKey(10)!
+    assert(foundIndex1 == foundIndex2)
+
+    assert(d[foundIndex1].0 == 10)
+    assert(d[foundIndex1].1 == 1010)
+    assert(identity1 == reinterpretCast(d))
+  }
+
+  // Try to find a key that is not present.
+  if true {
+    var foundIndex1 = d.indexForKey(1111)
+    assert(!foundIndex1)
+    assert(identity1 == reinterpretCast(d))
+  }
+
+  println("testCOW_Fast_IndexForKeyDoesNotReallocate done")
 }
-testCOW_Fast_FindDoesNotReallocate()
-// CHECK: testCOW_Fast_FindDoesNotReallocate done
+testCOW_Fast_IndexForKeyDoesNotReallocate()
+// CHECK: testCOW_Fast_IndexForKeyDoesNotReallocate done
 
-func testCOW_Slow_FindDoesNotReallocate() {
+func testCOW_Slow_IndexForKeyDoesNotReallocate() {
   var d = getCOWSlowDictionary()
   var identity1: Word = reinterpretCast(d)
 
-  var found = d.find(TestKeyTy(10))
-  assert(found!.value == 1010)
-  assert(identity1 == reinterpretCast(d))
+  // Find an existing key.
+  if true {
+    var foundIndex1 = d.indexForKey(TestKeyTy(10))!
+    assert(identity1 == reinterpretCast(d))
 
-  println("testCOW_Slow_FindDoesNotReallocate done")
+    var foundIndex2 = d.indexForKey(TestKeyTy(10))!
+    assert(foundIndex1 == foundIndex2)
+
+    assert(d[foundIndex1].0 == TestKeyTy(10))
+    assert(d[foundIndex1].1.value == 1010)
+    assert(identity1 == reinterpretCast(d))
+  }
+
+  // Try to find a key that is not present.
+  if true {
+    var foundIndex1 = d.indexForKey(TestKeyTy(1111))
+    assert(!foundIndex1)
+    assert(identity1 == reinterpretCast(d))
+  }
+
+  println("testCOW_Slow_IndexForKeyDoesNotReallocate done")
 }
-testCOW_Slow_FindDoesNotReallocate()
-// CHECK: testCOW_Slow_FindDoesNotReallocate done
+testCOW_Slow_IndexForKeyDoesNotReallocate()
+// CHECK: testCOW_Slow_IndexForKeyDoesNotReallocate done
 
 
 func testCOW_Fast_DeleteKeyDoesNotReallocate() {
@@ -853,13 +885,11 @@ func test_convertFromDictionaryLiteral() {
   }
   if true {
     var d: Dictionary<Int, Int> = [ 10: 1010, 20: 1020, 30: 1030 ]
-    dump(d)
     assert(d.count == 3)
     assert(d[10]! == 1010)
     assert(d[20]! == 1020)
     assert(d[30]! == 1030)
   }
-
 
   println("test_convertFromDictionaryLiteral done")
 }
@@ -1218,10 +1248,10 @@ func test_BridgedFromObjC_UpdateValueForKey() {
     assert(isNativeDictionary(d))
     assert(d.count == 4)
 
-    assert(d.find(TestObjCKeyTy(10))!.value == 1010)
-    assert(d.find(TestObjCKeyTy(20))!.value == 1020)
-    assert(d.find(TestObjCKeyTy(30))!.value == 1030)
-    assert(d.find(TestObjCKeyTy(40))!.value == 2040)
+    assert(d[TestObjCKeyTy(10)]!.value == 1010)
+    assert(d[TestObjCKeyTy(20)]!.value == 1020)
+    assert(d[TestObjCKeyTy(30)]!.value == 1030)
+    assert(d[TestObjCKeyTy(40)]!.value == 2040)
   }
 
   // Overwrite a value in existing binding.
@@ -1239,9 +1269,9 @@ func test_BridgedFromObjC_UpdateValueForKey() {
     assert(isNativeDictionary(d))
     assert(d.count == 3)
 
-    assert(d.find(TestObjCKeyTy(10))!.value == 2010)
-    assert(d.find(TestObjCKeyTy(20))!.value == 1020)
-    assert(d.find(TestObjCKeyTy(30))!.value == 1030)
+    assert(d[TestObjCKeyTy(10)]!.value == 2010)
+    assert(d[TestObjCKeyTy(20)]!.value == 1020)
+    assert(d[TestObjCKeyTy(30)]!.value == 1030)
   }
 
   println("test_BridgedFromObjC_UpdateValueForKey done")
@@ -1255,10 +1285,22 @@ func test_BridgedFromObjC_Find() {
   var identity1: Word = reinterpretCast(d)
   assert(isCocoaDictionary(d))
 
-  assert(d.find(TestObjCKeyTy(10))!.value == 1010)
-  assert(d.find(TestObjCKeyTy(20))!.value == 1020)
-  assert(d.find(TestObjCKeyTy(30))!.value == 1030)
-  assert(!d.find(TestObjCKeyTy(40)))
+  // Find an existing key.
+  if true {
+    var kv = d[d.indexForKey(TestObjCKeyTy(10))!]
+    assert(kv.0 == TestObjCKeyTy(10))
+    assert(kv.1.value == 1010)
+
+    kv = d[d.indexForKey(TestObjCKeyTy(20))!]
+    assert(kv.0 == TestObjCKeyTy(20))
+    assert(kv.1.value == 1020)
+
+    kv = d[d.indexForKey(TestObjCKeyTy(30))!]
+    assert(kv.0 == TestObjCKeyTy(30))
+    assert(kv.1.value == 1030)
+  }
+
+  assert(!d.indexForKey(TestObjCKeyTy(40)))
   assert(identity1 == reinterpretCast(d))
 
   println("test_BridgedFromObjC_Find done")
@@ -1284,9 +1326,9 @@ func test_BridgedFromObjC_DeleteKey() {
   assert(isNativeDictionary(d))
   assert(d.count == 2)
 
-  assert(!d.find(TestObjCKeyTy(10)))
-  assert(d.find(TestObjCKeyTy(20))!.value == 1020)
-  assert(d.find(TestObjCKeyTy(30))!.value == 1030)
+  assert(!d[TestObjCKeyTy(10)])
+  assert(d[TestObjCKeyTy(20)]!.value == 1020)
+  assert(d[TestObjCKeyTy(30)]!.value == 1030)
   assert(identity2 == reinterpretCast(d))
 
   println("test_BridgedFromObjC_DeleteKey done")

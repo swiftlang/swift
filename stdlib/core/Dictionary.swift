@@ -199,6 +199,7 @@ protocol _DictionaryStorage {
   typealias Index
   var startIndex: Index { get }
   var endIndex: Index { get }
+  func indexForKey(key: KeyType) -> Index?
   func assertingGet(i: Index) -> (KeyType, ValueType)
   func assertingGet(key: KeyType) -> ValueType
   func maybeGet(key: KeyType) -> ValueType?
@@ -375,6 +376,9 @@ struct _NativeDictionaryStorage<KeyType : Hashable, ValueType> :
   }
 
   /// Search for a given key starting from the specified bucket.
+  ///
+  /// If the key is not present, returns the position where it could be
+  /// inserted.
   func _find(k: KeyType, _ startBucket: Int) -> (pos: Index, found: Bool) {
     var bucket = startBucket
 
@@ -418,6 +422,11 @@ struct _NativeDictionaryStorage<KeyType : Hashable, ValueType> :
 
   var endIndex: Index {
     return Index(nativeStorage: self, offset: capacity)
+  }
+
+  func indexForKey(key: KeyType) -> Index? {
+    var (i, found) = _find(key, _bucket(key))
+    return found ? i : .None
   }
 
   func assertingGet(i: Index) -> (KeyType, ValueType) {
@@ -728,6 +737,20 @@ struct _CocoaDictionaryStorage : _DictionaryStorage {
     return Index(cocoaDictionary, endIndex: ())
   }
 
+  func indexForKey(key: AnyObject) -> Index? {
+    // Fast path that does not involve creating an array of all keys.  In case
+    // the key is present, this lookup is a penalty for the slow path, but the
+    // potential savings are significant: we could skip a memory allocation and
+    // a linear search.
+    if !maybeGet(key) {
+      return .None
+    }
+
+    let allKeys = cocoaDictionary.allKeys()
+    let keyIndex = allKeys.indexOfObject(key)
+    return Index(cocoaDictionary, allKeys, keyIndex)
+  }
+
   func assertingGet(i: Index) -> (AnyObject, AnyObject) {
     let key: AnyObject = i.allKeys.objectAtIndex(i.nextKeyIndex)
     let value: AnyObject = i.cocoaDictionary.objectForKey(key)!
@@ -900,6 +923,23 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
       return ._Native(native.endIndex)
     case .Cocoa(let cocoaStorage):
       return ._Cocoa(cocoaStorage.endIndex)
+    }
+  }
+
+  func indexForKey(key: KeyType) -> Index? {
+    switch self {
+    case .Native:
+      if let nativeIndex = native.indexForKey(key) {
+        return .Some(._Native(nativeIndex))
+      }
+      return .None
+    case .Cocoa(let cocoaStorage):
+      // FIXME: This assumes that KeyType and ValueType are bridged verbatim.
+      let anyObjectKey: AnyObject = _reinterpretCastToAnyObject(key)
+      if let cocoaIndex = cocoaStorage.indexForKey(anyObjectKey) {
+        return .Some(._Cocoa(cocoaIndex))
+      }
+      return .None
     }
   }
 
@@ -1153,10 +1193,14 @@ func == <KeyType : Hashable, ValueType> (
 }
 
 struct _CocoaDictionaryIndex : BidirectionalIndex {
+  // Assumption: we rely on NSDictionary.allKeys(), when being repeatedly
+  // called on the same NSDictionary, returning keys in the same order
+  // every time.
+
   typealias Index = _CocoaDictionaryIndex
 
   let cocoaDictionary: _SwiftNSDictionary
-  var allKeys: CocoaArray
+  var allKeys: _SwiftNSArray
   var nextKeyIndex: Int
 
   init(_ cocoaDictionary: _SwiftNSDictionary, startIndex: ()) {
@@ -1171,7 +1215,7 @@ struct _CocoaDictionaryIndex : BidirectionalIndex {
     self.nextKeyIndex = allKeys.count
   }
 
-  init(_ cocoaDictionary: _SwiftNSDictionary, _ allKeys: CocoaArray,
+  init(_ cocoaDictionary: _SwiftNSDictionary, _ allKeys: _SwiftNSArray,
        _ nextKeyIndex: Int) {
     self.cocoaDictionary = cocoaDictionary
     self.allKeys = allKeys
@@ -1471,11 +1515,23 @@ struct Dictionary<KeyType : Hashable, ValueType> : Collection,
   //
 
   var startIndex: Index {
+    // Complexity: amortized O(1) for native storage, O(N) when wrapping an
+    // NSDictionary.
     return _variantStorage.startIndex
   }
 
   var endIndex: Index {
+    // Complexity: amortized O(1) for native storage, O(N) when wrapping an
+    // NSDictionary.
     return _variantStorage.endIndex
+  }
+
+  /// Returns the `Index` for the given key, or `nil` if the key is not
+  /// present in the dictionary.
+  func indexForKey(key: KeyType) -> Index? {
+    // Complexity: amortized O(1) for native storage, O(N) when wrapping an
+    // NSDictionary.
+    return _variantStorage.indexForKey(key)
   }
 
   /// Access the key-value pair referenced by the given index.
@@ -1506,12 +1562,6 @@ struct Dictionary<KeyType : Hashable, ValueType> : Collection,
   /// was added.
   mutating func updateValue(value: ValueType, forKey key: KeyType) -> ValueType? {
     return _variantStorage.updateValue(value, forKey: key)
-  }
-
-  /// Returns `true` if the key was present in the dictionary, `false` if the
-  /// operation had no effect.
-  func find(key: KeyType) -> ValueType? {
-    return _variantStorage.maybeGet(key)
   }
 
   mutating func _deleteKey(key: KeyType) -> Bool {
@@ -1772,6 +1822,30 @@ protocol _SwiftNSCopying {
 }
 
 @objc
+protocol _SwiftNSArrayRequiredOverrides :
+    _SwiftNSCopying, _SwiftNSFastEnumeration {
+
+  func objectAtIndex(index: Int) -> AnyObject
+
+  func getObjects(UnsafePointer<AnyObject>, range: _SwiftNSRange)
+
+  func countByEnumeratingWithState(
+         state: UnsafePointer<_SwiftNSFastEnumerationState>,
+         objects: UnsafePointer<AnyObject>, count: Int
+  ) -> Int
+
+  func copyWithZone(zone: _SwiftNSZone) -> AnyObject
+
+  var count: Int { get }
+}
+
+// FIXME: replace CocoaArray with this.
+@objc
+protocol _SwiftNSArray : _SwiftNSArrayRequiredOverrides {
+  func indexOfObject(anObject: AnyObject) -> Int
+}
+
+@objc
 protocol _SwiftNSDictionaryRequiredOverrides :
     _SwiftNSCopying, _SwiftNSFastEnumeration {
 
@@ -1797,7 +1871,7 @@ protocol _SwiftNSDictionaryRequiredOverrides :
 
 @objc
 protocol _SwiftNSDictionary : _SwiftNSDictionaryRequiredOverrides {
-  func allKeys() -> CocoaArray
+  func allKeys() -> _SwiftNSArray
   func isEqual(anObject: AnyObject) -> Bool
 }
 

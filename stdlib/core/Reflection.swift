@@ -243,7 +243,7 @@ func _dumpWithMirror<TargetStream : OutputStream>(
   print(mirror.summary)
 
   if let id = mirror.objectIdentifier {
-    if let previous = visitedItems.find(id) {
+    if let previous = visitedItems[id] {
       println(" #\(previous)", &targetStream)
       return
     }
