@@ -1504,15 +1504,6 @@ struct Dictionary<KeyType : Hashable, ValueType> : Collection,
     return _Map(self) { $0.1 }
   }
 
-  func itemsAsArray() -> Element[] {
-    var ei = 0
-    var result = Array<Element>()
-    for e in self {
-      result.append(e)
-    }
-    return result
-  }
-
   //
   // DictionaryLiteralConvertible conformance
   //
