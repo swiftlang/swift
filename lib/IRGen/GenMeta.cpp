@@ -2386,9 +2386,10 @@ static void emitObjCClassSymbol(IRGenModule &IGM,
   };
   auto addressPoint
     = llvm::ConstantExpr::getGetElementPtr(fullMetadata, gepIndexes);
+  auto addressPointTy = cast<llvm::PointerType>(addressPoint->getType());
   
   // Create the alias.
-  new llvm::GlobalAlias(addressPoint->getType(),
+  new llvm::GlobalAlias(addressPointTy->getElementType(),
                         fullMetadata->getLinkage(),
                         classSymbol.str(), addressPoint,
                         IGM.getModule());
