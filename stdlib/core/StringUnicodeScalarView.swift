@@ -103,10 +103,10 @@ extension String {
     func compare(other : UnicodeScalarView) -> Int {
       // Try to compare the string without decoding
       // the UTF16 string.
-      var AIdx = self._base.startIndex
-      var BIdx = other._base.startIndex
-      var AEnd = self._base.endIndex
-      var BEnd = other._base.endIndex
+      var aIdx = self._base.startIndex
+      var bIdx = other._base.startIndex
+      var aEnd = self._base.endIndex
+      var bEnd = other._base.endIndex
 
       // If this is not a contiguous UTF-16 then use the slow path.
       // TODO: when we fix rdar://16740011 we'll need to optimize the ascii
@@ -119,10 +119,10 @@ extension String {
       }
 
       while true {
-        if AIdx < AEnd {
-          if BIdx < BEnd {
-            let e1 = self._base._nthContiguous(AIdx)
-            let e2 = other._base._nthContiguous(BIdx)
+        if aIdx < aEnd {
+          if bIdx < bEnd {
+            let e1 = self._base._nthContiguous(aIdx)
+            let e2 = other._base._nthContiguous(bIdx)
 
             if _slowPath((e1 >= 0x80) | (e2 >= 0x80)) {
               // Use slow unicode comparator if
@@ -136,13 +136,13 @@ extension String {
             if e2 < e1 {
               return 1
             }
-            AIdx++
-            BIdx++
+            aIdx++
+            bIdx++
             continue // equivalent
           }
           return 1
         }
-        if BIdx < BEnd {
+        if bIdx < bEnd {
           return -1
         }
         return 0
