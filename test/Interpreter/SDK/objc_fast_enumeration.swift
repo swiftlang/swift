@@ -61,12 +61,12 @@ var d : NSDictionary = [415 : "Giants", 510 : "A's"]
 var d_m : NSMutableDictionary = [1415 : "Big Giants", 11510 : "B's"]
 
 // CHECK: 510 => A's
-for (key: AnyObject, value: AnyObject) in d {
+for (key, value) in d {
   println("\(key.description!) => \(value.description!)")
 }
 
 // CHECK: 11510 => B's
-for (key: AnyObject, value: AnyObject) in d_m {
+for (key, value) in d_m {
   println("\(key.description!) => \(value.description!)")
 }
 

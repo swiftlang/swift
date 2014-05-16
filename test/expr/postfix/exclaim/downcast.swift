@@ -15,8 +15,8 @@ struct Z { }
 func getObject() -> AnyObject {}
 
 func forceDowncast(var obj: AnyObject) {
-  var x : X = (obj as X)!
-  x = (getObject() as X)!
+  var x : X = obj!
+  x = getObject()!
 
   x = (&obj)! // expected-error{{cannot convert the expression's type '()' to type '$T7'}}
 

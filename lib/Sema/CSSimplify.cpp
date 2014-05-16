@@ -2651,6 +2651,18 @@ ConstraintSystem::simplifyBridgedToObjectiveCConstraint(const Constraint
   if (!baseTy)
     return SolutionKind::Unsolved;
   
+  if (baseTy->getClassOrBoundGenericClass()) {
+    increaseScore(SK_UserConversion);
+    return SolutionKind::Solved;
+  }
+  
+  if (auto archetype = baseTy->getAs<ArchetypeType>()) {
+    if (archetype->requiresClass()) {
+      increaseScore(SK_UserConversion);
+      return SolutionKind::Solved;
+    }
+  }
+  
   if (auto bridgedType = TC.getBridgedToObjC(DC, baseTy).first) {
     return simplifyRestrictedConstraint(ConversionRestrictionKind::User,
                                         bridgedType,
@@ -2658,14 +2670,6 @@ ConstraintSystem::simplifyBridgedToObjectiveCConstraint(const Constraint
                                         TypeMatchKind::Conversion,
                                         TMF_GenerateConstraints,
                                         constraint.getLocator());
-  }
-  
-  if (baseTy->getClassOrBoundGenericClass())
-    return SolutionKind::Solved;
-  
-  if (auto archetype = baseTy->getAs<ArchetypeType>()) {
-    if (archetype->requiresClass())
-      return SolutionKind::Solved;
   }
   
   // Record this failure.
