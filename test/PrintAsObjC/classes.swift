@@ -220,7 +220,7 @@ class MyObject : NSObject {}
 // CHECK-NEXT: - (instancetype)init
 // CHECK-NEXT: @end
 @objc class PropertiesOverridden : Hive {
-  override var bees : NSArray! {
+  override var bees : (AnyObject[])! {
     get {
       return super.bees
     }

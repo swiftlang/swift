@@ -53,10 +53,6 @@ func _toNSArray<T, U:AnyObject>(a: T[], f: (T)->U) -> NSArray {
   return result
 }
 
-func _toNSArray(a: String[]) -> NSArray {
-  return _toNSArray(a){ $0 as NSString }
-}
-
 func _countFormatSpecifiers(a: String) -> Int {
   var lastChar = _asUTF16CodeUnit(".") // anything other than % would work here
   var count = 0
@@ -423,7 +419,7 @@ extension String {
       &nsOutputName,
       caseSensitive: caseSensitive,
       matchesIntoArray: matchesIntoArray,
-      filterTypes: filterTypes ? _toNSArray(filterTypes!) : nil
+      filterTypes: filterTypes ? filterTypes! : nil
     )
     
     outputName = nsOutputName.map { $0 }
@@ -484,9 +480,7 @@ extension String {
   /// \brief Returns an array containing substrings from the receiver
   /// that have been divided by characters in a given set.
   func componentsSeparatedByCharactersInSet(separator: NSCharacterSet) -> String[] {
-    return _ns
-    .componentsSeparatedByCharactersInSet(separator)
-    ._toStringArray()
+    return (_ns.componentsSeparatedByCharactersInSet(separator) as String[])!
   }
 
 
@@ -495,9 +489,7 @@ extension String {
   /// \brief Returns an array containing substrings from the receiver
   /// that have been divided by a given separator.
   func componentsSeparatedByString(separator: String) -> String[] {
-    return _ns
-    .componentsSeparatedByString(separator)
-    ._toStringArray()
+    return (_ns.componentsSeparatedByString(separator) as String[])!
   }
 
   // - (const char *)cStringUsingEncoding:(NSStringEncoding)encoding
@@ -1025,7 +1017,7 @@ extension String {
       tokenRanges: &tokenRanges_
     )
     tokenRanges = tokenRanges_!._toRangeArray()
-    return result._toStringArray()
+    return (result as String[])!
   }
 
   // - (NSComparisonResult)localizedCaseInsensitiveCompare:(NSString *)aString
@@ -1088,7 +1080,7 @@ extension String {
   /// \brief Returns an array of NSString objects containing, in
   /// order, each path component of the receiver.
   var pathComponents: String[] {
-    return _ns.pathComponents._toStringArray()
+    return (_ns.pathComponents as String[])!
   }
 
   // @property NSString* pathExtension;
@@ -1428,7 +1420,7 @@ extension String {
   /// \brief Returns an array of strings made by separately appending
   /// to the receiver each string in in a given array.
   func stringsByAppendingPaths(paths: String[]) -> String[] {
-    return _ns.stringsByAppendingPaths(_toNSArray(paths))._toStringArray()
+    return (_ns.stringsByAppendingPaths(paths) as String[])!
   }
 
   // - (NSString *)substringFromIndex:(NSUInteger)anIndex

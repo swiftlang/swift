@@ -2418,6 +2418,14 @@ namespace {
       // library functionality, this is handled separately from other checked
       // cast kinds.
       if (castKind == CheckedCastKind::ArrayDowncast) {
+        // Look through implicitly unwrapped optionals.
+        if (auto objTy 
+              = cs.lookThroughImplicitlyUnwrappedOptionalType(sub->getType())) {
+          sub = coerceImplicitlyUnwrappedOptionalToValue(
+                  sub, objTy, cs.getConstraintLocator(expr, { }, 0));
+          if (!sub) return nullptr;
+        }
+
         toType = tc.getOptionalType(sub->getLoc(), toType);
         auto arrayConversion = new (tc.Context)
                                   ArrayDowncastConversionExpr(
@@ -3836,7 +3844,6 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
 
     case ConversionRestrictionKind::ArrayUpcast: {
-      
       // Look through implicitly unwrapped optionals.
       if (auto objTy
               = cs.lookThroughImplicitlyUnwrappedOptionalType(

@@ -264,7 +264,7 @@ func protocolInheritance(s: NSString) {
 }
 
 func ivars(hive: Hive) {
-  hive.bees.description() // no-warning
+  var d = hive.bees.description
   hive.queen.description() // expected-error{{'Hive' does not have a member named 'queen'}}
 }
 

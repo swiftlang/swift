@@ -68,7 +68,7 @@ namespace swift {
     bool ImplicitObjCWith = true;
 
     /// Import NSArray* as AnyObject[]
-    bool ObjCBridgeArray = false;
+    bool ObjCBridgeArray = true;
 
     /// Import NSDictionary* as Dictionary<NSObject, AnyObject>
     bool ObjCBridgeDictionary = false;

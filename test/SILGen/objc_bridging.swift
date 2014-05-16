@@ -346,7 +346,7 @@ func bridgeCFunction() -> (String!) -> (String!) {
 
 func forceNSArrayMembers() -> (NSArray, NSArray) {
   let x = NSArray(objects: nil, count: 0)
-  return (x, NSArray(array: x))
+  return (x, x)
 }
 
 // Check that the allocating initializer shim for initializers that take pointer
