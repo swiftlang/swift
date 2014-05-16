@@ -997,6 +997,9 @@ WARNING(recursive_accessor_reference,tce_sema,none,
         "%select{getter|setter}1", (Identifier, bool))
 NOTE(recursive_accessor_reference_silence,tce_sema,none,
      "access 'self' explicitly to silence this warning", ())
+WARNING(store_in_willset,tce_sema,none,
+        "attempting to store to property %0 within its own willSet, which is "
+        "about to be overwritten by the new value", (Identifier))
 
 WARNING(unindented_code_after_return,tce_sema,none,
         "expression following 'return' is treated as an argument of "

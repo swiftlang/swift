@@ -1970,13 +1970,6 @@ bool VarDecl::isSettable(DeclContext *UseDC) const {
 
     return false;
   }
-  
-  // Observing properties are not mutable in their willset accessor, since any
-  // value stored in the willSet will be immediately overwritten by the store
-  // in progress.
-  if (getStorageKind() == Observing && getWillSetFunc() == UseDC)
-    return false;
-  
 
   // vars are settable unless they are computed and have no setter.
   return hasStorage() || getSetter();

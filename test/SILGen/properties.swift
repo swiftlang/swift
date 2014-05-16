@@ -450,8 +450,8 @@ struct DidSetWillSetTests {
 
       // CHECK-NEXT: // function_ref properties.takeInt
       // CHECK-NEXT: [[TAKEINTFN:%.*]] = function_ref @_TF10properties7takeInt
-      // CHECK-NEXT: [[STRUCT:%.*]] = load [[SELFBOX]]#1
-      // CHECK-NEXT: [[A:%.*]] = struct_extract [[STRUCT]] : $DidSetWillSetTests, #DidSetWillSetTests.a
+      // CHECK-NEXT: [[FIELDPTR:%.*]] = struct_element_addr [[SELFBOX]]#1 : $*DidSetWillSetTests, #DidSetWillSetTests.a
+      // CHECK-NEXT: [[A:%.*]] = load [[FIELDPTR]] : $*Int
       // CHECK-NEXT: apply [[TAKEINTFN]]([[A]]) : $@thin (Int) -> ()
 
       takeInt(newA)

@@ -285,7 +285,7 @@ static void diagModuleOrMetatypeValue(TypeChecker &TC, const Expr *E) {
 static void diagRecursivePropertyAccess(TypeChecker &TC, const Expr *E,
                                         const DeclContext *DC) {
   auto fn = dyn_cast<FuncDecl>(DC);
-  if (!fn || !fn->isGetterOrSetter())
+  if (!fn || !fn->isAccessor())
     return;
 
   auto var = dyn_cast<VarDecl>(fn->getAccessorStorageDecl());
@@ -295,11 +295,12 @@ static void diagRecursivePropertyAccess(TypeChecker &TC, const Expr *E,
   class DiagnoseWalker : public ASTWalker {
     TypeChecker &TC;
     VarDecl *Var;
-    bool IsSetter;
+    const FuncDecl *Accessor;
 
   public:
-    explicit DiagnoseWalker(TypeChecker &TC, VarDecl *var, bool isSetter)
-      : TC(TC), Var(var), IsSetter(isSetter) {}
+    explicit DiagnoseWalker(TypeChecker &TC, VarDecl *var,
+                            const FuncDecl *Accessor)
+      : TC(TC), Var(var), Accessor(Accessor) {}
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
@@ -310,32 +311,50 @@ static void diagRecursivePropertyAccess(TypeChecker &TC, const Expr *E,
           if (auto *ParentExpr = Parent.getAsExpr()) {
             if (isa<DotSyntaxBaseIgnoredExpr>(ParentExpr))
               shouldDiagnose = false;
-            else if (IsSetter)
+            else if (Accessor->isSetter())
               shouldDiagnose = !isa<LoadExpr>(ParentExpr);
           }
           if (shouldDiagnose) {
             TC.diagnose(E->getLoc(), diag::recursive_accessor_reference,
-                        Var->getName(), IsSetter);
+                        Var->getName(), Accessor->isSetter());
           }
         }
+        
+        // If this is a direct store in a "willSet", we reject this because
+        // it is about to get overwritten.
+        if (DRE->getDecl() == Var && DRE->isDirectPropertyAccess() &&
+            !dyn_cast_or_null<LoadExpr>(Parent.getAsExpr()) &&
+            Accessor->getAccessorKind() == AccessorKind::IsWillSet) {
+          TC.diagnose(E->getLoc(), diag::store_in_willset, Var->getName());
+        }
+
 
       } else if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
         // Handle instance and type computed variables.
         // Find MemberRefExprs that have an implicit "self" base.
         if (MRE->getMember().getDecl() == Var &&
             isa<DeclRefExpr>(MRE->getBase()) &&
-            MRE->getBase()->isImplicit() &&
-            !MRE->isDirectPropertyAccess()) {
-          bool shouldDiagnose = true;
-          if (IsSetter)
-            shouldDiagnose = !dyn_cast_or_null<LoadExpr>(Parent.getAsExpr());
-
-          if (shouldDiagnose) {
-            TC.diagnose(E->getLoc(), diag::recursive_accessor_reference,
-                        Var->getName(), IsSetter);
-            TC.diagnose(E->getLoc(),
-                        diag::recursive_accessor_reference_silence)
+            MRE->getBase()->isImplicit()) {
+          
+          if (!MRE->isDirectPropertyAccess()) {
+            bool shouldDiagnose = true;
+            if (Accessor->isSetter())
+              shouldDiagnose = !dyn_cast_or_null<LoadExpr>(Parent.getAsExpr());
+            
+            if (shouldDiagnose) {
+              TC.diagnose(E->getLoc(), diag::recursive_accessor_reference,
+                          Var->getName(), Accessor->isSetter());
+              TC.diagnose(E->getLoc(),
+                          diag::recursive_accessor_reference_silence)
               .fixItInsert(E->getStartLoc(), "self.");
+            }
+          } else {
+            // If this is a direct store in a "willSet", we reject this because
+            // it is about to get overwritten.
+            if (!dyn_cast_or_null<LoadExpr>(Parent.getAsExpr()) &&
+                Accessor->getAccessorKind() == AccessorKind::IsWillSet) {
+              TC.diagnose(E->getLoc(), diag::store_in_willset, Var->getName());
+            }
           }
         }
 
@@ -349,7 +368,7 @@ static void diagRecursivePropertyAccess(TypeChecker &TC, const Expr *E,
     }
   };
 
-  DiagnoseWalker walker(TC, var, fn->isSetter());
+  DiagnoseWalker walker(TC, var, fn);
   const_cast<Expr *>(E)->walk(walker);
 }
 

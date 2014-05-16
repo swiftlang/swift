@@ -779,20 +779,38 @@ var globalDidsetWillSet2 : Int = 42 {
 
 
 class ObservingPropertiesNotMutableInWillSet {
+  var anotherObj : ObservingPropertiesNotMutableInWillSet
+  
+  init() {}
   var property: Int = 42 {
     willSet {
-      property = 19  // expected-error {{cannot assign to 'property' in 'self'}}
+      // <rdar://problem/16826319> willSet immutability behavior is incorrect
+      anotherObj.property = 19 // ok
+      property = 19  // expected-warning {{attempting to store to property 'property' within its own willSet}}
     }
   }
 
   func localCase() {
     var localProperty: Int = 42 {
       willSet {
-        localProperty = 19   // expected-error {{cannot assign to 'localProperty'}}
+        localProperty = 19   // expected-warning {{attempting to store to property 'localProperty' within its own willSet}}
       }
     }
   }
 }
+
+func doLater(fn : () -> ()) {}
+
+// rdar://<rdar://problem/16264989> property not mutable in closure inside of its willSet
+class MutableInWillSetInClosureClass {
+    var bounds: Int = 0 {
+    willSet {
+        let oldBounds = bounds
+        doLater { self.bounds = oldBounds }
+    }
+    }
+}
+
 
 // <rdar://problem/16191398> add an 'oldValue' to didSet so you can implement "didChange" properties
 var didSetPropertyTakingOldValue : Int = 0 {
