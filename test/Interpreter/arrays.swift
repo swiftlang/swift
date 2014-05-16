@@ -77,10 +77,10 @@ let slice2_1_2 = arr2[1...2]
 let slice1_2_3 = arr1[2..3]
 let slice2_2_3 = arr2[2..3]
 
-let contig_arr1: NativeArray<Int> = [1, 2, 3, 4]
-let contig_arr2: NativeArray<Int> = [1, 2, 3, 4]
-let contig_arr3: NativeArray<Int> = [1, 2]
-let contig_arr4: NativeArray<Int> = [5, 6]
+let contig_arr1: ContiguousArray<Int> = [1, 2, 3, 4]
+let contig_arr2: ContiguousArray<Int> = [1, 2, 3, 4]
+let contig_arr3: ContiguousArray<Int> = [1, 2]
+let contig_arr4: ContiguousArray<Int> = [5, 6]
 
 // CHECK: arr1 == arr1: true
 // CHECK-NEXT: arr1 == arr2: true
@@ -118,4 +118,3 @@ println("contig_arr2 == contig_arr3: \(contig_arr2 == contig_arr3)")
 println("contig_arr2 != contig_arr3: \(contig_arr2 != contig_arr3)")
 println("contig_arr1 != contig_arr4: \(contig_arr1 != contig_arr4)")
 println("contig_arr1 == contig_arr4: \(contig_arr1 == contig_arr4)")
->>>>>>> Add basic '==' for Array, NativeArray, and Slice.

@@ -657,7 +657,7 @@ func !==<T: ArrayType, U: ArrayType>(lhs: T, rhs: U) -> Bool {
   return !(lhs === rhs)
 }
 
-% for Self in ['NativeArray', 'Slice', 'Array']:
+% for Self in ['ContiguousArray', 'Slice', 'Array']:
 // NOTE: The '==' and '!=' below only handles array types
 // that are the same, e.g. Array<Int> and Array<Int>, not
 // Slice<Int> and Array<Int>.
