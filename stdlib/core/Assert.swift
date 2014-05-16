@@ -16,7 +16,7 @@
 /// release or fast mode these checks are disabled. This means they may have no
 /// effect on program semantics, depending on the assert configuration.
 
-/// \brief Traditional C-style assert with an optional message.
+/// Traditional C-style assert with an optional message.
 /// When assertions are enabled and `condition` is false, stop program
 /// execution in a debuggable state after printing a message.  When
 /// assertions are disabled in release and fast builds, `condition` is not even
@@ -46,7 +46,7 @@ func assert<T : LogicValue>(
   }
 }
 
-/// \brief A fatal error occurred and program execution should stop in debug mode. In
+/// A fatal error occurred and program execution should stop in debug mode.  In
 /// optimized builds this is a noop.
 @transparent
 @noreturn
