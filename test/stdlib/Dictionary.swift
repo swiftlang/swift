@@ -140,10 +140,13 @@ func equalsUnordered(lhs: Array<(Int, Int)>, rhs: Array<(Int, Int)>) -> Bool {
   func comparePair(lhs: (Int, Int), rhs: (Int, Int)) -> Bool {
     return lexicographicalCompare([ lhs.0, lhs.1 ], [ rhs.0, rhs.1 ])
   }
-  let x = sort(lhs, comparePair)
   return equal(sort(lhs, comparePair), sort(rhs, comparePair)) {
     $0.0 == $1.0 && $0.1 == $1.1
   }
+}
+
+func equalsUnordered(lhs: Array<Int>, rhs: Array<Int>) -> Bool {
+  return equal(sort(lhs), sort(rhs))
 }
 
 //===---
@@ -1806,6 +1809,57 @@ func test_DictionaryToNSDictionaryCoversion() {
 test_DictionaryToNSDictionaryCoversion()
 // CHECK: test_DictionaryToNSDictionaryCoversion done
 
+//===---
+// Tests for APIs implemented strictly based on public interface.  We only need
+// to test them once, not for every storage type.
+//===---
+
+func getDerivedAPIsDictionary() -> Dictionary<Int, Int> {
+  var d = Dictionary<Int, Int>(minimumCapacity: 10)
+  d[10] = 1010
+  d[20] = 1020
+  d[30] = 1030
+  return d
+}
+
+func testDerivedAPIs_keys() {
+  if true {
+    var empty = Dictionary<Int, Int>()
+    var keys = Array(empty.keys)
+    assert(equalsUnordered(keys, []))
+  }
+  if true {
+    var d = getDerivedAPIsDictionary()
+    var keys = Array(d.keys)
+    assert(equalsUnordered(keys, [ 10, 20, 30 ]))
+  }
+
+  println("testDerivedAPIs_keys done")
+}
+testDerivedAPIs_keys()
+// CHECK: testDerivedAPIs_keys done
+
+func testDerivedAPIs_values() {
+  if true {
+    var empty = Dictionary<Int, Int>()
+    var values = Array(empty.values)
+    assert(equalsUnordered(values, []))
+  }
+  if true {
+    var d = getDerivedAPIsDictionary()
+
+    var values = Array(d.values)
+    assert(equalsUnordered(values, [ 1010, 1020, 1030 ]))
+
+    d[11] = 1010
+    values = Array(d.values)
+    assert(equalsUnordered(values, [ 1010, 1010, 1020, 1030 ]))
+  }
+
+  println("testDerivedAPIs_values done")
+}
+testDerivedAPIs_values()
+// CHECK: testDerivedAPIs_values done
 
 //===---
 // Misc tests.
