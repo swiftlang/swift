@@ -385,3 +385,6 @@ typedef NS_ENUM(NSInteger, NSByteCountFormatterCountStyle) {
 
 NSArray *arrayToArray(NSArray *arr);
 NSDictionary *dictToDict(NSDictionary *dict);
+
+void pointer_to_pointer(NSInteger **ptr);
+
