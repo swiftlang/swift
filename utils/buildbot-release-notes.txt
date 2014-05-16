@@ -1,6 +1,19 @@
 Latest
 ----------
 
+* UnsafePointer (and ObjCMutablePointer) "set()" and "get()"
+  have been replaced with a property called "pointee".
+  
+  - Previously you would write:
+  
+      val = p.get()
+      p.set(val)
+  
+  - Now you write:
+  
+     val = p.pointee
+     p.pointee = val
+
 * Removed shorthand "x as T!"; instead use "(x as T)!"
 
   - "x as T!" now means "x as implicitly unwrapped optional".
