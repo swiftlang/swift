@@ -322,9 +322,39 @@ func testCOW_Fast_SubscriptWithKeyDoesNotReallocate() {
   assert(d[10]! == 1010)
   assert(identity1 == reinterpretCast(d))
 
-  d[40] = 1040
+  // Insert a new key-value pair.
+  d[40] = 2040
   assert(identity1 == reinterpretCast(d))
-  assert(d[40]! == 1040)
+  assert(d.count == 4)
+  assert(d[10]! == 1010)
+  assert(d[20]! == 1020)
+  assert(d[30]! == 1030)
+  assert(d[40]! == 2040)
+
+  // Overwrite a value in existing binding.
+  d[10] = 2010
+  assert(identity1 == reinterpretCast(d))
+  assert(d.count == 4)
+  assert(d[10]! == 2010)
+  assert(d[20]! == 1020)
+  assert(d[30]! == 1030)
+  assert(d[40]! == 2040)
+
+  // Delete an existing key.
+  d[10] = nil
+  assert(identity1 == reinterpretCast(d))
+  assert(d.count == 3)
+  assert(d[20]! == 1020)
+  assert(d[30]! == 1030)
+  assert(d[40]! == 2040)
+
+  // Try to delete a key that does not exist.
+  d[42] = nil
+  assert(identity1 == reinterpretCast(d))
+  assert(d.count == 3)
+  assert(d[20]! == 1020)
+  assert(d[30]! == 1030)
+  assert(d[40]! == 2040)
 
   println("testCOW_Fast_SubscriptWithKeyDoesNotReallocate done")
 }
@@ -338,9 +368,39 @@ func testCOW_Slow_SubscriptWithKeyDoesNotReallocate() {
   assert(d[TestKeyTy(10)]!.value == 1010)
   assert(identity1 == reinterpretCast(d))
 
-  d[TestKeyTy(40)] = TestValueTy(1040)
+  // Insert a new key-value pair.
+  d[TestKeyTy(40)] = TestValueTy(2040)
   assert(identity1 == reinterpretCast(d))
-  assert(d[TestKeyTy(40)]!.value == 1040)
+  assert(d.count == 4)
+  assert(d[TestKeyTy(10)]!.value == 1010)
+  assert(d[TestKeyTy(20)]!.value == 1020)
+  assert(d[TestKeyTy(30)]!.value == 1030)
+  assert(d[TestKeyTy(40)]!.value == 2040)
+
+  // Overwrite a value in existing binding.
+  d[TestKeyTy(10)] = TestValueTy(2010)
+  assert(identity1 == reinterpretCast(d))
+  assert(d.count == 4)
+  assert(d[TestKeyTy(10)]!.value == 2010)
+  assert(d[TestKeyTy(20)]!.value == 1020)
+  assert(d[TestKeyTy(30)]!.value == 1030)
+  assert(d[TestKeyTy(40)]!.value == 2040)
+
+  // Delete an existing key.
+  d[TestKeyTy(10)] = nil
+  assert(identity1 == reinterpretCast(d))
+  assert(d.count == 3)
+  assert(d[TestKeyTy(20)]!.value == 1020)
+  assert(d[TestKeyTy(30)]!.value == 1030)
+  assert(d[TestKeyTy(40)]!.value == 2040)
+
+  // Try to delete a key that does not exist.
+  d[TestKeyTy(42)] = nil
+  assert(identity1 == reinterpretCast(d))
+  assert(d.count == 3)
+  assert(d[TestKeyTy(20)]!.value == 1020)
+  assert(d[TestKeyTy(30)]!.value == 1030)
+  assert(d[TestKeyTy(40)]!.value == 2040)
 
   println("testCOW_Slow_SubscriptWithKeyDoesNotReallocate done")
 }
