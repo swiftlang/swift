@@ -1041,7 +1041,10 @@ Type SyntaxSugarType::getImplementationType() {
     assert(implDecl && "Optional type has not been set yet");
   } else if (isa<ImplicitlyUnwrappedOptionalType>(this)) {
     implDecl = ctx.getImplicitlyUnwrappedOptionalDecl();
-    assert(implDecl && "Optional type has not been set yet");
+    assert(implDecl && "ImplicitlyUnwrappedOptional type has not been set yet");
+  } else if (isa<UnsafePointerType>(this)) {
+    implDecl = ctx.getUnsafePointerDecl();
+    assert(implDecl && "UnsafePointer type has not been set yet");
   } else {
     llvm_unreachable("Unhandled syntax sugar type");
   }
@@ -1240,7 +1243,8 @@ bool TypeBase::isSpelledLike(Type other) {
   }
   case TypeKind::ArraySlice:
   case TypeKind::Optional:
-  case TypeKind::ImplicitlyUnwrappedOptional: {
+  case TypeKind::ImplicitlyUnwrappedOptional:
+  case TypeKind::UnsafePointer: {
     auto aMe = cast<SyntaxSugarType>(me);
     auto aThem = cast<SyntaxSugarType>(them);
     return aMe->getBaseType()->isSpelledLike(aThem->getBaseType());
@@ -2527,6 +2531,18 @@ case TypeKind::Id:
       return *this;
 
     return ImplicitlyUnwrappedOptionalType::get(baseTy);
+  }
+
+  case TypeKind::UnsafePointer: {
+    auto unsafePointer = cast<UnsafePointerType>(base);
+    auto baseTy = unsafePointer->getBaseType().transform(fn);
+    if (!baseTy)
+      return Type();
+
+    if (baseTy.getPointer() == unsafePointer->getBaseType().getPointer())
+      return *this;
+
+    return UnsafePointerType::get(baseTy);
   }
 
   case TypeKind::LValue: {

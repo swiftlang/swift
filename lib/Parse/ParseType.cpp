@@ -46,6 +46,8 @@ ParserResult<TypeRepr> Parser::parseTypeSimple() {
 ///     type-composition
 ///     type-simple '.Type'
 ///     type-simple '?'
+///     type-simple '!'
+///     type-simple '*'
 ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID) {
   ParserResult<TypeRepr> ty;
   // If this is an "inout" marker for an identifier type, consume the inout.
@@ -120,6 +122,10 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID) {
         ty = parseTypeImplicitlyUnwrappedOptional(ty.get());
         continue;
       }
+      if (isAsterisk()) {
+        ty = parseTypeUnsafePointer(ty.get());
+        continue;
+      }
     }
     break;
   }
@@ -188,6 +194,11 @@ static bool checkMultidimensionalArrayThroughOptionals(Parser &parser,
       continue;
     }
 
+    if (auto unsafePointer = dyn_cast<UnsafePointerTypeRepr>(tyR)) {
+      tyR = unsafePointer->getBase();
+      continue;
+    }
+
     // Anything else breaks the chain.
     return false;
   };
@@ -240,7 +251,8 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID) {
     diagnose(brackets.Start, diag::generic_non_function);
   }
 
-  // Parse array and optional types, and complain if they are mixed.
+  // Parse array, optional, and unsafe pointer types, and complain if
+  // they are mixed.
   while (ty.isNonNull() && !Tok.isAtStartOfLine()) {
     if (Tok.is(tok::l_square)) {
       ty = parseTypeArray(ty.get());
@@ -248,6 +260,9 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID) {
       ty = parseTypeOptional(ty.get());
     } else if (isImplicitlyUnwrappedOptionalToken()) {
       ty = parseTypeImplicitlyUnwrappedOptional(ty.get());
+    } else if (isAsterisk()) {
+      ty = parseTypeUnsafePointer(ty.get());
+      continue;
     } else {
       break;
     }
@@ -688,6 +703,14 @@ Parser::parseTypeImplicitlyUnwrappedOptional(TypeRepr *base) {
                            base, exclamationLoc));
 }
 
+ParserResult<UnsafePointerTypeRepr> Parser::parseTypeUnsafePointer(
+                                      TypeRepr *base) {
+  assert(isAsterisk());
+  SourceLoc asteriskLoc = consumeToken();
+  return makeParserResult(new (Context) UnsafePointerTypeRepr(base, 
+                                                              asteriskLoc));
+}
+
 //===--------------------------------------------------------------------===//
 // Speculative type list parsing
 //===--------------------------------------------------------------------===//
@@ -778,7 +801,7 @@ bool Parser::canParseType() {
     return false;
   }
   
-  // '.Type' and '?' still leave us with type-simple.
+  // '.Type', '?', '!', and '*' still leave us with type-simple.
   while (true) {
     if ((Tok.is(tok::period) || Tok.is(tok::period_prefix)) &&
         peekToken().is(tok::kw_Type)) {
@@ -786,7 +809,8 @@ bool Parser::canParseType() {
       consumeToken(tok::kw_Type);
       continue;
     }
-    if (Tok.is(tok::question_postfix) || isImplicitlyUnwrappedOptionalToken()) {
+    if (Tok.is(tok::question_postfix) || isImplicitlyUnwrappedOptionalToken() ||
+        isAsterisk()) {
       consumeToken();
       continue;
     }
@@ -800,7 +824,7 @@ bool Parser::canParseType() {
     return true;
   }
 
-  // Handle optional types and arrays.
+  // Handle optional types, arrays, and pointers.
   // For recovery purposes, accept "T[]?" here, even though we'll reject it
   // later.
   while (!Tok.isAtStartOfLine()) {
@@ -808,7 +832,8 @@ bool Parser::canParseType() {
       if (!canParseTypeArray())
         return false;
     } else if (Tok.is(tok::question_postfix) || 
-               isImplicitlyUnwrappedOptionalToken()) {
+               isImplicitlyUnwrappedOptionalToken() ||
+               isAsterisk()) {
       consumeToken();
     } else {
       break;

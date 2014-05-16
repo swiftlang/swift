@@ -2294,6 +2294,17 @@ void Serializer::writeType(Type ty) {
     break;
   }
 
+  case TypeKind::UnsafePointer: {
+    auto ptrTy = cast<UnsafePointerType>(ty.getPointer());
+
+    Type base = ptrTy->getBaseType();
+
+    unsigned abbrCode = DeclTypeAbbrCodes[UnsafePointerTypeLayout::Code];
+    UnsafePointerTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                        addTypeRef(base));
+    break;
+  }
+
   case TypeKind::ProtocolComposition: {
     auto composition = cast<ProtocolCompositionType>(ty.getPointer());
 
@@ -2451,6 +2462,7 @@ void Serializer::writeAllDeclsAndTypes() {
     registerDeclTypeAbbr<UnboundGenericTypeLayout>();
     registerDeclTypeAbbr<OptionalTypeLayout>();
     registerDeclTypeAbbr<ImplicitlyUnwrappedOptionalTypeLayout>();
+    registerDeclTypeAbbr<UnsafePointerTypeLayout>();
     registerDeclTypeAbbr<DynamicSelfTypeLayout>();
     registerDeclTypeAbbr<OpenedExistentialTypeLayout>();
 

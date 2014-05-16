@@ -459,6 +459,33 @@ private:
   friend class TypeRepr;
 };
 
+/// \brief An unsafe pointer type.
+/// \code
+///   T*
+/// \endcode
+class UnsafePointerTypeRepr : public TypeRepr {
+  TypeRepr *Base;
+  SourceLoc AsteriskLoc;
+
+public:
+  UnsafePointerTypeRepr(TypeRepr *Base, SourceLoc Asterisk)
+    : TypeRepr(TypeReprKind::UnsafePointer), Base(Base), AsteriskLoc(Asterisk) {
+  }
+
+  TypeRepr *getBase() const { return Base; }
+  SourceLoc getAsteriskLoc() const { return AsteriskLoc; }
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::UnsafePointer;
+  }
+
+private:
+  SourceLoc getStartLocImpl() const { return Base->getStartLoc(); }
+  SourceLoc getEndLocImpl() const { return AsteriskLoc; }
+  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  friend class TypeRepr;
+};
+
 /// \brief A tuple type.
 /// \code
 ///   (Foo, Bar)
@@ -671,6 +698,7 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::Named:
   case TypeReprKind::Optional:
   case TypeReprKind::ImplicitlyUnwrappedOptional:
+  case TypeReprKind::UnsafePointer:
   case TypeReprKind::ProtocolComposition:
   case TypeReprKind::Tuple:
     return true;

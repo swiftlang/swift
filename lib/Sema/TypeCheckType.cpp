@@ -59,6 +59,15 @@ Type TypeChecker::getImplicitlyUnwrappedOptionalType(SourceLoc loc, Type element
   return ImplicitlyUnwrappedOptionalType::get(elementType);
 }
 
+Type TypeChecker::getUnsafePointerType(SourceLoc loc, Type elementType) {
+  if (!Context.getUnsafePointerDecl()) {
+    diagnose(loc, diag::sugar_type_not_found, 3);
+    return Type();
+  }
+
+  return UnsafePointerType::get(elementType);
+}
+
 Type TypeChecker::getNSStringType(DeclContext *dc) {
   
   if (NSStringType.isNull()) {
@@ -891,7 +900,9 @@ namespace {
     Type resolveOptionalType(OptionalTypeRepr *repr,
                              TypeResolutionOptions options);
     Type resolveImplicitlyUnwrappedOptionalType(ImplicitlyUnwrappedOptionalTypeRepr *repr,
-                                      TypeResolutionOptions options);
+                                                TypeResolutionOptions options);
+    Type resolveUnsafePointerType(UnsafePointerTypeRepr *repr,
+                                  TypeResolutionOptions options);
     Type resolveTupleType(TupleTypeRepr *repr,
                           TypeResolutionOptions options);
     Type resolveProtocolCompositionType(ProtocolCompositionTypeRepr *repr,
@@ -953,8 +964,12 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
     return resolveOptionalType(cast<OptionalTypeRepr>(repr), options);
 
   case TypeReprKind::ImplicitlyUnwrappedOptional:
-    return resolveImplicitlyUnwrappedOptionalType(cast<ImplicitlyUnwrappedOptionalTypeRepr>(repr),
-                                        options);
+    return resolveImplicitlyUnwrappedOptionalType(
+             cast<ImplicitlyUnwrappedOptionalTypeRepr>(repr),
+               options);
+
+  case TypeReprKind::UnsafePointer:
+    return resolveUnsafePointerType(cast<UnsafePointerTypeRepr>(repr), options);
 
   case TypeReprKind::Tuple:
     return resolveTupleType(cast<TupleTypeRepr>(repr), options);
@@ -1459,6 +1474,21 @@ Type TypeResolver::resolveImplicitlyUnwrappedOptionalType(ImplicitlyUnwrappedOpt
     return ErrorType::get(Context);
 
   return uncheckedOptionalTy;
+}
+
+Type TypeResolver::resolveUnsafePointerType(UnsafePointerTypeRepr *repr,
+                                            TypeResolutionOptions options) {
+  // The T in T* is a generic type argument and therefore always an AST type.
+  Type baseTy = resolveType(repr->getBase(), withoutContext(options));
+  if (baseTy->is<ErrorType>())
+    return baseTy;
+
+  auto unsafePointerTy = TC.getUnsafePointerType(repr->getAsteriskLoc(), 
+                                                 baseTy);
+  if (!unsafePointerTy)
+    return ErrorType::get(Context);
+
+  return unsafePointerTy;
 }
 
 Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
