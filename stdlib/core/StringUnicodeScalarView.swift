@@ -124,7 +124,12 @@ extension String {
             let e1 = self._base._nthContiguous(aIdx)
             let e2 = other._base._nthContiguous(bIdx)
 
-            if _slowPath((e1 >= 0x80) | (e2 >= 0x80)) {
+            // The range 0xD800 .. 0xDFFF is reserved for lead and trail
+            // surrogates. In this code we are only comparing against the
+            // lower bound because most interesting characters are in that
+            // range. This is conversatively correct since the slow path is
+            // handling the surrogates correctly.
+            if _slowPath((e1 >= 0xD800) | (e2 >= 0xD800)) {
               // Use slow unicode comparator if
               // we found multi-byte scalar.
               return _compareUnicode(other)
