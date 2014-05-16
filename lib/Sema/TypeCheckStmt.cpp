@@ -145,6 +145,15 @@ void TypeChecker::contextualizeTopLevelCode(TopLevelContext &TLC,
   TLC.NextAutoClosureDiscriminator = CC.NextDiscriminator;
 }
 
+static bool isImplicitlyUnwrappedOptionalType(Type &T) {
+  if(auto bgt = T->castTo<BoundGenericType>()) {
+    return bgt->getDecl()->classifyAsOptionalType() ==
+              OTK_ImplicitlyUnwrappedOptional;
+  }
+  
+  return false;
+}
+
 namespace {
 /// StmtChecker - This class implements 
 class StmtChecker : public StmtVisitor<StmtChecker, Stmt*> {
@@ -388,6 +397,28 @@ public:
     VarDecl *Generator;
     {
       Type SequenceType = Sequence->getType()->getRValueType();
+      
+      // If necessary, unwrap the implicitly unwrapped optional type before
+      // checking for a conformance.
+      auto desugaredSequence = SequenceType->getDesugaredType();
+      if (auto bgt = dyn_cast<BoundGenericType>(desugaredSequence)) {
+        if(bgt->getDecl()->classifyAsOptionalType() ==
+           OTK_ImplicitlyUnwrappedOptional) {
+          
+          // If we're a one-level implicitly unwrapped optional expression,
+          // force the sequence expression.
+          SequenceType = bgt->getGenericArgs()[0];
+          
+          if (!isImplicitlyUnwrappedOptionalType(SequenceType)) {
+            auto forceExpr = new (TC.Context) ForceValueExpr(
+                                                           Sequence,
+                                                           Sequence->getLoc());
+            forceExpr->setType(SequenceType);
+            Sequence = forceExpr;
+            S->setSequence(forceExpr);
+          }
+        }
+      }
 
       ProtocolConformance *Conformance = nullptr;
       if (!TC.conformsToProtocol(SequenceType, SequenceProto, DC,

@@ -2949,6 +2949,11 @@ static TypeMatchKind getTypeMatchKind(ConstraintKind kind) {
 }
 
 Type ConstraintSystem::getBaseTypeForArrayType(TypeBase *type) {
+  
+  if (auto bound = this->lookThroughImplicitlyUnwrappedOptionalType(type)) {
+    type = bound.getPointer();
+  }
+  
   if (auto bound = type->getAs<BoundGenericStructType>()) {
     if (bound->getDecl() == getASTContext().getArrayDecl()) {
       return bound->getGenericArgs()[0];

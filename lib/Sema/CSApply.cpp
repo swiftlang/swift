@@ -30,6 +30,16 @@
 using namespace swift;
 using namespace constraints;
 
+static bool isOptionalType(Type &T) {
+  T = T->getDesugaredType();
+  if(auto bgt = dyn_cast<BoundGenericType>(T.getPointer())) {
+    return bgt->getDecl()->classifyAsOptionalType() ==
+              OTK_Optional;
+  }
+  
+  return false;
+}
+
 /// \brief Retrieve the fixed type for the given type variable.
 Type Solution::getFixedType(TypeVariableType *typeVar) const {
   auto knownBinding = typeBindings.find(typeVar);
@@ -2260,13 +2270,22 @@ namespace {
     Expr *visitIsaExpr(IsaExpr *expr) {
       // Turn the subexpression into an rvalue.
       auto &tc = cs.getTypeChecker();
+      auto toType = simplifyType(expr->getCastTypeLoc().getType());
       auto sub = tc.coerceToRValue(expr->getSubExpr());
       if (!sub)
         return nullptr;
+      
+      if (auto base = cs.lookThroughImplicitlyUnwrappedOptionalType(
+                                                              sub->getType())) {
+        if (!isOptionalType(toType)) {
+          auto locator = cs.getConstraintLocator(sub);
+          sub = coerceImplicitlyUnwrappedOptionalToValue(sub, base, locator);
+        }
+      }
+      
       expr->setSubExpr(sub);
 
       // Set the type we checked against.
-      auto toType = simplifyType(expr->getCastTypeLoc().getType());
       expr->getCastTypeLoc().setType(toType, /*validated=*/true);
       auto fromType = sub->getType();
       auto castKind = tc.typeCheckCheckedCast(
@@ -2339,6 +2358,15 @@ namespace {
       // The subexpression is always an rvalue.
       auto &tc = cs.getTypeChecker();
       auto sub = tc.coerceToRValue(expr->getSubExpr());
+      
+      if (auto base = cs.lookThroughImplicitlyUnwrappedOptionalType(
+                                                              sub->getType())) {
+        if (!isOptionalType(toType)) {
+          auto locator = cs.getConstraintLocator(sub);
+          sub = coerceImplicitlyUnwrappedOptionalToValue(sub, base, locator);
+        }
+      }
+      
       if (!sub)
         return nullptr;
       expr->setSubExpr(sub);
@@ -3784,6 +3812,13 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
 
     case ConversionRestrictionKind::ArrayBridged: {
+      // Look through implicitly unwrapped optionals.
+      if (auto objTy
+          = cs.lookThroughImplicitlyUnwrappedOptionalType(
+                                                          expr->getType())) {
+        expr = coerceImplicitlyUnwrappedOptionalToValue(expr, objTy, locator);
+        if (!expr) return nullptr;
+      }
       auto bridgedArrayConversion = new (tc.Context)
                                       ArrayBridgedConversionExpr(expr, toType);
       
@@ -3801,6 +3836,14 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
 
     case ConversionRestrictionKind::ArrayUpcast: {
+      
+      // Look through implicitly unwrapped optionals.
+      if (auto objTy
+              = cs.lookThroughImplicitlyUnwrappedOptionalType(
+                                                          expr->getType())) {
+        expr = coerceImplicitlyUnwrappedOptionalToValue(expr, objTy, locator);
+        if (!expr) return nullptr;
+      }
       auto arrayConversion = new (tc.Context)
                                   ArrayUpcastConversionExpr(expr, toType);
       arrayConversion->setType(toType);

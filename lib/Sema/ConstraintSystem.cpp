@@ -650,6 +650,8 @@ Type ConstraintSystem::openType(
 }
 
 bool ConstraintSystem::isArrayType(Type t) {
+  t = t->getDesugaredType();
+  
   // ArraySliceType<T> desugars to Array<T>.
   if (isa<ArraySliceType>(t.getPointer()))
     return true;
