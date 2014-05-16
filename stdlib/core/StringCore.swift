@@ -255,7 +255,7 @@ struct _StringCore {
   }
 
   /// Get the Nth UTF16 Code Unit stored
-  func _NthContiguous(position: Int) -> UTF16.CodeUnit {
+  func _nthContiguous(position: Int) -> UTF16.CodeUnit {
     let p = UnsafePointer<UInt8>(_pointerToNth(position).value)
       // Always dereference two bytes, but when elements are 8 bits we
       // multiply the high byte by 0.
@@ -269,7 +269,7 @@ struct _StringCore {
     assert(position <= count)
 
     if (_baseAddress != .null()) {
-      return _NthContiguous(position)
+      return _nthContiguous(position)
     }
     
     return _cocoaStringSubscript(target: self, position: position)

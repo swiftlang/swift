@@ -121,8 +121,8 @@ extension String {
       while true {
         if AIdx < AEnd {
           if BIdx < BEnd {
-            let e1 = self._base._NthContiguous(AIdx)
-            let e2 = other._base._NthContiguous(BIdx)
+            let e1 = self._base._nthContiguous(AIdx)
+            let e2 = other._base._nthContiguous(BIdx)
 
             if _slowPath((e1 >= 0x80) | (e2 >= 0x80)) {
               // Use slow unicode comparator if
