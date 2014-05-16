@@ -1436,6 +1436,9 @@ struct Dictionary<KeyType : Hashable, ValueType> : Collection,
     return _variantStorage.endIndex
   }
 
+  /// Access the key-value pair referenced by the given index.
+  ///
+  /// Complexity: O(1)
   subscript(i: Index) -> Element {
     return _variantStorage.assertingGet(i)
   }
@@ -1474,6 +1477,8 @@ struct Dictionary<KeyType : Hashable, ValueType> : Collection,
   }
 
   /// The number of entries in the dictionary.
+  ///
+  /// Complexity: O(1)
   var count: Int {
     return _variantStorage.count
   }
