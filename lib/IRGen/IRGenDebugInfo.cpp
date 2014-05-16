@@ -92,6 +92,49 @@ static void mangleIdent(llvm::raw_string_ostream &OS, StringRef Id) {
   return;
 }
 
+/// Resolve a DITypeRef using our WeakVH-based map.
+static llvm::DIType resolve(const llvm::DITypeRef TyRef,
+                            const WeakDIRefMap &Map) {
+  llvm::Value *Val = TyRef;
+  if (!Val)
+    return llvm::DIType();
+
+  if (const llvm::MDNode *MD = dyn_cast<llvm::MDNode>(Val)) {
+    llvm::DIType DITy(MD);
+    assert(DITy.Verify() && "MDNode in DIRef should be a DIType.");
+    return DITy;
+  }
+
+  // Find the corresponding MDNode.
+  auto I = Map.find(cast<llvm::MDString>(Val));
+  assert(I != Map.end() && "Identifier not in the type map?");
+  llvm::Value *value = I->second;
+  llvm::DIType DITy(cast<llvm::MDNode>(value));
+  assert(DITy.Verify() && "MDNode in DITypeIdentifierMap should be a DIType.");
+  return DITy;
+
+}
+
+/// Return the size reported by a type.
+static unsigned getSizeInBits(llvm::DIType Ty,
+                              const WeakDIRefMap &Map) {
+  // Follow derived types until we reach a type that
+  // reports back a size.
+  while (Ty.isDerivedType() && !Ty.getSizeInBits()) {
+    llvm::DIDerivedType DT(&*Ty);
+    Ty = resolve(DT.getTypeDerivedFrom(), Map);
+  }
+  return Ty.getSizeInBits();
+}
+
+/// Return the size reported by the variable's type.
+static unsigned getSizeInBits(const llvm::DIVariable Var,
+                              const WeakDIRefMap &Map) {
+  llvm::DIType Ty = resolve(Var.getType(), Map);
+  return getSizeInBits(Ty, Map);
+}
+
+
 IRGenDebugInfo::IRGenDebugInfo(const IRGenOptions &Opts,
                                ClangImporter &CI,
                                IRGenModule &IGM,
@@ -787,9 +830,12 @@ llvm::DIFile IRGenDebugInfo::getFile(llvm::DIDescriptor Scope) {
     case llvm::dwarf::DW_TAG_lexical_block:
       Scope = llvm::DILexicalBlock(Scope).getContext();
       break;
-    case llvm::dwarf::DW_TAG_subprogram:
-      Scope = llvm::DISubprogram(Scope).getContext().resolve(DIRefMap);
+    case llvm::dwarf::DW_TAG_subprogram: {
+      // Scopes are not indexed by UID.
+      llvm::DITypeIdentifierMap EmptyMap;
+      Scope = llvm::DISubprogram(Scope).getContext().resolve(EmptyMap);
       break;
+    }
     default:
       return MainFile;
     }
@@ -816,12 +862,11 @@ static uint64_t getSizeFromExplosionValue(const clang::TargetInfo &TI,
 /// A generator that recursively returns the size of each element of a
 /// composite type.
 class ElementSizes {
-  const llvm::DITypeIdentifierMap &DIRefMap;
+  const WeakDIRefMap &DIRefMap;
   SmallVector<const llvm::MDNode *, 12> Stack;
 
 public:
-  ElementSizes(const llvm::MDNode *DITy,
-               const llvm::DITypeIdentifierMap &DIRefMap)
+  ElementSizes(const llvm::MDNode *DITy, const WeakDIRefMap &DIRefMap)
       : DIRefMap(DIRefMap), Stack(1, DITy) {}
 
   struct SizeAlign {
@@ -855,7 +900,7 @@ public:
     case llvm::dwarf::DW_TAG_typedef: {
       // Replace top of stack.
       llvm::DIDerivedType DTy(Cur);
-      Stack.push_back(DTy.getTypeDerivedFrom().resolve(DIRefMap));
+      Stack.push_back(resolve(DTy.getTypeDerivedFrom(), DIRefMap));
       return getNext();
     }
     default:
@@ -961,17 +1006,19 @@ void IRGenDebugInfo::emitVariableDeclaration(
 
       // FIXME: Occasionally we miss out that the Storage is acually a
       // refcount wrapper. Silently skip these for now.
-      if ((OffsetInBytes+SizeInBytes)*SizeOfByte > Var.getSizeInBits(DIRefMap))
+      unsigned VarSizeInBits = getSizeInBits(Var, DIRefMap);
+      assert(VarSizeInBits > 0 && "zero-sized variable");
+      if ((OffsetInBytes+SizeInBytes)*SizeOfByte > VarSizeInBits)
         break;
       if ((OffsetInBytes==0) &&
-          SizeInBytes*SizeOfByte == Var.getSizeInBits(DIRefMap))
+          SizeInBytes*SizeOfByte == VarSizeInBits)
         break;
       if (SizeInBytes == 0)
         break;
 
-      assert(SizeInBytes < Var.getSizeInBits(DIRefMap)
+      assert(SizeInBytes < VarSizeInBits
              && "piece covers entire var");
-      assert((OffsetInBytes+SizeInBytes)*SizeOfByte<=Var.getSizeInBits(DIRefMap)
+      assert((OffsetInBytes+SizeInBytes)*SizeOfByte<=VarSizeInBits
              && "pars > totum");
       Var = DBuilder.
         createVariablePiece(Descriptor, OffsetInBytes, SizeInBytes);
@@ -1021,17 +1068,6 @@ StringRef IRGenDebugInfo::getMangledName(DebugTypeInfo DbgTy) {
   }
   assert(!Buffer.empty() && "mangled name came back empty");
   return BumpAllocatedString(Buffer);
-}
-
-static unsigned getSizeInBits(llvm::DIType Ty,
-                              const llvm::DITypeIdentifierMap &Map) {
-  // Follow derived types until we reach a type that
-  // reports back a size.
-  while (Ty.isDerivedType() && !Ty.getSizeInBits()) {
-    llvm::DIDerivedType DT(&*Ty);
-    Ty = DT.getTypeDerivedFrom().resolve(Map);
-  }
-  return Ty.getSizeInBits();
 }
 
 /// Create a member of a struct, class, tuple, or enum.
@@ -1108,7 +1144,9 @@ llvm::DICompositeType IRGenDebugInfo::createStructType(
            "UID is not a mangled name");
 #endif
 
-  DITypeCache[DbgTy.getType()] = llvm::WeakVH(FwdDecl);
+  llvm::WeakVH VH(FwdDecl);
+  DITypeCache[DbgTy.getType()] = VH;
+  DIRefMap[llvm::MDString::get(IGM.getLLVMContext(), UniqueID)] = VH;
   auto Members = getStructMembers(Decl, BaseTy, Scope, File, Flags, SizeInBits);
   auto DITy = DBuilder.createStructType(
       Scope, Name, File, Line, SizeInBits, AlignInBits, Flags, DerivedFrom,
@@ -1155,23 +1193,28 @@ llvm::DIArray IRGenDebugInfo::getEnumElements(DebugTypeInfo DbgTy, EnumDecl *D,
 /// the type cache so we can safely build recursive types.
 llvm::DICompositeType
 IRGenDebugInfo::createEnumType(DebugTypeInfo DbgTy, EnumDecl *Decl,
-                               StringRef Name, llvm::DIDescriptor Scope,
+                               StringRef MangledName, llvm::DIDescriptor Scope,
                                llvm::DIFile File, unsigned Line,
                                unsigned Flags) {
   unsigned SizeOfByte = CI.getTargetInfo().getCharWidth();
   unsigned SizeInBits = DbgTy.size.getValue() * SizeOfByte;
   unsigned AlignInBits = DbgTy.align.getValue() * SizeOfByte;
+
   // FIXME: Is DW_TAG_union_type the right thing here?
+  // Consider using a DW_TAG_variant_type instead.
   auto FwdDecl = DBuilder.createForwardDecl(
-      llvm::dwarf::DW_TAG_union_type, Name, Scope, File, Line,
+      llvm::dwarf::DW_TAG_union_type, MangledName, Scope, File, Line,
       llvm::dwarf::DW_LANG_Swift, SizeInBits, AlignInBits);
 
-  DITypeCache[DbgTy.getType()] = llvm::WeakVH(FwdDecl);
+  llvm::WeakVH VH(FwdDecl);
+  DITypeCache[DbgTy.getType()] = VH;
+  DIRefMap[llvm::MDString::get(IGM.getLLVMContext(), MangledName)] = VH;
 
   auto DITy = DBuilder.createUnionType(
-      Scope, Name, File, Line, SizeInBits, AlignInBits, Flags,
+      Scope, MangledName, File, Line, SizeInBits, AlignInBits, Flags,
       getEnumElements(DbgTy, Decl, Scope, File, Flags),
       llvm::dwarf::DW_LANG_Swift);
+
   FwdDecl->replaceAllUsesWith(DITy);
   return DITy;
 }
@@ -1317,7 +1360,9 @@ llvm::DIType IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     // so we emit the static type instead. This is similar to what we
     // do with instancetype in Objective-C.
     auto DynamicSelfTy = BaseTy->castTo<DynamicSelfType>();
-    return getOrCreateDesugaredType(DynamicSelfTy->getSelfType(), DbgTy);
+    auto SelfTy = getOrCreateDesugaredType(DynamicSelfTy->getSelfType(), DbgTy);
+    return DBuilder.createTypedef(SelfTy, MangledName, File, 0, File);
+
   }
 
   // Even builtin swift types usually come boxed in a struct.
@@ -1671,11 +1716,12 @@ llvm::DIType IRGenDebugInfo::getOrCreateType(DebugTypeInfo DbgTy) {
   // not necessarily unique, but name mangling is too expensive to do
   // every time.
   StringRef MangledName;
+  llvm::MDString *UID = nullptr;
   if (canMangle(DbgTy.getType())) {
     MangledName = getMangledName(DbgTy);
-    auto UID = llvm::MDString::get(IGM.getLLVMContext(), MangledName);
-    if (auto *CachedTy = DIRefMap.lookup(UID)) {
-      auto DITy = llvm::DIType(CachedTy);
+    UID = llvm::MDString::get(IGM.getLLVMContext(), MangledName);
+    if (llvm::Value *CachedTy = DIRefMap.lookup(UID)) {
+      auto DITy = llvm::DIType(cast<llvm::MDNode>(CachedTy));
       if (DITy.Verify())
         return DITy;
     }
@@ -1695,9 +1741,20 @@ llvm::DIType IRGenDebugInfo::getOrCreateType(DebugTypeInfo DbgTy) {
 
   // Incrementally build the DIRefMap.
   if (DITy.isCompositeType()) {
-    auto CompTy = llvm::DICompositeType(DITy);
-    DIRefMap.insert({CompTy.getIdentifier(), CompTy});
+#ifndef NDEBUG
+    // Sanity check.
+    if (llvm::Value *V = DIRefMap.lookup(UID)) {
+      llvm::DIType CachedTy(cast<llvm::MDNode>(V));
+      if (CachedTy.Verify())
+        assert(CachedTy == DITy && "conflicting types for one UID");
+    }
+    if (auto *UID = llvm::DICompositeType(DITy).getIdentifier())
+      assert(UID->getString() == MangledName &&
+             "Unique identifier is different from mangled name ");
+#endif
+    DIRefMap[UID] = llvm::WeakVH(DITy);
   }
+
   // Store it in the cache.
   DITypeCache[DbgTy.getType()] = llvm::WeakVH(DITy);
 

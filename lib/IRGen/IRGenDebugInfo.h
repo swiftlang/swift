@@ -62,6 +62,8 @@ typedef struct {
   Location LocForLinetable, Loc;
 } FullLocation;
 
+typedef llvm::DenseMap<const llvm::MDString *, llvm::WeakVH> WeakDIRefMap;
+
 enum IndirectionKind : bool { DirectValue = false, IndirectValue = true };
 enum ArtificialKind : bool { RealValue = false, ArtificialValue = true };
 
@@ -81,7 +83,7 @@ class IRGenDebugInfo {
   llvm::DenseMap<const char *, llvm::WeakVH> DIFileCache;
   llvm::DenseMap<TypeBase *, llvm::WeakVH> DITypeCache;
   std::map<std::string, llvm::WeakVH> DIModuleCache;
-  llvm::DITypeIdentifierMap DIRefMap;
+  WeakDIRefMap DIRefMap;
 
   llvm::SmallString<256> MainFilename;
   llvm::BumpPtrAllocator DebugInfoNames;
@@ -250,7 +252,8 @@ private:
                                 llvm::DIDescriptor Scope, llvm::DIFile File,
                                 unsigned Flags);
   llvm::DICompositeType createEnumType(DebugTypeInfo DbgTy, EnumDecl *Decl,
-                                       StringRef Name, llvm::DIDescriptor Scope,
+                                       StringRef MangledName,
+                                       llvm::DIDescriptor Scope,
                                        llvm::DIFile File, unsigned Line,
                                        unsigned Flags);
   llvm::DIType createPointerSizedStruct(llvm::DIDescriptor Scope,
