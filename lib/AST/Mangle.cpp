@@ -581,6 +581,20 @@ void Mangler::mangleGenericSignature(GenericSignature *sig,
   Buffer << '_';
 }
 
+static void mangleMetatypeRepresentation(raw_ostream &Buffer,
+                                         MetatypeRepresentation Rep) {
+  switch (Rep) {
+  case MetatypeRepresentation::Thin:
+    Buffer << 't';
+    break;
+  case MetatypeRepresentation::Thick:
+    Buffer << 'T';
+    break;
+  case MetatypeRepresentation::ObjC:
+    Buffer << 'o';
+  }
+}
+
 /// Mangle a type into the buffer.
 ///
 /// Type manglings should never start with [0-9d_] or end with [0-9].
@@ -675,14 +689,28 @@ void Mangler::mangleType(CanType type, ResilienceExpansion explosion,
 #define TYPE(id, parent)
 #include "swift/AST/TypeNodes.def"
 
-  case TypeKind::ExistentialMetatype:
-    Buffer << 'P' << 'M';
-    return mangleType(cast<ExistentialMetatypeType>(type).getInstanceType(),
+  case TypeKind::ExistentialMetatype: {
+    CanExistentialMetatypeType EMT = cast<ExistentialMetatypeType>(type);
+    if (EMT->hasRepresentation()) {
+      Buffer << 'X' << 'P' << 'M';
+      mangleMetatypeRepresentation(Buffer, EMT->getRepresentation());
+    } else {
+      Buffer << 'P' << 'M';
+    }
+    return mangleType(EMT.getInstanceType(),
                       ResilienceExpansion::Minimal, 0);
-  case TypeKind::Metatype:
-    Buffer << 'M';
-    return mangleType(cast<MetatypeType>(type).getInstanceType(),
+  }
+  case TypeKind::Metatype: {
+    CanMetatypeType MT = cast<MetatypeType>(type);
+    if (MT->hasRepresentation()) {
+      Buffer << 'X' << 'M';
+      mangleMetatypeRepresentation(Buffer, MT->getRepresentation());
+    } else {
+      Buffer << 'M';
+    }
+    return mangleType(MT.getInstanceType(),
                       ResilienceExpansion::Minimal, 0);
+  }
   case TypeKind::LValue:
     assert(0 && "@lvalue types should not occur in function interfaces");
   case TypeKind::InOut:

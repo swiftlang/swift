@@ -799,6 +799,17 @@ GenericSpecializer::specializeApplyInstGroup(SILFunction *F, AIList &List) {
     if (auto PrevF = M->lookUpFunction(ClonedName)) {
       NewF = PrevF;
       createdFunction = false;
+
+#ifndef NDEBUG
+      // Make sure that NewF's subst type matches the expected type.
+      auto Subs = Bucket[0]->getSubstitutions();
+      auto FTy =
+        F->getLoweredFunctionType()->substInterfaceGenericArgs(*M,
+                                                               M->getSwiftModule(),
+                                                               Subs);
+      assert(FTy == NewF->getLoweredFunctionType() &&
+             "Previously specialized function does not match expected type.");
+#endif
     } else {
       // Create a new function.
       NewF = TypeSubCloner::cloneFunction(F, InterfaceSubs, ContextSubs,
