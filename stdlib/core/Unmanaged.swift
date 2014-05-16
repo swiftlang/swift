@@ -20,6 +20,28 @@ struct Unmanaged<T: AnyObject> {
   @transparent
   init(_private: T) { _value = _private }
 
+  /// Unsafely turn an opaque C pointer into an unmanaged
+  /// class reference.
+  ///
+  /// This operation does not change reference counts.
+  ///
+  /// \c let str: CFString = Unmanaged.fromOpaque(ptr).takeUnretainedValue()
+  @transparent
+  static func fromOpaque(value: COpaquePointer) -> Unmanaged {
+    return Unmanaged(_private: reinterpretCast(value))
+  }
+
+  /// Unsafely turn an unmanaged class reference into an opaque
+  /// C pointer.
+  ///
+  /// This operation does not change reference counts.
+  ///
+  /// \c let str: CFString = Unmanaged.fromOpaque(ptr).takeUnretainedValue()
+  @transparent
+  func toOpaque() -> COpaquePointer {
+    return reinterpretCast(_value)
+  }
+
   /// Create an unmanaged reference with an unbalanced retain.
   /// The object will leak if nothing eventually balances the retain.
   ///
@@ -47,42 +69,6 @@ struct Unmanaged<T: AnyObject> {
     return Unmanaged(_private: value)
   }
 
-  /// Create an unmanaged reference with an unbalanced retain,
-  /// starting from a value of a different class type.  You
-  /// take responsibility for ensuring that the types are actually
-  /// compatible at runtime.
-  ///
-  /// This is useful when passing an object to an API which Swift
-  /// does not know the ownership rules for, but you know that the
-  /// API expects you to pass the object at +1, and additionally
-  /// the object has a static type which you know is
-  /// toll-free-bridged to the type you need it to have.
-  ///
-  /// \c labels[i] = .bridgeToRetained<CFString>(someNSString)
-  @transparent
-  static func bridgeToRetained<U: AnyObject>(value: U) -> Unmanaged {
-    return passRetained(reinterpretCast(value))
-  }
-
-  /// Create an unmanaged reference without performing an unbalanced
-  /// retain, starting with a value of a different class type.
-  /// You take responsibility for ensuring that the types are
-  /// actually compatible at runtime.
-  ///
-  /// This is useful when passing an object to an API which Swift
-  /// does not know the ownership rules for, but you know that the
-  /// API expects you to pass the object at +0, and additionally
-  /// the object has a static type which you know is
-  /// toll-free-bridged to the type you need it to have.
-  ///
-  /// \c CGGradientCreateWithColors(colorSpace,
-  ///                               .bridgeToUnretained(someNSArray),
-  ///                               locations)
-  @transparent
-  static func bridgeToUnretained<U: AnyObject>(value: U) -> Unmanaged {
-    return passUnretained(reinterpretCast(value))
-  }
-
   /// Get the value of this unmanaged reference as a managed
   /// reference without consuming an unbalanced retain of it.
   ///
@@ -101,24 +87,6 @@ struct Unmanaged<T: AnyObject> {
     let result = _value
     release()
     return result
-  }
-
-  /// Get the value of this unmanaged reference as an managed
-  /// reference of a different class type without consuming
-  /// an unbalanced retain.  You take responsibility
-  /// for ensuring that the types are actually compatible at
-  /// runtime.
-  func bridgeUnretainedValueTo<U: AnyObject>() -> U {
-    return reinterpretCast(takeUnretainedValue())
-  }
-
-  /// Get the value of this unmanaged reference as an managed
-  /// reference of a different class type and consume
-  /// an unbalanced retain of it.  You take responsibility
-  /// for ensuring that the types are actually compatible at
-  /// runtime.
-  func bridgeRetainedValueTo<U: AnyObject>() -> U {
-    return reinterpretCast(takeRetainedValue())
   }
 
   /// Perform an unbalanced retain of the object.
@@ -140,9 +108,4 @@ struct Unmanaged<T: AnyObject> {
     Builtin.autorelease(_value)
     return self
   }
-}
-
-/// Bridge a value of one type to another type.
-func bridgeTo<T: AnyObject, U: AnyObject>(value: U) -> T {
-  return reinterpretCast(value)
 }
