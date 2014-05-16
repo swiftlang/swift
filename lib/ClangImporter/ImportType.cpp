@@ -746,10 +746,9 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
   // result type, map it to AnyObject[].
   if (hint == ImportHint::NSArray && canBridgeTypes(importKind) &&
       impl.hasFoundationModule()) {
-    importedType = impl.getNamedSwiftTypeSpecialization(
-                     impl.getStdlibModule(), "Array",
-                     { impl.getNamedSwiftType(impl.getStdlibModule(),
-                                              "AnyObject") });
+    Type anyObject = impl.getNamedSwiftType(impl.getStdlibModule(), 
+                                            "AnyObject");
+    importedType = ArraySliceType::get(anyObject);
   }
 
   // When NSDictionary* is the type of a function parameter or a function

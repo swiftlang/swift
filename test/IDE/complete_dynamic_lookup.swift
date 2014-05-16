@@ -123,8 +123,8 @@ protocol Bar { func bar() }
 // DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule:      [{#i: Int8#}][#Int?#]{{$}}
 // DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule:      [{#i: TopLevelObjcClass#}][#Int?#]{{$}}
 // DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule:      [{#i: TopLevelObjcProtocol#}][#Int?#]{{$}}
-// DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule:      [{#idx: CInt#}][#(AnyObject!)?#]{{$}}
-// DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule:      [{#key: AnyObject?#}][#(AnyObject!)?#]{{$}}
+// DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule:      [{#idx: CInt#}][#AnyObject!?#]{{$}}
+// DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule:      [{#key: AnyObject?#}][#AnyObject!?#]{{$}}
 // DL_INSTANCE_NO_DOT: End completions
 
 // DL_INSTANCE_DOT: Begin completions
@@ -137,7 +137,7 @@ protocol Bar { func bar() }
 // DL_INSTANCE_DOT-DAG: Decl[InstanceVar]/OtherModule:    base1_Property1[#Int?#]{{$}}
 // DL_INSTANCE_DOT-DAG: Decl[InstanceVar]/OtherModule:    base1_Property2[#Base?#]{{$}}
 // DL_INSTANCE_DOT-DAG: Decl[InstanceMethod]/OtherModule: baz_Class_InstanceFunc1!()[#Void#]{{$}}
-// DL_INSTANCE_DOT-DAG: Decl[InstanceVar]/OtherModule:    baz_Class_Property1[#(Baz_Class!)?#]{{$}}
+// DL_INSTANCE_DOT-DAG: Decl[InstanceVar]/OtherModule:    baz_Class_Property1[#Baz_Class!?#]{{$}}
 // DL_INSTANCE_DOT-DAG: Decl[InstanceMethod]/OtherModule: baz_Protocol_InstanceFunc1!()[#Void#]{{$}}
 // DL_INSTANCE_DOT-DAG: Decl[InstanceMethod]/OtherModule: foo_Nested1_ObjcInstanceFunc1!()[#Void#]{{$}}
 // DL_INSTANCE_DOT-DAG: Decl[InstanceVar]/OtherModule:    foo_Nested1_Property1[#Int?#]{{$}}

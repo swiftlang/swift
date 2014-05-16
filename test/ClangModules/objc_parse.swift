@@ -256,7 +256,7 @@ extension Wobbler : NSMaybeInitWobble { // expected-error{{type 'Wobbler' does n
 func optionalMemberAccess(w: NSWobbling) {
   w.wobble()
   w.wibble() // expected-error{{value of optional type '(() -> Void)?' not unwrapped; did you mean to use '!' or '?'?}}
-  var x: AnyObject = w[5] // expected-error{{value of optional type '(AnyObject!)?' not unwrapped; did you mean to use '!' or '?'?}}
+  var x: AnyObject = w[5] // expected-error{{value of optional type 'AnyObject!?' not unwrapped; did you mean to use '!' or '?'?}}
 }
 
 func protocolInheritance(s: NSString) {

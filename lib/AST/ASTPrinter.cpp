@@ -1549,11 +1549,9 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
 
   static bool isSimple(Type type) {
     switch (type->getKind()) {
-    case TypeKind::ArraySlice:
     case TypeKind::Function:
     case TypeKind::PolymorphicFunction:
     case TypeKind::GenericFunction:
-    case TypeKind::ImplicitlyUnwrappedOptional:
       return false;
 
     case TypeKind::Metatype:

@@ -25,7 +25,7 @@ b = a // expected-error {{cannot convert the expression's type '()' to type 'B[]
 var aa: A[][] = []
 var bb: B[][] = []
 
-aa = bb // expected-error {{cannot convert the expression's type '()' to type '(A[])[]'}}
+aa = bb // expected-error {{cannot convert the expression's type '()' to type 'A[][]'}}
 
 class C {
 }
