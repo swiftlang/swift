@@ -95,14 +95,23 @@ extern "C" uint64_t swift_doubleToString(char *Buffer, size_t BufferLength,
   if (BufferLength < 32)
     swift::crash("swift_doubleToString: insufficient buffer size");
 
-  int ActualLength = snprintf(Buffer, BufferLength, "%.15g", Value);
-  if (ActualLength < 0)
+  int i = snprintf(Buffer, BufferLength, "%0.15g", Value);
+  if (i < 0)
     swift::crash(
         "swift_doubleToString: unexpected return value from sprintf");
-  if (size_t(ActualLength) >= BufferLength)
+  if (size_t(i) >= BufferLength)
     swift::crash("swift_doubleToString: insufficient buffer size");
-
-  return ActualLength;
+  
+  // Add ".0" to a float that (a) is not in scientific notation, (b) does not
+  // already have a fractional part, (c) is not infinite, and (d) is not a NaN
+  // value.
+  if (strchr(Buffer, 'e') == nullptr && strchr(Buffer, '.') == nullptr &&
+      strchr(Buffer, 'n') == nullptr) {
+    Buffer[i++] = '.';
+    Buffer[i++] = '0';
+  }
+  
+  return i;
 }
 
 static bool _swift_replOutputIsUTF8(void) {

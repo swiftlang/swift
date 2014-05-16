@@ -42,9 +42,9 @@ print(pt, "named cgfloats")
 pt = CGPoint(x: int1, y: int2)
 print(pt, "named ints")
 // CHECK-NEXT: named float literals 1.25 2.25
-// CHECK-NEXT: named int literals 1 2
-// CHECK-NEXT: named cgfloats 1 2
-// CHECK-NEXT: named ints 1 2
+// CHECK-NEXT: named int literals 1.0 2.0
+// CHECK-NEXT: named cgfloats 1.0 2.0
+// CHECK-NEXT: named ints 1.0 2.0
 
 assert(pt != CGPoint.zeroPoint)
 
@@ -60,9 +60,9 @@ print(size, "named cgfloats")
 size = CGSize(width: int1, height: int2)
 print(size, "named ints")
 // CHECK-NEXT: named float literals -1.25 -2.25
-// CHECK-NEXT: named int literals -1 -2
-// CHECK-NEXT: named cgfloats 1 2
-// CHECK-NEXT: named ints 1 2
+// CHECK-NEXT: named int literals -1.0 -2.0
+// CHECK-NEXT: named cgfloats 1.0 2.0
+// CHECK-NEXT: named ints 1.0 2.0
 
 assert(size != CGSize.zeroSize)
 
@@ -78,9 +78,9 @@ print(vector, "cgfloats")
 vector = CGVector(int1, int2)
 print(vector, "ints")
 // CHECK-NEXT: float literals -111.25 -222.25
-// CHECK-NEXT: int literals -111 -222
-// CHECK-NEXT: cgfloats 1 2
-// CHECK-NEXT: ints 1 2
+// CHECK-NEXT: int literals -111.0 -222.0
+// CHECK-NEXT: cgfloats 1.0 2.0
+// CHECK-NEXT: ints 1.0 2.0
 
 vector = CGVector(-111.25, -222.25)
 print(vector, "named float literals")
@@ -91,9 +91,9 @@ print(vector, "named cgfloats")
 vector = CGVector(int1, int2)
 print(vector, "named ints")
 // CHECK-NEXT: named float literals -111.25 -222.25
-// CHECK-NEXT: named int literals -111 -222
-// CHECK-NEXT: named cgfloats 1 2
-// CHECK-NEXT: named ints 1 2
+// CHECK-NEXT: named int literals -111.0 -222.0
+// CHECK-NEXT: named cgfloats 1.0 2.0
+// CHECK-NEXT: named ints 1.0 2.0
 
 assert(vector != CGVector.zeroVector)
 
@@ -118,9 +118,9 @@ print(rect, "named cgfloats")
 rect = CGRect(x:int1, y:int2, width:int3, height:int4)
 print(rect, "named ints")
 // CHECK-NEXT: named float literals 10.25 20.25 30.25 40.25
-// CHECK-NEXT: named int literals 10 20 30 40
-// CHECK-NEXT: named cgfloats 1 2 3 4
-// CHECK-NEXT: named ints 1 2 3 4
+// CHECK-NEXT: named int literals 10.0 20.0 30.0 40.0
+// CHECK-NEXT: named cgfloats 1.0 2.0 3.0 4.0
+// CHECK-NEXT: named ints 1.0 2.0 3.0 4.0
 
 assert(rect == rect)
 assert(rect != CGRect.zeroRect)
@@ -136,8 +136,8 @@ var unstandard = CGRect(x: 10, y: 20, width: -30, height: -50)
 var standard = unstandard.standardizedRect
 print(unstandard, "unstandard")
 print(standard, "standard")
-// CHECK-NEXT: unstandard 10 20 -30 -50
-// CHECK-NEXT: standard -20 -30 30 50
+// CHECK-NEXT: unstandard 10.0 20.0 -30.0 -50.0
+// CHECK-NEXT: standard -20.0 -30.0 30.0 50.0
 
 assert(unstandard.width == 30)
 assert(unstandard.size.width == -30)
@@ -162,7 +162,7 @@ assert(unstandard.standardizedRect == standard)
 
 unstandard.standardize()
 print(unstandard, "standardized unstandard")
-// CHECK-NEXT: standardized unstandard -20 -30 30 50
+// CHECK-NEXT: standardized unstandard -20.0 -30.0 30.0 50.0
 
 
 rect = CGRect(x: 11.25, y: 22.25, width: 33.25, height: 44.25)
@@ -181,10 +181,10 @@ print(rect, "offset")
 
 rect = CGRect(x: 11.25, y: 22.25, width: 33.25, height: 44.25)
 print(rect.integerRect, "integerRect")
-// CHECK-NEXT: integerRect 11 22 34 45
+// CHECK-NEXT: integerRect 11.0 22.0 34.0 45.0
 rect.integerize()
 print(rect, "integerize")
-// CHECK-NEXT: integerize 11 22 34 45
+// CHECK-NEXT: integerize 11.0 22.0 34.0 45.0
 
 
 let smallRect = CGRect(x: 10, y: 25, width: 5, height: -5)
@@ -195,14 +195,14 @@ rect = CGRect(x: 11.25, y: 22.25, width: 33.25, height: 44.25)
 print(rect.rectByUnion(smallRect), "rectByUnion small")
 print(rect.rectByUnion(bigRect), "rectByUnion big")
 print(rect.rectByUnion(distantRect), "rectByUnion distant")
-// CHECK-NEXT: rectByUnion small 10 20 34.5 46.5
-// CHECK-NEXT: rectByUnion big 1 2 101 102
+// CHECK-NEXT: rectByUnion small 10.0 20.0 34.5 46.5
+// CHECK-NEXT: rectByUnion big 1.0 2.0 101.0 102.0
 // CHECK-NEXT: rectByUnion distant 11.25 22.25 989.75 1978.75
 rect.union(smallRect)
 rect.union(bigRect)
 rect.union(distantRect)
 print(rect, "union")
-// CHECK-NEXT: union 1 2 1000 1999
+// CHECK-NEXT: union 1.0 2.0 1000.0 1999.0
 
 rect = CGRect(x: 11.25, y: 22.25, width: 33.25, height: 44.25)
 print(rect.rectByIntersecting(smallRect), "rectByIntersecting small")
@@ -210,7 +210,7 @@ print(rect.rectByIntersecting(bigRect), "rectByIntersecting big")
 print(rect.rectByIntersecting(distantRect), "rectByIntersecting distant")
 // CHECK-NEXT: rectByIntersecting small 11.25 22.25 3.75 2.75
 // CHECK-NEXT: rectByIntersecting big 11.25 22.25 33.25 44.25
-// CHECK-NEXT: rectByIntersecting distant inf inf 0 0
+// CHECK-NEXT: rectByIntersecting distant inf inf 0.0 0.0
 assert(rect.intersects(smallRect))
 rect.intersect(smallRect)
 assert(!rect.isEmpty)
@@ -233,5 +233,5 @@ rect = CGRect(x: 11.25, y: 22.25, width: 33.25, height: 44.25)
 var (slice, remainder) = rect.rectsByDividing(5, fromEdge:CGRectEdge.MinXEdge)
 print(slice, "slice")
 print(remainder, "remainder")
-// CHECK-NEXT: slice 11.25 22.25 5 44.25
+// CHECK-NEXT: slice 11.25 22.25 5.0 44.25
 // CHECK-NEXT: remainder 16.25 22.25 28.25 44.25

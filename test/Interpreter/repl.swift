@@ -32,7 +32,7 @@ var aString = String() // CHECK: aString : String = ""
 
 String(-1) // CHECK: String = "-1"
 String(-112312312)  // CHECK: String = "-112312312"
-String(4.0)  // CHECK: String = "4"
+String(4.0)  // CHECK: String = "4.0"
 
 1 +
 44
@@ -74,9 +74,9 @@ f1 +
 
 func r13792487(x: Float64) -> Float64 { return x }
 r13792487(1234.0)
-// CHECK: Double = 1234{{$}}
+// CHECK: Double = 1234.0{{$}}
 r13792487(1234)
-// CHECK: Double = 1234{{$}}
+// CHECK: Double = 1234.0{{$}}
 
 var ab = (1,
 2)
@@ -100,7 +100,7 @@ var array = [1, 2, 3, 4, 5]
 // CHECK: array : Array<Int> = [1, 2, 3, 4, 5]
 
 var dict = [ "Hello" : 1.5, "World" : 3.0 ]
-// CHECK: Dictionary<String, Double> = ["Hello": 1.5, "World": 3]
+// CHECK: Dictionary<String, Double> = ["Hello": 1.5, "World": 3.0]
 
 0..10
 // FIXME: Disabled CHECK for Range<Int> = 0...10 until we get general printing going

@@ -54,7 +54,7 @@ testArrayFromStream()
 
 func testMap() {
   var floatPrimes = primes0.map { Float($0) }
-  // CHECK-NEXT: <2> <3> <5> <7> <11> .
+  // CHECK-NEXT: <2.0> <3.0> <5.0> <7.0> <11.0> .
   for y in floatPrimes { print("<\(y)> ") }
   println(".")
 }

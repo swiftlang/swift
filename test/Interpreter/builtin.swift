@@ -6,8 +6,8 @@ println(_uint64ToString(UInt64(Int32(Builtin.bitcast_FPIEEE32_Int32(Float32(1).v
 println(_uint64ToString(UInt64(Builtin.bitcast_FPIEEE64_Int64(Float64(1).value)), radix: 16)) // CHECK: {{^}}3ff0000000000000{{$}}
 
 // Check that floating point literals work
-println("\(1.0)") // CHECK: {{^}}1{{$}}
-println("\(-1.0)") // CHECK: {{^}}-1{{$}}
+println("\(1.0)") // CHECK: {{^}}1.0{{$}}
+println("\(-1.0)") // CHECK: {{^}}-1.0{{$}}
 println("\(Float32(340282350000000000000000000000000000000.0))") // CHECK: {{^}}3.40282346638529e+38{{$}}
 println("\(Float32(-340282350000000000000000000000000000000.0))") // CHECK: {{^}}-3.40282346638529e+38{{$}}
 let double : Double = 0.999999999

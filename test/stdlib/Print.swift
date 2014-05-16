@@ -74,10 +74,10 @@ func assertEquals(
 }
 
 func test_StdlibTypesPrinted() {
-  printedIs(Float(1.0), "1")
-  printedIs(Float(-1.0), "-1")
-  printedIs(Double(1.0), "1")
-  printedIs(Double(-1.0), "-1")
+  printedIs(Float(1.0), "1.0")
+  printedIs(Float(-1.0), "-1.0")
+  printedIs(Double(1.0), "1.0")
+  printedIs(Double(-1.0), "-1.0")
 
   printedIs(CChar(42), "42")
   printedIs(CUnsignedChar(42), "42")
@@ -90,10 +90,10 @@ func test_StdlibTypesPrinted() {
   printedIs(CInt(42), "42")
   printedIs(CLong(42), "42")
   printedIs(CLongLong(42), "42")
-  printedIs(CFloat(1.0), "1")
-  printedIs(CFloat(-1.0), "-1")
-  printedIs(CDouble(1.0), "1")
-  printedIs(CDouble(-1.0), "-1")
+  printedIs(CFloat(1.0), "1.0")
+  printedIs(CFloat(-1.0), "-1.0")
+  printedIs(CDouble(1.0), "1.0")
+  printedIs(CDouble(-1.0), "-1.0")
 
   printedIs(CWideChar(42), "*")
   printedIs(CChar16(42), "42")
@@ -203,18 +203,18 @@ func test_FloatingPointPrinting() {
   printedIs(Float.inf(), "inf")
   printedIs(-Float.inf(), "-inf")
   printedIs(Float.NaN(), "nan")
-  printedIs(Float(0.0), "0")
-  printedIs(Float(1.0), "1")
-  printedIs(Float(-1.0), "-1")
+  printedIs(Float(0.0), "0.0")
+  printedIs(Float(1.0), "1.0")
+  printedIs(Float(-1.0), "-1.0")
   printedIs(Float(100.125), "100.125")
   printedIs(Float(-100.125), "-100.125")
 
   printedIs(Double.inf(), "inf")
   printedIs(-Double.inf(), "-inf")
   printedIs(Double.NaN(), "nan")
-  printedIs(Double(0.0), "0")
-  printedIs(Double(1.0), "1")
-  printedIs(Double(-1.0), "-1")
+  printedIs(Double(0.0), "0.0")
+  printedIs(Double(1.0), "1.0")
+  printedIs(Double(-1.0), "-1.0")
   printedIs(Double(100.125), "100.125")
   printedIs(Double(-100.125), "-100.125")
 
@@ -248,10 +248,10 @@ func test_CTypesPrinting() {
   printedIs(CInt(42), "42")
   printedIs(CLong(42), "42")
   printedIs(CLongLong(42), "42")
-  printedIs(CFloat(1.0), "1")
-  printedIs(CFloat(-1.0), "-1")
-  printedIs(CDouble(1.0), "1")
-  printedIs(CDouble(-1.0), "-1")
+  printedIs(CFloat(1.0), "1.0")
+  printedIs(CFloat(-1.0), "-1.0")
+  printedIs(CDouble(1.0), "1.0")
+  printedIs(CDouble(-1.0), "-1.0")
 
   printedIs(CWideChar(42), "*")
   printedIs(CChar16(42), "42")
@@ -509,7 +509,7 @@ func test_StringInterpolation() {
   assertEquals("2", "\(1 + 1)")
   assertEquals("aaa1bbb2ccc", "aaa\(1)bbb\(2)ccc")
 
-  assertEquals("1", "\(1.0)")
+  assertEquals("1.0", "\(1.0)")
   assertEquals("1.5", "\(1.5)")
   assertEquals("1e-12", "\(1.0 / (1000000000000))")
 

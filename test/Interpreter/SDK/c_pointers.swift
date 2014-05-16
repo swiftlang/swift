@@ -30,7 +30,7 @@ nsRed.getRed(&r, green: &g, blue: &b, alpha: &a)
 
 // CHECK-LABEL: Red is:
 println("Red is:")
-println("<\(r) \(g) \(b) \(a)>") // CHECK-NEXT: <1 0 0 1>
+println("<\(r) \(g) \(b) \(a)>") // CHECK-NEXT: <1.0 0.0 0.0 1.0>
 
 //
 // Void C pointers
