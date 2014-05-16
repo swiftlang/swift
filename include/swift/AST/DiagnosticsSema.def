@@ -1269,7 +1269,8 @@ NOTE(not_objc_swift_enum,sema_objc,none,
 NOTE(not_objc_generic_type_param,sema_objc,none,
      "generic type parameters cannot be represented in Objective-C", ())
 NOTE(not_objc_function_type_param,sema_objc,none,
-     "Swift functions cannot be represented in Objective-C", ())
+     "function types cannot be represented in Objective-C unless their "
+     "parameters and returns can be", ())
 NOTE(objc_inferring_on_objc_protocol_member,sema_objc,none,
      "inferring '@objc' because the declaration is a member of "
      "an '@objc' protocol", ())

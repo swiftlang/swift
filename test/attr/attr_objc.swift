@@ -1652,3 +1652,31 @@ class Sub : Super {
   @objc(foo) // expected-error{{declaration has a different @objc name from the declaration it overrides ('foo' vs. 'renamedFoo')}}
   override var foo: Int { get { return 5 } }
 }
+
+enum NotObjCEnum { case X }
+struct NotObjCStruct {}
+
+// Closure arguments can only be @objc if their parameters and returns are.
+// CHECK-LABEL: @objc class ClosureArguments
+@objc class ClosureArguments {
+  // CHECK: @objc func foo
+  @objc func foo(f: Int -> ()) {}
+  // CHECK: @objc func bar
+  @objc func bar(f: NotObjCEnum -> NotObjCStruct) {} // expected-error{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}} expected-note{{function types cannot be represented in Objective-C unless their parameters and returns can be}}
+  // CHECK: @objc func bas
+  @objc func bas(f: NotObjCEnum -> ()) {} // expected-error{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}} expected-note{{function types cannot be represented in Objective-C unless their parameters and returns can be}}
+  // CHECK: @objc func zim
+  @objc func zim(f: () -> NotObjCStruct) {} // expected-error{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}} expected-note{{function types cannot be represented in Objective-C unless their parameters and returns can be}}
+  // CHECK: @objc func zang
+  @objc func zang(f: (NotObjCEnum, NotObjCStruct) -> ()) {} // expected-error{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}} expected-note{{function types cannot be represented in Objective-C unless their parameters and returns can be}}
+  // CHECK: @objc func fooImplicit
+  func fooImplicit(f: Int -> ()) {}
+  // CHECK: {{^}}  func barImplicit
+  func barImplicit(f: NotObjCEnum -> NotObjCStruct) {}
+  // CHECK: {{^}}  func basImplicit
+  func basImplicit(f: NotObjCEnum -> ()) {}
+  // CHECK: {{^}}  func zimImplicit
+  func zimImplicit(f: () -> NotObjCStruct) {}
+  // CHECK: {{^}}  func zangImplicit
+  func zangImplicit(f: (NotObjCEnum, NotObjCStruct) -> ()) {}
+}
