@@ -26,10 +26,10 @@ func stateFromPlistLame(plist: Dictionary<String, AnyObject>) -> State? {
 func stateFromPlistCool(plist: Dictionary<String, AnyObject>) -> State? {
   switch (plist["name"], plist["population"], plist["abbrev"]) {
   case let (.Some(name as NSString), .Some(pop as NSNumber), .Some(abbr as NSString))
-  where abbrev.length == 2:
+  where abbr.length == 2:
     return State(name: name,
-                 population: population.integerValue,
-                 abbrev: abbrev)
+                 population: pop.integerValue,
+                 abbrev: abbr)
   default:
     return nil
   }
