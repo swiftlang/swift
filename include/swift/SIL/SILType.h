@@ -364,6 +364,43 @@ public:
   /// *NOTE* Only call on SILTypes for metatype types.
   SILType getMetatypeInstanceType() const;
 
+  /// Returns true if this type is a native object type.
+  bool isBuiltinNativeObjectType() const {
+    return isa<BuiltinNativeObjectType>(getSwiftRValueType());
+  }
+
+  /// Returns true if this type is a raw pointer type.
+  bool isBuiltinRawPointerType() const {
+    return isa<BuiltinRawPointerType>(getSwiftRValueType());
+  }
+
+  /// Returns true if this SILType is any builtin type.
+  bool isBuiltinType() const {
+    return isa<BuiltinType>(getSwiftRValueType());
+  }
+
+  /// Returns true if this SILType is an unknown object type. An unknown object
+  /// type is a builtin opaque Objective-C pointer type.
+  bool isBuiltinUnknownObjectType() const {
+    return isa<BuiltinUnknownObjectType>(getSwiftRValueType());
+  }
+
+  /// Returns true if this SILType is a builtin integer type.
+  bool isBuiltinIntegerType() const {
+    return isa<BuiltinIntegerType>(getSwiftRValueType());
+  }
+
+  /// Returns true if this SILType is a builtin float type.
+  bool isBuiltinFloatType() const {
+    return isa<BuiltinFloatType>(getSwiftRValueType());
+  }
+
+  /// Returns true if this SILType has references to unbound generic types.
+  bool isGenericType() const;
+
+  /// Returns true if this SILType is an aggregate that contains \p Ty
+  bool aggregateContainsRecord(SILType Ty, SILModule &SILMod) const;
+
   //
   // Accessors for types used in SIL instructions:
   //

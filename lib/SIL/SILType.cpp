@@ -140,3 +140,58 @@ SILType SILType::getMetatypeInstanceType() const {
 
   return SILType::getPrimitiveObjectType(instanceType->getCanonicalType());
 }
+
+bool SILType::isGenericType() const {
+  return getSwiftRValueType().findIf([](Type type) -> bool {
+    return isa<ArchetypeType>(type.getPointer());
+  });
+}
+
+bool SILType::aggregateContainsRecord(SILType Record, SILModule &Mod) const {
+  assert(!isGenericType() && "Agg should be proven to not be generic "
+                             "before passed to this function.");
+  assert(!Record.isGenericType() && "Record should be proven to not be generic "
+                                    "before passed to this function.");
+
+  llvm::SmallVector<SILType, 8> Worklist;
+  Worklist.push_back(*this);
+
+  // For each "subrecord" of agg in the worklist...
+  while (!Worklist.empty()) {
+    SILType Ty = Worklist.pop_back_val();
+
+    // If it is record, we succeeded. Return true.
+    if (Ty == Record)
+      return true;
+
+    // Otherwise, we gather up sub-records that need to be checked for
+    // checking... First handle the tuple case.
+    if (CanTupleType TT = Ty.getAs<TupleType>()) {
+      for (unsigned i = 0, e = TT->getNumElements(); i != e; ++i)
+        Worklist.push_back(Ty.getTupleElementType(i));
+      continue;
+    }
+
+    // Then if we have an enum...
+    if (EnumDecl *E = Ty.getEnumOrBoundGenericEnum()) {
+      for (auto Elt : E->getAllElements())
+        if (Elt->hasArgumentType())
+          Worklist.push_back(Ty.getEnumElementType(Elt, Mod));
+      continue;
+    }
+
+    // Then if we have a struct address...
+    if (StructDecl *S = Ty.getStructOrBoundGenericStruct())
+      for (VarDecl *Var : S->getStoredProperties())
+        Worklist.push_back(Ty.getFieldType(Var, Mod));
+
+    // If we have a class address, it is a pointer so it can not contain other
+    // types.
+
+    // If we reached this point, then this type has no subrecords. Since it does
+    // not equal our record, we can skip it.
+  }
+
+  // Could not find the record in the aggregate.
+  return false;
+}
