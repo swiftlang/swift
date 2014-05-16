@@ -86,9 +86,3 @@ func testProtocolWrapper(conformer: ForwardClassUser) {
 }
 testProtocolWrapper(ProtoConformer())
 
-
-func testPartialClassCategories() {
-  PartialBaseClass().doPartialClassCategoryThing()
-  PartialSubClass().doPartialClassCategoryThing()
-}
-

@@ -29,9 +29,8 @@ void doSomethingProto(id <ForwardProto> arg);
 @end
 
 
-// If you get an error on the next lines, you probably aren't using the correct Clang repository.
-@partial_interface PartialBaseClass;
-@partial_interface PartialSubClass : NSObject;
+@class PartialBaseClass;
+@class PartialSubClass /* : NSObject */;
 void doSomethingPartialBase(PartialBaseClass *arg);
 void doSomethingPartialSub(PartialSubClass *arg);
 
@@ -39,13 +38,6 @@ void doSomethingPartialSub(PartialSubClass *arg);
 - (NSObject *)safeOverridePartialSub:(PartialSubClass *)arg;
 - (NSObject *)unsafeOverridePartialSubParam:(NSObject *)arg;
 - (PartialSubClass *)unsafeOverridePartialSubReturn:(PartialSubClass *)arg;
-@end
-
-@interface PartialBaseClass ()
-- (void)doPartialClassCategoryThing;
-@end
-@interface PartialSubClass ()
-- (void)doPartialClassCategoryThing;
 @end
 
 

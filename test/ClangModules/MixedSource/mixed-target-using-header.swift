@@ -40,12 +40,6 @@ func testProtocolWrapper(conformer: ForwardClassUser) {
 }
 testProtocolWrapper(ProtoConformer())
 
-
-func testPartialClassCategories() {
-  PartialBaseClass().doPartialClassCategoryThing()
-  PartialSubClass().doPartialClassCategoryThing()
-}
-
 func testStruct(p: Point) -> Point {
   var result = p
   result.y += 5
