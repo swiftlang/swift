@@ -545,9 +545,8 @@ SwiftZone::SwiftZone() : lock(PTHREAD_RWLOCK_INITIALIZER) {
 
 size_t swift::_swift_zone_size(malloc_zone_t *zone, const void *pointer) {
   swiftZone.readLock();
-  void *ptr = (void *)((unsigned long)pointer & ~arenaMask);
   size_t value = 0;
-  auto it = swiftZone.arenas.find(pointerToArena(ptr));
+  auto it = swiftZone.arenas.find(pointerToArena(pointer));
   if (it) {
     value = it->second.byteSize;
   } else {
