@@ -425,8 +425,13 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
   GenericParamList *contextParams = nullptr;
   if (!declarationOnly) {
     // We need to construct a linked list of GenericParamList. The outermost
-    // list appears first in the module file.
-    DeclContext *outerParamContext = MF->getAssociatedModule();
+    // list appears first in the module file. Force the declaration's context to
+    // be the current module, not the original module associated with this
+    // module file. A generic param decl at module scope cannot refer to another
+    // module because we would have no way lookup the original module when
+    // serializing a copy of the function. This comes up with generic
+    // reabstraction thunks which have shared linkage.
+    DeclContext *outerParamContext = SILMod.getSwiftModule();
     while(true) {
       // Params' OuterParameters will point to contextParams.
       auto *Params = MF->maybeReadGenericParams(outerParamContext,

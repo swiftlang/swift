@@ -1136,6 +1136,8 @@ void Serializer::writeCrossReference(const Decl *D) {
   writeCrossReference(D->getDeclContext());
 
   if (auto genericParam = dyn_cast<GenericTypeParamDecl>(D)) {
+    assert(!D->getDeclContext()->isModuleScopeContext() &&
+           "Cannot cross reference a generic type decl at module scope.");
     abbrCode = DeclTypeAbbrCodes[XRefGenericParamPathPieceLayout::Code];
     XRefGenericParamPathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                                 genericParam->getIndex());

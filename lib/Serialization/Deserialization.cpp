@@ -787,6 +787,20 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC,
       DeclID paramDeclID;
       GenericParamLayout::readRecord(scratch, paramDeclID);
       auto genericParam = cast<GenericTypeParamDecl>(getDecl(paramDeclID, DC));
+      // FIXME: There are unfortunate inconsistencies in the treatment of
+      // generic param decls. Currently the first request for context wins
+      // because we don't want to change context on-the-fly.
+      // Here are typical scenarios:
+      // (1) AST reads decl, get's scope.
+      //     Later, readSILFunction tries to force module scope.
+      // (2) readSILFunction forces module scope.
+      //     Later, readVTable requests an enclosing scope.
+      // ...other combinations are possible, but as long as AST lookups
+      // precede SIL linkage, we should be ok.
+      assert((genericParam->getDeclContext()->isModuleScopeContext() ||
+              DC->isModuleScopeContext() ||
+              genericParam->getDeclContext() == DC) &&
+             "Mismatched decl context for generic types.");
       params.push_back(GenericParam(genericParam));
       break;
     }
