@@ -65,3 +65,57 @@ do {
   println(x[0].1) // CHECK: true
 } while false
 println("still alive") // CHECK: still alive
+
+// Construct some arrays and compare by equality.
+let arr1 = [1, 2, 3, 4]
+let arr2 = [1, 2, 3, 4]
+let arr3 = [1, 2]
+let arr4 = [5, 6]
+
+let slice1_1_2 = arr1[1...2]
+let slice2_1_2 = arr2[1...2]
+let slice1_2_3 = arr1[2..3]
+let slice2_2_3 = arr2[2..3]
+
+let contig_arr1: NativeArray<Int> = [1, 2, 3, 4]
+let contig_arr2: NativeArray<Int> = [1, 2, 3, 4]
+let contig_arr3: NativeArray<Int> = [1, 2]
+let contig_arr4: NativeArray<Int> = [5, 6]
+
+// CHECK: arr1 == arr1: true
+// CHECK-NEXT: arr1 == arr2: true
+// CHECK-NEXT: arr1 != arr2: false
+// CHECK-NEXT: arr2 == arr3: false
+// CHECK-NEXT: arr2 != arr3: true
+// CHECK-NEXT: arr1 != arr4: true
+// CHECK-NEXT: arr1 == arr4: false
+// CHECK-NEXT: slice1_1_2 == slice1_1_2: true
+// CHECK-NEXT: slice1_1_2 == slice2_1_2: true
+// CHECK-NEXT: slice1_1_2 != slice1_1_2: false
+// CHECK-NEXT: slice1_2_3 == slice2_2_3: true
+// CHECK-NEXT: contig_arr1 == contig_arr1: true
+// CHECK-NEXT: contig_arr1 == contig_arr2: true
+// CHECK-NEXT: contig_arr1 != contig_arr2: false
+// CHECK-NEXT: contig_arr2 == contig_arr3: false
+// CHECK-NEXT: contig_arr2 != contig_arr3: true
+// CHECK-NEXT: contig_arr1 != contig_arr4: true
+// CHECK-NEXT: contig_arr1 == contig_arr4: false
+println("arr1 == arr1: \(arr1 == arr1)")
+println("arr1 == arr2: \(arr1 == arr2)")
+println("arr1 != arr2: \(arr1 != arr2)")
+println("arr2 == arr3: \(arr2 == arr3)")
+println("arr2 != arr3: \(arr2 != arr3)")
+println("arr1 != arr4: \(arr1 != arr4)")
+println("arr1 == arr4: \(arr1 == arr4)")
+println("slice1_1_2 == slice1_1_2: \(slice1_1_2 == slice1_1_2)")
+println("slice1_1_2 == slice2_1_2: \(slice1_1_2 == slice2_1_2)")
+println("slice1_1_2 != slice1_1_2: \(slice1_1_2 != slice1_1_2)")
+println("slice1_2_3 == slice2_2_3: \(slice1_2_3 == slice2_2_3)")
+println("contig_arr1 == contig_arr1: \(contig_arr1 == contig_arr1)")
+println("contig_arr1 == contig_arr2: \(contig_arr1 == contig_arr2)")
+println("contig_arr1 != contig_arr2: \(contig_arr1 != contig_arr2)")
+println("contig_arr2 == contig_arr3: \(contig_arr2 == contig_arr3)")
+println("contig_arr2 != contig_arr3: \(contig_arr2 != contig_arr3)")
+println("contig_arr1 != contig_arr4: \(contig_arr1 != contig_arr4)")
+println("contig_arr1 == contig_arr4: \(contig_arr1 == contig_arr4)")
+>>>>>>> Add basic '==' for Array, NativeArray, and Slice.
