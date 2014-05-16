@@ -5,6 +5,9 @@
 //
 // RUN: %target-run %t/a.out KeyTypeNotBridged 2>&1 | FileCheck %s -check-prefix=CHECK
 // RUN: %target-run %t/a.out ValueTypeNotBridged 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out DuplicateKeys1 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out DuplicateKeys2 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out DuplicateKeys3 2>&1 | FileCheck %s -check-prefix=CHECK
 
 // CHECK: OK
 // CHECK: CRASHED: SIG{{ILL|TRAP}}
@@ -52,7 +55,7 @@ assert(isBridgedToObjectiveC(BridgedVerbatimRefTy.self))
 assert(isBridgedVerbatimToObjectiveC(BridgedVerbatimRefTy.self))
 
 if true {
-  // Sanity checks.
+  // Sanity checks.  This code should not trap.
   var d = Dictionary<BridgedVerbatimRefTy, BridgedVerbatimRefTy>()
   var nsd: NSDictionary = d
 }
@@ -67,6 +70,23 @@ if arg == "ValueTypeNotBridged" {
   var d = Dictionary<BridgedVerbatimRefTy, NotBridgedValueTy>()
   println("OK")
   var nsd: NSDictionary = d
+}
+
+if arg == "DuplicateKeys1" {
+  println("OK")
+  Dictionary.convertFromDictionaryLiteral(
+    (10, 1010), (20, 1020), (30, 1030), (10, 0))
+}
+
+if arg == "DuplicateKeys2" {
+  println("OK")
+  Dictionary.convertFromDictionaryLiteral(
+    (10, 1010), (20, 1020), (30, 1030), (10, 1010))
+}
+
+if arg == "DuplicateKeys3" {
+  println("OK")
+  var d = [ 10: 1010, 10: 0 ]
 }
 
 println("BUSTED: should have crashed already")

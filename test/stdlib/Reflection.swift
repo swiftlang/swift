@@ -354,8 +354,8 @@ println("\(intArrayMirror[4].0): \(intArrayMirror[4].1.summary)")
 let dict = ["One":1,"Two":2,"Three":3,"Four":4,"Five":5]
 // CHECK-NEXT: ▿ 5 key/value pairs
 // CHECK-NEXT:   ▿ [0]: (2 elements)
-// CHECK-NEXT:     - .0: One
-// CHECK-NEXT:     - .1: 1
+// CHECK-NEXT:     - .0: Two
+// CHECK-NEXT:     - .1: 2
 // CHECK-NEXT:   ▿ [1]: (2 elements)
 // CHECK-NEXT:     - .0: Four
 // CHECK-NEXT:     - .1: 4
@@ -366,8 +366,8 @@ let dict = ["One":1,"Two":2,"Three":3,"Four":4,"Five":5]
 // CHECK-NEXT:     - .0: Three
 // CHECK-NEXT:     - .1: 3
 // CHECK-NEXT:   ▿ [4]: (2 elements)
-// CHECK-NEXT:     - .0: Two
-// CHECK-NEXT:     - .1: 2
+// CHECK-NEXT:     - .0: One
+// CHECK-NEXT:     - .1: 1
 dump(dict)
 
 #if os(OSX) || os(iOS)

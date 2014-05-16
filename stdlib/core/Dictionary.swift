@@ -205,6 +205,8 @@ protocol _DictionaryStorage {
   mutating func updateValue(value: ValueType, forKey: KeyType) -> ValueType?
   mutating func deleteKey(key: KeyType) -> Bool
   var count: Int { get }
+
+  class func fromArray(elements: Array<(KeyType, ValueType)>) -> Self
 }
 
 /// The inverse of the default hash table load factor.  Factored out so that it
@@ -387,6 +389,23 @@ struct _NativeDictionaryStorage<KeyType : Hashable, ValueType> :
     }
   }
 
+  @transparent
+  static func getMinCapacity(
+      requestedCount: Int, _ maxLoadFactorInverse: Double) -> Int {
+    // `requestedCount + 1` below ensures that we don't fill in the last hole
+    return max(Int(Double(requestedCount) * maxLoadFactorInverse),
+               requestedCount + 1)
+  }
+
+  /// Storage should be uniquely referenced.
+  /// The `key` should not be present in the dictionary.
+  /// This function does *not* update `count`.
+  mutating func unsafeAddNew(#key: KeyType, value: ValueType) {
+    var (i, found) = _find(key, _bucket(key))
+    assert(!found, "unsafeAddNew was called, but the key is already present")
+    self[i.offset] = Element(key: key, value: value)
+  }
+
   //
   // _DictionaryStorage conformance
   //
@@ -425,6 +444,23 @@ struct _NativeDictionaryStorage<KeyType : Hashable, ValueType> :
 
   mutating func deleteKey(key: KeyType) -> Bool {
     fatal("don't call mutating methods on _NativeDictionaryStorage")
+  }
+
+  static func fromArray(
+      elements: Array<(KeyType, ValueType)>
+  ) -> _NativeDictionaryStorage<KeyType, ValueType> {
+    let requiredCapacity =
+      _NativeDictionaryStorage<KeyType, ValueType>.getMinCapacity(
+          elements.count, _dictionaryDefaultMaxLoadFactorInverse)
+    var nativeStorage = _NativeDictionaryStorage<KeyType, ValueType>(
+        minimumCapacity: requiredCapacity)
+    for (key, value) in elements {
+      var (i, found) = nativeStorage._find(key, nativeStorage._bucket(key))
+      assert(!found, "dictionary literal contains duplicate keys")
+      nativeStorage[i.offset] = Element(key: key, value: value)
+    }
+    nativeStorage.count = elements.count
+    return nativeStorage
   }
 }
 
@@ -607,6 +643,11 @@ class _NativeDictionaryStorageOwnerBase
     super.init()
   }
 
+  init(nativeStorage: _NativeDictionaryStorage<KeyType, ValueType>) {
+    self.nativeStorage = nativeStorage
+    super.init()
+  }
+
   var nativeStorage: NativeStorage
 
   //
@@ -714,6 +755,12 @@ struct _CocoaDictionaryStorage : _DictionaryStorage {
   var count: Int {
     return cocoaDictionary.count
   }
+
+  static func fromArray(
+      elements: Array<(AnyObject, AnyObject)>
+  ) -> _CocoaDictionaryStorage {
+    fatal("this function should never be called")
+  }
 }
 
 enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
@@ -767,15 +814,6 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
     }
   }
 
-  /// The `key` should not be present in the dictionary.
-  /// Does *not* update `count`.
-  func nativeUnsafeAdd(
-      nativeStorage: NativeStorage, key: KeyType, value: ValueType) {
-    var (i, found) = nativeStorage._find(key, nativeStorage._bucket(key))
-    assert(!found)
-    nativeStorage[i.offset] = _NativeStorageElement(key: key, value: value)
-  }
-
   /// Ensure this we hold a unique reference to a native storage
   /// having at least `minimumCapacity` elements.
   mutating func ensureUniqueNativeStorage(minimumCapacity: Int)
@@ -789,7 +827,7 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
       }
 
       let newNativeOwner = NativeStorageOwner(minimumCapacity: minimumCapacity)
-      let newNativeStorage = newNativeOwner.nativeStorage
+      var newNativeStorage = newNativeOwner.nativeStorage
       let newCapacity = newNativeStorage.capacity
 
       for i in 0..oldCapacity {
@@ -802,7 +840,7 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
             newNativeStorage[i] = x
           }
           else {
-            nativeUnsafeAdd(newNativeStorage, key: x!.key, value: x!.value)
+            newNativeStorage.unsafeAddNew(key: x!.key, value: x!.value)
           }
         }
       }
@@ -815,7 +853,7 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
     case .Cocoa(let cocoaStorage):
       let cocoaDictionary = cocoaStorage.cocoaDictionary
       let newNativeOwner = NativeStorageOwner(minimumCapacity: minimumCapacity)
-      let newNativeStorage = newNativeOwner.nativeStorage
+      var newNativeStorage = newNativeOwner.nativeStorage
       var oldCocoaGenerator = _CocoaDictionaryGenerator(cocoaDictionary)
       while let (key: AnyObject, value: AnyObject) = oldCocoaGenerator.next() {
         // FIXME: we should be using an `as` cast instead of `reinterpretCast`.
@@ -823,8 +861,8 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
         // ObjC existential
         //
         // FIXME: This assumes that KeyType and ValueType are bridged verbatim.
-        nativeUnsafeAdd(
-            newNativeStorage, key: reinterpretCast(key) as KeyType,
+        newNativeStorage.unsafeAddNew(
+            key: reinterpretCast(key) as KeyType,
             value: reinterpretCast(value) as ValueType)
       }
       newNativeStorage.count = cocoaDictionary.count
@@ -835,7 +873,7 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
   }
 
   mutating func migrateDataToNativeStorage(cocoaStorage: _CocoaDictionaryStorage) {
-    var minCapacity = getMinCapacity(
+    var minCapacity = NativeStorage.getMinCapacity(
         cocoaStorage.count, _dictionaryDefaultMaxLoadFactorInverse)
     var allocated = ensureUniqueNativeStorage(minCapacity).reallocated
     assert(allocated, "failed to allocate native dictionary storage")
@@ -913,14 +951,6 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
     }
   }
 
-  @transparent
-  func getMinCapacity(
-      requestedCount: Int, _ maxLoadFactorInverse: Double) -> Int {
-    // `requestedCount + 1` below ensures that we don't fill in the last hole
-    return max(Int(Double(requestedCount) * maxLoadFactorInverse),
-               requestedCount + 1)
-  }
-
   mutating func nativeUpdateValue(
       value: ValueType, forKey key: KeyType
   ) -> ValueType? {
@@ -929,7 +959,7 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
 
     let minCapacity = found
         ? nativeStorage.capacity
-        : getMinCapacity(
+        : NativeStorage.getMinCapacity(
               nativeStorage.count + 1,
               nativeStorage.maxLoadFactorInverse)
 
@@ -1065,6 +1095,12 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
     case .Cocoa(let cocoaStorage):
       return ._Cocoa(_CocoaDictionaryGenerator(cocoaStorage.cocoaDictionary))
     }
+  }
+
+  static func fromArray(
+      elements: Array<(KeyType, ValueType)>
+  ) -> _VariantDictionaryStorage<KeyType, ValueType> {
+    fatal("this function should never be called")
   }
 }
 
@@ -1417,6 +1453,12 @@ struct Dictionary<KeyType : Hashable, ValueType> : Collection,
         .Native(_NativeStorage.Owner(minimumCapacity: minimumCapacity))
   }
 
+  /// Private initializer.
+  init(_nativeStorage: _NativeDictionaryStorage<KeyType, ValueType>) {
+    _variantStorage =
+        .Native(_NativeStorage.Owner(nativeStorage: _nativeStorage))
+  }
+
   /// Private initializer used for bridging.
   init(_cocoaDictionary: _SwiftNSDictionary) {
     _variantStorage =
@@ -1492,6 +1534,15 @@ struct Dictionary<KeyType : Hashable, ValueType> : Collection,
   }
 
   //
+  // DictionaryLiteralConvertible conformance
+  //
+  static func convertFromDictionaryLiteral(elements: (KeyType, ValueType)...)
+                -> Dictionary<KeyType, ValueType> {
+    return Dictionary<KeyType, ValueType>(
+        _nativeStorage: _NativeDictionaryStorage.fromArray(elements))
+  }
+
+  //
   // APIs below this comment should be implemented strictly in terms of
   // *public* APIs above.  `_variantStorage` should not be accessed directly.
   //
@@ -1507,18 +1558,6 @@ struct Dictionary<KeyType : Hashable, ValueType> : Collection,
 
   var values: _Map<Dictionary, ValueType> {
     return _Map(self) { $0.1 }
-  }
-
-  //
-  // DictionaryLiteralConvertible conformance
-  //
-  static func convertFromDictionaryLiteral(elements: (KeyType, ValueType)...)
-                -> Dictionary {
-    var dict = Dictionary()
-    for (k, v) in elements {
-      dict.updateValue(v, forKey: k)
-    }
-    return dict
   }
 }
 

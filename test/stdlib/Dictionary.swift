@@ -812,6 +812,59 @@ func testDeleteChainNoCollision() {
 testDeleteChainNoCollision()
 // CHECK: testDeleteChainNoCollision done
 
+func test_convertFromDictionaryLiteral() {
+  if true {
+    var empty = Dictionary<Int, Int>.convertFromDictionaryLiteral()
+    assert(empty.count == 0)
+    assert(!empty[1111])
+  }
+  if true {
+    var d = Dictionary.convertFromDictionaryLiteral((10, 1010))
+    assert(d.count == 1)
+    assert(d[10]! == 1010)
+    assert(!d[1111])
+  }
+  if true {
+    var d = Dictionary.convertFromDictionaryLiteral(
+        (10, 1010), (20, 1020))
+    assert(d.count == 2)
+    assert(d[10]! == 1010)
+    assert(d[20]! == 1020)
+    assert(!d[1111])
+  }
+  if true {
+    var d = Dictionary.convertFromDictionaryLiteral(
+        (10, 1010), (20, 1020), (30, 1030))
+    assert(d.count == 3)
+    assert(d[10]! == 1010)
+    assert(d[20]! == 1020)
+    assert(d[30]! == 1030)
+    assert(!d[1111])
+  }
+  if true {
+    var d = Dictionary.convertFromDictionaryLiteral(
+        (10, 1010), (20, 1020), (30, 1030), (40, 1040))
+    assert(d.count == 4)
+    assert(d[10]! == 1010)
+    assert(d[20]! == 1020)
+    assert(d[30]! == 1030)
+    assert(d[40]! == 1040)
+    assert(!d[1111])
+  }
+  if true {
+    var d: Dictionary<Int, Int> = [ 10: 1010, 20: 1020, 30: 1030 ]
+    dump(d)
+    assert(d.count == 3)
+    assert(d[10]! == 1010)
+    assert(d[20]! == 1020)
+    assert(d[30]! == 1030)
+  }
+
+
+  println("test_convertFromDictionaryLiteral done")
+}
+test_convertFromDictionaryLiteral()
+// CHECK: test_convertFromDictionaryLiteral done
 
 //===---
 // NSDictionary -> Dictionary bridging tests.
