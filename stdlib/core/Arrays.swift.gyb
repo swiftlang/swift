@@ -718,7 +718,7 @@ func _arrayElementType<T>(a: Array<T>) -> Any.Type {
 
 /// Implement the semantics of (a as Array<T>), where a is an
 /// AnyObject[].
-func _arrayBridgedDownCast<T>(a: AnyObject[]) -> (T[])? {
+func _arrayBridgedDownCast<T>(a: AnyObject[]) -> T[]? {
   // If T is not bridged, conversion fails in O(1), yielding nil
   if !isBridgedToObjectiveC(T.self) {
     return nil
@@ -727,7 +727,7 @@ func _arrayBridgedDownCast<T>(a: AnyObject[]) -> (T[])? {
   // If the NSArray was originally created as a Swift ArrayType<U>,
   // conversion succeeds in O(1) if U is T or a subclass thereof. No
   // further dynamic type checks are required.
-  if let r = _arrayCheckedDownCast(a) as (T[])? {
+  if let r = _arrayCheckedDownCast(a) as T[]? {
     return r
   }
   
@@ -759,7 +759,7 @@ func _arrayBridgedDownCast<T>(a: AnyObject[]) -> (T[])? {
 /// Conversion used when Objective-C APIs using NSArray are expressed
 /// in Swift as T[], where T != AnyObject.
 func _arrayBridgeFromObjectiveC<T>(a: AnyObject[]) -> T[] {
-  if let b = (_arrayBridgedDownCast(a) as (T[])?) {
+  if let b = (_arrayBridgedDownCast(a) as T[]?) {
     return b
   }
   fatal("Failed to bridge NSArray from Objective-C")
@@ -768,7 +768,7 @@ func _arrayBridgeFromObjectiveC<T>(a: AnyObject[]) -> T[] {
 /// Returns an Array<Derived> containing the same elements as a in
 /// O(1) iff a's buffer elements are dynamically known to have
 /// type Derived or a type derived from Derived.
-func _arrayCheckedDownCast<Base, Derived>(a: Array<Base>) -> (Derived[])? {
+func _arrayCheckedDownCast<Base, Derived>(a: Array<Base>) -> Derived[]? {
   if let n = a.buffer.requestNativeBuffer() {
     if let n2 = n.asBufferOf(Derived.self) {
       return Array(ArrayBuffer(n2))

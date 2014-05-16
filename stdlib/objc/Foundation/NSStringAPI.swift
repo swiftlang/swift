@@ -411,7 +411,7 @@ extension String {
   /// \brief a Helper function for the two completePathIntoString overloads below
   func _completePathIntoString(
     inout outputName: String?, caseSensitive: Bool,
-    matchesIntoArray: ObjCMutablePointer<NSArray?>, filterTypes: (String[])?) -> Int {
+    matchesIntoArray: ObjCMutablePointer<NSArray?>, filterTypes: String[]?) -> Int {
 
     var nsOutputName: NSString? = .None
 
@@ -436,8 +436,8 @@ extension String {
   /// returns the actual number of matching paths.
   func completePathIntoString(
     inout outputName: String?, caseSensitive: Bool,
-    inout matchesIntoArray: (String[])?,
-    filterTypes: (String[])? = .None
+    inout matchesIntoArray: String[]?,
+    filterTypes: String[]? = .None
   ) -> Int {
 
     var nsMatches: NSArray? = .None
@@ -465,7 +465,7 @@ extension String {
   func completePathIntoString(
     inout outputName: String?,
     caseSensitive: Bool,
-    filterTypes: (String[])? = .None
+    filterTypes: String[]? = .None
   ) -> Int {
 
     return _completePathIntoString(
@@ -1006,7 +1006,7 @@ extension String {
   /// range and requested tags within the receiving string.
   func linguisticTagsInRange(
     range: NSRange, scheme: String, options: NSLinguisticTaggerOptions,
-    orthography: NSOrthography?, inout tokenRanges: (NSRange[])?
+    orthography: NSOrthography?, inout tokenRanges: NSRange[]?
   ) -> String[] {
     var tokenRanges_: NSArray? = .None
     var result = self._ns.linguisticTagsInRange(

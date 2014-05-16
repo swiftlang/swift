@@ -35,17 +35,19 @@ var h0 : Int?
 var h1 : Int??
 !h1! // no-warning
 var h2 : Int?[]
-var h3 : Int[]? // expected-error {{optional array type requires parentheses}} {{10-10=(}} {{15-15=)}}
+var h3 : Int[]?
+var h3a : Int?[][]
+var h3b : Int?[]?
 var h4 : (Int[])?
 var h5 : ((Int??[][])?[])?
-var h6 : Int??[][]?[]? = h5 // expected-error {{optional array type requires parentheses}} {{10-10=(}} {{19-19=)}}  expected-error {{optional array type requires parentheses}} {{10-10=(}} {{22-22=)}}
+var h6 : Int??[][]?[]? = h5 // expected-error 3{{multi-dimensional arrays involving optional types require parentheses}}
 var _ : Int = (h6![0]![0][0]!)! // no-warning
 var h7 : (Int,Int)?
 var h8 : (Int -> Int)?
 var h9 : Int? -> Int?
 var h10 : Int?.Type?.Type
 
-var h6a : Int!![][]![]! // expected-error {{implicitly unwrapped optional array type requires parentheses}} {{11-11=(}} {{20-20=)}}  expected-error {{implicitly unwrapped optional array type requires parentheses}} {{11-11=(}} {{23-23=)}}
+var h6a : Int!![][]![]! // expected-error 3 {{multi-dimensional arrays involving optional types require parentheses}}
 
 var i = Int?(42)
 

@@ -131,6 +131,73 @@ ParserResult<TypeRepr> Parser::parseType() {
   return parseType(diag::expected_type);
 }
 
+/// Determine whether this type representation has a multi-dimensional
+/// array with an possibly-implicitly-unwrapped optional somewhere
+/// between or after the dimensions, with no parentheses. If so,
+/// diagnose it, because this is confusing.
+static bool checkMultidimensionalArrayThroughOptionals(Parser &parser,
+                                                       TypeRepr *tyR) {
+  if (!tyR)
+    return false;
+
+  TypeRepr *firstArrayRepr = nullptr;
+  TypeRepr *secondArrayRepr = nullptr;
+  SourceLoc optionalLoc;
+  
+  // Local function that records that we've seen an optional. It
+  // returns true if we've detected a problem.
+  auto recordOptional = [&](SourceLoc loc) {
+    if (optionalLoc.isInvalid()) {
+      optionalLoc = loc;
+
+      // If both arrays came before the optional, forget the earlier
+      // one.
+      if (secondArrayRepr) {
+        firstArrayRepr = secondArrayRepr;
+        secondArrayRepr = nullptr;
+      }
+    }
+  };
+
+  while (true) {
+    // Track first and second array representations.
+    if (auto array = dyn_cast<ArrayTypeRepr>(tyR)) {
+      if (!firstArrayRepr) {
+        firstArrayRepr = array;
+      } else {
+        if (!secondArrayRepr)
+          secondArrayRepr = array;
+
+        if (optionalLoc.isValid())
+          break;
+      }
+
+      tyR = array->getBase();
+      continue;
+    }
+
+    if (auto optional = dyn_cast<OptionalTypeRepr>(tyR)) {
+      recordOptional(optional->getQuestionLoc());
+      tyR = optional->getBase();
+      continue;
+    }
+
+    if (auto implicitOpt = dyn_cast<ImplicitlyUnwrappedOptionalTypeRepr>(tyR)) {
+      recordOptional(implicitOpt->getExclamationLoc());
+      tyR = implicitOpt->getBase();
+      continue;
+    }
+
+    // Anything else breaks the chain.
+    return false;
+  };
+
+  parser.diagnose(optionalLoc, diag::multidimensional_array_optional)
+    .highlight(firstArrayRepr->getSourceRange())
+    .highlight(secondArrayRepr->getSourceRange());
+  return true;
+}
+
 /// parseType
 ///   type:
 ///     attribute-list type-function
@@ -173,29 +240,19 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID) {
     diagnose(brackets.Start, diag::generic_non_function);
   }
 
-  // Parse array types, plus recovery for optional array types.
-  // If we see "T[]?", emit a diagnostic; this type must be written "(T[])?"
-  // or "Optional<T[]>".
+  // Parse array and optional types, and complain if they are mixed.
   while (ty.isNonNull() && !Tok.isAtStartOfLine()) {
     if (Tok.is(tok::l_square)) {
       ty = parseTypeArray(ty.get());
-    } else if (Tok.is(tok::question_postfix) || isImplicitlyUnwrappedOptionalToken()) {
-      bool IsImplicitlyUnwrappedOptional = isImplicitlyUnwrappedOptionalToken();
-      if (isa<ArrayTypeRepr>(ty.get())) {
-        diagnose(Tok, diag::unsupported_unparenthesized_array_optional,
-                 IsImplicitlyUnwrappedOptional ? 1 : 0)
-            .fixItInsert(ty.get()->getStartLoc(), "(")
-            .fixItInsert(Lexer::getLocForEndOfToken(SourceMgr,
-                                                    ty.get()->getEndLoc()),
-                         ")");
-      }
-      if (IsImplicitlyUnwrappedOptional)
-        ty = parseTypeImplicitlyUnwrappedOptional(ty.get());
-      else
-        ty = parseTypeOptional(ty.get());
+    } else if (Tok.is(tok::question_postfix)) {
+      ty = parseTypeOptional(ty.get());
+    } else if (isImplicitlyUnwrappedOptionalToken()) {
+      ty = parseTypeImplicitlyUnwrappedOptional(ty.get());
     } else {
       break;
     }
+
+    checkMultidimensionalArrayThroughOptionals(*this, ty.getPtrOrNull());
   }
 
   if (ty.isNonNull() && !ty.hasCodeCompletion()) {
@@ -557,6 +614,7 @@ ParserResult<ArrayTypeRepr> Parser::parseTypeArray(TypeRepr *Base) {
     // Just build a normal array slice type.
     ATR = new (Context) ArrayTypeRepr(NestedType.get(), nullptr,
                                            SourceRange(lsquareLoc, rsquareLoc));
+
     if (NestedType.isParseError())
       return makeParserErrorResult(ATR);
     else
@@ -619,14 +677,15 @@ ParserResult<OptionalTypeRepr> Parser::parseTypeOptional(TypeRepr *base) {
   return makeParserResult(new (Context) OptionalTypeRepr(base, questionLoc));
 }
 
-/// Parse a single implicitly unwrapped optional suffix, given that we are looking at
-///  the exclamation mark.
+/// Parse a single implicitly unwrapped optional suffix, given that we
+/// are looking at the exclamation mark.
 ParserResult<ImplicitlyUnwrappedOptionalTypeRepr>
 Parser::parseTypeImplicitlyUnwrappedOptional(TypeRepr *base) {
   assert(Tok.is(tok::exclaim_postfix));
   SourceLoc exclamationLoc = consumeToken();
-  return makeParserResult(new (Context)
-                            ImplicitlyUnwrappedOptionalTypeRepr(base, exclamationLoc));
+  return makeParserResult(
+           new (Context) ImplicitlyUnwrappedOptionalTypeRepr(
+                           base, exclamationLoc));
 }
 
 //===--------------------------------------------------------------------===//
@@ -748,7 +807,8 @@ bool Parser::canParseType() {
     if (Tok.is(tok::l_square)) {
       if (!canParseTypeArray())
         return false;
-    } else if (Tok.is(tok::question_postfix) || isImplicitlyUnwrappedOptionalToken()) {
+    } else if (Tok.is(tok::question_postfix) || 
+               isImplicitlyUnwrappedOptionalToken()) {
       consumeToken();
     } else {
       break;
