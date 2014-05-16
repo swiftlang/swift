@@ -337,10 +337,14 @@ static void diagRecursivePropertyAccess(TypeChecker &TC, const Expr *E,
             MRE->getBase()->isImplicit()) {
           
           if (!MRE->isDirectPropertyAccess()) {
-            bool shouldDiagnose = true;
+            bool shouldDiagnose = false;
+            // Warn about any property access in the getter.
+            if (Accessor->isGetter())
+              shouldDiagnose = true;
+            // Warn about stores in the setter, but allow loads.
             if (Accessor->isSetter())
               shouldDiagnose = !dyn_cast_or_null<LoadExpr>(Parent.getAsExpr());
-            
+
             if (shouldDiagnose) {
               TC.diagnose(E->getLoc(), diag::recursive_accessor_reference,
                           Var->getName(), Accessor->isSetter());

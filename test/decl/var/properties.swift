@@ -949,3 +949,15 @@ class Test16608609 {
    }
 }
 
+// <rdar://problem/16941124> Overriding property observers warn about using the property value "within its own getter"
+class rdar16941124Base {
+   var x = 0
+}
+class rdar16941124Derived : rdar16941124Base {
+   var y = 0
+   override var x: Int {
+      didSet {
+         y = x + 1  // no warning.
+      }
+   }
+}
