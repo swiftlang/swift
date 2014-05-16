@@ -1772,6 +1772,15 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
         if (!fromProtocol->isObjC())
           goto unsupported_existential_cast;
       }
+      
+      if (!(fromType->isAnyObject() || fromType->isObjCExistentialType())) {
+        diagnose(diagLoc, diag::downcast_to_unrelated,
+                 origFromType, origToType).
+        highlight(diagFromRange).
+        highlight(diagToRange);
+        return CheckedCastKind::Unresolved;
+      }
+      
     } else {
       auto fromClass = fromType->getClassOrBoundGenericClass();
       if (!fromClass)

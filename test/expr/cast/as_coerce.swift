@@ -50,3 +50,14 @@ class C2<T> : C1<Int> { }
 var c2 = C2<()>()
 var c1 = c2 as C1
 c1.f(5)
+
+@objc protocol P {}
+class CC : P {}
+let cc: Any = CC()
+if cc is P { // expected-error{{downcast from 'Any' to unrelated type 'P'}}
+   println("P")
+}
+if let p = cc as P { // expected-error{{downcast from 'Any' to unrelated type 'P'}}
+   println("P")
+}
+
