@@ -61,23 +61,6 @@ class PlainClass {}
 testBridging(PlainClass(), "PlainClass")
 
 //===----------------------------------------------------------------------===//
-class BridgedClass : _BridgedToObjectiveC {
-  class func getObjectiveCType() -> Any.Type {
-    return C.self
-  }
-  func bridgeToObjectiveC() -> C {
-    return C()
-  }
-  class func bridgeFromObjectiveC(x: C) -> BridgedClass? {
-    fatal("implement")
-  }
-}
-
-// CHECK-NEXT: BridgedClass is custom-bridged
-// CHECK-NEXT: BridgedClass instance bridged as C
-testBridging(BridgedClass(), "BridgedClass")
-
-//===----------------------------------------------------------------------===//
 struct ConditionallyBridged<T>
   : _BridgedToObjectiveC, _ConditionallyBridgedToObjectiveC {
   static func getObjectiveCType() -> Any.Type {
