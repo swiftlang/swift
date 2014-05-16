@@ -29,9 +29,13 @@ func main(x: Int) -> Void
 // ASM-CHECK: .loc	1 [[@LINE+1]] 5
     call_me (
 // ASM-CHECK-NOT: .loc	1 [[@LINE+1]] 5
+// CHECK: @_TFF9linetable4mainFSiT_U_FT_T__promote0
         {
             var result = my_class.do_something(x)
             print ("Here is something you might consider doing: \(result).\n")
+// CHECK: call {{.*}} @swift_release {{.*}}, !dbg ![[CLOSURE_END:.*]]
+// CHECK-NEXT: ret void, !dbg ![[CLOSURE_END]]
+// CHECK: ![[CLOSURE_END]] = metadata !{i32 [[@LINE+1]]
         }
     )
 
@@ -52,7 +56,7 @@ func main(x: Int) -> Void
 // ASM-CHECK:__TFF9linetable4main{{.*}}_promote0:
 // ASM-CHECK-NOT: ret
 // The end-of-prologue should have a valid location.
-// ASM-CHECK: .loc	1 33 {{[0-9]+}} prologue_end
+// ASM-CHECK: .loc	1 34 {{[0-9]+}} prologue_end
 
 
 main(30)
