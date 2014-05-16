@@ -132,10 +132,10 @@ extern "C" BoxPair::Return swift_allocBox(Metadata const *type);
 // The "try" flag tells the runtime to not wait for memory
 // When no flag is needed, pass zero.
 //
-// If alignment is needed, then please round up to the desired alignment.
-// For example, a 12 byte allocation with 8 byte alignment becomes 16.
+// An "alignment mask" is just the alignment (a power of 2) minus 1.
 #define SWIFT_TRYALLOC 0x0001
-extern "C" void *swift_slowAlloc(size_t bytes, uintptr_t flags);
+extern "C" void *swift_slowAlloc(size_t bytes, size_t alignMask,
+                                 uintptr_t flags);
 
 // These exist as fast entry points for the above slow API.
 //
@@ -204,7 +204,7 @@ extern "C" void *swift_tryAlloc(AllocIndex idx);
 // If the caller cannot promise to zero the object during destruction,
 // then call these corresponding APIs:
 extern "C" void swift_dealloc(void *ptr, AllocIndex idx);
-extern "C" void swift_slowDealloc(void *ptr, size_t bytes);
+extern "C" void swift_slowDealloc(void *ptr, size_t bytes, size_t alignMask);
 
 /// Atomically increments the retain count of an object.
 ///
@@ -256,11 +256,14 @@ extern "C" size_t swift_retainCount(HeapObject *object);
 /// \param object - never null
 /// \param allocatedSize - the allocated size of the object from the
 ///   program's perspective, i.e. the value
+/// \param allocatedAlignMask - the alignment requirement that was passed
+///   to allocObject
 ///
 /// POSSIBILITIES: It may be useful to have a variant which
 /// requires the object to have been fully zeroed from offsets
 /// sizeof(SwiftHeapObject) to allocatedSize.
-extern "C" void swift_deallocObject(HeapObject *object, size_t allocatedSize);
+extern "C" void swift_deallocObject(HeapObject *object, size_t allocatedSize,
+                                    size_t allocatedAlignMask);
 
 /// Deallocate the given memory allocated by swift_allocBox; it was returned
 /// by swift_allocBox but is otherwise in an unknown state. The given Metadata

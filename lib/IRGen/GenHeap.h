@@ -110,7 +110,8 @@ private:
 /// Emit a heap object deallocation.
 void emitDeallocateHeapObject(IRGenFunction &IGF,
                               llvm::Value *object,
-                              llvm::Value *size);
+                              llvm::Value *size,
+                              llvm::Value *alignMask);
 
 } // end namespace irgen
 } // end namespace swift

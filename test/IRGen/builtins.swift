@@ -230,7 +230,7 @@ func move(ptr: Builtin.RawPointer) {
 
 func allocDealloc(size: Builtin.Word, align: Builtin.Word) {
   var ptr = Builtin.allocRaw(size, align)
-  Builtin.deallocRaw(ptr, size)
+  Builtin.deallocRaw(ptr, size, align)
 }
 
 func fence_test() {

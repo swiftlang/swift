@@ -643,7 +643,8 @@ void irgen::emitClassDeallocation(IRGenFunction &IGF, SILType selfType,
   // FIXME: Dynamic-layout deallocation size.
   llvm::Value *size, *alignMask;
   if (layout.isFixedLayout()) {
-    size = info.getLayout(IGF.IGM).emitSize(IGF.IGM);
+    size = layout.emitSize(IGF.IGM);
+    alignMask = layout.emitAlignMask(IGF.IGM);
   } else {
     llvm::Value *metadata = emitTypeMetadataRefForHeapObject(IGF, selfValue, 
                                                              selfType);
@@ -652,7 +653,7 @@ void irgen::emitClassDeallocation(IRGenFunction &IGF, SILType selfType,
   }
 
   selfValue = IGF.Builder.CreateBitCast(selfValue, IGF.IGM.RefCountedPtrTy);
-  emitDeallocateHeapObject(IGF, selfValue, size);
+  emitDeallocateHeapObject(IGF, selfValue, size, alignMask);
 }
 
 llvm::Constant *irgen::tryEmitClassConstantFragileInstanceSize(

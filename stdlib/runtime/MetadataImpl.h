@@ -515,11 +515,11 @@ template <size_t Size, size_t Alignment,
           bool HasAllocIndex = (Size <= MaxSizeForAllocIndex)>
 struct SwiftAllocator {
   static void *alloc() {
-    return swift_slowAlloc(Size, 0);
+    return swift_slowAlloc(Size, Alignment-1, 0);
   }
 
   static void dealloc(void *addr) {
-    swift_slowDealloc(addr, Size);
+    swift_slowDealloc(addr, Size, Alignment-1);
   }
 };
 
@@ -630,7 +630,9 @@ struct NonFixedBufferValueWitnesses : BufferValueWitnessesBase<Impl> {
       return reinterpret_cast<OpaqueValue*>(buffer);
     } else {
       OpaqueValue *value =
-        static_cast<OpaqueValue*>(swift_slowAlloc(vwtable->size, 0));
+        static_cast<OpaqueValue*>(swift_slowAlloc(vwtable->size,
+                                                  vwtable->getAlignmentMask(),
+                                                  0));
       buffer->PrivateData[0] = value;
       return value;
     }
@@ -648,7 +650,8 @@ struct NonFixedBufferValueWitnesses : BufferValueWitnessesBase<Impl> {
   static void deallocateBuffer(ValueBuffer *buffer, const Metadata *self) {
     auto vwtable = self->getValueWitnesses();
     if (IsKnownAllocated || !vwtable->isValueInline()) {
-      swift_slowDealloc(buffer->PrivateData[0], vwtable->size);
+      swift_slowDealloc(buffer->PrivateData[0], vwtable->size,
+                        vwtable->getAlignmentMask());
     }
   }
 };

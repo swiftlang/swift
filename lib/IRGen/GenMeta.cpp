@@ -1185,10 +1185,10 @@ namespace {
                                     storedProperties.end());
     unsigned allocSize = fields.size() * IGM.getPointerSize().getValue();
     auto allocSizeVal = llvm::ConstantInt::get(IGM.IntPtrTy, allocSize);
-    auto allocAlignVal = llvm::ConstantInt::get(IGM.IntPtrTy,
-                                        IGM.getPointerAlignment().getValue());
+    auto allocAlignMaskVal =
+      IGM.getSize(IGM.getPointerAlignment().asSize() - Size(1));
     llvm::Value *builtVectorAlloc
-      = IGF.emitAllocRawCall(allocSizeVal, allocAlignVal);
+      = IGF.emitAllocRawCall(allocSizeVal, allocAlignMaskVal);
     
     llvm::Value *builtVector
       = IGF.Builder.CreateBitCast(builtVectorAlloc, metadataArrayPtrTy);
@@ -1228,7 +1228,7 @@ namespace {
     // If the cmpxchg failed, someone beat us to landing their field type
     // vector. Deallocate ours and return the winner.
     IGF.Builder.emitBlock(raceLostBB);
-    IGF.emitDeallocRawCall(builtVectorAlloc, allocSizeVal);
+    IGF.emitDeallocRawCall(builtVectorAlloc, allocSizeVal, allocAlignMaskVal);
     auto raceVector = IGF.Builder.CreateIntToPtr(raceVectorInt,
                                                  metadataArrayPtrTy);
     IGF.Builder.CreateBr(doneBB);

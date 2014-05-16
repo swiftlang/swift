@@ -912,10 +912,9 @@ static OpaqueValue *tuple_allocateBuffer(ValueBuffer *buffer,
   if (IsInline)
     return reinterpret_cast<OpaqueValue*>(buffer);
 
-  // It's important to use 'stride' instead of 'size' because slowAlloc
-  // only guarantees alignment up to a multiple of the value passed.
   auto wtable = tuple_getValueWitnesses(metatype);
-  auto value = (OpaqueValue*) swift_slowAlloc(wtable->stride, 0);
+  auto value = (OpaqueValue*) swift_slowAlloc(wtable->size,
+                                              wtable->getAlignmentMask(), 0);
 
   *reinterpret_cast<OpaqueValue**>(buffer) = value;
   return value;
@@ -933,7 +932,7 @@ static void tuple_deallocateBuffer(ValueBuffer *buffer,
 
   auto wtable = tuple_getValueWitnesses(metatype);
   auto value = *reinterpret_cast<OpaqueValue**>(buffer);
-  swift_slowDealloc(value, wtable->stride);
+  swift_slowDealloc(value, wtable->size, wtable->getAlignmentMask());
 }
 
 /// Generic tuple value witness for 'destroy'.

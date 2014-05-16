@@ -76,7 +76,7 @@ bb0(%0 : $C):
   %2 = apply %1(%0) : $@cc(method) @thin (@owned C) -> @owned Builtin.NativeObject // user: %3
   %3 = unchecked_ref_cast %2 : $Builtin.NativeObject to $C // user: %4
   // CHECK-NEXT: [[SELF:%[a-zA-Z0-9]+]] = bitcast [[C_CLASS]]* [[SELF_OBJ]] to [[REF]]*
-  // CHECK-NEXT: call void @swift_deallocObject([[REF]]* [[SELF]], i64 16)
+  // CHECK-NEXT: call void @swift_deallocObject([[REF]]* [[SELF]], i64 16, i64 7)
   dealloc_ref %3 : $C                             // id: %4
   // CHECK-NEXT: ret void   
   %5 = tuple ()                                   // user: %6

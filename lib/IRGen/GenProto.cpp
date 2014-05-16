@@ -1678,7 +1678,9 @@ static void emitDeallocateBuffer(IRGenFunction &IGF,
     Address slot =
       IGF.Builder.CreateBitCast(buffer, IGF.IGM.Int8PtrPtrTy);
     llvm::Value *addr = IGF.Builder.CreateLoad(slot, "storage");
-    IGF.emitDeallocRawCall(addr, type.getSize(IGF, T));
+    auto sizeAndAlignMask = type.getSizeAndAlignmentMask(IGF, T);
+    IGF.emitDeallocRawCall(addr, sizeAndAlignMask.first,
+                           sizeAndAlignMask.second);
     return;
   }
 

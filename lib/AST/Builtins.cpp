@@ -568,8 +568,8 @@ static ValueDecl *getAllocOperation(ASTContext &Context, Identifier Id) {
 }
 
 static ValueDecl *getDeallocOperation(ASTContext &Context, Identifier Id) {
-  TupleTypeElt ArgElts[] = { Context.TheRawPointerType,
-                             BuiltinIntegerType::getWordType(Context) };
+  auto PtrSizeTy = BuiltinIntegerType::getWordType(Context);
+  TupleTypeElt ArgElts[] = { Context.TheRawPointerType, PtrSizeTy, PtrSizeTy };
   Type ResultTy = TupleType::getEmpty(Context);
   return getBuiltinFunction(Id, ArgElts, ResultTy);
 }

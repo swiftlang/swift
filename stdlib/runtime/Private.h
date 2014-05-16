@@ -25,6 +25,9 @@ namespace swift {
   extern "C" LLVM_LIBRARY_VISIBILITY LLVM_ATTRIBUTE_NORETURN
   void _swift_abortRetainUnowned(const void *object);
 
+  extern "C" LLVM_LIBRARY_VISIBILITY
+  void _swift_deallocClassInstance(HeapObject *object);
+
 } // end namespace swift
 
 #endif /* SWIFT_RUNTIME_PRIVATE_H */

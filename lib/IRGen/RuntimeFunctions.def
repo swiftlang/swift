@@ -44,16 +44,16 @@ FUNCTION(AllocBox,       swift_allocBox,      RuntimeCC,
          ARGS(TypeMetadataPtrTy),
          ATTRS(NoUnwind))
 
-// RefCounted *swift_allocObject(Metadata *type, size_t size, size_t align);
+// RefCounted *swift_allocObject(Metadata *type, size_t size, size_t alignMask);
 FUNCTION(AllocObject,    swift_allocObject,   RuntimeCC,
          RETURNS(RefCountedPtrTy),
          ARGS(TypeMetadataPtrTy, SizeTy, SizeTy),
          ATTRS(NoUnwind))
 
-// void swift_deallocObject(RefCounted *obj, size_t size);
+// void swift_deallocObject(RefCounted *obj, size_t size, size_t alignMask);
 FUNCTION(DeallocObject,  swift_deallocObject, RuntimeCC,
          RETURNS(VoidTy),
-         ARGS(RefCountedPtrTy, SizeTy),
+         ARGS(RefCountedPtrTy, SizeTy, SizeTy),
          ATTRS(NoUnwind))
 
 // void *swift_alloc(SwiftAllocIndex index);
@@ -68,16 +68,16 @@ FUNCTION(Dealloc,     swift_dealloc,    RuntimeCC,
          ARGS(Int8PtrTy, SizeTy),
          ATTRS(NoUnwind))
 
-// void *swift_slowAlloc(size_t size, size_t flags);
+// void *swift_slowAlloc(size_t size, size_t alignMask, size_t flags);
 FUNCTION(SlowAlloc,      swift_slowAlloc,     RuntimeCC,
          RETURNS(Int8PtrTy),
-         ARGS(SizeTy, SizeTy),
+         ARGS(SizeTy, SizeTy, SizeTy),
          ATTRS(NoUnwind))
 
-// void swift_slowDealloc(void *ptr, size_t size);
+// void swift_slowDealloc(void *ptr, size_t size, size_t alignMask);
 FUNCTION(SlowDealloc, swift_slowDealloc,RuntimeCC,
          RETURNS(VoidTy),
-         ARGS(Int8PtrTy, SizeTy),
+         ARGS(Int8PtrTy, SizeTy, SizeTy),
          ATTRS(NoUnwind))
 
 // void *swift_copyPOD(void *dest, void *src, Metadata *self);

@@ -21,6 +21,7 @@
 #include "llvm/Support/MathExtras.h"
 #include "Private.h"
 #include "Debug.h"
+#include <algorithm>
 #include <malloc/malloc.h>
 #include <cassert>
 #include <cstring>
@@ -46,7 +47,8 @@ _swift_allocObject_(HeapMetadata const *metadata, size_t requiredSize,
                     size_t requiredAlignmentMask) {
   // llvm::RoundUpToAlignment(size, mask + 1) generates terrible code
   auto size = (requiredSize + requiredAlignmentMask) & ~requiredAlignmentMask;
-  auto object = reinterpret_cast<HeapObject *>(swift_slowAlloc(size, 0));
+  auto object = reinterpret_cast<HeapObject *>(
+                             swift_slowAlloc(size, requiredAlignmentMask, 0));
   object->metadata = metadata;
   object->refCount = RC_INTERVAL;
   object->weakRefCount = WRC_INTERVAL;
@@ -79,6 +81,9 @@ namespace {
   struct PODBox : HeapObject {
     /// The size of the complete allocation.
     size_t allocatedSize;
+
+    /// The required alignment of the complete allocation.
+    size_t allocatedAlignMask;
     
     /// Returns the offset in bytes from the address of the header of a POD
     /// allocation with the given size and alignment.
@@ -92,7 +97,7 @@ namespace {
 static void destroyPOD(HeapObject *o) {
   auto box = static_cast<PODBox*>(o);
   // Deallocate the buffer.
-  return swift_deallocObject(box, box->allocatedSize);
+  return swift_deallocObject(box, box->allocatedSize, box->allocatedAlignMask);
 }
 
 BoxPair::Return
@@ -100,9 +105,11 @@ swift::swift_allocPOD(size_t dataSize, size_t dataAlignmentMask) {
   // Allocate the heap object.
   size_t valueOffset = PODBox::getValueOffset(dataSize, dataAlignmentMask);
   size_t size = valueOffset + dataSize;
-  auto *obj = swift_allocObject(&PODHeapMetadata, size, dataAlignmentMask);
+  size_t alignMask = std::max(dataAlignmentMask, alignof(HeapObject) - 1);
+  auto *obj = swift_allocObject(&PODHeapMetadata, size, alignMask);
   // Initialize the header for the box.
   static_cast<PODBox*>(obj)->allocatedSize = size;
+  static_cast<PODBox*>(obj)->allocatedAlignMask = alignMask;
   // Get the address of the value inside.
   auto *data = reinterpret_cast<char*>(obj) + valueOffset;
   return BoxPair{obj, reinterpret_cast<OpaqueValue*>(data)};
@@ -133,11 +140,23 @@ namespace {
     size_t getAllocatedSize() const {
       return getAllocatedSize(type);
     }
-    
+
     /// Returns the size of the allocation that would be made for a box
     /// containing a value of the given type, including the header and the value.
     static size_t getAllocatedSize(Metadata const *type) {
       return getValueOffset(type) + type->getValueWitnesses()->stride;
+    }
+
+    size_t getAllocatedAlignMask() const {
+      return getAllocatedAlignMask(type);
+    }
+
+    /// Returns the alignment mask of the allocation that would be
+    /// made for a box containing a value of the given type, including
+    /// the header and the value.
+    static size_t getAllocatedAlignMask(Metadata const *type) {
+      return std::max(type->getValueWitnesses()->getAlignmentMask(),
+                      alignof(GenericBox) - 1);
     }
 
     /// Returns an opaque pointer to the value inside the box.
@@ -163,7 +182,8 @@ static void destroyGenericBox(HeapObject *o) {
   box->type->getValueWitnesses()->destroy(value, box->type);
   
   // Deallocate the buffer.
-  return swift_deallocObject(o, box->getAllocatedSize());
+  return swift_deallocObject(o, box->getAllocatedSize(),
+                             box->getAllocatedAlignMask());
 }
 
 /// Generic heap metadata for generic allocBox allocations.
@@ -191,7 +211,7 @@ static BoxPair::Return _swift_allocBox_(Metadata const *type) {
   // Allocate the box.
   HeapObject *obj = swift_allocObject(&GenericBoxHeapMetadata,
                                       GenericBox::getAllocatedSize(type),
-                                type->getValueWitnesses()->getAlignmentMask());
+                                      GenericBox::getAllocatedAlignMask(type));
   // allocObject will initialize the heap metadata pointer and refcount for us.
   // We also need to store the type metadata between the header and the
   // value.
@@ -208,22 +228,25 @@ void swift::swift_deallocBox(HeapObject *box, Metadata const *type) {
   // swift_allocBox.
 
   // First, we need to recover what the allocation size was.
-  size_t allocatedSize;
+  size_t allocatedSize, allocatedAlignMask;
   auto *vw = type->getValueWitnesses();
   if (vw->isPOD()) {
     // If the contained type is POD, use the POD allocation size.
     allocatedSize = static_cast<PODBox*>(box)->allocatedSize;
+    allocatedAlignMask = static_cast<PODBox*>(box)->allocatedAlignMask;
   } else {
     // Use the generic box size to deallocate the object.
     allocatedSize = GenericBox::getAllocatedSize(type);
+    allocatedAlignMask = GenericBox::getAllocatedAlignMask(type);
   }
 
   // Deallocate the box.
-  swift_deallocObject(box, allocatedSize);
+  swift_deallocObject(box, allocatedSize, allocatedAlignMask);
 }
 
 void swift::swift_deallocPOD(HeapObject *obj) {
-  swift_deallocObject(obj, static_cast<PODBox*>(obj)->allocatedSize);
+  swift_deallocObject(obj, static_cast<PODBox*>(obj)->allocatedSize,
+                      static_cast<PODBox*>(obj)->allocatedAlignMask);
 }
 
 // Forward-declare this, but define it after swift_release.
@@ -271,6 +294,15 @@ void swift::swift_weakRetain(HeapObject *object) {
   }
 }
 
+void swift::_swift_deallocClassInstance(HeapObject *self) {
+  auto metadata = self->metadata;
+  assert(metadata->isClassType());
+  auto classMetadata = static_cast<const ClassMetadata*>(metadata);
+  assert(classMetadata->isTypeMetadata());
+  swift_deallocObject(self, classMetadata->getInstanceSize(),
+                      classMetadata->getInstanceAlignMask());
+}
+
 void swift::swift_weakRelease(HeapObject *object) {
   if (!object) return;
 
@@ -279,8 +311,8 @@ void swift::swift_weakRelease(HeapObject *object) {
     assert(0 && "weak retain count underflow");
   }
   if (newCount == 0) {
-    swift_slowDealloc(object,
-                      _swift_zone_size(_swift_zone_get_shims(), object));
+    // Only class objects can be weak-retained and weak-released.
+    _swift_deallocClassInstance(object);
   }
 }
 
@@ -321,14 +353,29 @@ void _swift_release_slow(HeapObject *object) {
   asFullMetadata(object->metadata)->destroy(object);
 }
 
-void swift::swift_deallocObject(HeapObject *object, size_t allocatedSize) {
+void swift::swift_deallocObject(HeapObject *object, size_t allocatedSize,
+                                size_t allocatedAlignMask) {
   assert(object->refCount == RC_INTERVAL);
 #ifdef SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS
   memset_pattern8((uint8_t *)object + sizeof(HeapObject),
                   "\xAB\xAD\x1D\xEA\xF4\xEE\xD0\bB9",
                   allocatedSize - sizeof(HeapObject));
 #endif
-  swift_weakRelease(object);
+
+  // If there is an outstanding weak retain of the object, we need to
+  // fall back on swift_weakRelease, because we could race against
+  // either a weak retain or a weak release.  But if there isn't, then
+  // anybody trying to add a weak retain must be doing so with an
+  // unsafe reference, which is inherently going to be a race against
+  // deallocation.  So we can just do a simple check here.
+  // (Do we need a barrier?)
+  //
+  // This is useful both as a way to eliminate an unnecessary atomic
+  // operation and as a way to avoid calling swift_weakRelease on
+  // something that might not be a class object.
+  if (object->weakRefCount == WRC_INTERVAL) {
+    swift_slowDealloc(object, allocatedSize, allocatedAlignMask);
+  }
 }
 
 

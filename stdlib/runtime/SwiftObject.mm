@@ -202,8 +202,7 @@ static NSString *_getDescription(SwiftObject *obj) {
 }
 
 - (void)dealloc {
-  auto SELF = reinterpret_cast<HeapObject *>(self);
-  swift_deallocObject(SELF, 0);
+  _swift_deallocClassInstance(reinterpret_cast<HeapObject *>(self));
 }
 
 - (BOOL)isKindOfClass:(Class)someClass {
@@ -611,7 +610,8 @@ extern "C" const char *swift_getGenericClassObjCName(const ClassMetadata *clas,
   // address of the class onto the basename, which is totally lame but at least
   // gives a unique name to the ObjC runtime.
   size_t baseLen = strlen(basename);
-  auto fullName = (char*)swift_slowAlloc(baseLen + 17, 0);
+  size_t alignMask = alignof(char) - 1;
+  auto fullName = (char*)swift_slowAlloc(baseLen + 17, alignMask, 0);
   snprintf(fullName, baseLen + 17, "%s%016llX", basename,
            (unsigned long long)clas);
   return fullName;

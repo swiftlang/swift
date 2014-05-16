@@ -78,8 +78,7 @@ using namespace swift;
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wobjc-missing-super-calls"
 - (void)dealloc {
-  auto SELF = reinterpret_cast<HeapObject *>(self);
-  swift_deallocObject(SELF, 0);
+  _swift_deallocClassInstance(reinterpret_cast<HeapObject *>(self));
 }
 #pragma clang diagnostic pop
 

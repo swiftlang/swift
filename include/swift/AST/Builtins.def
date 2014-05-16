@@ -229,7 +229,7 @@ BUILTIN_MISC_OPERATION(Alignof, "alignof", "n", Special)
 /// AllocRaw has type (Int, Int) -> Builtin.RawPointer
 BUILTIN_MISC_OPERATION(AllocRaw, "allocRaw", "", Special)
 
-/// DeallocRaw has type (Builtin.RawPointer, Int) -> ()
+/// DeallocRaw has type (Builtin.RawPointer, Int, Int) -> ()
 BUILTIN_MISC_OPERATION(DeallocRaw, "deallocRaw", "", Special)
 
 /// Fence has type () -> ().

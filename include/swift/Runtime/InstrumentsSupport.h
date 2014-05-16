@@ -28,9 +28,10 @@ extern "C" BoxPair::Return (*_swift_allocBox)(Metadata const *type);
 
 extern "C" void *(*_swift_alloc)(AllocIndex idx);
 extern "C" void *(*_swift_tryAlloc)(AllocIndex idx);
-extern "C" void *(*_swift_slowAlloc)(size_t bytes, uintptr_t flags);
+extern "C" void *(*_swift_slowAlloc)(size_t bytes, size_t alignMask,
+                                     uintptr_t flags);
 extern "C" void (*_swift_dealloc)(void *ptr, AllocIndex idx);
-extern "C" void (*_swift_slowDealloc)(void *ptr, size_t bytes);
+extern "C" void (*_swift_slowDealloc)(void *ptr, size_t bytes, size_t alignMask);
 
 extern "C" HeapObject *(*_swift_retain)(HeapObject *object);
 extern "C" HeapObject *(*_swift_tryRetain)(HeapObject *object);

@@ -59,7 +59,7 @@ struct UnsafePointer<T> : BidirectionalIndex, Comparable, Hashable {
   }
 
   static func alloc(num: Int) -> UnsafePointer {
-    // Don't both with overflow checking.
+    // Don't bother with overflow checking.
     var size = Int(Builtin.strideof(T.self)) * num
     return UnsafePointer(Builtin.allocRaw(size.value, Builtin.alignof(T.self)))
   }
@@ -67,7 +67,7 @@ struct UnsafePointer<T> : BidirectionalIndex, Comparable, Hashable {
   func dealloc(num: Int) {
     // Overflow checking is actually not required here.
     var size = Int(Builtin.strideof(T.self)) * num
-    Builtin.deallocRaw(value, size.value)
+    Builtin.deallocRaw(value, size.value, Builtin.alignof(T.self))
   }
 
 

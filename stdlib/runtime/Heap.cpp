@@ -258,9 +258,10 @@ public:
 
   static void *alloc_optimized(AllocIndex idx);
   static void *tryAlloc_optimized(AllocIndex idx);
-  static void *slowAlloc_optimized(size_t size, uintptr_t flags);
+  static void *slowAlloc_optimized(size_t size, size_t alignMask,
+                                   uintptr_t flags);
   static void dealloc_optimized(void *ptr, AllocIndex idx);
-  static void slowDealloc_optimized(void *ptr, size_t bytes);
+  static void slowDealloc_optimized(void *ptr, size_t bytes, size_t alignMask);
 
   static void *alloc_semi_optimized(AllocIndex idx);
   static void *tryAlloc_semi_optimized(AllocIndex idx);
@@ -268,9 +269,9 @@ public:
 
   static void *alloc_gmalloc(AllocIndex idx);
   static void *tryAlloc_gmalloc(AllocIndex idx);
-  static void *slowAlloc_gmalloc(size_t size, uintptr_t flags);
+  static void *slowAlloc_gmalloc(size_t size, size_t alignMask, uintptr_t flags);
   static void dealloc_gmalloc(void *ptr, AllocIndex idx);
-  static void slowDealloc_gmalloc(void *ptr, size_t bytes);
+  static void slowDealloc_gmalloc(void *ptr, size_t bytes, size_t alignMask);
 
   bool tryWriteLock() {
     int r = pthread_rwlock_trywrlock(&lock);
@@ -551,8 +552,11 @@ size_t swift::_swift_zone_size(malloc_zone_t *zone, const void *pointer) {
   return value;
 }
 
+constexpr size_t _swift_zone_alignMask = 15;
+
 void *swift::_swift_zone_malloc(malloc_zone_t *zone, size_t size) {
-  return SwiftZone::slowAlloc_optimized(size, SWIFT_TRYALLOC);
+  return SwiftZone::slowAlloc_optimized(size, _swift_zone_alignMask,
+                                        SWIFT_TRYALLOC);
 }
 
 void *swift::_swift_zone_calloc(malloc_zone_t *zone,
@@ -567,7 +571,8 @@ void *swift::_swift_zone_valloc(malloc_zone_t *zone, size_t size) {
 }
 
 void swift::_swift_zone_free(malloc_zone_t *zone, void *pointer) {
-  swift::swift_slowDealloc(pointer, swift::_swift_zone_size(zone, pointer));
+  swift::swift_slowDealloc(pointer, swift::_swift_zone_size(zone, pointer),
+                           _swift_zone_alignMask);
 }
 
 void *swift::_swift_zone_realloc(malloc_zone_t *zone,
@@ -832,7 +837,8 @@ void _swift_refillThreadAllocCache(AllocIndex idx, uintptr_t flags) {
   SwiftZone::dealloc_semi_optimized(tmp, idx);
 }
 
-void *SwiftZone::slowAlloc_optimized(size_t size, uintptr_t flags) {
+void *SwiftZone::slowAlloc_optimized(size_t size, size_t alignMask,
+                                     uintptr_t flags) {
   AllocIndex idx = sizeToIndex(size);
   if (idx == badAllocIndex) {
     // large allocations
@@ -859,11 +865,14 @@ void *SwiftZone::slowAlloc_optimized(size_t size, uintptr_t flags) {
   }
 }
 
-void *SwiftZone::slowAlloc_gmalloc(size_t size, uintptr_t flags) {
+void *SwiftZone::slowAlloc_gmalloc(size_t size, size_t alignMask,
+                                   uintptr_t flags) {
+  // TODO: use posix_memalign if alignMask is larger than the system guarantee.
   return malloc(size);
 }
 
-void SwiftZone::slowDealloc_optimized(void *ptr, size_t bytes) {
+void SwiftZone::slowDealloc_optimized(void *ptr, size_t bytes,
+                                      size_t alignMask) {
   assert(bytes != 0);
   AllocIndex idx = sizeToIndex(bytes);
   if (idx == badAllocIndex) {
@@ -878,7 +887,7 @@ void SwiftZone::slowDealloc_optimized(void *ptr, size_t bytes) {
   dealloc_semi_optimized(ptr, idx);
 }
 
-void SwiftZone::slowDealloc_gmalloc(void *ptr, size_t bytes) {
+void SwiftZone::slowDealloc_gmalloc(void *ptr, size_t bytes, size_t alignMask) {
   return free(ptr);
 }
 
@@ -996,14 +1005,14 @@ void *swift::swift_alloc(AllocIndex idx) {
 void *swift::swift_tryAlloc(AllocIndex idx) {
   return _swift_tryAlloc(idx);
 }
-void *swift::swift_slowAlloc(size_t size, uintptr_t flags) {
-  return _swift_slowAlloc(size, flags);
+void *swift::swift_slowAlloc(size_t size, size_t alignMask, uintptr_t flags) {
+  return _swift_slowAlloc(size, alignMask, flags);
 }
 void swift::swift_dealloc(void *ptr, AllocIndex idx) {
   _swift_dealloc(ptr, idx);
 }
-void swift::swift_slowDealloc(void *ptr, size_t bytes) {
-  return _swift_slowDealloc(ptr, bytes);
+void swift::swift_slowDealloc(void *ptr, size_t bytes, size_t alignMask) {
+  return _swift_slowDealloc(ptr, bytes, alignMask);
 }
 
 auto swift::_swift_alloc = SwiftZone::alloc_optimized;

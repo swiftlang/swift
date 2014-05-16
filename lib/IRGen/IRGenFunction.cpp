@@ -138,21 +138,16 @@ llvm::Value *IRGenFunction::emitAllocRawCall(llvm::Value *size,
     AllocToken allocToken = getAllocToken(IGM, csize->getZExtValue());
     if (allocToken != InvalidAllocToken) {
       return emitAllocatingCall(*this, IGM.getAllocFn(),
-                          { llvm::ConstantInt::get(IGM.SizeTy, allocToken) },
+                                {IGM.getSize(Size(allocToken))},
                                 name);
     }
-
-    assert(isa<llvm::ConstantInt>(alignMask));
-    assert(csize->getZExtValue() %
-               (cast<llvm::ConstantInt>(alignMask)->getZExtValue() + 1)
-             == 0 && "size not a multiple of alignment!");
   }
 
   // Okay, fall back to swift_slowAlloc.  The flags here are:
   //  0x1 - 'try', i.e. returning null is acceptable
   //  0x2 - 'raw', i.e. returning uninitialized memory is acceptable
   return emitAllocatingCall(*this, IGM.getSlowAllocFn(),
-                            { size, llvm::ConstantInt::get(IGM.SizeTy, 2) },
+                            {size, alignMask, IGM.getSize(Size(2))},
                             name);
 }
 
@@ -183,8 +178,9 @@ void IRGenFunction::emitAllocBoxCall(llvm::Value *typeMetadata,
 }
 
 static void emitDeallocatingCall(IRGenFunction &IGF, llvm::Constant *fn,
-                                 llvm::Value *pointer, llvm::Value *arg) {
-  llvm::CallInst *call = IGF.Builder.CreateCall2(fn, pointer, arg);
+                                 std::initializer_list<llvm::Value *> args) {
+  llvm::CallInst *call =
+    IGF.Builder.CreateCall(fn, makeArrayRef(args.begin(), args.size()));
   call->setCallingConv(IGF.IGM.RuntimeCC);
   call->setDoesNotThrow();
 }
@@ -192,18 +188,20 @@ static void emitDeallocatingCall(IRGenFunction &IGF, llvm::Constant *fn,
 /// Emit a 'raw' deallocation, which has no heap pointer and is not
 /// guaranteed to be zero-initialized.
 void IRGenFunction::emitDeallocRawCall(llvm::Value *pointer,
-                                       llvm::Value *size) {
+                                       llvm::Value *size,
+                                       llvm::Value *alignMask) {
   // Try to use swift_dealloc.
   if (auto csize = dyn_cast<llvm::ConstantInt>(size)) {
     AllocToken allocToken = getAllocToken(IGM, csize->getZExtValue());
     if (allocToken != InvalidAllocToken) {
-      return emitDeallocatingCall(*this, IGM.getDeallocFn(), pointer,
-                             llvm::ConstantInt::get(IGM.SizeTy, allocToken));
+      return emitDeallocatingCall(*this, IGM.getDeallocFn(),
+                                  {pointer, IGM.getSize(Size(allocToken))});
     }
   }
 
   // Okay, fall back to swift_slowDealloc.
-  return emitDeallocatingCall(*this, IGM.getSlowDeallocFn(), pointer, size);
+  return emitDeallocatingCall(*this, IGM.getSlowDeallocFn(),
+                              {pointer, size, alignMask});
 }
 
 void IRGenFunction::emitFakeExplosion(const TypeInfo &type,

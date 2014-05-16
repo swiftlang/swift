@@ -1533,7 +1533,10 @@ if (Builtin.ID == BuiltinValueKind::id) { \
   if (Builtin.ID == BuiltinValueKind::DeallocRaw) {
     auto pointer = args.claimNext();
     auto size = args.claimNext();
-    IGF.emitDeallocRawCall(pointer, size);
+    auto align = args.claimNext();
+    // Translate the alignment to a mask.
+    auto alignMask = IGF.Builder.CreateSub(align, IGF.IGM.getSize(Size(1)));
+    IGF.emitDeallocRawCall(pointer, size, alignMask);
     return;
   }
 
