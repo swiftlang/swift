@@ -2658,6 +2658,11 @@ struct _ConditionallyBridgedToObjectiveCWitnessTable {
 extern "C" const ProtocolDescriptor _TMpSs20_BridgedToObjectiveC;
 extern "C" const ProtocolDescriptor _TMpSs33_ConditionallyBridgedToObjectiveC;
 
+//===--- Bridging helpers for the Swift stdlib ----------------------------===//
+// Functions that must discover and possibly use an arbitrary type's
+// conformance to a given protocol.  See ../core/BridgeObjectiveC.swift for
+// documentation.
+//===----------------------------------------------------------------------===//
 static const _BridgedToObjectiveCWitnessTable *
 findBridgeWitness(const Metadata *T) {
   auto w = swift_conformsToProtocol(T, &_TMpSs20_BridgedToObjectiveC, nullptr);
@@ -2681,10 +2686,10 @@ static inline bool swift_isClassOrObjCExistentialImpl(const Metadata *T) {
           static_cast<const ExistentialTypeMetadata *>(T)->isObjC());
 }
 
-extern "C" HeapObject *swift_bridgeToObjectiveC(OpaqueValue *value, 
-                                                const Metadata *T) {
-  if (swift_isClassOrObjCExistentialImpl(T))
-    return *reinterpret_cast<HeapObject **>(value);
+extern "C" HeapObject *swift_bridgeNonVerbatimToObjectiveC(
+  OpaqueValue *value, const Metadata *T
+) {
+  assert(!swift_isClassOrObjCExistentialImpl(T));
 
   auto const bridgeWitness = findBridgeWitness(T);
 
@@ -2702,11 +2707,11 @@ extern "C" HeapObject *swift_bridgeToObjectiveC(OpaqueValue *value,
   return nullptr;
 }
 
-extern "C" const Metadata *swift_getBridgedObjectiveCType(const Metadata *value,
-                                                          const Metadata *T) {
+extern "C" const Metadata *swift_getBridgedNonVerbatimObjectiveCType(
+  const Metadata *value, const Metadata *T
+) {
   // Classes and Objective-C existentials bridge verbatim.
-  if (swift_isClassOrObjCExistentialImpl(T))
-    return T;
+  assert(!swift_isClassOrObjCExistentialImpl(T));
 
   // Check if the type conforms to _BridgedToObjectiveC, in which case
   // we'll extract its associated type.
@@ -2717,82 +2722,55 @@ extern "C" const Metadata *swift_getBridgedObjectiveCType(const Metadata *value,
   return nullptr;
 }
 
-// @asmname("swift_bridgeFromObjectiveC")
-// func bridgeFromObjectiveC<NativeType>(
+// @asmname("swift_bridgeNonVerbatimFromObjectiveC")
+// func _bridgeNonVerbatimFromObjectiveC<NativeType>(
 //     x: AnyObject, nativeType: NativeType.Type
 // ) -> NativeType?
 extern "C" OpaqueExistentialContainer
-swift_bridgeFromObjectiveC(HeapObject *sourceValue, const Metadata *nativeType,
-                           const Metadata *nativeType_) {
-  if (swift_isClassOrObjCExistentialImpl(nativeType)) {
-    // Maybe sourceValue is bridged verbatim?  Check if sourceValue is of type
-    // nativeType.
-    if (!swift_dynamicCast(reinterpret_cast<const void *>(sourceValue),
-                           nativeType)) {
-      swift_release(sourceValue);
-      return _TFSs26_injectNothingIntoOptionalU__FT_GSqQ__(nativeType);
-    }
-
-    // sourceValue is bridged verbatim.  Box it and pass through
-    // injectValueIntoOptional.
-    ValueBuffer sourceValueBufer;
-    *reinterpret_cast<OpaqueValue **>(&sourceValueBufer) =
-        reinterpret_cast<OpaqueValue *>(sourceValue);
-
-    using box = OpaqueExistentialBox<0>;
-
-    box::Container outValue;
-    outValue.Header.Type = nativeType;
-    nativeType->vw_initializeBufferWithTake(
-        outValue.getBuffer(),
-        reinterpret_cast<OpaqueValue *>(&sourceValueBufer));
-
-    return _TFSs24_injectValueIntoOptionalU__FQ_GSqQ__(
-        reinterpret_cast<OpaqueValue *>(&outValue), nativeType);
-  }
-
+swift_bridgeNonVerbatimFromObjectiveC(
+  HeapObject *sourceValue,
+  const Metadata *nativeType,
+  const Metadata *nativeType_
+) {
   // Check if the type conforms to _BridgedToObjectiveC.
   const auto *bridgeWitness = findBridgeWitness(nativeType);
   if (bridgeWitness) {
-    // Check if the type also conforms to _ConditionallyBridgedToObjectiveC.
-    if (auto conditionalWitness = findConditionalBridgeWitness(nativeType)) {
-      if (!conditionalWitness->isBridgedToObjectiveC(nativeType, nativeType)) {
-        // This type is not bridged.
-        // Release the value because it is passed at +1.
-        swift_release(sourceValue);
-        return _TFSs26_injectNothingIntoOptionalU__FT_GSqQ__(nativeType);
+    // if the type also conforms to _ConditionallyBridgedToObjectiveC,
+    // make sure it bridges at runtime
+    auto conditionalWitness = findConditionalBridgeWitness(nativeType);
+    if (
+      conditionalWitness == nullptr
+      || conditionalWitness->isBridgedToObjectiveC(nativeType, nativeType)
+    ) {
+      // Check if sourceValue has the ObjectiveCType type required by the
+      // protocol.
+      const Metadata *objectiveCType =
+          bridgeWitness->getObjectiveCType(nativeType, nativeType);
+        
+      auto sourceValueAsObjectiveCType =
+          const_cast<void*>(swift_dynamicCast(sourceValue, objectiveCType));
+        
+      if (sourceValueAsObjectiveCType) {
+        // The type matches.  bridgeFromObjectiveC returns `Self?`;
+        // this function returns `NativeType`, so we don't need to
+        // re-wrap the optional.
+        return bridgeWitness->bridgeFromObjectiveC(
+          static_cast<HeapObject*>(sourceValueAsObjectiveCType),
+            nativeType, nativeType);
       }
     }
-
-    // Check if sourceValue has the ObjectiveCType type required by the
-    // protocol.
-    const Metadata *objectiveCType =
-        bridgeWitness->getObjectiveCType(nativeType, nativeType);
-    HeapObject *sourceValueAsObjectiveCType =
-        reinterpret_cast<HeapObject *>(const_cast<void *>(swift_dynamicCast(
-            reinterpret_cast<const void *>(sourceValue), objectiveCType)));
-    if (!sourceValueAsObjectiveCType) {
-      // The type is not correct.
-      swift_release(sourceValue);
-      return _TFSs26_injectNothingIntoOptionalU__FT_GSqQ__(nativeType);
-    }
-
-    // The type matches.  bridgeFromObjectiveC returns `Self?`, this function
-    // returns `NativeType`, so we don't need to re-wrap the optional.
-    return bridgeWitness->bridgeFromObjectiveC(sourceValueAsObjectiveCType,
-                                               nativeType, nativeType);
   }
 
-  // We could not bridge the value.
+  // return nil
   swift_release(sourceValue);
   return _TFSs26_injectNothingIntoOptionalU__FT_GSqQ__(nativeType);
 }
 
-// func isBridgedToObjectiveC<T>(x: T.Type) -> Bool
-extern "C" bool swift_isBridgedToObjectiveC(const Metadata *value,
-                                            const Metadata *T) {
-  if (swift_isClassOrObjCExistentialImpl(T))
-    return true;
+// func isBridgedNonVerbatimToObjectiveC<T>(x: T.Type) -> Bool
+extern "C" bool swift_isBridgedNonVerbatimToObjectiveC(
+  const Metadata *value, const Metadata *T
+) {
+  assert(!swift_isClassOrObjCExistentialImpl(T));
 
   auto bridgeWitness = findBridgeWitness(T);
 
@@ -2803,12 +2781,6 @@ extern "C" bool swift_isBridgedToObjectiveC(const Metadata *value,
   }
 
   return false;
-}
-
-// func isBridgedVerbatimToObjectiveC<T>(x: T.Type) -> Bool
-extern "C" bool swift_isBridgedVerbatimToObjectiveC(const Metadata *value,
-                                                    const Metadata *T) {
-  return swift_isClassOrObjCExistentialImpl(T);
 }
 
 // func isClassOrObjCExistential<T>(x: T.Type) -> Bool
