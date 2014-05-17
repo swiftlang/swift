@@ -715,16 +715,16 @@ testCOW_Slow_RemoveAtIndexDoesNotReallocate()
 // CHECK: testCOW_Slow_RemoveAtIndexDoesNotReallocate done
 
 
-func testCOW_Fast_RemoveObjectForKeyDoesNotReallocate() {
+func testCOW_Fast_RemoveValueForKeyDoesNotReallocate() {
   if true {
     var d1 = getCOWFastDictionary()
     var identity1: Word = reinterpretCast(d1)
 
-    var deleted = d1.removeObjectForKey(0)
+    var deleted = d1.removeValueForKey(0)
     assert(!deleted)
     assert(identity1 == reinterpretCast(d1))
 
-    deleted = d1.removeObjectForKey(10)
+    deleted = d1.removeValueForKey(10)
     assert(deleted! == 1010)
     assert(identity1 == reinterpretCast(d1))
 
@@ -737,12 +737,12 @@ func testCOW_Fast_RemoveObjectForKeyDoesNotReallocate() {
     var identity1: Word = reinterpretCast(d1)
 
     var d2 = d1
-    var deleted = d2.removeObjectForKey(0)
+    var deleted = d2.removeValueForKey(0)
     assert(!deleted)
     assert(identity1 == reinterpretCast(d1))
     assert(identity1 == reinterpretCast(d2))
 
-    deleted = d2.removeObjectForKey(10)
+    deleted = d2.removeValueForKey(10)
     assert(deleted! == 1010)
     assert(identity1 == reinterpretCast(d1))
     assert(identity1 != reinterpretCast(d2))
@@ -752,21 +752,21 @@ func testCOW_Fast_RemoveObjectForKeyDoesNotReallocate() {
     acceptsAnyDictionary(d2)
   }
 
-  println("testCOW_Fast_RemoveObjectForKeyDoesNotReallocate done")
+  println("testCOW_Fast_RemoveValueForKeyDoesNotReallocate done")
 }
-testCOW_Fast_RemoveObjectForKeyDoesNotReallocate()
-// CHECK: testCOW_Fast_RemoveObjectForKeyDoesNotReallocate done
+testCOW_Fast_RemoveValueForKeyDoesNotReallocate()
+// CHECK: testCOW_Fast_RemoveValueForKeyDoesNotReallocate done
 
-func testCOW_Slow_RemoveObjectForKeyDoesNotReallocate() {
+func testCOW_Slow_RemoveValueForKeyDoesNotReallocate() {
   if true {
     var d1 = getCOWSlowDictionary()
     var identity1: Word = reinterpretCast(d1)
 
-    var deleted = d1.removeObjectForKey(TestKeyTy(0))
+    var deleted = d1.removeValueForKey(TestKeyTy(0))
     assert(!deleted)
     assert(identity1 == reinterpretCast(d1))
 
-    deleted = d1.removeObjectForKey(TestKeyTy(10))
+    deleted = d1.removeValueForKey(TestKeyTy(10))
     assert(deleted!.value == 1010)
     assert(identity1 == reinterpretCast(d1))
 
@@ -779,12 +779,12 @@ func testCOW_Slow_RemoveObjectForKeyDoesNotReallocate() {
     var identity1: Word = reinterpretCast(d1)
 
     var d2 = d1
-    var deleted = d2.removeObjectForKey(TestKeyTy(0))
+    var deleted = d2.removeValueForKey(TestKeyTy(0))
     assert(!deleted)
     assert(identity1 == reinterpretCast(d1))
     assert(identity1 == reinterpretCast(d2))
 
-    deleted = d2.removeObjectForKey(TestKeyTy(10))
+    deleted = d2.removeValueForKey(TestKeyTy(10))
     assert(deleted!.value == 1010)
     assert(identity1 == reinterpretCast(d1))
     assert(identity1 != reinterpretCast(d2))
@@ -794,10 +794,10 @@ func testCOW_Slow_RemoveObjectForKeyDoesNotReallocate() {
     acceptsAnyDictionary(d2)
   }
 
-  println("testCOW_Slow_RemoveObjectForKeyDoesNotReallocate done")
+  println("testCOW_Slow_RemoveValueForKeyDoesNotReallocate done")
 }
-testCOW_Slow_RemoveObjectForKeyDoesNotReallocate()
-// CHECK: testCOW_Slow_RemoveObjectForKeyDoesNotReallocate done
+testCOW_Slow_RemoveValueForKeyDoesNotReallocate()
+// CHECK: testCOW_Slow_RemoveValueForKeyDoesNotReallocate done
 
 
 func testCOW_Fast_CountDoesNotReallocate() {
@@ -1445,12 +1445,12 @@ func test_BridgedFromObjC_DeleteKey() {
     var identity1: Word = reinterpretCast(d)
     assert(isCocoaDictionary(d))
 
-    var deleted: AnyObject? = d.removeObjectForKey(TestObjCKeyTy(0))
+    var deleted: AnyObject? = d.removeValueForKey(TestObjCKeyTy(0))
     assert(!deleted)
     assert(identity1 == reinterpretCast(d))
     assert(isCocoaDictionary(d))
 
-    deleted = d.removeObjectForKey(TestObjCKeyTy(10))
+    deleted = d.removeValueForKey(TestObjCKeyTy(10))
     assert(deleted!.value == 1010)
     var identity2: Word = reinterpretCast(d)
     assert(identity1 != identity2)
@@ -1471,14 +1471,14 @@ func test_BridgedFromObjC_DeleteKey() {
     assert(isCocoaDictionary(d1))
     assert(isCocoaDictionary(d2))
 
-    var deleted: AnyObject? = d2.removeObjectForKey(TestObjCKeyTy(0))
+    var deleted: AnyObject? = d2.removeValueForKey(TestObjCKeyTy(0))
     assert(!deleted)
     assert(identity1 == reinterpretCast(d1))
     assert(identity1 == reinterpretCast(d2))
     assert(isCocoaDictionary(d1))
     assert(isCocoaDictionary(d2))
 
-    deleted = d2.removeObjectForKey(TestObjCKeyTy(10))
+    deleted = d2.removeValueForKey(TestObjCKeyTy(10))
     assert(deleted!.value == 1010)
     var identity2: Word = reinterpretCast(d2)
     assert(identity1 != identity2)
