@@ -257,9 +257,12 @@ IRGenModule::IRGenModule(ASTContext &Context,
   if (Opts.DebugInfo) {
     DebugInfo = new IRGenDebugInfo(Opts, *CI, *this, Module);
   }
+
+  initClangTypeConverter();
 }
 
 IRGenModule::~IRGenModule() {
+  destroyClangTypeConverter();
   delete &Types;
   if (DebugInfo)
     delete DebugInfo;

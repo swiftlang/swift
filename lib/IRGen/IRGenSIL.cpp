@@ -21,6 +21,7 @@
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/Support/Debug.h"
+#include "clang/AST/ASTContext.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/STLExtras.h"
@@ -37,7 +38,6 @@
 #include "CallEmission.h"
 #include "Explosion.h"
 #include "GenClass.h"
-#include "GenClangType.h"
 #include "GenFunc.h"
 #include "GenHeap.h"
 #include "GenMeta.h"
@@ -879,12 +879,11 @@ static void emitEntryPointArgumentsCOrObjC(IRGenSILFunction &IGF,
         return requiresExternalIndirectResult(IGF.IGM, funcTy);
       });
 
-  GenClangType GCT(IGF.IGM.Context);
   SmallVector<clang::CanQualType,4> argTys;
-  auto const &clangCtx = GCT.getClangASTContext();
+  auto const &clangCtx = IGF.IGM.getClangASTContext();
 
   const auto &resultInfo = funcTy->getInterfaceResult();
-  auto clangResultTy = GCT.visit(resultInfo.getSILType().getSwiftRValueType());
+  auto clangResultTy = IGF.IGM.getClangType(resultInfo.getSILType());
   unsigned nextArgTyIdx = 0;
 
   if (IGF.CurSILFn->getAbstractCC() == AbstractCC::ObjCMethod) {
@@ -892,7 +891,7 @@ static void emitEntryPointArgumentsCOrObjC(IRGenSILFunction &IGF,
     // be considered for ABI type selection purposes.
     SILArgument *selfArg = args.back();
     args = args.slice(0, args.size() - 1);
-    auto clangTy = GCT.visit(selfArg->getType().getSwiftRValueType());
+    auto clangTy = IGF.IGM.getClangType(selfArg->getType());
     argTys.push_back(clangTy);
     argTys.push_back(clangCtx.VoidPtrTy);
 
@@ -923,7 +922,7 @@ static void emitEntryPointArgumentsCOrObjC(IRGenSILFunction &IGF,
 
   // Convert each argument to a Clang type.
   for (SILArgument *arg : args) {
-    auto clangTy = GCT.visit(arg->getType().getSwiftRValueType());
+    auto clangTy = IGF.IGM.getClangType(arg->getType());
     argTys.push_back(clangTy);
   }
 

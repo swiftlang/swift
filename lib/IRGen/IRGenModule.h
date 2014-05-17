@@ -47,8 +47,11 @@ namespace llvm {
   class AttributeSet;
 }
 namespace clang {
+  class ASTContext;
+  template <class> class CanQual;
   class CodeGenerator;
   class Decl;
+  class Type;
   namespace CodeGen {
     class CodeGenABITypes;
   }
@@ -93,6 +96,7 @@ namespace swift {
   
 namespace irgen {
   class Address;
+  class ClangTypeConverter;
   class ExplosionSchema;
   class FormalType;
   class IRGenDebugInfo;
@@ -248,6 +252,14 @@ public:
   bool isTrivialMetatype(CanMetatypeType type);
   bool isPOD(SILType type, ResilienceScope scope);
   ObjectSize classifyTypeSize(SILType type, ResilienceScope scope);
+  clang::CanQual<clang::Type> getClangType(CanType type);
+  clang::CanQual<clang::Type> getClangType(SILType type);
+
+  const clang::ASTContext &getClangASTContext() {
+    assert(ClangASTContext &&
+           "requesting clang AST context without clang importer!");
+    return *ClangASTContext;
+  }
 
   bool isResilient(Decl *decl, ResilienceScope scope);
 
@@ -256,6 +268,11 @@ public:
 private:
   TypeConverter &Types;
   friend class TypeConverter;
+
+  const clang::ASTContext *ClangASTContext;
+  ClangTypeConverter *ClangTypes;
+  void initClangTypeConverter();
+  void destroyClangTypeConverter();
 
   friend class GenericContextScope;
   

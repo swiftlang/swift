@@ -34,7 +34,6 @@
 #include "CallEmission.h"
 #include "Explosion.h"
 #include "FormalType.h"
-#include "GenClangType.h"
 #include "GenClass.h"
 #include "GenFunc.h"
 #include "GenHeap.h"
@@ -949,26 +948,20 @@ bool irgen::hasObjCClassRepresentation(IRGenModule &IGM, Type t) {
     ->getClassOrBoundGenericClass();
 }
 
-static llvm::Constant * GetObjCEncodingForType(IRGenModule &IGM,
-                                               Type T) {
-  ASTContext &Context = IGM.Context;
-  auto CI = static_cast<ClangImporter*>(&*Context.getClangModuleLoader());
-  assert(CI && "no clang module loader");
-  auto &clangASTContext = CI->getClangASTContext();
-  
+static llvm::Constant *GetObjCEncodingForType(IRGenModule &IGM, Type T) {
   // TODO. encode types 'T'.
-  GenClangType CTG(Context);
-  auto clangType = CTG.visit(T->getCanonicalType());
+  auto clangType = IGM.getClangType(T->getCanonicalType());
   if (!clangType.isNull()) {
     std::string TypeStr;
-    clangASTContext.getObjCEncodingForType(clangType, TypeStr);
+    IGM.getClangASTContext().getObjCEncodingForType(clangType, TypeStr);
     return IGM.getAddrOfGlobalString(TypeStr.c_str());
   }
   return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
 }
 
 static void
-HelperGetObjCEncodingForType(clang::ASTContext &Context, clang::CanQualType T,
+HelperGetObjCEncodingForType(const clang::ASTContext &Context,
+                             clang::CanQualType T,
                              std::string &S, bool Extended) {
   
   Context.getObjCEncodingForMethodParameter(clang::Decl::OBJC_TQ_None,
@@ -981,26 +974,21 @@ static llvm::Constant *GetObjCEncodingForTypes(IRGenModule &IGM,
                                                StringRef FixedArgs,
                                                Size::int_type ParmOffset,
                                                bool Extended) {
-  ASTContext &Context = IGM.Context;
-  auto CI = static_cast<ClangImporter*>(&*Context.getClangModuleLoader());
-  assert(CI && "no clang module loader");
-  auto &clangASTContext = CI->getClangASTContext();
-  GenClangType CTG(Context);
-  llvm::Constant *cnull = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+  auto &clangASTContext = IGM.getClangASTContext();
   
   // TODO. Encode type qualifer, 'in', 'inout', etc. for the parameter.
   std::string EncodeStr;
-  auto clangType = CTG.visit(Result->getCanonicalType());
+  auto clangType = IGM.getClangType(Result->getCanonicalType());
   if (clangType.isNull())
-    return cnull;
+    return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
   HelperGetObjCEncodingForType(clangASTContext, clangType, EncodeStr, Extended);
   std::string ArgsStr;
   
   // Argument types.
   for (auto ArgType : Args) {
-    auto PType = CTG.visit(ArgType->getCanonicalType());
+    auto PType = IGM.getClangType(ArgType->getCanonicalType());
     if (PType.isNull())
-      return cnull;
+      return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
     
     // TODO. Some stuff related to Array and Function type is missing.
     // TODO. Encode type qualifer, 'in', 'inout', etc. for the parameter.
@@ -1082,13 +1070,9 @@ void irgen::emitObjCGetterDescriptorParts(IRGenModule &IGM,
   Selector getterSel(property, Selector::ForGetter);
   selectorRef = IGM.getAddrOfObjCMethodName(getterSel.str());
   
-  ASTContext &Context = IGM.Context;
-  auto CI = static_cast<ClangImporter*>(&*Context.getClangModuleLoader());
-  assert(CI && "no clang module loader");
-  GenClangType CTG(Context);
-  auto &clangASTContext = CI->getClangASTContext();
+  auto &clangASTContext = IGM.getClangASTContext();
   std::string TypeStr;
-  auto clangType = CTG.visit(property->getType()->getCanonicalType());
+  auto clangType = IGM.getClangType(property->getType()->getCanonicalType());
   if (clangType.isNull()) {
     atEncoding = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
     return;
@@ -1131,11 +1115,7 @@ void irgen::emitObjCSetterDescriptorParts(IRGenModule &IGM,
   Selector setterSel(property, Selector::ForSetter);
   selectorRef = IGM.getAddrOfObjCMethodName(setterSel.str());
   
-  ASTContext &Context = IGM.Context;
-  auto CI = static_cast<ClangImporter*>(&*Context.getClangModuleLoader());
-  assert(CI && "no clang module loader");
-  GenClangType CTG(Context);
-  auto &clangASTContext = CI->getClangASTContext();
+  auto &clangASTContext = IGM.getClangASTContext();
   std::string TypeStr;
   auto clangType = clangASTContext.VoidTy;
   clangASTContext.getObjCEncodingForType(clangType, TypeStr);
@@ -1144,7 +1124,7 @@ void irgen::emitObjCSetterDescriptorParts(IRGenModule &IGM,
   Size::int_type ParmOffset = 2 * PtrSize.getValue();
 
   Type ArgType = property->getType();
-  clangType = CTG.visit(ArgType->getCanonicalType());
+  clangType = IGM.getClangType(ArgType->getCanonicalType());
   if (clangType.isNull()) {
     atEncoding = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
     return;

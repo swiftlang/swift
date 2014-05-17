@@ -76,7 +76,6 @@
 #include "CallingConvention.h"
 #include "CallEmission.h"
 #include "Explosion.h"
-#include "GenClangType.h"
 #include "GenClass.h"
 #include "GenHeap.h"
 #include "GenMeta.h"
@@ -945,21 +944,20 @@ llvm::Type *SignatureExpansion::expandExternalSignatureTypes() {
 
   // Convert the SIL result type to a Clang type.
   auto resultTy = FnType->getInterfaceResult().getSILType();
-  GenClangType GCT(IGM.Context);
-  auto clangResultTy = GCT.visit(resultTy.getSwiftRValueType());
+  auto clangResultTy = IGM.getClangType(resultTy);
 
   // Now convert the parameters to Clang types.
   auto params = FnType->getInterfaceParameters();
   unsigned paramOffset = 0;
 
   SmallVector<clang::CanQualType,4> paramTys;
-  auto const &clangCtx = GCT.getClangASTContext();
+  auto const &clangCtx = IGM.getClangASTContext();
 
   if (FnType->getAbstractCC() == AbstractCC::ObjCMethod) {
     // ObjC methods take their 'self' argument first, followed by an
     // implicit _cmd argument.
     auto &self = params.back();
-    auto clangTy = GCT.visit(self.getSILType().getSwiftRValueType());
+    auto clangTy = IGM.getClangType(self.getSILType());
     paramTys.push_back(clangTy);
     paramTys.push_back(clangCtx.VoidPtrTy);
     params = params.slice(0, params.size() - 1);
@@ -968,7 +966,7 @@ llvm::Type *SignatureExpansion::expandExternalSignatureTypes() {
 
   // Convert each parameter to a Clang type.
   for (auto param : params) {
-    auto clangTy = GCT.visit(param.getSILType().getSwiftRValueType());
+    auto clangTy = IGM.getClangType(param.getSILType());
     paramTys.push_back(clangTy);
   }
 
@@ -2224,8 +2222,7 @@ irgen::requiresExternalIndirectResult(IRGenModule &IGM,
   }
 
   auto resultTy = fnType->getInterfaceResult().getSILType();
-  GenClangType GCT(IGM.Context);
-  auto clangTy = GCT.visit(resultTy.getSwiftRValueType());
+  auto clangTy = IGM.getClangType(resultTy);
   assert(clangTy && "Unexpected failure in Clang type generation!");
 
   SmallVector<clang::CanQualType,1> args;
@@ -2248,9 +2245,8 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
 
   unsigned paramOffset = 0;
 
-  GenClangType GCT(IGF.IGM.Context);
   SmallVector<clang::CanQualType,4> paramTys;
-  auto const &clangCtx = GCT.getClangASTContext();
+  auto const &clangCtx = IGF.IGM.getClangASTContext();
   if (callee.getAbstractCC() == AbstractCC::ObjCMethod) {
     // The method will be uncurried to ((ArgsN...), ..., (Args1...),
     // Self). The self arg gets lowered to the first argument, and the
@@ -2258,7 +2254,7 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
     // args.
     // self
     auto &self = params.back();
-    auto clangTy = GCT.visit(self.getSILType().getSwiftRValueType());
+    auto clangTy = IGF.IGM.getClangType(self.getSILType());
     paramTys.push_back(clangTy);
     paramTys.push_back(clangCtx.VoidPtrTy);
     params = params.slice(0, params.size() - 1);
@@ -2266,12 +2262,12 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
   }
 
   for (auto param : params) {
-    auto clangTy = GCT.visit(param.getSILType().getSwiftRValueType());
+    auto clangTy = IGF.IGM.getClangType(param.getSILType());
     paramTys.push_back(clangTy);
   }
 
   const auto &resultInfo = callee.getSubstFunctionType()->getInterfaceResult();
-  auto clangResultTy = GCT.visit(resultInfo.getSILType().getSwiftRValueType());
+  auto clangResultTy = IGF.IGM.getClangType(resultInfo.getSILType());
 
   // Generate function info for this set of arguments.
   auto extInfo = clang::FunctionType::ExtInfo();
