@@ -27,7 +27,8 @@ func test_deprecated_imported_as_unavailable(s:CMutablePointer<CChar>) {
 
 func test_NSInvocation(x:NSInvocation) {} // expected-error {{'NSInvocation' is unavailable}}
 
-func test_class_avail(x:NSObject) {
+func test_class_avail(x:NSObject, obj: AnyObject) {
   x.`class`() // expected-error {{'class' is unavailable: use 'dynamicType' instead}}
   NSObject.`class`() // expected-error {{'class' is unavailable: use 'self' instead}}
+  
 }

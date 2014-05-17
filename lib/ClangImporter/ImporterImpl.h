@@ -204,9 +204,16 @@ struct LLVM_LIBRARY_VISIBILITY KnownObjCMethod {
   /// Whether to treat this method as a factory or initializer.
   unsigned FactoryAsInit : 2;
 
+  /// Whether this method is marked unavailable.
+  unsigned Unavailable : 1;
+
+  /// Message to use when this method is unavailable.
+  StringRef UnavailableMsg;
+
   KnownObjCMethod() 
     : DesignatedInit(false),
-      FactoryAsInit(static_cast<unsigned>(FactoryAsInitKind::Infer)) { }
+      FactoryAsInit(static_cast<unsigned>(FactoryAsInitKind::Infer)),
+      Unavailable(false) { }
 
   FactoryAsInitKind getFactoryAsInitKind() const {
     return static_cast<FactoryAsInitKind>(FactoryAsInit);
@@ -301,12 +308,12 @@ public:
   /// initializers a priori.
   llvm::DenseSet<Identifier> HasKnownDesignatedInits;
 
-  /// A map from (class name, selector) pairs to a prior information
+  /// A map from (class or protocol name, selector) pairs to a prior information
   /// about that instance method of an Objective-C class.
   llvm::DenseMap<std::pair<Identifier, ObjCSelector>, KnownObjCMethod>
     KnownInstanceMethods;
 
-  /// A map from (class name, selector) pairs to a prior information
+  /// A map from (class or protocol name, selector) pairs to a prior information
   /// about that class method of an Objective-C class.
   llvm::DenseMap<std::pair<Identifier, ObjCSelector>, KnownObjCMethod>
     KnownClassMethods;
@@ -314,6 +321,10 @@ public:
   /// Populate the tables of known methods, if it hasn't been done
   /// already.
   void populateKnownObjCMethods();
+
+  /// Retrieve any information known a priori about the given Objective-C,
+  /// method, if we have it.
+  KnownObjCMethod *getKnownObjCMethod(const clang::ObjCMethodDecl *method);
 
   /// Determine whether the given class has designated initializers,
   /// consulting 
@@ -582,6 +593,10 @@ public:
   /// \brief Classify the given Clang enumeration type to describe how it
   /// should be imported 
   EnumKind classifyEnum(const clang::EnumDecl *decl);
+
+  /// Import attributes from the given Clang declaration to its Swift
+  /// equivalent.
+  void importAttributes(const clang::NamedDecl *ClangDecl, Decl *MappedDecl);
 
   /// If we already imported a given decl, return the corresponding Swift decl.
   /// Otherwise, return nullptr.

@@ -1074,16 +1074,28 @@ namespace known_methods {
 namespace {
   // DesignatedInit flag
   enum DesignatedInitFlag { DesignatedInit };
-  KnownObjCMethod operator|(KnownObjCMethod known, DesignatedInitFlag) {
+  KnownObjCMethod &&operator|(KnownObjCMethod &&known, DesignatedInitFlag) {
     known.DesignatedInit = true;
-    return known;
+    return std::move(known);
   }
 
   // FactoryAsClassMethod flag
   enum FactoryAsClassMethodFlag { FactoryAsClassMethod };
-  KnownObjCMethod operator|(KnownObjCMethod known, FactoryAsClassMethodFlag) {
+  KnownObjCMethod &&operator|(KnownObjCMethod &&known,
+                              FactoryAsClassMethodFlag) {
     known.setFactoryAsInitKind(FactoryAsInitKind::AsClassMethod);
-    return known;
+    return std::move(known);
+  }
+
+  // Unavailable option.
+  struct Unavailable {
+    StringRef Msg;
+    Unavailable(StringRef Msg) : Msg(Msg) { }
+  };
+  KnownObjCMethod &&operator|(KnownObjCMethod &&known, Unavailable unavailable){
+    known.Unavailable = true;
+    known.UnavailableMsg = unavailable.Msg;
+    return std::move(known);
   }
 }
 }
@@ -1122,6 +1134,36 @@ void ClangImporter::Implementation::populateKnownObjCMethods() {
   addMethod(SwiftContext.getIdentifier(#ClassName), createSelector Selector, \
             /*isInstanceMethod=*/false, KnownObjCMethod() | Options);
 #include "KnownObjCMethods.def"
+}
+
+KnownObjCMethod* ClangImporter::Implementation::getKnownObjCMethod(
+                   const clang::ObjCMethodDecl *method)
+{
+  populateKnownObjCMethods();
+  
+  // Find the name of the method's context.
+  auto objcDC = method->getDeclContext();
+  StringRef contextName;
+  if (auto objcClass = dyn_cast<clang::ObjCInterfaceDecl>(objcDC)) {
+    contextName = objcClass->getName();
+  } else if (auto objcCat = dyn_cast<clang::ObjCCategoryDecl>(objcDC)) {
+    contextName = objcCat->getClassInterface()->getName();
+  } else if (auto objcProto=dyn_cast<clang::ObjCProtocolDecl>(objcDC)) {
+    contextName = objcProto->getName();
+  } else {
+    // error case.
+    return nullptr;
+  }
+
+  Identifier contextID = SwiftContext.getIdentifier(contextName);
+  ObjCSelector selector = importSelector(method->getSelector());
+  auto &knownMethods = method->isClassMethod() ? KnownClassMethods
+                                               : KnownInstanceMethods;
+  auto known = knownMethods.find({contextID, selector});
+  if (known == knownMethods.end())
+    return nullptr;
+
+  return &known->second;
 }
 
 bool ClangImporter::Implementation::hasDesignatedInitializers(

@@ -3163,11 +3163,8 @@ namespace {
           if (auto func = dyn_cast<AbstractFunctionDecl>(valueReq)){
             // For an optional requirement, record an empty witness:
             // we'll end up querying this at runtime.
-            //
-            // Also treat 'unavailable' requirements as optional.
-            //
             auto Attrs = func->getAttrs();
-            if (Attrs.isOptional() || Attrs.isUnavailable()) {
+            if (Attrs.isOptional()) {
               conformance->setWitness(valueReq, ConcreteDeclRef());
               continue;
             }
@@ -4312,8 +4309,12 @@ canSkipOverTypedef(ClangImporter::Implementation &Impl,
 }
 
 /// Import Clang attributes as Swift attributes.
-static void importAttributes(ASTContext &C, const clang::NamedDecl *ClangDecl,
-                             Decl *MappedDecl) {
+void ClangImporter::Implementation::importAttributes(
+       const clang::NamedDecl *ClangDecl,
+       Decl *MappedDecl)
+{
+  ASTContext &C = SwiftContext;
+
   // Scan through Clang attributes and map them onto Swift
   // equivalents.
   bool IsUnavailable = false;
@@ -4351,10 +4352,11 @@ static void importAttributes(ASTContext &C, const clang::NamedDecl *ClangDecl,
     }
   }
 
-  // Add implicit unavailablility.
+  // If the method is unavailable, we're done.
   if (IsUnavailable)
     return;
 
+  // Add implicit attributes.
   if (auto MD = dyn_cast<clang::ObjCMethodDecl>(ClangDecl)) {
     // Ban uses of 'performSelector'.
     auto sel = MD->getSelector();
@@ -4365,21 +4367,19 @@ static void importAttributes(ASTContext &C, const clang::NamedDecl *ClangDecl,
       return;
     }
 
-    // Ban the following from NSObject, as they remap to
-    // ".type" and ".dynamicType".
-    //
-    // - (Class)class;
-    // + (Class)class;
-    if (auto ID = dyn_cast<clang::NamedDecl>(MD->getDeclContext())) {
-      // Using a NamedDecl handles both the @protocol and @interface case.
-      if (ID->getName() == "NSObject") {
-        if (sel.getNumArgs() == 0 && sel.getNameForSlot(0) == "class") {
-          auto Str = MD->isClassMethod() ?
-                    "use 'self' instead" :
-                    "use 'dynamicType' instead";
-          auto attr = AvailabilityAttr::createImplicitUnavailableAttr(C, Str);
-          MappedDecl->getMutableAttrs().add(attr);
-          return;
+    // Any knowledge of methods known due to our whitelists.
+    if (auto knownMethod = getKnownObjCMethod(MD)) {
+      // Availability.
+      if (knownMethod->Unavailable) {
+        auto attr = AvailabilityAttr::createImplicitUnavailableAttr(
+                      C, knownMethod->UnavailableMsg);
+        MappedDecl->getMutableAttrs().add(attr);
+
+        // If we made a protocol requirement unavailable, mark it optional:
+        // nobody should have to satisfy it.
+        if (isa<ProtocolDecl>(MappedDecl->getDeclContext())) {
+          if (!MappedDecl->getAttrs().isOptional())
+            MappedDecl->getMutableAttrs().setAttr(AK_optional, SourceLoc());
         }
       }
     }
@@ -4418,7 +4418,7 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
     return nullptr;
 
   if (Result)
-    importAttributes(SwiftContext, ClangDecl, Result);
+    importAttributes(ClangDecl, Result);
 
   auto Canon = cast<clang::NamedDecl>(ClangDecl->getCanonicalDecl());
   (void)Canon;
@@ -4558,7 +4558,7 @@ ClangImporter::Implementation::importMirroredDecl(const clang::NamedDecl *decl,
     result->setImplicit();
 
     // Map the Clang attributes onto Swift attributes.
-    importAttributes(SwiftContext, decl, result);
+    importAttributes(decl, result);
   }
   if (result || !converter.hadForwardDeclaration())
     ImportedProtocolDecls[{{canon, forceClassMethod}, dc}] = result;

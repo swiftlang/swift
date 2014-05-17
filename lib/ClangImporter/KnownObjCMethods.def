@@ -29,6 +29,8 @@
 //   should be applied to this method. The possibilities are:
 //     DesignatedInit: Mark this as a designated initializer of its class
 //     NotFactory: Mark this class method as not being a factory method
+//     Unavailable(Msg): Mark this method as being unavailable, with the given
+//       message.
 
 #ifndef INSTANCE_METHOD
 #  error define INSTANCE_METHOD before including KnownMethods.def
@@ -40,6 +42,11 @@
 
 // ObjectiveC
 INSTANCE_METHOD(NSObject, (0, "init"), DesignatedInit)
+CLASS_METHOD(NSObject, (0, "class"), Unavailable("use 'self' instead"))
+
+// NSObject protocol
+INSTANCE_METHOD(NSObject, (0, "class"), 
+                Unavailable("use 'dynamicType' instead"))
 
 // Foundation
 INSTANCE_METHOD(NSArray, (0, "init"), DesignatedInit)
