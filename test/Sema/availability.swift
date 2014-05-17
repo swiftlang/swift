@@ -21,8 +21,18 @@ class ClassWithUnavailable {
   @availability(*, unavailable)
   func doNotOverride() {}
 
+  // FIXME: extraneous diagnostic here
   @availability(*, unavailable)
-  init(int _: Int) {} // expected-note {{'init' has been explicitly marked unavailable here}}
+  init(int _: Int) {} // expected-note 3 {{'init' has been explicitly marked unavailable here}}
+
+  convenience init(otherInt: Int) {
+    self.init(int: otherInt) // expected-error {{'init' is unavailable}}
+  }
+
+  @availability(*, unavailable)
+  subscript (i: Int) -> Int { // expected-note{{'subscript' has been explicitly marked unavailable here}}
+    return i
+  }
 }
 
 class ClassWithOverride : ClassWithUnavailable {
@@ -31,6 +41,10 @@ class ClassWithOverride : ClassWithUnavailable {
 
 func testInit() {
   ClassWithUnavailable(int: 0) // expected-error {{'init' is unavailable}}
+}
+
+func testSuvscript(cwu: ClassWithUnavailable) {
+  let x = cwu[5] // expected-error{{'subscript' is unavailable}}
 }
 
 func testString() {

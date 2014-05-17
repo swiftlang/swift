@@ -523,6 +523,16 @@ public:
       diagAvailability(TC, DR->getDecl(), DR->getSourceRange(), DC);
     if (auto MR = dyn_cast<MemberRefExpr>(E))
       diagAvailability(TC, MR->getMember().getDecl(), MR->getSourceRange(), DC);
+    if (auto OCDR = dyn_cast<OtherConstructorDeclRefExpr>(E))
+      diagAvailability(TC, OCDR->getDecl(), OCDR->getConstructorLoc(), DC);
+    if (auto DMR = dyn_cast<DynamicMemberRefExpr>(E))
+      diagAvailability(TC, DMR->getMember().getDecl(), DMR->getNameLoc(), DC);
+    if (auto DS = dyn_cast<DynamicSubscriptExpr>(E))
+      diagAvailability(TC, DS->getMember().getDecl(), DS->getSourceRange(), DC);
+    if (auto S = dyn_cast<SubscriptExpr>(E)) {
+      if (S->hasDecl())
+        diagAvailability(TC, S->getDecl().getDecl(), S->getSourceRange(), DC);
+    }
     return E;
   }
 };

@@ -21,6 +21,6 @@ println(anyWibble.description)
 
 // Check whether we can lookup the class with this name.
 var anyWibbleClass: AnyClass = NSClassFromString("_TtC10MangleTest6Wibble")
-var anyWibbleClass2 = anyWibble.`class`!()
+var anyWibbleClass2 = anyWibble.dynamicType
 assert(NSStringFromClass(anyWibbleClass) == "_TtC10MangleTest6Wibble")
 assert(NSStringFromClass(anyWibbleClass2) == "_TtC10MangleTest6Wibble")

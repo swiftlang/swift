@@ -191,7 +191,7 @@ func testProtocolMethods(b: B, p2m: P2.Type) {
 }
 
 func testId(x: AnyObject) {
-  x.performSelector!("foo:", withObject: x)
+  x.performSelector!("foo:", withObject: x) // expected-error{{'performSelector' is unavailable: 'performSelector' methods are unavailable}}
 
   x.performAdd(1, withValue: 2, withValue: 3, withValue2: 4)
   x.performAdd!(1, withValue: 2, withValue: 3, withValue2: 4)

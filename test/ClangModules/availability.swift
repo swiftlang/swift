@@ -30,5 +30,5 @@ func test_NSInvocation(x:NSInvocation) {} // expected-error {{'NSInvocation' is 
 func test_class_avail(x:NSObject, obj: AnyObject) {
   x.`class`() // expected-error {{'class' is unavailable: use 'dynamicType' instead}}
   NSObject.`class`() // expected-error {{'class' is unavailable: use 'self' instead}}
-  
+  obj.`class`!() // expected-error {{'class' is unavailable: use 'dynamicType' instead}}
 }
