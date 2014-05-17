@@ -742,6 +742,10 @@ func _arrayBridgedDownCast<T>(a: AnyObject[]) -> T[]? {
   return Array(ArrayBuffer(n))
 }
 
+/// Implements the semantics of `x as Derived[]` where `x` has type
+/// `Base[]` and `Derived` is a verbatim-bridged trivial subtype of
+/// `Base`.
+///
 /// Returns an Array<Derived> containing the same elements as a in
 /// O(1) iff a's buffer elements are dynamically known to have
 /// type Derived or a type derived from Derived.
