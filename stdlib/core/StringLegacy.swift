@@ -69,7 +69,7 @@ extension String {
     return count
   }
 
-  func isEmpty() -> Bool {
+  var isEmpty : Bool {
     return core.count == 0
   }
 }

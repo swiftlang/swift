@@ -189,7 +189,7 @@ extension String : StringInterpolationConvertible {
 }
 
 func +(var lhs: String, rhs: String) -> String {
-  if (lhs.isEmpty()) {
+  if (lhs.isEmpty) {
     return rhs
   }
   lhs._append(rhs)
@@ -214,7 +214,7 @@ func +(lhs: Character, rhs: Character) -> String {
 
 // String append
 @assignment func += (inout lhs: String, rhs: String) {
-  if (lhs.isEmpty()) {
+  if (lhs.isEmpty) {
     lhs = rhs
   }
   else {

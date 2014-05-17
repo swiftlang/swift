@@ -71,12 +71,12 @@ struct Range<T: ForwardIndex> : LogicValue, Sliceable {
     _endIndex = end
   }
 
-  func isEmpty() -> Bool {
+  var isEmpty : Bool {
     return startIndex == endIndex
   }
 
   func getLogicValue() -> Bool {
-    return !isEmpty()
+    return !isEmpty
   }
 
   subscript(i: T) -> T {
