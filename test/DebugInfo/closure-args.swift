@@ -3,7 +3,7 @@ import Swift
 
 func main() -> Void
 {
-
+    // I am line 6.
     var random_string = "b"
     var random_int = 5
     var out_only = 2013
@@ -11,13 +11,16 @@ func main() -> Void
     var backward_ptr  =
     // CHECK: define linkonce_odr hidden i1 @_TFF4main4mainFT_T_U_FTSSSS_Sb(
     // CHECK: %[[RHS_ADDR:.*]] = alloca %SS*, align 8
-    // CHECK: store %SS* %{{.*}}, %SS** %[[RHS_ADDR]], align 8, !dbg
+    // CHECK: store %SS* %{{.*}}, %SS** %[[RHS_ADDR]], align 8
+    // The shadow copying should happen in the prologue, because the
+    // stack pointer will be decremented after it.
+    // CHECK-NOT: !dbg
     // CHECK-NEXT: call void @llvm.dbg.declare(metadata !{%SS** %[[RHS_ADDR]]}, metadata !{{.*}}), !dbg
-    // HECK-DAG: [ DW_TAG_arg_variable ] [lhs] [line [[@LINE+5]]]
-    // HECK-DAG: [ DW_TAG_arg_variable ] [rhs] [line [[@LINE+4]]]
-    // CHECK-DAG: [ DW_TAG_arg_variable ] [random_string] [line [[@LINE-11]]]
-    // CHECK-DAG: [ DW_TAG_arg_variable ] [random_int] [line [[@LINE-11]]]
-    // CHECK-DAG: [ DW_TAG_arg_variable ] [out_only] [line [[@LINE-11]]]
+    // CHECK-DAG: [ DW_TAG_arg_variable ] [lhs] [line [[@LINE+5]]]
+    // CHECK-DAG: [ DW_TAG_arg_variable ] [rhs] [line [[@LINE+4]]]
+    // CHECK-DAG: [ DW_TAG_arg_variable ] [random_string] [line 7]
+    // CHECK-DAG: [ DW_TAG_arg_variable ] [random_int] [line 8]
+    // CHECK-DAG: [ DW_TAG_arg_variable ] [out_only] [line 9]
         { (lhs : String, rhs : String) -> Bool in
             if rhs == random_string || rhs.size() == random_int
             {

@@ -54,7 +54,7 @@ func main(x: Int) -> Void
 }
 
 // ASM-CHECK:__TFF9linetable4main{{.*}}_promote0:
-// ASM-CHECK-NOT: ret
+// ASM-CHECK-NOT: retq
 // The end-of-prologue should have a valid location.
 // ASM-CHECK: .loc	1 34 {{[0-9]+}} prologue_end
 

@@ -10,6 +10,7 @@ import Foundation
 // RUN: cat %t.ll | FileCheck %s --check-prefix=CHECK_NONE
 // CHECK_NONE: define void {{.*}}none
 func none(inout a: Int) {
+  // CHECK_NONE: call void @llvm.dbg{{.*}}, !dbg
   // CHECK_NONE: !dbg ![[NONE_INIT:.*]]
   a -= 2;
   // CHECK_NONE: ret {{.*}}, !dbg ![[NONE_RET:.*]]

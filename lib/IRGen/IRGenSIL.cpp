@@ -1339,7 +1339,9 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
             // arguments is initialized.  We need to emit the debug info
             // for the function arguments after the function prologue,
             // after the initialization.
+            IGM.DebugInfo->clearLoc(Builder);
             emitFunctionArgDebugInfo(BB);
+            IGM.DebugInfo->setCurrentLoc(Builder, DS, ILoc);
             ArgsEmitted = true;
           } else {
             // There may be instructions without a valid location

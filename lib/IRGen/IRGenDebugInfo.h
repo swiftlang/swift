@@ -129,7 +129,9 @@ public:
   }
 
   /// Restore the current debug location from the stack.
-  void popLoc() { std::tie(LastLoc, LastScope) = LocationStack.pop_back_val(); }
+  void popLoc() {
+    std::tie(LastLoc, LastScope) = LocationStack.pop_back_val();
+  }
 
   /// Emit debug info for an import declaration.
   void emitImport(ImportDecl *D);
@@ -304,15 +306,11 @@ class PrologueLocation {
   IRGenDebugInfo *DI;
 
 public:
-  /// Set the current location to line 0, but within the current scope
-  /// (= the top of the LexicalBlockStack).
+  /// Set the current location to an empty location.
   PrologueLocation(IRGenDebugInfo *DI, IRBuilder &Builder) : DI(DI) {
     if (DI) {
       DI->pushLoc();
-      llvm::DIDescriptor Scope(
-          Builder.getCurrentDebugLocation().getScope(Builder.getContext()));
-      auto DL = llvm::DebugLoc::get(0, 0, nullptr);
-      Builder.SetCurrentDebugLocation(DL);
+      DI->clearLoc(Builder);
     }
   }
 
