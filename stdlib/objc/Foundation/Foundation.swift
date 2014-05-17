@@ -711,12 +711,11 @@ func _convertDictionaryToNSDictionary<KeyType, ValueType>(
       if let nsCopyingKey = bridgedKey as NSCopying {
         result[nsCopyingKey] = bridgedValue
       } else {
-        // This check is considered not comprehensive because on a different
-        // code path -- when KeyType bridges verbatim -- we are not doing it
-        // eagerly.  Instead, the message send will fail at runtime when
-        // NSMutableDictionary attempts to copy the key that does not conform
-        // to NSCopying.
-        _debugPreconditionFailure("key bridged to an object that does not conform to NSCopying")
+        // Note: on a different code path -- when KeyType bridges verbatim --
+        // we are not doing this check eagerly.  Instead, the message send will
+        // fail at runtime when NSMutableDictionary attempts to copy the key
+        // that does not conform to NSCopying.
+        _preconditionFailure("key bridged to an object that does not conform to NSCopying")
       }
     }
     return reinterpretCast(result)
