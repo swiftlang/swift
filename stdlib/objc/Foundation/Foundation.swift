@@ -1161,6 +1161,11 @@ extension NSUndoManager {
   }
 }
 
+//===----------------------------------------------------------------------===//
+// NSError (as an out parameter).
+//===----------------------------------------------------------------------===//
+
+typealias NSErrorPointer = AutoreleasingUnsafePointer<NSError?>
 
 //===----------------------------------------------------------------------===//
 // Variadic initializers and methods

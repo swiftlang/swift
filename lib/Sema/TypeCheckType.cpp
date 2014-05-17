@@ -2276,6 +2276,7 @@ void TypeChecker::fillObjCRepresentableTypeCache(const DeclContext *DC) {
   if (auto FoundationModule = Context.getLoadedModule(ID_Foundation)) {
     StdlibTypeNames.clear();
     StdlibTypeNames.push_back(Context.getIdentifier("NSZone"));
+    StdlibTypeNames.push_back(Context.getIdentifier("NSErrorPointer"));
     lookupLibraryTypes(*this, FoundationModule, StdlibTypeNames,
                        ObjCMappedTypes);
   }
