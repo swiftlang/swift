@@ -225,7 +225,9 @@ namespace {
         return getOpaquePointerType();
       
       // Non-parameter pointers map to UnsafePointer.
-      return { UnsafePointerType::get(pointeeType), ImportHint::CPointer };
+      return { Impl.getNamedSwiftTypeSpecialization(Impl.getStdlibModule(),
+                                               "UnsafePointer", pointeeType),
+               ImportHint::CPointer };
     }
 
     Type getOpaquePointerType() {

@@ -75,4 +75,3 @@
 // FOUNDATION-NEXT: {{^}}  func getLogicValue() -> Bool{{$}}
 // FOUNDATION-NEXT: {{^}}}{{$}}
 
-// FOUNDATION: func pointer_to_pointer(ptr: CMutablePointer<Int*>)
