@@ -14,32 +14,35 @@
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
 
+struct Int32 {}
+
 @asmname("unknown1")
 func unknown1() -> ()
 
 protocol P {
-  func doSomething()
+  func doSomething(x : Int32)
 }
 
 struct X {}
 
 class B<T> : P {
-  func doSomething() {
+  func doSomething(x : Int32) {
      unknown1()
    }
  }
 
-func doSomething(p : P) {
-  p.doSomething()
+func doSomething(p : P, x : Int32) {
+  p.doSomething(x)
 }
-func doSomething2<T : P>(t : T) {
-  t.doSomething()
+func doSomething2<T : P>(t : T, x : Int32) {
+  t.doSomething(x)
 }
 
 func driver() {
   var b2 = B<X>()
-  doSomething(b2)
-  doSomething2(b2)
+  var x = Int32()
+  doSomething(b2, x)
+  doSomething2(b2, x)
 }
 
 driver()

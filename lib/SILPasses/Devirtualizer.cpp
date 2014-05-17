@@ -161,16 +161,13 @@ static bool optimizeClassMethod(ApplyInst *AI, ClassMethodInst *CMI) {
   // method inst.
   SILType FuncSelfTy = paramTypes[paramTypes.size() - 1];
   SILType OriginTy = Origin.getType();
-
   SILBuilder B(AI);
 
   // Then compare the two types and if they are unequal...
   if (FuncSelfTy != OriginTy) {
-
-    // And the self type on the function is not a super class of our class
-    // method inst, bail. Something weird is happening here.
-    if (!FuncSelfTy.isSuperclassOf(OriginTy))
-      return false;
+    assert(FuncSelfTy.isSuperclassOf(OriginTy) &&
+           "Can not call a class method on a non-subclass of the class_methods"
+           " class.");
 
     // Otherwise, upcast origin to the appropriate type.
     Origin = B.createUpcast(CMI->getLoc(), Origin, FuncSelfTy);
@@ -366,26 +363,22 @@ bool WitnessMethodDevirtualizer::processNormalProtocolConformance() {
   FunctionRefInst *FRI = Builder.createFunctionRef(Loc, F);
 
   // Collect args from the apply inst.
-  ArrayRef<Operand> ApplyArgs = AI->getArgumentOperands();
   SmallVector<SILValue, 4> Args;
 
-  // Add self to the Args list...
-  if (!Self)
-    Self = ApplyArgs[0].get();
-  Args.push_back(*Self);
+  // First add the non self arguments to the new argument list.
+  for (SILValue A : AI->getArgumentsWithoutSelf())
+    Args.push_back(A);
 
-  // Then add the rest of the arguments.
-  for (auto &A : ApplyArgs.slice(1))
-    Args.push_back(A.get());
+  // Then add the self argument since the self argument is always last.
+  if (!Self)
+    Self = AI->getSelfArgument();
+  Args.push_back(*Self);
 
   SmallVector<Substitution, 16> NewSubstList(Subs.begin(),
                                              Subs.end());
 
   // Add the non-self-derived substitutions from the original application.
-  assert(AI->getSubstitutions().size() && "Subst list must not be empty");
-  assert(AI->getSubstitutions()[0].Archetype->getSelfProtocol() &&
-         "The first substitution needS to be a 'self' substitution.");
-  for (auto &origSub : AI->getSubstitutions().slice(1)) {
+  for (auto &origSub : AI->getSubstitutionsWithoutSelfSubstitution()) {
     if (!origSub.Archetype->isSelfDerived())
       NewSubstList.push_back(origSub);
   }
@@ -406,7 +399,7 @@ bool WitnessMethodDevirtualizer::processNormalProtocolConformance() {
 bool WitnessMethodDevirtualizer::processInheritedProtocolConformance() {
   // Since we do not need to worry about substitutions, we can just insert an
   // upcast of self to the appropriate type.
-  Self = AI->getArgumentOperands()[0].get();
+  Self = AI->getSelfArgument();
   CanType Ty = WT->getConformance()->getType()->getCanonicalType();
   SILType SILTy = SILType::getPrimitiveType(Ty, Self->getType().getCategory());
   SILType SelfTy = Self->getType();
@@ -433,13 +426,13 @@ bool WitnessMethodDevirtualizer::processInheritedProtocolConformance() {
   // non-generic callee type.
   assert(SelfDerivedSubstitutions.size() == 1 &&
          "Must have a substitution for self.");
-  Substitution S = AI->getSubstitutions()[0];
-  S.Replacement = Ty;
+  Substitution NewSelfSub = AI->getSelfSubstitution();
+  NewSelfSub.Replacement = Ty;
 
   CanSILFunctionType OrigType = AI->getOrigCalleeType();
   CanSILFunctionType SubstCalleeType = OrigType->substInterfaceGenericArgs(
       AI->getModule(), AI->getModule().getSwiftModule(),
-      ArrayRef<Substitution>(S));
+      ArrayRef<Substitution>(NewSelfSub));
 
   SubstCalleeSILType = SILType::getPrimitiveObjectType(SubstCalleeType);
 
@@ -603,6 +596,27 @@ static ApplyInst *replaceDynApplyWithStaticApply(ApplyInst *AI, SILFunction *F,
   return SAI;
 }
 
+static bool substitutionListHasUnboundGenerics(ArrayRef<Substitution> Subs) {
+  for (auto &Sub : Subs)
+    if (hasUnboundGenericTypes(Sub.Replacement->getCanonicalType()))
+      return true;
+  return false;
+}
+
+/// Temperary helper method that should be removed when inherited protocol
+/// conformances are implemented for protocol methods.
+static bool
+inheritenceProtocolConformanceFreeConformance(ProtocolConformance *C) {
+  if (isa<NormalProtocolConformance>(C))
+    return true;
+
+  if (auto *SPC = dyn_cast<SpecializedProtocolConformance>(C))
+    if (isa<NormalProtocolConformance>(SPC->getGenericConformance()))
+      return true;
+
+  return false;
+}
+
 /// Devirtualize protocol_method + project_existential + init_existential
 /// instructions.  For example:
 ///
@@ -619,12 +633,11 @@ static bool optimizeProtocolMethod(ApplyInst *AI, ProtocolMethodInst *PMI) {
 
   // Find the last argument, which is the Self argument, which may be a
   // project_existential instruction.
-  MutableArrayRef<Operand> Args = AI->getArgumentOperands();
-  if (Args.size() < 1)
+  if (!AI->getNumArguments())
     return false;
 
-  SILValue LastArg = Args[Args.size() - 1].get();
-  ProjectExistentialInst *PEI = dyn_cast<ProjectExistentialInst>(LastArg);
+  SILValue Self = AI->getSelfArgument();
+  ProjectExistentialInst *PEI = dyn_cast<ProjectExistentialInst>(Self);
   if (!PEI)
     return false;
 
@@ -658,6 +671,7 @@ static bool optimizeProtocolMethod(ApplyInst *AI, ProtocolMethodInst *PMI) {
   SILModule &Mod = Init->getModule();
   // For each protocol that our type conforms to:
   for (ProtocolConformance *Conf : Init->getConformances()) {
+
     SILFunction *StaticRef;
     ArrayRef<Substitution> Subs;
     SILWitnessTable *WT;
@@ -670,14 +684,16 @@ static bool optimizeProtocolMethod(ApplyInst *AI, ProtocolMethodInst *PMI) {
     }
     assert(WT && "WT must never be null if static ref is also not.");
 
-    // If any of our subs is generic, don't replace anything.
-    bool FoundGenericSub = false;
-    for (auto &Sub : Subs)
-      if (hasUnboundGenericTypes(Sub.Replacement->getCanonicalType()))
-        FoundGenericSub = true;
-
-    if (FoundGenericSub)
+    // If any of our subs is generic, bail...
+    if (substitutionListHasUnboundGenerics(Subs))
       continue;
+
+    // If we have any form of inherited protocol conformance, bail.
+    //
+    // FIXME: Handle this along the lines of what was done with the witness
+    // method devirtualization.
+    if (!inheritenceProtocolConformanceFreeConformance(Conf))
+      return false;
 
     DEBUG(llvm::dbgs() << "        SUCCESS! Devirtualized : " << *AI);
     ApplyInst *NewApply =

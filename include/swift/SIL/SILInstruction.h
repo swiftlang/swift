@@ -454,6 +454,9 @@ public:
   MutableArrayRef<Operand> getArgumentOperands() {
     return Operands.getDynamicAsArray();
   }
+  ArrayRef<Operand> getArgumentOperands() const {
+    return Operands.getDynamicAsArray();
+  }
 
   /// The arguments passed to this instruction.
   OperandValueArrayRef getArguments() const {
@@ -465,6 +468,48 @@ public:
 
   /// Return the ith argument passed to this instruction.
   SILValue getArgument(unsigned i) const { return getArguments()[i]; }
+
+  /// The collection of following routines wrap the representation difference in
+  /// between the self substitution being first, but the self parameter of a
+  /// function being last.
+  ///
+  /// The hope is that this will prevent any future bugs from coming up related
+  /// to this.
+  ///
+  /// Self is always the last parameter, but self subtitutions are always
+  /// first. The reason to add this method is to wrap that dichotomy to reduce
+  /// errors.
+  ///
+  /// FIXME: Could this be standardized? It has and will lead to bugs. IMHO.
+  SILValue getSelfArgument() const {
+    assert(getNumArguments() && "Should only be called when Callee has "
+           "arguments.");
+    return getArgument(getNumArguments()-1);
+  }
+  OperandValueArrayRef getArgumentsWithoutSelf() const {
+    assert(getNumArguments() && "Should only be called when Callee has "
+           "at least a self parameter.");
+    assert(hasSubstitutions() && "Should only be called when Callee has "
+           "substitutions.");
+    ArrayRef<Operand> ops = getArgumentOperands();
+    ArrayRef<Operand> opsWithoutSelf = ArrayRef<Operand>(&ops[0],
+                                                         ops.size()-1);
+    return OperandValueArrayRef(opsWithoutSelf);
+  }
+  Substitution getSelfSubstitution() const {
+    assert(getNumArguments() && "Should only be called when Callee has "
+           "at least a self parameter.");
+    assert(hasSubstitutions() && "Should only be called when Callee has "
+           "substitutions.");
+    return getSubstitutions()[0];
+  }
+  ArrayRef<Substitution> getSubstitutionsWithoutSelfSubstitution() const {
+    assert(getNumArguments() && "Should only be called when Callee has "
+           "at least a self parameter.");
+    assert(hasSubstitutions() && "Should only be called when Callee has "
+           "substitutions.");
+    return getSubstitutions().slice(1);
+  }
 
   bool isTransparent() const { return Transparent; }
 
