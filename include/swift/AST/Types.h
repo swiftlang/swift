@@ -2563,22 +2563,6 @@ public:
   }
 };
 
-/// The type T*, which is always sugar for the library type \c UnsafePointer<T>.
-class UnsafePointerType : public SyntaxSugarType {
-  UnsafePointerType(const ASTContext &ctx,Type base,
-                    RecursiveTypeProperties properties)
-    : SyntaxSugarType(TypeKind::UnsafePointer, ctx, base, properties) {}
-
-public:
-  /// Return a uniqued unsafe pointer type with the specified base type.
-  static UnsafePointerType *get(Type baseTy);
-
-  // Implement isa/cast/dyncast/etc.
-  static bool classof(const TypeBase *T) {
-    return T->getKind() == TypeKind::UnsafePointer;
-  }
-};
-
 /// ProtocolType - A protocol type describes an abstract interface implemented
 /// by another type.
 class ProtocolType : public NominalType {

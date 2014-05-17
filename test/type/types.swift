@@ -56,9 +56,6 @@ var j1 = new Int.Type[4] {i in Int.self}
 var j2 = new (Int -> Int)[4] {i in {$0}}
 var j3 = new (Int[])[4]
 
-// Verify that T* is an alias of UnsafePointer<T>
-func unsafe_pointer_type_equiv(ptr: Int*) { } // expected-note{{'unsafe_pointer_type_equiv' previously declared here}}
-func unsafe_pointer_type_equiv(ptr: UnsafePointer<Int>) { } // expected-error{{invalid redeclaration of 'unsafe_pointer_type_equiv'}}
 
 var bad_io : (Int) -> (inout Int, Int)  // expected-error {{'inout' is only valid in parameter lists}}
 

@@ -781,18 +781,6 @@ public:
     return Tok.is(tok::exclaim_postfix);
   }
 
-  ParserResult<UnsafePointerTypeRepr> parseTypeUnsafePointer(TypeRepr *Base);
-
-  /// Whether the current token is the '*' token.
-  bool isAsterisk() const {
-    return isAsterisk(Tok);
-  }
-
-  /// Whether this is the '*' token.
-  bool isAsterisk(const Token &tok) const {
-    return tok.isAnyOperator() && tok.getText().equals("*");
-  }
-
   TypeRepr *applyAttributeToType(TypeRepr *Ty, const TypeAttributes &Attr);
 
   //===--------------------------------------------------------------------===//

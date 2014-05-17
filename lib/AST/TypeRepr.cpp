@@ -148,11 +148,6 @@ CloneVisitor::visitImplicitlyUnwrappedOptionalTypeRepr(ImplicitlyUnwrappedOption
                                              T->getExclamationLoc());
 }
 
-TypeRepr *CloneVisitor::visitUnsafePointerTypeRepr(UnsafePointerTypeRepr *T) {
-  return new (Ctx) UnsafePointerTypeRepr(visit(T->getBase()), 
-                                         T->getAsteriskLoc());
-}
-
 TypeRepr *CloneVisitor::visitTupleTypeRepr(TupleTypeRepr *T) {
   return new (Ctx) TupleTypeRepr(Ctx.AllocateCopy(T->getElements()),
                                  T->getParens(), T->getEllipsisLoc());
@@ -302,12 +297,6 @@ void ImplicitlyUnwrappedOptionalTypeRepr::printImpl(ASTPrinter &Printer,
                                           const PrintOptions &Opts) const {
   Base->print(Printer, Opts);
   Printer << "!";
-}
-
-void UnsafePointerTypeRepr::printImpl(ASTPrinter &Printer,
-                                      const PrintOptions &Opts) const {
-  Base->print(Printer, Opts);
-  Printer << "*";
 }
 
 TupleTypeRepr *TupleTypeRepr::create(ASTContext &C,

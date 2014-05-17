@@ -3194,15 +3194,6 @@ Type ModuleFile::getType(TypeID TID) {
     break;
   }
 
-  case decls_block::UNSAFE_POINTER_TYPE: {
-    TypeID baseID;
-    decls_block::UnsafePointerTypeLayout::readRecord(scratch, baseID);
-
-    auto unsafePointerTy = UnsafePointerType::get(getType(baseID));
-    typeOrOffset = unsafePointerTy;
-    break;
-  }
-
   case decls_block::UNBOUND_GENERIC_TYPE: {
     DeclID genericID;
     TypeID parentID;

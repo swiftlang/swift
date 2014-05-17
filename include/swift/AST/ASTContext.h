@@ -367,9 +367,6 @@ public:
   /// Retrieve the declaration of Swift.ImplicitlyUnwrappedOptional<T>.
   StructDecl *getImplicitlyUnwrappedOptionalDecl() const;
   
-  /// Retrieve the declaration of Swift.UnsafePointer<T>.
-  StructDecl *getUnsafePointerDecl() const;
-
   /// Retrieve the declaration of Swift.Optional<T>.Some.
   EnumElementDecl *getOptionalSomeDecl() const;
   

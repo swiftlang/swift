@@ -101,9 +101,6 @@ struct ASTContext::Implementation {
   /// The declaration of Swift.ImplicitlyUnwrappedOptional<T>.
   StructDecl *ImplicitlyUnwrappedOptionalDecl = nullptr;
 
-  /// The declaration of Swift.UnsafePointer<T>.
-  StructDecl *UnsafePointerDecl = nullptr;
-
   /// func _getBool(Builtin.Int1) -> Bool
   FuncDecl *GetBoolDecl = nullptr;
 
@@ -151,7 +148,6 @@ struct ASTContext::Implementation {
     llvm::DenseMap<Type, ArraySliceType*> ArraySliceTypes;
     llvm::DenseMap<Type, OptionalType*> OptionalTypes;
     llvm::DenseMap<Type, ImplicitlyUnwrappedOptionalType*> ImplicitlyUnwrappedOptionalTypes;
-    llvm::DenseMap<Type, UnsafePointerType*> UnsafePointerTypes;
     llvm::DenseMap<Type, ParenType*> ParenTypes;
     llvm::DenseMap<uintptr_t, ReferenceStorageType*> ReferenceStorageTypes;
     llvm::DenseMap<Type, LValueType*> LValueTypes;
@@ -520,15 +516,6 @@ StructDecl *ASTContext::getImplicitlyUnwrappedOptionalDecl() const {
                                                          "ImplicitlyUnwrappedOptional"));
 
   return Impl.ImplicitlyUnwrappedOptionalDecl;
-}
-
-StructDecl *ASTContext::getUnsafePointerDecl() const {
-  if (!Impl.UnsafePointerDecl)
-    Impl.UnsafePointerDecl
-      = dyn_cast_or_null<StructDecl>(findSyntaxSugarImpl(*this,
-                                                         "UnsafePointer"));
-
-  return Impl.UnsafePointerDecl;
 }
 
 ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
@@ -1963,18 +1950,6 @@ ImplicitlyUnwrappedOptionalType *ImplicitlyUnwrappedOptionalType::get(Type base)
   if (entry) return entry;
 
   return entry = new (C, arena) ImplicitlyUnwrappedOptionalType(C, base, properties);
-}
-
-UnsafePointerType *UnsafePointerType::get(Type base) {
-  auto properties = base->getRecursiveProperties();
-  auto arena = getArena(properties);
-
-  const ASTContext &C = base->getASTContext();
-
-  UnsafePointerType *&entry = C.Impl.getArena(arena).UnsafePointerTypes[base];
-  if (entry) return entry;
-
-  return entry = new (C, arena) UnsafePointerType(C, base, properties);
 }
 
 ProtocolType *ProtocolType::get(ProtocolDecl *D, const ASTContext &C) {

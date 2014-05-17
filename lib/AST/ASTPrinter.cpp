@@ -1764,11 +1764,6 @@ public:
         Printer << "!";
         return;
       }
-      if (NT == Ctx.getUnsafePointerDecl()) {
-        printWithParensIfNotSimple(T->getGenericArgs()[0]);
-        Printer << "*";
-        return;
-      }
     }
     if (auto ParentType = T->getParent()) {
       visit(ParentType);
@@ -2007,11 +2002,6 @@ public:
   void visitImplicitlyUnwrappedOptionalType(ImplicitlyUnwrappedOptionalType *T) {
     printWithParensIfNotSimple(T->getBaseType());
     Printer <<  "!";
-  }
-
-  void visitUnsafePointerType(UnsafePointerType *T) {
-    printWithParensIfNotSimple(T->getBaseType());
-    Printer << "*";
   }
 
   void visitProtocolType(ProtocolType *T) {

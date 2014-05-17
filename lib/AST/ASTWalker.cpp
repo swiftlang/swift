@@ -1135,12 +1135,6 @@ bool Traversal::visitImplicitlyUnwrappedOptionalTypeRepr(ImplicitlyUnwrappedOpti
   return false;
 }
 
-bool Traversal::visitUnsafePointerTypeRepr(UnsafePointerTypeRepr *T) {
-  if (doIt(T->getBase()))
-    return true;
-  return false;
-}
-
 bool Traversal::visitTupleTypeRepr(TupleTypeRepr *T) {
   for (auto elem : T->getElements()) {
     if (doIt(elem))
