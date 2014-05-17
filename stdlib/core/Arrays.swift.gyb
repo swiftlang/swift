@@ -742,15 +742,6 @@ func _arrayBridgedDownCast<T>(a: AnyObject[]) -> T[]? {
   return Array(ArrayBuffer(n))
 }
 
-/// Conversion used when Objective-C APIs using NSArray are expressed
-/// in Swift as T[], where T != AnyObject.
-func _arrayBridgeFromObjectiveC<T>(a: AnyObject[]) -> T[] {
-  if let b = (_arrayBridgedDownCast(a) as T[]?) {
-    return b
-  }
-  _fatalError("Failed to bridge NSArray from Objective-C")
-}
-
 /// Returns an Array<Derived> containing the same elements as a in
 /// O(1) iff a's buffer elements are dynamically known to have
 /// type Derived or a type derived from Derived.
@@ -769,6 +760,10 @@ func _arrayCheckedDownCast<Base, Derived>(a: Array<Base>) -> Derived[]? {
 func _arrayBridgeToObjectiveC<T: _BridgedToObjectiveC>(
   a: Array<T>
 ) -> Array<T.ObjectiveCType> {
+  // FIXME: This is completely unused by any test!  It is, however,
+  // expected to be found by the compiler.  We need to find out what
+  // it is.
+  _fatalError("This is never used!'")
   return Array(ArrayBuffer(a.asCocoaArray()))
 }
 
