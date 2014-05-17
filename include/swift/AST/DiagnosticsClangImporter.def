@@ -1,4 +1,4 @@
-//===- DiagnosticsAll.def - Diagnostics Text Index --------------*- C++ -*-===//
+//===- DiagnosticsClangImporter.def - Diagnostics Text ----------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  This file imports all the other diagnostic files.
+//  This file defines diagnostics for the Clang importer.
+//  Each diagnostic is described using one of three kinds (error, warning, or 
+//  note) along with a unique identifier, category, options, and text, and is
+//  followed by a signature describing the diagnostic argument kinds.
 //
 //===----------------------------------------------------------------------===//
 
@@ -33,22 +36,18 @@
   DIAG(NOTE,ID,Category,Options,Text,Signature)
 #endif
 
-#define DIAG_NO_UNDEF
+WARNING(warning_from_clang,none,none,
+  "%0", (StringRef))
+ERROR(error_from_clang,none,none,
+  "%0", (StringRef))
+NOTE(note_from_clang,none,none,
+  "%0", (StringRef))
 
-#include "DiagnosticsCommon.def"
-#include "DiagnosticsParse.def"
-#include "DiagnosticsSema.def"
-#include "DiagnosticsClangImporter.def"
-#include "DiagnosticsSIL.def"
-#include "DiagnosticsIRGen.def"
-#include "DiagnosticsFrontend.def"
-#include "DiagnosticsDriver.def"
-
-#undef DIAG_NO_UNDEF
-
-#if defined(DIAG)
+#ifndef DIAG_NO_UNDEF
+# if defined(DIAG)
 #  undef DIAG
+# endif
+# undef NOTE
+# undef WARNING
+# undef ERROR
 #endif
-#undef NOTE
-#undef WARNING
-#undef ERROR

@@ -6,6 +6,7 @@ if (XCODE)
 endif ()
 
 add_swift_library(swiftClangImporter
+  ClangDiagnosticConsumer.cpp
   ClangImporter.cpp
   ImportDecl.cpp
   ImportMacro.cpp

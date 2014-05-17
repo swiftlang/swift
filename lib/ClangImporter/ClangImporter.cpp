@@ -16,6 +16,7 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "ImporterImpl.h"
+#include "ClangDiagnosticConsumer.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
@@ -175,20 +176,6 @@ ClangImporter::create(ASTContext &ctx,
 
   // Get the SearchPathOptions to use when creating the Clang importer.
   SearchPathOptions &searchPathOpts = ctx.SearchPathOpts;
-
-  // Create a Clang diagnostics engine.
-  // FIXME: Route these diagnostics back to Swift's diagnostics engine,
-  // somehow. We'll lose macro expansions, but so what.
-  auto clangDiags(CompilerInstance::createDiagnostics(
-                    new clang::DiagnosticOptions, 0, nullptr));
-
-  // Don't stop emitting messages if we ever can't find a file.
-  // FIXME: This is actually a general problem: any "fatal" error could mess up
-  // the CompilerInvocation.
-  clangDiags->setDiagnosticMapping(clang::diag::err_module_not_found,
-                                   clang::diag::Mapping::MAP_ERROR,
-                                   clang::SourceLocation());
-
   // Construct the invocation arguments for Objective-C ARC with the current
   // target.
   //
@@ -206,7 +193,7 @@ ClangImporter::create(ASTContext &ctx,
     "-DCF_ENABLE_BRIDGED_TYPES_SO_YOU_CAN_FIX_BUILD_FAILURES",
     "-fretain-comments-from-system-headers",
     "-fmodules-validate-system-headers",
-    "swift.m"
+    "<swift-imported-modules>"
   };
 
   if (ctx.LangOpts.EnableAppExtensionRestrictions) {
@@ -278,20 +265,33 @@ ClangImporter::create(ASTContext &ctx,
     invocationArgs.push_back(argStr.c_str());
 
   // Create a new Clang compiler invocation.
-  llvm::IntrusiveRefCntPtr<CompilerInvocation> invocation
-    = new CompilerInvocation;
+
+  llvm::IntrusiveRefCntPtr<CompilerInvocation> invocation =
+    new CompilerInvocation;
+  auto clangDiags = CompilerInstance::createDiagnostics(
+      &invocation->getDiagnosticOpts(),
+      new ClangDiagnosticConsumer(importer->Impl));
+
+  // Don't stop emitting messages if we ever can't find a file.
+  // FIXME: This is actually a general problem: any "fatal" error could mess up
+  // the CompilerInvocation.
+  clangDiags->setDiagnosticMapping(clang::diag::err_module_not_found,
+                                   clang::diag::Mapping::MAP_ERROR,
+                                   clang::SourceLocation());
+
   if (!CompilerInvocation::CreateFromArgs(*invocation,
-                                         &invocationArgs.front(),
-                                         (&invocationArgs.front() +
-                                          invocationArgs.size()),
-                                         *clangDiags))
+                                          invocationArgs.data(),
+                                          (invocationArgs.data() +
+                                           invocationArgs.size()),
+                                          *clangDiags))
     return nullptr;
   importer->Impl.Invocation = invocation;
 
-  // Create an almost-empty memory buffer corresponding to the file "swift.m"
+  // Create an almost-empty memory buffer.
   auto sourceBuffer = llvm::MemoryBuffer::getMemBuffer(
     "extern int __swift __attribute__((unavailable));");
-  invocation->getPreprocessorOpts().addRemappedFile("swift.m", sourceBuffer);
+  invocation->getPreprocessorOpts().addRemappedFile("<swift-imported-modules>",
+                                                    sourceBuffer);
 
   // Create a compiler instance.
   importer->Impl.Instance.reset(new CompilerInstance);
@@ -417,13 +417,16 @@ Module *ClangImporter::loadModule(
                          clang::SourceLocation()} );
   }
 
+  auto &clangDiags = Impl.Instance->getDiagnosticClient();
+  llvm::SaveAndRestore<const clang::IdentifierInfo *> topModuleRAII{
+    static_cast<ClangDiagnosticConsumer &>(clangDiags).TopModuleBeingImported,
+    clangPath.front().first
+  };
+
   // Load the Clang module.
   // FIXME: The source location here is completely bogus. It can't be
   // invalid, and it can't be the same thing twice in a row, so we just use
   // a counter. Having real source locations would be far, far better.
-  // FIXME: This should not print a message if we just can't find a Clang
-  // module -- that's Swift's responsibility, since there could in theory be a
-  // later module loader.
   auto &srcMgr = clangContext.getSourceManager();
   clang::SourceLocation clangImportLoc
     = srcMgr.getLocForStartOfFile(srcMgr.getMainFileID())
