@@ -118,3 +118,16 @@ println("contig_arr2 == contig_arr3: \(contig_arr2 == contig_arr3)")
 println("contig_arr2 != contig_arr3: \(contig_arr2 != contig_arr3)")
 println("contig_arr1 != contig_arr4: \(contig_arr1 != contig_arr4)")
 println("contig_arr1 == contig_arr4: \(contig_arr1 == contig_arr4)")
+
+// <rdar://problem/16950035>
+protocol Runcible {}
+class Spoon: Runcible {
+  let x: Int
+  init(x: Int) { self.x = x }
+}
+let runceArray: Runcible[] = [Spoon(x: 219)]
+// CHECK:      1 element
+// CHECK-NEXT:   {{.*}}Spoon
+// CHECK-NEXT:     x: 219
+dump(runceArray)
+

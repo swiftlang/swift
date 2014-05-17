@@ -153,7 +153,11 @@ struct UnsafePointer<T> : BidirectionalIndex, Comparable, Hashable {
   ) {
     var p = self
     for x in source {
-      p++.initialize((x as T)!)
+      // FIXME: <rdar://problem/16951692> We should be able to use a
+      // C.GeneratorType.Element == T constraint here, because C._Element ==
+      // C.GeneratorType.Element in all cases, but doing so crashes the
+      // type-checker.
+      p++.initialize(reinterpretCast(x))
     }
   }
 
