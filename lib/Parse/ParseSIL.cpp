@@ -1216,7 +1216,7 @@ bool getApplySubstitutionsFromParsed(
          "Number of substitution exceeds number of archetypes");
   unsigned Id = 0;
   for (auto &parsed : parses) {
-    Substitution sub{nullptr, nullptr, nullptr};
+    Substitution sub;
     // The replacement is for the corresponding archetype by ordering.
     sub.Archetype = allArchetypes[Id++];
     if (!sub.Archetype) {
