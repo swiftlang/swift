@@ -389,12 +389,12 @@ void ClangImporter::importHeader(StringRef header, Module *adapter) {
 
   clang::SourceManager &sourceMgr =
     Impl.getClangASTContext().getSourceManager();
+  clang::SourceLocation mainFileLoc =
+    sourceMgr.getLocForStartOfFile(sourceMgr.getMainFileID());
   clang::FileID bufferID =
-    sourceMgr.createFileIDForMemBuffer(sourceBuffer,
-                                       clang::SrcMgr::C_User,
-                                       /*LoadedID=*/0,
-                                       /*LoadedOffset=*/0,
-      /*IncludeLoc=*/sourceMgr.getLocForStartOfFile(sourceMgr.getMainFileID()));
+    sourceMgr.createFileID(sourceBuffer, clang::SrcMgr::C_User,
+                           /*LoadedID=*/0, /*LoadedOffset=*/0,
+                           /*IncludeLoc=*/mainFileLoc);
 
   clang::Preprocessor &pp = Impl.getClangPreprocessor();
   pp.EnterSourceFile(bufferID, /*directoryLookup=*/nullptr, /*loc=*/{});
