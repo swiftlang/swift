@@ -696,7 +696,11 @@ func _convertDictionaryToNSDictionary<KeyType, ValueType>(
         // Avoid calling the runtime.
         bridgedValue = _reinterpretCastToAnyObject(value)
       } else {
-        bridgedValue = bridgeToObjectiveC(value)!
+        if let theBridgedValue: AnyObject = bridgeToObjectiveC(value) {
+          bridgedValue = theBridgedValue
+        } else {
+          _preconditionFailure("Dictionary to NSDictionary bridging: value failed to bridge")
+        }
       }
 
       // NOTE: the just-bridged key is copied here.  It would be nice to avoid
@@ -707,7 +711,12 @@ func _convertDictionaryToNSDictionary<KeyType, ValueType>(
       if let nsCopyingKey = bridgedKey as NSCopying {
         result[nsCopyingKey] = bridgedValue
       } else {
-        _fatalError("key bridged to an object that does not conform to NSCopying")
+        // This check is considered not comprehensive because on a different
+        // code path -- when KeyType bridges verbatim -- we are not doing it
+        // eagerly.  Instead, the message send will fail at runtime when
+        // NSMutableDictionary attempts to copy the key that does not conform
+        // to NSCopying.
+        _debugPreconditionFailure("key bridged to an object that does not conform to NSCopying")
       }
     }
     return reinterpretCast(result)

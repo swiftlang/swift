@@ -12,9 +12,15 @@
 // RUN: %target-run %t/a.out RemoveInvalidIndex2 2>&1 | FileCheck %s -check-prefix=CHECK
 // RUN: %target-run %t/a.out RemoveInvalidIndex3 2>&1 | FileCheck %s -check-prefix=CHECK
 // RUN: %target-run %t/a.out RemoveInvalidIndex4 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out BridgedKeyIsNotNSCopyable1 2>&1 | FileCheck %s -check-prefix=CHECK-UNRECOGNIZED-SELECTOR
+// RUN: %target-run %t/a.out BridgedKeyIsNotNSCopyable2 2>&1 | FileCheck %s -check-prefix=CHECK
 
 // CHECK: OK
-// CHECK: CRASHED: SIG{{ILL|TRAP}}
+// CHECK: CRASHED: SIG{{ILL|TRAP|ABRT}}
+
+// CHECK-UNRECOGNIZED-SELECTOR: OK
+// CHECK-UNRECOGNIZED-SELECTOR: unrecognized selector sent to instance
+// CHECK-UNRECOGNIZED-SELECTOR: CRASHED: SIGABRT
 
 import Foundation
 
@@ -121,6 +127,42 @@ if arg == "RemoveInvalidIndex4" {
   assert(!d[10])
   println("OK")
   d.removeAtIndex(index)
+}
+
+class TestObjCKeyTy : NSObject {
+  init(_ value: Int) {
+    self.value = value
+  }
+
+  override func isEqual(object: AnyObject!) -> Bool {
+    if let other: AnyObject = object {
+      if let otherObjcKey = other as TestObjCKeyTy {
+        return self.value == otherObjcKey.value
+      }
+    }
+    return false
+  }
+
+  override var hash : Int {
+    return value
+  }
+
+  var value: Int
+}
+
+if arg == "BridgedKeyIsNotNSCopyable1" {
+  // This Dictionary is bridged in O(1).
+  var d = [ TestObjCKeyTy(10): NSObject() ]
+  var nsd: NSDictionary = d
+  println("OK")
+  nsd.mutableCopy()
+}
+
+if arg == "BridgedKeyIsNotNSCopyable2" {
+  // This Dictionary is bridged in O(N).
+  var d = [ TestObjCKeyTy(10): 10 ]
+  println("OK")
+  var nsd: NSDictionary = d
 }
 
 println("BUSTED: should have crashed already")
