@@ -205,7 +205,7 @@ protocol _DictionaryStorage {
   func maybeGet(key: KeyType) -> ValueType?
   mutating func updateValue(value: ValueType, forKey: KeyType) -> ValueType?
   mutating func removeAtIndex(index: Index)
-  mutating func deleteKey(key: KeyType) -> Bool
+  mutating func removeObjectForKey(key: KeyType) -> ValueType?
   var count: Int { get }
 
   class func fromArray(elements: Array<(KeyType, ValueType)>) -> Self
@@ -458,7 +458,7 @@ struct _NativeDictionaryStorage<KeyType : Hashable, ValueType> :
     _fatalError("don't call mutating methods on _NativeDictionaryStorage")
   }
 
-  mutating func deleteKey(key: KeyType) -> Bool {
+  mutating func removeObjectForKey(key: KeyType) -> ValueType? {
     _fatalError("don't call mutating methods on _NativeDictionaryStorage")
   }
 
@@ -782,7 +782,7 @@ struct _CocoaDictionaryStorage : _DictionaryStorage {
     _fatalError("can not mutate NSDictionary")
   }
 
-  mutating func deleteKey(key: AnyObject) -> Bool {
+  mutating func removeObjectForKey(key: AnyObject) -> AnyObject? {
     _fatalError("can not mutate NSDictionary")
   }
 
@@ -1095,7 +1095,7 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
     }
   }
 
-  mutating func nativeDeleteKey(key: KeyType) -> Bool {
+  mutating func nativeRemoveObjectForKey(key: KeyType) -> ValueType? {
     var nativeStorage = native
     var start = nativeStorage._bucket(key)
     var (index, found) = nativeStorage._find(key, start)
@@ -1103,7 +1103,7 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
     // Fast path: if the key is not present, we will not mutate the dictionary,
     // so don't force unique storage.
     if !found {
-      return false
+      return .None
     }
 
     let (reallocated, capacityChanged) =
@@ -1117,8 +1117,9 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
       _sanityCheck(found, "key was lost during storage migration")
     }
 
+    let oldValue = nativeStorage[index.offset]!.value
     nativeDeleteImpl(nativeStorage, start: start, offset: index.offset)
-    return true
+    return oldValue
   }
 
   mutating func nativeRemoveAtIndex(nativeIndex: NativeIndex) {
@@ -1156,26 +1157,26 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
           cocoaIndex.allKeys.objectAtIndex(cocoaIndex.nextKeyIndex)
       migrateDataToNativeStorage(cocoaStorage)
       // FIXME: This assumes that KeyType is bridged verbatim.
-      nativeDeleteKey(reinterpretCast(key) as KeyType)
+      nativeRemoveObjectForKey(reinterpretCast(key) as KeyType)
     }
   }
 
-  mutating func deleteKey(key: KeyType) -> Bool {
+  mutating func removeObjectForKey(key: KeyType) -> ValueType? {
     if _fastPath(guaranteedNative) {
-      return nativeDeleteKey(key)
+      return nativeRemoveObjectForKey(key)
     }
 
     switch self {
     case .Native:
-      return nativeDeleteKey(key)
+      return nativeRemoveObjectForKey(key)
     case .Cocoa(let cocoaStorage):
       // FIXME: This assumes that KeyType and ValueType are bridged verbatim.
       let anyObjectKey: AnyObject = _reinterpretCastToAnyObject(key)
       if !cocoaStorage.maybeGet(anyObjectKey) {
-        return false
+        return .None
       }
       migrateDataToNativeStorage(cocoaStorage)
-      return nativeDeleteKey(key)
+      return nativeRemoveObjectForKey(key)
     }
   }
 
@@ -1607,10 +1608,12 @@ struct Dictionary<KeyType : Hashable, ValueType> : Collection,
     }
     set(newValue) {
       if let x = newValue {
+        // FIXME(performance): this loads and discards the old value.
         _variantStorage.updateValue(x, forKey: key)
       }
       else {
-        _deleteKey(key)
+        // FIXME(performance): this loads and discards the old value.
+        removeObjectForKey(key)
       }
     }
   }
@@ -1628,8 +1631,8 @@ struct Dictionary<KeyType : Hashable, ValueType> : Collection,
     _variantStorage.removeAtIndex(index)
   }
 
-  mutating func _deleteKey(key: KeyType) -> Bool {
-    return _variantStorage.deleteKey(key)
+  mutating func removeObjectForKey(key: KeyType) -> ValueType? {
+    return _variantStorage.removeObjectForKey(key)
   }
 
   /// The number of entries in the dictionary.
