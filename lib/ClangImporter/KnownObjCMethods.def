@@ -41,6 +41,9 @@
 #endif
 
 // ObjectiveC
+INSTANCE_METHOD(NSObject, (0, "dealloc"), 
+                Unavailable("use 'deinit' to define a de-initializer"))
+
 INSTANCE_METHOD(NSObject, (0, "init"), DesignatedInit)
 CLASS_METHOD(NSObject, (0, "class"), Unavailable("use 'self' instead"))
 

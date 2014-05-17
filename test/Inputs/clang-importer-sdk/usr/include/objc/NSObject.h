@@ -12,6 +12,7 @@
 @interface NSObject <NSObject>
 + alloc;
 - init;
+- (void)dealloc;
 + new;
 - performSelector:(SEL)selector withObject:(id)obj;
 - (Class)myClass;

@@ -389,3 +389,6 @@ func testNSExtensionContext(url: NSURL, extensionContext: NSExtensionContext) {
   extensionContext.openURL(url) { success in return }
 }
 
+func testDealloc(obj: NSObject) {
+  obj.dealloc() // expected-error{{'dealloc' is unavailable: use 'deinit' to define a de-initializer}}
+}
