@@ -115,7 +115,7 @@ where T.GeneratorType.Element == T.Buffer.Element,
   
   checkEqual(x, 1...5, true)
 
-  x.reserve(x.count + 2)
+  x.reserveCapacity(x.count + 2)
   checkEqual(x, 1...5, true)
   
   let bufferId0 = bufferID(x)
@@ -234,7 +234,7 @@ func testCocoa() {
   // CHECK-NEXT: [foo, bar, bag, baz]
 
   a = nsArrayOfStrings()
-  a.reserve(30)
+  a.reserveCapacity(30)
   printSequence(a)
   // CHECK-NEXT: [foo, bar, baz]
   
@@ -376,7 +376,7 @@ func testReplace${A}(
   makeOne: ()->${A}<X> = {
     var x = ${A}<X>()
     // make sure some - but not all - replacements will have to grow the buffer
-    x.reserve(testWidth * 3 / 2)
+    x.reserveCapacity(testWidth * 3 / 2)
     x += X(0)..X(testWidth)
     return x
   }
@@ -405,7 +405,7 @@ for (maxValue, label) in [(testWidth, "trailing"), (testWidth*2, "interior")] {
   println("testing subrange replacement in \(label) Sub-Slice")
   testReplaceSlice {
     var a = ContiguousArray(X(-testWidth)..X(maxValue))
-    a.reserve(a.count * 3 / 2)
+    a.reserveCapacity(a.count * 3 / 2)
     return a[testWidth..(2 * testWidth)]
   }
 }

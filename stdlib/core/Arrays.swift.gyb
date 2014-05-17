@@ -98,7 +98,7 @@ extension ${Self} : ArrayType {
   init(count: Int, value: T) {
     assert(count >= 0)
     buffer = Buffer()
-    reserve(count)
+    reserveCapacity(count)
     var p = buffer.elementStorage
     for _ in 0..count {
       p++.initialize(value)
@@ -140,20 +140,20 @@ extension ${Self} : ArrayType {
   /// Complexity: O(N)
   func copy() -> ${Self} {
     var result = self
-    result.reserve(0)
+    result.reserveCapacity(0)
     return result
   }
 
   /// Ensure the uniqueness of the array.
   /// Complexity: O(N)
   mutating func unshare() {
-    reserve(0)
+    reserveCapacity(0)
   }
 
   /// Ensure the array has enough mutable contiguous storage to store
   /// newCapacity elements in.  Note: does not affect count.
   /// Complexity: O(N)
-  mutating func reserve(newCapacity: Int) {
+  mutating func reserveCapacity(newCapacity: Int) {
     if !buffer.requestUniqueMutableBuffer(newCapacity) {
       var newBuffer = ContiguousArrayBuffer<T>(count: count, minimumCapacity: newCapacity)
       buffer._uninitializedCopy(0..count, target: newBuffer.elementStorage)
@@ -219,7 +219,7 @@ extension ${Self} : ArrayType {
     var result = ${Self}<U>()
 
     let count = self.count
-    result.reserve(count)
+    result.reserveCapacity(count)
     var p = result.buffer.elementStorage
     for i in 0..count {
       p++.initialize( transform(self[i]) )
@@ -436,7 +436,7 @@ where C.GeneratorType.Element == A.Buffer.Element
   
   // Ensure uniqueness, mutability, and sufficient storage.  Note that
   // for consistency, we need unique lhs even if rhs is empty.
-  lhs.reserve(newCount > capacity ? max(newCount, capacity * 2) : newCount)
+  lhs.reserveCapacity(newCount > capacity ? max(newCount, capacity * 2) : newCount)
   var p = lhs.buffer.elementStorage + oldCount
   for x in rhs {
     (p++).initialize(x)

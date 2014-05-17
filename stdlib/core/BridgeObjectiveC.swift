@@ -232,7 +232,7 @@ struct CMutablePointer<T> : Equatable {
 
     // The callee that receives the pointer may mutate through it, so
     // force uniqueness by calling reserve(0).
-    a.reserve(0)
+    a.reserveCapacity(0)
     return CMutablePointer(owner: a.owner, value: a.elementStorage.value)
   }
 
@@ -312,7 +312,7 @@ struct CMutableVoidPointer : Equatable {
 
     // The callee that receives the pointer may mutate through it, so
     // force uniqueness by calling reserve(0).
-    a.reserve(0)
+    a.reserveCapacity(0)
     return CMutableVoidPointer(owner: a.owner,
                                value: a.elementStorage.value)
   }

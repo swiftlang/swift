@@ -199,7 +199,7 @@ extension String {
 
   var nulTerminatedUTF8: ContiguousArray<UTF8.CodeUnit> {
     var result = ContiguousArray<UTF8.CodeUnit>()
-    result.reserve(countElements(utf8) + 1)
+    result.reserveCapacity(countElements(utf8) + 1)
     result += utf8
     result += 0
     return result

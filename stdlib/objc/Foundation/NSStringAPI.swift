@@ -31,7 +31,7 @@ extension NSArray {
   func _toArray<T>(body: (AnyObject) -> T) -> T[] {
     var length: Int = count
     var result = T[]()
-    result.reserve(length)
+    result.reserveCapacity(length)
     for i in 0..length {
       result.append(body(objectAtIndex(i)))
     }

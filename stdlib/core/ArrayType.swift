@@ -46,7 +46,7 @@ protocol ArrayType
   /// Reserve enough space to store newCapacity elements in O(N).  If
   /// newCapacity is less than count, has no effect.  PostCondition:
   /// the array has mutable contiguous storage
-  mutating func reserve(newCapacity: Int)
+  mutating func reserveCapacity(newCapacity: Int)
   
   /// Append newElement to the Array in O(1) (amortized)
   mutating func append(newElement: Self.GeneratorType.Element)
