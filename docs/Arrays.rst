@@ -132,169 +132,183 @@ Shared Subscript Assignment and ``NSArray``
 
 For ``Array`` there is one more wrinkle: when its storage is backed by
 an immutable ``NSArray``, shared semantics for subscript assignment
-implies that we add a level of indirection anyway: the NSArray needs
-to be replaced by an array buffer containing the new value, and that
-change needs to be visible through all copies of the array.  Remember
-that this indirection has no cost in cases like ``Array<Int>``, where
-it is statically known to be unneeded.
+implies that we add a level of indirection anyway: the ``NSArray``
+needs to be replaced by an array buffer containing the new value, and
+that change needs to be visible through all copies of the array.
+Remember that this indirection has no cost in cases like
+``Array<Int>``, where it is statically known to be unneeded.
 
 .. image:: ArrayBridge.png
-
-``Array`` Casts
----------------
-
-We can essentially reinterpret an ``Array`` buffer containing elements of
-dynamic type ``Derived`` as a buffer of elements of type ``Base``,
-where ``Derived`` is a subclass of ``Base``.  However, we cannot allow
-arbitrary ``Base`` elements to be inserted in the buffer without
-compromising type safety.  Also, our shared subscript assignment
-semantics imply that all copies of the resulting ``Array<Base>``
-see its subscript mutations.
-
-Therefore, casting ``Array<T>`` to ``Array<U>`` is akin to resizing:
-the new copy becomes independent.  To avoid an O(N) conversion cost,
-we use a layer of indirection in the data structure.  When ``T`` is a
-subclass of ``U``, the intermediate object is marked to prevent
-in-place mutation of the buffer; it will be copied upon its first
-mutation:
-
-.. image:: ArrayCast.png
-
-The specific rules for casting are as follows:
-
-* In O(1), ``Array<T>`` implicitly converts to ``Array<U>`` iff ``T``
-  is derived from ``U`` or if ``T`` is *bridged* to ``U`` or a
-  subclass thereof, including ``AnyObject``\ —see below__.  The
-  resulting array references the same buffer as the original.  If
-  element type checking has been deferred_ in the original array, it
-  is deferred_ in the result.
-
-  __ `bridging to objective-c`_
-
-* In O(1), ``Array<U>`` explicitly converts to ``Array<T>?`` via ``x
-  as Array<T>``.  The cast succeeds, yielding a non-nil result, iff
-  the array buffer is dynamically known to contain only elements of
-  type ``T`` or a type derived from ``T``.  The resulting ``Array<T>``
-  references the same buffer as the original.
 
 Bridging Rules and Terminology for all Types
 --------------------------------------------
 
-* An arbitrary Swift type ``T`` can conform to
+.. _bridged verbatim:
+
+* Every class type or ``@objc`` existential (such as ``AnyObject``) is
+  **bridged** to Objective-C and **bridged back** to Swift via the
+  *identity transformation, i.e. it is **bridged verbatim**.
+
+* A type ``T`` that is not `bridged verbatim`_ can conform to
   ``BridgedToObjectiveC``, which specifies its conversions to and from
   ObjectiveC::
 
     protocol _BridgedToObjectiveC {
-      // FIXME: should be ': class' or ': AnyObject'
-      typealias ObjectiveCType: ObjCClassType
+      typealias ObjectiveCType: AnyObject
       func bridgeToObjectiveC() -> ObjectiveCType
       class func bridgeFromObjectiveC(_: ObjectiveCType) -> Self?
     }
 
-.. obsolete now that we potentially require indirection even for pure
-   Swift classes
+  .. Note:: classes and ``@objc`` existentials shall not conform to
+     ``_BridgedToObjectiveC``, a restriction that's not currently
+     enforceable at compile-time.
 
-  * User-defined value types may conform to ``BridgedToObjectiveC``, but
-    user-defined classes may not.  [This restriction allows us to
-    maintain the highest efficiency for ``Array<T>`` where ``T`` is a
-    Swift class].
-
-* Some generic types (``Array<T>`` in particular) can be bridged only 
-  if their element type can be bridged.  These conform to
-  ``_ConditionallyBridgedToObjectiveC``::
+* Some generic types (*ArrayType*\ ``<T>`` in particular) bridge to
+  Objective-C only if their element types bridge.  These types conform
+  to ``_ConditionallyBridgedToObjectiveC``::
 
     protocol _ConditionallyBridgedToObjectiveC : _BridgedToObjectiveC {
       class func isBridgedToObjectiveC() -> Bool
     }
 
-.. _bridged:
-
-* A type ``T`` is formally considered **bridged** (to type ``U``) if
-  either:
-
-  - ``T`` conforms to ``BridgedToObjectiveC`` and ``T.ObjectiveCType``
-    is ``U`` and either
-  
-    - ``T`` does not conform to ``_ConditionallyBridgedToObjectiveC``
-    - or, ``T.isBridgedToObjectiveC()`` is ``true``
-
-  .. _bridged verbatim:
-
-  - or ``T`` is a class type that does not conform to
-    ``BridgedToObjectiveC`` and ``T`` == ``U``.  In this case ``T`` is
-    **bridged verbatim**.
-
-.. _bridges back:
-.. _bridge back:
-
-* For a type ``T`` that is bridged_, a value ``x`` of class type
-  **bridges back** to ``T`` as the first of these values that is
-  non-``nil``:
-
-  - if ``T`` conforms to ``BridgedToObjectiveC``, ::
-       T.bridgeFromObjectiveC((x as T.ObjectiveCType)!)
-
-  - if ``T`` is a class type or ``@objc`` existential (such as
-    ``AnyObject``), ::
- 
-        ``(x as T)``
-
-  Otherwise, ``x`` does not `bridge back`_ to ``T``.
-
-Bridging To Objective-C
------------------------
-
-* *ArrayType*\ ``<T>`` is bridged_ to ``NSArray`` iff ``T`` is
-  bridged_.
-
-* An ``NSArray`` can be constructed from any bridged_ ``Array<T>`` or
-  ``ContiguousArray<T>``.  The elements of the resulting ``NSArray`` have
-  dynamic type ``U``, where ``T`` is bridged to ``U``.
-
-  .. Admonition:: Implementation Notes
-
-     We *could* also support construction of ``NSArray`` from
-     ``Slice<T>`` at the cost of a single allocation
-
-* Constructing an ``NSArray`` from an array of un-\ bridged_ element
-  type is a fatal error detected at runtime.
+  Bridging from, or *bridging back* to, a type ``T`` conforming to
+  ``_ConditionallyBridgedToObjectiveC`` when
+  ``T.isBridgedToObjectiveC()`` is ``false`` is a user programming
+  error that may be diagnosed at runtime.
 
   .. Admonition:: Implementation Note
 
      There are various ways to move this detection to compile-time
 
-* if ``T`` is `bridged verbatim`_, the conversion is O(1)
+* For a type ``T`` that is not `bridged verbatim`_,
+
+  - if ``T`` conforms to ``BridgedToObjectiveC`` and either
   
-* if ``T`` is not `bridged verbatim`_, the elements of the ``NSArray``
-  (or ``Array<U>`` when bridging is used in array casting) are created
-  eagerly in O(N), by calling ``bridgeToObjectiveC()`` on the original
-  ``T``\ s, and a new ``NSArray`` is returned.
+    - ``T`` does not conform to ``_ConditionallyBridgedToObjectiveC``
+    - or, ``T.isBridgedToObjectiveC()``
 
-.. _bridging back:
+    then a value ``x`` of type ``T`` is **bridged** as
+    ``T.ObjectiveCType`` via ``x.bridgeToObjectiveC()``, and an object
+    ``y`` of ``T.ObjectiveCType`` is **bridged back** to ``T`` via
+    ``T.bridgeFromObjectiveC(y)``
 
-**Bridging Back** From Objective-C
-----------------------------------
+  - Otherwise, ``T`` **does not bridge** to Objective-C
 
-* ``NSArray`` can be implicitly converted to ``Array<AnyObject>`` in
-  O(1)
+``Array`` Type Conversions
+--------------------------
 
-* ``NSArray`` and ``Array<AnyObject>`` can be *explicitly* converted
-  to ``Array<T>?`` using ``a as Array<T>``.  There are several cases:
+From here on, this document deals only with ``Array`` itself, and not
+``Slice`` or ``ContiguousArray``, which support a subset of ``Array``\
+'s conversions.  Future revisions will add descriptions of ``Slice``
+and ``ContiguousArray`` conversions.
 
-  - If ``T`` is not bridged_, conversion fails in O(1), yielding nil
+Kinds of Conversions
+::::::::::::::::::::
 
-  - If the ``NSArray`` was originally created as a Swift *ArrayType*\
-    ``<U>`` and ``U`` is ``T`` or a subclass thereof, conversion
-    succeeds in O(1). No further dynamic type checks are required.
+In these definitions, ``Base`` is ``AnyObject`` or a trivial subtype
+thereof, ``Derived`` is a trivial subtype of ``Base``, and ``X``
+conforms to ``_BridgedToObjectiveC``:
 
-  .. _deferred:
+.. _trivial bridging:
 
-  - Otherwise, if ``T`` is a class or existential type, conversion
-    succeeds in O(1), but type-checking of elements is **deferred**
-    and on-demand.  The result of subscripting is the result of
-    `bridging back`_ the corresponding stored ``NSArray`` element to
-    ``T``.  Failure to `bridge back`_ is a fatal error detected at
-    runtime.
+* **Trivial bridging** implicitly converts ``Base[]`` to
+  ``NSArray`` in O(1). This is simply a matter of returning the
+  Array's internal buffer, which is-a ``NSArray``.
 
-  - Otherwise, conversion is O(N), and succeeds iff every element
-    `bridges back`_ to ``T``.
+.. _trivial bridging back:
+
+* **Trivial bridging back** implicitly converts ``NSArray`` to
+  ``AnyObject[]`` in O(1) plus the cost of calling ``copy()`` on
+  the ``NSArray``. [#nocopy]_
+
+* **Implicit conversions** between ``Array`` types
+
+  - **Implicit upcasting** implicitly converts ``Derived[]`` to
+    ``Base[]`` in O(1).  
+  - **Implicit bridging** implicitly converts ``X[]`` to
+    ``X.ObjectiveCType[]`` in O(N).
+
+  .. Note:: Either type of implicit conversion may be combined with
+     `trivial bridging`_ in an implicit conversion to ``NSArray``.
+
+* **Checked conversions** convert ``T[]`` to ``U[]?`` in O(N)
+  via ``a as U[]``.
+
+  - **Checked downcasting** converts ``Base[]`` to ``Derived[]?``.
+  - **Checked bridging back** converts ``T[]`` to ``X[]?`` where
+    ``X.ObjectiveCType`` is ``T`` or a trivial subtype thereof.
+
+* **Forced conversions** convert ``AnyObject[]`` or ``NSArray`` to
+  ``T[]`` implicitly, in bridging thunks between Swift and Objective-C.
+
+  For example, when a user writes a Swift method taking ``NSView[]``,
+  it is exposed to Objective-C as a method taking ``NSArray``, which
+  is force-converted to ``NSView[]`` when called from Objective-C.
+     
+  - **Forced downcasting** converts ``AnyObject[]`` to ``Derived[]`` in
+    O(1)
+  - **Forced bridging back** converts ``AnyObject[]`` to ``X[]`` in O(N).
+
+  A forced conversion where any element fails to convert is considered
+  a user programming error that may trap.  In the case of forced
+  downcasts, the trap may be deferred_ to the point where an offending
+  element is accessed.
+
+.. Note:: Both checked and forced downcasts may be combined with `trivial
+          bridging back`_ in conversions from ``NSArray``.
+
+Maintaining Type-Safety
+:::::::::::::::::::::::
+
+Both upcasts and forced downcasts raise type-safety issues.
+
+Upcasts
+.......
+
+When up-casting an ``Derived[]`` to ``Base[]``, a buffer of
+``Derived`` object can simply be ``reinterpretCast``\ 'ed to a buffer
+of elements of type ``Base``—as long as the resulting buffer is never
+mutated.  For example, we cannot allow a ``Base`` element to be
+inserted in the buffer, because the buffer's destructor will destroy
+the elements with the (incorrect) static presumption that they have
+``Derived`` type.
+
+Furthermore, we can't (logically) copy the buffer just prior to
+mutation, since the ``Base[]`` may be copied prior to mutation,
+and our shared subscript assignment semantics imply that all copies
+must observe its subscript assignments.
+
+Therefore, converting ``T[]`` to ``U[]`` is akin to
+resizing: the new ``Array`` becomes logically independent.  To avoid
+an immediate O(N) conversion cost, and preserve shared subscript
+assignment semantics, we use a layer of indirection in the data
+structure.  Further, when ``T`` is a subclass of ``U``, the
+intermediate object is marked to prevent in-place mutation of the
+buffer; it will be copied upon its first mutation:
+
+.. image:: ArrayCast.png
+
+.. _deferred:
+
+Deferrred Checking for Forced Downcasts
+.......................................
+
+In forced downcasts, if any element fails to have dynamic type ``Derived``,
+it is considered a programming error that may cause a trap.  Sometimes
+we can do this check in O(1) because the source holds a known buffer
+type.  Rather than incur O(N) checking for the other cases, the new
+intermediate object is marked for deferred checking, and all element
+accesses through that object are dynamically typechecked, with a trap
+upon failure (except in ``-Ofast`` builds).
+
+When the resulting array is later up-cast (other than to a type that
+can be validated in O(1) by checking the type of the underlying
+buffer), the result is also marked for deferred checking.
+
+----
+
+.. [#nocopy] This ``copy()`` may amount to a retain if the ``NSArray``
+   is already known to be immutable.  We could eventually optimize out
+   the copy if we can detect that the ``NSArray`` is uniquely
+   referenced.  Our current unique-reference detection applies only to
+   Swift objects, though.
