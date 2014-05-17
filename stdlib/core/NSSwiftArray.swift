@@ -80,7 +80,7 @@ class _NSSwiftArray : HeapBufferStorageBase, CocoaArray {
     state: UnsafePointer<_SwiftNSFastEnumerationState>,
     objects: UnsafePointer<AnyObject>, count bufferSize: Int
   ) -> Int {
-    var enumerationState = state.pointee
+    var enumerationState = state.memory
 
     let buffer = reinterpretCast(self) as Buffer
     // If used as an NSArray, the element type can have no fancy
@@ -93,7 +93,7 @@ class _NSSwiftArray : HeapBufferStorageBase, CocoaArray {
     enumerationState.mutationsPtr = _fastEnumerationStorageMutationsPtr
     enumerationState.itemsPtr = reinterpretCast(buffer.elementStorage)
     enumerationState.state = 1
-    state.pointee = enumerationState
+    state.memory = enumerationState
     return buffer.value.count
   }
   

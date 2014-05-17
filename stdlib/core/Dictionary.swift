@@ -347,12 +347,12 @@ struct _NativeDictionaryStorage<KeyType : Hashable, ValueType> :
     @transparent
     get {
       _precondition(i >= 0 && i < capacity)
-      return (elements + i).pointee
+      return (elements + i).memory
     }
     @transparent
     nonmutating set {
       _precondition(i >= 0 && i < capacity)
-      (elements + i).pointee = newValue
+      (elements + i).memory = newValue
     }
   }
 
@@ -703,7 +703,7 @@ class _NativeDictionaryStorageOwnerBase
                  isBridgedVerbatimToObjectiveC(ValueType.self),
                  "native Dictionary storage can be used as NSDictionary only when both key and value are bridged verbatim to Objective-C")
 
-    var theState = state.pointee
+    var theState = state.memory
     if theState.state == 0 {
       theState.state = 1 // Arbitrary non-zero value.
       theState.itemsPtr = UnsafePointer<AnyObject?>(objects)
@@ -726,7 +726,7 @@ class _NativeDictionaryStorageOwnerBase
       currIndex = currIndex.succ()
     }
     theState.extra.0 = CUnsignedLong(currIndex.offset)
-    state.pointee = theState
+    state.memory = theState
     return stored
   }
 }

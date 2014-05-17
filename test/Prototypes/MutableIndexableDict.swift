@@ -128,12 +128,12 @@ struct FixedSizedRefArrayOfOptional<T>
   subscript(i: Int) -> T? {
     get {
       assert(i >= 0 && i < buffer.value)
-      return (buffer.elementStorage + i).pointee
+      return (buffer.elementStorage + i).memory
     }
     nonmutating
     set {
       assert(i >= 0 && i < buffer.value)
-      (buffer.elementStorage + i).pointee = newValue
+      (buffer.elementStorage + i).memory = newValue
     }
   }
 

@@ -250,8 +250,8 @@ extension UTF16 {
     }
     else {
       for i in 0..count {
-        let u16 = T.toUTF16CodeUnit((source + i).pointee)
-        (destination + i).pointee = U.fromUTF16CodeUnit(u16)
+        let u16 = T.toUTF16CodeUnit((source + i).memory)
+        (destination + i).memory = U.fromUTF16CodeUnit(u16)
       }
     }
   }

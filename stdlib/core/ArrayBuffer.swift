@@ -241,7 +241,7 @@ extension ArrayBuffer {
     // Make another pass to retain the copied objects
     var result = target
     for i in subRange {
-      result.initialize(result.pointee)
+      result.initialize(result.memory)
       ++result
     }
     return result

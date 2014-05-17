@@ -58,7 +58,7 @@ func _canBeClass<T>(_: T.Type) -> Bool {
 func reinterpretCast<T, U>(var x: T) -> U {
   _precondition(sizeof(T.self) == sizeof(U.self),
     "can't reinterpretCast values of different sizes")
-  return UnsafePointer<U>(Builtin.addressof(&x)).pointee
+  return UnsafePointer<U>(Builtin.addressof(&x)).memory
 }
 
 /// `reinterpretCast` something to `AnyObject`

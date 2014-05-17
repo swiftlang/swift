@@ -73,7 +73,7 @@ func _stdlib_getTypeNameImpl<T>(value: T, result: UnsafePointer<String>)
 func _stdlib_getTypeName<T>(value: T) -> String {
   var resultPtr = UnsafePointer<String>.alloc(1)
   _stdlib_getTypeNameImpl(value, resultPtr)
-  let result = resultPtr.pointee
+  let result = resultPtr.memory
   resultPtr.dealloc(1)
   return result
 }

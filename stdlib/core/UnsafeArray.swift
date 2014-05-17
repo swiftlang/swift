@@ -29,7 +29,7 @@ struct UnsafeArray<T> : Collection, Generator {
   subscript(i: Int) -> T {
     _precondition(i >= 0)
     _precondition(i < endIndex)
-    return (_position + i).pointee
+    return (_position + i).memory
   }
   
   init(start: UnsafePointer<T>, length: Int) {
@@ -41,7 +41,7 @@ struct UnsafeArray<T> : Collection, Generator {
     if _position == _end {
       return .None
     }
-    return .Some((_position++).pointee)
+    return .Some((_position++).memory)
   }
 
   func generate() -> UnsafeArray {

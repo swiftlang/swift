@@ -14,10 +14,10 @@
 
 var errno : Int32 {
   get {
-    return __error().pointee
+    return __error().memory
   }
   set {
-    __error().pointee = newValue
+    __error().memory = newValue
   }
 }
 

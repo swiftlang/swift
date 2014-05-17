@@ -137,10 +137,10 @@ struct HeapBuffer<Value, Element> : LogicValue, Equatable {
 
   var value : Value {
     get {
-      return _value.pointee
+      return _value.memory
     }
     nonmutating set(newValue) {
-      _value.pointee = newValue
+      _value.memory = newValue
     }
   }
 
@@ -195,7 +195,7 @@ struct OnHeap<T> {
   }
   
   @conversion func __conversion() -> T {
-    return _storage._value.pointee
+    return _storage._value.memory
   }
   
   var _storage: Buffer

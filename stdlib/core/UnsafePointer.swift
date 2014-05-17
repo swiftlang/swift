@@ -72,7 +72,7 @@ struct UnsafePointer<T> : BidirectionalIndex, Comparable, Hashable {
 
   /// Access the underlying raw memory, getting and
   /// setting values.
-  var pointee : T {
+  var memory : T {
     @transparent get {
       return Builtin.load(value)
     }
@@ -178,11 +178,11 @@ struct UnsafePointer<T> : BidirectionalIndex, Comparable, Hashable {
   subscript (i : Int) -> T {
     @transparent
     get {
-      return (self + i).pointee
+      return (self + i).memory
     }
     @transparent
     nonmutating set {
-      (self + i).pointee = newValue
+      (self + i).memory = newValue
     }
   }
 

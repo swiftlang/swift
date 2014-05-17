@@ -103,7 +103,7 @@ class DumbString: NSString {
                                   encoding: NSStringEncoding,
                                   error: AutoreleasingUnsafePointer<NSError?>)
   -> DumbString? {
-    error.pointee = NSError(domain: "Malicious Mischief", code: 594, userInfo: nil)
+    error.memory = NSError(domain: "Malicious Mischief", code: 594, userInfo: nil)
     return nil
   }
 }

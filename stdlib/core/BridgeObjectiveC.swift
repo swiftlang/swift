@@ -64,7 +64,7 @@ func withUnsafePointerToObject<T: AnyObject, Result>(
   var buffer: Builtin.RawPointer = Builtin.inttoptr_Word(0.value)
   var address = UnsafePointer<ImplicitlyUnwrappedOptional<T>>(Builtin.addressof(&buffer))
   var result = body(address)
-  arg = address.pointee
+  arg = address.memory
   return result
 }
 
@@ -401,12 +401,12 @@ struct AutoreleasingUnsafePointer<T /* TODO : class */> : Equatable {
   
   /// Access the underlying raw memory, getting and
   /// setting values.
-  var pointee : T {
+  var memory : T {
     /// Retrieve the value the pointer points to.
     @transparent get {
       _debugPrecondition(!isNull())
       // We can do a strong load normally.
-      return UnsafePointer<T>(self).pointee
+      return UnsafePointer<T>(self).memory
     }
     /// Set the value the pointer points to, copying over the previous value.
     ///
@@ -422,7 +422,7 @@ struct AutoreleasingUnsafePointer<T /* TODO : class */> : Equatable {
       // autoreleasing slot, so retains/releases of the original value are
       // unneeded.
       let p = UnsafePointer<COpaquePointer>(UnsafePointer<T>(self))
-      p.pointee = reinterpretCast(newValue)
+      p.memory = reinterpretCast(newValue)
     }
   }
 }

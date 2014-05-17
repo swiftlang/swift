@@ -93,8 +93,8 @@ extension String {
   static func availableStringEncodings() -> NSStringEncoding[] {
     var result = NSStringEncoding[]()
     var p = NSString.availableStringEncodings()
-    while p.pointee != 0 {
-      result.append(p.pointee)
+    while p.memory != 0 {
+      result.append(p.memory)
       ++p
     }
     return result
@@ -557,7 +557,7 @@ extension String {
       var stop_ = false
       block(line: line!, stop: &stop_)
       if stop_ {
-        UnsafePointer(stop).pointee = true
+        UnsafePointer(stop).memory = true
       }
     }
   }
@@ -582,7 +582,7 @@ extension String {
       var stop_ = false
       usingBlock($0, $1, $2, &stop_)
       if stop_ {
-        UnsafePointer($3).pointee = true
+        UnsafePointer($3).memory = true
       }
     }
   }
@@ -602,7 +602,7 @@ extension String {
       var stop_ = false
       usingBlock(substring: $0, substringRange: $1, enclosingRange: $2, &stop_)
       if stop_ {
-        UnsafePointer($3).pointee = true
+        UnsafePointer($3).memory = true
       }
     }
   }
