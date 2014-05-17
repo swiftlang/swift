@@ -43,6 +43,9 @@ ERROR(error_from_clang,none,none,
 NOTE(note_from_clang,none,none,
   "%0", (StringRef))
 
+ERROR(clang_cannot_build_module,none,Fatal,
+  "could not build Objective-C module '%0'", (StringRef))
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG

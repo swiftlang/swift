@@ -12,9 +12,14 @@ import MissingDependencyFromSwift
 
 import MissingDependencyFromClang
 // CHECK: error: {{.+}}/Inputs/broken-modules/MissingDependencyFromClang.h:1: module 'Dependency' not found
-// FIXME-NOT: no such module 'MissingDependencyFromClang'
+// CHECK: error: could not build Objective-C module 'MissingDependencyFromClang'
+// CHECK-NOT: no such module 'MissingDependencyFromClang'
 
 import BrokenClangModule
 // CHECK: error: {{.+}}/Inputs/broken-modules/BrokenClangModule.h:2: redefinition of 'conflict' as different kind of symbol
-// FIXME-NOT: no such module 'BrokenClangModule'
+// CHECK: error: could not build Objective-C module 'BrokenClangModule'
+// CHECK-NOT: no such module 'BrokenClangModule'
 
+
+let _ = BrokenClangModule.x
+// CHECK: broken-modules.swift:[[@LINE-1]]:9: error: module 'BrokenClangModule' has no member named 'x'

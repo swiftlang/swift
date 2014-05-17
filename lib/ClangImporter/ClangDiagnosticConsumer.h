@@ -18,13 +18,59 @@
 namespace swift {
 
 class ClangDiagnosticConsumer : public clang::DiagnosticConsumer {
+  struct LoadModuleRAII {
+    ClangDiagnosticConsumer *Consumer;
+  public:
+    LoadModuleRAII(ClangDiagnosticConsumer &consumer,
+                   const clang::IdentifierInfo *name)
+        : Consumer(&consumer) {
+      assert(name);
+      Consumer->TopModuleBeingImported = name;
+      Consumer->TopModuleNotFound = false;
+    }
+
+    LoadModuleRAII(LoadModuleRAII &) = delete;
+    LoadModuleRAII &operator=(LoadModuleRAII &) = delete;
+
+    LoadModuleRAII(LoadModuleRAII &&other) {
+      *this = std::move(other);
+    }
+    LoadModuleRAII &operator=(LoadModuleRAII &&other) {
+      Consumer = other.Consumer;
+      other.Consumer = nullptr;
+      return *this;
+    }
+
+    ~LoadModuleRAII() {
+      if (Consumer)
+        Consumer->TopModuleBeingImported = nullptr;
+    }
+  };
+
+private:
+  friend struct LoadModuleRAII;
+
   ClangImporter::Implementation &ImporterImpl;
+  const clang::IdentifierInfo *TopModuleBeingImported = nullptr;
+  bool TopModuleNotFound;
 
 public:
   ClangDiagnosticConsumer(ClangImporter::Implementation &Impl)
-      : ImporterImpl(Impl) {}
+    : ImporterImpl(Impl) {}
 
-  const clang::IdentifierInfo *TopModuleBeingImported = nullptr;
+  LoadModuleRAII handleLoadModule(const clang::IdentifierInfo *name) {
+    return LoadModuleRAII(*this, name);
+  }
+
+  bool isTopModuleMissing() const {
+    assert(TopModuleBeingImported && "no module being loaded");
+    return TopModuleNotFound;
+  }
+
+  void setTopModuleMissing() {
+    assert(TopModuleBeingImported && "no module being loaded");
+    TopModuleNotFound = true;
+  }
 
   void HandleDiagnostic(clang::DiagnosticsEngine::Level diagLevel,
                         const clang::Diagnostic &info) override;

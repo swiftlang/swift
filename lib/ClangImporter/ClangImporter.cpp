@@ -272,10 +272,13 @@ ClangImporter::create(ASTContext &ctx,
       &invocation->getDiagnosticOpts(),
       new ClangDiagnosticConsumer(importer->Impl));
 
-  // Don't stop emitting messages if we ever can't find a file.
+  // Don't stop emitting messages if we ever can't load a module.
   // FIXME: This is actually a general problem: any "fatal" error could mess up
   // the CompilerInvocation.
   clangDiags->setDiagnosticMapping(clang::diag::err_module_not_found,
+                                   clang::diag::Mapping::MAP_ERROR,
+                                   clang::SourceLocation());
+  clangDiags->setDiagnosticMapping(clang::diag::err_module_not_built,
                                    clang::diag::Mapping::MAP_ERROR,
                                    clang::SourceLocation());
 
@@ -417,11 +420,9 @@ Module *ClangImporter::loadModule(
                          clang::SourceLocation()} );
   }
 
-  auto &clangDiags = Impl.Instance->getDiagnosticClient();
-  llvm::SaveAndRestore<const clang::IdentifierInfo *> topModuleRAII{
-    static_cast<ClangDiagnosticConsumer &>(clangDiags).TopModuleBeingImported,
-    clangPath.front().first
-  };
+  auto &rawDiagClient = Impl.Instance->getDiagnosticClient();
+  auto &diagClient = static_cast<ClangDiagnosticConsumer &>(rawDiagClient);
+  auto topModuleRAII = diagClient.handleLoadModule(clangPath.front().first);
 
   // Load the Clang module.
   // FIXME: The source location here is completely bogus. It can't be
@@ -435,8 +436,15 @@ Module *ClangImporter::loadModule(
                                                clangPath,
                                                clang::Module::AllVisible,
                                                /*IsInclusionDirective=*/false);
-  if (!clangModule)
-    return nullptr;
+  if (!clangModule) {
+    if (diagClient.isTopModuleMissing())
+      return nullptr;
+
+    // Otherwise, the module is present, but we've failed to load it for some
+    // reason. Create an empty module to serve as a placeholder.
+    Identifier name = path.back().first;
+    return Module::create(name, Impl.SwiftContext);
+  }
 
   return Impl.finishLoadingClangModule(*this, clangModule, /*adapter=*/false);
 }

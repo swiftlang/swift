@@ -22,12 +22,33 @@ using namespace swift;
 void ClangDiagnosticConsumer::HandleDiagnostic(
     clang::DiagnosticsEngine::Level clangDiagLevel,
     const clang::Diagnostic &clangDiag) {
-  // Ignore the module-not-found diagnostic if it's a top-level module we're
-  // looking for.
-  if (clangDiag.getID() == clang::diag::err_module_not_found)
-    if (TopModuleBeingImported)
-      if (clangDiag.getArgStdStr(0) == TopModuleBeingImported->getName())
+  // Handle the module-not-found diagnostic specially if it's a top-level module
+  // we're looking for.
+  if (TopModuleBeingImported) {
+    if (clangDiag.getID() == clang::diag::err_module_not_found) {
+      if (clangDiag.getArgStdStr(0) == TopModuleBeingImported->getName()) {
+        setTopModuleMissing();
         return;
+      }
+    }
+  }
+
+  clang::SourceManager &clangSrcMgr = clangDiag.getSourceManager();
+  clang::SourceLocation clangLoc = clangDiag.getLocation();
+  clangLoc = clangSrcMgr.getFileLoc(clangLoc);
+  SourceLoc loc = ImporterImpl.importSourceLoc(clangLoc);
+
+  auto &ctx = ImporterImpl.SwiftContext;
+
+  if (TopModuleBeingImported) {
+    if (clangDiag.getID() == clang::diag::err_module_not_built) {
+      if (clangDiag.getArgStdStr(0) == TopModuleBeingImported->getName()) {
+        ctx.Diags.diagnose(loc, diag::clang_cannot_build_module,
+                           TopModuleBeingImported->getName());
+        return;
+      }
+    }
+  }
 
   // Satisfy the default implementation (bookkeeping).
   DiagnosticConsumer::HandleDiagnostic(clangDiagLevel, clangDiag);
@@ -52,10 +73,6 @@ void ClangDiagnosticConsumer::HandleDiagnostic(
     break;
   }
 
-  clang::SourceManager &clangSrcMgr = clangDiag.getSourceManager();
-  clang::SourceLocation clangLoc = clangDiag.getLocation();
-  clangLoc = clangSrcMgr.getFileLoc(clangLoc);
-
   llvm::SmallString<128> message;
 
   // FIXME: Until we have real source locations, they're included in the
@@ -71,6 +88,5 @@ void ClangDiagnosticConsumer::HandleDiagnostic(
   clangDiag.FormatDiagnostic(message);
 
   // FIXME: Include source ranges in the diagnostic.
-  SourceLoc loc = ImporterImpl.importSourceLoc(clangLoc);
-  ImporterImpl.SwiftContext.Diags.diagnose(loc, diagKind, message);
+  ctx.Diags.diagnose(loc, diagKind, message);
 }
