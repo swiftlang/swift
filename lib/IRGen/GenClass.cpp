@@ -1440,7 +1440,9 @@ namespace {
           Properties.push_back(prop);
 
         // Don't emit getter/setter descriptors for @NSManagedAttr properties.
-        if (var->getAttrs().hasAttribute<NSManagedAttr>())
+        if (var->getAttrs().hasAttribute<NSManagedAttr>() ||
+            // Don't emit descriptors for properties without accessors.
+            var->getGetter() == nullptr)
           return;
 
         auto getter_setter = emitObjCPropertyMethodDescriptors(IGM, var);

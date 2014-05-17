@@ -35,6 +35,13 @@ extension SomeObject {
   }
 }
 
+// <rdar://problem/16952186> Crash with @lazy in @objc class
+@objc
+class LazyPropertyCrash  {
+  @lazy var applicationFilesDirectory: LazyPropertyCrash = LazyPropertyCrash()
+}
+
+
 
 // CHECK: [[READONLY_NAME:@.*]] = private unnamed_addr constant [9 x i8] c"readonly\00"
 // CHECK: [[READONLY_ATTRS:@.*]] = private unnamed_addr constant [29 x i8] c"T@\22SomeObject\22,R,N,Vreadonly\00"
