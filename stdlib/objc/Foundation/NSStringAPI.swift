@@ -718,9 +718,8 @@ extension String {
 
   // - (NSUInteger)hash
 
-  /// Returns an unsigned integer that can be used as a hash table address.
-  func hash() -> Int {
-    // FIXME: Should be a property.
+  /// An unsigned integer that can be used as a hash table address.
+  var hash: Int {
     return _ns.hash
   }
 
