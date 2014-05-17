@@ -103,15 +103,15 @@ struct ArrayBuffer<T> : ArrayBufferType {
 }
 
 extension ArrayBuffer {
-  /// Adopt the storage of x
-  init(_ buffer: NativeBuffer) {
+  /// Adopt the storage of source
+  init(_ source: NativeBuffer) {
     if !_isClassOrObjCExistential(T.self) {
       self.storage
-        = buffer.storage ? Builtin.castToNativeObject(buffer.storage!) : nil
+        = source.storage ? Builtin.castToNativeObject(source.storage!) : nil
     }
     else {
       self.storage = Builtin.castToNativeObject(
-        IndirectArrayBuffer(nativeBuffer: buffer, isMutable: true))
+        IndirectArrayBuffer(nativeBuffer: source, isMutable: true))
     }
   }
   

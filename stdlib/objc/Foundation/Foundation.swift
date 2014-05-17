@@ -550,7 +550,12 @@ extension NSArray : ArrayLiteralConvertible {
   }
 }
 
-/// The entry point for bridging `NSArray` to `Array`.
+/// The entry point for converting `NSArray` to `Array` in bridge
+/// thunks.  Used, for example, to expose ::
+///
+///   func f(NSView[]) {}
+///
+/// to Objective-C code as a method that accepts an NSArray.
 func _convertNSArrayToArray<T>(nsarr: NSArray) -> T[] {
   if let arr = T[].bridgeFromObjectiveC(nsarr) {
     return arr
@@ -558,7 +563,12 @@ func _convertNSArrayToArray<T>(nsarr: NSArray) -> T[] {
   _fatalError("NSArray does not bridge to array")
 }
 
-/// The entry point for bridging 'Array' to 'NSArray'.
+/// The entry point for converting `Array` to `NSArray` in bridge
+/// thunks.  Used, for example, to expose ::
+///
+///   func f() -> NSView[] { return [] }
+///
+/// to Objective-C code as a method that returns an NSArray.
 func _convertArrayToNSArray<T>(arr: T[]) -> NSArray {
   // FIXME: Check conditional bridging here?
   return arr.bridgeToObjectiveC()
