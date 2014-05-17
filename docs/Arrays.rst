@@ -147,7 +147,7 @@ Bridging Rules and Terminology for all Types
 
 * Every class type or ``@objc`` existential (such as ``AnyObject``) is
   **bridged** to Objective-C and **bridged back** to Swift via the
-  *identity transformation, i.e. it is **bridged verbatim**.
+  identity transformation, i.e. it is **bridged verbatim**.
 
 * A type ``T`` that is not `bridged verbatim`_ can conform to
   ``BridgedToObjectiveC``, which specifies its conversions to and from
