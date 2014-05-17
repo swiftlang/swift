@@ -702,20 +702,6 @@ func _arrayUpCast<Derived, Base>(a: Array<Derived>) -> Array<Base> {
   return Array(ArrayBuffer<Base>(castFrom: a.buffer, castKind: .Up))
 }
 
-/// Returns an Array<Derived> containing the same elements as a in
-/// O(1). Requires: a is known to contain only elements of type
-/// Derived, and Base is a base class or base @objc protocol (such as
-/// AnyObject) of Derived.
-func _arrayDownCast<Base, Derived>(a: Array<Base>) -> Array<Derived> {
-  return Array(ArrayBuffer<Derived>(castFrom: a.buffer, castKind: .Down))
-}
-
-/// Return the most-derived element type known to be stored in a's
-/// buffer. O(1)
-func _arrayElementType<T>(a: Array<T>) -> Any.Type {
-  return a.buffer.dynamicElementType
-}
-
 /// Implement the semantics of (a as Array<T>), where a is an
 /// AnyObject[].
 func _arrayBridgedDownCast<T>(a: AnyObject[]) -> T[]? {
