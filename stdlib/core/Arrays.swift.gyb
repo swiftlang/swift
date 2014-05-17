@@ -785,14 +785,17 @@ func _arrayCheckedDownCast<Base, Derived>(a: Array<Base>) -> Derived[]? {
 /// Convert a to its corresponding bridged array type.
 /// Precondition: T is bridged to objective C
 /// O(1) if T is bridged verbatim, O(N) otherwise
-func _arrayBridgeToObjectiveC<T: _BridgedToObjectiveC>(
-  a: Array<T>
-) -> Array<T.ObjectiveCType> {
-  // FIXME: This is completely unused by any test!  It is, however,
-  // expected to be found by the compiler.  We need to find out what
-  // it is.
-  _fatalError("This is never used!'")
-  return Array(ArrayBuffer(a.asCocoaArray()))
+func _arrayBridgeToObjectiveC<BridgesToDerived, Base>(
+  source: Array<BridgesToDerived>
+) -> Array<Base> {
+  var buf = ContiguousArrayBuffer<Base>(count: source.count, minimumCapacity: 0)
+  var p = buf._unsafeElementStorage
+  for value in source {
+    let bridged: AnyObject? = bridgeToObjectiveC(value)
+    _precondition(bridged, "array element can be bridged to Objective-C")
+    p++.initialize(reinterpretCast(bridged!))
+  }
+  return Array(ArrayBuffer(buf))
 }
 
 // ${'Local Variables'}:

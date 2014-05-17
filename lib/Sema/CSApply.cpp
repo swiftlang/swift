@@ -3820,27 +3820,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
 
     case ConversionRestrictionKind::ArrayBridged: {
-      // Look through implicitly unwrapped optionals.
-      if (auto objTy
-          = cs.lookThroughImplicitlyUnwrappedOptionalType(
-                                                          expr->getType())) {
-        expr = coerceImplicitlyUnwrappedOptionalToValue(expr, objTy, locator);
-        if (!expr) return nullptr;
-      }
-      auto bridgedArrayConversion = new (tc.Context)
-                                      ArrayBridgedConversionExpr(expr, toType);
-      
-      bridgedArrayConversion->setType(toType);
-      
-      // For a conversion from Array<T> to Array<U>, check if T conforms to the
-      // _ConditionallyBridgedToObjectiveC protocol.
-      auto desugaredArray = fromType.getPointer()->getDesugaredType();
-      auto baseType = cs.getBaseTypeForArrayType(desugaredArray);
-      
-      bool isConditionallyBridged = false;
-      tc.getBridgedToObjC(dc, baseType, &isConditionallyBridged);
-      bridgedArrayConversion->isConditionallyBridged = isConditionallyBridged;
-      return bridgedArrayConversion;
+      llvm_unreachable("Never generated");
     }
 
     case ConversionRestrictionKind::ArrayUpcast: {
@@ -3851,10 +3831,24 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
         expr = coerceImplicitlyUnwrappedOptionalToValue(expr, objTy, locator);
         if (!expr) return nullptr;
       }
-      auto arrayConversion = new (tc.Context)
-                                  ArrayUpcastConversionExpr(expr, toType);
-      arrayConversion->setType(toType);
-      return arrayConversion;
+
+      // Classify the element type of the array we're bridging from.
+      Type bridgedToType;
+      bool bridgedVerbatim;
+      bool isConditionallyBridged = false;
+      auto fromBaseType = cs.getBaseTypeForArrayType(fromType.getPointer());
+      std::tie(bridgedToType, bridgedVerbatim)
+        = tc.getBridgedToObjC(dc, fromBaseType, &isConditionallyBridged);
+
+      // If the source type is bridged verbatim, this is a simple upcast.
+      if (bridgedVerbatim) {
+        return new (tc.Context) ArrayUpcastConversionExpr(expr, toType);
+      }
+
+      // Otherwise, it's a bridged upcast.
+      auto upcast = new (tc.Context) ArrayBridgedConversionExpr(expr, toType);
+      upcast->isConditionallyBridged = isConditionallyBridged;
+      return upcast;
     }
 
     case ConversionRestrictionKind::User:

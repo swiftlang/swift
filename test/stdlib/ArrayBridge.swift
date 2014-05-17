@@ -73,8 +73,12 @@ class BridgedObjC : Base, Printable {
   }
 }
 
-class BridgedSwift : Base, Printable, _BridgedToObjectiveC {
-  class func getObjectiveCType() -> Any.Type {
+struct BridgedSwift : Printable, _BridgedToObjectiveC {
+  var value: Int 
+
+  init(_ value: Int) { self.value = value }
+
+  static func getObjectiveCType() -> Any.Type {
     return BridgedObjC.self
   }
   
@@ -82,13 +86,12 @@ class BridgedSwift : Base, Printable, _BridgedToObjectiveC {
     return BridgedObjC(value)
   }
 
-  class func bridgeFromObjectiveC(x: BridgedObjC) -> BridgedSwift? {
+  static func bridgeFromObjectiveC(x: BridgedObjC) -> BridgedSwift? {
     return x.value >= 0 ? BridgedSwift(x.value) : nil
   }
   
-  override var description: String {
-    assert(serialNumber > 0, "dead Tracked!")
-    return "BridgedSwift#\(serialNumber)(\(value))"
+  var description: String {
+    return "BridgedSwift(\(value))"
   }
 }
 
@@ -186,16 +189,32 @@ testBridgedVerbatim()
 // BridgedSwift conforms to _BridgedToObjectiveC
 //===----------------------------------------------------------------------===//
 func testExplicitlyBridged() {
+  // CHECK-LABEL: testExplicitlyBridged()
+  println("testExplicitlyBridged()")
 
-  let bridgedSwifts = [BridgedSwift(42)]
+  let bridgedSwifts = [BridgedSwift(42), BridgedSwift(17)]
+
+  // Convert to NSArray
   let bridgedSwiftsConvertedToNSArray: NSArray = bridgedSwifts
+  // CHECK-NEXT: BridgedObjC#[[ID0:[0-9]+]](42)
   println(bridgedSwiftsConvertedToNSArray.objectAtIndex(0) as Base)
+  // CHECK-NEXT: BridgedObjC#[[ID1:[0-9]+]](17)
+  println(bridgedSwiftsConvertedToNSArray.objectAtIndex(1) as Base)
 
   // all: verbatim,  not, and doesn't bridge
   // implicit conversions to/from NSArray 
   // Base[] -> Derived[] and Derived[] -> Base[] where Base can be AnyObject
   // defining @objc method taking T[] and returning T[]
+
+  // Up-casts.
+  let bridgedSwiftsAsAnyObjects: AnyObject[] = bridgedSwifts
+  // CHECK-NEXT: BridgedObjC#[[ID0:[0-9]+]](42)
+  println(bridgedSwiftsAsAnyObjects[0])
+  // CHECK-NEXT: BridgedObjC#[[ID1:[0-9]+]](17)
+  println(bridgedSwiftsAsAnyObjects[1])
 }
+
+testExplicitlyBridged()
 
 //===--- Non-bridging -----------------------------------------------------===//
 // X is not bridged to Objective-C
