@@ -1046,9 +1046,6 @@ public:
   void fillObjCRepresentableTypeCache(const DeclContext *DC);
   
   ArchetypeBuilder createArchetypeBuilder(Module *mod);
-
-/// Determine whether this is a reference to the '*' operator.
-  static bool isAsteriskRef(Expr *expr);
 };
 
 } // end namespace swift

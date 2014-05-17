@@ -539,6 +539,16 @@ bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
   return true;
 }
 
+static bool isAsteriskRef(Expr *E) {
+  if (auto UDRE = dyn_cast<UnresolvedDeclRefExpr>(E))
+    return UDRE->getName().str() == "*";
+  if (auto DRE = dyn_cast<DeclRefExpr>(E))
+    return DRE->getDecl()->getName().str() == "*";
+  if (auto ODRE = dyn_cast<OverloadedDeclRefExpr>(E))
+    return ODRE->getDecls()[0]->getName().str() == "*";
+  return false;
+}
+
 /// Simplify expressions which are type sugar productions that got parsed
 /// as expressions due to the parser not knowing which identifiers are
 /// type names.
@@ -593,7 +603,7 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
     auto *TyExpr = dyn_cast<TypeExpr>(PUE->getArg());
     if (!TyExpr) return nullptr;
 
-    if (!TypeChecker::isAsteriskRef(PUE->getFn()))
+    if (!isAsteriskRef(PUE->getFn()))
       return nullptr;
 
     auto *InnerTypeRepr = TyExpr->getTypeRepr();
