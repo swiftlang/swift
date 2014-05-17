@@ -22,28 +22,35 @@ enum _ArrayCastKind { case Up, Down, DeferredDown }
 @final
 class IndirectArrayBuffer {
   
-  init<T>(nativeBuffer: ContiguousArrayBuffer<T>, isMutable: Bool) {
+  init<T>(
+    nativeBuffer: ContiguousArrayBuffer<T>,
+    isMutable: Bool,
+    needsElementTypeCheck: Bool
+  ) {
     self.buffer = nativeBuffer.storage
     self.isMutable = isMutable
     self.isCocoa = false
+    self.needsElementTypeCheck = needsElementTypeCheck
   }
     
-  init(cocoa: CocoaArray) {
+  init(cocoa: CocoaArray, needsElementTypeCheck: Bool) {
     self.buffer = cocoa
     self.isMutable = false
     self.isCocoa = true
+    self.needsElementTypeCheck = needsElementTypeCheck
   }
 
   init(castFrom: IndirectArrayBuffer, castKind: _ArrayCastKind) {
     self.buffer = castFrom.buffer
-    self.isMutable = castKind == .Down
+    self.isMutable = castKind != .Up
     self.isCocoa = castFrom.isCocoa
+    self.needsElementTypeCheck = castKind == .DeferredDown
   }
   
   // When this buffer has immutable storage and it is modified, the
   // storage is replaced with mutable storage.
-  func replaceStorage<T>(buffer: ContiguousArrayBuffer<T>) {
-    self.buffer = buffer.storage
+  func replaceStorage<T>(newBuffer: ContiguousArrayBuffer<T>) {
+    self.buffer = newBuffer.storage
     self.isMutable = true
     self.isCocoa = false
   }
@@ -51,6 +58,7 @@ class IndirectArrayBuffer {
   var buffer: AnyObject?
   var isMutable: Bool
   var isCocoa: Bool
+  var needsElementTypeCheck: Bool
   
   func getNative<T>() -> ContiguousArrayBuffer<T> {
     _sanityCheck(!isCocoa)
@@ -80,12 +88,17 @@ struct ArrayBuffer<T> : ArrayBufferType {
       ? nil : Builtin.castToNativeObject(
       IndirectArrayBuffer(
         nativeBuffer: ContiguousArrayBuffer<T>(),
-        isMutable: false))
+        isMutable: false,
+        needsElementTypeCheck: false
+      ))
   }
 
   init(_ cocoa: CocoaArray) {
     _sanityCheck(_isClassOrObjCExistential(T.self))
-    storage = Builtin.castToNativeObject(IndirectArrayBuffer(cocoa: cocoa))
+    storage = Builtin.castToNativeObject(
+      IndirectArrayBuffer(
+        cocoa: cocoa,
+        needsElementTypeCheck: !(AnyObject.self is T.Type)))
   }
 
   /// An ArrayBuffer<T> containing the same elements.
@@ -111,7 +124,8 @@ extension ArrayBuffer {
     }
     else {
       self.storage = Builtin.castToNativeObject(
-        IndirectArrayBuffer(nativeBuffer: source, isMutable: true))
+        IndirectArrayBuffer(
+          nativeBuffer: source, isMutable: true, needsElementTypeCheck: false))
     }
   }
   
@@ -137,7 +151,7 @@ extension ArrayBuffer {
     }
     return indirect.isMutable && Swift.isUniquelyReferenced(&indirect.buffer)
   }
-  
+
   /// If this buffer is backed by a uniquely-referenced mutable
   /// ContiguousArrayBuffer that can be grown in-place to allow the self
   /// buffer store minimumCapacity elements, returns that buffer.
@@ -160,11 +174,33 @@ extension ArrayBuffer {
     if result { return result }
     return nil
   }
+
+  func _typeCheck(subRange: Range<Int>) {
+    if !_isClassOrObjCExistential(T.self) {
+      return
+    }
+    if _slowPath(indirect.needsElementTypeCheck) {
+      if _fastPath(_isNative) {
+        for x in _native[subRange] {
+          assert(reinterpretCast(x) as AnyObject is T)
+        }
+      }
+      else if (subRange) {
+        let ns = _nonNative!
+        // Could be sped up, e.g. by using
+        // enumerateObjectsAtIndexes:options:usingBlock:
+        for i in subRange {
+          assert(ns.objectAtIndex(i) is T)
+        }
+      }
+    }
+  }
   
   /// Copy the given subRange of this buffer into uninitialized memory
   /// starting at target.  Return a pointer past-the-end of the
   /// just-initialized memory.
   func _uninitializedCopy(subRange: Range<Int>, target: T*) -> T* {
+    _typeCheck(subRange)
     if _fastPath(_isNative) {
       return _native._uninitializedCopy(subRange, target: target)
     }
@@ -192,6 +228,7 @@ extension ArrayBuffer {
   /// Return a SliceBuffer containing the given subRange of values
   /// from this buffer.
   subscript(subRange: Range<Int>) -> SliceBuffer<T> {
+    _typeCheck(subRange)
     
     if _fastPath(_isNative) {
       return _native[subRange]
@@ -255,6 +292,7 @@ extension ArrayBuffer {
   /// Get/set the value of the ith element
   subscript(i: Int) -> T {
     get {
+      _typeCheck(i..i)
       if _fastPath(_isNative) {
         return _native[i]
       }
