@@ -353,17 +353,6 @@ namespace {
     }
     
     Type visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *expr) {
-      // We might have an operator that couldn't be resolved earlier.
-      if (expr->getRefKind() != DeclRefKind::Ordinary) {
-        auto &tc = CS.getTypeChecker();
-        tc.diagnose(expr->getLoc(), diag::use_nonmatching_operator, 
-                    expr->getName(),
-                    expr->getRefKind() == DeclRefKind::BinaryOperator ? 0 :
-                    expr->getRefKind() == DeclRefKind::PrefixOperator ? 1 : 2);
-
-        return Type();
-      }
-
       // This is an error case, where we're trying to use type inference
       // to help us determine which declaration the user meant to refer to.
       // FIXME: Do we need to note that we're doing some kind of recovery?

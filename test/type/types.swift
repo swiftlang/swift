@@ -80,10 +80,4 @@ func test_optional_construct<T>() {
   var c = (Int?)() // Parenthesized name.
 }
 
-// postfix * as sugar in expressions, 
-func test_unsafe_pointer_construct_postfix<T>(t: T) {
-  var a = T* ()
-  var b = (T*)()
-}
 
-// FIXME: * is infix is a delight
