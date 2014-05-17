@@ -600,6 +600,17 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
       if (isDeclAsSpecializedAs(tc, cs.DC, decl2, decl1))
         ++score2;
 
+      // If one declaration is available and the other is not,
+      bool unavail1 = decl1->getAttrs().isUnavailable();
+      bool unavail2 = decl2->getAttrs().isUnavailable();
+      if (unavail1 != unavail2) {
+        if (unavail1)
+          ++score2;
+        else
+          ++score1;
+        continue;
+      }
+
       // If both declarations come from Clang, and one is a type and the other
       // is a function, prefer the function.
       if (decl1->hasClangNode() &&

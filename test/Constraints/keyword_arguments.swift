@@ -253,6 +253,23 @@ trailingclosure3(x: 5) { return 5 }
 func trailingclosure4(#f: () -> Int) {}
 trailingclosure4 { 5 }
 
+class MismatchOverloaded1 {
+  func method1(x: Int!, arg: ((Int) -> Int)!) { }
+  func method1(x: Int!, secondArg: ((Int) -> Int)!) { }
+
+  @availability(*, unavailable)
+  func method2(x: Int!, arg: ((Int) -> Int)!) { }
+
+  func method2(x: Int!, secondArg: ((Int) -> Int)!) { }
+}
+
+var mismatchOverloaded1 = MismatchOverloaded1()
+mismatchOverloaded1.method1(5, arg: nil)
+mismatchOverloaded1.method1(5, secondArg: nil)
+
+// Prefer available to unavailable declaration, if it comes up.
+mismatchOverloaded1.method2(5) { $0 }
+
 // -------------------------------------------
 // Values of function type
 // -------------------------------------------
@@ -295,16 +312,4 @@ var tuple1 = (1, "hello")
 acceptTuple2(tuple1)
 acceptTuple2((1, "hello", 3.14159))
 
-
-// ---------------------------------------------------
-// Solving should penalize keyword argument mismatches
-// ---------------------------------------------------
-class MismatchOverloaded1 {
-  func method1(x: Int!, arg: ((Int) -> Int)!) { }
-  func method1(x: Int!, secondArg: ((Int) -> Int)!) { }
-}
-
-var mismatchOverloaded1 = MismatchOverloaded1()
-mismatchOverloaded1.method1(5, arg: nil)
-mismatchOverloaded1.method1(5, secondArg: nil)
 
