@@ -258,8 +258,6 @@ extension ArrayBuffer {
       if _fastPath(_isNative) {
         return _native[i]
       }
-      // FIXME: Should be possible to use "as" + "!" instead of
-      // reinterpretCast; <rdar://problem/16898943>
       return reinterpretCast(_nonNative!.objectAtIndex(i))
     }
     
