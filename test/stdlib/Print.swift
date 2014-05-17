@@ -115,9 +115,13 @@ func test_StdlibTypesPrinted() {
 
   var cstr: CString = "abc"
   printedIs(cstr, "abc")
-  printedIs(cstr.debugDescription, "\"abc\"")
+  debugPrintedIs(cstr, "\"abc\"")
   cstr = "\\ \' \" \n \r \t \x05"
-  printedIs(cstr.debugDescription, "\"\\\\ \\\' \\\" \\n \\r \\t \\x05\"")
+  debugPrintedIs(cstr, "\"\\\\ \\\' \\\" \\n \\r \\t \\x05\"")
+
+  var nullCString = CString(UnsafePointer.null())
+  printedIs(nullCString, "")
+  debugPrintedIs(nullCString, "<null C string>")
 
   var implicitlyUnwrappedString: String! = nil
   printedIs(implicitlyUnwrappedString, "nil")

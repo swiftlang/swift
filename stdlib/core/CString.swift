@@ -70,7 +70,7 @@ extension CString : DebugPrintable {
   var debugDescription: String {
     if isNull() {
       return "<null C string>"
-    }    
+    }
     return String.fromCString(self).debugDescription
   }
 }

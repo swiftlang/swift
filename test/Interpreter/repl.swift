@@ -221,7 +221,3 @@ if true && true { if true && true { println(true && true) } }
 "ok"
 // CHECK: = "ok"
 
-// Make sure that we can debug print null CStrings.
-// CHECK: null_cstring : CString = <null C string>
-var null_cstring = CString(UnsafePointer.null())
-
