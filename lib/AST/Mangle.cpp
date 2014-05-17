@@ -444,10 +444,16 @@ void Mangler::mangleTypeForDebugger(Type Ty, DeclContext *DC) {
     return;
   }
 
+  // Polymorphic function types carry their own generic parameters and
+  // manglePolymorphicType will bind them.
+  bool BindGenericParams = Ty->getKind() != TypeKind::PolymorphicFunction;
+
   Buffer << "_Tt";
+
   // Move up to the innermost generic context.
   while (DC && !DC->isInnermostContextGeneric()) DC = DC->getParent();
-  if (DC) bindAllGenericParameters(*this, DC->getGenericParamsOfContext());
+  if (DC && BindGenericParams)
+    bindAllGenericParameters(*this, DC->getGenericParamsOfContext());
   DeclCtx = DC;
 
   mangleType(Ty->getCanonicalType(), ResilienceExpansion::Minimal, /*uncurry*/ 0);
