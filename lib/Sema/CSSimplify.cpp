@@ -272,13 +272,13 @@ bool constraints::matchCallArguments(
       return claim(name);
     }
 
-    // If the current parameter appears to be a trailing closure, consume as if
-    // the name were always correct.
+    // If the current parameter appears to be a trailing closure, allow the
+    // argument to be unnamed even if the parameter has a name.
     // FIXME: This is a hack. We should know whether it's a trailing closure
     // or not.
-    if (nextArgIdx != numArgs && paramIsTrailingClosure(paramTuple, paramIdx)) {
-      return claim(argTuple[nextArgIdx].getName(),
-                   /*ignoreNameClash=*/true);
+    if (nextArgIdx != numArgs && paramIsTrailingClosure(paramTuple, paramIdx) &&
+        argTuple[nextArgIdx].getName().empty()) {
+      return claim(Identifier(), /*ignoreNameClash=*/true);
     }
 
     // If we're not supposed to attempt any fixes, we're done.
