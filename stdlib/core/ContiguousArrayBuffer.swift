@@ -164,9 +164,7 @@ struct ContiguousArrayBuffer<T> : ArrayBufferType, LogicValue {
   /// Copy the given subRange of this buffer into uninitialized memory
   /// starting at target.  Return a pointer past-the-end of the
   /// just-initialized memory.
-  func _uninitializedCopy(
-    subRange: Range<Int>, target: T*
-  ) -> T* {
+  func _uninitializedCopy(subRange: Range<Int>, target: T*) -> T* {
     _sanityCheck(subRange.startIndex >= 0)
     _sanityCheck(subRange.endIndex >= subRange.startIndex)
     _sanityCheck(subRange.endIndex <= count)

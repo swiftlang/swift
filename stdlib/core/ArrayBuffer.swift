@@ -164,9 +164,7 @@ extension ArrayBuffer {
   /// Copy the given subRange of this buffer into uninitialized memory
   /// starting at target.  Return a pointer past-the-end of the
   /// just-initialized memory.
-  func _uninitializedCopy(
-    subRange: Range<Int>, target: T*
-  ) -> T* {
+  func _uninitializedCopy(subRange: Range<Int>, target: T*) -> T* {
     if _fastPath(_isNative) {
       return _native._uninitializedCopy(subRange, target: target)
     }

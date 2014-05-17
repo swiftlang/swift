@@ -16,12 +16,7 @@ struct SliceBuffer<T> : ArrayBufferType {
   typealias NativeStorage = ContiguousArrayStorage<T>
   typealias NativeBuffer = ContiguousArrayBuffer<T>
 
-  init(
-    owner: AnyObject?,
-    start: T*,
-    count: Int,
-    hasNativeBuffer: Bool
-  ) {
+  init(owner: AnyObject?, start: T*, count: Int, hasNativeBuffer: Bool) {
     self.owner = owner
     self.start = start
     self._countAndFlags = (UInt(count) << 1) | (hasNativeBuffer ? 1 : 0)
@@ -110,9 +105,7 @@ struct SliceBuffer<T> : ArrayBufferType {
     return nil
   }
   
-  func _uninitializedCopy(
-    subRange: Range<Int>, var target: T*
-  ) -> T* {
+  func _uninitializedCopy(subRange: Range<Int>, var target: T*) -> T* {
     _invariantCheck()
     _sanityCheck(subRange.startIndex >= 0)
     _sanityCheck(subRange.endIndex >= subRange.startIndex)
