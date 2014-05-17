@@ -366,20 +366,16 @@ Type TypeChecker::getTypeOfRValue(ValueDecl *value, bool wantInterfaceType) {
   else
     type = value->getType();
 
-  // Look at the canonical type just for efficiency.  We won't
-  // use this as the source of the result.
-  CanType canType = type->getCanonicalType();
-
   // Uses of inout argument values are lvalues.
-  if (auto iot = dyn_cast<InOutType>(canType))
+  if (auto iot = type->getAs<InOutType>())
     return iot->getObjectType();
   
   // Uses of values with lvalue type produce their rvalue.
-  if (auto LV = dyn_cast<LValueType>(canType))
+  if (auto LV = type->getAs<LValueType>())
     return LV->getObjectType();
   
   // Turn @weak T into Optional<T>.
-  if (isa<WeakStorageType>(canType)) {
+  if (type->is<WeakStorageType>()) {
     // On the one hand, we should probably use a better location than
     // the declaration's.  On the other hand, all these diagnostics
     // are "broken library" errors, so it should really never matter.
@@ -393,13 +389,11 @@ Type TypeChecker::getTypeOfRValue(ValueDecl *value, bool wantInterfaceType) {
     // Check that we can do intrinsic operations on Optional<T> before
     // returning.
     requireOptionalIntrinsics(value->getLoc());
-
     return optTy;
   }
 
   // Ignore @unowned qualification.
-  if (isa<UnownedStorageType>(canType) ||
-      isa<UnmanagedStorageType>(canType))
+  if (type->is<UnownedStorageType>() || type->is<UnmanagedStorageType>())
     return type->getReferenceStorageReferent();
 
   // No other transforms necessary.
