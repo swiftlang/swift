@@ -385,3 +385,7 @@ func testAVFoundationMisc(obj: AVVideoCompositionInstruction, p: AVVideoComposit
   let _ = obj.backgroundColor
 }
 
+func testNSExtensionContext(url: NSURL, extensionContext: NSExtensionContext) {
+  extensionContext.openURL(url) { success in return }
+}
+

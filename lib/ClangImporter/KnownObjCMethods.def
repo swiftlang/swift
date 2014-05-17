@@ -76,6 +76,9 @@ INSTANCE_METHOD(NSException, (3, "initWithName", "reason", "userInfo"),
 
 INSTANCE_METHOD(NSExpression, (1, "initWithExpressionType"), DesignatedInit)
 
+INSTANCE_METHOD(NSExtensionContext, (2, "openURL", "completion"),
+                Unavailable("call openURL:completionHandler:"))
+
 INSTANCE_METHOD(NSFileWrapper, (3, "initWithURL", "options", "error"), 
                 DesignatedInit)
 INSTANCE_METHOD(NSFileWrapper, (1, "initDirectoryWithFileWrappers"),

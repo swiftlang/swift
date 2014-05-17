@@ -385,3 +385,8 @@ typedef NS_ENUM(NSInteger, NSByteCountFormatterCountStyle) {
 
 NSArray *arrayToArray(NSArray *arr);
 NSDictionary *dictToDict(NSDictionary *dict);
+
+@interface NSExtensionContext : NSObject
+- (void)openURL:(NSURL *)URL completionHandler:(void (^)(BOOL success))completionHandler;
+- (void)openURL:(NSURL *)URL completion:(void (^)(BOOL success))handler;
+@end
