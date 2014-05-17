@@ -550,11 +550,6 @@ extension NSArray : ArrayLiteralConvertible {
   }
 }
 
-// Should be in an extension, pending <rdar://problem/16536656>
-func asNSArray<T>(array: T[]) -> NSArray {
-  return ((array.asCocoaArray() as AnyObject) as NSArray)!
-}
-
 /// The entry point for bridging `NSArray` to `Array`.
 func _convertNSArrayToArray<T>(nsarr: NSArray) -> T[] {
   if let arr = T[].bridgeFromObjectiveC(nsarr) {
