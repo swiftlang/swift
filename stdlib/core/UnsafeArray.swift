@@ -32,7 +32,7 @@ struct UnsafeArray<T> : Collection, Generator {
     return (_position + i).pointee
   }
   
-  init(start: T*, length: Int) {
+  init(start: UnsafePointer<T>, length: Int) {
     _position = start
     _end = start + length
   }
@@ -48,5 +48,5 @@ struct UnsafeArray<T> : Collection, Generator {
     return self
   }
   
-  var _position, _end: T*
+  var _position, _end: UnsafePointer<T>
 }

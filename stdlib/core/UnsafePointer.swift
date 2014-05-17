@@ -285,34 +285,34 @@ struct UnsafePointer<T> : BidirectionalIndex, Comparable, Hashable {
 }
 
 @transparent
-func == <T> (lhs: T*, rhs: T*) -> Bool {
+func == <T> (lhs: UnsafePointer<T>, rhs: UnsafePointer<T>) -> Bool {
   return Bool(Builtin.cmp_eq_RawPointer(lhs.value, rhs.value))
 }
 
 @transparent
-func < <T>(lhs: T*, rhs: T*) -> Bool {
+func < <T>(lhs: UnsafePointer<T>, rhs: UnsafePointer<T>) -> Bool {
   return Bool(Builtin.cmp_ult_RawPointer(lhs.value, rhs.value))
 }
 
 @transparent
-func + <T>(lhs: T*, rhs: Int) -> T* {
+func + <T>(lhs: UnsafePointer<T>, rhs: Int) -> UnsafePointer<T> {
   return UnsafePointer(
     Builtin.gep_Word(lhs.value, (rhs * Int(Builtin.strideof(T.self))).value))
 }
 
 @transparent
 func + <T>(lhs: Int,
-           rhs: T*) -> T* {
+           rhs: UnsafePointer<T>) -> UnsafePointer<T> {
   return rhs + lhs
 }
 
 @transparent
-func - <T>(lhs: T*, rhs: Int) -> T* {
+func - <T>(lhs: UnsafePointer<T>, rhs: Int) -> UnsafePointer<T> {
   return lhs + -rhs
 }
 
 @transparent
-func - <T>(lhs: T*, rhs: T*) -> Int {
+func - <T>(lhs: UnsafePointer<T>, rhs: UnsafePointer<T>) -> Int {
   return
     Int(Builtin.sub_Word(Builtin.ptrtoint_Word(lhs.value),
                          Builtin.ptrtoint_Word(rhs.value)))
@@ -320,12 +320,12 @@ func - <T>(lhs: T*, rhs: T*) -> Int {
 }
 
 @transparent
-@assignment func += <T>(inout lhs: T*, rhs: Int) {
+@assignment func += <T>(inout lhs: UnsafePointer<T>, rhs: Int) {
   lhs = lhs + rhs
 }
 
 @transparent
-@assignment func -= <T>(inout lhs: T*, rhs: Int) {
+@assignment func -= <T>(inout lhs: UnsafePointer<T>, rhs: Int) {
   lhs = lhs - rhs
 }
 
@@ -345,7 +345,7 @@ struct RawByte {
 // Make nil work with UnsafePointer
 extension _Nil {
   @transparent
-  @conversion func __conversion<T>() -> T* {
+  @conversion func __conversion<T>() -> UnsafePointer<T> {
     return .null()
   }
 }

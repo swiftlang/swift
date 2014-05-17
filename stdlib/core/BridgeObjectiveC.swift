@@ -198,7 +198,7 @@ var _nilRawPointer: Builtin.RawPointer {
 ///   lvalue),
 /// - an inout argument of the Array<T> type, which gets passed as a pointer
 ///   to the beginning of the array,
-/// - an T*, which is passed as-is.
+/// - an UnsafePointer<T>, which is passed as-is.
 ///
 /// The value consists of an owner-value pair. During bridging, a strong
 /// reference to the owner is held for the duration of the call, and the pointer
@@ -246,7 +246,7 @@ struct CMutablePointer<T> : Equatable {
 
   /// Make the pointer available as an UnsafePointer within a closure.
   @transparent
-  func withUnsafePointer<U>(f: T* -> U) -> U {
+  func withUnsafePointer<U>(f: UnsafePointer<T> -> U) -> U {
     let result = f(UnsafePointer<T>(value))
     // Ensure the owner pointer stays alive for the duration of the closure.
     _fixLifetime(owner)
@@ -281,7 +281,7 @@ func == <T> (lhs: CConstPointer<T>, rhs: CMutablePointer<T>) -> Bool {
 ///   lvalue),
 /// - an inout argument of Array<T> type for any T, which gets passed as a
 ///   pointer to the beginning of the array,
-/// - an T* for any T or COpaquePointer, which is passed as-is.
+/// - an UnsafePointer<T> for any T or COpaquePointer, which is passed as-is.
 ///
 /// The value consists of an owner-value pair. During bridging, a strong
 /// reference to the owner is held for the duration of the call, and the pointer
@@ -327,7 +327,7 @@ struct CMutableVoidPointer : Equatable {
 
   /// Make the pointer available as an UnsafePointer within a closure.
   @transparent
-  func withUnsafePointer<T, U>(f: T* -> U) -> U {
+  func withUnsafePointer<T, U>(f: UnsafePointer<T> -> U) -> U {
     let result = f(UnsafePointer(value))
     // Ensure the owner pointer stays alive for the duration of the closure.
     _fixLifetime(owner)
@@ -348,10 +348,10 @@ func == (lhs: CMutableVoidPointer, rhs: CMutableVoidPointer) -> Bool {
 /// - 'nil', which gets passed as a null pointer,
 /// - an inout argument of the referenced type, which gets passed as a pointer
 ///   to a writeback temporary with autoreleasing ownership semantics,
-/// - an T*, which is passed as-is.
+/// - an UnsafePointer<T>, which is passed as-is.
 ///
 /// Unlike CMutablePointer, passing pointers to mutable arrays of ObjC class
-/// pointers is not directly supported. Unlike T*,
+/// pointers is not directly supported. Unlike UnsafePointer<T>,
 /// AutoreleasingUnsafePointer must reference storage that does not own a reference
 /// count to the referenced value. UnsafePointer's operations, by contrast,
 /// assume that the referenced storage owns values loaded from or stored to it.
@@ -397,7 +397,7 @@ struct AutoreleasingUnsafePointer<T /* TODO : class */> : Equatable {
 
   @transparent
   func isNull() -> Bool {
-    return (T*(self)).isNull()
+    return UnsafePointer<T>(self).isNull()
   }
   
   /// Access the underlying raw memory, getting and
@@ -407,7 +407,7 @@ struct AutoreleasingUnsafePointer<T /* TODO : class */> : Equatable {
     @transparent get {
       _debugPrecondition(!isNull())
       // We can do a strong load normally.
-      return (T*(self)).pointee
+      return UnsafePointer<T>(self).pointee
     }
     /// Set the value the pointer points to, copying over the previous value.
     ///
@@ -480,7 +480,7 @@ struct CConstPointer<T> : Equatable {
 
   /// Make the pointer available as an UnsafePointer within a closure.
   @transparent
-  func withUnsafePointer<U>(f: T* -> U) -> U {
+  func withUnsafePointer<U>(f: UnsafePointer<T> -> U) -> U {
     let result = f(UnsafePointer<T>(value))
     // Ensure the owner pointer stays alive for the duration of the closure.
     _fixLifetime(owner)
@@ -522,7 +522,7 @@ struct CConstVoidPointer : Equatable {
 
   /// Make the pointer available as an UnsafePointer within a closure.
   @transparent
-  func withUnsafePointer<T, U>(f: T* -> U) -> U {
+  func withUnsafePointer<T, U>(f: UnsafePointer<T> -> U) -> U {
     let result = f(UnsafePointer(value))
     // Ensure the owner pointer stays alive for the duration of the closure.
     _fixLifetime(owner)
@@ -584,7 +584,7 @@ extension COpaquePointer {
 
 @transparent
 func _convertCConstPointerToUnsafePointer<T>(p: CConstPointer<T>)
--> T* {
+-> UnsafePointer<T> {
   return UnsafePointer(p.value)
 }
 
@@ -596,7 +596,7 @@ func _convertCConstVoidPointerToCOpaquePointer(p: CConstVoidPointer)
 
 @transparent
 func _convertCMutablePointerToUnsafePointer<T>(p: CMutablePointer<T>)
--> T* {
+-> UnsafePointer<T> {
   return UnsafePointer(p.value)
 }
 
@@ -608,7 +608,7 @@ func _convertCMutableVoidPointerToCOpaquePointer(p: CMutableVoidPointer)
 
 @transparent
 func _convertAutoreleasingUnsafePointerToUnsafePointer<T>(p: AutoreleasingUnsafePointer<T>)
--> T* {
+-> UnsafePointer<T> {
   return UnsafePointer(p.value)
 }
 
@@ -622,7 +622,7 @@ func _convertAutoreleasingUnsafePointerToUnsafePointer<T>(p: AutoreleasingUnsafe
 // the arguments to C*Pointer types with nil owner references.
 
 @transparent
-func _convertUnsafePointerToCConstPointer<T>(p: T*)
+func _convertUnsafePointerToCConstPointer<T>(p: UnsafePointer<T>)
 -> CConstPointer<T> {
   return CConstPointer(_nilNativeObject, p.value)
 }
@@ -634,7 +634,7 @@ func _convertCOpaquePointerToCConstVoidPointer(p: COpaquePointer)
 }
 
 @transparent
-func _convertUnsafePointerToCMutablePointer<T>(p: T*)
+func _convertUnsafePointerToCMutablePointer<T>(p: UnsafePointer<T>)
 -> CMutablePointer<T> {
   return CMutablePointer(owner: _nilNativeObject, value: p.value)
 }
@@ -646,7 +646,8 @@ func _convertCOpaquePointerToCMutableVoidPointer(p: COpaquePointer)
 }
 
 @transparent
-func _convertUnsafePointerToAutoreleasingUnsafePointer<T>(p: T*)
--> AutoreleasingUnsafePointer<T> {
+func _convertUnsafePointerToAutoreleasingUnsafePointer<T>(
+  p: UnsafePointer<T>
+) -> AutoreleasingUnsafePointer<T> {
   return AutoreleasingUnsafePointer(p.value)
 }

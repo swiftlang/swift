@@ -16,7 +16,8 @@ struct SliceBuffer<T> : ArrayBufferType {
   typealias NativeStorage = ContiguousArrayStorage<T>
   typealias NativeBuffer = ContiguousArrayBuffer<T>
 
-  init(owner: AnyObject?, start: T*, count: Int, hasNativeBuffer: Bool) {
+  init(owner: AnyObject?, start: UnsafePointer<T>, count: Int, 
+       hasNativeBuffer: Bool) {
     self.owner = owner
     self.start = start
     self._countAndFlags = (UInt(count) << 1) | (hasNativeBuffer ? 1 : 0)
@@ -68,7 +69,7 @@ struct SliceBuffer<T> : ArrayBufferType {
   
   /// An object that keeps the elements stored in this buffer alive
   var owner: AnyObject?
-  var start: T*
+  var start: UnsafePointer<T>
   var _countAndFlags: UInt
 
   //===--- Non-essential bits ---------------------------------------------===//
@@ -105,7 +106,9 @@ struct SliceBuffer<T> : ArrayBufferType {
     return nil
   }
   
-  func _uninitializedCopy(subRange: Range<Int>, var target: T*) -> T* {
+  func _uninitializedCopy(
+    subRange: Range<Int>, var target: UnsafePointer<T>
+  ) -> UnsafePointer<T> {
     _invariantCheck()
     _sanityCheck(subRange.startIndex >= 0)
     _sanityCheck(subRange.endIndex >= subRange.startIndex)
@@ -116,7 +119,7 @@ struct SliceBuffer<T> : ArrayBufferType {
     return target
   }
 
-  var elementStorage: T* {
+  var elementStorage: UnsafePointer<T> {
     return start
   }
 

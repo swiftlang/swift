@@ -74,13 +74,13 @@ struct ContiguousArrayBuffer<T> : ArrayBufferType, LogicValue {
 
   /// If the elements are stored contiguously, a pointer to the first
   /// element. Otherwise, nil.
-  var elementStorage: T* {
+  var elementStorage: UnsafePointer<T> {
     return base ? base.elementStorage : nil
   }
 
   /// A pointer to the first element, assuming that the elements are stored
   /// contiguously.
-  var _unsafeElementStorage: T* {
+  var _unsafeElementStorage: UnsafePointer<T> {
     return base.elementStorage
   }
 
@@ -175,7 +175,9 @@ struct ContiguousArrayBuffer<T> : ArrayBufferType, LogicValue {
   /// Copy the given subRange of this buffer into uninitialized memory
   /// starting at target.  Return a pointer past-the-end of the
   /// just-initialized memory.
-  func _uninitializedCopy(subRange: Range<Int>, target: T*) -> T* {
+  func _uninitializedCopy(
+    subRange: Range<Int>, target: UnsafePointer<T>
+  ) -> UnsafePointer<T> {
     _sanityCheck(subRange.startIndex >= 0)
     _sanityCheck(subRange.endIndex >= subRange.startIndex)
     _sanityCheck(subRange.endIndex <= count)

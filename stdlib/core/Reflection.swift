@@ -195,7 +195,7 @@ protocol Mirror {
 /// without unnecessary copying of the underlying value.
 @asmname("swift_unsafeReflectAny") func unsafeReflect<T>(
   owner: Builtin.NativeObject,
-  ptr: T*
+  ptr: UnsafePointer<T>
 ) -> Mirror
 
 
