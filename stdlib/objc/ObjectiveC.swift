@@ -25,7 +25,7 @@ extension ObjCBool : Printable {
   }
 }
 
-/// \brief The Objective-C SEL type.
+/// The Objective-C SEL type.
 ///
 /// The Objective-C SEL type is typically an opaque pointer. Swift
 /// treats it as a distinct struct type, with operations to
@@ -35,19 +35,19 @@ extension ObjCBool : Printable {
 struct Selector : StringLiteralConvertible {
   var ptr : COpaquePointer
 
-  /// \brief Create a selector from a string.
+  /// Create a selector from a string.
   init(_ str : String) {
     ptr = str.withCString { sel_registerName($0).ptr }
   }
 
-  /// \brief Construct a selector from a string literal.
+  /// Construct a selector from a string literal.
   static func convertFromExtendedGraphemeClusterLiteral(
     value: CString) -> Selector {
 
     return convertFromStringLiteral(value)
   }
 
-  /// \brief Construct a selector from a string literal.
+  /// Construct a selector from a string literal.
   ///
   /// FIXME: Fast-path this in the compiler, so we don't end up with
   /// the sel_registerName call at compile time.
@@ -77,7 +77,7 @@ extension Selector : Printable {
 }
 
 extension String {
-  /// \brief Construct the C string representation of an Objective-C selector.
+  /// Construct the C string representation of an Objective-C selector.
   init(_sel: Selector) {
     // FIXME: This misses the ASCII optimization.
     self = String.fromCString(sel_getName(_sel))

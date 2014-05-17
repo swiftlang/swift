@@ -346,9 +346,8 @@ func split<Seq: Sliceable, R:LogicValue>(
   return result
 }
 
-/// \brief Return true iff the elements of e1 are equal to the initial
-/// elements of e2
-
+/// Return true iff the elements of `e1` are equal to the initial
+/// elements of `e2`.
 func startsWith<
   S0: Sequence, S1: Sequence
   where 
@@ -476,8 +475,8 @@ func lexicographicalCompare<
   }
 }
 
-/// Return true iff a1 precedes a2 in a lexicographical ("dictionary")
-/// ordering, using less as the comparison between elements.
+/// Return true iff `a1` precedes `a2` in a lexicographical ("dictionary")
+/// ordering, using `less` as the comparison between elements.
 func lexicographicalCompare<
     S1 : Sequence, S2 : Sequence
   where 
@@ -507,7 +506,7 @@ func lexicographicalCompare<
   }
 }
 
-/// \brief return true iff an element in seq satisfies predicate
+/// Return `true` iff an element in `seq` satisfies `predicate`.
 func contains<
   S: Sequence, L: LogicValue
 >(seq: S, predicate: (S.GeneratorType.Element)->L) -> Bool {
@@ -519,7 +518,7 @@ func contains<
   return false
 }
 
-/// \brief return true iff x is in seq
+/// Return `true` iff `x` is in `seq`.
 func contains<
   S: Sequence where S.GeneratorType.Element: Equatable
 >(seq: S, x: S.GeneratorType.Element) -> Bool {

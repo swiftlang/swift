@@ -19,7 +19,7 @@ struct IntEncoder : Sink {
   }
 }
 
-/// \brief Character represents some Unicode grapheme cluster as
+/// `Character` represents some Unicode grapheme cluster as
 /// defined by a canonical, localized, or otherwise tailored
 /// segmentation algorithm.
 enum Character :
@@ -83,7 +83,7 @@ enum Character :
     }
   }
 
-  /// \brief return the index of the lowest byte that is 0xFF, or 8 if
+  /// Return the index of the lowest byte that is 0xFF, or 8 if
   /// there is none
   static func _smallSize(value: UInt64) -> Int {
     var mask: UInt64 = 0xFF

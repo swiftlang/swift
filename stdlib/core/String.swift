@@ -100,8 +100,8 @@ extension String : DebugPrintable {
 }
 
 extension String {
-  /// \brief return the number of code units occupied by this string
-  /// in the given encoding
+  /// Return the number of code units occupied by this string
+  /// in the given encoding.
   func _encodedLength<Encoding: UnicodeCodec>(encoding: Encoding.Type) -> Int {
     var codeUnitCount = 0
     self._encode(

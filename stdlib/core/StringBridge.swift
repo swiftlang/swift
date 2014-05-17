@@ -14,16 +14,16 @@
 // variables, allowing the core stdlib to remain decoupled from
 // Foundation.
 
-/// \brief Effectively a proxy for NSString that doesn't mention it by
+/// Effectively a proxy for NSString that doesn't mention it by
 /// name.  NSString's conformance to this protocol is declared in
 /// Foundation.
 @class_protocol @objc protocol _CocoaString {}
 
-/// \brief Loading Foundation initializes these function variables
+/// Loading Foundation initializes these function variables
 /// with useful values
 
-/// \brief produces a _StringBuffer from a given subrange of a source
-/// _CocoaString, having the given minimum capacity.
+/// Produces a `_StringBuffer` from a given subrange of a source
+/// `_CocoaString`, having the given minimum capacity.
 var _cocoaStringToContiguous: (
   source: _CocoaString, range: Range<Int>, minimumCapacity: Int
 ) -> _StringBuffer = _cocoaStringToContiguousNotInitialized
@@ -34,7 +34,7 @@ func _cocoaStringToContiguousNotInitialized(
   _fatalError("_cocoaStringToContiguous not initialized")
 }
 
-/// \brief reads the entire contents of a _CocoaString into contiguous
+/// Reads the entire contents of a _CocoaString into contiguous
 /// storage of sufficient capacity.
 var _cocoaStringReadAll: (
   source: _CocoaString, destination: UnsafePointer<UTF16.CodeUnit>

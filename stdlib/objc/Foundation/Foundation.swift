@@ -116,7 +116,7 @@ extension NSString {
 //===----------------------------------------------------------------------===//
 extension NSString : _CocoaString {}
 
-/// \brief Sets variables in Swift's core stdlib that allow it to
+/// Sets variables in Swift's core stdlib that allow it to
 /// bridge Cocoa strings properly.  Currently invoked by a HACK in
 /// Misc.mm; a better mechanism may be needed.
 @asmname("__swift_initializeCocoaStringBridge")

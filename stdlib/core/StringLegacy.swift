@@ -170,7 +170,7 @@ extension String {
   func _isSpace() -> Bool { return _isAll({ $0.isSpace() }) }
 }
 
-/// \brief Represent a positive integer value in the given radix,
+/// Represent a positive integer value in the given radix,
 /// writing each ASCII character into stream.  The value of `ten'
 /// should be either "A" or "a", depending on whether you want upper-
 /// or lower-case letters when radix > 10
@@ -290,7 +290,7 @@ extension String {
 
 // Conversions from string to other types.
 extension String {
-  /// \brief If the string represents an integer that fits into an Int, returns
+  /// If the string represents an integer that fits into an Int, returns
   /// the corresponding integer.
   func toInt() -> Int? {
     var scalars = self.unicodeScalars
@@ -345,7 +345,7 @@ extension String {
 }
 
 extension String {
-  /// \brief Produce a substring of the given string from the given character
+  /// Produce a substring of the given string from the given character
   /// index to the end of the string.
   func _substr(start: Int) -> String {
     var rng = unicodeScalars
@@ -356,7 +356,7 @@ extension String {
     return rng[startIndex..rng.endIndex]
   }
 
-  /// \brief Split the given string at the given delimiter character, returning 
+  /// Split the given string at the given delimiter character, returning 
   /// the strings before and after that character (neither includes the character
   /// found) and a boolean value indicating whether the delimiter was found.
   func _splitFirst(delim: UnicodeScalar)
@@ -371,7 +371,7 @@ extension String {
     return (self, "", false)
   }
 
-  /// \brief Split the given string at the first character for which the given
+  /// Split the given string at the first character for which the given
   /// predicate returns true. Returns the string before that character, the 
   /// character that matches, the string after that character, and a boolean value
   /// indicating whether any character was found.
@@ -387,7 +387,7 @@ extension String {
     return (self, "🎃", String(), false)
   }
 
-  /// \brief Split the given string at each occurrence of a character for which
+  /// Split the given string at each occurrence of a character for which
   /// the given predicate evaluates true, returning an array of strings that
   /// before/between/after those delimiters.
   func _splitIf(pred: (UnicodeScalar) -> Bool) -> String[] {

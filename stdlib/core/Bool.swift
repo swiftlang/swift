@@ -16,10 +16,10 @@
 struct Bool {
   var value: Builtin.Int1
 
-  /// \brief Default-initialize Boolean value to \c false.
+  /// Default-initialize Boolean value to `false`.
   @transparent
   init() { value = Builtin.trunc_Word_Int1(0.value) }
-  
+
   @transparent
   init(_ v : Builtin.Int1) { value = v }
 

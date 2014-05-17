@@ -25,7 +25,9 @@ struct Unmanaged<T: AnyObject> {
   ///
   /// This operation does not change reference counts.
   ///
-  /// \c let str: CFString = Unmanaged.fromOpaque(ptr).takeUnretainedValue()
+  /// ::
+  ///
+  ///   let str: CFString = Unmanaged.fromOpaque(ptr).takeUnretainedValue()
   @transparent
   static func fromOpaque(value: COpaquePointer) -> Unmanaged {
     return Unmanaged(_private: reinterpretCast(value))
@@ -36,7 +38,9 @@ struct Unmanaged<T: AnyObject> {
   ///
   /// This operation does not change reference counts.
   ///
-  /// \c let str: CFString = Unmanaged.fromOpaque(ptr).takeUnretainedValue()
+  /// ::
+  ///
+  ///   let str: CFString = Unmanaged.fromOpaque(ptr).takeUnretainedValue()
   @transparent
   func toOpaque() -> COpaquePointer {
     return reinterpretCast(_value)
@@ -49,7 +53,9 @@ struct Unmanaged<T: AnyObject> {
   /// does not know the ownership rules for, but you know that the
   /// API expects you to pass the object at +1.
   ///
-  /// \c CFAutorelease(.passRetained(object))
+  /// ::
+  ///
+  ///   CFAutorelease(.passRetained(object))
   @transparent
   static func passRetained(value: T) -> Unmanaged {
     return Unmanaged(_private: value).retain()
@@ -62,8 +68,10 @@ struct Unmanaged<T: AnyObject> {
   /// does not know the ownership rules for, but you know that the
   /// API expects you to pass the object at +0.
   ///
-  /// \c CFArraySetValueAtIndex(.passUnretained(array), i,
-  ///                           .passUnretained(object))
+  /// ::
+  ///
+  ///   CFArraySetValueAtIndex(.passUnretained(array), i,
+  ///                          .passUnretained(object))
   @transparent
   static func passUnretained(value: T) -> Unmanaged {
     return Unmanaged(_private: value)

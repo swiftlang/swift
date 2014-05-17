@@ -10,15 +10,15 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// \brief An extremely simple string designed to represent something
-/// "statically knowable".
-
 // Implementation Note: Because StaticString is used in the
 // implementation of assert() and fatal(), we keep it extremely close
 // to the bare metal.  In particular, because we use only Builtin
 // types, we are guaranteed that no assertions are involved in its
 // construction.  This feature is crucial for preventing infinite
 // recursion even in non-asserting cases.
+
+/// An extremely simple string designed to represent something
+/// "statically knowable".
 struct StaticString
   : _BuiltinExtendedGraphemeClusterLiteralConvertible,
     ExtendedGraphemeClusterLiteralConvertible,
@@ -30,7 +30,7 @@ struct StaticString
   init() {
     self = ""
   }
-  
+
   init(
     start: Builtin.RawPointer, byteSize: Builtin.Word, isASCII: Builtin.Int1
   ) {
@@ -58,7 +58,7 @@ struct StaticString
   ) -> StaticString {
     return StaticString(start: start, byteSize: byteSize, isASCII: isASCII)
   }
-  
+
   static func convertFromStringLiteral(value: StaticString) -> StaticString {
     return value
   }

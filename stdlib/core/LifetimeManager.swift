@@ -16,11 +16,11 @@
 @asmname("swift_keepAlive")
 func swift_keepAlive<T>(inout _: T)
 
-/// \brief An instance of this struct keeps the references registered with it
-/// at +1 reference count until the call to \c release().
+/// An instance of this struct keeps the references registered with it
+/// at +1 reference count until the call to `release()`.
 ///
-/// It is absolutely necessary to call \c release().  Forgetting to call
-/// \c release() will not cause a memory leak.  Instead, the managed objects will be
+/// It is absolutely necessary to call `release()`.  Forgetting to call
+/// `release()` will not cause a memory leak.  Instead, the managed objects will be
 /// released earlier than expected.
 ///
 /// This class can be used to extend lifetime of objects to pass UnsafePointers
@@ -49,14 +49,14 @@ class LifetimeManager {
   //   put(Builtin.castToNativeObject(obj))
   // }
 
-  /// \brief Call this function to end the forced lifetime extension.
+  /// Call this function to end the forced lifetime extension.
   func release() {
     _fixLifetime(_managedRefs.owner)
     _releaseCalled = true
   }
 }
 
-/// \brief Evaluate f() and return its result, ensuring that x is not
+/// Evaluate `f()` and return its result, ensuring that `x` is not
 /// destroyed before f returns.
 func withExtendedLifetime<T, Result>(
   x: T, f: ()->Result
@@ -66,7 +66,7 @@ func withExtendedLifetime<T, Result>(
   return result
 }
 
-/// \brief Evaluate f(x) and return its result, ensuring that x is not
+/// Evaluate `f(x)` and return its result, ensuring that `x` is not
 /// destroyed before f returns.
 func withExtendedLifetime<T, Result>(
   x: T, f: (T)->Result
@@ -79,7 +79,7 @@ func withExtendedLifetime<T, Result>(
 // FIXME: this function can die once <rdar://problem/14497260> (need
 // support for CF bridging) is solved.
 
-/// \brief Pass a given object as a COpaquePointer at +0 to the given
+/// Pass a given object as a `COpaquePointer` at +0 to the given
 /// function, returning its result.  This function is useful for
 /// calling CoreFoundation functions on NS types that are toll-free
 /// bridged; you have to declare these functions as taking
@@ -93,9 +93,9 @@ func withObjectAtPlusZero<Result>(x: AnyObject, f: (COpaquePointer)->Result) -> 
 
 extension String {
 
-  /// \brief Invoke f on the contents of this string, represented as
+  /// Invoke `f` on the contents of this string, represented as
   /// a nul-terminated array of char, ensuring that the array's
-  /// lifetime extends through the execution of f
+  /// lifetime extends through the execution of `f`.
   func withCString<Result>(
     f: (CString)->Result
   ) -> Result {
@@ -104,9 +104,9 @@ extension String {
     }
   }
 
-  /// \brief Invoke f on the contents of this string, represented as
+  /// Invoke `f` on the contents of this string, represented as
   /// a nul-terminated array of char, ensuring that the array's
-  /// lifetime extends through the execution of f
+  /// lifetime extends through the execution of `f`.
   func withCString<Result>(
     f: (UnsafePointer<CChar>)->Result
   ) -> Result {

@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// \brief Invokes body with an UnsafePointer to arg and returns the
+/// Invokes `body` with an `UnsafePointer` to `arg` and returns the
 /// result. Useful for calling Objective-C APIs that take "in/out"
 /// parameters (and default-constructible "out" parameters) by pointer
 func withUnsafePointer<T, Result>(
@@ -21,8 +21,7 @@ func withUnsafePointer<T, Result>(
   return body(UnsafePointer<T>(Builtin.addressof(&arg)))
 }
 
-/// \brief Like withUnsafePointer, but passes pointers to arg0 and
-/// arg1
+/// Like `withUnsafePointer`, but passes pointers to `arg0` and `arg1`.
 func withUnsafePointers<A0, A1, Result>(
   inout arg0: A0,
   inout arg1: A1,
@@ -35,8 +34,8 @@ func withUnsafePointers<A0, A1, Result>(
   }
 }
 
-/// \brief Like withUnsafePointer, but passes pointers to arg0, arg1,
-/// and arg2
+/// Like `withUnsafePointer`, but passes pointers to `arg0`, `arg1`,
+/// and `arg2`.
 func withUnsafePointers<A0, A1, A2, Result>(
   inout arg0: A0,
   inout arg1: A1,
@@ -52,12 +51,12 @@ func withUnsafePointers<A0, A1, A2, Result>(
   }
 }
 
-/// \brief Invokes body with an UnsafePointer to a nil T, sets arg to
-/// the value of that T (or .None if the T is still nil), and returns
-/// the result of the invocation
+/// Invokes `body` with an `UnsafePointer` to a `nil` `T`, sets `arg` to
+/// the value of that `T` (or `.None` if the `T` is still `nil`), and returns
+/// the result of the invocation.
 ///
 /// Useful for calling Objective-C APIs that take class instances by
-/// pointer as @autorelease "out" parameters.
+/// pointer as `@autorelease` "out" parameters.
 func withUnsafePointerToObject<T: AnyObject, Result>(
   inout arg: T?,
   body: (UnsafePointer<ImplicitlyUnwrappedOptional<T>>)->Result

@@ -54,7 +54,7 @@ struct CString :
     return _bytesPtr.isNull()
   }
 
-  /// \brief From a CString with possibly-transient lifetime, create a
+  /// From a `CString` with possibly-transient lifetime, create a
   /// nul-terminated array of 'C' char.
   func persist() -> CChar[] {
     var length = _strlen(self)

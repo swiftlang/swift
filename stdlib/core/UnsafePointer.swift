@@ -18,7 +18,7 @@
 /// to allocate and free memory appropriately.
 ///
 /// For C pointers for which the pointed-to type cannot be represented
-/// directly in Swift, the \c COpaquePointer will be used instead.
+/// directly in Swift, the `COpaquePointer` will be used instead.
 struct UnsafePointer<T> : BidirectionalIndex, Comparable, Hashable {
   /// The underlying raw (untyped) pointer.
   var value : Builtin.RawPointer

@@ -23,11 +23,11 @@ func swift_bufferAllocate(
 @asmname("malloc_size")
 func c_malloc_size(heapMemory: UnsafePointer<Void>) -> Int
 
-/// \brief a class containing an ivar "value" of type Value, and
+/// A class containing an ivar "value" of type Value, and
 /// containing storage for an array of Element whose size is
-/// determined at create time.  
+/// determined at create time.
 ///
-/// The analogous C++-ish class template would be:
+/// The analogous C++-ish class template would be::
 ///
 ///   template <class Value, class Element>
 ///   struct HeapBuffer {
@@ -104,8 +104,7 @@ struct HeapBuffer<Value, Element> : LogicValue, Equatable {
     return UnsafePointer(HeapBuffer._elementOffset() + _address)
   }
 
-  /// \brief Return the actual number of Elements we can possibly
-  /// store.
+  /// Return the actual number of `Elements` we can possibly store.
   func _capacity() -> Int {
     let allocatedSize = c_malloc_size(UnsafePointer(_address))
     return (allocatedSize - HeapBuffer._elementOffset())
@@ -120,8 +119,8 @@ struct HeapBuffer<Value, Element> : LogicValue, Equatable {
     self.storage = storage
   }
   
-  /// \brief Create a HeapBuffer with self.value = initializer and
-  /// self._capacity() >= capacity.
+  /// Create a `HeapBuffer` with `self.value = initializer` and
+  /// `self._capacity() >= capacity`.
   init(
     _ storageClass: HeapBufferStorageBase.Type,
     _ initializer: Value, _ capacity: Int

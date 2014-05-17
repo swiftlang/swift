@@ -27,7 +27,7 @@ struct _StringBufferIVars {
     self.usedEnd = usedEnd
     self.capacityAndElementShift = byteCapacity + (elementWidth - 1)
   }
-  
+
   var usedEnd: UnsafePointer<RawByte>
   var capacityAndElementShift: Int
   var byteCapacity: Int {
@@ -52,7 +52,7 @@ struct _StringBuffer {
   func __conversion() -> _Storage {
     return _storage
   }
-  
+
   init(_ storage: _Storage) {
     _storage = storage
   }
@@ -60,7 +60,7 @@ struct _StringBuffer {
   init(capacity: Int, initialSize: Int, elementWidth: Int) {
     _sanityCheck(elementWidth == 1 || elementWidth == 2)
     let elementShift = elementWidth - 1
-    
+
     // We need at least 1 extra byte if we're storing 8-bit elements,
     // because indexing will always grab 2 consecutive bytes at a
     // time.
@@ -87,7 +87,7 @@ struct _StringBuffer {
     // Determine how many UTF16 code units we'll need
     var inputStream = input.generate()
     var (utf16Count, isAscii) = UTF16.measure(encoding, input: inputStream)
-    
+
     // Allocate storage
     self = _StringBuffer(
       capacity: max(utf16Count, minimumCapacity),
@@ -108,12 +108,12 @@ struct _StringBuffer {
     }
   }
 
-  /// \brief a pointer to the start of this buffer's data area
+  /// a pointer to the start of this buffer's data area
   var start: UnsafePointer<RawByte> {
     return UnsafePointer(_storage.elementStorage)
   }
 
-  /// \brief a past-the-end pointer for this buffer's stored data
+  /// a past-the-end pointer for this buffer's stored data
   var usedEnd: UnsafePointer<RawByte> {
     get {
       return _storage.value.usedEnd
@@ -127,22 +127,22 @@ struct _StringBuffer {
     return (usedEnd - start) >> elementShift
   }
 
-  /// \brief a past-the-end pointer for this buffer's available storage
+  /// a past-the-end pointer for this buffer's available storage
   var capacityEnd: UnsafePointer<RawByte> {
     return start + _storage.value.byteCapacity
   }
 
-  /// \brief The number of elements that can be stored in this buffer
+  /// The number of elements that can be stored in this buffer
   var capacity: Int {
     return _storage.value.byteCapacity >> elementShift
   }
 
-  /// \brief 1 if the buffer stores UTF16; 0 otherwise
+  /// 1 if the buffer stores UTF16; 0 otherwise
   var elementShift: Int {
     return _storage.value.elementShift
   }
 
-  /// \brief the number of bytes per element
+  /// the number of bytes per element
   var elementWidth: Int {
     return elementShift + 1
   }
@@ -154,7 +154,7 @@ struct _StringBuffer {
     }
 
     let newUsedEnd = start + (newUsedCount << elementShift)
-    
+
     if _fastPath(
       self._storage.isUniquelyReferenced()
     ) {
@@ -175,6 +175,6 @@ struct _StringBuffer {
   func __conversion() -> AnyObject? {
     return _storage.storage ? .Some(_storage.storage!) : .None
   }
-  
+
   var _storage: _Storage
 }

@@ -26,21 +26,19 @@ struct ObjCBool {
     self.value = value
   }
 
-  /// \brief Allow use in a Boolean context.
+  /// Allow use in a Boolean context.
   func getLogicValue() -> Bool {
     return value != 0
   }
 
-  /// \brief Implicit conversion from C Boolean type to Swift Boolean
-  /// type.
+  /// Implicit conversion from C Boolean type to Swift Boolean type.
   @conversion func __conversion() -> Bool {
     return self.getLogicValue()
   }
 }
 
 extension Bool {
-  /// \brief Implicit conversion from Swift Boolean type to
-  /// Objective-C Boolean type.
+  /// Implicit conversion from Swift Boolean type to Objective-C Boolean type.
   @conversion func __conversion() -> ObjCBool {
     return ObjCBool(self ? 1 : 0)
   }

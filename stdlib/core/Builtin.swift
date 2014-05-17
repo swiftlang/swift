@@ -10,9 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// \brief Definitions that make elements of Builtin usable in real
-/// code without gobs of boilerplate.  These APIs will probably *not*
-/// be exposed outside the stdlib.
+// Definitions that make elements of Builtin usable in real
+// code without gobs of boilerplate.  These APIs will probably *not*
+// be exposed outside the stdlib.
 
 @transparent
 func sizeof<T>(_:T.Type) -> Int {
