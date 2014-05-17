@@ -570,6 +570,16 @@ public:
     auto SILVal = i->getOperand();
     Explosion e = getLoweredExplosion(SILVal);
     DebugTypeInfo DbgTy(Decl, getTypeInfo(SILVal.getType()));
+    if (e.size() == 1) {
+      // Hack around rdar://problem/15525728 by emitting -O0 shadow
+      // copies for dbg_values. The value may loose the precise
+      // lifetime, but it doesn't unconditionally disappear after the
+      // first basic block.
+      llvm::Value *Shadow[] = { emitShadowCopy(e.claimAll()[0], Name) };
+      return emitDebugVariableDeclaration(Builder,
+                                          llvm::ArrayRef<llvm::Value *>(Shadow),
+                                          DbgTy, i->getDebugScope(), Name);
+    }
     emitDebugVariableDeclaration(Builder, e.claimAll(), DbgTy,
                                  i->getDebugScope(), Name);
   }
