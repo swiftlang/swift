@@ -299,6 +299,7 @@ extension ${Self} {
 %end
 
 extension Array {
+  /// This function "seeds" the ArrayLiteralConvertible protocol
   static func convertFromHeapArray(
     base: Builtin.RawPointer,
     owner: Builtin.NativeObject,
@@ -699,8 +700,11 @@ func !=<T: Equatable>(lhs: ${Self}<T>, rhs: ${Self}<T>) -> Bool {
 /// O(1). Requires: Base is a base class or base @objc protocol (such
 /// as AnyObject) of Derived.
 func _arrayUpCast<Derived, Base>(a: Array<Derived>) -> Array<Base> {
-  return Array(ArrayBuffer<Base>(castFrom: a.buffer, castKind: .Up))
+  return Array(a.buffer.castToBufferOf(Base.self))
 }
+
+// ** Currently used to implement
+// ** Array<T>.bridgeFromObjectiveC(x: NSArray) -> Array<T>?
 
 /// Implement the semantics of (a as Array<T>), where a is an
 /// AnyObject[].
@@ -723,7 +727,7 @@ func _arrayBridgedDownCast<T>(a: AnyObject[]) -> T[]? {
   // back the corresponding stored NSArray element to T. Failure to
   // bridge back is a fatal error detected at runtime.
   if _isClassOrObjCExistential(T.self) {
-    return Array(ArrayBuffer(castFrom: a.buffer, castKind: .DeferredDown))
+    return Array(a.buffer.castToBufferOf(T.self))
   }
 
   // Otherwise, conversion is O(N), and succeeds iff every element
@@ -750,12 +754,32 @@ func _arrayBridgedDownCast<T>(a: AnyObject[]) -> T[]? {
 /// O(1) iff a's buffer elements are dynamically known to have
 /// type Derived or a type derived from Derived.
 func _arrayCheckedDownCast<Base, Derived>(a: Array<Base>) -> Derived[]? {
-  if let n = a.buffer.requestNativeBuffer() {
-    if let n2 = n.asBufferOf(Derived.self) {
-      return Array(ArrayBuffer(n2))
+  _sanityCheck(isBridgedVerbatimToObjectiveC(Base.self))
+  _sanityCheck(isBridgedVerbatimToObjectiveC(Derived.self))
+  
+  if _fastPath(!a.isEmpty) {
+    let native = a.buffer.requestNativeBuffer()
+    
+    if _fastPath(native) {
+      if native!.storesOnlyElementsOfType(Derived.self) {
+        return Array(a.buffer.castToBufferOf(Derived.self))
+      }
+      return nil
     }
+    
+    // slow path: we store an NSArray
+    
+    // We can skip the check if Derived happens to be AnyObject
+    if !(AnyObject.self is Derived.Type) {
+      for element in a {
+        if !(element is Derived) {
+          return nil
+        }
+      }
+    }
+    return Array(a.buffer.castToBufferOf(Derived.self))
   }
-  return nil
+  return []
 }
 
 /// Convert a to its corresponding bridged array type.

@@ -555,12 +555,38 @@ extension NSArray : ArrayLiteralConvertible {
 ///
 ///   func f(NSView[]) {}
 ///
-/// to Objective-C code as a method that accepts an NSArray.
-func _convertNSArrayToArray<T>(nsarr: NSArray) -> T[] {
-  if let arr = T[].bridgeFromObjectiveC(nsarr) {
-    return arr
+/// to Objective-C code as a method that accepts an NSArray.  This operation
+/// is referred to as a "forced conversion" in ../../../docs/Arrays.rst
+func _convertNSArrayToArray<T>(source: NSArray) -> T[] {
+  if _fastPath(isBridgedVerbatimToObjectiveC(T.self)) {
+    // Forced down-cast
+    return Array(ArrayBuffer(reinterpretCast(source) as CocoaArray))
   }
-  _fatalError("NSArray does not bridge to array")
+  else {
+    // Forced bridge back
+
+    /* FIXME: blocked by <rdar://problem/16951124>
+    return Array<T>(
+      _Map(source) {
+        (object: AnyObject)->T 
+      in
+        let r = bridgeFromObjectiveC(object, T.self)
+        _precondition(
+          r, "NSArray element failed to bridge to Array element type")
+        return r!
+      }
+    )
+    */
+    var buf = ContiguousArrayBuffer<T>(count: source.count, minimumCapacity: 0)
+    var p = buf._unsafeElementStorage
+    for object: AnyObject in source {
+      let value = bridgeFromObjectiveC(object, T.self)
+      _precondition(
+        value, "NSArray element failed to bridge to Array element type")
+      p++.initialize(value!)
+    }
+    return Array(ArrayBuffer(buf))
+  }
 }
 
 /// The entry point for converting `Array` to `NSArray` in bridge
@@ -810,10 +836,30 @@ class NSFastGenerator : Generator {
 }
 
 extension NSArray : Sequence {
+  @final
   func generate() -> NSFastGenerator {
     return NSFastGenerator(self)
   }
 }
+
+/*
+// FIXME: <rdar://problem/16951124> prevents this from being used
+extension NSArray : Swift.Collection {
+  @final
+  var startIndex: Int {
+    return 0
+  }
+  
+  @final
+  var endIndex: Int {
+    return count
+  }
+
+  subscript(i: Int) -> AnyObject {
+    return self.objectAtIndex(i)
+  }
+}
+*/
 
 // FIXME: This should not be necessary.  We
 // should get this from the extension on 'NSArray' above.
@@ -1177,14 +1223,18 @@ extension NSArray {
     self.init(objects: UnsafePointer(x.elementStorage), count: x.count)
     _fixLifetime(x)
   }
-  
-  var _asCocoaArray: CocoaArray {
-    return reinterpretCast(self) as CocoaArray
+
+  /// An `AnyObject[]` that shares `self`\ 's storage.  If `self` is
+  /// mutable, any changes to it may be observable by the result.
+  @final
+  var _arraySharingStorage: AnyObject[] {
+    return Array(ArrayBuffer(reinterpretCast(self) as CocoaArray))
   }
-  
+
+  @final
   @conversion
-  func __conversion() -> Array<AnyObject> {
-    return Array(ArrayBuffer(self._asCocoaArray.copyWithZone(nil)))
+  func __conversion() -> AnyObject[] {
+    return self.copyWithZone(nil)!._arraySharingStorage
   }
 }
 

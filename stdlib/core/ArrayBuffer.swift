@@ -40,11 +40,25 @@ class IndirectArrayBuffer {
     self.needsElementTypeCheck = needsElementTypeCheck
   }
 
-  init(castFrom: IndirectArrayBuffer, castKind: _ArrayCastKind) {
-    self.buffer = castFrom.buffer
-    self.isMutable = castKind != .Up
-    self.isCocoa = castFrom.isCocoa
-    self.needsElementTypeCheck = castKind == .DeferredDown
+  init<Target>(
+    castFrom source: IndirectArrayBuffer,
+    toElementType _: Target.Type
+  ) {
+    self.buffer = source.buffer
+    self.isCocoa = source.isCocoa
+    
+    if source.isCocoa {
+      self.isMutable = false
+    }
+    else {
+      self.isMutable = source
+        .getNativeBufferOf(AnyObject.self)
+        .canStoreElementsOfDynamicType(Target.self)
+    }
+    
+    self.needsElementTypeCheck = source.needsElementTypeCheck
+      ? !(AnyObject.self is Target.Type)
+      : false
   }
   
   // When this buffer has immutable storage and it is modified, the
@@ -53,6 +67,7 @@ class IndirectArrayBuffer {
     self.buffer = newBuffer.storage
     self.isMutable = true
     self.isCocoa = false
+    self.needsElementTypeCheck = false
   }
 
   var buffer: AnyObject?
@@ -60,7 +75,7 @@ class IndirectArrayBuffer {
   var isCocoa: Bool
   var needsElementTypeCheck: Bool
   
-  func getNative<T>() -> ContiguousArrayBuffer<T> {
+  func getNativeBufferOf<T>(_: T.Type) -> ContiguousArrayBuffer<T> {
     _sanityCheck(!isCocoa)
     return ContiguousArrayBuffer(
       buffer ? reinterpretCast(buffer) as ContiguousArrayStorage<T> : nil)
@@ -98,20 +113,23 @@ struct ArrayBuffer<T> : ArrayBufferType {
     storage = Builtin.castToNativeObject(
       IndirectArrayBuffer(
         cocoa: cocoa,
+        // FIXME: it may be possible to avoid a deferred check if we can
+        // verify that source is backed by a ContiguousArray<T>.
         needsElementTypeCheck: !(AnyObject.self is T.Type)))
   }
 
-  /// An ArrayBuffer<T> containing the same elements.
-  /// Requires: the elements actually have dynamic type T.
-  init<U>(castFrom: ArrayBuffer<U>, castKind: _ArrayCastKind) {
-    _sanityCheck(_isClassOrObjCExistential(T.self))
-    _sanityCheck(_isClassOrObjCExistential(U.self))
-    storage = Builtin.castToNativeObject(
-      IndirectArrayBuffer(castFrom: castFrom.indirect, castKind: castKind))
+  init(_ buffer: IndirectArrayBuffer) {
+    storage = Builtin.castToNativeObject(buffer)
   }
   
-  var dynamicElementType: Any.Type {
-    return _isNative ? _native.dynamicElementType : AnyObject.self
+  /// Returns an `ArrayBuffer<U>` containing the same elements.
+  /// Requires: the elements actually have dynamic type `U`, and `U`
+  /// is a class or `@objc` existential.
+  func castToBufferOf<U>(_: U.Type) -> ArrayBuffer<U> {
+    _sanityCheck(_isClassOrObjCExistential(T.self))
+    _sanityCheck(_isClassOrObjCExistential(U.self))
+    return ArrayBuffer<U>(
+      IndirectArrayBuffer(castFrom: self.indirect, toElementType: U.self))
   }
 }
 
@@ -182,7 +200,9 @@ extension ArrayBuffer {
     if _slowPath(indirect.needsElementTypeCheck) {
       if _fastPath(_isNative) {
         for x in _native[subRange] {
-          assert(reinterpretCast(x) as AnyObject is T)
+          _precondition(
+            reinterpretCast(x) as AnyObject is T,
+            "NSArray element failed to match the Swift Array Element type")
         }
       }
       else if (subRange) {
@@ -190,7 +210,8 @@ extension ArrayBuffer {
         // Could be sped up, e.g. by using
         // enumerateObjectsAtIndexes:options:usingBlock:
         for i in subRange {
-          assert(ns.objectAtIndex(i) is T)
+          assert(ns.objectAtIndex(i) is T,
+            "NSArray element failed to match the Swift Array Element type")
         }
       }
     }
@@ -362,7 +383,9 @@ extension ArrayBuffer {
     }
     else {
       let i = indirect
-      return _fastPath(!i.isCocoa) ? i.getNative() : NativeBuffer()
+      return _fastPath(!i.isCocoa)
+        ? i.getNativeBufferOf(T.self) 
+        : NativeBuffer()
     }
   }
 

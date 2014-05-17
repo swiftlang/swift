@@ -25,8 +25,15 @@ import SwiftShims
 class _NSSwiftArray : HeapBufferStorageBase, CocoaArray {
   typealias Buffer = HeapBuffer<_ArrayBody, AnyObject>
   
-  var dynamicElementType: Any.Type {
-    _fatalError("This var must be overridden")
+  func canStoreElementsOfDynamicType(_: Any.Type) -> Bool {
+    _fatalError(
+      "Concrete subclasses must implement canStoreElementsOfDynamicType")
+  }
+
+  /// A type that every element in the array is.
+  var staticElementType: Any.Type {
+    _fatalError(
+      "Concrete subclasses must implement dynamicElementType")
   }
   
   /// Returns the object located at the specified index.

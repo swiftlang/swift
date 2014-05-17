@@ -151,12 +151,12 @@ func testBridgedVerbatim() {
   let derivedInBaseBuffer: Base[] = [Derived(44), Derived(55)]
   println(derivedInBaseBuffer)
   
-  // CHECK-NEXT: Downcast-ability is based on buffer type, not individual element types
+  // CHECK-NEXT: Explicit downcast-ability is based on element type, not buffer type
   if let downcastBaseBuffer = derivedInBaseBuffer as Derived[] {
-    println("Unexpected downcast success: \(downcastBaseBuffer)")
+    println("Explicit downcast-ability is based on element type, not buffer type")
   }
   else {
-    println("Downcast-ability is based on buffer type, not individual element types")
+    println("Unexpected downcast failure")
   }
 
   // We can up-cast to array of AnyObject

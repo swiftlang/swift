@@ -27,7 +27,18 @@ let emptyNSSwiftArray : _NSSwiftArray
     b.base._value.destroy()
   }
 
-  override var dynamicElementType: Any.Type {
+  /// Return true if the `proposedElementType` is `T` or a subclass of
+  /// `T`.  We can't store anything else without violating type
+  /// safety; for example, the destructor has static knowledge that
+  /// all of the elements can be destroyed as `T`
+  override func canStoreElementsOfDynamicType(
+    proposedElementType: Any.Type
+  ) -> Bool {
+    return proposedElementType is T.Type
+  }
+
+  /// A type that every element in the array is.
+  override var staticElementType: Any.Type {
     return T.self
   }
 }
@@ -230,17 +241,36 @@ struct ContiguousArrayBuffer<T> : ArrayBufferType, LogicValue {
   var identity: Word {
     return reinterpretCast(elementStorage)
   }
-  
-  func asBufferOf<U>(_: U.Type) -> ContiguousArrayBuffer<U>? {
-    if !(dynamicElementType is U.Type) {
-     return nil
+
+  /// Return true iff we have storage for elements of the given
+  /// `proposedElementType`.  If not, we'll be treated as immutable.
+  func canStoreElementsOfDynamicType(proposedElementType: Any.Type) -> Bool {
+    if let s = storage {
+      return s.canStoreElementsOfDynamicType(proposedElementType)
     }
-    return ContiguousArrayBuffer<U>(
-      reinterpretCast(storage) as ContiguousArrayStorage<U>)
+    return false
   }
-   
-  var dynamicElementType: Any.Type {
-    return storage ? storage!.dynamicElementType : T.self
+
+  /// Return true if the buffer stores only elements of type `U`.
+  /// Requires: `U` is a class or `@objc` existential. O(N)
+  func storesOnlyElementsOfType<U>(
+    _: U.Type
+  ) -> Bool {
+    let s = storage
+    if _fastPath(s) {
+      if _fastPath(s!.staticElementType is U.Type) {
+        // Done in O(1)
+        return true
+      }
+    }
+    
+    // Check the elements
+    for x in self {
+      if !(x is U) {
+        return false
+      }
+    }
+    return true
   }
   
   //===--- private --------------------------------------------------------===//
