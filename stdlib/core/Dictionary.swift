@@ -1627,10 +1627,14 @@ struct Dictionary<KeyType : Hashable, ValueType> : Collection,
     return _variantStorage.updateValue(value, forKey: key)
   }
 
+  /// Remove the key-value pair referenced by the given index.
   mutating func removeAtIndex(index: Index) {
     _variantStorage.removeAtIndex(index)
   }
 
+  /// Remove a given key and the associated value from the dictionary.
+  /// Returns the value that was removed, or `nil` if the key was not present
+  /// in the dictionary.
   mutating func removeObjectForKey(key: KeyType) -> ValueType? {
     return _variantStorage.removeObjectForKey(key)
   }
