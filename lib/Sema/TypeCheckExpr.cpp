@@ -668,9 +668,9 @@ NominalTypeDecl *TypeChecker::getCMutablePointerDecl(const DeclContext *DC) {
                              CMutablePointerDecl, "CMutablePointer");
 }
 
-NominalTypeDecl *TypeChecker::getObjCMutablePointerDecl(const DeclContext *DC) {
+NominalTypeDecl *TypeChecker::getAutoreleasingUnsafePointerDecl(const DeclContext *DC) {
   return getKnownPointerDecl(getStdlibModule(DC), Context,
-                             ObjCMutablePointerDecl, "ObjCMutablePointer");
+                             AutoreleasingUnsafePointerDecl, "AutoreleasingUnsafePointer");
 }
 
 Expr *TypeChecker::foldSequence(SequenceExpr *expr, DeclContext *dc) {

@@ -273,8 +273,8 @@ private:
   Optional<NominalTypeDecl *> CConstPointerDecl;
   /// The \c Swift.CMutablePointer<T> declaration.
   Optional<NominalTypeDecl *> CMutablePointerDecl;
-  /// The \c Swift.ObjCMutablePointer<T> declaration.
-  Optional<NominalTypeDecl *> ObjCMutablePointerDecl;
+  /// The \c Swift.AutoreleasingUnsafePointer<T> declaration.
+  Optional<NominalTypeDecl *> AutoreleasingUnsafePointerDecl;
   
   /// A set of types that can be trivially mapped to Objective-C types.
   llvm::DenseSet<CanType> ObjCMappedTypes;
@@ -805,8 +805,8 @@ public:
   NominalTypeDecl *getCConstPointerDecl(const DeclContext *DC);
   /// \brief Retrieve the \c Swift.CMutablePointer<T> declaration.
   NominalTypeDecl *getCMutablePointerDecl(const DeclContext *DC);
-  /// \brief Retrieve the \c Swift.ObjCMutablePointer<T> declaration.
-  NominalTypeDecl *getObjCMutablePointerDecl(const DeclContext *DC);
+  /// \brief Retrieve the \c Swift.AutoreleasingUnsafePointer<T> declaration.
+  NominalTypeDecl *getAutoreleasingUnsafePointerDecl(const DeclContext *DC);
   
   /// \brief Convert the given expression to the given type.
   ///

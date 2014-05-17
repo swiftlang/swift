@@ -21,9 +21,9 @@
   // CHECK:         [[CONVERT:%.*]] = function_ref @_TFSs43_convertCOpaquePointerToCMutableVoidPointer
   // CHECK:         apply [[CONVERT]]
 
-  @objc func objcMutablePointer(x: ObjCMutablePointer<TakesCPointers?>) {}
+  @objc func objcMutablePointer(x: AutoreleasingUnsafePointer<TakesCPointers?>) {}
   // CHECK-LABEL: sil @_TToFC18c_pointer_bridging14TakesCPointers18objcMutablePointer{{.*}} : $@cc(objc_method) @thin (UnsafePointer<Optional<TakesCPointers>>, TakesCPointers) -> ()
-  // CHECK:         [[CONVERT:%.*]] = function_ref @_TFSs41_convertUnsafePointerToObjCMutablePointer
+  // CHECK:         [[CONVERT:%.*]] = function_ref @_TFSs49_convertUnsafePointerToAutoreleasingUnsafePointer
   // CHECK:         apply [transparent] [[CONVERT]]<Optional<TakesCPointers>>
 }
 
@@ -77,11 +77,11 @@ func callWithCPointers(o: TakesCPointers) {
   var p: TakesCPointers? = nil
   o.objcMutablePointer(&p)
   // CHECK: [[METHOD:%.*]] = class_method [volatile] %0 : $TakesCPointers, #TakesCPointers.objcMutablePointer!1.foreign
-  // CHECK: [[OBJC_POINTER:%.*]] = apply {{.*}} -> ObjCMutablePointer
-  // CHECK: [[CONVERT:%.*]] = function_ref @_TFSs41_convertObjCMutablePointerToUnsafePointer
+  // CHECK: [[OBJC_POINTER:%.*]] = apply {{.*}} -> AutoreleasingUnsafePointer
+  // CHECK: [[CONVERT:%.*]] = function_ref @_TFSs49_convertAutoreleasingUnsafePointerToUnsafePointer
   // CHECK: [[CONVERTED:%.*]] = apply [transparent] [[CONVERT]]<Optional<TakesCPointers>>([[OBJC_POINTER]])
   // CHECK; apply [[METHOD]]([[CONVERTED]], %0)
-  // -- ObjCMutablePointer is trivial, so SILBuilder should swallow the
+  // -- AutoreleasingUnsafePointer is trivial, so SILBuilder should swallow the
   //    fix_lifetime
   // CHECK-NOT: fix_lifetime [[OBJC_POINTER]]
 }

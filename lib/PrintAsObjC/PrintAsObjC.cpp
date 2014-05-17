@@ -428,7 +428,7 @@ private:
     if (unsafePointerID.empty()) {
       cConstPointerID = ctx.getIdentifier("CConstPointer");
       cMutablePointerID = ctx.getIdentifier("CMutablePointer");
-      objcMutablePointerID = ctx.getIdentifier("ObjCMutablePointer");
+      objcMutablePointerID = ctx.getIdentifier("AutoreleasingUnsafePointer");
       unsafePointerID = ctx.getIdentifier("UnsafePointer");
     }
 

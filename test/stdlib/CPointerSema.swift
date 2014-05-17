@@ -43,7 +43,7 @@ takeMutablePointer(ptr)
 takeMutablePointer(ptrDifferentType) // expected-error{{}}
 
 class NSFoo {}
-func takeObjCMutablePointer(p: ObjCMutablePointer<NSFoo>) -> Bool { // expected-note{{}}
+func takeAutoreleasingUnsafePointer(p: AutoreleasingUnsafePointer<NSFoo>) -> Bool { // expected-note{{}}
   // Test '=='
   if p == p { return true }
   if p != p { return false }
@@ -55,12 +55,12 @@ var fooArr = [mutableFoo]
 let immutableFoo = NSFoo()
 let fooPtr: UnsafePointer<NSFoo> = nil
 
-takeObjCMutablePointer(nil)
-takeObjCMutablePointer(immutableFoo) // expected-error{{}}
-takeObjCMutablePointer(fooArr) // expected-error{{}}
-takeObjCMutablePointer(&fooArr) // expected-error{{}}
-takeObjCMutablePointer(&mutableFoo)
-takeObjCMutablePointer(fooPtr)
+takeAutoreleasingUnsafePointer(nil)
+takeAutoreleasingUnsafePointer(immutableFoo) // expected-error{{}}
+takeAutoreleasingUnsafePointer(fooArr) // expected-error{{}}
+takeAutoreleasingUnsafePointer(&fooArr) // expected-error{{}}
+takeAutoreleasingUnsafePointer(&mutableFoo)
+takeAutoreleasingUnsafePointer(fooPtr)
 
 func takeConstVoidPointer(p: CConstVoidPointer) {} // expected-note{{}}
 

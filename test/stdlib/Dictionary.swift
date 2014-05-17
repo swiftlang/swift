@@ -1189,7 +1189,7 @@ class ParallelArrayDictionary : NSDictionary {
 
   override func countByEnumeratingWithState(
       state: CMutablePointer<NSFastEnumerationState>,
-      objects: ObjCMutablePointer<AnyObject?>, count: Int) -> Int {
+      objects: AutoreleasingUnsafePointer<AnyObject?>, count: Int) -> Int {
     var stateUP = UnsafePointer(state)
     var theState = stateUP.pointee
     if theState.state == 0 {

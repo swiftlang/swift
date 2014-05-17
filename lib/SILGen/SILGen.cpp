@@ -241,8 +241,8 @@ static SILType getCMutablePointerInterfaceType(SILGenModule &SGM) {
   return getPointerInterfaceType(SGM.Types.getCMutablePointerDecl());
 }
 
-static SILType getObjCMutablePointerInterfaceType(SILGenModule &SGM) {
-  return getPointerInterfaceType(SGM.Types.getObjCMutablePointerDecl());
+static SILType getAutoreleasingUnsafePointerInterfaceType(SILGenModule &SGM) {
+  return getPointerInterfaceType(SGM.Types.getAutoreleasingUnsafePointerDecl());
 }
 
 static SILType getUnsafePointerInterfaceType(SILGenModule &SGM) {
@@ -263,10 +263,10 @@ SILDeclRef SILGenModule::getCMutablePointerToUnsafePointerFn() {
                        getUnsafePointerInterfaceType(*this));
 }
 
-SILDeclRef SILGenModule::getObjCMutablePointerToUnsafePointerFn() {
-  return getBridgingFn(ObjCMutablePointerToUnsafePointerFn, *this,
-                       STDLIB_NAME, "_convertObjCMutablePointerToUnsafePointer",
-                       {getObjCMutablePointerInterfaceType(*this)},
+SILDeclRef SILGenModule::getAutoreleasingUnsafePointerToUnsafePointerFn() {
+  return getBridgingFn(AutoreleasingUnsafePointerToUnsafePointerFn, *this,
+                       STDLIB_NAME, "_convertAutoreleasingUnsafePointerToUnsafePointer",
+                       {getAutoreleasingUnsafePointerInterfaceType(*this)},
                        getUnsafePointerInterfaceType(*this));
 }
 
@@ -284,11 +284,11 @@ SILDeclRef SILGenModule::getUnsafePointerToCMutablePointerFn() {
                        getCMutablePointerInterfaceType(*this));
 }
 
-SILDeclRef SILGenModule::getUnsafePointerToObjCMutablePointerFn() {
-  return getBridgingFn(UnsafePointerToObjCMutablePointerFn, *this,
-                       STDLIB_NAME, "_convertUnsafePointerToObjCMutablePointer",
+SILDeclRef SILGenModule::getUnsafePointerToAutoreleasingUnsafePointerFn() {
+  return getBridgingFn(UnsafePointerToAutoreleasingUnsafePointerFn, *this,
+                       STDLIB_NAME, "_convertUnsafePointerToAutoreleasingUnsafePointer",
                        {getUnsafePointerInterfaceType(*this)},
-                       getObjCMutablePointerInterfaceType(*this));
+                       getAutoreleasingUnsafePointerInterfaceType(*this));
 }
 
 SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {

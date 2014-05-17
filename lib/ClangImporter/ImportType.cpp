@@ -585,11 +585,11 @@ static Type importParameterPointerType(ClangImporter::Implementation &impl,
                                                 "CConstPointer", pointeeType);
 
   // Mutable pointers with __autoreleasing or __unsafe_unretained
-  // ownership map to ObjCMutablePointer<T>.
+  // ownership map to AutoreleasingUnsafePointer<T>.
   } else if (quals.getObjCLifetime() == clang::Qualifiers::OCL_Autoreleasing ||
              quals.getObjCLifetime() == clang::Qualifiers::OCL_ExplicitNone) {
     return impl.getNamedSwiftTypeSpecialization(impl.getStdlibModule(),
-                                                "ObjCMutablePointer", pointeeType);
+                                                "AutoreleasingUnsafePointer", pointeeType);
 
   // All other mutable pointers map to CMutablePointer<T>.
   } else {

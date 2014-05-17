@@ -216,8 +216,8 @@ struct UnsafePointer<T> : BidirectionalIndex, Comparable, Hashable {
     return CConstVoidPointer(_nilNativeObject, value)
   }
   @transparent @conversion
-  func __conversion() -> ObjCMutablePointer<T> {
-    return ObjCMutablePointer(value)
+  func __conversion() -> AutoreleasingUnsafePointer<T> {
+    return AutoreleasingUnsafePointer(value)
   }
 
   /// Construct from a CConstPointer.
@@ -246,14 +246,14 @@ struct UnsafePointer<T> : BidirectionalIndex, Comparable, Hashable {
     self.value = cm.value
   }
 
-  /// Construct from an ObjCMutablePointer.
+  /// Construct from an AutoreleasingUnsafePointer.
   ///
   /// This is an explicit construction
   /// because it is unsafe--UnsafePointer's store operations assume that
-  /// the pointed-to storage has strong ownership, whereas ObjCMutablePointers
+  /// the pointed-to storage has strong ownership, whereas AutoreleasingUnsafePointers
   /// reference +0 storage. Any values stored through the resulting
   /// UnsafePointer must be autoreleased.
-  init(_ op: ObjCMutablePointer<T>) {
+  init(_ op: AutoreleasingUnsafePointer<T>) {
     self.value = op.value
   }
 

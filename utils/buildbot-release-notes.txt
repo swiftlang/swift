@@ -20,8 +20,10 @@ Latest
 
   Swift arrays bridge to NSArray similarly to the way Swift
   strings bridge to NSString.
+
+* ObjCMutablePointer has been renamed AutoreleasingUnsafePointer.
     
-* UnsafePointer (and ObjCMutablePointer) "set()" and "get()"
+* UnsafePointer (and AutoreleasingUnsafePointer)'s "set()" and "get()"
   have been replaced with a property called "pointee".
   
   - Previously you would write:

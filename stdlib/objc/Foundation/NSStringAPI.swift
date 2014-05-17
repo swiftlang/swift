@@ -411,7 +411,7 @@ extension String {
   /// \brief a Helper function for the two completePathIntoString overloads below
   func _completePathIntoString(
     inout outputName: String?, caseSensitive: Bool,
-    matchesIntoArray: ObjCMutablePointer<NSArray?>, filterTypes: String[]?) -> Int {
+    matchesIntoArray: AutoreleasingUnsafePointer<NSArray?>, filterTypes: String[]?) -> Int {
 
     var nsOutputName: NSString? = .None
 

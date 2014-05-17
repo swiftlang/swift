@@ -2052,9 +2052,9 @@ bool TypeChecker::isTriviallyRepresentableInObjC(const DeclContext *DC,
         && !isUnknownObjectType(T);
     }
     
-    // An ObjCMutablePointer<T> is representable in ObjC if T
+    // An AutoreleasingUnsafePointer<T> is representable in ObjC if T
     // is a (potentially optional) ObjC pointer type.
-    if (NTD == getObjCMutablePointerDecl(DC)) {
+    if (NTD == getAutoreleasingUnsafePointerDecl(DC)) {
       T = T->castTo<BoundGenericType>()->getGenericArgs()[0];
       return isUnknownObjectOrOptionalType(T);
     }

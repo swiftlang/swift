@@ -174,7 +174,7 @@ var _nilRawPointer: Builtin.RawPointer {
 /// duration of the call.
 ///
 /// Pointers to ObjC object pointer type ``NSFoo**`` are not mapped to this
-/// type; they instead get mapped to ObjCMutablePointer<T>. ``void*`` pointers
+/// type; they instead get mapped to AutoreleasingUnsafePointer<T>. ``void*`` pointers
 /// are mapped to CMutableVoidPointer.
 struct CMutablePointer<T> : Equatable {
   let owner: AnyObject?
@@ -318,14 +318,14 @@ func == (lhs: CMutableVoidPointer, rhs: CMutableVoidPointer) -> Bool {
 ///
 /// Unlike CMutablePointer, passing pointers to mutable arrays of ObjC class
 /// pointers is not directly supported. Unlike T*,
-/// ObjCMutablePointer must reference storage that does not own a reference
+/// AutoreleasingUnsafePointer must reference storage that does not own a reference
 /// count to the referenced value. UnsafePointer's operations, by contrast,
 /// assume that the referenced storage owns values loaded from or stored to it.
 ///
 /// This type does not carry an owner pointer unlike the other C*Pointer types
 /// because it only needs to reference the results of inout conversions, which
 /// already have writeback-scoped lifetime.
-struct ObjCMutablePointer<T /* TODO : class */> : Equatable {
+struct AutoreleasingUnsafePointer<T /* TODO : class */> : Equatable {
   let value: Builtin.RawPointer
 
   @transparent
@@ -357,8 +357,8 @@ struct ObjCMutablePointer<T /* TODO : class */> : Equatable {
   @transparent
   static func __writeback_conversion(
     inout autoreleasingTemp: Builtin.RawPointer
-  ) -> ObjCMutablePointer {
-    return ObjCMutablePointer(Builtin.addressof(&autoreleasingTemp))
+  ) -> AutoreleasingUnsafePointer {
+    return AutoreleasingUnsafePointer(Builtin.addressof(&autoreleasingTemp))
   }
 
   @transparent
@@ -377,7 +377,7 @@ struct ObjCMutablePointer<T /* TODO : class */> : Equatable {
     }
     /// Set the value the pointer points to, copying over the previous value.
     ///
-    /// ObjCMutablePointers are assumed to reference a value with __autoreleasing
+    /// AutoreleasingUnsafePointers are assumed to reference a value with __autoreleasing
     /// ownership semantics, like 'NSFoo**' in ARC. This autoreleases the
     /// argument before trivially storing it to the referenced memory.    
     @transparent nonmutating set {
@@ -395,7 +395,7 @@ struct ObjCMutablePointer<T /* TODO : class */> : Equatable {
 }
 
 @transparent
-func == <T> (lhs: ObjCMutablePointer<T>, rhs: ObjCMutablePointer<T>) -> Bool {
+func == <T> (lhs: AutoreleasingUnsafePointer<T>, rhs: AutoreleasingUnsafePointer<T>) -> Bool {
   return Bool(Builtin.cmp_eq_RawPointer(lhs.value, rhs.value))
 }
 
@@ -523,8 +523,8 @@ extension _Nil {
     return CConstVoidPointer(_nilNativeObject, _nilRawPointer)
   }
   @transparent @conversion
-  func __conversion<T>() -> ObjCMutablePointer<T> {
-    return ObjCMutablePointer(_nilRawPointer)
+  func __conversion<T>() -> AutoreleasingUnsafePointer<T> {
+    return AutoreleasingUnsafePointer(_nilRawPointer)
   }
 }
 
@@ -573,7 +573,7 @@ func _convertCMutableVoidPointerToCOpaquePointer(p: CMutableVoidPointer)
 }
 
 @transparent
-func _convertObjCMutablePointerToUnsafePointer<T>(p: ObjCMutablePointer<T>)
+func _convertAutoreleasingUnsafePointerToUnsafePointer<T>(p: AutoreleasingUnsafePointer<T>)
 -> T* {
   return UnsafePointer(p.value)
 }
@@ -612,7 +612,7 @@ func _convertCOpaquePointerToCMutableVoidPointer(p: COpaquePointer)
 }
 
 @transparent
-func _convertUnsafePointerToObjCMutablePointer<T>(p: T*)
--> ObjCMutablePointer<T> {
-  return ObjCMutablePointer(p.value)
+func _convertUnsafePointerToAutoreleasingUnsafePointer<T>(p: T*)
+-> AutoreleasingUnsafePointer<T> {
+  return AutoreleasingUnsafePointer(p.value)
 }

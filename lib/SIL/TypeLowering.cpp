@@ -163,9 +163,9 @@ NominalTypeDecl *TypeConverter::getCConstPointerDecl() {
                                     "Swift", "CConstPointer");
 }
 
-NominalTypeDecl *TypeConverter::getObjCMutablePointerDecl() {
-  return getKnownNominalPointerType(ObjCMutablePointerDecl, M.getASTContext(),
-                                    "Swift", "ObjCMutablePointer");
+NominalTypeDecl *TypeConverter::getAutoreleasingUnsafePointerDecl() {
+  return getKnownNominalPointerType(AutoreleasingUnsafePointerDecl, M.getASTContext(),
+                                    "Swift", "AutoreleasingUnsafePointer");
 }
 
 CaptureKind Lowering::getDeclCaptureKind(CaptureInfo::LocalCaptureTy capture) {
@@ -2059,7 +2059,7 @@ static bool isCPointerType(TypeConverter &TC,
                            Type ty) {
   auto nom = ty->getNominalOrBoundGenericNominal();
   return nom && (nom == TC.getCMutablePointerDecl()
-    || nom == TC.getObjCMutablePointerDecl()
+    || nom == TC.getAutoreleasingUnsafePointerDecl()
     || nom == TC.getCConstPointerDecl());
 }
 

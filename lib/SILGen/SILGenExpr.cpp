@@ -4481,7 +4481,7 @@ static bool isCPointerType(SILGenFunction &gen,
   auto nom = ty->getNominalOrBoundGenericNominal();
   
   return nom == gen.SGM.Types.getCMutablePointerDecl()
-    || nom == gen.SGM.Types.getObjCMutablePointerDecl()
+    || nom == gen.SGM.Types.getAutoreleasingUnsafePointerDecl()
     || nom == gen.SGM.Types.getCConstPointerDecl();
 }
 
@@ -4522,9 +4522,9 @@ static ManagedValue emitBridgeCPointerToUnsafePointer(SILGenFunction &gen,
   else if (nativeNom == gen.SGM.Types.getCConstPointerDecl())
     cToUnsafePointer = gen.emitGlobalFunctionRef(loc,
                              gen.SGM.getCConstPointerToUnsafePointerFn());
-  else if (nativeNom == gen.SGM.Types.getObjCMutablePointerDecl())
+  else if (nativeNom == gen.SGM.Types.getAutoreleasingUnsafePointerDecl())
     cToUnsafePointer = gen.emitGlobalFunctionRef(loc,
-                             gen.SGM.getObjCMutablePointerToUnsafePointerFn());
+                             gen.SGM.getAutoreleasingUnsafePointerToUnsafePointerFn());
   else
     llvm_unreachable("unhandled C pointer type");
   
@@ -4646,9 +4646,9 @@ static ManagedValue emitBridgeUnsafePointerToCPointer(SILGenFunction &gen,
   else if (nativeNom == gen.SGM.Types.getCConstPointerDecl())
     unsafeToCPointer = gen.emitGlobalFunctionRef(loc,
                              gen.SGM.getUnsafePointerToCConstPointerFn());
-  else if (nativeNom == gen.SGM.Types.getObjCMutablePointerDecl())
+  else if (nativeNom == gen.SGM.Types.getAutoreleasingUnsafePointerDecl())
     unsafeToCPointer = gen.emitGlobalFunctionRef(loc,
-                             gen.SGM.getUnsafePointerToObjCMutablePointerFn());
+                             gen.SGM.getUnsafePointerToAutoreleasingUnsafePointerFn());
   else
     llvm_unreachable("unhandled C pointer type");
   

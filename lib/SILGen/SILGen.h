@@ -95,10 +95,10 @@ public:
   Optional<SILDeclRef> ArrayDefaultInitFn;
   Optional<SILDeclRef> CConstPointerToUnsafePointerFn;
   Optional<SILDeclRef> CMutablePointerToUnsafePointerFn;
-  Optional<SILDeclRef> ObjCMutablePointerToUnsafePointerFn;
+  Optional<SILDeclRef> AutoreleasingUnsafePointerToUnsafePointerFn;
   Optional<SILDeclRef> UnsafePointerToCConstPointerFn;
   Optional<SILDeclRef> UnsafePointerToCMutablePointerFn;
-  Optional<SILDeclRef> UnsafePointerToObjCMutablePointerFn;
+  Optional<SILDeclRef> UnsafePointerToAutoreleasingUnsafePointerFn;
   Optional<SILDeclRef> ConvertArraySimpleFn;
   
 public:
@@ -267,12 +267,12 @@ public:
   SILDeclRef getNSDictionaryToDictionaryFn();
   SILDeclRef getBoolToObjCBoolFn();
   SILDeclRef getObjCBoolToBoolFn();
-  SILDeclRef getObjCMutablePointerToUnsafePointerFn();
+  SILDeclRef getAutoreleasingUnsafePointerToUnsafePointerFn();
   SILDeclRef getCMutablePointerToUnsafePointerFn();
   SILDeclRef getCConstPointerToUnsafePointerFn();
   SILDeclRef getCMutableVoidPointerToCOpaquePointerFn();
   SILDeclRef getCConstVoidPointerToCOpaquePointerFn();
-  SILDeclRef getUnsafePointerToObjCMutablePointerFn();
+  SILDeclRef getUnsafePointerToAutoreleasingUnsafePointerFn();
   SILDeclRef getUnsafePointerToCMutablePointerFn();
   SILDeclRef getUnsafePointerToCConstPointerFn();
   SILDeclRef getCOpaquePointerToCMutableVoidPointerFn();
