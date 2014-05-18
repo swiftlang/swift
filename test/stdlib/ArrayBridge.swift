@@ -74,16 +74,12 @@ class BridgedObjC : Base, Printable {
 }
 
 struct BridgedSwift : Printable, _BridgedToObjectiveC {
-  var value: Int 
-
-  init(_ value: Int) { self.value = value }
-
   static func getObjectiveCType() -> Any.Type {
     return BridgedObjC.self
   }
   
   func bridgeToObjectiveC() -> BridgedObjC {
-    return BridgedObjC(value)
+    return BridgedObjC(trak.value)
   }
 
   static func bridgeFromObjectiveC(x: BridgedObjC) -> BridgedSwift? {
@@ -91,8 +87,19 @@ struct BridgedSwift : Printable, _BridgedToObjectiveC {
   }
   
   var description: String {
-    return "BridgedSwift(\(value))"
+    assert(trak.serialNumber > 0, "dead Tracked!")
+    return "BridgedSwift#\(trak.serialNumber)(\(trak.value))"
   }
+
+  init(_ value: Int) {
+    self.trak = Tracked(value)
+  }
+  
+  func succ() -> BridgedSwift {
+    return BridgedSwift(trak.value.succ())
+  }
+
+  var trak: Tracked
 }
 
 
@@ -194,13 +201,32 @@ func testExplicitlyBridged() {
 
   let bridgedSwifts = [BridgedSwift(42), BridgedSwift(17)]
 
-  // Convert to NSArray
-  let bridgedSwiftsConvertedToNSArray: NSArray = bridgedSwifts
-  // CHECK-NEXT: BridgedObjC#[[ID0:[0-9]+]](42)
-  println(bridgedSwiftsConvertedToNSArray.objectAtIndex(0) as Base)
-  // CHECK-NEXT: BridgedObjC#[[ID1:[0-9]+]](17)
-  println(bridgedSwiftsConvertedToNSArray.objectAtIndex(1) as Base)
+  if true { // Doug's tests.  Redundant now?
+    // Convert to NSArray
+    let bridgedSwiftsConvertedToNSArray: NSArray = bridgedSwifts
+    // CHECK-NEXT: BridgedObjC#[[ID0:[0-9]+]](42)
+    println(bridgedSwiftsConvertedToNSArray.objectAtIndex(0) as Base)
+    // CHECK-NEXT: BridgedObjC#[[ID1:[0-9]+]](17)
+    println(bridgedSwiftsConvertedToNSArray.objectAtIndex(1) as Base)
+  }
+  
+  let bridgedSwiftsAsNSArray: NSArray = bridgedSwifts
+  
+  // CHECK-NEXT: {{BridgedObjC#[0-9]+\(42\)}}
+  println(bridgedSwiftsAsNSArray.objectAtIndex(0) as Base)
 
+  // Make sure we can bridge back.  The result will use one of
+  // ContiguousArrayBuffer's
+  let roundTripBridgedSwifts
+    = BridgedSwift[].bridgeFromObjectiveC(bridgedSwiftsAsNSArray)
+
+  // Make a real Cocoa NSArray of these...
+  let cocoaBridgedSwifts = NSArray(objects: bridgedSwiftsAsNSArray)
+
+  // ...and bridge *that* back
+  let bridgedBackSwifts
+    = BridgedSwift[].bridgeFromObjectiveC(cocoaBridgedSwifts)
+  
   // all: verbatim,  not, and doesn't bridge
   // implicit conversions to/from NSArray 
   // Base[] -> Derived[] and Derived[] -> Base[] where Base can be AnyObject
@@ -213,6 +239,7 @@ func testExplicitlyBridged() {
   // CHECK-NEXT: BridgedObjC#[[ID1:[0-9]+]](17)
   println(bridgedSwiftsAsAnyObjects[1])
 }
+testExplicitlyBridged()
 
 testExplicitlyBridged()
 
@@ -227,6 +254,7 @@ let x: NSArray = arrayAsID(bases)!
 
 println(x.objectAtIndex(0) as Base)
 */
+
 
 
 // CHECK-NEXT: done.
