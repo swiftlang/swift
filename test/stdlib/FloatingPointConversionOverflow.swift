@@ -41,10 +41,10 @@ import Darwin
 // Interpret the command line arguments.
 let arg = Process.arguments[1]
 
-let pd = +Double.inf()
-let nd = -Double.inf()
-let pf = +Float.inf()
-let nf = -Float.inf()
+let pd = +Double.infinite()
+let nd = -Double.infinite()
+let pf = +Float.infinite()
+let nf = -Float.infinite()
 
 println("GOOD") // CHECK: GOOD
 

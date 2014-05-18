@@ -53,7 +53,7 @@ protocol FloatingPointNumber {
   // FIXME: make these readonly static properties.
 
   /// Returns positive infinity.
-  class func inf() -> Self
+  class func infinite() -> Self
 
   /// Returns a quiet NaN.
   class func NaN() -> Self

@@ -213,8 +213,8 @@ test_IntegerPrinting()
 // CHECK: test_IntegerPrinting done
 
 func test_FloatingPointPrinting() {
-  printedIs(Float.inf(), "inf")
-  printedIs(-Float.inf(), "-inf")
+  printedIs(Float.infinite(), "inf")
+  printedIs(-Float.infinite(), "-inf")
   printedIs(Float.NaN(), "nan")
   printedIs(Float(0.0), "0.0")
   printedIs(Float(1.0), "1.0")
@@ -222,8 +222,8 @@ func test_FloatingPointPrinting() {
   printedIs(Float(100.125), "100.125")
   printedIs(Float(-100.125), "-100.125")
 
-  printedIs(Double.inf(), "inf")
-  printedIs(-Double.inf(), "-inf")
+  printedIs(Double.infinite(), "inf")
+  printedIs(-Double.infinite(), "-inf")
   printedIs(Double.NaN(), "nan")
   printedIs(Double(0.0), "0.0")
   printedIs(Double(1.0), "1.0")
