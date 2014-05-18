@@ -166,15 +166,12 @@ if let str = objOpt as String {
   println("Downcast correctly failed due to nil")
 }
 
-#if false
-// <rdar://problem/16953860> Implicitly unwrapped optionals in casts are being forced rather than bound
-// FIXME-NEXT: Downcast correctly failed due to nil
+// CHECK-NEXT: Downcast correctly failed due to nil
 objImplicitOpt = nil
 if let str = objImplicitOpt as String {
   println("Downcast should not succeed for nil")
 } else {
   println("Downcast correctly failed due to nil")
 }
-#endif
 
 println("ok")  // CHECK: ok

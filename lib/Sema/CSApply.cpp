@@ -2357,15 +2357,6 @@ namespace {
       // The subexpression is always an rvalue.
       auto &tc = cs.getTypeChecker();
       auto sub = tc.coerceToRValue(expr->getSubExpr());
-      
-      if (auto base = cs.lookThroughImplicitlyUnwrappedOptionalType(
-                                                              sub->getType())) {
-        if (!isOptionalType(toType)) {
-          auto locator = cs.getConstraintLocator(sub);
-          sub = coerceImplicitlyUnwrappedOptionalToValue(sub, base, locator);
-        }
-      }
-      
       if (!sub)
         return nullptr;
       expr->setSubExpr(sub);
