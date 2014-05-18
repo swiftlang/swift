@@ -1050,6 +1050,7 @@ public:
   }
 
   void addTypeAnnotation(CodeCompletionResultBuilder &Builder, Type T) {
+    T = T->getReferenceStorageReferent();
     if (T->isVoid())
       Builder.addTypeAnnotation("Void");
     else
