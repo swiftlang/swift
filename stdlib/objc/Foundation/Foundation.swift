@@ -700,7 +700,7 @@ func _convertDictionaryToNSDictionary<KeyType, ValueType>(
     let result = NSMutableDictionary(capacity: nativeStorage.count)
     let endIndex = nativeStorage.endIndex
     for var i = nativeStorage.startIndex; i != endIndex; ++i {
-      let (key, value) = nativeStorage.assertingGet(i)
+      let (key, value) = nativeStorage._assertingGet(i)
       var bridgedKey: AnyObject
       if _fastPath(isKeyBridgedVerbatim) {
         // Avoid calling the runtime.
