@@ -749,7 +749,7 @@ func _arrayBridgeToObjectiveC<BridgesToDerived, Base>(
   var p = buf._unsafeElementStorage
   for value in source {
     let bridged: AnyObject? = bridgeToObjectiveC(value)
-    _precondition(bridged, "array element can be bridged to Objective-C")
+    _precondition(bridged, "array element cannot be bridged to Objective-C")
     p++.initialize(reinterpretCast(bridged!))
   }
   return Array(ArrayBuffer(buf))
