@@ -623,6 +623,46 @@ extension Array : _ConditionallyBridgedToObjectiveC {
   }
 }
 
+// ** Currently used to implement
+// ** Array<T>.bridgeFromObjectiveC(x: NSArray) -> Array<T>?
+func _arrayBridgedDownCast<T>(a: AnyObject[]) -> T[]? {
+  // If T is not bridged, conversion fails in O(1), yielding nil
+  if !isBridgedToObjectiveC(T.self) {
+    return nil
+  }
+
+  // If the NSArray was originally created as a Swift ArrayType<U>,
+  // conversion succeeds in O(1) if U is T or a subclass thereof. No
+  // further dynamic type checks are required.
+  if let r = _arrayCheckedDownCast(a) as T[]? {
+    return r
+  }
+  
+  // Otherwise, if T is a class or existential type, conversion
+  // succeeds in O(1), but type-checking of elements is deferred and
+  // on-demand. The result of subscripting is the result of bridging
+  // back the corresponding stored NSArray element to T. Failure to
+  // bridge back is a fatal error detected at runtime.
+  if _isClassOrObjCExistential(T.self) {
+    return Array(a.buffer.castToBufferOf(T.self))
+  }
+
+  // Otherwise, conversion is O(N), and succeeds iff every element
+  // bridges back to T
+  let n = ContiguousArrayBuffer<T>(count: a.count, minimumCapacity: 0)
+  for (i, srcElement: AnyObject) in enumerate(a) {
+    if let dstElement = bridgeFromObjectiveC(srcElement, T.self) {
+      (n._unsafeElementStorage + i).initialize(dstElement)
+    }
+    else {
+      n.count = 0
+      return nil
+    }
+  }
+  
+  return Array(ArrayBuffer(n))
+}
+
 extension NSArray : Reflectable {
   func getMirror() -> Mirror {
     return reflect(self as AnyObject[])
