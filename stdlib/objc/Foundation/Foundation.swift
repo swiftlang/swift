@@ -559,33 +559,17 @@ extension NSArray : ArrayLiteralConvertible {
 /// is referred to as a "forced conversion" in ../../../docs/Arrays.rst
 func _convertNSArrayToArray<T>(source: NSArray) -> T[] {
   if _fastPath(isBridgedVerbatimToObjectiveC(T.self)) {
-    // Forced down-cast
+    // Forced down-cast (possible deferred type-checking)
     return Array(ArrayBuffer(reinterpretCast(source) as CocoaArray))
   }
   else {
-    // Forced bridge back
-
-    /* FIXME: blocked by <rdar://problem/16951124>
-    return Array<T>(
-      _Map(source) {
-        (object: AnyObject)->T 
-      in
-        let r = bridgeFromObjectiveC(object, T.self)
-        _precondition(
-          r, "NSArray element failed to bridge to Array element type")
-        return r!
-      }
-    )
-    */
-    var buf = ContiguousArrayBuffer<T>(count: source.count, minimumCapacity: 0)
-    var p = buf._unsafeElementStorage
-    for object: AnyObject in source {
-      let value = bridgeFromObjectiveC(object, T.self)
-      _precondition(
-        value, "NSArray element failed to bridge to Array element type")
-      p++.initialize(value!)
+    let result = T[]._bridgeFromObjectiveCImpl(source)
+    if _fastPath(result) {
+      return result!
     }
-    return Array(ArrayBuffer(buf))
+    
+    _preconditionFailure(
+      "NSArray element failed to bridge to Array element type")
   }
 }
 
@@ -613,54 +597,47 @@ extension Array : _ConditionallyBridgedToObjectiveC {
     return reinterpretCast(self.buffer.asCocoaArray())
   }
 
-  static func bridgeFromObjectiveC(x: NSArray) -> Array<T>? {
-    let anyArr = AnyObject[](ArrayBuffer(reinterpretCast(x) as CocoaArray))
-    return _arrayBridgedDownCast(anyArr)
+  static func bridgeFromObjectiveC(source: NSArray) -> Array? {
+    // This is used for checked casts, so avoid allocating a buffer if
+    // we could statically know we're going to fail
+    if !Swift.isBridgedToObjectiveC(T.self) {
+      return nil
+    }
+    return _bridgeFromObjectiveCImpl(source)
+  }
+
+  /// The guts of bridgeFromObjectiveC; also used by forced conversion
+  /// (_convertNSArrayToArray).
+  static func _bridgeFromObjectiveCImpl(source: NSArray) -> Array? {
+    // FIXME: as an optimization we could look to see if the NSArray
+    // already wraps an appropriate ContiguousArrayBuffer
+    
+    var buf = ContiguousArrayBuffer<T>(
+      count: source.count, minimumCapacity: 0)
+    var p = buf._unsafeElementStorage
+    
+    ElementwiseBridging: do {
+      for object: AnyObject in source {
+        let value = Swift.bridgeFromObjectiveC(object, T.self)
+        if _slowPath(!value) {
+          break ElementwiseBridging
+        }
+        p++.initialize(value!)
+      }
+      return Array(ArrayBuffer(buf))
+    }
+    while false
+    
+    // Don't destroy anything we never created.
+    buf.count = p - buf._unsafeElementStorage
+    
+    // Report failure
+    return nil
   }
 
   @conversion func __conversion() -> NSArray {
     return self.bridgeToObjectiveC()
   }
-}
-
-// ** Currently used to implement
-// ** Array<T>.bridgeFromObjectiveC(x: NSArray) -> Array<T>?
-func _arrayBridgedDownCast<T>(a: AnyObject[]) -> T[]? {
-  // If T is not bridged, conversion fails in O(1), yielding nil
-  if !isBridgedToObjectiveC(T.self) {
-    return nil
-  }
-
-  // If the NSArray was originally created as a Swift ArrayType<U>,
-  // conversion succeeds in O(1) if U is T or a subclass thereof. No
-  // further dynamic type checks are required.
-  if let r = _arrayCheckedDownCast(a) as T[]? {
-    return r
-  }
-  
-  // Otherwise, if T is a class or existential type, conversion
-  // succeeds in O(1), but type-checking of elements is deferred and
-  // on-demand. The result of subscripting is the result of bridging
-  // back the corresponding stored NSArray element to T. Failure to
-  // bridge back is a fatal error detected at runtime.
-  if _isClassOrObjCExistential(T.self) {
-    return Array(a.buffer.castToBufferOf(T.self))
-  }
-
-  // Otherwise, conversion is O(N), and succeeds iff every element
-  // bridges back to T
-  let n = ContiguousArrayBuffer<T>(count: a.count, minimumCapacity: 0)
-  for (i, srcElement: AnyObject) in enumerate(a) {
-    if let dstElement = bridgeFromObjectiveC(srcElement, T.self) {
-      (n._unsafeElementStorage + i).initialize(dstElement)
-    }
-    else {
-      n.count = 0
-      return nil
-    }
-  }
-  
-  return Array(ArrayBuffer(n))
 }
 
 extension NSArray : Reflectable {

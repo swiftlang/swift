@@ -211,21 +211,24 @@ func testExplicitlyBridged() {
   }
   
   let bridgedSwiftsAsNSArray: NSArray = bridgedSwifts
-  
-  // CHECK-NEXT: {{BridgedObjC#[0-9]+\(42\)}}
-  println(bridgedSwiftsAsNSArray.objectAtIndex(0) as Base)
+  // CHECK-NEXT: [BridgedObjC#{{[0-9]+}}(42), BridgedObjC#{{[0-9]+}}(17)]
+  println("bridgedSwiftsAsNSArray = \(bridgedSwiftsAsNSArray as AnyObject[]))")
 
-  // Make sure we can bridge back.  The result will use one of
-  // ContiguousArrayBuffer's
-  let roundTripBridgedSwifts
-    = BridgedSwift[].bridgeFromObjectiveC(bridgedSwiftsAsNSArray)
+  // Make sure we can bridge back.
+  let roundTripBridgedSwifts = BridgedSwift[].bridgeFromObjectiveC(bridgedSwiftsAsNSArray)!
+  // CHECK-NEXT-NOT: [BridgedSwift#[[id00]](42), BridgedSwift#[[id01]](17)]
+  // CHECK-NEXT: [BridgedSwift#[[id10:[0-9]+]](42), BridgedSwift#[[id11:[0-9]+]](17)]
+  println("roundTripBridgedSwifts = \(roundTripBridgedSwifts))")
 
   // Make a real Cocoa NSArray of these...
-  let cocoaBridgedSwifts = NSArray(objects: bridgedSwiftsAsNSArray)
+  let cocoaBridgedSwifts = NSArray(array: bridgedSwiftsAsNSArray)
 
   // ...and bridge *that* back
-  let bridgedBackSwifts
-    = BridgedSwift[].bridgeFromObjectiveC(cocoaBridgedSwifts)
+  let bridgedBackSwifts = BridgedSwift[].bridgeFromObjectiveC(cocoaBridgedSwifts)!
+  // CHECK-NEXT-NOT: [BridgedSwift#[[id00]](42), BridgedSwift#[[id01]](17)]
+  // CHECK-NEXT-NOT: [BridgedSwift#[[id10]](42), BridgedSwift#[[id11]](17)]
+  // CHECK-NEXT: [BridgedSwift#{{[0-9]+}}(42), BridgedSwift#{{[0-9]+}}(17)]
+  println("bridgedBackSwifts      = \(bridgedBackSwifts)")
   
   // all: verbatim,  not, and doesn't bridge
   // implicit conversions to/from NSArray 
@@ -239,8 +242,6 @@ func testExplicitlyBridged() {
   // CHECK-NEXT: BridgedObjC#[[ID1:[0-9]+]](17)
   println(bridgedSwiftsAsAnyObjects[1])
 }
-testExplicitlyBridged()
-
 testExplicitlyBridged()
 
 //===--- Non-bridging -----------------------------------------------------===//
