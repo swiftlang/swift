@@ -37,7 +37,7 @@ protocol ArrayType
 
   /// If the elements are stored contiguously, a pointer to the first
   /// element. Otherwise, nil.
-  var elementStorage: UnsafePointer<Element> {get}
+  var _elementStorageIfContiguous: UnsafePointer<Element> {get}
 
   subscript(index: Int) -> Self.GeneratorType.Element {get nonmutating set}
   

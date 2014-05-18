@@ -250,21 +250,27 @@ func additionalUtf16Tests() {
   var u8: UTF8.CodeUnit[] = [ 0, 1, 2, 3, 4, 5 ]
   var u16: UTF16.CodeUnit[] = [ 6, 7, 8, 9, 10, 11 ]
 
-  // CHECK-NEXT: [ 0, 1, 2, 9, 10, 11 ]
-  UTF16.copy(u8.elementStorage, destination: u16.elementStorage, count: 3)
-  println(u16)
-  
-  // CHECK-NEXT: [ 9, 10, 11, 3, 4, 5 ]
-  UTF16.copy(u16.elementStorage + 3, destination: u8.elementStorage, count: 3)
-  println(u8)
+  u16.withUnsafePointerToElements {
+    (p16)->() in
+    u8.withUnsafePointerToElements {
+      (p8)->() in
+      // CHECK-NEXT: [ 0, 1, 2, 9, 10, 11 ]
+      UTF16.copy(p8, destination: p16, count: 3)
+      println(u16)
 
-  // CHECK-NEXT: [ 0, 1, 2, 0, 1, 2 ]
-  UTF16.copy(u16.elementStorage, destination: u16.elementStorage + 3, count: 3)
-  println(u16)
-  
-  // CHECK-NEXT: [ 9, 10, 11, 9, 10, 11 ]
-  UTF16.copy(u8.elementStorage, destination: u8.elementStorage + 3, count: 3)
-  println(u8)
+      // CHECK-NEXT: [ 9, 10, 11, 3, 4, 5 ]
+      UTF16.copy(p16 + 3, destination: p8, count: 3)
+      println(u8)
+
+      // CHECK-NEXT: [ 0, 1, 2, 0, 1, 2 ]
+      UTF16.copy(p16, destination: p16 + 3, count: 3)
+      println(u16)
+      
+      // CHECK-NEXT: [ 9, 10, 11, 9, 10, 11 ]
+      UTF16.copy(p8, destination: p8 + 3, count: 3)
+      println(u8)
+    }
+  }
 
   let (count0, isASCII0) = UTF16.measure(UTF8.self, input: u8.generate())
   // CHECK-NEXT: 6 / true

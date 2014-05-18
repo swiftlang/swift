@@ -56,6 +56,10 @@ protocol ArrayBufferType : MutableCollection {
   /// from this buffer.
   subscript(subRange: Range<Int>) -> SliceBuffer<Element> {get}
 
+  /// Call body(p), where p is a pointer to the underlying contiguous storage
+  /// Requires: such contiguous storage exists or the buffer is empty
+  func withUnsafePointerToElements<R>(body: (UnsafePointer<Element>)->R) -> R
+  
   /// How many elements the buffer stores
   var count: Int {get set}
 

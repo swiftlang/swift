@@ -225,7 +225,7 @@ struct CMutablePointer<T> : Equatable {
   /// Conversion from an inout array.
   @transparent
   static func __inout_conversion(inout a: Array<T>) -> CMutablePointer {
-    _debugPrecondition(a.elementStorage != nil || a.count == 0)
+    _debugPrecondition(a._elementStorageIfContiguous != nil || a.count == 0)
 
     // TODO: Putting a canary at the end of the array in checked builds might
     // be a good idea
@@ -233,7 +233,9 @@ struct CMutablePointer<T> : Equatable {
     // The callee that receives the pointer may mutate through it, so
     // force uniqueness by calling reserve(0).
     a.reserveCapacity(0)
-    return CMutablePointer(owner: a._owner, value: a.elementStorage.value)
+    return CMutablePointer(
+      owner: a._owner,
+      value: a._elementStorageIfContiguous.value)
   }
 
   /// True if this is a scoped pointer, meaning it has a owner reference
@@ -305,7 +307,7 @@ struct CMutableVoidPointer : Equatable {
   @transparent
   static func __inout_conversion<T>(inout a: Array<T>)
   -> CMutableVoidPointer {
-    _debugPrecondition(a.elementStorage != nil || a.count == 0)
+    _debugPrecondition(a._elementStorageIfContiguous != nil || a.count == 0)
 
     // TODO: Putting a canary at the end of the array in checked builds might
     // be a good idea.
@@ -314,7 +316,7 @@ struct CMutableVoidPointer : Equatable {
     // force uniqueness by calling reserve(0).
     a.reserveCapacity(0)
     return CMutableVoidPointer(owner: a._owner,
-                               value: a.elementStorage.value)
+                               value: a._elementStorageIfContiguous.value)
   }
 
   /// True if this is a scoped pointer, meaning it has a owner reference

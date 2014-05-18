@@ -845,8 +845,10 @@ class NSFastGenerator : Generator {
 
   func refresh() {
     n = 0
-    count = enumerable.countByEnumeratingWithState(state.elementStorage,
-      objects: UnsafePointer<AnyObject?>(objects.elementStorage),
+    count = enumerable.countByEnumeratingWithState(
+      state._elementStorageIfContiguous,
+      objects: UnsafePointer<AnyObject?>(
+        objects._elementStorageIfContiguous),
       count: STACK_BUF_SIZE)
   }
 

@@ -1218,7 +1218,7 @@ class ParallelArrayDictionary : NSDictionary {
     var theState = stateUP.memory
     if theState.state == 0 {
       theState.state = 1
-      theState.itemsPtr = UnsafePointer(keys.elementStorage)
+      theState.itemsPtr = UnsafePointer(keys._elementStorageIfContiguous)
       stateUP.memory = theState
       return 4
     }

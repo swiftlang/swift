@@ -332,6 +332,18 @@ extension ArrayBuffer {
     }
   }
 
+  /// Call body(p), where p is a pointer to the underlying contiguous storage
+  /// Requires: such contiguous storage exists or the buffer is empty
+  func withUnsafePointerToElements<R>(body: (UnsafePointer<T>)->R) -> R {
+    _precondition(
+      elementStorage != nil || count == 0,
+      "Array is bridging an opaque NSArray; can't get a pointer to the elements"
+    )
+    let ret = body(elementStorage)
+    _fixLifetime(self)
+    return ret
+  }
+  
   /// An object that keeps the elements stored in this buffer alive
   var owner: AnyObject? {
     return _fastPath(_isNative) ? _native.storage : _nonNative!

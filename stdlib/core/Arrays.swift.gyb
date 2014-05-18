@@ -128,10 +128,15 @@ extension ${Self} : ArrayType {
   
   /// If the elements are stored contiguously, a pointer to the first
   /// element. Otherwise, nil.
-  var elementStorage: UnsafePointer<Element> {
+  var _elementStorageIfContiguous: UnsafePointer<Element> {
     return buffer.elementStorage
   }
-  
+
+%if Self != 'Array': # // Array does not necessarily have contiguous storage
+  var _elementStorage: UnsafePointer<Element> {
+    return buffer.elementStorage
+  }
+%end
   //===--- basic mutations ------------------------------------------------===//
 
 
@@ -264,7 +269,7 @@ extension ${Self} : Printable, DebugPrintable {
 extension ${Self} {
   @transparent
   func _cPointerArgs() -> (AnyObject?, Builtin.RawPointer) {
-    let p = elementStorage
+    let p = _elementStorageIfContiguous
     if _fastPath(p != nil || count == 0) {
       return (_owner, p.value)
     }
@@ -284,13 +289,15 @@ extension ${Self} {
   }
 }
 
-%if Self != 'Array': # // Array does not necessarily have contiguous storage
 extension ${Self} {
+  /// Call body(p), where p is a pointer to the ${Self}'s contiguous storage
+%if Self != 'Array':
+  /// Requires: the Array's storage is not provided by an opaque NSArray
+%end
   func withUnsafePointerToElements<R>(body: (UnsafePointer<T>)->R) -> R {
     return buffer.withUnsafePointerToElements(body)
   }
 }
-%end
 
 %end
 

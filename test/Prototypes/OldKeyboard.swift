@@ -18,8 +18,11 @@
   init() {  }
 
   func read(inout buf: UInt8[]) -> Int {
-    buf.reserveCapacity(0) // ensure uniqueness before we allow buf to be modified
-    var r = posix_read(0, buf.elementStorage.value, buf.count)
+    // ensure uniqueness before we allow buf to be modified
+    buf.reserveCapacity(0) 
+    var r = buf.withUnsafePointerToElements {
+      posix_read(0, $0.value, buf.count)
+    }
     if r < 0 {
       _preconditionFailure("read failed")
     }
