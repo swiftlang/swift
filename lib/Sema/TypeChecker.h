@@ -610,6 +610,11 @@ public:
   /// \param convertType The type that the expression is being converted to,
   /// or null if the expression is standalone.
   ///
+  /// \param contextualType Contextual type information that can be applied to
+  /// the expression. (This is distinct from convertType in that while it can
+  /// inform the type of the expression, it won't result in a conversion
+  /// constraint being applied to the expression.)
+  ///
   /// \param discardedExpr True if the result of this expression will be
   /// discarded.
   ///
