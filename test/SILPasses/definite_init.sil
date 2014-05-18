@@ -166,6 +166,7 @@ bb0:
 class SomeClass {}
 
 sil @getSomeClass : $@thin () -> @owned SomeClass
+sil @getSomeOptionalClass : $@thin () -> Optional<SomeClass>
 
 
 // CHECK-LABEL: sil @assign_test_trivial
@@ -252,32 +253,32 @@ bb0:
   // Assignments of weak pointer.  The first becomes an initialize, and the
   // second becomes an assignment.
 
-  %b = alloc_box $@sil_weak SomeClass
-  %c = mark_uninitialized [var] %b#1 : $*@sil_weak SomeClass // expected-note {{variable defined here}}
+  %b = alloc_box $@sil_weak Optional<SomeClass>
+  %c = mark_uninitialized [var] %b#1 : $*@sil_weak Optional<SomeClass> // expected-note {{variable defined here}}
 
   // Invalid load to keep the alloc_box around so we can check init semantics.
-  load %c : $*@sil_weak SomeClass    // expected-error {{used before being initialized}}
+  load %c : $*@sil_weak Optional<SomeClass>    // expected-error {{used before being initialized}}
 
-  %f = function_ref @getSomeClass : $@thin () -> @owned SomeClass
+  %f = function_ref @getSomeOptionalClass : $@thin () -> Optional<SomeClass>
 
-  %4 = apply %f() : $@thin () -> @owned SomeClass
+  %4 = apply %f() : $@thin () -> Optional<SomeClass>
   // CHECK: [[C1:%[0-9]+]] = apply
 
   // This should become an initialization.
-  store_weak %4 to %c : $*@sil_weak SomeClass
+  store_weak %4 to %c : $*@sil_weak Optional<SomeClass>
   // CHECK-NEXT: store_weak [[C1]] to [initialization] %0#1
 
-  strong_release %4 : $SomeClass
-  // CHECK-NEXT: release [[C1]]
+  release_value %4 : $Optional<SomeClass>
+  // CHECK-NEXT: release_value [[C1]]
 
-  %8 = apply %f() : $@thin () -> @owned SomeClass
+  %8 = apply %f() : $@thin () -> Optional<SomeClass>
   // CHECK-NEXT: [[C2:%[0-9]+]] = apply
 
-  store_weak %8 to %c : $*@sil_weak SomeClass
+  store_weak %8 to %c : $*@sil_weak Optional<SomeClass>
   // CHECK-NEXT: store_weak [[C2]] to %0#1
 
-  strong_release %8 : $SomeClass
-  // CHECK-NEXT: release [[C2]]
+  release_value %8 : $Optional<SomeClass>
+  // CHECK-NEXT: release_value [[C2]]
 
   strong_release %b#0 : $Builtin.NativeObject
 

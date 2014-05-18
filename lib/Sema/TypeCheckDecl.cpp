@@ -1017,7 +1017,7 @@ static bool isDefaultInitializable(PatternBindingDecl *pbd) {
 /// Build a default initializer for the given type.
 static Expr *buildDefaultInitializer(TypeChecker &tc, Type type) {
   // Default-initialize optional types and weak values to 'nil'.
-  if (type->getAnyOptionalObjectType() || type->is<WeakStorageType>()) {
+  if (type->getReferenceStorageReferent()->getAnyOptionalObjectType()) {
     auto nilDecl = tc.Context.getNilDecl();
     return new (tc.Context) DeclRefExpr(nilDecl, SourceLoc(), /*implicit=*/true,
                                         /*direct access=*/false,

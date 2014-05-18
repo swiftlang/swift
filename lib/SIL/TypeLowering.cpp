@@ -2155,9 +2155,6 @@ SILType TypeConverter::getSubstitutedStorageType(ValueDecl *value,
   // The only really significant manipulation there is with @weak and
   // @unowned.
   if (auto refType = dyn_cast<ReferenceStorageType>(origType)) {
-    // Strip Optional<> off of @weak types.
-    if (isa<WeakStorageType>(refType))
-      substType = cast<BoundGenericType>(substType).getGenericArgs()[0];
     substType = CanType(ReferenceStorageType::get(substType,
                                                   refType->getOwnership(),
                                                   Context));

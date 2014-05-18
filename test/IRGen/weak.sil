@@ -28,63 +28,69 @@ struct A {
 // stride 8
 // CHECK: @_TWVV4weak1A = {{.*}} i8* inttoptr (i64 8 to i8*), i8* inttoptr (i64 458759 to i8*), i8* inttoptr (i64 8 to i8*)]
 
-sil @test_weak_load_store : $@thin (@inout A, C) -> () {
-bb0(%0 : $*A, %1 : $C):
+sil @test_weak_load_store : $@thin (@inout A, Optional<C>) -> () {
+bb0(%0 : $*A, %1 : $Optional<C>):
   %2 = struct_element_addr %0 : $*A, #A.x
-  %3 = load_weak %2 : $*@sil_weak C
-  store_weak %1 to %2 : $*@sil_weak C
-  strong_release %3 : $C
+  %3 = load_weak %2 : $*@sil_weak Optional<C>
+  store_weak %1 to %2 : $*@sil_weak Optional<C>
+  release_value %3 : $Optional<C>
   %4 = tuple ()
   return %4 : $()
 }
-// CHECK:    define void @test_weak_load_store([[A]]* noalias, [[C]]*) {
+// CHECK:    define void @test_weak_load_store([[A]]* noalias, i64) {
 // CHECK:      [[X:%.*]] = getelementptr inbounds [[A]]* %0, i32 0, i32 0
 // CHECK-NEXT: [[T0:%.*]] = call [[C]]* bitcast ([[REF]]* ([[WEAK]]*)* @swift_weakLoadStrong to [[C]]* ([[WEAK]]*)*)([[WEAK]]* [[X]])
-// CHECK-NEXT: call void bitcast (void ([[WEAK]]*, [[REF]]*)* @swift_weakAssign to void ([[WEAK]]*, [[C]]*)*)([[WEAK]]* [[X]], [[C]]* %1)
-// CHECK-NEXT: call void bitcast (void ([[REF]]*)* @swift_release to void ([[C]]*)*)([[C]]* [[T0]])
+// CHECK-NEXT: %3 = ptrtoint  %C4weak1C* %2 to i64
+// CHECK-NEXT: %4 = inttoptr
+// CHECK-NEXT: call void bitcast (void ([[WEAK]]*, [[REF]]*)* @swift_weakAssign to void ([[WEAK]]*, [[C]]*)*)([[WEAK]]* [[X]], [[C]]* %4)
+// CHECK-NEXT: %5 = inttoptr i64 %3 to %swift.refcounted*
+// CHECK-NEXT: call void @swift_release([[REF]]* %5)
 // CHECK-NEXT: ret void
 
 struct B {
   weak var x : P?
 }
 
-sil @test_weak_load_store_proto : $@thin (@inout B, P) -> () {
-bb0(%0 : $*B, %1 : $P):
+sil @test_weak_load_store_proto : $@thin (@inout B, Optional<P>) -> () {
+bb0(%0 : $*B, %1 : $Optional<P>):
   %2 = struct_element_addr %0 : $*B, #B.x
-  %3 = load_weak %2 : $*@sil_weak P
-  store_weak %1 to %2 : $*@sil_weak P
-  strong_release %3 : $P
+  %3 = load_weak %2 : $*@sil_weak Optional<P>
+  store_weak %1 to %2 : $*@sil_weak Optional<P>
+  release_value %3 : $Optional<P>
   %4 = tuple ()
   return %4 : $()
 }
-// CHECK:    define void @test_weak_load_store_proto([[B]]* noalias, [[UNKNOWN]]*, i8**)
+// CHECK:    define void @test_weak_load_store_proto([[B]]* noalias, i128)
 // CHECK:      [[X:%.*]] = getelementptr inbounds [[B]]* %0, i32 0, i32 0
 // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds { [[WEAK]], i8** }* [[X]], i32 0, i32 0
 // CHECK-NEXT: [[T1:%.*]] = call [[UNKNOWN]]* @swift_unknownWeakLoadStrong([[WEAK]]* [[T0]])
 // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds { [[WEAK]], i8** }* [[X]], i32 0, i32 1
 // CHECK-NEXT: [[W:%.*]] = load i8*** [[T0]], align 8
+// CHECK: [[TMPOBJ:%.*]] = inttoptr {{.*}} to %objc_object*
+// CHECK: [[TMPTAB:%.*]] = inttoptr {{.*}} to i8**
 // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds { [[WEAK]], i8** }* [[X]], i32 0, i32 1
-// CHECK-NEXT: store i8** %2, i8*** [[T0]], align 8
+// CHECK-NEXT: store i8** [[TMPTAB]], i8*** [[T0]], align 8
 // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds { [[WEAK]], i8** }* [[X]], i32 0, i32 0
-// CHECK-NEXT: call void @swift_unknownWeakAssign([[WEAK]]* [[T0]], [[UNKNOWN]]* %1)
-// CHECK-NEXT: call void @objc_release([[UNKNOWN]]* [[T1]])
-// CHECK-NEXT: ret void
+// CHECK-NEXT: call void @swift_unknownWeakAssign([[WEAK]]* [[T0]], [[UNKNOWN]]* [[TMPOBJ]])
+// CHECK: call void @objc_release([[UNKNOWN]]*
 
-sil @test_weak_alloc_stack : $@thin (P) -> () {
-bb0(%0 : $P):
-  %1 = alloc_stack $@sil_weak P
-  store_weak %0 to [initialization] %1#1 : $*@sil_weak P
-  destroy_addr %1#1 : $*@sil_weak P
-  dealloc_stack %1#0 : $*@local_storage @sil_weak P
+sil @test_weak_alloc_stack : $@thin (Optional<P>) -> () {
+bb0(%0 : $Optional<P>):
+  %1 = alloc_stack $@sil_weak Optional<P>
+  store_weak %0 to [initialization] %1#1 : $*@sil_weak Optional<P>
+  destroy_addr %1#1 : $*@sil_weak Optional<P>
+  dealloc_stack %1#0 : $*@local_storage @sil_weak Optional<P>
   %4 = tuple ()
   return %4 : $()
 }
-// CHECK:    define void @test_weak_alloc_stack([[UNKNOWN]]*, i8**)
+// CHECK:    define void @test_weak_alloc_stack(i128)
 // CHECK:      [[X:%.*]] = alloca { [[WEAK]], i8** }, align 8
-// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds { [[WEAK]], i8** }* [[X]], i32 0, i32 1
-// CHECK-NEXT: store i8** %1, i8*** [[T0]], align 8
+// CHECK: [[TMPOBJ:%.*]] = inttoptr {{.*}} to %objc_object*
+// CHECK: [[TMPTAB:%.*]] = inttoptr {{.*}} to i8**
+// CHECK: [[T0:%.*]] = getelementptr inbounds { [[WEAK]], i8** }* [[X]], i32 0, i32 1
+// CHECK-NEXT: store i8** [[TMPTAB:%.*]], i8*** [[T0]], align 8
 // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds { [[WEAK]], i8** }* [[X]], i32 0, i32 0
-// CHECK-NEXT: call void @swift_unknownWeakInit([[WEAK]]* [[T0]], [[UNKNOWN]]* %0)
+// CHECK-NEXT: call void @swift_unknownWeakInit([[WEAK]]* [[T0]], [[UNKNOWN]]* [[TMPOBJ:%.*]])
 // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds { [[WEAK]], i8** }* [[X]], i32 0, i32 0
 // CHECK-NEXT: call void @swift_unknownWeakDestroy([[WEAK]]* [[T0]])
 // CHECK-NEXT: ret void

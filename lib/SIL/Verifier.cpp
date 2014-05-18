@@ -574,6 +574,34 @@ public:
     require(Dest.getType().getObjectType() == Src.getType(),
             "Store operand type and dest type mismatch");
   }
+  void checkLoadWeakInst(LoadWeakInst *LWI) {
+    require(LWI->getType().isObject(), "Result of load must be an object");
+    require(LWI->getType().getSwiftType()->getAnyOptionalObjectType(),
+            "Result of weak load must be an optional");
+    auto PointerType = LWI->getOperand().getType();
+    auto PointerRVType = PointerType.getSwiftRValueType();
+    require(PointerType.isAddress() &&
+            PointerRVType->is<WeakStorageType>(),
+            "load_weak operand must be an weak address");
+    require(PointerRVType->getReferenceStorageReferent()->getCanonicalType() ==
+            LWI->getType().getSwiftType(),
+            "Load operand type and result type mismatch");
+  }
+
+  void checkStoreWeakInst(StoreWeakInst *SWI) {
+    require(SWI->getSrc().getType().isObject(),
+            "Can't store from an address source");
+    require(SWI->getSrc().getType().getSwiftType()->getAnyOptionalObjectType(),
+            "store_weak must be of an optional value");
+    auto PointerType = SWI->getDest().getType();
+    auto PointerRVType = PointerType.getSwiftRValueType();
+    require(PointerType.isAddress() &&
+            PointerRVType->is<WeakStorageType>(),
+            "store_weak address operand must be an weak address");
+    require(PointerRVType->getReferenceStorageReferent()->getCanonicalType() ==
+            SWI->getSrc().getType().getSwiftType(),
+            "Store operand type and dest type mismatch");
+  }
 
   void checkMarkUninitializedInst(MarkUninitializedInst *MU) {
     SILValue Src = MU->getOperand();

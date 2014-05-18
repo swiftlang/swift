@@ -713,8 +713,6 @@ namespace {
           if (var->getAttrs().isWeak()) {
             if (auto weakTy = openedType->getAs<WeakStorageType>())
               openedType = weakTy->getReferentType();
-            if (!openedType->getAnyOptionalObjectType())
-              openedType = OptionalType::get(openedType);
           } else if (var->getAttrs().hasAttribute<IBOutletAttr>() &&
                      !openedType->getAnyOptionalObjectType()) {
             openedType = CS.getTypeChecker()

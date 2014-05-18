@@ -1176,11 +1176,14 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   }
 
   // In SIL files *only*, permit @weak and @unowned to apply directly to types.
-  if (attrs.hasOwnership() && ty->hasReferenceSemantics()) {
+  if (attrs.hasOwnership()) {
     if (auto SF = DC->getParentSourceFile()) {
       if (SF->Kind == SourceFileKind::SIL) {
-        ty = ReferenceStorageType::get(ty, attrs.getOwnership(), Context);
-        attrs.clearOwnership();
+        if ((attrs.has(TAK_sil_weak) && ty->getAnyOptionalObjectType()) ||
+            (!attrs.has(TAK_sil_weak) && ty->hasReferenceSemantics())) {
+          ty = ReferenceStorageType::get(ty, attrs.getOwnership(), Context);
+          attrs.clearOwnership();
+        }
       }
     }
   }

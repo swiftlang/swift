@@ -373,27 +373,9 @@ Type TypeChecker::getTypeOfRValue(ValueDecl *value, bool wantInterfaceType) {
   // Uses of values with lvalue type produce their rvalue.
   if (auto LV = type->getAs<LValueType>())
     return LV->getObjectType();
-  
-  // Turn @weak T into Optional<T>.
-  if (type->is<WeakStorageType>()) {
-    // On the one hand, we should probably use a better location than
-    // the declaration's.  On the other hand, all these diagnostics
-    // are "broken library" errors, so it should really never matter.
 
-    auto refTy = type->castTo<ReferenceStorageType>()->getReferentType();
-    auto optTy = getOptionalType(value->getLoc(), refTy);
-
-    // If we can't create Optional<T>, use T instead of returning null.
-    if (!optTy) return refTy;
-
-    // Check that we can do intrinsic operations on Optional<T> before
-    // returning.
-    requireOptionalIntrinsics(value->getLoc());
-    return optTy;
-  }
-
-  // Ignore @unowned qualification.
-  if (type->is<UnownedStorageType>() || type->is<UnmanagedStorageType>())
+  // Ignore @unowned and @weak, and @unmanaged qualification.
+  if (type->is<ReferenceStorageType>())
     return type->getReferenceStorageReferent();
 
   // No other transforms necessary.

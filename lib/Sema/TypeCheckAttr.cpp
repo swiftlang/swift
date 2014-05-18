@@ -694,9 +694,8 @@ void TypeChecker::checkOwnershipAttr(VarDecl *var, Ownership ownershipKind) {
   if (type->is<ReferenceStorageType>())
     return;
 
-
-  // A weak variable must have type R? for some ownership-capable
-  // type R.
+  // A weak variable must have type R? or R! for some ownership-capable type R.
+  Type underlyingType = type;
   if (ownershipKind == Ownership::Weak) {
     if (var->isLet()) {
       diagnose(var->getStartLoc(), diag::invalid_weak_let);
@@ -705,7 +704,7 @@ void TypeChecker::checkOwnershipAttr(VarDecl *var, Ownership ownershipKind) {
     }
 
     if (Type objType = type->getAnyOptionalObjectType())
-      type = objType;
+      underlyingType = objType;
     else if (type->allowsOwnership()) {
       // Use this special diagnostic if it's actually a reference type but just
       // isn't Optional.
@@ -713,18 +712,20 @@ void TypeChecker::checkOwnershipAttr(VarDecl *var, Ownership ownershipKind) {
                OptionalType::get(type));
       var->getMutableAttrs().clearOwnership();
       return;
+    } else {
+      // This is also an error, but the code below will diagnose it.
     }
   }
 
-  if (!type->allowsOwnership()) {
+  if (!underlyingType->allowsOwnership()) {
     // If we have an opaque type, suggest the possibility of adding
     // a class bound.
     if (type->isExistentialType() || type->is<ArchetypeType>()) {
       diagnose(var->getStartLoc(), diag::invalid_ownership_opaque_type,
-               (unsigned) ownershipKind, type);
+               (unsigned) ownershipKind, underlyingType);
     } else {
       diagnose(var->getStartLoc(), diag::invalid_ownership_type,
-               (unsigned) ownershipKind, type);
+               (unsigned) ownershipKind, underlyingType);
     }
     var->getMutableAttrs().clearOwnership();
     return;
@@ -762,10 +763,12 @@ void TypeChecker::checkIBOutlet(VarDecl *VD) {
   // optional now.
   // FIXME: Should arrays start out empty instead?
   if (optionalKind == OptionalTypeKind::OTK_None) {
-    if (ownership == Ownership::Weak)
+    if (ownership == Ownership::Weak) {
+      type = OptionalType::get(type);
       type = ReferenceStorageType::get(type, ownership, Context);
-    else
+    } else {
       type = ImplicitlyUnwrappedOptionalType::get(type);
+    }
     VD->overwriteType(type);
   }
 

@@ -1309,11 +1309,12 @@ TypeConverter::convertUnmanagedStorageType(UnmanagedStorageType *refType) {
   return referentTI.createUnmanagedStorageType(*this);
 }
 
-/// Convert a [weak] storage type.  The implementation here
+/// Convert a weak storage type.  The implementation here
 /// depends on the underlying reference type.
 const TypeInfo *
 TypeConverter::convertWeakStorageType(WeakStorageType *refType) {
-  CanType referent = CanType(refType->getReferentType());
+  CanType referent =
+    CanType(refType->getReferentType()->getAnyOptionalObjectType());
   assert(referent->allowsOwnership());
   auto &referentTI = cast<ReferenceTypeInfo>(getCompleteTypeInfo(referent));
   return referentTI.createWeakStorageType(*this);

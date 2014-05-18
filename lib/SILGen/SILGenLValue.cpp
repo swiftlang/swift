@@ -112,12 +112,8 @@ static CanType getSubstFormalRValueType(Expr *expr) {
 }
 
 static AbstractionPattern getOrigFormalRValueType(Type formalStorageType) {
-  auto type = formalStorageType->getCanonicalType();
-  if (auto ref = dyn_cast<ReferenceStorageType>(type)) {
-    type = ref.getReferentType();
-    if (isa<WeakStorageType>(ref))
-      type = OptionalType::get(type)->getCanonicalType();
-  }
+  auto type =
+    formalStorageType->getReferenceStorageReferent()->getCanonicalType();
   return AbstractionPattern(type);
 }
 
@@ -868,6 +864,7 @@ static CanType getOptionalValueType(SILType optType,
   return generic.getGenericArgs()[0];
 }
 
+#if 0
 /// Emit code to convert the given possibly-null reference value into
 /// a value of the corresponding optional type.
 static SILValue emitRefToOptional(SILGenFunction &gen, SILLocation loc,
@@ -882,7 +879,8 @@ static SILValue emitRefToOptional(SILGenFunction &gen, SILLocation loc,
   SILValue resultAddr =
     gen.emitTemporaryAllocation(loc, optTL.getLoweredType());
 
-  CanType refType = ref.getType().getSwiftRValueType();
+  CanType refType =
+    ref.getType().getSwiftRValueType().getAnyOptionalObjectType();
   assert(refType.hasReferenceSemantics());
 
   // Ask whether the value is null.
@@ -908,7 +906,9 @@ static SILValue emitRefToOptional(SILGenFunction &gen, SILLocation loc,
   auto result = gen.B.createLoad(loc, resultAddr);
   return result;
 }
+#endif
 
+#if 0
 /// Emit code to convert the givenvalue of optional type into a
 /// possibly-null reference value.
 static SILValue emitOptionalToRef(SILGenFunction &gen, SILLocation loc,
@@ -997,6 +997,7 @@ static SILValue emitOptionalToRef(SILGenFunction &gen, SILLocation loc,
 
   return result;
 }
+#endif
 
 void SILGenFunction::emitInjectOptionalValueInto(SILLocation loc,
                                                  RValueSource &&value,
@@ -1074,10 +1075,9 @@ ManagedValue SILGenFunction::emitGetOptionalValueFrom(SILLocation loc,
 SILValue SILGenFunction::emitConversionToSemanticRValue(SILLocation loc,
                                                         SILValue src,
                                                   const TypeLowering &valueTL) {
-  // For @weak types, we need to create an Optional<T>.
-  // Optional<T> is currently loadable, but it probably won't be forever.
-  if (src.getType().is<WeakStorageType>())
-    return emitRefToOptional(*this, loc, src, valueTL);
+  // Weak storage types are handled with their underlying type.
+  assert(!src.getType().is<WeakStorageType>() &&
+         "weak pointers are always the right optional types");
 
   // For @unowned(safe) types, we need to generate a strong retain and
   // strip the unowned box.
@@ -1112,10 +1112,8 @@ static SILValue emitLoadOfSemanticRValue(SILGenFunction &gen,
 
   // For @weak types, we need to create an Optional<T>.
   // Optional<T> is currently loadable, but it probably won't be forever.
-  if (storageType.is<WeakStorageType>()) {
-    auto refValue = gen.B.createLoadWeak(loc, src, isTake);
-    return emitRefToOptional(gen, loc, refValue, valueTL);
-  }
+  if (storageType.is<WeakStorageType>())
+    return gen.B.createLoadWeak(loc, src, isTake);
 
   // For @unowned(safe) types, we need to strip the unowned box.
   if (auto unownedType = storageType.getAs<UnownedStorageType>()) {
@@ -1151,13 +1149,11 @@ static void emitStoreOfSemanticRValue(SILGenFunction &gen,
 
   // For @weak types, we need to break down an Optional<T> and then
   // emit the storeWeak ourselves.
-  if (auto weakType = storageType.getAs<WeakStorageType>()) {
-    auto refType = SILType::getPrimitiveObjectType(weakType.getReferentType());
-    auto refValue = emitOptionalToRef(gen, loc, value, valueTL, refType);
-    gen.B.createStoreWeak(loc, refValue, dest, isInit);
+  if (storageType.is<WeakStorageType>()) {
+    gen.B.createStoreWeak(loc, value, dest, isInit);
 
     // store_weak doesn't take ownership of the input, so cancel it out.
-    gen.B.emitStrongRelease(loc, refValue);
+    gen.B.emitReleaseValue(loc, value);
     return;
   }
 

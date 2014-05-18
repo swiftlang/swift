@@ -670,40 +670,101 @@ namespace {
       Address valueAddr = projectValue(IGF, existential);
       IGF.emitUnknownWeakDestroy(valueAddr);
     }
+        
+    /// Given an explosion with multiple pointer elements in them, merge them
+    /// together into a single huge integer.  This is used for mapping to
+    /// Swift.Optional and ImplicitlyUnwrappedOptional types, which have a known
+    /// layout.
+    static llvm::Value *mergeExplosion(Explosion &E, IRGenFunction &IGF) {
+      unsigned PointerBitwidth = IGF.IGM.getPointerSize().getValueInBits();
+      unsigned NumWords = E.size();
+      auto *BigType = IGF.Builder.getIntNTy(PointerBitwidth*NumWords);
+      
+      // We always have at least one entry.
+      auto *part = E.claimNext();
+      part = IGF.Builder.CreatePtrToInt(part, IGF.IGM.IntPtrTy);
+      auto *result = IGF.Builder.CreateZExtOrBitCast(part, BigType);
+      
+      for (unsigned i = 1; i != NumWords; ++i) {
+        part = E.claimNext();
+        part = IGF.Builder.CreatePtrToInt(part, IGF.IGM.IntPtrTy);
+        part = IGF.Builder.CreateZExtOrBitCast(part, BigType);
+        part = IGF.Builder.CreateShl(part, PointerBitwidth*i);
+        result = IGF.Builder.CreateOr(result, part);
+      }
+
+      return result;
+    }
+     
+        
+    // Given a large integer type which contains the weak pointer and the
+    // witness table pointers, consume the input explosion and generate a result
+    // one.
+    static void decomposeExplosion(Explosion &InE, Explosion &OutE,
+                                   IRGenFunction &IGF) {
+      llvm::Value *inValue = InE.claimNext();
+
+      unsigned InputBitwidth = inValue->getType()->getIntegerBitWidth();
+      unsigned PointerBitwidth = IGF.IGM.getPointerSize().getValueInBits();
+      unsigned NumElements = InputBitwidth / PointerBitwidth;
+      assert((InputBitwidth % PointerBitwidth) == 0 &&
+             "explosion not a multiple of the word size");
+
+      // The first entry is always the weak*.
+      auto *entry = IGF.Builder.CreateTruncOrBitCast(inValue, IGF.IGM.IntPtrTy);
+      OutE.add(IGF.Builder.CreateIntToPtr(entry,
+                                          IGF.IGM.UnknownRefCountedPtrTy));
+      
+      for (unsigned i = 1; i != NumElements; ++i) {
+        entry = IGF.Builder.CreateLShr(inValue, PointerBitwidth*i);
+        entry = IGF.Builder.CreateTruncOrBitCast(inValue, IGF.IGM.IntPtrTy);
+        OutE.add(IGF.Builder.CreateIntToPtr(entry, IGF.IGM.WitnessTablePtrTy));
+      }
+    }
 
     // These explosions must follow the same schema as
     // ClassExistentialTypeInfo, i.e. first the value, then the tables.
 
     void weakLoadStrong(IRGenFunction &IGF, Address existential,
                         Explosion &out) const override {
+      Explosion temp(ResilienceExpansion::Minimal);
       Address valueAddr = projectValue(IGF, existential);
-      out.add(IGF.emitUnknownWeakLoadStrong(valueAddr,
+      temp.add(IGF.emitUnknownWeakLoadStrong(valueAddr,
                                             IGF.IGM.UnknownRefCountedPtrTy));
-      emitLoadOfTables(IGF, existential, out);
+      emitLoadOfTables(IGF, existential, temp);
+      out.add(mergeExplosion(temp, IGF));
     }
 
     void weakTakeStrong(IRGenFunction &IGF, Address existential,
                         Explosion &out) const override {
+      Explosion temp(ResilienceExpansion::Minimal);
       Address valueAddr = projectValue(IGF, existential);
-      out.add(IGF.emitUnknownWeakTakeStrong(valueAddr,
+      temp.add(IGF.emitUnknownWeakTakeStrong(valueAddr,
                                             IGF.IGM.UnknownRefCountedPtrTy));
-      emitLoadOfTables(IGF, existential, out);
+      emitLoadOfTables(IGF, existential, temp);
+      out.add(mergeExplosion(temp, IGF));
     }
 
     void weakInit(IRGenFunction &IGF, Explosion &in,
                   Address existential) const override {
-      llvm::Value *value = in.claimNext();
+      Explosion temp(ResilienceExpansion::Minimal);
+      decomposeExplosion(in, temp, IGF);
+
+      llvm::Value *value = temp.claimNext();
       assert(value->getType() == IGF.IGM.UnknownRefCountedPtrTy);
-      emitStoreOfTables(IGF, in, existential);
+      emitStoreOfTables(IGF, temp, existential);
       Address valueAddr = projectValue(IGF, existential);
       IGF.emitUnknownWeakInit(value, valueAddr);
     }
 
     void weakAssign(IRGenFunction &IGF, Explosion &in,
                     Address existential) const override {
-      llvm::Value *value = in.claimNext();
+      Explosion temp(ResilienceExpansion::Minimal);
+      decomposeExplosion(in, temp, IGF);
+
+      llvm::Value *value = temp.claimNext();
       assert(value->getType() == IGF.IGM.UnknownRefCountedPtrTy);
-      emitStoreOfTables(IGF, in, existential);
+      emitStoreOfTables(IGF, temp, existential);
       Address valueAddr = projectValue(IGF, existential);
       IGF.emitUnknownWeakAssign(value, valueAddr);
     }

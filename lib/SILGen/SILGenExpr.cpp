@@ -553,12 +553,8 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
 }
 
 static AbstractionPattern getOrigFormalRValueType(Type formalStorageType) {
-  auto type = formalStorageType->getCanonicalType();
-  if (auto ref = dyn_cast<ReferenceStorageType>(type)) {
-    type = ref.getReferentType();
-    if (isa<WeakStorageType>(ref))
-      type = OptionalType::get(type)->getCanonicalType();
-  }
+  auto type =
+    formalStorageType->getReferenceStorageReferent()->getCanonicalType();
   return AbstractionPattern(type);
 }
 

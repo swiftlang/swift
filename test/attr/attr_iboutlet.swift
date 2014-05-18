@@ -129,7 +129,7 @@ class NonObjC {}
   init() { }
 }
 
-// Turn non-optional @IBOutlets into (possibly unchecked( optional ones.
+// Turn non-optional @IBOutlets into (possibly unchecked) optional ones.
 @objc class Infer {
   @IBOutlet var outlet1: Infer
   @IBOutlet weak var outlet2: Infer

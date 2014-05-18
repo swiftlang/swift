@@ -669,27 +669,40 @@ namespace {
       IGF.emitWeakDestroy(addr);
     }
 
+    llvm::Type *getOptionalIntType() const {
+      return llvm::IntegerType::get(ValueType->getContext(),
+                                    getFixedSize().getValueInBits());
+    }
+
     void weakLoadStrong(IRGenFunction &IGF, Address addr,
                         Explosion &out) const override {
-      out.add(IGF.emitWeakLoadStrong(addr, ValueType));
+      auto value = IGF.emitWeakLoadStrong(addr, ValueType);
+      // The optional will be lowered to an integer type the size of the word.
+      out.add(IGF.Builder.CreatePtrToInt(value, getOptionalIntType()));
     }
 
     void weakTakeStrong(IRGenFunction &IGF, Address addr,
                         Explosion &out) const override {
-      out.add(IGF.emitWeakTakeStrong(addr, ValueType));
+      auto value = IGF.emitWeakTakeStrong(addr, ValueType);
+      // The optional will be lowered to an integer type the size of the word.
+      out.add(IGF.Builder.CreatePtrToInt(value, getOptionalIntType()));
     }
 
     void weakInit(IRGenFunction &IGF, Explosion &in,
                   Address dest) const override {
       llvm::Value *value = in.claimNext();
-      assert(value->getType() == ValueType);
+      // The optional will be lowered to an integer type the size of the word.
+      assert(value->getType() == getOptionalIntType());
+      value = IGF.Builder.CreateIntToPtr(value, ValueType);
       IGF.emitWeakInit(value, dest);
     }
 
     void weakAssign(IRGenFunction &IGF, Explosion &in,
                     Address dest) const override {
       llvm::Value *value = in.claimNext();
-      assert(value->getType() == ValueType);
+      // The optional will be lowered to an integer type the size of the word.
+      assert(value->getType() == getOptionalIntType());
+      value = IGF.Builder.CreateIntToPtr(value, ValueType);
       IGF.emitWeakAssign(value, dest);
     }
   };
