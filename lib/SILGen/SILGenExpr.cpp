@@ -1022,18 +1022,67 @@ visitArrayBridgedConversionExpr(ArrayBridgedConversionExpr *E,
   auto canTypeU = E->getType().getPointer()->getCanonicalType();
   auto arrayT = cast<BoundGenericStructType>(canTypeT)->getGenericArgs()[0];
   auto arrayU = cast<BoundGenericStructType>(canTypeU)->getGenericArgs()[0];
-
+  auto typeName = cast<BoundGenericStructType>(canTypeT)->getDecl()->getName();
+  
   // Get the intrinsic function.
+  FuncDecl *fn = nullptr;
   auto &ctx = SGF.getASTContext();
-  FuncDecl *fn = ctx.getArrayBridgeToObjectiveC(nullptr);
+  
+  if (typeName.str() == "Array") {
+    fn = ctx.getArrayBridgeToObjectiveC(nullptr);
+  } else {
+    llvm_unreachable("unsupported array bridge kind");
+  }
+  
+  // Compute type parameter substitutions.
+  SmallVector<Substitution, 2> subs;
+  
+  // Fish out the conformances to _BridgedToObjectiveC and ObjectiveCType from
+  // the the canonical types of T and U's type arguments.
+  auto polyFnType = cast<PolymorphicFunctionType>
+  (fn->getType()->getCanonicalType());
+  auto genericParams = polyFnType->getGenericParameters();
+  
+  auto gp1 = genericParams[0].getAsTypeParam();
+  auto archetype = gp1->getArchetype();
+  auto protocolDecls = archetype->getConformsTo();
+  SmallVector<ProtocolConformance *, 1> conformances;
+  
+  auto dc = protocolDecls[0]->getDeclContext()->getModuleScopeContext();
 
-  // Form type parameter substitutions.
-  Substitution subs[2] = {
-    { nullptr, arrayT->getCanonicalType(), { } },
-    { nullptr, arrayU->getCanonicalType(), { } }
-  };
+  auto conformance = ctx.getConformsTo(arrayT->getCanonicalType(),
+                                       protocolDecls[0])->getPointer();
 
-  auto emitApply = SGF.emitApplyOfLibraryIntrinsic(loc, fn, subs, {mv}, C);
+  conformances.push_back(conformance);
+  
+  subs.push_back(Substitution{archetype,
+                 arrayT,
+                 ctx.AllocateCopy(conformances)});
+  
+  if (auto nestedAssocType =
+      archetype->getNestedTypeValue(ctx.getIdentifier("ObjectiveCType"))) {
+    if (auto nestedArchetype =
+                dyn_cast<ArchetypeType>(nestedAssocType.getPointer())) {
+      protocolDecls = nestedArchetype->getConformsTo();
+      SmallVector<ProtocolConformance *, 1> nestedConformances;
+      dc = protocolDecls[0]->getDeclContext()->getModuleScopeContext();
+      auto conformance = ctx.getConformsTo(arrayU->getCanonicalType(),
+                                           protocolDecls[0])->getPointer();
+      
+      nestedConformances.push_back(conformance);
+      subs.push_back(Substitution{nestedArchetype,
+                                  arrayU,
+                                  ctx.AllocateCopy(nestedConformances)});
+    }
+  }
+  
+  auto args = {mv};
+  auto emitApply = SGF.emitApplyOfLibraryIntrinsic(loc,
+                                                   fn,
+                                                   subs,
+                                                   args,
+                                                   C);
+  
   return RValue(SGF, E, emitApply);
 }
 

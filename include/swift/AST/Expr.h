@@ -2061,13 +2061,14 @@ public:
 // T is bridged to U.
 class ArrayBridgedConversionExpr : public ImplicitConversionExpr {
 public:
+  
   /// Keep track of whether or not the type being bridged to conforms to the
   /// _ConditionallyBridgedToObjectiveC protocol.
   bool isConditionallyBridged = false;
   
   ArrayBridgedConversionExpr(Expr *subExpr, Type type)
-    : ImplicitConversionExpr(ExprKind::ArrayBridgedConversion, subExpr, type) {}
-
+  : ImplicitConversionExpr(ExprKind::ArrayBridgedConversion, subExpr, type) {}
+  
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::ArrayBridgedConversion;
   }
