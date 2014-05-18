@@ -65,3 +65,11 @@ struct StructTest {
   }
 }
 
+
+// <rdar://problem/16889110> capture lists in lazy member properties cannot use self
+class CaptureListInLazyProperty {
+  @lazy var closure: () -> Int = { [weak self] in return self!.i }
+  var i = 42
+}
+
+

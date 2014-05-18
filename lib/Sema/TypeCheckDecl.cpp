@@ -1753,6 +1753,16 @@ namespace {
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       if (auto CE = dyn_cast<AbstractClosureExpr>(E)) {
         CE->setParent(NewDC);
+
+        // If this is a ClosureExpr, make sure to recontextualize any decls in
+        // the capture list as well.
+        if (auto *C = dyn_cast<ClosureExpr>(E)) {
+          for (auto &CLE : C->getCaptureList()) {
+            CLE.Var->setDeclContext(NewDC);
+            CLE.Init->setDeclContext(NewDC);
+          }
+        }
+
         return { false, E };
       }
 

@@ -248,10 +248,7 @@ DeclContext *Decl::getInnermostDeclContext() {
 }
 
 void Decl::setDeclContext(DeclContext *DC) { 
-  assert((isa<ParamDecl>(this) || isa<GenericTypeParamDecl>(this) ||
-          (Context && getASTContext().LangOpts.DebuggerSupport)) &&
-         "Only function and generic parameters can have their contexts set");
-  Context = DC; 
+  Context = DC;
 }
 
 Module *Decl::getModuleContext() const {
