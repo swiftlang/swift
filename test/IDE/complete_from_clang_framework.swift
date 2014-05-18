@@ -118,6 +118,8 @@ func testSwiftCompletions(foo: SwiftStruct) {
 // CLANG_BAR-DAG: Decl[Struct]/OtherModule:       BarForwardDeclaredEnum[#BarForwardDeclaredEnum#]{{$}}
 // CLANG_BAR-DAG: Decl[GlobalVar]/OtherModule:    BarForwardDeclaredEnumValue[#BarForwardDeclaredEnum#]{{$}}
 // CLANG_BAR-DAG: Decl[GlobalVar]/OtherModule:    BAR_MACRO_1[#CInt#]{{$}}
+// CLANG_BAR-DAG: Decl[Struct]/OtherModule:       SomeItemSet[#SomeItemSet#]
+// CLANG_BAR-DAG: Decl[TypeAlias]/OtherModule:    SomeEnvironment[#SomeItemSet#]
 // CLANG_BAR: End completions
 
 // CLANG_BOTH_FOO_BAR: Begin completions
@@ -209,7 +211,7 @@ func testCompleteModuleQualifiedBar1() {
   Bar.#^CLANG_QUAL_BAR_1^#
 // If the number of results below changes, this is an indication that you need
 // to add a result to the appropriate list.  Do not just bump the number!
-// CLANG_QUAL_BAR_1: Begin completions, 6 items
+// CLANG_QUAL_BAR_1: Begin completions, 8 items
 }
 
 func testCompleteFunctionCall1() {

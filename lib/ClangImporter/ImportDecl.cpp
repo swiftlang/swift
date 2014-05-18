@@ -4288,6 +4288,12 @@ canSkipOverTypedef(ClangImporter::Implementation &Impl,
     return nullptr;
 
   clang::QualType UnderlyingType = ClangTypedef->getUnderlyingType();
+
+  // A typedef to a typedef should get imported as a typealias.
+  auto *TypedefT = UnderlyingType->getAs<clang::TypedefType>();
+  if (TypedefT)
+    return nullptr;
+
   auto *TT = UnderlyingType->getAs<clang::TagType>();
   if (!TT)
     return nullptr;
