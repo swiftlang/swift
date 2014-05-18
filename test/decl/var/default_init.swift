@@ -1,4 +1,4 @@
-// RUN: %swift -parse %s -verify 
+// RUN: %swift -parse -parse-as-library %s -verify 
 
 // Default initialization of variables.
 
@@ -35,3 +35,6 @@ class DefaultInitOfLetProperty {
       self.property = DefaultInitOfLetProperty(x: self)
    }
 }
+
+var global: Int?
+
