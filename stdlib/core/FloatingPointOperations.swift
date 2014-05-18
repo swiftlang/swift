@@ -68,30 +68,30 @@ protocol FloatingPointNumber {
   var floatingPointClass: FloatingPointClassification { get }
 
   /// Returns true if this number has a negative sign.
-  func isSignMinus() -> Bool
+  var isSignMinus: Bool { get }
 
   /// Returns true if this number is normal (not zero, subnormal, infinite, or
   /// NaN).
-  func isNormal() -> Bool
+  var isNormal: Bool { get }
 
   /// Returns true if this number is zero, subnormal, or normal (not infinite
   /// or NaN).
-  func isFinite() -> Bool
+  var isFinite: Bool { get }
 
   /// Returns true if this number is +0.0 or -0.0.
-  func isZero() -> Bool
+  var isZero: Bool { get }
 
   /// Returns true if this number is subnormal.
-  func isSubnormal() -> Bool
+  var isSubnormal: Bool { get }
 
   /// Returns true if this number is infinite.
-  func isInfinite() -> Bool
+  var isInfinite: Bool { get }
 
   /// Returns true if this number is NaN.
-  func isNaN() -> Bool
+  var isNaN: Bool { get }
 
   /// Returns true if this number is a signaling NaN.
-  func isSignaling() -> Bool
+  var isSignaling: Bool { get }
 
   // Not implemented, because it only makes sense for decimal floating point.
   // Binary floating point numbers are always canonical.

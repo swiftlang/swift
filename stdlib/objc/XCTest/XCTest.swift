@@ -276,12 +276,12 @@ func XCTAssertNotEqual<T: Equatable>(expression1: @auto_closure () -> T, express
 }
 
 func _XCTCheckEqualWithAccuracy_Double(value1: Double, value2: Double, accuracy: Double) -> Bool {
-  return (!value1.isNaN() && !value2.isNaN())
+  return (!value1.isNaN && !value2.isNaN)
     && (abs(value1 - value2) <= accuracy)
 }
 
 func _XCTCheckEqualWithAccuracy_Float(value1: Float, value2: Float, accuracy: Float) -> Bool {
-  return (!value1.isNaN() && !value2.isNaN())
+  return (!value1.isNaN && !value2.isNaN)
     && (abs(value1 - value2) <= accuracy)
 }
 
@@ -324,12 +324,12 @@ func XCTAssertEqualWithAccuracy<T: FloatingPointNumber>(expression1: @auto_closu
 }
 
 func _XCTCheckNotEqualWithAccuracy_Double(value1: Double, value2: Double, accuracy: Double) -> Bool {
-  return (value1.isNaN() || value2.isNaN())
+  return (value1.isNaN || value2.isNaN)
     || (abs(value1 - value2) > accuracy)
 }
 
 func _XCTCheckNotEqualWithAccuracy_Float(value1: Float, value2: Float, accuracy: Float) -> Bool {
-  return (value1.isNaN() || value2.isNaN())
+  return (value1.isNaN || value2.isNaN)
     || (abs(value1 - value2) > accuracy)
 }
 

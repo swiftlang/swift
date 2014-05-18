@@ -193,27 +193,27 @@ extension ${Self} : FloatingPointNumber {
     return _fromBitPattern(${getQuietNaNBitPattern(bits)})
   }
 
-  func isSignMinus() -> Bool {
+  var isSignMinus:  Bool {
     return __getSignBit() == 1
   }
 
-  func isNormal() -> Bool {
+  var isNormal:  Bool {
     var biasedExponent = __getBiasedExponent()
     return biasedExponent != ${getInfinityExponent(bits)} &&
            biasedExponent != 0
   }
 
-  func isFinite() -> Bool {
+  var isFinite:  Bool {
     return __getBiasedExponent() != ${getInfinityExponent(bits)}
   }
 
-  func isZero() -> Bool {
+  var isZero:  Bool {
     // Mask out the sign bit.
     var mask: _BitsType = (1 << (${bits} - 1)) - 1
     return (_toBitPattern() & mask) == 0
   }
 
-  func isSubnormal() -> Bool {
+  var isSubnormal:  Bool {
     if __getBiasedExponent() == 0 {
       return __getSignificand() != 0
     }
@@ -228,7 +228,7 @@ extension ${Self} : FloatingPointNumber {
     // condition is going to be faster.
   }
 
-  func isInfinite() -> Bool {
+  var isInfinite:  Bool {
     if __getBiasedExponent() == ${getInfinityExponent(bits)} {
       return __getSignificand() == 0
     }
@@ -238,7 +238,7 @@ extension ${Self} : FloatingPointNumber {
     // return abs(self) == ${Self}.inf()
   }
 
-  func isNaN() -> Bool {
+  var isNaN:  Bool {
     if __getBiasedExponent() == ${getInfinityExponent(bits)} {
       return __getSignificand() != 0
     }
@@ -248,7 +248,7 @@ extension ${Self} : FloatingPointNumber {
     // return self != self
   }
 
-  func isSignaling() -> Bool {
+  var isSignaling: Bool {
     if __getBiasedExponent() == ${getInfinityExponent(bits)} {
       // IEEE-754R 2008 6.2.1: A signaling NaN bit string should be encoded
       // with the first bit of the trailing significand being 0.  If the first
@@ -273,14 +273,14 @@ extension ${Self} /* : FloatingPointNumber */ {
         var significand = __getSignificand()
         // This is either +/-inf or NaN.
         if significand == 0 {
-          return isSignMinus() ? .NegativeInfinity : .PositiveInfinity
+          return isSignMinus ? .NegativeInfinity : .PositiveInfinity
         }
         var isQNaN = (significand >> (${getSignificantBitCount(bits)} - 1)) == 1
         return isQNaN ? .QuietNaN : .SignalingNaN
       }
 
       // OK, the number is finite.
-      var isMinus = isSignMinus()
+      var isMinus = isSignMinus
       if biasedExponent != 0 {
         return isMinus ? .NegativeNormal : .PositiveNormal
       }

@@ -29,24 +29,24 @@ func noinlineMinusZero() -> TestFloat {
 //===---
 
 func checkNormal(normal: TestFloat) {
-  _precondition(normal.isNormal())
-  _precondition(normal.isFinite())
-  _precondition(!normal.isZero())
-  _precondition(!normal.isSubnormal())
-  _precondition(!normal.isInfinite())
-  _precondition(!normal.isNaN())
-  _precondition(!normal.isSignaling())
+  _precondition(normal.isNormal)
+  _precondition(normal.isFinite)
+  _precondition(!normal.isZero)
+  _precondition(!normal.isSubnormal)
+  _precondition(!normal.isInfinite)
+  _precondition(!normal.isNaN)
+  _precondition(!normal.isSignaling)
 }
 
 func testNormal() {
   var positiveNormal: TestFloat = 42.0
   checkNormal(positiveNormal)
-  _precondition(!positiveNormal.isSignMinus())
+  _precondition(!positiveNormal.isSignMinus)
   _precondition(positiveNormal.floatingPointClass == .PositiveNormal)
 
   var negativeNormal: TestFloat = -42.0
   checkNormal(negativeNormal)
-  _precondition(negativeNormal.isSignMinus())
+  _precondition(negativeNormal.isSignMinus)
   _precondition(negativeNormal.floatingPointClass == .NegativeNormal)
 
   _precondition(positiveNormal == positiveNormal)
@@ -66,24 +66,24 @@ testNormal()
 //===---
 
 func checkZero(zero: TestFloat) {
-  _precondition(!zero.isNormal())
-  _precondition(zero.isFinite())
-  _precondition(zero.isZero())
-  _precondition(!zero.isSubnormal())
-  _precondition(!zero.isInfinite())
-  _precondition(!zero.isNaN())
-  _precondition(!zero.isSignaling())
+  _precondition(!zero.isNormal)
+  _precondition(zero.isFinite)
+  _precondition(zero.isZero)
+  _precondition(!zero.isSubnormal)
+  _precondition(!zero.isInfinite)
+  _precondition(!zero.isNaN)
+  _precondition(!zero.isSignaling)
 }
 
 func testZero() {
   var plusZero = noinlinePlusZero()
   checkZero(plusZero)
-  _precondition(!plusZero.isSignMinus())
+  _precondition(!plusZero.isSignMinus)
   _precondition(plusZero.floatingPointClass == .PositiveZero)
 
   var minusZero = noinlineMinusZero()
   checkZero(minusZero)
-  _precondition(minusZero.isSignMinus())
+  _precondition(minusZero.isSignMinus)
   _precondition(minusZero.floatingPointClass == .NegativeZero)
 
   _precondition(plusZero == 0.0)
@@ -103,13 +103,13 @@ testZero()
 //===---
 
 func checkSubnormal(subnormal: TestFloat) {
-  _precondition(!subnormal.isNormal())
-  _precondition(subnormal.isFinite())
-  _precondition(!subnormal.isZero())
-  _precondition(subnormal.isSubnormal())
-  _precondition(!subnormal.isInfinite())
-  _precondition(!subnormal.isNaN())
-  _precondition(!subnormal.isSignaling())
+  _precondition(!subnormal.isNormal)
+  _precondition(subnormal.isFinite)
+  _precondition(!subnormal.isZero)
+  _precondition(subnormal.isSubnormal)
+  _precondition(!subnormal.isInfinite)
+  _precondition(!subnormal.isNaN)
+  _precondition(!subnormal.isSignaling)
 }
 
 func asUInt64(a: UInt64) -> UInt64 {
@@ -135,7 +135,7 @@ func testSubnormal() {
     positiveSubnormal /= 2.0 as TestFloat
   }
   checkSubnormal(positiveSubnormal)
-  _precondition(!positiveSubnormal.isSignMinus())
+  _precondition(!positiveSubnormal.isSignMinus)
   _precondition(positiveSubnormal.floatingPointClass == .PositiveSubnormal)
   _precondition(positiveSubnormal != 0.0)
 
@@ -144,7 +144,7 @@ func testSubnormal() {
     negativeSubnormal /= 2.0 as TestFloat
   }
   checkSubnormal(negativeSubnormal)
-  _precondition(negativeSubnormal.isSignMinus())
+  _precondition(negativeSubnormal.isSignMinus)
   _precondition(negativeSubnormal.floatingPointClass == .NegativeSubnormal)
   _precondition(negativeSubnormal != -0.0)
 
@@ -158,34 +158,34 @@ testSubnormal()
 //===---
 
 func checkInf(inf: TestFloat) {
-  _precondition(!inf.isNormal())
-  _precondition(!inf.isFinite())
-  _precondition(!inf.isZero())
-  _precondition(!inf.isSubnormal())
-  _precondition(inf.isInfinite())
-  _precondition(!inf.isNaN())
-  _precondition(!inf.isSignaling())
+  _precondition(!inf.isNormal)
+  _precondition(!inf.isFinite)
+  _precondition(!inf.isZero)
+  _precondition(!inf.isSubnormal)
+  _precondition(inf.isInfinite)
+  _precondition(!inf.isNaN)
+  _precondition(!inf.isSignaling)
 }
 
 func testInf() {
   var stdlibPlusInf = TestFloat.inf()
   checkInf(stdlibPlusInf)
-  _precondition(!stdlibPlusInf.isSignMinus())
+  _precondition(!stdlibPlusInf.isSignMinus)
   _precondition(stdlibPlusInf.floatingPointClass == .PositiveInfinity)
 
   var stdlibMinusInf = -TestFloat.inf()
   checkInf(stdlibMinusInf)
-  _precondition(stdlibMinusInf.isSignMinus())
+  _precondition(stdlibMinusInf.isSignMinus)
   _precondition(stdlibMinusInf.floatingPointClass == .NegativeInfinity)
 
   var computedPlusInf = 1.0 / noinlinePlusZero()
   checkInf(computedPlusInf)
-  _precondition(!computedPlusInf.isSignMinus())
+  _precondition(!computedPlusInf.isSignMinus)
   _precondition(computedPlusInf.floatingPointClass == .PositiveInfinity)
 
   var computedMinusInf = -1.0 / noinlinePlusZero()
   checkInf(computedMinusInf)
-  _precondition(computedMinusInf.isSignMinus())
+  _precondition(computedMinusInf.isSignMinus)
   _precondition(computedMinusInf.floatingPointClass == .NegativeInfinity)
 
   _precondition(stdlibPlusInf == computedPlusInf)
@@ -204,18 +204,18 @@ testInf()
 //===---
 
 func checkNaN(nan: TestFloat) {
-  _precondition(!nan.isSignMinus())
-  _precondition(!nan.isNormal())
-  _precondition(!nan.isFinite())
-  _precondition(!nan.isZero())
-  _precondition(!nan.isSubnormal())
-  _precondition(!nan.isInfinite())
-  _precondition(nan.isNaN())
+  _precondition(!nan.isSignMinus)
+  _precondition(!nan.isNormal)
+  _precondition(!nan.isFinite)
+  _precondition(!nan.isZero)
+  _precondition(!nan.isSubnormal)
+  _precondition(!nan.isInfinite)
+  _precondition(nan.isNaN)
 }
 
 func checkQNaN(qnan: TestFloat) {
   checkNaN(qnan)
-  _precondition(!qnan.isSignaling())
+  _precondition(!qnan.isSignaling)
   _precondition(qnan.floatingPointClass == .QuietNaN)
 }
 
