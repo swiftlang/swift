@@ -356,7 +356,7 @@ struct _StringCore {
     let (newCapacity, existingStorage)
       = _claimCapacity(newSize, minElementWidth: minElementWidth)
 
-    if _fastPath(!existingStorage.isNull()) {
+    if _fastPath(!existingStorage._isNull) {
       return existingStorage
     }
 

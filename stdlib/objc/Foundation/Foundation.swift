@@ -153,7 +153,7 @@ func _cocoaStringToContiguousImpl(
   source: _CocoaString, range: Range<Int>, minimumCapacity: Int
 ) -> _StringBuffer {
   let cfSelf: CFString = reinterpretCast(source)
-  _sanityCheck(CFStringGetCharactersPtr(cfSelf).isNull(),
+  _sanityCheck(CFStringGetCharactersPtr(cfSelf)._isNull,
     "Known contiguously-stored strings should already be converted to Swift")
 
   var startIndex = range.startIndex
@@ -374,7 +374,7 @@ extension String {
     // start will hold the base pointer of contiguous storage, if it
     // is found.
     var start = UnsafePointer<RawByte>(nulTerminatedASCII._bytesPtr)
-    let isUTF16 = nulTerminatedASCII.isNull()
+    let isUTF16 = nulTerminatedASCII._isNull
     if (isUTF16) {
       start = UnsafePointer(CFStringGetCharactersPtr(cfImmutableValue))
     }

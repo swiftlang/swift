@@ -358,7 +358,7 @@ func == (lhs: CMutableVoidPointer, rhs: CMutableVoidPointer) -> Bool {
 /// This type does not carry an owner pointer unlike the other C*Pointer types
 /// because it only needs to reference the results of inout conversions, which
 /// already have writeback-scoped lifetime.
-struct AutoreleasingUnsafePointer<T /* TODO : class */> : Equatable {
+struct AutoreleasingUnsafePointer<T /* TODO : class */> : Equatable, LogicValue {
   let value: Builtin.RawPointer
 
   @transparent
@@ -395,16 +395,21 @@ struct AutoreleasingUnsafePointer<T /* TODO : class */> : Equatable {
   }
 
   @transparent
-  func isNull() -> Bool {
-    return UnsafePointer<T>(self).isNull()
+  var _isNull : Bool {
+    return UnsafePointer<T>(self)._isNull
   }
   
+  @transparent
+  func getLogicValue() -> Bool {
+    return !_isNull
+  }
+
   /// Access the underlying raw memory, getting and
   /// setting values.
   var memory : T {
     /// Retrieve the value the pointer points to.
     @transparent get {
-      _debugPrecondition(!isNull())
+      _debugPrecondition(!_isNull)
       // We can do a strong load normally.
       return UnsafePointer<T>(self).memory
     }
@@ -414,7 +419,7 @@ struct AutoreleasingUnsafePointer<T /* TODO : class */> : Equatable {
     /// ownership semantics, like 'NSFoo**' in ARC. This autoreleases the
     /// argument before trivially storing it to the referenced memory.    
     @transparent nonmutating set {
-      _debugPrecondition(!isNull())
+      _debugPrecondition(!_isNull)
       // Autorelease the object reference.
       Builtin.retain(reinterpretCast(newValue) as AnyObject?)
       Builtin.autorelease(reinterpretCast(newValue) as AnyObject?)

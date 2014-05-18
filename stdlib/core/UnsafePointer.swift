@@ -19,7 +19,8 @@
 ///
 /// For C pointers for which the pointed-to type cannot be represented
 /// directly in Swift, the `COpaquePointer` will be used instead.
-struct UnsafePointer<T> : BidirectionalIndex, Comparable, Hashable {
+struct UnsafePointer<T> : BidirectionalIndex, Comparable, Hashable,
+                          LogicValue {
   /// The underlying raw (untyped) pointer.
   var value : Builtin.RawPointer
 
@@ -171,8 +172,14 @@ struct UnsafePointer<T> : BidirectionalIndex, Comparable, Hashable {
     Builtin.destroyArray(T.self, value, count.value)
   }
 
-  func isNull() -> Bool {
+  @transparent
+  var _isNull : Bool {
     return self == UnsafePointer.null()
+  }
+
+  @transparent
+  func getLogicValue() -> Bool {
+    return !_isNull
   }
 
   subscript (i : Int) -> T {

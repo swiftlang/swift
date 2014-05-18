@@ -17,7 +17,8 @@
 struct CString :
     _BuiltinExtendedGraphemeClusterLiteralConvertible,
     ExtendedGraphemeClusterLiteralConvertible,
-    _BuiltinStringLiteralConvertible, StringLiteralConvertible {
+    _BuiltinStringLiteralConvertible, StringLiteralConvertible,
+    LogicValue {
   var _bytesPtr : UnsafePointer<UInt8>
 
   @transparent
@@ -50,8 +51,14 @@ struct CString :
     return value
   }
 
-  func isNull() -> Bool {
-    return _bytesPtr.isNull()
+  @transparent
+  var _isNull : Bool {
+    return _bytesPtr._isNull
+  }
+
+  @transparent
+  func getLogicValue() -> Bool {
+    return !_isNull
   }
 
   /// From a `CString` with possibly-transient lifetime, create a
@@ -68,7 +75,7 @@ struct CString :
 
 extension CString : DebugPrintable {
   var debugDescription: String {
-    if isNull() {
+    if _isNull {
       return "<null C string>"
     }
     return String.fromCString(self).debugDescription
