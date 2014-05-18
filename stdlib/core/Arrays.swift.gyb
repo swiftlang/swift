@@ -191,15 +191,11 @@ extension ${Self} : ArrayType {
     return result
   }
 
-  /// Erase all the elements and release the storage
-  mutating func clear() {
-    buffer = Buffer()
-  }
-
-  /// Erase all the elements.  If keepStorage is true, capacity will not change
-  mutating func clear(keepStorage: Bool) {
-    if !keepStorage {
-      clear()
+  /// Erase all the elements.  If `keepCapacity` is `true`, `capacity`
+  /// will not change
+  mutating func removeAll(keepCapacity: Bool = false) {
+    if !keepCapacity {
+      buffer = Buffer()
     }
     else {
       replace(&self, indices(self), EmptyCollection())

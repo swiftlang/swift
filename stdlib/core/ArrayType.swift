@@ -63,11 +63,9 @@ protocol ArrayType
   /// element.  Worst case complexity: O(N).  Requires: count > index
   mutating func removeAt(index: Int) -> Self.GeneratorType.Element
 
-  /// Erase all the elements and release the storage
-  mutating func clear()
-  
-  /// Erase all the elements.  If keepStorage is true, capacity will not change
-  mutating func clear(keepStorage: Bool)
+  /// Erase all the elements.  If `keepCapacity` is `true`, `capacity`
+  /// will not change
+  mutating func removeAll(#keepCapacity: Bool)
   
   //===--- algorithms -----------------------------------------------------===//
   func reduce<U>(initial: U, combine: (U, Self.GeneratorType.Element) -> U) -> U
