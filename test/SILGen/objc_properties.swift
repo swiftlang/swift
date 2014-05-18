@@ -132,3 +132,16 @@ class TestNSCopying {
 }
 
 
+// <rdar://problem/16663515> IBOutlet not adjusting getter/setter when making a property implicit unchecked optional
+@objc
+class TestComputedOutlet {
+  var _disclosedView : TestComputedOutlet! = .None
+
+  @IBOutlet var disclosedView : TestComputedOutlet {
+  get { return _disclosedView }
+  }
+
+  func foo() {
+    !_disclosedView ? () : self.disclosedView.foo()
+  }
+}

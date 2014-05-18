@@ -735,6 +735,23 @@ void TypeChecker::checkOwnershipAttr(VarDecl *var, Ownership ownershipKind) {
   var->overwriteType(ReferenceStorageType::get(type, ownershipKind, Context));
 }
 
+/// When processing an @IBOutlet causes a variable to be promoted to implicit
+/// optional type, we need to adjust the typeloc for the getter if the outlet is
+/// computed.
+static void adjustGetterResultTypeLocForImplicitOptional(FuncDecl *Getter) {
+  // If there is no getter, don't do anything.
+  if (Getter == nullptr) return;
+
+  TypeLoc &FnResult = Getter->getBodyResultTypeLoc();
+  TypeRepr *Repr = FnResult.getTypeRepr();
+  assert(Repr && "No parsed form?");
+
+  auto &Ctx = Getter->getASTContext();
+  Repr = new (Ctx) ImplicitlyUnwrappedOptionalTypeRepr(Repr, Repr->getEndLoc());
+
+  FnResult = TypeLoc(Repr);
+}
+
 void TypeChecker::checkIBOutlet(VarDecl *VD) {
   assert(VD->getAttrs().hasAttribute<IBOutletAttr>() &&
          "Only call when @IBOutlet is set");
@@ -776,9 +793,12 @@ void TypeChecker::checkIBOutlet(VarDecl *VD) {
     if (ownership == Ownership::Unowned)
       /* FIXME: Cannot wrap unowned pointers with optionals yet*/;
     else if (optionalKind == OptionalTypeKind::OTK_None ||
-             optionalKind == OptionalTypeKind::OTK_ImplicitlyUnwrappedOptional)
+             optionalKind == OptionalTypeKind::OTK_ImplicitlyUnwrappedOptional){
       type = ImplicitlyUnwrappedOptionalType::get(type);
-    else
+
+      if (optionalKind == OptionalTypeKind::OTK_None)
+        adjustGetterResultTypeLocForImplicitOptional(VD->getGetter());
+    } else
       type = OptionalType::get(type);
     
     // Build the right ownership type around it.
