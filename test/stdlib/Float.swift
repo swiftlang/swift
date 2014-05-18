@@ -168,12 +168,12 @@ func checkInf(inf: TestFloat) {
 }
 
 func testInf() {
-  var stdlibPlusInf = TestFloat.infinite()
+  var stdlibPlusInf = TestFloat.infinity()
   checkInf(stdlibPlusInf)
   _precondition(!stdlibPlusInf.isSignMinus)
   _precondition(stdlibPlusInf.floatingPointClass == .PositiveInfinity)
 
-  var stdlibMinusInf = -TestFloat.infinite()
+  var stdlibMinusInf = -TestFloat.infinity()
   checkInf(stdlibMinusInf)
   _precondition(stdlibMinusInf.isSignMinus)
   _precondition(stdlibMinusInf.floatingPointClass == .NegativeInfinity)

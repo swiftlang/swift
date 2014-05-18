@@ -53,7 +53,7 @@ protocol FloatingPointNumber {
   // FIXME: make these readonly static properties.
 
   /// Returns positive infinity.
-  class func infinite() -> Self
+  class func infinity() -> Self
 
   /// Returns a quiet NaN.
   class func NaN() -> Self
@@ -70,11 +70,11 @@ protocol FloatingPointNumber {
   /// Returns true if this number has a negative sign.
   var isSignMinus: Bool { get }
 
-  /// Returns true if this number is normal (not zero, subnormal, infinite, or
+  /// Returns true if this number is normal (not zero, subnormal, infinity, or
   /// NaN).
   var isNormal: Bool { get }
 
-  /// Returns true if this number is zero, subnormal, or normal (not infinite
+  /// Returns true if this number is zero, subnormal, or normal (not infinity
   /// or NaN).
   var isFinite: Bool { get }
 
@@ -84,7 +84,7 @@ protocol FloatingPointNumber {
   /// Returns true if this number is subnormal.
   var isSubnormal: Bool { get }
 
-  /// Returns true if this number is infinite.
+  /// Returns true if this number is infinity.
   var isInfinite: Bool { get }
 
   /// Returns true if this number is NaN.

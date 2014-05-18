@@ -181,7 +181,7 @@ extension ${Self} : FloatingPointNumber {
     return _toBitPattern() & mask
   }
 
-  static func infinite() -> ${Self} {
+  static func infinity() -> ${Self} {
     return _fromBitPattern(${getInfBitPattern(bits)})
   }
 
@@ -235,7 +235,7 @@ extension ${Self} : FloatingPointNumber {
     return false
 
     // Alternative implementation that is not safe in case of SNaN:
-    // return abs(self) == ${Self}.infinite()
+    // return abs(self) == ${Self}.infinity()
   }
 
   var isNaN:  Bool {
