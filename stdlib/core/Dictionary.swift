@@ -200,9 +200,9 @@ protocol _DictionaryStorage {
   var startIndex: Index { get }
   var endIndex: Index { get }
   func indexForKey(key: KeyType) -> Index?
-  func _assertingGet(i: Index) -> (KeyType, ValueType)
-  func _assertingGet(key: KeyType) -> ValueType
-  func _maybeGet(key: KeyType) -> ValueType?
+  func assertingGet(i: Index) -> (KeyType, ValueType)
+  func assertingGet(key: KeyType) -> ValueType
+  func maybeGet(key: KeyType) -> ValueType?
   mutating func updateValue(value: ValueType, forKey: KeyType) -> ValueType?
   mutating func removeAtIndex(index: Index)
   mutating func removeValueForKey(key: KeyType) -> ValueType?
@@ -430,19 +430,19 @@ struct _NativeDictionaryStorage<KeyType : Hashable, ValueType> :
     return found ? i : .None
   }
 
-  func _assertingGet(i: Index) -> (KeyType, ValueType) {
+  func assertingGet(i: Index) -> (KeyType, ValueType) {
     let e = self[i.offset]
     _precondition(e, "attempting to access Dictionary elements using an invalid Index")
     return e!
   }
 
-  func _assertingGet(key: KeyType) -> ValueType {
+  func assertingGet(key: KeyType) -> ValueType {
     let e = self[_find(key, _bucket(key)).pos.offset]
     _precondition(e, "key not found in Dictionary")
     return e!.value
   }
 
-  func _maybeGet(key: KeyType) -> ValueType? {
+  func maybeGet(key: KeyType) -> ValueType? {
     var (i, found) = _find(key, _bucket(key))
     if found {
       return self[i.offset]!.value
@@ -547,7 +547,7 @@ class _NativeDictionaryStorageKeyNSEnumerator<KeyType : Hashable, ValueType>
     if nextIndex == endIndex {
       return nil
     }
-    let (nativeKey, _) = nextIndex.nativeStorage._assertingGet(nextIndex)
+    let (nativeKey, _) = nextIndex.nativeStorage.assertingGet(nextIndex)
     nextIndex = nextIndex.succ()
     return _reinterpretCastToAnyObject(nativeKey)
   }
@@ -679,7 +679,7 @@ class _NativeDictionaryStorageOwnerBase
                  isBridgedVerbatimToObjectiveC(ValueType.self),
                  "native Dictionary storage can be used as NSDictionary only when both key and value are bridged verbatim to Objective-C")
     let nativeKey = reinterpretCast(aKey) as KeyType
-    if let nativeValue = nativeStorage._maybeGet(nativeKey) {
+    if let nativeValue = nativeStorage.maybeGet(nativeKey) {
       return _reinterpretCastToAnyObject(nativeValue)
     }
     return nil
@@ -719,7 +719,7 @@ class _NativeDictionaryStorageOwnerBase
       if (currIndex == endIndex) {
         break
       }
-      var (nativeKey, _) = nativeStorage._assertingGet(currIndex)
+      var (nativeKey, _) = nativeStorage.assertingGet(currIndex)
       let bridgedKey: AnyObject = _reinterpretCastToAnyObject(nativeKey)
       unmanagedObjects[i] = bridgedKey
       ++stored
@@ -749,7 +749,7 @@ struct _CocoaDictionaryStorage : _DictionaryStorage {
     // the key is present, this lookup is a penalty for the slow path, but the
     // potential savings are significant: we could skip a memory allocation and
     // a linear search.
-    if !_maybeGet(key) {
+    if !maybeGet(key) {
       return .None
     }
 
@@ -758,19 +758,19 @@ struct _CocoaDictionaryStorage : _DictionaryStorage {
     return Index(cocoaDictionary, allKeys, keyIndex)
   }
 
-  func _assertingGet(i: Index) -> (AnyObject, AnyObject) {
+  func assertingGet(i: Index) -> (AnyObject, AnyObject) {
     let key: AnyObject = i.allKeys.objectAtIndex(i.nextKeyIndex)
     let value: AnyObject = i.cocoaDictionary.objectForKey(key)!
     return (key, value)
   }
 
-  func _assertingGet(key: AnyObject) -> AnyObject {
+  func assertingGet(key: AnyObject) -> AnyObject {
     let value: AnyObject? = cocoaDictionary.objectForKey(key)
     _precondition(value, "key not found in underlying NSDictionary")
     return value!
   }
 
-  func _maybeGet(key: AnyObject) -> AnyObject? {
+  func maybeGet(key: AnyObject) -> AnyObject? {
     return cocoaDictionary.objectForKey(key)
   }
 
@@ -955,13 +955,13 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
     }
   }
 
-  func _assertingGet(i: Index) -> (KeyType, ValueType) {
+  func assertingGet(i: Index) -> (KeyType, ValueType) {
     switch self {
     case .Native:
-      return native._assertingGet(i._nativeIndex)
+      return native.assertingGet(i._nativeIndex)
     case .Cocoa(let cocoaStorage):
       var (key: AnyObject, value: AnyObject) =
-          cocoaStorage._assertingGet(i._cocoaIndex)
+          cocoaStorage.assertingGet(i._cocoaIndex)
       // FIXME: we should be using an `as` cast instead of `reinterpretCast`.
       // <rdar://problem/15494623> Handle dynamic cast to archetype bound to
       // ObjC existential
@@ -977,26 +977,26 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
     }
   }
 
-  func _assertingGet(key: KeyType) -> ValueType {
+  func assertingGet(key: KeyType) -> ValueType {
     switch self {
     case .Native:
-      return native._assertingGet(key)
+      return native.assertingGet(key)
     case .Cocoa(let cocoaStorage):
       // FIXME: This assumes that KeyType and ValueType are bridged verbatim.
       let anyObjectKey: AnyObject = _reinterpretCastToAnyObject(key)
-      let anyObjectValue: AnyObject = cocoaStorage._assertingGet(anyObjectKey)
+      let anyObjectValue: AnyObject = cocoaStorage.assertingGet(anyObjectKey)
       return reinterpretCast(anyObjectValue) as ValueType
     }
   }
 
-  func _maybeGet(key: KeyType) -> ValueType? {
+  func maybeGet(key: KeyType) -> ValueType? {
     switch self {
     case .Native:
-      return native._maybeGet(key)
+      return native.maybeGet(key)
     case .Cocoa(let cocoaStorage):
       // FIXME: This assumes that KeyType and ValueType are bridged verbatim.
       let anyObjectKey: AnyObject = _reinterpretCastToAnyObject(key)
-      if let anyObjectValue: AnyObject = cocoaStorage._maybeGet(anyObjectKey) {
+      if let anyObjectValue: AnyObject = cocoaStorage.maybeGet(anyObjectKey) {
         return reinterpretCast(anyObjectValue) as ValueType
       }
       return .None
@@ -1133,7 +1133,7 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
       nativeStorage = native
     }
 
-    let key = nativeStorage._assertingGet(nativeIndex).0
+    let key = nativeStorage.assertingGet(nativeIndex).0
     let start = nativeStorage._bucket(key)
     nativeDeleteImpl(nativeStorage, start: start, offset: nativeIndex.offset)
   }
@@ -1172,7 +1172,7 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
     case .Cocoa(let cocoaStorage):
       // FIXME: This assumes that KeyType and ValueType are bridged verbatim.
       let anyObjectKey: AnyObject = _reinterpretCastToAnyObject(key)
-      if !cocoaStorage._maybeGet(anyObjectKey) {
+      if !cocoaStorage.maybeGet(anyObjectKey) {
         return .None
       }
       migrateDataToNativeStorage(cocoaStorage)
@@ -1512,7 +1512,7 @@ enum DictionaryGenerator<KeyType : Hashable, ValueType> : Generator {
       if startIndex == endIndex {
         return .None
       }
-      let result = startIndex.nativeStorage._assertingGet(startIndex)
+      let result = startIndex.nativeStorage.assertingGet(startIndex)
       self = ._Native(start: startIndex.succ(), end: endIndex)
       return result
     case ._Cocoa:
@@ -1599,12 +1599,12 @@ struct Dictionary<KeyType : Hashable, ValueType> : Collection,
   ///
   /// Complexity: O(1)
   subscript(i: Index) -> Element {
-    return _variantStorage._assertingGet(i)
+    return _variantStorage.assertingGet(i)
   }
 
   subscript(key: KeyType) -> ValueType? {
     get {
-      return _variantStorage._maybeGet(key)
+      return _variantStorage.maybeGet(key)
     }
     set(newValue) {
       if let x = newValue {
