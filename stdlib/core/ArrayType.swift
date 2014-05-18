@@ -61,7 +61,7 @@ protocol ArrayType
 
   /// Remove the element at the given index.  Returns: the removed
   /// element.  Worst case complexity: O(N).  Requires: count > index
-  mutating func removeAt(index: Int) -> Self.GeneratorType.Element
+  mutating func removeAtIndex(index: Int) -> Self.GeneratorType.Element
 
   /// Erase all the elements.  If `keepCapacity` is `true`, `capacity`
   /// will not change

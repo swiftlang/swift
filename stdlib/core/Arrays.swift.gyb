@@ -190,7 +190,7 @@ extension ${Self} : ArrayType {
 
   /// Remove the element at the given index.  Worst case complexity:
   /// O(N).  Requires: index < count
-  mutating func removeAt(index: Int) -> T {
+  mutating func removeAtIndex(index: Int) -> T {
     let result = self[index]
     replace(&self, index..(index + 1), EmptyCollection())
     return result
