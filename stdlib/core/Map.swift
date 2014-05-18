@@ -1,4 +1,4 @@
-//===--- Map.swift - Lazily map the elements of a Collection --------------===//
+//===--- Map.swift - Lazily map the elements of a Sequence ---------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,12 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-struct _MapGenerator<Base: Generator, T> : Generator, Sequence {
+struct MapSequenceView<Base: Generator, T> : Generator, Sequence {
   mutating func next() -> T? {
     return base.next().map(transform)
   }
   
-  func generate() -> _MapGenerator {
+  func generate() -> MapSequenceView {
     return self
   }
 
@@ -28,7 +28,7 @@ struct _MapGenerator<Base: Generator, T> : Generator, Sequence {
   var transform: (Base.Element)->T
 }
 
-struct _Map<Base: Collection, T> : Collection {
+struct MapCollectionView<Base: Collection, T> : Collection {
   var startIndex: Base.IndexType {
     return base.startIndex
   }
@@ -41,8 +41,8 @@ struct _Map<Base: Collection, T> : Collection {
     return transform(base[index])
   }
 
-  func generate() -> _MapGenerator<Base.GeneratorType, T> {
-    return _MapGenerator(base.generate(), transform)
+  func generate() -> MapSequenceView<Base.GeneratorType, T> {
+    return MapSequenceView(base.generate(), transform)
   }
 
   init(_ base: Base, transform: (Base.GeneratorType.Element)->T) {
@@ -54,3 +54,14 @@ struct _Map<Base: Collection, T> : Collection {
   var transform: (Base.GeneratorType.Element)->T
 }
 
+func map<S:Sequence, T>(
+  source: S, transform: (S.GeneratorType.Element)->T
+) -> MapSequenceView<S.GeneratorType, T> {
+  return MapSequenceView(source.generate(), transform)
+}
+
+func map<C:Collection, T>(
+  source: C, transform: (C.GeneratorType.Element)->T
+) -> MapCollectionView<C, T> {
+  return MapCollectionView(source, transform)
+}

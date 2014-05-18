@@ -1673,12 +1673,12 @@ struct Dictionary<KeyType : Hashable, ValueType> : Collection,
   // API itself.
   //
 
-  var keys: _Map<Dictionary, KeyType> {
-    return _Map(self) { $0.0 }
+  var keys: MapCollectionView<Dictionary, KeyType> {
+    return map(self) { $0.0 }
   }
 
-  var values: _Map<Dictionary, ValueType> {
-    return _Map(self) { $0.1 }
+  var values: MapCollectionView<Dictionary, ValueType> {
+    return map(self) { $0.1 }
   }
 }
 
