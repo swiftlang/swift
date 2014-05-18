@@ -189,6 +189,8 @@ struct ASTContext::Implementation {
       for (auto &conformance : NormalConformances)
         conformance.~NormalProtocolConformance();
     }
+
+    size_t getTotalMemory() const;
   };
 
   llvm::DenseMap<Module*, ModuleType*> ModuleTypes;
@@ -1180,6 +1182,71 @@ ASTContext::getInheritedConformance(Type type, ProtocolConformance *inherited) {
   auto result = new (*this, arena) InheritedProtocolConformance(type, inherited);
   inheritedConformances.InsertNode(result, insertPos);
   return result;
+}
+
+size_t ASTContext::getTotalMemory() const {
+  size_t Size = sizeof(*this) +
+    //LoadedModules ?
+    // ExternalDefinitions ?
+    llvm::capacity_in_bytes(ConformingDeclMap) +
+    llvm::capacity_in_bytes(CanonicalGenericTypeParamTypeNames) +
+    // RemappedTypes ?
+    sizeof(Impl) +
+    Impl.Allocator.getTotalMemory() +
+    Impl.Cleanups.capacity() +
+    Impl.IdentifierTable.getAllocator().getTotalMemory() +
+    llvm::capacity_in_bytes(Impl.ModuleLoaders) +
+    llvm::capacity_in_bytes(Impl.RawComments) +
+    llvm::capacity_in_bytes(Impl.BriefComments) +
+    llvm::capacity_in_bytes(Impl.LocalDiscriminators) +
+    llvm::capacity_in_bytes(Impl.ModuleTypes) +
+    llvm::capacity_in_bytes(Impl.GenericParamTypes) +
+    // Impl.GenericFunctionTypes ?
+    // Impl.SILFunctionTypes ?
+    llvm::capacity_in_bytes(Impl.SILBlockStorageTypes) +
+    llvm::capacity_in_bytes(Impl.IntegerTypes) +
+    // Impl.ProtocolCompositionTypes ?
+    // Impl.BuiltinVectorTypes ?
+    // Impl.GenericSignatures ?
+    // Impl.CompoundNames ?
+    Impl.OpenedExistentialArchetypes.capacity() +
+    Impl.Permanent.getTotalMemory();
+
+    if (Impl.CurrentConstraintSolverArena) {
+      Size +=
+        Impl.CurrentConstraintSolverArena->getTotalMemory() +
+        Impl.CurrentConstraintSolverArena->Allocator.getTotalMemory();
+    }
+
+    return Size;
+}
+
+size_t ASTContext::Implementation::Arena::getTotalMemory() const {
+  return sizeof(*this) +
+    // TupleTypes ?
+    llvm::capacity_in_bytes(MetatypeTypes) +
+    llvm::capacity_in_bytes(ExistentialMetatypeTypes) +
+    llvm::capacity_in_bytes(FunctionTypes) +
+    llvm::capacity_in_bytes(ArraySliceTypes) +
+    llvm::capacity_in_bytes(OptionalTypes) +
+    llvm::capacity_in_bytes(ImplicitlyUnwrappedOptionalTypes) +
+    llvm::capacity_in_bytes(ParenTypes) +
+    llvm::capacity_in_bytes(ReferenceStorageTypes) +
+    llvm::capacity_in_bytes(LValueTypes) +
+    llvm::capacity_in_bytes(InOutTypes) +
+    llvm::capacity_in_bytes(SubstitutedTypes) +
+    llvm::capacity_in_bytes(DependentMemberTypes) +
+    llvm::capacity_in_bytes(DynamicSelfTypes) +
+    // EnumTypes ?
+    // StructTypes ?
+    // ClassTypes ?
+    // UnboundGenericTypes ?
+    // BoundGenericTypes ?
+    llvm::capacity_in_bytes(BoundGenericSubstitutions) +
+    // NormalConformances ?
+    // SpecializedConformances ?
+    // InheritedConformances ?
+    llvm::capacity_in_bytes(ConformsTo);
 }
 
 //===----------------------------------------------------------------------===//

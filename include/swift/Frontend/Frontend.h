@@ -303,6 +303,7 @@ public:
   ASTContext &getASTContext() {
     return *Context;
   }
+  bool hasASTContext() const { return Context != nullptr; }
 
   void addDiagnosticConsumer(DiagnosticConsumer *DC) {
     Diagnostics.addConsumer(*DC);

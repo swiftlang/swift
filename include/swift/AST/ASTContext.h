@@ -606,6 +606,9 @@ public:
   Optional<ArrayRef<Substitution>>
         getSubstitutions(BoundGenericType *Bound) const;
 
+  /// \brief Returns memory usage of this ASTContext.
+  size_t getTotalMemory() const;
+
 private:
   friend class Decl;
   Optional<RawComment> getRawComment(const Decl *D);
