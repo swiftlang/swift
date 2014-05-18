@@ -168,12 +168,12 @@ func checkInf(inf: TestFloat) {
 }
 
 func testInf() {
-  var stdlibPlusInf = TestFloat.infinity()
+  var stdlibPlusInf = TestFloat.infinity
   checkInf(stdlibPlusInf)
   _precondition(!stdlibPlusInf.isSignMinus)
   _precondition(stdlibPlusInf.floatingPointClass == .PositiveInfinity)
 
-  var stdlibMinusInf = -TestFloat.infinity()
+  var stdlibMinusInf = -TestFloat.infinity
   checkInf(stdlibMinusInf)
   _precondition(stdlibMinusInf.isSignMinus)
   _precondition(stdlibMinusInf.floatingPointClass == .NegativeInfinity)
@@ -220,11 +220,11 @@ func checkQNaN(qnan: TestFloat) {
 }
 
 func testNaN() {
-  var stdlibDefaultNaN = TestFloat.NaN()
+  var stdlibDefaultNaN = TestFloat.NaN
   checkQNaN(stdlibDefaultNaN)
   _precondition(stdlibDefaultNaN != stdlibDefaultNaN)
 
-  var stdlibQNaN = TestFloat.quietNaN()
+  var stdlibQNaN = TestFloat.quietNaN
   checkQNaN(stdlibQNaN)
   _precondition(stdlibQNaN != stdlibQNaN)
 

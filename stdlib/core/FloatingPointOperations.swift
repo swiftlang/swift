@@ -44,21 +44,19 @@ func ==(lhs: FloatingPointClassification, rhs: FloatingPointClassification) -> B
   }
 }
 
-
 protocol FloatingPointNumber {
   typealias _BitsType
   class func _fromBitPattern(bits: _BitsType) -> Self
   func _toBitPattern() -> _BitsType
 
-  // FIXME: make these readonly static properties.
+  /// The positive infinity.
+  class var infinity: Self { get }
 
-  /// Returns positive infinity.
-  class func infinity() -> Self
+  /// A quiet NaN.
+  class var NaN: Self { get }
 
-  /// Returns a quiet NaN.
-  class func NaN() -> Self
-
-  class func quietNaN() -> Self
+  /// A quiet NaN.
+  class var quietNaN: Self { get }
 
   /// @{
   /// IEEE 754-2008 Non-computational operations.

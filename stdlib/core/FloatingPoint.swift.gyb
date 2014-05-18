@@ -181,19 +181,19 @@ extension ${Self} : FloatingPointNumber {
     return _toBitPattern() & mask
   }
 
-  static func infinity() -> ${Self} {
+  static var infinity: ${Self} {
     return _fromBitPattern(${getInfBitPattern(bits)})
   }
 
-  static func NaN() -> ${Self} {
-    return quietNaN()
+  static var NaN: ${Self} {
+    return quietNaN
   }
 
-  static func quietNaN() -> ${Self} {
+  static var quietNaN: ${Self} {
     return _fromBitPattern(${getQuietNaNBitPattern(bits)})
   }
 
-  var isSignMinus:  Bool {
+  var isSignMinus: Bool {
     return __getSignBit() == 1
   }
 
