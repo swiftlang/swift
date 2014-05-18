@@ -15,8 +15,10 @@
 
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_VAR_INIT_2 | FileCheck %s -check-prefix=TOP_LEVEL_VAR_INIT_2
 
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=PLAIN_TOP_LEVEL_1 | FileCheck %s -check-prefix=PLAIN_TOP_LEVEL
-// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=PLAIN_TOP_LEVEL_1 | FileCheck %s -check-prefix=NEGATIVE
+// RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=PLAIN_TOP_LEVEL_1 > %t.toplevel.txt
+// RUN: FileCheck %s -check-prefix=PLAIN_TOP_LEVEL < %t.toplevel.txt
+// RUN: FileCheck %s -check-prefix=PLAIN_TOP_LEVEL_NO_DUPLICATES < %t.toplevel.txt
+// RUN: FileCheck %s -check-prefix=NEGATIVE < %t.toplevel.txt
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=PLAIN_TOP_LEVEL_2 | FileCheck %s -check-prefix=PLAIN_TOP_LEVEL
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=PLAIN_TOP_LEVEL_2 | FileCheck %s -check-prefix=NEGATIVE
 
@@ -60,6 +62,9 @@ struct FooStruct {
 }
 
 var fooObject : FooStruct
+
+func fooFunc1() {}
+func fooFunc2(a: Int, b: Double) {}
 
 func erroneous1(x: Undeclared) {}
 
@@ -160,6 +165,13 @@ func resyncParser8() {}
 // PLAIN_TOP_LEVEL-DAG: Decl[Struct]/CurrModule: FooStruct[#FooStruct#]{{$}}
 // PLAIN_TOP_LEVEL-DAG: Decl[GlobalVar]/CurrModule: fooObject[#FooStruct#]{{$}}
 // PLAIN_TOP_LEVEL: End completions
+
+// PLAIN_TOP_LEVEL_NO_DUPLICATES: Begin completions
+// PLAIN_TOP_LEVEL_NO_DUPLICATES-DAG: Decl[FreeFunction]/CurrModule: fooFunc1()[#Void#]{{$}}
+// PLAIN_TOP_LEVEL_NO_DUPLICATES-DAG: Decl[FreeFunction]/CurrModule: fooFunc2({#Int#}, {#Double#})[#Void#]{{$}}
+// PLAIN_TOP_LEVEL_NO_DUPLICATES-NOT: fooFunc1
+// PLAIN_TOP_LEVEL_NO_DUPLICATES-NOT: fooFunc2
+// PLAIN_TOP_LEVEL_NO_DUPLICATES: End completions
 
 func resyncParser9() {}
 

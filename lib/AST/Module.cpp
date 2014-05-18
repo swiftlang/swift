@@ -228,8 +228,13 @@ void SourceLookupCache::lookupVisibleDecls(AccessPathTy AccessPath,
   }
 
   for (auto &tlv : TopLevelValues) {
-    for (ValueDecl *vd : tlv.second)
+    for (ValueDecl *vd : tlv.second) {
+      // Declarations are added under their full and simple names.  Skip the
+      // entry for the simple name so that we report each declaration once.
+      if (tlv.first.isSimpleName() && !vd->getFullName().isSimpleName())
+        continue;
       Consumer.foundDecl(vd, DeclVisibilityKind::VisibleAtTopLevel);
+    }
   }
 }
 
