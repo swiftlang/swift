@@ -3854,23 +3854,12 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
         if (!expr) return nullptr;
       }
 
-      // Classify the element type of the array we're bridging from.
-      Type bridgedToType;
-      bool bridgedVerbatim;
-      bool isConditionallyBridged = false;
-      auto fromBaseType = cs.getBaseTypeForArrayType(fromType.getPointer());
-      std::tie(bridgedToType, bridgedVerbatim)
-        = tc.getBridgedToObjC(dc, fromBaseType, &isConditionallyBridged);
-
-      // If the source type is bridged verbatim, this is a simple upcast.
-      if (bridgedVerbatim) {
-        return new (tc.Context) ArrayUpcastConversionExpr(expr, toType);
-      }
-
-      // Otherwise, it's a bridged upcast.
-      auto upcast = new (tc.Context) ArrayBridgedConversionExpr(expr, toType);
-      upcast->isConditionallyBridged = isConditionallyBridged;
-      return upcast;
+      // Form the upcast.
+      assert(tc.getBridgedToObjC(
+               dc,
+               cs.getBaseTypeForArrayType(fromType.getPointer())).second &&
+             "Cannot upcast array of non-bridged-verbatim type");
+      return new (tc.Context) ArrayUpcastConversionExpr(expr, toType);
     }
 
     case ConversionRestrictionKind::User:

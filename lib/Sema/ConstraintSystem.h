@@ -683,10 +683,10 @@ enum ScoreKind {
   SK_FunctionConversion,
   /// A literal expression bound to a non-default literal type.
   SK_NonDefaultLiteral,
-  /// An implicit upcast conversion between array types.
-  SK_ArrayUpcastConversion,
   /// An implicit bridged conversion between array types.
   SK_ArrayBridgedConversion,
+  /// An implicit upcast conversion between array types.
+  SK_ArrayUpcastConversion,
 };
 
 /// The number of score kinds.
