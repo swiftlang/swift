@@ -33,7 +33,7 @@ protocol ArrayType
   var isEmpty: Bool {get}
 
   /// An object that guarantees the lifetime of this array's elements
-  var owner: AnyObject? {get}
+  var _owner: AnyObject? {get}
 
   /// If the elements are stored contiguously, a pointer to the first
   /// element. Otherwise, nil.

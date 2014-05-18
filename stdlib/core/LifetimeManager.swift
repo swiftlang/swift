@@ -51,7 +51,7 @@ class LifetimeManager {
 
   /// Call this function to end the forced lifetime extension.
   func release() {
-    _fixLifetime(_managedRefs.owner)
+    _fixLifetime(_managedRefs._owner)
     _releaseCalled = true
   }
 }

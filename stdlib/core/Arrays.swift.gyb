@@ -122,7 +122,7 @@ extension ${Self} : ArrayType {
   }
   
   /// An object that guarantees the lifetime of this array's elements
-  var owner: AnyObject? {
+  var _owner: AnyObject? {
     return buffer.owner
   }
   
@@ -266,7 +266,7 @@ extension ${Self} {
   func _cPointerArgs() -> (AnyObject?, Builtin.RawPointer) {
     let p = elementStorage
     if _fastPath(p != nil || count == 0) {
-      return (owner, p.value)
+      return (_owner, p.value)
     }
     let n = _extractOrCopyToNativeArrayBuffer(self.buffer)
     return (n.owner, n.elementStorage.value)

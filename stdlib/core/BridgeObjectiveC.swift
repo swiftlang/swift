@@ -233,7 +233,7 @@ struct CMutablePointer<T> : Equatable {
     // The callee that receives the pointer may mutate through it, so
     // force uniqueness by calling reserve(0).
     a.reserveCapacity(0)
-    return CMutablePointer(owner: a.owner, value: a.elementStorage.value)
+    return CMutablePointer(owner: a._owner, value: a.elementStorage.value)
   }
 
   /// True if this is a scoped pointer, meaning it has a owner reference
@@ -313,7 +313,7 @@ struct CMutableVoidPointer : Equatable {
     // The callee that receives the pointer may mutate through it, so
     // force uniqueness by calling reserve(0).
     a.reserveCapacity(0)
-    return CMutableVoidPointer(owner: a.owner,
+    return CMutableVoidPointer(owner: a._owner,
                                value: a.elementStorage.value)
   }
 
