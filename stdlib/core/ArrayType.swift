@@ -20,8 +20,8 @@ protocol ArrayType
   /// Construct an empty Array
   init()
 
-  /// Construct an array of count elements, each initialized to value
-  init(count: Int, value: Self.GeneratorType.Element)
+  /// Construct an array of count elements, each initialized to repeatedValue
+  init(count: Int, repeatedValue: Self.GeneratorType.Element)
   
   /// How many elements the Array stores
   var count: Int {get}

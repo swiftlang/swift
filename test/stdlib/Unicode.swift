@@ -119,7 +119,7 @@ where
 // inspected later.
 class ArraySink<T: IntegerLiteralConvertible> : Sink {
   init(capacity: Int) {
-    storage = Array(count: capacity, value: 0)
+    storage = Array(count: capacity, repeatedValue: 0)
   }
   func put(x: T) {
     storage[count++] = x
@@ -161,7 +161,7 @@ else {
 class CodecTest<Codec: TestableUnicodeCodec> {
   var used = 0
   typealias CodeUnit = Codec.CodeUnit
-  var nsEncodeBuffer: CodeUnit[] = Array(count: 4, value: 0)
+  var nsEncodeBuffer: CodeUnit[] = Array(count: 4, repeatedValue: 0)
   var encodeBuffer = ArraySink<CodeUnit>(capacity: 4)
 
   func testOne(scalar: UnicodeScalar)

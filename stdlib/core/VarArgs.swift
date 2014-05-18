@@ -47,7 +47,9 @@ func getVaList(args: CVarArg[]) -> CVaListPointer {
 }
 
 func encodeBitsAsWords<T: CVarArg>(x: T) -> Word[] {
-  var result = Word[](count: (sizeof(T.self) + sizeof(Word.self) - 1) / sizeof(Word.self), value: 0)
+  var result = Word[](
+    count: (sizeof(T.self) + sizeof(Word.self) - 1) / sizeof(Word.self),
+    repeatedValue: 0)
   var tmp = x
   c_memcpy(dest: UnsafePointer(result.elementStorage),
            src: UnsafePointer(Builtin.addressof(&tmp)),
@@ -171,7 +173,7 @@ class VaListBuilder {
   
   init() {
     // prepare the register save area
-    storage = Array(count: _x86_64RegisterSaveWords, value: 0)
+    storage = Array(count: _x86_64RegisterSaveWords, repeatedValue: 0)
   }
 
   func append(arg: CVarArg) {
