@@ -753,7 +753,7 @@ struct _CocoaDictionaryStorage : _DictionaryStorage {
       return .None
     }
 
-    let allKeys = cocoaDictionary.allKeys()
+    let allKeys = cocoaDictionary.allKeys
     let keyIndex = allKeys.indexOfObject(key)
     return Index(cocoaDictionary, allKeys, keyIndex)
   }
@@ -1254,7 +1254,7 @@ func == <KeyType : Hashable, ValueType> (
 }
 
 struct _CocoaDictionaryIndex : BidirectionalIndex {
-  // Assumption: we rely on NSDictionary.allKeys(), when being repeatedly
+  // Assumption: we rely on NSDictionary.allKeys, when being repeatedly
   // called on the same NSDictionary, returning keys in the same order
   // every time.
 
@@ -1266,13 +1266,13 @@ struct _CocoaDictionaryIndex : BidirectionalIndex {
 
   init(_ cocoaDictionary: _SwiftNSDictionary, startIndex: ()) {
     self.cocoaDictionary = cocoaDictionary
-    self.allKeys = cocoaDictionary.allKeys()
+    self.allKeys = cocoaDictionary.allKeys
     self.nextKeyIndex = 0
   }
 
   init(_ cocoaDictionary: _SwiftNSDictionary, endIndex: ()) {
     self.cocoaDictionary = cocoaDictionary
-    self.allKeys = cocoaDictionary.allKeys()
+    self.allKeys = cocoaDictionary.allKeys
     self.nextKeyIndex = allKeys.count
   }
 
@@ -1943,7 +1943,7 @@ protocol _SwiftNSDictionaryRequiredOverrides :
 
 @objc
 protocol _SwiftNSDictionary : _SwiftNSDictionaryRequiredOverrides {
-  func allKeys() -> _SwiftNSArray
+  var allKeys:  _SwiftNSArray { get }
   func isEqual(anObject: AnyObject) -> Bool
 }
 
