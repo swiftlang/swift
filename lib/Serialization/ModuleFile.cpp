@@ -988,6 +988,7 @@ void ModuleFile::lookupVisibleDecls(Module::AccessPathTy accessPath,
     for (auto item : *iter)
       consumer.foundDecl(cast<ValueDecl>(getDecl(item.second)),
                          DeclVisibilityKind::VisibleAtTopLevel);
+    return;
   }
 
   for (auto entry : TopLevelDecls->data()) {
