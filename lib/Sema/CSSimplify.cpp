@@ -2017,15 +2017,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
       return SolutionKind::Solved;
   }
   
-  auto isExplicitCheckedCast = false;
-  auto baseLocator = locator.getBaseLocator();
-  if (baseLocator) {
-    isExplicitCheckedCast =
-    baseLocator->getAnchor() &&
-    isa<ConditionalCheckedCastExpr>(baseLocator->getAnchor()) &&
-    !baseLocator->getAnchor()->isImplicit();
-  }
-  
   // If possible, redirect the coercion to a bridged type.
   // Don't implicitly unwrap, though - that can lead to bogus casts.
   if (!(flags & TMF_UnwrappingOptional)) {
