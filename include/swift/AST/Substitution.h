@@ -63,8 +63,8 @@ public:
   /// order as Archetype->getConformsTo().
   ArrayRef<ProtocolConformance *> Conformance;
 
-  bool operator!=(const Substitution &Other) const;
-  bool operator==(const Substitution &Other) const;
+  bool operator!=(const Substitution &other) const { return !(*this == other); }
+  bool operator==(const Substitution &other) const;
   void print(llvm::raw_ostream &os) const;
   void dump() const;
   

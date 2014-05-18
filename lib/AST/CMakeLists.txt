@@ -25,6 +25,7 @@ add_swift_library(swiftAST
   ProtocolConformance.cpp
   RawComment.cpp
   Stmt.cpp
+  Substitution.cpp
   Type.cpp
   TypeRepr.cpp
   TypeWalker.cpp
