@@ -91,14 +91,14 @@ func indices<
   return Range(start: seq.startIndex, end: seq.endIndex)
 }
 
-struct IndexedGenerator<
-  Seq: Collection, Indices: Sequence
-  where Seq.IndexType == Indices.GeneratorType.Element
+struct PermutationGenerator<
+  C: Collection, Indices: Sequence
+  where C.IndexType == Indices.GeneratorType.Element
 > : Generator, Sequence {
-  var seq : Seq
+  var seq : C
   var indices : Indices.GeneratorType
 
-  typealias Element = Seq.GeneratorType.Element
+  typealias Element = C.GeneratorType.Element
 
   mutating func next() -> Element? {
     var result = indices.next()
@@ -106,12 +106,12 @@ struct IndexedGenerator<
   }
 
   // Every Generator is also a single-pass Sequence
-  typealias GeneratorType = IndexedGenerator
+  typealias GeneratorType = PermutationGenerator
   func generate() -> GeneratorType {
     return self
   }
 
-  init(sequence seq: Seq, indices: Indices) {
+  init(elements seq: C, indices: Indices) {
     self.seq = seq
     self.indices = indices.generate()
   }

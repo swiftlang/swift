@@ -32,7 +32,7 @@ println("")
 // CHECK: raboof
 let i = indices(foobar)
 let r = Reverse(i)
-for a in IndexedGenerator(sequence: foobar, indices: r) {
+for a in PermutationGenerator(elements: foobar, indices: r) {
   
   print(a)
 }
@@ -66,7 +66,7 @@ func isPalindrome1<
   where S.IndexType: BidirectionalIndex, S.GeneratorType.Element: Equatable
 >(seq: S) -> Bool {
 
-  var a = IndexedGenerator(sequence: seq, indices: indices(seq))
+  var a = PermutationGenerator(elements: seq, indices: indices(seq))
   var b = Reverse(seq).generate()
   for nextChar in a {
     if nextChar != b.next()! {
@@ -138,12 +138,12 @@ func isPalindrome4<
 >(seq: S) -> Bool {
   typealias IndexType = S.IndexType
 
-  var a = IndexedGenerator(sequence: seq, indices: indices(seq))
+  var a = PermutationGenerator(elements: seq, indices: indices(seq))
   // FIXME: separate ri from the expression below pending
   // <rdar://problem/15772601> Type checking failure
   var i = indices(seq)
   let ri = Reverse(i)
-  var b = IndexedGenerator(sequence: seq, indices: ri)
+  var b = PermutationGenerator(elements: seq, indices: ri)
   for nextChar in a {
     if nextChar != b.next()! {
       return false
