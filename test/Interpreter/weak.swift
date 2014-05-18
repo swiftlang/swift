@@ -2,7 +2,13 @@
 
 import ObjectiveC
 
-class SwiftClassBase {
+@class_protocol protocol Protocol {
+  func noop()
+}
+
+//========================== Test pure Swift classes ==========================
+
+class SwiftClassBase : Protocol {
   func noop() { println("noop") }
 }
 
@@ -37,5 +43,71 @@ func testSwiftClass() {
 
 testSwiftClass()
 
+//========================== Test ObjC classes ==========================
+
+@objc
+class ObjCClassBase : Protocol {
+  func noop() { println("noop") }
+}
+
+@objc
+class ObjCClass : ObjCClassBase {
+  init() {
+    println("ObjCClass Created")
+  }
+
+  deinit {
+    println("ObjCClass Destroyed")
+  }
+}
+
+func printState(x : ObjCClassBase?) {
+  println(x ? "is present" : "is nil")
+}
+
+func testObjCClass() {
+  println("testObjCClass")                // CHECK: testObjCClass
+  
+  weak var w : ObjCClassBase?
+  printState(w)                           // CHECK-NEXT: is nil
+  var c : ObjCClassBase = ObjCClass()     // CHECK: ObjCClass Created
+  printState(w)                           // CHECK-NEXT: is nil
+  w = c
+  printState(w)                           // CHECK-NEXT: is present
+  c.noop()                                // CHECK-NEXT: noop
+  c = ObjCClassBase()                     // CHECK-NEXT: ObjCClass Destroyed
+  w = nil
+  printState(w)                           // CHECK-NEXT: is nil
+}
+
+testObjCClass()
+
+
+//======================== Test Classbound Protocols ========================
+
+
+/* This crashes SILGen:
+  <rdar://problem/16952927> assigning a pure swift class to a classbound protocol crashes in silgen
+  
+func printState(x : Protocol?) {
+  println(x ? "is present" : "is nil")
+}
+
+func testProtocol() {
+  println("testProtocol")                 // HECK: testProtocol
+  
+  weak var w : Protocol?
+  printState(w)                           // HECK-NEXT: is nil
+  var c : SwiftClassBase = SwiftClass()   // HECK: SwiftClass Created
+  printState(w)                           // HECK-NEXT: is nil
+  w = c
+  printState(w)                           // HECK-NEXT: is present
+  c.noop()                                // HECK-NEXT: noop
+  c = SwiftClassBase()                    // HECK-NEXT: SwiftClass Destroyed
+  w = nil
+  printState(w)                           // HECK-NEXT: is nil
+}
+
+testProtocol()*/
 
 
