@@ -174,7 +174,7 @@ extension ${Self} : ArrayType {
   
   /// Remove an element from the end of the ${Self} in O(1).
   /// Requires: count > 0
-  mutating func popLast() -> T {
+  mutating func removeLast() -> T {
     assert(count > 0, "can't pop from an empty ${Self}")
     let c = count
     let result = self[c - 1]

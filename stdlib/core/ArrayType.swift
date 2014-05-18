@@ -53,7 +53,7 @@ protocol ArrayType
   
   /// Remove an element from the end of the Array in O(1).  Returns:
   /// the removed element. Requires: count > 0
-  mutating func popLast() -> Self.GeneratorType.Element
+  mutating func removeLast() -> Self.GeneratorType.Element
   
   /// Insert an element at the given index in O(N).  Requires: atIndex
   /// <= count

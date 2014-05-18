@@ -425,7 +425,7 @@ func testSingleElementModifiers${A}() {
   // CHECK-NEXT: testing ${A} single-argument modifiers
   
   var a = ${A}(X(0)..10)
-  println(a.popLast().value)     // CHECK-NEXT: 9
+  println(a.removeLast().value)     // CHECK-NEXT: 9
   printSequence(a)               // CHECK-NEXT: [0, 1, 2, 3, 4, 5, 6, 7, 8]
   
   a.insert(4, newElement: 42)
