@@ -73,13 +73,13 @@ class Attributes {
 // CHECK: <attr-builtin>@IBOutlet</attr-builtin> <kw>var</kw> v0: <type>Int</type>
   @IBOutlet var v0: Int
 
-// CHECK: <attr-builtin>@IBOutlet</attr-builtin> <attr-id>@IBOutlet</attr-id> <kw>var</kw> v1: <type>String</type>
+// CHECK: <attr-builtin>@IBOutlet</attr-builtin> <attr-id>@IBOutlet</attr-id> <kw>var</kw> {{(<attr-builtin>)?}}v1{{(</attr-builtin>)?}}: <type>String</type>
   @IBOutlet @IBOutlet var v1: String
 
-// CHECK: <attr-builtin>@objc</attr-builtin> <attr-builtin>@IBOutlet</attr-builtin> <kw>var</kw> v2: <type>String</type>
+// CHECK: <attr-builtin>@objc</attr-builtin> <attr-builtin>@IBOutlet</attr-builtin> <kw>var</kw> {{(<attr-builtin>)?}}v2{{(</attr-builtin>)?}}: <type>String</type>
   @objc @IBOutlet var v2: String
 
-// CHECK: <attr-builtin>@IBOutlet</attr-builtin> <attr-builtin>@objc</attr-builtin> <kw>var</kw> v3: <type>String</type>
+// CHECK: <attr-builtin>@IBOutlet</attr-builtin> <attr-builtin>@objc</attr-builtin> <kw>var</kw> {{(<attr-builtin>)?}}v3{{(</attr-builtin>)?}}: <type>String</type>
   @IBOutlet @objc var v3: String
 
 // CHECK: <attr-builtin>@noreturn</attr-builtin> <kw>func</kw> f0() {}

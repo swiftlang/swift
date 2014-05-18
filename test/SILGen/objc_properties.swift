@@ -14,7 +14,7 @@ class ClassWithOutlets {
   // CHECK: function_ref @_TFVSs4_Nil12__conversionfS_U__FT_GSQQ__
   // CHECK: ref_element_addr [[SELF:%[0-9]+]] : $ClassWithOutlets, #ClassWithOutlets.String3
   @IBOutlet var String1 = "Hello"
-  @IBOutlet var String2: String = "World"
+  @IBOutlet weak var String2: String! = "World"
   @IBOutlet var String3: String
 }
 

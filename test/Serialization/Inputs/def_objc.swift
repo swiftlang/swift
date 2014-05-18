@@ -6,7 +6,7 @@
   class func classMethod() {}
   func implicitlyObjC() {}
 
-  @IBOutlet var outlet : ObjCClass = ObjCClass()
+  @IBOutlet var outlet : ObjCClass! = ObjCClass()
   @IBAction func performAction(_: AnyObject?) {}
 }
 
@@ -20,6 +20,6 @@ class NonObjCClass : ObjCProto {
     return 5
   }
 
-  @IBOutlet var outlet : ObjCClass = ObjCClass()
+  @IBOutlet var outlet : ObjCClass! = ObjCClass()
   @IBAction func performAction(_: AnyObject?) {}
 }

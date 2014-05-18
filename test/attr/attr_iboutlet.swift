@@ -165,7 +165,7 @@ class SwiftGizmo {
 
   @IBOutlet weak var h : C?
   @IBOutlet weak var i : C!
-  //  @IBOutlet unowned var j : C
+  @IBOutlet unowned var j : C
 
 
   @IBOutlet var bad1 : Int  // expected-error {{'IBOutlet' property cannot have non-object type 'Int'}}

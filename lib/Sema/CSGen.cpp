@@ -677,16 +677,17 @@ namespace {
                                         forFunctionParam? TVO_CanBindToLValue
                                                         : 0);
 
-        // For @weak variables, use Optional<T>.
+        // For weak variables, use Optional<T>.
         if (!forFunctionParam && var->getAttrs().isWeak()) {
           ty = CS.getTypeChecker().getOptionalType(var->getLoc(), ty);
           if (!ty) return Type();
-        // For @IBOutlet variables, use T!.
         } else if (var->getAttrs().hasAttribute<IBOutletAttr>()) {
-          ty = CS.getTypeChecker().getImplicitlyUnwrappedOptionalType(var->getLoc(), ty);
+          // For @IBOutlet variables, use an optional type T!.
+          ty = CS.getTypeChecker().
+                   getImplicitlyUnwrappedOptionalType(var->getLoc(), ty);
           if (!ty) return Type();
         }
- 
+
         // We want to set the variable's type here when type-checking
         // a function's parameter clauses because we're going to
         // type-check the entire function body within the context of
@@ -702,24 +703,12 @@ namespace {
       case PatternKind::Typed: {
         auto typedPattern = cast<TypedPattern>(pattern);
 
+        Type openedType = CS.openType(typedPattern->getType());
+        if (auto weakTy = openedType->getAs<WeakStorageType>())
+          openedType = weakTy->getReferentType();
+
         // For a typed pattern, simply return the opened type of the pattern.
         // FIXME: Error recovery if the type is an error type?
-        Type openedType = CS.openType(typedPattern->getType());
-
-        // Somewhat crazy special cases: add a level of ImplicitlyUnwrappedOptional
-        // if we don't have one and this pattern is directly bound to an
-        // IBOutlet, or turn a @weak into an optional
-        if (auto var = typedPattern->getSingleVar()) {
-          if (var->getAttrs().isWeak()) {
-            if (auto weakTy = openedType->getAs<WeakStorageType>())
-              openedType = weakTy->getReferentType();
-          } else if (var->getAttrs().hasAttribute<IBOutletAttr>() &&
-                     !openedType->getAnyOptionalObjectType()) {
-            openedType = CS.getTypeChecker()
-                           .getImplicitlyUnwrappedOptionalType(var->getLoc(), openedType);
-            if (!openedType) return Type();
-          }
-        }
         return openedType;
       }
 

@@ -1492,7 +1492,7 @@ class HasIBOutlet {
   init() {}
 
   @IBOutlet var goodOutlet: Class_ObjC1
-  // CHECK-LABEL: {{^}}  @objc @IBOutlet var goodOutlet: Class_ObjC1!
+  // CHECK-LABEL: {{^}}  @objc @IBOutlet var goodOutlet: @sil_weak Class_ObjC1!
 
   @IBOutlet var badOutlet: PlainStruct
   // expected-error@-1 {{'IBOutlet' property cannot have non-object type 'PlainStruct'}}

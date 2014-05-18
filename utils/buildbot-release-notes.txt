@@ -1,6 +1,10 @@
 Latest
 ----------
 
+* Weak pointers of classbound protocol type work now.
+
+* IBOutlets now default to weak pointers with implicit optional type (T!).
+
 * NSArray* parameters and result types of Objective-C APIs are now
   imported as AnyObject[]!, i.e., an implicitly unwrapped optional
   array storing AnyObject values. For example, NSView's constraints

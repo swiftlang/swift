@@ -338,7 +338,7 @@ public:
 
   void visitIBOutletAttr(IBOutletAttr *attr);
   
-    void visitLLDBDebuggerFunctionAttr (LLDBDebuggerFunctionAttr *attr) {};
+  void visitLLDBDebuggerFunctionAttr (LLDBDebuggerFunctionAttr *attr) {};
 
   void visitAvailabilityAttr(AvailabilityAttr *attr) {
     // FIXME: Check that this declaration is at least as available as the
@@ -741,9 +741,10 @@ void TypeChecker::checkIBOutlet(VarDecl *VD) {
   checkDeclAttributesEarly(VD);
 
   // Check to see if prechecking removed the attribute because it was invalid.
-  auto *attr = VD->getMutableAttrs().getAttribute<IBOutletAttr>();
-  if (!attr)
+  if (!VD->getMutableAttrs().getAttribute<IBOutletAttr>())
     return;
+  
+  bool NeedsUpdate = false;
 
   // Validate the type of the @IBOutlet.
   auto type = VD->getType();
@@ -751,27 +752,41 @@ void TypeChecker::checkIBOutlet(VarDecl *VD) {
   if (auto refStorageType = type->getAs<ReferenceStorageType>()) {
     ownership = refStorageType->getOwnership();
     type = refStorageType->getReferentType();
-  } else if (VD->getAttrs().hasOwnership()) {
-    ownership = Ownership::Weak;
+
+    // If the outlet was explicitly marked unowned, then bail out.  This is a
+    // horrible hack because unowned pointers cannot yet be optionals.
+    if (ownership == Ownership::Unowned)
+      return;
+  } else {
+    // If it isn't marked weak or unowned, then it needs to be updated.
+    NeedsUpdate = true;
+    ownership = VD->getAttrs().getOwnership();
   }
 
+  // If the underlying type isn't an optional, then we need to update it.
   OptionalTypeKind optionalKind;
   if (auto optObjectType = type->getAnyOptionalObjectType(optionalKind))
     type = optObjectType;
+  else
+    NeedsUpdate = true;
 
-  // If the type wasn't optional before, turn it into an implicitly unwrapped
-  // optional now.
-  // FIXME: Should arrays start out empty instead?
-  if (optionalKind == OptionalTypeKind::OTK_None) {
-    if (ownership == Ownership::Weak) {
-      type = OptionalType::get(type);
-      type = ReferenceStorageType::get(type, ownership, Context);
-    } else {
+  // If the type wasn't optional before or has no ownership, default it to
+  // implicitly unwrapped optional and weak.
+  if (NeedsUpdate) {
+    if (ownership == Ownership::Unowned)
+      /* FIXME: Cannot wrap unowned pointers with optionals yet*/;
+    else if (optionalKind == OptionalTypeKind::OTK_None ||
+             optionalKind == OptionalTypeKind::OTK_ImplicitlyUnwrappedOptional)
       type = ImplicitlyUnwrappedOptionalType::get(type);
+    else
+      type = OptionalType::get(type);
+    
+    // Build the right ownership type around it.
+    if (ownership == Ownership::Strong) {
+      ownership = Ownership::Weak;
+      VD->getMutableAttrs().setAttr(AK_weak, VD->getLoc());
     }
+    type = ReferenceStorageType::get(type, ownership, Context);
     VD->overwriteType(type);
   }
-
-
-
 }
