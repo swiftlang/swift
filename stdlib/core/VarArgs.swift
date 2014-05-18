@@ -153,7 +153,7 @@ class VaListBuilder {
   }
   
   func va_list() -> CVaListPointer {
-    return CVaListPointer(fromUnsafePointer: UnsafePointer<Void>(storage.elementStorage))
+    return CVaListPointer(fromUnsafePointer: UnsafePointer<Void>(storage._elementStorageIfContiguous))
   }
 
   var storage = Word[]()
