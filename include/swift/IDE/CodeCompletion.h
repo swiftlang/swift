@@ -19,6 +19,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Allocator.h"
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -414,8 +415,19 @@ public:
 };
 
 struct CodeCompletionResultSink {
-  llvm::BumpPtrAllocator Allocator;
+  using AllocatorPtr = std::shared_ptr<llvm::BumpPtrAllocator>;
+
+  /// The allocator used to allocate results "native" to this sink.
+  AllocatorPtr Allocator;
+
+  /// Allocators that keep alive "foreign" results imported into this sink from
+  /// other sinks.
+  std::vector<AllocatorPtr> ForeignAllocators;
+
   std::vector<CodeCompletionResult *> Results;
+
+  CodeCompletionResultSink()
+      : Allocator(std::make_shared<llvm::BumpPtrAllocator>()) {}
 };
 
 struct CodeCompletionCacheImpl;

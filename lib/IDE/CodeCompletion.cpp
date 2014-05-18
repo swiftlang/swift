@@ -373,11 +373,11 @@ static StringRef copyString(llvm::BumpPtrAllocator &Allocator,
 
 void CodeCompletionResultBuilder::addChunkWithText(
     CodeCompletionString::Chunk::ChunkKind Kind, StringRef Text) {
-  addChunkWithTextNoCopy(Kind, copyString(Sink.Allocator, Text));
+  addChunkWithTextNoCopy(Kind, copyString(*Sink.Allocator, Text));
 }
 
 StringRef CodeCompletionContext::copyString(StringRef Str) {
-  return ::copyString(CurrentResults.Allocator, Str);
+  return ::copyString(*CurrentResults.Allocator, Str);
 }
 
 static bool isDeclUnavailable(const Decl *D) {
@@ -394,9 +394,9 @@ static bool isDeclUnavailable(const Decl *D) {
 
 CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
   void *CCSMem = Sink.Allocator
-      .Allocate(sizeof(CodeCompletionString) +
-                    Chunks.size() * sizeof(CodeCompletionString::Chunk),
-                llvm::alignOf<CodeCompletionString>());
+      ->Allocate(sizeof(CodeCompletionString) +
+                     Chunks.size() * sizeof(CodeCompletionString::Chunk),
+                 llvm::alignOf<CodeCompletionString>());
   auto *CCS = new (CCSMem) CodeCompletionString(Chunks);
 
   switch (Kind) {
@@ -414,14 +414,14 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
       BriefComment = AssociatedDecl->getBriefComment();
     }
     bool NotRecommended = isDeclUnavailable(AssociatedDecl);
-    return new (Sink.Allocator) CodeCompletionResult(
+    return new (*Sink.Allocator) CodeCompletionResult(
         SemanticContext, NumBytesToErase, CCS, AssociatedDecl, NotRecommended,
-        copyString(Sink.Allocator, BriefComment));
+        copyString(*Sink.Allocator, BriefComment));
   }
 
   case CodeCompletionResult::ResultKind::Keyword:
   case CodeCompletionResult::ResultKind::Pattern:
-    return new (Sink.Allocator)
+    return new (*Sink.Allocator)
         CodeCompletionResult(Kind, SemanticContext, NumBytesToErase, CCS);
   }
 }
@@ -500,7 +500,7 @@ template<>
 struct CacheValueCostInfo<swift::ide::CodeCompletionCacheImpl::Value> {
   static size_t
   getCost(const swift::ide::CodeCompletionCacheImpl::Value &V) {
-    return V.Sink.Allocator.getTotalMemory();
+    return V.Sink.Allocator->getTotalMemory();
   }
 };
 } // namespace sys
@@ -529,6 +529,12 @@ void CodeCompletionCacheImpl::getResults(
   }
   assert(V.hasValue());
   auto &SourceSink = V.getValue()->Sink;
+
+  // We will be adding foreign results (from another sink) into TargetSink.
+  // TargetSink should have an owning pointer to the allocator that keeps the
+  // results alive.
+  TargetSink.ForeignAllocators.push_back(SourceSink.Allocator);
+
   if (OnlyTypes) {
     std::copy_if(SourceSink.Results.begin(), SourceSink.Results.end(),
                  std::back_inserter(TargetSink.Results),
@@ -599,7 +605,7 @@ MutableArrayRef<CodeCompletionResult *> CodeCompletionContext::takeResults() {
   // Copy pointers to the results.
   const size_t Count = CurrentResults.Results.size();
   CodeCompletionResult **Results =
-      CurrentResults.Allocator.Allocate<CodeCompletionResult *>(Count);
+      CurrentResults.Allocator->Allocate<CodeCompletionResult *>(Count);
   std::copy(CurrentResults.Results.begin(), CurrentResults.Results.end(),
             Results);
   CurrentResults.Results.clear();
