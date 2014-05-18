@@ -560,7 +560,7 @@ extension NSArray : ArrayLiteralConvertible {
 func _convertNSArrayToArray<T>(source: NSArray) -> T[] {
   if _fastPath(isBridgedVerbatimToObjectiveC(T.self)) {
     // Forced down-cast (possible deferred type-checking)
-    return Array(ArrayBuffer(reinterpretCast(source) as CocoaArray))
+    return Array(ArrayBuffer(reinterpretCast(source) as _CocoaArray))
   }
   else {
     let result = T[]._bridgeFromObjectiveCImpl(source)
@@ -594,7 +594,7 @@ extension Array : _ConditionallyBridgedToObjectiveC {
   }
 
   func bridgeToObjectiveC() -> NSArray {
-    return reinterpretCast(self.buffer.asCocoaArray())
+    return reinterpretCast(self.buffer._asCocoaArray())
   }
 
   static func bridgeFromObjectiveC(source: NSArray) -> Array? {
@@ -1258,7 +1258,7 @@ extension NSArray {
   /// mutable, any changes to it may be observable by the result.
   @final
   var _arraySharingStorage: AnyObject[] {
-    return Array(ArrayBuffer(reinterpretCast(self) as CocoaArray))
+    return Array(ArrayBuffer(reinterpretCast(self) as _CocoaArray))
   }
 
   @final

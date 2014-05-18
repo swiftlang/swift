@@ -83,7 +83,7 @@ println("testing...")
 
 func testScope() {
   let a = [X(1), X(2), X(3)]
-  let nsx = a.asCocoaArray()
+  let nsx = a._asCocoaArray()
 
   // construction of these tracked objects is eager
   // CHECK-NEXT: trackedCount = 3 .

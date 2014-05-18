@@ -88,7 +88,7 @@ for x: AnyObject in s_m {
 // CHECK: bridged
 // CHECK: array
 var a2 = ["hello", "bridged", "array"]
-var nsa2 : NSArray = ((a2.asCocoaArray() as AnyObject) as NSArray)!
+var nsa2 : NSArray = ((a2._asCocoaArray() as AnyObject) as NSArray)!
 for x: AnyObject in nsa2 {
   println(x.description!)
 }

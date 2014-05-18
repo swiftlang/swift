@@ -219,7 +219,7 @@ struct ContiguousArrayBuffer<T> : ArrayBufferType, LogicValue {
   /// Convert to an NSArray.
   /// Precondition: T is bridged to Objective-C
   /// O(1) if T is bridged verbatim, O(N) otherwise
-  func asCocoaArray() -> CocoaArray {
+  func _asCocoaArray() -> _CocoaArray {
     _sanityCheck(
       isBridgedToObjectiveC(T.self),
       "Array element type is not bridged to ObjectiveC")

@@ -1911,7 +1911,7 @@ protocol _SwiftNSArrayRequiredOverrides :
   var count: Int { get }
 }
 
-// FIXME: replace CocoaArray with this.
+// FIXME: replace _CocoaArray with this.
 @objc
 protocol _SwiftNSArray : _SwiftNSArrayRequiredOverrides {
   func indexOfObject(anObject: AnyObject) -> Int

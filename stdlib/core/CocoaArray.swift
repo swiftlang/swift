@@ -14,7 +14,7 @@
 //  a little bit with Cocoa.  Because we want to keep the core
 //  decoupled from the Foundation module, we can't use NSArray
 //  directly.  We _can_, however, use an @objc protocol with a
-//  compatible API.  That's CocoaArray.
+//  compatible API.  That's _CocoaArray.
 //
 //===----------------------------------------------------------------------===//
 
@@ -24,10 +24,10 @@ import SwiftShims
 /// (e.g. _SwiftNSRange is layout-compatible with NSRange in
 /// getObjects:range: below).  Array<T> is backed by one of these, and
 /// when T isBridgedToObjectiveC, it can be used directly as an
-/// NSArray.  It is safe to convert between NSArray and CocoaArray via
+/// NSArray.  It is safe to convert between NSArray and _CocoaArray via
 /// reinterpretCast.
 @objc @class_protocol
-protocol CocoaArray {
+protocol _CocoaArray {
   func objectAtIndex(index: Int) -> AnyObject
   
   func getObjects(UnsafePointer<AnyObject>, range: _SwiftNSRange)
@@ -37,15 +37,15 @@ protocol CocoaArray {
          objects buffer: UnsafePointer<AnyObject>,
          count len: Int) -> Int
 
-  func copyWithZone(COpaquePointer) -> CocoaArray
+  func copyWithZone(COpaquePointer) -> _CocoaArray
   
   var count: Int {get}
 }
 
-/// A wrapper around any CocoaArray that gives it Collection
-/// conformance.  Why not make CocoaArray conform directly?  It's a
+/// A wrapper around any _CocoaArray that gives it Collection
+/// conformance.  Why not make _CocoaArray conform directly?  It's a
 /// class, and I don't want to pay for the dynamic dispatch overhead.
-struct CocoaArrayWrapper : Collection {
+struct _CocoaArrayWrapper : Collection {
   var startIndex: Int {
     return 0
   }
@@ -58,7 +58,7 @@ struct CocoaArrayWrapper : Collection {
     return buffer.objectAtIndex(i)
   }
 
-  func generate() -> IndexingGenerator<CocoaArrayWrapper> {
+  func generate() -> IndexingGenerator<_CocoaArrayWrapper> {
     return IndexingGenerator(self)
   }
   
@@ -86,10 +86,10 @@ struct CocoaArrayWrapper : Collection {
   }
 
   @transparent
-  init(_ buffer: CocoaArray) {
+  init(_ buffer: _CocoaArray) {
     self.buffer = buffer
   }
 
-  var buffer: CocoaArray
+  var buffer: _CocoaArray
 }
 

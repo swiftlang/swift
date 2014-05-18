@@ -79,8 +79,8 @@ extension ${Self} : ArrayLiteralConvertible {
 }
 
 extension ${Self} {
-  func asCocoaArray() -> CocoaArray {
-    return buffer.asCocoaArray()
+  func _asCocoaArray() -> _CocoaArray {
+    return buffer._asCocoaArray()
   }
 }
 

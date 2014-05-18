@@ -74,13 +74,13 @@ struct SliceBuffer<T> : ArrayBufferType {
 
   //===--- Non-essential bits ---------------------------------------------===//
   
-  func asCocoaArray() -> CocoaArray {
+  func _asCocoaArray() -> _CocoaArray {
     _sanityCheck(
       isBridgedToObjectiveC(T.self),
       "Array element type is not bridged to ObjectiveC")
     _invariantCheck()
 
-    return _extractOrCopyToNativeArrayBuffer(self).asCocoaArray()
+    return _extractOrCopyToNativeArrayBuffer(self)._asCocoaArray()
   }
 
   mutating func requestUniqueMutableBuffer(minimumCapacity: Int)

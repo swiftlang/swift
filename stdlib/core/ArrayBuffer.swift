@@ -33,7 +33,7 @@ class IndirectArrayBuffer {
     self.needsElementTypeCheck = needsElementTypeCheck
   }
     
-  init(cocoa: CocoaArray, needsElementTypeCheck: Bool) {
+  init(cocoa: _CocoaArray, needsElementTypeCheck: Bool) {
     self.buffer = cocoa
     self.isMutable = false
     self.isCocoa = true
@@ -81,9 +81,9 @@ class IndirectArrayBuffer {
       buffer ? reinterpretCast(buffer) as ContiguousArrayStorage<T> : nil)
   }
 
-  func getCocoa() -> CocoaArray {
+  func getCocoa() -> _CocoaArray {
     _sanityCheck(isCocoa)
-    return reinterpretCast(buffer!) as CocoaArray
+    return reinterpretCast(buffer!) as _CocoaArray
   }
 }
 
@@ -108,7 +108,7 @@ struct ArrayBuffer<T> : ArrayBufferType {
       ))
   }
 
-  init(_ cocoa: CocoaArray) {
+  init(_ cocoa: _CocoaArray) {
     _sanityCheck(_isClassOrObjCExistential(T.self))
     storage = Builtin.castToNativeObject(
       IndirectArrayBuffer(
@@ -155,12 +155,12 @@ extension ArrayBuffer {
   /// Convert to an NSArray.
   /// Precondition: isBridgedToObjectiveC(Element.self)
   /// O(1) if the element type is bridged verbatim, O(N) otherwise
-  func asCocoaArray() -> CocoaArray {
+  func _asCocoaArray() -> _CocoaArray {
     _sanityCheck(
       isBridgedToObjectiveC(T.self),
       "Array element type is not bridged to ObjectiveC")
 
-    return _fastPath(_isNative) ? _native.asCocoaArray() : _nonNative!
+    return _fastPath(_isNative) ? _native._asCocoaArray() : _nonNative!
   }
 
   var _hasMutableBuffer: Bool {
@@ -261,7 +261,7 @@ extension ArrayBuffer {
     let subRangeCount = countElements(subRange)
     
     // Look for contiguous storage in the NSArray
-    let cocoa = CocoaArrayWrapper(nonNative!)
+    let cocoa = _CocoaArrayWrapper(nonNative!)
     let start = cocoa.contiguousStorage(subRange)
     if start != nil {
       return SliceBuffer(owner: nonNative, start: UnsafePointer(start),
@@ -390,7 +390,7 @@ extension ArrayBuffer {
     }
   }
 
-  var _nonNative: CocoaArray? {
+  var _nonNative: _CocoaArray? {
     if !_isClassOrObjCExistential(T.self) {
       return nil
     }

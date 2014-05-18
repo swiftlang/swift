@@ -30,7 +30,7 @@ protocol ArrayBufferType : MutableCollection {
   /// Convert to an NSArray.
   /// Precondition: isBridgedToObjectiveC(Element.self)
   /// O(1) if the element type is bridged verbatim, O(N) otherwise
-  func asCocoaArray() -> CocoaArray
+  func _asCocoaArray() -> _CocoaArray
 
   /// Get/set the index'th element
   subscript(index: Int) -> Element { get nonmutating set}

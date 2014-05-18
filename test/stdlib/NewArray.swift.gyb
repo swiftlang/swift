@@ -199,7 +199,7 @@ func nsArrayOfStrings() -> Array<NSString> {
     objects: UnsafePointer(src.buffer.elementStorage),
     count: src.count)
 
-  return Array(ArrayBuffer(reinterpretCast(ns) as CocoaArray))
+  return Array(ArrayBuffer(reinterpretCast(ns) as _CocoaArray))
 }
 
 func testCocoa() {
@@ -281,7 +281,7 @@ func testSlice() {
 
   // Now a bridged slice
   var a = Array<NSString>(
-    ArrayBuffer(nsArrayOfStrings().asCocoaArray()))
+    ArrayBuffer(nsArrayOfStrings()._asCocoaArray()))
   
   printSequence(a)                // CHECK-NEXT: [foo, bar, baz]
   
