@@ -229,7 +229,7 @@ struct ContiguousArrayBuffer<T> : ArrayBufferType, LogicValue {
     if _fastPath(base.value.elementTypeIsBridgedVerbatim) {
       return reinterpretCast(base.storage)
     }
-    return ContiguousArray(self).map { bridgeToObjectiveC($0)! }.buffer.storage!
+    return ContiguousArray(self).map { bridgeToObjectiveC($0)! }._buffer.storage!
   }
   
   /// An object that keeps the elements stored in this buffer alive
@@ -391,6 +391,6 @@ func _copyCollectionToNativeArrayBuffer<C: protocol<_Collection,_Sequence_>>(
 protocol _ArrayType : Collection {
   var count: Int {get}
 
-  typealias Buffer : ArrayBufferType
-  var buffer: Buffer {get}
+  typealias _Buffer : ArrayBufferType
+  var _buffer: _Buffer {get}
 }

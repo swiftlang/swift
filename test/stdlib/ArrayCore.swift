@@ -87,14 +87,14 @@ struct MrMcRange : Collection {
 // ContiguousArrayBuffer, it is first asked for its underlying
 // ContiguousArrayBuffer.
 struct MrMcArray<T> : Collection, _ArrayType {
-  typealias Buffer = ContiguousArrayBuffer<T>
+  typealias _Buffer = ContiguousArrayBuffer<T>
 
-  init(_ buffer: Buffer) {
-    self.buffer = buffer
+  init(_ buffer: _Buffer) {
+    self._buffer = buffer
   }
   
   var count: Int {
-    return buffer.count
+    return _buffer.count
   }
 
   typealias GeneratorType = IndexingGenerator<MrMcArray>
@@ -107,14 +107,14 @@ struct MrMcArray<T> : Collection, _ArrayType {
   }
   
   var endIndex: Int {
-    return buffer.count
+    return _buffer.count
   }
 
   subscript(i: Int) -> T {
-    return buffer[i]
+    return _buffer[i]
   }
 
-  var buffer: Buffer
+  var _buffer: _Buffer
 }
 
 func printSequence<T: Sequence>(x: T) {

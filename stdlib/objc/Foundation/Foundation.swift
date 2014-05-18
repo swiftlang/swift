@@ -543,7 +543,7 @@ let NSNotFound: Int = .max
 extension NSArray : ArrayLiteralConvertible {
   class func convertFromArrayLiteral(elements: AnyObject...) -> Self {
     // + (instancetype)arrayWithObjects:(const id [])objects count:(NSUInteger)cnt;
-    let x = _extractOrCopyToNativeArrayBuffer(elements.buffer)
+    let x = _extractOrCopyToNativeArrayBuffer(elements._buffer)
     let result = self(objects: UnsafePointer(x.elementStorage), count: x.count)
     _fixLifetime(x)
     return result
@@ -594,7 +594,7 @@ extension Array : _ConditionallyBridgedToObjectiveC {
   }
 
   func bridgeToObjectiveC() -> NSArray {
-    return reinterpretCast(self.buffer._asCocoaArray())
+    return reinterpretCast(self._buffer._asCocoaArray())
   }
 
   static func bridgeFromObjectiveC(source: NSArray) -> Array? {
@@ -1247,7 +1247,7 @@ extension NSArray {
   // Overlay: - (instancetype)initWithObjects:(id)firstObj, ...
   convenience init(objects elements: AnyObject...) {
     // - (instancetype)initWithObjects:(const id [])objects count:(NSUInteger)cnt;
-    let x = _extractOrCopyToNativeArrayBuffer(elements.buffer)
+    let x = _extractOrCopyToNativeArrayBuffer(elements._buffer)
     // Use Imported:
     // @objc(initWithObjects:count:)
     //    init(withObjects objects: CConstPointer<AnyObject?>,
@@ -1288,7 +1288,7 @@ extension NSDictionary {
 extension NSOrderedSet {
   // - (instancetype)initWithObjects:(id)firstObj, ...
   convenience init(objects elements: AnyObject...) {
-    let x = _extractOrCopyToNativeArrayBuffer(elements.buffer)
+    let x = _extractOrCopyToNativeArrayBuffer(elements._buffer)
     // - (instancetype)initWithObjects:(const id [])objects count:(NSUInteger)cnt;
     // Imported as:
     // @objc(initWithObjects:count:)
@@ -1302,7 +1302,7 @@ extension NSOrderedSet {
 extension NSSet {
   // - (instancetype)initWithObjects:(id)firstObj, ...
   convenience init(objects elements: AnyObject...) {
-    let x = _extractOrCopyToNativeArrayBuffer(elements.buffer)
+    let x = _extractOrCopyToNativeArrayBuffer(elements._buffer)
     // - (instancetype)initWithObjects:(const id [])objects count:(NSUInteger)cnt;
     // Imported as:
     // @objc(initWithObjects:count:)

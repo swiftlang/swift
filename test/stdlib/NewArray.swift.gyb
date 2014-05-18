@@ -76,7 +76,7 @@ func printSequence<T: Sequence>(x: T) {
 }
 
 func bufferID<T : ArrayType>(x: T) -> Int {
-  return reinterpretCast(x.buffer.elementStorage) as Int
+  return reinterpretCast(x._buffer.elementStorage) as Int
 }
 
 func checkReallocation<T : ArrayType>(
@@ -104,8 +104,8 @@ func checkEqual<
 
 func test<
   T: ArrayType
-where T.GeneratorType.Element == T.Buffer.Element,
-          T.Buffer.Element == T.Element,
+where T.GeneratorType.Element == T._Buffer.Element,
+          T._Buffer.Element == T.Element,
           T.Element == X,
           T.IndexType == Int
 >(_: T.Type, label: String) {
@@ -195,11 +195,10 @@ import Foundation
 func nsArrayOfStrings() -> Array<NSString> {
   let src: ContiguousArray<NSString> = ["foo", "bar", "baz"]
 
-  let ns =  NSArray(
-    objects: UnsafePointer(src.buffer.elementStorage),
-    count: src.count)
-
-  return Array(ArrayBuffer(reinterpretCast(ns) as _CocoaArray))
+  return src.withUnsafePointerToElements {
+    let ns =  NSArray(objects: UnsafePointer($0), count: src.count)
+    return Array(ArrayBuffer(reinterpretCast(ns) as _CocoaArray))
+  }
 }
 
 func testCocoa() {

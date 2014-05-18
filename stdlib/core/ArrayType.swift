@@ -78,10 +78,10 @@ protocol ArrayType
   
   //===--- implementation detail  -----------------------------------------===//
 
-  typealias Buffer : ArrayBufferType
-  init(_ buffer: Buffer)
+  typealias _Buffer : ArrayBufferType
+  init(_ buffer: _Buffer)
   
-  var buffer: Buffer {get set}
+  var _buffer: _Buffer {get set}
 }
 
 struct _ArrayTypeMirror<T : ArrayType> : Mirror {

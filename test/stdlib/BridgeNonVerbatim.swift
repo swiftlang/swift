@@ -102,10 +102,12 @@ func testScope() {
   // Because the elements come back at +0, we really don't want to
   // treat them as objects, or we'll get double deletion
   let objects: Word[] = [0, 0]
-  
-  nsx.getObjects(
-    UnsafePointer(objects.buffer.elementStorage), // pointer cast
-    range: _SwiftNSRange(location: 1, length: 2))
+
+  objects.withUnsafePointerToElements {
+    nsx.getObjects(
+      UnsafePointer($0), // pointer cast
+      range: _SwiftNSRange(location: 1, length: 2))
+  }
 
   // CHECK-NEXT: getObjects yields them at +0: true
   var x = objects[0]
