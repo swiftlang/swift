@@ -16,6 +16,9 @@ class ClassWithOutlets {
   @IBOutlet var String1 = "Hello"
   @IBOutlet weak var String2: String! = "World"
   @IBOutlet var String3: String
+
+
+  @IBOutlet weak var String4: String = "World"
 }
 
 

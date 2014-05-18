@@ -179,8 +179,7 @@ unowned
 var weak7 : Int // expected-error {{'unowned' cannot be applied to non-class type 'Int'}}
 weak
 var weak8 : Class? = Ty0()
-unowned
-var weak9 : Class = Ty0()
+unowned var weak9 : Class = Ty0()
 weak
 var weak10 : NonClass = Ty0() // expected-error {{'weak' cannot be applied to non-class type 'NonClass'; consider adding a class bound}}
 unowned

@@ -555,8 +555,10 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
     if (coercePatternToType(subPattern, dc, P->getType(),
                             options|TR_FromNonInferredPattern, resolver))
       hadError = true;
-    else
+    else {
       TP->setSubPattern(subPattern);
+      TP->setType(subPattern->getType());
+    }
     return hadError;
   }
 
@@ -640,21 +642,22 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
   // For parens and vars, just set the type annotation and propagate inwards.
   case PatternKind::Paren: {
     auto PP = cast<ParenPattern>(P);
-    PP->setType(type);
     Pattern *sub = PP->getSubPattern();
     if (coercePatternToType(sub, dc, type, subOptions, resolver))
       return true;
     PP->setSubPattern(sub);
+    PP->setType(sub->getType());
     return false;
   }
   case PatternKind::Var: {
     auto VP = cast<VarPattern>(P);
-    VP->setType(type);
     
     Pattern *sub = VP->getSubPattern();
     if (coercePatternToType(sub, dc, type, subOptions, resolver))
       return true;
     VP->setSubPattern(sub);
+    if (sub->hasType())
+      VP->setType(sub->getType());
     return false;
   }
 
@@ -704,8 +707,10 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
     hadError |= coercePatternToType(sub, dc, TP->getType(),
                                     subOptions | TR_FromNonInferredPattern,
                                     resolver);
-    if (!hadError)
+    if (!hadError) {
       TP->setSubPattern(sub);
+      TP->setType(sub->getType());
+    }
     return hadError;
   }
 
@@ -719,9 +724,11 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
       var->overwriteType(type);
     if (var->getAttrs().hasAttribute<IBOutletAttr>()) {
       checkIBOutlet(var);
+      type = getTypeOfRValue(var, true);
     }
     if (var->getAttrs().hasOwnership()) {
       checkOwnershipAttr(var, var->getAttrs().getOwnership());
+      type = getTypeOfRValue(var, true);
     }
 
     if (type->is<InOutType>())
