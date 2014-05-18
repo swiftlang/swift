@@ -20,6 +20,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Optional.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Sema/CodeCompletionTypeChecking.h"
 #include "swift/Subsystems.h"
@@ -31,6 +32,7 @@
 #include "CodeCompletionResultBuilder.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
+#include "clang/Basic/Module.h"
 #include <algorithm>
 #include <functional>
 #include <string>
@@ -459,7 +461,9 @@ struct CodeCompletionCacheImpl {
 
   void getResults(
       const Key &K, CodeCompletionResultSink &TargetSink, bool OnlyTypes,
-      std::function<void(CodeCompletionCacheImpl &, Key)> FillCacheCallback);
+      const Module *TheModule,
+      std::function<void(CodeCompletionCacheImpl &, Key,
+                         const Module *)> FillCacheCallback);
 
   ValueRefCntPtr getResultSinkFor(const Key &K);
 
@@ -508,12 +512,14 @@ struct CacheValueCostInfo<swift::ide::CodeCompletionCacheImpl::Value> {
 
 void CodeCompletionCacheImpl::getResults(
     const Key &K, CodeCompletionResultSink &TargetSink, bool OnlyTypes,
-    std::function<void(CodeCompletionCacheImpl &, Key)> FillCacheCallback) {
+    const Module *TheModule,
+    std::function<void(CodeCompletionCacheImpl &, Key, const Module *)>
+        FillCacheCallback) {
   // FIXME(thread-safety): lock the whole AST context.  We might load a module.
   llvm::Optional<ValueRefCntPtr> V = TheCache.get(K);
   if (!V.hasValue()) {
     // No cached results found.  Fill the cache.
-    FillCacheCallback(*this, K);
+    FillCacheCallback(*this, K, TheModule);
     V = TheCache.get(K);
   } else {
     llvm::sys::fs::file_status ModuleStatus;
@@ -523,7 +529,7 @@ void CodeCompletionCacheImpl::getResults(
             ModuleStatus.getLastModificationTime()) {
       // Cache is stale.  Update the cache.
       TheCache.remove(K);
-      FillCacheCallback(*this, K);
+      FillCacheCallback(*this, K, TheModule);
       V = TheCache.get(K);
     }
   }
@@ -1837,6 +1843,21 @@ public:
     M->lookupVisibleDecls({}, *this, NLKind::QualifiedLookup);
   }
 
+  void getVisibleDeclsOfModule(const Module *TheModule,
+                               ArrayRef<std::string> AccessPath,
+                               bool ResultsHaveLeadingDot) {
+    Kind = LookupKind::ImportFromModule;
+    NeedLeadingDot = ResultsHaveLeadingDot;
+
+    llvm::SmallVector<std::pair<Identifier, SourceLoc>, 1> LookupAccessPath;
+    for (auto Piece : AccessPath) {
+      LookupAccessPath.push_back(
+          std::make_pair(Ctx.getIdentifier(Piece), SourceLoc()));
+    }
+    TheModule->lookupVisibleDecls(LookupAccessPath, *this,
+                                  NLKind::QualifiedLookup);
+  }
+
   void getModuleImportCompletions(StringRef ModuleName,
                                   const std::vector<std::string> &AccessPath,
                                   bool ResultsHaveLeadingDot) {
@@ -2131,6 +2152,15 @@ static bool isDynamicLookup(Type T) {
   return false;
 }
 
+static bool isClangSubModule(Module *TheModule) {
+  auto Files = TheModule->getFiles();
+  assert(!Files.empty());
+  if (auto CMU = dyn_cast<ClangModuleUnit>(Files.front())) {
+    return CMU->getClangModule()->isSubModule();
+  }
+  return false;
+}
+
 void CodeCompletionCallbacksImpl::doneParsing() {
   if (Kind == CompletionKind::None) {
     return;
@@ -2262,30 +2292,60 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     auto &SwiftContext = P.Context;
     auto FillCacheCallback =
         [&SwiftContext](CodeCompletionCacheImpl &Cache,
-                        const CodeCompletionCacheImpl::Key &K) {
+                        const CodeCompletionCacheImpl::Key &K,
+                        const Module *TheModule) {
       auto V = Cache.getResultSinkFor(K);
       CompletionLookup Lookup(V->Sink, SwiftContext, nullptr);
-      Lookup.getModuleImportCompletions(K.ModuleName, K.AccessPath,
-                                        K.ResultsHaveLeadingDot);
+      Lookup.getVisibleDeclsOfModule(TheModule, K.AccessPath,
+                                     K.ResultsHaveLeadingDot);
       Cache.storeResults(K, V);
     };
 
     auto &Request = Lookup.RequestedCachedResults.getValue();
-    if (Request.TheModule) {
-      Lookup.discardTypeResolver();
 
-      // FIXME: actually check imports.
-      StringRef ModuleFilename = Request.TheModule->getModuleFilename();
+    llvm::DenseSet<CodeCompletionCacheImpl::Key> ImportsSeen;
+    auto handleImport = [&](Module::ImportedModule Import) {
+      Module *TheModule = Import.second;
+      Module::AccessPathTy Path = Import.first;
+      if (TheModule->getFiles().empty())
+        return;
+
+      // Clang submodules are ignored and there's no lookup cost involved,
+      // so just ignore them and don't put the empty results in the cache
+      // because putting a lot of objects in the cache will push out
+      // other lookups.
+      if (isClangSubModule(TheModule))
+        return;
+
+      std::vector<std::string> AccessPath;
+      for (auto Piece : Path) {
+        AccessPath.push_back(Piece.first.str());
+      }
+
+      StringRef ModuleFilename = TheModule->getModuleFilename();
       // ModuleFilename can be empty if something strange happened during
       // module loading, for example, the module file is corrupted.
       if (!ModuleFilename.empty()) {
         CodeCompletionCacheImpl::Key K{ModuleFilename,
-                                       Request.TheModule->Name.str(),
-                                       {}, Request.NeedLeadingDot};
+                                       TheModule->Name.str(),
+                                       AccessPath, Request.NeedLeadingDot};
+        std::pair<decltype(ImportsSeen)::iterator, bool>
+        Result = ImportsSeen.insert(K);
+        if (!Result.second)
+          return; // already handled.
+
         CompletionContext.Cache.Impl->getResults(
             K, CompletionContext.getResultSink(), Request.OnlyTypes,
-            FillCacheCallback);
+            TheModule, FillCacheCallback);
       }
+    };
+
+    if (Request.TheModule) {
+      Lookup.discardTypeResolver();
+
+      // FIXME: actually check imports.
+      const_cast<Module*>(Request.TheModule)
+          ->forAllVisibleModules({}, handleImport);
     } else {
       // Add results from current module.
       Lookup.getToplevelCompletions(Request.OnlyTypes);
@@ -2295,22 +2355,9 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       auto *SF = CurDeclContext->getParentSourceFile();
       for (std::pair<Module::ImportedModule, bool> Imported :
                SF->getImports()) {
-        std::vector<std::string> AccessPath;
-        for (auto Piece : Imported.first.first) {
-          AccessPath.push_back(Piece.first.str());
-        }
         Module *TheModule = Imported.first.second;
-        StringRef ModuleFilename = TheModule->getModuleFilename();
-        // ModuleFilename can be empty if something strange happened during
-        // module loading, for example, the module file is corrupted.
-        if (!ModuleFilename.empty()) {
-          CodeCompletionCacheImpl::Key K{ModuleFilename,
-                                         TheModule->Name.str(),
-                                         AccessPath, false};
-          CompletionContext.Cache.Impl->getResults(
-              K, CompletionContext.getResultSink(), Request.OnlyTypes,
-              FillCacheCallback);
-        }
+        Module::AccessPathTy AccessPath = Imported.first.first;
+        TheModule->forAllVisibleModules(AccessPath, handleImport);
       }
     }
     Lookup.RequestedCachedResults.reset();
