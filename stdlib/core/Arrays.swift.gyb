@@ -1,5 +1,5 @@
 %# -*- mode: swift -*-
-//===--- Arrays.swift.gyb - ContiguousArray, Array, and Slice -----------------===//
+//===--- Arrays.swift.gyb - ContiguousArray, Array, and Slice -------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -156,15 +156,18 @@ extension ${Self} : ArrayType {
   }
 
   /// Ensure the array has enough mutable contiguous storage to store
-  /// newCapacity elements in.  Note: does not affect count.
+  /// minimumCapacity elements in.  Note: does not affect count.
   /// Complexity: O(N)
-  mutating func reserveCapacity(newCapacity: Int) {
-    if !_buffer.requestUniqueMutableBuffer(newCapacity) {
-      var newBuffer = ContiguousArrayBuffer<T>(count: count, minimumCapacity: newCapacity)
+  mutating func reserveCapacity(minimumCapacity: Int) {
+    if !_buffer.requestUniqueMutableBuffer(minimumCapacity) {
+      
+      var newBuffer = ContiguousArrayBuffer<T>(
+        count: count, minimumCapacity: minimumCapacity)
+      
       _buffer._uninitializedCopy(0..count, target: newBuffer.elementStorage)
       _buffer = _Buffer(newBuffer)
     }
-    assert(capacity >= newCapacity)
+    assert(capacity >= minimumCapacity)
   }
   
   /// Append newElement to the ${Self} in O(1) (amortized)
@@ -439,7 +442,9 @@ where C.GeneratorType.Element == A._Buffer.Element
   
   // Ensure uniqueness, mutability, and sufficient storage.  Note that
   // for consistency, we need unique lhs even if rhs is empty.
-  lhs.reserveCapacity(newCount > capacity ? max(newCount, capacity * 2) : newCount)
+  lhs.reserveCapacity(
+    newCount > capacity ? max(newCount, capacity * 2) : newCount)
+  
   var p = lhs._buffer.elementStorage + oldCount
   for x in rhs {
     (p++).initialize(x)
@@ -479,11 +484,12 @@ func _demandUniqueMutableBuffer<_Buffer: ArrayBufferType>(
     return nil
   }
 
-  let newCapacity = max(
+  let minimumCapacity = max(
     requiredCapacity,
     newCount > source.capacity ? source.capacity * 2 : source.capacity)
 
-  return ContiguousArrayBuffer(count: newCount, minimumCapacity: newCapacity)
+  return ContiguousArrayBuffer(
+    count: newCount, minimumCapacity: minimumCapacity)
 }
 
 protocol PointerFunction {
@@ -592,17 +598,19 @@ struct IgnorePointer<T> : PointerFunction {
 }
 
 func _arrayReserve<_Buffer: ArrayBufferType>(
-  inout buffer: _Buffer, newCapacity: Int
+  inout buffer: _Buffer, minimumCapacity: Int
 ) {
   let oldCount = buffer.count
-  var newBuffer = _demandUniqueMutableBuffer(&buffer, oldCount, minimumCapacity: newCapacity)
+  var newBuffer = _demandUniqueMutableBuffer(
+    &buffer, oldCount, minimumCapacity: minimumCapacity)
   if _slowPath(newBuffer) {
     _arrayOutOfPlaceUpdate(&buffer, &newBuffer, oldCount, 1, IgnorePointer())
   }
 }
 
 func _extractOrCopyToNativeArrayBuffer<
-  _Buffer: ArrayBufferType where _Buffer.GeneratorType.Element == _Buffer.Element
+  _Buffer: ArrayBufferType
+    where _Buffer.GeneratorType.Element == _Buffer.Element
 >(source: _Buffer) 
   -> ContiguousArrayBuffer<_Buffer.Element> 
 {
