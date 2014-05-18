@@ -321,7 +321,7 @@ extension Array {
   }
 }
 
-struct _InitializeMemoryFromCollection<C: Collection> : PointerFunction {
+struct _InitializeMemoryFromCollection<C: Collection> : _PointerFunction {
   func call(rawMemory: UnsafePointer<C.GeneratorType.Element>) {
     var p = rawMemory
     for x in newValues {
@@ -492,7 +492,7 @@ func _demandUniqueMutableBuffer<_Buffer: ArrayBufferType>(
     count: newCount, minimumCapacity: minimumCapacity)
 }
 
-protocol PointerFunction {
+protocol _PointerFunction {
   typealias Element
   func call(UnsafePointer<Element>)
 }
@@ -505,7 +505,7 @@ protocol PointerFunction {
 /// As an optimization, may move elements out of source rather than
 /// copying when it isUniquelyReferenced.
 func _arrayOutOfPlaceUpdate<
-  _Buffer: ArrayBufferType, Initializer: PointerFunction
+  _Buffer: ArrayBufferType, Initializer: _PointerFunction
     where Initializer.Element == _Buffer.Element
 >(
   inout source: _Buffer, 
@@ -565,7 +565,7 @@ func _arrayOutOfPlaceUpdate<
   source = _Buffer(dest!)
 }
 
-struct InitializePointer<T> : PointerFunction {
+struct _InitializePointer<T> : _PointerFunction {
   func call(rawMemory: UnsafePointer<T>) {
     // FIXME: maybe we should move here instead of copying?
     rawMemory.initialize(newValue)
@@ -589,11 +589,11 @@ func _arrayAppend<_Buffer: ArrayBufferType>(
   }
   else {
     _arrayOutOfPlaceUpdate(
-      &buffer, &newBuffer, oldCount, 1, InitializePointer(newValue))
+      &buffer, &newBuffer, oldCount, 1, _InitializePointer(newValue))
   }
 }
 
-struct IgnorePointer<T> : PointerFunction {
+struct _IgnorePointer<T> : _PointerFunction {
   func call(_:UnsafePointer<T>) {}
 }
 
@@ -604,7 +604,7 @@ func _arrayReserve<_Buffer: ArrayBufferType>(
   var newBuffer = _demandUniqueMutableBuffer(
     &buffer, oldCount, minimumCapacity: minimumCapacity)
   if _slowPath(newBuffer) {
-    _arrayOutOfPlaceUpdate(&buffer, &newBuffer, oldCount, 1, IgnorePointer())
+    _arrayOutOfPlaceUpdate(&buffer, &newBuffer, oldCount, 1, _IgnorePointer())
   }
 }
 
