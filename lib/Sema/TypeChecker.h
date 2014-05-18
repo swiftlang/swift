@@ -622,7 +622,9 @@ public:
   ///
   /// \returns true if an error occurred, false otherwise.
   bool typeCheckExpression(Expr *&expr, DeclContext *dc,
-                           Type convertType, bool discardedExpr,
+                           Type convertType,
+                           Type contextualType,
+                           bool discardedExpr,
                            FreeTypeVariableBinding allowFreeTypeVariables
                              = FreeTypeVariableBinding::Disallow,
                            ExprTypeCheckListener *listener = nullptr);

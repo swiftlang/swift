@@ -2177,7 +2177,8 @@ namespace {
                                      SourceLoc(), /*implicit*/ true);
         Expr *metaty = TypeExpr::createImplicit(baseElementType, tc.Context);
         Expr *applyExpr = new(tc.Context) ConstructorRefCallExpr(ctor, metaty);
-        if (tc.typeCheckExpression(applyExpr, dc, Type(), /*discarded*/ false))
+        if (tc.typeCheckExpression(applyExpr, dc, Type(), Type(),
+                                   /*discarded*/ false))
           llvm_unreachable("should not fail");
       
         expr->setConstructionFunction(applyExpr);
@@ -2870,7 +2871,7 @@ static Expr *getCallerDefaultArg(TypeChecker &tc, DeclContext *dc,
   // literal expression.
   Expr *init = new (tc.Context) MagicIdentifierLiteralExpr(magicKind, loc,
                                                            /*Implicit=*/true);
-  bool invalid = tc.typeCheckExpression(init, dc, defArg.second,
+  bool invalid = tc.typeCheckExpression(init, dc, defArg.second, Type(),
                                         /*discardedExpr=*/false);
   assert(!invalid && "conversion cannot fail");
   (void)invalid;

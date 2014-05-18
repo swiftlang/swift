@@ -734,6 +734,7 @@ static void diagnoseExpr(TypeChecker &TC, const Expr *E,
 bool TypeChecker::typeCheckExpression(
        Expr *&expr, DeclContext *dc,
        Type convertType,
+       Type contextualType,
        bool discardedExpr,
        FreeTypeVariableBinding allowFreeTypeVariables,
        ExprTypeCheckListener *listener) {
@@ -746,6 +747,11 @@ bool TypeChecker::typeCheckExpression(
 
   // Construct a constraint system from this expression.
   ConstraintSystem cs(*this, dc, ConstraintSystemFlags::AllowFixes);
+  
+  if (!contextualType.isNull()) {
+    cs.setContextualType(expr, &contextualType);
+  }
+  
   CleanupIllFormedExpressionRAII cleanup(cs, expr);
   if (auto generatedExpr = cs.generateConstraints(expr))
     expr = generatedExpr;
@@ -1027,9 +1033,14 @@ bool TypeChecker::typeCheckBinding(PatternBindingDecl *binding) {
     }
     DC = initContext;
   }
+  
+  auto contextualType = binding->getPattern()->hasType() ?
+                            binding->getPattern()->getType() :
+                            Type();
 
   // Type-check the initializer.
-  bool hadError = typeCheckExpression(init, DC, Type(), /*discardedExpr=*/false,
+  bool hadError = typeCheckExpression(init, DC, Type(),
+                                      contextualType, /*discardedExpr=*/false,
                                       FreeTypeVariableBinding::Disallow,
                                       &listener);
 
@@ -1167,7 +1178,7 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
   };
 
   ConditionListener listener;
-  return typeCheckExpression(expr, dc, Type(), /*discardedExpr=*/false,
+  return typeCheckExpression(expr, dc, Type(), Type(), /*discardedExpr=*/false,
                              FreeTypeVariableBinding::Disallow,
                              &listener);
 }
@@ -1255,7 +1266,7 @@ bool TypeChecker::typeCheckArrayBound(Expr *&expr, bool constantRequired,
   };
 
   ArrayBoundListener listener;
-  return typeCheckExpression(expr, dc, Type(), /*discardedExpr=*/false,
+  return typeCheckExpression(expr, dc, Type(), Type(), /*discardedExpr=*/false,
                              FreeTypeVariableBinding::Disallow, &listener);
 }
 

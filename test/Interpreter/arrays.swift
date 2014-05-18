@@ -131,3 +131,14 @@ let runceArray: Runcible[] = [Spoon(x: 219)]
 // CHECK-NEXT:     x: 219
 dump(runceArray)
 
+// type check a large array literal in a reasonable amount of time
+let afd: Float[] = [
+    0.5, -0.5, -0.5,        1.0, 0.0, 0.0,
+    0.5, 0.5, -0.5,         1.0, 0.0, 0.0,
+    0.5, -0.5, 0.5,         1.0, 0.0, 0.0, 
+    0.5, -0.5, 0.5,         1.0, 0.0, 0.0,
+    0.5, 0.5, -0.5,         1.0, 0.0, 0.0,
+    0.5, 0.5, 0.5,          1.0, 0.0, 0.0, 
+    0.5, 0.5, -0.5,         0.0, 1.0, 0.0, 
+    -0.5, 0.5, -0.5,        0.0, 1.0, 2.0
+]

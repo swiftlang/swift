@@ -1093,6 +1093,7 @@ private:
   Score CurrentScore;
 
   SmallVector<TypeVariableType *, 16> TypeVariables;
+  llvm::DenseMap<Expr *, Type *> ContextualTypes;
 
   llvm::DenseMap<UnresolvedDotExpr *, ApplyExpr *> PossibleDynamicLookupCalls;
 
@@ -1313,6 +1314,14 @@ public:
   /// Retrieve the set of active type variables.
   ArrayRef<TypeVariableType *> getTypeVariables() const {
     return TypeVariables;
+  }
+  
+  Type* getContextualType(Expr *E) {
+    return this->ContextualTypes[E];
+  }
+  
+  void setContextualType(Expr *E, Type *T) {
+    this->ContextualTypes[E] = T;
   }
 
   /// \brief Retrieve the constraint locator for the given anchor and

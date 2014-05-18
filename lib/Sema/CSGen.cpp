@@ -542,6 +542,34 @@ namespace {
                                 C.getIdentifier("Element")).front());
 
       auto locator = CS.getConstraintLocator(expr);
+      auto contextualType = CS.getContextualType(expr);
+      Type *contextualArrayType = nullptr;
+      Type contextualArrayElementType = nullptr;
+      
+      // If a contextual type exists for this expression, apply it directly.
+      if (contextualType && CS.isArrayType(*contextualType)) {
+        // Is the array type a contextual type
+        contextualArrayType = contextualType;
+        contextualArrayElementType =
+            CS.getBaseTypeForArrayType(contextualType->getPointer());
+        
+        CS.addConstraint(ConstraintKind::ConformsTo, *contextualType,
+                         arrayProto->getDeclaredType(),
+                         locator);
+        
+        unsigned index = 0;
+        for (auto element : expr->getElements()) {
+          CS.addConstraint(ConstraintKind::Conversion,
+                           element->getType(),
+                           contextualArrayElementType,
+                           CS.getConstraintLocator(expr,
+                                                   LocatorPathElt::
+                                                    getTupleElement(index++)));
+        }
+        
+        return *contextualArrayType;
+      }
+      
       auto arrayTy = CS.createTypeVariable(locator, TVO_PrefersSubtypeBinding);
 
       // The array must be an array literal type.

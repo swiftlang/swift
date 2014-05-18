@@ -450,7 +450,7 @@ bool swift::typeCheckCompletionContextExpr(ASTContext &Ctx, DeclContext *DC,
   DiagnosticEngine diags(Ctx.SourceMgr);
 
   TypeChecker TC(Ctx, diags);
-  TC.typeCheckExpression(parsedExpr, DC, Type(), /*discardedExpr=*/true,
+  TC.typeCheckExpression(parsedExpr, DC, Type(), Type(), /*discardedExpr=*/true,
                          FreeTypeVariableBinding::GenericParameters);
   
   return parsedExpr && !isa<ErrorExpr>(parsedExpr)

@@ -2680,7 +2680,7 @@ public:
             }
             elt->setRawValueExpr(nextValue);
             Expr *typeChecked = nextValue;
-            if (!TC.typeCheckExpression(typeChecked, ED, rawTy, false))
+            if (!TC.typeCheckExpression(typeChecked, ED, rawTy, Type(), false))
               elt->setTypeCheckedRawValueExpr(typeChecked);
           } else {
             lastExplicitValueElt = elt;
@@ -4192,7 +4192,7 @@ public:
           // Recover by setting the raw type as this element's type.
         }
         Expr *typeCheckedExpr = rawValue;
-        if (!TC.typeCheckExpression(typeCheckedExpr, ED, rawTy, false))
+        if (!TC.typeCheckExpression(typeCheckedExpr, ED, rawTy, Type(), false))
           EED->setTypeCheckedRawValueExpr(typeCheckedExpr);
       }
     } else if (EED->getRecursiveness() ==
@@ -5382,7 +5382,7 @@ void TypeChecker::addImplicitEnumConformances(EnumDecl *ED) {
     assert(elt->hasRawValueExpr());
     Expr *typeChecked = elt->getRawValueExpr();
     Type rawTy = ArchetypeBuilder::mapTypeIntoContext(ED, ED->getRawType());
-    bool error = typeCheckExpression(typeChecked, ED, rawTy, false);
+    bool error = typeCheckExpression(typeChecked, ED, rawTy, Type(), false);
     assert(!error); (void)error;
     elt->setTypeCheckedRawValueExpr(typeChecked);
   }
