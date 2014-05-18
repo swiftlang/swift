@@ -1503,8 +1503,19 @@ public:
       Builder.addTypeAnnotation(TypeAnnotation);
   }
 
+  bool isPrivateStdlibDecl(const ValueDecl *VD) {
+    if (!VD->getDeclContext()->getParentModule()->isStdlibModule())
+      return false;
+
+    return VD->getNameStr().startswith("_");
+  }
+
   // Implement swift::VisibleDeclConsumer.
   void foundDecl(ValueDecl *D, DeclVisibilityKind Reason) override {
+    // Hide private stdlib declarations.
+    if (isPrivateStdlibDecl(D))
+      return;
+
     if (!D->hasType())
       TypeResolver->resolveDeclSignature(D);
 
