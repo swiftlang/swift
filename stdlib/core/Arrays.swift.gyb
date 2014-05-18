@@ -729,7 +729,8 @@ func _arrayCheckedDownCast<Base, Derived>(a: Array<Base>) -> Derived[]? {
     // We can skip the check if Derived happens to be AnyObject
     if !(AnyObject.self is Derived.Type) {
       for element in a {
-        if !(element is Derived) {
+        // FIXME: reinterpretCast works around <rdar://problem/16953026>
+        if !(reinterpretCast(element) as AnyObject is Derived) {
           return nil
         }
       }

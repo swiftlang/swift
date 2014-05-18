@@ -290,6 +290,17 @@ func testExplicitlyBridged() {
   } else {
     println("Could not downcast AnyObject[] to Base[]?")
   }
+
+  // Downcast of Cocoa array.
+  let wrappedCocoaBridgedSwifts: AnyObject[] = cocoaBridgedSwifts
+  if let downcasted = wrappedCocoaBridgedSwifts as BridgedObjC[] {
+    // CHECK-NEXT: BridgedObjC#[[ID0:[0-9]+]](42)
+    println(downcasted[0])
+    // CHECK-NEXT: BridgedObjC#[[ID1:[0-9]+]](17)
+    println(downcasted[1])
+  } else {
+    println("Could not downcast NSArray to BridgedObjC[]?")
+  }
 }
 testExplicitlyBridged()
 
