@@ -77,6 +77,9 @@ void ClangDiagnosticConsumer::HandleDiagnostic(
 
   // FIXME: Until we have real source locations, they're included in the
   // diagnostic.
+  // Note: getPresumedLoc handles invalid source locations by returning an
+  // empty PresumedLoc structure. In these cases we just won't show location
+  // information.
   auto presumedLoc = clangSrcMgr.getPresumedLoc(clangLoc);
   if (presumedLoc.getFilename()) {
     message.append(presumedLoc.getFilename());
