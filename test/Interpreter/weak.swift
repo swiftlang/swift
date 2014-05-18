@@ -86,8 +86,6 @@ testObjCClass()
 //======================== Test Classbound Protocols ========================
 
 
-/* This crashes SILGen:
-  <rdar://problem/16952927> assigning a pure swift class to a classbound protocol crashes in silgen
   
 func printState(x : Protocol?) {
   println(x ? "is present" : "is nil")
@@ -108,6 +106,6 @@ func testProtocol() {
   printState(w)                           // HECK-NEXT: is nil
 }
 
-testProtocol()*/
+testProtocol()
 
 
