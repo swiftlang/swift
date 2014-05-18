@@ -1818,7 +1818,9 @@ bool Substitution::operator!=(const Substitution &Other) const {
 }
 
 bool Substitution::operator==(const Substitution &Other) const {
-  return Archetype->getCanonicalType() == Other.Archetype->getCanonicalType() &&
+  // The archetypes may be missing, but we can compare them directly
+  // because archetypes are always canonical.
+  return Archetype == Other.Archetype &&
     Replacement->getCanonicalType() == Other.Replacement->getCanonicalType() &&
     Conformance.equals(Other.Conformance);
 }
