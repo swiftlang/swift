@@ -32,7 +32,7 @@ func get_eof() -> CInt {
 
 
 func testCStrings() -> Bool {
-    return !VERSION_STRING.isNull() && !UTF8_STRING.isNull()
+    return VERSION_STRING != nil && UTF8_STRING != nil
 }
 
 // CHECK-LABEL: define linkonce_odr hidden i8* @_TFSCg14VERSION_STRINGVSs7CString

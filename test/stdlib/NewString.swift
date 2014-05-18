@@ -77,7 +77,7 @@ func nonASCII() {
   // Offset of each character:     0 2 3 4 5 7 9 11
   var nsUTF16 = NSString(UTF8String: "🏂☃❅❆❄︎⛄️❄️")
   // CHECK-NEXT: has UTF16: true
-  println("has UTF16: \(!CFStringGetCharactersPtr(reinterpretCast(nsUTF16)).isNull())")
+  println("has UTF16: \(CFStringGetCharactersPtr(reinterpretCast(nsUTF16)) != nil)")
 
   // CHECK: --- UTF16 basic round-tripping ---
   println("--- UTF16 basic round-tripping ---")
@@ -123,7 +123,7 @@ func ascii() {
   // treating it as an opaque NSString.
   var nsASCII = NSString(UTF8String: "foobar")
   // CHECK-NEXT: has UTF16: false
-  println("has UTF16: \(!CFStringGetCharactersPtr(reinterpretCast(nsASCII)).isNull())")
+  println("has UTF16: \(CFStringGetCharactersPtr(reinterpretCast(nsASCII)) != nil)")
 
   // CHECK: --- ASCII basic round-tripping ---
   println("--- ASCII basic round-tripping ---")
