@@ -81,7 +81,7 @@ protocol _BridgedToObjectiveC {
   class func getObjectiveCType() -> Any.Type
 
   func bridgeToObjectiveC() -> ObjectiveCType
-  class func bridgeFromObjectiveC(x: ObjectiveCType) -> Self?
+  class func bridgeFromObjectiveC(source: ObjectiveCType) -> Self?
 }
 
 /// Whether a given type conforming to this protocol bridges to

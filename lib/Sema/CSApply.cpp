@@ -3822,25 +3822,27 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     case ConversionRestrictionKind::ArrayBridged: {
       // Look through implicitly unwrapped optionals.
       if (auto objTy
-          = cs.lookThroughImplicitlyUnwrappedOptionalType(
+              = cs.lookThroughImplicitlyUnwrappedOptionalType(
                                                           expr->getType())) {
         expr = coerceImplicitlyUnwrappedOptionalToValue(expr, objTy, locator);
         if (!expr) return nullptr;
       }
-      auto bridgedArrayConversion = new (tc.Context)
-                                      ArrayBridgedConversionExpr(expr, toType);
-      
-      bridgedArrayConversion->setType(toType);
-      
-      // For a conversion from Array<T> to Array<U>, check if T conforms to the
-      // _ConditionallyBridgedToObjectiveC protocol.
-      auto desugaredArray = fromType.getPointer()->getDesugaredType();
-      auto baseType = cs.getBaseTypeForArrayType(desugaredArray);
-      
+
+      // Classify the element type of the array we're bridging from.
+      Type bridgedToType;
+      bool bridgedVerbatim;
       bool isConditionallyBridged = false;
-      tc.getBridgedToObjC(dc, baseType, &isConditionallyBridged);
-      bridgedArrayConversion->isConditionallyBridged = isConditionallyBridged;
-      return bridgedArrayConversion;
+      auto fromBaseType = cs.getBaseTypeForArrayType(fromType.getPointer());
+      std::tie(bridgedToType, bridgedVerbatim)
+        = tc.getBridgedToObjC(dc, fromBaseType, &isConditionallyBridged);
+
+      // If the source type is bridged verbatim, this is a simple upcast.
+      assert(!bridgedVerbatim && "Should be an upcast");
+
+      // Otherwise, it's a bridged upcast.
+      auto upcast = new (tc.Context) ArrayBridgedConversionExpr(expr, toType);
+      upcast->isConditionallyBridged = isConditionallyBridged;
+      return upcast;
     }
 
     case ConversionRestrictionKind::ArrayUpcast: {
@@ -3851,10 +3853,13 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
         expr = coerceImplicitlyUnwrappedOptionalToValue(expr, objTy, locator);
         if (!expr) return nullptr;
       }
-      auto arrayConversion = new (tc.Context)
-                                  ArrayUpcastConversionExpr(expr, toType);
-      arrayConversion->setType(toType);
-      return arrayConversion;
+
+      // Form the upcast.
+      assert(tc.getBridgedToObjC(
+               dc,
+               cs.getBaseTypeForArrayType(fromType.getPointer())).second &&
+             "Cannot upcast array of non-bridged-verbatim type");
+      return new (tc.Context) ArrayUpcastConversionExpr(expr, toType);
     }
 
     case ConversionRestrictionKind::User:

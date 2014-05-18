@@ -2994,44 +2994,45 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
     flags |= TMF_ApplyingOperatorParameter;
   }
 
+  unsigned subFlags = flags | TMF_GenerateConstraints;
   switch (restriction) {
   // for $< in { <, <c, <oc }:
   //   T_i $< U_i ===> (T_i...) $< (U_i...)
   case ConversionRestrictionKind::TupleToTuple:
     return matchTupleTypes(type1->castTo<TupleType>(),
                            type2->castTo<TupleType>(),
-                           matchKind, flags, locator);
+                           matchKind, subFlags, locator);
 
   //   T <c U ===> T <c (U)
   case ConversionRestrictionKind::ScalarToTuple:
     return matchScalarToTupleTypes(type1,
                                    type2->castTo<TupleType>(),
-                                   matchKind, flags, locator);
+                                   matchKind, subFlags, locator);
 
   // for $< in { <, <c, <oc }:
   //   T $< U ===> (T) $< U
   case ConversionRestrictionKind::TupleToScalar:
     return matchTupleToScalarTypes(type1->castTo<TupleType>(),
                                    type2,
-                                   matchKind, flags, locator);
+                                   matchKind, subFlags, locator);
 
   case ConversionRestrictionKind::DeepEquality:
     return matchDeepEqualityTypes(type1, type2, locator);
 
   case ConversionRestrictionKind::Superclass:
     addContextualScore();
-    return matchSuperclassTypes(type1, type2, matchKind, flags, locator);
+    return matchSuperclassTypes(type1, type2, matchKind, subFlags, locator);
 
   case ConversionRestrictionKind::LValueToRValue:
     return matchTypes(type1->getRValueType(), type2,
-                      matchKind, flags, locator);
+                      matchKind, subFlags, locator);
 
   // for $< in { <, <c, <oc }:
   //   T $< U, U : P_i ===> T $< protocol<P_i...>
   case ConversionRestrictionKind::Existential:
     addContextualScore();
     return matchExistentialTypes(type1, type2,
-                                 matchKind, flags, locator);
+                                 matchKind, subFlags, locator);
 
   // for $< in { <, <c, <oc }:
   //   T $< U ===> T $< U?
@@ -3041,7 +3042,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
     auto generic2 = type2->castTo<BoundGenericType>();
     assert(generic2->getDecl()->classifyAsOptionalType());
     return matchTypes(type1, generic2->getGenericArgs()[0],
-                      matchKind, (flags | TMF_UnwrappingOptional), locator);
+                      matchKind, (subFlags | TMF_UnwrappingOptional), locator);
   }
 
   // for $< in { <, <c, <oc }:
@@ -3061,7 +3062,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
     assert(generic2->getDecl()->classifyAsOptionalType());
     return matchTypes(generic1->getGenericArgs()[0],
                       generic2->getGenericArgs()[0],
-                      matchKind, flags, locator);
+                      matchKind, subFlags, locator);
   }
 
   // T <c U ===> T! <c U
@@ -3082,67 +3083,94 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
     Type valueType1 = boundGenericType1->getGenericArgs()[0];
     increaseScore(SK_ForceUnchecked);
     return matchTypes(valueType1, type2,
-                      matchKind, flags, locator);
+                      matchKind, subFlags, locator);
   }
       
   // T < U ===> Array<T> <c Array<U>
   case ConversionRestrictionKind::ArrayUpcast: {
-    increaseScore(SK_ArrayUpcastConversion);
-    
-    addContextualScore();
-    assert(matchKind >= TypeMatchKind::Conversion);
-    
     auto t1 = type1->getDesugaredType();
     auto t2 = type2->getDesugaredType();
     
     Type baseType1 = this->getBaseTypeForArrayType(t1);
     Type baseType2 = this->getBaseTypeForArrayType(t2);
-    
-    if (baseType2->isAnyObject()) {
-      if (baseType1->getClassOrBoundGenericClass()) {
+
+    // Look through type variables in the first base type; we need to know it's
+    // structure before we can decide whether this can be an array upcast.
+    TypeVariableType *baseTypeVar1;
+    baseType1 = getFixedTypeRecursive(baseType1, baseTypeVar1, false, false);
+    if (baseTypeVar1) {
+      if (flags & TMF_GenerateConstraints) {
+        addConstraint(
+          Constraint::createRestricted(*this, getConstraintKind(matchKind),
+                                       restriction, type1, type2,
+                                       getConstraintLocator(locator)));
         return SolutionKind::Solved;
       }
+
+      return SolutionKind::Unsolved;
     }
-    
+
+    // The first base type must be a class or ObjC class existential.
+    if (!baseType1->getClassOrBoundGenericClass() &&
+        !baseType1->isObjCExistentialType()) {
+      // FIXME: Record failure.
+      return SolutionKind::Error;
+    }
+
+    increaseScore(SK_ArrayUpcastConversion);
+    addContextualScore();
+    assert(matchKind >= TypeMatchKind::Conversion);
+
     return matchTypes(baseType1,
                       baseType2,
                       TypeMatchKind::Subtype,
-                      flags,
+                      subFlags,
                       locator);
   }
       
   // T < U ===> Array<T> is bridged to Array<U>
   case ConversionRestrictionKind::ArrayBridged: {
-    addContextualScore();
-    assert(matchKind >= TypeMatchKind::Conversion);
-    
     auto t1 = type1->getDesugaredType();
     auto t2 = type2->getDesugaredType();
     
     Type baseType1 = this->getBaseTypeForArrayType(t1);
     Type baseType2 = this->getBaseTypeForArrayType(t2);
-    
-    if (!baseType2->isAnyObject()) {
-      // Allow assignments from Array<T> to Array<U> if T is bridged
-      // to type U.
-      if (auto bridgedType1 = TC.getBridgedToObjC(DC, baseType1).first) {
-        // If we're not converting to AnyObject, check if T.ObjectiveCType is
-        // U.
-        // We'll save the further check for conformance with
-        // _ConditionallyBridgedToObjectiveC until runtime.
-        if (bridgedType1->isEqual(baseType2)) {
-          return SolutionKind::Solved;
-        } else {
-          // Check if T's bridged type is a subtype of U.
-          return matchTypes(bridgedType1,
-                            baseType2,
-                            TypeMatchKind::Subtype,
-                            flags,
-                            locator);
-        }
+
+    // Look through type variables in the first base type; we need to know it's
+    // structure before we can decide whether this can be an array bridge.
+    TypeVariableType *baseTypeVar1;
+    baseType1 = getFixedTypeRecursive(baseType1, baseTypeVar1, false, false);
+    if (baseTypeVar1) {
+      if (flags & TMF_GenerateConstraints) {
+        addConstraint(
+          Constraint::createRestricted(*this, getConstraintKind(matchKind),
+                                       restriction, type1, type2,
+                                       getConstraintLocator(locator)));
+        return SolutionKind::Solved;
       }
+
+      return SolutionKind::Unsolved;
     }
-    
+
+    increaseScore(SK_ArrayBridgedConversion);
+    addContextualScore();
+    assert(matchKind >= TypeMatchKind::Conversion);
+
+    // Allow assignments from Array<T> to Array<U> if T is bridged
+    // non-verbatim to type U.
+    Type bridgedType1;
+    bool bridgedVerbatim;
+    std::tie(bridgedType1, bridgedVerbatim) = TC.getBridgedToObjC(DC,baseType1);
+    if (bridgedType1 && !bridgedVerbatim) {
+      // Check if T's bridged type is a subtype of U.
+      return matchTypes(bridgedType1,
+                        baseType2,
+                        TypeMatchKind::Subtype,
+                        subFlags,
+                        locator);
+    }
+
+    // FIXME: Record failure.
     return ConstraintSystem::SolutionKind::Error;
   }
 
@@ -3288,7 +3316,7 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
                                                          constraint.getFirstType(),
                                                          constraint.getSecondType(),
                                                          matchKind,
-                                                         TMF_GenerateConstraints,
+                                                         0,
                                                          constraint.getLocator());
 
       // If we actually solved something, record what we did.

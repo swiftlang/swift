@@ -703,49 +703,6 @@ func _arrayUpCast<Derived, Base>(a: Array<Derived>) -> Array<Base> {
   return Array(a.buffer.castToBufferOf(Base.self))
 }
 
-// ** Currently used to implement
-// ** Array<T>.bridgeFromObjectiveC(x: NSArray) -> Array<T>?
-
-/// Implement the semantics of (a as Array<T>), where a is an
-/// AnyObject[].
-func _arrayBridgedDownCast<T>(a: AnyObject[]) -> T[]? {
-  // If T is not bridged, conversion fails in O(1), yielding nil
-  if !isBridgedToObjectiveC(T.self) {
-    return nil
-  }
-
-  // If the NSArray was originally created as a Swift ArrayType<U>,
-  // conversion succeeds in O(1) if U is T or a subclass thereof. No
-  // further dynamic type checks are required.
-  if let r = _arrayCheckedDownCast(a) as T[]? {
-    return r
-  }
-  
-  // Otherwise, if T is a class or existential type, conversion
-  // succeeds in O(1), but type-checking of elements is deferred and
-  // on-demand. The result of subscripting is the result of bridging
-  // back the corresponding stored NSArray element to T. Failure to
-  // bridge back is a fatal error detected at runtime.
-  if _isClassOrObjCExistential(T.self) {
-    return Array(a.buffer.castToBufferOf(T.self))
-  }
-
-  // Otherwise, conversion is O(N), and succeeds iff every element
-  // bridges back to T
-  let n = ContiguousArrayBuffer<T>(count: a.count, minimumCapacity: 0)
-  for (i, srcElement: AnyObject) in enumerate(a) {
-    if let dstElement = bridgeFromObjectiveC(srcElement, T.self) {
-      (n._unsafeElementStorage + i).initialize(dstElement)
-    }
-    else {
-      n.count = 0
-      return nil
-    }
-  }
-  
-  return Array(ArrayBuffer(n))
-}
-
 /// Implements the semantics of `x as Derived[]` where `x` has type
 /// `Base[]` and `Derived` is a verbatim-bridged trivial subtype of
 /// `Base`.
@@ -785,14 +742,17 @@ func _arrayCheckedDownCast<Base, Derived>(a: Array<Base>) -> Derived[]? {
 /// Convert a to its corresponding bridged array type.
 /// Precondition: T is bridged to objective C
 /// O(1) if T is bridged verbatim, O(N) otherwise
-func _arrayBridgeToObjectiveC<T: _BridgedToObjectiveC>(
-  a: Array<T>
-) -> Array<T.ObjectiveCType> {
-  // FIXME: This is completely unused by any test!  It is, however,
-  // expected to be found by the compiler.  We need to find out what
-  // it is.
-  _fatalError("This is never used!'")
-  return Array(ArrayBuffer(a.asCocoaArray()))
+func _arrayBridgeToObjectiveC<BridgesToDerived, Base>(
+  source: Array<BridgesToDerived>
+) -> Array<Base> {
+  var buf = ContiguousArrayBuffer<Base>(count: source.count, minimumCapacity: 0)
+  var p = buf._unsafeElementStorage
+  for value in source {
+    let bridged: AnyObject? = bridgeToObjectiveC(value)
+    _precondition(bridged, "array element cannot be bridged to Objective-C")
+    p++.initialize(reinterpretCast(bridged!))
+  }
+  return Array(ArrayBuffer(buf))
 }
 
 // ${'Local Variables'}:
