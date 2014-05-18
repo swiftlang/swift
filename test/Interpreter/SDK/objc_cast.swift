@@ -132,4 +132,49 @@ var s: String = auo!
 var auoo: AnyObject? = "s"
 auoo! as String
 
+// Test bridged casts.
+// CHECK: Downcast to hello
+obj = NSString(string: "hello")
+if let str = obj as String {
+  println("Downcast to \(str)")
+} else {
+  println("Not a string?")
+}
+
+// CHECK-NEXT: Downcast to Swift
+var objOpt: AnyObject? = NSString(string: "Swift")
+if let str = objOpt as String {
+  println("Downcast to \(str)")
+} else {
+  println("Not a string?")
+}
+
+// CHECK-NEXT: Downcast to world
+var objImplicitOpt: AnyObject! = NSString(string: "world")
+if let str = objImplicitOpt as String {
+  println("Downcast to \(str)")
+} else {
+  println("Not a string?")
+}
+
+
+// CHECK-NEXT: Downcast correctly failed due to nil
+objOpt = nil
+if let str = objOpt as String {
+  println("Downcast should not succeed for nil")
+} else {
+  println("Downcast correctly failed due to nil")
+}
+
+#if false
+// <rdar://problem/16953860> Implicitly unwrapped optionals in casts are being forced rather than bound
+// FIXME-NEXT: Downcast correctly failed due to nil
+objImplicitOpt = nil
+if let str = objImplicitOpt as String {
+  println("Downcast should not succeed for nil")
+} else {
+  println("Downcast correctly failed due to nil")
+}
+#endif
+
 println("ok")  // CHECK: ok

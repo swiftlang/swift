@@ -2326,19 +2326,18 @@ namespace {
         break;
       }
       
-      // Allow for casts from AnyObject to a bridged type.
-      if (tc.getDynamicBridgedThroughObjCClass(cs.DC, fromType, toType)) {
-        sub = tc.coerceToRValue(expr->getSubExpr());
-        if (!sub)
-          return nullptr;
-     
-        auto OSTLoc = TypeLoc::withoutLoc(toType /*optType*/);
-        
-        auto wrappedExpr
-                  = new (tc.Context) ConditionalCheckedCastExpr(sub,
-                                                                sub->getLoc(),
-                                                                OSTLoc);
-        return visitConditionalCheckedCastExpr(wrappedExpr);
+      // Allow for bridging of a value type through a class type.
+      auto fromValueType = fromType->lookThroughAllAnyOptionalTypes();
+      if (auto classType = tc.getDynamicBridgedThroughObjCClass(cs.DC,
+                                                                fromValueType,
+                                                                toType)) {
+        // The actual check is against the class type through which we're
+        // bridging.
+        expr->getCastTypeLoc().setType(classType, /*validated=*/true);
+
+        // FIXME: We actually need to perform a checked cast, then call
+        // bridgeFromObjectiveC to try to perform the bridge, then check whether
+        // that optional has a value.
       }
 
       // SIL-generation magically turns this into a Bool; make sure it can.
@@ -2434,35 +2433,33 @@ namespace {
         arrayConversion->setType(toType);
         return arrayConversion;
       }
-      
-      // Allow for casts from AnyObject to a briged type.
-      if (auto bridgedType = tc.getDynamicBridgedThroughObjCClass(cs.DC, 
-                                                                  fromType, 
-                                                                  toType)) {
-        sub->setType(bridgedType);
-        
-        sub = tc.coerceToRValue(expr->getSubExpr());
-        if (!sub)
-          return nullptr;
-        expr->setSubExpr(sub);
-        expr->getCastTypeLoc().setType(bridgedType, true);
-        expr->setType(tc.getOptionalType(expr->getLoc(), bridgedType));
-          
-        auto optType = tc.getOptionalType(expr->getLoc(), toType);
-        auto OSTLoc = TypeLoc::withoutLoc(optType);
-          
-        auto wrappedExpr
-          = new (tc.Context) ConditionalCheckedCastExpr(expr,
-                                                        expr->getLoc(),
-                                                        OSTLoc);
 
-        // The original expression now represents the wrapped conversion.
-        expr->setImplicit();
-        return visitConditionalCheckedCastExpr(wrappedExpr);
-      }
-      
+      // The type to which the result of the optional should be coerced.
+      Type coercedResultType;
+
+      // Local function to finish the result, performing a final coercion if
+      // needed.
+      auto finishResult = [&](Expr *expr) -> Expr * {
+        // If there is no final coercion to perform, we're done.
+        if (!coercedResultType)
+          return expr;
+
+        bool failed = tc.convertToType(expr, coercedResultType, cs.DC);
+        assert(!failed && "Not convertible?");
+        return expr;
+      };
+
+      // Allow for casts from AnyObject to a bridged type.
+      auto fromValueType = fromType->lookThroughAllAnyOptionalTypes();
       Type finalResultType = simplifyType(expr->getType());
-      
+      if (auto bridgedType = tc.getDynamicBridgedThroughObjCClass(cs.DC,
+                                                                  fromValueType,
+                                                                  toType)) {
+        // FIXME: multiple levels of optionality.
+        coercedResultType = finalResultType;
+        finalResultType = tc.getOptionalType(expr->getLoc(), bridgedType);
+      }
+
       // Handle optional operands or optional results.
       
       // FIXME: some of this work needs to be delayed until runtime to
@@ -2487,7 +2484,7 @@ namespace {
       srcType = plumbOptionals(srcType, srcOptionals);
       if (srcOptionals.empty()) {
         expr->setType(finalResultType);
-        return expr;
+        return finishResult(expr);
       }
 
       SmallVector<Type, 4> destOptionals;
@@ -2557,7 +2554,7 @@ namespace {
                                                          finalResultType);
       }
 
-      return result;
+      return finishResult(result);
     }
 
     Expr *visitCoerceExpr(CoerceExpr *expr) {

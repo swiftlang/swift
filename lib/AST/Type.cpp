@@ -438,6 +438,14 @@ CanType CanType::getAnyOptionalObjectTypeImpl(CanType type) {
   return CanType();
 }
 
+Type TypeBase::lookThroughAllAnyOptionalTypes() {
+  Type type(this);
+  while (auto objType = type->getAnyOptionalObjectType())
+    type = objType;
+
+  return type;
+}
+
 bool TypeBase::isAnyObject() {
   if (auto proto = getAs<ProtocolType>())
     return proto->getDecl()->isSpecificProtocol(KnownProtocolKind::AnyObject);

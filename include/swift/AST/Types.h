@@ -591,6 +591,10 @@ public:
     return getAnyOptionalObjectType(ignored);
   }
 
+  /// Return the type T after looking through all of the optional or
+  /// implicitly-unwrapped optional types.
+  Type lookThroughAllAnyOptionalTypes();
+
   /// Whether this is the AnyObject type.
   bool isAnyObject();
 

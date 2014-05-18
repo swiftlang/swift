@@ -2050,14 +2050,9 @@ static CheckedCastKind getCheckedCastKind(ConstraintSystem *cs,
                                           Type toType) {
   // Peel off optionals metatypes from the types, because we might cast through
   // them.
-  while (auto toValueType = toType->getAnyOptionalObjectType()) {
-    toType = toValueType;
-  }
-  
-  while (auto fromValueType = fromType->getAnyOptionalObjectType()) {
-    fromType = fromValueType;
-  }
-  
+  toType = toType->lookThroughAllAnyOptionalTypes();
+  fromType = fromType->lookThroughAllAnyOptionalTypes();
+
   // Peel off metatypes, since if we can cast two types, we can cast their
   // metatypes.
   while (auto toMetatype = toType->getAs<MetatypeType>()) {
@@ -2185,10 +2180,27 @@ ConstraintSystem::simplifyCheckedCastConstraint(
   }
   return SolutionKind::Solved;
 
-  case CheckedCastKind::ExistentialToConcrete:
+  case CheckedCastKind::ExistentialToConcrete: {
+    // Peel off optionals metatypes from the types, because we might cast through
+    // them.
+    auto toValueType = toType->lookThroughAllAnyOptionalTypes();
+    auto fromValueType = fromType->lookThroughAllAnyOptionalTypes();
+
+    // This existential-to-concrete cast might bridge through an Objective-C
+    // class type.
+    if (auto classType = TC.getDynamicBridgedThroughObjCClass(DC, fromValueType,
+                                                              toValueType)) {
+      // The class we're bridging through must be a subtype of the type we're
+      // coming from.
+      addConstraint(ConstraintKind::Subtype, classType, fromValueType,
+                    getConstraintLocator(locator));
+      return SolutionKind::Solved;
+    }
+
     addConstraint(ConstraintKind::Subtype, toType, fromType,
                   getConstraintLocator(locator));
     return SolutionKind::Solved;
+  }
 
   case CheckedCastKind::Coercion:
   case CheckedCastKind::Unresolved:
