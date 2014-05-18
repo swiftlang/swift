@@ -258,6 +258,7 @@ struct ContiguousArrayBuffer<T> : ArrayBufferType, LogicValue {
   func storesOnlyElementsOfType<U>(
     _: U.Type
   ) -> Bool {
+    _sanityCheck(_isClassOrObjCExistential(U.self))
     let s = storage
     if _fastPath(s) {
       if _fastPath(s!.staticElementType is U.Type) {
@@ -268,7 +269,8 @@ struct ContiguousArrayBuffer<T> : ArrayBufferType, LogicValue {
     
     // Check the elements
     for x in self {
-      if !(x is U) {
+      // FIXME: reinterpretCast works around <rdar://problem/16953026>
+      if !(reinterpretCast(x) as AnyObject is U) {
         return false
       }
     }

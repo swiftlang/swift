@@ -182,7 +182,7 @@ func testBridgedVerbatim() {
     println("downcastBackToBase failed")
   }
 
-  // CHECK-NEXT: downcastBackToDerived failed
+  // CHECK-NEXT: downcastBackToDerived = [[derived2]]
   if let downcastBackToDerived = derivedAsAnyObjectArray as Derived[] {
     println("downcastBackToDerived = \(downcastBackToDerived)")
   }
@@ -270,6 +270,25 @@ func testExplicitlyBridged() {
     println(downcasted[0])
     // CHECK-NEXT: BridgedObjC#[[ID1:[0-9]+]](17)
     println(downcasted[1])
+  }
+
+  // Downcasts of up-casted arrays.
+  if let downcasted = bridgedSwiftsAsAnyObjects as BridgedObjC[] {
+    // CHECK-NEXT: BridgedObjC#[[ID0:[0-9]+]](42)
+    println(downcasted[0])
+    // CHECK-NEXT: BridgedObjC#[[ID1:[0-9]+]](17)
+    println(downcasted[1])
+  } else {
+    println("Could not downcast AnyObject[] to BridgedObjC[]?")
+  }
+
+  if let downcasted = bridgedSwiftsAsAnyObjects as Base[] {
+    // CHECK-NEXT: BridgedObjC#[[ID0:[0-9]+]](42)
+    println(downcasted[0])
+    // CHECK-NEXT: BridgedObjC#[[ID1:[0-9]+]](17)
+    println(downcasted[1])
+  } else {
+    println("Could not downcast AnyObject[] to Base[]?")
   }
 }
 testExplicitlyBridged()
