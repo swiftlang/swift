@@ -232,6 +232,12 @@ extension ${Self} : ArrayType {
     
     return result
   }
+
+  /// Return a ${Self} containg the elements `x` of `self` for which
+  /// `includeElement(x)` is `true`
+  func filter(includeElement: (T)->Bool) -> ${Self} {
+    return ${Self}(Swift.filter(self, includeElement))
+  }
 }
 
 extension ${Self} : Reflectable {

@@ -79,5 +79,12 @@ func testCopy() {
 }
 testCopy()
 
+func testFilter() {
+  let a = Array(3..16)
+  println(a.filter { $0 % 4 == 0 })
+  // CHECK-NEXT: [4, 8, 12]
+}
+testFilter()
+
 println("done!") // CHECK-NEXT: {{^done!$}}
 
