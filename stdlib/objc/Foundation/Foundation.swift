@@ -562,15 +562,16 @@ func _convertNSArrayToArray<T>(source: NSArray) -> T[] {
     // Forced down-cast (possible deferred type-checking)
     return Array(ArrayBuffer(reinterpretCast(source) as _CocoaArray))
   }
-  else {
-    let result = T[]._bridgeFromObjectiveCImpl(source)
-    if _fastPath(result) {
-      return result!
-    }
-    
-    _preconditionFailure(
-      "NSArray element failed to bridge to Array element type")
+
+  var anyObjectArr: AnyObject[]
+    = Array(ArrayBuffer(reinterpretCast(source) as _CocoaArray))
+  let result: T[]? = _arrayBridgeFromObjectiveC(anyObjectArr)
+  if _fastPath(result) {
+    return result!
   }
+  
+  _preconditionFailure(
+    "NSArray element failed to bridge to Array element type")
 }
 
 /// The entry point for converting `Array` to `NSArray` in bridge
@@ -603,36 +604,11 @@ extension Array : _ConditionallyBridgedToObjectiveC {
     if !Swift.isBridgedToObjectiveC(T.self) {
       return nil
     }
-    return _bridgeFromObjectiveCImpl(source)
-  }
 
-  /// The guts of bridgeFromObjectiveC; also used by forced conversion
-  /// (_convertNSArrayToArray).
-  static func _bridgeFromObjectiveCImpl(source: NSArray) -> Array? {
-    // FIXME: as an optimization we could look to see if the NSArray
-    // already wraps an appropriate ContiguousArrayBuffer
-    
-    var buf = ContiguousArrayBuffer<T>(
-      count: source.count, minimumCapacity: 0)
-    var p = buf._unsafeElementStorage
-    
-    ElementwiseBridging: do {
-      for object: AnyObject in source {
-        let value = Swift.bridgeFromObjectiveC(object, T.self)
-        if _slowPath(!value) {
-          break ElementwiseBridging
-        }
-        p++.initialize(value!)
-      }
-      return Array(ArrayBuffer(buf))
-    }
-    while false
-    
-    // Don't destroy anything we never created.
-    buf.count = p - buf._unsafeElementStorage
-    
-    // Report failure
-    return nil
+
+    var anyObjectArr: AnyObject[]
+      = AnyObject[](ArrayBuffer(reinterpretCast(source) as _CocoaArray))
+    return _arrayBridgeFromObjectiveC(anyObjectArr)
   }
 
   @conversion func __conversion() -> NSArray {
@@ -1256,17 +1232,11 @@ extension NSArray {
     _fixLifetime(x)
   }
 
-  /// An `AnyObject[]` that shares `self`\ 's storage.  If `self` is
-  /// mutable, any changes to it may be observable by the result.
-  @final
-  var _arraySharingStorage: AnyObject[] {
-    return Array(ArrayBuffer(reinterpretCast(self) as _CocoaArray))
-  }
-
   @final
   @conversion
   func __conversion() -> AnyObject[] {
-    return self.copyWithZone(nil)!._arraySharingStorage
+    return Array(
+             ArrayBuffer(reinterpretCast(self.copyWithZone(nil)) as _CocoaArray))
   }
 }
 

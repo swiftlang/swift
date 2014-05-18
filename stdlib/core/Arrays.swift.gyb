@@ -758,11 +758,13 @@ func _arrayCheckedDownCast<Base, Derived>(a: Array<Base>) -> Derived[]? {
 }
 
 /// Convert a to its corresponding bridged array type.
-/// Precondition: T is bridged to objective C
-/// O(1) if T is bridged verbatim, O(N) otherwise
+/// Precondition: T is bridged non-verbatim to objective C
+/// O(N), because each element must be bridged separately.
 func _arrayBridgeToObjectiveC<BridgesToDerived, Base>(
   source: Array<BridgesToDerived>
 ) -> Array<Base> {
+  _sanityCheck(isBridgedVerbatimToObjectiveC(Base.self))
+  _sanityCheck(!isBridgedVerbatimToObjectiveC(BridgesToDerived.self))
   var buf = ContiguousArrayBuffer<Base>(count: source.count, minimumCapacity: 0)
   var p = buf._unsafeElementStorage
   for value in source {
@@ -771,6 +773,39 @@ func _arrayBridgeToObjectiveC<BridgesToDerived, Base>(
     p++.initialize(reinterpretCast(bridged!))
   }
   return Array(ArrayBuffer(buf))
+}
+
+/// Convert the source array of objects to an array of values produced by
+/// bridging the objects from Objective-C to \c BridgesToDerived.
+/// Precondition: Base is a class type.
+/// Precondition: BridgesToDerived is bridged non-verbatim to Objective-C.
+/// O(n), because each element must be bridged separately.
+func _arrayBridgeFromObjectiveC<Base, BridgesToDerived>(source: Array<Base>)
+       -> Array<BridgesToDerived>? {
+  _sanityCheck(isBridgedVerbatimToObjectiveC(Base.self))
+  _sanityCheck(!isBridgedVerbatimToObjectiveC(BridgesToDerived.self))
+  var buf = ContiguousArrayBuffer<BridgesToDerived>(count: source.count, 
+                                                    minimumCapacity: 0)
+  var p = buf._unsafeElementStorage
+  
+  ElementwiseBridging: do {
+    for object: Base in source {
+      let value = Swift.bridgeFromObjectiveC(reinterpretCast(object), 
+                                             BridgesToDerived.self)
+      if _slowPath(!value) {
+        break ElementwiseBridging
+      }
+      p++.initialize(value!)
+    }
+    return Array(ArrayBuffer(buf))
+  }
+  while false
+  
+  // Don't destroy anything we never created.
+  buf.count = p - buf._unsafeElementStorage
+  
+  // Report failure
+  return nil
 }
 
 // ${'Local Variables'}:
