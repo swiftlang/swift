@@ -34,6 +34,7 @@ set(SWIFTLIB_ESSENTIAL
   CocoaArray.swift
   Collection.swift
   CompilerProtocols.swift
+  ContiguousArrayBuffer.swift
   Dictionary.swift
   EmptyCollection.swift
   Existential.swift
@@ -50,7 +51,6 @@ set(SWIFTLIB_ESSENTIAL
   Mirrors.swift.gyb
   Misc.swift
   NSSwiftArray.swift
-  ContiguousArrayBuffer.swift
   Nil.swift
   Optional.swift
   OutputStream.swift
@@ -66,9 +66,9 @@ set(SWIFTLIB_ESSENTIAL
   StringBuffer.swift
   StringCore.swift
   StringLegacy.swift
-  StringUnicodeScalarView.swift
   StringUTF16.swift
   StringUTF8.swift
+  StringUnicodeScalarView.swift
   Unicode.swift
   UnicodeScalar.swift
   Unmanaged.swift
