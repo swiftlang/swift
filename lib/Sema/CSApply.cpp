@@ -2268,6 +2268,15 @@ namespace {
       llvm_unreachable("Already type-checked");
     }
 
+    /// A helper function to plumb a stack of optional types.
+    Type plumbOptionals(Type type, SmallVectorImpl<Type> &optionals) {
+      while (auto valueType = type->getAnyOptionalObjectType()) {
+        optionals.push_back(type);
+        type = valueType;
+      }
+      return type;
+    };
+
     Expr *visitIsaExpr(IsaExpr *expr) {
       // Turn the subexpression into an rvalue.
       auto &tc = cs.getTypeChecker();
@@ -2275,14 +2284,6 @@ namespace {
       auto sub = tc.coerceToRValue(expr->getSubExpr());
       if (!sub)
         return nullptr;
-      
-      if (auto base = cs.lookThroughImplicitlyUnwrappedOptionalType(
-                                                              sub->getType())) {
-        if (!isOptionalType(toType)) {
-          auto locator = cs.getConstraintLocator(sub);
-          sub = coerceImplicitlyUnwrappedOptionalToValue(sub, base, locator);
-        }
-      }
       
       expr->setSubExpr(sub);
 
@@ -2297,7 +2298,7 @@ namespace {
                         [&](Type commonTy) -> bool {
                           return tc.convertToType(sub, commonTy, cs.DC);
                         });
-      
+
       switch (castKind) {
       case CheckedCastKind::Unresolved:
         // Invalid type check.
@@ -2326,12 +2327,53 @@ namespace {
         expr->setCastKind(castKind);
         break;
       }
-      
+
+      // SIL-generation magically turns this into a Bool; make sure it can.
+      if (!cs.getASTContext().getGetBoolDecl(&cs.getTypeChecker())) {
+        tc.diagnose(expr->getLoc(), diag::bool_intrinsics_not_found);
+        // Continue anyway.
+      }
+
+      // Dig through the optionals in the from/to types.
+      SmallVector<Type, 2> fromOptionals;
+      auto fromValueType = plumbOptionals(fromType, fromOptionals);
+      SmallVector<Type, 2> toOptionals;
+      auto toValueType = plumbOptionals(toType, toOptionals);
+
+      // If we have an imbalance of optionals, handle this as a checked cast
+      // followed by a getLogicValue.
+      if (fromOptionals.size() != toOptionals.size()) {
+        auto toOptType = OptionalType::get(toType);
+        ConditionalCheckedCastExpr *cast
+          = new (tc.Context) ConditionalCheckedCastExpr(
+                               sub, expr->getLoc(),
+                               TypeLoc::withoutLoc(toType));
+        cast->setType(toOptType);
+
+        // Type-check this conditional case.
+        Expr *result = visitConditionalCheckedCastExpr(cast);
+        if (!result)
+          return nullptr;
+
+        // Extract a Bool from the resulting expression.
+        // FIXME: This loses the 'is' sugar.
+        return solution.convertToLogicValue(result,
+                                            cs.getConstraintLocator(expr));
+      }
+
       // Allow for bridging of a value type through a class type.
-      auto fromValueType = fromType->lookThroughAllAnyOptionalTypes();
       if (auto classType = tc.getDynamicBridgedThroughObjCClass(cs.DC,
                                                                 fromValueType,
-                                                                toType)) {
+                                                                toValueType)) {
+        // Rebuild classType with all of the optionals in toOptionals.
+        for (unsigned i = toOptionals.size(); i > 0; --i) {
+          // Figure out the kind of this optional.
+          OptionalTypeKind kind;
+          toOptionals[i-1]->getAnyOptionalObjectType(kind);
+
+          classType = OptionalType::get(kind, classType);
+        }
+
         // The actual check is against the class type through which we're
         // bridging.
         expr->getCastTypeLoc().setType(classType, /*validated=*/true);
@@ -2339,12 +2381,6 @@ namespace {
         // FIXME: We actually need to perform a checked cast, then call
         // bridgeFromObjectiveC to try to perform the bridge, then check whether
         // that optional has a value.
-      }
-
-      // SIL-generation magically turns this into a Bool; make sure it can.
-      if (!cs.getASTContext().getGetBoolDecl(&cs.getTypeChecker())) {
-        tc.diagnose(expr->getLoc(), diag::bool_intrinsics_not_found);
-        // Continue anyway.
       }
 
       return expr;
@@ -2458,15 +2494,6 @@ namespace {
       // properly account for archetypes dynamically being optional
       // types.  For example, if we're casting T to NSView?, that
       // should succeed if T=NSObject? and its value is actually nil.
-
-      /// A helper function to plumb a stack of optional types.
-      auto plumbOptionals = [](Type type, SmallVectorImpl<Type> &optionals) {
-        while (auto valueType = type->getAnyOptionalObjectType()) {
-          optionals.push_back(type);
-          type = valueType;
-        }
-        return type;
-      };
 
       Expr *subExpr = expr->getSubExpr();
       Type srcType = subExpr->getType();

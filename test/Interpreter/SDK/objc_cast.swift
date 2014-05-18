@@ -174,4 +174,46 @@ if let str = objImplicitOpt as String {
   println("Downcast correctly failed due to nil")
 }
 
+// Test bridged "isa" checks.
+// CHECK: It's a string!
+obj = NSString(string: "hello")
+if obj is String {
+  println("It's a string!")
+} else {
+  println("Not a string?")
+}
+
+// CHECK-NEXT: It's a string!
+objOpt = NSString(string: "Swift")
+if objOpt is String {
+  println("It's a string!")
+} else {
+  println("Not a string?")
+}
+
+// CHECK-NEXT: It's a string!
+objImplicitOpt = NSString(string: "world")
+if objImplicitOpt is String {
+  println("It's a string!")
+} else {
+  println("Not a string?")
+}
+
+
+// CHECK-NEXT: Isa correctly failed due to nil
+objOpt = nil
+if objOpt is String {
+  println("Isa should not succeed for nil")
+} else {
+  println("Isa correctly failed due to nil")
+}
+
+// CHECK-NEXT: Isa correctly failed due to nil
+objImplicitOpt = nil
+if objImplicitOpt is String {
+  println("Isa should not succeed for nil")
+} else {
+  println("Isa correctly failed due to nil")
+}
+
 println("ok")  // CHECK: ok
