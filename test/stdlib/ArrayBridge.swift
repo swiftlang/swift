@@ -200,15 +200,6 @@ func testExplicitlyBridged() {
   println("testExplicitlyBridged()")
 
   let bridgedSwifts = [BridgedSwift(42), BridgedSwift(17)]
-
-  if true { // Doug's tests.  Redundant now?
-    // Convert to NSArray
-    let bridgedSwiftsConvertedToNSArray: NSArray = bridgedSwifts
-    // CHECK-NEXT: BridgedObjC#[[ID0:[0-9]+]](42)
-    println(bridgedSwiftsConvertedToNSArray.objectAtIndex(0) as Base)
-    // CHECK-NEXT: BridgedObjC#[[ID1:[0-9]+]](17)
-    println(bridgedSwiftsConvertedToNSArray.objectAtIndex(1) as Base)
-  }
   
   let bridgedSwiftsAsNSArray: NSArray = bridgedSwifts
   // CHECK-NEXT: [BridgedObjC#{{[0-9]+}}(42), BridgedObjC#{{[0-9]+}}(17)]
@@ -253,6 +244,31 @@ func testExplicitlyBridged() {
   println(bridgedSwiftsAsAnyObjects[0])
   // CHECK-NEXT: BridgedObjC#[[ID1:[0-9]+]](17)
   println(bridgedSwiftsAsAnyObjects[1])
+
+  // Downcasts of non-verbatim bridged value types to objects.
+  if true {
+    let downcasted = bridgedSwifts as BridgedObjC[]
+    // CHECK-NEXT: BridgedObjC#[[ID0:[0-9]+]](42)
+    println(downcasted[0])
+    // CHECK-NEXT: BridgedObjC#[[ID1:[0-9]+]](17)
+    println(downcasted[1])
+  }
+
+  if true {
+    let downcasted = bridgedSwifts as Base[]
+    // CHECK-NEXT: BridgedObjC#[[ID0:[0-9]+]](42)
+    println(downcasted[0])
+    // CHECK-NEXT: BridgedObjC#[[ID1:[0-9]+]](17)
+    println(downcasted[1])
+  }
+
+  if true {
+    let downcasted = bridgedSwifts as AnyObject[]
+    // CHECK-NEXT: BridgedObjC#[[ID0:[0-9]+]](42)
+    println(downcasted[0])
+    // CHECK-NEXT: BridgedObjC#[[ID1:[0-9]+]](17)
+    println(downcasted[1])
+  }
 }
 testExplicitlyBridged()
 
