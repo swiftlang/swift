@@ -2047,10 +2047,12 @@ Type TypeConverter::getLoweredBridgedType(Type t, AbstractCC cc) {
     // Look through optional types.
     if (auto valueTy = t->getOptionalObjectType()) {
       auto Ty = getLoweredCBridgedType(valueTy);
-      return OptionalType::get(Ty);
+      return Ty ? OptionalType::get(Ty) : Ty;
     }
-    if (auto valueTy = t->getImplicitlyUnwrappedOptionalObjectType())
-      return ImplicitlyUnwrappedOptionalType::get(getLoweredCBridgedType(valueTy));
+    if (auto valueTy = t->getImplicitlyUnwrappedOptionalObjectType()) {
+      auto Ty = getLoweredCBridgedType(valueTy);
+      return Ty ? ImplicitlyUnwrappedOptionalType::get(Ty) : Ty;
+    }
     return getLoweredCBridgedType(t);
   }
 };
