@@ -109,3 +109,16 @@ func testProtocol() {
 testProtocol()
 
 
+
+
+@class_protocol protocol P { }
+
+func test_rdar15293354() {
+  weak var x : P? = .None
+  if x {
+    x!
+  }
+}
+
+test_rdar15293354()
+
