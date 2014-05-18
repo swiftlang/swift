@@ -2009,12 +2009,13 @@ load_weak
 
   sil-instruction ::= 'load_weak' '[take]'? sil-operand
 
-  load_weak [take] %0 : $*@weak T
-  // $T must be a reference type
+  load_weak [take] %0 : $*@sil_weak Optional<T>
+  // $T must be an optional wrapping a reference type
 
 Increments the strong reference count of the heap object held in the operand,
 which must be an initialized weak reference.  The result is value of type
-``$T``, except that it is ``null`` if the heap object has begun deallocation.
+``$Optional<T>``, except that it is ``null`` if the heap object has begun
+deallocation.
 
 This operation must be atomic with respect to the final ``strong_release`` on
 the operand heap object.  It need not be atomic with respect to ``store_weak``
@@ -2027,10 +2028,10 @@ store_weak
 
   sil-instruction ::= 'store_weak' sil-value 'to' '[initialization]'? sil-operand
 
-  store_weak %0 to [initialization] %1 : $*@weak T
-  // $T must be a reference type
+  store_weak %0 to [initialization] %1 : $*@sil_weak Optional<T>
+  // $T must be an optional wrapping a reference type
 
-Initializes or reassigns a weak reference.  The operand may be ``null``.
+Initializes or reassigns a weak reference.  The operand may be ``nil``.
 
 If ``[initialization]`` is given, the weak reference must currently either be
 uninitialized or destroyed.  If it is not given, the weak reference must
