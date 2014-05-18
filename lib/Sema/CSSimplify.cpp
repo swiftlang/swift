@@ -3113,6 +3113,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
       
   // T < U ===> Array<T> is bridged to Array<U>
   case ConversionRestrictionKind::ArrayBridged: {
+    increaseScore(SK_ArrayBridgedConversion);
     addContextualScore();
     assert(matchKind >= TypeMatchKind::Conversion);
     
@@ -3122,27 +3123,20 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
     Type baseType1 = this->getBaseTypeForArrayType(t1);
     Type baseType2 = this->getBaseTypeForArrayType(t2);
     
-    if (!baseType2->isAnyObject()) {
-      // Allow assignments from Array<T> to Array<U> if T is bridged
-      // to type U.
-      if (auto bridgedType1 = TC.getBridgedToObjC(DC, baseType1).first) {
-        // If we're not converting to AnyObject, check if T.ObjectiveCType is
-        // U.
-        // We'll save the further check for conformance with
-        // _ConditionallyBridgedToObjectiveC until runtime.
-        if (bridgedType1->isEqual(baseType2)) {
-          return SolutionKind::Solved;
-        } else {
-          // Check if T's bridged type is a subtype of U.
-          return matchTypes(bridgedType1,
-                            baseType2,
-                            TypeMatchKind::Subtype,
-                            flags,
-                            locator);
-        }
-      }
+    // Allow assignments from Array<T> to Array<U> if T is bridged
+    // non-verbatim to type U.
+    Type bridgedType1;
+    bool bridgedVerbatim;
+    std::tie(bridgedType1, bridgedVerbatim) = TC.getBridgedToObjC(DC,baseType1);
+    if (bridgedType1 && !bridgedVerbatim) {
+      // Check if T's bridged type is a subtype of U.
+      return matchTypes(bridgedType1,
+                        baseType2,
+                        TypeMatchKind::Subtype,
+                        flags,
+                        locator);
     }
-    
+
     return ConstraintSystem::SolutionKind::Error;
   }
 

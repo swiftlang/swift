@@ -236,6 +236,18 @@ func testExplicitlyBridged() {
   // defining @objc method taking T[] and returning T[]
 
   // Up-casts.
+  let bridgedSwiftsAsBridgedObjCs: BridgedObjC[] = bridgedSwifts
+  // CHECK-NEXT: BridgedObjC#[[ID0:[0-9]+]](42)
+  println(bridgedSwiftsAsBridgedObjCs[0])
+  // CHECK-NEXT: BridgedObjC#[[ID1:[0-9]+]](17)
+  println(bridgedSwiftsAsBridgedObjCs[1])
+
+  let bridgedSwiftsAsBases: Base[] = bridgedSwifts
+  // CHECK-NEXT: BridgedObjC#[[ID0:[0-9]+]](42)
+  println(bridgedSwiftsAsBases[0])
+  // CHECK-NEXT: BridgedObjC#[[ID1:[0-9]+]](17)
+  println(bridgedSwiftsAsBases[1])
+
   let bridgedSwiftsAsAnyObjects: AnyObject[] = bridgedSwifts
   // CHECK-NEXT: BridgedObjC#[[ID0:[0-9]+]](42)
   println(bridgedSwiftsAsAnyObjects[0])

@@ -3820,7 +3820,29 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
 
     case ConversionRestrictionKind::ArrayBridged: {
-      llvm_unreachable("Never generated");
+      // Look through implicitly unwrapped optionals.
+      if (auto objTy
+              = cs.lookThroughImplicitlyUnwrappedOptionalType(
+                                                          expr->getType())) {
+        expr = coerceImplicitlyUnwrappedOptionalToValue(expr, objTy, locator);
+        if (!expr) return nullptr;
+      }
+
+      // Classify the element type of the array we're bridging from.
+      Type bridgedToType;
+      bool bridgedVerbatim;
+      bool isConditionallyBridged = false;
+      auto fromBaseType = cs.getBaseTypeForArrayType(fromType.getPointer());
+      std::tie(bridgedToType, bridgedVerbatim)
+        = tc.getBridgedToObjC(dc, fromBaseType, &isConditionallyBridged);
+
+      // If the source type is bridged verbatim, this is a simple upcast.
+      assert(!bridgedVerbatim && "Should be an upcast");
+
+      // Otherwise, it's a bridged upcast.
+      auto upcast = new (tc.Context) ArrayBridgedConversionExpr(expr, toType);
+      upcast->isConditionallyBridged = isConditionallyBridged;
+      return upcast;
     }
 
     case ConversionRestrictionKind::ArrayUpcast: {
