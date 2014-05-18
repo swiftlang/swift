@@ -47,10 +47,7 @@ println("Active X objects = \(activeXObjects)")
 // Bridge an array of an implicitly unwrapped bridged value type.
 func testConvertArrayOfImplicitUnwrappedValue() {
   println("Converting array of IOU of String to NSArray...")
-  // FIXME: Array literal of these explodes
-  var stringArr1: (String!)[] = []
-  stringArr1.append(getIUO("Hello"))
-  stringArr1.append(getIUO("World"))
+  var stringArr1: (String!)[] = ["Hello", "World"]
 
   let stringNSArr1: NSArray = stringArr1
 
@@ -74,15 +71,9 @@ testConvertArrayOfImplicitUnwrappedValue()
 
 // Bridge an array of an implicitly unwrapped array value type.
 func testConvertArrayOfImplicitUnwrappedArray() {
-  println("Converting array of IOU of Arrays of String to NSArray...")
-  // FIXME: Array literal of these explodes
-  var stringArr1: (String!)[] = []
-  stringArr1.append(getIUO("Hello"))
-  stringArr1.append(getIUO("World"))
-
-  var stringArr2: (String!)[] = []
-  stringArr2.append(getIUO("Welcome"))
-  stringArr2.append(getIUO("Swift"))
+  println("Converting array of IUO of Arrays of String to NSArray...")
+  var stringArr1: (String!)[] = ["Hello", "World"]
+  var stringArr2 = [getIUO("Welcome"), getIUO("Swift")]
 
   var stringArrArr: (((String!)[])!)[] = []
   stringArrArr.append(getIUO(stringArr1))
