@@ -57,7 +57,7 @@ protocol ArrayType
   
   /// Insert an element at the given index in O(N).  Requires: atIndex
   /// <= count
-  mutating func insert(atIndex: Int, newElement: Self.GeneratorType.Element)
+  mutating func insert(newElement: Self.GeneratorType.Element, atIndex: Int)
 
   /// Remove the element at the given index.  Returns: the removed
   /// element.  Worst case complexity: O(N).  Requires: count > index

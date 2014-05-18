@@ -187,7 +187,7 @@ extension ${Self} : ArrayType {
   
   /// Insert an element at the given index in O(N).  Requires: atIndex
   /// <= count
-  mutating func insert(atIndex: Int, newElement: T) {
+  mutating func insert(newElement: T, atIndex: Int) {
     replace(&self, atIndex..atIndex, CollectionOfOne(newElement))
   }
 

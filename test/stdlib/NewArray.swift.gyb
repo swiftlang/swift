@@ -228,7 +228,7 @@ func testCocoa() {
   // CHECK-NEXT: [foo, garply, baz]
   
   a = nsArrayOfStrings()
-  a.insert(2, newElement: "bag")
+  a.insert("bag", atIndex:2)
   printSequence(a)
   // CHECK-NEXT: [foo, bar, bag, baz]
 
@@ -427,7 +427,7 @@ func testSingleElementModifiers${A}() {
   println(a.removeLast().value)     // CHECK-NEXT: 9
   printSequence(a)               // CHECK-NEXT: [0, 1, 2, 3, 4, 5, 6, 7, 8]
   
-  a.insert(4, newElement: 42)
+  a.insert(42, atIndex: 4)
   printSequence(a)               // CHECK-NEXT: [0, 1, 2, 3, 42, 4, 5, 6, 7, 8]
   
   println(a.removeAtIndex(2).value) // CHECK-NEXT: 2
