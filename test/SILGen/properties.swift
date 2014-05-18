@@ -787,3 +787,31 @@ class ObservedDerived : ObservedBase {
 }
 
 
+
+/// <rdar://problem/16953517> Class properties should be allowed in protocols, even without stored class properties
+protocol ProtoWithClassProp {
+  class var x: Int { get }
+}
+
+class ClassWithClassProp : ProtoWithClassProp {
+  class var x: Int {
+  return 42
+  }
+}
+
+struct StructWithClassProp : ProtoWithClassProp {
+  static var x: Int {
+  return 19
+  }
+}
+
+
+func getX<T : ProtoWithClassProp>(a : T) -> Int {
+  return T.x
+}
+
+func testClassPropertiesInProtocol() -> Int {
+  return getX(ClassWithClassProp())+getX(StructWithClassProp())
+}
+
+

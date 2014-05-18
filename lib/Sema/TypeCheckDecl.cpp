@@ -1232,13 +1232,8 @@ static void validatePatternBindingDecl(TypeChecker &tc,
       nominal = cast<NominalTypeDecl>(dc);
     }
 
-    // Type variables in a protocol context are just a kind of
-    // requirement we don't know how to work with yet.
-    if (isa<ProtocolDecl>(nominal)) {
-      unimplementedStatic(Protocols);
-
-    // Non-stored properties are fine in any other context.
-    } else if (!binding->hasStorage()) {
+    // Non-stored properties are fine.
+    if (!binding->hasStorage()) {
       // do nothing
 
     // Stored type variables in a generic context need to logically

@@ -22,8 +22,7 @@ protocol Test2 {
   var property: Int { get }
 
   var title: String = "The Art of War" { get } // expected-error{{initial value is not allowed here}} expected-error {{property in protocol must have explicit { get } or { get set } specifier}}
-  class var title2: String = "The Art of War" // expected-error{{initial value is not allowed here}} expected-error {{property in protocol must have explicit { get } or { get set } specifier}}
-      // expected-error@-1 {{class variables not yet supported in protocols}}
+  class var title2: String = "The Art of War" // expected-error{{initial value is not allowed here}} expected-error {{property in protocol must have explicit { get } or { get set } specifier}} expected-error {{class variables not yet supported in generic types}}
 
   typealias mytype
   typealias mybadtype = Int

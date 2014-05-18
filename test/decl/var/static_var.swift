@@ -162,17 +162,13 @@ extension C {
 
 protocol P {
   static var v1: Int { get } // expected-error {{static properties are only allowed within structs and enums; use 'class' to declare a class property}}{{3-9=class}}
-      // expected-error@-1 {{static variables not yet supported in protocols}}
-  class var v2: Int { get } // expected-error {{class variables not yet supported in protocols}}
+  class var v2: Int { get }
 
   static var v3: Int { get } // expected-error {{static properties are only allowed within structs and enums; use 'class' to declare a class property}}{{3-9=class}}
-      // expected-error@-1 {{static variables not yet supported in protocols}}
   class var v4: Int { get }
-      // expected-error@-1 {{class variables not yet supported in protocols}}
 
-  static let l1: Int // expected-error {{static properties are only allowed within structs and enums; use 'class' to declare a class property}}{{3-9=class}}
-      // expected-error@-1 {{static variables not yet supported in protocols}}
-  class let l2: Int // expected-error {{class variables not yet supported in protocols}}
+  static let l1: Int // expected-error {{static properties are only allowed within structs and enums; use 'class' to declare a class property}}{{3-9=class}} expected-error {{static variables not yet supported in generic types}}
+  class let l2: Int // expected-error {{class variables not yet supported in generic types}}
 }
 
 

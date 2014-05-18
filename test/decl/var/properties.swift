@@ -409,11 +409,11 @@ extension EnumWithExtension1 {
 
 protocol ProtocolWithExtension1 {
   var foo: Int { get }
-  class var fooStatic : Int { get } // expected-error {{class variables not yet supported in protocols}}
+  class var fooStatic : Int { get }
 }
 extension ProtocolWithExtension1 { // expected-error {{protocol 'ProtocolWithExtension1' cannot be extended}}
   var fooExt: Int // expected-error {{'var' declarations without getter/setter not allowed here}}
-  class var fooExtStatic = 4 // expected-error {{class variables not yet supported in protocols}}
+  class var fooExtStatic = 4  // expected-error {{class variables not yet supported in generic types}}
 }
 
 func getS() -> S {
@@ -533,7 +533,7 @@ class MonoClass {
 }
 
 protocol Proto {
-  class var foo: Int { get } // expected-error{{class variables not yet supported in protocols}}
+  class var foo: Int { get }
 }
 
 func staticPropRefs() -> (Int, Int, String, UnicodeScalar, UInt8) {
