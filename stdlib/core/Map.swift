@@ -10,58 +10,62 @@
 //
 //===----------------------------------------------------------------------===//
 
-struct MapSequenceView<Base: Generator, T> : Generator, Sequence {
+struct MapSequenceGenerator<Base: Generator, T>: Generator, Sequence {
   mutating func next() -> T? {
-    return base.next().map(transform)
+    let x = _base.next()
+    if x {
+      return _transform(x!)
+    }
+    return nil
   }
   
-  func generate() -> MapSequenceView {
+  func generate() -> MapSequenceGenerator {
     return self
   }
+  
+  var _base: Base
+  var _transform: (Base.Element)->T
+}
 
-  init(_ base: Base, _ transform: (Base.Element)->T) {
-    self.base = base
-    self.transform = transform
+struct MapSequenceView<Base: Sequence, T> : Sequence {
+  func generate() -> MapSequenceGenerator<Base.GeneratorType,T> {
+    return MapSequenceGenerator(
+      _base: _base.generate(), _transform: _transform)
   }
-
-  var base: Base
-  var transform: (Base.Element)->T
+  
+  var _base: Base
+  var _transform: (Base.GeneratorType.Element)->T
 }
 
 struct MapCollectionView<Base: Collection, T> : Collection {
   var startIndex: Base.IndexType {
-    return base.startIndex
+    return _base.startIndex
   }
   
   var endIndex: Base.IndexType {
-    return base.endIndex
+    return _base.endIndex
   }
 
   subscript(index: Base.IndexType) -> T {
-    return transform(base[index])
+    return _transform(_base[index])
   }
 
-  func generate() -> MapSequenceView<Base.GeneratorType, T> {
-    return MapSequenceView(base.generate(), transform)
+  func generate() -> MapSequenceView<Base, T>.GeneratorType {
+    return MapSequenceGenerator(_base: _base.generate(), _transform: _transform)
   }
 
-  init(_ base: Base, transform: (Base.GeneratorType.Element)->T) {
-    self.base = base
-    self.transform = transform
-  }
-  
-  var base: Base
-  var transform: (Base.GeneratorType.Element)->T
+  var _base: Base
+  var _transform: (Base.GeneratorType.Element)->T
 }
 
 func map<S:Sequence, T>(
   source: S, transform: (S.GeneratorType.Element)->T
-) -> MapSequenceView<S.GeneratorType, T> {
-  return MapSequenceView(source.generate(), transform)
+) -> MapSequenceView<S, T> {
+  return MapSequenceView(_base: source, _transform: transform)
 }
 
 func map<C:Collection, T>(
   source: C, transform: (C.GeneratorType.Element)->T
 ) -> MapCollectionView<C, T> {
-  return MapCollectionView(source, transform)
+  return MapCollectionView(_base: source, _transform: transform)
 }
