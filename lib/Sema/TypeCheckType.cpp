@@ -2054,6 +2054,13 @@ TypeChecker::getBridgedToObjC(const DeclContext *dc,
   if (type->getClassOrBoundGenericClass() || type->isObjCExistentialType())
     return { type, true };
 
+  // Class archetypes are always bridged verbatim.
+  if (auto archetype = type->getAs<ArchetypeType>()) {
+    if (archetype->requiresClass()) {
+      return { type, true };
+    }
+  }
+
   // Retrieve the _BridgedToObjectiveC protocol.
   auto bridgedProto
     = Context.getProtocol(KnownProtocolKind::_BridgedToObjectiveC);

@@ -2647,32 +2647,17 @@ ConstraintSystem::simplifyClassConstraint(const Constraint &constraint){
 }
 
 ConstraintSystem::SolutionKind
-ConstraintSystem::simplifyBridgedToObjectiveCConstraint(const Constraint
-                                                                  &constraint){
+ConstraintSystem::simplifyBridgedToObjectiveCConstraint(
+  const Constraint &constraint)
+{
   auto baseTy = simplifyForTypePropertyConstraint(*this,
                                                   constraint.getFirstType());
   if (!baseTy)
     return SolutionKind::Unsolved;
   
-  if (baseTy->getClassOrBoundGenericClass()) {
+  if (TC.getBridgedToObjC(DC, baseTy).first) {
     increaseScore(SK_UserConversion);
     return SolutionKind::Solved;
-  }
-  
-  if (auto archetype = baseTy->getAs<ArchetypeType>()) {
-    if (archetype->requiresClass()) {
-      increaseScore(SK_UserConversion);
-      return SolutionKind::Solved;
-    }
-  }
-  
-  if (auto bridgedType = TC.getBridgedToObjC(DC, baseTy).first) {
-    return simplifyRestrictedConstraint(ConversionRestrictionKind::User,
-                                        bridgedType,
-                                        baseTy,
-                                        TypeMatchKind::Conversion,
-                                        TMF_GenerateConstraints,
-                                        constraint.getLocator());
   }
   
   // Record this failure.

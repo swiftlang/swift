@@ -141,6 +141,11 @@ if let str = obj as String {
   println("Not a string?")
 }
 
+// Forced cast using context
+// CHECK-NEXT: Forced to string hello
+let forcedStr: String = obj!
+println("Forced to string \(forcedStr)")
+
 // CHECK-NEXT: Downcast to Swift
 var objOpt: AnyObject? = NSString(string: "Swift")
 if let str = objOpt as String {
@@ -148,6 +153,11 @@ if let str = objOpt as String {
 } else {
   println("Not a string?")
 }
+
+// Forced cast using context
+// CHECK-NEXT: Forced to string Swift
+let forcedStrOpt: String = objOpt!
+println("Forced to string \(forcedStrOpt)")
 
 // CHECK-NEXT: Downcast to world
 var objImplicitOpt: AnyObject! = NSString(string: "world")
@@ -157,6 +167,10 @@ if let str = objImplicitOpt as String {
   println("Not a string?")
 }
 
+// Forced cast using context
+// CHECK-NEXT: Forced to string world
+let forcedStrImplicitOpt: String = objImplicitOpt!
+println("Forced to string \(forcedStrImplicitOpt)")
 
 // CHECK-NEXT: Downcast correctly failed due to nil
 objOpt = nil
@@ -224,6 +238,11 @@ if let strArr = obj as String[] {
   println("Object-to-bridged-array cast failed")
 }
 
+// Forced downcast based on context.
+// CHECK-NEXT: Forced to string array [Hello, Swift, World]
+let forcedStrArray: String[] = obj!
+println("Forced to string array \(forcedStrArray)")
+
 // CHECK-NEXT: Object-to-array cast produced [Hello, Swift, World]
 if let strArr = obj as NSString[] {
   println("Object-to-array cast produced \(strArr)")
@@ -246,6 +265,11 @@ if let strArr = objOpt as String[] {
 } else {
   println("Object-to-bridged-array cast failed")
 }
+
+// Forced downcast based on context.
+// CHECK-NEXT: Forced to string array [Hello, Swift, World]
+let forcedStrArrayOpt: String[] = objOpt!
+println("Forced to string array \(forcedStrArrayOpt)")
 
 // CHECK-NEXT: Object-to-array cast produced [Hello, Swift, World]
 if let strArr = objOpt as NSString[] {
@@ -277,6 +301,11 @@ if let strArr = objImplicitOpt as String[] {
 } else {
   println("Object-to-bridged-array cast failed")
 }
+
+// Forced downcast based on context.
+// CHECK-NEXT: Forced to string array [Hello, Swift, World]
+let forcedStrArrayImplicitOpt: String[] = objImplicitOpt!
+println("Forced to string array \(forcedStrArrayImplicitOpt)")
 
 // CHECK-NEXT: Object-to-array cast produced [Hello, Swift, World]
 if let strArr = objImplicitOpt as NSString[] {
@@ -315,7 +344,6 @@ if let floatArr = obj as Float[] {
 } else {
   println("Numbers-as-floats failed")
 }
-
 
 // CHECK: Numbers-as-ints cast produces [3, 2, 0]
 if let intArr = obj as Int[] {

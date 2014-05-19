@@ -1084,7 +1084,40 @@ namespace {
                                                             resultTy);
       return refExpr;
     }
-    
+
+    /// Bridge the given object from Objective-C to its value type.
+    ///
+    /// This routine should only be used for bridging non-verbatim value types.
+    ///
+    /// \param object The object, whose type should already be of the type
+    /// that the value type bridges through.
+    ///
+    /// \param valueType The value type to which we are bridging.
+    ///
+    /// \returns a value of type \c valueType? that stores the bridged result.
+    Expr *bridgeFromObjectiveC(Expr *object, Type valueType) {
+      auto &tc = cs.getTypeChecker();
+
+      // Find the _BridgedToObjectiveC protocol.
+      auto bridgedProto
+        = tc.Context.getProtocol(KnownProtocolKind::_BridgedToObjectiveC);
+
+      // Find the conformance of the value type to _BridgedToObjectiveC.
+      ProtocolConformance *conformance = nullptr;
+      bool conforms = tc.conformsToProtocol(valueType, bridgedProto, cs.DC,
+                                            &conformance);
+      assert(conforms && "Should already have checked the conformance");
+      (void)conforms;
+
+      // Form the call.
+      Expr *valueMetatype = TypeExpr::createImplicit(valueType, tc.Context);
+      Expr *args[1] = { object };
+      return tc.callWitness(valueMetatype, cs.DC, bridgedProto,
+                            conformance,
+                            tc.Context.getIdentifier("bridgeFromObjectiveC"),
+                            args, diag::broken_bridged_to_objc_protocol);
+    }
+
     TypeAliasDecl *MaxIntegerTypeDecl = nullptr;
     TypeAliasDecl *MaxFloatTypeDecl = nullptr;
     
@@ -2587,21 +2620,9 @@ namespace {
                                                  intermediateResultType);
 
       // Form a call to the bridgeFromObjectiveC witness.
-      auto bridgedProto
-        = tc.Context.getProtocol(KnownProtocolKind::_BridgedToObjectiveC);
-      ProtocolConformance *conformance = nullptr;
-      bool conforms = tc.conformsToProtocol(toValueType, bridgedProto, cs.DC,
-                                            &conformance);
-      assert(conforms && "Should already have checked the conformance");
-      (void)conforms;
-      Expr *toValueMetatype = TypeExpr::createImplicit(toValueType, tc.Context);
-      Expr *args[1] = { result };
-      result = tc.callWitness(toValueMetatype, cs.DC, bridgedProto, 
-                              conformance, 
-                              tc.Context.getIdentifier("bridgeFromObjectiveC"),
-                              args, diag::broken_bridged_to_objc_protocol);
+      result = bridgeFromObjectiveC(result, toValueType);
       if (!result)
-        return result;
+        return nullptr;
 
       // Wrap up the optional evaluation and we're done.
       return new (tc.Context) OptionalEvaluationExpr(result, finalResultType);
@@ -2727,18 +2748,17 @@ namespace {
         }
 
         // At this point, we should have an AnyObject.
-        assert(isDynamicLookupType(subExpr->getType()));
-        
-        auto fromType = subExpr->getType().getPointer()->getRValueObjectType();
-        
-        // Allow for casts from AnyObject through a bridged type.
-        auto bridgedType = tc.getDynamicBridgedThroughObjCClass(cs.DC,
+        auto fromType = subExpr->getType();
+        assert(isDynamicLookupType(fromType));
+
+        // Allow for casts from AnyObject through a class type.
+        auto bridgedClass = tc.getDynamicBridgedThroughObjCClass(cs.DC,
                                                                 fromType,
                                                                 valueType);
-        if (bridgedType) {
+        if (bridgedClass) {
           // Create a checked cast from AnyObject to the bridged type.
-          auto optType = tc.getOptionalType(expr->getLoc(), bridgedType);
-          auto OSTLoc = TypeLoc::withoutLoc(bridgedType);
+          auto optType = tc.getOptionalType(expr->getLoc(), bridgedClass);
+          auto OSTLoc = TypeLoc::withoutLoc(bridgedClass);
           
           auto wrappedExpr = new (tc.Context)
                                 ConditionalCheckedCastExpr(subExpr,
@@ -2746,38 +2766,39 @@ namespace {
                                                            OSTLoc);
           wrappedExpr->setImplicit(true);
           wrappedExpr->setType(optType);
-          wrappedExpr->setCastKind(CheckedCastKind::ExistentialToArchetype);
-          
-          // Force the inner checked cast.
+
           subExpr = visitConditionalCheckedCastExpr(wrappedExpr);
-          
+          if (!subExpr)
+            return nullptr;
+
+          // Force the inner checked cast.
           subExpr = new (tc.Context) ForceValueExpr(subExpr,
                                                     expr->getExclaimLoc());
-          subExpr->setType(bridgedType);
+          subExpr->setType(bridgedClass);
           subExpr->setImplicit(true);
           
-          // Now perform the final coercion to the result type.
-          optType = OptionalType::get(valueType);
-          
-          subExpr = coerceToType(subExpr, optType,
-                                 cs.getConstraintLocator(expr));
-          
+          // Now bridge from the Objective-C class.
+          subExpr = bridgeFromObjectiveC(subExpr, valueType);
+          if (!subExpr)
+            return nullptr;
+
+          // Make the bridged result forced.
           expr->setSubExpr(subExpr);
           expr->setType(valueType);
           return expr;
-        } else {
-          // Create a conditional checked cast to the value type, e.g., x as T.
-          bool isArchetype = valueType->is<ArchetypeType>();
-          auto cast = new (tc.Context) ConditionalCheckedCastExpr(
-                                         subExpr,
-                                         SourceLoc(),
-                                         TypeLoc::withoutLoc(valueType));
-          cast->setImplicit(true);
-          cast->setType(OptionalType::get(valueType));
-          cast->setCastKind(isArchetype? CheckedCastKind::ExistentialToArchetype
-                                       : CheckedCastKind::ExistentialToConcrete);
-          subExpr = cast;
         }
+
+        // Create a conditional checked cast to the value type, e.g., x as T.
+        bool isArchetype = valueType->is<ArchetypeType>();
+        auto cast = new (tc.Context) ConditionalCheckedCastExpr(
+                                       subExpr,
+                                       SourceLoc(),
+                                       TypeLoc::withoutLoc(valueType));
+        cast->setImplicit(true);
+        cast->setType(OptionalType::get(valueType));
+        cast->setCastKind(isArchetype? CheckedCastKind::ExistentialToArchetype
+                                     : CheckedCastKind::ExistentialToConcrete);
+        subExpr = cast;
       } else {
         Type optType = OptionalType::get(valueType);
         
