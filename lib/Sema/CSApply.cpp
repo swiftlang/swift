@@ -2388,9 +2388,6 @@ namespace {
         return nullptr;
       expr->setSubExpr(sub);
 
-      auto locator = cs.getConstraintLocator(expr,
-                                        ConstraintLocator::CheckedCastOperand);
-
       auto fromType = sub->getType();
       auto castKind = tc.typeCheckCheckedCast(
                         fromType, toType, cs.DC,
@@ -2437,15 +2434,11 @@ namespace {
       // Allow for down casts between array types. Because of its dependence on
       // library functionality, this is handled separately from other checked
       // cast kinds.
+      ExplicitCastExpr *cast;
       if (castKind == CheckedCastKind::ArrayDowncast) {
-        // Look through implicitly unwrapped optionals.
-        if (auto objTy 
-              = cs.lookThroughImplicitlyUnwrappedOptionalType(sub->getType())) {
-          sub = coerceImplicitlyUnwrappedOptionalToValue(sub, objTy, locator);
-          if (!sub) return nullptr;
-        }
-
-        auto toEltType = cs.getBaseTypeForArrayType(toType.getPointer());
+        auto toEltType 
+          = cs.getBaseTypeForArrayType(
+              toType->lookThroughAllAnyOptionalTypes().getPointer());
         bool bridgesFromObjC = !tc.getBridgedToObjC(cs.DC, toEltType).second;
         toType = tc.getOptionalType(sub->getLoc(), toType);
         auto arrayConversion
@@ -2453,8 +2446,16 @@ namespace {
                                                expr->getCastTypeLoc(), 
                                                bridgesFromObjC);
         arrayConversion->setType(toType);
-        return arrayConversion;
+
+        cast = arrayConversion;
+      } else {
+        cast = expr;
       }
+
+      // Note: after this point, "cast" is the expression we're
+      // working on and returning. Null out 'expr' so we don't
+      // accidentally rely on it below.
+      expr = nullptr;
 
       // The type to which the result of the optional should be coerced.
       // This type is only used when bridging through an Objective-C class.
@@ -2474,13 +2475,15 @@ namespace {
 
       // Allow for casts from AnyObject to a bridged type.
       auto fromValueType = fromType->lookThroughAllAnyOptionalTypes();
-      Type finalResultType = simplifyType(expr->getType());
-      if (auto bridgedType = tc.getDynamicBridgedThroughObjCClass(cs.DC,
-                                                                  fromValueType,
-                                                                  toType)) {
-        // FIXME: multiple levels of optionality.
-        coercedResultType = finalResultType;
-        finalResultType = tc.getOptionalType(expr->getLoc(), bridgedType);
+      auto toValueType = toType->lookThroughAllAnyOptionalTypes();
+      Type finalResultType = simplifyType(cast->getType());
+      if (castKind != CheckedCastKind::ArrayDowncast) {
+        if (auto bridgedType = tc.getDynamicBridgedThroughObjCClass(
+                                 cs.DC, fromValueType, toValueType)) {
+          // FIXME: multiple levels of optionality.
+          coercedResultType = finalResultType;
+          finalResultType = tc.getOptionalType(cast->getLoc(), bridgedType);
+        }
       }
 
       // Handle optional operands or optional results.
@@ -2489,16 +2492,15 @@ namespace {
       // properly account for archetypes dynamically being optional
       // types.  For example, if we're casting T to NSView?, that
       // should succeed if T=NSObject? and its value is actually nil.
-
-      Expr *subExpr = expr->getSubExpr();
+      Expr *subExpr = cast->getSubExpr();
       Type srcType = subExpr->getType();
 
       // There's nothing special to do if the operand isn't optional.
       SmallVector<Type, 4> srcOptionals;
       srcType = plumbOptionals(srcType, srcOptionals);
       if (srcOptionals.empty()) {
-        expr->setType(finalResultType);
-        return finishResult(expr);
+        cast->setType(finalResultType);
+        return finishResult(cast);
       }
 
       SmallVector<Type, 4> destOptionals;
@@ -2509,7 +2511,7 @@ namespace {
       // of the checked-cast expression.
       assert(!destOptionals.empty() &&
              "result of checked cast is not an optional type");
-      expr->setType(destOptionals.back());
+      cast->setType(destOptionals.back());
 
       // The result type (without the final optional) is a subtype of
       // the operand type, so it will never have a higher depth.
@@ -2543,16 +2545,16 @@ namespace {
                                                     depth, valueType);
         subExpr->setImplicit(true);
       }
-      expr->setSubExpr(subExpr);
+      cast->setSubExpr(subExpr);
 
       // If we're casting to an optional type, we need to capture the
       // final M bindings.
-      Expr *result = expr;
+      Expr *result = cast;
       if (destOptionals.size() > 1) {
         // If the innermost cast fails, the entire expression fails.  To
         // get this behavior, we have to bind and then re-inject the result.
         // (SILGen should know how to peephole this.)
-        result = new (tc.Context) BindOptionalExpr(result, expr->getEndLoc(),
+        result = new (tc.Context) BindOptionalExpr(result, cast->getEndLoc(),
                                                    failureDepth, destValueType);
         result->setImplicit(true);
 
