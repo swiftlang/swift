@@ -1270,7 +1270,7 @@ func getEmptyBridgedNonverbatimDictionary() -> Dictionary<TestBridgedKeyTy, Test
   return Dictionary(_cocoaDictionary: reinterpretCast(nsd))
 }
 
-func getHugeBridgedVerbatimDictionary() -> Dictionary<NSObject, AnyObject> {
+func getHugeBridgedVerbatimDictionaryHelper() -> NSDictionary {
   let keys = NSMutableArray()
   let values = NSMutableArray()
   for i in 1...32 {
@@ -1278,9 +1278,17 @@ func getHugeBridgedVerbatimDictionary() -> Dictionary<NSObject, AnyObject> {
     values.addObject(TestObjCValueTy(1000 + i))
   }
 
-  var nsd = NSDictionary(objects: values, forKeys: keys)
+  return NSDictionary(objects: values, forKeys: keys)
+}
 
+func getHugeBridgedVerbatimDictionary() -> Dictionary<NSObject, AnyObject> {
+  var nsd = getHugeBridgedVerbatimDictionaryHelper()
   return _convertNSDictionaryToDictionary(nsd)
+}
+
+func getHugeBridgedNonverbatimDictionary() -> Dictionary<TestBridgedKeyTy, TestBridgedValueTy> {
+  var nsd = getHugeBridgedVerbatimDictionaryHelper()
+  return Dictionary(_cocoaDictionary: reinterpretCast(nsd))
 }
 
 /// A mock dictionary that stores its keys and values in parallel arrays, which
@@ -1977,7 +1985,7 @@ test_BridgedFromObjC_Nonverbatim_Generate_Empty()
 assert(objcKeyCount == 0, "key leak")
 assert(objcValueCount == 0, "value leak")
 
-func test_BridgedFromObjC_Generate_Huge() {
+func test_BridgedFromObjC_Verbatim_Generate_Huge() {
   var d = getHugeBridgedVerbatimDictionary()
   var identity1: Word = reinterpretCast(d)
   assert(isCocoaDictionary(d))
@@ -1999,10 +2007,37 @@ func test_BridgedFromObjC_Generate_Huge() {
   assert(!gen.next())
   assert(identity1 == reinterpretCast(d))
 
-  println("test_BridgedFromObjC_Generate_Huge done")
+  println("test_BridgedFromObjC_Verbatim_Generate_Huge done")
 }
-test_BridgedFromObjC_Generate_Huge()
-// CHECK: test_BridgedFromObjC_Generate_Huge done
+test_BridgedFromObjC_Verbatim_Generate_Huge()
+// CHECK: test_BridgedFromObjC_Verbatim_Generate_Huge done
+
+func test_BridgedFromObjC_Nonverbatim_Generate_Huge() {
+  var d = getHugeBridgedNonverbatimDictionary()
+  var identity1: Word = reinterpretCast(d)
+  assert(isCocoaDictionary(d))
+
+  var gen = d.generate()
+  var pairs = Array<(Int, Int)>()
+  while let (key, value) = gen.next() {
+    pairs += (key.value, value.value)
+  }
+  var expectedPairs = Array<(Int, Int)>()
+  for i in 1...32 {
+    expectedPairs += (i, 1000 + i)
+  }
+  assert(equalsUnordered(pairs, expectedPairs))
+  // The following is not required by the Generator protocol, but
+  // it is a nice QoI.
+  assert(!gen.next())
+  assert(!gen.next())
+  assert(!gen.next())
+  assert(identity1 == reinterpretCast(d))
+
+  println("test_BridgedFromObjC_Nonverbatim_Generate_Huge done")
+}
+test_BridgedFromObjC_Nonverbatim_Generate_Huge()
+// CHECK: test_BridgedFromObjC_Nonverbatim_Generate_Huge done
 
 assert(objcKeyCount == 0, "key leak")
 assert(objcValueCount == 0, "value leak")
