@@ -969,17 +969,12 @@ visitArrayDowncastConversionExpr(ArrayDowncastConversionExpr *E,
   auto arrayTypeU = optTypeU->getCanonicalType();
   auto arrayT = cast<BoundGenericStructType>(canTypeT)->getGenericArgs()[0];
   auto arrayU = cast<BoundGenericStructType>(arrayTypeU)->getGenericArgs()[0];
-  auto typeName = cast<BoundGenericStructType>(canTypeT)->getDecl()->getName();
-  
+
   // Get the intrinsic function.
-  FuncDecl *fn = nullptr;
-  
-  if (typeName.str() == "Array") {
-    fn = SGF.getASTContext().getArrayDownCast(nullptr);
-  } else {
-    llvm_unreachable("unsupported array upcast kind");
-  }
-  
+  FuncDecl *fn = E->bridgesFromObjC()
+                  ? SGF.getASTContext().getArrayBridgeFromObjectiveC(nullptr)
+                  : SGF.getASTContext().getArrayDownCast(nullptr);
+
   // Compute type parameter substitutions.
   SmallVector<Substitution, 2> subs;
   

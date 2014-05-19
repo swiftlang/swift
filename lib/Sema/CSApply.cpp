@@ -2453,11 +2453,12 @@ namespace {
           if (!sub) return nullptr;
         }
 
+
+        auto toEltType = cs.getBaseTypeForArrayType(toType.getPointer());
+        bool bridgesFromObjC = !tc.getBridgedToObjC(cs.DC, toEltType).second;
         toType = tc.getOptionalType(sub->getLoc(), toType);
-        auto arrayConversion = new (tc.Context)
-                                  ArrayDowncastConversionExpr(
-                                                          sub,
-                                                          toType);
+        auto arrayConversion = new (tc.Context) ArrayDowncastConversionExpr(
+                                                  sub, toType, bridgesFromObjC);
         arrayConversion->setType(toType);
         return arrayConversion;
       }

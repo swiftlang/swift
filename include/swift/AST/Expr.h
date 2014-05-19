@@ -33,6 +33,7 @@ namespace llvm {
 
 namespace swift {
   class ArchetypeType;
+  class ArrayDowncastConversionExpr;
   class ASTContext;
   class Type;
   class ValueDecl;
@@ -216,7 +217,7 @@ class alignas(8) Expr {
   };
   enum { NumBindOptionalExprBits = NumExprBits + 16 };
   static_assert(NumBindOptionalExprBits <= 32, "fits in an unsigned");
-  
+
   enum { NumCheckedCastKindBits = 4 };
   class CheckedCastExprBitfields {
     friend class CheckedCastExpr;
@@ -228,7 +229,15 @@ class alignas(8) Expr {
   static_assert(unsigned(CheckedCastKind::Last_CheckedCastKind)
                   < (1 << NumCheckedCastKindBits),
                 "unable to fit a CheckedCastKind in the given number of bits");
-  
+
+  class ArrayDowncastConversionExprBitfields {
+    friend class ArrayDowncastConversionExpr;
+    unsigned : NumExprBits;
+    unsigned BridgesFromObjC : 1;
+  };
+  enum { NumArrayDowncastConversionExprBits = NumExprBits + 1 };
+  static_assert(NumArrayDowncastConversionExprBits <= 32, "fits in an unsigned");
+
 protected:
   union {
     ExprBitfields ExprBits;
@@ -244,6 +253,7 @@ protected:
     ClosureExprBitfields ClosureExprBits;
     BindOptionalExprBitfields BindOptionalExprBits;
     CheckedCastExprBitfields CheckedCastExprBits;
+    ArrayDowncastConversionExprBitfields ArrayDowncastConversionExprBits;
   };
 
 private:
@@ -2049,9 +2059,18 @@ public:
 // T is a subtype of U.
 class ArrayDowncastConversionExpr : public ImplicitConversionExpr {
 public:
-  ArrayDowncastConversionExpr(Expr *subExpr, Type type)
-  : ImplicitConversionExpr(ExprKind::ArrayDowncastConversion, subExpr, type) {}
-  
+  ArrayDowncastConversionExpr(Expr *subExpr, Type type, bool bridgesFromObjC)
+    : ImplicitConversionExpr(ExprKind::ArrayDowncastConversion, subExpr, type)
+  {
+    ArrayDowncastConversionExprBits.BridgesFromObjC = bridgesFromObjC;
+  }
+
+  /// Determine whether this downcast bridges "non-verbatim" from the
+  /// Objective-C objects in the source array to values in the result array.
+  bool bridgesFromObjC() const {
+    return ArrayDowncastConversionExprBits.BridgesFromObjC;
+  }
+
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::ArrayDowncastConversion;
   }

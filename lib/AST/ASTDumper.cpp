@@ -1373,7 +1373,10 @@ public:
     OS << ')';
   }
   void visitArrayDowncastConversionExpr(ArrayDowncastConversionExpr *E) {
-    printCommon(E, "array_downcast_expr") << '\n';
+    printCommon(E, "array_downcast_expr");
+    if (E->bridgesFromObjC())
+      OS << " bridges_from_objc";
+    OS << '\n';
     printRec(E->getSubExpr());
     OS << ')';
   }

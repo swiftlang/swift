@@ -381,7 +381,11 @@ public:
   
   /// Retrieve the simple bridge conversion function for Array<T>.
   FuncDecl *getArrayBridgeToObjectiveC(LazyResolver *resolver) const;
-  
+
+  /// Retrieve the function that bridges back from an array of objects to an
+  /// array of values.
+  FuncDecl *getArrayBridgeFromObjectiveC(LazyResolver *resolver) const;
+
   /// Retrieve the declaration of
   /// Swift._does{,ImplicitlyUnwrapped}OptionalHaveValue.
   FuncDecl *getDoesOptionalHaveValueDecl(LazyResolver *resolver,

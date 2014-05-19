@@ -80,9 +80,13 @@ struct ASTContext::Implementation {
   /// Array<T> simple upcast.
   FuncDecl *GetArrayUpCast = nullptr;
   
-  /// Array<T> bridge conversion.
+  /// Array<T> -> Array<U> bridge conversion where T is bridged non-verbatim.
   FuncDecl *GetArrayBridgeToObjectiveC = nullptr;
-  
+
+  /// Array<T> -> Array<U> checked bridge conversion where U is brdiged
+  /// non-verbatim.
+  FuncDecl *GetArrayBridgeFromObjectiveC = nullptr;
+
   /// Array<T> downcast conversion.
   FuncDecl *GetArrayDownCast = nullptr;
   
@@ -672,6 +676,22 @@ FuncDecl *ASTContext::getArrayBridgeToObjectiveC(LazyResolver *resolver) const {
   if (!decl)
     return nullptr;
   
+  cache = decl;
+  return decl;
+}
+
+FuncDecl *ASTContext::getArrayBridgeFromObjectiveC(
+            LazyResolver *resolver) const {
+  auto &cache = Impl.GetArrayBridgeFromObjectiveC;
+  if (cache) return cache;
+
+  // Look for a generic function.
+  CanType input, output, param;
+  auto decl = findLibraryIntrinsic(*this, "_arrayBridgeFromObjectiveC",
+                                   resolver);
+  if (!decl)
+    return nullptr;
+
   cache = decl;
   return decl;
 }

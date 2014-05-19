@@ -291,7 +291,7 @@ func testExplicitlyBridged() {
     println("Could not downcast AnyObject[] to Base[]?")
   }
 
-  // Downcast of Cocoa array.
+  // Downcast of Cocoa array to an array of classes.
   let wrappedCocoaBridgedSwifts: AnyObject[] = cocoaBridgedSwifts
   if let downcasted = wrappedCocoaBridgedSwifts as BridgedObjC[] {
     // CHECK-NEXT: BridgedObjC#[[ID0:[0-9]+]](42)
@@ -299,7 +299,25 @@ func testExplicitlyBridged() {
     // CHECK-NEXT: BridgedObjC#[[ID1:[0-9]+]](17)
     println(downcasted[1])
   } else {
-    println("Could not downcast NSArray to BridgedObjC[]?")
+    println("Could not downcast AnyObject[] to BridgedObjC[]?")
+  }
+
+  // Downcast of Cocoa array to an array of values.
+  if let downcasted = wrappedCocoaBridgedSwifts as BridgedSwift[] {
+    // CHECK-NEXT: BridgedSwift#[[ID0:[0-9]+]](42)
+    println(downcasted[0])
+    // CHECK-NEXT: BridgedSwift#[[ID1:[0-9]+]](17)
+    println(downcasted[1])
+  } else {
+    println("Could not downcast AnyObject[] to BridgedSwift[]?")
+  }
+
+  // Downcast of Cocoa array to an array of strings (which should fail)
+  // CHECK-NEXT: Could not downcast AnyObject[] to String[]
+  if let downcasted = wrappedCocoaBridgedSwifts as String[] {
+    println("Shouldn't be able to downcast to an array of strings")
+  } else {
+    println("Could not downcast AnyObject[] to String[]")
   }
 }
 testExplicitlyBridged()
