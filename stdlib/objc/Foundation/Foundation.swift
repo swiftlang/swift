@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 @exported import Foundation // Clang module
-
+import CoreFoundation
 
 //===----------------------------------------------------------------------===//
 // Enums
@@ -108,6 +108,12 @@ extension NSString : StringLiteralConvertible {
 extension NSString {
   @conversion func __conversion() -> String {
     return String(self)
+  }
+}
+
+extension CFString {
+  @conversion func __conversion() -> String {
+    return String(self as NSString)
   }
 }
 
