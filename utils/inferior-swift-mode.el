@@ -62,7 +62,7 @@
          (current-buffer)))
       (unless buffer
         (apply 'make-comint-in-buffer "inferior-swift" buffer
-               swift-command nil (list (concat "-sdk=" swift-sdk-path)))
+               swift-xcrun-command nil (list swift-command "-sdk" swift-sdk-path))
         (setq swift-comint-buffer (get-buffer "*inferior-swift*"))
         (inferior-swift-mode)))))
 
