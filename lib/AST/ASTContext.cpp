@@ -1214,7 +1214,6 @@ size_t ASTContext::getTotalMemory() const {
     sizeof(Impl) +
     Impl.Allocator.getTotalMemory() +
     Impl.Cleanups.capacity() +
-    Impl.IdentifierTable.getAllocator().getTotalMemory() +
     llvm::capacity_in_bytes(Impl.ModuleLoaders) +
     llvm::capacity_in_bytes(Impl.RawComments) +
     llvm::capacity_in_bytes(Impl.BriefComments) +
@@ -1234,8 +1233,7 @@ size_t ASTContext::getTotalMemory() const {
 
     if (Impl.CurrentConstraintSolverArena) {
       Size +=
-        Impl.CurrentConstraintSolverArena->getTotalMemory() +
-        Impl.CurrentConstraintSolverArena->Allocator.getTotalMemory();
+        Impl.CurrentConstraintSolverArena->getTotalMemory();
     }
 
     return Size;
