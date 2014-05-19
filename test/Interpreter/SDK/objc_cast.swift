@@ -300,4 +300,35 @@ if let strArr = objImplicitOpt as String[] {
   println("Object-to-bridged-array cast failed due to nil")
 }
 
+// Casting an array of numbers to different numbers.
+// CHECK: Numbers-as-doubles cast produces [3.14159, 2.71828, 0.0]
+obj = [3.14159, 2.71828, 0] as Double[]
+if let doubleArr = obj as Double[] {
+  println("Numbers-as-doubles cast produces \(doubleArr)")
+} else {
+  println("Numbers-as-doubles failed")
+}
+
+// CHECK: Numbers-as-floats cast produces [3.14159{{.*}}, 2.71828{{.*}}, 0.0]
+if let floatArr = obj as Float[] {
+  println("Numbers-as-floats cast produces \(floatArr)")
+} else {
+  println("Numbers-as-floats failed")
+}
+
+
+// CHECK: Numbers-as-ints cast produces [3, 2, 0]
+if let intArr = obj as Int[] {
+  println("Numbers-as-ints cast produces \(intArr)")
+} else {
+  println("Numbers-as-ints failed")
+}
+
+// CHECK: Numbers-as-bools cast produces [true, true, false]
+if let boolArr = obj as Bool[] {
+  println("Numbers-as-bools cast produces \(boolArr)")
+} else {
+  println("Numbers-as-bools failed")
+}
+
 println("ok")  // CHECK: ok

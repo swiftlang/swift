@@ -434,7 +434,7 @@ extension Int : _BridgedToObjectiveC {
   }
 
   static func bridgeFromObjectiveC(x: NSNumber) -> Int? {
-    _fatalError("implement")
+    return x.integerValue
   }
 }
 
@@ -458,7 +458,7 @@ extension UInt : _BridgedToObjectiveC {
   }
 
   static func bridgeFromObjectiveC(x: NSNumber) -> UInt? {
-    _fatalError("implement")
+    return UInt(x.unsignedIntegerValue.value)
   }
 }
 
@@ -480,7 +480,7 @@ extension Float : _BridgedToObjectiveC {
   }
 
   static func bridgeFromObjectiveC(x: NSNumber) -> Float? {
-    _fatalError("implement")
+    return x.floatValue
   }
 }
 
@@ -502,7 +502,7 @@ extension Double : _BridgedToObjectiveC {
   }
 
   static func bridgeFromObjectiveC(x: NSNumber) -> Double? {
-    _fatalError("implement")
+    return x.doubleValue
   }
 }
 
@@ -525,7 +525,7 @@ extension Bool: _BridgedToObjectiveC {
   }
 
   static func bridgeFromObjectiveC(x: NSNumber) -> Bool? {
-    _fatalError("implement")
+    return x.boolValue
   }
 }
 
@@ -742,7 +742,7 @@ extension Dictionary : _ConditionallyBridgedToObjectiveC {
   }
 
   static func bridgeFromObjectiveC(x: NSDictionary) -> Dictionary? {
-    _fatalError("implement")
+    return Dictionary(_cocoaDictionary: reinterpretCast(x))
   }
 }
 
