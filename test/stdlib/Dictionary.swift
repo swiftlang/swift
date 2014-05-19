@@ -1730,7 +1730,7 @@ test_BridgedFromObjC_Nonverbatim_RemoveAtIndex()
 // CHECK: test_BridgedFromObjC_Nonverbatim_RemoveAtIndex done
 
 
-func test_BridgedFromObjC_DeleteKey() {
+func test_BridgedFromObjC_Verbatim_DeleteKey() {
   if true {
     var d = getBridgedVerbatimDictionary()
     var identity1: Word = reinterpretCast(d)
@@ -1788,10 +1788,73 @@ func test_BridgedFromObjC_DeleteKey() {
     assert(identity2 == reinterpretCast(d2))
   }
 
-  println("test_BridgedFromObjC_DeleteKey done")
+  println("test_BridgedFromObjC_Verbatim_DeleteKey done")
 }
-test_BridgedFromObjC_DeleteKey()
-// CHECK: test_BridgedFromObjC_DeleteKey done
+test_BridgedFromObjC_Verbatim_DeleteKey()
+// CHECK: test_BridgedFromObjC_Verbatim_DeleteKey done
+
+func test_BridgedFromObjC_Nonverbatim_DeleteKey() {
+  if true {
+    var d = getBridgedNonverbatimDictionary()
+    var identity1: Word = reinterpretCast(d)
+    assert(isCocoaDictionary(d))
+
+    var deleted = d.removeValueForKey(TestBridgedKeyTy(0))
+    assert(!deleted)
+    assert(identity1 == reinterpretCast(d))
+    assert(isCocoaDictionary(d))
+
+    deleted = d.removeValueForKey(TestBridgedKeyTy(10))
+    assert(deleted!.value == 1010)
+    var identity2: Word = reinterpretCast(d)
+    assert(identity1 != identity2)
+    assert(isNativeDictionary(d))
+    assert(d.count == 2)
+
+    assert(!d[TestBridgedKeyTy(10)])
+    assert(d[TestBridgedKeyTy(20)]!.value == 1020)
+    assert(d[TestBridgedKeyTy(30)]!.value == 1030)
+    assert(identity2 == reinterpretCast(d))
+  }
+
+  if true {
+    var d1 = getBridgedNonverbatimDictionary()
+    var identity1: Word = reinterpretCast(d1)
+
+    var d2 = d1
+    assert(isCocoaDictionary(d1))
+    assert(isCocoaDictionary(d2))
+
+    var deleted = d2.removeValueForKey(TestBridgedKeyTy(0))
+    assert(!deleted)
+    assert(identity1 == reinterpretCast(d1))
+    assert(identity1 == reinterpretCast(d2))
+    assert(isCocoaDictionary(d1))
+    assert(isCocoaDictionary(d2))
+
+    deleted = d2.removeValueForKey(TestBridgedKeyTy(10))
+    assert(deleted!.value == 1010)
+    var identity2: Word = reinterpretCast(d2)
+    assert(identity1 != identity2)
+    assert(isCocoaDictionary(d1))
+    assert(isNativeDictionary(d2))
+    assert(d2.count == 2)
+
+    assert(d1[TestBridgedKeyTy(10)]!.value == 1010)
+    assert(d1[TestBridgedKeyTy(20)]!.value == 1020)
+    assert(d1[TestBridgedKeyTy(30)]!.value == 1030)
+    assert(identity1 == reinterpretCast(d1))
+
+    assert(!d2[TestBridgedKeyTy(10)])
+    assert(d2[TestBridgedKeyTy(20)]!.value == 1020)
+    assert(d2[TestBridgedKeyTy(30)]!.value == 1030)
+    assert(identity2 == reinterpretCast(d2))
+  }
+
+  println("test_BridgedFromObjC_Nonverbatim_DeleteKey done")
+}
+test_BridgedFromObjC_Nonverbatim_DeleteKey()
+// CHECK: test_BridgedFromObjC_Nonverbatim_DeleteKey done
 
 
 func test_BridgedFromObjC_Count() {

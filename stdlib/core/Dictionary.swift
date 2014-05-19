@@ -1156,8 +1156,7 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
     case .Native:
       return nativeRemoveObjectForKey(key)
     case .Cocoa(let cocoaStorage):
-      // FIXME: This assumes that KeyType and ValueType are bridged verbatim.
-      let anyObjectKey: AnyObject = _reinterpretCastToAnyObject(key)
+      let anyObjectKey: AnyObject = bridgeToObjectiveCUnconditional(key)
       if !cocoaStorage.maybeGet(anyObjectKey) {
         return .None
       }
