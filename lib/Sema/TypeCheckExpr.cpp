@@ -21,6 +21,7 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Decl.h"
+#include "swift/Parse/Lexer.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -213,13 +214,41 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS) {
     assert(RHS == as && "'as' with non-type RHS?!");
     as->setSubExpr(LHS);
     
-    // If the cast was forced, add the ForceValueExpr here.
-    auto forceLoc = as->getForceLoc();
-    if (forceLoc.isValid()) {
-      as->setForceLoc(SourceLoc());
-      return new (TC.Context) ForceValueExpr(as, forceLoc);
+    // Ban "x as T!" due to the ambiguity between what the user probably wanted:
+    //
+    //    (x as T)!
+    //
+    // and what falls out naturally from the grammar:
+    //
+    //    x as (T!)
+    TypeRepr *typeRepr = as->getCastTypeLoc().getTypeRepr();
+    if (auto implicitOpt
+          = dyn_cast_or_null<ImplicitlyUnwrappedOptionalTypeRepr>(typeRepr)) {
+      TypeRepr *base = implicitOpt->getBase();
+      
+      // When we complain, provide Fix-Its for both well-formed
+      // parenthesizations.
+      SourceLoc asLoc = as->getLoc();
+      SourceLoc exclaimLoc = implicitOpt->getExclamationLoc();
+      TC.diagnose(exclaimLoc, diag::exclaim_after_as_type)
+        .highlight(asLoc);
+      TC.diagnose(asLoc, diag::parenthesize_cast_expr)
+        .fixItInsert(LHS->getStartLoc(), "(")
+        .fixItInsert(Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
+                                                base->getEndLoc()), 
+                     ")");
+      TC.diagnose(asLoc, diag::parenthesize_cast_type)
+        .fixItInsert(base->getStartLoc(), "(")
+        .fixItInsert(Lexer::getLocForEndOfToken(TC.Context.SourceMgr, 
+                                                exclaimLoc),
+                    ")");
+
+      // Note: recover as if the user had parenthesized the cast,
+      // which is by far the more common solution.
+      as->getCastTypeLoc() = TypeLoc(base);
+      return new (TC.Context) ForceValueExpr(as, exclaimLoc);
     }
-    
+
     return as;
   }
   
