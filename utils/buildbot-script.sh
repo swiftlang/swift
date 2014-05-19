@@ -297,7 +297,7 @@ fi
 # CMake options used for all targets, including LLVM/Clang
 COMMON_CMAKE_OPTIONS=(
     "${CMAKE_COMPILER_OPTIONS[@]}"
-    -DCMAKE_BUILD_TYPE="RelWithDebInfo"
+    -DCMAKE_BUILD_TYPE="$BUILD_TYPE"
     -DLLVM_ENABLE_ASSERTIONS="ON" 
 )
 
