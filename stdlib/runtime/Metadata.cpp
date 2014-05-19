@@ -24,6 +24,7 @@
 #include <algorithm>
 #include <dlfcn.h>
 #include <new>
+#include <mutex>
 #include <sstream>
 #include <string.h>
 #include "llvm/ADT/DenseMap.h"
@@ -187,6 +188,9 @@ namespace {
   /// The implementation of a metadata cache.  Note that all-zero must
   /// be a valid state for the cache.
   template <class Entry> class MetadataCache {
+    /// Thread safety
+    std::mutex *mutex;
+
     /// The head of a linked list connecting all the metadata cache entries.
     /// TODO: Remove this when LLDB is able to understand the final data
     /// structure for the metadata cache.
@@ -197,8 +201,22 @@ namespace {
     llvm::DenseMap<EntryRef<Entry>, bool> Entries;
 
   public:
+    // Compiler generated generic clases do not call the constructor
+    void lazyInit() {
+      if (mutex == nullptr) {
+        new (this) MetadataCache();
+      }
+    }
+    MetadataCache() : mutex(new std::mutex()) {
+      assert(mutex);
+    }
+    ~MetadataCache() { delete mutex; }
+    /// Mutexes are not copyable
+    MetadataCache(const MetadataCache &other) = delete;
+    MetadataCache &operator =(MetadataCache other) = delete;
     /// Try to find an existing entry in this cache.
     const Entry *find(const void * const *arguments, size_t numArguments) const{
+      std::lock_guard<std::mutex> lock(*mutex);
       auto found
         = Entries.find(EntryRef<Entry>::forArguments(arguments, numArguments));
       if (found == Entries.end())
@@ -214,6 +232,7 @@ namespace {
     ///
     /// FIXME: locking!
     const Entry *add(Entry *entry) {
+      std::lock_guard<std::mutex> lock(*mutex);
       // Maintain the linked list.
       /// TODO: Remove this when LLDB is able to understand the final data
       /// structure for the metadata cache.
@@ -237,7 +256,9 @@ static GenericMetadataCache &getCache(GenericMetadata *metadata) {
                 sizeof(GenericMetadata::PrivateData),
                 "metadata cache is larger than the allowed space");
 
-  return *reinterpret_cast<GenericMetadataCache*>(metadata->PrivateData);
+  auto value = reinterpret_cast<GenericMetadataCache*>(metadata->PrivateData);
+  value->lazyInit();
+  return *value;
 }
 
 template <class T>
