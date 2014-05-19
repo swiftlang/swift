@@ -921,6 +921,53 @@ Constraint *getComponentConstraint(Constraint *constraint) {
   return constraint->getNestedConstraints().front();
 }
 
+static std::pair<Type, Type> getBoundTypesFromConstraint(ConstraintSystem *CS,
+                                                         Expr *expr,
+                                                         Constraint *constraint) {
+  auto type1 = expr->getType();
+  auto type2 = constraint->getSecondType();
+  
+  if (auto typeVariableType =
+      dyn_cast<TypeVariableType>(type2.getPointer())) {
+    SmallVector<Type, 4> bindings;
+    CS->getComputedBindings(typeVariableType, bindings);
+    auto binding = bindings.size() ? bindings.front() : Type();
+    
+    if (!binding.isNull()) {
+      if (binding.getPointer() != type1.getPointer())
+        type2 = binding;
+    } else {
+      auto impl = typeVariableType->getImpl();
+      if (auto archetypeType = impl.getArchetype()) {
+        type2 = archetypeType;
+      } else {
+        auto implAnchor = impl.getLocator()->getAnchor();
+        auto anchorType = implAnchor->getType();
+        
+        // Don't re-substitute an opened type variable for itself.
+        if (anchorType.getPointer() != type1.getPointer())
+          type2 = anchorType;
+      }
+    }
+  }
+  
+  if (auto typeVariableType =
+      dyn_cast<TypeVariableType>(type1.getPointer())) {
+    SmallVector<Type, 4> bindings;
+    
+    CS->getComputedBindings(typeVariableType, bindings);
+    
+    for (auto binding : bindings) {
+      if (type2.getPointer() != binding.getPointer()) {
+        type1 = binding;
+        break;
+      }
+    }
+  }
+  
+  return std::pair<Type, Type>(type1, type2);
+}
+
 bool ConstraintSystem::diagnoseFailureFromConstraints(Expr *expr) {
   
   // If we've been asked for more detailed type-check diagnostics, mine the
@@ -933,6 +980,7 @@ bool ConstraintSystem::diagnoseFailureFromConstraints(Expr *expr) {
   Constraint *valueMemberConstraint = nullptr;
   Constraint *argumentConstraint = nullptr;
   Constraint *disjunctionConversionConstraint = nullptr;
+  Constraint *conformanceConstraint = nullptr;
     
   if(!ActiveConstraints.empty()) {
     // If any active conformance constraints are in the system, we know that
@@ -952,6 +1000,14 @@ bool ConstraintSystem::diagnoseFailureFromConstraints(Expr *expr) {
         (constraint->getKind() != ConstraintKind::Disjunction) &&
         (constraint->getKind() != ConstraintKind::Conjunction)) {
       fallbackConstraint = constraint;
+    }
+    
+    // Store off conversion constraints, favoring existing conversion
+    // constraints.
+    if (!activeConformanceConstraint &&
+        !conformanceConstraint &&
+        constraint->getKind() == ConstraintKind::ConformsTo) {
+      conformanceConstraint = constraint;
     }
     
     // Failed binding constraints point to a missing member.
@@ -1010,14 +1066,6 @@ bool ConstraintSystem::diagnoseFailureFromConstraints(Expr *expr) {
     conversionConstraint = this->failedConstraint;
   }
   
-  if (argumentConstraint) {
-    TC.diagnose(expr->getLoc(),
-                diag::could_not_convert_argument,
-                argumentConstraint->getFirstType(),
-                argumentConstraint->getSecondType());
-    return true;
-  }
-  
   if (valueMemberConstraint) {
     auto memberName = valueMemberConstraint->getMember().getBaseName();
     TC.diagnose(expr->getLoc(),
@@ -1029,11 +1077,15 @@ bool ConstraintSystem::diagnoseFailureFromConstraints(Expr *expr) {
   }
   
   if (activeConformanceConstraint) {
-    auto type = activeConformanceConstraint->getSecondType();
+    std::pair<Type, Type> types = getBoundTypesFromConstraint(
+                                                  this,
+                                                  expr,
+                                                  activeConformanceConstraint);
     
     TC.diagnose(expr->getLoc(),
                 diag::does_not_conform_to_constraint,
-                type)
+                types.first,
+                types.second)
     .highlight(expr->getSourceRange());
   
     return true;
@@ -1054,54 +1106,35 @@ bool ConstraintSystem::diagnoseFailureFromConstraints(Expr *expr) {
   
   // Otherwise, if we have a conversion constraint, use that as the basis for
   // the diagnostic.
-  if (conversionConstraint) {
-    auto locator = conversionConstraint->getLocator();
+  if (conversionConstraint || argumentConstraint) {
+    auto constraint = argumentConstraint ?
+                          argumentConstraint :conversionConstraint;
+    
+    if (conformanceConstraint) {
+      if (conformanceConstraint->getTypeVariables().size() <
+              constraint->getTypeVariables().size()) {
+        constraint = conformanceConstraint;
+      }
+    }
+    
+    auto locator = constraint->getLocator();
     auto anchor = locator ? locator->getAnchor() : expr;
-    auto type1 = expr->getType();
-    auto type2 = conversionConstraint->getSecondType();
+    std::pair<Type, Type> types = getBoundTypesFromConstraint(this,
+                                                              expr,
+                                                              constraint);
     
-    if (auto typeVariableType =
-        dyn_cast<TypeVariableType>(type2.getPointer())) {
-      SmallVector<Type, 4> bindings;
-      this->getComputedBindings(typeVariableType, bindings);
-      auto binding = bindings.size() ? bindings.front() : Type();
-      
-      if (!binding.isNull()) {
-        if (binding.getPointer() != type1.getPointer())
-          type2 = binding;
-      } else {
-        auto impl = typeVariableType->getImpl();
-        if (auto archetypeType = impl.getArchetype()) {
-          type2 = archetypeType;
-        } else {
-          auto implAnchor = impl.getLocator()->getAnchor();
-          auto anchorType = implAnchor->getType();
-          
-          // Don't re-substitute an opened type variable for itself.
-          if (anchorType.getPointer() != type1.getPointer())
-            type2 = anchorType;
-        }
-      }
+    if (argumentConstraint) {
+      TC.diagnose(expr->getLoc(),
+                  diag::could_not_convert_argument,
+                  types.first,
+                  types.second).
+      highlight(anchor->getSourceRange());
+    } else {
+      TC.diagnose(anchor->getLoc(),
+                  diag::cannot_find_conversion,
+                  types.first, types.second)
+      .highlight(anchor->getSourceRange());
     }
-    
-    if (auto typeVariableType =
-        dyn_cast<TypeVariableType>(type1.getPointer())) {
-      SmallVector<Type, 4> bindings;
-      
-      this->getComputedBindings(typeVariableType, bindings);
-      
-      for (auto binding : bindings) {
-        if (type2.getPointer() != binding.getPointer()) {
-          type1 = binding;
-          break;
-        }
-      }
-    }
-    
-    TC.diagnose(anchor->getLoc(),
-                diag::cannot_find_conversion,
-                type1, type2)
-    .highlight(anchor->getSourceRange());
     
     return true;
   }

@@ -2,7 +2,7 @@
 
 // <rdar://problem/15593704>
 struct X {
-  var _maxLoadFactorInverse = 1.0 // expected-error{{cannot convert the expression's type '$T0' to type '$T1'}}
+  var _maxLoadFactorInverse = 1.0 // expected-error{{cannot convert the expression's type '$T0' to type 'FloatLiteralConvertible'}}
 }
 
 typealias MaxBuiltinFloatType = Builtin.FPIEEE64

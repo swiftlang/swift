@@ -5,8 +5,8 @@ func testTypeInference() {
   func isCharacter(inout _: Character) {}
   func isString(inout _: String) {}
 
-  var singleQuoted1 = 'a' // expected-error {{cannot convert the expression's type '$T0' to type '$T1'}}
-  var singleQuoted2 = 'あ' // expected-error {{cannot convert the expression's type '$T0' to type '$T1'}}
+  var singleQuoted1 = 'a' // expected-error {{cannot convert the expression's type '$T0' to type 'CharacterLiteralConvertible'}}
+  var singleQuoted2 = 'あ' // expected-error {{cannot convert the expression's type '$T0' to type 'CharacterLiteralConvertible'}}
 
   var us1: UnicodeScalar = "" // expected-error {{cannot convert the expression's type 'String' to type 'UnicodeScalar'}}
   var us2: UnicodeScalar = "a"

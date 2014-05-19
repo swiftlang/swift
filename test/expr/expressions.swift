@@ -539,7 +539,15 @@ struct Rule {
 }
 
 var ruleVar: Rule
-ruleVar = Rule("a") // expected-error {{cannot convert the expression's type '()' to type '(target: String, dependencies: String)'}}
+ruleVar = Rule("a") // expected-error {{cannot convert the expression's type '()' to type 'ExtendedGraphemeClusterLiteralConvertible'}}
+
+
+class C {
+  var x: C?
+  init(other: C?) { x = other }
+}
+
+var c = C(3) // expected-error {{cannot convert the expression's type 'C' to type 'IntegerLiteralConvertible'}}
 
 //===----------------------------------------------------------------------===//
 // Unary Operators
@@ -657,13 +665,13 @@ func test() {
 func arrayLiterals() { 
   var a = [1,2,3]
   var b : Int[] = []
-  var c = []  // expected-error {{cannot convert the expression's type 'Array' to type '$T2'}}
+  var c = []  // expected-error {{cannot convert the expression's type 'Array' to type 'ArrayLiteralConvertible'}}
 }
 
 func dictionaryLiterals() {
   var a = [1 : "foo",2 : "bar",3 : "baz"]
   var b : Dictionary<Int, String> = [:]
-  var c = [:]  // expected-error {{cannot convert the expression's type 'Dictionary' to type '$T3'}}
+  var c = [:]  // expected-error {{cannot convert the expression's type 'Dictionary' to type 'DictionaryLiteralConvertible'}}
 }
 
 func invalidDictionaryLiteral() {

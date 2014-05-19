@@ -347,7 +347,7 @@ struct ErrorInFunctionSignatureResultArrayType1 {
 
 struct ErrorInFunctionSignatureResultArrayType2 {
   func foo() -> Int[0 { // expected-error {{expected ']' in array type}} expected-note {{to match this opening '['}}
-    return [0] // expected-error {{cannot convert the expression's type 'Array' to type '$T2'}}
+    return [0] // expected-error {{cannot convert the expression's type 'Array' to type 'IntegerLiteralConvertible'}}
   }
 }
 

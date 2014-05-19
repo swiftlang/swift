@@ -57,7 +57,7 @@ ERROR(cannot_find_conversion,sema,none,
       "cannot convert the expression's type %0 to type %1", (Type, Type))
 
 ERROR(does_not_conform_to_constraint,sema,none,
-      "type does not conform to protocol %0", (Type))
+      "type %0 does not conform to protocol %1", (Type, Type))
 
 ERROR(cannot_find_appropriate_overload,sema,none,
       "could not find an overload for '%0' that accepts the supplied "
