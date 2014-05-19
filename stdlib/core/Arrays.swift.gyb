@@ -24,7 +24,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-% for Self in ['ContiguousArray', 'Slice', 'Array']:
+% arrayTypes = ['ContiguousArray', 'Slice', 'Array']
+% for Self in arrayTypes:
 struct ${Self}<T> : MutableCollection, Sliceable {
   typealias Element = T
   var startIndex: Int {
@@ -57,9 +58,9 @@ struct ${Self}<T> : MutableCollection, Sliceable {
     get {
       return Slice(_buffer[subRange])
     }
-    set {
-      if self[subRange] !== newValue {
-        replace(&self, subRange, newValue)
+    set(rhs) {
+      if self[subRange] !== rhs {
+        self.replaceRange(subRange, with: rhs)
       }
     }
   }
@@ -183,21 +184,21 @@ extension ${Self} : ArrayType {
     _precondition(count > 0, "can't removeLast from an empty ${Self}")
     let c = count
     let result = self[c - 1]
-    replace(&self, (c - 1)..c, EmptyCollection())
+    self.replaceRange((c - 1)..c, with: EmptyCollection())
     return result
   }
   
   /// Insert an element at the given index in O(N).  Requires: atIndex
   /// <= count
   mutating func insert(newElement: T, atIndex: Int) {
-    replace(&self, atIndex..atIndex, CollectionOfOne(newElement))
+    self.replaceRange(atIndex..atIndex, with: CollectionOfOne(newElement))
   }
 
   /// Remove the element at the given index.  Worst case complexity:
   /// O(N).  Requires: index < count
   mutating func removeAtIndex(index: Int) -> T {
     let result = self[index]
-    replace(&self, index..(index + 1), EmptyCollection())
+    self.replaceRange(index..(index + 1), with: EmptyCollection())
     return result
   }
 
@@ -208,7 +209,7 @@ extension ${Self} : ArrayType {
       _buffer = _Buffer()
     }
     else {
-      replace(&self, indices(self), EmptyCollection())
+      self.replaceRange(indices(self), with: EmptyCollection())
     }
   }
   
@@ -346,7 +347,7 @@ struct _InitializeMemoryFromCollection<C: Collection> : _PointerFunction {
   var newValues: C
 }
 
-func replace<
+func _arrayReplace2<
   A: ArrayType, C: Collection
   where C.GeneratorType.Element == A._Buffer.Element, A.IndexType == Int
   >(
@@ -438,6 +439,26 @@ func replace<
     )
   }
 }
+
+% for Self in arrayTypes:
+func _arrayReplace1<
+  T, C: Collection where C.GeneratorType.Element == T
+  >(
+  inout target: ${Self}<T>, subRange: Range<Int>, newValues: C
+) {
+  _arrayReplace2(&target, subRange, newValues)
+}
+
+extension ${Self} {
+  mutating func replaceRange<
+    C: Collection where C.GeneratorType.Element == _Buffer.Element
+  >(
+    subRange: Range<Int>, with newValues: C
+  ) {
+    _arrayReplace1(&self, subRange, newValues) 
+  }
+}
+% end
 
 @assignment
 func += <
@@ -687,7 +708,7 @@ func !==<T: ArrayType, U: ArrayType>(lhs: T, rhs: U) -> Bool {
   return !(lhs === rhs)
 }
 
-% for Self in ['ContiguousArray', 'Slice', 'Array']:
+% for Self in arrayTypes:
 // NOTE: The '==' and '!=' below only handles array types
 // that are the same, e.g. Array<Int> and Array<Int>, not
 // Slice<Int> and Array<Int>.

@@ -347,7 +347,7 @@ func testReplace/*<
 
         var a = make()
      
-        replace(&a, i..j, newValues)
+        a.replaceRange(i..j, with: newValues)
         let growth = newCount - oldCount
         
         let expectedCount = source.count + growth
