@@ -191,6 +191,7 @@ ClangImporter::create(ASTContext &ctx,
     "-DSWIFT_PROTOCOL_EXTRA=__attribute__((annotate(\""
       SWIFT_NATIVE_ANNOTATION_STRING "\")))",
     "-DCF_ENABLE_BRIDGED_TYPES_SO_YOU_CAN_FIX_BUILD_FAILURES",
+    "-DCF_ENABLE_BRIDGED_TYPES",
     "-fretain-comments-from-system-headers",
     "-fmodules-validate-system-headers",
     "<swift-imported-modules>"
