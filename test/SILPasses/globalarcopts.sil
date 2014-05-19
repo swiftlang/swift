@@ -1,0 +1,380 @@
+// RUN: %sil-opt -global-arc-opts -verify %s | FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+
+/////////////////
+// Basic Tests //
+/////////////////
+
+// CHECK-LABEL: sil @simple_retain_release_pair : $@thin (Builtin.NativeObject) -> ()
+// CHECK: bb0
+// CHECK-NEXT: tuple ()
+// CHECK-NEXT: return
+sil @simple_retain_release_pair : $@thin (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  strong_retain %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  %1 = tuple ()
+  return %1 : $()
+}
+
+struct S {
+  var x : Builtin.NativeObject
+}
+
+// CHECK-LABEL: sil @simple_copyvalue_destroyvalue_pair : $@thin (S) -> S
+// CHECK: bb0({{%[0-9]+}} : $S)
+// CHECK-NEXT: return
+sil @simple_copyvalue_destroyvalue_pair : $@thin (S) -> S {
+bb0(%0 : $S):
+  retain_value %0 : $S
+  release_value %0 : $S
+  retain_value %0 : $S
+  release_value %0 : $S
+  retain_value %0 : $S
+  release_value %0 : $S
+  return %0 : $S
+}
+
+// CHECK-LABEL: sil @delete_retain_over_non_side_effect_instructions : $@thin (Builtin.NativeObject, Builtin.Int64) -> Builtin.Int1
+// CHECK: bb0
+// CHECK-NEXT: builtin_function_ref
+// CHECK-NEXT: apply
+// CHECK-NEXT: return
+sil @delete_retain_over_non_side_effect_instructions : $@thin (Builtin.NativeObject, Builtin.Int64) -> (Builtin.Int1) {
+bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.Int64):
+  strong_retain %0 : $Builtin.NativeObject
+  %2 = builtin_function_ref "cmp_eq_Int64" : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int1
+  %3 = apply %2(%1, %1) : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int1
+  strong_release %0 : $Builtin.NativeObject
+  return %3 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @delete_copyvalue_over_non_side_effect_instructions : $@thin (S, Builtin.Int64) -> Builtin.Int1
+// CHECK: bb0
+// CHECK-NEXT: builtin_function_ref
+// CHECK-NEXT: apply
+// CHECK-NEXT: return
+sil @delete_copyvalue_over_non_side_effect_instructions : $@thin (S, Builtin.Int64) -> (Builtin.Int1) {
+bb0(%0 : $S, %1 : $Builtin.Int64):
+  retain_value %0 : $S
+  %2 = builtin_function_ref "cmp_eq_Int64" : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int1
+  %3 = apply %2(%1, %1) : $@thin (Builtin.Int64, Builtin.Int64) -> Builtin.Int1
+  release_value %0 : $S
+  return %3 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @delete_retain_over_single_potential_decrement : $@thin (Builtin.NativeObject, Builtin.NativeObject) -> ()
+// CHECK: bb0
+// CHECK-NEXT: strong_release
+// CHECK-NEXT: tuple ()
+// CHECK-NEXT: return
+sil @delete_retain_over_single_potential_decrement : $@thin (Builtin.NativeObject, Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
+  strong_retain %0 : $Builtin.NativeObject
+  strong_release %1 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  %2 = tuple()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil @delete_copyvalue_over_single_potential_decrement : $@thin (S, Builtin.NativeObject) -> ()
+// CHECK: bb0
+// CHECK-NEXT: strong_release
+// CHECK-NEXT: tuple ()
+// CHECK-NEXT: return
+sil @delete_copyvalue_over_single_potential_decrement : $@thin (S, Builtin.NativeObject) -> () {
+bb0(%0 : $S, %1 : $Builtin.NativeObject):
+  retain_value %0 : $S
+  strong_release %1 : $Builtin.NativeObject
+  release_value %0 : $S
+  %2 = tuple()
+  return %2 : $()
+}
+
+sil @user : $@thin (Builtin.NativeObject) -> ()
+
+// CHECK-LABEL: sil @dont_delete_retain_over_decrement_use : $@thin (Builtin.NativeObject) -> ()
+// CHECK: bb0
+// CHECK: strong_retain
+// CHECK-NEXT: apply
+// CHECK-NEXT: apply
+// CHECK-NEXT: strong_release
+// CHECK-NEXT: tuple ()
+// CHECK-NEXT: return
+sil @dont_delete_retain_over_decrement_use : $@thin (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = function_ref @user : $@thin (Builtin.NativeObject) -> ()
+  strong_retain %0 : $Builtin.NativeObject
+  apply %1 (%0) : $@thin (Builtin.NativeObject) -> ()
+  apply %1 (%0) : $@thin (Builtin.NativeObject) -> ()
+  strong_release %0 : $Builtin.NativeObject
+  %2 = tuple()
+  return %2 : $()
+}
+
+sil @S_user : $@thin (S) -> ()
+
+// CHECK-LABEL: sil @dont_delete_copyvalue_over_decrement_use : $@thin (S) -> ()
+// CHECK: bb0
+// CHECK: retain_value
+// CHECK-NEXT: apply
+// CHECK-NEXT: apply
+// CHECK-NEXT: release_value
+// CHECK-NEXT: tuple ()
+// CHECK-NEXT: return
+sil @dont_delete_copyvalue_over_decrement_use : $@thin (S) -> () {
+bb0(%0 : $S):
+  %1 = function_ref @S_user : $@thin (S) -> ()
+  retain_value %0 : $S
+  apply %1 (%0) : $@thin (S) -> ()
+  apply %1 (%0) : $@thin (S) -> ()
+  release_value %0 : $S
+  %2 = tuple()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil @move_delete_retain_over_decrement_use_when_knownsafe : $@thin (Builtin.NativeObject) -> ()
+// CHECK: bb0
+// CHECK: integer_literal
+// CHECK-NEXT: integer_literal
+// CHECK-NEXT: strong_retain
+// CHECK-NEXT: apply
+// CHECK-NEXT: apply
+// CHECK-NEXT: strong_release
+// CHECK-NEXT: tuple ()
+// CHECK-NEXT: return
+sil @move_delete_retain_over_decrement_use_when_knownsafe : $@thin (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = function_ref @user : $@thin (Builtin.NativeObject) -> ()
+  strong_retain %0 : $Builtin.NativeObject
+  %2 = integer_literal $Builtin.Int32, 1
+  %3 = integer_literal $Builtin.Int32, 2
+  strong_retain %0 : $Builtin.NativeObject
+  apply %1 (%0) : $@thin (Builtin.NativeObject) -> ()
+  apply %1 (%0) : $@thin (Builtin.NativeObject) -> ()
+  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  %4 = tuple()
+  return %4 : $()
+}
+
+// CHECK-LABEL: sil @delete_copyvalue_over_decrement_use_when_knownsafe : $@thin (S) -> ()
+// CHECK: bb0
+// CHECK: integer_literal
+// CHECK-NEXT: integer_literal
+// CHECK-NEXT: retain_value
+// CHECK-NEXT: apply
+// CHECK-NEXT: apply
+// CHECK-NEXT: release_value
+// CHECK-NEXT: tuple ()
+// CHECK-NEXT: return
+sil @delete_copyvalue_over_decrement_use_when_knownsafe : $@thin (S) -> () {
+bb0(%0 : $S):
+  %1 = function_ref @S_user : $@thin (S) -> ()
+  retain_value %0 : $S
+  %2 = integer_literal $Builtin.Int32, 1
+  %3 = integer_literal $Builtin.Int32, 2
+  retain_value %0 : $S
+  apply %1 (%0) : $@thin (S) -> ()
+  apply %1 (%0) : $@thin (S) -> ()
+  release_value %0 : $S
+  release_value %0 : $S
+  %4 = tuple()
+  return %4 : $()
+}
+
+// CHECK-LABEL: sil @literals_do_not_use_values_with_reference_semantics : $@thin (Builtin.NativeObject) -> ()
+// CHECK: bb0
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: apply
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: builtin_function_ref
+// CHECK-NEXT: integer_literal
+// CHECK-NEXT: string_literal
+// CHECK-NEXT: tuple ()
+// CHECK-NEXT: return
+sil @literals_do_not_use_values_with_reference_semantics : $@thin (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  strong_retain %0 : $Builtin.NativeObject
+  %1 = function_ref @user : $@thin (Builtin.NativeObject) -> ()
+  apply %1 (%0) : $@thin (Builtin.NativeObject) -> ()
+  %2 = function_ref @user : $@thin (Builtin.NativeObject) -> ()
+  %3 = builtin_function_ref "sextOrBitCast_Word_Int64" : $@thin (Builtin.Word) -> Builtin.Int64
+  %4 = integer_literal $Builtin.Int64, 0
+  %5 = string_literal utf8 "123"
+  strong_release %0 : $Builtin.NativeObject
+  %6 = tuple()
+  return %6 : $()
+}
+
+// CHECK-LABEL: sil @owned_arguments_are_known_safe_in_the_first_bb
+// CHECK: bb0
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: apply
+// CHECK-NEXT: apply
+// CHECK-NEXT: br
+// CHECK: bb1:
+// CHECK-NEXT: strong_retain
+// CHECK-NEXT: apply
+// CHECK-NEXT: apply
+// CHECK-NEXT: strong_release
+// CHECK-NEXT: tuple ()
+// CHECK-NEXT: return
+sil @owned_arguments_are_known_safe_in_the_first_bb : $@thin (@owned Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = function_ref @user : $@thin (Builtin.NativeObject) -> ()
+  strong_retain %0 : $Builtin.NativeObject
+  apply %1 (%0) : $@thin (Builtin.NativeObject) -> ()
+  apply %1 (%0) : $@thin (Builtin.NativeObject) -> ()
+  strong_release %0 : $Builtin.NativeObject
+  br bb1
+
+bb1:
+  strong_retain %0 : $Builtin.NativeObject
+  apply %1 (%0) : $@thin (Builtin.NativeObject) -> ()
+  apply %1 (%0) : $@thin (Builtin.NativeObject) -> ()
+  strong_release %0 : $Builtin.NativeObject
+  %2 = tuple()
+  return %2 : $()
+}
+
+// CHECK-LABEL: @simple_alias_store_use_test : $@thin (Builtin.NativeObject, @inout Builtin.Int32) -> () {
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+sil @simple_alias_store_use_test : $@thin (Builtin.NativeObject, @inout Builtin.Int32) -> () {
+bb0(%0 : $Builtin.NativeObject, %1 : $*Builtin.Int32):
+  %2 = function_ref @user : $@thin (Builtin.NativeObject) -> ()
+  %3 = integer_literal $Builtin.Int32, 2
+  strong_retain %0 : $Builtin.NativeObject
+  apply %2 (%0) : $@thin (Builtin.NativeObject) -> ()
+  store %3 to %1 : $*Builtin.Int32
+  strong_release %0 : $Builtin.NativeObject
+  %4 = tuple()
+  return %4: $()
+}
+
+// We can't remove the retain-release pair because the apply may be
+// decrementing the refcount on our object.
+// CHECK-LABEL: @simple_alias_load_use_test : $@thin (@inout Builtin.Int32) -> () {
+// CHECK: bb0
+// CHECK-NEXT: alloc_box
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: strong_retain
+// CHECK-NEXT: apply
+// CHECK-NEXT: load
+// CHECK-NEXT: strong_release
+// CHECK-NEXT: strong_release
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @simple_alias_load_use_test : $@thin (@inout Builtin.Int32) -> () {
+bb0(%0 : $*Builtin.Int32):
+  %1 = alloc_box $Builtin.Int32
+  %2 = function_ref @user : $@thin (Builtin.NativeObject) -> ()
+  strong_retain %1#0 : $Builtin.NativeObject
+  apply %2 (%1#0) : $@thin (Builtin.NativeObject) -> ()
+  %3 = load %1#1 : $*Builtin.Int32
+  strong_release %1#0 : $Builtin.NativeObject
+  strong_release %1#0 : $Builtin.NativeObject
+  %4 = tuple()
+  return %4: $()
+}
+
+// CHECK-LABEL: sil @silargument_retain_iterated : $@thin (@owned Builtin.NativeObject) -> ()
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+sil @silargument_retain_iterated : $@thin (@owned Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = function_ref @user : $@thin (Builtin.NativeObject) -> ()
+  strong_retain %0 : $Builtin.NativeObject
+  apply %1 (%0) : $@thin (Builtin.NativeObject) -> ()
+  apply %1 (%0) : $@thin (Builtin.NativeObject) -> ()
+  strong_release %0 : $Builtin.NativeObject
+  strong_retain %0 : $Builtin.NativeObject
+  apply %1 (%0) : $@thin (Builtin.NativeObject) -> ()
+  apply %1 (%0) : $@thin (Builtin.NativeObject) -> ()
+  strong_release %0 : $Builtin.NativeObject
+  %2 = tuple()
+  return %2 : $()
+}
+
+class Cls {
+  var random : Builtin.Int32
+
+  init()
+}
+
+// CHECK-LABEL: sil @value_that_does_not_alias_pointer_args_cannot_be_decremented : $@thin (Cls) -> ()
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+sil @value_that_does_not_alias_pointer_args_cannot_be_decremented : $@thin (Cls) -> () {
+bb0(%0 : $Cls):
+  %1 = alloc_ref $Cls
+  %2 = function_ref @user : $@thin (Builtin.NativeObject) -> ()
+  %3 = unchecked_ref_cast %0 : $Cls to $Builtin.NativeObject
+  strong_retain %1 : $Cls
+  apply %2(%3) : $@thin (Builtin.NativeObject) -> ()
+  apply %2(%3) : $@thin (Builtin.NativeObject) -> ()
+  strong_release %1 : $Cls
+  %4 = tuple()
+  return %4 : $()
+}
+
+// CHECK-LABEL: sil @escaping_pointer_can_have_refcount_decremented_indirectly : $@thin (Builtin.NativeObject) -> ()
+// CHECK: strong_retain
+// CHECK: strong_release
+
+sil @the_kraken : $@thin () -> ()
+sil @escaping_pointer_can_have_refcount_decremented_indirectly : $@thin (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = function_ref @the_kraken : $@thin () -> ()
+  strong_retain %0 : $Builtin.NativeObject
+  apply %1() : $@thin () -> ()
+  apply %1() : $@thin () -> ()
+  strong_release %0 : $Builtin.NativeObject
+  %2 = tuple()
+  return %2 : $()
+}
+
+// Make sure that we clear state and don't do anything in the fact of
+// autorelease push/pop.
+sil @objc_autoreleasePoolPush : $@thin () -> Builtin.RawPointer
+sil @objc_autoreleasePoolPop : $@thin (Builtin.RawPointer) -> ()
+
+// CHECK-LABEL: sil @clear_state_in_fact_of_autorelease_pool_ops : $@thin (Builtin.RawPointer) -> () {
+// CHECK: bb0
+// CHECK-NEXT: function_ref objc_autoreleasePoolPush
+// CHECK-NEXT: function_ref @objc_autoreleasePoolPush
+// CHECK-NEXT: function_ref objc_autoreleasePoolPop
+// CHECK-NEXT: function_ref @objc_autoreleasePoolPop
+// CHECK-NEXT: alloc_box
+// CHECK-NEXT: retain
+// CHECK-NEXT: apply
+// CHECK-NEXT: release
+// CHECK-NEXT: retain
+// CHECK-NEXT: apply
+// CHECK-NEXT: release
+// CHECK-NEXT: release
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @clear_state_in_fact_of_autorelease_pool_ops : $@thin (Builtin.RawPointer) -> () {
+bb0(%0 : $Builtin.RawPointer):
+  %1 = function_ref @objc_autoreleasePoolPush : $@thin () -> Builtin.RawPointer
+  %2 = function_ref @objc_autoreleasePoolPop : $@thin (Builtin.RawPointer) -> ()
+  %3 = alloc_box $Builtin.Int32
+  strong_retain %3#0 : $Builtin.NativeObject
+  apply %1() : $@thin () -> Builtin.RawPointer
+  strong_release %3#0 : $Builtin.NativeObject
+  strong_retain %3#0 : $Builtin.NativeObject
+  apply %2(%0) : $@thin (Builtin.RawPointer) -> ()
+  strong_release %3#0 : $Builtin.NativeObject
+  strong_release %3#0 : $Builtin.NativeObject
+  %4 = tuple()
+  return %4 : $()
+}

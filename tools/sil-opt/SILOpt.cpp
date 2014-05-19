@@ -66,6 +66,7 @@ enum class PassKind {
   AADumper,
   LoadStoreOpts,
   SILLinker,
+  GlobalARCOpts,
 };
 
 enum class OptGroup {
@@ -208,6 +209,9 @@ Passes(llvm::cl::desc("Passes:"),
                                    "linker",
                                    "Link in all serialized SIL referenced by "
                                    "the given SIL file."),
+                        clEnumValN(PassKind::GlobalARCOpts,
+                                   "global-arc-opts",
+                                   "Perform multiple basic block arc optzns."),
                         clEnumValEnd));
 
 static llvm::cl::opt<bool>
@@ -358,6 +362,8 @@ static void runCommandLineSelectedPasses(SILModule *Module,
     case PassKind::SILLinker:
       PM.add(createSILLinker());
       break;
+    case PassKind::GlobalARCOpts:
+      PM.add(createGlobalARCOpts());
     }
   }
   PM.run();
