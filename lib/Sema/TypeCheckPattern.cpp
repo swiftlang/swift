@@ -745,9 +745,12 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
     if (!diagTy) diagTy = type;
     
     bool shouldRequireType = false;
-    if (diagTy->getCanonicalType() == Context.TheEmptyTupleType)
+    if (NP->isImplicit()) {
+      // If the whole pattern is implicit, the user didn't write it.
+      // Assume the compiler knows what it's doing.
+    } else if (diagTy->getCanonicalType() == Context.TheEmptyTupleType) {
       shouldRequireType = true;
-    else if (auto protoTy = diagTy->getAs<ProtocolType>()) {
+    } else if (auto protoTy = diagTy->getAs<ProtocolType>()) {
       shouldRequireType =
         protoTy->getDecl()->isSpecificProtocol(KnownProtocolKind::AnyObject);
     } else if (auto MTT = diagTy->getAs<AnyMetatypeType>()) {
