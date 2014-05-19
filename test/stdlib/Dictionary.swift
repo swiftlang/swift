@@ -1594,8 +1594,7 @@ test_BridgedFromObjC_Nonverbatim_SubscriptWithKey()
 // CHECK: test_BridgedFromObjC_Nonverbatim_SubscriptWithKey done
 
 
-
-func test_BridgedFromObjC_UpdateValueForKey() {
+func test_BridgedFromObjC_Verbatim_UpdateValueForKey() {
   // Insert a new key-value pair.
   if true {
     var d = getBridgedVerbatimDictionary()
@@ -1636,10 +1635,56 @@ func test_BridgedFromObjC_UpdateValueForKey() {
     assert(d[TestObjCKeyTy(30)]!.value == 1030)
   }
 
-  println("test_BridgedFromObjC_UpdateValueForKey done")
+  println("test_BridgedFromObjC_Verbatim_UpdateValueForKey done")
 }
-test_BridgedFromObjC_UpdateValueForKey()
-// CHECK: test_BridgedFromObjC_UpdateValueForKey done
+test_BridgedFromObjC_Verbatim_UpdateValueForKey()
+// CHECK: test_BridgedFromObjC_Verbatim_UpdateValueForKey done
+
+func test_BridgedFromObjC_Nonverbatim_UpdateValueForKey() {
+  // Insert a new key-value pair.
+  if true {
+    var d = getBridgedNonverbatimDictionary()
+    var identity1: Word = reinterpretCast(d)
+    assert(isCocoaDictionary(d))
+
+    var oldValue =
+        d.updateValue(TestBridgedValueTy(2040), forKey: TestBridgedKeyTy(40))
+    assert(!oldValue)
+    var identity2: Word = reinterpretCast(d)
+    assert(identity1 != identity2)
+    assert(isNativeDictionary(d))
+    assert(d.count == 4)
+
+    assert(d[TestBridgedKeyTy(10)]!.value == 1010)
+    assert(d[TestBridgedKeyTy(20)]!.value == 1020)
+    assert(d[TestBridgedKeyTy(30)]!.value == 1030)
+    assert(d[TestBridgedKeyTy(40)]!.value == 2040)
+  }
+
+  // Overwrite a value in existing binding.
+  if true {
+    var d = getBridgedNonverbatimDictionary()
+    var identity1: Word = reinterpretCast(d)
+    assert(isCocoaDictionary(d))
+
+    var oldValue =
+        d.updateValue(TestBridgedValueTy(2010), forKey: TestBridgedKeyTy(10))!
+    assert(oldValue.value == 1010)
+
+    var identity2: Word = reinterpretCast(d)
+    assert(identity1 != identity2)
+    assert(isNativeDictionary(d))
+    assert(d.count == 3)
+
+    assert(d[TestBridgedKeyTy(10)]!.value == 2010)
+    assert(d[TestBridgedKeyTy(20)]!.value == 1020)
+    assert(d[TestBridgedKeyTy(30)]!.value == 1030)
+  }
+
+  println("test_BridgedFromObjC_Nonverbatim_UpdateValueForKey done")
+}
+test_BridgedFromObjC_Nonverbatim_UpdateValueForKey()
+// CHECK: test_BridgedFromObjC_Nonverbatim_UpdateValueForKey done
 
 
 func test_BridgedFromObjC_RemoveAtIndex() {
