@@ -23,6 +23,14 @@ class IBOutletWrapperTy {
 
   @IBOutlet // expected-error {{only instance properties can be declared 'IBOutlet'}}
   func click() -> () {}
+
+  @IBOutlet // expected-error {{'IBOutlet' attribute requires property to be mutable}}
+  let immutable: IBOutletWrapperTy? = nil
+
+  @IBOutlet // expected-error {{'IBOutlet' attribute requires property to be mutable}}
+  var computedImmutable: IBOutletWrapperTy? {
+    return nil
+  }
 }
 
 struct S { }

@@ -139,6 +139,9 @@ void AttributeEarlyChecker::visitIBOutletAttr(IBOutletAttr *attr) {
       VD->isStatic())
     return diagnoseAndRemoveAttr(attr, diag::invalid_iboutlet);
 
+  if (!VD->isSettable(nullptr))
+    return diagnoseAndRemoveAttr(attr, diag::iboutlet_only_mutable);
+
   // Verify that the field type is valid as an outlet.
   auto type = VD->getType();
 

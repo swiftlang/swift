@@ -139,6 +139,7 @@ class TestComputedOutlet {
 
   @IBOutlet var disclosedView : TestComputedOutlet {
   get { return _disclosedView }
+  set { _disclosedView = newValue }
   }
 
   func foo() {

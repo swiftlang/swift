@@ -337,6 +337,8 @@ ERROR(iboutlet_nonobjc_class,sema_tcd,none,
 ERROR(iboutlet_nonobject_type,sema_tcd,none,
       "'IBOutlet' property cannot %select{have|be an array of}0 "
       "non-object type %1", (bool, Type))
+ERROR(iboutlet_only_mutable,sema_tcd,none,
+      "'IBOutlet' attribute requires property to be mutable", ())
 ERROR(invalid_ibinspectable,sema_tcd,none,
       "only instance properties can be declared 'IBInspectable'", ())
 ERROR(invalid_ibaction_decl,sema_tcd,none,
