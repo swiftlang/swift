@@ -41,6 +41,10 @@ class LazyPropertyCrash  {
   @lazy var applicationFilesDirectory: LazyPropertyCrash = LazyPropertyCrash()
 }
 
+// <rdar://16909436>
+@objc class Tree {
+  weak var parent: Tree?
+}
 
 
 // CHECK: [[READONLY_NAME:@.*]] = private unnamed_addr constant [9 x i8] c"readonly\00"
@@ -126,3 +130,11 @@ class LazyPropertyCrash  {
 // CHECK:     i8* getelementptr inbounds ([38 x i8]* [[EXTENSIONPROPERTY_ATTRS]], i64 0, i64 0)
 // CHECK:   }]
 // CHECK: }, section "__DATA, __objc_const", align 8
+
+// CHECK: @_INSTANCE_METHODS__TtC15objc_properties4Tree =
+// CHECK:    i8* getelementptr inbounds ([7 x i8]* @"\01L_selector_data(parent)", i64 0, i64 0),
+// CHECK:    i8* getelementptr inbounds ([8 x i8]* [[GETTER_SIGNATURE]], i64 0, i64 0),
+// CHECK:    i8* bitcast (%2* (%2*, i8*)* @_TToFC15objc_properties4Treeg6parentXwGSqS0__ to i8*)
+// CHECK:    i8* getelementptr inbounds ([11 x i8]* @"\01L_selector_data(setParent:)", i64 0, i64 0),
+// CHECK:    i8* getelementptr inbounds ([11 x i8]* [[SETTER_SIGNATURE]], i64 0, i64 0),
+// CHECK:    i8* bitcast (void (%2*, i8*, %2*)* @_TToFC15objc_properties4Trees6parentXwGSqS0__ to i8*)

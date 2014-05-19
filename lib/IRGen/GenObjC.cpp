@@ -1072,7 +1072,8 @@ void irgen::emitObjCGetterDescriptorParts(IRGenModule &IGM,
   
   auto &clangASTContext = IGM.getClangASTContext();
   std::string TypeStr;
-  auto clangType = IGM.getClangType(property->getType()->getCanonicalType());
+  auto swiftType = property->getType()->getReferenceStorageReferent();
+  auto clangType = IGM.getClangType(swiftType->getCanonicalType());
   if (clangType.isNull()) {
     atEncoding = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
     return;
@@ -1123,7 +1124,7 @@ void irgen::emitObjCSetterDescriptorParts(IRGenModule &IGM,
   Size PtrSize = IGM.getPointerSize();
   Size::int_type ParmOffset = 2 * PtrSize.getValue();
 
-  Type ArgType = property->getType();
+  Type ArgType = property->getType()->getReferenceStorageReferent();
   clangType = IGM.getClangType(ArgType->getCanonicalType());
   if (clangType.isNull()) {
     atEncoding = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);

@@ -798,14 +798,12 @@ namespace {
     void weakInit(IRGenFunction &IGF, Explosion &in,
                   Address dest) const override {
       llvm::Value *value = in.claimNext();
-      assert(value->getType() == ValueType);
       IGF.emitUnknownWeakInit(value, dest);
     }
 
     void weakAssign(IRGenFunction &IGF, Explosion &in,
                     Address dest) const override {
       llvm::Value *value = in.claimNext();
-      assert(value->getType() == ValueType);
       IGF.emitUnknownWeakAssign(value, dest);
     }
   };
