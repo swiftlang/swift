@@ -79,7 +79,7 @@ class CodeCompletionInClassMethods1 {
 // IN_CLASS_INSTANCE_METHOD_1-DAG: Decl[LocalVar]/Local:             self[#CodeCompletionInClassMethods1#]{{$}}
 // IN_CLASS_INSTANCE_METHOD_1-DAG: Decl[InstanceVar]/CurrNominal:    instanceVar[#Int#]{{$}}
 // IN_CLASS_INSTANCE_METHOD_1-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc0()[#Void#]{{$}}
-// IN_CLASS_INSTANCE_METHOD_1-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc1({#Int#})[#Void#]{{$}}
+// IN_CLASS_INSTANCE_METHOD_1-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc1({#(a): Int#})[#Void#]{{$}}
 // IN_CLASS_INSTANCE_METHOD_1-DAG: Decl[Struct]/CurrNominal:         NestedStruct[#CodeCompletionInClassMethods1.NestedStruct#]{{$}}
 // IN_CLASS_INSTANCE_METHOD_1-DAG: Decl[Class]/CurrNominal:          NestedClass[#CodeCompletionInClassMethods1.NestedClass#]{{$}}
 // IN_CLASS_INSTANCE_METHOD_1-DAG: Decl[Enum]/CurrNominal:           NestedEnum[#CodeCompletionInClassMethods1.NestedEnum#]{{$}}
@@ -102,7 +102,7 @@ class CodeCompletionInClassMethods1 {
 // IN_CLASS_STATIC_METHOD_1-DAG: Decl[Enum]/CurrNominal:           NestedEnum[#CodeCompletionInClassMethods1.NestedEnum#]{{$}}
 // IN_CLASS_STATIC_METHOD_1-DAG: Decl[TypeAlias]/CurrNominal:      NestedTypealias[#Int#]{{$}}
 // IN_CLASS_STATIC_METHOD_1-DAG: Decl[StaticMethod]/CurrNominal:   staticFunc0()[#Void#]{{$}}
-// IN_CLASS_STATIC_METHOD_1-DAG: Decl[StaticMethod]/CurrNominal:   staticFunc1({#Int#})[#Void#]{{$}}
+// IN_CLASS_STATIC_METHOD_1-DAG: Decl[StaticMethod]/CurrNominal:   staticFunc1({#(a): Int#})[#Void#]{{$}}
 // IN_CLASS_STATIC_METHOD_1: End completions
   }
 
@@ -112,7 +112,7 @@ class CodeCompletionInClassMethods1 {
 // IN_CLASS_CONSTRUCTOR_1-DAG: Decl[LocalVar]/Local:             self[#CodeCompletionInClassMethods1#]{{$}}
 // IN_CLASS_CONSTRUCTOR_1-DAG: Decl[InstanceVar]/CurrNominal:    instanceVar[#Int#]{{$}}
 // IN_CLASS_CONSTRUCTOR_1-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc0()[#Void#]{{$}}
-// IN_CLASS_CONSTRUCTOR_1-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc1({#Int#})[#Void#]{{$}}
+// IN_CLASS_CONSTRUCTOR_1-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc1({#(a): Int#})[#Void#]{{$}}
 // IN_CLASS_CONSTRUCTOR_1-DAG: Decl[Struct]/CurrNominal:         NestedStruct[#CodeCompletionInClassMethods1.NestedStruct#]{{$}}
 // IN_CLASS_CONSTRUCTOR_1-DAG: Decl[Class]/CurrNominal:          NestedClass[#CodeCompletionInClassMethods1.NestedClass#]{{$}}
 // IN_CLASS_CONSTRUCTOR_1-DAG: Decl[Enum]/CurrNominal:           NestedEnum[#CodeCompletionInClassMethods1.NestedEnum#]{{$}}
@@ -126,7 +126,7 @@ class CodeCompletionInClassMethods1 {
 // IN_CLASS_DESTRUCTOR_1-DAG: Decl[LocalVar]/Local:             self[#CodeCompletionInClassMethods1#]{{$}}
 // IN_CLASS_DESTRUCTOR_1-DAG: Decl[InstanceVar]/CurrNominal:    instanceVar[#Int#]{{$}}
 // IN_CLASS_DESTRUCTOR_1-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc0()[#Void#]{{$}}
-// IN_CLASS_DESTRUCTOR_1-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc1({#Int#})[#Void#]{{$}}
+// IN_CLASS_DESTRUCTOR_1-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc1({#(a): Int#})[#Void#]{{$}}
 // IN_CLASS_DESTRUCTOR_1-DAG: Decl[Struct]/CurrNominal:         NestedStruct[#CodeCompletionInClassMethods1.NestedStruct#]{{$}}
 // IN_CLASS_DESTRUCTOR_1-DAG: Decl[Class]/CurrNominal:          NestedClass[#CodeCompletionInClassMethods1.NestedClass#]{{$}}
 // IN_CLASS_DESTRUCTOR_1-DAG: Decl[Enum]/CurrNominal:           NestedEnum[#CodeCompletionInClassMethods1.NestedEnum#]{{$}}
@@ -180,7 +180,7 @@ struct CodeCompletionInStructMethods1 {
 // IN_STRUCT_INSTANCE_METHOD_1-DAG: Decl[LocalVar]/Local:             self[#CodeCompletionInStructMethods1#]{{$}}
 // IN_STRUCT_INSTANCE_METHOD_1-DAG: Decl[InstanceVar]/CurrNominal:    instanceVar[#Int#]{{$}}
 // IN_STRUCT_INSTANCE_METHOD_1-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc0()[#Void#]{{$}}
-// IN_STRUCT_INSTANCE_METHOD_1-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc1({#Int#})[#Void#]{{$}}
+// IN_STRUCT_INSTANCE_METHOD_1-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc1({#(a): Int#})[#Void#]{{$}}
 // IN_STRUCT_INSTANCE_METHOD_1-DAG: Decl[Struct]/CurrNominal:         NestedStruct[#CodeCompletionInStructMethods1.NestedStruct#]{{$}}
 // IN_STRUCT_INSTANCE_METHOD_1-DAG: Decl[Class]/CurrNominal:          NestedClass[#CodeCompletionInStructMethods1.NestedClass#]{{$}}
 // IN_STRUCT_INSTANCE_METHOD_1-DAG: Decl[Enum]/CurrNominal:           NestedEnum[#CodeCompletionInStructMethods1.NestedEnum#]{{$}}
@@ -203,7 +203,7 @@ struct CodeCompletionInStructMethods1 {
 // IN_STRUCT_STATIC_METHOD_1-DAG: Decl[Enum]/CurrNominal:           NestedEnum[#CodeCompletionInStructMethods1.NestedEnum#]{{$}}
 // IN_STRUCT_STATIC_METHOD_1-DAG: Decl[TypeAlias]/CurrNominal:      NestedTypealias[#Int#]{{$}}
 // IN_STRUCT_STATIC_METHOD_1-DAG: Decl[StaticMethod]/CurrNominal:   staticFunc0()[#Void#]{{$}}
-// IN_STRUCT_STATIC_METHOD_1-DAG: Decl[StaticMethod]/CurrNominal:   staticFunc1({#Int#})[#Void#]{{$}}
+// IN_STRUCT_STATIC_METHOD_1-DAG: Decl[StaticMethod]/CurrNominal:   staticFunc1({#(a): Int#})[#Void#]{{$}}
 // IN_STRUCT_STATIC_METHOD_1: End completions
   }
 
@@ -213,7 +213,7 @@ struct CodeCompletionInStructMethods1 {
 // IN_STRUCT_CONSTRUCTOR_1-DAG: Decl[LocalVar]/Local:             self[#CodeCompletionInStructMethods1#]{{$}}
 // IN_STRUCT_CONSTRUCTOR_1-DAG: Decl[InstanceVar]/CurrNominal:    instanceVar[#Int#]{{$}}
 // IN_STRUCT_CONSTRUCTOR_1-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc0()[#Void#]{{$}}
-// IN_STRUCT_CONSTRUCTOR_1-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc1({#Int#})[#Void#]{{$}}
+// IN_STRUCT_CONSTRUCTOR_1-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc1({#(a): Int#})[#Void#]{{$}}
 // IN_STRUCT_CONSTRUCTOR_1-DAG: Decl[Struct]/CurrNominal:         NestedStruct[#CodeCompletionInStructMethods1.NestedStruct#]{{$}}
 // IN_STRUCT_CONSTRUCTOR_1-DAG: Decl[Class]/CurrNominal:          NestedClass[#CodeCompletionInStructMethods1.NestedClass#]{{$}}
 // IN_STRUCT_CONSTRUCTOR_1-DAG: Decl[Enum]/CurrNominal:           NestedEnum[#CodeCompletionInStructMethods1.NestedEnum#]{{$}}

@@ -121,7 +121,7 @@ func returnsInt() -> Int {}
 // WITH_MEMBER_DECLS-DAG: Decl[FreeFunction]/CurrModule:    returnsInt()[#Int#]{{$}}
 // WITH_MEMBER_DECLS-DAG: Decl[LocalVar]/Local:             self[#MemberAccessors#]{{$}}
 // WITH_MEMBER_DECLS-DAG: Decl[InstanceVar]/CurrNominal:    instanceVar[#Double#]{{$}}
-// WITH_MEMBER_DECLS-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc({#Int#})[#Float#]{{$}}
+// WITH_MEMBER_DECLS-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc({#(a): Int#})[#Float#]{{$}}
 // WITH_MEMBER_DECLS: End completions
 
 // WITH_MEMBER_DECLS_INIT: Begin completions
@@ -137,7 +137,7 @@ func returnsInt() -> Int {}
 // WITH_LOCAL_DECLS-DAG: Decl[Struct]/CurrModule:          FooStruct[#FooStruct#]{{$}}
 // WITH_LOCAL_DECLS-DAG: Decl[FreeFunction]/CurrModule:    returnsInt()[#Int#]{{$}}
 // WITH_LOCAL_DECLS-DAG: Decl[LocalVar]/Local:             functionParam[#Int#]{{$}}
-// WITH_LOCAL_DECLS-DAG: Decl[FreeFunction]/Local:         localFunc({#Int#})[#Float#]{{$}}
+// WITH_LOCAL_DECLS-DAG: Decl[FreeFunction]/Local:         localFunc({#(a): Int#})[#Float#]{{$}}
 // WITH_LOCAL_DECLS: End completions
 
 
@@ -391,14 +391,14 @@ func accessorsInFunction(functionParam: Int) {
 // ACCESSORS_IN_MEMBER_FUNC_1-DAG: Decl[LocalVar]/Local:             self[#AccessorsInMemberFunction#]
 // ACCESSORS_IN_MEMBER_FUNC_1-DAG: Decl[LocalVar]/Local:             functionParam[#Int#]
 // ACCESSORS_IN_MEMBER_FUNC_1-DAG: Decl[InstanceVar]/CurrNominal:    instanceVar[#Double#]
-// ACCESSORS_IN_MEMBER_FUNC_1-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc({#Int#})[#Float#]
+// ACCESSORS_IN_MEMBER_FUNC_1-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc({#(a): Int#})[#Float#]
 // ACCESSORS_IN_MEMBER_FUNC_1: End completions
 
 // ACCESSORS_IN_MEMBER_FUNC_2: Begin completions
 // ACCESSORS_IN_MEMBER_FUNC_2-DAG: Decl[LocalVar]/Local:            self[#AccessorsInMemberFunction#]
 // ACCESSORS_IN_MEMBER_FUNC_2-DAG: Decl[LocalVar]/Local:            functionParam[#Int#]
 // ACCESSORS_IN_MEMBER_FUNC_2-DAG: Decl[InstanceVar]/OutNominal:    instanceVar[#Double#]
-// ACCESSORS_IN_MEMBER_FUNC_2-DAG: Decl[InstanceMethod]/OutNominal: instanceFunc({#Int#})[#Float#]
+// ACCESSORS_IN_MEMBER_FUNC_2-DAG: Decl[InstanceMethod]/OutNominal: instanceFunc({#(a): Int#})[#Float#]
 // ACCESSORS_IN_MEMBER_FUNC_2: End completions
 
 struct AccessorsInMemberFunction {

@@ -146,7 +146,7 @@ public:
         CodeCompletionString::Chunk::ChunkKind::QuestionMark, "?");
   }
 
-  void addCallParameter(Identifier Name, Type Ty) {
+  void addCallParameter(Identifier Name, Identifier LocalName, Type Ty) {
     CurrentNestingLevel++;
 
     addSimpleChunk(CodeCompletionString::Chunk::ChunkKind::CallParameterBegin);
@@ -182,9 +182,22 @@ public:
       Ty = IOT->getObjectType();
     }
 
+    if (Name.empty() && !LocalName.empty()) {
+      // Use local (non-API) parameter name if we have nothing else.
+      addChunkWithText(
+          CodeCompletionString::Chunk::ChunkKind::CallParameterInternalName,
+          LocalName.str());
+      addChunkWithTextNoCopy(
+          CodeCompletionString::Chunk::ChunkKind::CallParameterColon, ": ");
+    }
+
     addChunkWithText(CodeCompletionString::Chunk::ChunkKind::CallParameterType,
                      Ty->getString());
     CurrentNestingLevel--;
+  }
+
+  void addCallParameter(Identifier Name, Type Ty) {
+    addCallParameter(Name, Identifier(), Ty);
   }
 
   void addGenericParameter(StringRef Name) {

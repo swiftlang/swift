@@ -85,8 +85,8 @@ protocol Bar { func bar() }
 // DL_INSTANCE_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule: .bar_ImportedObjcClass_InstanceFunc1!()[#Void#]{{$}}
 // DL_INSTANCE_NO_DOT-DAG: Decl[InstanceVar]/OtherModule:    .bar_ImportedObjcClass_Property1[#Int?#]{{$}}
 // DL_INSTANCE_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule: .base1_InstanceFunc1!()[#Void#]{{$}}
-// DL_INSTANCE_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule: .base1_InstanceFunc2!({#Derived#})[#Void#]{{$}}
-// DL_INSTANCE_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule: .base1_InstanceFunc3!({#Derived#})[#Void#]{{$}}
+// DL_INSTANCE_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule: .base1_InstanceFunc2!({#(a): Derived#})[#Void#]{{$}}
+// DL_INSTANCE_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule: .base1_InstanceFunc3!({#(a): Derived#})[#Void#]{{$}}
 // DL_INSTANCE_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule: .base1_InstanceFunc4!()[#Base#]{{$}}
 // DL_INSTANCE_NO_DOT-DAG: Decl[InstanceVar]/OtherModule:    .base1_Property1[#Int?#]{{$}}
 // DL_INSTANCE_NO_DOT-DAG: Decl[InstanceVar]/OtherModule:    .base1_Property2[#Base?#]{{$}}
@@ -106,9 +106,9 @@ protocol Bar { func bar() }
 // DL_INSTANCE_NO_DOT-DAG: Decl[InstanceVar]/OtherModule:    .nested1_Property1[#Int?#]{{$}}
 // DL_INSTANCE_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule: .nested2_ObjcInstanceFunc1!()[#Void#]{{$}}
 // DL_INSTANCE_NO_DOT-DAG: Decl[InstanceVar]/OtherModule:    .nested2_Property[#Int?#]{{$}}
-// DL_INSTANCE_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule: .objectAtIndexedSubscript!({#CInt#})[#AnyObject!#]{{$}}
-// DL_INSTANCE_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule: .objectForKeyedSubscript!({#AnyObject?#})[#AnyObject!#]{{$}}
-// DL_INSTANCE_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule: .returnsObjcClass!({#Int#})[#TopLevelObjcClass#]{{$}}
+// DL_INSTANCE_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule: .objectAtIndexedSubscript!({#(idx): CInt#})[#AnyObject!#]{{$}}
+// DL_INSTANCE_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule: .objectForKeyedSubscript!({#(key): AnyObject?#})[#AnyObject!#]{{$}}
+// DL_INSTANCE_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule: .returnsObjcClass!({#(i): Int#})[#TopLevelObjcClass#]{{$}}
 // DL_INSTANCE_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule: .topLevelClass_ObjcInstanceFunc1!()[#Void#]{{$}}
 // DL_INSTANCE_NO_DOT-DAG: Decl[InstanceVar]/OtherModule:    .topLevelClass_ObjcProperty1[#Int?#]{{$}}
 // DL_INSTANCE_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule: .topLevelObjcClass_InstanceFunc1!()[#Void#]{{$}}
@@ -131,8 +131,8 @@ protocol Bar { func bar() }
 // DL_INSTANCE_DOT-DAG: Decl[InstanceMethod]/OtherModule: bar_ImportedObjcClass_InstanceFunc1!()[#Void#]{{$}}
 // DL_INSTANCE_DOT-DAG: Decl[InstanceVar]/OtherModule:    bar_ImportedObjcClass_Property1[#Int?#]{{$}}
 // DL_INSTANCE_DOT-DAG: Decl[InstanceMethod]/OtherModule: base1_InstanceFunc1!()[#Void#]{{$}}
-// DL_INSTANCE_DOT-DAG: Decl[InstanceMethod]/OtherModule: base1_InstanceFunc2!({#Derived#})[#Void#]{{$}}
-// DL_INSTANCE_DOT-DAG: Decl[InstanceMethod]/OtherModule: base1_InstanceFunc3!({#Derived#})[#Void#]{{$}}
+// DL_INSTANCE_DOT-DAG: Decl[InstanceMethod]/OtherModule: base1_InstanceFunc2!({#(a): Derived#})[#Void#]{{$}}
+// DL_INSTANCE_DOT-DAG: Decl[InstanceMethod]/OtherModule: base1_InstanceFunc3!({#(a): Derived#})[#Void#]{{$}}
 // DL_INSTANCE_DOT-DAG: Decl[InstanceMethod]/OtherModule: base1_InstanceFunc4!()[#Base#]{{$}}
 // DL_INSTANCE_DOT-DAG: Decl[InstanceVar]/OtherModule:    base1_Property1[#Int?#]{{$}}
 // DL_INSTANCE_DOT-DAG: Decl[InstanceVar]/OtherModule:    base1_Property2[#Base?#]{{$}}
@@ -153,9 +153,9 @@ protocol Bar { func bar() }
 // DL_INSTANCE_DOT-DAG: Decl[InstanceVar]/OtherModule:    nested1_Property1[#Int?#]{{$}}
 // DL_INSTANCE_DOT-DAG: Decl[InstanceMethod]/OtherModule: nested2_ObjcInstanceFunc1!()[#Void#]{{$}}
 // DL_INSTANCE_DOT-DAG: Decl[InstanceVar]/OtherModule:    nested2_Property[#Int?#]{{$}}
-// DL_INSTANCE_DOT-DAG: Decl[InstanceMethod]/OtherModule: objectAtIndexedSubscript!({#CInt#})[#AnyObject!#]{{$}}
-// DL_INSTANCE_DOT-DAG: Decl[InstanceMethod]/OtherModule: objectForKeyedSubscript!({#AnyObject?#})[#AnyObject!#]{{$}}
-// DL_INSTANCE_DOT-DAG: Decl[InstanceMethod]/OtherModule: returnsObjcClass!({#Int#})[#TopLevelObjcClass#]{{$}}
+// DL_INSTANCE_DOT-DAG: Decl[InstanceMethod]/OtherModule: objectAtIndexedSubscript!({#(idx): CInt#})[#AnyObject!#]{{$}}
+// DL_INSTANCE_DOT-DAG: Decl[InstanceMethod]/OtherModule: objectForKeyedSubscript!({#(key): AnyObject?#})[#AnyObject!#]{{$}}
+// DL_INSTANCE_DOT-DAG: Decl[InstanceMethod]/OtherModule: returnsObjcClass!({#(i): Int#})[#TopLevelObjcClass#]{{$}}
 // DL_INSTANCE_DOT-DAG: Decl[InstanceMethod]/OtherModule: topLevelClass_ObjcInstanceFunc1!()[#Void#]{{$}}
 // DL_INSTANCE_DOT-DAG: Decl[InstanceVar]/OtherModule:    topLevelClass_ObjcProperty1[#Int?#]{{$}}
 // DL_INSTANCE_DOT-DAG: Decl[InstanceMethod]/OtherModule: topLevelObjcClass_InstanceFunc1!()[#Void#]{{$}}
@@ -237,14 +237,14 @@ protocol Bar { func bar() }
 // DL_CLASS_DOT: End completions
 
 // TLOC_MEMBERS_NO_DOT: Begin completions
-// TLOC_MEMBERS_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .returnsObjcClass({#Int#})[#TopLevelObjcClass#]{{$}}
+// TLOC_MEMBERS_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .returnsObjcClass({#(i): Int#})[#TopLevelObjcClass#]{{$}}
 // TLOC_MEMBERS_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .topLevelObjcClass_InstanceFunc1()[#Void#]{{$}}
 // TLOC_MEMBERS_NO_DOT-NEXT: Decl[Subscript]/CurrNominal:      [{#i: Int8#}][#Int#]{{$}}
 // TLOC_MEMBERS_NO_DOT-NEXT: Decl[InstanceVar]/CurrNominal:    .topLevelObjcClass_Property1[#Int#]{{$}}
 // TLOC_MEMBERS_NO_DOT-NEXT: End completions
 
 // TLOC_MEMBERS_DOT: Begin completions
-// TLOC_MEMBERS_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: returnsObjcClass({#Int#})[#TopLevelObjcClass#]{{$}}
+// TLOC_MEMBERS_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: returnsObjcClass({#(i): Int#})[#TopLevelObjcClass#]{{$}}
 // TLOC_MEMBERS_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: topLevelObjcClass_InstanceFunc1()[#Void#]{{$}}
 // TLOC_MEMBERS_DOT-NEXT: Decl[InstanceVar]/CurrNominal:    topLevelObjcClass_Property1[#Int#]{{$}}
 // TLOC_MEMBERS_DOT-NEXT: End completions

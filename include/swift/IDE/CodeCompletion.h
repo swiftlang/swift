@@ -97,6 +97,10 @@ public:
       CallParameterBegin,
       /// Function call parameter name.  Can be omitted in the editor buffer.
       CallParameterName,
+      /// Function call parameter internal / local name. If the parameter has no
+      /// formal API name, it can still have a local name which can be useful
+      /// for display purposes. Can be ommitted in the editor buffer.
+      CallParameterInternalName,
       /// A colon between parameter name and value.  Should be inserted in the
       /// editor buffer if the preceding CallParameterName was inserted.
       CallParameterColon,
@@ -142,6 +146,7 @@ public:
              Kind == ChunkKind::QuestionMark ||
              Kind == ChunkKind::Ampersand ||
              Kind == ChunkKind::CallParameterName ||
+             Kind == ChunkKind::CallParameterInternalName ||
              Kind == ChunkKind::CallParameterColon ||
              Kind == ChunkKind::CallParameterType ||
              Kind == ChunkKind::GenericParameterName ||

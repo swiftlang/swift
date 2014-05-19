@@ -144,11 +144,14 @@ void CodeCompletionString::print(raw_ostream &OS) const {
       AnnotatedTextChunk = C.isAnnotation();
       SWIFT_FALLTHROUGH;
     case Chunk::ChunkKind::CallParameterName:
+    case Chunk::ChunkKind::CallParameterInternalName:
     case Chunk::ChunkKind::CallParameterColon:
     case Chunk::ChunkKind::CallParameterType:
     case CodeCompletionString::Chunk::ChunkKind::GenericParameterName:
       if (AnnotatedTextChunk)
         OS << "['";
+      else if (C.getKind() == Chunk::ChunkKind::CallParameterInternalName)
+        OS << "(";
       for (char Ch : C.getText()) {
         if (Ch == '\n')
           OS << "\\n";
@@ -157,6 +160,8 @@ void CodeCompletionString::print(raw_ostream &OS) const {
       }
       if (AnnotatedTextChunk)
         OS << "']";
+      else if (C.getKind() == Chunk::ChunkKind::CallParameterInternalName)
+        OS << ")";
       break;
     case Chunk::ChunkKind::OptionalBegin:
     case Chunk::ChunkKind::CallParameterBegin:
@@ -638,6 +643,7 @@ Optional<unsigned> CodeCompletionString::getFirstTextChunkIndex() const {
     case CodeCompletionString::Chunk::ChunkKind::OverrideKeyword:
     case CodeCompletionString::Chunk::ChunkKind::DeclIntroducer:
     case CodeCompletionString::Chunk::ChunkKind::CallParameterName:
+    case CodeCompletionString::Chunk::ChunkKind::CallParameterInternalName:
     case CodeCompletionString::Chunk::ChunkKind::CallParameterColon:
     case CodeCompletionString::Chunk::ChunkKind::CallParameterType:
     case CodeCompletionString::Chunk::ChunkKind::OptionalBegin:
@@ -1243,7 +1249,42 @@ public:
     addPatternFromTypeImpl(Builder, T, Identifier(), true);
   }
 
-  void addFunctionCall(const AnyFunctionType *AFT) {
+  void addParamPatternFromFunction(CodeCompletionResultBuilder &Builder,
+                                   const AbstractFunctionDecl *AFD,
+                                   const AnyFunctionType *AFT) {
+    auto BodyPatterns = AFD->getBodyParamPatterns();
+    // Skip over the implicit 'self'.
+    if (AFD->getImplicitSelfDecl()) {
+      BodyPatterns = BodyPatterns.slice(1);
+    }
+
+    ArrayRef<Identifier> ArgNames;
+    DeclName Name = AFD->getFullName();
+    if (Name) {
+      ArgNames = Name.getArgumentNames();
+    }
+
+    if (!BodyPatterns.empty()) {
+      if (auto *BodyTuple = dyn_cast<TuplePattern>(BodyPatterns.front())) {
+        for (unsigned i = 0, e = BodyTuple->getFields().size(); i != e; ++i) {
+          if (i > 0)
+            Builder.addComma();
+          auto ParamPattern = BodyTuple->getFields()[i].getPattern();
+          Builder.addCallParameter(ArgNames[i], ParamPattern->getBoundName(),
+                                   ParamPattern->getType());
+        }
+      } else {
+        Type T = AFT->getInput();
+        if (auto *PT = dyn_cast<ParenType>(T.getPointer())) {
+          // Only unwrap the paren sugar, if it exists.
+          T = PT->getUnderlyingType();
+        }
+        Builder.addCallParameter(Identifier(), T);
+      }
+    }
+  }
+
+  void addFunctionCallPattern(const AnyFunctionType *AFT) {
     foundFunction(AFT);
     CodeCompletionResultBuilder Builder(
         Sink,
@@ -1269,6 +1310,23 @@ public:
       }
       Builder.addCallParameter(Identifier(), T);
     }
+    Builder.addRightParen();
+    addTypeAnnotation(Builder, AFT->getResult());
+  }
+
+  void addFunctionCallPattern(const AbstractFunctionDecl *AFD, const AnyFunctionType *AFT) {
+    foundFunction(AFT);
+    CodeCompletionResultBuilder Builder(
+      Sink,
+      CodeCompletionResult::ResultKind::Pattern,
+      SemanticContextKind::ExpressionSpecific);
+    if (!HaveLParen)
+      Builder.addLeftParen();
+    else
+      Builder.addAnnotatedLeftParen();
+
+    addParamPatternFromFunction(Builder, AFD, AFT);
+
     Builder.addRightParen();
     addTypeAnnotation(Builder, AFT->getResult());
   }
@@ -1344,7 +1402,10 @@ public:
       Builder.addCallParameter(Ctx.Id_self, FirstInputType);
       Builder.addRightParen();
     } else {
-      addPatternFromType(Builder, FirstInputType);
+      Builder.addLeftParen();
+      addParamPatternFromFunction(Builder, FD,
+                                  FunctionType->castTo<AnyFunctionType>());
+      Builder.addRightParen();
     }
 
     FunctionType = FunctionType->castTo<AnyFunctionType>()->getResult();
@@ -1698,10 +1759,14 @@ public:
     }
   }
 
-  bool tryFunctionCallCompletions(Type ExprType) {
+  bool tryFunctionCallCompletions(Type ExprType, ValueDecl *VD) {
     ExprType = ExprType->getRValueType();
     if (auto AFT = ExprType->getAs<AnyFunctionType>()) {
-      addFunctionCall(AFT);
+      if (auto *AFD = dyn_cast_or_null<AbstractFunctionDecl>(VD)) {
+        addFunctionCallPattern(AFD, AFT);
+      } else {
+        addFunctionCallPattern(AFT);
+      }
       return true;
     }
     return false;
@@ -1740,12 +1805,12 @@ public:
     return true;
   }
 
-  void getValueExprCompletions(Type ExprType) {
+  void getValueExprCompletions(Type ExprType, ValueDecl *VD = nullptr) {
     Kind = LookupKind::ValueExpr;
     NeedLeadingDot = !HaveDot;
     this->ExprType = ExprType;
     bool Done = false;
-    if (tryFunctionCallCompletions(ExprType))
+    if (tryFunctionCallCompletions(ExprType, VD))
       Done = true;
     if (auto MT = ExprType->getAs<ModuleType>()) {
       Module *M = MT->getModule();
@@ -2223,8 +2288,13 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
   case CompletionKind::PostfixExprParen: {
     Lookup.setHaveLParen(true);
+    ValueDecl *VD = nullptr;
+    if (auto *AE = dyn_cast<ApplyExpr>(ParsedExpr)) {
+      if (auto *DRE = dyn_cast<DeclRefExpr>(AE->getFn()))
+        VD = DRE->getDecl();
+    }
     if (ParsedExpr->getType())
-      Lookup.getValueExprCompletions(ParsedExpr->getType());
+      Lookup.getValueExprCompletions(ParsedExpr->getType(), VD);
 
     if (!Lookup.FoundFunctionCalls ||
         (Lookup.FoundFunctionCalls &&

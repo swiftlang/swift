@@ -55,6 +55,7 @@ std::string toInsertableString(CodeCompletionResult *Result) {
       break;
 
     case CodeCompletionString::Chunk::ChunkKind::CallParameterName:
+    case CodeCompletionString::Chunk::ChunkKind::CallParameterInternalName:
     case CodeCompletionString::Chunk::ChunkKind::CallParameterColon:
     case CodeCompletionString::Chunk::ChunkKind::CallParameterType:
     case CodeCompletionString::Chunk::ChunkKind::OptionalBegin:
