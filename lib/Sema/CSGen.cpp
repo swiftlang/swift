@@ -1282,6 +1282,10 @@ namespace {
       return expr->getCastTypeLoc().getType();
     }
 
+    Type visitArrayDowncastExpr(ArrayDowncastExpr *expr) {
+      return expr->getCastTypeLoc().getType();
+    }
+
     Type visitDiscardAssignmentExpr(DiscardAssignmentExpr *expr) {
       // '_' is only allowed in assignments, so give it an AssignDest locator.
       auto locator = CS.getConstraintLocator(expr, 

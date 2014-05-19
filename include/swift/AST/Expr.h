@@ -33,7 +33,7 @@ namespace llvm {
 
 namespace swift {
   class ArchetypeType;
-  class ArrayDowncastConversionExpr;
+  class ArrayDowncastExpr;
   class ASTContext;
   class Type;
   class ValueDecl;
@@ -230,13 +230,13 @@ class alignas(8) Expr {
                   < (1 << NumCheckedCastKindBits),
                 "unable to fit a CheckedCastKind in the given number of bits");
 
-  class ArrayDowncastConversionExprBitfields {
-    friend class ArrayDowncastConversionExpr;
+  class ArrayDowncastExprBitfields {
+    friend class ArrayDowncastExpr;
     unsigned : NumExprBits;
     unsigned BridgesFromObjC : 1;
   };
-  enum { NumArrayDowncastConversionExprBits = NumExprBits + 1 };
-  static_assert(NumArrayDowncastConversionExprBits <= 32, "fits in an unsigned");
+  enum { NumArrayDowncastExprBits = NumExprBits + 1 };
+  static_assert(NumArrayDowncastExprBits <= 32, "fits in an unsigned");
 
 protected:
   union {
@@ -253,7 +253,7 @@ protected:
     ClosureExprBitfields ClosureExprBits;
     BindOptionalExprBitfields BindOptionalExprBits;
     CheckedCastExprBitfields CheckedCastExprBits;
-    ArrayDowncastConversionExprBitfields ArrayDowncastConversionExprBits;
+    ArrayDowncastExprBitfields ArrayDowncastExprBits;
   };
 
 private:
@@ -2055,27 +2055,6 @@ public:
   }
 };
   
-// ArrayDowncastConversionExpr - Convert an Array<T> to an Array<U>, where
-// T is a subtype of U.
-class ArrayDowncastConversionExpr : public ImplicitConversionExpr {
-public:
-  ArrayDowncastConversionExpr(Expr *subExpr, Type type, bool bridgesFromObjC)
-    : ImplicitConversionExpr(ExprKind::ArrayDowncastConversion, subExpr, type)
-  {
-    ArrayDowncastConversionExprBits.BridgesFromObjC = bridgesFromObjC;
-  }
-
-  /// Determine whether this downcast bridges "non-verbatim" from the
-  /// Objective-C objects in the source array to values in the result array.
-  bool bridgesFromObjC() const {
-    return ArrayDowncastConversionExprBits.BridgesFromObjC;
-  }
-
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::ArrayDowncastConversion;
-  }
-};
-  
 // ArrayBridgedConversionExpr - Convert an Array<U> to an Array<T>, where
 // T is bridged to U.
 class ArrayBridgedConversionExpr : public ImplicitConversionExpr {
@@ -3165,6 +3144,35 @@ public:
     return E->getKind() == ExprKind::Coerce;
   }
 };
+
+/// Performs a checked downcast of an Array<T> to Array<U>, where T is
+/// either a supertype of U or is T bridged through an Objective-C
+/// class of which it is a supertype, to U.
+///
+/// \code
+/// var arr: AnyObject[] = ...
+/// if let views = arr as NSView[] { ... }
+/// \endcode
+class ArrayDowncastExpr : public ExplicitCastExpr {
+public:
+  ArrayDowncastExpr(Expr *sub, SourceLoc asLoc, TypeLoc castTy,
+                              bool bridgesFromObjC)
+    : ExplicitCastExpr(ExprKind::ArrayDowncast, sub, asLoc, castTy, Type())
+  {
+    ArrayDowncastExprBits.BridgesFromObjC = bridgesFromObjC;
+  }
+
+  /// Determine whether this downcast bridges "non-verbatim" from the
+  /// Objective-C objects in the source array to values in the result array.
+  bool bridgesFromObjC() const {
+    return ArrayDowncastExprBits.BridgesFromObjC;
+  }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::ArrayDowncast;
+  }
+};
+  
 
 /// \brief Represents the rebinding of 'self' in a constructor that calls out
 /// to another constructor. The result of the subexpression is assigned to

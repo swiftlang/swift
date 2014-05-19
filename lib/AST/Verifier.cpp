@@ -745,12 +745,7 @@ struct ASTNodeBase {};
       verifyChecked(E->getSubExpr());
       verifyCheckedBase(E);
     }
-    
-    void verifyChecked(ArrayDowncastConversionExpr *E) {
-      verifyChecked(E->getSubExpr());
-      verifyCheckedBase(E);
-    }
-    
+        
     void verifyChecked(ArrayBridgedConversionExpr *E) {
       verifyChecked(E->getSubExpr());
       verifyCheckedBase(E);
@@ -963,6 +958,14 @@ struct ASTNodeBase {};
       checkSameType(E->getType(), E->getSubExpr()->getType(),
                     "coercion type and subexpression type");
 
+      verifyCheckedBase(E);
+    }
+
+    void verifyChecked(ArrayDowncastExpr *E) {
+      verifyChecked(E->getSubExpr());
+      checkSameType(E->getType(), 
+                    OptionalType::get(E->getCastTypeLoc().getType()),
+                    "array downcast expression type and downcast type");
       verifyCheckedBase(E);
     }
 

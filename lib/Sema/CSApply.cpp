@@ -2445,17 +2445,19 @@ namespace {
           if (!sub) return nullptr;
         }
 
-
         auto toEltType = cs.getBaseTypeForArrayType(toType.getPointer());
         bool bridgesFromObjC = !tc.getBridgedToObjC(cs.DC, toEltType).second;
         toType = tc.getOptionalType(sub->getLoc(), toType);
-        auto arrayConversion = new (tc.Context) ArrayDowncastConversionExpr(
-                                                  sub, toType, bridgesFromObjC);
+        auto arrayConversion
+          = new (tc.Context) ArrayDowncastExpr(sub, expr->getLoc(), 
+                                               expr->getCastTypeLoc(), 
+                                               bridgesFromObjC);
         arrayConversion->setType(toType);
         return arrayConversion;
       }
 
       // The type to which the result of the optional should be coerced.
+      // This type is only used when bridging through an Objective-C class.
       Type coercedResultType;
 
       // Local function to finish the result, performing a final coercion if
@@ -2570,6 +2572,10 @@ namespace {
     }
 
     Expr *visitCoerceExpr(CoerceExpr *expr) {
+      return expr;
+    }
+
+    Expr *visitArrayDowncastExpr(ArrayDowncastExpr *expr) {
       return expr;
     }
 
