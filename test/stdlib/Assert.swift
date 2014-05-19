@@ -46,7 +46,7 @@ func test_fatalIsNoreturn() {
 
 func test_fatal() {
   _preconditionFailure("this should fail")
-  // CHECK_FATAL: fatal error: this should fail: file {{.*}}Assert.swift, line [[@LINE-1]]
+  // CHECK_FATAL: fatal error: this should fail
   // CHECK_FATAL: CRASHED: SIG{{ILL|TRAP}}
 }
 
@@ -61,7 +61,7 @@ func test_securityCheckBool() {
   println("OK")
   // CHECK_BOOL: OK
   _precondition(x == 42, "this should fail")
-  // CHECK_BOOL-NEXT: fatal error: this should fail: file {{.*}}Assert.swift, line [[@LINE-1]]
+  // CHECK_BOOL-NEXT: fatal error: this should fail
   // CHECK_BOOL-NEXT: CRASHED: SIG{{ILL|TRAP}}
 }
 
@@ -74,7 +74,7 @@ func test_securityCheckLogicValue() {
   println("OK")
   // CHECK_LOGICVALUE: OK
   _precondition(falsie, "this should fail")
-  // CHECK_LOGICVALUE-NEXT: fatal error: this should fail: file {{.*}}Assert.swift, line [[@LINE-1]]
+  // CHECK_LOGICVALUE-NEXT: fatal error: this should fail
   // CHECK_LOGICVALUE-NEXT: CRASHED: SIG{{ILL|TRAP}}
 }
 

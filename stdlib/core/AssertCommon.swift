@@ -44,28 +44,52 @@ func _isFastAssertConfiguration() -> Bool {
   return Int32(Builtin.assert_configuration()) == 2;
 }
 
+@asmname("swift_reportFatalErrorInFile")
+func _reportFatalErrorInFile(
+  prefix: Builtin.RawPointer, prefixLength: Builtin.Word,
+  message: Builtin.RawPointer, messageLength: Builtin.Word,
+  file: Builtin.RawPointer, fileLength: Builtin.Word,
+  line: UWord)
+
 @asmname("swift_reportFatalError")
 func _reportFatalError(
-  header: Builtin.RawPointer, headerLength: Builtin.Word, 
-  message: Builtin.RawPointer, messageLength: Builtin.Word,
-  file: Builtin.RawPointer, fileLength: Builtin.Word, 
-  line: UWord)
+  prefix: Builtin.RawPointer, prefixLength: Builtin.Word,
+  message: Builtin.RawPointer, messageLength: Builtin.Word)
 
 @asmname("swift_reportUnimplementedInitializer")
 func _reportUnimplementedInitializer(
-  className: Builtin.RawPointer, classNameLength: Builtin.Word, 
-  file: Builtin.RawPointer, fileLength: Builtin.Word, 
-  line: UWord, column: UWord, 
+  className: Builtin.RawPointer, classNameLength: Builtin.Word,
+  file: Builtin.RawPointer, fileLength: Builtin.Word,
+  line: UWord, column: UWord,
   initName: Builtin.RawPointer, initNameLength: Builtin.Word)
 
+/// This function should be used only in the implementation of user-level
+/// assertions.
 @noreturn
-func _fatal_error_message(header: StaticString, message: StaticString, 
-                          file: StaticString, line: UWord) 
-{
-  _reportFatalError(header.start, header.byteSize, 
-                    message.start, message.byteSize, 
-                    file.start, file.byteSize, line)
-  
+func _assertionFalied(prefix: StaticString, message: StaticString,
+                        file: StaticString, line: UWord) {
+  _reportFatalErrorInFile(
+      prefix.start, prefix.byteSize, message.start, message.byteSize,
+      file.start, file.byteSize, line)
+
+  Builtin.int_trap()
+}
+
+/// This function should be used only in the implementation of stdlib
+/// assertions.
+@transparent
+@noreturn
+func _fatalErrorMessage(prefix: StaticString, message: StaticString,
+                        file: StaticString, line: UWord) {
+#if INTERNAL_CHECKS_ENABLED
+  _reportFatalErrorInFile(
+      prefix.start, prefix.byteSize, message.start, message.byteSize,
+      file.start, file.byteSize, line)
+#else
+  _reportFatalError(prefix.start, prefix.byteSize,
+                    message.start, message.byteSize)
+#endif
+
   Builtin.int_trap()
 }
 
@@ -76,11 +100,11 @@ func _unimplemented_initializer(className: StaticString,
                                 file: StaticString = __FILE__,
                                 line: UWord = __LINE__,
                                 column: UWord = __LINE__,
-                                initName: StaticString = __FUNCTION__) 
+                                initName: StaticString = __FUNCTION__)
 {
-  _reportUnimplementedInitializer(className.start, className.byteSize, 
-                                 file.start, file.byteSize, line, column, 
+  _reportUnimplementedInitializer(className.start, className.byteSize,
+                                 file.start, file.byteSize, line, column,
                                  initName.start, initName.byteSize)
-  
+
   Builtin.int_trap()
 }

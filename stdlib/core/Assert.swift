@@ -29,7 +29,7 @@ func assert(
   // Only assert in debug mode.
   if _isDebugAssertConfiguration() {
     if !_branchHint(condition(), true) {
-      _fatal_error_message("assertion failed", message, file, line)
+      _assertionFalied("assertion failed", message, file, line)
     }
   }
 }
@@ -41,7 +41,7 @@ func assert<T : LogicValue>(
   // Only assert in debug mode.
   if _isDebugAssertConfiguration() {
     if !_branchHint(condition(), true) {
-      _fatal_error_message("assertion failed", message, file, line)
+      _assertionFalied("assertion failed", message, file, line)
     }
   }
 }
@@ -55,11 +55,10 @@ func fatalError(
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
   if _isDebugAssertConfiguration() {
-    _fatal_error_message("fatal error", message, file, line)
+    _assertionFalied("fatal error", message, file, line)
   }
   _conditionallyUnreachable()
 }
-
 
 /// Library precondition checks
 ///
@@ -75,7 +74,7 @@ func _precondition(
   // Only check in debug and release mode. In release mode just trap.
   if _isDebugAssertConfiguration() {
     if !_branchHint(condition(), true) {
-      _fatal_error_message("fatal error", message, file, line)
+      _fatalErrorMessage("fatal error", message, file, line)
     }
   } else if _isReleaseAssertConfiguration() {
     if !_branchHint(condition(), true) {
@@ -91,7 +90,7 @@ func _precondition<T : LogicValue>(
   // Only check in debug and release mode. In release mode just trap.
   if _isDebugAssertConfiguration() {
     if !_branchHint(condition(), true) {
-      _fatal_error_message("fatal error", message, file, line)
+      _fatalErrorMessage("fatal error", message, file, line)
     }
   } else if _isReleaseAssertConfiguration() {
     if !_branchHint(condition(), true) {
@@ -122,7 +121,7 @@ func _overflowChecked<T>(
   let (result, error) = args
   if _isDebugAssertConfiguration() {
     if _branchHint(error, false) {
-      _fatal_error_message("fatal error", "Overflow/underflow", file, line)
+      _fatalErrorMessage("fatal error", "Overflow/underflow", file, line)
     }
   } else {
     Builtin.condfail(error.value)
@@ -146,7 +145,7 @@ func _debugPrecondition(
   // Only check in debug mode.
   if _isDebugAssertConfiguration() {
     if !_branchHint(condition(), true) {
-      _fatal_error_message("fatal error", message, file, line)
+      _fatalErrorMessage("fatal error", message, file, line)
     }
   }
 }
@@ -159,7 +158,7 @@ func _debugPrecondition<T : LogicValue>(
   // Only check in debug mode.
   if _isDebugAssertConfiguration() {
     if !_branchHint(condition(), true) {
-      _fatal_error_message("fatal error", message, file, line)
+      _fatalErrorMessage("fatal error", message, file, line)
     }
   }
 }
@@ -188,7 +187,7 @@ func _sanityCheck(
 ) {
 #if INTERNAL_CHECKS_ENABLED
   if !_branchHint(condition(), true) {
-    _fatal_error_message("fatal error", message, file, line)
+    _fatalErrorMessage("fatal error", message, file, line)
   }
 #endif
 }
@@ -200,7 +199,7 @@ func _sanityCheck<T : LogicValue>(
 ) {
 #if INTERNAL_CHECKS_ENABLED
   if !_branchHint(condition(), true) {
-    _fatal_error_message("fatal error", message, file, line)
+    _fatalErrorMessage("fatal error", message, file, line)
   }
 #endif
 }

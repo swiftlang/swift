@@ -74,15 +74,14 @@ reportNow(const char *message)
 // <prefix>: <message>: file <file>, line <line>\n
 // The message may be omitted by passing messageLength=0.
 extern "C" void
-swift_reportFatalError(const char *prefix, intptr_t prefixLength, 
-                       const char *message, intptr_t messageLength, 
-                       const char *file, intptr_t fileLength, 
-                       uintptr_t line)
-{
+swift_reportFatalErrorInFile(const char *prefix, intptr_t prefixLength,
+                             const char *message, intptr_t messageLength,
+                             const char *file, intptr_t fileLength,
+                             uintptr_t line) {
   char *log;
-  asprintf(&log, "%.*s: %.*s%sfile %.*s, line %zu\n", 
-           (int)prefixLength, prefix, (int)messageLength, message, 
-           (messageLength ? ": " : ""), (int)fileLength, file, (size_t)line);
+  asprintf(&log, "%.*s: %.*s%sfile %.*s, line %zu\n", (int)prefixLength, prefix,
+           (int)messageLength, message, (messageLength ? ": " : ""),
+           (int)fileLength, file, (size_t)line);
 
   reportNow(log);
   reportOnCrash(log);
@@ -90,6 +89,22 @@ swift_reportFatalError(const char *prefix, intptr_t prefixLength,
   free(log);
 }
 
+// Report a fatal error to system console, stderr, and crash logs.
+// <prefix>: <message>: file <file>, line <line>\n
+// The message may be omitted by passing messageLength=0.
+extern "C" void swift_reportFatalError(const char *prefix,
+                                       intptr_t prefixLength,
+                                       const char *message,
+                                       intptr_t messageLength) {
+  char *log;
+  asprintf(&log, "%.*s: %.*s\n", (int)prefixLength, prefix,
+           (int)messageLength, message);
+
+  reportNow(log);
+  reportOnCrash(log);
+
+  free(log);
+}
 
 // Report a call to an unimplemented initializer.
 // <file>: <line>: <column>: fatal error: use of unimplemented 
