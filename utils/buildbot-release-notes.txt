@@ -1,6 +1,10 @@
 Latest
 ----------
 
+
+2014-05-19
+----------
+
 * sort, map, filter, and reduce methods on Arrays accept trailing
   closures:
 
@@ -67,7 +71,7 @@ Latest
 * ObjCMutablePointer has been renamed AutoreleasingUnsafePointer.
     
 * UnsafePointer (and AutoreleasingUnsafePointer)'s "set()" and "get()"
-  have been replaced with a property called "pointee".
+  have been replaced with a property called "memory".
   
   - Previously you would write:
   
@@ -76,8 +80,8 @@ Latest
   
   - Now you write:
   
-     val = p.pointee
-     p.pointee = val
+     val = p.memory
+     p.memory = val
 
 * Removed shorthand "x as T!"; instead use "(x as T)!"
 
