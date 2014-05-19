@@ -1514,10 +1514,12 @@ enum DictionaryGenerator<KeyType : Hashable, ValueType> : Generator {
     case ._Native(var startIndex, var endIndex):
       return _nativeNext()
     case ._Cocoa(var cocoaGenerator):
-      if let (key: AnyObject, value: AnyObject) = cocoaGenerator.next() {
-        // FIXME: This assumes that KeyType and ValueType are bridged verbatim.
-        let nativeKey = reinterpretCast(key) as KeyType
-        let nativeValue = reinterpretCast(value) as ValueType
+      if let (anyObjectKey: AnyObject, anyObjectValue: AnyObject) =
+          cocoaGenerator.next() {
+        let nativeKey =
+            bridgeFromObjectiveCUnconditional(anyObjectKey, KeyType.self)
+        let nativeValue =
+            bridgeFromObjectiveCUnconditional(anyObjectValue, ValueType.self)
         return (nativeKey, nativeValue)
       }
       return .None

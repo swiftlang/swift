@@ -1884,7 +1884,7 @@ test_BridgedFromObjC_Nonverbatim_Count()
 // CHECK: test_BridgedFromObjC_Nonverbatim_Count done
 
 
-func test_BridgedFromObjC_Generate() {
+func test_BridgedFromObjC_Verbatim_Generate() {
   var d = getBridgedVerbatimDictionary()
   var identity1: Word = reinterpretCast(d)
   assert(isCocoaDictionary(d))
@@ -1902,12 +1902,35 @@ func test_BridgedFromObjC_Generate() {
   assert(!gen.next())
   assert(identity1 == reinterpretCast(d))
 
-  println("test_BridgedFromObjC_Generate done")
+  println("test_BridgedFromObjC_Verbatim_Generate done")
 }
-test_BridgedFromObjC_Generate()
-// CHECK: test_BridgedFromObjC_Generate done
+test_BridgedFromObjC_Verbatim_Generate()
+// CHECK: test_BridgedFromObjC_Verbatim_Generate done
 
-func test_BridgedFromObjC_Generate_Empty() {
+func test_BridgedFromObjC_Nonverbatim_Generate() {
+  var d = getBridgedNonverbatimDictionary()
+  var identity1: Word = reinterpretCast(d)
+  assert(isCocoaDictionary(d))
+
+  var gen = d.generate()
+  var pairs = Array<(Int, Int)>()
+  while let (key, value) = gen.next() {
+    pairs += (key.value, value.value)
+  }
+  assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
+  // The following is not required by the Generator protocol, but
+  // it is a nice QoI.
+  assert(!gen.next())
+  assert(!gen.next())
+  assert(!gen.next())
+  assert(identity1 == reinterpretCast(d))
+
+  println("test_BridgedFromObjC_Nonverbatim_Generate done")
+}
+test_BridgedFromObjC_Nonverbatim_Generate()
+// CHECK: test_BridgedFromObjC_Nonverbatim_Generate done
+
+func test_BridgedFromObjC_Verbatim_Generate_Empty() {
   var d = getEmptyBridgedVerbatimDictionary()
   var identity1: Word = reinterpretCast(d)
   assert(isCocoaDictionary(d))
@@ -1924,10 +1947,32 @@ func test_BridgedFromObjC_Generate_Empty() {
   assert(!gen.next())
   assert(identity1 == reinterpretCast(d))
 
-  println("test_BridgedFromObjC_Generate_Empty done")
+  println("test_BridgedFromObjC_Verbatim_Generate_Empty done")
 }
-test_BridgedFromObjC_Generate_Empty()
-// CHECK: test_BridgedFromObjC_Generate_Empty done
+test_BridgedFromObjC_Verbatim_Generate_Empty()
+// CHECK: test_BridgedFromObjC_Verbatim_Generate_Empty done
+
+func test_BridgedFromObjC_Nonverbatim_Generate_Empty() {
+  var d = getEmptyBridgedNonverbatimDictionary()
+  var identity1: Word = reinterpretCast(d)
+  assert(isCocoaDictionary(d))
+
+  var gen = d.generate()
+  // Can not write code below because of
+  // <rdar://problem/16811736> Optional tuples are broken as optionals regarding == comparison
+  // assert(gen.next() == .None)
+  assert(!gen.next())
+  // The following is not required by the Generator protocol, but
+  // it is a nice QoI.
+  assert(!gen.next())
+  assert(!gen.next())
+  assert(!gen.next())
+  assert(identity1 == reinterpretCast(d))
+
+  println("test_BridgedFromObjC_Nonverbatim_Generate_Empty done")
+}
+test_BridgedFromObjC_Nonverbatim_Generate_Empty()
+// CHECK: test_BridgedFromObjC_Nonverbatim_Generate_Empty done
 
 assert(objcKeyCount == 0, "key leak")
 assert(objcValueCount == 0, "value leak")
