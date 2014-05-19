@@ -37,11 +37,13 @@ struct ${Self}<T> : MutableCollection, Sliceable {
 
   subscript(index: Int) -> Element {
     get {
-      assert(index < count, "Array index out of range")
+      _precondition(index < count, "${Self} index out of range")
+      _precondition(index >= 0, "Negative ${Self} index is out of range")
       return _buffer[index]
     }
     nonmutating set {
-      assert(index < count, "Array index out of range")
+      _precondition(index < count, "${Self} index out of range")
+      _precondition(index >= 0, "Negative array index is out of range")
       _buffer[index] = newValue
     }
   }
@@ -96,7 +98,7 @@ extension ${Self} : ArrayType {
 
   /// Construct an array of count elements, each initialized to value
   init(count: Int, repeatedValue: T) {
-    assert(count >= 0)
+    _precondition(count >= 0, "Can't construct ${Self} with count < 0")
     _buffer = _Buffer()
     reserveCapacity(count)
     var p = _buffer.elementStorage
@@ -167,7 +169,7 @@ extension ${Self} : ArrayType {
       _buffer._uninitializedCopy(0..count, target: newBuffer.elementStorage)
       _buffer = _Buffer(newBuffer)
     }
-    assert(capacity >= minimumCapacity)
+    _sanityCheck(capacity >= minimumCapacity)
   }
   
   /// Append newElement to the ${Self} in O(1) (amortized)
@@ -178,7 +180,7 @@ extension ${Self} : ArrayType {
   /// Remove an element from the end of the ${Self} in O(1).
   /// Requires: count > 0
   mutating func removeLast() -> T {
-    assert(count > 0, "can't pop from an empty ${Self}")
+    _precondition(count > 0, "can't pop from an empty ${Self}")
     let c = count
     let result = self[c - 1]
     replace(&self, (c - 1)..c, EmptyCollection())
@@ -215,8 +217,10 @@ extension ${Self} : ArrayType {
     return Swift.reduce(self, initial, combine)
   }
 
-  mutating func sort(isOrderedBefore: (T, T)->Bool) {
-    quickSort(&self, indices(self), isOrderedBefore)
+  func sort(isOrderedBefore: (T, T)->Bool) {
+    // We have reference semantics for subscript assignment
+    var mutableSelf = self 
+    quickSort(&mutableSelf, indices(self), isOrderedBefore)
   }
 
   func map<U>(transform: (T)->U) -> ${Self}<U> {
@@ -348,9 +352,17 @@ func replace<
   >(
   inout target: A, subRange: Range<Int>, newValues: C
 ) {
-  assert(subRange.startIndex >= 0)
-  assert(subRange.endIndex >= subRange.startIndex)
-  assert(subRange.endIndex <= target.endIndex)
+  _precondition(
+    subRange.startIndex >= 0,
+    "${Self} replace: subRange start is negative")
+  
+  _precondition(
+    subRange.endIndex >= subRange.startIndex,
+    "${Self} replace: subRange is inside-out")
+  
+  _precondition(
+    subRange.endIndex <= target.endIndex,
+    "${Self} replace: subRange is inside-out")
   
   let oldCount = target.count
   let eraseCount = countElements(subRange)
@@ -362,7 +374,7 @@ func replace<
     let growth = insertCount - eraseCount
     
     let elements = target._buffer.elementStorage
-    assert(elements != nil)
+    _sanityCheck(elements != nil)
     
     let oldTailIndex = subRange.endIndex
     let oldTailStart = elements + oldTailIndex
@@ -481,7 +493,7 @@ func _demandUniqueMutableBuffer<_Buffer: ArrayBufferType>(
   inout source: _Buffer, newCount: Int, minimumCapacity: Int = 0)
 -> ContiguousArrayBuffer<_Buffer.Element>? {
 
-  assert(newCount >= 0)
+  _sanityCheck(newCount >= 0)
   
   let requiredCapacity = max(newCount, minimumCapacity)
   
@@ -520,12 +532,12 @@ func _arrayOutOfPlaceUpdate<
   newCount: Int,  // Count of new elements to insert
   initializeNewElements: Initializer
 ) {
-  assert(headCount >= 0)
-  assert(newCount >= 0)
+  _sanityCheck(headCount >= 0)
+  _sanityCheck(newCount >= 0)
   
   // Count of trailing source elements to copy/move
   let tailCount = dest!.count - headCount - newCount
-  assert(headCount + tailCount <= source.count)
+  _sanityCheck(headCount + tailCount <= source.count)
   
   let sourceCount = source.count
   let oldCount = sourceCount - headCount - tailCount
