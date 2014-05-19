@@ -2300,11 +2300,7 @@ namespace {
                     expr->getCastTypeLoc().getType());
         expr->setCastKind(castKind);
         break;
-      case CheckedCastKind::ArrayDowncast: {
-        // Re-write to a coercion.
-        expr->setCastKind(CheckedCastKind::Coercion);
-        break;
-      }
+      case CheckedCastKind::ArrayDowncast:
       case CheckedCastKind::Downcast:
       case CheckedCastKind::SuperToArchetype:
       case CheckedCastKind::ArchetypeToArchetype:
@@ -2332,7 +2328,8 @@ namespace {
 
       // If we have an imbalance of optionals, handle this as a checked cast
       // followed by a getLogicValue.
-      if (fromOptionals.size() != toOptionals.size()) {
+      if (fromOptionals.size() != toOptionals.size() ||
+          castKind == CheckedCastKind::ArrayDowncast) {
         auto toOptType = OptionalType::get(toType);
         ConditionalCheckedCastExpr *cast
           = new (tc.Context) ConditionalCheckedCastExpr(
