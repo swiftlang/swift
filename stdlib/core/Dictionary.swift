@@ -891,14 +891,9 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
       var newNativeStorage = newNativeOwner.nativeStorage
       var oldCocoaGenerator = _CocoaDictionaryGenerator(cocoaDictionary)
       while let (key: AnyObject, value: AnyObject) = oldCocoaGenerator.next() {
-        // FIXME: we should be using an `as` cast instead of `reinterpretCast`.
-        // <rdar://problem/15494623> Handle dynamic cast to archetype bound to
-        // ObjC existential
-        //
-        // FIXME: This assumes that KeyType and ValueType are bridged verbatim.
         newNativeStorage.unsafeAddNew(
-            key: reinterpretCast(key) as KeyType,
-            value: reinterpretCast(value) as ValueType)
+            key: bridgeFromObjectiveCUnconditional(key, KeyType.self),
+            value: bridgeFromObjectiveCUnconditional(value, ValueType.self))
       }
       newNativeStorage.count = cocoaDictionary.count
 
@@ -986,10 +981,9 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
     case .Native:
       return native.maybeGet(key)
     case .Cocoa(let cocoaStorage):
-      // FIXME: This assumes that KeyType and ValueType are bridged verbatim.
-      let anyObjectKey: AnyObject = _reinterpretCastToAnyObject(key)
+      let anyObjectKey: AnyObject = bridgeToObjectiveCUnconditional(key)
       if let anyObjectValue: AnyObject = cocoaStorage.maybeGet(anyObjectKey) {
-        return reinterpretCast(anyObjectValue) as ValueType
+        return bridgeFromObjectiveCUnconditional(anyObjectValue, ValueType.self)
       }
       return .None
     }
