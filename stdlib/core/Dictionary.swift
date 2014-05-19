@@ -946,8 +946,7 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
       }
       return .None
     case .Cocoa(let cocoaStorage):
-      // FIXME: This assumes that KeyType and ValueType are bridged verbatim.
-      let anyObjectKey: AnyObject = _reinterpretCastToAnyObject(key)
+      let anyObjectKey: AnyObject = bridgeToObjectiveCUnconditional(key)
       if let cocoaIndex = cocoaStorage.indexForKey(anyObjectKey) {
         return .Some(._Cocoa(cocoaIndex))
       }
@@ -960,19 +959,12 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
     case .Native:
       return native.assertingGet(i._nativeIndex)
     case .Cocoa(let cocoaStorage):
-      var (key: AnyObject, value: AnyObject) =
+      var (anyObjectKey: AnyObject, anyObjectValue: AnyObject) =
           cocoaStorage.assertingGet(i._cocoaIndex)
-      // FIXME: we should be using an `as` cast instead of `reinterpretCast`.
-      // <rdar://problem/15494623> Handle dynamic cast to archetype bound to
-      // ObjC existential
-      //
-      // FIXME: This assumes that KeyType and ValueType are bridged verbatim.
-      // This is true now, but when we allow Cocoa-backed Dictionaries to be
-      // typed differently from `Dictionary<NSObject, AnyObject>`, this should
-      // use bridgeFromObjectiveC() instead.  (And a fast path for verbatim
-      // bridging.)
-      let nativeKey = reinterpretCast(key) as KeyType
-      let nativeValue = reinterpretCast(value) as ValueType
+      let nativeKey =
+          bridgeFromObjectiveCUnconditional(anyObjectKey, KeyType.self)
+      let nativeValue =
+          bridgeFromObjectiveCUnconditional(anyObjectValue, ValueType.self)
       return (nativeKey, nativeValue)
     }
   }

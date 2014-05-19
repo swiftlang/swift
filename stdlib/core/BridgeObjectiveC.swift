@@ -113,6 +113,12 @@ func bridgeToObjectiveC<T>(x: T) -> AnyObject? {
   return _bridgeNonVerbatimToObjectiveC(x)
 }
 
+func bridgeToObjectiveCUnconditional<T>(x: T) -> AnyObject {
+  let optResult: AnyObject? = bridgeToObjectiveC(x)
+  _precondition(optResult, "value failed to bridge from Swift type to a Objective-C type")
+  return optResult!
+}
+
 @asmname("swift_bridgeNonVerbatimToObjectiveC")
 func _bridgeNonVerbatimToObjectiveC<T>(x: T) -> AnyObject?
 
@@ -134,6 +140,13 @@ func bridgeFromObjectiveC<T>(x: AnyObject, _: T.Type) -> T? {
     return x as T
   }
   return _bridgeNonVerbatimFromObjectiveC(x, T.self)
+}
+
+/// Like `bridgeFromObjectiveC`, but traps in case bridging failed.
+func bridgeFromObjectiveCUnconditional<T>(x: AnyObject, _: T.Type) -> T {
+  let optResult = bridgeFromObjectiveC(x, T.self)
+  _precondition(optResult, "value failed to bridge from Objective-C type to a Swift type")
+  return optResult!
 }
 
 @asmname("swift_bridgeNonVerbatimFromObjectiveC")

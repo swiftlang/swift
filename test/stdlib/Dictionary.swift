@@ -2,7 +2,7 @@
 // RUN: mkdir -p %t
 //
 // RUN: xcrun -sdk %target-sdk-name clang++ -arch %target-cpu %S/Inputs/SlurpFastEnumeration/SlurpFastEnumeration.m -c -o %t/SlurpFastEnumeration.o -g
-// RUN: %target-build-swift %s -I %S/Inputs/SlurpFastEnumeration/ -Xlinker %t/SlurpFastEnumeration.o -o %t/Dictionary
+// RUN: %target-build-swift %s -I %S/Inputs/SlurpFastEnumeration/ -Xlinker %t/SlurpFastEnumeration.o -o %t/Dictionary -g
 
 // RUN: %target-run %t/Dictionary > %t.txt
 // RUN: FileCheck %s < %t.txt
@@ -1100,6 +1100,79 @@ class TestObjCValueTy : NSObject, Printable {
   var serial: Int
 }
 
+var bridgedKeyCount = 0
+var bridgedKeySerial = 0
+
+struct TestBridgedKeyTy : Equatable, Hashable, Printable, _BridgedToObjectiveC {
+  init(_ value: Int) {
+    ++bridgedKeyCount
+    serial = ++bridgedKeySerial
+    self.value = value
+    self._hashValue = value
+  }
+
+  var description: String {
+    assert(serial > 0, "dead TestBridgedKeyTy")
+    return value.description
+  }
+
+  var hashValue: Int {
+    return _hashValue
+  }
+
+  static func getObjectiveCType() -> Any.Type {
+    return TestObjCKeyTy.self
+  }
+
+  func bridgeToObjectiveC() -> TestObjCKeyTy {
+    return TestObjCKeyTy(value)
+  }
+
+  static func bridgeFromObjectiveC(x: TestObjCKeyTy) -> TestBridgedKeyTy? {
+    return TestBridgedKeyTy(x.value)
+  }
+
+  var value: Int
+  var _hashValue: Int
+  var serial: Int
+}
+
+func == (lhs: TestBridgedKeyTy, rhs: TestBridgedKeyTy) -> Bool {
+  return lhs.value == rhs.value
+}
+
+var bridgedValueCount = 0
+var bridgedValueSerial = 0
+
+struct TestBridgedValueTy : Printable, _BridgedToObjectiveC {
+  init(_ value: Int) {
+    ++bridgedValueCount
+    serial = ++bridgedValueSerial
+    self.value = value
+  }
+
+  var description: String {
+    assert(serial > 0, "dead TestBridgedValueTy")
+    return value.description
+  }
+
+  static func getObjectiveCType() -> Any.Type {
+    return TestObjCValueTy.self
+  }
+
+  func bridgeToObjectiveC() -> TestObjCValueTy {
+    return TestObjCValueTy(value)
+  }
+
+  static func bridgeFromObjectiveC(x: TestObjCValueTy) -> TestBridgedValueTy? {
+    return TestBridgedValueTy(x.value)
+  }
+
+  var value: Int
+  var serial: Int
+}
+
+
 func slurpFastEnumeration(
     d: NSDictionary, fe: NSFastEnumeration
 ) -> Array<(Int, Int)> {
@@ -1155,7 +1228,7 @@ func slurpFastEnumerationFromObjC(
   return pairs
 }
 
-func getBridgedDictionary() -> Dictionary<NSObject, AnyObject> {
+func getBridgedDictionaryHelper() -> NSDictionary {
   let keys = NSMutableArray()
   keys.addObject(TestObjCKeyTy(10))
   keys.addObject(TestObjCKeyTy(20))
@@ -1166,12 +1239,20 @@ func getBridgedDictionary() -> Dictionary<NSObject, AnyObject> {
   values.addObject(TestObjCValueTy(1020))
   values.addObject(TestObjCValueTy(1030))
 
-  var nsd = NSDictionary(objects: values, forKeys: keys)
+  return NSDictionary(objects: values, forKeys: keys)
+}
 
+func getBridgedVerbatimDictionary() -> Dictionary<NSObject, AnyObject> {
+  var nsd = getBridgedDictionaryHelper()
   return _convertNSDictionaryToDictionary(nsd)
 }
 
-func getEmptyBridgedDictionary() -> Dictionary<NSObject, AnyObject> {
+func getBridgedNonverbatimDictionary() -> Dictionary<TestBridgedKeyTy, TestBridgedValueTy> {
+  var nsd = getBridgedDictionaryHelper()
+  return Dictionary(_cocoaDictionary: reinterpretCast(nsd))
+}
+
+func getEmptyBridgedVerbatimDictionary() -> Dictionary<NSObject, AnyObject> {
   let keys = NSMutableArray()
   let values = NSMutableArray()
 
@@ -1180,7 +1261,16 @@ func getEmptyBridgedDictionary() -> Dictionary<NSObject, AnyObject> {
   return _convertNSDictionaryToDictionary(nsd)
 }
 
-func getHugeBridgedDictionary() -> Dictionary<NSObject, AnyObject> {
+func getEmptyBridgedNonverbatimDictionary() -> Dictionary<TestBridgedKeyTy, TestBridgedValueTy> {
+  let keys = NSMutableArray()
+  let values = NSMutableArray()
+
+  var nsd = NSDictionary(objects: values, forKeys: keys)
+
+  return Dictionary(_cocoaDictionary: reinterpretCast(nsd))
+}
+
+func getHugeBridgedVerbatimDictionary() -> Dictionary<NSObject, AnyObject> {
   let keys = NSMutableArray()
   let values = NSMutableArray()
   for i in 1...32 {
@@ -1235,8 +1325,8 @@ func getParallelArrayBridgedDictionary() -> Dictionary<NSObject, AnyObject> {
   return _convertNSDictionaryToDictionary(nsd)
 }
 
-func test_BridgedFromObjC_IndexForKey() {
-  var d = getBridgedDictionary()
+func test_BridgedFromObjC_Verbatim_IndexForKey() {
+  var d = getBridgedVerbatimDictionary()
   var identity1: Word = reinterpretCast(d)
   assert(isCocoaDictionary(d))
 
@@ -1259,13 +1349,42 @@ func test_BridgedFromObjC_IndexForKey() {
   assert(!d.indexForKey(TestObjCKeyTy(40)))
   assert(identity1 == reinterpretCast(d))
 
-  println("test_BridgedFromObjC_IndexForKey done")
+  println("test_BridgedFromObjC_Verbatim_IndexForKey done")
 }
-test_BridgedFromObjC_IndexForKey()
-// CHECK: test_BridgedFromObjC_IndexForKey done
+test_BridgedFromObjC_Verbatim_IndexForKey()
+// CHECK: test_BridgedFromObjC_Verbatim_IndexForKey done
 
-func test_BridgedFromObjC_SubscriptWithIndex() {
-  var d = getBridgedDictionary()
+func test_BridgedFromObjC_Nonverbatim_IndexForKey() {
+  var d = getBridgedNonverbatimDictionary()
+  var identity1: Word = reinterpretCast(d)
+  assert(isCocoaDictionary(d))
+
+  // Find an existing key.
+  if true {
+    var kv = d[d.indexForKey(TestBridgedKeyTy(10))!]
+    assert(kv.0 == TestBridgedKeyTy(10))
+    assert(kv.1.value == 1010)
+
+    kv = d[d.indexForKey(TestBridgedKeyTy(20))!]
+    assert(kv.0 == TestBridgedKeyTy(20))
+    assert(kv.1.value == 1020)
+
+    kv = d[d.indexForKey(TestBridgedKeyTy(30))!]
+    assert(kv.0 == TestBridgedKeyTy(30))
+    assert(kv.1.value == 1030)
+  }
+
+  // Try to find a key that does not exist.
+  assert(!d.indexForKey(TestBridgedKeyTy(40)))
+  assert(identity1 == reinterpretCast(d))
+
+  println("test_BridgedFromObjC_Nonverbatim_IndexForKey done")
+}
+test_BridgedFromObjC_Nonverbatim_IndexForKey()
+// CHECK: test_BridgedFromObjC_Nonverbatim_IndexForKey done
+
+func test_BridgedFromObjC_Verbatim_SubscriptWithIndex() {
+  var d = getBridgedVerbatimDictionary()
   var identity1: Word = reinterpretCast(d)
   assert(isCocoaDictionary(d))
 
@@ -1286,13 +1405,40 @@ func test_BridgedFromObjC_SubscriptWithIndex() {
   withExtendedLifetime(startIndex) { () }
   withExtendedLifetime(endIndex) { () }
 
-  println("test_BridgedFromObjC_SubscriptWithIndex done")
+  println("test_BridgedFromObjC_Verbatim_SubscriptWithIndex done")
 }
-test_BridgedFromObjC_SubscriptWithIndex()
-// CHECK: test_BridgedFromObjC_SubscriptWithIndex done
+test_BridgedFromObjC_Verbatim_SubscriptWithIndex()
+// CHECK: test_BridgedFromObjC_Verbatim_SubscriptWithIndex done
 
-func test_BridgedFromObjC_SubscriptWithIndex_Empty() {
-  var d = getEmptyBridgedDictionary()
+func test_BridgedFromObjC_Nonverbatim_SubscriptWithIndex() {
+  var d = getBridgedNonverbatimDictionary()
+  var identity1: Word = reinterpretCast(d)
+  assert(isCocoaDictionary(d))
+
+  var startIndex = d.startIndex
+  var endIndex = d.endIndex
+  assert(startIndex != endIndex)
+  assert(identity1 == reinterpretCast(d))
+
+  var pairs = Array<(Int, Int)>()
+  for var i = startIndex; i != endIndex; ++i {
+    var (key, value) = d[i]
+    pairs += (key.value, value.value)
+  }
+  assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
+  assert(identity1 == reinterpretCast(d))
+
+  // Keep indexes alive during the calls above.
+  withExtendedLifetime(startIndex) { () }
+  withExtendedLifetime(endIndex) { () }
+
+  println("test_BridgedFromObjC_Nonverbatim_SubscriptWithIndex done")
+}
+test_BridgedFromObjC_Nonverbatim_SubscriptWithIndex()
+// CHECK: test_BridgedFromObjC_Nonverbatim_SubscriptWithIndex done
+
+func test_BridgedFromObjC_Verbatim_SubscriptWithIndex_Empty() {
+  var d = getEmptyBridgedVerbatimDictionary()
   var identity1: Word = reinterpretCast(d)
   assert(isCocoaDictionary(d))
 
@@ -1305,14 +1451,32 @@ func test_BridgedFromObjC_SubscriptWithIndex_Empty() {
   withExtendedLifetime(startIndex) { () }
   withExtendedLifetime(endIndex) { () }
 
-  println("test_BridgedFromObjC_SubscriptWithIndex_Empty done")
+  println("test_BridgedFromObjC_Verbatim_SubscriptWithIndex_Empty done")
 }
-test_BridgedFromObjC_SubscriptWithIndex_Empty()
-// CHECK: test_BridgedFromObjC_SubscriptWithIndex_Empty done
+test_BridgedFromObjC_Verbatim_SubscriptWithIndex_Empty()
+// CHECK: test_BridgedFromObjC_Verbatim_SubscriptWithIndex_Empty done
 
+func test_BridgedFromObjC_Nonverbatim_SubscriptWithIndex_Empty() {
+  var d = getEmptyBridgedNonverbatimDictionary()
+  var identity1: Word = reinterpretCast(d)
+  assert(isCocoaDictionary(d))
+
+  var startIndex = d.startIndex
+  var endIndex = d.endIndex
+  assert(startIndex == endIndex)
+  assert(identity1 == reinterpretCast(d))
+
+  // Keep indexes alive during the calls above.
+  withExtendedLifetime(startIndex) { () }
+  withExtendedLifetime(endIndex) { () }
+
+  println("test_BridgedFromObjC_Nonverbatim_SubscriptWithIndex_Empty done")
+}
+test_BridgedFromObjC_Nonverbatim_SubscriptWithIndex_Empty()
+// CHECK: test_BridgedFromObjC_Nonverbatim_SubscriptWithIndex_Empty done
 
 func test_BridgedFromObjC_SubscriptWithKey() {
-  var d = getBridgedDictionary()
+  var d = getBridgedVerbatimDictionary()
   var identity1: Word = reinterpretCast(d)
   assert(isCocoaDictionary(d))
 
@@ -1374,7 +1538,7 @@ test_BridgedFromObjC_SubscriptWithKey()
 func test_BridgedFromObjC_UpdateValueForKey() {
   // Insert a new key-value pair.
   if true {
-    var d = getBridgedDictionary()
+    var d = getBridgedVerbatimDictionary()
     var identity1: Word = reinterpretCast(d)
     assert(isCocoaDictionary(d))
 
@@ -1394,7 +1558,7 @@ func test_BridgedFromObjC_UpdateValueForKey() {
 
   // Overwrite a value in existing binding.
   if true {
-    var d = getBridgedDictionary()
+    var d = getBridgedVerbatimDictionary()
     var identity1: Word = reinterpretCast(d)
     assert(isCocoaDictionary(d))
 
@@ -1419,7 +1583,7 @@ test_BridgedFromObjC_UpdateValueForKey()
 
 
 func test_BridgedFromObjC_RemoveAtIndex() {
-  var d = getBridgedDictionary()
+  var d = getBridgedVerbatimDictionary()
   var identity1: Word = reinterpretCast(d)
   assert(isCocoaDictionary(d))
 
@@ -1441,7 +1605,7 @@ test_BridgedFromObjC_RemoveAtIndex()
 
 func test_BridgedFromObjC_DeleteKey() {
   if true {
-    var d = getBridgedDictionary()
+    var d = getBridgedVerbatimDictionary()
     var identity1: Word = reinterpretCast(d)
     assert(isCocoaDictionary(d))
 
@@ -1464,7 +1628,7 @@ func test_BridgedFromObjC_DeleteKey() {
   }
 
   if true {
-    var d1 = getBridgedDictionary()
+    var d1 = getBridgedVerbatimDictionary()
     var identity1: Word = reinterpretCast(d1)
 
     var d2 = d1
@@ -1504,7 +1668,7 @@ test_BridgedFromObjC_DeleteKey()
 
 
 func test_BridgedFromObjC_Count() {
-  var d = getBridgedDictionary()
+  var d = getBridgedVerbatimDictionary()
   var identity1: Word = reinterpretCast(d)
   assert(isCocoaDictionary(d))
 
@@ -1518,7 +1682,7 @@ test_BridgedFromObjC_Count()
 
 
 func test_BridgedFromObjC_Generate() {
-  var d = getBridgedDictionary()
+  var d = getBridgedVerbatimDictionary()
   var identity1: Word = reinterpretCast(d)
   assert(isCocoaDictionary(d))
 
@@ -1541,7 +1705,7 @@ test_BridgedFromObjC_Generate()
 // CHECK: test_BridgedFromObjC_Generate done
 
 func test_BridgedFromObjC_Generate_Empty() {
-  var d = getEmptyBridgedDictionary()
+  var d = getEmptyBridgedVerbatimDictionary()
   var identity1: Word = reinterpretCast(d)
   assert(isCocoaDictionary(d))
 
@@ -1566,7 +1730,7 @@ assert(objcKeyCount == 0, "key leak")
 assert(objcValueCount == 0, "value leak")
 
 func test_BridgedFromObjC_Generate_Huge() {
-  var d = getHugeBridgedDictionary()
+  var d = getHugeBridgedVerbatimDictionary()
   var identity1: Word = reinterpretCast(d)
   assert(isCocoaDictionary(d))
 
@@ -1624,11 +1788,11 @@ assert(objcValueCount == 0, "value leak")
 
 #if false
 func test_BridgedFromObjC_EqualityTest_Empty() {
-  var d1 = getEmptyBridgedDictionary()
+  var d1 = getEmptyBridgedVerbatimDictionary()
   var identity1: Word = reinterpretCast(d1)
   assert(isCocoaDictionary(d1))
 
-  var d2 = getEmptyBridgedDictionary()
+  var d2 = getEmptyBridgedVerbatimDictionary()
   var identity2: Word = reinterpretCast(d2)
   assert(isCocoaDictionary(d2))
 
@@ -1812,78 +1976,6 @@ test_BridgedToObjC_FastEnumeration_Empty()
 //
 // Key type and value type are bridged non-verbatim.
 //===---
-
-var bridgedKeyCount = 0
-var bridgedKeySerial = 0
-
-struct TestBridgedKeyTy : Equatable, Hashable, Printable, _BridgedToObjectiveC {
-  init(_ value: Int) {
-    ++bridgedKeyCount
-    serial = ++bridgedKeySerial
-    self.value = value
-    self._hashValue = value
-  }
-
-  var description: String {
-    assert(serial > 0, "dead TestBridgedKeyTy")
-    return value.description
-  }
-
-  var hashValue: Int {
-    return _hashValue
-  }
-
-  static func getObjectiveCType() -> Any.Type {
-    return TestObjCKeyTy.self
-  }
-
-  func bridgeToObjectiveC() -> TestObjCKeyTy {
-    return TestObjCKeyTy(value)
-  }
-
-  static func bridgeFromObjectiveC(x: TestObjCKeyTy) -> TestBridgedKeyTy? {
-    _preconditionFailure("implement")
-  }
-
-  var value: Int
-  var _hashValue: Int
-  var serial: Int
-}
-
-func == (lhs: TestBridgedKeyTy, rhs: TestBridgedKeyTy) -> Bool {
-  return lhs.value == rhs.value
-}
-
-var bridgedValueCount = 0
-var bridgedValueSerial = 0
-
-struct TestBridgedValueTy : Printable, _BridgedToObjectiveC {
-  init(_ value: Int) {
-    ++bridgedValueCount
-    serial = ++bridgedValueSerial
-    self.value = value
-  }
-
-  var description: String {
-    assert(serial > 0, "dead TestBridgedValueTy")
-    return value.description
-  }
-
-  static func getObjectiveCType() -> Any.Type {
-    return TestObjCValueTy.self
-  }
-
-  func bridgeToObjectiveC() -> TestObjCValueTy {
-    return TestObjCValueTy(value)
-  }
-
-  static func bridgeFromObjectiveC(x: TestObjCValueTy) -> TestBridgedValueTy? {
-    _preconditionFailure("implement")
-  }
-
-  var value: Int
-  var serial: Int
-}
 
 func getBridgedNSDictionaryOfKeyValue_ValueTypesCustomBridged() -> NSDictionary {
   assert(!isBridgedVerbatimToObjectiveC(TestBridgedKeyTy.self))
