@@ -396,7 +396,7 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E) {
     /// Return true if this is an implicit reference to self.
     static bool isImplicitSelfUse(Expr *E) {
       auto *DRE = dyn_cast<DeclRefExpr>(E);
-      return DRE && DRE->isImplicit() &&
+      return DRE && DRE->isImplicit() && DRE->getDecl()->hasName() &&
              DRE->getDecl()->getName().str() == "self";
     }
 

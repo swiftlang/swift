@@ -174,3 +174,18 @@ extension SomeClass {
   }
 }
 
+
+// <rdar://problem/16955318> Observed variable in a closure triggers an assertion
+var closureWithObservedProperty: () -> () = {
+  var a: Int = 42 {
+  willSet {
+    println("Will set a to \(newValue)")
+  }
+  didSet {
+    println("Did set a with old value of \(oldValue)")
+  }
+  }
+}
+
+
+
