@@ -2762,7 +2762,7 @@ swift_bridgeNonVerbatimFromObjectiveC(
   }
 
   // return nil
-  swift_release(sourceValue);
+  swift_unknownRelease(sourceValue);
   return _TFSs26_injectNothingIntoOptionalU__FT_GSqQ__(nativeType);
 }
 
