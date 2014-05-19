@@ -6,7 +6,7 @@
 
 typedef unsigned long NSUInteger;
 typedef long NSInteger;
-typedef signed char BOOL;
+typedef __typeof__(__objc_yes) BOOL;
 
 typedef struct objc_selector    *SEL;
 SEL sel_registerName(const char *str);

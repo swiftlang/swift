@@ -8,8 +8,6 @@
 
 typedef struct objc_object { void *isa; } *id;
 
-typedef signed char BOOL;
-
 typedef struct _NSZone NSZone;
 void *allocate(NSZone *zone);
 

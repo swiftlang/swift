@@ -1,4 +1,4 @@
-typedef signed char BOOL;
+typedef __typeof__(__objc_yes) BOOL;
 @class NSString;
 
 @protocol NSCopying
