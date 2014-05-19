@@ -37,7 +37,6 @@ func testSwiftClass() {
   printState(w)                           // CHECK-NEXT: is present
   c.noop()                                // CHECK-NEXT: noop
   c = SwiftClassBase()                    // CHECK-NEXT: SwiftClass Destroyed
-  w = nil
   printState(w)                           // CHECK-NEXT: is nil
 }
 
@@ -56,7 +55,6 @@ func testSwiftImplicitOptionalClass() {
   printState(w)                           // CHECK-NEXT: is present
   c.noop()                                // CHECK-NEXT: noop
   c = SwiftClassBase()                    // CHECK-NEXT: SwiftClass Destroyed
-  w = nil
   printState(w)                           // CHECK-NEXT: is nil
 }
 
@@ -95,7 +93,6 @@ func testObjCClass() {
   printState(w)                           // CHECK-NEXT: is present
   c.noop()                                // CHECK-NEXT: noop
   c = ObjCClassBase()                     // CHECK-NEXT: ObjCClass Destroyed
-  w = nil
   printState(w)                           // CHECK-NEXT: is nil
 }
 
@@ -111,18 +108,17 @@ func printState(x : Protocol?) {
 }
 
 func testProtocol() {
-  println("testProtocol")                 // HECK: testProtocol
+  println("testProtocol")                 // CHECK: testProtocol
   
   weak var w : Protocol?
-  printState(w)                           // HECK-NEXT: is nil
-  var c : SwiftClassBase = SwiftClass()   // HECK: SwiftClass Created
-  printState(w)                           // HECK-NEXT: is nil
+  printState(w)                           // CHECK-NEXT: is nil
+  var c : SwiftClassBase = SwiftClass()   // CHECK: SwiftClass Created
+  printState(w)                           // CHECK-NEXT: is nil
   w = c
-  printState(w)                           // HECK-NEXT: is present
-  c.noop()                                // HECK-NEXT: noop
-  c = SwiftClassBase()                    // HECK-NEXT: SwiftClass Destroyed
-  w = nil
-  printState(w)                           // HECK-NEXT: is nil
+  printState(w)                           // CHECK-NEXT: is present
+  c.noop()                                // CHECK-NEXT: noop
+  c = SwiftClassBase()                    // CHECK-NEXT: SwiftClass Destroyed
+  printState(w)                           // CHECK-NEXT: is nil
 }
 
 testProtocol()
