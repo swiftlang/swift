@@ -29,7 +29,7 @@ func assert(
   // Only assert in debug mode.
   if _isDebugAssertConfiguration() {
     if !_branchHint(condition(), true) {
-      _assertionFalied("assertion failed", message, file, line)
+      _assertionFailed("assertion failed", message, file, line)
     }
   }
 }
@@ -41,7 +41,7 @@ func assert<T : LogicValue>(
   // Only assert in debug mode.
   if _isDebugAssertConfiguration() {
     if !_branchHint(condition(), true) {
-      _assertionFalied("assertion failed", message, file, line)
+      _assertionFailed("assertion failed", message, file, line)
     }
   }
 }
@@ -55,7 +55,7 @@ func fatalError(
   file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
   if _isDebugAssertConfiguration() {
-    _assertionFalied("fatal error", message, file, line)
+    _assertionFailed("fatal error", message, file, line)
   }
   _conditionallyUnreachable()
 }

@@ -66,7 +66,7 @@ func _reportUnimplementedInitializer(
 /// This function should be used only in the implementation of user-level
 /// assertions.
 @noreturn
-func _assertionFalied(prefix: StaticString, message: StaticString,
+func _assertionFailed(prefix: StaticString, message: StaticString,
                         file: StaticString, line: UWord) {
   _reportFatalErrorInFile(
       prefix.start, prefix.byteSize, message.start, message.byteSize,
