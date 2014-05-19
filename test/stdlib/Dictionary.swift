@@ -1894,8 +1894,7 @@ func getBridgedNSDictionaryOfKeyValue_ValueTypesCustomBridged() -> NSDictionary 
   d[TestBridgedKeyTy(20)] = TestBridgedValueTy(1020)
   d[TestBridgedKeyTy(30)] = TestBridgedValueTy(1030)
 
-  let bridged =
-      reinterpretCast(_convertDictionaryToNSDictionary(d)) as NSDictionary
+  let bridged = _convertDictionaryToNSDictionary(d)
   assert(isCocoaNSDictionary(bridged))
 
   return bridged
@@ -1927,8 +1926,7 @@ func getBridgedNSDictionaryOfKey_ValueTypeCustomBridged() -> NSDictionary {
   d[TestBridgedKeyTy(20)] = TestObjCValueTy(1020)
   d[TestBridgedKeyTy(30)] = TestObjCValueTy(1030)
 
-  let bridged =
-      reinterpretCast(_convertDictionaryToNSDictionary(d)) as NSDictionary
+  let bridged = _convertDictionaryToNSDictionary(d)
   assert(isCocoaNSDictionary(bridged))
 
   return bridged
@@ -1960,8 +1958,7 @@ func getBridgedNSDictionaryOfValue_ValueTypeCustomBridged() -> NSDictionary {
   d[TestObjCKeyTy(20)] = TestBridgedValueTy(1020)
   d[TestObjCKeyTy(30)] = TestBridgedValueTy(1030)
 
-  let bridged =
-      reinterpretCast(_convertDictionaryToNSDictionary(d)) as NSDictionary
+  let bridged = _convertDictionaryToNSDictionary(d)
   assert(isCocoaNSDictionary(bridged))
 
   return bridged
