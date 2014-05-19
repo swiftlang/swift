@@ -117,53 +117,6 @@ struct PermutationGenerator<
   }
 }
 
-/// A wrapper for a BidirectionalIndex that reverses its
-/// direction of traversal
-struct ReverseIndex<I: BidirectionalIndex> : BidirectionalIndex {
-  var _base: I
-
-  init(_ base: I) { self._base = base }
-
-  func succ() -> ReverseIndex {
-    return ReverseIndex(_base.pred())
-  }
-  
-  func pred() -> ReverseIndex {
-    return ReverseIndex(_base.succ())
-  }
-}
-
-func == <I> (lhs: ReverseIndex<I>, rhs: ReverseIndex<I>) -> Bool {
-  return lhs._base == rhs._base
-}
-
-struct Reverse<T: Collection where T.IndexType: BidirectionalIndex> : Collection {
-  typealias IndexType = ReverseIndex<T.IndexType>
-  typealias GeneratorType = IndexingGenerator<Reverse>
-
-  init(_ base: T) {
-    self._base = base 
-  }
-
-  func generate() -> IndexingGenerator<Reverse> {
-    return IndexingGenerator(self)
-  }
-  
-  var startIndex: IndexType {
-    return ReverseIndex(_base.endIndex)
-  }
-  
-  var endIndex: IndexType {
-    return ReverseIndex(_base.startIndex)
-  }
-
-  subscript(i: IndexType) -> T.GeneratorType.Element {
-    return _base[i._base.pred()]
-  }
-  
-  var _base: T
-}
-
 protocol _Sliceable : Collection {}
 
 protocol Sliceable : _Sliceable {

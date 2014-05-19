@@ -31,7 +31,7 @@ println("")
 // <rdar://problem/15772601> Type checking failure
 // CHECK: raboof
 let i = indices(foobar)
-let r = Reverse(i)
+let r = reverse(i)
 for a in PermutationGenerator(elements: foobar, indices: r) {
   
   print(a)
@@ -46,7 +46,7 @@ func isPalindrome0<
 
   var a = indices(seq)
   var i = indices(seq)
-  var ir = Reverse(i)
+  var ir = reverse(i)
   var b = ir.generate()
   for i in a {
     if seq[i] != seq[b.next()!] {
@@ -67,7 +67,7 @@ func isPalindrome1<
 >(seq: S) -> Bool {
 
   var a = PermutationGenerator(elements: seq, indices: indices(seq))
-  var b = Reverse(seq).generate()
+  var b = reverse(seq).generate()
   for nextChar in a {
     if nextChar != b.next()! {
       return false
@@ -81,7 +81,7 @@ func isPalindrome1_5<
   where S.IndexType: BidirectionalIndex, S.GeneratorType.Element == S.GeneratorType.Element, S.GeneratorType.Element: Equatable
 >(seq: S) -> Bool {
 
-  var b = Reverse(seq).generate()
+  var b = reverse(seq).generate()
   for nextChar in seq {
     if nextChar != b.next()! {
       return false
@@ -142,7 +142,7 @@ func isPalindrome4<
   // FIXME: separate ri from the expression below pending
   // <rdar://problem/15772601> Type checking failure
   var i = indices(seq)
-  let ri = Reverse(i)
+  let ri = reverse(i)
   var b = PermutationGenerator(elements: seq, indices: ri)
   for nextChar in a {
     if nextChar != b.next()! {

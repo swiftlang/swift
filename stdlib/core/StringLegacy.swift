@@ -162,7 +162,7 @@ extension String {
   }
   
   func hasSuffix(suffix: String) -> Bool {
-    return Swift.startsWith(Reverse(self), Reverse(suffix))
+    return Swift.startsWith(reverse(self), reverse(suffix))
   }
 
   func _isAlpha() -> Bool { return _isAll({ $0.isAlpha() }) }

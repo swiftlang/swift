@@ -124,9 +124,9 @@ func f1<
   S: Collection 
   where S.IndexType: BidirectionalIndex
 >(seq: S) {
-  let x = Reverse(indices(seq))
+  let x = reverse(indices(seq))
   PermutationGenerator(elements: seq, indices: x)
-  PermutationGenerator(elements: seq, indices: Reverse(indices(seq)))
+  PermutationGenerator(elements: seq, indices: reverse(indices(seq)))
 }
 
 // <rdar://problem/16078944>

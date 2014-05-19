@@ -26,7 +26,7 @@ func _atREPLExit(handler: () -> ()) {
 }
 
 func _replExit() {
-  for handler in Reverse(_replExitHandlers) {
+  for handler in reverse(_replExitHandlers) {
     handler.f()
   }
 }
