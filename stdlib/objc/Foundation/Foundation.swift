@@ -611,6 +611,10 @@ extension Array : _ConditionallyBridgedToObjectiveC {
       return nil
     }
 
+    if _fastPath(isBridgedVerbatimToObjectiveC(T.self)) {
+      // Forced down-cast (possible deferred type-checking)
+      return Array(ArrayBuffer(reinterpretCast(source) as _CocoaArray))
+    }
 
     var anyObjectArr: AnyObject[]
       = AnyObject[](ArrayBuffer(reinterpretCast(source) as _CocoaArray))
