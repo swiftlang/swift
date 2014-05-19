@@ -1,6 +1,45 @@
 Latest
 ----------
 
+* sort, map, filter, and reduce methods on Arrays accept trailing
+  closures:
+
+    let a = [5, 6, 1, 3, 9]
+    a.sort{ $0 > $1 }
+    println(a)                          // [9, 6, 5, 3, 1]
+    println(a.map{ $0 * 2 })            // [18, 12, 10, 6, 2]
+    println(a.filter{ $0 < 10})         // [6, 2]
+    println(a.reduce(1000){ $0 + $1 })  // 1024 (no kidding)
+    
+* A lazy map() function in the standard library works on any Sequence.
+  Example:
+
+    class X {
+      var value: Int
+
+      init(_ value: Int) {
+        self.value = value
+        println("created X(\(value))")
+      }
+    }
+
+    // logically, this sequence is X(0), X(1), X(2), ... X(50)
+    let lazyXs = map(0..50){ X($0) } 
+
+    // Prints "created X(...)" 4 times
+    for x in lazyXs {
+      if x.value == 4 {
+        break
+      }
+    }
+
+* There's a similar lazy filter() function:
+
+    // 0, 10, 20, 30, 40
+    let tens = filter(0..50) { $0 % 10 == 0 }
+    let tenX = map(tens){ X($0) }    // 5 lazy Xs
+    let tenXarray = Array(tenX)      // Actually creates those Xs
+
 * Weak pointers of classbound protocol type work now.
 
 * IBOutlets now default to weak pointers with implicit optional type (T!).
