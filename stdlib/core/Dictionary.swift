@@ -249,7 +249,8 @@ struct _DictionaryElement<KeyType : Hashable, ValueType> {
   typealias DictionaryHeapBuffer = HeapBuffer<_DictionaryBody, Element?>
 
   deinit {
-    let buffer = DictionaryHeapBuffer(reinterpretCast(self) as DictionaryHeapBuffer.Storage)
+    let buffer = DictionaryHeapBuffer(
+        reinterpretCast(self) as DictionaryHeapBuffer.Storage)
     let body = buffer.value
     buffer._value.destroy()
     buffer.elementStorage.destroy(body.capacity)
@@ -549,6 +550,8 @@ class _NativeDictionaryStorageKeyNSEnumerator<KeyType : Hashable, ValueType>
     }
     let (nativeKey, _) = nextIndex.nativeStorage.assertingGet(nextIndex)
     nextIndex = nextIndex.succ()
+    // Not using bridgeToObjectiveC() here because we know that KeyType is
+    // bridged verbatim.
     return _reinterpretCastToAnyObject(nativeKey)
   }
 }
@@ -970,9 +973,9 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
       return native.assertingGet(key)
     case .Cocoa(let cocoaStorage):
       // FIXME: This assumes that KeyType and ValueType are bridged verbatim.
-      let anyObjectKey: AnyObject = _reinterpretCastToAnyObject(key)
+      let anyObjectKey: AnyObject = bridgeToObjectiveCUnconditional(key)
       let anyObjectValue: AnyObject = cocoaStorage.assertingGet(anyObjectKey)
-      return reinterpretCast(anyObjectValue) as ValueType
+      return bridgeFromObjectiveCUnconditional(anyObjectValue, ValueType.self)
     }
   }
 
