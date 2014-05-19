@@ -10,7 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-func ==(lhs: String.UnicodeScalarView.IndexType, rhs: String.UnicodeScalarView.IndexType) -> Bool {
+func ==(
+  lhs: String.UnicodeScalarView.IndexType,
+  rhs: String.UnicodeScalarView.IndexType
+) -> Bool {
   return lhs._position == rhs._position
 }
 
@@ -77,7 +80,8 @@ extension String {
     }
 
     subscript(r: Range<IndexType>) -> UnicodeScalarView {
-      return UnicodeScalarView(_base[r.startIndex._position..r.endIndex._position])
+      return UnicodeScalarView(
+        _base[r.startIndex._position..r.endIndex._position])
     }
 
     struct GeneratorType : Generator {
