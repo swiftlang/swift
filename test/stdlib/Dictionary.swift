@@ -1857,7 +1857,7 @@ test_BridgedFromObjC_Nonverbatim_DeleteKey()
 // CHECK: test_BridgedFromObjC_Nonverbatim_DeleteKey done
 
 
-func test_BridgedFromObjC_Count() {
+func test_BridgedFromObjC_Verbatim_Count() {
   var d = getBridgedVerbatimDictionary()
   var identity1: Word = reinterpretCast(d)
   assert(isCocoaDictionary(d))
@@ -1865,10 +1865,23 @@ func test_BridgedFromObjC_Count() {
   assert(d.count == 3)
   assert(identity1 == reinterpretCast(d))
 
-  println("test_BridgedFromObjC_Count done")
+  println("test_BridgedFromObjC_Verbatim_Count done")
 }
-test_BridgedFromObjC_Count()
-// CHECK: test_BridgedFromObjC_Count done
+test_BridgedFromObjC_Verbatim_Count()
+// CHECK: test_BridgedFromObjC_Verbatim_Count done
+
+func test_BridgedFromObjC_Nonverbatim_Count() {
+  var d = getBridgedNonverbatimDictionary()
+  var identity1: Word = reinterpretCast(d)
+  assert(isCocoaDictionary(d))
+
+  assert(d.count == 3)
+  assert(identity1 == reinterpretCast(d))
+
+  println("test_BridgedFromObjC_Nonverbatim_Count done")
+}
+test_BridgedFromObjC_Nonverbatim_Count()
+// CHECK: test_BridgedFromObjC_Nonverbatim_Count done
 
 
 func test_BridgedFromObjC_Generate() {
