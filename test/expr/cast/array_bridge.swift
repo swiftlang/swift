@@ -4,14 +4,14 @@ class A {
   var x = 0
 }
 
-class B : A, _BridgedToObjectiveC {
-  class func getObjectiveCType() -> Any.Type {
+struct B : _BridgedToObjectiveC {
+  static func getObjectiveCType() -> Any.Type {
     return A.self
   }
   func bridgeToObjectiveC() -> A {
     return A()
   }
-  class func bridgeFromObjectiveC(x: A) -> B? {
+  static func bridgeFromObjectiveC(x: A) -> B? {
     _preconditionFailure("implement")
   }
 }
