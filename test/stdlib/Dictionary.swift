@@ -1100,6 +1100,41 @@ class TestObjCValueTy : NSObject, Printable {
   var serial: Int
 }
 
+class TestObjCEquatableValueTy : NSObject, Equatable, Printable {
+  init(_ value: Int) {
+    ++valueCount
+    serial = ++valueSerial
+    self.value = value
+  }
+
+  deinit {
+    assert(serial > 0, "double destruction")
+    --valueCount
+    serial = -serial
+  }
+
+  override func isEqual(object: AnyObject!) -> Bool {
+    if let other: AnyObject = object {
+      if let otherObjcKey = other as TestObjCEquatableValueTy {
+        return self.value == otherObjcKey.value
+      }
+    }
+    return false
+  }
+
+  override var description: String {
+    assert(serial > 0, "dead TestObjCValueTy")
+    return value.description
+  }
+
+  var value: Int
+  var serial: Int
+}
+
+func == (lhs: TestObjCEquatableValueTy, rhs: TestObjCEquatableValueTy) -> Bool {
+  return lhs.value == rhs.value
+}
+
 var bridgedKeyCount = 0
 var bridgedKeySerial = 0
 
@@ -1172,6 +1207,37 @@ struct TestBridgedValueTy : Printable, _BridgedToObjectiveC {
   var serial: Int
 }
 
+struct TestBridgedEquatableValueTy : Equatable, Printable, _BridgedToObjectiveC {
+  init(_ value: Int) {
+    ++bridgedValueCount
+    serial = ++bridgedValueSerial
+    self.value = value
+  }
+
+  var description: String {
+    assert(serial > 0, "dead TestBridgedValueTy")
+    return value.description
+  }
+
+  static func getObjectiveCType() -> Any.Type {
+    return TestObjCValueTy.self
+  }
+
+  func bridgeToObjectiveC() -> TestObjCEquatableValueTy {
+    return TestObjCEquatableValueTy(value)
+  }
+
+  static func bridgeFromObjectiveC(x: TestObjCEquatableValueTy) -> TestBridgedEquatableValueTy? {
+    return TestBridgedEquatableValueTy(x.value)
+  }
+
+  var value: Int
+  var serial: Int
+}
+
+func == (lhs: TestBridgedEquatableValueTy, rhs: TestBridgedEquatableValueTy) -> Bool {
+  return lhs.value == rhs.value
+}
 
 func slurpFastEnumeration(
     d: NSDictionary, fe: NSFastEnumeration
@@ -1228,46 +1294,49 @@ func slurpFastEnumerationFromObjC(
   return pairs
 }
 
-func getBridgedDictionaryHelper() -> NSDictionary {
+func getAsNSDictionary(d: Dictionary<Int, Int>) -> NSDictionary {
   let keys = NSMutableArray()
-  keys.addObject(TestObjCKeyTy(10))
-  keys.addObject(TestObjCKeyTy(20))
-  keys.addObject(TestObjCKeyTy(30))
-
   let values = NSMutableArray()
-  values.addObject(TestObjCValueTy(1010))
-  values.addObject(TestObjCValueTy(1020))
-  values.addObject(TestObjCValueTy(1030))
+  for (k, v) in d {
+    keys.addObject(TestObjCKeyTy(k))
+    values.addObject(TestObjCValueTy(v))
+  }
+  return NSMutableDictionary(objects: values, forKeys: keys)
+}
 
-  return NSDictionary(objects: values, forKeys: keys)
+func getAsEquatableNSDictionary(d: Dictionary<Int, Int>) -> NSDictionary {
+  let keys = NSMutableArray()
+  let values = NSMutableArray()
+  for (k, v) in d {
+    keys.addObject(TestObjCKeyTy(k))
+    values.addObject(TestObjCEquatableValueTy(v))
+  }
+  return NSMutableDictionary(objects: values, forKeys: keys)
 }
 
 func getBridgedVerbatimDictionary() -> Dictionary<NSObject, AnyObject> {
-  var nsd = getBridgedDictionaryHelper()
+  var nsd = getAsNSDictionary([ 10: 1010, 20: 1020, 30: 1030 ])
+  return _convertNSDictionaryToDictionary(nsd)
+}
+
+func getBridgedVerbatimDictionary(d: Dictionary<Int, Int>) -> Dictionary<NSObject, AnyObject> {
+  var nsd = getAsNSDictionary(d)
   return _convertNSDictionaryToDictionary(nsd)
 }
 
 func getBridgedNonverbatimDictionary() -> Dictionary<TestBridgedKeyTy, TestBridgedValueTy> {
-  var nsd = getBridgedDictionaryHelper()
+  var nsd = getAsNSDictionary([ 10: 1010, 20: 1020, 30: 1030 ])
   return Dictionary(_cocoaDictionary: reinterpretCast(nsd))
 }
 
-func getEmptyBridgedVerbatimDictionary() -> Dictionary<NSObject, AnyObject> {
-  let keys = NSMutableArray()
-  let values = NSMutableArray()
+func getBridgedNonverbatimDictionary(d: Dictionary<Int, Int>) -> Dictionary<TestBridgedKeyTy, TestBridgedValueTy> {
+  var nsd = getAsNSDictionary(d)
+  return Dictionary(_cocoaDictionary: reinterpretCast(nsd))
+}
 
-  var nsd = NSDictionary(objects: values, forKeys: keys)
-
+func getBridgedVerbatimEquatableDictionary(d: Dictionary<Int, Int>) -> Dictionary<NSObject, TestObjCEquatableValueTy> {
+  var nsd = getAsEquatableNSDictionary(d)
   return _convertNSDictionaryToDictionary(nsd)
-}
-
-func getEmptyBridgedNonverbatimDictionary() -> Dictionary<TestBridgedKeyTy, TestBridgedValueTy> {
-  let keys = NSMutableArray()
-  let values = NSMutableArray()
-
-  var nsd = NSDictionary(objects: values, forKeys: keys)
-
-  return Dictionary(_cocoaDictionary: reinterpretCast(nsd))
 }
 
 func getHugeBridgedVerbatimDictionaryHelper() -> NSDictionary {
@@ -1451,7 +1520,7 @@ test_BridgedFromObjC_Nonverbatim_SubscriptWithIndex()
 // CHECK: test_BridgedFromObjC_Nonverbatim_SubscriptWithIndex done
 
 func test_BridgedFromObjC_Verbatim_SubscriptWithIndex_Empty() {
-  var d = getEmptyBridgedVerbatimDictionary()
+  var d = getBridgedVerbatimDictionary([:])
   var identity1: Word = reinterpretCast(d)
   assert(isCocoaDictionary(d))
 
@@ -1470,7 +1539,7 @@ test_BridgedFromObjC_Verbatim_SubscriptWithIndex_Empty()
 // CHECK: test_BridgedFromObjC_Verbatim_SubscriptWithIndex_Empty done
 
 func test_BridgedFromObjC_Nonverbatim_SubscriptWithIndex_Empty() {
-  var d = getEmptyBridgedNonverbatimDictionary()
+  var d = getBridgedNonverbatimDictionary([:])
   var identity1: Word = reinterpretCast(d)
   assert(isCocoaDictionary(d))
 
@@ -1944,7 +2013,7 @@ test_BridgedFromObjC_Nonverbatim_Generate()
 // CHECK: test_BridgedFromObjC_Nonverbatim_Generate done
 
 func test_BridgedFromObjC_Verbatim_Generate_Empty() {
-  var d = getEmptyBridgedVerbatimDictionary()
+  var d = getBridgedVerbatimDictionary([:])
   var identity1: Word = reinterpretCast(d)
   assert(isCocoaDictionary(d))
 
@@ -1966,7 +2035,7 @@ test_BridgedFromObjC_Verbatim_Generate_Empty()
 // CHECK: test_BridgedFromObjC_Verbatim_Generate_Empty done
 
 func test_BridgedFromObjC_Nonverbatim_Generate_Empty() {
-  var d = getEmptyBridgedNonverbatimDictionary()
+  var d = getBridgedNonverbatimDictionary([:])
   var identity1: Word = reinterpretCast(d)
   assert(isCocoaDictionary(d))
 
@@ -2098,21 +2167,21 @@ test_BridgedFromObjC_Nonverbatim_Generate_ParallelArray()
 assert(objcKeyCount == 0, "key leak")
 assert(objcValueCount == 0, "value leak")
 
-#if false
-func test_BridgedFromObjC_EqualityTest_Empty() {
-  var d1 = getEmptyBridgedVerbatimDictionary()
+func test_BridgedFromObjC_Verbatim_EqualityTest_Empty() {
+  var d1 = getBridgedVerbatimDictionary([:])
   var identity1: Word = reinterpretCast(d1)
   assert(isCocoaDictionary(d1))
 
-  var d2 = getEmptyBridgedVerbatimDictionary()
+  var d2 = getBridgedVerbatimDictionary([:])
   var identity2: Word = reinterpretCast(d2)
   assert(isCocoaDictionary(d2))
+  assert(identity1 != identity2)
 
   assert(d1 == d2)
   assert(identity1 == reinterpretCast(d1))
   assert(identity2 == reinterpretCast(d2))
 
-  d2.add(TestObjCKeyTy(10), TestObjCValueTy(2010))
+  d2[TestObjCKeyTy(10)] = TestObjCValueTy(2010)
   assert(isNativeDictionary(d2))
   assert(identity2 != reinterpretCast(d2))
   identity2 = reinterpretCast(d2)
@@ -2121,11 +2190,131 @@ func test_BridgedFromObjC_EqualityTest_Empty() {
   assert(identity1 == reinterpretCast(d1))
   assert(identity2 == reinterpretCast(d2))
 
-  println("test_BridgedFromObjC_EqualityTest_Empty done")
+  println("test_BridgedFromObjC_Verbatim_EqualityTest_Empty done")
 }
-test_BridgedFromObjC_EqualityTest_Empty()
-// CHECK_FIXME: test_BridgedFromObjC_EqualityTest_Empty done
-#endif
+test_BridgedFromObjC_Verbatim_EqualityTest_Empty()
+// CHECK_FIXME: test_BridgedFromObjC_Verbatim_EqualityTest_Empty done
+
+func test_BridgedFromObjC_Nonverbatim_EqualityTest_Empty() {
+  var d1 = getBridgedNonverbatimDictionary([:])
+  var identity1: Word = reinterpretCast(d1)
+  assert(isCocoaDictionary(d1))
+
+  var d2 = getBridgedNonverbatimDictionary([:])
+  var identity2: Word = reinterpretCast(d2)
+  assert(isCocoaDictionary(d2))
+  assert(identity1 != identity2)
+
+  assert(d1 == d2)
+  assert(identity1 == reinterpretCast(d1))
+  assert(identity2 == reinterpretCast(d2))
+
+  d2[TestBridgedKeyTy(10)] = TestBridgedValueTy(2010)
+  assert(isNativeDictionary(d2))
+  assert(identity2 != reinterpretCast(d2))
+  identity2 = reinterpretCast(d2)
+
+  assert(d1 != d2)
+  assert(identity1 == reinterpretCast(d1))
+  assert(identity2 == reinterpretCast(d2))
+
+  println("test_BridgedFromObjC_Nonverbatim_EqualityTest_Empty done")
+}
+test_BridgedFromObjC_Nonverbatim_EqualityTest_Empty()
+// CHECK_FIXME: test_BridgedFromObjC_Nonverbatim_EqualityTest_Empty done
+
+
+func test_BridgedFromObjC_Verbatim_EqualityTest_Small() {
+  func helper(nd1: Dictionary<Int, Int>, nd2: Dictionary<Int, Int>, expectedEq: Bool) {
+    var d1 = getBridgedVerbatimEquatableDictionary(nd1)
+    var identity1: Word = reinterpretCast(d1)
+    assert(isCocoaDictionary(d1))
+
+    var d2 = getBridgedVerbatimEquatableDictionary(nd2)
+    var identity2: Word = reinterpretCast(d2)
+    assert(isCocoaDictionary(d2))
+
+    if true {
+      var eq1 = (d1 == d2)
+      assert(eq1 == expectedEq)
+
+      var eq2 = (d2 == d1)
+      assert(eq2 == expectedEq)
+
+      var neq1 = (d1 != d2)
+      assert(neq1 != expectedEq)
+
+      var neq2 = (d2 != d1)
+      assert(neq2 != expectedEq)
+    }
+    assert(identity1 == reinterpretCast(d1))
+    assert(identity2 == reinterpretCast(d2))
+
+    d2[TestObjCKeyTy(1111)] = TestObjCEquatableValueTy(1111)
+    d2[TestObjCKeyTy(1111)] = nil
+    assert(isNativeDictionary(d2))
+    assert(identity2 != reinterpretCast(d2))
+    identity2 = reinterpretCast(d2)
+
+    if true {
+      var eq1 = (d1 == d2)
+      assert(eq1 == expectedEq)
+
+      var eq2 = (d2 == d1)
+      assert(eq2 == expectedEq)
+
+      var neq1 = (d1 != d2)
+      assert(neq1 != expectedEq)
+
+      var neq2 = (d2 != d1)
+      assert(neq2 != expectedEq)
+    }
+    assert(identity1 == reinterpretCast(d1))
+    assert(identity2 == reinterpretCast(d2))
+  }
+
+  helper([:], [:], true)
+
+  helper([ 10: 1010 ],
+         [ 10: 1010 ],
+         true)
+
+  helper([ 10: 1010, 20: 1020 ],
+         [ 10: 1010, 20: 1020 ],
+         true)
+
+  helper([ 10: 1010, 20: 1020, 30: 1030 ],
+         [ 10: 1010, 20: 1020, 30: 1030 ],
+         true)
+
+  helper([ 10: 1010, 20: 1020, 30: 1030 ],
+         [ 10: 1010, 20: 1020, 1111: 1030 ],
+         false)
+
+  helper([ 10: 1010, 20: 1020, 30: 1030 ],
+         [ 10: 1010, 20: 1020, 30: 1111 ],
+         false)
+
+  helper([ 10: 1010, 20: 1020, 30: 1030 ],
+         [ 10: 1010, 20: 1020 ],
+         false)
+
+  helper([ 10: 1010, 20: 1020, 30: 1030 ],
+         [ 10: 1010 ],
+         false)
+
+  helper([ 10: 1010, 20: 1020, 30: 1030 ],
+         [:],
+         false)
+
+  helper([ 10: 1010, 20: 1020, 30: 1030 ],
+         [ 10: 1010, 20: 1020, 30: 1030, 40: 1040 ],
+         false)
+
+  println("test_BridgedFromObjC_Verbatim_EqualityTest_Small done")
+}
+test_BridgedFromObjC_Verbatim_EqualityTest_Small()
+// CHECK_FIXME: test_BridgedFromObjC_Verbatim_EqualityTest_Small done
 
 
 //===---

@@ -1706,14 +1706,30 @@ func == <KeyType : Equatable, ValueType : Equatable>(
     if lhsCocoa.cocoaDictionary === rhsCocoa.cocoaDictionary {
       return true
     }
-    // FIXME: implement when we have dictionary casts.
-    //return lhsCocoa.cocoaDictionary.isEqual(rhsCocoa.cocoaDictionary)
-    _fatalError("dictionaries backed by Cocoa storage are not Equatable when obtained using public interface")
+    return _stdlib_NSDictionary_isEqual(
+        lhsCocoa.cocoaDictionary, rhsCocoa.cocoaDictionary)
 
   case (.Native(let lhsNativeOwner), .Cocoa(let rhsCocoa)):
-    // FIXME: compare elements.
-    // FIXME: implement when we have dictionary casts.
-    _fatalError("dictionaries backed by Cocoa storage are not Equatable when obtained using public interface")
+    let lhsNative = lhsNativeOwner.nativeStorage
+
+    if lhsNative.count != rhsCocoa.count {
+      return false
+    }
+
+    let endIndex = lhsNative.endIndex
+    for var index = lhsNative.startIndex; index != endIndex; ++index {
+      let (key, value) = lhsNative.assertingGet(index)
+      let optRhsValue: AnyObject? =
+          rhsCocoa.maybeGet(bridgeToObjectiveCUnconditional(key))
+      if let rhsValue: AnyObject = optRhsValue {
+        if value ==
+            bridgeFromObjectiveCUnconditional(rhsValue, ValueType.self) {
+          continue
+        }
+      }
+      return false
+    }
+    return true
 
   case (.Cocoa, .Native):
     return rhs == lhs
@@ -1930,9 +1946,18 @@ protocol _SwiftNSDictionaryRequiredOverrides :
 
 @objc
 protocol _SwiftNSDictionary : _SwiftNSDictionaryRequiredOverrides {
-  var allKeys:  _SwiftNSArray { get }
+  var allKeys: _SwiftNSArray { get }
   func isEqual(anObject: AnyObject) -> Bool
 }
+
+/// Call `[lhs isEqual: rhs]`.
+///
+/// This function is part of the runtime because `Bool` type is bridged to
+/// `ObjCBool`, which is in Foundation overlay.
+@asmname("swift_stdlib_NSDictionary_isEqual")
+func _stdlib_NSDictionary_isEqual(
+    lhs: _SwiftNSDictionary, rhs: _SwiftNSDictionary
+) -> Bool
 
 /// This class is derived from `_NSSwiftDictionaryBase` (through runtime magic),
 /// which is derived from `NSDictionary`.

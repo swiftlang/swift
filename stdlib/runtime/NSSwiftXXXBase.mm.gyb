@@ -87,3 +87,9 @@ using namespace swift;
 }
 @end
 % end
+
+extern "C" bool swift_stdlib_NSDictionary_isEqual(NSDictionary *lhs,
+                                                  NSDictionary *rhs) {
+  return [lhs isEqual:rhs];
+}
+
