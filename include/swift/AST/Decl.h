@@ -3161,9 +3161,8 @@ public:
 
   /// \brief Turn this into a Observing var, providing the didSet/willSet
   /// specifiers.
-  void makeObserving(SourceLoc LBraceLoc,
-                         FuncDecl *WillSet, FuncDecl *DidSet,
-                         SourceLoc RBraceLoc);
+  void makeObserving(SourceLoc LBraceLoc, FuncDecl *WillSet, FuncDecl *DidSet,
+                     SourceLoc RBraceLoc);
 
   /// \brief Specify the synthesized get/set functions for a Observing var.
   /// This is used by Sema.

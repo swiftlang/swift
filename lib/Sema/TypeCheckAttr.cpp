@@ -738,21 +738,38 @@ void TypeChecker::checkOwnershipAttr(VarDecl *var, Ownership ownershipKind) {
   var->overwriteType(ReferenceStorageType::get(type, ownershipKind, Context));
 }
 
-/// When processing an @IBOutlet causes a variable to be promoted to implicit
-/// optional type, we need to adjust the typeloc for the getter if the outlet is
-/// computed.
-static void adjustGetterResultTypeLocForImplicitOptional(FuncDecl *Getter) {
-  // If there is no getter, don't do anything.
-  if (Getter == nullptr) return;
-
-  TypeLoc &FnResult = Getter->getBodyResultTypeLoc();
-  TypeRepr *Repr = FnResult.getTypeRepr();
+static void addImplicitOptionalToTypeLoc(TypeLoc &TyLoc, ASTContext &Ctx) {
+  TypeRepr *Repr = TyLoc.getTypeRepr();
   assert(Repr && "No parsed form?");
 
-  auto &Ctx = Getter->getASTContext();
   Repr = new (Ctx) ImplicitlyUnwrappedOptionalTypeRepr(Repr, Repr->getEndLoc());
+  TyLoc = TypeLoc(Repr);
+}
 
-  FnResult = TypeLoc(Repr);
+/// When processing an @IBOutlet causes a variable to be promoted to implicit
+/// optional type, we need to adjust the typeloc for the accessor if the outlet
+/// is computed.
+static void adjustAccessorTypeLocForImplicitOptional(FuncDecl *Accessor) {
+  // If there is no accessor, don't do anything.
+  if (Accessor == nullptr) return;
+  auto &Ctx = Accessor->getASTContext();
+
+  if (Accessor->isGetter()) {
+    addImplicitOptionalToTypeLoc(Accessor->getBodyResultTypeLoc(), Ctx);
+    return;
+  }
+
+  // Otherwise, this is a didset/willset/setter, they have the type of the
+  // outlet specified in the pattern for the argument.
+  bool HasSelf = Accessor->getDeclContext()->isTypeContext();
+  Pattern *ArgPattern = Accessor->getBodyParamPatterns()[HasSelf];
+
+  // Strip off the TuplePattern to get to the first argpattern.
+  if (auto *TP = dyn_cast<TuplePattern>(ArgPattern))
+    ArgPattern = TP->getFields()[0].getPattern();
+
+  addImplicitOptionalToTypeLoc(cast<TypedPattern>(ArgPattern)->getTypeLoc(),
+                               Ctx);
 }
 
 void TypeChecker::checkIBOutlet(VarDecl *VD) {
@@ -799,8 +816,16 @@ void TypeChecker::checkIBOutlet(VarDecl *VD) {
              optionalKind == OptionalTypeKind::OTK_ImplicitlyUnwrappedOptional){
       type = ImplicitlyUnwrappedOptionalType::get(type);
 
-      if (optionalKind == OptionalTypeKind::OTK_None)
-        adjustGetterResultTypeLocForImplicitOptional(VD->getGetter());
+      // Adjust the accessors to take/return the implicit optional as well.
+      if (optionalKind == OptionalTypeKind::OTK_None &&
+          VD->hasAccessorFunctions()) {
+        adjustAccessorTypeLocForImplicitOptional(VD->getGetter());
+        adjustAccessorTypeLocForImplicitOptional(VD->getSetter());
+        if (VD->getStorageKind() == VarDecl::Observing) {
+          adjustAccessorTypeLocForImplicitOptional(VD->getWillSetFunc());
+          adjustAccessorTypeLocForImplicitOptional(VD->getDidSetFunc());
+        }
+      }
     } else
       type = OptionalType::get(type);
     
