@@ -30,16 +30,6 @@
 using namespace swift;
 using namespace constraints;
 
-static bool isOptionalType(Type &T) {
-  T = T->getDesugaredType();
-  if(auto bgt = dyn_cast<BoundGenericType>(T.getPointer())) {
-    return bgt->getDecl()->classifyAsOptionalType() ==
-              OTK_Optional;
-  }
-  
-  return false;
-}
-
 /// \brief Retrieve the fixed type for the given type variable.
 Type Solution::getFixedType(TypeVariableType *typeVar) const {
   auto knownBinding = typeBindings.find(typeVar);
