@@ -105,8 +105,10 @@ struct UnsafePointer<T> : BidirectionalIndex, Comparable, Hashable,
   /// Requires: either `source` precedes `self` or follows `self + count`.
   func moveInitializeBackwardFrom(source: UnsafePointer, count: Int) {
     _debugPrecondition(
+      count >= 0, "UnsafePointer.moveInitializeBackwardFrom with negative count")
+    _debugPrecondition(
       source <= self || source > self + count,
-      "moveInitializeBackwardFrom non-preceding overlapping range; use moveInitializeFrom instead")
+      "UnsafePointer.moveInitializeBackwardFrom non-preceding overlapping range; use moveInitializeFrom instead")
     var src = source + count
     var dst = self + count
     while dst != self {
@@ -117,6 +119,8 @@ struct UnsafePointer<T> : BidirectionalIndex, Comparable, Hashable,
   /// Assign from count values beginning at source into initialized
   /// memory, transforming the source values into raw memory.
   func moveAssignFrom(source: UnsafePointer, count: Int) {
+    _debugPrecondition(
+      count >= 0, "moveAssignFrom with negative count")
     _debugPrecondition(
       source > self || source < self - count,
       "moveAssignFrom non-following overlapping range")
@@ -129,8 +133,10 @@ struct UnsafePointer<T> : BidirectionalIndex, Comparable, Hashable,
   /// transforming the source values into raw memory.
   func moveInitializeFrom(source: UnsafePointer, count: Int) {
     _debugPrecondition(
+      count >= 0, "UnsafePointer.moveInitializeFrom with negative count")
+    _debugPrecondition(
       source >= self || source < self - count,
-      "moveInitializeFrom non-following overlapping range; use moveInitializeBackwardFrom")
+      "UnsafePointer.moveInitializeFrom non-following overlapping range; use moveInitializeBackwardFrom")
     for i in 0..count {
       (self + i).initialize((source + i).move())
     }
@@ -139,8 +145,10 @@ struct UnsafePointer<T> : BidirectionalIndex, Comparable, Hashable,
   /// Copy count values beginning at source into raw memory.
   func initializeFrom(source: UnsafePointer, count: Int) {
     _debugPrecondition(
+      count >= 0, "UnsafePointer.initializeFrom with negative count")
+    _debugPrecondition(
       source >= self || source < self - count,
-      "initializeFrom non-following overlapping range")
+      "UnsafePointer.initializeFrom non-following overlapping range")
     for i in 0..count {
       (self + i).initialize(source[i])
     }
@@ -169,6 +177,7 @@ struct UnsafePointer<T> : BidirectionalIndex, Comparable, Hashable,
 
   /// Destroy the `count` objects the pointer points to.
   func destroy(count: Int) {
+    _debugPrecondition(count >= 0, "UnsafePointer.destroy with negative count")
     Builtin.destroyArray(T.self, value, count.value)
   }
 
