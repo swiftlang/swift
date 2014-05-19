@@ -1687,7 +1687,7 @@ test_BridgedFromObjC_Nonverbatim_UpdateValueForKey()
 // CHECK: test_BridgedFromObjC_Nonverbatim_UpdateValueForKey done
 
 
-func test_BridgedFromObjC_RemoveAtIndex() {
+func test_BridgedFromObjC_Verbatim_RemoveAtIndex() {
   var d = getBridgedVerbatimDictionary()
   var identity1: Word = reinterpretCast(d)
   assert(isCocoaDictionary(d))
@@ -1700,12 +1700,34 @@ func test_BridgedFromObjC_RemoveAtIndex() {
   d.removeAtIndex(foundIndex1)
   assert(identity1 != reinterpretCast(d))
   assert(isNativeDictionary(d))
-  assert(!d.indexForKey(10))
+  assert(d.count == 2)
+  assert(!d.indexForKey(TestObjCKeyTy(10)))
 
-  println("test_BridgedFromObjC_RemoveAtIndex done")
+  println("test_BridgedFromObjC_Verbatim_RemoveAtIndex done")
 }
-test_BridgedFromObjC_RemoveAtIndex()
-// CHECK: test_BridgedFromObjC_RemoveAtIndex done
+test_BridgedFromObjC_Verbatim_RemoveAtIndex()
+// CHECK: test_BridgedFromObjC_Verbatim_RemoveAtIndex done
+
+func test_BridgedFromObjC_Nonverbatim_RemoveAtIndex() {
+  var d = getBridgedNonverbatimDictionary()
+  var identity1: Word = reinterpretCast(d)
+  assert(isCocoaDictionary(d))
+
+  let foundIndex1 = d.indexForKey(TestBridgedKeyTy(10))!
+  assert(d[foundIndex1].0 == TestBridgedKeyTy(10))
+  assert(d[foundIndex1].1.value == 1010)
+  assert(identity1 == reinterpretCast(d))
+
+  d.removeAtIndex(foundIndex1)
+  assert(identity1 != reinterpretCast(d))
+  assert(isNativeDictionary(d))
+  assert(d.count == 2)
+  assert(!d.indexForKey(TestBridgedKeyTy(10)))
+
+  println("test_BridgedFromObjC_Nonverbatim_RemoveAtIndex done")
+}
+test_BridgedFromObjC_Nonverbatim_RemoveAtIndex()
+// CHECK: test_BridgedFromObjC_Nonverbatim_RemoveAtIndex done
 
 
 func test_BridgedFromObjC_DeleteKey() {

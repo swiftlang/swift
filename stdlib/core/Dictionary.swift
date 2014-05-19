@@ -1139,11 +1139,12 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
       // FIXME(performance): fuse data migration and element deletion into one
       // operation.
       let cocoaIndex = index._cocoaIndex
-      let key: AnyObject =
+      let anyObjectKey: AnyObject =
           cocoaIndex.allKeys.objectAtIndex(cocoaIndex.nextKeyIndex)
       migrateDataToNativeStorage(cocoaStorage)
       // FIXME: This assumes that KeyType is bridged verbatim.
-      nativeRemoveObjectForKey(reinterpretCast(key) as KeyType)
+      nativeRemoveObjectForKey(
+          bridgeFromObjectiveCUnconditional(anyObjectKey, KeyType.self))
     }
   }
 
