@@ -95,11 +95,13 @@ public:
       /// The first chunk of a substring that describes the parameter for a
       /// function call.
       CallParameterBegin,
-      /// Function call parameter name.  Can be omitted in the editor buffer.
+      /// Function call parameter name.
       CallParameterName,
       /// Function call parameter internal / local name. If the parameter has no
       /// formal API name, it can still have a local name which can be useful
-      /// for display purposes. Can be ommitted in the editor buffer.
+      /// for display purposes.
+      ///
+      /// This chunk should not be inserted into the editor buffer.
       CallParameterInternalName,
       /// A colon between parameter name and value.  Should be inserted in the
       /// editor buffer if the preceding CallParameterName was inserted.
