@@ -6,6 +6,7 @@
 // RUN: %target-run %t/a.out OutOfBounds1 2>&1 | FileCheck %s -check-prefix=CHECK
 // RUN: %target-run %t/a.out OutOfBounds2 2>&1 | FileCheck %s -check-prefix=CHECK
 // RUN: %target-run %t/a.out OutOfBounds3 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out OutOfBounds4 2>&1 | FileCheck %s -check-prefix=CHECK
 
 // CHECK: OK
 // CHECK: CRASHED: SIG{{ILL|TRAP}}
@@ -31,6 +32,12 @@ if arg == "OutOfBounds3" {
   var a = [ 10, 20, 30 ]
   println("OK")
   let x = a[3]
+}
+
+if arg == "OutOfBounds4" {
+  var a: Int[] = []
+  println("OK")
+  a.removeLast()
 }
 
 println("BUSTED: should have crashed already")

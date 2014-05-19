@@ -180,7 +180,7 @@ extension ${Self} : ArrayType {
   /// Remove an element from the end of the ${Self} in O(1).
   /// Requires: count > 0
   mutating func removeLast() -> T {
-    _precondition(count > 0, "can't pop from an empty ${Self}")
+    _precondition(count > 0, "can't removeLast from an empty ${Self}")
     let c = count
     let result = self[c - 1]
     replace(&self, (c - 1)..c, EmptyCollection())
