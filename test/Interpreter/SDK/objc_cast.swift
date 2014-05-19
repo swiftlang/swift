@@ -216,4 +216,88 @@ if objImplicitOpt is String {
   println("Isa correctly failed due to nil")
 }
 
+// CHECK-NEXT: Object-to-bridged-array cast produced [Hello, Swift, World]
+obj = ["Hello", "Swift", "World"] as String[]
+if let strArr = obj as String[] {
+  println("Object-to-bridged-array cast produced \(strArr)")
+} else {
+  println("Object-to-bridged-array cast failed")
+}
+
+// CHECK-NEXT: Object-to-array cast produced [Hello, Swift, World]
+if let strArr = obj as NSString[] {
+  println("Object-to-array cast produced \(strArr)")
+} else {
+  println("Object-to-array cast failed")
+}
+
+// CHECK: Object-to-bridged-array cast failed due to bridge mismatch
+if let strArr = obj as Int[] {
+  println("Object-to-bridged-array cast should not have succedded")
+} else {
+  println("Object-to-bridged-array cast failed due to bridge mismatch")
+}
+
+// Implicitly unwrapped optional of object to array casts.
+// CHECK-NEXT: Object-to-bridged-array cast produced [Hello, Swift, World]
+objOpt = ["Hello", "Swift", "World"] as String[]
+if let strArr = objOpt as String[] {
+  println("Object-to-bridged-array cast produced \(strArr)")
+} else {
+  println("Object-to-bridged-array cast failed")
+}
+
+// CHECK-NEXT: Object-to-array cast produced [Hello, Swift, World]
+if let strArr = objOpt as NSString[] {
+  println("Object-to-array cast produced \(strArr)")
+} else {
+  println("Object-to-array cast failed")
+}
+
+// CHECK: Object-to-bridged-array cast failed due to bridge mismatch
+if let intArr = objOpt as Int[] {
+  println("Object-to-bridged-array cast should not have succedded")
+} else {
+  println("Object-to-bridged-array cast failed due to bridge mismatch")
+}
+
+// CHECK: Object-to-bridged-array cast failed due to nil
+objOpt = nil
+if let strArr = objOpt as String[] {
+  println("Cast from nil succeeded?")
+} else {
+  println("Object-to-bridged-array cast failed due to nil")
+}
+
+// Optional of object to array casts.
+// CHECK-NEXT: Object-to-bridged-array cast produced [Hello, Swift, World]
+objImplicitOpt = ["Hello", "Swift", "World"] as String[]
+if let strArr = objImplicitOpt as String[] {
+  println("Object-to-bridged-array cast produced \(strArr)")
+} else {
+  println("Object-to-bridged-array cast failed")
+}
+
+// CHECK-NEXT: Object-to-array cast produced [Hello, Swift, World]
+if let strArr = objImplicitOpt as NSString[] {
+  println("Object-to-array cast produced \(strArr)")
+} else {
+  println("Object-to-array cast failed")
+}
+
+// CHECK: Object-to-bridged-array cast failed due to bridge mismatch
+if let intArr = objImplicitOpt as Int[] {
+  println("Object-to-bridged-array cast should not have succedded")
+} else {
+  println("Object-to-bridged-array cast failed due to bridge mismatch")
+}
+
+// CHECK: Object-to-bridged-array cast failed due to nil
+objImplicitOpt = nil
+if let strArr = objImplicitOpt as String[] {
+  println("Cast from nil succeeded?")
+} else {
+  println("Object-to-bridged-array cast failed due to nil")
+}
+
 println("ok")  // CHECK: ok

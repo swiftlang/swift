@@ -403,6 +403,14 @@ ValueDecl *ApplyExpr::getCalledValue() const {
   return ::getCalledValue(Fn);
 }
 
+SourceRange CallExpr::getSourceRange() const {
+  SourceRange fnRange = getFn()->getSourceRange();
+  SourceRange argRange = getArg()->getSourceRange();
+  if (fnRange.isValid() && argRange.isValid())
+    return SourceRange(fnRange.Start, argRange.End);
+  return fnRange.isValid() ? fnRange : argRange;
+}
+
 RebindSelfInConstructorExpr::RebindSelfInConstructorExpr(Expr *SubExpr,
                                                          VarDecl *Self)
   : Expr(ExprKind::RebindSelfInConstructor, /*Implicit=*/true,

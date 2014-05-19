@@ -2544,29 +2544,67 @@ namespace {
       // accidentally rely on it below.
       expr = nullptr;
 
+      // Check whether we're casting from AnyObject to a bridged type
+      // of some sort.
+
       // Allow for casts from AnyObject to a bridged type.
       auto fromValueType = fromType->lookThroughAllAnyOptionalTypes();
       auto toValueType = toType->lookThroughAllAnyOptionalTypes();
       Type finalResultType = simplifyType(cast->getType());
-      Type coercedResultType;
-      if (castKind != CheckedCastKind::ArrayDowncast) {
-        if (auto bridgedType = tc.getDynamicBridgedThroughObjCClass(
-                                 cs.DC, fromValueType, toValueType)) {
-          // FIXME: multiple levels of optionality.
-          coercedResultType = finalResultType;
-          finalResultType = tc.getOptionalType(cast->getLoc(), bridgedType);
-        }
+      Type bridgedThroughClass;
+      if (castKind == CheckedCastKind::ArrayDowncast ||
+          !(bridgedThroughClass = tc.getDynamicBridgedThroughObjCClass(
+                                    cs.DC, fromValueType, toValueType))) {
+        // We're not casting through a bridged type, so finish up the
+        // optional bindings and we're done.
+        return handleOptionalBindings(cast, finalResultType);
       }
 
-      Expr *result = handleOptionalBindings(cast, finalResultType);
+      // Rebuild the class type we're bridging through with the
+      // optionals from the final result type (except the outermost).
+      Type intermediateResultType = bridgedThroughClass;
+      SmallVector<Type, 2> finalOptionals;
+      plumbOptionals(finalResultType, finalOptionals);
+      for (unsigned i = finalOptionals.size(); i > 1; --i) {
+        // Figure out the kind of this optional.
+        OptionalTypeKind kind;
+        finalOptionals[i-1]->getAnyOptionalObjectType(kind);
+        
+        intermediateResultType = OptionalType::get(kind,intermediateResultType);
+      }
+
+      // Form a cast to the intermediate result type, which is the
+      // class through which we are bridging.
+      cast->getCastTypeLoc().setType(intermediateResultType,/*validated=*/true);
+      toType = OptionalType::get(intermediateResultType);
+      auto result = handleOptionalBindings(cast, toType);
       if (!result)
         return nullptr;
 
-      if (coercedResultType) {
-        bool failed = tc.convertToType(result, coercedResultType, cs.DC);
-        assert(!failed && "Not convertible?");
-      }
-      return result;
+      // Bind the optional produced by the checked cast.
+      result = new (tc.Context) BindOptionalExpr(result, SourceLoc(),
+                                                 /*depth=*/0, 
+                                                 intermediateResultType);
+
+      // Form a call to the bridgeFromObjectiveC witness.
+      auto bridgedProto
+        = tc.Context.getProtocol(KnownProtocolKind::_BridgedToObjectiveC);
+      ProtocolConformance *conformance = nullptr;
+      bool conforms = tc.conformsToProtocol(toValueType, bridgedProto, cs.DC,
+                                            &conformance);
+      assert(conforms && "Should already have checked the conformance");
+      (void)conforms;
+      Expr *toValueMetatype = TypeExpr::createImplicit(toValueType, tc.Context);
+      Expr *args[1] = { result };
+      result = tc.callWitness(toValueMetatype, cs.DC, bridgedProto, 
+                              conformance, 
+                              tc.Context.getIdentifier("bridgeFromObjectiveC"),
+                              args, diag::broken_bridged_to_objc_protocol);
+      if (!result)
+        return result;
+
+      // Wrap up the optional evaluation and we're done.
+      return new (tc.Context) OptionalEvaluationExpr(result, finalResultType);
     }
 
     Expr *visitCoerceExpr(CoerceExpr *expr) {

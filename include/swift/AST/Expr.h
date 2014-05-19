@@ -2792,9 +2792,7 @@ public:
   CallExpr(Expr *fn, Expr *arg, bool Implicit, Type ty = Type())
     : ApplyExpr(ExprKind::Call, fn, arg, Implicit, ty) {}
 
-  SourceRange getSourceRange() const {
-    return SourceRange(getFn()->getStartLoc(), getArg()->getEndLoc()); 
-  }
+  SourceRange getSourceRange() const;
   
   SourceLoc getLoc() const { return getFn()->getLoc(); }
   
