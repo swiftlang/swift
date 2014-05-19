@@ -1314,7 +1314,8 @@ public:
     addTypeAnnotation(Builder, AFT->getResult());
   }
 
-  void addFunctionCallPattern(const AbstractFunctionDecl *AFD, const AnyFunctionType *AFT) {
+  void addFunctionCallPattern(const AbstractFunctionDecl *AFD,
+                              const AnyFunctionType *AFT) {
     foundFunction(AFT);
     CodeCompletionResultBuilder Builder(
       Sink,
@@ -1759,7 +1760,7 @@ public:
     }
   }
 
-  bool tryFunctionCallCompletions(Type ExprType, ValueDecl *VD) {
+  bool tryFunctionCallCompletions(Type ExprType, const ValueDecl *VD) {
     ExprType = ExprType->getRValueType();
     if (auto AFT = ExprType->getAs<AnyFunctionType>()) {
       if (auto *AFD = dyn_cast_or_null<AbstractFunctionDecl>(VD)) {
