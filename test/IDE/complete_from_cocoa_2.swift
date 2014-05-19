@@ -17,8 +17,8 @@ import Cocoa
 func testQualifiedWithDot() {
   Cocoa.#^T1^#
 // T1: Begin completions
-// T1-DAG: Decl[FreeFunction]/OtherModule: CFArrayCreate({#CFAllocator?#}, {#CMutablePointer<COpaquePointer>#}, {#CFIndex#}, {#CConstPointer<CFArrayCallBacks>#})[#CFArray!#]{{$}}
-// T1-DAG: Decl[FreeFunction]/OtherModule: CFArrayGetCount({#CFArray?#})[#CFIndex#]{{$}}
+// T1-DAG: Decl[FreeFunction]/OtherModule: CFArrayCreate({#(allocator): CFAllocator?#}, {#(values): CMutablePointer<COpaquePointer>#}, {#(numValues): CFIndex#}, {#(callBacks): CConstPointer<CFArrayCallBacks>#})[#CFArray!#]{{$}}
+// T1-DAG: Decl[FreeFunction]/OtherModule: CFArrayGetCount({#(theArray): CFArray?#})[#CFIndex#]{{$}}
 // T1-DAG: Decl[Class]/OtherModule:        NSObject[#NSObject#]{{$}}
 // T1: End completions
 }
@@ -26,8 +26,8 @@ func testQualifiedWithDot() {
 func testQualifiedWithoutDot() {
   Cocoa#^T2^#
 // T2: Begin completions
-// T2-DAG: Decl[FreeFunction]/OtherModule: .CFArrayCreate({#CFAllocator?#}, {#CMutablePointer<COpaquePointer>#}, {#CFIndex#}, {#CConstPointer<CFArrayCallBacks>#})[#CFArray!#]{{$}}
-// T2-DAG: Decl[FreeFunction]/OtherModule: .CFArrayGetCount({#CFArray?#})[#CFIndex#]{{$}}
+// T2-DAG: Decl[FreeFunction]/OtherModule: .CFArrayCreate({#(allocator): CFAllocator?#}, {#(values): CMutablePointer<COpaquePointer>#}, {#(numValues): CFIndex#}, {#(callBacks): CConstPointer<CFArrayCallBacks>#})[#CFArray!#]{{$}}
+// T2-DAG: Decl[FreeFunction]/OtherModule: .CFArrayGetCount({#(theArray): CFArray?#})[#CFIndex#]{{$}}
 // T2-DAG: Decl[Class]/OtherModule:        .NSObject[#NSObject#]{{$}}
 // T2: End completions
 }
