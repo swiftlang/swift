@@ -1595,12 +1595,12 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
     llvm_unreachable("bad extension member kind");
   }
   
-  // If the original class is ObjC, or the extension either introduces a
-  // conformance to an ObjC protocol or introduces a method that requires an
-  // Objective-C entry point, generate a category.
+  // Generate a category if the extension either introduces a
+  // conformance to an ObjC protocol or introduces a method
+  // that requires an Objective-C entry point.
   if (!origClass)
     return;
-  bool needsCategory = origClass->isObjC();
+  bool needsCategory = false;
   if (!needsCategory) {
     for (unsigned i = 0, size = ext->getProtocols().size(); i < size; ++i)
       if (protocolExtensionRequiresCategory(ext->getProtocols()[i],
