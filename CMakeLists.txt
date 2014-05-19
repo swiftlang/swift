@@ -972,6 +972,9 @@ if (SWIFT_INCLUDE_DOCS)
   add_subdirectory(docs)
 endif()
 
+  add_subdirectory(benchmark)
+endif()
+
 # Add a documentation target so that documentation shows up in the
 # Xcode project.
 if(XCODE)
