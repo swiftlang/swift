@@ -276,7 +276,10 @@ void swift::swift_release(HeapObject *object) {
 }
 static void _swift_release_(HeapObject *object) {
   if (object && (__sync_sub_and_fetch(&object->refCount, RC_INTERVAL) == 0)) {
-    _swift_release_slow(object);
+    if (__sync_bool_compare_and_swap(&object->refCount,
+                                     0, RC_DEALLOCATING_BIT)) {
+      _swift_release_slow(object);
+    }
   }
 }
 auto swift::_swift_release = _swift_release_;
@@ -355,7 +358,7 @@ void _swift_release_slow(HeapObject *object) {
 
 void swift::swift_deallocObject(HeapObject *object, size_t allocatedSize,
                                 size_t allocatedAlignMask) {
-  assert(object->refCount == RC_INTERVAL);
+  assert(object->refCount == (RC_INTERVAL|RC_DEALLOCATING_BIT));
 #ifdef SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS
   memset_pattern8((uint8_t *)object + sizeof(HeapObject),
                   "\xAB\xAD\x1D\xEA\xF4\xEE\xD0\bB9",
