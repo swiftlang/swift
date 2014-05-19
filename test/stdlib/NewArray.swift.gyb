@@ -437,6 +437,14 @@ testSingleElementModifiers${A}()
 %end
 
 //===--- Regression Tests -------------------------------------------------===//
+func rdar16958865() {
+  var a: Int[] = []
+  a += SequenceOf([ 42, 4242 ])
+  // CHECK-NEXT: [42, 4242]
+  println(a)
+}
+rdar16958865()
+
 import SpriteKit
 
 class Rdar16914909 : NSObject {

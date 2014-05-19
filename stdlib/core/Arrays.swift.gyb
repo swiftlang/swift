@@ -640,7 +640,7 @@ func _arrayReserve<_Buffer: ArrayBufferType>(
   var newBuffer = _demandUniqueMutableBuffer(
     &buffer, oldCount, minimumCapacity: minimumCapacity)
   if _slowPath(newBuffer) {
-    _arrayOutOfPlaceUpdate(&buffer, &newBuffer, oldCount, 1, _IgnorePointer())
+    _arrayOutOfPlaceUpdate(&buffer, &newBuffer, oldCount, 0, _IgnorePointer())
   }
 }
 
