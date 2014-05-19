@@ -81,7 +81,8 @@ def help_hidden : Flag<["-", "--"], "help-hidden">,
 
 def v : Flag<["-"], "v">,
   HelpText<"Show commands to run and use verbose output">;
-def version : Flag<["-", "--"], "version">;
+def version : Flag<["-", "--"], "version">,
+  HelpText<"Print version information and exit">;
 
 // Standard Options
 def _DASH_DASH : Option<["--"], "", KIND_REMAINING_ARGS>,
