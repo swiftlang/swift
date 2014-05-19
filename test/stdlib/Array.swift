@@ -86,5 +86,12 @@ func testFilter() {
 }
 testFilter()
 
+func testReverse() {
+  let a = Array(7..12)
+  println(a.reverse())
+  // CHECK-NEXT: [11, 10, 9, 8, 7]
+}
+testReverse()
+
 println("done!") // CHECK-NEXT: {{^done!$}}
 

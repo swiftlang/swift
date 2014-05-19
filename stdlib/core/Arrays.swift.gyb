@@ -224,21 +224,18 @@ extension ${Self} : ArrayType {
     quickSort(&mutableSelf, indices(self), isOrderedBefore)
   }
 
+  /// Return a ${Self} containing the results of calling
+  /// `transform(x)` on each element `x` of `self`
   func map<U>(transform: (T)->U) -> ${Self}<U> {
-    var result = ${Self}<U>()
-
-    let count = self.count
-    result.reserveCapacity(count)
-    var p = result._buffer.elementStorage
-    for i in 0..count {
-      p++.initialize( transform(self[i]) )
-    }
-    result._buffer.count = count
-    
-    return result
+    return ${Self}<U>(Swift.map(self, transform))
   }
 
-  /// Return a ${Self} containg the elements `x` of `self` for which
+  /// A ${Self} containing the elements of `self` in reverse order
+  func reverse() -> ${Self} {
+    return ${Self}(Swift.reverse(self))
+  }
+
+  /// Return a ${Self} containing the elements `x` of `self` for which
   /// `includeElement(x)` is `true`
   func filter(includeElement: (T)->Bool) -> ${Self} {
     return ${Self}(Swift.filter(self, includeElement))
