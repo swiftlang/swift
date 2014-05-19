@@ -1328,9 +1328,14 @@ class ParallelArrayDictionary : NSDictionary {
   }
 }
 
-func getParallelArrayBridgedDictionary() -> Dictionary<NSObject, AnyObject> {
+func getParallelArrayBridgedVerbatimDictionary() -> Dictionary<NSObject, AnyObject> {
   var nsd: NSDictionary = ParallelArrayDictionary()
   return _convertNSDictionaryToDictionary(nsd)
+}
+
+func getParallelArrayBridgedNonverbatimDictionary() -> Dictionary<TestBridgedKeyTy, TestBridgedValueTy> {
+  var nsd: NSDictionary = ParallelArrayDictionary()
+  return Dictionary(_cocoaDictionary: reinterpretCast(nsd))
 }
 
 func test_BridgedFromObjC_Verbatim_IndexForKey() {
@@ -2042,8 +2047,8 @@ test_BridgedFromObjC_Nonverbatim_Generate_Huge()
 assert(objcKeyCount == 0, "key leak")
 assert(objcValueCount == 0, "value leak")
 
-func test_BridgedFromObjC_Generate_ParallelArray() {
-  var d = getParallelArrayBridgedDictionary()
+func test_BridgedFromObjC_Verbatim_Generate_ParallelArray() {
+  var d = getParallelArrayBridgedVerbatimDictionary()
   var identity1: Word = reinterpretCast(d)
   assert(isCocoaDictionary(d))
 
@@ -2061,10 +2066,34 @@ func test_BridgedFromObjC_Generate_ParallelArray() {
   assert(!gen.next())
   assert(identity1 == reinterpretCast(d))
 
-  println("test_BridgedFromObjC_Generate_ParallelArray done")
+  println("test_BridgedFromObjC_Verbatim_Generate_ParallelArray done")
 }
-test_BridgedFromObjC_Generate_ParallelArray()
-// CHECK: test_BridgedFromObjC_Generate_ParallelArray done
+test_BridgedFromObjC_Verbatim_Generate_ParallelArray()
+// CHECK: test_BridgedFromObjC_Verbatim_Generate_ParallelArray done
+
+func test_BridgedFromObjC_Nonverbatim_Generate_ParallelArray() {
+  var d = getParallelArrayBridgedNonverbatimDictionary()
+  var identity1: Word = reinterpretCast(d)
+  assert(isCocoaDictionary(d))
+
+  var gen = d.generate()
+  var pairs = Array<(Int, Int)>()
+  while let (key, value) = gen.next() {
+    pairs += (key.value, value.value)
+  }
+  var expectedPairs = [ (10, 1111), (20, 1111), (30, 1111), (40, 1111) ]
+  assert(equalsUnordered(pairs, expectedPairs))
+  // The following is not required by the Generator protocol, but
+  // it is a nice QoI.
+  assert(!gen.next())
+  assert(!gen.next())
+  assert(!gen.next())
+  assert(identity1 == reinterpretCast(d))
+
+  println("test_BridgedFromObjC_Nonverbatim_Generate_ParallelArray done")
+}
+test_BridgedFromObjC_Nonverbatim_Generate_ParallelArray()
+// CHECK: test_BridgedFromObjC_Nonverbatim_Generate_ParallelArray done
 
 assert(objcKeyCount == 0, "key leak")
 assert(objcValueCount == 0, "value leak")
