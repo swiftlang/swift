@@ -2388,6 +2388,9 @@ namespace {
         return nullptr;
       expr->setSubExpr(sub);
 
+      auto locator = cs.getConstraintLocator(expr,
+                                        ConstraintLocator::CheckedCastOperand);
+
       auto fromType = sub->getType();
       auto castKind = tc.typeCheckCheckedCast(
                         fromType, toType, cs.DC,
@@ -2438,8 +2441,7 @@ namespace {
         // Look through implicitly unwrapped optionals.
         if (auto objTy 
               = cs.lookThroughImplicitlyUnwrappedOptionalType(sub->getType())) {
-          sub = coerceImplicitlyUnwrappedOptionalToValue(
-                  sub, objTy, cs.getConstraintLocator(expr, { }, 0));
+          sub = coerceImplicitlyUnwrappedOptionalToValue(sub, objTy, locator);
           if (!sub) return nullptr;
         }
 

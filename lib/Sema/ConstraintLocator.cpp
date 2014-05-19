@@ -108,6 +108,10 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
       out << "assignment source";
       break;
         
+    case CheckedCastOperand:
+      out << "checked cast operand";
+      break;
+
     case ClosureResult:
       out << "closure result";
       break;

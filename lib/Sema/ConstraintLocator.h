@@ -133,7 +133,9 @@ public:
     /// \brief The array element type of a 'new' expression.
     NewArrayElement,
     /// \brief The constructor for an array 'new' expression.
-    NewArrayConstructor
+    NewArrayConstructor,
+    /// \brief The operand of a checked cast.
+    CheckedCastOperand,
   };
 
   /// \brief Determine the number of numeric values used for the given path
@@ -173,6 +175,7 @@ public:
     case AssignDest:
     case NewArrayElement:
     case NewArrayConstructor:
+    case CheckedCastOperand:
       return 0;
 
     case GenericArgument:
@@ -212,6 +215,7 @@ public:
     case ApplyFunction:
     case ApplyArgToParam:
     case ArrayElementType:
+    case CheckedCastOperand:
     case ClosureResult:
     case ConstructorMember:
     case ConversionMember:

@@ -1220,7 +1220,8 @@ namespace {
       expr->getCastTypeLoc().setType(toType, /*validated=*/true);
 
       // Create a type variable to describe the result.
-      auto locator = CS.getConstraintLocator(expr);
+      auto locator = CS.getConstraintLocator(expr,
+                                     ConstraintLocator::CheckedCastOperand);
       auto typeVar = CS.createTypeVariable(locator, /*options=*/0);
 
       // Form the constraints for the implicit conversion case.
