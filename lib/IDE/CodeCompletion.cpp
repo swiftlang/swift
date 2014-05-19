@@ -2376,42 +2376,40 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     auto &Request = Lookup.RequestedCachedResults.getValue();
 
     llvm::DenseSet<CodeCompletionCacheImpl::Key> ImportsSeen;
-    auto handleImport = [&](Module::ImportedModule Import) -> bool {
+    auto handleImport = [&](Module::ImportedModule Import) {
       Module *TheModule = Import.second;
       Module::AccessPathTy Path = Import.first;
       if (TheModule->getFiles().empty())
-        return false; // abort visitation.
+        return;
 
       // Clang submodules are ignored and there's no lookup cost involved,
       // so just ignore them and don't put the empty results in the cache
       // because putting a lot of objects in the cache will push out
       // other lookups.
       if (isClangSubModule(TheModule))
-        return true;
+        return;
 
       std::vector<std::string> AccessPath;
       for (auto Piece : Path) {
         AccessPath.push_back(Piece.first.str());
       }
 
+      StringRef ModuleFilename = TheModule->getModuleFilename();
       // ModuleFilename can be empty if something strange happened during
       // module loading, for example, the module file is corrupted.
-      StringRef ModuleFilename = TheModule->getModuleFilename();
-      if (ModuleFilename.empty())
-        return false; // abort visitation.
+      if (!ModuleFilename.empty()) {
+        CodeCompletionCacheImpl::Key K{ModuleFilename,
+                                       TheModule->Name.str(),
+                                       AccessPath, Request.NeedLeadingDot};
+        std::pair<decltype(ImportsSeen)::iterator, bool>
+        Result = ImportsSeen.insert(K);
+        if (!Result.second)
+          return; // already handled.
 
-      CodeCompletionCacheImpl::Key K{ModuleFilename,
-                                     TheModule->Name.str(),
-                                     AccessPath, Request.NeedLeadingDot};
-      std::pair<decltype(ImportsSeen)::iterator, bool>
-      Result = ImportsSeen.insert(K);
-      if (!Result.second)
-        return false; // already handled, abort visitation.
-
-      CompletionContext.Cache.Impl->getResults(
-          K, CompletionContext.getResultSink(), Request.OnlyTypes,
-          TheModule, FillCacheCallback);
-      return true;
+        CompletionContext.Cache.Impl->getResults(
+            K, CompletionContext.getResultSink(), Request.OnlyTypes,
+            TheModule, FillCacheCallback);
+      }
     };
 
     if (Request.TheModule) {
