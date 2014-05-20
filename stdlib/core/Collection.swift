@@ -59,6 +59,15 @@ func ~> <T: _Collection>(x:T,_:(_UnderestimateCount,())) -> Int {
   return numericCast(x~>_countElements())
 }
 
+// Default implementation of `preprocessingPass` for Collections.  Do not
+// use this operator directly; call `_preprocessingPass(s)` instead
+func ~> <T: _Collection, R>(
+  s: T, args: (_PreprocessingPass, ( (T)->R ))
+) -> R? {
+  return args.1(s)
+}
+
+
 protocol MutableCollection : Collection {
   subscript(i: IndexType) -> GeneratorType.Element {get set}
 }

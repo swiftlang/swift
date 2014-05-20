@@ -63,9 +63,13 @@ protocol _Sequence_ : _Sequence {
 protocol Sequence : _Sequence_ {
   typealias GeneratorType : Generator
   func generate() -> GeneratorType
-  
+
   func ~> (_:Self,_:(_UnderestimateCount,())) -> Int
-  
+
+  /// If `self` is multi-pass (i.e., a `Collection`), invoke the function
+  /// on `self` and return its result.  Otherwise, return `nil`.
+  func ~> <R>(_: Self, _: (_PreprocessingPass, ((Self)->R))) -> R?
+
   func ~>(
     _:Self, _: (_CopyToNativeArrayBuffer, ())
   ) -> ContiguousArrayBuffer<Self.GeneratorType.Element>
@@ -96,6 +100,20 @@ func ~> <T: _Sequence>(s: T,_:(_UnderestimateCount, ())) -> Int {
 /// actually Collections, this will return countElements(x)
 func underestimateCount<T: Sequence>(x: T) -> Int {
   return x~>_underestimateCount()
+}
+
+// Operation tags for preprocessingPass.  See Index.swift for an
+// explanation of operation tags.
+struct _PreprocessingPass {}
+
+// Default implementation of `_preprocessingPass` for Sequences.  Do not
+// use this operator directly; call `_preprocessingPass(s)` instead
+func ~> <T : _Sequence, R>(s: T, _: (_PreprocessingPass, ( (T)->R ))) -> R? {
+  return nil
+}
+
+func _preprocessingPass<Args>(args: Args) -> (_PreprocessingPass, Args) {
+  return (_PreprocessingPass(), args)
 }
 
 // Pending <rdar://problem/14011860> and <rdar://problem/14396120>,

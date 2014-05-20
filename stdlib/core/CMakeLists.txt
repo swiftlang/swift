@@ -46,6 +46,7 @@ set(SWIFTLIB_ESSENTIAL
   ImplicitlyUnwrappedOptional.swift
   Index.swift
   IntegerArithmetic.swift.gyb
+  Join.swift
   LifetimeManager.swift
   LogicValue.swift
   Map.swift

@@ -1,0 +1,425 @@
+// RUN: rm -rf %t && mkdir -p %t && %S/../../utils/gyb %s -o %t/Join.swift
+// RUN: %S/../../utils/line-directive %t/Join.swift -- %target-build-swift -module-cache-path %t/clang-module-cache %t/Join.swift -o %t/a.out
+// RUN: %target-run %t/a.out | %S/../../utils/line-directive %t/Join.swift -- FileCheck %t/Join.swift
+
+%for EquatableArrayType in ['ContiguousArray', 'Slice', 'Array']:
+
+func expectEqual<T : Equatable>(
+    expected: ${EquatableArrayType}<T>, actual: ${EquatableArrayType}<T>,
+    file: String = __FILE__, line: UWord = __LINE__
+) {
+  if expected != actual {
+    println("check failed at \(file), line \(line)")
+    println("expected: \"\(expected)\"")
+    println("actual: \"\(actual)\"")
+    println()
+  }
+}
+
+%end
+
+%for EquatableType in ['String', 'Int']:
+
+func expectEqual(
+    expected: ${EquatableType}, actual: ${EquatableType},
+    file: String = __FILE__, line: UWord = __LINE__
+) {
+  if expected != actual {
+    println("check failed at \(file), line \(line)")
+    println("expected: \"\(expected)\"")
+    println("actual: \"\(actual)\"")
+    println()
+  }
+}
+
+%end
+
+func expectEmpty<T>(
+    value: Optional<T>,
+    file: String = __FILE__, line: UWord = __LINE__
+) {
+  if value {
+    println("check failed at \(file), line \(line)")
+    println("expected optional to be empty")
+    println("actual: \"\(value)\"")
+    println()
+  }
+}
+
+func expectNotEmpty<T>(
+    value: Optional<T>,
+    file: String = __FILE__, line: UWord = __LINE__
+) {
+  if !value {
+    println("check failed at \(file), line \(line)")
+    println("expected optional to be non-empty")
+    println()
+  }
+}
+
+// Slice tests disabled because of:
+// <rdar://problem/16971593> Creating an empty Slice<Int> crashes
+//
+// for ArrayType in ['ContiguousArray', 'Slice', 'Array']:
+
+%for ArrayType in ['ContiguousArray', 'Array']:
+
+func testJoin${ArrayType}() {
+  typealias ArrayType = ${ArrayType}<Int>
+
+  // Empty separator.
+  if true {
+    let separator: ArrayType = []
+    if true {
+      let r = join(separator, [])
+      expectEqual([], r)
+    }
+    if true {
+      let seq: ArrayType[] = [[]]
+      let r = join(separator, seq)
+      expectEqual([], r)
+    }
+    if true {
+      let seq: ArrayType[] = [[], []]
+      let r = join(separator, seq)
+      expectEqual([], r)
+    }
+    if true {
+      let seq: ArrayType[] = [[], [], []]
+      let r = join(separator, seq)
+      expectEqual([], r)
+    }
+    if true {
+      let seq: ArrayType[] = [[ 1 ]]
+      let r = join(separator, seq)
+      expectEqual([ 1 ], r)
+    }
+    if true {
+      let seq: ArrayType[] = [[ 1 ], [ 2 ]]
+      let r = join(separator, seq)
+      expectEqual([ 1, 2 ], r)
+    }
+    if true {
+      let seq: ArrayType[] = [[ 1 ], [ 2 ], [ 3 ]]
+      let r = join(separator, seq)
+      expectEqual([ 1, 2, 3 ], r)
+    }
+    if true {
+      let seq: ArrayType[] = [[ 1, 2 ], [ 3, 4 ], [ 5, 6 ]]
+      let r = join(separator, seq)
+      expectEqual([ 1, 2, 3, 4, 5, 6 ], r)
+    }
+  }
+
+  // 1-element separator.
+  if true {
+    let separator: ArrayType = [ 42 ]
+    if true {
+      let seq: ArrayType[] = []
+      let r = join(separator, seq)
+      expectEqual([], r)
+    }
+    if true {
+      let seq: ArrayType[] = [[]]
+      let r = join(separator, seq)
+      expectEqual([], r)
+    }
+    if true {
+      let seq: ArrayType[] = [[], []]
+      let r = join(separator, seq)
+      expectEqual([ 42 ], r)
+    }
+    if true {
+      let seq: ArrayType[] = [[], [], []]
+      let r = join(separator, seq)
+      expectEqual([ 42, 42 ], r)
+    }
+    if true {
+      let seq: ArrayType[] = [[ 1 ]]
+      let r = join(separator, seq)
+      expectEqual([ 1 ], r)
+    }
+    if true {
+      let seq: ArrayType[] = [[ 1 ], [ 2 ]]
+      let r = join(separator, seq)
+      expectEqual([ 1, 42, 2 ], r)
+    }
+    if true {
+      let seq: ArrayType[] = [[ 1 ], [ 2 ], [ 3 ]]
+      let r = join(separator, seq)
+      expectEqual([ 1, 42, 2, 42, 3 ], r)
+    }
+    if true {
+      let seq: ArrayType[] = [[ 1, 2 ], [ 3, 4 ], [ 5, 6 ]]
+      let r = join(separator, seq)
+      expectEqual([ 1, 2, 42, 3, 4, 42, 5, 6 ], r)
+    }
+  }
+
+  // 2-element separator.
+  if true {
+    let separator: ArrayType = [ 42, 4242 ]
+    if true {
+      let seq: ArrayType[] = []
+      let r = join(separator, seq)
+      expectEqual([], r)
+    }
+    if true {
+      let seq: ArrayType[] = [[]]
+      let r = join(separator, seq)
+      expectEqual([], r)
+    }
+    if true {
+      let seq: ArrayType[] = [[], []]
+      let r = join(separator, seq)
+      expectEqual([ 42, 4242 ], r)
+    }
+    if true {
+      let seq: ArrayType[] = [[], [], []]
+      let r = join(separator, seq)
+      expectEqual([ 42, 4242, 42, 4242 ], r)
+    }
+    if true {
+      let seq: ArrayType[] = [[ 1 ]]
+      let r = join(separator, seq)
+      expectEqual([ 1 ], r)
+    }
+    if true {
+      let seq: ArrayType[] = [[ 1 ], [ 2 ]]
+      let r = join(separator, seq)
+      expectEqual([ 1, 42, 4242, 2 ], r)
+    }
+    if true {
+      let seq: ArrayType[] = [[ 1 ], [ 2 ], [ 3 ]]
+      let r = join(separator, seq)
+      expectEqual([ 1, 42, 4242, 2, 42, 4242, 3 ], r)
+    }
+    if true {
+      let seq: ArrayType[] = [[ 1, 2 ], [ 3, 4 ], [ 5, 6 ]]
+      let r = join(separator, seq)
+      expectEqual([ 1, 2, 42, 4242, 3, 4, 42, 4242, 5, 6 ], r)
+    }
+  }
+
+  println("testJoin${ArrayType} done")
+}
+// CHECK: testJoin${ArrayType} done
+testJoin${ArrayType}()
+
+%end
+
+func testJoinString() {
+  // Empty separator.
+  expectEqual("",    join("", []))
+  expectEqual("",    join("", [""]))
+  expectEqual("",    join("", ["", ""]))
+  expectEqual("",    join("", ["", "", ""]))
+  expectEqual("a",   join("", ["a"]))
+  expectEqual("ab",  join("", ["a", "b"]))
+  expectEqual("abc", join("", ["a", "b", "c"]))
+  expectEqual("abcdef", join("", ["ab", "cd", "ef"]))
+
+  // 1-element separator.
+  expectEqual("",      join("x", [""]))
+  expectEqual("x",     join("x", ["", ""]))
+  expectEqual("xx",    join("x", ["", "", ""]))
+  expectEqual("a",     join("x", ["a"]))
+  expectEqual("axb",   join("x", ["a", "b"]))
+  expectEqual("axbxc", join("x", ["a", "b", "c"]))
+  expectEqual("abxcdxef", join("x", ["ab", "cd", "ef"]))
+
+  // 2-element separator.
+  expectEqual("",        join("xy", [""]))
+  expectEqual("xy",      join("xy", ["", ""]))
+  expectEqual("xyxy",    join("xy", ["", "", ""]))
+  expectEqual("a",       join("xy", ["a"]))
+  expectEqual("axyb",    join("xy", ["a", "b"]))
+  expectEqual("axybxyc", join("xy", ["a", "b", "c"]))
+  expectEqual("abxycdxyef", join("xy", ["ab", "cd", "ef"]))
+
+  println("testJoinString done")
+}
+// CHECK: testJoinString done
+testJoinString()
+
+struct MockExtensibleCollection : ExtensibleCollection {
+  init() {}
+  init(_ a: Array<Int>) {
+    _storage = a
+    _reservedCapacity = a.count
+  }
+
+  func generate() -> Array<Int>.GeneratorType {
+    return _storage.generate()
+  }
+
+  var startIndex: Array<Int>.IndexType {
+    return _storage.startIndex
+  }
+
+  var endIndex: Array<Int>.IndexType {
+    return _storage.endIndex
+  }
+
+  subscript(i: Array<Int>.IndexType) -> Int {
+    return _storage[i]
+  }
+
+  mutating func reserveCapacity(n: Int) {
+    expectEmpty(_reservedCapacity)
+    _reservedCapacity = n
+  }
+
+  mutating func extend<
+    S : Sequence
+    where S.GeneratorType.Element == Int
+  >(seq: S) {
+    expectNotEmpty(_reservedCapacity)
+    _storage += seq
+  }
+
+  var _storage: Array<Int> = []
+  var _reservedCapacity: Int? = .None
+}
+
+func testJoinReservesCapacity() {
+  if true {
+    let r = join(MockExtensibleCollection([]), [])
+    expectEqual(0, r._reservedCapacity!)
+  }
+  if true {
+    let r = join(MockExtensibleCollection([ 42 ]),
+        [ MockExtensibleCollection([]) ])
+    expectEqual(0, r._reservedCapacity!)
+  }
+
+  if true {
+    let r = join(MockExtensibleCollection([ 42 ]),
+        [ MockExtensibleCollection([ 1 ]),
+          MockExtensibleCollection([ 2, 3, 4 ]),
+          MockExtensibleCollection([ 5, 6, 7 ]) ])
+    expectEqual(9, r._reservedCapacity!)
+    expectEqual([ 1, 42, 2, 3, 4, 42, 5, 6, 7 ], r._storage)
+  }
+  if true {
+    let r = join(MockExtensibleCollection([ 42, 4242 ]),
+        [ MockExtensibleCollection([ 1 ]),
+          MockExtensibleCollection([ 2, 3, 4 ]),
+          MockExtensibleCollection([ 5, 6, 7 ]) ])
+    expectEqual(11, r._reservedCapacity!)
+    expectEqual([ 1, 42, 4242, 2, 3, 4, 42, 4242, 5, 6, 7 ], r._storage)
+  }
+
+  println("testJoinReservesCapacity done")
+}
+// CHECK: testJoinReservesCapacity done
+testJoinReservesCapacity()
+
+struct MinimalCollection : Collection {
+  init(_ a: Array<Int>) {
+    _storage = a
+  }
+
+  func generate() -> Array<Int>.GeneratorType {
+    return _storage.generate()
+  }
+
+  var startIndex: Array<Int>.IndexType {
+    return _storage.startIndex
+  }
+
+  var endIndex: Array<Int>.IndexType {
+    return _storage.endIndex
+  }
+
+  subscript(i: Array<Int>.IndexType) -> Int {
+    return _storage[i]
+  }
+
+  var _storage: Array<Int> = []
+}
+
+func testJoinOperatorPlus() {
+  // ExtensibleCollection + Sequence
+  if true {
+    var ec: Int[] = []
+    var s = SequenceOf(Int[]())
+    var r: Int[] = ec + s
+    expectEqual([], r)
+  }
+  if true {
+    var ec: Int[] = []
+    var s = SequenceOf([ 4, 5, 6, 7 ])
+    var r: Int[] = ec + s
+    expectEqual([ 4, 5, 6, 7 ], r)
+  }
+  if true {
+    var ec: Int[] = [ 1, 2, 3 ]
+    var s = SequenceOf(Int[]())
+    var r: Int[] = ec + s
+    expectEqual([ 1, 2, 3 ], r)
+  }
+  if true {
+    var ec: Int[] = [ 1, 2, 3 ]
+    var s = SequenceOf([ 4, 5, 6, 7 ])
+    var r: Int[] = ec + s
+    expectEqual([ 1, 2, 3, 4, 5, 6, 7 ], r)
+  }
+
+  // Sequence + ExtensibleCollection
+  if true {
+    var s = SequenceOf(Int[]())
+    var ec: Int[] = []
+    var r: Int[] = s + ec
+    expectEqual([], r)
+  }
+  if true {
+    var s = SequenceOf(Int[]())
+    var ec: Int[] = [ 4, 5, 6, 7 ]
+    var r: Int[] = s + ec
+    expectEqual([ 4, 5, 6, 7 ], r)
+  }
+  if true {
+    var s = SequenceOf([ 1, 2, 3 ])
+    var ec: Int[] = []
+    var r: Int[] = s + ec
+    expectEqual([ 1, 2, 3 ], r)
+  }
+  if true {
+    var s = SequenceOf([ 1, 2, 3 ])
+    var ec: Int[] = [ 4, 5, 6, 7]
+    var r: Int[] = s + ec
+    expectEqual([ 1, 2, 3, 4, 5, 6, 7 ], r)
+  }
+
+  // ExtensibleCollection + Collection
+  if true {
+    var ec: Int[] = []
+    var c = MinimalCollection(Int[]())
+    var r: Int[] = ec + c
+    expectEqual([], r)
+  }
+  if true {
+    var ec: Int[] = []
+    var c = MinimalCollection([ 4, 5, 6, 7 ])
+    var r: Int[] = ec + c
+    expectEqual([ 4, 5, 6, 7 ], r)
+  }
+  if true {
+    var ec: Int[] = [ 1, 2, 3 ]
+    var c = MinimalCollection(Int[]())
+    var r: Int[] = ec + c
+    expectEqual([ 1, 2, 3 ], r)
+  }
+  if true {
+    var ec: Int[] = [ 1, 2, 3 ]
+    var c = MinimalCollection([ 4, 5, 6, 7 ])
+    var r: Int[] = ec + c
+    expectEqual([ 1, 2, 3, 4, 5, 6, 7 ], r)
+  }
+
+  println("testJoinOperatorPlus done")
+}
+// CHECK: testJoinOperatorPlus done
+testJoinOperatorPlus()
+
