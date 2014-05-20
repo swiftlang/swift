@@ -243,9 +243,6 @@ struct CMutablePointer<T> : Equatable {
     // TODO: Putting a canary at the end of the array in checked builds might
     // be a good idea
 
-    // The callee that receives the pointer may mutate through it, so
-    // force uniqueness by calling reserve(0).
-    a.reserveCapacity(0)
     return CMutablePointer(
       owner: a._owner,
       value: a._elementStorageIfContiguous.value)
