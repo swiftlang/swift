@@ -1186,9 +1186,9 @@ void PrintAST::visitEnumElementDecl(EnumElementDecl *decl) {
 }
 
 void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
-  recordDeclLoc(decl);
   printAttributes(decl);
   printOverrideKeyword(decl);
+  recordDeclLoc(decl);
   Printer << "subscript ";
   printPattern(decl->getIndices());
   Printer << " -> ";
@@ -1199,13 +1199,13 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
 
 void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
   printDocumentationComment(decl);
-  recordDeclLoc(decl);
   printAttributes(decl);
 
   if (decl->getInitKind() == CtorInitializerKind::Convenience ||
       decl->getInitKind() == CtorInitializerKind::ConvenienceFactory)
     Printer << "convenience ";
   
+  recordDeclLoc(decl);
   Printer << "init";
   if (decl->isGeneric())
     printGenericParams(decl->getGenericParams());
@@ -1226,8 +1226,8 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
 
 void PrintAST::visitDestructorDecl(DestructorDecl *decl) {
   printDocumentationComment(decl);
-  recordDeclLoc(decl);
   printAttributes(decl);
+  recordDeclLoc(decl);
   Printer << "deinit ";
 
   if (!Options.FunctionDefinitions || !decl->getBody()) {
@@ -1239,8 +1239,8 @@ void PrintAST::visitDestructorDecl(DestructorDecl *decl) {
 }
 
 void PrintAST::visitInfixOperatorDecl(InfixOperatorDecl *decl) {
-  recordDeclLoc(decl);
   Printer << "operator infix ";
+  recordDeclLoc(decl);
   Printer.printName(decl->getName());
   Printer << " {";
   Printer.printNewline();
@@ -1273,8 +1273,8 @@ void PrintAST::visitInfixOperatorDecl(InfixOperatorDecl *decl) {
 }
 
 void PrintAST::visitPrefixOperatorDecl(PrefixOperatorDecl *decl) {
-  recordDeclLoc(decl);
   Printer << "operator prefix ";
+  recordDeclLoc(decl);
   Printer.printName(decl->getName());
   Printer << " {";
   Printer.printNewline();
@@ -1282,8 +1282,8 @@ void PrintAST::visitPrefixOperatorDecl(PrefixOperatorDecl *decl) {
 }
 
 void PrintAST::visitPostfixOperatorDecl(PostfixOperatorDecl *decl) {
-  recordDeclLoc(decl);
   Printer << "operator postfix ";
+  recordDeclLoc(decl);
   Printer.printName(decl->getName());
   Printer << " {";
   Printer.printNewline();

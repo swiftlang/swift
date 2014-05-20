@@ -146,7 +146,8 @@ int redeclaredInMultipleModulesFunc1(int a);
 @interface FooClassBase
 - (void) fooBaseInstanceFunc0;
 - (FooClassBase *) fooBaseInstanceFunc1:(id)anObject;
-- (instancetype) init;
+- (instancetype) init __attribute__((objc_designated_initializer));
+- (instancetype) initWithFloat:(float)f;
 - (void) fooBaseInstanceFuncOverridden;
 
 + (void) fooBaseClassFunc0;

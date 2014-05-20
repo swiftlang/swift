@@ -135,6 +135,7 @@ protocol <loc/>FooProtocolBase {
   <decl:Func>class func <loc/>fooBaseInstanceFunc1(anObject: <ref:Protocol>AnyObject</ref>!) -> <ref:Class>FooClassBase</ref>!</decl>
   <decl:Func>func <loc/>fooBaseInstanceFunc1(anObject: <ref:Protocol>AnyObject</ref>!) -> <ref:Class>FooClassBase</ref>!</decl>
   <decl:Constructor><loc/>init()</decl>
+  <decl:Constructor>convenience <loc/>init(withFloat f: <ref:TypeAlias>CFloat</ref>)</decl>
   <decl:Func>class func <loc/>fooBaseInstanceFuncOverridden()</decl>
   <decl:Func>func <loc/>fooBaseInstanceFuncOverridden()</decl>
   <decl:Func>class func <loc/>fooBaseClassFunc0()</decl>
@@ -168,6 +169,7 @@ class <loc/>FooClassDerived : <ref:Class>FooClassBase</ref>, <ref:Protocol>FooPr
   <decl:Func>func <loc/>fooBaseInstanceFuncOverridden()</decl>
   <decl:Func>class func <loc/>fooClassFunc0()</decl>
   <decl:Constructor><loc/>init()</decl>
+  <decl:Constructor>convenience <loc/>init(withFloat f: <ref:TypeAlias>CFloat</ref>)</decl>
 
   <decl:Func>/// Aaa.  fooProtoFunc.  Bbb.
   /// Ccc.

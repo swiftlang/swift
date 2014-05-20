@@ -135,6 +135,7 @@ class FooClassBase {
   class func fooBaseInstanceFunc1(anObject: AnyObject!) -> FooClassBase!
   func fooBaseInstanceFunc1(anObject: AnyObject!) -> FooClassBase!
   init()
+  convenience init(withFloat f: CFloat)
   class func fooBaseInstanceFuncOverridden()
   func fooBaseInstanceFuncOverridden()
   class func fooBaseClassFunc0()
@@ -168,6 +169,7 @@ class FooClassDerived : FooClassBase, FooProtocolDerived, FooProtocolBase {
   func fooBaseInstanceFuncOverridden()
   class func fooClassFunc0()
   init()
+  convenience init(withFloat f: CFloat)
 
   /// Aaa.  fooProtoFunc.  Bbb.
   /// Ccc.
