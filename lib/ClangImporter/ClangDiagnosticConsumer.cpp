@@ -54,6 +54,7 @@ void ClangDiagnosticConsumer::HandleDiagnostic(
       if (clangSrcMgr.getBuffer(clangSrcMgr.getFileID(clangLoc)) == buf) {
         ctx.Diags.diagnose(loc, diag::clang_cannot_import_header,
                            clangDiag.getArgStdStr(0));
+        return;
       }
     }
   }
