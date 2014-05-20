@@ -22,7 +22,7 @@ func printEquality<T: Equatable>(lhs: T, rhs: T, lhsName: String, rhsName: Strin
   }
 }
 
-func printIdentity(lhs: AnyObject, rhs: AnyObject, lhsName: String, rhsName: String) {
+func printIdentity(lhs: AnyObject?, rhs: AnyObject?, lhsName: String, rhsName: String) {
   if lhs === lhs {
     println("\(lhsName) === \(lhsName)")
   }
@@ -161,7 +161,7 @@ class ValueLike : NSObject {
     super.init()
   }
 
-  override func isEqual(_ rhs: AnyObject) -> Bool {
+  override func isEqual(_ rhs: AnyObject!) -> Bool {
     if let rhs2 = rhs as ValueLike {
       return x == rhs2.x
     }

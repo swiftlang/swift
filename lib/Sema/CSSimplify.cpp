@@ -672,30 +672,32 @@ matchCallArguments(ConstraintSystem &cs, TypeMatchKind kind,
 
       
       auto isOptionalConversion = false;
-      auto tryUser = false;
+      auto notTyVarMatch = false;
       
       if (!haveOneNonUserConversion) {
-        tryUser = !(isa<TypeVariableType>(argTy->getDesugaredType()) ||
-                         isa<TypeVariableType>(paramTy->getDesugaredType()));
+        notTyVarMatch = !(isa<TypeVariableType>(argTy->getDesugaredType()) ||
+                          isa<TypeVariableType>(paramTy->getDesugaredType()));
         
         // We'll bypass optional conversions because of the implicit conversions
         // that take place - there will always be a ValueToOptional disjunctive
         // choice.
-        if (tryUser) {
+        if (notTyVarMatch) {
           if(auto boundGenericType = paramTy->getAs<BoundGenericType>()) {
             auto typeDecl = boundGenericType->getDecl();
-            isOptionalConversion = typeDecl->classifyAsOptionalType();
+            isOptionalConversion =
+                typeDecl->classifyAsOptionalType() ==
+                    OTK_ImplicitlyUnwrappedOptional;
           }
         }
         
-        haveOneNonUserConversion = !tryUser ||
+        haveOneNonUserConversion = (!notTyVarMatch && !paramIdx) ||
                                    isOptionalConversion ||
                                    haveOneNonUserConversion;
       }
       
       // If at least one operator argument can be applied to without a user
       // conversion, there's no need to check the others.
-      if (!haveOneNonUserConversion) {
+      if (!haveOneNonUserConversion && notTyVarMatch) {
         auto applyFlags = subflags |
                           ConstraintSystem::TMF_ApplyingOperatorParameter;
         auto nonConversionResult = cs.matchTypes(argTy,
@@ -1725,8 +1727,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
           }
         }
         
-        conversionsOrFixes.push_back(
-          ConversionRestrictionKind::ValueToOptional);
+        if (!(flags & TMF_ApplyingOperatorParameter)) {
+          conversionsOrFixes.push_back(
+              ConversionRestrictionKind::ValueToOptional);
+        }
       }
     }
   }

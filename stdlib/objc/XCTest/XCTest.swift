@@ -46,7 +46,7 @@ func XCTAssertNil(expression: @auto_closure () -> AnyObject?, _ message: String 
   var expressionValueStr: String = "nil"
   if let expressionValueUnwrapped: AnyObject = expressionValueOptional {
     // TODO: passed = (expressionValueUnwrapped === nil)
-    if expressionValueUnwrapped === nil {
+    if (expressionValueUnwrapped as AnyObject?) === nil {
       passed = true
     } else {
       passed = false
@@ -78,7 +78,7 @@ func XCTAssertNotNil(expression: @auto_closure () -> AnyObject?, _ message: Stri
   var expressionValueStr: String = "nil"
   if let expressionValueUnwrapped: AnyObject = expressionValueOptional {
     // TODO: passed = !(expressionValueUnwrapped === nil)
-    if expressionValueUnwrapped === nil {
+    if (expressionValueUnwrapped as AnyObject?) === nil {
       passed = false
     } else {
       passed = true

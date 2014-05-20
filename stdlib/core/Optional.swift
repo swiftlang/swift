@@ -116,6 +116,26 @@ func != <T: Equatable> (lhs: T?, rhs: T?) -> Bool {
   return !(lhs == rhs)
 }
 
+@transparent
+func == <T>(lhs: T?, rhs: _Nil) -> Bool {
+  return lhs.getLogicValue() == false
+}
+
+@transparent
+func == <T>(lhs: _Nil, rhs: T?) -> Bool {
+  return rhs.getLogicValue() == false
+}
+
+@transparent
+func != <T>(lhs: T?, rhs: _Nil) -> Bool {
+  return !(lhs == rhs)
+}
+
+@transparent
+func != <T>(lhs: _Nil, rhs: T?) -> Bool {
+  return !(lhs == rhs)
+}
+
 struct _OptionalMirror<T> : Mirror {
   let _value : Optional<T>
 

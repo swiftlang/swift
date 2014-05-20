@@ -1332,7 +1332,7 @@ struct _CocoaDictionaryIndex : BidirectionalIndex {
 }
 
 func ==(lhs: _CocoaDictionaryIndex, rhs: _CocoaDictionaryIndex) -> Bool {
-  _precondition(lhs.cocoaDictionary === rhs.cocoaDictionary,
+  _precondition((lhs.cocoaDictionary as AnyObject) === rhs.cocoaDictionary,
       "can not compare indexes pointing to different dictionaries")
   _precondition(lhs.allKeys.count == rhs.allKeys.count,
       "one or both of the indexes have been invalidated")
@@ -1764,7 +1764,7 @@ func == <KeyType : Equatable, ValueType : Equatable>(
     return true
 
   case (.Cocoa(let lhsCocoa), .Cocoa(let rhsCocoa)):
-    if lhsCocoa.cocoaDictionary === rhsCocoa.cocoaDictionary {
+    if (lhsCocoa.cocoaDictionary as AnyObject) === rhsCocoa.cocoaDictionary {
       return true
     }
     return _stdlib_NSDictionary_isEqual(

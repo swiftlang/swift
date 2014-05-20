@@ -97,7 +97,7 @@ func testScope() {
   // If we get the element again, it has the same object identity
   // CHECK-NEXT: object identity matches: true
   var anotherOne = (nsx.objectAtIndex(0) as Tracked)!
-  println("object identity matches: \(one === anotherOne)")
+  println("object identity matches: \((one as AnyObject) === anotherOne)")
 
   // Because the elements come back at +0, we really don't want to
   // treat them as objects, or we'll get double deletion
