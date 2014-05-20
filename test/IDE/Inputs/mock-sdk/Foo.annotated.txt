@@ -1,74 +1,74 @@
-<decl:Import>@exported import Foo.FooSub</decl>
-<decl:Import>@exported import FooHelper</decl>
+<decl:Import>@exported import <loc/>Foo.FooSub</decl>
+<decl:Import>@exported import <loc/>FooHelper</decl>
 
 
 <decl:Struct>/// Aaa.  FooEnum1.  Bbb.
-struct FooEnum1 {
-  <decl:Constructor>init(_ value: <ref:TypeAlias>CUnsignedInt</ref>)</decl>
-  <decl:Var>var value: <ref:TypeAlias>CUnsignedInt</ref></decl>
+struct <loc/>FooEnum1 {
+  <decl:Constructor><loc/>init(_ value: <ref:TypeAlias>CUnsignedInt</ref>)</decl>
+  <decl:Var>var <loc/>value: <ref:TypeAlias>CUnsignedInt</ref></decl>
 }</decl>
 
 <decl:Var>/// Aaa.  FooEnum1X.  Bbb.
-var FooEnum1X: <ref:Struct>FooEnum1</ref> { get }</decl>
-<decl:Struct>struct FooEnum2 {
-  <decl:Constructor>init(_ value: <ref:TypeAlias>CUnsignedInt</ref>)</decl>
-  <decl:Var>var value: <ref:TypeAlias>CUnsignedInt</ref></decl>
+var <loc/>FooEnum1X: <ref:Struct>FooEnum1</ref> { get }</decl>
+<decl:Struct>struct <loc/>FooEnum2 {
+  <decl:Constructor><loc/>init(_ value: <ref:TypeAlias>CUnsignedInt</ref>)</decl>
+  <decl:Var>var <loc/>value: <ref:TypeAlias>CUnsignedInt</ref></decl>
 }</decl>
-<decl:Var>var FooEnum2X: <ref:Struct>FooEnum2</ref> { get }</decl>
-<decl:Var>var FooEnum2Y: <ref:Struct>FooEnum2</ref> { get }</decl>
-<decl:Struct>struct FooEnum3 {
-  <decl:Constructor>init(_ value: <ref:TypeAlias>CUnsignedInt</ref>)</decl>
-  <decl:Var>var value: <ref:TypeAlias>CUnsignedInt</ref></decl>
+<decl:Var>var <loc/>FooEnum2X: <ref:Struct>FooEnum2</ref> { get }</decl>
+<decl:Var>var <loc/>FooEnum2Y: <ref:Struct>FooEnum2</ref> { get }</decl>
+<decl:Struct>struct <loc/>FooEnum3 {
+  <decl:Constructor><loc/>init(_ value: <ref:TypeAlias>CUnsignedInt</ref>)</decl>
+  <decl:Var>var <loc/>value: <ref:TypeAlias>CUnsignedInt</ref></decl>
 }</decl>
-<decl:Var>var FooEnum3X: <ref:Struct>FooEnum3</ref> { get }</decl>
-<decl:Var>var FooEnum3Y: <ref:Struct>FooEnum3</ref> { get }</decl>
+<decl:Var>var <loc/>FooEnum3X: <ref:Struct>FooEnum3</ref> { get }</decl>
+<decl:Var>var <loc/>FooEnum3Y: <ref:Struct>FooEnum3</ref> { get }</decl>
 
 <decl:Enum>/// Aaa.  FooComparisonResult.  Bbb.
-enum FooComparisonResult : <ref:TypeAlias>CLong</ref> {
+enum <loc/>FooComparisonResult : <ref:TypeAlias>CLong</ref> {
   <decl:EnumElement>case OrderedAscending</decl>
   <decl:EnumElement>case OrderedSame</decl>
   <decl:EnumElement>case OrderedDescending</decl>
 }</decl>
 
 <decl:Struct>/// Aaa.  FooRuncingOptions.  Bbb.
-struct FooRuncingOptions : <ref:Protocol>RawOptionSet</ref> {
-  <decl:Constructor>init()</decl>
-  <decl:Constructor>init(_ value: <ref:TypeAlias>CLong</ref>)</decl>
-  <decl:Var>var value: <ref:TypeAlias>CLong</ref></decl>
-  <decl:Var>static var EnableMince: <ref:Struct>FooRuncingOptions</ref> { get }</decl>
-  <decl:Var>static var EnableQuince: <ref:Struct>FooRuncingOptions</ref> { get }</decl>
-  <decl:Func>static func fromMask(raw: <ref:TypeAlias>CLong</ref>) -> <ref:Struct>FooRuncingOptions</ref></decl>
-  <decl:Func>static func fromRaw(raw: <ref:TypeAlias>CLong</ref>) -> <ref:Struct>FooRuncingOptions</ref>?</decl>
-  <decl:Func>func toRaw() -> <ref:TypeAlias>CLong</ref></decl>
-  <decl:Func>func getLogicValue() -> <ref:Struct>Bool</ref></decl>
+struct <loc/>FooRuncingOptions : <ref:Protocol>RawOptionSet</ref> {
+  <decl:Constructor><loc/>init()</decl>
+  <decl:Constructor><loc/>init(_ value: <ref:TypeAlias>CLong</ref>)</decl>
+  <decl:Var>var <loc/>value: <ref:TypeAlias>CLong</ref></decl>
+  <decl:Var>static var <loc/>EnableMince: <ref:Struct>FooRuncingOptions</ref> { get }</decl>
+  <decl:Var>static var <loc/>EnableQuince: <ref:Struct>FooRuncingOptions</ref> { get }</decl>
+  <decl:Func>static func <loc/>fromMask(raw: <ref:TypeAlias>CLong</ref>) -> <ref:Struct>FooRuncingOptions</ref></decl>
+  <decl:Func>static func <loc/>fromRaw(raw: <ref:TypeAlias>CLong</ref>) -> <ref:Struct>FooRuncingOptions</ref>?</decl>
+  <decl:Func>func <loc/>toRaw() -> <ref:TypeAlias>CLong</ref></decl>
+  <decl:Func>func <loc/>getLogicValue() -> <ref:Struct>Bool</ref></decl>
 }</decl>
-<decl:Struct>struct FooStruct1 {
-  <decl:Var>var x: <ref:TypeAlias>CInt</ref></decl>
-  <decl:Var>var y: <ref:TypeAlias>CDouble</ref></decl>
+<decl:Struct>struct <loc/>FooStruct1 {
+  <decl:Var>var <loc/>x: <ref:TypeAlias>CInt</ref></decl>
+  <decl:Var>var <loc/>y: <ref:TypeAlias>CDouble</ref></decl>
 }</decl>
-<decl:Struct>struct FooStruct2 {
-  <decl:Var>var x: <ref:TypeAlias>CInt</ref></decl>
-  <decl:Var>var y: <ref:TypeAlias>CDouble</ref></decl>
+<decl:Struct>struct <loc/>FooStruct2 {
+  <decl:Var>var <loc/>x: <ref:TypeAlias>CInt</ref></decl>
+  <decl:Var>var <loc/>y: <ref:TypeAlias>CDouble</ref></decl>
 }</decl>
-<decl:TypeAlias>typealias FooStructTypedef1 = <ref:Struct>FooStruct2</ref></decl>
-<decl:Struct>struct FooStructTypedef2 {
-  <decl:Var>var x: <ref:TypeAlias>CInt</ref></decl>
-  <decl:Var>var y: <ref:TypeAlias>CDouble</ref></decl>
+<decl:TypeAlias>typealias <loc/>FooStructTypedef1 = <ref:Struct>FooStruct2</ref></decl>
+<decl:Struct>struct <loc/>FooStructTypedef2 {
+  <decl:Var>var <loc/>x: <ref:TypeAlias>CInt</ref></decl>
+  <decl:Var>var <loc/>y: <ref:TypeAlias>CDouble</ref></decl>
 }</decl>
 
 <decl:TypeAlias>/// Aaa.  FooTypedef1.  Bbb.
-typealias FooTypedef1 = <ref:TypeAlias>CInt</ref></decl>
+typealias <loc/>FooTypedef1 = <ref:TypeAlias>CInt</ref></decl>
 
 <decl:Var>/// Aaa.  fooIntVar.  Bbb.
-var fooIntVar: <ref:TypeAlias>CInt</ref></decl>
+var <loc/>fooIntVar: <ref:TypeAlias>CInt</ref></decl>
 
 <decl:Func>/// Aaa.  fooFunc1.  Bbb.
-func fooFunc1(a: <ref:TypeAlias>CInt</ref>) -> <ref:TypeAlias>CInt</ref></decl>
-<decl:Func>func fooFunc1AnonymousParam(_: <ref:TypeAlias>CInt</ref>) -> <ref:TypeAlias>CInt</ref></decl>
-<decl:Func>func fooFunc3(a: <ref:TypeAlias>CInt</ref>, b: <ref:TypeAlias>CFloat</ref>, c: <ref:TypeAlias>CDouble</ref>, d: <ref:Struct>CMutablePointer</ref><<ref:TypeAlias>CInt</ref>>) -> <ref:TypeAlias>CInt</ref></decl>
-<decl:Func>func fooFuncWithBlock(blk: ((<ref:TypeAlias>CFloat</ref>) -> <ref:TypeAlias>CInt</ref>)!)</decl>
-<decl:Func>@noreturn func fooFuncNoreturn1()</decl>
-<decl:Func>@noreturn func fooFuncNoreturn2()</decl>
+func <loc/>fooFunc1(a: <ref:TypeAlias>CInt</ref>) -> <ref:TypeAlias>CInt</ref></decl>
+<decl:Func>func <loc/>fooFunc1AnonymousParam(_: <ref:TypeAlias>CInt</ref>) -> <ref:TypeAlias>CInt</ref></decl>
+<decl:Func>func <loc/>fooFunc3(a: <ref:TypeAlias>CInt</ref>, b: <ref:TypeAlias>CFloat</ref>, c: <ref:TypeAlias>CDouble</ref>, d: <ref:Struct>CMutablePointer</ref><<ref:TypeAlias>CInt</ref>>) -> <ref:TypeAlias>CInt</ref></decl>
+<decl:Func>func <loc/>fooFuncWithBlock(blk: ((<ref:TypeAlias>CFloat</ref>) -> <ref:TypeAlias>CInt</ref>)!)</decl>
+<decl:Func>@noreturn func <loc/>fooFuncNoreturn1()</decl>
+<decl:Func>@noreturn func <loc/>fooFuncNoreturn2()</decl>
 
 <decl:Func>/**
  * Aaa.  fooFuncWithComment1.  Bbb.
@@ -76,12 +76,12 @@ func fooFunc1(a: <ref:TypeAlias>CInt</ref>) -> <ref:TypeAlias>CInt</ref></decl>
  *
  * Ddd.
  */
-func fooFuncWithComment1()</decl>
+func <loc/>fooFuncWithComment1()</decl>
 
 <decl:Func>/*!
   Aaa.  fooFuncWithComment2.  Bbb.
  */
-func fooFuncWithComment2()</decl>
+func <loc/>fooFuncWithComment2()</decl>
 
 <decl:Func>/**
  * Aaa.  fooFuncWithComment3.  Bbb.
@@ -89,114 +89,114 @@ func fooFuncWithComment2()</decl>
 /**
  * Ccc.
  */
-func fooFuncWithComment3()</decl>
+func <loc/>fooFuncWithComment3()</decl>
 
 <decl:Func>/**
  * Aaa.  fooFuncWithComment4.  Bbb.
  */
 /// Ddd.
-func fooFuncWithComment4()</decl>
+func <loc/>fooFuncWithComment4()</decl>
 
 <decl:Func>/// Aaa.  fooFuncWithComment5.  Bbb.
 /// Ccc.
 ///
 /// Ddd.
-func fooFuncWithComment5()</decl>
+func <loc/>fooFuncWithComment5()</decl>
 
 <decl:Func>/// Aaa.  redeclaredInMultipleModulesFunc1.  Bbb.
-func redeclaredInMultipleModulesFunc1(a: <ref:TypeAlias>CInt</ref>) -> <ref:TypeAlias>CInt</ref></decl>
+func <loc/>redeclaredInMultipleModulesFunc1(a: <ref:TypeAlias>CInt</ref>) -> <ref:TypeAlias>CInt</ref></decl>
 
 <decl:Protocol>/// Aaa.  FooProtocolBase.  Bbb.
-protocol FooProtocolBase {
+protocol <loc/>FooProtocolBase {
 
   <decl:Func>/// Aaa.  fooProtoFunc.  Bbb.
   /// Ccc.
-  func fooProtoFunc()</decl>
+  func <loc/>fooProtoFunc()</decl>
 
   <decl:Func>/// Aaa.  fooProtoFuncWithExtraIndentation1.  Bbb.
   /// Ccc.
-  func fooProtoFuncWithExtraIndentation1()</decl>
+  func <loc/>fooProtoFuncWithExtraIndentation1()</decl>
 
   <decl:Func>/**
    * Aaa.  fooProtoFuncWithExtraIndentation2.  Bbb.
    * Ccc.
    */
-  func fooProtoFuncWithExtraIndentation2()</decl>
-  <decl:Func>class func fooProtoClassFunc()</decl>
-  <decl:Var>var fooProperty1: <ref:TypeAlias>CInt</ref> { get set }</decl>
-  <decl:Var>var fooProperty2: <ref:TypeAlias>CInt</ref> { get set }</decl>
-  <decl:Var>var fooProperty3: <ref:TypeAlias>CInt</ref> { get }</decl>
+  func <loc/>fooProtoFuncWithExtraIndentation2()</decl>
+  <decl:Func>class func <loc/>fooProtoClassFunc()</decl>
+  <decl:Var>var <loc/>fooProperty1: <ref:TypeAlias>CInt</ref> { get set }</decl>
+  <decl:Var>var <loc/>fooProperty2: <ref:TypeAlias>CInt</ref> { get set }</decl>
+  <decl:Var>var <loc/>fooProperty3: <ref:TypeAlias>CInt</ref> { get }</decl>
 }</decl>
-<decl:Protocol>protocol FooProtocolDerived : <ref:Protocol>FooProtocolBase</ref> {
+<decl:Protocol>protocol <loc/>FooProtocolDerived : <ref:Protocol>FooProtocolBase</ref> {
 }</decl>
-<decl:Class>class FooClassBase {
-  <decl:Func>class func fooBaseInstanceFunc0()</decl>
-  <decl:Func>func fooBaseInstanceFunc0()</decl>
-  <decl:Func>class func fooBaseInstanceFunc1(anObject: <ref:Protocol>AnyObject</ref>!) -> <ref:Class>FooClassBase</ref>!</decl>
-  <decl:Func>func fooBaseInstanceFunc1(anObject: <ref:Protocol>AnyObject</ref>!) -> <ref:Class>FooClassBase</ref>!</decl>
-  <decl:Constructor>init()</decl>
-  <decl:Func>class func fooBaseInstanceFuncOverridden()</decl>
-  <decl:Func>func fooBaseInstanceFuncOverridden()</decl>
-  <decl:Func>class func fooBaseClassFunc0()</decl>
-}</decl>
-
-<decl:Extension>extension <ref:Class>FooClassBase</ref> {
-  <decl:Func>class func _internalMeth3() -> <ref:Protocol>AnyObject</ref>!</decl>
-  <decl:Func>func _internalMeth3() -> <ref:Protocol>AnyObject</ref>!</decl>
+<decl:Class>class <loc/>FooClassBase {
+  <decl:Func>class func <loc/>fooBaseInstanceFunc0()</decl>
+  <decl:Func>func <loc/>fooBaseInstanceFunc0()</decl>
+  <decl:Func>class func <loc/>fooBaseInstanceFunc1(anObject: <ref:Protocol>AnyObject</ref>!) -> <ref:Class>FooClassBase</ref>!</decl>
+  <decl:Func>func <loc/>fooBaseInstanceFunc1(anObject: <ref:Protocol>AnyObject</ref>!) -> <ref:Class>FooClassBase</ref>!</decl>
+  <decl:Constructor><loc/>init()</decl>
+  <decl:Func>class func <loc/>fooBaseInstanceFuncOverridden()</decl>
+  <decl:Func>func <loc/>fooBaseInstanceFuncOverridden()</decl>
+  <decl:Func>class func <loc/>fooBaseClassFunc0()</decl>
 }</decl>
 
-<decl:Extension>extension <ref:Class>FooClassBase</ref> {
-  <decl:Func>class func _internalMeth2() -> <ref:Protocol>AnyObject</ref>!</decl>
-  <decl:Func>func _internalMeth2() -> <ref:Protocol>AnyObject</ref>!</decl>
-  <decl:Func>class func nonInternalMeth() -> <ref:Protocol>AnyObject</ref>!</decl>
-  <decl:Func>func nonInternalMeth() -> <ref:Protocol>AnyObject</ref>!</decl>
+<decl:Extension>extension <ref:Class><loc/>FooClassBase</ref> {
+  <decl:Func>class func <loc/>_internalMeth3() -> <ref:Protocol>AnyObject</ref>!</decl>
+  <decl:Func>func <loc/>_internalMeth3() -> <ref:Protocol>AnyObject</ref>!</decl>
 }</decl>
 
-<decl:Extension>extension <ref:Class>FooClassBase</ref> {
-  <decl:Func>class func _internalMeth1() -> <ref:Protocol>AnyObject</ref>!</decl>
-  <decl:Func>func _internalMeth1() -> <ref:Protocol>AnyObject</ref>!</decl>
+<decl:Extension>extension <ref:Class><loc/>FooClassBase</ref> {
+  <decl:Func>class func <loc/>_internalMeth2() -> <ref:Protocol>AnyObject</ref>!</decl>
+  <decl:Func>func <loc/>_internalMeth2() -> <ref:Protocol>AnyObject</ref>!</decl>
+  <decl:Func>class func <loc/>nonInternalMeth() -> <ref:Protocol>AnyObject</ref>!</decl>
+  <decl:Func>func <loc/>nonInternalMeth() -> <ref:Protocol>AnyObject</ref>!</decl>
+}</decl>
+
+<decl:Extension>extension <ref:Class><loc/>FooClassBase</ref> {
+  <decl:Func>class func <loc/>_internalMeth1() -> <ref:Protocol>AnyObject</ref>!</decl>
+  <decl:Func>func <loc/>_internalMeth1() -> <ref:Protocol>AnyObject</ref>!</decl>
 }</decl>
 
 <decl:Class>/// Aaa.  FooClassDerived.  Bbb.
-class FooClassDerived : <ref:Class>FooClassBase</ref>, <ref:Protocol>FooProtocolDerived</ref>, <ref:Protocol>FooProtocolBase</ref> {
-  <decl:Var>var fooProperty1: <ref:TypeAlias>CInt</ref></decl>
-  <decl:Var>var fooProperty2: <ref:TypeAlias>CInt</ref></decl>
-  <decl:Var>var fooProperty3: <ref:TypeAlias>CInt</ref> { get }</decl>
-  <decl:Func>func fooInstanceFunc0()</decl>
-  <decl:Func>func fooInstanceFunc1(a: <ref:TypeAlias>CInt</ref>)</decl>
-  <decl:Func>func fooInstanceFunc2(a: <ref:TypeAlias>CInt</ref>, withB b: <ref:TypeAlias>CInt</ref>)</decl>
-  <decl:Func>func fooBaseInstanceFuncOverridden()</decl>
-  <decl:Func>class func fooClassFunc0()</decl>
-  <decl:Constructor>init()</decl>
+class <loc/>FooClassDerived : <ref:Class>FooClassBase</ref>, <ref:Protocol>FooProtocolDerived</ref>, <ref:Protocol>FooProtocolBase</ref> {
+  <decl:Var>var <loc/>fooProperty1: <ref:TypeAlias>CInt</ref></decl>
+  <decl:Var>var <loc/>fooProperty2: <ref:TypeAlias>CInt</ref></decl>
+  <decl:Var>var <loc/>fooProperty3: <ref:TypeAlias>CInt</ref> { get }</decl>
+  <decl:Func>func <loc/>fooInstanceFunc0()</decl>
+  <decl:Func>func <loc/>fooInstanceFunc1(a: <ref:TypeAlias>CInt</ref>)</decl>
+  <decl:Func>func <loc/>fooInstanceFunc2(a: <ref:TypeAlias>CInt</ref>, withB b: <ref:TypeAlias>CInt</ref>)</decl>
+  <decl:Func>func <loc/>fooBaseInstanceFuncOverridden()</decl>
+  <decl:Func>class func <loc/>fooClassFunc0()</decl>
+  <decl:Constructor><loc/>init()</decl>
 
   <decl:Func>/// Aaa.  fooProtoFunc.  Bbb.
   /// Ccc.
-  func fooProtoFunc()</decl>
+  func <loc/>fooProtoFunc()</decl>
 
   <decl:Func>/// Aaa.  fooProtoFuncWithExtraIndentation1.  Bbb.
   /// Ccc.
-  func fooProtoFuncWithExtraIndentation1()</decl>
+  func <loc/>fooProtoFuncWithExtraIndentation1()</decl>
 
   <decl:Func>/**
    * Aaa.  fooProtoFuncWithExtraIndentation2.  Bbb.
    * Ccc.
    */
-  func fooProtoFuncWithExtraIndentation2()</decl>
-  <decl:Func>class func fooProtoClassFunc()</decl>
+  func <loc/>fooProtoFuncWithExtraIndentation2()</decl>
+  <decl:Func>class func <loc/>fooProtoClassFunc()</decl>
 }</decl>
-<decl:Var>var FOO_MACRO_1: <ref:TypeAlias>CInt</ref> { get }</decl>
-<decl:Var>var FOO_MACRO_2: <ref:TypeAlias>CInt</ref> { get }</decl>
-<decl:Var>var FOO_MACRO_3: <ref:TypeAlias>CInt</ref> { get }</decl>
-<decl:Var>var FOO_MACRO_4: <ref:TypeAlias>CUnsignedInt</ref> { get }</decl>
-<decl:Var>var FOO_MACRO_5: <ref:TypeAlias>CUnsignedLongLong</ref> { get }</decl>
-<decl:Var>var FOO_MACRO_REDEF_1: <ref:TypeAlias>CInt</ref> { get }</decl>
-<decl:Var>var FOO_MACRO_REDEF_2: <ref:TypeAlias>CInt</ref> { get }</decl>
-<decl:Func>func theLastDeclInFoo()</decl>
-<decl:Func>func _internalTopLevelFunc()</decl>
-<decl:Struct>struct _InternalStruct {
-  <decl:Var>var x: <ref:TypeAlias>CInt</ref></decl>
+<decl:Var>var <loc/>FOO_MACRO_1: <ref:TypeAlias>CInt</ref> { get }</decl>
+<decl:Var>var <loc/>FOO_MACRO_2: <ref:TypeAlias>CInt</ref> { get }</decl>
+<decl:Var>var <loc/>FOO_MACRO_3: <ref:TypeAlias>CInt</ref> { get }</decl>
+<decl:Var>var <loc/>FOO_MACRO_4: <ref:TypeAlias>CUnsignedInt</ref> { get }</decl>
+<decl:Var>var <loc/>FOO_MACRO_5: <ref:TypeAlias>CUnsignedLongLong</ref> { get }</decl>
+<decl:Var>var <loc/>FOO_MACRO_REDEF_1: <ref:TypeAlias>CInt</ref> { get }</decl>
+<decl:Var>var <loc/>FOO_MACRO_REDEF_2: <ref:TypeAlias>CInt</ref> { get }</decl>
+<decl:Func>func <loc/>theLastDeclInFoo()</decl>
+<decl:Func>func <loc/>_internalTopLevelFunc()</decl>
+<decl:Struct>struct <loc/>_InternalStruct {
+  <decl:Var>var <loc/>x: <ref:TypeAlias>CInt</ref></decl>
 }</decl>
-<decl:Protocol>protocol _InternalProt {
+<decl:Protocol>protocol <loc/>_InternalProt {
 }</decl>
-<decl:Class>class ClassWithInternalProt : <ref:Protocol>_InternalProt</ref> {
+<decl:Class>class <loc/>ClassWithInternalProt : <ref:Protocol>_InternalProt</ref> {
 }</decl>

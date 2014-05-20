@@ -984,6 +984,9 @@ public:
   void printDeclPre(const Decl *D) override {
     OS << "<decl:" << Decl::getKindName(D->getKind()) << '>';
   }
+  void printDeclLoc(const Decl *D) override {
+    OS << "<loc/>";
+  }
   void printDeclPost(const Decl *D) override {
     OS << "</decl>";
   }
