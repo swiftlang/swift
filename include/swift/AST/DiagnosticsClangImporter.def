@@ -45,6 +45,8 @@ NOTE(note_from_clang,none,none,
 
 ERROR(clang_cannot_build_module,none,Fatal,
   "could not build Objective-C module '%0'", (StringRef))
+ERROR(clang_cannot_import_header,none,Fatal,
+  "could not import Objective-C header '%0'", (StringRef))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

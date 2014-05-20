@@ -381,24 +381,35 @@ void ClangImporter::importHeader(StringRef header, Module *adapter) {
   if (adapter)
     Impl.ImportedHeaderOwners.push_back(adapter);
 
+  clang::Preprocessor &pp = Impl.getClangPreprocessor();
+
   llvm::SmallString<128> importLine{"#import \""};
   importLine += header;
   importLine += "\"\n";
 
   auto sourceBuffer = llvm::MemoryBuffer::getMemBufferCopy(importLine,
                                                            "<import>");
+  {
+    auto &rawDiagClient = Impl.Instance->getDiagnosticClient();
+    auto &diagClient = static_cast<ClangDiagnosticConsumer &>(rawDiagClient);
+    auto importRAII = diagClient.handleImport(sourceBuffer);
 
-  clang::SourceManager &sourceMgr =
-    Impl.getClangASTContext().getSourceManager();
-  clang::FileID bufferID =
-    sourceMgr.createFileIDForMemBuffer(sourceBuffer,
-                                       clang::SrcMgr::C_User,
-                                       /*LoadedID=*/0,
-                                       /*LoadedOffset=*/0,
-      /*IncludeLoc=*/sourceMgr.getLocForStartOfFile(sourceMgr.getMainFileID()));
+    clang::SourceManager &sourceMgr =
+      Impl.getClangASTContext().getSourceManager();
+    clang::SourceLocation includeLoc =
+      sourceMgr.getLocForStartOfFile(sourceMgr.getMainFileID());
+    clang::FileID bufferID =
+      sourceMgr.createFileIDForMemBuffer(sourceBuffer,
+                                         clang::SrcMgr::C_User,
+                                         /*LoadedID=*/0,
+                                         /*LoadedOffset=*/0,
+                                         includeLoc);
 
-  clang::Preprocessor &pp = Impl.getClangPreprocessor();
-  pp.EnterSourceFile(bufferID, /*directoryLookup=*/nullptr, /*loc=*/{});
+    pp.EnterSourceFile(bufferID, /*directoryLookup=*/nullptr, /*loc=*/{});
+    // Force the import to occur.
+    pp.LookAhead(0);
+  }
+
   clang::Parser::DeclGroupPtrTy parsed;
   while (!Impl.Parser->ParseTopLevelDecl(parsed)) {}
   pp.EndSourceFile();
@@ -421,30 +432,34 @@ Module *ClangImporter::loadModule(
                          clang::SourceLocation()} );
   }
 
-  auto &rawDiagClient = Impl.Instance->getDiagnosticClient();
-  auto &diagClient = static_cast<ClangDiagnosticConsumer &>(rawDiagClient);
-  auto topModuleRAII = diagClient.handleLoadModule(clangPath.front().first);
+  clang::ModuleLoadResult clangModule;
+  {
+    auto &rawDiagClient = Impl.Instance->getDiagnosticClient();
+    auto &diagClient = static_cast<ClangDiagnosticConsumer &>(rawDiagClient);
+    auto importRAII = diagClient.handleImport(clangPath.front().first);
 
-  // Load the Clang module.
-  // FIXME: The source location here is completely bogus. It can't be
-  // invalid, and it can't be the same thing twice in a row, so we just use
-  // a counter. Having real source locations would be far, far better.
-  auto &srcMgr = clangContext.getSourceManager();
-  clang::SourceLocation clangImportLoc
-    = srcMgr.getLocForStartOfFile(srcMgr.getMainFileID())
-            .getLocWithOffset(Impl.ImportCounter++);
-  auto clangModule = Impl.Instance->loadModule(clangImportLoc,
-                                               clangPath,
-                                               clang::Module::AllVisible,
-                                               /*IsInclusionDirective=*/false);
-  if (!clangModule) {
-    if (diagClient.isTopModuleMissing())
-      return nullptr;
+    // Load the Clang module.
+    // FIXME: The source location here is completely bogus. It can't be
+    // invalid, and it can't be the same thing twice in a row, so we just use
+    // a counter. Having real source locations would be far, far better.
+    auto &srcMgr = clangContext.getSourceManager();
+    clang::SourceLocation clangImportLoc
+      = srcMgr.getLocForStartOfFile(srcMgr.getMainFileID())
+              .getLocWithOffset(Impl.ImportCounter++);
+    clangModule = Impl.Instance->loadModule(clangImportLoc,
+                                            clangPath,
+                                            clang::Module::AllVisible,
+                                            /*IsInclusionDirective=*/false);
 
-    // Otherwise, the module is present, but we've failed to load it for some
-    // reason. Create an empty module to serve as a placeholder.
-    Identifier name = path.back().first;
-    return Module::create(name, Impl.SwiftContext);
+    if (!clangModule) {
+      if (diagClient.isCurrentImportMissing())
+        return nullptr;
+
+      // Otherwise, the module is present, but we've failed to load it for some
+      // reason. Create an empty module to serve as a placeholder.
+      Identifier name = path.back().first;
+      return Module::create(name, Impl.SwiftContext);
+    }
   }
 
   return Impl.finishLoadingClangModule(*this, clangModule, /*adapter=*/false);

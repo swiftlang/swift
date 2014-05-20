@@ -1,5 +1,12 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: not %swift -parse %s -I %S/Inputs/broken-modules/ -module-cache-path %t -enable-source-import -show-diagnostics-after-fatal 2>&1 | FileCheck %s
+// RUN: not %swift -parse %s -import-objc-header %t/fake.h -module-cache-path %t 2>&1 | FileCheck -check-prefix=MISSING-HEADER %s
+// RUN: not %swift -parse %s -import-objc-header %S/../../Inputs/empty.swift -module-cache-path %t 2>&1 | FileCheck -check-prefix=EMPTY-HEADER %s
+
+// MISSING-HEADER: error: could not import Objective-C header '{{.*}}/fake.h'
+// MISSING-HEADER-NOT: error
+
+// EMPTY-HEADER-NOT: header
 
 import Nonexistent
 // CHECK-NOT: not found

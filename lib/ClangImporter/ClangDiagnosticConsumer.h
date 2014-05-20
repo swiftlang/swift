@@ -14,19 +14,24 @@
 
 #include "swift/ClangImporter/ClangImporter.h"
 #include "clang/Basic/Diagnostic.h"
+#include "clang/Basic/IdentifierTable.h"
 
 namespace swift {
 
 class ClangDiagnosticConsumer : public clang::DiagnosticConsumer {
+  using ImportTy =
+    PointerUnion<const clang::IdentifierInfo *, const llvm::MemoryBuffer *>;
+
   struct LoadModuleRAII {
     ClangDiagnosticConsumer *Consumer;
   public:
     LoadModuleRAII(ClangDiagnosticConsumer &consumer,
-                   const clang::IdentifierInfo *name)
+                   ImportTy import)
         : Consumer(&consumer) {
-      assert(name);
-      Consumer->TopModuleBeingImported = name;
-      Consumer->TopModuleNotFound = false;
+      assert(import);
+      assert(!Consumer->CurrentImport);
+      Consumer->CurrentImport = import;
+      Consumer->CurrentImportNotFound = false;
     }
 
     LoadModuleRAII(LoadModuleRAII &) = delete;
@@ -43,7 +48,7 @@ class ClangDiagnosticConsumer : public clang::DiagnosticConsumer {
 
     ~LoadModuleRAII() {
       if (Consumer)
-        Consumer->TopModuleBeingImported = nullptr;
+        Consumer->CurrentImport = nullptr;
     }
   };
 
@@ -51,25 +56,25 @@ private:
   friend struct LoadModuleRAII;
 
   ClangImporter::Implementation &ImporterImpl;
-  const clang::IdentifierInfo *TopModuleBeingImported = nullptr;
-  bool TopModuleNotFound;
+  ImportTy CurrentImport;
+  bool CurrentImportNotFound;
 
 public:
   ClangDiagnosticConsumer(ClangImporter::Implementation &Impl)
     : ImporterImpl(Impl) {}
 
-  LoadModuleRAII handleLoadModule(const clang::IdentifierInfo *name) {
-    return LoadModuleRAII(*this, name);
+  LoadModuleRAII handleImport(ImportTy nameOrImportBuffer) {
+    return LoadModuleRAII(*this, nameOrImportBuffer);
   }
 
-  bool isTopModuleMissing() const {
-    assert(TopModuleBeingImported && "no module being loaded");
-    return TopModuleNotFound;
+  bool isCurrentImportMissing() const {
+    assert(CurrentImport && "nothing being loaded");
+    return CurrentImportNotFound;
   }
 
-  void setTopModuleMissing() {
-    assert(TopModuleBeingImported && "no module being loaded");
-    TopModuleNotFound = true;
+  void setCurrentImportMissing() {
+    assert(CurrentImport && "nothing being loaded");
+    CurrentImportNotFound = true;
   }
 
   void HandleDiagnostic(clang::DiagnosticsEngine::Level diagLevel,

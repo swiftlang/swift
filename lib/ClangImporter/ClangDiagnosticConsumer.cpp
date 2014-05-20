@@ -16,6 +16,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "clang/AST/ASTContext.h"
+#include "clang/Lex/LexDiagnostic.h"
 
 using namespace swift;
 
@@ -24,10 +25,10 @@ void ClangDiagnosticConsumer::HandleDiagnostic(
     const clang::Diagnostic &clangDiag) {
   // Handle the module-not-found diagnostic specially if it's a top-level module
   // we're looking for.
-  if (TopModuleBeingImported) {
-    if (clangDiag.getID() == clang::diag::err_module_not_found) {
-      if (clangDiag.getArgStdStr(0) == TopModuleBeingImported->getName()) {
-        setTopModuleMissing();
+  if (clangDiag.getID() == clang::diag::err_module_not_found) {
+    if (auto *import = CurrentImport.dyn_cast<const clang::IdentifierInfo *>()){
+      if (clangDiag.getArgStdStr(0) == import->getName()) {
+        setCurrentImportMissing();
         return;
       }
     }
@@ -40,12 +41,19 @@ void ClangDiagnosticConsumer::HandleDiagnostic(
 
   auto &ctx = ImporterImpl.SwiftContext;
 
-  if (TopModuleBeingImported) {
-    if (clangDiag.getID() == clang::diag::err_module_not_built) {
-      if (clangDiag.getArgStdStr(0) == TopModuleBeingImported->getName()) {
+  if (clangDiag.getID() == clang::diag::err_module_not_built) {
+    if (auto *import = CurrentImport.dyn_cast<const clang::IdentifierInfo *>()){
+      if (clangDiag.getArgStdStr(0) == import->getName()) {
         ctx.Diags.diagnose(loc, diag::clang_cannot_build_module,
-                           TopModuleBeingImported->getName());
+                           import->getName());
         return;
+      }
+    }
+  } else if (clangDiag.getID() == clang::diag::err_pp_file_not_found) {
+    if (auto *buf = CurrentImport.dyn_cast<const llvm::MemoryBuffer *>()) {
+      if (clangSrcMgr.getBuffer(clangSrcMgr.getFileID(clangLoc)) == buf) {
+        ctx.Diags.diagnose(loc, diag::clang_cannot_import_header,
+                           clangDiag.getArgStdStr(0));
       }
     }
   }
