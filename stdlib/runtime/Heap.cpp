@@ -718,7 +718,7 @@ _swift_zone_enumerator(task_t task, void *context, unsigned type_mask,
 
   zone->arenas.forEach([&] (const void *arenaBase, Arena arena) {
     const size_t size = arena.byteSize;
-    for (size_t i = 0; (i + size) < arenaSize; i += size) {
+    for (size_t i = 0; (i + size) <= arenaSize; i += size) {
       auto pointer = (const void *)((uint8_t *)arena.base + i);
       if (!unusedBlocks.find(pointer)) {
         vm_range_t buffer = { (vm_address_t)pointer, size };
@@ -947,7 +947,7 @@ enumerateBlocks(std::function<void(const void *, size_t)> func) {
 
   swiftZone.readLock();
   swiftZone.arenas.forEach([&](const void *key, Arena arena) {
-    for (size_t i = 0; (i + arena.byteSize) < arenaSize; i += arena.byteSize) {
+    for (size_t i = 0; (i + arena.byteSize) <= arenaSize; i += arena.byteSize) {
       auto pointer = (const void *)((uint8_t *)arena.base + i);
       if (!unusedBlocks[pointer]) {
         func(pointer, arena.byteSize);
