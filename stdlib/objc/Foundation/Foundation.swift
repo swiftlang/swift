@@ -732,11 +732,6 @@ func _convertDictionaryToNSDictionary<KeyType, ValueType>(
 
 // Dictionary<KeyType, ValueType> is conditionally bridged to NSDictionary
 extension Dictionary : _ConditionallyBridgedToObjectiveC {
-  static func isBridgedToObjectiveC() -> Bool {
-    return KeyType.self is NSObject.Type &&
-           Swift.isBridgedVerbatimToObjectiveC(ValueType.self)
-  }
-
   static func getObjectiveCType() -> Any.Type {
     return NSDictionary.self
   }
@@ -747,6 +742,11 @@ extension Dictionary : _ConditionallyBridgedToObjectiveC {
 
   static func bridgeFromObjectiveC(x: NSDictionary) -> Dictionary? {
     return Dictionary(_cocoaDictionary: reinterpretCast(x))
+  }
+
+  static func isBridgedToObjectiveC() -> Bool {
+    return Swift.isBridgedToObjectiveC(KeyType.self) &&
+           Swift.isBridgedToObjectiveC(ValueType.self)
   }
 }
 
