@@ -206,6 +206,7 @@ protocol _DictionaryStorage {
   mutating func updateValue(value: ValueType, forKey: KeyType) -> ValueType?
   mutating func removeAtIndex(index: Index)
   mutating func removeValueForKey(key: KeyType) -> ValueType?
+  mutating func removeAll(#keepCapacity: Bool)
   var count: Int { get }
 
   class func fromArray(elements: Array<(KeyType, ValueType)>) -> Self
@@ -460,6 +461,10 @@ struct _NativeDictionaryStorage<KeyType : Hashable, ValueType> :
   }
 
   mutating func removeValueForKey(key: KeyType) -> ValueType? {
+    _fatalError("don't call mutating methods on _NativeDictionaryStorage")
+  }
+
+  mutating func removeAll(#keepCapacity: Bool) {
     _fatalError("don't call mutating methods on _NativeDictionaryStorage")
   }
 
@@ -786,6 +791,10 @@ struct _CocoaDictionaryStorage : _DictionaryStorage {
   }
 
   mutating func removeValueForKey(key: AnyObject) -> AnyObject? {
+    _fatalError("can not mutate NSDictionary")
+  }
+
+  mutating func removeAll(#keepCapacity: Bool) {
     _fatalError("can not mutate NSDictionary")
   }
 
@@ -1165,6 +1174,46 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
       }
       migrateDataToNativeStorage(cocoaStorage)
       return nativeRemoveObjectForKey(key)
+    }
+  }
+
+  mutating func nativeRemoveAll() {
+    var nativeStorage = native
+
+    // We have already checked for the empty dictionary case, so we will always
+    // mutating the dictionary storage.  Request unique storage.
+    let (reallocated, capacityChanged) =
+        ensureUniqueNativeStorage(nativeStorage.capacity)
+    if reallocated {
+      nativeStorage = native
+    }
+
+    for var b = 0; b != nativeStorage.capacity; ++b {
+      nativeStorage[b] = .None
+    }
+    nativeStorage.count = 0
+  }
+
+  mutating func removeAll(#keepCapacity: Bool) {
+    if count == 0 {
+      return
+    }
+
+    if !keepCapacity {
+      self = .Native(NativeStorage.Owner(minimumCapacity: 2))
+      return
+    }
+
+    if _fastPath(guaranteedNative) {
+      nativeRemoveAll()
+      return
+    }
+
+    switch self {
+    case .Native:
+      nativeRemoveAll()
+    case .Cocoa(let cocoaStorage):
+      self = .Native(NativeStorage.Owner(minimumCapacity: cocoaStorage.count))
     }
   }
 
@@ -1627,6 +1676,15 @@ struct Dictionary<KeyType : Hashable, ValueType> : Collection,
   /// in the dictionary.
   mutating func removeValueForKey(key: KeyType) -> ValueType? {
     return _variantStorage.removeValueForKey(key)
+  }
+
+  /// Erase all the elements.  If `keepCapacity` is `true`, `capacity`
+  /// will not decrease.
+  mutating func removeAll(keepCapacity: Bool = false) {
+    // The 'will not decrease' part in the documentation comment is worded very
+    // carefully.  The capacity can increase if we replace Cocoa storage with
+    // native storage.
+    _variantStorage.removeAll(keepCapacity: keepCapacity)
   }
 
   /// The number of entries in the dictionary.

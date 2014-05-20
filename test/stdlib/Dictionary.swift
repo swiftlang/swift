@@ -798,6 +798,187 @@ testCOW_Slow_RemoveValueForKeyDoesNotReallocate()
 // CHECK: testCOW_Slow_RemoveValueForKeyDoesNotReallocate done
 
 
+func testCOW_Fast_RemoveAllDoesNotReallocate() {
+  if true {
+    var d = getCOWFastDictionary()
+    let originalCapacity = d._variantStorage.native.capacity
+    assert(d.count == 3)
+    assert(d[10]! == 1010)
+
+    d.removeAll()
+    // We can not assert that identity changed, since the new buffer of smaller
+    // size can be allocated at the same address as the old one.
+    var identity1: Word = reinterpretCast(d)
+    assert(d._variantStorage.native.capacity < originalCapacity)
+    assert(d.count == 0)
+    assert(!d[10])
+
+    d.removeAll()
+    assert(identity1 == reinterpretCast(d))
+    assert(d.count == 0)
+    assert(!d[10])
+  }
+
+  if true {
+    var d = getCOWFastDictionary()
+    var identity1: Word = reinterpretCast(d)
+    let originalCapacity = d._variantStorage.native.capacity
+    assert(d.count == 3)
+    assert(d[10]! == 1010)
+
+    d.removeAll(keepCapacity: true)
+    assert(identity1 == reinterpretCast(d))
+    assert(d._variantStorage.native.capacity == originalCapacity)
+    assert(d.count == 0)
+    assert(!d[10])
+
+    d.removeAll(keepCapacity: true)
+    assert(identity1 == reinterpretCast(d))
+    assert(d._variantStorage.native.capacity == originalCapacity)
+    assert(d.count == 0)
+    assert(!d[10])
+  }
+
+  if true {
+    var d1 = getCOWFastDictionary()
+    var identity1: Word = reinterpretCast(d1)
+    assert(d1.count == 3)
+    assert(d1[10]! == 1010)
+
+    var d2 = d1
+    d2.removeAll()
+    var identity2: Word = reinterpretCast(d2)
+    assert(identity1 == reinterpretCast(d1))
+    assert(identity2 != identity1)
+    assert(d1.count == 3)
+    assert(d1[10]! == 1010)
+    assert(d2.count == 0)
+    assert(!d2[10])
+
+    // Keep variables alive.
+    acceptsAnyDictionary(d1)
+    acceptsAnyDictionary(d2)
+  }
+
+  if true {
+    var d1 = getCOWFastDictionary()
+    var identity1: Word = reinterpretCast(d1)
+    let originalCapacity = d1._variantStorage.native.capacity
+    assert(d1.count == 3)
+    assert(d1[10] == 1010)
+
+    var d2 = d1
+    d2.removeAll(keepCapacity: true)
+    var identity2: Word = reinterpretCast(d2)
+    assert(identity1 == reinterpretCast(d1))
+    assert(identity2 != identity1)
+    assert(d1.count == 3)
+    assert(d1[10]! == 1010)
+    assert(d2._variantStorage.native.capacity == originalCapacity)
+    assert(d2.count == 0)
+    assert(!d2[10])
+
+    // Keep variables alive.
+    acceptsAnyDictionary(d1)
+    acceptsAnyDictionary(d2)
+  }
+
+  println("testCOW_Fast_RemoveAllDoesNotReallocate done")
+}
+testCOW_Fast_RemoveAllDoesNotReallocate()
+// CHECK: testCOW_Fast_RemoveAllDoesNotReallocate done
+
+func testCOW_Slow_RemoveAllDoesNotReallocate() {
+  if true {
+    var d = getCOWSlowDictionary()
+    let originalCapacity = d._variantStorage.native.capacity
+    assert(d.count == 3)
+    assert(d[TestKeyTy(10)]!.value == 1010)
+
+    d.removeAll()
+    // We can not assert that identity changed, since the new buffer of smaller
+    // size can be allocated at the same address as the old one.
+    var identity1: Word = reinterpretCast(d)
+    assert(d._variantStorage.native.capacity < originalCapacity)
+    assert(d.count == 0)
+    assert(!d[TestKeyTy(10)])
+
+    d.removeAll()
+    assert(identity1 == reinterpretCast(d))
+    assert(d.count == 0)
+    assert(!d[TestKeyTy(10)])
+  }
+
+  if true {
+    var d = getCOWSlowDictionary()
+    var identity1: Word = reinterpretCast(d)
+    let originalCapacity = d._variantStorage.native.capacity
+    assert(d.count == 3)
+    assert(d[TestKeyTy(10)]!.value == 1010)
+
+    d.removeAll(keepCapacity: true)
+    assert(identity1 == reinterpretCast(d))
+    assert(d._variantStorage.native.capacity == originalCapacity)
+    assert(d.count == 0)
+    assert(!d[TestKeyTy(10)])
+
+    d.removeAll(keepCapacity: true)
+    assert(identity1 == reinterpretCast(d))
+    assert(d._variantStorage.native.capacity == originalCapacity)
+    assert(d.count == 0)
+    assert(!d[TestKeyTy(10)])
+  }
+
+  if true {
+    var d1 = getCOWSlowDictionary()
+    var identity1: Word = reinterpretCast(d1)
+    assert(d1.count == 3)
+    assert(d1[TestKeyTy(10)]!.value == 1010)
+
+    var d2 = d1
+    d2.removeAll()
+    var identity2: Word = reinterpretCast(d2)
+    assert(identity1 == reinterpretCast(d1))
+    assert(identity2 != identity1)
+    assert(d1.count == 3)
+    assert(d1[TestKeyTy(10)]!.value == 1010)
+    assert(d2.count == 0)
+    assert(!d2[TestKeyTy(10)])
+
+    // Keep variables alive.
+    acceptsAnyDictionary(d1)
+    acceptsAnyDictionary(d2)
+  }
+
+  if true {
+    var d1 = getCOWSlowDictionary()
+    var identity1: Word = reinterpretCast(d1)
+    let originalCapacity = d1._variantStorage.native.capacity
+    assert(d1.count == 3)
+    assert(d1[TestKeyTy(10)]!.value == 1010)
+
+    var d2 = d1
+    d2.removeAll(keepCapacity: true)
+    var identity2: Word = reinterpretCast(d2)
+    assert(identity1 == reinterpretCast(d1))
+    assert(identity2 != identity1)
+    assert(d1.count == 3)
+    assert(d1[TestKeyTy(10)]!.value == 1010)
+    assert(d2._variantStorage.native.capacity == originalCapacity)
+    assert(d2.count == 0)
+    assert(!d2[TestKeyTy(10)])
+
+    // Keep variables alive.
+    acceptsAnyDictionary(d1)
+    acceptsAnyDictionary(d2)
+  }
+
+  println("testCOW_Slow_RemoveAllDoesNotReallocate done")
+}
+testCOW_Slow_RemoveAllDoesNotReallocate()
+// CHECK: testCOW_Slow_RemoveAllDoesNotReallocate done
+
+
 func testCOW_Fast_CountDoesNotReallocate() {
   var d = getCOWFastDictionary()
   var identity1: Word = reinterpretCast(d)
@@ -1810,7 +1991,7 @@ test_BridgedFromObjC_Nonverbatim_RemoveAtIndex()
 // CHECK: test_BridgedFromObjC_Nonverbatim_RemoveAtIndex done
 
 
-func test_BridgedFromObjC_Verbatim_DeleteKey() {
+func test_BridgedFromObjC_Verbatim_RemoveValueForKey() {
   if true {
     var d = getBridgedVerbatimDictionary()
     var identity1: Word = reinterpretCast(d)
@@ -1868,12 +2049,12 @@ func test_BridgedFromObjC_Verbatim_DeleteKey() {
     assert(identity2 == reinterpretCast(d2))
   }
 
-  println("test_BridgedFromObjC_Verbatim_DeleteKey done")
+  println("test_BridgedFromObjC_Verbatim_RemoveValueForKey done")
 }
-test_BridgedFromObjC_Verbatim_DeleteKey()
-// CHECK: test_BridgedFromObjC_Verbatim_DeleteKey done
+test_BridgedFromObjC_Verbatim_RemoveValueForKey()
+// CHECK: test_BridgedFromObjC_Verbatim_RemoveValueForKey done
 
-func test_BridgedFromObjC_Nonverbatim_DeleteKey() {
+func test_BridgedFromObjC_Nonverbatim_RemoveValueForKey() {
   if true {
     var d = getBridgedNonverbatimDictionary()
     var identity1: Word = reinterpretCast(d)
@@ -1931,10 +2112,185 @@ func test_BridgedFromObjC_Nonverbatim_DeleteKey() {
     assert(identity2 == reinterpretCast(d2))
   }
 
-  println("test_BridgedFromObjC_Nonverbatim_DeleteKey done")
+  println("test_BridgedFromObjC_Nonverbatim_RemoveValueForKey done")
 }
-test_BridgedFromObjC_Nonverbatim_DeleteKey()
-// CHECK: test_BridgedFromObjC_Nonverbatim_DeleteKey done
+test_BridgedFromObjC_Nonverbatim_RemoveValueForKey()
+// CHECK: test_BridgedFromObjC_Nonverbatim_RemoveValueForKey done
+
+
+func test_BridgedFromObjC_Verbatim_RemoveAll() {
+  if true {
+    var d = getBridgedVerbatimDictionary([:])
+    var identity1: Word = reinterpretCast(d)
+    assert(isCocoaDictionary(d))
+    assert(d.count == 0)
+
+    d.removeAll()
+    assert(identity1 == reinterpretCast(d))
+    assert(d.count == 0)
+  }
+
+  if true {
+    var d = getBridgedVerbatimDictionary()
+    var identity1: Word = reinterpretCast(d)
+    assert(isCocoaDictionary(d))
+    let originalCapacity = d.count
+    assert(d.count == 3)
+    assert(d[TestObjCKeyTy(10)]!.value == 1010)
+
+    d.removeAll()
+    assert(identity1 != reinterpretCast(d))
+    assert(d._variantStorage.native.capacity < originalCapacity)
+    assert(d.count == 0)
+    assert(!d[TestObjCKeyTy(10)])
+  }
+
+  if true {
+    var d = getBridgedVerbatimDictionary()
+    var identity1: Word = reinterpretCast(d)
+    assert(isCocoaDictionary(d))
+    let originalCapacity = d.count
+    assert(d.count == 3)
+    assert(d[TestObjCKeyTy(10)]!.value == 1010)
+
+    d.removeAll(keepCapacity: true)
+    assert(identity1 != reinterpretCast(d))
+    assert(d._variantStorage.native.capacity >= originalCapacity)
+    assert(d.count == 0)
+    assert(!d[TestObjCKeyTy(10)])
+  }
+
+  if true {
+    var d1 = getBridgedVerbatimDictionary()
+    var identity1: Word = reinterpretCast(d1)
+    assert(isCocoaDictionary(d1))
+    let originalCapacity = d1.count
+    assert(d1.count == 3)
+    assert(d1[TestObjCKeyTy(10)]!.value == 1010)
+
+    var d2 = d1
+    d2.removeAll()
+    var identity2: Word = reinterpretCast(d2)
+    assert(identity1 == reinterpretCast(d1))
+    assert(identity2 != identity1)
+    assert(d1.count == 3)
+    assert(d1[TestObjCKeyTy(10)]!.value == 1010)
+    assert(d2._variantStorage.native.capacity < originalCapacity)
+    assert(d2.count == 0)
+    assert(!d2[TestObjCKeyTy(10)])
+  }
+
+  if true {
+    var d1 = getBridgedVerbatimDictionary()
+    var identity1: Word = reinterpretCast(d1)
+    assert(isCocoaDictionary(d1))
+    let originalCapacity = d1.count
+    assert(d1.count == 3)
+    assert(d1[TestObjCKeyTy(10)]!.value == 1010)
+
+    var d2 = d1
+    d2.removeAll(keepCapacity: true)
+    var identity2: Word = reinterpretCast(d2)
+    assert(identity1 == reinterpretCast(d1))
+    assert(identity2 != identity1)
+    assert(d1.count == 3)
+    assert(d1[TestObjCKeyTy(10)]!.value == 1010)
+    assert(d2._variantStorage.native.capacity >= originalCapacity)
+    assert(d2.count == 0)
+    assert(!d2[TestObjCKeyTy(10)])
+  }
+
+  println("test_BridgedFromObjC_Verbatim_RemoveAll done")
+}
+test_BridgedFromObjC_Verbatim_RemoveAll()
+// CHECK: test_BridgedFromObjC_Verbatim_RemoveAll done
+
+func test_BridgedFromObjC_Nonverbatim_RemoveAll() {
+  if true {
+    var d = getBridgedNonverbatimDictionary([:])
+    var identity1: Word = reinterpretCast(d)
+    assert(isCocoaDictionary(d))
+    assert(d.count == 0)
+
+    d.removeAll()
+    assert(identity1 == reinterpretCast(d))
+    assert(d.count == 0)
+  }
+
+  if true {
+    var d = getBridgedNonverbatimDictionary()
+    var identity1: Word = reinterpretCast(d)
+    assert(isCocoaDictionary(d))
+    let originalCapacity = d.count
+    assert(d.count == 3)
+    assert(d[TestBridgedKeyTy(10)]!.value == 1010)
+
+    d.removeAll()
+    assert(identity1 != reinterpretCast(d))
+    assert(d._variantStorage.native.capacity < originalCapacity)
+    assert(d.count == 0)
+    assert(!d[TestBridgedKeyTy(10)])
+  }
+
+  if true {
+    var d = getBridgedNonverbatimDictionary()
+    var identity1: Word = reinterpretCast(d)
+    assert(isCocoaDictionary(d))
+    let originalCapacity = d.count
+    assert(d.count == 3)
+    assert(d[TestBridgedKeyTy(10)]!.value == 1010)
+
+    d.removeAll(keepCapacity: true)
+    assert(identity1 != reinterpretCast(d))
+    assert(d._variantStorage.native.capacity >= originalCapacity)
+    assert(d.count == 0)
+    assert(!d[TestBridgedKeyTy(10)])
+  }
+
+  if true {
+    var d1 = getBridgedNonverbatimDictionary()
+    var identity1: Word = reinterpretCast(d1)
+    assert(isCocoaDictionary(d1))
+    let originalCapacity = d1.count
+    assert(d1.count == 3)
+    assert(d1[TestBridgedKeyTy(10)]!.value == 1010)
+
+    var d2 = d1
+    d2.removeAll()
+    var identity2: Word = reinterpretCast(d2)
+    assert(identity1 == reinterpretCast(d1))
+    assert(identity2 != identity1)
+    assert(d1.count == 3)
+    assert(d1[TestBridgedKeyTy(10)]!.value == 1010)
+    assert(d2._variantStorage.native.capacity < originalCapacity)
+    assert(d2.count == 0)
+    assert(!d2[TestBridgedKeyTy(10)])
+  }
+
+  if true {
+    var d1 = getBridgedNonverbatimDictionary()
+    var identity1: Word = reinterpretCast(d1)
+    assert(isCocoaDictionary(d1))
+    let originalCapacity = d1.count
+    assert(d1.count == 3)
+    assert(d1[TestBridgedKeyTy(10)]!.value == 1010)
+
+    var d2 = d1
+    d2.removeAll(keepCapacity: true)
+    var identity2: Word = reinterpretCast(d2)
+    assert(identity1 == reinterpretCast(d1))
+    assert(identity2 != identity1)
+    assert(d1.count == 3)
+    assert(d1[TestBridgedKeyTy(10)]!.value == 1010)
+    assert(d2._variantStorage.native.capacity >= originalCapacity)
+    assert(d2.count == 0)
+    assert(!d2[TestBridgedKeyTy(10)])
+  }
+
+  println("test_BridgedFromObjC_Nonverbatim_RemoveAll done")
+}
+test_BridgedFromObjC_Nonverbatim_RemoveAll()
+// CHECK: test_BridgedFromObjC_Nonverbatim_RemoveAll done
 
 
 func test_BridgedFromObjC_Verbatim_Count() {
