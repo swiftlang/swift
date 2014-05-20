@@ -95,72 +95,10 @@ func +<
   return lhs
 }
 
-func _contiguousArrayExtend<
-    T, S : Sequence
-    where S.GeneratorType.Element == T
->(inout a: ContiguousArray<T>, seq: S) {
-  a += seq
-}
-
-extension ContiguousArray : ExtensibleCollection {
-  mutating func extend<
-      S : Sequence
-      where S.GeneratorType.Element == T
-  >(seq: S) {
-    // Calling a helper function instead of writing the code inline because of:
-    //
-    // <rdar://problem/16954386> Type checker assertion: Unable to solve for
-    // call to witness?
-
-    _contiguousArrayExtend(&self, seq)
-  }
-}
-
-func _sliceExtend<
-    T, S : Sequence
-    where S.GeneratorType.Element == T
->(inout a: Slice<T>, seq: S) {
-  a += seq
-}
-
-extension Slice : ExtensibleCollection {
-  mutating func extend<
-      S : Sequence
-      where S.GeneratorType.Element == T
-  >(seq: S) {
-    // Calling a helper function instead of writing the code inline because of:
-    //
-    // <rdar://problem/16954386> Type checker assertion: Unable to solve for
-    // call to witness?
-
-    _sliceExtend(&self, seq)
-  }
-}
-
-func _arrayExtend<
-    T, S : Sequence
-    where S.GeneratorType.Element == T
->(inout a: Array<T>, seq: S) {
-  a += seq
-}
-
-extension Array : ExtensibleCollection {
-  mutating func extend<
-      S : Sequence
-      where S.GeneratorType.Element == T
-  >(seq: S) {
-    // Calling a helper function instead of writing the code inline because of:
-    //
-    // <rdar://problem/16954386> Type checker assertion: Unable to solve for
-    // call to witness?
-
-    _arrayExtend(&self, seq)
-  }
-}
-
 extension String : ExtensibleCollection {
   mutating func reserveCapacity(n: Int) {
     // FIXME: implement.
+    // <rdar://problem/16970908> Implement String.reserveCapacity
   }
 
   mutating func extend<

@@ -177,7 +177,21 @@ extension ${Self} : ArrayType {
   mutating func append(newElement: T) {
     _arrayAppend(&_buffer, newElement)
   }
-  
+
+  /// Append elements from `sequence` to the Array
+  mutating func extend<
+      S : Sequence
+      where S.GeneratorType.Element == T
+  >(sequence: S) {
+    // Calling a helper free function instead of writing the code inline
+    // because of:
+    //
+    // <rdar://problem/16954386> Type checker assertion: Unable to solve for
+    // call to witness?
+
+    _${Self}Extend(&self, sequence)
+  }
+
   /// Remove an element from the end of the ${Self} in O(1).
   /// Requires: count > 0
   mutating func removeLast() -> T {
@@ -240,6 +254,13 @@ extension ${Self} : ArrayType {
   func filter(includeElement: (T)->Bool) -> ${Self} {
     return ${Self}(Swift.filter(self, includeElement))
   }
+}
+
+func _${Self}Extend<
+    T, S : Sequence
+    where S.GeneratorType.Element == T
+>(inout a: ${Self}<T>, sequence: S) {
+  a += sequence
 }
 
 extension ${Self} : Reflectable {
