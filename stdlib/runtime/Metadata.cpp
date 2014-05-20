@@ -21,12 +21,14 @@
 #include "swift/Runtime/Enum.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
+#include "swift/Strings.h"
 #include <algorithm>
 #include <dlfcn.h>
 #include <new>
 #include <mutex>
 #include <sstream>
-#include <string.h>
+#include <cctype>
+#include <cstring>
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/Hashing.h"
@@ -2530,6 +2532,91 @@ recur:
     return nullptr;
   }
 }
+
+
+/// Scan and return a single run-length encoded identifier.
+/// Returns a malloc-allocated string, or nullptr on failure.
+/// mangled is advanced past the end of the scanned token.
+static char *scanIdentifier(const char *&mangled)
+{
+  const char *original = mangled;
+
+  {
+    if (*mangled == '0') goto fail;  // length may not be zero
+    
+    size_t length = 0;
+    while (isdigit(*mangled)) {
+      size_t oldlength = length;
+      length *= 10;
+      length += *mangled++ - '0';
+      if (length <= oldlength) goto fail;  // integer overflow
+    }
+    
+    if (length == 0) goto fail;
+    if (length > strlen(mangled)) goto fail;
+    
+    char *result = strndup(mangled, length);
+    assert(result);
+    mangled += length;
+    return result;
+  }
+
+fail:
+  mangled = original;  // rewind
+  return nullptr;
+}
+
+
+/// \brief Demangle a mangled class name into module+class.
+/// Returns true if the name was successfully decoded.
+/// On success, *outModule and *outClass must be freed with free().
+/// FIXME: this should be replaced by a real demangler
+bool swift_demangleSimpleClass(const char *mangledName, 
+                               char **outModule, char **outClass)
+{
+  char *moduleName = nullptr;
+  char *className = nullptr;
+
+  {  
+    // Prefix for a mangled class
+    const char *m = mangledName;
+    if (0 != strncmp(m, "_TtC", 4)) 
+      goto fail;
+    m += 4;
+    
+    // Module name
+    if (strncmp(m, "Ss", 2) == 0) {
+      moduleName = strdup(swift::STDLIB_NAME);
+      assert(moduleName);
+      m += 2;
+    } else {
+      moduleName = scanIdentifier(m);
+      if (!moduleName) 
+        goto fail;
+    }
+    
+    // Class name
+    className = scanIdentifier(m);
+    if (!className) 
+      goto fail;
+    
+    // Nothing else
+    if (strlen(m)) 
+      goto fail;
+    
+    *outModule = moduleName;
+    *outClass = className;
+    return true;
+  }
+
+fail:
+  if (moduleName) free(moduleName);
+  if (className) free(className);
+  *outModule = nullptr;
+  *outClass = nullptr;
+  return false;
+}
+
 
 static const void *
 findWitnessTableForDynamicCastToExistential1(OpaqueValue *sourceValue,

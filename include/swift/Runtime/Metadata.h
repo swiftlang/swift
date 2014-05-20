@@ -1965,4 +1965,11 @@ extern "C" void swift_printAny(OpaqueValue *value, const Metadata *type);
   
 } // end namespace swift
 
+/// \brief Demangle a mangled class name into module+class.
+/// Returns true if the name was successfully decoded.
+/// On success, *outModule and *outClass must be freed with free().
+extern "C" bool
+swift_demangleSimpleClass(const char *mangledName, 
+                          char **outModule, char **outClass);
+
 #endif /* SWIFT_RUNTIME_METADATA_H */
