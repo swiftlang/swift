@@ -1047,12 +1047,12 @@ struct RC4 {
       var K : UInt8 = Key[i % Key.count]
       var S : UInt8 = State[i]
       j = j &+ S &+ K
-      swapByIndex(i, Int(j))
+      swapByIndex(i, y: Int(j))
     }
   }
 
   mutating
-  func swapByIndex(x: Int, y: Int) {
+  func swapByIndex(`x`: Int, y: Int) {
     let T1 : UInt8 = State[x]
     let T2 : UInt8 = State[y]
     State[x] = T2
@@ -1063,7 +1063,7 @@ struct RC4 {
   func next() -> UInt8 {
     I = I &+ 1
     J = J &+ State[Int(I)]
-    swapByIndex(Int(I), Int(J))
+    swapByIndex(Int(I), y:Int(J))
     return State[Int(State[Int(I)] &+ State[Int(J)]) & 0xFF]
   }
 
@@ -1197,7 +1197,7 @@ class NthToggle : Toggle {
     var counter  : Int = 0
 
     init(start_state : Bool, max_counter : Int) {
-        super.init(start_state)
+        super.init(start_state: start_state)
         count_max = max_counter
         counter = 0
     }
@@ -1212,22 +1212,22 @@ class NthToggle : Toggle {
 }
 
 func benchObjInst_internal(n : Int) {
-  var toggle1 = Toggle(true)
+  var toggle1 = Toggle(start_state: true)
   //for i in 0...5 {
   //  println(toggle1.activate().value())
   //}
 
   for i in 0..5 {
-    var t = Toggle(true)
+    var t = Toggle(start_state: true)
   }
 
-  var ntoggle1 = NthToggle(true, 3)
+  var ntoggle1 = NthToggle(start_state: true, max_counter: 3)
   //for i in 0...5 {
   //  println(ntoggle1.activate().value())
   //}
 
   for i in 0..n {
-    var toggle = NthToggle(true, 3)
+    var toggle = NthToggle(start_state: true, max_counter: 3)
   }
 }
 
