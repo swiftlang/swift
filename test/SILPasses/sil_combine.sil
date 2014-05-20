@@ -1244,3 +1244,43 @@ bb0(%0 : $*AddressOnlyEnum):
   %2 = load %1 : $*Builtin.Int32
   return %2 : $Builtin.Int32
 }
+
+sil @partial_apply_arg_fun : $@thin (Builtin.Int32, Builtin.Int32) -> () {
+bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
+  %2 = tuple()
+  return %2 : $()
+}
+sil @partial_apply_generic_func : $@thin <T> () -> () {
+bb0:
+  %0 = tuple()
+  return %0 : $()
+}
+
+sil @partial_apply_nothing : $@thin () -> () {
+  %0 = tuple()
+  return %0 : $()
+}
+
+// CHECK-LABEL: sil @partial_apply_without_subs_or_args_is_thin_to_thick
+// CHECK: bb0:
+// CHECK-NEXT: function_ref partial_apply_nothing
+// CHECK-NEXT: function_ref @partial_apply_nothing
+// CHECK-NEXT: thin_to_thick_function
+// CHECK-NEXT: function_ref partial_apply_arg_fun
+// CHECK-NEXT: function_ref @partial_apply_arg_fun
+// CHECK-NEXT: integer_literal
+// CHECK-NEXT: partial_apply
+// CHECK-NEXT: function_ref partial_apply_generic_func
+// CHECK-NEXT: function_ref @partial_apply_generic_func
+// CHECK-NEXT: partial_apply
+sil @partial_apply_without_subs_or_args_is_thin_to_thick : $@thin () -> (@callee_owned () -> ()) {
+bb0:
+  %0 = function_ref @partial_apply_nothing : $@thin () -> ()
+  %1 = partial_apply %0() : $@thin () -> ()
+  %2 = function_ref @partial_apply_arg_fun : $@thin (Builtin.Int32, Builtin.Int32) -> ()
+  %3 = integer_literal $Builtin.Int32, 0
+  %4 = partial_apply %2(%3) : $@thin (Builtin.Int32, Builtin.Int32) -> ()
+  %5 = function_ref @partial_apply_generic_func : $@thin <T> () -> ()
+  %6 = partial_apply %5<Builtin.Int32>() : $@thin <T> () -> ()
+  return %1 : $@callee_owned () -> ()
+}

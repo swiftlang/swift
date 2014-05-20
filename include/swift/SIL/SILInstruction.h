@@ -611,6 +611,9 @@ public:
     return Operands.getDynamicValuesAsArray();
   }
 
+  /// Returns the number of arguments for this partial apply.
+  unsigned getNumArguments() const { return getArguments().size(); }
+
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 

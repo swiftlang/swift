@@ -745,6 +745,13 @@ SILInstruction *SILCombiner::visitRetainValueInst(RetainValueInst *RVI) {
 }
 
 SILInstruction *SILCombiner::visitPartialApplyInst(PartialApplyInst *PAI) {
+  // partial_apply without any substitutions or arguments is just a
+  // thin_to_thick_function.
+  if (!PAI->hasSubstitutions() && (PAI->getNumArguments() == 0))
+    return new (PAI->getModule()) ThinToThickFunctionInst(PAI->getLoc(),
+                                                          PAI->getCallee(),
+                                                          PAI->getType());
+
   // Delete dead closures of this form:
   //
   // %X = partial_apply %x(...)    // has 1 use.
