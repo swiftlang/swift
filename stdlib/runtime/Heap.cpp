@@ -494,7 +494,9 @@ Arena::Arena(size_t idx, size_t size) : byteSize(size), index(idx) {
 
 void Arena::newArena(size_t idx, size_t size) {
   auto arena = Arena(idx, size);
+  swiftZone.writeLock();
   swiftZone.arenas.insert(std::pair<void *, Arena>(arena.base, arena));
+  swiftZone.writeUnlock();
 }
 
 malloc_zone_t *swift::_swift_zone_get_shims() {
