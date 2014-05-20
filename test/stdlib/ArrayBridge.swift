@@ -28,7 +28,7 @@ import ArrayBridgeObjC
 var trackedCount = 0
 var nextTrackedSerialNumber = 0
 
-class Tracked : ForwardIndex, Printable {
+class Tracked : NSObject, ForwardIndex, Printable {
   init(_ value: Int) {
     ++trackedCount
     serialNumber = ++nextTrackedSerialNumber
@@ -41,7 +41,7 @@ class Tracked : ForwardIndex, Printable {
     serialNumber = -serialNumber
   }
 
-  var description: String {
+  override var description: String {
     assert(serialNumber > 0, "dead Tracked!")
     return "Base#\(serialNumber)(\(value))"
   }
@@ -100,6 +100,39 @@ struct BridgedSwift : Printable, _BridgedToObjectiveC {
   }
 
   var trak: Tracked
+}
+
+// A class used to test various Objective-C thunks.
+class Thunks : NSObject {
+  func createBridgedObjC(value: Int) -> AnyObject {
+    return BridgedObjC(value)
+  }
+  
+  @objc func acceptBridgedObjCArray(x: BridgedObjC[]) {
+    println("acceptBridgedObjCArray(\(x))")
+  }
+
+  @objc func produceBridgedObjCArray(numItems: Int) -> BridgedObjC[] {
+    var array: BridgedObjC[] = []
+    for i in 0..numItems {
+      array.append(BridgedObjC(i))
+    }
+    println("produceBridgedObjCArray(\(array))")
+    return array
+  }
+
+  @objc func acceptBridgedSwiftArray(x: BridgedSwift[]) {
+    println("acceptBridgedSwiftArray(\(x))")
+  }
+
+  @objc func produceBridgedSwiftArray(numItems: Int) -> BridgedSwift[] {
+    var array: BridgedSwift[] = []
+    for i in 0..numItems {
+      array.append(BridgedSwift(i))
+    }
+    println("produceBridgedSwiftArray(\(array))")
+    return array
+  }
 }
 
 
@@ -189,6 +222,17 @@ func testBridgedVerbatim() {
   else {
     println("downcastBackToDerived failed")
   }
+
+  // CHECK-NEXT: produceBridgedObjCArray([BridgedObjC[[A:#[0-9]+]](0), BridgedObjC[[B:#[0-9]+]](1), BridgedObjC[[C:#[0-9]+]](2), BridgedObjC[[D:#[0-9]+]](3), BridgedObjC[[E:#[0-9]+]](4)])
+  testBridgedObjC(Thunks())
+  // CHECK-NEXT: 5 elements in the array
+  // CHECK-NEXT: BridgedObjC[[A]](0)
+  // CHECK-NEXT: BridgedObjC[[B]](1)
+  // CHECK-NEXT: BridgedObjC[[C]](2)
+  // CHECK-NEXT: BridgedObjC[[D]](3)
+  // CHECK-NEXT: BridgedObjC[[E]](4)
+
+  // CHECK-NEXT: acceptBridgedObjCArray([BridgedObjC[[A:#[0-9]+]](10), BridgedObjC[[B:#[0-9]+]](11), BridgedObjC[[C:#[0-9]+]](12), BridgedObjC[[D:#[0-9]+]](13), BridgedObjC[[E:#[0-9]+]](14)])
 }
 testBridgedVerbatim()
 
@@ -359,6 +403,17 @@ func testExplicitlyBridged() {
     // CHECK-NEXT: Correctly rejected downcast of nil array
     println("Correctly rejected downcast of nil array")
   }
+
+  // CHECK-NEXT: produceBridgedSwiftArray([BridgedSwift[[A:#[0-9]+]](0), BridgedSwift[[B:#[0-9]+]](1), BridgedSwift[[C:#[0-9]+]](2), BridgedSwift[[D:#[0-9]+]](3), BridgedSwift[[E:#[0-9]+]](4)])
+  testBridgedSwift(Thunks())
+  // CHECK-NEXT: 5 elements in the array
+  // CHECK-NEXT: BridgedObjC[[A:#[0-9]+]](0)
+  // CHECK-NEXT: BridgedObjC[[B:#[0-9]+]](1)
+  // CHECK-NEXT: BridgedObjC[[C:#[0-9]+]](2)
+  // CHECK-NEXT: BridgedObjC[[D:#[0-9]+]](3)
+  // CHECK-NEXT: BridgedObjC[[E:#[0-9]+]](4)
+
+  // CHECK-NEXT: acceptBridgedSwiftArray([BridgedSwift[[A:#[0-9]+]](10), BridgedSwift[[B:#[0-9]+]](11), BridgedSwift[[C:#[0-9]+]](12), BridgedSwift[[D:#[0-9]+]](13), BridgedSwift[[E:#[0-9]+]](14)])
 }
 testExplicitlyBridged()
 
