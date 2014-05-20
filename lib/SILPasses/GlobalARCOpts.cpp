@@ -517,15 +517,15 @@ static bool processFunction(SILFunction &F, AliasAnalysis *AA) {
       BBState.clear();
       DecToIncStateMap.clear();
 
-      bool NestingDectected;
-      processBBTopDown(BB, BBState, DecToIncStateMap, NestingDectected, AA);
+      bool NestingDetected;
+      processBBTopDown(BB, BBState, DecToIncStateMap, NestingDetected, AA);
 
       bool RemovedRetain = performCodeMotion(DecToIncStateMap);
       Changed |= RemovedRetain;
 
       // We need to rerun if we saw any nested increment/decrements and if we
       // removed any increment/decrement pairs.
-      if (!NestingDectected || !RemovedRetain)
+      if (!NestingDetected || !RemovedRetain)
         break;
 
       DEBUG(llvm::dbgs() << "\n<<< Made a Change! Reprocessing BB! >>>\n");
