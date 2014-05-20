@@ -1052,7 +1052,7 @@ struct RC4 {
   }
 
   mutating
-  func swapByIndex(`x`: Int, y: Int) {
+  func swapByIndex(x: Int, y: Int) {
     let T1 : UInt8 = State[x]
     let T2 : UInt8 = State[y]
     State[x] = T2
