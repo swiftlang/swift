@@ -1216,15 +1216,27 @@ bool getApplySubstitutionsFromParsed(
          "Number of substitution exceeds number of archetypes");
   unsigned Id = 0;
   for (auto &parsed : parses) {
-    Substitution sub;
     // The replacement is for the corresponding archetype by ordering.
-    sub.Archetype = allArchetypes[Id++];
-    if (!sub.Archetype) {
+    auto subArchetype = allArchetypes[Id++];
+    if (!subArchetype) {
       SP.P.diagnose(parsed.loc, diag::sil_apply_archetype_not_found);
       return true;
     }
-    sub.Replacement = parsed.replacement;
-    subs.push_back(sub);
+    // Collect conformances by looking up the conformance from replacement
+    // type and protocol decl in GenericParamList.
+    SmallVector<ProtocolConformance*, 2> conformances;
+    for (const auto &req : params->getRequirements())
+      if (req.getKind() == RequirementKind::Conformance)
+        if (auto protoTy = req.getConstraint()->getAs<ProtocolType>()) {
+          auto proto = protoTy->getDecl();
+          auto conformance = SP.P.SF.getParentModule()->lookupConformance(
+                               parsed.replacement, proto, nullptr);
+          if (conformance.getPointer())
+            conformances.push_back(conformance.getPointer());
+        }
+
+    subs.push_back({subArchetype, parsed.replacement,
+                    SP.P.Context.AllocateCopy(conformances)});
   }
   return false;
 }
