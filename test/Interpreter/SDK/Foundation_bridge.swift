@@ -119,10 +119,20 @@ if let obj: AnyObject = bridgeToObjectiveC(dict) {
   println("dictionary is not bridged to Objective-C")
 }
 
-// CHECK: dictionary is not bridged to Objective-C
+// CHECK:      dictionary bridges to {
+// CHECK-NEXT:   1 = Hello;
+// CHECK-NEXT:   2 = World;
+// CHECK-NEXT: }
 var dict2 = [1: "Hello", 2: "World"]
 if let obj: AnyObject = bridgeToObjectiveC(dict2) {
-  // FIXME: Printing \(obj.description!()) here 
+  println("dictionary bridges to \(obj.description!)")
+} else {
+  println("dictionary is not bridged to Objective-C")
+}
+
+// CHECK: dictionary is not bridged to Objective-C
+var dict3 = [1: ("Hello", 1), 2: ("World", 2)]
+if let obj: AnyObject = bridgeToObjectiveC(dict3) {
   println("dictionary bridges to \(obj.description!)")
 } else {
   println("dictionary is not bridged to Objective-C")
@@ -130,21 +140,21 @@ if let obj: AnyObject = bridgeToObjectiveC(dict2) {
 
 // Check dictionary bridging.
 var propListStr: NSString = "\"Hello\" = 1;\n\n\"World\" = 2;"
-var dict3 = propListStr.propertyListFromStringsFileFormat()
+var dict4 = propListStr.propertyListFromStringsFileFormat()
 var hello = "Hello"
 var world = "World"
 
 // Print out the keys. We only check one of these because the order is
 // nondeterministic.
 // CHECK: Hello
-for key in dict3.keys {
+for key in dict4.keys {
   println(key.description)
 }
 
 // CHECK: Hello: 1
-println("Hello: \(dict3[hello]!.description!)")
+println("Hello: \(dict4[hello]!.description!)")
 // CHECK: World: 2
-println("World: \(dict3[world]!.description!)")
+println("World: \(dict4[world]!.description!)")
 
 
 
