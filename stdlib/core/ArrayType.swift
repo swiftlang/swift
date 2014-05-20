@@ -12,8 +12,8 @@
 
 protocol ArrayType
   : _ArrayType,
-    Collection,     
-    MutableSliceable, 
+    ExtensibleCollection,
+    MutableSliceable,
     ArrayLiteralConvertible
 {
   //===--- public interface -----------------------------------------------===//
@@ -50,7 +50,13 @@ protocol ArrayType
   
   /// Append newElement to the Array in O(1) (amortized)
   mutating func append(newElement: Self.GeneratorType.Element)
-  
+
+  /// Append elements from `sequence` to the Array
+  mutating func extend<
+      S : Sequence
+      where S.GeneratorType.Element == Self.GeneratorType.Element
+  >(sequence: S)
+
   /// Remove an element from the end of the Array in O(1).  Returns:
   /// the removed element. Requires: count > 0
   mutating func removeLast() -> Self.GeneratorType.Element
