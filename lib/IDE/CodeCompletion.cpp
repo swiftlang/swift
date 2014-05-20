@@ -2223,7 +2223,8 @@ static bool isClangSubModule(Module *TheModule) {
   auto Files = TheModule->getFiles();
   assert(!Files.empty());
   if (auto CMU = dyn_cast<ClangModuleUnit>(Files.front())) {
-    return CMU->getClangModule()->isSubModule();
+    if (auto ClangMod = CMU->getClangModule())
+      return ClangMod->isSubModule();
   }
   return false;
 }

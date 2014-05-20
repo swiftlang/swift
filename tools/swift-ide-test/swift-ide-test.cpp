@@ -135,6 +135,9 @@ ImportPaths("I", llvm::cl::desc("add a directory to the import search path"));
 static llvm::cl::list<std::string>
 FrameworkPaths("F", llvm::cl::desc("add a directory to the framework search path"));
 
+static llvm::cl::opt<std::string>
+ImportObjCHeader("import-objc-header", llvm::cl::desc("header to implicitly import"));
+
 static llvm::cl::opt<bool>
 EnableSourceImport("enable-source-import", llvm::cl::Hidden,
                    llvm::cl::init(false));
@@ -1593,6 +1596,8 @@ int main(int argc, char *argv[]) {
   InitInvok.setFrameworkSearchPaths(options::FrameworkPaths);
   InitInvok.getFrontendOptions().EnableSourceImport =
     options::EnableSourceImport;
+  InitInvok.getFrontendOptions().ImplicitObjCHeaderPath =
+    options::ImportObjCHeader;
   InitInvok.getLangOptions().SplitPrepositions = options::SplitObjCSelectors;
   InitInvok.getClangImporterOptions().InferImplicitProperties
     = options::ImplicitProperties;
