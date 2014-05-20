@@ -233,21 +233,30 @@ struct ASTNodeBase {};
     /// If we're visiting in pre-order, don't validate the node yet;
     /// just check whether we should stop further descent.
     template <class T> bool dispatchVisitPre(T node) {
-      return shouldVerify(node);
+      if (shouldVerify(node))
+        return true;
+      cleanup(node);
+      return false;
     }
 
     /// Helper template for dispatching pre-visitation.
     /// If we're visiting in pre-order, don't validate the node yet;
     /// just check whether we should stop further descent.
     template <class T> std::pair<bool, Expr *> dispatchVisitPreExpr(T node) {
-      return { shouldVerify(node), node };
+      if (shouldVerify(node))
+        return { true, node };
+      cleanup(node);
+      return { false, node };
     }
 
     /// Helper template for dispatching pre-visitation.
     /// If we're visiting in pre-order, don't validate the node yet;
     /// just check whether we should stop further descent.
     template <class T> std::pair<bool, Stmt *> dispatchVisitPreStmt(T node) {
-      return { shouldVerify(node), node };
+      if (shouldVerify(node))
+        return { true, node };
+      cleanup(node);
+      return { false, node };
     }
 
     /// Helper template for dispatching pre-visitation.
@@ -255,7 +264,10 @@ struct ASTNodeBase {};
     /// just check whether we should stop further descent.
     template <class T>
     std::pair<bool, Pattern *> dispatchVisitPrePattern(T node) {
-      return { shouldVerify(node), node };
+      if (shouldVerify(node))
+        return { true, node };
+      cleanup(node);
+      return { false, node };
     }
 
     /// Helper template for dispatching post-visitation.
