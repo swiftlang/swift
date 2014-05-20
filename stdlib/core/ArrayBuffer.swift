@@ -390,7 +390,7 @@ extension ArrayBuffer {
   /// Our native representation, if any.  If there's no native
   /// representation, the result is an empty buffer.
   var _native: NativeBuffer {
-    if _isNative {
+    if !_isClassOrObjCExistential(T.self) {
       return NativeBuffer(
         reinterpretCast(storage) as ContiguousArrayStorage<T>?)
     }
