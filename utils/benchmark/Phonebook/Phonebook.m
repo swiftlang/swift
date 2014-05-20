@@ -2,7 +2,8 @@
 #include <mach/mach_time.h>
 #include <stdio.h>
 #include "Phonebook.h"
-// clang -O3 Phonebook.m -o Phonebook.bin -framework Foundation -fobjc-arc
+// NOTE: compile with ARC disabled (no -fobjc-arc)!
+// clang -O3 Phonebook.m -o Phonebook.bin -framework Foundation
 
 @implementation Record
 - (NSString*) Firstname { return First; }
@@ -18,11 +19,11 @@
 
 - (NSComparisonResult)compare:(Record *)otherObject {
   NSComparisonResult FirstComp =
-    [self->Last compare:otherObject->Last];
+    [self.Lastname compare:otherObject.Lastname];
   if (FirstComp != NSOrderedSame)
     return FirstComp;
 
-  return [self->First compare:otherObject->First];
+  return [self.Firstname compare:otherObject.Firstname];
 }
 
 - (void) setFirst: (NSString*)input { First = input; }
@@ -57,6 +58,7 @@ int main(void) {
       [entry setFirst: First];
       [entry setLast: Last];
       [PhoneBook addObject: entry];
+      [entry release];
     }
   }
 
@@ -65,6 +67,7 @@ int main(void) {
   for (unsigned i = 0; i < 100; i++) {
       NSMutableArray *NMA = [PhoneBook mutableCopy];
       [NMA sortUsingSelector: @selector(compare:)];
+      [NMA release];
 #if 0
       for (int i=0; i < size; i++) {
         Record *rec = [NMA objectAtIndex: i];
