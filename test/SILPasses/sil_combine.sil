@@ -1206,10 +1206,12 @@ sil @eliminate_dead_thin_to_thick_function_fun : $@thin () -> ()
 sil @eliminate_dead_thin_to_thick_function : $@thin () -> () {
 bb0:
   %0 = function_ref @eliminate_dead_thin_to_thick_function_fun : $@thin () -> ()
-  %1 = thin_to_thick_function %0 : $@thin () -> () to $@callee_owned () -> ()
+  %1 = thin_to_thick_function %0 : $@thin () -> () to $@callee_owned () -> ()  
   strong_release %1 : $@callee_owned () -> ()
-  %2 = tuple()
-  return %2 : $()
+  %2 = thin_to_thick_function %0 : $@thin () -> () to $@callee_owned () -> ()
+  strong_retain %2 : $@callee_owned () -> ()
+  %3 = tuple()
+  return %3 : $()
 }
 
 // CHECK-LABEL: sil @ref_ops_of_enum_is_equivalent_to_ref_ops_of_payload : $@thin (Builtin.NativeObject) -> FakeOptional<Builtin.NativeObject> {

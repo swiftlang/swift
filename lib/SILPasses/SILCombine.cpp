@@ -956,6 +956,10 @@ SILInstruction *SILCombiner::visitCondFailInst(CondFailInst *CFI) {
 }
 
 SILInstruction *SILCombiner::visitStrongRetainInst(StrongRetainInst *SRI) {
+  // Retain of ThinToThickFunction is a no-op.
+  if (isa<ThinToThickFunctionInst>(SRI->getOperand()))
+    return eraseInstFromFunction(*SRI);
+
   // Sometimes in the stdlib due to hand offs, we will see code like:
   //
   // strong_release %0
@@ -1247,13 +1251,9 @@ visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *TEDAI) {
 }
 
 SILInstruction *SILCombiner::visitStrongReleaseInst(StrongReleaseInst *SRI) {
-  if (auto *TTTFI = dyn_cast<ThinToThickFunctionInst>(SRI->getOperand())) {
-    if (SILValue(TTTFI).hasOneUse()) {
-      eraseInstFromFunction(*SRI);
-      eraseInstFromFunction(*TTTFI);
-      return nullptr;
-    }
-  }
+  // Release of ThinToThickFunction is a no-op.
+  if (isa<ThinToThickFunctionInst>(SRI->getOperand()))
+    return eraseInstFromFunction(*SRI);
 
   return nullptr;
 }
