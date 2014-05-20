@@ -429,13 +429,13 @@ var st_u2 = " \u123 "  // expected-error {{\u escape sequence expects 4 hex digi
 var st_u3 = " \U1234567 "  // expected-error {{\U escape sequence expects 8 hex digits to follow it}}
 var st_u4 = " \q "  // expected-error {{invalid escape sequence in literal}}
 
-var st_u5 = " \UFFFFFFFF "  // expected-error {{invalid unicode code point}}
+var st_u5 = " \UFFFFFFFF "  // expected-error {{invalid unicode scalar}}
 var st_u6 = " \uD7FF \uE000 "  // Fencepost UTF16 surrogate pairs.
-var st_u7 = " \uD800 "  // expected-error {{invalid unicode code point}}
-var st_u8 = " \uDFFF "  // expected-error {{invalid unicode code point}}
+var st_u7 = " \uD800 "  // expected-error {{invalid unicode scalar}}
+var st_u8 = " \uDFFF "  // expected-error {{invalid unicode scalar}}
 var st_u9 = " \xFF "    // expected-error {{invalid hex escape}}
 var st_u10 = " \U0010FFFD "  // Last valid codepoint, 0xFFFE and 0xFFFF are reserved in each plane
-var st_u11 = " \U00110000 "  // expected-error {{invalid unicode code point}}
+var st_u11 = " \U00110000 "  // expected-error {{invalid unicode scalar}}
 
 func stringliterals() {
  var ch_a = 'ab // expected-error {{unterminated character literal}}

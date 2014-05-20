@@ -55,7 +55,7 @@ var ch_u = '\u014d' // 'ō'
 var ch_U = '\U0001D41F' // '𝐁' a.k.a. "Math alphanumeric B"
 
 var ch_x_too_big = '\x80' // expected-error {{invalid hex escape, use \u00XX for values over \x7F}}
-var ch_U_too_big = '\U12345678' // expected-error {{invalid unicode code point}}
+var ch_U_too_big = '\U12345678' // expected-error {{invalid unicode scalar}}
 
 var ch_x_too_short = '\x1' // expected-error {{\x escape sequence expects 2 hex digits to follow it}}
 var ch_u_too_short = '\u1' // expected-error {{\u escape sequence expects 4 hex digits to follow it}}

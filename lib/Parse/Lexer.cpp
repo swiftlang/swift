@@ -1006,7 +1006,7 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, bool StopAtDoubleQuote,
   llvm::SmallString<64> TempString;
   if (CharValue >= 0x80 && EncodeToUTF8(CharValue, TempString)) {
     if (EmitDiagnostics)
-      diagnose(CharStart, diag::lex_invalid_unicode_code_point);
+      diagnose(CharStart, diag::lex_invalid_unicode_scalar);
     return ~1U;
   }
   
