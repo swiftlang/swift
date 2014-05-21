@@ -77,6 +77,10 @@ MAP_STDLIB_TYPE("size_t",    UnsignedWord, 0, "UInt", All, false, DefineOnly)
 
 // POSIX sys/types.h.
 MAP_STDLIB_TYPE("ssize_t", SignedWord, 0, "Int", All, false, DefineOnly)
+MAP_STDLIB_TYPE("u_int8_t",  UnsignedInt, 8,  "UInt8",  All, false, DoNothing)
+MAP_STDLIB_TYPE("u_int16_t", UnsignedInt, 16, "UInt16", All, false, DoNothing)
+MAP_STDLIB_TYPE("u_int32_t", UnsignedInt, 32, "UInt32", All, false, DoNothing)
+MAP_STDLIB_TYPE("u_int64_t", UnsignedInt, 64, "UInt64", All, false, DoNothing)
 
 // stdarg.h types.
 // FIXME: why does this not catch va_list on x86_64?

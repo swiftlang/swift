@@ -141,6 +141,10 @@ STDLIB_TYPEDEF(__SIZE_TYPE__, size_t);
 
 // Types from sys/types.h (POSIX).
 STDLIB_TYPEDEF(long, ssize_t);
+STDLIB_TYPEDEF(unsigned __INT8_TYPE__, u_int8_t);
+STDLIB_TYPEDEF(unsigned __INT16_TYPE__, u_int16_t);
+STDLIB_TYPEDEF(unsigned __INT32_TYPE__, u_int32_t);
+STDLIB_TYPEDEF(unsigned __INT64_TYPE__, u_int64_t);
 
 // Types from libkern/OSTypes.h.
 STDLIB_TYPEDEF(signed int, SInt);

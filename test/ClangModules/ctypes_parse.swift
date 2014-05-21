@@ -130,28 +130,8 @@ func testImportMacTypes() {
   var b : Float64 = Float64_test
   b = b + 1
 
-  var t1_unqual : UInt8 = UInt8_test
-  var t2_unqual : UInt16 = UInt16_test
-  var t3_unqual : UInt32 = UInt32_test
-  var t4_unqual : UInt64 = UInt64_test
-
-  var t5_unqual : Int8 = SInt8_test
-  var t6_unqual : Int16 = SInt16_test
-  var t7_unqual : Int32 = SInt32_test
-  var t8_unqual : Int64 = SInt64_test
-
   var t9_unqual : Float32 = Float32_test
   var t10_unqual : Float64 = Float64_test
-
-  var t1_qual : ctypes.UInt8 = 0  // expected-error {{no type named 'UInt8' in module 'ctypes'}}
-  var t2_qual : ctypes.UInt16 = 0 // expected-error {{no type named 'UInt16' in module 'ctypes'}}
-  var t3_qual : ctypes.UInt32 = 0 // expected-error {{no type named 'UInt32' in module 'ctypes'}}
-  var t4_qual : ctypes.UInt64 = 0 // expected-error {{no type named 'UInt64' in module 'ctypes'}}
-
-  var t5_qual : ctypes.SInt8 = 0  // expected-error {{no type named 'SInt8' in module 'ctypes'}}
-  var t6_qual : ctypes.SInt16 = 0 // expected-error {{no type named 'SInt16' in module 'ctypes'}}
-  var t7_qual : ctypes.SInt32 = 0 // expected-error {{no type named 'SInt32' in module 'ctypes'}}
-  var t8_qual : ctypes.SInt64 = 0 // expected-error {{no type named 'SInt64' in module 'ctypes'}}
 
   var t9_qual : ctypes.Float32 = 0.0  // expected-error {{no type named 'Float32' in module 'ctypes'}}
   var t10_qual : ctypes.Float64 = 0.0 // expected-error {{no type named 'Float64' in module 'ctypes'}}
@@ -168,30 +148,10 @@ var word: Word = 0
 var uword: UWord = 0
 
 func testImportStdintTypes() {
-  var t1_unqual : UInt8 = uint8_t_test
-  var t2_unqual : UInt16 = uint16_t_test
-  var t3_unqual : UInt32 = uint32_t_test
-  var t4_unqual : UInt64 = uint64_t_test
-
-  var t5_unqual : Int8 = int8_t_test
-  var t6_unqual : Int16 = int16_t_test
-  var t7_unqual : Int32 = int32_t_test
-  var t8_unqual : Int64 = int64_t_test
-
   var t9_unqual : Int = intptr_t_test
   var t10_unqual : UInt = uintptr_t_test
   t9_unqual = word
   t10_unqual = uword
-
-  var t1_qual : ctypes.uint8_t = 0  // expected-error {{no type named 'uint8_t' in module 'ctypes'}}
-  var t2_qual : ctypes.uint16_t = 0 // expected-error {{no type named 'uint16_t' in module 'ctypes'}}
-  var t3_qual : ctypes.uint32_t = 0 // expected-error {{no type named 'uint32_t' in module 'ctypes'}}
-  var t4_qual : ctypes.uint64_t = 0 // expected-error {{no type named 'uint64_t' in module 'ctypes'}}
-
-  var t5_qual : ctypes.int8_t = 0  // expected-error {{no type named 'int8_t' in module 'ctypes'}}
-  var t6_qual : ctypes.int16_t = 0 // expected-error {{no type named 'int16_t' in module 'ctypes'}}
-  var t7_qual : ctypes.int32_t = 0 // expected-error {{no type named 'int32_t' in module 'ctypes'}}
-  var t8_qual : ctypes.int64_t = 0 // expected-error {{no type named 'int64_t' in module 'ctypes'}}
 
   var t9_qual : intptr_t = 0 // no-warning
   var t10_qual : uintptr_t = 0 // no-warning
