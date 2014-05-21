@@ -123,7 +123,7 @@ func ascii() {
   // treating it as an opaque NSString.
   var nsASCII = NSString(UTF8String: "foobar")
   // CHECK-NEXT: has UTF16: false
-  println("has UTF16: \(CFStringGetCharactersPtr(reinterpretCast(nsASCII)) != nil)")
+  println("has UTF16: \(CFStringGetCharactersPtr(reinterpretCast(nsASCII)) != (nil as UnsafePointer<UniChar>))")
 
   // CHECK: --- ASCII basic round-tripping ---
   println("--- ASCII basic round-tripping ---")

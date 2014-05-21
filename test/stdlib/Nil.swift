@@ -9,9 +9,9 @@ if opaqueNil == nil {
 }
 
 let unsafeNil: UnsafePointer<Int> = nil
-if unsafeNil == nil {
-  println("ok unsafeNil == nil")
-  // CHECK: ok unsafeNil == nil
+if unsafeNil == (nil as UnsafePointer<Int>) {
+  println("ok unsafeNil == (nil as UnsafePointer<Int>)")
+  // CHECK: ok unsafeNil == (nil as UnsafePointer<Int>)
 }
 
 let removed = NSFileManager.defaultManager().removeItemAtURL(NSURL(string:"/this/file/does/not/exist"), error:nil)

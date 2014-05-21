@@ -72,3 +72,23 @@ test(.None, { $0 as B?? })
 // CHECK: .Some(.None) as B??: .None
 // CHECK: .None as B??: .None
 
+class Foo {}
+var x_foo: Foo! = nil
+if x_foo == nil { println("x_foo is nil") }
+// CHECK: x_foo is nil
+if x_foo != nil { println("x_foo is not nil") } else { println("x_foo is nil") }
+// CHECK: x_foo is nil
+if nil == x_foo { println("x_foo is nil") }
+// CHECK: x_foo is nil
+if nil != x_foo { println("x_foo is not nil") } else { println("x_foo is nil") }
+// CHECK: x_foo is nil
+
+var y_foo: Foo? = nil
+if y_foo == nil { println("y_foo is nil") }
+// CHECK: y_foo is nil
+if y_foo != nil { println("y_foo is not nil") } else { println("y_foo is nil") }
+// CHECK: y_foo is nil
+if nil == y_foo { println("y_foo is nil") }
+// CHECK: y_foo is nil
+if nil != y_foo { println("y_foo is not nil") } else { println("y_foo is nil") }
+// CHECK: y_foo is nil

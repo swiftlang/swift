@@ -977,7 +977,10 @@ bool TypeChecker::typeCheckBinding(PatternBindingDecl *binding) {
       // prior to coercion.
       if (Binding->isConditional()) {
         auto exprType = solution.simplifyType(tc, expr->getType());
-        if (!exprType->getAnyOptionalObjectType()) {
+        auto exprNominalType = exprType->getNominalOrBoundGenericNominal();
+        if (!(exprType->getAnyOptionalObjectType() ||
+              (exprNominalType &&
+               exprNominalType->getNameStr().equals("_Nil")))) {
           tc.diagnose(expr->getLoc(),
                       diag::non_optional_in_conditional_binding);
         }
