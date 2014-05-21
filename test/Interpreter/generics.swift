@@ -43,3 +43,52 @@ println(bigStruct)
 // FIXME: missing symbol for Object destructor?
 // C/HECK: true
 //println(someClass === someClass2)
+
+
+//===----
+// Check overload resolution of generic functions.
+//===----
+
+protocol P1 {}
+protocol P2 : P1 {}
+protocol P3 : P2 {}
+
+struct S1 : P1 {}
+struct S2 : P2 {}
+struct S3 : P3 {}
+
+func foo1<T : P1>(x: T) { println("P1") }
+func foo1<T : P2>(x: T) { println("P2") }
+func foo1<T : P3>(x: T) { println("P3") }
+
+func foo2<T : P1>(x: T) { println("P1") }
+func foo2<T : P2>(x: T) { println("P2") }
+
+func foo3<T : P1>(x: T) { println("P1") }
+func foo3<T : P3>(x: T) { println("P3") }
+
+func foo4<T : P3, U : P1>(x: T, y: U) { println("P3, P1") }
+func foo4<T : P3, U : P3>(x: T, y: U) { println("P3, P3") }
+
+func checkOverloadResolution() {
+  println("overload resolution:")
+  // CHECK-LABEL: overload resolution
+
+  foo1(S1()) // CHECK-NEXT: P1
+  foo1(S2()) // CHECK-NEXT: P2
+  foo1(S3()) // CHECK-NEXT: P3
+
+  foo2(S1()) // CHECK-NEXT: P1
+  foo2(S2()) // CHECK-NEXT: P2
+  foo2(S3()) // CHECK-NEXT: P2
+
+  foo3(S1()) // CHECK-NEXT: P1
+  foo3(S2()) // CHECK-NEXT: P1
+  foo3(S3()) // CHECK-NEXT: P3
+
+  foo4(S3(), S1()) // CHECK-NEXT: P3, P1
+  foo4(S3(), S2()) // CHECK-NEXT: P3, P1
+  foo4(S3(), S3()) // CHECK-NEXT: P3, P3
+}
+checkOverloadResolution()
+
