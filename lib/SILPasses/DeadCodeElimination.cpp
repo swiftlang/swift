@@ -93,15 +93,17 @@ static void propagateBasicBlockArgs(SILBasicBlock &BB) {
   // This functions would simplify the code as following:
   //
   //   bb0:
-  //     br bb1(%1 : $Builtin.Int1, %2 : $Builtin.Int1)
+  //     br bb2(%1 : $Builtin.Int1, %2 : $Builtin.Int1)
   //   bb1:
-  //     br bb1(%1 : $Builtin.Int1, %2 : $Builtin.Int1)
+  //     br bb2(%1 : $Builtin.Int1, %2 : $Builtin.Int1)
   //   bb2(%3 : $Builtin.Int1, %4 : $Builtin.Int1):
   //     use(%3 : $Builtin.Int1)
   //     use(%4 : $Builtin.Int1)
   // =>
   //   bb0:
-  //     br bb1
+  //     br bb2
+  //   bb1:
+  //     br bb2
   //   bb2:
   //     use(%1 : $Builtin.Int1)
   //     use(%2 : $Builtin.Int1)
