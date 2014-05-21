@@ -1599,6 +1599,14 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     Printer.printTypeRef(TD, TD->getName());
   }
 
+  // FIXME: we should have a callback that would tell us
+  // whether it's kosher to print a module name or not
+  bool isLLDBExpressionModule(Module *M) {
+    if (!M)
+      return false;
+    return M->Name.str().startswith("lldb_expr_");
+  }
+
   bool shouldPrintFullyQualified(TypeBase *T) {
     if (Options.FullyQualifiedTypes)
       return true;
@@ -1621,7 +1629,8 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
 
     // Don't print qualifiers for types from the standard library.
     if (M->isStdlibModule() ||
-        M->Name == T->getASTContext().ObjCModuleName)
+        M->Name == T->getASTContext().ObjCModuleName ||
+        isLLDBExpressionModule(M))
       return false;
 
     // Don't print qualifiers for imported types.
