@@ -57,12 +57,7 @@ func expectNotEmpty<T>(
   }
 }
 
-// Slice tests disabled because of:
-// <rdar://problem/16971593> Creating an empty Slice<Int> crashes
-//
-// for ArrayType in ['ContiguousArray', 'Slice', 'Array']:
-
-%for ArrayType in ['ContiguousArray', 'Array']:
+%for ArrayType in ['ContiguousArray', 'Slice', 'Array']:
 
 func testJoin${ArrayType}() {
   typealias ArrayType = ${ArrayType}<Int>
