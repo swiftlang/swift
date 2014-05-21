@@ -10,7 +10,7 @@ struct RC4 {
   }
 
   mutating
-  func initialize(inout Key: UInt8[]) {
+  func initialize(Key: UInt8[]) {
     for i in 0..256 {
       State[i] = UInt8(i)
     }
@@ -50,10 +50,10 @@ struct RC4 {
 }
 
 func benchRC4_internal(messageLen : Int, iterations : Int) {
-  var Secret = "This is my secret message"
-  var Key    = "This is my key"
-  var SecretData : UInt8[] = Secret.asUTF8()
-  var KeyData    : UInt8[] = Key.asUTF8()
+  let Secret = "This is my secret message"
+  let Key    = "This is my key"
+  let SecretData : UInt8[] = Array(Secret.utf8)
+  let KeyData    : UInt8[] = Array(Key.utf8)
 
   var LongData : UInt8[] = new UInt8[messageLen]
 
@@ -63,7 +63,7 @@ func benchRC4_internal(messageLen : Int, iterations : Int) {
   }
 
   var Enc = RC4()
-  Enc.initialize(&KeyData)
+  Enc.initialize(KeyData)
 
   let start = __mach_absolute_time__()
 
