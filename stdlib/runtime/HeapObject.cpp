@@ -60,9 +60,9 @@ auto swift::_swift_allocObject = _swift_allocObject_;
 /// occupies <size> bytes of maximally-aligned storage.  The object is
 /// uninitialized except for its header.
 extern "C" HeapObject* swift_bufferAllocate(
-  HeapMetadata const* bufferType, intptr_t size)
+  HeapMetadata const* bufferType, size_t size, size_t alignMask)
 {
-  return swift::swift_allocObject(bufferType, size, 0);
+  return swift::swift_allocObject(bufferType, size, alignMask);
 }
 
 extern "C" intptr_t swift_bufferHeaderSize() { return sizeof(HeapObject); }

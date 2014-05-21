@@ -256,6 +256,11 @@ struct _DictionaryElement<KeyType : Hashable, ValueType> {
     buffer._value.destroy()
     buffer.elementStorage.destroy(body.capacity)
   }
+  @final func __getInstanceSizeAndAlignMask() -> (Int,Int) {
+    let buffer = DictionaryHeapBuffer(
+        reinterpretCast(self) as DictionaryHeapBuffer.Storage)
+    return buffer._allocatedSizeAndAlignMask()
+  }
 }
 
 struct _NativeDictionaryStorage<KeyType : Hashable, ValueType> :

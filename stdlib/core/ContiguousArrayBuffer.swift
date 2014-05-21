@@ -27,6 +27,10 @@ let emptyNSSwiftArray : _NSSwiftArray
     b.base._value.destroy()
   }
 
+  @final func __getInstanceSizeAndAlignMask() -> (Int,Int) {
+    return Buffer(self).base._allocatedSizeAndAlignMask()
+  }
+
   /// Return true if the `proposedElementType` is `T` or a subclass of
   /// `T`.  We can't store anything else without violating type
   /// safety; for example, the destructor has static knowledge that

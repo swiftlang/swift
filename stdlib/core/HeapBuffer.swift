@@ -14,11 +14,13 @@ import SwiftShims
 typealias _HeapObject = SwiftShims.HeapObject
 
 // Provides a common type off of which to hang swift_bufferAllocate.
+// If you introduce a new most-derived subclass of this, you need
+// to define __deallocate in it.
 @objc class HeapBufferStorageBase {}
 
 @asmname("swift_bufferAllocate")
 func swift_bufferAllocate(
-  bufferType: HeapBufferStorageBase.Type, size: Int) -> AnyObject
+  bufferType: HeapBufferStorageBase.Type, size: Int, alignMask: Int) -> AnyObject
 
 @asmname("malloc_size")
 func c_malloc_size(heapMemory: UnsafePointer<Void>) -> Int
@@ -46,6 +48,9 @@ func c_malloc_size(heapMemory: UnsafePointer<Void>) -> Int
   typealias Buffer = HeapBuffer<Value, Element>
   deinit {
     Buffer(self)._value.destroy()
+  }
+  @final func __getInstanceSizeAndAlignMask() -> (Int,Int) {
+    return Buffer(self)._allocatedSizeAndAlignMask()
   }
 }
 
@@ -90,6 +95,16 @@ struct HeapBuffer<Value, Element> : LogicValue, Equatable {
                               alignof(Element.self))
   }
 
+  static func _requiredAlignMask() -> Int {
+    // We can't use max here because it can allocate an array.
+    let heapAlign = alignof(_HeapObject.self) - 1
+    let valueAlign = alignof(Value.self) - 1
+    let elementAlign = alignof(Element.self) - 1
+    return (heapAlign < valueAlign
+            ? (valueAlign < elementAlign ? elementAlign : valueAlign)
+            : (heapAlign < elementAlign ? elementAlign : heapAlign))
+  }
+
   var _address: UnsafePointer<Int8> {
     return UnsafePointer(
       Builtin.bridgeToRawPointer(self as Builtin.NativeObject))
@@ -104,10 +119,21 @@ struct HeapBuffer<Value, Element> : LogicValue, Equatable {
     return UnsafePointer(HeapBuffer._elementOffset() + _address)
   }
 
+  func _allocatedSize() -> Int {
+    return c_malloc_size(UnsafePointer(_address))
+  }
+
+  func _allocatedAlignMask() -> Int {
+    return HeapBuffer._requiredAlignMask()
+  }
+
+  func _allocatedSizeAndAlignMask() -> (Int, Int) {
+    return (_allocatedSize(), _allocatedAlignMask())
+  }
+
   /// Return the actual number of `Elements` we can possibly store.
   func _capacity() -> Int {
-    let allocatedSize = c_malloc_size(UnsafePointer(_address))
-    return (allocatedSize - HeapBuffer._elementOffset())
+    return (_allocatedSize() - HeapBuffer._elementOffset())
       / Int(Builtin.strideof(Element.self))
   }
 
@@ -129,9 +155,10 @@ struct HeapBuffer<Value, Element> : LogicValue, Equatable {
 
     let totalSize = HeapBuffer._elementOffset() +
         capacity * Int(Builtin.strideof(Element.self))
+    let alignMask = HeapBuffer._requiredAlignMask()
 
     self.storage = reinterpretCast(
-      swift_bufferAllocate(storageClass, totalSize))
+      swift_bufferAllocate(storageClass, totalSize, alignMask))
     self._value.initialize(initializer)
   }
 

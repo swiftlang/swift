@@ -632,25 +632,114 @@ llvm::Value *irgen::emitClassAllocationDynamic(IRGenFunction &IGF,
   return IGF.Builder.CreateBitCast(val, destType);
 }
 
+/// Look for the instance method:
+///   func __getInstanceSizeAndAlignMask() -> (Int, Int)
+/// and use it to populate 'size' and 'alignMask' if it's present.
+static bool getInstanceSizeByMethod(IRGenFunction &IGF,
+                                    CanType selfType,
+                                    ClassDecl *selfClass,
+                                    llvm::Value *selfValue,
+                                    llvm::Value *&size,
+                                    llvm::Value *&alignMask) {
+  // Look for a single instance method with the magic name.
+  FuncDecl *fn; {
+    auto name = IGF.IGM.Context.getIdentifier("__getInstanceSizeAndAlignMask");
+    SmallVector<ValueDecl*, 4> results;
+    selfClass->lookupQualified(selfType, name, 0, nullptr, results);
+    if (results.size() != 1)
+      return false;
+    fn = dyn_cast<FuncDecl>(results[0]);
+    if (!fn)
+      return false;
+  }
+
+  // Check whether the SIL module defines it.  (We need a type for it.)
+  SILDeclRef fnRef(fn, SILDeclRef::Kind::Func,
+                   ResilienceExpansion::Minimal,
+                   /*uncurryLevel*/ 1,
+                   /*foreign*/ false);
+  SILFunction *silFn; {
+    llvm::SmallString<32> name;
+    fnRef.mangle(name);
+    silFn = IGF.IGM.SILMod->lookUpFunction(name);
+    if (!silFn)
+      return false;
+  }
+
+  // Check that it returns two size_t's and takes no other arguments.
+  auto fnType = silFn->getLoweredFunctionType();
+  if (fnType->getInterfaceParameters().size() != 1)
+    return false;
+  if (fnType->getInterfaceResult().getConvention() != ResultConvention::Unowned)
+    return false;
+  llvm::Function *llvmFn =
+    IGF.IGM.getAddrOfSILFunction(silFn, NotForDefinition);
+  auto llvmFnTy = llvmFn->getFunctionType();
+  if (llvmFnTy->getNumParams() != 1) return false;
+  auto returnType = dyn_cast<llvm::StructType>(llvmFnTy->getReturnType());
+  if (!returnType ||
+      returnType->getNumElements() != 2 ||
+      returnType->getElementType(0) != IGF.IGM.SizeTy ||
+      returnType->getElementType(1) != IGF.IGM.SizeTy)
+    return false;
+
+  // Retain 'self' if necessary.
+  if (fnType->getInterfaceParameters()[0].isConsumed()) {
+    IGF.emitRetainCall(selfValue);
+  }
+
+  // Adjust down to the defining subclass type if necessary.
+  selfValue = IGF.Builder.CreateBitCast(selfValue, llvmFnTy->getParamType(0));
+
+  // Emit a direct call.
+  auto result = IGF.Builder.CreateCall(llvmFn, selfValue);
+  result->setCallingConv(llvmFn->getCallingConv());
+
+  // Extract the size and alignment.
+  size = IGF.Builder.CreateExtractValue(result, 0, "size");
+  alignMask = IGF.Builder.CreateExtractValue(result, 1, "alignMask");
+  return true;
+}
+
+/// Get the instance size and alignment mask for the given class
+/// instance.
+static void getInstanceSizeAndAlignMask(IRGenFunction &IGF,
+                                        SILType selfType,
+                                        ClassDecl *selfClass,
+                                        llvm::Value *selfValue,
+                                        llvm::Value *&size,
+                                        llvm::Value *&alignMask) {
+  // Use the magic __getInstanceSizeAndAlignMask method if we can
+  // see a declaration of it
+  if (getInstanceSizeByMethod(IGF, selfType.getSwiftRValueType(),
+                              selfClass, selfValue, size, alignMask))
+    return;
+
+  // Try to determine the size of the object we're deallocating.
+  auto &info = IGF.IGM.getTypeInfo(selfType).as<ClassTypeInfo>();
+  auto &layout = info.getLayout(IGF.IGM);
+
+  // If it's fixed, emit the constant size and alignment mask.
+  if (layout.isFixedLayout()) {
+    size = layout.emitSize(IGF.IGM);
+    alignMask = layout.emitAlignMask(IGF.IGM);
+    return;
+  }
+
+  // Otherwise, get them from the metadata.
+  llvm::Value *metadata =
+    emitTypeMetadataRefForHeapObject(IGF, selfValue, selfType);
+  std::tie(size, alignMask)
+    = emitClassFragileInstanceSizeAndAlignMask(IGF, selfClass, metadata);
+}
+
 void irgen::emitClassDeallocation(IRGenFunction &IGF, SILType selfType,
                                   llvm::Value *selfValue) {
   auto *theClass = selfType.getClassOrBoundGenericClass();
 
-  // Determine the size of the object we're deallocating.
-  // FIXME: We should get this value dynamically!
-  auto &info = IGF.IGM.getTypeInfo(selfType).as<ClassTypeInfo>();
-  auto &layout = info.getLayout(IGF.IGM);
-  // FIXME: Dynamic-layout deallocation size.
   llvm::Value *size, *alignMask;
-  if (layout.isFixedLayout()) {
-    size = layout.emitSize(IGF.IGM);
-    alignMask = layout.emitAlignMask(IGF.IGM);
-  } else {
-    llvm::Value *metadata = emitTypeMetadataRefForHeapObject(IGF, selfValue, 
-                                                             selfType);
-    std::tie(size, alignMask)
-      = emitClassFragileInstanceSizeAndAlignMask(IGF, theClass, metadata);
-  }
+  getInstanceSizeAndAlignMask(IGF, selfType, theClass, selfValue,
+                              size, alignMask);
 
   selfValue = IGF.Builder.CreateBitCast(selfValue, IGF.IGM.RefCountedPtrTy);
   emitDeallocateHeapObject(IGF, selfValue, size, alignMask);
