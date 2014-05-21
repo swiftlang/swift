@@ -297,25 +297,20 @@ void swift::swift_weakRetain(HeapObject *object) {
   }
 }
 
-void swift::_swift_deallocClassInstance(HeapObject *self) {
-  auto metadata = self->metadata;
-  assert(metadata->isClassType());
-  auto classMetadata = static_cast<const ClassMetadata*>(metadata);
-  assert(classMetadata->isTypeMetadata());
-  swift_deallocObject(self, classMetadata->getInstanceSize(),
-                      classMetadata->getInstanceAlignMask());
-}
-
 void swift::swift_weakRelease(HeapObject *object) {
   if (!object) return;
 
   uint32_t newCount = __sync_sub_and_fetch(&object->weakRefCount, WRC_INTERVAL);
-  if (newCount >= (uint32_t)~WRC_INTERVAL) {
-    assert(0 && "weak retain count underflow");
-  }
+  assert(newCount < (0U - uint32_t(WRC_INTERVAL)) &&
+         "weak retain count underflow");
   if (newCount == 0) {
     // Only class objects can be weak-retained and weak-released.
-    _swift_deallocClassInstance(object);
+    auto metadata = object->metadata;
+    assert(metadata->isClassType());
+    auto classMetadata = static_cast<const ClassMetadata*>(metadata);
+    assert(classMetadata->isTypeMetadata());
+    _swift_slowDealloc(object, classMetadata->getInstanceSize(),
+                       classMetadata->getInstanceAlignMask());
   }
 }
 
@@ -342,10 +337,9 @@ void swift::swift_retainUnowned(HeapObject *object) {
   assert((object->weakRefCount & WRC_MASK) &&
          "object is not currently weakly retained");
 
-  // FIXME: this test should be atomic with the retain
-  if (object->refCount & RC_DEALLOCATING_BIT)
+  uint32_t curCount = __sync_fetch_and_add(&object->refCount, RC_INTERVAL);
+  if (curCount & RC_DEALLOCATING_BIT)
     _swift_abortRetainUnowned(object);
-  swift_retain(object);
 }
 
 // Declared extern "C" LLVM_LIBRARY_VISIBILITY above.
@@ -354,6 +348,16 @@ void _swift_release_slow(HeapObject *object) {
   // destructor don't recursively destroy the object.
   swift_retain_noresult(object);
   asFullMetadata(object->metadata)->destroy(object);
+}
+
+/// Perform the root -dealloc operation for a class instance.
+void swift::_swift_deallocClassInstance(HeapObject *self) {
+  auto metadata = self->metadata;
+  assert(metadata->isClassType());
+  auto classMetadata = static_cast<const ClassMetadata*>(metadata);
+  assert(classMetadata->isTypeMetadata());
+  swift_deallocObject(self, classMetadata->getInstanceSize(),
+                      classMetadata->getInstanceAlignMask());
 }
 
 void swift::swift_deallocObject(HeapObject *object, size_t allocatedSize,
@@ -365,19 +369,76 @@ void swift::swift_deallocObject(HeapObject *object, size_t allocatedSize,
                   allocatedSize - sizeof(HeapObject));
 #endif
 
-  // If there is an outstanding weak retain of the object, we need to
-  // fall back on swift_weakRelease, because we could race against
-  // either a weak retain or a weak release.  But if there isn't, then
-  // anybody trying to add a weak retain must be doing so with an
-  // unsafe reference, which is inherently going to be a race against
-  // deallocation.  So we can just do a simple check here.
-  // (Do we need a barrier?)
+  // Drop the initial weak retain of the object.
   //
-  // This is useful both as a way to eliminate an unnecessary atomic
-  // operation and as a way to avoid calling swift_weakRelease on
-  // something that might not be a class object.
+  // If the outstanding weak retain count is 1 (i.e. only the initial
+  // weak retain), we can immediately call swift_slowDealloc.  This is
+  // useful both as a way to eliminate an unnecessary atomic
+  // operation, and as a way to avoid calling swift_weakRelease on an
+  // object that might be a class object, which simplifies the logic
+  // required in swift_weakRelease for determining the size of the
+  // object.
+  //
+  // If we see that there is an outstanding weak retain of the object,
+  // we need to fall back on swift_release, because it's possible for
+  // us to race against a weak retain or a weak release.  But if the
+  // outstanding weak retain count is 1, then anyone attempting to
+  // increase the weak reference count is inherently racing against
+  // deallocation and thus in undefined-behavior territory.  And
+  // we can even do this with a normal load!  Here's why:
+  //
+  // 1. There is an invariant that, if the strong reference count
+  // is > 0, then the weak reference count is > 1.
+  //
+  // 2. The above lets us say simply that, in the absence of
+  // races, once a reference count reaches 0, there are no points
+  // which happen-after where the reference count is > 0.
+  //
+  // 3. To not race, a strong retain must happen-before a point
+  // where the strong reference count is > 0, and a weak retain
+  // must happen-before a point where the weak reference count
+  // is > 0.
+  //
+  // 4. Changes to either the strong and weak reference counts occur
+  // in a total order with respect to each other.  This can
+  // potentially be done with a weaker memory ordering than
+  // sequentially consistent if the architecture provides stronger
+  // ordering for memory guaranteed to be co-allocated on a cache
+  // line (which the reference count fields are).
+  //
+  // 5. This function happens-after a point where the strong
+  // reference count was 0.
+  //
+  // 6. Therefore, if a normal load in this function sees a weak
+  // reference count of 1, it cannot be racing with a weak retain
+  // that is not racing with deallocation:
+  //
+  //   - A weak retain must happen-before a point where the weak
+  //     reference count is > 0.
+  //
+  //   - This function logically decrements the weak reference
+  //     count.  If it is possible for it to see a weak reference
+  //     count of 1, then at the end of this function, the
+  //     weak reference count will logically be 0.
+  //
+  //   - There can be no points after that point where the
+  //     weak reference count will be > 0.
+  //
+  //   - Therefore either the weak retain must happen-before this
+  //     function, or this function cannot see a weak reference
+  //     count of 1, or there is a race.
+  //
+  // Note that it is okay for there to be a race involving a weak
+  // *release* which happens after the strong reference count drops to
+  // 0.  However, this is harmless: if our load fails to see the
+  // release, we will fall back on swift_weakRelease, which does an
+  // atomic decrement (and has the ability to reconstruct
+  // allocatedSize and allocatedAlignMask).
+
   if (object->weakRefCount == WRC_INTERVAL) {
     swift_slowDealloc(object, allocatedSize, allocatedAlignMask);
+  } else {
+    swift_weakRelease(object);
   }
 }
 
