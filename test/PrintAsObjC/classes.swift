@@ -197,6 +197,10 @@ class MyObject : NSObject {}
 // CHECK-NEXT: @property (nonatomic, readonly) Properties * this;
 // CHECK-NEXT: @property (nonatomic, readonly) double pi;
 // CHECK-NEXT: @property (nonatomic) NSInteger computed;
+// CHECK-NEXT: @property (nonatomic) Properties * weakOther;
+// CHECK-NEXT: @property (nonatomic) Properties * unownedOther;
+// CHECK-NEXT: @property (nonatomic) Properties * unmanagedOther;
+// CHECK-NEXT: @property (nonatomic) id outlet;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class Properties {
@@ -213,6 +217,14 @@ class MyObject : NSObject {}
       println("it doesn't change")
     }
   }
+
+  class var shared: Properties { return Properties() }
+
+  weak var weakOther: Properties?
+  unowned var unownedOther: Properties = .shared
+  unowned(unsafe) var unmanagedOther: Properties = .shared
+
+  @IBOutlet var outlet: AnyObject
 }
 
 // CHECK-LABEL: @interface PropertiesOverridden

@@ -601,6 +601,10 @@ private:
     os << "instancetype";
   }
 
+  void visitReferenceStorageType(ReferenceStorageType *RST) {
+    visitPart(RST->getReferentType());
+  }
+
   /// Print a full type, optionally declaring the given \p name.
   ///
   /// This will properly handle nested function types (see
