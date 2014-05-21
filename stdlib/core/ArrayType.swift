@@ -74,6 +74,11 @@ protocol ArrayType
   mutating func removeAll(#keepCapacity: Bool)
   
   //===--- algorithms -----------------------------------------------------===//
+
+  func join<
+      S : Sequence where S.GeneratorType.Element == Self
+  >(elements: S) -> Self
+
   func reduce<U>(initial: U, combine: (U, Self.GeneratorType.Element) -> U) -> U
 
   mutating func sort(

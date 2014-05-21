@@ -297,3 +297,13 @@ extension String : Sliceable {
       unicodeScalars[subRange.startIndex._base..subRange.endIndex._base]._base)
   }
 }
+
+// Algorithms
+extension String {
+  func join<
+      S : Sequence where S.GeneratorType.Element == String
+  >(elements: S) -> String{
+    return Swift.join(self, elements)
+  }
+}
+

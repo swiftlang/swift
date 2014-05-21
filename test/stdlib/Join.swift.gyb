@@ -62,6 +62,10 @@ func expectNotEmpty<T>(
 func testJoin${ArrayType}() {
   typealias ArrayType = ${ArrayType}<Int>
 
+  //
+  // Test the free function.
+  //
+
   // Empty separator.
   if true {
     let separator: ArrayType = []
@@ -196,6 +200,17 @@ func testJoin${ArrayType}() {
     }
   }
 
+  //
+  // Test forwarding instance function.
+  //
+
+  if true {
+    let separator: ArrayType = [ 42, 4242 ]
+    let seq: ArrayType[] = [[ 1, 2 ], [ 3, 4 ], [ 5, 6 ]]
+    let r = separator.join(seq)
+    expectEqual([ 1, 2, 42, 4242, 3, 4, 42, 4242, 5, 6 ], r)
+  }
+
   println("testJoin${ArrayType} done")
 }
 // CHECK: testJoin${ArrayType} done
@@ -204,6 +219,10 @@ testJoin${ArrayType}()
 %end
 
 func testJoinString() {
+  //
+  // Test the free function.
+  //
+
   // Empty separator.
   expectEqual("",    join("", []))
   expectEqual("",    join("", [""]))
@@ -231,6 +250,12 @@ func testJoinString() {
   expectEqual("axyb",    join("xy", ["a", "b"]))
   expectEqual("axybxyc", join("xy", ["a", "b", "c"]))
   expectEqual("abxycdxyef", join("xy", ["ab", "cd", "ef"]))
+
+  //
+  // Test forwarding instance function.
+  //
+
+  expectEqual("abxycdxyef", "xy".join(["ab", "cd", "ef"]))
 
   println("testJoinString done")
 }

@@ -228,6 +228,13 @@ extension ${Self} : ArrayType {
   }
   
   //===--- algorithms -----------------------------------------------------===//
+
+  func join<
+      S : Sequence where S.GeneratorType.Element == ${Self}<T>
+  >(elements: S) -> ${Self}<T> {
+    return Swift.join(self, elements)
+  }
+
   func reduce<U>(initial: U, combine: (U, T)->U) -> U {
     return Swift.reduce(self, initial, combine)
   }
