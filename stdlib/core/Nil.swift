@@ -13,7 +13,7 @@
 struct _Nil : Reflectable {
 
   @conversion func __conversion<T: RawOptionSet>() -> T {
-    return .fromMask(.allZeros())
+    return .fromMask(.allZeros)
   }
 
   func getMirror() -> Mirror {

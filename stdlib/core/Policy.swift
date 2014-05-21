@@ -127,9 +127,7 @@ protocol BitwiseOperations {
   ///   x & allZeros() == allZeros()
   ///   x & ~allZeros() == x
   ///
-  ///
-  /// FIXME: Should be a static property when we support those on protocols.
-  class func allZeros() -> Self
+  class var allZeros: Self { get }
 }
 
 protocol Hashable : Equatable {
