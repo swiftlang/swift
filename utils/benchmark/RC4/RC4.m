@@ -3,6 +3,9 @@
 #include <stdint.h>
 #include "RC4.h"
 
+// Compile as
+//   clang -O3 RC4.m -o RC4.bin -framework Foundation
+
 @implementation RC4
 
 - (id) init {
@@ -41,6 +44,7 @@
 }
 
 - (void) dealloc {
+  [super dealloc];
   free(_state);
 }
 
@@ -93,6 +97,8 @@ void benchRC4(int messageLen, int numIterations, bool validate) {
   printf("%lf nanoseconds.\n", end/(double)numIterations);
 
   free(LongData);
+
+  [Enc release];
 }
 
 int main(int argc, char **argv) {
