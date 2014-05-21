@@ -31,7 +31,7 @@
 using namespace swift;
 using namespace ide;
 
-std::string toInsertableString(CodeCompletionResult *Result) {
+static std::string toInsertableString(CodeCompletionResult *Result) {
   std::string Str;
   for (auto C : Result->getCompletionString()->getChunks()) {
     switch (C.getKind()) {
@@ -73,6 +73,61 @@ std::string toInsertableString(CodeCompletionResult *Result) {
   return Str;
 }
 
+static void toDisplayString(CodeCompletionResult *Result,
+                            llvm::raw_ostream &OS) {
+  std::string Str;
+  for (auto C : Result->getCompletionString()->getChunks()) {
+    if (C.getKind() ==
+        CodeCompletionString::Chunk::ChunkKind::BraceStmtWithCursor) {
+      OS << ' ';
+      continue;
+    }
+    if (!C.isAnnotation() && C.hasText()) {
+      OS << C.getText();
+      continue;
+    }
+    if (C.getKind() == CodeCompletionString::Chunk::ChunkKind::TypeAnnotation) {
+      if (Result->getKind() == CodeCompletionResult::Declaration) {
+        switch (Result->getAssociatedDeclKind()) {
+        case CodeCompletionDeclKind::Class:
+        case CodeCompletionDeclKind::Struct:
+        case CodeCompletionDeclKind::Enum:
+          continue;
+
+        case CodeCompletionDeclKind::EnumElement:
+          OS << ": ";
+          break;
+
+        case CodeCompletionDeclKind::Protocol:
+        case CodeCompletionDeclKind::TypeAlias:
+        case CodeCompletionDeclKind::GenericTypeParam:
+        case CodeCompletionDeclKind::Constructor:
+        case CodeCompletionDeclKind::Destructor:
+          continue;
+
+        case CodeCompletionDeclKind::Subscript:
+        case CodeCompletionDeclKind::StaticMethod:
+        case CodeCompletionDeclKind::InstanceMethod:
+        case CodeCompletionDeclKind::OperatorFunction:
+        case CodeCompletionDeclKind::FreeFunction:
+          OS << " -> ";
+          break;
+
+        case CodeCompletionDeclKind::StaticVar:
+        case CodeCompletionDeclKind::InstanceVar:
+        case CodeCompletionDeclKind::LocalVar:
+        case CodeCompletionDeclKind::GlobalVar:
+          OS << ": ";
+          break;
+        }
+      } else {
+        OS << ": ";
+      }
+      OS << C.getText();
+    }
+  }
+}
+
 namespace swift {
 class REPLCodeCompletionConsumer : public CodeCompletionConsumer {
   REPLCompletions &Completions;
@@ -89,7 +144,7 @@ public:
         llvm::SmallString<128> PrintedResult;
         {
           llvm::raw_svector_ostream OS(PrintedResult);
-          Result->print(OS);
+          toDisplayString(Result, OS);
         }
         Completions.CompletionStrings.push_back(
             Completions.CompletionContext.copyString(PrintedResult));

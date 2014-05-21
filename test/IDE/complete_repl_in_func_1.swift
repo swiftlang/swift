@@ -5,7 +5,7 @@
 // Don't add any tests at the end of the file!
 //
 // CHECK: Begin completions
-// CHECK-DAG: Decl[InstanceMethod]/CurrNominal: a()[#Void#]{{$}}
+// CHECK-DAG: {{^}}a() -> Void{{$}}
 // CHECK: End completions
 struct FooStruct {
   func a() {}
