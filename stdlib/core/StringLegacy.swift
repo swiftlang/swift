@@ -41,13 +41,6 @@ extension String {
                   input: Repeat(count: count, repeatedValue: c.value))
   }
   
-  func asUTF8() -> UTF8.CodeUnit[] {
-    var result = new UTF8.CodeUnit[_encodedLength(UTF8.self)]
-    var len = 0
-    _encode(UTF8.self, output: SinkOf<UTF8.CodeUnit>({ result[len++] = $0 }))
-    return result
-  }
-
   func byteLength() -> Int {
     return _encodedLength(UTF8.self)
   }

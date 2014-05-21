@@ -62,14 +62,14 @@ func testStringToInt() {
     initialValue: Int, 
     modification: (inout chars: UTF8.CodeUnit[]) -> () ) 
   {
-    var chars = String(initialValue).asUTF8()
+    var chars = Array(String(initialValue).utf8)
     modification(chars: &chars)
     var str = String(UTF8.self, input: chars)
     var is_isnot = str.toInt() ? "is" : "is not"
     println("\(str) \(is_isnot) an Int")
   }
 
-  var minChars = String(Int.min).asUTF8()
+  var minChars = String(Int.min).utf8
 
   testConvertabilityOfStringWithModification(Int.min) { 
     (inout chars: UTF8.CodeUnit[]) in ()
@@ -92,7 +92,7 @@ func testStringToInt() {
   // CHECK-NEXT: {{-9323372036854775808|-2247483648}} is not an Int
 
   testConvertabilityOfStringWithModification(Int.min) { 
-    $0.append("0".asUTF8()[0]); ()  // underflow by adding digits
+    $0.append(Array("0".utf8)[0]); ()  // underflow by adding digits
   }
   // CHECK-NEXT: {{-92233720368547758080|-21474836480}} is not an Int
 
@@ -118,7 +118,7 @@ func testStringToInt() {
   // CHECK-NEXT: {{9323372036854775807|2247483647}} is not an Int
 
   testConvertabilityOfStringWithModification(Int.max) { 
-    $0.append("0".asUTF8()[0]); ()  // overflow by adding digits
+    $0.append(Array("0".utf8)[0]); ()  // overflow by adding digits
   }
   // CHECK-NEXT: {{92233720368547758070|21474836470}} is not an Int
 
