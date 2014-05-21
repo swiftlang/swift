@@ -80,7 +80,7 @@ var kbd : Keyboard = Keyboard()
 
   func write(buf: String) -> Int {
     var r = 0
-    let p = buf.contiguousUTF8
+    let p = buf._contiguousUTF8
 
     if p != nil {
       let r = posix_write(1, p.value, buf.core.count)

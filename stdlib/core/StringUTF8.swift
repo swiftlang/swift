@@ -193,7 +193,7 @@ extension String {
     return UTF8View(self.core)
   }
 
-  var contiguousUTF8: UnsafePointer<UTF8.CodeUnit> {
+  var _contiguousUTF8: UnsafePointer<UTF8.CodeUnit> {
     return core.elementWidth == 1 ? core.startASCII : nil
   }
 
