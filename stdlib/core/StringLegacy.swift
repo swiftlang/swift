@@ -41,10 +41,6 @@ extension String {
                   input: Repeat(count: count, repeatedValue: c.value))
   }
   
-  func byteLength() -> Int {
-    return _encodedLength(UTF8.self)
-  }
-
   var lines : String[] {
     return split("\n")
   }
