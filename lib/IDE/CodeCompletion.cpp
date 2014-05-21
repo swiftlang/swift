@@ -1556,7 +1556,14 @@ public:
   }
 
   bool isPrivateStdlibDecl(const ValueDecl *VD) {
-    if (!VD->getDeclContext()->getParentModule()->isStdlibModule())
+    DeclContext *DC = VD->getDeclContext()->getModuleScopeContext();
+    if (!DC->getParentModule()->isSystemModule())
+      return false;
+    auto FU = dyn_cast<FileUnit>(DC);
+    if (!FU)
+      return false;
+    // Check for Swift module and overlays.
+    if (FU->getKind() != FileUnitKind::SerializedAST)
       return false;
 
     return VD->getNameStr().startswith("_");
