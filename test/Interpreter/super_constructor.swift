@@ -51,3 +51,21 @@ println(C(x: "y"))
 // CHECK: ...in bed
 // CHECK: C(a=20721, b=12702)
 println(D())
+
+class BaseWithDummyParameter {
+  init() {
+    fatalError("wrong init")
+  }
+  init(dummy: ()) {
+    println("correct")
+  }
+}
+class DerivedWithDummyParameter : BaseWithDummyParameter {
+  init() {
+    super.init(dummy: ())
+  }
+}
+
+BaseWithDummyParameter(dummy: ()) // CHECK: correct
+DerivedWithDummyParameter() // CHECK: correct
+
