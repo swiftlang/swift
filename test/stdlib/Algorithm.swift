@@ -119,7 +119,7 @@ testStartsWith()
 func testEnumerate() {
   println("testing enumerate")
   // CHECK: testing enumerate
-  for (i, s) in enumerate( "You will never retrieve the necronomicon!".split(" ") ) {
+  for (i, s) in enumerate( "You will never retrieve the necronomicon!"._split(" ") ) {
       println("\(i): \(s)")
   }
   // CHECK-NEXT: 0: You

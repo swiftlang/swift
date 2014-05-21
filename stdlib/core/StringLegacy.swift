@@ -41,11 +41,11 @@ extension String {
                   input: Repeat(count: count, repeatedValue: c.value))
   }
   
-  var lines : String[] {
-    return split("\n")
+  var _lines : String[] {
+    return _split("\n")
   }
   
-  func split(separator: UnicodeScalar) -> String[] {
+  func _split(separator: UnicodeScalar) -> String[] {
     var scalarSlices = Swift.split(unicodeScalars, { $0 == separator })
     return scalarSlices.map { $0 as String }
   }
