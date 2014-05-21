@@ -549,6 +549,9 @@ ParserResult<Expr> Parser::parseExprSuper() {
   VarDecl *selfDecl = getImplicitSelfDeclForSuperContext(*this,
                                                          CurDeclContext,
                                                          superLoc);
+  if (!selfDecl)
+    return nullptr;
+
   Expr *superRef = selfDecl
     ? cast<Expr>(new (Context) SuperRefExpr(selfDecl, superLoc,
                                             /*Implicit=*/false))
