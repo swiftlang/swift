@@ -18,8 +18,11 @@ namespace swift {
 /// Options for controlling diagnostics.
 class DiagnosticOptions {
 public:
+  /// Indicates whether textual diagnostics should use color.
+  bool UseColor = false;
+
   /// Indicates whether the diagnostics produced during compilation should be
-  /// checked against expectated diagnostics, indicated by markers in the
+  /// checked against expected diagnostics, indicated by markers in the
   /// input source file.
   bool VerifyDiagnostics = false;
 

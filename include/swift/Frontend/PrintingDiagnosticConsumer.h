@@ -25,10 +25,15 @@ namespace swift {
 
 /// \brief Diagnostic consumer that displays diagnostics to standard error.
 class PrintingDiagnosticConsumer : public DiagnosticConsumer {
+  bool ForceColors = false;
 public:
   virtual void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
                                 DiagnosticKind Kind, StringRef Text,
                                 const DiagnosticInfo &Info) override;
+
+  void forceColors() {
+    ForceColors = true;
+  }
 };
   
 }

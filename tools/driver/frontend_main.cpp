@@ -347,6 +347,9 @@ int frontend_main(ArrayRef<const char *>Args,
     }
   }
 
+  if (Invocation.getDiagnosticOptions().UseColor)
+    PDC.forceColors();
+
   if (Invocation.getFrontendOptions().PrintHelp ||
       Invocation.getFrontendOptions().PrintHelpHidden) {
     unsigned IncludedFlagsBitmask = driver::options::FrontendOption;

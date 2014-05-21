@@ -19,7 +19,46 @@
 #include "swift/Basic/SourceManager.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Twine.h"
+#include "llvm/Support/raw_ostream.h"
+
 using namespace swift;
+
+namespace {
+  class ColoredStream : public raw_ostream {
+    raw_ostream &Underlying;
+  public:
+    explicit ColoredStream(raw_ostream &underlying) : Underlying(underlying) {}
+    ~ColoredStream() { flush(); }
+
+    raw_ostream &changeColor(Colors color, bool bold = false,
+                             bool bg = false) override {
+      Underlying.changeColor(color, bold, bg);
+      return *this;
+    }
+    raw_ostream &resetColor() override {
+      Underlying.resetColor();
+      return *this;
+    }
+    raw_ostream &reverseColor() override {
+      Underlying.reverseColor();
+      return *this;
+    }
+    bool has_colors() const override {
+      return true;
+    }
+
+    void write_impl(const char *ptr, size_t size) override {
+      Underlying.write(ptr, size);
+    }
+    uint64_t current_pos() const override {
+      return Underlying.tell() - GetNumBytesInBuffer();
+    }
+
+    size_t preferred_buffer_size() const override {
+      return 0;
+    }
+  };
+} // end anonymous namespace
 
 void
 PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM, SourceLoc Loc,
@@ -52,6 +91,8 @@ PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM, SourceLoc Loc,
     FixIts.push_back(getRawFixIt(SM, F));
 
   // Display the diagnostic.
-  SM->PrintMessage(getRawLoc(Loc), SMKind, StringRef(Text), Ranges, FixIts);
+  ColoredStream coloredErrs{llvm::errs()};
+  raw_ostream &out = ForceColors ? coloredErrs : llvm::errs();
+  SM->PrintMessage(out, getRawLoc(Loc), SMKind, Text, Ranges, FixIts);
 }
 

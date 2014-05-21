@@ -645,6 +645,7 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
   Opts.SkipDiagnosticPasses |= Args.hasArg(OPT_disable_diagnostic_passes);
   Opts.ShowDiagnosticsAfterFatalError |=
     Args.hasArg(OPT_show_diagnostics_after_fatal);
+  Opts.UseColor |= Args.hasArg(OPT_color_diagnostics);
 
   return false;
 }

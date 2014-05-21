@@ -26,6 +26,7 @@
 #include "llvm/Option/ArgList.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/Process.h"
 
 using namespace swift;
 using namespace swift::driver;
@@ -147,6 +148,7 @@ static void addCommonFrontendArgs(const ToolChain &TC,
 
   inputArgs.AddLastArg(arguments, options::OPT_AssertConfig);
   inputArgs.AddLastArg(arguments, options::OPT_autolink_force_load);
+  inputArgs.AddLastArg(arguments, options::OPT_color_diagnostics);
   inputArgs.AddLastArg(arguments, options::OPT_enable_app_extension);
   inputArgs.AddLastArg(arguments, options::OPT_g);
   inputArgs.AddLastArg(arguments, options::OPT_import_objc_header);
@@ -179,6 +181,9 @@ static void addCommonFrontendArgs(const ToolChain &TC,
     arguments.push_back("-emit-module-doc-path");
     arguments.push_back(moduleDocOutputPath.c_str());
   }
+
+  if (llvm::sys::Process::StandardErrHasColors())
+    arguments.push_back("-color-diagnostics");
 }
 
 Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
