@@ -76,6 +76,9 @@ BraceStmt::BraceStmt(SourceLoc lbloc, ArrayRef<ASTNode> elts,
 BraceStmt *BraceStmt::create(ASTContext &ctx, SourceLoc lbloc,
                              ArrayRef<ASTNode> elts, SourceLoc rbloc,
                              Optional<bool> implicit) {
+  assert(std::none_of(elts.begin(), elts.end(),
+                      [](ASTNode node) -> bool { return node.isNull(); }) &&
+         "null element in BraceStmt");
   void *Buffer = ctx.Allocate(sizeof(BraceStmt)
                                 + elts.size() * sizeof(ASTNode),
                               alignof(BraceStmt));
