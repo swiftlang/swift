@@ -462,8 +462,9 @@ static bool simplifyBlocksWithCallsToNoReturn(SILBasicBlock &BB,
   
   // If the call is to the 'unreachable' builtin, then remove the call,
   // as it is redundant with the actual unreachable terminator.
-  if (auto builtin = dyn_cast<BuiltinFunctionRefInst>(NoReturnCall->getCallee())) {
-    if (builtin->getName().str() == "unreachable")
+  auto Callee = NoReturnCall->getCallee();
+  if (auto Builtin = dyn_cast<BuiltinFunctionRefInst>(Callee)) {
+    if (Builtin->getName().str() == "unreachable")
       ToBeDeleted.push_back(const_cast<ApplyInst*>(NoReturnCall));
   }
   
