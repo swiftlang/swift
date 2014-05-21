@@ -174,12 +174,10 @@ ClangImporter::create(ASTContext &ctx,
     new ClangImporter(ctx, importerOpts, tracker)
   };
 
-  // Get the SearchPathOptions to use when creating the Clang importer.
   SearchPathOptions &searchPathOpts = ctx.SearchPathOpts;
+
   // Construct the invocation arguments for Objective-C ARC with the current
   // target.
-  //
-  // FIXME: Figure out an appropriate OS deployment version to pass along.
   std::vector<std::string> invocationArgStrs = {
     "-x", "objective-c", "-std=gnu11", "-fobjc-arc", "-fmodules", "-fblocks",
     "-fsyntax-only", "-w",
@@ -194,6 +192,7 @@ ClangImporter::create(ASTContext &ctx,
     "-DCF_ENABLE_BRIDGED_TYPES",
     "-fretain-comments-from-system-headers",
     "-fmodules-validate-system-headers",
+    "-Werror=non-modular-include-in-framework-module",
     "<swift-imported-modules>"
   };
 
