@@ -394,47 +394,46 @@ void IRGenModule::emitSourceFile(SourceFile &SF, unsigned StartElem) {
 
 void IRGenModule::emitDebuggerInitializers() {
   SILFunction *DebuggerSILFunction = nullptr;
-    
-  for (SILFunction &SF : *SILMod) {
-    if (SF.hasLocation()) {
-      if (Decl* D = SF.getLocation().getAsASTNode<Decl>()) {
-        if (FuncDecl *FD = dyn_cast<FuncDecl>(D)) {
-          if (FD->getAttrs().hasAttribute<LLDBDebuggerFunctionAttr>()) {
-            DebuggerSILFunction = &SF;
-            break;
+  
+  // In playgrounds mode, insert the initialization into top_level_code.
+  if (Opts.Playground) {
+    DebuggerSILFunction = SILMod->lookUpFunction(SWIFT_ENTRY_POINT_FUNCTION);
+    assert(DebuggerSILFunction && "did not emit top_level_code for playground");
+  } else {
+    // Otherwise, try to find the LLDBDebuggerFunction.
+    for (SILFunction &SF : *SILMod) {
+      if (SF.hasLocation()) {
+        if (Decl* D = SF.getLocation().getAsASTNode<Decl>()) {
+          if (FuncDecl *FD = dyn_cast<FuncDecl>(D)) {
+            if (FD->getAttrs().hasAttribute<LLDBDebuggerFunctionAttr>()) {
+              DebuggerSILFunction = &SF;
+              break;
+            }
           }
         }
       }
     }
   }
-    
+  
   if (!DebuggerSILFunction)
     return;
     
-  llvm::StringRef DebuggerFunctionMangledName = DebuggerSILFunction->getName();
-    
-  llvm::Function *DebuggerFunction = nullptr;
-    
-  for (llvm::Function &F : Module) {
-    if (F.getName() == DebuggerFunctionMangledName) {
-      DebuggerFunction = &F;
-      break;
-    }
+  llvm::Function *DebuggerFunction
+    = Module.getFunction(DebuggerSILFunction->getName());
+  if (!DebuggerFunction)
+    return;
+  
+  llvm::BasicBlock *EntryBB = &DebuggerFunction->getEntryBlock();
+  llvm::BasicBlock::iterator IP = EntryBB->getFirstInsertionPt();
+  IRBuilder Builder(getLLVMContext());
+  Builder.llvm::IRBuilderBase::SetInsertPoint(EntryBB, IP);
+  
+  for (llvm::WeakVH &ObjCClass : ObjCClasses) {
+    Builder.CreateCall(getInstantiateObjCClassFn(), ObjCClass);
   }
     
-  if (DebuggerFunction) {
-    llvm::BasicBlock *EntryBB = &DebuggerFunction->getEntryBlock();
-    llvm::BasicBlock::iterator IP = EntryBB->getFirstInsertionPt();
-    IRBuilder Builder(getLLVMContext());
-    Builder.llvm::IRBuilderBase::SetInsertPoint(EntryBB, IP);
-    
-    for (llvm::WeakVH &ObjCClass : ObjCClasses) {
-      Builder.CreateCall(getInstantiateObjCClassFn(), ObjCClass);
-    }
-      
-    for (ExtensionDecl *ext : ObjCCategoryDecls) {
-      CategoryInitializerVisitor(*this, Builder, ext).visitMembers(ext);
-    }
+  for (ExtensionDecl *ext : ObjCCategoryDecls) {
+    CategoryInitializerVisitor(*this, Builder, ext).visitMembers(ext);
   }
 }
 

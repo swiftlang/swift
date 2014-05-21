@@ -872,6 +872,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   Opts.OutputFilename = FrontendOpts.OutputFilename;
   Opts.ModuleName = FrontendOpts.ModuleName;
 
+  if (Args.hasArg(OPT_playground))
+    Opts.Playground = true;
+  
   return false;
 }
 

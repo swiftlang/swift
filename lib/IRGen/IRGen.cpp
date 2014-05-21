@@ -156,13 +156,13 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
     }
   }
 
-  // Emit intializers for debugger functions if needed
-  if (IGM.ObjCInterop && Opts.UseJIT) {
-    IGM.emitDebuggerInitializers();
-  }
-
   // Okay, emit any definitions that we suddenly need.
   IGM.emitLazyDefinitions();
+
+  // Emit intializers for debugger functions if needed
+  if (IGM.ObjCInterop && (Opts.UseJIT || Opts.Playground)) {
+    IGM.emitDebuggerInitializers();
+  }
 
   std::for_each(Opts.LinkLibraries.begin(), Opts.LinkLibraries.end(),
                 [&](LinkLibrary linkLib) {

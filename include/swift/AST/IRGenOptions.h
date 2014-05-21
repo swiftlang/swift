@@ -93,12 +93,16 @@ public:
 
   /// Disable frame pointer elimination?
   unsigned DisableFPElim : 1;
+  
+  /// Special codegen for playgrounds.
+  unsigned Playground : 1;
 
   IRGenOptions() : OutputKind(IRGenOutputKind::LLVMAssembly), Verify(true),
                    OptLevel(0), DebugInfo(false), UseJIT(false),
                    EnableDynamicValueTypeLayout(false),
                    DisableLLVMOptzns(false), DisableLLVMARCOpts(false),
-                   DisableAllRuntimeChecks(false), DisableFPElim(true) {}
+                   DisableAllRuntimeChecks(false), DisableFPElim(true),
+                   Playground(false) {}
 };
 
 } // end namespace swift
