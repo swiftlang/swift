@@ -1250,72 +1250,55 @@ public:
   }
 
   void addParamPatternFromFunction(CodeCompletionResultBuilder &Builder,
-                                   const AbstractFunctionDecl *AFD,
-                                   const AnyFunctionType *AFT) {
-    auto BodyPatterns = AFD->getBodyParamPatterns();
-    // Skip over the implicit 'self'.
-    if (AFD->getImplicitSelfDecl()) {
-      BodyPatterns = BodyPatterns.slice(1);
-    }
+                                   const AnyFunctionType *AFT,
+                                   const AbstractFunctionDecl *AFD) {
 
-    ArrayRef<Identifier> ArgNames;
-    DeclName Name = AFD->getFullName();
-    if (Name) {
-      ArgNames = Name.getArgumentNames();
-    }
-
-    if (!BodyPatterns.empty()) {
-      if (auto *BodyTuple = dyn_cast<TuplePattern>(BodyPatterns.front())) {
-        for (unsigned i = 0, e = BodyTuple->getFields().size(); i != e; ++i) {
-          if (i > 0)
-            Builder.addComma();
-          auto ParamPattern = BodyTuple->getFields()[i].getPattern();
-          Builder.addCallParameter(ArgNames[i], ParamPattern->getBoundName(),
-                                   ParamPattern->getType());
-        }
-      } else {
-        Type T = AFT->getInput();
-        if (auto *PT = dyn_cast<ParenType>(T.getPointer())) {
-          // Only unwrap the paren sugar, if it exists.
-          T = PT->getUnderlyingType();
-        }
-        Builder.addCallParameter(Identifier(), T);
+    const TuplePattern *BodyTuple = nullptr;
+    if (AFD) {
+      auto BodyPatterns = AFD->getBodyParamPatterns();
+      // Skip over the implicit 'self'.
+      if (AFD->getImplicitSelfDecl()) {
+        BodyPatterns = BodyPatterns.slice(1);
       }
-    }
-  }
 
-  void addFunctionCallPattern(const AnyFunctionType *AFT) {
-    foundFunction(AFT);
-    CodeCompletionResultBuilder Builder(
-        Sink,
-        CodeCompletionResult::ResultKind::Pattern,
-        SemanticContextKind::ExpressionSpecific);
-    if (!HaveLParen)
-      Builder.addLeftParen();
-    else
-      Builder.addAnnotatedLeftParen();
-    bool NeedComma = false;
+      if (!BodyPatterns.empty())
+        BodyTuple = dyn_cast<TuplePattern>(BodyPatterns.front());
+    }
+
     if (auto *TT = AFT->getInput()->getAs<TupleType>()) {
-      for (auto TupleElt : TT->getFields()) {
-        if (NeedComma)
+      // Iterate over the tuple type fields, corresponding to each parameter.
+      for (unsigned i = 0, e = TT->getFields().size(); i != e; ++i) {
+        if (i > 0)
           Builder.addComma();
-        Builder.addCallParameter(TupleElt.getName(), TupleElt.getType());
-        NeedComma = true;
+        auto TupleElt = TT->getFields()[i];
+        auto ParamType = TupleElt.getType();
+        auto Name = TupleElt.getName();
+        if (BodyTuple && i < BodyTuple->getFields().size()) {
+          // If we have a local name for the parameter, pass in that as well.
+          auto ParamPat = BodyTuple->getFields()[i].getPattern();
+          Builder.addCallParameter(Name, ParamPat->getBoundName(), ParamType);
+        }
+        else
+          Builder.addCallParameter(Name, ParamType);
       }
     } else {
+      // If it's not a tuple, it could be a unary function.
       Type T = AFT->getInput();
       if (auto *PT = dyn_cast<ParenType>(T.getPointer())) {
         // Only unwrap the paren sugar, if it exists.
         T = PT->getUnderlyingType();
       }
-      Builder.addCallParameter(Identifier(), T);
+      if (BodyTuple && !BodyTuple->getFields().empty()) {
+        auto ParamPat = BodyTuple->getFields().front().getPattern();
+        Builder.addCallParameter(Identifier(), ParamPat->getBoundName(), T);
+      }
+      else
+        Builder.addCallParameter(Identifier(), T);
     }
-    Builder.addRightParen();
-    addTypeAnnotation(Builder, AFT->getResult());
   }
 
-  void addFunctionCallPattern(const AbstractFunctionDecl *AFD,
-                              const AnyFunctionType *AFT) {
+  void addFunctionCallPattern(const AnyFunctionType *AFT,
+                              const AbstractFunctionDecl *AFD = nullptr) {
     foundFunction(AFT);
     CodeCompletionResultBuilder Builder(
       Sink,
@@ -1326,7 +1309,7 @@ public:
     else
       Builder.addAnnotatedLeftParen();
 
-    addParamPatternFromFunction(Builder, AFD, AFT);
+    addParamPatternFromFunction(Builder, AFT, AFD);
 
     Builder.addRightParen();
     addTypeAnnotation(Builder, AFT->getResult());
@@ -1404,8 +1387,8 @@ public:
       Builder.addRightParen();
     } else {
       Builder.addLeftParen();
-      addParamPatternFromFunction(Builder, FD,
-                                  FunctionType->castTo<AnyFunctionType>());
+      addParamPatternFromFunction(Builder,
+                                  FunctionType->castTo<AnyFunctionType>(), FD);
       Builder.addRightParen();
     }
 
@@ -1764,7 +1747,7 @@ public:
     ExprType = ExprType->getRValueType();
     if (auto AFT = ExprType->getAs<AnyFunctionType>()) {
       if (auto *AFD = dyn_cast_or_null<AbstractFunctionDecl>(VD)) {
-        addFunctionCallPattern(AFD, AFT);
+        addFunctionCallPattern(AFT, AFD);
       } else {
         addFunctionCallPattern(AFT);
       }
