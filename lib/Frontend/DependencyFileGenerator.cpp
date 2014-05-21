@@ -36,7 +36,7 @@ void DependencyFileGenerator::writeToStream(llvm::raw_ostream &os) const {
     for (auto index = raw.find_first_of(badChars); index != StringRef::npos;
          index = raw.find_first_of(badChars, index+1)) {
       pathBuf.append(raw.slice(prev, index));
-      if (pathBuf[index] == '$')
+      if (raw[index] == '$')
         pathBuf.push_back('$');
       else
         pathBuf.push_back('\\');

@@ -47,3 +47,4 @@ class Test: NSObject {}
 _ = A()
 _ = USER_VERSION
 _ = EXTRA_VERSION
+_ = MONEY
