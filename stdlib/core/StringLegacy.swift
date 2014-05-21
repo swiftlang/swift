@@ -50,14 +50,6 @@ extension String {
     return scalarSlices.map { $0 as String }
   }
   
-  func size() -> Int {
-    var count = 0
-    for c in unicodeScalars {
-      ++count
-    }
-    return count
-  }
-
   var isEmpty : Bool {
     return core.count == 0
   }

@@ -22,7 +22,8 @@ func main() -> Void
     // CHECK-DAG: [ DW_TAG_arg_variable ] [random_int] [line 8]
     // CHECK-DAG: [ DW_TAG_arg_variable ] [out_only] [line 9]
         { (lhs : String, rhs : String) -> Bool in
-            if rhs == random_string || rhs.size() == random_int
+            if rhs == random_string
+               || countElements(rhs.unicodeScalars) == random_int
             {
             // Ensure the two local_vars are in different lexical scopes.
             // CHECK-DAG: metadata !{{{.*}}, metadata ![[THENSCOPE:.*]], metadata !"local_var", {{.*}}} ; [ DW_TAG_auto_variable ] [local_var] [line [[@LINE+2]]]

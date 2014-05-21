@@ -2,10 +2,10 @@
 
 func StringPrint() {
   var str = String()
-  assert(str.size() == 0)
+  assert(str.isEmpty)
   print(str)
   str = "\u00B5"
-  assert(str.size() == 1)
+  assert(str.core.count == 1)
   print(str)
 }
 

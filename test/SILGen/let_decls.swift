@@ -48,7 +48,7 @@ func test2() {
 func testTupleLetCapture() {
   let t = ("foo", 42)
 
-  takeClosure( { t.0.size() })
+  takeClosure( { countElements(t.0.unicodeScalars) })
 }
 
 
