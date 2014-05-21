@@ -26,13 +26,13 @@
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/ObjCBridge.h"
-#include "llvm/ADT/DenseMap.h"
 #include "Private.h"
 #include "Debug.h"
 #include <dlfcn.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <mutex>
+#include <unordered_map>
 #include "../shims/shims.h"
 
 // Redeclare these just we check them.
@@ -289,13 +289,21 @@ static NSString *_getDescription(SwiftObject *obj) {
 /// FIXME: this needs to be integrated with the ObjC runtime so that
 /// entries will actually get collected.  Also, that would make this just
 /// a simple manipulation of the internal structures there.
+///
+/// FIXME: this is not actually safe; if the ObjC runtime deallocates
+/// the pointer, the keys in UnownedRefs will become dangling
+/// references.  rdar://16968733
 namespace {
   struct UnownedRefEntry {
     id Value;
     size_t Count;
   };
 }
-static llvm::DenseMap<const void*, UnownedRefEntry> UnownedRefs;
+
+// The ObjC runtime will hold a point into the UnownedRefEntry,
+// so we require pointers to objects to be stable across rehashes.
+// DenseMap doesn't guarantee that, but std::unordered_map does.
+static std::unordered_map<const void*, UnownedRefEntry> UnownedRefs;
 static std::mutex UnownedRefsMutex;
 
 static void objc_rootRetainUnowned(id object) {
