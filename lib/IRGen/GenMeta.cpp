@@ -539,7 +539,21 @@ namespace {
       auto argMetadata = visit(type.getInput());
       auto resultMetadata = visit(type.getResult());
 
-      auto call = IGF.Builder.CreateCall2(IGF.IGM.getGetFunctionMetadataFn(),
+      llvm::Constant *getMetadataFn;
+      switch (type->getRepresentation()) {
+      case AnyFunctionType::Representation::Thin:
+        // TODO: Provide metadata for thin function types. This should not come
+        // up yet because thin types aren't allowed in the AST.
+        llvm_unreachable("thin function types aren't allowed in the AST");
+      case AnyFunctionType::Representation::Thick:
+        getMetadataFn = IGF.IGM.getGetFunctionMetadataFn();
+        break;
+      case AnyFunctionType::Representation::Block:
+        getMetadataFn = IGF.IGM.getGetBlockMetadataFn();
+        break;
+      }
+      
+      auto call = IGF.Builder.CreateCall2(getMetadataFn,
                                           argMetadata, resultMetadata);
       call->setDoesNotThrow();
       call->setCallingConv(IGF.IGM.RuntimeCC);

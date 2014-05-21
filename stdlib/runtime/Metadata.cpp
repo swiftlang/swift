@@ -377,6 +377,7 @@ _dynamicCastToExistential(const OpaqueValue *value,
     
   case MetadataKind::ExistentialMetatype:
   case MetadataKind::Function:
+  case MetadataKind::Block:
   case MetadataKind::HeapArray:
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::Metatype:
@@ -420,6 +421,7 @@ swift::swift_dynamicCast(const void *object, const Metadata *targetType) {
   case MetadataKind::ExistentialMetatype:
   case MetadataKind::ForeignClass: // FIXME
   case MetadataKind::Function:
+  case MetadataKind::Block:
   case MetadataKind::HeapArray:
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::Metatype:
@@ -459,6 +461,7 @@ swift::swift_dynamicCastUnconditional(const void *object,
   case MetadataKind::ForeignClass: // FIXME
   case MetadataKind::ExistentialMetatype:
   case MetadataKind::Function:
+  case MetadataKind::Block:
   case MetadataKind::HeapArray:
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::Metatype:
@@ -505,6 +508,7 @@ swift::swift_dynamicCastMetatype(const Metadata *sourceType,
     case MetadataKind::Existential:
     case MetadataKind::ExistentialMetatype:
     case MetadataKind::Function:
+    case MetadataKind::Block:
     case MetadataKind::HeapArray:
     case MetadataKind::HeapLocalVariable:
     case MetadataKind::Metatype:
@@ -521,6 +525,7 @@ swift::swift_dynamicCastMetatype(const Metadata *sourceType,
   case MetadataKind::Existential:
   case MetadataKind::ExistentialMetatype:
   case MetadataKind::Function:
+  case MetadataKind::Block:
   case MetadataKind::HeapArray:
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::Metatype:
@@ -570,6 +575,7 @@ swift::swift_dynamicCastMetatypeUnconditional(const Metadata *sourceType,
     case MetadataKind::Existential:
     case MetadataKind::ExistentialMetatype:
     case MetadataKind::Function:
+    case MetadataKind::Block:
     case MetadataKind::HeapArray:
     case MetadataKind::HeapLocalVariable:
     case MetadataKind::Metatype:
@@ -586,6 +592,7 @@ swift::swift_dynamicCastMetatypeUnconditional(const Metadata *sourceType,
   case MetadataKind::Existential:
   case MetadataKind::ExistentialMetatype:
   case MetadataKind::Function:
+  case MetadataKind::Block:
   case MetadataKind::HeapArray:
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::Metatype:
@@ -624,6 +631,7 @@ swift::swift_dynamicCastIndirect(const OpaqueValue *value,
     case MetadataKind::Existential:
     case MetadataKind::ExistentialMetatype:
     case MetadataKind::Function:
+    case MetadataKind::Block:
     case MetadataKind::HeapArray:
     case MetadataKind::HeapLocalVariable:
     case MetadataKind::Metatype:
@@ -643,6 +651,7 @@ swift::swift_dynamicCastIndirect(const OpaqueValue *value,
   case MetadataKind::ForeignClass: // FIXME
   case MetadataKind::ExistentialMetatype:
   case MetadataKind::Function:
+  case MetadataKind::Block:
   case MetadataKind::HeapArray:
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::Metatype:
@@ -682,6 +691,7 @@ swift::swift_dynamicCastIndirectUnconditional(const OpaqueValue *value,
     case MetadataKind::Existential:
     case MetadataKind::ExistentialMetatype:
     case MetadataKind::Function:
+    case MetadataKind::Block:
     case MetadataKind::HeapArray:
     case MetadataKind::HeapLocalVariable:
     case MetadataKind::Metatype:
@@ -705,6 +715,7 @@ swift::swift_dynamicCastIndirectUnconditional(const OpaqueValue *value,
   case MetadataKind::ForeignClass: // FIXME
   case MetadataKind::ExistentialMetatype:
   case MetadataKind::Function:
+  case MetadataKind::Block:
   case MetadataKind::HeapArray:
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::Metatype:
@@ -854,30 +865,53 @@ namespace {
 }
 
 /// The uniquing structure for function type metadata.
-static MetadataCache<FunctionCacheEntry> FunctionTypes;
+namespace {
+  MetadataCache<FunctionCacheEntry> FunctionTypes;
+  MetadataCache<FunctionCacheEntry> BlockTypes;
+  
+  const FunctionTypeMetadata *
+  _getFunctionTypeMetadata(const Metadata *argMetadata,
+                           const Metadata *resultMetadata,
+                           MetadataKind Kind,
+                           MetadataCache<FunctionCacheEntry> &Cache,
+                           const ValueWitnessTable &ValueWitnesses) {
+    const size_t numGenericArgs = 2;
 
+    typedef FullMetadata<FunctionTypeMetadata> FullFunctionTypeMetadata;
+
+    const void *args[] = { argMetadata, resultMetadata };
+    if (auto entry = Cache.find(args, numGenericArgs)) {
+      return entry->getData();
+    }
+
+    auto entry = FunctionCacheEntry::allocate(args, numGenericArgs, 0);
+
+    auto metadata = entry->getData();
+    metadata->setKind(Kind);
+    metadata->ValueWitnesses = &ValueWitnesses;
+    metadata->ArgumentType = argMetadata;
+    metadata->ResultType = resultMetadata;
+
+    return Cache.add(entry)->getData();
+  }
+}
 
 const FunctionTypeMetadata *
 swift::swift_getFunctionTypeMetadata(const Metadata *argMetadata,
                                      const Metadata *resultMetadata) {
-  const size_t numGenericArgs = 2;
+  return _getFunctionTypeMetadata(argMetadata, resultMetadata,
+                                  MetadataKind::Function,
+                                  FunctionTypes,
+                                  _TWVFT_T_);
+}
 
-  typedef FullMetadata<FunctionTypeMetadata> FullFunctionTypeMetadata;
-
-  const void *args[] = { argMetadata, resultMetadata };
-  if (auto entry = FunctionTypes.find(args, numGenericArgs)) {
-    return entry->getData();
-  }
-
-  auto entry = FunctionCacheEntry::allocate(args, numGenericArgs, 0);
-
-  auto metadata = entry->getData();
-  metadata->setKind(MetadataKind::Function);
-  metadata->ValueWitnesses = &_TWVFT_T_; // standard function value witnesses
-  metadata->ArgumentType = argMetadata;
-  metadata->ResultType = resultMetadata;
-
-  return FunctionTypes.add(entry)->getData();
+const FunctionTypeMetadata *
+swift::swift_getBlockTypeMetadata(const Metadata *argMetadata,
+                                  const Metadata *resultMetadata) {
+  return _getFunctionTypeMetadata(argMetadata, resultMetadata,
+                                  MetadataKind::Block,
+                                  BlockTypes,
+                                  _TWVBO);
 }
 
 /*** Tuples ****************************************************************/
@@ -2350,6 +2384,7 @@ Metadata::getNominalTypeDescriptor() const {
   case MetadataKind::Opaque:
   case MetadataKind::Tuple:
   case MetadataKind::Function:
+  case MetadataKind::Block:
   case MetadataKind::PolyFunction:
   case MetadataKind::Existential:
   case MetadataKind::ExistentialMetatype:
@@ -2448,6 +2483,7 @@ recur:
   case MetadataKind::Enum:
   case MetadataKind::Opaque:
   case MetadataKind::Function:
+  case MetadataKind::Block:
   case MetadataKind::Existential:
   case MetadataKind::ExistentialMetatype:
   case MetadataKind::Metatype: {
@@ -2519,6 +2555,7 @@ recur:
   case MetadataKind::Enum:
   case MetadataKind::Opaque:
   case MetadataKind::Function:
+  case MetadataKind::Block:
   case MetadataKind::Existential:
   case MetadataKind::ExistentialMetatype:
   case MetadataKind::Metatype:

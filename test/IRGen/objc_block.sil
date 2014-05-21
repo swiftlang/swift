@@ -24,3 +24,15 @@ entry(%b : $@cc(cdecl) @objc_block Foo -> Foo, %x : $Foo):
 // CHECK:         ret %C10objc_block3Foo* %7
 // CHECK:       }
 
+sil @generic : $@thin <T> (@in T) -> ()
+
+sil @generic_with_block : $@thin (@in @cc(cdecl) @objc_block () -> ()) -> () {
+entry(%b : $*@cc(cdecl) @objc_block () -> ()):
+  %f = function_ref @generic : $@thin <T> (@in T) -> ()
+  %z = apply %f<@objc_block () -> ()>(%b) : $@thin <T> (@in T) -> ()
+  return %z : $()
+}
+
+// CHECK-LABEL: define void @generic_with_block(%objc_block** noalias)
+// CHECK:         call %swift.type* @swift_getBlockTypeMetadata
+

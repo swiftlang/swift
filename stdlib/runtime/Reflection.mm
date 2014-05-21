@@ -804,6 +804,7 @@ getImplementationForType(const Metadata *T, const OpaqueValue *Value) {
   /// TODO: Implement specialized mirror witnesses for all kinds.
   case MetadataKind::Enum:
   case MetadataKind::Function:
+  case MetadataKind::Block:
   case MetadataKind::Existential:
   case MetadataKind::ExistentialMetatype:
   case MetadataKind::Metatype:
@@ -855,6 +856,7 @@ getReflectableConformance(const Metadata *T, const OpaqueValue *Value) {
   case MetadataKind::Opaque:
   case MetadataKind::Enum:
   case MetadataKind::Function:
+  case MetadataKind::Block:
   case MetadataKind::Metatype:
     break;
       
@@ -994,6 +996,7 @@ static void swift_stdlib_getTypeNameImpl(OpaqueValue *value,
     return;
 
   case MetadataKind::Function:
+  case MetadataKind::Block:
     // FIXME: reconstruct the type name.
     new (result) String("");
     return;

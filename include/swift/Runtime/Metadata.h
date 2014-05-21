@@ -1668,6 +1668,11 @@ extern "C" const FunctionTypeMetadata *
 swift_getFunctionTypeMetadata(const Metadata *argMetadata,
                               const Metadata *resultMetadata);
 
+/// \brief Fetch a uniqued metadata for a block type.
+extern "C" const FunctionTypeMetadata *
+swift_getBlockTypeMetadata(const Metadata *argMetadata,
+                           const Metadata *resultMetadata);
+
 /// \brief Fetch a uniqued type metadata for an ObjC class.
 extern "C" const Metadata *
 swift_getObjCClassMetadata(const ClassMetadata *theClass);

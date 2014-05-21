@@ -62,6 +62,9 @@ enum class MetadataKind : uintptr_t {
 
   /// A foreign class, such as a Core Foundation class.
   ForeignClass = 16,
+  
+  /// An Objective-C block type.
+  Block = 17,
 
   // Array types?
   // L-value types?

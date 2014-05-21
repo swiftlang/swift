@@ -242,6 +242,13 @@ FUNCTION(UnknownWeakTakeAssign, swift_unknownWeakTakeAssign,RuntimeCC,
          ARGS(WeakReferencePtrTy, WeakReferencePtrTy),
          ATTRS(NoUnwind))
 
+// type_metadata_t *swift_getBlockTypeMetadata(type_metadata_t *arg,
+//                                             type_metadata_t *result);
+FUNCTION(GetBlockMetadata, swift_getBlockTypeMetadata, RuntimeCC,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(TypeMetadataPtrTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind, ReadNone))
+
 // type_metadata_t *swift_getFunctionTypeMetadata(type_metadata_t *arg,
 //                                                type_metadata_t *result);
 FUNCTION(GetFunctionMetadata, swift_getFunctionTypeMetadata, RuntimeCC,
