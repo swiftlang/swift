@@ -31,8 +31,8 @@ using namespace swift;
 using namespace swift::arc;
 
 STATISTIC(NumIncrements, "Total number of increments seen");
-STATISTIC(NumMovedIncrements, "Total number of increments moved");
-STATISTIC(NumIncrementsRemoved, "Total number of increments removed");
+STATISTIC(NumRefCountOpsMoved, "Total number of increments moved");
+STATISTIC(NumRefCountOpsRemoved, "Total number of increments removed");
 
 //===----------------------------------------------------------------------===//
 //                             Utility Functions
@@ -437,16 +437,116 @@ processBBTopDown(SILBasicBlock &BB,
 //                                Code Motion
 //===----------------------------------------------------------------------===//
 
+/// A set of matching reference count increments, decrements, increment
+/// insertion pts, and decrement insertion pts.
+namespace {
+struct ARCMatchingSet {
+  SILValue Ptr;
+  llvm::SmallPtrSet<SILInstruction *, 8> Increments;
+  llvm::SmallPtrSet<SILInstruction *, 8> IncrementInsertPts;
+  llvm::SmallPtrSet<SILInstruction *, 8> Decrements;
+  llvm::SmallPtrSet<SILInstruction *, 8> DecrementInsertionPts;
+
+  void clear() {
+    Ptr = SILValue();
+    Increments.clear();
+    IncrementInsertPts.clear();
+    Decrements.clear();
+    DecrementInsertionPts.clear();
+  }
+};
+} // end anonymous namespace
+
+static SILInstruction *createIncrement(SILValue Ptr, SILInstruction *InsertPt) {
+  SILBuilder B(InsertPt);
+  if (Ptr.getType().hasReferenceSemantics())
+    return B.createStrongRetain(InsertPt->getLoc(), Ptr);
+  return B.createRetainValue(InsertPt->getLoc(), Ptr);
+}
+
+static SILInstruction *createDecrement(SILValue Ptr, SILInstruction *InsertPt) {
+  SILBuilder B(InsertPt);
+
+  if (Ptr.getType().hasReferenceSemantics())
+    return B.createStrongRelease(InsertPt->getLoc(), Ptr);
+  return B.createReleaseValue(InsertPt->getLoc(), Ptr);
+}
+
 static bool
-performCodeMotion(llvm::MapVector<SILInstruction *,
-                                 ReferenceCountState> &DecToIncStateMap) {
-  llvm::SmallVector<SILInstruction *, 16> DeleteList;
+optimizeReferenceCountMatchingSet(ARCMatchingSet &MatchSet) {
+  DEBUG(llvm::dbgs() << "**** Optimizing Matching Set ****\n");
+
+  bool Changed = false;
+
+  // Insert the new increments.
+  for (SILInstruction *InsertPt : MatchSet.IncrementInsertPts) {
+    if (!InsertPt) {
+      DEBUG(llvm::dbgs() << "    No insertion point, not inserting increment "
+            "into new position.\n");
+      continue;
+    }
+
+    Changed = true;
+    SILInstruction *NewIncrement = createIncrement(MatchSet.Ptr, InsertPt);
+    (void)NewIncrement;
+    DEBUG(llvm::dbgs() << "    Inserting new increment: " << *NewIncrement
+                       << "\n"
+                          "At insertion point: " << *InsertPt << "\n");
+    ++NumRefCountOpsMoved;
+  }
+
+  // Insert the new decrements.
+  for (SILInstruction *InsertPt : MatchSet.DecrementInsertionPts) {
+    if (!InsertPt) {
+      DEBUG(llvm::dbgs() << "    No insertion point, not inserting decrement "
+            "into its new position.\n");
+      continue;
+    }
+
+    Changed = true;
+    SILInstruction *NewDecrement = createDecrement(MatchSet.Ptr, InsertPt);
+    (void)NewDecrement;
+    DEBUG(llvm::dbgs() << "    Inserting new NewDecrement: " << *NewDecrement
+                       << "\nAt insertion point: " << *InsertPt << "\n");
+    ++NumRefCountOpsMoved;
+  }
+
+  // Add the old increments to the delete list.
+  for (SILInstruction *Increment : MatchSet.Increments) {
+    Changed = true;
+    DEBUG(llvm::dbgs() << "    Deleting increment: " << *Increment);
+    Increment->eraseFromParent();
+    ++NumRefCountOpsRemoved;
+  }
+
+  // Add the old decrements to the delete list.
+  for (SILInstruction *Decrement : MatchSet.Decrements) {
+    Changed = true;
+    DEBUG(llvm::dbgs() << "    Deleting decrement: " << *Decrement);
+    Decrement->eraseFromParent();
+    ++NumRefCountOpsRemoved;
+  }
+
+  return Changed;
+}
+
+static bool
+computeARCMatchingSet(llvm::MapVector<SILInstruction *,
+                                      ReferenceCountState> &DecToIncStateMap,
+                      ARCMatchingSet &MatchSet) {
+  bool MatchedPair = false;
 
   for (auto &Pair : DecToIncStateMap) {
     // If we do not have an instruction, this is a state with an invalidated
     // reference count. Skip it...
     if (!Pair.second.getInstruction())
       continue;
+
+    if (!MatchSet.Ptr)
+      MatchSet.Ptr = Pair.first->getOperand(0);
+    assert(MatchSet.Ptr == Pair.first->getOperand(0) &&
+           "If Ptr is already set, make sure it matches the ptr on the "
+           "increment.");
 
     auto *InsertPt = Pair.second.getInsertPoint();
 
@@ -461,31 +561,19 @@ performCodeMotion(llvm::MapVector<SILInstruction *,
             << "\n    " << *Inst << "    "
             << *Pair.first);
 
-      assert(!std::count(DeleteList.begin(), DeleteList.end(), Pair.first) &&
-             "Should only add an instruction to this list once.");
-      assert(!std::count(DeleteList.begin(), DeleteList.end(), Inst) &&
-             "Should only add an instruction to this list once.");
-
-      // Add our deleted instructions to the delete list.
-      DeleteList.push_back(Pair.first);
-      DeleteList.push_back(Inst);
-
-      ++NumIncrementsRemoved;
+      MatchedPair = true;
+      MatchSet.Increments.insert(Inst);
+      MatchSet.Decrements.insert(Pair.first);
       continue;
     }
-    
+
     if (InsertPt) {
-      Pair.second.getInstruction()->moveBefore(InsertPt);
-      ++NumMovedIncrements;
+      MatchSet.Increments.insert(Pair.second.getInstruction());
+      MatchSet.IncrementInsertPts.insert(InsertPt);
     }
   }
 
-  // Delete the instructions.
-  for (auto *Inst : DeleteList)
-    Inst->eraseFromParent();
-
-  // If we found instructions to delete, return true.
-  return !DeleteList.empty();
+  return MatchedPair;
 }
 
 
@@ -505,6 +593,7 @@ static bool processFunction(SILFunction &F, AliasAnalysis *AA) {
 
   llvm::MapVector<SILValue, ReferenceCountState> BBState;
   llvm::MapVector<SILInstruction *, ReferenceCountState> DecToIncStateMap;
+  ARCMatchingSet MatchingSet;
   bool Changed = false;
 
   // For each basic block in F...
@@ -516,16 +605,27 @@ static bool processFunction(SILFunction &F, AliasAnalysis *AA) {
     while (true) {
       BBState.clear();
       DecToIncStateMap.clear();
+      MatchingSet.clear();
 
       bool NestingDetected;
+      // Perform the top down dataflow.
       processBBTopDown(BB, BBState, DecToIncStateMap, NestingDetected, AA);
 
-      bool RemovedRetain = performCodeMotion(DecToIncStateMap);
-      Changed |= RemovedRetain;
+      // Use the result of the top down dataflow to initialize a set of matching
+      // increments, decrements, increment insertion pts, and decrement
+      // insertion pts.
+      //
+      // *NOTE* Since we are single basic block only and are not moving
+      // releases, currently we will have match sets consisting of an increment,
+      // decrement pair or an increment, increment insertion pt.
+      bool RemovedPair = computeARCMatchingSet(DecToIncStateMap, MatchingSet);
+
+      // Optimize the computed. ReferenceCountMatchingSet
+      Changed |= optimizeReferenceCountMatchingSet(MatchingSet);
 
       // We need to rerun if we saw any nested increment/decrements and if we
       // removed any increment/decrement pairs.
-      if (!NestingDetected || !RemovedRetain)
+      if (!NestingDetected || !RemovedPair)
         break;
 
       DEBUG(llvm::dbgs() << "\n<<< Made a Change! Reprocessing BB! >>>\n");
