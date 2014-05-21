@@ -96,8 +96,8 @@ extern "C" uint64_t swift_doubleToString(char *Buffer, size_t BufferLength,
   if (BufferLength < 32)
     swift::crash("swift_doubleToString: insufficient buffer size");
 
-  static locale_t locale = newlocale(LC_NUMERIC_MASK, "loc1", (locale_t)0);
-  int i = snprintf_l(Buffer, BufferLength, locale, "%0.15g", Value);
+  // Pass a null locale to use the C locale.
+  int i = snprintf_l(Buffer, BufferLength, /*locale=*/nullptr, "%0.15g", Value);
   if (i < 0)
     swift::crash(
         "swift_doubleToString: unexpected return value from sprintf");

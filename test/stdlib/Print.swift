@@ -1,4 +1,18 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-build-swift %s -o %t/a.out
+// RUN: %target-run %t/a.out env | FileCheck %s
+// RUN: %target-run %t/a.out ru_RU.UTF-8 | FileCheck %s
+// REQUIRES: sdk
+
+import Darwin
+
+// Interpret the command line arguments.
+var arg = Process.arguments[1]
+
+if arg == "env" {
+  setlocale(LC_ALL, "")
+} else {
+  setlocale(LC_ALL, C_ARGV[1])
+}
 
 func stdlibTypesHaveDescription() {
   func hasDescription(_: Printable) {}
@@ -37,15 +51,19 @@ func stdlibTypesHaveDescription() {
   hasDescription(CBool(true))
 }
 
+var failed = false
+
 func printedIs<T>(
     object: T, expected: String,
     file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
   var actual = toString(object)
   if expected != actual {
+    println("check failed at \(file), line \(line)")
     println("expected: \"\(expected)\"")
     println("actual: \"\(actual)\"")
-    assert(expected == actual, file: file, line: line)
+    println()
+    failed = true
   }
 }
 
@@ -56,9 +74,11 @@ func debugPrintedIs<T>(
   var actual = ""
   debugPrint(object, &actual)
   if expected != actual {
+    println("check failed at \(file), line \(line)")
     println("expected: \"\(expected)\"")
     println("actual: \"\(actual)\"")
-    assert(expected == actual, file: file, line: line)
+    println()
+    failed = true
   }
 }
 
@@ -67,9 +87,11 @@ func assertEquals(
     file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
   if expected != actual {
+    println("check failed at \(file), line \(line)")
     println("expected: \"\(expected)\"")
     println("actual: \"\(actual)\"")
-    assert(expected == actual, file: file, line: line)
+    println()
+    failed = true
   }
 }
 
@@ -230,6 +252,42 @@ func test_FloatingPointPrinting() {
   printedIs(Double(-1.0), "-1.0")
   printedIs(Double(100.125), "100.125")
   printedIs(Double(-100.125), "-100.125")
+
+  printedIs(Double(125000000000000000.0), "1.25e+17")
+  printedIs(Double(12500000000000000.0),  "1.25e+16")
+  printedIs(Double(1250000000000000.0),   "1.25e+15")
+  printedIs(Double(125000000000000.0), "125000000000000.0")
+  printedIs(Double(12500000000000.0),  "12500000000000.0")
+  printedIs(Double(1250000000000.0),   "1250000000000.0")
+  printedIs(Double(125000000000.0),    "125000000000.0")
+  printedIs(Double(12500000000.0),     "12500000000.0")
+  printedIs(Double(1250000000.0),      "1250000000.0")
+  printedIs(Double(125000000.0),       "125000000.0")
+  printedIs(Double(12500000.0),        "12500000.0")
+  printedIs(Double(1250000.0),         "1250000.0")
+  printedIs(Double(125000.0),          "125000.0")
+  printedIs(Double(12500.0),           "12500.0")
+  printedIs(Double(1250.0),            "1250.0")
+  printedIs(Double(125.0), "125.0")
+  printedIs(Double(12.5),  "12.5")
+  printedIs(Double(1.25),  "1.25")
+  printedIs(Double(0.125), "0.125")
+  printedIs(Double(0.0125),             "0.0125")
+  printedIs(Double(0.00125),            "0.00125")
+  printedIs(Double(0.000125),           "0.000125")
+  printedIs(Double(0.0000125),          "1.25e-05")
+  printedIs(Double(0.00000125),         "1.25e-06")
+  printedIs(Double(0.000000125),        "1.25e-07")
+  printedIs(Double(0.0000000125),       "1.25e-08")
+  printedIs(Double(0.00000000125),      "1.25e-09")
+  printedIs(Double(0.000000000125),     "1.25e-10")
+  printedIs(Double(0.0000000000125),    "1.25e-11")
+  printedIs(Double(0.00000000000125),   "1.25e-12")
+  printedIs(Double(0.000000000000125),  "1.25e-13")
+  printedIs(Double(0.0000000000000125), "1.25e-14")
+  printedIs(Double(0.00000000000000125),   "1.25e-15")
+  printedIs(Double(0.000000000000000125),  "1.25e-16")
+  printedIs(Double(0.0000000000000000125), "1.25e-17")
 
   println("test_FloatingPointPrinting done")
 }
@@ -576,4 +634,8 @@ func test_CustomStringInterpolation() {
 test_CustomStringInterpolation()
 // CHECK: test_CustomStringInterpolation done
 
+if !failed {
+  println("OK")
+}
+// CHECK: OK
 
