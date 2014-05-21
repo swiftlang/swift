@@ -119,28 +119,27 @@ static void propagateBasicBlockArgs(SILBasicBlock &BB) {
        PI != PE; ++PI) {
     SILBasicBlock *PredB = *PI;
 
-    // We are only simplifying branch instructions.
-    if (BranchInst *BI = dyn_cast<BranchInst>(PredB->getTerminator())) {
-      unsigned Idx = 0;
-      assert(!BI->getArgs().empty());
-      for (OperandValueArrayRef::iterator AI = BI->getArgs().begin(),
-                                          AE = BI->getArgs().end();
-                                          AI != AE; ++AI, ++Idx) {
-        // When processing the first predecessor, record the arguments.
-        if (!checkArgs)
-          Args.push_back(*AI);
-        else
-          // On each subsequent predecessor, check the arguments.
-          if (Args[Idx] != *AI)
-            return;
-      }
-
-    // If the terminator is not a branch instruction, do not simplify.
-    } else {
+    // We are only simplifying cases where all predecessors are
+    // unconditional branch instructions.
+    if (!isa<BranchInst>(PredB->getTerminator()))
       return;
+
+    BranchInst *BI = cast<BranchInst>(PredB->getTerminator());
+    unsigned Idx = 0;
+    assert(!BI->getArgs().empty());
+    for (OperandValueArrayRef::iterator AI = BI->getArgs().begin(),
+           AE = BI->getArgs().end();
+         AI != AE; ++AI, ++Idx) {
+      // When processing the first predecessor, record the arguments.
+      if (!checkArgs)
+        Args.push_back(*AI);
+      else
+        // On each subsequent predecessor, check the arguments.
+        if (Args[Idx] != *AI)
+          return;
     }
 
-    // After the first branch is processed, the arguments vector is poulated.
+    // After the first branch is processed, the arguments vector is populated.
     assert(Args.size() > 0);
     checkArgs = true;
   }
