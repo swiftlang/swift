@@ -122,10 +122,10 @@ protocol BitwiseOperations {
   ///
   /// ::
   ///
-  ///   x | allZeros() == x
-  ///   x ^ allZeros() == x
-  ///   x & allZeros() == allZeros()
-  ///   x & ~allZeros() == x
+  ///   x | allZeros == x
+  ///   x ^ allZeros == x
+  ///   x & allZeros == allZeros
+  ///   x & ~allZeros == x
   ///
   class var allZeros: Self { get }
 }
