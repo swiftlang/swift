@@ -2,6 +2,8 @@
 // RUN: %S/../../utils/line-directive %t/Join.swift -- %target-build-swift -module-cache-path %t/clang-module-cache %t/Join.swift -o %t/a.out
 // RUN: %target-run %t/a.out | %S/../../utils/line-directive %t/Join.swift -- FileCheck %t/Join.swift
 
+var failed = false
+
 %for EquatableArrayType in ['ContiguousArray', 'Slice', 'Array']:
 
 func expectEqual<T : Equatable>(
@@ -13,6 +15,7 @@ func expectEqual<T : Equatable>(
     println("expected: \"\(expected)\"")
     println("actual: \"\(actual)\"")
     println()
+    failed = true
   }
 }
 
@@ -29,6 +32,7 @@ func expectEqual(
     println("expected: \"\(expected)\"")
     println("actual: \"\(actual)\"")
     println()
+    failed = true
   }
 }
 
@@ -43,6 +47,7 @@ func expectEmpty<T>(
     println("expected optional to be empty")
     println("actual: \"\(value)\"")
     println()
+    failed = true
   }
 }
 
@@ -54,6 +59,7 @@ func expectNotEmpty<T>(
     println("check failed at \(file), line \(line)")
     println("expected optional to be non-empty")
     println()
+    failed = true
   }
 }
 
@@ -494,4 +500,9 @@ func testJoinOperatorPlus() {
 }
 // CHECK: testJoinOperatorPlus done
 testJoinOperatorPlus()
+
+if !failed {
+  println("OK")
+}
+// CHECK: OK
 
