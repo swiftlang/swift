@@ -264,6 +264,37 @@ struct CMutablePointer<T> : Equatable {
     _fixLifetime(owner)
     return result
   }  
+
+  /// Return the result of invoking body.  If self was converted from
+  /// nil, passes nil as the argument.  Otherwise, passes the address
+  /// of a T which is written into buffer before this method returns
+  @transparent
+  func _withBridgeObject<U: AnyObject, R>(
+    inout buffer: U?, body: (AutoreleasingUnsafePointer<U?>)->R
+  ) -> R {
+    if reinterpretCast(value) != 0 {
+      return body(&buffer)
+    }
+    return body(nil)
+  }
+    
+  /// Return the result of invoking body.  If self was converted from
+  /// nil, passes nil as the argument.  Otherwise, passes the address
+  /// of buffer
+  @transparent
+  func _withBridgeValue<U, R>(
+    inout buffer: U, body: (CMutablePointer<U>)->R
+  ) -> R {
+    return reinterpretCast(value) == 0  ? body(nil) : body(&buffer)
+  }
+
+  /// If self was converted from nil, writes the result of invoking body into 
+  /// the pointee
+  func _setIfNonNil(body: ()->T) {
+    self.withUnsafePointer {
+      (p)->() in if (p) { p.memory = body() }
+    }
+  }
 }
 
 @transparent
