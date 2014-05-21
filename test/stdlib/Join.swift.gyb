@@ -418,6 +418,58 @@ func testJoinOperatorPlus() {
     expectEqual([ 1, 2, 3, 4, 5, 6, 7 ], r)
   }
 
+  // ExtensibleCollection + same ExtensibleCollection
+  if true {
+    var ec1: Int[] = []
+    var ec2: Int[] = []
+    var r: Int[] = ec1 + ec2
+    expectEqual([], r)
+  }
+  if true {
+    var ec1: Int[] = []
+    var ec2: Int[] = [ 4, 5, 6, 7 ]
+    var r: Int[] = ec1 + ec2
+    expectEqual([ 4, 5, 6, 7 ], r)
+  }
+  if true {
+    var ec1: Int[] = [ 1, 2, 3 ]
+    var ec2: Int[] = []
+    var r: Int[] = ec1 + ec2
+    expectEqual([ 1, 2, 3 ], r)
+  }
+  if true {
+    var ec1: Int[] = [ 1, 2, 3 ]
+    var ec2: Int[] = [ 4, 5, 6, 7 ]
+    var r: Int[] = ec1 + ec2
+    expectEqual([ 1, 2, 3, 4, 5, 6, 7 ], r)
+  }
+
+  // ExtensibleCollection + other ExtensibleCollection
+  if true {
+    var ec1: Int[] = []
+    var ec2 = MockExtensibleCollection(Int[]())
+    var r: Int[] = ec1 + ec2
+    expectEqual([], r)
+  }
+  if true {
+    var ec1: Int[] = []
+    var ec2 = MockExtensibleCollection([ 4, 5, 6, 7 ])
+    var r: Int[] = ec1 + ec2
+    expectEqual([ 4, 5, 6, 7 ], r)
+  }
+  if true {
+    var ec1: Int[] = [ 1, 2, 3 ]
+    var ec2 = MockExtensibleCollection(Int[]())
+    var r: Int[] = ec1 + ec2
+    expectEqual([ 1, 2, 3 ], r)
+  }
+  if true {
+    var ec1: Int[] = [ 1, 2, 3 ]
+    var ec2 = MockExtensibleCollection([ 4, 5, 6, 7 ])
+    var r: Int[] = ec1 + ec2
+    expectEqual([ 1, 2, 3, 4, 5, 6, 7 ], r)
+  }
+
   println("testJoinOperatorPlus done")
 }
 // CHECK: testJoinOperatorPlus done

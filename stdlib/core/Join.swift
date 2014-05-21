@@ -58,6 +58,11 @@ protocol ExtensibleCollection : _ExtensibleCollection {
     S : Collection
     where S.GeneratorType.Element == Self.GeneratorType.Element
   >(_: Self, _: S) -> Self
+
+  func +<
+    EC : ExtensibleCollection
+    where EC.GeneratorType.Element == Self.GeneratorType.Element
+  >(_: Self, _: S) -> Self
 */
 }
 
@@ -89,6 +94,17 @@ func +<
     S : Collection
     where S.GeneratorType.Element == C.GeneratorType.Element
 >(var lhs: C, rhs: S) -> C {
+  // FIXME: what if lhs is a reference type?  This will mutate it.
+  lhs.reserveCapacity(countElements(lhs) + numericCast(countElements(rhs)))
+  lhs.extend(rhs)
+  return lhs
+}
+
+func +<
+    EC1 : _ExtensibleCollection,
+    EC2 : _ExtensibleCollection
+    where EC1.GeneratorType.Element == EC2.GeneratorType.Element
+>(var lhs: EC1, rhs: EC2) -> EC1 {
   // FIXME: what if lhs is a reference type?  This will mutate it.
   lhs.reserveCapacity(countElements(lhs) + numericCast(countElements(rhs)))
   lhs.extend(rhs)
