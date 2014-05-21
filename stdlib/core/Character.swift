@@ -121,7 +121,7 @@ extension String {
 func ==(lhs: Character, rhs: Character) -> Bool {
   switch (lhs, rhs) {
   case (.LargeRepresentation(let lhsValue), .LargeRepresentation(let rhsValue)):
-    return (lhsValue as String) == rhsValue
+    return lhsValue == rhsValue
 
   case (.SmallRepresentation(let lhsValue), .SmallRepresentation(let rhsValue)):
     return Character._smallValue(lhsValue) == Character._smallValue(rhsValue)

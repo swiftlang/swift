@@ -44,20 +44,4 @@ struct _NilMirror : Mirror {
   var disposition: MirrorDisposition { return .Aggregate }
 }
 
-/// FIXME: _NilOptionalComparator is used to influence equality comparison
-/// operations between values of type _Nil and values of type Optional<T>.
-/// Specifically, the existence of the overload for '==' below will short-circuit
-/// the overload resolution process when type checking the expressions ".None == nil"
-/// and "nil == .None".
-struct _NilOptionalComparator : Equatable {
-}
 
-func == (lhs: _NilOptionalComparator, rhs: _NilOptionalComparator) -> Bool {
-  return false
-}
-
-extension _Nil {
-  @conversion func __conversion() -> _NilOptionalComparator? {
-    return .None
-  }
-}

@@ -686,8 +686,3 @@ func invalidDictionaryLiteral() {
   var g = [1: "one", 2: ???] // expected-error {{expected value in dictionary literal}} expected-error 2{{expected ',' separator}} expected-error {{expected key expression in dictionary literal}}
 }
 
-//===----------------------------------------------------------------------===//
-// nil/.None comparisons
-//===----------------------------------------------------------------------===//
-.None == nil // expected-error {{could not find member 'None'}}
-nil == .None // expected-error {{could not find member 'None'}}

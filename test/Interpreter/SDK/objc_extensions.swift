@@ -40,7 +40,7 @@ println(o.respondsToSelector("setBlackHoleWithHawkingRadiation:"))
 // CHECK: I've been frobbed!
 o.frob()
 // CHECK: true
-println((o as AnyObject) === o.asHerself)
+println(o === o.asHerself)
 // CHECK: e+
 drop(o.blackHoleWithHawkingRadiation)
 // CHECK: e-

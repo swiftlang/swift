@@ -438,7 +438,7 @@ switch reflect(somesubclassofnsstring).quickLookObject {
 let astr = NSAttributedString(string: "yizzle pizzle")
 switch reflect(astr as NSAttributedString).quickLookObject {
 case .Some(.AttributedString(let astr2 as NSAttributedString))
-where (astr as AnyObject) === astr2:
+where astr === astr2:
   println("got the expected quick look attributed string")
 case _:
   println("got something else")
@@ -477,7 +477,7 @@ case _:
 #if os(OSX)
 let image = NSImage(contentsOfFile:Process.arguments[1])
 switch reflect(image).quickLookObject {
-case .Some(.Image(let image2 as NSImage)) where (image as AnyObject) === image2:
+case .Some(.Image(let image2 as NSImage)) where image === image2:
   println("got the expected quick look image")
 case _:
   println("got something else")
@@ -485,7 +485,7 @@ case _:
 
 let color = NSColor.blackColor()! // FIXME: unnecessary bang
 switch reflect(color).quickLookObject {
-case .Some(.Color(let color2 as NSColor)) where (color as AnyObject) === color2:
+case .Some(.Color(let color2 as NSColor)) where color === color2:
   println("got the expected quick look color")
 case _:
   println("got something else")
@@ -493,7 +493,7 @@ case _:
 
 let path = NSBezierPath()
 switch reflect(path).quickLookObject {
-case .Some(.BezierPath(let path2 as NSBezierPath)) where (path as AnyObject) === path2:
+case .Some(.BezierPath(let path2 as NSBezierPath)) where path === path2:
   println("got the expected quick look bezier path")
 case _:
   println("got something else")

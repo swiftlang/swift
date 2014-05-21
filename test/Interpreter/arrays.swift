@@ -142,11 +142,3 @@ let afd: Float[] = [
     0.5, 0.5, -0.5,         0.0, 1.0, 0.0, 
     -0.5, 0.5, -0.5,        0.0, 1.0, 2.0
 ]
-
-// Check equality on arrays
-func test() {
-  var a = [42]
-  println(a == [42])
-}
-test()
-// CHECK: true

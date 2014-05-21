@@ -672,32 +672,30 @@ matchCallArguments(ConstraintSystem &cs, TypeMatchKind kind,
 
       
       auto isOptionalConversion = false;
-      auto notTyVarMatch = false;
+      auto tryUser = false;
       
       if (!haveOneNonUserConversion) {
-        notTyVarMatch = !(isa<TypeVariableType>(argTy->getDesugaredType()) ||
-                          isa<TypeVariableType>(paramTy->getDesugaredType()));
+        tryUser = !(isa<TypeVariableType>(argTy->getDesugaredType()) ||
+                         isa<TypeVariableType>(paramTy->getDesugaredType()));
         
         // We'll bypass optional conversions because of the implicit conversions
         // that take place - there will always be a ValueToOptional disjunctive
         // choice.
-        if (notTyVarMatch) {
+        if (tryUser) {
           if(auto boundGenericType = paramTy->getAs<BoundGenericType>()) {
             auto typeDecl = boundGenericType->getDecl();
-            isOptionalConversion =
-                typeDecl->classifyAsOptionalType() ==
-                    OTK_ImplicitlyUnwrappedOptional;
+            isOptionalConversion = typeDecl->classifyAsOptionalType();
           }
         }
         
-        haveOneNonUserConversion = (!notTyVarMatch && !paramIdx) ||
+        haveOneNonUserConversion = !tryUser ||
                                    isOptionalConversion ||
                                    haveOneNonUserConversion;
       }
       
       // If at least one operator argument can be applied to without a user
       // conversion, there's no need to check the others.
-      if (!haveOneNonUserConversion && notTyVarMatch) {
+      if (!haveOneNonUserConversion) {
         auto applyFlags = subflags |
                           ConstraintSystem::TMF_ApplyingOperatorParameter;
         auto nonConversionResult = cs.matchTypes(argTy,
@@ -1727,10 +1725,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
           }
         }
         
-        if (!(flags & TMF_ApplyingOperatorParameter)) {
-          conversionsOrFixes.push_back(
-              ConversionRestrictionKind::ValueToOptional);
-        }
+        conversionsOrFixes.push_back(
+          ConversionRestrictionKind::ValueToOptional);
       }
     }
   }
