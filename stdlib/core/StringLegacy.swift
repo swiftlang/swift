@@ -26,7 +26,7 @@ extension String {
     self = String(_StringBuffer(encoding: _encoding, input: input))
   }
   
-  init(count sz: Int, character c: Character) {
+  init(count sz: Int, repeatedValue c: Character) {
     let s = String(c)
     self = String(_StringBuffer(capacity: s.core.count * sz, 
                                 initialSize: 0, 
@@ -36,9 +36,9 @@ extension String {
     }
   }
 
-  init(count: Int, scalar _c: UnicodeScalar) {
+  init(count: Int, repeatedValue c: UnicodeScalar) {
     self = String(UTF32.self, 
-                  input: Repeat(count: count, repeatedValue: _c.value))
+                  input: Repeat(count: count, repeatedValue: c.value))
   }
   
   func asUTF8() -> UTF8.CodeUnit[] {
@@ -148,7 +148,7 @@ extension String {
   }
 
   init(_ _c: UnicodeScalar) {
-    self = String(count: 1, scalar: _c)
+    self = String(count: 1, repeatedValue: _c)
   }
 
   func _isAll(predicate: (UnicodeScalar) -> Bool) -> Bool {
