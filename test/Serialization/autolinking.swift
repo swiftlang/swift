@@ -40,4 +40,8 @@ import someModule
 // FORCE-LOAD-HEX: @"_swift_FORCE_LOAD_$306d6f64756c65" = weak constant i1 false
 
 // FORCE-LOAD-CLIENT: @"_swift_FORCE_LOAD_$_module" = external global i1
-// FORCE-LOAD-CLIENT: @"_swift_FORCE_LOAD_$_module_$_autolinking" = weak constant i1* @"_swift_FORCE_LOAD_$_module"
+// FORCE-LOAD-CLIENT: @"_swift_FORCE_LOAD_$_module_$_autolinking" = weak hidden constant i1* @"_swift_FORCE_LOAD_$_module"
+
+// FORCE-LOAD-CLIENT: @llvm.used = appending global [{{[0-9]+}} x i8*] [
+// FORCE-LOAD-CLIENT: i8* bitcast (i1** @"_swift_FORCE_LOAD_$_module_$_autolinking" to i8*)
+// FORCE-LOAD-CLIENT: ], section "llvm.metadata"

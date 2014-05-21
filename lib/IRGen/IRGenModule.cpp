@@ -391,16 +391,26 @@ llvm::Constant *IRGenModule::getSize(Size size) {
   return llvm::ConstantInt::get(SizeTy, size.getValue());
 }
 
-static StringRef encodeForceLoadSymbolName(llvm::SmallVectorImpl<char> &buf,
-                                           StringRef name) {
-  llvm::raw_svector_ostream os{buf};
-  os << "_swift_FORCE_LOAD_$";
+static void appendEncodedName(raw_ostream &os, StringRef name) {
   if (clang::isValidIdentifier(name)) {
     os << "_" << name;
   } else {
     for (auto c : name)
       os.write_hex(static_cast<uint8_t>(c));
   }
+}
+
+static void appendEncodedName(llvm::SmallVectorImpl<char> &buf,
+                              StringRef name) {
+  llvm::raw_svector_ostream os{buf};
+  appendEncodedName(os, name);
+}
+
+static StringRef encodeForceLoadSymbolName(llvm::SmallVectorImpl<char> &buf,
+                                           StringRef name) {
+  llvm::raw_svector_ostream os{buf};
+  os << "_swift_FORCE_LOAD_$";
+  appendEncodedName(os, name);
   return os.str();
 }
 
@@ -432,14 +442,17 @@ void IRGenModule::addLinkLibrary(const LinkLibrary &linkLib) {
     encodeForceLoadSymbolName(buf, linkLib.getName());
     auto symbolAddr = Module.getOrInsertGlobal(buf.str(), Int1Ty);
 
-    buf += "_$_";
-    buf += Opts.ModuleName;
+    buf += "_$";
+    appendEncodedName(buf, Opts.ModuleName);
 
     if (!Module.getGlobalVariable(buf.str())) {
-      (void)new llvm::GlobalVariable(Module, symbolAddr->getType(),
-                                     /*constant=*/true,
-                                     llvm::GlobalAlias::WeakAnyLinkage,
-                                     symbolAddr, buf.str());
+      auto ref = new llvm::GlobalVariable(Module, symbolAddr->getType(),
+                                          /*constant=*/true,
+                                          llvm::GlobalValue::WeakAnyLinkage,
+                                          symbolAddr, buf.str());
+      ref->setVisibility(llvm::GlobalValue::HiddenVisibility);
+      auto casted = llvm::ConstantExpr::getBitCast(ref, Int8PtrTy);
+      LLVMUsed.push_back(casted);
     }
   }
 }
@@ -475,7 +488,7 @@ void IRGenModule::emitAutolinkInfo() {
     llvm::SmallString<64> buf;
     encodeForceLoadSymbolName(buf, Opts.ForceLoadSymbolName);
     (void)new llvm::GlobalVariable(Module, Int1Ty, /*constant=*/true,
-                                   llvm::GlobalVariable::WeakAnyLinkage,
+                                   llvm::GlobalValue::WeakAnyLinkage,
                                    llvm::Constant::getNullValue(Int1Ty),
                                    buf.str());
   }
