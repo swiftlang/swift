@@ -71,6 +71,11 @@ module ProtoWithInitializer {
   export *
 }
 
+module TypeAndValue {
+  header "TypeAndValue.h"
+  export *
+}
+
 module Redeclaration {
   header "Redeclaration.h"
   export *

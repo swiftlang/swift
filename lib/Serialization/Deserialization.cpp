@@ -985,7 +985,7 @@ Optional<MutableArrayRef<Decl *>> ModuleFile::readMembers() {
 /// Both \p expectedTy and \p expectedModule can be omitted, in which case any
 /// type or module is accepted. Values imported from Clang can also appear in
 /// any module.
-static void filterValues(Type expectedTy, Module *expectedModule,
+static void filterValues(Type expectedTy, Module *expectedModule, bool isType,
                          SmallVectorImpl<ValueDecl *> &values) {
   CanType canTy;
   if (expectedTy)
@@ -993,6 +993,8 @@ static void filterValues(Type expectedTy, Module *expectedModule,
 
   auto newEnd = std::remove_if(values.begin(), values.end(),
                                [=](ValueDecl *value) {
+    if (isType != isa<TypeDecl>(value))
+      return true;
     if (canTy && value->getInterfaceType()->getCanonicalType() != canTy)
       return true;
     // FIXME: Should be able to move a value from an extension in a derived
@@ -1032,7 +1034,8 @@ Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
   case XREF_VALUE_PATH_PIECE: {
     IdentifierID IID;
     TypeID TID = 0;
-    if (recordID == XREF_TYPE_PATH_PIECE)
+    bool isType = (recordID == XREF_TYPE_PATH_PIECE);
+    if (isType)
       XRefTypePathPieceLayout::readRecord(scratch, IID);
     else
       XRefValuePathPieceLayout::readRecord(scratch, TID, IID);
@@ -1042,7 +1045,7 @@ Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
 
     M->lookupQualified(ModuleType::get(M), name, NL_QualifiedDefault,
                        /*typeResolver=*/nullptr, values);
-    filterValues(getType(TID), nullptr, values);
+    filterValues(getType(TID), nullptr, isType, values);
     break;
   }
 
@@ -1105,7 +1108,8 @@ Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
     case XREF_VALUE_PATH_PIECE: {
       IdentifierID IID;
       TypeID TID = 0;
-      if (recordID == XREF_TYPE_PATH_PIECE)
+      bool isType = (recordID == XREF_TYPE_PATH_PIECE);
+      if (isType)
         XRefTypePathPieceLayout::readRecord(scratch, IID);
       else
         XRefValuePathPieceLayout::readRecord(scratch, TID, IID);
@@ -1128,7 +1132,7 @@ Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
 
       auto members = nominal->lookupDirect(memberName);
       values.append(members.begin(), members.end());
-      filterValues(getType(TID), M, values);
+      filterValues(getType(TID), M, isType, values);
       break;
     }
 
