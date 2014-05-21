@@ -204,13 +204,13 @@ var _nilRawPointer: Builtin.RawPointer {
 /// This type has no operations of its own, but has implicit conversions
 /// to allow passing any of the following to a C or ObjC API:
 ///
-/// - 'nil', which gets passed as a null pointer,
+/// - `nil`, which gets passed as a null pointer,
 /// - an inout argument of the referenced type, which gets passed as a pointer
 ///   to the inout-ed lvalue (or its writeback temporary, if it is a computed
 ///   lvalue),
-/// - an inout argument of the Array<T> type, which gets passed as a pointer
+/// - an inout argument of the `Array<T>` type, which gets passed as a pointer
 ///   to the beginning of the array,
-/// - an UnsafePointer<T>, which is passed as-is.
+/// - an `UnsafePointer<T>`, which is passed as-is.
 ///
 /// The value consists of an owner-value pair. During bridging, a strong
 /// reference to the owner is held for the duration of the call, and the pointer
@@ -219,9 +219,10 @@ var _nilRawPointer: Builtin.RawPointer {
 /// a pointer and still guarantee that their storage will be held for the
 /// duration of the call.
 ///
-/// Pointers to ObjC object pointer type ``NSFoo**`` are not mapped to this
-/// type; they instead get mapped to AutoreleasingUnsafePointer<T>. ``void*`` pointers
-/// are mapped to CMutableVoidPointer.
+/// Pointers to ObjC object pointer type `NSFoo**` are not mapped to
+/// this type; they instead get mapped to
+/// `AutoreleasingUnsafePointer<T>`. `void*` pointers are mapped to
+/// CMutableVoidPointer.
 struct CMutablePointer<T> : Equatable {
   let owner: AnyObject?
   let value: Builtin.RawPointer
