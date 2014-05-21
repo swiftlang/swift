@@ -846,7 +846,8 @@ func _arrayBridgeFromObjectiveC<Base, BridgesToDerived>(source: Array<Base>)
                                                     minimumCapacity: 0)
   var p = buf._unsafeElementStorage
   
-  ElementwiseBridging: do {
+ElementwiseBridging:
+  do {
     for object: Base in source {
       let value = Swift.bridgeFromObjectiveC(reinterpretCast(object), 
                                              BridgesToDerived.self)

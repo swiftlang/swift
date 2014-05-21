@@ -142,6 +142,7 @@
        '(swift-font-lock-keywords) ))
 
 (defun swift-indent-line ()
+  (interactive)
   (let (indent-level target-column)
     (save-excursion
       (widen)
@@ -155,7 +156,9 @@
                (- indent-level
                   (cond ((= (char-syntax (or (char-after) ?\X)) ?\))
                          1)
-                        ((save-match-data (looking-at "case \\|default *:"))
+                        ((save-match-data
+                           (looking-at
+                            "case \\|default *:\\|[a-zA-Z_][a-zA-Z0-9_]*\\(\\s-\\|\n\\)*:\\(\\s-\\|\n\\)*\\(for\\|do\\|\\while\\|switch\\)\\>"))
                          1)
                         (t 0)))))
       (indent-line-to target-column))
