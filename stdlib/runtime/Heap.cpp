@@ -72,11 +72,13 @@ typedef struct AllocCacheEntry_s {
 
 
 
-static void *pthreadTSDTable() {
-  static const auto details
+static const auto pthread_layout_details
     = reinterpret_cast<struct pthread_layout_offsets_s *>(
       dlsym(RTLD_DEFAULT, "pthread_layout_offsets"));
+
+static void *pthreadTSDTable() {
   pthread_t self = pthread_self();
+  auto details = pthread_layout_details;
 
   if (details) {
     assert(details->plo_pthread_tsd_entry_size == sizeof(void *));
