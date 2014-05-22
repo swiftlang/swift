@@ -1630,6 +1630,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     // Don't print qualifiers for types from the standard library.
     if (M->isStdlibModule() ||
         M->Name == T->getASTContext().ObjCModuleName ||
+        M->isSystemModule() ||
         isLLDBExpressionModule(M))
       return false;
 

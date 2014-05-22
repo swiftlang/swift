@@ -11,3 +11,10 @@
 // RUN: FileCheck -input-file %t/Foundation.NSKeyValueCoding.printed.txt -check-prefix=CHECK2 %s
 
 // CHECK2: extension NSObject
+
+// RUN: %swift-ide-test -print-module -source-filename %s -module-to-print=Foundation.NSString -function-definitions=false > %t/Foundation.NSString.printed.txt
+// RUN: FileCheck -input-file %t/Foundation.NSString.printed.txt -check-prefix=CHECK_NSSTRING %s
+
+// Make sure that we don't qualify 'NSErrorPointer'.
+// CHECK_NSSTRING: init(withContentsOfFile path: String!, encoding enc: UInt, error: NSErrorPointer)
+
