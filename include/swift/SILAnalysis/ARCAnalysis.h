@@ -13,11 +13,15 @@
 #ifndef SWIFT_SILANALYSIS_ARCANALYSIS_H
 #define SWIFT_SILANALYSIS_ARCANALYSIS_H
 
+#include "swift/SIL/SILValue.h"
+#include "llvm/ADT/SmallPtrSet.h"
+
 namespace swift {
 
 class SILValue;
 class SILInstruction;
 class AliasAnalysis;
+class SILFunction;
 
 } // end namespace swift
 
@@ -30,6 +34,27 @@ bool canDecrementRefCount(SILInstruction *User, SILValue Ptr,AliasAnalysis *AA);
 /// \returns True if the user \p User can use the pointer \p Ptr in a manner
 /// that requires \p Ptr to be alive before Inst.
 bool canUseValue(SILInstruction *User, SILValue Ptr, AliasAnalysis *AA);
+
+/// A set of matching reference count increments, decrements, increment
+/// insertion pts, and decrement insertion pts.
+struct ARCMatchingSet {
+  SILValue Ptr;
+  llvm::SmallPtrSet<SILInstruction *, 8> Increments;
+  llvm::SmallPtrSet<SILInstruction *, 8> IncrementInsertPts;
+  llvm::SmallPtrSet<SILInstruction *, 8> Decrements;
+  llvm::SmallPtrSet<SILInstruction *, 8> DecrementInsertionPts;
+
+  void clear() {
+    Ptr = SILValue();
+    Increments.clear();
+    IncrementInsertPts.clear();
+    Decrements.clear();
+    DecrementInsertionPts.clear();
+  }
+};
+
+bool computeARCMatchingSet(SILFunction &F, AliasAnalysis *AA,
+                           std::function<void (ARCMatchingSet&)> Fun);
 
 } // end namespace arc
 } // end namespace swift
