@@ -4,6 +4,7 @@ import json
 import optparse
 import subprocess
 import time
+import random
 
 def send_to_screen(screen_name, arg0=None, command='stuff'):
     args = ['screen', '-S', screen_name, '-p', '0',
@@ -122,10 +123,7 @@ for example::
         print "sending command: %r" % (command.replace('\n', '<cr>'),)
         for c in command:
             send(c)
-            if c == "\n":
-                time.sleep(0.75)
-            else:
-                time.sleep(0.005)
+            time.sleep(0.01 + random.random() * 0.03)
 
         # Wait for user input, then send a return.
 #        raw_input('press enter to send return...')
