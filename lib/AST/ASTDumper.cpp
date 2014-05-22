@@ -1052,7 +1052,19 @@ public:
     OS.indent(Indent) << '(' << C;
     if (E->isImplicit())
       OS << " implicit";
-    return OS << " type='" << E->getType() << '\'';
+    OS << " type='" << E->getType() << '\'';
+
+    // If we have a source range and an ASTContext, print the source range.
+    auto R = E->getSourceRange();
+    if (R.isValid()) {
+      if (auto Ty = E->getType()) {
+        auto &Ctx = Ty->getASTContext();
+        OS << " location=";
+        R.print(OS, Ctx.SourceMgr, /*PrintText=*/false);
+      }
+    }
+
+    return OS;
   }
 
   void visitErrorExpr(ErrorExpr *E) {
