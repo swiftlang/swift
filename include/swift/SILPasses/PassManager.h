@@ -45,6 +45,9 @@ namespace swift {
     /// The number of passes run so far.
     unsigned NumPassesRun = 0;
 
+    /// Number of optimization iterations run.
+    unsigned NumOptimizationIterations = 0;
+
   public:
     /// C'tor
     SILPassManager(SILModule *M, SILOptions Opts) :

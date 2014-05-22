@@ -62,6 +62,7 @@ runFunctionPasses(llvm::ArrayRef<SILFunctionTransform*> FuncTransforms) {
 void SILPassManager::runOneIteration() {
   DEBUG(llvm::dbgs() << "*** Optimizing the module *** \n");
   NumOptzIterations++;
+  NumOptimizationIterations++;
   CompleteFunctions *CompleteFuncs = getAnalysis<CompleteFunctions>();
   SmallVector<SILFunctionTransform*, 16> PendingFuncTransforms;
 
@@ -96,7 +97,7 @@ void SILPassManager::runOneIteration() {
       if (CompleteFuncs->hasChanged()) {
         if (Options.PrintAll) {
           llvm::dbgs() << "*** SIL module after " << SMT->getName()
-                       << " (" << NumOptzIterations << ") ***\n";
+                       << " (" << NumOptimizationIterations << ") ***\n";
           Mod->dump();
         }
         if (Options.VerifyAll) {
@@ -123,7 +124,7 @@ void SILPassManager::runOneIteration() {
 void SILPassManager::run() {
   if (Options.PrintAll) {
     llvm::dbgs() << "*** SIL module before transformation ("
-                 << NumOptzIterations << ") ***\n";
+                 << NumOptimizationIterations << ") ***\n";
     Mod->dump();
   }
   // Keep optimizing the module until no pass requested another iteration
@@ -131,10 +132,8 @@ void SILPassManager::run() {
   const unsigned IterationLimit = 20;
   do {
     anotherIteration = false;
-
     runOneIteration();
-
-  } while (anotherIteration && NumOptzIterations < IterationLimit);
+  } while (anotherIteration && NumOptimizationIterations < IterationLimit);
 }
 
 /// D'tor.
