@@ -128,7 +128,7 @@ for example::
                 time.sleep(0.005)
 
         # Wait for user input, then send a return.
-        raw_input('press enter to send return...')
+#        raw_input('press enter to send return...')
         send('\n')
         if item is not demo_script[-1]:
             raw_input('press enter to continue to next command...')
