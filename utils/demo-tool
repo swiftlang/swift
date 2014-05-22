@@ -15,7 +15,7 @@ def send_to_screen(screen_name, arg0=None, command='stuff'):
     p.communicate()
 
 def load_as_transcript(f):
-    def add_block(clearScreen=False):
+    def add_block(clearScreen=False,noReturn=False):
         # If so, add the current block after trimming leading and trailing blank
         # lines.
         while current_block and current_block[0].isspace():
@@ -31,7 +31,9 @@ def load_as_transcript(f):
             # Strip off any trailing newline.
             if script.endswith('\n'):
                 script = script[:-1]
-            demo_script.append({ 'command' :  script, 'clearScreen' : clearScreen })
+            demo_script.append({ 'command' :  script,
+                                 'clearScreen' : clearScreen,
+                                 'noReturn' : noReturn })
 
             # Clear the block.
             del current_block[:]
@@ -48,6 +50,10 @@ def load_as_transcript(f):
 
         if ln.strip() == '>>>CLEAR':
             add_block(clearScreen=True)
+            continue
+
+        if ln.strip() == '>>>NORETURN':
+            add_block(noReturn=True)
             continue
 
         # Otherwise, add the line to the current block.
@@ -117,6 +123,7 @@ for example::
     # continue.
     for item in demo_script:
         shouldClear = bool(item['clearScreen'])
+        noReturn = bool(item['noReturn'])        
         command = str(item['command'])
 
         # Send the command slowly, as if it was typed.
@@ -125,9 +132,11 @@ for example::
             send(c)
             time.sleep(random.random() * 0.03)
 
-        # Wait for user input, then send a return.
-        raw_input('press enter to send return...')
-        send('\n')
+        if not noReturn:
+          # Wait for user input, then send a return.        
+          raw_input('press enter to send return...')
+          send('\n')
+          
         if item is not demo_script[-1]:
             raw_input('press enter to continue to next command...')
             # Send the command slowly, as if it was typed.
