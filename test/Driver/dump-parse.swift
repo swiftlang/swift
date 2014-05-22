@@ -10,7 +10,7 @@ func foo(n: Int) -> Int {
   // CHECK-AST: (brace_stmt
   // CHECK-AST:   (return_stmt
   // CHECK-AST:     (call_expr implicit type='Int'
-  // CHECK-AST:       (integer_literal_expr type='{{[^']+}}' value=42)
+  // CHECK-AST:       (integer_literal_expr type='{{[^']+}}' {{.*}} value=42)
   return 42
 }
 
@@ -23,8 +23,8 @@ func bar() {
   // CHECK-NEXT:   (unresolved_decl_ref_expr type='{{[^']+}}' name=foo
   // CHECK-NEXT:   (unresolved_decl_ref_expr type='{{[^']+}}' name=foo
   // CHECK-AST: (brace_stmt
-  // CHECK-AST-NEXT:   (declref_expr type='{{[^']+}}' decl=main.(file).foo
-  // CHECK-AST-NEXT:   (declref_expr type='{{[^']+}}' decl=main.(file).foo
-  // CHECK-AST-NEXT:   (declref_expr type='{{[^']+}}' decl=main.(file).foo
+  // CHECK-AST-NEXT:   (declref_expr type='{{[^']+}}' {{.*}} decl=main.(file).foo
+  // CHECK-AST-NEXT:   (declref_expr type='{{[^']+}}' {{.*}} decl=main.(file).foo
+  // CHECK-AST-NEXT:   (declref_expr type='{{[^']+}}' {{.*}} decl=main.(file).foo
   foo foo foo
 }

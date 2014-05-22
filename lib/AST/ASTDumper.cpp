@@ -1055,11 +1055,17 @@ public:
     OS << " type='" << E->getType() << '\'';
 
     // If we have a source range and an ASTContext, print the source range.
-    auto R = E->getSourceRange();
-    if (R.isValid()) {
-      if (auto Ty = E->getType()) {
-        auto &Ctx = Ty->getASTContext();
+    if (auto Ty = E->getType()) {
+      auto &Ctx = Ty->getASTContext();
+      auto L = E->getLoc();
+      if (L.isValid()) {
         OS << " location=";
+        L.print(OS, Ctx.SourceMgr);
+      }
+
+      auto R = E->getSourceRange();
+      if (R.isValid()) {
+        OS << " range=";
         R.print(OS, Ctx.SourceMgr, /*PrintText=*/false);
       }
     }
