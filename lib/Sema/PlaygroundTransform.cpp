@@ -43,7 +43,7 @@ private:
   ASTContext &Context;
   DeclContext *TypeCheckDC;
   unsigned TmpNameIndex = 0;
-  const unsigned int LineOffset = 10;
+  const unsigned int LineOffset = 5;
 
   struct BracePair {
   public:
@@ -510,13 +510,14 @@ public:
         }
       } else if (Decl *D = Element.dyn_cast<Decl*>()) {
         D->walk(CF);
-        if (VarDecl *VD = llvm::dyn_cast<VarDecl>(D)) {
-          PatternBindingDecl *PBD = VD->getParentPattern();
-          if (PBD && PBD->getInit()) {
-            Expr *Log = logVarDecl(VD);
-            if (Log) {
-              Elements.insert(Elements.begin() + (EI + 1), Log);
-              ++EI;
+        if (PatternBindingDecl *PBD = llvm::dyn_cast<PatternBindingDecl>(D)) {
+          if (PBD->hasInit()) {
+            if (VarDecl *VD = PBD->getSingleVar()) {
+              Expr *Log = logVarDecl(VD);
+              if (Log) {
+                Elements.insert(Elements.begin() + (EI + 1), Log);
+                ++EI;
+              }
             }
           }
         } else {
@@ -530,6 +531,16 @@ public:
       Elements.insert(Elements.begin(), buildScopeEntry(BS->getSourceRange()));
       Elements.insert(Elements.end(), buildScopeExit(BS->getSourceRange()));
     }
+
+    // Remove null elements from the list.
+    // FIXME: This is a band-aid used to work around the fact that the
+    // above code can introduce null elements into the vector. The
+    // right fix is to avoid doing that above.
+    Elements.erase(std::remove_if(Elements.begin(), Elements.end(), 
+                                  [](ASTNode node) {
+                                    return node.isNull();
+                                  }),
+                   Elements.end());
     
     return swift::BraceStmt::create(Context, BS->getLBraceLoc(),
                                     Context.AllocateCopy(Elements),
@@ -714,44 +725,39 @@ public:
 
 } // end anonymous namespace
 
-
 void swift::performPlaygroundTransform(SourceFile &SF) {
   class ExpressionFinder : public ASTWalker {
-    FuncDecl *WrappedDecl = nullptr;
-    FuncDecl *ExpressionDecl = nullptr;
-    StringRef WrappedName = "__lldb_wrapped_expr";
-    StringRef ExpressionName = "__lldb_expr";
   public:
     virtual bool walkToDeclPre(Decl *D) {
       if (FuncDecl *FD = llvm::dyn_cast<FuncDecl>(D)) {
-        StringRef FuncName = FD->getName().str();
-        if (!FuncName.endswith(WrappedName)) {
-          WrappedDecl = FD;
-          return false;
-        } else if (!FuncName.endswith(ExpressionName)) {
-          ExpressionDecl = FD;
-          return false;
+        if (!FD->isImplicit()) {
+          if (BraceStmt *Body = FD->getBody()) {
+            Instrumenter I(FD->getASTContext(), FD);
+            BraceStmt *NewBody = I.transformBraceStmt(Body);
+            if (NewBody != Body) {
+              FD->setBody(NewBody);
+            }
+            return false;
+          }
+        }
+      } else if (TopLevelCodeDecl *TLCD = llvm::dyn_cast<TopLevelCodeDecl>(D)) {
+        if (!TLCD->isImplicit()) {
+          if (BraceStmt *Body = TLCD->getBody()) {
+            Instrumenter I(((Decl*)TLCD)->getASTContext(), TLCD);
+            BraceStmt *NewBody = I.transformBraceStmt(Body);
+            if (NewBody != Body) {
+              TLCD->setBody(NewBody);
+            }
+            return false;
+          }
         }
       }
       return true;
-    }
-    FuncDecl *getFunctionToTransform() {
-      return WrappedDecl ? WrappedDecl : ExpressionDecl;
     }
   };
 
   ExpressionFinder EF;
   for (Decl* D : SF.Decls) {
     D->walk(EF);
-  }
-
-  if (FuncDecl *FuncToTransform = EF.getFunctionToTransform()) {
-    if (BraceStmt *Body = FuncToTransform->getBody()) {
-      Instrumenter I(SF.getASTContext(), FuncToTransform);
-      BraceStmt *NewBody = I.transformBraceStmt(Body);
-      if (NewBody != Body) {
-        FuncToTransform->setBody(NewBody);
-      }
-    }
   }
 }
