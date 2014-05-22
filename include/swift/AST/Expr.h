@@ -1685,7 +1685,12 @@ public:
       return SubExpr->getSourceRange();
     return SourceRange(SubExpr->getStartLoc(), QuestionLoc);
   }
-  SourceLoc getLoc() const { return getQuestionLoc(); }
+  SourceLoc getLoc() const { 
+    if (isImplicit())
+      return SubExpr->getLoc();
+
+    return getQuestionLoc(); 
+  }
   SourceLoc getQuestionLoc() const { return QuestionLoc; }
 
   unsigned getDepth() const { return BindOptionalExprBits.Depth; }
@@ -2799,7 +2804,10 @@ public:
 
   SourceRange getSourceRange() const;
   
-  SourceLoc getLoc() const { return getFn()->getLoc(); }
+  SourceLoc getLoc() const { 
+    SourceLoc FnLoc = getFn()->getLoc(); 
+    return FnLoc.isValid() ? FnLoc : getArg()->getLoc();
+  }
   
   static bool classof(const Expr *E) { return E->getKind() == ExprKind::Call; }
 };
@@ -3198,7 +3206,7 @@ public:
 class ArrayDowncastExpr : public ExplicitCastExpr {
 public:
   ArrayDowncastExpr(Expr *sub, SourceLoc asLoc, TypeLoc castTy,
-                              bool bridgesFromObjC)
+                    bool bridgesFromObjC)
     : ExplicitCastExpr(ExprKind::ArrayDowncast, sub, asLoc, castTy, Type())
   {
     ArrayDowncastExprBits.BridgesFromObjC = bridgesFromObjC;
