@@ -1741,6 +1741,8 @@ static bool isParamPatternRepresentableInObjC(TypeChecker &TC,
                                               const AbstractFunctionDecl *AFD,
                                               const Pattern *P,
                                               ObjCReason Reason) {
+  // If you change this function, you must add or modify a test in PrintAsObjC.
+
   bool Diagnose = (Reason != ObjCReason::DontDiagnose);
   if (auto *TP = dyn_cast<TuplePattern>(P)) {
     auto Fields = TP->getFields();
@@ -1812,6 +1814,8 @@ static bool checkObjCInGenericContext(TypeChecker &tc,
 
 bool TypeChecker::isRepresentableInObjC(const AbstractFunctionDecl *AFD,
                                         ObjCReason Reason) {
+  // If you change this function, you must add or modify a test in PrintAsObjC.
+
   bool Diagnose = (Reason != ObjCReason::DontDiagnose);
   if (auto *FD = dyn_cast<FuncDecl>(AFD)) {
     if (!FD->isGetterOrSetter()) {
@@ -1873,6 +1877,8 @@ bool TypeChecker::isRepresentableInObjC(const AbstractFunctionDecl *AFD,
 }
 
 bool TypeChecker::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
+  // If you change this function, you must add or modify a test in PrintAsObjC.
+
   Type T = VD->getType();
   if (auto *RST = T->getAs<ReferenceStorageType>()) {
     // In-memory layout of @weak and @unowned does not correspond to anything
@@ -1913,6 +1919,8 @@ bool TypeChecker::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
 
 bool TypeChecker::isRepresentableInObjC(const SubscriptDecl *SD,
                                         ObjCReason Reason) {
+  // If you change this function, you must add or modify a test in PrintAsObjC.
+
   bool Diagnose = (Reason != ObjCReason::DontDiagnose);
 
   // Figure out the type of the indices.
@@ -1986,6 +1994,8 @@ static bool isUnknownObjectOrOptionalType(Type T) {
 
 bool TypeChecker::isTriviallyRepresentableInObjC(const DeclContext *DC,
                                                  Type T) {
+  // If you change this function, you must add or modify a test in PrintAsObjC.
+
   // Look through one level of optional type, but remember that we did.
   bool wasOptional = false;
   if (auto valueType = T->getAnyOptionalObjectType()) {
@@ -2091,6 +2101,8 @@ TypeChecker::getBridgedToObjC(const DeclContext *dc,
 }
 
 bool TypeChecker::isRepresentableInObjC(const DeclContext *DC, Type T) {
+  // If you change this function, you must add or modify a test in PrintAsObjC.
+
   if (isTriviallyRepresentableInObjC(DC, T))
     return true;
 
