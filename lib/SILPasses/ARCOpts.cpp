@@ -549,7 +549,15 @@ class ARCOpts : public SILFunctionTransform {
 };
 } // end anonymous namespace
 
+#ifndef NDEBUG
+llvm::cl::opt<bool>
+EnableGlobalARCOpts("enable-global-arc-opts", llvm::cl::init(false));
+#endif
 
 SILTransform *swift::createARCOpts() {
+#ifndef NDEBUG
+  if (EnableGlobalARCOpts)
+    return createGlobalARCOpts();
+#endif
   return new ARCOpts();
 }
