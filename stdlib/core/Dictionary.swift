@@ -264,7 +264,7 @@ struct _DictionaryElement<KeyType : Hashable, ValueType> {
 }
 
 struct _NativeDictionaryStorage<KeyType : Hashable, ValueType> :
-    _DictionaryStorage {
+    _DictionaryStorage, Printable {
 
   typealias Owner = _NativeDictionaryStorageOwner<KeyType, ValueType>
   typealias StorageImpl = _NativeDictionaryStorageImpl<KeyType, ValueType>
@@ -416,6 +416,20 @@ struct _NativeDictionaryStorage<KeyType : Hashable, ValueType> :
     var (i, found) = _find(key, _bucket(key))
     _sanityCheck(!found, "unsafeAddNew was called, but the key is already present")
     self[i.offset] = Element(key: key, value: value)
+  }
+
+  var description: String {
+    var result = ""
+#if INTERNAL_CHECKS_ENABLED
+    for var i = 0; i != capacity; ++i {
+      if let key = self[i]?.key {
+        result += "bucket \(i), ideal bucket = \(_bucket(key)), key = \(key)\n"
+      } else {
+        result += "bucket \(i), empty\n"
+      }
+    }
+#endif
+    return result
   }
 
   //
@@ -1051,7 +1065,7 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
   /// :param: start The offset of the beginning of the chain.
   /// :param: offset The offset of the element that will be deleted.
   mutating func nativeDeleteImpl(
-      nativeStorage: NativeStorage, start: Int, offset: Int
+      nativeStorage: NativeStorage, var start: Int, offset: Int
   ) {
     // remove the element
     nativeStorage[offset] = .None
@@ -1060,6 +1074,11 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
     // If we've put a hole in a chain of contiguous elements, some
     // element after the hole may belong where the new hole is.
     var hole = offset
+
+    // Find the first bucket in the contigous chain
+    while nativeStorage[nativeStorage._prev(start)] {
+      start = nativeStorage._prev(start)
+    }
 
     // Find the last bucket in the contiguous chain
     var lastInChain = hole

@@ -10,6 +10,8 @@
 // RUN: FileCheck %s < %t.txt
 // RUN: FileCheck --check-prefix=CHECK-PTR%target-ptrsize %s < %t.txt
 
+import Darwin
+
 //===---
 // Utilities.
 //===---
@@ -1131,6 +1133,103 @@ func testDeleteChainNoCollision() {
 }
 testDeleteChainNoCollision()
 // CHECK: testDeleteChainNoCollision done
+
+func testDeleteChainCollision2() {
+  var k1_0 = TestKeyTy(value: 10, hashValue: 0)
+  var k2_0 = TestKeyTy(value: 20, hashValue: 0)
+  var k3_2 = TestKeyTy(value: 30, hashValue: 2)
+  var k4_0 = TestKeyTy(value: 40, hashValue: 0)
+  var k5_2 = TestKeyTy(value: 50, hashValue: 2)
+  var k6_0 = TestKeyTy(value: 60, hashValue: 0)
+
+  var d = Dictionary<TestKeyTy, TestValueTy>(minimumCapacity: 10)
+
+  d[k1_0] = TestValueTy(1010) // in bucket 0
+  d[k2_0] = TestValueTy(1020) // in bucket 1
+  d[k3_2] = TestValueTy(1030) // in bucket 2
+  d[k4_0] = TestValueTy(1040) // in bucket 3
+  d[k5_2] = TestValueTy(1050) // in bucket 4
+  d[k6_0] = TestValueTy(1060) // in bucket 5
+
+  d[k3_2] = nil
+
+  assert(d[k1_0]!.value == 1010)
+  assert(d[k2_0]!.value == 1020)
+  assert(!d[k3_2])
+  assert(d[k4_0]!.value == 1040)
+  assert(d[k5_2]!.value == 1050)
+  assert(d[k6_0]!.value == 1060)
+
+  println("testDeleteChainCollision2 done")
+}
+testDeleteChainCollision2()
+// CHECK: testDeleteChainCollision2 done
+
+func uniformRandom(max: Int) -> Int {
+  // FIXME: this is not uniform.
+  return random() % max
+}
+
+func pickRandom<T>(a: T[]) -> T {
+  return a[uniformRandom(a.count)]
+}
+
+func testDeleteChainCollisionRandomized() {
+  let timeNow = CUnsignedInt(time(nil))
+  println("time is \(timeNow)")
+  srandom(timeNow)
+
+  func check(d: Dictionary<TestKeyTy, TestValueTy>) {
+    var keys = Array(d.keys)
+    for i in 0..keys.count {
+      for j in 0..i {
+        assert(keys[i] != keys[j])
+      }
+    }
+
+    for k in keys {
+      assert(d[k])
+    }
+  }
+
+  var collisionChainsChoices = Array(1...8)
+  var chainOverlapChoices = Array(0...5)
+
+  var collisionChains = pickRandom(collisionChainsChoices)
+  var chainOverlap = pickRandom(chainOverlapChoices)
+  println("chose parameters: collisionChains=\(collisionChains) chainLength=\(chainOverlap)")
+
+  let chainLength = 7
+
+  var knownKeys: TestKeyTy[] = []
+  func getKey(value: Int) -> TestKeyTy {
+    for k in knownKeys {
+      if k.value == value {
+        return k
+      }
+    }
+    let hashValue = uniformRandom(chainLength - chainOverlap) * collisionChains
+    let k = TestKeyTy(value: value, hashValue: hashValue)
+    knownKeys += k
+    return k
+  }
+
+  var d = Dictionary<TestKeyTy, TestValueTy>(minimumCapacity: 30)
+  for i in 1..300 {
+    let key = getKey(uniformRandom(collisionChains * chainLength))
+    if uniformRandom(chainLength * 2) == 0 {
+      d[key] = nil
+    } else {
+      d[key] = TestValueTy(key.value * 10)
+    }
+    check(d)
+  }
+
+  println("testDeleteChainCollisionRandomized done")
+}
+testDeleteChainCollisionRandomized()
+// CHECK: testDeleteChainCollisionRandomized done
+
 
 func test_convertFromDictionaryLiteral() {
   if true {
