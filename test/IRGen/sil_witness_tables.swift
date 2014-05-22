@@ -35,7 +35,7 @@ struct Conformer: Q {
 // CHECK:   i8* null,
 // CHECK:   i8* bitcast (void (%swift.type*, %swift.type*)* @_TTWV18sil_witness_tables9ConformerS_1PFS1_12staticMethodUS1__US_1A__fMQPS1_FT_T_ to i8*),
 // CHECK:   i8* bitcast (void (%V18sil_witness_tables9Conformer*, %swift.type*)* @_TTWV18sil_witness_tables9ConformerS_1PFS1_14instanceMethodUS1__US_1A__fRQPS1_FT_T_ to i8*)
-// CHECK: ]
+// CHECK: ], section {{.*}}no_dead_strip
 // CHECK: [[CONFORMER_Q_WITNESS_TABLE:@_TWPV18sil_witness_tables9ConformerS_1Q]] = constant [2 x i8*] [
 // CHECK:   i8* bitcast ([4 x i8*]* [[CONFORMER_P_WITNESS_TABLE]] to i8*),
 // CHECK:   i8* bitcast (void (%V18sil_witness_tables9Conformer*, %swift.type*)* @_TTWV18sil_witness_tables9ConformerS_1QFS1_7qMethodUS1__US_1A__fRQPS1_FT_T_ to i8*)

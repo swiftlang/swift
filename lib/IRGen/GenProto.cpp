@@ -3154,6 +3154,11 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   global->setInitializer(initializer);
   global->setAlignment(getWitnessTableAlignment().getValue());
   
+  // FIXME: Put the witness table into a no_dead_strip section, because our
+  // dynamic protocol lookup hack relies on witness tables always being
+  // available.
+  global->setSection("__DATA,__objc_data,regular,no_dead_strip");
+  
   // TODO: We should record what access mode the witness table requires:
   // direct, lazily initialized, or runtime instantiated template.
 }
