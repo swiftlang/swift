@@ -14,7 +14,7 @@ def send_to_screen(screen_name, arg0=None, command='stuff'):
     p.communicate()
 
 def load_as_transcript(f):
-    def add_block():
+    def add_block(clearScreen=False):
         # If so, add the current block after trimming leading and trailing blank
         # lines.
         while current_block and current_block[0].isspace():
@@ -30,7 +30,7 @@ def load_as_transcript(f):
             # Strip off any trailing newline.
             if script.endswith('\n'):
                 script = script[:-1]
-            demo_script.append({ 'command' :  script})
+            demo_script.append({ 'command' :  script, 'clearScreen' : clearScreen })
 
             # Clear the block.
             del current_block[:]
@@ -43,6 +43,10 @@ def load_as_transcript(f):
         # Check if this is a block delimiter.
         if ln.strip() == '>>>':
             add_block()
+            continue
+
+        if ln.strip() == '>>>CLEAR':
+            add_block(clearScreen=True)
             continue
 
         # Otherwise, add the line to the current block.
@@ -111,6 +115,7 @@ for example::
     # Iterate over each command, sending it and waiting for user direction to
     # continue.
     for item in demo_script:
+        shouldClear = bool(item['clearScreen'])
         command = str(item['command'])
 
         # Send the command slowly, as if it was typed.
