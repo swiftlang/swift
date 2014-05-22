@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "sil-global-arc-opts"
 #include "swift/SILPasses/Passes.h"
+#include "BlotMapVector.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
@@ -312,15 +313,14 @@ static bool isAutoreleasePoolCall(SILInstruction &I) {
 ///
 /// NestingDetected will be set to indicate that the block needs to be
 /// reanalyzed if code motion occurs.
-static void
+static bool
 processBBTopDown(SILBasicBlock &BB,
                  llvm::MapVector<SILValue, ReferenceCountState> &BBState,
-                 llvm::MapVector<SILInstruction *,
-                                ReferenceCountState> &DecToIncStateMap,
-                 bool &NestingDetected,
+                 BlotMapVector<SILInstruction *,
+                               ReferenceCountState> &DecToIncStateMap,
                  AliasAnalysis *AA) {
 
-  NestingDetected = false;
+  bool NestingDetected = false;
 
 #ifndef NDEBUG
   // If we are in debug mode, to make the output less verbose, make sure we are
@@ -329,7 +329,7 @@ processBBTopDown(SILBasicBlock &BB,
   for (auto &I : BB)
     FoundOneInst |= isInterestingInstruction(I.getKind());
   if (!FoundOneInst)
-    return;
+    return false;
 #endif
 
   // If the current BB is the entry BB, initialize a state corresponding to each
@@ -431,6 +431,8 @@ processBBTopDown(SILBasicBlock &BB,
         DEBUG(llvm::dbgs() << "    Found Potential Use:\n        " << *Other);
     }
   }
+
+  return NestingDetected;
 }
 
 //===----------------------------------------------------------------------===//
@@ -473,7 +475,8 @@ static SILInstruction *createDecrement(SILValue Ptr, SILInstruction *InsertPt) {
 }
 
 static bool
-optimizeReferenceCountMatchingSet(ARCMatchingSet &MatchSet) {
+optimizeReferenceCountMatchingSet(ARCMatchingSet &MatchSet,
+                                  SmallVectorImpl<SILInstruction *> &DelList) {
   DEBUG(llvm::dbgs() << "**** Optimizing Matching Set ****\n");
 
   bool Changed = false;
@@ -515,7 +518,7 @@ optimizeReferenceCountMatchingSet(ARCMatchingSet &MatchSet) {
   for (SILInstruction *Increment : MatchSet.Increments) {
     Changed = true;
     DEBUG(llvm::dbgs() << "    Deleting increment: " << *Increment);
-    Increment->eraseFromParent();
+    DelList.push_back(Increment);
     ++NumRefCountOpsRemoved;
   }
 
@@ -523,7 +526,7 @@ optimizeReferenceCountMatchingSet(ARCMatchingSet &MatchSet) {
   for (SILInstruction *Decrement : MatchSet.Decrements) {
     Changed = true;
     DEBUG(llvm::dbgs() << "    Deleting decrement: " << *Decrement);
-    Decrement->eraseFromParent();
+    DelList.push_back(Decrement);
     ++NumRefCountOpsRemoved;
   }
 
@@ -531,12 +534,40 @@ optimizeReferenceCountMatchingSet(ARCMatchingSet &MatchSet) {
 }
 
 static bool
-computeARCMatchingSet(llvm::MapVector<SILInstruction *,
-                                      ReferenceCountState> &DecToIncStateMap,
-                      ARCMatchingSet &MatchSet) {
+performDataflow(SILFunction &F,
+                BlotMapVector<SILInstruction *,
+                              ReferenceCountState> &DecToIncStateMap,
+                AliasAnalysis *AA) {
+  llvm::MapVector<SILValue, ReferenceCountState> BBState;
+
+  bool NestingDetected = false;
+
+  // For each basic block in F...
+  for (auto &BB : F) {
+    DEBUG(llvm::dbgs() << "\n<<< Processing New BB! >>>\n");
+
+    BBState.clear();
+
+    NestingDetected |= processBBTopDown(BB, BBState, DecToIncStateMap, AA);
+  }
+
+  return NestingDetected;
+}
+
+static bool computeARCMatchingSet(SILFunction &F, AliasAnalysis *AA,
+                                  std::function<void (ARCMatchingSet&)> Fun) {
+  BlotMapVector<SILInstruction *, ReferenceCountState> DecToIncStateMap;
+
+  bool NestingDetected = performDataflow(F, DecToIncStateMap, AA);
   bool MatchedPair = false;
 
+  ARCMatchingSet MatchSet;
+
   for (auto &Pair : DecToIncStateMap) {
+    // If we were blotted, skip this pair.
+    if (!Pair.first)
+      continue;
+
     // If we do not have an instruction, this is a state with an invalidated
     // reference count. Skip it...
     if (!Pair.second.getInstruction())
@@ -557,25 +588,30 @@ computeARCMatchingSet(llvm::MapVector<SILInstruction *,
       SILInstruction *Inst = Pair.second.getInstruction();
 
       DEBUG(llvm::dbgs() << "Removing Pair:\n    KnownSafe: "
-            << (Pair.second.isKnownSafe()?"yes":"no")
-            << "\n    " << *Inst << "    "
-            << *Pair.first);
+                         << (Pair.second.isKnownSafe() ? "yes" : "no")
+                         << "\n    " << *Inst << "    " << *Pair.first);
 
       MatchedPair = true;
       MatchSet.Increments.insert(Inst);
       MatchSet.Decrements.insert(Pair.first);
+      DecToIncStateMap.blot(Pair.first);
+      Fun(MatchSet);
+      MatchSet.clear();
       continue;
     }
 
     if (InsertPt) {
       MatchSet.Increments.insert(Pair.second.getInstruction());
       MatchSet.IncrementInsertPts.insert(InsertPt);
+      Fun(MatchSet);
+      MatchSet.clear();
     }
   }
 
-  return MatchedPair;
+  // If we did not find a matching pair or detected nesting during the dataflow,
+  // there are no more increment, decrements that we can optimize.
+  return MatchedPair && NestingDetected;
 }
-
 
 //===----------------------------------------------------------------------===//
 //                              Top Level Driver
@@ -591,48 +627,39 @@ static bool processFunction(SILFunction &F, AliasAnalysis *AA) {
 
   DEBUG(llvm::dbgs() << "***** Processing " << F.getName() << " *****\n");
 
-  llvm::MapVector<SILValue, ReferenceCountState> BBState;
-  llvm::MapVector<SILInstruction *, ReferenceCountState> DecToIncStateMap;
-  ARCMatchingSet MatchingSet;
   bool Changed = false;
+  llvm::SmallVector<SILInstruction *, 16> InstructionsToDelete;
 
-  // For each basic block in F...
-  for (auto &BB : F) {
-    DEBUG(llvm::dbgs() << "\n<<< Processing New BB! >>>\n");
+  // Until we do not remove any instructions or have nested increments,
+  // decrements...
+  while(true) {
+    // Compute matching sets of increments, decrements, and their insertion
+    // points.
+    //
+    // We need to blot pointers we remove after processing an individual pointer
+    // so we don't process pairs after we have paired them up. Thus we pass in a
+    // lambda that performs the work for us.
+    bool ShouldRunAgain = computeARCMatchingSet(F, AA,
+      // Remove the increments, decrements and insert new increments, decrements
+      // at the insertion points associated with a specific pointer.
+      [&Changed, &InstructionsToDelete](ARCMatchingSet &Set) {
+        Changed |= optimizeReferenceCountMatchingSet(Set, InstructionsToDelete);
+      }
+    );
 
-    // Process the basic block until we do not eliminate any inc/dec pairs
-    // and see any nested increments.
-    while (true) {
-      BBState.clear();
-      DecToIncStateMap.clear();
-      MatchingSet.clear();
-
-      bool NestingDetected;
-      // Perform the top down dataflow.
-      processBBTopDown(BB, BBState, DecToIncStateMap, NestingDetected, AA);
-
-      // Use the result of the top down dataflow to initialize a set of matching
-      // increments, decrements, increment insertion pts, and decrement
-      // insertion pts.
-      //
-      // *NOTE* Since we are single basic block only and are not moving
-      // releases, currently we will have match sets consisting of an increment,
-      // decrement pair or an increment, increment insertion pt.
-      bool RemovedPair = computeARCMatchingSet(DecToIncStateMap, MatchingSet);
-
-      // Optimize the computed. ReferenceCountMatchingSet
-      Changed |= optimizeReferenceCountMatchingSet(MatchingSet);
-
-      // We need to rerun if we saw any nested increment/decrements and if we
-      // removed any increment/decrement pairs.
-      if (!NestingDetected || !RemovedPair)
-        break;
-
-      DEBUG(llvm::dbgs() << "\n<<< Made a Change! Reprocessing BB! >>>\n");
+    while (!InstructionsToDelete.empty()) {
+      InstructionsToDelete.pop_back_val()->eraseFromParent();
     }
 
-    DEBUG(llvm::dbgs() << "\n");
+    // If we did not remove any instructions or have any nested increments, do
+    // not perform another iteration.
+    if (!ShouldRunAgain)
+      break;
+
+    DEBUG(llvm::dbgs() << "\n<<< Made a Change! Reprocessing Function! >>>\n");
   }
+  DEBUG(llvm::dbgs() << "\n");
+
   return Changed;
 }
 
