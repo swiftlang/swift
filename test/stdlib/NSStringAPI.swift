@@ -120,8 +120,7 @@ NSStringAPIs.test("Encodings") {
   let defaultCStringEncoding = String.defaultCStringEncoding()
   expectEqual(true, contains(availableEncodings, defaultCStringEncoding))
 
-  expectNotEqual("",
-      String.localizedNameOfStringEncoding(defaultCStringEncoding))
+  expectNotEqual("", String.localizedNameOfStringEncoding(NSUTF8StringEncoding))
 }
 
 NSStringAPIs.test("NSStringEncoding") {
