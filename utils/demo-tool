@@ -123,7 +123,7 @@ for example::
         print "sending command: %r" % (command.replace('\n', '<cr>'),)
         for c in command:
             send(c)
-            time.sleep(0.01 + random.random() * 0.03)
+            time.sleep(0.01 + random.random() * 0.02)
 
         # Wait for user input, then send a return.
 #        raw_input('press enter to send return...')
