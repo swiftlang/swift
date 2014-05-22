@@ -11,7 +11,7 @@ func upcast(d: D) -> B {
 // CHECK-LABEL: sil  @_TF5casts8downcast
 func downcast(b: B) -> D {
   // CHECK: {{%.*}} = unconditional_checked_cast downcast
-  return (b as D)!
+  return b as D
 }
 
 // CHECK-LABEL: sil  @_TF5casts3isa
@@ -39,7 +39,7 @@ func upcast_archetype_metatype<T : B>(t: T.Type) -> B.Type {
 // CHECK-LABEL: sil  @_TF5casts18downcast_archetype
 func downcast_archetype<T : B>(b: B) -> T {
   // CHECK: {{%.*}} = unconditional_checked_cast super_to_archetype
-  return (b as T)!
+  return b as T
 }
 
 // CHECK-LABEL: sil  @_TF5casts12is_archetype
@@ -56,7 +56,7 @@ func is_archetype<T : B>(b: B) -> Bool {
 // CHECK:   checked_cast_br downcast {{%.*}} : $B to $D
 // CHECK:   load {{.*}} : $*Optional<D>
 func downcast_conditional(b: B) -> D? {
-  return b as D
+  return b as? D
 }
 
 protocol P {}
@@ -71,6 +71,6 @@ struct S : P {}
 // CHECK: {{bb.*}}:
 // CHECK:   load {{.*}} : $*Optional<S>
 func downcast_existential_conditional(p: P) -> S? {
-  return p as S
+  return p as? S
 }
 

@@ -11,7 +11,7 @@ class D : C {
 }
 
 func down<T : C>(x: C, _: T.Type) -> T {
-  return (x as T)!
+  return x as T
 }
 
 func up<T : C>(x: T) -> C {

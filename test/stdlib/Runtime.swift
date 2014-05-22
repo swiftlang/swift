@@ -102,7 +102,7 @@ struct ConditionallyBridgedValueType<T> : _ConditionallyBridgedToObjectiveC {
   }
 
   static func isBridgedToObjectiveC() -> Bool {
-    return !((T.self as Any) as String.Type)
+    return !((T.self as Any) as? String.Type)
   }
 
   var value: Int
@@ -113,11 +113,11 @@ class BridgedVerbatimRefType {}
 func test_bridgeToObjectiveC() {
   assert(!bridgeToObjectiveC(NotBridgedValueType()))
 
-  assert((bridgeToObjectiveC(BridgedValueType(value: 42)) as ClassA)!.value == 42)
+  assert((bridgeToObjectiveC(BridgedValueType(value: 42)) as ClassA).value == 42)
 
-  assert((bridgeToObjectiveC(BridgedLargeValueType(value: 42)) as ClassA)!.value == 42)
+  assert((bridgeToObjectiveC(BridgedLargeValueType(value: 42)) as ClassA).value == 42)
 
-  assert((bridgeToObjectiveC(ConditionallyBridgedValueType<Int>(value: 42)) as ClassA)!.value == 42)
+  assert((bridgeToObjectiveC(ConditionallyBridgedValueType<Int>(value: 42)) as ClassA).value == 42)
 
   assert(!bridgeToObjectiveC(ConditionallyBridgedValueType<String>(value: 42)))
 

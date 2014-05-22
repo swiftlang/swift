@@ -191,6 +191,8 @@ namespace {
              SGFContext C);
     RValue visitErasureExpr(ErasureExpr *E, SGFContext C);
     RValue visitMetatypeErasureExpr(MetatypeErasureExpr *E, SGFContext C);
+    RValue visitForcedCheckedCastExpr(ForcedCheckedCastExpr *E,
+                                      SGFContext C);
     RValue visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *E,
                                            SGFContext C);
     RValue visitIsaExpr(IsaExpr *E, SGFContext C);
@@ -1628,6 +1630,12 @@ SILGenFunction::emitCheckedCastBranch(SILLocation loc,
                             success, failure);
   
   return {success, failure};
+}
+
+RValue RValueEmitter::visitForcedCheckedCastExpr(ForcedCheckedCastExpr *E,
+                                                 SGFContext C) {
+  return emitUnconditionalCheckedCast(E->getSubExpr(), E, E->getType(),
+                                      E->getCastKind(), C);
 }
 
 RValue RValueEmitter::

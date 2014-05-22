@@ -200,13 +200,6 @@ ERROR(does_not_have_non_mutating_member,sema_tcc,none,
 ERROR(isa_is_always_true,sema_tcc,none,
       "'is' test is always true",
       (Type, Type))
-ERROR(exclaim_after_as_type,expr_parsing,none,
-      "'!' not permitted directly following the type of a cast", ())
-NOTE(parenthesize_cast_expr,expr_parsing,none,
-     "parenthesize the cast to force-unwrap it with '!'", ())
-NOTE(parenthesize_cast_type,expr_parsing,none,
-     "parenthesize the type to cast to an implicitly unwrapped optional type", 
-     ())
 ERROR(downcast_to_unrelated,sema_tcc,none,
       "downcast from %0 to unrelated type %1", (Type, Type))
 ERROR(downcast_to_non_objc_existential,sema_tcc,none,
@@ -897,9 +890,25 @@ ERROR(condition_broken_proto,sema_tce,none,
 ERROR(broken_bool,sema_tce,none, "type 'Bool' is broken", ())
 ERROR(binding_injected_optional,sema_tce,none,
       "operand of postfix '?' should have optional type; type is %0", (Type))
+ERROR(binding_explicit_downcast,sema_tce,none,
+      "operand of postfix '?' is a forced downcast to type %0; use 'as?' to "
+      "perform a conditional downcast", (Type))
 
 ERROR(forcing_injected_optional,sema_tce,none,
       "operand of postfix '!' should have optional type; type is %0", (Type))
+
+ERROR(forcing_explicit_downcast,sema_tce,none,
+      "extraneous postfix '!'; forced downcast already produces a non-optional "
+      "value of type %0", (Type))
+
+WARNING(inject_forced_downcast,sema_tce,none,
+        "treating a forced downcast to %0 as optional will never produce 'nil'",
+        (Type))
+NOTE(forced_to_conditional_downcast,sema_tce,none,
+     "use 'as?' to perform a conditional downcast to %0", (Type))
+
+ERROR(contextual_downcast_to_forced_downcast,sema_tce,none,
+      "use 'as' to downcast to %0", (Type))
 
 ERROR(new_array_bound_zero,sema_tce,none,
       "array type cannot have zero length", ())
@@ -1059,6 +1068,9 @@ ERROR(assignment_unresolved_expr,sema_tcs,none,
 
 ERROR(non_optional_in_conditional_binding,sema_tcs,none,
       "bound value in a conditional binding must be of Optional type", ())
+ERROR(forced_downcast_should_be_conditional,sema_tcs,none,
+      "forced downcast in conditional binding produces non-optional type %0; "
+      "use 'as?' to perform a conditional downcast", (Type))
 
 // ForEach Stmt
 ERROR(sequence_protocol_broken,sema_tcs,none,

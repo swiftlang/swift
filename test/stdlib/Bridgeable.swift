@@ -21,7 +21,7 @@ func testBridging<T>(x: T, name: String) {
   var b : String
   if let result: AnyObject = bridgeToObjectiveC(x) {
     b = "bridged as " + (
-      (result as C) ? "C" : (result as T) ? "itself" : "an unknown type")
+      (result as? C) ? "C" : (result as? T) ? "itself" : "an unknown type")
   }
   else {
     b = "did not bridge"
@@ -73,7 +73,7 @@ struct ConditionallyBridged<T>
     _preconditionFailure("implement")
   }
   static func isBridgedToObjectiveC() -> Bool {
-    return !((T.self as Any) as String.Type)
+    return !((T.self as Any) as? String.Type)
   }
 }
 

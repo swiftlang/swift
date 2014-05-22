@@ -132,17 +132,32 @@ ParserResult<Expr> Parser::parseExprIs() {
 
 /// parseExprAs
 ///   expr-as:
-///     'as' type '!'?
+///     'as' type
+///     'as' '?' type
 ParserResult<Expr> Parser::parseExprAs() {
+  // Parse the 'as'.
   SourceLoc asLoc = consumeToken(tok::kw_as);
+
+  // Parse the postfix '?'.
+  SourceLoc questionLoc;
+  if (Tok.is(tok::question_postfix)) {
+    questionLoc = consumeToken(tok::question_postfix);
+  }
+
   ParserResult<TypeRepr> type = parseType(diag::expected_type_after_as);
 
   if (type.hasCodeCompletion())
     return makeParserCodeCompletionResult<Expr>();
   if (type.isNull())
     return nullptr;
-  
-  auto *parsed = new (Context) ConditionalCheckedCastExpr(asLoc, type.get());
+
+  Expr *parsed;
+  if (questionLoc.isValid()) {
+    parsed = new (Context) ConditionalCheckedCastExpr(asLoc, questionLoc,
+                                                      type.get());
+  } else {
+    parsed = new (Context) UnresolvedCheckedCastExpr(asLoc, type.get());
+  }
   return makeParserResult(parsed);
 }
 

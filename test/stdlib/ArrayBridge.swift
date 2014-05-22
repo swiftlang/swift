@@ -163,7 +163,7 @@ func testBridgedVerbatim() {
 
   // ...with the same elements
   // CHECK-NEXT: [[base42]]
-  println((nsArrayOfBaseConvertedToAnyObjectArray[0] as Base)!)
+  println(nsArrayOfBaseConvertedToAnyObjectArray[0] as Base)
 
   //===--- Up- and Down-casts -----------------------------------------------===//
   let derived: Derived[] = [Derived(11), Derived(22)]
@@ -185,7 +185,7 @@ func testBridgedVerbatim() {
   println(derivedAsBases)
 
   // CHECK-NEXT: [[derived0]]
-  if let roundTripDerived = derivedAsBases as Derived[] {
+  if let roundTripDerived = derivedAsBases as? Derived[] {
     println(roundTripDerived)
   }
   else {
@@ -197,7 +197,7 @@ func testBridgedVerbatim() {
   println(derivedInBaseBuffer)
   
   // CHECK-NEXT: Explicit downcast-ability is based on element type, not buffer type
-  if let downcastBaseBuffer = derivedInBaseBuffer as Derived[] {
+  if let downcastBaseBuffer = derivedInBaseBuffer as? Derived[] {
     println("Explicit downcast-ability is based on element type, not buffer type")
   }
   else {
@@ -210,7 +210,7 @@ func testBridgedVerbatim() {
   println(derivedAsAnyObjectArray)
 
   // CHECK-NEXT: downcastBackToBase = [[derived2]]
-  if let downcastBackToBase = derivedAsAnyObjectArray as Base[] {
+  if let downcastBackToBase = derivedAsAnyObjectArray as? Base[] {
     println("downcastBackToBase = \(downcastBackToBase)")
   }
   else {
@@ -218,7 +218,7 @@ func testBridgedVerbatim() {
   }
 
   // CHECK-NEXT: downcastBackToDerived = [[derived2]]
-  if let downcastBackToDerived = derivedAsAnyObjectArray as Derived[] {
+  if let downcastBackToDerived = derivedAsAnyObjectArray as? Derived[] {
     println("downcastBackToDerived = \(downcastBackToDerived)")
   }
   else {
@@ -319,7 +319,7 @@ func testExplicitlyBridged() {
   }
 
   // Downcasts of up-casted arrays.
-  if let downcasted = bridgedSwiftsAsAnyObjects as BridgedObjC[] {
+  if let downcasted = bridgedSwiftsAsAnyObjects as? BridgedObjC[] {
     // CHECK-NEXT: BridgedObjC#[[ID0:[0-9]+]](42)
     println(downcasted[0])
     // CHECK-NEXT: BridgedObjC#[[ID1:[0-9]+]](17)
@@ -328,7 +328,7 @@ func testExplicitlyBridged() {
     println("Could not downcast AnyObject[] to BridgedObjC[]?")
   }
 
-  if let downcasted = bridgedSwiftsAsAnyObjects as Base[] {
+  if let downcasted = bridgedSwiftsAsAnyObjects as? Base[] {
     // CHECK-NEXT: BridgedObjC#[[ID0:[0-9]+]](42)
     println(downcasted[0])
     // CHECK-NEXT: BridgedObjC#[[ID1:[0-9]+]](17)
@@ -339,7 +339,7 @@ func testExplicitlyBridged() {
 
   // Downcast of Cocoa array to an array of classes.
   let wrappedCocoaBridgedSwifts: AnyObject[] = cocoaBridgedSwifts
-  if let downcasted = wrappedCocoaBridgedSwifts as BridgedObjC[] {
+  if let downcasted = wrappedCocoaBridgedSwifts as? BridgedObjC[] {
     // CHECK-NEXT: BridgedObjC#[[ID0:[0-9]+]](42)
     println(downcasted[0])
     // CHECK-NEXT: BridgedObjC#[[ID1:[0-9]+]](17)
@@ -349,7 +349,7 @@ func testExplicitlyBridged() {
   }
 
   // Downcast of Cocoa array to an array of values.
-  if let downcasted = wrappedCocoaBridgedSwifts as BridgedSwift[] {
+  if let downcasted = wrappedCocoaBridgedSwifts as? BridgedSwift[] {
     // CHECK-NEXT: BridgedSwift#[[ID0:[0-9]+]](42)
     println(downcasted[0])
     // CHECK-NEXT: BridgedSwift#[[ID1:[0-9]+]](17)
@@ -360,7 +360,7 @@ func testExplicitlyBridged() {
 
   // Downcast of Cocoa array to an array of strings (which should fail)
   // CHECK-NEXT: Could not downcast AnyObject[] to String[]
-  if let downcasted = wrappedCocoaBridgedSwifts as String[] {
+  if let downcasted = wrappedCocoaBridgedSwifts as? String[] {
     println("Shouldn't be able to downcast to an array of strings")
   } else {
     println("Could not downcast AnyObject[] to String[]")
@@ -368,7 +368,7 @@ func testExplicitlyBridged() {
 
   // Downcast from an implicitly unwrapped optional array of AnyObjects.
   var wrappedCocoaBridgedSwiftsIUO: AnyObject[]! = wrappedCocoaBridgedSwifts
-    if let downcasted = wrappedCocoaBridgedSwiftsIUO as BridgedSwift[] {
+    if let downcasted = wrappedCocoaBridgedSwiftsIUO as? BridgedSwift[] {
     // CHECK-NEXT: BridgedSwift#[[ID0:[0-9]+]](42)
     println(downcasted[0])
     // CHECK-NEXT: BridgedSwift#[[ID1:[0-9]+]](17)
@@ -379,7 +379,7 @@ func testExplicitlyBridged() {
 
   // Downcast from a nil implicitly unwrapped optional array of AnyObjects.
   wrappedCocoaBridgedSwiftsIUO = nil
-  if let downcasted = wrappedCocoaBridgedSwiftsIUO as BridgedSwift[] {
+  if let downcasted = wrappedCocoaBridgedSwiftsIUO as? BridgedSwift[] {
     println("Cannot downcast from a nil array!")
   } else {
     // CHECK-NEXT: Correctly rejected downcast of nil array
@@ -388,7 +388,7 @@ func testExplicitlyBridged() {
 
   // Downcast from an optional array of AnyObjects.
   var wrappedCocoaBridgedSwiftsOpt: AnyObject[]? = wrappedCocoaBridgedSwifts
-    if let downcasted = wrappedCocoaBridgedSwiftsOpt as BridgedSwift[] {
+    if let downcasted = wrappedCocoaBridgedSwiftsOpt as? BridgedSwift[] {
     // CHECK-NEXT: BridgedSwift#[[ID0:[0-9]+]](42)
     println(downcasted[0])
     // CHECK-NEXT: BridgedSwift#[[ID1:[0-9]+]](17)
@@ -399,7 +399,7 @@ func testExplicitlyBridged() {
 
   // Downcast from a nil optional array of AnyObjects.
   wrappedCocoaBridgedSwiftsOpt = nil
-  if let downcasted = wrappedCocoaBridgedSwiftsOpt as BridgedSwift[] {
+  if let downcasted = wrappedCocoaBridgedSwiftsOpt as? BridgedSwift[] {
     println("Cannot downcast from a nil array!")
   } else {
     // CHECK-NEXT: Correctly rejected downcast of nil array

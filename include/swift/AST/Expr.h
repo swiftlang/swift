@@ -1749,7 +1749,12 @@ public:
 
     return SourceRange(SubExpr->getStartLoc(), ExclaimLoc);
   }
-  SourceLoc getLoc() const { return getExclaimLoc(); }
+  SourceLoc getLoc() const {
+    if (!isImplicit())
+      return getExclaimLoc();
+    
+    return SubExpr->getLoc();
+  }
   SourceLoc getExclaimLoc() const { return ExclaimLoc; }
 
   Expr *getSubExpr() const { return SubExpr; }
@@ -3079,21 +3084,69 @@ public:
   }
 };
 
+/// Represents an parsed cast "x as T" on which we have not yet performed
+/// semantic analysis. Spelled 'a as T' and produces a value of type 'T'.
+class UnresolvedCheckedCastExpr : public CheckedCastExpr {
+public:
+  UnresolvedCheckedCastExpr(Expr *sub, SourceLoc asLoc, TypeLoc type)
+    : CheckedCastExpr(ExprKind::UnresolvedCheckedCast,
+                      sub, asLoc, type, type.getType())
+  { }
+
+  UnresolvedCheckedCastExpr(SourceLoc asLoc, TypeLoc type)
+    : UnresolvedCheckedCastExpr(nullptr, asLoc, type)
+  {}
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::UnresolvedCheckedCast;
+  }
+};
+
+/// Represents an explicit forced checked cast, which converts
+/// from a value of some type to some specified subtype and fails dynamically
+/// if the value does not have that type.
+/// Spelled 'a as T' and produces a value of type 'T'.
+class ForcedCheckedCastExpr : public CheckedCastExpr {
+public:
+  ForcedCheckedCastExpr(Expr *sub, SourceLoc asLoc, TypeLoc type)
+    : CheckedCastExpr(ExprKind::ForcedCheckedCast,
+                      sub, asLoc, type, type.getType())
+  {
+  }
+
+  ForcedCheckedCastExpr(SourceLoc asLoc, TypeLoc type)
+    : ForcedCheckedCastExpr(nullptr, asLoc, type)
+  {
+  }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::ForcedCheckedCast;
+  }
+};
+
 /// \brief Represents an explicit conditional checked cast, which converts
 /// from a type to some subtype and produces an Optional value, which will be
 /// .Some(x) if the cast succeeds, or .None if the cast fails.
-/// Spelled 'a as T' and produces a value of type 'T?'.
+/// Spelled 'a as? T' and produces a value of type 'T?'.
 class ConditionalCheckedCastExpr : public CheckedCastExpr {
+  SourceLoc QuestionLoc;
+
 public:
-  ConditionalCheckedCastExpr(Expr *sub, SourceLoc asLoc, TypeLoc type)
+  ConditionalCheckedCastExpr(Expr *sub, SourceLoc asLoc, SourceLoc questionLoc,
+                             TypeLoc type)
     : CheckedCastExpr(ExprKind::ConditionalCheckedCast,
-                      sub, asLoc, type, type.getType())
+                      sub, asLoc, type, type.getType()),
+      QuestionLoc(questionLoc)
   { }
   
-  ConditionalCheckedCastExpr(SourceLoc asLoc, TypeLoc type)
-    : ConditionalCheckedCastExpr(nullptr, asLoc, type)
+  ConditionalCheckedCastExpr(SourceLoc asLoc, SourceLoc questionLoc,
+                             TypeLoc type)
+    : ConditionalCheckedCastExpr(nullptr, asLoc, questionLoc, type)
   {}
-  
+
+  /// Retrieve the location of the '?' that follows 'as'.
+  SourceLoc getQuestionLoc() const { return QuestionLoc; }
+
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::ConditionalCheckedCast;
   }

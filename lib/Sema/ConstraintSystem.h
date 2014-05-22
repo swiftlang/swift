@@ -827,8 +827,13 @@ public:
   /// \param toType The type to coerce the expression to.
   /// \param locator Locator used to describe the location of this expression.
   ///
+  /// \param ignoreTopLevelInjection Whether to suppress diagnostics
+  /// on a suspicious top-level optional injection (because the caller already
+  /// diagnosed it).
+  ///
   /// \returns the coerced expression, which will have type \c ToType.
-  Expr *coerceToType(Expr *expr, Type toType, ConstraintLocator *locator) const;
+  Expr *coerceToType(Expr *expr, Type toType, ConstraintLocator *locator,
+                     bool ignoreTopLevelInjection = false) const;
 
   /// \brief Convert the given expression to a logic value.
   ///
@@ -2310,6 +2315,10 @@ TypeVariableType *TypeVariableType::getNew(const ASTContext &C, unsigned ID,
 
   return result;
 }
+
+/// If the expression has the effect of a forced downcast, find the
+/// underlying forced downcast expression.
+ExplicitCastExpr *findForcedDowncast(Expr *expr);
 
 } // end namespace swift
 

@@ -995,7 +995,7 @@ extension String {
   /// Returns an array of NSString objects containing, in
   /// order, each path component of the `String`.
   var pathComponents: String[] {
-    return (_ns.pathComponents as String[])!
+    return _ns.pathComponents as String[]
   }
 
   // @property NSString* pathExtension;
@@ -1353,7 +1353,7 @@ extension String {
   /// Returns an array of strings made by separately appending
   /// to the `String` each string in in a given array.
   func stringsByAppendingPaths(paths: String[]) -> String[] {
-    return (_ns.stringsByAppendingPaths(paths) as String[])!
+    return _ns.stringsByAppendingPaths(paths) as String[]
   }
 
   // - (NSString *)substringFromIndex:(NSUInteger)anIndex

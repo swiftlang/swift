@@ -9,9 +9,9 @@ struct State {
 }
 
 func stateFromPlistLame(plist: Dictionary<String, AnyObject>) -> State? {
-  if let name = plist["name"] as NSString {
-    if let population = plist["population"] as NSNumber {
-      if let abbrev = plist["abbrev"] as NSString {
+  if let name = plist["name"] as? NSString {
+    if let population = plist["population"] as? NSNumber {
+      if let abbrev = plist["abbrev"] as? NSString {
         if abbrev.length == 2 {
           return State(name: name,
                        population: population.integerValue,

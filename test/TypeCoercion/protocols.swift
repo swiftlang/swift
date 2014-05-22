@@ -178,5 +178,5 @@ struct CoercesToClass {
 }
 func testNoCoercionDowncast(v : AnyObject) {
   let maybeClass = v as CoercionTarget
-  let maybeStruct = v as CoercesToClass // expected-error {{cannot convert the expression's type '$T1' to type '$T2'}}
+  let maybeStruct = v as CoercesToClass // expected-error {{cannot convert the expression's type 'CoercesToClass' to type '$T1'}}
 }

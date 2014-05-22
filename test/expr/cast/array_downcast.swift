@@ -17,10 +17,10 @@ va = ta
 var va2: (V[])? = va as V[]
 var v2: V = va2![0]
 
-var ua2: (U[])? = va as U[]
+var ua2: (U[])? = va as? U[]
 var u2: U = ua2![0]
 
-var ta2: (T[])? = va as T[]
+var ta2: (T[])? = va as? T[]
 var t2: T = ta2![0]
 
 // Check downcasts that require bridging.
@@ -44,15 +44,15 @@ func testBridgedDowncastAnyObject(arr: AnyObject[], arrOpt: AnyObject[]?,
                                   arrIUO: AnyObject[]!) {
   var b = B()
 
-  if let bArr = arr as B[] {
+  if let bArr = arr as? B[] {
     b = bArr[0]
   }
 
-  if let bArr = arrOpt as B[] {
+  if let bArr = arrOpt as? B[] {
     b = bArr[0]
   }
 
-  if let bArr = arrIUO as B[] {
+  if let bArr = arrIUO as? B[] {
     b = bArr[0]
   }
 }

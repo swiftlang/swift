@@ -212,43 +212,7 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS) {
     // Resolve the 'as' or 'is' expression.
     assert(!as->isFolded() && "already folded 'as' expr in sequence?!");
     assert(RHS == as && "'as' with non-type RHS?!");
-    as->setSubExpr(LHS);
-    
-    // Ban "x as T!" due to the ambiguity between what the user probably wanted:
-    //
-    //    (x as T)!
-    //
-    // and what falls out naturally from the grammar:
-    //
-    //    x as (T!)
-    TypeRepr *typeRepr = as->getCastTypeLoc().getTypeRepr();
-    if (auto implicitOpt
-          = dyn_cast_or_null<ImplicitlyUnwrappedOptionalTypeRepr>(typeRepr)) {
-      TypeRepr *base = implicitOpt->getBase();
-      
-      // When we complain, provide Fix-Its for both well-formed
-      // parenthesizations.
-      SourceLoc asLoc = as->getLoc();
-      SourceLoc exclaimLoc = implicitOpt->getExclamationLoc();
-      TC.diagnose(exclaimLoc, diag::exclaim_after_as_type)
-        .highlight(asLoc);
-      TC.diagnose(asLoc, diag::parenthesize_cast_expr)
-        .fixItInsert(LHS->getStartLoc(), "(")
-        .fixItInsert(Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
-                                                base->getEndLoc()), 
-                     ")");
-      TC.diagnose(asLoc, diag::parenthesize_cast_type)
-        .fixItInsert(base->getStartLoc(), "(")
-        .fixItInsert(Lexer::getLocForEndOfToken(TC.Context.SourceMgr, 
-                                                exclaimLoc),
-                    ")");
-
-      // Note: recover as if the user had parenthesized the cast,
-      // which is by far the more common solution.
-      as->getCastTypeLoc() = TypeLoc(base);
-      return new (TC.Context) ForceValueExpr(as, exclaimLoc);
-    }
-
+    as->setSubExpr(LHS);    
     return as;
   }
   

@@ -178,7 +178,7 @@ func _cocoaStringToContiguousImpl(
 func _cocoaStringLengthImpl(source: _CocoaString) -> Int {
   // FIXME: Not ultra-fast, but reliable... but we're counting on an
   // early demise for this function anyhow
-  return (source as NSString)!.length
+  return (source as NSString).length
 }
 
 func _cocoaStringSliceImpl(
@@ -200,7 +200,7 @@ func _cocoaStringSliceImpl(
 func _cocoaStringSubscriptImpl(
   target: _StringCore, position: Int) -> UTF16.CodeUnit {
   // FIXME: implement this in terms of CFString
-  return (target.cocoaBuffer! as NSString)!.characterAtIndex(position)
+  return (target.cocoaBuffer! as NSString).characterAtIndex(position)
 }
 
 
@@ -340,7 +340,7 @@ extension String {
   @conversion func __conversion() -> NSString {
     if let ns = core.cocoaBuffer {
       if _cocoaStringLength(source: ns) == core.count {
-        return (ns as NSString)!
+        return ns as NSString
       }
     }
     _sanityCheck(core.hasContiguousStorage)
@@ -353,7 +353,7 @@ extension String {
 //
 extension String {
   init(_ value: NSString) {
-    if let wrapped = value as _NSContiguousString {
+    if let wrapped = value as? _NSContiguousString {
       self.core = wrapped.value
       return
     }
@@ -711,7 +711,7 @@ func _convertDictionaryToNSDictionary<KeyType, ValueType>(
       // since the key may potentially come from user code, it might be a good
       // idea to copy it anyway.  In the case of bridging stdlib types, this is
       // wasteful.
-      if let nsCopyingKey = bridgedKey as NSCopying {
+      if let nsCopyingKey = bridgedKey as? NSCopying {
         result[nsCopyingKey] = bridgedValue
       } else {
         // Note: on a different code path -- when KeyType bridges verbatim --
@@ -893,7 +893,7 @@ extension NSMutableSet : Sequence {}
 class NSDictionaryGenerator : Generator {
   var fastGenerator : NSFastGenerator
   var dictionary : NSDictionary {
-    return (fastGenerator.enumerable as NSDictionary)!
+    return fastGenerator.enumerable as NSDictionary
   }
 
   func next() -> (key: AnyObject, value: AnyObject)? {

@@ -1234,7 +1234,7 @@ class TestObjCKeyTy : NSObject, NSCopying, Printable {
 
   override func isEqual(object: AnyObject!) -> Bool {
     if let other: AnyObject = object {
-      if let otherObjcKey = other as TestObjCKeyTy {
+      if let otherObjcKey = other as? TestObjCKeyTy {
         return self.value == otherObjcKey.value
       }
     }
@@ -1294,7 +1294,7 @@ class TestObjCEquatableValueTy : NSObject, Equatable, Printable {
 
   override func isEqual(object: AnyObject!) -> Bool {
     if let other: AnyObject = object {
-      if let otherObjcKey = other as TestObjCEquatableValueTy {
+      if let otherObjcKey = other as? TestObjCEquatableValueTy {
         return self.value == otherObjcKey.value
       }
     }
@@ -1442,7 +1442,7 @@ func slurpFastEnumeration(
     for i in 0..returnedCount {
       let key: AnyObject = state.itemsPtr[i]!
       let value: AnyObject = d.objectForKey(key)
-      pairs += ((key as TestObjCKeyTy)!.value, (value as TestObjCValueTy)!.value)
+      pairs += ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
     }
   }
 
@@ -1468,9 +1468,9 @@ func slurpFastEnumerationFromObjC(
   // <rdar://problem/16865289> type 'NSMutableArray' does not conform to
   // protocol 'Sequence'
   for pairAnyObject: AnyObject in (objcPairs as NSArray) {
-    let pair = (pairAnyObject as NSArray)!
-    let key = (pair[0] as TestObjCKeyTy)!.value
-    let value = (pair[1] as TestObjCValueTy)!.value
+    let pair = pairAnyObject as NSArray
+    let key = (pair[0] as TestObjCKeyTy).value
+    let value = (pair[1] as TestObjCValueTy).value
     pairs += (key, value)
   }
   return pairs
@@ -1665,7 +1665,7 @@ func test_BridgedFromObjC_Verbatim_SubscriptWithIndex() {
   var pairs = Array<(Int, Int)>()
   for var i = startIndex; i != endIndex; ++i {
     var (key, value: AnyObject) = d[i]
-    pairs += ((key as TestObjCKeyTy)!.value, (value as TestObjCValueTy)!.value)
+    pairs += ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
   }
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
   assert(identity1 == reinterpretCast(d))
@@ -1751,13 +1751,13 @@ func test_BridgedFromObjC_Verbatim_SubscriptWithKey() {
 
   // Read existing key-value pairs.
   var v = d[TestObjCKeyTy(10)] as TestObjCValueTy
-  assert(v!.value == 1010)
+  assert(v.value == 1010)
 
   v = d[TestObjCKeyTy(20)] as TestObjCValueTy
-  assert(v!.value == 1020)
+  assert(v.value == 1020)
 
   v = d[TestObjCKeyTy(30)] as TestObjCValueTy
-  assert(v!.value == 1030)
+  assert(v.value == 1030)
 
   assert(identity1 == reinterpretCast(d))
 
@@ -1769,16 +1769,16 @@ func test_BridgedFromObjC_Verbatim_SubscriptWithKey() {
   assert(d.count == 4)
 
   v = d[TestObjCKeyTy(10)] as TestObjCValueTy
-  assert(v!.value == 1010)
+  assert(v.value == 1010)
 
   v = d[TestObjCKeyTy(20)] as TestObjCValueTy
-  assert(v!.value == 1020)
+  assert(v.value == 1020)
 
   v = d[TestObjCKeyTy(30)] as TestObjCValueTy
-  assert(v!.value == 1030)
+  assert(v.value == 1030)
 
   v = d[TestObjCKeyTy(40)] as TestObjCValueTy
-  assert(v!.value == 2040)
+  assert(v.value == 2040)
 
   // Overwrite value in existing binding.
   d[TestObjCKeyTy(10)] = TestObjCValueTy(2010)
@@ -1787,16 +1787,16 @@ func test_BridgedFromObjC_Verbatim_SubscriptWithKey() {
   assert(d.count == 4)
 
   v = d[TestObjCKeyTy(10)] as TestObjCValueTy
-  assert(v!.value == 2010)
+  assert(v.value == 2010)
 
   v = d[TestObjCKeyTy(20)] as TestObjCValueTy
-  assert(v!.value == 1020)
+  assert(v.value == 1020)
 
   v = d[TestObjCKeyTy(30)] as TestObjCValueTy
-  assert(v!.value == 1030)
+  assert(v.value == 1030)
 
   v = d[TestObjCKeyTy(40)] as TestObjCValueTy
-  assert(v!.value == 2040)
+  assert(v.value == 2040)
 
   println("test_BridgedFromObjC_Verbatim_SubscriptWithKey done")
 }
@@ -1892,7 +1892,7 @@ func test_BridgedFromObjC_Verbatim_UpdateValueForKey() {
 
     var oldValue: AnyObject? =
         d.updateValue(TestObjCValueTy(2010), forKey: TestObjCKeyTy(10))
-    assert((oldValue as TestObjCValueTy)!.value == 1010)
+    assert((oldValue as TestObjCValueTy).value == 1010)
 
     var identity2: Word = reinterpretCast(d)
     assert(identity1 != identity2)
@@ -2336,7 +2336,7 @@ func test_BridgedFromObjC_Verbatim_Generate() {
   var gen = d.generate()
   var pairs = Array<(Int, Int)>()
   while let (key, value: AnyObject) = gen.next() {
-    pairs += ((key as TestObjCKeyTy)!.value, (value as TestObjCValueTy)!.value)
+    pairs += ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
   }
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
   // The following is not required by the Generator protocol, but
@@ -2429,7 +2429,7 @@ func test_BridgedFromObjC_Verbatim_Generate_Huge() {
   var gen = d.generate()
   var pairs = Array<(Int, Int)>()
   while let (key, value: AnyObject) = gen.next() {
-    pairs += ((key as TestObjCKeyTy)!.value, (value as TestObjCValueTy)!.value)
+    pairs += ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
   }
   var expectedPairs = Array<(Int, Int)>()
   for i in 1...32 {
@@ -2486,7 +2486,7 @@ func test_BridgedFromObjC_Verbatim_Generate_ParallelArray() {
   var gen = d.generate()
   var pairs = Array<(Int, Int)>()
   while let (key, value: AnyObject) = gen.next() {
-    pairs += ((key as TestObjCKeyTy)!.value, (value as TestObjCValueTy)!.value)
+    pairs += ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
   }
   var expectedPairs = [ (10, 1111), (20, 1111), (30, 1111), (40, 1111) ]
   assert(equalsUnordered(pairs, expectedPairs))
@@ -2686,13 +2686,13 @@ func test_BridgedFromObjC_Verbatim_ArrayOfDictionaries() {
         getAsNSDictionary([ 10: 1010 + i, 20: 1020 + i, 30: 1030 + i ]))
   }
 
-  var a = (nsa as AnyObject[] as Dictionary<NSObject, AnyObject>[])!
+  var a = nsa as AnyObject[] as Dictionary<NSObject, AnyObject>[]
   for i in 0..3 {
     var d = a[i]
     var gen = d.generate()
     var pairs = Array<(Int, Int)>()
     while let (key, value: AnyObject) = gen.next() {
-      pairs += ((key as TestObjCKeyTy)!.value, (value as TestObjCValueTy)!.value)
+      pairs += ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
     }
     var expectedPairs = [ (10, 1010 + i), (20, 1020 + i), (30, 1030 + i) ]
     assert(equalsUnordered(pairs, expectedPairs))
@@ -2710,7 +2710,7 @@ func test_BridgedFromObjC_Nonverbatim_ArrayOfDictionaries() {
         getAsNSDictionary([ 10: 1010 + i, 20: 1020 + i, 30: 1030 + i ]))
   }
 
-  var a = (nsa as AnyObject[] as Dictionary<TestBridgedKeyTy, TestBridgedValueTy>[])!
+  var a = nsa as AnyObject[] as Dictionary<TestBridgedKeyTy, TestBridgedValueTy>[]
   for i in 0..3 {
     var d = a[i]
     var gen = d.generate()
@@ -2778,13 +2778,13 @@ func test_BridgedToObjC_ObjectForKey() {
   assert(!d.objectForKey(nil))
 
   var v: AnyObject? = d.objectForKey(TestObjCKeyTy(10))
-  assert((v as TestObjCValueTy)!.value == 1010)
+  assert((v as TestObjCValueTy).value == 1010)
 
   v = d.objectForKey(TestObjCKeyTy(20))
-  assert((v as TestObjCValueTy)!.value == 1020)
+  assert((v as TestObjCValueTy).value == 1020)
 
   v = d.objectForKey(TestObjCKeyTy(30))
-  assert((v as TestObjCValueTy)!.value == 1030)
+  assert((v as TestObjCValueTy).value == 1030)
 
   assert(!d.objectForKey(TestObjCKeyTy(40)))
 
@@ -2800,7 +2800,7 @@ func test_BridgedToObjC_KeyEnumerator_NextObject() {
   var pairs = Array<(Int, Int)>()
   while let key: AnyObject = enumerator.nextObject() {
     let value: AnyObject = d.objectForKey(key)
-    pairs += ((key as TestObjCKeyTy)!.value, (value as TestObjCValueTy)!.value)
+    pairs += ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
   }
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
 
@@ -2912,7 +2912,7 @@ func test_BridgedToObjC_KeyValue_ValueTypesCustomBridged() {
   var pairs = Array<(Int, Int)>()
   while let key: AnyObject = enumerator.nextObject() {
     let value: AnyObject = d.objectForKey(key)
-    pairs += ((key as TestObjCKeyTy)!.value, (value as TestObjCValueTy)!.value)
+    pairs += ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
   }
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
 
@@ -2944,7 +2944,7 @@ func test_BridgedToObjC_Key_ValueTypeCustomBridged() {
   var pairs = Array<(Int, Int)>()
   while let key: AnyObject = enumerator.nextObject() {
     let value: AnyObject = d.objectForKey(key)
-    pairs += ((key as TestObjCKeyTy)!.value, (value as TestObjCValueTy)!.value)
+    pairs += ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
   }
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
 
@@ -2976,7 +2976,7 @@ func test_BridgedToObjC_Value_ValueTypeCustomBridged() {
   var pairs = Array<(Int, Int)>()
   while let key: AnyObject = enumerator.nextObject() {
     let value: AnyObject = d.objectForKey(key)
-    pairs += ((key as TestObjCKeyTy)!.value, (value as TestObjCValueTy)!.value)
+    pairs += ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
   }
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
 
@@ -3018,7 +3018,7 @@ func test_BridgingRoundtrip() {
   var pairs = Array<(Int, Int)>()
   while let key: AnyObject = enumerator.nextObject() {
     let value: AnyObject = d.objectForKey(key)
-    pairs += ((key as TestObjCKeyTy)!.value, (value as TestObjCValueTy)!.value)
+    pairs += ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
   }
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
 
@@ -3048,7 +3048,7 @@ func test_NSDictionaryToDictionaryCoversion() {
 
   var pairs = Array<(Int, Int)>()
   for (key, value: AnyObject) in d {
-    pairs += ((key as TestObjCKeyTy)!.value, (value as TestObjCValueTy)!.value)
+    pairs += ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
   }
   assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
 

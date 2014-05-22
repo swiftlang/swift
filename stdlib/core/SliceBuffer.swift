@@ -40,7 +40,7 @@ struct SliceBuffer<T> : ArrayBufferType {
   func _invariantCheck() {
     let isNative = _hasNativeBuffer
     _sanityCheck(
-      (owner as NativeStorage).getLogicValue() == isNative
+      (owner as? NativeStorage).getLogicValue() == isNative
     )
     if isNative {
       _sanityCheck(count <= nativeBuffer.count)
@@ -56,7 +56,7 @@ struct SliceBuffer<T> : ArrayBufferType {
 
   var nativeBuffer: NativeBuffer {
     _sanityCheck(_hasNativeBuffer)
-    return NativeBuffer(owner as NativeStorage)
+    return NativeBuffer(owner as? NativeStorage)
   }
   
   /// A value that identifies first mutable element, if any.  Two

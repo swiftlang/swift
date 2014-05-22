@@ -70,8 +70,8 @@ class G : F {
 
 // Explicit downcasting
 func test_explicit_downcasting(f: F, ei: E<Int>) {
-  var g = (f as G)!
-  g = (ei as G)!
+  var g = f as G
+  g = ei as G
 }
 
 // Type and instance functions with the same name

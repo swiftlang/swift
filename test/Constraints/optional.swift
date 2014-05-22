@@ -80,14 +80,14 @@ func test5() -> Int? {
 func test6<T>(x : T) {
   // FIXME: this code should work; T could be Int? or Int??
   // or something like that at runtime.  rdar://16374053
-  let y = x as Int? // expected-error {{cannot downcast from 'T' to a more optional type 'Int?'}}
+  let y = x as? Int? // expected-error {{cannot downcast from 'T' to a more optional type 'Int?'}}
 }
 
 func test7(x : A) {
   // This should get diagnosed with the "more optional type" error above.
-  let y = x as B? // expected-error {{cannot convert the expression's type '$T1' to type '$T2'}}
+  let y = x as? B? // expected-error {{'B?' is not a subtype of 'A'}}
 }
 
 func test8(x : AnyObject?) {
-  let y : A = (x as A)!
+  let y : A = x as A
 }

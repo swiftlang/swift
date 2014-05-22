@@ -20,7 +20,7 @@ var o : AnyObject = c
 ////////////////////////////
 
 func ArchetypeToArchetype<T1, T2>(#t: T1, #t2: T2) -> T2 {
-  return (t as T2)!
+  return t as T2
 }
 
 // x -> x where x is a class.
@@ -88,16 +88,16 @@ ArchetypeToArchetype(t: b, t2: f)
 ///////////////////////////
 
 func ArchetypeToConcreteConvertUInt8<T>(#t: T) -> UInt8 {
-  return (t as UInt8)!
+  return t as UInt8
 }
 func ArchetypeToConcreteConvertC<T>(#t: T) -> C {
-  return (t as C)!
+  return t as C
 }
 func ArchetypeToConcreteConvertD<T>(#t: T) -> D {
-  return (t as D)!
+  return t as D
 }
 func ArchetypeToConcreteConvertE<T>(#t: T) -> E {
-  return (t as E)!
+  return t as E
 }
 
 // x -> x where x is not a class.
@@ -176,13 +176,13 @@ ArchetypeToConcreteConvertD(t: c)
 ///////////////////////////
 
 func ConcreteToArchetypeConvertUInt8<T>(#t: UInt8, #t2: T) -> T {
-  return (t as T)!
+  return t as T
 }
 func ConcreteToArchetypeConvertC<T>(#t: C, #t2: T) -> T {
-  return (t as T)!
+  return t as T
 }
 func ConcreteToArchetypeConvertD<T>(#t: D, #t2: T) -> T {
-  return (t as T)!
+  return t as T
 }
 
 // x -> x where x is not a class.
@@ -262,11 +262,11 @@ ConcreteToArchetypeConvertD(t: d, t2: c)
 ////////////////////////
 
 func SuperToArchetypeC<T>(#c : C, #t : T) -> T {
-  return (c as T)!
+  return c as T
 }
 
 func SuperToArchetypeD<T>(#d : D, #t : T) -> T {
-  return (d as T)!
+  return d as T
 }
 
 // x -> x where x is a class.
@@ -314,7 +314,7 @@ SuperToArchetypeD(d: d, t: d)
 //////////////////////////////
 
 func ExistentialToArchetype<T>(#o : AnyObject, #t : T) -> T {
-  return (o as T)!
+  return o as T
 }
 
 // AnyObject -> Class.

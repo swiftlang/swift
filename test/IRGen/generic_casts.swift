@@ -27,7 +27,7 @@ import gizmo
 
 // CHECK: define i64 @_TF13generic_casts8allToInt{{.*}}(%swift.opaque* noalias, %swift.type* %T)
 func allToInt<T>(x: T) -> Int {
-  return (x as Int)!
+  return x as Int
   // CHECK: [[METADATA:%.*]] = bitcast %swift.type* %T to i8*{{$}}
   // CHECK: [[CAST:%.*]] = call %swift.opaque* @swift_dynamicCastIndirectUnconditional(%swift.opaque* {{%.*}}, i8* [[METADATA]], i8* bitcast ({{.*}}@_TMdSi{{.*}}))
   // CHECK: [[INT_RESULT_PTR:%.*]] = bitcast %swift.opaque* [[CAST]] to %Si*
@@ -40,12 +40,12 @@ func allToInt<T>(x: T) -> Int {
 func intToAll<T>(x: Int) -> T {
   // CHECK: [[METADATA:%.*]] = bitcast %swift.type* %T to i8*
   // CHECK: [[CAST:%.*]] = call %swift.opaque* @swift_dynamicCastIndirectUnconditional(%swift.opaque* {{%.*}}, i8* bitcast ({{.*}} @_TMdSi, {{.*}}), i8* [[METADATA]])
-  return (x as T)!
+  return x as T
 }
 
 // CHECK: define i64 @_TF13generic_casts8anyToInt{{.*}}(%"protocol<>"* noalias)
 func anyToInt(x: protocol<>) -> Int {
-  return (x as Int)!
+  return x as Int
 }
 
 @class_protocol @objc protocol ObjCProto1 {
@@ -64,7 +64,7 @@ func protoCast(x: ObjCClass) -> protocol<ObjCProto1, NSRuncing> {
   // CHECK: load i8** @"\01l_OBJC_PROTOCOL_REFERENCE_$__TtP13generic_casts10ObjCProto1_"
   // CHECK: load i8** @"\01l_OBJC_PROTOCOL_REFERENCE_$_NSRuncing"
   // CHECK: call %objc_object* @swift_dynamicCastObjCProtocolUnconditional(%objc_object* {{%.*}}, i64 2, i8** {{%.*}})
-  return (x as protocol<ObjCProto1, NSRuncing>)!
+  return x as protocol<ObjCProto1, NSRuncing>
 }
 
 @objc class ObjCClass2 : NSObject, ObjCProto2 {
@@ -88,5 +88,5 @@ func classExistentialToOpaqueArchetype<T>(var x: ObjCProto1) -> T {
   // CHECK: [[PROTO_TYPE_OPAQUE:%.*]] = bitcast %swift.type* [[PROTO_TYPE]] to i8*
   // CHECK: [[T_OPAQUE:%.*]] = bitcast %swift.type* %T to i8*
   // CHECK: call %swift.opaque* @swift_dynamicCastIndirectUnconditional(%swift.opaque* [[PROTO_VALUE_OPAQUE]], i8* [[PROTO_TYPE_OPAQUE]], i8* [[T_OPAQUE]])
-  return (x as T)!
+  return x as T
 }

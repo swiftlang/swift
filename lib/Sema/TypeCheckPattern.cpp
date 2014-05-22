@@ -228,7 +228,7 @@ public:
   Pattern *visitSequenceExpr(SequenceExpr *E) {
     if (E->getElements().size() != 3)
       return nullptr;
-    auto cast = dyn_cast<ConditionalCheckedCastExpr>(E->getElement(1));
+    auto cast = dyn_cast<UnresolvedCheckedCastExpr>(E->getElement(1));
     if (!cast)
       return nullptr;
     

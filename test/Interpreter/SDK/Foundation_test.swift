@@ -53,9 +53,9 @@ var nsArr : NSArray = [1, 2.5, "Hello"]
 assert(nsArr.count == 3)
 
 // Subscripting
-assert(Int((nsArr[0] as NSNumber)!) == 1)
-assert(Double((nsArr[1] as NSNumber)!) == 2.5)
-assert((nsArr[2] as NSString)!.isEqual("Hello"))
+assert(Int(nsArr[0] as NSNumber) == 1)
+assert(Double(nsArr[1] as NSNumber) == 2.5)
+assert((nsArr[2] as NSString).isEqual("Hello"))
 
 // Iteration
 for x : AnyObject in nsArr { 
@@ -65,7 +65,7 @@ for x : AnyObject in nsArr {
   // FIXME: There is an ambiguity between the class method in NSObject
   // and the property in NSObject which using 'x' as AnyObject.
   // This crashes the type checker.
-  print((x as NSObject)!.description)
+  print((x as NSObject).description)
   print("\n")
 }
 // CHECK: Element = 1
@@ -75,7 +75,7 @@ for x : AnyObject in nsArr {
 // Mutation
 var nsMutableArr : NSMutableArray = ["Constant", "Moon"]
 nsMutableArr[0] = "Inconstant"
-println("mutable array \((nsMutableArr[0] as NSString)!) \((nsMutableArr[1] as NSString)!)")
+println("mutable array \(nsMutableArr[0] as NSString) \(nsMutableArr[1] as NSString)")
 assert(nsMutableArr.count == 2)
 // CHECK: mutable array Inconstant Moon
 
@@ -106,8 +106,8 @@ nsArrayToAnyObjectArray(aoa)
 // Dictionaries
 //===----------------------------------------------------------------------===//
 var nsDict : NSDictionary = [1 : "Hello", 2 : "World"]
-assert((nsDict[1] as NSString)!.isEqual("Hello"))
-assert((nsDict[2] as NSString)!.isEqual("World"))
+assert((nsDict[1] as NSString).isEqual("Hello"))
+assert((nsDict[2] as NSString).isEqual("World"))
 
 let nsMutableDict: NSMutableDictionary = ["Hello" : 1, "World" : 2]
 assert(nsMutableDict["Hello"].isEqual(1))

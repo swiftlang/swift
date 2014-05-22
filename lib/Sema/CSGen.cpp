@@ -1206,8 +1206,8 @@ namespace {
     Type visitImplicitConversionExpr(ImplicitConversionExpr *expr) {
       llvm_unreachable("Already type-checked");
     }
-    
-    Type visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *expr) {
+
+    Type visitUnresolvedCheckedCastExpr(UnresolvedCheckedCastExpr *expr) {
       auto &tc = CS.getTypeChecker();
       
       // Validate the resulting type.
@@ -1219,44 +1219,48 @@ namespace {
       auto toType = CS.openType(expr->getCastTypeLoc().getType());
       expr->getCastTypeLoc().setType(toType, /*validated=*/true);
 
-      // Create a type variable to describe the result.
       auto locator = CS.getConstraintLocator(expr,
                                      ConstraintLocator::CheckedCastOperand);
-      auto typeVar = CS.createTypeVariable(locator, /*options=*/0);
 
-      // Form the constraints for the implicit conversion case.
+      // Form the disjunction of the two possible type checks.
       auto fromType = expr->getSubExpr()->getType();
-      Constraint *convConstraints[2] = {
+      Constraint *constraints[2] = {
+        // The source type can be coerced to the destination type.
         Constraint::create(CS, ConstraintKind::Conversion, fromType, toType,
                            Identifier(), locator),
-        Constraint::create(CS, ConstraintKind::Equal, typeVar, toType,
-                           Identifier(), locator)
-      };
-      auto convConstraint = Constraint::createConjunction(CS, convConstraints,
-                                                          locator);
-
-      // Form the constraints for the checked cast case.
-      auto optToType = tc.getOptionalType(expr->getLoc(), toType);
-      if (!optToType)
-        return nullptr;
-      Constraint *checkConstraints[2] = {
+        // The source type can be downcast to the destination type.
         Constraint::create(CS, ConstraintKind::CheckedCast, fromType, toType,
                            Identifier(), locator),
-        Constraint::create(CS, ConstraintKind::Equal, typeVar, optToType,
-                           Identifier(), locator)
       };
-      auto checkConstraint = Constraint::createConjunction(CS,
-                                                           checkConstraints,
-                                                           locator);
+      CS.addConstraint(Constraint::createDisjunction(CS, constraints, locator,
+                                                     RememberChoice));
 
-      // Form the disjunction of the two kinds of constraints.
-      Constraint *constraints[2] = { convConstraint, checkConstraint };
-      CS.addConstraint(Constraint::createDisjunction(CS, constraints,
-                                                     locator));
-
-      return typeVar;
+      return toType;
     }
-    
+
+    Type visitForcedCheckedCastExpr(ForcedCheckedCastExpr *expr) {
+      llvm_unreachable("Already type checked");
+    }
+
+    Type visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *expr) {
+      auto &tc = CS.getTypeChecker();
+
+      // Validate the resulting type.
+      if (tc.validateType(expr->getCastTypeLoc(), CS.DC,
+                          TR_AllowUnboundGenerics))
+        return nullptr;
+
+      // Open the type we're casting to.
+      auto toType = CS.openType(expr->getCastTypeLoc().getType());
+      expr->getCastTypeLoc().setType(toType, /*validated=*/true);
+
+      auto fromType = expr->getSubExpr()->getType();
+      auto locator = CS.getConstraintLocator(
+                       expr, ConstraintLocator::CheckedCastOperand);
+      CS.addConstraint(ConstraintKind::CheckedCast, fromType, toType, locator);
+      return OptionalType::get(toType);
+    }
+
     Type visitIsaExpr(IsaExpr *expr) {
       // Validate the type.
       auto &tc = CS.getTypeChecker();
@@ -1279,11 +1283,11 @@ namespace {
     }
 
     Type visitCoerceExpr(CoerceExpr *expr) {
-      return expr->getCastTypeLoc().getType();
+      llvm_unreachable("Already type-checked");
     }
 
     Type visitArrayDowncastExpr(ArrayDowncastExpr *expr) {
-      return expr->getCastTypeLoc().getType();
+      llvm_unreachable("Already type-checked");
     }
 
     Type visitDiscardAssignmentExpr(DiscardAssignmentExpr *expr) {

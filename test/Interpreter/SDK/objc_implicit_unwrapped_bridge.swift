@@ -31,7 +31,7 @@ func testConvertArrayOfImplicitUnwrappedClass() {
   // CHECK: Element 0 has value 1
   // CHECK: Element 1 has value 2
   for (index, obj) in enumerate(classNSArr1) {
-    if let x = obj as X {
+    if let x = obj as? X {
       println("Element \(index) has value \(x.value)")
     } else {
       println("Element \(index) is not an X")
@@ -57,7 +57,7 @@ func testConvertArrayOfImplicitUnwrappedValue() {
   // CHECK: Element 0 has value Hello
   // CHECK: Element 1 has value World
   for (index, obj) in enumerate(stringNSArr1) {
-    if let str = obj as String {
+    if let str = obj as? String {
       println("Element \(index) has value \(str)")
     } else {
       println("Element \(index) is not a String")
@@ -93,7 +93,7 @@ func testConvertArrayOfImplicitUnwrappedArray() {
   // CHECK:   Swift
   // CHECK: )
   for (index, obj) in enumerate(nsarr) {
-    if let innerNSArr = obj as NSArray {
+    if let innerNSArr = obj as? NSArray {
       println("Element \(index) has value \(innerNSArr.description!)")
     } else {
       println("Element \(index) is not an NSArray")

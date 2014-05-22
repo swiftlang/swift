@@ -162,7 +162,7 @@ class ValueLike : NSObject {
   }
 
   override func isEqual(_ rhs: AnyObject) -> Bool {
-    if let rhs2 = rhs as ValueLike {
+    if let rhs2 = rhs as? ValueLike {
       return x == rhs2.x
     }
     return false

@@ -16,7 +16,7 @@ var o : AnyObject = c
 ////////////////////////
 
 func ArchetypeToArchetypeCast<T1, T2>(#t1 : T1, #t2 : T2) -> T2 {
-  if let x = t1 as T2 {
+  if let x = t1 as? T2 {
     return x
   }
   _preconditionFailure("??? Profit?")
@@ -85,28 +85,28 @@ ArchetypeToArchetypeCast(t1: c, t2: e)
 ///////////////////////////
 
 func ArchetypeToConcreteCastUInt8<T>(#t : T) -> UInt8 {
-  if let x = t as UInt8 {
+  if let x = t as? UInt8 {
     return x
   }
   _preconditionFailure("??? Profit?")
 }
 
 func ArchetypeToConcreteCastC<T>(#t : T) -> C {
-  if let x = t as C {
+  if let x = t as? C {
     return x
   }
   _preconditionFailure("??? Profit?")
 }
 
 func ArchetypeToConcreteCastD<T>(#t : T) -> D {
-  if let x = t as D {
+  if let x = t as? D {
     return x
   }
   _preconditionFailure("??? Profit?")
 }
 
 func ArchetypeToConcreteCastE<T>(#t : T) -> E {
-  if let x = t as E {
+  if let x = t as? E {
     return x
   }
   _preconditionFailure("??? Profit?")
@@ -182,19 +182,19 @@ ArchetypeToConcreteCastD(t: c)
 ///////////////////////////
 
 func ConcreteToArchetypeCastUInt8<T>(#t: UInt8, #t2: T) -> T {
-  if let x = t as T {
+  if let x = t as? T {
     return x
   }
   _preconditionFailure("??? Profit?")
 }
 func ConcreteToArchetypeCastC<T>(#t: C, #t2: T) -> T {
-  if let x = t as T {
+  if let x = t as? T {
     return x
   }
   _preconditionFailure("??? Profit?")
 }
 func ConcreteToArchetypeCastD<T>(#t: D, #t2: T) -> T {
-  if let x = t as T {
+  if let x = t as? T {
     return x
   }
   _preconditionFailure("??? Profit?")
@@ -261,14 +261,14 @@ ConcreteToArchetypeCastD(t: d, t2: c)
 ////////////////////////
 
 func SuperToArchetypeCastC<T>(#c : C, #t : T) -> T {
-  if let x = c as T {
+  if let x = c as? T {
     return x
   }
   _preconditionFailure("??? Profit?")
 }
 
 func SuperToArchetypeCastD<T>(#d : D, #t : T) -> T {
-  if let x = d as T {
+  if let x = d as? T {
     return x
   }
   _preconditionFailure("??? Profit?")
@@ -316,7 +316,7 @@ SuperToArchetypeCastD(d: d, t: d)
 //////////////////////////////
 
 func ExistentialToArchetypeCast<T>(#o : AnyObject, #t : T) -> T {
-  if let x = o as T {
+  if let x = o as? T {
     return x
   }
   _preconditionFailure("??? Profit?")

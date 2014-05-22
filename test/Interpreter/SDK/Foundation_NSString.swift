@@ -22,9 +22,9 @@ var dict  = strings.propertyListFromStringsFileFormat()
 
 // Subscripting an NSDictionary. FIXME: The inner NSString casts are annoying.
 // CHECK: A -> Foo
-println("A -> " + (dict[asNSString("A")] as NSString)!)
+println("A -> " + (dict[asNSString("A")] as NSString))
 // CHECK: B -> Bar
-println("B -> " + (dict[asNSString("B")] as NSString)!)
+println("B -> " + (dict[asNSString("B")] as NSString))
 
 // Creating and subscripting an NSMutableArray
 var array = NSMutableArray(capacity: 2)
@@ -35,9 +35,9 @@ array[1] = asNSString("world")
 // FIXME: NSString string interpolation doesn't work due to lack of
 // overload resolution.
 // CHECK: Hello, world!
-print((array[0] as NSString)!)
+print(array[0] as NSString)
 print(", ");
-print((array[1] as NSString)!)
+print(array[1] as NSString)
 println("!")
 
 // Selectors

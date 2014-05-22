@@ -1125,6 +1125,10 @@ namespace {
     ExprRewriter(ConstraintSystem &cs, const Solution &solution)
       : cs(cs), dc(cs.DC), solution(solution) { }
 
+    ~ExprRewriter() {
+      finalize();
+    }
+
     ConstraintSystem &getConstraintSystem() const { return cs; }
 
     /// \brief Simplify the expression type and return the expression.
@@ -1772,6 +1776,15 @@ namespace {
     llvm::SmallDenseMap<Expr*, MemberPartialApplication, 2>
       InvalidPartialApplications;
     
+    /// A list of "suspicious" optional injections that come from
+    /// forced downcasts.
+    SmallVector<InjectIntoOptionalExpr *, 4> SuspiciousOptionalInjections;
+
+  public:
+    /// A list of optional injections that have been diagnosed.
+    llvm::SmallPtrSet<InjectIntoOptionalExpr *, 4>  DiagnosedOptionalInjections;
+  private:
+
     Expr *applyMemberRefExpr(Expr *expr,
                              Expr *base,
                              SourceLoc dotLoc,
@@ -2366,9 +2379,11 @@ namespace {
         auto toOptType = OptionalType::get(toType);
         ConditionalCheckedCastExpr *cast
           = new (tc.Context) ConditionalCheckedCastExpr(
-                               sub, expr->getLoc(),
+                               sub, expr->getLoc(), SourceLoc(),
                                TypeLoc::withoutLoc(toType));
         cast->setType(toOptType);
+        if (expr->isImplicit())
+          cast->setImplicit();
 
         // Type-check this conditional case.
         Expr *result = visitConditionalCheckedCastExpr(cast);
@@ -2496,6 +2511,88 @@ namespace {
       return result;
     }
 
+    Expr *visitUnresolvedCheckedCastExpr(UnresolvedCheckedCastExpr *expr) {
+      // Simplify the type we're casting to.
+      auto toType = simplifyType(expr->getCastTypeLoc().getType());
+      expr->getCastTypeLoc().setType(toType, /*validated=*/true);
+
+      // Determine whether we performed a coercion or a downcast.
+      auto locator
+        = cs.getConstraintLocator(expr, ConstraintLocator::CheckedCastOperand);
+      unsigned choice = solution.getDisjunctionChoice(locator);
+      assert(choice <= 1 && "checked cast choices not synced with disjunction");
+
+      // Choice 0 is coercion.
+      if (choice == 0) {
+        // The subexpression is always an rvalue.
+        auto &tc = cs.getTypeChecker();
+        auto sub = tc.coerceToRValue(expr->getSubExpr());
+        if (!sub)
+          return nullptr;
+
+        // Convert the subexpression.
+        bool failed = tc.convertToType(sub, toType, cs.DC);
+        (void)failed;
+        assert(!failed && "Not convertible?");
+
+        // Transmute the checked cast into a coercion expression.
+        Expr *result = new (tc.Context) CoerceExpr(sub, expr->getLoc(),
+                                                   expr->getCastTypeLoc());
+
+        // The result type is the type we're converting to.
+        result->setType(toType);
+        return result;
+      }
+
+      // Choice 1 is downcast.
+      assert(choice == 1);
+
+      // Form a conditional checked cast and type-check that.
+      auto &tc = cs.getTypeChecker();
+      Expr *casted;
+      {
+        auto *conditionalCast = new (tc.Context) ConditionalCheckedCastExpr(
+                                                   expr->getSubExpr(),
+                                                   expr->getLoc(),
+                                                   SourceLoc(),
+                                                   expr->getCastTypeLoc());
+        conditionalCast->setType(OptionalType::get(toType));
+        if (expr->isImplicit())
+          conditionalCast->setImplicit();
+        casted = visitConditionalCheckedCastExpr(conditionalCast);
+        if (!casted)
+          return nullptr;
+      }
+
+      // If we ended up with a "bare" conditional checked cast, replace it
+      // with a forced checked cast.
+      //
+      // This is the common case.
+      if (auto conditional = dyn_cast<ConditionalCheckedCastExpr>(casted)) {
+        auto result = new (tc.Context) ForcedCheckedCastExpr(
+                                         conditional->getSubExpr(),
+                                         conditional->getLoc(),
+                                         conditional->getCastTypeLoc());
+        result->setType(toType);
+        result->setCastKind(conditional->getCastKind());
+        if (conditional->isImplicit())
+          result->setImplicit();
+        return result;
+      }
+
+      // Otherwise, unwrap the result.
+      //
+      // This happens when the conditional cast propagates optionals.
+      Expr *result = new (tc.Context) ForceValueExpr(casted, SourceLoc());
+      result->setType(toType);
+      result->setImplicit();
+      return result;
+    }
+
+    Expr *visitForcedCheckedCastExpr(ForcedCheckedCastExpr *expr) {
+      llvm_unreachable("Already type-checked");
+    }
+
     Expr *visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *expr) {
       // Simplify the type we're casting to.
       auto toType = simplifyType(expr->getCastTypeLoc().getType());
@@ -2523,7 +2620,7 @@ namespace {
       case CheckedCastKind::Unresolved:
         return nullptr;
       case CheckedCastKind::Coercion: {
-        // This is a coercion. Convert the subexpression.
+        // Convert the subexpression.
         bool failed = tc.convertToType(sub, toType, cs.DC);
         (void)failed;
         assert(!failed && "Not convertible?");
@@ -2683,12 +2780,26 @@ namespace {
       // inject-into-optional implicit conversion.
       //
       // It should be the case that that's always the last conversion applied.
-      if (isa<InjectIntoOptionalExpr>(subExpr)) {
-        cs.getTypeChecker().diagnose(subExpr->getLoc(),
-                                     diag::binding_injected_optional,
-                               expr->getSubExpr()->getType()->getRValueType())
-          .highlight(subExpr->getSourceRange())
-          .fixItRemove(expr->getQuestionLoc());
+      if (auto injection = dyn_cast<InjectIntoOptionalExpr>(subExpr)) {
+        // If the sub-expression was a forced downcast, suggest
+        // turning it into a conditional downcast.
+        auto &tc = cs.getTypeChecker();
+        if (auto forced = findForcedDowncast(injection->getSubExpr())) {
+          tc.diagnose(expr->getLoc(), diag::binding_explicit_downcast,
+                      injection->getSubExpr()->getType()->getRValueType())
+            .highlight(forced->getLoc())
+            .fixItInsert(Lexer::getLocForEndOfToken(tc.Context.SourceMgr,
+                                                    forced->getLoc()),
+                        "?");
+        } else {
+          tc.diagnose(subExpr->getLoc(), diag::binding_injected_optional,
+                      expr->getSubExpr()->getType()->getRValueType())
+            .highlight(subExpr->getSourceRange())
+            .fixItRemove(expr->getQuestionLoc());
+        }
+
+        // Don't diagnose this injection again.
+        DiagnosedOptionalInjections.insert(injection);
       }
 
       expr->setSubExpr(subExpr);
@@ -2738,6 +2849,22 @@ namespace {
         subExpr = tc.coerceToRValue(subExpr);
         if (!subExpr) return nullptr;
 
+        // Complain about this syntax: it is going away.
+        // FIXME: if we're initializing a variable, which is a common case,
+        // we would like to zap the type annotation as well.
+        {
+          llvm::SmallString<32> asStr;
+          asStr += " as ";
+          asStr += valueType->getString();
+          tc.diagnose(expr->getLoc(), 
+                      diag::contextual_downcast_to_forced_downcast,
+                      valueType)
+            .fixItReplaceChars(expr->getLoc(),
+                               Lexer::getLocForEndOfToken(tc.Context.SourceMgr,
+                                                          expr->getLoc()),
+                               asStr);
+        }
+
         // If the operand is AnyObject?, force it.
         if (auto operandValueType =
               subExpr->getType()->getAnyOptionalObjectType()) {
@@ -2763,6 +2890,7 @@ namespace {
           auto wrappedExpr = new (tc.Context)
                                 ConditionalCheckedCastExpr(subExpr,
                                                            subExpr->getLoc(),
+                                                           SourceLoc(),
                                                            OSTLoc);
           wrappedExpr->setImplicit(true);
           wrappedExpr->setType(optType);
@@ -2793,6 +2921,7 @@ namespace {
         auto cast = new (tc.Context) ConditionalCheckedCastExpr(
                                        subExpr,
                                        SourceLoc(),
+                                       SourceLoc(),
                                        TypeLoc::withoutLoc(valueType));
         cast->setImplicit(true);
         cast->setType(OptionalType::get(valueType));
@@ -2811,11 +2940,29 @@ namespace {
         // inject-into-optional implicit conversion.
         //
         // It should be the case that that's always the last conversion applied.
-        if (isa<InjectIntoOptionalExpr>(subExpr)) {
-          tc.diagnose(subExpr->getLoc(), diag::forcing_injected_optional,
-                      expr->getSubExpr()->getType()->getRValueType())
-            .highlight(subExpr->getSourceRange())
-            .fixItRemove(expr->getExclaimLoc());
+        if (auto injection = dyn_cast<InjectIntoOptionalExpr>(subExpr)) {
+          // If the injection was the result of an explicit unwrap (!), zap the
+          // redundant '!'.
+          bool diagnosed = false;
+          if (auto forced = findForcedDowncast(injection->getSubExpr())) {
+            tc.diagnose(expr->getLoc(), diag::forcing_explicit_downcast,
+                        expr->getSubExpr()->getType()->getRValueType())
+              .highlight(forced->getLoc())
+              .fixItRemove(expr->getLoc());
+            diagnosed = true;
+          }
+
+          // If we haven't diagnosed a more specific problem above,
+          // give a more generic message.
+          if (!diagnosed) {
+            tc.diagnose(subExpr->getLoc(), diag::forcing_injected_optional,
+                        expr->getSubExpr()->getType()->getRValueType())
+              .highlight(subExpr->getSourceRange())
+              .fixItRemove(expr->getExclaimLoc());
+          }
+
+          // Don't diagnose this injection again.
+          DiagnosedOptionalInjections.insert(injection);
         }
       }
 
@@ -2846,6 +2993,42 @@ namespace {
       assert((OpenedExistentials.empty() || 
               !InvalidPartialApplications.empty()) &&
              "Opened existentials have not been closed");
+
+      // Look at all of the suspicious optional injections
+      for (auto injection : SuspiciousOptionalInjections) {
+        // If we already diagnosed this injection, we're done.
+        if (DiagnosedOptionalInjections.count(injection)) {
+          continue;
+        }
+
+        auto *cast = findForcedDowncast(injection->getSubExpr());
+        if (!cast)
+          continue;
+
+        tc.diagnose(injection->getLoc(), diag::inject_forced_downcast,
+                    injection->getSubExpr()->getType()->getRValueType());
+        auto questionLoc = Lexer::getLocForEndOfToken(tc.Context.SourceMgr,
+                                                      cast->getLoc());
+        tc.diagnose(questionLoc, diag::forced_to_conditional_downcast, 
+                    injection->getType()->getAnyOptionalObjectType())
+          .fixItInsert(questionLoc, "?");
+      }
+    }
+
+    /// Diagnose an optional injection that is probably not what the
+    /// user wanted, because it comes from a forced downcast.
+    void diagnoseOptionalInjection(InjectIntoOptionalExpr *injection) {
+      // Don't diagnose when we're injecting into 
+      auto toOptionalType = injection->getType();
+      if (toOptionalType->getImplicitlyUnwrappedOptionalObjectType())
+        return;
+
+      // Check whether we have a forced downcast.
+      auto *cast = findForcedDowncast(injection->getSubExpr());
+      if (!cast)
+        return;
+      
+      SuspiciousOptionalInjections.push_back(injection);
     }
   };
 }
@@ -3875,7 +4058,9 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       expr = coerceToType(expr, valueType, locator);
       if (!expr) return nullptr;
 
-      return new (tc.Context) InjectIntoOptionalExpr(expr, toType);
+      auto *result = new (tc.Context) InjectIntoOptionalExpr(expr, toType);
+      diagnoseOptionalInjection(result);
+      return result;
     }
 
     case ConversionRestrictionKind::OptionalToImplicitlyUnwrappedOptional:
@@ -4086,7 +4271,9 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       expr = coerceToType(expr, valueType, locator);
       if (!expr) return nullptr;
 
-      return new (tc.Context) InjectIntoOptionalExpr(expr, toType);
+      auto *result = new (tc.Context) InjectIntoOptionalExpr(expr, toType);
+      diagnoseOptionalInjection(result);
+      return result;
     }
   }
 
@@ -4809,7 +4996,6 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr) {
   ExprRewriter rewriter(*this, solution);
   ExprWalker walker(rewriter);
   auto result = expr->walk(walker);
-  rewriter.finalize();
   return result;
 }
 
@@ -4820,10 +5006,24 @@ Expr *ConstraintSystem::applySolutionShallow(const Solution &solution,
 }
 
 Expr *Solution::coerceToType(Expr *expr, Type toType,
-                             ConstraintLocator *locator) const {
+                             ConstraintLocator *locator,
+                             bool ignoreTopLevelInjection) const {
   auto &cs = getConstraintSystem();
   ExprRewriter rewriter(cs, *this);
-  return rewriter.coerceToType(expr, toType, locator);
+  Expr *result = rewriter.coerceToType(expr, toType, locator);
+  if (!result)
+    return nullptr;
+
+  // If we were asked to ignore top-level optional injections, mark
+  // the top-level injection (if any) as "diagnosed".
+  if (ignoreTopLevelInjection) {
+    if (auto injection = dyn_cast<InjectIntoOptionalExpr>(
+                           result->getSemanticsProvidingExpr())) {
+      rewriter.DiagnosedOptionalInjections.insert(injection);
+    }
+  }
+
+  return result;
 }
 
 Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,

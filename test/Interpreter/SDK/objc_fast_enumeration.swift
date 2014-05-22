@@ -44,7 +44,7 @@ autoreleasepool {
 
   // CHECK: 1
   for x: AnyObject in b {
-    (x as Canary)!.chirp()
+    (x as Canary).chirp()
     break
   }
 
@@ -88,7 +88,7 @@ for x: AnyObject in s_m {
 // CHECK: bridged
 // CHECK: array
 var a2 = ["hello", "bridged", "array"]
-var nsa2 : NSArray = ((a2._asCocoaArray() as AnyObject) as NSArray)!
+var nsa2 = (a2._asCocoaArray() as AnyObject) as NSArray
 for x: AnyObject in nsa2 {
   println(x.description!)
 }

@@ -86,7 +86,7 @@ extension Foo {
 
 // Downcasting
 var b : Base
-(b as Derived)!
+b as Derived
 
 // Construction doesn't permit conversion.
 // NOTE: Int and other integer-literal convertible types

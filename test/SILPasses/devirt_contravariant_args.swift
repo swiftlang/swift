@@ -25,7 +25,7 @@ class C2 : C1 {}
 
 class B<T> {
   func performSomething(p : P) {
-    doSomething((p as C2)!)
+    doSomething(p as C2)
   }
 
   func doSomething(c : C2) {
@@ -40,7 +40,7 @@ class B<T> {
 
 class B2<T> : B<T> {
   override func performSomething(p : P) {
-    doSomething((p as C1)!)
+    doSomething(p as C1)
   }
 
   // When we have covariance in protocols, change this to B2.
@@ -58,7 +58,7 @@ class B2<T> : B<T> {
 
 class B3<T> : B2<T> {
   override func performSomething(p : P) {
-    doSomething((p as C0)!)
+    doSomething(p as C0)
   }
 
   override func doSomething(c : C0) {

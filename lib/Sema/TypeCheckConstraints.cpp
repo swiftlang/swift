@@ -26,6 +26,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/TypeCheckerDebugConsumer.h"
 #include "swift/Basic/Fallthrough.h"
+#include "swift/Parse/Lexer.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/FoldingSet.h"
@@ -981,13 +982,31 @@ bool TypeChecker::typeCheckBinding(PatternBindingDecl *binding) {
         if (!(exprType->getAnyOptionalObjectType() ||
               (exprNominalType &&
                exprNominalType->getNameStr().equals("_Nil")))) {
-          tc.diagnose(expr->getLoc(),
-                      diag::non_optional_in_conditional_binding);
+          // Special-case diagnostics for 'as' downcasts that should have been
+          // 'as?' conditional downcasts.
+          bool diagnosed = false;
+          if (auto forced = findForcedDowncast(expr)) {
+            tc.diagnose(forced->getLoc(),
+                        diag::forced_downcast_should_be_conditional,
+                        exprType)
+              .fixItInsert(Lexer::getLocForEndOfToken(tc.Context.SourceMgr,
+                                                      forced->getLoc()),
+                           "?");
+            diagnosed = true;
+          }
+
+          // If we didn't have a special-case diagnostic, emit a general one.
+          if (!diagnosed) {
+            tc.diagnose(expr->getLoc(),
+                        diag::non_optional_in_conditional_binding);
+          }
         }
       }
       
       // Convert the initializer to the type of the pattern.
-      expr = solution.coerceToType(expr, InitType, Locator);
+      expr = solution.coerceToType(expr, InitType, Locator,
+                                   /*ignoreTopLevelInjection=*/
+                                     Binding->isConditional());
       if (!expr) {
         return nullptr;
       }
@@ -1875,4 +1894,46 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   }
 
   return CheckedCastKind::Downcast;
+}
+
+    /// If the expression has the effect of a forced downcast, find the
+    /// underlying forced downcast expression.
+ExplicitCastExpr *swift::findForcedDowncast(Expr *expr) {
+  expr = expr->getSemanticsProvidingExpr();
+  
+  // Simple case: forced checked cast.
+  if (auto forced = dyn_cast<ForcedCheckedCastExpr>(expr)) {
+    return forced;
+  }
+
+  // If we have an implicit force, look through it.
+  if (auto forced = dyn_cast<ForceValueExpr>(expr)) {
+    if (forced->isImplicit()) {
+      // Skip through optional evaluations and binds.
+      auto sub = forced->getSubExpr();
+      do {
+        if (!sub->isImplicit())
+          break;
+
+        if (auto optionalEval = dyn_cast<OptionalEvaluationExpr>(sub)) {
+          sub = optionalEval->getSubExpr();
+          continue;
+        }
+
+        if (auto bindOptional = dyn_cast<BindOptionalExpr>(sub)) {
+          sub = bindOptional->getSubExpr();
+          continue;
+        }
+        
+        break;
+      } while (true);
+      
+      // If we have an explicit cast, we're done.
+      if (isa<ForcedCheckedCastExpr>(sub) || isa<ArrayDowncastExpr>(sub) || 
+          isa<ConditionalCheckedCastExpr>(sub))
+        return cast<ExplicitCastExpr>(sub);
+    }
+  }
+
+  return nullptr;
 }

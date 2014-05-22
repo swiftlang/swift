@@ -59,6 +59,6 @@ class G<T> : A {
 func a_to_gint(a: A) -> G<Int> {
   // CHECK: call %swift.type* @swift_getGenericMetadata
   // CHECK: call i8* @swift_dynamicCastUnconditional
-  return (a as G<Int>)!
+  return a as G<Int>
 }
 // CHECK: }

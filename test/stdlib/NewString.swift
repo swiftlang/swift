@@ -11,10 +11,10 @@ func hexAddrVal<T>(x: T) -> String {
 
 func hexAddr(x: AnyObject?) -> String {
   if let owner: AnyObject = x {
-    if let y = owner as _StringBuffer._Storage.Storage {
+    if let y = owner as? _StringBuffer._Storage.Storage {
       return ".Native\(hexAddrVal(y))"
     }
-    if let y = owner as NSString {
+    if let y = owner as? NSString {
       return ".Cocoa\(hexAddrVal(y))"
     }
     else {

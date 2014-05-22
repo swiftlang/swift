@@ -10,7 +10,7 @@ rootView.subviews = v
 
 rootView.subviews as View[]
 
-for view in (rootView.subviews as View[])! {
+for view in rootView.subviews as View[] {
 	println("found subview")
 }
 

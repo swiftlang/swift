@@ -1,23 +1,23 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 
 func allToInt<T>(x: T) -> Int {
-  return (x as Int)!
+  return x as Int
 }
 
 func allToIntOrZero<T>(x: T) -> Int {
   if x is Int {
-    return (x as Int)!
+    return x as Int
   }
   return 0
 }
 
 func anyToInt(x: protocol<>) -> Int {
-  return (x as Int)!
+  return x as Int
 }
 
 func anyToIntOrZero(x: protocol<>) -> Int {
   if x is Int {
-    return (x as Int)!
+    return x as Int
   }
   return 0
 }
@@ -40,45 +40,45 @@ class X : Class {
 }
 
 func allToC<T>(x: T) -> C {
-  return (x as C)!
+  return x as C
 }
 
 func allToCOrE<T>(x: T) -> C {
   if x is C {
-    return (x as C)!
+    return x as C
   }
   return E()
 }
 
 func anyToC(x: protocol<>) -> C {
-  return (x as C)!
+  return x as C
 }
 
 func anyToCOrE(x: protocol<>) -> C {
   if x is C {
-    return (x as C)!
+    return x as C
   }
   return E()
 }
 
 func allClassesToC<T : Class>(x: T) -> C {
-  return (x as C)!
+  return x as C
 }
 
 func allClassesToCOrE<T : Class>(x: T) -> C {
   if x is C {
-    return (x as C)!
+    return x as C
   }
   return E()
 }
 
 func anyClassToC(x: protocol<Class>) -> C {
-  return (x as C)!
+  return x as C
 }
 
 func anyClassToCOrE(x: protocol<Class>) -> C {
   if x is C {
-    return (x as C)!
+    return x as C
   }
   return E()
 }

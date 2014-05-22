@@ -20,7 +20,7 @@ class REPLApplication : NSApplication {
 func replApplicationMain() {
   _precondition(NSApp === nil)
   // Create a REPLApplication as the NSApp.
-  let app = (REPLApplication.sharedApplication() as REPLApplication)!
+  let app = REPLApplication.sharedApplication() as REPLApplication
 
   // Set the activation policy so we get a dock icon and can go foreground.
   app.setActivationPolicy(.Regular)

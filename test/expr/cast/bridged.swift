@@ -26,9 +26,9 @@ struct BridgedStruct : _BridgedToObjectiveC {
 
 func testBridgeDowncast(obj: AnyObject, objOpt: AnyObject?, 
                         objImplicitOpt: AnyObject!) -> BridgedStruct? {
-  var s1Opt = obj as BridgedStruct
-  var s2Opt = objOpt as BridgedStruct
-  var s3Opt = objImplicitOpt as BridgedStruct
+  var s1Opt = obj as? BridgedStruct
+  var s2Opt = objOpt as? BridgedStruct
+  var s3Opt = objImplicitOpt as? BridgedStruct
 
   // Make sure we seem to have the right result type.
   if s1Opt { return s1Opt }

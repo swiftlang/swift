@@ -1462,16 +1462,21 @@ static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD,
   TypeLoc ResultTy;
   ResultTy.setType(VD->getType(), true);
 
-  Call = new (Ctx) ConditionalCheckedCastExpr(Call, SourceLoc(),
+  // If we're working with non-optional types, we're forcing the cast.
+  if (!isOptional) {
+    Call = new (Ctx) UnresolvedCheckedCastExpr(Call, SourceLoc(),
+                                          TypeLoc::withoutLoc(UnderlyingType));
+    Call->setImplicit();
+    return Call;
+  }
+
+  // We're working with optional types, so perform a conditional checked
+  // downcast.
+  Call = new (Ctx) ConditionalCheckedCastExpr(Call, SourceLoc(), SourceLoc(),
                                            TypeLoc::withoutLoc(UnderlyingType));
   Call->setImplicit();
 
-  // If we're working with non-optional types, we use ! to force downcast.
-  if (!isOptional)
-    return new (Ctx) ForceValueExpr(Call, SourceLoc());
-
-  // If we're working with optional types, we use OptionalEvaluationExpr to
-  // evaluate the "?".
+  // Use OptionalEvaluationExpr to evaluate the "?".
   return new (Ctx) OptionalEvaluationExpr(Call);
 }
 

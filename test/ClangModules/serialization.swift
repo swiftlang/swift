@@ -7,6 +7,6 @@ import SerializationHelper
 
 let obj: InitProto = Impl(int: 42)
 
-let impl = (obj as Impl)!
+let impl = obj as Impl
 impl.takeStruct(testStruct(value: 0))
 _ = impl.getEnum()

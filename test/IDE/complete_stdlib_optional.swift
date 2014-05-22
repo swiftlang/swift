@@ -193,6 +193,6 @@ func testAnyObject7(a: AnyObject) {
 }
 
 func testAnyObject8(a: AnyObject) {
-  (a as ObjcClass)#^OPT_CAST_AS_RESULT_1^#
+  (a as? ObjcClass)#^OPT_CAST_AS_RESULT_1^#
 }
 

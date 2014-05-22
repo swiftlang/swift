@@ -4,7 +4,7 @@ class A {}
 class B : A {}
 
 func foo(y : A?) {
-  var x = (y as B)
+  var x = (y as? B)
 }
 // CHECK-DAG: sil @_TF4main3foo
 // CHECK:      [[X:%.*]] = alloc_box $Optional<B>
@@ -58,7 +58,7 @@ func foo(y : A?) {
 // CHECK-NEXT: release_value %0
 
 func bar(y : A????) {
-  var x = (y as B??)
+  var x = (y as? B??)
 }
 // CHECK-DAG: sil @_TF4main3bar
 // CHECK:      [[X:%.*]] = alloc_box $Optional<Optional<Optional<B>>>
@@ -229,7 +229,7 @@ func bar(y : A????) {
 // CHECK-NEXT: release_value %0
 
 func baz(y : AnyObject?) {
-  var x = (y as B)
+  var x = (y as? B)
 }
 // CHECK-DAG: sil @_TF4main3baz
 // CHECK:      [[X:%.*]] = alloc_box $Optional<B>

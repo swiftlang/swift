@@ -212,5 +212,5 @@ func downcast(var obj: AnyObject) -> X {
   // CHECK-NEXT: [[X:%[0-9]+]] = unconditional_checked_cast existential_to_concrete [[OBJ]] : $AnyObject to $X
   // CHECK-NEXT: strong_release [[OBJ_BOX]]#0 : $Builtin.NativeObject
   // CHECK-NEXT: return [[X]] : $X
-  return (obj as X)!
+  return obj as X
 }

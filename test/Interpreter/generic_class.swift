@@ -130,11 +130,11 @@ printPair(r)
 printTriple(r)
 var rAsPair: BufferedPair<State, String> = r
 // CHECK: 21 Washington "Bar" 31 Oregon
-printTriple((rAsPair as AwkwardTriple<State, String, State>)!)
+printTriple(rAsPair as AwkwardTriple<State, String, State>)
 // CHECK: 21 Washington "Bar" 31 Oregon 3.125
 printQuad(r)
 // CHECK: 21 Washington "Bar" 31 Oregon 3.125
-printQuad((rAsPair as FourthWheel<State, String, State, Double>)!)
+printQuad(rAsPair as FourthWheel<State, String, State, Double>)
 
 class ConcretePair {
   var first, second: UInt8

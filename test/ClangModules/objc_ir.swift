@@ -51,7 +51,7 @@ func indexedSubscripting(#b: B, #idx: Int, #a: A) {
   b[idx] = a
 
   // CHECK: load i8** @"\01L_selector(objectAtIndexedSubscript:)"
-  var a2 = (b[idx] as A)!
+  var a2 = b[idx] as A
 }
 
 // CHECK: define void @_TF7objc_ir17keyedSubscriptingFT1bCSo1B3idxCSo1A1aS1__T_
@@ -59,7 +59,7 @@ func keyedSubscripting(#b: B, #idx: A, #a: A) {
   // CHECK: load i8** @"\01L_selector(setObject:forKeyedSubscript:)"
   b[a] = a
   // CHECK: load i8** @"\01L_selector(objectForKeyedSubscript:)"
-  var a2 = (b[a] as A)!
+  var a2 = b[a] as A
 }
 
 // CHECK: define void @_TF7objc_ir14propertyAccessFT1bCSo1B_T_
@@ -72,7 +72,7 @@ func propertyAccess(#b: B) {
 // CHECK: define [[B]]* @_TF7objc_ir8downcastFT1aCSo1A_CSo1B(
 func downcast(#a: A) -> B {
   // CHECK: call i8* @swift_dynamicCastClassUnconditional(i8* [[A:%.*]], i8* bitcast (%objc_class* @"OBJC_CLASS_$_B" to i8*)) [[NOUNWIND:#[0-9]+]]
-  return (a as B)!
+  return a as B
 }
 
 // CHECK: define void @_TF7objc_ir19almostSubscriptableFT3as1CSo19AlmostSubscriptable1aCSo1A_T_
