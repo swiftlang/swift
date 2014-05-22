@@ -1,110 +1,617 @@
-// Test for the NSString API as exposed by String
+// RUN: %target-run-simple-swift %S/Inputs/NSStringAPI_test.txt | FileCheck %s
 
-// RUN: %target-run-simple-swift %s | FileCheck %s
+//
+// Tests for the NSString APIs as exposed by String
+//
 
 import Foundation
 
-func testFindFileAndURL(path: String) {
-  var err: NSError?
-  var content = String.stringWithContentsOfFile(path, error: &err)
-  
-  println("error: " + (err ? err.description : "<no error>"))
-  println("content: " + (content ? content!._lines[0] : "<no content>"))
+var _anyExpectFailed = false
 
-  var url = NSURL.URLWithString("file://" + path)
-
-  err = nil
-  content = String.stringWithContentsOfURL(url, error: &err)
-  
-  println("error: " + (err ? err.description : "<no error>"))
-  println("content: " + (content ? content!._lines[0] : "<no content>"))
-  
+func expectEqual<T : Equatable>(
+    expected: T, actual: T,
+    file: String = __FILE__, line: UWord = __LINE__
+) {
+  if expected != actual {
+    _anyExpectFailed = true
+    println("check failed at \(file), line \(line)")
+    println("expected: \"\(expected)\"")
+    println("actual: \"\(actual)\"")
+    println()
+  }
 }
 
-func testClassMethods() {
-  var encodings: NSStringEncoding[] = String.availableStringEncodings()
-  // CHECK: available encodings found
-  // CHECK-NOT: 0 available encodings
-  println("\(encodings.count) available encodings found")
+func expectEqual<T : Equatable>(
+    expected: T, actual: T?,
+    file: String = __FILE__, line: UWord = __LINE__
+) {
+  if !actual || expected != actual! {
+    _anyExpectFailed = true
+    println("check failed at \(file), line \(line)")
+    println("expected: \"\(expected)\"")
+    println("actual: \"\(actual)\"")
+    println()
+  }
+}
 
-  // CHECK-NEXT: defaultCStringEncoding is available
-  var defaultCStringEncoding = String.defaultCStringEncoding()
-  for e in encodings {
-    if e == defaultCStringEncoding {
-      println("defaultCStringEncoding is available")
+func expectNotEqual<T : Equatable>(
+    expected: T, actual: T,
+    file: String = __FILE__, line: UWord = __LINE__
+) {
+  if expected == actual {
+    _anyExpectFailed = true
+    println("check failed at \(file), line \(line)")
+    println("unexpected value: \"\(actual)\"")
+    println()
+  }
+}
+
+func expectEmpty<T>(
+    value: Optional<T>,
+    file: String = __FILE__, line: UWord = __LINE__
+) {
+  if value {
+    _anyExpectFailed = true
+    println("check failed at \(file), line \(line)")
+    println("expected optional to be empty")
+    println("actual: \"\(value)\"")
+    println()
+  }
+}
+
+func expectNotEmpty<T>(
+    value: Optional<T>,
+    file: String = __FILE__, line: UWord = __LINE__
+) {
+  if !value {
+    _anyExpectFailed = true
+    println("check failed at \(file), line \(line)")
+    println("expected optional to be non-empty")
+    println()
+  }
+}
+
+struct TestCase {
+  init(_ name: String) {
+    self.name = name
+  }
+
+  mutating func test(name: String, testFunction: () -> ()) {
+    _tests.append(_Test(name: name, code: testFunction))
+  }
+
+  mutating func run() {
+    var anyTestFailed = false
+    for t in _tests {
+      var fullTestName = "\(name).\(t.name)"
+      println("[ RUN      ] \(fullTestName)")
+      _anyExpectFailed = false
+      t.code()
+      if _anyExpectFailed {
+        anyTestFailed = true
+        println("[     FAIL ] \(fullTestName)")
+      } else {
+        println("[       OK ] \(fullTestName)")
+      }
+    }
+    if anyTestFailed {
+      println("Some tests failed, aborting")
+      abort()
+    } else {
+      println("All tests passed")
     }
   }
 
-  // CHECK-NEXT: It is called
-  println(
-    "It is called \"" +
-    String.localizedNameOfStringEncoding(defaultCStringEncoding) + "\"")
+  struct _Test {
+    var name: String
+    var code: () -> ()
+  }
 
-  var path = String.pathWithComponents(["flugelhorn", "baritone", "bass"])
-  // CHECK-NEXT: <flugelhorn/baritone/bass>
-  println("<\(path)>")
+  var name: String
+  var _tests: _Test[] = []
+}
 
-  // CHECK-NEXT: <sox>
+var NSStringAPIs = TestCase("NSStringAPIs")
+
+NSStringAPIs.test("Encodings") {
+  let availableEncodings: NSStringEncoding[] = String.availableStringEncodings()
+  expectNotEqual(0, availableEncodings.count)
+
+  let defaultCStringEncoding = String.defaultCStringEncoding()
+  expectEqual(true, contains(availableEncodings, defaultCStringEncoding))
+
+  expectNotEqual("",
+      String.localizedNameOfStringEncoding(defaultCStringEncoding))
+}
+
+NSStringAPIs.test("NSStringEncoding") {
+  // Make sure NSStringEncoding and its values are type-compatible.
+  var enc: NSStringEncoding
+  enc = NSWindowsCP1250StringEncoding
+  enc = NSUTF32LittleEndianStringEncoding
+  enc = NSUTF32BigEndianStringEncoding
+  enc = NSASCIIStringEncoding
+  enc = NSUTF8StringEncoding
+}
+
+NSStringAPIs.test("localizedStringWithFormat(_:...)") {
+  var world: NSString = "world"
+  expectEqual("Hello, world!%42", String.localizedStringWithFormat(
+      "Hello, %@!%%%ld", world, 42))
+}
+
+NSStringAPIs.test("pathWithComponents(_:)") {
+  expectEqual("flugelhorn/baritone/bass",
+      String.pathWithComponents(["flugelhorn", "baritone", "bass"]))
+}
+
+var existingPath = Process.arguments[1]
+var nonExistentPath = existingPath + "-NoNeXiStEnT"
+
+NSStringAPIs.test("stringWithContentsOfFile(_:encoding:error:)") {
+  if true {
+    var err: NSError?
+    var content = String.stringWithContentsOfFile(existingPath,
+        encoding: NSASCIIStringEncoding, error: &err)
+
+    expectEmpty(err)
+    expectEqual("Lorem ipsum dolor sit amet, consectetur adipisicing elit,",
+        content?._lines[0])
+  }
+  if true {
+    var err: NSError?
+    var content = String.stringWithContentsOfFile(nonExistentPath,
+        encoding: NSASCIIStringEncoding, error: &err)
+
+    expectNotEmpty(err)
+    expectEmpty(content)
+  }
+}
+
+NSStringAPIs.test("stringWithContentsOfFile(_:usedEncoding:error:)") {
+  if true {
+    var usedEncoding: NSStringEncoding = 0
+    var err: NSError?
+    var content = String.stringWithContentsOfFile(existingPath,
+        usedEncoding: &usedEncoding, error: &err)
+
+    expectNotEqual(0, usedEncoding)
+    expectEmpty(err)
+    expectEqual("Lorem ipsum dolor sit amet, consectetur adipisicing elit,",
+        content?._lines[0])
+  }
+  if true {
+    var usedEncoding: NSStringEncoding = 0
+    var err: NSError?
+    var content = String.stringWithContentsOfFile(nonExistentPath, error: &err)
+
+    expectEqual(0, usedEncoding)
+    expectNotEmpty(err)
+    expectEmpty(content)
+  }
+}
+
+var existingURL = NSURL.URLWithString("file://" + existingPath)
+var nonExistentURL = NSURL.URLWithString("file://" + nonExistentPath)
+
+NSStringAPIs.test("stringWithContentsOfURL(_:encoding:error:)") {
+  if true {
+    var err: NSError?
+    var content = String.stringWithContentsOfURL(existingURL,
+        encoding: NSASCIIStringEncoding, error: &err)
+
+    expectEmpty(err)
+    expectEqual("Lorem ipsum dolor sit amet, consectetur adipisicing elit,",
+        content?._lines[0])
+  }
+  if true {
+    var err: NSError?
+    var content = String.stringWithContentsOfURL(nonExistentURL,
+        encoding: NSASCIIStringEncoding, error: &err)
+
+    expectNotEmpty(err)
+    expectEmpty(content)
+  }
+}
+
+NSStringAPIs.test("stringWithContentsOfURL(_:usedEncoding:error:)") {
+  if true {
+    var usedEncoding: NSStringEncoding = 0
+    var err: NSError?
+    var content = String.stringWithContentsOfURL(existingURL,
+        usedEncoding: &usedEncoding, error: &err)
+
+    expectNotEqual(0, usedEncoding)
+    expectEmpty(err)
+    expectEqual("Lorem ipsum dolor sit amet, consectetur adipisicing elit,",
+        content?._lines[0])
+  }
+  if true {
+    var usedEncoding: NSStringEncoding = 0
+    var err: NSError?
+    var content = String.stringWithContentsOfURL(nonExistentURL,
+        usedEncoding: &usedEncoding, error: &err)
+
+    expectEqual(0, usedEncoding)
+    expectNotEmpty(err)
+    expectEmpty(content)
+  }
+}
+
+NSStringAPIs.test("stringWithCString(_:encoding:)") {
+  expectEqual("foo, a basmati bar!",
+      String.stringWithCString(
+          "foo, a basmati bar!", encoding: String.defaultCStringEncoding()))
+}
+
+NSStringAPIs.test("stringWithUTF8String(_:)") {
+  var s = "foo あいう"
+  var up = UnsafePointer<UInt8>.alloc(100)
+  var i = 0
+  for b in s.utf8 {
+    up[i] = b
+    i++
+  }
+  expectEqual(s, String.stringWithUTF8String(CString(up)))
+  up.dealloc(100)
+}
+
+NSStringAPIs.test("canBeConvertedToEncoding(_:)") {
+  // FIXME
+}
+
+NSStringAPIs.test("capitalizedString") {
+  // FIXME
+}
+
+NSStringAPIs.test("capitalizedStringWithLocale") {
+  // FIXME
+}
+
+NSStringAPIs.test("caseInsensitiveCompare(_:)") {
+  // FIXME
+}
+
+NSStringAPIs.test("commonPrefixWithString(_:options:)") {
+  // FIXME
+}
+
+NSStringAPIs.test("compare(_:options:range:locale:)") {
+  // FIXME
+}
+
+NSStringAPIs.test("completePathIntoString(_:caseSensitive:matchesIntoArray:filterTypes)") {
+
+  // FIXME
+  if true {
+    var outputName = "None Found"
+    var count = nonExistentPath.completePathIntoString(
+        &outputName, caseSensitive: false)
+
+    expectEqual(0, count)
+    expectEqual("None Found", outputName)
+  }
+
+  if true {
+    var outputName = "None Found"
+    var count = existingPath.completePathIntoString(
+        &outputName, caseSensitive: false)
+
+    expectEqual(1, count)
+    expectEqual(existingPath, outputName)
+  }
+
+}
+
+NSStringAPIs.test("componentsSeparatedByCharactersInSet(_:)") {
+  // FIXME
+}
+
+NSStringAPIs.test("componentsSeparatedByString(_:)") {
+  // FIXME
+}
+
+NSStringAPIs.test("cStringUsingEncoding(_:)") {
+  // FIXME
+}
+
+NSStringAPIs.test("dataUsingEncoding(_:allowLossyConversion:)") {
+  // FIXME
+}
+
+NSStringAPIs.test("decomposedStringWithCanonicalMapping") {
+  // FIXME
+}
+
+NSStringAPIs.test("decomposedStringWithCompatibilityMapping") {
+  // FIXME
+}
+
+NSStringAPIs.test("enumerateLines(_:)") {
+  // FIXME
+}
+
+NSStringAPIs.test("enumerateLinguisticTagsInRange(_:scheme:options:orthography:_:") {
+  // FIXME
+}
+
+NSStringAPIs.test("enumerateSubstringsInRange(_:options:_:)") {
+  // FIXME
+}
+
+NSStringAPIs.test("fastestEncoding") {
+  // FIXME
+}
+
+NSStringAPIs.test("fileSystemRepresentation()") {
+  // FIXME
+}
+
+NSStringAPIs.test("getBytes(_:maxLength:usedLength:encoding:options:range:remainingRange:)") {
+  // FIXME
+}
+
+NSStringAPIs.test("getCString(_:maxLength:encoding:)") {
+  // FIXME
+}
+
+NSStringAPIs.test("getFileSystemRepresentation(_:maxLength:)") {
+  // FIXME
+}
+
+NSStringAPIs.test("getLineStart(_:end:contentsEnd:forRange:)") {
+  // FIXME
+}
+
+NSStringAPIs.test("getParagraphStart(_:end:contentsEnd:forRange:)") {
+  // FIXME
+}
+
+NSStringAPIs.test("hash") {
+  // FIXME
+}
+
+NSStringAPIs.test("stringWithBytes(_:length:encoding:)") {
+  // FIXME
+}
+
+NSStringAPIs.test("stringWithBytesNoCopy(_:length:encoding:freeWhenDone:)") {
+  // FIXME
+}
+
+NSStringAPIs.test("init(utf16CodeUnits:count:)") {
   var chars: unichar[] = [
     unichar("s".value), unichar("o".value), unichar("x".value) ]
 
-  var sox: String = String(utf16CodeUnits: chars, count: chars.count)
-  println("<\(sox)>")
-
-  var pathToThisSource = Process.arguments[1]
-  var nonExistentPath = pathToThisSource + "-NoNeXiStEnT"
-  
-  // CHECK-NEXT: error: Error Domain=NSCocoaErrorDomain
-  // CHECK-NEXT: content: <no content>
-  // CHECK-NEXT: error: Error Domain=NSCocoaErrorDomain
-  // CHECK-NEXT: content: <no content>
-  testFindFileAndURL(nonExistentPath)
-
-  // CHECK-NEXT: error: <no error>
-  // CHECK-NEXT: content: // Test for the NSString API as exposed by String
-  // CHECK-NEXT: error: <no error>
-  // CHECK-NEXT: content: // Test for the NSString API as exposed by String
-  testFindFileAndURL(pathToThisSource)
-
-  // CHECK-NEXT: foo, a basmati bar!
-  println(
-    String.stringWithCString(
-      "foo, a basmati bar!", encoding: String.defaultCStringEncoding()))
-
-  var emptyString = ""
-  
-  // CHECK-NEXT: {{.*}} has 0 completions and the longest is <None Found>
-  var outputName = "None Found"
-  var count = nonExistentPath.completePathIntoString(
-    &outputName, caseSensitive: false)
-  
-  println(
-    "<\(nonExistentPath)> has \(count) "
-    + "completions and the longest is <\(outputName)>")
-
-  // CHECK-NEXT: <[[THISPATH:.*]]> has 1 completions and the longest is <[[THISPATH]]>
-  count = pathToThisSource.completePathIntoString(
-    &outputName, caseSensitive: false)
-  
-  println(
-    "<\(pathToThisSource)> has \(count) "
-    + "completions and the longest is <\(outputName)>")
-
-  var world: NSString = "world"
-  // CHECK-NEXT: Hello, world!%42
-  println(String(format: "Hello, %@!%%%ld", world, 42))
+  var sox = String(utf16CodeUnits: chars, count: chars.count)
+  expectEqual("sox", sox)
 }
 
+NSStringAPIs.test("init(utf16CodeUnitsNoCopy:count:freeWhenDone:)") {
+  // FIXME
+}
 
-testClassMethods()
+NSStringAPIs.test("init(format:_:...)") {
+  var world: NSString = "world"
+  expectEqual("Hello, world!%42", String(format: "Hello, %@!%%%ld", world, 42))
+}
 
-// Make sure NSStringEncoding and its values are type-compatible.
-var enc : NSStringEncoding
-enc = NSWindowsCP1250StringEncoding
-enc = NSUTF32LittleEndianStringEncoding
-enc = NSUTF32BigEndianStringEncoding
-enc = NSASCIIStringEncoding
-enc = NSUTF8StringEncoding
+NSStringAPIs.test("init(format:arguments:)") {
+  // FIXME
+}
 
-// CHECK: done!
-println("done!")
+NSStringAPIs.test("init(format:locale:_:...)") {
+  var world: NSString = "world"
+  expectEqual("Hello, world!%42", String(format: "Hello, %@!%%%ld",
+      locale: nil, world, 42))
+  expectEqual("Hello, world!%42", String(format: "Hello, %@!%%%ld",
+      locale: NSLocale.systemLocale(), world, 42))
+}
+
+NSStringAPIs.test("init(format:locale:arguments:)") {
+  // FIXME
+}
+
+NSStringAPIs.test("lastPathComponent") {
+  // FIXME
+}
+
+NSStringAPIs.test("utf16count") {
+  // FIXME
+}
+
+NSStringAPIs.test("lengthOfBytesUsingEncoding(_:)") {
+  // FIXME
+}
+
+NSStringAPIs.test("lineRangeForRange(_:)") {
+  // FIXME
+}
+
+NSStringAPIs.test("linguisticTagsInRange(_:scheme:options:orthography:tokenRanges:)") {
+  // FIXME
+}
+
+NSStringAPIs.test("localizedCaseInsensitiveCompare(_:)") {
+  // FIXME
+}
+
+NSStringAPIs.test("localizedCompare(_:)") {
+  // FIXME
+}
+
+NSStringAPIs.test("localizedStandardCompare(_:)") {
+  // FIXME
+}
+
+NSStringAPIs.test("lowercaseStringWithLocale(_:)") {
+  // FIXME
+}
+
+NSStringAPIs.test("maximumLengthOfBytesUsingEncoding(_:)") {
+  // FIXME
+}
+
+NSStringAPIs.test("paragraphRangeForRange(_:)") {
+  // FIXME
+}
+
+NSStringAPIs.test("pathComponents") {
+  // FIXME
+}
+
+NSStringAPIs.test("pathExtension") {
+  // FIXME
+}
+
+NSStringAPIs.test("precomposedStringWithCanonicalMapping") {
+  // FIXME
+}
+
+NSStringAPIs.test("precomposedStringWithCompatibilityMapping") {
+  // FIXME
+}
+
+NSStringAPIs.test("propertyList()") {
+  // FIXME
+}
+
+NSStringAPIs.test("propertyListFromStringsFileFormat()") {
+  // FIXME
+}
+
+NSStringAPIs.test("rangeOfCharacterFromSet(_:options:range:)") {
+  // FIXME
+}
+
+NSStringAPIs.test("rangeOfComposedCharacterSequenceAtIndex(_:)") {
+  // FIXME
+}
+
+NSStringAPIs.test("rangeOfComposedCharacterSequencesForRange(_:)") {
+  // FIXME
+}
+
+NSStringAPIs.test("rangeOfString(_:options:range:locale:)") {
+  // FIXME
+}
+
+NSStringAPIs.test("smallestEncoding") {
+  // FIXME
+}
+
+NSStringAPIs.test("stringByAbbreviatingWithTildeInPath()") {
+  // FIXME
+}
+
+NSStringAPIs.test("stringByAddingPercentEncodingWithAllowedCharacters(_:)") {
+  // FIXME
+}
+
+NSStringAPIs.test("stringByAddingPercentEscapesUsingEncoding(_:)") {
+  // FIXME
+}
+
+NSStringAPIs.test("stringByAppendingFormat(_:_:...)") {
+  // FIXME
+}
+
+NSStringAPIs.test("stringByAppendingPathComponent(_:)") {
+  // FIXME
+}
+
+NSStringAPIs.test("stringByAppendingPathExtension(_:)") {
+  // FIXME
+}
+
+NSStringAPIs.test("stringByAppendingString(_:)") {
+  // FIXME
+}
+
+NSStringAPIs.test("stringByDeletingLastPathComponent") {
+  // FIXME
+}
+
+NSStringAPIs.test("stringByDeletingPathExtension") {
+  // FIXME
+}
+
+NSStringAPIs.test("stringByExpandingTildeInPath") {
+  // FIXME
+}
+
+NSStringAPIs.test("stringByFoldingWithOptions(_:locale:)") {
+  // FIXME
+}
+
+NSStringAPIs.test("stringByPaddingToLength(_:withString:startingAtIndex:)") {
+  // FIXME
+}
+
+NSStringAPIs.test("stringByRemovingPercentEncoding") {
+  // FIXME
+}
+
+NSStringAPIs.test("stringByReplacingCharactersInRange(_:withString:)") {
+  // FIXME
+}
+
+NSStringAPIs.test("stringByReplacingOccurrencesOfString(_:withString:options:range:)") {
+  // FIXME
+}
+
+NSStringAPIs.test("stringByReplacingPercentEscapesUsingEncoding(_:)") {
+  // FIXME
+}
+
+NSStringAPIs.test("stringByResolvingSymlinksInPath") {
+  // FIXME
+}
+
+NSStringAPIs.test("stringByStandardizingPath") {
+  // FIXME
+}
+
+NSStringAPIs.test("stringByTrimmingCharactersInSet(_:)") {
+  // FIXME
+}
+
+NSStringAPIs.test("stringsByAppendingPaths(_:)") {
+  // FIXME
+}
+
+NSStringAPIs.test("substringFromIndex(_:)") {
+  // FIXME
+}
+
+NSStringAPIs.test("substringToIndex(_:)") {
+  // FIXME
+}
+
+NSStringAPIs.test("substringWithRange(_:)") {
+  // FIXME
+}
+
+NSStringAPIs.test("uppercaseStringWithLocale(_:)") {
+  // FIXME
+}
+
+NSStringAPIs.test("writeToFile(_:atomically:encoding:error:)") {
+  // FIXME
+}
+
+NSStringAPIs.test("writeToURL(_:atomically:encoding:error:)") {
+  // FIXME
+}
+
+NSStringAPIs.test("OperatorEquals") {
+  // FIXME
+
+  // NSString == NSString
+  // String == NSString
+  // NSString == String
+}
+
+NSStringAPIs.run()
+// CHECK: All tests passed
+
