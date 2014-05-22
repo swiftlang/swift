@@ -38,5 +38,6 @@ func testNonsplittableFactoryMethod() {
 }
 
 func testFactoryMethodBlacklist() {
-  var x = NCWidgetController.widgetController()
+  _ = NCWidgetController.widgetController()
+  _ = NSProcessInfo.processInfo()
 }

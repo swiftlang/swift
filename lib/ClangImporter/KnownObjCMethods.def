@@ -27,8 +27,8 @@
 //
 //   Options: A set of OR'd options describing what specific behavior
 //   should be applied to this method. The possibilities are:
-//     DesignatedInit: Mark this as a designated initializer of its class
-//     NotFactory: Mark this class method as not being a factory method
+//     DesignatedInit: Mark this as a designated initializer of its class.
+//     FactoryAsClassMethod: Don't import this factory method as an initializer.
 //     Unavailable(Msg): Mark this method as being unavailable, with the given
 //       message.
 
@@ -129,6 +129,8 @@ INSTANCE_METHOD(NSOrderedSet, (2, "initWithObjects", "count"), DesignatedInit)
 INSTANCE_METHOD(NSPortMessage, 
                 (3, "initWithSendPort", "receivePort", "components"),
                 DesignatedInit)
+
+CLASS_METHOD(NSProcessInfo, (0, "processInfo"), FactoryAsClassMethod)
 
 INSTANCE_METHOD(NSScriptObjectSpecifier, 
                 (3, "initWithContainerClassDescription", "containerSpecifier",

@@ -388,3 +388,7 @@ NSDictionary *dictToDict(NSDictionary *dict);
 - (void)openURL:(NSURL *)URL completionHandler:(void (^)(BOOL success))completionHandler;
 - (void)openURL:(NSURL *)URL completion:(void (^)(BOOL success))handler;
 @end
+
+@interface NSProcessInfo : NSObject
++ (NSProcessInfo *)processInfo;
+@end
