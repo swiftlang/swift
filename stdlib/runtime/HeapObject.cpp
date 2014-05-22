@@ -45,6 +45,7 @@ swift::swift_allocObject(HeapMetadata const *metadata,
 static HeapObject *
 _swift_allocObject_(HeapMetadata const *metadata, size_t requiredSize,
                     size_t requiredAlignmentMask) {
+  assert(isAlignmentMask(requiredAlignmentMask));
   // llvm::RoundUpToAlignment(size, mask + 1) generates terrible code
   auto size = (requiredSize + requiredAlignmentMask) & ~requiredAlignmentMask;
   auto object = reinterpret_cast<HeapObject *>(
@@ -102,6 +103,7 @@ static void destroyPOD(HeapObject *o) {
 
 BoxPair::Return
 swift::swift_allocPOD(size_t dataSize, size_t dataAlignmentMask) {
+  assert(isAlignmentMask(dataAlignmentMask));
   // Allocate the heap object.
   size_t valueOffset = PODBox::getValueOffset(dataSize, dataAlignmentMask);
   size_t size = valueOffset + dataSize;
@@ -362,6 +364,7 @@ void swift::_swift_deallocClassInstance(HeapObject *self) {
 
 void swift::swift_deallocObject(HeapObject *object, size_t allocatedSize,
                                 size_t allocatedAlignMask) {
+  assert(isAlignmentMask(allocatedAlignMask));
   assert(object->refCount == (RC_INTERVAL|RC_DEALLOCATING_BIT));
 #ifdef SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS
   memset_pattern8((uint8_t *)object + sizeof(HeapObject),

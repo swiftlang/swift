@@ -108,6 +108,9 @@ class FixedSizedRefArrayOfOptionalStorage<T> : HeapBufferStorage<Int, T?> {
       (buffer.elementStorage + i).destroy()
     }
   }
+  override func __getInstanceSizeAndAlignMask() -> (Int,Int) {
+    return Buffer(self)._allocatedSizeAndAlignMask()
+  }
 }
 
 struct FixedSizedRefArrayOfOptional<T>

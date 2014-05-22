@@ -229,7 +229,7 @@ HeapArrayInfo::Layout HeapArrayInfo::getLayout(IRGenFunction &IGF) const {
 
     return {
       IGF.IGM.getSize(headerSize),
-      IGF.IGM.getSize(headerAlign.asSize()),
+      IGF.IGM.getSize(headerAlign.asSize() - Size(1)),
       headerAlign
     };
   }

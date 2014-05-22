@@ -1033,12 +1033,14 @@ void *swift::swift_tryAlloc(AllocIndex idx) {
   return _swift_tryAlloc(idx);
 }
 void *swift::swift_slowAlloc(size_t size, size_t alignMask, uintptr_t flags) {
+  assert(isAlignmentMask(alignMask));
   return _swift_slowAlloc(size, alignMask, flags);
 }
 void swift::swift_dealloc(void *ptr, AllocIndex idx) {
   _swift_dealloc(ptr, idx);
 }
 void swift::swift_slowDealloc(void *ptr, size_t bytes, size_t alignMask) {
+  assert(isAlignmentMask(alignMask));
   return _swift_slowDealloc(ptr, bytes, alignMask);
 }
 

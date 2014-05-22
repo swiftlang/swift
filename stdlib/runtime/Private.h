@@ -28,6 +28,16 @@ namespace swift {
   extern "C" LLVM_LIBRARY_VISIBILITY
   void _swift_deallocClassInstance(HeapObject *object);
 
+  /// Is the given value a valid alignment mask?
+  static inline bool isAlignmentMask(size_t mask) {
+    // mask          == xyz01111...
+    // mask+1        == xyz10000...
+    // mask&(mask+1) == xyz00000...
+    // So this is nonzero if and only if there any bits set
+    // other than an arbitrarily long sequence of low bits.
+    return (mask & (mask + 1)) == 0;
+  }
+
 } // end namespace swift
 
 #endif /* SWIFT_RUNTIME_PRIVATE_H */

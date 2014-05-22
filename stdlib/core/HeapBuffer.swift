@@ -49,7 +49,7 @@ func c_malloc_size(heapMemory: UnsafePointer<Void>) -> Int
   deinit {
     Buffer(self)._value.destroy()
   }
-  @final func __getInstanceSizeAndAlignMask() -> (Int,Int) {
+  func __getInstanceSizeAndAlignMask() -> (Int,Int) {
     return Buffer(self)._allocatedSizeAndAlignMask()
   }
 }

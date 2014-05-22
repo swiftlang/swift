@@ -1422,9 +1422,12 @@ func slurpFastEnumeration(
     d: NSDictionary, fe: NSFastEnumeration
 ) -> Array<(Int, Int)> {
   var state = NSFastEnumerationState()
+
+  // This leaks the actual objects we store in it.
+  // Why are we doing this in a test again?
   let stackBufLength = 3
   var stackBuf = HeapBuffer<(), AnyObject?>(
-      HeapBufferStorageBase.self, (), stackBufLength)
+      HeapBufferStorage<(), AnyObject?>.self, (), stackBufLength)
 
   var pairs = Array<(Int, Int)>()
   while true {
