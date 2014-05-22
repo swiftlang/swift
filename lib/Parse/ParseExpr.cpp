@@ -549,10 +549,9 @@ ParserResult<Expr> Parser::parseExprSuper() {
   VarDecl *selfDecl = getImplicitSelfDeclForSuperContext(*this,
                                                          CurDeclContext,
                                                          superLoc);
-  if (!selfDecl)
-    return nullptr;
+  bool ErrorOccurred = selfDecl == nullptr;
 
-  Expr *superRef = selfDecl
+  Expr *superRef = !ErrorOccurred
     ? cast<Expr>(new (Context) SuperRefExpr(selfDecl, superLoc,
                                             /*Implicit=*/false))
     : cast<Expr>(new (Context) ErrorExpr(superLoc));
@@ -564,6 +563,10 @@ ParserResult<Expr> Parser::parseExprSuper() {
     
     // FIXME: This code is copy-paste from the general handling for kw_init.
     if (Tok.is(tok::kw_init)) {
+
+      if (ErrorOccurred)
+        return makeParserError();
+
       // super.init
       SourceLoc ctorLoc = consumeToken();
       
