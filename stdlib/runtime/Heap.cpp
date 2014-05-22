@@ -30,6 +30,7 @@
 #include <sys/mman.h>
 #include <errno.h>
 #include <unistd.h>
+#include <crt_externs.h>
 
 // FIXME when we start building with the internal SDK
 //#if __has_include(<pthread/tsd_private.h>)
@@ -275,11 +276,13 @@ public:
   static void *tryAlloc_semi_optimized(AllocIndex idx);
   static void dealloc_semi_optimized(void *ptr, AllocIndex idx);
 
-  static void *alloc_gmalloc(AllocIndex idx);
-  static void *tryAlloc_gmalloc(AllocIndex idx);
-  static void *slowAlloc_gmalloc(size_t size, size_t alignMask, uintptr_t flags);
-  static void dealloc_gmalloc(void *ptr, AllocIndex idx);
-  static void slowDealloc_gmalloc(void *ptr, size_t bytes, size_t alignMask);
+  static void *alloc_systemMalloc(AllocIndex idx);
+  static void *tryAlloc_systemMalloc(AllocIndex idx);
+  static void *slowAlloc_systemMalloc(size_t size, size_t alignMask,
+                                      uintptr_t flags);
+  static void dealloc_systemMalloc(void *ptr, AllocIndex idx);
+  static void slowDealloc_systemMalloc(void *ptr, size_t bytes,
+                                       size_t alignMask);
 
   bool tryWriteLock() {
     int r = pthread_rwlock_trywrlock(&lock);
@@ -416,7 +419,7 @@ void *SwiftZone::alloc_semi_optimized(AllocIndex idx) {
   return globalAlloc(idx, 0);
 }
 
-void *SwiftZone::alloc_gmalloc(AllocIndex idx) {
+void *SwiftZone::alloc_systemMalloc(AllocIndex idx) {
   assert(idx < ALLOC_CACHE_COUNT);
   size_t size = indexToSize(idx);
   return malloc(size);
@@ -432,7 +435,7 @@ void *SwiftZone::tryAlloc_semi_optimized(AllocIndex idx) {
   return globalAlloc(idx, SWIFT_TRYALLOC);
 }
 
-void *SwiftZone::tryAlloc_gmalloc(AllocIndex idx) {
+void *SwiftZone::tryAlloc_systemMalloc(AllocIndex idx) {
   assert(idx < ALLOC_CACHE_COUNT);
   size_t size = indexToSize(idx);
   return malloc(size);
@@ -447,7 +450,7 @@ void SwiftZone::dealloc_semi_optimized(void *ptr, AllocIndex idx) {
   setAllocCacheEntry_slow(idx, cur);
 }
 
-void SwiftZone::dealloc_gmalloc(void *ptr, AllocIndex idx) {
+void SwiftZone::dealloc_systemMalloc(void *ptr, AllocIndex idx) {
   assert(idx < ALLOC_CACHE_COUNT);
   free(ptr);
 }
@@ -531,13 +534,24 @@ static void _swift_zone_initImpl() {
     _swift_dealloc = SwiftZone::dealloc_semi_optimized;
   }
   setAllocCacheEntry_slow(0, NULL);
+
+  bool useSystemMalloc = false;
+  for (char **string = *_NSGetEnviron(); *string; string++) {
+    if (strncmp(*string, "Malloc", strlen("Malloc")) == 0) {
+      useSystemMalloc = true;
+      break;
+    }
+  }
   const char *dyldMagic = getenv("DYLD_INSERT_LIBRARIES");
   if (dyldMagic && strstr(dyldMagic, "libgmalloc")) {
-    _swift_alloc = SwiftZone::alloc_gmalloc;
-    _swift_tryAlloc = SwiftZone::tryAlloc_gmalloc;
-    _swift_slowAlloc = SwiftZone::slowAlloc_gmalloc;
-    _swift_dealloc = SwiftZone::dealloc_gmalloc;
-    _swift_slowDealloc = SwiftZone::slowDealloc_gmalloc;
+    useSystemMalloc = true;
+  }
+  if (useSystemMalloc) {
+    _swift_alloc = SwiftZone::alloc_systemMalloc;
+    _swift_tryAlloc = SwiftZone::tryAlloc_systemMalloc;
+    _swift_slowAlloc = SwiftZone::slowAlloc_systemMalloc;
+    _swift_dealloc = SwiftZone::dealloc_systemMalloc;
+    _swift_slowDealloc = SwiftZone::slowDealloc_systemMalloc;
   }
 }
 void swift::_swift_zone_init() {
@@ -878,8 +892,8 @@ void *SwiftZone::slowAlloc_optimized(size_t size, size_t alignMask,
   }
 }
 
-void *SwiftZone::slowAlloc_gmalloc(size_t size, size_t alignMask,
-                                   uintptr_t flags) {
+void *SwiftZone::slowAlloc_systemMalloc(size_t size, size_t alignMask,
+                                        uintptr_t flags) {
   // TODO: use posix_memalign if alignMask is larger than the system guarantee.
   return malloc(size);
 }
@@ -910,7 +924,8 @@ void SwiftZone::slowDealloc_optimized(void *ptr, size_t bytes,
   dealloc_semi_optimized(ptr, idx);
 }
 
-void SwiftZone::slowDealloc_gmalloc(void *ptr, size_t bytes, size_t alignMask) {
+void SwiftZone::slowDealloc_systemMalloc(void *ptr, size_t bytes,
+                                         size_t alignMask) {
   return free(ptr);
 }
 
