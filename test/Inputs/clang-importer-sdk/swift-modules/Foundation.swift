@@ -63,3 +63,15 @@ extension Int : _BridgedToObjectiveC {
     _fatalError("implement")
   }
 }
+
+extension Array : _BridgedToObjectiveC {
+  static func getObjectiveCType() -> Any.Type {
+    return NSArray.self
+  }
+  func bridgeToObjectiveC() -> NSArray {
+    return NSArray()
+  }
+  static func bridgeFromObjectiveC(x: NSArray) -> Array? {
+    return nil
+  }
+}

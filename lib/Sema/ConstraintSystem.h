@@ -2318,7 +2318,7 @@ TypeVariableType *TypeVariableType::getNew(const ASTContext &C, unsigned ID,
 
 /// If the expression has the effect of a forced downcast, find the
 /// underlying forced downcast expression.
-ExplicitCastExpr *findForcedDowncast(Expr *expr);
+ExplicitCastExpr *findForcedDowncast(ASTContext &ctx, Expr *expr);
 
 } // end namespace swift
 

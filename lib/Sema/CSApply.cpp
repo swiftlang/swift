@@ -1114,7 +1114,7 @@ namespace {
       Expr *args[1] = { object };
       return tc.callWitness(valueMetatype, cs.DC, bridgedProto,
                             conformance,
-                            tc.Context.getIdentifier("bridgeFromObjectiveC"),
+                            tc.Context.Id_bridgeFromObjectiveC,
                             args, diag::broken_bridged_to_objc_protocol);
     }
 
@@ -2784,7 +2784,8 @@ namespace {
         // If the sub-expression was a forced downcast, suggest
         // turning it into a conditional downcast.
         auto &tc = cs.getTypeChecker();
-        if (auto forced = findForcedDowncast(injection->getSubExpr())) {
+        if (auto forced = findForcedDowncast(tc.Context, 
+                                             injection->getSubExpr())) {
           tc.diagnose(expr->getLoc(), diag::binding_explicit_downcast,
                       injection->getSubExpr()->getType()->getRValueType())
             .highlight(forced->getLoc())
@@ -2943,18 +2944,14 @@ namespace {
         if (auto injection = dyn_cast<InjectIntoOptionalExpr>(subExpr)) {
           // If the injection was the result of an explicit unwrap (!), zap the
           // redundant '!'.
-          bool diagnosed = false;
-          if (auto forced = findForcedDowncast(injection->getSubExpr())) {
+          if (auto forced = findForcedDowncast(tc.Context, 
+                                               injection->getSubExpr())) {
             tc.diagnose(expr->getLoc(), diag::forcing_explicit_downcast,
                         expr->getSubExpr()->getType()->getRValueType())
               .highlight(forced->getLoc())
               .fixItRemove(expr->getLoc());
-            diagnosed = true;
-          }
-
-          // If we haven't diagnosed a more specific problem above,
-          // give a more generic message.
-          if (!diagnosed) {
+          } else {
+            // Generic diagnostic.
             tc.diagnose(subExpr->getLoc(), diag::forcing_injected_optional,
                         expr->getSubExpr()->getType()->getRValueType())
               .highlight(subExpr->getSourceRange())
@@ -3001,7 +2998,7 @@ namespace {
           continue;
         }
 
-        auto *cast = findForcedDowncast(injection->getSubExpr());
+        auto *cast = findForcedDowncast(tc.Context, injection->getSubExpr());
         if (!cast)
           continue;
 
@@ -3024,7 +3021,8 @@ namespace {
         return;
 
       // Check whether we have a forced downcast.
-      auto *cast = findForcedDowncast(injection->getSubExpr());
+      auto &tc = cs.getTypeChecker();
+      auto *cast = findForcedDowncast(tc.Context, injection->getSubExpr());
       if (!cast)
         return;
       

@@ -24,6 +24,7 @@
 #endif
 
 IDENTIFIER(atIndexedSubscript)
+IDENTIFIER(bridgeFromObjectiveC)
 IDENTIFIER(dealloc)
 IDENTIFIER(deinit)
 IDENTIFIER(forKeyedSubscript)

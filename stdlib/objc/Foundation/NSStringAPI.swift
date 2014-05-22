@@ -1039,7 +1039,7 @@ extension String {
     var result = Dictionary<String, String>()
     _ns.propertyListFromStringsFileFormat().enumerateKeysAndObjectsUsingBlock {
       key, value, stop in
-      result[key! as String] = value! as String
+      result[key! as String] = value! as? String
     }
     return result
   }
