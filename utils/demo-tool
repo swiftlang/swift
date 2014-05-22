@@ -134,8 +134,8 @@ for example::
             raw_input('press enter to continue to next command...')
 
     # Notify screen that the demo is over, after a small wait period.
-    time.sleep(0.1)
-    send('Demo session is over.', command='wall')
+#    time.sleep(0.1)
+#    send('Demo session is over.', command='wall')
 
 if __name__ == '__main__':
     main()
