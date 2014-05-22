@@ -132,6 +132,11 @@ for example::
         send('\n')
         if item is not demo_script[-1]:
             raw_input('press enter to continue to next command...')
+            # Send the command slowly, as if it was typed.
+            if shouldClear:
+                print "clearing screen"
+                send(command="clear")
+                send('\n')
 
     # Notify screen that the demo is over, after a small wait period.
 #    time.sleep(0.1)
