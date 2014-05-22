@@ -899,16 +899,12 @@ void SwiftZone::slowDealloc_optimized(void *ptr, size_t bytes,
     return;
   }
 
-#if RADAR_16979846_IS_FIXED
 #ifndef NDEBUG
   swiftZone.readLock();
   auto it = swiftZone.arenas.find(pointerToArena(ptr));
   assert(it != nullptr);
   assert(idx == it->second.index);
-  auto it2 = swiftZone.hugeAllocations.find(ptr);
-  assert(it2 == nullptr);
   swiftZone.readUnlock();
-#endif
 #endif
 
   dealloc_semi_optimized(ptr, idx);
