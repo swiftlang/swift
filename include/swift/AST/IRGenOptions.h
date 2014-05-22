@@ -93,6 +93,9 @@ public:
 
   /// Disable frame pointer elimination?
   unsigned DisableFPElim : 1;
+
+  /// Whether or not this is the Swift half of a mixed-source framework.
+  unsigned HasUnderlyingModule : 1;
   
   /// Special codegen for playgrounds.
   unsigned Playground : 1;
@@ -102,7 +105,7 @@ public:
                    EnableDynamicValueTypeLayout(false),
                    DisableLLVMOptzns(false), DisableLLVMARCOpts(false),
                    DisableAllRuntimeChecks(false), DisableFPElim(true),
-                   Playground(false) {}
+                   HasUnderlyingModule(false), Playground(false) {}
 };
 
 } // end namespace swift

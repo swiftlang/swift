@@ -297,7 +297,11 @@ void IRGenModule::emitSourceFile(SourceFile &SF, unsigned StartElem) {
     emitGlobalDecl(SF.Decls[i]);
 
   SF.forAllVisibleModules([&](swift::Module::ImportedModule import) {
-    import.second->collectLinkLibraries([this](LinkLibrary linkLib) {
+    swift::Module *next = import.second;
+    if (Opts.HasUnderlyingModule && next->Name == SF.getParentModule()->Name)
+      return;
+
+    next->collectLinkLibraries([this](LinkLibrary linkLib) {
       this->addLinkLibrary(linkLib);
     });
   });

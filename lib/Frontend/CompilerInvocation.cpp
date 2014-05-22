@@ -855,6 +855,7 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   Opts.DisableLLVMARCOpts |= Args.hasArg(OPT_disable_llvm_arc_opts);
   Opts.EnableDynamicValueTypeLayout |=
     Args.hasArg(OPT_enable_dynamic_value_type_layout);
+  Opts.HasUnderlyingModule |= Args.hasArg(OPT_import_underlying_module);
 
   if (Args.hasArg(OPT_autolink_force_load))
     Opts.ForceLoadSymbolName = Args.getLastArgValue(OPT_module_link_name);

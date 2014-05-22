@@ -175,10 +175,14 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
     swift::Module *next = external->getModuleContext();
     if (next == prev)
       continue;
+    prev = next;
+
+    if (Opts.HasUnderlyingModule && next->Name == M->Name)
+      continue;
+
     next->collectLinkLibraries([&](LinkLibrary linkLib) {
       IGM.addLinkLibrary(linkLib);
     });
-    prev = next;
   }
 
   IGM.finalize();
