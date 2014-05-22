@@ -688,6 +688,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
                     this->getDynamicBridgedThroughObjCClass(dc,
                                                             type,
                                                             wrappedType)) {
+                  TP->overwriteType(wrappedType);
                   allowTPtype = true;
                 }
               }

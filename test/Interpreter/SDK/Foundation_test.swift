@@ -166,3 +166,14 @@ class ClassWithDtor : NSObject {
     noteCenter.removeObserver(self, name: "ReceivedContentNotification", object: nil)
   }
 }
+
+// <rdar://problem/16265970>
+var nsa3: NSArray = [NSObject()]
+for nsd: NSDictionary! in nsa3 {
+  let p:NSDictionary = nsd
+}
+
+var nsa4: NSDictionary![] = []
+for nsd2: NSDictionary! in nsa4 {
+  let p:NSDictionary = nsd2
+}

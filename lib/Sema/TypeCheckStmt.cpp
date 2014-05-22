@@ -509,6 +509,24 @@ public:
       return nullptr;
     S->setPattern(pattern);
     
+    if (pattern->getType()->getImplicitlyUnwrappedOptionalObjectType() &&
+        GenNext->getType()->getOptionalObjectType() &&
+        GenNext->getType()->getOptionalObjectType()->isAnyObject()) {
+      
+      // Need to coerce the genNext expression's type to the pattern type.
+      TypeLoc patternTy;
+      patternTy.setType(pattern->getType(), true);
+      
+      auto castExpr = new (TC.Context) ForcedCheckedCastExpr(GenNext,
+                                                             SourceLoc(),
+                                                             patternTy);
+      castExpr->setImplicit();
+      castExpr->setType(pattern->getType());
+      castExpr->setCastKind(CheckedCastKind::Downcast);
+      S->setGeneratorNext(castExpr);
+    }
+    
+    
     // Type-check the body of the loop.
     AddLabeledStmt loopNest(*this, S);
     BraceStmt *Body = S->getBody();
