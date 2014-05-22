@@ -263,6 +263,11 @@ extension String : Collection {
       return Index(_base.pred())
     }
     let _base: UnicodeScalarView.IndexType
+
+    /// The integer offset of this index in UTF16 text.  
+    var _utf16Index: Int {
+      return _base._position
+    }
   }
 
   var startIndex: Index {

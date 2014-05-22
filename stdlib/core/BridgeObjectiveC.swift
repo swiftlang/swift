@@ -223,7 +223,7 @@ var _nilRawPointer: Builtin.RawPointer {
 /// this type; they instead get mapped to
 /// `AutoreleasingUnsafePointer<T>`. `void*` pointers are mapped to
 /// CMutableVoidPointer.
-struct CMutablePointer<T> : Equatable {
+struct CMutablePointer<T> : Equatable, LogicValue {
   let owner: AnyObject?
   let value: Builtin.RawPointer
 
@@ -265,6 +265,12 @@ struct CMutablePointer<T> : Equatable {
     return result
   }  
 
+  /// Return true if self was not constructed with nil
+  @transparent
+  func getLogicValue() -> Bool {
+    return reinterpretCast(value) != 0
+  }
+
   /// Return the result of invoking body.  If self was converted from
   /// nil, passes nil as the argument.  Otherwise, passes the address
   /// of a T which is written into buffer before this method returns
@@ -272,10 +278,7 @@ struct CMutablePointer<T> : Equatable {
   func _withBridgeObject<U: AnyObject, R>(
     inout buffer: U?, body: (AutoreleasingUnsafePointer<U?>)->R
   ) -> R {
-    if reinterpretCast(value) != 0 {
-      return body(&buffer)
-    }
-    return body(nil)
+    return self ? body(&buffer) : body(nil)
   }
     
   /// Return the result of invoking body.  If self was converted from
@@ -285,14 +288,15 @@ struct CMutablePointer<T> : Equatable {
   func _withBridgeValue<U, R>(
     inout buffer: U, body: (CMutablePointer<U>)->R
   ) -> R {
-    return reinterpretCast(value) == 0  ? body(nil) : body(&buffer)
+    return self ? body(&buffer) : body(nil)
   }
 
   /// If self was converted from nil, writes the result of invoking body into 
   /// the pointee
   func _setIfNonNil(body: ()->T) {
-    self.withUnsafePointer {
-      (p)->() in if (p) { p.memory = body() }
+    if self {
+      UnsafePointer(value).memory = body()
+      _fixLifetime(owner)
     }
   }
 }

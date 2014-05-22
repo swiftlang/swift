@@ -17,35 +17,8 @@
 // Open Issues
 // ===========
 //
-// Some APIs traffic unavoidably in unsafe pointers.  What do we do about those?
-//
 // Property Lists need to be properly bridged
 //
-// It would be great to be able to define conversion operators TO
-// NSArray and NSDictionary.  Currently the language only supports
-// user-defined conversions FROM a type.
-//
-// What about bridging NSRange and Range<Int>?
-
-extension NSArray {
-  func _toArray<T>(body: (AnyObject) -> T) -> T[] {
-    var length: Int = count
-    var result = T[]()
-    result.reserveCapacity(length)
-    for i in 0..length {
-      result.append(body(objectAtIndex(i)))
-    }
-    return result
-  }
-
-  func _toStringArray() -> String[] {
-    return _toArray{ String(($0 as NSString)!) }
-  }
-
-  func _toRangeArray() -> NSRange[] {
-    return _toArray{ ($0 as NSValue)!.rangeValue }
-  }
-}
 
 func _toNSArray<T, U:AnyObject>(a: T[], f: (T)->U) -> NSArray {
   var result = NSMutableArray(capacity: a.count)
@@ -55,6 +28,12 @@ func _toNSArray<T, U:AnyObject>(a: T[], f: (T)->U) -> NSArray {
   return result
 }
 
+func _toNSRange(r: Range<String.Index>) -> NSRange {
+  return NSRange(
+    location: r.startIndex._utf16Index, 
+    length: r.endIndex._utf16Index - r.startIndex._utf16Index)
+}
+
 func _countFormatSpecifiers(a: String) -> Int {
   var lastChar = _asUTF16CodeUnit(".") // anything other than % would work here
   var count = 0
@@ -62,7 +41,8 @@ func _countFormatSpecifiers(a: String) -> Int {
   for c in a.unicodeScalars {
     if lastChar == _asUTF16CodeUnit("%") {
       if c == "%" {
-        lastChar = _asUTF16CodeUnit(".") // a "%" following this one should not be taken as literal
+        // a "%" following this one should not be taken as literal
+        lastChar = _asUTF16CodeUnit(".") 
       }
       else {
         ++count
@@ -77,14 +57,58 @@ func _countFormatSpecifiers(a: String) -> Int {
 
 extension String {
 
-  /// The corresponding NSString - a convenience for bridging code.
+  //===--- Bridging Helpers -----------------------------------------------===//
+  //===--------------------------------------------------------------------===//
+  
+  /// The corresponding `NSString` - a convenience for bridging code.
   var _ns: NSString {
     return self as NSString
   }
 
-  //
-  // Class Methods
-  //
+  /// Return an `Index` corresponding to the given offset in our UTF16
+  /// representation.
+  func _index(utf16Index: Int) -> Index {
+    return Index(String.UnicodeScalarView.IndexType(utf16Index, core))
+  }
+
+  /// Return a `Range<Index>` corresponding to the given `NSRange` of
+  /// our UTF16 representation.
+  func _range(r: NSRange) -> Range<Index> {
+    return _index(r.location).._index(r.location + r.length)
+  }
+
+  /// Invoke `body` on an `Int` buffer.  If `index` was converted from
+  /// non-`nil`, convert the buffer to an `Index` and write it into the
+  /// memory referred to by `index`
+  func _withOptionalOutParameter<Result>(
+    index: CMutablePointer<Index>,
+    body: (CMutablePointer<Int>)->Result
+  ) -> Result {
+    var utf16Index: Int = 0
+    let result = index._withBridgeValue(&utf16Index) {
+      body($0)
+    }
+    index._setIfNonNil { self._index(utf16Index) }
+    return result
+  }
+  
+  /// Invoke `body` on an `NSRange` buffer.  If `range` was converted
+  /// from non-`nil`, convert the buffer to a `Range<Index>` and write
+  /// it into the memory referred to by `range`
+  func _withOptionalOutParameter<Result>(
+    range: CMutablePointer<Range<Index>>,
+    body: (CMutablePointer<NSRange>)->Result
+  ) -> Result {
+    var nsRange = NSRange(location: 0, length: 0)
+    let result = range._withBridgeValue(&nsRange) {
+      body($0)
+    }
+    range._setIfNonNil { self._range(nsRange) }
+    return result
+  }
+
+  //===--- Class Methods --------------------------------------------------===//
+  //===--------------------------------------------------------------------===//
 
   // + (const NSStringEncoding *)availableStringEncodings
 
@@ -111,7 +135,9 @@ extension String {
   // + (NSString *)localizedNameOfStringEncoding:(NSStringEncoding)encoding
 
   /// Returns a human-readable string giving the name of a given encoding.
-  static func localizedNameOfStringEncoding(encoding: NSStringEncoding) -> String {
+  static func localizedNameOfStringEncoding(
+    encoding: NSStringEncoding
+  ) -> String {
     return NSString.localizedNameOfStringEncoding(encoding)
   }
 
@@ -120,7 +146,9 @@ extension String {
   /// Returns a string created by using a given format string as a
   /// template into which the remaining argument values are substituted
   /// according to the user's default locale.
-  static func localizedStringWithFormat(format: String, _ arguments: CVarArg...) -> String {
+  static func localizedStringWithFormat(
+    format: String, _ arguments: CVarArg...
+  ) -> String {
     return String(format: format, arguments: arguments)
   }
 
@@ -129,197 +157,122 @@ extension String {
   /// Returns a string built from the strings in a given array
   /// by concatenating them with a path separator between each pair.
   static func pathWithComponents(components: String[]) -> String {
-    var _components = NSMutableArray()
-    for c in components {
-      _components.addObject(c as NSString)
-    }
-    return NSString.pathWithComponents(_components)
+    return NSString.pathWithComponents(components)
   }
 
+  //===--- Non-failing factories ------------------------------------------===//
+  // NSString factory functions that can't fail, and have a
+  // corresponding constructor, are omitted.
+  //
   // + (instancetype)string
+  //
+  // + (instancetype)
+  //     stringWithCharacters:(const unichar *)chars length:(NSUInteger)length
+  //
+  // + (instancetype)stringWithFormat:(NSString *)format, ...
+  //===--------------------------------------------------------------------===//
+  
+  // + (instancetype)
+  //     stringWithContentsOfFile:(NSString *)path
+  //     encoding:(NSStringEncoding)enc
+  //     error:(NSError **)error
 
-  /// Returns an empty string.
-  static func string() -> String {
-    return ""
-  }
-
-  // + (instancetype)stringWithCharacters:(const unichar *)chars length:(NSUInteger)length
-
-  /// Returns a string containing a given number of characters
-  /// taken from a given array of Unicode characters.
-  static func stringWithCharacters(chars: unichar[]) -> String {
-    var local = chars
-    return NSString(characters: local, length: local.count)
-  }
-
-  // + (instancetype)stringWithContentsOfFile:(NSString *)path encoding:(NSStringEncoding)enc error:(NSError **)error
-
-  /// Returns a string created by reading data from the file at
-  /// a given path interpreted using a given encoding.  Errors are
-  /// written into the inout `error` argument.
+  /// Returns a string created by reading data from the file at a
+  /// given path interpreted using a given encoding.
   static func stringWithContentsOfFile(
     path: String,
-    encoding: NSStringEncoding,
-    inout error: NSError?) -> String?
-  {
-    var result = NSString.stringWithContentsOfFile(path, encoding: encoding,
-                                                   error: &error)
-
-    return (result as NSString?).map { $0 }
+    encoding enc: NSStringEncoding,
+    error: NSErrorPointer = nil
+  ) -> String? {
+    return NSString.stringWithContentsOfFile(path, encoding: enc, error: error)
   }
 
-  // The Cocoa API allows passing NULL for the error if you want to
-  // ignore it.  We provide an overload for that purpose here.
-
-  /// Returns a string created by reading data from the file at
-  /// a given path interpreted using a given encoding.
-  static func stringWithContentsOfFile(
-    path: String, encoding: NSStringEncoding) -> String? {
-    var ignoredError: NSError? = .None
-    return stringWithContentsOfFile(path, encoding: encoding,
-                                    error: &ignoredError)
-  }
-
-  // + (instancetype)stringWithContentsOfFile:(NSString *)path usedEncoding:(NSStringEncoding *) enc error:(NSError **)error
-
-  /// Returns a string created by reading data from the file at
-  /// a given path and returns by reference the encoding used to
-  /// interpret the file. Errors are written into the inout `error`
-  /// argument.
-  static func stringWithContentsOfFile(
-    path: String,
-    inout usedEncoding: NSStringEncoding,
-    inout error: NSError?) -> String?
-  {
-    var result = NSString.stringWithContentsOfFile(
-      path, usedEncoding: &usedEncoding, error: &error
-    )
-    return (result as NSString?).map { $0 }
-  }
-
-  // The Cocoa API allows passing NULL for the error if you want to
-  // ignore it.  We provide an overload for that purpose here.
+  // + (instancetype)
+  //     stringWithContentsOfFile:(NSString *)path
+  //     usedEncoding:(NSStringEncoding *)
+  //     enc error:(NSError **)error
 
   /// Returns a string created by reading data from the file at
   /// a given path and returns by reference the encoding used to
   /// interpret the file.
   static func stringWithContentsOfFile(
-    path: String, inout usedEncoding: NSStringEncoding) -> String? {
-    var ignoredError: NSError? = .None
-    return String.stringWithContentsOfFile(path, usedEncoding: &usedEncoding, 
-                                           error: &ignoredError)
+    path: String,
+    usedEncoding: CMutablePointer<NSStringEncoding> = nil,
+    error: NSErrorPointer = nil
+  ) -> String? {
+    return usedEncoding.withUnsafePointer {
+      NSString.stringWithContentsOfFile(path, usedEncoding: $0, error: error)
+    }
   }
 
-  // + (instancetype)stringWithContentsOfURL:(NSURL *)url encoding:(NSStringEncoding)enc error:(NSError **)error
+  // + (instancetype)
+  //     stringWithContentsOfURL:(NSURL *)url
+  //     encoding:(NSStringEncoding)enc
+  //     error:(NSError **)error
 
   /// Returns a string created by reading data from a given URL
   /// interpreted using a given encoding.  Errors are written into the
   /// inout `error` argument.
   static func stringWithContentsOfURL(
-    url: NSURL, encoding: NSStringEncoding, inout error: NSError?
+    url: NSURL, encoding enc: NSStringEncoding, error: NSErrorPointer = nil
   ) -> String? {
-    var result = NSString.stringWithContentsOfURL(url, encoding: encoding, 
-                                                  error: &error)
-    return (result as NSString?).map { $0 }
+    return NSString.stringWithContentsOfURL(url, encoding: enc, error: error)
   }
 
-  // The Cocoa API allows passing NULL for the error if you want to
-  // ignore it.  We provide an overload for that purpose here.
-
-  /// Returns a string created by reading data from a given URL
-  /// interpreted using a given encoding.
-  static func stringWithContentsOfURL(
-    url: NSURL, encoding: NSStringEncoding
-  ) -> String? {
-    var ignoredError: NSError? = .None
-    return stringWithContentsOfURL(url, encoding: encoding, 
-                                   error: &ignoredError)
-  }
-
-  // + (instancetype)stringWithContentsOfURL:(NSURL *)url usedEncoding:(NSStringEncoding *)enc error:(NSError **)error
+  // + (instancetype)
+  //     stringWithContentsOfURL:(NSURL *)url
+  //     usedEncoding:(NSStringEncoding *)enc
+  //     error:(NSError **)error
 
   /// Returns a string created by reading data from a given URL
   /// and returns by reference the encoding used to interpret the
   /// data.  Errors are written into the inout `error` argument.
   static func stringWithContentsOfURL(
     url: NSURL,
-    inout usedEncoding: NSStringEncoding,
-    inout error: NSError?) -> String?
-  {
-    var result =
-      NSString.stringWithContentsOfURL(url, usedEncoding: &usedEncoding, 
-                                       error: &error)
-    return (result as NSString?).map { $0 }
+    usedEncoding enc: CMutablePointer<NSStringEncoding> = nil,
+    error: NSErrorPointer = nil
+  ) -> String? {
+    return enc.withUnsafePointer {
+      NSString.stringWithContentsOfURL(url, usedEncoding: $0, error: error)
+    }
   }
 
-  // The Cocoa API allows passing NULL for the error if you want to
-  // ignore it.  We provide an overload for that purpose here.
-
-  /// Returns a string created by reading data from a given URL
-  /// and returns by reference the encoding used to interpret the
-  /// data.
-  static func stringWithContentsOfURL(
-    url: NSURL,
-    inout usedEncoding: NSStringEncoding
-  ) -> String?
-  {
-    var ignoredError: NSError? = .None
-    return stringWithContentsOfURL(url, usedEncoding: &usedEncoding, 
-                                   error: &ignoredError)
-  }
-
-
-  // + (instancetype)stringWithCString:(const char *)cString encoding:(NSStringEncoding)enc
+  // + (instancetype)
+  //     stringWithCString:(const char *)cString
+  //     encoding:(NSStringEncoding)enc
 
   /// Returns a string containing the bytes in a given C array,
   /// interpreted according to a given encoding.
   static func stringWithCString(
-    s: CString, encoding: NSStringEncoding) -> String {
-
-    return NSString(CString:s, encoding: encoding)
+    cString: CString,
+    encoding enc: NSStringEncoding
+  ) -> String? {
+    return NSString.stringWithCString(cString, encoding: enc)
   }
 
-  // + (instancetype)stringWithFormat:(NSString *)format,, ...
 
-  /// Returns a string created by using a given format string
-  /// as a template into which the remaining argument values are
-  /// substituted.
-  static func stringWithFormat(
-    format: String, _ arguments: CVarArg...) -> String {
-    return String(format: format, arguments: arguments)
-  }
-
+  //===--- Adds nothing for String beyond what String(s) does -------------===//
   // + (instancetype)stringWithString:(NSString *)aString
-
-  /// Returns a string created by copying the characters from
-  /// another given string.
-  static func stringWithString(aString: String) -> String {
-    return aString
-  }
-
+  //===--------------------------------------------------------------------===//
+  
   // + (instancetype)stringWithUTF8String:(const char *)bytes
 
   /// Returns a string created by copying the data from a given
   /// C array of UTF8-encoded bytes.
-  static func stringWithUTF8String(bytes: CString) -> String {
-    return NSString(UTF8String: bytes)
+  static func stringWithUTF8String(bytes: CString) -> String? {
+    return NSString.stringWithUTF8String(bytes)
   }
 
-  //
-  // Instance Methods
-  //
+  //===--- Instance Methods/Properties-------------------------------------===//
+  //===--------------------------------------------------------------------===//
 
+  //===--- Omitted by agreement during API review 5/20/2014 ---------------===//
   // @property BOOL boolValue;
-
-  /// Returns the Boolean value of the receiver’s text.
-  var boolValue: Bool {
-    return _ns.boolValue
-  }
-
+  
   // - (BOOL)canBeConvertedToEncoding:(NSStringEncoding)encoding
 
   /// Returns a Boolean value that indicates whether the
-  /// receiver can be converted to a given encoding without loss of
+  /// `String` can be converted to a given encoding without loss of
   /// information.
   func canBeConvertedToEncoding(encoding: NSStringEncoding) -> Bool {
     return _ns.canBeConvertedToEncoding(encoding)
@@ -335,7 +288,7 @@ extension String {
 
   // - (NSString *)capitalizedStringWithLocale:(NSLocale *)locale
 
-  /// Returns a capitalized representation of the receiver
+  /// Returns a capitalized representation of the `String`
   /// using the specified locale.
   func capitalizedStringWithLocale(locale: NSLocale) -> String{
     return _ns.capitalizedStringWithLocale(locale) as String
@@ -350,16 +303,17 @@ extension String {
     return _ns.caseInsensitiveCompare(aString as NSString)
   }
 
+  //===--- Omitted by agreement during API review 5/20/2014 ---------------===//
   // - (unichar)characterAtIndex:(NSUInteger)index
+  //
+  // We have a different meaning for "Character" in Swift, and we are
+  // trying not to expose error-prone UTF16 integer indexes
+  
+  // - (NSString *)
+  //     commonPrefixWithString:(NSString *)aString
+  //     options:(NSStringCompareOptions)mask
 
-  /// Returns the character at a given array position.
-  func characterAtIndex(index: Int) -> unichar {
-    return _ns.characterAtIndex(index)
-  }
-
-  // - (NSString *)commonPrefixWithString:(NSString *)aString options:(NSStringCompareOptions)mask
-
-  /// Returns a string containing characters the receiver and a
+  /// Returns a string containing characters the `String` and a
   /// given string have in common, starting from the beginning of each
   /// up to the first characters that aren’t equivalent.
   func commonPrefixWithString(
@@ -368,134 +322,115 @@ extension String {
       aString as NSString, options: options) as String
   }
 
-  // - (NSComparisonResult)compare:(NSString *)aString
-
-  /// Returns the result of invoking `compare:options:range:`
-  /// with no options and the receiver’s full extent as the range.
-  func compare(aString: String) -> NSComparisonResult {
-    return _ns.compare(aString as NSString)
-  }
-
-  // - (NSComparisonResult)compare:(NSString *)aString options:(NSStringCompareOptions)mask
-
-  /// Compares the string with the specified string using the
-  /// given options.
-  func compare(
-    aString: String, options: NSStringCompareOptions) -> NSComparisonResult {
-    return _ns.compare(aString as NSString, options: options)
-  }
-
-  // - (NSComparisonResult)compare:(NSString *)aString options:(NSStringCompareOptions)mask range:(NSRange)range
-
-  /// Returns the result of invoking
-  /// `compare:options:range:locale:` with a `nil` locale.
-  func compare(
-    aString: String,
-    options: NSStringCompareOptions,
-    range: NSRange
-  ) -> NSComparisonResult {
-    return _ns.compare(
-      aString as NSString, options: options, range: range)
-  }
-
-  // - (NSComparisonResult)compare:(NSString *)aString options:(NSStringCompareOptions)mask range:(NSRange)range locale:(id)locale
+  // - (NSComparisonResult)
+  //     compare:(NSString *)aString
+  //
+  // - (NSComparisonResult)
+  //     compare:(NSString *)aString options:(NSStringCompareOptions)mask
+  //
+  // - (NSComparisonResult)
+  //     compare:(NSString *)aString options:(NSStringCompareOptions)mask 
+  //     range:(NSRange)range
+  //
+  // - (NSComparisonResult)
+  //     compare:(NSString *)aString options:(NSStringCompareOptions)mask 
+  //     range:(NSRange)range locale:(id)locale
 
   /// Compares the string using the specified options and
   /// returns the lexical ordering for the range.
   func compare(
-    aString: NSString, options: NSStringCompareOptions,
-    range: NSRange, locale: NSLocale) -> NSComparisonResult {
-    return _ns.compare(
-      aString as NSString, options: options, range: range, locale: locale)
+    aString: String,
+    options mask: NSStringCompareOptions = nil,
+    range: Range<Index>? = nil,
+    locale: NSLocale? = nil
+  ) -> NSComparisonResult {
+    // According to Ali Ozer, there may be some real advantage to
+    // dispatching to the minimal selector for the supplied options.
+    // So let's do that; the switch should compile away anyhow.
+    return locale ? _ns.compare(
+      aString, options: mask,
+      range: _toNSRange(range ? range! : indices(self)), locale: locale)
+    
+    : range ? _ns.compare(
+      aString, options: mask, range: _toNSRange(range ? range! : indices(self)))
+      
+    : mask ? _ns.compare(aString, options: mask)
+      
+    : _ns.compare(aString)
   }
 
-  /// Helper function for the two `completePathIntoString` overloads below.
-  func _completePathIntoString(
-    inout outputName: String?, caseSensitive: Bool,
-    matchesIntoArray: AutoreleasingUnsafePointer<NSArray?>, filterTypes: String[]?) -> Int {
+  // - (NSUInteger)
+  //     completePathIntoString:(NSString **)outputName
+  //     caseSensitive:(BOOL)flag
+  //     matchesIntoArray:(NSArray **)outputArray
+  //     filterTypes:(NSArray *)filterTypes
 
-    var nsOutputName: NSString? = .None
-
-    var result = self._ns.completePathIntoString(
-      &nsOutputName,
-      caseSensitive: caseSensitive,
-      matchesIntoArray: matchesIntoArray,
-      filterTypes: filterTypes ? filterTypes! : nil
-    )
-
-    outputName = nsOutputName.map { $0 }
-
-    return result
-  }
-
-  // - (NSUInteger)completePathIntoString:(NSString **)outputName caseSensitive:(BOOL)flag matchesIntoArray:(NSArray **)outputArray filterTypes:(NSArray *)filterTypes
-
-  /// Interprets the receiver as a path in the file system and
+  /// Interprets the `String` as a path in the file system and
   /// attempts to perform filename completion, returning a numeric
   /// value that indicates whether a match was possible, and by
-  /// reference the longest path that matches the receiver.
+  /// reference the longest path that matches the `String`.
   /// returns the actual number of matching paths.
   func completePathIntoString(
-    inout outputName: String?, caseSensitive: Bool,
-    inout matchesIntoArray: String[]?,
-    filterTypes: String[]? = .None
+    _ outputName: CMutablePointer<String> = nil,
+    caseSensitive: Bool,
+    matchesIntoArray: CMutablePointer<String[]> = nil,
+    filterTypes: String[]? = nil
   ) -> Int {
+    var nsMatches: NSArray?
+    var nsOutputName: NSString?
 
-    var nsMatches: NSArray? = .None
+    let result = outputName._withBridgeObject(&nsOutputName) {
+      outputName in matchesIntoArray._withBridgeObject(&nsMatches) {
+        matchesIntoArray in
+        self._ns.completePathIntoString(
+          outputName, caseSensitive: caseSensitive,
+          matchesIntoArray: matchesIntoArray, filterTypes: filterTypes
+        )
+      }
+    }
 
-    var result = _completePathIntoString(
-      &outputName,
-      caseSensitive: caseSensitive,
-      matchesIntoArray: &nsMatches,
-      filterTypes: filterTypes
-    )
-
-    matchesIntoArray = nsMatches.map { $0._toStringArray() }
-
+    if let matches = nsMatches {
+      // Since this function is effectively a bridge thunk, use the
+      // bridge thunk semantics for the NSArray conversion
+      matchesIntoArray._setIfNonNil { _convertNSArrayToArray(matches) }
+    }
+    
+    if let n = nsOutputName {
+      outputName._setIfNonNil { n }
+    }
     return result
   }
 
-  // Cocoa allows us to pass NULL for matchesIntoArray, which
-  // implies this overload
+  // - (NSArray *)
+  //     componentsSeparatedByCharactersInSet:(NSCharacterSet *)separator
 
-  /// Interprets the receiver as a path in the file system and
-  /// attempts to perform filename completion, returning a numeric
-  /// value that indicates whether a match was possible, and by
-  /// reference the longest path that matches the receiver.
-  /// returns a positive number if any path matched.
-  func completePathIntoString(
-    inout outputName: String?,
-    caseSensitive: Bool,
-    filterTypes: String[]? = .None
-  ) -> Int {
-
-    return _completePathIntoString(
-      &outputName,
-      caseSensitive: caseSensitive,
-      matchesIntoArray: nil,
-      filterTypes: filterTypes)
-  }
-
-  // - (NSArray *)componentsSeparatedByCharactersInSet:(NSCharacterSet *)separator
-
-  /// Returns an array containing substrings from the receiver
+  /// Returns an array containing substrings from the `String`
   /// that have been divided by characters in a given set.
-  func componentsSeparatedByCharactersInSet(separator: NSCharacterSet) -> String[] {
-    return (_ns.componentsSeparatedByCharactersInSet(separator) as String[])!
+  func componentsSeparatedByCharactersInSet(
+    separator: NSCharacterSet
+  ) -> String[] {
+    // FIXME: two steps due to <rdar://16971181>
+    let nsa = _ns.componentsSeparatedByCharactersInSet(separator)
+    // Since this function is effectively a bridge thunk, use the
+    // bridge thunk semantics for the NSArray conversion
+    return _convertNSArrayToArray(nsa)
   }
 
 
   // - (NSArray *)componentsSeparatedByString:(NSString *)separator
 
-  /// Returns an array containing substrings from the receiver
+  /// Returns an array containing substrings from the `String`
   /// that have been divided by a given separator.
   func componentsSeparatedByString(separator: String) -> String[] {
-    return (_ns.componentsSeparatedByString(separator) as String[])!
+    let nsa = _ns.componentsSeparatedByString(separator)
+    // Since this function is effectively a bridge thunk, use the
+    // bridge thunk semantics for the NSArray conversion
+    return _convertNSArrayToArray(nsa)
   }
 
   // - (const char *)cStringUsingEncoding:(NSStringEncoding)encoding
 
-  /// Returns a representation of the receiver as a C string
+  /// Returns a representation of the `String` as a C string
   /// using a given encoding.
   func cStringUsingEncoding(encoding: NSStringEncoding) -> CChar[] {
     return withExtendedLifetime(_ns) {
@@ -505,21 +440,24 @@ extension String {
   }
 
   // - (NSData *)dataUsingEncoding:(NSStringEncoding)encoding
-  // - (NSData *)dataUsingEncoding:(NSStringEncoding)encoding allowLossyConversion:(BOOL)flag
+  //
+  // - (NSData *)
+  //     dataUsingEncoding:(NSStringEncoding)encoding
+  //     allowLossyConversion:(BOOL)flag
 
   /// Returns an `NSData` object containing a representation of
-  /// the receiver encoded using a given encoding.
+  /// the `String` encoded using a given encoding.
   func dataUsingEncoding(
     encoding: NSStringEncoding,
     allowLossyConversion: Bool = false
   ) -> NSData {
-    return _ns.dataUsingEncoding(encoding, 
-                                 allowLossyConversion: allowLossyConversion)
+    return _ns.dataUsingEncoding(
+      encoding, allowLossyConversion: allowLossyConversion)
   }
 
   // @property NSString* decomposedStringWithCanonicalMapping;
 
-  /// Returns a string made by normalizing the receiver’s
+  /// Returns a string made by normalizing the `String`’s
   /// contents using Form D.
   var decomposedStringWithCanonicalMapping: String {
     return _ns.decomposedStringWithCanonicalMapping
@@ -527,80 +465,102 @@ extension String {
 
   // @property NSString* decomposedStringWithCompatibilityMapping;
 
-  /// Returns a string made by normalizing the receiver’s
+  /// Returns a string made by normalizing the `String`’s
   /// contents using Form KD.
   var decomposedStringWithCompatibilityMapping: String {
     return _ns.decomposedStringWithCompatibilityMapping
   }
 
-  // @property NSString* description
+  //===--- Importing Foundation should not affect String printing ---------===//
+  // Therefore, we're not exposing this:
+  //
+  //   @property NSString* description
 
-  /// Returns the receiver.
-  var description: String {
-    return self
-  }
-
+  
+  //===--- Omitted for consistency with API review results 5/20/2014 -----===//
   // @property double doubleValue;
 
-  /// Returns the floating-point value of the receiver’s text as a double.
-  var doubleValue: Double {
-    return _ns.doubleValue
-  }
-
-  // - (void)enumerateLinesUsingBlock:(void (^)(NSString *line, BOOL *stop))block
+  // - (void)
+  //     enumerateLinesUsingBlock:(void (^)(NSString *line, BOOL *stop))block
 
   /// Enumerates all the lines in a string.
-  func enumerateLinesUsingBlock(block: (line: String, inout stop: Bool)->()) {
+  func enumerateLines(body: (line: String, inout stop: Bool)->()) {
     _ns.enumerateLinesUsingBlock {
       (line: String?, stop: CMutablePointer<ObjCBool>)
     in
       var stop_ = false
-      block(line: line!, stop: &stop_)
+      body(line: line!, stop: &stop_)
       if stop_ {
         UnsafePointer(stop).memory = true
       }
     }
   }
 
-  // - (void)enumerateLinguisticTagsInRange:(NSRange)range scheme:(NSString *)tagScheme options:(NSLinguisticTaggerOptions)opts orthography:(NSOrthography *)orthography usingBlock:(void (^)(NSString *tag, NSRange tokenRange, NSRange sentenceRange, BOOL *stop))block
-
+  // - (void)
+  //     enumerateLinguisticTagsInRange:(NSRange)range
+  //     scheme:(NSString *)tagScheme
+  //     options:(NSLinguisticTaggerOptions)opts
+  //     orthography:(NSOrthography *)orthography
+  //     usingBlock:(
+  //       void (^)(
+  //         NSString *tag, NSRange tokenRange, 
+  //         NSRange sentenceRange, BOOL *stop)
+  //       )block
 
   /// Performs linguistic analysis on the specified string by
   /// enumerating the specific range of the string, providing the
   /// Block with the located tags.
   func enumerateLinguisticTagsInRange(
-    range: NSRange, scheme: String, options: NSLinguisticTaggerOptions,
+    range: Range<Index>, 
+    scheme tagScheme: String, 
+    options opts: NSLinguisticTaggerOptions,
     orthography: NSOrthography?,
-    usingBlock: (String, NSRange, NSRange, inout Bool)->()
+    _ body:
+      (String, Range<Index>, Range<Index>, inout Bool)->()
   ) {
     _ns.enumerateLinguisticTagsInRange(
-      range,
-      scheme: scheme,
-      options: options,
+      _toNSRange(range),
+      scheme: tagScheme,
+      options: opts,
       orthography: orthography ? orthography! : nil
     ) {
       var stop_ = false
-      usingBlock($0, $1, $2, &stop_)
+      body($0, self._range($1), self._range($2), &stop_)
       if stop_ {
         UnsafePointer($3).memory = true
       }
     }
   }
 
-  // - (void)enumerateSubstringsInRange:(NSRange)range options:(NSStringEnumerationOptions)opts usingBlock:(void (^)(NSString *substring, NSRange substringRange, NSRange enclosingRange, BOOL *stop))block
+  // - (void)
+  //     enumerateSubstringsInRange:(NSRange)range
+  //     options:(NSStringEnumerationOptions)opts
+  //     usingBlock:(
+  //       void (^)(
+  //         NSString *substring,
+  //         NSRange substringRange,
+  //         NSRange enclosingRange,
+  //         BOOL *stop)
+  //       )block
 
   /// Enumerates the substrings of the specified type in the
   /// specified range of the string.
   func enumerateSubstringsInRange(
-    range: NSRange, options:NSStringEnumerationOptions,
-    usingBlock: (
-      substring: String, substringRange: NSRange,
-      enclosingRange: NSRange, inout Bool
+    range: Range<Index>,
+    options opts:NSStringEnumerationOptions,
+    _ body: (
+      substring: String, substringRange: Range<Index>,
+      enclosingRange: Range<Index>, inout Bool
     )->()
   ) {
-    _ns.enumerateSubstringsInRange(range, options: options) {
+    _ns.enumerateSubstringsInRange(_toNSRange(range), options: opts) {
       var stop_ = false
-      usingBlock(substring: $0, substringRange: $1, enclosingRange: $2, &stop_)
+      
+      body(substring: $0,
+        substringRange: self._range($1),
+        enclosingRange: self._range($2),
+        &stop_)
+      
       if stop_ {
         UnsafePointer($3).memory = true
       }
@@ -609,7 +569,7 @@ extension String {
 
   // @property NSStringEncoding fastestEncoding;
 
-  /// Returns the fastest encoding to which the receiver may be
+  /// Returns the fastest encoding to which the `String` may be
   /// converted without loss of information.
   var fastestEncoding: NSStringEncoding {
     return _ns.fastestEncoding
@@ -617,49 +577,52 @@ extension String {
 
   // - (const char *)fileSystemRepresentation
 
-  /// Returns a file system-specific representation of the receiver.
+  /// Returns a file system-specific representation of the `String`.
   func fileSystemRepresentation() -> CChar[] {
     return _ns.fileSystemRepresentation.persist()
   }
 
+  //===--- Omitted for consistency with API review results 5/20/2014 ------===//
   // @property float floatValue;
 
-  /// Returns the floating-point value of the receiver’s text as a float.
-  var floatValue: Float {
-    return _ns.floatValue
-  }
-
-  // - (BOOL)getBytes:(void *)buffer maxLength:(NSUInteger)maxBufferCount usedLength:(NSUInteger*)usedBufferCount encoding:(NSStringEncoding)encoding options:(NSStringEncodingConversionOptions)options range:(NSRange)range remainingRange:(NSRangePointer)leftover
+  // - (BOOL)
+  //     getBytes:(void *)buffer
+  //     maxLength:(NSUInteger)maxBufferCount
+  //     usedLength:(NSUInteger*)usedBufferCount
+  //     encoding:(NSStringEncoding)encoding
+  //     options:(NSStringEncodingConversionOptions)options
+  //     range:(NSRange)range
+  //     remainingRange:(NSRangePointer)leftover
 
   /// Gets a given range of characters as bytes in a specified encoding.
   /// Note: will get a maximum of `min(buffer.count, maxLength)` bytes.
   func getBytes(
-    inout buffer: UInt8[], maxLength: Int, inout usedLength: Int,
-    encoding: NSStringEncoding, options: NSStringEncodingConversionOptions,
-    range: NSRange, inout remainingRange: NSRange
+    inout buffer: UInt8[],
+    maxLength: Int,
+    usedLength: CMutablePointer<Int>,
+    encoding: NSStringEncoding,
+    options: NSStringEncodingConversionOptions,
+    range: Range<Index>,
+    remainingRange: CMutablePointer<Range<Index>>
   ) -> Bool {
-    return self._ns.getBytes(
-      &buffer,
-      maxLength: min(buffer.count, maxLength),
-      usedLength: &usedLength, encoding: encoding, options: options,
-      range: range, remainingRange: &remainingRange)
+    return _withOptionalOutParameter(remainingRange) {
+      self._ns.getBytes(
+        &buffer,
+        maxLength: min(buffer.count, maxLength),
+        usedLength: usedLength,
+        encoding: encoding,
+        options: options,
+        range: _toNSRange(range),
+        remainingRange: $0)
+    }
   }
 
+  // - (BOOL)
+  //     getCString:(char *)buffer
+  //     maxLength:(NSUInteger)maxBufferCount
+  //     encoding:(NSStringEncoding)encoding
 
-  // - (void)getCharacters:(unichar *)buffer range:(NSRange)aRange
-
-  /// Copies characters from a given range in the receiver into a given buffer.
-  /// Note: will copy a maximum of `min(buffer.count, range.length)`
-  /// characters.
-  func getCharacters(inout buffer: unichar[], range: NSRange) {
-    let r = NSRange(location: range.location, 
-                    length: min(buffer.count, range.length))
-    _ns.getCharacters(&buffer, range: r)
-  }
-
-  // - (BOOL)getCString:(char *)buffer maxLength:(NSUInteger)maxBufferCount encoding:(NSStringEncoding)encoding
-
-  /// Converts the receiver’s content to a given encoding and
+  /// Converts the `String`’s content to a given encoding and
   /// stores them in a buffer. Note: will store a maximum of
   /// `min(buffer.count, maxLength)` bytes.
   func getCString(
@@ -669,9 +632,11 @@ extension String {
                           encoding: encoding)
   }
 
-  // - (BOOL)getFileSystemRepresentation:(char *)buffer maxLength:(NSUInteger)maxLength
+  // - (BOOL)
+  //     getFileSystemRepresentation:(char *)buffer
+  //     maxLength:(NSUInteger)maxLength
 
-  /// Interprets the receiver as a system-independent path and
+  /// Interprets the `String` as a system-independent path and
   /// fills a buffer with a C-string in a format and encoding suitable
   /// for use with file-system calls. Note: will store a maximum of
   /// `min(buffer.count, maxLength)` bytes.
@@ -681,39 +646,56 @@ extension String {
       &buffer, maxLength: min(buffer.count, maxLength))
   }
 
-  // - (void)getLineStart:(NSUInteger *)startIndex end:(NSUInteger *)lineEndIndex contentsEnd:(NSUInteger *)contentsEndIndex forRange:(NSRange)aRange
+  // - (void)
+  //     getLineStart:(NSUInteger *)startIndex
+  //     end:(NSUInteger *)lineEndIndex
+  //     contentsEnd:(NSUInteger *)contentsEndIndex
+  //     forRange:(NSRange)aRange
 
   /// Returns by reference the beginning of the first line and
   /// the end of the last line touched by the given range.
   func getLineStart(
-    inout startIndex: Int, inout end: Int,
-    inout contentsEnd: Int, forRange: NSRange
+    start: CMutablePointer<Index>,
+    end: CMutablePointer<Index>,
+    contentsEnd: CMutablePointer<Index>,
+    forRange: Range<Index>
   ) {
-    var outArgs: (Int, Int, Int)
-    = (startIndex, end, contentsEnd)
-
-    withUnsafePointers(&outArgs.0, &outArgs.1, &outArgs.2) {
-      self._ns.getLineStart($0, end: $1, contentsEnd: $2, forRange: forRange)
+    _withOptionalOutParameter(start) {
+      start in self._withOptionalOutParameter(end) {
+        end in self._withOptionalOutParameter(contentsEnd) {
+          contentsEnd in self._ns.getLineStart(
+            start, end: end,
+            contentsEnd: contentsEnd,
+            forRange: _toNSRange(forRange))
+        }
+      }
     }
-    (startIndex, end, contentsEnd) = outArgs
   }
 
-  // - (void)getParagraphStart:(NSUInteger *)startIndex end:(NSUInteger *)endIndex contentsEnd:(NSUInteger *)contentsEndIndex forRange:(NSRange)aRange
+  // - (void)
+  //     getParagraphStart:(NSUInteger *)startIndex
+  //     end:(NSUInteger *)endIndex
+  //     contentsEnd:(NSUInteger *)contentsEndIndex
+  //     forRange:(NSRange)aRange
 
   /// Returns by reference the beginning of the first paragraph
   /// and the end of the last paragraph touched by the given range.
   func getParagraphStart(
-    inout startIndex: Int, inout end: Int,
-    inout contentsEnd: Int, forRange: NSRange
+    start: CMutablePointer<Index>,
+    end: CMutablePointer<Index>,
+    contentsEnd: CMutablePointer<Index>,
+    forRange: Range<Index>
   ) {
-    var outArgs: (Int, Int, Int)
-    = (startIndex, end, contentsEnd)
-
-    withUnsafePointers(&outArgs.0, &outArgs.1, &outArgs.2) {
-      self._ns.getParagraphStart($0, end: $1, contentsEnd: $2, 
-                                 forRange: forRange)
+    _withOptionalOutParameter(start) {
+      start in self._withOptionalOutParameter(end) {
+        end in self._withOptionalOutParameter(contentsEnd) {
+          contentsEnd in self._ns.getParagraphStart(
+            start, end: end,
+            contentsEnd: contentsEnd,
+            forRange: _toNSRange(forRange))
+        }
+      }
     }
-    (startIndex, end, contentsEnd) = outArgs
   }
 
   // - (NSUInteger)hash
@@ -723,263 +705,196 @@ extension String {
     return _ns.hash
   }
 
-  /*
-  Nothing to do here; already provided for String
-
+  //===--- Already provided by String's core ------------------------------===//
   // - (instancetype)init
 
-  /// Returns an initialized NSString object that contains no
-  /// characters.
-  */
-
-  // - (instancetype)initWithBytes:(const void *)bytes length:(NSUInteger)length encoding:(NSStringEncoding)encoding
+  //===--- Initializers that can fail presented as factory functions ------===//
+  // - (instancetype)
+  //     initWithBytes:(const void *)bytes
+  //     length:(NSUInteger)length
+  //     encoding:(NSStringEncoding)encoding
 
   /// Returns an initialized NSString object containing a given
   /// number of bytes from a given buffer of bytes interpreted in a
   /// given encoding.  Note: will store a maximum of
   /// `min(bytes.count, length)` bytes.
-  init(inout bytes: UInt8[], length: Int, encoding: NSStringEncoding) {
-    self = NSString(
-      bytes: bytes, length: min(bytes.count, length),
-      encoding: encoding)
+  static func stringWithBytes(
+    var bytes: UInt8[], 
+    length: Int, 
+    encoding: NSStringEncoding
+  ) -> String? {
+    return NSString(
+      bytes: &bytes, length: min(bytes.count, length), encoding: encoding
+    ) as NSString? // Important: coerce to optional NSString to handle nil
   }
 
-  // - (instancetype)initWithBytesNoCopy:(void *)bytes length:(NSUInteger)length encoding:(NSStringEncoding)encoding freeWhenDone:(BOOL)flag
+  // - (instancetype)
+  //     initWithBytesNoCopy:(void *)bytes
+  //     length:(NSUInteger)length
+  //     encoding:(NSStringEncoding)encoding
+  //     freeWhenDone:(BOOL)flag
 
-  /// Returns an initialized `NSString` object that contains a
+  /// Returns an initialized `String` object that contains a
   /// given number of bytes from a given buffer of bytes interpreted
   /// in a given encoding, and optionally frees the buffer.  WARNING:
   /// this method is not memory-safe!
-  init(
-    bytesNoCopy: COpaquePointer, length: Int,
-    encoding: NSStringEncoding, freeWhenDone:Bool
-  ) {
-    self = NSString(
-      bytesNoCopy: bytesNoCopy, length: length,
-      encoding: encoding, freeWhenDone: freeWhenDone)
+  static func stringWithBytesNoCopy(
+    bytes: CMutableVoidPointer, length: Int,
+    encoding: NSStringEncoding, freeWhenDone flag: Bool
+  ) -> String? {
+    return NSString(
+      bytesNoCopy: bytes, length: length,
+      encoding: encoding, freeWhenDone: flag
+    ) as NSString? // Important: coerce to optional NSString to handle nil
   }
 
 
-  // - (instancetype)initWithCharacters:(const unichar *)characters length:(NSUInteger)length
-
-  /// Returns an initialized `NSString` object that contains a
+  // - (instancetype)
+  //     initWithCharacters:(const unichar *)characters
+  //     length:(NSUInteger)length
+  
+  /// Returns an initialized `String` object that contains a
   /// given number of characters from a given array of Unicode
   /// characters.
-  init(characters: unichar[]) {
-    self = .stringWithCharacters(characters)
-  }
-
-  /*
-  There's no safe way to express this method that isn't identical to the previous one
-
-  // - (instancetype)initWithCharactersNoCopy:(unichar *)characters length:(NSUInteger)length freeWhenDone:(BOOL)flag
-
-  /// Returns an initialized `NSString` object that contains a
-  /// given number of characters from a given C array of Unicode
-  /// characters.
-  */
-
-  // - (instancetype)initWithContentsOfFile:(NSString *)path encoding:(NSStringEncoding)enc error:(NSError **)error
-
-  /// Returns an `NSString` object initialized by reading data
-  /// from the file at a given path using a given encoding.
-  init(contentsOfFile: String, encoding: NSStringEncoding, inout error: NSError?) {
-    self = String.stringWithContentsOfFile(
-      contentsOfFile, encoding: encoding, error: &error)!
-  }
-
-  init(contentsOfFile: String, encoding: NSStringEncoding) {
-    var ignoredError: NSError? = .None
-    self = String.stringWithContentsOfFile(
-      contentsOfFile, encoding: encoding, error: &ignoredError)!
-  }
-
-
-  // - (instancetype)initWithContentsOfFile:(NSString *)path usedEncoding:(NSStringEncoding *)enc error:(NSError **)error
-
-  /// Returns an `NSString` object initialized by reading data
-  /// from the file at a given path and returns by reference the
-  /// encoding used to interpret the characters.
-  init(contentsOfFile: String,
-      inout usedEncoding: NSStringEncoding,
-      inout error: NSError?
-  ) {
-    self = String.stringWithContentsOfFile(
-      contentsOfFile, usedEncoding: &usedEncoding, error: &error)!
-  }
-
   init(
-    contentsOfFile: String,
-    inout usedEncoding: NSStringEncoding
+    utf16CodeUnits: CConstPointer<unichar>, 
+    count: Int
   ) {
-    var ignoredError: NSError? = .None
-    self = String.stringWithContentsOfFile(
-      contentsOfFile, usedEncoding: &usedEncoding, error: &ignoredError)!
+    self = NSString(characters: utf16CodeUnits, length: count)
   }
 
-  // - (instancetype)initWithContentsOfURL:(NSURL *)url encoding:(NSStringEncoding)enc inout error: NSError?)
+  // - (instancetype)
+  //     initWithCharactersNoCopy:(unichar *)characters
+  //     length:(NSUInteger)length
+  //     freeWhenDone:(BOOL)flag
 
-  /// Returns an `NSString` object initialized by reading data
-  /// from a given URL interpreted using a given encoding.
-  init(contentsOfURL: NSURL, encoding: NSStringEncoding, inout error: NSError?) {
-    self = String.stringWithContentsOfURL(contentsOfURL, encoding: encoding, error: &error)!
-  }
-
-  init(contentsOfURL: NSURL, encoding: NSStringEncoding) {
-    var ignoredError: NSError? = .None
-    self = String.stringWithContentsOfURL(
-      contentsOfURL, encoding: encoding, error: &ignoredError)!
-  }
-
-  // - (instancetype)initWithContentsOfURL:(NSURL *)url usedEncoding:(NSStringEncoding *)enc error:(NSError **)error
-
-  /// Returns an `NSString` object initialized by reading data
-  /// from a given URL and returns by reference the encoding used to
-  /// interpret the data.
+  /// Returns an initialized `String` object that contains a given
+  /// number of characters from a given array of UTF16 Code Units
   init(
-    contentsOfURL: NSURL,
-    inout usedEncoding: NSStringEncoding,
-    inout error: NSError?
+    utf16CodeUnitsNoCopy: CConstPointer<unichar>, 
+    count: Int, 
+    freeWhenDone flag: Bool
   ) {
-    self = String.stringWithContentsOfURL(
-      contentsOfURL, usedEncoding: &usedEncoding, error: &error)!
+    self = utf16CodeUnitsNoCopy.withUnsafePointer {
+      NSString(charactersNoCopy: $0, length: count, freeWhenDone: flag)
+    }
   }
 
-  init(
-    contentsOfURL: NSURL,
-    inout usedEncoding: NSStringEncoding
-  ) {
-    var ignoredError: NSError? = .None
-    self = String.stringWithContentsOfURL(
-      contentsOfURL, usedEncoding: &usedEncoding, error: &ignoredError)!
-  }
-
-  // - (instancetype)initWithCString:(const char *)nullTerminatedCString encoding:(NSStringEncoding)encoding
-
-  /// Returns an `NSString` object initialized using the
-  /// characters in a given C array, interpreted according to a given
-  /// encoding.
-  init(CString: Swift.CString, encoding: NSStringEncoding) {
-    self = .stringWithCString(CString, encoding: encoding)
-  }
-
-  // - (instancetype)initWithData:(NSData *)data encoding:(NSStringEncoding)encoding
-
-  /// Returns an `NSString` object initialized by converting
-  /// given data into Unicode characters using a given encoding.
-
-  init(data: NSData, encoding: NSStringEncoding) {
-    self = NSString(data: data, encoding: encoding)
-  }
-
+  //===--- Initializers that can fail dropped for factory functions -------===//
+  // - (instancetype)
+  //     initWithContentsOfFile:(NSString *)path
+  //     encoding:(NSStringEncoding)enc
+  //     error:(NSError **)error
+  //
+  // - (instancetype)
+  //     initWithContentsOfFile:(NSString *)path
+  //     usedEncoding:(NSStringEncoding *)enc
+  //     error:(NSError **)error
+  //
+  // - (instancetype)
+  //     initWithContentsOfURL:(NSURL *)url
+  //     encoding:(NSStringEncoding)enc
+  //     error:(NSError**)error
+  //  
+  // - (instancetype)
+  //     initWithContentsOfURL:(NSURL *)url
+  //     usedEncoding:(NSStringEncoding *)enc
+  //     error:(NSError **)error
+  //
+  // - (instancetype)
+  //     initWithCString:(const char *)nullTerminatedCString
+  //     encoding:(NSStringEncoding)encoding
+  //
+  // - (instancetype)
+  //     initWithData:(NSData *)data
+  //     encoding:(NSStringEncoding)encoding
+  //===--------------------------------------------------------------------===//
+  
+  // FIXME: optional locale can't be handled with default
+  // arguments due to <rdar://problem/16983329>
+  
   // - (instancetype)initWithFormat:(NSString *)format, ...
 
-  /// Returns an `NSString` object initialized by using a given
+  /// Returns a `String` object initialized by using a given
   /// format string as a template into which the remaining argument
   /// values are substituted.
   init(format: String, _ _arguments: CVarArg...) {
     self = String(format: format, arguments: _arguments)
   }
 
-  // - (instancetype)initWithFormat:(NSString *)format arguments:(va_list)argList
+  // - (instancetype)
+  //     initWithFormat:(NSString *)format
+  //     arguments:(va_list)argList
 
-  /// Returns an `NSString` object initialized by using a given
+  /// Returns a `String` object initialized by using a given
   /// format string as a template into which the remaining argument
   /// values are substituted according to the user’s default locale.
   init(format: String, arguments: CVarArg[]) {
-    _precondition(_countFormatSpecifiers(format) <= arguments.count)
-    self = withVaList(arguments) {
-      NSString(format: format, arguments: $0)
-    }
+    self = String(format: format, locale: nil, arguments: arguments)
   }
-
+  
   // - (instancetype)initWithFormat:(NSString *)format locale:(id)locale, ...
 
-  /// Returns an `NSString` object initialized by using a given
+  /// Returns a `String` object initialized by using a given
   /// format string as a template into which the remaining argument
   /// values are substituted according to given locale information.
-  init(format: String, locale: NSLocale, _ arguments: CVarArg...) {
-    self = String(format: format, locale: locale, arguments: arguments)
+  init(format: String, locale: NSLocale?, _ args: CVarArg...) {
+    self = String(format: format, locale: locale, arguments: args)
   }
 
-  // - (instancetype)initWithFormat:(NSString *)format locale:(id)locale arguments:(va_list)argList
+  // - (instancetype)
+  //     initWithFormat:(NSString *)format
+  //     locale:(id)locale
+  //     arguments:(va_list)argList
 
-  /// Returns an `NSString` object initialized by using a given
+  /// Returns a `String` object initialized by using a given
   /// format string as a template into which the remaining argument
   /// values are substituted according to given locale information.
-  init(format: String, locale: NSLocale, arguments: CVarArg[]) {
-    _precondition(_countFormatSpecifiers(format) <= arguments.count, "More format specifiers than arguments")
+  init(format: String, locale: NSLocale?, arguments: CVarArg[]) {
+    _precondition(
+      _countFormatSpecifiers(format) <= arguments.count,
+      "Too many format specifiers (%<letter>) provided for the argument list"
+    )
     self = withVaList(arguments) {
       NSString(format: format, locale: locale, arguments: $0)
     }
   }
 
+  //===--- Already provided by core Swift ---------------------------------===//
   // - (instancetype)initWithString:(NSString *)aString
-
-  /// Returns an `NSString` object initialized by copying the
-  /// characters from another given string.
-  init(string: String) {
-    self = string
-  }
-
+  
+  //===--- Initializers that can fail dropped for factory functions -------===//
   // - (instancetype)initWithUTF8String:(const char *)bytes
 
-  /// Returns an `NSString` object initialized by copying the
-  /// characters from a given C array of UTF8-encoded bytes.
-  init(UTF8String: CString) {
-    self = String.stringWithUTF8String(UTF8String)
-  }
-
+  //===--- Omitted for consistency with API review results 5/20/2014 ------===//
   // @property NSInteger integerValue;
-
-  /// Returns the `NSInteger` value of the receiver’s text.
-  var integerValue: Int {
-    return _ns.integerValue
-  }
-
   // @property Int intValue;
 
-  /// Returns the integer value of the receiver’s text.
-  var intValue: Int {
-    return Int(_ns.intValue)
-  }
-
-  /// @property BOOL absolutePath;
-
-  /// Returning a Boolean value that indicates whether the
-  /// receiver represents an absolute path.
-  var absolutePath: Bool {
-    return _ns.absolutePath
-  }
-
+  //===--- Omitted by apparent agreement during API review 5/20/2014 ------===//
+  // @property BOOL absolutePath;
   // - (BOOL)isEqualToString:(NSString *)aString
 
-  /// Returns a Boolean value that indicates whether a given
-  /// string is equal to the receiver using a literal Unicode-based
-  /// comparison.
-
-  func isEqualToString(aString: String) -> Bool {
-    return _ns.isEqualToString(aString)
-  }
-
+  //===--- Kept for consistency with API review results 5/20/2014 ---------===//
+  // We decided to keep pathWithComponents, so keeping this too
   // @property NSString lastPathComponent;
 
-  /// Returns the last path component of the receiver.
+  /// Returns the last path component of the `String`.
   var lastPathComponent: String {
     return _ns.lastPathComponent
   }
 
+  //===--- Renamed by agreement during API review 5/20/2014 ---------------===//
   // @property NSUInteger length;
 
-  /// Returns the number of Unicode characters in the receiver.
-  var length: Int {
+  /// Returns the number of Unicode characters in the `String`.
+  var utf16count: Int {
     return _ns.length
   }
 
   // - (NSUInteger)lengthOfBytesUsingEncoding:(NSStringEncoding)enc
 
   /// Returns the number of bytes required to store the
-  /// receiver in a given encoding.
+  /// `String` in a given encoding.
   func lengthOfBytesUsingEncoding(encoding: NSStringEncoding) -> Int {
     return _ns.lengthOfBytesUsingEncoding(encoding)
   }
@@ -988,28 +903,42 @@ extension String {
 
   /// Returns the range of characters representing the line or lines
   /// containing a given range.
-  func lineRangeForRange(aRange: NSRange) -> NSRange {
-    return _ns.lineRangeForRange(aRange)
+  func lineRangeForRange(aRange: Range<Index>) -> Range<Index> {
+    return _range(_ns.lineRangeForRange(_toNSRange(aRange)))
   }
 
-  // - (NSArray *)linguisticTagsInRange:(NSRange)range scheme:(NSString *)tagScheme options:(NSLinguisticTaggerOptions)opts orthography:(NSOrthography *)orthography tokenRanges:(NSArray**)tokenRanges
+  // - (NSArray *)
+  //     linguisticTagsInRange:(NSRange)range
+  //     scheme:(NSString *)tagScheme
+  //     options:(NSLinguisticTaggerOptions)opts
+  //     orthography:(NSOrthography *)orthography
+  //     tokenRanges:(NSArray**)tokenRanges
 
   /// Returns an array of linguistic tags for the specified
   /// range and requested tags within the receiving string.
   func linguisticTagsInRange(
-    range: NSRange, scheme: String, options: NSLinguisticTaggerOptions,
-    orthography: NSOrthography?, inout tokenRanges: NSRange[]?
+    range: Range<Index>, 
+    scheme tagScheme: String, 
+    options opts: NSLinguisticTaggerOptions = nil,
+    orthography: NSOrthography? = nil, 
+    tokenRanges: CMutablePointer<Range<Index>[]> = nil // FIXME:Can this be nil?
   ) -> String[] {
-    var tokenRanges_: NSArray? = .None
-    var result = self._ns.linguisticTagsInRange(
-      range,
-      scheme: scheme,
-      options: options,
-      orthography: orthography ? orthography! : nil,
-      tokenRanges: &tokenRanges_
-    )
-    tokenRanges = tokenRanges_!._toRangeArray()
-    return (result as String[])!
+    var nsTokenRanges: NSArray? = nil
+    let result = tokenRanges._withBridgeObject(&nsTokenRanges) {
+      self._ns.linguisticTagsInRange(
+        _toNSRange(range), scheme: tagScheme, options: opts,
+        orthography: orthography ? orthography! : nil, tokenRanges: $0)
+    }
+    
+    if nsTokenRanges {
+      tokenRanges._setIfNonNil {
+        (nsTokenRanges! as AnyObject[]).map {
+          self._range($0.rangeValue)
+        }
+      }
+    }
+    
+    return _convertNSArrayToArray(result)
   }
 
   // - (NSComparisonResult)localizedCaseInsensitiveCompare:(NSString *)aString
@@ -1033,12 +962,8 @@ extension String {
     return _ns.localizedStandardCompare(string)
   }
 
+  //===--- Omitted for consistency with API review results 5/20/2014 ------===//
   // @property long long longLongValue
-
-  /// Returns the long long value of the receiver’s text.
-  var longLongValue: Int64 {
-    return self.longLongValue
-  }
 
   // - (NSString *)lowercaseStringWithLocale:(NSLocale *)locale
 
@@ -1052,7 +977,7 @@ extension String {
   // - (NSUInteger)maximumLengthOfBytesUsingEncoding:(NSStringEncoding)enc
 
   /// Returns the maximum number of bytes needed to store the
-  /// receiver in a given encoding.
+  /// `String` in a given encoding.
   func maximumLengthOfBytesUsingEncoding(encoding: NSStringEncoding) -> Int {
     return _ns.maximumLengthOfBytesUsingEncoding(encoding)
   }
@@ -1061,29 +986,29 @@ extension String {
 
   /// Returns the range of characters representing the
   /// paragraph or paragraphs containing a given range.
-  func paragraphRangeForRange(aRange: NSRange) -> NSRange {
-    return _ns.paragraphRangeForRange(aRange)
+  func paragraphRangeForRange(aRange: Range<Index>) -> Range<Index> {
+    return _range(_ns.paragraphRangeForRange(_toNSRange(aRange)))
   }
 
   // @property NSArray* pathComponents
 
   /// Returns an array of NSString objects containing, in
-  /// order, each path component of the receiver.
+  /// order, each path component of the `String`.
   var pathComponents: String[] {
     return (_ns.pathComponents as String[])!
   }
 
   // @property NSString* pathExtension;
 
-  /// Interprets the receiver as a path and returns the
-  /// receiver’s extension, if any.
+  /// Interprets the `String` as a path and returns the
+  /// `String`’s extension, if any.
   var pathExtension: String {
     return _ns.pathExtension
   }
 
   // @property NSString* precomposedStringWithCanonicalMapping;
 
-  /// Returns a string made by normalizing the receiver’s
+  /// Returns a string made by normalizing the `String`’s
   /// contents using Form C.
   var precomposedStringWithCanonicalMapping: String {
     return _ns.precomposedStringWithCanonicalMapping
@@ -1091,7 +1016,7 @@ extension String {
 
   // @property NSString * precomposedStringWithCompatibilityMapping;
 
-  /// Returns a string made by normalizing the receiver’s
+  /// Returns a string made by normalizing the `String`’s
   /// contents using Form KC.
   var precomposedStringWithCompatibilityMapping: String {
     return _ns.precomposedStringWithCompatibilityMapping
@@ -1099,7 +1024,7 @@ extension String {
 
   // - (id)propertyList
 
-  /// Parses the receiver as a text representation of a
+  /// Parses the `String` as a text representation of a
   /// property list, returning an NSString, NSData, NSArray, or
   /// NSDictionary object, according to the topmost element.
   func propertyList() -> AnyObject {
@@ -1109,107 +1034,106 @@ extension String {
   // - (NSDictionary *)propertyListFromStringsFileFormat
 
   /// Returns a dictionary object initialized with the keys and
-  /// values found in the receiver.
-  func propertyListFromStringsFileFormat() -> Dictionary<String, AnyObject> {
-    var result = Dictionary<String, AnyObject>()
-
+  /// values found in the `String`.
+  func propertyListFromStringsFileFormat() -> Dictionary<String, String> {
+    var result = Dictionary<String, String>()
     _ns.propertyListFromStringsFileFormat().enumerateKeysAndObjectsUsingBlock {
-      (key: AnyObject?, value: AnyObject?, stop: CMutablePointer<ObjCBool>)->Void
-    in
-      print("")
+      key, value, stop in
+      result[key! as String] = value! as String
     }
     return result
   }
 
   // - (NSRange)rangeOfCharacterFromSet:(NSCharacterSet *)aSet
-
-  /// Finds and returns the range in the receiver of the first
-  /// character from a given character set.
-  func rangeOfCharacterFromSet(aSet: NSCharacterSet) -> NSRange {
-    return _ns.rangeOfCharacterFromSet(aSet)
-  }
-
-  // - (NSRange)rangeOfCharacterFromSet:(NSCharacterSet *)aSet options:(NSStringCompareOptions)mask
-
-  /// Finds and returns the range in the receiver of the first
-  /// character, using given options, from a given character set.
-  func rangeOfCharacterFromSet(aSet: NSCharacterSet, options: NSStringCompareOptions) -> NSRange {
-    return _ns.rangeOfCharacterFromSet(aSet, options: options)
-  }
-
-  // - (NSRange)rangeOfCharacterFromSet:(NSCharacterSet *)aSet options:(NSStringCompareOptions)mask range:(NSRange)aRange
-
-  /// Finds and returns the range in the receiver of the first
+  //
+  // - (NSRange)
+  //     rangeOfCharacterFromSet:(NSCharacterSet *)aSet
+  //     options:(NSStringCompareOptions)mask
+  //
+  // - (NSRange)
+  //     rangeOfCharacterFromSet:(NSCharacterSet *)aSet
+  //     options:(NSStringCompareOptions)mask
+  //     range:(NSRange)aRange
+  
+  /// Finds and returns the range in the `String` of the first
   /// character from a given character set found in a given range with
   /// given options.
-
   func rangeOfCharacterFromSet(
-    aSet: NSCharacterSet, options:NSStringCompareOptions, range: NSRange
-  )-> NSRange {
-    return _ns.rangeOfCharacterFromSet(aSet, options: options, range: range)
+    aSet: NSCharacterSet,
+    options mask:NSStringCompareOptions = nil,
+    range aRange: Range<Index>? = nil
+  )-> Range<Index> {
+    return _range(
+      _ns.rangeOfCharacterFromSet(
+        aSet, options: mask,
+        range: _toNSRange(aRange ? aRange! : indices(self))))
   }
 
   // - (NSRange)rangeOfComposedCharacterSequenceAtIndex:(NSUInteger)anIndex
 
-  /// Returns the range in the receiver of the composed
+  /// Returns the range in the `String` of the composed
   /// character sequence located at a given index.
-  func rangeOfComposedCharacterSequenceAtIndex(anIndex: Int) -> NSRange {
-    return _ns.rangeOfComposedCharacterSequenceAtIndex(anIndex)
+  func rangeOfComposedCharacterSequenceAtIndex(anIndex: Index) -> Range<Index> {
+    return _range(
+      _ns.rangeOfComposedCharacterSequenceAtIndex(anIndex._utf16Index))
   }
 
   // - (NSRange)rangeOfComposedCharacterSequencesForRange:(NSRange)range
 
   /// Returns the range in the string of the composed character
   /// sequences for a given range.
-  func rangeOfComposedCharacterSequencesForRange(range: NSRange) -> NSRange {
-    return _ns.rangeOfComposedCharacterSequencesForRange(range)
+  func rangeOfComposedCharacterSequencesForRange(
+    range: Range<Index>
+  ) -> Range<Index> {
+    // Theoretically, this will be the identity function.  In practice
+    // I think users will be able to observe differences in the input
+    // and output ranges due (if nothing else) to locale changes
+    return _range(
+      _ns.rangeOfComposedCharacterSequencesForRange(_toNSRange(range)))
   }
 
   // - (NSRange)rangeOfString:(NSString *)aString
+  //
+  // - (NSRange)
+  //     rangeOfString:(NSString *)aString options:(NSStringCompareOptions)mask
+  //
+  // - (NSRange)
+  //     rangeOfString:(NSString *)aString
+  //     options:(NSStringCompareOptions)mask
+  //     range:(NSRange)aRange
+  //
+  // - (NSRange)
+  //     rangeOfString:(NSString *)aString
+  //     options:(NSStringCompareOptions)mask
+  //     range:(NSRange)searchRange
+  //     locale:(NSLocale *)locale
 
   /// Finds and returns the range of the first occurrence of a
-  /// given string within the receiver.
-  func rangeOfString(aString: String) -> NSRange {
-    return _ns.rangeOfString(aString)
-  }
-
-  // - (NSRange)rangeOfString:(NSString *)aString options:(NSStringCompareOptions)mask
-
-  /// Finds and returns the range of the first occurrence of a
-  /// given string within the receiver, subject to given options.
-  func rangeOfString(
-    aString: NSString, options:NSStringCompareOptions
-  ) -> NSRange {
-    return _ns.rangeOfString(aString, options: options)
-  }
-
-  // - (NSRange)rangeOfString:(NSString *)aString options:(NSStringCompareOptions)mask range:(NSRange)aRange
-
-  /// Finds and returns the range of the first occurrence of a
-  /// given string, within the given range of the receiver, subject to
-  /// given options.
-  func rangeOfString(
-    aString: String, options: NSStringCompareOptions, range: NSRange
-  ) -> NSRange {
-    return _ns.rangeOfString(aString, options: options, range: range)
-  }
-
-  // - (NSRange)rangeOfString:(NSString *)aString options:(NSStringCompareOptions)mask range:(NSRange)searchRange locale:(NSLocale *)locale
-
-  /// Finds and returns the range of the first occurrence of a
-  /// given string within a given range of the receiver, subject to
+  /// given string within a given range of the `String`, subject to
   /// given options, using the specified locale, if any.
   func rangeOfString(
-    aString: NSString, options: NSStringCompareOptions, range: NSRange, locale: NSLocale
-  ) -> NSRange {
-    return _ns.rangeOfString(
-      aString, options: options, range: range, locale: locale
+    aString: String,
+    options mask: NSStringCompareOptions = nil,
+    range searchRange: Range<Index>? = nil,
+    locale: NSLocale? = nil
+  ) -> Range<Index> {
+    return _range(
+      locale ? _ns.rangeOfString(
+        aString, options: mask,
+        range: _toNSRange(searchRange ? searchRange! : indices(self)),
+        locale: locale
+      )
+      : searchRange ? _ns.rangeOfString(
+        aString, options: mask, range: _toNSRange(searchRange!)
+      )
+      : mask ? _ns.rangeOfString(aString, options: mask)
+      : _ns.rangeOfString(aString)
     )
   }
 
   // @property NSStringEncoding smallestEncoding;
 
-  /// Returns the smallest encoding to which the receiver can
+  /// Returns the smallest encoding to which the `String` can
   /// be converted without loss of information.
   var smallestEncoding: NSStringEncoding {
     return _ns.smallestEncoding
@@ -1224,9 +1148,11 @@ extension String {
     return _ns.stringByAbbreviatingWithTildeInPath
   }
 
-  // - (NSString *)stringByAddingPercentEncodingWithAllowedCharacters:(NSCharacterSet *)allowedCharacters
+  // - (NSString *)
+  //     stringByAddingPercentEncodingWithAllowedCharacters:
+  //       (NSCharacterSet *)allowedCharacters
 
-  /// Returns a new string made from the receiver by replacing
+  /// Returns a new string made from the `String` by replacing
   /// all characters not in the specified set with percent encoded
   /// characters.
   func stringByAddingPercentEncodingWithAllowedCharacters(
@@ -1237,11 +1163,12 @@ extension String {
     )
   }
 
-  // - (NSString *)stringByAddingPercentEscapesUsingEncoding:(NSStringEncoding)encoding
+  // - (NSString *)
+  //     stringByAddingPercentEscapesUsingEncoding:(NSStringEncoding)encoding
 
-  /// Returns a representation of the receiver using a given
+  /// Returns a representation of the `String` using a given
   /// encoding to determine the percent escapes necessary to convert
-  /// the receiver into a legal URL string.
+  /// the `String` into a legal URL string.
   func stringByAddingPercentEscapesUsingEncoding(
     encoding: NSStringEncoding
   ) -> String {
@@ -1250,7 +1177,7 @@ extension String {
 
   // - (NSString *)stringByAppendingFormat:(NSString *)format, ...
 
-  /// Returns a string made by appending to the receiver a
+  /// Returns a string made by appending to the `String` a
   /// string constructed from a given format string and the following
   /// arguments.
   func stringByAppendingFormat(
@@ -1262,14 +1189,14 @@ extension String {
 
   // - (NSString *)stringByAppendingPathComponent:(NSString *)aString
 
-  /// Returns a new string made by appending to the receiver a given string.
+  /// Returns a new string made by appending to the `String` a given string.
   func stringByAppendingPathComponent(aString: String) -> String {
     return _ns.stringByAppendingPathComponent(aString)
   }
 
   // - (NSString *)stringByAppendingPathExtension:(NSString *)ext
 
-  /// Returns a new string made by appending to the receiver an
+  /// Returns a new string made by appending to the `String` an
   /// extension separator followed by a given extension.
   func stringByAppendingPathExtension(ext: String) -> String {
     return _ns.stringByAppendingPathExtension(ext)
@@ -1278,7 +1205,7 @@ extension String {
   // - (NSString *)stringByAppendingString:(NSString *)aString
 
   /// Returns a new string made by appending a given string to
-  /// the receiver.
+  /// the `String`.
   func stringByAppendingString(aString: String) -> String {
     return _ns.stringByAppendingString(aString)
   }
@@ -1286,7 +1213,7 @@ extension String {
   // @property NSString* stringByDeletingLastPathComponent;
 
   /// Returns a new string made by deleting the last path
-  /// component from the receiver, along with any final path
+  /// component from the `String`, along with any final path
   /// separator.
   var stringByDeletingLastPathComponent: String {
     return _ns.stringByDeletingLastPathComponent
@@ -1295,7 +1222,7 @@ extension String {
   // @property NSString* stringByDeletingPathExtension;
 
   /// Returns a new string made by deleting the extension (if
-  /// any, and only the last) from the receiver.
+  /// any, and only the last) from the `String`.
   var stringByDeletingPathExtension: String {
     return _ns.stringByDeletingPathExtension
   }
@@ -1303,12 +1230,14 @@ extension String {
   // @property NSString* stringByExpandingTildeInPath;
 
   /// Returns a new string made by expanding the initial
-  /// component of the receiver to its full path value.
+  /// component of the `String` to its full path value.
   var stringByExpandingTildeInPath: String {
     return _ns.stringByExpandingTildeInPath
   }
 
-  // - (NSString *)stringByFoldingWithOptions:(NSStringCompareOptions)options locale:(NSLocale *)locale
+  // - (NSString *)
+  //     stringByFoldingWithOptions:(NSStringCompareOptions)options
+  //     locale:(NSLocale *)locale
 
   /// Returns a string with the given character folding options
   /// applied.
@@ -1318,61 +1247,75 @@ extension String {
     return _ns.stringByFoldingWithOptions(options, locale: locale)
   }
 
-  // - (NSString *)stringByPaddingToLength:(NSUInteger)newLength withString:(NSString *)padString startingAtIndex:(NSUInteger)padIndex
+  // - (NSString *)stringByPaddingToLength:(NSUInteger)newLength
+  //     withString:(NSString *)padString
+  //     startingAtIndex:(NSUInteger)padIndex
 
-  /// Returns a new string formed from the receiver by either
+  /// Returns a new string formed from the `String` by either
   /// removing characters from the end, or by appending as many
   /// occurrences as necessary of a given pad string.
   func stringByPaddingToLength(
-    newLength: Int, withString: String, startingAtIndex:Int
+    newLength: Int, withString padString: String, startingAtIndex padIndex: Int
   ) -> String {
     return _ns.stringByPaddingToLength(
-      newLength, withString: withString, startingAtIndex: startingAtIndex)
+      newLength, withString: padString, startingAtIndex: padIndex)
   }
 
   // @property NSString* stringByRemovingPercentEncoding;
 
-  /// Returns a new string made from the receiver by replacing
+  /// Returns a new string made from the `String` by replacing
   /// all percent encoded sequences with the matching UTF-8
   /// characters.
   var stringByRemovingPercentEncoding: String {
     return _ns.stringByRemovingPercentEncoding
   }
 
-  // - (NSString *)stringByReplacingCharactersInRange:(NSRange)range withString:(NSString *)replacement
+  // - (NSString *)
+  //     stringByReplacingCharactersInRange:(NSRange)range
+  //     withString:(NSString *)replacement
 
   /// Returns a new string in which the characters in a
-  /// specified range of the receiver are replaced by a given string.
+  /// specified range of the `String` are replaced by a given string.
   func stringByReplacingCharactersInRange(
-    range: NSRange, withString: String
+    range: Range<Index>, withString replacement: String
   ) -> String {
-    return _ns.stringByReplacingCharactersInRange(range, withString:withString)
+    return _ns.stringByReplacingCharactersInRange(
+      _toNSRange(range), withString: replacement)
   }
 
-  // - (NSString *)stringByReplacingOccurrencesOfString:(NSString *)target withString:(NSString *)replacement
+  // - (NSString *)
+  //     stringByReplacingOccurrencesOfString:(NSString *)target
+  //     withString:(NSString *)replacement
+  //
+  // - (NSString *)
+  //     stringByReplacingOccurrencesOfString:(NSString *)target
+  //     withString:(NSString *)replacement
+  //     options:(NSStringCompareOptions)options
+  //     range:(NSRange)searchRange
 
   /// Returns a new string in which all occurrences of a target
-  /// string in the receiver are replaced by another given string.
-  func stringByReplacingOccurrencesOfString(target: String, withString: NSString) -> String {
-    return _ns.stringByReplacingOccurrencesOfString(target, withString: withString)
-  }
-
-  // - (NSString *)stringByReplacingOccurrencesOfString:(NSString *)target withString:(NSString *)replacement options:(NSStringCompareOptions)options range:(NSRange)searchRange
-
-  /// Returns a new string in which all occurrences of a target
-  /// string in a specified range of the receiver are replaced by
+  /// string in a specified range of the `String` are replaced by
   /// another given string.
   func stringByReplacingOccurrencesOfString(
-    target: String, withString: String, options: NSStringCompareOptions, range: NSRange
+    target: String,
+    withString replacement: String,
+    options: NSStringCompareOptions = nil,
+    range searchRange: Range<Index>? = nil
   ) -> String {
-    return _ns.stringByReplacingOccurrencesOfString(
-      target, withString: withString, options: options, range: range
+    // FIXME: " != nil" needed pending <rdar://problem/16997968> 
+    return searchRange || options != nil 
+    ? _ns.stringByReplacingOccurrencesOfString(
+      target,
+      withString: replacement, options: options,
+      range: _toNSRange(searchRange ? searchRange! : indices(self))
     )
+    : _ns.stringByReplacingOccurrencesOfString(target, withString: replacement)
   }
 
-  // - (NSString *)stringByReplacingPercentEscapesUsingEncoding:(NSStringEncoding)encoding
+  // - (NSString *)
+  //     stringByReplacingPercentEscapesUsingEncoding:(NSStringEncoding)encoding
 
-  /// Returns a new string made by replacing in the receiver
+  /// Returns a new string made by replacing in the `String`
   /// all percent escapes with the matching characters as determined
   /// by a given encoding.
   func stringByReplacingPercentEscapesUsingEncoding(
@@ -1383,7 +1326,7 @@ extension String {
 
   // @property NSString* stringByResolvingSymlinksInPath;
 
-  /// Returns a new string made from the receiver by resolving
+  /// Returns a new string made from the `String` by resolving
   /// all symbolic links and standardizing path.
   var stringByResolvingSymlinksInPath: String {
     return _ns.stringByResolvingSymlinksInPath
@@ -1392,7 +1335,7 @@ extension String {
   // @property NSString* stringByStandardizingPath;
 
   /// Returns a new string made by removing extraneous path
-  /// components from the receiver.
+  /// components from the `String`.
   var stringByStandardizingPath: String {
     return _ns.stringByStandardizingPath
   }
@@ -1400,7 +1343,7 @@ extension String {
   // - (NSString *)stringByTrimmingCharactersInSet:(NSCharacterSet *)set
 
   /// Returns a new string made by removing from both ends of
-  /// the receiver characters contained in a given character set.
+  /// the `String` characters contained in a given character set.
   func stringByTrimmingCharactersInSet(set: NSCharacterSet) -> String {
     return _ns.stringByTrimmingCharactersInSet(set)
   }
@@ -1408,7 +1351,7 @@ extension String {
   // - (NSArray *)stringsByAppendingPaths:(NSArray *)paths
 
   /// Returns an array of strings made by separately appending
-  /// to the receiver each string in in a given array.
+  /// to the `String` each string in in a given array.
   func stringsByAppendingPaths(paths: String[]) -> String[] {
     return (_ns.stringsByAppendingPaths(paths) as String[])!
   }
@@ -1416,7 +1359,7 @@ extension String {
   // - (NSString *)substringFromIndex:(NSUInteger)anIndex
 
   /// Returns a new string containing the characters of the
-  /// receiver from the one at a given index to the end.
+  /// `String` from the one at a given index to the end.
   func substringFromIndex(index: Int) -> String {
     return _ns.substringFromIndex(index)
   }
@@ -1424,7 +1367,7 @@ extension String {
   // - (NSString *)substringToIndex:(NSUInteger)anIndex
 
   /// Returns a new string containing the characters of the
-  /// receiver up to, but not including, the one at a given index.
+  /// `String` up to, but not including, the one at a given index.
   func substringToIndex(index: Int) -> String {
     return _ns.substringToIndex(index)
   }
@@ -1432,9 +1375,9 @@ extension String {
   // - (NSString *)substringWithRange:(NSRange)aRange
 
   /// Returns a string object containing the characters of the
-  /// receiver that lie within a given range.
-  func substringWithRange(aRange: NSRange) -> String {
-    return _ns.substringWithRange(aRange)
+  /// `String` that lie within a given range.
+  func substringWithRange(aRange: Range<Index>) -> String {
+    return _ns.substringWithRange(_toNSRange(aRange))
   }
 
 
@@ -1447,62 +1390,54 @@ extension String {
     return _ns.uppercaseStringWithLocale(locale)
   }
 
+  //===--- Omitted due to redundancy with "utf8" property -----------------===//
   // - (const char *)UTF8String
 
-  /// Returns a null-terminated UTF8 representation of the receiver.
-  func UTF8String() -> CChar[] {
-    return _ns.UTF8String.persist()
-  }
+  // - (BOOL)
+  //     writeToFile:(NSString *)path
+  //     atomically:(BOOL)useAuxiliaryFile
+  //     encoding:(NSStringEncoding)enc
+  //     error:(NSError **)error
 
-  // - (BOOL)writeToFile:(NSString *)path atomically:(BOOL)useAuxiliaryFile encoding:(NSStringEncoding)enc error:(NSError **)error
-
-  /// Writes the contents of the receiver to a file at a given
+  /// Writes the contents of the `String` to a file at a given
   /// path using a given encoding.
   func writeToFile(
-    path: NSString, atomically:Bool, encoding: NSStringEncoding, inout error: NSError?
+    path: String, atomically useAuxiliaryFile:Bool,
+    encoding enc: NSStringEncoding, error: NSErrorPointer = nil
   ) -> Bool {
     return self._ns.writeToFile(
-      path, atomically: atomically, encoding: encoding,
-      error: &error
-    )
+      path, atomically: useAuxiliaryFile, encoding: enc, error: error)
   }
 
-  func writeToFile(
-    path: NSString, atomically:Bool, encoding: NSStringEncoding) -> Bool {
-      return _ns.writeToFile(path, atomically: atomically, encoding: encoding, error: nil)
-  }
+  // - (BOOL)
+  //     writeToURL:(NSURL *)url
+  //     atomically:(BOOL)useAuxiliaryFile
+  //     encoding:(NSStringEncoding)enc
+  //     error:(NSError **)error
 
-  // - (BOOL)writeToURL:(NSURL *)url atomically:(BOOL)useAuxiliaryFile encoding:(NSStringEncoding)enc error:(NSError **)error
-
-  /// Writes the contents of the receiver to the URL specified
+  /// Writes the contents of the `String` to the URL specified
   /// by url using the specified encoding.
   func writeToURL(
-    url: NSURL, atomically: Bool, encoding: NSStringEncoding, inout error: NSError?
+    url: NSURL, atomically useAuxiliaryFile: Bool,
+    encoding enc: NSStringEncoding, error: NSErrorPointer = nil
   ) -> Bool {
     return self._ns.writeToURL(
-      url, atomically: atomically, encoding: encoding, error: &error
-    )
-  }
-
-  func writeToURL(
-    url: NSURL, atomically: Bool, encoding: NSStringEncoding
-  ) -> Bool {
-    return _ns.writeToURL(url, atomically: atomically, encoding: encoding, error: nil)
+      url, atomically: useAuxiliaryFile, encoding: enc, error: error)
   }
 }
 
 @transparent
 func == (lhs: NSString, rhs: NSString) -> Bool {
-  return lhs.isEqualToString(rhs)
+  return String(lhs) == String(rhs)
 }
 
 @transparent
 func == (lhs: String, rhs: NSString) -> Bool {
-  return lhs.isEqualToString(rhs)
+  return lhs == String(rhs)
 }
 
 @transparent
 func == (lhs: NSString, rhs: String) -> Bool {
-  return lhs.isEqualToString(rhs)
+  return String(lhs) == rhs
 }
 
