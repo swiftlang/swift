@@ -1062,10 +1062,10 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
     }
   }
 
-  /// :param: start The offset of the beginning of the chain.
+  /// :param: idealBucket The ideal bucket for the element being deleted.
   /// :param: offset The offset of the element that will be deleted.
   mutating func nativeDeleteImpl(
-      nativeStorage: NativeStorage, var start: Int, offset: Int
+      nativeStorage: NativeStorage, idealBucket: Int, offset: Int
   ) {
     // remove the element
     nativeStorage[offset] = .None
@@ -1076,6 +1076,7 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
     var hole = offset
 
     // Find the first bucket in the contigous chain
+    var start = idealBucket
     while nativeStorage[nativeStorage._prev(start)] {
       start = nativeStorage._prev(start)
     }
@@ -1119,8 +1120,8 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
 
   mutating func nativeRemoveObjectForKey(key: KeyType) -> ValueType? {
     var nativeStorage = native
-    var start = nativeStorage._bucket(key)
-    var (index, found) = nativeStorage._find(key, start)
+    var idealBucket = nativeStorage._bucket(key)
+    var (index, found) = nativeStorage._find(key, idealBucket)
 
     // Fast path: if the key is not present, we will not mutate the dictionary,
     // so don't force unique storage.
@@ -1134,13 +1135,14 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
       nativeStorage = native
     }
     if capacityChanged {
-      start = nativeStorage._bucket(key)
-      (index, found) = nativeStorage._find(key, start)
+      idealBucket = nativeStorage._bucket(key)
+      (index, found) = nativeStorage._find(key, idealBucket)
       _sanityCheck(found, "key was lost during storage migration")
     }
 
     let oldValue = nativeStorage[index.offset]!.value
-    nativeDeleteImpl(nativeStorage, start: start, offset: index.offset)
+    nativeDeleteImpl(nativeStorage, idealBucket: idealBucket,
+        offset: index.offset)
     return oldValue
   }
 
@@ -1156,8 +1158,8 @@ enum _VariantDictionaryStorage<KeyType : Hashable, ValueType> :
     }
 
     let key = nativeStorage.assertingGet(nativeIndex).0
-    let start = nativeStorage._bucket(key)
-    nativeDeleteImpl(nativeStorage, start: start, offset: nativeIndex.offset)
+    nativeDeleteImpl(nativeStorage, idealBucket: nativeStorage._bucket(key),
+        offset: nativeIndex.offset)
   }
 
   mutating func removeAtIndex(index: Index) {
