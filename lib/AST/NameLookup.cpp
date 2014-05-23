@@ -64,7 +64,7 @@ void swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
     // FIXME: Egregious hack to avoid failing when there are no declared types.
     if (!decl->hasType() || isa<TypeAliasDecl>(decl) || isa<AbstractTypeParamDecl>(decl)) {
       // FIXME: Pass this down instead of getting it from the ASTContext.
-      if (typeResolver)
+      if (typeResolver && !decl->isBeingTypeChecked())
         typeResolver->resolveDeclSignature(decl);
       if (!decl->hasType())
         continue;
@@ -1090,7 +1090,7 @@ bool DeclContext::lookupQualified(Type type,
     for (auto decl : current->lookupDirect(name)) {
       // Resolve the declaration signature when we find the
       // declaration.
-      if (typeResolver && !decl->hasType()) {
+      if (typeResolver && !decl->hasType() && !decl->isBeingTypeChecked()) {
         typeResolver->resolveDeclSignature(decl);
 
         if (!decl->hasType())

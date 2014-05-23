@@ -1193,8 +1193,12 @@ void ValueDecl::setInterfaceType(Type type) {
 }
 
 Type TypeDecl::getDeclaredType() const {
-  if (auto TAD = dyn_cast<TypeAliasDecl>(this))
+  if (auto TAD = dyn_cast<TypeAliasDecl>(this)) {
+    if (isa<ErrorType>(TAD->getType()->getCanonicalType())) {
+      return TAD->getType();
+    }
     return TAD->getAliasType();
+  }
   if (auto typeParam = dyn_cast<AbstractTypeParamDecl>(this))
     return typeParam->getType()->castTo<MetatypeType>()->getInstanceType();
   return cast<NominalTypeDecl>(this)->getDeclaredType();

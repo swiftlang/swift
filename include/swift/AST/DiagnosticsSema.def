@@ -429,6 +429,10 @@ ERROR(static_requires_initializer,decl_parsing,none,
       "%select{ERROR|'static var'|'class var'|}0 declaration requires an initializer "
       "expression or getter/setter specifier", (StaticSpellingKind))
 
+// Type aliases
+ERROR(circular_type_alias,sema_tct,none,
+      "type alias %0 circularly references itself", (Identifier))
+
 // Extensions
 ERROR(non_nominal_extension,sema_tcd,none,
       "%select{non-nominal type|protocol}0 %1 cannot be extended", (bool, Type))

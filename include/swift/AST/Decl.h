@@ -285,8 +285,11 @@ class alignas(8) Decl {
     /// \brief Whether we've already performed early attribute validation.
     /// FIXME: This is ugly.
     unsigned EarlyAttrValidation : 1;
+    
+    /// \brief Whether or not this declaration is currently being type-checked.
+    unsigned BeingTypeChecked : 1;
   };
-  enum { NumDeclBits = 12 };
+  enum { NumDeclBits = 13 };
   static_assert(NumDeclBits <= 32, "fits in an unsigned");
   
   class PatternBindingDeclBitfields {
@@ -582,6 +585,7 @@ protected:
     DeclBits.Implicit = false;
     DeclBits.FromClang = false;
     DeclBits.EarlyAttrValidation = false;
+    DeclBits.BeingTypeChecked = false;
   }
 
   ClangNode getClangNodeImpl() const {
@@ -708,6 +712,14 @@ public:
   /// Set whether we've performed early attribute validation.
   void setEarlyAttrValidation(bool validated = true) {
     DeclBits.EarlyAttrValidation = validated;
+  }
+  
+  /// Whether the declaration is currently being validated.
+  bool isBeingTypeChecked() { return DeclBits.BeingTypeChecked; }
+  
+  /// Toggle whether or not the declaration is being validated.
+  void setIsBeingTypeChecked(bool ibt = true) {
+    DeclBits.BeingTypeChecked = ibt;
   }
 
   /// \returns the unparsed comment attached to this declaration.

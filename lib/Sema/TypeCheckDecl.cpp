@@ -1133,8 +1133,10 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
 static void validatePatternBindingDecl(TypeChecker &tc,
                                        PatternBindingDecl *binding) {
   // If the pattern already has a type, we're done.
-  if (binding->getPattern()->hasType())
+  if (binding->getPattern()->hasType() || binding->isBeingTypeChecked())
     return;
+  
+  binding->setIsBeingTypeChecked();
 
   // Validate 'static'/'class' on properties in extensions.
   auto StaticSpelling = binding->getStaticSpelling();
@@ -1170,7 +1172,7 @@ static void validatePatternBindingDecl(TypeChecker &tc,
     setBoundVarsTypeError(binding->getPattern(), tc.Context);
     binding->setInvalid();
     binding->getPattern()->setType(ErrorType::get(tc.Context));
-    return;
+    goto done;
   }
 
   // If the pattern didn't get a type, it's because we ran into some
@@ -1180,7 +1182,7 @@ static void validatePatternBindingDecl(TypeChecker &tc,
       setBoundVarsTypeError(binding->getPattern(), tc.Context);
       binding->setInvalid();
       binding->getPattern()->setType(ErrorType::get(tc.Context));
-      return;
+      goto done;
     }
   }
 
@@ -1196,57 +1198,62 @@ static void validatePatternBindingDecl(TypeChecker &tc,
 
   // If we're in a generic type context, provide interface types for all of
   // the variables.
-  auto dc = binding->getDeclContext();
-  if (dc->isGenericContext() && dc->isTypeContext()) {
-    binding->getPattern()->forEachVariable([&](VarDecl *var) {
-      var->setInterfaceType(
-        tc.getInterfaceTypeFromInternalType(dc, var->getType()));
-    });
-  }
-
-  // For now, we only support static/class variables in specific contexts.
-  if (binding->isStatic()) {
-    // Selector for unimplemented_type_var message.
-    enum : unsigned {
-      Misc,
-      GenericTypes,
-      Classes,
-      Protocols,
-    };
-      
-    auto unimplementedStatic = [&](unsigned diagSel) {
-      auto staticLoc = binding->getStaticLoc();
-      tc.diagnose(staticLoc, diag::unimplemented_type_var,
-                  diagSel, binding->getStaticSpelling())
-        .highlight(SourceRange(staticLoc));
-    };
-
-    assert(dc->isTypeContext());
-    // The parser only accepts 'type' variables in type contexts, so
-    // we're either in a nominal type context or an extension.
-    NominalTypeDecl *nominal;
-    if (auto extension = dyn_cast<ExtensionDecl>(dc)) {
-      nominal = extension->getExtendedType()->getAnyNominal();
-      assert(nominal);
-    } else {
-      nominal = cast<NominalTypeDecl>(dc);
+  {
+    auto dc = binding->getDeclContext();
+    if (dc->isGenericContext() && dc->isTypeContext()) {
+      binding->getPattern()->forEachVariable([&](VarDecl *var) {
+        var->setInterfaceType(
+          tc.getInterfaceTypeFromInternalType(dc, var->getType()));
+      });
     }
 
-    // Non-stored properties are fine.
-    if (!binding->hasStorage()) {
-      // do nothing
+    // For now, we only support static/class variables in specific contexts.
+    if (binding->isStatic()) {
+      // Selector for unimplemented_type_var message.
+      enum : unsigned {
+        Misc,
+        GenericTypes,
+        Classes,
+        Protocols,
+      };
+        
+      auto unimplementedStatic = [&](unsigned diagSel) {
+        auto staticLoc = binding->getStaticLoc();
+        tc.diagnose(staticLoc, diag::unimplemented_type_var,
+                    diagSel, binding->getStaticSpelling())
+          .highlight(SourceRange(staticLoc));
+      };
 
-    // Stored type variables in a generic context need to logically
-    // occur once per instantiation, which we don't yet handle.
-    } else if (dc->isGenericContext()) {
-      unimplementedStatic(GenericTypes);
+      assert(dc->isTypeContext());
+      // The parser only accepts 'type' variables in type contexts, so
+      // we're either in a nominal type context or an extension.
+      NominalTypeDecl *nominal;
+      if (auto extension = dyn_cast<ExtensionDecl>(dc)) {
+        nominal = extension->getExtendedType()->getAnyNominal();
+        assert(nominal);
+      } else {
+        nominal = cast<NominalTypeDecl>(dc);
+      }
 
-    // Stored type variables in a class context need to be created
-    // once per subclass, which we don't yet handle.
-    } else if (isa<ClassDecl>(nominal)) {
-      unimplementedStatic(Classes);
+      // Non-stored properties are fine.
+      if (!binding->hasStorage()) {
+        // do nothing
+
+      // Stored type variables in a generic context need to logically
+      // occur once per instantiation, which we don't yet handle.
+      } else if (dc->isGenericContext()) {
+        unimplementedStatic(GenericTypes);
+
+      // Stored type variables in a class context need to be created
+      // once per subclass, which we don't yet handle.
+      } else if (isa<ClassDecl>(nominal)) {
+        unimplementedStatic(Classes);
+      }
     }
   }
+  
+done:
+  binding->setIsBeingTypeChecked(false);
 }
 
 /// \brief Build an implicit 'self' parameter for the specified DeclContext.
@@ -2073,6 +2080,7 @@ public:
       : TC(TC), IsFirstPass(IsFirstPass), IsSecondPass(IsSecondPass) {}
 
   void visit(Decl *decl) {
+    
     DeclVisitor<DeclChecker>::visit(decl);
 
     if (auto valueDecl = dyn_cast<ValueDecl>(decl)) {
@@ -2292,7 +2300,7 @@ public:
     validatePatternBindingDecl(TC, PBD);
     if (PBD->isInvalid())
       return;
-
+    
     if (!IsFirstPass) {
       if (PBD->getInit() && !PBD->wasInitChecked()) {
         if (TC.typeCheckBinding(PBD)) {
@@ -2501,6 +2509,20 @@ public:
   }
 
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
+    if (TAD->isBeingTypeChecked()) {
+      
+      if (!TAD->hasUnderlyingType()) {
+        TAD->setInvalid();
+        TAD->overwriteType(ErrorType::get(TC.Context));
+        TAD->getUnderlyingTypeLoc().setType(ErrorType::get(TC.Context));
+        
+        TC.diagnose(TAD->getLoc(), diag::circular_type_alias, TAD->getName());
+      }
+      return;
+    }
+    
+    TAD->setIsBeingTypeChecked();
+    
     TC.checkDeclAttributesEarly(TAD);
     if (!IsSecondPass) {
       if (TC.validateType(TAD->getUnderlyingTypeLoc(), TAD->getDeclContext())) {
@@ -2523,6 +2545,8 @@ public:
         TC.checkInheritanceClause(TAD);
     }
     TC.checkDeclAttributes(TAD);
+    
+    TAD->setIsBeingTypeChecked(false);
   }
   
   void visitAssociatedTypeDecl(AssociatedTypeDecl *assocType) {
@@ -3145,8 +3169,13 @@ public:
       }
     }
 
-    if (!badType)
+    if (!badType) {
+      FD->setIsBeingTypeChecked();
+      
       badType = semaFuncParamPatterns(FD, resolver);
+      
+      FD->setIsBeingTypeChecked(false);
+    }
 
     // Checking the function parameter patterns might (recursively)
     // end up setting the type.
@@ -3158,7 +3187,6 @@ public:
       FD->setInvalid();
       return;
     }
-
 
     // Reject things like "func f(Int)" if it has a body, since this will
     // implicitly name the argument 'f'.  Instead, suggest that the user write
@@ -3201,6 +3229,12 @@ public:
       outerGenericParams = FD->getDeclContext()->getGenericParamsOfContext();
 
     for (unsigned i = 0, e = patterns.size(); i != e; ++i) {
+      if (!patterns[e - i - 1]->hasType()) {
+        FD->setType(ErrorType::get(TC.Context));
+        FD->setInvalid();
+        return;
+      }
+      
       Type argTy = patterns[e - i - 1]->getType();
 
       // Determine the appropriate generic parameters at this level.
@@ -3502,7 +3536,8 @@ public:
 
     // Before anything else, set up the 'self' argument correctly if present.
     GenericParamList *outerGenericParams = nullptr;
-    if (FD->getDeclContext()->isTypeContext())
+    if (FD->getDeclContext()->isTypeContext() &&
+        !FD->getImplicitSelfDecl()->hasType())
       configureImplicitSelf(FD, outerGenericParams);
 
     // If we have generic parameters, check the generic signature now.
