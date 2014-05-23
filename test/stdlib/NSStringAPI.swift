@@ -490,27 +490,80 @@ NSStringAPIs.test("dataUsingEncoding(_:allowLossyConversion:)") {
 }
 
 NSStringAPIs.test("decomposedStringWithCanonicalMapping") {
-  // FIXME
+  expectEqual("abc", "abc".decomposedStringWithCanonicalMapping)
+  expectEqual("\u305f\u3099くてん", "だくてん".decomposedStringWithCanonicalMapping)
+  expectEqual("\uff80\uff9eｸﾃﾝ", "ﾀﾞｸﾃﾝ".decomposedStringWithCanonicalMapping)
 }
 
 NSStringAPIs.test("decomposedStringWithCompatibilityMapping") {
-  // FIXME
+  expectEqual("abc", "abc".decomposedStringWithCompatibilityMapping)
+  expectEqual("\u30bf\u3099クテン", "ﾀﾞｸﾃﾝ".decomposedStringWithCompatibilityMapping)
 }
 
 NSStringAPIs.test("enumerateLines(_:)") {
-  // FIXME
+  var lines: String[] = []
+  "abc\n\ndefghi\njklm".enumerateLines {
+    (line: String, inout stop: Bool)
+  in
+    lines += line
+    if lines.count == 3 {
+      stop = true
+    }
+  }
+  expectEqual([ "abc", "", "defghi" ], lines)
 }
 
 NSStringAPIs.test("enumerateLinguisticTagsInRange(_:scheme:options:orthography:_:") {
-  // FIXME
+  let s = "Абв. Глокая куздра штеко будланула бокра и кудрячит бокрёнка. Абв."
+  let startIndex = advance(s.startIndex, 5)
+  let endIndex = advance(s.startIndex, 62)
+  var tags: String[] = []
+  var tokens: String[] = []
+  var sentences: String[] = []
+  s.enumerateLinguisticTagsInRange(startIndex..endIndex,
+      scheme: NSLinguisticTagSchemeTokenType,
+      options: NSLinguisticTaggerOptions(0),
+      orthography: nil) {
+    (tag: String, tokenRange: Range<String.Index>, sentenceRange: Range<String.Index>, inout stop: Bool)
+  in
+    tags += tag
+    tokens += s[tokenRange]
+    sentences += s[sentenceRange]
+    if tags.count == 3 {
+      stop = true
+    }
+  }
+  expectEqual(
+      [ NSLinguisticTagWord, NSLinguisticTagWhitespace,
+        NSLinguisticTagWord ],
+      tags)
+  expectEqual([ "Глокая", " ", "куздра" ], tokens)
+  let sentence = s[startIndex..endIndex]
+  expectEqual([ sentence, sentence, sentence ], sentences)
 }
 
 NSStringAPIs.test("enumerateSubstringsInRange(_:options:_:)") {
-  // FIXME
+  let s = "え\u304b\u3099お\u263a\ufe0f😀😊"
+  let startIndex = advance(s.startIndex, 1)
+  // FIXME: this might need to be adjusted to 5 when we implement
+  // grapheme clusters properly.
+  let endIndex = advance(s.startIndex, 7)
+  var substrings: String[] = []
+  s.enumerateSubstringsInRange(startIndex..endIndex,
+      options: NSStringEnumerationOptions.ByComposedCharacterSequences) {
+    (substring: String, substringRange: Range<String.Index>,
+     enclosingRange: Range<String.Index>, inout stop: Bool)
+  in
+    substrings += substring
+    expectEqual(substring, s[substringRange])
+    expectEqual(substring, s[enclosingRange])
+  }
+  expectEqual([ "\u304b\u3099", "お", "☺️", "😀" ], substrings)
 }
 
 NSStringAPIs.test("fastestEncoding") {
-  // FIXME
+  let availableEncodings: NSStringEncoding[] = String.availableStringEncodings()
+  expectTrue(contains(availableEncodings, "abc".fastestEncoding))
 }
 
 NSStringAPIs.test("fileSystemRepresentation()") {
