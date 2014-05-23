@@ -259,6 +259,32 @@ Any swift_MagicMirrorData_objcValue(HeapObject *owner,
   swift_release(owner);
   return result;
 }
+extern "C"
+void swift_MagicMirrorData_summary(const Metadata *T, String *result) {
+  switch (T->getKind()) {
+    case MetadataKind::Enum:
+      new (result) String("(Enum Value)");
+      break;
+    case MetadataKind::Function:
+      new (result) String("(Function)");
+      break;
+    case MetadataKind::Block:
+      new (result) String("(Block)");
+      break;
+    case MetadataKind::Existential:
+      new (result) String("(Existential)");
+      break;
+    case MetadataKind::ExistentialMetatype:
+      new (result) String("(ExistentialMetatype)");
+      break;
+    case MetadataKind::Metatype:
+      new (result) String("(Metatype)");
+      break;
+    default:
+      break;
+  }
+}
+
   
 extern "C"
 const Metadata *swift_MagicMirrorData_objcValueType(HeapObject *owner,
@@ -668,12 +694,16 @@ OptionalQuickLookObject swift_ObjCMirror_quickLookObject(HeapObject *owner,
 // mirrors.
 extern "C" const FullMetadata<Metadata> _TMdVSs13_OpaqueMirror;
 extern "C" const MirrorWitnessTable _TWPVSs13_OpaqueMirrorSs6Mirror;
+
 extern "C" const FullMetadata<Metadata> _TMdVSs12_TupleMirror;
 extern "C" const MirrorWitnessTable _TWPVSs12_TupleMirrorSs6Mirror;
+
 extern "C" const FullMetadata<Metadata> _TMdVSs13_StructMirror;
 extern "C" const MirrorWitnessTable _TWPVSs13_StructMirrorSs6Mirror;
+
 extern "C" const FullMetadata<Metadata> _TMdVSs12_ClassMirror;
 extern "C" const MirrorWitnessTable _TWPVSs12_ClassMirrorSs6Mirror;
+
 extern "C" const FullMetadata<Metadata> _TMdVSs17_ClassSuperMirror;
 extern "C" const MirrorWitnessTable _TWPVSs17_ClassSuperMirrorSs6Mirror;
   

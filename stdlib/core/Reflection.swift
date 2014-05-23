@@ -312,6 +312,9 @@ struct _LeafMirror<T>: Mirror {
 
 // -- Implementation details for the runtime's Mirror implementation
 
+@asmname("swift_MagicMirrorData_summary")
+func swift_MagicMirrorData_summaryImpl(metadata: Any.Type, result: UnsafePointer<String>)
+
 struct _MagicMirrorData {
   let owner: Builtin.NativeObject
   let ptr: Builtin.RawPointer
@@ -331,6 +334,14 @@ struct _MagicMirrorData {
     @asmname("swift_MagicMirrorData_objcValueType") get
   }
   
+  var summary: String {
+    var resultPtr = UnsafePointer<String>.alloc(1)
+    swift_MagicMirrorData_summaryImpl(metadata, resultPtr)
+    let result = resultPtr.memory
+    resultPtr.dealloc(1)
+    return result
+  }
+  
   func _loadValue<T>() -> T {
     return Builtin.load(ptr) as T
   }
@@ -344,7 +355,7 @@ struct _OpaqueMirror: Mirror {
   var objectIdentifier: ObjectIdentifier? { return nil }
   var count: Int { return 0 }
   subscript(i: Int) -> (String, Mirror) { _preconditionFailure("no children") }
-  var summary: String { return "<opaque>" }
+  var summary: String { return data.summary }
   var quickLookObject: QuickLookObject? { return nil }
   var disposition: MirrorDisposition { return .Aggregate }
 }

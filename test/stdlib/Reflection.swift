@@ -370,6 +370,17 @@ let dict = ["One":1,"Two":2,"Three":3,"Four":4,"Five":5]
 // CHECK-NEXT:     - .1: 1
 dump(dict)
 
+enum JustSomeEnum {case A,B}
+// CHECK-NEXT: (Enum Value)
+println(reflect(JustSomeEnum.A).summary)
+
+var justSomeFunction = { (x:Int)->Int in return x + 1 }
+// CHECK-NEXT: (Function)
+println(reflect(justSomeFunction).summary)
+
+// CHECK-NEXT: (Metatype)
+println(reflect(String.self).summary)
+
 #if os(OSX) || os(iOS)
 
 // Check ObjC mirror implementation.
