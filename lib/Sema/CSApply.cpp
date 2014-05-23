@@ -4817,7 +4817,7 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr) {
         if (auto optTy = type->getAnyOptionalObjectType())
           type = optTy;
 
-        if (isa<AnyFunctionType>(type->getCanonicalType())) {
+        if (type->is<AnyFunctionType>()) {
           type = type->castTo<AnyFunctionType>()->getResult();
         }
         
