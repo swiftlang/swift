@@ -192,7 +192,7 @@ class Hoozit : Gizmo {
   // CHECK-NEXT: [[SELF_REPLACED:%[0-9]+]] = apply [[SUPERMETHOD]](%0, [[X:%[0-9]+]]) : $@cc(objc_method) @thin (Int, @owned Gizmo) -> @owned Gizmo
   // CHECK-NOT: unconditional_checked_cast downcast [[SELF_REPLACED]] : $Gizmo to $Hoozit
   // CHECK: unchecked_ref_cast
-  // CHECK-NEXT: assign [[SELF:%[0-9]+]] to [[SELF_BOX]]#1 : $*Hoozit
+  // CHECK-NEXT: store [[SELF:%[0-9]+]] to [[SELF_BOX]]#1 : $*Hoozit
   // CHECK-NEXT: [[NONNULL:%[0-9]+]] = is_nonnull [[SELF]] : $Hoozit
   // CHECK-NEXT: cond_br [[NONNULL]], [[NONNULL_BB:bb[0-9]+]], [[NULL_BB:bb[0-9]+]]
   // CHECK: [[NULL_BB]]:
@@ -267,7 +267,7 @@ extension Hoozit {
     var x = X()
     // CHECK: [[CTOR:%[0-9]+]] = class_method [volatile] [[SELF:%[0-9]+]] : $Hoozit, #Hoozit.init!initializer.1.foreign : Hoozit.Type -> (int: Int) -> Hoozit , $@cc(objc_method) @thin (Int, @owned Hoozit) -> @owned Hoozit
     // CHECK: [[NEW_SELF:%[0-9]+]] = apply [[CTOR]]
-    // CHECK: assign [[NEW_SELF]] to [[SELF_BOX]]#1 : $*Hoozit
+    // CHECK: store [[NEW_SELF]] to [[SELF_BOX]]#1 : $*Hoozit
     // CHECK: [[NONNULL:%[0-9]+]] = is_nonnull [[NEW_SELF]] : $Hoozit
     // CHECK-NEXT: cond_br [[NONNULL]], [[NONNULL_BB:bb[0-9]+]], [[NULL_BB:bb[0-9]+]]
     // CHECK: [[NULL_BB]]:

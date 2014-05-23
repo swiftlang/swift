@@ -51,12 +51,11 @@ class F : E { }
 // CHECK-NEXT: [[SELF:%[0-9]+]] = mark_uninitialized [derivedself]
 // CHECK-NEXT: store [[SELF]] to [[SELF_BOX]]#1 : $*F
 // CHECK-NEXT: [[SELF:%[0-9]+]] = load [[SELF_BOX]]#1 : $*F
-// CHECK-NEXT: strong_retain [[SELF]] : $F
 // CHECK-NEXT: [[E:%[0-9]]] = upcast [[SELF]] : $F to $E
 // CHECK: [[E_CTOR:%[0-9]+]] = function_ref @_TFC19default_constructor1EcfMS0_FT_S0_ : $@cc(method) @thin (@owned E) -> @owned E
 // CHECK-NEXT: [[ESELF:%[0-9]]] = apply [[E_CTOR]]([[E]]) : $@cc(method) @thin (@owned E) -> @owned E
 // CHECK-NEXT: [[ESELFW:%[0-9]+]] = unchecked_ref_cast [[ESELF]] : $E to $F
-// CHECK-NEXT: assign [[ESELFW]] to [[SELF_BOX]]#1 : $*F
+// CHECK-NEXT: store [[ESELFW]] to [[SELF_BOX]]#1 : $*F
 // CHECK-NEXT: [[SELF:%[0-9]+]] = load [[SELF_BOX]]#1 : $*F
 // CHECK-NEXT: strong_retain [[SELF]] : $F
 // CHECK-NEXT: strong_release [[SELF_BOX]]#0 : $Builtin.NativeObject

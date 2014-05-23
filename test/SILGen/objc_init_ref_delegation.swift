@@ -11,10 +11,9 @@ extension Gizmo {
     // CHECK:   [[SELF:%[0-9]+]] = mark_uninitialized [delegatingself] [[ORIG_SELF]] : $Gizmo
     // CHECK:   store [[SELF]] to [[SELF_BOX]]#1 : $*Gizmo
     // CHECK:   [[SELF:%[0-9]+]] = load [[SELF_BOX]]#1 : $*Gizmo
-    // CHECK:   strong_retain [[SELF]] : $Gizmo
     // CHECK:   [[INIT_DELEG:%[0-9]+]] = class_method [volatile] [[SELF]] : $Gizmo, #Gizmo.init!initializer.1.foreign : Gizmo.Type -> (bellsOn: Int) -> Gizmo , $@cc(objc_method) @thin (Int, @owned Gizmo) -> @owned Gizmo
     // CHECK:   [[SELF_RET:%[0-9]+]] = apply [[INIT_DELEG]]([[I]], [[SELF]]) : $@cc(objc_method) @thin (Int, @owned Gizmo) -> @owned Gizmo
-    // CHECK:   assign [[SELF_RET]] to [[SELF_BOX]]#1 : $*Gizmo
+    // CHECK:   store [[SELF_RET]] to [[SELF_BOX]]#1 : $*Gizmo
     // CHECK:   [[SELF4:%[0-9]+]] = load [[SELF_BOX]]#1 : $*Gizmo
     // CHECK:   strong_retain [[SELF4]] : $Gizmo
     // CHECK:   strong_release [[SELF_BOX]]#0 : $Builtin.NativeObject

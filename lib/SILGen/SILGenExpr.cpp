@@ -461,9 +461,37 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
 
     // If this VarDecl is represented as an address, emit it as an lvalue, then
     // perform a load to get the rvalue.
-    if (auto Result = emitLValueForDecl(loc, var))
+    if (auto Result = emitLValueForDecl(loc, var)) {
+      IsTake_t takes;
+      // 'self' may need to be taken during an 'init' delegation.
+      if (var->getName() == getASTContext().Id_self) {
+        switch (SelfInitDelegationState) {
+        case NormalSelf:
+          // Don't consume self.
+          takes = IsNotTake;
+          break;
+        
+        case WillConsumeSelf:
+          // Consume self, and remember we did so.
+          takes = IsTake;
+          SelfInitDelegationState = DidConsumeSelf;
+          break;
+            
+        case DidConsumeSelf:
+          // We already consumed self. This shouldn't happen in valid code, because
+          // 'super.init(self)' is a DI violation, but we haven't run DI yet,
+          // so we can't actually crash here. At least emit
+          // somewhat balanced code.
+          takes = IsNotTake;
+          break;
+        }
+      } else {
+        takes = IsNotTake;
+      }
+      
       return emitLoad(loc, Result.getLValueAddress(), getTypeLowering(refType),
-                      C, IsNotTake);
+                      C, takes);
+    }
 
     // For local decls, use the address we allocated or the value if we have it.
     auto It = VarLocs.find(decl);
@@ -4006,6 +4034,11 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
   auto selfTy = selfDecl->getType()->getInOutObjectType();
   bool isSuper = !E->getSubExpr()->getType()->isEqual(selfTy);
 
+  // The subexpression consumes the current 'self' binding.
+  assert(SGF.SelfInitDelegationState == SILGenFunction::NormalSelf
+         && "already doing something funky with self?!");
+  SGF.SelfInitDelegationState = SILGenFunction::WillConsumeSelf;
+  
   // Emit the subexpression.
   ManagedValue newSelf = SGF.emitRValueAsSingleValue(E->getSubExpr());
 
@@ -4029,7 +4062,23 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
 
   // We know that self is a box, so get its address.
   SILValue selfAddr = SGF.emitLValueForDecl(E, selfDecl).getLValueAddress();
-  newSelf.assignInto(SGF, E, selfAddr);
+  // Forward or assign into the box depending on whether we actually consumed
+  // 'self'.
+  switch (SGF.SelfInitDelegationState) {
+  case SILGenFunction::NormalSelf:
+    llvm_unreachable("self isn't normal in a constructor delegation");
+    
+  case SILGenFunction::WillConsumeSelf:
+    // We didn't consume, so reassign.
+    newSelf.assignInto(SGF, E, selfAddr);
+    break;
+  
+  case SILGenFunction::DidConsumeSelf:
+    // We did consume, so reinitialize.
+    newSelf.forwardInto(SGF, E, selfAddr);
+    break;
+  }
+  SGF.SelfInitDelegationState = SILGenFunction::NormalSelf;
 
   // If we are using Objective-C allocation, the caller can return
   // nil. When this happens with an explicitly-written super.init or

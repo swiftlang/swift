@@ -610,7 +610,6 @@ class D : B {
 
     super.init(y: y)
     // CHECK: [[THIS1:%[0-9]+]] = load [[THISADDR]]
-    // CHECK: retain [[THIS1]]
     // CHECK: [[THIS1_SUP:%[0-9]+]] = upcast [[THIS1]] : ${{.*}} to $B
     // CHECK: [[SUPER_CTOR:%[0-9]+]] = function_ref @_TFC8lifetime1Bc{{.*}}
     // CHECK: [[Y:%[0-9]+]] = load [[YADDR]]

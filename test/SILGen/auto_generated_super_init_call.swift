@@ -16,13 +16,12 @@ class SomeDerivedClass : Parent {
 // CHECK: integer_literal $Builtin.Int2048, 42
 // CHECK: load
 // CHECK: [[SELFLOAD:%[0-9]+]] = load [[SELF:%[0-9]+]]#1 : $*SomeDerivedClass
-// CHECK-NEXT: strong_retain [[SELFLOAD]] : $SomeDerivedClass
 // CHECK-NEXT: [[PARENT:%[0-9]+]] = upcast [[SELFLOAD]] : $SomeDerivedClass to $Parent
 // CHECK-NEXT: function_ref auto_generated_super_init_call.Parent.init
 // CHECK-NEXT: [[INITCALL1:%[0-9]+]] = function_ref @_TFC30auto_generated_super_init_call6ParentcfMS0_FT_S0_
 // CHECK-NEXT: [[RES1:%[0-9]+]] = apply [[INITCALL1]]([[PARENT]])
 // CHECK-NEXT: [[DOWNCAST:%[0-9]+]] = unchecked_ref_cast [[RES1]] : $Parent to $SomeDerivedClass
-// CHECK-NEXT: assign [[DOWNCAST]] to [[SELF]]#1 : $*SomeDerivedClass 
+// CHECK-NEXT: store [[DOWNCAST]] to [[SELF]]#1 : $*SomeDerivedClass 
   }
   
   init(x: Int) {
@@ -45,7 +44,7 @@ class SomeDerivedClass : Parent {
 // CHECK: function_ref @_TFC30auto_generated_super_init_call6ParentcfMS0_FT_S0_ : $@cc(method) @thin (@owned Parent) -> @owned Parent
 // CHECK-NEXT: apply
 // CHECK-NEXT: unchecked_ref_cast
-// CHECK-NEXT: assign
+// CHECK-NEXT: store
 // CHECK-NEXT: load
 // CHECK-NEXT: strong_retain
 // CHECK-NEXT: strong_release

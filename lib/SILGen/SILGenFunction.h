@@ -175,12 +175,28 @@ public:
       return Result;
     }
   };
-    
+  
   /// VarLocs - Entries in this map are generated when a PatternBindingDecl is
   /// emitted. The map is queried to produce the lvalue for a DeclRefExpr to
   /// a local variable.
   llvm::DenseMap<ValueDecl*, VarLoc> VarLocs;
     
+  /// When rebinding 'self' during an initializer delegation, we have to be
+  /// careful to preserve the object at 1 retain count during the delegation
+  /// because of assumptions in framework code. This enum tracks the state of
+  /// 'self' during the delegation.
+  enum SelfInitDelegationStates {
+    // 'self' is a normal variable.
+    NormalSelf,
+    
+    // 'self' needs to be consumed next time it is referenced.
+    WillConsumeSelf,
+    
+    // 'self' has been consumed.
+    DidConsumeSelf,
+  };
+  SelfInitDelegationStates SelfInitDelegationState = NormalSelf;
+  
   /// LocalFunctions - Entries in this map are generated when a local function
   /// declaration that requires local context, such as a func closure, is
   /// emitted. This map is then queried to produce the value for a DeclRefExpr
