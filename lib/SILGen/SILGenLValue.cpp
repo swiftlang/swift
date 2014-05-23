@@ -535,7 +535,7 @@ namespace {
     }
   };
 
-  /// Remap an weak value to Optional<T>*, or unowned pointer to T*.
+  /// Remap a weak value to Optional<T>*, or unowned pointer to T*.
   class OwnershipComponent : public LogicalPathComponent {
   public:
     OwnershipComponent(LValueTypeData typeData)
@@ -715,6 +715,12 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
   } else {
     lv.add<StructElementComponent>(var, varStorageType, typeData);
   }
+  
+  // If the member has weak or unowned storage, convert it away.
+  if (varStorageType.is<ReferenceStorageType>()) {
+    lv.add<OwnershipComponent>(typeData);
+  }
+  
   return std::move(lv);
 }
 

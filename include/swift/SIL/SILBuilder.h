@@ -318,6 +318,7 @@ public:
   CopyAddrInst *createCopyAddr(SILLocation loc, SILValue srcAddr,
                                SILValue destAddr, IsTake_t isTake,
                                IsInitialization_t isInitialize) {
+    assert(srcAddr.getType() == destAddr.getType());
     return insert(new (F.getModule())
                     CopyAddrInst(loc, srcAddr, destAddr, isTake, isInitialize));
   }
