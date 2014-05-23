@@ -291,18 +291,15 @@ NSStringAPIs.test("capitalizedString") {
   expectEqual("Жжж", "жжж".capitalizedString)
 }
 
-NSStringAPIs.test("capitalizedStringWithLocale") {
+NSStringAPIs.test("capitalizedStringWithLocale(_:)") {
   expectEqual("Foo Foo Foo Foo",
       "foo Foo fOO FOO".capitalizedStringWithLocale(NSLocale.currentLocale()))
   expectEqual("Жжж",
       "жжж".capitalizedStringWithLocale(NSLocale.currentLocale()))
 
-  /*
-  FIXME
   expectEqual("Foo Foo Foo Foo",
       "foo Foo fOO FOO".capitalizedStringWithLocale(nil))
   expectEqual("Жжж", "жжж".capitalizedStringWithLocale(nil))
-  */
 }
 
 NSStringAPIs.test("caseInsensitiveCompare(_:)") {
