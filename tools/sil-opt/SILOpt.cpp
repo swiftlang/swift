@@ -364,6 +364,7 @@ static void runCommandLineSelectedPasses(SILModule *Module,
       break;
     case PassKind::GlobalARCOpts:
       PM.add(createGlobalARCOpts());
+      break;
     }
   }
   PM.run();
