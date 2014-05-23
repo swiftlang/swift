@@ -470,12 +470,13 @@ performCodeMotion(llvm::MapVector<SILInstruction *,
       DeleteList.push_back(Pair.first);
       DeleteList.push_back(Inst);
 
-      ++NumIncrementsRemoved;
+      NumIncrementsRemoved += 2;
       continue;
     }
     
     if (InsertPt) {
       Pair.second.getInstruction()->moveBefore(InsertPt);
+      ++NumIncrementsRemoved;
       ++NumMovedIncrements;
     }
   }
