@@ -1,4 +1,6 @@
-// RUN: %target-run-simple-swift %S/Inputs/NSStringAPI_test.txt | FileCheck %s
+// RUN: rm -rf %t && mkdir -p %t && %S/../../utils/gyb %s -o %t/NSStringAPI.swift
+// RUN: %S/../../utils/line-directive %t/NSStringAPI.swift -- %target-build-swift -module-cache-path %t/clang-module-cache %t/NSStringAPI.swift -o %t/a.out
+// RUN: %target-run %t/a.out %S/Inputs/NSStringAPI_test.txt | %S/../../utils/line-directive %t/NSStringAPI.swift -- FileCheck %s
 
 //
 // Tests for the NSString APIs as exposed by String
@@ -8,8 +10,12 @@ import Foundation
 
 var _anyExpectFailed = false
 
+// Can not write a sane set of overloads using generics because of:
+// <rdar://problem/17015923> Array->NSArray implicit conversion insanity
+%for EquatableArrayType in ['ContiguousArray', 'Slice', 'Array']:
+
 func expectEqual<T : Equatable>(
-    expected: T, actual: T,
+    expected: ${EquatableArrayType}<T>, actual: ${EquatableArrayType}<T>,
     file: String = __FILE__, line: UWord = __LINE__
 ) {
   if expected != actual {
@@ -21,8 +27,37 @@ func expectEqual<T : Equatable>(
   }
 }
 
-func expectEqual<T : Equatable>(
-    expected: T, actual: T?,
+func expectNotEqual<T : Equatable>(
+    expected: ${EquatableArrayType}<T>, actual: ${EquatableArrayType}<T>,
+    file: String = __FILE__, line: UWord = __LINE__
+) {
+  if expected == actual {
+    _anyExpectFailed = true
+    println("check failed at \(file), line \(line)")
+    println("unexpected value: \"\(actual)\"")
+    println()
+  }
+}
+
+%end
+
+%for EquatableType in ['String', 'Int', 'UInt', 'NSComparisonResult']:
+
+func expectEqual(
+    expected: ${EquatableType}, actual: ${EquatableType},
+    file: String = __FILE__, line: UWord = __LINE__
+) {
+  if expected != actual {
+    _anyExpectFailed = true
+    println("check failed at \(file), line \(line)")
+    println("expected: \"\(expected)\"")
+    println("actual: \"\(actual)\"")
+    println()
+  }
+}
+
+func expectEqual(
+    expected: ${EquatableType}, actual: ${EquatableType}?,
     file: String = __FILE__, line: UWord = __LINE__
 ) {
   if !actual || expected != actual! {
@@ -34,8 +69,8 @@ func expectEqual<T : Equatable>(
   }
 }
 
-func expectNotEqual<T : Equatable>(
-    expected: T, actual: T,
+func expectNotEqual(
+    expected: ${EquatableType}, actual: ${EquatableType},
     file: String = __FILE__, line: UWord = __LINE__
 ) {
   if expected == actual {
@@ -45,6 +80,8 @@ func expectNotEqual<T : Equatable>(
     println()
   }
 }
+
+%end
 
 func expectTrue(
     actual: Bool,
@@ -144,7 +181,7 @@ NSStringAPIs.test("Encodings") {
   expectNotEqual(0, availableEncodings.count)
 
   let defaultCStringEncoding = String.defaultCStringEncoding()
-  expectEqual(true, contains(availableEncodings, defaultCStringEncoding))
+  expectTrue(contains(availableEncodings, defaultCStringEncoding))
 
   expectNotEqual("", String.localizedNameOfStringEncoding(NSUTF8StringEncoding))
 }
@@ -327,12 +364,41 @@ NSStringAPIs.test("commonPrefixWithString(_:options:)") {
 }
 
 NSStringAPIs.test("compare(_:options:range:locale:)") {
-  // FIXME
+  expectEqual(NSComparisonResult.OrderedSame,
+      "abc".compare("abc"))
+  expectEqual(NSComparisonResult.OrderedAscending,
+      "абв".compare("где"))
+
+  expectEqual(NSComparisonResult.OrderedSame,
+      "abc".compare("abC", options: .CaseInsensitiveSearch))
+  expectEqual(NSComparisonResult.OrderedSame,
+      "абв".compare("абВ", options: .CaseInsensitiveSearch))
+
+  if true {
+    let s = "abcd"
+    let r = s.startIndex.succ()..s.endIndex
+    expectEqual(NSComparisonResult.OrderedSame,
+        s.compare("bcd", range: r))
+  }
+  if true {
+    let s = "абвг"
+    let r = s.startIndex.succ()..s.endIndex
+    expectEqual(NSComparisonResult.OrderedSame,
+        s.compare("бвг", range: r))
+  }
+
+  expectEqual(NSComparisonResult.OrderedSame,
+      "abc".compare("abc", locale: NSLocale.currentLocale()))
+  expectEqual(NSComparisonResult.OrderedSame,
+      "абв".compare("абв", locale: NSLocale.currentLocale()))
 }
 
 NSStringAPIs.test("completePathIntoString(_:caseSensitive:matchesIntoArray:filterTypes)") {
+  if true {
+    var count = nonExistentPath.completePathIntoString(caseSensitive: false)
+    expectEqual(0, count)
+  }
 
-  // FIXME
   if true {
     var outputName = "None Found"
     var count = nonExistentPath.completePathIntoString(
@@ -344,6 +410,22 @@ NSStringAPIs.test("completePathIntoString(_:caseSensitive:matchesIntoArray:filte
 
   if true {
     var outputName = "None Found"
+    var outputArray: String[] = [ "foo", "bar" ]
+    var count = nonExistentPath.completePathIntoString(
+        &outputName, caseSensitive: false, matchesIntoArray: &outputArray)
+
+    expectEqual(0, count)
+    expectEqual("None Found", outputName)
+    expectEqual([ "foo", "bar" ], outputArray)
+  }
+
+  if true {
+    var count = existingPath.completePathIntoString(caseSensitive: false)
+    expectEqual(1, count)
+  }
+
+  if true {
+    var outputName = "None Found"
     var count = existingPath.completePathIntoString(
         &outputName, caseSensitive: false)
 
@@ -351,18 +433,47 @@ NSStringAPIs.test("completePathIntoString(_:caseSensitive:matchesIntoArray:filte
     expectEqual(existingPath, outputName)
   }
 
+  if true {
+    var outputName = "None Found"
+    var outputArray: String[] = [ "foo", "bar" ]
+    var count = existingPath.completePathIntoString(
+        &outputName, caseSensitive: false, matchesIntoArray: &outputArray)
+
+    expectEqual(1, count)
+    expectEqual(existingPath, outputName)
+    expectEqual([ existingPath ], outputArray)
+  }
+
+  if true {
+    var outputName = "None Found"
+    var count = existingPath.completePathIntoString(
+        &outputName, caseSensitive: false, filterTypes: [ "txt" ])
+
+    expectEqual(1, count)
+    expectEqual(existingPath, outputName)
+  }
 }
 
 NSStringAPIs.test("componentsSeparatedByCharactersInSet(_:)") {
-  // FIXME
+  expectEqual([ "абв", "", "あいう", "abc" ],
+      "абв12あいう3abc".componentsSeparatedByCharactersInSet(
+          NSCharacterSet.decimalDigitCharacterSet()))
 }
 
 NSStringAPIs.test("componentsSeparatedByString(_:)") {
-  // FIXME
+  expectEqual([ "абв", "あいう", "abc" ],
+      "абв//あいう//abc".componentsSeparatedByString("//"))
 }
 
 NSStringAPIs.test("cStringUsingEncoding(_:)") {
-  // FIXME
+  // FIXME: crashes because of a null pointer
+  //expectEmpty("абв".cStringUsingEncoding(NSASCIIStringEncoding))
+
+  // FIXME: crashes because of a non-ASCII string
+  //let expectedBytes: UInt8[] = [ 0xd0, 0xb0, 0xd0, 0xb1, 0xd0, 0xb2 ]
+  //var expectedStr: CChar[] = expectedBytes.map { $0.asSigned() }
+  //expectEqual(expectedStr,
+  //    "абв".cStringUsingEncoding(NSUTF8StringEncoding))
 }
 
 NSStringAPIs.test("dataUsingEncoding(_:allowLossyConversion:)") {
