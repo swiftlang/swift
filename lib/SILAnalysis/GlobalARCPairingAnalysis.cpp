@@ -331,52 +331,6 @@ computeARCMatchingSet(SILFunction &F, AliasAnalysis *AA,
       M.clear();
     }
   }
-#if 0
-  for (auto &Pair : DecToIncStateMap) {
-    // If we were blotted, skip this pair.
-    if (!Pair.first)
-      continue;
-
-    // If we do not have an instruction, this is a state with an invalidated
-    // reference count. Skip it...
-    if (!Pair.second.getInstruction())
-      continue;
-
-    if (!MatchSet.Ptr)
-      MatchSet.Ptr = Pair.first->getOperand(0);
-    assert(MatchSet.Ptr == Pair.first->getOperand(0) &&
-           "If Ptr is already set, make sure it matches the ptr on the "
-           "increment.");
-
-    auto *InsertPt = Pair.second.getInsertPoint();
-
-    // If we reached this point and do not have an insertion point (in the case
-    // where we do not complete the sequence) or are known safe, remove the
-    // increment decrement pair.
-    if (Pair.second.isKnownSafe() || !InsertPt) {
-      SILInstruction *Inst = Pair.second.getInstruction();
-
-      DEBUG(llvm::dbgs() << "Removing Pair:\n    KnownSafe: "
-                         << (Pair.second.isKnownSafe() ? "yes" : "no")
-                         << "\n    " << *Inst << "    " << *Pair.first);
-
-      MatchedPair = true;
-      MatchSet.Increments.insert(Inst);
-      MatchSet.Decrements.insert(Pair.first);
-      DecToIncStateMap.blot(Pair.first);
-      Fun(MatchSet);
-      MatchSet.clear();
-      continue;
-    }
-
-    if (InsertPt) {
-      MatchSet.Increments.insert(Pair.second.getInstruction());
-      MatchSet.IncrementInsertPts.insert(InsertPt);
-      Fun(MatchSet);
-      MatchSet.clear();
-    }
-  }
-#endif
 
   // If we did not find a matching pair or detected nesting during the dataflow,
   // there are no more increment, decrements that we can optimize.
