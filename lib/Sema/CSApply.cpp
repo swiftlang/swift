@@ -4817,7 +4817,10 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr) {
         if (auto optTy = type->getAnyOptionalObjectType())
           type = optTy;
 
-        type = type->castTo<AnyFunctionType>()->getResult();
+        if (isa<AnyFunctionType>(type->getCanonicalType())) {
+          type = type->castTo<AnyFunctionType>()->getResult();
+        }
+        
         SourceLoc afterAffectedLoc
           = Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
                                        affected->getEndLoc());

@@ -77,3 +77,17 @@ func extraCall() {
 
   maybeFn()(5) // expected-error{{value of optional type '(Int -> Int)?' not unwrapped; did you mean to use '!' or '?'?}}{{12-12=!}}
 }
+
+class U {
+    var prop1 = 0
+}
+
+class T {
+    func m1() {
+        let l = self.m2!.prop1 // expected-error {{function produces expected type 'U'; did you mean to call it with '()'?}}
+    }
+
+    func m2() -> U! {
+      return U()
+    }
+}
