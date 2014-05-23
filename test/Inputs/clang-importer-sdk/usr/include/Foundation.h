@@ -361,26 +361,6 @@ typedef NS_ENUM(NSInteger, NSByteCountFormatterCountStyle) {
 
 @end
 
-@interface SomeActionSheet
-
-- (instancetype)initWithTitle:(NSString *)title
-                     delegate:(id)delegate
-            cancelButtonTitle:(NSString *)cancelButtonTitle
-       destructiveButtonTitle:(NSString *)destructiveButtonTitle
-            otherButtonTitles:(NSString *)titles, ...;
-
-@end
-
-@interface SomeAlertView
-
-- (instancetype)initWithTitle:(NSString *)title
-                      message:(NSString *)message
-                     delegate:(id)delegate
-            cancelButtonTitle:(NSString *)cancelButtonTitle
-            otherButtonTitles:(NSString *)titles, ...;
-
-@end
-
 NSArray *arrayToArray(NSArray *arr);
 NSDictionary *dictToDict(NSDictionary *dict);
 

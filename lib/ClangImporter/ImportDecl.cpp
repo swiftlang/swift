@@ -2355,10 +2355,12 @@ namespace {
     ///
     /// Some special cased remappings also change the parameter signature of the
     /// imported initializer, such as to drop vararg parameters.
-    std::tuple<DeclName, ArrayRef<const clang::ParmVarDecl *>, /*variadic*/bool>
-    mapInitSelectorToDeclName(ObjCSelector selector,
-                              ArrayRef<const clang::ParmVarDecl *> args,
-                              bool variadic) {
+    ///
+    /// All parameters are in/out parameters.
+    DeclName
+    mapInitSelectorToDeclName(ObjCSelector &selector,
+                              ArrayRef<const clang::ParmVarDecl *> &args,
+                              bool &variadic) {
       auto &C = Impl.SwiftContext;
       
       // Map UIActionSheet and UIAlertView's designated initializers to
@@ -2394,9 +2396,7 @@ namespace {
         variadic = false;
       }
       
-      DeclName mappedDeclName = Impl.mapSelectorToDeclName(selector,
-                                                         /*initializer*/ true);
-      return {mappedDeclName, args, variadic};
+      return Impl.mapSelectorToDeclName(selector, /*initializer*/true);
     }
     
     /// \brief Given an imported method, try to import it as a constructor.
@@ -2429,16 +2429,15 @@ namespace {
         return nullptr;
 
       // Map the name and complete the import.
-      DeclName name;
-      ArrayRef<const clang::ParmVarDecl *> args;
-      bool variadic;
-      std::tie(name, args, variadic)
-        = mapInitSelectorToDeclName(selector,
-                                    {objcMethod->param_begin(),
-                                     objcMethod->param_size()},
-                                    objcMethod->isVariadic());
+      ArrayRef<const clang::ParmVarDecl *> params{
+        objcMethod->param_begin(),
+        objcMethod->param_end()
+      };
+      bool variadic = objcMethod->isVariadic();
+      DeclName name = mapInitSelectorToDeclName(selector, params, variadic);
+
       return importConstructor(objcMethod, dc, implicit, kind, required,
-                               selector, name, args, variadic);
+                               selector, name, params, variadic);
     }
 
     /// \brief Given an imported method, try to import it as a constructor.
