@@ -467,14 +467,12 @@ NSStringAPIs.test("componentsSeparatedByString(_:)") {
 }
 
 NSStringAPIs.test("cStringUsingEncoding(_:)") {
-  // FIXME: crashes because of a null pointer
-  //expectEmpty("абв".cStringUsingEncoding(NSASCIIStringEncoding))
+  expectEmpty("абв".cStringUsingEncoding(NSASCIIStringEncoding))
 
-  // FIXME: crashes because of a non-ASCII string
-  //let expectedBytes: UInt8[] = [ 0xd0, 0xb0, 0xd0, 0xb1, 0xd0, 0xb2 ]
-  //var expectedStr: CChar[] = expectedBytes.map { $0.asSigned() }
-  //expectEqual(expectedStr,
-  //    "абв".cStringUsingEncoding(NSUTF8StringEncoding))
+  let expectedBytes: UInt8[] = [ 0xd0, 0xb0, 0xd0, 0xb1, 0xd0, 0xb2, 0 ]
+  var expectedStr: CChar[] = expectedBytes.map { $0.asSigned() }
+  expectEqual(expectedStr,
+      "абв".cStringUsingEncoding(NSUTF8StringEncoding)!)
 }
 
 NSStringAPIs.test("dataUsingEncoding(_:allowLossyConversion:)") {
@@ -872,12 +870,9 @@ CStringTests.test("debugDescription") {
     dealloc()
   }
   if true {
-    /*
-    FIXME: currently 'debugDescription' depends on the locale.
     var (s, dealloc) = getNonASCIICString()
     expectEqual("\"аб\"", s.debugDescription)
     dealloc()
-    */
   }
 }
 
