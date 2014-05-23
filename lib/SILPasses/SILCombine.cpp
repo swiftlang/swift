@@ -272,6 +272,8 @@ public:
   SILInstruction *visitPointerToAddressInst(PointerToAddressInst *PTAI);
   SILInstruction *visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI);
   SILInstruction *visitUncheckedRefCastInst(UncheckedRefCastInst *URCI);
+  SILInstruction *visitUnconditionalCheckedCastInst(
+                    UnconditionalCheckedCastInst *UCCI);
   SILInstruction *visitRawPointerToRefInst(RawPointerToRefInst *RPTR);
   SILInstruction *
   visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *TEDAI);
@@ -1186,6 +1188,23 @@ SILCombiner::visitUncheckedRefCastInst(UncheckedRefCastInst *URCI) {
     return new (URCI->getModule())
         UpcastInst(URCI->getLoc(), URCI->getOperand(), URCI->getType());
 
+  return nullptr;
+}
+
+SILInstruction *SILCombiner::visitUnconditionalCheckedCastInst(
+                               UnconditionalCheckedCastInst *UCCI) {
+  // FIXME: rename from RemoveCondFails to RemoveRuntimeAsserts.
+  if (RemoveCondFails) {
+    if (UCCI->getOperand().getType().isAddress()) {
+      // unconditional_checked_cast -> unchecked_addr_cast
+      return new (UCCI->getModule()) UncheckedAddrCastInst(
+        UCCI->getLoc(), UCCI->getOperand(), UCCI->getType());
+    } else if (UCCI->getOperand().getType().isHeapObjectReferenceType()) {
+      // unconditional_checked_cast -> unchecked_ref_cast
+      return new (UCCI->getModule()) UncheckedRefCastInst(
+        UCCI->getLoc(), UCCI->getOperand(), UCCI->getType());
+    }
+  }
   return nullptr;
 }
 

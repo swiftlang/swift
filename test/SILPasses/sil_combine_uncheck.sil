@@ -1,0 +1,53 @@
+// RUN: %sil-opt %s -sil-combine -remove-runtime-asserts -verify | FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+class RawBuffer {}
+class HeapBufferStorage<T,U> : RawBuffer {}
+
+class C {
+}
+class D : C {
+}
+
+// CHECK-LABEL: sil @test_unconditional_checked_cast
+// CHECK: bb0
+// CHECK-NEXT: unchecked_ref_cast
+// CHECK-NEXT: return
+sil @test_unconditional_checked_cast : $@thin <T_0_0, T_0_1> (RawBuffer) -> HeapBufferStorage<T_0_0, T_0_1> {
+bb0(%0 : $RawBuffer):
+  %3 = unconditional_checked_cast downcast %0 : $RawBuffer to $HeapBufferStorage<T_0_0, T_0_1>
+  return %3 : $HeapBufferStorage<T_0_0, T_0_1>
+}
+
+// CHECK-LABEL: sil @test_unconditional_checked_cast_addr
+// CHECK: bb0
+// CHECK: unchecked_addr_cast
+sil @test_unconditional_checked_cast_addr : $@thin (@in C) -> () {
+bb0(%0 : $*C):
+  %4 = alloc_stack $C
+  %5 = load %0 : $*C
+  strong_retain %5 : $C
+  store %5 to %4#1 : $*C
+  %8 = unconditional_checked_cast downcast %4#1 : $*C to $*D
+  %9 = function_ref @callee : $@thin (@in D) -> ()
+  %10 = apply %9(%8) : $@thin (@in D) -> ()
+  dealloc_stack %4#0 : $*@local_storage C
+  %12 = tuple ()
+  return %12 : $()
+}
+sil @callee : $@thin (@in D) -> ()
+
+// CHECK-LABEL: sil @test_cond_fail
+// CHECK: bb0
+// CHECK-NEXT: tuple ()
+// CHECK-NEXT: return
+sil @test_cond_fail : $@thin (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  cond_fail %0 : $Builtin.Int1
+  %2 = tuple ()
+  return %2 : $()
+}
