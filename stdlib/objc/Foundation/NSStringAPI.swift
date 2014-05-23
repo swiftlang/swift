@@ -369,7 +369,7 @@ extension String {
   /// attempts to perform filename completion, returning a numeric
   /// value that indicates whether a match was possible, and by
   /// reference the longest path that matches the `String`.
-  /// returns the actual number of matching paths.
+  /// Returns the actual number of matching paths.
   func completePathIntoString(
     _ outputName: CMutablePointer<String> = nil,
     caseSensitive: Bool,
