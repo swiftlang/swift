@@ -1,6 +1,7 @@
 set(SHARED_LIBRARY ON)
 set(DISABLE_APPLICATION_EXTENSION ON)
 set(SWIFTXCTEST_SOURCES
+    XCTestCaseAdditions.mm
     XCTest.swift
 )
 
@@ -23,6 +24,9 @@ endif()
 list(APPEND SWIFT_EXTRA_FLAGS
   "-F${XCTEST_FRAMEWORK_LOCATION}"
   "-framework" "XCTest")
+
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -F${XCTEST_FRAMEWORK_LOCATION}")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -framework XCTest")
 
 add_swift_library(swiftXCTest INSTALL
   ${SWIFTXCTEST_SOURCES}
