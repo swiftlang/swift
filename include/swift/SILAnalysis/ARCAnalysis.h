@@ -42,14 +42,14 @@ struct ARCMatchingSet {
   llvm::SmallPtrSet<SILInstruction *, 8> Increments;
   llvm::SmallPtrSet<SILInstruction *, 8> IncrementInsertPts;
   llvm::SmallPtrSet<SILInstruction *, 8> Decrements;
-  llvm::SmallPtrSet<SILInstruction *, 8> DecrementInsertionPts;
+  llvm::SmallPtrSet<SILInstruction *, 8> DecrementInsertPts;
 
   void clear() {
     Ptr = SILValue();
     Increments.clear();
     IncrementInsertPts.clear();
     Decrements.clear();
-    DecrementInsertionPts.clear();
+    DecrementInsertPts.clear();
   }
 };
 

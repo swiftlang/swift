@@ -206,24 +206,27 @@ processBBTopDown(ARCBBState &BBState,
       continue;
     }
 
+    SILValue Op;
+
     // If I is a ref count increment instruction...
     if (isRefCountIncrement(I)) {
       // map its operand to a newly initialized or reinitialized ref count
       // state and continue...
-      SILValue Op = I.getOperand(0).stripCasts();
+      Op = I.getOperand(0).stripCasts();
       TopDownRefCountState &State = BBState.getTopDownRefCountState(Op);
       NestingDetected |= State.initWithInst(&I);
 
       DEBUG(llvm::dbgs() << "    REF COUNT INCREMENT! Known Safe: "
             << (State.isKnownSafe()?"yes":"no") << "\n");
 
-      continue;
+      // Continue processing in case this increment could be a CanUse for a
+      // different pointer.
     }
 
     // If we have a reference count decrement...
     if (isRefCountDecrement(I)) {
       // Look up the state associated with its operand...
-      SILValue Op = I.getOperand(0).stripCasts();
+      Op = I.getOperand(0).stripCasts();
       TopDownRefCountState &RefCountState = BBState.getTopDownRefCountState(Op);
 
       DEBUG(llvm::dbgs() << "    REF COUNT DECREMENT!\n");
@@ -258,6 +261,10 @@ processBBTopDown(ARCBBState &BBState,
     // For all other (reference counted value, ref count state) we are
     // tracking...
     for (auto &OtherState : BBState.getTopDownStates()) {
+      // If the state we are visiting is for the pointer we just visited, bail.
+      if (Op && OtherState.first == Op)
+        continue;
+
       // If we are tracking an argument, skip it.
       if (!OtherState.second.isTrackingRefCountInst())
         continue;
@@ -326,26 +333,29 @@ processBBBottomUp(ARCBBState &BBState,
       continue;
     }
 
+    SILValue Op;
+
     // If I is a ref count decrement instruction...
     if (isRefCountDecrement(I)) {
       // map its operand to a newly initialized or reinitialized ref count
       // state and continue...
-      SILValue Op = I.getOperand(0).stripCasts();
+      Op = I.getOperand(0).stripCasts();
       BottomUpRefCountState &State = BBState.getBottomUpRefCountState(Op);
       NestingDetected |= State.initWithInst(&I);
 
       DEBUG(llvm::dbgs() << "    REF COUNT DECREMENT! Known Safe: "
             << (State.isKnownSafe()?"yes":"no") << "\n");
 
-      continue;
+      // Continue on to see if our reference decrement could potentially affect
+      // any other pointers via a use or a decrement.
     }
 
     // If we have a reference count decrement...
     if (isRefCountIncrement(I)) {
       // Look up the state associated with its operand...
-      SILValue Op = I.getOperand(0).stripCasts();
+      Op = I.getOperand(0).stripCasts();
       BottomUpRefCountState &RefCountState =
-        BBState.getBottomUpRefCountState(Op);
+          BBState.getBottomUpRefCountState(Op);
 
       DEBUG(llvm::dbgs() << "    REF COUNT INCREMENT!\n");
 
@@ -355,7 +365,7 @@ processBBBottomUp(ARCBBState &BBState,
       // and add the retain/release pair to the delete list and continue.
       if (RefCountState.isRefCountInstMatchedToTrackedInstruction(&I)) {
         // Copy the current value of ref count state into the result map.
-        IncToDecStateMap[&I] = BottomUpRefCountState(RefCountState);
+        IncToDecStateMap[&I] = RefCountState;
         DEBUG(llvm::dbgs() << "    MATCHING DECREMENT:"
               << *RefCountState.getInstruction());
 
@@ -373,13 +383,17 @@ processBBBottomUp(ARCBBState &BBState,
       }
 
       // Otherwise we continue processing the reference count decrement to
-      // see if the decrement can affect any other pointers that we are
-      // tracking.
+      // see if the increment can act as a use for other values.
     }
 
     // For all other (reference counted value, ref count state) we are
     // tracking...
-    for (auto &OtherState : BBState.getTopDownStates()) {
+    for (auto &OtherState : BBState.getBottomupStates()) {
+      // If this is the state associated with the instruction that we are
+      // currently visiting, bail.
+      if (Op && OtherState.first == Op)
+        continue;
+
       // If we are tracking an argument, skip it.
       if (!OtherState.second.isTrackingRefCountInst())
         continue;

@@ -260,7 +260,7 @@ struct BottomUpRefCountState : public RefCountState<BottomUpRefCountState> {
 
   /// Is this ref count initialized and tracking a ref count ptr.
   bool isTrackingRefCount() const {
-    return Decrement.isNull();
+    return !Decrement.isNull();
   }
 
   /// Are we tracking an instruction currently? This returns false when given an

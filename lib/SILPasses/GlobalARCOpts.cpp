@@ -77,7 +77,7 @@ optimizeReferenceCountMatchingSet(ARCMatchingSet &MatchSet,
   }
 
   // Insert the new decrements.
-  for (SILInstruction *InsertPt : MatchSet.DecrementInsertionPts) {
+  for (SILInstruction *InsertPt : MatchSet.DecrementInsertPts) {
     if (!InsertPt) {
       DEBUG(llvm::dbgs() << "    No insertion point, not inserting decrement "
             "into its new position.\n");
