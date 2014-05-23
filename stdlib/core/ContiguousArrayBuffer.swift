@@ -362,7 +362,7 @@ func ~> <
 }
 
 func ~> <  
-  C: Collection
+  C: protocol<_Collection,_Sequence_>
 >(
   source: C, _:(_CopyToNativeArrayBuffer, ())
 ) -> ContiguousArrayBuffer<C.GeneratorType.Element>
