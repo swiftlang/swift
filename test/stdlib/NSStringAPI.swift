@@ -476,7 +476,17 @@ NSStringAPIs.test("cStringUsingEncoding(_:)") {
 }
 
 NSStringAPIs.test("dataUsingEncoding(_:allowLossyConversion:)") {
-  // FIXME
+  expectEmpty("あいう".dataUsingEncoding(NSASCIIStringEncoding, allowLossyConversion: false))
+
+  if true {
+    let data = "あいう".dataUsingEncoding(NSUTF8StringEncoding)
+    let bytes = Array(UnsafeArray(
+        start: UnsafePointer<UInt8>(data!.bytes), length: data!.length))
+    let expectedBytes: UInt8[] = [
+      0xe3, 0x81, 0x82, 0xe3, 0x81, 0x84, 0xe3, 0x81, 0x86
+    ]
+    expectTrue(equal(expectedBytes, bytes))
+  }
 }
 
 NSStringAPIs.test("decomposedStringWithCanonicalMapping") {

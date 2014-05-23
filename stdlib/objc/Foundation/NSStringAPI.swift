@@ -450,7 +450,7 @@ extension String {
   func dataUsingEncoding(
     encoding: NSStringEncoding,
     allowLossyConversion: Bool = false
-  ) -> NSData {
+  ) -> NSData? {
     return _ns.dataUsingEncoding(
       encoding, allowLossyConversion: allowLossyConversion)
   }
