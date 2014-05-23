@@ -56,7 +56,7 @@ struct UnicodeScalar : ExtendedGraphemeClusterLiteralConvertible {
     self = v
   }
 
-  func escape() -> String {
+  func escape(#asASCII: Bool) -> String {
     func lowNibbleAsHex(v: UInt32) -> String {
       var nibble = v & 15
       if nibble < 10 {
@@ -86,7 +86,7 @@ struct UnicodeScalar : ExtendedGraphemeClusterLiteralConvertible {
       return "\\x"  
         + lowNibbleAsHex(UInt32(self) >> 4)
         + lowNibbleAsHex(UInt32(self))
-    } else if _isUTF8() {
+    } else if !asASCII {
       return String(self)
     } else if UInt32(self) <= 0xFFFF {
       return "\\u"  
@@ -157,9 +157,12 @@ struct UnicodeScalar : ExtendedGraphemeClusterLiteralConvertible {
   }
 }
 
-extension UnicodeScalar : Printable {
+extension UnicodeScalar : Printable, DebugPrintable {
   var description: String {
-    return "\"\(escape())\""
+    return "\"\(escape(asASCII: false))\""
+  }
+  var debugDescription: String {
+    return "\"\(escape(asASCII: true))\""
   }
 }
 

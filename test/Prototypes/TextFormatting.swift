@@ -131,7 +131,7 @@ struct EscapedStringFormat : XStreamable {
   func writeTo<Target: XOutputStream>(inout target: Target) {
     target.append("\"")
     for c in _value.unicodeScalars {
-      target.append(c.escape())
+      target.append(c.escape(asASCII: true))
     }
     target.append("\"")
   }

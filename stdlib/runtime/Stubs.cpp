@@ -116,16 +116,6 @@ extern "C" uint64_t swift_doubleToString(char *Buffer, size_t BufferLength,
   return i;
 }
 
-static bool _swift_replOutputIsUTF8(void) {
-  const char *lang = getenv("LANG");
-  return lang && strstr(lang, "UTF-8");
-}
-
-extern "C" uint32_t swift_replOutputIsUTF8(void) {
-  static auto rval = _swift_replOutputIsUTF8();
-  return rval;
-}
-
 #if __arm64__
 
 // FIXME: rdar://14883575 Libcompiler_rt omits muloti4

@@ -17,8 +17,6 @@
 @asmname("putchar")
 func c_putchar(value: Int32)
 
-@asmname("swift_replOutputIsUTF8") func _isUTF8() -> Bool
-
 // Some file stuff
 
 @asmname("write")

@@ -92,7 +92,7 @@ extension String : DebugPrintable {
   var debugDescription: String {
     var result = "\""
     for us in self.unicodeScalars {
-      result += us.escape()
+      result += us.escape(asASCII: false)
     }
     result += "\""
     return result

@@ -135,6 +135,15 @@ func test_StdlibTypesPrinted() {
 
   var us: UnicodeScalar = "a"
   printedIs(us, "a")
+  debugPrintedIs(us, "\"a\"")
+  us = "\\"
+  printedIs(us, "\\")
+  assertEquals("\"\\\\\"", us.description)
+  debugPrintedIs(us, "\"\\\\\"")
+  us = "あ"
+  printedIs(us, "あ")
+  assertEquals("\"あ\"", us.description)
+  debugPrintedIs(us, "\"\\u3042\"")
 
   var cstr: CString = "abc"
   printedIs(cstr, "abc")
