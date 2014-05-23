@@ -432,9 +432,9 @@ extension String {
 
   /// Returns a representation of the `String` as a C string
   /// using a given encoding.
-  func cStringUsingEncoding(encoding: NSStringEncoding) -> CChar[] {
+  func cStringUsingEncoding(encoding: NSStringEncoding) -> CChar[]? {
     return withExtendedLifetime(_ns) {
-      (s: NSString) -> CChar[] in
+      (s: NSString) -> CChar[]? in
       s.cStringUsingEncoding(encoding).persist()
     }
   }
@@ -579,7 +579,7 @@ extension String {
 
   /// Returns a file system-specific representation of the `String`.
   func fileSystemRepresentation() -> CChar[] {
-    return _ns.fileSystemRepresentation.persist()
+    return _ns.fileSystemRepresentation.persist()!
   }
 
   //===--- Omitted for consistency with API review results 5/20/2014 ------===//

@@ -1,6 +1,7 @@
 // RUN: rm -rf %t && mkdir -p %t && %S/../../utils/gyb %s -o %t/NSStringAPI.swift
 // RUN: %S/../../utils/line-directive %t/NSStringAPI.swift -- %target-build-swift -module-cache-path %t/clang-module-cache %t/NSStringAPI.swift -o %t/a.out
-// RUN: %target-run %t/a.out %S/Inputs/NSStringAPI_test.txt | %S/../../utils/line-directive %t/NSStringAPI.swift -- FileCheck %s
+// RUN: %target-run %t/a.out %S/Inputs/NSStringAPI_test.txt > /tmp/z.txt
+// RU/N: %target-run %t/a.out %S/Inputs/NSStringAPI_test.txt | %S/../../utils/line-directive %t/NSStringAPI.swift -- FileCheck %s
 
 //
 // Tests for the NSString APIs as exposed by String
@@ -161,7 +162,7 @@ struct TestCase {
       println("Some tests failed, aborting")
       abort()
     } else {
-      println("All tests passed")
+      println("\(name): All tests passed")
     }
   }
 
@@ -774,5 +775,120 @@ NSStringAPIs.test("OperatorEquals") {
 }
 
 NSStringAPIs.run()
-// CHECK: All tests passed
+// CHECK: NSStringAPIs: All tests passed
 
+var CStringTests = TestCase("CStringTests")
+
+func getNullCString() -> CString {
+  return CString(UnsafePointer.null())
+}
+
+func getASCIICString() -> (CString, dealloc: ()->()) {
+  var up = UnsafePointer<UInt8>.alloc(100)
+  up[0] = 0x61
+  up[1] = 0x62
+  up[2] = 0
+  return (CString(up), { up.dealloc(100) })
+}
+
+func getNonASCIICString() -> (CString, dealloc: ()->()) {
+  var up = UnsafePointer<UInt8>.alloc(100)
+  up[0] = 0xd0
+  up[1] = 0xb0
+  up[2] = 0xd0
+  up[3] = 0xb1
+  up[4] = 0
+  return (CString(up), { up.dealloc(100) })
+}
+
+func asCCharArray(a: UInt8[]) -> CChar[] {
+  return a.map { $0.asSigned() }
+}
+
+CStringTests.test("init(_:)") {
+  if true {
+    getNullCString()
+  }
+  if true {
+    var (s, dealloc) = getASCIICString()
+    dealloc()
+  }
+  if true {
+    var (s, dealloc) = getNonASCIICString()
+    dealloc()
+  }
+}
+
+CStringTests.test("convertFromLiterals") {
+  var fromEmpty: CString = ""
+  var fromGraphemeCluster1: CString = "z"
+  var fromGraphemeCluster2: CString = "あ"
+  var fromStringLiteral1: CString = "abc"
+  var fromStringLiteral2: CString = "абв"
+}
+
+CStringTests.test("getLogicValue()") {
+  if true {
+    var s = getNullCString()
+    expectFalse(s.getLogicValue())
+  }
+  if true {
+    var (s, dealloc) = getASCIICString()
+    expectTrue(s.getLogicValue())
+    dealloc()
+  }
+  if true {
+    var (s, dealloc) = getNonASCIICString()
+    expectTrue(s.getLogicValue())
+    dealloc()
+  }
+}
+
+CStringTests.test("persist()") {
+  if true {
+    var s = getNullCString()
+    expectEmpty(s.persist())
+  }
+  if true {
+    var (s, dealloc) = getASCIICString()
+    expectEqual(asCCharArray([ 0x61, 0x62, 0 ]), s.persist()!)
+    dealloc()
+  }
+  if true {
+    var (s, dealloc) = getNonASCIICString()
+    expectEqual(asCCharArray([ 0xd0, 0xb0, 0xd0, 0xb1, 0 ]), s.persist()!)
+    dealloc()
+  }
+}
+
+CStringTests.test("debugDescription") {
+  if true {
+    var s = getNullCString()
+    expectEqual("<null C string>", s.debugDescription)
+  }
+  if true {
+    var (s, dealloc) = getASCIICString()
+    expectEqual("\"ab\"", s.debugDescription)
+    dealloc()
+  }
+  if true {
+    /*
+    FIXME: currently 'debugDescription' depends on the locale.
+    var (s, dealloc) = getNonASCIICString()
+    expectEqual("\"аб\"", s.debugDescription)
+    dealloc()
+    */
+  }
+}
+
+CStringTests.test("OperatorEquals") {
+  var (s1, dealloc1) = getASCIICString()
+  var (s2, dealloc2) = getNonASCIICString()
+  expectTrue(s1 == s1)
+  expectFalse(s1 == s2)
+  dealloc1()
+  dealloc2()
+}
+
+CStringTests.run()
+// CHECK: {{^}}CStringTests: All tests passed

@@ -61,13 +61,18 @@ struct CString :
     return !_isNull
   }
 
-  /// From a `CString` with possibly-transient lifetime, create a
+  /// From a non-`nil` `CString` with possibly-transient lifetime, create a
   /// nul-terminated array of 'C' char.
-  func persist() -> CChar[] {
+  /// Returns `nil` if the `CString` was created from a null pointer.
+  func persist() -> CChar[]? {
+    if !self {
+      return .None
+    }
     var length = _strlen(self)
     var result = new CChar[length + 1]
     for var i = 0; i < length; ++i {
-      result[i] = CChar(_bytesPtr[i])
+      // FIXME: this will not compile on platforms where 'CChar' is unsigned.
+      result[i] = _bytesPtr[i].asSigned()
     }
     return result
   }
