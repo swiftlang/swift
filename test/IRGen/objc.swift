@@ -97,3 +97,13 @@ func test10(g: Gizmo, r: Rect) {
 // Force the emission of the Rect metadata.
 func test11_helper<T>(t: T) {}
 func test11(r: Rect) { test11_helper(r) }
+
+class WeakObjC {
+  weak var obj: NSObject?
+  weak var id: AnyObject?
+
+  init() {
+    var foo = obj
+    var bar = id
+  }
+}
