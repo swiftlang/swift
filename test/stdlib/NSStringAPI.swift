@@ -46,6 +46,32 @@ func expectNotEqual<T : Equatable>(
   }
 }
 
+func expectTrue(
+    actual: Bool,
+    file: String = __FILE__, line: UWord = __LINE__
+) {
+  if !actual {
+    _anyExpectFailed = true
+    println("check failed at \(file), line \(line)")
+    println("expected: true")
+    println("actual: \(actual)")
+    println()
+  }
+}
+
+func expectFalse(
+    actual: Bool,
+    file: String = __FILE__, line: UWord = __LINE__
+) {
+  if actual {
+    _anyExpectFailed = true
+    println("check failed at \(file), line \(line)")
+    println("expected: false")
+    println("actual: \(actual)")
+    println()
+  }
+}
+
 func expectEmpty<T>(
     value: Optional<T>,
     file: String = __FILE__, line: UWord = __LINE__
@@ -256,23 +282,51 @@ NSStringAPIs.test("stringWithUTF8String(_:)") {
 }
 
 NSStringAPIs.test("canBeConvertedToEncoding(_:)") {
-  // FIXME
+  expectTrue("foo".canBeConvertedToEncoding(NSASCIIStringEncoding))
+  expectFalse("あいう".canBeConvertedToEncoding(NSASCIIStringEncoding))
 }
 
 NSStringAPIs.test("capitalizedString") {
-  // FIXME
+  expectEqual("Foo Foo Foo Foo", "foo Foo fOO FOO".capitalizedString)
+  expectEqual("Жжж", "жжж".capitalizedString)
 }
 
 NSStringAPIs.test("capitalizedStringWithLocale") {
-  // FIXME
+  expectEqual("Foo Foo Foo Foo",
+      "foo Foo fOO FOO".capitalizedStringWithLocale(NSLocale.currentLocale()))
+  expectEqual("Жжж",
+      "жжж".capitalizedStringWithLocale(NSLocale.currentLocale()))
+
+  /*
+  FIXME
+  expectEqual("Foo Foo Foo Foo",
+      "foo Foo fOO FOO".capitalizedStringWithLocale(nil))
+  expectEqual("Жжж", "жжж".capitalizedStringWithLocale(nil))
+  */
 }
 
 NSStringAPIs.test("caseInsensitiveCompare(_:)") {
-  // FIXME
+  expectEqual(NSComparisonResult.OrderedSame,
+      "abCD".caseInsensitiveCompare("AbCd"))
+  expectEqual(NSComparisonResult.OrderedAscending,
+      "abCD".caseInsensitiveCompare("AbCdE"))
+
+  expectEqual(NSComparisonResult.OrderedSame,
+      "абвг".caseInsensitiveCompare("АбВг"))
+  expectEqual(NSComparisonResult.OrderedAscending,
+      "абВГ".caseInsensitiveCompare("АбВгД"))
 }
 
 NSStringAPIs.test("commonPrefixWithString(_:options:)") {
-  // FIXME
+  expectEqual("ab",
+      "abcd".commonPrefixWithString("abdc", options: NSStringCompareOptions(0)))
+  expectEqual("abC",
+      "abCd".commonPrefixWithString("abce", options: .CaseInsensitiveSearch))
+
+  expectEqual("аб",
+      "абвг".commonPrefixWithString("абгв", options: NSStringCompareOptions(0)))
+  expectEqual("абВ",
+      "абВг".commonPrefixWithString("абвд", options: .CaseInsensitiveSearch))
 }
 
 NSStringAPIs.test("compare(_:options:range:locale:)") {
