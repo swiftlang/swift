@@ -67,7 +67,7 @@ class DCE : public SILFunctionTransform {
   void markLive(SILFunction &F);
   bool removeDead(SILFunction &F);
 
-  void markValueLive(ValueBase* V);
+  void markValueLive(ValueBase *V);
   void markTerminatorArgsLive(SILBasicBlock *Pred, SILBasicBlock *Succ,
                               size_t ArgIndex);
   void propagateLiveBlockArgument(SILArgument *Arg);
@@ -78,7 +78,7 @@ class DCE : public SILFunctionTransform {
 
 // Keep track of the fact that V is live and add it to our worklist
 // so that we can process the values it depends on.
-void DCE::markValueLive(ValueBase* V) {
+void DCE::markValueLive(ValueBase *V) {
   if (Live.count(V))
     return;
 
