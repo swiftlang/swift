@@ -152,9 +152,10 @@ int main(int argc, char **argv) {
     }
   }
 
-  // After running this pass all of the functions to remove should consist only
-  // of one BB with an unreachable.
-  performSILDeadCodeElimination(M);
+  // After running this pass all of the functions we will remove
+  // should consist only of one basic block terminated by
+  // UnreachableInst.
+  performSILDiagnoseUnreachable(M);
 
   // Now clear those functions.
   for (auto &F : DeadFunctions) {

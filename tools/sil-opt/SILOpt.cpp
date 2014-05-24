@@ -42,7 +42,7 @@ enum class PassKind {
   CSE,
   DefiniteInit,
   NoReturn,
-  DCE,
+  DiagnoseUnreachable,
   DataflowDiagnostics,
   GlobalOpt,
   InOutDeshadowing,
@@ -135,8 +135,9 @@ Passes(llvm::cl::desc("Passes:"),
                         clEnumValN(PassKind::NoReturn,
                                    "noreturn-folding",
                                    "Add 'unreachable' after noreturn calls"),
-                        clEnumValN(PassKind::DCE,
-                                   "dead-code-elimination", "Remove dead code"),
+                        clEnumValN(PassKind::DiagnoseUnreachable,
+                                   "diagnose-unreachable",
+                                   "Diagnose unreachable code"),
                         clEnumValN(PassKind::DefiniteInit,
                                    "definite-init","definitive initialization"),
                         clEnumValN(PassKind::InOutDeshadowing,
@@ -287,8 +288,8 @@ static void runCommandLineSelectedPasses(SILModule *Module,
     case PassKind::NoReturn:
       PM.add(createNoReturnFolding());
       break;
-    case PassKind::DCE:
-      PM.add(createDCE());
+    case PassKind::DiagnoseUnreachable:
+      PM.add(createDiagnoseUnreachable());
       break;
     case PassKind::DefiniteInit:
       PM.add(createDefiniteInitialization());

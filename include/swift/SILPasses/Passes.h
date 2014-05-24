@@ -33,7 +33,7 @@ namespace swift {
 
   /// \brief Detect and remove unreachable code. Diagnose provably unreachable
   /// user code.
-  void performSILDeadCodeElimination(SILModule *M);
+  void performSILDiagnoseUnreachable(SILModule *M);
 
   /// \brief Link a SILFunction declaration to the actual definition in the
   /// serialized modules.
@@ -52,7 +52,7 @@ namespace swift {
   SILTransform *createPredictableMemoryOptimizations();
   SILTransform *createDiagnosticConstantPropagation();
   SILTransform *createNoReturnFolding();
-  SILTransform *createDCE();
+  SILTransform *createDiagnoseUnreachable();
   SILTransform *createMandatoryInlining();
   SILTransform *createSILCleanup();
   SILTransform *createEmitDFDiagnostics();

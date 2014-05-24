@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "dead-code-elimination"
+#define DEBUG_TYPE "diagnose-unreachable"
 #include "swift/SILPasses/Passes.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/SIL/SILArgument.h"
@@ -677,9 +677,9 @@ static void performNoReturnFunctionProcessing(SILModule *M) {
   }
 }
 
-void swift::performSILDeadCodeElimination(SILModule *M) {
+void swift::performSILDiagnoseUnreachable(SILModule *M) {
   for (auto &Fn : *M) {
-    DEBUG(llvm::errs() << "*** Dead Code Elimination processing: "
+    DEBUG(llvm::errs() << "*** Diagnose Unreachable processing: "
           << Fn.getName() << "\n");
 
     UnreachableUserCodeReportingState State;
@@ -735,16 +735,16 @@ SILTransform *swift::createNoReturnFolding() {
 
 
 namespace {
-  class DCE : public SILModuleTransform {
+  class DiagnoseUnreachable : public SILModuleTransform {
     void run() {
-      performSILDeadCodeElimination(getModule());
+      performSILDiagnoseUnreachable(getModule());
       invalidateAnalysis(SILAnalysis::InvalidationKind::All);
     }
 
-    StringRef getName() override { return "DCE"; }
+    StringRef getName() override { return "Diagnose Unreachable"; }
   };
 }
 
-SILTransform *swift::createDCE() {
-  return new DCE();
+SILTransform *swift::createDiagnoseUnreachable() {
+  return new DiagnoseUnreachable();
 }

@@ -65,7 +65,7 @@ bool swift::runSILDiagnosticPasses(SILModule &Module,
   PM.add(createDefiniteInitialization());
   PM.add(createPredictableMemoryOptimizations());
   PM.add(createDiagnosticConstantPropagation());
-  PM.add(createDCE());
+  PM.add(createDiagnoseUnreachable());
   PM.add(createEmitDFDiagnostics());
   PM.run();
 
