@@ -30,39 +30,88 @@ func permute(size : Int, verify : (Int[]) -> ()) {
 }
 
 
+// A simple random number generator.
+func randomize(size : Int, verify : (Int[]) -> ()) {
+  var arr : Int[] = []
+  var N = 1
+  var M = 1
+  for i in 0..size {
+    N = N * 19 % 1024
+    M = (N + M) % size
+    arr.append(N)
+    if (M % 3 == 0) {
+      arr.append(M)
+    }
+  }
+  verify(arr)
+}
+
 // Verify the permute method itself:
 let printer : (Int[]) -> () = {
-    print("[")
-    for i in $0 {
-      print("\(i) ")
-    }
-    print("]\n")
+  println($0)
 }
-//CHECK: [0 1 2 ]
-//CHECK: [0 2 1 ]
-//CHECK: [1 0 2 ]
-//CHECK: [1 2 0 ]
-//CHECK: [2 0 1 ]
-//CHECK: [2 1 0 ]
+//CHECK: [0, 1, 2]
+//CHECK: [0, 2, 1]
+//CHECK: [1, 0, 2]
+//CHECK: [1, 2, 0]
+//CHECK: [2, 0, 1]
+//CHECK: [2, 1, 0]
 permute(3, printer)
 
 // Now, let's verify the sort.
-let verifier : (Int[]) -> () = {
+let sort_verifier : (Int[]) -> () = {
     var y = $0.copy()
     sort(y)
     for i in 0..y.count - 1 {
       if (y[i] > y[i+1]) {
-        print("Error!")
+        print("Error!\n")
         return
       }
     }
 }
 
 //CHECK-NOT: Error!
-permute(2, verifier)
-permute(5, verifier)
-permute(6, verifier)
-permute(7, verifier)
-//CHECK: Done
-println("Done")
+permute(2, sort_verifier)
+permute(6, sort_verifier)
+permute(7, sort_verifier)
+//CHECK: Test1 - Done
+println("Test1 - Done")
+
+// Now, let's verify the sort.
+let partition_verifier : (Int[]) -> () = {
+    var y = $0.copy()
+    // Partition() returns the index to the pivot value.
+    let idx = partition(&y, 0..y.count)
+    // Check that all of the elements in the first partition are smaller or
+    // equal to the pivot value.
+    for i in 0..idx {
+      if y[i] > y[idx]  {
+        print("Error!\n")
+        return
+      }
+    }
+    // Check that all of the elements in the second partition are greater or
+    // equal to the pivot value.
+    for i in idx..y.count - 1 {
+      if y[i] < y[idx]  {
+        print("Error!\n")
+        return
+      }
+    }
+}
+
+permute(2, partition_verifier)
+permute(6, partition_verifier)
+permute(7, partition_verifier)
+//CHECK-NOT: Error!
+//CHECK: Test2 - Done
+println("Test2 - Done")
+
+
+randomize(70, sort_verifier)
+randomize(700, sort_verifier)
+randomize(1900, sort_verifier)
+//CHECK-NOT: Error!
+//CHECK: Test3 - Done
+println("Test3 - Done")
 

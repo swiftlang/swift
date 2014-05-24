@@ -91,8 +91,9 @@ func insertionSort<
   }
 }
 
-/// Partition a non empty range into two partially sorted regions:
-/// [start..idx), [idx..end)
+/// Partition a non empty range into two partially sorted regions and return
+/// the index of the pivot:
+/// [start..idx), pivot ,[idx..end)
 func partition<C: MutableCollection where C.IndexType: SignedInteger>(
   inout elements: C,
   range: Range<C.IndexType>,
@@ -102,12 +103,16 @@ func partition<C: MutableCollection where C.IndexType: SignedInteger>(
   var i = range.startIndex
   var j = range.endIndex - 1
 
-  let pivot = (i + j) / 2
+  // The first element is the pivot.
+  let pivot = elements[range.startIndex]
+  i++
+
   while i <= j {
-    while less(elements[i], elements[pivot]) {
+    while less(elements[i], pivot) {
       i++
+      if (i > j) { break }
     }
-    while less(elements[pivot], elements[j]) {
+    while less(pivot, elements[j]) {
       j--
     }
     if i <= j {
@@ -117,7 +122,8 @@ func partition<C: MutableCollection where C.IndexType: SignedInteger>(
     }
   }
 
-  return i
+  swap(&elements[i - 1], &elements[range.startIndex])
+  return i - 1
 }
 
 
@@ -138,15 +144,15 @@ func _quickSort<C: MutableCollection where C.IndexType: SignedInteger>(
 
   // Insertion sort is better at handling smaller regions.
   let cnt = count(range)
-  if cnt < 16 {
+  if cnt < 20 {
     insertionSort(&elements, range, &less)
     return
   }
 
-   // Partition and sort.
+   // Part2tion and sort.
   let part_idx : C.IndexType = partition(&elements, range, &less)
   _quickSort(&elements, range.startIndex..part_idx, &less);
-  _quickSort(&elements, part_idx..range.endIndex, &less);
+  _quickSort(&elements, (part_idx + 1)..range.endIndex, &less);
 }
 
 struct Less<T: Comparable> {
@@ -211,8 +217,9 @@ func insertionSort<
   }
 }
 
-/// Partition a non empty range into two partially sorted regions:
-/// [start..idx), [idx..end)
+/// Partition a non empty range into two partially sorted regions and return
+/// the index of the pivot:
+/// [start..idx), pivot ,[idx..end)
 func partition<C: MutableCollection where C.GeneratorType.Element: Comparable, C.IndexType: SignedInteger>(
   inout elements: C,
   range: Range<C.IndexType>) -> C.IndexType {
@@ -220,12 +227,16 @@ func partition<C: MutableCollection where C.GeneratorType.Element: Comparable, C
   var i = range.startIndex
   var j = range.endIndex - 1
 
-  let pivot = (i + j) / 2
+  // The first element is the pivot.
+  let pivot = elements[range.startIndex]
+  i++
+
   while i <= j {
-    while Less.compare(elements[i], elements[pivot]) {
+    while Less.compare(elements[i], pivot) {
       i++
+      if (i > j) { break }
     }
-    while Less.compare(elements[pivot], elements[j]) {
+    while Less.compare(pivot, elements[j]) {
       j--
     }
     if i <= j {
@@ -235,7 +246,8 @@ func partition<C: MutableCollection where C.GeneratorType.Element: Comparable, C
     }
   }
 
-  return i
+  swap(&elements[i - 1], &elements[range.startIndex])
+  return i - 1
 }
 
 func quickSort<C: MutableCollection where C.GeneratorType.Element: Comparable, C.IndexType: SignedInteger>(
@@ -248,14 +260,14 @@ func _quickSort<C: MutableCollection where C.GeneratorType.Element: Comparable, 
   inout elements: C, range: Range<C.IndexType>) {
   // Insertion sort is better at handling smaller regions.
   let cnt = count(range)
-  if cnt < 16 {
+  if cnt < 20 {
     insertionSort(&elements, range)
     return
   }
    // Partition and sort.
   let part_idx : C.IndexType = partition(&elements, range)
   _quickSort(&elements, range.startIndex..part_idx);
-  _quickSort(&elements, part_idx..range.endIndex);
+  _quickSort(&elements, (part_idx + 1)..range.endIndex);
 }
 //// End of non-predicate sort functions.
 
