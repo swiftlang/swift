@@ -130,7 +130,10 @@ for example::
         print "sending command: %r" % (command.replace('\n', '<cr>'),)
         for c in command:
             send(c)
-            time.sleep(random.random() * 0.03)
+            if c == "\n":
+              time.sleep(0.1)
+            else:
+              time.sleep(random.random() * 0.03)
 
         if not noReturn:
           # Wait for user input, then send a return.        
