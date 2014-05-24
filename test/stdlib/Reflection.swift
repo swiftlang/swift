@@ -570,7 +570,6 @@ if have1 && have2 && have3 && have4 {
 }
 #endif
 
-#if os(OSX)
 // CHECK-NEXT: 42
 class MyQLTestClass {
   @objc func debugQuickLookObject() -> AnyObject {
@@ -596,7 +595,6 @@ switch reflect(MyQLTestClass()).quickLookObject {
   case .Some(_): println("non-Int object")
   default: println("nil is good here")
 }
-#endif
 
 // CHECK-LABEL: and now our song is done
 println("and now our song is done")
