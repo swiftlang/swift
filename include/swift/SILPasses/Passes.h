@@ -76,6 +76,7 @@ namespace swift {
   SILTransform *createLoadStoreOpts();
   SILTransform *createPerformanceConstantPropagation();
   SILTransform *createGlobalARCOpts();
+  SILTransform *createDCE();
 
   // Utilities
   SILTransform *createStripDebug();

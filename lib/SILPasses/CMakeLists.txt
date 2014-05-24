@@ -33,5 +33,5 @@ add_swift_library(swiftSILPasses
   DeadFunctionElimination.cpp
   GlobalOpt.cpp
   GlobalARCOpts.cpp
+  DeadCodeElimination.cpp
   DEPENDS swiftSILPassesUtils swiftSILAnalysis)
-

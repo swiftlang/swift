@@ -105,6 +105,7 @@ void swift::runSILOptimizationPasses(SILModule &Module,
     PM.add(createARCOpts());
     PM.add(createAllocBoxToStack());
     PM.add(createDeadObjectElimination());
+    PM.add(createDCE());
     PM.run();
 
     DEBUG(Module.verify());

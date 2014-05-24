@@ -67,6 +67,7 @@ enum class PassKind {
   LoadStoreOpts,
   SILLinker,
   GlobalARCOpts,
+  DCE
 };
 
 enum class OptGroup {
@@ -213,6 +214,9 @@ Passes(llvm::cl::desc("Passes:"),
                         clEnumValN(PassKind::GlobalARCOpts,
                                    "global-arc-opts",
                                    "Perform multiple basic block arc optzns."),
+                        clEnumValN(PassKind::DCE,
+                                   "dce",
+                                   "Eliminate dead code"),
                         clEnumValEnd));
 
 static llvm::cl::opt<bool>
@@ -365,6 +369,9 @@ static void runCommandLineSelectedPasses(SILModule *Module,
       break;
     case PassKind::GlobalARCOpts:
       PM.add(createGlobalARCOpts());
+      break;
+    case PassKind::DCE:
+      PM.add(createDCE());
       break;
     }
   }

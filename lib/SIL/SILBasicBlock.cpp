@@ -85,6 +85,15 @@ SILArgument *SILBasicBlock::replaceBBArg(unsigned i, SILType Ty, ValueDecl *D) {
   return NewArg;
 }
 
+size_t SILBasicBlock::getBBArgIndex(SILArgument *Target) {
+  auto *Block = Target->getParent();
+  for (size_t i = 0, e = Block->getNumBBArg(); i != e; ++i)
+    if (Block->getBBArg(i) == Target)
+      return i;
+
+  llvm_unreachable("Expected to find argument in block's argument list!");
+}
+
 /// \brief Splits a basic block into two at the specified instruction.
 ///
 /// Note that all the instructions BEFORE the specified iterator

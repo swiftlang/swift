@@ -131,6 +131,7 @@ public:
   const SILArgument *getBBArg(unsigned i) const { return BBArgList[i]; }
   SILArgument *getBBArg(unsigned i) { return BBArgList[i]; }
   SILArgument *replaceBBArg(unsigned i, SILType Ty, ValueDecl *D =nullptr);
+  size_t getBBArgIndex(SILArgument *Arg);
 
   /// \brief Remove all block arguments.
   void dropAllArgs() { BBArgList.clear(); }
