@@ -70,6 +70,11 @@ def load_as_transcript(f):
         if ln.startswith('#'):
             comment_block.append(ln)
             continue
+        
+        # Check for backspace.
+        if ln.strip() == '>>>BACKSPACE':
+            current_block.append('\b')
+            continue
 
         # Otherwise, add the line to the current block.
         current_block.append(ln)
