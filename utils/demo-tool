@@ -5,6 +5,7 @@ import optparse
 import subprocess
 import time
 import random
+import sys
 
 def send_to_screen(screen_name, arg0=None, command='stuff'):
     args = ['screen', '-S', screen_name, '-p', '0',
@@ -24,36 +25,50 @@ def load_as_transcript(f):
             current_block.pop()
 
         # Add the block if it is non-empty.
-        if current_block:
+        if current_block or comment_block:
             # Form the joined script..
             script = ''.join(current_block)
+            comment = ''.join(comment_block)
 
             # Strip off any trailing newline.
             if script.endswith('\n'):
                 script = script[:-1]
             demo_script.append({ 'command' :  script,
+                                 'comment' : comment,
                                  'clearScreen' : clearScreen,
                                  'noReturn' : noReturn })
 
-            # Clear the block.
+            # Clear the block and comment block.
             del current_block[:]
+            del comment_block[:]
 
     f.seek(0)
 
     demo_script = []
     current_block = []
+    comment_block = []
     for ln in f:
         # Check if this is a block delimiter.
         if ln.strip() == '>>>':
             add_block()
             continue
 
+        # Check if this is a block delimiter
+        # but marked to clear the screen.
         if ln.strip() == '>>>CLEAR':
             add_block(clearScreen=True)
             continue
 
+        # Check if this is a block delimiter
+        # but marked to not insert a newline.
         if ln.strip() == '>>>NORETURN':
             add_block(noReturn=True)
+            continue
+
+        # Check if the line starts with a '#'
+        # to indicate a prompter comment.
+        if ln.startswith('#'):
+            comment_block.append(ln)
             continue
 
         # Otherwise, add the line to the current block.
@@ -89,6 +104,16 @@ for example::
   $ screen -S demo
 """)
 
+    # Determine up front if the terminal supports color.
+    hasColor = sys.stdout.isatty()
+
+    def prompterPrint(string):
+        if hasColor:
+            attr = [ '32', '1' ]
+            print '\x1b[%sm%s\x1b[0m' % (';'.join(attr), string)
+        else:
+            print string
+    
     def send(*args, **kwargs):
         return send_to_screen(opts.screen_name, *args, **kwargs)
     parser.add_option("-S", "--screen-name", dest="screen_name", metavar="NAME",
@@ -125,20 +150,25 @@ for example::
         shouldClear = bool(item['clearScreen'])
         noReturn = bool(item['noReturn'])        
         command = str(item['command'])
+        comment = str(item['comment'])
+        
+        if comment:
+            prompterPrint(comment)
 
-        # Send the command slowly, as if it was typed.
-        print "sending command: %r" % (command.replace('\n', '<cr>'),)
-        for c in command:
-            send(c)
-            if c == "\n":
-              time.sleep(0.1)
-            else:
-              time.sleep(random.random() * 0.03)
+        if command:
+            # Send the command slowly, as if it was typed.
+            print "sending command: %r" % (command.replace('\n', '<cr>'),)
+            for c in command:
+                send(c)
+                if c == "\n":
+                  time.sleep(0.1)
+                else:
+                  time.sleep(random.random() * 0.03)
 
-        if not noReturn:
-          # Wait for user input, then send a return.        
-          raw_input('press enter to send return...')
-          send('\n')
+            if not noReturn:
+              # Wait for user input, then send a return.        
+              raw_input('press enter to send return...')
+              send('\n')
           
         if item is not demo_script[-1]:
             raw_input('press enter to continue to next command...')
