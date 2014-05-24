@@ -1,4 +1,4 @@
-//===--- DeadCodeElimination.cpp - Promote alloc_box to alloc_stack ------===//
+//===--- DiagnoseUnreachable.cpp - Diagnose unreachable code --------------===//
 //
 // This source file is part of the Swift.org open source project
 //

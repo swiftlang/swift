@@ -6,7 +6,7 @@ add_swift_library(swiftSILPasses
   CSE.cpp
   SILCodeMotion.cpp
   DataflowDiagnostics.cpp
-  DeadCodeElimination.cpp
+  DiagnoseUnreachable.cpp
   InOutDeshadowing.cpp
   Link.cpp
   MandatoryInlining.cpp

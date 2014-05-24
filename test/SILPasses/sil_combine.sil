@@ -113,7 +113,7 @@ bb2:
 }
 
 //////////////////////////////////////////////////////////
-// Other DCE Tests taken from dead_code_elimination.sil //
+// Other DCE Tests taken from diagnose_unreachable.sil //
 //////////////////////////////////////////////////////////
 
 sil @exit : $@thin @noreturn () -> () {
