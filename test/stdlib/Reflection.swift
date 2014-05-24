@@ -570,6 +570,40 @@ if have1 && have2 && have3 && have4 {
 }
 #endif
 
+#if os(OSX)
+// CHECK-NEXT: 42
+class MyQLTestClass {
+  @objc func debugQuickLookObject() -> AnyObject {
+    return (42 as NSNumber)
+  }
+}
+
+switch reflect(MyQLTestClass()).quickLookObject {
+  case .Some(let ql):
+    switch ql {
+      case .Int(let value): println(value)
+      default: println("failure here")
+    }
+  default: println("even more failure here")
+}
+
+// CHECK-NEXT nil is good here
+class MyNonQLTestClass {
+  func debugQuickLookObject() -> AnyObject {
+    return (42 as NSNumber)
+  }
+}
+
+switch reflect(MyQLTestClass()).quickLookObject {
+  case .Some(let ql):
+    switch ql {
+      case .Int(let value): println(value)
+      default: println("failure here")
+    }
+  default: println("nil is good here")
+}
+#endif
+
 // CHECK-LABEL: and now our song is done
 println("and now our song is done")
 

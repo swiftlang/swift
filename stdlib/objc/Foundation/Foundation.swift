@@ -997,9 +997,6 @@ func _getObjCSummary(data: _MagicMirrorData) -> String {
   return (data._loadValue() as NSObject).debugDescription
 }
 
-@asmname("swift_ObjCMirror_quickLookObject")
-func _getObjCQuickLookObject(data: _MagicMirrorData) -> QuickLookObject?
-
 struct _ObjCMirror: Mirror {
   let data: _MagicMirrorData
 
@@ -1018,7 +1015,7 @@ struct _ObjCMirror: Mirror {
     return _getObjCSummary(data)
   }
   var quickLookObject: QuickLookObject? {
-    return _getObjCQuickLookObject(data)
+    return _getClassQuickLookObject(data)
   }
   var disposition: MirrorDisposition { return .Class }
 }
@@ -1043,7 +1040,7 @@ struct _ObjCSuperMirror: Mirror {
     return _getObjCSummary(data)
   }
   var quickLookObject: QuickLookObject? {
-    return _getObjCQuickLookObject(data)
+    return _getClassQuickLookObject(data)
   }
   var disposition: MirrorDisposition { return .Class }
 }

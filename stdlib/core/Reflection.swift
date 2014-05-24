@@ -402,6 +402,9 @@ func _getClassCount(_MagicMirrorData) -> Int
 @asmname("swift_ClassMirror_subscript")
 func _getClassChild(Int, _MagicMirrorData) -> (String, Mirror)
 
+@asmname("swift_ClassMirror_quickLookObject")
+func _getClassQuickLookObject(data: _MagicMirrorData) -> QuickLookObject?
+
 struct _ClassMirror: Mirror {
   let data: _MagicMirrorData
   
@@ -419,7 +422,9 @@ struct _ClassMirror: Mirror {
   var summary: String {
     return "\(_stdlib_getTypeName(value))\(_formatNumChildren(count))"
   }
-  var quickLookObject: QuickLookObject? { return nil }
+  var quickLookObject: QuickLookObject? {
+    return _getClassQuickLookObject(data)
+  }
   var disposition: MirrorDisposition { return .Class }
 }
 
