@@ -28,9 +28,10 @@
 using namespace swift;
 
 // Declare the debugQuickLookObject selector.
-@protocol DeclareQuickLookObject
+@interface DeclareSelectors
 
 - (id)debugQuickLookObject;
+- (bool) __usesNativeSwiftReferenceCounting;
 
 @end
 
@@ -405,6 +406,14 @@ intptr_t swift_ClassMirror_count(HeapObject *owner,
   return count;
 }
   
+/// Decide dynamically whether the given object uses native Swift
+/// reference-counting.
+static bool usesNativeSwiftReferenceCounting(void *object) {
+  // This could be *much* faster if it were integrated into the ObjC runtime.
+  assert(object);
+  return [(id) object __usesNativeSwiftReferenceCounting];
+}
+  
 extern "C"
 StringMirrorTuple swift_ClassMirror_subscript(intptr_t i,
                                               HeapObject *owner,
@@ -432,7 +441,19 @@ StringMirrorTuple swift_ClassMirror_subscript(intptr_t i,
   
   // Load the type and offset from their respective vectors.
   auto fieldType = Clas->getFieldTypes()[i];
-  auto fieldOffset = Clas->getFieldOffsets()[i];
+  
+  // FIXME: If the class has ObjC heritage, get the field offset using the ObjC
+  // metadata, because we don't update the field offsets in the face of
+  // resilient base classes.
+  uintptr_t fieldOffset;
+  if (usesNativeSwiftReferenceCounting(*(void * const *)value)) {
+    
+    fieldOffset = Clas->getFieldOffsets()[i];
+  } else {
+    Ivar *ivars = class_copyIvarList((Class)Clas, nullptr);
+    fieldOffset = ivar_getOffset(ivars[i]);
+    free(ivars);
+  }
   
   auto bytes = *reinterpret_cast<const char * const*>(value);
   auto fieldData = reinterpret_cast<const OpaqueValue *>(bytes + fieldOffset);

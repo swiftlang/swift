@@ -5,6 +5,7 @@
 
 #if os(OSX) || os(iOS)
 import Foundation
+import SpriteKit
 #endif
 
 #if os(OSX)
@@ -595,6 +596,38 @@ switch reflect(MyQLTestClass()).quickLookObject {
   case .Some(_): println("non-Int object")
   default: println("nil is good here")
 }
+
+#if os(OSX) || os(iOS)
+
+// <rdar://problem/17027510>
+struct Pear<T, U> { let fst: T; let snd: U }
+
+class SubScene: SKScene {
+  let foo = 12_131_415
+  let bar = "boom"
+  let bas: Pear<Int, Any?[]> = Pear(fst: 219, snd: ["boom", 123, 456.0])
+  let zim = 20721
+}
+
+// CHECK-LABEL: SKScene subclass:
+// CHECK-NEXT: {{.*}}SubScene
+// CHECK-NEXT:   super: <SKScene>
+// CHECK-NEXT:   foo: 12131415
+// CHECK-NEXT:   bar: boom
+// CHECK-NEXT:   bas: {{.*}}Pear
+// CHECK-NEXT:     fst: 219
+// CHECK-NEXT:     snd: 3 elements
+// CHECK-NEXT:       [0]: boom
+// CHECK-NEXT:         Some: boom
+// CHECK-NEXT:       [1]: 123
+// CHECK-NEXT:         Some: 123
+// CHECK-NEXT:       [2]: 456.0
+// CHECK-NEXT:         Some: 456.0
+// CHECK-NEXT:   zim: 20721
+println("SKScene subclass:")
+dump(SubScene())
+
+#endif
 
 // CHECK-LABEL: and now our song is done
 println("and now our song is done")
