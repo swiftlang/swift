@@ -1231,7 +1231,7 @@ namespace {
         }
       } else {
         // Handle the cases covered by each tag bit value.
-        unsigned casesPerTag = 1 << ExtraTagBitCount;
+        unsigned casesPerTag = payloadBits >= 32 ? UINT_MAX : 1U << payloadBits;
         for (unsigned i = 1, e = tagBitBlocks.size(); i < e; ++i) {
           assert(elti != eltEnd &&
                  "ran out of cases before running out of extra tags?");

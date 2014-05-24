@@ -427,6 +427,9 @@ enum SinglePayloadNoXI2 {
   case x(Builtin.Int64)
   case y
   case z
+  case w
+  case v
+  case u
 }
 
 // CHECK: define void @single_payload_no_xi_switch(i64, i1) {
@@ -441,10 +444,14 @@ entry(%u : $SinglePayloadNoXI2):
 // CHECK:   switch i64 %0, label %[[DFLT]] [
 // CHECK:     i64 0, label %[[Y_DEST:[0-9]+]]
 // CHECK:     i64 1, label %[[Z_DEST:[0-9]+]]
+// CHECK:     i64 2, label %[[W_DEST:[0-9]+]]
+// CHECK:     i64 3, label %[[V_DEST:[0-9]+]]
+// CHECK:     i64 4, label %[[U_DEST:[0-9]+]]
 // CHECK:   ]
 // CHECK: ; <label>:[[DFLT]]
 // CHECK:   unreachable
-  switch_enum %u : $SinglePayloadNoXI2, case #SinglePayloadNoXI2.x!enumelt.1: x_dest, case #SinglePayloadNoXI2.y!enumelt: y_dest, case #SinglePayloadNoXI2.z!enumelt: z_dest
+  switch_enum %u : $SinglePayloadNoXI2, case #SinglePayloadNoXI2.x!enumelt.1: x_dest, case #SinglePayloadNoXI2.y!enumelt: y_dest, case #SinglePayloadNoXI2.z!enumelt: z_dest, case #SinglePayloadNoXI2.w!enumelt: w_dest, case #SinglePayloadNoXI2.v!enumelt: v_dest, case #SinglePayloadNoXI2.u!enumelt: u_dest
+
 
 // CHECK: ; <label>:[[X_DEST]]
 // CHECK:   call void @a()
@@ -470,6 +477,30 @@ z_dest:
   apply %c() : $@thin () -> ()
   br end
 
+// CHECK: ; <label>:[[W_DEST]]
+// CHECK:   call void @a()
+// CHECK:   br label %[[END:[0-9]+]]
+w_dest:
+  %d = function_ref @a : $@thin () -> ()
+  apply %d() : $@thin () -> ()
+  br end
+
+// CHECK: ; <label>:[[V_DEST]]
+// CHECK:   call void @b()
+// CHECK:   br label %[[END]]
+v_dest:
+  %e = function_ref @b : $@thin () -> ()
+  apply %e() : $@thin () -> ()
+  br end
+
+// CHECK: ; <label>:[[U_DEST]]
+// CHECK:   call void @c()
+// CHECK:   br label %[[END]]
+u_dest:
+  %f = function_ref @c : $@thin () -> ()
+  apply %f() : $@thin () -> ()
+  br end
+
 // CHECK: ; <label>:[[END]]
 // CHECK:   ret void
 end:
@@ -486,13 +517,16 @@ entry(%u : $SinglePayloadNoXI2):
 // CHECK:     i1 true, label %[[TAGS:[0-9]+]]
 // CHECK:   ]
 // CHECK: ; <label>:[[TAGS]]
-// CHECK:   switch i64 %0, label %[[DFLT]] [
+// CHECK:   switch i64 %0, label %[[DFLT:[0-9]+]] [
 // CHECK:     i64 0, label %[[Y_DEST:[0-9]+]]
 // CHECK:     i64 1, label %[[Z_DEST:[0-9]+]]
+// CHECK:     i64 2, label %[[END:[0-9]+]]
+// CHECK:     i64 3, label %[[END]]
+// CHECK:     i64 4, label %[[END]]
 // CHECK:   ]
 // CHECK: ; <label>:[[DFLT]]
 // CHECK:   unreachable
-  switch_enum %u : $SinglePayloadNoXI2, case #SinglePayloadNoXI2.x!enumelt.1: x_dest, case #SinglePayloadNoXI2.y!enumelt: y_dest, case #SinglePayloadNoXI2.z!enumelt: z_dest
+  switch_enum %u : $SinglePayloadNoXI2, case #SinglePayloadNoXI2.x!enumelt.1: x_dest, case #SinglePayloadNoXI2.y!enumelt: y_dest, case #SinglePayloadNoXI2.z!enumelt: z_dest, default end
 
 // CHECK: ; <label>:[[X_PREDEST]]
 // CHECK:   br label %[[X_DEST:[0-9]+]]
@@ -500,7 +534,7 @@ entry(%u : $SinglePayloadNoXI2):
 // CHECK:   {{%.*}} = phi i64 [ %0, %[[X_PREDEST]] ]
 x_dest(%u2 : $Builtin.Int64):
 // CHECK:   call void @a()
-// CHECK:   br label %[[END:[0-9]+]]
+// CHECK:   br label %[[END]]
   %a = function_ref @a : $@thin () -> ()
   apply %a() : $@thin () -> ()
   br end
