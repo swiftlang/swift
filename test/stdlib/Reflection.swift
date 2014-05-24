@@ -579,12 +579,9 @@ class MyQLTestClass {
 }
 
 switch reflect(MyQLTestClass()).quickLookObject {
-  case .Some(let ql):
-    switch ql {
-      case .Int(let value): println(value)
-      default: println("failure here")
-    }
-  default: println("even more failure here")
+  case .Some(.Int(let value)): println(value)
+  case .Some(_): println("non-Int object")
+  default: println("None")
 }
 
 // CHECK-NEXT nil is good here
@@ -595,11 +592,8 @@ class MyNonQLTestClass {
 }
 
 switch reflect(MyQLTestClass()).quickLookObject {
-  case .Some(let ql):
-    switch ql {
-      case .Int(let value): println(value)
-      default: println("failure here")
-    }
+  case .Some(.Int(let value)): println(value)
+  case .Some(_): println("non-Int object")
   default: println("nil is good here")
 }
 #endif
