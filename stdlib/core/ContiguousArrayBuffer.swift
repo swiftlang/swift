@@ -24,11 +24,11 @@ let emptyNSSwiftArray : _NSSwiftArray
   deinit {
     let b = Buffer(self)
     b.elementStorage.destroy(b.count)
-    b.base._value.destroy()
+    b._base._value.destroy()
   }
 
   @final func __getInstanceSizeAndAlignMask() -> (Int,Int) {
-    return Buffer(self).base._allocatedSizeAndAlignMask()
+    return Buffer(self)._base._allocatedSizeAndAlignMask()
   }
 
   /// Return true if the `proposedElementType` is `T` or a subclass of
@@ -54,7 +54,7 @@ struct ContiguousArrayBuffer<T> : ArrayBufferType, LogicValue {
   /// result's .elementStorage or set the result's .count to zero.
   init(count: Int, minimumCapacity: Int)
   {
-    base = HeapBuffer(
+    _base = HeapBuffer(
       ContiguousArrayStorage<T>.self,
       _ArrayBody(),
       max(count, minimumCapacity))
@@ -64,42 +64,42 @@ struct ContiguousArrayBuffer<T> : ArrayBufferType, LogicValue {
       bridged = isBridgedVerbatimToObjectiveC(T.self)
     }
 
-    base.value = _ArrayBody(count: count, capacity: base._capacity(),  
+    _base.value = _ArrayBody(count: count, capacity: _base._capacity(),  
                             elementTypeIsBridgedVerbatim: bridged)
   }
 
   init(_ storage: ContiguousArrayStorage<T>?) {
-    base = reinterpretCast(storage)
+    _base = reinterpretCast(storage)
   }
   
   func getLogicValue() -> Bool {
-    return base.getLogicValue()
+    return _base.getLogicValue()
   }
 
   /// If the elements are stored contiguously, a pointer to the first
   /// element. Otherwise, nil.
   var elementStorage: UnsafePointer<T> {
-    return base ? base.elementStorage : nil
+    return _base ? _base.elementStorage : nil
   }
 
   /// A pointer to the first element, assuming that the elements are stored
   /// contiguously.
   var _unsafeElementStorage: UnsafePointer<T> {
-    return base.elementStorage
+    return _base.elementStorage
   }
 
   func withUnsafePointerToElements<R>(body: (UnsafePointer<T>)->R) -> R {
-    let p = base.elementStorage
-    return withExtendedLifetime(base) { body(p) }
+    let p = _base.elementStorage
+    return withExtendedLifetime(_base) { body(p) }
   }
 
   mutating func take() -> ContiguousArrayBuffer {
-    if !base {
+    if !_base {
       return ContiguousArrayBuffer()
     }
-    _sanityCheck(base.isUniquelyReferenced(), "Can't \"take\" a shared array buffer")
+    _sanityCheck(_base.isUniquelyReferenced(), "Can't \"take\" a shared array buffer")
     let result = self
-    base = Base()
+    _base = _Base()
     return result
   }
 
@@ -109,7 +109,7 @@ struct ContiguousArrayBuffer<T> : ArrayBufferType, LogicValue {
 
   /// create an empty buffer
   init() {
-    base = HeapBuffer()
+    _base = HeapBuffer()
   }
 
   /// Adopt the storage of x
@@ -154,7 +154,7 @@ struct ContiguousArrayBuffer<T> : ArrayBufferType, LogicValue {
   /// How many elements the buffer stores
   var count: Int {
     get {
-      return base ? base.value.count : 0
+      return _base ? _base.value.count : 0
     }
     nonmutating set {
       _sanityCheck(newValue >= 0)
@@ -163,17 +163,17 @@ struct ContiguousArrayBuffer<T> : ArrayBufferType, LogicValue {
         newValue <= capacity,
         "Can't grow an array buffer past its capacity")
 
-      _sanityCheck(base || newValue == 0)
+      _sanityCheck(_base || newValue == 0)
       
-      if base {
-        base.value.count = newValue
+      if _base {
+        _base.value.count = newValue
       }
     }
   }
 
   /// How many elements the buffer can store without reallocation
   var capacity: Int {
-    return base ? base.value.capacity : 0
+    return _base ? _base.value.capacity : 0
   }
 
   /// Copy the given subRange of this buffer into uninitialized memory
@@ -200,7 +200,7 @@ struct ContiguousArrayBuffer<T> : ArrayBufferType, LogicValue {
   subscript(subRange: Range<Int>) -> SliceBuffer<T>
   {
     return SliceBuffer(
-      owner: base.storage,
+      owner: _base.storage,
       start: elementStorage + subRange.startIndex,
       count: subRange.endIndex - subRange.startIndex,
       hasNativeBuffer: true)
@@ -211,7 +211,7 @@ struct ContiguousArrayBuffer<T> : ArrayBufferType, LogicValue {
   /// may need to be considered, such as whether the buffer could be
   /// some immutable Cocoa container.
   mutating func isUniquelyReferenced() -> Bool {
-    return base.isUniquelyReferenced()
+    return _base.isUniquelyReferenced()
   }
 
   /// Returns true iff this buffer is mutable. NOTE: a true result
@@ -230,15 +230,15 @@ struct ContiguousArrayBuffer<T> : ArrayBufferType, LogicValue {
     if count == 0 {
       return emptyNSSwiftArray
     }
-    if _fastPath(base.value.elementTypeIsBridgedVerbatim) {
-      return reinterpretCast(base.storage)
+    if _fastPath(_base.value.elementTypeIsBridgedVerbatim) {
+      return reinterpretCast(_base.storage)
     }
-    return ContiguousArray(self).map { bridgeToObjectiveC($0)! }._buffer.storage!
+    return ContiguousArray(self).map { bridgeToObjectiveC($0)! }._buffer._storage!
   }
   
   /// An object that keeps the elements stored in this buffer alive
   var owner: AnyObject? {
-    return storage
+    return _storage
   }
 
   /// A value that identifies first mutable element, if any.  Two
@@ -251,7 +251,7 @@ struct ContiguousArrayBuffer<T> : ArrayBufferType, LogicValue {
   /// Return true iff we have storage for elements of the given
   /// `proposedElementType`.  If not, we'll be treated as immutable.
   func canStoreElementsOfDynamicType(proposedElementType: Any.Type) -> Bool {
-    if let s = storage {
+    if let s = _storage {
       return s.canStoreElementsOfDynamicType(proposedElementType)
     }
     return false
@@ -263,7 +263,7 @@ struct ContiguousArrayBuffer<T> : ArrayBufferType, LogicValue {
     _: U.Type
   ) -> Bool {
     _sanityCheck(_isClassOrObjCExistential(U.self))
-    let s = storage
+    let s = _storage
     if _fastPath(s) {
       if _fastPath(s!.staticElementType is U.Type) {
         // Done in O(1)
@@ -282,12 +282,12 @@ struct ContiguousArrayBuffer<T> : ArrayBufferType, LogicValue {
   }
   
   //===--- private --------------------------------------------------------===//
-  var storage: ContiguousArrayStorage<T>? {
-    return reinterpretCast(base.storage)
+  var _storage: ContiguousArrayStorage<T>? {
+    return reinterpretCast(_base.storage)
   }
   
-  typealias Base = HeapBuffer<_ArrayBody, T>
-  var base: Base
+  typealias _Base = HeapBuffer<_ArrayBody, T>
+  var _base: _Base
 }
 
 /// Append the elements of rhs to lhs
@@ -306,13 +306,13 @@ func += <
   else {
     let newLHS = ContiguousArrayBuffer<T>(count: newCount, 
                                       minimumCapacity: lhs.capacity * 2)
-    if lhs.base {
+    if lhs._base {
       newLHS.elementStorage.moveInitializeFrom(lhs.elementStorage, 
                                                count: oldCount)
-      lhs.base.value.count = 0
+      lhs._base.value.count = 0
     }
-    lhs.base = newLHS.base
-    (lhs.base.elementStorage + oldCount).initializeFrom(rhs)
+    lhs._base = newLHS._base
+    (lhs._base.elementStorage + oldCount).initializeFrom(rhs)
   }
 }
 
@@ -324,13 +324,13 @@ func += <T> (inout lhs: ContiguousArrayBuffer<T>, rhs: T) {
 func === <T>(
   lhs: ContiguousArrayBuffer<T>, rhs: ContiguousArrayBuffer<T>
 ) -> Bool {
-  return lhs.base == rhs.base
+  return lhs._base == rhs._base
 }
 
 func !== <T>(
   lhs: ContiguousArrayBuffer<T>, rhs: ContiguousArrayBuffer<T>
 ) -> Bool {
-  return lhs.base != rhs.base
+  return lhs._base != rhs._base
 }
 
 extension ContiguousArrayBuffer : Collection {

@@ -27,7 +27,7 @@ class IndirectArrayBuffer {
     isMutable: Bool,
     needsElementTypeCheck: Bool
   ) {
-    self.buffer = nativeBuffer.storage
+    self.buffer = nativeBuffer._storage
     self.isMutable = isMutable
     self.isCocoa = false
     self.needsElementTypeCheck = needsElementTypeCheck
@@ -64,7 +64,7 @@ class IndirectArrayBuffer {
   // When this buffer has immutable storage and it is modified, the
   // storage is replaced with mutable storage.
   func replaceStorage<T>(newBuffer: ContiguousArrayBuffer<T>) {
-    self.buffer = newBuffer.storage
+    self.buffer = newBuffer._storage
     self.isMutable = true
     self.isCocoa = false
     self.needsElementTypeCheck = false
@@ -138,7 +138,7 @@ extension ArrayBuffer {
   init(_ source: NativeBuffer) {
     if !_isClassOrObjCExistential(T.self) {
       self.storage
-        = source.storage ? Builtin.castToNativeObject(source.storage!) : nil
+        = source._storage ? Builtin.castToNativeObject(source._storage!) : nil
     }
     else {
       self.storage = Builtin.castToNativeObject(
@@ -346,7 +346,7 @@ extension ArrayBuffer {
   
   /// An object that keeps the elements stored in this buffer alive
   var owner: AnyObject? {
-    return _fastPath(_isNative) ? _native.storage : _nonNative!
+    return _fastPath(_isNative) ? _native._storage : _nonNative!
   }
   
   /// A value that identifies first mutable element, if any.  Two

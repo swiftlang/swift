@@ -31,7 +31,7 @@ struct SliceBuffer<T> : ArrayBufferType {
   }
   
   init(_ buffer: NativeBuffer) {
-    owner = buffer.storage
+    owner = buffer._storage
     start = buffer.elementStorage
     _countAndFlags = (UInt(buffer.count) << 1) | (owner ? 1 : 0)
     _invariantCheck()

@@ -20,3 +20,6 @@
 
 // RUN: FileCheck -check-prefix=CHECK-PRIVATE3 -input-file %t.txt %s
 // CHECK-PRIVATE3-NOT: _StringCore
+
+// RUN: FileCheck -check-prefix=CHECK-PRIVATE4 -input-file %t.txt %s
+// CHECK-PRIVATE4-NOT: _ArrayBody
