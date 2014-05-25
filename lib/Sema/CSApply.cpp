@@ -4841,20 +4841,36 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr) {
         break;
       }
 
-      case FixKind::ForceOptional:
-      case FixKind::ForceDowncast: {
+      case FixKind::ForceOptional: {
         auto type = solution.simplifyType(TC, affected->getType())
                       ->getRValueObjectType();
         SourceLoc afterAffectedLoc
           = Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
                                        affected->getEndLoc());
-        TC.diagnose(affected->getLoc(),
-                    fix.first.getKind() == FixKind::ForceOptional
-                      ? diag::missing_unwrap_optional
-                      : diag::missing_forced_downcast,
-                    type)
+        TC.diagnose(affected->getLoc(), diag::missing_unwrap_optional, type)
           .fixItInsert(afterAffectedLoc, "!");
         diagnosed = true;
+        break;
+      }
+
+      case FixKind::ForceDowncast: {
+        auto fromType = solution.simplifyType(TC, affected->getType())
+                          ->getRValueObjectType();
+        Type toType = solution.simplifyType(TC,
+                                            fix.first.getTypeArgument(*this));
+        SourceLoc afterAffectedLoc
+          = Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
+                                       affected->getEndLoc());
+
+        llvm::SmallString<32> asCastStr;
+        asCastStr += " as ";
+        asCastStr += toType.getString();
+        TC.diagnose(affected->getLoc(), diag::missing_forced_downcast, fromType,
+                    toType)
+          .fixItInsert(afterAffectedLoc, asCastStr);
+        diagnosed = true;
+
+        // FIXME: Add parentheses if we now need them.
         break;
       }
 

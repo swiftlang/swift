@@ -325,9 +325,20 @@ Fix Fix::getRelabelTuple(ConstraintSystem &cs, FixKind kind,
   return result;
 }
 
+Fix Fix::getForcedDowncast(ConstraintSystem &cs, Type toType) {
+  unsigned index = cs.FixedTypes.size();
+  cs.FixedTypes.push_back(toType);
+  return Fix(FixKind::ForceDowncast, index);
+}
+
 ArrayRef<Identifier> Fix::getRelabelTupleNames(ConstraintSystem &cs) const {
   assert(isRelabelTuple());
   return cs.RelabelTupleNames[Data];
+}
+
+Type Fix::getTypeArgument(ConstraintSystem &cs) const {
+  assert(getKind() == FixKind::ForceDowncast);
+  return cs.FixedTypes[Data];
 }
 
 StringRef Fix::getName(FixKind kind) {
@@ -360,6 +371,11 @@ void Fix::print(llvm::raw_ostream &Out, ConstraintSystem *cs) const {
     Out << " to ";
     for (auto name : getRelabelTupleNames(*cs))
       Out << name << ":";
+  }
+
+  if (getKind() == FixKind::ForceDowncast && cs) {
+    Out << " as ";
+    Out << getTypeArgument(*cs).getString();
   }
   Out << "]";
 }

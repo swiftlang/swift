@@ -56,7 +56,7 @@ func forgotOptionalBang(a: A, obj: AnyObject) {
 
 func forgotAnyObjectBang(obj: AnyObject) {
   var a = A()
-  a = obj // expected-error{{type 'AnyObject' cannot be implicitly downcast; did you mean to use '!'?}}{{10-10=!}}
+  a = obj // expected-error{{type 'AnyObject' cannot be implicitly downcast to 'A'; did you mean to force downcast with 'as'?}}{{10-10= as A}}
 }
 
 func increment(inout x: Int) { }

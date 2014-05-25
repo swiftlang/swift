@@ -1787,9 +1787,10 @@ commit_to_conversions:
 
     // If we have a value of type AnyObject that we're trying to convert to
     // a class, force a downcast.
+    // FIXME: Also allow types bridged through Objective-C classes.
     if (objectType1->isAnyObject() &&
         type2->getClassOrBoundGenericClass()) {
-      conversionsOrFixes.push_back(FixKind::ForceDowncast);
+      conversionsOrFixes.push_back(Fix::getForcedDowncast(*this, type2));
     }
 
     // If we're converting an lvalue to an inout type, add the missing '&'.

@@ -197,7 +197,7 @@ enum class FixKind : uint8_t {
   /// Introduce a '!' to force an optional unwrap.
   ForceOptional,
 
-  /// Introduce a '!' to force a downcast.
+  /// Introduce a '!' to force a downcast to the specified type.
   ForceDowncast,
 
   /// Introduce a '&' to take the address of an lvalue.
@@ -232,11 +232,15 @@ public:
   
   Fix(FixKind kind) : Kind(kind), Data(0) { 
     assert(!isRelabelTuple() && "Use getRelabelTuple()");
+    assert(kind != FixKind::ForceDowncast && "Use getForceDowncast()");
   }
 
   /// Produce a new fix that relabels a tuple.
   static Fix getRelabelTuple(ConstraintSystem &cs, FixKind kind,
                              ArrayRef<Identifier> names);
+
+  /// Produce a new fix that performs a forced downcast to the given type.
+  static Fix getForcedDowncast(ConstraintSystem &cs, Type toType);
 
   /// Retrieve the kind of fix.
   FixKind getKind() const { return Kind; }
@@ -253,6 +257,9 @@ public:
 
   /// For a relabel-tuple fix, retrieve the new names.
   ArrayRef<Identifier> getRelabelTupleNames(ConstraintSystem &cs) const;
+
+  /// If this fix has a type argument, retrieve it.
+  Type getTypeArgument(ConstraintSystem &cs) const;
 
   /// Return a string representation of a fix.
   static llvm::StringRef getName(FixKind kind);

@@ -1120,6 +1120,9 @@ private:
   /// The names used in relabel-tuple fixes.
   std::vector<ArrayRef<Identifier>> RelabelTupleNames;
 
+  /// Types used in fixes.
+  std::vector<Type> FixedTypes;
+
   /// \brief The set of remembered disjunction choices used to reach
   /// the current constraint system.
   SmallVector<std::pair<ConstraintLocator*, unsigned>, 32>
