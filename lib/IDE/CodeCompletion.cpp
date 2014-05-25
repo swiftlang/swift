@@ -1555,24 +1555,10 @@ public:
       Builder.addTypeAnnotation(TypeAnnotation);
   }
 
-  bool isPrivateStdlibDecl(const ValueDecl *VD) {
-    DeclContext *DC = VD->getDeclContext()->getModuleScopeContext();
-    if (!DC->getParentModule()->isSystemModule())
-      return false;
-    auto FU = dyn_cast<FileUnit>(DC);
-    if (!FU)
-      return false;
-    // Check for Swift module and overlays.
-    if (FU->getKind() != FileUnitKind::SerializedAST)
-      return false;
-
-    return VD->getNameStr().startswith("_");
-  }
-
   // Implement swift::VisibleDeclConsumer.
   void foundDecl(ValueDecl *D, DeclVisibilityKind Reason) override {
     // Hide private stdlib declarations.
-    if (isPrivateStdlibDecl(D))
+    if (D->isPrivateStdlibDecl())
       return;
 
     if (!D->hasType())

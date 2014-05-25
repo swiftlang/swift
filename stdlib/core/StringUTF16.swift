@@ -17,10 +17,15 @@ extension String {
     var endIndex: Int {
       return _core.endIndex
     }
-    func generate() -> _StringCore.GeneratorType {
+
+    // This is to avoid printing "func generate() -> IndexingGenerator<_StringCore>"
+    typealias _GeneratorType = _StringCore.GeneratorType
+    typealias GeneratorType = _GeneratorType
+
+    func generate() -> GeneratorType {
       return _core.generate()
     }
-    subscript(i: Int) -> _StringCore.GeneratorType.Element {
+    subscript(i: Int) -> GeneratorType.Element {
       return _core[i]
     }
     subscript(subRange: Range<Int>) -> UTF16View {

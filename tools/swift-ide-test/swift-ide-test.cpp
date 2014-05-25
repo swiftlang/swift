@@ -270,7 +270,7 @@ SkipUnavailable("skip-unavailable",
                 llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
-SkipLeadingUnderscoreDecls("skip-leading-underscore-decls",
+SkipPrivateStdlibDecls("skip-private-stdlib-decls",
                 llvm::cl::desc("Don't print declarations that start with '_'"),
                 llvm::cl::init(false));
 
@@ -1013,7 +1013,7 @@ static int doPrintModules(const CompilerInvocation &InitInvok,
                           bool PrintImplicitAttrs,
                           bool PrintUnavailableDecls,
                           bool PrintRegularComments,
-                          bool PrintLeadingUnderscoreDecls) {
+                          bool PrintPrivateStdlibDecls) {
   CompilerInvocation Invocation(InitInvok);
 
   CompilerInstance CI;
@@ -1037,7 +1037,7 @@ static int doPrintModules(const CompilerInvocation &InitInvok,
   Options.SynthesizeSugarOnTypes = SynthesizeSugarOnTypes;
   Options.PrintImplicitAttrs = PrintImplicitAttrs;
   Options.PrintRegularClangComments = PrintRegularComments;
-  Options.SkipLeadingUnderscoreDecls = !PrintLeadingUnderscoreDecls;
+  Options.SkipPrivateStdlibDecls = !PrintPrivateStdlibDecls;
   Options.SkipUnavailable = !PrintUnavailableDecls;
 
   std::unique_ptr<ASTPrinter> Printer;
@@ -1692,7 +1692,7 @@ int main(int argc, char *argv[]) {
         options::PrintImplicitAttrs,
         !options::SkipUnavailable,
         options::PrintRegularComments,
-        !options::SkipLeadingUnderscoreDecls);
+        !options::SkipPrivateStdlibDecls);
     break;
   }
 

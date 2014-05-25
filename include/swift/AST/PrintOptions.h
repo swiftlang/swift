@@ -73,8 +73,8 @@ struct PrintOptions {
   /// \brief Whether to print unavailable parts of the AST.
   bool SkipUnavailable = false;
 
-  /// Whether to skip declarations that start with '_'.
-  bool SkipLeadingUnderscoreDecls = false;
+  /// Whether to skip internal stdlib declarations.
+  bool SkipPrivateStdlibDecls = false;
 
   /// Whether to print attributes.
   bool SkipAttributes = false;
@@ -132,7 +132,7 @@ struct PrintOptions {
     result.VarInitializers = true;
     result.PrintDefaultParameterPlaceholder = true;
     result.SkipImplicit = false;
-    result.SkipLeadingUnderscoreDecls = false;
+    result.SkipPrivateStdlibDecls = false;
     result.PrintImplicitAttrs = true;
     result.PrintAttrTransparent = true;
     result.PrintDocumentationComments = true;

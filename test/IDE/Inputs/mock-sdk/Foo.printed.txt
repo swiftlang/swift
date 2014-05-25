@@ -214,12 +214,32 @@ var FOO_MACRO_REDEF_2: CInt { get }
 
 func theLastDeclInFoo()
 
+func _internalTopLevelFunc()
+
+struct _InternalStruct {
+  var x: CInt
+}
+
+extension FooClassBase {
+  class func _internalMeth1() -> AnyObject!
+  func _internalMeth1() -> AnyObject!
+}
+
 /* Extending FooClassBase with cool stuff */
 extension FooClassBase {
-  
+  class func _internalMeth2() -> AnyObject!
+  func _internalMeth2() -> AnyObject!
   class func nonInternalMeth() -> AnyObject!
   func nonInternalMeth() -> AnyObject!
 }
 
-class ClassWithInternalProt {
+extension FooClassBase {
+  class func _internalMeth3() -> AnyObject!
+  func _internalMeth3() -> AnyObject!
+}
+
+protocol _InternalProt {
+}
+
+class ClassWithInternalProt : _InternalProt {
 }

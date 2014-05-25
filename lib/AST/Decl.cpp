@@ -312,6 +312,68 @@ bool Decl::isTransparent() const {
   return false;
 }
 
+static bool isPrivateType(Type Ty) {
+  if (!Ty)
+    return false;
+
+  if (auto TyD = Ty->getAnyNominal())
+    if (TyD->isPrivateStdlibDecl())
+      return true;
+
+  // It can also be an internal typealias.
+  if (NameAliasType *NAT = dyn_cast<NameAliasType>(Ty.getPointer()))
+    return NAT->getDecl()->isPrivateStdlibDecl();
+
+  return false;
+}
+
+bool Decl::isPrivateStdlibDecl() const {
+  if (auto ExtD = dyn_cast<ExtensionDecl>(this))
+    return isPrivateType(ExtD->getExtendedType());
+
+  auto VD = dyn_cast<ValueDecl>(this);
+  if (!VD || !VD->hasName())
+    return false;
+
+  DeclContext *DC = VD->getDeclContext()->getModuleScopeContext();
+  if (!DC->getParentModule()->isSystemModule())
+    return false;
+  auto FU = dyn_cast<FileUnit>(DC);
+  if (!FU)
+    return false;
+  // Check for Swift module and overlays.
+  if (FU->getKind() != FileUnitKind::SerializedAST)
+    return false;
+
+  // If the name has leading underscore then it's a private symbol.
+  if (VD->getNameStr().startswith("_"))
+    return true;
+
+  if (auto VarD = dyn_cast<VarDecl>(VD)) {
+    return isPrivateType(VarD->getType());
+
+  // If it's a function with a parameter with leading underscore, it's a private
+  // function.
+  } else if (auto AFD = dyn_cast<AbstractFunctionDecl>(VD)) {
+    bool hasInternalParameter = false;
+    for (auto Pat : AFD->getBodyParamPatterns()) {
+      Pat->forEachVariable([&](VarDecl *Param) {
+        if ((Param->hasName() && Param->getNameStr().startswith("_")) ||
+            isPrivateType(Param->getType())) {
+          hasInternalParameter = true;
+        }
+      });
+      if (hasInternalParameter)
+        return true;
+    }
+
+  } else if (auto TAD = dyn_cast<TypeAliasDecl>(VD)) {
+    return isPrivateType(TAD->getUnderlyingType());
+  }
+
+  return false;
+}
+
 GenericParamList::GenericParamList(SourceLoc LAngleLoc,
                                    ArrayRef<GenericParam> Params,
                                    SourceLoc WhereLoc,

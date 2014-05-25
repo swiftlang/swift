@@ -517,12 +517,8 @@ bool PrintAST::shouldPrint(const Decl *D) {
   if (Options.SkipUnavailable && D->getAttrs().isUnavailable())
     return false;
 
-  if (Options.SkipLeadingUnderscoreDecls) {
-    if (auto VD = dyn_cast<ValueDecl>(D)) {
-      if (VD->hasName() && VD->getFullName().getBaseName().str().startswith("_"))
-        return false;
-    }
-  }
+  if (Options.SkipPrivateStdlibDecls && D->isPrivateStdlibDecl())
+      return false;
 
   if (auto Ext = dyn_cast<ExtensionDecl>(D)) {
     // If the extension doesn't add protocols or has no members that we should

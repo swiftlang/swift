@@ -1,7 +1,7 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 
-// RUN: %swift-ide-test -print-module -source-filename %s -module-to-print=Foo -F %S/Inputs/mock-sdk -module-cache-path %t/clang-module-cache -function-definitions=false -print-regular-comments -skip-leading-underscore-decls > %t/Foo.printed.txt
+// RUN: %swift-ide-test -print-module -source-filename %s -module-to-print=Foo -F %S/Inputs/mock-sdk -module-cache-path %t/clang-module-cache -function-definitions=false -print-regular-comments > %t/Foo.printed.txt
 // RUN: diff %t/Foo.printed.txt %S/Inputs/mock-sdk/Foo.printed.txt
 
 // RUN: %swift-ide-test -print-module -source-filename %s -module-to-print=Foo -F %S/Inputs/mock-sdk -module-cache-path %t/clang-module-cache -function-definitions=false -prefer-type-repr=true -module-print-submodules > %t/Foo.printed.recursive.txt

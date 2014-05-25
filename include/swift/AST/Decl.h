@@ -761,6 +761,8 @@ public:
     return getClangNodeImpl().getAsMacro();
   }
 
+  bool isPrivateStdlibDecl() const;
+
   // Make vanilla new/delete illegal for Decls.
   void *operator new(size_t Bytes) = delete;
   void operator delete(void *Data) = delete;
