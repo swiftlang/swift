@@ -312,26 +312,32 @@ bool Decl::isTransparent() const {
   return false;
 }
 
+static bool isPrivateStdlibDecl(const Decl *D, bool checkType);
+
 static bool isPrivateType(Type Ty) {
   if (!Ty)
     return false;
+
+  // It can also be an internal typealias.
+  // FIXME: If the typealias is not with leading underscore, we accept it as
+  // public type, but if its type is an internal one it will show up undeclared
+  // in the interface. We currently allow this to avoid unintentionally hiding
+  // a public API.
+  if (NameAliasType *NAT = dyn_cast<NameAliasType>(Ty.getPointer()))
+    return isPrivateStdlibDecl(NAT->getDecl(), /*checkType=*/false);
 
   if (auto TyD = Ty->getAnyNominal())
     if (TyD->isPrivateStdlibDecl())
       return true;
 
-  // It can also be an internal typealias.
-  if (NameAliasType *NAT = dyn_cast<NameAliasType>(Ty.getPointer()))
-    return NAT->getDecl()->isPrivateStdlibDecl();
-
   return false;
 }
 
-bool Decl::isPrivateStdlibDecl() const {
-  if (auto ExtD = dyn_cast<ExtensionDecl>(this))
+static bool isPrivateStdlibDecl(const Decl *D, bool checkType) {
+  if (auto ExtD = dyn_cast<ExtensionDecl>(D))
     return isPrivateType(ExtD->getExtendedType());
 
-  auto VD = dyn_cast<ValueDecl>(this);
+  auto VD = dyn_cast<ValueDecl>(D);
   if (!VD || !VD->hasName())
     return false;
 
@@ -350,7 +356,8 @@ bool Decl::isPrivateStdlibDecl() const {
     return true;
 
   if (auto VarD = dyn_cast<VarDecl>(VD)) {
-    return isPrivateType(VarD->getType());
+    if (checkType)
+      return isPrivateType(VarD->getType());
 
   // If it's a function with a parameter with leading underscore, it's a private
   // function.
@@ -359,7 +366,7 @@ bool Decl::isPrivateStdlibDecl() const {
     for (auto Pat : AFD->getBodyParamPatterns()) {
       Pat->forEachVariable([&](VarDecl *Param) {
         if ((Param->hasName() && Param->getNameStr().startswith("_")) ||
-            isPrivateType(Param->getType())) {
+            (checkType && isPrivateType(Param->getType()))) {
           hasInternalParameter = true;
         }
       });
@@ -368,10 +375,15 @@ bool Decl::isPrivateStdlibDecl() const {
     }
 
   } else if (auto TAD = dyn_cast<TypeAliasDecl>(VD)) {
-    return isPrivateType(TAD->getUnderlyingType());
+    if (checkType)
+      return isPrivateType(TAD->getUnderlyingType());
   }
 
   return false;
+}
+
+bool Decl::isPrivateStdlibDecl() const {
+  return ::isPrivateStdlibDecl(this, /*checkType=*/true);
 }
 
 GenericParamList::GenericParamList(SourceLoc LAngleLoc,
