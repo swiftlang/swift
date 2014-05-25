@@ -23,3 +23,6 @@
 
 // RUN: FileCheck -check-prefix=CHECK-PRIVATE4 -input-file %t.txt %s
 // CHECK-PRIVATE4-NOT: _ArrayBody
+
+// RUN: FileCheck -check-prefix=CHECK-PRIVATE5 -input-file %t.txt %s
+// CHECK-PRIVATE5-NOT: ~>

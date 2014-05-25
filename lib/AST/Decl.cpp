@@ -337,11 +337,7 @@ static bool isPrivateStdlibDecl(const Decl *D, bool checkType) {
   if (auto ExtD = dyn_cast<ExtensionDecl>(D))
     return isPrivateType(ExtD->getExtendedType());
 
-  auto VD = dyn_cast<ValueDecl>(D);
-  if (!VD || !VD->hasName())
-    return false;
-
-  DeclContext *DC = VD->getDeclContext()->getModuleScopeContext();
+  DeclContext *DC = D->getDeclContext()->getModuleScopeContext();
   if (!DC->getParentModule()->isSystemModule())
     return false;
   auto FU = dyn_cast<FileUnit>(DC);
@@ -349,6 +345,14 @@ static bool isPrivateStdlibDecl(const Decl *D, bool checkType) {
     return false;
   // Check for Swift module and overlays.
   if (FU->getKind() != FileUnitKind::SerializedAST)
+    return false;
+
+  // Hide '~>' operator.
+  if (auto OperD = dyn_cast<OperatorDecl>(D))
+    return OperD->getName().str() == "~>";
+
+  auto VD = dyn_cast<ValueDecl>(D);
+  if (!VD || !VD->hasName())
     return false;
 
   // If the name has leading underscore then it's a private symbol.
@@ -362,6 +366,10 @@ static bool isPrivateStdlibDecl(const Decl *D, bool checkType) {
   // If it's a function with a parameter with leading underscore, it's a private
   // function.
   } else if (auto AFD = dyn_cast<AbstractFunctionDecl>(VD)) {
+    // Hide '~>' operator.
+    if (AFD->getNameStr() == "~>")
+      return true;
+
     bool hasInternalParameter = false;
     for (auto Pat : AFD->getBodyParamPatterns()) {
       Pat->forEachVariable([&](VarDecl *Param) {
