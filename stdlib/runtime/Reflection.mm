@@ -702,6 +702,11 @@ OptionalQuickLookObject swift_ClassMirror_quickLookObject(HeapObject *owner,
     result.payload.Kind = QuickLookObject::Tag::BezierPath;
     result.optional.isNone = false;
     return result;
+  } else if ([object isKindOfClass:NSClassFromString(@"NSString")]) {
+    result.payload.TextOrURL = String((NSString*)object);
+    result.payload.Kind = QuickLookObject::Tag::Text;
+    result.optional.isNone = false;
+    return result;
   }
   
   // Return none if we didn't get a suitable object.
