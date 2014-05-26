@@ -76,6 +76,9 @@ extension NSObject : _PrintableNSObject {}
 // Strings
 //===----------------------------------------------------------------------===//
 
+@availability(*, unavailable, message="Please use String or NSString")
+class NSSimpleCString {}
+
 @asmname("swift_convertStringToNSString")
 func _convertStringToNSString(string: String) -> NSString {
   return string as NSString
