@@ -1,7 +1,6 @@
 // RUN: rm -rf %t && mkdir -p %t && %S/../../utils/gyb %s -o %t/NSStringAPI.swift
 // RUN: %S/../../utils/line-directive %t/NSStringAPI.swift -- %target-build-swift -module-cache-path %t/clang-module-cache %t/NSStringAPI.swift -o %t/a.out
-// RUN: %target-run %t/a.out %S/Inputs/NSStringAPI_test.txt > /tmp/z.txt
-// RU/N: %target-run %t/a.out %S/Inputs/NSStringAPI_test.txt | %S/../../utils/line-directive %t/NSStringAPI.swift -- FileCheck %s
+// RUN: %target-run %t/a.out %S/Inputs/NSStringAPI_test.txt | %S/../../utils/line-directive %t/NSStringAPI.swift -- FileCheck %s
 
 //
 // Tests for the NSString APIs as exposed by String
@@ -42,9 +41,9 @@ func expectNotEqual<T : Equatable>(
 
 %end
 
-%for EquatableType in ['String', 'Int', 'UInt', 'NSComparisonResult']:
+%for (Generic, EquatableType) in [('', 'String'), ('', 'Int'), ('', 'UInt'), ('', 'NSComparisonResult'), ('<T : ForwardIndex>', 'T')]:
 
-func expectEqual(
+func expectEqual${Generic}(
     expected: ${EquatableType}, actual: ${EquatableType},
     file: String = __FILE__, line: UWord = __LINE__
 ) {
@@ -57,7 +56,7 @@ func expectEqual(
   }
 }
 
-func expectEqual(
+func expectEqual${Generic}(
     expected: ${EquatableType}, actual: ${EquatableType}?,
     file: String = __FILE__, line: UWord = __LINE__
 ) {
@@ -70,7 +69,7 @@ func expectEqual(
   }
 }
 
-func expectNotEqual(
+func expectNotEqual${Generic}(
     expected: ${EquatableType}, actual: ${EquatableType},
     file: String = __FILE__, line: UWord = __LINE__
 ) {
@@ -567,31 +566,196 @@ NSStringAPIs.test("fastestEncoding") {
 }
 
 NSStringAPIs.test("fileSystemRepresentation()") {
-  // FIXME
+  if true {
+    let expectedStr: CChar[] = Array(map("abc\0".utf8) { $0.asSigned() })
+    expectEqual(expectedStr, "abc".fileSystemRepresentation())
+  }
+
+  // On OSX file system representation is Unicode NFD.
+  // This test might need to be adjusted for other systems.
+  if true {
+    let expectedStr: CChar[] =
+        Array(map("\u305f\u3099くてん\0".utf8) { $0.asSigned() })
+    expectEqual(expectedStr, "だくてん".fileSystemRepresentation())
+  }
 }
 
 NSStringAPIs.test("getBytes(_:maxLength:usedLength:encoding:options:range:remainingRange:)") {
-  // FIXME
+  let s = "abc абв def где gh жз zzz"
+  let startIndex = advance(s.startIndex, 8)
+  let endIndex = advance(s.startIndex, 22)
+  if true {
+    // 'maxLength' is limiting.
+    let bufferLength = 100
+    var expectedStr: UInt8[] = Array("def где ".utf8)
+    while (expectedStr.count != bufferLength) {
+      expectedStr += 0xff
+    }
+    var buffer = UInt8[](count: bufferLength, repeatedValue: 0xff)
+    var usedLength = 0
+    var remainingRange = startIndex..endIndex
+    var result = s.getBytes(&buffer, maxLength: 11, usedLength: &usedLength,
+        encoding: NSUTF8StringEncoding,
+        options: NSStringEncodingConversionOptions(0),
+        range: startIndex..endIndex, remainingRange: &remainingRange)
+    expectTrue(result)
+    expectTrue(equal(expectedStr, buffer))
+    expectEqual(11, usedLength)
+    expectEqual(remainingRange.startIndex, advance(startIndex, 8))
+    expectEqual(remainingRange.endIndex, endIndex)
+  }
+  if true {
+    // 'bufferLength' is limiting.  Note that the buffer is not filled
+    // completely, since doing that would break a UTF sequence.
+    let bufferLength = 5
+    var expectedStr: UInt8[] = Array("def ".utf8)
+    while (expectedStr.count != bufferLength) {
+      expectedStr += 0xff
+    }
+    var buffer = UInt8[](count: bufferLength, repeatedValue: 0xff)
+    var usedLength = 0
+    var remainingRange = startIndex..endIndex
+    var result = s.getBytes(&buffer, maxLength: 11, usedLength: &usedLength,
+        encoding: NSUTF8StringEncoding,
+        options: NSStringEncodingConversionOptions(0),
+        range: startIndex..endIndex, remainingRange: &remainingRange)
+    expectTrue(result)
+    expectTrue(equal(expectedStr, buffer))
+    expectEqual(4, usedLength)
+    expectEqual(remainingRange.startIndex, advance(startIndex, 4))
+    expectEqual(remainingRange.endIndex, endIndex)
+  }
+  if true {
+    // 'range' is converted completely.
+    let bufferLength = 100
+    var expectedStr: UInt8[] = Array("def где gh жз ".utf8)
+    while (expectedStr.count != bufferLength) {
+      expectedStr += 0xff
+    }
+    var buffer = UInt8[](count: bufferLength, repeatedValue: 0xff)
+    var usedLength = 0
+    var remainingRange = startIndex..endIndex
+    var result = s.getBytes(&buffer, maxLength: bufferLength,
+        usedLength: &usedLength, encoding: NSUTF8StringEncoding,
+        options: NSStringEncodingConversionOptions(0),
+        range: startIndex..endIndex, remainingRange: &remainingRange)
+    expectTrue(result)
+    expectTrue(equal(expectedStr, buffer))
+    expectEqual(19, usedLength)
+    expectEqual(remainingRange.startIndex, endIndex)
+    expectEqual(remainingRange.endIndex, endIndex)
+  }
+  if true {
+    // Inappropriate encoding.
+    let bufferLength = 100
+    var expectedStr: UInt8[] = Array("def ".utf8)
+    while (expectedStr.count != bufferLength) {
+      expectedStr += 0xff
+    }
+    var buffer = UInt8[](count: bufferLength, repeatedValue: 0xff)
+    var usedLength = 0
+    var remainingRange = startIndex..endIndex
+    var result = s.getBytes(&buffer, maxLength: bufferLength,
+        usedLength: &usedLength, encoding: NSASCIIStringEncoding,
+        options: NSStringEncodingConversionOptions(0),
+        range: startIndex..endIndex, remainingRange: &remainingRange)
+    expectTrue(result)
+    expectTrue(equal(expectedStr, buffer))
+    expectEqual(4, usedLength)
+    expectEqual(remainingRange.startIndex, advance(startIndex, 4))
+    expectEqual(remainingRange.endIndex, endIndex)
+  }
 }
 
 NSStringAPIs.test("getCString(_:maxLength:encoding:)") {
-  // FIXME
+  var s = "abc あかさた"
+  if true {
+    let bufferLength = 16
+    var buffer = CChar[](count: bufferLength, repeatedValue: (0xff).asSigned())
+    var result = s.getCString(&buffer, maxLength: 100,
+        encoding: NSUTF8StringEncoding)
+    expectFalse(result)
+  }
+  if true {
+    let bufferLength = 17
+    var expectedStr: CChar[] = Array(map("abc あかさた\0".utf8) { $0.asSigned() })
+    while (expectedStr.count != bufferLength) {
+      expectedStr += (0xff).asSigned()
+    }
+    var buffer = CChar[](count: bufferLength, repeatedValue: (0xff).asSigned())
+    var result = s.getCString(&buffer, maxLength: 100,
+        encoding: NSUTF8StringEncoding)
+    expectTrue(result)
+    expectTrue(equal(expectedStr, buffer))
+  }
+  if true {
+    let bufferLength = 100
+    var buffer = CChar[](count: bufferLength, repeatedValue: (0xff).asSigned())
+    var result = s.getCString(&buffer, maxLength: 8,
+        encoding: NSUTF8StringEncoding)
+    expectFalse(result)
+  }
 }
 
 NSStringAPIs.test("getFileSystemRepresentation(_:maxLength:)") {
-  // FIXME
+  // On OSX file system representation is Unicode NFD.
+  // This test might need to be adjusted for other systems.
+  var s = "abc だくてん"
+  if true {
+    let bufferLength = 16
+    var buffer = CChar[](count: bufferLength, repeatedValue: (0xff).asSigned())
+    var result = s.getFileSystemRepresentation(&buffer, maxLength: 100)
+    expectFalse(result)
+  }
+  if true {
+    let bufferLength = 100
+    var expectedStr: CChar[] =
+        Array(map("abc \u305f\u3099くてん\0".utf8) { $0.asSigned() })
+    while (expectedStr.count != bufferLength) {
+      expectedStr += (0xff).asSigned()
+    }
+    var buffer = CChar[](count: bufferLength, repeatedValue: (0xff).asSigned())
+    expectTrue(s.getFileSystemRepresentation(&buffer, maxLength: bufferLength))
+    expectTrue(equal(expectedStr, buffer))
+  }
 }
 
 NSStringAPIs.test("getLineStart(_:end:contentsEnd:forRange:)") {
-  // FIXME
+  let s = "Глокая куздра\nштеко будланула\nбокра и кудрячит\nбокрёнка."
+  let r = advance(s.startIndex, 16)..advance(s.startIndex, 35)
+  if true {
+    var outStartIndex = s.startIndex
+    var outLineEndIndex = s.startIndex
+    var outContentsEndIndex = s.startIndex
+    s.getLineStart(&outStartIndex, end: &outLineEndIndex,
+        contentsEnd: &outContentsEndIndex, forRange: r)
+    expectEqual("штеко будланула\nбокра и кудрячит\n",
+        s[outStartIndex..outLineEndIndex])
+    expectEqual("штеко будланула\nбокра и кудрячит",
+        s[outStartIndex..outContentsEndIndex])
+  }
 }
 
 NSStringAPIs.test("getParagraphStart(_:end:contentsEnd:forRange:)") {
-  // FIXME
+  let s = "Глокая куздра\nштеко будланула\u2028бокра и кудрячит\u2028бокрёнка.\n Абв."
+  let r = advance(s.startIndex, 16)..advance(s.startIndex, 35)
+  if true {
+    var outStartIndex = s.startIndex
+    var outEndIndex = s.startIndex
+    var outContentsEndIndex = s.startIndex
+    s.getParagraphStart(&outStartIndex, end: &outEndIndex,
+        contentsEnd: &outContentsEndIndex, forRange: r)
+    expectEqual("штеко будланула\u2028бокра и кудрячит\u2028бокрёнка.\n",
+        s[outStartIndex..outEndIndex])
+    expectEqual("штеко будланула\u2028бокра и кудрячит\u2028бокрёнка.",
+        s[outStartIndex..outContentsEndIndex])
+  }
 }
 
 NSStringAPIs.test("hash") {
-  // FIXME
+  var s: String = "abc"
+  var nsstr: NSString = "abc"
+  expectEqual(nsstr.hash, s.hash)
 }
 
 NSStringAPIs.test("stringWithBytes(_:length:encoding:)") {
