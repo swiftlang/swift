@@ -118,6 +118,9 @@ public:
   /// \brief True if a non-void return is required in this function.
   bool NeedsReturn : 1;
   
+  /// True if we're emitting a class initializing constructor.
+  bool EmittingClassInitializer = false;
+  
   /// \brief The SIL location corresponding to the AST node being processed.
   SILLocation CurrentSILLoc;
 
@@ -355,6 +358,13 @@ public:
   /// \param selfDecl The 'self' declaration within the current function.
   /// \param nominal The type whose members are being initialized.
   void emitMemberInitializers(VarDecl *selfDecl, NominalTypeDecl *nominal);
+
+  /// In class initializers, we cannot retain or release 'self' prior to
+  /// super.init because custom r/r implementations in ObjC may require
+  /// initialization that has not yet happened. This method loads an unmanaged +0
+  /// reference to self that is only suitable for direct property access.
+  ManagedValue emitSelfForDirectPropertyInConstructor(SILLocation loc,
+                                                      VarDecl *selfDecl);
 
   /// Emit a method that initializes the ivars of a class.
   void emitIVarInitializer(SILDeclRef ivarInitializer);

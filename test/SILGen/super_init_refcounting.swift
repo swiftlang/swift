@@ -34,6 +34,27 @@ extension Foo {
   }
 }
 
+class Zim: Foo {
+  var foo = Foo()
+  // CHECK-LABEL: sil @_TFC22super_init_refcounting3ZimcfMS0_FT_S0_
+  // CHECK-NOT:     strong_retain
+  // CHECK-NOT:     strong_release
+  // CHECK:         function_ref @_TFC22super_init_refcounting3FoocfMS0_FT_S0_
+}
+
+class Zang: Foo {
+  var foo: Foo
+
+  init() {
+    foo = Foo()
+    super.init()
+  }
+  // CHECK-LABEL: sil @_TFC22super_init_refcounting4ZangcfMS0_FT_S0_
+  // CHECK-NOT:     strong_retain
+  // CHECK-NOT:     strong_release
+  // CHECK:         function_ref @_TFC22super_init_refcounting3FoocfMS0_FT_S0_
+}
+
 class Bad: Foo {
   // Invalid code, but it's not diagnosed till DI. We at least shouldn't
   // crash on it.

@@ -3415,6 +3415,7 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
 
 void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   MagicFunctionName = getMagicFunctionName(ctor);
+  EmittingClassInitializer = true;
   
   assert(ctor->getBody() && "Class constructor without a body?");
 
@@ -3551,6 +3552,26 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
     ->setDebugScope(F.getDebugScope());
 }
 
+/// In class initializers, we cannot retain or release 'self' prior to
+/// super.init because custom r/r implementations in ObjC may require
+/// initialization that has not yet happened. This method loads an unmanaged +0
+/// reference to self that is only suitable for direct property access.
+ManagedValue SILGenFunction::emitSelfForDirectPropertyInConstructor(
+                                                    SILLocation loc,
+                                                    VarDecl *selfDecl) {
+  assert(selfDecl->getType()->hasReferenceSemantics()
+         && "this method only applies to classes");
+  SILValue value;
+  auto &selfLoc = VarLocs[selfDecl];
+  if (selfLoc.isAddress()) {
+    auto addr = selfLoc.getAddress();
+    value = B.createLoad(loc, addr);
+  } else {
+    value = selfLoc.getConstant();
+  }
+  return ManagedValue::forUnmanaged(value);
+}
+
 /// Emit a member initialization for the members described in the
 /// given pattern from the given source value.
 static void emitMemberInit(SILGenFunction &SGF, VarDecl *selfDecl, 
@@ -3580,7 +3601,7 @@ static void emitMemberInit(SILGenFunction &SGF, VarDecl *selfDecl,
     SILLocation loc = pattern;
     ManagedValue self;
     if (selfDecl->getType()->hasReferenceSemantics())
-      self = SGF.emitRValueForDecl(loc, selfDecl, selfDecl->getType());
+      self = SGF.emitSelfForDirectPropertyInConstructor(loc, selfDecl);
     else
       self = SGF.emitLValueForDecl(loc, selfDecl, true);
 

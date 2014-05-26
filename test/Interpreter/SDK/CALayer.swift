@@ -19,7 +19,11 @@ func hangCanary(o: AnyObject) {
 }
 
 class FooLayer: CALayer {
+  var black: CGColor
+  var white: CGColor = CGColorGetConstantColor(kCGColorWhite)
+
   init() {
+    black = CGColorGetConstantColor(kCGColorBlack)
     super.init()
     hangCanary(self)
   }

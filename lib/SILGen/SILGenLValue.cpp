@@ -667,7 +667,27 @@ LValue SILGenLValue::visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *e){
 }
 
 LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e) {
-  LValue lv = visitRec(e->getBase());
+  LValue lv = [&]{
+    // If we're emitting an initializer, the base is a reference to 'self', and
+    // we're doing direct property access, emit a +0 reference to self to avoid
+    // retain/release traffic that breaks brittle custom r/r implementations in
+    // ObjC.
+    if (gen.EmittingClassInitializer
+        && e->isDirectPropertyAccess()) {
+      if (auto baseDeclRef = dyn_cast<DeclRefExpr>(e->getBase())) {
+        if (baseDeclRef->getDecl()->getName() == gen.getASTContext().Id_self) {
+          ManagedValue self = gen.emitSelfForDirectPropertyInConstructor(
+                             e->getBase(), cast<VarDecl>(baseDeclRef->getDecl()));
+          auto typeData = getValueTypeData(self.getValue());
+          LValue valueLV;
+          valueLV.add<ValueComponent>(self, typeData);
+          return valueLV;
+        }
+      }
+    }
+
+    return visitRec(e->getBase());
+  }();
 
   // MemberRefExpr can refer to type and function members, but the only case
   // that can be an lvalue is a VarDecl.
