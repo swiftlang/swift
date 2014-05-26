@@ -100,6 +100,7 @@ func partition<C: MutableCollection where C.IndexType: SignedInteger>(
   inout less: (C.GeneratorType.Element, C.GeneratorType.Element)->Bool
 ) -> C.IndexType {
 
+  // Variables i and j point to the next element to be visited.
   var i = range.startIndex
   var j = range.endIndex - 1
 
@@ -107,6 +108,8 @@ func partition<C: MutableCollection where C.IndexType: SignedInteger>(
   let pivot = elements[range.startIndex]
   i++
 
+  // Continue to swap until all elements were visited and placed in one
+  // of the partitions.
   while i <= j {
     while less(elements[i], pivot) {
       i++
@@ -114,6 +117,8 @@ func partition<C: MutableCollection where C.IndexType: SignedInteger>(
     }
     while less(pivot, elements[j]) {
       j--
+      // We don't need to check if j is greater than zero because we placed
+      // our pivot at startIndex and comparing with pivot ends this loop.
     }
     if i <= j {
       swap(&elements[i], &elements[j])
@@ -122,6 +127,7 @@ func partition<C: MutableCollection where C.IndexType: SignedInteger>(
     }
   }
 
+  // Swap the pivot in between the two partitions.
   swap(&elements[i - 1], &elements[range.startIndex])
   return i - 1
 }
@@ -149,7 +155,7 @@ func _quickSort<C: MutableCollection where C.IndexType: SignedInteger>(
     return
   }
 
-   // Part2tion and sort.
+   // Partition and sort.
   let part_idx : C.IndexType = partition(&elements, range, &less)
   _quickSort(&elements, range.startIndex..part_idx, &less);
   _quickSort(&elements, (part_idx + 1)..range.endIndex, &less);
@@ -224,6 +230,7 @@ func partition<C: MutableCollection where C.GeneratorType.Element: Comparable, C
   inout elements: C,
   range: Range<C.IndexType>) -> C.IndexType {
 
+  // Variables i and j point to the next element to be visited.
   var i = range.startIndex
   var j = range.endIndex - 1
 
@@ -231,12 +238,16 @@ func partition<C: MutableCollection where C.GeneratorType.Element: Comparable, C
   let pivot = elements[range.startIndex]
   i++
 
+  // Continue to swap until all elements were visited and placed in one
+  // of the partitions.
   while i <= j {
     while Less.compare(elements[i], pivot) {
       i++
       if (i > j) { break }
     }
     while Less.compare(pivot, elements[j]) {
+      // We don't need to check if j is greater than zero because we placed
+      // our pivot at startIndex and comparing with pivot ends this loop.
       j--
     }
     if i <= j {
@@ -246,6 +257,7 @@ func partition<C: MutableCollection where C.GeneratorType.Element: Comparable, C
     }
   }
 
+  // Swap the pivot in between the two partitions.
   swap(&elements[i - 1], &elements[range.startIndex])
   return i - 1
 }
