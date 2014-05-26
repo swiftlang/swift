@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "dead-code-elimination"
+#define DEBUG_TYPE "sil-dce"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILFunction.h"
@@ -20,6 +20,8 @@
 #include "swift/SILPasses/Utils/Local.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/Support/Debug.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 
@@ -81,6 +83,9 @@ class DCE : public SILFunctionTransform {
 void DCE::markValueLive(ValueBase *V) {
   if (Live.count(V))
     return;
+
+  DEBUG(llvm::dbgs() << "Marking as live:\n");
+  DEBUG(V->dump());
 
   Live.insert(V);
 
@@ -217,6 +222,10 @@ bool DCE::removeDead(SILFunction &F) {
                                       Inst->getModule());
           SILValue(Inst, i).replaceAllUsesWith(Undef);
         }
+
+        DEBUG(llvm::dbgs() << "Removing dead instruction:\n");
+        DEBUG(Inst->dump());
+
         Inst->eraseFromParent();
         Changed = true;
       }
