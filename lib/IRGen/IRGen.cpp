@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#define DEBUG_TYPE "irgen"
 #include "swift/Subsystems.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/DiagnosticsIRGen.h"
@@ -41,7 +42,6 @@
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "IRGenModule.h"
-#define DEBUG_TYPE "irgen"
 
 using namespace swift;
 using namespace irgen;

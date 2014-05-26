@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#define DEBUG_TYPE "silverifier"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILVisitor.h"
@@ -25,7 +26,6 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/StringSet.h"
-#define DEBUG_TYPE "silverifier"
 using namespace swift;
 
 using Lowering::AbstractionPattern;

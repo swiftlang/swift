@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#define DEBUG_TYPE "silgen"
 #include "SILGenFunction.h"
 #include "llvm/ADT/Optional.h"
 #include "swift/Strings.h"
@@ -24,7 +25,6 @@
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/Subsystems.h"
 #include "llvm/Support/Debug.h"
-#define DEBUG_TYPE "silgen"
 using namespace swift;
 using namespace Lowering;
 

@@ -14,11 +14,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#define DEBUG_TYPE "swift-basic"
 #include "swift/Basic/DiagnosticConsumer.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
-#define DEBUG_TYPE "swift-basic"
 using namespace swift;
 
 DiagnosticConsumer::~DiagnosticConsumer() { }

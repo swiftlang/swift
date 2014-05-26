@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#define DEBUG_TYPE "libsil"
 #include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/CanTypeVisitor.h"
@@ -25,7 +26,6 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/Support/Debug.h"
-#define DEBUG_TYPE "libsil"
 
 using namespace swift;
 using namespace Lowering;

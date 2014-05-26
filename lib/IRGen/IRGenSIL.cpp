@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#define DEBUG_TYPE "irgen"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Instructions.h"
@@ -52,7 +53,6 @@
 #include "ReferenceTypeInfo.h"
 #include "GenType.h"
 #include "WeakTypeInfo.h"
-#define DEBUG_TYPE "irgen"
 
 using namespace swift;
 using namespace irgen;

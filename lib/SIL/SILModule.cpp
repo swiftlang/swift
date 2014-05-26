@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#define DEBUG_TYPE "sil-module"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILExternalSource.h"
 #include "swift/SIL/SILVisitor.h"
@@ -19,7 +20,6 @@
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
-#define DEBUG_TYPE "sil-module"
 using namespace swift;
 
 STATISTIC(NumFuncLinked, "Number of SIL functions linked");

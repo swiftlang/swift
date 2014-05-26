@@ -16,6 +16,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#define DEBUG_TYPE "libsil"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/AST/Decl.h"
@@ -27,7 +28,6 @@
 #include "clang/AST/DeclObjC.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
-#define DEBUG_TYPE "libsil"
 using namespace swift;
 using namespace swift::Lowering;
 
