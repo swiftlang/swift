@@ -128,3 +128,59 @@ extension UIAlertView {
     }
   }
 }
+
+struct _UIViewMirror : Mirror {
+  var _v : UIView
+  
+  init(_ v : UIView) {_v = v}
+  
+  var value: Any { get { return _v } }
+  
+  var valueType: Any.Type { get { return (_v as Any).dynamicType } }
+  
+  var objectIdentifier: ObjectIdentifier? { get { return .None } }
+  
+  var count: Int { get { return 0 } }
+  
+  subscript(_: Int) -> (String,Mirror) { get { _fatalError("don't ask") } }
+  
+  var summary: String { get { return ""} }
+  
+  var quickLookObject: QuickLookObject? {
+      // iOS 7 or greater only
+      
+      let bounds = _v.bounds
+      
+      // in case of an empty rectangle abort the logging
+      if (bounds.size.width == 0) || (bounds.size.height == 0) {
+        return nil
+      }
+      
+      UIGraphicsBeginImageContext(bounds.size)
+      
+      var ctx = UIGraphicsGetCurrentContext()
+      
+      UIColor(white:1.0, alpha:0.0).set()
+      
+      CGContextFillRect(ctx, bounds)
+      
+      _v.layer.renderInContext(ctx)
+      
+      var maybe_image = UIGraphicsGetImageFromCurrentImageContext()
+      
+      UIGraphicsEndImageContext()
+      
+      if let image = maybe_image {
+        return .Some(.View(image))
+      }
+      return nil
+  }
+  
+  var disposition : MirrorDisposition { get { return .Aggregate } }
+}
+
+extension UIView : Reflectable {
+  func getMirror() -> Mirror {
+    return _UIViewMirror(self)
+  }
+}
