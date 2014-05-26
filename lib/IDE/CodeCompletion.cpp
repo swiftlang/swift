@@ -2064,8 +2064,10 @@ public:
   }
 
   void getOverrideCompletions(SourceLoc Loc) {
-    Type CurrTy =
-        CurrDeclContext->getInnermostTypeContext()->getDeclaredTypeInContext();
+    auto TypeContext = CurrDeclContext->getInnermostTypeContext();
+    if (!TypeContext)
+      return;
+    Type CurrTy = TypeContext->getDeclaredTypeInContext();
     lookupVisibleMemberDecls(*this, CurrTy, CurrDeclContext,
                              TypeResolver.get());
     addDesignatedInitializers(CurrTy);
