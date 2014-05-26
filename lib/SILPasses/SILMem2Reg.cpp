@@ -443,7 +443,7 @@ void StackAllocationPromoter::fixPhiPredBlock(BlockSet &PhiBlocks,
   DEBUG(llvm::dbgs() << "*** Fixing the terminator " << TI << ".\n");
 
   SILValue Def = getDefinitionForValue(PhiBlocks, Pred);
-  if (!Def.isValid())
+  if (!Def)
     Def =  SILUndef::get(ASI->getElementType(), ASI->getModule());
 
   DEBUG(llvm::dbgs() << "*** Found the definition: " << *Def);
@@ -495,6 +495,8 @@ void StackAllocationPromoter::fixBranchesAndLoads(BlockSet &PhiBlocks) {
     BB = Node->getBlock();
 
     SILValue Def = getDefinitionForValue(PhiBlocks, BB);
+    if (!Def)
+      Def =  SILUndef::get(ASI->getElementType(), ASI->getModule());
     DEBUG(llvm::dbgs() << "*** Replacing " << *LI << " with Def " << *Def);
 
     // Replace the load with the definition that we found.
