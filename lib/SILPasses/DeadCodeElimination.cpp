@@ -29,7 +29,7 @@ namespace {
 // something that we need to keep?
 // FIXME: Reconcile the similarities between this and
 //        isInstructionTriviallyDead.
-bool seemsUseful(SILInstruction *I) {
+static bool seemsUseful(SILInstruction *I) {
   if (const ApplyInst *AI = dyn_cast<ApplyInst>(I))
     if (BuiltinFunctionRefInst *FR =
         dyn_cast<BuiltinFunctionRefInst>(AI->getCallee()))
