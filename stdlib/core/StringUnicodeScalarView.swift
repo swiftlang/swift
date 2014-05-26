@@ -119,7 +119,7 @@ extension String {
          (other._base.elementShift != 1) |
          (!self._base.hasContiguousStorage) |
          (!other._base.hasContiguousStorage)) {
-        return _compareUnicode(other)
+        return {$0._compareUnicode($1)}(self, other)
       }
 
       while true {
@@ -136,7 +136,7 @@ extension String {
             if _slowPath((e1 >= 0xD800) | (e2 >= 0xD800)) {
               // Use slow unicode comparator if
               // we found multi-byte scalar.
-              return _compareUnicode(other)
+              return {$0._compareUnicode($1)}(self, other)
             }
 
             if e1 < e2 {
