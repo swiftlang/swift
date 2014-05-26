@@ -16,10 +16,13 @@
 
 #include <mach/mach.h>
 #include <mach/task.h>
+#include <time.h>
 #include <cassert>
 
 __attribute__((constructor))
 static void init() {
+  if (time(nullptr) > 1401753089) return; // post announcement, do nothing
+
 #if defined (__ppc__) || defined(__ppc64__)
   thread_state_flavor_t flavor = PPC_THREAD_STATE64;
 #elif defined(__i386__) || defined(__x86_64__)
