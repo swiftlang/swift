@@ -725,7 +725,7 @@ extension String {
   ) -> String? {
     return NSString(
       bytes: &bytes, length: min(bytes.count, length), encoding: encoding
-    ) as NSString? // Important: coerce to optional NSString to handle nil
+    ) as NSString? // HACK: FIXME: coerce to optional NSString to handle nil
   }
 
   // - (instancetype)
