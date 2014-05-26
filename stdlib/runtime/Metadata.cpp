@@ -2654,6 +2654,15 @@ fail:
   return false;
 }
 
+static const Metadata *getDynamicTypeMetadata(OpaqueValue *value,
+                                              const Metadata *type) {
+  if (type->getKind() == MetadataKind::Existential) {
+    const auto existentialMetadata =
+        static_cast<const ExistentialTypeMetadata *>(type);
+    return existentialMetadata->getDynamicType(value);
+  }
+  return type;
+}
 
 static const void *
 findWitnessTableForDynamicCastToExistential1(OpaqueValue *sourceValue,
@@ -2672,14 +2681,9 @@ findWitnessTableForDynamicCastToExistential1(OpaqueValue *sourceValue,
 
   auto destProtocolDescriptor = destExistentialMetadata->Protocols[0];
 
-  if (sourceType->getKind() == MetadataKind::Existential) {
-    const auto sourceExistentialMetadata =
-        static_cast<const ExistentialTypeMetadata *>(sourceType);
-    // Existentials don't carry complete type information about the value, but
-    // it is necessary to find the witness tables.  Find the dynamic type and
-    // use it instead.
-    sourceType = sourceExistentialMetadata->getDynamicType(sourceValue);
-  }
+  if (sourceType->getKind() == MetadataKind::Existential)
+    swift::crash("Swift protocol conformance check failed: "
+                 "source type is an existential");
 
   return swift_conformsToProtocol(sourceType, destProtocolDescriptor, nullptr);
 }
@@ -2691,6 +2695,10 @@ extern "C" bool
 swift_stdlib_conformsToProtocol(
     OpaqueValue *sourceValue, const Metadata *_destType,
     const Metadata *sourceType, const Metadata *destType) {
+  // Existentials don't carry complete type information about the value, but
+  // it is necessary to find the witness tables.  Find the dynamic type and
+  // use it instead.
+  sourceType = getDynamicTypeMetadata(sourceValue, sourceType);
   auto vw = findWitnessTableForDynamicCastToExistential1(sourceValue,
                                                          sourceType, destType);
   sourceType->vw_destroy(sourceValue);
@@ -2705,12 +2713,18 @@ extern "C" FixedOpaqueExistentialContainer<1>
 swift_stdlib_dynamicCastToExistential1Unconditional(
     OpaqueValue *sourceValue, const Metadata *_destType,
     const Metadata *sourceType, const Metadata *destType) {
+  // Existentials don't carry complete type information about the value, but
+  // it is necessary to find the witness tables.  Find the dynamic type and
+  // use it instead.
+  sourceType = getDynamicTypeMetadata(sourceValue, sourceType);
   auto vw = findWitnessTableForDynamicCastToExistential1(sourceValue,
                                                          sourceType, destType);
   if (!vw)
     swift::crash("Swift dynamic cast failed: "
                  "type does not conform to the protocol");
 
+  // Note: the 'sourceType' has been adjusted to the dynamic type of the value.
+  // It is important so that we don't return a value with Existential metadata.
   using box = OpaqueExistentialBox<1>;
 
   box::Container outValue;
@@ -2742,6 +2756,10 @@ _TFSs26_injectNothingIntoOptionalU__FT_GSqQ__(const Metadata *T);
 extern "C" OpaqueExistentialContainer swift_stdlib_dynamicCastToExistential1(
     OpaqueValue *sourceValue, const Metadata *_destType,
     const Metadata *sourceType, const Metadata *destType) {
+  // Existentials don't carry complete type information about the value, but
+  // it is necessary to find the witness tables.  Find the dynamic type and
+  // use it instead.
+  sourceType = getDynamicTypeMetadata(sourceValue, sourceType);
   auto vw = findWitnessTableForDynamicCastToExistential1(sourceValue,
                                                          sourceType, destType);
   if (!vw) {
@@ -2749,6 +2767,8 @@ extern "C" OpaqueExistentialContainer swift_stdlib_dynamicCastToExistential1(
     return _TFSs26_injectNothingIntoOptionalU__FT_GSqQ__(destType);
   }
 
+  // Note: the 'sourceType' has been adjusted to the dynamic type of the value.
+  // It is important so that we don't return a value with Existential metadata.
   using box = OpaqueExistentialBox<1>;
 
   box::Container outValue;

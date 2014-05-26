@@ -212,6 +212,16 @@ func test_dynamicCastToExistential1() {
     }
   }
 
+  struct Struct2ConformsToP1<T : LogicValue> : LogicValue, P2 {
+    init(_ value: T) {
+      self.value = value
+    }
+    func getLogicValue() -> Bool {
+      return value.getLogicValue()
+    }
+    var value: T
+  }
+
   struct StructDoesNotConformToP1 : P2 {}
 
   class ClassConformsToP1 : LogicValue, P2 {
@@ -220,64 +230,100 @@ func test_dynamicCastToExistential1() {
     }
   }
 
+  class Class2ConformsToP1<T : LogicValue> : LogicValue, P2 {
+    init(_ value: T) {
+      self.value = [ value ]
+    }
+    func getLogicValue() -> Bool {
+      return value[0].getLogicValue()
+    }
+    // FIXME: should be "var value: T", but we don't support it now.
+    var value: Array<T>
+  }
+
   class ClassDoesNotConformToP1 : P2 {}
 
   var someP1Value = StructConformsToP1()
+  var someP1Value2 = Struct2ConformsToP1(true)
   var someNotP1Value = StructDoesNotConformToP1()
   var someP1Ref = ClassConformsToP1()
+  var someP1Ref2 = Class2ConformsToP1(true)
   var someNotP1Ref = ClassDoesNotConformToP1()
 
   assert(_stdlib_conformsToProtocol(someP1Value, P1.self))
+  assert(_stdlib_conformsToProtocol(someP1Value2, P1.self))
   assert(!_stdlib_conformsToProtocol(someNotP1Value, P1.self))
   assert(_stdlib_conformsToProtocol(someP1Ref, P1.self))
+  assert(_stdlib_conformsToProtocol(someP1Ref2, P1.self))
   assert(!_stdlib_conformsToProtocol(someNotP1Ref, P1.self))
 
   assert(_stdlib_conformsToProtocol(someP1Value as P1, P1.self))
+  assert(_stdlib_conformsToProtocol(someP1Value2 as P1, P1.self))
   assert(_stdlib_conformsToProtocol(someP1Ref as P1, P1.self))
 
   assert(_stdlib_conformsToProtocol(someP1Value as P2, P1.self))
+  assert(_stdlib_conformsToProtocol(someP1Value2 as P2, P1.self))
   assert(!_stdlib_conformsToProtocol(someNotP1Value as P2, P1.self))
   assert(_stdlib_conformsToProtocol(someP1Ref as P2, P1.self))
+  assert(_stdlib_conformsToProtocol(someP1Ref2 as P2, P1.self))
   assert(!_stdlib_conformsToProtocol(someNotP1Ref as P2, P1.self))
 
   assert(_stdlib_conformsToProtocol(someP1Value as Any, P1.self))
+  assert(_stdlib_conformsToProtocol(someP1Value2 as Any, P1.self))
   assert(!_stdlib_conformsToProtocol(someNotP1Value as Any, P1.self))
   assert(_stdlib_conformsToProtocol(someP1Ref as Any, P1.self))
+  assert(_stdlib_conformsToProtocol(someP1Ref2 as Any, P1.self))
   assert(!_stdlib_conformsToProtocol(someNotP1Ref as Any, P1.self))
 
   assert(_stdlib_conformsToProtocol(someP1Ref as AnyObject, P1.self))
+  assert(_stdlib_conformsToProtocol(someP1Ref2 as AnyObject, P1.self))
   assert(!_stdlib_conformsToProtocol(someNotP1Ref as AnyObject, P1.self))
 
   assert(_stdlib_dynamicCastToExistential1Unconditional(someP1Value, P1.self).getLogicValue())
+  assert(_stdlib_dynamicCastToExistential1Unconditional(someP1Value2, P1.self).getLogicValue())
   assert(_stdlib_dynamicCastToExistential1Unconditional(someP1Ref, P1.self).getLogicValue())
+  assert(_stdlib_dynamicCastToExistential1Unconditional(someP1Ref2, P1.self).getLogicValue())
 
   assert(_stdlib_dynamicCastToExistential1Unconditional(someP1Value as P2, P1.self).getLogicValue())
+  assert(_stdlib_dynamicCastToExistential1Unconditional(someP1Value2 as P2, P1.self).getLogicValue())
   assert(_stdlib_dynamicCastToExistential1Unconditional(someP1Ref as P2, P1.self).getLogicValue())
+  assert(_stdlib_dynamicCastToExistential1Unconditional(someP1Ref2 as P2, P1.self).getLogicValue())
 
   assert(_stdlib_dynamicCastToExistential1Unconditional(someP1Value as Any, P1.self).getLogicValue())
+  assert(_stdlib_dynamicCastToExistential1Unconditional(someP1Value2 as Any, P1.self).getLogicValue())
   assert(_stdlib_dynamicCastToExistential1Unconditional(someP1Ref as Any, P1.self).getLogicValue())
+  assert(_stdlib_dynamicCastToExistential1Unconditional(someP1Ref2 as Any, P1.self).getLogicValue())
 
   assert(_stdlib_dynamicCastToExistential1Unconditional(someP1Ref as AnyObject, P1.self).getLogicValue())
 
   assert(_stdlib_dynamicCastToExistential1(someP1Value, P1.self)!.getLogicValue())
+  assert(_stdlib_dynamicCastToExistential1(someP1Value2, P1.self)!.getLogicValue())
   assert(!_stdlib_dynamicCastToExistential1(someNotP1Value, P1.self))
   assert(_stdlib_dynamicCastToExistential1(someP1Ref, P1.self)!.getLogicValue())
+  assert(_stdlib_dynamicCastToExistential1(someP1Ref2, P1.self)!.getLogicValue())
   assert(!_stdlib_dynamicCastToExistential1(someNotP1Ref, P1.self))
 
   assert(_stdlib_dynamicCastToExistential1(someP1Value as P1, P1.self)!.getLogicValue())
+  assert(_stdlib_dynamicCastToExistential1(someP1Value2 as P1, P1.self)!.getLogicValue())
   assert(_stdlib_dynamicCastToExistential1(someP1Ref as P1, P1.self)!.getLogicValue())
+  assert(_stdlib_dynamicCastToExistential1(someP1Ref2 as P1, P1.self)!.getLogicValue())
 
   assert(_stdlib_dynamicCastToExistential1(someP1Value as P2, P1.self)!.getLogicValue())
+  assert(_stdlib_dynamicCastToExistential1(someP1Value2 as P2, P1.self)!.getLogicValue())
   assert(!_stdlib_dynamicCastToExistential1(someNotP1Value as P2, P1.self))
   assert(_stdlib_dynamicCastToExistential1(someP1Ref as P2, P1.self)!.getLogicValue())
+  assert(_stdlib_dynamicCastToExistential1(someP1Ref2 as P2, P1.self)!.getLogicValue())
   assert(!_stdlib_dynamicCastToExistential1(someNotP1Ref as P2, P1.self))
 
   assert(_stdlib_dynamicCastToExistential1(someP1Value as Any, P1.self)!.getLogicValue())
+  assert(_stdlib_dynamicCastToExistential1(someP1Value2 as Any, P1.self)!.getLogicValue())
   assert(!_stdlib_dynamicCastToExistential1(someNotP1Value as Any, P1.self))
   assert(_stdlib_dynamicCastToExistential1(someP1Ref as Any, P1.self)!.getLogicValue())
+  assert(_stdlib_dynamicCastToExistential1(someP1Ref2 as Any, P1.self)!.getLogicValue())
   assert(!_stdlib_dynamicCastToExistential1(someNotP1Ref as Any, P1.self))
 
   assert(_stdlib_dynamicCastToExistential1(someP1Ref as AnyObject, P1.self)!.getLogicValue())
+  assert(_stdlib_dynamicCastToExistential1(someP1Ref2 as AnyObject, P1.self)!.getLogicValue())
   assert(!_stdlib_dynamicCastToExistential1(someNotP1Ref as AnyObject, P1.self))
 
   println("test_dynamicCastToExistential1 done")
