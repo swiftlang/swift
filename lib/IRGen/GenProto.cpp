@@ -3153,12 +3153,18 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   global->setConstant(true);
   global->setInitializer(initializer);
   global->setAlignment(getWitnessTableAlignment().getValue());
-  
-  // FIXME: Put the witness table into a no_dead_strip section, because our
-  // dynamic protocol lookup hack relies on witness tables always being
-  // available.
-  global->setSection("__DATA,__objc_data,regular,no_dead_strip");
-  
+
+  // FIXME: Set the referenced-dynamically bit on the witness table's symbol. 
+  // asm(".desc _symbol, 0x10")
+  // Our dynamic protocol lookup hack relies on witness tables always being
+  // available, and this bit prevents the symbol name from being stripped.
+  if (llvm::GlobalValue::isExternalLinkage(global->getLinkage())) {
+    llvm::SmallString<128> referencedDynamicallyAsm(".desc _");
+    referencedDynamicallyAsm += global->getName();
+    referencedDynamicallyAsm += ", 0x10";
+    global->getParent()->appendModuleInlineAsm(referencedDynamicallyAsm);
+  }
+
   // TODO: We should record what access mode the witness table requires:
   // direct, lazily initialized, or runtime instantiated template.
 }
