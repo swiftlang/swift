@@ -41,7 +41,7 @@ func expectNotEqual<T : Equatable>(
 
 %end
 
-%for (Generic, EquatableType) in [('', 'String'), ('', 'Int'), ('', 'UInt'), ('', 'NSComparisonResult'), ('<T : ForwardIndex>', 'T')]:
+%for (Generic, EquatableType) in [('', 'String'), ('', 'Int'), ('', 'UInt'), ('', 'NSComparisonResult'), ('<T : ForwardIndex>', 'T'), ('<T, U : Equatable>', 'Dictionary<T, U>')]:
 
 func expectEqual${Generic}(
     expected: ${EquatableType}, actual: ${EquatableType},
@@ -77,6 +77,23 @@ func expectNotEqual${Generic}(
     _anyExpectFailed = true
     println("check failed at \(file), line \(line)")
     println("unexpected value: \"\(actual)\"")
+    println()
+  }
+}
+
+%end
+
+%for ComparableType in ['Int']:
+
+func expectLE(
+    expected: ${ComparableType}, actual: ${ComparableType},
+    file: String = __FILE__, line: UWord = __LINE__
+) {
+  if !(expected <= actual) {
+    _anyExpectFailed = true
+    println("check failed at \(file), line \(line)")
+    println("expected: \"\(expected)\"")
+    println("actual: \"\(actual)\"")
     println()
   }
 }
@@ -759,7 +776,18 @@ NSStringAPIs.test("hash") {
 }
 
 NSStringAPIs.test("stringWithBytes(_:length:encoding:)") {
-  // FIXME
+  /*
+  Tests disabled because of:
+  <rdar://problem/17034498> NSString(bytes:length:encoding:) constructs a garbage NSString
+
+  var s: String = "abc あかさた"
+  var bytes: UInt8[] = Array(s.utf8)
+  dump(bytes)
+  expectEqual(s, String.stringWithBytes(bytes, length: bytes.count,
+      encoding: NSUTF8StringEncoding))
+  expectEmpty(String.stringWithBytes(bytes, length: bytes.count,
+      encoding: NSASCIIStringEncoding))
+  */
 }
 
 NSStringAPIs.test("stringWithBytesNoCopy(_:length:encoding:freeWhenDone:)") {
@@ -800,71 +828,150 @@ NSStringAPIs.test("init(format:locale:arguments:)") {
 }
 
 NSStringAPIs.test("lastPathComponent") {
-  // FIXME
+  expectEqual("bar", "/foo/bar".lastPathComponent)
+  expectEqual("абв", "/foo/абв".lastPathComponent)
 }
 
 NSStringAPIs.test("utf16count") {
-  // FIXME
+  expectEqual(1, "a".utf16count)
+  expectEqual(2, "\U0001F60A".utf16count)
 }
 
 NSStringAPIs.test("lengthOfBytesUsingEncoding(_:)") {
-  // FIXME
+  expectEqual(1, "a".lengthOfBytesUsingEncoding(NSUTF8StringEncoding))
+  expectEqual(2, "あ".lengthOfBytesUsingEncoding(NSShiftJISStringEncoding))
 }
 
 NSStringAPIs.test("lineRangeForRange(_:)") {
-  // FIXME
+  let s = "Глокая куздра\nштеко будланула\nбокра и кудрячит\nбокрёнка."
+  let r = advance(s.startIndex, 16)..advance(s.startIndex, 35)
+  if true {
+    let result = s.lineRangeForRange(r)
+    expectEqual("штеко будланула\nбокра и кудрячит\n", s[result])
+  }
 }
 
 NSStringAPIs.test("linguisticTagsInRange(_:scheme:options:orthography:tokenRanges:)") {
-  // FIXME
+  let s = "Абв. Глокая куздра штеко будланула бокра и кудрячит бокрёнка. Абв."
+  let startIndex = advance(s.startIndex, 5)
+  let endIndex = advance(s.startIndex, 17)
+  var tokenRanges: Range<String.Index>[] = []
+  var tags = s.linguisticTagsInRange(startIndex..endIndex,
+      scheme: NSLinguisticTagSchemeTokenType,
+      options: NSLinguisticTaggerOptions(0),
+      orthography: nil, tokenRanges: &tokenRanges)
+  expectEqual(
+      [ NSLinguisticTagWord, NSLinguisticTagWhitespace,
+        NSLinguisticTagWord ],
+      tags)
+  expectEqual([ "Глокая", " ", "куздра" ],
+      tokenRanges.map() { s[$0] } )
 }
 
 NSStringAPIs.test("localizedCaseInsensitiveCompare(_:)") {
-  // FIXME
+  expectEqual(NSComparisonResult.OrderedSame,
+      "abCD".localizedCaseInsensitiveCompare("AbCd"))
+  expectEqual(NSComparisonResult.OrderedAscending,
+      "abCD".localizedCaseInsensitiveCompare("AbCdE"))
+
+  expectEqual(NSComparisonResult.OrderedSame,
+      "абвг".localizedCaseInsensitiveCompare("АбВг"))
+  expectEqual(NSComparisonResult.OrderedAscending,
+      "абВГ".localizedCaseInsensitiveCompare("АбВгД"))
 }
 
 NSStringAPIs.test("localizedCompare(_:)") {
-  // FIXME
+  expectEqual(NSComparisonResult.OrderedAscending,
+      "abCD".localizedCompare("AbCd"))
+
+  expectEqual(NSComparisonResult.OrderedAscending,
+      "абвг".localizedCompare("АбВг"))
 }
 
 NSStringAPIs.test("localizedStandardCompare(_:)") {
-  // FIXME
+  expectEqual(NSComparisonResult.OrderedAscending,
+      "abCD".localizedStandardCompare("AbCd"))
+
+  expectEqual(NSComparisonResult.OrderedAscending,
+      "абвг".localizedStandardCompare("АбВг"))
 }
 
 NSStringAPIs.test("lowercaseStringWithLocale(_:)") {
-  // FIXME
+  expectEqual("abcd", "abCD".lowercaseStringWithLocale(
+      NSLocale(localeIdentifier: "en")))
+
+  expectEqual("абвг", "абВГ".lowercaseStringWithLocale(
+      NSLocale(localeIdentifier: "ru")))
 }
 
 NSStringAPIs.test("maximumLengthOfBytesUsingEncoding(_:)") {
-  // FIXME
+  if true {
+    let s = "abc"
+    expectLE(countElements(s.utf8),
+        s.maximumLengthOfBytesUsingEncoding(NSUTF8StringEncoding))
+  }
+  if true {
+    let s = "abc абв"
+    expectLE(countElements(s.utf8),
+        s.maximumLengthOfBytesUsingEncoding(NSUTF8StringEncoding))
+  }
+  if true {
+    let s = "\U0001F60A"
+    expectLE(countElements(s.utf8),
+        s.maximumLengthOfBytesUsingEncoding(NSUTF8StringEncoding))
+  }
 }
 
 NSStringAPIs.test("paragraphRangeForRange(_:)") {
-  // FIXME
+  let s = "Глокая куздра\nштеко будланула\u2028бокра и кудрячит\u2028бокрёнка.\n Абв."
+  let r = advance(s.startIndex, 16)..advance(s.startIndex, 35)
+  if true {
+    let result = s.paragraphRangeForRange(r)
+    expectEqual("штеко будланула\u2028бокра и кудрячит\u2028бокрёнка.\n", s[result])
+  }
 }
 
 NSStringAPIs.test("pathComponents") {
-  // FIXME
+  expectEqual([ "/", "foo", "bar" ], "/foo/bar".pathComponents)
+  expectEqual([ "/", "абв", "где" ], "/абв/где".pathComponents)
 }
 
 NSStringAPIs.test("pathExtension") {
-  // FIXME
+  expectEqual("", "/foo/bar".pathExtension)
+  expectEqual("txt", "/foo/bar.txt".pathExtension)
 }
 
 NSStringAPIs.test("precomposedStringWithCanonicalMapping") {
-  // FIXME
+  expectEqual("abc", "abc".precomposedStringWithCanonicalMapping)
+  expectEqual("だくてん",
+      "\u305f\u3099くてん".precomposedStringWithCanonicalMapping)
+  expectEqual("ﾀﾞｸﾃﾝ",
+      "\uff80\uff9eｸﾃﾝ".precomposedStringWithCanonicalMapping)
+  expectEqual("\ufb03", "\ufb03".precomposedStringWithCanonicalMapping)
 }
 
 NSStringAPIs.test("precomposedStringWithCompatibilityMapping") {
-  // FIXME
+  expectEqual("abc", "abc".precomposedStringWithCompatibilityMapping)
+  /*
+  Test disabled because of:
+  <rdar://problem/17041347> NFKD normalization as implemented by
+  'precomposedStringWithCompatibilityMapping:' is not idempotent
+
+  expectEqual("\u30c0クテン",
+      "\uff80\uff9eｸﾃﾝ".precomposedStringWithCompatibilityMapping)
+  */
+  expectEqual("ffi", "\ufb03".precomposedStringWithCompatibilityMapping)
 }
 
 NSStringAPIs.test("propertyList()") {
-  // FIXME
+  expectEqual([ "foo", "bar" ],
+      "(\"foo\", \"bar\")".propertyList() as String[])
 }
 
 NSStringAPIs.test("propertyListFromStringsFileFormat()") {
-  // FIXME
+  expectEqual([ "foo": "bar", "baz": "baz" ],
+      "/* comment */\n\"foo\" = \"bar\";\n\"baz\";"
+          .propertyListFromStringsFileFormat() as Dictionary<String, String>)
 }
 
 NSStringAPIs.test("rangeOfCharacterFromSet(_:options:range:)") {
