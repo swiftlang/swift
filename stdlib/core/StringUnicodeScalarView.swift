@@ -119,6 +119,9 @@ extension String {
          (other._base.elementShift != 1) |
          (!self._base.hasContiguousStorage) |
          (!other._base.hasContiguousStorage)) {
+        // We wrap this function with a closure to disable inlining.
+        // This is a cold path and inlining _compareUnicode may
+        // prevent the inlining of the compare function.
         return {$0._compareUnicode($1)}(self, other)
       }
 
@@ -136,6 +139,7 @@ extension String {
             if _slowPath((e1 >= 0xD800) | (e2 >= 0xD800)) {
               // Use slow unicode comparator if
               // we found multi-byte scalar.
+              // Disable inlining by wrapping the callee in a closure.
               return {$0._compareUnicode($1)}(self, other)
             }
 
