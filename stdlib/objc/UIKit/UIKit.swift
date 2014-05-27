@@ -158,7 +158,7 @@ struct _UIViewMirror : Mirror {
       
       UIGraphicsBeginImageContext(bounds.size)
       
-      var ctx = UIGraphicsGetCurrentContext().takeUnretainedValue()
+      var ctx = UIGraphicsGetCurrentContext()
       
       UIColor(white:1.0, alpha:0.0).set()
       
