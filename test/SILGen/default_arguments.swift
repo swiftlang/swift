@@ -71,6 +71,21 @@ func testMagicLiterals(file: String = __FILE__,
                        line: Int = __LINE__,
                        column: Int = __COLUMN__) {}
 
+// Check that default argument generator functions don't leak information about
+// user's source.
+//
+// CHECK-LABEL: sil @_TIF17default_arguments17testMagicLiteralsFT4fileSS8functionSS4lineSi6columnSi_T_A_
+// CHECK: string_literal utf16 ""
+//
+// CHECK-LABEL: sil @_TIF17default_arguments17testMagicLiteralsFT4fileSS8functionSS4lineSi6columnSi_T_A0_
+// CHECK: string_literal utf16 ""
+//
+// CHECK-LABEL: sil @_TIF17default_arguments17testMagicLiteralsFT4fileSS8functionSS4lineSi6columnSi_T_A1_
+// CHECK: integer_literal $Builtin.Int2048, 0
+//
+// CHECK-LABEL: sil @_TIF17default_arguments17testMagicLiteralsFT4fileSS8functionSS4lineSi6columnSi_T_A2_
+// CHECK: integer_literal $Builtin.Int2048, 0
+
 func closure(_: () -> ()) {}
 func autoclosure(_: @auto_closure () -> ()) {}
 

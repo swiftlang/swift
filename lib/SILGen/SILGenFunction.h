@@ -246,7 +246,7 @@ public:
   /// identifier expansion (e.g. __FILE__).  This allows default argument
   /// expansion to report the location of the call, instead of the location
   /// of the original expr.
-  SourceLoc overrideLocationForMagicIdentifiers;
+  Optional<SourceLoc> overrideLocationForMagicIdentifiers;
   
   SILGenFunction(SILGenModule &SGM, SILFunction &F);
   ~SILGenFunction();
