@@ -2639,6 +2639,12 @@ bool Type::isPrivateStdlibType() const {
   if (NameAliasType *NAT = dyn_cast<NameAliasType>(Ty.getPointer()))
     return NAT->getDecl()->isPrivateStdlibDecl();
 
+  if (auto Paren = dyn_cast<ParenType>(Ty.getPointer()))
+    return Paren->getUnderlyingType().isPrivateStdlibType();
+
+  if (Type Unwrapped = Ty->getAnyOptionalObjectType())
+    return Unwrapped.isPrivateStdlibType();
+
   if (auto TyD = Ty->getAnyNominal())
     if (TyD->isPrivateStdlibDecl())
       return true;

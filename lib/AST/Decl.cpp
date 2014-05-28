@@ -318,6 +318,8 @@ bool Decl::isPrivateStdlibDecl() const {
     return ExtD->getExtendedType().isPrivateStdlibType();
 
   DeclContext *DC = D->getDeclContext()->getModuleScopeContext();
+  if (DC->getParentModule()->isBuiltinModule())
+    return true;
   if (!DC->getParentModule()->isSystemModule())
     return false;
   auto FU = dyn_cast<FileUnit>(DC);

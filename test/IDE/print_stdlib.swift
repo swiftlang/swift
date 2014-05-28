@@ -1,6 +1,6 @@
 // Make sure we don't crash while printing the standard library.
 //
-// RUN: %swift-ide-test -print-module -module-to-print=Swift -source-filename %s -skip-private-stdlib-decls -synthesize-sugar-on-types > %t.txt
+// RUN: %swift-ide-test -print-module -module-to-print=Swift -source-filename %s -skip-private-stdlib-decls -fully-qualified-types-if-ambiguous -synthesize-sugar-on-types > %t.txt
 // RUN: FileCheck -input-file %t.txt %s
 // RUN: %swift-ide-test -print-module -module-to-print=Swift -source-filename %s -module-print-submodules | FileCheck %s
 
@@ -26,6 +26,12 @@
 
 // RUN: FileCheck -check-prefix=CHECK-PRIVATE5 -input-file %t.txt %s
 // CHECK-PRIVATE5-NOT: ~>
+
+// RUN: FileCheck -check-prefix=CHECK-PRIVATE6 -input-file %t.txt %s
+// CHECK-PRIVATE6-NOT: Builtin.
+
+// RUN: FileCheck -check-prefix=CHECK-PRIVATE7 -input-file %t.txt %s
+// CHECK-PRIVATE7-NOT: RawPointer
 
 // RUN: FileCheck -check-prefix=CHECK-PUBLIC1 -input-file %t.txt %s
 // CHECK-PUBLIC1: var nil

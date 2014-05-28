@@ -1159,8 +1159,11 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
 void PrintAST::printEnumElement(EnumElementDecl *elt) {
   Printer.printName(elt->getName());
 
-  if (elt->hasArgumentType())
-    elt->getArgumentType().print(Printer, Options);
+  if (elt->hasArgumentType()) {
+    Type Ty = elt->getArgumentType();
+    if (!Options.SkipPrivateStdlibDecls || !Ty.isPrivateStdlibType())
+      Ty.print(Printer, Options);
+  }
 }
 
 void PrintAST::visitEnumCaseDecl(EnumCaseDecl *decl) {
