@@ -2629,3 +2629,19 @@ TypeTraitResult TypeBase::canBeClass() {
   
   return TypeTraitResult::IsNot;
 }
+
+bool Type::isPrivateStdlibType() const {
+  Type Ty = *this;
+  if (!Ty)
+    return false;
+
+  // A 'public' typealias can have an 'internal' type.
+  if (NameAliasType *NAT = dyn_cast<NameAliasType>(Ty.getPointer()))
+    return NAT->getDecl()->isPrivateStdlibDecl();
+
+  if (auto TyD = Ty->getAnyNominal())
+    if (TyD->isPrivateStdlibDecl())
+      return true;
+
+  return false;
+}

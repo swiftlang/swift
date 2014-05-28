@@ -124,6 +124,8 @@ public:
   Type subst(Module *module, TypeSubstitutionMap &substitutions,
              bool ignoreMissing, LazyResolver *resolver) const;
 
+  bool isPrivateStdlibType() const;
+
   void dump() const;
 
   void print(raw_ostream &OS, const PrintOptions &PO = PrintOptions()) const;

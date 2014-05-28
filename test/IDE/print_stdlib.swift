@@ -29,3 +29,6 @@
 
 // RUN: FileCheck -check-prefix=CHECK-PUBLIC1 -input-file %t.txt %s
 // CHECK-PUBLIC1: var nil
+
+// RUN: FileCheck -check-prefix=CHECK-PUBLIC2 -input-file %t.txt %s
+// CHECK-PUBLIC2: typealias NilType{{$}}
