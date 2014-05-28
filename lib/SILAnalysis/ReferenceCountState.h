@@ -214,7 +214,7 @@ struct BottomUpRefCountState : public RefCountState<BottomUpRefCountState> {
   /// when visiting decrements bottom up. The reason why I have this separate
   /// from TopDownSubstruct is I think it gives more clarity to the algorithm
   /// by giving it typed form.
-  enum struct LatticeState {
+  enum class LatticeState {
     None,               ///< The pointer has no information associated with it.
     Decremented,        ///< The pointer will be decremented.
     MightBeUsed,        ///< The pointer will be used and then at this point
@@ -343,7 +343,7 @@ struct TopDownRefCountState : public RefCountState<TopDownRefCountState> {
   /// when visiting decrements bottom up. The reason why I have this separate
   /// from BottomUpRefCountState is I think it gives more clarity to the
   /// algorithm by giving it typed form.
-  enum struct LatticeState {
+  enum class LatticeState {
     None,               ///< The pointer has no information associated with it.
     Incremented,        ///< The pointer has been incremented.
     MightBeDecremented, ///< The pointer has been incremented and might be
