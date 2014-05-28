@@ -21,8 +21,10 @@ struct _Nil : Reflectable {
   }
 }
 
+typealias NilType = _Nil
+
 /// A null sentinel value.
-var nil : _Nil {
+var nil : NilType {
   return _Nil()
 }
 

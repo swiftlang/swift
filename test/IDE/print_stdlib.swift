@@ -26,3 +26,6 @@
 
 // RUN: FileCheck -check-prefix=CHECK-PRIVATE5 -input-file %t.txt %s
 // CHECK-PRIVATE5-NOT: ~>
+
+// RUN: FileCheck -check-prefix=CHECK-PUBLIC1 -input-file %t.txt %s
+// CHECK-PUBLIC1: var nil
