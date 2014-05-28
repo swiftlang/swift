@@ -91,7 +91,7 @@ case "32": let x = Int64(pf)
 default:   break
 }
 
-// CHECK: assertion failed: file {{.*}}/FloatingPoint.swift, line {{[0-9]*}}
+// CHECK: fatal error: floating point value can not be converted
 // CHECK-NEXT: CRASHED: SIG{{ILL|TRAP}}
 println("BUSTED: should have crashed already")
 exit(1)

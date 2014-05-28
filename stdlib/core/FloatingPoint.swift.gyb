@@ -483,8 +483,10 @@ extension ${Self} {
 %   for srcBits in allFloatBits:
 %     That = floatName(srcBits)
   init(_ v: ${That}) {
-    assert(v >= ${That}(${Self}.min))
-    assert(v <= ${That}(${Self}.max))
+    _precondition(v >= ${That}(${Self}.min),
+        "floating point value can not be converted to ${Self} because it is greater than ${Self}.min")
+    _precondition(v <= ${That}(${Self}.max),
+        "floating point value can not be converted to ${Self} because it is less than ${Self}.min")
     value = Builtin.fpto${sign}i_FPIEEE${srcBits}_${BuiltinName}(v.value)
   }
 %   end

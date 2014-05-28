@@ -210,7 +210,7 @@ extension ArrayBuffer {
         // Could be sped up, e.g. by using
         // enumerateObjectsAtIndexes:options:usingBlock:
         for i in subRange {
-          assert(ns.objectAtIndex(i) is T,
+          _precondition(ns.objectAtIndex(i) is T,
             "NSArray element failed to match the Swift Array Element type")
         }
       }
