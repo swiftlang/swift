@@ -109,21 +109,37 @@ extern "C" void swift_reportFatalError(const char *prefix,
 // Report a call to an unimplemented initializer.
 // <file>: <line>: <column>: fatal error: use of unimplemented 
 // initializer '<initName>' for class 'className'
-extern "C" void
-swift_reportUnimplementedInitializer(
-  const char *className, intptr_t classNameLength,
-  const char *file, intptr_t fileLength, 
-  uintptr_t line, uintptr_t column, 
-  const char *initName, intptr_t initNameLength)
-{
+extern "C" void swift_reportUnimplementedInitializerInFile(
+    const char *className, intptr_t classNameLength, const char *initName,
+    intptr_t initNameLength, const char *file, intptr_t fileLength,
+    uintptr_t line, uintptr_t column) {
   char *log;
   asprintf(&log, "%.*s: %zu: %zu: fatal error: use of unimplemented "
-           "initializer '%.*s' for class '%.*s'\n", 
-           (int)fileLength, file, (size_t)line, (size_t)column, 
+                 "initializer '%.*s' for class '%.*s'\n",
+           (int)fileLength, file, (size_t)line, (size_t)column,
            (int)initNameLength, initName, (int)classNameLength, className);
 
   reportNow(log);
   reportOnCrash(log);
-  
+
   free(log);
 }
+
+// Report a call to an unimplemented initializer.
+// fatal error: use of unimplemented initializer '<initName>' for class
+// 'className'
+extern "C" void swift_reportUnimplementedInitializer(const char *className,
+                                                     intptr_t classNameLength,
+                                                     const char *initName,
+                                                     intptr_t initNameLength) {
+  char *log;
+  asprintf(&log, "fatal error: use of unimplemented "
+                 "initializer '%.*s' for class '%.*s'\n",
+           (int)initNameLength, initName, (int)classNameLength, className);
+
+  reportNow(log);
+  reportOnCrash(log);
+
+  free(log);
+}
+

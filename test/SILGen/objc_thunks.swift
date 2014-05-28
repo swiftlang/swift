@@ -347,8 +347,8 @@ class DesignatedStubs : Gizmo {
   // CHECK-LABEL: sil @_TFC11objc_thunks15DesignatedStubscfMS0_FT7bellsOnSi_S0_ : $@cc(method) @thin (Int, @owned DesignatedStubs) -> @owned DesignatedStubs
   // CHECK: function_ref @_TFSs26_unimplemented_initializer
   // CHECK: string_literal utf8 "objc_thunks.DesignatedStubs"
-  // CHECK: string_literal utf8 "{{.*}}objc_thunks.swift"
   // CHECK: string_literal utf8 "init(bellsOn:)"
+  // CHECK: string_literal utf8 "{{.*}}objc_thunks.swift"
   // CHECK: return
 
   // CHECK-NOT: sil @_TFCSo15DesignatedStubscfMS_FT12withoutBellsSi_S_

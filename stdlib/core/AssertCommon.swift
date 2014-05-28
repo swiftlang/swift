@@ -56,11 +56,16 @@ func _reportFatalError(
   prefix: Builtin.RawPointer, prefixLength: Builtin.Word,
   message: Builtin.RawPointer, messageLength: Builtin.Word)
 
+@asmname("swift_reportUnimplementedInitializerInFile")
+func _reportUnimplementedInitializerInFile(
+  className: Builtin.RawPointer, classNameLength: Builtin.Word,
+  initName: Builtin.RawPointer, initNameLength: Builtin.Word,
+  file: Builtin.RawPointer, fileLength: Builtin.Word,
+  line: UWord, column: UWord)
+
 @asmname("swift_reportUnimplementedInitializer")
 func _reportUnimplementedInitializer(
   className: Builtin.RawPointer, classNameLength: Builtin.Word,
-  file: Builtin.RawPointer, fileLength: Builtin.Word,
-  line: UWord, column: UWord,
   initName: Builtin.RawPointer, initNameLength: Builtin.Word)
 
 /// This function should be used only in the implementation of user-level
@@ -95,16 +100,28 @@ func _fatalErrorMessage(prefix: StaticString, message: StaticString,
 
 /// Prints a fatal error message when a unimplemented initializer gets
 /// called by the Objective-C runtime.
+@transparent
 @noreturn
 func _unimplemented_initializer(className: StaticString,
+                                initName: StaticString = __FUNCTION__,
                                 file: StaticString = __FILE__,
                                 line: UWord = __LINE__,
-                                column: UWord = __LINE__,
-                                initName: StaticString = __FUNCTION__)
-{
-  _reportUnimplementedInitializer(className.start, className.byteSize,
-                                 file.start, file.byteSize, line, column,
-                                 initName.start, initName.byteSize)
+                                column: UWord = __COLUMN__) {
+  // This function is marked @transparent so that it is inlined into the caller
+  // (the initializer stub), and, depending on the build configuration,
+  // redundant parameter values (__FILE__ etc.) are eliminated, and don't leak
+  // information about the user's source.
+
+  if _isDebugAssertConfiguration() {
+    _reportUnimplementedInitializerInFile(
+        className.start, className.byteSize,
+        initName.start, initName.byteSize,
+        file.start, file.byteSize, line, column)
+  } else {
+    _reportUnimplementedInitializer(
+        className.start, className.byteSize,
+        initName.start, initName.byteSize)
+  }
 
   Builtin.int_trap()
 }
