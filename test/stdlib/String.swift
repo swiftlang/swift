@@ -252,3 +252,81 @@ func testCompareUnicode() {
 }
 testCompareUnicode()
 
+
+import Foundation
+
+// The most simple subclass of NSString that CoreFoundation does not know
+// about.
+class NonContiguousNSString : NSString {
+  init(_ value: String) {
+    _value = value
+    super.init()
+  }
+
+  @objc override var length: Int {
+    return _value.utf16count
+  }
+
+  @objc override func characterAtIndex(index: Int) -> unichar {
+    return _value.utf16[index]
+  }
+
+  var _value: String
+}
+
+func testUTF8Encoding(expectedContents: String, stringUnderTest: String) {
+  var utf8Bytes: UInt8[] = Array(stringUnderTest.utf8)
+  dump(utf8Bytes)
+  assert(Array(expectedContents.utf8) == utf8Bytes)
+}
+
+func testUTF8EncodingOfBridgedNSString() {
+  if true {
+    var nss = NonContiguousNSString("abc")
+    let cfstring: CFString = reinterpretCast(nss)
+    assert(!CFStringGetCStringPtr(cfstring,
+        CFStringBuiltInEncodings.ASCII.toRaw()))
+    assert(!CFStringGetCStringPtr(cfstring,
+        CFStringBuiltInEncodings.UTF8.toRaw()))
+    assert(!CFStringGetCharactersPtr(cfstring))
+    testUTF8Encoding("abc", cfstring)
+  }
+
+  if true {
+    var bytes: UInt8[] = [ 97, 98, 99 ]
+    var cfstring: CFString = CFStringCreateWithBytesNoCopy(kCFAllocatorDefault,
+        bytes, bytes.count, CFStringBuiltInEncodings.MacRoman.toRaw(), 0, kCFAllocatorNull)
+
+    // Sanity checks to make sure we are testing the code path that does UTF-8
+    // encoding itself, instead of dispatching to CF.
+    assert(!CFStringGetCStringPtr(cfstring,
+        CFStringBuiltInEncodings.ASCII.toRaw()))
+    assert(!CFStringGetCStringPtr(cfstring,
+        CFStringBuiltInEncodings.UTF8.toRaw()))
+    assert(!CFStringGetCharactersPtr(cfstring))
+
+    testUTF8Encoding("abc", cfstring)
+    _fixLifetime(bytes)
+  }
+
+  if true {
+    var bytes: UInt8[] = [ 97, 98, 99 ]
+    var cfstring: CFString = CFStringCreateWithBytes(kCFAllocatorDefault,
+        bytes, bytes.count, CFStringBuiltInEncodings.MacRoman.toRaw(), 0)
+
+    // Sanity checks to make sure we are testing the code path that does UTF-8
+    // encoding itself, instead of dispatching to CF.
+    assert(!CFStringGetCStringPtr(cfstring,
+        CFStringBuiltInEncodings.ASCII.toRaw()))
+    assert(!CFStringGetCStringPtr(cfstring,
+        CFStringBuiltInEncodings.UTF8.toRaw()))
+    assert(!CFStringGetCharactersPtr(cfstring))
+
+    testUTF8Encoding("abc", cfstring)
+  }
+
+  println("testUTF8EncodingOfBridgedNSString done")
+}
+testUTF8EncodingOfBridgedNSString()
+// CHECK: testUTF8EncodingOfBridgedNSString done
+

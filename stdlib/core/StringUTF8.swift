@@ -54,7 +54,7 @@ extension _StringCore {
   func _encodeSomeUTF16AsUTF8(i: Int) -> (Int, UTF8Chunk) {
     _sanityCheck(elementWidth == 2)
     
-    if _fastPath(_baseAddress != nil) {
+    if _fastPath(!_baseAddress._isNull) {
       
       let utf16Count = self.count
       let utf8Max = sizeof(UTF8Chunk.self)
