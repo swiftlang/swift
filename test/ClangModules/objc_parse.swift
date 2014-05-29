@@ -392,3 +392,14 @@ func testNSExtensionContext(url: NSURL, extensionContext: NSExtensionContext) {
 func testDealloc(obj: NSObject) {
   obj.dealloc() // expected-error{{'dealloc' is unavailable: use 'deinit' to define a de-initializer}}
 }
+
+func testConstantGlobals() {
+  println(MAX)
+  println(SomeImageName)
+  println(SomeNumber.description)
+
+  MAX = 5 // expected-error{{cannot assign to 'let' value 'MAX'}}
+  SomeImageName = "abc" // expected-error{{cannot assign to 'let' value 'SomeImageName'}}
+  SomeNumber = nil // expected-error{{cannot assign to 'let' value 'SomeNumber'}}
+}
+

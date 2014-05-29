@@ -1,4 +1,4 @@
-@import ObjectiveC;
+@import Foundation;
 
 __attribute__((objc_root_class))
 @interface Base
@@ -59,3 +59,10 @@ __attribute__((objc_root_class))
 @property int x;
 - (void)setObject:(id)obj atIndexedSubscript:(int)i;
 @end
+
+
+#pragma mark Constant global properties
+
+extern const int MAX;
+extern NSString * const SomeImageName;
+extern NSNumber * const SomeNumber;

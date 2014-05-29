@@ -1903,10 +1903,9 @@ namespace {
       if (!dc)
         return nullptr;
 
-      // FIXME: Should 'const' vardecl's be imported as 'let' decls?
       auto result = Impl.createDeclWithClangNode<VarDecl>(decl,
                        /*static*/ false,
-                       /*IsLet*/ false,
+                       decl->getType().isConstQualified(),
                        Impl.importSourceLoc(decl->getLocation()),
                        name, type, dc);
       return result;
