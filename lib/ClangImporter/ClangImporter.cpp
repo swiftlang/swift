@@ -398,8 +398,11 @@ void ClangImporter::importHeader(StringRef header, Module *adapter) {
     clang::SourceLocation includeLoc =
       sourceMgr.getLocForStartOfFile(sourceMgr.getMainFileID());
     clang::FileID bufferID =
-      sourceMgr.createFileID(sourceBuffer, clang::SrcMgr::C_User,
-                             /*LoadedID=*/0, /*LoadedOffset=*/0, includeLoc);
+      sourceMgr.createFileIDForMemBuffer(sourceBuffer,
+                                         clang::SrcMgr::C_User,
+                                         /*LoadedID=*/0,
+                                         /*LoadedOffset=*/0,
+                                         includeLoc);
 
     pp.EnterSourceFile(bufferID, /*directoryLookup=*/nullptr, /*loc=*/{});
     // Force the import to occur.
