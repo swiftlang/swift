@@ -3,16 +3,23 @@
 // RUN: %S/timeout.sh 360 %target-run %t/a.out %S/Inputs/shuffle.jpg | FileCheck %s
 // FIXME: timeout wrapper is necessary because the ASan test runs for hours
 
-#if os(OSX) || os(iOS)
 import Foundation
 import SpriteKit
-#endif
 
 #if os(OSX)
 import AppKit
+
+typealias OSImage = NSImage
+typealias OSColor = NSColor
+typealias OSBezierPath = NSBezierPath
 #endif
+
 #if os(iOS)
 import UIKit
+
+typealias OSImage = UIImage
+typealias OSColor = UIColor
+typealias OSBezierPath = UIBezierPath
 #endif
 
 // A struct type that gets destructured by the default mirror.
@@ -382,8 +389,6 @@ println(reflect(justSomeFunction).summary)
 // CHECK-NEXT: (Metatype)
 println(reflect(String.self).summary)
 
-#if os(OSX) || os(iOS)
-
 // Check ObjC mirror implementation.
 // CHECK-LABEL: ObjC:
 println("ObjC:")
@@ -484,61 +489,30 @@ case _:
 // CHECK-NEXT: got the expected quick look color
 // CHECK-NEXT: got the expected quick look bezier path
 
-#endif
-
-#if os(OSX)
-let image = NSImage(contentsOfFile:Process.arguments[1])
+let image = OSImage(contentsOfFile:Process.arguments[1])
 switch reflect(image).quickLookObject {
-case .Some(.Image(let image2 as NSImage)) where image === image2:
+case .Some(.Image(let image2 as OSImage)) where image === image2:
   println("got the expected quick look image")
 case _:
   println("got something else")
 }
 
-let color = NSColor.blackColor()! // FIXME: unnecessary bang
+let color = OSColor.blackColor()! // FIXME: unnecessary bang
 switch reflect(color).quickLookObject {
-case .Some(.Color(let color2 as NSColor)) where color === color2:
+case .Some(.Color(let color2 as OSColor)) where color === color2:
   println("got the expected quick look color")
 case _:
   println("got something else")
 }
 
-let path = NSBezierPath()
+let path = OSBezierPath()
 switch reflect(path).quickLookObject {
-case .Some(.BezierPath(let path2 as NSBezierPath)) where path === path2:
+case .Some(.BezierPath(let path2 as OSBezierPath)) where path === path2:
   println("got the expected quick look bezier path")
 case _:
   println("got something else")
 }
-#endif
 
-#if os(iOS)
-let image = UIImage(contentsOfFile:Process.arguments[1])
-switch reflect(image).quickLookObject {
-case .Some(.Image(let image2 as UIImage)) where image === image2:
-  println("got the expected quick look image")
-case _:
-  println("got something else")
-}
-
-let color = UIColor.blackColor()! // FIXME: unnecessary bang
-switch reflect(color).quickLookObject {
-case .Some(.Color(let color2 as UIColor)) where color === color2:
-  println("got the expected quick look color")
-case _:
-  println("got something else")
-}
-
-let path = UIBezierPath()
-switch reflect(path).quickLookObject {
-case .Some(.BezierPath(let path2 as UIBezierPath)) where path === path2:
-  println("got the expected quick look bezier path")
-case _:
-  println("got something else")
-}
-#endif
-
-#if os(OSX) || os(iOS)
 let intNSArray : NSArray = [1 as NSNumber,2 as NSNumber,3 as NSNumber,4 as NSNumber,5 as NSNumber]
 let intNSArrayMirror = reflect(intNSArray)
 // CHECK-NEXT: 5 elements
@@ -547,10 +521,8 @@ println(intNSArrayMirror.summary)
 println("\(intNSArrayMirror[0].0): \(intNSArrayMirror[0].1.summary)")
 // CHECK-NEXT: [4]: 5
 println("\(intNSArrayMirror[4].0): \(intNSArrayMirror[4].1.summary)")
-#endif
 
 
-#if os(OSX) || os(iOS)
 let numset = NSSet(objects: 1,2,3,4)
 let numsetMirror = reflect(numset)
 // CHECK-NEXT: 4 elements
@@ -569,7 +541,6 @@ if have1 && have2 && have3 && have4 {
 } else {
   println("I see \(num0), \(num1), \(num2), \(num3)")
 }
-#endif
 
 // CHECK-NEXT: 42
 class MyQLTestClass {
@@ -596,8 +567,6 @@ switch reflect(MyQLTestClass()).quickLookObject {
   case .Some(_): println("non-Int object")
   default: println("nil is good here")
 }
-
-#if os(OSX) || os(iOS)
 
 // <rdar://problem/17027510>
 struct Pear<T, U> { let fst: T; let snd: U }
@@ -627,8 +596,5 @@ class SubScene: SKScene {
 println("SKScene subclass:")
 dump(SubScene())
 
-#endif
-
 // CHECK-LABEL: and now our song is done
 println("and now our song is done")
-
