@@ -1095,8 +1095,8 @@ func benchStringSort() {
 func benchRC4_internal(messageLen : Int, iterations : Int, validate : Bool) {
   var Secret = "This is my secret message"
   var Key    = "This is my key"
-  var SecretData : UInt8[] = Secret.asUTF8()
-  var KeyData    : UInt8[] = Key.asUTF8()
+  var SecretData : UInt8[] = Array(Secret.utf8)
+  var KeyData    : UInt8[] = Array(Key.utf8)
 
   var LongData : UInt8[] = new UInt8[messageLen]
 
