@@ -1013,6 +1013,21 @@ NSStringAPIs.test("rangeOfCharacterFromSet(_:options:range:)") {
     if true {
       expectEmpty("клмн".rangeOfCharacterFromSet(charset))
     }
+    if true {
+      let s = "абвклмнабвклмн"
+      let r = s.rangeOfCharacterFromSet(charset,
+          options: .BackwardsSearch)!
+      expectEqual(advance(s.startIndex, 9), r.startIndex)
+      expectEqual(advance(s.startIndex, 10), r.endIndex)
+    }
+    if true {
+      let s = "абвклмнабв"
+      let r = s.rangeOfCharacterFromSet(charset,
+          range: advance(s.startIndex, 3)..s.endIndex)!
+      dump(r.startIndex._utf16Index)
+      expectEqual(advance(s.startIndex, 7), r.startIndex)
+      expectEqual(advance(s.startIndex, 8), r.endIndex)
+    }
   }
 
   if true {
@@ -1038,11 +1053,24 @@ NSStringAPIs.test("rangeOfCharacterFromSet(_:options:range:)") {
 }
 
 NSStringAPIs.test("rangeOfComposedCharacterSequenceAtIndex(_:)") {
-  // FIXME
+  let s = "\U0001F601abc \u305f\u3099 def"
+  expectEqual("\U0001F601", s[s.rangeOfComposedCharacterSequenceAtIndex(
+      s.startIndex)])
+  expectEqual("a", s[s.rangeOfComposedCharacterSequenceAtIndex(
+      advance(s.startIndex, 1))])
+  expectEqual("\u305f\u3099", s[s.rangeOfComposedCharacterSequenceAtIndex(
+      advance(s.startIndex, 5))])
+  expectEqual("\u305f\u3099", s[s.rangeOfComposedCharacterSequenceAtIndex(
+      advance(s.startIndex, 6))])
 }
 
 NSStringAPIs.test("rangeOfComposedCharacterSequencesForRange(_:)") {
-  // FIXME
+  let s = "\U0001F601abc さ\u3099し\u3099す\u3099せ\u3099そ\u3099"
+
+  expectEqual("\U0001F601a", s[s.rangeOfComposedCharacterSequencesForRange(
+      s.startIndex..advance(s.startIndex, 2))])
+  expectEqual("し\u3099す\u3099", s[s.rangeOfComposedCharacterSequencesForRange(
+      advance(s.startIndex, 8)..advance(s.startIndex, 10))])
 }
 
 NSStringAPIs.test("rangeOfString(_:options:range:locale:)") {
