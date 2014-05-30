@@ -724,7 +724,7 @@ extension String {
     encoding: NSStringEncoding
   ) -> String? {
     return NSString(
-      bytes: &bytes, length: min(bytes.count, length), encoding: encoding
+      bytes: bytes, length: min(bytes.count, length), encoding: encoding
     ) as NSString? // HACK: FIXME: coerce to optional NSString to handle nil
   }
 
@@ -818,8 +818,8 @@ extension String {
   /// Returns a `String` object initialized by using a given
   /// format string as a template into which the remaining argument
   /// values are substituted.
-  init(format: String, _ _arguments: CVarArg...) {
-    self = String(format: format, arguments: _arguments)
+  init(format: String, _ arguments: CVarArg...) {
+    self = String(format: format, arguments: arguments)
   }
 
   // - (instancetype)

@@ -776,43 +776,65 @@ NSStringAPIs.test("hash") {
 }
 
 NSStringAPIs.test("stringWithBytes(_:length:encoding:)") {
-  /*
-  Tests disabled because of:
-  <rdar://problem/17034498> NSString(bytes:length:encoding:) constructs a garbage NSString
-
   var s: String = "abc あかさた"
   var bytes: UInt8[] = Array(s.utf8)
-  dump(bytes)
   expectEqual(s, String.stringWithBytes(bytes, length: bytes.count,
       encoding: NSUTF8StringEncoding))
+
+  /*
+  FIXME: Test disabled because the NSString documentation is unclear about
+  what should actually happen in this case.
+
   expectEmpty(String.stringWithBytes(bytes, length: bytes.count,
       encoding: NSASCIIStringEncoding))
   */
+
+  // FIXME: add a test where this function actually returns nil.
 }
 
 NSStringAPIs.test("stringWithBytesNoCopy(_:length:encoding:freeWhenDone:)") {
-  // FIXME
+  var s: String = "abc あかさた"
+  var bytes: UInt8[] = Array(s.utf8)
+  expectEqual(s, String.stringWithBytesNoCopy(&bytes, length: bytes.count,
+      encoding: NSUTF8StringEncoding, freeWhenDone: false))
+
+  /*
+  FIXME: Test disabled because the NSString documentation is unclear about
+  what should actually happen in this case.
+
+  expectEmpty(String.stringWithBytesNoCopy(&bytes, length: bytes.count,
+      encoding: NSASCIIStringEncoding, freeWhenDone: false))
+  */
+
+  // FIXME: add a test where this function actually returns nil.
 }
 
 NSStringAPIs.test("init(utf16CodeUnits:count:)") {
-  var chars: unichar[] = [
-    unichar("s".value), unichar("o".value), unichar("x".value) ]
+  let expected = "abc абв \U0001F60A"
+  let chars: unichar[] = Array(expected.utf16)
 
-  var sox = String(utf16CodeUnits: chars, count: chars.count)
-  expectEqual("sox", sox)
+  expectEqual(expected, String(utf16CodeUnits: chars, count: chars.count))
 }
 
 NSStringAPIs.test("init(utf16CodeUnitsNoCopy:count:freeWhenDone:)") {
-  // FIXME
+  let expected = "abc абв \U0001F60A"
+  let chars: unichar[] = Array(expected.utf16)
+
+  expectEqual(expected, String(utf16CodeUnitsNoCopy: chars,
+      count: chars.count, freeWhenDone: false))
 }
 
 NSStringAPIs.test("init(format:_:...)") {
-  var world: NSString = "world"
-  expectEqual("Hello, world!%42", String(format: "Hello, %@!%%%ld", world, 42))
+  let world: NSString = "world"
+  expectEqual("Hello, world!%42",
+      String(format: "Hello, %@!%%%ld", world, 42))
 }
 
 NSStringAPIs.test("init(format:arguments:)") {
-  // FIXME
+  let world: NSString = "world"
+  let args: CVarArg[] = [ world, 42 ]
+  expectEqual("Hello, world!%42",
+      String(format: "Hello, %@!%%%ld", arguments: args))
 }
 
 NSStringAPIs.test("init(format:locale:_:...)") {
@@ -824,7 +846,12 @@ NSStringAPIs.test("init(format:locale:_:...)") {
 }
 
 NSStringAPIs.test("init(format:locale:arguments:)") {
-  // FIXME
+  let world: NSString = "world"
+  let args: CVarArg[] = [ world, 42 ]
+  expectEqual("Hello, world!%42", String(format: "Hello, %@!%%%ld",
+      locale: nil, arguments: args))
+  expectEqual("Hello, world!%42", String(format: "Hello, %@!%%%ld",
+      locale: NSLocale.systemLocale(), arguments: args))
 }
 
 NSStringAPIs.test("lastPathComponent") {
