@@ -263,6 +263,10 @@ class NonContiguousNSString : NSString {
     super.init()
   }
 
+  @objc override func copyWithZone(zone: NSZone) -> AnyObject {
+    return self
+  }
+
   @objc override var length: Int {
     return _value.utf16count
   }
@@ -281,15 +285,29 @@ func testUTF8Encoding(expectedContents: String, stringUnderTest: String) {
 }
 
 func testUTF8EncodingOfBridgedNSString() {
-  if true {
-    var nss = NonContiguousNSString("abc")
+  for str in [ "abc", "абв", "あいうえお" ] {
+    var nss = NonContiguousNSString(str)
+
+    // Sanity checks to make sure we are testing the code path that does UTF-8
+    // encoding itself, instead of dispatching to CF.  Both the original string
+    // itself and its copies should be resilient to CF's fast path functions,
+    // because Swift bridging may copy the string to ensure that it is not
+    // mutated.
     let cfstring: CFString = reinterpretCast(nss)
     assert(!CFStringGetCStringPtr(cfstring,
         CFStringBuiltInEncodings.ASCII.toRaw()))
     assert(!CFStringGetCStringPtr(cfstring,
         CFStringBuiltInEncodings.UTF8.toRaw()))
     assert(!CFStringGetCharactersPtr(cfstring))
-    testUTF8Encoding("abc", cfstring)
+
+    let copy = CFStringCreateCopy(nil, cfstring)
+    assert(!CFStringGetCStringPtr(copy,
+        CFStringBuiltInEncodings.ASCII.toRaw()))
+    assert(!CFStringGetCStringPtr(copy,
+        CFStringBuiltInEncodings.UTF8.toRaw()))
+    assert(!CFStringGetCharactersPtr(copy))
+
+    testUTF8Encoding(str, cfstring)
   }
 
   if true {
