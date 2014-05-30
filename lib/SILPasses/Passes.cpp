@@ -96,6 +96,7 @@ void swift::runSILOptimizationPasses(SILModule &Module,
     PM.add(createSROA());
     PM.add(createMem2Reg());
     PM.add(createPerformanceConstantPropagation());
+    PM.add(createDCE());
     PM.add(createCSE());
     PM.add(createSILCombine());
     PM.add(createLoadStoreOpts());

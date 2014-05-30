@@ -25,13 +25,14 @@ sil @dead2 : $@thin () -> () {
 bb0:
 // CHECK-NOT: integer_literal $Builtin.Word, 2
   %0 = integer_literal $Builtin.Word, 2
-// CHECK: [[ZERO:%[a-zA-Z0-9]+]] = integer_literal $Builtin.Word, 0
+// CHECK-NOT: integer_literal $Builtin.Word, 0
   %1 = integer_literal $Builtin.Word, 0
-// CHECK: br bb1(undef : $Builtin.Word, [[ZERO]] : $Builtin.Word)
+// CHECK-NEXT: br bb1
   br bb1(%0 : $Builtin.Word, %1 : $Builtin.Word)
 
 // CHECK: bb1
 bb1(%3 : $Builtin.Word, %4 : $Builtin.Word):
+// CHECK-NEXT: br bb3
   %5 = integer_literal $Builtin.Word, 100
   %6 = builtin_function_ref "cmp_slt_Word" : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
   %7 = apply %6(%4, %5) : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
@@ -39,24 +40,32 @@ bb1(%3 : $Builtin.Word, %4 : $Builtin.Word):
 
 // CHECK: bb2
 bb2:
-// CHECK-NOT: [[THREE:%[a-zA-Z0-9]+]] = integer_literal $Builtin.Word, 3
+// CHECK-NEXT: br bb1
   %9 = integer_literal $Builtin.Word, 3
-// CHECK: [[SADD:%[a-zA-Z0-9]+]] = builtin_function_ref "sadd_with_overflow_Word"
   %10 = builtin_function_ref "sadd_with_overflow_Word" : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
   %11 = integer_literal $Builtin.Int1, -1
-// CHECK-NOT: apply [[SADD]]({{.*}}, [[THREE]]
   %12 = apply %10(%3, %9, %11) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
   %13 = tuple_extract %12 : $(Builtin.Word, Builtin.Int1), 0
-// CHECK: [[ONE:%[a-zA-Z0-9]+]] = integer_literal $Builtin.Word, 1
   %14 = integer_literal $Builtin.Word, 1
-// CHECK: [[APPLY:%[a-zA-Z0-9]+]] = apply [[SADD]]({{.*}}, [[ONE]]
   %15 = apply %10(%4, %14, %11) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
-// CHECK: [[RESULT:%[a-zA-Z0-9]+]] = tuple_extract [[APPLY]] : $(Builtin.Word, Builtin.Int1), 0
   %16 = tuple_extract %15 : $(Builtin.Word, Builtin.Int1), 0
-// CHECK:  br bb1(undef : $Builtin.Word, [[RESULT]] : $Builtin.Word)
   br bb1(%13 : $Builtin.Word, %16 : $Builtin.Word)
 
+// CHECK: bb3
 bb3:
+// CHECK-NEXT: [[RESULT:%[a-zA-Z0-9]+]] = tuple ()
   %18 = tuple ()
+// CHECK-NEXT: return [[RESULT]]
   return %18 : $()
+}
+
+// We currently bail out on functions that have structurally infinite
+// loops.
+// CHECK-LABEL: sil @dead3
+sil @dead3 : $@thin () -> () {
+// CHECK: bb0
+bb0:
+// CHECK: integer_literal $Builtin.Word, 0
+  %0 = integer_literal $Builtin.Word, 0
+  br bb0
 }
