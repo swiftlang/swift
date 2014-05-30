@@ -26,7 +26,6 @@ using namespace swift;
 /// (for any reason).
 bool SILInliner::inlineFunction(ApplyInst *AI,
                                 SILFunction *CalleeFunction,
-                                ArrayRef<Substitution> Subs,
                                 ArrayRef<SILValue> Args) {
   // Do not attempt to inline an apply into its parent function.
   if (AI->getParent()->getParent() == CalleeFunction)
@@ -43,6 +42,7 @@ bool SILInliner::inlineFunction(ApplyInst *AI,
          "inlining");
 
   // We can't handle specializations yet.
+  auto Subs = AI->getSubstitutions();
   if (!Subs.empty())
     return false;
 

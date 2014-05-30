@@ -200,7 +200,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
     // will be erased by the inliner. Notice that we will skip all of the
     // newly inlined ApplyInsts. That's okay because we will visit them in
     // our next invocation of the inliner.
-    Inliner.inlineFunction(AI, Callee, ArrayRef<Substitution>(), Args);
+    Inliner.inlineFunction(AI, Callee, Args);
     NumFunctionsInlined++;
     Changed = true;
   }

@@ -383,8 +383,7 @@ runOnFunctionRecursively(SILFunction *F, ApplyInst* AI,
         --I;
       else
         I = ApplyBlock->end();
-      if (!Inliner.inlineFunction(InnerAI, CalleeFunction,
-                                  InnerAI->getSubstitutions(), FullArgs)) {
+      if (!Inliner.inlineFunction(InnerAI, CalleeFunction, FullArgs)) {
         I = InnerAI;
         continue;
       }

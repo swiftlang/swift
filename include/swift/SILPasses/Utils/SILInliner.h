@@ -54,7 +54,7 @@ public:
   /// instruction, or the next instruction after the removed instruction in the
   /// original function, in case the inlined function is completely trivial
   bool inlineFunction(ApplyInst *AI,
-                      SILFunction *CalleeFunction, ArrayRef<Substitution> Subs,
+                      SILFunction *CalleeFunction,
                       ArrayRef<SILValue> Args);
 
 private:
