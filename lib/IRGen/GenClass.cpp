@@ -1486,7 +1486,7 @@ namespace {
       } else {
         // FIXME: set something up to fill these in at runtime!
         size = Size(0);
-        alignment = Alignment(0);
+        alignment = Alignment(1);
       }
 
       // If the size is larger than we can represent in 32-bits,
