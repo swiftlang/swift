@@ -1,0 +1,15 @@
+
+if (APPLE)
+  set(SHARED_LIBRARY YES)
+  add_swift_library(LeaksDetector leaksDetector.c)
+  get_property(LEAKS_DETECTOR_LIBRARY_PATH TARGET LeaksDetector PROPERTY LOCATION)
+  configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/leaks-runner.in
+    ${CMAKE_CURRENT_BINARY_DIR}/leaks-runner
+    @ONLY
+    NEWLINE_STYLE UNIX)
+  file(COPY ${CMAKE_CURRENT_BINARY_DIR}/leaks-runner
+    DESTINATION ${LLVM_TOOLS_BINARY_DIR}
+    FILE_PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ
+    GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+endif()
