@@ -77,6 +77,15 @@ extension String {
     return _index(r.location).._index(r.location + r.length)
   }
 
+  /// Return a `Range<Index>?` corresponding to the given `NSRange` of
+  /// our UTF16 representation.
+  func _optionalRange(r: NSRange) -> Range<Index>? {
+    if r.location == NSNotFound {
+      return .None
+    }
+    return _range(r)
+  }
+
   /// Invoke `body` on an `Int` buffer.  If `index` was converted from
   /// non-`nil`, convert the buffer to an `Index` and write it into the
   /// memory referred to by `index`
@@ -1062,8 +1071,8 @@ extension String {
     aSet: NSCharacterSet,
     options mask:NSStringCompareOptions = nil,
     range aRange: Range<Index>? = nil
-  )-> Range<Index> {
-    return _range(
+  )-> Range<Index>? {
+    return _optionalRange(
       _ns.rangeOfCharacterFromSet(
         aSet, options: mask,
         range: _toNSRange(aRange ? aRange! : indices(self))))

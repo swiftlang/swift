@@ -41,7 +41,7 @@ func expectNotEqual<T : Equatable>(
 
 %end
 
-%for (Generic, EquatableType) in [('', 'String'), ('', 'Int'), ('', 'UInt'), ('', 'NSComparisonResult'), ('<T : ForwardIndex>', 'T'), ('<T, U : Equatable>', 'Dictionary<T, U>')]:
+%for (Generic, EquatableType) in [('', 'String'), ('', 'String.Index'), ('', 'Int'), ('', 'UInt'), ('', 'NSComparisonResult'), ('<T : ForwardIndex>', 'T'), ('<T, U : Equatable>', 'Dictionary<T, U>')]:
 
 func expectEqual${Generic}(
     expected: ${EquatableType}, actual: ${EquatableType},
@@ -1002,7 +1002,39 @@ NSStringAPIs.test("propertyListFromStringsFileFormat()") {
 }
 
 NSStringAPIs.test("rangeOfCharacterFromSet(_:options:range:)") {
-  // FIXME
+  if true {
+    let charset = NSCharacterSet(charactersInString: "абв")
+    if true {
+      let s = "Глокая куздра"
+      let r = s.rangeOfCharacterFromSet(charset)!
+      expectEqual(advance(s.startIndex, 4), r.startIndex)
+      expectEqual(advance(s.startIndex, 5), r.endIndex)
+    }
+    if true {
+      expectEmpty("клмн".rangeOfCharacterFromSet(charset))
+    }
+  }
+
+  if true {
+    let charset = NSCharacterSet(charactersInString: "\u305f\u3099")
+    expectEmpty("\u3060".rangeOfCharacterFromSet(charset))
+  }
+  if true {
+    let charset = NSCharacterSet(charactersInString: "\u3060")
+    expectEmpty("\u305f\u3099".rangeOfCharacterFromSet(charset))
+  }
+
+  if true {
+    let charset = NSCharacterSet(charactersInString: "\U0001F600")
+    if true {
+      let s = "abc\U0001F600"
+      expectEqual("\U0001F600",
+          s[s.rangeOfCharacterFromSet(charset)!])
+    }
+    if true {
+      expectEmpty("abc\U0001F601".rangeOfCharacterFromSet(charset))
+    }
+  }
 }
 
 NSStringAPIs.test("rangeOfComposedCharacterSequenceAtIndex(_:)") {
