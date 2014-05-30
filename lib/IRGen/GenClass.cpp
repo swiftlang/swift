@@ -1444,7 +1444,7 @@ namespace {
     ///   uintptr_t *offset;
     ///   const char *name;
     ///   const char *type;
-    ///   uint32_t alignment;
+    ///   uint32_t alignment;    // actually the log2 of the alignment
     ///   uint32_t size;
     /// };
     llvm::Constant *buildIvar(VarDecl *ivar, SILType loweredType) {
@@ -1502,8 +1502,8 @@ namespace {
         offsetPtr,
         name,
         typeEncode,
+        llvm::ConstantInt::get(IGM.Int32Ty, alignment.log2()),
         llvm::ConstantInt::get(IGM.Int32Ty, size.getValue()),
-        llvm::ConstantInt::get(IGM.Int32Ty, alignment.getValue())
       };
       return llvm::ConstantStruct::getAnon(IGM.getLLVMContext(), fields);
     }

@@ -87,7 +87,7 @@
 // CHECK:     i64* @_TWvdvC13objc_subclass10SwiftGizmo1xSi,
 // CHECK:     i8* getelementptr inbounds ([2 x i8]* [[STRING_X]], i64 0, i64 0),
 // CHECK:     i8* null,
-// CHECK:     i32 8,
+// CHECK:     i32 3,
 // CHECK:     i32 8 }]
 // CHECK: }, section "__DATA, __objc_const", align 8
 // CHECK: @_DATA__TtC13objc_subclass10SwiftGizmo = private constant { {{.*}}* } {

@@ -177,6 +177,10 @@ public:
   Alignment alignmentAtOffset(Size S) const;
   Size asSize() const;
 
+  unsigned log2() const {
+    return llvm::Log2_64(Value);
+  }
+
   explicit operator bool() const { return Value != 0; }
 
   friend bool operator< (Alignment L, Alignment R){ return L.Value <  R.Value; }
@@ -255,6 +259,10 @@ public:
 
   bool isMultipleOf(Size other) const {
     return (Value % other.Value) == 0;
+  }
+
+  unsigned log2() const {
+    return llvm::Log2_64(Value);
   }
 
   friend bool operator< (Size L, Size R) { return L.Value <  R.Value; }
