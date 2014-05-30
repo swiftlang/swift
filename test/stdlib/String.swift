@@ -299,6 +299,8 @@ func testUTF8EncodingOfBridgedNSString() {
 
     // Sanity checks to make sure we are testing the code path that does UTF-8
     // encoding itself, instead of dispatching to CF.
+    // GetCStringPtr fails because our un-copied bytes aren't zero-terminated.
+    // GetCharactersPtr fails because our un-copied bytes aren't UTF-16.
     assert(!CFStringGetCStringPtr(cfstring,
         CFStringBuiltInEncodings.ASCII.toRaw()))
     assert(!CFStringGetCStringPtr(cfstring,
@@ -316,13 +318,18 @@ func testUTF8EncodingOfBridgedNSString() {
 
     // Sanity checks to make sure we are testing the code path that does UTF-8
     // encoding itself, instead of dispatching to CF.
-    assert(!CFStringGetCStringPtr(cfstring,
-        CFStringBuiltInEncodings.ASCII.toRaw()))
-    assert(!CFStringGetCStringPtr(cfstring,
-        CFStringBuiltInEncodings.UTF8.toRaw()))
-    assert(!CFStringGetCharactersPtr(cfstring))
+    // CFStringCreateWithBytes() usually allocates zero-terminated ASCII 
+    // or UTF-16, in which case one of the fast paths will succeed. 
+    // This test operates only when CF creates a tagged pointer string object.
+    if (object_getClassName(cfstring) == "NSTaggedPointerString") {
+      assert(!CFStringGetCStringPtr(cfstring,
+          CFStringBuiltInEncodings.ASCII.toRaw()))
+      assert(!CFStringGetCStringPtr(cfstring,
+          CFStringBuiltInEncodings.UTF8.toRaw()))
+      assert(!CFStringGetCharactersPtr(cfstring))
 
-    testUTF8Encoding("abc", cfstring)
+      testUTF8Encoding("abc", cfstring)
+    }
   }
 
   println("testUTF8EncodingOfBridgedNSString done")
