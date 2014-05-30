@@ -1040,8 +1040,7 @@ void irgen::emitObjCMethodDescriptorParts(IRGenModule &IGM,
   /// The first element is the selector.
   selectorRef = IGM.getAddrOfObjCMethodName(selector.str());
   
-  /// The second element is the type @encoding. Handle some simple cases, and
-  /// leave the rest as null for now.
+  /// The second element is the type @encoding.
   CanAnyFunctionType methodType
     = cast<AnyFunctionType>(method->getType()->getCanonicalType());
   

@@ -170,11 +170,13 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
   if (auto closure = getAbstractClosureExpr())
     return getLinkageForLocalContext(closure->getParent());
   
-  // Function-local declarations always have internal linkage.
+  // Native function-local declarations have local linkage.
+  // FIXME: @objc declarations should be too, but we currently have no way
+  // of marking them "used" other than making them external. 
   ValueDecl *d = getDecl();
   DeclContext *dc = d->getDeclContext();
   while (!dc->isModuleScopeContext()) {
-    if (dc->isLocalContext())
+    if (!isForeign && dc->isLocalContext())
       return getLinkageForLocalContext(dc);
     dc = dc->getParent();
   }
