@@ -931,9 +931,52 @@ void PrintAST::printOneParameter(Identifier ArgName,
                                  bool ArgNameIsAPIByDefault,
                                  bool StripOuterSliceType,
                                  bool Curried) {
+  auto printArgName = [&]() {
+    // Print argument name.
+    auto BodyName = BodyPattern->getBoundName();
+    if (Curried) {
+      // For curried parameters, just print the body name if there is one.
+      Printer.printName(BodyName);
+      Printer << ": ";
+    } else {
+      auto printArg = [&]{
+        if (!ArgName.empty() && !ArgNameIsAPIByDefault)
+          Printer << "#";
+        Printer.printName(ArgName);
+      };
+
+      switch (Options.ArgAndParamPrinting) {
+      case PrintOptions::ArgAndParamPrintingMode::ArgumentOnly:
+        printArg();
+        break;
+      case PrintOptions::ArgAndParamPrintingMode::BothIfDifferent:
+        if (ArgName == BodyName) {
+          printArg();
+          break;
+        }
+        if (ArgName.empty() && !ArgNameIsAPIByDefault) {
+          Printer.printName(BodyName);
+          break;
+        }
+        SWIFT_FALLTHROUGH;
+      case PrintOptions::ArgAndParamPrintingMode::BothAlways:
+        Printer.printName(ArgName);
+        Printer << " ";
+        Printer.printName(BodyName);
+        break;
+      }
+      Printer << ": ";
+    }
+  };
+
   if (auto *VP = dyn_cast<VarPattern>(BodyPattern))
     BodyPattern = VP->getSubPattern();
-  auto *TypedBodyPattern = cast<TypedPattern>(BodyPattern);
+  auto *TypedBodyPattern = dyn_cast<TypedPattern>(BodyPattern);
+  if (!TypedBodyPattern) {
+    // It was a syntax error.
+    printArgName();
+    return;
+  }
   auto TheTypeLoc = TypedBodyPattern->getTypeLoc();
   if (TheTypeLoc.hasLocation()) {
     // If the outer typeloc is an InOutTypeRepr, print the 'inout' before the
@@ -957,41 +1000,7 @@ void PrintAST::printOneParameter(Identifier ArgName,
     }
   }
 
-  // Print argument name.
-  auto BodyName = BodyPattern->getBoundName();
-  if (Curried) {
-    // For curried parameters, just print the body name if there is one.
-    Printer.printName(BodyName);
-    Printer << ": ";
-  } else {
-    auto printArg = [&]{
-      if (!ArgName.empty() && !ArgNameIsAPIByDefault)
-        Printer << "#";
-      Printer.printName(ArgName);
-    };
-
-    switch (Options.ArgAndParamPrinting) {
-    case PrintOptions::ArgAndParamPrintingMode::ArgumentOnly:
-      printArg();
-      break;
-    case PrintOptions::ArgAndParamPrintingMode::BothIfDifferent:
-      if (ArgName == BodyName) {
-        printArg();
-        break;
-      }
-      if (ArgName.empty() && !ArgNameIsAPIByDefault) {
-        Printer.printName(BodyName);
-        break;
-      }
-      SWIFT_FALLTHROUGH;
-    case PrintOptions::ArgAndParamPrintingMode::BothAlways:
-      Printer.printName(ArgName);
-      Printer << " ";
-      Printer.printName(BodyName);
-      break;
-    }
-    Printer << ": ";
-  }
+  printArgName();
 
   if (StripOuterSliceType && !TheTypeLoc.hasLocation()) {
     if (auto *BGT = TypedBodyPattern->getType()->getAs<BoundGenericType>()) {

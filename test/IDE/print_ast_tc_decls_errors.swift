@@ -170,4 +170,8 @@ var topLevelVar1 = 42
 // CHECK: {{^}}var topLevelVar1{{$}}
 // CHECK-NOT: topLevelVar1
 
-
+// CHECK: class C1
+class C1 {
+  // CHECK: init(data: )
+  init(data:) // expected-error {{expected parameter type following ':'}}
+}
