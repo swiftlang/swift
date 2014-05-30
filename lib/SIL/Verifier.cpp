@@ -315,6 +315,17 @@ public:
     return false;
   }
 
+  /// \return True if all of the users of the AllocStack instruction \p ASI are
+  /// inside the same basic block.
+  static bool isSingleBlockUsage(AllocStackInst *ASI) {
+    SILBasicBlock *BB = ASI->getParent();
+    for (auto UI = ASI->use_begin(), E = ASI->use_end(); UI != E; ++UI)
+      if (UI->getUser()->getParent() != BB)
+        return false;
+
+    return true;
+  }
+
   void checkAllocStackInst(AllocStackInst *AI) {
     require(AI->getContainerResult().getType().isLocalStorage(),
             "first result of alloc_stack must be local storage");
@@ -323,6 +334,31 @@ public:
     require(AI->getContainerResult().getType().getSwiftRValueType()
               == AI->getElementType().getSwiftRValueType(),
             "container storage must be for allocated type");
+
+    // Scan the parent block of AI and check that the users of AI inside this
+    // block are inside the lifetime of the allocated memory.
+    SILBasicBlock *SBB = AI->getParent();
+    bool Allocated = true;
+    for (SILBasicBlock::iterator Inst = AI, E = SBB->end(); Inst != E; ++Inst) {
+      if (LoadInst *LI = dyn_cast<LoadInst>(Inst))
+        if (LI->getOperand().getDef() == AI)
+          require(Allocated, "AllocStack used by Load outside its lifetime");
+
+      if (StoreInst *SI = dyn_cast<StoreInst>(Inst))
+        if (SI->getDest().getDef() == AI)
+          require(Allocated, "AllocStack used by Store outside its lifetime");
+
+      if (DeallocStackInst *DSI = dyn_cast<DeallocStackInst>(Inst))
+        if (DSI->getOperand() == AI)
+          Allocated = false;
+    }
+
+    // If the AllocStackInst is also deallocated inside the allocation block
+    // then make sure that all the users are inside that block.
+    if (!Allocated) {
+      require(isSingleBlockUsage(AI),
+              "AllocStack has users in other basic blocks after allocation");
+    }
   }
 
   void checkAllocRefInst(AllocRefInst *AI) {
