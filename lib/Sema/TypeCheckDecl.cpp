@@ -2375,7 +2375,9 @@ public:
         // Let declarations require an initializer, unless they are a property
         // (in which case they get set during the init method of the enclosing
         // type).
-        if (var->isLet() && !varDC->isTypeContext()) {
+        // The debugger will also need to emulate let variables which have been
+        // initialized in a previous expression, so they don't need initializers.
+        if (var->isLet() && !var->isDebuggerVar() && !varDC->isTypeContext()) {
           TC.diagnose(var->getLoc(), diag::let_requires_initializer);
           PBD->setInvalid();
           var->setInvalid();

@@ -15,6 +15,7 @@
 #include "RValue.h"
 #include "Scope.h"
 #include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILDebuggerClient.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/TypeLowering.h"
 #include "swift/AST/AST.h"
@@ -30,6 +31,7 @@ using namespace Mangle;
 using namespace Lowering;
 
 void Initialization::_anchor() {}
+void SILDebuggerClient::anchor() {}
 
 namespace {
   /// A "null" initialization that indicates that any value being initialized
@@ -406,6 +408,12 @@ public:
     // Globals don't need to be cleaned up.
   }
 };
+
+class DebuggerInitialization : public GlobalInitialization {
+public:
+  DebuggerInitialization(SILValue address) : GlobalInitialization(address) {
+  }
+};
   
 /// Cleanup that writes back to a inout argument on function exit.
 class CleanupWriteBackToInOut : public Cleanup {
@@ -571,7 +579,7 @@ struct MarkPatternUninitialized
   
   void visitNamedPattern(NamedPattern *P) {
     VarDecl *var = P->getDecl();
-    if (!var->hasStorage())
+    if ((!var->hasStorage()) || (var->isDebuggerVar()))
       return;
     
     // Emit a mark_uninitialized for the variable's storage, and fix up the
@@ -606,6 +614,17 @@ SILGenFunction::emitInitializationForVarDecl(VarDecl *vd, bool isArgument,
   // We'll generate the getter and setter when we see their FuncDecls.
   if (!vd->hasStorage())
     return InitializationPtr(new BlackHoleInitialization());
+
+  if (vd->isDebuggerVar()) {
+    DebuggerClient *DebugClient = SGM.SwiftModule->getDebugClient();
+    assert(DebugClient && "Debugger variables with no debugger client");
+    SILDebuggerClient *SILDebugClient = DebugClient->getAsSILDebuggerClient();
+    assert(SILDebugClient && "Debugger client doesn't support SIL");
+    SILValue SV = SILDebugClient->emitLValueForVariable(vd, B);
+
+    VarLocs[vd] = SILGenFunction::VarLoc::getAddress(SV);
+    return InitializationPtr(new DebuggerInitialization(SV));
+  }
 
   CanType varType = vd->getType()->getCanonicalType();
 

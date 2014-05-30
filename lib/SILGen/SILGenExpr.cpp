@@ -23,7 +23,6 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/type_traits.h"
 #include "swift/SIL/SILArgument.h"
-#include "swift/SIL/SILDebuggerClient.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
 #include "Initialization.h"
@@ -37,8 +36,6 @@
 
 using namespace swift;
 using namespace Lowering;
-
-void SILDebuggerClient::anchor() {}
 
 SILGenFunction::OpaqueValueRAII::~OpaqueValueRAII() {
   // Destroy the value, unless it was both uniquely referenced and consumed.
@@ -393,16 +390,6 @@ static ManagedValue emitGlobalVariableRef(SILGenFunction &gen,
 /// null.
 ManagedValue SILGenFunction::emitLValueForDecl(SILLocation loc, VarDecl *var,
                                                bool isDirectPropertyAccess) {
-
-  if (var->isDebuggerVar()) {
-    DebuggerClient *DebugClient = SGM.SwiftModule->getDebugClient();
-    assert(DebugClient && "Debugger variables with no debugger client");
-    SILDebuggerClient *SILDebugClient = DebugClient->getAsSILDebuggerClient();
-    assert(SILDebugClient && "Debugger client doesn't support SIL");
-    SILValue SV = SILDebugClient->emitLValueForVariable(var, B);
-    return ManagedValue::forLValue(SV);
-  }
-  
   // For local decls, use the address we allocated or the value if we have it.
   auto It = VarLocs.find(var);
   if (It != VarLocs.end()) {
