@@ -15,6 +15,8 @@
 #define MINUS_THREE -3
 #define true 1
 #define false 0
+#define TRUE 1
+#define FALSE 0
 
 #define A_PI M_PI
 

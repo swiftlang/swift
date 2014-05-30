@@ -49,6 +49,9 @@ func subThree(x: CInt) -> CInt {
 func testTrueFalse() {
   var x : Bool = true
   var y : Bool = false
+
+  _ = TRUE // expected-error {{use of unresolved identifier 'TRUE'}}
+  _ = FALSE // expected-error {{use of unresolved identifier 'FALSE'}}
 }
 
 func testCStrings() -> Bool {
