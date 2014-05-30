@@ -22,6 +22,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsDriver.h"
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Version.h"
 #include "swift/Basic/Range.h"
@@ -272,9 +273,7 @@ void Driver::buildInputs(const ToolChain &TC,
           Ty = types::TY_Swift;
         } else {
           // Otherwise lookup by extension.
-          if (const char *Ext = strrchr(Value, '.')) {
-            Ty = TC.lookupTypeForExtension(Ext + 1);
-          }
+          Ty = TC.lookupTypeForExtension(llvm::sys::path::extension(Value));
 
           if (Ty == types::TY_INVALID) {
             // FIXME: should we adjust this inference in certain modes?
@@ -493,9 +492,45 @@ void Driver::buildActions(const ToolChain &TC,
       const Arg *InputArg = Input.second;
 
       std::unique_ptr<Action> Current(new InputAction(*InputArg, InputType));
-      if (InputType == types::TY_Swift || InputType == types::TY_SIL)
+      switch (InputType) {
+      case types::TY_Swift:
+      case types::TY_SIL:
+        // Source inputs always need to be compiled.
         Current.reset(new CompileJobAction(Current.release(),
                                            OI.CompilerOutputType));
+        break;
+      case types::TY_SwiftModuleFile:
+      case types::TY_SwiftModuleDocFile:
+        // Module inputs are okay if generating a module or linking.
+        if (OI.ShouldGenerateModule)
+          break;
+        SWIFT_FALLTHROUGH;
+      case types::TY_Object:
+        // Object inputs are only okay if linking.
+        if (OI.shouldLink())
+          break;
+        SWIFT_FALLTHROUGH;
+      case types::TY_Image:
+      case types::TY_dSYM:
+      case types::TY_Dependencies:
+      case types::TY_Assembly:
+      case types::TY_LLVM_IR:
+      case types::TY_LLVM_BC:
+      case types::TY_SerializedDiagnostics:
+      case types::TY_ObjCHeader:
+      case types::TY_ClangModuleFile:
+        // We could in theory handle assembly or LLVM input, but let's not.
+        // FIXME: What about LTO?
+        Diags.diagnose(SourceLoc(), diag::error_unknown_file_type,
+                       InputArg->getValue());
+        continue;
+      case types::TY_RawSIL:
+      case types::TY_Nothing:
+      case types::TY_INVALID:
+      case types::TY_LAST:
+        llvm_unreachable("these types should never be inferred");
+      }
+
       CompileActions.push_back(Current.release());
     }
     break;
@@ -873,6 +908,8 @@ Job *Driver::buildJobsForAction(const Compilation &C, const Action *A,
                                 const ToolChain &TC, bool AtTopLevel,
                                 JobCacheMap &JobCache,
                                 const TemporaryCallback &callback) const {
+  assert(!isa<InputAction>(A) && "unexpected unprocessed input");
+
   // 1. See if we've already got this cached.
   std::pair<const Action *, const ToolChain *> Key(A, &TC);
   {

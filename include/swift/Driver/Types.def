@@ -19,7 +19,7 @@
 #error "Define TYPE prior to including this file!"
 #endif
 
-// TYPE(NAME, ID, TEMP_SUFFIX, FLAGS)
+// TYPE(NAME, ID, SUFFIX, FLAGS)
 
 // The first value is the type name as a string; this should be something which
 // could be displayed to the user, or something which the user could provide.
@@ -28,7 +28,9 @@
 // swift::driver::types::TY_XX enum constant.
 
 // The third value is the suffix to use when creating temporary files
-// of this type, or null if unspecified.
+// of this type. It is also used when inferring a type from an extension.
+// If multiple types specify the same extension, the first one is chosen when
+// performing type inference.
 
 // The fifth value is a string containing option flags. For now, this is unused,
 // and should always be the empty string.
@@ -43,7 +45,7 @@ TYPE("object",          Object,             "o",               "")
 TYPE("dSYM",            dSYM,               "dSYM",            "")
 TYPE("dependencies",    Dependencies,       "d",               "")
 TYPE("swiftmodule",     SwiftModuleFile,    "swiftmodule",     "")
-TYPE("swiftdoc",        SwiftModuleDocFile, "swiftdoc",       "")
+TYPE("swiftdoc",        SwiftModuleDocFile, "swiftdoc",        "")
 TYPE("assembly",        Assembly,           "s",               "")
 TYPE("raw-sil",         RawSIL,             "sil",             "")
 TYPE("llvm-ir",         LLVM_IR,            "ir",              "")
@@ -53,4 +55,6 @@ TYPE("objc-header",     ObjCHeader,         "h",               "")
 
 // Misc types
 TYPE("pcm",             ClangModuleFile,    "pcm",             "")
-TYPE("none",            Nothing,            0,                 "")
+TYPE("none",            Nothing,            "",                "")
+
+#undef TYPE

@@ -30,7 +30,6 @@ static const TypeInfo TypeInfos[] = {
 #define TYPE(NAME, ID, TEMP_SUFFIX, FLAGS) \
   { NAME, FLAGS, TEMP_SUFFIX },
 #include "swift/Driver/Types.def"
-#undef TYPE
 };
 static const unsigned numTypes = llvm::array_lengthof(TypeInfos);
 
@@ -48,12 +47,13 @@ StringRef types::getTypeTempSuffix(ID Id) {
 }
 
 ID types::lookupTypeForExtension(StringRef Ext) {
-  return llvm::StringSwitch<types::ID>(Ext)
-           .Case("swift", TY_Swift)
-           .Case("sil", TY_SIL)
-           .Case("swiftmodule", TY_SwiftModuleFile)
-           .Case("pcm", TY_ClangModuleFile)
-           .Case("o", TY_Object)
+  if (Ext.empty())
+    return TY_INVALID;
+  assert(Ext.front() == '.' && "not a file extension");
+  return llvm::StringSwitch<types::ID>(Ext.drop_front())
+#define TYPE(NAME, ID, SUFFIX, FLAGS) \
+           .Case(SUFFIX, TY_##ID)
+#include "swift/Driver/Types.def"
            .Default(TY_INVALID);
 }
 
