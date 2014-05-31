@@ -88,6 +88,90 @@ SILInstruction *findIdenticalInBlock(SILBasicBlock *BB, SILInstruction *Iden) {
   return nullptr;
 }
 
+// Try to sink values from the Nth argument \p ArgNum. 
+static bool sinkArgument(SILBasicBlock *BB, unsigned ArgNum) {
+  assert(ArgNum < BB->getNumBBArg() && "Invalid argument");
+
+  // Find the first predecessor, the first terminator and the Nth argument.
+  SILBasicBlock *FirstPred = *BB->pred_begin();
+  TermInst *FirstTerm = FirstPred->getTerminator();
+  auto FirstPredArg = FirstTerm->getOperand(ArgNum);
+  SILInstruction *FSI = dyn_cast<SILInstruction>(FirstPredArg);
+
+  // The list of identical instructions.
+  SmallVector<SILValue, 8> Clones;
+  Clones.push_back(FirstPredArg);
+
+  // We only move instructions with a single use.
+  if (!FSI || !FSI->hasOneUse())
+    return false;
+
+  // Don't move instructions that are sensitive to their location.
+  if (FSI->mayHaveSideEffects())
+    return false;
+
+  // Check if the Nth argument in all predecessors is identical.
+  for (auto P : BB->getPreds()) {
+    if (P == FirstPred)
+      continue;
+
+    // Only handle branch or conditional branch instructions.
+    TermInst *TI = P->getTerminator();
+    if (!isa<BranchInst>(TI) && !isa<CondBranchInst>(TI))
+      return false;
+
+    // Find the Nth argument passed to BB.
+    SILValue Arg = TI->getOperand(ArgNum);
+    SILInstruction *SI = dyn_cast<SILInstruction>(Arg);
+    if (SI && SI->hasOneUse() && SI->isIdenticalTo(FSI)) {
+      Clones.push_back(SI);
+      continue;
+    }
+
+    // Arguments are different.
+    return false;
+  }
+
+  if (!FSI)
+    return false;
+
+  SILValue Undef = SILUndef::get(FirstPredArg.getType(), BB->getModule());
+
+  // Sink one of the copies of the instruction.
+  FirstPredArg.replaceAllUsesWith(Undef);
+  FSI->moveBefore(BB->begin());
+  SILValue(BB->getBBArg(ArgNum)).replaceAllUsesWith(FirstPredArg);
+
+  // The argument is no longer in use. Replace all incoming inputs with undef
+  // and try to delete the instruction.
+  for (auto S : Clones)
+    if (S.getDef() != FSI) {
+      S.replaceAllUsesWith(Undef);
+      auto DeadArgInst = cast<SILInstruction>(S.getDef());
+      recursivelyDeleteTriviallyDeadInstructions(DeadArgInst);
+    }
+
+  return true;
+}
+
+/// Try to sink identical arguments coming from multiple predecessors.
+static bool sinkArgumentsFromPredecessors(SILBasicBlock *BB) {
+  if (BB->pred_empty() || BB->getSinglePredecessor())
+    return false;
+
+  // This block must be the only successor of all the predecessors.
+  for (auto P : BB->getPreds())
+    if (P->getSingleSuccessor() != BB)
+      return false;
+
+  // Try to sink values from each of the arguments to the basic block.
+  bool Changed = false;
+  for (int i = 0, e = BB->getNumBBArg(); i < e; ++i)
+    Changed |= sinkArgument(BB, i);
+
+  return Changed;
+}
+
 static bool sinkCodeFromPredecessors(SILBasicBlock *BB) {
   bool Changed = false;
   if (BB->pred_empty())
@@ -183,8 +267,10 @@ class SILCodeMotion : public SILFunctionTransform {
 
     // Sink duplicated code from predecessors.
     bool Changed = false;
-    for (auto &BB : F)
+    for (auto &BB : F) {
       Changed |= sinkCodeFromPredecessors(&BB);
+      Changed |= sinkArgumentsFromPredecessors(&BB);
+    }
 
     if (Changed)
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
