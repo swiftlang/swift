@@ -71,8 +71,7 @@ optimizeReferenceCountMatchingSet(ARCMatchingSet &MatchSet,
     SILInstruction *NewIncrement = createIncrement(MatchSet.Ptr, InsertPt);
     (void)NewIncrement;
     DEBUG(llvm::dbgs() << "    Inserting new increment: " << *NewIncrement
-                       << "\n"
-                          "At insertion point: " << *InsertPt << "\n");
+                       << "At insertion point: " << *InsertPt);
     ++NumRefCountOpsMoved;
   }
 
@@ -88,7 +87,7 @@ optimizeReferenceCountMatchingSet(ARCMatchingSet &MatchSet,
     SILInstruction *NewDecrement = createDecrement(MatchSet.Ptr, InsertPt);
     (void)NewDecrement;
     DEBUG(llvm::dbgs() << "    Inserting new NewDecrement: " << *NewDecrement
-                       << "\nAt insertion point: " << *InsertPt << "\n");
+                       << "At insertion point: " << *InsertPt);
     ++NumRefCountOpsMoved;
   }
 
