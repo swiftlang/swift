@@ -39,17 +39,22 @@ STATISTIC(NumRefCountOpsRemoved, "Total number of increments removed");
 
 static SILInstruction *createIncrement(SILValue Ptr, SILInstruction *InsertPt) {
   SILBuilder B(InsertPt);
+
+  // TODO: What is the correct SILLocation to use here? If the InsertPt is a
+  // terminator, then we will have the wrong location type and hit an assertion.
   if (Ptr.getType().hasReferenceSemantics())
-    return B.createStrongRetain(InsertPt->getLoc(), Ptr);
-  return B.createRetainValue(InsertPt->getLoc(), Ptr);
+    return B.createStrongRetain(SILFileLocation(SourceLoc()), Ptr);
+  return B.createRetainValue(SILFileLocation(SourceLoc()), Ptr);
 }
 
 static SILInstruction *createDecrement(SILValue Ptr, SILInstruction *InsertPt) {
   SILBuilder B(InsertPt);
 
+  // TODO: What is the correct SILLocation to use here? If the InsertPt is a
+  // terminator, then we will have the wrong location type and hit an assertion.
   if (Ptr.getType().hasReferenceSemantics())
-    return B.createStrongRelease(InsertPt->getLoc(), Ptr);
-  return B.createReleaseValue(InsertPt->getLoc(), Ptr);
+    return B.createStrongRelease(SILFileLocation(SourceLoc()), Ptr);
+  return B.createReleaseValue(SILFileLocation(SourceLoc()), Ptr);
 }
 
 static bool
