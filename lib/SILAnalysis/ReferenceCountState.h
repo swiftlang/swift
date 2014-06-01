@@ -86,6 +86,11 @@ struct RefCountState {
   /// semantics.
   InstructionSet InsertPts;
 
+  /// Have we performed any partial merges of insertion points? We can not
+  /// perform two partial merges in a row unless we are able to reason about
+  /// control dependency (which avoid for now).
+  bool Partial = false;
+
   /// Return this as the CRTP substruct.
   ImplStruct *asImpl() { return static_cast<ImplStruct *>(this); }
   ImplStruct *asImpl() const {
@@ -353,6 +358,8 @@ struct BottomUpRefCountState : public RefCountState<BottomUpRefCountState> {
         return true;
     }
   }
+
+  void merge(const BottomUpRefCountState &Other);
 };
 
 //===----------------------------------------------------------------------===//
@@ -403,9 +410,10 @@ struct TopDownRefCountState : public RefCountState<TopDownRefCountState> {
   void initWithArg(SILArgument *Arg) {
     LatState = LatticeState::Incremented;
     Increments.clear();
-    InsertPts.clear();
     Argument = Arg;
+    Value = Arg;
     KnownSafe = false;
+    InsertPts.clear();
   }
 
   /// Uninitialize the current state.
@@ -498,6 +506,8 @@ struct TopDownRefCountState : public RefCountState<TopDownRefCountState> {
         return true;
     }
   }
+
+  void merge(const TopDownRefCountState &Other);
 };
 
 } // end arc namespace

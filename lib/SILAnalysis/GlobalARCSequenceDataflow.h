@@ -121,6 +121,77 @@ public:
   /// predecessors. This is currently a stub.
   void initPredTopDown(ARCBBState &PredBB);
 };
+
+/// A class that implements the ARC sequence data flow.
+class ARCSequenceDataflowEvaluator {
+  /// The SILFunction that we are applying the dataflow to.
+  SILFunction &F;
+
+  /// The alias analysis that we are using for alias queries.
+  AliasAnalysis *AA;
+
+  /// The map from dataflow terminating decrements -> increment dataflow state.
+  BlotMapVector<SILInstruction *, TopDownRefCountState> &DecToIncStateMap;
+
+  /// The map from dataflow terminating increment -> decrement dataflow state.
+  BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap;
+
+  /// An array containing a post order of F. We only compute this once in the
+  /// lifetime of this class. We use this fields reverse iterator to perform
+  /// reverse post order traversals.
+  std::vector<SILBasicBlock *> PostOrder;
+
+  /// A map from SIL Basic Blocks to their index in the post order.
+  llvm::DenseMap<SILBasicBlock *, unsigned> BBToPostOrderID;
+
+  /// A map mapping the head to a tail of a backedge. We only compute this once
+  /// in the lifetime of this class.
+  llvm::DenseMap<SILBasicBlock *,
+                 llvm::SmallPtrSet<SILBasicBlock *, 4>> BackedgeMap;
+
+  /// Map from a basic block to its bottom up dataflow state.
+  llvm::DenseMap<SILBasicBlock *, ARCBBState> BottomUpBBStates;
+
+  /// Map from basic block to its top down dataflow state.
+  llvm::DenseMap<SILBasicBlock *, ARCBBState> TopDownBBStates;
+
+public:
+  ARCSequenceDataflowEvaluator(
+      SILFunction &F, AliasAnalysis *AA,
+      BlotMapVector<SILInstruction *, TopDownRefCountState> &DecToIncStateMap,
+      BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap)
+      : F(F), AA(AA), DecToIncStateMap(DecToIncStateMap),
+        IncToDecStateMap(IncToDecStateMap) {}
+
+  /// Initialize the dataflow evaluator state.
+  void init();
+
+  /// Run the dataflow evaluator.
+  bool run();
+
+  /// Clear all of the states we are tracking for the various basic blocks.
+  void clear() {
+    BottomUpBBStates.clear();
+    TopDownBBStates.clear();
+  }
+
+private:
+  /// Perform the bottom up data flow.
+  bool processBottomUp();
+
+  /// Perform the top down dataflow.
+  bool processTopDown();
+
+  /// Merge in the bottomupstate for any successors of BB into BBState. This is
+  /// a stub currently.
+  void mergeSuccessors(ARCBBState &BBState, SILBasicBlock *BB);
+
+  /// Merge in the top down state for any predecessors of BB into BBState. This
+  /// is a stub currently.
+  void mergePredecessors(ARCBBState &BBState, SILBasicBlock *BB);
+};
+
+/// The main entry point for the sequence dataflow analysis.
 bool performARCSequenceDataflow(
     SILFunction &F, AliasAnalysis *AA,
     BlotMapVector<SILInstruction *, TopDownRefCountState> &DecToIncStateMap,

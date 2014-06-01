@@ -15,6 +15,9 @@
 #include "swift/SILAnalysis/ARCAnalysis.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILSuccessor.h"
+#include "swift/SIL/CFG.h"
+#include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/Debug.h"
@@ -40,6 +43,42 @@ static bool isAutoreleasePoolCall(SILInstruction &I) {
     .Case("objc_autoreleasePoolPop", true)
     .Default(false);
 }
+
+//===----------------------------------------------------------------------===//
+//                         ARCBBState Implementation
+//===----------------------------------------------------------------------===//
+
+/// Merge in the state of the successor basic block. This is currently a stub.
+void ARCBBState::mergeSuccBottomUp(ARCBBState &SuccBB) {
+
+}
+
+/// Initialize this BB with the state of the successor basic block. This is
+/// called on a basic block's state and then any other successors states are
+/// merged in. This is currently a stub.
+void ARCBBState::initSuccBottomUp(ARCBBState &SuccBB) {
+
+}
+
+/// Merge in the state of the predecessor basic block. This is currently a stub.
+void ARCBBState::mergePredTopDown(ARCBBState &PredBB) {
+
+}
+
+/// Initialize the state for this BB with the state of its predecessor
+/// BB. Used to create an initial state before we merge in other
+/// predecessors. This is currently a stub.
+void ARCBBState::initPredTopDown(ARCBBState &PredBB) {
+
+}
+
+//===----------------------------------------------------------------------===//
+//                    Reference Count State Implementation
+//===----------------------------------------------------------------------===//
+
+void TopDownRefCountState::merge(const TopDownRefCountState &Other) {}
+
+void BottomUpRefCountState::merge(const BottomUpRefCountState &Other) {}
 
 //===----------------------------------------------------------------------===//
 //                             Top Down Dataflow
@@ -127,7 +166,7 @@ processBBTopDown(ARCBBState &BBState,
         // Copy the current value of ref count state into the result map.
         DecToIncStateMap[&I] = RefCountState;
         DEBUG(llvm::dbgs() << "    MATCHING INCREMENT:\n"
-              << **RefCountState.getInstructions().begin());
+              << RefCountState.getValue());
 
         // Clear the ref count state in case we see more operations on this
         // ref counted value. This is for safety reasons.
@@ -135,7 +174,7 @@ processBBTopDown(ARCBBState &BBState,
       } else {
         if (RefCountState.isTrackingRefCountInst()) {
           DEBUG(llvm::dbgs() << "    FAILED MATCH INCREMENT:\n" <<
-                **RefCountState.getInstructions().begin());
+                RefCountState.getValue());
         } else {
           DEBUG(llvm::dbgs() << "    FAILED MATCH. NO INCREMENT.\n");
         }
@@ -162,17 +201,61 @@ processBBTopDown(ARCBBState &BBState,
       // cause us to change states. If we do change states continue...
       if (OtherState.second.handlePotentialDecrement(&I, AA)) {
         DEBUG(llvm::dbgs() << "    Found Potential Decrement:\n        "
-              << **OtherState.second.getInstructions().begin());
+              << OtherState.second.getValue());
         continue;
       }
 
       // Otherwise check if the reference counted value we are tracking
       // could be used by the given instruction.
-      SILInstruction *Other = *OtherState.second.getInstructions().begin();
-      (void)Other;
       if (OtherState.second.handlePotentialUser(&I, AA))
-        DEBUG(llvm::dbgs() << "    Found Potential Use:\n        " << *Other);
+        DEBUG(llvm::dbgs() << "    Found Potential Use:\n        "
+              << OtherState.second.getValue());
     }
+  }
+
+  return NestingDetected;
+}
+
+void
+swift::arc::ARCSequenceDataflowEvaluator::
+mergePredecessors(ARCBBState &BBState, SILBasicBlock *BB) {
+  // For each successor of BB...
+  unsigned i = 0;
+  for (auto Pred : BB->getPreds()) {
+    auto *PredBB = Pred;
+    // If the precessor is the head of a backedge in our traversal, clear any
+    // state we are tracking now and clear the state of the basic block. There
+    // is some sort of control flow here that we do not understand.
+    if (BackedgeMap[PredBB].count(BB)) {
+      BBState.clear();
+      break;
+    }
+
+    // Otherwise, lookup the BBState associated with the predecessor and merge
+    // the predecessor in.
+    auto I = TopDownBBStates.find(PredBB);
+    assert(I != TopDownBBStates.end());
+    if (i++ == 0)
+      BBState.initPredTopDown(I->second);
+    else
+      BBState.mergePredTopDown(I->second);
+  }
+}
+
+bool swift::arc::ARCSequenceDataflowEvaluator::processTopDown() {
+  bool NestingDetected = false;
+
+  // For each BB in our reverse post order...
+  for (auto *BB : reversed(PostOrder)) {
+
+    // Grab the BBState associated with it and set it to be the current BB.
+    ARCBBState &BBState = TopDownBBStates[BB];
+    BBState.init(BB);
+
+    mergePredecessors(BBState, BB);
+
+    // Then perform the basic block optimization.
+    NestingDetected |= processBBTopDown(BBState, DecToIncStateMap, AA);
   }
 
   return NestingDetected;
@@ -245,7 +328,7 @@ processBBBottomUp(ARCBBState &BBState,
         // Copy the current value of ref count state into the result map.
         IncToDecStateMap[&I] = RefCountState;
         DEBUG(llvm::dbgs() << "    MATCHING DECREMENT:"
-              << **RefCountState.getInstructions().begin());
+              << RefCountState.getValue());
 
         // Clear the ref count state in case we see more operations on this
         // ref counted value. This is for safety reasons.
@@ -253,7 +336,7 @@ processBBBottomUp(ARCBBState &BBState,
       } else {
         if (RefCountState.isTrackingRefCountInst()) {
           DEBUG(llvm::dbgs() << "    FAILED MATCH DECREMENT:"
-                << **RefCountState.getInstructions().begin());
+                << RefCountState.getValue());
         } else {
           DEBUG(llvm::dbgs() << "    FAILED MATCH DECREMENT. Not tracking a "
                 "decrement.\n");
@@ -281,18 +364,110 @@ processBBBottomUp(ARCBBState &BBState,
       // cause us to change states. If we do change states continue...
       if (OtherState.second.handlePotentialDecrement(&I, AA)) {
         DEBUG(llvm::dbgs() << "    Found Potential Decrement:\n        "
-              << **OtherState.second.getInstructions().begin());
+              << OtherState.second.getValue());
         continue;
       }
 
       // Otherwise check if the reference counted value we are tracking
       // could be used by the given instruction.
-      SILInstruction *Other = *OtherState.second.getInstructions().begin();
-      (void)Other;
       if (OtherState.second.handlePotentialUser(&I, AA))
-        DEBUG(llvm::dbgs() << "    Found Potential Use:\n        " << *Other);
+        DEBUG(llvm::dbgs() << "    Found Potential Use:\n        "
+              << OtherState.second.getValue());
     }
   }
+
+  return NestingDetected;
+}
+
+void
+swift::arc::ARCSequenceDataflowEvaluator::
+mergeSuccessors(ARCBBState &BBState, SILBasicBlock *BB) {
+  // Grab the backedge set for our BB.
+  auto &BackEdgeSet = BackedgeMap[BB];
+
+  // For each successor of BB...
+  ArrayRef<SILSuccessor> Succs = BB->getSuccs();
+  for (unsigned i = 0, e = Succs.size(); i != e; ++i) {
+    // If it does not have a basic block associated with it...
+    auto *SuccBB = Succs[i].getBB();
+
+    // Skip it.
+    if (!SuccBB)
+      continue;
+
+    // If the BB is the head of a backedge in our traversal, clear any state
+    // we are tracking now and clear the state of the basic block. There is
+    // some sort of control flow here that we do not understand.
+    if (BackEdgeSet.count(SuccBB)) {
+      BBState.clear();
+      break;
+    }
+
+    // Otherwise, lookup the BBState associated with the successor and merge
+    // the successor in.
+    auto I = BottomUpBBStates.find(SuccBB);
+    assert(I != BottomUpBBStates.end());
+    if (i == 0)
+      BBState.initSuccBottomUp(I->second);
+    else
+      BBState.mergeSuccBottomUp(I->second);
+  }
+}
+
+bool swift::arc::ARCSequenceDataflowEvaluator::processBottomUp() {
+  bool NestingDetected = false;
+
+  // For each BB in our post order...
+  for (auto *BB : PostOrder) {
+
+    // Grab the BBState associated with it and set it to be the current BB.
+    ARCBBState &BBState = BottomUpBBStates[BB];
+    BBState.init(BB);
+
+    mergeSuccessors(BBState, BB);
+
+    // Then perform the basic block optimization.
+    NestingDetected |= processBBBottomUp(BBState, IncToDecStateMap, AA);
+  }
+
+  return NestingDetected;
+}
+
+//===----------------------------------------------------------------------===//
+//                 Top Level ARC Sequence Dataflow Evaluator
+//===----------------------------------------------------------------------===//
+
+void swift::arc::ARCSequenceDataflowEvaluator::init() {
+  assert((F.empty() || PostOrder.empty()) &&
+         "This should only be called if we have not initialized our post "
+         "order.");
+
+  // Initialize the post order data structure.
+  unsigned Count = 0;
+  for (auto PI = po_begin(&F), PE = po_end(&F); PI != PE; ++PI) {
+    PostOrder.push_back(*PI);
+    BBToPostOrderID[*PI] = F.size() - Count++ - 1;
+  }
+
+  // Then iterate through it in reverse to perform the post order, looking for
+  // backedges.
+  llvm::DenseSet<SILBasicBlock *> VisitedSet;
+  for (auto *BB : reversed(PostOrder)) {
+    VisitedSet.insert(BB);
+
+    for (auto &Succ : BB->getSuccs())
+      if (SILBasicBlock *SuccBB = Succ.getBB())
+        if (VisitedSet.count(SuccBB))
+          BackedgeMap[BB].insert(SuccBB);
+  }
+}
+
+bool swift::arc::ARCSequenceDataflowEvaluator::run() {
+  assert((F.empty() || PostOrder.size()) &&
+         "F must be empty or PostOrder must be initialized with a post order.");
+
+  bool NestingDetected = processBottomUp();
+  NestingDetected |= processTopDown();
 
   return NestingDetected;
 }

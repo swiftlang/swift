@@ -309,8 +309,12 @@ computeARCMatchingSet(SILFunction &F, AliasAnalysis *AA,
 
   DEBUG(llvm::dbgs() << "**** Performing ARC Dataflow for "
         << F.getName() << " ****\n");
-  bool NestingDetected = performARCSequenceDataflow(F, AA, DecToIncStateMap,
-                                                    IncToDecStateMap);
+
+  ARCSequenceDataflowEvaluator Eval(F, AA, DecToIncStateMap, IncToDecStateMap);
+  Eval.init();
+  bool NestingDetected = Eval.run();
+  Eval.clear();
+
   bool MatchedPair = false;
 
   DEBUG(llvm::dbgs() << "**** Computing ARC Matching Sets for "
