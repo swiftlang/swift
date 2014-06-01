@@ -1757,6 +1757,7 @@ void ClangModuleUnit::getImportedModules(
     if (!actualMod || actualMod == topLevelAdapter)
       actualMod = wrapper->getParentModule();
 
+    assert(actualMod && "Missing imported adapter module");
     imports.push_back({Module::AccessPathTy(), actualMod});
   }
 }
