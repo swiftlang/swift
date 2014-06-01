@@ -213,7 +213,7 @@ processBBTopDown(ARCBBState &BBState,
         // Copy the current value of ref count state into the result map.
         DecToIncStateMap[&I] = RefCountState;
         DEBUG(llvm::dbgs() << "    MATCHING INCREMENT:\n"
-              << *RefCountState.getInstruction());
+              << **RefCountState.getInstructions().begin());
 
         // Clear the ref count state in case we see more operations on this
         // ref counted value. This is for safety reasons.
@@ -221,7 +221,7 @@ processBBTopDown(ARCBBState &BBState,
       } else {
         if (RefCountState.isTrackingRefCountInst()) {
           DEBUG(llvm::dbgs() << "    FAILED MATCH INCREMENT:\n" <<
-                *RefCountState.getInstruction());
+                **RefCountState.getInstructions().begin());
         } else {
           DEBUG(llvm::dbgs() << "    FAILED MATCH. NO INCREMENT.\n");
         }
@@ -248,13 +248,13 @@ processBBTopDown(ARCBBState &BBState,
       // cause us to change states. If we do change states continue...
       if (OtherState.second.handlePotentialDecrement(&I, AA)) {
         DEBUG(llvm::dbgs() << "    Found Potential Decrement:\n        "
-              << *OtherState.second.getInstruction());
+              << **OtherState.second.getInstructions().begin());
         continue;
       }
 
       // Otherwise check if the reference counted value we are tracking
       // could be used by the given instruction.
-      SILInstruction *Other = OtherState.second.getInstruction();
+      SILInstruction *Other = *OtherState.second.getInstructions().begin();
       (void)Other;
       if (OtherState.second.handlePotentialUser(&I, AA))
         DEBUG(llvm::dbgs() << "    Found Potential Use:\n        " << *Other);
@@ -331,7 +331,7 @@ processBBBottomUp(ARCBBState &BBState,
         // Copy the current value of ref count state into the result map.
         IncToDecStateMap[&I] = RefCountState;
         DEBUG(llvm::dbgs() << "    MATCHING DECREMENT:"
-              << *RefCountState.getInstruction());
+              << **RefCountState.getInstructions().begin());
 
         // Clear the ref count state in case we see more operations on this
         // ref counted value. This is for safety reasons.
@@ -339,7 +339,7 @@ processBBBottomUp(ARCBBState &BBState,
       } else {
         if (RefCountState.isTrackingRefCountInst()) {
           DEBUG(llvm::dbgs() << "    FAILED MATCH DECREMENT:"
-                << *RefCountState.getInstruction());
+                << **RefCountState.getInstructions().begin());
         } else {
           DEBUG(llvm::dbgs() << "    FAILED MATCH DECREMENT. Not tracking a "
                 "decrement.\n");
@@ -367,13 +367,13 @@ processBBBottomUp(ARCBBState &BBState,
       // cause us to change states. If we do change states continue...
       if (OtherState.second.handlePotentialDecrement(&I, AA)) {
         DEBUG(llvm::dbgs() << "    Found Potential Decrement:\n        "
-              << *OtherState.second.getInstruction());
+              << **OtherState.second.getInstructions().begin());
         continue;
       }
 
       // Otherwise check if the reference counted value we are tracking
       // could be used by the given instruction.
-      SILInstruction *Other = OtherState.second.getInstruction();
+      SILInstruction *Other = *OtherState.second.getInstructions().begin();
       (void)Other;
       if (OtherState.second.handlePotentialUser(&I, AA))
         DEBUG(llvm::dbgs() << "    Found Potential Use:\n        " << *Other);

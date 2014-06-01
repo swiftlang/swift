@@ -70,6 +70,11 @@ static inline bool matchingRefCountPairType(SILInstruction *I1,
 /// retain_value, strong_release,
 template <typename ImplStruct>
 struct RefCountState {
+  using InstructionSet = llvm::SmallPtrSet<SILInstruction *, 8>;
+
+  /// Return the SILValue that we are tracking.
+  SILValue Value;
+
   /// Was the pointer we are tracking known incremented when we visited the
   /// current increment we are tracking? In that case we know that it is safe
   /// to move the inner retain over instructions that may decrement ref counts
@@ -79,7 +84,7 @@ struct RefCountState {
   /// The latest point we can move Instruction without moving it over an
   /// instruction that might be able to decrement the value with reference
   /// semantics.
-  SILInstruction *InsertPt = nullptr;
+  InstructionSet InsertPts;
 
   /// Return this as the CRTP substruct.
   ImplStruct *asImpl() { return static_cast<ImplStruct *>(this); }
@@ -96,13 +101,16 @@ struct RefCountState {
     // Are we already tracking a ref count modification?
     bool Nested = isTrackingRefCount();
 
+    // Initialize value.
+    Value = I->getOperand(0).stripCasts();
+
     // This retain is known safe if the operand we are tracking was already
     // known incremented previously. This occurs when you have nested
     // increments.
     KnownSafe = isRefCountStateModified();
 
-    // Reset our insertion point to null.
-    InsertPt = nullptr;
+    // Clear our insertion point list.
+    InsertPts.clear();
 
     return Nested;
   }
@@ -110,8 +118,9 @@ struct RefCountState {
   /// Uninitialize the current state.
   void clear() {
     asImpl()->clear();
+    Value = SILValue();
     KnownSafe = false;
-    InsertPt = nullptr;
+    InsertPts.clear();
   }
 
   /// Can we gaurantee that the given reference counted value has been modified?
@@ -138,19 +147,26 @@ struct RefCountState {
   }
 
   /// Return the increment we are tracking.
-  SILInstruction *getInstruction() const {
-   return asImpl()->getInstruction();
+  Range<InstructionSet::iterator> getInstructions() const {
+    return asImpl()->getInstructions();
+  }
+
+  /// Returns true if I is in the instructions we are tracking.
+  bool containsInstruction(SILInstruction *I) const {
+    return asImpl()->containsInstruction(I);
   }
 
   /// Return the value with reference semantics that is the operand of our
   /// increment.
   SILValue getValue() const {
-    return getInstruction()->getOperand(0).stripCasts();
+    return Value;
   }
 
   /// The latest point we can move the increment without bypassing instructions
   /// that may have reference semantics.
-  SILInstruction *getInsertPoint() const { return InsertPt; }
+  Range<InstructionSet::iterator> getInsertPts() const {
+    return {InsertPts.begin(), InsertPts.end()};
+  }
 
   /// This retain is known safe if the operand we are tracking was already
   /// known incremented previously. This occurs when you have nested
@@ -197,7 +213,7 @@ struct RefCountState {
     // anything. If the ValueKind of our increments, decrement do not match, we
     // can not eliminate the pair so return false.
     if (!isTrackingRefCountInst() ||
-        !matchingRefCountPairType(getInstruction(), RefCountInst))
+        !matchingRefCountPairType(*getInstructions().begin(), RefCountInst))
       return false;
     return asImpl()->handleRefCountInstMatch(RefCountInst);
   }
@@ -224,8 +240,8 @@ struct BottomUpRefCountState : public RefCountState<BottomUpRefCountState> {
                         ///  this decrement.
   };
 
-  /// The decrement that we are tracking.
-  NullablePtr<SILInstruction> Decrement;
+  /// The set of decrements that we are tracking.
+  llvm::SmallPtrSet<SILInstruction *, 8> Decrements;
 
   /// Current place in the sequence of the value.
   LatticeState LatState = LatticeState::None;
@@ -238,8 +254,9 @@ struct BottomUpRefCountState : public RefCountState<BottomUpRefCountState> {
 
     bool NestingDetected = Super::initWithInst(I);
 
-    // Set increment to I.
-    Decrement = I;
+    // Clear our decrement list and insert I into it.
+    Decrements.clear();
+    Decrements.insert(I);
 
     // Set our lattice state to be incremented.
     LatState = LatticeState::Decremented;
@@ -249,7 +266,7 @@ struct BottomUpRefCountState : public RefCountState<BottomUpRefCountState> {
 
   /// Uninitialize the current state.
   void clear() {
-    Decrement = nullptr;
+    Decrements.clear();
     LatState = LatticeState::None;
   }
 
@@ -260,13 +277,13 @@ struct BottomUpRefCountState : public RefCountState<BottomUpRefCountState> {
 
   /// Is this ref count initialized and tracking a ref count ptr.
   bool isTrackingRefCount() const {
-    return !Decrement.isNull();
+    return !Decrements.empty();
   }
 
   /// Are we tracking an instruction currently? This returns false when given an
   /// uninitialized ReferenceCountState.
   bool isTrackingRefCountInst() const {
-    return !Decrement.isNull();
+    return !Decrements.empty();
   }
 
   /// Are we tracking a source of ref counts? This currently means that we are
@@ -276,9 +293,14 @@ struct BottomUpRefCountState : public RefCountState<BottomUpRefCountState> {
     return false;
   }
 
+  /// Returns true if I is an instruction that we are tracking.
+  bool containsInstruction(SILInstruction *I) const {
+    return Decrements.count(I);
+  }
+
   /// Return the increment we are tracking.
-  SILInstruction *getInstruction() const {
-    return const_cast<BottomUpRefCountState *>(this)->Decrement.get();
+  Range<decltype(Decrements)::iterator> getInstructions() const {
+    return {Decrements.begin(), Decrements.end()};
   }
 
   /// If advance the state's sequence appropriately for a decrement. If we do
@@ -302,8 +324,9 @@ struct BottomUpRefCountState : public RefCountState<BottomUpRefCountState> {
     switch (LatState) {
       case LatticeState::Decremented:
         LatState = LatticeState::MightBeUsed;
-        assert(!InsertPt && "Insert Point should be empty at this point.");
-        InsertPt = std::next(SILBasicBlock::iterator(PotentialUser));
+        assert(InsertPts.empty() && "If we are decremented, we should have no "
+               "insertion points.");
+        InsertPts.insert(std::next(SILBasicBlock::iterator(PotentialUser)));
         return true;
       case LatticeState::MightBeUsed:
       case LatticeState::MightBeDecremented:
@@ -324,7 +347,7 @@ struct BottomUpRefCountState : public RefCountState<BottomUpRefCountState> {
       case LatticeState::MightBeUsed:
         // Unset InsertPt so we remove retain release pairs instead of
         // performing code motion.
-        InsertPt = nullptr;
+        InsertPts.clear();
         SWIFT_FALLTHROUGH;
       case LatticeState::MightBeDecremented:
         return true;
@@ -351,8 +374,9 @@ struct TopDownRefCountState : public RefCountState<TopDownRefCountState> {
     MightBeUsed,        ///< The pointer has been incremented,
   };
 
-  /// The increment that we are tracking.
-  llvm::PointerUnion<SILInstruction *, SILArgument *> Increment;
+  /// The increment/increment set that we are tracking.
+  NullablePtr<SILArgument> Argument;
+  llvm::SmallPtrSet<SILInstruction *, 8> Increments;
 
   /// Current place in the sequence of the value.
   LatticeState LatState = LatticeState::None;
@@ -365,8 +389,10 @@ struct TopDownRefCountState : public RefCountState<TopDownRefCountState> {
 
     bool NestingDetected = Super::initWithInst(I);
 
-    // Set increment to I.
-    Increment = I;
+    // Clear our tracked set of increments and add I to the list.
+    Argument = nullptr;
+    Increments.clear();
+    Increments.insert(I);
 
     // Set our lattice state to be incremented.
     LatState = LatticeState::Incremented;
@@ -376,14 +402,16 @@ struct TopDownRefCountState : public RefCountState<TopDownRefCountState> {
 
   void initWithArg(SILArgument *Arg) {
     LatState = LatticeState::Incremented;
-    Increment = Arg;
-    InsertPt = nullptr;
+    Increments.clear();
+    InsertPts.clear();
+    Argument = Arg;
     KnownSafe = false;
   }
 
   /// Uninitialize the current state.
   void clear() {
-    Increment = llvm::PointerUnion<SILInstruction *, SILArgument *>();
+    Argument = nullptr;
+    Increments.clear();
     LatState = LatticeState::None;
   }
 
@@ -394,25 +422,32 @@ struct TopDownRefCountState : public RefCountState<TopDownRefCountState> {
 
   /// Is this ref count initialized and tracking a ref count ptr.
   bool isTrackingRefCount() const {
-    return !Increment.isNull();
+    return !Increments.empty() || !Argument.isNull();
   }
 
   /// Are we tracking an instruction currently? This returns false when given an
   /// uninitialized ReferenceCountState.
   bool isTrackingRefCountInst() const {
-    return Increment && Increment.is<SILInstruction *>();
+    return Increments.size();
   }
 
   /// Are we tracking a source of ref counts? This currently means that we are
   /// tracking an argument that is @owned. In the future this will include
   /// return values of functions that are @owned.
   bool isTrackingRefCountSource() const {
-    return Increment && Increment.is<SILArgument *>();
+    return !Argument.isNull();
+  }
+
+  /// Returns true if I is an instruction that we are tracking.
+  bool containsInstruction(SILInstruction *I) const {
+    return Increments.count(I);
   }
 
   /// Return the increment we are tracking.
-  SILInstruction *getInstruction() const {
-    return Increment.get<SILInstruction *>();
+  Range<decltype(Increments)::iterator> getInstructions() const {
+    assert(Argument.isNull() &&
+           "Should never call this when processing an argument.");
+    return {Increments.begin(), Increments.end()};
   }
 
   /// If advance the state's sequence appropriately for a decrement. If we do
@@ -421,7 +456,7 @@ struct TopDownRefCountState : public RefCountState<TopDownRefCountState> {
     switch (LatState) {
       case LatticeState::Incremented:
         LatState = LatticeState::MightBeDecremented;
-        InsertPt = PotentialDecrement;
+        InsertPts.insert(PotentialDecrement);
         return true;
       case LatticeState::None:
       case LatticeState::MightBeDecremented:
@@ -457,7 +492,7 @@ struct TopDownRefCountState : public RefCountState<TopDownRefCountState> {
       case LatticeState::MightBeDecremented:
         // Unset InsertPt so we remove retain release pairs instead of performing
         // code motion.
-        InsertPt = nullptr;
+        InsertPts.clear();
         SWIFT_FALLTHROUGH;
       case LatticeState::MightBeUsed:
         return true;

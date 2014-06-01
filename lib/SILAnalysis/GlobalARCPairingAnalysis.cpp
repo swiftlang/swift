@@ -115,40 +115,42 @@ ARCMatchingSetBuilder::matchIncrementsToDecrements() {
     KnownSafe &= BURefCountState->second.isKnownSafe();
 
     // Now that we know we have an inst, grab the decrement.
-    SILInstruction *Decrement = BURefCountState->second.getInstruction();
-    DEBUG(llvm::dbgs() << "    Decrement: " << *Decrement);
+    for (auto DecIter : BURefCountState->second.getInstructions()) {
+      SILInstruction *Decrement = DecIter;
+      DEBUG(llvm::dbgs() << "    Decrement: " << *Decrement);
 
-    // Now grab the increment matched up with the decrement from the bottom up map.
-    // If we can't find it, bail we can't match this increment up with anything.
-    auto TDRefCountState = TDMap.find(Decrement);
-    if (TDRefCountState == TDMap.end()) {
-      DEBUG(llvm::dbgs() << "        FAILURE! Could not find state for "
-            "decrement.\n");
-      return IncrementDecrementMatchResult::Fail;
+      // Now grab the increment matched up with the decrement from the bottom up map.
+      // If we can't find it, bail we can't match this increment up with anything.
+      auto TDRefCountState = TDMap.find(Decrement);
+      if (TDRefCountState == TDMap.end()) {
+        DEBUG(llvm::dbgs() << "        FAILURE! Could not find state for "
+              "decrement.\n");
+        return IncrementDecrementMatchResult::Fail;
+      }
+      DEBUG(llvm::dbgs() << "        SUCCESS! Found state for decrement.\n");
+
+      // Make sure the increment we are looking at is also matched to our decrement.
+      // Otherwise bail.
+      if (!TDRefCountState->second.isTrackingRefCountInst() ||
+          !TDRefCountState->second.containsInstruction(Increment)) {
+        DEBUG(llvm::dbgs() << "        FAILURE! Not tracking instruction or "
+              "found increment that did not match.\n");
+        return IncrementDecrementMatchResult::Fail;
+      }
+
+      // Add the decrement to the decrement to move set. If we don't insert
+      // anything, just continue.
+      if (!MatchSet.Decrements.insert(Decrement)) {
+        DEBUG(llvm::dbgs() << "    SKIPPING! Already processed this decrement");
+        continue;
+      }
+
+      // Collect the increment insertion point if it has one.
+      for (auto InsertPt : TDRefCountState->second.getInsertPts()) {
+        MatchSet.IncrementInsertPts.insert(InsertPt);
+      }
+      NewDecrements.push_back(Decrement);
     }
-
-    DEBUG(llvm::dbgs() << "        SUCCESS! Found state for decrement.\n");
-
-    // Make sure the increment we are looking at is also matched to our decrement.
-    // Otherwise bail.
-    if (!TDRefCountState->second.isTrackingRefCountInst() ||
-        TDRefCountState->second.getInstruction() != Increment) {
-      DEBUG(llvm::dbgs() << "        FAILURE! Not tracking instruction or "
-            "found increment that did not match.\n");
-      return IncrementDecrementMatchResult::Fail;
-    }
-
-    // Add the decrement to the decrement to move set. If we don't insert
-    // anything, just continue.
-    if (!MatchSet.Decrements.insert(Decrement)) {
-      DEBUG(llvm::dbgs() << "    SKIPPING! Already processed this decrement");
-      continue;
-    }
-
-    // Collect the increment insertion point if it has one.
-    if (SILInstruction *InsertPt = TDRefCountState->second.getInsertPoint())
-      MatchSet.IncrementInsertPts.insert(InsertPt);
-    NewDecrements.push_back(Decrement);
   }
 
   if (!KnownSafe)
@@ -190,40 +192,43 @@ ARCMatchingSetBuilder::matchDecrementsToIncrements() {
     KnownSafe &= TDRefCountState->second.isKnownSafe();
 
     // Now that we know we have an inst, grab the decrement.
-    SILInstruction *Increment = TDRefCountState->second.getInstruction();
-    DEBUG(llvm::dbgs() << "    Increment: " << *Increment);
+    for (auto IncIter : TDRefCountState->second.getInstructions()) {
+      SILInstruction *Increment = IncIter;
+      DEBUG(llvm::dbgs() << "    Increment: " << *Increment);
 
-    // Now grab the increment matched up with the decrement from the bottom up map.
-    // If we can't find it, bail we can't match this increment up with anything.
-    auto BURefCountState = BUMap.find(Increment);
-    if (BURefCountState == BUMap.end()) {
-      DEBUG(llvm::dbgs() << "        FAILURE! Could not find state for "
-            "increment.\n");
-      return IncrementDecrementMatchResult::Fail;
+      // Now grab the increment matched up with the decrement from the bottom up map.
+      // If we can't find it, bail we can't match this increment up with anything.
+      auto BURefCountState = BUMap.find(Increment);
+      if (BURefCountState == BUMap.end()) {
+        DEBUG(llvm::dbgs() << "        FAILURE! Could not find state for "
+              "increment.\n");
+        return IncrementDecrementMatchResult::Fail;
+      }
+
+      DEBUG(llvm::dbgs() << "        SUCCESS! Found state for increment.\n");
+
+      // Make sure the increment we are looking at is also matched to our decrement.
+      // Otherwise bail.
+      if (!BURefCountState->second.isTrackingRefCountInst() ||
+          !BURefCountState->second.containsInstruction(Decrement)) {
+        DEBUG(llvm::dbgs() << "        FAILURE! Not tracking instruction or "
+              "found increment that did not match.\n");
+        return IncrementDecrementMatchResult::Fail;
+      }
+
+      // Add the decrement to the decrement to move set. If we don't insert
+      // anything, just continue.
+      if (!MatchSet.Increments.insert(Increment)) {
+        DEBUG(llvm::dbgs() << "    SKIPPING! Already processed this increment");
+        continue;
+      }
+
+      // Collect the decrement insertion point if we have one.
+      for (auto InsertPtIter : BURefCountState->second.getInsertPts()) {
+        MatchSet.DecrementInsertPts.insert(InsertPtIter);
+      }
+      NewIncrements.push_back(Increment);
     }
-
-    DEBUG(llvm::dbgs() << "        SUCCESS! Found state for increment.\n");
-
-    // Make sure the increment we are looking at is also matched to our decrement.
-    // Otherwise bail.
-    if (!BURefCountState->second.isTrackingRefCountInst() ||
-        BURefCountState->second.getInstruction() != Decrement) {
-      DEBUG(llvm::dbgs() << "        FAILURE! Not tracking instruction or "
-            "found increment that did not match.\n");
-      return IncrementDecrementMatchResult::Fail;
-    }
-
-    // Add the decrement to the decrement to move set. If we don't insert
-    // anything, just continue.
-    if (!MatchSet.Increments.insert(Increment)) {
-      DEBUG(llvm::dbgs() << "    SKIPPING! Already processed this increment");
-      continue;
-    }
-
-    // Collect the decrement insertion point if we have one.
-    if (SILInstruction *InsertPt = BURefCountState->second.getInsertPoint())
-      MatchSet.DecrementInsertPts.insert(InsertPt);
-    NewIncrements.push_back(Increment);
   }
 
   if (!KnownSafe)
@@ -317,7 +322,7 @@ computeARCMatchingSet(SILFunction &F, AliasAnalysis *AA,
     if (!Increment)
       continue; // blotted
 
-    DEBUG(llvm::dbgs() << "Visiting: " << *Increment);
+    DEBUG(llvm::dbgs() << "Constructing Matching Set For: " << *Increment);
     ARCMatchingSetBuilder Builder(DecToIncStateMap, IncToDecStateMap);
     Builder.init(Increment);
     if (Builder.matchUpIncDecSetsForPtr()) {
