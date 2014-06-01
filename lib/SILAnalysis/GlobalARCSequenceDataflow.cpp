@@ -42,92 +42,6 @@ static bool isAutoreleasePoolCall(SILInstruction &I) {
 }
 
 //===----------------------------------------------------------------------===//
-//                             Basic Block State
-//===----------------------------------------------------------------------===//
-
-namespace {
-  /// \brief Per-BasicBlock state.
-  class ARCBBState {
-  public:
-    using TopDownMapTy = BlotMapVector<SILValue, TopDownRefCountState>;
-    using BottomUpMapTy = BlotMapVector<SILValue, BottomUpRefCountState>;
-  private:
-    /// The basic block that this bbstate corresponds to.
-    SILBasicBlock &BB;
-
-    /// The top-down traversal uses this to record information known about a
-    /// pointer at the bottom of each block.
-    TopDownMapTy PtrToTopDownState;
-
-    /// The bottom-up traversal uses this to record information known about a
-    /// pointer at the top of each block.
-    BottomUpMapTy PtrToBottomUpState;
-
-  public:
-    ARCBBState(SILBasicBlock &BB) : BB(BB) {}
-
-    /// Top Down Iterators
-    using topdown_iterator = TopDownMapTy::iterator;
-    using topdown_const_iterator = TopDownMapTy::const_iterator;
-    topdown_iterator topdown_begin() { return PtrToTopDownState.begin(); }
-    topdown_iterator topdown_end() { return PtrToTopDownState.end(); }
-    topdown_const_iterator topdown_begin() const {
-      return PtrToTopDownState.begin();
-    }
-    topdown_const_iterator topdown_end() const {
-      return PtrToTopDownState.end();
-    }
-    Range<topdown_iterator> getTopDownStates() {
-      return make_range(topdown_begin(), topdown_end());
-    }
-
-    /// Bottom up iteration.
-    using bottomup_iterator = BottomUpMapTy::iterator;
-    using bottomup_const_iterator = BottomUpMapTy::const_iterator;
-    bottomup_iterator bottomup_begin() { return PtrToBottomUpState.begin(); }
-    bottomup_iterator bottomup_end() { return PtrToBottomUpState.end(); }
-    bottomup_const_iterator bottomup_begin() const {
-      return PtrToBottomUpState.begin();
-    }
-    bottomup_const_iterator bottomup_end() const {
-      return PtrToBottomUpState.end();
-    }
-    Range<bottomup_iterator> getBottomupStates() {
-      return make_range(bottomup_begin(), bottomup_end());
-    }
-
-    /// Attempt to find the PtrState object describing the top down state for
-    /// pointer Arg. Return a new initialized PtrState describing the top down
-    /// state for Arg if we do not find one.
-    TopDownRefCountState &getTopDownRefCountState(SILValue Ptr) {
-      return PtrToTopDownState[Ptr];
-    }
-
-    /// Attempt to find the PtrState object describing the bottom up state for
-    /// pointer Arg. Return a new initialized PtrState describing the bottom up
-    /// state for Arg if we do not find one.
-    BottomUpRefCountState & getBottomUpRefCountState(SILValue Ptr) {
-      return PtrToBottomUpState[Ptr];
-    }
-
-    void clearTopDownState() {
-      PtrToTopDownState.clear();
-    }
-
-    void clearBottomUpState() {
-      PtrToBottomUpState.clear();
-    }
-
-    void clear() {
-      clearTopDownState();
-      clearBottomUpState();
-    }
-
-    SILBasicBlock &getBB() const { return BB; }
-  };
-} // end anonymous namespace
-
-//===----------------------------------------------------------------------===//
 //                             Top Down Dataflow
 //===----------------------------------------------------------------------===//
 
@@ -398,7 +312,7 @@ bool swift::arc::performARCSequenceDataflow(
   for (auto &BB : F) {
     DEBUG(llvm::dbgs() << "\n<<< Processing New BB! >>>\n");
 
-    ARCBBState state(BB);
+    ARCBBState state(&BB);
 
     // Perform the bottom up and then top down dataflow.
     NestingDetected |= processBBBottomUp(state, IncToDecStateMap, AA);
