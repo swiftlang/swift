@@ -2020,22 +2020,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
       return SolutionKind::Solved;
   }
   
-  // If possible, redirect the coercion to a bridged type.
-  // Don't implicitly unwrap, though - that can lead to bogus casts.
-  if (!(flags & TMF_UnwrappingOptional)) {
-    if (auto bridgedType = TC.getDynamicBridgedThroughObjCClass(
-                             DC, protocol->getDeclaredType(), type)) {
-      simplifyRestrictedConstraint(ConversionRestrictionKind::User,
-                                   type,
-                                   bridgedType,
-                                   TypeMatchKind::Conversion,
-                                   TMF_GenerateConstraints,
-                                   locator);
-      
-      return SolutionKind::Solved;
-    }
-  }
-  
   // There's nothing more we can do; fail.
   recordFailure(getConstraintLocator(locator),
                 Failure::DoesNotConformToProtocol, type,
@@ -2162,6 +2146,19 @@ ConstraintSystem::simplifyCheckedCastConstraint(
     auto fromBaseType = getBaseTypeForArrayType(fromType.getPointer());
     auto toBaseType = getBaseTypeForArrayType(toType.getPointer());
     
+    // FIXME: Deal with from/to base types that haven't been solved
+    // down to type variables yet.
+
+    // Check whether we need to bridge through an Objective-C class.
+    if (auto classType = TC.getDynamicBridgedThroughObjCClass(DC, fromBaseType,
+                                                              toBaseType)) {
+      // The class we're bridging through must be a subtype of the type we're
+      // coming from.
+      addConstraint(ConstraintKind::Subtype, classType, fromBaseType,
+                    getConstraintLocator(locator));
+      return SolutionKind::Solved;
+    }
+
     addConstraint(ConstraintKind::Subtype, toBaseType, fromBaseType,
                   getConstraintLocator(locator));
     return SolutionKind::Solved;
@@ -2177,12 +2174,7 @@ ConstraintSystem::simplifyCheckedCastConstraint(
     // FIXME: Check substitutability.
     return SolutionKind::Solved;
 
-  case CheckedCastKind::Downcast: {
-    addConstraint(ConstraintKind::Subtype, toType, fromType,
-                  getConstraintLocator(locator));
-  }
-  return SolutionKind::Solved;
-
+  case CheckedCastKind::Downcast:
   case CheckedCastKind::ExistentialToConcrete: {
     // Peel off optionals metatypes from the types, because we might cast through
     // them.

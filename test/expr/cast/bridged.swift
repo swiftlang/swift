@@ -2,12 +2,9 @@
 
 // Test casting through a class type to a bridged value type.
 
-class BridgedClass { 
-  // FIXME: We shouldn't depend on these implicit conversions.
- 
-  @conversion func __conversion() -> BridgedStruct {
-    return BridgedStruct()
-  }
+class NSObject { }
+
+class BridgedClass : NSObject { 
 }
 
 struct BridgedStruct : _BridgedToObjectiveC {
@@ -44,4 +41,19 @@ func testBridgeIsa(obj: AnyObject, objOpt: AnyObject?,
   if obj is BridgedStruct { }
   if objOpt is BridgedStruct { }
   if objImplicitOpt is BridgedStruct { }
+}
+
+func testBridgeDowncastSuperclass(obj: NSObject, objOpt: NSObject?,
+                                  objImplicitOpt: NSObject!) 
+       -> BridgedStruct? {
+  var s1Opt = obj as? BridgedStruct
+  var s2Opt = objOpt as? BridgedStruct
+  var s3Opt = objImplicitOpt as? BridgedStruct
+}
+
+func testBridgeDowncastExact(obj: BridgedClass, objOpt: BridgedClass?,
+                             objImplicitOpt: BridgedClass!) -> BridgedStruct? {
+  var s1Opt = obj as? BridgedStruct
+  var s2Opt = objOpt as? BridgedStruct
+  var s3Opt = objImplicitOpt as? BridgedStruct
 }

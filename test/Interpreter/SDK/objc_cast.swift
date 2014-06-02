@@ -213,7 +213,6 @@ if objImplicitOpt is String {
   println("Not a string?")
 }
 
-
 // CHECK-NEXT: Isa correctly failed due to nil
 objOpt = nil
 if objOpt is String {
@@ -238,10 +237,56 @@ if let strArr = obj as? String[] {
   println("Object-to-bridged-array cast failed")
 }
 
+// Check downcast from the bridged type itself.
+// CHECK-NEXT: NSArray-to-bridged-array cast produced [Hello, Swift, World]
+var nsarr: NSArray = ["Hello", "Swift", "World"] as String[]
+if let strArr = nsarr as? String[] {
+  println("NSArray-to-bridged-array cast produced \(strArr)")
+} else {
+  println("NSArray-to-bridged-array cast failed")
+}
+
+// CHECK-NEXT: NSArray?-to-bridged-array cast produced [Hello, Swift, World]
+var nsarrOpt: NSArray? = ["Hello", "Swift", "World"] as String[]
+if let strArr = nsarrOpt as? String[] {
+  println("NSArray?-to-bridged-array cast produced \(strArr)")
+} else {
+  println("NSArray?-to-bridged-array cast failed")
+}
+
+// CHECK-NEXT: NSArray!-to-bridged-array cast produced [Hello, Swift, World]
+var nsarrImplicitOpt: NSArray! = ["Hello", "Swift", "World"] as String[]
+if let strArr = nsarrImplicitOpt as? String[] {
+  println("NSArray!-to-bridged-array cast produced \(strArr)")
+} else {
+  println("NSArray!-to-bridged-array cast failed")
+}
+
+// Check downcast from a superclass of the bridged type.
+// CHECK-NEXT: NSObject-to-bridged-array cast produced [Hello, Swift, World]
+var nsobj: NSObject = nsarr
+if let strArr = nsobj as? String[] {
+  println("NSObject-to-bridged-array cast produced \(strArr)")
+} else {
+  println("NSObject-to-bridged-array cast failed")
+}
+
 // Forced downcast based on context.
 // CHECK-NEXT: Forced to string array [Hello, Swift, World]
-let forcedStrArray: String[] = obj as String[]
+var forcedStrArray: String[] = obj as String[]
 println("Forced to string array \(forcedStrArray)")
+
+// CHECK-NEXT: Forced NSArray to string array [Hello, Swift, World]
+forcedStrArray = nsarr as String[]
+println("Forced NSArray to string array \(forcedStrArray)")
+
+// CHECK-NEXT: Forced NSArray? to string array [Hello, Swift, World]
+forcedStrArray = nsarrOpt as String[]
+println("Forced NSArray? to string array \(forcedStrArray)")
+
+// CHECK-NEXT: Forced NSArray! to string array [Hello, Swift, World]
+forcedStrArray = nsarrImplicitOpt as String[]
+println("Forced NSArray! to string array \(forcedStrArray)")
 
 // CHECK-NEXT: Object-to-array cast produced [Hello, Swift, World]
 if let strArr = obj as? NSString[] {

@@ -713,9 +713,8 @@ public:
   /// Find the Objective-C class that bridges between a value of the given
   /// dynamic type and the given value type.
   ///
-  /// \param dynamicType A dynamic type from which we are bridging. At
-  /// present, only \c AnyObject can be used here for a successful
-  /// bridge.
+  /// \param dynamicType A dynamic type from which we are bridging. Class and
+  /// Objective-C protocol types can be used for bridging.
   ///
   /// \returns the Objective-C class type that represents the value
   /// type as an Objective-C class, e.g., \c NSString represents \c

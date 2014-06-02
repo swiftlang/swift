@@ -2711,6 +2711,15 @@ namespace {
       if (!result)
         return nullptr;
 
+      // If the cast's subexpression has the type same as we're trying
+      // to cast to, drop the cast itself and perform a bridge.
+      // FIXME: The AST no longer reflects the source.
+      if (cast->getSubExpr()->getType()->isEqual(intermediateResultType)) {
+        result = cast->getSubExpr();
+        result = new (tc.Context) InjectIntoOptionalExpr(result,
+                                                         cast->getType());
+      }
+
       // Bind the optional produced by the checked cast.
       result = new (tc.Context) BindOptionalExpr(result, SourceLoc(),
                                                  /*depth=*/0, 
@@ -2819,18 +2828,6 @@ namespace {
       return expr;
     }
 
-    /// Whether this type is AnyObject or an implicit lvalue thereof.
-    bool isDynamicLookupType(Type type) {
-      // Check whether we have a protocol type.
-      auto protoTy = type->getAs<ProtocolType>();
-      if (!protoTy)
-        return false;
-
-      // Check whether this is AnyObject.
-      return protoTy->getDecl()->isSpecificProtocol(
-                                   KnownProtocolKind::AnyObject);
-    }
-
     Expr *visitForceValueExpr(ForceValueExpr *expr) {
       Type valueType = simplifyType(expr->getType());
       auto &tc = cs.getTypeChecker();
@@ -2877,9 +2874,9 @@ namespace {
 
         // At this point, we should have an AnyObject.
         auto fromType = subExpr->getType();
-        assert(isDynamicLookupType(fromType));
+        assert(fromType->isAnyObject());
 
-        // Allow for casts from AnyObject through a class type.
+        // Allow for casts to a value type through a class type.
         auto bridgedClass = tc.getDynamicBridgedThroughObjCClass(cs.DC,
                                                                 fromType,
                                                                 valueType);

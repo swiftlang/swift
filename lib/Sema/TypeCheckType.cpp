@@ -84,14 +84,17 @@ Type
 TypeChecker::getDynamicBridgedThroughObjCClass(DeclContext *dc,
                                                Type dynamicType,
                                                Type valueType,
-                                               bool *isConditionallyBridged) {  
-  if (dynamicType->isAnyObject()) {
-    // We only interested in types that bridge non-verbatim.
-    auto bridged = getBridgedToObjC(dc, valueType, isConditionallyBridged);
-    if (bridged.first && !bridged.second)
-      return bridged.first;
-  }
-  
+                                               bool *isConditionallyBridged) {
+  // We can only bridge from class or Objective-C existential types.
+  if (!dynamicType->isObjCExistentialType() &&
+      !dynamicType->getClassOrBoundGenericClass())
+    return Type();
+
+  // We only interested in types that bridge non-verbatim.
+  auto bridged = getBridgedToObjC(dc, valueType, isConditionallyBridged);
+  if (bridged.first && !bridged.second)
+    return bridged.first;
+
   return Type();
 }
 

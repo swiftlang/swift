@@ -1823,16 +1823,24 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   if (fromExistential) {
     if (toArchetype) {
       return CheckedCastKind::ExistentialToArchetype;
-    } else if (isConvertibleTo(toType, fromType, dc)) {
+    } 
+
+    if (isSubtypeOf(toType, fromType, dc)) {
       return CheckedCastKind::ExistentialToConcrete;
-    } else {
-      diagnose(diagLoc,
-               diag::downcast_from_existential_to_unrelated,
-               origFromType, origToType)
-        .highlight(diagFromRange)
-        .highlight(diagToRange);
-      return CheckedCastKind::Unresolved;
+    } 
+
+    if (Type objCClass 
+               = getDynamicBridgedThroughObjCClass(dc, fromType, toType)) {
+      if (isSubtypeOf(objCClass, fromType, dc))
+        return CheckedCastKind::ExistentialToConcrete;
     }
+    
+    diagnose(diagLoc,
+             diag::downcast_from_existential_to_unrelated,
+             origFromType, origToType)
+      .highlight(diagFromRange)
+      .highlight(diagToRange);
+    return CheckedCastKind::Unresolved;
   }
   
   //   - convert an archetype to a concrete type fulfilling its constraints.
@@ -1885,15 +1893,22 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     return CheckedCastKind::ArrayDowncast;
   }
 
-  // The destination type must be a subtype of the source type.
-  if (!isSubtypeOf(toType, fromType, dc)) {
-    diagnose(diagLoc, diag::downcast_to_unrelated, origFromType, origToType)
-      .highlight(diagFromRange)
-      .highlight(diagToRange);
-    return CheckedCastKind::Unresolved;
+  // If the destination type is a subtype of the source type, we have
+  // a downcast.
+  if (isSubtypeOf(toType, fromType, dc)) {
+    return CheckedCastKind::Downcast;
   }
 
-  return CheckedCastKind::Downcast;
+  // If we can bridge through an Objective-C class, do so.
+  if (Type objCClass = getDynamicBridgedThroughObjCClass(dc, fromType, toType)){
+    if (isSubtypeOf(objCClass, fromType, dc))
+      return CheckedCastKind::Downcast;
+  }
+
+  diagnose(diagLoc, diag::downcast_to_unrelated, origFromType, origToType)
+    .highlight(diagFromRange)
+    .highlight(diagToRange);
+  return CheckedCastKind::Unresolved;
 }
 
 /// If the expression is a an implicit call to bridgeFromObjectiveC,
