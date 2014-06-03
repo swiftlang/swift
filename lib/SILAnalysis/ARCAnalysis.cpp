@@ -173,7 +173,28 @@ static bool canInstUseRefCountValues(SILInstruction *Inst) {
   case ValueKind::RefToRawPointerInst:
   case ValueKind::RawPointerToRefInst:
   case ValueKind::UnconditionalCheckedCastInst:
+    return true;
+
+  // Typed GEPs do not use pointers. The user of the typed GEP may but we will
+  // catch that via the dataflow.
+  case ValueKind::StructExtractInst:
+  case ValueKind::TupleExtractInst:
+  case ValueKind::RefElementAddrInst:
+  case ValueKind::UncheckedEnumDataInst:
+  case ValueKind::IndexAddrInst:
+  case ValueKind::IndexRawPointerInst:
       return true;
+
+  // Aggregate formation by themselves do not create new uses since it is their
+  // users that would create the appropriate uses.
+  case ValueKind::EnumInst:
+  case ValueKind::StructInst:
+  case ValueKind::TupleInst:
+    return true;
+
+  // Only uses non reference counted values.
+  case ValueKind::CondFailInst:
+    return true;
 
   default:
     return false;
