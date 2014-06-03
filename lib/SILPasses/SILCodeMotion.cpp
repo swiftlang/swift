@@ -88,7 +88,7 @@ SILInstruction *findIdenticalInBlock(SILBasicBlock *BB, SILInstruction *Iden) {
   return nullptr;
 }
 
-// Try to sink values from the Nth argument \p ArgNum. 
+// Try to sink values from the Nth argument \p ArgNum.
 static bool sinkArgument(SILBasicBlock *BB, unsigned ArgNum) {
   assert(ArgNum < BB->getNumBBArg() && "Invalid argument");
 
@@ -255,6 +255,95 @@ static bool sinkCodeFromPredecessors(SILBasicBlock *BB) {
   return Changed;
 }
 
+static void createRefCountOpForPayload(SILBuilder &Builder, SILInstruction *I,
+                                       EnumElementDecl *EnumDecl) {
+  // If we do not have any argument, there is nothing to do... bail...
+  if (!EnumDecl->hasArgumentType())
+    return;
+
+  // Otherwise, create a UEDI for our payload.
+  SILModule &Mod = I->getModule();
+  SILType ArgType =
+      I->getOperand(0).getType().getEnumElementType(EnumDecl, Mod);
+  auto *UEDI = Builder.createUncheckedEnumData(I->getLoc(), I->getOperand(0),
+                                               EnumDecl, ArgType);
+  if (isa<RetainValueInst>(I)) {
+    Builder.createRetainValue(I->getLoc(), UEDI);
+    return;
+  }
+
+  Builder.createReleaseValue(I->getLoc(), UEDI);
+}
+
+static bool tryToSinkRefCountInst(SwitchEnumInst *S, SILInstruction *I) {
+  // If this instruction is not a retain_value or release_value, there is
+  // nothing left for us to do... bail...
+  if (!isa<RetainValueInst>(I) && !isa<ReleaseValueInst>(I))
+    return false;
+
+  // If the retain value's argument is not the switch's argument, we can't do
+  // anything with our simplistic analysis... bail...
+  if (I->getOperand(0) != S->getOperand())
+    return false;
+
+  SILBuilder Builder(S);
+
+  // Ok, we have a ref count instruction, sink it!
+  for (unsigned i = 0, e = S->getNumCases(); i != e; ++i) {
+    auto Case = S->getCase(i);
+    EnumElementDecl *Enum = Case.first;
+    SILBasicBlock *Succ = Case.second;
+    Builder.setInsertionPoint(&*Succ->begin());
+    createRefCountOpForPayload(Builder, I, Enum);
+  }
+
+  I->eraseFromParent();
+  NumSunk++;
+  return true;
+}
+
+/// Sink retain_value, release_value before switch_enum to be retain_value,
+/// release_value on the payload of the switch_enum in the destination BBs. We
+/// only do this if the destination BBs have only the switch enum as its
+/// predecessor.
+static bool sinkSwitchEnumRefCountArgsToSuccessors(SILBasicBlock *BB) {
+  // First attempt to cast our terminator to a switch enum...
+  SwitchEnumInst *S = dyn_cast<SwitchEnumInst>(BB->getTerminator());
+
+  // If we don't have a switch enum, bail...
+  if (!S)
+    return false;
+
+  // Then make sure that each one of our successors only has one predecessor,
+  // us. If that condition is not true, bail...
+  for (auto &Succ : BB->getSuccs()) {
+    SILBasicBlock *SuccBB = Succ.getBB();
+    if (!SuccBB || !SuccBB->getSinglePredecessor())
+      return false;
+  }
+
+  // Ok, we can perform this transformation... We bail immediately if we do not
+  // have
+  bool Changed = false;
+  SILBuilder Builder(BB);
+
+  SILBasicBlock::iterator SI = S, SE = BB->begin();
+  if (SI == SE)
+    return false;
+
+  SI = std::prev(SI);
+
+  while (SI != SE) {
+    SILInstruction *Inst = &*SI;
+    SI = std::prev(SI);
+    if (!tryToSinkRefCountInst(S, Inst))
+      return Changed;
+    Changed = true;
+  }
+
+  return Changed | tryToSinkRefCountInst(S, &*SI);
+}
+
 namespace {
 class SILCodeMotion : public SILFunctionTransform {
 
@@ -270,6 +359,11 @@ class SILCodeMotion : public SILFunctionTransform {
     for (auto &BB : F) {
       Changed |= sinkCodeFromPredecessors(&BB);
       Changed |= sinkArgumentsFromPredecessors(&BB);
+
+      // Push retain_value, release_value on enums before switch_enum into
+      // retain_value, release_value on the payload of the enum in the
+      // successors of the switch_enum.
+      Changed |= sinkSwitchEnumRefCountArgsToSuccessors(&BB);
     }
 
     if (Changed)
