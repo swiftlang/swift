@@ -372,6 +372,13 @@ namespace {
       return X->getElement() == RHS->getElement();
     }
 
+    bool visitUncheckedEnumDataInst(UncheckedEnumDataInst *RHS) {
+      // We already checked operands and types. Only thing we need to check is
+      // that the element is the same.
+      auto *X = cast<UncheckedEnumDataInst>(LHS);
+      return X->getElement() == RHS->getElement();
+    }
+
   private:
     const SILInstruction *LHS;
   };

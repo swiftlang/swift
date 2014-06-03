@@ -594,3 +594,25 @@ bb0:
   %6 = tuple()
   return %6 : $()
 }
+
+sil @int32_user : $@thin (Builtin.Int32) -> ()
+
+// CHECK-LABEL: sil @unchecked_enum_data_cse : $@thin (FakeOptional) -> () {
+// CHECK: bb0([[INPUT_ENUM:%[0-9]+]] : $FakeOptional):
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: [[FUNC:%[0-9]+]] = function_ref @int32_user : $@thin (Builtin.Int32) -> ()
+// CHECK-NEXT: [[INT:%[0-9]+]] = unchecked_enum_data [[INPUT_ENUM]] : $FakeOptional, #FakeOptional.Some!enumelt.1
+// CHECK-NEXT: apply [[FUNC]]([[INT]]) : $@thin (Builtin.Int32) -> ()
+// CHECK-NEXT: apply [[FUNC]]([[INT]]) : $@thin (Builtin.Int32) -> ()
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @unchecked_enum_data_cse : $@thin (FakeOptional) -> () {
+bb0(%0 : $FakeOptional):
+  %1 = function_ref @int32_user : $@thin (Builtin.Int32) -> ()
+  %2 = unchecked_enum_data %0 : $FakeOptional, #FakeOptional.Some!enumelt.1
+  %3 = unchecked_enum_data %0 : $FakeOptional, #FakeOptional.Some!enumelt.1
+  apply %1(%2) : $@thin (Builtin.Int32) -> ()
+  apply %1(%3) : $@thin (Builtin.Int32) -> ()
+  %6 = tuple()
+  return %6 : $()
+}

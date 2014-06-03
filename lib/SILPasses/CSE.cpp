@@ -80,6 +80,7 @@ struct SimpleValue {
       case ValueKind::PointerToAddressInst:
       case ValueKind::CondFailInst:
       case ValueKind::EnumInst:
+      case ValueKind::UncheckedEnumDataInst:
         return true;
       default:
         return false;
@@ -217,6 +218,12 @@ public:
       return base;
 
     return llvm::hash_combine(base, X->getOperand());
+  }
+
+  hash_code visitUncheckedEnumDataInst(UncheckedEnumDataInst *X) {
+    // We hash the enum by hashing its kind, element, and operand.
+    return llvm::hash_combine(unsigned(ValueKind::UncheckedEnumDataInst),
+                              X->getElement(), X->getOperand());
   }
 };
 } // end anonymous namespace
