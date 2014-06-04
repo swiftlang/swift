@@ -62,27 +62,27 @@ struct SimpleValue {
       return (BFRI && isSideEffectFree(BFRI));
     }
     switch (Inst->getKind()) {
-      case ValueKind::FunctionRefInst:
-      case ValueKind::BuiltinFunctionRefInst:
-      case ValueKind::GlobalAddrInst:
-      case ValueKind::IntegerLiteralInst:
-      case ValueKind::FloatLiteralInst:
-      case ValueKind::StringLiteralInst:
-      case ValueKind::StructInst:
-      case ValueKind::StructExtractInst:
-      case ValueKind::StructElementAddrInst:
-      case ValueKind::TupleInst:
-      case ValueKind::TupleExtractInst:
-      case ValueKind::TupleElementAddrInst:
-      case ValueKind::MetatypeInst:
-      case ValueKind::RefElementAddrInst:
-      case ValueKind::IndexRawPointerInst:
-      case ValueKind::PointerToAddressInst:
-      case ValueKind::CondFailInst:
-      case ValueKind::EnumInst:
-      case ValueKind::UncheckedEnumDataInst:
+    case ValueKind::FunctionRefInst:
+    case ValueKind::BuiltinFunctionRefInst:
+    case ValueKind::GlobalAddrInst:
+    case ValueKind::IntegerLiteralInst:
+    case ValueKind::FloatLiteralInst:
+    case ValueKind::StringLiteralInst:
+    case ValueKind::StructInst:
+    case ValueKind::StructExtractInst:
+    case ValueKind::StructElementAddrInst:
+    case ValueKind::TupleInst:
+    case ValueKind::TupleExtractInst:
+    case ValueKind::TupleElementAddrInst:
+    case ValueKind::MetatypeInst:
+    case ValueKind::RefElementAddrInst:
+    case ValueKind::IndexRawPointerInst:
+    case ValueKind::PointerToAddressInst:
+    case ValueKind::CondFailInst:
+    case ValueKind::EnumInst:
+    case ValueKind::UncheckedEnumDataInst:
         return true;
-      default:
+    default:
         return false;
     }
   }
