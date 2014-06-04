@@ -21,6 +21,7 @@
 #include "swift/SIL/SILUndef.h"
 #include "swift/Serialization/BCReadingExtras.h"
 
+#include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/OnDiskHashTable.h"
@@ -29,6 +30,8 @@ using namespace swift;
 using namespace swift::serialization;
 using namespace swift::serialization::sil_block;
 using namespace llvm::support;
+
+STATISTIC(NumDeserializedFunc, "Number of deserialized SIL functions");
 
 static Optional<StringLiteralInst::Encoding>
 fromStableStringEncoding(unsigned value) {
@@ -466,6 +469,7 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
     return fn;
   }
 
+  NumDeserializedFunc++;
   scratch.clear();
 
   assert(!fn->getContextGenericParams()
@@ -1838,4 +1842,14 @@ SILDeserializer::~SILDeserializer() {
     if (fnEntry.isDeserialized())
       fnEntry.get()->decrementRefCount();
   }
+}
+
+// Invalidate all cached SILFunctions if the argument is null. Otherwise, only
+// invalidate the specified SILFunction.
+void SILDeserializer::invalidateEntry(SILFunction *fn) {
+  for (auto &fnEntry : Funcs)
+    if (fnEntry.isDeserialized() && (!fn || fnEntry.get() == fn)) {
+      fnEntry.get()->decrementRefCount();
+      fnEntry.reset();
+    }
 }

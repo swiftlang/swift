@@ -26,11 +26,27 @@ using namespace swift;
 
 STATISTIC(NumDeadFunc, "Number of dead functions eliminated");
 
+namespace {
+struct FinalEliminator {
+  llvm::SmallSetVector<SILFunction*, 16> Worklist;
+
+  // Update module information before actually removing a SILFunction.
+  void updateBeforeRemoveFunction(SILFunction *F) {
+    // Collect all FRIs and insert the callees to the work list.
+    for (auto &BB : *F)
+      for (auto &I : BB)
+        if (auto FRI = dyn_cast<FunctionRefInst>(&I))
+          Worklist.insert(FRI->getReferencedFunction());
+  }
+};
+
+} // end anonymous namespace
+
 //===----------------------------------------------------------------------===//
 //                             Utility Functions
 //===----------------------------------------------------------------------===//
 
-bool tryToRemoveFunction(SILFunction *F) {
+bool tryToRemoveFunction(SILFunction *F, FinalEliminator *FE = nullptr) {
   // Remove internal functions that are not referenced by anything.
   // TODO: top_level_code is currently marked as internal so we explicitly check
   // for functions with this name and keep them around.
@@ -40,6 +56,10 @@ bool tryToRemoveFunction(SILFunction *F) {
 
   DEBUG(llvm::dbgs() << "DEAD FUNCTION ELIMINATION: Erasing:" << F->getName()
                      << "\n");
+  if (FE) {
+    FE->updateBeforeRemoveFunction(F);
+  }
+
   F->getModule().eraseFunction(F);
   NumDeadFunc++;
   return true;
@@ -91,4 +111,31 @@ class SILDeadFuncElimination : public SILModuleTransform {
 
 SILTransform *swift::createDeadFunctionElimination() {
   return new SILDeadFuncElimination();
+}
+
+bool swift::performSILElimination(SILModule *M) {
+  bool Changed = false;
+  llvm::SmallSet<SILFunction *, 16> removedFuncs;
+
+  FinalEliminator FE;
+
+  for (auto FI = M->begin(), EI = M->end(); FI != EI;) {
+    SILFunction *F = FI++;
+    if (tryToRemoveFunction(F, &FE)) {
+      Changed = true;
+      removedFuncs.insert(F);
+    }
+  }
+
+  while (!FE.Worklist.empty()) {
+    llvm::SmallSetVector<SILFunction *, 16> CurrWorklist = FE.Worklist;
+    FE.Worklist.clear();
+    for (auto entry : CurrWorklist)
+      if (!removedFuncs.count(entry))
+        if (tryToRemoveFunction(entry, &FE)) {
+          Changed = true;
+          removedFuncs.insert(entry);
+        }
+  }
+  return Changed;
 }

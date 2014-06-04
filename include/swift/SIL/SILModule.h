@@ -180,6 +180,9 @@ public:
     return Types.getTypeLowering(t);
   }
 
+  /// Invalidate cached entries in SIL Loader.
+  void invalidateSILLoader();
+
   /// Erase a function from the module.
   void eraseFunction(SILFunction *F) {
     getFunctionList().erase(F);

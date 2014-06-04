@@ -163,22 +163,24 @@ public:
     /// The deserialized value.
     T Value;
 
-    /// The offset.  Set to 0 when fully deserialized.
+    /// The offset.
     serialization::BitOffset Offset;
+
+    unsigned IsFullyDeserialized : 1;
 
   public:
     /*implicit*/ PartiallySerialized(serialization::BitOffset offset)
-      : Value(), Offset(offset) {}
+      : Value(), Offset(offset), IsFullyDeserialized(0) {}
 
     /*implicit*/ PartiallySerialized(RawBitOffset offset)
-      : Value(), Offset(offset) {}
+      : Value(), Offset(offset), IsFullyDeserialized(0) {}
 
     bool isDeserialized() const {
       return Value != T();
     }
 
     bool isFullyDeserialized() const {
-      return isDeserialized() && Offset == 0;
+      return isDeserialized() && IsFullyDeserialized;
     }
 
     serialization::BitOffset getOffset() const {
@@ -191,10 +193,15 @@ public:
       return Value;
     }
 
+    void reset() {
+      IsFullyDeserialized = 0;
+      Value = T();
+    }
+
     void set(T value, bool isFullyDeserialized) {
       assert(!isDeserialized() || Value == value);
       Value = value;
-      if (isFullyDeserialized) Offset = 0;
+      IsFullyDeserialized = isFullyDeserialized;
     }
   };
 

@@ -656,6 +656,10 @@ void SILModule::linkAllVTables() {
   getSILLoader()->getAllVTables();
 }
 
+void SILModule::invalidateSILLoader() {
+  getSILLoader()->invalidateEntry(nullptr);
+}
+
 SILVTable *SILModule::lookUpVTable(const ClassDecl *C) {
   if (!C)
     return nullptr;

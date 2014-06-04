@@ -109,6 +109,17 @@ void swift::runSILOptimizationPasses(SILModule &Module,
     PM.add(createDCE());
     PM.run();
 
+    // We have a tradeoff here on how often we should clean up the deserialized
+    // SILFunctions. We can remove them at dead function elimination of each
+    // optimization iteration, the down side is that we will pay the cost of
+    // deserializing them again if they are needed later on; the plus side is
+    // that passes have fewer function to process.
+    // We first release the reference from the deserializer.
+    Module.invalidateSILLoader();
+
+    // Remove unused SIL Functions, VTables and WitnessTables.
+    performSILElimination(&Module);
+
     DEBUG(Module.verify());
 }
 

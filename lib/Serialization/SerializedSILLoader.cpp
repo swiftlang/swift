@@ -70,6 +70,11 @@ SILWitnessTable *SerializedSILLoader::lookupWitnessTable(SILWitnessTable *WT) {
   return nullptr;
 }
 
+void SerializedSILLoader::invalidateEntry(SILFunction *fn) {
+  for (auto &Des : LoadedSILSections)
+    Des->invalidateEntry(fn);
+}
+
 void SerializedSILLoader::getAll() {
   for (auto &Des : LoadedSILSections)
     Des->getAll();

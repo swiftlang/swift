@@ -105,6 +105,9 @@ public:
     SILVTable *lookupVTable(Identifier Name);
     SILWitnessTable *lookupWitnessTable(SILWitnessTable *wt);
 
+    /// Invalidate the cached entry for SILFunction.
+    void invalidateEntry(SILFunction *fn);
+
     /// Deserialize all SILFunctions, VTables, and WitnessTables inside the
     /// module and add them to SILMod.
     ///

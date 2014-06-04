@@ -45,6 +45,9 @@ namespace swift {
   /// \brief Cleanup instructions/builtin calls not suitable for IRGen.
   void performSILCleanup(SILModule *M);
 
+  /// \brief Eliminate unused SILFunctions, SILVTables and SILWitnessTables.
+  bool performSILElimination(SILModule *M);
+
   // Diagnostics transformations.
   SILTransform *createCapturePromotion();
   SILTransform *createInOutDeshadowing();
