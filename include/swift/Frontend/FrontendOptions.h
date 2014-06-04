@@ -168,6 +168,10 @@ public:
   /// Indicates whether full help (including "hidden" options) should be shown.
   bool PrintHelpHidden = false;
 
+  /// Should we sort SIL functions, vtables, witness tables, and global
+  /// variables by name when we print it out. This eases diffing of SIL files.
+  bool EmitSortedSIL = false;
+
   /// An enum with different modes for automatically crashing at defined times.
   enum class DebugCrashMode {
     None, ///< Don't automatically crash.

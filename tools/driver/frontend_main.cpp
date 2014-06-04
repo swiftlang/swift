@@ -72,7 +72,7 @@ static bool emitDependencies(DiagnosticEngine &Diags,
 
 /// Writes SIL out to the given file.
 static bool writeSIL(SILModule &SM, Module *M, bool EmitVerboseSIL,
-                     std::string &OutputFilename) {
+                     std::string &OutputFilename, bool SortSIL) {
   std::string ErrorInfo;
   llvm::raw_fd_ostream OS(OutputFilename.c_str(), ErrorInfo,
                           llvm::sys::fs::F_None);
@@ -81,7 +81,7 @@ static bool writeSIL(SILModule &SM, Module *M, bool EmitVerboseSIL,
                           OutputFilename, ErrorInfo);
     return true;
   }
-  SM.print(OS, EmitVerboseSIL, M);
+  SM.print(OS, EmitVerboseSIL, M, SortSIL);
   return false;
 }
 
@@ -184,7 +184,7 @@ static bool performCompile(CompilerInstance &Instance,
     if (Invocation.getSILOptions().LinkMode == SILOptions::LinkAll)
       performSILLinking(SM.get(), true);
     return writeSIL(*SM, Instance.getMainModule(), opts.EmitVerboseSIL,
-                    opts.OutputFilename);
+                    opts.OutputFilename, opts.EmitSortedSIL);
   }
 
   // Perform "stable" optimizations that are invariant across compiler versions.
@@ -229,7 +229,7 @@ static bool performCompile(CompilerInstance &Instance,
   // We've been told to write canonical SIL, so write it now.
   if (Action == FrontendOptions::EmitSIL) {
     return writeSIL(*SM, Instance.getMainModule(), opts.EmitVerboseSIL,
-                    opts.OutputFilename);
+                    opts.OutputFilename, opts.EmitSortedSIL);
   }
 
   assert(Action >= FrontendOptions::Immediate &&

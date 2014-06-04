@@ -182,6 +182,10 @@ def sil_debug_serialization : Flag<["-"], "sil-debug-serialization">,
   HelpText<"Do not eliminate functions in Mandatory Inlining/SILCombine dead "
            "functions. (for debugging only)">;
 
+def emit_sorted_sil : Flag<["-"], "emit-sorted-sil">,
+  HelpText<"When printing SIL, print out all sil entities sorted by name to "
+           "ease diffing">;
+
 def use_malloc : Flag<["-"], "use-malloc">,
   HelpText<"Allocate internal data structures using malloc "
            "(for memory debugging)">;

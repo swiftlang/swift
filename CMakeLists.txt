@@ -185,6 +185,7 @@ option(SWIFT_STDLIB_INTERNAL_CHECKS "Enable internal checks for the Swift standa
 option(SWIFT_RUNTIME_CHECKS "Enable overflow checks for the Swift standard library" YES)
 option(SWIFT_VERIFY_ALL "Run SIL verification after each transform when building Swift files in the build process" NO)
 option(SWIFT_ENABLE_GLOBAL_ARC_OPTS "Use experimental SIL Global ARC Opts instead of local ARCOpts" NO)
+option(SWIFT_EMIT_SORTED_SIL "Sort SIL output by name to enable diffing of output" NO)
 set(SWIFT_MODULE_CACHE_PATH "" CACHE PATH
   "Directory to use as the Clang module cache when building Swift source files")
 option(SWIFT_NEW_DRIVER "Enable the new Swift driver" ON)
@@ -360,6 +361,10 @@ function(compile_swift_files)
 
   if (SWIFT_ENABLE_GLOBAL_ARC_OPTS)
     list(APPEND swift_flags "-Xllvm" "-enable-global-arc-opts")
+  endif()
+
+  if (SWIFT_EMIT_SORTED_SIL_OUTPUT)
+    list(APPEND swift_flags "-Xfrontend" "-emit-sorted-sil")
   endif()
 
   # Allow import of other Swift modules we just built.

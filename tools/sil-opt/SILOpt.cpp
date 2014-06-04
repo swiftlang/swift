@@ -256,7 +256,7 @@ RemoveRuntimeAsserts("remove-runtime-asserts",
                      llvm::cl::desc("Remove runtime assertions (cond_fail)."));
 
 static llvm::cl::opt<bool>
-EnableSILPrintAll("-sil-print-all",
+EnableSILPrintAll("sil-print-all",
                   llvm::cl::Hidden,
                   llvm::cl::init(false),
                   llvm::cl::desc("Print sil after every pass."));
@@ -268,6 +268,12 @@ EmitVerboseSIL("emit-verbose-sil",
 static llvm::cl::opt<std::string>
 ModuleCachePath("module-cache-path", llvm::cl::desc("Clang module cache path"),
                 llvm::cl::init(SWIFT_MODULE_CACHE_PATH));
+
+static llvm::cl::opt<bool>
+EnableSILSortOutput("sil-sort-output", llvm::cl::Hidden,
+                    llvm::cl::init(false),
+                    llvm::cl::desc("Sort Functions, VTables, Globals, "
+                                   "WitnessTables by name to ease diffing."));
 
 static void runCommandLineSelectedPasses(SILModule *Module,
                                          const SILOptions &Options) {
@@ -498,7 +504,8 @@ int main(int argc, char **argv) {
                  << ErrorInfo << '\n';
     return 1;
   }
-  CI.getSILModule()->print(OS, EmitVerboseSIL, CI.getMainModule());
+  CI.getSILModule()->print(OS, EmitVerboseSIL, CI.getMainModule(),
+                           EnableSILSortOutput);
 
   bool HadError = CI.getASTContext().hadError();
 
