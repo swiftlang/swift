@@ -44,6 +44,38 @@ static bool isAutoreleasePoolCall(SILInstruction &I) {
     .Default(false);
 }
 
+namespace llvm {
+raw_ostream &operator<<(raw_ostream &OS,
+                        BottomUpRefCountState::LatticeState S) {
+  using LatticeState = BottomUpRefCountState::LatticeState;
+  switch (S) {
+  case LatticeState::None:
+    return OS << "None";
+  case LatticeState::Decremented:
+    return OS << "Decremented";
+  case LatticeState::MightBeUsed:
+    return OS << "MightBeUsed";
+  case LatticeState::MightBeDecremented:
+    return OS << "MightBeDecremented";
+  }
+}
+
+llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
+                        TopDownRefCountState::LatticeState S) {
+  using LatticeState = TopDownRefCountState::LatticeState;
+  switch (S) {
+  case LatticeState::None:
+    return OS << "None";
+  case LatticeState::Incremented:
+    return OS << "Incremented";
+  case LatticeState::MightBeUsed:
+    return OS << "MightBeUsed";
+  case LatticeState::MightBeDecremented:
+    return OS << "MightBeDecremented";
+  }
+}
+} // end namespace llvm
+
 //===----------------------------------------------------------------------===//
 //                         ARCBBState Implementation
 //===----------------------------------------------------------------------===//
