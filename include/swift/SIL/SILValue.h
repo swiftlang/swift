@@ -40,6 +40,11 @@ namespace swift {
 #include "swift/SIL/SILNodes.def"
   };
 
+  /// ValueKind hashes to its underlying integer representation.
+  static inline llvm::hash_code hash_value(ValueKind K) {
+    return llvm::hash_value(size_t(K));
+  }
+
 /// ValueBase - This is the base class of the SIL value hierarchy, which
 /// represents a runtime computed value.  Things like SILInstruction derive
 /// from this.

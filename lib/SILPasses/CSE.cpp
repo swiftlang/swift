@@ -112,118 +112,99 @@ public:
   }
 
   hash_code visitFunctionRefInst(FunctionRefInst *X) {
-    return llvm::hash_combine(unsigned(ValueKind::FunctionRefInst),
-                              X->getReferencedFunction());
+    return llvm::hash_combine(X->getKind(), X->getReferencedFunction());
   }
 
   hash_code visitBuiltinFunctionRefInst(BuiltinFunctionRefInst *X) {
-    return llvm::hash_combine(unsigned(ValueKind::BuiltinFunctionRefInst),
-                              X->getName().get());
+    return llvm::hash_combine(X->getKind(), X->getName().get());
   }
 
   hash_code visitGlobalAddrInst(GlobalAddrInst *X) {
-    return llvm::hash_combine(unsigned(ValueKind::GlobalAddrInst),
-                              X->getGlobal());
+    return llvm::hash_combine(X->getKind(), X->getGlobal());
   }
 
   hash_code visitIntegerLiteralInst(IntegerLiteralInst *X) {
-    return llvm::hash_combine(unsigned(ValueKind::IntegerLiteralInst),
-                              X->getType(), X->getValue());
+    return llvm::hash_combine(X->getKind(), X->getType(), X->getValue());
   }
 
   hash_code visitFloatLiteralInst(FloatLiteralInst *X) {
-    return llvm::hash_combine(unsigned(ValueKind::FloatLiteralInst),
-                              X->getType(), X->getBits());
+    return llvm::hash_combine(X->getKind(), X->getType(), X->getBits());
   }
 
   hash_code visitRefElementAddrInst(RefElementAddrInst *X) {
-    return llvm::hash_combine(unsigned(ValueKind::RefElementAddrInst),
-                              X->getOperand(), X->getField());
+    return llvm::hash_combine(X->getKind(), X->getOperand(), X->getField());
   }
 
   hash_code visitStringLiteralInst(StringLiteralInst *X) {
-    return llvm::hash_combine(unsigned(ValueKind::StringLiteralInst),
-                              unsigned(X->getEncoding()), X->getValue());
+    return llvm::hash_combine(X->getKind(), X->getEncoding(), X->getValue());
   }
 
   hash_code visitStructInst(StructInst *X) {
     // This is safe since we are hashing the operands using the actual pointer
     // values of the values being used by the operand.
     OperandValueArrayRef Operands(X->getAllOperands());
-    return llvm::hash_combine(
-      unsigned(ValueKind::StructInst), X->getStructDecl(),
+    return llvm::hash_combine(X->getKind(), X->getStructDecl(),
       llvm::hash_combine_range(Operands.begin(), Operands.end()));
   }
 
   hash_code visitStructExtractInst(StructExtractInst *X) {
-    return llvm::hash_combine(unsigned(ValueKind::StructExtractInst),
-                              X->getStructDecl(), X->getField(),
+    return llvm::hash_combine(X->getKind(), X->getStructDecl(), X->getField(),
                               X->getOperand());
   }
 
   hash_code visitStructElementAddrInst(StructElementAddrInst *X) {
-    return llvm::hash_combine(unsigned(ValueKind::StructElementAddrInst),
-                              X->getStructDecl(), X->getField(),
+    return llvm::hash_combine(X->getKind(), X->getStructDecl(), X->getField(),
                               X->getOperand());
   }
 
   hash_code visitCondFailInst(CondFailInst *X) {
-    return llvm::hash_combine(unsigned(ValueKind::CondFailInst),
-                              X->getOperand());
+    return llvm::hash_combine(X->getKind(), X->getOperand());
   }
 
   hash_code visitTupleInst(TupleInst *X) {
     OperandValueArrayRef Operands(X->getAllOperands());
-    return llvm::hash_combine(
-        unsigned(ValueKind::TupleInst), X->getTupleType(),
+    return llvm::hash_combine(X->getKind(), X->getTupleType(),
       llvm::hash_combine_range(Operands.begin(), Operands.end()));
   }
 
   hash_code visitTupleExtractInst(TupleExtractInst *X) {
-    return llvm::hash_combine(unsigned(ValueKind::TupleExtractInst),
-                              X->getTupleType(), X->getFieldNo(),
+    return llvm::hash_combine(X->getKind(), X->getTupleType(), X->getFieldNo(),
                               X->getOperand());
   }
 
   hash_code visitTupleElementAddrInst(TupleElementAddrInst *X) {
-    return llvm::hash_combine(unsigned(ValueKind::TupleElementAddrInst),
-                              X->getTupleType(), X->getFieldNo(),
+    return llvm::hash_combine(X->getKind(), X->getTupleType(), X->getFieldNo(),
                               X->getOperand());
   }
 
   hash_code visitMetatypeInst(MetatypeInst *X) {
-    return llvm::hash_combine(unsigned(ValueKind::MetatypeInst), X->getType());
+    return llvm::hash_combine(X->getKind(), X->getType());
   }
 
   hash_code visitIndexRawPointerInst(IndexRawPointerInst *X) {
-    return llvm::hash_combine(unsigned(ValueKind::IndexRawPointerInst),
-                              X->getType(), X->getBase(), X->getIndex());
+    return llvm::hash_combine(X->getKind(), X->getType(), X->getBase(),
+                              X->getIndex());
   }
   hash_code visitPointerToAddressInst(PointerToAddressInst *X) {
-    return llvm::hash_combine(unsigned(ValueKind::PointerToAddressInst),
-                              X->getType(), X->getOperand());
+    return llvm::hash_combine(X->getKind(), X->getType(), X->getOperand());
   }
   hash_code visitApplyInst(ApplyInst *X) {
     OperandValueArrayRef Operands(X->getAllOperands());
-    return llvm::hash_combine(unsigned(ValueKind::ApplyInst), X->getCallee(),
+    return llvm::hash_combine(X->getKind(), X->getCallee(),
                               llvm::hash_combine_range(Operands.begin(),
                                                        Operands.end()),
                               X->hasSubstitutions(), X->isTransparent());
   }
   hash_code visitEnumInst(EnumInst *X) {
     // We hash the enum by hashing its kind, element, and operand if it has one.
-    unsigned base = llvm::hash_combine(unsigned(ValueKind::EnumInst),
-                                       X->getElement());
     if (!X->hasOperand())
-      return base;
-
-    return llvm::hash_combine(base, X->getOperand());
+      return llvm::hash_combine(X->getKind(), X->getElement());
+    return llvm::hash_combine(X->getKind(), X->getElement(), X->getOperand());
   }
 
   hash_code visitUncheckedEnumDataInst(UncheckedEnumDataInst *X) {
     // We hash the enum by hashing its kind, element, and operand.
-    return llvm::hash_combine(unsigned(ValueKind::UncheckedEnumDataInst),
-                              X->getElement(), X->getOperand());
+    return llvm::hash_combine(X->getKind(), X->getElement(), X->getOperand());
   }
 };
 } // end anonymous namespace

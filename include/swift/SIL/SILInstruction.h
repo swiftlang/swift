@@ -847,6 +847,10 @@ public:
   }
 };
 
+/// StringLiteralInst::Encoding hashes to its underlying integer representation.
+static inline llvm::hash_code hash_value(StringLiteralInst::Encoding E) {
+  return llvm::hash_value(size_t(E));
+}
 
 /// LoadInst - Represents a load from a memory location.
 class LoadInst
