@@ -80,6 +80,7 @@ namespace swift {
   SILTransform *createPerformanceConstantPropagation();
   SILTransform *createGlobalARCOpts();
   SILTransform *createDCE();
+  SILTransform *createEnumSimplification();
 
   // Utilities
   SILTransform *createStripDebug();

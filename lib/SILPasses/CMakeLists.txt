@@ -34,4 +34,5 @@ add_swift_library(swiftSILPasses
   GlobalOpt.cpp
   GlobalARCOpts.cpp
   DeadCodeElimination.cpp
+  EnumSimplification.cpp
   DEPENDS swiftSILPassesUtils swiftSILAnalysis)
