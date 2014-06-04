@@ -1,0 +1,68 @@
+// RUN: %sil-opt -enum-simplification -verify %s | FileCheck %s
+
+import Builtin
+
+enum FakeOptional {
+  case None
+  case Some(Builtin.Int32)
+}
+
+// CHECK-LABEL: sil @test1 : $@thin (FakeOptional) -> () {
+// CHECK: bb0
+// CHECK-NEXT: retain_value
+// CHECK-NEXT: release_value
+sil @test1 : $@thin (FakeOptional) -> () {
+bb0(%0 : $FakeOptional):
+  retain_value %0 : $FakeOptional
+  release_value %0 : $FakeOptional
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @test2 : $@thin (FakeOptional) -> () {
+// CHECK: bb0
+// CHECK-NEXT: unchecked_enum_data
+// CHECK-NEXT: unchecked_enum_data
+// CHECK-NEXT: retain_value
+// CHECK-NEXT: unchecked_enum_data
+// CHECK-NEXT: release_value
+sil @test2 : $@thin (FakeOptional) -> () {
+bb0(%0 : $FakeOptional):
+  %1 = unchecked_enum_data %0 : $FakeOptional, #FakeOptional.Some!enumelt.1
+  retain_value %0 : $FakeOptional
+  release_value %0 : $FakeOptional
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @test3 : $@thin () -> () {
+// CHECK: bb0
+// CHECK-NEXT: enum
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @test3 : $@thin () -> () {
+bb0:
+  %0 = enum $FakeOptional, #FakeOptional.None!enumelt
+  retain_value %0 : $FakeOptional
+  release_value %0 : $FakeOptional
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @test4 : $@thin () -> () {
+// CHECK: bb0
+// CHECK-NEXT: integer_literal
+// CHECK-NEXT: enum
+// CHECK-NEXT: unchecked_enum_data
+// CHECK-NEXT: retain_value
+// CHECK-NEXT: unchecked_enum_data
+// CHECK-NEXT: release_value
+sil @test4 : $@thin () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Int32, 0
+  %1 = enum $FakeOptional, #FakeOptional.Some!enumelt.1, %0 : $Builtin.Int32
+  retain_value %1 : $FakeOptional
+  release_value %1 : $FakeOptional
+  %9999 = tuple()
+  return %9999 : $()
+}
