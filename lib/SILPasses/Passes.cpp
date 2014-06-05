@@ -104,7 +104,7 @@ void swift::runSILOptimizationPasses(SILModule &Module,
     PM.add(createSimplifyCFG());
     PM.add(createDevirtualization());
     PM.add(createEnumSimplification());
-    PM.add(createARCOpts());
+    PM.add(createGlobalARCOpts());
     PM.add(createAllocBoxToStack());
     PM.add(createDeadObjectElimination());
     PM.add(createDCE());
