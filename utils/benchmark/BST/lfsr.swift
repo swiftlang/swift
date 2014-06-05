@@ -25,7 +25,7 @@ func test() {
   var rands = Dictionary<Int, Bool>()
   for i in 0..1000 {
     let r = lfsr.randInt()
-    assert(!rands.find(r))
+    assert(!rands[r])
     rands[r] = true
     println(r)
   }

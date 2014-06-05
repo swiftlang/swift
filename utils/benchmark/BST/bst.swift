@@ -7,7 +7,7 @@ class BST {
     var right:Node?
     var key:Int = 0
     
-    init(key:Int) {
+    init(_ key:Int) {
       self.key = key
     }
   }
@@ -19,7 +19,7 @@ class BST {
       root = BST.Node(key)
       return true
     }
-    return insertInto(key, root!)
+    return insertInto(key, node: root!)
   }
 
   // Written this way for tail recursion.
@@ -29,14 +29,14 @@ class BST {
     }
     if key < node.key {
       if node.left {
-        return insertInto(key, node.left!)
+        return insertInto(key, node: node.left!)
       } else {
         node.left = BST.Node(key)
         return true
       }
     } else {
       if node.right {
-        return insertInto(key, node.right!)
+        return insertInto(key, node: node.right!)
       } else {
         node.right = BST.Node(key)
         return true
@@ -45,7 +45,7 @@ class BST {
   }
 
   func find(key:Int) -> Bool {
-    return findIn(key, root)
+    return findIn(key, node: root)
   }
 
   func findIn(key:Int, node:Node?) -> Bool {
@@ -57,9 +57,9 @@ class BST {
       return true
     }
     if key < n.key {
-      return self.findIn(key, n.left)
+      return self.findIn(key, node: n.left)
     } else {
-      return self.findIn(key, n.right)
+      return self.findIn(key, node: n.right)
     }
   }
 
@@ -111,13 +111,13 @@ class BST {
   }
 
   func visitInorder(f:(Int) -> ()) {
-    self.visitInorderSubtree(f, root)
+    self.visitInorderSubtree(f, node: root)
   }
   func visitInorderSubtree(f:(Int) -> (), node:Node?) {
     if let n = node {
-      self.visitInorderSubtree(f, n.left)
+      self.visitInorderSubtree(f, node: n.left)
       f(n.key)
-      self.visitInorderSubtree(f, n.right)
+      self.visitInorderSubtree(f, node: n.right)
     }
   }
 }
