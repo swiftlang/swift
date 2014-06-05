@@ -415,6 +415,8 @@ bb0(%0 : $Builtin.RawPointer):
 sil @swift_keepAlive : $@thin <τ_0_0> (@inout τ_0_0) -> ()
 
 // CHECK-LABEL: sil @release_can_decrement_other_releases  : $@thin () -> () {
+// CHECK: strong_retain
+// CHECK: strong_release
 // CHECK: strong_release
 sil @release_can_decrement_other_releases  : $@thin () -> () {
 bb0:
@@ -422,11 +424,11 @@ bb0:
   %1 = alloc_array $Builtin.Int32, %0 : $Builtin.Word
   %2 = alloc_stack $Builtin.NativeObject
   store %1#0 to %2#1 : $*Builtin.NativeObject
-  %4 = function_ref @swift_keepAlive : $@thin <τ_0_0> (@inout τ_0_0) -> ()
+  %4 = function_ref @user : $@thin (Builtin.NativeObject) -> ()
   strong_retain %1#0 : $Builtin.NativeObject
-  %6 = apply %4<Builtin.NativeObject>(%2#1) : $@thin <τ_0_0> (@inout τ_0_0) -> ()
-  %7 = load %2#1 : $*Builtin.NativeObject
-  strong_release %7 : $Builtin.NativeObject
+  %6 = load %2#1 : $*Builtin.NativeObject
+  %7 = apply %4(%6) : $@thin (Builtin.NativeObject) -> ()
+  strong_release %6 : $Builtin.NativeObject
   strong_release %1#0 : $Builtin.NativeObject
   dealloc_stack %2#0 : $*@local_storage Builtin.NativeObject
   %11 = tuple ()
