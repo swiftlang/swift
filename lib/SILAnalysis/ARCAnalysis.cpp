@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "sil-arc-analysis"
 #include "swift/SILAnalysis/ARCAnalysis.h"
 #include "swift/Basic/Fallthrough.h"
+#include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILAnalysis/AliasAnalysis.h"
 #include "swift/SILAnalysis/ValueTracking.h"
@@ -37,6 +38,11 @@ static bool canApplyDecrementRefCount(ApplyInst *AI, SILValue Ptr,
   // ApplyInst and the retain.
   if (auto *BI = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee()))
     if (isSideEffectFree(BI))
+      return false;
+
+  // swift_keepAlive can not retain values. Remove this when we get rid of that.
+  if (auto *FRI = dyn_cast<FunctionRefInst>(AI->getCallee()))
+    if (FRI->getReferencedFunction()->getName().equals("swift_keepAlive"))
       return false;
 
   // Ok, this apply *MAY* decrement ref counts. Now our strategy is to attempt
