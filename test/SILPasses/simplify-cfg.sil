@@ -426,3 +426,56 @@ bb7(%6 : $Builtin.Int64):
   %7 = struct $Int64 (%6 : $Builtin.Int64)
   return %7 : $Int64
 }
+
+// CHECK-LABEL: simplify_loop_header
+// CHECK-NOT: switch_enum
+// CHECK: bb0
+// CHECK:  br bb1
+// CHECK: bb1
+// CHECK:  cond_br {{.*}}, bb3, bb2
+// CHECK: bb2
+// CHECK:  br bb1
+// CHECK: bb3
+// CHECK:  return
+
+sil @simplify_loop_header : $@thin () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Word, 0
+  %1 = integer_literal $Builtin.Word, 1000
+  br bb1(%0 : $Builtin.Word)
+
+bb1(%3 : $Builtin.Word):
+  %4 = struct $Int (%3 : $Builtin.Word)
+  %5 = builtin_function_ref "cmp_eq_Word" : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
+  %6 = apply %5(%3, %1) : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Int1
+  cond_br %6, bb2, bb3
+
+bb2:
+  %8 = enum $Optional<Int>, #Optional.None!enumelt
+  br bb4(%3 : $Builtin.Word, %8 : $Optional<Int>)
+
+bb3:
+  %10 = integer_literal $Builtin.Word, 1
+  %11 = builtin_function_ref "sadd_with_overflow_Word" : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %12 = integer_literal $Builtin.Int1, -1
+  %13 = apply %11(%3, %10, %12) : $@thin (Builtin.Word, Builtin.Word, Builtin.Int1) -> (Builtin.Word, Builtin.Int1)
+  %14 = tuple_extract %13 : $(Builtin.Word, Builtin.Int1), 0
+  %15 = tuple_extract %13 : $(Builtin.Word, Builtin.Int1), 1
+  cond_fail %15 : $Builtin.Int1
+  %17 = enum $Optional<Int>, #Optional.Some!enumelt.1, %4 : $Int
+  br bb4(%14 : $Builtin.Word, %17 : $Optional<Int>)
+
+bb4(%19 : $Builtin.Word, %20 : $Optional<Int>):
+  switch_enum %20 : $Optional<Int>, case #Optional.Some!enumelt.1: bb5, case #Optional.None!enumelt: bb6
+
+bb5:
+  // This could be a use like we generate for a loop with a use induction
+  // variables like in:
+  //  for i in 1..10 { a[i] = i }
+  %9 = unchecked_enum_data %20 : $Optional<Int>, #Optional.Some!enumelt.1
+  br bb1(%19 : $Builtin.Word)
+
+bb6:
+  %23 = tuple ()
+  return %23 : $()
+}

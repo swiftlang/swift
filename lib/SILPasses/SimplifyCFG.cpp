@@ -95,6 +95,7 @@ namespace {
 
     bool simplifyBlocks();
     bool dominatorBasedSimplify(DominanceInfo *DT);
+    bool simplifyLoopStructure();
 
     /// \brief Remove the basic block if it has no predecessors. Returns true
     /// If the block was removed.
@@ -725,6 +726,234 @@ bool SimplifyCFG::simplifySwitchEnumUnreachableBlocks(SwitchEnumInst *SEI) {
   return true;
 }
 
+static SILBasicBlock *isEnumOnlyBlock(SILBasicBlock *BB, EnumInst *&Enum) {
+  SILBasicBlock::iterator BI = BB->begin();
+  assert(BI != BB->end() && "Malformed block?");
+  // Check for an enum instruction.
+  EnumInst *EI = dyn_cast<EnumInst>(&*BI);
+  if (!EI)
+    return nullptr;
+
+  // And only an enum instruction.
+  ++BI;
+  if (!isa<BranchInst>(&*BI))
+    return nullptr;
+
+  Enum = EI;
+  return BB;
+}
+
+static void removeBlock(SILBasicBlock *BB) {
+  SILBasicBlock::reverse_iterator RI;
+  while ((RI = BB->rbegin()) != BB->rend()) {
+    SILInstruction *CurI = &*RI;
+    CurI->dropAllReferences();
+    CurI->eraseFromParent();
+  }
+  BB->dropAllArgs();
+  BB->eraseFromParent();
+}
+
+/// Simplify a pattern that occurs in counting loops. What is normally the loop
+/// exiting header is expressed as a diamond with a switch on an optional. In
+/// many cases we can get rid of the switch_enum and replace the diamond by an
+/// conditional branch.
+static bool simplifySwitchEnumCondBrPattern(
+    SwitchEnumInst *SEI, DominanceInfo &DT,
+    SmallVectorImpl<SILBasicBlock *> &BlocksToRemove) {
+  // We are looking for the following diamond pattern.
+  //         CONDBR:
+  //           cond_br ..., OnlyEnumBB, OtherBB
+  //
+  //   OnlyEnumBB:          OtherBB:
+  //     Only:                i2 =
+  //     e = enum None()      e = enum Some(val)
+  //     br SWITCHBB (e,i)      br SWITCHBB (e,i2)
+  //
+  //   SWITCHBB: (e, i)
+  //     // (e, i) only used in OtherSucc
+  //     switch_enum e None: OnlyEnumSUCC, Some: OtherSUCC
+  //
+  // In such a case we can collapse the switch_enum into the following pattern.
+  //
+  //   CONDBR:
+  //     cond_br OnlyEnumSUCC, PRED2:
+  //
+  //   OtherBB:
+  //     i2 =
+  //     e = enum Some(val)
+  //     br OtherSUCC (i2)
+  //
+  //   OnlyEnumSUCC: ...
+  //   OtherSUCC(new_i): ...
+
+
+  if (SEI->getNumCases() != 2)
+    return false;
+
+  // The enum must be an argument to the switch block and the switch_enum must
+  // be the only instruction in the switch block.
+  SILBasicBlock *SwitchBB = SEI->getParent();
+  SILArgument *EnumMerge = dyn_cast<SILArgument>(SEI->getOperand());
+  if (&*SwitchBB->begin() != SEI || !EnumMerge ||
+      EnumMerge->getParent() != SwitchBB)
+    return false;
+
+  assert(!EnumMerge->use_empty() && "Empty use but switch enum user?!");
+
+  unsigned EnumMergeIdx = SwitchBB->getBBArgIndex(EnumMerge);
+
+  //  Check for two predecessors.
+  if (SwitchBB->pred_empty())
+    return false;
+
+  SILBasicBlock::pred_iterator Pred = SwitchBB->pred_begin();
+
+  SILBasicBlock *B1 = *Pred;
+  // Bail if there is only one predecessor.
+  if (++Pred == SwitchBB->pred_end())
+    return false;
+
+  SILBasicBlock *B2 = *Pred;
+  // Bail if there are more than two predecessors.
+  if (++Pred != SwitchBB->pred_end())
+    return false;
+
+  // Look for diamonds.
+  SILBasicBlock *CondBrBB = B1->getSinglePredecessor();
+  CondBranchInst *CondBr;
+  if (!CondBrBB || CondBrBB != B2->getSinglePredecessor())
+    return false;
+  if (!(CondBr = dyn_cast<CondBranchInst>(CondBrBB->getTerminator())))
+    return false;
+
+  if (B1->getSingleSuccessor() != SwitchBB ||
+      B2->getSingleSuccessor() != SwitchBB ||
+      !isa<BranchInst>(B1->getTerminator()) ||
+      !isa<BranchInst>(B2->getTerminator()))
+    return false;
+
+  // Look for a block with only an enum.
+  EnumInst *OnlyEnum = nullptr;
+  auto *OnlyEnumBB = isEnumOnlyBlock(B1, OnlyEnum) != nullptr
+                                 ? B1
+                                 : isEnumOnlyBlock(B2, OnlyEnum);
+  if (!OnlyEnumBB)
+    return false;
+
+  auto *OtherBlock = OnlyEnumBB == B1 ? B2 : B1;
+  BranchInst *OtherBlockBr = cast<BranchInst>(OtherBlock->getTerminator());
+  EnumInst *OtherBlockEnum =
+      cast<EnumInst>(OtherBlockBr->getArg(EnumMergeIdx));
+
+  // The two enum tags need to be different.
+  if (OtherBlockEnum->getElement() == OnlyEnum->getElement())
+    return false;
+
+  // TODO: Implement the logic for handling this case.
+  if (SEI->hasDefault())
+    return false;
+
+  // Collect the switch's successor blocks.
+  auto *OnlyEnumBBSucc =
+      SEI->getCaseDestination(OnlyEnum->getElement());
+  auto *OtherBBSucc = SEI->getCaseDestination(OtherBlockEnum->getElement());
+
+  // Check that the blocks have only a single predecessor and no arguments.
+  if (!OnlyEnumBBSucc->getSinglePredecessor() ||
+      !OtherBBSucc->getSinglePredecessor() ||
+      !OnlyEnumBBSucc->getBBArgs().empty() ||
+      !OtherBBSucc->getBBArgs().empty())
+    return false;
+
+  // Make sure that all uses of the switch's arguments are dominated by the
+  // other bb's side. Except the enum instruction itself that will be used by
+  // the switch enum instructions.
+  for (auto *Arg : SwitchBB->getBBArgs()) {
+    for (auto Use : Arg->getUses())
+      if (Use->getUser() != SEI &&
+          !DT.dominates(OtherBBSucc, Use->getUser()->getParent()))
+        return false;
+  }
+
+  // Update the uses of the switch bb arguments. We made sure that they are
+  // dominated by the other block edge.
+  for (unsigned i = 0, e = SwitchBB->getNumBBArg(); i < e; ++i) {
+    auto *Arg = SwitchBB->getBBArg(i);
+    // We are also replacing the value use in the switch basic block. This is
+    // fine since we are going to delete it in the next steps.
+    Arg->replaceAllUsesWith(OtherBlockBr->getArg(i).getDef());
+  }
+
+  // The two enum tags need to be different.
+  bool ForwardEnumOnlyOnTrue = CondBr->getTrueBB() == OnlyEnumBB;
+
+  // Create a new conditional branch. We forward the path through the 'enum
+  // only' block and jump to the 'other bb' otherwise.
+  SILBuilder B(CondBr);
+  SILBasicBlock *TrueBB = ForwardEnumOnlyOnTrue ? OnlyEnumBBSucc : OtherBlock;
+  SILBasicBlock *FalseBB =
+      !ForwardEnumOnlyOnTrue ? OnlyEnumBBSucc : OtherBlock;
+  B.createCondBranch(CondBr->getLoc(), CondBr->getCondition(), TrueBB, FalseBB);
+  CondBr->dropAllReferences();
+  CondBr->eraseFromParent();
+
+  // Directly jump to the 'other bb' edge successor.
+  B.setInsertionPoint(OtherBlockBr);
+  B.createBranch(OtherBlockBr->getLoc(), OtherBBSucc);
+  OtherBlockBr->dropAllReferences();
+  OtherBlockBr->eraseFromParent();
+
+  // Fix the dominator tree.
+  SmallVector<SILBasicBlock *, 4> BlocksToFix;
+  for (auto *Child: *DT.getNode(SwitchBB))
+     if (Child->getBlock() != OnlyEnumBBSucc &&
+         Child->getBlock() != OtherBBSucc)
+       BlocksToFix.push_back(Child->getBlock());
+
+  DT.changeImmediateDominator(DT.getNode(OnlyEnumBBSucc), DT.getNode(CondBrBB));
+  DT.changeImmediateDominator(DT.getNode(OtherBBSucc), DT.getNode(OtherBlock));
+  for (auto *B : BlocksToFix)
+    DT.changeImmediateDominator(DT.getNode(B), DT.getNode(CondBrBB));
+
+  DT.eraseNode(SwitchBB);
+  DT.eraseNode(OnlyEnumBB);
+
+  // Delete the switch block and the enum only block.
+  BlocksToRemove.push_back(SwitchBB);
+  BlocksToRemove.push_back(OnlyEnumBB);
+
+  return true;
+}
+
+bool SimplifyCFG::simplifyLoopStructure() {
+  bool Changed = false;
+  for (auto &BB: Fn)
+    if (isa<SwitchEnumInst>(BB.getTerminator()))
+      addToWorklist(&BB);
+
+  if (WorklistList.empty())
+   return false;
+
+  PM->invalidateAnalysis(&Fn, SILAnalysis::InvalidationKind::CFG);
+  DominanceAnalysis* DA = PM->getAnalysis<DominanceAnalysis>();
+  DominanceInfo *DT = DA->getDomInfo(&Fn);
+
+  while (SILBasicBlock *BB = popWorklist()) {
+    auto *SEI = cast<SwitchEnumInst>(BB->getTerminator());
+    SmallVector<SILBasicBlock *, 2> BlocksToRemove;
+    if (simplifySwitchEnumCondBrPattern(SEI, *DT, BlocksToRemove)) {
+      Changed = true;
+      for (auto *BB : BlocksToRemove) {
+        removeFromWorklist(BB);
+        removeBlock(BB);
+      }
+    }
+  }
+
+  return Changed;
+}
+
 /// simplifySwitchEnumBlock - Simplify a basic block that ends with a
 /// switch_enum instruction that gets its operand from a an enum
 /// instruction.
@@ -919,6 +1148,9 @@ bool SimplifyCFG::run() {
   DominanceAnalysis* DA = PM->getAnalysis<DominanceAnalysis>();
   DominanceInfo *DT = DA->getDomInfo(&Fn);
   Changed |= dominatorBasedSimplify(DT);
+
+  // This function also uses the dominator tree.
+  Changed |= simplifyLoopStructure();
 
   // Now attempt to simplify the remaining blocks.
   if (simplifyBlocks()) {
