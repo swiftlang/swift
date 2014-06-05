@@ -118,6 +118,8 @@ sil @blocker : $@thin () -> ()
 // CHECK-NEXT: release_value
 // CHECK-NEXT: retain_value
 // CHECK-NEXT: apply
+// CHECK-NEXT: alloc_stack
+// CHECK-NEXT: dealloc_stack
 // CHECK-NEXT: switch_enum
 // CHECK: bb1({{.*}}):
 // CHECK-NEXT: unchecked_enum_data
@@ -137,8 +139,10 @@ bb0(%0 : $FakeOptional):
   release_value %0 : $FakeOptional
   retain_value %0 : $FakeOptional
   apply %1() : $@thin () -> ()
+  %3 = alloc_stack $Builtin.Int32
   release_value %0 : $FakeOptional
   retain_value %0 : $FakeOptional
+  dealloc_stack %3#0 : $*@local_storage Builtin.Int32
   switch_enum %0 : $FakeOptional, case #FakeOptional.Some!enumelt.1: bb1, case #FakeOptional.None!enumelt: bb2
 
 bb1(%2 : $Builtin.Int32):
@@ -148,8 +152,8 @@ bb2:
   br bb3
 
 bb3:
-  %3 = tuple()
-  return %3 : $()
+  %4 = tuple()
+  return %4 : $()
 }
 
 // CHECK-LABEL: sil @sink_ref_count_ops_enum_over_switch_enum_2 : $@thin (FakeOptional) -> () {

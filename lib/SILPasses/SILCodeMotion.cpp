@@ -276,6 +276,14 @@ static void createRefCountOpForPayload(SILBuilder &Builder, SILInstruction *I,
 }
 
 static bool tryToSinkRefCountInst(SwitchEnumInst *S, SILInstruction *I) {
+  // For now skip any dealloc stack inst that we see. This is ok to do since the
+  // fact that we are traversing backwards from a switch_enum of our enum value
+  // implies the dealloc_stack can not be on our enum value. Thus if we have
+  // retain_value, release_value on our enum value it is safe to move them over
+  // the dealloc_stack.
+  if (isa<DeallocStackInst>(I))
+    return true;
+
   // If this instruction is not a retain_value or release_value, there is
   // nothing left for us to do... bail...
   if (!isa<RetainValueInst>(I) && !isa<ReleaseValueInst>(I))
