@@ -69,6 +69,7 @@ enum class PassKind {
   GlobalARCOpts,
   DCE,
   EnumSimplification,
+  LoopInfoPrinter
 };
 
 enum class OptGroup {
@@ -221,6 +222,9 @@ Passes(llvm::cl::desc("Passes:"),
                         clEnumValN(PassKind::EnumSimplification,
                                    "enum-simplification",
                                    "Enum Simplification"),
+                        clEnumValN(PassKind::LoopInfoPrinter,
+                                   "loop-info-printer",
+                                   "Display loop information."),
                         clEnumValEnd));
 
 static llvm::cl::opt<bool>
@@ -282,6 +286,8 @@ static void runCommandLineSelectedPasses(SILModule *Module,
   PM.registerAnalysis(createCallGraphAnalysis(Module));
   PM.registerAnalysis(createAliasAnalysis(Module));
   PM.registerAnalysis(createDominanceAnalysis(Module));
+  PM.registerAnalysis(createLoopInfoAnalysis(Module, &PM));
+
   for (auto Pass : Passes) {
     switch (Pass) {
     case PassKind::AllocBoxToStack:
@@ -385,6 +391,9 @@ static void runCommandLineSelectedPasses(SILModule *Module,
       break;
     case PassKind::EnumSimplification:
       PM.add(createEnumSimplification());
+      break;
+    case PassKind::LoopInfoPrinter:
+      PM.add(createLoopInfoPrinter());
       break;
     }
   }

@@ -87,6 +87,7 @@ namespace swift {
   SILTransform *createSILInstCount();
   SILTransform *createSILAADumper();
   SILTransform *createSILLinker();
+  SILTransform *createLoopInfoPrinter();
 } // end namespace swift
 
 #endif
