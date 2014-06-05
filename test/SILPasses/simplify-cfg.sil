@@ -389,3 +389,40 @@ bb5:
   %6 = tuple ()
   return %6 : $()
 }
+
+// CHECK-LABEL: @dominator_based_simplify_condbr
+// CHECK:  integer_literal $Builtin.Int64, 1
+// CHECK-NOT:  integer_literal $Builtin.Int64, 2
+// CHECK-NOT:  integer_literal $Builtin.Int64, 3
+// CHECK:  integer_literal $Builtin.Int64, 4
+// CHECK: return
+sil @dominator_based_simplify_condbr : $@thin (Builtin.Int1) -> Int64 {
+bb0(%0 : $Builtin.Int1):
+  cond_br %0, bb1, bb4
+
+bb1:
+  cond_br %0, bb2, bb3
+
+bb2:
+  %1 = integer_literal $Builtin.Int64, 1
+  br bb7(%1 : $Builtin.Int64)
+
+bb3:
+  %2 = integer_literal $Builtin.Int64, 2
+  br bb7(%2 : $Builtin.Int64)
+
+bb4:
+  cond_br %0, bb5, bb6
+
+bb5:
+  %3 = integer_literal $Builtin.Int64, 3
+  br bb7(%3 : $Builtin.Int64)
+
+bb6:
+  %4 = integer_literal $Builtin.Int64, 4
+  br bb7(%4 : $Builtin.Int64)
+
+bb7(%6 : $Builtin.Int64):
+  %7 = struct $Int64 (%6 : $Builtin.Int64)
+  return %7 : $Int64
+}

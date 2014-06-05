@@ -176,7 +176,23 @@ static void simplifySwitchEnumInst(SwitchEnumInst *SEI,
   SEI->eraseFromParent();
 }
 
-static bool trySimplifyConditional(TermInst *Term, DominanceInfo *DT) {
+static bool getBranchTaken(CondBranchInst *CondBr, SILBasicBlock *BB) {
+  if (CondBr->getTrueBB() == BB)
+    return true;
+  else
+    return false;
+}
+
+static void simplifyCondBranchInst(CondBranchInst *BI, bool BranchTaken) {
+  auto LiveArgs =  BranchTaken ?  BI->getTrueArgs(): BI->getFalseArgs();
+  auto *LiveBlock =  BranchTaken ? BI->getTrueBB() : BI->getFalseBB();
+
+  SILBuilder(BI).createBranch(BI->getLoc(), LiveBlock, LiveArgs);
+  BI->dropAllReferences();
+  BI->eraseFromParent();
+}
+
+bool trySimplifyConditional(TermInst *Term, DominanceInfo *DT) {
   assert(isConditional(Term) && "Expected conditional terminator!");
 
   auto *BB = Term->getParent();
@@ -215,7 +231,12 @@ static bool trySimplifyConditional(TermInst *Term, DominanceInfo *DT) {
       //        and taking the default path.
       continue;
     }
-    case ValueKind::CondBranchInst:
+    case ValueKind::CondBranchInst: {
+      auto *CondBrInst = cast<CondBranchInst>(PredTerm);
+      bool BranchTaken = getBranchTaken(CondBrInst, DomBB);
+      simplifyCondBranchInst(cast<CondBranchInst>(Term), BranchTaken);
+      return true;
+    }
     case ValueKind::SwitchIntInst:
     case ValueKind::SwitchEnumAddrInst:
       // FIXME: Handle these.
