@@ -39,9 +39,9 @@ static bool isAutoreleasePoolCall(SILInstruction &I) {
     return false;
 
   return llvm::StringSwitch<bool>(FRI->getReferencedFunction()->getName())
-    .Case("objc_autoreleasePoolPush", true)
-    .Case("objc_autoreleasePoolPop", true)
-    .Default(false);
+      .Case("objc_autoreleasePoolPush", true)
+      .Case("objc_autoreleasePoolPop", true)
+      .Default(false);
 }
 
 namespace llvm {
@@ -61,7 +61,7 @@ raw_ostream &operator<<(raw_ostream &OS,
 }
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
-                        TopDownRefCountState::LatticeState S) {
+                              TopDownRefCountState::LatticeState S) {
   using LatticeState = TopDownRefCountState::LatticeState;
   switch (S) {
   case LatticeState::None:
@@ -77,40 +77,215 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
 } // end namespace llvm
 
 //===----------------------------------------------------------------------===//
+//                           Lattice State Merging
+//===----------------------------------------------------------------------===//
+
+static inline BottomUpRefCountState::LatticeState
+MergeBottomUpLatticeStates(BottomUpRefCountState::LatticeState L1,
+                           BottomUpRefCountState::LatticeState L2) {
+  using LatticeState = BottomUpRefCountState::LatticeState;
+  // If both states equal, return the first.
+  if (L1 == L2)
+    return L1;
+
+  // If either are none, return None.
+  if (L1 == LatticeState::None || L2 == LatticeState::None)
+    return LatticeState::None;
+
+  // Canonicalize.
+  if (unsigned(L1) > unsigned(L2))
+    std::swap(L1, L2);
+
+  // Choose the side further along in the sequence.
+  if ((L1 == LatticeState::Decremented || L1 == LatticeState::MightBeUsed) ||
+      (L2 == LatticeState::MightBeUsed ||
+       L2 == LatticeState::MightBeDecremented))
+    return L2;
+
+  // Otherwise, we don't know what happened, be conservative and return none.
+  return LatticeState::None;
+}
+
+static inline TopDownRefCountState::LatticeState
+MergeTopDownLatticeStates(TopDownRefCountState::LatticeState L1,
+                          TopDownRefCountState::LatticeState L2) {
+  using LatticeState = TopDownRefCountState::LatticeState;
+  // If both states equal, return the first.
+  if (L1 == L2)
+    return L1;
+
+  // If either are none, return None.
+  if (L1 == LatticeState::None || L2 == LatticeState::None)
+    return LatticeState::None;
+
+  // Canonicalize.
+  if (unsigned(L1) > unsigned(L2))
+    std::swap(L1, L2);
+
+  // Choose the side further along in the sequence.
+  if ((L1 == LatticeState::Incremented ||
+       L1 == LatticeState::MightBeDecremented) ||
+      (L2 == LatticeState::MightBeDecremented ||
+       L2 == LatticeState::MightBeUsed))
+    return L2;
+
+  // Otherwise, we don't know what happened, return none.
+  return LatticeState::None;
+}
+
+//===----------------------------------------------------------------------===//
 //                         ARCBBState Implementation
 //===----------------------------------------------------------------------===//
 
 /// Merge in the state of the successor basic block. This is currently a stub.
 void ARCBBState::mergeSuccBottomUp(ARCBBState &SuccBB) {
+  // For each entry in the other set, if our set has an entry with the same key,
+  // merge the entires. Otherwise, copy the entry and merge it with an empty
+  // entry.
+  for (auto MI : SuccBB.getBottomupStates()) {
+    auto Pair = PtrToBottomUpState.insert(MI);
+    // If we fail to merge, bail.
+    if (!Pair.first->second.merge(Pair.second ? BottomUpRefCountState()
+                                              : MI.second)) {
+      clear();
+      return;
+    }
+  }
 
+  for (auto Pair : getBottomupStates()) {
+    if (SuccBB.PtrToBottomUpState.find(Pair.first) ==
+        SuccBB.PtrToBottomUpState.end())
+      // If we fail to merge, bail.
+      if (!Pair.second.merge(BottomUpRefCountState())) {
+        clear();
+        return;
+      }
+  }
 }
 
 /// Initialize this BB with the state of the successor basic block. This is
 /// called on a basic block's state and then any other successors states are
 /// merged in. This is currently a stub.
 void ARCBBState::initSuccBottomUp(ARCBBState &SuccBB) {
-
+  PtrToBottomUpState = SuccBB.PtrToBottomUpState;
 }
 
 /// Merge in the state of the predecessor basic block. This is currently a stub.
 void ARCBBState::mergePredTopDown(ARCBBState &PredBB) {
+  // For each entry in the other set, if our set has an entry with the same key,
+  // merge the entires. Otherwise, copy the entry and merge it with an empty
+  // entry.
+  for (auto MI : PredBB.getTopDownStates()) {
+    auto Pair = PtrToTopDownState.insert(MI);
+    // If we fail to merge, bail.
+    if (!Pair.first->second.merge(Pair.second ? TopDownRefCountState()
+                                              : MI.second)) {
+      clear();
+      return;
+    }
+  }
 
+  for (auto Pair : getTopDownStates()) {
+    if (PredBB.PtrToTopDownState.find(Pair.first) ==
+        PredBB.PtrToTopDownState.end())
+      // If we fail to merge, bail.
+      if (!Pair.second.merge(TopDownRefCountState())) {
+        clear();
+        return;
+      }
+  }
 }
 
 /// Initialize the state for this BB with the state of its predecessor
 /// BB. Used to create an initial state before we merge in other
 /// predecessors. This is currently a stub.
 void ARCBBState::initPredTopDown(ARCBBState &PredBB) {
-
+  PtrToTopDownState = PredBB.PtrToTopDownState;
 }
 
 //===----------------------------------------------------------------------===//
 //                    Reference Count State Implementation
 //===----------------------------------------------------------------------===//
 
-void TopDownRefCountState::merge(const TopDownRefCountState &Other) {}
+bool TopDownRefCountState::merge(const TopDownRefCountState &Other) {
+  auto NewState = MergeTopDownLatticeStates(LatState, Other.LatState);
+  DEBUG(llvm::dbgs() << "            Performing TopDown Merge.\n");
+  DEBUG(llvm::dbgs() << "                Left: " << LatState << "; Right: "
+                     << Other.LatState << "; Result: " << NewState << "\n");
+  LatState = NewState;
+  KnownSafe &= KnownSafe;
 
-void BottomUpRefCountState::merge(const BottomUpRefCountState &Other) {}
+  // If we're doing a merge on a path that's previously seen a partial merge,
+  // conservatively drop the sequence, to avoid doing partial RR
+  // elimination. If the branch predicates for the two merge differ, mixing
+  // them is unsafe since they are not control dependent.
+  if (LatState == TopDownRefCountState::LatticeState::None || Partial ||
+      Other.Partial) {
+    RefCountState<TopDownRefCountState>::clear();
+    DEBUG(llvm::dbgs() << "            Found LatticeState::None or Partial. "
+                          "Clearing State!\n");
+    return false;
+  }
+
+  // We should never have an argument path merge with a non-argument path.
+  if (!Argument.isNull()) {
+    RefCountState<TopDownRefCountState>::clear();
+    DEBUG(
+        llvm::dbgs() << "            Can not merge Argument with Non-Argument "
+                        "path... Bailing!\n");
+    return false;
+  }
+
+  Increments.insert(Other.Increments.begin(), Other.Increments.end());
+
+  Partial = InsertPts.size() != Other.InsertPts.size();
+  for (auto *SI : Other.InsertPts)
+    Partial |= InsertPts.insert(SI);
+
+  if (Partial) {
+    DEBUG(llvm::dbgs() << "            Found partial, clearing state!\n");
+    RefCountState<TopDownRefCountState>::clear();
+    return false;
+  }
+
+  return true;
+}
+
+bool BottomUpRefCountState::merge(const BottomUpRefCountState &Other) {
+
+  auto NewState = MergeBottomUpLatticeStates(LatState, Other.LatState);
+  DEBUG(llvm::dbgs() << "            Performing BottomUp Merge.\n");
+  DEBUG(llvm::dbgs() << "                Left: " << LatState << "; Right: "
+                     << Other.LatState << "; Result: " << NewState << "\n");
+  LatState = NewState;
+  KnownSafe &= KnownSafe;
+
+  // If we're doing a merge on a path that's previously seen a partial merge,
+  // conservatively drop the sequence, to avoid doing partial RR
+  // elimination. If the branch predicates for the two merge differ, mixing
+  // them is unsafe since they are not control dependent.
+  if (LatState == BottomUpRefCountState::LatticeState::None || Partial ||
+      Other.Partial) {
+    DEBUG(llvm::dbgs() << "            Found LatticeState::None or Partial. "
+                          "Clearing State!\n");
+    RefCountState<BottomUpRefCountState>::clear();
+    return false;
+  }
+
+  Decrements.insert(Other.Decrements.begin(), Other.Decrements.end());
+
+  Partial = InsertPts.size() != Other.InsertPts.size();
+  for (auto *SI : Other.InsertPts)
+    Partial |= InsertPts.insert(SI);
+
+  if (Partial) {
+    DEBUG(llvm::dbgs() << "            Found partial, clearing state!\n");
+    RefCountState<BottomUpRefCountState>::clear();
+    return false;
+  }
+
+  return true;
+}
 
 //===----------------------------------------------------------------------===//
 //                             Top Down Dataflow
@@ -122,11 +297,10 @@ void BottomUpRefCountState::merge(const BottomUpRefCountState &Other) {}
 ///
 /// NestingDetected will be set to indicate that the block needs to be
 /// reanalyzed if code motion occurs.
-static bool
-processBBTopDown(ARCBBState &BBState,
-                 BlotMapVector<SILInstruction *,
-                               TopDownRefCountState> &DecToIncStateMap,
-                 AliasAnalysis *AA) {
+static bool processBBTopDown(
+    ARCBBState &BBState,
+    BlotMapVector<SILInstruction *, TopDownRefCountState> &DecToIncStateMap,
+    AliasAnalysis *AA) {
   DEBUG(llvm::dbgs() << ">>>> Top Down!\n");
 
   SILBasicBlock &BB = BBState.getBB();
@@ -140,7 +314,7 @@ processBBTopDown(ARCBBState &BBState,
   if (&BB == &*BB.getParent()->begin()) {
     auto Args = BB.getBBArgs();
     auto SignatureParams =
-      BB.getParent()->getLoweredFunctionType()->getInterfaceParameters();
+        BB.getParent()->getLoweredFunctionType()->getInterfaceParameters();
     for (unsigned i = 0, e = Args.size(); i != e; ++i) {
       SILArgument *A = Args[i];
       ParameterConvention P = SignatureParams[i].getConvention();
@@ -176,7 +350,7 @@ processBBTopDown(ARCBBState &BBState,
       NestingDetected |= State.initWithInst(&I);
 
       DEBUG(llvm::dbgs() << "    REF COUNT INCREMENT! Known Safe: "
-            << (State.isKnownSafe()?"yes":"no") << "\n");
+                         << (State.isKnownSafe() ? "yes" : "no") << "\n");
 
       // Continue processing in case this increment could be a CanUse for a
       // different pointer.
@@ -198,15 +372,15 @@ processBBTopDown(ARCBBState &BBState,
         // Copy the current value of ref count state into the result map.
         DecToIncStateMap[&I] = RefCountState;
         DEBUG(llvm::dbgs() << "    MATCHING INCREMENT:\n"
-              << RefCountState.getValue());
+                           << RefCountState.getValue());
 
         // Clear the ref count state in case we see more operations on this
         // ref counted value. This is for safety reasons.
         RefCountState.clear();
       } else {
         if (RefCountState.isTrackingRefCountInst()) {
-          DEBUG(llvm::dbgs() << "    FAILED MATCH INCREMENT:\n" <<
-                RefCountState.getValue());
+          DEBUG(llvm::dbgs() << "    FAILED MATCH INCREMENT:\n"
+                             << RefCountState.getValue());
         } else {
           DEBUG(llvm::dbgs() << "    FAILED MATCH. NO INCREMENT.\n");
         }
@@ -224,8 +398,8 @@ processBBTopDown(ARCBBState &BBState,
       if (Op && OtherState.first == Op)
         continue;
 
-      // If we are tracking an argument, skip it.
-      if (!OtherState.second.isTrackingRefCountInst())
+      // If the other state is not tracking anything, bail.
+      if (!OtherState.second.isTrackingRefCount())
         continue;
 
       // Check if the instruction we are visiting could potentially decrement
@@ -233,7 +407,7 @@ processBBTopDown(ARCBBState &BBState,
       // cause us to change states. If we do change states continue...
       if (OtherState.second.handlePotentialDecrement(&I, AA)) {
         DEBUG(llvm::dbgs() << "    Found Potential Decrement:\n        "
-              << OtherState.second.getValue());
+                           << OtherState.second.getValue());
         continue;
       }
 
@@ -241,7 +415,7 @@ processBBTopDown(ARCBBState &BBState,
       // could be used by the given instruction.
       if (OtherState.second.handlePotentialUser(&I, AA))
         DEBUG(llvm::dbgs() << "    Found Potential Use:\n        "
-              << OtherState.second.getValue());
+                           << OtherState.second.getValue());
     }
   }
 
@@ -249,8 +423,8 @@ processBBTopDown(ARCBBState &BBState,
 }
 
 void
-swift::arc::ARCSequenceDataflowEvaluator::
-mergePredecessors(ARCBBState &BBState, SILBasicBlock *BB) {
+swift::arc::ARCSequenceDataflowEvaluator::mergePredecessors(ARCBBState &BBState,
+                                                            SILBasicBlock *BB) {
   // For each successor of BB...
   unsigned i = 0;
   for (auto Pred : BB->getPreds()) {
@@ -277,13 +451,18 @@ mergePredecessors(ARCBBState &BBState, SILBasicBlock *BB) {
 bool swift::arc::ARCSequenceDataflowEvaluator::processTopDown() {
   bool NestingDetected = false;
 
+  DEBUG(llvm::dbgs() << "<<<< Processing Bottom Up! >>>>\n");
+
   // For each BB in our reverse post order...
   for (auto *BB : reversed(PostOrder)) {
+
+    DEBUG(llvm::dbgs() << "Processing BB#: " << BBToPostOrderID[BB] << "\n");
 
     // Grab the BBState associated with it and set it to be the current BB.
     ARCBBState &BBState = TopDownBBStates[BB];
     BBState.init(BB);
 
+    DEBUG(llvm::dbgs() << "Merging Predecessors!\n");
     mergePredecessors(BBState, BB);
 
     // Then perform the basic block optimization.
@@ -297,18 +476,16 @@ bool swift::arc::ARCSequenceDataflowEvaluator::processTopDown() {
 //                             Bottom Up Dataflow
 //===----------------------------------------------------------------------===//
 
-
 /// Analyze a single BB for refcount inc/dec instructions.
 ///
 /// If anything was found it will be added to DecToIncStateMap.
 ///
 /// NestingDetected will be set to indicate that the block needs to be
 /// reanalyzed if code motion occurs.
-static bool
-processBBBottomUp(ARCBBState &BBState,
-                  BlotMapVector<SILInstruction *,
-                                  BottomUpRefCountState> &IncToDecStateMap,
-                  AliasAnalysis *AA) {
+static bool processBBBottomUp(
+    ARCBBState &BBState,
+    BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap,
+    AliasAnalysis *AA) {
   DEBUG(llvm::dbgs() << ">>>> Bottom Up!\n");
   SILBasicBlock &BB = BBState.getBB();
 
@@ -337,7 +514,7 @@ processBBBottomUp(ARCBBState &BBState,
       NestingDetected |= State.initWithInst(&I);
 
       DEBUG(llvm::dbgs() << "    REF COUNT DECREMENT! Known Safe: "
-            << (State.isKnownSafe()?"yes":"no") << "\n");
+                         << (State.isKnownSafe() ? "yes" : "no") << "\n");
 
       // Continue on to see if our reference decrement could potentially affect
       // any other pointers via a use or a decrement.
@@ -360,18 +537,18 @@ processBBBottomUp(ARCBBState &BBState,
         // Copy the current value of ref count state into the result map.
         IncToDecStateMap[&I] = RefCountState;
         DEBUG(llvm::dbgs() << "    MATCHING DECREMENT:"
-              << RefCountState.getValue());
+                           << RefCountState.getValue());
 
         // Clear the ref count state in case we see more operations on this
         // ref counted value. This is for safety reasons.
         RefCountState.clear();
       } else {
         if (RefCountState.isTrackingRefCountInst()) {
-          DEBUG(llvm::dbgs() << "    FAILED MATCH DECREMENT:"
-                << RefCountState.getValue());
+          DEBUG(llvm::dbgs()
+                << "    FAILED MATCH DECREMENT:" << RefCountState.getValue());
         } else {
           DEBUG(llvm::dbgs() << "    FAILED MATCH DECREMENT. Not tracking a "
-                "decrement.\n");
+                                "decrement.\n");
         }
       }
 
@@ -387,8 +564,8 @@ processBBBottomUp(ARCBBState &BBState,
       if (Op && OtherState.first == Op)
         continue;
 
-      // If we are tracking an argument, skip it.
-      if (!OtherState.second.isTrackingRefCountInst())
+      // If this state is not tracking anything, skip it.
+      if (!OtherState.second.isTrackingRefCount())
         continue;
 
       // Check if the instruction we are visiting could potentially decrement
@@ -396,7 +573,7 @@ processBBBottomUp(ARCBBState &BBState,
       // cause us to change states. If we do change states continue...
       if (OtherState.second.handlePotentialDecrement(&I, AA)) {
         DEBUG(llvm::dbgs() << "    Found Potential Decrement:\n        "
-              << OtherState.second.getValue());
+                           << OtherState.second.getValue());
         continue;
       }
 
@@ -404,7 +581,7 @@ processBBBottomUp(ARCBBState &BBState,
       // could be used by the given instruction.
       if (OtherState.second.handlePotentialUser(&I, AA))
         DEBUG(llvm::dbgs() << "    Found Potential Use:\n        "
-              << OtherState.second.getValue());
+                           << OtherState.second.getValue());
     }
   }
 
@@ -412,8 +589,8 @@ processBBBottomUp(ARCBBState &BBState,
 }
 
 void
-swift::arc::ARCSequenceDataflowEvaluator::
-mergeSuccessors(ARCBBState &BBState, SILBasicBlock *BB) {
+swift::arc::ARCSequenceDataflowEvaluator::mergeSuccessors(ARCBBState &BBState,
+                                                          SILBasicBlock *BB) {
   // Grab the backedge set for our BB.
   auto &BackEdgeSet = BackedgeMap[BB];
 
@@ -449,13 +626,18 @@ mergeSuccessors(ARCBBState &BBState, SILBasicBlock *BB) {
 bool swift::arc::ARCSequenceDataflowEvaluator::processBottomUp() {
   bool NestingDetected = false;
 
+  DEBUG(llvm::dbgs() << "<<<< Processing Bottom Up! >>>>\n");
+
   // For each BB in our post order...
   for (auto *BB : PostOrder) {
+
+    DEBUG(llvm::dbgs() << "Processing BB#: " << BBToPostOrderID[BB] << "\n");
 
     // Grab the BBState associated with it and set it to be the current BB.
     ARCBBState &BBState = BottomUpBBStates[BB];
     BBState.init(BB);
 
+    DEBUG(llvm::dbgs() << "Merging Successors!\n");
     mergeSuccessors(BBState, BB);
 
     // Then perform the basic block optimization.
@@ -509,8 +691,7 @@ bool swift::arc::ARCSequenceDataflowEvaluator::run() {
 //===----------------------------------------------------------------------===//
 
 bool swift::arc::performARCSequenceDataflow(
-    SILFunction &F,
-    AliasAnalysis *AA,
+    SILFunction &F, AliasAnalysis *AA,
     BlotMapVector<SILInstruction *, TopDownRefCountState> &DecToIncStateMap,
     BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap) {
 

@@ -15,6 +15,7 @@
 
 #include "swift/SIL/SILValue.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/SetVector.h"
 
 namespace swift {
 
@@ -39,10 +40,10 @@ bool canUseValue(SILInstruction *User, SILValue Ptr, AliasAnalysis *AA);
 /// insertion pts, and decrement insertion pts.
 struct ARCMatchingSet {
   SILValue Ptr;
-  llvm::SmallPtrSet<SILInstruction *, 8> Increments;
-  llvm::SmallPtrSet<SILInstruction *, 8> IncrementInsertPts;
-  llvm::SmallPtrSet<SILInstruction *, 8> Decrements;
-  llvm::SmallPtrSet<SILInstruction *, 8> DecrementInsertPts;
+  llvm::SetVector<SILInstruction *> Increments;
+  llvm::SetVector<SILInstruction *> IncrementInsertPts;
+  llvm::SetVector<SILInstruction *> Decrements;
+  llvm::SetVector<SILInstruction *> DecrementInsertPts;
 
   void clear() {
     Ptr = SILValue();

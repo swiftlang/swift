@@ -184,7 +184,7 @@ struct RefCountState {
   bool handlePotentialDecrement(SILInstruction *PotentialDecrement,
                                 AliasAnalysis *AA) {
     // If we are not tracking a ref count, just return false.
-    if (!isTrackingRefCountInst())
+    if (!isTrackingRefCount())
       return false;
 
     // If we can prove that Other can not use the pointer we are tracking,
@@ -282,13 +282,13 @@ struct BottomUpRefCountState : public RefCountState<BottomUpRefCountState> {
 
   /// Is this ref count initialized and tracking a ref count ptr.
   bool isTrackingRefCount() const {
-    return !Decrements.empty();
+    return Decrements.size();
   }
 
   /// Are we tracking an instruction currently? This returns false when given an
   /// uninitialized ReferenceCountState.
   bool isTrackingRefCountInst() const {
-    return !Decrements.empty();
+    return Decrements.size();
   }
 
   /// Are we tracking a source of ref counts? This currently means that we are
@@ -359,7 +359,7 @@ struct BottomUpRefCountState : public RefCountState<BottomUpRefCountState> {
     }
   }
 
-  void merge(const BottomUpRefCountState &Other);
+  bool merge(const BottomUpRefCountState &Other);
 };
 
 //===----------------------------------------------------------------------===//
@@ -507,7 +507,7 @@ struct TopDownRefCountState : public RefCountState<TopDownRefCountState> {
     }
   }
 
-  void merge(const TopDownRefCountState &Other);
+  bool merge(const TopDownRefCountState &Other);
 };
 
 } // end arc namespace

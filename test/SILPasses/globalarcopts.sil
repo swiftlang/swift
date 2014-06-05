@@ -4,6 +4,10 @@ sil_stage canonical
 
 import Builtin
 
+// Utilities
+
+sil @user : $@thin (Builtin.NativeObject) -> ()
+
 /////////////////
 // Basic Tests //
 /////////////////
@@ -93,8 +97,6 @@ bb0(%0 : $S, %1 : $Builtin.NativeObject):
   %2 = tuple()
   return %2 : $()
 }
-
-sil @user : $@thin (Builtin.NativeObject) -> ()
 
 // CHECK-LABEL: sil @dont_delete_retain_over_decrement_use : $@thin (Builtin.NativeObject) -> ()
 // CHECK: bb0
@@ -310,8 +312,15 @@ bb0(%0 : $*Builtin.Int32):
 }
 
 // CHECK-LABEL: sil @silargument_retain_iterated : $@thin (@owned Builtin.NativeObject) -> ()
-// CHECK-NOT: strong_retain
-// CHECK-NOT: strong_release
+// CHECK: bb0
+// CHECK-NEXT: function_ref user
+// CHECK-NEXT: function_ref @user
+// CHECK-NEXT: apply
+// CHECK-NEXT: apply
+// CHECK-NEXT: strong_retain
+// CHECK-NEXT: apply
+// CHECK-NEXT: apply
+// CHECK-NEXT: strong_release
 sil @silargument_retain_iterated : $@thin (@owned Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject):
   %1 = function_ref @user : $@thin (Builtin.NativeObject) -> ()
@@ -440,4 +449,573 @@ bb0(%0 : $RetainUser, %1 : $Builtin.NativeObject):
   strong_retain %1 : $Builtin.NativeObject
   strong_release %0 : $RetainUser
   return %1 : $Builtin.NativeObject
+}
+
+
+////////////////////
+// Multi-BB tests //
+////////////////////
+
+//////////////
+// Hammocks //
+//////////////
+
+// CHECK-LABEL: sil @hammock1 : $@thin (Builtin.NativeObject) -> () {
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+sil @hammock1 : $@thin (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  strong_retain %0 : $Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb2
+
+bb2:
+  strong_release %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// This hammock can not be optimized.
+// CHECK-LABEL: sil @hammock2 : $@thin (Builtin.NativeObject) -> () {
+// CHECK: bb0
+// CHECK-NEXT: strong_retain
+// CHECK: bb1:
+// CHECK-NEXT: strong_retain
+// CHECK: bb2:
+// CHECK-NEXT: strong_release
+sil @hammock2 : $@thin (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  strong_retain %0 : $Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb1:
+  strong_retain %0 : $Builtin.NativeObject
+  br bb2
+
+bb2:
+  strong_release %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+/// This hammock can't be optimized.
+// CHECK-LABEL: sil @hammock3 : $@thin (Builtin.NativeObject) -> () {
+// CHECK: bb0
+// CHECK-NEXT: strong_retain
+// CHECK: bb1:
+// CHECK-NEXT: strong_release
+// CHECK: bb2:
+// CHECK-NEXT: strong_release
+sil @hammock3 : $@thin (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  strong_retain %0 : $Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb1:
+  strong_release %0 : $Builtin.NativeObject
+  br bb2
+
+bb2:
+  strong_release %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// This should not be optimizable.
+// CHECK-LABEL: sil @hammock4 : $@thin (Builtin.NativeObject) -> () {
+// CHECK: bb0
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+// CHECK: bb1:
+// CHECK-NEXT: strong_retain
+// CHECK: bb2:
+// CHECK-NEXT: strong_release
+sil @hammock4 : $@thin (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  cond_br undef, bb1, bb2
+
+bb1:
+  strong_retain %0 : $Builtin.NativeObject
+  br bb2
+
+bb2:
+  strong_release %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @hammock5 : $@thin (Builtin.NativeObject) -> () {
+// CHECK: bb0
+// CHECK-NOT: strong_release
+// CHECK-NOT: strong_retain
+// CHECK: bb1:
+// CHECK-NEXT: strong_release
+// CHECK: bb2:
+// CHECK-NEXT: strong_release
+sil @hammock5 : $@thin (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  cond_br undef, bb1, bb2
+
+bb1:
+  strong_release %0 : $Builtin.NativeObject
+  br bb2
+
+bb2:
+  strong_release %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @hammock6 : $@thin (Builtin.NativeObject) -> () {
+// CHECK: bb0
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+// CHECK: bb1:
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+// CHECK: bb2:
+// CHECK-NEXT: strong_release
+sil @hammock6 : $@thin (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb2
+
+bb2:
+  strong_release %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @hammock7 : $@thin (Builtin.NativeObject) -> () {
+// CHECK: bb0
+// CHECK-NEXT: strong_retain
+// CHECK: bb1:
+// CHECK-NEXT: strong_retain
+// CHECK: bb2:
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+sil @hammock7 : $@thin (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  strong_retain %0 : $Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb1:
+  strong_retain %0 : $Builtin.NativeObject
+  br bb2
+
+bb2:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @hammock8 : $@thin (Builtin.NativeObject) -> () {
+// CHECK: bb0
+// CHECK-NEXT: strong_retain
+// CHECK-NOT: strong_release
+// CHECK: bb1:
+// CHECK-NEXT: strong_release
+// CHECK-NOT: strong_retain
+// CHECK: bb2:
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+sil @hammock8 : $@thin (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  strong_retain %0 : $Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb1:
+  strong_release %0 : $Builtin.NativeObject
+  br bb2
+
+bb2:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+////////////////////
+// Double Hammock //
+////////////////////
+
+// Make sure we do not do anything in the presense of double partial
+// applies. This is due to issues related to the two branches of the two
+// diamonds not being control dependent.
+// CHECK-LABEL: sil @double_hammock1 : $@thin (Builtin.NativeObject) -> () {
+// CHECK: bb0
+// CHECK-NEXT: function_ref user
+// CHECK-NEXT: function_ref @user
+// CHECK-NEXT: strong_retain
+// CHECK-NEXT: cond_br
+// CHECK: bb1:
+// CHECK-NEXT: apply
+// CHECK-NEXT: bb2
+// CHECK: bb2:
+// CHECK-NEXT: cond_br
+// CHECK: bb3:
+// CHECK-NEXT: apply
+// CHECK-NEXT: br
+// CHECK: bb4:
+// CHECK-NEXT: strong_release
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @double_hammock1 : $@thin (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = function_ref @user : $@thin (Builtin.NativeObject) -> ()
+  strong_retain %0 : $Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb1:
+  apply %1(%0) : $@thin (Builtin.NativeObject) -> ()
+  br bb2
+
+bb2:
+  cond_br undef, bb3, bb4
+
+bb3:
+  apply %1(%0) : $@thin (Builtin.NativeObject) -> ()
+  br bb4
+
+bb4:
+  strong_release %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+//////////////
+// Diamonds //
+//////////////
+
+// CHECK-LABEL: sil @diamond1 : $@thin (Builtin.NativeObject) -> () {
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+sil @diamond1 : $@thin (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  strong_retain %0 : $Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  strong_release %0 : $Builtin.NativeObject
+  %1 = tuple()
+  return %1 : $()
+}
+
+// CHECK-LABEL: sil @diamond2 : $@thin (Builtin.NativeObject) -> () {
+// CHECK: bb0
+// CHECK-NEXT: strong_retain
+// CHECK-NEXT: cond_br
+// CHECK: bb1:
+// CHECK-NEXT: br
+// CHECK: bb2:
+// CHECK-NEXT: strong_release
+// CHECK-NEXT: br
+// CHECK: bb3:
+// CHECK-NEXT: tuple ()
+// CHECK-NEXT: return
+sil @diamond2 : $@thin (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  strong_retain %0 : $Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  strong_release %0 : $Builtin.NativeObject
+  br bb3
+
+bb3:
+  %1 = tuple()
+  return %1 : $()
+}
+
+// CHECK-LABEL: sil @diamond3 : $@thin (Builtin.NativeObject) -> () {
+// CHECK: bb0
+// CHECK-NEXT: strong_retain
+// CHECK-NEXT: cond_br
+// CHECK: bb1:
+// CHECK-NEXT: strong_release
+// CHECK-NEXT: br
+// CHECK: bb2:
+// CHECK-NEXT: br
+// CHECK: bb3:
+// CHECK-NEXT: tuple ()
+// CHECK-NEXT: return
+sil @diamond3 : $@thin (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  strong_retain %0 : $Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb1:
+  strong_release %0 : $Builtin.NativeObject
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %1 = tuple()
+  return %1 : $()
+}
+
+// CHECK-LABEL: sil @diamond4 : $@thin (Builtin.NativeObject) -> () {
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+sil @diamond4 : $@thin (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  strong_retain %0 : $Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb1:
+  strong_release %0 : $Builtin.NativeObject
+  br bb3
+
+bb2:
+  strong_release %0 : $Builtin.NativeObject
+  br bb3
+
+bb3:
+  %1 = tuple()
+  return %1 : $()
+}
+
+// CHECK-LABEL: sil @diamond5 : $@thin (Builtin.NativeObject) -> () {
+// CHECK: bb0
+// CHECK-NEXT: strong_retain
+// CHECK-NEXT: cond_br
+// CHECK: bb1:
+// CHECK-NEXT: strong_release
+// CHECK-NEXT: br
+// CHECK: bb2:
+// CHECK-NEXT: br
+// CHECK: bb3:
+// CHECK-NEXT: strong_release
+// CHECK-NEXT: tuple ()
+// CHECK-NEXT: return
+sil @diamond5 : $@thin (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  strong_retain %0 : $Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb1:
+  strong_release %0 : $Builtin.NativeObject
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  strong_release %0 : $Builtin.NativeObject
+  %1 = tuple()
+  return %1 : $()
+}
+
+// CHECK-LABEL: sil @diamond6 : $@thin (Builtin.NativeObject) -> () {
+// CHECK: bb0
+// CHECK-NEXT: strong_retain
+// CHECK-NEXT: cond_br
+// CHECK: bb1:
+// CHECK-NEXT: br
+// CHECK: bb2:
+// CHECK-NEXT: strong_release
+// CHECK-NEXT: br
+// CHECK: bb3:
+// CHECK-NEXT: strong_release
+// CHECK-NEXT: tuple ()
+// CHECK-NEXT: return
+sil @diamond6 : $@thin (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  strong_retain %0 : $Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  strong_release %0 : $Builtin.NativeObject
+  br bb3
+
+bb3:
+  strong_release %0 : $Builtin.NativeObject
+  %1 = tuple()
+  return %1 : $()
+}
+
+// CHECK-LABEL: sil @diamond7 : $@thin (Builtin.NativeObject) -> () {
+// CHECK: bb0
+// CHECK-NEXT: cond_br
+// CHECK: bb1:
+// CHECK-NEXT: br
+// CHECK: bb2:
+// CHECK-NEXT: br
+// CHECK: bb3:
+// CHECK-NEXT: strong_release
+// CHECK-NEXT: tuple ()
+// CHECK-NEXT: return
+sil @diamond7 : $@thin (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  strong_retain %0 : $Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb1:
+  strong_release %0 : $Builtin.NativeObject
+  br bb3
+
+bb2:
+  strong_release %0 : $Builtin.NativeObject
+  br bb3
+
+bb3:
+  strong_release %0 : $Builtin.NativeObject
+  %1 = tuple()
+  return %1 : $()
+}
+
+// CHECK-LABEL: sil @diamond8 : $@thin (Builtin.NativeObject) -> () {
+// CHECK: bb0
+// CHECK-NEXT: cond_br
+// CHECK: bb1:
+// CHECK-NEXT: strong_retain
+// CHECK-NEXT: br
+// CHECK: bb2:
+// CHECK-NEXT: br
+// CHECK: bb3:
+// CHECK-NEXT: strong_release
+// CHECK-NEXT: tuple ()
+// CHECK-NEXT: return
+sil @diamond8 : $@thin (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  cond_br undef, bb1, bb2
+
+bb1:
+  strong_retain %0 : $Builtin.NativeObject
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  strong_release %0 : $Builtin.NativeObject
+  %1 = tuple()
+  return %1 : $()
+}
+
+/// CHECK-LABEL: sil @diamond9 : $@thin (Builtin.NativeObject) -> () {
+// CHECK: bb0
+// CHECK-NEXT: cond_br
+// CHECK: bb1:
+// CHECK-NEXT: br
+// CHECK: bb2:
+// CHECK-NEXT: strong_retain
+// CHECK-NEXT: br
+// CHECK: bb3:
+// CHECK-NEXT: strong_release
+// CHECK-NEXT: tuple ()
+// CHECK-NEXT: return
+sil @diamond9 : $@thin (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  strong_retain %0 : $Builtin.NativeObject
+  br bb3
+
+bb3:
+  strong_release %0 : $Builtin.NativeObject
+  %1 = tuple()
+  return %1 : $()
+}
+
+// CHECK-LABEL: sil @diamond10 : $@thin (Builtin.NativeObject) -> () {
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+sil @diamond10 : $@thin (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  cond_br undef, bb1, bb2
+
+bb1:
+  strong_retain %0 : $Builtin.NativeObject
+  br bb3
+
+bb2:
+  strong_retain %0 : $Builtin.NativeObject
+  br bb3
+
+bb3:
+  strong_release %0 : $Builtin.NativeObject
+  %1 = tuple()
+  return %1 : $()
+}
+
+/// CHECK-LABEL: sil @diamond11 : $@thin (Builtin.NativeObject) -> () {
+// CHECK: bb0
+// CHECK-NEXT: strong_retain
+// CHECK-NEXT: cond_br
+// CHECK: bb1:
+// CHECK-NEXT: strong_retain
+// CHECK-NEXT: br
+// CHECK: bb2:
+// CHECK-NEXT: br
+// CHECK: bb3:
+// CHECK-NEXT: strong_release
+// CHECK-NEXT: tuple ()
+// CHECK-NEXT: return
+sil @diamond11 : $@thin (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  strong_retain %0 : $Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb1:
+  strong_retain %0 : $Builtin.NativeObject
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  strong_release %0 : $Builtin.NativeObject
+  %1 = tuple()
+  return %1 : $()
+}
+
+/// CHECK-LABEL: sil @diamond12 : $@thin (Builtin.NativeObject) -> () {
+// CHECK: bb0
+// CHECK-NEXT: strong_retain
+// CHECK-NEXT: cond_br
+// CHECK: bb1:
+// CHECK-NEXT: br
+// CHECK: bb2:
+// CHECK-NEXT: strong_retain
+// CHECK-NEXT: br
+// CHECK: bb3:
+// CHECK-NEXT: strong_release
+// CHECK-NEXT: tuple ()
+// CHECK-NEXT: return
+sil @diamond12 : $@thin (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  strong_retain %0 : $Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  strong_retain %0 : $Builtin.NativeObject
+  br bb3
+
+bb3:
+  strong_release %0 : $Builtin.NativeObject
+  %1 = tuple()
+  return %1 : $()
 }
