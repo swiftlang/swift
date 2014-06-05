@@ -415,8 +415,6 @@ bb0(%0 : $Builtin.RawPointer):
 sil @swift_keepAlive : $@thin <τ_0_0> (@inout τ_0_0) -> ()
 
 // CHECK-LABEL: sil @release_can_decrement_other_releases  : $@thin () -> () {
-// CHECK: strong_retain
-// CHECK: strong_release
 // CHECK: strong_release
 sil @release_can_decrement_other_releases  : $@thin () -> () {
 bb0:
