@@ -22,6 +22,7 @@
 namespace swift {
   class SILModule;
   class SILFunction;
+  class SILPassManager;
 
   /// The base class for all SIL-level analysis.
   class SILAnalysis {
@@ -42,6 +43,7 @@ namespace swift {
       CallGraph,
       Dominance,
       Alias,
+      LoopInfo
     };
 
     /// Stores the kind of derived class.
@@ -131,6 +133,7 @@ namespace swift {
   SILAnalysis *createCallGraphAnalysis(SILModule *M);
   SILAnalysis *createAliasAnalysis(SILModule *M);
   SILAnalysis *createDominanceAnalysis(SILModule *M);
+  SILAnalysis *createLoopInfoAnalysis(SILModule *M, SILPassManager *PM);
 
 } // end namespace swift
 

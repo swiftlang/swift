@@ -5,5 +5,6 @@ add_swift_library(swiftSILAnalysis
   ValueTracking.cpp
   GlobalARCPairingAnalysis.cpp
   GlobalARCSequenceDataflow.cpp
+  SILLoopInfo.cpp
   DEPENDS swiftSILPassesUtils)
 

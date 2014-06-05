@@ -48,4 +48,20 @@ public:
 
 }  // end namespace swift
 
+namespace llvm {
+
+/// DominatorTree GraphTraits specialization so the DominatorTree can be
+/// iterable by generic graph iterators.
+template <> struct GraphTraits<swift::DominanceInfoNode *> {
+  typedef swift::DominanceInfoNode NodeType;
+  typedef NodeType::iterator ChildIteratorType;
+
+  static NodeType *getEntryNode(NodeType *N) { return N; }
+  static inline ChildIteratorType child_begin(NodeType *N) {
+    return N->begin();
+  }
+  static inline ChildIteratorType child_end(NodeType *N) { return N->end(); }
+};
+
+} // end namespace llvm
 #endif
