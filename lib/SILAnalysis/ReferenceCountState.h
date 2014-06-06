@@ -187,6 +187,14 @@ struct RefCountState {
     if (!isTrackingRefCount())
       return false;
 
+    // If at the current lattice state, we don't care if the value we are
+    // tracking can be decremented, just return false.
+    //
+    // This causes us to only perform alias queries when we are at a lattice
+    // state where the alias queries will actually be used.
+    if (!asImpl()->valueCanBeDecrementedGivenLatticeState())
+      return false;
+
     // If we can prove that Other can not use the pointer we are tracking,
     // return...
     if (!canDecrementRefCount(PotentialDecrement, getValue(), AA))
@@ -203,6 +211,14 @@ struct RefCountState {
   bool handlePotentialUser(SILInstruction *PotentialUser, AliasAnalysis *AA) {
     // If we are not tracking a ref count, just return false.
     if (!isTrackingRefCount())
+      return false;
+
+    // If at the current lattice state, we don't care if the value we are
+    // tracking can be used, just return false.
+    //
+    // This causes us to only perform alias queries when we are at a lattice
+    // state where the alias queries will actually be used.
+    if (!asImpl()->valueCanBeUsedGivenLatticeState())
       return false;
 
     if (!canUseValue(PotentialUser, getValue(), AA))
@@ -308,6 +324,12 @@ struct BottomUpRefCountState : public RefCountState<BottomUpRefCountState> {
     return {Decrements.begin(), Decrements.end()};
   }
 
+  /// Returns true if given the current lattice state, do we care if the value
+  /// we are tracking is decremented.
+  bool valueCanBeDecrementedGivenLatticeState() const {
+    return LatState == LatticeState::MightBeUsed;
+  }
+
   /// If advance the state's sequence appropriately for a decrement. If we do
   /// advance return true. Otherwise return false.
   bool handleDecrement(SILInstruction *PotentialDecrement) {
@@ -322,9 +344,17 @@ struct BottomUpRefCountState : public RefCountState<BottomUpRefCountState> {
     }
   }
 
+  /// Returns true if given the current lattice state, do we care if the value
+  /// we are tracking is used.
+  bool valueCanBeUsedGivenLatticeState() const {
+    return LatState == LatticeState::Decremented;
+  }
+
   /// Given the current lattice state, if we have seen a use, advance the
   /// lattice state. Return true if we do so and false otherwise.
   bool handleUser(SILInstruction *PotentialUser) {
+    assert(valueCanBeUsedGivenLatticeState() &&
+           "Must be able to be used at this point of the lattice.");
     // Advance the sequence...
     switch (LatState) {
       case LatticeState::Decremented:
@@ -458,6 +488,12 @@ struct TopDownRefCountState : public RefCountState<TopDownRefCountState> {
     return {Increments.begin(), Increments.end()};
   }
 
+  /// Returns true if given the current lattice state, do we care if the value
+  /// we are tracking is decremented.
+  bool valueCanBeDecrementedGivenLatticeState() const {
+    return LatState == LatticeState::Incremented;
+  }
+
   /// If advance the state's sequence appropriately for a decrement. If we do
   /// advance return true. Otherwise return false.
   bool handleDecrement(SILInstruction *PotentialDecrement) {
@@ -473,9 +509,18 @@ struct TopDownRefCountState : public RefCountState<TopDownRefCountState> {
     }
   }
 
+  /// Returns true if given the current lattice state, do we care if the value
+  /// we are tracking is used.
+  bool valueCanBeUsedGivenLatticeState() const {
+    return LatState == LatticeState::MightBeDecremented;
+  }
+
   /// Given the current lattice state, if we have seen a use, advance the
   /// lattice state. Return true if we do so and false otherwise.
   bool handleUser(SILInstruction *PotentialUser) {
+    assert(valueCanBeUsedGivenLatticeState() &&
+           "Must be able to be used at this point of the lattice.");
+
     // Otherwise advance the sequence...
     switch (LatState) {
       case LatticeState::MightBeDecremented:
