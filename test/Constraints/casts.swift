@@ -191,3 +191,15 @@ func metatype_casts<T, U>(b: B.Type) {
   let x5 = b is D.Type.Type // expected-error{{'D.Type' is not a subtype of 'B'}}
 
 }
+
+// <rdar://problem/17017851>
+func forcedDowncastToOptional(b: B) {
+  var dOpt: D? = b as D // expected-warning{{treating a forced downcast to 'D' as optional will never produce 'nil'}}
+  // expected-note@-1{{use 'as?' to perform a conditional downcast to 'D'}}{{22-22=?}}
+  // expected-note@-2{{add parentheses around the cast to silence this warning}}{{18-18=(}}{{24-24=)}}
+  dOpt = b as D // expected-warning{{treating a forced downcast to 'D' as optional will never produce 'nil'}}
+  // expected-note@-1{{use 'as?' to perform a conditional downcast to 'D'}}{{14-14=?}}
+  // expected-note@-2{{add parentheses around the cast to silence this warning}}{{10-10=(}}{{16-16=)}}
+  dOpt = (b as D)
+}
+

@@ -913,6 +913,8 @@ WARNING(inject_forced_downcast,sema_tce,none,
         (Type))
 NOTE(forced_to_conditional_downcast,sema_tce,none,
      "use 'as?' to perform a conditional downcast to %0", (Type))
+NOTE(silence_inject_forced_downcast,sema_tce,none,
+     "add parentheses around the cast to silence this warning", ())
 
 ERROR(new_array_bound_zero,sema_tce,none,
       "array type cannot have zero length", ())

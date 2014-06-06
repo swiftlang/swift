@@ -2893,6 +2893,9 @@ namespace {
         if (!cast)
           continue;
 
+        if (isa<ParenExpr>(injection->getSubExpr()))
+          continue;
+
         tc.diagnose(injection->getLoc(), diag::inject_forced_downcast,
                     injection->getSubExpr()->getType()->getRValueType());
         auto questionLoc = Lexer::getLocForEndOfToken(tc.Context.SourceMgr,
@@ -2900,6 +2903,11 @@ namespace {
         tc.diagnose(questionLoc, diag::forced_to_conditional_downcast, 
                     injection->getType()->getAnyOptionalObjectType())
           .fixItInsert(questionLoc, "?");
+        auto pastEndLoc = Lexer::getLocForEndOfToken(tc.Context.SourceMgr,
+                                                     cast->getEndLoc());
+        tc.diagnose(cast->getStartLoc(), diag::silence_inject_forced_downcast)
+          .fixItInsert(cast->getStartLoc(), "(")
+          .fixItInsert(pastEndLoc, ")");
       }
     }
 
