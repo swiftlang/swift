@@ -29,7 +29,7 @@ func f0<T : A>(obji: T, ai: A, bi: B) {
   obj = b // expected-error{{'B' is not convertible to 'T'}}
 
   // Downcast that is actually a coercion
-  a = (obj as? A)! // expected-error{{operand of postfix '!' should have optional type; type is 'A'}}
+  a = (obj as? A)! // expected-error{{conditional downcast from 'T' to 'A' always succeeds}}
   a = obj as A
 
   // Downcasts

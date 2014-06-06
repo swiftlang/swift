@@ -61,3 +61,6 @@ if let p = cc as P { // expected-error{{downcast from 'Any' to unrelated type 'P
    println("P")
 }
 
+// Test that 'as?' coercion fails.
+let strImplicitOpt: String! = nil
+strImplicitOpt as? String // expected-error{{conditional downcast from 'String!' to 'String' always succeeds}}

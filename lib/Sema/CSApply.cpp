@@ -2602,6 +2602,9 @@ namespace {
       case CheckedCastKind::Unresolved:
         return nullptr;
       case CheckedCastKind::Coercion: {
+        tc.diagnose(expr->getLoc(), diag::conditional_downcast_coercion,
+                    sub->getType(), toType);
+
         // Convert the subexpression.
         bool failed = tc.convertToType(sub, toType, cs.DC);
         (void)failed;
@@ -2613,7 +2616,11 @@ namespace {
 
         // The result type is the type we're converting to.
         result->setType(toType);
-        return result;
+
+        // Wrap the result in an optional.
+        return new (tc.Context) InjectIntoOptionalExpr(
+                                  result,
+                                  OptionalType::get(toType));
       }
 
       // Valid casts.

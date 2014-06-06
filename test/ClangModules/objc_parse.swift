@@ -343,7 +343,7 @@ class ProtocolAdopterBad3 : FooProto { // expected-error{{type 'ProtocolAdopterB
 func testPreferClassMethodToCurriedInstanceMethod(obj: NSObject) {
   let result = NSObject.isEqual(obj)
   let resultChecked: Bool = result // no-warning
-  let curried = NSObject.isEqual(obj) as? (NSObject!) -> Bool // no-warning
+  let curried = NSObject.isEqual(obj) as (NSObject!) -> Bool // no-warning
 }
 
 
