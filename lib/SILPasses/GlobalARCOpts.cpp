@@ -119,6 +119,15 @@ optimizeReferenceCountMatchingSet(ARCMatchingSet &MatchSet,
 //                              Top Level Driver
 //===----------------------------------------------------------------------===//
 
+static bool functionHasInterestingInstructions(SILFunction &F) {
+  for (auto &BB : F)
+    for (auto &II : BB)
+      if (isa<StrongRetainInst>(II) || isa<StrongReleaseInst>(II) ||
+          isa<RetainValueInst>(II) || isa<ReleaseValueInst>(II))
+        return true;
+  return false;
+}
+
 static bool processFunction(SILFunction &F, AliasAnalysis *AA) {
   // GlobalARCOpts seems to be taking up a lot of compile time when running on
   // globalinit_func. Since that is not *that* interesting from an ARC
@@ -128,6 +137,12 @@ static bool processFunction(SILFunction &F, AliasAnalysis *AA) {
     return false;
 
   DEBUG(llvm::dbgs() << "***** Processing " << F.getName() << " *****\n");
+
+  if (!functionHasInterestingInstructions(F)) {
+    DEBUG(llvm::dbgs() << "    Function does not have any ref count "
+          "instructions we handle... bailing...\n");
+    return false;
+  }
 
   bool Changed = false;
   llvm::SmallVector<SILInstruction *, 16> InstructionsToDelete;
