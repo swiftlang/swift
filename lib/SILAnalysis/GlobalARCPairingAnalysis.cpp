@@ -298,48 +298,80 @@ bool ARCMatchingSetBuilder::matchUpIncDecSetsForPtr() {
 }
 
 //===----------------------------------------------------------------------===//
+//                                  Context
+//===----------------------------------------------------------------------===//
+
+namespace swift {
+namespace arc {
+
+struct ARCMatchingSetComputationContext {
+  BlotMapVector<SILInstruction *, TopDownRefCountState> DecToIncStateMap;
+  BlotMapVector<SILInstruction *, BottomUpRefCountState> IncToDecStateMap;
+  ARCSequenceDataflowEvaluator Evaluator;
+
+  ARCMatchingSetComputationContext(SILFunction &F, AliasAnalysis *AA) :
+    DecToIncStateMap(), IncToDecStateMap(), Evaluator(F, AA, DecToIncStateMap,
+                                                      IncToDecStateMap) {}
+};
+
+} // end namespace arc
+} // end namespace swift
+
+ARCMatchingSetComputationContext *
+swift::arc::
+createARCMatchingSetComputationContext(SILFunction &F, AliasAnalysis *AA) {
+  auto *C = new ARCMatchingSetComputationContext(F, AA);
+  C->Evaluator.init();
+  return C;
+}
+
+void
+swift::arc::
+destroyARCMatchingSetComputationContext(ARCMatchingSetComputationContext *Ctx) {
+  delete Ctx;
+}
+
+//===----------------------------------------------------------------------===//
 //                           Top Level Entry Point
 //===----------------------------------------------------------------------===//
 
 bool swift::arc::
-computeARCMatchingSet(SILFunction &F, AliasAnalysis *AA,
+computeARCMatchingSet(ARCMatchingSetComputationContext *Ctx,
                       std::function<void (ARCMatchingSet&)> Fun) {
-  BlotMapVector<SILInstruction *, TopDownRefCountState> DecToIncStateMap;
-  BlotMapVector<SILInstruction *, BottomUpRefCountState> IncToDecStateMap;
 
   DEBUG(llvm::dbgs() << "**** Performing ARC Dataflow for "
-        << F.getName() << " ****\n");
+        << Ctx->Evaluator.getFunction()->getName() << " ****\n");
 
-  ARCSequenceDataflowEvaluator Eval(F, AA, DecToIncStateMap, IncToDecStateMap);
-  Eval.init();
-  bool NestingDetected = Eval.run();
-  Eval.clear();
-
+  bool NestingDetected = Ctx->Evaluator.run();
+  Ctx->Evaluator.clear();
   bool MatchedPair = false;
 
   DEBUG(llvm::dbgs() << "**** Computing ARC Matching Sets for "
-        << F.getName() << " ****\n");
+        << Ctx->Evaluator.getFunction()->getName() << " ****\n");
 
   /// For each increment that we matched to a decrement...
-  for (auto Pair : IncToDecStateMap) {
+  for (auto Pair : Ctx->IncToDecStateMap) {
     SILInstruction *Increment = Pair.first;
     if (!Increment)
       continue; // blotted
 
     DEBUG(llvm::dbgs() << "Constructing Matching Set For: " << *Increment);
-    ARCMatchingSetBuilder Builder(DecToIncStateMap, IncToDecStateMap);
+    ARCMatchingSetBuilder Builder(Ctx->DecToIncStateMap,
+                                  Ctx->IncToDecStateMap);
     Builder.init(Increment);
     if (Builder.matchUpIncDecSetsForPtr()) {
       ARCMatchingSet &M = Builder.getResult();
       MatchedPair |= Builder.matchedPair();
       for (auto *I : M.Increments)
-        IncToDecStateMap.blot(I);
+        Ctx->IncToDecStateMap.blot(I);
       for (auto *I : M.Decrements)
-        DecToIncStateMap.blot(I);
+        Ctx->DecToIncStateMap.blot(I);
       Fun(M);
       M.clear();
     }
   }
+  Ctx->DecToIncStateMap.clear();
+  Ctx->IncToDecStateMap.clear();
 
   // If we did not find a matching pair or detected nesting during the dataflow,
   // there are no more increment, decrements that we can optimize.

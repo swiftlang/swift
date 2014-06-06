@@ -132,6 +132,9 @@ static bool processFunction(SILFunction &F, AliasAnalysis *AA) {
   bool Changed = false;
   llvm::SmallVector<SILInstruction *, 16> InstructionsToDelete;
 
+  // Construct our context once.
+  auto *Ctx =  createARCMatchingSetComputationContext(F, AA);
+
   // Until we do not remove any instructions or have nested increments,
   // decrements...
   while(true) {
@@ -141,7 +144,7 @@ static bool processFunction(SILFunction &F, AliasAnalysis *AA) {
     // We need to blot pointers we remove after processing an individual pointer
     // so we don't process pairs after we have paired them up. Thus we pass in a
     // lambda that performs the work for us.
-    bool ShouldRunAgain = computeARCMatchingSet(F, AA,
+    bool ShouldRunAgain = computeARCMatchingSet(Ctx,
       // Remove the increments, decrements and insert new increments, decrements
       // at the insertion points associated with a specific pointer.
       [&Changed, &InstructionsToDelete](ARCMatchingSet &Set) {
@@ -160,6 +163,8 @@ static bool processFunction(SILFunction &F, AliasAnalysis *AA) {
 
     DEBUG(llvm::dbgs() << "\n<<< Made a Change! Reprocessing Function! >>>\n");
   }
+  destroyARCMatchingSetComputationContext(Ctx);
+
   DEBUG(llvm::dbgs() << "\n");
 
   return Changed;

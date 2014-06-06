@@ -177,6 +177,8 @@ public:
     TopDownBBStates.clear();
   }
 
+  SILFunction *getFunction() const { return &F; }
+
 private:
   /// Perform the bottom up data flow.
   bool processBottomUp();

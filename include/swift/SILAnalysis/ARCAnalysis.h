@@ -54,7 +54,21 @@ struct ARCMatchingSet {
   }
 };
 
-bool computeARCMatchingSet(SILFunction &F, AliasAnalysis *AA,
+/// An opaque context that contains cached information that can be used on
+/// multiple calls to computeARCMatchingSet on the same function.
+struct ARCMatchingSetComputationContext;
+
+/// Create an opaque arc mutation set computation context for SILFunction F
+/// using AliasAnalysis AA.
+ARCMatchingSetComputationContext *
+createARCMatchingSetComputationContext(SILFunction &F, AliasAnalysis *AA);
+
+/// Destroy the context.
+void
+destroyARCMatchingSetComputationContext(ARCMatchingSetComputationContext *Ctx);
+
+/// Use the opaque context to recompute the matching set for the input function.
+bool computeARCMatchingSet(ARCMatchingSetComputationContext *Ctx,
                            std::function<void (ARCMatchingSet&)> Fun);
 
 } // end namespace arc
