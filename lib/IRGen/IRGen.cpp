@@ -258,6 +258,7 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
   // Configure the function passes.
   FunctionPassManager FunctionPasses(Module);
   FunctionPasses.add(new llvm::DataLayoutPass(*DataLayout));
+  TargetMachine->addAnalysisPasses(FunctionPasses);
   if (Opts.Verify)
     FunctionPasses.add(createVerifierPass());
   PMBuilder.populateFunctionPassManager(FunctionPasses);
@@ -272,6 +273,7 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
   // Configure the module passes.
   PassManager ModulePasses;
   ModulePasses.add(new llvm::DataLayoutPass(*DataLayout));
+  TargetMachine->addAnalysisPasses(ModulePasses);
   PMBuilder.populateModulePassManager(ModulePasses);
   if (Opts.Verify)
     ModulePasses.add(createVerifierPass());
@@ -298,6 +300,7 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
                   ? llvm::TargetMachine::CGFT_AssemblyFile
                   : llvm::TargetMachine::CGFT_ObjectFile);
 
+    TargetMachine->addAnalysisPasses(EmitPasses);
     bool fail = TargetMachine->addPassesToEmitFile(EmitPasses, FormattedOS,
                                                    FileType, !Opts.Verify);
     if (fail) {
