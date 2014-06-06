@@ -193,11 +193,5 @@ private:
   void mergePredecessors(ARCBBState &BBState, SILBasicBlock *BB);
 };
 
-/// The main entry point for the sequence dataflow analysis.
-bool performARCSequenceDataflow(
-    SILFunction &F, AliasAnalysis *AA,
-    BlotMapVector<SILInstruction *, TopDownRefCountState> &DecToIncStateMap,
-    BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap);
-
 } // end arc namespace
 } // end swift namespace

@@ -685,27 +685,3 @@ bool swift::arc::ARCSequenceDataflowEvaluator::run() {
 
   return NestingDetected;
 }
-
-//===----------------------------------------------------------------------===//
-//                              Top Level Driver
-//===----------------------------------------------------------------------===//
-
-bool swift::arc::performARCSequenceDataflow(
-    SILFunction &F, AliasAnalysis *AA,
-    BlotMapVector<SILInstruction *, TopDownRefCountState> &DecToIncStateMap,
-    BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap) {
-
-  bool NestingDetected = false;
-
-  for (auto &BB : F) {
-    DEBUG(llvm::dbgs() << "\n<<< Processing New BB! >>>\n");
-
-    ARCBBState state(&BB);
-
-    // Perform the bottom up and then top down dataflow.
-    NestingDetected |= processBBBottomUp(state, IncToDecStateMap, AA);
-    NestingDetected |= processBBTopDown(state, DecToIncStateMap, AA);
-  }
-
-  return NestingDetected;
-}
