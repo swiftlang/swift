@@ -911,9 +911,6 @@ WARNING(inject_forced_downcast,sema_tce,none,
 NOTE(forced_to_conditional_downcast,sema_tce,none,
      "use 'as?' to perform a conditional downcast to %0", (Type))
 
-ERROR(contextual_downcast_to_forced_downcast,sema_tce,none,
-      "use 'as' to downcast to %0", (Type))
-
 ERROR(new_array_bound_zero,sema_tce,none,
       "array type cannot have zero length", ())
 ERROR(non_constant_array,type_parsing,none,

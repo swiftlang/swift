@@ -1982,9 +1982,6 @@ private:
   SolutionKind simplifyBridgedToObjectiveCConstraint(const Constraint
                                                                 &constraint);
 
-  /// \brief Attempt to simplify the given dynamic lookup constraint.
-  SolutionKind simplifyDynamicLookupConstraint(const Constraint &constraint);
-
   /// \brief Simplify the given constaint.
   SolutionKind simplifyConstraint(const Constraint &constraint);
 

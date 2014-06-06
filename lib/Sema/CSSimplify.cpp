@@ -2663,37 +2663,6 @@ ConstraintSystem::simplifyBridgedToObjectiveCConstraint(
 }
 
 ConstraintSystem::SolutionKind
-ConstraintSystem::simplifyDynamicLookupConstraint(const Constraint &constraint){
-  auto baseTy = simplifyForTypePropertyConstraint(*this,
-                                                  constraint.getFirstType());
-  if (!baseTy)
-    return SolutionKind::Unsolved;
-
-  // Look through implicit lvalue types.
-  baseTy = baseTy->getRValueType();
-
-  // Look through one level of optional type.
-  // FIXME: this is kindof specific to the use of this
-  // constraint for ForceValueExpr.
-  if (auto valueTy = baseTy->getAnyOptionalObjectType()) {
-    valueTy = simplifyForTypePropertyConstraint(*this, valueTy);
-    if (!valueTy)
-      return SolutionKind::Unsolved;
-    baseTy = valueTy;
-  }
-
-  if (auto protoTy = baseTy->getAs<ProtocolType>()) {
-    if (protoTy->getDecl()->isSpecificProtocol(
-                              KnownProtocolKind::AnyObject))
-      return SolutionKind::Solved;
-  }
-
-  // Record this failure.
-  recordFailure(constraint.getLocator(), Failure::IsNotArchetype, baseTy);
-  return SolutionKind::Error;
-}
-
-ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyDynamicTypeOfConstraint(const Constraint &constraint) {
   // Solve forward.
   TypeVariableType *typeVar2;
@@ -2926,7 +2895,6 @@ static TypeMatchKind getTypeMatchKind(ConstraintKind kind) {
   case ConstraintKind::Archetype:
   case ConstraintKind::Class:
   case ConstraintKind::BridgedToObjectiveC:
-  case ConstraintKind::DynamicLookupValue:
     llvm_unreachable("Type properties don't involve type matches");
 
   case ConstraintKind::Conjunction:
@@ -3364,9 +3332,6 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
 
   case ConstraintKind::Class:
     return simplifyClassConstraint(constraint);
-
-  case ConstraintKind::DynamicLookupValue:
-    return simplifyDynamicLookupConstraint(constraint);
 
   case ConstraintKind::Conjunction:
     // Process all of the constraints in the conjunction.

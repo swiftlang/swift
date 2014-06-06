@@ -2813,133 +2813,38 @@ namespace {
     Expr *visitForceValueExpr(ForceValueExpr *expr) {
       Type valueType = simplifyType(expr->getType());
       auto &tc = cs.getTypeChecker();
-
-      // Choice #0 is forcing a T? to T.
-      // Choice #1 is forcing an AnyObject or AnyObject? to a class type.
-      unsigned disjChoice =
-        solution.getDisjunctionChoice(cs.getConstraintLocator(expr));
-      bool isAnyObjectDowncast = (disjChoice != 0);
-
-      // If the subexpression is of AnyObject type, introduce a conditional
-      // cast to the value type. This cast produces a value of optional type.
       Expr *subExpr = expr->getSubExpr();
       
-      if (isAnyObjectDowncast) {
-        // Coerce the subexpression to an rvalue.
-        subExpr = tc.coerceToRValue(subExpr);
-        if (!subExpr) return nullptr;
-
-        // Complain about this syntax: it is going away.
-        // FIXME: if we're initializing a variable, which is a common case,
-        // we would like to zap the type annotation as well.
-        {
-          llvm::SmallString<32> asStr;
-          asStr += " as ";
-          asStr += valueType->getString();
-          tc.diagnose(expr->getLoc(), 
-                      diag::contextual_downcast_to_forced_downcast,
-                      valueType)
-            .fixItReplaceChars(expr->getLoc(),
-                               Lexer::getLocForEndOfToken(tc.Context.SourceMgr,
-                                                          expr->getLoc()),
-                               asStr);
-        }
-
-        // If the operand is AnyObject?, force it.
-        if (auto operandValueType =
-              subExpr->getType()->getAnyOptionalObjectType()) {
-          subExpr = new (tc.Context) ForceValueExpr(subExpr,
-                                                    expr->getExclaimLoc());
-          subExpr->setType(operandValueType);
-          subExpr->setImplicit(true);
-        }
-
-        // At this point, we should have an AnyObject.
-        auto fromType = subExpr->getType();
-        assert(fromType->isAnyObject());
-
-        // Allow for casts to a value type through a class type.
-        auto bridgedClass = tc.getDynamicBridgedThroughObjCClass(cs.DC,
-                                                                fromType,
-                                                                valueType);
-        if (bridgedClass) {
-          // Create a checked cast from AnyObject to the bridged type.
-          auto optType = tc.getOptionalType(expr->getLoc(), bridgedClass);
-          auto OSTLoc = TypeLoc::withoutLoc(bridgedClass);
-          
-          auto wrappedExpr = new (tc.Context)
-                                ConditionalCheckedCastExpr(subExpr,
-                                                           subExpr->getLoc(),
-                                                           SourceLoc(),
-                                                           OSTLoc);
-          wrappedExpr->setImplicit(true);
-          wrappedExpr->setType(optType);
-
-          subExpr = visitConditionalCheckedCastExpr(wrappedExpr);
-          if (!subExpr)
-            return nullptr;
-
-          // Force the inner checked cast.
-          subExpr = new (tc.Context) ForceValueExpr(subExpr,
-                                                    expr->getExclaimLoc());
-          subExpr->setType(bridgedClass);
-          subExpr->setImplicit(true);
-          
-          // Now bridge from the Objective-C class.
-          subExpr = bridgeFromObjectiveC(subExpr, valueType);
-          if (!subExpr)
-            return nullptr;
-
-          // Make the bridged result forced.
-          expr->setSubExpr(subExpr);
-          expr->setType(valueType);
-          return expr;
-        }
-
-        // Create a conditional checked cast to the value type, e.g., x as T.
-        bool isArchetype = valueType->is<ArchetypeType>();
-        auto cast = new (tc.Context) ConditionalCheckedCastExpr(
-                                       subExpr,
-                                       SourceLoc(),
-                                       SourceLoc(),
-                                       TypeLoc::withoutLoc(valueType));
-        cast->setImplicit(true);
-        cast->setType(OptionalType::get(valueType));
-        cast->setCastKind(isArchetype? CheckedCastKind::ExistentialToArchetype
-                                     : CheckedCastKind::ExistentialToConcrete);
-        subExpr = cast;
-      } else {
-        Type optType = OptionalType::get(valueType);
+      Type optType = OptionalType::get(valueType);
         
-        // Coerce the subexpression to the appropriate optional type.
-        subExpr = coerceToType(subExpr, optType,
-                               cs.getConstraintLocator(expr));
-        if (!subExpr) return nullptr;
+      // Coerce the subexpression to the appropriate optional type.
+      subExpr = coerceToType(subExpr, optType,
+                             cs.getConstraintLocator(expr));
+      if (!subExpr) return nullptr;
 
-        // Complain if the sub-expression was converted to T? via the
-        // inject-into-optional implicit conversion.
-        //
-        // It should be the case that that's always the last conversion applied.
-        if (auto injection = dyn_cast<InjectIntoOptionalExpr>(subExpr)) {
-          // If the injection was the result of an explicit unwrap (!), zap the
-          // redundant '!'.
-          if (auto forced = findForcedDowncast(tc.Context, 
-                                               injection->getSubExpr())) {
-            tc.diagnose(expr->getLoc(), diag::forcing_explicit_downcast,
-                        expr->getSubExpr()->getType()->getRValueType())
-              .highlight(forced->getLoc())
-              .fixItRemove(expr->getLoc());
-          } else {
-            // Generic diagnostic.
-            tc.diagnose(subExpr->getLoc(), diag::forcing_injected_optional,
-                        expr->getSubExpr()->getType()->getRValueType())
-              .highlight(subExpr->getSourceRange())
-              .fixItRemove(expr->getExclaimLoc());
-          }
-
-          // Don't diagnose this injection again.
-          DiagnosedOptionalInjections.insert(injection);
+      // Complain if the sub-expression was converted to T? via the
+      // inject-into-optional implicit conversion.
+      //
+      // It should be the case that that's always the last conversion applied.
+      if (auto injection = dyn_cast<InjectIntoOptionalExpr>(subExpr)) {
+        // If the injection was the result of an explicit unwrap (!), zap the
+        // redundant '!'.
+        if (auto forced = findForcedDowncast(tc.Context, 
+                                             injection->getSubExpr())) {
+          tc.diagnose(expr->getLoc(), diag::forcing_explicit_downcast,
+                      expr->getSubExpr()->getType()->getRValueType())
+            .highlight(forced->getLoc())
+            .fixItRemove(expr->getLoc());
+        } else {
+          // Generic diagnostic.
+          tc.diagnose(subExpr->getLoc(), diag::forcing_injected_optional,
+                      expr->getSubExpr()->getType()->getRValueType())
+            .highlight(subExpr->getSourceRange())
+            .fixItRemove(expr->getExclaimLoc());
         }
+
+        // Don't diagnose this injection again.
+        DiagnosedOptionalInjections.insert(injection);
       }
 
       expr->setSubExpr(subExpr);

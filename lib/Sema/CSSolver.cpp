@@ -575,7 +575,6 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
     case ConstraintKind::Archetype:
     case ConstraintKind::Class:
     case ConstraintKind::BridgedToObjectiveC:
-    case ConstraintKind::DynamicLookupValue:
       // Constraints from which we can't do anything.
       // FIXME: Record this somehow?
       continue;

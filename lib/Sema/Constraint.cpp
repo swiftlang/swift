@@ -75,7 +75,6 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
   case ConstraintKind::Archetype:
   case ConstraintKind::Class:
   case ConstraintKind::BridgedToObjectiveC:
-  case ConstraintKind::DynamicLookupValue:
     assert(!Member && "Type property cannot have a member");
     assert(Second.isNull() && "Type property with second type");
     break;
@@ -241,10 +240,6 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
     break;
   case ConstraintKind::BridgedToObjectiveC:
     Out << " is bridged to an Objective-C type";
-    skipSecond = true;
-    break;
-  case ConstraintKind::DynamicLookupValue:
-    Out << " is an AnyObject value";
     skipSecond = true;
     break;
   case ConstraintKind::Conjunction:
@@ -417,7 +412,6 @@ gatherReferencedTypeVars(Constraint *constraint,
   case ConstraintKind::Class:
   case ConstraintKind::BridgedToObjectiveC:
   case ConstraintKind::ConformsTo:
-  case ConstraintKind::DynamicLookupValue:
   case ConstraintKind::SelfObjectOfProtocol:
     constraint->getFirstType()->getTypeVariables(typeVars);
 

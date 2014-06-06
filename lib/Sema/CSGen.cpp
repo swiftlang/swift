@@ -1371,11 +1371,7 @@ namespace {
     }
 
     Type visitForceValueExpr(ForceValueExpr *expr) {
-      // The value can be forced in two different ways:
-      //   - Either the value is coercible to T? and the result is T, which
-      //     retrieves the value stored in the optional
-      //   - The value is of rvalue type AnyObject, and the result is
-      //     some class type T.
+      // Force-unwrap an optional of type T? to produce a T.
       auto valueTy = CS.createTypeVariable(CS.getConstraintLocator(expr),
                                            TVO_PrefersSubtypeBinding);
 
@@ -1385,32 +1381,10 @@ namespace {
       
       auto locator = CS.getConstraintLocator(expr);
       
-      auto bridgeConstraint = Constraint::create(CS, ConstraintKind::BridgedToObjectiveC,
-                                                 valueTy,
-                                                 Type(),
-                                                 Identifier(),
-                                                 locator);
-      Constraint *downcastConstraints[2] = {
-        Constraint::create(CS, ConstraintKind::DynamicLookupValue,
-                           expr->getSubExpr()->getType(),
-                           Type(),
-                           Identifier(),
-                           locator),
-        bridgeConstraint
-      };
-      
-      Constraint *constraints[2] = {
-        // The subexpression is convertible to T?
-        Constraint::create(CS, ConstraintKind::Conversion,
-                           expr->getSubExpr()->getType(), optTy,
-                           Identifier(),
-                           locator),
-        // The subexpression is a AnyObject value and the resulting value
-        // is of class type.
-        Constraint::createConjunction(CS, downcastConstraints, locator)
-      };
-      CS.addConstraint(Constraint::createDisjunction(CS, constraints, locator,
-                                                     RememberChoice));
+      // The subexpression is convertible to T?.
+      CS.addConstraint(ConstraintKind::Conversion, 
+                       expr->getSubExpr()->getType(), optTy,
+                       locator);
 
       // The result is of type T.
       return valueTy;
