@@ -24,11 +24,11 @@ template class llvm::LoopBase<SILBasicBlock, SILLoop>;
 template class llvm::LoopInfoBase<SILBasicBlock, SILLoop>;
 
 
-#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
 void SILLoop::dump() const {
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
   print(llvm::dbgs());
-}
 #endif
+}
 
 SILLoopInfo::SILLoopInfo(SILFunction *F, DominanceInfo *DT) {
   LI.Analyze(*DT);
