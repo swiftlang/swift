@@ -141,10 +141,12 @@ class ARCSequenceDataflowEvaluator {
   /// reverse post order traversals.
   std::vector<SILBasicBlock *> PostOrder;
 
+#ifndef NDEBUG
   /// A map from SIL Basic Blocks to their index in the post order. This is just
   /// to make it easier to debug the optimizer by enabling log print outs of the
   /// BB# in the traversal.
   llvm::DenseMap<SILBasicBlock *, unsigned> BBToPostOrderID;
+#endif
 
   /// A map mapping the head to a tail of a backedge. We only compute this once
   /// in the lifetime of this class.

@@ -657,10 +657,15 @@ void swift::arc::ARCSequenceDataflowEvaluator::init() {
          "order.");
 
   // Initialize the post order data structure.
+#ifndef NDEBUG
   unsigned Count = 0;
+  unsigned MaxSize = F.size();
+#endif
   for (auto PI = po_begin(&F), PE = po_end(&F); PI != PE; ++PI) {
     PostOrder.push_back(*PI);
-    BBToPostOrderID[*PI] = F.size() - Count++ - 1;
+#ifndef NDEBUG
+    BBToPostOrderID[*PI] = MaxSize - Count++ - 1;
+#endif
   }
 
   // Then iterate through it in reverse to perform the post order, looking for
