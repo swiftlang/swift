@@ -271,6 +271,34 @@ if let strArr = nsobj as? String[] {
   println("NSObject-to-bridged-array cast failed")
 }
 
+// CHECK-NEXT: NSArray is String[]
+if nsarr is String[] {
+  println("NSArray is String[]")
+} else {
+  println("NSArray is not a String[]")
+}
+
+// CHECK-NEXT: NSArray? is String[]
+if nsarrOpt is String[] {
+  println("NSArray? is String[]")
+} else {
+  println("NSArray? is not a String[]")
+}
+
+// CHECK-NEXT: NSArray! is String[]
+if nsarrImplicitOpt is String[] {
+  println("NSArray! is String[]")
+} else {
+  println("NSArray! is not a String[]")
+}
+
+// CHECK-NEXT: NSObject is String[]
+if nsobj is String[] {
+  println("NSObject is String[]")
+} else {
+  println("NSObject is not a String[]")
+}
+
 // Forced downcast based on context.
 // CHECK-NEXT: Forced to string array [Hello, Swift, World]
 var forcedStrArray: String[] = obj as String[]
@@ -295,11 +323,18 @@ if let strArr = obj as? NSString[] {
   println("Object-to-array cast failed")
 }
 
-// CHECK: Object-to-bridged-array cast failed due to bridge mismatch
+// CHECK-NEXT: Object-to-bridged-array cast failed due to bridge mismatch
 if let strArr = obj as? Int[] {
   println("Object-to-bridged-array cast should not have succedded")
 } else {
   println("Object-to-bridged-array cast failed due to bridge mismatch")
+}
+
+// CHECK-NEXT: Array of strings is not an array of ints
+if obj is Int[] {
+  println("Array of strings should not be an array of ints!")
+} else {
+  println("Array of strings is not an array of ints")
 }
 
 // Implicitly unwrapped optional of object to array casts.

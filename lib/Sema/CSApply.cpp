@@ -2372,10 +2372,14 @@ namespace {
       SmallVector<Type, 2> toOptionals;
       auto toValueType = plumbOptionals(toType, toOptionals);
 
-      // If we have an imbalance of optionals, handle this as a checked cast
-      // followed by a getLogicValue.
+      // If we have an imbalance of optionals, an array downcast, or
+      // are bridging through an Objective-C class, handle this as a
+      // checked cast followed by a getLogicValue.
       if (fromOptionals.size() != toOptionals.size() ||
-          castKind == CheckedCastKind::ArrayDowncast) {
+          castKind == CheckedCastKind::ArrayDowncast ||
+          tc.getDynamicBridgedThroughObjCClass(cs.DC,
+                                               fromValueType,
+                                               toValueType)) {
         auto toOptType = OptionalType::get(toType);
         ConditionalCheckedCastExpr *cast
           = new (tc.Context) ConditionalCheckedCastExpr(
@@ -2394,28 +2398,6 @@ namespace {
         // FIXME: This loses the 'is' sugar.
         return solution.convertToLogicValue(result,
                                             cs.getConstraintLocator(expr));
-      }
-
-      // Allow for bridging of a value type through a class type.
-      if (auto classType = tc.getDynamicBridgedThroughObjCClass(cs.DC,
-                                                                fromValueType,
-                                                                toValueType)) {
-        // Rebuild classType with all of the optionals in toOptionals.
-        for (unsigned i = toOptionals.size(); i > 0; --i) {
-          // Figure out the kind of this optional.
-          OptionalTypeKind kind;
-          toOptionals[i-1]->getAnyOptionalObjectType(kind);
-
-          classType = OptionalType::get(kind, classType);
-        }
-
-        // The actual check is against the class type through which we're
-        // bridging.
-        expr->getCastTypeLoc().setType(classType, /*validated=*/true);
-
-        // FIXME: We actually need to perform a checked cast, then call
-        // bridgeFromObjectiveC to try to perform the bridge, then check whether
-        // that optional has a value.
       }
 
       return expr;
