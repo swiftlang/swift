@@ -1,14 +1,15 @@
 // These tests should crash.
-// RUN: mkdir -p %t
-// RUN: xcrun -sdk %target-sdk-name clang++ -arch %target-cpu %S/Inputs/CatchCrashes.cpp -c -o %t/CatchCrashes.o
-// RUN: xcrun -sdk %target-sdk-name clang++ -arch %target-cpu %S/Inputs/ReturnNil/ReturnNil.m -c -o %t/ReturnNil.o -g
-// RUN: %target-build-swift %s -I %S/Inputs/ReturnNil/ -Xlinker %t/CatchCrashes.o -Xlinker %t/ReturnNil.o -o %t/OptionalTraps_Debug
-// RUN: %target-build-swift %s -I %S/Inputs/ReturnNil/ -Xlinker %t/CatchCrashes.o -Xlinker %t/ReturnNil.o -o %t/OptionalTraps_Release -O
-// RUN: %target-build-swift %s -I %S/Inputs/ReturnNil/ -Xlinker %t/CatchCrashes.o -Xlinker %t/ReturnNil.o -o %t/OptionalTraps_Fast -Ofast
+// RUN: true
+// UN: mkdir -p %t
+// UN: xcrun -sdk %target-sdk-name clang++ -arch %target-cpu %S/Inputs/CatchCrashes.cpp -c -o %t/CatchCrashes.o
+// UN: xcrun -sdk %target-sdk-name clang++ -arch %target-cpu %S/Inputs/ReturnNil/ReturnNil.m -c -o %t/ReturnNil.o -g
+// UN: %target-build-swift %s -I %S/Inputs/ReturnNil/ -Xlinker %t/CatchCrashes.o -Xlinker %t/ReturnNil.o -o %t/OptionalTraps_Debug
+// UN: %target-build-swift %s -I %S/Inputs/ReturnNil/ -Xlinker %t/CatchCrashes.o -Xlinker %t/ReturnNil.o -o %t/OptionalTraps_Release -O
+// UN: %target-build-swift %s -I %S/Inputs/ReturnNil/ -Xlinker %t/CatchCrashes.o -Xlinker %t/ReturnNil.o -o %t/OptionalTraps_Fast -Ofast
 //
-// RUN: %target-run %t/OptionalTraps_Debug UnwrapNone1 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/OptionalTraps_Release UnwrapNone1 2>&1 | FileCheck %s -check-prefix=CHECK
-// RUN: %target-run %t/OptionalTraps_Fast UnwrapNoneFast1 2>&1 | FileCheck %s -check-prefix=CHECK_UNWRAP_NONE_1_FAST
+// UN: %target-run %t/OptionalTraps_Debug UnwrapNone1 2>&1 | FileCheck %s -check-prefix=CHECK
+// UN: %target-run %t/OptionalTraps_Release UnwrapNone1 2>&1 | FileCheck %s -check-prefix=CHECK
+// UN: %target-run %t/OptionalTraps_Fast UnwrapNoneFast1 2>&1 | FileCheck %s -check-prefix=CHECK_UNWRAP_NONE_1_FAST
 
 // CHECK: OK
 // CHECK: CRASHED: SIG{{ILL|TRAP}}
