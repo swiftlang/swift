@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SILPASSES_BLOTMAPVECTOR_H
-#define SWIFT_SILPASSES_BLOTMAPVECTOR_H
+#ifndef SWIFT_BASIC_BLOTMAPVECTOR_H
+#define SWIFT_BASIC_BLOTMAPVECTOR_H
 
 #include "llvm/ADT/DenseMap.h"
 #include "swift/Basic/Range.h"

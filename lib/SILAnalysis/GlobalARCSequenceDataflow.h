@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/BlotMapVector.h"
 #include "ReferenceCountState.h"
-#include "BlotMapVector.h"
 
 namespace swift {
 

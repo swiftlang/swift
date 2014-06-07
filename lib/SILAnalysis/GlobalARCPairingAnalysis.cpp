@@ -12,7 +12,7 @@
 
 #define DEBUG_TYPE "sil-global-arc-analysis"
 #include "swift/SILAnalysis/ARCAnalysis.h"
-#include "BlotMapVector.h"
+#include "swift/Basic/BlotMapVector.h"
 #include "ReferenceCountState.h"
 #include "GlobalARCSequenceDataflow.h"
 #include "swift/Basic/Fallthrough.h"
