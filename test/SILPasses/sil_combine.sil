@@ -25,6 +25,8 @@ enum AddressOnlyEnum {
   case AddressOnly(Any)
 }
 
+sil [global_init] @global_init_fun : $@thin () -> Builtin.RawPointer
+
 //////////////////////
 // Simple DCE Tests //
 //////////////////////
@@ -1282,4 +1284,16 @@ bb0:
   %5 = function_ref @partial_apply_generic_func : $@thin <T> () -> ()
   %6 = partial_apply %5<Builtin.Int32>() : $@thin <T> () -> ()
   return %1 : $@callee_owned () -> ()
+}
+
+// CHECK-LABEL: sil @dead_global_init_call : $@thin () -> () {
+// CHECK-NEXT: bb0:
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @dead_global_init_call : $@thin () -> () {
+bb0:
+  %0 = function_ref @global_init_fun : $@thin () -> Builtin.RawPointer
+  %1 = apply %0() : $@thin () -> Builtin.RawPointer
+  %2 = tuple()
+  return %2 : $()
 }

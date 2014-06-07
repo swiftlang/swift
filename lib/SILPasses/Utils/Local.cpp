@@ -66,10 +66,15 @@ swift::isInstructionTriviallyDead(SILInstruction *I) {
 
   // We know that some calls do not have side effects.
   if (const ApplyInst *AI = dyn_cast<ApplyInst>(I)) {
-    if (BuiltinFunctionRefInst *FR =
-        dyn_cast<BuiltinFunctionRefInst>(AI->getCallee())) {
-      return isSideEffectFree(FR);
+    if (auto *BFRI = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee())) {
+      return isSideEffectFree(BFRI);
     }
+
+    if (auto *FRI = dyn_cast<FunctionRefInst>(AI->getCallee()))
+      // If we call an apply inst to a global initializer, but the value is not
+      // used it is safe to remove it.
+      if (FRI->getReferencedFunction()->isGlobalInit())
+        return true;
   }
 
   // condfail instructions that obviously can't fail are dead.
