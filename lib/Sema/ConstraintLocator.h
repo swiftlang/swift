@@ -381,6 +381,7 @@ public:
     /// if it has one.
     unsigned getValue2() const {
       unsigned numValues = numNumericValuesInPathElement(getKind());
+      (void)numValues;
       assert(numValues == 2 && "No second value in path element!");
 
       auto value = decodeStorage(
