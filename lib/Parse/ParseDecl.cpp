@@ -668,6 +668,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 ///     'infix' '=' numeric_constant
 ///     'unary'
 ///     'stdlib'
+///     'strong'
 ///     'weak'
 ///     'inout'
 ///     'unowned'
@@ -679,8 +680,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 ///     'requires_stored_property_inits'
 /// \endverbatim
 ///
-/// Note that the mutating, weak, and unowned attributes are parsed but
-/// rejected since they have context-sensitive keywords.
+/// Note that various attributes (like mutating, weak, and unowned) are parsed
+/// but rejected since they have context-sensitive keywords.
 ///
 bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
   SourceLoc InversionLoc;
@@ -810,13 +811,18 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
     diagnose(Loc, diag::mutating_not_attribute, isInverted)
       .fixItReplace(AtLoc, isInverted ? "non" : "");
     break;
+  case AK_strong:
   case AK_weak:
   case AK_unowned:
-  case AK_unowned_unsafe:
+  case AK_unowned_unsafe: {
+    const char *Kind = "strong";
+    if (attr == AK_weak) Kind = "weak";
+    if (attr == AK_unowned) Kind = "unowned";
+    if (attr == AK_unowned_unsafe) Kind = "unowned(unsafe)";
     // Ownership are context-sensitive keywords, not attributes.
-    diagnose(Loc, diag::ownership_not_attribute,
-             attr == AK_weak ? "weak" : "unowned").fixItRemove(AtLoc);
+    diagnose(Loc, diag::ownership_not_attribute, Kind).fixItRemove(AtLoc);
     break;
+  }
   }
 
   return false;
@@ -1281,7 +1287,8 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
       
       // Likewise, if this is a context sensitive keyword, parse it too.
       if (Tok.isContextualKeyword("weak") ||
-          Tok.isContextualKeyword("unowned")) {
+          Tok.isContextualKeyword("unowned") ||
+          Tok.isContextualKeyword("strong")) {
         AttrKind attr = AK_Count;
         bool isUnowned = Tok.getText() == "unowned";
 
@@ -1295,8 +1302,13 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
           consumeToken(tok::identifier);
           consumeToken(tok::r_paren);
         } else {
+          if (isUnowned)
+            attr = AK_unowned;
+          else if (Tok.getText() == "weak")
+            attr = AK_weak;
+          else
+            attr = AK_strong;
           consumeToken(tok::identifier);
-          attr = isUnowned ? AK_unowned : AK_weak;
         }
         
         if (Attributes.hasOwnership())

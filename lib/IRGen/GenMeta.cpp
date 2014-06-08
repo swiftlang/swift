@@ -1214,7 +1214,7 @@ namespace {
                         llvm::ConstantInt::get(IGM.Int32Ty, i));
       auto fieldTy = field->getType()->getCanonicalType();
       
-      // Strip reference storage qualifiers like @unowned and @weak.
+      // Strip reference storage qualifiers like unowned and weak.
       // FIXME: Some clients probably care about them.
       if (auto refStorTy = dyn_cast<ReferenceStorageType>(fieldTy))
         fieldTy = refStorTy.getReferentType();

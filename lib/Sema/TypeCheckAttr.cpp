@@ -735,7 +735,8 @@ void TypeChecker::checkOwnershipAttr(VarDecl *var, Ownership ownershipKind) {
   }
 
   // Change the type to the appropriate reference storage type.
-  var->overwriteType(ReferenceStorageType::get(type, ownershipKind, Context));
+  if (ownershipKind != Ownership::Strong)
+    var->overwriteType(ReferenceStorageType::get(type, ownershipKind, Context));
 }
 
 static void addImplicitOptionalToTypeLoc(TypeLoc &TyLoc, ASTContext &Ctx) {
@@ -781,6 +782,11 @@ void TypeChecker::checkIBOutlet(VarDecl *VD) {
   if (!VD->getMutableAttrs().getAttribute<IBOutletAttr>())
     return;
   
+  // If this is an explicitly marked "strong" outlet, then there are no
+  // adjustments necessary.
+  if (VD->getAttrs().isStrong())
+    return;
+  
   bool NeedsUpdate = false;
 
   // Validate the type of the @IBOutlet.
@@ -796,8 +802,8 @@ void TypeChecker::checkIBOutlet(VarDecl *VD) {
       return;
   } else {
     // If it isn't marked weak or unowned, then it needs to be updated.
-    NeedsUpdate = true;
     ownership = VD->getAttrs().getOwnership();
+    NeedsUpdate = true;
   }
 
   // If the underlying type isn't an optional, then we need to update it.

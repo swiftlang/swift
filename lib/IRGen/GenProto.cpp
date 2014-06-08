@@ -583,7 +583,7 @@ namespace {
     }
   };
 
-  /// A type implementation for [weak] existential types.
+  /// A type implementation for 'weak' existential types.
   class WeakClassExistentialTypeInfo :
       public IndirectTypeInfo<WeakClassExistentialTypeInfo, WeakTypeInfo> {
     unsigned NumProtocols;

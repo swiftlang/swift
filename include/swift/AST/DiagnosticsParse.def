@@ -789,7 +789,7 @@ ERROR(anon_closure_arg_in_closure_with_args,expr_parsing,none,
 ERROR(expected_closure_parameter_name,expr_parsing,none,
       "expected the name of a closure parameter", ())
 ERROR(expected_capture_specifier,expr_parsing,none,
-      "expected 'weak' or 'unowned' specifier in capture list", ())
+      "expected 'strong', 'weak', or 'unowned' specifier in capture list", ())
 ERROR(expected_capture_specifier_name,attribute_parsing,none,
       "expected name of in closure capture list", ())
 ERROR(expected_init_capture_specifier,attribute_parsing,none,

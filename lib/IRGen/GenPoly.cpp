@@ -184,10 +184,10 @@ void checkFunctionsAreCompatible(IRGenModule &IGM,
 ///
 /// There is (currently) one way in which a variable can be accessed
 /// indirectly, without knowledge of how it was originally declared,
-/// and that is when it is passed [inout].  A variable cannot be
+/// and that is when it is passed 'inout'.  A variable cannot be
 /// passed directly by reference when the target l-value type
 /// differs by abstraction from the variable's type.  However, the
-/// mechanics and relatively weak guarantees of [inout] make it
+/// mechanics and relatively weak guarantees of 'inout' make it
 /// legal to instead pass a properly-abstracted temporary variable,
 /// thunking the current value as it's passed in and "un-thunking"
 /// it on the way out.  Of course, that ain't free.

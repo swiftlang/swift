@@ -1465,13 +1465,15 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
   // and parameters.
   if (consumeIf(tok::l_square) &&
       !consumeIf(tok::r_square)) {
-    // Skip by the capture list, checking it as we go.
     do {
-      // Check for the strength specifier, "weak", "unowned", or
+      // Check for the strength specifier: "strong", "weak", "unowned", or
       // "unowned(safe/unsafe)".
       SourceLoc loc;
       AttrKind attrKind = AK_Count;
-      if (Tok.isContextualKeyword("weak")){
+      if (Tok.isContextualKeyword("strong")){
+        loc = consumeToken(tok::identifier);
+        attrKind = AK_strong;
+      } else if (Tok.isContextualKeyword("weak")){
         loc = consumeToken(tok::identifier);
         attrKind = AK_weak;
       } else if (Tok.isContextualKeyword("unowned")) {

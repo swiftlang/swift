@@ -173,6 +173,8 @@ unowned unowned var weak4 : Ty0  // expected-error {{declaration cannot have mul
 
 unowned weak var weak5 : Ty0 // expected-error {{declaration cannot have multiple ownership specifiers}}
 
+strong weak var weak5a : Ty0  // expected-error {{declaration cannot have multiple ownership specifiers}}
+
 weak
 var weak6 : Int // expected-error {{'weak' cannot be applied to non-class type 'Int'}}
 unowned

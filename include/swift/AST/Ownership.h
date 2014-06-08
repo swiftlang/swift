@@ -11,8 +11,8 @@
 //===----------------------------------------------------------------------===//
 //
 // This file defines common structures for working with the different
-// kinds of reference ownership supported by Swift, such as [weak] and
-// [unowned].
+// kinds of reference ownership supported by Swift, such as 'weak' and
+// 'unowned'.
 //
 //===----------------------------------------------------------------------===//
 

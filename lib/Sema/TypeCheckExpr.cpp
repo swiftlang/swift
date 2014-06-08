@@ -367,7 +367,7 @@ Type TypeChecker::getTypeOfRValue(ValueDecl *value, bool wantInterfaceType) {
   if (auto LV = type->getAs<LValueType>())
     return LV->getObjectType();
 
-  // Ignore @unowned and @weak, and @unmanaged qualification.
+  // Ignore 'unowned', 'weak' and @unmanaged qualification.
   if (type->is<ReferenceStorageType>())
     return type->getReferenceStorageReferent();
 
