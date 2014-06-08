@@ -2355,8 +2355,13 @@ namespace {
                                      IGF.IGM.TypeMetadataPtrTy->getPointerTo());
         unsigned index = 0;
         for (auto prop : storedProperties) {
-          llvm::Value *metadata = IGF.emitTypeMetadataRef(
-                                           prop->getType()->getCanonicalType());
+          auto propTy = prop->getType()->getCanonicalType();
+          // Strip reference storage qualifiers like unowned and weak.
+          // FIXME: Some clients probably care about them.
+          if (auto refStorTy = dyn_cast<ReferenceStorageType>(propTy))
+            propTy = refStorTy.getReferentType();
+          
+          llvm::Value *metadata = IGF.emitTypeMetadataRef(propTy);
           Address field = IGF.Builder.CreateConstArrayGEP(fields, index,
                                                       IGF.IGM.getPointerSize());
           IGF.Builder.CreateStore(metadata, field);
