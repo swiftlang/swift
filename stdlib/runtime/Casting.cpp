@@ -783,7 +783,7 @@ swift_stdlib_dynamicCastToExistential1Unconditional(
   return outValue;
 }
 
-#pragm clang diagnostic pop
+#pragma clang diagnostic pop
 
 // The return type is incorrect.  It is only important that it is
 // passed using 'sret'.
