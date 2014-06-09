@@ -10,6 +10,7 @@ else ()
 endif()
 
 add_swift_library(swift_runtime INSTALL
+  Casting.cpp
   FastEntryPoints.s
   HeapObject.cpp
   KnownMetadata.cpp
