@@ -2251,32 +2251,38 @@ enum class ResolvedLocatorKind : uint8_t {
 /// The entity to which a locator resolved.
 class ResolvedLocator {
   ResolvedLocatorKind kind;
-  ValueDecl *decl;
+  ConcreteDeclRef decl;
 
 public:
   ResolvedLocator() : kind(ResolvedLocatorKind::Unresolved) { }
 
-  ResolvedLocator(FuncDecl *func)
-    : kind(ResolvedLocatorKind::Function), decl(func)
+  enum ForFunction_t { ForFunction };
+  enum ForConstructor_t { ForConstructor };
+  enum ForVar_t { ForVar };
+  
+  ResolvedLocator(ForFunction_t, ConcreteDeclRef decl)
+    : kind(ResolvedLocatorKind::Function), decl(decl)
   {
+    assert(isa<FuncDecl>(decl.getDecl()));
   }
 
-  ResolvedLocator(ConstructorDecl *constructor)
-    : kind(ResolvedLocatorKind::Constructor), decl(constructor)
+  ResolvedLocator(ForConstructor_t, ConcreteDeclRef decl)
+    : kind(ResolvedLocatorKind::Constructor), decl(decl)
   {
+    assert(isa<ConstructorDecl>(decl.getDecl()));
   }
 
-  ResolvedLocator(VarDecl *param)
-    : kind(ResolvedLocatorKind::Parameter), decl(param)
+  ResolvedLocator(ForVar_t, ConcreteDeclRef decl)
+    : kind(ResolvedLocatorKind::Parameter), decl(decl)
   {
+    assert(isa<VarDecl>(decl.getDecl()));
   }
   
-
   /// Determine the kind of entity to which the locator resolved.
   ResolvedLocatorKind getKind() const { return kind; }
 
   /// Retrieve the declaration to which the locator resolved.
-  ValueDecl *getDecl() const { return decl; }
+  ConcreteDeclRef getDecl() const { return decl; }
 
   explicit operator bool() const {
     return getKind() != ResolvedLocatorKind::Unresolved;
@@ -2299,8 +2305,10 @@ public:
 ResolvedLocator resolveLocatorToDecl(
                   ConstraintSystem &cs,
                   ConstraintLocator *locator,
-                  std::function<Optional<OverloadChoice>(ConstraintLocator *)>
-                    findOvlChoice);
+                  std::function<Optional<SelectedOverload>(ConstraintLocator *)>
+                    findOvlChoice,
+                  std::function<ConcreteDeclRef(ValueDecl *decl,
+                                                Type openedType)> getConcreteDeclRef);
 
 } // end namespace constraints
 

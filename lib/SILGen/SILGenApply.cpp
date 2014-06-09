@@ -1495,7 +1495,7 @@ static SILValue emitRawApply(SILGenFunction &gen,
 /// lowered appropriately for the abstraction level but that the
 /// result does need to be turned back into something matching a
 /// formal type.
-static ManagedValue emitApply(SILGenFunction &gen,
+ManagedValue SILGenFunction::emitApply(
                               SILLocation loc,
                               ManagedValue fn,
                               ArrayRef<Substitution> subs,
@@ -1506,7 +1506,7 @@ static ManagedValue emitApply(SILGenFunction &gen,
                               bool transparent,
                               Optional<AbstractCC> overrideCC,
                               SGFContext evalContext) {
-  auto &formalResultTL = gen.getTypeLowering(substResultType);
+  auto &formalResultTL = getTypeLowering(substResultType);
   auto loweredFormalResultType = formalResultTL.getLoweredType();
   AbstractCC cc = overrideCC ? *overrideCC : substFnType->getAbstractCC();
 
@@ -1535,13 +1535,13 @@ static ManagedValue emitApply(SILGenFunction &gen,
     // into the context.
     emittedIntoContext = !hasAbsDiffs;
     if (emittedIntoContext) {
-      resultAddr = gen.getBufferForExprResult(loc, actualResultType,
+      resultAddr = getBufferForExprResult(loc, actualResultType,
                                               evalContext);
 
     // Otherwise, we need a temporary of the right abstraction.
     } else {
       resultAddr =
-        gen.emitTemporaryAllocation(loc, actualResultType.getObjectType());
+        emitTemporaryAllocation(loc, actualResultType.getObjectType());
     }
   }
   
@@ -1556,13 +1556,13 @@ static ManagedValue emitApply(SILGenFunction &gen,
     case swift::ParameterConvention::Direct_Owned:
       // If the callee will consume the 'self' parameter, let's retain it so we
       // can keep it alive.
-      gen.B.emitRetainValueOperation(loc, lifetimeExtendedSelf);
+      B.emitRetainValueOperation(loc, lifetimeExtendedSelf);
       break;
     case swift::ParameterConvention::Direct_Guaranteed:
     case swift::ParameterConvention::Direct_Unowned:
       // We'll manually manage the argument's lifetime after the call. Disable
       // its cleanup.
-      args.back().forwardCleanup(gen);
+      args.back().forwardCleanup(*this);
       break;
         
     case swift::ParameterConvention::Indirect_In:
@@ -1575,7 +1575,7 @@ static ManagedValue emitApply(SILGenFunction &gen,
   }
   
   // Emit the raw application.
-  SILValue scalarResult = emitRawApply(gen, loc, fn, subs, args,
+  SILValue scalarResult = emitRawApply(*this, loc, fn, subs, args,
                                        substFnType, transparent, resultAddr);
 
   // If we emitted into the eval context, then it's because there was
@@ -1585,7 +1585,7 @@ static ManagedValue emitApply(SILGenFunction &gen,
     assert(substFnType->hasIndirectResult());
     assert(!hasAbsDiffs);
     auto managedBuffer =
-      gen.manageBufferForExprResult(resultAddr, formalResultTL, evalContext);
+      manageBufferForExprResult(resultAddr, formalResultTL, evalContext);
 
     // managedBuffer will be null here to indicate that we satisfied
     // the evalContext.  If so, we're done.
@@ -1595,23 +1595,23 @@ static ManagedValue emitApply(SILGenFunction &gen,
 
     // Otherwise, deactivate the cleanup we just entered; we're about
     // to take from the address.
-    resultAddr = managedBuffer.forward(gen);
+    resultAddr = managedBuffer.forward(*this);
   }
 
   // Get the type lowering for the actual result representation.
   // This is very likely to be the same as that for the formal result.
   auto &actualResultTL
     = (actualResultType == loweredFormalResultType
-         ? formalResultTL : gen.getTypeLowering(actualResultType));
+         ? formalResultTL : getTypeLowering(actualResultType));
 
   // If the expected result is an address, manage the result address.
   if (formalResultTL.isAddressOnly()) {
     assert(resultAddr);
     auto managedActualResult =
-      gen.emitManagedBufferWithCleanup(resultAddr, actualResultTL);
+      emitManagedBufferWithCleanup(resultAddr, actualResultTL);
 
     if (!hasAbsDiffs) return managedActualResult;
-    return gen.emitOrigToSubstValue(loc, managedActualResult,
+    return emitOrigToSubstValue(loc, managedActualResult,
                                     origResultType, substResultType,
                                     evalContext);
   }
@@ -1624,8 +1624,8 @@ static ManagedValue emitApply(SILGenFunction &gen,
 
   // If we got an indirect result, emit a take out of the result address.
   if (substFnType->hasIndirectResult()) {
-    managedScalar = gen.emitLoad(loc, resultAddr, actualResultTL,
-                                 SGFContext(), IsTake);
+    managedScalar = emitLoad(loc, resultAddr, actualResultTL,
+                             SGFContext(), IsTake);
 
   // Otherwise, manage the direct result.
   } else {
@@ -1636,24 +1636,24 @@ static ManagedValue emitApply(SILGenFunction &gen,
 
     case ResultConvention::Autoreleased:
       // Autoreleased. Retain using retain_autoreleased.
-      gen.B.createStrongRetainAutoreleased(loc, scalarResult);
+      B.createStrongRetainAutoreleased(loc, scalarResult);
       break;
         
     case ResultConvention::UnownedInnerPointer:
       // Autorelease the 'self' value to lifetime-extend it.
       assert(lifetimeExtendedSelf.isValid()
              && "did not save lifetime-extended self param");
-      gen.B.createAutoreleaseValue(loc, lifetimeExtendedSelf);
+      B.createAutoreleaseValue(loc, lifetimeExtendedSelf);
       SWIFT_FALLTHROUGH;
         
     case ResultConvention::Unowned:
       // Unretained. Retain the value.
-      actualResultTL.emitRetainValue(gen.B, loc, scalarResult);
+      actualResultTL.emitRetainValue(B, loc, scalarResult);
       break;
     }
 
-    managedScalar = gen.emitManagedRValueWithCleanup(scalarResult,
-                                                     actualResultTL);
+    managedScalar = emitManagedRValueWithCleanup(scalarResult,
+                                                 actualResultTL);
   }
 
   // Fast path: no abstraction differences or bridging.
@@ -1661,15 +1661,15 @@ static ManagedValue emitApply(SILGenFunction &gen,
 
   // Remove abstraction differences.
   if (origResultType.getAsType() != substResultType) {
-    managedScalar = gen.emitOrigToSubstValue(loc, managedScalar,
-                                             origResultType,
-                                             substResultType,
-                                             SGFContext());
+    managedScalar = emitOrigToSubstValue(loc, managedScalar,
+                                         origResultType,
+                                         substResultType,
+                                         SGFContext());
   }
 
   // Convert the result to a native value.
-  return gen.emitBridgedToNativeValue(loc, managedScalar, cc,
-                                      substResultType);
+  return emitBridgedToNativeValue(loc, managedScalar, cc,
+                                  substResultType);
 }
 
 ManagedValue SILGenFunction::emitMonomorphicApply(SILLocation loc,
@@ -1680,7 +1680,7 @@ ManagedValue SILGenFunction::emitMonomorphicApply(SILLocation loc,
                                               Optional<AbstractCC> overrideCC) {
   auto fnType = fn.getType().castTo<SILFunctionType>();
   assert(!fnType->isPolymorphic());
-  return emitApply(*this, loc, fn, {}, args, fnType,
+  return emitApply(loc, fn, {}, args, fnType,
                    AbstractionPattern(resultType), resultType,
                    transparent, overrideCC, SGFContext());
 }
@@ -2098,7 +2098,7 @@ namespace {
                                     uncurriedArgs,
                                     uncurriedContext);
       else
-        result = emitApply(gen, uncurriedLoc.getValue(), mv,
+        result = gen.emitApply(uncurriedLoc.getValue(), mv,
                            callee.getSubstitutions(),
                            uncurriedArgs,
                            substFnType,
@@ -2128,7 +2128,7 @@ namespace {
                                       uncurriedArgs);
         SGFContext context = i == size - 1 ? C : SGFContext();
         SILLocation loc = extraSites[i].Loc;
-        result = emitApply(gen, loc, result, {}, uncurriedArgs,
+        result = gen.emitApply(loc, result, {}, uncurriedArgs,
                            substFnType,
                            origFormalType,
                            extraSites[i].getSubstResultType(),
@@ -2661,7 +2661,7 @@ SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
 
   assert(substFnType->getAbstractCC() == AbstractCC::Freestanding);
 
-  return emitApply(*this, loc, mv, subs, args, substFnType,
+  return emitApply(loc, mv, subs, args, substFnType,
                    AbstractionPattern(origFormalType.getResult()),
                    substFormalType.getResult(),
                    transparent, Nothing, ctx);

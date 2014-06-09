@@ -772,6 +772,21 @@ public:
   
   RValue emitApplyExpr(ApplyExpr *e, SGFContext c);
 
+  /// Emit a function application, assuming that the arguments have been
+  /// lowered appropriately for the abstraction level but that the
+  /// result does need to be turned back into something matching a
+  /// formal type.
+  ManagedValue emitApply(SILLocation loc,
+                         ManagedValue fn,
+                         ArrayRef<Substitution> subs,
+                         ArrayRef<ManagedValue> args,
+                         CanSILFunctionType substFnType,
+                         AbstractionPattern origResultType,
+                         CanType substResultType,
+                         bool transparent,
+                         Optional<AbstractCC> overrideCC,
+                         SGFContext evalContext);
+
   /// A convenience method for emitApply that just handles monomorphic
   /// applications.
   ManagedValue emitMonomorphicApply(SILLocation loc,

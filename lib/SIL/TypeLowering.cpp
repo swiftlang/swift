@@ -1507,23 +1507,51 @@ static CanAnyFunctionType getGlobalAccessorType(CanType varType) {
 }
 
 /// Get the type of a default argument generator, () -> T.
-static CanAnyFunctionType getDefaultArgGeneratorType(AbstractFunctionDecl *AFD,
+static CanAnyFunctionType getDefaultArgGeneratorType(TypeConverter &TC,
+                                                     AbstractFunctionDecl *AFD,
                                                      unsigned DefaultArgIndex,
                                                      ASTContext &context) {
-  // FIXME: Should be generic if the function is generic
   auto resultTy = AFD->getDefaultArg(DefaultArgIndex).second->getCanonicalType();
   assert(resultTy && "Didn't find default argument?");
+  
+  // Get the generic parameters from the surrounding context.
+  auto genericParams
+    = TC.getConstantInfo(SILDeclRef(AFD))
+        .ContextGenericParams;
+  
+  if (genericParams)
+    return CanPolymorphicFunctionType::get(TupleType::getEmpty(context),
+                                           resultTy,
+                                           genericParams,
+                                           AnyFunctionType::ExtInfo());
+
   return CanFunctionType::get(TupleType::getEmpty(context), resultTy);
 }
 
 /// Get the type of a default argument generator, () -> T.
 static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
+                                                     TypeConverter &TC,
                                                      AbstractFunctionDecl *AFD,
                                                      unsigned DefaultArgIndex,
                                                      ASTContext &context) {
-  // FIXME: Should be generic if the function is generic
   auto resultTy = AFD->getDefaultArg(DefaultArgIndex).second->getCanonicalType();
   assert(resultTy && "Didn't find default argument?");
+  
+  // Get the generic signature from the surrounding context.
+  auto funcInfo = TC.getConstantInfo(SILDeclRef(AFD));
+  CanGenericSignature sig;
+  if (auto genTy = funcInfo.FormalInterfaceType->getAs<GenericFunctionType>()) {
+    sig = genTy->getGenericSignature()->getCanonicalSignature();
+    resultTy = TC.getInterfaceTypeInContext(resultTy,
+                                            funcInfo.ContextGenericParams);
+  }
+  
+  if (sig)
+    return CanGenericFunctionType::get(sig,
+                                       TupleType::getEmpty(context),
+                                       resultTy,
+                                       AnyFunctionType::ExtInfo());
+  
   return CanFunctionType::get(TupleType::getEmpty(context), resultTy);
 }
 
@@ -1910,7 +1938,8 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c,
     return getGlobalAccessorType(var->getInterfaceType()->getCanonicalType());
   }
   case SILDeclRef::Kind::DefaultArgGenerator:
-    return getDefaultArgGeneratorInterfaceType(cast<AbstractFunctionDecl>(vd),
+    return getDefaultArgGeneratorInterfaceType(*this,
+                                      cast<AbstractFunctionDecl>(vd),
                                       c.defaultArgIndex, Context);
   case SILDeclRef::Kind::IVarInitializer:
     return getIVarInitDestroyerInterfaceType(cast<ClassDecl>(vd),
@@ -1968,13 +1997,13 @@ TypeConverter::getConstantContextGenericParams(SILDeclRef c,
       nullptr,
     };
   }
-  case SILDeclRef::Kind::DefaultArgGenerator: {
-    // FIXME: Should be generic if the function is generic
-    return {nullptr, nullptr};
-  }
   case SILDeclRef::Kind::IVarInitializer:
   case SILDeclRef::Kind::IVarDestroyer:
     return {cast<ClassDecl>(vd)->getGenericParamsOfContext(), nullptr};
+  case SILDeclRef::Kind::DefaultArgGenerator:
+    // Use the context generic parameters of the original declaration.
+    return getConstantContextGenericParams(SILDeclRef(c.getDecl()),
+                                           /*captures*/ false);
   }
 }
 
@@ -2022,7 +2051,8 @@ CanAnyFunctionType TypeConverter::makeConstantType(SILDeclRef c,
     return getGlobalAccessorType(var->getType()->getCanonicalType());
   }
   case SILDeclRef::Kind::DefaultArgGenerator:
-    return getDefaultArgGeneratorType(cast<AbstractFunctionDecl>(vd),
+    return getDefaultArgGeneratorType(*this,
+                                      cast<AbstractFunctionDecl>(vd),
                                       c.defaultArgIndex, Context);
   case SILDeclRef::Kind::IVarInitializer:
       return getIVarInitDestroyerType(cast<ClassDecl>(vd), c.isForeign,

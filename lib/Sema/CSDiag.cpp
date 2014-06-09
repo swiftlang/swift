@@ -396,15 +396,17 @@ static Pattern *getParameterPattern(ValueDecl *decl) {
 }
 
 ResolvedLocator constraints::resolveLocatorToDecl(
-                  ConstraintSystem &cs,
-                  ConstraintLocator *locator,
-                  std::function<Optional<OverloadChoice>(ConstraintLocator *)>
-                    findOvlChoice) {
+   ConstraintSystem &cs,
+   ConstraintLocator *locator,
+   std::function<Optional<SelectedOverload>(ConstraintLocator *)> findOvlChoice,
+   std::function<ConcreteDeclRef (ValueDecl *decl,
+                                  Type openedType)> getConcreteDeclRef)
+{
   assert(locator && "Null locator");
   if (!locator->getAnchor())
     return ResolvedLocator();
 
-  ValueDecl *decl = nullptr;
+  ConcreteDeclRef declRef;
   auto anchor = locator->getAnchor();
   // Unwrap any specializations, constructor calls, implicit conversions, and
   // '.'s.
@@ -437,39 +439,45 @@ ResolvedLocator constraints::resolveLocatorToDecl(
 
     break;
   } while (true);
-
+  
+  auto getConcreteDeclRefFromOverload
+    = [&](const SelectedOverload &selected) -> ConcreteDeclRef {
+      return getConcreteDeclRef(selected.choice.getDecl(),
+                                selected.openedType);
+    };
+  
   if (auto dre = dyn_cast<DeclRefExpr>(anchor)) {
     // Simple case: direct reference to a declaration.
-    decl = dre->getDecl();
+    declRef = dre->getDeclRef();
   } else if (auto mre = dyn_cast<MemberRefExpr>(anchor)) {
     // Simple case: direct reference to a declaration.
-    decl = mre->getMember().getDecl();
+    declRef = mre->getMember();
   } else if (isa<OverloadedDeclRefExpr>(anchor) ||
              isa<OverloadedMemberRefExpr>(anchor) ||
              isa<UnresolvedDeclRefExpr>(anchor)) {
     // Overloaded and unresolved cases: find the resolved overload.
     auto anchorLocator = cs.getConstraintLocator(anchor);
-    if (auto choice = findOvlChoice(anchorLocator)) {
+    if (auto selected = findOvlChoice(anchorLocator)) {
       // FIXME: DeclViaDynamic
-      if (choice->getKind() == OverloadChoiceKind::Decl)
-        decl = choice->getDecl();
+      if (selected->choice.getKind() == OverloadChoiceKind::Decl)
+        declRef = getConcreteDeclRefFromOverload(*selected);
     }
   } else if (isa<UnresolvedMemberExpr>(anchor)) {
     // Unresolved member: find the resolved overload.
     auto anchorLocator = cs.getConstraintLocator(
                            anchor,
                            ConstraintLocator::UnresolvedMember);
-    if (auto choice = findOvlChoice(anchorLocator)) {
+    if (auto selected = findOvlChoice(anchorLocator)) {
       // FIXME: DeclViaDynamic
-      if (choice->getKind() == OverloadChoiceKind::Decl)
-        decl = choice->getDecl();
+      if (selected->choice.getKind() == OverloadChoiceKind::Decl)
+        declRef = getConcreteDeclRefFromOverload(*selected);
     }
   } else if (auto ctorRef = dyn_cast<OtherConstructorDeclRefExpr>(anchor)) {
-    decl = ctorRef->getDecl();
+    declRef = ctorRef->getDeclRef();
   }
 
   // If we didn't find the declaration, we're out of luck.
-  if (!decl)
+  if (!declRef)
     return ResolvedLocator();
 
   // Use the declaration and the path to produce a more specific result.
@@ -483,7 +491,7 @@ ResolvedLocator constraints::resolveLocatorToDecl(
     case ConstraintLocator::ApplyArgument:
       // If we're calling into something that has parameters, dig into the
       // actual parameter pattern.
-      parameterPattern = getParameterPattern(decl);
+      parameterPattern = getParameterPattern(declRef.getDecl());
       if (!parameterPattern)
         break;
 
@@ -543,15 +551,15 @@ ResolvedLocator constraints::resolveLocatorToDecl(
     }
 
     if (auto named = dyn_cast<NamedPattern>(parameterPattern)) {
-      return ResolvedLocator(named->getDecl());
+      return ResolvedLocator(ResolvedLocator::ForVar, named->getDecl());
     }
   }
 
   // Otherwise, do the best we can with the declaration we found.
-  if (auto func = dyn_cast<FuncDecl>(decl))
-    return ResolvedLocator(func);
-  if (auto constructor = dyn_cast<ConstructorDecl>(decl))
-    return ResolvedLocator(constructor);
+  if (isa<FuncDecl>(declRef.getDecl()))
+    return ResolvedLocator(ResolvedLocator::ForFunction, declRef);
+  if (isa<ConstructorDecl>(declRef.getDecl()))
+    return ResolvedLocator(ResolvedLocator::ForConstructor, declRef);
 
   // FIXME: Deal with the other interesting cases here, e.g.,
   // subscript declarations.
@@ -570,14 +578,21 @@ static void noteTargetOfDiagnostic(ConstraintSystem &cs,
   // Try to resolve the locator to a particular declaration.
   auto resolved
     = resolveLocatorToDecl(cs, targetLocator,
-        [&](ConstraintLocator *locator) -> Optional<OverloadChoice> {
+        [&](ConstraintLocator *locator) -> Optional<SelectedOverload> {
           for (auto resolved = failure.getResolvedOverloadSets();
                resolved; resolved = resolved->Previous) {
             if (resolved->Locator == locator)
-              return resolved->Choice;
+              return SelectedOverload{resolved->Choice,
+                                      resolved->OpenedFullType,
+                                      // FIXME: opened type?
+                                      Type()};
           }
 
           return Nothing;
+        },
+        [&](ValueDecl *decl,
+            Type openedType) -> ConcreteDeclRef {
+          return decl;
         });
 
   // We couldn't resolve the locator to a declaration, so we're done.
@@ -590,23 +605,24 @@ static void noteTargetOfDiagnostic(ConstraintSystem &cs,
     return;
 
   case ResolvedLocatorKind::Function: {
-    auto name = resolved.getDecl()->getName();
-    cs.getTypeChecker().diagnose(resolved.getDecl(),
+    auto name = resolved.getDecl().getDecl()->getName();
+    cs.getTypeChecker().diagnose(resolved.getDecl().getDecl(),
                                  name.isOperator()? diag::note_call_to_operator
                                                   : diag::note_call_to_func,
-                                 resolved.getDecl()->getName());
+                                 resolved.getDecl().getDecl()->getName());
     return;
   }
 
   case ResolvedLocatorKind::Constructor:
     // FIXME: Specialize for implicitly-generated constructors.
-    cs.getTypeChecker().diagnose(resolved.getDecl(),
+    cs.getTypeChecker().diagnose(resolved.getDecl().getDecl(),
                                  diag::note_call_to_initializer);
     return;
 
   case ResolvedLocatorKind::Parameter:
-    cs.getTypeChecker().diagnose(resolved.getDecl(), diag::note_init_parameter,
-                                 resolved.getDecl()->getName());
+    cs.getTypeChecker().diagnose(resolved.getDecl().getDecl(),
+                                 diag::note_init_parameter,
+                                 resolved.getDecl().getDecl()->getName());
     return;
   }
 }

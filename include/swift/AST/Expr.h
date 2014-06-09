@@ -1939,13 +1939,13 @@ private:
 
   /// If there are any default arguments, the owning function
   /// declaration.
-  ValueDecl *DefaultArgsOwner;
+  ConcreteDeclRef DefaultArgsOwner;
 
   MutableArrayRef<Expr *> CallerDefaultArgs;
 
 public:
   TupleShuffleExpr(Expr *subExpr, ArrayRef<int> elementMapping, 
-                   ValueDecl *defaultArgsOwner,
+                   ConcreteDeclRef defaultArgsOwner,
                    MutableArrayRef<Expr *> CallerDefaultArgs, Type ty)
     : ImplicitConversionExpr(ExprKind::TupleShuffle, subExpr, ty),
       ElementMapping(elementMapping), InjectionFn(nullptr),
@@ -1966,7 +1966,7 @@ public:
   }
 
   /// Retrieve the owner of the default arguments.
-  ValueDecl *getDefaultArgsOwner() const { return DefaultArgsOwner; }
+  ConcreteDeclRef getDefaultArgsOwner() const { return DefaultArgsOwner; }
 
   /// Retrieve the caller-defaulted arguments.
   ArrayRef<Expr *> getCallerDefaultArgs() const { return CallerDefaultArgs; }
@@ -2247,7 +2247,7 @@ public:
   /// caller-side default argument expression, the declaration from which the
   /// callee-side default argument should be produced, or null to indicate the
   /// 'hole' where the scalar expression should be placed.
-  typedef llvm::PointerUnion<Expr *, ValueDecl *> Element;
+  typedef llvm::PointerUnion<Expr *, ConcreteDeclRef> Element;
 
 private:
   /// If we're doing a varargs shuffle, this is the function to build the

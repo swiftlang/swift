@@ -117,6 +117,10 @@ public:
     return Data.get<SpecializedDeclRef *>()->getSubstitutions();
   }
 
+  bool operator==(ConcreteDeclRef rhs) const {
+    return Data == rhs.Data;
+  }
+  
   /// Dump a debug representation of this reference.
   void dump(raw_ostream &os);
   void dump() LLVM_ATTRIBUTE_USED;

@@ -2011,12 +2011,26 @@ RValue RValueEmitter::visitTupleShuffleExpr(TupleShuffleExpr *E,
       unsigned destIndex
         = shuffleIndexIterator - E->getElementMapping().begin() - 1;
       SILDeclRef generator 
-        = SILDeclRef::getDefaultArgGenerator(E->getDefaultArgsOwner(),
+        = SILDeclRef::getDefaultArgGenerator(E->getDefaultArgsOwner().getDecl(),
                                               destIndex);
+      
       auto fnRef = SGF.emitFunctionRef(E, generator);
       auto resultType = field.getType()->getCanonicalType();
-      auto apply = SGF.emitMonomorphicApply(E, fnRef, {}, resultType,
-                                            generator.isTransparent());
+      
+      auto fnType = fnRef.getType().castTo<SILFunctionType>();
+      auto substFnType = fnType->substInterfaceGenericArgs(SGF.SGM.M,
+                                   SGF.SGM.M.getSwiftModule(),
+                                   E->getDefaultArgsOwner().getSubstitutions());
+      auto origResultType = AbstractionPattern(
+        E->getDefaultArgsOwner().getDecl()->getType()->getCanonicalType());
+      
+      auto apply = SGF.emitApply(E, fnRef, E->getDefaultArgsOwner().getSubstitutions(),
+                                 {}, substFnType,
+                                 origResultType, resultType,
+                                 generator.isTransparent(),
+                                 Nothing,
+                                 SGFContext());
+      
       result.addElement(SGF, apply, resultType, E);
       continue;
     }
@@ -2116,9 +2130,9 @@ static void emitScalarToTupleExprInto(SILGenFunction &gen,
     // that generator in-place.
     assert(outerFields[i].hasInit() &&
            "no default initializer in non-scalar field of scalar-to-tuple?!");
-    if (auto defaultArgOwner = element.dyn_cast<ValueDecl *>()) {
+    if (auto defaultArgOwner = element.dyn_cast<ConcreteDeclRef>()) {
       SILDeclRef generator
-        = SILDeclRef::getDefaultArgGenerator(defaultArgOwner, i);
+        = SILDeclRef::getDefaultArgGenerator(defaultArgOwner.getDecl(), i);
       auto fnRef = gen.emitFunctionRef(E, generator);
       auto resultType = tupleType.getElementType(i);
       auto apply = gen.emitMonomorphicApply(E, fnRef, {}, resultType,
@@ -2186,13 +2200,26 @@ RValue RValueEmitter::visitScalarToTupleExpr(ScalarToTupleExpr *E,
     // that generator.
     assert(outerFields[i].hasInit() &&
            "no default initializer in non-scalar field of scalar-to-tuple?!");
-    if (auto defaultArgOwner = element.dyn_cast<ValueDecl *>()) {
+    if (auto defaultArgOwner = element.dyn_cast<ConcreteDeclRef>()) {
       SILDeclRef generator
-        = SILDeclRef::getDefaultArgGenerator(defaultArgOwner, i);
+        = SILDeclRef::getDefaultArgGenerator(defaultArgOwner.getDecl(), i);
       auto fnRef = SGF.emitFunctionRef(E, generator);
       auto resultType = outerFields[i].getType()->getCanonicalType();
-      auto apply = SGF.emitMonomorphicApply(E, fnRef, {}, resultType,
-                                            generator.isTransparent());
+      
+      auto fnType = fnRef.getType().castTo<SILFunctionType>();
+      auto substFnType = fnType->substInterfaceGenericArgs(SGF.SGM.M,
+                                   SGF.SGM.M.getSwiftModule(),
+                                   defaultArgOwner.getSubstitutions());
+      auto origResultType = AbstractionPattern(
+        defaultArgOwner.getDecl()->getType()->getCanonicalType());
+      
+      auto apply = SGF.emitApply(E, fnRef, defaultArgOwner.getSubstitutions(),
+                                 {}, substFnType,
+                                 origResultType, resultType,
+                                 generator.isTransparent(),
+                                 Nothing,
+                                 SGFContext());
+
       result.addElement(SGF, apply, resultType, E);
       continue;
     }
