@@ -20,6 +20,7 @@
 #include "swift/Runtime/Metadata.h"
 #include "llvm/ADT/DenseMap.h"
 #include "Debug.h"
+#include "ExistentialMetadataImpl.h"
 
 #include <dlfcn.h>
 
@@ -28,6 +29,7 @@
 #include <sstream>
 
 using namespace swift;
+using namespace metadataimpl;
 
 // Objective-C runtime entry points.
 extern "C" const ClassMetadata* object_getClass(const void *);
@@ -693,4 +695,311 @@ recur:
     assert(false);
     return nullptr;
   }
+}
+
+static const Metadata *getDynamicTypeMetadata(OpaqueValue *value,
+                                              const Metadata *type) {
+  if (type->getKind() == MetadataKind::Existential) {
+    const auto existentialMetadata =
+        static_cast<const ExistentialTypeMetadata *>(type);
+    return existentialMetadata->getDynamicType(value);
+  }
+  return type;
+}
+
+static const void *
+findWitnessTableForDynamicCastToExistential1(OpaqueValue *sourceValue,
+                                             const Metadata *sourceType,
+                                             const Metadata *destType) {
+  if (destType->getKind() != MetadataKind::Existential)
+    swift::crash("Swift protocol conformance check failed: "
+                 "destination type is not an existential");
+
+  auto destExistentialMetadata =
+      static_cast<const ExistentialTypeMetadata *>(destType);
+
+  if (destExistentialMetadata->Protocols.NumProtocols != 1)
+    swift::crash("Swift protocol conformance check failed: "
+                 "destination type conforms more than to one protocol");
+
+  auto destProtocolDescriptor = destExistentialMetadata->Protocols[0];
+
+  if (sourceType->getKind() == MetadataKind::Existential)
+    swift::crash("Swift protocol conformance check failed: "
+                 "source type is an existential");
+
+  return swift_conformsToProtocol(sourceType, destProtocolDescriptor, nullptr);
+}
+
+// func _stdlib_conformsToProtocol<SourceType, DestType>(
+//     value: SourceType, _: DestType.Type
+// ) -> Bool
+extern "C" bool
+swift_stdlib_conformsToProtocol(
+    OpaqueValue *sourceValue, const Metadata *_destType,
+    const Metadata *sourceType, const Metadata *destType) {
+  // Existentials don't carry complete type information about the value, but
+  // it is necessary to find the witness tables.  Find the dynamic type and
+  // use it instead.
+  sourceType = getDynamicTypeMetadata(sourceValue, sourceType);
+  auto vw = findWitnessTableForDynamicCastToExistential1(sourceValue,
+                                                         sourceType, destType);
+  sourceType->vw_destroy(sourceValue);
+  return vw != nullptr;
+}
+
+// Work around a really dumb clang bug where it doesn't instantiate
+// the return type first.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wreturn-type-c-linkage"
+
+// func _stdlib_dynamicCastToExistential1Unconditional<SourceType, DestType>(
+//     value: SourceType,
+//     _: DestType.Type
+// ) -> DestType
+extern "C" FixedOpaqueExistentialContainer<1>
+swift_stdlib_dynamicCastToExistential1Unconditional(
+    OpaqueValue *sourceValue, const Metadata *_destType,
+    const Metadata *sourceType, const Metadata *destType) {
+  // Existentials don't carry complete type information about the value, but
+  // it is necessary to find the witness tables.  Find the dynamic type and
+  // use it instead.
+  sourceType = getDynamicTypeMetadata(sourceValue, sourceType);
+  auto vw = findWitnessTableForDynamicCastToExistential1(sourceValue,
+                                                         sourceType, destType);
+  if (!vw)
+    swift::crash("Swift dynamic cast failed: "
+                 "type does not conform to the protocol");
+
+  // Note: the 'sourceType' has been adjusted to the dynamic type of the value.
+  // It is important so that we don't return a value with Existential metadata.
+  using box = OpaqueExistentialBox<1>;
+
+  box::Container outValue;
+  outValue.Header.Type = sourceType;
+  outValue.WitnessTables[0] = vw;
+  sourceType->vw_initializeBufferWithTake(outValue.getBuffer(), sourceValue);
+
+  return outValue;
+}
+
+#pragm clang diagnostic pop
+
+// The return type is incorrect.  It is only important that it is
+// passed using 'sret'.
+extern "C" OpaqueExistentialContainer
+_TFSs24_injectValueIntoOptionalU__FQ_GSqQ__(OpaqueValue *value,
+                                            const Metadata *T);
+
+// The return type is incorrect.  It is only important that it is
+// passed using 'sret'.
+extern "C" OpaqueExistentialContainer
+_TFSs26_injectNothingIntoOptionalU__FT_GSqQ__(const Metadata *T);
+
+// func _stdlib_dynamicCastToExistential1<SourceType, DestType>(
+//     value: SourceType,
+//     _: DestType.Type
+// ) -> DestType?
+//
+// The return type is incorrect.  It is only important that it is
+// passed using 'sret'.
+extern "C" OpaqueExistentialContainer swift_stdlib_dynamicCastToExistential1(
+    OpaqueValue *sourceValue, const Metadata *_destType,
+    const Metadata *sourceType, const Metadata *destType) {
+  // Existentials don't carry complete type information about the value, but
+  // it is necessary to find the witness tables.  Find the dynamic type and
+  // use it instead.
+  sourceType = getDynamicTypeMetadata(sourceValue, sourceType);
+  auto vw = findWitnessTableForDynamicCastToExistential1(sourceValue,
+                                                         sourceType, destType);
+  if (!vw) {
+    sourceType->vw_destroy(sourceValue);
+    return _TFSs26_injectNothingIntoOptionalU__FT_GSqQ__(destType);
+  }
+
+  // Note: the 'sourceType' has been adjusted to the dynamic type of the value.
+  // It is important so that we don't return a value with Existential metadata.
+  using box = OpaqueExistentialBox<1>;
+
+  box::Container outValue;
+  outValue.Header.Type = sourceType;
+  outValue.WitnessTables[0] = vw;
+  sourceType->vw_initializeBufferWithTake(outValue.getBuffer(), sourceValue);
+
+  return _TFSs24_injectValueIntoOptionalU__FQ_GSqQ__(
+      reinterpret_cast<OpaqueValue *>(&outValue), destType);
+}
+
+//===----------------------------------------------------------------------===//
+// Bridging to and from Objective-C
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+// protocol _BridgedToObjectiveC {
+struct _BridgedToObjectiveCWitnessTable {
+  // typealias ObjectiveCType: class
+  const Metadata *ObjectiveCType;
+
+  // class func getObjectiveCType() -> Any.Type
+  const Metadata *(*getObjectiveCType)(const Metadata *self,
+                                       const Metadata *selfType);
+
+  // func bridgeToObjectiveC() -> ObjectiveCType
+  HeapObject *(*bridgeToObjectiveC)(OpaqueValue *self, const Metadata *Self);
+  // func bridgeFromObjectiveC(x: ObjectiveCType) -> Self?
+  OpaqueExistentialContainer (*bridgeFromObjectiveC)(HeapObject *sourceValue,
+                                                     const Metadata *self,
+                                                     const Metadata *selfType);
+};
+// }
+
+// protocol _ConditionallyBridgedToObjectiveC {
+struct _ConditionallyBridgedToObjectiveCWitnessTable {
+  // My untrained eye can't find this offset in the generated LLVM IR,
+  // but I do see it being applied in x86 assembly.  It disappears
+  // when inheritance from _BridgedToObjectiveC is removed.  If it
+  // presents any portability problems we can drop that inheritance
+  // relationship.
+  const void *const probablyPointsAtBridgedToObjectiveCWitnessTable;
+
+  // class func isBridgedToObjectiveC() -> bool
+  bool (*isBridgedToObjectiveC)(const Metadata *value, const Metadata *T);
+};
+// }
+
+} // unnamed namespace
+
+extern "C" const ProtocolDescriptor _TMpSs20_BridgedToObjectiveC;
+extern "C" const ProtocolDescriptor _TMpSs33_ConditionallyBridgedToObjectiveC;
+
+//===--- Bridging helpers for the Swift stdlib ----------------------------===//
+// Functions that must discover and possibly use an arbitrary type's
+// conformance to a given protocol.  See ../core/BridgeObjectiveC.swift for
+// documentation.
+//===----------------------------------------------------------------------===//
+static const _BridgedToObjectiveCWitnessTable *
+findBridgeWitness(const Metadata *T) {
+  auto w = swift_conformsToProtocol(T, &_TMpSs20_BridgedToObjectiveC, nullptr);
+  return reinterpret_cast<const _BridgedToObjectiveCWitnessTable *>(w);
+}
+
+static const _ConditionallyBridgedToObjectiveCWitnessTable *
+findConditionalBridgeWitness(const Metadata *T) {
+  auto w = swift_conformsToProtocol(
+      T, &_TMpSs33_ConditionallyBridgedToObjectiveC, nullptr);
+
+  return reinterpret_cast<
+      const _ConditionallyBridgedToObjectiveCWitnessTable *>(w);
+}
+
+static inline bool swift_isClassOrObjCExistentialImpl(const Metadata *T) {
+  auto kind = T->getKind();
+  return kind == MetadataKind::Class ||
+         kind == MetadataKind::ObjCClassWrapper ||
+         (kind == MetadataKind::Existential &&
+          static_cast<const ExistentialTypeMetadata *>(T)->isObjC());
+}
+
+extern "C" HeapObject *swift_bridgeNonVerbatimToObjectiveC(
+  OpaqueValue *value, const Metadata *T
+) {
+  assert(!swift_isClassOrObjCExistentialImpl(T));
+
+  auto const bridgeWitness = findBridgeWitness(T);
+
+  if (bridgeWitness) {
+    if (auto conditionalWitness = findConditionalBridgeWitness(T)) {
+      if (!conditionalWitness->isBridgedToObjectiveC(T, T))
+        return nullptr;
+    }
+    auto result = bridgeWitness->bridgeToObjectiveC(value, T);
+    // Witnesses take 'self' at +0, so we still need to consume the +1 argument.
+    T->vw_destroy(value);
+    return result;
+  }
+
+  return nullptr;
+}
+
+extern "C" const Metadata *swift_getBridgedNonVerbatimObjectiveCType(
+  const Metadata *value, const Metadata *T
+) {
+  // Classes and Objective-C existentials bridge verbatim.
+  assert(!swift_isClassOrObjCExistentialImpl(T));
+
+  // Check if the type conforms to _BridgedToObjectiveC, in which case
+  // we'll extract its associated type.
+  if (const auto *bridgeWitness = findBridgeWitness(T)) {
+    return bridgeWitness->getObjectiveCType(T, T);
+  }
+  
+  return nullptr;
+}
+
+// @asmname("swift_bridgeNonVerbatimFromObjectiveC")
+// func _bridgeNonVerbatimFromObjectiveC<NativeType>(
+//     x: AnyObject, nativeType: NativeType.Type
+// ) -> NativeType?
+extern "C" OpaqueExistentialContainer
+swift_bridgeNonVerbatimFromObjectiveC(
+  HeapObject *sourceValue,
+  const Metadata *nativeType,
+  const Metadata *nativeType_
+) {
+  // Check if the type conforms to _BridgedToObjectiveC.
+  const auto *bridgeWitness = findBridgeWitness(nativeType);
+  if (bridgeWitness) {
+    // if the type also conforms to _ConditionallyBridgedToObjectiveC,
+    // make sure it bridges at runtime
+    auto conditionalWitness = findConditionalBridgeWitness(nativeType);
+    if (
+      conditionalWitness == nullptr
+      || conditionalWitness->isBridgedToObjectiveC(nativeType, nativeType)
+    ) {
+      // Check if sourceValue has the ObjectiveCType type required by the
+      // protocol.
+      const Metadata *objectiveCType =
+          bridgeWitness->getObjectiveCType(nativeType, nativeType);
+        
+      auto sourceValueAsObjectiveCType =
+          const_cast<void*>(swift_dynamicCast(sourceValue, objectiveCType));
+        
+      if (sourceValueAsObjectiveCType) {
+        // The type matches.  bridgeFromObjectiveC returns `Self?`;
+        // this function returns `NativeType`, so we don't need to
+        // re-wrap the optional.
+        return bridgeWitness->bridgeFromObjectiveC(
+          static_cast<HeapObject*>(sourceValueAsObjectiveCType),
+            nativeType, nativeType);
+      }
+    }
+  }
+
+  // return nil
+  swift_unknownRelease(sourceValue);
+  return _TFSs26_injectNothingIntoOptionalU__FT_GSqQ__(nativeType);
+}
+
+// func isBridgedNonVerbatimToObjectiveC<T>(x: T.Type) -> Bool
+extern "C" bool swift_isBridgedNonVerbatimToObjectiveC(
+  const Metadata *value, const Metadata *T
+) {
+  assert(!swift_isClassOrObjCExistentialImpl(T));
+
+  auto bridgeWitness = findBridgeWitness(T);
+
+  if (bridgeWitness) {
+    auto conditionalWitness = findConditionalBridgeWitness(T);
+    return !conditionalWitness ||
+           conditionalWitness->isBridgedToObjectiveC(value, T);
+  }
+
+  return false;
+}
+
+// func isClassOrObjCExistential<T>(x: T.Type) -> Bool
+extern "C" bool swift_isClassOrObjCExistential(const Metadata *value,
+                                               const Metadata *T) {
+  return swift_isClassOrObjCExistentialImpl(T);
 }

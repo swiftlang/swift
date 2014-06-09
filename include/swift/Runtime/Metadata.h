@@ -1967,8 +1967,6 @@ inline constexpr unsigned swift_getHeapObjectExtraInhabitantCount() {
   
 /// FIXME: This doesn't belong in the runtime.
 extern "C" void swift_printAny(OpaqueValue *value, const Metadata *type);
-  
-} // end namespace swift
 
 /// \brief Demangle a mangled class name into module+class.
 /// Returns true if the name was successfully decoded.
@@ -1976,5 +1974,7 @@ extern "C" void swift_printAny(OpaqueValue *value, const Metadata *type);
 extern "C" bool
 swift_demangleSimpleClass(const char *mangledName, 
                           char **outModule, char **outClass);
+  
+} // end namespace swift
 
 #endif /* SWIFT_RUNTIME_METADATA_H */
