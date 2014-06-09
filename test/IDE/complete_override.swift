@@ -123,6 +123,7 @@ class BaseA {
   }
 
   func baseAFunc(foo x: Int) {}
+  func baseAFunc2(foo x: Int) {}
 
   @noreturn
   func baseAFuncWithAttr() {
@@ -136,10 +137,13 @@ class BaseA {
 // WITH_BA-DAG: Decl[Constructor]/Super:    init(fromBaseA: Int) {|}{{$}}
 // WITH_BA-DAG: Decl[Constructor]/Super:    init(fromBaseAWithParamName foo: Int, withOther bar: Double) {|}{{$}}
 // WITH_BA-DAG: Decl[InstanceMethod]/Super: override func baseAFunc(foo x: Int) {|}{{$}}
+// WITH_BA-DAG: Decl[InstanceMethod]/Super: override func baseAFunc2(foo x: Int) {|}{{$}}
 // WITH_BA-DAG: Decl[InstanceMethod]/Super: override @noreturn func baseAFuncWithAttr() {|}{{$}}
 // WITH_BA: End completions
 
 class BaseB : BaseA {
+  override func baseAFunc2(foo x: Int) {}
+
   init(fromBaseB: Int) {}
   convenience init(convenienceFromBaseB: Double) {
     self.init(fromBaseB: 0)
@@ -152,6 +156,7 @@ class BaseB : BaseA {
 }
 // WITH_BB: Begin completions
 // WITH_BB-DAG: Decl[InstanceMethod]/Super: override func baseAFunc(foo x: Int) {|}{{$}}
+// WITH_BB-DAG: Decl[InstanceMethod]/Super: override func baseAFunc2(foo x: Int) {|}{{$}}
 // WITH_BB-DAG: Decl[InstanceMethod]/Super: override @noreturn func baseAFuncWithAttr() {|}{{$}}
 // WITH_BB-DAG: Decl[Constructor]/Super:    init(fromBaseB: Int) {|}{{$}}
 // WITH_BB-DAG: Decl[InstanceMethod]/Super: override func baseBFunc() {|}{{$}}
@@ -218,22 +223,22 @@ class TestClass_PA_PB : ProtocolA, ProtocolB {
 class TestClass_BA : BaseA {
   #^CLASS_BA^#
 }
-// CLASS_BA: Begin completions, 4 items
+// CLASS_BA: Begin completions, 5 items
 
 class TestClass_BA_PA : BaseA, ProtocolA {
   #^CLASS_BA_PA^#
 }
-// CLASS_BA_PA: Begin completions, 8 items
+// CLASS_BA_PA: Begin completions, 9 items
 
 class TestClass_BA_PB : BaseA, ProtocolB {
   #^CLASS_BA_PB^#
 }
-// CLASS_BA_PB: Begin completions, 10 items
+// CLASS_BA_PB: Begin completions, 11 items
 
 class TestClass_BB : BaseB {
   #^CLASS_BB^#
 }
-// CLASS_BB: Begin completions, 4 items
+// CLASS_BB: Begin completions, 5 items
 
 class TestClass_BE : BaseE {
   #^CLASS_BE^#

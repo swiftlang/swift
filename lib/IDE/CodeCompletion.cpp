@@ -1976,11 +1976,12 @@ public:
       if (Reason == DeclVisibilityKind::MemberOfSuper)
         Builder.addOverrideKeyword();
       PrintOptions Options;
-      Options.PrintImplicitAttrs = false;
-      Options.PrintAttrTransparent = false;
-      Options.ExclusiveAttrList.push_back(DAK_noreturn);
       Options.FunctionDefinitions = false;
       Options.PrintDefaultParameterPlaceholder = false;
+      Options.PrintImplicitAttrs = false;
+      Options.ExclusiveAttrList.push_back(DAK_noreturn);
+      Options.PrintAttrTransparent = false;
+      Options.PrintOverrideKeyword = false;
       FD->print(Printer, Options);
       NameOffset = Printer.NameOffset.getValue();
     }
