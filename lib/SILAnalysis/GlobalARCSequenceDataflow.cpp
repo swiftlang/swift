@@ -671,14 +671,23 @@ void swift::arc::ARCSequenceDataflowEvaluator::init() {
   // Then iterate through it in reverse to perform the post order, looking for
   // backedges.
   llvm::DenseSet<SILBasicBlock *> VisitedSet;
-  for (auto *BB : reversed(PostOrder)) {
+  for (int i = PostOrder.size() - 1; i >= 0; --i) {
+    SILBasicBlock *BB = PostOrder[i];
     VisitedSet.insert(BB);
+
+    BottomUpBBStates[i].first = BB;
+    BottomUpBBStates[i].second.init(BB);
+    TopDownBBStates[i].first = BB;
+    TopDownBBStates[i].second.init(BB);
 
     for (auto &Succ : BB->getSuccs())
       if (SILBasicBlock *SuccBB = Succ.getBB())
         if (VisitedSet.count(SuccBB))
           BackedgeMap[BB].insert(SuccBB);
   }
+
+  BottomUpBBStates.sort();
+  TopDownBBStates.sort();
 }
 
 bool swift::arc::ARCSequenceDataflowEvaluator::run() {

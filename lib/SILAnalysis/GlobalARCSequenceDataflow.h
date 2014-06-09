@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/BlotMapVector.h"
+#include "swift/Basic/PreallocatedMap.h"
 #include "ReferenceCountState.h"
 
 namespace swift {
@@ -138,7 +139,7 @@ class ARCSequenceDataflowEvaluator {
 
   /// An array containing a post order of F. We only compute this once in the
   /// lifetime of this class. We use this fields reverse iterator to perform
-  /// reverse post order traversals.
+  /// reverse post order traversals.  
   std::vector<SILBasicBlock *> PostOrder;
 
 #ifndef NDEBUG
@@ -153,19 +154,36 @@ class ARCSequenceDataflowEvaluator {
   llvm::DenseMap<SILBasicBlock *,
                  llvm::SmallPtrSet<SILBasicBlock *, 4>> BackedgeMap;
 
+  /// A type which maps a basic block to an ARCBBState.
+  using BBToARCStateMapTy = PreallocatedMap<SILBasicBlock *, ARCBBState>;
+
   /// Map from a basic block to its bottom up dataflow state.
-  llvm::DenseMap<SILBasicBlock *, ARCBBState> BottomUpBBStates;
+  BBToARCStateMapTy BottomUpBBStates;
 
   /// Map from basic block to its top down dataflow state.
-  llvm::DenseMap<SILBasicBlock *, ARCBBState> TopDownBBStates;
+  BBToARCStateMapTy TopDownBBStates;
 
 public:
   ARCSequenceDataflowEvaluator(
-      SILFunction &F, AliasAnalysis *AA,
+      SILFunction &F, AliasAnalysis *AA, unsigned NumBB,
       BlotMapVector<SILInstruction *, TopDownRefCountState> &DecToIncStateMap,
       BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap)
       : F(F), AA(AA), DecToIncStateMap(DecToIncStateMap),
-        IncToDecStateMap(IncToDecStateMap) {}
+        IncToDecStateMap(IncToDecStateMap), PostOrder(),
+#ifndef NDEBUG
+        BBToPostOrderID(),
+#endif
+        BackedgeMap(),
+        BottomUpBBStates(NumBB,
+                         [](const BBToARCStateMapTy::PairTy &P1,
+                            const BBToARCStateMapTy::PairTy &P2) {
+                           return P1.first < P2.first;
+                         }),
+        TopDownBBStates(NumBB,
+                        [](const BBToARCStateMapTy::PairTy &P1,
+                           const BBToARCStateMapTy::PairTy &P2) {
+                          return P1.first < P2.first;
+                        }) {}
 
   /// Initialize the dataflow evaluator state.
   void init();
@@ -175,8 +193,13 @@ public:
 
   /// Clear all of the states we are tracking for the various basic blocks.
   void clear() {
-    BottomUpBBStates.clear();
-    TopDownBBStates.clear();
+    assert(BottomUpBBStates.size() == TopDownBBStates.size()
+           && "These should be one to one mapped to basic blocks so should"
+           " have the same size");
+    for (unsigned i = 0, e = BottomUpBBStates.size(); i != e; ++i) {
+      BottomUpBBStates[i].second.clear();
+      TopDownBBStates[i].second.clear();
+    }
   }
 
   SILFunction *getFunction() const { return &F; }

@@ -310,7 +310,8 @@ struct ARCMatchingSetComputationContext {
   ARCSequenceDataflowEvaluator Evaluator;
 
   ARCMatchingSetComputationContext(SILFunction &F, AliasAnalysis *AA) :
-    DecToIncStateMap(), IncToDecStateMap(), Evaluator(F, AA, DecToIncStateMap,
+    DecToIncStateMap(), IncToDecStateMap(), Evaluator(F, AA, F.size(),
+                                                      DecToIncStateMap,
                                                       IncToDecStateMap) {}
 };
 

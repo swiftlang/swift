@@ -13,6 +13,7 @@
 #ifndef SWIFT_BASIC_PREALLOCATEDMAP_H_
 #define SWIFT_BASIC_PREALLOCATEDMAP_H_
 
+#include <functional>
 #include "swift/Basic/PreallocatedArray.h"
 
 namespace swift {
@@ -22,9 +23,12 @@ namespace swift {
 template <typename KeyTy, typename ValueTy,
           typename AllocatorTy=llvm::MallocAllocator>
 class PreallocatedMap {
+public:
   using PairTy = std::pair<KeyTy, ValueTy>;
-  using ArrayTy = PreallocatedArray<PairTy, AllocatorTy>;
   using SortFunTy = std::function<bool (const PairTy &, const PairTy &)>;
+
+private:
+  using ArrayTy = PreallocatedArray<PairTy, AllocatorTy>;
 
   bool IsSorted = false;
   ArrayTy Array;

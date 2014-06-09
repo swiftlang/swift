@@ -31,7 +31,7 @@ class PreallocatedArray {
 
 public:
   PreallocatedArray(unsigned NumElts)
-      : NumElts(NumElts), Allocator(new llvm::MallocAllocator()),
+      : NumElts(NumElts), Allocator(new AllocatorTy()),
         Elts(new (Allocator.get()->template Allocate<EltTy>(NumElts))
              EltTy[NumElts]) {}
 
@@ -50,14 +50,16 @@ public:
     Allocator.get()->template Deallocate<EltTy>(Elts, NumElts);
   }
 
-  MutableArrayRef<EltTy> getArray() {
-    return MutableArrayRef<EltTy>(Elts, NumElts);
+  llvm::MutableArrayRef<EltTy> getArray() {
+    return llvm::MutableArrayRef<EltTy>(Elts, NumElts);
   }
 
-  ArrayRef<EltTy> getArray() const { return ArrayRef<EltTy>(Elts, NumElts); }
+  llvm::ArrayRef<EltTy> getArray() const {
+    return llvm::ArrayRef<EltTy>(Elts, NumElts);
+  }
 
-  using iterator = typename MutableArrayRef<EltTy>::iterator;
-  using const_iterator = typename ArrayRef<EltTy>::iterator;
+  using iterator = typename llvm::MutableArrayRef<EltTy>::iterator;
+  using const_iterator = typename llvm::ArrayRef<EltTy>::iterator;
 
   iterator begin() { return getArray().begin(); }
   iterator end() { return getArray().end(); }
