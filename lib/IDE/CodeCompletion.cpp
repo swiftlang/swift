@@ -848,7 +848,7 @@ void CodeCompletionCallbacksImpl::completeExpr() {
 
 namespace {
 /// Build completions by doing visible decl lookup from a context.
-class CompletionLookup : public swift::VisibleDeclConsumer {
+class CompletionLookup final : public swift::VisibleDeclConsumer {
   CodeCompletionResultSink &Sink;
   ASTContext &Ctx;
   OwnedResolver TypeResolver;
@@ -1268,20 +1268,36 @@ public:
     }
 
     if (auto *TT = AFT->getInput()->getAs<TupleType>()) {
+      bool NeedComma = false;
       // Iterate over the tuple type fields, corresponding to each parameter.
       for (unsigned i = 0, e = TT->getFields().size(); i != e; ++i) {
-        if (i > 0)
-          Builder.addComma();
-        auto TupleElt = TT->getFields()[i];
+        const auto &TupleElt = TT->getFields()[i];
+        switch (TupleElt.getDefaultArgKind()) {
+        case DefaultArgumentKind::None:
+        case DefaultArgumentKind::Normal:
+        case DefaultArgumentKind::Inherited:
+          break;
+
+        case DefaultArgumentKind::File:
+        case DefaultArgumentKind::Line:
+        case DefaultArgumentKind::Column:
+        case DefaultArgumentKind::Function:
+          // Skip parameters that are defaulted to source location.  Users
+          // typically don't want to specify these parameters.
+          continue;
+        }
         auto ParamType = TupleElt.getType();
         auto Name = TupleElt.getName();
-        if (BodyTuple && i < BodyTuple->getFields().size()) {
+
+        if (NeedComma)
+          Builder.addComma();
+        if (BodyTuple) {
           // If we have a local name for the parameter, pass in that as well.
           auto ParamPat = BodyTuple->getFields()[i].getPattern();
           Builder.addCallParameter(Name, ParamPat->getBoundName(), ParamType);
-        }
-        else
+        } else
           Builder.addCallParameter(Name, ParamType);
+        NeedComma = true;
       }
     } else {
       // If it's not a tuple, it could be a unary function.
@@ -1290,11 +1306,10 @@ public:
         // Only unwrap the paren sugar, if it exists.
         T = PT->getUnderlyingType();
       }
-      if (BodyTuple && !BodyTuple->getFields().empty()) {
+      if (BodyTuple) {
         auto ParamPat = BodyTuple->getFields().front().getPattern();
         Builder.addCallParameter(Identifier(), ParamPat->getBoundName(), T);
-      }
-      else
+      } else
         Builder.addCallParameter(Identifier(), T);
     }
   }
