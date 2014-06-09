@@ -12,6 +12,15 @@ print(MyArray)
 // CHECK: D
 // CHECK: )
 
+var MyMutableArray = NSMutableArray(objects:"A", "B", "C", "D")
+print(MyMutableArray)
+// CHECK: (
+// CHECK: A,
+// CHECK: B,
+// CHECK: C,
+// CHECK: D
+// CHECK: )
+
 var MySet = NSSet(objects:"a", "b", "c", "42")
 MySet = NSSet(objects:"a", "b", "c", "42")
 print(MySet)

@@ -1111,8 +1111,7 @@ bool DeclContext::lookupQualified(Type type,
       // current class permits inheritance. Even then, only find complete
       // object initializers.
       if (name.getBaseName() == ctx.Id_init) {
-        if (classDecl->inheritsSuperclassInitializers(typeResolver) &&
-            !classDecl->hasClangNode())
+        if (classDecl->inheritsSuperclassInitializers(typeResolver))
           onlyCompleteObjectInits = true;
         else
           continue;

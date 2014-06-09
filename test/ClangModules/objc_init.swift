@@ -16,6 +16,12 @@ func testNSInterestingDesignated() {
   NSInterestingDesignatedSub(string:"hello")
 }
 
+extension NSDocument {
+  convenience init(string: String) {
+    self.init(URL: string)
+  }
+}
+
 class MyDocument1 : NSDocument {
   init() { 
     super.init()
@@ -25,6 +31,9 @@ class MyDocument1 : NSDocument {
 func createMyDocument1() {
   var md = MyDocument1()
   md = MyDocument1(URL: "http://llvm.org")
+
+  // Inherited convenience init.
+  md = MyDocument1(string: "http://llvm.org")
 }
 
 class MyDocument2 : NSDocument {
