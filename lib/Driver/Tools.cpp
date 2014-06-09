@@ -406,27 +406,7 @@ Job *MergeModule::constructJob(const JobAction &JA,
 bool LLDB::isPresentRelativeToDriver() const {
   if (!Bits.DidCheckRelativeToDriver) {
     const Driver &D = getToolChain().getDriver();
-    llvm::SmallString<128> LLDBPath{D.getSwiftProgramPath()};
-    llvm::sys::path::remove_filename(LLDBPath); // swift
-
-    // First try "bin/lldb" (i.e. next to Swift).
-    llvm::sys::path::append(LLDBPath, "lldb");
-    if (llvm::sys::fs::exists(LLDBPath.str())) {
-      Path = LLDBPath.str().str();
-    } else {
-      // Then see if we're in an Xcode toolchain.
-      llvm::sys::path::remove_filename(LLDBPath); // lldb
-      llvm::sys::path::remove_filename(LLDBPath); // bin
-      llvm::sys::path::remove_filename(LLDBPath); // usr
-      if (llvm::sys::path::extension(LLDBPath) == ".xctoolchain") {
-        llvm::sys::path::remove_filename(LLDBPath); // *.xctoolchain
-        llvm::sys::path::remove_filename(LLDBPath); // Toolchains
-        llvm::sys::path::append(LLDBPath, "usr", "bin", "lldb");
-        if (llvm::sys::fs::exists(LLDBPath.str()))
-          Path = LLDBPath.str().str();
-      }
-    }
-
+    Path = findRelativeExecutable(D.getSwiftProgramPath(), "lldb");
     Bits.DidCheckRelativeToDriver = true;
   }
   return !Path.empty();

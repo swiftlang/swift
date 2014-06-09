@@ -20,3 +20,35 @@
 // RUN:          -module-cache-path /path/to/cache %s 2>&1 | FileCheck %s --check-prefix=CACHE-PATH
 
 // CACHE-PATH: /path/to/cache
+
+
+// Test SDK detection for -i, first in a clean environment, then in one that
+// looks like the Xcode installation environment. We use hard links to make sure
+// the Swift driver really thinks it's been moved.
+
+// RUN: %swift_driver -i %s -### | FileCheck -check-prefix=NOSDK %s
+// RUN: %swift_driver -integrated-repl -### | FileCheck -check-prefix=NOSDK %s
+
+// NOSDK-NOT: -sdk
+
+// RUN: rm -rf %t && mkdir -p %t/usr/bin/
+// RUN: ln %swift_driver_plain %t/usr/bin/swift
+
+// RUN: cp %S/Inputs/xcrun-bad.sh %t/usr/bin/xcrun
+// RUN: %t/usr/bin/swift -i %s -### | FileCheck -check-prefix=NOSDK %s
+// RUN: %t/usr/bin/swift -integrated-repl -### | FileCheck -check-prefix=NOSDK %s
+
+// RUN: cp %S/Inputs/xcrun.sh %t/usr/bin/xcrun
+// RUN: %t/usr/bin/swift -i %s -### | FileCheck -check-prefix=XCRUN-SDK %s
+// RUN: %t/usr/bin/swift -integrated-repl -### | FileCheck -check-prefix=XCRUN-SDK %s
+
+// RUN: mkdir -p %t/Toolchains/Test.xctoolchain/usr/bin/
+// RUN: mv %t/usr/bin/swift %t/Toolchains/Test.xctoolchain/usr/bin/swift
+// RUN: %t/Toolchains/Test.xctoolchain/usr/bin/swift -i %s -### | FileCheck -check-prefix=XCRUN-SDK %s
+
+// XCRUN-SDK: -sdk
+// XCRUN-SDK: /path/to/sdk/
+
+
+// Clean up the test executable because hard links are expensive.
+// RUN: rm -f %t/Toolchains/Test.xctoolchain/usr/bin/swift

@@ -10,6 +10,7 @@ add_swift_library(swiftDriver
   ToolChain.cpp
   ToolChains.cpp
   Types.cpp
+  Util.cpp
   DEPENDS swiftAST swiftBasic)
 
 add_dependencies(swiftDriver SwiftDriverOptions)

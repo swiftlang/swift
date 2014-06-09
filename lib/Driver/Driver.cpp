@@ -24,6 +24,7 @@
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/TaskQueue.h"
 #include "swift/Basic/Version.h"
 #include "swift/Basic/Range.h"
 #include "swift/Driver/Action.h"
@@ -461,10 +462,31 @@ void Driver::buildOutputInfo(const DerivedArgList &Args,
   {
     if (const Arg *A = Args.getLastArg(options::OPT_sdk)) {
       OI.SDKPath = A->getValue();
-    } else {
-      const char *SDKROOT = getenv("SDKROOT");
-      if (SDKROOT)
-        OI.SDKPath = SDKROOT;
+    } else if (const char *SDKROOT = getenv("SDKROOT")) {
+      OI.SDKPath = SDKROOT;
+    } else if (OI.CompilerMode == OutputInfo::Mode::Immediate ||
+               OI.CompilerMode == OutputInfo::Mode::REPL) {
+      std::string xcrunPath = findRelativeExecutable(getSwiftProgramPath(),
+                                                     "xcrun");
+      if (!xcrunPath.empty()) {
+        const char *args[] = { "--show-sdk-path", "--sdk", "macosx", nullptr };
+        sys::TaskQueue queue;
+        queue.addTask(xcrunPath.c_str(), args);
+        queue.execute(nullptr,
+                      [&OI](sys::ProcessId PID,
+                            int returnCode,
+                            StringRef output,
+                            void *unused) -> sys::TaskFinishedResponse {
+          if (returnCode == 0) {
+            output = output.rtrim();
+            auto lastLineStart = output.find_last_of("\n\r");
+            if (lastLineStart != StringRef::npos)
+              output = output.substr(lastLineStart+1);
+            OI.SDKPath = output.str();
+          }
+          return sys::TaskFinishedResponse::ContinueExecution;
+        });
+      }
     }
 
     if (!OI.SDKPath.empty()) {
