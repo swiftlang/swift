@@ -169,3 +169,9 @@ var ir = &i // expected-error{{type 'inout Int' of variable is not materializabl
             // expected-error{{reference to 'Int' not used to initialize a inout parameter}}
 var ir2 = ((&i)) // expected-error{{type 'inout Int' of variable is not materializable}} \
                  // expected-error{{reference to 'Int' not used to initialize a inout parameter}}
+
+// <rdar://problem/17133089>
+func takeArrayRef(inout x:Array<String>) { }
+
+// FIXME: Poor diagnostic.
+takeArrayRef(["asdf", "1234"]) // expected-error{{cannot convert the expression's type '()' to type 'StringLiteralConvertible'}}

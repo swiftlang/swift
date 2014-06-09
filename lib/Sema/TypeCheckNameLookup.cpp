@@ -100,6 +100,10 @@ LookupTypeResult TypeChecker::lookupMemberType(Type type, Identifier name,
                                                DeclContext *dc) {
   LookupTypeResult result;
 
+  // Look through an inout type.
+  if (auto inout = type->getAs<InOutType>())
+    type = inout->getObjectType();
+
   // Look through the metatype.
   if (auto metaT = type->getAs<AnyMetatypeType>())
     type = metaT->getInstanceType();
