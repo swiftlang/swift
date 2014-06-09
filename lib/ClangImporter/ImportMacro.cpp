@@ -231,7 +231,7 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
   auto suppressMacro =
     llvm::StringSwitch<bool>(name.str())
 #define SUPPRESS_MACRO(NAME) .Case(#NAME, true)
-#include "SuppressedMacros.def"
+#include "MacroTable.def"
     .Default(false);
 
   if (suppressMacro)
@@ -270,7 +270,7 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
         auto isNilMacro =
           llvm::StringSwitch<bool>(clangID->getName())
 #define NIL_MACRO(NAME) .Case(#NAME, true)
-#include "SuppressedMacros.def"
+#include "MacroTable.def"
           .Default(false);
         if (isNilMacro)
           return importNil(impl, DC, name, ClangN);
