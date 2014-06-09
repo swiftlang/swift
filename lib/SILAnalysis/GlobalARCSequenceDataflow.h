@@ -139,7 +139,7 @@ class ARCSequenceDataflowEvaluator {
 
   /// An array containing a post order of F. We only compute this once in the
   /// lifetime of this class. We use this fields reverse iterator to perform
-  /// reverse post order traversals.  
+  /// reverse post order traversals.
   std::vector<SILBasicBlock *> PostOrder;
 
 #ifndef NDEBUG
