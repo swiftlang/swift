@@ -20,13 +20,13 @@
 namespace swift {
   /// \brief An associative container with fast insertion-order (deterministic)
   /// iteration over its elements. Plus the special blot operation.
-  template<class KeyT, class ValueT>
+template<typename KeyT, typename ValueT,
+         typename MapTy=llvm::DenseMap<KeyT, size_t>,
+         typename VectorTy=std::vector<std::pair<KeyT, ValueT>>>
   class BlotMapVector {
     /// Map keys to indices in Vector.
-    using MapTy = llvm::DenseMap<KeyT, size_t>;
     MapTy Map;
 
-    using VectorTy = std::vector<std::pair<KeyT, ValueT>>;
     /// Keys and values.
     VectorTy Vector;
 

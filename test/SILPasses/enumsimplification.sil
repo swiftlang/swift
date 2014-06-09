@@ -66,3 +66,187 @@ bb0:
   %9999 = tuple()
   return %9999 : $()
 }
+
+// CHECK-LABEL: sil @test5 : $@thin () -> () {
+// CHECK: bb1:
+// CHECK-NEXT: [[DATA:%[0-9]+]] = unchecked_enum_data
+// CHECK-NEXT: retain_value [[DATA]]
+// CHECK: bb2:
+// CHECK-NEXT: [[DATA1:%[0-9]+]] = unchecked_enum_data
+// CHECK-NEXT: release_value [[DATA1]]
+sil @test5 : $@thin () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Int32, 0
+  %1 = enum $FakeOptional, #FakeOptional.Some!enumelt.1, %0 : $Builtin.Int32
+  cond_br undef, bb1, bb2
+
+bb1:
+  retain_value %1 : $FakeOptional
+  br bb3
+
+bb2:
+  release_value %1 : $FakeOptional
+  br bb3
+
+bb3:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @test6 : $@thin (FakeOptional) -> () {
+// CHECK: bb1:
+// CHECK-NEXT: [[DATA:%[0-9]+]] = unchecked_enum_data
+// CHECK-NEXT: retain_value [[DATA]]
+// CHECK: bb2:
+// CHECK-NEXT: [[DATA1:%[0-9]+]] = unchecked_enum_data
+// CHECK-NEXT: release_value [[DATA1]]
+sil @test6 : $@thin (FakeOptional) -> () {
+bb0(%0 : $FakeOptional):
+  %1 = unchecked_enum_data %0 : $FakeOptional, #FakeOptional.Some!enumelt.1
+  cond_br undef, bb1, bb2
+
+bb1:
+  retain_value %0 : $FakeOptional
+  br bb3
+
+bb2:
+  release_value %0 : $FakeOptional
+  br bb3
+
+bb3:
+  %9999 = tuple()
+  return %9999 : $()  
+}
+
+// CHECK-LABEL: sil @test7 : $@thin () -> () {
+// CHECK-NOT: retain_value
+// CHECK-NOT: release_value
+sil @test7 : $@thin () -> () {
+bb0:
+  %0 = enum $FakeOptional, #FakeOptional.None!enumelt
+  cond_br undef, bb1, bb2
+
+bb1:
+  retain_value %0 : $FakeOptional
+  br bb3
+
+bb2:
+  release_value %0 : $FakeOptional
+  br bb3
+
+bb3:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @test8 : $@thin (FakeOptional) -> () {
+// CHECK: bb0([[INPUT:%[0-9]+]] : $FakeOptional):
+// CHECK: bb2:
+// CHECK-NEXT: retain_value [[INPUT]]
+// CHECK: bb3:
+// CHECK-NEXT: [[PAYLOAD:%[0-9]+]] = unchecked_enum_data [[INPUT]]
+// CHECK-NEXT: retain_value [[PAYLOAD]]
+// CHECK: bb4:
+// CHECK-NEXT: retain_value [[INPUT]]
+sil @test8 : $@thin (FakeOptional) -> () {
+bb0(%0 : $FakeOptional):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %1 = unchecked_enum_data %0 : $FakeOptional, #FakeOptional.Some!enumelt.1
+  cond_br undef, bb2, bb3
+
+bb2:
+  retain_value %0 : $FakeOptional
+  br bb4
+
+bb3:
+  retain_value %0 : $FakeOptional
+  br bb4
+
+bb4:
+  retain_value %0 : $FakeOptional
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @test9 : $@thin (FakeOptional) -> () {
+// CHECK: bb0([[INPUT:%[0-9]+]] : $FakeOptional):
+// CHECK: bb1:
+// CHECK-NEXT: [[PAYLOAD:%[0-9]+]] = unchecked_enum_data [[INPUT]]
+// CHECK-NEXT: retain_value [[PAYLOAD]]
+// CHECK: bb2:
+// CHECK-NOT: retain_value
+// CHECK: bb3:
+// CHECK-NEXT: retain_value [[INPUT]]
+sil @test9 : $@thin (FakeOptional) -> () {
+bb0(%0 : $FakeOptional):
+  switch_enum %0 : $FakeOptional, case #FakeOptional.Some!enumelt.1: bb1, case #FakeOptional.None!enumelt: bb2
+
+bb1:
+  retain_value %0 : $FakeOptional
+  br bb3
+
+bb2:
+  retain_value %0 : $FakeOptional
+  br bb3
+
+bb3:
+  retain_value %0 : $FakeOptional
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+////////////////
+// Loop Tests //
+////////////////
+
+// CHECK-LABEL: sil @test10 : $@thin (FakeOptional) -> () {
+// CHECK: bb0([[INPUT:%[0-9]+]] : $FakeOptional):
+// CHECK: retain_value [[INPUT]]
+// CHECK: retain_value [[INPUT]]
+// CHECK: retain_value [[INPUT]]
+// CHECK: retain_value [[INPUT]]
+sil @test10 : $@thin (FakeOptional) -> () {
+bb0(%0 : $FakeOptional):
+  switch_enum %0 : $FakeOptional, case #FakeOptional.Some!enumelt.1: bb1, case #FakeOptional.None!enumelt: bb2
+
+// Single BB Loop
+bb1:
+  retain_value %0 : $FakeOptional
+  cond_br undef, bb1, bb9999
+
+// Two BB Loop. We can use loop or domination to handle this case. But we don't
+// handle it now.
+bb2:
+  retain_value %0 : $FakeOptional
+  br bb3
+
+bb3:
+  retain_value %0 : $FakeOptional
+  cond_br undef, bb2, bb9999
+
+bb9999:
+  retain_value %0 : $FakeOptional
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Make sure we don't propagate state out of loops.
+// CHECK-LABEL: sil @test11 : $@thin (FakeOptional) -> () {
+// CHECK: bb0([[INPUT:%[0-9]+]] : $FakeOptional):
+// CHECK: retain_value [[INPUT]]
+// CHECK: retain_value [[INPUT]]
+sil @test11 : $@thin (FakeOptional) -> () {
+bb0(%0 : $FakeOptional):
+  switch_enum %0 : $FakeOptional, case #FakeOptional.Some!enumelt.1: bb1, case #FakeOptional.None!enumelt: bb2
+
+bb1:
+  retain_value %0 : $FakeOptional
+  cond_br undef, bb1, bb2
+
+bb2:
+  retain_value %0 : $FakeOptional
+  %9999 = tuple()
+  return %9999 : $()
+}
