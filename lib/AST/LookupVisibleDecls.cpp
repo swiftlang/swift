@@ -314,8 +314,6 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
     ProtocolsWithConformances.insert(Protocols.begin(), Protocols.end());
   }
 
-  CurrNominal = BaseTy->getAnyNominal();
-
   auto TopProtocols = CurrNominal->getProtocols();
   SmallVector<ProtocolDecl *, 8> Worklist(TopProtocols.begin(),
                                           TopProtocols.end());
@@ -324,7 +322,8 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
     if (!Visited.insert(Proto))
       return;
 
-    bool ShouldFindValueRequirements = !ProtocolsWithConformances.count(Proto);
+    bool ShouldFindNonOptionalValueRequirements =
+        !ProtocolsWithConformances.count(Proto);
     DeclVisibilityKind ReasonForThisProtocol;
     if (Reason == DeclVisibilityKind::MemberOfCurrentNominal)
       ReasonForThisProtocol =
@@ -339,9 +338,14 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
         }
         continue;
       }
-      if (ShouldFindValueRequirements) {
-        if (auto *VD = dyn_cast<ValueDecl>(Member))
+      if (auto *VD = dyn_cast<ValueDecl>(Member)) {
+        // Skip non-optional value requirements from protocols that the type
+        // correctly conforms to.  This is done so that we don't return
+        // duplicate members.
+        if (ShouldFindNonOptionalValueRequirements ||
+            VD->getAttrs().isOptional()) {
           Consumer.foundDecl(VD, ReasonForThisProtocol);
+        }
       }
     }
     auto Protocols = Proto->getProtocols();

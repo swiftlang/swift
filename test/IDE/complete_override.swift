@@ -53,11 +53,14 @@
 // RUN: %swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_NOMINAL > %t.txt
 // RUN: FileCheck %s -check-prefix=NESTED_NOMINAL < %t.txt
 
-struct TagPA {}
+@objc
+class TagPA {}
+@objc
 protocol ProtocolA {
   init(fromProtocolA: Int)
 
   func protoAFunc()
+  @optional func protoAFuncOptional()
 
   @noreturn
   func protoAFuncWithAttr()
@@ -70,6 +73,7 @@ protocol ProtocolA {
 // WITH_PA: Begin completions
 // WITH_PA-DAG: Decl[Constructor]/Super:    init(fromProtocolA: Int) {|}{{$}}
 // WITH_PA-DAG: Decl[InstanceMethod]/Super: func protoAFunc() {|}{{$}}
+// WITH_PA-DAG: Decl[InstanceMethod]/Super: func protoAFuncOptional() {|}{{$}}
 // WITH_PA-DAG: Decl[InstanceMethod]/Super: @noreturn func protoAFuncWithAttr() {|}{{$}}
 // WITH_PA: End completions
 
@@ -98,12 +102,13 @@ protocol ProtocolE {
 
   func protoEFunc()
 
-  subscript(a: TagPB) -> Int { get }
+  subscript(a: TagPE) -> Int { get }
 
   var protoEVarRW: Int { get set }
   var protoEVarRO: Int { get }
 }
 // WITH_PE: Begin completions
+// WITH_PE-DAG: Decl[Constructor]/Super:    init(fromProtocolE: Int) {|}{{$}}
 // WITH_PE-DAG: Decl[InstanceMethod]/Super: func protoEFunc() {|}{{$}}
 // WITH_PE: End completions
 
@@ -157,7 +162,7 @@ class BaseE : ProtocolE {
 
   func protoEFunc() {}
 
-  subscript(a: TagPB) -> Int { return 0 }
+  subscript(a: TagPE) -> Int { return 0 }
 
   var protoEVarRW: Int { get { return 0 } set {} }
   var protoEVarRO: Int { return 0 }
@@ -181,7 +186,7 @@ class ProtocolEImpl /* : ProtocolE but does not implement the protocol */ {
 
   func protoEFunc() {}
 
-  subscript(a: TagPB) -> Int { return 0 }
+  subscript(a: TagPE) -> Int { return 0 }
 
   var protoEVarRW: Int { get { return 0 } set {} }
   var protoEVarRO: Int { return 0 }
@@ -198,17 +203,17 @@ class TestClass_PA : ProtocolA {
 
   #^CLASS_PA^#
 }
-// CLASS_PA: Begin completions, 3 items
+// CLASS_PA: Begin completions, 4 items
 
 class TestClass_PB : ProtocolB {
   #^CLASS_PB^#
 }
-// CLASS_PB: Begin completions, 5 items
+// CLASS_PB: Begin completions, 6 items
 
 class TestClass_PA_PB : ProtocolA, ProtocolB {
   #^CLASS_PA_PB^#
 }
-// CLASS_PA_PB: Begin completions, 5 items
+// CLASS_PA_PB: Begin completions, 6 items
 
 class TestClass_BA : BaseA {
   #^CLASS_BA^#
@@ -218,12 +223,12 @@ class TestClass_BA : BaseA {
 class TestClass_BA_PA : BaseA, ProtocolA {
   #^CLASS_BA_PA^#
 }
-// CLASS_BA_PA: Begin completions, 7 items
+// CLASS_BA_PA: Begin completions, 8 items
 
 class TestClass_BA_PB : BaseA, ProtocolB {
   #^CLASS_BA_PB^#
 }
-// CLASS_BA_PB: Begin completions, 9 items
+// CLASS_BA_PB: Begin completions, 10 items
 
 class TestClass_BB : BaseB {
   #^CLASS_BB^#
@@ -238,12 +243,12 @@ class TestClass_BE : BaseE {
 class TestClass_BE_PA : BaseE, ProtocolA {
   #^CLASS_BE_PA^#
 }
-// CLASS_BE_PA: Begin completions, 7 items
+// CLASS_BE_PA: Begin completions, 8 items
 
 class TestClass_BE_PA_PE : BaseE, ProtocolA, ProtocolE {
   #^CLASS_BE_PA_PE^#
 }
-// CLASS_BE_PA_PE: Begin completions, 7 items
+// CLASS_BE_PA_PE: Begin completions, 8 items
 
 class TestClass_PEI_PE : ProtocolEImpl, ProtocolE {
   #^CLASS_PEI_PE^#
