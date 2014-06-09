@@ -457,8 +457,8 @@ namespace {
         }
                                 
         auto locator = archetype
-           ? CS.getConstraintLocator((Expr *)nullptr, LocatorPathElt(archetype))
-           : nullptr;
+           ? CS.getConstraintLocator(CS.rootExpr, LocatorPathElt(archetype))
+           : CS.getConstraintLocator(CS.rootExpr);
                                 
         auto memberTypeVar = CS.createTypeVariable(locator,
                                                    TVO_PrefersSubtypeBinding);
@@ -484,7 +484,8 @@ namespace {
         // If we have a replacement type, bind the member's type
         // variable to it.
         if (replacementType)
-          CS.addConstraint(ConstraintKind::Bind, memberTypeVar, replacementType);
+          CS.addConstraint(ConstraintKind::Bind, memberTypeVar,
+                           replacementType, locator);
                                 
         if (!archetype) {
           // If the nested type is not an archetype (because it was constrained
@@ -496,12 +497,13 @@ namespace {
         // FIXME: Would be better to walk the requirements of the protocol
         // of which the associated type is a member.
         if (auto superclass = member->getSuperclass()) {
-          CS.addConstraint(ConstraintKind::Subtype, memberTypeVar, superclass);
+          CS.addConstraint(ConstraintKind::Subtype, memberTypeVar,
+                           superclass, locator);
         }
 
         for (auto proto : member->getArchetype()->getConformsTo()) {
           CS.addConstraint(ConstraintKind::ConformsTo, memberTypeVar,
-                           proto->getDeclaredType());
+                           proto->getDeclaredType(), locator);
         }
 
         return memberTypeVar;
@@ -749,7 +751,8 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     // FIXME: We eventually want to loosen this constraint, to allow us
     // to find operator functions both in classes and in protocols to which
     // a class conforms (if there's a default implementation).
-    addArchetypeConstraint(openedFnType->getInput()->getRValueInstanceType());
+    addArchetypeConstraint(openedFnType->getInput()->getRValueInstanceType(),
+                           getConstraintLocator(rootExpr));
 
     // The reference implicitly binds 'self'.
     return { openedType, openedFnType->getResult() };
@@ -811,7 +814,8 @@ void ConstraintSystem::openGeneric(
       opener->openedGenericParameter(gp, typeVar, replacementType);
 
       if (replacementType)
-        addConstraint(ConstraintKind::Bind, typeVar, replacementType);
+        addConstraint(ConstraintKind::Bind, typeVar, replacementType,
+                      getConstraintLocator(rootExpr));
     }
   }
 
@@ -831,11 +835,12 @@ void ConstraintSystem::openGeneric(
             !(isa<ProtocolDecl>(dc) || isa<ProtocolDecl>(dc->getParent())) ||
             !isProtocolSelfType(req.getFirstType())) {
           addConstraint(ConstraintKind::ConformsTo, subjectTy,
-                        proto);
+                        proto, getConstraintLocator(rootExpr));
         }
       } else {
         auto boundTy = req.getSecondType().transform(replaceDependentTypes);
-        addConstraint(ConstraintKind::Subtype, subjectTy, boundTy);
+        addConstraint(ConstraintKind::Subtype, subjectTy, boundTy,
+                      getConstraintLocator(rootExpr));
       }
       break;
     }
@@ -843,7 +848,8 @@ void ConstraintSystem::openGeneric(
     case RequirementKind::SameType: {
       auto firstTy = req.getFirstType().transform(replaceDependentTypes);
       auto secondTy = req.getSecondType().transform(replaceDependentTypes);
-      addConstraint(ConstraintKind::Bind, firstTy, secondTy);
+      addConstraint(ConstraintKind::Bind, firstTy, secondTy,
+                    getConstraintLocator(rootExpr));
       break;
     }
 
@@ -868,18 +874,21 @@ static void addSelfConstraint(ConstraintSystem &cs, Type objectTy, Type selfTy){
   // as the Self type of the protocol, which covers anything that conforms to
   // the protocol as well as existentials that include that protocol.
   if (selfTy->is<ProtocolType>()) {
-    cs.addConstraint(ConstraintKind::SelfObjectOfProtocol, objectTy, selfTy);
+    cs.addConstraint(ConstraintKind::SelfObjectOfProtocol, objectTy, selfTy,
+                     cs.getConstraintLocator(cs.rootExpr));
     return;
   }
 
   // Otherwise, use a subtype constraint for classes to cope with inheritance.
   if (selfTy->getClassOrBoundGenericClass()) {
-    cs.addConstraint(ConstraintKind::Subtype, objectTy, selfTy);
+    cs.addConstraint(ConstraintKind::Subtype, objectTy, selfTy,
+                     cs.getConstraintLocator(cs.rootExpr));
     return;
   }
 
   // Otherwise, the types must be equivalent.
-  cs.addConstraint(ConstraintKind::Equal, objectTy, selfTy);
+  cs.addConstraint(ConstraintKind::Equal, objectTy, selfTy,
+                   cs.getConstraintLocator(cs.rootExpr));
 }
 
 /// Collect all of the generic parameters and requirements from the
@@ -1066,7 +1075,8 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
     // For a protocol, substitute the base object directly. We don't need a
     // conformance constraint because we wouldn't have found the declaration
     // if it didn't conform.
-    addConstraint(ConstraintKind::Equal, baseObjTy, selfObjTy);
+    addConstraint(ConstraintKind::Equal, baseObjTy, selfObjTy,
+                  getConstraintLocator(rootExpr));
   } else if (!isDynamicResult) {
     addSelfConstraint(*this, baseObjTy, selfObjTy);
   }
@@ -1238,7 +1248,8 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     
     if (auto FT = openedFullType->getAs<FunctionType>()) {
       auto returnType = FT->getResult();
-      addConstraint(ConstraintKind::Bind, returnType, refType);
+      addConstraint(ConstraintKind::Bind, returnType, refType,
+                    getConstraintLocator(rootExpr));
     }
   }
 

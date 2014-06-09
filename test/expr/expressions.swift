@@ -653,7 +653,7 @@ func test() {
   var x = int_test3()
 
   // rdar://15708430
-  (&x).convertFromIntegerLiteral()  // expected-error {{could not find member 'convertFromIntegerLiteral'}}
+  (&x).convertFromIntegerLiteral()  // expected-error {{'inout int_test3' is not identical to 'int_test3'}}
 }
 
 

@@ -202,7 +202,7 @@ extension Int : IsBefore {
 
 func callMin(x: Int, y: Int, a: Float, b: Float) {
   min2(x, y)
-  min2(a, b) // expected-error{{cannot convert the expression's type 'T' to type 'Float'}}
+  min2(a, b) // expected-error{{type 'Float' does not conform to protocol 'IsBefore'}}
 }
 
 func rangeOfIsBefore<R : Generator where R.Element : IsBefore>(range : R) { }
@@ -210,7 +210,7 @@ func rangeOfIsBefore<R : Generator where R.Element : IsBefore>(range : R) { }
 
 func callRangeOfIsBefore(ia: Int[], da: Double[]) {
   rangeOfIsBefore(ia.generate())
-  rangeOfIsBefore(da.generate()) // expected-error{{cannot convert the expression's type '()' to type 'R'}}
+  rangeOfIsBefore(da.generate()) // expected-error{{type 'Double' does not conform to protocol 'IsBefore'}}
 }
 
 //===----------------------------------------------------------------------===//

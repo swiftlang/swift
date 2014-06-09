@@ -1048,6 +1048,11 @@ public:
   TypeChecker &TC;
   DeclContext *DC;
   ConstraintSystemOptions Options;
+  
+  /// \brief When constraints are being gathered for a specific expression,
+  /// we store aside the expression in case we need a default anchor for
+  /// otherwise 'anonymous' constraints.
+  Expr* rootExpr = nullptr;
 
   friend class Fix;
   class SolverScope;
@@ -1513,7 +1518,7 @@ public:
 
   /// \brief Add a constraint to the constraint system.
   void addConstraint(ConstraintKind kind, Type first, Type second,
-                     ConstraintLocator *locator = nullptr) {
+                     ConstraintLocator *locator) {
     assert(first && "Missing first type");
     assert(second && "Missing second type");
     addConstraint(Constraint::create(*this, kind, first, second, DeclName(),
@@ -1529,7 +1534,7 @@ public:
 
   /// \brief Add a value member constraint to the constraint system.
   void addValueMemberConstraint(Type baseTy, DeclName name, Type memberTy,
-                                ConstraintLocator *locator = nullptr) {
+                                ConstraintLocator *locator) {
     assert(baseTy);
     assert(memberTy);
     assert(name);
@@ -1538,7 +1543,7 @@ public:
   }
 
   /// \brief Add an archetype constraint.
-  void addArchetypeConstraint(Type baseTy, ConstraintLocator *locator = nullptr) {
+  void addArchetypeConstraint(Type baseTy, ConstraintLocator *locator) {
     assert(baseTy);
     addConstraint(Constraint::create(*this, ConstraintKind::Archetype,
                                      baseTy, Type(), DeclName(),

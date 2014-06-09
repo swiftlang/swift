@@ -431,6 +431,8 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
     selfTy2 = funcTy2->getInput()->getRValueInstanceType();
     openedType2 = funcTy2->getResult();
   }
+  
+  auto locator = cs.getConstraintLocator(cs.rootExpr);
 
   // Determine the relationship between the 'self' types and add the
   // appropriate constraints. The constraints themselves never fail, but
@@ -442,30 +444,33 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
     break;
 
   case SelfTypeRelationship::Equivalent:
-    cs.addConstraint(ConstraintKind::Equal, selfTy1, selfTy2);
+    cs.addConstraint(ConstraintKind::Equal, selfTy1, selfTy2, locator);
     break;
 
   case SelfTypeRelationship::Subclass:
-    cs.addConstraint(ConstraintKind::Subtype, selfTy1, selfTy2);
+    cs.addConstraint(ConstraintKind::Subtype, selfTy1, selfTy2, locator);
     break;
 
   case SelfTypeRelationship::Superclass:
-    cs.addConstraint(ConstraintKind::Subtype, selfTy2, selfTy1);
+    cs.addConstraint(ConstraintKind::Subtype, selfTy2, selfTy1, locator);
     break;
 
   case SelfTypeRelationship::ConformsTo:
-    cs.addConstraint(ConstraintKind::ConformsTo, selfTy1, selfTy2);
+    cs.addConstraint(ConstraintKind::ConformsTo, selfTy1, selfTy2, locator);
     break;
 
   case SelfTypeRelationship::ConformedToBy:
-    cs.addConstraint(ConstraintKind::ConformsTo, selfTy2, selfTy1);
+    cs.addConstraint(ConstraintKind::ConformsTo, selfTy2, selfTy1, locator);
     break;
   }
 
   switch (checkKind) {
   case CheckAll:
     // Check whether the first type is a subtype of the second.
-    cs.addConstraint(ConstraintKind::Subtype, openedType1, openedType2);
+    cs.addConstraint(ConstraintKind::Subtype,
+                     openedType1,
+                     openedType2,
+                     locator);
     break;
 
   case CheckInput: {
@@ -475,7 +480,8 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
     auto funcTy2 = openedType2->castTo<FunctionType>();
     cs.addConstraint(ConstraintKind::Subtype,
                      funcTy1->getInput(),
-                     funcTy2->getInput());
+                     funcTy2->getInput(),
+                     locator);
     break;
   }
 
@@ -486,7 +492,8 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
     auto funcTy2 = openedType2->castTo<FunctionType>();
     cs.addConstraint(ConstraintKind::Subtype,
                      funcTy1->getResult(),
-                     funcTy2->getResult());
+                     funcTy2->getResult(),
+                     locator);
     break;
   }
   }

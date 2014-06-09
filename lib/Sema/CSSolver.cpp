@@ -826,7 +826,10 @@ static bool tryTypeVariableBindings(
         type = cs.openBindingType(type);
       }
 
-      cs.addConstraint(ConstraintKind::Bind, typeVar, type);
+      cs.addConstraint(ConstraintKind::Bind,
+                       typeVar,
+                       type,
+                       cs.getConstraintLocator(cs.rootExpr));
       if (!cs.solve(solutions, allowFreeTypeVariables))
         anySolved = true;
 

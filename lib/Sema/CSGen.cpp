@@ -153,7 +153,8 @@ namespace {
       auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr),
                                       TVO_PrefersSubtypeBinding);
       CS.addConstraint(ConstraintKind::ConformsTo, tv,
-                       protocol->getDeclaredType());
+                       protocol->getDeclaredType(),
+                       CS.getConstraintLocator(CS.rootExpr));
       return tv;
     }
 
@@ -175,7 +176,8 @@ namespace {
       auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr),
                                       TVO_PrefersSubtypeBinding);
       CS.addConstraint(ConstraintKind::ConformsTo, tv,
-                       interpolationProto->getDeclaredType());
+                       interpolationProto->getDeclaredType(),
+                       CS.getConstraintLocator(CS.rootExpr));
 
       // Each of the segments is passed as an argument to
       // convertFromStringInterpolationSegment().
@@ -464,7 +466,8 @@ namespace {
           // open type.
           for (size_t i = 0, size = specializations.size(); i < size; ++i) {
             CS.addConstraint(ConstraintKind::Equal,
-                             typeVars[i], specializations[i].getType());
+                             typeVars[i], specializations[i].getType(),
+                             CS.getConstraintLocator(CS.rootExpr));
           }
           
           return baseTy;

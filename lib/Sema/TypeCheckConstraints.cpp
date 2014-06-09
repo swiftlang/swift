@@ -770,6 +770,9 @@ bool TypeChecker::typeCheckExpression(
   // Construct a constraint system from this expression.
   ConstraintSystem cs(*this, dc, ConstraintSystemFlags::AllowFixes);
   
+  llvm::SaveAndRestore<Expr*> rootExpr(cs.rootExpr, expr);
+
+  
   if (!contextualType.isNull()) {
     cs.setContextualType(expr, &contextualType);
   }
@@ -1136,7 +1139,10 @@ Type ConstraintSystem::computeAssignDestType(Expr *dest, SourceLoc equalLoc) {
                                            ConstraintLocator::AssignDest),
                       /*options=*/0);
     auto refTv = LValueType::get(objectTv);
-    addConstraint(ConstraintKind::Bind, typeVar, refTv);
+    addConstraint(ConstraintKind::Bind,
+                  typeVar,
+                  refTv,
+                  this->getConstraintLocator(dest));
     destTy = objectTv;
   } else {
     // Give a more specific diagnostic depending on what we're assigning to.
@@ -1193,7 +1199,8 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
       auto rvalueType = expr->getType()->getRValueType();
       if (rvalueType->isBuiltinIntegerType(1)) {
         cs.addConstraint(ConstraintKind::Conversion, expr->getType(),
-                         rvalueType);
+                         rvalueType,
+                         cs.getConstraintLocator(expr));
         return false;
       }
 
@@ -1376,14 +1383,20 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
 
 bool TypeChecker::isSubtypeOf(Type type1, Type type2, DeclContext *dc) {
   ConstraintSystem cs(*this, dc, ConstraintSystemOptions());
-  cs.addConstraint(ConstraintKind::Subtype, type1, type2);
+  cs.addConstraint(ConstraintKind::Subtype,
+                   type1,
+                   type2,
+                   cs.getConstraintLocator(cs.rootExpr));
   SmallVector<Solution, 1> solutions;
   return !cs.solve(solutions);
 }
 
 bool TypeChecker::isConvertibleTo(Type type1, Type type2, DeclContext *dc) {
   ConstraintSystem cs(*this, dc, ConstraintSystemOptions());
-  cs.addConstraint(ConstraintKind::Conversion, type1, type2);
+  cs.addConstraint(ConstraintKind::Conversion,
+                   type1,
+                   type2,
+                   cs.getConstraintLocator(cs.rootExpr));
   SmallVector<Solution, 1> solutions;
   return !cs.solve(solutions);
 }
@@ -1391,6 +1404,7 @@ bool TypeChecker::isConvertibleTo(Type type1, Type type2, DeclContext *dc) {
 bool TypeChecker::isSubstitutableFor(Type type, ArchetypeType *archetype,
                                      DeclContext *dc) {
   ConstraintSystem cs(*this, dc, ConstraintSystemOptions());
+  auto locator = cs.getConstraintLocator(cs.rootExpr);
 
   // Add all of the requirements of the archetype to the given type.
   // FIXME: Short-circuit if any of the constraints fails.
@@ -1398,11 +1412,11 @@ bool TypeChecker::isSubstitutableFor(Type type, ArchetypeType *archetype,
     return false;
 
   if (auto superclass = archetype->getSuperclass()) {
-    cs.addConstraint(ConstraintKind::Subtype, type, superclass);
+    cs.addConstraint(ConstraintKind::Subtype, type, superclass, locator);
   }
   for (auto proto : archetype->getConformsTo()) {
     cs.addConstraint(ConstraintKind::ConformsTo, type,
-                     proto->getDeclaredType());
+                     proto->getDeclaredType(), locator);
   }
 
   // Solve the system.

@@ -1169,7 +1169,7 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
       case SolutionKind::Unsolved:
         // Add the constraint.
         addConstraint(ConstraintKind::ConformsTo, type1,
-                      proto->getDeclaredType());
+                      proto->getDeclaredType(), getConstraintLocator(rootExpr));
         break;
 
       case SolutionKind::Error:

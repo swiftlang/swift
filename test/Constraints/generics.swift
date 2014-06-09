@@ -14,7 +14,7 @@ func min<T : Comparable>(x: T, y: T) -> T {
 func weirdConcat<T : ConcatToAnything, U>(t: T, u: U) {
   t +++ u
   t +++ 1
-  u +++ t // expected-error{{cannot convert the expression's type '()' to type 'T'}}
+  u +++ t // expected-error{{type 'U' does not conform to protocol 'ConcatToAnything'}}
 }
 
 // Make sure that the protocol operators don't get in the way.

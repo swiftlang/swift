@@ -593,7 +593,8 @@ matchWitness(TypeChecker &tc, NormalProtocolConformance *conformance,
     if (!ignoreReturnType) {
       auto typePair = getTypesToCompare(req, reqResultType, witnessResultType);
       cs.addConstraint(constraints::ConstraintKind::Equal,
-                       typePair.first, typePair.second);
+                       typePair.first, typePair.second,
+                       cs.getConstraintLocator(cs.rootExpr));
       // FIXME: Check whether this has already failed.
     }
 
@@ -635,7 +636,8 @@ matchWitness(TypeChecker &tc, NormalProtocolConformance *conformance,
 
       // Check whether the parameter types match.
       cs.addConstraint(constraints::ConstraintKind::Equal,
-                       typePair.first, typePair.second);
+                       typePair.first, typePair.second,
+                       cs.getConstraintLocator(cs.rootExpr));
       // FIXME: Check whether this failed.
 
       // FIXME: Consider default arguments here?
@@ -644,7 +646,8 @@ matchWitness(TypeChecker &tc, NormalProtocolConformance *conformance,
     // Simple case: add the constraint.
     auto typePair = getTypesToCompare(req, reqType, openWitnessType);
     cs.addConstraint(constraints::ConstraintKind::Equal,
-                     typePair.first, typePair.second);
+                     typePair.first, typePair.second,
+                     cs.getConstraintLocator(cs.rootExpr));
   }
 
   // Try to solve the system.
