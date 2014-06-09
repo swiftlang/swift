@@ -169,6 +169,7 @@ void CodeCompletionString::print(raw_ostream &OS) const {
       OS << "{#";
       break;
     case Chunk::ChunkKind::DynamicLookupMethodCallTail:
+    case Chunk::ChunkKind::OptionalMethodCallTail:
       OS << C.getText();
       break;
     case Chunk::ChunkKind::TypeAnnotation:
@@ -651,6 +652,7 @@ Optional<unsigned> CodeCompletionString::getFirstTextChunkIndex() const {
     case CodeCompletionString::Chunk::ChunkKind::GenericParameterBegin:
     case CodeCompletionString::Chunk::ChunkKind::GenericParameterName:
     case CodeCompletionString::Chunk::ChunkKind::DynamicLookupMethodCallTail:
+    case CodeCompletionString::Chunk::ChunkKind::OptionalMethodCallTail:
     case CodeCompletionString::Chunk::ChunkKind::TypeAnnotation:
       continue;
 
@@ -1176,9 +1178,9 @@ public:
       // parameters.  But for 'self' it is just noise.
       VarType = VarType->getInOutObjectType();
     }
-    if (IsDynamicLookup) {
+    if (IsDynamicLookup || VD->getAttrs().isOptional()) {
       // Values of properties that were found on a AnyObject have
-      // Optional<T> type.
+      // Optional<T> type.  Same applies to @optional members.
       VarType = OptionalType::get(VarType);
     }
     addTypeAnnotation(Builder, VarType);
@@ -1358,6 +1360,8 @@ public:
     Builder.addTextChunk(Name);
     if (IsDynamicLookup)
       Builder.addDynamicLookupMethodCallTail();
+    else if (FD->getAttrs().isOptional())
+      Builder.addOptionalMethodCallTail();
 
     llvm::SmallString<32> TypeStr;
 

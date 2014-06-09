@@ -216,6 +216,12 @@ public:
     getLastChunk().setIsAnnotation();
   }
 
+  void addOptionalMethodCallTail() {
+    addChunkWithTextNoCopy(
+        CodeCompletionString::Chunk::ChunkKind::OptionalMethodCallTail, "!");
+    getLastChunk().setIsAnnotation();
+  }
+
   void addTypeAnnotation(StringRef Type) {
     addChunkWithText(
         CodeCompletionString::Chunk::ChunkKind::TypeAnnotation, Type);

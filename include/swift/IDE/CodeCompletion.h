@@ -116,6 +116,12 @@ public:
       /// desired.
       DynamicLookupMethodCallTail,
 
+      /// A placeholder for \c ! or \c ? in a call to an @optional method.
+      ///
+      /// The default spelling is \c !, but clients may render it as \c ? if
+      /// desired.
+      OptionalMethodCallTail,
+
       /// Specifies the type of the whole entity that is returned in this code
       /// completion result.  For example, for variable references it is the
       /// variable type, for function calls it is the return type.
@@ -153,6 +159,7 @@ public:
              Kind == ChunkKind::CallParameterType ||
              Kind == ChunkKind::GenericParameterName ||
              Kind == ChunkKind::DynamicLookupMethodCallTail ||
+             Kind == ChunkKind::OptionalMethodCallTail ||
              Kind == ChunkKind::TypeAnnotation ||
              Kind == ChunkKind::BraceStmtWithCursor;
     }

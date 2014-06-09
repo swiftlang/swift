@@ -50,6 +50,7 @@ static std::string toInsertableString(CodeCompletionResult *Result) {
     case CodeCompletionString::Chunk::ChunkKind::QuestionMark:
     case CodeCompletionString::Chunk::ChunkKind::Ampersand:
     case CodeCompletionString::Chunk::ChunkKind::DynamicLookupMethodCallTail:
+    case CodeCompletionString::Chunk::ChunkKind::OptionalMethodCallTail:
       if (!C.isAnnotation())
         Str += C.getText();
       break;
