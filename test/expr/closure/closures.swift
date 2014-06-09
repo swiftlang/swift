@@ -62,11 +62,11 @@ func funcdecl5(a: Int, y: Int) {
   // Pattern doesn't need to name arguments.
   func6({ _,_ in 4 })
   
-  var fn = {} // FIXME: maybe? expected-error{{cannot convert the expression's type '() -> $T0' to type '$T1'}}
+  var fn = {} // FIXME: maybe? expected-error{{cannot convert the expression's type '() -> () -> $T0' to type '() -> () -> $T0'}}
   var fn2 = { 4 }
   
   
-  var c : Int = { a,b-> Int in a+b} // expected-error{{'($T0, $T1) -> Int' is not convertible to 'Int'}}
+  var c : Int = { a,b-> Int in a+b} // expected-error{{'(($T0, ($T0, $T1) -> Int) -> Int, (($T0, $T1) -> Int, $T1) -> Int) -> Int' is not convertible to 'Int'}}
   
   
 }
@@ -92,7 +92,7 @@ assert(f0(1) == 1)
 
 
 var selfRef = { selfRef() } // expected-error {{variable used within its own initial value}}
-var nestedSelfRef = { // expected-error {{cannot convert the expression's type '() -> $T0' to type '$T1'}}
+var nestedSelfRef = { // expected-error {{cannot convert the expression's type '() -> () -> $T0' to type '() -> () -> $T0'}}
   var recursive = { nestedSelfRef() } // expected-error {{variable used within its own initial value}}
   recursive()
 }

@@ -36,8 +36,8 @@ func nsc4<T : NonSelfConforming4>(x: T) { }
 
 func testNonSelfConforming(c1: NonSelfConforming1, c2: NonSelfConforming2,
                            c3: NonSelfConforming3, c4: NonSelfConforming4) {
-  nsc1(c1) // expected-error{{cannot convert the expression's type '()' to type '$T1'}}
-  nsc2(c2) // expected-error{{cannot convert the expression's type '()' to type '$T1'}}
-  nsc3(c3) // expected-error{{cannot convert the expression's type '()' to type '$T1'}}
-  nsc4(c4) // expected-error{{cannot convert the expression's type '()' to type '$T1'}}
+  nsc1(c1) // expected-error{{cannot convert the expression's type '()' to type 'T'}}
+  nsc2(c2) // expected-error{{cannot convert the expression's type '()' to type 'T'}}
+  nsc3(c3) // expected-error{{cannot convert the expression's type '()' to type 'T'}}
+  nsc4(c4) // expected-error{{cannot convert the expression's type '()' to type 'T'}}
 }

@@ -170,10 +170,10 @@ protocol P {
 override func f() { } // expected-error{{'override' can only be specified on class members}}
 
 // Invalid 'override' on declarations inside closures.
-var rdar16654075a = { // expected-error {{cannot convert the expression's type '() -> $T0' to type '$T1'}}
+var rdar16654075a = { // expected-error {{cannot convert the expression's type '() -> () -> $T0' to type '() -> () -> $T0'}}
   override func foo() {}
 }
-var rdar16654075b = { // expected-error {{cannot convert the expression's type '() -> $T0' to type '$T1'}}
+var rdar16654075b = { // expected-error {{cannot convert the expression's type '() -> () -> $T0' to type '() -> () -> $T0'}}
   class A {
     override func foo() {}
   }

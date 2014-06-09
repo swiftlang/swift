@@ -192,7 +192,7 @@ func useNested(ii: Int, hni: HasNested<Int>,
   typealias HNI = HasNested<Int>
   var id = hni.f(1, u: 3.14159)
   id = (2, 3.14159)
-  hni.f(1.5, 3.14159) // expected-error{{cannot convert the expression's type '(Int, $T3)' to type 'FloatLiteralConvertible'}}
+  hni.f(1.5, 3.14159) // expected-error{{cannot convert the expression's type '(Int, U)' to type 'FloatLiteralConvertible'}}
 
   // Generic constructor of a generic struct
   HNI(1, 2.71828)

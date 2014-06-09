@@ -55,7 +55,7 @@ func testAny(at: AnyT, let ap: AnyPair) {
   var f : Float = at
   var t1 : (Int, Int) = at
   t1 = ap
-  i = ap // expected-error{{'($T4, $T4)' is not a subtype of 'Int'}}
+  i = ap // expected-error{{'(T, T)' is not a subtype of 'Int'}}
 }
 
 // Prefer solutions with fewer user conversions.

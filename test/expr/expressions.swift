@@ -60,7 +60,7 @@ func basictest() {
 
   // Brace expressions.
   // FIXME: Defaulting to () -> () for function expressions?
-  var brace3 = { // expected-error{{cannot convert the expression's type '() -> $T0' to type '$T1'}}
+  var brace3 = { // expected-error{{cannot convert the expression's type '() -> () -> $T0' to type '() -> () -> $T0'}}
     var brace2 = 42  // variable shadowing.
     brace2+7
   }
@@ -517,7 +517,7 @@ func conversionTest(inout a: Double, inout b: Int) {
 
   var pi_f1 = Float(pi_f)
   var pi_d1 = Double(pi_d)
-  var pi_s1 = SpecialPi(pi_s) // expected-error {{cannot convert the expression's type 'SpecialPi' to type '$T3'}}
+  var pi_s1 = SpecialPi(pi_s) // expected-error {{cannot convert the expression's type 'SpecialPi' to type 'SpecialPi'}}
 
   var pi_f2 = Float(getPi()) // expected-error {{ambiguous use of 'getPi'}}
   var pi_d2 = Double(getPi()) // expected-error {{ambiguous use of 'getPi'}}

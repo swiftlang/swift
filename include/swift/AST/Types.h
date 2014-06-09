@@ -3308,11 +3308,21 @@ class TypeVariableType : public TypeBase {
   class Implementation;
   
 public:
+  
+  /// \brief Printing substitutions for type variables may result in recursive
+  /// references to the type variable itself. This flag is used to short-circuit
+  /// such operations.
+  bool isPrinting = false;
+  
   /// \brief Create a new type variable whose implementation is constructed
   /// with the given arguments.
   template<typename ...Args>
   static TypeVariableType *getNew(const ASTContext &C, unsigned ID,
                                   Args &&...args);
+  
+  /// \brief If possible, retrieve the TypeBase object that was opened to create
+  /// this type variable.
+  TypeBase *getBaseBeingSubstituted();
 
   /// \brief Retrieve the implementation data corresponding to this type
   /// variable.

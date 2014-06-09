@@ -2124,7 +2124,18 @@ public:
   }
 
   void visitTypeVariableType(TypeVariableType *T) {
-    Printer << "$T" << T->getID();
+    auto Base = T->getBaseBeingSubstituted();
+    
+    if (T->getASTContext().LangOpts.DebugConstraintSolver ||
+        (T->isEqual(Base)) ||
+        T->isPrinting) {
+      Printer << "$T" << T->getID();
+      return;
+    }
+    
+    llvm::SaveAndRestore<bool> isPrinting(T->isPrinting, true);
+    
+    visit(Base);
   }
 };
 } // unnamed namespace

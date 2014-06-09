@@ -55,6 +55,27 @@ void TypeVariableType::Implementation::print(llvm::raw_ostream &OS) {
   getTypeVariable()->print(OS, PrintOptions());
 }
 
+TypeBase *TypeVariableType::getBaseBeingSubstituted() {
+  auto impl = this->getImpl();
+  auto archetype = impl.getArchetype();
+  
+  if (archetype) {
+    return archetype;
+  } else {
+    if (auto locator = impl.getLocator()) {
+      if (auto anchor = locator->getAnchor()) {
+        if (auto anchorType = anchor->getType()) {
+          if (!(anchorType->getAs<TypeVariableType>())) {
+            return anchorType.getPointer();
+          }
+        }
+      }
+    }
+  }
+  
+  return this;
+}
+
 SavedTypeVariableBinding::SavedTypeVariableBinding(TypeVariableType *typeVar)
   : TypeVar(typeVar), ParentOrFixed(typeVar->getImpl().ParentOrFixed) { }
 

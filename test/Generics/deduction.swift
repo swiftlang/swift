@@ -24,7 +24,7 @@ func useIdentity(x: Int, y: Float, i32: Int32) {
   // FIXME: Is this actually the behavior we want? It's strange that these
   // two have different behavior.
   var xx : X, yy : Y
-  xx = identity(yy) // expected-error{{cannot convert the expression's type '()' to type '$T2'}}
+  xx = identity(yy) // expected-error{{cannot convert the expression's type '()' to type 'T'}}
   xx = identity2(yy) // expected-error{{could not find an overload for 'identity2' that accepts the supplied arguments}}
 }
 
@@ -82,10 +82,10 @@ func passFunction(f: (Int) -> Float, x: Int, y: Float) {
 func returnTuple<T, U>(_: T) -> (T, U) { }
 
 func testReturnTuple(x: Int, y: Float) {
-  returnTuple(x) // expected-error{{cannot convert the expression's type '($T1, $T2)' to type '$T1'}}
+  returnTuple(x) // expected-error{{cannot convert the expression's type '(T, U)' to type 'T'}}
   var rt1 : (Int, Float) = returnTuple(x)
   var rt2 : (Float, Float) = returnTuple(y)
-  var rt3 : (Int, Float) = returnTuple(y) // expected-error{{cannot convert the expression's type '($T1, $T2)' to type 'Float'}}
+  var rt3 : (Int, Float) = returnTuple(y) // expected-error{{cannot convert the expression's type '(T, U)' to type 'Float'}}
 }
 
 
@@ -202,7 +202,7 @@ extension Int : IsBefore {
 
 func callMin(x: Int, y: Int, a: Float, b: Float) {
   min2(x, y)
-  min2(a, b) // expected-error{{cannot convert the expression's type '$T1' to type 'Float'}}
+  min2(a, b) // expected-error{{cannot convert the expression's type 'T' to type 'Float'}}
 }
 
 func rangeOfIsBefore<R : Generator where R.Element : IsBefore>(range : R) { }
@@ -210,7 +210,7 @@ func rangeOfIsBefore<R : Generator where R.Element : IsBefore>(range : R) { }
 
 func callRangeOfIsBefore(ia: Int[], da: Double[]) {
   rangeOfIsBefore(ia.generate())
-  rangeOfIsBefore(da.generate()) // expected-error{{cannot convert the expression's type '()' to type '$T1'}}
+  rangeOfIsBefore(da.generate()) // expected-error{{cannot convert the expression's type '()' to type 'R'}}
 }
 
 //===----------------------------------------------------------------------===//
@@ -241,7 +241,7 @@ func testGetVectorSize(vi: MyVector<Int>, vf: MyVector<Float>) {
   i = getVectorSize(vi)
   i = getVectorSize(vf)
   // FIXME: $T1 should not show up here!
-  getVectorSize(i) // expected-error{{'Int' is not convertible to 'MyVector<$T1>'}}
+  getVectorSize(i) // expected-error{{'Int' is not convertible to 'MyVector<T>'}}
 
   var x : X, y : Y
   x = ovlVector(vi)

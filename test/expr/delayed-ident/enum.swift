@@ -21,4 +21,4 @@ var e2a: E2<Int> = .First
 e2a = .Second(5)
 var e2b: E2 = .Second(5)
 e2b = .First
-var e2c: E2 = .First // expected-error{{@lvalue E2<$T2>' is not identical to 'E2<$T2>}}
+var e2c: E2 = .First // expected-error{{@lvalue E2<T>' is not identical to 'E2<T>}}
