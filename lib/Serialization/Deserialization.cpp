@@ -1729,8 +1729,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     // Set the initializer type of the constructor.
     auto allocType = ctor->getType();
-    auto selfTy = allocType->castTo<AnyFunctionType>()->getInput()
-                    ->castTo<MetatypeType>()->getInstanceType();
+    auto selfTy = ctor->computeSelfType();
     if (auto polyFn = allocType->getAs<PolymorphicFunctionType>()) {
       ctor->setInitializerType(
         PolymorphicFunctionType::get(selfTy, polyFn->getResult(),
@@ -1745,8 +1744,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     // Set the initializer interface type of the constructor.
     allocType = ctor->getInterfaceType();
-    selfTy = allocType->castTo<AnyFunctionType>()->getInput()
-               ->castTo<MetatypeType>()->getInstanceType();
+    selfTy = ctor->computeInterfaceSelfType(/*isInitializingCtor=*/true);
     if (auto polyFn = allocType->getAs<GenericFunctionType>()) {
       ctor->setInitializerInterfaceType(
               GenericFunctionType::get(polyFn->getGenericSignature(),

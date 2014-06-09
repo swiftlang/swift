@@ -21,6 +21,10 @@ enum Lazy<T> : Computable {
   case Thunk(() -> T)
   case Value(T)
 
+  init(value: T) {
+    self = .Value(value)
+  }
+
   func compute() {
 //    if (this ~= .Thunk(var fn)) {
 //      this = .Value(fn())
