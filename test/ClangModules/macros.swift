@@ -83,11 +83,11 @@ func testSuppressed() {
 }
 
 func testNil() {
-  var localNil: _Nil
-  localNil = NULL_VIA_NAME
-  localNil = NULL_VIA_VALUE
-  localNil = NULL_AS_NIL
-  localNil = NULL_AS_CLASS_NIL
+  var localNil: ()
+  localNil = NULL_VIA_NAME    // expected-error {{'NULL_VIA_NAME' is unavailable: use 'nil' instead of this imported macro}}
+  localNil = NULL_VIA_VALUE    // expected-error {{'NULL_VIA_VALUE' is unavailable: use 'nil' instead of this imported macro}}
+  localNil = NULL_AS_NIL       // expected-error {{'NULL_AS_NIL' is unavailable: use 'nil' instead of this imported macro}}
+  localNil = NULL_AS_CLASS_NIL // expected-error {{'NULL_AS_CLASS_NIL' is unavailable: use 'nil' instead of this imported macro}}
 
   localNil = Nil // expected-error {{use of unresolved identifier 'Nil'}}
 }

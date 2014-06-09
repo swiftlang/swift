@@ -199,22 +199,14 @@ static ValueDecl *importLiteral(ClangImporter::Implementation &Impl,
 }
 
 static ValueDecl *importNil(ClangImporter::Implementation &Impl,
-                            DeclContext *DC,
-                            Identifier name,
+                            DeclContext *DC, Identifier name,
                             const clang::MacroInfo *clangN) {
-  auto nilVar = Impl.SwiftContext.getNilDecl();
-  if (!nilVar->hasInterfaceType())
-    if (auto typeResolver = Impl.getTypeResolver())
-      typeResolver->resolveDeclSignature(nilVar);
-  auto nilExpr =
-    new (Impl.SwiftContext) DeclRefExpr(nilVar,
-                                        /*Loc=*/{},
-                                        /*Implicit=*/true,
-                                        /*Direct=*/false,
-                                        nilVar->getInterfaceType());
-  return Impl.createConstant(name, DC, nilExpr->getType(), nilExpr,
-                             ConstantConvertKind::None, /*static=*/false,
-                             clangN);
+  // We use a dummy type since we don't have a convenient type for 'nil'.  Any
+  // use of this will be an error anyway.
+  auto type = TupleType::getEmpty(Impl.SwiftContext);
+  return Impl.createUnavailableDecl(name, DC, type,
+                                    "use 'nil' instead of this imported macro",
+                                    /*static=*/false, clangN);
 }
 
 static bool isSignToken(const clang::Token &tok) {

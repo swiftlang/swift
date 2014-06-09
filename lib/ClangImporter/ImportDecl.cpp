@@ -4778,6 +4778,26 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   return var;
 }
 
+/// \brief Create a decl with error type and an "unavailable" attribute on it
+/// with the specified message.
+ValueDecl *ClangImporter::Implementation::
+createUnavailableDecl(Identifier name, DeclContext *dc, Type type,
+                      StringRef UnavailableMessage, bool isStatic,
+                      ClangNode ClangN) {
+
+  // Create a new VarDecl with dummy type.
+  auto var = createDeclWithClangNode<VarDecl>(ClangN,
+                                              isStatic, /*IsLet*/ false,
+                                              SourceLoc(), name, type, dc);
+
+  UnavailableMessage = SwiftContext.AllocateCopy(UnavailableMessage);
+  auto UA = AvailabilityAttr::createImplicitUnavailableAttr(SwiftContext,
+                                                            UnavailableMessage);
+  var->getMutableAttrs().add(UA);
+  return var;
+}
+
+
 ArrayRef<Decl *>
 ClangImporter::Implementation::loadAllMembers(const Decl *D, uint64_t unused) {
   assert(D->hasClangNode());

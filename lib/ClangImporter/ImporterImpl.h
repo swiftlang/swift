@@ -697,6 +697,12 @@ public:
                             bool isStatic,
                             ClangNode ClangN);
 
+  /// \brief Create a decl with error type and an "unavailable" attribute on it
+  /// with the specified message.
+  ValueDecl *createUnavailableDecl(Identifier name, DeclContext *dc,
+                                   Type type, StringRef UnavailableMessage,
+                                   bool isStatic, ClangNode ClangN);
+
   /// \brief Retrieve the standard library module.
   Module *getStdlibModule();
 
