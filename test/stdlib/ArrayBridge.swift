@@ -30,7 +30,21 @@ import ArrayBridgeObjC
 var trackedCount = 0
 var nextTrackedSerialNumber = 0
 
-class Tracked : NSObject, ForwardIndex, Printable {
+@objc protocol Fooable {
+  func foo()
+}
+
+@objc protocol Barable {
+  func bar()
+}
+
+@objc protocol Bazable {
+  func baz()
+}
+
+class Tracked : NSObject, ForwardIndex, Printable, Fooable {
+  func foo() { }
+
   init(_ value: Int) {
     ++trackedCount
     serialNumber = ++nextTrackedSerialNumber
@@ -61,14 +75,17 @@ func == (x: Tracked, y: Tracked) -> Bool {
 }
 
 typealias Base = Tracked
-class Derived : Base, Printable {
+class Derived : Base, Printable, Barable {
+  func bar() { }
+
   override var description: String {
     assert(serialNumber > 0, "dead Tracked!")
     return "Derived#\(serialNumber)(\(value))"
   }
 }
 
-class BridgedObjC : Base, Printable {
+class BridgedObjC : Base, Printable, Barable {
+  func bar() { }
   override var description: String {
     assert(serialNumber > 0, "dead Tracked!")
     return "BridgedObjC#\(serialNumber)(\(value))"
@@ -223,6 +240,34 @@ func testBridgedVerbatim() {
   }
   else {
     println("downcastBackToDerived failed")
+  }
+
+  // CHECK-NEXT: downcastToProtocols = [[derived2]]
+  if let downcastToProtocols = derivedAsAnyObjectArray as? Fooable[] {
+    println("downcastToProtocols = \(downcastToProtocols)")
+  } else {
+    println("downcastToProtocols failed")
+  }
+
+  // CHECK-NEXT: downcastToProtocols = [[derived2]]
+  if let downcastToProtocols = derivedAsAnyObjectArray as? Barable[] {
+    println("downcastToProtocols = \(downcastToProtocols)")
+  } else {
+    println("downcastToProtocols failed")
+  }
+
+  // CHECK-NEXT: downcastToProtocols = [[derived2]]
+  if let downcastToProtocols = derivedAsAnyObjectArray as? protocol<Barable, Fooable>[] {
+    println("downcastToProtocols = \(downcastToProtocols)")
+  } else {
+    println("downcastToProtocols failed")
+  }
+
+  // CHECK-NEXT: downcastToProtocols failed
+  if let downcastToProtocols = derivedAsAnyObjectArray as? protocol<Barable, Bazable>[] {
+    println("downcastToProtocols = \(downcastToProtocols)")
+  } else {
+    println("downcastToProtocols failed")
   }
 
   // CHECK-NEXT: produceBridgedObjCArray([BridgedObjC[[A:#[0-9]+]](0), BridgedObjC[[B:#[0-9]+]](1), BridgedObjC[[C:#[0-9]+]](2), BridgedObjC[[D:#[0-9]+]](3), BridgedObjC[[E:#[0-9]+]](4)])

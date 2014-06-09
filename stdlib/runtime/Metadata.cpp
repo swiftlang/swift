@@ -42,9 +42,16 @@
 using namespace swift;
 using namespace metadataimpl;
 
+// Objective-C runtime entry points.
 extern "C" const ClassMetadata* object_getClass(const void *);
 extern "C" const char* class_getName(const ClassMetadata*);
 extern "C" const ClassMetadata* class_getSuperclass(const ClassMetadata*);
+
+// Aliases for Swift runtime entry points for Objective-C types.
+extern "C" const void *swift_dynamicCastObjCProtocolConditional(
+                         const void *object,
+                         size_t numProtocols,
+                         const ProtocolDescriptor * const *protocols);
 
 namespace {
   template <class Entry> class MetadataCache;
@@ -352,42 +359,85 @@ static const OpaqueValue *
 _dynamicCastToExistential(const OpaqueValue *value,
                           const Metadata *sourceType,
                           const ExistentialTypeMetadata *targetType) {
-  // TODO: We don't have the runtime infrastructure to support casts to protocol
-  // types generally. For now, only handle the case of classes "conforming" to
-  // AnyObject.
-  if (targetType->Protocols.NumProtocols != 1
-      || strcmp(targetType->Protocols[0]->Name, "_TtPSs9AnyObject_") != 0)
-    return nullptr;
-    
-  switch (sourceType->getKind()) {
-  case MetadataKind::Class:
-  case MetadataKind::ObjCClassWrapper:
-  case MetadataKind::ForeignClass: // FIXME
-    return value;
+  for (unsigned i = 0, n = targetType->Protocols.NumProtocols; i != n; ++i) {
+    auto *protocol = targetType->Protocols[i];
 
-  case MetadataKind::Existential: {
-    auto sourceExistential
-      = static_cast<const ExistentialTypeMetadata*>(sourceType);
-    // The existential conforms to AnyObject if it's class-constrained.
-    if (sourceExistential->Flags.getClassConstraint()
-          != ProtocolClassConstraint::Class)
+    // Handle AnyObject directly.
+    // FIXME: strcmp here is horribly slow.
+    if (strcmp(protocol->Name, "_TtPSs9AnyObject_") == 0) {
+      switch (sourceType->getKind()) {
+      case MetadataKind::Class:
+      case MetadataKind::ObjCClassWrapper:
+      case MetadataKind::ForeignClass: // FIXME
+        // Classes conform to AnyObject.
+        break;
+
+      case MetadataKind::Existential: {
+        auto sourceExistential
+          = static_cast<const ExistentialTypeMetadata*>(sourceType);
+        // The existential conforms to AnyObject if it's class-constrained.
+        if (sourceExistential->Flags.getClassConstraint()
+            != ProtocolClassConstraint::Class)
+          return nullptr;
+        break;
+      }
+      
+      case MetadataKind::ExistentialMetatype: // FIXME
+      case MetadataKind::Function:
+      case MetadataKind::Block: // FIXME
+      case MetadataKind::HeapArray:
+      case MetadataKind::HeapLocalVariable:
+      case MetadataKind::Metatype:
+      case MetadataKind::Enum:
+      case MetadataKind::Opaque:
+      case MetadataKind::PolyFunction:
+      case MetadataKind::Struct:
+      case MetadataKind::Tuple:
+        return nullptr;
+      }
+
+      continue;
+    }
+
+    // FIXME: Can't handle protocols that require witness tables.
+    if (protocol->Flags.needsWitnessTable())
       return nullptr;
-    break;
-  }
-    
-  case MetadataKind::ExistentialMetatype:
-  case MetadataKind::Function:
-  case MetadataKind::Block:
-  case MetadataKind::HeapArray:
-  case MetadataKind::HeapLocalVariable:
-  case MetadataKind::Metatype:
-  case MetadataKind::Enum:
-  case MetadataKind::Opaque:
-  case MetadataKind::PolyFunction:
-  case MetadataKind::Struct:
-  case MetadataKind::Tuple:
+
+    // For Objective-C protocols, check whether we have a class that
+    // conforms to the given protocol.
+    switch (sourceType->getKind()) {
+    case MetadataKind::Class: 
+    case MetadataKind::ObjCClassWrapper: {
+      const void *object
+        = *reinterpret_cast<const void * const *>(value);
+      if (swift_dynamicCastObjCProtocolConditional(object, 1, &protocol)) {
+        continue;
+      }
+
+      return nullptr;
+    }
+
+    case MetadataKind::ForeignClass:
+      return nullptr;
+
+    case MetadataKind::Existential: // FIXME
+    case MetadataKind::ExistentialMetatype: // FIXME
+    case MetadataKind::Function:
+    case MetadataKind::Block: // FIXME
+    case MetadataKind::HeapArray:
+    case MetadataKind::HeapLocalVariable:
+    case MetadataKind::Metatype:
+    case MetadataKind::Enum:
+    case MetadataKind::Opaque:
+    case MetadataKind::PolyFunction:
+    case MetadataKind::Struct:
+    case MetadataKind::Tuple:
+      return nullptr;
+    }
+
     return nullptr;
   }
+
   return value;
 }
 
