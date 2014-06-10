@@ -889,6 +889,11 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
         }
         Kind = SILDeclRef::Kind::Func;
         VD = cast<AbstractStorageDecl>(VD)->getGetter();
+        // Update values for getter.
+        for (unsigned I = 0, E = values.size(); I < E; I++)
+          if (isa<AbstractStorageDecl>(values[I]) &&
+              cast<AbstractStorageDecl>(values[I])->getGetter())
+            values[I] = cast<AbstractStorageDecl>(values[I])->getGetter();
         ParseState = 1;
       } else if (!ParseState && Id.str() == "setter") {
         if (!isa<AbstractStorageDecl>(VD) ||
@@ -898,6 +903,11 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
         }
         Kind = SILDeclRef::Kind::Func;
         VD = cast<AbstractStorageDecl>(VD)->getSetter();
+        // Update values for setter.
+        for (unsigned I = 0, E = values.size(); I < E; I++)
+          if (isa<AbstractStorageDecl>(values[I]) &&
+              cast<AbstractStorageDecl>(values[I])->getSetter())
+            values[I] = cast<AbstractStorageDecl>(values[I])->getSetter();
         ParseState = 1;
       } else if (!ParseState && Id.str() == "allocator") {
         Kind = SILDeclRef::Kind::Allocator;

@@ -1,0 +1,21 @@
+// RUN: %swift %s -emit-silgen | FileCheck %s
+
+// Verify that SILParser correctly handles protocol_method on a getter.
+import Swift
+
+@class_protocol
+protocol TestP {
+  var count: Int {get}
+}
+
+// CHECK-LABEL: sil @test
+sil @test : $@cc(method) @thin (TestP) -> () {
+bb0(%0 : $TestP):
+  // CHECK: protocol_method %{{[0-9]+}} : $TestP, #TestP.count!getter : <`Self` : TestP> Self -> () -> Int, $@cc(witness_method) (Self) -> Int
+  %2 = protocol_method %0 : $TestP, #TestP.count!getter : <`Self` : TestP> Self -> () -> Int, $@cc(witness_method) (@sil_self TestP) -> Int
+
+  // Currently SILParser does not parse the below, but SILPrinter dumps "(Self) -> Int".
+  // %2 = protocol_method %0 : $TestP, #TestP.count!getter : <`Self` : TestP> Self -> () -> Int, $@cc(witness_method) (Self) -> Int
+  %3 = tuple ()
+  return %3 : $()
+}
