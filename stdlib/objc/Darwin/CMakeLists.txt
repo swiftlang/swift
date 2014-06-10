@@ -1,6 +1,7 @@
 set(SHARED_LIBRARY ON)
 set(SWIFTFOUNDATION_SOURCES
     Darwin.swift
+    Misc.mm
 )
 
 add_swift_library(swiftDarwin INSTALL
