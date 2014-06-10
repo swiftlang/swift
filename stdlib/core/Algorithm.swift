@@ -299,14 +299,25 @@ func swap<T>(inout a : T, inout b : T) {
 }
 
 
-func min<T : Comparable>(x: T, y: T, rest: T...) -> T {
+func min<T : Comparable>(x: T, y: T) -> T {
   var r = x
   if y < x {
     r = y
   }
-  for z in rest {
-    if z < r {
-      r = z
+  return r
+}
+
+func min<T : Comparable>(x: T, y: T, z: T, rest: T...) -> T {
+  var r = x
+  if y < x {
+    r = y
+  }
+  if z < r {
+    r = z
+  }
+  for t in rest {
+    if t < r {
+      r = t
     }
   }
   return r
