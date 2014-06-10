@@ -3,7 +3,7 @@
 import Darwin
 
 // CHECK: Hello world
-puts("Hello world")
+fputs("Hello world", stdout)
 
 // CHECK: 4294967295
 println("\(UINT32_MAX)")

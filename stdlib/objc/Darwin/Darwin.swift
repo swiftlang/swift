@@ -21,6 +21,35 @@ var errno : Int32 {
   }
 }
 
+
+var stdin : UnsafePointer<FILE> {
+  get {
+    return __stdinp
+  }
+  set {
+    __stdinp = newValue
+  }   
+}
+
+var stdout : UnsafePointer<FILE> {
+  get {
+    return __stdoutp
+  }
+  set {
+    __stdoutp = newValue
+  }   
+}
+
+var stderr : UnsafePointer<FILE> {
+  get {
+    return __stderrp
+  }
+  set {
+    __stderrp = newValue
+  }   
+}
+
+
 @availability(*, unavailable, message="Please use threads or posix_spawn*()")
 func fork() -> Int32 {
   errno = ENOSYS
