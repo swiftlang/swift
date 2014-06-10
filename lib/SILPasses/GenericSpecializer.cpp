@@ -597,11 +597,12 @@ static bool canSpecializeFunction(SILFunction *F) {
 /// substitution list without doing partial specialization.
 static bool canSpecializeFunctionWithSubList(SILFunction *F,
                                              TypeSubstitutionMap &SubsMap) {
-  CanSILFunctionType N =
-      SILType::substFuncType(F->getModule(), F->getModule().getSwiftModule(),
-                             SubsMap, F->getLoweredFunctionType(),
-                                                /*dropGenerics = */ true);
-  return !hasUnboundGenericTypes(N);
+  // Check whether any of the substitutions are dependent.
+  for (auto &entry : SubsMap) {
+    if (hasUnboundGenericTypes(entry.second->getCanonicalType()))
+      return false;
+  }
+  return true;
 }
 
 namespace {
