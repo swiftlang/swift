@@ -76,7 +76,7 @@ namespace swift {
 /// on structural types.
 class RecursiveTypeProperties {
 public:
-  enum { BitWidth = 3 };
+  enum { BitWidth = 4 };
 
   /// A single property.
   ///
@@ -86,12 +86,15 @@ public:
     /// This type expression contains a TypeVariableType.
     HasTypeVariable     = 0x01,
 
+    /// This type expression contains an ArchetypeType.
+    HasArchetype        = 0x02,
+
     /// This type expression contains a GenericTypeParamType.
-    IsDependent         = 0x02,
+    IsDependent         = 0x04,
 
     /// This type expression contains an LValueType or InOutType,
     /// other than as a function input.
-    IsNotMaterializable = 0x04,
+    IsNotMaterializable = 0x08,
   };
 
 private:
@@ -108,6 +111,10 @@ public:
   /// Does a type with these properties structurally contain a type
   /// variable?
   bool hasTypeVariable() const { return Bits & HasTypeVariable; }
+
+  /// Does a type with these properties structurally contain an
+  /// archetype?
+  bool hasArchetype() const { return Bits & HasArchetype; }
 
   /// Is a type with these properties dependent, in the sense of being
   /// expressed in terms of a generic type parameter or a dependent
@@ -320,6 +327,11 @@ public:
   /// \brief Determine whether this type involves a type variable.
   bool hasTypeVariable() const {
     return getRecursiveProperties().hasTypeVariable();
+  }
+
+  /// Determine whether the type involves an archetype.
+  bool hasArchetype() const {
+    return getRecursiveProperties().hasArchetype();
   }
 
   /// \brief Compute and return the set of type variables that occur within this
@@ -2967,7 +2979,7 @@ private:
                 Identifier Name, ArrayRef<ProtocolDecl *> ConformsTo,
                 Type Superclass, Optional<unsigned> Index)
     : SubstitutableType(TypeKind::Archetype, &Ctx,
-                        RecursiveTypeProperties(),
+                        RecursiveTypeProperties::HasArchetype,
                         ConformsTo, Superclass),
       ParentOrOpened(Parent), AssocTypeOrProto(AssocTypeOrProto), Name(Name),
       IndexIfPrimaryOrExistentialID(Index? *Index + 1 : 0) { }
@@ -2978,7 +2990,7 @@ private:
                 ArrayRef<ProtocolDecl *> ConformsTo,
                 Type Superclass)
     : SubstitutableType(TypeKind::Archetype, &Ctx,
-                        RecursiveTypeProperties(),
+                        RecursiveTypeProperties::HasArchetype,
                         ConformsTo, Superclass),
       ParentOrOpened(Existential.getPointer()), 
       IndexIfPrimaryOrExistentialID(ID) { }

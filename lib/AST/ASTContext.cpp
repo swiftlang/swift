@@ -1822,7 +1822,7 @@ GenericFunctionType::get(GenericSignature *sig,
   // they erase dependence) or contain type variables, and they're
   // always materializable.
   RecursiveTypeProperties properties;
-  static_assert(RecursiveTypeProperties::BitWidth == 3,
+  static_assert(RecursiveTypeProperties::BitWidth == 4,
                 "revisit this if you add new recursive type properties");
 
   auto result = new (mem) GenericFunctionType(sig, input, output, info,
@@ -1961,25 +1961,18 @@ CanSILFunctionType SILFunctionType::get(GenericSignature *genericSig,
   // FIXME: If we ever have first-class polymorphic values, we'll need to
   // revisit this.
   RecursiveTypeProperties properties;
-  static_assert(RecursiveTypeProperties::BitWidth == 3,
+  static_assert(RecursiveTypeProperties::BitWidth == 4,
                 "revisit this if you add new recursive type properties");
   if (!genericSig) {
     // Nongeneric SIL functions are dependent if they have dependent argument
     // or return types. They still never contain type variables and are always
     // materializable.
-    if (interfaceResult.getType()->isDependentType()) {
-      properties += RecursiveTypeProperties::IsDependent;
-      goto did_set_dependent;
-    }
+    properties += interfaceResult.getType()->getRecursiveProperties();
 
     for (auto &param : interfaceParams) {
-      if (param.getType()->isDependentType()) {
-        properties += RecursiveTypeProperties::IsDependent;
-        goto did_set_dependent;
-      }
+      properties += param.getType()->getRecursiveProperties();
     }
   }
-did_set_dependent:
 
   auto fnType =
     new (mem) SILFunctionType(genericSig, ext, callee,

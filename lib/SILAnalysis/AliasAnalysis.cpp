@@ -343,7 +343,7 @@ static bool typedAccessTBAAMayAlias(SILType LTy, SILType RTy, SILModule &Mod) {
   // range of the type. A type such as $Array<Int> may alias $Array<T>.
   // Right now we are conservative and we assume that $UnsafePointer<T> and $Int
   // may alias.
-  if (LTy.isGenericType() || RTy.isGenericType())
+  if (LTy.hasArchetype() || RTy.hasArchetype())
     return true;
 
   // If either type is a protocol type, we don't know the underlying type so

@@ -141,16 +141,10 @@ SILType SILType::getMetatypeInstanceType() const {
   return SILType::getPrimitiveObjectType(instanceType->getCanonicalType());
 }
 
-bool SILType::isGenericType() const {
-  return getSwiftRValueType().findIf([](Type type) -> bool {
-    return isa<ArchetypeType>(type.getPointer());
-  });
-}
-
 bool SILType::aggregateContainsRecord(SILType Record, SILModule &Mod) const {
-  assert(!isGenericType() && "Agg should be proven to not be generic "
+  assert(!hasArchetype() && "Agg should be proven to not be generic "
                              "before passed to this function.");
-  assert(!Record.isGenericType() && "Record should be proven to not be generic "
+  assert(!Record.hasArchetype() && "Record should be proven to not be generic "
                                     "before passed to this function.");
 
   llvm::SmallVector<SILType, 8> Worklist;

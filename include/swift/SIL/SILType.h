@@ -285,6 +285,11 @@ public:
   bool isDependentType() const {
     return getSwiftRValueType()->isDependentType();
   }
+
+  /// True if the type involves any archetypes.
+  bool hasArchetype() const {
+    return getSwiftRValueType()->hasArchetype();
+  }
   
   /// Returns the ASTContext for the referenced Swift type.
   const ASTContext &getASTContext() const {
@@ -363,9 +368,6 @@ public:
   ///
   /// *NOTE* Only call on SILTypes for metatype types.
   SILType getMetatypeInstanceType() const;
-
-  /// Returns true if this SILType has references to unbound generic types.
-  bool isGenericType() const;
 
   /// Returns true if this SILType is an aggregate that contains \p Ty
   bool aggregateContainsRecord(SILType Ty, SILModule &SILMod) const;
