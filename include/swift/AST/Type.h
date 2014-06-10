@@ -160,6 +160,7 @@ class CanType : public Type {
                                     SmallVectorImpl<ProtocolDecl*> &protocols);
   static bool isObjCExistentialTypeImpl(CanType type);
   static CanType getAnyOptionalObjectTypeImpl(CanType type);
+  static ClassDecl *getClassBoundImpl(CanType type);
 
 public:
   explicit CanType(TypeBase *P = 0) : Type(P) {
@@ -215,6 +216,15 @@ public:
   EnumDecl *getEnumOrBoundGenericEnum() const; // in Types.h
   NominalTypeDecl *getNominalOrBoundGenericNominal() const; // in Types.h
   NominalTypeDecl *getAnyNominal() const; // in Types.h
+
+  /// \brief Retrieve the most-specific class bound of this type,
+  /// which is either a class, a bound-generic class, or a class-bounded
+  /// archetype.
+  ///
+  /// Returns nil if this is an archetype with a non-specific class bound.
+  ClassDecl *getClassBound() const {
+    return getClassBoundImpl(*this);
+  }
 
   CanType getAnyOptionalObjectType() const {
     return getAnyOptionalObjectTypeImpl(*this);

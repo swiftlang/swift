@@ -446,6 +446,24 @@ Type TypeBase::lookThroughAllAnyOptionalTypes() {
   return type;
 }
 
+ClassDecl *CanType::getClassBoundImpl(CanType type) {
+  if (auto classTy = dyn_cast<ClassType>(type))
+    return classTy->getDecl();
+
+  if (auto boundTy = dyn_cast<BoundGenericClassType>(type))
+    return boundTy->getDecl();
+
+  if (auto archetypeTy = dyn_cast<ArchetypeType>(type)) {
+    assert(archetypeTy->requiresClass());
+    if (Type supertype = archetypeTy->getSuperclass()) {
+      return supertype->getClassOrBoundGenericClass();
+    }
+    return nullptr;
+  }
+
+  llvm_unreachable("class has no class bound!");
+}
+
 bool TypeBase::isAnyObject() {
   if (auto proto = getAs<ProtocolType>())
     return proto->getDecl()->isSpecificProtocol(KnownProtocolKind::AnyObject);
