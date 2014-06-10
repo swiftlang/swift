@@ -142,6 +142,8 @@ struct ${Self} : ${'SignedInteger' if sign == 's' else 'UnsignedInteger'} {
   init(_ value: ${Self}) { self = value }
 
 %  if bits > 8:
+  /// Creates an integer from its big-endian representation, changing the
+  /// byte order if necessary.
   @transparent
   init(bigEndian value: ${Self}) {
 #if arch(i386) || arch(x86_64) || arch(arm) || arch(arm64)
@@ -151,6 +153,8 @@ struct ${Self} : ${'SignedInteger' if sign == 's' else 'UnsignedInteger'} {
 #endif
   }
 
+  /// Creates an integer from its little-endian representation, changing the
+  /// byte order if necessary.
   @transparent
   init(littleEndian value: ${Self}) {
 #if arch(i386) || arch(x86_64) || arch(arm) || arch(arm64)
@@ -189,6 +193,8 @@ struct ${Self} : ${'SignedInteger' if sign == 's' else 'UnsignedInteger'} {
   }
 
 %  if bits > 8:
+  /// Returns the big-endian representation of the integer, changing the
+  /// byte order if necessary.
   var bigEndian: ${Self} {
 #if arch(i386) || arch(x86_64) || arch(arm) || arch(arm64)
     return ${Self}(Builtin.int_bswap_${BuiltinName}(value) )
@@ -196,6 +202,8 @@ struct ${Self} : ${'SignedInteger' if sign == 's' else 'UnsignedInteger'} {
     assert(false)
 #endif
   }
+  /// Returns the little-endian representation of the integer, changing the
+  /// byte order if necessary.
   var littleEndian: ${Self} {
 #if arch(i386) || arch(x86_64) || arch(arm) || arch(arm64)
     return self
