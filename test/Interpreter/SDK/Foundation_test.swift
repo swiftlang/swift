@@ -101,7 +101,6 @@ func nsArrayToAnyObjectArray(nsa: NSArray) -> AnyObject[] {
 nsArrayToAnyObjectArray(nsa)
 nsArrayToAnyObjectArray(aoa)
 
-
 //===----------------------------------------------------------------------===//
 // Dictionaries
 //===----------------------------------------------------------------------===//

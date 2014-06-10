@@ -41,8 +41,14 @@ protocol P8 {
   init(int: Int)
 }
 
+// Inheritable: operator requirement.
+protocol P9 {
+  func ==(x: Self, y: Self) -> Bool 
+}
+
+
 // Class A conforms to everything.
-class A : P1, P2, P3, P4, P5, P6, P7, P8 {
+class A : P1, P2, P3, P4, P5, P6, P7, P8, P9 {
   // P1
   func f1(x: A) -> Bool { return true }
 
@@ -78,6 +84,8 @@ class A : P1, P2, P3, P4, P5, P6, P7, P8 {
   init(int: Int) { }
 }
 
+func ==(x: A, y: A) -> Bool { return true }
+
 // Class B inherits A; gets all of its inheritable conformances.
 class B : A { }
 
@@ -90,6 +98,7 @@ func testB(b: B) {
   var p6: P6 = b
   var p7: P7 = b
   var p8: P8 = b // expected-error{{type 'B' does not conform to protocol 'P8'}}
+  var p9: P9 = b
 }
 
 // Class A5 conforms to P5 in an inheritable manner.

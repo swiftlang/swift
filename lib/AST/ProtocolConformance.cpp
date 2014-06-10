@@ -493,11 +493,16 @@ static SelfReferenceKind findSelfReferences(ValueDecl *value) {
 
     // Skip the 'self' type.
     type = type->castTo<AnyFunctionType>()->getResult();
+
+    // Check argument types.
     for (unsigned i = 1, n = afd->getNumParamPatterns(); i != n; ++i) {
-      // Check whether the input type contains Self anywhere.
       auto fnType = type->castTo<AnyFunctionType>();
-      if (containsSelf(fnType->getInput()))
+
+      // Check whether the input type contains Self anywhere. Operators are
+      // a specific exception, because they are never dynamically dispatched.
+      if (!afd->isOperator() && containsSelf(fnType->getInput())) {
         return SelfReferenceKind::Yes;
+      }
 
       type = fnType->getResult();
     }

@@ -1,6 +1,7 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 
 import ObjectiveC
+import Foundation
 
 func test_CBool() {
   let x: CBool = true
@@ -56,3 +57,15 @@ func test_UWord() {
 // CHECK-NEXT: UWord: hash = 42
 test_UWord()
 
+func test_Equatable() {
+  // CHECK-NEXT: Found 2.5 at index 1
+  let array: NSNumber[] = [1, 2.5, 3.14159]
+  if let index = find(array, 2.5) {
+    println("Found \(array[index]) at index \(index)")
+  } else {
+    println("Did not find 2.5?")
+  }
+
+  let eq: Equatable = array[1]
+}
+test_Equatable()
