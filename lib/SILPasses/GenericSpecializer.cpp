@@ -38,34 +38,18 @@ class TypeSubCloner : public SILCloner<TypeSubCloner> {
   friend class SILCloner<TypeSubCloner>;
 
 public:
-  /// Clone and remap the types in \p F according to the substitution
-  /// list in \p Subs.
-  static SILFunction *cloneFunction(SILFunction *F,
-                                    TypeSubstitutionMap &InterfaceSubs,
-                                    TypeSubstitutionMap &ContextSubs,
-                                    StringRef NewName, ApplyInst *Caller) {
-    // Clone and specialize the function.
-    TypeSubCloner TSC(F, InterfaceSubs, ContextSubs, NewName, Caller);
-    TSC.populateCloned();
-    return TSC.getCloned();
-  }
-
-private:
   TypeSubCloner(SILFunction *F,
                 TypeSubstitutionMap &InterfaceSubs,
                 TypeSubstitutionMap &ContextSubs,
                 StringRef NewName,
                 ApplyInst *Caller)
-      : SILCloner(*initCloned(F, InterfaceSubs, NewName)),
-        SwiftMod(F->getModule().getSwiftModule()),
-        SubsMap(ContextSubs),
-        Original(F),
-        TheApply(Caller) { }
+    : SILCloner(*initCloned(F, InterfaceSubs, NewName)),
+      SwiftMod(F->getModule().getSwiftModule()),
+      SubsMap(ContextSubs),
+      Original(F),
+      TheApply(Caller) { }
 
-  /// Clone the body of the function into the empty function that was created
-  /// by initCloned.
-  void populateCloned();
-
+protected:
   SILType remapType(SILType Ty) {
     return SILType::substType(Original->getModule(), SwiftMod, SubsMap, Ty);
   }
@@ -181,7 +165,8 @@ private:
 
     // If we don't have a witness table for this conformance, create a witness
     // table declaration for it.
-    SILModule &OtherMod = getCloned()->getModule();
+    SILFunction &Cloned = getBuilder().getFunction();
+    SILModule &OtherMod = Cloned.getModule();
     if (!OtherMod.lookUpWitnessTable(sub.Conformance[0]).first)
       OtherMod.createWitnessTableDeclaration(sub.Conformance[0]);
 
@@ -543,8 +528,6 @@ private:
     return NewF;
   }
 
-  SILFunction *getCloned() { return &getBuilder().getFunction(); }
-
   /// The Swift module that the cloned function belongs to.
   Module *SwiftMod;
   /// The substitutions list for the specialization.
@@ -557,7 +540,54 @@ private:
 
 } // end anonymous namespace.
 
-void TypeSubCloner::populateCloned() {
+/// Check if we can clone and remap types this function.
+static bool canSpecializeFunction(SILFunction *F) {
+  return !F->isExternalDeclaration();
+}
+
+/// \brief return true if we can specialize the function type with a specific
+/// substitution list without doing partial specialization.
+static bool canSpecializeFunctionWithSubList(SILFunction *F,
+                                             TypeSubstitutionMap &SubsMap) {
+  // Check whether any of the substitutions are dependent.
+  for (auto &entry : SubsMap) {
+    if (hasUnboundGenericTypes(entry.second->getCanonicalType()))
+      return false;
+  }
+  return true;
+}
+
+namespace {
+
+class SpecializingCloner : public TypeSubCloner {
+public:
+  SpecializingCloner(SILFunction *F,
+                TypeSubstitutionMap &InterfaceSubs,
+                TypeSubstitutionMap &ContextSubs,
+                StringRef NewName,
+                ApplyInst *Caller)
+    : TypeSubCloner(F, InterfaceSubs, ContextSubs, NewName, Caller) {}
+
+  /// Clone and remap the types in \p F according to the substitution
+  /// list in \p Subs.
+  static SILFunction *cloneFunction(SILFunction *F,
+                                    TypeSubstitutionMap &InterfaceSubs,
+                                    TypeSubstitutionMap &ContextSubs,
+                                    StringRef NewName, ApplyInst *Caller) {
+    // Clone and specialize the function.
+    SpecializingCloner SC(F, InterfaceSubs, ContextSubs, NewName, Caller);
+    SC.populateCloned();
+    return SC.getCloned();
+  }
+
+private:
+  /// Clone the body of the function into the empty function that was created
+  /// by initCloned.
+  void populateCloned();
+  SILFunction *getCloned() { return &getBuilder().getFunction(); }
+};
+
+void SpecializingCloner::populateCloned() {
   SILFunction *Cloned = getCloned();
   SILModule &M = Cloned->getModule();
 
@@ -588,24 +618,6 @@ void TypeSubCloner::populateCloned() {
   }
 }
 
-/// Check if we can clone and remap types this function.
-static bool canSpecializeFunction(SILFunction *F) {
-  return !F->isExternalDeclaration();
-}
-
-/// \brief return true if we can specialize the function type with a specific
-/// substitution list without doing partial specialization.
-static bool canSpecializeFunctionWithSubList(SILFunction *F,
-                                             TypeSubstitutionMap &SubsMap) {
-  // Check whether any of the substitutions are dependent.
-  for (auto &entry : SubsMap) {
-    if (hasUnboundGenericTypes(entry.second->getCanonicalType()))
-      return false;
-  }
-  return true;
-}
-
-namespace {
 
 struct GenericSpecializer {
   /// A list of ApplyInst instructions.
@@ -813,8 +825,8 @@ GenericSpecializer::specializeApplyInstGroup(SILFunction *F, AIList &List) {
 #endif
     } else {
       // Create a new function.
-      NewF = TypeSubCloner::cloneFunction(F, InterfaceSubs, ContextSubs,
-                                          ClonedName, Bucket[0]);
+      NewF = SpecializingCloner::cloneFunction(F, InterfaceSubs, ContextSubs,
+                                               ClonedName, Bucket[0]);
       createdFunction = true;
     }
 
