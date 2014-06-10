@@ -26,8 +26,8 @@
   
   char *modulePart;
   char *classPart;
-  bool ok = swift_demangleSimpleClass([className UTF8String], 
-                                      &modulePart, &classPart);
+  bool ok = swift::swift_demangleSimpleClass([className UTF8String], 
+                                             &modulePart, &classPart);
   if (ok) {
     className = [NSString stringWithUTF8String:classPart];
     
