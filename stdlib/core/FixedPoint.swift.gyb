@@ -169,8 +169,19 @@ struct ${Self} : ${'SignedInteger' if sign == 's' else 'UnsignedInteger'} {
   }
 
 %  if bits > 8:
-  var byteSwapped: ${Self} {
+  var bigEndian: ${Self} {
+#if arch(i386) || arch(x86_64) || arch(arm) || arch(arm64)
     return ${Self}(Builtin.int_bswap_${BuiltinName}(value) )
+#else
+    assert(false);
+#endif
+  }
+  var littleEndian: ${Self} {
+#if arch(i386) || arch(x86_64) || arch(arm) || arch(arm64)
+    return self
+#else
+    assert(false);
+#endif
   }
 % end
 
