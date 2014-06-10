@@ -27,3 +27,5 @@ func testBitwiseOperations() {
 testBitwiseOperations()
 // CHECK: testBitwiseOperations done
 
+let bigEndian: UInt32 = 0xdeadbeef
+println("0x\(String(bigEndian.byteSwapped, radix: 16))") // CHECK: 0xefbeadde
