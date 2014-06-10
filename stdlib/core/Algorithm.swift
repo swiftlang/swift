@@ -312,14 +312,25 @@ func min<T : Comparable>(x: T, y: T, rest: T...) -> T {
   return r
 }
 
-func max<T : Comparable>(x: T, y: T, rest: T...) -> T {
+func max<T : Comparable>(x: T, y: T) -> T {
   var r = y
   if y < x {
     r = x
   }
-  for z in rest {
-    if z >= r {
-      r = z
+  return r
+}
+
+func max<T : Comparable>(x: T, y: T, z: T, rest: T...) -> T {
+  var r = y
+  if y < x {
+    r = x
+  }
+  if r < z {
+    r = z
+  }
+  for t in rest {
+    if t >= r {
+      r = t
     }
   }
   return r
