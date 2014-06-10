@@ -59,15 +59,15 @@ private:
       : SILCloner(*initCloned(F, InterfaceSubs, NewName)),
         SwiftMod(F->getModule().getSwiftModule()),
         SubsMap(ContextSubs),
-        OrigFunc(F),
-        CallerInst(Caller) { }
+        Original(F),
+        TheApply(Caller) { }
 
   /// Clone the body of the function into the empty function that was created
   /// by initCloned.
   void populateCloned();
 
   SILType remapType(SILType Ty) {
-    return SILType::substType(OrigFunc->getModule(), SwiftMod, SubsMap, Ty);
+    return SILType::substType(Original->getModule(), SwiftMod, SubsMap, Ty);
   }
 
   ProtocolConformance *remapConformance(SILType Ty, ProtocolConformance *C) {
@@ -84,7 +84,7 @@ private:
     // And create the new specialized conformance.
     ASTContext &AST = SwiftMod->getASTContext();
     return AST.getSpecializedConformance(Type, C,
-                                         CallerInst->getSubstitutions());
+                                         TheApply->getSubstitutions());
   }
 
   void visitClassMethodInst(ClassMethodInst *Inst) {
@@ -120,8 +120,8 @@ private:
    SmallVector<Substitution, 16> TempSubstList;
    for (auto &Sub : Inst->getSubstitutions())
      TempSubstList.push_back(Sub.subst(Inst->getModule().getSwiftModule(),
-                                       OrigFunc->getContextGenericParams(),
-                                       CallerInst->getSubstitutions()));
+                                       Original->getContextGenericParams(),
+                                       TheApply->getSubstitutions()));
 
    ApplyInst *N = Builder.createApply(
           getOpLocation(Inst->getLoc()), getOpValue(CalleeVal),
@@ -153,8 +153,8 @@ private:
    SmallVector<Substitution, 16> TempSubstList;
    for (auto &Sub : Inst->getSubstitutions())
      TempSubstList.push_back(Sub.subst(Inst->getModule().getSwiftModule(),
-                                       OrigFunc->getContextGenericParams(),
-                                       CallerInst->getSubstitutions()));
+                                       Original->getContextGenericParams(),
+                                       TheApply->getSubstitutions()));
 
    PartialApplyInst *N = Builder.createPartialApply(
        getOpLocation(Inst->getLoc()), getOpValue(CalleeVal),
@@ -173,8 +173,8 @@ private:
     // we handle type aliases correctly.
     auto sub =
       Inst->getSelfSubstitution().subst(Inst->getModule().getSwiftModule(),
-                                        OrigFunc->getContextGenericParams(),
-                                        CallerInst->getSubstitutions());
+                                        Original->getContextGenericParams(),
+                                        TheApply->getSubstitutions());
 
     assert(sub.Conformance.size() == 1 &&
            "didn't get conformance from substitution?!");
@@ -550,9 +550,9 @@ private:
   /// The substitutions list for the specialization.
   TypeSubstitutionMap &SubsMap;
   /// The original function to specialize.
-  SILFunction *OrigFunc;
+  SILFunction *Original;
   /// The ApplyInst that is the caller to the cloned function.
-  ApplyInst *CallerInst;
+  ApplyInst *TheApply;
 };
 
 } // end anonymous namespace.
@@ -562,7 +562,7 @@ void TypeSubCloner::populateCloned() {
   SILModule &M = Cloned->getModule();
 
   // Create arguments for the entry block.
-  SILBasicBlock *OrigEntryBB = OrigFunc->begin();
+  SILBasicBlock *OrigEntryBB = Original->begin();
   SILBasicBlock *ClonedEntryBB = new (M) SILBasicBlock(Cloned);
 
   // Create the entry basic block with the function arguments.
