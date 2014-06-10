@@ -405,8 +405,8 @@ struct _NativeDictionaryStorage<KeyType : Hashable, ValueType> :
   static func getMinCapacity(
       requestedCount: Int, _ maxLoadFactorInverse: Double) -> Int {
     // `requestedCount + 1` below ensures that we don't fill in the last hole
-    return max2(Int(Double(requestedCount) * maxLoadFactorInverse),
-                requestedCount + 1)
+    return max(Int(Double(requestedCount) * maxLoadFactorInverse),
+               requestedCount + 1)
   }
 
   /// Storage should be uniquely referenced.

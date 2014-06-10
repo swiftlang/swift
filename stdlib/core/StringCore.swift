@@ -339,7 +339,7 @@ struct _StringCore {
       }
       else if newSize > buffer.capacity {
         // Growth failed because of insufficient storage; double the size
-        return (max2(buffer.capacity * 2, newSize), .null())
+        return (max(buffer.capacity * 2, newSize), .null())
       }
     }
     return (newSize, .null())

@@ -507,7 +507,7 @@ where C.GeneratorType.Element == A._Buffer.Element
   // Ensure uniqueness, mutability, and sufficient storage.  Note that
   // for consistency, we need unique lhs even if rhs is empty.
   lhs.reserveCapacity(
-    newCount > capacity ? max2(newCount, capacity * 2) : newCount)
+    newCount > capacity ? max(newCount, capacity * 2) : newCount)
   
   var p = lhs._buffer.elementStorage + oldCount
   for x in rhs {
@@ -541,14 +541,14 @@ func _demandUniqueMutableBuffer<_Buffer: ArrayBufferType>(
 
   _sanityCheck(newCount >= 0)
   
-  let requiredCapacity = max2(newCount, minimumCapacity)
+  let requiredCapacity = max(newCount, minimumCapacity)
   
   if let b = source.requestUniqueMutableBuffer(requiredCapacity) {
     source.count = newCount
     return nil
   }
 
-  let minimumCapacity = max2(
+  let minimumCapacity = max(
     requiredCapacity,
     newCount > source.capacity ? source.capacity * 2 : source.capacity)
 

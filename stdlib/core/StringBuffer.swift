@@ -90,7 +90,7 @@ struct _StringBuffer {
 
     // Allocate storage
     self = _StringBuffer(
-      capacity: max2(utf16Count, minimumCapacity),
+      capacity: max(utf16Count, minimumCapacity),
       initialSize: utf16Count,
       elementWidth: isAscii ? 1 : 2)
 

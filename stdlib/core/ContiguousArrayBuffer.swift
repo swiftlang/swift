@@ -57,7 +57,7 @@ struct ContiguousArrayBuffer<T> : ArrayBufferType, LogicValue {
     _base = HeapBuffer(
       ContiguousArrayStorage<T>.self,
       _ArrayBody(),
-      max2(count, minimumCapacity))
+      max(count, minimumCapacity))
 
     var bridged = false
     if _canBeClass(T.self) {
