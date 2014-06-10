@@ -141,6 +141,26 @@ struct ${Self} : ${'SignedInteger' if sign == 's' else 'UnsignedInteger'} {
   @transparent
   init(_ value: ${Self}) { self = value }
 
+%  if bits > 8:
+  @transparent
+  init(bigEndian value: ${Self}) {
+#if arch(i386) || arch(x86_64) || arch(arm) || arch(arm64)
+    self = ${Self}(Builtin.int_bswap_${BuiltinName}(value.value) )
+#else
+    assert(false)
+#endif
+  }
+
+  @transparent
+  init(littleEndian value: ${Self}) {
+#if arch(i386) || arch(x86_64) || arch(arm) || arch(arm64)
+    self = value
+#else
+    assert(false)
+#endif
+  }
+%  end
+
   @transparent
   static func _convertFromBuiltinIntegerLiteral(value: Builtin.Int${builtinIntLiteralBits}) -> ${Self} {
     return ${Self}(Builtin.s_to_${sign}_checked_trunc_Int${builtinIntLiteralBits}_${BuiltinName}(value).0)
@@ -173,14 +193,14 @@ struct ${Self} : ${'SignedInteger' if sign == 's' else 'UnsignedInteger'} {
 #if arch(i386) || arch(x86_64) || arch(arm) || arch(arm64)
     return ${Self}(Builtin.int_bswap_${BuiltinName}(value) )
 #else
-    assert(false);
+    assert(false)
 #endif
   }
   var littleEndian: ${Self} {
 #if arch(i386) || arch(x86_64) || arch(arm) || arch(arm64)
     return self
 #else
-    assert(false);
+    assert(false)
 #endif
   }
 % end
