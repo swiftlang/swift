@@ -52,6 +52,7 @@ public:
   IGNORED_ATTR(ObjC)
   IGNORED_ATTR(RawDocComment)
   IGNORED_ATTR(Required)
+  IGNORED_ATTR(UnsafeNoObjCTaggedPointer)
 #undef IGNORED_ATTR
 
   void visitIBActionAttr(IBActionAttr *attr);
@@ -351,6 +352,7 @@ public:
   void visitAssignmentAttr(AssignmentAttr *attr);
 
   void visitClassProtocolAttr(ClassProtocolAttr *attr);
+  void visitUnsafeNoObjCTaggedPointerAttr(UnsafeNoObjCTaggedPointerAttr *attr);
 
   void visitFinalAttr(FinalAttr *attr);
 
@@ -498,6 +500,25 @@ void AttributeChecker::visitClassProtocolAttr(ClassProtocolAttr *attr) {
     TC.diagnose(attr->getLocation(),
                 diag::class_protocol_not_protocol);
     attr->setInvalid();
+  }
+}
+
+void AttributeChecker::visitUnsafeNoObjCTaggedPointerAttr(
+                                          UnsafeNoObjCTaggedPointerAttr *attr) {
+  // Only class protocols can have the attribute.
+  auto proto = dyn_cast<ProtocolDecl>(D);
+  if (!proto) {
+    TC.diagnose(attr->getLocation(),
+                diag::no_objc_tagged_pointer_not_class_protocol);
+    attr->setInvalid();
+  }
+  
+  if (!proto->requiresClass()
+      && !proto->getAttrs().has(DAK_class_protocol)
+      && !proto->getAttrs().has(DAK_objc)) {
+    TC.diagnose(attr->getLocation(),
+                diag::no_objc_tagged_pointer_not_class_protocol);
+    attr->setInvalid();    
   }
 }
 

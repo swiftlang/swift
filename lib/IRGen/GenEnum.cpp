@@ -3661,13 +3661,22 @@ namespace {
     IsBitwiseTakable_t isBT = IsBitwiseTakable;
     for (auto &elt : ElementsWithPayload) {
       auto &fixedPayloadTI = cast<FixedTypeInfo>(*elt.ti); // FIXME
-      fixedPayloadTI.applyFixedSpareBitsMask(CommonSpareBits);
       if (fixedPayloadTI.getFixedAlignment() > worstAlignment)
         worstAlignment = fixedPayloadTI.getFixedAlignment();
       if (!fixedPayloadTI.isPOD(ResilienceScope::Component))
         isPOD = IsNotPOD;
       if (!fixedPayloadTI.isBitwiseTakable(ResilienceScope::Component))
         isBT = IsNotBitwiseTakable;
+
+      // As a hack, if the payload type is generic, don't use any spare bits
+      // from it, even if our concrete instance has them. We can't support
+      // runtime-dependent spare bits yet. There's a corresponding hack in
+      // TypeConverter::convertArchetypeType to give class archetypes no
+      // spare bits.
+      if (elt.decl->getInterfaceType()->isDependentType())
+        CommonSpareBits.reset(0, fixedPayloadTI.getFixedSize().getValueInBits());
+      else
+        fixedPayloadTI.applyFixedSpareBitsMask(CommonSpareBits);
     }
     
     unsigned commonSpareBitCount = CommonSpareBits.count();
@@ -4198,11 +4207,6 @@ IRGenModule::getHeapObjectSpareBits() const {
 
     // Low bits are made available by heap object alignment.
     setAlignmentBits(r, TargetInfo.HeapObjectAlignment);
-    
-    // Mask out bits reserved by the Objective-C runtime.
-    llvm::BitVector objcMask = TargetInfo.ObjCPointerReservedBits;
-    objcMask.flip();
-    r &= objcMask;
     
     return r;
   });

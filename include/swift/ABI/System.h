@@ -41,12 +41,6 @@
 /// heap object allocation will never set any of these bits.
 #define SWIFT_ABI_DEFAULT_SWIFT_SPARE_BITS_MASK 0
 
-/// The bitmask of spare bits in an Objective-C object pointer.  An
-/// Objective-C object value will never set any of these bits.  Note
-/// that some platforms support tagged pointers and therefore this set
-/// can be a subset of SwiftSpareBitsMask.
-#define SWIFT_ABI_DEFAULT_OBJC_SPARE_BITS_MASK 0
-
 /// The bitmask of reserved bits in an Objective-C object pointer.
 #define SWIFT_ABI_DEFAULT_OBJC_RESERVED_BITS_MASK 0
 
@@ -64,7 +58,6 @@
 #define SWIFT_ABI_X86_64_SWIFT_SPARE_BITS_MASK 0xFFFF800000000007ULL
 
 // Objective-C reserves the high and low bits for tagged pointers.
-#define SWIFT_ABI_X86_64_OBJC_SPARE_BITS_MASK 0x8FFF800000000006ULL
 #define SWIFT_ABI_X86_64_OBJC_RESERVED_BITS_MASK 0x8000000000000001ULL
 #define SWIFT_ABI_X86_64_OBJC_NUM_RESERVED_LOW_BITS 1
 
@@ -79,7 +72,6 @@
 #define SWIFT_ABI_ARM64_SWIFT_SPARE_BITS_MASK 0xFF00000000000007ULL
 
 // Objective-C reserves the high and low bits for tagged pointers.
-#define SWIFT_ABI_ARM64_OBJC_SPARE_BITS_MASK 0x8F00000000000006ULL
 #define SWIFT_ABI_ARM64_OBJC_RESERVED_BITS_MASK 0x8000000000000001ULL
 #define SWIFT_ABI_ARM64_OBJC_NUM_RESERVED_LOW_BITS 1
 

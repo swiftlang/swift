@@ -114,6 +114,9 @@ void DeclAttribute::print(ASTPrinter &Printer) const {
   case DAK_exported:       Printer << "@exported"; break;
   case DAK_final:          Printer << "@final"; break;
   case DAK_noreturn:       Printer << "@noreturn"; break;
+  case DAK_unsafe_no_objc_tagged_pointer:
+    Printer << "@unsafe_no_objc_tagged_pointer";
+    break;
   case DAK_NSCopying:      Printer << "@NSCopying"; break;
   case DAK_NSManaged:      Printer << "@NSManaged"; break;
   case DAK_UIApplicationMain: Printer << "@UIApplicationMain"; break;

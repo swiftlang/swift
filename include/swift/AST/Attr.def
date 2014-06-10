@@ -104,7 +104,7 @@ SIMPLE_DECL_ATTR(final, Final,
 DECL_ATTR(objc, ObjC,
           OnFunc | OnClass | OnProtocol | OnVar | OnSubscript |
           OnConstructor | OnDestructor, 3)
-    
+
 SIMPLE_DECL_ATTR(required, Required,
                  OnConstructor, 4)
                                
@@ -144,6 +144,9 @@ SIMPLE_DECL_ATTR(LLDBDebuggerFunction, LLDBDebuggerFunction,
 
 SIMPLE_DECL_ATTR(UIApplicationMain, UIApplicationMain,
                  OnClass, 17)
+
+SIMPLE_DECL_ATTR(unsafe_no_objc_tagged_pointer, UnsafeNoObjCTaggedPointer,
+                 OnProtocol, 18)
 
 VIRTUAL_DECL_ATTR(override, Override,
                   OnFunc | OnVar | OnSubscript,

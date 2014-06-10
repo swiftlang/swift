@@ -3186,11 +3186,15 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM,
   fields.push_back(nullptr);
 
   bool requiresClass = false;
+  bool allowsTaggedPointers = true;
   
   for (auto protocol : protocols) {
     // The existential container is class-constrained if any of its protocol
     // constraints are.
     requiresClass |= protocol->requiresClass();
+    
+    if (protocol->getAttrs().has(DAK_unsafe_no_objc_tagged_pointer))
+      allowsTaggedPointers = false;
     
     // ObjC protocols need no layout or witness table info. All dispatch is done
     // through objc_msgSend.
@@ -3227,9 +3231,14 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM,
       }
     };
 
-    // The class pointer is a heap object reference and has heap object spare
-    // bits.
-    append(spareBits, IGM.getHeapObjectSpareBits());
+    // The class pointer is an unknown heap object, so it may be a tagged
+    // pointer, if the platform has those.
+    if (allowsTaggedPointers && IGM.TargetInfo.hasObjCTaggedPointers()) {
+      spareBits.resize(IGM.getPointerSize().getValueInBits(), /*value*/ false);
+    } else {
+      // If the platform doesn't use ObjC tagged pointers, we can go crazy.
+      append(spareBits, IGM.getHeapObjectSpareBits());
+    }
     
     // The witness table fields are pointers and have pointer spare bits.
     for (unsigned i = 1, e = classFields.size(); i < e; ++i) {
@@ -3299,9 +3308,12 @@ const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
       reprTy = cast<llvm::PointerType>(superTI.StorageType);
     }
     
+    // As a hack, assume class archetypes never have spare bits. There's a
+    // corresponding hack in MultiPayloadEnumImplStrategy::completeEnumTypeLayout
+    // to ignore spare bits of dependent-typed payloads.
     return ClassArchetypeTypeInfo::create(reprTy,
                                       IGM.getPointerSize(),
-                                      IGM.getHeapObjectSpareBits(),
+                                      {},
                                       IGM.getPointerAlignment(),
                                       protocols, refcount);
   }

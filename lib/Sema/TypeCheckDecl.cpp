@@ -3990,6 +3990,7 @@ public:
     UNINTERESTING_ATTR(Asmname)
     UNINTERESTING_ATTR(Assignment)
     UNINTERESTING_ATTR(ClassProtocol)
+    UNINTERESTING_ATTR(UnsafeNoObjCTaggedPointer)
     UNINTERESTING_ATTR(Exported)
     UNINTERESTING_ATTR(Override)
     UNINTERESTING_ATTR(RawDocComment)

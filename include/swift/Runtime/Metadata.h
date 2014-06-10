@@ -718,8 +718,6 @@ static const uintptr_t LeastValidPointerValue =
 # endif
 static const uintptr_t SwiftSpareBitsMask =
   SWIFT_ABI_X86_64_SWIFT_SPARE_BITS_MASK;
-static const uintptr_t ObjCSpareBitsMask =
-  SWIFT_ABI_X86_64_OBJC_SPARE_BITS_MASK;
 static const uintptr_t ObjCReservedBitsMask =
   SWIFT_ABI_X86_64_OBJC_RESERVED_BITS_MASK;
 static const unsigned ObjCReservedLowBits =
@@ -736,8 +734,6 @@ static const uintptr_t LeastValidPointerValue =
 # endif
 static const uintptr_t SwiftSpareBitsMask =
   SWIFT_ABI_ARM64_SWIFT_SPARE_BITS_MASK;
-static const uintptr_t ObjCSpareBitsMask =
-  SWIFT_ABI_ARM64_OBJC_SPARE_BITS_MASK;
 static const uintptr_t ObjCReservedBitsMask =
   SWIFT_ABI_ARM64_OBJC_RESERVED_BITS_MASK;
 static const unsigned ObjCReservedLowBits =
@@ -749,8 +745,6 @@ static const uintptr_t LeastValidPointerValue =
   SWIFT_ABI_DEFAULT_LEAST_VALID_POINTER;
 static const uintptr_t SwiftSpareBitsMask =
   SWIFT_ABI_DEFAULT_SWIFT_SPARE_BITS_MASK;
-static const uintptr_t ObjCSpareBitsMask =
-  SWIFT_ABI_DEFAULT_OBJC_SPARE_BITS_MASK;
 static const uintptr_t ObjCReservedBitsMask =
   SWIFT_ABI_DEFAULT_OBJC_RESERVED_BITS_MASK;
 static const unsigned ObjCReservedLowBits =

@@ -153,3 +153,6 @@ SwiftTargetInfo SwiftTargetInfo::get(IRGenModule &IGM) {
   return target;
 }
 
+bool SwiftTargetInfo::hasObjCTaggedPointers() const {
+  return ObjCPointerReservedBits.any();
+}

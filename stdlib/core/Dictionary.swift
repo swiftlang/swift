@@ -2002,7 +2002,7 @@ protocol _SwiftNSArrayRequiredOverrides :
 }
 
 // FIXME: replace _CocoaArray with this.
-@objc
+@objc @unsafe_no_objc_tagged_pointer
 protocol _SwiftNSArray : _SwiftNSArrayRequiredOverrides {
   func indexOfObject(anObject: AnyObject) -> Int
 }
@@ -2031,7 +2031,7 @@ protocol _SwiftNSDictionaryRequiredOverrides :
   ) -> Int
 }
 
-@objc
+@objc @unsafe_no_objc_tagged_pointer
 protocol _SwiftNSDictionary : _SwiftNSDictionaryRequiredOverrides {
   var allKeys: _SwiftNSArray { get }
   func isEqual(anObject: AnyObject) -> Bool

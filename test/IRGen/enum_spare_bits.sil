@@ -1,0 +1,67 @@
+// RUN: rm -rf %t/clang-module-cache
+// RUN: %swift -target x86_64-apple-darwin10 -module-cache-path %t/clang-module-cache -sdk %S/Inputs -I=%S/Inputs -enable-source-import %s -emit-ir | FileCheck %s
+
+import Swift
+import Foundation
+
+class C {}
+class D: NSObject {}
+
+enum SwiftClass {
+  case A(C), B(D)
+}
+// can use spare bits—both payloads are Swift-defined classes
+// CHECK: %O15enum_spare_bits10SwiftClass = type <{ [8 x i8] }>
+
+enum ObjCClass {
+  case A(NSObject), B(C)
+}
+// can't use spare bits—NSObject is an ObjC-defined class
+// CHECK: %O15enum_spare_bits9ObjCClass = type <{ [8 x i8], [1 x i8] }>
+
+@objc @class_protocol @unsafe_no_objc_tagged_pointer
+protocol NoTaggedPointers {}
+
+enum Existential {
+  case A(AnyObject), B(C)
+}
+// can't use spare bits—existential may be bound to tagged pointer type
+// CHECK: %O15enum_spare_bits11Existential = type <{ [8 x i8], [1 x i8] }>
+
+enum ExistentialNoTaggedPointers {
+  case A(NoTaggedPointers), B(C)
+}
+// can use spare bits—@unsafe_no_objc_tagged_pointer says it's ok
+// CHECK: %O15enum_spare_bits27ExistentialNoTaggedPointers = type <{ [8 x i8] }>
+
+enum Archetype<T: AnyObject> {
+  case A(T), B(C)
+}
+// can't use spare bits—archetype may be bound to tagged pointer type
+// CHECK: [[ARCHETYPE:%O15enum_spare_bits9Archetype]] = type <{ [8 x i8], [1 x i8] }>
+
+let swiftClass: SwiftClass
+let objcClass: ObjCClass
+let existential: Existential
+let existentialntp: ExistentialNoTaggedPointers
+let archetypeBoundToSwift: Archetype<C>
+let archetypeBoundToObjC: Archetype<NSObject>
+
+// CHECK: @_Tv15enum_spare_bits21archetypeBoundToSwiftGOS_9ArchetypeCS_1C_ = external global [[ARCHETYPE]]
+// CHECK: @_Tv15enum_spare_bits20archetypeBoundToObjCGOS_9ArchetypeCSo8NSObject_ = external global [[ARCHETYPE]]
+
+sil @instantiate_globals : $() -> () {
+entry:
+  %a = global_addr #swiftClass : $*SwiftClass
+  %b = global_addr #objcClass : $*ObjCClass
+  %c = global_addr #existential : $*Existential
+  %d = global_addr #existentialntp : $*ExistentialNoTaggedPointers
+  %e = global_addr #archetypeBoundToSwift : $*Archetype<C>
+  %f = global_addr #archetypeBoundToObjC : $*Archetype<NSObject>
+  return undef : $()
+}
+
+sil @_TToFC15enum_spare_bits1DcfMS0_FT_S0_ : $(@owned D) -> @owned D {
+entry(%x : $D):
+  return undef : $D
+}

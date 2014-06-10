@@ -33,6 +33,9 @@ public:
   /// Produces a SwiftTargetInfo object appropriate to the target.
   static SwiftTargetInfo get(IRGenModule &IGM);
 
+  /// True if the ObjC runtime for the chosen platform supports tagged pointers.
+  bool hasObjCTaggedPointers() const;
+  
   /// The spare bit mask for pointers. Bits set in this mask are unused by
   /// pointers of any alignment.
   llvm::BitVector PointerSpareBits;

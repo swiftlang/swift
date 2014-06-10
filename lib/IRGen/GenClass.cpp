@@ -1803,8 +1803,19 @@ const TypeInfo *TypeConverter::convertClassType(ClassDecl *D) {
   llvm::StructType *ST = IGM.createNominalType(D);
   llvm::PointerType *irType = ST->getPointerTo();
   ReferenceCounting refcount = ::getReferenceCountingForClass(IGM, D);
+  
+  llvm::BitVector spareBits;
+  
+  // Classes known to be implemented in Swift can be assumed not to have tagged
+  // pointer representations, so we can use spare bits for enum layout with
+  // them. We can't make that assumption about imported ObjC types.
+  if (D->hasClangNode() && IGM.TargetInfo.hasObjCTaggedPointers())
+    spareBits.resize(IGM.getPointerSize().getValueInBits(), /*initial*/ false);
+  else
+    spareBits = IGM.getHeapObjectSpareBits();
+  
   return new ClassTypeInfo(irType, IGM.getPointerSize(),
-                           IGM.getHeapObjectSpareBits(),
+                           std::move(spareBits),
                            IGM.getPointerAlignment(),
                            D, refcount);
 }

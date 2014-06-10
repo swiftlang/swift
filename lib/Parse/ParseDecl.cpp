@@ -646,6 +646,10 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     setFirstObjCAttributeLocation(Loc);
     break;
   }
+  case DAK_unsafe_no_objc_tagged_pointer:
+    if (!DiscardAttribute)
+      Attributes.add(new (Context) UnsafeNoObjCTaggedPointerAttr(AtLoc, Loc));
+    break;
   case DAK_required:
     if (!DiscardAttribute)
       Attributes.add(new (Context) RequiredAttr(AtLoc, Loc));
