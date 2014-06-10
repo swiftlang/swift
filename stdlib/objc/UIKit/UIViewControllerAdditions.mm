@@ -36,8 +36,8 @@ static NSString *existingNibName(UIViewController *self, SEL _cmd,
   // Try demangling the Swift name.
   char *modulePart;
   char *classPart;
-  bool ok = swift_demangleSimpleClass([className UTF8String], 
-                                       &modulePart, &classPart);
+  bool ok = swift::swift_demangleSimpleClass([className UTF8String], 
+                                             &modulePart, &classPart);
   if (!ok) return nil;
 
   if (0 == strncmp(classPart, "UI", 2)) {
