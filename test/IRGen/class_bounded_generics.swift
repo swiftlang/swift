@@ -170,7 +170,7 @@ func class_bounded_archetype_archetype_cast
   return x as U
   // CHECK: [[IN_PTR:%.*]] = bitcast %objc_object* {{%.*}} to i8*
   // CHECK: [[OUT_TYPE:%.*]] = bitcast %swift.type* %U to i8*
-  // CHECK: [[OUT_PTR:%.*]] = call i8* @swift_dynamicCastUnconditional(i8* [[IN_PTR]], i8* [[OUT_TYPE]]) #0
+  // CHECK: [[OUT_PTR:%.*]] = call i8* @swift_dynamicCastUnknownClassUnconditional(i8* [[IN_PTR]], i8* [[OUT_TYPE]]) #0
   // CHECK: [[OUT:%.*]] = bitcast i8* [[OUT_PTR]] to %objc_object*
   // CHECK: ret %objc_object* [[OUT]]
 }

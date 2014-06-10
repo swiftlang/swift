@@ -482,34 +482,5 @@ IRGenFunction::emitSuperToClassArchetypeConversion(llvm::Value *super,
   assert(destType.castTo<ArchetypeType>()->requiresClass()
          && "expected class archetype type");
 
-  // Cast the super pointer to i8* for the runtime call.
-  super = Builder.CreateBitCast(super, IGM.Int8PtrTy);
-
-  // Retrieve the metadata.
-  llvm::Value *metadataRef = emitTypeMetadataRef(destType);
-  if (metadataRef->getType() != IGM.Int8PtrTy)
-    metadataRef = Builder.CreateBitCast(metadataRef, IGM.Int8PtrTy);
-
-  // Call the (unconditional) dynamic cast.
-  llvm::Value *castFn;
-  switch (mode) {
-  case CheckedCastMode::Unconditional:
-    castFn = IGM.getDynamicCastUnconditionalFn();
-    break;
-  case CheckedCastMode::Conditional:
-    castFn = IGM.getDynamicCastFn();
-    break;
-  }
-  
-  auto call
-    = Builder.CreateCall2(castFn, super, metadataRef);
-  
-  // FIXME: Eventually, we may want to throw.
-  call->setDoesNotThrow();
-  
-  // Bitcast the result to the archetype's representation type.
-  auto &destTI = getTypeInfo(destType);
-  llvm::Value *cast = Builder.CreateBitCast(call, destTI.StorageType);
-
-  return cast;
+  return emitClassDowncast(super, destType, mode);
 }

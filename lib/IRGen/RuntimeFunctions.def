@@ -480,6 +480,32 @@ FUNCTION(DynamicCastClassUnconditional, swift_dynamicCastClassUnconditional,
          ARGS(Int8PtrTy, Int8PtrTy),
          ATTRS(NoUnwind, ReadOnly))
 
+// void *swift_dynamicCastObjCClass(void*, void*);
+FUNCTION(DynamicCastObjCClass, swift_dynamicCastObjCClass, RuntimeCC,
+         RETURNS(Int8PtrTy),
+         ARGS(Int8PtrTy, Int8PtrTy),
+         ATTRS(NoUnwind, ReadOnly))
+
+// void *swift_dynamicCastObjCClassUnconditional(void*, void*);
+FUNCTION(DynamicCastObjCClassUnconditional,
+         swift_dynamicCastObjCClassUnconditional, RuntimeCC,
+         RETURNS(Int8PtrTy),
+         ARGS(Int8PtrTy, Int8PtrTy),
+         ATTRS(NoUnwind, ReadOnly))
+
+// void *swift_dynamicCastUnknownClass(void*, void*);
+FUNCTION(DynamicCastUnknownClass, swift_dynamicCastUnknownClass, RuntimeCC,
+         RETURNS(Int8PtrTy),
+         ARGS(Int8PtrTy, Int8PtrTy),
+         ATTRS(NoUnwind, ReadOnly))
+
+// void *swift_dynamicCastUnknownClassUnconditional(void*, void*);
+FUNCTION(DynamicCastUnknownClassUnconditional,
+         swift_dynamicCastUnknownClassUnconditional, RuntimeCC,
+         RETURNS(Int8PtrTy),
+         ARGS(Int8PtrTy, Int8PtrTy),
+         ATTRS(NoUnwind, ReadOnly))
+
 // type *swift_dynamicCastMetatype(type*, type*);
 FUNCTION(DynamicCastMetatype, swift_dynamicCastMetatype, RuntimeCC,
          RETURNS(TypeMetadataPtrTy),
@@ -494,28 +520,17 @@ FUNCTION(DynamicCastMetatypeUnconditional,
          ATTRS(NoUnwind, ReadOnly))
 
 // objc_class *swift_dynamicCastObjCClassMetatype(objc_class*, objc_class*);
-FUNCTION(DynamicCastObjCClassMetatype, swift_dynamicCastMetatype, RuntimeCC,
+FUNCTION(DynamicCastObjCClassMetatype, swift_dynamicCastObjCClassMetatype,
+         RuntimeCC,
          RETURNS(ObjCClassPtrTy),
          ARGS(ObjCClassPtrTy, ObjCClassPtrTy),
          ATTRS(NoUnwind, ReadOnly))
 
 // objc_class *swift_dynamicCastObjCClassMetatypeUnconditional(objc_class*, objc_class*);
 FUNCTION(DynamicCastObjCClassMetatypeUnconditional,
-         swift_dynamicCastMetatypeUnconditional, RuntimeCC,
+         swift_dynamicCastObjCClassMetatypeUnconditional, RuntimeCC,
          RETURNS(ObjCClassPtrTy),
          ARGS(ObjCClassPtrTy, ObjCClassPtrTy),
-         ATTRS(NoUnwind, ReadOnly))
-
-// void *swift_dynamicCast(void*, void*);
-FUNCTION(DynamicCast, swift_dynamicCast, RuntimeCC,
-         RETURNS(Int8PtrTy),
-         ARGS(Int8PtrTy, Int8PtrTy),
-         ATTRS(NoUnwind, ReadOnly))
-
-// void *swift_dynamicCastUnconditional(void*, void*);
-FUNCTION(DynamicCastUnconditional, swift_dynamicCastUnconditional, RuntimeCC,
-         RETURNS(Int8PtrTy),
-         ARGS(Int8PtrTy, Int8PtrTy),
          ATTRS(NoUnwind, ReadOnly))
 
 // opaque *swift_dynamicCastIndirect(opaque*, void*, void*);

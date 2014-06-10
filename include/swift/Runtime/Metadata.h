@@ -1753,23 +1753,23 @@ swift_getExistentialTypeMetadata(size_t numProtocols,
 extern "C" size_t swift_classMask;
 extern "C" uint8_t swift_classShift;
 
-/// \brief Checked dynamic cast to a class type.
+/// \brief Checked dynamic cast to a Swift class type.
 ///
 /// \param object The object to cast.
 /// \param targetType The type to which we are casting, which is known to be
-/// a class type.
+/// a Swift class type.
 ///
 /// \returns the object if the cast succeeds, or null otherwise.
 extern "C" const void *
 swift_dynamicCastClass(const void *object, const ClassMetadata *targetType);
 
-/// \brief Unconditional, checked dynamic cast to a class type.
+/// \brief Unconditional, checked dynamic cast to a Swift class type.
 ///
 /// Aborts if the object isn't of the target type.
 ///
 /// \param object The object to cast.
 /// \param targetType The type to which we are casting, which is known to be
-/// a class type.
+/// a Swift class type.
 ///
 /// \returns the object.
 extern "C" const void *
@@ -1780,7 +1780,7 @@ swift_dynamicCastClassUnconditional(const void *object,
 ///
 /// \param object The object to cast, or nil.
 /// \param targetType The type to which we are casting, which is known to be
-/// a class type.
+/// a class type, but not necessarily valid type metadata.
 ///
 /// \returns the object if the cast succeeds, or null otherwise.
 extern "C" const void *
@@ -1795,7 +1795,7 @@ swift_dynamicCastObjCClass(const void *object, const ClassMetadata *targetType);
 ///
 /// \param object The object to cast, or nil.
 /// \param targetType The type to which we are casting, which is known to be
-/// a class type.
+/// a class type, but not necessarily valid type metadata.
 ///
 /// \returns the object.
 extern "C" const void *
@@ -1811,7 +1811,7 @@ swift_dynamicCastObjCClassUnconditional(const void *object,
 ///
 /// \returns the object, or null if it doesn't have the given target type.
 extern "C" const void *
-swift_dynamicCast(const void *object, const Metadata *targetType);
+swift_dynamicCastUnknownClass(const void *object, const Metadata *targetType);
 
 /// \brief Unconditional checked dynamic cast of a class instance pointer to
 /// the given type.
@@ -1825,8 +1825,8 @@ swift_dynamicCast(const void *object, const Metadata *targetType);
 ///
 /// \returns the object.
 extern "C" const void *
-swift_dynamicCastUnconditional(const void *object,
-                               const Metadata *targetType);
+swift_dynamicCastUnknownClassUnconditional(const void *object,
+                                           const Metadata *targetType);
 
 /// \brief Checked dynamic cast of an opaque value to the given type.
 ///

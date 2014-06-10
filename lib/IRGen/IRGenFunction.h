@@ -229,9 +229,9 @@ public:
   
   /// \brief Convert the given value to the given destination type, using a
   /// runtime-checked cast.
-  llvm::Value *emitDowncast(llvm::Value *from,
-                            SILType toType,
-                            CheckedCastMode mode);
+  llvm::Value *emitClassDowncast(llvm::Value *from,
+                                 SILType toType,
+                                 CheckedCastMode mode);
   
 
 //--- Declaration emission -----------------------------------------------------

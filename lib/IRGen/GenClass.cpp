@@ -529,22 +529,28 @@ OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
   llvm_unreachable("bad field-access strategy");
 }
 
-/// Emit a checked unconditional downcast.
-llvm::Value *IRGenFunction::emitDowncast(llvm::Value *from, SILType toType,
-                                         CheckedCastMode mode) {
+/// Emit a checked unconditional downcast of a class value.
+llvm::Value *IRGenFunction::emitClassDowncast(llvm::Value *from,
+                                              SILType toType,
+                                              CheckedCastMode mode) {
   // Emit the value we're casting from.
   if (from->getType() != IGM.Int8PtrTy)
     from = Builder.CreateBitCast(from, IGM.Int8PtrTy);
   
-  // Emit a reference to the metadata.
-  bool isConcreteClass = toType.is<ClassType>();
+  // Emit a reference to the metadata and figure out what cast
+  // function to use.
   llvm::Value *metadataRef;
   llvm::Constant *castFn;
-  if (isConcreteClass) {
-    // If the dest type is a concrete class, get the full class metadata
-    // and call dynamicCastClass directly.
-    metadataRef
-      = IGM.getAddrOfTypeMetadata(toType.getSwiftRValueType(), false, false);
+
+  // Get the best known type information about the destination type.
+  auto destClass = toType.getSwiftRValueType().getClassBound();
+  assert(destClass || toType.is<ArchetypeType>());
+
+  // If the destination type is known to have a Swift-compatible
+  // implementation, use the most specific entrypoint.
+  if (destClass && hasKnownSwiftImplementation(IGM, destClass)) {
+    metadataRef = emitTypeMetadataRef(toType);
+
     switch (mode) {
     case CheckedCastMode::Unconditional:
       castFn = IGM.getDynamicCastClassUnconditionalFn();
@@ -553,20 +559,35 @@ llvm::Value *IRGenFunction::emitDowncast(llvm::Value *from, SILType toType,
       castFn = IGM.getDynamicCastClassFn();
       break;
     }
-  } else {
-    // Otherwise, get the type metadata, which may be local, and go through
-    // the more general dynamicCast entry point.
+
+  // If the destination type is a foreign class or a non-specific
+  // class-bounded archetype, use the most general cast entrypoint.
+  } else if (!destClass || destClass->isForeign()) {
     metadataRef = emitTypeMetadataRef(toType);
+
     switch (mode) {
     case CheckedCastMode::Unconditional:
-      castFn = IGM.getDynamicCastUnconditionalFn();
+      castFn = IGM.getDynamicCastUnknownClassUnconditionalFn();
       break;
     case CheckedCastMode::Conditional:
-      castFn = IGM.getDynamicCastFn();
+      castFn = IGM.getDynamicCastUnknownClassFn();
+      break;
+    }
+
+  // Otherwise, use the ObjC-specific entrypoint.
+  } else {
+    metadataRef = IGM.getAddrOfObjCClass(destClass, NotForDefinition);
+
+    switch (mode) {
+    case CheckedCastMode::Unconditional:
+      castFn = IGM.getDynamicCastObjCClassUnconditionalFn();
+      break;
+    case CheckedCastMode::Conditional:
+      castFn = IGM.getDynamicCastObjCClassFn();
       break;
     }
   }
-  
+
   if (metadataRef->getType() != IGM.Int8PtrTy)
     metadataRef = Builder.CreateBitCast(metadataRef, IGM.Int8PtrTy);
   

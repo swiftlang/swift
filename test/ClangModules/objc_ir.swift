@@ -71,7 +71,7 @@ func propertyAccess(#b: B) {
 
 // CHECK: define [[B]]* @_TF7objc_ir8downcastFT1aCSo1A_CSo1B(
 func downcast(#a: A) -> B {
-  // CHECK: call i8* @swift_dynamicCastClassUnconditional(i8* [[A:%.*]], i8* bitcast (%objc_class* @"OBJC_CLASS_$_B" to i8*)) [[NOUNWIND:#[0-9]+]]
+  // CHECK: call i8* @swift_dynamicCastObjCClassUnconditional(i8* [[A:%.*]], i8* bitcast (%objc_class* @"OBJC_CLASS_$_B" to i8*)) [[NOUNWIND:#[0-9]+]]
   return a as B
 }
 

@@ -56,34 +56,41 @@ _setupClassMask() {
 size_t swift::swift_classMask = _setupClassMask();
 uint8_t swift::swift_classShift = 0;
 
-/// The primary entrypoint.
+#if SWIFT_OBJC_INTEROP
+/// Does this object use a tagged-pointer representation?
+static bool isTaggedPointerOrNull(const void *object) {
+  return ((long)object & 1) || ((long)object <= 0);
+}
+#endif
+
+/// Dynamically cast a class object to a Swift class type.
 const void *
 swift::swift_dynamicCastClass(const void *object,
                               const ClassMetadata *targetType) {
 #if SWIFT_OBJC_INTEROP
-  if (targetType->isPureObjC()) {
-    return swift_dynamicCastObjCClass(object, targetType);
-  }
-  // Swift cannot subclass tagged classes
-  // The tag big is either high or low.
-  // We need to handle both scenarios for now.
-  if (((long)object & 1) || ((long)object <= 0)) {
+  assert(!targetType->isPureObjC());
+
+  // Swift native classes never have a tagged-pointer representation.
+  if (isTaggedPointerOrNull(object)) {
     return NULL;
   }
+
   auto isa = reinterpret_cast<const ClassMetadata *>(object_getClass(object));
 #else
   auto isa = *reinterpret_cast<const ClassMetadata *const*>(object);
 #endif
+
   do {
     if (isa == targetType) {
       return object;
     }
     isa = isa->SuperClass;
   } while (isa);
+
   return NULL;
 }
 
-/// The primary entrypoint.
+/// Dynamically cast a class object to a Swift class type.
 const void *
 swift::swift_dynamicCastClassUnconditional(const void *object,
                                            const ClassMetadata *targetType) {
@@ -181,24 +188,21 @@ _dynamicCastToExistential(const OpaqueValue *value,
 }
 
 const void *
-swift::swift_dynamicCast(const void *object, const Metadata *targetType) {
-  const ClassMetadata *targetClassType;
+swift::swift_dynamicCastUnknownClass(const void *object,
+                                     const Metadata *targetType) {
   switch (targetType->getKind()) {
-  case MetadataKind::Class:
-#if SWIFT_DEBUG_RUNTIME
-    printf("casting to class\n");
-#endif
-    targetClassType = static_cast<const ClassMetadata *>(targetType);
-    break;
+  case MetadataKind::Class: {
+    auto targetClassType = static_cast<const ClassMetadata *>(targetType);
+    return swift_dynamicCastClass(object, targetClassType);
+  }
 
-  case MetadataKind::ObjCClassWrapper:
-#if SWIFT_DEBUG_RUNTIME
-    printf("casting to objc class wrapper\n");
-#endif
-    targetClassType
+  case MetadataKind::ObjCClassWrapper: {
+    auto targetClassType
       = static_cast<const ObjCClassWrapperMetadata *>(targetType)->Class;
-    break;
+    return swift_dynamicCastObjCClass(object, targetClassType);
+  }
 
+  // FIXME: can this really happen here?
   case MetadataKind::Existential: {
     auto r = _dynamicCastToExistential((const OpaqueValue*)&object,
                                      object_getClass(object),
@@ -221,23 +225,23 @@ swift::swift_dynamicCast(const void *object, const Metadata *targetType) {
   case MetadataKind::Tuple:
     swift::crash("Swift dynamic cast failed");
   }
-
-  return swift_dynamicCastClass(object, targetClassType);
+  swift::crash("bad metadata kind!");
 }
 
 const void *
-swift::swift_dynamicCastUnconditional(const void *object,
-                                      const Metadata *targetType) {
-  const ClassMetadata *targetClassType;
+swift::swift_dynamicCastUnknownClassUnconditional(const void *object,
+                                                  const Metadata *targetType) {
   switch (targetType->getKind()) {
-  case MetadataKind::Class:
-    targetClassType = static_cast<const ClassMetadata *>(targetType);
-    break;
+  case MetadataKind::Class: {
+    auto targetClassType = static_cast<const ClassMetadata *>(targetType);
+    return swift_dynamicCastClassUnconditional(object, targetClassType);
+  }
 
-  case MetadataKind::ObjCClassWrapper:
-    targetClassType
+  case MetadataKind::ObjCClassWrapper: {
+    auto targetClassType
       = static_cast<const ObjCClassWrapperMetadata *>(targetType)->Class;
-    break;
+    return swift_dynamicCastObjCClassUnconditional(object, targetClassType);
+  }
 
   case MetadataKind::Existential: {
     auto r = _dynamicCastToExistential((const OpaqueValue*)&object,
@@ -261,8 +265,7 @@ swift::swift_dynamicCastUnconditional(const void *object,
   case MetadataKind::Tuple:
     swift::crash("Swift dynamic cast failed");
   }
-
-  return swift_dynamicCastClassUnconditional(object, targetClassType);
+  swift::crash("bad metadata kind!");
 }
 
 const Metadata *
@@ -412,7 +415,7 @@ swift::swift_dynamicCastIndirect(const OpaqueValue *value,
       // Do a dynamic cast on the instance pointer.
       const void *object
         = *reinterpret_cast<const void * const *>(value);
-      if (!swift_dynamicCast(object, targetType))
+      if (!swift_dynamicCastUnknownClass(object, targetType))
         return nullptr;
       break;
     }
@@ -473,7 +476,7 @@ swift::swift_dynamicCastIndirectUnconditional(const OpaqueValue *value,
       // Do a dynamic cast on the instance pointer.
       const void *object
         = *reinterpret_cast<const void * const *>(value);
-      swift_dynamicCastUnconditional(object, targetType);
+      swift_dynamicCastUnknownClassUnconditional(object, targetType);
       break;
     }
     case MetadataKind::ForeignClass: // FIXME
@@ -963,7 +966,8 @@ swift_bridgeNonVerbatimFromObjectiveC(
           bridgeWitness->getObjectiveCType(nativeType, nativeType);
         
       auto sourceValueAsObjectiveCType =
-          const_cast<void*>(swift_dynamicCast(sourceValue, objectiveCType));
+          const_cast<void*>(swift_dynamicCastUnknownClass(sourceValue,
+                                                          objectiveCType));
         
       if (sourceValueAsObjectiveCType) {
         // The type matches.  bridgeFromObjectiveC returns `Self?`;

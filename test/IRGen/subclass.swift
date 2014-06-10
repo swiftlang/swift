@@ -58,7 +58,7 @@ class G<T> : A {
 // CHECK: define %C8subclass1G* @_TF8subclass9a_to_gintF{{.*}}(%C8subclass1A*) {
 func a_to_gint(a: A) -> G<Int> {
   // CHECK: call %swift.type* @swift_getGenericMetadata
-  // CHECK: call i8* @swift_dynamicCastUnconditional
+  // CHECK: call i8* @swift_dynamicCastClassUnconditional
   return a as G<Int>
 }
 // CHECK: }

@@ -2727,17 +2727,18 @@ static Address emitCheckedCast(IRGenSILFunction &IGF,
   case CheckedCastKind::ArrayDowncast:      
     llvm_unreachable("invalid for sil");
   case CheckedCastKind::Downcast: {
-    // If we have an address, load the value and use the emitDowncast code to
-    // make the check. Then just bitcast addr appropriately.
+    // If we have an address, load the value and use the
+    // emitClassDowncast code to make the check. Then just bitcast
+    // addr appropriately.
     //
-    // FIXME: The assumption of not taking a pointer is heavily baked into emit
-    // IRGEnFunction::emitDowncast. We should refactor it into
-    // emitDowncastPointer or the like.
+    // FIXME: The assumption of not taking a pointer is heavily baked
+    // into IRGenFunction::emitClassDowncast. We should refactor it
+    // into emitDowncastPointer or the like.
     if (operand.getType().isAddress()) {
       auto fromAddr = IGF.getLoweredAddress(operand);
       auto toTy = IGF.getTypeInfo(destTy).getStorageType();
       llvm::Value *fromValue = IGF.Builder.CreateLoad(fromAddr);
-      IGF.emitDowncast(fromValue, destTy, mode);
+      IGF.emitClassDowncast(fromValue, destTy, mode);
       llvm::Value *cast = IGF.Builder.CreateBitCast(
         fromAddr.getAddress(), toTy->getPointerTo());
       return Address(cast, fromAddr.getAlignment());
@@ -2745,7 +2746,7 @@ static Address emitCheckedCast(IRGenSILFunction &IGF,
 
     Explosion from = IGF.getLoweredExplosion(operand);
     llvm::Value *fromValue = from.claimNext();
-    llvm::Value *cast = IGF.emitDowncast(fromValue, destTy, mode);
+    llvm::Value *cast = IGF.emitClassDowncast(fromValue, destTy, mode);
     return Address(cast, Alignment(1));
   }
     
@@ -2770,7 +2771,7 @@ static Address emitCheckedCast(IRGenSILFunction &IGF,
     } else {
       Explosion archetype = IGF.getLoweredExplosion(operand);
       llvm::Value *fromValue = archetype.claimNext();
-      llvm::Value *toValue = IGF.emitDowncast(fromValue, destTy, mode);
+      llvm::Value *toValue = IGF.emitClassDowncast(fromValue, destTy, mode);
       return Address(toValue, Alignment(1));
     }
   }
@@ -2790,7 +2791,7 @@ static Address emitCheckedCast(IRGenSILFunction &IGF,
                                          operand.getType(),
                                          CanArchetypeType());
       
-      llvm::Value *toValue = IGF.emitDowncast(instance, destTy, mode);
+      llvm::Value *toValue = IGF.emitClassDowncast(instance, destTy, mode);
       return Address(toValue, Alignment(1));
     }
   }
