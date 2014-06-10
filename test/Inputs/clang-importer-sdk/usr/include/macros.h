@@ -56,3 +56,6 @@
 #define BIT_SHIFT_2 (1 << 2)
 #define BIT_SHIFT_3 (3LL << 3)
 #define BIT_SHIFT_4 (1U << 1)
+
+#define RECURSION RECURSION
+#define REF_TO_RECURSION RECURSION

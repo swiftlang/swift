@@ -98,3 +98,8 @@ func testBitwiseOps() {
   let _: CLongLong = BIT_SHIFT_3
   let _: CUnsignedInt = BIT_SHIFT_4
 }
+
+func testRecursion() {
+  _ = RECURSION // expected-error {{use of unresolved identifier 'RECURSION'}}
+  _ = REF_TO_RECURSION // expected-error {{use of unresolved identifier 'REF_TO_RECURSION'}}
+}

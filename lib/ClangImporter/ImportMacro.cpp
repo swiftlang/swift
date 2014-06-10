@@ -276,7 +276,8 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
           return importNil(impl, DC, name, ClangN);
 
         auto macroID = impl.getClangPreprocessor().getMacroInfo(clangID);
-        return importMacro(impl, DC, name, macroID, ClangN);
+        if (macroID != macro)
+          return importMacro(impl, DC, name, macroID, ClangN);
       }
 
       // FIXME: If the identifier refers to a declaration, alias it?
