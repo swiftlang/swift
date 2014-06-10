@@ -97,6 +97,13 @@ var nestedSelfRef = { // expected-error {{cannot convert the expression's type '
   recursive()
 }
 
+var shadowed = { (shadowed: Int) -> Int in
+  let x = shadowed
+  return x
+} // no-warning
+var shadowedShort = { (shadowedShort: Int) -> Int in shadowedShort+1 } // no-warning
+
+
 func anonymousClosureArgsInClosureWithArgs() {
   var a1 = { () in $0 } // expected-error {{anonymous closure arguments cannot be used inside a closure that has explicit arguments}}
   var a2 = { () -> Int in $0 } // expected-error {{anonymous closure arguments cannot be used inside a closure that has explicit arguments}}
@@ -186,6 +193,4 @@ var closureWithObservedProperty: () -> () = {
   }
   }
 }
-
-
 
