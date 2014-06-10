@@ -20,7 +20,6 @@ add_swift_library(swift_runtime INSTALL
   NSSwiftXXXBase.mm.gyb
   Enum.cpp
   Once.cpp
-  Init.cpp
   Reflection.mm
   Heap.cpp
   Errors.cpp)
