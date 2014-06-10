@@ -1,8 +1,8 @@
 // RUN: %swift -parse %s -verify
 
-// Never inheritable: method with 'Self' in its signature
+// Inheritable: method with 'Self' in its signature
 protocol P1 {
-  func f1(x: Self) -> Bool
+  func f1(x: Self?) -> Bool
 }
 
 // Never inheritable: property with 'Self' in its signature.
@@ -10,12 +10,12 @@ protocol P2 {
   var prop2: Self { get }
 }
 
-// Never inheritable: subscript with 'Self' in its signature
+// Never inheritable: subscript with 'Self' in its result type.
 protocol P3 {
   subscript (i: Int) -> Self { get }
 }
 
-// Never inheritable: subscript with 'Self' in its signature
+// Inheritable: subscript with 'Self' in its index type.
 protocol P4 {
   subscript (s: Self) -> Int { get }
 }
@@ -46,11 +46,21 @@ protocol P9 {
   func ==(x: Self, y: Self) -> Bool 
 }
 
+// Never inheritable: method with 'Self' in a non-contravariant position.
+protocol P10 {
+  func f10(arr: Self[])
+}
+
+// Never inheritable: method with 'Self' in curried position.
+protocol P11 {
+  func f11()(x: Self) -> Int
+}
+
 
 // Class A conforms to everything.
-class A : P1, P2, P3, P4, P5, P6, P7, P8, P9 {
+class A : P1, P2, P3, P4, P5, P6, P7, P8, P9, P10 {
   // P1
-  func f1(x: A) -> Bool { return true }
+  func f1(x: A?) -> Bool { return true }
 
   // P2
   var prop2: A {
@@ -82,23 +92,32 @@ class A : P1, P2, P3, P4, P5, P6, P7, P8, P9 {
 
   // P8
   init(int: Int) { }
+
+  // P10
+  func f10(arr: A[]) { }
+
+  // P11
+  func f11()(x: A) -> Int { return 5 }
 }
 
+// P9
 func ==(x: A, y: A) -> Bool { return true }
 
 // Class B inherits A; gets all of its inheritable conformances.
 class B : A { }
 
 func testB(b: B) {
-  var p1: P1 = b // expected-error{{type 'B' does not conform to protocol 'P1'}}
+  var p1: P1 = b
   var p2: P2 = b // expected-error{{type 'B' does not conform to protocol 'P2'}}
   var p3: P3 = b // expected-error{{type 'B' does not conform to protocol 'P3'}}
-  var p4: P4 = b // expected-error{{type 'B' does not conform to protocol 'P4'}}
+  var p4: P4 = b
   var p5: P5 = b // expected-error{{type 'B' does not conform to protocol 'P5'}}
   var p6: P6 = b
   var p7: P7 = b
   var p8: P8 = b // expected-error{{type 'B' does not conform to protocol 'P8'}}
   var p9: P9 = b
+  var p10: P10 = b // expected-error{{type 'B' does not conform to protocol 'P10'}}
+  var p11: P11 = b // expected-error{{type 'B' does not conform to protocol 'P11'}}
 }
 
 // Class A5 conforms to P5 in an inheritable manner.

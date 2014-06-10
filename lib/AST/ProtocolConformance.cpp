@@ -453,6 +453,14 @@ static bool isSelf(Type type) {
   return false;
 }
 
+/// Determine whether the given type is the 'Self' generic parameter of a
+/// protocol or a (possibly implicitly unwrapped) optional thereof.
+static bool isSelfOrOptionalSelf(Type type) {
+  if (auto optType = type->getAnyOptionalObjectType())
+    type = optType;
+  return isSelf(type);
+}
+
 /// Determine whether the given type contains a reference to the
 /// 'Self' generic parameter of a protocol that is not the base of a
 /// dependent member expression.
@@ -480,6 +488,61 @@ static bool containsSelf(Type type) {
   return selfWalker.FoundSelf;
 }
 
+/// Determine whether the given parameter type involves Self in a manner that
+/// is not contravariant.
+static bool isNonContravariantSelfParamType(Type type) {
+  // 'Self' or an optional thereof will be contravariant in overrides.
+  if (isSelfOrOptionalSelf(type))
+    return false;
+
+  // If the parameter contains Self, it is not contravariant.
+  return containsSelf(type);
+}
+
+namespace {
+  /// Describes how we should check for Self in the result type of a function.
+  enum class SelfInResultType {
+    /// Check for the Self type normally.
+    Check,
+    /// Ignore Self in the result type.
+    Ignore,
+    /// The result type is known to be a dynamic Self.
+    DynamicSelf,
+  };
+
+}
+/// Find references to Self within the given function type.
+static SelfReferenceKind findSelfReferences(const AnyFunctionType *fnType,
+                                            SelfInResultType inResultType) {
+  // Check whether the input type contains Self in any position where it would
+  // make an override not have contravariant parameter types.
+  auto inputType = fnType->getInput();
+  if (auto tuple = dyn_cast<TupleType>(inputType.getPointer())) {
+    for (auto &elt: tuple->getFields()) {
+      if (isNonContravariantSelfParamType(elt.getType()))
+        return SelfReferenceKind::Yes;
+    }
+  } else if (isNonContravariantSelfParamType(inputType)) {
+    return SelfReferenceKind::Yes;
+  }
+
+  // Consider the result type.
+  auto type = fnType->getResult();
+  switch (inResultType) {
+  case SelfInResultType::DynamicSelf:
+    return SelfReferenceKind::Result;
+
+  case SelfInResultType::Check:
+    return isSelfOrOptionalSelf(type)
+             ? SelfReferenceKind::Result
+             : containsSelf(type) ? SelfReferenceKind::Yes
+                                  : SelfReferenceKind::No;
+
+  case SelfInResultType::Ignore:
+    return SelfReferenceKind::No;
+  }
+}
+
 /// Find the bare Self references within the given requirement.
 static SelfReferenceKind findSelfReferences(ValueDecl *value) {
   // Types never refer to 'Self'.
@@ -494,32 +557,33 @@ static SelfReferenceKind findSelfReferences(ValueDecl *value) {
     // Skip the 'self' type.
     type = type->castTo<AnyFunctionType>()->getResult();
 
-    // Check argument types.
-    for (unsigned i = 1, n = afd->getNumParamPatterns(); i != n; ++i) {
-      auto fnType = type->castTo<AnyFunctionType>();
-
-      // Check whether the input type contains Self anywhere. Operators are
-      // a specific exception, because they are never dynamically dispatched.
-      if (!afd->isOperator() && containsSelf(fnType->getInput())) {
-        return SelfReferenceKind::Yes;
-      }
-
-      type = fnType->getResult();
-    }
-
-    // For constructors, we're done.
-    if (isa<ConstructorDecl>(afd))
-      return SelfReferenceKind::No;
-
-    // The result type remains.
-    auto func = cast<FuncDecl>(afd);
-    return (isSelf(type) || func->hasDynamicSelf())
-             ? SelfReferenceKind::Result
-             : containsSelf(type) ? SelfReferenceKind::Yes
-                                  : SelfReferenceKind::No;
+    // Check first input types. Any further input types are treated as part of
+    // the result type.
+    auto fnType = type->castTo<AnyFunctionType>();
+    return findSelfReferences(fnType,
+                              isa<ConstructorDecl>(afd)
+                                ? SelfInResultType::Ignore
+                                : (isa<FuncDecl>(afd) &&
+                                   cast<FuncDecl>(afd)->hasDynamicSelf())
+                                  ? SelfInResultType::DynamicSelf
+                                  : SelfInResultType::Check);
   }
 
   auto type = value->getInterfaceType();
+
+  if (isa<SubscriptDecl>(value)) {
+    auto fnType = type->castTo<AnyFunctionType>();
+    return findSelfReferences(fnType, SelfInResultType::Check);
+  }
+
+  if (isa<VarDecl>(value)) {
+    type = type->getRValueType();
+    return isSelfOrOptionalSelf(type)
+             ? SelfReferenceKind::Result
+             : containsSelf(type) ? SelfReferenceKind::Yes
+                                  : SelfReferenceKind::No;
+
+  }
 
   return containsSelf(type) ? SelfReferenceKind::Yes
                             : SelfReferenceKind::No;
@@ -558,10 +622,14 @@ bool NormalProtocolConformance::isInheritableSlow(LazyResolver *resolver) const{
     case SelfReferenceKind::Result: {
       // When only the result type is 'Self', we can inherit the
       // conformance if the witness returns DynamicSelf.
-      auto func = cast_or_null<FuncDecl>(
-                    getWitness(req, resolver).getDecl());
-      if (func && func->hasDynamicSelf())
-        continue;
+      if (auto func = dyn_cast_or_null<FuncDecl>(
+                        getWitness(req, resolver).getDecl())) {
+        if (func->hasDynamicSelf())
+          continue;
+      }
+
+      // FIXME: Subscript doesn't allow dynamic self.
+      // FIXME: Properties don't allow dynamic self.
 
       // Fall through.
       SWIFT_FALLTHROUGH;
