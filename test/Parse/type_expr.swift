@@ -154,3 +154,14 @@ func nonexistentMember() {
   let prop = Foo.nonexistent // expected-error{{does not have a member named 'nonexistent'}}
   let meth = Foo.nonexistent() // expected-error{{does not have a member named 'nonexistent'}}
 }
+
+protocol P {}
+
+func meta_metatypes() {
+  let p: P.Protocol = P.self
+  let a = P.Type.self
+  let b = P.Protocol.self
+  let c = P.Protocol.Protocol.self // expected-error{{'Protocol' type only applies to existential types}}
+  let d = P.Protocol.Type.self
+  let e = B.Type.self
+}

@@ -578,6 +578,29 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
                                      Indexes->getSourceRange());
     return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
   }
+  
+  // Fold 'T.Type' or 'T.Protocol' into a metatype when T is a TypeExpr.
+  if (auto *MRE = dyn_cast<UnresolvedDotExpr>(E)) {
+    auto *TyExpr = dyn_cast<TypeExpr>(MRE->getBase());
+    if (!TyExpr) return nullptr;
+    
+    auto *InnerTypeRepr = TyExpr->getTypeRepr();
+    assert(!TyExpr->isImplicit() && InnerTypeRepr &&
+           "SubscriptExpr doesn't work on implicit TypeExpr's, "
+           "the TypeExpr should have been built correctly in the first place");
+
+    if (MRE->getName() == TC.Context.Id_Protocol) {
+      auto *NewTypeRepr =
+        new (TC.Context) ProtocolTypeRepr(InnerTypeRepr, MRE->getNameLoc());
+      return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
+    }
+    
+    if (MRE->getName() == TC.Context.Id_Type) {
+      auto *NewTypeRepr =
+        new (TC.Context) MetatypeTypeRepr(InnerTypeRepr, MRE->getNameLoc());
+      return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
+    }
+  }
 
   // Fold T? into an optional type when T is a TypeExpr.
   if (isa<OptionalEvaluationExpr>(E) || isa<BindOptionalExpr>(E)) {

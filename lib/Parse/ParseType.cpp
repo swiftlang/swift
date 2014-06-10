@@ -45,6 +45,7 @@ ParserResult<TypeRepr> Parser::parseTypeSimple() {
 ///     type-tuple
 ///     type-composition
 ///     type-simple '.Type'
+///     type-simple '.Protocol'
 ///     type-simple '?'
 ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID) {
   ParserResult<TypeRepr> ty;
@@ -77,7 +78,6 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID) {
   }
   case tok::kw_super:
   case tok::kw_dynamicType:
-  case tok::kw_Type:
   case tok::kw_self:
     // These keywords don't start a decl or a statement, and thus should be
     // safe to skip over.
@@ -92,12 +92,12 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID) {
     return nullptr;
   }
 
-  // '.Type' and '?' still leave us with type-simple.
+  // '.Type', '.Protocol', and '?' still leave us with type-simple.
   while (ty.isNonNull()) {
     if ((Tok.is(tok::period) || Tok.is(tok::period_prefix))) {
-      if (peekToken().is(tok::kw_Type)) {
+      if (peekToken().isContextualKeyword("Type")) {
         consumeToken();
-        SourceLoc metatypeLoc = consumeToken(tok::kw_Type);
+        SourceLoc metatypeLoc = consumeToken(tok::identifier);
         ty = makeParserResult(ty,
           new (Context) MetatypeTypeRepr(ty.get(), metatypeLoc));
         continue;
@@ -379,7 +379,8 @@ ParserResult<IdentTypeRepr> Parser::parseTypeIdentifier() {
         Status.setHasCodeCompletion();
         break;
       }
-      if (peekToken().isNot(tok::kw_Type)) {
+      if (!peekToken().isContextualKeyword("Type")
+          && !peekToken().isContextualKeyword("Protocol")) {
         consumeToken();
         continue;
       }
@@ -778,12 +779,13 @@ bool Parser::canParseType() {
     return false;
   }
   
-  // '.Type' and '?' still leave us with type-simple.
+  // '.Type', '.Protocol', and '?' still leave us with type-simple.
   while (true) {
     if ((Tok.is(tok::period) || Tok.is(tok::period_prefix)) &&
-        peekToken().is(tok::kw_Type)) {
+        (peekToken().isContextualKeyword("Type")
+         || peekToken().isContextualKeyword("Protocol"))) {
       consumeToken();
-      consumeToken(tok::kw_Type);
+      consumeToken(tok::identifier);
       continue;
     }
     if (Tok.is(tok::question_postfix) || isImplicitlyUnwrappedOptionalToken()) {
@@ -839,7 +841,8 @@ bool Parser::canParseTypeIdentifier() {
     // Treat 'Foo.<anything>' as an attempt to write a dotted type
     // unless <anything> is 'Type'.
     if ((Tok.is(tok::period) || Tok.is(tok::period_prefix)) &&
-        peekToken().isNot(tok::kw_Type)) {
+        !peekToken().isContextualKeyword("Type") &&
+        !peekToken().isContextualKeyword("Protocol")) {
       consumeToken();
     } else {
       return true;
