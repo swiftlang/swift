@@ -466,26 +466,36 @@ void Driver::buildOutputInfo(const DerivedArgList &Args,
       OI.SDKPath = SDKROOT;
     } else if (OI.CompilerMode == OutputInfo::Mode::Immediate ||
                OI.CompilerMode == OutputInfo::Mode::REPL) {
-      std::string xcrunPath = findRelativeExecutable(getSwiftProgramPath(),
-                                                     "xcrun");
-      if (!xcrunPath.empty()) {
-        const char *args[] = { "--show-sdk-path", "--sdk", "macosx", nullptr };
-        sys::TaskQueue queue;
-        queue.addTask(xcrunPath.c_str(), args);
-        queue.execute(nullptr,
-                      [&OI](sys::ProcessId PID,
-                            int returnCode,
-                            StringRef output,
-                            void *unused) -> sys::TaskFinishedResponse {
-          if (returnCode == 0) {
-            output = output.rtrim();
-            auto lastLineStart = output.find_last_of("\n\r");
-            if (lastLineStart != StringRef::npos)
-              output = output.substr(lastLineStart+1);
-            OI.SDKPath = output.str();
-          }
-          return sys::TaskFinishedResponse::ContinueExecution;
-        });
+      if (llvm::Triple(llvm::sys::getProcessTriple()).isMacOSX()) {
+        // In immediate modes, use the SDK provided by xcrun.
+        // This will prefer the SDK alongside the Swift found by "xcrun swift".
+        // We don't do this in compilation modes because defaulting to the
+        // latest SDK may not be intended.
+        std::string xcrunPath = llvm::sys::FindProgramByName("xcrun");
+        if (!xcrunPath.empty()) {
+          const char *args[] = {
+            "--show-sdk-path", "--sdk", "macosx", nullptr
+          };
+          sys::TaskQueue queue;
+          queue.addTask(xcrunPath.c_str(), args);
+          queue.execute(nullptr,
+                        [&OI](sys::ProcessId PID,
+                              int returnCode,
+                              StringRef output,
+                              void *unused) -> sys::TaskFinishedResponse {
+            if (returnCode == 0) {
+              output = output.rtrim();
+              auto lastLineStart = output.find_last_of("\n\r");
+              if (lastLineStart != StringRef::npos)
+                output = output.substr(lastLineStart+1);
+              if (output.empty())
+                OI.SDKPath = "/";
+              else
+                OI.SDKPath = output.str();
+            }
+            return sys::TaskFinishedResponse::ContinueExecution;
+          });
+        }
       }
     }
 
