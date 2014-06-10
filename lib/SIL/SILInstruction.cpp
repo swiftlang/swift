@@ -857,6 +857,13 @@ CopyAddrInst::CopyAddrInst(SILLocation Loc, SILValue SrcLValue, SILValue DestLVa
 {
 }
 
+UnconditionalCheckedCastAddrInst::
+UnconditionalCheckedCastAddrInst(SILLocation loc, CheckedCastKind kind,
+                                 SILValue src, SILValue dest)
+  : SILInstruction(ValueKind::UnconditionalCheckedCastAddrInst, loc),
+    Operands(this, src, dest), CastKind(kind) {
+}
+
 StructInst *StructInst::create(SILLocation Loc, SILType Ty,
                                ArrayRef<SILValue> Elements, SILFunction &F) {
   void *Buffer = F.getModule().allocate(sizeof(StructInst) +

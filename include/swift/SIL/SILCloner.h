@@ -588,6 +588,20 @@ SILCloner<ImplClass>::visitUnconditionalCheckedCastInst(
                                                      OpValue,
                                                      OpType));
 }
+
+template<typename ImplClass>
+void
+SILCloner<ImplClass>::visitUnconditionalCheckedCastAddrInst(
+                                      UnconditionalCheckedCastAddrInst *Inst) {
+  SILLocation OpLoc = getOpLocation(Inst->getLoc());
+  SILValue SrcValue = getOpValue(Inst->getSrc());
+  SILValue DestValue = getOpValue(Inst->getDest());
+  doPostProcess(Inst,
+         getBuilder().createUnconditionalCheckedCastAddr(OpLoc,
+                                                         Inst->getCastKind(),
+                                                         SrcValue,
+                                                         DestValue));
+}
   
 template<typename ImplClass>
 void
@@ -1099,6 +1113,20 @@ SILCloner<ImplClass>::visitCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
                                             getOpValue(Inst->getOperand()),
                                             getOpType(Inst->getCastType()),
                                             OpSuccBB, OpFailBB));
+}
+
+template<typename ImplClass>
+void SILCloner<ImplClass>::visitCheckedCastAddrBranchInst(
+                                             CheckedCastAddrBranchInst *Inst) {
+  SILBasicBlock *OpSuccBB = getOpBasicBlock(Inst->getSuccessBB());
+  SILBasicBlock *OpFailBB = getOpBasicBlock(Inst->getFailureBB());
+  SILValue SrcValue = getOpValue(Inst->getSrc());
+  SILValue DestValue = getOpValue(Inst->getDest());
+  doPostProcess(Inst,
+       getBuilder().createCheckedCastAddrBranch(getOpLocation(Inst->getLoc()),
+                                                Inst->getCastKind(),
+                                                SrcValue, DestValue,
+                                                OpSuccBB, OpFailBB));
 }
   
 template<typename ImplClass>

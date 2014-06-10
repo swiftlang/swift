@@ -866,6 +866,19 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         addValueRef(CI->getOperand()), CI->getOperand().getResultNumber());
     break;
   }
+  case ValueKind::UnconditionalCheckedCastAddrInst: {
+    auto CI = cast<UnconditionalCheckedCastAddrInst>(&SI);
+    SILTwoOperandsLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILTwoOperandsLayout::Code],
+        (unsigned)SI.getKind(), (unsigned) CI->getCastKind(),
+        S.addTypeRef(CI->getSrc().getType().getSwiftRValueType()),
+        (unsigned)CI->getSrc().getType().getCategory(),
+        addValueRef(CI->getSrc()), CI->getSrc().getResultNumber(),
+        S.addTypeRef(CI->getDest().getType().getSwiftRValueType()),
+        (unsigned)CI->getDest().getType().getCategory(),
+        addValueRef(CI->getDest()), CI->getDest().getResultNumber());
+    break;
+  }
 
   case ValueKind::AssignInst:
   case ValueKind::CopyAddrInst:
@@ -1154,6 +1167,30 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
              SILAbbrCodes[SILOneTypeValuesLayout::Code], (unsigned)SI.getKind(),
              S.addTypeRef(CBI->getCastType().getSwiftRValueType()),
              (unsigned)CBI->getCastType().getCategory(),
+             ListOfValues);
+    break;
+  }
+  case ValueKind::CheckedCastAddrBranchInst: {
+    // Format: the cast kind, two typed values, a BasicBlock ID for
+    // success, a BasicBlock ID for failure.  Uses SILOneTypeValuesLayout;
+    // the type is the type of the second (dest) operand.
+    auto CBI = cast<CheckedCastAddrBranchInst>(&SI);
+    SmallVector<ValueID, 9> ListOfValues;
+    ListOfValues.push_back((unsigned)CBI->getCastKind());
+    ListOfValues.push_back(addValueRef(CBI->getSrc()));
+    ListOfValues.push_back(CBI->getSrc().getResultNumber());
+    ListOfValues.push_back(
+               S.addTypeRef(CBI->getSrc().getType().getSwiftRValueType()));
+    ListOfValues.push_back((unsigned)CBI->getSrc().getType().getCategory());
+    ListOfValues.push_back(addValueRef(CBI->getDest()));
+    ListOfValues.push_back(CBI->getDest().getResultNumber());
+    ListOfValues.push_back(BasicBlockMap[CBI->getSuccessBB()]);
+    ListOfValues.push_back(BasicBlockMap[CBI->getFailureBB()]);
+
+    SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
+             SILAbbrCodes[SILOneTypeValuesLayout::Code], (unsigned)SI.getKind(),
+             S.addTypeRef(CBI->getDest().getType().getSwiftRValueType()),
+             (unsigned)CBI->getDest().getType().getCategory(),
              ListOfValues);
     break;
   }

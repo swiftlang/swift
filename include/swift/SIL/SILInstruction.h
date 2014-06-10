@@ -1340,6 +1340,37 @@ public:
   CheckedCastKind getCastKind() const { return CastKind; }
 };
 
+/// Perform an unconditional checked cast that aborts if the cast fails.
+/// The result of the checked cast is left in the destination address.
+class UnconditionalCheckedCastAddrInst : public SILInstruction
+{
+  enum {
+    /// the value being stored
+    Src,
+    /// the lvalue being stored to
+    Dest
+  };
+  FixedOperandList<2> Operands;
+  CheckedCastKind CastKind;
+public:
+  UnconditionalCheckedCastAddrInst(SILLocation loc,
+                                   CheckedCastKind kind,
+                                   SILValue src,
+                                   SILValue dest);
+
+  CheckedCastKind getCastKind() const { return CastKind; }
+
+  SILValue getSrc() const { return Operands[Src].get(); }
+  SILValue getDest() const { return Operands[Dest].get(); }
+
+  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::UnconditionalCheckedCastAddrInst;
+  }  
+};
+
 /// StructInst - Represents a constructed loadable struct.
 class StructInst : public SILInstruction {
   TailAllocatedOperandList<0> Operands;
@@ -2822,6 +2853,57 @@ public:
 
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::CheckedCastBranchInst;
+  }
+};
+
+/// Perform a checked cast operation and branch on whether the cast succeeds.
+/// The result of the checked cast is left in the destination address.
+class CheckedCastAddrBranchInst : public TermInst {
+  CheckedCastKind CastKind;
+
+  enum {
+    /// the value being stored
+    Src,
+    /// the lvalue being stored to
+    Dest
+  };
+  FixedOperandList<2> Operands;
+  SILSuccessor DestBBs[2];
+
+public:
+  CheckedCastAddrBranchInst(SILLocation loc,
+                            CheckedCastKind castKind,
+                            SILValue src,
+                            SILValue dest,
+                            SILBasicBlock *successBB,
+                            SILBasicBlock *failureBB)
+    : TermInst(ValueKind::CheckedCastAddrBranchInst, loc),
+      CastKind(castKind), Operands{this, src, dest},
+      DestBBs{{this, successBB}, {this, failureBB}}
+  {
+    assert(CastKind >= CheckedCastKind::First_Resolved
+           && "cannot create a cast instruction with an unresolved cast kind");
+  }
+
+  CheckedCastKind getCastKind() const { return CastKind; }
+
+  SILValue getSrc() const { return Operands[Src].get(); }
+  SILValue getDest() const { return Operands[Dest].get(); }
+
+  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+
+  SuccessorListTy getSuccessors() {
+    return DestBBs;
+  }
+
+  SILBasicBlock *getSuccessBB() { return DestBBs[0]; }
+  const SILBasicBlock *getSuccessBB() const { return DestBBs[0]; }
+  SILBasicBlock *getFailureBB() { return DestBBs[1]; }
+  const SILBasicBlock *getFailureBB() const { return DestBBs[1]; }
+
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::CheckedCastAddrBranchInst;
   }
 };
 

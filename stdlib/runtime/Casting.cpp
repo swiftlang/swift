@@ -202,17 +202,10 @@ swift::swift_dynamicCastUnknownClass(const void *object,
     return swift_dynamicCastObjCClass(object, targetClassType);
   }
 
-  // FIXME: can this really happen here?
-  case MetadataKind::Existential: {
-    auto r = _dynamicCastToExistential((const OpaqueValue*)&object,
-                                     object_getClass(object),
-                                     (const ExistentialTypeMetadata*)targetType);
-    if (!r)
-      return nullptr;
-    return object;
-  }
-  case MetadataKind::ExistentialMetatype:
   case MetadataKind::ForeignClass: // FIXME
+
+  case MetadataKind::Existential:
+  case MetadataKind::ExistentialMetatype:
   case MetadataKind::Function:
   case MetadataKind::Block:
   case MetadataKind::HeapArray:
@@ -243,15 +236,9 @@ swift::swift_dynamicCastUnknownClassUnconditional(const void *object,
     return swift_dynamicCastObjCClassUnconditional(object, targetClassType);
   }
 
-  case MetadataKind::Existential: {
-    auto r = _dynamicCastToExistential((const OpaqueValue*)&object,
-                                     object_getClass(object),
-                                     (const ExistentialTypeMetadata*)targetType);
-    if (!r)
-      swift::crash("Swift dynamic cast failed");
-    return object;
-  }
   case MetadataKind::ForeignClass: // FIXME
+
+  case MetadataKind::Existential:
   case MetadataKind::ExistentialMetatype:
   case MetadataKind::Function:
   case MetadataKind::Block:

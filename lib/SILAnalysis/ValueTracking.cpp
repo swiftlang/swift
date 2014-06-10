@@ -99,6 +99,7 @@ static bool isTransitiveEscapeInst(SILInstruction *Inst) {
   case ValueKind::ValueMetatypeInst:
   case ValueKind::BranchInst:
   case ValueKind::CheckedCastBranchInst:
+  case ValueKind::CheckedCastAddrBranchInst:
   case ValueKind::ClassMethodInst:
   case ValueKind::CondBranchInst:
   case ValueKind::ConvertFunctionInst:
@@ -142,6 +143,7 @@ static bool isTransitiveEscapeInst(SILInstruction *Inst) {
   case ValueKind::TupleExtractInst:
   case ValueKind::TupleInst:
   case ValueKind::UnconditionalCheckedCastInst:
+  case ValueKind::UnconditionalCheckedCastAddrInst:
   case ValueKind::UnmanagedToRefInst:
   case ValueKind::UnownedToRefInst:
   case ValueKind::UpcastExistentialRefInst:

@@ -339,6 +339,7 @@ static InlineCost instructionInlineCost(SILInstruction &I,
     case ValueKind::AutoreleaseReturnInst:
     case ValueKind::BranchInst:
     case ValueKind::CheckedCastBranchInst:
+    case ValueKind::CheckedCastAddrBranchInst:
     case ValueKind::ClassMethodInst:
     case ValueKind::CondBranchInst:
     case ValueKind::CondFailInst:
@@ -387,6 +388,7 @@ static InlineCost instructionInlineCost(SILInstruction &I,
     case ValueKind::UncheckedEnumDataInst:
     case ValueKind::UncheckedTakeEnumDataAddrInst:
     case ValueKind::UnconditionalCheckedCastInst:
+    case ValueKind::UnconditionalCheckedCastAddrInst:
     case ValueKind::UnmanagedToRefInst:
     case ValueKind::UnownedReleaseInst:
     case ValueKind::UnownedRetainInst:

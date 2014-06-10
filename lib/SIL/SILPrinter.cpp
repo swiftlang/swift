@@ -745,6 +745,21 @@ public:
        << " to " << CI->getCastType() << ", "
        << getID(CI->getSuccessBB()) << ", " << getID(CI->getFailureBB());
   }
+
+  void visitUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *CI) {
+    OS << "unconditional_checked_cast_addr "
+       << getCheckedCastKindName(CI->getCastKind())
+       << ' ' << getIDAndType(CI->getSrc())
+       << " to " << getIDAndType(CI->getDest());
+  }
+  
+  void visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CI) {
+    OS << "checked_cast_addr_br "
+       << getCheckedCastKindName(CI->getCastKind()) << ' '
+       << getIDAndType(CI->getSrc())
+       << " to " << getIDAndType(CI->getDest()) << ", "
+       << getID(CI->getSuccessBB()) << ", " << getID(CI->getFailureBB());
+  }
   
   void visitConvertFunctionInst(ConvertFunctionInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand(), "convert_function");

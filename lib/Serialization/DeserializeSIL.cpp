@@ -987,21 +987,17 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     SILValue Val = getLocalValue(ValID, ValResNum,
                  getSILType(MF->getType(TyID2), (SILValueCategory)TyCategory2));
     SILType Ty = getSILType(MF->getType(TyID), (SILValueCategory)TyCategory);
-    CheckedCastKind Kind;
-    switch (Attr) {
-    case (unsigned)CheckedCastKind::ArchetypeToArchetype:
-    case (unsigned)CheckedCastKind::ArchetypeToConcrete:
-    case (unsigned)CheckedCastKind::Downcast:
-    case (unsigned)CheckedCastKind::ExistentialToArchetype:
-    case (unsigned)CheckedCastKind::ExistentialToConcrete:
-    case (unsigned)CheckedCastKind::SuperToArchetype:
-      Kind = (CheckedCastKind)Attr;
-      break;
-
-    default:
-      llvm_unreachable("not a valid CheckedCastKind for SIL");
-    }
+    CheckedCastKind Kind = getCheckedCastKind(Attr);
     ResultVal = Builder.createUnconditionalCheckedCast(Loc, Kind, Val, Ty);
+    break;
+  }
+  case ValueKind::UnconditionalCheckedCastAddrInst: {
+    SILValue Src = getLocalValue(ValID, ValResNum,
+                 getSILType(MF->getType(TyID), (SILValueCategory)TyCategory));
+    SILValue Dest = getLocalValue(ValID2, ValResNum2,
+                 getSILType(MF->getType(TyID2), (SILValueCategory)TyCategory2));
+    CheckedCastKind Kind = getCheckedCastKind(Attr);
+    ResultVal = Builder.createUnconditionalCheckedCastAddr(Loc, Kind, Src, Dest);
     break;
   }
 
@@ -1417,6 +1413,26 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
 
     ResultVal = Builder.createCheckedCastBranch(Loc, castKind, op, castTy,
                                                 successBB, failureBB);
+    break;
+  }
+  case ValueKind::CheckedCastAddrBranchInst: {
+    // Format: the cast kind, two typed values, a BasicBlock ID for success,
+    // a BasicBlock ID for failure. Uses SILOneTypeValuesLayout; the type
+    // is the type of the second (dest) operand.
+    assert(ListOfValues.size() == 9 &&
+           "expect 9 numbers for CheckedCastBranchInst");
+    CheckedCastKind castKind = getCheckedCastKind(ListOfValues[0]);
+    SILType srcTy = getSILType(MF->getType(ListOfValues[3]),
+                              (SILValueCategory)ListOfValues[4]);
+    SILValue src = getLocalValue(ListOfValues[1], ListOfValues[2], srcTy);
+    SILType destTy = getSILType(MF->getType(TyID),
+                                (SILValueCategory)TyCategory);
+    SILValue dest = getLocalValue(ListOfValues[5], ListOfValues[6], destTy);
+    auto *successBB = getBBForReference(Fn, ListOfValues[7]);
+    auto *failureBB = getBBForReference(Fn, ListOfValues[8]);
+
+    ResultVal = Builder.createCheckedCastAddrBranch(Loc, castKind, src, dest,
+                                                    successBB, failureBB);
     break;
   }
   case ValueKind::InitBlockStorageHeaderInst: {

@@ -668,6 +668,7 @@ public:
   void visitThickToObjCMetatypeInst(ThickToObjCMetatypeInst *i);
   void visitObjCToThickMetatypeInst(ObjCToThickMetatypeInst *i);
   void visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *i);
+  void visitUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *i);
 
   void visitIsNonnullInst(IsNonnullInst *i);
 
@@ -684,6 +685,7 @@ public:
   void visitSwitchEnumAddrInst(SwitchEnumAddrInst *i);
   void visitDynamicMethodBranchInst(DynamicMethodBranchInst *i);
   void visitCheckedCastBranchInst(CheckedCastBranchInst *i);
+  void visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *i);
 };
 
 }
@@ -2839,6 +2841,11 @@ void IRGenSILFunction::visitUnconditionalCheckedCastInst(
   }
 }
 
+void IRGenSILFunction::visitUnconditionalCheckedCastAddrInst(
+                                   swift::UnconditionalCheckedCastAddrInst *i) {
+  // FIXME: implement
+}
+
 void IRGenSILFunction::visitCheckedCastBranchInst(
                                               swift::CheckedCastBranchInst *i) {
   // Emit the cast operation.
@@ -2866,6 +2873,11 @@ void IRGenSILFunction::visitCheckedCastBranchInst(
     ex.add(val.getAddress());
     addIncomingExplosionToPHINodes(*this, successBB, phiIndex, ex);
   }
+}
+
+void IRGenSILFunction::visitCheckedCastAddrBranchInst(
+                                          swift::CheckedCastAddrBranchInst *i) {
+  // FIXME: implement
 }
 
 void IRGenSILFunction::visitIsNonnullInst(swift::IsNonnullInst *i) {
