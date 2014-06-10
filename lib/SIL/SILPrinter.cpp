@@ -293,6 +293,15 @@ static void print(raw_ostream &OS, SILValueCategory category) {
   }
   llvm_unreachable("bad value category!");
 }
+
+static StringRef getCastConsumptionKindName(CastConsumptionKind kind) {
+  switch (kind) {
+  case CastConsumptionKind::TakeAlways: return "take_always";
+  case CastConsumptionKind::TakeOnSuccess: return "take_on_success";
+  case CastConsumptionKind::CopyOnSuccess: return "copy_on_success";
+  }
+  llvm_unreachable("bad cast consumption kind");
+}
       
 void SILType::print(raw_ostream &OS) const {
   SILColor C(OS, SC_Type);
@@ -749,6 +758,7 @@ public:
   void visitUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *CI) {
     OS << "unconditional_checked_cast_addr "
        << getCheckedCastKindName(CI->getCastKind())
+       << ' ' << getCastConsumptionKindName(CI->getConsumptionKind())
        << ' ' << getIDAndType(CI->getSrc())
        << " to " << getIDAndType(CI->getDest());
   }
@@ -756,6 +766,7 @@ public:
   void visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CI) {
     OS << "checked_cast_addr_br "
        << getCheckedCastKindName(CI->getCastKind()) << ' '
+       << getCastConsumptionKindName(CI->getConsumptionKind()) << ' '
        << getIDAndType(CI->getSrc())
        << " to " << getIDAndType(CI->getDest()) << ", "
        << getID(CI->getSuccessBB()) << ", " << getID(CI->getFailureBB());

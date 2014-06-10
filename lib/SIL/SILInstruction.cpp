@@ -859,9 +859,10 @@ CopyAddrInst::CopyAddrInst(SILLocation Loc, SILValue SrcLValue, SILValue DestLVa
 
 UnconditionalCheckedCastAddrInst::
 UnconditionalCheckedCastAddrInst(SILLocation loc, CheckedCastKind kind,
+                                 CastConsumptionKind consumption,
                                  SILValue src, SILValue dest)
   : SILInstruction(ValueKind::UnconditionalCheckedCastAddrInst, loc),
-    Operands(this, src, dest), CastKind(kind) {
+    Operands(this, src, dest), CastKind(kind), ConsumptionKind(consumption) {
 }
 
 StructInst *StructInst::create(SILLocation Loc, SILType Ty,

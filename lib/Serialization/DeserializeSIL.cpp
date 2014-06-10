@@ -557,20 +557,49 @@ SILBasicBlock *SILDeserializer::readSILBasicBlock(SILFunction *Fn,
   return CurrentBB;
 }
 
-static CheckedCastKind getCheckedCastKind(unsigned Attr) {
-  switch (Attr) {
-  case (unsigned)CheckedCastKind::ArchetypeToArchetype:
-  case (unsigned)CheckedCastKind::ArchetypeToConcrete:
-  case (unsigned)CheckedCastKind::Downcast:
-  case (unsigned)CheckedCastKind::ExistentialToArchetype:
-  case (unsigned)CheckedCastKind::ExistentialToConcrete:
-  case (unsigned)CheckedCastKind::SuperToArchetype:
-  case (unsigned)CheckedCastKind::ConcreteToArchetype:
-  case (unsigned)CheckedCastKind::ConcreteToUnrelatedExistential:
-    return (CheckedCastKind)Attr;
+static CheckedCastKind getCheckedCastKind(unsigned attr) {
+  switch (attr) {
+  case SIL_CHECKED_CAST_ARCHETYPE_TO_ARCHETYPE:
+    return CheckedCastKind::ArchetypeToArchetype;
+  case SIL_CHECKED_CAST_ARCHETYPE_TO_CONCRETE:
+    return CheckedCastKind::ArchetypeToConcrete;
+  case SIL_CHECKED_CAST_ARRAY_DOWNCAST:
+    return CheckedCastKind::ArrayDowncast;
+  case SIL_CHECKED_CAST_DOWNCAST:
+    return CheckedCastKind::Downcast;
+  case SIL_CHECKED_CAST_EXISTENTIAL_TO_ARCHETYPE:
+    return CheckedCastKind::ExistentialToArchetype;
+  case SIL_CHECKED_CAST_EXISTENTIAL_TO_CONCRETE:
+    return CheckedCastKind::ExistentialToConcrete;
+  case SIL_CHECKED_CAST_SUPER_TO_ARCHETYPE:
+    return CheckedCastKind::SuperToArchetype;
+  case SIL_CHECKED_CAST_CONCRETE_TO_ARCHETYPE:
+    return CheckedCastKind::ConcreteToArchetype;
+  case SIL_CHECKED_CAST_CONCRETE_TO_UNRELATED_EXISTENTIAL:
+    return CheckedCastKind::ConcreteToUnrelatedExistential;
   default:
     llvm_unreachable("not a valid CheckedCastKind for SIL");
   }
+}
+
+static CastConsumptionKind getCastConsumptionKind(unsigned attr) {
+  switch (attr) {
+  case SIL_CAST_CONSUMPTION_TAKE_ALWAYS:
+    return CastConsumptionKind::TakeAlways;
+  case SIL_CAST_CONSUMPTION_TAKE_ON_SUCCESS:
+    return CastConsumptionKind::TakeOnSuccess;
+  case SIL_CAST_CONSUMPTION_COPY_ON_SUCCESS:
+    return CastConsumptionKind::CopyOnSuccess;
+  default:
+    llvm_unreachable("not a valid CastConsumptionKind for SIL");
+  }
+}
+
+/// Unpack a pair of enumerators, as would appear in a 
+static std::pair<CheckedCastKind,CastConsumptionKind>
+getCheckedCastAndConsumptionKinds(unsigned attr) {
+  return { getCheckedCastKind(attr & SIL_CHECKED_CAST_MASK),
+           getCastConsumptionKind(attr >> SIL_CAST_CONSUMPTION_BIT_OFFSET) };
 }
 
 /// Construct a SILDeclRef from ListOfValues.
@@ -992,12 +1021,17 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     break;
   }
   case ValueKind::UnconditionalCheckedCastAddrInst: {
-    SILValue Src = getLocalValue(ValID, ValResNum,
+    SILValue src = getLocalValue(ValID, ValResNum,
                  getSILType(MF->getType(TyID), (SILValueCategory)TyCategory));
-    SILValue Dest = getLocalValue(ValID2, ValResNum2,
+    SILValue dest = getLocalValue(ValID2, ValResNum2,
                  getSILType(MF->getType(TyID2), (SILValueCategory)TyCategory2));
-    CheckedCastKind Kind = getCheckedCastKind(Attr);
-    ResultVal = Builder.createUnconditionalCheckedCastAddr(Loc, Kind, Src, Dest);
+    CheckedCastKind castKind;
+    CastConsumptionKind consumption;
+    std::tie(castKind, consumption) =
+      getCheckedCastAndConsumptionKinds(Attr);
+    ResultVal = Builder.createUnconditionalCheckedCastAddr(Loc, castKind,
+                                                           consumption,
+                                                           src, dest);
     break;
   }
 
@@ -1421,7 +1455,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     // is the type of the second (dest) operand.
     assert(ListOfValues.size() == 9 &&
            "expect 9 numbers for CheckedCastBranchInst");
-    CheckedCastKind castKind = getCheckedCastKind(ListOfValues[0]);
+    CheckedCastKind castKind;
+    CastConsumptionKind consumption;
+    std::tie(castKind, consumption) =
+      getCheckedCastAndConsumptionKinds(ListOfValues[0]);
     SILType srcTy = getSILType(MF->getType(ListOfValues[3]),
                               (SILValueCategory)ListOfValues[4]);
     SILValue src = getLocalValue(ListOfValues[1], ListOfValues[2], srcTy);
@@ -1431,7 +1468,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     auto *successBB = getBBForReference(Fn, ListOfValues[7]);
     auto *failureBB = getBBForReference(Fn, ListOfValues[8]);
 
-    ResultVal = Builder.createCheckedCastAddrBranch(Loc, castKind, src, dest,
+    ResultVal = Builder.createCheckedCastAddrBranch(Loc, castKind, consumption,
+                                                    src, dest,
                                                     successBB, failureBB);
     break;
   }

@@ -1339,6 +1339,22 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       P.diagnose(loc, diag::expected_tok_in_sil_instr, "checked cast kind");
     return kind;
   };
+
+  auto parseCastConsumptionKind = [&](Identifier name, SourceLoc loc,
+                                      CastConsumptionKind &out) -> bool {
+    auto kind = llvm::StringSwitch<Optional<CastConsumptionKind>>(name.str())
+      .Case("take_always", CastConsumptionKind::TakeAlways)
+      .Case("take_on_success", CastConsumptionKind::TakeOnSuccess)
+      .Case("copy_on_success", CastConsumptionKind::CopyOnSuccess)
+      .Default(Nothing);
+
+    if (kind) {
+      out = kind.getValue();
+      return false;
+    }
+    P.diagnose(loc, diag::expected_tok_in_sil_instr, "cast consumption kind");
+    return true;
+  };
   
   // Validate the opcode name, and do opcode-specific parsing logic based on the
   // opcode we find.
@@ -1653,60 +1669,81 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   case ValueKind::CheckedCastBranchInst:
   case ValueKind::UnconditionalCheckedCastAddrInst:
   case ValueKind::CheckedCastAddrBranchInst: {
-    SILType Ty; // only for the non-addr instructions
-    SILValue DestVal; // only for the addr instructions
-    Identifier KindToken, ToToken;
-    SourceLoc KindLoc, ToLoc;
+    SILType ty; // only for the non-addr instructions
+    SILValue destVal; // only for the addr instructions
+    Identifier kindToken, consumptionKindToken, toToken;
+    SourceLoc kindLoc, consumptionKindLoc, toLoc;
     
-    if (parseSILIdentifier(KindToken, KindLoc,
-                           diag::expected_tok_in_sil_instr, "checked cast kind")
-        || parseTypedValueRef(Val)
-        || parseSILIdentifier(ToToken, ToLoc,
+    if (parseSILIdentifier(kindToken, kindLoc,
+                           diag::expected_tok_in_sil_instr, "checked cast kind"))
+      return true;
+
+    CastConsumptionKind consumptionKind;
+    if (Opcode == ValueKind::UnconditionalCheckedCastAddrInst ||
+        Opcode == ValueKind::CheckedCastAddrBranchInst) {
+      if (parseSILIdentifier(consumptionKindToken, consumptionKindLoc,
+                             diag::expected_tok_in_sil_instr,
+                             "cast consumption kind") ||
+          parseCastConsumptionKind(consumptionKindToken,
+                                   consumptionKindLoc,
+                                   consumptionKind))
+        return true;
+    }
+
+    if (parseTypedValueRef(Val)
+        || parseSILIdentifier(toToken, toLoc,
                               diag::expected_tok_in_sil_instr, "to"))
       return true;
 
+    if (toToken.str() != "to") {
+      P.diagnose(toLoc, diag::expected_tok_in_sil_instr, "to");
+      return true;
+    }
+
     if (Opcode == ValueKind::UnconditionalCheckedCastInst ||
         Opcode == ValueKind::CheckedCastBranchInst) {
-      if (parseSILType(Ty))
+      if (parseSILType(ty))
         return true;
     } else {
-      if (parseTypedValueRef(DestVal))
+      if (parseTypedValueRef(destVal))
         return true;
     }
     
-    CheckedCastKind CastKind = parseCastKind(KindToken, KindLoc);
-    if (CastKind == CheckedCastKind::Unresolved)
+    CheckedCastKind castKind = parseCastKind(kindToken, kindLoc);
+    if (castKind == CheckedCastKind::Unresolved)
       return true;
-    
+
     // An unconditional cast instruction is finished here.
     if (Opcode == ValueKind::UnconditionalCheckedCastInst) {
-      ResultVal = B.createUnconditionalCheckedCast(InstLoc, CastKind, Val, Ty);
+      ResultVal = B.createUnconditionalCheckedCast(InstLoc, castKind, Val, ty);
       break;
     } else if (Opcode == ValueKind::UnconditionalCheckedCastAddrInst) {
-      ResultVal = B.createUnconditionalCheckedCastAddr(InstLoc, CastKind,
-                                                       Val, DestVal);
+      ResultVal = B.createUnconditionalCheckedCastAddr(InstLoc, castKind,
+                                                       consumptionKind,
+                                                       Val, destVal);
       break;
     }
     
     // The conditional cast still needs its branch destinations.
-    Identifier SuccessBBName, FailureBBName;
-    SourceLoc SuccessBBLoc, FailureBBLoc;
+    Identifier successBBName, failureBBName;
+    SourceLoc successBBLoc, failureBBLoc;
     if (P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",")
-        || parseSILIdentifier(SuccessBBName, SuccessBBLoc,
+        || parseSILIdentifier(successBBName, successBBLoc,
                               diag::expected_sil_block_name)
         || P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",")
-        || parseSILIdentifier(FailureBBName, FailureBBLoc,
+        || parseSILIdentifier(failureBBName, failureBBLoc,
                               diag::expected_sil_block_name))
       return true;
 
     if (Opcode == ValueKind::CheckedCastAddrBranchInst) {
-      ResultVal = B.createCheckedCastAddrBranch(InstLoc, CastKind, Val, DestVal,
-                                getBBForReference(SuccessBBName, SuccessBBLoc),
-                                getBBForReference(FailureBBName, FailureBBLoc));
+      ResultVal = B.createCheckedCastAddrBranch(InstLoc, castKind,
+                                                consumptionKind, Val, destVal,
+                                getBBForReference(successBBName, successBBLoc),
+                                getBBForReference(failureBBName, failureBBLoc));
     } else {
-      ResultVal = B.createCheckedCastBranch(InstLoc, CastKind, Val, Ty,
-                                getBBForReference(SuccessBBName, SuccessBBLoc),
-                                getBBForReference(FailureBBName, FailureBBLoc));
+      ResultVal = B.createCheckedCastBranch(InstLoc, castKind, Val, ty,
+                                getBBForReference(successBBName, successBBLoc),
+                                getBBForReference(failureBBName, failureBBLoc));
     }
     break;
   }

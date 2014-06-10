@@ -45,6 +45,33 @@ enum SILLinkageEncoding : uint8_t {
 };
 using SILLinkageField = BCFixed<3>;
 
+enum CheckedCastKindEncoding : uint8_t {
+  SIL_CHECKED_CAST_ARCHETYPE_TO_ARCHETYPE,
+  SIL_CHECKED_CAST_ARCHETYPE_TO_CONCRETE,
+  SIL_CHECKED_CAST_ARRAY_DOWNCAST,
+  SIL_CHECKED_CAST_DOWNCAST,
+  SIL_CHECKED_CAST_EXISTENTIAL_TO_ARCHETYPE,
+  SIL_CHECKED_CAST_EXISTENTIAL_TO_CONCRETE,
+  SIL_CHECKED_CAST_SUPER_TO_ARCHETYPE,
+  SIL_CHECKED_CAST_CONCRETE_TO_ARCHETYPE,
+  SIL_CHECKED_CAST_CONCRETE_TO_UNRELATED_EXISTENTIAL,
+};
+
+enum CastConsumptionKindEncoding : uint8_t {
+  SIL_CAST_CONSUMPTION_TAKE_ALWAYS,
+  SIL_CAST_CONSUMPTION_TAKE_ON_SUCCESS,
+  SIL_CAST_CONSUMPTION_COPY_ON_SUCCESS,
+};
+
+// Constants for packing an encoded CheckedCastKind and
+// CastConsumptionKind together.
+enum {
+  // Must be large enough to store all the CheckedCastKindEncodings
+  SIL_CAST_CONSUMPTION_BIT_OFFSET = 4,
+  SIL_CHECKED_CAST_MASK =
+    (1 << SIL_CAST_CONSUMPTION_BIT_OFFSET) - 1
+};
+
 /// The record types within the "sil-index" block.
 ///
 /// \sa SIL_INDEX_BLOCK_ID

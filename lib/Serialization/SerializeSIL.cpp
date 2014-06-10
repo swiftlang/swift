@@ -50,6 +50,52 @@ static unsigned toStableSILLinkage(SILLinkage linkage) {
   llvm_unreachable("bad linkage");
 }
 
+static unsigned toStableCheckedCastKind(CheckedCastKind kind) {
+  switch (kind) {
+  case CheckedCastKind::ArchetypeToArchetype:
+    return SIL_CHECKED_CAST_ARCHETYPE_TO_ARCHETYPE;
+  case CheckedCastKind::ArchetypeToConcrete:
+    return SIL_CHECKED_CAST_ARCHETYPE_TO_CONCRETE;
+  case CheckedCastKind::ArrayDowncast:
+    return SIL_CHECKED_CAST_ARRAY_DOWNCAST;
+  case CheckedCastKind::Downcast:
+    return SIL_CHECKED_CAST_DOWNCAST;
+  case CheckedCastKind::ExistentialToArchetype:
+    return SIL_CHECKED_CAST_EXISTENTIAL_TO_ARCHETYPE;
+  case CheckedCastKind::ExistentialToConcrete:
+    return SIL_CHECKED_CAST_EXISTENTIAL_TO_CONCRETE;
+  case CheckedCastKind::SuperToArchetype:
+    return SIL_CHECKED_CAST_SUPER_TO_ARCHETYPE;
+  case CheckedCastKind::ConcreteToArchetype:
+    return SIL_CHECKED_CAST_CONCRETE_TO_ARCHETYPE;
+  case CheckedCastKind::ConcreteToUnrelatedExistential:
+    return SIL_CHECKED_CAST_CONCRETE_TO_UNRELATED_EXISTENTIAL;
+  case CheckedCastKind::Unresolved:
+  case CheckedCastKind::Coercion:
+    llvm_unreachable("serializing unexpected cast kind");
+  }
+  llvm_unreachable("bad checked cast kind");
+}
+
+static unsigned toStableCastConsumptionKind(CastConsumptionKind kind) {
+  switch (kind) {
+  case CastConsumptionKind::TakeAlways:
+    return SIL_CAST_CONSUMPTION_TAKE_ALWAYS;
+  case CastConsumptionKind::TakeOnSuccess:
+    return SIL_CAST_CONSUMPTION_TAKE_ON_SUCCESS;
+  case CastConsumptionKind::CopyOnSuccess:
+    return SIL_CAST_CONSUMPTION_COPY_ON_SUCCESS;
+  }
+  llvm_unreachable("bad cast consumption kind");
+}
+
+template <class I>
+static unsigned packCheckedCastKinds(I *castInst) {
+  return toStableCheckedCastKind(castInst->getCastKind())
+      | (toStableCastConsumptionKind(castInst->getConsumptionKind())
+           << SIL_CAST_CONSUMPTION_BIT_OFFSET);
+}
+
 namespace {
     /// Used to serialize the on-disk func hash table.
   class FuncTableInfo {
@@ -858,7 +904,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     auto CI = cast<UnconditionalCheckedCastInst>(&SI);
     SILInstCastLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILInstCastLayout::Code],
-        (unsigned)SI.getKind(), (unsigned)CI->getCastKind(),
+        (unsigned)SI.getKind(),
+        toStableCheckedCastKind(CI->getCastKind()),
         S.addTypeRef(CI->getType().getSwiftRValueType()),
         (unsigned)CI->getType().getCategory(),
         S.addTypeRef(CI->getOperand().getType().getSwiftRValueType()),
@@ -870,7 +917,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     auto CI = cast<UnconditionalCheckedCastAddrInst>(&SI);
     SILTwoOperandsLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILTwoOperandsLayout::Code],
-        (unsigned)SI.getKind(), (unsigned) CI->getCastKind(),
+        (unsigned)SI.getKind(), packCheckedCastKinds(CI),
         S.addTypeRef(CI->getSrc().getType().getSwiftRValueType()),
         (unsigned)CI->getSrc().getType().getCategory(),
         addValueRef(CI->getSrc()), CI->getSrc().getResultNumber(),
@@ -1154,7 +1201,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     // a BasicBlock ID for failure. Uses SILOneTypeValuesLayout.
     const CheckedCastBranchInst *CBI = cast<CheckedCastBranchInst>(&SI);
     SmallVector<ValueID, 8> ListOfValues;
-    ListOfValues.push_back((unsigned)CBI->getCastKind());
+    ListOfValues.push_back(toStableCheckedCastKind(CBI->getCastKind()));
     ListOfValues.push_back(addValueRef(CBI->getOperand()));
     ListOfValues.push_back(CBI->getOperand().getResultNumber());
     ListOfValues.push_back(
@@ -1176,7 +1223,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     // the type is the type of the second (dest) operand.
     auto CBI = cast<CheckedCastAddrBranchInst>(&SI);
     SmallVector<ValueID, 9> ListOfValues;
-    ListOfValues.push_back((unsigned)CBI->getCastKind());
+    ListOfValues.push_back(packCheckedCastKinds(CBI));
     ListOfValues.push_back(addValueRef(CBI->getSrc()));
     ListOfValues.push_back(CBI->getSrc().getResultNumber());
     ListOfValues.push_back(

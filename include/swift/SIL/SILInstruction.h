@@ -49,6 +49,22 @@ class VarDecl;
 enum IsTake_t { IsNotTake, IsTake };
 enum IsInitialization_t { IsNotInitialization, IsInitialization };
 
+/// The behavior of a dynamic cast operation on the source value.
+enum class CastConsumptionKind {
+  /// The source value is always taken, regardless of whether the cast
+  /// succeeds.  That is, if the cast fails, the source value is
+  /// destroyed.
+  TakeAlways,
+
+  /// The source value is taken only on a successful cast; otherwise,
+  /// it is left in place.
+  TakeOnSuccess,
+
+  /// The source value is always left in place, and the destination
+  /// value is copied into on success.
+  CopyOnSuccess,
+};
+
 /// This is the root class for all instructions that can be used as the contents
 /// of a Swift SILBasicBlock.
 class SILInstruction : public ValueBase,public llvm::ilist_node<SILInstruction>{
@@ -1352,13 +1368,16 @@ class UnconditionalCheckedCastAddrInst : public SILInstruction
   };
   FixedOperandList<2> Operands;
   CheckedCastKind CastKind;
+  CastConsumptionKind ConsumptionKind;
 public:
   UnconditionalCheckedCastAddrInst(SILLocation loc,
                                    CheckedCastKind kind,
+                                   CastConsumptionKind consumption,
                                    SILValue src,
                                    SILValue dest);
 
   CheckedCastKind getCastKind() const { return CastKind; }
+  CastConsumptionKind getConsumptionKind() const { return ConsumptionKind; }
 
   SILValue getSrc() const { return Operands[Src].get(); }
   SILValue getDest() const { return Operands[Dest].get(); }
@@ -1368,7 +1387,7 @@ public:
 
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::UnconditionalCheckedCastAddrInst;
-  }  
+  }
 };
 
 /// StructInst - Represents a constructed loadable struct.
@@ -2860,6 +2879,7 @@ public:
 /// The result of the checked cast is left in the destination address.
 class CheckedCastAddrBranchInst : public TermInst {
   CheckedCastKind CastKind;
+  CastConsumptionKind ConsumptionKind;
 
   enum {
     /// the value being stored
@@ -2873,12 +2893,14 @@ class CheckedCastAddrBranchInst : public TermInst {
 public:
   CheckedCastAddrBranchInst(SILLocation loc,
                             CheckedCastKind castKind,
+                            CastConsumptionKind consumptionKind,
                             SILValue src,
                             SILValue dest,
                             SILBasicBlock *successBB,
                             SILBasicBlock *failureBB)
     : TermInst(ValueKind::CheckedCastAddrBranchInst, loc),
-      CastKind(castKind), Operands{this, src, dest},
+      CastKind(castKind), ConsumptionKind(consumptionKind),
+      Operands{this, src, dest},
       DestBBs{{this, successBB}, {this, failureBB}}
   {
     assert(CastKind >= CheckedCastKind::First_Resolved
@@ -2886,6 +2908,7 @@ public:
   }
 
   CheckedCastKind getCastKind() const { return CastKind; }
+  CastConsumptionKind getConsumptionKind() const { return ConsumptionKind; }
 
   SILValue getSrc() const { return Operands[Src].get(); }
   SILValue getDest() const { return Operands[Dest].get(); }

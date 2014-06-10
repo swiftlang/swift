@@ -599,6 +599,7 @@ SILCloner<ImplClass>::visitUnconditionalCheckedCastAddrInst(
   doPostProcess(Inst,
          getBuilder().createUnconditionalCheckedCastAddr(OpLoc,
                                                          Inst->getCastKind(),
+                                                    Inst->getConsumptionKind(),
                                                          SrcValue,
                                                          DestValue));
 }
@@ -1125,6 +1126,7 @@ void SILCloner<ImplClass>::visitCheckedCastAddrBranchInst(
   doPostProcess(Inst,
        getBuilder().createCheckedCastAddrBranch(getOpLocation(Inst->getLoc()),
                                                 Inst->getCastKind(),
+                                                Inst->getConsumptionKind(),
                                                 SrcValue, DestValue,
                                                 OpSuccBB, OpFailBB));
 }

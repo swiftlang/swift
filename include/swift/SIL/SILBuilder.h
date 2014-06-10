@@ -414,9 +414,11 @@ public:
 
   UnconditionalCheckedCastAddrInst *
   createUnconditionalCheckedCastAddr(SILLocation loc, CheckedCastKind kind,
+                                     CastConsumptionKind consumption,
                                      SILValue src, SILValue dest) {
     return insert(new (F.getModule())
-                    UnconditionalCheckedCastAddrInst(loc, kind, src, dest));
+                    UnconditionalCheckedCastAddrInst(loc, kind, consumption,
+                                                     src, dest));
   }
   
   RetainValueInst *createRetainValue(SILLocation loc, SILValue operand) {
@@ -889,12 +891,14 @@ public:
 
   CheckedCastAddrBranchInst *createCheckedCastAddrBranch(SILLocation loc,
                                                          CheckedCastKind kind,
+                                              CastConsumptionKind consumption,
                                                          SILValue src,
                                                          SILValue dest,
                                                  SILBasicBlock *successBB,
                                                  SILBasicBlock *failureBB) {
     return insertTerminator(new (F.getModule())
-                              CheckedCastAddrBranchInst(loc, kind, src, dest,
+                              CheckedCastAddrBranchInst(loc, kind, consumption,
+                                                        src, dest,
                                                         successBB, failureBB));
   }
 
