@@ -48,7 +48,7 @@ runFunctionPasses(llvm::ArrayRef<SILFunctionTransform*> FuncTransforms) {
       if (CompleteFuncs->hasChanged()) {
         if (Options.PrintAll) {
           llvm::dbgs() << "*** SIL function after " << SFT->getName()
-                       << " (" << NumOptzIterations << ") ***\n";
+                       << " (" << NumOptimizationIterations << ") ***\n";
           F.dump();
         }
         if (Options.VerifyAll) {
