@@ -32,26 +32,27 @@ STATISTIC(NumCMSpecialized, "Number of ClassMethodInst specialized");
 
 namespace {
 
-/// TypeSubCloner - a utility class for cloning and remapping types.
+/// TypeSubCloner - a utility class for cloning code while remapping types.
 class TypeSubCloner : public SILCloner<TypeSubCloner> {
   friend class SILVisitor<TypeSubCloner>;
   friend class SILCloner<TypeSubCloner>;
 
 public:
-  TypeSubCloner(SILFunction *F,
+  TypeSubCloner(SILFunction &To,
+                SILFunction &From,
                 TypeSubstitutionMap &InterfaceSubs,
                 TypeSubstitutionMap &ContextSubs,
                 StringRef NewName,
                 ApplyInst *Caller)
-    : SILCloner(*initCloned(F, InterfaceSubs, NewName)),
-      SwiftMod(F->getModule().getSwiftModule()),
+    : SILCloner(To),
+      SwiftMod(From.getModule().getSwiftModule()),
       SubsMap(ContextSubs),
-      Original(F),
+      Original(From),
       TheApply(Caller) { }
 
 protected:
   SILType remapType(SILType Ty) {
-    return SILType::substType(Original->getModule(), SwiftMod, SubsMap, Ty);
+    return SILType::substType(Original.getModule(), SwiftMod, SubsMap, Ty);
   }
 
   ProtocolConformance *remapConformance(SILType Ty, ProtocolConformance *C) {
@@ -104,7 +105,7 @@ protected:
    SmallVector<Substitution, 16> TempSubstList;
    for (auto &Sub : Inst->getSubstitutions())
      TempSubstList.push_back(Sub.subst(Inst->getModule().getSwiftModule(),
-                                       Original->getContextGenericParams(),
+                                       Original.getContextGenericParams(),
                                        TheApply->getSubstitutions()));
 
    ApplyInst *N = Builder.createApply(
@@ -137,7 +138,7 @@ protected:
    SmallVector<Substitution, 16> TempSubstList;
    for (auto &Sub : Inst->getSubstitutions())
      TempSubstList.push_back(Sub.subst(Inst->getModule().getSwiftModule(),
-                                       Original->getContextGenericParams(),
+                                       Original.getContextGenericParams(),
                                        TheApply->getSubstitutions()));
 
    PartialApplyInst *N = Builder.createPartialApply(
@@ -157,7 +158,7 @@ protected:
     // we handle type aliases correctly.
     auto sub =
       Inst->getSelfSubstitution().subst(Inst->getModule().getSwiftModule(),
-                                        Original->getContextGenericParams(),
+                                        Original.getContextGenericParams(),
                                         TheApply->getSubstitutions());
 
     assert(sub.Conformance.size() == 1 &&
@@ -498,42 +499,12 @@ protected:
     }
   }
 
-  /// Create a new empty function with the correct arguments and a unique name.
-  static SILFunction *initCloned(SILFunction *Orig,
-                                 TypeSubstitutionMap &InterfaceSubs,
-                                 StringRef NewName) {
-    SILModule &M = Orig->getModule();
-    Module *SM = M.getSwiftModule();
-
-    CanSILFunctionType FTy =
-        SILType::substFuncType(M, SM, InterfaceSubs,
-                               Orig->getLoweredFunctionType(),
-                               /*dropGenerics = */ true);
-
-    assert((Orig->isTransparent() || Orig->isBare() || Orig->getLocation())
-           && "SILFunction missing location");
-    assert((Orig->isTransparent() || Orig->isBare() || Orig->getDebugScope())
-           && "SILFunction missing DebugScope");
-    assert(!Orig->isGlobalInit() && "Global initializer cannot be cloned");
-
-    // Create a new empty function.
-    SILFunction *NewF =
-        SILFunction::create(M, getSpecializedLinkage(Orig->getLinkage()),
-                            NewName, FTy, nullptr,
-                            Orig->getLocation(), Orig->isBare(),
-                            Orig->isTransparent(), 0,
-                            Orig->getDebugScope(), Orig->getDeclContext());
-
-    NumSpecialized++;
-    return NewF;
-  }
-
   /// The Swift module that the cloned function belongs to.
   Module *SwiftMod;
   /// The substitutions list for the specialization.
   TypeSubstitutionMap &SubsMap;
   /// The original function to specialize.
-  SILFunction *Original;
+  SILFunction &Original;
   /// The ApplyInst that is the caller to the cloned function.
   ApplyInst *TheApply;
 };
@@ -562,12 +533,12 @@ namespace {
 class SpecializingCloner : public TypeSubCloner {
 public:
   SpecializingCloner(SILFunction *F,
-                TypeSubstitutionMap &InterfaceSubs,
-                TypeSubstitutionMap &ContextSubs,
-                StringRef NewName,
-                ApplyInst *Caller)
-    : TypeSubCloner(F, InterfaceSubs, ContextSubs, NewName, Caller) {}
-
+                     TypeSubstitutionMap &InterfaceSubs,
+                     TypeSubstitutionMap &ContextSubs,
+                     StringRef NewName,
+                     ApplyInst *Caller)
+    : TypeSubCloner(*initCloned(F, InterfaceSubs, NewName), *F, InterfaceSubs,
+                    ContextSubs, NewName, Caller) {}
   /// Clone and remap the types in \p F according to the substitution
   /// list in \p Subs.
   static SILFunction *cloneFunction(SILFunction *F,
@@ -581,18 +552,51 @@ public:
   }
 
 private:
+  static SILFunction *initCloned(SILFunction *Orig,
+                                 TypeSubstitutionMap &InterfaceSubs,
+                                 StringRef NewName);
   /// Clone the body of the function into the empty function that was created
   /// by initCloned.
   void populateCloned();
   SILFunction *getCloned() { return &getBuilder().getFunction(); }
 };
 
+/// Create a new empty function with the correct arguments and a unique name.
+SILFunction *SpecializingCloner::initCloned(SILFunction *Orig,
+                                            TypeSubstitutionMap &InterfaceSubs,
+                                            StringRef NewName) {
+  SILModule &M = Orig->getModule();
+  Module *SM = M.getSwiftModule();
+
+  CanSILFunctionType FTy =
+    SILType::substFuncType(M, SM, InterfaceSubs,
+                           Orig->getLoweredFunctionType(),
+                           /*dropGenerics = */ true);
+
+  assert((Orig->isTransparent() || Orig->isBare() || Orig->getLocation())
+         && "SILFunction missing location");
+  assert((Orig->isTransparent() || Orig->isBare() || Orig->getDebugScope())
+         && "SILFunction missing DebugScope");
+  assert(!Orig->isGlobalInit() && "Global initializer cannot be cloned");
+
+  // Create a new empty function.
+  SILFunction *NewF =
+    SILFunction::create(M, getSpecializedLinkage(Orig->getLinkage()),
+                        NewName, FTy, nullptr,
+                        Orig->getLocation(), Orig->isBare(),
+                        Orig->isTransparent(), 0,
+                        Orig->getDebugScope(), Orig->getDeclContext());
+
+  NumSpecialized++;
+  return NewF;
+}
+
 void SpecializingCloner::populateCloned() {
   SILFunction *Cloned = getCloned();
   SILModule &M = Cloned->getModule();
 
   // Create arguments for the entry block.
-  SILBasicBlock *OrigEntryBB = Original->begin();
+  SILBasicBlock *OrigEntryBB = Original.begin();
   SILBasicBlock *ClonedEntryBB = new (M) SILBasicBlock(Cloned);
 
   // Create the entry basic block with the function arguments.
