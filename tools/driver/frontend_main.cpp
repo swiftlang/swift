@@ -85,7 +85,8 @@ static bool writeSIL(SILModule &SM, Module *M, bool EmitVerboseSIL,
   return false;
 }
 
-static bool printAsObjC(const std::string &path, Module *M) {
+static bool printAsObjC(const std::string &path, Module *M,
+                        StringRef bridgingHeader) {
   std::string errorInfo;
   llvm::raw_fd_ostream out(path.c_str(), errorInfo, llvm::sys::fs::F_None);
 
@@ -96,7 +97,7 @@ static bool printAsObjC(const std::string &path, Module *M) {
     return true;
   }
 
-  return printAsObjC(out, M);
+  return printAsObjC(out, M, bridgingHeader);
 }
 
 /// Performs the compile requested by the user.
@@ -163,7 +164,8 @@ static bool performCompile(CompilerInstance &Instance,
   // We've just been told to perform a parse, so we can return now.
   if (Action == FrontendOptions::Parse) {
     if (!opts.ObjCHeaderOutputPath.empty())
-      return printAsObjC(opts.ObjCHeaderOutputPath, Instance.getMainModule());
+      return printAsObjC(opts.ObjCHeaderOutputPath, Instance.getMainModule(),
+                         opts.ImplicitObjCHeaderPath);
     return false;
   }
 
@@ -206,8 +208,10 @@ static bool performCompile(CompilerInstance &Instance,
     SM->verify();
   }
 
-  if (!opts.ObjCHeaderOutputPath.empty())
-    (void)printAsObjC(opts.ObjCHeaderOutputPath, Instance.getMainModule());
+  if (!opts.ObjCHeaderOutputPath.empty()) {
+    (void)printAsObjC(opts.ObjCHeaderOutputPath, Instance.getMainModule(),
+                      opts.ImplicitObjCHeaderPath);
+  }
 
   if (!opts.ModuleOutputPath.empty() || !opts.ModuleDocOutputPath.empty()) {
     auto DC = PrimarySourceFile ? ModuleOrSourceFile(PrimarySourceFile) :

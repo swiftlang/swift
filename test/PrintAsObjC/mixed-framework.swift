@@ -14,6 +14,8 @@
 
 // FRAMEWORK-LABEL: #import <Mixed/Mixed.h>
 // HEADER-NOT: __ObjC
+// HEADER: #import "{{.*}}Mixed.h"
+// HEADER-NOT: __ObjC
 
 import Foundation
 

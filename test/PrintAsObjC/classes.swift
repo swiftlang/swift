@@ -134,6 +134,8 @@ class NotObjC {}
 
 typealias AliasForNSRect = NSRect
 
+// CHECK-LABEL: @class NSURL;
+// NEGATIVE-NOT: @class CFTree
 // CHECK-LABEL: @interface MethodsWithImports
 // CHECK-NEXT: - (NSPoint)getOrigin:(NSRect)r;
 // CHECK-NEXT: - (CGFloat)getOriginX:(NSRect)r;
@@ -144,6 +146,7 @@ typealias AliasForNSRect = NSRect
 // CHECK-NEXT: - (NSZone *)zone;
 // CHECK-NEXT: - (CFTypeRef)cf:(CFTreeRef)x str:(CFStringRef)str str2:(CFMutableStringRef)str2;
 // CHECK-NEXT: - (void)appKitInImplementation;
+// CHECK-NEXT: - (NSURL *)returnsURL;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class MethodsWithImports {
@@ -163,6 +166,8 @@ typealias AliasForNSRect = NSRect
   func appKitInImplementation() {
     let _ : NSResponder? = nil
   }
+
+  func returnsURL() -> NSURL? { return nil }
 }
 
 // CHECK-LABEL: @interface MethodsWithPointers
@@ -185,7 +190,6 @@ typealias AliasForNSRect = NSRect
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 // NEGATIVE-NOT: @interface NSObject
-// NEGATIVE-NOT: @class NSObject
 class MyObject : NSObject {}
 
 // CHECK-LABEL: @protocol MyProtocol <NSObject>

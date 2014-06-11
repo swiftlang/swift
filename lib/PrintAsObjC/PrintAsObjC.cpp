@@ -717,9 +717,11 @@ class ModuleWriter {
   llvm::raw_string_ostream os{bodyBuffer};
 
   Module &M;
+  StringRef bridgingHeader;
   ObjCPrinter printer;
 public:
-  ModuleWriter(Module &mod) : M(mod), printer(M.Ctx, os) {}
+  ModuleWriter(Module &mod, StringRef header)
+    : M(mod), bridgingHeader(header), printer(M.Ctx, os) {}
 
   /// Returns true if we added the decl's module to the import set, false if
   /// the decl is a local decl.
@@ -737,8 +739,10 @@ public:
   }
 
   bool require(const TypeDecl *D) {
-    if (addImport(D))
+    if (addImport(D)) {
+      seenTypes[D] = { EmissionState::Defined, true };
       return true;
+    }
 
     auto &state = seenTypes[D];
     switch (state.first) {
@@ -753,7 +757,7 @@ public:
   }
 
   void forwardDeclare(const NominalTypeDecl *NTD, StringRef introducer) {
-    if (addImport(NTD))
+    if (NTD->getModuleContext()->isStdlibModule())
       return;
     auto &state = seenTypes[NTD];
     if (state.second)
@@ -763,7 +767,7 @@ public:
   }
 
   void forwardDeclare(const ClassDecl *CD) {
-    if (!CD->isObjC())
+    if (!CD->isObjC() || CD->isForeign())
       return;
     forwardDeclare(CD, "@class");
   }
@@ -782,12 +786,12 @@ public:
       ReferencedTypeFinder::walk(VD->getType(),
                                  [this](ReferencedTypeFinder &finder,
                                         const TypeDecl *TD) {
-        if (addImport(TD))
-          return;
         if (auto CD = dyn_cast<ClassDecl>(TD))
           forwardDeclare(CD);
         else if (auto PD = dyn_cast<ProtocolDecl>(TD))
           forwardDeclare(PD);
+        else if (addImport(TD))
+          return;
         else if (auto TAD = dyn_cast<TypeAliasDecl>(TD))
           finder.visit(TAD->getUnderlyingType());
         else if (isa<AbstractTypeParamDecl>(TD))
@@ -803,8 +807,7 @@ public:
     if (addImport(CD))
       return true;
 
-    auto &state = seenTypes[CD];
-    if (state.first == EmissionState::Defined)
+    if (seenTypes[CD].first == EmissionState::Defined)
       return true;
 
     bool allRequirementsSatisfied = true;
@@ -821,7 +824,7 @@ public:
     if (!allRequirementsSatisfied)
       return false;
 
-    state = { EmissionState::Defined, true };
+    seenTypes[CD] = { EmissionState::Defined, true };
     forwardDeclareMemberTypes(CD->getMembers());
     printer.print(CD);
     return true;
@@ -835,8 +838,7 @@ public:
     if (knownProtocol && *knownProtocol == KnownProtocolKind::AnyObject)
       return true;
 
-    auto &state = seenTypes[PD];
-    if (state.first == EmissionState::Defined)
+    if (seenTypes[PD].first == EmissionState::Defined)
       return true;
 
     bool allRequirementsSatisfied = true;
@@ -849,7 +851,7 @@ public:
     if (!allRequirementsSatisfied)
       return false;
 
-    state = { EmissionState::Defined, true };
+    seenTypes[PD] = { EmissionState::Defined, true };
     forwardDeclareMemberTypes(PD->getMembers());
     printer.print(PD);
     return true;
@@ -938,7 +940,10 @@ public:
            "\n";
   }
 
-  static bool isClangHeaderModule(Module *import) {
+  bool isUnderlyingModule(Module *import) {
+    if (bridgingHeader.empty())
+      return import != &M && import->Name == M.Name;
+
     auto importer =
       static_cast<ClangImporter *>(import->Ctx.getClangModuleLoader());
     return import == importer->getImportedHeaderModule();
@@ -948,16 +953,11 @@ public:
     out << "#if defined(__has_feature) && __has_feature(modules)\n";
 
     llvm::DenseSet<Identifier> seenImports;
-    bool includeUmbrella = false;
+    bool includeUnderlying = false;
     for (auto import : imports) {
       auto Name = import->Name;
-      if (Name == M.Name) {
-        includeUmbrella = true;
-        continue;
-      }
-      if (isClangHeaderModule(import)) {
-        // FIXME: Should we at least emit the header provided on the command
-        // line with -import-objc-header?
+      if (isUnderlyingModule(import)) {
+        includeUnderlying = true;
         continue;
       }
       if (seenImports.insert(Name).second)
@@ -966,8 +966,12 @@ public:
 
     out << "#endif\n\n";
 
-    if (includeUmbrella)
-      out << "#import <" << M.Name.str() << '/' << M.Name.str() << ".h>\n\n";
+    if (includeUnderlying) {
+      if (bridgingHeader.empty())
+        out << "#import <" << M.Name.str() << '/' << M.Name.str() << ".h>\n\n";
+      else
+        out << "#import \"" << bridgingHeader << "\"\n\n";
+    }
   }
 
   bool writeToStream(raw_ostream &out) {
@@ -1093,6 +1097,7 @@ public:
 };
 }
 
-bool swift::printAsObjC(llvm::raw_ostream &os, Module *M) {
-  return ModuleWriter(*M).writeToStream(os);
+bool swift::printAsObjC(llvm::raw_ostream &os, Module *M,
+                        StringRef bridgingHeader) {
+  return ModuleWriter(*M, bridgingHeader).writeToStream(os);
 }

@@ -9,6 +9,9 @@
 // RUN: %check-in-clang %t/extensions.h
 
 import Foundation
+import AppKit
+
+// CHECK-NOT: AppKit
 
 // CHECK: @interface A1{{$}}
 // CHECK-NEXT: init
@@ -37,11 +40,16 @@ extension NotObjC {}
 // NEGATIVE-NOT: @class NSObject
 extension NSObject {}
 
+// NEGATIVE-NOT: @class NSString;
+// CHECK: @class NSColor;
 // CHECK: @interface NSString ()
 // CHECK-NEXT: - (void)test;
 // CHECK-NEXT: + (void)test2;
+// CHECK-NEXT: + (NSString *)fromColor:(NSColor *)color;
 // CHECK-NEXT: @end
 extension NSString {
   func test() {}
   class func test2() {}
+
+  class func fromColor(color: NSColor) -> NSString? { return nil; }
 }

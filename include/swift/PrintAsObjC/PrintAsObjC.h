@@ -13,9 +13,7 @@
 #ifndef SWIFT_PRINTASOBJC_H
 #define SWIFT_PRINTASOBJC_H
 
-namespace llvm {
-  class raw_ostream;
-};
+#include "swift/Basic/LLVM.h"
 
 namespace swift {
   class Module;
@@ -24,7 +22,7 @@ namespace swift {
   /// header.
   ///
   /// Returns true on error.
-  bool printAsObjC(llvm::raw_ostream &out, Module *M);
+  bool printAsObjC(raw_ostream &out, Module *M, StringRef bridgingHeader);
 }
 
 #endif
