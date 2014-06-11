@@ -1264,30 +1264,25 @@ SourceFile::getCachedVisibleDecls() const {
 }
 
 static void performAutoImport(SourceFile &SF,
-                              SourceFile::ImplicitModuleImportKind ModImpKind) {
+                              SourceFile::ImplicitModuleImportKind modImpKind) {
   if (SF.Kind == SourceFileKind::SIL)
-    return;
+    assert(modImpKind == SourceFile::ImplicitModuleImportKind::None);
 
   ASTContext &Ctx = SF.getASTContext();
   Module *M = nullptr;
 
-  switch (ModImpKind) {
+  switch (modImpKind) {
   case SourceFile::ImplicitModuleImportKind::None:
     return;
-
   case SourceFile::ImplicitModuleImportKind::Builtin:
+    M = Ctx.TheBuiltinModule;
+    break;
   case SourceFile::ImplicitModuleImportKind::Stdlib:
-    // If we're building the standard library, import the magic Builtin module,
-    // otherwise, import the standard library.
-    if (ModImpKind == SourceFile::ImplicitModuleImportKind::Builtin)
-      M = Ctx.TheBuiltinModule;
-    else
-      M = Ctx.getModule({ {Ctx.StdlibModuleName, SourceLoc()} });
+    M = Ctx.getStdlibModule();
     break;
   }
 
-  if (!M)
-    return;
+  assert(M && "unable to auto-import module");
 
   // FIXME: These will be the same for most source files, but we copy them
   // over and over again.

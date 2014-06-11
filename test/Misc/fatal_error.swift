@@ -1,8 +1,12 @@
-// RUN: not %swift -parse %s -sdk "" 2>&1 | FileCheck %s
+// RUN: not %swift -parse %s -sdk "" 2>&1 | FileCheck -check-prefix=CHECK -check-prefix=NO-MODULE %s
+// RUN: not %swift -parse %s -resource-dir / 2>&1 | FileCheck -check-prefix=CHECK -check-prefix=NO-STDLIB %s
 
-// CHECK: error: no such module 'NonExistent'
-// CHECK: note: did you forget to set an SDK using -sdk or SDKROOT?
-// CHECK-NEXT: use "{{.+}}" to select the default OS X SDK installed with Xcode
+// NO-MODULE: error: no such module 'NonExistent'
+// NO-MODULE: note: did you forget to set an SDK using -sdk or SDKROOT?
+// NO-MODULE-NEXT: use "{{.+}}" to select the default OS X SDK installed with Xcode
+
+// NO-STDLIB: error: unable to load standard library for target '{{.+-.+}}'
+
 // CHECK-NOT: error
 // CHECK-NOT: warning
 // CHECK-NOT: note

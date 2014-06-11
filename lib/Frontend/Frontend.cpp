@@ -237,10 +237,31 @@ void CompilerInstance::performSema() {
   MainModule = Module::create(ID, *Context);
   Context->LoadedModules[ID.str()] = MainModule;
 
+  auto modImpKind = SourceFile::ImplicitModuleImportKind::Stdlib;
+
   if (Kind == SourceFileKind::SIL) {
     assert(BufferIDs.size() == 1);
     assert(MainBufferID != NO_SUCH_BUFFER);
     createSILModule();
+    modImpKind = SourceFile::ImplicitModuleImportKind::None;
+  } else if (Invocation.getParseStdlib()) {
+    modImpKind = SourceFile::ImplicitModuleImportKind::Builtin;
+  }
+
+  switch (modImpKind) {
+  case SourceFile::ImplicitModuleImportKind::None:
+  case SourceFile::ImplicitModuleImportKind::Builtin:
+    break;
+  case SourceFile::ImplicitModuleImportKind::Stdlib:
+    auto *theStdlib = Context->getModule({
+      std::make_pair(Context->StdlibModuleName, SourceLoc())
+    });
+    if (!theStdlib) {
+      Diagnostics.diagnose(SourceLoc(), diag::error_stdlib_not_found,
+                           Invocation.getTargetTriple());
+      return;
+    }
+    break;
   }
 
   auto clangImporter =
@@ -284,13 +305,9 @@ void CompilerInstance::performSema() {
     SF->setImports(Context->AllocateCopy(initialImportsBuf));
   };
 
-  SourceFile::ImplicitModuleImportKind ModImpKind =
-    Invocation.getParseStdlib() ? SourceFile::ImplicitModuleImportKind::Builtin
-                                : SourceFile::ImplicitModuleImportKind::Stdlib;
-
   if (Kind == SourceFileKind::REPL) {
     auto *SingleInputFile =
-      new (*Context) SourceFile(*MainModule, Kind, {}, ModImpKind);
+      new (*Context) SourceFile(*MainModule, Kind, {}, modImpKind);
     MainModule->addFile(*SingleInputFile);
     addAdditionalInitialImports(SingleInputFile);
     return;
@@ -317,7 +334,7 @@ void CompilerInstance::performSema() {
       SourceMgr.setHashbangBufferID(MainBufferID);
 
     auto *MainFile = new (*Context) SourceFile(*MainModule, Kind, MainBufferID,
-                                               ModImpKind);
+                                               modImpKind);
     MainModule->addFile(*MainFile);
     addAdditionalInitialImports(MainFile);
 
@@ -343,7 +360,7 @@ void CompilerInstance::performSema() {
     auto *NextInput = new (*Context) SourceFile(*MainModule,
                                                 SourceFileKind::Library,
                                                 BufferID,
-                                                ModImpKind);
+                                                modImpKind);
     MainModule->addFile(*NextInput);
     addAdditionalInitialImports(NextInput);
 

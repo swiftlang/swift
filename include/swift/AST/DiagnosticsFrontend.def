@@ -87,6 +87,8 @@ ERROR(error_stdlib_module_name,frontend,none,
       "%select{|; use -module-name flag to specify an alternate name}1",
       (StringRef, bool))
 
+ERROR(error_stdlib_not_found,frontend,Fatal,
+      "unable to load standard library for target '%0'", (StringRef))
 ERROR(error_underlying_module_not_found,frontend,none,
       "underlying Objective-C module %0 not found", (Identifier))
 

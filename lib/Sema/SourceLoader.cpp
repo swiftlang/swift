@@ -97,9 +97,12 @@ Module *SourceLoader::loadModule(SourceLoc importLoc,
   auto *importMod = Module::create(moduleID.first, Ctx);
   Ctx.LoadedModules[moduleID.first.str()] = importMod;
 
+  auto implicitImportKind = SourceFile::ImplicitModuleImportKind::Stdlib;
+  if (!Ctx.getStdlibModule())
+    implicitImportKind = SourceFile::ImplicitModuleImportKind::None;
+
   auto *importFile = new (Ctx) SourceFile(*importMod, SourceFileKind::Library,
-                                          bufferID,
-                                  SourceFile::ImplicitModuleImportKind::Stdlib);
+                                          bufferID, implicitImportKind);
   importMod->addFile(*importFile);
 
   bool done;
