@@ -1,0 +1,166 @@
+%# -*- mode: swift -*-
+
+%# Ignore the following admonition; it applies to the resulting .swift file only
+//// Automatically Generated From tgmath.swift.gyb.  Do Not Edit Directly
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+%{
+
+# Don't need 64-bit (Double/CDouble) overlays. The ordinary C imports work fine.
+# FIXME: need 80-bit (Float80/long double) versions when long double is imported
+overlayFloatBits = [32] # 80
+allFloatBits = [32, 64] # 80
+
+def floatName(bits):
+    if bits == 32:
+        return 'Float'
+    if bits == 64:
+        return 'Double'
+    if bits == 80:
+        return 'Float80'
+
+def cFloatName(bits):
+    if bits == 32:
+        return 'CFloat'
+    if bits == 64:
+        return 'CDouble'
+    if bits == 80:
+        return 'CLongDouble'
+
+def cFuncSuffix(bits):
+    if bits == 32:
+        return 'f'
+    if bits == 64:
+        return ''
+    if bits == 80:
+        return 'l'
+
+# Each of the following lists is ordered to match tgmath.h.
+
+UnaryFunctions = ['acos', 'asin', 'atan', 'acosh', 'asinh', 'atanh',
+                  'cos', 'sin', 'tan', 'cosh', 'sinh', 'tanh', 
+                  'exp', 'log', 'sqrt', 'fabs', 'cbrt', 'ceil', 
+                  'erf', 'erfc', 'exp2', 'expm1', 'floor', 'lgamma', 
+                  'log10', 'log1p', 'log2', 'logb', 
+                  'nearbyint', 'rint', 'round', 'tgamma', 'trunc']
+
+BinaryFunctions = ['pow', 'atan2', 'copysign', 'fdim', 'fmax', 'fmin', 
+# FIXME: rdar://17275152 call to fmodf causes deserialization crash
+# 'fmod', 
+                   'hypot', 'nextafter', 'remainder']
+
+OtherFunctions = ['fma', 'frexp', 'ilogb', 'ldexp', 'remquo', 'scalbn']
+
+UnhandledFunctions = ['llrint', 'llround', 'lrint', 'lround', 'nexttoward', 
+                      'scalbln', 'carg', 'cimag', 'conj', 'cproj', 'creal']
+
+def AllFloatTypes():
+    for bits in allFloatBits:
+        yield floatName(bits), cFloatName(bits), cFuncSuffix(bits)
+
+def OverlayFloatTypes():
+    for bits in overlayFloatBits:
+        yield floatName(bits), cFloatName(bits), cFuncSuffix(bits)
+
+def TypedUnaryFunctions():
+    for ufunc in UnaryFunctions:
+        for bits in overlayFloatBits:
+            yield floatName(bits), cFloatName(bits), cFuncSuffix(bits), ufunc
+
+def TypedBinaryFunctions():
+    for bfunc in BinaryFunctions:
+        for bits in overlayFloatBits:
+            yield floatName(bits), cFloatName(bits), cFuncSuffix(bits), bfunc
+
+}%
+
+% for T, CT, f, ufunc in TypedUnaryFunctions():
+@transparent 
+func ${ufunc}(x: ${T}) -> ${T} {
+  return ${T}(${ufunc}${f}(${CT}(x)))
+}
+
+% end
+
+% for T, CT, f, bfunc in TypedBinaryFunctions():
+@transparent 
+func ${bfunc}(lhs: ${T}, rhs: ${T}) -> ${T} {
+  return ${T}(${bfunc}${f}(${CT}(lhs), ${CT}(rhs)))
+}
+
+%end
+
+% for T, CT, f in OverlayFloatTypes():
+@transparent 
+func fma(x: ${T}, y: ${T}, z: ${T}) -> ${T} {
+  return ${T}(fma${f}(${CT}(x), ${CT}(y), ${CT}(z)))
+}
+
+% end
+
+% # This is AllFloatTypes not OverlayFloatTypes because of the tuple return.
+% for T, CT, f in AllFloatTypes():
+@transparent 
+func frexp(value: ${T}) -> (${T}, Int) {
+  var exp = CInt(0)
+  let frac = frexp${f}(${CT}(value), &exp)
+  return (${T}(frac), Int(exp))
+}
+
+% end
+
+% # This would be AllFloatTypes not OverlayFloatTypes because of the Int return.
+% # ... except we need an asmname to avoid an overload ambiguity.
+% for T, CT, f in OverlayFloatTypes():
+@transparent 
+func ilogb(x: ${T}) -> Int {
+  return Int(ilogb${f}(${CT}(x)))
+}
+
+@asmname("ilogb")
+func _swift_Darwin_ilogb(value: CDouble) -> CInt
+@transparent 
+func ilogb(x: Double) -> Int {
+  return Int(_swift_Darwin_ilogb(CDouble(x)))
+}
+
+% end
+
+% # This is AllFloatTypes not OverlayFloatTypes because of the Int parameter.
+% for T, CT, f in AllFloatTypes():
+@transparent 
+func ldexp(x: ${T}, n: Int) -> ${T} {
+  return ${T}(ldexp${f}(${CT}(x), CInt(n)))
+}
+
+% end
+
+% # This is AllFloatTypes not OverlayFloatTypes because of the tuple return.
+% for T, CT, f in AllFloatTypes():
+@transparent 
+func remquo(x: ${T}, y: ${T}) -> (${T}, Int) {
+  var quo = CInt(0)
+  let rem = remquo${f}(${CT}(x), ${CT}(y), &quo)
+  return (${T}(rem), Int(quo))
+}
+
+% end
+
+% # This is AllFloatTypes not OverlayFloatTypes because of the Int parameter.
+% for T, CT, f in AllFloatTypes():
+@transparent 
+func scalbn(x: ${T}, n: Int) -> ${T} {
+  return ${T}(scalbn${f}(${CT}(x), CInt(n)))
+}
+
+% end
