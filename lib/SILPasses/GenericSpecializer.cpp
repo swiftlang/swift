@@ -32,13 +32,13 @@ STATISTIC(NumCMSpecialized, "Number of ClassMethodInst specialized");
 
 namespace {
 
-/// TypeSubCloner - a utility class for cloning code while remapping types.
-class TypeSubCloner : public SILCloner<TypeSubCloner> {
-  friend class SILVisitor<TypeSubCloner>;
-  friend class SILCloner<TypeSubCloner>;
+/// TypeSubstCloner - a utility class for cloning code while remapping types.
+class TypeSubstCloner : public SILCloner<TypeSubstCloner> {
+  friend class SILVisitor<TypeSubstCloner>;
+  friend class SILCloner<TypeSubstCloner>;
 
 public:
-  TypeSubCloner(SILFunction &To,
+  TypeSubstCloner(SILFunction &To,
                 SILFunction &From,
                 TypeSubstitutionMap &InterfaceSubs,
                 TypeSubstitutionMap &ContextSubs,
@@ -271,7 +271,7 @@ protected:
     case CheckedCastKind::Downcast:
     case CheckedCastKind::ExistentialToConcrete:
     case CheckedCastKind::ConcreteToUnrelatedExistential:
-      SILCloner<TypeSubCloner>::visitUnconditionalCheckedCastInst(Inst);
+      SILCloner<TypeSubstCloner>::visitUnconditionalCheckedCastInst(Inst);
       return;
     case CheckedCastKind::SuperToArchetype: {
       SILValue OpValue = getOpValue(Inst->getOperand());
@@ -413,7 +413,7 @@ protected:
     case CheckedCastKind::Downcast:
     case CheckedCastKind::ExistentialToConcrete:
     case CheckedCastKind::ConcreteToUnrelatedExistential:
-      SILCloner<TypeSubCloner>::visitCheckedCastBranchInst(Inst);
+      SILCloner<TypeSubstCloner>::visitCheckedCastBranchInst(Inst);
       return;
     case CheckedCastKind::SuperToArchetype: {
       // Just change the type of cast to a checked_cast_br downcast
@@ -530,14 +530,14 @@ static bool canSpecializeFunctionWithSubList(SILFunction *F,
 
 namespace {
 
-class SpecializingCloner : public TypeSubCloner {
+class SpecializingCloner : public TypeSubstCloner {
 public:
   SpecializingCloner(SILFunction *F,
                      TypeSubstitutionMap &InterfaceSubs,
                      TypeSubstitutionMap &ContextSubs,
                      StringRef NewName,
                      ApplyInst *Caller)
-    : TypeSubCloner(*initCloned(F, InterfaceSubs, NewName), *F, InterfaceSubs,
+    : TypeSubstCloner(*initCloned(F, InterfaceSubs, NewName), *F, InterfaceSubs,
                     ContextSubs, NewName, Caller) {}
   /// Clone and remap the types in \p F according to the substitution
   /// list in \p Subs.
