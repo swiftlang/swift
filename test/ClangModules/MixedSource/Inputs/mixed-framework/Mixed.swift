@@ -6,3 +6,7 @@
     return x ? true : false
   }
 }
+
+class PureSwiftClass {
+  class func verify() -> Bool { return true }
+}

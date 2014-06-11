@@ -1143,12 +1143,7 @@ static bool forAllImportedModules(Module *topLevel,
   using AccessPathTy = Module::AccessPathTy;
   
   llvm::SmallSet<ImportedModule, 32, Module::OrderImportedModules> visited;
-  SmallVector<ImportedModule, 32> queue;
-
-  AccessPathTy overridingPath;
-  if (respectVisibility)
-    overridingPath = thisPath;
-  queue.push_back(ImportedModule(overridingPath, topLevel));
+  SmallVector<ImportedModule, 32> stack;
 
   // Even if we're processing the top-level module like any other, we may
   // still want to include non-exported modules.
@@ -1156,10 +1151,16 @@ static bool forAllImportedModules(Module *topLevel,
                                                   : Module::ImportFilter::All;
   Module::ImportFilter topLevelFilter =
     includePrivateTopLevelImports ? Module::ImportFilter::All : filter;
-  topLevel->getImportedModules(queue, topLevelFilter);
+  topLevel->getImportedModules(stack, topLevelFilter);
 
-  while (!queue.empty()) {
-    auto next = queue.pop_back_val();
+  // Make sure the top-level module is first; we want pre-order-ish traversal.
+  AccessPathTy overridingPath;
+  if (respectVisibility)
+    overridingPath = thisPath;
+  stack.push_back(ImportedModule(overridingPath, topLevel));
+
+  while (!stack.empty()) {
+    auto next = stack.pop_back_val();
 
     // Filter any whole-module imports, and skip specific-decl imports if the
     // import path doesn't match exactly.
@@ -1178,7 +1179,7 @@ static bool forAllImportedModules(Module *topLevel,
 
     if (!fn(next))
       return false;
-    next.second->getImportedModules(queue, filter);
+    next.second->getImportedModules(stack, filter);
   }
 
   return true;

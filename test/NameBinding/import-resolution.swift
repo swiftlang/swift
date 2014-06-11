@@ -44,13 +44,13 @@ var qD1 : asdf.D // okay
 var qS1 : asdf.S // okay
 
 
-// CHECK-IMPORTS-DAG: asdf:
-// CHECK-IMPORTS-DAG: aeiou:
-// CHECK-IMPORTS-DAG: aeiou:
-// CHECK-IMPORTS-DAG: abcde:
 // CHECK-IMPORTS: letters:
 // CHECK-IMPORTS-DAG: 	abcde
 // CHECK-IMPORTS-DAG: 	aeiou
 // CHECK-IMPORTS-DAG: 	aeiou.E
 // CHECK-IMPORTS-DAG: 	asdf.D
 // CHECK-IMPORTS-NOT:   asdf.S
+// CHECK-IMPORTS-DAG: asdf:
+// CHECK-IMPORTS-DAG: aeiou:
+// CHECK-IMPORTS-DAG: aeiou:
+// CHECK-IMPORTS-DAG: abcde:

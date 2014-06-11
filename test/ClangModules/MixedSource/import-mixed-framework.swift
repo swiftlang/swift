@@ -19,3 +19,6 @@ let clangStruct = PureClangType(x: 1, y: 2)
 instance.categoryMethod(clangStruct)
 
 let x: BogusClass? = nil // expected-error {{'BogusClass' is unavailable: cannot find Swift declaration for this class}}
+
+_ = PureSwiftClass.verify()
+_ = Mixed.PureSwiftClass.verify()
