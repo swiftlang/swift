@@ -398,8 +398,8 @@ SOURCEKIT_CMAKE_OPTIONS=(
 ASAN_CMAKE_OPTIONS=(
     -DCMAKE_C_COMPILER="${RUN_WITH_ASAN_COMPILER}"
     -DCMAKE_CXX_COMPILER="${RUN_WITH_ASAN_COMPILER}++"
-    -DCMAKE_C_FLAGS="-fsanitize=address -O1 -g -fno-omit-frame-pointer"
-    -DCMAKE_CXX_FLAGS="-fsanitize=address -O1 -g -fno-omit-frame-pointer"
+    -DCMAKE_C_FLAGS="-isysroot${SYSROOT} -fsanitize=address -O1 -g -fno-omit-frame-pointer"
+    -DCMAKE_CXX_FLAGS="-isysroot${SYSROOT} -fsanitize=address -O1 -g -fno-omit-frame-pointer"
     -DCMAKE_SHARED_LINKER_FLAGS="-fsanitize=address"
     -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address"
     -DSOURCEKIT_USE_INPROC_LIBRARY="ON"
