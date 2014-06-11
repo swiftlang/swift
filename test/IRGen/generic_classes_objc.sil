@@ -1,0 +1,27 @@
+// RUN: rm -rf %t/clang-module-cache
+// RUN: %swift -enable-dynamic-value-type-layout -target x86_64-apple-darwin10 -module-cache-path %t/clang-module-cache -sdk %S/Inputs -I=%S/Inputs -enable-source-import %s -emit-ir | FileCheck %s
+
+import Builtin
+import Swift
+import gizmo
+
+// CHECK: @_TMPdC20generic_classes_objc19GenericInheritsObjC
+// CHECK: @_TMPdC20generic_classes_objc20GenericInheritsObjC2
+
+class GenericInheritsObjC<D> : Gizmo {
+  var x : D
+
+  init()
+}
+sil @_TFC15generic_classes19GenericInheritsObjCD : $@cc(method) @thin <T> (GenericInheritsObjC<T>) -> ()
+
+class GenericInheritsObjC2<E> : Gizmo {
+  var x : UInt8
+  var y : E
+  var z : UInt8
+
+  init()
+}
+sil @_TFC15generic_classes20GenericInheritsObjC2D : $@cc(method) @thin <T> (GenericInheritsObjC2<T>) -> ()
+
+

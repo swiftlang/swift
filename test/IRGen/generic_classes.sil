@@ -1,5 +1,5 @@
 // RUN: rm -rf %t/clang-module-cache
-// RUN: %swift -enable-dynamic-value-type-layout -target x86_64-apple-darwin10 -module-cache-path %t/clang-module-cache -sdk %S/Inputs -I=%S/Inputs -enable-source-import %s -emit-ir | FileCheck %s
+// RUN: %swift -target x86_64-apple-darwin10 -module-cache-path %t/clang-module-cache -sdk %S/Inputs -I=%S/Inputs -enable-source-import %s -emit-ir | FileCheck %s
 
 import Builtin
 import Swift
@@ -95,8 +95,6 @@ import gizmo
 // CHECK: }
 
 // CHECK: @_TMPdC15generic_classes25GenericInheritsNonGeneric
-// CHECK: @_TMPdC15generic_classes19GenericInheritsObjC
-// CHECK: @_TMPdC15generic_classes20GenericInheritsObjC2
 
 class RootGeneric<T> {
   var x : UInt8
@@ -152,22 +150,6 @@ class GenericInheritsNonGeneric<C> : RootNonGeneric {
   init()
 }
 sil @_TFC15generic_classes25GenericInheritsNonGenericD : $@cc(method) @thin <T> (GenericInheritsNonGeneric<T>) -> ()
-
-class GenericInheritsObjC<D> : Gizmo {
-  var x : D
-
-  init()
-}
-sil @_TFC15generic_classes19GenericInheritsObjCD : $@cc(method) @thin <T> (GenericInheritsObjC<T>) -> ()
-
-class GenericInheritsObjC2<E> : Gizmo {
-  var x : UInt8
-  var y : E
-  var z : UInt8
-
-  init()
-}
-sil @_TFC15generic_classes20GenericInheritsObjC2D : $@cc(method) @thin <T> (GenericInheritsObjC2<T>) -> ()
 
 // CHECK: define [[ROOTGENERIC]]* @RootGeneric_fragile_dependent_alloc
 // CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_getGenericMetadata
