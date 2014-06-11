@@ -375,8 +375,8 @@ namespace {
             IGM.unimplemented(var->getLoc(),
                               "non-fixed class layout in ObjC-derived classes");
             complainedAboutUnimplementedLayout = true;
-            continue;
           }
+          continue;
         }
         
         Elements.push_back(ElementLayout::getIncomplete(eltType));
