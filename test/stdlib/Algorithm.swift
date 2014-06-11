@@ -183,3 +183,18 @@ func testContains() {
   
 }
 testContains()
+
+func testMinMax() {
+  // CHECK: testing min max
+  println("testing min max")
+  // CHECK-NEXT: 2
+  println(min(3, 2))
+  // CHECK-NEXT: 3
+  println(min(3, 7, 5))
+  // CHECK-NEXT: 3
+  println(max(3, 2))
+  // CHECK-NEXT: 7
+  println(max(3, 7, 5))
+}
+
+testMinMax()
