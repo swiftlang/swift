@@ -185,6 +185,9 @@ enum class SpecialMethodKind {
 
 #define SWIFT_NATIVE_ANNOTATION_STRING "__swift native"
 
+#define SWIFT_PROTOCOL_SUFFIX "Protocol"
+#define SWIFT_CFTYPE_SUFFIX "Ref"
+
 /// Describes whether to classify a factory method as an initializer.
 enum class FactoryAsInitKind {
   /// Infer based on name and type (the default).

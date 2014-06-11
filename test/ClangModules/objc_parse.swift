@@ -10,6 +10,7 @@ import objc_ext
 import TestProtocols
 
 import ObjCParseExtras
+import ObjCParseExtrasToo
 
 func testAnyObject(obj: AnyObject) {
   var optStr = obj.nsstringProperty
@@ -379,11 +380,29 @@ func testSubscriptAndPropertyWithProtocols(obj: SubscriptAndPropertyWithProto) {
   obj.setObject(obj, atIndexedSubscript: 2) // should error...
 }
 
-func testAVFoundationMisc(obj: AVVideoCompositionInstruction, p: AVVideoCompositionInstructionProtocol) {
+func testProtocolMappingSameModule(obj: AVVideoCompositionInstruction, p: AVVideoCompositionInstructionProtocol) {
   println(p.enablePostProcessing)
   println(obj.enablePostProcessing)
   let _ = obj.backgroundColor
 }
+
+func testProtocolMappingDifferentModules(obj: ObjCParseExtrasToo.ProtoOrClass, p: ObjCParseExtras.ProtoOrClass) {
+  println(p.thisIsTheProto)
+  println(obj.thisClassHasAnAwfulName)
+
+  let _: ProtoOrClass? // expected-error{{'ProtoOrClass' is ambiguous for type lookup in this context}}
+
+  let _ = ObjCParseExtrasToo.ClassInHelper() // expected-error{{'ClassInHelper' is not constructible with '()'}}
+  let _ = ObjCParseExtrasToo.ProtoInHelper()
+  let _ = ObjCParseExtrasTooHelper.ClassInHelper()
+  let _ = ObjCParseExtrasTooHelper.ProtoInHelper() // expected-error{{'ProtoInHelper' is not constructible with '()'}}
+}
+
+func testProtocolClassShadowing(obj: ClassInHelper, p: ProtoInHelper) {
+  let _: ObjCParseExtrasToo.ClassInHelper = obj
+  let _: ObjCParseExtrasToo.ProtoInHelper = p
+}
+
 
 func testNSExtensionContext(url: NSURL, extensionContext: NSExtensionContext) {
   extensionContext.openURL(url) { success in return }

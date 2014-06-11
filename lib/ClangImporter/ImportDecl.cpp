@@ -32,6 +32,7 @@
 #include "clang/AST/DeclVisitor.h"
 #include "clang/Basic/CharInfo.h"
 #include "clang/Lex/Preprocessor.h"
+#include "clang/Sema/Lookup.h"
 
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Statistic.h"
@@ -986,7 +987,7 @@ namespace {
       theClass->setCheckedInheritanceClause();
       theClass->setAddedImplicitInitializers(); // suppress all initializers
       theClass->setForeign(true);
-      addObjCAttribute(theClass, ObjCSelector(Impl.SwiftContext, 0, className));
+      addObjCAttribute(theClass, className);
       Impl.registerExternalDecl(theClass);
 
       SmallVector<ProtocolDecl *, 4> protocols;
@@ -1028,7 +1029,7 @@ namespace {
 
         // Import 'typedef struct __Blah *BlahRef;' as a CF type.
         if (!SwiftType && Impl.SwiftContext.LangOpts.ImportCFTypes &&
-            Decl->getName().endswith("Ref")) {
+            Decl->getName().endswith(SWIFT_CFTYPE_SUFFIX)) {
           if (auto pointee = CFPointeeInfo::classifyTypedef(Decl)) {
             // If the pointee is a record, consider creating a class type.
             if (pointee.isRecord()) {
@@ -1958,6 +1959,14 @@ namespace {
           classDecl->recordObjCMember(decl);
         }
       }
+    }
+
+    /// Add an @objc(name) attribute with the given, optional name expressed as
+    /// selector.
+    ///
+    /// The importer should use this rather than adding the attribute directly.
+    void addObjCAttribute(ValueDecl *decl, Identifier name) {
+      addObjCAttribute(decl, ObjCSelector(Impl.SwiftContext, 0, name));
     }
 
     Decl *VisitObjCMethodDecl(const clang::ObjCMethodDecl *decl) {
@@ -3812,19 +3821,8 @@ namespace {
     }
 
     Decl *VisitObjCProtocolDecl(const clang::ObjCProtocolDecl *decl) {
-      // Form the protocol name, using the renaming table when necessary.
-      Identifier name;
-      Identifier origName = Impl.importName(decl->getDeclName());
-      if (false) { }
-#define RENAMED_PROTOCOL(ObjCName, SwiftName)                  \
-      else if (decl->getName().equals(#ObjCName)) {            \
-        name = Impl.SwiftContext.getIdentifier(#SwiftName);    \
-      }
-#include "swift/ClangImporter/RenamedProtocols.def"
-      else {
-        name = origName;
-      }
-
+      clang::DeclarationName clangName = decl->getDeclName();
+      Identifier name = Impl.importName(clangName);
       if (name.empty())
         return nullptr;
 
@@ -3843,6 +3841,44 @@ namespace {
 
       decl = decl->getDefinition();
 
+      // Test to see if there is a value with the same name as the protocol
+      // in the same module.
+      // FIXME: This will miss macros.
+      auto clangModule = Impl.getClangSubmoduleForDecl(decl);
+      if (clangModule.hasValue() && clangModule.getValue())
+        clangModule = clangModule.getValue()->getTopLevelModule();
+
+      auto isInSameModule = [&](const clang::Decl *D) -> bool {
+        auto declModule = Impl.getClangSubmoduleForDecl(D);
+        if (!declModule.hasValue())
+          return false;
+        return *clangModule == declModule.getValue()->getTopLevelModule();
+      };
+
+
+      bool hasConflict = false;
+      clang::LookupResult lookupResult(Impl.getClangSema(), clangName,
+                                       clang::SourceLocation(),
+                                       clang::Sema::LookupOrdinaryName);
+      if (Impl.getClangSema().LookupName(lookupResult, /*scope=*/nullptr)) {
+        hasConflict = std::any_of(lookupResult.begin(), lookupResult.end(),
+                                  isInSameModule);
+      }
+      if (!hasConflict) {
+        lookupResult.clear(clang::Sema::LookupTagName);
+        if (Impl.getClangSema().LookupName(lookupResult, /*scope=*/nullptr)) {
+          hasConflict = std::any_of(lookupResult.begin(), lookupResult.end(),
+                                    isInSameModule);
+        }
+      }
+
+      Identifier origName = name;
+      if (hasConflict) {
+        SmallString<64> nameBuf{name.str()};
+        nameBuf += SWIFT_PROTOCOL_SUFFIX;
+        name = Impl.SwiftContext.getIdentifier(nameBuf.str());
+      }
+
       auto dc = Impl.importDeclContextOf(decl);
       if (!dc)
         return nullptr;
@@ -3860,7 +3896,7 @@ namespace {
                                    name,
                                    None);
       result->computeType();
-      addObjCAttribute(result, ObjCSelector(Impl.SwiftContext, 0, origName));
+      addObjCAttribute(result, origName);
 
       if (declaredNative)
         markMissingSwiftDecl(result);
@@ -3951,7 +3987,7 @@ namespace {
           result->setSuperclass(nsObjectTy);
           result->setCheckedInheritanceClause();
           result->setAddedImplicitInitializers();
-          addObjCAttribute(result, ObjCSelector(Impl.SwiftContext, 0, name));
+          addObjCAttribute(result, name);
           Impl.registerExternalDecl(result);
           return result;
         }
@@ -3990,7 +4026,7 @@ namespace {
       Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
       result->setCircularityCheck(CircularityCheck::Checked);
       result->setAddedImplicitInitializers();
-      addObjCAttribute(result, ObjCSelector(Impl.SwiftContext, 0, name));
+      addObjCAttribute(result, name);
 
       if (declaredNative)
         markMissingSwiftDecl(result);

@@ -60,6 +60,10 @@ __attribute__((objc_root_class))
 - (void)setObject:(id)obj atIndexedSubscript:(int)i;
 @end
 
+@protocol ProtoOrClass
+@property int thisIsTheProto;
+@end
+
 
 #pragma mark Constant global properties
 

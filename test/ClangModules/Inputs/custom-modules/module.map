@@ -1,12 +1,3 @@
-module ExternIntX { header "x.h" }
-module TestProtocols { header "Protocols.h" }
-
-module LinkMusket {
-  link "Lock"
-  link "Stock"
-  link framework "Barrel"
-}
-
 module script {
   header "script.h"
 }
@@ -20,27 +11,6 @@ module ClangModuleWithAdapter {
   link "UnderlyingClangLibrary"
 }
 
-module IndirectFramework {
-  link framework "Indirect"
-}
-
-module IndirectFrameworkImporter {
-  header "IndirectFrameworkImporter.h"
-  export IndirectFramework
-}
-
-module HasSubmodule {
-  link framework "HasSubmodule"
-  module Submodule {
-    header "Submodule.h"
-  }
-}
-
-module UsesSubmodule {
-  header "UsesSubmodule.h"
-  export *
-}
-
 module CoreData {
   header "NSManagedObject.h"
   export *
@@ -51,6 +21,30 @@ module CoreCooling {
   export *
 }
 
+module ExternIntX { header "x.h" }
+
+module HasSubmodule {
+  link framework "HasSubmodule"
+  module Submodule {
+    header "Submodule.h"
+  }
+}
+
+module IndirectFramework {
+  link framework "Indirect"
+}
+
+module IndirectFrameworkImporter {
+  header "IndirectFrameworkImporter.h"
+  export IndirectFramework
+}
+
+module LinkMusket {
+  link "Lock"
+  link "Stock"
+  link framework "Barrel"
+}
+
 module ObjCIRExtras {
   header "ObjCIRExtras.h"
   export *
@@ -58,6 +52,16 @@ module ObjCIRExtras {
 
 module ObjCParseExtras {
   header "ObjCParseExtras.h"
+  export *
+}
+
+module ObjCParseExtrasToo {
+  header "ObjCParseExtrasToo.h"
+  export *
+}
+
+module ObjCParseExtrasTooHelper {
+  header "ObjCParseExtrasTooHelper.h"
   export *
 }
 
@@ -71,12 +75,19 @@ module ProtoWithInitializer {
   export *
 }
 
+module Redeclaration {
+  header "Redeclaration.h"
+  export *
+}
+
+module TestProtocols { header "Protocols.h" }
+
 module TypeAndValue {
   header "TypeAndValue.h"
   export *
 }
 
-module Redeclaration {
-  header "Redeclaration.h"
+module UsesSubmodule {
+  header "UsesSubmodule.h"
   export *
 }

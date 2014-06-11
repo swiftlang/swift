@@ -554,6 +554,10 @@ ClangImporter::Implementation::getClangSubmoduleForDecl(
     actual = TD->getDefinition();
     if (!actual && !allowForwardDeclaration)
       return Nothing;
+  } else if (auto OPD = dyn_cast<clang::ObjCProtocolDecl>(D)) {
+    actual = OPD->getDefinition();
+    if (!actual && !allowForwardDeclaration)
+      return Nothing;
   }
 
   if (!actual)
@@ -1224,22 +1228,6 @@ void ClangImporter::lookupValue(Identifier name, VisibleDeclConsumer &consumer){
   auto &pp = Impl.Instance->getPreprocessor();
   auto &sema = Impl.Instance->getSema();
 
-  // If the given name matches one of a special set of renamed
-  // protocol names, perform protocol lookup. For example, the
-  // NSObject protocol is named NSObjectProto so that it does not
-  // conflict with the NSObject class.
-  // FIXME: It would be better to put protocols into a submodule, so
-  // that normal name lookup would prefer the class (NSObject) but
-  // protocols would be visible with, e.g., protocols.NSObject.
-  auto lookupNameKind = clang::Sema::LookupOrdinaryName;
-  if (false) { }
-#define RENAMED_PROTOCOL(ObjCName, SwiftName)             \
-  else if (name.str().equals(#SwiftName)) {               \
-    name = Impl.SwiftContext.getIdentifier(#ObjCName);    \
-    lookupNameKind = clang::Sema::LookupObjCProtocolName; \
-  }
-#include "swift/ClangImporter/RenamedProtocols.def"
-
   // Map the name. If we can't represent the Swift name in Clang, bail out now.
   auto clangName = Impl.importName(name);
   if (!clangName)
@@ -1255,73 +1243,71 @@ void ClangImporter::lookupValue(Identifier name, VisibleDeclConsumer &consumer){
     }
   }
 
-  // Perform name lookup into the global scope.
-  // FIXME: Map source locations over.
-  clang::LookupResult lookupResult(sema, clangName, clang::SourceLocation(),
-                                   lookupNameKind);
   bool FoundType = false;
   bool FoundAny = false;
-  if (sema.LookupName(lookupResult, /*Scope=*/0)) {
+  auto processResults = [&](clang::LookupResult &result) {
     // FIXME: Filter based on access path? C++ access control?
-    for (auto decl : lookupResult) {
-      if (auto swiftDecl = Impl.importDeclReal(decl->getUnderlyingDecl()))
+    for (auto decl : result) {
+      if (auto swiftDecl = Impl.importDeclReal(decl->getUnderlyingDecl())) {
         if (auto valueDecl = dyn_cast<ValueDecl>(swiftDecl)) {
           // If the importer gave us a declaration from the stdlib, make sure
           // it does not show up in the lookup results for the imported module.
           if (valueDecl->getDeclContext()->isModuleScopeContext() &&
               valueDecl->getModuleContext() == Impl.getStdlibModule())
             continue;
+          // Check that we didn't pick up something with a remapped name.
+          if (valueDecl->getName() != name)
+            continue;
 
           consumer.foundDecl(valueDecl, DeclVisibilityKind::VisibleAtTopLevel);
           FoundType = FoundType || isa<TypeDecl>(valueDecl);
           FoundAny = true;
         }
+      }
     }
-  }
+  };
 
-  if (lookupNameKind == clang::Sema::LookupOrdinaryName && !FoundType) {
+  // Perform name lookup into the global scope.
+  // FIXME: Map source locations over.
+  clang::LookupResult lookupResult(sema, clangName, clang::SourceLocation(),
+                                   clang::Sema::LookupOrdinaryName);
+  if (sema.LookupName(lookupResult, /*Scope=*/nullptr))
+    processResults(lookupResult);
+
+  if (!FoundType) {
     // Look up a tag name if we did not find a type with this name already.
     // We don't want to introduce multiple types with same name.
     lookupResult.clear(clang::Sema::LookupTagName);
-    if (sema.LookupName(lookupResult, /*Scope=*/0)) {
-      // FIXME: Filter based on access path? C++ access control?
-      for (auto decl : lookupResult) {
-        if (auto swiftDecl = Impl.importDeclReal(decl->getUnderlyingDecl()))
-          if (auto valueDecl = dyn_cast<ValueDecl>(swiftDecl)) {
-            consumer.foundDecl(valueDecl, DeclVisibilityKind::VisibleAtTopLevel);
-            FoundAny = true;
-          }
-      }
-    }
+    if (sema.LookupName(lookupResult, /*Scope=*/nullptr))
+      processResults(lookupResult);
   }
 
-  if (lookupNameKind == clang::Sema::LookupOrdinaryName && !FoundAny) {
-    // Look up a protocol name if we did not find anything with this
-    // name already.
+  // Look up protocol names as well.
+  lookupResult.clear(clang::Sema::LookupObjCProtocolName);
+  if (sema.LookupName(lookupResult, /*Scope=*/nullptr)) {
+    processResults(lookupResult);
+
+  } else if (!FoundAny && name.str().endswith(SWIFT_PROTOCOL_SUFFIX)) {
+    auto noProtoNameStr = name.str().drop_back(strlen(SWIFT_PROTOCOL_SUFFIX));
+    auto protoIdent = &Impl.getClangASTContext().Idents.get(noProtoNameStr);
     lookupResult.clear(clang::Sema::LookupObjCProtocolName);
-    if (sema.LookupName(lookupResult, /*Scope=*/0)) {
-      // FIXME: Filter based on access path? C++ access control?
-      for (auto decl : lookupResult) {
-        if (auto swiftDecl = Impl.importDeclReal(decl->getUnderlyingDecl())) {
-          if (auto valueDecl = dyn_cast<ValueDecl>(swiftDecl)) {
-            consumer.foundDecl(valueDecl, DeclVisibilityKind::VisibleAtTopLevel);
-            FoundAny = true;
-          }
-        }
-      }
-    }
+    lookupResult.setLookupName(protoIdent);
+
+    if (sema.LookupName(lookupResult, /*Scope=*/nullptr))
+      processResults(lookupResult);
+
+    lookupResult.setLookupName(clangName);
   }
 
   // If we *still* haven't found anything, try looking for '<name>Ref'.
   // Eventually, this should be optimized by recognizing this case when
   // generating the clang module.
-  if (lookupNameKind == clang::Sema::LookupOrdinaryName &&
-      !FoundAny && clangID && Impl.SwiftContext.LangOpts.ImportCFTypes) {
+  if (!FoundAny && clangID && Impl.SwiftContext.LangOpts.ImportCFTypes) {
     lookupResult.clear(clang::Sema::LookupOrdinaryName);
 
     llvm::SmallString<128> buffer;
     buffer += clangID->getName();
-    buffer += "Ref";
+    buffer += SWIFT_CFTYPE_SUFFIX;
     auto refIdent = &Impl.Instance->getASTContext().Idents.get(buffer.str());
     lookupResult.setLookupName(refIdent);
 

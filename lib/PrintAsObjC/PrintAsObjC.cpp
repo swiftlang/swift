@@ -87,14 +87,12 @@ private:
     os << " <";
     interleave(protosToPrint,
                [this](const ProtocolDecl *PD) {
-                 auto Name = PD->getName().str();
-                 // Remap back to the original protocol name that may
-                 // have been changed during import.
-                 Name = llvm::StringSwitch<StringRef>(Name)
-#define RENAMED_PROTOCOL(ObjCName, SwiftName) .Case(#SwiftName, #ObjCName)
-#include "swift/ClangImporter/RenamedProtocols.def"
-                  .Default(Name);
-                 os << Name;
+                 if (PD->hasClangNode()) {
+                   SmallString<64> buf;
+                   os << PD->getObjCRuntimeName(buf);
+                 } else {
+                   os << PD->getName().str();
+                  }
                },
                [this] { os << ", "; });
     os << ">";
