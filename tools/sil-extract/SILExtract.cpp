@@ -85,6 +85,7 @@ int main(int argc, char **argv) {
   // Give the context the list of search paths to use for modules.
   Invocation.setImportSearchPaths(ImportPaths);
   Invocation.getClangImporterOptions().ModuleCachePath = ModuleCachePath;
+  Invocation.setParseStdlib();
 
   // Load the input file.
   std::unique_ptr<llvm::MemoryBuffer> InputFile;

@@ -436,6 +436,7 @@ int main(int argc, char **argv) {
   // Set the module cache path. If not passed in we use the default swift module
   // cache.
   Invocation.getClangImporterOptions().ModuleCachePath = ModuleCachePath;
+  Invocation.setParseStdlib();
 
   // Load the input file.
   std::unique_ptr<llvm::MemoryBuffer> InputFile;
