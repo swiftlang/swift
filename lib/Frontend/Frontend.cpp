@@ -253,10 +253,7 @@ void CompilerInstance::performSema() {
   case SourceFile::ImplicitModuleImportKind::Builtin:
     break;
   case SourceFile::ImplicitModuleImportKind::Stdlib:
-    auto *theStdlib = Context->getModule({
-      std::make_pair(Context->StdlibModuleName, SourceLoc())
-    });
-    if (!theStdlib) {
+    if (!Context->getStdlibModule(true)) {
       Diagnostics.diagnose(SourceLoc(), diag::error_stdlib_not_found,
                            Invocation.getTargetTriple());
       return;
@@ -421,8 +418,8 @@ void CompilerInstance::performSema() {
 
   // Even if there were no source files, we should still record known
   // protocols.
-  if (Context->getStdlibModule())
-    Context->recordKnownProtocols(Context->getStdlibModule());
+  if (auto *stdlib = Context->getStdlibModule())
+    Context->recordKnownProtocols(stdlib);
 
   if (DelayedCB) {
     performDelayedParsing(MainModule, PersistentState,

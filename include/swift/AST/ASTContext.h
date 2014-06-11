@@ -530,7 +530,15 @@ public:
   /// \returns The requested module, or NULL if the module cannot be found.
   Module *getModule(ArrayRef<std::pair<Identifier, SourceLoc>> ModulePath);
 
-  Module *getStdlibModule() const;
+  /// Returns the standard library module, or null if the library isn't present.
+  ///
+  /// If \p loadIfAbsent is true, the ASTContext will attempt to load the module
+  /// if it hasn't been set yet.
+  Module *getStdlibModule(bool loadIfAbsent = false);
+
+  Module *getStdlibModule() const {
+    return const_cast<ASTContext *>(this)->getStdlibModule(false);
+  }
 
   /// \brief Retrieve the current generation number, which reflects the
   /// number of times a module import has caused mass invalidation of

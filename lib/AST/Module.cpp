@@ -1279,7 +1279,7 @@ static void performAutoImport(SourceFile &SF,
     M = Ctx.TheBuiltinModule;
     break;
   case SourceFile::ImplicitModuleImportKind::Stdlib:
-    M = Ctx.getStdlibModule();
+    M = Ctx.getStdlibModule(true);
     break;
   }
 

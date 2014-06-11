@@ -1067,7 +1067,7 @@ Type ClangImporter::Implementation::importMethodType(
 }
 
 Module *ClangImporter::Implementation::getStdlibModule() {
-  return SwiftContext.getStdlibModule();
+  return SwiftContext.getStdlibModule(true);
 }
 
 Module *ClangImporter::Implementation::getNamedModule(StringRef name) {

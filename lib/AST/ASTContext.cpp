@@ -1009,11 +1009,17 @@ ASTContext::getModule(ArrayRef<std::pair<Identifier, SourceLoc>> ModulePath) {
   return nullptr;
 }
 
-Module *ASTContext::getStdlibModule() const {
+Module *ASTContext::getStdlibModule(bool loadIfAbsent) {
   if (TheStdlibModule)
     return TheStdlibModule;
 
-  TheStdlibModule = getLoadedModule(StdlibModuleName);
+  if (loadIfAbsent) {
+    auto mutableThis = const_cast<ASTContext*>(this);
+    TheStdlibModule =
+      mutableThis->getModule({ std::make_pair(StdlibModuleName, SourceLoc()) });
+  } else {
+    TheStdlibModule = getLoadedModule(StdlibModuleName);
+  }
   return TheStdlibModule;
 }
 
