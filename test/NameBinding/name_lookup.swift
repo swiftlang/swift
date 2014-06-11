@@ -160,7 +160,7 @@ class ThisDerived1 : ThisBase1 {
     var deo3 = self.DerivedExtNestedUnion.DerivedExtUnionX(24) // expected-error{{ThisDerived1' does not have a member named 'DerivedExtNestedUnion'}}
     var det2 = self.DerivedExtNestedTypealias(42) // expected-error{{ThisDerived1' does not have a member named 'DerivedExtNestedTypealias'}}
 
-    self.Type // expected-error {{expected member name following '.'}}
+    self.Type // expected-error {{does not have a member named 'Type'}}
   }
 
   func testSuper1() {
@@ -216,7 +216,7 @@ class ThisDerived1 : ThisBase1 {
     var deo3 = super.DerivedExtNestedUnion.DerivedExtUnionX(24) // expected-error {{'ThisBase1' does not have a member named 'DerivedExtNestedUnion'}}
     var det2 = super.DerivedExtNestedTypealias(42) // expected-error {{'ThisBase1' does not have a member named 'DerivedExtNestedTypealias'}}
 
-    super.Type // expected-error {{expected identifier or 'init' after super '.' expression}}
+    super.Type // expected-error {{does not have a member named 'Type'}}
   }
 
   class func staticTestSelf1() {
@@ -282,7 +282,7 @@ class ThisDerived1 : ThisBase1 {
     var deo3 = self.DerivedExtNestedUnion.DerivedExtUnionX(24)
     var det2 = self.DerivedExtNestedTypealias()
 
-    self.Type // expected-error {{expected member name following '.'}}
+    self.Type // expected-error {{does not have a member named 'Type'}}
   }
 
   class func staticTestSuper1() {
@@ -334,7 +334,7 @@ class ThisDerived1 : ThisBase1 {
     var deo3 = super.DerivedExtNestedUnion.DerivedExtUnionX(24) // expected-error {{'ThisBase1.Type' does not have a member named 'DerivedExtNestedUnion'}}
     var det2 = super.DerivedExtNestedTypealias(42) // expected-error {{'ThisBase1.Type' does not have a member named 'DerivedExtNestedTypealias'}}
 
-    super.Type // expected-error {{expected identifier or 'init' after super '.' expression}}
+    super.Type // expected-error {{does not have a member named 'Type'}}
   }
 }
 
