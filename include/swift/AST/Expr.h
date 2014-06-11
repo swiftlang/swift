@@ -1845,6 +1845,40 @@ public:
   }
 };
 
+/// The implicit conversion from a class metatype to AnyObject.
+class ClassMetatypeToObjectExpr : public ImplicitConversionExpr {
+public:
+  ClassMetatypeToObjectExpr(Expr *subExpr, Type ty)
+    : ImplicitConversionExpr(ExprKind::ClassMetatypeToObject, subExpr, ty) {}
+  
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::ClassMetatypeToObject;
+  }
+};
+
+/// The implicit conversion from a class existential metatype to AnyObject.
+class ExistentialMetatypeToObjectExpr : public ImplicitConversionExpr {
+public:
+  ExistentialMetatypeToObjectExpr(Expr *subExpr, Type ty)
+    : ImplicitConversionExpr(ExprKind::ClassMetatypeToObject, subExpr, ty) {}
+  
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::ExistentialMetatypeToObject;
+  }
+};
+  
+/// The implicit conversion from a protocol value metatype to ObjC's Protocol
+/// class type.
+class ProtocolMetatypeToObjectExpr : public ImplicitConversionExpr {
+public:
+  ProtocolMetatypeToObjectExpr(Expr *subExpr, Type ty)
+    : ImplicitConversionExpr(ExprKind::ProtocolMetatypeToObject, subExpr, ty) {}
+  
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::ProtocolMetatypeToObject;
+  }
+};
+  
 /// InjectIntoOptionalExpr - The implicit conversion from T to T?.
 class InjectIntoOptionalExpr : public ImplicitConversionExpr {
 public:

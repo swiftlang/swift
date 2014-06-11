@@ -149,6 +149,13 @@ enum class ConversionRestrictionKind {
   DeepEquality,
   /// Subclass-to-superclass conversion.
   Superclass,
+  /// Class metatype to AnyObject conversion.
+  ClassMetatypeToAnyObject,
+  /// Existential metatype to AnyObject conversion.
+  ExistentialMetatypeToAnyObject,
+  /// Protocol value metatype to Protocol class conversion.
+  ProtocolMetatypeToProtocolClass,
+  /// Existential metatype to AnyObject conversion.
   /// Lvalue-to-rvalue conversion.
   LValueToRValue,
   /// Value to existential value conversion.

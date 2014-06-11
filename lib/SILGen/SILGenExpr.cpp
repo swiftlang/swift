@@ -221,6 +221,12 @@ namespace {
     RValue visitInjectIntoOptionalExpr(InjectIntoOptionalExpr *E, SGFContext C);
     RValue visitLValueConversionExpr(LValueConversionExpr *E, SGFContext C);
     RValue visitLValueToPointerExpr(LValueToPointerExpr *E, SGFContext C);
+    RValue visitClassMetatypeToObjectExpr(ClassMetatypeToObjectExpr *E,
+                                          SGFContext C);
+    RValue visitExistentialMetatypeToObjectExpr(ExistentialMetatypeToObjectExpr *E,
+                                                SGFContext C);
+    RValue visitProtocolMetatypeToObjectExpr(ProtocolMetatypeToObjectExpr *E,
+                                             SGFContext C);
     RValue visitIfExpr(IfExpr *E, SGFContext C);
     
     RValue visitDefaultValueExpr(DefaultValueExpr *E, SGFContext C);
@@ -4200,6 +4206,23 @@ RValue RValueEmitter::visitLValueToPointerExpr(LValueToPointerExpr *E,
   SILValue ptr = SGF.B.createAddressToPointer(E, address,
                               SILType::getRawPointerType(SGF.getASTContext()));
   return RValue(SGF, E, ManagedValue::forUnmanaged(ptr));
+}
+
+RValue RValueEmitter::visitClassMetatypeToObjectExpr(ClassMetatypeToObjectExpr *E,
+                                                     SGFContext C) {
+  llvm_unreachable("not implemented");
+}
+
+RValue RValueEmitter::visitExistentialMetatypeToObjectExpr(
+                                             ExistentialMetatypeToObjectExpr *E,
+                                             SGFContext C) {
+  llvm_unreachable("not implemented");
+}
+
+RValue RValueEmitter::visitProtocolMetatypeToObjectExpr(
+                                             ProtocolMetatypeToObjectExpr *E,
+                                             SGFContext C) {
+  llvm_unreachable("not implemented");
 }
 
 RValue RValueEmitter::visitInOutConversionExpr(InOutConversionExpr *E,

@@ -204,6 +204,9 @@ static void diagModuleOrMetatypeValue(TypeChecker &TC, const Expr *E) {
           case ExprKind::OpaqueValue:
           case ExprKind::BindOptional:
           case ExprKind::OptionalEvaluation:
+          case ExprKind::ClassMetatypeToObject:
+          case ExprKind::ProtocolMetatypeToObject:
+          case ExprKind::ExistentialMetatypeToObject:
           case ExprKind::ForceValue:
           case ExprKind::OpenExistential:
           case ExprKind::PrefixUnary:

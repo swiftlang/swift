@@ -1076,7 +1076,7 @@ public:
   void visitErrorExpr(ErrorExpr *E) {
     printCommon(E, "error_expr") << ')';
   }
-
+  
   void visitIntegerLiteralExpr(IntegerLiteralExpr *E) {
     printCommon(E, "integer_literal_expr");
     if (E->isNegative())
@@ -1436,6 +1436,21 @@ public:
   }
   void visitInjectIntoOptionalExpr(InjectIntoOptionalExpr *E) {
     printCommon(E, "inject_into_optional") << '\n';
+    printRec(E->getSubExpr());
+    OS << ')';
+  }
+  void visitClassMetatypeToObjectExpr(ClassMetatypeToObjectExpr *E) {
+    printCommon(E, "class_metatype_to_object") << '\n';
+    printRec(E->getSubExpr());
+    OS << ')';
+  }
+  void visitExistentialMetatypeToObjectExpr(ExistentialMetatypeToObjectExpr *E) {
+    printCommon(E, "existential_metatype_to_object") << '\n';
+    printRec(E->getSubExpr());
+    OS << ')';
+  }
+  void visitProtocolMetatypeToObjectExpr(ProtocolMetatypeToObjectExpr *E) {
+    printCommon(E, "protocol_metatype_to_object") << '\n';
     printRec(E->getSubExpr());
     OS << ')';
   }

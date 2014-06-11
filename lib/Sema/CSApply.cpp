@@ -3960,6 +3960,16 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     case ConversionRestrictionKind::Existential:
       return coerceExistential(expr, toType, locator);
 
+    case ConversionRestrictionKind::ClassMetatypeToAnyObject: {
+      return new (tc.Context) ClassMetatypeToObjectExpr(expr, toType);
+    }
+    case ConversionRestrictionKind::ExistentialMetatypeToAnyObject: {
+      return new (tc.Context) ExistentialMetatypeToObjectExpr(expr, toType);
+    }
+    case ConversionRestrictionKind::ProtocolMetatypeToProtocolClass: {
+      return new (tc.Context) ProtocolMetatypeToObjectExpr(expr, toType);
+    }
+        
     case ConversionRestrictionKind::ValueToOptional: {
       auto toGenericType = toType->castTo<BoundGenericType>();
       assert(toGenericType->getDecl()->classifyAsOptionalType());

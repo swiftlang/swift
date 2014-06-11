@@ -294,6 +294,12 @@ StringRef swift::constraints::getName(ConversionRestrictionKind kind) {
     return "[unchecked-optional-to-optional]";
   case ConversionRestrictionKind::OptionalToImplicitlyUnwrappedOptional:
     return "[optional-to-unchecked-optional]";
+  case ConversionRestrictionKind::ClassMetatypeToAnyObject:
+    return "[class-metatype-to-object]";
+  case ConversionRestrictionKind::ExistentialMetatypeToAnyObject:
+    return "[existential-metatype-to-object]";
+  case ConversionRestrictionKind::ProtocolMetatypeToProtocolClass:
+    return "[protocol-metatype-to-object]";
   case ConversionRestrictionKind::ForceUnchecked:
     return "[force-unchecked]";
   case ConversionRestrictionKind::ArrayUpcast:
