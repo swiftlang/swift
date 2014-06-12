@@ -83,7 +83,7 @@ public:
                         SILGenFunction& SGF,
                         CleanupLocation Loc)
     : Scope(Cleanups, Loc), SGF(SGF) {
-    SILDebugScope *DS = new (SGF.SGM.M) SILDebugScope(Loc);
+    SILDebugScope *DS = new (SGF.SGM.M) SILDebugScope(Loc, SGF.getFunction());
     SGF.enterDebugScope(DS);
   }
   using Scope::pop;

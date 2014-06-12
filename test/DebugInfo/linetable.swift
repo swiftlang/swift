@@ -26,9 +26,9 @@ func main(x: Int) -> Void
 {
     var my_class = MyClass(input: 10)
 // Linetable continuity. Don't go into the closure expression.
-// ASM-CHECK: .loc	1 [[@LINE+1]] 5
+// ASM-CHECK: .loc	[[FILEID:[0-9]]] [[@LINE+1]] 5
     call_me (
-// ASM-CHECK-NOT: .loc	1 [[@LINE+1]] 5
+// ASM-CHECK-NOT: .loc	[[FILEID]] [[@LINE+1]] 5
 // CHECK: @_TFF9linetable4mainFSiT_U_FT_T__promote0
         {
             var result = my_class.do_something(x)
@@ -39,7 +39,7 @@ func main(x: Int) -> Void
         }
     )
 
-// ASM-CHECK: .loc	1 [[@LINE+1]] 5
+// ASM-CHECK: .loc	[[FILEID]] [[@LINE+1]] 5
     call_me (
         {
             print ("Here is something you might consider doing: \(x).\n")
@@ -48,15 +48,15 @@ func main(x: Int) -> Void
 
 // The swift_releases at the end should not jump to the point where
 // that memory was retained/allocated and also not to line 0.
-// ASM-CHECK-NOT: .loc	1 0 0
-// ASM-CHECK: .loc	1 [[@LINE+2]] 1
+// ASM-CHECK-NOT: .loc	[[FILEID]] 0 0
+// ASM-CHECK: .loc	[[FILEID]] [[@LINE+2]] 1
 // ASM-CHECK: ret
 }
 
 // ASM-CHECK:__TFF9linetable4main{{.*}}_promote0:
 // ASM-CHECK-NOT: retq
 // The end-of-prologue should have a valid location.
-// ASM-CHECK: .loc	1 34 {{[0-9]+}} prologue_end
+// ASM-CHECK: .loc	[[FILEID]] 34 {{[0-9]+}} prologue_end
 
 
 main(30)

@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-module"
+#include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILExternalSource.h"
 #include "swift/SIL/SILVisitor.h"
@@ -232,8 +233,10 @@ SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
     return fn;
   }
 
-  return SILFunction::create(*this, linkage, name, type, nullptr,
-                             loc, isBareSILFunction, isTransparent);
+  auto fn = SILFunction::create(*this, linkage, name, type, nullptr,
+                                loc, isBareSILFunction, isTransparent);
+  fn->setDebugScope(new (*this) SILDebugScope(loc, *fn));
+  return fn;
 }
 
 SILFunction *SILModule::getOrCreateSharedFunction(SILLocation loc,

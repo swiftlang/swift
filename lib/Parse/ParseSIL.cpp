@@ -17,6 +17,7 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/Subsystems.h"
@@ -328,8 +329,10 @@ SILFunction *SILParser::getGlobalNameForDefinition(Identifier Name,
       P.diagnose(Loc, diag::sil_value_use_type_mismatch, Name.str(),
                  Fn->getLoweredFunctionType(), Ty);
       P.diagnose(It->second.second, diag::sil_prior_reference);
-      Fn = SILFunction::create(SILMod, SILLinkage::Private, "", Ty, nullptr,
-                               SILFileLocation(Loc));
+      auto loc = SILFileLocation(Loc);
+      Fn = SILFunction::create(SILMod, SILLinkage::Private, "", Ty,
+                               nullptr, loc);
+      Fn->setDebugScope(new (SILMod) SILDebugScope(loc, *Fn));
     }
     
     assert(Fn->isExternalDeclaration() && "Forward defns cannot have bodies!");
@@ -342,18 +345,22 @@ SILFunction *SILParser::getGlobalNameForDefinition(Identifier Name,
     return Fn;
   }
   
+  auto loc = SILFileLocation(Loc);
   // If we don't have a forward reference, make sure the function hasn't been
   // defined already.
   if (SILMod.lookUpFunction(Name.str()) != nullptr) {
     P.diagnose(Loc, diag::sil_value_redefinition, Name.str());
-    return SILFunction::create(SILMod, SILLinkage::Private, "", Ty, nullptr,
-                               SILFileLocation(Loc));
+    auto fn = SILFunction::create(SILMod, SILLinkage::Private, "", Ty,
+                                  nullptr, loc);
+    fn->setDebugScope(new (SILMod) SILDebugScope(loc, *fn));
+    return fn;
   }
 
   // Otherwise, this definition is the first use of this name.
-  return SILFunction::create(SILMod, SILLinkage::Private, Name.str(),
-                             Ty, nullptr,
-                             SILFileLocation(Loc));
+  auto fn = SILFunction::create(SILMod, SILLinkage::Private, Name.str(),
+                                Ty, nullptr, loc);
+  fn->setDebugScope(new (SILMod) SILDebugScope(loc, *fn));
+  return fn;
 }
 
 
@@ -363,6 +370,7 @@ SILFunction *SILParser::getGlobalNameForDefinition(Identifier Name,
 SILFunction *SILParser::getGlobalNameForReference(Identifier Name,
                                                   CanSILFunctionType Ty,
                                                   SourceLoc Loc) {
+  auto loc = SILFileLocation(Loc);
   
   // Check to see if we have a function by this name already.
   if (SILFunction *FnRef = SILMod.lookUpFunction(Name.str())) {
@@ -371,7 +379,8 @@ SILFunction *SILParser::getGlobalNameForReference(Identifier Name,
       P.diagnose(Loc, diag::sil_value_use_type_mismatch,
                  Name.str(), FnRef->getLoweredFunctionType(), Ty);
       FnRef = SILFunction::create(SILMod, SILLinkage::Private, "", Ty, nullptr,
-                                  SILFileLocation(Loc));
+                                  loc);
+      FnRef->setDebugScope(new (SILMod) SILDebugScope(loc, *FnRef));
     }
     return FnRef;
   }
@@ -379,7 +388,8 @@ SILFunction *SILParser::getGlobalNameForReference(Identifier Name,
   // If we didn't find a function, create a new one - it must be a forward
   // reference.
   auto Fn = SILFunction::create(SILMod, SILLinkage::Private,
-                                Name.str(), Ty, nullptr, SILFileLocation(Loc));
+                                Name.str(), Ty, nullptr, loc);
+  Fn->setDebugScope(new (SILMod) SILDebugScope(loc, *Fn));
   TUState.ForwardRefFns[Name] = { Fn, Loc };
   TUState.Diags = &P.Diags;
   return Fn;

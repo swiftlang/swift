@@ -1108,7 +1108,7 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
   // both the requirement and witness contexts.
   if (DebugInfo && !f->isExternalDeclaration()
       && f->getAbstractCC() != AbstractCC::WitnessMethod)
-    DebugInfo->emitFunction(f, fn);
+    DebugInfo->emitFunction(*f, fn);
 
   return fn;
 }

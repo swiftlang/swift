@@ -2370,7 +2370,8 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
                 IsNotBare,
                 IsNotTransparent);
   
-  f->setDebugScope(new (M) SILDebugScope(RegularLocation(witness.getDecl())));
+  f->setDebugScope(new (M)
+                   SILDebugScope(RegularLocation(witness.getDecl()), *f));
   
   // Create the witness.
   SILGenFunction(*this, *f)

@@ -5,10 +5,12 @@
 // RUN: dwarfdump --debug-info %t.o | FileCheck --check-prefix=CHECK-DWARF %s
 
 // Verify that the unmangles basenames end up in the accelerator table.
-// CHECK-ACCEL:	 str[0]{{.*}}"Int"
-// CHECK-ACCEL:	 str[0]{{.*}}"foo"
+// CHECK-ACCEL-DAG:	 str[0]{{.*}}"Int"
+// CHECK-ACCEL-DAG:	 str[0]{{.*}}"foo"
 
 // Verify that the mangled names end up in the debug info.
+// CHECK-DWARF: TAG_module
+// CHECK-DWARF: AT_name( "main" )
 // CHECK-DWARF: TAG_structure_type
 // CHECK-DWARF-NEXT: AT_name( "foo" )
 // CHECK-DWARF-NEXT: AT_linkage_name( "_TtC4main3foo" )

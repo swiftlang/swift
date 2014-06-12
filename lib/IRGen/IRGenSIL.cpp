@@ -1327,12 +1327,9 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
       auto DS = I.getDebugScope();
       if (!DS) DS = CurSILFn->getDebugScope();
       if (!DS)
-        // We don't expect a scope from transparent functions. They
-        // should be elided during IR generation anyway. Additionally
-        // until DebugScopes are properly serialized, bare functions
+        // Until DebugScopes are properly serialized, bare functions
         // are allowed to not have a scope.
-        assert((CurSILFn->isTransparent() || CurSILFn->isBare()) &&
-               "function without a debug scope");
+        assert(CurSILFn->isBare() && "function without a debug scope");
       else if (!KeepCurrentLocation)
         IGM.DebugInfo->setCurrentLoc(Builder, DS, ILoc);
 

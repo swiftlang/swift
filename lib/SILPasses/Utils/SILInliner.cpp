@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "sil-inliner"
 #include "swift/SILPasses/Utils/SILInliner.h"
+#include "swift/SIL/SILDebugScope.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
 using namespace swift;
@@ -27,6 +28,8 @@ using namespace swift;
 bool SILInliner::inlineFunction(ApplyInst *AI,
                                 SILFunction *CalleeFunction,
                                 ArrayRef<SILValue> Args) {
+  this->CalleeFunction = CalleeFunction;
+
   // Do not attempt to inline an apply into its parent function.
   if (AI->getParent()->getParent() == CalleeFunction)
     return false;
@@ -57,7 +60,16 @@ bool SILInliner::inlineFunction(ApplyInst *AI,
     Loc = MandatoryInlinedLocation::getMandatoryInlinedLocation(AI->getLoc());
   }
 
-  DebugScope = AI->getDebugScope();
+  auto AIScope = AI->getDebugScope();
+  // FIXME: Turn this into an assertion instead.
+  if (!AIScope)
+    AIScope = AI->getParent()->getParent()->getDebugScope();
+
+  CallSiteScope = new (F.getModule())
+    SILDebugScope(AI->getLoc(), F, AIScope, AIScope->InlineScope);
+
+  assert(CallSiteScope ||
+         AI->getLoc().getKind() == SILLocation::MandatoryInlinedKind);
 
   // If the caller's BB is not the last BB in the calling function, then keep
   // track of the next BB so we always insert new BBs before it; otherwise,
@@ -150,7 +162,7 @@ void SILInliner::visitDebugValueInst(DebugValueInst *Inst) {
   // The mandatory inliner drops debug_value instructions when inlining, as if
   // it were a "nodebug" function in C.
   if (IKind == InlineKind::MandatoryInline) return;
-  
+
   return SILCloner<SILInliner>::visitDebugValueInst(Inst);
 }
 void SILInliner::visitDebugValueAddrInst(DebugValueAddrInst *Inst) {
@@ -205,6 +217,22 @@ void SILInliner::visitSILBasicBlock(SILBasicBlock* BB) {
     visitSILBasicBlock(Succ.getBB());
   }
 }
+
+SILDebugScope *SILInliner::getOrCreateInlineScope(SILInstruction *Orig) {
+  auto CalleeScope = Orig->getDebugScope();
+  auto it = InlinedScopeCache.find(CalleeScope);
+  if (it != InlinedScopeCache.end())
+    return it->second;
+
+  if (CalleeScope) {
+    auto InlineScope = new (getBuilder().getFunction().getModule())
+      SILDebugScope(CallSiteScope, CalleeScope, *CalleeFunction);
+    InlinedScopeCache.insert({CalleeScope, InlineScope});
+    return InlineScope;
+  }
+  return CalleeScope;
+}
+
 
 //===----------------------------------------------------------------------===//
 //                                 Cost Model

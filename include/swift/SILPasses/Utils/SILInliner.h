@@ -39,7 +39,7 @@ public:
 
   explicit SILInliner(SILFunction &F, InlineKind IKind)
     : SILCloner<SILInliner>(F), IKind(IKind),
-      CalleeEntryBB(nullptr), DebugScope(nullptr) {
+    CalleeEntryBB(nullptr), CallSiteScope(nullptr) {
   }
 
   /// inlineFunction - This method inlines a callee function, assuming that it
@@ -64,10 +64,16 @@ private:
   void visitDebugValueAddrInst(DebugValueAddrInst *Inst);
 
   
-
+  SILDebugScope *getOrCreateInlineScope(SILInstruction *Orig);
   void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
-    if (DebugScope)
-      Cloned->setDebugScope(DebugScope);
+    if (IKind == InlineKind::MandatoryInline)
+      // Transparent functions are inheriting the location of the call
+      // site. No soup, err, debugging for you!
+      Cloned->setDebugScope(CallSiteScope);
+    else
+      // Create an inlined version of the scope.
+      Cloned->setDebugScope(getOrCreateInlineScope(Orig));
+
     SILCloner<SILInliner>::postProcess(Orig, Cloned);
   }
 
@@ -87,7 +93,9 @@ private:
   /// Alternatively, it can be the SIL file location of the call site (in case
   /// of SIL-to-SIL transformations).
   Optional<SILLocation> Loc;
-  SILDebugScope *DebugScope;
+  SILDebugScope *CallSiteScope;
+  SILFunction *CalleeFunction;
+  llvm::SmallDenseMap<SILDebugScope *, SILDebugScope *> InlinedScopeCache;
 };
 
 } // end namespace swift

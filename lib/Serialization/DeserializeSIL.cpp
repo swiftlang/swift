@@ -425,6 +425,12 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
   fn->setBare(IsBare);
   if (!fn->hasLocation()) fn->setLocation(loc);
 
+  DebugScope = fn->getDebugScope();
+  if (!DebugScope) {
+    DebugScope = new (SILMod) SILDebugScope(loc, *fn);
+    fn->setDebugScope(DebugScope);
+  }
+
   GenericParamList *contextParams = nullptr;
   if (!declarationOnly) {
     // We need to construct a linked list of GenericParamList. The outermost
@@ -623,7 +629,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   if (!BB)
     return true;
 
-  SILBuilder Builder(BB);
+  SmallVector<SILInstruction*, 1> InsertedInsn;
+  SILBuilder Builder(BB, &InsertedInsn);
   unsigned OpCode = 0, TyCategory = 0, TyCategory2 = 0, ValResNum = 0,
            ValResNum2 = 0, Attr = 0,
            IsTransparent = 0, NumSubs = 0;
@@ -1510,6 +1517,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   }
   if (ResultVal->hasValue())
     setLocalValue(ResultVal, ++LastValueID);
+
+  for (auto I : InsertedInsn)
+    I->setDebugScope(DebugScope);
+
   return false;
 }
 

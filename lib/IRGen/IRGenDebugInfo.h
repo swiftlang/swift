@@ -145,7 +145,7 @@ public:
                     AbstractCC CC, SILType Ty, DeclContext *DeclCtx = nullptr);
 
   /// Emit debug info for a given SIL function.
-  void emitFunction(SILFunction *SILFn, llvm::Function *Fn);
+  void emitFunction(SILFunction &SILFn, llvm::Function *Fn, bool Force = false);
 
   /// Convenience function useful for functions without any source
   /// location. Internally calls emitFunction, emits a debug
@@ -216,6 +216,7 @@ private:
   llvm::DIType getOrCreateType(DebugTypeInfo DbgTy);
   llvm::DIDescriptor getOrCreateScope(SILDebugScope *DS);
   llvm::DIScope getOrCreateContext(DeclContext *DC);
+  llvm::MDNode* createInlinedAt(SILDebugScope &Scope);
 
   StringRef getCurrentDirname();
   llvm::DIFile getOrCreateFile(const char *Filename);

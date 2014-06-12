@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "specialization"
+#include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
@@ -102,13 +103,17 @@ SILFunction *SpecializingCloner::initCloned(SILFunction *Orig,
          && "SILFunction missing DebugScope");
   assert(!Orig->isGlobalInit() && "Global initializer cannot be cloned");
 
+  // This scope needs to hash to a different value than the original scope.
+  auto OrigScope = Orig->getDebugScope();
+  auto ClonedScope = OrigScope ? new (M) SILDebugScope(*OrigScope) : nullptr;
+
   // Create a new empty function.
   SILFunction *NewF =
     SILFunction::create(M, getSpecializedLinkage(Orig->getLinkage()),
                         NewName, FTy, nullptr,
                         Orig->getLocation(), Orig->isBare(),
                         Orig->isTransparent(), 0,
-                        Orig->getDebugScope(), Orig->getDeclContext());
+                        ClonedScope, Orig->getDeclContext());
 
   NumSpecialized++;
   return NewF;

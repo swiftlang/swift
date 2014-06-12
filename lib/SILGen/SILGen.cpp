@@ -371,7 +371,7 @@ SILFunction *SILGenModule::preEmitFunction(SILDeclRef constant, T *astNode,
                          Types.getConstantInfo(constant).ContextGenericParams);
   
   // Create a debug scope for the function using astNode as source location.
-  f->setDebugScope(new (M) SILDebugScope(RegularLocation(astNode)));
+  f->setDebugScope(new (M) SILDebugScope(RegularLocation(astNode), *f));
 
   f->setLocation(Loc);
 
@@ -646,7 +646,8 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
     SILFunction::create(M, SILLinkage::Private, funcName,
                         initSILType, nullptr,
                         binding, IsNotBare, IsNotTransparent);
-  f->setDebugScope(new (M) SILDebugScope(RegularLocation(binding->getInit())));
+  f->setDebugScope(new (M)
+                   SILDebugScope(RegularLocation(binding->getInit()), *f));
   f->setLocation(binding);
   
   SILGenFunction(*this, *f)
@@ -820,7 +821,7 @@ public:
       SILFunction *toplevel = sgm.emitTopLevelFunction(TopLevelLoc);
       
       // Assign a debug scope pointing into the void to the top level function.
-      toplevel->setDebugScope(new (sgm.M) SILDebugScope(TopLevelLoc));
+      toplevel->setDebugScope(new (sgm.M) SILDebugScope(TopLevelLoc,*toplevel));
       
       sgm.TopLevelSGF = new SILGenFunction(sgm, *toplevel);
       sgm.TopLevelSGF->MagicFunctionName = sgm.SwiftModule->Name;
@@ -853,7 +854,7 @@ public:
       SILFunction *toplevel = sgm.emitTopLevelFunction(TopLevelLoc);
 
       // Assign a debug scope pointing into the void to the top level function.
-      toplevel->setDebugScope(new (sgm.M) SILDebugScope(TopLevelLoc));
+      toplevel->setDebugScope(new (sgm.M) SILDebugScope(TopLevelLoc,*toplevel));
       
       SILGenFunction(sgm, *toplevel)
         .emitArtificialTopLevel(mainClass);
