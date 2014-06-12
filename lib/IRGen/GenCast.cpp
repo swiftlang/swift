@@ -22,11 +22,66 @@
 #include "IRGenModule.h"
 #include "TypeInfo.h"
 
-#include "swift/SIL/SILDeclRef.h"
-#include "swift/SIL/SILType.h"
+#include "swift/Basic/Fallthrough.h"
+#include "swift/SIL/SILInstruction.h"
+#include "swift/ABI/MetadataValues.h"
 
 using namespace swift;
 using namespace irgen;
+
+/// Compute the flags to pass to swift_dynamicCast.
+static DynamicCastFlags getDynamicCastFlags(CastConsumptionKind consumptionKind,
+                                            CheckedCastMode mode) {
+  DynamicCastFlags flags = DynamicCastFlags::Default;
+
+  if (mode == CheckedCastMode::Unconditional)
+    flags |= DynamicCastFlags::Unconditional;
+
+  switch (consumptionKind) {
+  case CastConsumptionKind::TakeAlways:
+    flags |= DynamicCastFlags::DestroyOnFailure;
+    SWIFT_FALLTHROUGH;
+  case CastConsumptionKind::TakeOnSuccess:
+    flags |= DynamicCastFlags::TakeOnSuccess;
+    break;
+  case CastConsumptionKind::CopyOnSuccess:
+    break;
+  }
+
+  return flags;
+}
+
+/// Emit a checked cast, starting with a value in memory.
+llvm::Value *irgen::emitCheckedCast(IRGenFunction &IGF,
+                                    Address src,
+                                    SILType srcType,
+                                    Address dest,
+                                    SILType targetType,
+                                    CastConsumptionKind consumptionKind,
+                                    CheckedCastMode mode) {
+  // TODO: attempt to specialize this based on the known types.
+
+  DynamicCastFlags flags = getDynamicCastFlags(consumptionKind, mode);
+
+  // Cast both addresses to opaque pointer type.
+  dest = IGF.Builder.CreateBitCast(dest, IGF.IGM.OpaquePtrTy);
+  src = IGF.Builder.CreateBitCast(src, IGF.IGM.OpaquePtrTy);
+
+  // Load type metadata for the source's static type and the target type.
+  llvm::Value *srcMetadata = IGF.emitTypeMetadataRef(srcType);
+  llvm::Value *targetMetadata = IGF.emitTypeMetadataRef(targetType);
+
+  llvm::Value *args[] = {
+    dest.getAddress(), src.getAddress(),
+    srcMetadata, targetMetadata,
+    IGF.IGM.getSize(Size(unsigned(flags)))
+  };
+
+  auto call = IGF.Builder.CreateCall(IGF.IGM.getDynamicCastFn(), args);
+  call->setDoesNotThrow();
+
+  return call;
+}
 
 llvm::Value *irgen::emitSuperToClassArchetypeConversion(IRGenFunction &IGF,
                                                         llvm::Value *super,

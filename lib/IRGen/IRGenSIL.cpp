@@ -2860,7 +2860,11 @@ void IRGenSILFunction::visitObjCProtocolInst(ObjCProtocolInst *i) {
 
 void IRGenSILFunction::visitUnconditionalCheckedCastAddrInst(
                                    swift::UnconditionalCheckedCastAddrInst *i) {
-  // FIXME: implement
+  Address dest = getLoweredAddress(i->getDest());
+  Address src = getLoweredAddress(i->getSrc());
+  emitCheckedCast(*this, src, i->getSrc().getType(),
+                  dest, i->getDest().getType(),
+                  i->getConsumptionKind(), CheckedCastMode::Unconditional);
 }
 
 void IRGenSILFunction::visitCheckedCastBranchInst(
@@ -2894,7 +2898,15 @@ void IRGenSILFunction::visitCheckedCastBranchInst(
 
 void IRGenSILFunction::visitCheckedCastAddrBranchInst(
                                           swift::CheckedCastAddrBranchInst *i) {
-  // FIXME: implement
+  Address dest = getLoweredAddress(i->getDest());
+  Address src = getLoweredAddress(i->getSrc());
+  llvm::Value *castSucceeded =
+    emitCheckedCast(*this, src, i->getSrc().getType(),
+                    dest, i->getDest().getType(),
+                    i->getConsumptionKind(), CheckedCastMode::Conditional);
+  Builder.CreateCondBr(castSucceeded,
+                       getLoweredBB(i->getSuccessBB()).bb,
+                       getLoweredBB(i->getFailureBB()).bb);
 }
 
 void IRGenSILFunction::visitIsNonnullInst(swift::IsNonnullInst *i) {

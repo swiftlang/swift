@@ -1792,7 +1792,7 @@ extern "C" uint8_t swift_classShift;
 ///
 /// \param targetType The type to which we are casting.
 ///
-/// \param sourceType The static type of the source value.
+/// \param srcType The static type of the source value.
 ///
 /// \param flags Flags to control the operation.
 ///
@@ -1800,8 +1800,8 @@ extern "C" uint8_t swift_classShift;
 ///   swift_dynamicCast may fail rather than return false.
 extern "C" bool
 swift_dynamicCast(OpaqueValue *dest, OpaqueValue *src,
+                  const Metadata *srcType,
                   const Metadata *targetType,
-                  const Metadata *sourceType,
                   DynamicCastFlags flags);
 
 /// \brief Checked dynamic cast to a Swift class type.

@@ -50,7 +50,7 @@ enum IsTake_t { IsNotTake, IsTake };
 enum IsInitialization_t { IsNotInitialization, IsInitialization };
 
 /// The behavior of a dynamic cast operation on the source value.
-enum class CastConsumptionKind {
+enum class CastConsumptionKind : unsigned char {
   /// The source value is always taken, regardless of whether the cast
   /// succeeds.  That is, if the cast fails, the source value is
   /// destroyed.

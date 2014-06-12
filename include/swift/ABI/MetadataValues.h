@@ -94,6 +94,9 @@ enum class NominalTypeKind : uintptr_t {
 
 /// Flags for dynamic-cast operations.
 enum class DynamicCastFlags : size_t {
+  /// All flags clear.
+  Default = 0x0,
+
   /// True if the cast is not permitted to fail.
   Unconditional = 0x1,
 
@@ -105,8 +108,14 @@ enum class DynamicCastFlags : size_t {
   /// false if the value should be left in place.
   DestroyOnFailure = 0x4,
 };
-inline bool operator&(DynamicCastFlags lhs, DynamicCastFlags rhs) {
-  return (size_t(lhs) & size_t(rhs)) != 0;
+inline bool operator&(DynamicCastFlags a, DynamicCastFlags b) {
+  return (size_t(a) & size_t(b)) != 0;
+}
+inline DynamicCastFlags operator|(DynamicCastFlags a, DynamicCastFlags b) {
+  return DynamicCastFlags(size_t(a) | size_t(b));
+}
+inline DynamicCastFlags &operator|=(DynamicCastFlags &a, DynamicCastFlags b) {
+  return a = (a | b);
 }
 
 }

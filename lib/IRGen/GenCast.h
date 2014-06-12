@@ -25,6 +25,7 @@ namespace llvm {
 
 namespace swift {
   class SILType;
+  enum class CastConsumptionKind : unsigned char;
 
 namespace irgen {
   class Address;
@@ -35,6 +36,14 @@ namespace irgen {
     Unconditional,
     Conditional,
   };
+
+  llvm::Value *emitCheckedCast(IRGenFunction &IGF,
+                               Address src,
+                               SILType fromType,
+                               Address dest,
+                               SILType toType,
+                               CastConsumptionKind consumptionKind,
+                               CheckedCastMode mode);
 
   /// \brief Convert a class object to the given destination type,
   /// using a runtime-checked cast.
