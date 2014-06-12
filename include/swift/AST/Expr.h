@@ -1860,7 +1860,7 @@ public:
 class ExistentialMetatypeToObjectExpr : public ImplicitConversionExpr {
 public:
   ExistentialMetatypeToObjectExpr(Expr *subExpr, Type ty)
-    : ImplicitConversionExpr(ExprKind::ClassMetatypeToObject, subExpr, ty) {}
+    : ImplicitConversionExpr(ExprKind::ExistentialMetatypeToObject, subExpr, ty) {}
   
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::ExistentialMetatypeToObject;
