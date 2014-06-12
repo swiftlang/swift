@@ -22,6 +22,12 @@
 #include "llvm/Support/Compiler.h"
 
 namespace swift {
+  struct ProtocolDescriptor;
+
+  extern "C" LLVM_LIBRARY_VISIBILITY
+  bool _swift_classConformsToObjCProtocol(const void *theClass,
+                                    const ProtocolDescriptor *theProtocol);
+
   extern "C" LLVM_LIBRARY_VISIBILITY LLVM_ATTRIBUTE_NORETURN
   void _swift_abortRetainUnowned(const void *object);
 

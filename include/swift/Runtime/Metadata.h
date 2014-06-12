@@ -1782,6 +1782,28 @@ swift_getExistentialTypeMetadata(size_t numProtocols,
 extern "C" size_t swift_classMask;
 extern "C" uint8_t swift_classShift;
 
+/// \brief Perform a checked dynamic cast of a value to a target type.
+///
+/// \param dest A buffer into which to write the destination value.
+/// In all cases, this will be left uninitialized if the cast fails.
+///
+/// \param src Pointer to the source value to cast.  This may be left
+///   uninitialized after the operation, depending on the flags.
+///
+/// \param targetType The type to which we are casting.
+///
+/// \param sourceType The static type of the source value.
+///
+/// \param flags Flags to control the operation.
+///
+/// \return true if the cast succeeded. Depending on the flags,
+///   swift_dynamicCast may fail rather than return false.
+extern "C" bool
+swift_dynamicCast(OpaqueValue *dest, OpaqueValue *src,
+                  const Metadata *targetType,
+                  const Metadata *sourceType,
+                  DynamicCastFlags flags);
+
 /// \brief Checked dynamic cast to a Swift class type.
 ///
 /// \param object The object to cast.

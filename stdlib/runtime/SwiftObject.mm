@@ -555,6 +555,11 @@ extern "C" bool swift_objcRespondsToSelector(id object, SEL selector) {
   return [object respondsToSelector:selector];
 }
 
+extern "C" bool swift::_swift_classConformsToObjCProtocol(const void *theClass,
+                                           const ProtocolDescriptor *protocol) {
+  return [((Class) theClass) conformsToProtocol: (Protocol*) protocol];
+}
+
 extern "C" id swift_dynamicCastObjCProtocolUnconditional(id object,
                                                  size_t numProtocols,
                                                  Protocol * const *protocols) {

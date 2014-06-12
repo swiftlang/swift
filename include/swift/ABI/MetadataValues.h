@@ -92,6 +92,23 @@ enum class NominalTypeKind : uintptr_t {
   Enum = uintptr_t(MetadataKind::Enum),
 };
 
+/// Flags for dynamic-cast operations.
+enum class DynamicCastFlags : size_t {
+  /// True if the cast is not permitted to fail.
+  Unconditional = 0x1,
+
+  /// True if the cast should 'take' the source value on success;
+  /// false if the value should be copied.
+  TakeOnSuccess = 0x2,
+
+  /// True if the cast should destroy the source value on failure;
+  /// false if the value should be left in place.
+  DestroyOnFailure = 0x4,
+};
+inline bool operator&(DynamicCastFlags lhs, DynamicCastFlags rhs) {
+  return (size_t(lhs) & size_t(rhs)) != 0;
+}
+
 }
 
 #endif

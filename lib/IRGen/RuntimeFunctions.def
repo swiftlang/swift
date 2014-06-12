@@ -533,6 +533,13 @@ FUNCTION(DynamicCastObjCClassMetatypeUnconditional,
          ARGS(ObjCClassPtrTy, ObjCClassPtrTy),
          ATTRS(NoUnwind, ReadOnly))
 
+// bool swift_dynamicCast(opaque*, opaque*, type*, type*, size_t);
+FUNCTION(DynamicCast, swift_dynamicCast, RuntimeCC,
+         RETURNS(Int1Ty),
+         ARGS(OpaquePtrTy, OpaquePtrTy, TypeMetadataPtrTy, TypeMetadataPtrTy,
+              SizeTy),
+         ATTRS(NoUnwind, ReadOnly))
+
 // opaque *swift_dynamicCastIndirect(opaque*, void*, void*);
 FUNCTION(DynamicCastIndirect, swift_dynamicCastIndirect, RuntimeCC,
          RETURNS(OpaquePtrTy),
