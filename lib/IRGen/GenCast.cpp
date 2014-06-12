@@ -278,7 +278,7 @@ Address irgen::emitIndirectExistentialDowncast(IRGenFunction &IGF,
 }
 
 /// Emit a Protocol* value referencing an ObjC protocol.
-static llvm::Value *emitReferenceToObjCProtocol(IRGenFunction &IGF,
+llvm::Value *irgen::emitReferenceToObjCProtocol(IRGenFunction &IGF,
                                                 ProtocolDecl *proto) {
   assert(proto->isObjC() && "not an objc protocol");
 

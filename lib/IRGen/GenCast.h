@@ -25,6 +25,7 @@ namespace llvm {
 
 namespace swift {
   class SILType;
+  class ProtocolDecl;
   enum class CastConsumptionKind : unsigned char;
 
 namespace irgen {
@@ -86,6 +87,10 @@ namespace irgen {
                                            SILType srcType,
                                            SILType destType,
                                            CheckedCastMode mode);
+
+  /// Emit a Protocol* value referencing an ObjC protocol.
+  llvm::Value *emitReferenceToObjCProtocol(IRGenFunction &IGF,
+                                           ProtocolDecl *proto);
 
 } // end namespace irgen
 } // end namespace swift

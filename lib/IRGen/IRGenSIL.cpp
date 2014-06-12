@@ -2845,14 +2845,38 @@ void IRGenSILFunction::visitUnconditionalCheckedCastInst(
 
 void IRGenSILFunction::visitObjCMetatypeToObjectInst(
                                                   ObjCMetatypeToObjectInst *i){
-  // FIXME: implement
+  // Bitcast the @objc metatype reference, which is already an ObjC object, to
+  // the destination type.
+  Explosion from = getLoweredExplosion(i->getOperand());
+  llvm::Value *value = from.claimNext();
+  value = Builder.CreateBitCast(value, IGM.UnknownRefCountedPtrTy);
+  Explosion to(from.getKind());
+  to.add(value);
+  setLoweredExplosion(SILValue(i,0), to);
 }
+
 void IRGenSILFunction::visitObjCExistentialMetatypeToObjectInst(
                                        ObjCExistentialMetatypeToObjectInst *i){
-  // FIXME: implement
+  // Bitcast the @objc metatype reference, which is already an ObjC object, to
+  // the destination type. The metatype may carry additional witness tables we
+  // can drop.
+  Explosion from = getLoweredExplosion(i->getOperand());
+  llvm::Value *value = from.claimNext();
+  from.claimAll();
+  value = Builder.CreateBitCast(value, IGM.UnknownRefCountedPtrTy);
+  Explosion to(from.getKind());
+  to.add(value);
+  setLoweredExplosion(SILValue(i,0), to);
 }
 void IRGenSILFunction::visitObjCProtocolInst(ObjCProtocolInst *i) {
-  // FIXME: implement
+  // Get the protocol reference.
+  llvm::Value *protoRef = emitReferenceToObjCProtocol(*this, i->getProtocol());
+  // Bitcast it to the class reference type.
+  protoRef = Builder.CreateBitCast(protoRef,
+                                   getTypeInfo(i->getType()).getStorageType());
+  Explosion ex(ResilienceExpansion::Maximal);
+  ex.add(protoRef);
+  setLoweredExplosion(SILValue(i,0), ex);
 }
 
 void IRGenSILFunction::visitUnconditionalCheckedCastAddrInst(
