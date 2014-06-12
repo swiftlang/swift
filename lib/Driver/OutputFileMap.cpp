@@ -13,7 +13,7 @@
 #include "swift/Driver/OutputFileMap.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/system_error.h"
+#include <system_error>
 
 using namespace swift;
 using namespace swift::driver;

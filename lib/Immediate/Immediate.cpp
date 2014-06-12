@@ -58,7 +58,6 @@
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/system_error.h"
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 
@@ -71,6 +70,7 @@
 #include <wchar.h>
 #include <histedit.h>
 #include <dlfcn.h>
+#include <system_error>
 
 using namespace swift;
 

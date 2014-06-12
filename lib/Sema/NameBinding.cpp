@@ -26,9 +26,9 @@
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/SaveAndRestore.h"
-#include "llvm/Support/system_error.h"
 #include "llvm/Support/Path.h"
 #include <algorithm>
+#include <system_error>
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
