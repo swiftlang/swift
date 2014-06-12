@@ -683,19 +683,11 @@ ModuleFile::maybeGetOrReadGenericParams(serialization::DeclID genericContextID,
     Decl *genericContext = getDecl(genericContextID);
     assert(genericContext && "loading PolymorphicFunctionType before its decl");
 
-    switch (genericContext->getKind()) {
-    case DeclKind::Constructor:
-      return cast<ConstructorDecl>(genericContext)->getGenericParams();
-    case DeclKind::Func:
-      return cast<FuncDecl>(genericContext)->getGenericParams();
-    case DeclKind::Class:
-    case DeclKind::Struct:
-    case DeclKind::Enum:
-    case DeclKind::Protocol:
-      return cast<NominalTypeDecl>(genericContext)->getGenericParams();
-    default:
-      return nullptr;
-    }
+    if (auto fn = dyn_cast<AbstractFunctionDecl>(genericContext))
+      return fn->getGenericParams();
+    if (auto nominal = dyn_cast<NominalTypeDecl>(genericContext))
+      return nominal->getGenericParams();
+    llvm_unreachable("only functions and nominals can provide generic params");
   } else {
     return maybeReadGenericParams(DC, Cursor);
   }
@@ -1205,10 +1197,8 @@ Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
 
       if (auto nominal = dyn_cast<NominalTypeDecl>(base))
         paramList = nominal->getGenericParams();
-      else if (auto fn = dyn_cast<FuncDecl>(base))
+      else if (auto fn = dyn_cast<AbstractFunctionDecl>(base))
         paramList = fn->getGenericParams();
-      else if (auto ctor = dyn_cast<ConstructorDecl>(base))
-        paramList = ctor->getGenericParams();
 
       if (!paramList || paramIndex >= paramList->size()) {
         error();

@@ -146,22 +146,10 @@ DeclID Serializer::addDeclRef(const Decl *D, bool forceSerialization) {
   // Record any generic parameters that come from this decl, so that we can use
   // the decl to refer to the parameters later.
   const GenericParamList *paramList = nullptr;
-  switch (D->getKind()) {
-  case DeclKind::Constructor:
-    paramList = cast<ConstructorDecl>(D)->getGenericParams();
-    break;
-  case DeclKind::Func:
-    paramList = cast<FuncDecl>(D)->getGenericParams();
-    break;
-  case DeclKind::Class:
-  case DeclKind::Struct:
-  case DeclKind::Enum:
-  case DeclKind::Protocol:
-    paramList = cast<NominalTypeDecl>(D)->getGenericParams();
-    break;
-  default:
-    break;
-  }
+  if (auto fn = dyn_cast<AbstractFunctionDecl>(D))
+    paramList = fn->getGenericParams();
+  else if (auto nominal = dyn_cast<NominalTypeDecl>(D))
+    paramList = nominal->getGenericParams();
   if (paramList)
     GenericContexts[paramList] = D;
 
@@ -1367,6 +1355,10 @@ void Serializer::writeDecl(const Decl *D) {
 
     const Decl *DC = getDeclForContext(extension->getDeclContext());
     Type baseTy = extension->getExtendedType();
+
+    // Make sure the base type has registered itself as a provider of generic
+    // parameters.
+    (void)addDeclRef(baseTy->getAnyNominal());
 
     SmallVector<DeclID, 8> protocols;
     for (auto proto : extension->getProtocols())
