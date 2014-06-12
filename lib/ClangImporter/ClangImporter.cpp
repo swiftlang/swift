@@ -276,10 +276,10 @@ ClangImporter::create(ASTContext &ctx,
   // FIXME: This is actually a general problem: any "fatal" error could mess up
   // the CompilerInvocation.
   clangDiags->setDiagnosticMapping(clang::diag::err_module_not_found,
-                                   clang::diag::Mapping::MAP_ERROR,
+                                   clang::diag::Severity::MAP_ERROR,
                                    clang::SourceLocation());
   clangDiags->setDiagnosticMapping(clang::diag::err_module_not_built,
-                                   clang::diag::Mapping::MAP_ERROR,
+                                   clang::diag::Severity::MAP_ERROR,
                                    clang::SourceLocation());
 
   if (!CompilerInvocation::CreateFromArgs(*invocation,
