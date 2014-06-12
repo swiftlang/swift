@@ -189,7 +189,7 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
 
     // Open the input file.
     std::unique_ptr<llvm::MemoryBuffer> InputFile;
-    if (llvm::error_code Err =
+    if (std::error_code Err =
           llvm::MemoryBuffer::getFileOrSTDIN(File, InputFile)) {
       Diagnostics.diagnose(SourceLoc(), diag::error_open_input_file,
                            File, Err.message());
@@ -203,7 +203,7 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
       std::unique_ptr<llvm::MemoryBuffer> ModuleDocFile;
       auto Err = llvm::MemoryBuffer::getFileOrSTDIN(ModuleDocFilePath,
                                                     ModuleDocFile);
-      if (Err && Err.value() != llvm::errc::no_such_file_or_directory) {
+      if (Err && Err != std::errc::no_such_file_or_directory) {
         Diagnostics.diagnose(SourceLoc(), diag::error_open_input_file,
                              File, Err.message());
         return true;

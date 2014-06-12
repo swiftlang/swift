@@ -20,8 +20,7 @@ using namespace swift::driver;
 
 std::unique_ptr<OutputFileMap> OutputFileMap::loadFromPath(StringRef Path) {
   std::unique_ptr<llvm::MemoryBuffer> Buffer;
-  llvm::error_code Result = llvm::MemoryBuffer::getFile(Path, Buffer);
-  if (Result != 0)
+  if (llvm::MemoryBuffer::getFile(Path, Buffer))
     return nullptr;
   return loadFromBuffer(std::move(Buffer));
 }

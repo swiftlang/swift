@@ -35,7 +35,7 @@ SerializedModuleLoader::SerializedModuleLoader(ASTContext &ctx,
   : ModuleLoader(tracker), Ctx(ctx) {}
 SerializedModuleLoader::~SerializedModuleLoader() = default;
 
-static llvm::error_code
+static std::error_code
 openModuleFiles(StringRef DirName, StringRef ModuleFilename,
                 StringRef ModuleDocFilename,
                 std::unique_ptr<llvm::MemoryBuffer> &ModuleBuffer,
@@ -55,14 +55,14 @@ openModuleFiles(StringRef DirName, StringRef ModuleFilename,
   llvm::sys::path::append(Scratch, DirName, ModuleDocFilename);
   auto Err = llvm::MemoryBuffer::getFile(
       StringRef(Scratch.data(), Scratch.size()), ModuleDocBuffer);
-  if (Err && Err.value() != llvm::errc::no_such_file_or_directory) {
+  if (Err && Err != std::errc::no_such_file_or_directory) {
     ModuleBuffer.reset(nullptr);
     return Err;
   }
-  return llvm::error_code();
+  return std::error_code();
 }
 
-static llvm::error_code
+static std::error_code
 findModule(ASTContext &ctx, AccessPathElem moduleID,
            std::unique_ptr<llvm::MemoryBuffer> &moduleBuffer,
            std::unique_ptr<llvm::MemoryBuffer> &moduleDocBuffer,
@@ -96,7 +96,7 @@ findModule(ASTContext &ctx, AccessPathElem moduleID,
                                moduleFilename.str(), moduleDocFilename.str(),
                                moduleBuffer, moduleDocBuffer,
                                scratch);
-    if (err.value() == llvm::errc::is_a_directory) {
+    if (err == std::errc::is_a_directory) {
       currPath = path;
       llvm::sys::path::append(currPath, moduleFilename.str());
       err = openModuleFiles(currPath,
@@ -104,7 +104,7 @@ findModule(ASTContext &ctx, AccessPathElem moduleID,
                             moduleBuffer, moduleDocBuffer,
                             scratch);
     }
-    if (!err || err.value() != llvm::errc::no_such_file_or_directory)
+    if (!err || err != std::errc::no_such_file_or_directory)
       return err;
   }
 
@@ -121,14 +121,14 @@ findModule(ASTContext &ctx, AccessPathElem moduleID,
                                  archFile.str(), archDocFile.str(),
                                  moduleBuffer, moduleDocBuffer,
                                  scratch);
-      if (!err || err.value() != llvm::errc::no_such_file_or_directory)
+      if (!err || err != std::errc::no_such_file_or_directory)
         return err;
     }
   }
 
   // If we're not allowed to look in the runtime library import path, stop.
   if (ctx.SearchPathOpts.SkipRuntimeLibraryImportPath)
-    return llvm::make_error_code(llvm::errc::no_such_file_or_directory);
+    return llvm::make_error_code(std::errc::no_such_file_or_directory);
 
   // Search the runtime import path.
   isFramework = false;
@@ -289,10 +289,10 @@ Module *SerializedModuleLoader::loadModule(SourceLoc importLoc,
 
   // Otherwise look on disk.
   if (!moduleInputBuffer) {
-    if (llvm::error_code err = findModule(Ctx, moduleID, moduleInputBuffer,
-                                          moduleDocInputBuffer,
-                                          isFramework)) {
-      if (err.value() != llvm::errc::no_such_file_or_directory) {
+    if (std::error_code err = findModule(Ctx, moduleID, moduleInputBuffer,
+                                         moduleDocInputBuffer,
+                                         isFramework)) {
+      if (err != std::errc::no_such_file_or_directory) {
         Ctx.Diags.diagnose(moduleID.second, diag::sema_opening_import,
                            moduleID.first.str(), err.message());
       }

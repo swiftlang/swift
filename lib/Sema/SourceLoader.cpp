@@ -31,9 +31,9 @@
 using namespace swift;
 
 // FIXME: Basically the same as SerializedModuleLoader.
-static llvm::error_code findModule(ASTContext &ctx, StringRef moduleID,
-                                   SourceLoc importLoc,
-                                   std::unique_ptr<llvm::MemoryBuffer> &buffer){
+static std::error_code findModule(ASTContext &ctx, StringRef moduleID,
+                                  SourceLoc importLoc,
+                                  std::unique_ptr<llvm::MemoryBuffer> &buffer) {
   llvm::SmallString<128> inputFilename;
 
   for (auto Path : ctx.SearchPathOpts.ImportSearchPaths) {
@@ -41,11 +41,11 @@ static llvm::error_code findModule(ASTContext &ctx, StringRef moduleID,
     llvm::sys::path::append(inputFilename, moduleID);
     inputFilename.append(".swift");
     auto err = llvm::MemoryBuffer::getFile(inputFilename.str(), buffer);
-    if (!err || err.value() != llvm::errc::no_such_file_or_directory)
+    if (!err || err != std::errc::no_such_file_or_directory)
       return err;
   }
 
-  return make_error_code(llvm::errc::no_such_file_or_directory);
+  return make_error_code(std::errc::no_such_file_or_directory);
 }
 
 namespace {
@@ -71,9 +71,9 @@ Module *SourceLoader::loadModule(SourceLoc importLoc,
   auto moduleID = path[0];
 
   std::unique_ptr<llvm::MemoryBuffer> inputFile;
-  if (llvm::error_code err = findModule(Ctx, moduleID.first.str(),
-                                        moduleID.second, inputFile)) {
-    if (err.value() != llvm::errc::no_such_file_or_directory) {
+  if (std::error_code err = findModule(Ctx, moduleID.first.str(),
+                                       moduleID.second, inputFile)) {
+    if (err != std::errc::no_such_file_or_directory) {
       Ctx.Diags.diagnose(moduleID.second, diag::sema_opening_import,
                          moduleID.first.str(), err.message());
     }

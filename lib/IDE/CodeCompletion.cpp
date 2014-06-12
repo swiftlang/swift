@@ -529,8 +529,7 @@ void CodeCompletionCacheImpl::getResults(
     V = TheCache.get(K);
   } else {
     llvm::sys::fs::file_status ModuleStatus;
-    bool IsError = llvm::sys::fs::status(K.ModuleFilename, ModuleStatus);
-    if (IsError ||
+    if (llvm::sys::fs::status(K.ModuleFilename, ModuleStatus) ||
         V.getValue()->ModuleModificationTime !=
             ModuleStatus.getLastModificationTime()) {
       // Cache is stale.  Update the cache.
