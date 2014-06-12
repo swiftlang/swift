@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "global-arc-dataflow-analysis"
+#define DEBUG_TYPE "sil-global-arc-opts"
 #include "GlobalARCSequenceDataflow.h"
 #include "swift/SILAnalysis/ARCAnalysis.h"
 #include "swift/SIL/SILInstruction.h"

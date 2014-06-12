@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "sil-global-arc-analysis"
+#define DEBUG_TYPE "sil-global-arc-opts"
 #include "swift/SILAnalysis/ARCAnalysis.h"
 #include "swift/Basic/BlotMapVector.h"
 #include "ReferenceCountState.h"
