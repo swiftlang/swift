@@ -67,41 +67,36 @@ t.objcValue = "four"
 // CHECK-NEXT: swiftValue 42, objcValue four
 
 //===========================================================================//
-// Test using new KVOContext object and API.
+// Test using a proper global context reference.
 //===========================================================================//
 
-class MyContext : KVOContext {
-  func sayHello() { println("hello from MyContext") }
-  deinit { println("goodbye from MyContext") }
-}
+var kvoContext = Int()
 
 class ObserverKVO : NSObject {
   var target: Target?
-  weak var kvoContext : KVOContext?
 
   init() { target = nil; super.init() }
 
-  func observeTarget(target: Target, kvoContext: KVOContext) {
+  func observeTarget(target: Target) {
     self.target = target
-    self.kvoContext = kvoContext
     self.target!.addObserver(self,
        forKeyPath:"objcValue",
        options:NSKeyValueObservingOptions.New | NSKeyValueObservingOptions.Old, 
-       kvoContext: kvoContext)
+       context: &kvoContext)
   }
   
   func removeTarget() {
     self.target!.removeObserver(self, forKeyPath:"objcValue",
-                                      kvoContext: kvoContext!)
+                                      context: &kvoContext)
   }
 
   override func observeValueForKeyPath(path:String,
                                        ofObject obj:AnyObject,
                                        change:NSDictionary,
                                        context:CMutableVoidPointer) {
-    target!.print()
-    let myContext = KVOContext.fromVoidContext(context) as MyContext
-    myContext.sayHello()
+    if context == &kvoContext {
+      target!.print()
+    }
   }
 }
 
@@ -112,7 +107,7 @@ println("unobserved 2")
 t2.objcValue = "one"
 t2.objcValue = "two"
 println("registering observer 2")
-o2.observeTarget(t2, kvoContext: MyContext())
+o2.observeTarget(t2)
 println("Now witness the firepower of this fully armed and operational panopticon!")
 t2.objcValue = "three"
 t2.objcValue = "four"
@@ -122,8 +117,5 @@ println("target removed")
 // CHECK: registering observer 2
 // CHECK-NEXT: Now witness the firepower of this fully armed and operational panopticon!
 // CHECK-NEXT: swiftValue 42, objcValue three
-// CHECK-NEXT: hello from MyContext
 // CHECK-NEXT: swiftValue 42, objcValue four
-// CHECK-NEXT: hello from MyContext
-// CHECK-NEXT: goodbye from MyContext
 // CHECK-NEXT: target removed

@@ -1,7 +1,6 @@
 set(SHARED_LIBRARY ON)
 set(SWIFTFOUNDATION_SOURCES
     Foundation.swift
-    KVO.swift
     NSStringAPI.swift
     Misc.mm
 )
