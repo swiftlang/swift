@@ -473,14 +473,3 @@ void irgen::reemitAsUnsubstituted(IRGenFunction &IGF,
     out.add(value);
   }
 }
-
-llvm::Value *
-IRGenFunction::emitSuperToClassArchetypeConversion(llvm::Value *super,
-                                                   SILType destType,
-                                                   CheckedCastMode mode) {
-  assert(destType.is<ArchetypeType>() && "expected archetype type");
-  assert(destType.castTo<ArchetypeType>()->requiresClass()
-         && "expected class archetype type");
-
-  return emitClassDowncast(super, destType, mode);
-}

@@ -54,7 +54,6 @@ namespace swift {
   class VarDecl;
   
 namespace irgen {
-  enum class CheckedCastMode : unsigned char;
   class Explosion;
   class FunctionRef;
   class HeapLayout;
@@ -73,12 +72,6 @@ enum class LocalTypeData : unsigned {
   Metatype = ~0U
 };
   
-/// Discriminator for checked cast modes.
-enum class CheckedCastMode : unsigned char {
-  Unconditional,
-  Conditional,
-};
-
 /// IRGenFunction - Primary class for emitting LLVM instructions for a
 /// specific function.
 class IRGenFunction {
@@ -220,19 +213,6 @@ public:
 //--- Expression emission ------------------------------------------------------
 public:
   void emitFakeExplosion(const TypeInfo &type, Explosion &explosion);
-
-  /// \brief Convert the given explosion to the given destination archetype,
-  /// using a runtime-checked cast.
-  llvm::Value *emitSuperToClassArchetypeConversion(llvm::Value *super,
-                                                   SILType destType,
-                                                   CheckedCastMode mode);
-  
-  /// \brief Convert the given value to the given destination type, using a
-  /// runtime-checked cast.
-  llvm::Value *emitClassDowncast(llvm::Value *from,
-                                 SILType toType,
-                                 CheckedCastMode mode);
-  
 
 //--- Declaration emission -----------------------------------------------------
 public:

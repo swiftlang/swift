@@ -38,6 +38,7 @@
 
 #include "CallEmission.h"
 #include "Explosion.h"
+#include "GenCast.h"
 #include "GenClass.h"
 #include "GenFunc.h"
 #include "GenHeap.h"
@@ -2734,13 +2735,13 @@ static Address emitCheckedCast(IRGenSILFunction &IGF,
     // addr appropriately.
     //
     // FIXME: The assumption of not taking a pointer is heavily baked
-    // into IRGenFunction::emitClassDowncast. We should refactor it
+    // into emitClassDowncast. We should refactor it
     // into emitDowncastPointer or the like.
     if (operand.getType().isAddress()) {
       auto fromAddr = IGF.getLoweredAddress(operand);
       auto toTy = IGF.getTypeInfo(destTy).getStorageType();
       llvm::Value *fromValue = IGF.Builder.CreateLoad(fromAddr);
-      IGF.emitClassDowncast(fromValue, destTy, mode);
+      emitClassDowncast(IGF, fromValue, destTy, mode);
       llvm::Value *cast = IGF.Builder.CreateBitCast(
         fromAddr.getAddress(), toTy->getPointerTo());
       return Address(cast, fromAddr.getAlignment());
@@ -2748,7 +2749,7 @@ static Address emitCheckedCast(IRGenSILFunction &IGF,
 
     Explosion from = IGF.getLoweredExplosion(operand);
     llvm::Value *fromValue = from.claimNext();
-    llvm::Value *cast = IGF.emitClassDowncast(fromValue, destTy, mode);
+    llvm::Value *cast = emitClassDowncast(IGF, fromValue, destTy, mode);
     return Address(cast, Alignment(1));
   }
     
@@ -2757,7 +2758,7 @@ static Address emitCheckedCast(IRGenSILFunction &IGF,
     llvm::Value *in = super.claimNext();
     Explosion out(ResilienceExpansion::Maximal);
     llvm::Value *cast
-      = IGF.emitSuperToClassArchetypeConversion(in, destTy, mode);
+      = emitSuperToClassArchetypeConversion(IGF, in, destTy, mode);
     return Address(cast, Alignment(1));
   }
       
@@ -2773,7 +2774,7 @@ static Address emitCheckedCast(IRGenSILFunction &IGF,
     } else {
       Explosion archetype = IGF.getLoweredExplosion(operand);
       llvm::Value *fromValue = archetype.claimNext();
-      llvm::Value *toValue = IGF.emitClassDowncast(fromValue, destTy, mode);
+      llvm::Value *toValue = emitClassDowncast(IGF, fromValue, destTy, mode);
       return Address(toValue, Alignment(1));
     }
   }
@@ -2793,7 +2794,7 @@ static Address emitCheckedCast(IRGenSILFunction &IGF,
                                          operand.getType(),
                                          CanArchetypeType());
       
-      llvm::Value *toValue = IGF.emitClassDowncast(instance, destTy, mode);
+      llvm::Value *toValue = emitClassDowncast(IGF, instance, destTy, mode);
       return Address(toValue, Alignment(1));
     }
   }

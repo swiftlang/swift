@@ -35,7 +35,6 @@ namespace irgen {
   class Address;
   class Explosion;
   class CallEmission;
-  enum class CheckedCastMode : unsigned char;
   class IRGenFunction;
   class IRGenModule;
   class TypeInfo;
@@ -194,34 +193,12 @@ namespace irgen {
                                                              Explosion &value,
                                                              CanType type);
 
-  /// Emit a checked cast of a metatype.
-  llvm::Value *emitMetatypeDowncast(IRGenFunction &IGF,
-                                    llvm::Value *metatype,
-                                    CanAnyMetatypeType toMetatype,
-                                    CheckedCastMode mode);
-  
-  /// Emit a checked cast of an opaque archetype.
-  Address emitOpaqueArchetypeDowncast(IRGenFunction &IGF,
-                                      Address value,
-                                      SILType srcType,
-                                      SILType destType,
-                                      CheckedCastMode mode);
-  
-  /// Emit a checked cast of an existential container's
-  /// contained value.
-  Address emitIndirectExistentialDowncast(IRGenFunction &IGF,
-                                          Address value,
-                                          SILType srcType,
-                                          SILType destType,
-                                          CheckedCastMode mode);
-  
-  /// Emit a checked cast to an Objective-C protocol or protocol composition.
-  llvm::Value *emitObjCExistentialDowncast(IRGenFunction &IGF,
-                                           llvm::Value *orig,
-                                           SILType srcType,
-                                           SILType destType,
-                                           CheckedCastMode mode);
-  
+  std::pair<Address, llvm::Value*>
+  emitIndirectExistentialProjectionWithMetadata(IRGenFunction &IGF,
+                                                Address base,
+                                                SILType baseTy,
+                                                CanType openedArchetype);
+
   /// True if the protocol requires a witness table for method dispatch.
   bool requiresProtocolWitnessTable(ProtocolDecl *protocol);
   
