@@ -24,7 +24,6 @@ namespace llvm {
 namespace swift {
   class CanType;
   class FuncDecl;
-  class PolymorphicFunctionType;
   class ProtocolConformance;
   struct SILDeclRef;
   class SILType;

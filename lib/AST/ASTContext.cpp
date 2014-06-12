@@ -638,15 +638,19 @@ ASTContext::getUnimplementedInitializerDecl(LazyResolver *resolver) const {
 static bool isGenericIntrinsic(FuncDecl *fn, CanType &input, CanType &output,
                                CanType &param) {
   auto fnType =
-    dyn_cast<PolymorphicFunctionType>(fn->getType()->getCanonicalType());
-  if (!fnType || fnType->getAllArchetypes().size() != 1)
+    dyn_cast<GenericFunctionType>(fn->getInterfaceType()->getCanonicalType());
+  if (!fnType || fnType->getGenericParams().size() != 1)
     return false;
 
-  auto paramType = CanArchetypeType(fnType->getAllArchetypes()[0]);
-  if (paramType->hasRequirements())
+  bool hasRequirements = std::any_of(fnType->getRequirements().begin(),
+                                     fnType->getRequirements().end(),
+                                     [](const Requirement &req) -> bool {
+    return req.getKind() != RequirementKind::WitnessMarker;
+  });
+  if (hasRequirements)
     return false;
 
-  param = paramType;
+  param = CanGenericTypeParamType(fnType->getGenericParams().front());
   input = stripImmediateLabels(fnType.getInput());
   output = stripImmediateLabels(fnType.getResult());
   return true;

@@ -1293,11 +1293,7 @@ bool irgen::requiresObjCMethodDescriptor(FuncDecl *method) {
     return false;
     
     // We don't export generic methods or subclasses to IRGen yet.
-  if (method->getType()->is<PolymorphicFunctionType>()
-      || method->getType()->getAs<AnyFunctionType>()
-          ->getResult()->is<PolymorphicFunctionType>()
-      || method->getDeclContext()->getDeclaredTypeInContext()
-          ->is<BoundGenericType>())
+  if (method->getGenericParamsOfContext())
     return false;
   
   if (method->isObjC() || method->getAttrs().hasAttribute<IBActionAttr>())
@@ -1310,11 +1306,7 @@ bool irgen::requiresObjCMethodDescriptor(FuncDecl *method) {
 bool irgen::requiresObjCMethodDescriptor(ConstructorDecl *constructor) {
   // We don't export generic methods or subclasses to IRGen yet.
   // FIXME: Total hack. Sema should filter these out.
-  if (constructor->getType()->is<PolymorphicFunctionType>()
-      || constructor->getType()->getAs<AnyFunctionType>()
-           ->getResult()->is<PolymorphicFunctionType>()
-      || constructor->getDeclContext()->getDeclaredTypeInContext()
-           ->is<BoundGenericType>())
+  if (constructor->getGenericParamsOfContext())
     return false;
 
   return constructor->isObjC();
