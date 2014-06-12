@@ -45,24 +45,40 @@ def cFuncSuffix(bits):
     if bits == 80:
         return 'l'
 
-# Each of the following lists is ordered to match tgmath.h.
+# Each of the following lists is ordered to match math.h
 
-UnaryFunctions = ['acos', 'asin', 'atan', 'acosh', 'asinh', 'atanh',
-                  'cos', 'sin', 'tan', 'cosh', 'sinh', 'tanh', 
-                  'exp', 'log', 'sqrt', 'fabs', 'cbrt', 'ceil', 
-                  'erf', 'erfc', 'exp2', 'expm1', 'floor', 'lgamma', 
-                  'log10', 'log1p', 'log2', 'logb', 
-                  'nearbyint', 'rint', 'round', 'tgamma', 'trunc']
+# (T) -> T
+UnaryFunctions = ['acos', 'asin', 'atan', 'cos', 'sin', 'tan', 
+                  'acosh', 'asinh', 'atanh', 'cosh', 'sinh', 'tanh', 
+                  'exp', 'exp2', 'expm1',
+                  'log', 'log10', 'log2', 'log1p', 'logb', 
+                  'fabs', 'cbrt', 'sqrt', 'erf', 'erfc', 'tgamma', 
+                  'ceil', 'floor', 'nearbyint', 'rint', 'round', 'trunc', 
+                  ]
 
-BinaryFunctions = ['pow', 'atan2', 'copysign', 'fdim', 'fmax', 'fmin', 
+# (T, T) -> T
+BinaryFunctions = ['atan2', 'hypot', 'pow', 
 # FIXME: rdar://17275152 call to fmodf causes deserialization crash
 # 'fmod', 
-                   'hypot', 'nextafter', 'remainder']
+                   'remainder', 'copysign', 'nextafter', 'fdim', 'fmax', 'fmin']
 
-OtherFunctions = ['fma', 'frexp', 'ilogb', 'ldexp', 'remquo', 'scalbn']
+# These functions have special implementations.
+OtherFunctions = ['fpclassify', 
+                  'isnormal', 'isfinite', 'isinf', 'isnan', 'signbit', 
+                  'modf', 'ldexp', 'frexp', 'ilogb', 'scalbn', 'lgamma', 
+                  'remquo', 'nan', 'fma', 
+                  'jn', 'yn']
 
-UnhandledFunctions = ['llrint', 'llround', 'lrint', 'lround', 'nexttoward', 
-                      'scalbln', 'carg', 'cimag', 'conj', 'cproj', 'creal']
+# These functions are imported correctly as-is.             
+OkayFunctions = ['j0', 'j1', 'y0', 'y1']
+
+# These functions are not supported for various reasons.
+UnhandledFunctions = ['math_errhandling', 'scalbln', 
+                      'lrint', 'lround', 'llrint', 'llround', 'nexttoward', 
+                      'isgreater', 'isgreaterequal', 'isless', 'islessequal', 
+                      'islessgreater', 'isunordered', '__exp10', 
+                      '__sincos', '__cospi', '__sinpi', '__tanpi', '__sincospi']
+
 
 def AllFloatTypes():
     for bits in allFloatBits:
@@ -84,6 +100,9 @@ def TypedBinaryFunctions():
 
 }%
 
+
+// Unary functions
+
 % for T, CT, f, ufunc in TypedUnaryFunctions():
 @transparent 
 func ${ufunc}(x: ${T}) -> ${T} {
@@ -92,18 +111,75 @@ func ${ufunc}(x: ${T}) -> ${T} {
 
 % end
 
+// Binary functions
+
 % for T, CT, f, bfunc in TypedBinaryFunctions():
 @transparent 
 func ${bfunc}(lhs: ${T}, rhs: ${T}) -> ${T} {
   return ${T}(${bfunc}${f}(${CT}(lhs), ${CT}(rhs)))
 }
 
-%end
+% end
 
-% for T, CT, f in OverlayFloatTypes():
+// Other functions
+
+% # These are AllFloatTypes not OverlayFloatTypes because of the Int return.
+% for T, CT, f in AllFloatTypes():
+%   if f == '':
+%     f = 'd'
 @transparent 
-func fma(x: ${T}, y: ${T}, z: ${T}) -> ${T} {
-  return ${T}(fma${f}(${CT}(x), ${CT}(y), ${CT}(z)))
+func fpclassify(x: ${T}) -> Int {
+  return Int(__fpclassify${f}(${CT}(x)))
+}
+
+% end
+
+% # These are AllFloatTypes not OverlayFloatTypes because we need to cover 
+% # them all because C's declarations are compiler builtins.
+% for T, CT, f in AllFloatTypes():
+@transparent
+func isnormal(value: ${T}) -> Bool {
+  return value.isNormal
+}
+
+@transparent
+func isfinite(value: ${T}) -> Bool {
+  return value.isFinite
+}
+
+@transparent
+func isinf(value: ${T}) -> Bool {
+  return value.isInfinite
+}
+
+@transparent
+func isnan(value: ${T}) -> Bool {
+  return value.isNaN
+}
+
+@transparent
+func signbit(value: ${T}) -> Int {
+  return value.isSignMinus ? 1 : 0
+}
+
+% end
+
+% # These are AllFloatTypes not OverlayFloatTypes because of the tuple return.
+% for T, CT, f in AllFloatTypes():
+@transparent 
+func modf(value: ${T}) -> (${T}, ${T}) {
+  var ipart = ${CT}(0)
+  let fpart = modf${f}(${CT}(value), &ipart)
+  return (${T}(ipart), ${T}(fpart))
+}
+
+% end
+
+% # This is AllFloatTypes not OverlayFloatTypes because of the Int parameter.
+% for T, CT, f in AllFloatTypes():
+@transparent 
+func ldexp(x: ${T}, n: Int) -> ${T} {
+  return ${T}(ldexp${f}(${CT}(x), CInt(n)))
 }
 
 % end
@@ -127,6 +203,7 @@ func ilogb(x: ${T}) -> Int {
   return Int(ilogb${f}(${CT}(x)))
 }
 
+% end
 @asmname("ilogb")
 func _swift_Darwin_ilogb(value: CDouble) -> CInt
 @transparent 
@@ -134,13 +211,29 @@ func ilogb(x: Double) -> Int {
   return Int(_swift_Darwin_ilogb(CDouble(x)))
 }
 
-% end
 
 % # This is AllFloatTypes not OverlayFloatTypes because of the Int parameter.
 % for T, CT, f in AllFloatTypes():
 @transparent 
-func ldexp(x: ${T}, n: Int) -> ${T} {
-  return ${T}(ldexp${f}(${CT}(x), CInt(n)))
+func scalbn(x: ${T}, n: Int) -> ${T} {
+  return ${T}(scalbn${f}(${CT}(x), CInt(n)))
+}
+
+% end
+
+% # This is AllFloatTypes not OverlayFloatTypes because of the tuple return.
+% for T, CT, f in AllFloatTypes():
+% # The real lgamma_r is not imported because it hides behind macro _REENTRANT.
+@asmname("lgamma${f}_r") 
+func _swift_Darwin_lgamma${f}_r(${CT}, UnsafePointer<CInt>) -> ${CT}
+@transparent 
+func lgamma(x: ${T}) -> (${T}, Int) {
+  var sign = CInt(0)
+  let value = withUnsafePointer(&sign) { 
+    (signp: UnsafePointer<CInt>) -> ${CT} in
+    return _swift_Darwin_lgamma${f}_r(${CT}(x), signp)
+  }
+  return (${T}(value), Int(sign))
 }
 
 % end
@@ -156,11 +249,35 @@ func remquo(x: ${T}, y: ${T}) -> (${T}, Int) {
 
 % end
 
-% # This is AllFloatTypes not OverlayFloatTypes because of the Int parameter.
+% # This is AllFloatTypes not OverlayFloatTypes because of the String parameter.
 % for T, CT, f in AllFloatTypes():
 @transparent 
-func scalbn(x: ${T}, n: Int) -> ${T} {
-  return ${T}(scalbn${f}(${CT}(x), CInt(n)))
+func nan(tag: String) -> ${T} {
+  return tag.withCString { (cstr: CString)->${T} in
+    return ${T}(nan${f}(cstr))
+  }
 }
 
 % end
+
+% for T, CT, f in OverlayFloatTypes():
+@transparent 
+func fma(x: ${T}, y: ${T}, z: ${T}) -> ${T} {
+  return ${T}(fma${f}(${CT}(x), ${CT}(y), ${CT}(z)))
+}
+
+% end
+
+% # These C functions only support double. The overlay fixes the Int parameter.
+@transparent 
+func jn(n: Int, x: Double) -> Double {
+  return jn(CInt(n), x)
+}
+
+@transparent 
+func yn(n: Int, x: Double) -> Double {
+  return yn(CInt(n), x)
+}
+
+% end
+
