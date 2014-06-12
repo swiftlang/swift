@@ -86,7 +86,8 @@ func _getOptionalValue<T>(v: T?) -> T {
   case .Some(var x):
     return x
   case .None:
-    _preconditionFailure("Can't unwrap Optional.None")
+    _preconditionFailure(
+      "unexpectedly found nil while unwrapping an Optional value")
   }
 }
 
