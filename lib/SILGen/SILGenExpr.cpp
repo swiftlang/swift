@@ -4208,21 +4208,56 @@ RValue RValueEmitter::visitLValueToPointerExpr(LValueToPointerExpr *E,
   return RValue(SGF, E, ManagedValue::forUnmanaged(ptr));
 }
 
-RValue RValueEmitter::visitClassMetatypeToObjectExpr(ClassMetatypeToObjectExpr *E,
-                                                     SGFContext C) {
-  llvm_unreachable("not implemented");
+RValue RValueEmitter::visitClassMetatypeToObjectExpr(
+                                                   ClassMetatypeToObjectExpr *E,
+                                                   SGFContext C) {
+  SILValue value = SGF.emitRValueAsSingleValue(E->getSubExpr())
+    .getUnmanagedValue();
+  
+  // Convert the metatype to objc representation.
+  auto metatypeTy = value.getType().castTo<MetatypeType>();
+  auto objcMetatypeTy = CanMetatypeType::get(metatypeTy.getInstanceType(),
+                                             MetatypeRepresentation::ObjC);
+  value = SGF.B.createThickToObjCMetatype(E, value,
+                               SILType::getPrimitiveObjectType(objcMetatypeTy));
+  
+  // Convert to an object reference.
+  value = SGF.B.createObjCMetatypeToObject(E, value,
+                                      SGF.getLoweredLoadableType(E->getType()));
+  
+  return RValue(SGF, E, ManagedValue::forUnmanaged(value));
 }
 
 RValue RValueEmitter::visitExistentialMetatypeToObjectExpr(
                                              ExistentialMetatypeToObjectExpr *E,
                                              SGFContext C) {
-  llvm_unreachable("not implemented");
+  SILValue value = SGF.emitRValueAsSingleValue(E->getSubExpr())
+    .getUnmanagedValue();
+  
+  // Convert the metatype to objc representation.
+  auto metatypeTy = value.getType().castTo<ExistentialMetatypeType>();
+  auto objcMetatypeTy = CanExistentialMetatypeType::get(
+                                              metatypeTy.getInstanceType(),
+                                              MetatypeRepresentation::ObjC);
+  value = SGF.B.createThickToObjCMetatype(E, value,
+                               SILType::getPrimitiveObjectType(objcMetatypeTy));
+  
+  // Convert to an object reference.
+  value = SGF.B.createObjCExistentialMetatypeToObject(E, value,
+                                      SGF.getLoweredLoadableType(E->getType()));
+  
+  return RValue(SGF, E, ManagedValue::forUnmanaged(value));
 }
 
 RValue RValueEmitter::visitProtocolMetatypeToObjectExpr(
-                                             ProtocolMetatypeToObjectExpr *E,
-                                             SGFContext C) {
-  llvm_unreachable("not implemented");
+                                                ProtocolMetatypeToObjectExpr *E,
+                                                SGFContext C) {
+  SGF.emitIgnoredExpr(E->getSubExpr());
+  ProtocolDecl *protocol = E->getSubExpr()->getType()->castTo<MetatypeType>()
+    ->getInstanceType()->castTo<ProtocolType>()->getDecl();
+  SILValue value = SGF.B.createObjCProtocol(E, protocol,
+                                      SGF.getLoweredLoadableType(E->getType()));
+  return RValue(SGF, E, ManagedValue::forUnmanaged(value));
 }
 
 RValue RValueEmitter::visitInOutConversionExpr(InOutConversionExpr *E,

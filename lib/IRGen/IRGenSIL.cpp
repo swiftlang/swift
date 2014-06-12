@@ -2847,7 +2847,7 @@ void IRGenSILFunction::visitUnconditionalCheckedCastInst(
 }
 
 void IRGenSILFunction::visitObjCMetatypeToObjectInst(
-                                                   ObjCMetatypeToObjectInst *i){
+                                                  ObjCMetatypeToObjectInst *i){
   // FIXME: implement
 }
 void IRGenSILFunction::visitObjCExistentialMetatypeToObjectInst(

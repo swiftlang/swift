@@ -377,6 +377,12 @@ public:
     return insert(new (F.getModule()) ObjCToThickMetatypeInst(Loc, Op, Ty));
   }
 
+  ObjCProtocolInst *createObjCProtocol(SILLocation Loc,
+                                       ProtocolDecl *P,
+                                       SILType Ty) {
+    return insert(new (F.getModule()) ObjCProtocolInst(Loc, P, Ty));
+  }
+  
   UnownedToRefInst *createUnownedToRef(SILLocation loc,
                                        SILValue op, SILType ty) {
     return insert(new (F.getModule()) UnownedToRefInst(loc, op, ty));
@@ -674,11 +680,6 @@ public:
     return insert(new (F.getModule()) MetatypeInst(Loc, Metatype));
   }
   
-  ObjCProtocolInst *createObjCProtocol(SILLocation Loc, ProtocolDecl *Protocol,
-                                       SILType Ty) {
-    return insert(new (F.getModule()) ObjCProtocolInst(Loc, Protocol, Ty));
-  }
-
   ObjCMetatypeToObjectInst *createObjCMetatypeToObject(SILLocation Loc,
                                                        SILValue Op,
                                                        SILType Ty) {
