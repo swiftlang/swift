@@ -275,12 +275,12 @@ ClangImporter::create(ASTContext &ctx,
   // Don't stop emitting messages if we ever can't load a module.
   // FIXME: This is actually a general problem: any "fatal" error could mess up
   // the CompilerInvocation.
-  clangDiags->setDiagnosticMapping(clang::diag::err_module_not_found,
-                                   clang::diag::Severity::MAP_ERROR,
-                                   clang::SourceLocation());
-  clangDiags->setDiagnosticMapping(clang::diag::err_module_not_built,
-                                   clang::diag::Severity::MAP_ERROR,
-                                   clang::SourceLocation());
+  clangDiags->setSeverity(clang::diag::err_module_not_found,
+                          clang::diag::Severity::Error,
+                          clang::SourceLocation());
+  clangDiags->setSeverity(clang::diag::err_module_not_built,
+                          clang::diag::Severity::Error,
+                          clang::SourceLocation());
 
   if (!CompilerInvocation::CreateFromArgs(*invocation,
                                           invocationArgs.data(),
