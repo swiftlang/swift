@@ -1139,6 +1139,10 @@ public:
     
     return getter(this);
   }
+
+  static bool classof(const Metadata *metadata) {
+    return metadata->getKind() == MetadataKind::Class;
+  }
 };
 
 /// The structure of metadata for heap-allocated local variables.
@@ -1178,6 +1182,10 @@ struct HeapArrayMetadata : public HeapMetadata {
 /// Swift-compiled.
 struct ObjCClassWrapperMetadata : public Metadata {
   const ClassMetadata *Class;
+
+  static bool classof(const Metadata *metadata) {
+    return metadata->getKind() == MetadataKind::ObjCClassWrapper;
+  }
 };
 
 /// The structure of metadata for foreign types where the source
@@ -1236,6 +1244,10 @@ struct ForeignClassMetadata : public ForeignTypeMetadata {
 
   /// Reserved space.  For now, these should be zero-initialized.
   void *Reserved[3];
+
+  static bool classof(const Metadata *metadata) {
+    return metadata->getKind() == MetadataKind::ForeignClass;
+  }
 };
 
 /// The structure of type metadata for structs.
@@ -1274,6 +1286,10 @@ struct StructMetadata : public Metadata {
     asWords += Description->GenericParams.Offset;
     return reinterpret_cast<const Metadata * const *>(asWords);
   }
+
+  static bool classof(const Metadata *metadata) {
+    return metadata->getKind() == MetadataKind::Struct;
+  }
 };
 
 /// The structure of function type metadata.
@@ -1289,6 +1305,10 @@ struct FunctionTypeMetadata : public Metadata {
 struct MetatypeMetadata : public Metadata {
   /// The type metadata for the element.
   const Metadata *InstanceType;
+
+  static bool classof(const Metadata *metadata) {
+    return metadata->getKind() == MetadataKind::Metatype;
+  }
 };
 
 /// The structure of tuple type metadata.
@@ -1323,6 +1343,10 @@ struct TupleTypeMetadata : public Metadata {
   }
   const Element *getElements() const {
     return reinterpret_cast<const Element *>(this+1);
+  }
+
+  static bool classof(const Metadata *metadata) {
+    return metadata->getKind() == MetadataKind::Tuple;
   }
 };
   
@@ -1553,8 +1577,15 @@ struct ExistentialTypeMetadata : public Metadata {
 
   /// Return true iff all the protocol constraints are @objc.
   bool isObjC() const {
-    return Flags.getClassConstraint() == ProtocolClassConstraint::Class 
-      && Flags.getNumWitnessTables() == 0;
+    return isClassBounded() && Flags.getNumWitnessTables() == 0;
+  }
+
+  bool isClassBounded() const {
+    return Flags.getClassConstraint() == ProtocolClassConstraint::Class;
+  }
+
+  static bool classof(const Metadata *metadata) {
+    return metadata->getKind() == MetadataKind::Existential;
   }
 };
 
@@ -1566,6 +1597,10 @@ struct ExistentialMetatypeMetadata : public Metadata {
   /// The number of witness tables and class-constrained-ness of the
   /// underlying type.
   ExistentialTypeFlags Flags;
+
+  static bool classof(const Metadata *metadata) {
+    return metadata->getKind() == MetadataKind::ExistentialMetatype;
+  }
 };
 
 /// \brief The header in front of a generic metadata template.

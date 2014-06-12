@@ -1394,7 +1394,7 @@ ExistentialTypeMetadata::projectValue(const OpaqueValue *container) const {
 const Metadata *
 ExistentialTypeMetadata::getDynamicType(const OpaqueValue *container) const {
   // The layout of the container depends on whether it's class-constrained.
-  if (Flags.getClassConstraint() == ProtocolClassConstraint::Class) {
+  if (isClassBounded()) {
     auto classContainer =
       reinterpret_cast<const ClassExistentialContainer*>(container);
     void *obj = classContainer->Value;
@@ -1413,7 +1413,7 @@ ExistentialTypeMetadata::getWitnessTable(const OpaqueValue *container,
 
   // The layout of the container depends on whether it's class-constrained.
   const void * const * witnessTables;
-  if (Flags.getClassConstraint() == ProtocolClassConstraint::Class) {
+  if (isClassBounded()) {
     auto classContainer =
       reinterpret_cast<const ClassExistentialContainer*>(container);
     witnessTables = classContainer->getWitnessTables();
