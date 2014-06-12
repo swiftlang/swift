@@ -2408,10 +2408,10 @@ static void emitObjCClassSymbol(IRGenModule &IGM,
   auto addressPointTy = cast<llvm::PointerType>(addressPoint->getType());
   
   // Create the alias.
-  new llvm::GlobalAlias(addressPointTy->getElementType(),
-                        fullMetadata->getLinkage(),
-                        classSymbol.str(), addressPoint,
-                        IGM.getModule());
+  llvm::GlobalAlias::create(addressPointTy->getElementType(),
+                            addressPointTy->getAddressSpace(),
+                            fullMetadata->getLinkage(), classSymbol.str(),
+                            addressPoint, IGM.getModule());
 }
 
 /// Emit the type metadata or metadata template for a class.
