@@ -17,9 +17,9 @@ println(basic.foo(1, 2))
 
 // DWARF: .debug_info
 // DWARF: DW_TAG_module
-// DWARF-NEXT: "Swift"
-// DWARF: DW_TAG_module
 // DWARF-NEXT: "Foo"
+// DWARF: DW_TAG_module
+// DWARF-NEXT: "Swift"
 // DWARF: DW_TAG_module
 // DWARF-NEXT: "basic"
 
