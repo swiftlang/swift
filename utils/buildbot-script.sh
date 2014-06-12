@@ -294,6 +294,22 @@ else
     )
 fi
 
+CMAKE_C_FLAGS=""
+CMAKE_CXX_FLAGS=""
+CMAKE_EXE_LINKER_FLAGS=""
+CMAKE_SHARED_LINKER_FLAGS=""
+
+if [[ "${RUN_WITH_ASAN_COMPILER}" ]]; then
+    CMAKE_COMPILER_OPTIONS=(
+        -DCMAKE_C_COMPILER="${RUN_WITH_ASAN_COMPILER}"
+        -DCMAKE_CXX_COMPILER="${RUN_WITH_ASAN_COMPILER}++"
+    )
+    CMAKE_C_FLAGS="-fsanitize=address -O1 -g -fno-omit-frame-pointer"
+    CMAKE_CXX_FLAGS="-fsanitize=address -O1 -g -fno-omit-frame-pointer"
+    CMAKE_EXE_LINKER_FLAGS="-fsanitize=address"
+    CMAKE_SHARED_LINKER_FLAGS="-fsanitize=address"
+fi
+
 # CMake options used for all targets, including LLVM/Clang
 COMMON_CMAKE_OPTIONS=(
     "${CMAKE_COMPILER_OPTIONS[@]}"
@@ -328,9 +344,9 @@ if [ \! "$SKIP_BUILD_LLVM" ]; then
       # LLDB
       (cd "${LLVM_BUILD_DIR}" &&
           "$CMAKE" -G "${CMAKE_GENERATOR}" "${COMMON_CMAKE_OPTIONS[@]}" \
-              -DCMAKE_CXX_FLAGS="-stdlib=libc++" \
-              -DCMAKE_EXE_LINKER_FLAGS="-stdlib=libc++" \
-              -DCMAKE_SHARED_LINKER_FLAGS="-stdlib=libc++" \
+              -DCMAKE_CXX_FLAGS="-stdlib=libc++ ${CMAKE_CXX_FLAGS}" \
+              -DCMAKE_EXE_LINKER_FLAGS="-stdlib=libc++ ${CMAKE_EXE_LINKER_FLAGS}" \
+              -DCMAKE_SHARED_LINKER_FLAGS="-stdlib=libc++ ${CMAKE_SHARED_LINKER_FLAGS}" \
               -DLLVM_IMPLICIT_PROJECT_IGNORE="${LLVM_SOURCE_DIR}/tools/swift" \
               -DLLVM_TARGETS_TO_BUILD="${LLVM_TARGETS_TO_BUILD}" \
               -DCLANG_REPOSITORY_STRING="$CUSTOM_VERSION_NAME" \
@@ -347,8 +363,8 @@ fi
 SWIFT_CMAKE_OPTIONS=(
     -DCMAKE_OSX_SYSROOT="${SYSROOT}"
     -DMODULES_SDK="${SYSROOT}"
-    -DCMAKE_C_FLAGS="-isysroot${SYSROOT}"
-    -DCMAKE_CXX_FLAGS="-isysroot${SYSROOT}"
+    -DCMAKE_C_FLAGS="-isysroot${SYSROOT} ${CMAKE_C_FLAGS}"
+    -DCMAKE_CXX_FLAGS="-isysroot${SYSROOT} ${CMAKE_CXX_FLAGS}"
     -DSWIFT_RUN_LONG_TESTS="ON"
     -DLLVM_CONFIG="${LLVM_BUILD_DIR}/bin/llvm-config"
 )
@@ -393,15 +409,11 @@ SOURCEKIT_CMAKE_OPTIONS=(
     -DSOURCEKIT_PATH_TO_SWIFT_SOURCE="${SWIFT_SOURCE_DIR}"
     -DSOURCEKIT_PATH_TO_SWIFT_BUILD="${SWIFT_BUILD_DIR}"
     -DLLVM_CONFIG="${LLVM_BUILD_DIR}/bin/llvm-config"
+    -DCMAKE_C_FLAGS="-isysroot${SYSROOT} ${CMAKE_C_FLAGS}"
+    -DCMAKE_CXX_FLAGS="-isysroot${SYSROOT} ${CMAKE_CXX_FLAGS}"
 )
 
 ASAN_CMAKE_OPTIONS=(
-    -DCMAKE_C_COMPILER="${RUN_WITH_ASAN_COMPILER}"
-    -DCMAKE_CXX_COMPILER="${RUN_WITH_ASAN_COMPILER}++"
-    -DCMAKE_C_FLAGS="-isysroot${SYSROOT} -fsanitize=address -O1 -g -fno-omit-frame-pointer"
-    -DCMAKE_CXX_FLAGS="-isysroot${SYSROOT} -fsanitize=address -O1 -g -fno-omit-frame-pointer"
-    -DCMAKE_SHARED_LINKER_FLAGS="-fsanitize=address"
-    -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address"
     -DSOURCEKIT_USE_INPROC_LIBRARY="ON"
     -DSWIFT_ASAN_BUILD="ON"
 )
