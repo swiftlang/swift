@@ -43,9 +43,7 @@ public:
 
   TypeSubstCloner(SILFunction &To,
                   SILFunction &From,
-                  TypeSubstitutionMap &InterfaceSubs,
                   TypeSubstitutionMap &ContextSubs,
-                  StringRef NewName,
                   ApplyInst *Caller)
     : SILCloner<ImplClass>(To),
       SwiftMod(From.getModule().getSwiftModule()),

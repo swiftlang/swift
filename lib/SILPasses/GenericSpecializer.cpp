@@ -56,8 +56,8 @@ public:
                      TypeSubstitutionMap &ContextSubs,
                      StringRef NewName,
                      ApplyInst *Caller)
-    : TypeSubstCloner(*initCloned(F, InterfaceSubs, NewName), *F, InterfaceSubs,
-                    ContextSubs, NewName, Caller) {}
+    : TypeSubstCloner(*initCloned(F, InterfaceSubs, NewName), *F, ContextSubs,
+                      Caller) {}
   /// Clone and remap the types in \p F according to the substitution
   /// list in \p Subs.
   static SILFunction *cloneFunction(SILFunction *F,
