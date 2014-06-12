@@ -1,5 +1,6 @@
 add_swift_library(swiftIRGen
   DebugTypeInfo.cpp
+  GenCast.cpp
   GenClangType.cpp
   GenClass.cpp
   GenControl.cpp

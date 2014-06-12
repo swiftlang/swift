@@ -17,22 +17,22 @@
 #ifndef SWIFT_IRGEN_GENMETA_H
 #define SWIFT_IRGEN_GENMETA_H
 
+#include "swift/AST/Types.h"
+#include <utility>
+
 namespace llvm {
   template <class T> class ArrayRef;
+  class Constant;
   class Value;
 }
 
 namespace swift {
-  class Type;
-  class CanType;
-  class ClassDecl;
+  class AbstractFunctionDecl;
   class FuncDecl;
-  class NominalTypeDecl;
   enum class ResilienceExpansion : unsigned;
   struct SILDeclRef;
   class SILType;
-  class StructDecl;
-  class Substitution;
+  class VarDecl;
   
 namespace irgen {
   class AbstractCallee;
