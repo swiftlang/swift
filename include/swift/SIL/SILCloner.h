@@ -34,9 +34,10 @@ namespace swift {
 template<typename ImplClass>
 class SILCloner : protected SILVisitor<ImplClass> {
   friend class SILVisitor<ImplClass, SILValue>;
-  using SILVisitor<ImplClass>::asImpl;
 
 public:
+  using SILVisitor<ImplClass>::asImpl;
+
   explicit SILCloner(SILFunction &F)
     : Builder(F), InsertBeforeBB(nullptr) { }
   

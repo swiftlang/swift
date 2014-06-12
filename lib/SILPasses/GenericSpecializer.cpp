@@ -49,7 +49,7 @@ static bool canSpecializeFunctionWithSubList(SILFunction *F,
 
 namespace {
 
-class SpecializingCloner : public TypeSubstCloner {
+class SpecializingCloner : public TypeSubstCloner<SpecializingCloner> {
 public:
   SpecializingCloner(SILFunction *F,
                      TypeSubstitutionMap &InterfaceSubs,

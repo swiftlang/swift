@@ -26,18 +26,28 @@
 namespace swift {
 
 /// TypeSubstCloner - a utility class for cloning code while remapping types.
-class TypeSubstCloner : public SILCloner<TypeSubstCloner> {
-  friend class SILVisitor<TypeSubstCloner>;
-  friend class SILCloner<TypeSubstCloner>;
+template<typename ImplClass>
+class TypeSubstCloner : public SILCloner<ImplClass> {
+  friend class SILVisitor<ImplClass>;
+  friend class SILCloner<ImplClass>;
 
 public:
+  using SILCloner<ImplClass>::asImpl;
+  using SILCloner<ImplClass>::getBuilder;
+  using SILCloner<ImplClass>::getOpLocation;
+  using SILCloner<ImplClass>::getOpValue;
+  using SILCloner<ImplClass>::getOpType;
+  using SILCloner<ImplClass>::getOpBasicBlock;
+  using SILCloner<ImplClass>::doPostProcess;
+  using SILCloner<ImplClass>::ValueMap;
+
   TypeSubstCloner(SILFunction &To,
-                SILFunction &From,
-                TypeSubstitutionMap &InterfaceSubs,
-                TypeSubstitutionMap &ContextSubs,
-                StringRef NewName,
-                ApplyInst *Caller)
-    : SILCloner(To),
+                  SILFunction &From,
+                  TypeSubstitutionMap &InterfaceSubs,
+                  TypeSubstitutionMap &ContextSubs,
+                  StringRef NewName,
+                  ApplyInst *Caller)
+    : SILCloner<ImplClass>(To),
       SwiftMod(From.getModule().getSwiftModule()),
       SubsMap(ContextSubs),
       Original(From),
@@ -67,23 +77,27 @@ protected:
 
   void visitClassMethodInst(ClassMethodInst *Inst) {
     doPostProcess(Inst,
-                  Builder.createClassMethod(getOpLocation(Inst->getLoc()),
-                                            getOpValue(Inst->getOperand()),
-                                            Inst->getMember(),
-                                            // No need to translate the return
-                                            // type because this is the type of
-                                            // the fetched method.
-                                            Inst->getType(),
-                                            Inst->isVolatile()));
+                  getBuilder().createClassMethod(getOpLocation(Inst->getLoc()),
+                                                 getOpValue(Inst->getOperand()),
+                                                 Inst->getMember(),
+                                                 // No need to
+                                                 // translate the
+                                                 // return type
+                                                 // because this is
+                                                 // the type of the
+                                                 // fetched method.
+                                                 Inst->getType(),
+                                                 Inst->isVolatile()));
   }
 
  void visitApplyInst(ApplyInst *Inst) {
-   auto Args = getOpValueArray<8>(Inst->getArguments());
+   auto Args = this->template getOpValueArray<8>(Inst->getArguments());
 
    // Handle recursions by replacing the apply to the callee with an apply to
    // the newly specialized function.
    SILValue CalleeVal = Inst->getCallee();
    FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(CalleeVal);
+   SILBuilder &Builder = getBuilder();
    if (FRI && FRI->getReferencedFunction() == Inst->getFunction()) {
      FRI = Builder.createFunctionRef(getOpLocation(Inst->getLoc()),
                                      &Builder.getFunction());
@@ -108,12 +122,13 @@ protected:
  }
 
  void visitPartialApplyInst(PartialApplyInst *Inst) {
-   auto Args = getOpValueArray<8>(Inst->getArguments());
+   auto Args = this->template getOpValueArray<8>(Inst->getArguments());
 
    // Handle recursions by replacing the apply to the callee with an apply to
    // the newly specialized function.
    SILValue CalleeVal = Inst->getCallee();
    FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(CalleeVal);
+   SILBuilder &Builder = getBuilder();
    if (FRI && FRI->getReferencedFunction() == Inst->getFunction()) {
      FRI = Builder.createFunctionRef(getOpLocation(Inst->getLoc()),
                                      &Builder.getFunction());
@@ -164,6 +179,7 @@ protected:
       OtherMod.createWitnessTableDeclaration(sub.Conformance[0]);
 
     // We already subst so getOpConformance is not needed.
+    SILBuilder &Builder = getBuilder();
     doPostProcess(Inst, Builder.createWitnessMethod(
                             getOpLocation(Inst->getLoc()),
                             getOpType(Inst->getLookupType()),
@@ -195,6 +211,7 @@ protected:
     SILType OpFromTy = getOpType(Inst->getOperand().getType());
     SILType OpToTy = getOpType(Inst->getType());
     SILLocation Loc = getOpLocation(Inst->getLoc());
+    SILBuilder &Builder = getBuilder();
 
     // If the from/to type is the same, just propagate the operand along to all
     // uses.
@@ -264,7 +281,7 @@ protected:
     case CheckedCastKind::Downcast:
     case CheckedCastKind::ExistentialToConcrete:
     case CheckedCastKind::ConcreteToUnrelatedExistential:
-      SILCloner<TypeSubstCloner>::visitUnconditionalCheckedCastInst(Inst);
+      SILCloner<ImplClass>::visitUnconditionalCheckedCastInst(Inst);
       return;
     case CheckedCastKind::SuperToArchetype: {
       SILValue OpValue = getOpValue(Inst->getOperand());
@@ -343,6 +360,7 @@ protected:
     SILLocation OpLoc = getOpLocation(Inst->getLoc());
     SILBasicBlock *OpSuccBB = getOpBasicBlock(Inst->getSuccessBB());
     SILBasicBlock *OpFailBB = getOpBasicBlock(Inst->getFailureBB());
+    SILBuilder &Builder = getBuilder();
 
     // If the from/to type is the same, create a branch to the success basic
     // block with the relevant argument.
@@ -406,7 +424,7 @@ protected:
     case CheckedCastKind::Downcast:
     case CheckedCastKind::ExistentialToConcrete:
     case CheckedCastKind::ConcreteToUnrelatedExistential:
-      SILCloner<TypeSubstCloner>::visitCheckedCastBranchInst(Inst);
+      SILCloner<ImplClass>::visitCheckedCastBranchInst(Inst);
       return;
     case CheckedCastKind::SuperToArchetype: {
       // Just change the type of cast to a checked_cast_br downcast
@@ -415,6 +433,7 @@ protected:
       SILType OpFromTy = OpValue.getType();
       SILType OpToTy = getOpType(Inst->getCastType());
       SILBasicBlock *OpSuccBB = getOpBasicBlock(Inst->getSuccessBB());
+      SILBuilder &Builder = getBuilder();
 
       // If the from/to type is the same, insert a branch to the success basic
       // block with the relevant argument.
@@ -449,6 +468,7 @@ protected:
       SILType OpFromTy = OpValue.getType();
       SILType OpToTy = getOpType(Inst->getCastType());
       SILBasicBlock *OpSuccBB = getOpBasicBlock(Inst->getSuccessBB());
+      SILBuilder &Builder = getBuilder();
 
       // If the from/to type is the same, insert a branch to the success basic
       // block with the relevant argument.
