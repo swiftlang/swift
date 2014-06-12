@@ -193,7 +193,7 @@ LLVM_TARGETS_TO_BUILD="X86;ARM"
 if [[ ! "$SKIP_IOS" ]]; then
     IOS_SIMULATOR_PRODUCTS=(swift_stdlib_ios_simulator_x86_64 swift_stdlib_ios_simulator_i386)
     IOS_DEVICE_PRODUCTS=(swift_stdlib_ios_arm64 swift_stdlib_ios_armv7)
-    LLVM_TARGETS_TO_BUILD="X86;ARM;ARM64"
+    LLVM_TARGETS_TO_BUILD="X86;ARM;AArch64"
     if [[ ! "$SKIP_BUILD_IOS" ]]; then
         if [[ ! "$SKIP_BUILD_IOS_SIMULATOR" ]]; then
             IOS_BUILD_PRODUCTS=("${IOS_BUILD_PRODUCTS[@]}" "${IOS_SIMULATOR_PRODUCTS[@]}")
