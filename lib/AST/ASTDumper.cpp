@@ -1385,8 +1385,8 @@ public:
     printRec(E->getSubExpr());
     OS << ')';
   }
-  void visitArrayUpcastConversionExpr(ArrayUpcastConversionExpr *E) {
-    printCommon(E, "array_upcast_expr") << '\n';
+  void visitCollectionUpcastConversionExpr(CollectionUpcastConversionExpr *E) {
+    printCommon(E, "collection_upcast_expr") << '\n';
     printRec(E->getSubExpr());
     OS << ')';
   }
@@ -1398,8 +1398,8 @@ public:
     printRec(E->getSubExpr());
     OS << ')';
   }
-  void visitArrayBridgedConversionExpr(ArrayBridgedConversionExpr *E) {
-    printCommon(E, "array_bridged_conversion_expr") << '\n';
+  void visitCollectionBridgedConversionExpr(CollectionBridgedConversionExpr *E){
+    printCommon(E, "collection_bridged_conversion_expr") << '\n';
     printRec(E->getSubExpr());
     OS << ')';
   }

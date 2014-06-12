@@ -4018,7 +4018,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       assert(!bridgedVerbatim && "Should be an upcast");
 
       // Otherwise, it's a bridged upcast.
-      auto upcast = new (tc.Context) ArrayBridgedConversionExpr(expr, toType);
+      auto upcast = new (tc.Context) CollectionBridgedConversionExpr(expr, 
+                                                                     toType);
       upcast->isConditionallyBridged = isConditionallyBridged;
       return upcast;
     }
@@ -4037,7 +4038,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                dc,
                cs.getBaseTypeForArrayType(fromType.getPointer())).second &&
              "Cannot upcast array of non-bridged-verbatim type");
-      return new (tc.Context) ArrayUpcastConversionExpr(expr, toType);
+      return new (tc.Context) CollectionUpcastConversionExpr(expr, toType);
     }
 
     case ConversionRestrictionKind::User:

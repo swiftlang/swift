@@ -3126,7 +3126,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
       return SolutionKind::Error;
     }
 
-    increaseScore(SK_ArrayUpcastConversion);
+    increaseScore(SK_CollectionUpcastConversion);
     addContextualScore();
     assert(matchKind >= TypeMatchKind::Conversion);
 
@@ -3161,7 +3161,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
       return SolutionKind::Unsolved;
     }
 
-    increaseScore(SK_ArrayBridgedConversion);
+    increaseScore(SK_CollectionBridgedConversion);
     addContextualScore();
     assert(matchKind >= TypeMatchKind::Conversion);
 

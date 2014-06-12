@@ -57,11 +57,11 @@ void ConstraintSystem::increaseScore(ScoreKind kind) {
       log << "non-default literal";
       break;
         
-    case SK_ArrayUpcastConversion:
-      log << "array upcast conversion";
+    case SK_CollectionUpcastConversion:
+      log << "collection upcast conversion";
       break;
-    case SK_ArrayBridgedConversion:
-      log << "array bridged conversion";
+    case SK_CollectionBridgedConversion:
+      log << "collection bridged conversion";
       break;
     }
     log << ")\n";

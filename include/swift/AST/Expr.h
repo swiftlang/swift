@@ -2087,31 +2087,35 @@ public:
   }
 };
   
-// ArrayUpcastConversionExpr - Convert an Array<U> to an Array<T>, where
-// U is a subtype of T.
-class ArrayUpcastConversionExpr : public ImplicitConversionExpr {
+/// CollectionUpcastConversionExpr - Convert a collection whose
+/// elements have some type T to the same kind of collection whose
+/// elements have type U, where U is a subtype of T.
+class CollectionUpcastConversionExpr : public ImplicitConversionExpr {
 public:
-  ArrayUpcastConversionExpr(Expr *subExpr, Type type)
-  : ImplicitConversionExpr(ExprKind::ArrayUpcastConversion, subExpr, type) {}
+  CollectionUpcastConversionExpr(Expr *subExpr, Type type)
+    : ImplicitConversionExpr(
+        ExprKind::CollectionUpcastConversion, subExpr, type) {}
   
   static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::ArrayUpcastConversion;
+    return E->getKind() == ExprKind::CollectionUpcastConversion;
   }
 };
   
-// ArrayBridgedConversionExpr - Convert an Array<U> to an Array<T>, where
-// T is bridged to U.
-class ArrayBridgedConversionExpr : public ImplicitConversionExpr {
+/// CollectionBridgedConversionExpr - Convert a collection whose
+/// elements have some type T to the same kind of collection whose
+/// elements have type U, where T is bridges to U.
+class CollectionBridgedConversionExpr : public ImplicitConversionExpr {
 public:
   /// Keep track of whether or not the type being bridged to conforms to the
   /// _ConditionallyBridgedToObjectiveC protocol.
   bool isConditionallyBridged = false;
   
-  ArrayBridgedConversionExpr(Expr *subExpr, Type type)
-    : ImplicitConversionExpr(ExprKind::ArrayBridgedConversion, subExpr, type) {}
+  CollectionBridgedConversionExpr(Expr *subExpr, Type type)
+    : ImplicitConversionExpr(ExprKind::CollectionBridgedConversion, subExpr, 
+                             type) {}
 
   static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::ArrayBridgedConversion;
+    return E->getKind() == ExprKind::CollectionBridgedConversion;
   }
 };
 

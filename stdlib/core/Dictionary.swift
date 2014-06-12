@@ -185,7 +185,7 @@
 // Syntax for bridging
 // -------------------
 //
-// There are two implict conversions:
+// There are two implicit conversions:
 //
 // * `NSDictionary` converts to `Dictionary<NSObject, AnyObject>`,
 // * `Dictionary<K, V>` converts to `NSDictionary`.

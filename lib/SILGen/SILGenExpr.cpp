@@ -173,10 +173,12 @@ namespace {
     RValue visitDerivedToBaseExpr(DerivedToBaseExpr *E, SGFContext C);
     RValue visitMetatypeConversionExpr(MetatypeConversionExpr *E,
                                        SGFContext C);
-    RValue visitArrayUpcastConversionExpr(ArrayUpcastConversionExpr *E,
-                                          SGFContext C);
-    RValue visitArrayBridgedConversionExpr(ArrayBridgedConversionExpr *E,
-                                           SGFContext C);
+    RValue visitCollectionUpcastConversionExpr(
+             CollectionUpcastConversionExpr *E,
+             SGFContext C);
+    RValue visitCollectionBridgedConversionExpr(
+             CollectionBridgedConversionExpr *E,
+             SGFContext C);
     RValue visitArchetypeToSuperExpr(ArchetypeToSuperExpr *E, SGFContext C);
     RValue visitFunctionConversionExpr(FunctionConversionExpr *E,
                                        SGFContext C);
@@ -909,8 +911,7 @@ RValue RValueEmitter::visitDerivedToBaseExpr(DerivedToBaseExpr *E,
   return RValue(SGF, E, ManagedValue(converted, original.getCleanup()));
 }
 
-RValue RValueEmitter::
-visitMetatypeConversionExpr(MetatypeConversionExpr *E,
+RValue RValueEmitter::visitMetatypeConversionExpr(MetatypeConversionExpr *E,
                                                   SGFContext C) {
   SILValue metaBase =
     SGF.emitRValueAsSingleValue(E->getSubExpr()).getUnmanagedValue();
@@ -927,8 +928,8 @@ visitMetatypeConversionExpr(MetatypeConversionExpr *E,
 }
 
 RValue RValueEmitter::
-visitArrayUpcastConversionExpr(ArrayUpcastConversionExpr *E,
-                               SGFContext C) {
+visitCollectionUpcastConversionExpr(CollectionUpcastConversionExpr *E,
+                                    SGFContext C) {
   
   SILLocation loc = RegularLocation(E);
   
@@ -1021,8 +1022,8 @@ RValue RValueEmitter::visitArrayDowncastExpr(ArrayDowncastExpr *E,
 }
 
 RValue RValueEmitter::
-visitArrayBridgedConversionExpr(ArrayBridgedConversionExpr *E,
-                                SGFContext C) {
+visitCollectionBridgedConversionExpr(CollectionBridgedConversionExpr *E,
+                                     SGFContext C) {
   
   SILLocation loc = RegularLocation(E);
   
