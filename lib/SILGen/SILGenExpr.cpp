@@ -4258,6 +4258,14 @@ RValue RValueEmitter::visitProtocolMetatypeToObjectExpr(
     ->getInstanceType()->castTo<ProtocolType>()->getDecl();
   SILValue value = SGF.B.createObjCProtocol(E, protocol,
                                       SGF.getLoweredLoadableType(E->getType()));
+  
+  // Protocol objects, despite being global objects, inherit default reference
+  // counting semantics from NSObject, so we need to retain the protocol
+  // reference when we use it to prevent it being released and attempting to
+  // deallocate itself. It doesn't matter if we ever actually clean up that
+  // retain though.
+  SGF.B.createStrongRetain(E, value);
+  
   return RValue(SGF, E, ManagedValue::forUnmanaged(value));
 }
 
