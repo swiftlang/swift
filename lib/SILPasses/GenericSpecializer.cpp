@@ -30,11 +30,6 @@ using namespace swift;
 
 STATISTIC(NumSpecialized, "Number of functions specialized");
 
-namespace {
-
-
-} // end anonymous namespace.
-
 /// Check if we can clone and remap types this function.
 static bool canSpecializeFunction(SILFunction *F) {
   return !F->isExternalDeclaration();
