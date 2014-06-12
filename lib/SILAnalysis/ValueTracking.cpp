@@ -72,6 +72,7 @@ static bool isTransitiveEscapeInst(SILInstruction *Inst) {
   case ValueKind::LoadInst:
   case ValueKind::LoadWeakInst:
   case ValueKind::MetatypeInst:
+  case ValueKind::ObjCProtocolInst:
   case ValueKind::SILGlobalAddrInst:
   case ValueKind::StoreInst:
   case ValueKind::StoreWeakInst:
@@ -111,6 +112,8 @@ static bool isTransitiveEscapeInst(SILInstruction *Inst) {
   case ValueKind::InitEnumDataAddrInst:
   case ValueKind::InitExistentialInst:
   case ValueKind::InitExistentialRefInst:
+  case ValueKind::ObjCExistentialMetatypeToObjectInst:
+  case ValueKind::ObjCMetatypeToObjectInst:
   case ValueKind::ObjCToThickMetatypeInst:
   case ValueKind::UncheckedRefCastInst:
   case ValueKind::UncheckedAddrCastInst:

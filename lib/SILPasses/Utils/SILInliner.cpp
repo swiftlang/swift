@@ -312,6 +312,15 @@ static InlineCost instructionInlineCost(SILInstruction &I,
       // instantiation.
       return InlineCost::Expensive;
 
+    // Protocol descriptor references are free.
+    case ValueKind::ObjCProtocolInst:
+      return InlineCost::Free;
+      
+    // Metatype-to-object conversions are free.
+    case ValueKind::ObjCExistentialMetatypeToObjectInst:
+    case ValueKind::ObjCMetatypeToObjectInst:
+      return InlineCost::Free;
+      
     // Return and unreachable are free.
     case ValueKind::UnreachableInst:
     case ValueKind::ReturnInst:

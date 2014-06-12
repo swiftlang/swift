@@ -1328,6 +1328,49 @@ public:
   ObjCToThickMetatypeInst(SILLocation Loc, SILValue Operand, SILType Ty)
     : UnaryInstructionBase(Loc, Operand, Ty) {}
 };
+  
+/// Given an Objective-C metatype value, convert it to an AnyObject value.
+class ObjCMetatypeToObjectInst
+  : public UnaryInstructionBase<ValueKind::ObjCMetatypeToObjectInst,
+                                ConversionInst>
+{
+public:
+  ObjCMetatypeToObjectInst(SILLocation Loc, SILValue Operand, SILType Ty)
+    : UnaryInstructionBase(Loc, Operand, Ty) {}
+};
+  
+/// Given an Objective-C existential metatype value, convert it to an AnyObject
+/// value.
+class ObjCExistentialMetatypeToObjectInst
+  : public UnaryInstructionBase<ValueKind::ObjCExistentialMetatypeToObjectInst,
+                                ConversionInst>
+{
+public:
+  ObjCExistentialMetatypeToObjectInst(SILLocation Loc, SILValue Operand, SILType Ty)
+    : UnaryInstructionBase(Loc, Operand, Ty) {}
+};
+  
+/// Return the Objective-C Protocol class instance for a protocol.
+class ObjCProtocolInst : public SILInstruction
+{
+  ProtocolDecl *Proto;
+public:
+  ObjCProtocolInst(SILLocation Loc, ProtocolDecl *Proto, SILType Ty)
+    : SILInstruction(ValueKind::ObjCProtocolInst, Loc, Ty), Proto(Proto)
+  {}
+
+  ProtocolDecl *getProtocol() const { return Proto; }
+  
+  ArrayRef<Operand> getAllOperands() const { return {}; }
+  MutableArrayRef<Operand> getAllOperands() { return {}; }
+  
+  /// getType() is ok since this is known to only have one type.
+  SILType getType(unsigned i = 0) const { return ValueBase::getType(i); }
+
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::ObjCProtocolInst;
+  }
+};
 
 /// Test that an address or reference type is not null.
 class IsNonnullInst : public UnaryInstructionBase<ValueKind::IsNonnullInst> {

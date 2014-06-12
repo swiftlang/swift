@@ -1,0 +1,18 @@
+// RUN: rm -rf %t/clang-module-cache
+// RUN: %swift %clang-importer-sdk %s -emit-silgen -module-cache-path %t/clang-module-cache -target x86_64-apple-darwin13 | FileCheck %s
+
+sil_stage raw // CHECK: sil_stage raw
+
+import Builtin
+import Swift
+import ObjectiveC
+
+@objc protocol ObjCProto {}
+
+// CHECK-LABEL: sil @protocol_conversion
+sil @protocol_conversion : $@thin () -> @owned Protocol {
+entry:
+  // CHECK: {{%.*}} = objc_protocol #ObjCProto : $Protocol
+  %p = objc_protocol #ObjCProto : $Protocol
+  return %p : $Protocol
+}

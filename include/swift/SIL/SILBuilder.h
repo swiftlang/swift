@@ -673,7 +673,26 @@ public:
   MetatypeInst *createMetatype(SILLocation Loc, SILType Metatype) {
     return insert(new (F.getModule()) MetatypeInst(Loc, Metatype));
   }
+  
+  ObjCProtocolInst *createObjCProtocol(SILLocation Loc, ProtocolDecl *Protocol,
+                                       SILType Ty) {
+    return insert(new (F.getModule()) ObjCProtocolInst(Loc, Protocol, Ty));
+  }
 
+  ObjCMetatypeToObjectInst *createObjCMetatypeToObject(SILLocation Loc,
+                                                       SILValue Op,
+                                                       SILType Ty) {
+    return insert(new (F.getModule()) ObjCMetatypeToObjectInst(Loc, Op, Ty));
+  }
+  
+  ObjCExistentialMetatypeToObjectInst *
+  createObjCExistentialMetatypeToObject(SILLocation Loc,
+                                        SILValue Op,
+                                        SILType Ty) {
+    return insert(new (F.getModule())
+                    ObjCExistentialMetatypeToObjectInst(Loc, Op, Ty));
+  }
+  
   ValueMetatypeInst *createValueMetatype(SILLocation Loc,
                                                  SILType Metatype,
                                                  SILValue Base) {

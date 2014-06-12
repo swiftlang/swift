@@ -608,6 +608,7 @@ public:
   void visitUncheckedEnumDataInst(UncheckedEnumDataInst *i);
   void visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *i);
   void visitInjectEnumAddrInst(InjectEnumAddrInst *i);
+  void visitObjCProtocolInst(ObjCProtocolInst *i);
   void visitMetatypeInst(MetatypeInst *i);
   void visitValueMetatypeInst(ValueMetatypeInst *i);
   void visitExistentialMetatypeInst(ExistentialMetatypeInst *i);
@@ -670,6 +671,9 @@ public:
   void visitObjCToThickMetatypeInst(ObjCToThickMetatypeInst *i);
   void visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *i);
   void visitUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *i);
+  void visitObjCMetatypeToObjectInst(ObjCMetatypeToObjectInst *i);
+  void visitObjCExistentialMetatypeToObjectInst(
+                                        ObjCExistentialMetatypeToObjectInst *i);
 
   void visitIsNonnullInst(IsNonnullInst *i);
 
@@ -2840,6 +2844,18 @@ void IRGenSILFunction::visitUnconditionalCheckedCastInst(
     ex.add(val.getAddress());
     setLoweredExplosion(SILValue(i,0), ex);
   }
+}
+
+void IRGenSILFunction::visitObjCMetatypeToObjectInst(
+                                                   ObjCMetatypeToObjectInst *i){
+  // FIXME: implement
+}
+void IRGenSILFunction::visitObjCExistentialMetatypeToObjectInst(
+                                       ObjCExistentialMetatypeToObjectInst *i){
+  // FIXME: implement
+}
+void IRGenSILFunction::visitObjCProtocolInst(ObjCProtocolInst *i) {
+  // FIXME: implement
 }
 
 void IRGenSILFunction::visitUnconditionalCheckedCastAddrInst(

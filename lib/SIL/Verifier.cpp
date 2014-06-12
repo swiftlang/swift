@@ -2027,6 +2027,46 @@ public:
           "result must match all parameters of invoke function but the first");
     }
   }
+  
+  void checkObjCProtocolInst(ObjCProtocolInst *OPI) {
+    require(OPI->getProtocol()->isObjC(),
+            "objc_protocol must be applied to an @objc protocol");
+    auto classTy = OPI->getType();
+    require(classTy.isObject(), "objc_protocol must produce a value");
+    auto classDecl = classTy.getClassOrBoundGenericClass();
+    require(classDecl, "objc_protocol must produce a class instance");
+    require(classDecl->getName() == F.getASTContext().Id_Protocol,
+            "objc_protocol must produce an instance of ObjectiveC.Protocol class");
+    require(classDecl->getModuleContext()->Name == F.getASTContext().Id_ObjectiveC,
+            "objc_protocol must produce an instance of ObjectiveC.Protocol class");
+  }
+  
+  void checkObjCMetatypeToObjectInst(ObjCMetatypeToObjectInst *OMOI) {
+    require(OMOI->getOperand().getType().isObject(),
+            "objc_metatype_to_object must take a value");
+    auto fromMetaTy = OMOI->getOperand().getType().getAs<MetatypeType>();
+    require(fromMetaTy, "objc_metatype_to_object must take an @objc metatype value");
+    require(fromMetaTy->getRepresentation() == MetatypeRepresentation::ObjC,
+            "objc_metatype_to_object must take an @objc metatype value");
+    require(OMOI->getType().isObject(),
+            "objc_metatype_to_object must produce a value");
+    require(OMOI->getType().getSwiftRValueType()->isAnyObject(),
+            "objc_metatype_to_object must produce an AnyObject value");
+  }
+
+  void checkObjCExistentialMetatypeToObjectInst(
+                                    ObjCExistentialMetatypeToObjectInst *OMOI) {
+    require(OMOI->getOperand().getType().isObject(),
+            "objc_metatype_to_object must take a value");
+    auto fromMetaTy = OMOI->getOperand().getType().getAs<ExistentialMetatypeType>();
+    require(fromMetaTy, "objc_metatype_to_object must take an @objc existential metatype value");
+    require(fromMetaTy->getRepresentation() == MetatypeRepresentation::ObjC,
+            "objc_metatype_to_object must take an @objc existential metatype value");
+    require(OMOI->getType().isObject(),
+            "objc_metatype_to_object must produce a value");
+    require(OMOI->getType().getSwiftRValueType()->isAnyObject(),
+            "objc_metatype_to_object must produce an AnyObject value");
+  }
 
   void verifyEntryPointArguments(SILBasicBlock *entry) {
     SILFunctionType *ti = F.getLoweredFunctionType();

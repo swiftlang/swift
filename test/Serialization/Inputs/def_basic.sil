@@ -907,6 +907,29 @@ entry(%0 : $Int):
   return %b : $@cc(cdecl) @objc_block () -> ()
 }
 
+@class_protocol protocol SomeClassProtocol {}
+
+// CHECK-LABEL: sil public_external @metatype_to_object
+// CHECK:         {{%.*}} = objc_metatype_to_object {{%.*}} : $@objc_metatype SomeClass.Type to $AnyObject
+// CHECK:         {{%.*}} = objc_existential_metatype_to_object {{%.*}} : $@objc_metatype SomeClassProtocol.Type to $AnyObject
+sil @metatype_to_object : $@thin (@objc_metatype SomeClass.Type, @objc_metatype SomeClassProtocol.Type) -> @owned (AnyObject, AnyObject) {
+entry(%a : $@objc_metatype SomeClass.Type, %b : $@objc_metatype SomeClassProtocol.Type):
+  %x = objc_metatype_to_object %a : $@objc_metatype SomeClass.Type to $AnyObject
+  %y = objc_existential_metatype_to_object %b : $@objc_metatype SomeClassProtocol.Type to $AnyObject
+  %z = tuple (%x : $AnyObject, %y : $AnyObject)
+  return %z : $(AnyObject, AnyObject)
+}
+
+@objc protocol ObjCProto {}
+
+// CHECK-LABEL: sil public_external @protocol_conversion
+sil @protocol_conversion : $@thin () -> @owned Protocol {
+entry:
+  // CHECK: {{%.*}} = objc_protocol #ObjCProto : $Protocol
+  %p = objc_protocol #ObjCProto : $Protocol
+  return %p : $Protocol
+}
+
 sil @block_invoke : $@thin @cc(cdecl) (@inout @block_storage Int) -> ()
 
 
@@ -1151,6 +1174,8 @@ bb0:
   %118 = function_ref @cond_fail_test : $@thin Builtin.Int1 -> ()
 
   %124 = function_ref @block_storage_type : $@thin Int -> @cc(cdecl) @objc_block () -> ()
+  %125 = function_ref @metatype_to_object : $@thin (@objc_metatype SomeClass.Type, @objc_metatype SomeClassProtocol.Type) -> @owned (AnyObject, AnyObject)
+  %126 = function_ref @protocol_conversion : $@thin () -> @owned Protocol
   %120 = function_ref @test_forward_ref : $@thin (UInt8, UInt8) -> UInt8
   %121 = function_ref @partial_apply : $@thin (@thin (@out Int, Int) -> (), Int) -> Int
   %122 = function_ref @partial_apply_with_closure : $@thin (@owned @callee_owned () -> Bool, @owned String, CString, Int64) -> ()

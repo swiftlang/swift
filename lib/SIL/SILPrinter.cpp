@@ -820,6 +820,19 @@ public:
   void visitUpcastExistentialRefInst(UpcastExistentialRefInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand(),"upcast_existential_ref");
   }
+  void visitObjCMetatypeToObjectInst(ObjCMetatypeToObjectInst *CI) {
+    printUncheckedConversionInst(CI, CI->getOperand(),
+                                 "objc_metatype_to_object");
+  }
+  void visitObjCExistentialMetatypeToObjectInst(
+                                      ObjCExistentialMetatypeToObjectInst *CI) {
+    printUncheckedConversionInst(CI, CI->getOperand(),
+                                 "objc_existential_metatype_to_object");
+  }
+  void visitObjCProtocolInst(ObjCProtocolInst *CI) {
+    OS << "objc_protocol #" << CI->getProtocol()->getName()
+       << " : " << CI->getType();
+  }
 
   void visitIsNonnullInst(IsNonnullInst *I) {
     OS << "is_nonnull " << getIDAndType(I->getOperand());

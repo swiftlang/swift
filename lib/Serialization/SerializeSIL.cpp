@@ -817,6 +817,16 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
                       (unsigned)MI->getType().getCategory());
     break;
   }
+  case ValueKind::ObjCProtocolInst: {
+    const ObjCProtocolInst *PI = cast<ObjCProtocolInst>(&SI);
+    unsigned abbrCode = SILAbbrCodes[SILOneOperandLayout::Code];
+    SILOneOperandLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                              (unsigned)SI.getKind(), 0,
+                              S.addTypeRef(PI->getType().getSwiftRValueType()),
+                              (unsigned)PI->getType().getCategory(),
+                              S.addDeclRef(PI->getProtocol()), 0);
+    break;
+  }
   case ValueKind::ProjectExistentialInst: {
     const ProjectExistentialInst *PEI = cast<ProjectExistentialInst>(&SI);
     SILOneTypeOneOperandLayout::emitRecord(Out, ScratchRecord,
@@ -886,6 +896,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case ValueKind::ObjCToThickMetatypeInst:
   case ValueKind::ConvertFunctionInst:
   case ValueKind::UpcastExistentialRefInst:
+  case ValueKind::ObjCMetatypeToObjectInst:
+  case ValueKind::ObjCExistentialMetatypeToObjectInst:
   case ValueKind::ProjectBlockStorageInst: {
     SILValue operand = SI.getOperand(0);
     SILType Ty = SI.getType(0);

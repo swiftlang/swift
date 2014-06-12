@@ -1213,6 +1213,35 @@ visitInitBlockStorageHeaderInst(InitBlockStorageHeaderInst *I) {
                                          getOpValue(I->getInvokeFunction()),
                                          getOpType(I->getType())));
 }
+  
+template<typename ImplClass>
+void
+SILCloner<ImplClass>::
+visitObjCMetatypeToObjectInst(ObjCMetatypeToObjectInst *I) {
+  doPostProcess(I, getBuilder().createObjCMetatypeToObject(
+                                         getOpLocation(I->getLoc()),
+                                         getOpValue(I->getOperand()),
+                                         getOpType(I->getType())));
+}
+
+template<typename ImplClass>
+void
+SILCloner<ImplClass>::
+visitObjCExistentialMetatypeToObjectInst(ObjCExistentialMetatypeToObjectInst *I) {
+  doPostProcess(I, getBuilder().createObjCExistentialMetatypeToObject(
+                                         getOpLocation(I->getLoc()),
+                                         getOpValue(I->getOperand()),
+                                         getOpType(I->getType())));
+}
+
+template<typename ImplClass>
+void
+SILCloner<ImplClass>::
+visitObjCProtocolInst(ObjCProtocolInst *I) {
+  doPostProcess(I, getBuilder().createObjCProtocol(getOpLocation(I->getLoc()),
+                                                   I->getProtocol(),
+                                                   getOpType(I->getType())));
+}
 
 } // end namespace swift
 

@@ -748,10 +748,20 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   ONEOPERAND_ONETYPE_INST(ThinToThickFunction)
   ONEOPERAND_ONETYPE_INST(ThickToObjCMetatype)
   ONEOPERAND_ONETYPE_INST(ObjCToThickMetatype)
+  ONEOPERAND_ONETYPE_INST(ObjCMetatypeToObject)
+  ONEOPERAND_ONETYPE_INST(ObjCExistentialMetatypeToObject)
   ONEOPERAND_ONETYPE_INST(ConvertFunction)
   ONEOPERAND_ONETYPE_INST(UpcastExistentialRef)
   ONEOPERAND_ONETYPE_INST(ProjectBlockStorage)
 #undef ONEOPERAND_ONETYPE_INST
+      
+  case ValueKind::ObjCProtocolInst: {
+    auto Ty = getSILType(MF->getType(TyID), (SILValueCategory)TyCategory);
+    auto Proto = MF->getDecl(ValID);
+    ResultVal = Builder.createObjCProtocol(Loc, cast<ProtocolDecl>(Proto), Ty);
+    break;
+  }
+      
   case ValueKind::InitExistentialInst:
   case ValueKind::InitExistentialRefInst: {
 

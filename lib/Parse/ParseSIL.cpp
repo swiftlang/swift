@@ -1096,6 +1096,10 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("mark_uninitialized", ValueKind::MarkUninitializedInst)
     .Case("mark_function_escape", ValueKind::MarkFunctionEscapeInst)
     .Case("metatype", ValueKind::MetatypeInst)
+    .Case("objc_existential_metatype_to_object",
+          ValueKind::ObjCExistentialMetatypeToObjectInst)
+    .Case("objc_metatype_to_object", ValueKind::ObjCMetatypeToObjectInst)
+    .Case("objc_protocol", ValueKind::ObjCProtocolInst)
     .Case("objc_to_thick_metatype", ValueKind::ObjCToThickMetatypeInst)
     .Case("open_existential", ValueKind::OpenExistentialInst)
     .Case("open_existential_ref", ValueKind::OpenExistentialRefInst)
@@ -1606,7 +1610,9 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   case ValueKind::ThickToObjCMetatypeInst:
   case ValueKind::ObjCToThickMetatypeInst:
   case ValueKind::ConvertFunctionInst:
-  case ValueKind::UpcastExistentialRefInst: {
+  case ValueKind::UpcastExistentialRefInst:
+  case ValueKind::ObjCExistentialMetatypeToObjectInst:
+  case ValueKind::ObjCMetatypeToObjectInst: {
     SILType Ty;
     Identifier ToToken;
     SourceLoc ToLoc;
@@ -1670,6 +1676,12 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
       break;
     case ValueKind::UpcastExistentialRefInst:
       ResultVal = B.createUpcastExistentialRef(InstLoc, Val, Ty);
+      break;
+    case ValueKind::ObjCMetatypeToObjectInst:
+      ResultVal = B.createObjCMetatypeToObject(InstLoc, Val, Ty);
+      break;
+    case ValueKind::ObjCExistentialMetatypeToObjectInst:
+      ResultVal = B.createObjCExistentialMetatypeToObject(InstLoc, Val, Ty);
       break;
     }
     break;
@@ -2414,6 +2426,27 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     assert(CurModuleResults.size() == 1);
     VD = CurModuleResults[0];
     ResultVal = B.createGlobalAddr(InstLoc, cast<VarDecl>(VD), Ty);
+    break;
+  }
+  case ValueKind::ObjCProtocolInst: {
+    Identifier ProtocolName;
+    SILType Ty;
+    if (P.parseToken(tok::pound, diag::expected_sil_constant) ||
+        parseSILIdentifier(ProtocolName, diag::expected_sil_constant) ||
+        P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":") ||
+        parseSILType(Ty))
+      return true;
+    // Find the decl for the protocol name.
+    ValueDecl *VD;
+    SmallVector<ValueDecl*, 4> CurModuleResults;
+    // Perform a module level lookup on the first component of the
+    // fully-qualified name.
+    P.SF.getParentModule()->lookupValue(Module::AccessPathTy(), ProtocolName,
+                                        NLKind::UnqualifiedLookup,
+                                        CurModuleResults);
+    assert(CurModuleResults.size() == 1);
+    VD = CurModuleResults[0];
+    ResultVal = B.createObjCProtocol(InstLoc, cast<ProtocolDecl>(VD), Ty);
     break;
   }
   case ValueKind::SILGlobalAddrInst: {
