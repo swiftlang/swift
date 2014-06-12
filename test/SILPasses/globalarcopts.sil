@@ -1019,3 +1019,22 @@ bb3:
   %1 = tuple()
   return %1 : $()
 }
+
+// CHECK: sil @unreachable_bb : $@thin (Builtin.NativeObject) -> () {
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+sil @unreachable_bb : $@thin (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  strong_retain %0 : $Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb1:
+  strong_release %0 : $Builtin.NativeObject
+  %1 = tuple()
+  return %1 : $()
+
+bb2:
+  %2 = builtin_function_ref "int_trap" : $@thin @noreturn @callee_owned () -> ()
+  %3 = apply %2() : $@thin @noreturn @callee_owned () -> ()
+  unreachable
+}

@@ -42,6 +42,9 @@ private:
   /// pointer at the top of each block.
   BottomUpMapTy PtrToBottomUpState;
 
+  /// Is this a BB that is a trap?
+  bool IsTrapBB;
+
 public:
   ARCBBState() : BB() {}
   ARCBBState(SILBasicBlock *BB) : BB(BB) {}
@@ -49,7 +52,11 @@ public:
   void init(SILBasicBlock *NewBB) {
     assert(NewBB && "Cannot set NewBB to a nullptr.");
     BB = NewBB;
+    IsTrapBB = false;
+    initializeTrapStatus();
   }
+
+  bool isTrapBB() const { return IsTrapBB; }
 
   /// Top Down Iterators
   using topdown_iterator = TopDownMapTy::iterator;
@@ -121,6 +128,9 @@ public:
   /// BB. Used to create an initial state before we merge in other
   /// predecessors. This is currently a stub.
   void initPredTopDown(ARCBBState &PredBB);
+
+private:
+  void initializeTrapStatus();
 };
 
 /// A class that implements the ARC sequence data flow.

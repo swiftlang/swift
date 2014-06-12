@@ -425,10 +425,12 @@ static bool processBBTopDown(
 void
 swift::arc::ARCSequenceDataflowEvaluator::mergePredecessors(ARCBBState &BBState,
                                                             SILBasicBlock *BB) {
+  bool HasAtLeastOnePred = false;
+
   // For each successor of BB...
-  unsigned i = 0;
   for (auto Pred : BB->getPreds()) {
     auto *PredBB = Pred;
+
     // If the precessor is the head of a backedge in our traversal, clear any
     // state we are tracking now and clear the state of the basic block. There
     // is some sort of control flow here that we do not understand.
@@ -441,10 +443,14 @@ swift::arc::ARCSequenceDataflowEvaluator::mergePredecessors(ARCBBState &BBState,
     // the predecessor in.
     auto I = TopDownBBStates.find(PredBB);
     assert(I != TopDownBBStates.end());
-    if (i++ == 0)
-      BBState.initPredTopDown(I->second);
-    else
-      BBState.mergePredTopDown(I->second);
+    if (!I->second.isTrapBB()) {
+      if (!HasAtLeastOnePred) {
+        BBState.initPredTopDown(I->second);
+      } else {
+        BBState.mergePredTopDown(I->second);
+      }
+      HasAtLeastOnePred = true;
+    }
   }
 }
 
@@ -596,6 +602,7 @@ swift::arc::ARCSequenceDataflowEvaluator::mergeSuccessors(ARCBBState &BBState,
 
   // For each successor of BB...
   ArrayRef<SILSuccessor> Succs = BB->getSuccs();
+  bool HasAtLeastOneSucc = false;
   for (unsigned i = 0, e = Succs.size(); i != e; ++i) {
     // If it does not have a basic block associated with it...
     auto *SuccBB = Succs[i].getBB();
@@ -616,10 +623,14 @@ swift::arc::ARCSequenceDataflowEvaluator::mergeSuccessors(ARCBBState &BBState,
     // the successor in.
     auto I = BottomUpBBStates.find(SuccBB);
     assert(I != BottomUpBBStates.end());
-    if (i == 0)
-      BBState.initSuccBottomUp(I->second);
-    else
-      BBState.mergeSuccBottomUp(I->second);
+    if (!I->second.isTrapBB()) {
+      if (!HasAtLeastOneSucc) {
+        BBState.initSuccBottomUp(I->second);
+      } else {
+        BBState.mergeSuccBottomUp(I->second);
+      }
+      HasAtLeastOneSucc = true;
+    }
   }
 }
 
@@ -698,4 +709,19 @@ bool swift::arc::ARCSequenceDataflowEvaluator::run() {
   NestingDetected |= processTopDown();
 
   return NestingDetected;
+}
+
+void swift::arc::ARCBBState::initializeTrapStatus() {
+  auto II = BB->begin();
+  auto *BFRI = dyn_cast<BuiltinFunctionRefInst>(&*II);
+  if (!BFRI || !BFRI->getName().str().equals("int_trap"))
+    return;
+  ++II;
+
+  auto *AI = dyn_cast<ApplyInst>(&*II);
+  if (!AI || AI->getCallee() != SILValue(BFRI))
+    return;
+  ++II;
+
+  IsTrapBB = isa<UnreachableInst>(&*II);
 }
