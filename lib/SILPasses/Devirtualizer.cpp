@@ -835,7 +835,7 @@ static bool specializeClassMethodDispatch(ApplyInst *AI) {
   SILType InstanceType = CMI->getOperand().stripCasts().getType();
   SILValue ClassInstance = CMI->getOperand();
   ClassDecl *CD = InstanceType.getClassOrBoundGenericClass();
-  if (!CD)
+  if (!CD || CD->isForeign())
     return false;
 
   // Create a diamond shaped control flow and a checked_cast_branch
