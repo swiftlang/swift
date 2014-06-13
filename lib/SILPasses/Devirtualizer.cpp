@@ -813,7 +813,6 @@ static ApplyInst *CloneApply(ApplyInst *AI, SILBuilder &Builder) {
                                                         OrigCMI->getOperand(),
                                                         OrigCMI->getMember(),
                                                         OrigCMI->getType());
-
   // Clone the Apply.
   auto Args = AI->getArguments();
   SmallVector<SILValue, 8> Ret(Args.size());
@@ -835,7 +834,7 @@ static bool specializeClassMethodDispatch(ApplyInst *AI) {
   SILType InstanceType = CMI->getOperand().stripCasts().getType();
   SILValue ClassInstance = CMI->getOperand();
   ClassDecl *CD = InstanceType.getClassOrBoundGenericClass();
-  if (!CD || CD->isForeign())
+  if (!CD || CMI->isVolatile())
     return false;
 
   // Create a diamond shaped control flow and a checked_cast_branch
