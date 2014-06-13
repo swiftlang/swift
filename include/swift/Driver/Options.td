@@ -94,8 +94,6 @@ def o : JoinedOrSeparate<["-"], "o">, Flags<[FrontendOption]>,
 def j : JoinedOrSeparate<["-"], "j">,
   HelpText<"Number of commands to execute in parallel">, MetaVarName<"<n>">;
 
-def arch : Separate<["-"], "arch">,
-  HelpText<"Compile for architecture <arch>">, MetaVarName<"<arch>">;
 def sdk : Separate<["-"], "sdk">, Flags<[FrontendOption]>,
   HelpText<"Compile against <sdk>">, MetaVarName<"<sdk>">;
 def g : Flag<["-"], "g">, Flags<[FrontendOption]>,

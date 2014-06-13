@@ -1,4 +1,4 @@
-// RUN: %swift_driver -driver-print-jobs -arch x86_64 %s 2>&1 > %t.simple.txt
+// RUN: %swift_driver -driver-print-jobs -target x86_64-apple-macosx10.9 %s 2>&1 > %t.simple.txt
 // RUN: FileCheck %s < %t.simple.txt
 // RUN: FileCheck -check-prefix SIMPLE %s < %t.simple.txt
 
@@ -6,7 +6,7 @@
 // RUN: FileCheck %s < %t.complex.txt
 // RUN: FileCheck -check-prefix COMPLEX %s < %t.complex.txt
 
-// RUN: %swift_driver -driver-print-jobs -arch x86_64 -g %s | FileCheck -check-prefix DEBUG %s
+// RUN: %swift_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -g %s | FileCheck -check-prefix DEBUG %s
 
 // REQUIRES: X86
 

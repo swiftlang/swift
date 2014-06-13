@@ -702,16 +702,6 @@ void Driver::buildJobs(const ActionList &Actions, const OutputInfo &OI,
     }
   }
 
-  // Collect the list of architectures.
-  llvm::StringSet<> ArchNames;
-  if (TC.getTriple().isOSDarwin()) {
-    for (const Arg *A : Args){
-      if (A->getOption().matches(options::OPT_arch)) {
-        ArchNames.insert(A->getValue());
-      }
-    }
-  }
-
   for (const Action *A : Actions) {
     bool saveTemps = Args.hasArg(options::OPT_save_temps);
     Job *J = buildJobsForAction(C, A, OI, OFM, C.getDefaultToolChain(), true,
@@ -1270,13 +1260,8 @@ static llvm::Triple computeTargetTriple(DiagnosticEngine &diags,
   // Handle Darwin-specific options available here.
   if (target.isOSDarwin()) {
     // If an explict Darwin arch name is given, that trumps all.
-    if (!DarwinArchName.empty()) {
+    if (!DarwinArchName.empty())
       setTargetFromArch(diags, target, DarwinArchName);
-    
-    // Handle the Darwin '-arch' flag.
-    } else if (Arg *A = Args.getLastArg(options::OPT_arch)) {
-      setTargetFromArch(diags, target, A->getValue());
-    }
   }
 
   // TODO: handle other target/pseudo-target flags as necessary.
