@@ -818,8 +818,8 @@ static StringRef getOutputFilename(const JobAction *JA,
     // the top level.
     StringRef Stem = llvm::sys::path::stem(BaseName);
     StringRef Suffix = types::getTypeTempSuffix(JA->getType());
-    llvm::error_code EC = llvm::sys::fs::createTemporaryFile(Stem, Suffix,
-                                                             Buffer);
+    std::error_code EC =
+        llvm::sys::fs::createTemporaryFile(Stem, Suffix, Buffer);
     if (EC) {
       Diags.diagnose(SourceLoc(),
                      diag::error_unable_to_make_temporary_file,

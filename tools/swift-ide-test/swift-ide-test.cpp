@@ -303,7 +303,7 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
                             StringRef CodeCompletionToken,
                             bool CodeCompletionDiagnostics) {
   std::unique_ptr<llvm::MemoryBuffer> InputFile;
-  if (llvm::error_code Err =
+  if (std::error_code Err =
           llvm::MemoryBuffer::getFile(SourceFilename, InputFile)) {
     llvm::errs() << "error opening input file: " << Err.message() << '\n';
     return 1;
@@ -359,7 +359,7 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
 static int doREPLCodeCompletion(const CompilerInvocation &InitInvok,
                                 StringRef SourceFilename) {
   std::unique_ptr<llvm::MemoryBuffer> InputFile;
-  if (llvm::error_code Err =
+  if (std::error_code Err =
           llvm::MemoryBuffer::getFile(SourceFilename, InputFile)) {
     llvm::errs() << "error opening input file: " << Err.message() << '\n';
     return 1;
@@ -904,7 +904,7 @@ static int doSemanticAnnotation(const CompilerInvocation &InitInvok,
 
 static int doInputCompletenessTest(StringRef SourceFilename) {
   std::unique_ptr<llvm::MemoryBuffer> InputFile;
-  if (llvm::error_code Err =
+  if (std::error_code Err =
           llvm::MemoryBuffer::getFile(SourceFilename, InputFile)) {
     llvm::errs() << "error opening input file: " << Err.message() << '\n';
     return 1;
@@ -1517,7 +1517,7 @@ static int doParseReST(StringRef SourceFilename) {
   llvm::rest::SourceManager<unsigned> SM;
   llvm::SmallString<64> DocutilsXML;
   std::unique_ptr<llvm::MemoryBuffer> InputFile;
-  if (llvm::error_code Err =
+  if (std::error_code Err =
           llvm::MemoryBuffer::getFileOrSTDIN(SourceFilename, InputFile)) {
     llvm::errs() << "error opening input file: " << Err.message() << '\n';
     return 1;

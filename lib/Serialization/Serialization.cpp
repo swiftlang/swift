@@ -424,7 +424,7 @@ void Serializer::writeInputFiles(FilenamesTy inputFiles,
   for (auto filename : inputFiles) {
     llvm::SmallString<128> path(filename);
 
-    llvm::error_code err;
+    std::error_code err;
     err = llvm::sys::fs::make_absolute(path);
     if (err)
       continue;

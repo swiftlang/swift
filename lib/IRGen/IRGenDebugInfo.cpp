@@ -500,9 +500,9 @@ llvm::DIFile IRGenDebugInfo::getOrCreateFile(const char *Filename) {
   StringRef File = BumpAllocatedString(llvm::sys::path::filename(Filename));
   llvm::SmallString<512> Path(Filename);
   llvm::sys::path::remove_filename(Path);
-  llvm::error_code ec = llvm::sys::fs::make_absolute(Path);
+  std::error_code ec = llvm::sys::fs::make_absolute(Path);
   // Basically ignore any error.
-  assert(ec == llvm::error_code());
+  assert(ec == std::error_code());
   (void)ec; // Silence the unused variable warning
   llvm::DIFile F = DBuilder.createFile(File, BumpAllocatedString(Path));
 
