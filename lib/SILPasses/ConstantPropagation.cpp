@@ -596,7 +596,7 @@ static SILInstruction *constantFoldBuiltin(ApplyInst *AI,
   if (Intrinsic.ID != llvm::Intrinsic::not_intrinsic)
     return constantFoldIntrinsic(AI, Intrinsic.ID, ResultsInError);
 
-  // Otherwise, it should be one of the builin functions.
+  // Otherwise, it should be one of the builtin functions.
   OperandValueArrayRef Args = AI->getArguments();
   const BuiltinInfo &Builtin = FR->getBuiltinInfo();
 
