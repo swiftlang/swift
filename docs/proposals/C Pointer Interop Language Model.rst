@@ -156,7 +156,8 @@ accept any of the following:
 
 As a special case, when a function is declared as taking an
 ``ConstUnsafePointer<Void>`` argument, it can accept the same operands as
-``ConstUnsafePointer<T>`` for any type ``T``.
+``ConstUnsafePointer<T>`` for any type ``T``. Pointers to certain integer
+types can furthermore interoperate with strings; see `Strings`_ below.
 
 So if you have a function declared::
 
@@ -186,3 +187,23 @@ You can call it as any of::
   zang(&y)
   zang([1.0, 2.0, 3.0])
   zang([1, 2, 3])
+
+Strings
+=======
+
+Pointers to the following C integer and character types can interoperate with
+Swift ``String`` values and string literals:
+
+- ``CChar``, ``CSignedChar``, and ``CUnsignedChar``, which interoperate with
+  ``String`` as a UTF-8 code unit array;
+- ``CShort``, ``CUnsignedShort``, and ``CChar16``, which interoperate with
+  ``String`` as a UTF-16 code unit array; and
+- ``CInt``, ``CUnsignedInt``, ``CWideChar``, and ``CChar32``, which interoperate
+  with ``String`` as a UTF-32 code unit array.
+
+A ``ConstUnsafePointer`` parameter with any of the above element types may take
+a ``String`` value as an argument. The string is transcoded to a null-terminated
+buffer of the appropriate encoding, if necessary, and a pointer to the buffer
+is passed to the function.  The callee may not mutate through the array, and
+the referenced memory is only guaranteed to live for the duration of the call.
+
