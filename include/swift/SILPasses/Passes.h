@@ -74,6 +74,7 @@ namespace swift {
   SILTransform *createARCOpts();
   SILTransform *createSimplifyCFG();
   SILTransform *createDevirtualization();
+  SILTransform *createEarlyBinding();
   SILTransform *createAllocBoxToStack();
   SILTransform *createDeadObjectElimination();
   SILTransform *createLoadStoreOpts();

@@ -102,7 +102,8 @@ static ClassDecl *findClassDeclForOperand(SILValue S) {
 /// %YY = function_ref @...
 /// apply %YY(...)
 ///
-static bool optimizeClassMethod(ApplyInst *AI, ClassMethodInst *CMI) {
+static bool optimizeClassMethod(ApplyInst *AI, ClassMethodInst *CMI,
+                                ClassDecl *KnownClass) {
   DEBUG(llvm::dbgs() << "    Trying to optimize : " << *CMI);
 
   // First attempt to lookup the origin for our class method. The origin should
@@ -111,7 +112,9 @@ static bool optimizeClassMethod(ApplyInst *AI, ClassMethodInst *CMI) {
   DEBUG(llvm::dbgs() << "        Origin: " << Origin);
 
   // Then attempt to lookup the class for origin.
-  ClassDecl *Class = findClassDeclForOperand(Origin);
+  ClassDecl *Class = KnownClass;
+  if (!Class)
+    Class = findClassDeclForOperand(Origin);
 
   // If we are unable to lookup a class decl for origin there is nothing here
   // that we can deserialize.
@@ -740,7 +743,7 @@ static bool optimizeApplyInst(ApplyInst *AI) {
   ///
   /// %YY = function_ref @...
   if (auto *CMI = dyn_cast<ClassMethodInst>(AI->getCallee()))
-    return optimizeClassMethod(AI, CMI);
+    return optimizeClassMethod(AI, CMI, nullptr);
 
   // Devirtualize protocol_method + project_existential + init_existential
   // instructions.  For example:
@@ -801,3 +804,119 @@ public:
 SILTransform *swift::createDevirtualization() {
   return new SILDevirtualizationPass();
 }
+
+// A utility function for cloning the apply and cmi instructions.
+static ApplyInst *CloneApply(ApplyInst *AI, SILBuilder &Builder) {
+  // Clone the CMI.
+  ClassMethodInst *OrigCMI = cast<ClassMethodInst>(AI->getCallee());
+  ClassMethodInst *NewCMI = Builder.createClassMethod(OrigCMI->getLoc(),
+                                                        OrigCMI->getOperand(),
+                                                        OrigCMI->getMember(),
+                                                        OrigCMI->getType());
+
+  // Clone the Apply.
+  auto Args = AI->getArguments();
+  SmallVector<SILValue, 8> Ret(Args.size());
+  for (unsigned i = 0, e = Args.size(); i != e; ++i)
+    Ret[i] = Args[i];
+
+  return Builder.createApply(AI->getLoc(), NewCMI,
+                             AI->getSubstCalleeSILType(),
+                             AI->getType(),
+                             AI->getSubstitutions(),
+                             Ret, AI->isTransparent());
+}
+
+/// Specialize virtual dispatch.
+static bool specializeClassMethodDispatch(ApplyInst *AI) {
+  ClassMethodInst *CMI = dyn_cast<ClassMethodInst>(AI->getCallee());
+  assert(CMI && "Invalid class method instruction");
+
+  SILType InstanceType = CMI->getOperand().stripCasts().getType();
+  SILValue ClassInstance = CMI->getOperand();
+  ClassDecl *CD = InstanceType.getClassOrBoundGenericClass();
+  if (!CD)
+    return false;
+
+  // Create a diamond shaped control flow and a checked_cast_branch
+  // instruction that checks the exact type of the object.
+  // This cast selects between two paths: one that calls the slow dynamic
+  // dispatch and one that calls the specific method.
+  SILBasicBlock::iterator It = AI;
+  SILFunction *F = AI->getFunction();
+  SILBasicBlock *Entry = AI->getParent();
+
+  // Iden is the basic block containing the early binding code.
+  SILBasicBlock *Iden = F->createBasicBlock();
+  // Virt is the block containing the slow virtual call.
+  SILBasicBlock *Virt = F->createBasicBlock();
+  Iden->createArgument(InstanceType);
+
+  SILBasicBlock *Continue = Entry->splitBasicBlock(It);
+
+  SILBuilder Builder(Entry);
+  // Create the checked_cast_branch instruction that checks at runtime if the
+  // class instance is identical to the SILType.
+  Builder.createCheckedCastBranch(AI->getLoc(), CheckedCastKind::Identical,
+                                  ClassInstance, InstanceType, Iden, Virt);
+
+  SILBuilder VirtBuilder(Virt);
+  SILBuilder IdenBuilder(Iden);
+
+  // Copy the two apply instructions into the two blocks.
+  ApplyInst *IdenAI = CloneApply(AI, IdenBuilder);
+  ApplyInst *VirtAI = CloneApply(AI, VirtBuilder);
+
+  // Create a PHInode for returning the return value from both apply
+  // instructions.
+  SILArgument *Arg = Continue->createArgument(AI->getType());
+  IdenBuilder.createBranch(AI->getLoc(), Continue, ArrayRef<SILValue>(IdenAI));
+  VirtBuilder.createBranch(AI->getLoc(), Continue, ArrayRef<SILValue>(VirtAI));
+
+  // Remove the old Apply instruction.
+  AI->replaceAllUsesWith(Arg);
+  AI->eraseFromParent();
+
+  // Devirtualize the apply instruction on the identical path.
+  optimizeClassMethod(IdenAI, CMI, CD);
+  return true;
+}
+
+namespace {
+  /// Perform early binding of virtual calls by speculating that the requested
+  /// class is at the bottom of the class hierarchy.
+  class SILEarlyBindingPass : public SILFunctionTransform {
+  public:
+    virtual ~SILEarlyBindingPass() {}
+
+    virtual void run() {
+      bool Changed = false;
+
+      // Collect virtual calls that may be specialized.
+      SmallVector<ApplyInst *, 16> ToSpecialize;
+      for (auto &BB : *getFunction()) {
+        for (auto II = BB.begin(), IE = BB.end(); II != IE; ++II) {
+          ApplyInst *AI = dyn_cast<ApplyInst>(&*II);
+          if (AI && isa<ClassMethodInst>(AI->getCallee()))
+            ToSpecialize.push_back(AI);
+        }
+      }
+
+      // Perform the early binding.
+      for (auto AI : ToSpecialize)
+        Changed |= specializeClassMethodDispatch(AI);
+
+      if (Changed) {
+        invalidateAnalysis(SILAnalysis::InvalidationKind::CallGraph);
+      }
+    }
+
+    StringRef getName() override { return "Devirtualization"; }
+  };
+
+} // end anonymous namespace
+
+SILTransform *swift::createEarlyBinding() {
+  return new SILEarlyBindingPass();
+}
+
