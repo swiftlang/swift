@@ -34,6 +34,12 @@
 
 using namespace swift;
 
+static void registerAnalysisPasses(SILPassManager &PM, SILModule *Mod) {
+  PM.registerAnalysis(createCallGraphAnalysis(Mod));
+  PM.registerAnalysis(createAliasAnalysis(Mod));
+  PM.registerAnalysis(createDominanceAnalysis(Mod));
+}
+
 bool swift::runSILDiagnosticPasses(SILModule &Module,
                                    const SILOptions &Options) {
   // If we parsed a .sil file that is already in canonical form, don't rerun
@@ -44,10 +50,7 @@ bool swift::runSILDiagnosticPasses(SILModule &Module,
   auto &Ctx = Module.getASTContext();
 
   SILPassManager PM(&Module, Options);
-  PM.registerAnalysis(createCallGraphAnalysis(&Module));
-  PM.registerAnalysis(createAliasAnalysis(&Module));
-  PM.registerAnalysis(createDominanceAnalysis(&Module));
-
+  registerAnalysisPasses(PM, &Module);
   // If we are asked do debug serialization, instead of running all diagnostic
   // passes, just run mandatory inlining with dead transparent function cleanup
   // disabled.
@@ -79,9 +82,7 @@ bool swift::runSILDiagnosticPasses(SILModule &Module,
 void swift::runSILOptimizationPasses(SILModule &Module,
                                      const SILOptions &Options) {
     SILPassManager PM(&Module, Options);
-    PM.registerAnalysis(createCallGraphAnalysis(&Module));
-    PM.registerAnalysis(createAliasAnalysis(&Module));
-    PM.registerAnalysis(createDominanceAnalysis(&Module));
+    registerAnalysisPasses(PM, &Module);
     PM.add(createSILLinker());
     if (Options.DebugSerialization) {
       PM.run();
