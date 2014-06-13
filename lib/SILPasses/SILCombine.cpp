@@ -936,6 +936,32 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
   if (auto *CFI = dyn_cast<ConvertFunctionInst>(AI->getCallee()))
     return optimizeApplyOfConvertFunctionInst(AI, CFI);
 
+  // Optimize sub(x - x) -> 0.
+  if (AI->getNumOperands() == 3 &&
+      match(AI, m_ApplyInst(BuiltinValueKind::Sub, m_ValueBase())) &&
+      AI->getOperand(1) == AI->getOperand(2))
+    if (auto DestTy = AI->getType().getAs<BuiltinIntegerType>())
+      return IntegerLiteralInst::create(AI->getLoc(), AI->getType(),
+                                        APInt(DestTy->getGreatestWidth(), 0),
+                                        *AI->getFunction());
+
+  // Optimize sub(ptrtoint(index_raw_pointer(v, x)), ptrtoint(v)) -> x.
+  ApplyInst *Bytes2;
+  IndexRawPointerInst *Indexraw;
+  if (AI->getNumOperands() == 3 &&
+      match(AI, m_ApplyInst(BuiltinValueKind::Sub,
+                            m_ApplyInst(BuiltinValueKind::PtrToInt,
+                                        m_IndexRawPointerInst(Indexraw)),
+                            m_ApplyInst(Bytes2)))) {
+    if (match(Bytes2, m_ApplyInst(BuiltinValueKind::PtrToInt, m_ValueBase()))) {
+      if (Indexraw->getOperand(0) == Bytes2->getOperand(1) &&
+          Indexraw->getOperand(1).getType() == AI->getType()) {
+        replaceInstUsesWith(*AI, Indexraw->getOperand(1).getDef());
+        return eraseInstFromFunction(*AI);
+      }
+    }
+  }
+
   // Canonicalize multiplication by a stride to be such that the stride is
   // always the second argument.
   if (AI->getNumOperands() != 4)

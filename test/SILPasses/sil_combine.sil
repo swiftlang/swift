@@ -1297,3 +1297,32 @@ bb0:
   %2 = tuple()
   return %2 : $()
 }
+
+// CHECK-LABEL: sil @sub_pointers : $@thin (Builtin.RawPointer) -> Builtin.Word
+// CHECK-NEXT: bb0
+// CHECK-NEXT: integer_literal
+// CHECK-NEXT: return
+sil @sub_pointers : $@thin (Builtin.RawPointer) -> Builtin.Word {
+bb0(%0 : $Builtin.RawPointer):
+  %1 = integer_literal $Builtin.Word, 0
+  %23 = index_raw_pointer %0 : $Builtin.RawPointer, %1 : $Builtin.Word
+  %24 = builtin_function_ref "sub_Word" : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Word
+  %25 = builtin_function_ref "ptrtoint_Word" : $@thin (Builtin.RawPointer) -> Builtin.Word
+  %26 = apply %25(%23) : $@thin (Builtin.RawPointer) -> Builtin.Word
+  %27 = apply %25(%0) : $@thin (Builtin.RawPointer) -> Builtin.Word
+  %28 = apply %24(%26, %27) : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Word
+  return %28 : $Builtin.Word
+}
+
+// CHECK-LABEL: sil @sub_same_value : $@thin (Builtin.RawPointer) -> Builtin.Word
+// CHECK-NEXT: bb0
+// CHECK-NEXT: integer_literal
+// CHECK-NEXT: return
+sil @sub_same_value : $@thin (Builtin.RawPointer) -> Builtin.Word {
+bb0(%0 : $Builtin.RawPointer):
+  %24 = builtin_function_ref "sub_Word" : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Word
+  %25 = builtin_function_ref "ptrtoint_Word" : $@thin (Builtin.RawPointer) -> Builtin.Word
+  %27 = apply %25(%0) : $@thin (Builtin.RawPointer) -> Builtin.Word
+  %28 = apply %24(%27, %27) : $@thin (Builtin.Word, Builtin.Word) -> Builtin.Word
+  return %28 : $Builtin.Word
+}
