@@ -1,0 +1,82 @@
+// RUN: %sil-opt %s -sil-combine -verify | FileCheck %s
+
+import Builtin
+
+// Simplify arithmetic where one operand is a zero and the other is not a constant
+sil @fold_add_with_overflow_zeros : $@thin (Builtin.Int64) -> Builtin.Int64 {
+bb0(%x : $Builtin.Int64):
+ %1 = builtin_function_ref "int_sadd_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64) -> (Builtin.Int64, Builtin.Int1)
+ %0 = integer_literal $Builtin.Int64, 0
+ %18 = apply %1(%x, %0) : $@thin (Builtin.Int64, Builtin.Int64) -> (Builtin.Int64, Builtin.Int1)
+ %19 = tuple_extract %18 : $(Builtin.Int64, Builtin.Int1), 0
+ return %19 : $Builtin.Int64
+
+// CHECK-LABEL: sil @fold_add_with_overflow_zeros
+// CHECK-NOT: builtin_function_ref "int_sadd_with_overflow_Int64"
+// CHECK-NOT: integer_literal $Builtin.Int64, 0
+// CHECK-NOT: apply
+// CHECK: return %0 : $Builtin.Int64
+}
+
+// Simplify arithmetic where one operand is a zero and the other is not a constant
+sil @fold_add_with_overflow_zeros2 : $@thin (Builtin.Int64) -> Builtin.Int64 {
+bb0(%x : $Builtin.Int64):
+ %1 = builtin_function_ref "int_sadd_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64) -> (Builtin.Int64, Builtin.Int1)
+ %0 = integer_literal $Builtin.Int64, 0
+ %18 = apply %1(%0, %x) : $@thin (Builtin.Int64, Builtin.Int64) -> (Builtin.Int64, Builtin.Int1)
+ %19 = tuple_extract %18 : $(Builtin.Int64, Builtin.Int1), 0
+ return %19 : $Builtin.Int64
+
+// CHECK-LABEL: sil @fold_add_with_overflow_zeros2
+// CHECK-NOT: builtin_function_ref "int_sadd_with_overflow_Int64"
+// CHECK-NOT: integer_literal $Builtin.Int64, 0
+// CHECK-NOT: apply
+// CHECK: return %0 : $Builtin.Int64
+}
+
+// Simplify arithmetic where one operand is a zero and the other is not a constant
+sil @fold_sub_with_overflow_zeros : $@thin (Builtin.Int64) -> Builtin.Int64 {
+bb0(%x : $Builtin.Int64):
+ %1 = builtin_function_ref "int_ssub_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64) -> (Builtin.Int64, Builtin.Int1)
+ %0 = integer_literal $Builtin.Int64, 0
+ %18 = apply %1(%x, %0) : $@thin (Builtin.Int64, Builtin.Int64) -> (Builtin.Int64, Builtin.Int1)
+ %19 = tuple_extract %18 : $(Builtin.Int64, Builtin.Int1), 0
+ return %19 : $Builtin.Int64
+
+// CHECK-LABEL: sil @fold_sub_with_overflow_zeros
+// CHECK-NOT: builtin_function_ref "int_ssub_with_overflow_Int64"
+// CHECK-NOT: integer_literal $Builtin.Int64, 0
+// CHECK-NOT: apply
+// CHECK: return %0 : $Builtin.Int64
+}
+
+// Simplify arithmetic where one operand is a zero and the other is not a constant
+sil @fold_mul_with_overflow_zeros : $@thin (Builtin.Int64) -> Builtin.Int64 {
+bb0(%x : $Builtin.Int64):
+ %1 = builtin_function_ref "int_smul_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64) -> (Builtin.Int64, Builtin.Int1)
+ %0 = integer_literal $Builtin.Int64, 0
+ %18 = apply %1(%x, %0) : $@thin (Builtin.Int64, Builtin.Int64) -> (Builtin.Int64, Builtin.Int1)
+ %19 = tuple_extract %18 : $(Builtin.Int64, Builtin.Int1), 0
+ return %19 : $Builtin.Int64
+
+// CHECK-LABEL: sil @fold_mul_with_overflow_zeros
+// CHECK-NOT: builtin_function_ref "int_smul_with_overflow_Int64"
+// CHECK-NOT: apply
+// CHECK: [[RES:%.*]] = integer_literal $Builtin.Int64, 0
+// CHECK-NEXT: return [[RES:%.*]] : $Builtin.Int64
+}
+
+// Simplify arithmetic where one operand is a one and the other is not a constant
+sil @fold_mul_with_overflow_ones : $@thin (Builtin.Int64) -> Builtin.Int64 {
+bb0(%x : $Builtin.Int64):
+ %1 = builtin_function_ref "int_smul_with_overflow_Int64" : $@thin (Builtin.Int64, Builtin.Int64) -> (Builtin.Int64, Builtin.Int1)
+ %0 = integer_literal $Builtin.Int64, 1
+ %18 = apply %1(%x, %0) : $@thin (Builtin.Int64, Builtin.Int64) -> (Builtin.Int64, Builtin.Int1)
+ %19 = tuple_extract %18 : $(Builtin.Int64, Builtin.Int1), 0
+ return %19 : $Builtin.Int64
+
+// CHECK-LABEL: sil @fold_mul_with_overflow_ones
+// CHECK-NOT: builtin_function_ref "int_smul_with_overflow_Int64"
+// CHECK-NOT: apply
+// CHECK: return %0 : $Builtin.Int64
+}

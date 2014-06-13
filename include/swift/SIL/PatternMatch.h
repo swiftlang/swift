@@ -232,6 +232,33 @@ static inline integerliteral_ty m_IntegerLiteralInst(APInt V, bool isSigned) {
   return {V, isSigned};
 }
 
+struct match_zero {
+  template<typename ITy>
+  bool match(ITy *V) {
+    auto *Literal = dyn_cast<IntegerLiteralInst>(V);
+    if (!Literal)
+      return false;
+    return Literal->getValue() == 0;
+  }
+};
+
+/// m_Zero() - Match an arbitrary zero/null constant.  This includes
+/// zero_initializer for vectors and ConstantPointerNull for pointers.
+inline match_zero m_Zero() { return match_zero(); }
+
+struct match_one {
+  template<typename ITy>
+  bool match(ITy *V) {
+    auto *Literal = dyn_cast<IntegerLiteralInst>(V);
+    if (!Literal)
+      return false;
+    return Literal->getValue() == 1;
+  }
+};
+
+/// m_One() - Match a one constant.
+inline match_one m_One() { return match_one(); }
+
 //===----------------------------------------------------------------------===//
 //                             Unary Instructions
 //===----------------------------------------------------------------------===//

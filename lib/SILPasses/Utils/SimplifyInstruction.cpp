@@ -10,10 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 
+#define DEBUG_TYPE "sil-simplify"
 #include "swift/SILPasses/Utils/Local.h"
+#include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
+
 using namespace swift;
+using namespace swift::PatternMatch;
 
 namespace swift {
   class ASTContext;
@@ -39,6 +43,9 @@ namespace {
     SILValue visitTupleInst(TupleInst *SI);
     SILValue visitApplyInst(ApplyInst *AI);
     SILValue visitUpcastInst(UpcastInst *UI);
+
+    SILValue simplifyOverflowBuiltin(ApplyInst *AI,
+                                     BuiltinFunctionRefInst *FR);
   };
 } // end anonymous namespace
 
@@ -116,6 +123,12 @@ SILValue InstSimplifier::visitTupleExtractInst(TupleExtractInst *TEI) {
   // tuple_extract(tuple(x, y), 0) -> x
   if (TupleInst *TheTuple = dyn_cast<TupleInst>(TEI->getOperand()))
     return TheTuple->getElements()[TEI->getFieldNo()];
+
+  // tuple_extract(apply([add|sub|...]overflow(x, 0)) -> x
+  if (TEI->getFieldNo() == 0)
+    if (ApplyInst *AI = dyn_cast<ApplyInst>(TEI->getOperand()))
+      if (auto *BFRI = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee()))
+        return simplifyOverflowBuiltin(AI, BFRI);
 
   return SILValue();
 }
@@ -273,6 +286,102 @@ SILValue InstSimplifier::visitApplyInst(ApplyInst *AI) {
     if (auto *Literal = dyn_cast<IntegerLiteralInst>(AI->getArgument(0)))
       return Literal;
 
+  return SILValue();
+}
+
+/// \brief Simplify arithmetic intrinsics with overflow and known identity
+/// constants such as 0 and 1.
+/// If this returns a value other than SILValue() then the instruction was
+/// simplified to a value which doesn't overflow.  The overflow case is handled
+/// in SILCombine.
+static SILValue simplifyBinaryWithOverflow(ApplyInst *AI,
+                                           llvm::Intrinsic::ID ID) {
+  OperandValueArrayRef Args = AI->getArguments();
+  assert(Args.size() >= 2);
+
+  const SILValue &Op1 = Args[0];
+  const SILValue &Op2 = Args[1];
+
+  IntegerLiteralInst *IntOp1 = dyn_cast<IntegerLiteralInst>(Op1);
+  IntegerLiteralInst *IntOp2 = dyn_cast<IntegerLiteralInst>(Op2);
+
+  // If both ops are not constants, we cannot do anything.
+  // FIXME: Add cases where we can do something, eg, (x - x) -> 0
+  if (!IntOp1 && !IntOp2)
+    return SILValue();
+
+  // Calculate the result.
+
+  switch (ID) {
+    default: llvm_unreachable("Invalid case");
+    case llvm::Intrinsic::sadd_with_overflow:
+    case llvm::Intrinsic::uadd_with_overflow:
+      // 0 + X -> X
+      if (match(Op1, m_Zero()))
+        return Op2;
+      // X + 0 -> X
+      if (match(Op2, m_Zero()))
+        return Op1;
+      return SILValue();
+    case llvm::Intrinsic::ssub_with_overflow:
+    case llvm::Intrinsic::usub_with_overflow:
+      // X - 0 -> X
+      if (match(Op2, m_Zero()))
+        return Op1;
+      return SILValue();
+    case llvm::Intrinsic::smul_with_overflow:
+    case llvm::Intrinsic::umul_with_overflow:
+      // 0 * X -> 0
+      if (match(Op1, m_Zero()))
+        return Op1;
+      // X * 0 -> 0
+      if (match(Op2, m_Zero()))
+        return Op2;
+      // 1 * X -> X
+      if (match(Op1, m_One()))
+        return Op2;
+      // X * 1 -> X
+      if (match(Op2, m_One()))
+        return Op1;
+      return SILValue();
+  }
+  return SILValue();
+}
+
+SILValue InstSimplifier::simplifyOverflowBuiltin(ApplyInst *AI,
+                                                 BuiltinFunctionRefInst *FR) {
+  const IntrinsicInfo &Intrinsic = FR->getIntrinsicInfo();
+
+  // If it's an llvm intrinsic, fold the intrinsic.
+  switch (Intrinsic.ID) {
+    default:
+      return SILValue();
+    case llvm::Intrinsic::not_intrinsic:
+      break;
+    case llvm::Intrinsic::sadd_with_overflow:
+    case llvm::Intrinsic::uadd_with_overflow:
+    case llvm::Intrinsic::ssub_with_overflow:
+    case llvm::Intrinsic::usub_with_overflow:
+    case llvm::Intrinsic::smul_with_overflow:
+    case llvm::Intrinsic::umul_with_overflow:
+      return simplifyBinaryWithOverflow(AI, Intrinsic.ID);
+  }
+
+  // Otherwise, it should be one of the builtin functions.
+  const BuiltinInfo &Builtin = FR->getBuiltinInfo();
+
+  switch (Builtin.ID) {
+    default: break;
+
+      // Check and simplify binary arithmetic with overflow.
+#define BUILTIN(id, name, Attrs)
+#define BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(id, name, _, attrs, overload) \
+case BuiltinValueKind::id:
+#include "swift/AST/Builtins.def"
+      return simplifyBinaryWithOverflow(AI,
+                          getLLVMIntrinsicIDForBuiltinWithOverflow(Builtin.ID));
+
+  }
   return SILValue();
 }
 
