@@ -94,6 +94,10 @@ size_t SILBasicBlock::getBBArgIndex(SILArgument *Target) {
   llvm_unreachable("Expected to find argument in block's argument list!");
 }
 
+SILArgument *SILBasicBlock::createArgument(SILType Ty) {
+  return new (getModule()) SILArgument(Ty, this);
+}
+
 /// \brief Splits a basic block into two at the specified instruction.
 ///
 /// Note that all the instructions BEFORE the specified iterator

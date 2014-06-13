@@ -113,3 +113,7 @@ Type SILFunction::mapTypeIntoContext(Type type) const {
                                               getContextGenericParams(),
                                               type);
 }
+
+SILBasicBlock *SILFunction::createBasicBlock() {
+  return new (getModule()) SILBasicBlock(this);
+}
