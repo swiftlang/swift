@@ -276,6 +276,7 @@ protected:
       llvm_unreachable("invalid for SIL");
 
     // These are not affected by specialization.
+    case CheckedCastKind::Identical:
     case CheckedCastKind::Downcast:
     case CheckedCastKind::ExistentialToConcrete:
     case CheckedCastKind::ConcreteToUnrelatedExistential:
@@ -419,6 +420,7 @@ protected:
       llvm_unreachable("invalid for SIL");
 
     // These are not affected by specialization.
+    case CheckedCastKind::Identical:
     case CheckedCastKind::Downcast:
     case CheckedCastKind::ExistentialToConcrete:
     case CheckedCastKind::ConcreteToUnrelatedExistential:

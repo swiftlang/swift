@@ -2347,6 +2347,7 @@ namespace {
         expr->setCastKind(castKind);
         break;
       case CheckedCastKind::ArrayDowncast:
+      case CheckedCastKind::Identical:
       case CheckedCastKind::Downcast:
       case CheckedCastKind::SuperToArchetype:
       case CheckedCastKind::ArchetypeToArchetype:
@@ -2625,6 +2626,7 @@ namespace {
 
       // Valid casts.
       case CheckedCastKind::ArrayDowncast:
+      case CheckedCastKind::Identical:
       case CheckedCastKind::Downcast:
       case CheckedCastKind::SuperToArchetype:
       case CheckedCastKind::ArchetypeToArchetype:

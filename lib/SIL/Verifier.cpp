@@ -1455,6 +1455,7 @@ public:
     case CheckedCastKind::Coercion:
     case CheckedCastKind::ArrayDowncast:        
       llvm_unreachable("invalid for SIL");
+    case CheckedCastKind::Identical:
     case CheckedCastKind::Downcast:
       require(fromTy.getClassOrBoundGenericClass(),
               "downcast operand must be a class type");
