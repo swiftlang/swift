@@ -18,7 +18,7 @@ for obj: AnyObject in classes {
 
 // <rdar://problem/17303759> The Protocol class object is hidden on 64-bit iOS,
 // so we cannot form its metadata.
-#if os(iOS) && (arch(x86_64) || arch(arm64))
+#if os(iOS)
 println("false\ntrue")
 #else
 println(NSObject.conformsToProtocol(NSCopying.self))
