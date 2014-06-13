@@ -3170,6 +3170,59 @@ test_DictionaryToNSDictionaryCoversion()
 // CHECK: test_DictionaryToNSDictionaryCoversion done
 
 //===---
+// Dictionary upcasts
+//===---
+func test_DictionaryUpcastEntryPoint() {
+  var d = Dictionary<TestObjCKeyTy, TestObjCValueTy>(minimumCapacity: 32)
+  d[TestObjCKeyTy(10)] = TestObjCValueTy(1010)
+  d[TestObjCKeyTy(20)] = TestObjCValueTy(1020)
+  d[TestObjCKeyTy(30)] = TestObjCValueTy(1030)
+
+  var dAsAnyObject: Dictionary<NSObject, AnyObject> = _dictionaryUpCast(d)
+
+  assert(dAsAnyObject.count == 3)
+  var v = dAsAnyObject[TestObjCKeyTy(10)]
+  assert((v! as TestObjCValueTy).value == 1010)
+
+  v = dAsAnyObject[TestObjCKeyTy(20)]
+  assert((v! as TestObjCValueTy).value == 1020)
+
+  v = dAsAnyObject[TestObjCKeyTy(30)]
+  assert((v! as TestObjCValueTy).value == 1030)
+
+  println("test_DictionaryUpcastEntryPoint done")
+}
+
+test_DictionaryUpcastEntryPoint()
+// CHECK: test_DictionaryUpcastEntryPoint done
+
+func test_DictionaryUpcastBridgedEntryPoint() {
+  var d = Dictionary<TestBridgedKeyTy, TestBridgedValueTy>(minimumCapacity: 32)
+  d[TestBridgedKeyTy(10)] = TestBridgedValueTy(1010)
+  d[TestBridgedKeyTy(20)] = TestBridgedValueTy(1020)
+  d[TestBridgedKeyTy(30)] = TestBridgedValueTy(1030)
+
+  var dAsAnyObject: Dictionary<NSObject, AnyObject>
+    = _dictionaryBridgeToObjectiveC(d)
+
+  assert(dAsAnyObject.count == 3)
+  var v = dAsAnyObject[TestObjCKeyTy(10)]
+  assert((v! as TestBridgedValueTy).value == 1010)
+
+  v = dAsAnyObject[TestObjCKeyTy(20)]
+  assert((v! as TestBridgedValueTy).value == 1020)
+
+  v = dAsAnyObject[TestObjCKeyTy(30)]
+  assert((v! as TestBridgedValueTy).value == 1030)
+
+  println("test_DictionaryUpcastBridgedEntryPoint done")
+}
+
+test_DictionaryUpcastBridgedEntryPoint()
+// CHECK: test_DictionaryUpcastBridgedEntryPoint done
+
+
+//===---
 // Tests for APIs implemented strictly based on public interface.  We only need
 // to test them once, not for every storage type.
 //===---

@@ -2062,6 +2062,76 @@ class _NSSwiftDictionary {}
 @objc
 class _NSSwiftEnumerator {}
 
+//===--- Compiler conversion/casting entry points -------------------------===//
+
+/// Perform a non-bridged upcast from the source to another dictionary.
+///
+/// Requires: BaseKey and BaseValue are base classs or base @objc
+/// protocols (such as AnyObject) of DerivedKey and DerivedValue,
+/// respectively.
+///
+/// FIXME: This crappy implementation is O(n) because it copies the
+/// data; a proper implementation would be O(1).
+func _dictionaryUpCast<DerivedKey, DerivedValue, BaseKey, BaseValue>(
+       source: Dictionary<DerivedKey, DerivedValue>
+     ) -> Dictionary<BaseKey, BaseValue> {
+  _sanityCheck(isBridgedVerbatimToObjectiveC(BaseKey.self))
+  _sanityCheck(isBridgedVerbatimToObjectiveC(BaseValue.self))
+  _sanityCheck(isBridgedVerbatimToObjectiveC(DerivedKey.self))
+  _sanityCheck(isBridgedVerbatimToObjectiveC(DerivedValue.self))
+
+  var result = Dictionary<BaseKey, BaseValue>(minimumCapacity: source.count)
+  for (k, v) in source {
+    result[reinterpretCast(k)] = reinterpretCast(v)
+  }
+  return result
+}
+
+/// Perform a bridged upcast from the source to another dictionary.
+///
+/// Precondition: BridgesToKey and BridgesToValue are bridged to
+/// Objective-C, and at least one of them requires bridging.
+///
+/// 
+func _dictionaryBridgeToObjectiveC<BridgesToKey, BridgesToValue, Key, Value>(
+       source: Dictionary<BridgesToKey, BridgesToValue>
+     ) -> Dictionary<Key, Value> {
+  _sanityCheck(!isBridgedVerbatimToObjectiveC(BridgesToKey.self) ||
+               !isBridgedVerbatimToObjectiveC(BridgesToValue.self))
+  _sanityCheck(isBridgedVerbatimToObjectiveC(Key.self))
+  _sanityCheck(isBridgedVerbatimToObjectiveC(Value.self))
+
+  var result = Dictionary<Key, Value>(minimumCapacity: source.count)
+  let keyBridgesVerbatim = isBridgedVerbatimToObjectiveC(BridgesToKey.self)
+  let valueBridgesVerbatim = isBridgedVerbatimToObjectiveC(BridgesToValue.self)
+  for (key, value) in source {
+    // Bridge the key
+    var bridgedKey: Key
+    if keyBridgesVerbatim {
+      bridgedKey = reinterpretCast(key)
+    } else {
+      let bridged: AnyObject? = bridgeToObjectiveC(key)
+      _precondition(bridged, "dictionary key cannot be bridged to Objective-C")
+      bridgedKey = reinterpretCast(bridged!)
+    }
+
+    // Bridge the value
+    var bridgedValue: Value
+    if valueBridgesVerbatim {
+      bridgedValue = reinterpretCast(value)
+    } else {
+      let bridged: AnyObject? = bridgeToObjectiveC(value)
+      _precondition(bridged, 
+                    "dictionary value cannot be bridged to Objective-C")
+      bridgedValue = reinterpretCast(bridged!)
+    }
+
+    result[bridgedKey] = bridgedValue
+  }
+
+  return result
+}
+
 //===--- Hacks and workarounds --------------------------------------------===//
 
 /// Like `UnsafePointer<Unmanaged<AnyObject>>`, or `id __unsafe_unretained *` in
