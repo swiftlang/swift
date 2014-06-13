@@ -53,6 +53,11 @@ namespace irgen {
                                  SILType toType,
                                  CheckedCastMode mode);
 
+  /// \brief Convert the given value to the the exact destination type.
+  llvm::Value *emitClassIdenticalCast(IRGenFunction &IGF, llvm::Value *from,
+                                      SILType fromType, SILType toType,
+                                      CheckedCastMode mode);
+
   /// \brief Convert the given explosion to the given destination archetype,
   /// using a runtime-checked cast.
   llvm::Value *emitSuperToClassArchetypeConversion(IRGenFunction &IGF,

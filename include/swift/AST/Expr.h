@@ -72,6 +72,8 @@ enum class CheckedCastKind : unsigned {
   Coercion = First_Resolved,
   /// A cast from a class to one of its subclasses.
   Downcast,
+  // The requested class type is identical to the evaluated class.
+  Identical,
   /// A cast from a class to a type parameter constrained by that class as a
   /// superclass.
   SuperToArchetype,

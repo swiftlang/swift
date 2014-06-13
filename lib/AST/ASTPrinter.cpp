@@ -2183,6 +2183,8 @@ StringRef swift::getCheckedCastKindName(CheckedCastKind kind) {
     return "unresolved";
   case CheckedCastKind::Coercion:
     return "coercion";
+  case CheckedCastKind::Identical:
+    return "identical";
   case CheckedCastKind::Downcast:
     return "downcast";
   case CheckedCastKind::SuperToArchetype:

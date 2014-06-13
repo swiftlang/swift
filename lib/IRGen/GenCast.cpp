@@ -94,6 +94,43 @@ llvm::Value *irgen::emitSuperToClassArchetypeConversion(IRGenFunction &IGF,
   return emitClassDowncast(IGF, super, destType, mode);
 }
 
+llvm::Value *irgen::emitClassIdenticalCast(IRGenFunction &IGF,
+                                           llvm::Value *from,
+                                           SILType fromType,
+                                           SILType toType,
+                                           CheckedCastMode mode) {
+  // Emit a reference to the metadata.
+  bool isConcreteClass = toType.is<ClassType>();
+  llvm::Value *MetadataRef;
+  if (isConcreteClass) {
+    // If the dest type is a concrete class, get the full class metadata
+    // and call dynamicCastClass directly.
+    MetadataRef = IGF.IGM.getAddrOfTypeMetadata(toType.getSwiftRValueType(),
+                                            false, false);
+  } else {
+    // Otherwise, get the type metadata, which may be local, and go through
+    // the more general dynamicCast entry point.
+    MetadataRef = IGF.emitTypeMetadataRef(toType);
+  }
+
+  if (MetadataRef->getType() != IGF.IGM.Int8PtrTy)
+    MetadataRef = IGF.Builder.CreateBitCast(MetadataRef, IGF.IGM.Int8PtrTy);
+
+  llvm::Value *FromMetadataRef = emitTypeMetadataRefForHeapObject(IGF, from,
+                                                                  fromType);
+
+  llvm::Value *A = IGF.Builder.CreateBitCast(FromMetadataRef, IGF.IGM.Int8PtrTy);
+  llvm::Value *B = IGF.Builder.CreateBitCast(MetadataRef, IGF.IGM.Int8PtrTy);
+
+  llvm::Value *Cond = IGF.Builder.CreateICmpEQ(A, B);
+  llvm::Type *subTy = IGF.getTypeInfo(toType).StorageType;
+
+  llvm::Value *Nil = llvm::ConstantPointerNull::get(IGF.IGM.Int8PtrTy);
+  from = IGF.Builder.CreateBitCast(from, IGF.IGM.Int8PtrTy);
+  llvm::Value *Res = IGF.Builder.CreateSelect(Cond, from, Nil);
+  return IGF.Builder.CreateBitCast(Res, subTy);
+}
+
 /// Emit a checked unconditional downcast of a class value.
 llvm::Value *irgen::emitClassDowncast(IRGenFunction &IGF, llvm::Value *from,
                                       SILType toType, CheckedCastMode mode) {

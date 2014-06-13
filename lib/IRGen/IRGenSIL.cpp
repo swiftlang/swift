@@ -2730,7 +2730,10 @@ static Address emitCheckedCast(IRGenSILFunction &IGF,
   case CheckedCastKind::Coercion:
   case CheckedCastKind::ArrayDowncast:      
     llvm_unreachable("invalid for sil");
+  case CheckedCastKind::Identical:
   case CheckedCastKind::Downcast: {
+    bool DowncastKind = kind == CheckedCastKind::Downcast;
+
     // If we have an address, load the value and use the
     // emitClassDowncast code to make the check. Then just bitcast
     // addr appropriately.
@@ -2742,15 +2745,27 @@ static Address emitCheckedCast(IRGenSILFunction &IGF,
       auto fromAddr = IGF.getLoweredAddress(operand);
       auto toTy = IGF.getTypeInfo(destTy).getStorageType();
       llvm::Value *fromValue = IGF.Builder.CreateLoad(fromAddr);
-      emitClassDowncast(IGF, fromValue, destTy, mode);
-      llvm::Value *cast = IGF.Builder.CreateBitCast(
-        fromAddr.getAddress(), toTy->getPointerTo());
+      if (DowncastKind) {
+        emitClassDowncast(IGF, fromValue, destTy, mode);
+      } else {
+        emitClassIdenticalCast(IGF, fromValue, operand.getType(), destTy,
+                               mode);
+      }
+
+      llvm::Value *cast = IGF.Builder.CreateBitCast(fromAddr.getAddress(),
+                                                    toTy->getPointerTo());
       return Address(cast, fromAddr.getAlignment());
     }
 
     Explosion from = IGF.getLoweredExplosion(operand);
     llvm::Value *fromValue = from.claimNext();
-    llvm::Value *cast = emitClassDowncast(IGF, fromValue, destTy, mode);
+    llvm::Value *cast;
+    if (DowncastKind) {
+      cast = emitClassDowncast(IGF, fromValue, destTy, mode);
+    } else {
+      cast = emitClassIdenticalCast(IGF, fromValue, operand.getType(), destTy,
+                                    mode);
+    }
     return Address(cast, Alignment(1));
   }
     

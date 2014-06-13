@@ -60,6 +60,8 @@ static unsigned toStableCheckedCastKind(CheckedCastKind kind) {
     return SIL_CHECKED_CAST_ARRAY_DOWNCAST;
   case CheckedCastKind::Downcast:
     return SIL_CHECKED_CAST_DOWNCAST;
+    case CheckedCastKind::Identical:
+      return SIL_CHECKED_CAST_IDENTICAL;
   case CheckedCastKind::ExistentialToArchetype:
     return SIL_CHECKED_CAST_EXISTENTIAL_TO_ARCHETYPE;
   case CheckedCastKind::ExistentialToConcrete:

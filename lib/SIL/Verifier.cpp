@@ -845,7 +845,8 @@ public:
             "Operand of strong_retain_autoreleased must be an object");
     require(RI->getOperand().getType().hasRetainablePointerRepresentation(),
             "Operand of strong_retain_autoreleased must be a retainable pointer");
-    require(isa<ApplyInst>(RI->getOperand()),
+    require(isa<ApplyInst>(RI->getOperand()) ||
+            isa<SILArgument>(RI->getOperand()),
             "Operand of strong_retain_autoreleased must be the return value of "
             "an apply instruction");
   }
@@ -1422,7 +1423,9 @@ public:
 
   void verifyCheckedCast(CheckedCastKind kind, SILType fromTy, SILType toTy) {
     // Verify common invariants.
-    require(fromTy != toTy, "can't checked cast to same type");
+    require(fromTy != toTy ||
+            kind == CheckedCastKind::Identical,
+            "can't checked cast to same type");
     require(fromTy.isAddress() == toTy.isAddress(),
             "address-ness of checked cast src and dest must match");
 

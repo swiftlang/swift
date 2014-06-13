@@ -573,6 +573,8 @@ static CheckedCastKind getCheckedCastKind(unsigned attr) {
     return CheckedCastKind::ArrayDowncast;
   case SIL_CHECKED_CAST_DOWNCAST:
     return CheckedCastKind::Downcast;
+    case SIL_CHECKED_CAST_IDENTICAL:
+      return CheckedCastKind::Identical;
   case SIL_CHECKED_CAST_EXISTENTIAL_TO_ARCHETYPE:
     return CheckedCastKind::ExistentialToArchetype;
   case SIL_CHECKED_CAST_EXISTENTIAL_TO_CONCRETE:

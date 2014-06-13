@@ -1350,6 +1350,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
   /// Parse a checked cast kind.
   auto parseCastKind = [&](Identifier name, SourceLoc loc) -> CheckedCastKind {
     auto kind = llvm::StringSwitch<CheckedCastKind>(name.str())
+      .Case("identical", CheckedCastKind::Identical)
       .Case("downcast", CheckedCastKind::Downcast)
       .Case("super_to_archetype", CheckedCastKind::SuperToArchetype)
       .Case("archetype_to_archetype", CheckedCastKind::ArchetypeToArchetype)

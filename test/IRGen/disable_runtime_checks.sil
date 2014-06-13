@@ -77,6 +77,18 @@ entry(%b : $B):
   return %d : $D
 }
 
+// CHECK-LABEL: define %C22disable_runtime_checks1D* @unconditional_cast_class_iden(%C22disable_runtime_checks1B*) {
+// CHECK-NEXT:  entry:
+// CHECK-NEXT:    %1 = bitcast %C22disable_runtime_checks1B* %0 to %C22disable_runtime_checks1D*
+// CHECK-NEXT:    ret %C22disable_runtime_checks1D* %1
+// CHECK-NEXT:  }
+sil @unconditional_cast_class_iden : $@thin B -> D {
+entry(%b : $B):
+  %d = unconditional_checked_cast identical %b : $B to $D
+  return %d : $D
+}
+
+
 // CHECK-LABEL: define i8 @unconditional_cast_existential(%P22disable_runtime_checks1P_* noalias) {
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    %1 = bitcast %P22disable_runtime_checks1P_* %0 to %V22disable_runtime_checks1X*
