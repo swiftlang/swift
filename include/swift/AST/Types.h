@@ -486,6 +486,15 @@ public:
   /// unknown-released.
   bool hasRetainablePointerRepresentation();
 
+  /// Determines whether this type has a bridgable object
+  /// representation, i.e., whether it is representable as a single
+  /// (non-nil) pointer that can be unknown-retained and
+  /// unknown-released.
+  ///
+  /// This predicate covers all types that could be placed into an
+  /// AnyObject.
+  bool isBridgeableObjectType();
+
   /// \brief If this is a nominal type or a bound generic nominal type,
   /// returns the (possibly generic) nominal type declaration.
   NominalTypeDecl *getNominalOrBoundGenericNominal();

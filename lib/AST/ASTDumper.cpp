@@ -1386,7 +1386,10 @@ public:
     OS << ')';
   }
   void visitCollectionUpcastConversionExpr(CollectionUpcastConversionExpr *E) {
-    printCommon(E, "collection_upcast_expr") << '\n';
+    printCommon(E, "collection_upcast_expr");
+    if (E->bridgesToObjC())
+      OS << " bridges_to_objc";
+    OS << '\n';
     printRec(E->getSubExpr());
     OS << ')';
   }
@@ -1395,11 +1398,6 @@ public:
     if (E->bridgesFromObjC())
       OS << " bridges_from_objc";
     OS << '\n';
-    printRec(E->getSubExpr());
-    OS << ')';
-  }
-  void visitCollectionBridgedConversionExpr(CollectionBridgedConversionExpr *E){
-    printCommon(E, "collection_bridged_conversion_expr") << '\n';
     printRec(E->getSubExpr());
     OS << ')';
   }

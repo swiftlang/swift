@@ -658,11 +658,7 @@ bool ConstraintSystem::isArrayType(Type t) {
   if (isa<ArraySliceType>(t.getPointer()))
     return true;
   if (auto boundStruct = dyn_cast<BoundGenericStructType>(t.getPointer())) {
-    if (!boundStruct->getParent() &&
-        boundStruct->getGenericArgs().size() == 1 &&
-        boundStruct->getDecl()->getName().str() == "Array") {
-      return true;
-    }
+    return boundStruct->getDecl() == TC.Context.getArrayDecl();
   }
   
   return false;

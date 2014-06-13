@@ -1356,12 +1356,7 @@ bool TypeBase::isSuperclassOf(Type ty, LazyResolver *resolver) {
   return false;
 }
 
-static bool hasRetainablePointerRepresentation(CanType type) {
-  // Look through one level of Optional<> or ImplicitlyUnwrappedOptional<>.
-  if (auto objType = type.getAnyOptionalObjectType()) {
-    type = objType;
-  }
-
+static bool isBridgeableObjectType(CanType type) {
   // Classes and class-constrained archetypes.
   if (type->mayHaveSuperclass())
     return true;
@@ -1394,8 +1389,21 @@ static bool hasRetainablePointerRepresentation(CanType type) {
   return false;
 }
 
+static bool hasRetainablePointerRepresentation(CanType type) {
+  // Look through one level of Optional<> or ImplicitlyUnwrappedOptional<>.
+  if (auto objType = type.getAnyOptionalObjectType()) {
+    type = objType;
+  }
+
+  return isBridgeableObjectType(type);
+}
+
 bool TypeBase::hasRetainablePointerRepresentation() {
   return ::hasRetainablePointerRepresentation(getCanonicalType());
+}
+
+bool TypeBase::isBridgeableObjectType() {
+  return ::isBridgeableObjectType(getCanonicalType());
 }
 
 /// Is t1 not just a subtype of t2, but one such that its values are

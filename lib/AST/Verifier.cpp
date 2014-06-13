@@ -758,11 +758,6 @@ struct ASTNodeBase {};
       verifyCheckedBase(E);
     }
         
-    void verifyChecked(CollectionBridgedConversionExpr *E) {
-      verifyChecked(E->getSubExpr());
-      verifyCheckedBase(E);
-    }
-
     void verifyChecked(DerivedToBaseExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx, "verifying DerivedToBaseExpr", E);
 

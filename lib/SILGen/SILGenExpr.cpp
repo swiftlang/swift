@@ -176,9 +176,6 @@ namespace {
     RValue visitCollectionUpcastConversionExpr(
              CollectionUpcastConversionExpr *E,
              SGFContext C);
-    RValue visitCollectionBridgedConversionExpr(
-             CollectionBridgedConversionExpr *E,
-             SGFContext C);
     RValue visitArchetypeToSuperExpr(ArchetypeToSuperExpr *E, SGFContext C);
     RValue visitFunctionConversionExpr(FunctionConversionExpr *E,
                                        SGFContext C);
@@ -937,40 +934,33 @@ visitCollectionUpcastConversionExpr(CollectionUpcastConversionExpr *E,
   auto mv = SGF.emitRValueAsSingleValue(E->getSubExpr());
   
   // Compute substitutions for the intrinsic call.
-  auto canTypeT = E->getSubExpr()->getType().getPointer()->getCanonicalType();
-  auto canTypeU = E->getType().getPointer()->getCanonicalType();
-  auto arrayT = cast<BoundGenericStructType>(canTypeT)->getGenericArgs()[0];
-  auto arrayU = cast<BoundGenericStructType>(canTypeU)->getGenericArgs()[0];
-  auto typeName = cast<BoundGenericStructType>(canTypeT)->getDecl()->getName();
-  
+  auto fromArray = cast<BoundGenericStructType>(
+                     E->getSubExpr()->getType()->getCanonicalType());
+  auto toArray = cast<BoundGenericStructType>(
+                   E->getType()->getCanonicalType());
+  auto fromElement = fromArray.getGenericArgs()[0];
+  auto toElement = toArray.getGenericArgs()[0];
+
   // Get the intrinsic function.
+  auto &ctx = SGF.getASTContext();
   FuncDecl *fn = nullptr;
-  
-  if (typeName.str() == "Array") {
-    fn = SGF.getASTContext().getArrayUpCast(nullptr);
+  if (fromArray->getDecl() == ctx.getArrayDecl()) {
+    fn = E->bridgesToObjC() ? ctx.getArrayBridgeToObjectiveC(nullptr)
+                            : SGF.getASTContext().getArrayUpCast(nullptr);
   } else {
-    llvm_unreachable("unsupported array upcast kind");
+    llvm_unreachable("unsupported collection upcast kind");
   }
   
-  // Compute type parameter substitutions.
-  SmallVector<Substitution, 2> subs;
-  
-  auto polyFnType = cast<PolymorphicFunctionType>
-                        (fn->getType()->getCanonicalType());
-  auto genericParams = polyFnType->getGenericParameters();
-  
-  
-  auto gp1 = genericParams[0].getAsTypeParam();
-  auto gp2 = genericParams[1].getAsTypeParam();
-  subs.push_back(Substitution{gp1->getArchetype(), arrayT, {}});
-  subs.push_back(Substitution{gp2->getArchetype(), arrayU, {}});
-  
-  auto args = {mv};
-  
+  // Form type parameter substitutions.
+  Substitution subs[2] = {
+    { nullptr, fromElement, { } },
+    { nullptr, toElement, { } }
+  };
+
   auto emitApply = SGF.emitApplyOfLibraryIntrinsic(loc,
                                                    fn,
                                                    subs,
-                                                   args,
+                                                   {mv},
                                                    C);
   
   return RValue(SGF, E, emitApply);
@@ -1018,35 +1008,6 @@ RValue RValueEmitter::visitArrayDowncastExpr(ArrayDowncastExpr *E,
                                                    args,
                                                    C);
   
-  return RValue(SGF, E, emitApply);
-}
-
-RValue RValueEmitter::
-visitCollectionBridgedConversionExpr(CollectionBridgedConversionExpr *E,
-                                     SGFContext C) {
-  
-  SILLocation loc = RegularLocation(E);
-  
-  // Get the sub expression argument as a managed value
-  auto mv = SGF.emitRValueAsSingleValue(E->getSubExpr());
-  
-  // Compute substitutions for the intrinsic call.
-  auto canTypeT = E->getSubExpr()->getType().getPointer()->getCanonicalType();
-  auto canTypeU = E->getType().getPointer()->getCanonicalType();
-  auto arrayT = cast<BoundGenericStructType>(canTypeT)->getGenericArgs()[0];
-  auto arrayU = cast<BoundGenericStructType>(canTypeU)->getGenericArgs()[0];
-
-  // Get the intrinsic function.
-  auto &ctx = SGF.getASTContext();
-  FuncDecl *fn = ctx.getArrayBridgeToObjectiveC(nullptr);
-
-  // Form type parameter substitutions.
-  Substitution subs[2] = {
-    { nullptr, arrayT->getCanonicalType(), { } },
-    { nullptr, arrayU->getCanonicalType(), { } }
-  };
-
-  auto emitApply = SGF.emitApplyOfLibraryIntrinsic(loc, fn, subs, {mv}, C);
   return RValue(SGF, E, emitApply);
 }
 

@@ -1684,12 +1684,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     // Implicit array conversions.
     if (kind >= TypeMatchKind::Conversion) {      
       if (isArrayType(desugar1) && isArrayType(desugar2)) {
-        
-        // Push both the upcast and bridged conversion kinds. We'll construct
-        // a disjunctive constraint out of them, favoring the upcast conversion
-        // should there be a tie.
         conversionsOrFixes.push_back(ConversionRestrictionKind::ArrayUpcast);
-        conversionsOrFixes.push_back(ConversionRestrictionKind::ArrayBridged);
       }
     }
   }
@@ -3093,7 +3088,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
     return SolutionKind::Solved;
   }
     
-  // T < U ===> Array<T> <c Array<U>
+  // T < U or T is bridged to V where V < U ===> Array<T> <c Array<U>
   case ConversionRestrictionKind::ArrayUpcast: {
     auto t1 = type1->getDesugaredType();
     auto t2 = type2->getDesugaredType();
@@ -3101,8 +3096,8 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
     Type baseType1 = this->getBaseTypeForArrayType(t1);
     Type baseType2 = this->getBaseTypeForArrayType(t2);
 
-    // Look through type variables in the first base type; we need to know it's
-    // structure before we can decide whether this can be an array upcast.
+    // Look through type variables in the first element type; we need to know
+    // it's structure before we can decide whether this can be an array upcast.
     TypeVariableType *baseTypeVar1;
     baseType1 = getFixedTypeRecursive(baseType1, baseTypeVar1, false, false);
     if (baseTypeVar1) {
@@ -3117,14 +3112,22 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
       return SolutionKind::Unsolved;
     }
 
-    // The first base type must be a class or ObjC class existential.
-    if (!baseType1->getClassOrBoundGenericClass() &&
-        !baseType1->isObjCExistentialType()) {
-      // FIXME: Record failure.
-      return SolutionKind::Error;
+    bool isSimpleUpcast = baseType1->isBridgeableObjectType();
+    if (isSimpleUpcast) {
+      increaseScore(SK_CollectionUpcastConversion);
+    } else {
+      // Check whether this is a bridging upcast.
+      Type bridgedType1 = TC.getBridgedToObjC(DC, baseType1).first;
+      if (!bridgedType1) {
+        // FIXME: Record error.
+        return SolutionKind::Error;
+      }
+
+      // Replace the base type so we perform the appropriate subtype check.
+      baseType1 = bridgedType1;
+      increaseScore(SK_CollectionBridgedConversion);
     }
 
-    increaseScore(SK_CollectionUpcastConversion);
     addContextualScore();
     assert(matchKind >= TypeMatchKind::Conversion);
 
@@ -3135,52 +3138,6 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
                       locator);
   }
       
-  // T < U ===> Array<T> is bridged to Array<U>
-  case ConversionRestrictionKind::ArrayBridged: {
-    auto t1 = type1->getDesugaredType();
-    auto t2 = type2->getDesugaredType();
-    
-    Type baseType1 = this->getBaseTypeForArrayType(t1);
-    Type baseType2 = this->getBaseTypeForArrayType(t2);
-
-    // Look through type variables in the first base type; we need to know it's
-    // structure before we can decide whether this can be an array bridge.
-    TypeVariableType *baseTypeVar1;
-    baseType1 = getFixedTypeRecursive(baseType1, baseTypeVar1, false, false);
-    if (baseTypeVar1) {
-      if (flags & TMF_GenerateConstraints) {
-        addConstraint(
-          Constraint::createRestricted(*this, getConstraintKind(matchKind),
-                                       restriction, type1, type2,
-                                       getConstraintLocator(locator)));
-        return SolutionKind::Solved;
-      }
-
-      return SolutionKind::Unsolved;
-    }
-
-    increaseScore(SK_CollectionBridgedConversion);
-    addContextualScore();
-    assert(matchKind >= TypeMatchKind::Conversion);
-
-    // Allow assignments from Array<T> to Array<U> if T is bridged
-    // non-verbatim to type U.
-    Type bridgedType1;
-    bool bridgedVerbatim;
-    std::tie(bridgedType1, bridgedVerbatim) = TC.getBridgedToObjC(DC,baseType1);
-    if (bridgedType1 && !bridgedVerbatim) {
-      // Check if T's bridged type is a subtype of U.
-      return matchTypes(bridgedType1,
-                        baseType2,
-                        TypeMatchKind::Subtype,
-                        subFlags,
-                        locator);
-    }
-
-    // FIXME: Record failure.
-    return ConstraintSystem::SolutionKind::Error;
-  }
-
   // T' < U, hasMember(T, conversion, T -> T') ===> T <c U
   case ConversionRestrictionKind::User:
     addContextualScore();

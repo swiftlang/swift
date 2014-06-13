@@ -240,6 +240,14 @@ class alignas(8) Expr {
   enum { NumArrayDowncastExprBits = NumExprBits + 1 };
   static_assert(NumArrayDowncastExprBits <= 32, "fits in an unsigned");
 
+  class CollectionUpcastConversionExprBitfields {
+    friend class CollectionUpcastConversionExpr;
+    unsigned : NumExprBits;
+    unsigned BridgesToObjC : 1;
+  };
+  enum { NumCollectionUpcastConversionExprBits = NumExprBits + 1 };
+  static_assert(NumCollectionUpcastConversionExprBits <= 32, "fits in an unsigned");
+
 protected:
   union {
     ExprBitfields ExprBits;
@@ -256,6 +264,7 @@ protected:
     BindOptionalExprBitfields BindOptionalExprBits;
     CheckedCastExprBitfields CheckedCastExprBits;
     ArrayDowncastExprBitfields ArrayDowncastExprBits;
+    CollectionUpcastConversionExprBitfields CollectionUpcastConversionExprBits;
   };
 
 private:
@@ -2094,33 +2103,23 @@ public:
 /// elements have type U, where U is a subtype of T.
 class CollectionUpcastConversionExpr : public ImplicitConversionExpr {
 public:
-  CollectionUpcastConversionExpr(Expr *subExpr, Type type)
+  CollectionUpcastConversionExpr(Expr *subExpr, Type type,
+                                 bool bridgesToObjC)
     : ImplicitConversionExpr(
-        ExprKind::CollectionUpcastConversion, subExpr, type) {}
-  
+        ExprKind::CollectionUpcastConversion, subExpr, type) {
+    CollectionUpcastConversionExprBits.BridgesToObjC = bridgesToObjC;
+  }
+
+  /// Whether this upcast bridges the source elements to Objective-C.
+  bool bridgesToObjC() const {
+    return CollectionUpcastConversionExprBits.BridgesToObjC;
+  }
+
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::CollectionUpcastConversion;
   }
 };
   
-/// CollectionBridgedConversionExpr - Convert a collection whose
-/// elements have some type T to the same kind of collection whose
-/// elements have type U, where T is bridges to U.
-class CollectionBridgedConversionExpr : public ImplicitConversionExpr {
-public:
-  /// Keep track of whether or not the type being bridged to conforms to the
-  /// _ConditionallyBridgedToObjectiveC protocol.
-  bool isConditionallyBridged = false;
-  
-  CollectionBridgedConversionExpr(Expr *subExpr, Type type)
-    : ImplicitConversionExpr(ExprKind::CollectionBridgedConversion, subExpr, 
-                             type) {}
-
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::CollectionBridgedConversion;
-  }
-};
-
 /// AnyErasureExpr - An abstract class for implicit conversions that
 /// erase a type into an existential in some way.
 ///
