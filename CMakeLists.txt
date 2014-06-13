@@ -928,7 +928,7 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     set(version_min_os "macosx")
     set(triple_os "macosx")
   else()
-    message(FATAL_ERROR "Can't understand SWIFT_DEPLOYMENT OS '${SWIFT_DEPLOYMENT_OS};")
+    message(FATAL_ERROR "Can't understand SWIFT_DEPLOYMENT_OS '${SWIFT_DEPLOYMENT_OS}';")
   endif()
 
   # Add host triple to swift compiler flags.
