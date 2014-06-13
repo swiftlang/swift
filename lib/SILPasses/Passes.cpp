@@ -111,6 +111,13 @@ void swift::runSILOptimizationPasses(SILModule &Module,
     PM.add(createDCE());
     PM.run();
 
+    // Run the laste passes.
+    SILPassManager PM2(&Module, Options);
+    registerAnalysisPasses(PM2, &Module);
+    PM2.add(createEarlyBinding());
+    PM2.runOneIteration();
+    PM.runOneIteration();
+
     // We have a tradeoff here on how often we should clean up the deserialized
     // SILFunctions. We can remove them at dead function elimination of each
     // optimization iteration, the down side is that we will pay the cost of
