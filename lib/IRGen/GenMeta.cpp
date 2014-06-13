@@ -1230,13 +1230,13 @@ namespace {
                                                      IGM.IntPtrTy);
     auto zero = llvm::ConstantInt::get(IGM.IntPtrTy, 0);
     
-    auto raceVectorInt = IGF.Builder.CreateAtomicCmpXchg(vectorIntPtr,
+    llvm::Value *raceVectorInt = IGF.Builder.CreateAtomicCmpXchg(vectorIntPtr,
                                  zero, builtVectorInt,
                                  llvm::AtomicOrdering::SequentiallyConsistent,
                                  llvm::AtomicOrdering::SequentiallyConsistent);
-    
     // The pointer in the slot should still have been null.
-    auto didStore = IGF.Builder.CreateICmpEQ(raceVectorInt, zero);
+    auto didStore = IGF.Builder.CreateExtractValue(raceVectorInt, 1);
+    raceVectorInt = IGF.Builder.CreateExtractValue(raceVectorInt, 0);
     IGF.Builder.CreateCondBr(didStore, doneBB, raceLostBB);
     
     // If the cmpxchg failed, someone beat us to landing their field type
