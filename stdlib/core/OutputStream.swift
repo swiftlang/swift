@@ -167,7 +167,7 @@ func println<T>(object: T) {
   stdoutStream.write("\n")
 }
 
-/// Writes a single newline charater into stdout.
+/// Writes a single newline character into stdout.
 func println() {
   var stdoutStream = _Stdout()
   stdoutStream.write("\n")
