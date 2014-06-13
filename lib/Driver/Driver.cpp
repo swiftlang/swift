@@ -678,7 +678,6 @@ void Driver::buildJobs(const ActionList &Actions, const OutputInfo &OI,
   llvm::PrettyStackTraceString CrashInfo("Building compilation jobs");
 
   const DerivedArgList &Args = C.getArgs();
-  const ToolChain &TC = C.getDefaultToolChain();
   JobCacheMap JobCache;
 
   Arg *FinalOutput = Args.getLastArg(options::OPT_o);
