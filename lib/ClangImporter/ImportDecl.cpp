@@ -3960,39 +3960,38 @@ namespace {
       if (name.empty())
         return nullptr;
 
+      // Special case for Protocol, which gets forward-declared as an ObjC
+      // class which is hidden in modern Objective-C runtimes.
+      // We treat it as a foreign class (like a CF type) because it doesn't
+      // have a real public class object.
+      clang::ASTContext &clangCtx = Impl.getClangASTContext();
+      if (decl->getCanonicalDecl() ==
+          clangCtx.getObjCProtocolDecl()->getCanonicalDecl()) {
+        Type nsObjectTy = Impl.getNSObjectType();
+        if (!nsObjectTy)
+          return nullptr;
+        const ClassDecl *nsObjectDecl =
+          nsObjectTy->getClassOrBoundGenericClass();
+        auto dc = nsObjectDecl->getDeclContext();
+
+        auto result = Impl.createDeclWithClangNode<ClassDecl>(decl,
+                                                        SourceLoc(), name,
+                                                        SourceLoc(), None,
+                                                        nullptr, dc);
+        result->computeType();
+        Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
+        result->setCircularityCheck(CircularityCheck::Checked);
+        result->setSuperclass(Type()); // FIXME: NSObject maybe?
+        result->setCheckedInheritanceClause();
+        result->setAddedImplicitInitializers(); // suppress all initializers
+        result->setForeign(true);
+        addObjCAttribute(result, name);
+        Impl.registerExternalDecl(result);
+        return result;
+      }
+
+      // Check if this class is implemented in its adapter.
       if (!decl->hasDefinition()) {
-        // Special case for Protocol, which gets forward-declared everywhere but
-        // really lives in ObjectiveC.
-        // FIXME: This is a workaround for a Clang modules bug.
-        // See http://llvm.org/bugs/show_bug.cgi?id=19061
-        clang::ASTContext &clangCtx = Impl.getClangASTContext();
-        if (decl->getCanonicalDecl() ==
-            clangCtx.getObjCProtocolDecl()->getCanonicalDecl()) {
-          Type nsObjectTy = Impl.getNSObjectType();
-          if (!nsObjectTy)
-            return nullptr;
-
-          const ClassDecl *nsObjectDecl =
-            nsObjectTy->getClassOrBoundGenericClass();
-          auto dc = nsObjectDecl->getDeclContext();
-
-          auto result = Impl.createDeclWithClangNode<ClassDecl>(decl,
-                                                          SourceLoc(), name,
-                                                          SourceLoc(), None,
-                                                          nullptr, dc);
-          result->setAddedImplicitInitializers();
-          result->computeType();
-          Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
-          result->setCircularityCheck(CircularityCheck::Checked);
-          result->setSuperclass(nsObjectTy);
-          result->setCheckedInheritanceClause();
-          result->setAddedImplicitInitializers();
-          addObjCAttribute(result, name);
-          Impl.registerExternalDecl(result);
-          return result;
-        }
-
-        // Otherwise, check if this class is implemented in its adapter.
         if (auto clangModule = Impl.getClangModuleForDecl(decl, true))
           if (auto native = resolveSwiftDecl<ClassDecl>(decl, name,
                                                         clangModule))
