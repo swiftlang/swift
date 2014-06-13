@@ -1633,53 +1633,51 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     
     // Metatype to object conversion.
     
-    if (getASTContext().LangOpts.EnableMetatypeToObjectConversions) {
-      // These conversions are between concrete types that don't need further
-      // resolution, so we can consider them immediately solved.
-      auto addSolvedRestrictedConstraint
-        = [&](ConversionRestrictionKind restriction) -> SolutionKind {
-          auto constraint = Constraint::createRestricted(*this,
-                                                   ConstraintKind::Subtype,
-                                                   restriction,
-                                                   type1, type2,
-                                                   getConstraintLocator(locator));
-          this->addConstraint(constraint);
-          return SolutionKind::Solved;
-        };
+    // These conversions are between concrete types that don't need further
+    // resolution, so we can consider them immediately solved.
+    auto addSolvedRestrictedConstraint
+      = [&](ConversionRestrictionKind restriction) -> SolutionKind {
+        auto constraint = Constraint::createRestricted(*this,
+                                                 ConstraintKind::Subtype,
+                                                 restriction,
+                                                 type1, type2,
+                                                 getConstraintLocator(locator));
+        this->addConstraint(constraint);
+        return SolutionKind::Solved;
+      };
+    
+    if (auto meta1 = type1->getAs<MetatypeType>()) {
+      // Class metatypes can be converted to AnyObject.
+      if (meta1->getInstanceType()->mayHaveSuperclass()
+          && type2->isAnyObject()) {
+        return addSolvedRestrictedConstraint(
+                           ConversionRestrictionKind::ClassMetatypeToAnyObject);
+      }
+      // Single @objc protocol value metatypes can be converted to the ObjC
+      // Protocol class type.
+      auto isProtocolClassType = [&](Type t) -> bool {
+        if (auto classDecl = t->getClassOrBoundGenericClass())
+          if (classDecl->getName() == getASTContext().Id_Protocol
+              && classDecl->getModuleContext()->Name
+                  == getASTContext().Id_ObjectiveC)
+            return true;
+        return false;
+      };
       
-      if (auto meta1 = type1->getAs<MetatypeType>()) {
-        // Class metatypes can be converted to AnyObject.
-        if (meta1->getInstanceType()->mayHaveSuperclass()
-            && type2->isAnyObject()) {
+      if (auto protoTy = meta1->getInstanceType()->getAs<ProtocolType>()) {
+        if (protoTy->getDecl()->isObjC()
+            && isProtocolClassType(type2)) {
           return addSolvedRestrictedConstraint(
-                             ConversionRestrictionKind::ClassMetatypeToAnyObject);
-        }
-        // Single @objc protocol value metatypes can be converted to the ObjC
-        // Protocol class type.
-        auto isProtocolClassType = [&](Type t) -> bool {
-          if (auto classDecl = t->getClassOrBoundGenericClass())
-            if (classDecl->getName() == getASTContext().Id_Protocol
-                && classDecl->getModuleContext()->Name
-                    == getASTContext().Id_ObjectiveC)
-              return true;
-          return false;
-        };
-        
-        if (auto protoTy = meta1->getInstanceType()->getAs<ProtocolType>()) {
-          if (protoTy->getDecl()->isObjC()
-              && isProtocolClassType(type2)) {
-            return addSolvedRestrictedConstraint(
-                    ConversionRestrictionKind::ProtocolMetatypeToProtocolClass);
-          }
+                  ConversionRestrictionKind::ProtocolMetatypeToProtocolClass);
         }
       }
-      if (auto meta1 = type1->getAs<ExistentialMetatypeType>()) {
-        // Class-constrained existential metatypes can be converted to AnyObject.
-        if (meta1->getInstanceType()->isClassExistentialType()
-            && type2->isAnyObject()) {
-          return addSolvedRestrictedConstraint(
-                     ConversionRestrictionKind::ExistentialMetatypeToAnyObject);
-        }
+    }
+    if (auto meta1 = type1->getAs<ExistentialMetatypeType>()) {
+      // Class-constrained existential metatypes can be converted to AnyObject.
+      if (meta1->getInstanceType()->isClassExistentialType()
+          && type2->isAnyObject()) {
+        return addSolvedRestrictedConstraint(
+                   ConversionRestrictionKind::ExistentialMetatypeToAnyObject);
       }
     }
     

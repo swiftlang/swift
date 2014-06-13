@@ -1,5 +1,5 @@
 // RUN: rm -rf %t/clang-module-cache
-// RUN: %swift -enable-metatype-object-conversions -emit-silgen -module-cache-path %t/clang-module-cache -target x86_64-apple-darwin13 -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | FileCheck %s
+// RUN: %swift -emit-silgen -module-cache-path %t/clang-module-cache -target x86_64-apple-darwin13 -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | FileCheck %s
 
 import Foundation
 

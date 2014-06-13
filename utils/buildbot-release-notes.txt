@@ -1,3 +1,13 @@
+Latest
+------
+
+* Class objects such as 'NSObject.self' can now be converted to 'AnyObject' and
+  used as object values.
+
+* Objective-C protocol objects such as 'NSCopying.self' can now be used as
+  instances of the 'Protocol' class, such as in APIs such as XPC.
+
+
 2014-05-19
 ----------
 

@@ -1,4 +1,4 @@
-// RUN: %swift -enable-metatype-object-conversions -parse -verify %s
+// RUN: %swift -parse -verify %s
 
 class C {}
 struct S {}
