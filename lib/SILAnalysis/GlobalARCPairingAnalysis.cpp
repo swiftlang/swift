@@ -15,6 +15,7 @@
 #include "swift/Basic/BlotMapVector.h"
 #include "ReferenceCountState.h"
 #include "GlobalARCSequenceDataflow.h"
+#include "swift/Basic/Optional.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
@@ -34,7 +35,12 @@ using namespace swift::arc;
 
 namespace {
 
-enum class IncrementDecrementMatchResult { Fail, KnownSafe, NotKnownSafe };
+struct MatchingSetFlags {
+  bool KnownSafe;
+  bool Partial;
+};
+static_assert(std::is_pod<MatchingSetFlags>::value,
+              "MatchingSetFlags should be a pod.");
 
 struct ARCMatchingSetBuilder {
   using TDMapTy = BlotMapVector<SILInstruction *, TopDownRefCountState>;
@@ -74,17 +80,18 @@ public:
   bool matchedPair() const { return MatchedPair; }
 
 private:
-  IncrementDecrementMatchResult matchIncrementsToDecrements();
-  IncrementDecrementMatchResult matchDecrementsToIncrements();
+  /// Returns .Some(MatchingSetFlags) on success and .None on failure.
+  Optional<MatchingSetFlags> matchIncrementsToDecrements();
+  Optional<MatchingSetFlags> matchDecrementsToIncrements();
 };
 
 } // end anonymous namespace
 
 /// Match retains to releases and return whether or not all of the releases
 /// were known safe.
-IncrementDecrementMatchResult
+Optional<MatchingSetFlags>
 ARCMatchingSetBuilder::matchIncrementsToDecrements() {
-  bool KnownSafe = true;
+  MatchingSetFlags Flags = { true, false };
 
   // For each increment in our list of new increments.
   //
@@ -97,7 +104,7 @@ ARCMatchingSetBuilder::matchIncrementsToDecrements() {
     if (BURefCountState == BUMap.end()) {
       DEBUG(llvm::dbgs() << "        FAILURE! Could not find state for "
             "increment!\n");
-      return IncrementDecrementMatchResult::Fail;
+      return Nothing_t::Nothing;
     }
 
     DEBUG(llvm::dbgs() << "        SUCCESS! Found state for increment.\n");
@@ -112,7 +119,11 @@ ARCMatchingSetBuilder::matchIncrementsToDecrements() {
 
     // We need to be known safe over all increments/decrements we are matching up
     // to ignore insertion points.
-    KnownSafe &= BURefCountState->second.isKnownSafe();
+    Flags.KnownSafe &= BURefCountState->second.isKnownSafe();
+
+    // We can only move instructions if we know that we are not partial. We can
+    // still delete instructions in such cases though.
+    Flags.Partial |= BURefCountState->second.isPartial();
 
     // Now that we know we have an inst, grab the decrement.
     for (auto DecIter : BURefCountState->second.getInstructions()) {
@@ -125,7 +136,7 @@ ARCMatchingSetBuilder::matchIncrementsToDecrements() {
       if (TDRefCountState == TDMap.end()) {
         DEBUG(llvm::dbgs() << "        FAILURE! Could not find state for "
               "decrement.\n");
-        return IncrementDecrementMatchResult::Fail;
+        return Nothing_t::Nothing;
       }
       DEBUG(llvm::dbgs() << "        SUCCESS! Found state for decrement.\n");
 
@@ -135,7 +146,7 @@ ARCMatchingSetBuilder::matchIncrementsToDecrements() {
           !TDRefCountState->second.containsInstruction(Increment)) {
         DEBUG(llvm::dbgs() << "        FAILURE! Not tracking instruction or "
               "found increment that did not match.\n");
-        return IncrementDecrementMatchResult::Fail;
+        return Nothing_t::Nothing;
       }
 
       // Add the decrement to the decrement to move set. If we don't insert
@@ -153,15 +164,12 @@ ARCMatchingSetBuilder::matchIncrementsToDecrements() {
     }
   }
 
-  if (!KnownSafe)
-    return IncrementDecrementMatchResult::NotKnownSafe;
-
-  return IncrementDecrementMatchResult::KnownSafe;
+  return Flags;
 }
 
-IncrementDecrementMatchResult
+Optional<MatchingSetFlags>
 ARCMatchingSetBuilder::matchDecrementsToIncrements() {
-  bool KnownSafe = true;
+  MatchingSetFlags Flags = { true, false };
 
   // For each increment in our list of new increments.
   //
@@ -174,7 +182,7 @@ ARCMatchingSetBuilder::matchDecrementsToIncrements() {
     if (TDRefCountState == TDMap.end()) {
       DEBUG(llvm::dbgs() << "        FAILURE! Could not find state for "
             "increment!\n");
-      return IncrementDecrementMatchResult::Fail;
+      return Nothing_t::Nothing;
     }
 
     DEBUG(llvm::dbgs() << "        SUCCESS! Found state for decrement.\n");
@@ -189,7 +197,11 @@ ARCMatchingSetBuilder::matchDecrementsToIncrements() {
 
     // We need to be known safe over all increments/decrements we are matching up
     // to ignore insertion points.
-    KnownSafe &= TDRefCountState->second.isKnownSafe();
+    Flags.KnownSafe &= TDRefCountState->second.isKnownSafe();
+
+    // We can only move instructions if we know that we are not partial. We can
+    // still delete instructions in such cases though.
+    Flags.Partial |= TDRefCountState->second.isPartial();
 
     // Now that we know we have an inst, grab the decrement.
     for (auto IncIter : TDRefCountState->second.getInstructions()) {
@@ -202,7 +214,7 @@ ARCMatchingSetBuilder::matchDecrementsToIncrements() {
       if (BURefCountState == BUMap.end()) {
         DEBUG(llvm::dbgs() << "        FAILURE! Could not find state for "
               "increment.\n");
-        return IncrementDecrementMatchResult::Fail;
+        return Nothing_t::Nothing;
       }
 
       DEBUG(llvm::dbgs() << "        SUCCESS! Found state for increment.\n");
@@ -213,7 +225,7 @@ ARCMatchingSetBuilder::matchDecrementsToIncrements() {
           !BURefCountState->second.containsInstruction(Decrement)) {
         DEBUG(llvm::dbgs() << "        FAILURE! Not tracking instruction or "
               "found increment that did not match.\n");
-        return IncrementDecrementMatchResult::Fail;
+        return Nothing_t::Nothing;
       }
 
       // Add the decrement to the decrement to move set. If we don't insert
@@ -231,9 +243,7 @@ ARCMatchingSetBuilder::matchDecrementsToIncrements() {
     }
   }
 
-  if (!KnownSafe)
-    return IncrementDecrementMatchResult::NotKnownSafe;
-  return IncrementDecrementMatchResult::KnownSafe;
+  return Flags;
 }
 
 /// Visit each retain/release that is matched up to our operand over and over
@@ -243,19 +253,24 @@ ARCMatchingSetBuilder::matchDecrementsToIncrements() {
 bool ARCMatchingSetBuilder::matchUpIncDecSetsForPtr() {
   bool KnownSafeTD = true;
   bool KnownSafeBU = true;
+  bool Partial = false;
 
   while (true) {
     DEBUG(llvm::dbgs() << "Attempting to match up increments -> decrements:\n");
     // For each increment in our list of new increments, attempt to match them up
     // with decrements and gather the insertion points of the decrements.
     auto Result = matchIncrementsToDecrements();
-    if (Result == IncrementDecrementMatchResult::Fail) {
+    if (!Result) {
       DEBUG(llvm::dbgs() << "    FAILED TO MATCH INCREMENTS -> DECREMENTS!\n");
       return false;
     }
-    if (Result == IncrementDecrementMatchResult::NotKnownSafe) {
+    if (!Result->KnownSafe) {
       DEBUG(llvm::dbgs() << "    NOT KNOWN SAFE!\n");
       KnownSafeTD = false;
+    }
+    if (Result->Partial) {
+      DEBUG(llvm::dbgs() << "    IS PARTIAL!\n");
+      Partial = true;
     }
     NewIncrements.clear();
 
@@ -265,13 +280,17 @@ bool ARCMatchingSetBuilder::matchUpIncDecSetsForPtr() {
 
     DEBUG(llvm::dbgs() << "Attempting to match up decrements -> increments:\n");
     Result = matchDecrementsToIncrements();
-    if (Result == IncrementDecrementMatchResult::Fail) {
+    if (!Result) {
       DEBUG(llvm::dbgs() << "    FAILED TO MATCH DECREMENTS -> INCREMENTS!\n");
       return false;
     }
-    if (Result == IncrementDecrementMatchResult::NotKnownSafe) {
+    if (!Result->KnownSafe) {
       DEBUG(llvm::dbgs() << "    NOT KNOWN SAFE!\n");
       KnownSafeBU = false;
+    }
+    if (Result->Partial) {
+      DEBUG(llvm::dbgs() << "    IS PARTIAL!\n");
+      Partial = true;
     }
     NewDecrements.clear();
 
@@ -287,13 +306,21 @@ bool ARCMatchingSetBuilder::matchUpIncDecSetsForPtr() {
     MatchSet.DecrementInsertPts.clear();
   } else {
     DEBUG(llvm::dbgs() << "NOT UNCONDITIONALLY SAFE!\n");
+
   }
+
+  // If we have insertion points and partial merges, return false to avoid
+  // control dependency issues.
+  if ((!MatchSet.IncrementInsertPts.empty() ||
+       !MatchSet.DecrementInsertPts.empty()) &&
+      Partial)
+    return false;
 
   if (MatchSet.IncrementInsertPts.empty() && !MatchSet.Increments.empty())
     MatchedPair = true;
 
-  DEBUG(llvm::dbgs() << "SUCCESS! We can move, remove things.\n");
   // Success!
+  DEBUG(llvm::dbgs() << "SUCCESS! We can move, remove things.\n");
   return true;
 }
 

@@ -178,6 +178,11 @@ struct RefCountState {
   /// increments.
   bool isKnownSafe() const { return KnownSafe; }
 
+  /// This reference count state is partial if we found a partial merge of
+  /// insertion points. This stymies our ability to move instructions due to
+  /// potential control dependency issues.
+  bool isPartial() const { return Partial; }
+
   /// Check if PotentialDecrement can decrement the reference count associated
   /// with the value we are tracking. If so advance the state's sequence
   /// appropriately and return true. Otherwise return false.

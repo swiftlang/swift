@@ -219,10 +219,9 @@ bool TopDownRefCountState::merge(const TopDownRefCountState &Other) {
   // conservatively drop the sequence, to avoid doing partial RR
   // elimination. If the branch predicates for the two merge differ, mixing
   // them is unsafe since they are not control dependent.
-  if (LatState == TopDownRefCountState::LatticeState::None || Partial ||
-      Other.Partial) {
+  if (LatState == TopDownRefCountState::LatticeState::None) {
     RefCountState<TopDownRefCountState>::clear();
-    DEBUG(llvm::dbgs() << "            Found LatticeState::None or Partial. "
+    DEBUG(llvm::dbgs() << "            Found LatticeState::None. "
                           "Clearing State!\n");
     return false;
   }
@@ -238,15 +237,9 @@ bool TopDownRefCountState::merge(const TopDownRefCountState &Other) {
 
   Increments.insert(Other.Increments.begin(), Other.Increments.end());
 
-  Partial = InsertPts.size() != Other.InsertPts.size();
+  Partial |= InsertPts.size() != Other.InsertPts.size();
   for (auto *SI : Other.InsertPts)
     Partial |= InsertPts.insert(SI);
-
-  if (Partial) {
-    DEBUG(llvm::dbgs() << "            Found partial, clearing state!\n");
-    RefCountState<TopDownRefCountState>::clear();
-    return false;
-  }
 
   return true;
 }
@@ -264,9 +257,8 @@ bool BottomUpRefCountState::merge(const BottomUpRefCountState &Other) {
   // conservatively drop the sequence, to avoid doing partial RR
   // elimination. If the branch predicates for the two merge differ, mixing
   // them is unsafe since they are not control dependent.
-  if (LatState == BottomUpRefCountState::LatticeState::None || Partial ||
-      Other.Partial) {
-    DEBUG(llvm::dbgs() << "            Found LatticeState::None or Partial. "
+  if (LatState == BottomUpRefCountState::LatticeState::None) {
+    DEBUG(llvm::dbgs() << "            Found LatticeState::None. "
                           "Clearing State!\n");
     RefCountState<BottomUpRefCountState>::clear();
     return false;
@@ -274,15 +266,9 @@ bool BottomUpRefCountState::merge(const BottomUpRefCountState &Other) {
 
   Decrements.insert(Other.Decrements.begin(), Other.Decrements.end());
 
-  Partial = InsertPts.size() != Other.InsertPts.size();
+  Partial |= InsertPts.size() != Other.InsertPts.size();
   for (auto *SI : Other.InsertPts)
     Partial |= InsertPts.insert(SI);
-
-  if (Partial) {
-    DEBUG(llvm::dbgs() << "            Found partial, clearing state!\n");
-    RefCountState<BottomUpRefCountState>::clear();
-    return false;
-  }
 
   return true;
 }

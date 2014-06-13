@@ -1038,3 +1038,49 @@ bb2:
   %3 = apply %2() : $@thin @noreturn @callee_owned () -> ()
   unreachable
 }
+
+// CHECK: sil @dont_move_values_in_face_of_partial_merges : $@thin (Builtin.NativeObject) -> () {
+// CHECK: strong_retain
+// CHECK: strong_release
+sil @dont_move_values_in_face_of_partial_merges : $@thin (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = function_ref @user : $@thin (Builtin.NativeObject) -> ()
+  strong_retain %0 : $Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb1:
+  apply %1(%0) : $@thin (Builtin.NativeObject) -> ()
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  strong_release %0 : $Builtin.NativeObject
+  %2 = tuple()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil @do_remove_values_in_face_of_partial_merges : $@thin (Builtin.NativeObject) -> () {
+// CHECK: strong_retain
+// CHECK-NOT: strong_release
+// CHECK-NOT: strong_release
+sil @do_remove_values_in_face_of_partial_merges : $@thin (Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = function_ref @user : $@thin (Builtin.NativeObject) -> ()
+  strong_retain %0 : $Builtin.NativeObject
+  strong_retain %0 : $Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb1:
+  apply %1(%0) : $@thin (Builtin.NativeObject) -> ()
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  strong_release %0 : $Builtin.NativeObject
+  %2 = tuple()
+  return %2 : $()
+}
