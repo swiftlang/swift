@@ -1,0 +1,46 @@
+// RUN: %sil-opt %s -earlybinding | FileCheck %s
+sil_stage canonical
+
+import Builtin
+import Swift
+
+class Foo {
+  func ping() -> Int
+}
+
+sil @_TFC4main3Foo4pingfS0_FT_Si : $@cc(method) @thin (@owned Foo) -> Int {
+bb0(%0 : $Foo):
+  debug_value %0 : $Foo  // let self              // id: %1
+  %2 = integer_literal $Builtin.Word, 1           // user: %3
+  %3 = struct $Int (%2 : $Builtin.Word)           // user: %5
+  strong_release %0 : $Foo                        // id: %4
+  return %3 : $Int                                // id: %5
+}
+
+sil @_TFC4main3FoocfMS0_FT_S0_ : $@cc(method) @thin (@owned Foo) -> @owned Foo {
+bb0(%0 : $Foo):
+  debug_value %0 : $Foo  // let self              // id: %1
+  return %0 : $Foo                                // id: %2
+}
+
+sil @_TF4main7my_mainFCS_3FooSi : $@thin (@owned Foo) -> Int {
+bb0(%0 : $Foo):
+  // CHECK-LABLE: _TF4main7my_mainFCS_3FooSi
+  // CHECK-NOT: strong_retain
+  // CHECK: checked_cast_br identical %0 : $Foo to $Foo
+  // CHECK: strong_retain
+  // CHECK-NEXT: class_method
+  // CHECK: strong_retain
+  // CHECK-NEXT: class_method
+  debug_value %0 : $Foo  // let x                 // id: %1
+  strong_retain %0 : $Foo                         // id: %2
+  %3 = class_method %0 : $Foo, #Foo.ping!1 : Foo -> () -> Int , $@cc(method) @thin (@owned Foo) -> Int // user: %4
+  %4 = apply %3(%0) : $@cc(method) @thin (@owned Foo) -> Int // user: %6
+  strong_release %0 : $Foo                        // id: %5
+  return %4 : $Int                                // id: %6
+}
+
+sil_vtable Foo {
+  #Foo.ping!1: _TFC4main3Foo4pingfS0_FT_Si  // main.Foo.ping (main.Foo)() -> Swift.Int
+  #Foo.init!initializer.1: _TFC4main3FoocfMS0_FT_S0_  // main.Foo.init (main.Foo.Type)() -> main.Foo
+}

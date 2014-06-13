@@ -857,11 +857,25 @@ static bool specializeClassMethodDispatch(ApplyInst *AI) {
   SILBuilder Builder(Entry);
   // Create the checked_cast_branch instruction that checks at runtime if the
   // class instance is identical to the SILType.
-  Builder.createCheckedCastBranch(AI->getLoc(), CheckedCastKind::Identical,
-                                  ClassInstance, InstanceType, Iden, Virt);
+  It = Builder.createCheckedCastBranch(AI->getLoc(), CheckedCastKind::Identical,
+                                       ClassInstance, InstanceType, Iden, Virt);
 
   SILBuilder VirtBuilder(Virt);
   SILBuilder IdenBuilder(Iden);
+
+  // Try sinking the retain of the class instance into the diamond. This may
+  // allow additional ARC optimizations on the fast path.
+  if (It != Entry->begin()) {
+    StrongRetainInst *SRI = dyn_cast<StrongRetainInst>(--It);
+    // Try to skip another instruction, in case the class_method came first.
+    if (!SRI && It != Entry->begin())
+      SRI = dyn_cast<StrongRetainInst>(--It);
+    if (SRI && SRI->getOperand() == ClassInstance) {
+      VirtBuilder.createStrongRetain(SRI->getLoc(), ClassInstance);
+      IdenBuilder.createStrongRetain(SRI->getLoc(), ClassInstance);
+      SRI->eraseFromParent();
+    }
+  }
 
   // Copy the two apply instructions into the two blocks.
   ApplyInst *IdenAI = CloneApply(AI, IdenBuilder);
