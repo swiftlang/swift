@@ -80,3 +80,33 @@ bb0(%x : $Builtin.Int64):
 // CHECK-NOT: apply
 // CHECK: return %0 : $Builtin.Int64
 }
+
+// Simplify trunc(zext(x)) -> x
+sil @fold_trunc_zext : $@thin (Builtin.Word) -> Builtin.Word {
+bb0(%x : $Builtin.Word):
+  %77 = builtin_function_ref "zextOrBitCast_Word_Int64" : $@thin (Builtin.Word) -> Builtin.Int64
+  %78 = apply %77(%x) : $@thin (Builtin.Word) -> Builtin.Int64 // user: %80
+  %79 = builtin_function_ref "truncOrBitCast_Int64_Word" : $@thin (Builtin.Int64) -> Builtin.Word
+  %80 = apply %79(%78) : $@thin (Builtin.Int64) -> Builtin.Word // users: %81, %85
+  return %80 : $Builtin.Word
+
+// CHECK-LABEL: sil @fold_trunc_zext
+// CHECK-NOT: builtin_function_ref
+// CHECK-NOT: apply
+// CHECK: return %0 : $Builtin.Word
+}
+
+// Simplify trunc(sext(x)) -> x
+sil @fold_trunc_sext : $@thin (Builtin.Word) -> Builtin.Word {
+bb0(%x : $Builtin.Word):
+  %77 = builtin_function_ref "sextOrBitCast_Word_Int64" : $@thin (Builtin.Word) -> Builtin.Int64
+  %78 = apply %77(%x) : $@thin (Builtin.Word) -> Builtin.Int64 // user: %80
+  %79 = builtin_function_ref "truncOrBitCast_Int64_Word" : $@thin (Builtin.Int64) -> Builtin.Word
+  %80 = apply %79(%78) : $@thin (Builtin.Int64) -> Builtin.Word // users: %81, %85
+  return %80 : $Builtin.Word
+
+// CHECK-LABEL: sil @fold_trunc_sext
+// CHECK-NOT: builtin_function_ref
+// CHECK-NOT: apply
+// CHECK: return %0 : $Builtin.Word
+}

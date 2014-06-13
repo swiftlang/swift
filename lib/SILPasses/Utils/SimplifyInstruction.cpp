@@ -271,21 +271,57 @@ SILValue InstSimplifier::visitUpcastInst(UpcastInst *UI) {
   return SILValue();
 }
 
+static SILValue simplifyBuiltin(ApplyInst *AI,
+                                BuiltinFunctionRefInst *FR) {
+  const IntrinsicInfo &Intrinsic = FR->getIntrinsicInfo();
+
+  switch (Intrinsic.ID) {
+    default:
+      // TODO: Handle some of the llvm intrinsics here.
+      return SILValue();
+    case llvm::Intrinsic::not_intrinsic:
+      break;
+    case llvm::Intrinsic::expect:
+      // If we have an expect optimizer hint with a constant value input,
+      // there is nothing left to expect so propagate the input, i.e.,
+      //
+      // apply(expect, constant, _) -> constant.
+      if (auto *Literal = dyn_cast<IntegerLiteralInst>(AI->getArgument(0)))
+        return Literal;
+      return SILValue();
+  }
+
+  // Otherwise, it should be one of the builtin functions.
+  OperandValueArrayRef Args = AI->getArguments();
+  const BuiltinInfo &Builtin = FR->getBuiltinInfo();
+
+  switch (Builtin.ID) {
+    default: break;
+
+    case BuiltinValueKind::TruncOrBitCast: {
+      const SILValue &Op = Args[0];
+      SILValue Result;
+      // trunc(ext(x)) -> x
+      if (match(Op, m_ApplyInst(BuiltinValueKind::ZExtOrBitCast,
+                                m_ValueBase(), m_SILValue(Result))) ||
+          match(Op, m_ApplyInst(BuiltinValueKind::SExtOrBitCast,
+                                m_ValueBase(), m_SILValue(Result)))) {
+        // Truncated back to the same bits we started with.
+        if (Result->getType(0) == AI->getType())
+          return Result;
+      }
+      return SILValue();
+    }
+  }
+  return SILValue();
+}
+
 /// Simplify an apply of the builtin canBeClass to either 0 or 1
 /// when we can statically determine the result.
 SILValue InstSimplifier::visitApplyInst(ApplyInst *AI) {
   auto *BFRI = dyn_cast<BuiltinFunctionRefInst>(AI->getCallee());
-  if (!BFRI)
-    return SILValue();
-
-  // If we have an expect optimizer hint with a constant value input, there is
-  // nothing left to expect so propagate the input, i.e.,
-  //
-  // apply(expect, constant, _) -> constant.
-  if (BFRI->getIntrinsicInfo().ID == llvm::Intrinsic::expect)
-    if (auto *Literal = dyn_cast<IntegerLiteralInst>(AI->getArgument(0)))
-      return Literal;
-
+  if (BFRI)
+    return simplifyBuiltin(AI, BFRI);
   return SILValue();
 }
 
