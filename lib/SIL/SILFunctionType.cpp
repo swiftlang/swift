@@ -525,12 +525,22 @@ const auto ObjCSelfConvention = ParameterConvention::Direct_Unowned;
 namespace {
   class ObjCMethodConventions : public Conventions {
     const clang::ObjCMethodDecl *Method;
+    // The Clang importer sometimes chops off the last parameter of a method.
+    // This must be coordinated with the overlays so that a method with the
+    // modified selector actually exists, but in this case the offset of the
+    // "self" parameter in the Swift representation of the method may not match
+    // up with the Clang representation.
+    unsigned SwiftParamCount;
  public:
-    ObjCMethodConventions(const clang::ObjCMethodDecl *method) : Method(method) {}
+    ObjCMethodConventions(const clang::ObjCMethodDecl *method,
+                          unsigned paramCount)
+        : Method(method), SwiftParamCount(paramCount) {
+      assert(SwiftParamCount <= Method->param_size());
+    }
 
     bool isSelfParameter(unsigned index) const {
-      assert(index <= Method->param_size());
-      return index == Method->param_size();
+      assert(index <= SwiftParamCount);
+      return index == SwiftParamCount;
     }
 
     ParameterConvention getIndirectParameter(unsigned index,
@@ -676,9 +686,22 @@ getSILFunctionTypeForClangDecl(SILModule &M, const clang::Decl *clangDecl,
                                CanAnyFunctionType substInterfaceType,
                                AnyFunctionType::ExtInfo extInfo) {
   if (auto method = dyn_cast<clang::ObjCMethodDecl>(clangDecl)) {
+    // Get Swift's view of how many parameters this method has.
+    unsigned paramCount;
+    auto inputTuple = origType->getInput()->castTo<TupleType>();
+    if (auto paramTuple = inputTuple->getElementType(0)->getAs<TupleType>()) {
+      paramCount = paramTuple->getNumElements();
+      // Handle "labeled Void" parameters, which are used to translate
+      // -initForIncrementalLoad into init(forIncrementalLoad: ()).
+      if (paramCount == 1 && paramTuple->getElementType(0)->isVoid())
+        paramCount = 0;
+    } else {
+      paramCount = 1;
+    }
+
     return getSILFunctionType(M, origType, substType, substInterfaceType,
                               extInfo,
-                              ObjCMethodConventions(method));
+                              ObjCMethodConventions(method, paramCount));
   }
 
   if (auto func = dyn_cast<clang::FunctionDecl>(clangDecl)) {
