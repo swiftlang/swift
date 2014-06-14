@@ -2166,6 +2166,71 @@ func _dictionaryCheckedDownCast<BaseKey, BaseValue, DerivedKey, DerivedValue>(
   return result
 }
 
+/// Implements a checked downcast from a Dictionary<Key, Value> to
+/// Dictionary<BridgesToKey, BridgesToValue> that involves bridging.
+///
+/// Precondition: at least one of BridgesToKey or BridgesToValue is an
+/// object type, and at least one of Key or Value is a bridged value
+/// type.
+func _dictionaryBridgeFromObjectiveC<Key, Value, BridgesToKey, BridgesToValue>(
+       source: Dictionary<Key, Value>
+     ) -> Dictionary<BridgesToKey, BridgesToValue>? {
+  _sanityCheck(isBridgedVerbatimToObjectiveC(Key.self) || 
+               isBridgedVerbatimToObjectiveC(Value.self))
+  _sanityCheck(!isBridgedVerbatimToObjectiveC(BridgesToKey.self) ||
+               !isBridgedVerbatimToObjectiveC(BridgesToValue.self))
+  
+  let keyBridgesDirectly 
+    = isBridgedVerbatimToObjectiveC(BridgesToKey.self) == 
+      isBridgedVerbatimToObjectiveC(Key.self)
+  let valueBridgesDirectly 
+    = isBridgedVerbatimToObjectiveC(BridgesToValue.self) ==
+      isBridgedVerbatimToObjectiveC(Value.self)
+
+  var result = Dictionary<BridgesToKey, BridgesToValue>()
+  for (key, value) in source {
+    // Downcast the key.
+    var resultKey: BridgesToKey
+    if keyBridgesDirectly {
+      // FIXME: reinterpretCasts work around <rdar://problem/16953026>
+      if reinterpretCast(key) as AnyObject is BridgesToKey {
+        resultKey = reinterpretCast(key)
+      } else {
+        return nil
+      }
+    } else {
+      if let bridgedKey = bridgeFromObjectiveC(reinterpretCast(key), 
+                                               BridgesToKey.self) {
+        resultKey = bridgedKey
+      } else {
+        return nil
+      }
+    }
+
+    // Downcast the value.
+    var resultValue: BridgesToValue
+    if valueBridgesDirectly {
+      // FIXME: reinterpretCasts work around <rdar://problem/16953026>
+      if reinterpretCast(value) as AnyObject is BridgesToValue {
+        resultValue = reinterpretCast(value)
+      } else {
+        return nil
+      }
+    } else {
+      if let bridgedValue = bridgeFromObjectiveC(reinterpretCast(value), 
+                                                 BridgesToValue.self) {
+        resultValue = bridgedValue
+      } else {
+        return nil
+      }
+    }
+
+    result[resultKey] = resultValue
+  }
+  return result
+}
+
+
 //===--- Hacks and workarounds --------------------------------------------===//
 
 /// Like `UnsafePointer<Unmanaged<AnyObject>>`, or `id __unsafe_unretained *` in

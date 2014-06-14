@@ -3368,6 +3368,81 @@ func test_DictionaryCheckedDowncastEntryPoint() {
 test_DictionaryCheckedDowncastEntryPoint()
 // CHECK: test_DictionaryCheckedDowncastEntryPoint done
 
+func test_DictionaryBridgeFromObjectiveCEntryPoint() {
+  var d = Dictionary<NSObject, AnyObject>(minimumCapacity: 32)
+  d[TestObjCKeyTy(10)] = TestObjCValueTy(1010)
+  d[TestObjCKeyTy(20)] = TestObjCValueTy(1020)
+  d[TestObjCKeyTy(30)] = TestObjCValueTy(1030)
+
+  // Successful downcast.
+  if let dCV: Dictionary<TestObjCKeyTy, TestBridgedValueTy> 
+       = _dictionaryBridgeFromObjectiveC(d) {
+    assert(dCV.count == 3)
+    var v = dCV[TestObjCKeyTy(10)]
+    assert(v!.value == 1010)
+
+    v = dCV[TestObjCKeyTy(20)]
+    assert(v!.value == 1020)
+
+    v = dCV[TestObjCKeyTy(30)]
+    assert(v!.value == 1030)
+  } else {
+    assert(false)
+  }
+
+  // Successful downcast.
+  if let dVC: Dictionary<TestBridgedKeyTy, TestObjCValueTy> 
+       = _dictionaryBridgeFromObjectiveC(d) {
+    assert(dVC.count == 3)
+    var v = dVC[TestBridgedKeyTy(10)]
+    assert(v!.value == 1010)
+
+    v = dVC[TestBridgedKeyTy(20)]
+    assert(v!.value == 1020)
+
+    v = dVC[TestBridgedKeyTy(30)]
+    assert(v!.value == 1030)
+  } else {
+    assert(false)
+  }
+
+  // Successful downcast.
+  if let dVV: Dictionary<TestBridgedKeyTy, TestBridgedValueTy> 
+       = _dictionaryBridgeFromObjectiveC(d) {
+    assert(dVV.count == 3)
+    var v = dVV[TestBridgedKeyTy(10)]
+    assert(v!.value == 1010)
+
+    v = dVV[TestBridgedKeyTy(20)]
+    assert(v!.value == 1020)
+
+    v = dVV[TestBridgedKeyTy(30)]
+    assert(v!.value == 1030)
+  } else {
+    assert(false)
+  }
+
+  // Unsuccessful downcasts
+  d["hello"] = 17
+  if let dCV: Dictionary<TestObjCKeyTy, TestBridgedValueTy> 
+       = _dictionaryBridgeFromObjectiveC(d) {
+    assert(false)
+  }
+  if let dVC: Dictionary<TestBridgedKeyTy, TestObjCValueTy> 
+       = _dictionaryBridgeFromObjectiveC(d) {
+    assert(false)
+  }
+  if let dVV: Dictionary<TestBridgedKeyTy, TestBridgedValueTy> 
+       = _dictionaryBridgeFromObjectiveC(d) {
+    assert(false)
+  }
+
+  println("test_DictionaryBridgeFromObjectiveCEntryPoint done")
+}
+
+test_DictionaryBridgeFromObjectiveCEntryPoint()
+// CHECK: test_DictionaryBridgeFromObjectiveCEntryPoint done
+
 //===---
 // Tests for APIs implemented strictly based on public interface.  We only need
 // to test them once, not for every storage type.
