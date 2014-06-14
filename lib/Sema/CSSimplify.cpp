@@ -3196,38 +3196,9 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
         return SolutionKind::Error;
       }
 
-      // Look through type variables in the second key and value type; we
-      // need to know their structure before we can decide whether we'll be
-      // bridging either of them (independently).
-      TypeVariableType *keyTypeVar2 = nullptr;
-      TypeVariableType *valueTypeVar2 = nullptr;
-      key2 = getFixedTypeRecursive(key2, keyTypeVar2, false, false);
-      if (!keyTypeVar2) {
-        value2 = getFixedTypeRecursive(value2, valueTypeVar2, false, false);
-      }
-
-      // If we have type variables left over, we're done.
-      // FIXME: Alternatively, we could create a disjunction here to cover
-      // both possibilities.
-      if (keyTypeVar2 || valueTypeVar2) {
-        if (flags & TMF_GenerateConstraints) {
-          addConstraint(
-            Constraint::createRestricted(*this, getConstraintKind(matchKind),
-                                         restriction, type1, type2,
-                                         getConstraintLocator(locator)));
-          return SolutionKind::Solved;
-        }
-
-        return SolutionKind::Unsolved;
-      }
-
       // This can be a bridging upcast.
-      if (key2->isBridgeableObjectType())
-        key1 = bridgedKey1;
-
-      if (value2->isBridgeableObjectType())
-        value1 = bridgedValue1;
-
+      key1 = bridgedKey1;
+      value1 = bridgedValue1;
       increaseScore(SK_CollectionBridgedConversion);
     }
 

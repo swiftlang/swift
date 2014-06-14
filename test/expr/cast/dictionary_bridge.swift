@@ -32,7 +32,7 @@ struct BridgedToObjC : Hashable, _BridgedToObjectiveC {
 
 func ==(x: BridgedToObjC, y: BridgedToObjC) -> Bool { return true }
 
-func testUpcast() {
+func testUpcastBridge() {
   var dictRR = Dictionary<Root, Root>()
   var dictRO = Dictionary<Root, ObjC>()
   var dictOR = Dictionary<ObjC, Root>()
@@ -41,36 +41,39 @@ func testUpcast() {
   var dictDO = Dictionary<DerivesObjC, ObjC>()
   var dictDD = Dictionary<DerivesObjC, DerivesObjC>()
 
-  dictRR = dictRO
-  dictRR = dictOR
-  dictRR = dictOO
-  dictRR = dictOD
-  dictRR = dictDO
-  dictRR = dictDD
+  var dictBB = Dictionary<BridgedToObjC, BridgedToObjC>()
+  var dictBO = Dictionary<BridgedToObjC, ObjC>()
+  var dictOB = Dictionary<ObjC, BridgedToObjC>()
 
-  dictRO = dictOO
-  dictRO = dictOD
-  dictRO = dictDO
-  dictRO = dictDD
+  // Upcast to object types.
+  dictRR = dictBB
+  dictRR = dictBO
+  dictRR = dictOB
 
-  dictOR = dictOO
-  dictOR = dictOD
-  dictOR = dictDO
-  dictOR = dictDD
+  dictRO = dictBB
+  dictRO = dictBO
+  dictRO = dictOB
 
-  dictOO = dictOD
-  dictOO = dictDO
-  dictOO = dictDD
+  dictOR = dictBB
+  dictOR = dictBO
+  dictOR = dictOB
 
-  dictOD = dictDD
+  dictOO = dictBB
+  dictOO = dictBO
+  dictOO = dictOB
 
-  dictDO = dictDD
+  // Upcast key or value to object type (but not both)
+  // FIXME: We don't allow this now, because it's not converting to object
+  // representations for everything.
+  dictBO = dictBB // expected-error{{cannot convert}}
+  dictOB = dictBB // expected-error{{cannot convert}}
 
-  dictDO = dictDD // error
-  dictOD = dictDD // error
-}
+  dictBB = dictBO // expected-error{{cannot convert the expression's type '()' to type 'Dictionary<BridgedToObjC, BridgedToObjC>'}}
+  dictBB = dictOB // expected-error{{cannot convert the expression's type '()' to type 'Dictionary<BridgedToObjC, BridgedToObjC>'}}
 
-func testUpcastBridged() {
+  dictDO = dictBB // expected-error{{cannot convert the expression's type '()' to type 'Dictionary<DerivesObjC, ObjC>'}}
+  dictOD = dictBB // expected-error{{cannot convert the expression's type '()' to type 'Dictionary<ObjC, DerivesObjC>'}}
+  dictDD = dictBB // expected-error{{cannot convert the expression's type '()' to type 'Dictionary<DerivesObjC, DerivesObjC>'}}
 }
 
 
