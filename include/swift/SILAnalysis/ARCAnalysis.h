@@ -30,7 +30,8 @@ namespace swift {
 namespace arc {
 
 /// \returns True if the user \p User decrement the ref count of pointer \p Ptr.
-bool canDecrementRefCount(SILInstruction *User, SILValue Ptr,AliasAnalysis *AA);
+bool canDecrementRefCount(SILInstruction *User, SILValue Ptr,
+                          AliasAnalysis *AA);
 
 /// \returns True if the user \p User can use the pointer \p Ptr in a manner
 /// that requires \p Ptr to be alive before Inst.

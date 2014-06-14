@@ -214,7 +214,7 @@ static bool valueMayBeCaptured(SILValue V, CaptureException Exception) {
     // if and only if the results of Inst escape as well.
     if (isTransitiveEscapeInst(Inst)) {
       DEBUG(llvm::dbgs() << "                Found transitive escape "
-            "instruction!");
+            "instruction!\n");
       for (auto *UI : Inst->getUses()) {
         // If we have more uses than the threshold, be conservative and bail
         // so we don't use too much compile time.
@@ -274,10 +274,13 @@ static bool valueMayBeCaptured(SILValue V, CaptureException Exception) {
 
     // We could not prove that Inst does not capture V. Be conservative and
     // return true.
+    DEBUG(llvm::dbgs() << "        Could not prove that inst does not capture "
+          "V!\n");
     return true;
   }
 
   // We successfully proved that V is not captured. Return false.
+  DEBUG(llvm::dbgs() << "        V was not captured!\n");
   return false;
 }
 
