@@ -167,6 +167,13 @@ public:
   SILType getFunctionInterfaceResultType() const {
     return castTo<SILFunctionType>()->getSemanticInterfaceResultSILType();
   }
+
+  /// Returns true if this function type has an indirect argument.
+  ///
+  /// The SILType must refer to a function type.
+  bool isFunctionTypeWithIndirectResult() const {
+    return castTo<SILFunctionType>()->hasIndirectResult();
+  }
   
   /// Returns the AbstractCC of a function type.
   /// The SILType must refer to a function type.

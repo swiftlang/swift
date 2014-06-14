@@ -807,8 +807,15 @@ SILInstruction *SILCombiner::visitPartialApplyInst(PartialApplyInst *PAI) {
 SILInstruction *
 SILCombiner::optimizeApplyOfPartialApply(ApplyInst *AI, PartialApplyInst *PAI) {
   // Don't handle generic applys.
-  if (AI->hasSubstitutions() || PAI->hasSubstitutions())
+  if (AI->hasSubstitutions())
     return nullptr;
+
+  // Make sure that the substitution list of the PAI does not contain any
+  // archetypes.
+  ArrayRef<Substitution> Subs = PAI->getSubstitutions();
+  for (Substitution S : Subs)
+    if (hasUnboundGenericTypes(S.Replacement->getCanonicalType()))
+      return nullptr;
 
   FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(PAI->getCallee());
   if (!FRI)
@@ -833,8 +840,15 @@ SILCombiner::optimizeApplyOfPartialApply(ApplyInst *AI, PartialApplyInst *PAI) {
     if (!Arg.getType().isAddress())
       Builder->emitRetainValueOperation(PAI->getLoc(), Arg);
 
-  ApplyInst *NAI =
-      Builder->createApply(AI->getLoc(), FRI, Args, AI->isTransparent());
+  SILFunction *F = FRI->getReferencedFunction();
+  SILType FnType = F->getLoweredType();
+  if (!Subs.empty()) {
+    FnType = FnType.substInterfaceGenericArgs(PAI->getModule(), Subs);
+  }
+  SILType ResultTy = F->getLoweredFunctionType()->getSILInterfaceResult();
+
+  ApplyInst *NAI = Builder->createApply(AI->getLoc(), FRI, FnType, ResultTy,
+                                        Subs, Args, AI->isTransparent());
 
   // We also need to release the partial_apply instruction itself because it
   // is consumed by the apply_instruction.
