@@ -1633,6 +1633,10 @@ public:
   /// \brief Determine if the type in question is an Array<T>.
   bool isArrayType(Type t);
 
+  /// Determine whether the given type is a dictionary and, if so, provide the
+  /// key and value types for the dictionary.
+  Optional<std::pair<Type, Type>> isDictionaryType(Type type);
+
 private:
   /// Introduce the constraints associated with the given type variable
   /// into the worklist.

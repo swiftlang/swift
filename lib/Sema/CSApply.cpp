@@ -4015,6 +4015,25 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                                                              isBridged);
     }
 
+    case ConversionRestrictionKind::DictionaryUpcast: {
+      // Look through implicitly unwrapped optionals.
+      if (auto objTy
+            = cs.lookThroughImplicitlyUnwrappedOptionalType(expr->getType())) {
+        expr = coerceImplicitlyUnwrappedOptionalToValue(expr, objTy, locator);
+        if (!expr) return nullptr;
+      }
+
+      // If the source key and value types are object types, this is an upcast.
+      // Otherwise, it's bridged.
+      Type sourceKey, sourceValue;
+      std::tie(sourceKey, sourceValue) = *cs.isDictionaryType(expr->getType());
+
+      bool isBridged = !sourceKey->isBridgeableObjectType() ||
+                       !sourceValue->isBridgeableObjectType();
+      return new (tc.Context) CollectionUpcastConversionExpr(expr, toType,
+                                                             isBridged);
+    }
+
     case ConversionRestrictionKind::User:
       return coerceViaUserConversion(expr, toType, locator);
     }

@@ -172,6 +172,9 @@ enum class ConversionRestrictionKind {
   ForceUnchecked,
   /// Implicit upcast conversion of array types.
   ArrayUpcast,
+  /// Implicit upcast conversion of dictionary types, which includes
+  /// bridging.
+  DictionaryUpcast,
   /// User-defined conversions.
   User
 };

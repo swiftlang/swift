@@ -304,6 +304,8 @@ StringRef swift::constraints::getName(ConversionRestrictionKind kind) {
     return "[force-unchecked]";
   case ConversionRestrictionKind::ArrayUpcast:
     return "[array-upcast]";
+  case ConversionRestrictionKind::DictionaryUpcast:
+    return "[dictionary-upcast]";
   case ConversionRestrictionKind::User:
     return "[user]";
   }

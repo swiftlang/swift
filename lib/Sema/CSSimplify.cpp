@@ -1681,10 +1681,13 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       }
     }
     
-    // Implicit array conversions.
+    // Implicit collection conversions.
     if (kind >= TypeMatchKind::Conversion) {      
       if (isArrayType(desugar1) && isArrayType(desugar2)) {
         conversionsOrFixes.push_back(ConversionRestrictionKind::ArrayUpcast);
+      } else if (isDictionaryType(desugar1) && isDictionaryType(desugar2)) {
+        conversionsOrFixes.push_back(
+          ConversionRestrictionKind::DictionaryUpcast);
       }
     }
   }
@@ -3137,6 +3140,118 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
                       TypeMatchKind::Subtype,
                       subFlags,
                       locator);
+  }
+
+  // K1 < K2 && V1 < V2 || K1 bridges to K2 && V1 bridges to V2 ===> 
+  //   Dictionary<K1, V1> <c Dictionary<K2, V2>
+  case ConversionRestrictionKind::DictionaryUpcast: {
+    auto t1 = type1->getDesugaredType();    
+    Type key1, value1;
+    std::tie(key1, value1) = *isDictionaryType(t1);
+
+    auto t2 = type2->getDesugaredType();
+    Type key2, value2;
+    std::tie(key2, value2) = *isDictionaryType(t2);
+
+    // Look through type variables in the first key and value type; we
+    // need to know their structure before we can decide whether this
+    // can be an upcast.
+    TypeVariableType *keyTypeVar1 = nullptr;
+    TypeVariableType *valueTypeVar1 = nullptr;    
+    key1 = getFixedTypeRecursive(key1, keyTypeVar1, false, false);
+    if (!keyTypeVar1) {
+      value1 = getFixedTypeRecursive(value1, valueTypeVar1, false, false);
+    }
+
+    if (keyTypeVar1 || valueTypeVar1) {
+      if (flags & TMF_GenerateConstraints) {
+        addConstraint(
+          Constraint::createRestricted(*this, getConstraintKind(matchKind),
+                                       restriction, type1, type2,
+                                       getConstraintLocator(locator)));
+        return SolutionKind::Solved;
+      }
+
+      return SolutionKind::Unsolved;
+    }
+
+    // If both the first key and value types are bridgeable object
+    // types, this can only be an upcast.
+    bool isUpcast = key1->isBridgeableObjectType() && 
+                    value1->isBridgeableObjectType();
+
+    if (isUpcast) {
+      increaseScore(SK_CollectionUpcastConversion);
+    } else {
+      // This might be a bridged upcast.
+      Type bridgedKey1 = TC.getBridgedToObjC(DC, key1).first;
+      Type bridgedValue1;
+      if (bridgedKey1) {
+        bridgedValue1 = TC.getBridgedToObjC(DC, value1).first;
+      }
+
+      // Both the key and value types need to be bridged.
+      if (!bridgedKey1 || !bridgedValue1) {
+        // FIXME: Record failure.
+        return SolutionKind::Error;
+      }
+
+      // Look through type variables in the second key and value type; we
+      // need to know their structure before we can decide whether we'll be
+      // bridging either of them (independently).
+      TypeVariableType *keyTypeVar2 = nullptr;
+      TypeVariableType *valueTypeVar2 = nullptr;
+      key2 = getFixedTypeRecursive(key2, keyTypeVar2, false, false);
+      if (!keyTypeVar2) {
+        value2 = getFixedTypeRecursive(value2, valueTypeVar2, false, false);
+      }
+
+      // If we have type variables left over, we're done.
+      // FIXME: Alternatively, we could create a disjunction here to cover
+      // both possibilities.
+      if (keyTypeVar2 || valueTypeVar2) {
+        if (flags & TMF_GenerateConstraints) {
+          addConstraint(
+            Constraint::createRestricted(*this, getConstraintKind(matchKind),
+                                         restriction, type1, type2,
+                                         getConstraintLocator(locator)));
+          return SolutionKind::Solved;
+        }
+
+        return SolutionKind::Unsolved;
+      }
+
+      // This can be a bridging upcast.
+      if (key2->isBridgeableObjectType())
+        key1 = bridgedKey1;
+
+      if (value2->isBridgeableObjectType())
+        value1 = bridgedValue1;
+
+      increaseScore(SK_CollectionBridgedConversion);
+    }
+
+    addContextualScore();
+    assert(matchKind >= TypeMatchKind::Conversion);
+
+    // The source key and value types must be subtypes of the destination
+    // key and value types, respectively.
+    auto result = matchTypes(key1, key2, TypeMatchKind::Subtype, subFlags, 
+                             locator);
+    if (result == SolutionKind::Error)
+      return result;
+
+    switch (matchTypes(value1, value2, TypeMatchKind::Subtype, subFlags, 
+                       locator)) {
+    case SolutionKind::Solved:
+      return result;
+
+    case SolutionKind::Unsolved:
+      return SolutionKind::Unsolved;
+
+    case SolutionKind::Error:
+      return SolutionKind::Error;
+    }
   }
       
   // T' < U, hasMember(T, conversion, T -> T') ===> T <c U

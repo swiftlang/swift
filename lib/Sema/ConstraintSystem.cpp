@@ -664,6 +664,18 @@ bool ConstraintSystem::isArrayType(Type t) {
   return false;
 }
 
+Optional<std::pair<Type, Type>> ConstraintSystem::isDictionaryType(Type type) {
+  if (auto boundStruct = type->getAs<BoundGenericStructType>()) {
+    if (boundStruct->getDecl() != TC.Context.getDictionaryDecl())
+      return Nothing;
+
+    auto genericArgs = boundStruct->getGenericArgs();
+    return { genericArgs[0], genericArgs[1] };
+  }
+
+  return Nothing;
+}
+
 Type ConstraintSystem::openBindingType(Type type, DeclContext *dc) {
   Type result = openType(type, dc);
   
