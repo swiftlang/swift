@@ -306,6 +306,13 @@ bool swift::isNonEscapingLocalObject(SILValue V) {
   if (isNoAliasArgument(V))
       return !valueMayBeCaptured(V, CaptureException::ReturnsCannotCapture);
 
+  // If this is an enum value. If it or its operand does not escape, it is
+  // local.
+  if (auto *EI = dyn_cast<EnumInst>(V))
+    return !EI->hasOperand() ||
+           !valueMayBeCaptured(EI->getOperand(),
+                               CaptureException::ReturnsCannotCapture);
+
   // Otherwise we could not prove that V is a non escaping local object. Be
   // conservative and return false.
   return false;
