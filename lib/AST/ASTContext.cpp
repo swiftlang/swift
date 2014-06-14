@@ -93,8 +93,14 @@ struct ASTContext::Implementation {
   /// Dictionary<K, V> simple upcast.
   FuncDecl *GetDictionaryUpCast = nullptr;
 
+  /// Dictionary<K, V> simple downcast.
+  FuncDecl *GetDictionaryDownCast = nullptr;
+
   /// Dictionary<K, V> bridge to a dictionary of objects.
   FuncDecl *GetDictionaryBridgeToObjectiveC = nullptr;
+
+  /// Dictionary<K, V> bridge from a dictionary of objects.
+  FuncDecl *GetDictionaryBridgeFromObjectiveC = nullptr;
 
   /// func _doesOptionalHaveValue<T>(v : [inout] Optional<T>) -> T
   FuncDecl *DoesOptionalHaveValueDecls[NumOptionalTypeKinds] = {};
@@ -735,6 +741,22 @@ FuncDecl *ASTContext::getDictionaryUpCast(LazyResolver *resolver) const {
 }
 
 FuncDecl *
+ASTContext::getDictionaryDownCast(LazyResolver *resolver) const {
+  auto &cache = Impl.GetDictionaryDownCast;
+  if (cache) return cache;
+  
+  // Look for a generic function.
+  CanType input, output, param;
+  auto decl = findLibraryIntrinsic(*this, "_dictionaryCheckedDownCast", 
+                                   resolver);
+  if (!decl)
+    return nullptr;
+  
+  cache = decl;
+  return decl;
+}
+
+FuncDecl *
 ASTContext::getDictionaryBridgeToObjectiveC(LazyResolver *resolver) const {
   auto &cache = Impl.GetDictionaryBridgeToObjectiveC;
   if (cache) return cache;
@@ -742,6 +764,22 @@ ASTContext::getDictionaryBridgeToObjectiveC(LazyResolver *resolver) const {
   // Look for a generic function.
   CanType input, output, param;
   auto decl = findLibraryIntrinsic(*this, "_dictionaryBridgeToObjectiveC",
+                                   resolver);
+  if (!decl)
+    return nullptr;
+  
+  cache = decl;
+  return decl;
+}
+
+FuncDecl *
+ASTContext::getDictionaryBridgeFromObjectiveC(LazyResolver *resolver) const {
+  auto &cache = Impl.GetDictionaryBridgeFromObjectiveC;
+  if (cache) return cache;
+  
+  // Look for a generic function.
+  CanType input, output, param;
+  auto decl = findLibraryIntrinsic(*this, "_dictionaryBridgeFromObjectiveC",
                                    resolver);
   if (!decl)
     return nullptr;

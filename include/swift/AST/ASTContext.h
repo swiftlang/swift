@@ -389,9 +389,16 @@ public:
   /// Retrieve the simple upcast conversion function for Dictionary<K, V>.
   FuncDecl *getDictionaryUpCast(LazyResolver *resolver) const;
 
-  /// Retrieve the function that brigs a Dictionary<K, V> to a dictionary of
+  /// Retrieve the simple downcast conversion function for Dictionary<K, V>.
+  FuncDecl *getDictionaryDownCast(LazyResolver *resolver) const;
+
+  /// Retrieve the function that bridges a Dictionary<K, V> to a dictionary of
   /// objects.
   FuncDecl *getDictionaryBridgeToObjectiveC(LazyResolver *resolver) const;
+
+  /// Retrieve the function that bridges a dictionary of objects to a
+  /// Dictionary<K, V>.
+  FuncDecl *getDictionaryBridgeFromObjectiveC(LazyResolver *resolver) const;
 
   /// Retrieve the declaration of
   /// Swift._does{,ImplicitlyUnwrapped}OptionalHaveValue.
