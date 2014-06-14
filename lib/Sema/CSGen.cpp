@@ -1289,7 +1289,7 @@ namespace {
       llvm_unreachable("Already type-checked");
     }
 
-    Type visitArrayDowncastExpr(ArrayDowncastExpr *expr) {
+    Type visitCollectionDowncastExpr(CollectionDowncastExpr *expr) {
       llvm_unreachable("Already type-checked");
     }
 

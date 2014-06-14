@@ -1393,8 +1393,8 @@ public:
     printRec(E->getSubExpr());
     OS << ')';
   }
-  void visitArrayDowncastExpr(ArrayDowncastExpr *E) {
-    printCommon(E, "array_downcast_expr");
+  void visitCollectionDowncastExpr(CollectionDowncastExpr *E) {
+    printCommon(E, "collection_downcast_expr");
     if (E->bridgesFromObjC())
       OS << " bridges_from_objc";
     OS << '\n';

@@ -33,7 +33,7 @@ namespace llvm {
 
 namespace swift {
   class ArchetypeType;
-  class ArrayDowncastExpr;
+  class CollectionDowncastExpr;
   class ASTContext;
   class Type;
   class ValueDecl;
@@ -232,13 +232,13 @@ class alignas(8) Expr {
                   < (1 << NumCheckedCastKindBits),
                 "unable to fit a CheckedCastKind in the given number of bits");
 
-  class ArrayDowncastExprBitfields {
-    friend class ArrayDowncastExpr;
+  class CollectionDowncastExprBitfields {
+    friend class CollectionDowncastExpr;
     unsigned : NumExprBits;
     unsigned BridgesFromObjC : 1;
   };
-  enum { NumArrayDowncastExprBits = NumExprBits + 1 };
-  static_assert(NumArrayDowncastExprBits <= 32, "fits in an unsigned");
+  enum { NumCollectionDowncastExprBits = NumExprBits + 1 };
+  static_assert(NumCollectionDowncastExprBits <= 32, "fits in an unsigned");
 
   class CollectionUpcastConversionExprBitfields {
     friend class CollectionUpcastConversionExpr;
@@ -263,7 +263,7 @@ protected:
     ClosureExprBitfields ClosureExprBits;
     BindOptionalExprBitfields BindOptionalExprBits;
     CheckedCastExprBitfields CheckedCastExprBits;
-    ArrayDowncastExprBitfields ArrayDowncastExprBits;
+    CollectionDowncastExprBitfields CollectionDowncastExprBits;
     CollectionUpcastConversionExprBitfields CollectionUpcastConversionExprBits;
   };
 
@@ -3234,31 +3234,33 @@ public:
   }
 };
 
-/// Performs a checked downcast of an Array<T> to Array<U>, where T is
-/// either a supertype of U or is T bridged through an Objective-C
-/// class of which it is a supertype, to U.
+/// Performs a checked downcast of a collection to a colleciton of the
+/// same kind, where the element type of the source collection is
+/// either a supertype of the element type of the destination
+/// collection or is bridged through an Objective-C class that is a
+/// supertype.
 ///
 /// \code
 /// var arr: AnyObject[] = ...
 /// if let views = arr as NSView[] { ... }
 /// \endcode
-class ArrayDowncastExpr : public ExplicitCastExpr {
+class CollectionDowncastExpr : public ExplicitCastExpr {
 public:
-  ArrayDowncastExpr(Expr *sub, SourceLoc asLoc, TypeLoc castTy,
-                    bool bridgesFromObjC)
-    : ExplicitCastExpr(ExprKind::ArrayDowncast, sub, asLoc, castTy, Type())
+  CollectionDowncastExpr(Expr *sub, SourceLoc asLoc, TypeLoc castTy,
+                         bool bridgesFromObjC)
+    : ExplicitCastExpr(ExprKind::CollectionDowncast, sub, asLoc, castTy, Type())
   {
-    ArrayDowncastExprBits.BridgesFromObjC = bridgesFromObjC;
+    CollectionDowncastExprBits.BridgesFromObjC = bridgesFromObjC;
   }
 
   /// Determine whether this downcast bridges "non-verbatim" from the
   /// Objective-C objects in the source array to values in the result array.
   bool bridgesFromObjC() const {
-    return ArrayDowncastExprBits.BridgesFromObjC;
+    return CollectionDowncastExprBits.BridgesFromObjC;
   }
 
   static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::ArrayDowncast;
+    return E->getKind() == ExprKind::CollectionDowncast;
   }
 };
   

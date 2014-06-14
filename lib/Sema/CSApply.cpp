@@ -2650,9 +2650,9 @@ namespace {
         bool bridgesFromObjC = !tc.getBridgedToObjC(cs.DC, toEltType).second;
         toType = tc.getOptionalType(sub->getLoc(), toType);
         auto arrayConversion
-          = new (tc.Context) ArrayDowncastExpr(sub, expr->getLoc(), 
-                                               expr->getCastTypeLoc(), 
-                                               bridgesFromObjC);
+          = new (tc.Context) CollectionDowncastExpr(sub, expr->getLoc(), 
+                                                    expr->getCastTypeLoc(), 
+                                                    bridgesFromObjC);
         arrayConversion->setType(toType);
 
         cast = arrayConversion;
@@ -2729,7 +2729,7 @@ namespace {
       return expr;
     }
 
-    Expr *visitArrayDowncastExpr(ArrayDowncastExpr *expr) {
+    Expr *visitCollectionDowncastExpr(CollectionDowncastExpr *expr) {
       return expr;
     }
 

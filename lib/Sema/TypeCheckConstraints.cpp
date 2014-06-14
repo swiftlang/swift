@@ -2026,7 +2026,8 @@ ExplicitCastExpr *swift::findForcedDowncast(ASTContext &ctx, Expr *expr) {
       auto sub = skipOptionalEvalAndBinds(forced->getSubExpr());
       
       // If we have an explicit cast, we're done.
-      if (isa<ForcedCheckedCastExpr>(sub) || isa<ArrayDowncastExpr>(sub) || 
+      if (isa<ForcedCheckedCastExpr>(sub) || 
+          isa<CollectionDowncastExpr>(sub) || 
           isa<ConditionalCheckedCastExpr>(sub))
         return cast<ExplicitCastExpr>(sub);
 
@@ -2034,7 +2035,8 @@ ExplicitCastExpr *swift::findForcedDowncast(ASTContext &ctx, Expr *expr) {
       // bridgeFromObjectiveC() call.
       if (auto arg = lookThroughBridgeFromObjCCall(ctx, sub)) {
         sub = skipOptionalEvalAndBinds(arg);
-        if (isa<ForcedCheckedCastExpr>(sub) || isa<ArrayDowncastExpr>(sub) || 
+        if (isa<ForcedCheckedCastExpr>(sub) || 
+            isa<CollectionDowncastExpr>(sub) || 
             isa<ConditionalCheckedCastExpr>(sub))
           return cast<ExplicitCastExpr>(sub);
       }

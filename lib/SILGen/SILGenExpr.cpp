@@ -193,7 +193,7 @@ namespace {
                                            SGFContext C);
     RValue visitIsaExpr(IsaExpr *E, SGFContext C);
     RValue visitCoerceExpr(CoerceExpr *E, SGFContext C);
-    RValue visitArrayDowncastExpr(ArrayDowncastExpr *E, SGFContext C);
+    RValue visitCollectionDowncastExpr(CollectionDowncastExpr *E, SGFContext C);
     RValue visitTupleExpr(TupleExpr *E, SGFContext C);
     RValue visitScalarToTupleExpr(ScalarToTupleExpr *E, SGFContext C);
     RValue visitMemberRefExpr(MemberRefExpr *E, SGFContext C);
@@ -970,8 +970,8 @@ visitCollectionUpcastConversionExpr(CollectionUpcastConversionExpr *E,
   return RValue(SGF, E, emitApply);
 }
 
-RValue RValueEmitter::visitArrayDowncastExpr(ArrayDowncastExpr *E,
-                                             SGFContext C) {
+RValue RValueEmitter::visitCollectionDowncastExpr(CollectionDowncastExpr *E,
+                                                  SGFContext C) {
   
   SILLocation loc = RegularLocation(E);
   
