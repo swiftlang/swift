@@ -1329,6 +1329,7 @@ bb0(%0 : $Builtin.RawPointer):
 
 sil @generic_call_with_indirect_result : $@thin <T> (@in T, @out T) -> ()
 sil @generic_call_without_indirect_result : $@thin <T> (@in T) -> Bool
+sil @generic_call_with_direct_result : $@thin <T> (T) -> T
 
 // CHECK-LABEL: sil @generic_partial_apply : $@thin () -> () {
 // CHECK-NOT: partial_apply
@@ -1342,6 +1343,10 @@ bb0:
   %5 = apply %2(%3#1, %4#1) : $@callee_owned (@in Builtin.Int32, @out Builtin.Int32) -> ()
   %6 = partial_apply %1<Builtin.Int32>() : $@thin <τ_0_0> (@in τ_0_0) -> Bool
   %7 = apply %6(%3#1) : $@callee_owned (@in Builtin.Int32) -> Bool
+  %8 = integer_literal $Builtin.Int32, 0
+  %9 = function_ref @generic_call_with_direct_result : $@thin <τ_0_0> (τ_0_0) -> τ_0_0
+  %10 = partial_apply %9<Builtin.Int32>() : $@thin <τ_0_0> (τ_0_0) -> τ_0_0
+  %11 = apply %10(%8) : $@callee_owned (Builtin.Int32) -> Builtin.Int32
   dealloc_stack %4#0 : $*@local_storage Builtin.Int32
   dealloc_stack %3#0 : $*@local_storage Builtin.Int32
   %9999 = tuple()

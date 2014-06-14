@@ -842,10 +842,11 @@ SILCombiner::optimizeApplyOfPartialApply(ApplyInst *AI, PartialApplyInst *PAI) {
 
   SILFunction *F = FRI->getReferencedFunction();
   SILType FnType = F->getLoweredType();
+  SILType ResultTy = F->getLoweredFunctionType()->getSILInterfaceResult();
   if (!Subs.empty()) {
     FnType = FnType.substInterfaceGenericArgs(PAI->getModule(), Subs);
+    ResultTy = FnType.getAs<SILFunctionType>()->getSILInterfaceResult();
   }
-  SILType ResultTy = F->getLoweredFunctionType()->getSILInterfaceResult();
 
   ApplyInst *NAI = Builder->createApply(AI->getLoc(), FRI, FnType, ResultTy,
                                         Subs, Args, AI->isTransparent());
