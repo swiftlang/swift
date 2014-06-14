@@ -2136,6 +2136,36 @@ func _dictionaryBridgeToObjectiveC<BridgesToKey, BridgesToValue, Key, Value>(
   return result
 }
 
+/// Implements a checked downcast from a Dictionary<BaseKey,
+/// BaseValue> to a Dictionary<DerivedKey, DerivedValue>.
+///
+/// Precondition: DerivedKey is a subtype of BaseKey, DerivedValue is
+/// a subtype of BaseValue, and all of these types are objects.
+///
+func _dictionaryCheckedDownCast<BaseKey, BaseValue, DerivedKey, DerivedValue>(
+       source: Dictionary<BaseKey, BaseValue>
+     ) -> Dictionary<DerivedKey, DerivedValue>? {
+  _sanityCheck(isBridgedVerbatimToObjectiveC(BaseKey.self))
+  _sanityCheck(isBridgedVerbatimToObjectiveC(BaseValue.self))
+  _sanityCheck(isBridgedVerbatimToObjectiveC(DerivedKey.self))
+  _sanityCheck(isBridgedVerbatimToObjectiveC(DerivedValue.self))
+
+  var result = Dictionary<DerivedKey, DerivedValue>()
+  for (key, value) in source {
+    // FIXME: reinterpretCasts work around <rdar://problem/16953026>
+    if reinterpretCast(key) as AnyObject is DerivedKey && 
+       reinterpretCast(value) as AnyObject is DerivedValue {
+      result[reinterpretCast(key)] = reinterpretCast(value)
+      continue;
+    }
+
+    // Either the key or the value wasn't of the appropriate derived
+    // type. Fail.
+    return nil
+  }
+  return result
+}
+
 //===--- Hacks and workarounds --------------------------------------------===//
 
 /// Like `UnsafePointer<Unmanaged<AnyObject>>`, or `id __unsafe_unretained *` in

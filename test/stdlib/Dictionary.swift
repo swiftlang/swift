@@ -3330,6 +3330,43 @@ func test_DictionaryUpcastBridged() {
 test_DictionaryUpcastBridged()
 // CHECK: test_DictionaryUpcastBridged done
 
+//===---
+// Dictionary downcasts
+//===---
+func test_DictionaryCheckedDowncastEntryPoint() {
+  var d = Dictionary<NSObject, AnyObject>(minimumCapacity: 32)
+  d[TestObjCKeyTy(10)] = TestObjCValueTy(1010)
+  d[TestObjCKeyTy(20)] = TestObjCValueTy(1020)
+  d[TestObjCKeyTy(30)] = TestObjCValueTy(1030)
+
+  // Successful downcast.
+  if let dCC: Dictionary<TestObjCKeyTy, TestObjCValueTy> 
+       = _dictionaryCheckedDownCast(d) {
+    assert(dCC.count == 3)
+    var v = dCC[TestObjCKeyTy(10)]
+    assert(v!.value == 1010)
+
+    v = dCC[TestObjCKeyTy(20)]
+    assert(v!.value == 1020)
+
+    v = dCC[TestObjCKeyTy(30)]
+    assert(v!.value == 1030)
+  } else {
+    assert(false)
+  }
+
+  // Unsuccessful downcast
+  d["hello"] = 17
+  if let dCC: Dictionary<TestObjCKeyTy, TestObjCValueTy> 
+       = _dictionaryCheckedDownCast(d) {
+    assert(false)
+  }
+
+  println("test_DictionaryCheckedDowncastEntryPoint done")
+}
+
+test_DictionaryCheckedDowncastEntryPoint()
+// CHECK: test_DictionaryCheckedDowncastEntryPoint done
 
 //===---
 // Tests for APIs implemented strictly based on public interface.  We only need
