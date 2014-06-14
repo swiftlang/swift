@@ -2347,6 +2347,7 @@ namespace {
         expr->setCastKind(castKind);
         break;
       case CheckedCastKind::ArrayDowncast:
+      case CheckedCastKind::DictionaryDowncast:
       case CheckedCastKind::Identical:
       case CheckedCastKind::Downcast:
       case CheckedCastKind::SuperToArchetype:
@@ -2373,11 +2374,12 @@ namespace {
       SmallVector<Type, 2> toOptionals;
       auto toValueType = plumbOptionals(toType, toOptionals);
 
-      // If we have an imbalance of optionals, an array downcast, or
+      // If we have an imbalance of optionals, a collection downcast, or
       // are bridging through an Objective-C class, handle this as a
       // checked cast followed by a getLogicValue.
       if (fromOptionals.size() != toOptionals.size() ||
           castKind == CheckedCastKind::ArrayDowncast ||
+          castKind == CheckedCastKind::DictionaryDowncast ||
           tc.getDynamicBridgedThroughObjCClass(cs.DC,
                                                fromValueType,
                                                toValueType)) {
@@ -2626,6 +2628,7 @@ namespace {
 
       // Valid casts.
       case CheckedCastKind::ArrayDowncast:
+      case CheckedCastKind::DictionaryDowncast:
       case CheckedCastKind::Identical:
       case CheckedCastKind::Downcast:
       case CheckedCastKind::SuperToArchetype:
@@ -2643,19 +2646,39 @@ namespace {
       // library functionality, this is handled separately from other checked
       // cast kinds.
       ExplicitCastExpr *cast;
-      if (castKind == CheckedCastKind::ArrayDowncast) {
-        auto toEltType 
-          = cs.getBaseTypeForArrayType(
+      if (castKind == CheckedCastKind::ArrayDowncast ||
+          castKind == CheckedCastKind::DictionaryDowncast) {
+        bool bridgesFromObjC;
+        if (castKind == CheckedCastKind::ArrayDowncast) {
+          auto toEltType 
+            = cs.getBaseTypeForArrayType(
               toType->lookThroughAllAnyOptionalTypes().getPointer());
-        bool bridgesFromObjC = !tc.getBridgedToObjC(cs.DC, toEltType).second;
+          bridgesFromObjC = !tc.getBridgedToObjC(cs.DC, toEltType).second;
+        } else if (castKind == CheckedCastKind::DictionaryDowncast) {
+          Type fromKeyType, fromValueType;
+          std::tie(fromKeyType, fromValueType) =
+            *cs.isDictionaryType(fromType->lookThroughAllAnyOptionalTypes());
+          
+          Type toKeyType, toValueType;
+          std::tie(toKeyType, toValueType) 
+            = *cs.isDictionaryType(toType->lookThroughAllAnyOptionalTypes());
+
+          bridgesFromObjC = !(fromKeyType->isBridgeableObjectType() &&
+                              fromValueType->isBridgeableObjectType() &&
+                              toKeyType->isBridgeableObjectType() &&
+                              toValueType->isBridgeableObjectType());
+        } else {
+          llvm_unreachable("unhandled collection kind");
+        }
+
         toType = tc.getOptionalType(sub->getLoc(), toType);
-        auto arrayConversion
+        auto collectionConversion
           = new (tc.Context) CollectionDowncastExpr(sub, expr->getLoc(), 
                                                     expr->getCastTypeLoc(), 
                                                     bridgesFromObjC);
-        arrayConversion->setType(toType);
+        collectionConversion->setType(toType);
 
-        cast = arrayConversion;
+        cast = collectionConversion;
       } else {
         cast = expr;
       }
@@ -2674,6 +2697,7 @@ namespace {
       Type finalResultType = simplifyType(cast->getType());
       Type bridgedThroughClass;
       if (castKind == CheckedCastKind::ArrayDowncast ||
+          castKind == CheckedCastKind::DictionaryDowncast ||
           !(bridgedThroughClass = tc.getDynamicBridgedThroughObjCClass(
                                     cs.DC, fromValueType, toValueType))) {
         // We're not casting through a bridged type, so finish up the

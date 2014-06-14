@@ -74,4 +74,64 @@ func testUpcastBridge() {
   dictDD = dictBB // expected-error{{cannot convert the expression's type '()' to type 'Dictionary<DerivesObjC, DerivesObjC>'}}
 }
 
+func testDowncastBridge() {
+  var dictRR = Dictionary<Root, Root>()
+  var dictRO = Dictionary<Root, ObjC>()
+  var dictOR = Dictionary<ObjC, Root>()
+  var dictOO = Dictionary<ObjC, ObjC>()
+  var dictOD = Dictionary<ObjC, DerivesObjC>()
+  var dictDO = Dictionary<DerivesObjC, ObjC>()
+  var dictDD = Dictionary<DerivesObjC, DerivesObjC>()
+
+  var dictBB = Dictionary<BridgedToObjC, BridgedToObjC>()
+  var dictBO = Dictionary<BridgedToObjC, ObjC>()
+  var dictOB = Dictionary<ObjC, BridgedToObjC>()
+
+  // Downcast to bridged value types.
+  dictRR as Dictionary<BridgedToObjC, BridgedToObjC>
+  dictRR as Dictionary<BridgedToObjC, ObjC>
+  dictRR as Dictionary<ObjC, BridgedToObjC>
+
+  dictRO as Dictionary<BridgedToObjC, BridgedToObjC>
+  dictRO as Dictionary<BridgedToObjC, ObjC>
+  dictRO as Dictionary<ObjC, BridgedToObjC>
+
+  dictBO as Dictionary<BridgedToObjC, BridgedToObjC>
+  dictOB as Dictionary<BridgedToObjC, BridgedToObjC>
+
+  // We don't do mixed down/upcasts.
+  dictDO as Dictionary<BridgedToObjC, BridgedToObjC> // expected-error{{to type 'Dictionary<BridgedToObjC, BridgedToObjC>'}}
+}
+
+func testConditionalDowncastBridge() {
+  var dictRR = Dictionary<Root, Root>()
+  var dictRO = Dictionary<Root, ObjC>()
+  var dictOR = Dictionary<ObjC, Root>()
+  var dictOO = Dictionary<ObjC, ObjC>()
+  var dictOD = Dictionary<ObjC, DerivesObjC>()
+  var dictDO = Dictionary<DerivesObjC, ObjC>()
+  var dictDD = Dictionary<DerivesObjC, DerivesObjC>()
+
+  var dictBB = Dictionary<BridgedToObjC, BridgedToObjC>()
+  var dictBO = Dictionary<BridgedToObjC, ObjC>()
+  var dictOB = Dictionary<ObjC, BridgedToObjC>()
+
+  // Downcast to bridged value types.
+  if let d = dictRR as? Dictionary<BridgedToObjC, BridgedToObjC> { }
+  if let d = dictRR as? Dictionary<BridgedToObjC, ObjC> { }
+  if let d = dictRR as? Dictionary<ObjC, BridgedToObjC> { }
+
+  if let d = dictRO as? Dictionary<BridgedToObjC, BridgedToObjC> { }
+  if let d = dictRO as? Dictionary<BridgedToObjC, ObjC> { }
+  if let d = dictRO as? Dictionary<ObjC, BridgedToObjC> { }
+
+  if let d = dictBO as? Dictionary<BridgedToObjC, BridgedToObjC> { }
+  if let d = dictOB as? Dictionary<BridgedToObjC, BridgedToObjC> { }
+
+  // We don't do mixed down/upcasts.
+  if let d = dictDO as? Dictionary<BridgedToObjC, BridgedToObjC> { } // expected-error{{'ObjC' is not a subtype of 'DerivesObjC'}}
+}
+
+
+
 

@@ -273,6 +273,7 @@ protected:
     case CheckedCastKind::Unresolved:
     case CheckedCastKind::Coercion:
     case CheckedCastKind::ArrayDowncast:
+    case CheckedCastKind::DictionaryDowncast:
       llvm_unreachable("invalid for SIL");
 
     // These are not affected by specialization.
@@ -417,6 +418,7 @@ protected:
     case CheckedCastKind::Unresolved:
     case CheckedCastKind::Coercion:
     case CheckedCastKind::ArrayDowncast:
+    case CheckedCastKind::DictionaryDowncast:
       llvm_unreachable("invalid for SIL");
 
     // These are not affected by specialization.

@@ -2117,6 +2117,11 @@ static CheckedCastKind getCheckedCastKind(ConstraintSystem *cs,
     return CheckedCastKind::ArrayDowncast;
   }
 
+  // Dictionary downcasts are handled specially.
+  if (cs->isDictionaryType(fromType) && cs->isDictionaryType(toType)) {
+    return CheckedCastKind::DictionaryDowncast;
+  }
+
   // We can only downcast to an existential if the destination protocols are
   // objc and the source type is an objc class or an existential bounded by objc
   // protocols.
@@ -2210,6 +2215,49 @@ ConstraintSystem::simplifyCheckedCastConstraint(
     addConstraint(ConstraintKind::Subtype, toBaseType, fromBaseType,
                   getConstraintLocator(locator));
     return SolutionKind::Solved;
+  }
+  case CheckedCastKind::DictionaryDowncast: {
+    Type fromKeyType, fromValueType;
+    std::tie(fromKeyType, fromValueType) = *isDictionaryType(fromType);
+
+    Type toKeyType, toValueType;
+    std::tie(toKeyType, toValueType) = *isDictionaryType(toType);
+    
+    // FIXME: Deal with from/to base types that haven't been solved
+    // down to type variables yet.
+
+    // Check whether we need to bridge the key through an Objective-C class.
+    if (auto bridgedKey = TC.getDynamicBridgedThroughObjCClass(DC, fromKeyType,
+                                                               toKeyType)) {
+      toKeyType = bridgedKey;
+    }
+
+    // Perform subtype check on the possibly-bridged-through key type.
+    unsigned subFlags = TMF_GenerateConstraints;
+    auto result = matchTypes(toKeyType, fromKeyType, TypeMatchKind::Subtype, 
+                             subFlags, locator);
+    if (result == SolutionKind::Error)
+      return result;
+
+    // Check whether we need to bridge the value through an Objective-C class.
+    if (auto bridgedValue = TC.getDynamicBridgedThroughObjCClass(DC, 
+                                                                 fromValueType,
+                                                                 toValueType)) {
+      toValueType = bridgedValue;
+    }
+
+    // Perform subtype check on the possibly-bridged-through value type.
+    switch (matchTypes(toValueType, fromValueType, TypeMatchKind::Subtype, 
+                       subFlags, locator)) {
+    case SolutionKind::Solved:
+      return result;
+
+    case SolutionKind::Unsolved:
+      return SolutionKind::Unsolved;
+
+    case SolutionKind::Error:
+      return SolutionKind::Error;
+    }
   }
   case CheckedCastKind::ArchetypeToArchetype:
   case CheckedCastKind::ConcreteToUnrelatedExistential:

@@ -1453,7 +1453,8 @@ public:
     switch (kind) {
     case CheckedCastKind::Unresolved:
     case CheckedCastKind::Coercion:
-    case CheckedCastKind::ArrayDowncast:        
+    case CheckedCastKind::ArrayDowncast:
+    case CheckedCastKind::DictionaryDowncast:
       llvm_unreachable("invalid for SIL");
     case CheckedCastKind::Identical:
     case CheckedCastKind::Downcast:

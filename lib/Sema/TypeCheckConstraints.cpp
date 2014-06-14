@@ -1951,6 +1951,10 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     return CheckedCastKind::ArrayDowncast;
   }
 
+  if (cs.isDictionaryType(toType) && cs.isDictionaryType(fromType)) {
+    return CheckedCastKind::DictionaryDowncast;
+  }
+
   // If the destination type is a subtype of the source type, we have
   // a downcast.
   if (isSubtypeOf(toType, fromType, dc)) {

@@ -92,6 +92,8 @@ enum class CheckedCastKind : unsigned {
   ConcreteToUnrelatedExistential,
   // A downcast from an array type to another array type.
   ArrayDowncast,
+  // A downcast from a dictionary type to another dictionary type.
+  DictionaryDowncast,
   
   Last_CheckedCastKind = ConcreteToUnrelatedExistential,
 };
