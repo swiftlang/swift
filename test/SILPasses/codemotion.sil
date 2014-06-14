@@ -6,6 +6,15 @@ import Swift
 class B { }
 class E : B { }
 
+enum FakeOptional {
+  case None
+  case Some(Builtin.Int32)
+}
+
+sil @user : $@thin (Builtin.NativeObject) -> ()
+sil @optional_user : $@thin (FakeOptional) -> ()
+sil @blocker : $@thin () -> ()
+
 // CHECK-LABEL: sil @sink_from_preds
 // CHECK: bb1:
 // CHECK-NEXT: br bb3
@@ -104,18 +113,10 @@ bb3(%6 : $Builtin.Int32):
   return %6 : $Builtin.Int32
 }
 
-enum FakeOptional {
-  case None
-  case Some(Builtin.Int32)
-}
-
-sil @blocker : $@thin () -> ()
-
 // CHECK-LABEL: sil @sink_ref_count_ops_enum_over_switch_enum_1 : $@thin (FakeOptional) -> () {
 // CHECK: bb0({{.*}}):
 // CHECK-NEXT: function_ref blocker
 // CHECK-NEXT: function_ref @blocker
-// CHECK-NEXT: release_value
 // CHECK-NEXT: retain_value
 // CHECK-NEXT: apply
 // CHECK-NEXT: alloc_stack
@@ -123,24 +124,18 @@ sil @blocker : $@thin () -> ()
 // CHECK-NEXT: switch_enum
 // CHECK: bb1({{.*}}):
 // CHECK-NEXT: unchecked_enum_data
-// CHECK-NEXT: release_value
-// CHECK-NEXT: unchecked_enum_data
 // CHECK-NEXT: retain_value
 // CHECK: bb2:
 // CHECK-NOT: unchecked_enum_data
-// CHECK-NOT: release_value
 // CHECK-NOT: retain_value
 // CHECK: bb3:
-// CHECK-NOT: release_value
 // CHECK-NOT: retain_value
 sil @sink_ref_count_ops_enum_over_switch_enum_1 : $@thin (FakeOptional) -> () {
 bb0(%0 : $FakeOptional):
   %1 = function_ref @blocker : $@thin () -> ()
-  release_value %0 : $FakeOptional
   retain_value %0 : $FakeOptional
   apply %1() : $@thin () -> ()
   %3 = alloc_stack $Builtin.Int32
-  release_value %0 : $FakeOptional
   retain_value %0 : $FakeOptional
   dealloc_stack %3#0 : $*@local_storage Builtin.Int32
   switch_enum %0 : $FakeOptional, case #FakeOptional.Some!enumelt.1: bb1, case #FakeOptional.None!enumelt: bb2
@@ -162,20 +157,16 @@ bb3:
 // CHECK-NEXT: function_ref @blocker
 // CHECK-NEXT: cond_br
 // CHECK: bb1:
-// CHECK-NEXT: release_value
 // CHECK-NEXT: retain_value
 // CHECK-NEXT: switch_enum
 // CHECK: bb2:
 // CHECK-NOT: unchecked_enum_data
-// CHECK-NOT: release_value
 // CHECK-NOT: retain_value
 // CHECK: bb3:
 // CHECK-NOT: unchecked_enum_data
-// CHECK-NOT: release_value
 // CHECK-NOT: retain_value
 // CHECK: bb4:
 // CHECK-NOT: unchecked_enum_data
-// CHECK-NOT: release_value
 // CHECK-NOT: retain_value
 sil @sink_ref_count_ops_enum_over_switch_enum_2 : $@thin (FakeOptional) -> () {
 bb0(%0 : $FakeOptional):
@@ -183,7 +174,6 @@ bb0(%0 : $FakeOptional):
   cond_br undef, bb1, bb2
 
 bb1:
-  release_value %0 : $FakeOptional
   retain_value %0 : $FakeOptional
   switch_enum %0 : $FakeOptional, case #FakeOptional.Some!enumelt.1: bb2, case #FakeOptional.None!enumelt: bb3
 
@@ -204,20 +194,16 @@ bb4:
 // CHECK-NEXT: function_ref @blocker
 // CHECK-NEXT: cond_br
 // CHECK: bb1:
-// CHECK-NEXT: release_value
 // CHECK-NEXT: retain_value
 // CHECK-NEXT: switch_enum
 // CHECK: bb2:
 // CHECK-NOT: unchecked_enum_data
-// CHECK-NOT: release_value
 // CHECK-NOT: retain_value
 // CHECK: bb3:
 // CHECK-NOT: unchecked_enum_data
-// CHECK-NOT: release_value
 // CHECK-NOT: retain_value
 // CHECK: bb4:
 // CHECK-NOT: unchecked_enum_data
-// CHECK-NOT: release_value
 // CHECK-NOT: retain_value
 sil @sink_ref_count_ops_enum_over_switch_enum_3 : $@thin (FakeOptional) -> () {
 bb0(%0 : $FakeOptional):
@@ -225,7 +211,6 @@ bb0(%0 : $FakeOptional):
   cond_br undef, bb1, bb3
 
 bb1:
-  release_value %0 : $FakeOptional
   retain_value %0 : $FakeOptional
   switch_enum %0 : $FakeOptional, case #FakeOptional.Some!enumelt.1: bb2, case #FakeOptional.None!enumelt: bb3
 
@@ -240,3 +225,38 @@ bb4:
   return %2 : $()
 }
 
+// CHECK-LABEL: sil @sink_ref_count_ops_enum_over_switch_enum_4 : $@thin (FakeOptional) -> FakeOptional {
+// CHECK: bb0({{.*}}):
+// CHECK-NOT: retain_value
+// CHECK: switch_enum
+// CHECK: bb1:
+// CHECK: unchecked_enum_data
+// CHECK: retain_value
+// CHECK: bb2:
+// CHECK-NOT: unchecked_enum_data
+// CHECK-NOT: retain_value
+// CHECK: bb3:
+// CHECK-NOT: unchecked_enum_data
+// CHECK-NOT: retain_value
+sil @sink_ref_count_ops_enum_over_switch_enum_4 : $@thin (FakeOptional) -> FakeOptional {
+bb0(%0 : $FakeOptional):
+  %1 = function_ref @blocker : $@thin () -> ()
+  %2 = alloc_stack $FakeOptional
+  %3 = function_ref @optional_user : $@thin (FakeOptional) -> ()
+  %4 = integer_literal $Builtin.Int32, 0
+  %5 = enum $FakeOptional, #FakeOptional.Some!enumelt.1, %4 : $Builtin.Int32
+  retain_value %5 : $FakeOptional
+  apply %1() : $@thin () -> ()
+  apply %3(%0) : $@thin (FakeOptional) -> ()
+  switch_enum %5 : $FakeOptional, case #FakeOptional.Some!enumelt.1: bb1, case #FakeOptional.None!enumelt: bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  dealloc_stack %2#0 : $*@local_storage FakeOptional
+  return %5 : $FakeOptional
+}

@@ -21,6 +21,7 @@
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILPasses/Transforms.h"
 #include "swift/SILAnalysis/AliasAnalysis.h"
+#include "swift/SILAnalysis/ARCAnalysis.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/ScopedHashTable.h"
 #include "llvm/ADT/Statistic.h"
@@ -31,6 +32,7 @@
 STATISTIC(NumSunk,   "Number of instructions sunk");
 
 using namespace swift;
+using namespace swift::arc;
 
 static const int SinkSearchWindow = 6;
 
@@ -275,24 +277,31 @@ static void createRefCountOpForPayload(SILBuilder &Builder, SILInstruction *I,
   Builder.createReleaseValue(I->getLoc(), UEDI);
 }
 
-static bool tryToSinkRefCountInst(SwitchEnumInst *S, SILInstruction *I) {
-  // For now skip any dealloc stack inst that we see. This is ok to do since the
-  // fact that we are traversing backwards from a switch_enum of our enum value
-  // implies the dealloc_stack can not be on our enum value. Thus if we have
-  // retain_value, release_value on our enum value it is safe to move them over
-  // the dealloc_stack.
-  if (isa<DeallocStackInst>(I))
-    return true;
-
-  // If this instruction is not a retain_value or release_value, there is
-  // nothing left for us to do... bail...
-  if (!isa<RetainValueInst>(I) && !isa<ReleaseValueInst>(I))
+static bool tryToSinkRefCountInst(SwitchEnumInst *S, SILInstruction *I,
+                                  AliasAnalysis *AA) {
+  // If this instruction is not a retain_value, there is nothing left for us to
+  // do... bail...
+  if (!isa<RetainValueInst>(I))
     return false;
+
+  SILValue Ptr = I->getOperand(0);
 
   // If the retain value's argument is not the switch's argument, we can't do
   // anything with our simplistic analysis... bail...
-  if (I->getOperand(0) != S->getOperand())
+  if (Ptr != S->getOperand())
     return false;
+
+  // Next go over all instructions after I in the basic block. If none of them
+  // can decrement our ptr value, we can move the retain over the ref count
+  // inst. If any of them do potentially decrement the ref count of Ptr, we can
+  // not move it.
+  SILBasicBlock::iterator II = I;
+  ++II;
+  for (; &*II != S; ++II) {
+    if (canDecrementRefCount(&*II, Ptr, AA)) {
+      return false;
+    }
+  }
 
   SILBuilder Builder(S);
 
@@ -314,7 +323,8 @@ static bool tryToSinkRefCountInst(SwitchEnumInst *S, SILInstruction *I) {
 /// release_value on the payload of the switch_enum in the destination BBs. We
 /// only do this if the destination BBs have only the switch enum as its
 /// predecessor.
-static bool sinkSwitchEnumRefCountArgsToSuccessors(SILBasicBlock *BB) {
+static bool sinkSwitchEnumRefCountArgsToSuccessors(SILBasicBlock *BB,
+                                                   AliasAnalysis *AA) {
   // First attempt to cast our terminator to a switch enum...
   SwitchEnumInst *S = dyn_cast<SwitchEnumInst>(BB->getTerminator());
 
@@ -344,12 +354,11 @@ static bool sinkSwitchEnumRefCountArgsToSuccessors(SILBasicBlock *BB) {
   while (SI != SE) {
     SILInstruction *Inst = &*SI;
     SI = std::prev(SI);
-    if (!tryToSinkRefCountInst(S, Inst))
-      return Changed;
-    Changed = true;
+    if (tryToSinkRefCountInst(S, Inst, AA))
+      Changed = true;
   }
 
-  return Changed | tryToSinkRefCountInst(S, &*SI);
+  return Changed | tryToSinkRefCountInst(S, &*SI, AA);
 }
 
 namespace {
@@ -358,6 +367,7 @@ class SILCodeMotion : public SILFunctionTransform {
   /// The entry point to the transformation.
   void run() {
     SILFunction &F = *getFunction();
+    AliasAnalysis *AA = getAnalysis<AliasAnalysis>();
 
     DEBUG(llvm::dbgs() << "***** CodeMotion on function: " << F.getName() <<
           " *****\n");
@@ -371,7 +381,7 @@ class SILCodeMotion : public SILFunctionTransform {
       // Push retain_value, release_value on enums before switch_enum into
       // retain_value, release_value on the payload of the enum in the
       // successors of the switch_enum.
-      Changed |= sinkSwitchEnumRefCountArgsToSuccessors(&BB);
+      Changed |= sinkSwitchEnumRefCountArgsToSuccessors(&BB, AA);
     }
 
     if (Changed)
