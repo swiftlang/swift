@@ -3196,9 +3196,35 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
         return SolutionKind::Error;
       }
 
+      // Look through the destination key and value types. We need
+      // their structure to determine whether we'll be bridging or
+      // upcasting the key and value.
+      TypeVariableType *keyTypeVar2 = nullptr;
+      TypeVariableType *valueTypeVar2 = nullptr;    
+      key2 = getFixedTypeRecursive(key2, keyTypeVar2, false, false);
+      if (!keyTypeVar2) {
+        value2 = getFixedTypeRecursive(value2, valueTypeVar2, false, false);
+      }
+      
+      // If either the destination key or value type is a type
+      // variable, we can't simplify this now.
+      if (keyTypeVar2 || valueTypeVar2) {
+        if (flags & TMF_GenerateConstraints) {
+          addConstraint(
+            Constraint::createRestricted(*this, getConstraintKind(matchKind),
+                                         restriction, type1, type2,
+                                         getConstraintLocator(locator)));
+          return SolutionKind::Solved;
+        }
+        
+        return SolutionKind::Unsolved;
+      }
+
       // This can be a bridging upcast.
-      key1 = bridgedKey1;
-      value1 = bridgedValue1;
+      if (key2->isBridgeableObjectType())
+        key1 = bridgedKey1;
+      if (value2->isBridgeableObjectType())
+        value1 = bridgedValue1;
       increaseScore(SK_CollectionBridgedConversion);
     }
 

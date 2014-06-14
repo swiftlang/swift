@@ -2098,16 +2098,20 @@ func _dictionaryBridgeToObjectiveC<BridgesToKey, BridgesToValue, Key, Value>(
      ) -> Dictionary<Key, Value> {
   _sanityCheck(!isBridgedVerbatimToObjectiveC(BridgesToKey.self) ||
                !isBridgedVerbatimToObjectiveC(BridgesToValue.self))
-  _sanityCheck(isBridgedVerbatimToObjectiveC(Key.self))
-  _sanityCheck(isBridgedVerbatimToObjectiveC(Value.self))
+  _sanityCheck(isBridgedVerbatimToObjectiveC(Key.self) ||
+               isBridgedVerbatimToObjectiveC(Value.self))
 
   var result = Dictionary<Key, Value>(minimumCapacity: source.count)
-  let keyBridgesVerbatim = isBridgedVerbatimToObjectiveC(BridgesToKey.self)
-  let valueBridgesVerbatim = isBridgedVerbatimToObjectiveC(BridgesToValue.self)
+  let keyBridgesDirectly 
+    = isBridgedVerbatimToObjectiveC(BridgesToKey.self) == 
+      isBridgedVerbatimToObjectiveC(Key.self)
+  let valueBridgesDirectly 
+    = isBridgedVerbatimToObjectiveC(BridgesToValue.self) ==
+      isBridgedVerbatimToObjectiveC(Value.self)
   for (key, value) in source {
     // Bridge the key
     var bridgedKey: Key
-    if keyBridgesVerbatim {
+    if keyBridgesDirectly {
       bridgedKey = reinterpretCast(key)
     } else {
       let bridged: AnyObject? = bridgeToObjectiveC(key)
@@ -2117,7 +2121,7 @@ func _dictionaryBridgeToObjectiveC<BridgesToKey, BridgesToValue, Key, Value>(
 
     // Bridge the value
     var bridgedValue: Value
-    if valueBridgesVerbatim {
+    if valueBridgesDirectly {
       bridgedValue = reinterpretCast(value)
     } else {
       let bridged: AnyObject? = bridgeToObjectiveC(value)

@@ -3226,18 +3226,49 @@ func test_DictionaryUpcastBridgedEntryPoint() {
   d[TestBridgedKeyTy(20)] = TestBridgedValueTy(1020)
   d[TestBridgedKeyTy(30)] = TestBridgedValueTy(1030)
 
-  var dAsAnyObject: Dictionary<NSObject, AnyObject>
-    = _dictionaryBridgeToObjectiveC(d)
+  if true {
+    var dOO: Dictionary<NSObject, AnyObject> = _dictionaryBridgeToObjectiveC(d)
 
-  assert(dAsAnyObject.count == 3)
-  var v = dAsAnyObject[TestObjCKeyTy(10)]
-  assert((v! as TestBridgedValueTy).value == 1010)
+    assert(dOO.count == 3)
+    var v = dOO[TestObjCKeyTy(10)]
+    assert((v! as TestBridgedValueTy).value == 1010)
 
-  v = dAsAnyObject[TestObjCKeyTy(20)]
-  assert((v! as TestBridgedValueTy).value == 1020)
+    v = dOO[TestObjCKeyTy(20)]
+    assert((v! as TestBridgedValueTy).value == 1020)
 
-  v = dAsAnyObject[TestObjCKeyTy(30)]
-  assert((v! as TestBridgedValueTy).value == 1030)
+    v = dOO[TestObjCKeyTy(30)]
+    assert((v! as TestBridgedValueTy).value == 1030)
+  }
+
+  if true {
+    var dOV: Dictionary<NSObject, TestBridgedValueTy> 
+      = _dictionaryBridgeToObjectiveC(d)
+
+    assert(dOV.count == 3)
+    var v = dOV[TestObjCKeyTy(10)]
+    assert(v!.value == 1010)
+
+    v = dOV[TestObjCKeyTy(20)]
+    assert(v!.value == 1020)
+
+    v = dOV[TestObjCKeyTy(30)]
+    assert(v!.value == 1030)
+  }
+
+  if true {
+    var dVO: Dictionary<TestBridgedKeyTy, AnyObject> 
+      = _dictionaryBridgeToObjectiveC(d)
+
+    assert(dVO.count == 3)
+    var v = dVO[TestBridgedKeyTy(10)]
+    assert((v! as TestBridgedValueTy).value == 1010)
+
+    v = dVO[TestBridgedKeyTy(20)]
+    assert((v! as TestBridgedValueTy).value == 1020)
+
+    v = dVO[TestBridgedKeyTy(30)]
+    assert((v! as TestBridgedValueTy).value == 1030)
+  }
 
   println("test_DictionaryUpcastBridgedEntryPoint done")
 }
@@ -3251,17 +3282,47 @@ func test_DictionaryUpcastBridged() {
   d[TestBridgedKeyTy(20)] = TestBridgedValueTy(1020)
   d[TestBridgedKeyTy(30)] = TestBridgedValueTy(1030)
 
-  var dAsAnyObject: Dictionary<NSObject, AnyObject> = d
+  if true {
+    var dOO: Dictionary<NSObject, AnyObject> = d
 
-  assert(dAsAnyObject.count == 3)
-  var v = dAsAnyObject[TestObjCKeyTy(10)]
-  assert((v! as TestBridgedValueTy).value == 1010)
+    assert(dOO.count == 3)
+    var v = dOO[TestObjCKeyTy(10)]
+    assert((v! as TestBridgedValueTy).value == 1010)
 
-  v = dAsAnyObject[TestObjCKeyTy(20)]
-  assert((v! as TestBridgedValueTy).value == 1020)
+    v = dOO[TestObjCKeyTy(20)]
+    assert((v! as TestBridgedValueTy).value == 1020)
 
-  v = dAsAnyObject[TestObjCKeyTy(30)]
-  assert((v! as TestBridgedValueTy).value == 1030)
+    v = dOO[TestObjCKeyTy(30)]
+    assert((v! as TestBridgedValueTy).value == 1030)
+  }
+
+  if true {
+    var dOV: Dictionary<NSObject, TestBridgedValueTy> = d
+
+    assert(dOV.count == 3)
+    var v = dOV[TestObjCKeyTy(10)]
+    assert(v!.value == 1010)
+
+    v = dOV[TestObjCKeyTy(20)]
+    assert(v!.value == 1020)
+
+    v = dOV[TestObjCKeyTy(30)]
+    assert(v!.value == 1030)
+  }
+
+  if true {
+    var dVO: Dictionary<TestBridgedKeyTy, AnyObject> = d
+
+    assert(dVO.count == 3)
+    var v = dVO[TestBridgedKeyTy(10)]
+    assert((v! as TestBridgedValueTy).value == 1010)
+
+    v = dVO[TestBridgedKeyTy(20)]
+    assert((v! as TestBridgedValueTy).value == 1020)
+
+    v = dVO[TestBridgedKeyTy(30)]
+    assert((v! as TestBridgedValueTy).value == 1030)
+  }
 
   println("test_DictionaryUpcastBridged done")
 }

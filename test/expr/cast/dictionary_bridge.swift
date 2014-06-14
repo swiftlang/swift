@@ -63,10 +63,8 @@ func testUpcastBridge() {
   dictOO = dictOB
 
   // Upcast key or value to object type (but not both)
-  // FIXME: We don't allow this now, because it's not converting to object
-  // representations for everything.
-  dictBO = dictBB // expected-error{{cannot convert}}
-  dictOB = dictBB // expected-error{{cannot convert}}
+  dictBO = dictBB
+  dictOB = dictBB
 
   dictBB = dictBO // expected-error{{cannot convert the expression's type '()' to type 'Dictionary<BridgedToObjC, BridgedToObjC>'}}
   dictBB = dictOB // expected-error{{cannot convert the expression's type '()' to type 'Dictionary<BridgedToObjC, BridgedToObjC>'}}
