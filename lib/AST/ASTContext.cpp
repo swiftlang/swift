@@ -89,7 +89,13 @@ struct ASTContext::Implementation {
 
   /// Array<T> downcast conversion.
   FuncDecl *GetArrayDownCast = nullptr;
-  
+
+  /// Dictionary<K, V> simple upcast.
+  FuncDecl *GetDictionaryUpCast = nullptr;
+
+  /// Dictionary<K, V> bridge to a dictionary of objects.
+  FuncDecl *GetDictionaryBridgeToObjectiveC = nullptr;
+
   /// func _doesOptionalHaveValue<T>(v : [inout] Optional<T>) -> T
   FuncDecl *DoesOptionalHaveValueDecls[NumOptionalTypeKinds] = {};
 
@@ -707,6 +713,36 @@ FuncDecl *ASTContext::getArrayDownCast(LazyResolver *resolver) const {
   // Look for a generic function.
   CanType input, output, param;
   auto decl = findLibraryIntrinsic(*this, "_arrayCheckedDownCast", resolver);
+  if (!decl)
+    return nullptr;
+  
+  cache = decl;
+  return decl;
+}
+
+FuncDecl *ASTContext::getDictionaryUpCast(LazyResolver *resolver) const {
+  auto &cache = Impl.GetDictionaryUpCast;
+  if (cache) return cache;
+  
+  // Look for a generic function.
+  CanType input, output, param;
+  auto decl = findLibraryIntrinsic(*this, "_dictionaryUpCast", resolver);
+  if (!decl)
+    return nullptr;
+  
+  cache = decl;
+  return decl;
+}
+
+FuncDecl *
+ASTContext::getDictionaryBridgeToObjectiveC(LazyResolver *resolver) const {
+  auto &cache = Impl.GetDictionaryBridgeToObjectiveC;
+  if (cache) return cache;
+  
+  // Look for a generic function.
+  CanType input, output, param;
+  auto decl = findLibraryIntrinsic(*this, "_dictionaryBridgeToObjectiveC",
+                                   resolver);
   if (!decl)
     return nullptr;
   

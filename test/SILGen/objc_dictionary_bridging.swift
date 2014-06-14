@@ -4,9 +4,7 @@
 import Foundation
 import gizmo
 
-@objc class Foo : NSObject, Hashable {
-  var hashValue: Int { return 5 }  
-
+@objc class Foo : NSObject {
   // Bridging dictionary parameters
   // CHECK-LABEL: sil @_TToFC24objc_dictionary_bridging3Foo23bridge_Dictionary_param{{.*}} : $@cc(objc_method) @thin (NSDictionary, Foo) -> ()
   func bridge_Dictionary_param(dict: Dictionary<Foo, Foo>) {

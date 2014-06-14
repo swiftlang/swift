@@ -934,28 +934,32 @@ visitCollectionUpcastConversionExpr(CollectionUpcastConversionExpr *E,
   auto mv = SGF.emitRValueAsSingleValue(E->getSubExpr());
   
   // Compute substitutions for the intrinsic call.
-  auto fromArray = cast<BoundGenericStructType>(
-                     E->getSubExpr()->getType()->getCanonicalType());
-  auto toArray = cast<BoundGenericStructType>(
-                   E->getType()->getCanonicalType());
-  auto fromElement = fromArray.getGenericArgs()[0];
-  auto toElement = toArray.getGenericArgs()[0];
+  auto fromCollection = cast<BoundGenericStructType>(
+                          E->getSubExpr()->getType()->getCanonicalType());
+  auto toCollection = cast<BoundGenericStructType>(
+                        E->getType()->getCanonicalType());
 
   // Get the intrinsic function.
   auto &ctx = SGF.getASTContext();
   FuncDecl *fn = nullptr;
-  if (fromArray->getDecl() == ctx.getArrayDecl()) {
+  if (fromCollection->getDecl() == ctx.getArrayDecl()) {
     fn = E->bridgesToObjC() ? ctx.getArrayBridgeToObjectiveC(nullptr)
-                            : SGF.getASTContext().getArrayUpCast(nullptr);
+                            : ctx.getArrayUpCast(nullptr);
+  } else if (fromCollection->getDecl() == ctx.getDictionaryDecl()) {
+    fn = E->bridgesToObjC() ? ctx.getDictionaryBridgeToObjectiveC(nullptr)
+                            : ctx.getDictionaryUpCast(nullptr);
   } else {
     llvm_unreachable("unsupported collection upcast kind");
   }
   
   // Form type parameter substitutions.
-  Substitution subs[2] = {
-    { nullptr, fromElement, { } },
-    { nullptr, toElement, { } }
-  };
+  SmallVector<Substitution, 4> subs;
+  for (auto sub: fromCollection->getSubstitutions(SGF.SGM.SwiftModule,nullptr)){
+    subs.push_back(Substitution{nullptr, sub.Replacement, sub.Conformance});
+  }
+  for (auto sub: toCollection->getSubstitutions(SGF.SGM.SwiftModule,nullptr)){
+    subs.push_back(Substitution{nullptr, sub.Replacement, sub.Conformance});
+  }
 
   auto emitApply = SGF.emitApplyOfLibraryIntrinsic(loc,
                                                    fn,

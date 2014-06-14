@@ -54,3 +54,9 @@ extension Int : _BridgedToObjectiveC {
     fatal("implement")
   }
 }
+
+extension NSObject : Hashable {
+  var hashValue: Int { return 0 }
+}
+
+func == (x: NSObject, y: NSObject) -> Bool { return true }

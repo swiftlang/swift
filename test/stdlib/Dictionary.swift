@@ -3196,6 +3196,30 @@ func test_DictionaryUpcastEntryPoint() {
 test_DictionaryUpcastEntryPoint()
 // CHECK: test_DictionaryUpcastEntryPoint done
 
+func test_DictionaryUpcast() {
+  var d = Dictionary<TestObjCKeyTy, TestObjCValueTy>(minimumCapacity: 32)
+  d[TestObjCKeyTy(10)] = TestObjCValueTy(1010)
+  d[TestObjCKeyTy(20)] = TestObjCValueTy(1020)
+  d[TestObjCKeyTy(30)] = TestObjCValueTy(1030)
+
+  var dAsAnyObject: Dictionary<NSObject, AnyObject> = d
+
+  assert(dAsAnyObject.count == 3)
+  var v = dAsAnyObject[TestObjCKeyTy(10)]
+  assert((v! as TestObjCValueTy).value == 1010)
+
+  v = dAsAnyObject[TestObjCKeyTy(20)]
+  assert((v! as TestObjCValueTy).value == 1020)
+
+  v = dAsAnyObject[TestObjCKeyTy(30)]
+  assert((v! as TestObjCValueTy).value == 1030)
+
+  println("test_DictionaryUpcast done")
+}
+
+test_DictionaryUpcast()
+// CHECK: test_DictionaryUpcast done
+
 func test_DictionaryUpcastBridgedEntryPoint() {
   var d = Dictionary<TestBridgedKeyTy, TestBridgedValueTy>(minimumCapacity: 32)
   d[TestBridgedKeyTy(10)] = TestBridgedValueTy(1010)
@@ -3220,6 +3244,30 @@ func test_DictionaryUpcastBridgedEntryPoint() {
 
 test_DictionaryUpcastBridgedEntryPoint()
 // CHECK: test_DictionaryUpcastBridgedEntryPoint done
+
+func test_DictionaryUpcastBridged() {
+  var d = Dictionary<TestBridgedKeyTy, TestBridgedValueTy>(minimumCapacity: 32)
+  d[TestBridgedKeyTy(10)] = TestBridgedValueTy(1010)
+  d[TestBridgedKeyTy(20)] = TestBridgedValueTy(1020)
+  d[TestBridgedKeyTy(30)] = TestBridgedValueTy(1030)
+
+  var dAsAnyObject: Dictionary<NSObject, AnyObject> = d
+
+  assert(dAsAnyObject.count == 3)
+  var v = dAsAnyObject[TestObjCKeyTy(10)]
+  assert((v! as TestBridgedValueTy).value == 1010)
+
+  v = dAsAnyObject[TestObjCKeyTy(20)]
+  assert((v! as TestBridgedValueTy).value == 1020)
+
+  v = dAsAnyObject[TestObjCKeyTy(30)]
+  assert((v! as TestBridgedValueTy).value == 1030)
+
+  println("test_DictionaryUpcastBridged done")
+}
+
+test_DictionaryUpcastBridged()
+// CHECK: test_DictionaryUpcastBridged done
 
 
 //===---
