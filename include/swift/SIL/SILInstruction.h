@@ -1499,10 +1499,25 @@ public:
   }
 };
 
+/// RefCountingInst - An abstract class of instructions which
+/// manipulate the reference count of their object operand.
+class RefCountingInst : public SILInstruction {
+protected:
+  RefCountingInst(ValueKind Kind, SILLocation Loc, SILTypeList *TypeList = 0,
+                  SILDebugScope *DS=0)
+    : SILInstruction(Kind, Loc, TypeList, DS) {}
+
+public:
+  static bool classof(const ValueBase *V) {
+    return V->getKind() >= ValueKind::First_RefCountingInst &&
+           V->getKind() <= ValueKind::Last_RefCountingInst;
+  }
+};
+
 /// RetainValueInst - Copies a loadable value.
 class RetainValueInst : public UnaryInstructionBase<ValueKind::RetainValueInst,
-                                                  SILInstruction,
-                                                  /*HasValue*/ false> {
+                                                    RefCountingInst,
+                                                    /*HasValue*/ false> {
 public:
   RetainValueInst(SILLocation loc, SILValue operand)
     : UnaryInstructionBase(loc, operand) {}
@@ -1510,7 +1525,7 @@ public:
 
 /// ReleaseValueInst - Destroys a loadable value.
 class ReleaseValueInst : public UnaryInstructionBase<ValueKind::ReleaseValueInst,
-                                                     SILInstruction,
+                                                     RefCountingInst,
                                                      /*HasValue*/ false> {
 public:
   ReleaseValueInst(SILLocation loc, SILValue operand)
@@ -1520,7 +1535,7 @@ public:
 /// Transfers ownership of a loadable value to the current autorelease pool.
 class AutoreleaseValueInst
                   : public UnaryInstructionBase<ValueKind::AutoreleaseValueInst,
-                                                SILInstruction,
+                                                RefCountingInst,
                                                 /*HasValue*/ false> {
 public:
   AutoreleaseValueInst(SILLocation loc, SILValue operand)
@@ -2149,21 +2164,6 @@ public:
   
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::InitBlockStorageHeaderInst;
-  }
-};
-  
-/// RefCountingInst - An abstract class of instructions which
-/// manipulate the reference count of their object operand.
-class RefCountingInst : public SILInstruction {
-protected:
-  RefCountingInst(ValueKind Kind, SILLocation Loc, SILTypeList *TypeList = 0,
-                  SILDebugScope *DS=0)
-    : SILInstruction(Kind, Loc, TypeList, DS) {}
-
-public:
-  static bool classof(const ValueBase *V) {
-    return V->getKind() >= ValueKind::First_RefCountingInst &&
-           V->getKind() <= ValueKind::Last_RefCountingInst;
   }
 };
 
