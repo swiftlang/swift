@@ -95,11 +95,10 @@ func test_unowned_let_capture(aC : C) {
 // CHECK-NEXT: bb0(%0 : $@sil_unowned C):
 // CHECK-NEXT:   strong_retain_unowned %0 : $@sil_unowned C
 // CHECK-NEXT:   %2 = unowned_to_ref %0 : $@sil_unowned C to $C
-// CHECK-NEXT:   strong_retain %2 : $C 
-// CHECK-NEXT:   %4 = class_method %2 : $C, #C.f!1 : C -> () -> Int , $@cc(method) @thin (@owned C) -> Int
-// CHECK-NEXT:   %5 = apply %4(%2) : $@cc(method) @thin (@owned C) -> Int
+// CHECK-NEXT:   %3 = class_method %2 : $C, #C.f!1 : C -> () -> Int , $@cc(method) @thin (@owned C) -> Int
+// CHECK-NEXT:   %4 = apply %3(%2) : $@cc(method) @thin (@owned C) -> Int
 // CHECK-NEXT:   unowned_release %0 : $@sil_unowned C
-// CHECK-NEXT:   return %5 : $Int
+// CHECK-NEXT:   return %4 : $Int
 
 
 
@@ -120,8 +119,3 @@ class TestUnownedMember {
 // CHECK:  assign [[INVAL]] to [[FIELDPTR]] : $*@sil_unowned C
 // CHECK:  strong_release %0 : $C
 // CHECK:  return [[SELF]] : $TestUnownedMember
-
-
-
-
-

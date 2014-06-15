@@ -497,9 +497,12 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
 
       // For weak and unowned types, convert the reference to the right
       // pointer.
-      if (Scalar.getType().is<ReferenceStorageType>())
+      if (Scalar.getType().is<ReferenceStorageType>()) {
         Scalar = emitConversionToSemanticRValue(loc, Scalar,
                                                 getTypeLowering(refType));
+        // emitConversionToSemanticRValue always produces a +1 strong result.
+        return emitManagedRValueWithCleanup(Scalar);
+      }
 
       auto Result = ManagedValue::forUnmanaged(Scalar);
 
