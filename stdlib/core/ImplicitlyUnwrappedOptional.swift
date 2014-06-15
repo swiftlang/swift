@@ -20,7 +20,8 @@
 /// The compiler has special knowledge of the existence of
 /// ImplicitlyUnwrappedOptional<T>, but always interacts with it using the
 /// library intrinsics below.
-struct ImplicitlyUnwrappedOptional<T>: LogicValue, Reflectable {
+struct ImplicitlyUnwrappedOptional<T>
+  : LogicValue, Reflectable, NilLiteralConvertible {
   // Note: explicit initialization to .None is required to break infinite
   // recursion with the otherwise-implicitly-provided default value of
   // `nil`.
@@ -33,6 +34,12 @@ struct ImplicitlyUnwrappedOptional<T>: LogicValue, Reflectable {
     @transparent get {
       return ImplicitlyUnwrappedOptional(.None)
     }
+  }
+  
+  // Make nil work with ImplicitlyUnwrappedOptional
+  @transparent
+  static func convertFromNilLiteral() -> ImplicitlyUnwrappedOptional<T> {
+    return .None
   }
 
   @transparent
@@ -47,10 +54,11 @@ struct ImplicitlyUnwrappedOptional<T>: LogicValue, Reflectable {
   }
 
   func getMirror() -> Mirror {
+    // FIXME: This should probably use _OptionalMirror in both cases.
     if let value = self {
       return reflect(value)
     } else {
-      return _NilMirror()
+      return _OptionalMirror(self)
     }
   }
 
@@ -85,13 +93,6 @@ func _injectValueIntoImplicitlyUnwrappedOptional<T>(v: T) -> T! {
 @transparent
 func _injectNothingIntoImplicitlyUnwrappedOptional<T>() -> T! {
   return ImplicitlyUnwrappedOptional(_injectNothingIntoOptional())
-}
-
-// Make nil work with ImplicitlyUnwrappedOptional (and Optional, via subtype conversion).
-extension _Nil {
-  @conversion func __conversion<T>() -> T! {
-    return .None
-  }
 }
 
 extension ImplicitlyUnwrappedOptional : _ConditionallyBridgedToObjectiveC {

@@ -291,11 +291,6 @@ func == (lhs: String.Index, rhs: String.Index) -> Bool {
   return lhs._base == rhs._base
 }
 
-@availability(*, unavailable, message="Cannot compare a String to nil")
-func == (lhs: String, rhs: _Nil) -> Bool { return false }
-@availability(*, unavailable, message="Cannot compare a String to nil")
-func == (lhs: _Nil, rhs: String) -> Bool { return false }
-
 extension String : Sliceable {
   subscript(subRange: Range<Index>) -> String {
     return String(

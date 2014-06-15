@@ -148,8 +148,8 @@ protocol _RawOptionSet: RawRepresentable {
 }
 
 // TODO: This is an incomplete implementation of our option sets vision.
-protocol RawOptionSet : _RawOptionSet, LogicValue, Equatable
-                        /*FIXME: , BitwiseOperations*/ {
+protocol RawOptionSet : _RawOptionSet, LogicValue, Equatable,
+                        NilLiteralConvertible {
   // A non-failable version of RawRepresentable.fromRaw.
   class func fromMask(raw: RawType) -> Self
 
@@ -160,6 +160,12 @@ protocol RawOptionSet : _RawOptionSet, LogicValue, Equatable
   /* class func fromRaw(raw: RawType) -> Self? { return fromMask(raw) } */
 
   /* func getLogicValue() -> Bool { return toRaw() != .allZeros() } */
+}
+
+/// Conforming to this protocol allows a type to be usable with the 'nil'
+/// literal.
+protocol NilLiteralConvertible {
+  class func convertFromNilLiteral() -> Self
 }
 
 protocol _BuiltinIntegerLiteralConvertible {

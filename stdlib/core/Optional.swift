@@ -12,7 +12,7 @@
 
 // The compiler has special knowledge of Optional<T>, including the fact that
 // it is an enum with cases named 'None' and 'Some'.
-enum Optional<T>: LogicValue, Reflectable {
+enum Optional<T>: LogicValue, Reflectable, NilLiteralConvertible {
   case None
   case Some(T)
 
@@ -43,6 +43,11 @@ enum Optional<T>: LogicValue, Reflectable {
 
   func getMirror() -> Mirror {
     return _OptionalMirror(self)
+  }
+  
+  @transparent
+  static func convertFromNilLiteral() -> Optional<T> {
+    return .None
   }
 }
 
@@ -114,26 +119,6 @@ func == <T: Equatable> (lhs: T?, rhs: T?) -> Bool {
 }
 
 func != <T: Equatable> (lhs: T?, rhs: T?) -> Bool {
-  return !(lhs == rhs)
-}
-
-@transparent
-func == <T>(lhs: T?, rhs: _Nil) -> Bool {
-  return !lhs
-}
-
-@transparent
-func == <T>(lhs: _Nil, rhs: T?) -> Bool {
-  return !rhs
-}
-
-@transparent
-func != <T>(lhs: T?, rhs: _Nil) -> Bool {
-  return !(lhs == rhs)
-}
-
-@transparent
-func != <T>(lhs: _Nil, rhs: T?) -> Bool {
   return !(lhs == rhs)
 }
 

@@ -1017,12 +1017,8 @@ static bool isDefaultInitializable(PatternBindingDecl *pbd) {
 /// Build a default initializer for the given type.
 static Expr *buildDefaultInitializer(TypeChecker &tc, Type type) {
   // Default-initialize optional types and weak values to 'nil'.
-  if (type->getReferenceStorageReferent()->getAnyOptionalObjectType()) {
-    auto nilDecl = tc.Context.getNilDecl();
-    return new (tc.Context) DeclRefExpr(nilDecl, SourceLoc(), /*implicit=*/true,
-                                        /*direct access=*/false,
-                                        nilDecl->getType());
-  }
+  if (type->getReferenceStorageReferent()->getAnyOptionalObjectType())
+    return new (tc.Context) NilLiteralExpr(SourceLoc(), /*implicit=*/true);
 
   // Build tuple literals for tuple types.
   if (auto tupleType = type->getAs<TupleType>()) {
@@ -1454,13 +1450,11 @@ static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD,
   //     (unresolved_dot_expr type='<null>' field 'copyWithZone'
   //       "Val")
   //     (paren_expr type='<null>'
-  //       (unresolved_decl_ref_expr type='<null>' name=nil specialized=no))))
+  //       (nil_literal_expr type='<null>'))))
   auto UDE = new (Ctx) UnresolvedDotExpr(Val, SourceLoc(),
                                          Ctx.getIdentifier("copyWithZone"),
                                          SourceLoc(), /*implicit*/true);
-  Expr *Nil = new (Ctx) UnresolvedDeclRefExpr(Ctx.getIdentifier("nil"),
-                                             DeclRefKind::Ordinary,
-                                             SourceLoc());
+  Expr *Nil = new (Ctx) NilLiteralExpr(SourceLoc(), /*implicit*/true);
   Nil = new (Ctx) ParenExpr(SourceLoc(), Nil, SourceLoc(), false);
 
   //- (id)copyWithZone:(NSZone *)zone;

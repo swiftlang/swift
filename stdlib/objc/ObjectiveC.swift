@@ -32,7 +32,7 @@ extension ObjCBool : Printable {
 /// convert between C strings and selectors.
 ///
 /// The compiler has special knowledge of this type.
-struct Selector : StringLiteralConvertible {
+struct Selector : StringLiteralConvertible, NilLiteralConvertible {
   var ptr : COpaquePointer
 
   /// Create a selector from a string.
@@ -55,8 +55,13 @@ struct Selector : StringLiteralConvertible {
     return sel_registerName(value)
   }
 
-  init(_: _Nil) {
+  init() {
     ptr = nil
+  }
+  
+  @transparent
+  static func convertFromNilLiteral() -> Selector {
+    return Selector()
   }
 }
 
@@ -91,12 +96,6 @@ func _convertBoolToObjCBool(x: Bool) -> ObjCBool {
 }
 func _convertObjCBoolToBool(x: ObjCBool) -> Bool {
   return x
-}
-
-extension _Nil {
-  @conversion func __conversion() -> Selector {
-    return Selector(nil)
-  }
 }
 
 func ~=(x: NSObject, y: NSObject) -> Bool {

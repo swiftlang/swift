@@ -771,19 +771,6 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
         .fixItInsert(fixItLoc, " : " + type.getString());
     }
 
-
-    // Similarly, don't allow "var x = nil", this is not a useful thing to do
-    // without a result type being specified.
-    // FIXME: Turn this into an attribute or something on the definition of
-    // _Nil instead of hard coding the name into the compiler.
-    if (!(options & TR_FromNonInferredPattern)) {
-      if (auto *ST = type->getAs<StructType>()) {
-        if (ST->getDecl()->getName().str() == "_Nil")
-          diagnose(NP->getLoc(), diag::type_inferred_to_nil,
-                   NP->getDecl()->getName(), NP->getDecl()->isLet());
-      }
-    }
-
     return false;
   }
   case PatternKind::Any:

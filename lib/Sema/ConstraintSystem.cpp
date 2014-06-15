@@ -227,8 +227,8 @@ LookupResult &ConstraintSystem::lookupMember(Type base, DeclName name) {
   return *result;
 }
 
-ArrayRef<Type> ConstraintSystem::getAlternativeLiteralTypes(
-                  KnownProtocolKind kind) {
+ArrayRef<Type> ConstraintSystem::
+getAlternativeLiteralTypes(KnownProtocolKind kind) {
   unsigned index;
 
   switch (kind) {
@@ -237,37 +237,16 @@ ArrayRef<Type> ConstraintSystem::getAlternativeLiteralTypes(
 #define LITERAL_CONVERTIBLE_PROTOCOL(Protocol)
 #include "swift/AST/KnownProtocols.def"
 
-  case KnownProtocolKind::ArrayLiteralConvertible:
-    index = 0;
+  case KnownProtocolKind::ArrayLiteralConvertible:     index = 0; break;
+  case KnownProtocolKind::CharacterLiteralConvertible: index = 1; break;
+  case KnownProtocolKind::DictionaryLiteralConvertible:index = 2; break;
+  case KnownProtocolKind::ExtendedGraphemeClusterLiteralConvertible: index = 3;
     break;
-
-  case KnownProtocolKind::CharacterLiteralConvertible:
-    index = 1;
-    break;
-
-  case KnownProtocolKind::DictionaryLiteralConvertible:
-    index = 2;
-    break;
-
-  case KnownProtocolKind::ExtendedGraphemeClusterLiteralConvertible:
-    index = 3;
-    break;
-
-  case KnownProtocolKind::FloatLiteralConvertible:
-    index = 4;
-    break;
-
-  case KnownProtocolKind::IntegerLiteralConvertible:
-    index = 5;
-    break;
-
-  case KnownProtocolKind::StringInterpolationConvertible:
-    index = 6;
-    break;
-
-  case KnownProtocolKind::StringLiteralConvertible:
-    index = 7;
-    break;
+  case KnownProtocolKind::FloatLiteralConvertible: index = 4; break;
+  case KnownProtocolKind::IntegerLiteralConvertible: index = 5; break;
+  case KnownProtocolKind::StringInterpolationConvertible: index = 6; break;
+  case KnownProtocolKind::StringLiteralConvertible: index = 7; break;
+  case KnownProtocolKind::NilLiteralConvertible: index = 8; break;
   }
 
   // If we already looked for alternative literal types, return those results.

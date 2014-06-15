@@ -223,7 +223,7 @@ var _nilRawPointer: Builtin.RawPointer {
 /// this type; they instead get mapped to
 /// `AutoreleasingUnsafePointer<T>`. `void*` pointers are mapped to
 /// CMutableVoidPointer.
-struct CMutablePointer<T> : Equatable, LogicValue {
+struct CMutablePointer<T> : Equatable, LogicValue, NilLiteralConvertible {
   let owner: AnyObject?
   let value: Builtin.RawPointer
 
@@ -299,6 +299,11 @@ struct CMutablePointer<T> : Equatable, LogicValue {
       _fixLifetime(owner)
     }
   }
+  
+  @transparent
+  static func convertFromNilLiteral() -> CMutablePointer<T> {
+    return CMutablePointer<T>(owner: _nilNativeObject, value: _nilRawPointer)
+  }
 }
 
 @transparent
@@ -336,7 +341,7 @@ func == <T> (lhs: CConstPointer<T>, rhs: CMutablePointer<T>) -> Bool {
 /// types that own heap storage, such as Array, to convert themselves to
 /// a pointer and still guarantee that their storage will be held for the
 /// duration of the call.
-struct CMutableVoidPointer : Equatable {
+struct CMutableVoidPointer : Equatable, NilLiteralConvertible {
   let owner: AnyObject?
   let value: Builtin.RawPointer
 
@@ -380,6 +385,11 @@ struct CMutableVoidPointer : Equatable {
     _fixLifetime(owner)
     return result
   }
+  
+  @transparent
+  static func convertFromNilLiteral() -> CMutableVoidPointer {
+    return CMutableVoidPointer(owner: _nilNativeObject,value: _nilRawPointer)
+  }
 }
 
 @transparent
@@ -406,7 +416,8 @@ func == (lhs: CMutableVoidPointer, rhs: CMutableVoidPointer) -> Bool {
 /// This type does not carry an owner pointer unlike the other C*Pointer types
 /// because it only needs to reference the results of inout conversions, which
 /// already have writeback-scoped lifetime.
-struct AutoreleasingUnsafePointer<T /* TODO : class */> : Equatable, LogicValue {
+struct AutoreleasingUnsafePointer<T /* TODO : class */>
+  : Equatable, LogicValue, NilLiteralConvertible {
   let value: Builtin.RawPointer
 
   @transparent
@@ -478,6 +489,11 @@ struct AutoreleasingUnsafePointer<T /* TODO : class */> : Equatable, LogicValue 
       p.memory = reinterpretCast(newValue)
     }
   }
+  
+  @transparent
+  static func convertFromNilLiteral() -> AutoreleasingUnsafePointer {
+    return AutoreleasingUnsafePointer(_nilRawPointer)
+  }
 }
 
 @transparent
@@ -503,7 +519,7 @@ func == <T> (lhs: AutoreleasingUnsafePointer<T>, rhs: AutoreleasingUnsafePointer
 /// types that own heap storage, such as Array, to convert themselves to
 /// a pointer and still guarantee that their storage will be held for the
 /// duration of the call.
-struct CConstPointer<T> : Equatable {
+struct CConstPointer<T> : Equatable, NilLiteralConvertible {
   // TODO: Owner should become AnyObject? when the new Array implementation
   // comes online.
   let owner: AnyObject?
@@ -538,6 +554,11 @@ struct CConstPointer<T> : Equatable {
     _fixLifetime(owner)
     return result
   }
+  
+  @transparent
+  static func convertFromNilLiteral() -> CConstPointer<T> {
+    return CConstPointer<T>(_nilNativeObject, _nilRawPointer)
+  }
 }
 
 @transparent
@@ -545,7 +566,7 @@ func == <T> (lhs: CConstPointer<T>, rhs: CConstPointer<T>) -> Bool {
   return Bool(Builtin.cmp_eq_RawPointer(lhs.value, rhs.value))
 }
 
-struct CConstVoidPointer : Equatable {
+struct CConstVoidPointer : Equatable, NilLiteralConvertible {
   // TODO: Owner should become AnyObject? when the new Array implementation
   // comes online.
   let owner: AnyObject?
@@ -580,38 +601,15 @@ struct CConstVoidPointer : Equatable {
     _fixLifetime(owner)
     return result
   }
+  @transparent
+  static func convertFromNilLiteral() -> CConstVoidPointer {
+    return CConstVoidPointer(_nilNativeObject, _nilRawPointer)
+  }
 }
 
 @transparent
 func ==(lhs: CConstVoidPointer, rhs: CConstVoidPointer) -> Bool {
   return Bool(Builtin.cmp_eq_RawPointer(lhs.value, rhs.value))
-}
-
-//
-// Conversions from nil to bridging pointer types.
-//
-
-extension _Nil {
-  @transparent @conversion
-  func __conversion<T>() -> CMutablePointer<T> {
-    return CMutablePointer(owner: _nilNativeObject, value: _nilRawPointer)
-  }
-  @transparent @conversion
-  func __conversion() -> CMutableVoidPointer {
-    return CMutableVoidPointer(owner: _nilNativeObject, value: _nilRawPointer)
-  }
-  @transparent @conversion
-  func __conversion<T>() -> CConstPointer<T> {
-    return CConstPointer(_nilNativeObject, _nilRawPointer)
-  }
-  @transparent @conversion
-  func __conversion() -> CConstVoidPointer {
-    return CConstVoidPointer(_nilNativeObject, _nilRawPointer)
-  }
-  @transparent @conversion
-  func __conversion<T>() -> AutoreleasingUnsafePointer<T> {
-    return AutoreleasingUnsafePointer(_nilRawPointer)
-  }
 }
 
 //

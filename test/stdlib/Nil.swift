@@ -25,7 +25,7 @@ if selNil == nil {
   println("ok selNil == nil")
   // CHECK: ok selNil == nil
 }
-selNil = Selector(nil)
+selNil = nil
 if selNil == nil { 
   println("ok selNil == nil")
   // CHECK: ok selNil == nil

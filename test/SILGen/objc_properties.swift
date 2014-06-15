@@ -11,7 +11,6 @@ class ClassWithOutlets {
   // CHECK-NOT: return
   // CHECK: string_literal utf16 "World"
   // CHECK-NOT: return
-  // CHECK: function_ref @_TFVSs4_Nil12__conversionfS_U__FT_GSQQ__
   // CHECK: ref_element_addr [[SELF:%[0-9]+]] : $ClassWithOutlets, #ClassWithOutlets.String3
   @IBOutlet var String1 = "Hello"
   @IBOutlet weak var String2: String! = "World"

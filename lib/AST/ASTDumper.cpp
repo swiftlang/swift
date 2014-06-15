@@ -1077,6 +1077,10 @@ public:
     printCommon(E, "error_expr") << ')';
   }
   
+  void visitNilLiteralExpr(NilLiteralExpr *E) {
+    printCommon(E, "nil_literal_expr") << ')';
+  }
+  
   void visitIntegerLiteralExpr(IntegerLiteralExpr *E) {
     printCommon(E, "integer_literal_expr");
     if (E->isNegative())

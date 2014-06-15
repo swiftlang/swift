@@ -52,6 +52,7 @@ struct FooRuncingOptions : RawOptionSet {
   static func fromRaw(raw: CLong) -> FooRuncingOptions?
   func toRaw() -> CLong
   func getLogicValue() -> Bool
+  static func convertFromNilLiteral() -> FooRuncingOptions
 }
 
 struct FooStruct1 {

@@ -20,7 +20,7 @@
 /// For C pointers for which the pointed-to type cannot be represented
 /// directly in Swift, the `COpaquePointer` will be used instead.
 struct UnsafePointer<T> : BidirectionalIndex, Comparable, Hashable,
-                          LogicValue {
+                          LogicValue, NilLiteralConvertible {
   /// The underlying raw (untyped) pointer.
   var value : Builtin.RawPointer
 
@@ -53,6 +53,12 @@ struct UnsafePointer<T> : BidirectionalIndex, Comparable, Hashable,
   /// This is a fundamentally unsafe conversion.
   init<U>(_ from : UnsafePointer<U>) {
     value = from.value
+  }
+
+  // Make nil work with UnsafePointer
+  @transparent
+  static func convertFromNilLiteral() -> UnsafePointer<T> {
+    return .null()
   }
 
   static func null() -> UnsafePointer {
@@ -361,12 +367,3 @@ extension UnsafePointer : Printable {
 struct RawByte {
   let _inaccessible: UInt8
 }
-
-// Make nil work with UnsafePointer
-extension _Nil {
-  @transparent
-  @conversion func __conversion<T>() -> UnsafePointer<T> {
-    return .null()
-  }
-}
-

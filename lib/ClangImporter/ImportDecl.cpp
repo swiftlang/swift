@@ -641,6 +641,65 @@ static FuncDecl *makeOptionSetGetLogicValueMethod(StructDecl *optionSetDecl,
   return getLVDecl;
 }
 
+// Build the NilLiteralConvertible conformance:
+//
+// extension NSSomeOptionSet : NilLiteralConvertible {
+//  static func convertFromNilLiteral() -> S {
+//    return S()
+//  }
+// }
+static FuncDecl *makeNilLiteralConformance(StructDecl *optionSetDecl,
+                                           ValueDecl *valueDecl) {
+  auto &C = optionSetDecl->getASTContext();
+  auto optionSetType = optionSetDecl->getDeclaredTypeInContext();
+  
+  VarDecl *selfDecl = createSelfDecl(optionSetDecl, true);
+  Pattern *selfParam = createTypedNamedPattern(selfDecl);
+  Pattern *methodParam = TuplePattern::create(C, SourceLoc(),{},SourceLoc());
+  methodParam->setType(TupleType::getEmpty(C));
+  Pattern *params[] = {selfParam, methodParam};
+
+  Identifier baseName = C.getIdentifier("convertFromNilLiteral");
+  
+  DeclName name(C, baseName, { });
+  auto factoryDecl = FuncDecl::create(C, SourceLoc(), StaticSpellingKind::None,
+                                      SourceLoc(),
+                                      name,
+                                      SourceLoc(), nullptr, Type(), params,
+                                      TypeLoc::withoutLoc(optionSetType),
+                                      optionSetDecl);
+  
+  factoryDecl->setStatic();
+  factoryDecl->setImplicit();
+  
+  Type factoryType = FunctionType::get(TupleType::getEmpty(C), optionSetType);
+  factoryType = FunctionType::get(selfDecl->getType(), factoryType);
+  factoryDecl->setType(factoryType);
+  factoryDecl->setBodyResultType(optionSetType);
+
+  auto *ctorRef = new (C) DeclRefExpr(ConcreteDeclRef(optionSetDecl),
+                                      SourceLoc(), /*implicit*/ true);
+  auto *arg = TupleExpr::createEmpty(C, SourceLoc(), SourceLoc(),
+                                     /*implicit*/ true);
+  auto *ctorCall = new (C) CallExpr(ctorRef, arg, /*implicit*/ true);
+  auto *ctorRet = new (C) ReturnStmt(SourceLoc(), ctorCall, /*implicit*/ true);
+  
+  auto body = BraceStmt::create(C, SourceLoc(),
+                                ASTNode(ctorRet),
+                                SourceLoc(),
+                                /*implicit*/ true);
+  
+  factoryDecl->setBody(body);
+  
+  // Add as an external definition.
+  C.addedExternalDecl(factoryDecl);
+  
+  return factoryDecl;
+}
+
+
+
+
 // Build the default initializer for an option set.
 // struct NSSomeOptionSet : RawOptionSet {
 //   var value: RawType
@@ -1475,7 +1534,8 @@ namespace {
           [=](){return makeOptionSetFactoryMethod(structDecl, var,
                                          OptionSetFactoryMethod::FromRaw);},
           [=](){return makeOptionSetToRawMethod(structDecl, var);},
-          [=](){return makeOptionSetGetLogicValueMethod(structDecl, var);}
+          [=](){return makeOptionSetGetLogicValueMethod(structDecl, var);},
+          [=](){return makeNilLiteralConformance(structDecl, var);}
         };
         
         structDecl->setDelayedMemberDecls(Impl.SwiftContext.AllocateCopy(

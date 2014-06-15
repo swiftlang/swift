@@ -94,6 +94,10 @@ ProtocolDecl *TypeChecker::getLiteralProtocol(Expr *expr) {
   if (!isa<LiteralExpr>(expr))
     return nullptr;
   
+  if (isa<NilLiteralExpr>(expr))
+    return getProtocol(expr->getLoc(),
+                       KnownProtocolKind::NilLiteralConvertible);
+  
   if (isa<IntegerLiteralExpr>(expr))
     return getProtocol(expr->getLoc(),
                        KnownProtocolKind::IntegerLiteralConvertible);

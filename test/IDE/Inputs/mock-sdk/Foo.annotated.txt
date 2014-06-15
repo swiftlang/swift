@@ -41,6 +41,7 @@ struct <loc/>FooRuncingOptions : <ref:Protocol>RawOptionSet</ref> {
   <decl:Func>static func <loc/>fromRaw(raw: <ref:TypeAlias>CLong</ref>) -> <ref:Struct>FooRuncingOptions</ref>?</decl>
   <decl:Func>func <loc/>toRaw() -> <ref:TypeAlias>CLong</ref></decl>
   <decl:Func>func <loc/>getLogicValue() -> <ref:Struct>Bool</ref></decl>
+  <decl:Func>static func <loc/>convertFromNilLiteral() -> <ref:Struct>FooRuncingOptions</ref></decl>
 }</decl>
 <decl:Struct>struct <loc/>FooStruct1 {
   <decl:Var>var <loc/>x: <ref:TypeAlias>CInt</ref></decl>

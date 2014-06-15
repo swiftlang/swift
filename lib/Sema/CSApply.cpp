@@ -1202,6 +1202,31 @@ namespace {
                diag::builtin_integer_literal_broken_proto);
     }
     
+    Expr *visitNilLiteralExpr(NilLiteralExpr *expr) {
+      auto &tc = cs.getTypeChecker();
+      auto *protocol = tc.getProtocol(expr->getLoc(),
+                                      KnownProtocolKind::NilLiteralConvertible);
+      
+      // For type-sugar reasons, prefer the spelling of the default literal
+      // type.
+      auto type = simplifyType(expr->getType());
+      if (auto defaultType = tc.getDefaultType(protocol, dc)) {
+        if (defaultType->isEqual(type))
+          type = defaultType;
+      }
+      
+      return convertLiteral(expr, type, expr->getType(), protocol,
+                            Identifier(), tc.Context.Id_ConvertFromNilLiteral,
+                            nullptr, Identifier(),
+                            Identifier(),
+                            [] (Type type) -> bool {
+                              return false;
+                            },
+                            diag::nil_literal_broken_proto,
+                            diag::nil_literal_broken_proto);
+    }
+
+    
     Expr *visitIntegerLiteralExpr(IntegerLiteralExpr *expr) {
       return handleIntegerLiteralExpr(expr);
     }
@@ -4276,7 +4301,8 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
 
   // Check whether this literal type conforms to the builtin protocol.
   ProtocolConformance *builtinConformance = nullptr;
-  if (tc.conformsToProtocol(type, builtinProtocol, cs.DC, &builtinConformance)){
+  if (builtinProtocol &&
+      tc.conformsToProtocol(type, builtinProtocol, cs.DC, &builtinConformance)){
     // Find the builtin argument type we'll use.
     Type argType;
     if (builtinLiteralType.is<Type>())
@@ -4320,27 +4346,37 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
   assert(conforms && "must conform to literal protocol");
   (void)conforms;
 
-  // Figure out the (non-builtin) argument type.
+  // Figure out the (non-builtin) argument type if there is one.
   Type argType;
-  if (literalType.is<Type>())
-    argType = literalType.get<Type>();
-  else
-    argType = tc.getWitnessType(type, protocol, conformance,
-                                literalType.get<Identifier>(),
-                                brokenProtocolDiag);
-  if (!argType)
-    return nullptr;
+  if (literalType.is<Identifier>() &&
+      literalType.get<Identifier>().empty()) {
+    // If there is no argument to the constructor function, then just pass in
+    // the empty tuple.
+    literal = TupleExpr::createEmpty(tc.Context, literal->getLoc(),
+                                     literal->getLoc(), /*implicit*/true);
+  } else {
+    // Otherwise, figure out the type of the constructor function and coerce to
+    // it.
+    if (literalType.is<Type>())
+      argType = literalType.get<Type>();
+    else
+      argType = tc.getWitnessType(type, protocol, conformance,
+                                  literalType.get<Identifier>(),
+                                  brokenProtocolDiag);
+    if (!argType)
+      return nullptr;
 
-  // Convert the literal to the non-builtin argument type via the
-  // builtin protocol, first.
-  // FIXME: Do we need an opened type here?
-  literal = convertLiteral(literal, argType, argType, nullptr, Identifier(),
-                           Identifier(), builtinProtocol,
-                           builtinLiteralType, builtinLiteralFuncName,
-                           isBuiltinArgType, brokenProtocolDiag,
-                           brokenBuiltinProtocolDiag);
-  if (!literal)
-    return nullptr;
+    // Convert the literal to the non-builtin argument type via the
+    // builtin protocol, first.
+    // FIXME: Do we need an opened type here?
+    literal = convertLiteral(literal, argType, argType, nullptr, Identifier(),
+                             Identifier(), builtinProtocol,
+                             builtinLiteralType, builtinLiteralFuncName,
+                             isBuiltinArgType, brokenProtocolDiag,
+                             brokenBuiltinProtocolDiag);
+    if (!literal)
+      return nullptr;
+  }
 
   // Convert the resulting expression to the final literal type.
   // FIXME: Bogus location info.

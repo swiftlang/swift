@@ -49,9 +49,9 @@ func testSuvscript(cwu: ClassWithUnavailable) {
 
 func testString() {
   let a : String = "Hey"
-  if a == nil { // expected-error {{Cannot compare a String to nil}}
+  if a == nil {
     println("nil")
-  } else if nil == a {  // expected-error {{Cannot compare a String to nil}}
+  } else if nil == a {
     println("nil")
   }
   else {

@@ -54,6 +54,8 @@ static LiteralExpr *cloneRawLiteralExpr(ASTContext &C, LiteralExpr *expr) {
                                        /*implicit*/ true);
     if (intLit->isNegative())
       cast<IntegerLiteralExpr>(clone)->setNegative(SourceLoc());
+  } else if (isa<NilLiteralExpr>(expr)) {
+    clone = new (C) NilLiteralExpr(SourceLoc());
   } else if (auto charLit = dyn_cast<CharacterLiteralExpr>(expr)) {
     clone = new (C) CharacterLiteralExpr(charLit->getValue(), SourceLoc());
   } else if (auto stringLit = dyn_cast<StringLiteralExpr>(expr)) {

@@ -433,21 +433,6 @@ ValueDecl *ASTContext::getFalseDecl() const {
 
 }
 
-VarDecl *ASTContext::getNilDecl() const {
-  if (Impl.NilDecl) return Impl.NilDecl;
-
-  SmallVector<ValueDecl*, 1> results;
-  lookupInSwiftModule("nil", results);
-  for (auto result : results) {
-    if (auto var = dyn_cast<VarDecl>(result)) {
-      Impl.NilDecl = var;
-      return Impl.NilDecl;
-    }
-  }
-
-  return nullptr;
-}
-
 /// Find the generic implementation declaration for the named syntactic-sugar
 /// type.
 static NominalTypeDecl *findSyntaxSugarImpl(const ASTContext &ctx,

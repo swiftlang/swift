@@ -51,7 +51,7 @@ var aot2 = aot1          // expected-warning {{variable 'aot2' inferred to have 
                        // expected-note {{add an explicit type annotation to silence this warning}}
 
 // <rdar://problem/16574105> Type inference of _Nil very coherent but kind of useless
-var ptr = nil // expected-error {{variable 'ptr' inferred to nil with unspecified type; use a type annotation to specify which nil}}
+var ptr = nil // expected-error {{cannot convert the expression's type '$T0' to type 'NilLiteralConvertible'}}
 
 func testAnyObjectOptional() -> AnyObject? {
   var x = testAnyObjectOptional() // expected-warning {{variable 'x' inferred to have type 'AnyObject?', which may be unexpected}} expected-note {{add an explicit type annotation to silence this warning}}

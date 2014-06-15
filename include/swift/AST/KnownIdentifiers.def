@@ -53,6 +53,7 @@ IDENTIFIER_WITH_NAME(NotEqualsOperator, "!=")
 // Built-in identifiers
 IDENTIFIER(MaxBuiltinIntegerType)
 IDENTIFIER(IntegerLiteralType)
+IDENTIFIER_WITH_NAME(ConvertFromNilLiteral, "convertFromNilLiteral")
 IDENTIFIER_WITH_NAME(ConvertFromIntegerLiteral, "convertFromIntegerLiteral")
 IDENTIFIER_WITH_NAME(ConvertFromBuiltinIntegerLiteral,
                      "_convertFromBuiltinIntegerLiteral")

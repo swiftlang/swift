@@ -160,7 +160,8 @@ namespace {
     RValue visitSuperRefExpr(SuperRefExpr *E, SGFContext C);
     RValue visitOtherConstructorDeclRefExpr(OtherConstructorDeclRefExpr *E,
                                             SGFContext C);
-  
+
+    RValue visitNilLiteralExpr(NilLiteralExpr *E, SGFContext C);
     RValue visitIntegerLiteralExpr(IntegerLiteralExpr *E, SGFContext C);
     RValue visitFloatLiteralExpr(FloatLiteralExpr *E, SGFContext C);
     RValue visitCharacterLiteralExpr(CharacterLiteralExpr *E, SGFContext C);
@@ -727,6 +728,10 @@ RValue RValueEmitter::visitOtherConstructorDeclRefExpr(
   // This should always be a child of an ApplyExpr and so will be emitted by
   // SILGenApply.
   llvm_unreachable("unapplied reference to constructor?!");
+}
+
+RValue RValueEmitter::visitNilLiteralExpr(NilLiteralExpr *E, SGFContext C) {
+  llvm_unreachable("NilLiteralExpr not lowered?");
 }
 
 RValue RValueEmitter::visitIntegerLiteralExpr(IntegerLiteralExpr *E,

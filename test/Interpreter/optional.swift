@@ -72,7 +72,11 @@ test(.None, { $0 as? B?? })
 // CHECK: .Some(.None) as? B??: .None
 // CHECK: .None as? B??: .None
 
-class Foo {}
+class Foo : Equatable {
+}
+func ==(a : Foo, b : Foo) -> Bool { return a === b }
+
+
 var x_foo: Foo! = nil
 if x_foo == nil { println("x_foo is nil") }
 // CHECK: x_foo is nil

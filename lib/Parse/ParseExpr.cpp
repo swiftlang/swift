@@ -817,7 +817,12 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
   case tok::string_literal:  // "foo"
     Result = makeParserResult(parseExprStringLiteral());
     break;
-      
+  
+  case tok::kw_nil:
+    Result = makeParserResult(
+                      new (Context) NilLiteralExpr(consumeToken(tok::kw_nil)));
+    break;
+    
   case tok::kw___FILE__:
   case tok::kw___LINE__:
   case tok::kw___COLUMN__:

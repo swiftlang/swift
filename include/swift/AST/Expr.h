@@ -410,6 +410,25 @@ public:
   }
 };
 
+/// \brief The 'nil' literal.
+///
+class NilLiteralExpr : public LiteralExpr {
+  SourceLoc Loc;
+public:
+  NilLiteralExpr(SourceLoc Loc, bool Implicit = false)
+  : LiteralExpr(ExprKind::NilLiteral, Implicit), Loc(Loc) {
+  }
+  
+  SourceRange getSourceRange() const {
+    return Loc;
+  }
+  
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::NilLiteral;
+  }
+};
+
+  
 /// \brief Integer literal with a '+' or '-' sign, like '+4' or '- 2'.
 ///
 /// After semantic analysis assigns types, this is guaranteed to only have

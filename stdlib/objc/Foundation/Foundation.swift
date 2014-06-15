@@ -979,18 +979,16 @@ extension NSRange : _BridgedToObjectiveC {
 // NSZone
 //===----------------------------------------------------------------------===//
 
-struct NSZone {
+struct NSZone : NilLiteralConvertible {
   var pointer : COpaquePointer
 
   init() { pointer = nil }
-}
-
-extension _Nil {
-  @conversion func __conversion() -> NSZone {
+  
+  @transparent
+  static func convertFromNilLiteral() -> NSZone {
     return NSZone()
   }
 }
-
 
 //===----------------------------------------------------------------------===//
 // NSLocalizedString
