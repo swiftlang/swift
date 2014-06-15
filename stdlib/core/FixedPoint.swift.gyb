@@ -213,6 +213,13 @@ struct ${Self} : ${'SignedInteger' if sign == 's' else 'UnsignedInteger'} {
   }
 % end
 
+%  if bits > 8:
+  /// Returns the current integer with the byte order swapped.
+  var byteSwapped: ${Self} {
+    return ${Self}(Builtin.int_bswap_${BuiltinName}(value) )
+  }
+% end
+
 % max = maskBits((bits - 1) if signed else bits)
   @transparent
   static var max: ${Self} { return ${max} }
