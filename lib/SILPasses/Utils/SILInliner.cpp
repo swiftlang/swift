@@ -173,51 +173,6 @@ void SILInliner::visitDebugValueAddrInst(DebugValueAddrInst *Inst) {
   return SILCloner<SILInliner>::visitDebugValueAddrInst(Inst);
 }
 
-
-// \brief Recursively visit a callee's BBs in depth-first preorder (only
-/// processing blocks on the first visit), mapping newly visited BBs to new BBs
-/// in the caller and cloning all instructions into the caller other than
-/// terminators (which are handled separately later).
-void SILInliner::visitSILBasicBlock(SILBasicBlock* BB) {
-  SILFunction &F = getBuilder().getFunction();
-
-  // Clone all instructions in BB except for the terminator.
-  for (auto I = BB->begin(), E = --BB->end(); I != E; ++I)
-    visit(I);
-
-  // Iterate over successors to do the depth-first search.
-  for (auto &Succ : BB->getSuccs()) {
-    assert(Succ.getBB() != CalleeEntryBB &&
-           "Entry block should not be a successor when inlining");
-    SILBasicBlock *&MappedBB = BBMap[Succ];
-
-    // If we have already cloned the given successor, skip it.
-    if (MappedBB)
-      continue;
-
-    // Otherwise map the successor to a new BB.
-    MappedBB = new (F.getModule()) SILBasicBlock(&F);
-
-    // Create new arguments for each of the original block's arguments.
-    for (auto &Arg : Succ.getBB()->getBBArgs()) {
-      SILValue MappedArg = new (F.getModule()) SILArgument(Arg->getType(),
-                                                           MappedBB);
-      ValueMap.insert(std::make_pair(Arg, MappedArg));
-    }
-
-    // Move the new mapped BB to the right position in the caller if requested.
-    if (InsertBeforeBB)
-      F.getBlocks().splice(SILFunction::iterator(InsertBeforeBB),
-                           F.getBlocks(), SILFunction::iterator(MappedBB));
-
-    // Set the insertion point to the new mapped BB
-    getBuilder().setInsertionPoint(MappedBB);
-
-    // Recurse into the successor
-    visitSILBasicBlock(Succ.getBB());
-  }
-}
-
 SILDebugScope *SILInliner::getOrCreateInlineScope(SILInstruction *Orig) {
   auto CalleeScope = Orig->getDebugScope();
   auto it = InlinedScopeCache.find(CalleeScope);

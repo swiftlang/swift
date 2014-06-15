@@ -58,8 +58,6 @@ public:
                       ArrayRef<SILValue> Args);
 
 private:
-  void visitSILBasicBlock(SILBasicBlock* BB);
-  
   void visitDebugValueInst(DebugValueInst *Inst);
   void visitDebugValueAddrInst(DebugValueAddrInst *Inst);
 
