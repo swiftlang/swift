@@ -489,15 +489,11 @@ namespace {
         return { importedType, ImportHint::NSString };
       }
 
-      if (imported->hasName() &&
-          Impl.SwiftContext.LangOpts.ObjCBridgeArray &&
-          imported->getName().str() == "NSArray") {
+      if (imported->hasName() && imported->getName().str() == "NSArray") {
         return { importedType, ImportHint::NSArray };
       }
 
-      if (imported->hasName() &&
-          Impl.SwiftContext.LangOpts.ObjCBridgeDictionary &&
-          imported->getName().str() == "NSDictionary") {
+      if (imported->hasName() && imported->getName().str() == "NSDictionary") {
         return { importedType, ImportHint::NSDictionary };
       }
 
@@ -1115,8 +1111,6 @@ getNamedSwiftTypeSpecialization(Module *module, StringRef name,
           // When we form the bound generic type, make sure we get the
           // substitutions.
           auto *BGT = BoundGenericType::get(nominalDecl, Type(), args);
-          BGT->getSubstitutions(BGT->getDecl()->getModuleContext(),
-                                typeResolver);
           return BGT;
         }
       }

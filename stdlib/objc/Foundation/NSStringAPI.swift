@@ -1045,12 +1045,7 @@ extension String {
   /// Returns a dictionary object initialized with the keys and
   /// values found in the `String`.
   func propertyListFromStringsFileFormat() -> Dictionary<String, String> {
-    var result = Dictionary<String, String>()
-    _ns.propertyListFromStringsFileFormat().enumerateKeysAndObjectsUsingBlock {
-      key, value, stop in
-      result[key! as String] = value! as? String
-    }
-    return result
+    return _ns.propertyListFromStringsFileFormat() as Dictionary<String, String>
   }
 
   // - (NSRange)rangeOfCharacterFromSet:(NSCharacterSet *)aSet

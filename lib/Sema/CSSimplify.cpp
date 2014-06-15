@@ -2218,10 +2218,12 @@ ConstraintSystem::simplifyCheckedCastConstraint(
   }
   case CheckedCastKind::DictionaryDowncast: {
     Type fromKeyType, fromValueType;
-    std::tie(fromKeyType, fromValueType) = *isDictionaryType(fromType);
+    std::tie(fromKeyType, fromValueType) 
+      = *isDictionaryType(fromType->lookThroughAllAnyOptionalTypes());
 
     Type toKeyType, toValueType;
-    std::tie(toKeyType, toValueType) = *isDictionaryType(toType);
+    std::tie(toKeyType, toValueType) 
+      = *isDictionaryType(toType->lookThroughAllAnyOptionalTypes());
     
     // FIXME: Deal with from/to base types that haven't been solved
     // down to type variables yet.

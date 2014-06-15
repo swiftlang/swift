@@ -163,11 +163,6 @@ FactoryMethodsAsConstructors("enable-objc-factory-method-constructors",
                    llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
-ObjCBridgeDictionary("objc-bridge-dictionary",
-                     llvm::cl::desc("Bridge Dictionary<K, V> to NSDictionary"),
-                     llvm::cl::init(false));
-
-static llvm::cl::opt<bool>
 PrintStats("print-stats",
            llvm::cl::desc("Print statistics"),
            llvm::cl::init(false));
@@ -1605,8 +1600,6 @@ int main(int argc, char *argv[]) {
   InitInvok.getClangImporterOptions().InferImplicitProperties
     = options::ImplicitProperties;
   InitInvok.getLangOptions().ImplicitObjCWith = options::ImplicitObjCWith;
-  InitInvok.getLangOptions().ObjCBridgeDictionary
-    = options::ObjCBridgeDictionary;
 
   for (auto ConfigName : options::BuildConfigs)
     InitInvok.getLangOptions().addBuildConfigOption(ConfigName);

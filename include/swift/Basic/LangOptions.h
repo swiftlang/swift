@@ -67,12 +67,6 @@ namespace swift {
     /// a selector).
     bool ImplicitObjCWith = true;
 
-    /// Import NSArray* as AnyObject[]
-    bool ObjCBridgeArray = true;
-
-    /// Import NSDictionary* as Dictionary<NSObject, AnyObject>
-    bool ObjCBridgeDictionary = false;
-
     /// Enables checking that uses of @objc require importing
     /// the ObjectiveC module.
     bool EnableObjCAttrRequiresObjCModule = false;
