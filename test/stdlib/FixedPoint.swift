@@ -32,3 +32,5 @@ println("0x\(String(x.bigEndian, radix: 16))") // CHECK: 0xefbeadde
 
 let y = UInt32(bigEndian: 0xdeadbeef)
 println("0x\(String(y.bigEndian, radix: 16))") // CHECK: 0xdeadbeef
+
+let z = 4.byteSwapped
