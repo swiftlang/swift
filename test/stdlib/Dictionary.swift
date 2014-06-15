@@ -3545,6 +3545,77 @@ func test_DictionaryBridgeFromObjectiveC() {
 test_DictionaryBridgeFromObjectiveC()
 // CHECK: test_DictionaryBridgeFromObjectiveC done
 
+func test_DictionaryAnyObjectDowncast() {
+  var d = Dictionary<NSObject, AnyObject>(minimumCapacity: 32)
+  d[TestObjCKeyTy(10)] = TestObjCValueTy(1010)
+  d[TestObjCKeyTy(20)] = TestObjCValueTy(1020)
+  d[TestObjCKeyTy(30)] = TestObjCValueTy(1030)
+
+  var obj: AnyObject = d
+
+  // Successful downcast.
+  if let dCV = obj as? Dictionary<TestObjCKeyTy, TestBridgedValueTy>  {
+    assert(dCV.count == 3)
+    var v = dCV[TestObjCKeyTy(10)]
+    assert(v!.value == 1010)
+
+    v = dCV[TestObjCKeyTy(20)]
+    assert(v!.value == 1020)
+
+    v = dCV[TestObjCKeyTy(30)]
+    assert(v!.value == 1030)
+  } else {
+    assert(false)
+  }
+
+  // Successful downcast.
+  if let dVC = obj as? Dictionary<TestBridgedKeyTy, TestObjCValueTy> {
+    assert(dVC.count == 3)
+    var v = dVC[TestBridgedKeyTy(10)]
+    assert(v!.value == 1010)
+
+    v = dVC[TestBridgedKeyTy(20)]
+    assert(v!.value == 1020)
+
+    v = dVC[TestBridgedKeyTy(30)]
+    assert(v!.value == 1030)
+  } else {
+    assert(false)
+  }
+
+  // Successful downcast.
+  if let dVV = obj as? Dictionary<TestBridgedKeyTy, TestBridgedValueTy> {
+    assert(dVV.count == 3)
+    var v = dVV[TestBridgedKeyTy(10)]
+    assert(v!.value == 1010)
+
+    v = dVV[TestBridgedKeyTy(20)]
+    assert(v!.value == 1020)
+
+    v = dVV[TestBridgedKeyTy(30)]
+    assert(v!.value == 1030)
+  } else {
+    assert(false)
+  }
+
+  // Unsuccessful downcasts
+  d["hello"] = 17
+  obj = d
+  if let dCV = obj as? Dictionary<TestObjCKeyTy, TestBridgedValueTy> {
+    assert(false)
+  }
+  if let dVC = obj as? Dictionary<TestBridgedKeyTy, TestObjCValueTy> {
+    assert(false)
+  }
+  if let dVV = obj as? Dictionary<TestBridgedKeyTy, TestBridgedValueTy> {
+    assert(false)
+  }
+
+  println("test_DictionaryAnyObjectDowncast done")
+}
+test_DictionaryAnyObjectDowncast()
+// CHECK: test_DictionaryAnyObjectDowncast done
+
 //===---
 // Tests for APIs implemented strictly based on public interface.  We only need
 // to test them once, not for every storage type.
