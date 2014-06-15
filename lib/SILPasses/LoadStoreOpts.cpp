@@ -85,6 +85,7 @@ static SILValue findExtractPathBetweenValues(LoadInst *PrevLI, LoadInst *LI) {
 static bool isLSForwardingInertInstruction(SILInstruction *Inst) {
   switch (Inst->getKind()) {
   case ValueKind::StrongRetainInst:
+  case ValueKind::RetainValueInst:
   case ValueKind::DeallocStackInst:
   case ValueKind::CondFailInst:
     return true;
