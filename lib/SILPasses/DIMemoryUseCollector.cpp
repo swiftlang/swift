@@ -895,15 +895,23 @@ static bool isSuperInitUse(UpcastInst *Inst) {
 }
 
 /// isSelfInitUse - Return true if this apply_inst is a call to self.init.
-static bool isSelfInitUse(ApplyInst *AI) {
-  auto *LocExpr = AI->getLoc().getAsASTNode<ApplyExpr>();
+static bool isSelfInitUse(SILInstruction *I) {
+  auto *LocExpr = I->getLoc().getAsASTNode<ApplyExpr>();
+  
+  // If we have the rebind_self_in_constructor_expr, then the call is the
+  // sub-expression.
+  if (!LocExpr)
+    if (auto *RB = I->getLoc().getAsASTNode<RebindSelfInConstructorExpr>())
+      LocExpr = dyn_cast<ApplyExpr>(RB->getSubExpr());
+  
   if (!LocExpr) {
     // If we're reading a .sil file, treat a call to "selfinit" as a
     // self.init call as a hack to allow us to write testcases.
-    if (AI->getLoc().is<SILFileLocation>())
-      if (auto *FRI = dyn_cast<FunctionRefInst>(AI->getCallee()))
-        if (FRI->getReferencedFunction()->getName() == "selfinit")
-          return true;
+    if (I->getLoc().is<SILFileLocation>())
+      if (auto *AI = dyn_cast<ApplyInst>(I))
+        if (auto *FRI = dyn_cast<FunctionRefInst>(AI->getCallee()))
+          if (FRI->getReferencedFunction()->getName() == "selfinit")
+            return true;
     return false;
   }
 
@@ -1118,12 +1126,13 @@ void ElementUseCollector::collectDelegatingValueTypeInitSelfUses() {
         if (isSelfInitUse(Call))
           Kind = DIUseKind::SelfInit;
       }
-
-      if (auto *VMI = dyn_cast<ValueMetatypeInst>(AI->getOperand(0))) {
-        if (isSelfInitUse(VMI))
-          Kind = DIUseKind::SelfInit;
-      }
     }
+    
+    if (auto *CAI = dyn_cast<CopyAddrInst>(User)) {
+      if (isSelfInitUse(CAI))
+        Kind = DIUseKind::SelfInit;
+    }
+    
     
     // We can safely handle anything else as an escape.  They should all happen
     // after self.init is invoked.

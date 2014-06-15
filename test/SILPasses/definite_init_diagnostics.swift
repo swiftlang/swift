@@ -630,3 +630,20 @@ class ClassWhoseInitDoesntReturn : BaseWithConvenienceInits {
     _preconditionFailure("leave me alone dude");
   }
 }
+
+// <rdar://problem/17233681> DI: Incorrectly diagnostic in delegating init with generic enum
+enum r17233681Lazy<T>  {
+  case Thunk(() -> T)
+  case Value(T)
+  
+  init(value: T) {
+    self = .Value(value)
+  }
+}
+
+extension r17233681Lazy {
+  init(otherValue: T) {
+    self.init(value: otherValue)
+  }
+}
+
