@@ -21,6 +21,7 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/ADT/MapVector.h"
+#include "llvm/ADT/SmallBitVector.h"
 #include "llvm/Support/Debug.h"
 #include "clang/AST/ASTContext.h"
 #include "swift/Basic/Fallthrough.h"
@@ -294,6 +295,7 @@ public:
   llvm::DenseMap<SILType, LoweredValue> LoweredUndefs;
   llvm::MapVector<SILBasicBlock *, LoweredBB> LoweredBBs;
   llvm::SmallDenseMap<const VarDecl *, unsigned, 8> ArgNo;
+  llvm::SmallBitVector DidEmitDebugInfoForArg;
   
   // Shared destination basic block for condfail traps.
   llvm::BasicBlock *FailBB = nullptr;
@@ -494,10 +496,14 @@ public:
     if (!IGM.DebugInfo || isAvailableExternally()) return;
     auto N = ArgNo.find(cast<VarDecl>(Ty.getDecl()));
     if (N != ArgNo.end()) {
+      if (DidEmitDebugInfoForArg[N->second])
+        return;
+
       PrologueLocation AutoRestore(IGM.DebugInfo, Builder);
       IGM.DebugInfo->
         emitArgVariableDeclaration(Builder, Storage,
                                    Ty, DS, Name, N->second, DirectValue);
+      DidEmitDebugInfoForArg.set(N->second);
     } else
       IGM.DebugInfo->
         emitStackVariableDeclaration(Builder, Storage,
@@ -1212,7 +1218,7 @@ void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
     SILArgument *Arg = *I;
     ++N;
 
-    if (!Arg->getDecl())
+    if (!Arg->getDecl() || DidEmitDebugInfoForArg[N])
       continue;
 
     // Generic and existential types were already handled in
@@ -1245,12 +1251,14 @@ void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
     // FIXME: Consider wrapping this in a reference_type, otherwise we
     // loose flags such as artificial.
     if (Arg->getType().hasReferenceSemantics() &&
-        DTI.getType()->getKind() != TypeKind::InOut)
-      Direct = IndirectValue;
+       DTI.getType()->getKind() != TypeKind::InOut)
+    Direct = IndirectValue;
 
     IGM.DebugInfo->emitArgVariableDeclaration
       (Builder, Vals, DTI, getDebugScope(), Name, N,
        Direct, RealValue);
+
+    DidEmitDebugInfoForArg.set(N);
   }
 }
 
@@ -1274,6 +1282,7 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
         ArgNo.insert( {VD, N} );
       ++N;
     }
+    DidEmitDebugInfoForArg.resize(N);
   }
 
   // Generate the body.
