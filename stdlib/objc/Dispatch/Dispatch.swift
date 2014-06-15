@@ -24,9 +24,9 @@ let DISPATCH_IO_STOP = dispatch_io_close_flags_t(1)
 let DISPATCH_IO_STRICT_INTERVAL = dispatch_io_interval_flags_t(1)
 
 // dispatch/queue.h
-// DISPATCH_QUEUE_SERIAL: ok
-// DISPATCH_CURRENT_QUEUE_LABEL: ok
-// DISPATCH_TARGET_QUEUE_DEFAULT: ok
+let DISPATCH_QUEUE_SERIAL : dispatch_queue_attr_t! = nil
+let DISPATCH_CURRENT_QUEUE_LABEL : dispatch_queue_t! = nil
+let DISPATCH_TARGET_QUEUE_DEFAULT : dispatch_queue_t! = nil
 let DISPATCH_QUEUE_PRIORITY_HIGH       = dispatch_queue_priority_t(2)
 let DISPATCH_QUEUE_PRIORITY_DEFAULT    = dispatch_queue_priority_t(0)
 let DISPATCH_QUEUE_PRIORITY_LOW        = dispatch_queue_priority_t(-2)

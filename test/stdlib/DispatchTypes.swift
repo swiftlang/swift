@@ -8,10 +8,10 @@ dispatch_io_close(nil, DISPATCH_IO_STOP)
 dispatch_io_set_interval(nil, 0, DISPATCH_IO_STRICT_INTERVAL)
 
 // dispatch/queue.h
-dispatch_queue_create("", DISPATCH_QUEUE_SERIAL)               // FIXME: expected-error 2 {{}}
+dispatch_queue_create("", DISPATCH_QUEUE_SERIAL)              
 dispatch_queue_create("", DISPATCH_QUEUE_CONCURRENT)
-dispatch_set_target_queue(nil, DISPATCH_TARGET_QUEUE_DEFAULT)  // FIXME: expected-error 2 {{}}
-dispatch_queue_get_label(DISPATCH_CURRENT_QUEUE_LABEL)         // FIXME: expected-error 2 {{}}
+dispatch_set_target_queue(nil, DISPATCH_TARGET_QUEUE_DEFAULT)
+dispatch_queue_get_label(DISPATCH_CURRENT_QUEUE_LABEL)      
 dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0)
 dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_BACKGROUND, 0)
 
