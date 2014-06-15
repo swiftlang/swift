@@ -346,7 +346,7 @@ static bool couldSimplifyUsers(SILArgument *BBArg, SILValue Val) {
 
 
 namespace {
-  class ThreadingCloner : public SILCloner<ThreadingCloner> {
+  class ThreadingCloner : public SILClonerWithScopes<ThreadingCloner> {
     friend class SILVisitor<ThreadingCloner>;
     friend class SILCloner<ThreadingCloner>;
 
@@ -354,7 +354,7 @@ namespace {
   public:
 
     ThreadingCloner(BranchInst *BI)
-      : SILCloner(*BI->getFunction()),
+      : SILClonerWithScopes(*BI->getFunction()),
         FromBB(BI->getDestBB()), DestBB(BI->getParent()) {
       // Populate the value map so that uses of the BBArgs in the DestBB are
       // replaced with the branch's values.
@@ -383,7 +383,7 @@ namespace {
 
     void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
       DestBB->getInstList().push_back(Cloned);
-      SILCloner<ThreadingCloner>::postProcess(Orig, Cloned);
+      SILClonerWithScopes<ThreadingCloner>::postProcess(Orig, Cloned);
     }
   };
 } // end anonymous namespace

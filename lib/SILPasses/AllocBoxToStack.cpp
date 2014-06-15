@@ -469,7 +469,7 @@ namespace {
 /// \brief A SILCloner subclass which clones a closure function while
 /// removing some of the parameters, which are either completely dead
 /// or only used in retains and releases (which will not be cloned).
-class DeadParamCloner : public SILCloner<DeadParamCloner> {
+class DeadParamCloner : public SILClonerWithScopes<DeadParamCloner> {
   public:
   friend class SILVisitor<DeadParamCloner>;
   friend class SILCloner<DeadParamCloner>;
@@ -498,7 +498,7 @@ class DeadParamCloner : public SILCloner<DeadParamCloner> {
 
 DeadParamCloner::DeadParamCloner(SILFunction *Orig,
                                  ParamIndexSet &DeadParamIndices)
-  : SILCloner<DeadParamCloner>(*initCloned(Orig, DeadParamIndices)),
+  : SILClonerWithScopes<DeadParamCloner>(*initCloned(Orig, DeadParamIndices)),
     Orig(Orig), DeadParamIndices(DeadParamIndices) {
 }
 

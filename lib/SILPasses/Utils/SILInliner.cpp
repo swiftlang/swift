@@ -175,17 +175,17 @@ void SILInliner::visitDebugValueAddrInst(DebugValueAddrInst *Inst) {
 
 SILDebugScope *SILInliner::getOrCreateInlineScope(SILInstruction *Orig) {
   auto CalleeScope = Orig->getDebugScope();
+  if (!CalleeScope)
+    return nullptr;
+
   auto it = InlinedScopeCache.find(CalleeScope);
   if (it != InlinedScopeCache.end())
     return it->second;
 
-  if (CalleeScope) {
-    auto InlineScope = new (getBuilder().getFunction().getModule())
-      SILDebugScope(CallSiteScope, CalleeScope, *CalleeFunction);
-    InlinedScopeCache.insert({CalleeScope, InlineScope});
-    return InlineScope;
-  }
-  return CalleeScope;
+  auto InlineScope = new (getBuilder().getFunction().getModule())
+    SILDebugScope(CallSiteScope, CalleeScope, *CalleeFunction);
+  InlinedScopeCache.insert({CalleeScope, InlineScope});
+  return InlineScope;
 }
 
 

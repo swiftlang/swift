@@ -483,11 +483,11 @@ bool SILInstruction::mayHaveSideEffects() const {
 }
 
 namespace {
-  class TrivialCloner : public SILCloner<TrivialCloner> {
+  class TrivialCloner : public SILClonerWithScopes<TrivialCloner> {
     friend class SILCloner<TrivialCloner>;
     friend class SILVisitor<TrivialCloner>;
     SILInstruction *Result = nullptr;
-    TrivialCloner(SILFunction *F) : SILCloner(*F) {}
+    TrivialCloner(SILFunction *F) : SILClonerWithScopes(*F) {}
   public:
 
     static SILInstruction *doIt(SILInstruction *I) {
@@ -498,6 +498,7 @@ namespace {
 
     void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
       Result = Cloned;
+      SILClonerWithScopes<TrivialCloner>::postProcess(Orig, Cloned);
     }
     SILValue remapValue(SILValue Value) {
       return Value;

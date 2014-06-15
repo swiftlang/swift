@@ -18,6 +18,7 @@
 #define SWIFT_SIL_SILCLONER_H
 
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILVisitor.h"
 
 namespace swift {
@@ -126,6 +127,40 @@ protected:
   TypeSubstitutionMap OpenedExistentialSubs;
 };
 
+/// SILClonerWithScopes - a SILCloner that automatically clones
+/// SILDebugScopes. In contrast to inline scopes, this generates a
+/// deep copy of the scope tree.
+template<typename ImplClass>
+class SILClonerWithScopes : public SILCloner<ImplClass> {
+  friend class SILCloner<ImplClass>;
+public:
+  SILClonerWithScopes(SILFunction &To) : SILCloner<ImplClass>(To) {}
+
+private:
+  llvm::SmallDenseMap<SILDebugScope *, SILDebugScope *> ClonedScopeCache;
+  SILDebugScope *getOrCreateClonedScope(SILDebugScope *OrigScope) {
+    auto it = ClonedScopeCache.find(OrigScope);
+    if (it != ClonedScopeCache.end())
+      return it->second;
+
+    auto Parent = OrigScope->Parent
+      ? getOrCreateClonedScope(OrigScope->Parent) : nullptr;
+    auto &ClonedFn = SILCloner<ImplClass>::getBuilder().getFunction();
+    auto CloneScope = new (ClonedFn.getModule())
+      SILDebugScope(OrigScope->Loc, ClonedFn, Parent);
+    ClonedScopeCache.insert({OrigScope, CloneScope});
+    return CloneScope;
+  }
+
+protected:
+  /// Clone the SILDebugScope for the specialized function.
+  void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
+    if (auto OrigScope = Orig->getDebugScope())
+      Cloned->setDebugScope(getOrCreateClonedScope(OrigScope));
+    SILCloner<ImplClass>::postProcess(Orig, Cloned);
+  }
+};
+
 template<typename ImplClass>
 SILValue
 SILCloner<ImplClass>::remapValue(SILValue Value) {
@@ -159,9 +194,11 @@ template<typename ImplClass>
 void
 SILCloner<ImplClass>::postProcess(SILInstruction *Orig,
                                   SILInstruction *Cloned) {
-  SILDebugScope *DebugScope = Orig->getDebugScope();
-  if (DebugScope && !Cloned->getDebugScope())
-    Cloned->setDebugScope(DebugScope);
+//  SILDebugScope *DebugScope = Orig->getDebugScope();
+//  if (DebugScope && !Cloned->getDebugScope())
+//    Cloned->setDebugScope(DebugScope);
+  assert((Orig->getDebugScope() ? Cloned->getDebugScope()!=nullptr : true) &&
+         "cloned function without a debug scope");
   InstructionMap.insert(std::make_pair(Orig, Cloned));
 }
 

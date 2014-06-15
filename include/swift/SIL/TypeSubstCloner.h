@@ -27,7 +27,7 @@ namespace swift {
 
 /// TypeSubstCloner - a utility class for cloning code while remapping types.
 template<typename ImplClass>
-class TypeSubstCloner : public SILCloner<ImplClass> {
+class TypeSubstCloner : public SILClonerWithScopes<ImplClass> {
   friend class SILVisitor<ImplClass>;
   friend class SILCloner<ImplClass>;
 
@@ -45,7 +45,7 @@ public:
                   SILFunction &From,
                   TypeSubstitutionMap &ContextSubs,
                   ApplyInst *Caller)
-    : SILCloner<ImplClass>(To),
+    : SILClonerWithScopes<ImplClass>(To),
       SwiftMod(From.getModule().getSwiftModule()),
       SubsMap(ContextSubs),
       Original(From),

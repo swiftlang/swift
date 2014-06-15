@@ -152,7 +152,7 @@ private:
 namespace {
 /// \brief A SILCloner subclass which clones a closure function while converting
 /// one or more captures from 'inout' (by-reference) to by-value.
-class ClosureCloner : public SILCloner<ClosureCloner> {
+class ClosureCloner : public SILClonerWithScopes<ClosureCloner> {
 public:
   friend class SILVisitor<ClosureCloner>;
   friend class SILCloner<ClosureCloner>;
@@ -256,7 +256,7 @@ ReachabilityInfo::isReachable(SILBasicBlock *From, SILBasicBlock *To) {
 }
 
 ClosureCloner::ClosureCloner(SILFunction *Orig, IndicesSet &PromotableIndices)
-  : SILCloner<ClosureCloner>(*initCloned(Orig, PromotableIndices)),
+  : SILClonerWithScopes<ClosureCloner>(*initCloned(Orig, PromotableIndices)),
     Orig(Orig), PromotableIndices(PromotableIndices) {
 }
 

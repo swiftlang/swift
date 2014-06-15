@@ -61,8 +61,8 @@ private:
   void visitDebugValueInst(DebugValueInst *Inst);
   void visitDebugValueAddrInst(DebugValueAddrInst *Inst);
 
-  
   SILDebugScope *getOrCreateInlineScope(SILInstruction *Orig);
+
   void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
     if (IKind == InlineKind::MandatoryInline)
       // Transparent functions are inheriting the location of the call
