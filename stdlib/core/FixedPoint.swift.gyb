@@ -216,7 +216,7 @@ struct ${Self} : ${'SignedInteger' if sign == 's' else 'UnsignedInteger'} {
 %  if bits > 8:
   /// Returns the current integer with the byte order swapped.
   var byteSwapped: ${Self} {
-    return ${Self}(Builtin.int_bswap_${BuiltinName}(value) )
+    return ${Self}(Builtin.int_bswap_${BuiltinName}(value))
   }
 % end
 
