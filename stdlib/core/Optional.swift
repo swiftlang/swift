@@ -122,6 +122,19 @@ func != <T: Equatable> (lhs: T?, rhs: T?) -> Bool {
   return !(lhs == rhs)
 }
 
+// Enable pattern matching against the nil literal, even if the element type
+// isn't equatable.
+struct _OptionalNilComparisonType : NilLiteralConvertible {
+  @transparent
+  static func convertFromNilLiteral() -> _OptionalNilComparisonType {
+    return _OptionalNilComparisonType()
+  }
+}
+@transparent @infix
+func ~= <T>(lhs: _OptionalNilComparisonType, rhs: T?) -> Bool {
+  return !rhs.getLogicValue()
+}
+
 struct _OptionalMirror<T> : Mirror {
   let _value : Optional<T>
 

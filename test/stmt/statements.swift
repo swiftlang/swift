@@ -264,5 +264,15 @@ Loop:  // expected-note {{previously declared here}}
   default:
     println("")
   }
+  
+  var x : Int? = 42
+  
+  // <rdar://problem/16879701> Should be able to pattern match 'nil' against optionals
+  switch x {
+  case .Some(42): break
+  case nil: break
+  
+  }
+  
 }
 
