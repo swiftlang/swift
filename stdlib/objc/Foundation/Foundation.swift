@@ -765,49 +765,7 @@ extension Dictionary : _ConditionallyBridgedToObjectiveC {
   }
 
   static func bridgeFromObjectiveC(x: NSDictionary) -> Dictionary? {
-    let keyBridgesDirectly = isBridgedVerbatimToObjectiveC(KeyType.self)
-    let valueBridgesDirectly = isBridgedVerbatimToObjectiveC(ValueType.self)
-
-    var result = Dictionary()
-    for (key: AnyObject, value: AnyObject) in x {
-      // Bridge the key.
-      var resultKey: KeyType
-      if keyBridgesDirectly {
-        if key is KeyType {
-          resultKey = reinterpretCast(key)
-        } else {
-          return nil
-        }
-      } else {
-        if let bridgedKey = Swift.bridgeFromObjectiveC(reinterpretCast(key),
-                                                       KeyType.self) {
-          resultKey = bridgedKey
-        } else {
-          return nil
-        }
-      }
-
-      // Bridge the value.
-      var resultValue: ValueType
-      if valueBridgesDirectly {
-        if value is ValueType {
-          resultValue = reinterpretCast(value)
-        } else {
-          return nil
-        }
-      } else {
-        if let bridgedValue = Swift.bridgeFromObjectiveC(reinterpretCast(value),
-                                                         ValueType.self) {
-          resultValue = bridgedValue
-        } else {
-          return nil
-        }
-      }
-
-      result[resultKey] = resultValue
-    }
-
-    return result
+    return Dictionary(_cocoaDictionary: reinterpretCast(x))
   }
 
   static func isBridgedToObjectiveC() -> Bool {
