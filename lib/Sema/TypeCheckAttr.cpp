@@ -739,6 +739,10 @@ void TypeChecker::checkOwnershipAttr(VarDecl *var, Ownership ownershipKind) {
     } else {
       // This is also an error, but the code below will diagnose it.
     }
+  } else if (ownershipKind == Ownership::Strong) {
+    // We allow strong on optional-qualified reference types.
+    if (Type objType = type->getAnyOptionalObjectType())
+      underlyingType = objType;
   }
 
   if (!underlyingType->allowsOwnership()) {

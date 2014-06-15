@@ -152,11 +152,16 @@ class NonObjC {}
    let o2 = outlet2
   }
   
+  // <rdar://problem/16954464> Cannot make a strong IBOutlet
   // This outlet is strong, so it cannot be tested.
   @IBOutlet strong var outlet3 : Infer
-  
+
+  // This outlet is strong and optional.
+  @IBOutlet strong var outlet4: AnyObject?
+
   func testStrong() {
     if outlet3 {}      // expected-error {{type 'Infer' does not conform to protocol 'LogicValue'}}
+    if outlet4 {}
   }
 }
 
