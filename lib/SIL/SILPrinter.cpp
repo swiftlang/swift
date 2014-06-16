@@ -757,19 +757,17 @@ public:
 
   void visitUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *CI) {
     OS << "unconditional_checked_cast_addr "
-       << getCheckedCastKindName(CI->getCastKind())
-       << ' ' << getCastConsumptionKindName(CI->getConsumptionKind())
-       << ' ' << getIDAndType(CI->getSrc())
-       << " to " << getIDAndType(CI->getDest());
+       << getCastConsumptionKindName(CI->getConsumptionKind())
+       << ' '    << CI->getSourceType() << " in " << getIDAndType(CI->getSrc())
+       << " to " << CI->getTargetType() << " in " << getIDAndType(CI->getDest());
   }
   
   void visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CI) {
     OS << "checked_cast_addr_br "
-       << getCheckedCastKindName(CI->getCastKind()) << ' '
-       << getCastConsumptionKindName(CI->getConsumptionKind()) << ' '
-       << getIDAndType(CI->getSrc())
-       << " to " << getIDAndType(CI->getDest()) << ", "
-       << getID(CI->getSuccessBB()) << ", " << getID(CI->getFailureBB());
+       << getCastConsumptionKindName(CI->getConsumptionKind())
+       << ' '    << CI->getSourceType() << " in " << getIDAndType(CI->getSrc())
+       << " to " << CI->getTargetType() << " in " << getIDAndType(CI->getDest())
+       << ", " << getID(CI->getSuccessBB()) << ", " << getID(CI->getFailureBB());
   }
   
   void visitConvertFunctionInst(ConvertFunctionInst *CI) {

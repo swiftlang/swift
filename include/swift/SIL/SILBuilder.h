@@ -419,12 +419,14 @@ public:
   }
 
   UnconditionalCheckedCastAddrInst *
-  createUnconditionalCheckedCastAddr(SILLocation loc, CheckedCastKind kind,
+  createUnconditionalCheckedCastAddr(SILLocation loc,
                                      CastConsumptionKind consumption,
-                                     SILValue src, SILValue dest) {
+                                     SILValue src, CanType sourceType,
+                                     SILValue dest, CanType targetType) {
     return insert(new (F.getModule())
-                    UnconditionalCheckedCastAddrInst(loc, kind, consumption,
-                                                     src, dest));
+                    UnconditionalCheckedCastAddrInst(loc, consumption,
+                                                     src, sourceType,
+                                                     dest, targetType));
   }
   
   RetainValueInst *createRetainValue(SILLocation loc, SILValue operand) {
@@ -910,15 +912,17 @@ public:
   }
 
   CheckedCastAddrBranchInst *createCheckedCastAddrBranch(SILLocation loc,
-                                                         CheckedCastKind kind,
                                               CastConsumptionKind consumption,
                                                          SILValue src,
+                                                         CanType sourceType,
                                                          SILValue dest,
+                                                         CanType targetType,
                                                  SILBasicBlock *successBB,
                                                  SILBasicBlock *failureBB) {
     return insertTerminator(new (F.getModule())
-                              CheckedCastAddrBranchInst(loc, kind, consumption,
-                                                        src, dest,
+                              CheckedCastAddrBranchInst(loc, consumption,
+                                                        src, sourceType,
+                                                        dest, targetType,
                                                         successBB, failureBB));
   }
 

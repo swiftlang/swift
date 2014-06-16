@@ -1410,20 +1410,25 @@ class UnconditionalCheckedCastAddrInst : public SILInstruction
     Dest
   };
   FixedOperandList<2> Operands;
-  CheckedCastKind CastKind;
   CastConsumptionKind ConsumptionKind;
+  CanType SourceType;
+  CanType TargetType;
 public:
   UnconditionalCheckedCastAddrInst(SILLocation loc,
-                                   CheckedCastKind kind,
                                    CastConsumptionKind consumption,
-                                   SILValue src,
-                                   SILValue dest);
+                                   SILValue src, CanType sourceType,
+                                   SILValue dest, CanType targetType);
 
-  CheckedCastKind getCastKind() const { return CastKind; }
   CastConsumptionKind getConsumptionKind() const { return ConsumptionKind; }
 
   SILValue getSrc() const { return Operands[Src].get(); }
   SILValue getDest() const { return Operands[Dest].get(); }
+
+  /// Returns the formal type of the source value.
+  CanType getSourceType() const { return SourceType; }
+
+  /// Returns the formal target type.
+  CanType getTargetType() const { return TargetType; }
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
@@ -2921,7 +2926,6 @@ public:
 /// Perform a checked cast operation and branch on whether the cast succeeds.
 /// The result of the checked cast is left in the destination address.
 class CheckedCastAddrBranchInst : public TermInst {
-  CheckedCastKind CastKind;
   CastConsumptionKind ConsumptionKind;
 
   enum {
@@ -2933,28 +2937,32 @@ class CheckedCastAddrBranchInst : public TermInst {
   FixedOperandList<2> Operands;
   SILSuccessor DestBBs[2];
 
+  CanType SourceType;
+  CanType TargetType;
+
 public:
   CheckedCastAddrBranchInst(SILLocation loc,
-                            CheckedCastKind castKind,
                             CastConsumptionKind consumptionKind,
-                            SILValue src,
-                            SILValue dest,
+                            SILValue src, CanType srcType,
+                            SILValue dest, CanType targetType,
                             SILBasicBlock *successBB,
                             SILBasicBlock *failureBB)
     : TermInst(ValueKind::CheckedCastAddrBranchInst, loc),
-      CastKind(castKind), ConsumptionKind(consumptionKind),
-      Operands{this, src, dest},
-      DestBBs{{this, successBB}, {this, failureBB}}
-  {
-    assert(CastKind >= CheckedCastKind::First_Resolved
-           && "cannot create a cast instruction with an unresolved cast kind");
+      ConsumptionKind(consumptionKind), Operands{this, src, dest},
+      DestBBs{{this, successBB}, {this, failureBB}},
+      SourceType(srcType), TargetType(targetType) {
   }
 
-  CheckedCastKind getCastKind() const { return CastKind; }
   CastConsumptionKind getConsumptionKind() const { return ConsumptionKind; }
 
   SILValue getSrc() const { return Operands[Src].get(); }
   SILValue getDest() const { return Operands[Dest].get(); }
+
+  /// Returns the formal type of the source value.
+  CanType getSourceType() const { return SourceType; }
+
+  /// Returns the formal target type.
+  CanType getTargetType() const { return TargetType; }
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }

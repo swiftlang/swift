@@ -605,13 +605,6 @@ static CastConsumptionKind getCastConsumptionKind(unsigned attr) {
   }
 }
 
-/// Unpack a pair of enumerators, as would appear in a 
-static std::pair<CheckedCastKind,CastConsumptionKind>
-getCheckedCastAndConsumptionKinds(unsigned attr) {
-  return { getCheckedCastKind(attr & SIL_CHECKED_CAST_MASK),
-           getCastConsumptionKind(attr >> SIL_CAST_CONSUMPTION_BIT_OFFSET) };
-}
-
 /// Construct a SILDeclRef from ListOfValues.
 static SILDeclRef getSILDeclRef(ModuleFile *MF,
                                 ArrayRef<uint64_t> ListOfValues,
@@ -1041,20 +1034,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     ResultVal = Builder.createUnconditionalCheckedCast(Loc, Kind, Val, Ty);
     break;
   }
-  case ValueKind::UnconditionalCheckedCastAddrInst: {
-    SILValue src = getLocalValue(ValID, ValResNum,
-                 getSILType(MF->getType(TyID), (SILValueCategory)TyCategory));
-    SILValue dest = getLocalValue(ValID2, ValResNum2,
-                 getSILType(MF->getType(TyID2), (SILValueCategory)TyCategory2));
-    CheckedCastKind castKind;
-    CastConsumptionKind consumption;
-    std::tie(castKind, consumption) =
-      getCheckedCastAndConsumptionKinds(Attr);
-    ResultVal = Builder.createUnconditionalCheckedCastAddr(Loc, castKind,
-                                                           consumption,
-                                                           src, dest);
-    break;
-  }
 
 #define UNARY_INSTRUCTION(ID) \
   case ValueKind::ID##Inst:                   \
@@ -1470,27 +1449,32 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                                                 successBB, failureBB);
     break;
   }
+  case ValueKind::UnconditionalCheckedCastAddrInst:
   case ValueKind::CheckedCastAddrBranchInst: {
-    // Format: the cast kind, two typed values, a BasicBlock ID for success,
-    // a BasicBlock ID for failure. Uses SILOneTypeValuesLayout; the type
-    // is the type of the second (dest) operand.
-    assert(ListOfValues.size() == 9 &&
-           "expect 9 numbers for CheckedCastBranchInst");
-    CheckedCastKind castKind;
-    CastConsumptionKind consumption;
-    std::tie(castKind, consumption) =
-      getCheckedCastAndConsumptionKinds(ListOfValues[0]);
-    SILType srcTy = getSILType(MF->getType(ListOfValues[3]),
-                              (SILValueCategory)ListOfValues[4]);
-    SILValue src = getLocalValue(ListOfValues[1], ListOfValues[2], srcTy);
-    SILType destTy = getSILType(MF->getType(TyID),
-                                (SILValueCategory)TyCategory);
-    SILValue dest = getLocalValue(ListOfValues[5], ListOfValues[6], destTy);
-    auto *successBB = getBBForReference(Fn, ListOfValues[7]);
-    auto *failureBB = getBBForReference(Fn, ListOfValues[8]);
+    CastConsumptionKind consumption = getCastConsumptionKind(ListOfValues[0]);
 
-    ResultVal = Builder.createCheckedCastAddrBranch(Loc, castKind, consumption,
-                                                    src, dest,
+    CanType sourceType = MF->getType(ListOfValues[1])->getCanonicalType();
+    SILType srcAddrTy = getSILType(MF->getType(ListOfValues[4]),
+                                   (SILValueCategory)ListOfValues[5]);
+    SILValue src = getLocalValue(ListOfValues[2], ListOfValues[3], srcAddrTy);
+
+    CanType targetType = MF->getType(ListOfValues[6])->getCanonicalType();
+    SILType destAddrTy =
+      getSILType(MF->getType(TyID), (SILValueCategory) TyCategory);
+    SILValue dest = getLocalValue(ListOfValues[7], ListOfValues[8], destAddrTy);
+
+    if (OpCode == (unsigned) ValueKind::UnconditionalCheckedCastAddrInst) {
+      ResultVal = Builder.createUnconditionalCheckedCastAddr(Loc, consumption,
+                                                             src, sourceType,
+                                                             dest, targetType);
+      break;
+    }
+
+    auto *successBB = getBBForReference(Fn, ListOfValues[9]);
+    auto *failureBB = getBBForReference(Fn, ListOfValues[10]);
+    ResultVal = Builder.createCheckedCastAddrBranch(Loc, consumption,
+                                                    src, sourceType,
+                                                    dest, targetType,
                                                     successBB, failureBB);
     break;
   }

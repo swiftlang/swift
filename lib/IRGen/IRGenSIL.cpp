@@ -2898,8 +2898,7 @@ void IRGenSILFunction::visitUnconditionalCheckedCastAddrInst(
                                    swift::UnconditionalCheckedCastAddrInst *i) {
   Address dest = getLoweredAddress(i->getDest());
   Address src = getLoweredAddress(i->getSrc());
-  emitCheckedCast(*this, src, i->getSrc().getType(),
-                  dest, i->getDest().getType(),
+  emitCheckedCast(*this, src, i->getSourceType(), dest, i->getTargetType(),
                   i->getConsumptionKind(), CheckedCastMode::Unconditional);
 }
 
@@ -2937,8 +2936,7 @@ void IRGenSILFunction::visitCheckedCastAddrBranchInst(
   Address dest = getLoweredAddress(i->getDest());
   Address src = getLoweredAddress(i->getSrc());
   llvm::Value *castSucceeded =
-    emitCheckedCast(*this, src, i->getSrc().getType(),
-                    dest, i->getDest().getType(),
+    emitCheckedCast(*this, src, i->getSourceType(), dest, i->getTargetType(),
                     i->getConsumptionKind(), CheckedCastMode::Conditional);
   Builder.CreateCondBr(castSucceeded,
                        getLoweredBB(i->getSuccessBB()).bb,

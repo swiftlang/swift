@@ -72,6 +72,7 @@ protected:
   // called afterwards on the result.
   SILLocation remapLocation(SILLocation Loc) { return Loc; }
   SILType remapType(SILType Ty) { return Ty; }
+  CanType remapASTType(CanType Ty) { return Ty; }
   ProtocolConformance *remapConformance(SILType Ty, ProtocolConformance *C) {
     return C;
   }
@@ -94,6 +95,16 @@ protected:
     }
 
     return asImpl().remapType(Ty);
+  }
+  CanType getOpASTType(CanType ty) {
+    // Substitute opened existential types, if we have any.
+    if (!OpenedExistentialSubs.empty()) {
+      auto &F = getBuilder().getFunction();
+      ty = ty.subst(F.getModule().getSwiftModule(), OpenedExistentialSubs,
+                    /*ignore missing*/ false, nullptr)->getCanonicalType();
+    }
+
+    return asImpl().remapASTType(ty);
   }
   ProtocolConformance *getOpConformance(SILType Ty,
                                         ProtocolConformance *Conformance) {
@@ -634,12 +645,13 @@ SILCloner<ImplClass>::visitUnconditionalCheckedCastAddrInst(
   SILLocation OpLoc = getOpLocation(Inst->getLoc());
   SILValue SrcValue = getOpValue(Inst->getSrc());
   SILValue DestValue = getOpValue(Inst->getDest());
+  CanType SrcType = getOpASTType(Inst->getSourceType());
+  CanType TargetType = getOpASTType(Inst->getTargetType());
   doPostProcess(Inst,
          getBuilder().createUnconditionalCheckedCastAddr(OpLoc,
-                                                         Inst->getCastKind(),
                                                     Inst->getConsumptionKind(),
-                                                         SrcValue,
-                                                         DestValue));
+                                                         SrcValue, SrcType,
+                                                         DestValue, TargetType));
 }
   
 template<typename ImplClass>
@@ -1161,11 +1173,13 @@ void SILCloner<ImplClass>::visitCheckedCastAddrBranchInst(
   SILBasicBlock *OpFailBB = getOpBasicBlock(Inst->getFailureBB());
   SILValue SrcValue = getOpValue(Inst->getSrc());
   SILValue DestValue = getOpValue(Inst->getDest());
+  CanType SrcType = getOpASTType(Inst->getSourceType());
+  CanType TargetType = getOpASTType(Inst->getTargetType());
   doPostProcess(Inst,
        getBuilder().createCheckedCastAddrBranch(getOpLocation(Inst->getLoc()),
-                                                Inst->getCastKind(),
                                                 Inst->getConsumptionKind(),
-                                                SrcValue, DestValue,
+                                                SrcValue, SrcType,
+                                                DestValue, TargetType,
                                                 OpSuccBB, OpFailBB));
 }
   

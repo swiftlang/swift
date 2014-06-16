@@ -93,13 +93,6 @@ static unsigned toStableCastConsumptionKind(CastConsumptionKind kind) {
   llvm_unreachable("bad cast consumption kind");
 }
 
-template <class I>
-static unsigned packCheckedCastKinds(I *castInst) {
-  return toStableCheckedCastKind(castInst->getCastKind())
-      | (toStableCastConsumptionKind(castInst->getConsumptionKind())
-           << SIL_CAST_CONSUMPTION_BIT_OFFSET);
-}
-
 namespace {
     /// Used to serialize the on-disk func hash table.
   class FuncTableInfo {
@@ -931,15 +924,22 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
   case ValueKind::UnconditionalCheckedCastAddrInst: {
     auto CI = cast<UnconditionalCheckedCastAddrInst>(&SI);
-    SILTwoOperandsLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[SILTwoOperandsLayout::Code],
-        (unsigned)SI.getKind(), packCheckedCastKinds(CI),
-        S.addTypeRef(CI->getSrc().getType().getSwiftRValueType()),
-        (unsigned)CI->getSrc().getType().getCategory(),
-        addValueRef(CI->getSrc()), CI->getSrc().getResultNumber(),
-        S.addTypeRef(CI->getDest().getType().getSwiftRValueType()),
-        (unsigned)CI->getDest().getType().getCategory(),
-        addValueRef(CI->getDest()), CI->getDest().getResultNumber());
+    ValueID listOfValues[] = {
+      toStableCastConsumptionKind(CI->getConsumptionKind()),
+      S.addTypeRef(CI->getSourceType()),
+      addValueRef(CI->getSrc()),
+      CI->getSrc().getResultNumber(),
+      S.addTypeRef(CI->getSrc().getType().getSwiftRValueType()),
+      (unsigned)CI->getSrc().getType().getCategory(),
+      S.addTypeRef(CI->getTargetType()),
+      addValueRef(CI->getDest()),
+      CI->getDest().getResultNumber()
+    };
+    SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
+             SILAbbrCodes[SILOneTypeValuesLayout::Code], (unsigned)SI.getKind(),
+             S.addTypeRef(CI->getDest().getType().getSwiftRValueType()),
+             (unsigned)CI->getDest().getType().getCategory(),
+             llvm::makeArrayRef(listOfValues));
     break;
   }
 
@@ -1238,23 +1238,24 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     // success, a BasicBlock ID for failure.  Uses SILOneTypeValuesLayout;
     // the type is the type of the second (dest) operand.
     auto CBI = cast<CheckedCastAddrBranchInst>(&SI);
-    SmallVector<ValueID, 9> ListOfValues;
-    ListOfValues.push_back(packCheckedCastKinds(CBI));
-    ListOfValues.push_back(addValueRef(CBI->getSrc()));
-    ListOfValues.push_back(CBI->getSrc().getResultNumber());
-    ListOfValues.push_back(
-               S.addTypeRef(CBI->getSrc().getType().getSwiftRValueType()));
-    ListOfValues.push_back((unsigned)CBI->getSrc().getType().getCategory());
-    ListOfValues.push_back(addValueRef(CBI->getDest()));
-    ListOfValues.push_back(CBI->getDest().getResultNumber());
-    ListOfValues.push_back(BasicBlockMap[CBI->getSuccessBB()]);
-    ListOfValues.push_back(BasicBlockMap[CBI->getFailureBB()]);
-
+    ValueID listOfValues[] = {
+      toStableCastConsumptionKind(CBI->getConsumptionKind()),
+      S.addTypeRef(CBI->getSourceType()),
+      addValueRef(CBI->getSrc()),
+      CBI->getSrc().getResultNumber(),
+      S.addTypeRef(CBI->getSrc().getType().getSwiftRValueType()),
+      (unsigned)CBI->getSrc().getType().getCategory(),
+      S.addTypeRef(CBI->getTargetType()),
+      addValueRef(CBI->getDest()),
+      CBI->getDest().getResultNumber(),
+      BasicBlockMap[CBI->getSuccessBB()],
+      BasicBlockMap[CBI->getFailureBB()]
+    };
     SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
              SILAbbrCodes[SILOneTypeValuesLayout::Code], (unsigned)SI.getKind(),
              S.addTypeRef(CBI->getDest().getType().getSwiftRValueType()),
              (unsigned)CBI->getDest().getType().getCategory(),
-             ListOfValues);
+             llvm::makeArrayRef(listOfValues));
     break;
   }
   case ValueKind::InitBlockStorageHeaderInst: {

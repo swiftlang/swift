@@ -54,9 +54,9 @@ static DynamicCastFlags getDynamicCastFlags(CastConsumptionKind consumptionKind,
 /// Emit a checked cast, starting with a value in memory.
 llvm::Value *irgen::emitCheckedCast(IRGenFunction &IGF,
                                     Address src,
-                                    SILType srcType,
+                                    CanType srcType,
                                     Address dest,
-                                    SILType targetType,
+                                    CanType targetType,
                                     CastConsumptionKind consumptionKind,
                                     CheckedCastMode mode) {
   // TODO: attempt to specialize this based on the known types.

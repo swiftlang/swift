@@ -40,9 +40,9 @@ namespace irgen {
 
   llvm::Value *emitCheckedCast(IRGenFunction &IGF,
                                Address src,
-                               SILType fromType,
+                               CanType fromType,
                                Address dest,
-                               SILType toType,
+                               CanType toType,
                                CastConsumptionKind consumptionKind,
                                CheckedCastMode mode);
 
