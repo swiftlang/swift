@@ -170,9 +170,12 @@ namespace {
       return parseSILIdentifier(Result, L, Diagnostic(ID, Args...));
     }
 
+    bool parseVerbatim(StringRef identifier);
+
     /// @}
 
     // Parsing logic.
+    bool parseASTType(CanType &result);
     bool parseSILType(SILType &Result, GenericParamList *&genericParams,
                       bool IsFuncDecl = false);
     bool parseSILType(SILType &Result) {
@@ -291,6 +294,20 @@ bool SILParser::parseSILIdentifier(Identifier &Result, SourceLoc &Loc,
 
   Loc = P.Tok.getLoc();
   P.consumeToken();
+  return false;
+}
+
+bool SILParser::parseVerbatim(StringRef name) {
+  Identifier tok;
+  SourceLoc loc;
+
+  if (parseSILIdentifier(tok, loc, diag::expected_tok_in_sil_instr, name)) {
+    return true;
+  }
+  if (tok.str() != name) {
+    P.diagnose(loc, diag::expected_tok_in_sil_instr, name);
+    return true;
+  }
   return false;
 }
 
@@ -727,6 +744,16 @@ bool SILParser::handleGenericParams(TypeLoc &T, ArchetypeBuilder *builder) {
   if (auto fnType = dyn_cast<FunctionTypeRepr>(T.getTypeRepr()))
     if (auto gp = fnType->getGenericParams())
       handleSILGenericParams(P.Context, gp, &P.SF, builder);
+  return false;
+}
+
+bool SILParser::parseASTType(CanType &result) {
+  ParserResult<TypeRepr> parsedType = P.parseType();
+  if (parsedType.isNull()) return true;
+  TypeLoc loc = parsedType.get();
+  if (performTypeLocChecking(loc, false))
+    return true;
+  result = loc.getType()->getCanonicalType();
   return false;
 }
 
