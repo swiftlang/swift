@@ -57,7 +57,9 @@ func test_partial_safety_check(x: Int, y: Int) -> Int {
 // RELEASE-LABEL: _TF19OptimizationOptions10test_fatalFTSiSi_Si
 // RELEASE-NOT: "Human nature ..."
 // RELEASE-NOT: "fatal error"
-// RELEASE: int_trap
+// RELEASE: bb2:
+// RELEASE: %[[ALWAYS:.+]] = integer_literal $Builtin.Int1, -1
+// RELEASE: cond_fail %[[ALWAYS]]
 
 // In fast mode remove fatal errors.
 // FAST-LABEL: _TF19OptimizationOptions10test_fatalFTSiSi_Si
@@ -78,8 +80,9 @@ func test_partial_safety_check(x: Int, y: Int) -> Int {
 // In release mode keep succinct library precondition checks (trap).
 // RELEASE-LABEL: _TF19OptimizationOptions23test_precondition_checkFTSiSi_Si
 // RELEASE-NOT:  "fatal error"
-// RELEASE:  builtin_function_ref "int_trap"
-// RELEASE:  unreachable
+// RELEASE:  %[[V1:.+]] = builtin_function_ref "xor_Int1"
+// RELEASE:  %[[V2:.+]] = apply %[[V1]](%{{.+}}, %{{.+}})
+// RELEASE:  cond_fail %[[V2]]
 // RELEASE:  return
 
 // In fast mode remove library precondition checks.

@@ -77,9 +77,8 @@ func _precondition(
       _fatalErrorMessage("fatal error", message, file, line)
     }
   } else if _isReleaseAssertConfiguration() {
-    if !_branchHint(condition(), true) {
-      Builtin.int_trap()
-    }
+    let error = !condition()
+    Builtin.condfail(error.value)
   }
 }
 @transparent
@@ -93,9 +92,8 @@ func _precondition<T : LogicValue>(
       _fatalErrorMessage("fatal error", message, file, line)
     }
   } else if _isReleaseAssertConfiguration() {
-    if !_branchHint(condition(), true) {
-      Builtin.int_trap()
-    }
+    let error = !condition().getLogicValue();
+    Builtin.condfail(error.value)
   }
 }
 
