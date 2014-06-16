@@ -45,7 +45,7 @@ func testArrayDowncastBridged(array: AnyObject[]) -> BridgedSwift[] {
 // CHECK: bb0([[DICT:%[0-9]+]] : $Dictionary<NSObject, AnyObject>)
 func testDictionaryDowncast(dict: Dictionary<NSObject, AnyObject>) 
        -> Dictionary<BridgedObjC, BridgedObjC> {
-  // CHECK: [[DOWNCAST_FN:%[0-9]+]] = function_ref @_TFSs26_dictionaryCheckedDownCastUSs8Hashable__S____FGVSs10DictionaryQ_Q0__GSqGS0_Q1_Q2___ : $@thin <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@owned Dictionary<τ_0_0, τ_0_1>) -> @owned Optional<Dictionary<τ_0_2, τ_0_3>>
+  // CHECK: [[DOWNCAST_FN:%[0-9]+]] = function_ref @_TFSs30_dictionaryDownCastConditionalUSs8Hashable__S____FGVSs10DictionaryQ_Q0__GSqGS0_Q1_Q2___ : $@thin <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@owned Dictionary<τ_0_0, τ_0_1>) -> @owned Optional<Dictionary<τ_0_2, τ_0_3>>
   // CHECK-NEXT: apply [[DOWNCAST_FN]]<NSObject, AnyObject, BridgedObjC, BridgedObjC>([[DICT]]) : $@thin <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@owned Dictionary<τ_0_0, τ_0_1>) -> @owned Optional<Dictionary<τ_0_2, τ_0_3>>
   return dict as Dictionary<BridgedObjC, BridgedObjC>
 }
@@ -54,7 +54,7 @@ func testDictionaryDowncast(dict: Dictionary<NSObject, AnyObject>)
 // CHECK: bb0([[DICT:%[0-9]+]] : $Dictionary<NSObject, AnyObject>)
 func testDictionaryDowncastBridgedV(dict: Dictionary<NSObject, AnyObject>) 
        -> Dictionary<BridgedObjC, BridgedSwift> {
-  // CHECK: [[BRIDGE_FN:%[0-9]+]] = function_ref @_TFSs31_dictionaryBridgeFromObjectiveCUSs8Hashable__S____FGVSs10DictionaryQ_Q0__GSqGS0_Q1_Q2___ : $@thin <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@owned Dictionary<τ_0_0, τ_0_1>) -> @owned Optional<Dictionary<τ_0_2, τ_0_3>>
+  // CHECK: [[BRIDGE_FN:%[0-9]+]] = function_ref @_TFSs42_dictionaryBridgeFromObjectiveCConditionalUSs8Hashable__S____FGVSs10DictionaryQ_Q0__GSqGS0_Q1_Q2___ : $@thin <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@owned Dictionary<τ_0_0, τ_0_1>) -> @owned Optional<Dictionary<τ_0_2, τ_0_3>>
   // CHECK-NEXT: apply [[BRIDGE_FN]]<NSObject, AnyObject, BridgedObjC, BridgedSwift>([[DICT]]) : $@thin <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@owned Dictionary<τ_0_0, τ_0_1>) -> @owned Optional<Dictionary<τ_0_2, τ_0_3>> // user: %6
   return dict as Dictionary<BridgedObjC, BridgedSwift>
 }
@@ -63,7 +63,7 @@ func testDictionaryDowncastBridgedV(dict: Dictionary<NSObject, AnyObject>)
 // CHECK: bb0([[DICT:%[0-9]+]] : $Dictionary<NSObject, AnyObject>)
 func testDictionaryDowncastBridgedK(dict: Dictionary<NSObject, AnyObject>) 
        -> Dictionary<BridgedSwift, BridgedObjC> {
-  // CHECK: [[BRIDGE_FN:%[0-9]+]] = function_ref @_TFSs31_dictionaryBridgeFromObjectiveCUSs8Hashable__S____FGVSs10DictionaryQ_Q0__GSqGS0_Q1_Q2___ : $@thin <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@owned Dictionary<τ_0_0, τ_0_1>) -> @owned Optional<Dictionary<τ_0_2, τ_0_3>>
+  // CHECK: [[BRIDGE_FN:%[0-9]+]] = function_ref @_TFSs42_dictionaryBridgeFromObjectiveCConditionalUSs8Hashable__S____FGVSs10DictionaryQ_Q0__GSqGS0_Q1_Q2___ : $@thin <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@owned Dictionary<τ_0_0, τ_0_1>) -> @owned Optional<Dictionary<τ_0_2, τ_0_3>>
   // CHECK-NEXT: apply [[BRIDGE_FN]]<NSObject, AnyObject, BridgedSwift, BridgedObjC>([[DICT]]) : $@thin <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@owned Dictionary<τ_0_0, τ_0_1>) -> @owned Optional<Dictionary<τ_0_2, τ_0_3>>
   return dict as Dictionary<BridgedSwift, BridgedObjC>
 }
@@ -72,7 +72,7 @@ func testDictionaryDowncastBridgedK(dict: Dictionary<NSObject, AnyObject>)
 // CHECK: bb0([[DICT:%[0-9]+]] : $Dictionary<NSObject, AnyObject>)
 func testDictionaryDowncastBridgedKV(dict: Dictionary<NSObject, AnyObject>) 
        -> Dictionary<BridgedSwift, BridgedSwift> {
-  // CHECK: [[BRIDGE_FN:%[0-9]+]] = function_ref @_TFSs31_dictionaryBridgeFromObjectiveCUSs8Hashable__S____FGVSs10DictionaryQ_Q0__GSqGS0_Q1_Q2___ : $@thin <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@owned Dictionary<τ_0_0, τ_0_1>) -> @owned Optional<Dictionary<τ_0_2, τ_0_3>>
+  // CHECK: [[BRIDGE_FN:%[0-9]+]] = function_ref @_TFSs42_dictionaryBridgeFromObjectiveCConditionalUSs8Hashable__S____FGVSs10DictionaryQ_Q0__GSqGS0_Q1_Q2___ : $@thin <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@owned Dictionary<τ_0_0, τ_0_1>) -> @owned Optional<Dictionary<τ_0_2, τ_0_3>>
   // CHECK-NEXT: apply [[BRIDGE_FN]]<NSObject, AnyObject, BridgedSwift, BridgedSwift>([[DICT]]) : $@thin <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@owned Dictionary<τ_0_0, τ_0_1>) -> @owned Optional<Dictionary<τ_0_2, τ_0_3>>
   return dict as Dictionary<BridgedSwift, BridgedSwift>
 }

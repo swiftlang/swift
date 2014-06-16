@@ -2136,13 +2136,14 @@ func _dictionaryBridgeToObjectiveC<BridgesToKey, BridgesToValue, Key, Value>(
   return result
 }
 
-/// Implements a checked downcast from a Dictionary<BaseKey,
+/// Implements a conditional downcast from a Dictionary<BaseKey,
 /// BaseValue> to a Dictionary<DerivedKey, DerivedValue>.
 ///
 /// Precondition: DerivedKey is a subtype of BaseKey, DerivedValue is
 /// a subtype of BaseValue, and all of these types are objects.
 ///
-func _dictionaryCheckedDownCast<BaseKey, BaseValue, DerivedKey, DerivedValue>(
+func _dictionaryDownCastConditional<BaseKey, BaseValue, DerivedKey,
+                                    DerivedValue>(
        source: Dictionary<BaseKey, BaseValue>
      ) -> Dictionary<DerivedKey, DerivedValue>? {
   _sanityCheck(isBridgedVerbatimToObjectiveC(BaseKey.self))
@@ -2166,13 +2167,14 @@ func _dictionaryCheckedDownCast<BaseKey, BaseValue, DerivedKey, DerivedValue>(
   return result
 }
 
-/// Implements a checked downcast from a Dictionary<Key, Value> to
+/// Implements a conditional downcast from a Dictionary<Key, Value> to
 /// Dictionary<BridgesToKey, BridgesToValue> that involves bridging.
 ///
 /// Precondition: at least one of BridgesToKey or BridgesToValue is an
 /// object type, and at least one of Key or Value is a bridged value
 /// type.
-func _dictionaryBridgeFromObjectiveC<Key, Value, BridgesToKey, BridgesToValue>(
+func _dictionaryBridgeFromObjectiveCConditional<Key, Value, BridgesToKey, 
+                                                BridgesToValue>(
        source: Dictionary<Key, Value>
      ) -> Dictionary<BridgesToKey, BridgesToValue>? {
   _sanityCheck(isBridgedVerbatimToObjectiveC(Key.self) || 

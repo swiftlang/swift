@@ -998,8 +998,9 @@ RValue RValueEmitter::visitCollectionDowncastExpr(CollectionDowncastExpr *E,
            ? ctx.getArrayBridgeFromObjectiveCConditional(nullptr)
            : ctx.getArrayDownCastConditional(nullptr);
   } else if (fromCollection->getDecl() == ctx.getDictionaryDecl()) {
-    fn = E->bridgesFromObjC() ? ctx.getDictionaryBridgeFromObjectiveC(nullptr)
-                              : ctx.getDictionaryDownCast(nullptr);
+    fn = E->bridgesFromObjC()
+           ? ctx.getDictionaryBridgeFromObjectiveCConditional(nullptr)
+           : ctx.getDictionaryDownCastConditional(nullptr);
   } else {
     llvm_unreachable("unsupported collection upcast kind");
   }

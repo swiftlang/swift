@@ -93,14 +93,14 @@ struct ASTContext::Implementation {
   /// Dictionary<K, V> simple upcast.
   FuncDecl *GetDictionaryUpCast = nullptr;
 
-  /// Dictionary<K, V> simple downcast.
-  FuncDecl *GetDictionaryDownCast = nullptr;
+  /// Dictionary<K, V> conditional downcast.
+  FuncDecl *GetDictionaryDownCastConditional = nullptr;
 
   /// Dictionary<K, V> bridge to a dictionary of objects.
   FuncDecl *GetDictionaryBridgeToObjectiveC = nullptr;
 
-  /// Dictionary<K, V> bridge from a dictionary of objects.
-  FuncDecl *GetDictionaryBridgeFromObjectiveC = nullptr;
+  /// Dictionary<K, V> conditionally bridge from a dictionary of objects.
+  FuncDecl *GetDictionaryBridgeFromObjectiveCConditional = nullptr;
 
   /// func _doesOptionalHaveValue<T>(v : [inout] Optional<T>) -> T
   FuncDecl *DoesOptionalHaveValueDecls[NumOptionalTypeKinds] = {};
@@ -729,13 +729,13 @@ FuncDecl *ASTContext::getDictionaryUpCast(LazyResolver *resolver) const {
 }
 
 FuncDecl *
-ASTContext::getDictionaryDownCast(LazyResolver *resolver) const {
-  auto &cache = Impl.GetDictionaryDownCast;
+ASTContext::getDictionaryDownCastConditional(LazyResolver *resolver) const {
+  auto &cache = Impl.GetDictionaryDownCastConditional;
   if (cache) return cache;
   
   // Look for a generic function.
   CanType input, output, param;
-  auto decl = findLibraryIntrinsic(*this, "_dictionaryCheckedDownCast", 
+  auto decl = findLibraryIntrinsic(*this, "_dictionaryDownCastConditional", 
                                    resolver);
   if (!decl)
     return nullptr;
@@ -760,14 +760,15 @@ ASTContext::getDictionaryBridgeToObjectiveC(LazyResolver *resolver) const {
   return decl;
 }
 
-FuncDecl *
-ASTContext::getDictionaryBridgeFromObjectiveC(LazyResolver *resolver) const {
-  auto &cache = Impl.GetDictionaryBridgeFromObjectiveC;
+FuncDecl *ASTContext::getDictionaryBridgeFromObjectiveCConditional(
+            LazyResolver *resolver) const {
+  auto &cache = Impl.GetDictionaryBridgeFromObjectiveCConditional;
   if (cache) return cache;
   
   // Look for a generic function.
   CanType input, output, param;
-  auto decl = findLibraryIntrinsic(*this, "_dictionaryBridgeFromObjectiveC",
+  auto decl = findLibraryIntrinsic(*this, 
+                                   "_dictionaryBridgeFromObjectiveCConditional",
                                    resolver);
   if (!decl)
     return nullptr;

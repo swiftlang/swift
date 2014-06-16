@@ -3341,7 +3341,7 @@ func test_DictionaryCheckedDowncastEntryPoint() {
 
   // Successful downcast.
   if let dCC: Dictionary<TestObjCKeyTy, TestObjCValueTy> 
-       = _dictionaryCheckedDownCast(d) {
+       = _dictionaryDownCastConditional(d) {
     assert(dCC.count == 3)
     var v = dCC[TestObjCKeyTy(10)]
     assert(v!.value == 1010)
@@ -3358,7 +3358,7 @@ func test_DictionaryCheckedDowncastEntryPoint() {
   // Unsuccessful downcast
   d["hello"] = 17
   if let dCC: Dictionary<TestObjCKeyTy, TestObjCValueTy> 
-       = _dictionaryCheckedDownCast(d) {
+       = _dictionaryDownCastConditional(d) {
     assert(false)
   }
 
@@ -3409,7 +3409,7 @@ func test_DictionaryBridgeFromObjectiveCEntryPoint() {
 
   // Successful downcast.
   if let dCV: Dictionary<TestObjCKeyTy, TestBridgedValueTy> 
-       = _dictionaryBridgeFromObjectiveC(d) {
+       = _dictionaryBridgeFromObjectiveCConditional(d) {
     assert(dCV.count == 3)
     var v = dCV[TestObjCKeyTy(10)]
     assert(v!.value == 1010)
@@ -3425,7 +3425,7 @@ func test_DictionaryBridgeFromObjectiveCEntryPoint() {
 
   // Successful downcast.
   if let dVC: Dictionary<TestBridgedKeyTy, TestObjCValueTy> 
-       = _dictionaryBridgeFromObjectiveC(d) {
+       = _dictionaryBridgeFromObjectiveCConditional(d) {
     assert(dVC.count == 3)
     var v = dVC[TestBridgedKeyTy(10)]
     assert(v!.value == 1010)
@@ -3441,7 +3441,7 @@ func test_DictionaryBridgeFromObjectiveCEntryPoint() {
 
   // Successful downcast.
   if let dVV: Dictionary<TestBridgedKeyTy, TestBridgedValueTy> 
-       = _dictionaryBridgeFromObjectiveC(d) {
+       = _dictionaryBridgeFromObjectiveCConditional(d) {
     assert(dVV.count == 3)
     var v = dVV[TestBridgedKeyTy(10)]
     assert(v!.value == 1010)
@@ -3458,15 +3458,15 @@ func test_DictionaryBridgeFromObjectiveCEntryPoint() {
   // Unsuccessful downcasts
   d["hello"] = 17
   if let dCV: Dictionary<TestObjCKeyTy, TestBridgedValueTy> 
-       = _dictionaryBridgeFromObjectiveC(d) {
+       = _dictionaryBridgeFromObjectiveCConditional(d) {
     assert(false)
   }
   if let dVC: Dictionary<TestBridgedKeyTy, TestObjCValueTy> 
-       = _dictionaryBridgeFromObjectiveC(d) {
+       = _dictionaryBridgeFromObjectiveCConditional(d) {
     assert(false)
   }
   if let dVV: Dictionary<TestBridgedKeyTy, TestBridgedValueTy> 
-       = _dictionaryBridgeFromObjectiveC(d) {
+       = _dictionaryBridgeFromObjectiveCConditional(d) {
     assert(false)
   }
 
