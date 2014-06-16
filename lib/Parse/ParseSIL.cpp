@@ -280,6 +280,11 @@ bool SILParser::parseSILIdentifier(Identifier &Result, SourceLoc &Loc,
     Result = P.Context.Id_subscript;
     break;
   default:
+    // If it's some other keyword, grab an identifier for it.
+    if (P.Tok.isKeyword()) {
+      Result = P.Context.getIdentifier(P.Tok.getText());
+      break;
+    }
     P.diagnose(P.Tok, D);
     return true;
   }
