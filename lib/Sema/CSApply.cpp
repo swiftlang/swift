@@ -1085,9 +1085,37 @@ namespace {
       return refExpr;
     }
 
+    /// Bridge the given value to its corresponding Objective-C object
+    /// type.
+    ///
+    /// This routine should only be used for bridging value types.
+    ///
+    /// \param value The value to be bridged.
+    Expr *bridgeToObjectiveC(Expr *value) {
+      auto &tc = cs.getTypeChecker();
+
+      // Find the _BridgedToObjectiveC protocol.
+      auto bridgedProto
+        = tc.Context.getProtocol(KnownProtocolKind::_BridgedToObjectiveC);
+
+      // Find the conformance of the value type to _BridgedToObjectiveC.
+      Type valueType = value->getType()->getRValueType();
+      ProtocolConformance *conformance = nullptr;
+      bool conforms = tc.conformsToProtocol(valueType, bridgedProto, cs.DC,
+                                            &conformance);
+      assert(conforms && "Should already have checked the conformance");
+      (void)conforms;
+
+      // Form the call.
+      return tc.callWitness(value, cs.DC, bridgedProto,
+                            conformance,
+                            tc.Context.Id_bridgeToObjectiveC,
+                            { }, diag::broken_bridged_to_objc_protocol);
+    }
+
     /// Bridge the given object from Objective-C to its value type.
     ///
-    /// This routine should only be used for bridging non-verbatim value types.
+    /// This routine should only be used for bridging value types.
     ///
     /// \param object The object, whose type should already be of the type
     /// that the value type bridges through.
@@ -1822,6 +1850,34 @@ namespace {
                           ConstraintLocator::MemberRefBase));
 
       switch (selected.choice.getKind()) {
+      case OverloadChoiceKind::DeclViaBridge: {
+        // Look through an implicitly unwrapped optional.
+        auto baseTy = base->getType()->getRValueType();
+        if (auto objTy = cs.lookThroughImplicitlyUnwrappedOptionalType(baseTy)){
+          base = coerceImplicitlyUnwrappedOptionalToValue(base, objTy,
+                                         cs.getConstraintLocator(base));
+          if (!base) return nullptr;
+
+          baseTy = base->getType()->getRValueType();
+        }
+
+        if (auto baseMetaTy = baseTy->getAs<MetatypeType>()) {
+          auto &tc = cs.getTypeChecker();
+          auto classTy = tc.getBridgedToObjC(cs.DC, 
+                                             baseMetaTy->getInstanceType())
+                           .first;
+          // FIXME: We're dropping side effects in the base here!
+          base = TypeExpr::createImplicitHack(base->getLoc(), classTy, 
+                                              tc.Context);
+        } else {
+          // Bridge the base to its corresponding Objective-C object.
+          base = bridgeToObjectiveC(base);
+        }
+
+        // Fall through to build the member reference.
+        SWIFT_FALLTHROUGH;
+      }
+
       case OverloadChoiceKind::Decl: {
         auto member = buildMemberRef(base,
                                      selected.openedFullType,

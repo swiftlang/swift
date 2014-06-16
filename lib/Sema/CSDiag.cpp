@@ -458,8 +458,7 @@ ResolvedLocator constraints::resolveLocatorToDecl(
     // Overloaded and unresolved cases: find the resolved overload.
     auto anchorLocator = cs.getConstraintLocator(anchor);
     if (auto selected = findOvlChoice(anchorLocator)) {
-      // FIXME: DeclViaDynamic
-      if (selected->choice.getKind() == OverloadChoiceKind::Decl)
+      if (selected->choice.isDecl())
         declRef = getConcreteDeclRefFromOverload(*selected);
     }
   } else if (isa<UnresolvedMemberExpr>(anchor)) {
@@ -468,8 +467,7 @@ ResolvedLocator constraints::resolveLocatorToDecl(
                            anchor,
                            ConstraintLocator::UnresolvedMember);
     if (auto selected = findOvlChoice(anchorLocator)) {
-      // FIXME: DeclViaDynamic
-      if (selected->choice.getKind() == OverloadChoiceKind::Decl)
+      if (selected->choice.isDecl())
         declRef = getConcreteDeclRefFromOverload(*selected);
     }
   } else if (auto ctorRef = dyn_cast<OtherConstructorDeclRefExpr>(anchor)) {
@@ -806,7 +804,7 @@ static unsigned countDistinctOverloads(ArrayRef<OverloadChoice> choices) {
 /// \brief Determine the name of the overload in a set of overload choices.
 static Identifier getOverloadChoiceName(ArrayRef<OverloadChoice> choices) {
   for (auto choice : choices) {
-    if (choice.getKind() == OverloadChoiceKind::Decl)
+    if (choice.isDecl())
       return choice.getDecl()->getName();
   }
 
@@ -878,6 +876,7 @@ bool diagnoseAmbiguity(ConstraintSystem &cs, ArrayRef<Solution> solutions) {
       case OverloadChoiceKind::Decl:
       case OverloadChoiceKind::DeclViaDynamic:
       case OverloadChoiceKind::TypeDecl:
+      case OverloadChoiceKind::DeclViaBridge:
         // FIXME: show deduced types, etc, etc.
         tc.diagnose(choice.getDecl(), diag::found_candidate);
         break;

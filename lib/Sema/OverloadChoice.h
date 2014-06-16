@@ -49,48 +49,65 @@ enum class OverloadChoiceKind : int {
   /// \brief The overload choice indexes into a tuple. Index zero will
   /// have the value of this enumerator, index one will have the value of this
   /// enumerator + 1, and so on. Thus, this enumerator must always be last.
-  TupleIndex
+  TupleIndex,
+  /// \brief The overload choice selects a particular declaration that
+  /// was found by bridging the base value type to its Objective-C
+  /// class type.
+  DeclViaBridge,
 };
 
 /// \brief Describes a particular choice within an overload set.
 ///
 /// 
 class OverloadChoice {
+  enum : unsigned {
+    /// Indicates whether this overload was immediately specialized.
+    IsSpecializedBit = 0x01,
+    /// Indicates whether this declaration was bridged, turning a
+    /// "Decl" kind into "DeclViaBridge" kind.
+    IsBridgedBit = 0x02
+  };
+
   /// \brief The base type to be used when referencing the declaration
-  /// along with a bit indicating whether this overload was immediately
-  /// specialized.
-  llvm::PointerIntPair<Type, 1, bool> BaseAndSpecialized;
+  /// along with two bits: the low bit indicates whether this overload
+  /// was immediately specialized and the second lowest bit indicates
+  /// whether the declaration was bridged.
+  llvm::PointerIntPair<Type, 2, unsigned> BaseAndBits;
 
   /// \brief Either the declaration pointer (if the low bit is clear) or the
   /// overload choice kind shifted by 1 with the low bit set.
   uintptr_t DeclOrKind;
 
 public:
-  OverloadChoice() : BaseAndSpecialized(nullptr, false), DeclOrKind() { }
+  OverloadChoice() : BaseAndBits(nullptr, 0), DeclOrKind() { }
 
   OverloadChoice(Type base, ValueDecl *value, bool isSpecialized)
-    : BaseAndSpecialized(base, isSpecialized) {
+    : BaseAndBits(base, isSpecialized ? IsSpecializedBit : 0) {
     assert((reinterpret_cast<uintptr_t>(value) & (uintptr_t)0x03) == 0
            && "Badly aligned decl");
     DeclOrKind = reinterpret_cast<uintptr_t>(value);
   }
 
   OverloadChoice(Type base, TypeDecl *type, bool isSpecialized)
-    : BaseAndSpecialized(base, isSpecialized) {
+    : BaseAndBits(base, isSpecialized ? IsSpecializedBit : 0) {
     assert((reinterpret_cast<uintptr_t>(type) & (uintptr_t)0x03) == 0
            && "Badly aligned decl");
     DeclOrKind = reinterpret_cast<uintptr_t>(type) | 0x01;
   }
 
   OverloadChoice(Type base, OverloadChoiceKind kind)
-    : BaseAndSpecialized(base, false),
+    : BaseAndBits(base, 0),
       DeclOrKind((uintptr_t)kind << 2 | (uintptr_t)0x03) {
     assert(base && "Must have a base type for overload choice");
-    assert(kind != OverloadChoiceKind::Decl && "wrong constructor for decl");
+    assert(kind != OverloadChoiceKind::Decl &&
+           kind != OverloadChoiceKind::DeclViaDynamic &&
+           kind != OverloadChoiceKind::TypeDecl &&
+           kind != OverloadChoiceKind::DeclViaBridge &&
+           "wrong constructor for decl");
   }
 
   OverloadChoice(Type base, unsigned index)
-    : BaseAndSpecialized(base, false),
+    : BaseAndBits(base, 0),
       DeclOrKind(((uintptr_t)index
                   + (uintptr_t)OverloadChoiceKind::TupleIndex) << 2
                  | (uintptr_t)0x03) {
@@ -101,24 +118,41 @@ public:
   /// dynamic lookup.
   static OverloadChoice getDeclViaDynamic(Type base, ValueDecl *value) {
     OverloadChoice result;
-    result.BaseAndSpecialized.setPointer(base);
+    result.BaseAndBits.setPointer(base);
     result.DeclOrKind = reinterpret_cast<uintptr_t>(value) | 0x02;
     return result;
   }
 
+  /// Retrieve an overload choice for a declaration that was found via
+  /// bridging to an Objective-C class.
+  static OverloadChoice getDeclViaBridge(Type base, ValueDecl *value) {
+    OverloadChoice result;
+    result.BaseAndBits.setPointer(base);
+    result.BaseAndBits.setInt(IsBridgedBit);
+    result.DeclOrKind = reinterpret_cast<uintptr_t>(value);
+    return result;
+  }
+
   /// \brief Retrieve the base type used to refer to the declaration.
-  Type getBaseType() const { return BaseAndSpecialized.getPointer(); }
+  Type getBaseType() const { return BaseAndBits.getPointer(); }
 
   /// \brief Determine whether the referenced declaration was immediately
   /// specialized with <...>.
   ///
   /// This value only has meaning when there is no base type.
-  bool isSpecialized() const { return BaseAndSpecialized.getInt(); }
+  bool isSpecialized() const { 
+    return BaseAndBits.getInt() & IsSpecializedBit;
+  }
   
   /// \brief Determines the kind of overload choice this is.
   OverloadChoiceKind getKind() const {
     switch (DeclOrKind & 0x03) {
-    case 0x00: return OverloadChoiceKind::Decl;
+    case 0x00: 
+      if (BaseAndBits.getInt() & IsBridgedBit)
+        return OverloadChoiceKind::DeclViaBridge;
+
+      return OverloadChoiceKind::Decl;
+      
     case 0x01: return OverloadChoiceKind::TypeDecl;
     case 0x02: return OverloadChoiceKind::DeclViaDynamic;
     case 0x03: {
@@ -133,11 +167,24 @@ public:
     }
   }
 
+  /// Determine whether this choice is for a declaration.
+  bool isDecl() const {
+    switch (getKind()) {
+      case OverloadChoiceKind::Decl:
+      case OverloadChoiceKind::DeclViaDynamic:
+      case OverloadChoiceKind::TypeDecl:
+      case OverloadChoiceKind::DeclViaBridge:
+        return true;
+
+      case OverloadChoiceKind::BaseType:
+      case OverloadChoiceKind::TupleIndex:
+        return false;
+    }
+  }
+
   /// \brief Retrieve the declaraton that corresponds to this overload choice.
   ValueDecl *getDecl() const {
-    assert((getKind() == OverloadChoiceKind::Decl ||
-            getKind() == OverloadChoiceKind::DeclViaDynamic ||
-            getKind() == OverloadChoiceKind::TypeDecl) && "Not a declaration");
+    assert(isDecl() && "Not a declaration");
     return reinterpret_cast<ValueDecl *>(DeclOrKind & ~(uintptr_t)0x03);
   }
 

@@ -19,10 +19,10 @@ class X {
   @objc func foo(i: Int) { }
   @objc func bar() { }
 
-  @objc func ovl2() -> A { }
+  @objc func ovl2() -> A { } // expected-note{{found this candidate}}
 
   @objc func ovl4() -> B { }
-  @objc func ovl5() -> B { }
+  @objc func ovl5() -> B { } // expected-note{{found this candidate}}
 
   @objc class func staticFoo(i : Int) { }
 
@@ -38,7 +38,7 @@ class Y : P {
   @objc func ovl1() -> A { }
 
   @objc func ovl4() -> B { }
-  @objc func ovl5() -> C { }
+  @objc func ovl5() -> C { } // expected-note{{found this candidate}}
 
   @objc var prop1 : Int {
     get {
@@ -73,7 +73,7 @@ class Y : P {
 
 class Z : Y {
   @objc override func ovl1() -> B { }
-  @objc func ovl2() -> C { }
+  @objc func ovl2() -> C { } // expected-note{{found this candidate}}
   @objc func ovl3() -> A { }
   @objc func ovl3() -> B { }
   func generic4<T>(x : T) { }
@@ -142,7 +142,7 @@ obj.ovl1()
 
 // Don't allow overload resolution between declarations from different
 // classes.
-var ovl2ResultA = obj.ovl2!() // expected-error{{could not find an overload for 'ovl2' that accepts the supplied arguments}}
+var ovl2ResultA = obj.ovl2!() // expected-error{{ambiguous use of 'ovl2'}}
 
 // ... but it's okay to allow overload resolution between declarations
 // from the same class.
@@ -154,7 +154,7 @@ ovl3Result = B()
 var ovl4Result = obj.ovl4!()
 
 // ... but not when the types are different.
-var ovl5Result = obj.ovl5!() // expected-error{{could not find an overload for 'ovl5' that accepts the supplied arguments}}
+var ovl5Result = obj.ovl5!() // expected-error{{ambiguous use of 'ovl5'}}
 
 // Same as above but without the '!'
 obj.ovl4()

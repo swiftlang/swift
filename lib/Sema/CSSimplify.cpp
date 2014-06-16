@@ -17,6 +17,7 @@
 
 #include "ConstraintSystem.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/ClangImporter/ClangModule.h"
 
 using namespace swift;
 using namespace constraints;
@@ -2401,7 +2402,8 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
   Type baseTy = simplifyType(constraint.getFirstType());
   Type baseObjTy = baseTy->getRValueType();
 
-  // Try to look through ImplicitlyUnwrappedOptional<T>; the result is always an r-value.
+  // Try to look through ImplicitlyUnwrappedOptional<T>; the result is
+  // always an r-value.
   if (auto objTy = lookThroughImplicitlyUnwrappedOptionalType(baseObjTy)) {
     increaseScore(SK_ForceUnchecked);
     baseTy = baseObjTy = objTy;
@@ -2489,6 +2491,8 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
                                        /*isSpecialized=*/false));
     }
 
+    // FIXME: Should we look for constructors in bridged types?
+
     if (choices.empty()) {
       recordFailure(constraint.getLocator(), Failure::DoesNotHaveMember,
                     baseObjTy, name);
@@ -2564,60 +2568,68 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
         return SolutionKind::Solved;
       }
 
-      // FIXME: Specialize diagnostic here?
+      recordFailure(constraint.getLocator(), Failure::DoesNotHaveMember,
+                    baseObjTy, name);
+
+      return SolutionKind::Error;
     }
-
-    recordFailure(constraint.getLocator(), Failure::DoesNotHaveMember,
-                  baseObjTy, name);
-
-    return SolutionKind::Error;
   }
 
   // The set of directly accessible types, which is only used when
   // we're performing dynamic lookup into an existential type.
-  bool isDynamicLookup = false;
-  if (auto protoTy = instanceTy->getAs<ProtocolType>()) {
-    isDynamicLookup = protoTy->getDecl()->isSpecificProtocol(
-                                            KnownProtocolKind::AnyObject);
-  }
+  bool isDynamicLookup = instanceTy->isAnyObject();
 
   // Record the fact that we found a mutating function for diagnostics.
   bool FoundMutating = false;
 
   // Introduce a new overload set to capture the choices.
   SmallVector<OverloadChoice, 4> choices;
-  for (auto result : lookup) {
+
+  // If the instance type is a bridged to an Objective-C type, compute
+  // the type we'll look in for bridging.
+  Type bridgedClass;
+  Type bridgedType;
+  if (!instanceTy->isBridgeableObjectType()) {
+    if (Type classType = TC.getBridgedToObjC(DC, instanceTy).first) {
+      bridgedClass = classType;
+      bridgedType = isMetatype ? MetatypeType::get(classType) : classType;
+    }
+  }
+
+  // Local function that adds the given declaration if it is a
+  // reasonable choice.
+  auto addChoice = [&](ValueDecl *result, bool isBridged) {
     // If the result is invalid, skip it.
     // FIXME: Note this as invalid, in case we don't find a solution,
     // so we don't let errors cascade further.
     TC.validateDecl(result, true);
     if (result->isInvalid())
-      continue;
+      return;
 
     // If our base is an existential type, we can't make use of any
     // member whose signature involves associated types.
     // FIXME: Mark this as 'unavailable'.
     if (isExistential && isUnavailableInExistential(getTypeChecker(), result))
-      continue;
+      return;
 
     // If we are looking for a metatype member, don't include members that can
     // only be accessed on an instance of the object.
     // FIXME: Mark as 'unavailable' somehow.
     if (isMetatype && !(isa<FuncDecl>(result) || !result->isInstanceMember())) {
-      continue;
+      return;
     }
 
     // If we aren't looking in a metatype, ignore static functions, static
     // variables, and enum elements.
     if (!isMetatype && !baseObjTy->is<ModuleType>() &&
         !result->isInstanceMember())
-      continue;
+      return;
 
     // If we're doing dynamic lookup into a metatype of AnyObject and we've
     // found an instance member, ignore it.
     if (isDynamicLookup && isMetatype && result->isInstanceMember()) {
       // FIXME: Mark as 'unavailable' somehow.
-      continue;
+      return;
     }
 
     // If we have an rvalue base of struct or enum type, make sure that the
@@ -2627,14 +2639,14 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
       if (auto *FD = dyn_cast<FuncDecl>(result))
         if (FD->isMutating()) {
           FoundMutating = true;
-          continue;
+          return;
         }
 
       // Subscripts are ok on rvalues so long as the getter is nonmutating.
       if (auto *SD = dyn_cast<SubscriptDecl>(result))
         if (SD->getGetter()->isMutating()) {
           FoundMutating = true;
-          continue;
+          return;
         }
 
       // Computed properties are ok on rvalues so long as the getter is
@@ -2643,7 +2655,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
         if (auto *GD = VD->getGetter())
           if (GD->isMutating()) {
             FoundMutating = true;
-            continue;
+            return;
           }
     }
     
@@ -2661,10 +2673,46 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
 
       // We found this declaration via dynamic lookup, record it as such.
       choices.push_back(OverloadChoice::getDeclViaDynamic(baseTy, result));
-      continue;
+      return;
+    }
+
+    // If we have a bridged type, we found this declaration via bridging.
+    if (isBridged) {
+      choices.push_back(OverloadChoice::getDeclViaBridge(bridgedType, result));
+      return;
     }
 
     choices.push_back(OverloadChoice(baseTy, result, /*isSpecialized=*/false));
+  };
+
+  // Add all results from this lookup.
+  for (auto result : lookup) {
+    addChoice(result, /*isBridged=*/false);
+  }
+
+  // If the instance type is a bridged to an Objective-C type, perform
+  // a lookup into that Objective-C type.
+  if (bridgedType) {
+    LookupResult &bridgedLookup = lookupMember(bridgedClass, name);
+    Module *foundationModule = nullptr;
+    for (auto result : bridgedLookup) {
+      // Ignore results from the Objective-C "Foundation"
+      // module. Those core APIs are explicitly provided by the
+      // Foundation module overlay.
+      auto module = result->getModuleContext();
+      if (foundationModule) {
+        if (module == foundationModule)
+          continue;
+      } else if (ClangModuleUnit::hasClangModule(module) &&
+                 module->getName().str() == "Foundation") {
+        // Cache the foundation module name so we don't need to look
+        // for it again.
+        foundationModule = module;
+        continue;
+      }
+
+      addChoice(result, /*isBridged=*/true);
+    }
   }
 
   if (choices.empty()) {

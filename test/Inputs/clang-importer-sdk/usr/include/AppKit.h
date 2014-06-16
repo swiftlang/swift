@@ -73,3 +73,15 @@
 @interface NCWidgetController : NSObject
 + (instancetype)widgetController;
 @end
+
+@interface NSString(Category)
+- (NSString*)nsStringMethod;
++ (NSInteger)nsStringClassMethod;
+@property (readonly) NSString *nsStringProperty;
+@end
+
+@interface NSDictionary(Category)
+- (NSDictionary*)nsDictionaryMethod;
++ (NSInteger)nsDictionaryClassMethod;
+@property (readonly) NSDictionary *nsDictionaryProperty;
+@end

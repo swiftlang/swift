@@ -372,3 +372,8 @@ NSDictionary *dictToDict(NSDictionary *dict);
 @interface NSProcessInfo : NSObject
 + (NSProcessInfo *)processInfo;
 @end
+
+@interface NSString(FoundationExts)
+- (void)notBridgedMethod;
+@end
+

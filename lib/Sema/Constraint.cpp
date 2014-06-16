@@ -212,6 +212,10 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
       Out << "decl-via-dynamic ";
       printDecl();
       break;
+    case OverloadChoiceKind::DeclViaBridge:
+      Out << "decl-via-bridge ";
+      printDecl();
+      break;
     case OverloadChoiceKind::BaseType:
       Out << "base type";
       break;

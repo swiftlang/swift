@@ -1605,6 +1605,7 @@ void Solution::dump(SourceManager *sm, raw_ostream &out) const {
     case OverloadChoiceKind::Decl:
     case OverloadChoiceKind::DeclViaDynamic:
     case OverloadChoiceKind::TypeDecl:
+    case OverloadChoiceKind::DeclViaBridge:
       choice.getDecl()->dumpRef(out);
       out << " as ";
       if (choice.getBaseType())
@@ -1713,6 +1714,7 @@ void ConstraintSystem::dump(raw_ostream &out) {
         case OverloadChoiceKind::Decl:
         case OverloadChoiceKind::DeclViaDynamic:
         case OverloadChoiceKind::TypeDecl:
+        case OverloadChoiceKind::DeclViaBridge:
           if (choice.getBaseType())
             out << choice.getBaseType()->getString() << ".";
           out << choice.getDecl()->getName().str() << ": "

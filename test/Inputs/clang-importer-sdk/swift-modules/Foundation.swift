@@ -75,3 +75,15 @@ extension Array : _BridgedToObjectiveC {
     return nil
   }
 }
+
+extension Dictionary : _BridgedToObjectiveC {
+  static func getObjectiveCType() -> Any.Type {
+    return NSDictionary.self
+  }
+  func bridgeToObjectiveC() -> NSDictionary {
+    return NSDictionary()
+  }
+  static func bridgeFromObjectiveC(x: NSDictionary) -> Dictionary? {
+    return nil
+  }
+}

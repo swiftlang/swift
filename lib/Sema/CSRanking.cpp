@@ -143,6 +143,7 @@ static bool sameOverloadChoice(const OverloadChoice &x,
 
   case OverloadChoiceKind::Decl:
   case OverloadChoiceKind::DeclViaDynamic:
+  case OverloadChoiceKind::DeclViaBridge:
     return sameDecl(x.getDecl(), y.getDecl());
 
   case OverloadChoiceKind::TypeDecl:
@@ -572,13 +573,16 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
       identical = false;
       
       // A declaration found directly beats any declaration found via dynamic
-      // lookup.
+      // lookup or one found via bridging.
       if (choice1.getKind() == OverloadChoiceKind::Decl &&
-          choice2.getKind() == OverloadChoiceKind::DeclViaDynamic) {
+          (choice2.getKind() == OverloadChoiceKind::DeclViaDynamic || 
+           choice2.getKind() == OverloadChoiceKind::DeclViaBridge)) {
         ++score1;
         continue;
       }
-      if (choice1.getKind() == OverloadChoiceKind::DeclViaDynamic &&
+
+      if ((choice1.getKind() == OverloadChoiceKind::DeclViaDynamic ||
+           choice1.getKind() == OverloadChoiceKind::DeclViaBridge) &&
           choice2.getKind() == OverloadChoiceKind::Decl) {
         ++score2;
         continue;
@@ -601,6 +605,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
 
     case OverloadChoiceKind::DeclViaDynamic:
     case OverloadChoiceKind::Decl:
+    case OverloadChoiceKind::DeclViaBridge:
       // Determine whether one declaration is more specialized than the other.
       if (isDeclAsSpecializedAs(tc, cs.DC, decl1, decl2))
         ++score1;

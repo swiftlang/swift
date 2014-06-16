@@ -1160,6 +1160,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
   Type refType;
   Type openedFullType;
   switch (choice.getKind()) {
+  case OverloadChoiceKind::DeclViaBridge:
   case OverloadChoiceKind::Decl:
   case OverloadChoiceKind::DeclViaDynamic:
   case OverloadChoiceKind::TypeDecl: {
