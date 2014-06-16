@@ -170,15 +170,39 @@ struct Less<T: Comparable> {
   }
 }
 
+func sort<
+  C: MutableCollection where C.IndexType: RandomAccessIndex
+>(
+  inout collection: C,
+  pred: (C.GeneratorType.Element, C.GeneratorType.Element) -> Bool
+) {
+  quickSort(&collection, indices(collection), pred)
+}
+
+func sort<
+  C: MutableCollection 
+    where C.IndexType: RandomAccessIndex, C.GeneratorType.Element: Comparable
+>(
+  inout collection: C
+) {
+  quickSort(&collection, indices(collection))
+}
+
 func sort<T>(inout array: T[], pred: (T, T) -> Bool) {
-  quickSort(&array, 0..array.count, pred)
+  return array.withMutableStorage {
+    a in sort(&a, pred)
+    return
+  }
 }
 
 /// The functions below are a copy of the functions above except that
 /// they don't accept a predicate and they are hardcoded to use the less-than
 /// comparator.
 func sort<T : Comparable>(inout array: T[]) {
-  quickSort(&array, 0..array.count)
+  return array.withMutableStorage {
+    a in sort(&a)
+    return
+  }
 }
 
 func sorted<
@@ -188,7 +212,7 @@ func sorted<
   pred: (C.GeneratorType.Element, C.GeneratorType.Element) -> Bool
 ) -> C {
   var result = source
-  quickSort(&result, indices(result), pred)
+  sort(&result, pred)
   return result
 }
 
@@ -197,7 +221,7 @@ func sorted<
     where C.GeneratorType.Element: Comparable, C.IndexType: RandomAccessIndex
 >(source: C) -> C {
   var result = source
-  quickSort(&result, indices(result))
+  sort(&result)
   return result
 }
 
@@ -208,7 +232,7 @@ func sorted<
   pred: (S.GeneratorType.Element, S.GeneratorType.Element) -> Bool
 ) -> S.GeneratorType.Element[] {
   var result = Array(source)
-  quickSort(&result, indices(result), pred)
+  sort(&result, pred)
   return result
 }
 
@@ -219,7 +243,7 @@ func sorted<
   source: S
 ) -> S.GeneratorType.Element[] {
   var result = Array(source)
-  quickSort(&result, indices(result))
+  sort(&result)
   return result
 }
 
@@ -308,14 +332,21 @@ func partition<
   return i.pred()
 }
 
-func quickSort<C: MutableCollection where C.GeneratorType.Element: Comparable, C.IndexType: RandomAccessIndex>(
+func quickSort<
+  C: MutableCollection
+    where C.GeneratorType.Element: Comparable, C.IndexType: RandomAccessIndex
+>(
   inout elements: C,
   range: Range<C.IndexType>) {
   _quickSort(&elements, range)
 }
 
-func _quickSort<C: MutableCollection where C.GeneratorType.Element: Comparable, C.IndexType: RandomAccessIndex>(
-  inout elements: C, range: Range<C.IndexType>) {
+func _quickSort<
+  C: MutableCollection
+    where C.GeneratorType.Element: Comparable, C.IndexType: RandomAccessIndex
+>(
+  inout elements: C, range: Range<C.IndexType>
+) {
   // Insertion sort is better at handling smaller regions.
   let cnt = count(range)
   if cnt < 20 {
