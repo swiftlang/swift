@@ -30,9 +30,15 @@ class LogicalPathComponent;
 
 /// Information about the type of an l-value.
 struct LValueTypeData {
-  AbstractionPattern OrigFormalType;
+  AbstractionPattern OrigFormalType = AbstractionPattern::getInvalid();
   CanType SubstFormalType;
   SILType TypeOfRValue;
+
+  LValueTypeData() = default;
+  LValueTypeData(AbstractionPattern origFormalType, CanType substFormalType,
+                 SILType typeOfRValue)
+    : OrigFormalType(origFormalType), SubstFormalType(substFormalType),
+      TypeOfRValue(typeOfRValue) {}
 };
 
 /// An l-value path component represents a chunk of the access path to

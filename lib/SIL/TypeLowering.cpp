@@ -1268,8 +1268,6 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
     auto substLoweredType =
       getLoweredASTFunctionType(substFnType, uncurryLevel);
 
-    AbstractionPattern origLoweredType;
-    
     bool canReabstract;
     switch (substLoweredType->getAbstractCC()) {
     case AbstractCC::C:
@@ -1287,16 +1285,18 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
       canReabstract = true;
       break;
     }
-    
-    if (!canReabstract || substType == origType.getAsType()) {
-      origLoweredType = AbstractionPattern(substLoweredType);
-    } else if (origType.isOpaque()) {
-      origLoweredType = origType;
-    } else {
-      auto origFnType = cast<AnyFunctionType>(origType.getAsType());
-      origLoweredType =
-        AbstractionPattern(getLoweredASTFunctionType(origFnType, uncurryLevel));
-    }
+
+    AbstractionPattern origLoweredType = [&] {
+      if (!canReabstract || substType == origType.getAsType()) {
+        return AbstractionPattern(substLoweredType);
+      } else if (origType.isOpaque()) {
+        return origType;
+      } else {
+        auto origFnType = cast<AnyFunctionType>(origType.getAsType());
+        return AbstractionPattern(getLoweredASTFunctionType(origFnType,
+                                                            uncurryLevel));
+      }
+    }();
     TypeKey loweredKey = getTypeKey(origLoweredType, substLoweredType, 0);
 
     // If the uncurrying/unbridging process changed the type, re-check

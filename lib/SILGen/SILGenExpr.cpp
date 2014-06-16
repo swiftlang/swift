@@ -645,21 +645,19 @@ emitRValueForPropertyLoad(SILLocation loc, ManagedValue base,
 
   // If the accessed field is stored, emit a StructExtract on the base.
 
-  // Check for an abstraction difference.
-  bool hasAbstractionChange = false;
   auto substFormalType = propTy->getCanonicalType();
-  AbstractionPattern origFormalType;
-  // FIXME: This crazy 'if' condition should not be required when we have
-  // reliable canonical type comparisons (i.e., interfacetypes get done).  For
-  // now, not doing this causes us to emit extra pointless copies.
-  if (substFormalType->is<AnyFunctionType>() ||
-      substFormalType->is<TupleType>() ||
-      substFormalType->is<AnyMetatypeType>()) {
-    origFormalType = getOrigFormalRValueType(FieldDecl->getType());
-    hasAbstractionChange = origFormalType.getAsType() != substFormalType;
+  auto &lowering = getTypeLowering(substFormalType);
+
+  // Check for an abstraction difference.
+  AbstractionPattern origFormalType =
+    getOrigFormalRValueType(FieldDecl->getType());
+  bool hasAbstractionChange = false;
+  if (origFormalType.getAsType() != substFormalType) {
+    auto &abstractedTL = getTypeLowering(origFormalType, substFormalType);
+    hasAbstractionChange =
+      (abstractedTL.getLoweredType() != lowering.getLoweredType());
   }
 
-  auto &lowering = getTypeLowering(propTy);
   ManagedValue Result;
   if (!base.getType().isAddress()) {
     // For non-address-only structs, we emit a struct_extract sequence.

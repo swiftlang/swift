@@ -32,13 +32,15 @@ namespace Lowering {
 class AbstractionPattern {
   CanType OrigType;
 public:
-  AbstractionPattern() {}
   explicit AbstractionPattern(Type origType)
     : AbstractionPattern(origType->getCanonicalType()) {}
   explicit AbstractionPattern(CanType origType) : OrigType(origType) {}
-  CanType getAsType() const { return OrigType; }
 
-  bool isNull() const { return OrigType.isNull(); }
+  static AbstractionPattern getInvalid() {
+    return AbstractionPattern(CanType());
+  }
+
+  CanType getAsType() const { return OrigType; }
 
   bool isOpaque() const {
     if (auto arch = dyn_cast<ArchetypeType>(OrigType))
