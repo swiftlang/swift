@@ -158,18 +158,6 @@ extension ${Self} : ArrayType {
   //===--- basic mutations ------------------------------------------------===//
 
 
-  /// Returns a new array that does not share the underlying storage with this
-  /// array.
-  /// Complexity: O(N)
-  func copy() -> ${Self} {
-    return self
-  }
-
-  /// Ensure the uniqueness of the array.
-  /// Complexity: O(N)
-  func unshare() {
-  }
-
   /// Ensure the array has enough mutable contiguous storage to store
   /// minimumCapacity elements in.  Note: does not affect count.
   /// Complexity: O(N)
@@ -252,11 +240,11 @@ extension ${Self} : ArrayType {
   }
 
   mutating func sort(isOrderedBefore: (T, T)->Bool) {
-    quickSort(&self, indices(self), isOrderedBefore)
+    Swift.sort(&self, isOrderedBefore)
   }
 
   func sorted(isOrderedBefore: (T, T)->Bool) -> ${Self} {
-    var result = self.copy()
+    var result = self
     result.sort(isOrderedBefore)
     return result
   }

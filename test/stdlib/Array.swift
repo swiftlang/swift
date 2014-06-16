@@ -60,25 +60,6 @@ func testMap() {
 }
 testMap()
 
-func testUnshare() {
-  var x = [35]
-  var y = x
-  y.unshare()
-  x[0] = 8
-  print("<\(y[0])>\n")
-  // CHECK-NEXT: <35>
-}
-testUnshare()
-
-func testCopy() {
-  var x = [320]
-  var y = x.copy()
-  x[0] = 7
-  print("<\(y[0])>\n")
-  // CHECK-NEXT: <320>
-}
-testCopy()
-
 func testFilter() {
   let a = Array(3..16)
   println(a.filter { $0 % 4 == 0 })

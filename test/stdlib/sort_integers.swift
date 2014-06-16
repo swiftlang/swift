@@ -78,7 +78,7 @@ println("Test1 - Done")
 
 // Now, let's verify the sort.
 let partition_verifier : (Int[]) -> () = {
-    var y = $0.copy()
+    var y = $0
     // Partition() returns the index to the pivot value.
     let idx = partition(&y, 0..y.count)
     // Check that all of the elements in the first partition are smaller or
