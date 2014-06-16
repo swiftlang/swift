@@ -29,3 +29,8 @@ func testDictionaryBridge(dict: Dictionary<String, String>) {
   var int = Dictionary<String, String>.nsDictionaryClassMethod()
   var d3 = dict.nsDictionaryProperty  
 }
+
+func testStringBridge() {
+  var i = String.someFactoryMethod()
+  i = 17
+}

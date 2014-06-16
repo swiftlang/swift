@@ -78,6 +78,7 @@
 - (NSString*)nsStringMethod;
 + (NSInteger)nsStringClassMethod;
 @property (readonly) NSString *nsStringProperty;
++ (NSString*)someFactoryMethod;
 @end
 
 @interface NSDictionary(Category)
