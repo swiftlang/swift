@@ -1,0 +1,121 @@
+%# -*- mode: C++ -*-
+
+%# Ignore the following admonition; it applies to the resulting .cpp file only
+//// Automatically Generated From UnicodeExtendedGraphemeClusters.cpp.gyb.
+//// Do Not Edit Directly!
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+%{
+
+import re
+
+# Grapheme_Cluster_Break property.  An array of tuples (startCodePoint,
+# endCodePoint, value).
+graphemeBreakProperty = []
+
+with open(unicodeGraphemeBreakPropertyFile, 'rb') as f:
+    for line in f:
+        # Strip comments.
+        line = re.sub('#.*', '', line)
+
+        # Single code point?
+        m = re.match('([0-9A-F]+) +; +([a-zA-Z]+) ', line)
+        if m:
+            codePoint = int(m.group(1), 16)
+            value = m.group(2)
+            graphemeBreakProperty += [(codePoint, codePoint, value)]
+            continue
+
+        # Range of code points?
+        m = re.match('([0-9A-F]+)..([0-9A-F]+) +; +([a-zA-Z_]+) ', line)
+        if m:
+            startCodePoint = int(m.group(1), 16)
+            endCodePoint = int(m.group(2), 16)
+            value = m.group(3)
+            graphemeBreakProperty += [(startCodePoint, endCodePoint, value)]
+
+}%
+
+#include "swift/Basic/Unicode.h"
+
+swift::unicode::GraphemeClusterBreakProperty
+swift::unicode::getGraphemeClusterBreakProperty(uint32_t C) {
+  // FIXME: replace linear search with a trie lookup.
+
+% for startCodePoint,endCodePoint,value in graphemeBreakProperty:
+%   if startCodePoint == 0:
+  if (C <= ${endCodePoint})
+%   else:
+  if (C >= ${startCodePoint} && C <= ${endCodePoint})
+%   end
+    return GraphemeClusterBreakProperty::${value};
+% end
+
+  return GraphemeClusterBreakProperty::Other;
+}
+
+%{
+
+# The order should be consistent with 'GraphemeClusterBreakProperty' enum.
+anyGraphemePropertyValue = [
+  'Other', 'CR', 'LF', 'Control', 'Extend', 'Regional_Indicator', 'Prepend',
+  'SpacingMark', 'L', 'V', 'T', 'LV', 'LVT',
+]
+
+# Rules to determine extended grapheme cluster boundaries, as defined in
+# 'Grapheme Break Chart', ucd/auxiliary/GraphemeBreakTest.html, Unicode 6.3.0.
+extendedGraphemeClusterRules = [
+  ( [ 'CR' ], 'no_boundary', [ 'LF' ] ),
+  ( [ 'Control', 'CR', 'LF' ], 'boundary', anyGraphemePropertyValue ),
+  ( anyGraphemePropertyValue, 'boundary', [ 'Control', 'CR', 'LF' ] ),
+  ( [ 'L' ], 'no_boundary', [ 'L', 'V', 'LV', 'LVT' ] ),
+  ( [ 'LV', 'V' ], 'no_boundary', [ 'V', 'T' ] ),
+  ( [ 'LVT', 'T' ], 'no_boundary', [ 'T' ] ),
+  ( [ 'Regional_Indicator' ], 'no_boundary', [ 'Regional_Indicator' ] ),
+  ( anyGraphemePropertyValue, 'no_boundary', [ 'Extend' ] ),
+  ( anyGraphemePropertyValue, 'no_boundary', [ 'SpacingMark' ] ),
+  ( [ 'Prepend' ], 'no_boundary', anyGraphemePropertyValue ),
+  ( anyGraphemePropertyValue, 'boundary', anyGraphemePropertyValue ),
+]
+
+# Expand the rules into a matrix.
+extendedGraphemeClusterRulesMatrix = {}
+for first in anyGraphemePropertyValue:
+    extendedGraphemeClusterRulesMatrix[first] = \
+        dict.fromkeys(anyGraphemePropertyValue, None)
+
+for firstList,action,secondList in reversed(extendedGraphemeClusterRules):
+    for first in firstList:
+        for second in secondList:
+            extendedGraphemeClusterRulesMatrix[first][second] = action
+
+# Make sure we can pack one row of the matrix into a 'uint16_t'.
+assert(len(anyGraphemePropertyValue) <= 16)
+
+}%
+
+uint16_t swift::unicode::ExtendedGraphemeClusterNoBoundaryRulesMatrix[] = {
+% for first in anyGraphemePropertyValue:
+%   # Retrieve a row that corresponds to this first code point.
+%   row = extendedGraphemeClusterRulesMatrix[first]
+
+%   # Change strings into bits.
+%   bits = [ row[second] == 'no_boundary' for second in anyGraphemePropertyValue ]
+
+%   # Pack bits into an integer.
+%   packed = sum([ bits[i] * pow(2, i) for i in range(0, len(bits)) ])
+
+  ${packed},
+% end
+};
+

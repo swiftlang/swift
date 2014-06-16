@@ -545,6 +545,8 @@ set(SWIFTLIB_SUBDIR ".")
 set(SWIFT_GYB_FLAGS
   "-DCMAKE_SIZEOF_VOID_P=${CMAKE_SIZEOF_VOID_P}"
   "-DCMAKE_SYSTEM_PROCESSOR=${CMAKE_SYSTEM_PROCESSOR}"
+  "-DunicodeGraphemeBreakPropertyFile=${SWIFT_SOURCE_DIR}/utils/UnicodeData/GraphemeBreakProperty.txt"
+  "-DunicodeGraphemeBreakTestFile=${SWIFT_SOURCE_DIR}/utils/UnicodeData/GraphemeBreakTest.txt"
   "--test" # Run gyb's self-tests whenever we use it.  They're cheap
            # enough and it keeps us honest.
   )

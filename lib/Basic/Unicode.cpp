@@ -16,13 +16,47 @@
 using namespace swift;
 
 StringRef swift::unicode::extractFirstExtendedGraphemeCluster(StringRef S) {
-  // FIXME: implement as described in Unicode Standard Annex #29.
+  // Extended grapheme cluster segmentation algorithm as described in Unicode
+  // Standard Annex #29.
   if (S.empty())
     return StringRef();
 
-  // FIXME: deal with broken code unit sequences.
-  // For now, just extract the first code point.
-  unsigned CodeUnitSeqLen = getNumBytesForUTF8(S[0]);
-  return S.slice(0, CodeUnitSeqLen);
+  const UTF8 *SourceStart = reinterpret_cast<const UTF8 *>(S.data());
+
+  const UTF8 *SourceNext = SourceStart;
+  UTF32 C[2];
+  UTF32 *TargetStart = C;
+
+  ConvertUTF8toUTF32(&SourceNext, SourceStart + S.size(), &TargetStart, C + 1,
+                     lenientConversion);
+  if (TargetStart == C) {
+    // The source string contains an ill-formed subsequence at the end.
+    return S;
+  }
+
+  GraphemeClusterBreakProperty GCBForC0 = getGraphemeClusterBreakProperty(C[0]);
+  while (true) {
+    if (isExtendedGraphemeClusterBoundaryAfter(GCBForC0))
+      return S.slice(0, SourceNext - SourceStart);
+
+    size_t C1Offset = SourceNext - SourceStart;
+    ConvertUTF8toUTF32(&SourceNext, SourceStart + S.size(), &TargetStart, C + 2,
+                       lenientConversion);
+
+    if (TargetStart == C + 1) {
+      // End of source string or the source string contains an ill-formed
+      // subsequence at the end.
+      return S.slice(0, C1Offset);
+    }
+
+    GraphemeClusterBreakProperty GCBForC1 =
+        getGraphemeClusterBreakProperty(C[1]);
+    if (isExtendedGraphemeClusterBoundary(GCBForC0, GCBForC1))
+      return S.slice(0, C1Offset);
+
+    C[0] = C[1];
+    TargetStart = C + 1;
+    GCBForC0 = GCBForC1;
+  }
 }
 

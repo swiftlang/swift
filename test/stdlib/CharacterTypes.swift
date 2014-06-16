@@ -21,9 +21,7 @@ func testTypeInference() {
   isCharacter(&ch2)
   var ch4: Character = "例"
   isCharacter(&ch3)
-  // FIXME: this should pass when we implement grapheme cluster extraction
-  // correctly.
-  var ch5: Character = "\u304b\u3099" // expected-error {{cannot convert the expression's type 'String' to type 'Character'}}
+  var ch5: Character = "\u304b\u3099"
   isCharacter(&ch4)
 
   var s1 = ""

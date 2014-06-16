@@ -1,3 +1,7 @@
+set(UNICODE_TABLES UnicodeExtendedGraphemeClusters.cpp.gyb)
+
+handle_gyb_sources(UNICODE_TABLES)
+
 add_swift_library(swiftBasic
   Cache.cpp
   Demangle.cpp
@@ -21,7 +25,10 @@ add_swift_library(swiftBasic
   Unix/TaskQueue.inc
 
   # Platform-agnostic fallback TaskQueue implementation
-  Default/TaskQueue.inc)
+  Default/TaskQueue.inc
+
+  ${UNICODE_TABLES}
+  )
 
 set(SWIFT_VERSION "1.0")
 message(STATUS "Swift version: ${SWIFT_VERSION}")
