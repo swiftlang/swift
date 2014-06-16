@@ -1509,7 +1509,7 @@ namespace {
                                   substParams, substResult,
                                   getASTContext());
     }
-
+        
     SILType subst(SILType type) {
       return SILType::getPrimitiveType(visit(type.getSwiftRValueType()),
                                        type.getCategory());
@@ -1536,6 +1536,12 @@ namespace {
         substElts.push_back(origElt.getWithType(substEltType));
       }
       return CanType(TupleType::get(substElts, getASTContext()));
+    }
+    // Block storage types need to substitute their capture type by these same
+    // rules.
+    CanType visitSILBlockStorageType(CanSILBlockStorageType origType) {
+      auto substCaptureType = visit(origType->getCaptureType());
+      return SILBlockStorageType::get(substCaptureType);
     }
 
     /// Any other type is would be a valid type in the AST.  Just
