@@ -354,6 +354,19 @@ extension ${Self} {
   }
 }
 
+extension ${Self} {
+  mutating func withMutableStorage<R>(body: (UnsafeMutableArray<T>)->R) -> R {
+    if _slowPath(!_buffer.isMutableAndUniquelyReferenced()) {
+      {
+        self._buffer = _Buffer(ContiguousArray(self)._buffer)
+      }()
+    }
+    return _buffer.withUnsafePointerToElements {
+      [count = self.count] in
+      body(UnsafeMutableArray(start: $0, length: count))
+    }
+  }
+}
 %end
 
 extension Array {
