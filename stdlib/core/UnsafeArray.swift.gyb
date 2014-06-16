@@ -16,7 +16,21 @@
 /// single-pass.  It's not clear how well this combination will work
 /// out, or whether all Collections should also be Streams; consider
 /// this an experiment.
-struct UnsafeArray<T> : Collection, Generator {
+
+struct UnsafeArrayGenerator<T>: Generator, Sequence {
+  mutating func next() -> T? {
+    return position == end ? nil : (position++).memory
+  }
+
+  func generate() -> UnsafeArrayGenerator {
+    return self
+  }
+  
+  var position, end: UnsafePointer<T>
+}
+
+%for Mutable in ('Mutable', ''):
+struct Unsafe${Mutable}Array<T> : ${Mutable}Collection {
 
   var startIndex: Int {
     return 0
@@ -27,9 +41,18 @@ struct UnsafeArray<T> : Collection, Generator {
   }
 
   subscript(i: Int) -> T {
-    _precondition(i >= 0)
-    _precondition(i < endIndex)
-    return (_position + i).memory
+    get {
+      _debugPrecondition(i >= 0)
+      _debugPrecondition(i < endIndex)
+      return _position[i]
+    }
+%if Mutable:
+    set {
+      _debugPrecondition(i >= 0)
+      _debugPrecondition(i < endIndex)
+      _position[i] = newValue
+    }
+%end    
   }
   
   init(start: UnsafePointer<T>, length: Int) {
@@ -37,16 +60,10 @@ struct UnsafeArray<T> : Collection, Generator {
     _end = start + length
   }
 
-  mutating func next() -> T? {
-    if _position == _end {
-      return .None
-    }
-    return .Some((_position++).memory)
-  }
-
-  func generate() -> UnsafeArray {
-    return self
+  func generate() -> UnsafeArrayGenerator<T> {
+    return UnsafeArrayGenerator(position: _position, end: _end)
   }
   
   var _position, _end: UnsafePointer<T>
 }
+%end

@@ -296,7 +296,7 @@ struct _StringCore {
           UnsafeArray(
             start: UnsafePointer<UTF16.CodeUnit>(_baseAddress),
             length: count
-          ),
+          ).generate(),
           output
         )
       }

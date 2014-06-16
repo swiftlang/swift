@@ -75,7 +75,7 @@ set(SWIFTLIB_ESSENTIAL
   Unicode.swift
   UnicodeScalar.swift
   Unmanaged.swift
-  UnsafeArray.swift
+  UnsafeArray.swift.gyb
   UnsafePointer.swift
   )
 
