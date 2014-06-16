@@ -123,6 +123,10 @@ struct ContiguousArrayBuffer<T> : ArrayBufferType, LogicValue {
     return isUniquelyReferenced() && capacity >= minimumCapacity ? self : nil
   }
 
+  mutating func isMutableAndUniquelyReferenced() -> Bool {
+    return isUniquelyReferenced()
+  }
+  
   /// If this buffer is backed by a ContiguousArrayBuffer, return it.
   /// Otherwise, return nil.  Note: the result's elementStorage may
   /// not match ours, if we are a SliceBuffer.

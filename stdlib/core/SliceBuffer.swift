@@ -95,6 +95,10 @@ struct SliceBuffer<T> : ArrayBufferType {
     return nil
   }
 
+  mutating func isMutableAndUniquelyReferenced() -> Bool {
+    return _hasNativeBuffer && Swift.isUniquelyReferenced(&owner)
+  }
+
   /// If this buffer is backed by a ContiguousArrayBuffer, return it.
   /// Otherwise, return nil.  Note: the result's elementStorage may
   /// not match ours, since we are a SliceBuffer.

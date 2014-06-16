@@ -132,18 +132,8 @@ where T.GeneratorType.Element == T._Buffer.Element,
 
   let y = x
   x[x.endIndex.pred()] = 17
-  let bufferId3 = checkReallocation(x, bufferId2, false)
-  checkEqual(x, y, true)
-
-  if x !== y {
-    println("unexpectedly, x !== y")
-  }
-
-  x += 42
+  let bufferId3 = checkReallocation(x, bufferId2, true)
   checkEqual(x, y, false)
-  if x === y {
-    println("unexpectedly, x === y")
-  }
   
   println("done.")
 }
@@ -223,9 +213,9 @@ func testCocoa() {
   printSequence(a)
   // CHECK-NEXT: [foo, garply, baz]
 
-  // Mutating an element in a changes b, too
+  // Mutating an element in a has no effect on b
   printSequence(b)
-  // CHECK-NEXT: [foo, garply, baz]
+  // CHECK-NEXT: [foo, bar, baz]
   
   a = nsArrayOfStrings()
   a.insert("bag", atIndex:2)
@@ -259,24 +249,25 @@ func testSlice() {
   var bSlice = b[3..5]
   println("<\(bSlice.count)>")
   // CHECK-NEXT: <2>
-  printSequence(bSlice)
-  // CHECK-NEXT: [3, 4]
+  println("bSlice0: \(bSlice)")           // CHECK-NEXT: bSlice0: [3, 4]
 
   // bSlice += X(11)..X(13)
 
-  // Writing into b changes bSlice
+  // Writing into b does not change bSlice
   b[4] = 41        
-  printSequence(bSlice)           // CHECK-NEXT: [3, 41]
+  println("bSlice1: \(bSlice)")           // CHECK-NEXT: bSlice1: [3, 4]
 
-  // Writing into bSlice changes b
-  bSlice[1] = 42                  // CHECK-NEXT: [3, 42]
-  printSequence(bSlice) 
-  printSequence(b)                // CHECK-NEXT: [0, 1, 2, 3, 42, 5, 6]
+  // Writing into bSlice does not change b
+  bSlice[1] = 42
+
+  
+  println("bSlice2: \(bSlice)")           // CHECK-NEXT: bSlice2: [3, 42]
+  printSequence(b)                // CHECK-NEXT: [0, 1, 2, 3, 41, 5, 6]
 
   var c = b
   b[4..b.count].qsort(<)
-  printSequence(b)                // CHECK-NEXT: [0, 1, 2, 3, 5, 6, 42]
-  printSequence(c)                // CHECK-NEXT: [0, 1, 2, 3, 5, 6, 42]
+  printSequence(b)                // CHECK-NEXT: [0, 1, 2, 3, 5, 6, 41]
+  printSequence(c)                // CHECK-NEXT: [0, 1, 2, 3, 41, 5, 6]
 
   // Now a bridged slice
   var a = Array<NSString>(
@@ -291,8 +282,8 @@ func testSlice() {
   aSlice[0] = "buzz"              // CHECK-NEXT: [buzz, baz]
   printSequence(aSlice)  
 
-  // ...and also changes a with reference semantics
-  printSequence(a)                // CHECK-NEXT: [foo, buzz, baz]
+  // ...and doesn't affect a
+  printSequence(a)                // CHECK-NEXT: [foo, bar, baz]
 
   // Appending to aSlice works...
   aSlice += "fodder"              
@@ -300,7 +291,7 @@ func testSlice() {
   printSequence(aSlice)           // CHECK-NEXT: [buzz, baz, fodder]
 
   // And doesn't change a
-  printSequence(a)                // CHECK-NEXT: [foo, buzz, baz]
+  printSequence(a)                // CHECK-NEXT: [foo, bar, baz]
 }
 testSlice()
 

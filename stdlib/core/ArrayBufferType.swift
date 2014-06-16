@@ -47,6 +47,14 @@ protocol ArrayBufferType : MutableCollection {
   mutating func requestUniqueMutableBuffer(minimumCapacity: Int)
     -> ContiguousArrayBuffer<Element>?
 
+  /// Returns true iff this buffer is backed by a uniquely-referenced mutable
+  /// ContiguousArrayBuffer.
+  ///
+  /// Note: this function must remain mutating; otherwise the buffer
+  /// may acquire spurious extra references, which will cause
+  /// unnecessary reallocation.
+  mutating func isMutableAndUniquelyReferenced() -> Bool
+
   /// If this buffer is backed by a ContiguousArrayBuffer, return it.
   /// Otherwise, return nil.  Note: the result's elementStorage may
   /// not match ours, if we are a SliceBuffer.

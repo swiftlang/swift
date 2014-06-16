@@ -183,7 +183,7 @@ func testBridgedVerbatim() {
   println(nsArrayOfBaseConvertedToAnyObjectArray[0] as Base)
 
   //===--- Up- and Down-casts -----------------------------------------------===//
-  let derived: Derived[] = [Derived(11), Derived(22)]
+  var derived: Derived[] = [Derived(11), Derived(22)]
   // CHECK-NEXT: [[derived0:\[Derived#[0-9]+\(11\), Derived#[0-9]+\(22\)\]{1}]]
   println(derived)
 

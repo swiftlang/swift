@@ -39,7 +39,7 @@ protocol ArrayType
   /// element. Otherwise, nil.
   var _elementStorageIfContiguous: UnsafePointer<Element> {get}
 
-  subscript(index: Int) -> Self.GeneratorType.Element {get nonmutating set}
+  subscript(index: Int) -> Self.GeneratorType.Element {get set}
   
   //===--- basic mutations ------------------------------------------------===//
 

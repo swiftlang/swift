@@ -1,7 +1,11 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 
 // Generate all possible permutes.
-func _permuteInternal(elem: Int, size : Int, perm : Int[], visited : Bool[], verify : (Int[]) -> ()) {
+func _permuteInternal(
+  elem: Int, size : Int,
+  inout perm : Int[], inout visited : Bool[],
+  verify : (Int[]) -> ()
+) {
   if (elem == size) {
     verify(perm)
     return
@@ -13,20 +17,16 @@ func _permuteInternal(elem: Int, size : Int, perm : Int[], visited : Bool[], ver
     }
     visited[i] = true
     perm[elem] = i
-    _permuteInternal(elem + 1, size, perm, visited, verify)
+    _permuteInternal(elem + 1, size, &perm, &visited, verify)
     visited[i] = false
   }
 }
 
 // Convenience wrapper for the permute method.
 func permute(size : Int, verify : (Int[]) -> ()) {
-  var perm : Int[] = []
-  var visited : Bool[] = []
-  for i in 0..size {
-    visited.append(false)
-    perm.append(0)
-  }
-  _permuteInternal(0, size, perm, visited, verify)
+  var perm = Int[](count: size, repeatedValue: 0)
+  var visited = Bool[](count: size, repeatedValue: false)
+  _permuteInternal(0, size, &perm, &visited, verify)
 }
 
 
@@ -62,8 +62,8 @@ permute(3, printer)
 let sort_verifier : (Int[]) -> () = {
     var y = sorted($0)
     for i in 0..y.count - 1 {
-      if (y[i] > y[i+1]) {
-        print("Error!\n")
+    if (y[i] > y[i+1]) {
+        println("Error: \(y)")
         return
       }
     }

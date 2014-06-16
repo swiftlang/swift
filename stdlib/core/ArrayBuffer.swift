@@ -183,6 +183,10 @@ extension ArrayBuffer {
     }
     return nil
   }
+
+  mutating func isMutableAndUniquelyReferenced() -> Bool {
+    return Swift.isUniquelyReferenced(&storage) && _hasMutableBuffer
+  }
   
   /// If this buffer is backed by a ContiguousArrayBuffer, return it.
   /// Otherwise, return nil.  Note: the result's elementStorage may
