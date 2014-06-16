@@ -373,15 +373,16 @@ public:
   /// Retrieve the simple upcast conversion function for Array<T>.
   FuncDecl *getArrayUpCast(LazyResolver *resolver) const;
 
-  /// Retrieve the simple downast conversion function for Array<T>.
-  FuncDecl *getArrayDownCast(LazyResolver *resolver) const;
+  /// Retrieve the conditional downcast conversion function for Array<T>.
+  FuncDecl *getArrayDownCastConditional(LazyResolver *resolver) const;
 
   /// Retrieve the simple bridge conversion function for Array<T>.
   FuncDecl *getArrayBridgeToObjectiveC(LazyResolver *resolver) const;
 
   /// Retrieve the function that bridges back from an array of objects to an
   /// array of values.
-  FuncDecl *getArrayBridgeFromObjectiveC(LazyResolver *resolver) const;
+  FuncDecl *
+  getArrayBridgeFromObjectiveCConditional(LazyResolver *resolver) const;
 
   /// Retrieve the simple upcast conversion function for Dictionary<K, V>.
   FuncDecl *getDictionaryUpCast(LazyResolver *resolver) const;

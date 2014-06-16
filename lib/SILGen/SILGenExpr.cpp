@@ -994,8 +994,9 @@ RValue RValueEmitter::visitCollectionDowncastExpr(CollectionDowncastExpr *E,
   auto &ctx = SGF.getASTContext();
   FuncDecl *fn = nullptr;
   if (fromCollection->getDecl() == ctx.getArrayDecl()) {
-    fn = E->bridgesFromObjC() ? ctx.getArrayBridgeFromObjectiveC(nullptr)
-                              : ctx.getArrayDownCast(nullptr);
+    fn = E->bridgesFromObjC() 
+           ? ctx.getArrayBridgeFromObjectiveCConditional(nullptr)
+           : ctx.getArrayDownCastConditional(nullptr);
   } else if (fromCollection->getDecl() == ctx.getDictionaryDecl()) {
     fn = E->bridgesFromObjC() ? ctx.getDictionaryBridgeFromObjectiveC(nullptr)
                               : ctx.getDictionaryDownCast(nullptr);

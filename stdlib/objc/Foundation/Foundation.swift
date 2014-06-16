@@ -595,7 +595,7 @@ func _convertNSArrayToArray<T>(source: NSArray) -> T[] {
 
   var anyObjectArr: AnyObject[]
     = Array(ArrayBuffer(reinterpretCast(source) as _CocoaArray))
-  let result: T[]? = _arrayBridgeFromObjectiveC(anyObjectArr)
+  let result: T[]? = _arrayBridgeFromObjectiveCConditional(anyObjectArr)
   if _fastPath(result) {
     return result!
   }
@@ -642,7 +642,7 @@ extension Array : _ConditionallyBridgedToObjectiveC {
 
     var anyObjectArr: AnyObject[]
       = AnyObject[](ArrayBuffer(reinterpretCast(source) as _CocoaArray))
-    return _arrayBridgeFromObjectiveC(anyObjectArr)
+    return _arrayBridgeFromObjectiveCConditional(anyObjectArr)
   }
 
   @conversion func __conversion() -> NSArray {

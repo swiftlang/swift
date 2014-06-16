@@ -83,12 +83,12 @@ struct ASTContext::Implementation {
   /// Array<T> -> Array<U> bridge conversion where T is bridged non-verbatim.
   FuncDecl *GetArrayBridgeToObjectiveC = nullptr;
 
-  /// Array<T> -> Array<U> checked bridge conversion where U is brdiged
+  /// Array<T> -> Array<U> conditional bridge conversion where U is bridged
   /// non-verbatim.
-  FuncDecl *GetArrayBridgeFromObjectiveC = nullptr;
+  FuncDecl *GetArrayBridgeFromObjectiveCConditional = nullptr;
 
-  /// Array<T> downcast conversion.
-  FuncDecl *GetArrayDownCast = nullptr;
+  /// Array<T> conditional downcast conversion.
+  FuncDecl *GetArrayDownCastConditional = nullptr;
 
   /// Dictionary<K, V> simple upcast.
   FuncDecl *GetDictionaryUpCast = nullptr;
@@ -681,14 +681,15 @@ FuncDecl *ASTContext::getArrayBridgeToObjectiveC(LazyResolver *resolver) const {
   return decl;
 }
 
-FuncDecl *ASTContext::getArrayBridgeFromObjectiveC(
+FuncDecl *ASTContext::getArrayBridgeFromObjectiveCConditional(
             LazyResolver *resolver) const {
-  auto &cache = Impl.GetArrayBridgeFromObjectiveC;
+  auto &cache = Impl.GetArrayBridgeFromObjectiveCConditional;
   if (cache) return cache;
 
   // Look for a generic function.
   CanType input, output, param;
-  auto decl = findLibraryIntrinsic(*this, "_arrayBridgeFromObjectiveC",
+  auto decl = findLibraryIntrinsic(*this, 
+                                   "_arrayBridgeFromObjectiveCConditional",
                                    resolver);
   if (!decl)
     return nullptr;
@@ -697,13 +698,15 @@ FuncDecl *ASTContext::getArrayBridgeFromObjectiveC(
   return decl;
 }
 
-FuncDecl *ASTContext::getArrayDownCast(LazyResolver *resolver) const {
-  auto &cache = Impl.GetArrayDownCast;
+FuncDecl *
+ASTContext::getArrayDownCastConditional(LazyResolver *resolver) const {
+  auto &cache = Impl.GetArrayDownCastConditional;
   if (cache) return cache;
   
   // Look for a generic function.
   CanType input, output, param;
-  auto decl = findLibraryIntrinsic(*this, "_arrayCheckedDownCast", resolver);
+  auto decl = findLibraryIntrinsic(*this, "_arrayDownCastConditional", 
+                                   resolver);
   if (!decl)
     return nullptr;
   
