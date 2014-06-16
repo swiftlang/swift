@@ -1,7 +1,5 @@
 set(UNICODE_TABLES UnicodeExtendedGraphemeClusters.cpp.gyb)
 
-handle_gyb_sources(UNICODE_TABLES)
-
 add_swift_library(swiftBasic
   Cache.cpp
   Demangle.cpp
