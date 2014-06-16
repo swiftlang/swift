@@ -1076,15 +1076,15 @@ struct RC4 {
   }
 }
 
-func benchStringSort_internal(var words: String[]) {
-  sort(words)
+func benchStringSort_internal(inout words: String[]) {
+  sort(&words)
 }
 
 func benchStringSort() {
   let start = __mach_absolute_time__()
   for i in 0..50 {  // do not change '50', we have historic perf data
     // Notice that we _copy_ the array of words before we sort it.
-    benchStringSort_internal(stringBenchmarkWords)
+    benchStringSort_internal(&stringBenchmarkWords)
   }
   let delta = __mach_absolute_time__() - start
 

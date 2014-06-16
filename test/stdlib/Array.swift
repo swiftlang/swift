@@ -93,5 +93,34 @@ func testReverse() {
 }
 testReverse()
 
+func testSort() {
+  var a = [3, 1, 9, 7]
+  println(a.sorted { $0 < $1 })
+  // CHECK-NEXT: [1, 3, 7, 9]
+  println(a.sorted { $0 > $1 })
+  // CHECK-NEXT: [9, 7, 3, 1]
+  println(a)
+  // CHECK-NEXT: [3, 1, 9, 7]
+  a.sort { $0 < $1 }
+  println(a)
+  // CHECK-NEXT: [1, 3, 7, 9]
+  a.sort { $0 > $1 }
+  println(a)
+  // CHECK-NEXT: [9, 7, 3, 1]
+
+  // Also make sure the free functions do somethign sane
+  a = [3, 1, 9, 7]
+  println(sorted(a))
+  // CHECK-NEXT: [1, 3, 7, 9]
+  println(sorted(a) { $0 > $1 })
+  // CHECK-NEXT: [9, 7, 3, 1]
+  sort(&a)
+  println(a)
+  // CHECK-NEXT: [1, 3, 7, 9]
+  sort(&a) { $0 > $1 }
+  println(a)
+  // CHECK-NEXT: [9, 7, 3, 1]
+}
+testSort()
 println("done!") // CHECK-NEXT: {{^done!$}}
 

@@ -7,7 +7,7 @@
 // CHECK: [ DW_TAG_arg_variable ] [b] [line 10] [piece, size 8, offset 16]
 func demo () {
     var names = ["Sean", "Barry", "Kate"]
-    var sortedNames = sort(names) {(a, b) in
+    var sortedNames = sorted(names) {(a, b) in
         println("Sorting..\(a) & \(b)")
         return (a < b)
     }

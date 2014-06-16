@@ -144,13 +144,13 @@ func equalsUnordered(lhs: Array<(Int, Int)>, rhs: Array<(Int, Int)>) -> Bool {
   func comparePair(lhs: (Int, Int), rhs: (Int, Int)) -> Bool {
     return lexicographicalCompare([ lhs.0, lhs.1 ], [ rhs.0, rhs.1 ])
   }
-  return equal(sort(lhs, comparePair), sort(rhs, comparePair)) {
+  return equal(sorted(lhs, comparePair), sorted(rhs, comparePair)) {
     $0.0 == $1.0 && $0.1 == $1.1
   }
 }
 
 func equalsUnordered(lhs: Array<Int>, rhs: Array<Int>) -> Bool {
-  return equal(sort(lhs), sort(rhs))
+  return equal(sorted(lhs), sorted(rhs))
 }
 
 //===---

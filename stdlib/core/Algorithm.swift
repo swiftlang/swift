@@ -94,15 +94,18 @@ func insertionSort<
 /// Partition a non empty range into two partially sorted regions and return
 /// the index of the pivot:
 /// [start..idx), pivot ,[idx..end)
-func partition<C: MutableCollection where C.IndexType: SignedInteger>(
+func partition<C: MutableCollection where C.IndexType: RandomAccessIndex>(
   inout elements: C,
   range: Range<C.IndexType>,
   inout less: (C.GeneratorType.Element, C.GeneratorType.Element)->Bool
 ) -> C.IndexType {
 
+  _precondition(
+    range.startIndex != range.endIndex, "Can't partition an empty range")
+
   // Variables i and j point to the next element to be visited.
   var i = range.startIndex
-  var j = range.endIndex - 1
+  var j = range.endIndex.pred()
 
   // The first element is the pivot.
   let pivot = elements[range.startIndex]
@@ -110,17 +113,17 @@ func partition<C: MutableCollection where C.IndexType: SignedInteger>(
 
   // Continue to swap until all elements were visited and placed in one
   // of the partitions.
-  while i <= j {
+  while i.distanceTo(j) >= 0 {
     while less(elements[i], pivot) {
       i++
-      if (i > j) { break }
+      if (i.distanceTo(j) < 0) { break }
     }
     while less(pivot, elements[j]) {
       j--
       // We don't need to check if j is greater than zero because we placed
       // our pivot at startIndex and comparing with pivot ends this loop.
     }
-    if i <= j {
+    if i.distanceTo(j) >= 0 {
       swap(&elements[i], &elements[j])
       i++
       j--
@@ -128,12 +131,12 @@ func partition<C: MutableCollection where C.IndexType: SignedInteger>(
   }
 
   // Swap the pivot in between the two partitions.
-  swap(&elements[i - 1], &elements[range.startIndex])
-  return i - 1
+  swap(&elements[i.pred()], &elements[range.startIndex])
+  return i.pred()
 }
 
 
-func quickSort<C: MutableCollection where C.IndexType: SignedInteger>(
+func quickSort<C: MutableCollection where C.IndexType: RandomAccessIndex>(
   inout elements: C,
   range: Range<C.IndexType>,
   less: (C.GeneratorType.Element, C.GeneratorType.Element)->Bool
@@ -142,7 +145,7 @@ func quickSort<C: MutableCollection where C.IndexType: SignedInteger>(
   _quickSort(&elements, range, &comp)
 }
 
-func _quickSort<C: MutableCollection where C.IndexType: SignedInteger>(
+func _quickSort<C: MutableCollection where C.IndexType: RandomAccessIndex>(
   inout elements: C,
   range: Range<C.IndexType>,
   inout less: (C.GeneratorType.Element, C.GeneratorType.Element)->Bool
@@ -158,7 +161,7 @@ func _quickSort<C: MutableCollection where C.IndexType: SignedInteger>(
    // Partition and sort.
   let part_idx : C.IndexType = partition(&elements, range, &less)
   _quickSort(&elements, range.startIndex..part_idx, &less);
-  _quickSort(&elements, (part_idx + 1)..range.endIndex, &less);
+  _quickSort(&elements, (part_idx.succ())..range.endIndex, &less);
 }
 
 struct Less<T: Comparable> {
@@ -167,21 +170,61 @@ struct Less<T: Comparable> {
   }
 }
 
-func sort<T>(var array: T[], pred: (T, T) -> Bool) -> T[] {
+func sort<T>(inout array: T[], pred: (T, T) -> Bool) {
   quickSort(&array, 0..array.count, pred)
-  return array
 }
 
 /// The functions below are a copy of the functions above except that
 /// they don't accept a predicate and they are hardcoded to use the less-than
 /// comparator.
-func sort<T : Comparable>(var array: T[]) -> T[] {
+func sort<T : Comparable>(inout array: T[]) {
   quickSort(&array, 0..array.count)
-  return array
+}
+
+func sorted<
+  C: MutableCollection where C.IndexType: RandomAccessIndex
+>(
+  source: C,
+  pred: (C.GeneratorType.Element, C.GeneratorType.Element) -> Bool
+) -> C {
+  var result = source
+  quickSort(&result, indices(result), pred)
+  return result
+}
+
+func sorted<
+  C: MutableCollection 
+    where C.GeneratorType.Element: Comparable, C.IndexType: RandomAccessIndex
+>(source: C) -> C {
+  var result = source
+  quickSort(&result, indices(result))
+  return result
+}
+
+func sorted<
+  S: Sequence
+>(
+  source: S,
+  pred: (S.GeneratorType.Element, S.GeneratorType.Element) -> Bool
+) -> S.GeneratorType.Element[] {
+  var result = Array(source)
+  quickSort(&result, indices(result), pred)
+  return result
+}
+
+func sorted<
+  S: Sequence 
+    where S.GeneratorType.Element: Comparable
+>(
+  source: S
+) -> S.GeneratorType.Element[] {
+  var result = Array(source)
+  quickSort(&result, indices(result))
+  return result
 }
 
 func insertionSort<
-  C: MutableCollection where C.IndexType: BidirectionalIndex,
+  C: MutableCollection where C.IndexType: RandomAccessIndex,
   C.GeneratorType.Element: Comparable>(
   inout elements: C,
   range: Range<C.IndexType>) {
@@ -226,13 +269,16 @@ func insertionSort<
 /// Partition a non empty range into two partially sorted regions and return
 /// the index of the pivot:
 /// [start..idx), pivot ,[idx..end)
-func partition<C: MutableCollection where C.GeneratorType.Element: Comparable, C.IndexType: SignedInteger>(
+func partition<
+  C: MutableCollection where C.GeneratorType.Element: Comparable
+, C.IndexType: RandomAccessIndex
+>(
   inout elements: C,
   range: Range<C.IndexType>) -> C.IndexType {
 
   // Variables i and j point to the next element to be visited.
   var i = range.startIndex
-  var j = range.endIndex - 1
+  var j = range.endIndex.pred()
 
   // The first element is the pivot.
   let pivot = elements[range.startIndex]
@@ -240,17 +286,17 @@ func partition<C: MutableCollection where C.GeneratorType.Element: Comparable, C
 
   // Continue to swap until all elements were visited and placed in one
   // of the partitions.
-  while i <= j {
+  while i.distanceTo(j) >= 0 {
     while Less.compare(elements[i], pivot) {
       i++
-      if (i > j) { break }
+      if (i.distanceTo(j) < 0) { break }
     }
     while Less.compare(pivot, elements[j]) {
       // We don't need to check if j is greater than zero because we placed
       // our pivot at startIndex and comparing with pivot ends this loop.
       j--
     }
-    if i <= j {
+    if i.distanceTo(j) >= 0 {
       swap(&elements[i], &elements[j])
       i++
       j--
@@ -258,17 +304,17 @@ func partition<C: MutableCollection where C.GeneratorType.Element: Comparable, C
   }
 
   // Swap the pivot in between the two partitions.
-  swap(&elements[i - 1], &elements[range.startIndex])
-  return i - 1
+  swap(&elements[i.pred()], &elements[range.startIndex])
+  return i.pred()
 }
 
-func quickSort<C: MutableCollection where C.GeneratorType.Element: Comparable, C.IndexType: SignedInteger>(
+func quickSort<C: MutableCollection where C.GeneratorType.Element: Comparable, C.IndexType: RandomAccessIndex>(
   inout elements: C,
   range: Range<C.IndexType>) {
   _quickSort(&elements, range)
 }
 
-func _quickSort<C: MutableCollection where C.GeneratorType.Element: Comparable, C.IndexType: SignedInteger>(
+func _quickSort<C: MutableCollection where C.GeneratorType.Element: Comparable, C.IndexType: RandomAccessIndex>(
   inout elements: C, range: Range<C.IndexType>) {
   // Insertion sort is better at handling smaller regions.
   let cnt = count(range)
@@ -279,7 +325,7 @@ func _quickSort<C: MutableCollection where C.GeneratorType.Element: Comparable, 
    // Partition and sort.
   let part_idx : C.IndexType = partition(&elements, range)
   _quickSort(&elements, range.startIndex..part_idx);
-  _quickSort(&elements, (part_idx + 1)..range.endIndex);
+  _quickSort(&elements, (part_idx.succ())..range.endIndex);
 }
 //// End of non-predicate sort functions.
 

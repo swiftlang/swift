@@ -21,13 +21,13 @@ println(maxElement(arr[1..5]))
 // sorting
 
 // FIXME: compilation fails without the temporary xxx
-var xxx = sort(["apple", "Banana", "cherry"])
+var xxx = sorted(["apple", "Banana", "cherry"])
 println(xxx)
 
 // CHECK-NEXT: [Banana, apple, cherry]
 
 // FIXME: compilation fails without the temporary yyy
-var yyy = sort(["apple", "Banana", "cherry"],
+var yyy = sorted(["apple", "Banana", "cherry"],
                { $0.lowercaseString > $1.lowercaseString })
 println(yyy)
 // CHECK-NEXT: [cherry, Banana, apple]

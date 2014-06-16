@@ -60,8 +60,7 @@ permute(3, printer)
 
 // Now, let's verify the sort.
 let sort_verifier : (Int[]) -> () = {
-    var y = $0.copy()
-    sort(y)
+    var y = sorted($0)
     for i in 0..y.count - 1 {
       if (y[i] > y[i+1]) {
         print("Error!\n")

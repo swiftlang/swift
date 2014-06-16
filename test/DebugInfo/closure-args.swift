@@ -50,7 +50,7 @@ func main() -> Void
 
     var my_string = ["a", "b", "c", "d"]
 
-    var new_string = sort (my_string, backward_ptr )
+    var new_string = sorted (my_string, backward_ptr )
 
     print (new_string)
     print ("\n")

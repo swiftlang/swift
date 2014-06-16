@@ -239,10 +239,14 @@ extension ${Self} : ArrayType {
     return Swift.reduce(self, initial, combine)
   }
 
-  func sort(isOrderedBefore: (T, T)->Bool) {
-    // We have reference semantics for subscript assignment
-    var mutableSelf = self 
-    quickSort(&mutableSelf, indices(self), isOrderedBefore)
+  mutating func sort(isOrderedBefore: (T, T)->Bool) {
+    quickSort(&self, indices(self), isOrderedBefore)
+  }
+
+  func sorted(isOrderedBefore: (T, T)->Bool) -> ${Self} {
+    var result = self.copy()
+    result.sort(isOrderedBefore)
+    return result
   }
 
   /// Return a ${Self} containing the results of calling

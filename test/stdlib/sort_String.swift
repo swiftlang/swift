@@ -7,7 +7,7 @@ func test() {
   array[2] = "bsqdunldltkxripsaxkaojfiovnxulshiohbumirjzgfmovowiv"
   array[3] = "hepdatupehcbbdyhyjsnvtzhfupd"
   array[4] = "rlrezqqlfpoktoiitbtyngyyyeoglmwxfrxjtejmyy"
-  array = sort(array)
+  array = sorted(array)
   for i in array {
     println(i)
   }

@@ -75,7 +75,7 @@ func test() {
     var arrayPerson = [Person(), Person()]
     var dictionary = [1 : "Kate", 2 : "Sean", 3 : "Barry"]
 
-    var sortedArrayString = sort(["C", "B", "A"],
+    var sortedArrayString = sorted(["C", "B", "A"],
     {
         $0 < $1
     })
