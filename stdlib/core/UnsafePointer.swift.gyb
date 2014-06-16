@@ -1,3 +1,4 @@
+%# -*- mode: swift -*-
 //===----------------------------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
@@ -10,17 +11,15 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A wrapper around a C pointer to type T.
-///
-/// This wrapper stores a C pointer to an object of type T, and is
-/// intended to be used to interface with C libraries. It provides no
+% for mutable in (True, False):
+%  Self = 'UnsafePointer' if mutable else 'ConstUnsafePointer'
+%  a_Self = 'an UnsafePointer' if mutable else 'a ConstUnsafePointer'
+
+/// This type stores a pointer to an object of type T. It provides no
 /// automated memory management, and therefore the user must take care
 /// to allocate and free memory appropriately.
-///
-/// For C pointers for which the pointed-to type cannot be represented
-/// directly in Swift, the `COpaquePointer` will be used instead.
-struct UnsafePointer<T> : BidirectionalIndex, Comparable, Hashable,
-                          LogicValue, NilLiteralConvertible {
+struct ${Self}<T> : BidirectionalIndex, Comparable, Hashable,
+                    LogicValue, NilLiteralConvertible {
   /// The underlying raw (untyped) pointer.
   var value : Builtin.RawPointer
 
@@ -29,46 +28,54 @@ struct UnsafePointer<T> : BidirectionalIndex, Comparable, Hashable,
     self.value = Builtin.inttoptr_Word(0.value)
   }
 
-  /// Construct an UnsafePointer from a builtin raw pointer.
+  /// Construct ${a_Self} from a builtin raw pointer.
   init(_ value : Builtin.RawPointer) {
     self.value = value
   }
 
-  /// Convert from an opaque C pointer to a typed C pointer.
+  /// Convert from an opaque C pointer to a typed pointer
   ///
   /// This is a fundamentally unsafe conversion.
   init(_ other : COpaquePointer) {
     value = other.value
   }
 
-  /// Construct an UnsafePointer from a given address in memory.
+  /// Construct ${a_Self} from a given address in memory.
   ///
   /// This is a fundamentally unsafe conversion.
   init(_ value : Int) {
     self.value = Builtin.inttoptr_Word(value.value)
   }
 
-  /// Convert from a pointer of a different type.
+  /// Convert from an UnsafePointer of a different type.
   ///
   /// This is a fundamentally unsafe conversion.
   init<U>(_ from : UnsafePointer<U>) {
     value = from.value
   }
 
-  // Make nil work with UnsafePointer
+  /// Convert from a ConstUnsafePointer of a different type.
+  ///
+  /// This is a fundamentally unsafe conversion.
+  init<U>(_ from : ConstUnsafePointer<U>) {
+    value = from.value
+  }
+
+  // Make nil work with ${Self}.
   @transparent
-  static func convertFromNilLiteral() -> UnsafePointer<T> {
+  static func convertFromNilLiteral() -> ${Self}<T> {
     return .null()
   }
 
-  static func null() -> UnsafePointer {
-    return UnsafePointer()
+  static func null() -> ${Self} {
+    return ${Self}()
   }
 
-  static func alloc(num: Int) -> UnsafePointer {
+%  if mutable:
+  static func alloc(num: Int) -> ${Self} {
     // Don't bother with overflow checking.
     var size = Int(Builtin.strideof(T.self)) * num
-    return UnsafePointer(Builtin.allocRaw(size.value, Builtin.alignof(T.self)))
+    return ${Self}(Builtin.allocRaw(size.value, Builtin.alignof(T.self)))
   }
 
   func dealloc(num: Int) {
@@ -76,6 +83,7 @@ struct UnsafePointer<T> : BidirectionalIndex, Comparable, Hashable,
     var size = Int(Builtin.strideof(T.self)) * num
     Builtin.deallocRaw(value, size.value, Builtin.alignof(T.self))
   }
+%  end
 
   /// Access the underlying raw memory, getting and
   /// setting values.
@@ -83,11 +91,14 @@ struct UnsafePointer<T> : BidirectionalIndex, Comparable, Hashable,
     @transparent get {
       return Builtin.load(value)
     }
+%  if mutable:
     @transparent nonmutating set {
       Builtin.assign(newValue, value)
     }
+%  end
   }
 
+%  if mutable:
   /// Initialize the value the pointer points to, to construct
   /// an object where there was no object previously stored.
   func initialize(newvalue: T) {
@@ -109,12 +120,12 @@ struct UnsafePointer<T> : BidirectionalIndex, Comparable, Hashable,
   /// later memory that may overlap with the source range.
   ///
   /// Requires: either `source` precedes `self` or follows `self + count`.
-  func moveInitializeBackwardFrom(source: UnsafePointer, count: Int) {
+  func moveInitializeBackwardFrom(source: ${Self}, count: Int) {
     _debugPrecondition(
-      count >= 0, "UnsafePointer.moveInitializeBackwardFrom with negative count")
+      count >= 0, "${Self}.moveInitializeBackwardFrom with negative count")
     _debugPrecondition(
       source <= self || source > self + count,
-      "UnsafePointer.moveInitializeBackwardFrom non-preceding overlapping range; use moveInitializeFrom instead")
+      "${Self}.moveInitializeBackwardFrom non-preceding overlapping range; use moveInitializeFrom instead")
     var src = source + count
     var dst = self + count
     while dst != self {
@@ -124,7 +135,7 @@ struct UnsafePointer<T> : BidirectionalIndex, Comparable, Hashable,
 
   /// Assign from count values beginning at source into initialized
   /// memory, transforming the source values into raw memory.
-  func moveAssignFrom(source: UnsafePointer, count: Int) {
+  func moveAssignFrom(source: ${Self}, count: Int) {
     _debugPrecondition(
       count >= 0, "moveAssignFrom with negative count")
     _debugPrecondition(
@@ -137,24 +148,24 @@ struct UnsafePointer<T> : BidirectionalIndex, Comparable, Hashable,
 
   /// Move count values beginning at source into raw memory,
   /// transforming the source values into raw memory.
-  func moveInitializeFrom(source: UnsafePointer, count: Int) {
+  func moveInitializeFrom(source: ${Self}, count: Int) {
     _debugPrecondition(
-      count >= 0, "UnsafePointer.moveInitializeFrom with negative count")
+      count >= 0, "${Self}.moveInitializeFrom with negative count")
     _debugPrecondition(
       source >= self || source < self - count,
-      "UnsafePointer.moveInitializeFrom non-following overlapping range; use moveInitializeBackwardFrom")
+      "${Self}.moveInitializeFrom non-following overlapping range; use moveInitializeBackwardFrom")
     for i in 0..count {
       (self + i).initialize((source + i).move())
     }
   }
 
   /// Copy count values beginning at source into raw memory.
-  func initializeFrom(source: UnsafePointer, count: Int) {
+  func initializeFrom(source: ${Self}, count: Int) {
     _debugPrecondition(
-      count >= 0, "UnsafePointer.initializeFrom with negative count")
+      count >= 0, "${Self}.initializeFrom with negative count")
     _debugPrecondition(
       source >= self || source < self - count,
-      "UnsafePointer.initializeFrom non-following overlapping range")
+      "${Self}.initializeFrom non-following overlapping range")
     for i in 0..count {
       (self + i).initialize(source[i])
     }
@@ -183,13 +194,14 @@ struct UnsafePointer<T> : BidirectionalIndex, Comparable, Hashable,
 
   /// Destroy the `count` objects the pointer points to.
   func destroy(count: Int) {
-    _debugPrecondition(count >= 0, "UnsafePointer.destroy with negative count")
+    _debugPrecondition(count >= 0, "${Self}.destroy with negative count")
     Builtin.destroyArray(T.self, value, count.value)
   }
+%  end
 
   @transparent
   var _isNull : Bool {
-    return self == UnsafePointer.null()
+    return self == ${Self}.null()
   }
 
   @transparent
@@ -202,10 +214,12 @@ struct UnsafePointer<T> : BidirectionalIndex, Comparable, Hashable,
     get {
       return (self + i).memory
     }
+%  if mutable:
     @transparent
     nonmutating set {
       (self + i).memory = newValue
     }
+%  end
   }
 
   //
@@ -214,10 +228,10 @@ struct UnsafePointer<T> : BidirectionalIndex, Comparable, Hashable,
   var hashValue: Int {
     return Int(Builtin.ptrtoint_Word(value))
   }
-  func succ() -> UnsafePointer {
+  func succ() -> ${Self} {
     return self + 1
   }
-  func pred() -> UnsafePointer {
+  func pred() -> ${Self} {
     return self - 1
   }
 
@@ -311,34 +325,34 @@ struct UnsafePointer<T> : BidirectionalIndex, Comparable, Hashable,
 }
 
 @transparent
-func == <T> (lhs: UnsafePointer<T>, rhs: UnsafePointer<T>) -> Bool {
+func == <T> (lhs: ${Self}<T>, rhs: ${Self}<T>) -> Bool {
   return Bool(Builtin.cmp_eq_RawPointer(lhs.value, rhs.value))
 }
 
 @transparent
-func < <T>(lhs: UnsafePointer<T>, rhs: UnsafePointer<T>) -> Bool {
+func < <T>(lhs: ${Self}<T>, rhs: ${Self}<T>) -> Bool {
   return Bool(Builtin.cmp_ult_RawPointer(lhs.value, rhs.value))
 }
 
 @transparent
-func + <T>(lhs: UnsafePointer<T>, rhs: Int) -> UnsafePointer<T> {
-  return UnsafePointer(
+func + <T>(lhs: ${Self}<T>, rhs: Int) -> ${Self}<T> {
+  return ${Self}(
     Builtin.gep_Word(lhs.value, (rhs * Int(Builtin.strideof(T.self))).value))
 }
 
 @transparent
 func + <T>(lhs: Int,
-           rhs: UnsafePointer<T>) -> UnsafePointer<T> {
+           rhs: ${Self}<T>) -> ${Self}<T> {
   return rhs + lhs
 }
 
 @transparent
-func - <T>(lhs: UnsafePointer<T>, rhs: Int) -> UnsafePointer<T> {
+func - <T>(lhs: ${Self}<T>, rhs: Int) -> ${Self}<T> {
   return lhs + -rhs
 }
 
 @transparent
-func - <T>(lhs: UnsafePointer<T>, rhs: UnsafePointer<T>) -> Int {
+func - <T>(lhs: ${Self}<T>, rhs: ${Self}<T>) -> Int {
   return
     Int(Builtin.sub_Word(Builtin.ptrtoint_Word(lhs.value),
                          Builtin.ptrtoint_Word(rhs.value)))
@@ -346,20 +360,21 @@ func - <T>(lhs: UnsafePointer<T>, rhs: UnsafePointer<T>) -> Int {
 }
 
 @transparent
-@assignment func += <T>(inout lhs: UnsafePointer<T>, rhs: Int) {
+@assignment func += <T>(inout lhs: ${Self}<T>, rhs: Int) {
   lhs = lhs + rhs
 }
 
 @transparent
-@assignment func -= <T>(inout lhs: UnsafePointer<T>, rhs: Int) {
+@assignment func -= <T>(inout lhs: ${Self}<T>, rhs: Int) {
   lhs = lhs - rhs
 }
 
-extension UnsafePointer : Printable {
+extension ${Self} : Printable {
   var description: String {
     return ""
   }
 }
+% end # for mutable
 
 /// A byte-sized thing that isn't designed to interoperate with
 /// any other types; it makes a decent parameter to UnsafePointer when

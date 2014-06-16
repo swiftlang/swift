@@ -76,7 +76,7 @@ set(SWIFTLIB_ESSENTIAL
   UnicodeScalar.swift
   Unmanaged.swift
   UnsafeArray.swift.gyb
-  UnsafePointer.swift
+  UnsafePointer.swift.gyb
   )
 
 # The complete list of sources in the core standard library.  Includes
