@@ -5,6 +5,6 @@
 
 import AppKit
 
-let service = NSSharingService(named: NSSharingServiceNamePostOnTwitter)
-// CHECK: Twitter
-println(service.title)
+let image = NSImage(named: NSImageNameTrashEmpty)
+// CHECK: TrashEmpty
+println(image.name())
