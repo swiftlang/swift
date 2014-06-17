@@ -12,10 +12,17 @@
 
 import SwiftShims
 
-// The empty array prototype.  We use the same object for all empty
-// [Native]Array<T>s.
-let emptyNSSwiftArray : _NSSwiftArray
-  = reinterpretCast(ContiguousArrayBuffer<Int>(count: 0, minimumCapacity: 0))
+// The empty array prototype.  We use the same buffer object for all
+// empty [Native]Array<T>s.
+let _emptyContiguousArrayBuffer : ContiguousArrayBuffer<Int> = {
+  let result = ContiguousArrayBuffer<Int>(count: 0, minimumCapacity: 0)
+  // It probably doesn't matter that this buffer can have non-zero
+  // actual capacity, because it will never be uniquely referenced, so
+  // it will never grow in place.  However, for sanity's sake, let's
+  // make sure no code thinks they can grow it.
+  result._base._value[0]._capacityAndFlags = 0
+  return result
+}()
 
 // The class that implements the storage for a ContiguousArray<T>
 @final class ContiguousArrayStorage<T> : _NSSwiftArray {
@@ -232,7 +239,7 @@ struct ContiguousArrayBuffer<T> : ArrayBufferType, LogicValue {
       isBridgedToObjectiveC(T.self),
       "Array element type is not bridged to ObjectiveC")
     if count == 0 {
-      return emptyNSSwiftArray
+      return reinterpretCast(_emptyContiguousArrayBuffer._base.storage)
     }
     if _fastPath(_base.value.elementTypeIsBridgedVerbatim) {
       return reinterpretCast(_base.storage)
@@ -247,7 +254,7 @@ struct ContiguousArrayBuffer<T> : ArrayBufferType, LogicValue {
 
   /// A value that identifies first mutable element, if any.  Two
   /// arrays compare === iff they are both empty, or if their buffers
-  /// have the same identity and count.
+  /// have the same identity and count.  Used only for testing.
   var identity: Word {
     return reinterpretCast(elementStorage)
   }

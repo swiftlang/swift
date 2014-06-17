@@ -67,6 +67,36 @@ func _reinterpretCastToAnyObject<T>(x: T) -> AnyObject {
   return reinterpretCast(x)
 }
 
+/*
+/// Checking for type equivalence
+@transparent
+func === <T, U>(lhs: T.Type, rhs: U.Type) -> Bool {
+  return reinterpretCast(lhs) as Word == reinterpretCast(rhs)
+}
+
+@transparent
+func !== <T, U>(lhs: T.Type, rhs: U.Type) -> Bool {
+  return !(lhs === rhs)
+}
+
+@transparent
+func === <T>(_: T.Type, _: T.Type) -> Bool {
+  return true
+}
+
+@transparent
+func !== <T>(_: T.Type, _: T.Type) -> Bool {
+  return false
+}
+*/
+
+@transparent
+func _sanityCheckedDownCast<T, U>(x: T, U.Type) -> U {
+  _sanityCheck(x as Any as? U,
+    "_sanityCheckedDownCast: expected type not found!")
+  return reinterpretCast(x) as U
+}
+
 @transparent
 func ==(lhs: Builtin.NativeObject, rhs: Builtin.NativeObject) -> Bool {
   return (reinterpretCast(lhs) as Int) == (reinterpretCast(rhs) as Int)
@@ -136,4 +166,3 @@ func _fastPath<C: LogicValue>(x: C) -> Bool {
 func _slowPath<C: LogicValue>(x: C) -> Bool {
   return _branchHint(x.getLogicValue(), false)
 }
-

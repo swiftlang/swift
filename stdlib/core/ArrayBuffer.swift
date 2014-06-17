@@ -87,30 +87,75 @@ class IndirectArrayBuffer {
   }
 }
 
+let _emptyIndirectArrayBuffer = IndirectArrayBuffer(
+  nativeBuffer: _emptyContiguousArrayBuffer,
+  isMutable: false,
+  needsElementTypeCheck: true
+)
+
+enum ArrayBufferStorage<T> {
+case Direct(ContiguousArrayStorage<T>)
+case Indirect(IndirectArrayBuffer)
+
+  init() {
+    _sanityCheck(sizeof(ArrayBufferStorage<T>.self) == sizeof(Word.self))
+    if !_isClassOrObjCExistential(T.self) {
+      let s: ContiguousArrayStorage = _emptyContiguousArrayBuffer._storage!
+      self = Direct(reinterpretCast(s) as ContiguousArrayStorage<T>)
+    }
+    else {
+      self = Indirect(_emptyIndirectArrayBuffer)
+    }
+  }
+
+  init(_ source: ContiguousArrayBuffer<T>) {
+    if !_isClassOrObjCExistential(T.self) {
+      self = source ? Direct(source._storage!) : ArrayBufferStorage()
+    }
+    else {
+      self = Indirect(
+        IndirectArrayBuffer(
+          nativeBuffer: source, isMutable: true, needsElementTypeCheck: false))
+    }
+  }
+
+  mutating func isUniquelyReferenced() -> Bool {
+    // Extract the buffer without increasing its refcount
+    var x = self.bufferAsWord()
+    return Swift.isUniquelyReferenced(&x)
+  }
+
+  func bufferAsWord() -> Word {
+    switch self {
+    case Direct(let x):
+      return reinterpretCast(x) as Word
+    case Indirect(let x):
+      return reinterpretCast(x) as Word
+    }
+  }
+}
+
 struct ArrayBuffer<T> : ArrayBufferType {
-  var storage: Builtin.NativeObject?
+  var storage: ArrayBufferStorage<T> = ArrayBufferStorage()
 
   var indirect: IndirectArrayBuffer {
     _sanityCheck(_isClassOrObjCExistential(T.self))
-    return Builtin.castFromNativeObject(storage!)
+    switch storage {
+    case .Indirect(let x):
+      return x
+    default:
+      _fatalError("Array of Class or ObjC existential without indirect buffer")
+    }
   }
   
   typealias Element = T
 
   /// create an empty buffer
-  init() {
-    storage = !_isClassOrObjCExistential(T.self)
-      ? nil : Builtin.castToNativeObject(
-      IndirectArrayBuffer(
-        nativeBuffer: ContiguousArrayBuffer<T>(),
-        isMutable: false,
-        needsElementTypeCheck: false
-      ))
-  }
+  init() {}
 
   init(_ cocoa: _CocoaArray) {
     _sanityCheck(_isClassOrObjCExistential(T.self))
-    storage = Builtin.castToNativeObject(
+    storage = .Indirect(
       IndirectArrayBuffer(
         cocoa: cocoa,
         // FIXME: it may be possible to avoid a deferred check if we can
@@ -119,7 +164,7 @@ struct ArrayBuffer<T> : ArrayBufferType {
   }
 
   init(_ buffer: IndirectArrayBuffer) {
-    storage = Builtin.castToNativeObject(buffer)
+    storage = .Indirect(buffer)
   }
   
   /// Returns an `ArrayBuffer<U>` containing the same elements.
@@ -136,20 +181,12 @@ struct ArrayBuffer<T> : ArrayBufferType {
 extension ArrayBuffer {
   /// Adopt the storage of source
   init(_ source: NativeBuffer) {
-    if !_isClassOrObjCExistential(T.self) {
-      self.storage
-        = source._storage ? Builtin.castToNativeObject(source._storage!) : nil
-    }
-    else {
-      self.storage = Builtin.castToNativeObject(
-        IndirectArrayBuffer(
-          nativeBuffer: source, isMutable: true, needsElementTypeCheck: false))
-    }
+    storage = ArrayBufferStorage(source)
   }
   
   /// Return true iff this buffer's storage is uniquely-referenced.
   mutating func isUniquelyReferenced() -> Bool {
-    return Swift.isUniquelyReferenced(&storage)
+    return storage.isUniquelyReferenced()
   }
 
   /// Convert to an NSArray.
@@ -177,7 +214,7 @@ extension ArrayBuffer {
   mutating func requestUniqueMutableBuffer(minimumCapacity: Int)
     -> NativeBuffer?
   {
-    if _fastPath(Swift.isUniquelyReferenced(&storage) && _hasMutableBuffer) {
+    if _fastPath(storage.isUniquelyReferenced() && _hasMutableBuffer) {
       let b = _native
       return b.capacity >= minimumCapacity ? b : nil
     }
@@ -185,7 +222,7 @@ extension ArrayBuffer {
   }
 
   mutating func isMutableAndUniquelyReferenced() -> Bool {
-    return Swift.isUniquelyReferenced(&storage) && _hasMutableBuffer
+    return storage.isUniquelyReferenced() && _hasMutableBuffer
   }
   
   /// If this buffer is backed by a ContiguousArrayBuffer, return it.
@@ -357,8 +394,10 @@ extension ArrayBuffer {
   /// arrays compare === iff they are both empty or if their buffers
   /// have the same identity and count.
   var identity: Word {
-    let p = elementStorage
-    return p != nil ? reinterpretCast(p) : reinterpretCast(owner)
+    if count == 0 {
+      return 0
+    }
+    return reinterpretCast(elementStorage)
   }
   
   //===--- Collection conformance -----------------------------------------===//
@@ -395,8 +434,14 @@ extension ArrayBuffer {
   /// representation, the result is an empty buffer.
   var _native: NativeBuffer {
     if !_isClassOrObjCExistential(T.self) {
-      return NativeBuffer(
-        reinterpretCast(storage) as ContiguousArrayStorage<T>?)
+      switch storage {
+      case .Direct(let x):
+        return reinterpretCast(x) as Int
+          == reinterpretCast(_emptyContiguousArrayBuffer)
+          ? NativeBuffer() : NativeBuffer(x)
+      default:
+        _fatalError("Array of non-class or -ObjC existential is indirect")
+      }
     }
     else {
       let i = indirect
