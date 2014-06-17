@@ -2,70 +2,13 @@
 // RUN: %S/../../utils/line-directive %t/Join.swift -- %target-build-swift -module-cache-path %t/clang-module-cache %t/Join.swift -o %t/a.out
 // RUN: %target-run %t/a.out | %S/../../utils/line-directive %t/Join.swift -- FileCheck %t/Join.swift
 
-var failed = false
+import StdlibUnittest
 
-%for EquatableArrayType in ['ContiguousArray', 'Slice', 'Array']:
-
-func expectEqual<T : Equatable>(
-    expected: ${EquatableArrayType}<T>, actual: ${EquatableArrayType}<T>,
-    file: String = __FILE__, line: UWord = __LINE__
-) {
-  if expected != actual {
-    println("check failed at \(file), line \(line)")
-    println("expected: \"\(expected)\"")
-    println("actual: \"\(actual)\"")
-    println()
-    failed = true
-  }
-}
-
-%end
-
-%for EquatableType in ['String', 'Int']:
-
-func expectEqual(
-    expected: ${EquatableType}, actual: ${EquatableType},
-    file: String = __FILE__, line: UWord = __LINE__
-) {
-  if expected != actual {
-    println("check failed at \(file), line \(line)")
-    println("expected: \"\(expected)\"")
-    println("actual: \"\(actual)\"")
-    println()
-    failed = true
-  }
-}
-
-%end
-
-func expectEmpty<T>(
-    value: Optional<T>,
-    file: String = __FILE__, line: UWord = __LINE__
-) {
-  if value {
-    println("check failed at \(file), line \(line)")
-    println("expected optional to be empty")
-    println("actual: \"\(value)\"")
-    println()
-    failed = true
-  }
-}
-
-func expectNotEmpty<T>(
-    value: Optional<T>,
-    file: String = __FILE__, line: UWord = __LINE__
-) {
-  if !value {
-    println("check failed at \(file), line \(line)")
-    println("expected optional to be non-empty")
-    println()
-    failed = true
-  }
-}
+var JoinTestCase = TestCase("Join")
 
 %for ArrayType in ['ContiguousArray', 'Slice', 'Array']:
 
-func testJoin${ArrayType}() {
+JoinTestCase.test("${ArrayType}") {
   typealias ArrayType = ${ArrayType}<Int>
 
   //
@@ -216,15 +159,11 @@ func testJoin${ArrayType}() {
     let r = separator.join(seq)
     expectEqual([ 1, 2, 42, 4242, 3, 4, 42, 4242, 5, 6 ], r)
   }
-
-  println("testJoin${ArrayType} done")
 }
-// CHECK: testJoin${ArrayType} done
-testJoin${ArrayType}()
 
 %end
 
-func testJoinString() {
+JoinTestCase.test("String") {
   //
   // Test the free function.
   //
@@ -262,11 +201,7 @@ func testJoinString() {
   //
 
   expectEqual("abxycdxyef", "xy".join(["ab", "cd", "ef"]))
-
-  println("testJoinString done")
 }
-// CHECK: testJoinString done
-testJoinString()
 
 struct MockExtensibleCollection : ExtensibleCollection {
   init() {}
@@ -308,7 +243,8 @@ struct MockExtensibleCollection : ExtensibleCollection {
   var _reservedCapacity: Int? = .None
 }
 
-func testJoinReservesCapacity() {
+
+JoinTestCase.test("ReservesCapacity") {
   if true {
     let r = join(MockExtensibleCollection([]), [])
     expectEqual(0, r._reservedCapacity!)
@@ -335,11 +271,7 @@ func testJoinReservesCapacity() {
     expectEqual(11, r._reservedCapacity!)
     expectEqual([ 1, 42, 4242, 2, 3, 4, 42, 4242, 5, 6, 7 ], r._storage)
   }
-
-  println("testJoinReservesCapacity done")
 }
-// CHECK: testJoinReservesCapacity done
-testJoinReservesCapacity()
 
 struct MinimalCollection : Collection {
   init(_ a: Array<Int>) {
@@ -365,7 +297,7 @@ struct MinimalCollection : Collection {
   var _storage: Array<Int> = []
 }
 
-func testJoinOperatorPlus() {
+JoinTestCase.test("OperatorPlus") {
   // ExtensibleCollection + Sequence
   if true {
     var ec: Int[] = []
@@ -495,14 +427,9 @@ func testJoinOperatorPlus() {
     var r: Int[] = ec1 + ec2
     expectEqual([ 1, 2, 3, 4, 5, 6, 7 ], r)
   }
-
-  println("testJoinOperatorPlus done")
+  expectEqual(0, 1)
 }
-// CHECK: testJoinOperatorPlus done
-testJoinOperatorPlus()
 
-if !failed {
-  println("OK")
-}
-// CHECK: OK
+JoinTestCase.run()
+// CHECK: {{^}}Join: All tests passed
 
