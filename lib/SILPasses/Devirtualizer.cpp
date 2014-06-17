@@ -805,21 +805,15 @@ SILTransform *swift::createDevirtualization() {
   return new SILDevirtualizationPass();
 }
 
-// A utility function for cloning the apply and cmi instructions.
+// A utility function for cloning the apply instruction.
 static ApplyInst *CloneApply(ApplyInst *AI, SILBuilder &Builder) {
-  // Clone the CMI.
-  ClassMethodInst *OrigCMI = cast<ClassMethodInst>(AI->getCallee());
-  ClassMethodInst *NewCMI = Builder.createClassMethod(OrigCMI->getLoc(),
-                                                        OrigCMI->getOperand(),
-                                                        OrigCMI->getMember(),
-                                                        OrigCMI->getType());
   // Clone the Apply.
   auto Args = AI->getArguments();
   SmallVector<SILValue, 8> Ret(Args.size());
   for (unsigned i = 0, e = Args.size(); i != e; ++i)
     Ret[i] = Args[i];
 
-  return Builder.createApply(AI->getLoc(), NewCMI,
+  return Builder.createApply(AI->getLoc(), AI->getCallee(),
                              AI->getSubstCalleeSILType(),
                              AI->getType(),
                              AI->getSubstitutions(),

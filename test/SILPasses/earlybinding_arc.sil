@@ -26,12 +26,11 @@ bb0(%0 : $Foo):
 sil @_TF4main7my_mainFCS_3FooSi : $@thin (@owned Foo) -> Int {
 bb0(%0 : $Foo):
   // CHECK-LABLE: _TF4main7my_mainFCS_3FooSi
+  // CHECK: class_method
   // CHECK-NOT: strong_retain
   // CHECK: checked_cast_br identical %0 : $Foo to $Foo
   // CHECK: strong_retain
-  // CHECK-NEXT: class_method
   // CHECK: strong_retain
-  // CHECK-NEXT: class_method
   debug_value %0 : $Foo  // let x                 // id: %1
   strong_retain %0 : $Foo                         // id: %2
   %3 = class_method %0 : $Foo, #Foo.ping!1 : Foo -> () -> Int , $@cc(method) @thin (@owned Foo) -> Int // user: %4
