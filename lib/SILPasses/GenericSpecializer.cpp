@@ -55,9 +55,9 @@ public:
                      TypeSubstitutionMap &InterfaceSubs,
                      TypeSubstitutionMap &ContextSubs,
                      StringRef NewName,
-                     ApplyInst *Caller)
+                     ArrayRef<Substitution> ApplySubs)
     : TypeSubstCloner(*initCloned(F, InterfaceSubs, NewName), *F, ContextSubs,
-                      Caller) {}
+                      ApplySubs) {}
   /// Clone and remap the types in \p F according to the substitution
   /// list in \p Subs.
   static SILFunction *cloneFunction(SILFunction *F,
@@ -65,7 +65,8 @@ public:
                                     TypeSubstitutionMap &ContextSubs,
                                     StringRef NewName, ApplyInst *Caller) {
     // Clone and specialize the function.
-    SpecializingCloner SC(F, InterfaceSubs, ContextSubs, NewName, Caller);
+    SpecializingCloner SC(F, InterfaceSubs, ContextSubs, NewName,
+                          Caller->getSubstitutions());
     SC.populateCloned();
     return SC.getCloned();
   }

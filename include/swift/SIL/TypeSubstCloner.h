@@ -44,12 +44,12 @@ public:
   TypeSubstCloner(SILFunction &To,
                   SILFunction &From,
                   TypeSubstitutionMap &ContextSubs,
-                  ApplyInst *Caller)
+                  ArrayRef<Substitution> ApplySubs)
     : SILClonerWithScopes<ImplClass>(To),
       SwiftMod(From.getModule().getSwiftModule()),
       SubsMap(ContextSubs),
       Original(From),
-      TheApply(Caller) { }
+      ApplySubs(ApplySubs) { }
 
 protected:
   SILType remapType(SILType Ty) {
@@ -73,8 +73,7 @@ protected:
 
     // And create the new specialized conformance.
     ASTContext &AST = SwiftMod->getASTContext();
-    return AST.getSpecializedConformance(Type, C,
-                                         TheApply->getSubstitutions());
+    return AST.getSpecializedConformance(Type, C, ApplySubs);
   }
 
   void visitClassMethodInst(ClassMethodInst *Inst) {
@@ -114,7 +113,7 @@ protected:
    for (auto &Sub : Inst->getSubstitutions())
      TempSubstList.push_back(Sub.subst(Inst->getModule().getSwiftModule(),
                                        Original.getContextGenericParams(),
-                                       TheApply->getSubstitutions()));
+                                       ApplySubs));
 
    ApplyInst *N = Builder.createApply(
           getOpLocation(Inst->getLoc()), getOpValue(CalleeVal),
@@ -148,7 +147,7 @@ protected:
    for (auto &Sub : Inst->getSubstitutions())
      TempSubstList.push_back(Sub.subst(Inst->getModule().getSwiftModule(),
                                        Original.getContextGenericParams(),
-                                       TheApply->getSubstitutions()));
+                                       ApplySubs));
 
    PartialApplyInst *N = Builder.createPartialApply(
        getOpLocation(Inst->getLoc()), getOpValue(CalleeVal),
@@ -168,7 +167,7 @@ protected:
     auto sub =
       Inst->getSelfSubstitution().subst(Inst->getModule().getSwiftModule(),
                                         Original.getContextGenericParams(),
-                                        TheApply->getSubstitutions());
+                                        ApplySubs);
 
     assert(sub.Conformance.size() == 1 &&
            "didn't get conformance from substitution?!");
@@ -524,8 +523,8 @@ protected:
   TypeSubstitutionMap &SubsMap;
   /// The original function to specialize.
   SILFunction &Original;
-  /// The ApplyInst that is the caller to the cloned function.
-  ApplyInst *TheApply;
+  /// The substiutions used at the call site.
+  ArrayRef<Substitution> ApplySubs;
 };
 
 } // end namespace swift
