@@ -83,7 +83,7 @@ A type may conform to a protocol with less accessibility than the type itself.
 Types
 -----
 
-A nominal type's accessibility is the same as the accessibility of the nominal declaration itself. A generic type's accessibility is the minimum of the accessibility of the base type and the accessibility of all generic parameters.
+A nominal type's accessibility is the same as the accessibility of the nominal declaration itself. A generic type's accessibility is the minimum of the accessibility of the base type and the accessibility of all generic argument types.
 
 A tuple type's accessibility is the minimum of the accessibility of its elements. A function type's accessibility is the minimum accessibility of its input and return types.
 
