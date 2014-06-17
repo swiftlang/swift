@@ -56,7 +56,7 @@ namespace {
   private:
     std::vector<llvm::SMDiagnostic>::iterator
     findDiagnostic(const ExpectedDiagnosticInfo &Expected,
-                   const llvm::MemoryBuffer &MemBuffer);
+                   StringRef BufferName);
 
   };
 } // end anonymous namespace
@@ -68,12 +68,12 @@ namespace {
 /// Otherwise return CapturedDiagnostics.end().
 std::vector<llvm::SMDiagnostic>::iterator
 DiagnosticVerifier::findDiagnostic(const ExpectedDiagnosticInfo &Expected,
-                                   const llvm::MemoryBuffer &MemBuffer) {
+                                   StringRef BufferName) {
   for (auto I = CapturedDiagnostics.begin(), E = CapturedDiagnostics.end();
        I != E; ++I) {
     // Verify the file and line of the diagnostic.
     if (I->getLineNo() != (int)Expected.LineNo ||
-        I->getFilename() != MemBuffer.getBufferIdentifier())
+        I->getFilename() != BufferName)
       continue;
 
     // Verify the classification and string.
@@ -88,16 +88,11 @@ DiagnosticVerifier::findDiagnostic(const ExpectedDiagnosticInfo &Expected,
   return CapturedDiagnostics.end();
 }
 
-/// Returns the column number of a low-level source location.
-//
-// FIXME: This should live on llvm::SourceMgr.
-static unsigned getColumnNumber(const llvm::MemoryBuffer &MemBuffer,
-                                llvm::SMLoc Loc) {
-  assert(Loc.getPointer() >= MemBuffer.getBufferStart());
-  assert(Loc.getPointer() <= MemBuffer.getBufferEnd());
+static unsigned getColumnNumber(StringRef buffer, llvm::SMLoc loc) {
+  assert(loc.getPointer() >= buffer.data());
+  assert((size_t)(loc.getPointer() - buffer.data()) <= buffer.size());
 
-  StringRef UpToLoc(MemBuffer.getBufferStart(),
-                    Loc.getPointer() - MemBuffer.getBufferStart());
+  StringRef UpToLoc = buffer.slice(0, loc.getPointer() - buffer.data());
 
   size_t ColumnNo = UpToLoc.size();
   size_t NewlinePos = UpToLoc.find_last_of("\r\n");
@@ -111,15 +106,15 @@ static unsigned getColumnNumber(const llvm::MemoryBuffer &MemBuffer,
 /// diagnostic \p D.
 static bool checkForFixIt(const ExpectedFixIt &Expected,
                           const llvm::SMDiagnostic &D,
-                          const llvm::MemoryBuffer &MemBuffer) {
+                          StringRef buffer) {
   for (auto &ActualFixIt : D.getFixIts()) {
     if (ActualFixIt.getText() != Expected.Text)
       continue;
 
     llvm::SMRange Range = ActualFixIt.getRange();
-    if (getColumnNumber(MemBuffer, Range.Start) != Expected.StartCol)
+    if (getColumnNumber(buffer, Range.Start) != Expected.StartCol)
       continue;
-    if (getColumnNumber(MemBuffer, Range.End) != Expected.EndCol)
+    if (getColumnNumber(buffer, Range.End) != Expected.EndCol)
       continue;
 
     return true;
@@ -134,8 +129,9 @@ static bool checkForFixIt(const ExpectedFixIt &Expected,
 /// ones.
 bool DiagnosticVerifier::verifyFile(unsigned BufferID) {
   const SourceLoc BufferStartLoc = SM.getLocForBufferStart(BufferID);
-  const llvm::MemoryBuffer &MemBuffer = *SM->getMemoryBuffer(BufferID);
-  StringRef InputFile = MemBuffer.getBuffer();
+  CharSourceRange EntireRange = SM.getRangeForBuffer(BufferID);
+  StringRef InputFile = SM.extractText(EntireRange);
+  StringRef BufferName = SM.getIdentifierForBuffer(BufferID);
 
   // Queue up all of the diagnostics, allowing us to sort them and emit them in
   // file order.
@@ -145,12 +141,10 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID) {
 
   // Scan the memory buffer looking for expected-note/warning/error.
   for (size_t Match = InputFile.find("expected-");
-       Match != StringRef::npos; Match = InputFile.find("expected-")) {
+       Match != StringRef::npos; Match = InputFile.find("expected-", Match+1)) {
     // Process this potential match.  If we fail to process it, just move on to
     // the next match.
     StringRef MatchStart = InputFile.substr(Match);
-    InputFile = InputFile.substr(Match+1); // Continue at the next match.
-
     const char *ExpectedStringStart = MatchStart.data();
 
     llvm::SourceMgr::DiagKind ExpectedClassification;
@@ -229,8 +223,7 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID) {
       Expected.LineNo = PrevExpectedContinuationLine;
     else
       Expected.LineNo = SM.getLineAndColumn(
-          BufferStartLoc
-              .getAdvancedLoc(MatchStart.data() - MemBuffer.getBufferStart()),
+          BufferStartLoc.getAdvancedLoc(MatchStart.data() - InputFile.data()),
           BufferID).first;
     Expected.LineNo += LineOffset;
 
@@ -244,7 +237,7 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID) {
 
     // Check to see if we had this expected diagnostic.
     while (MatchCount--) {
-      auto FoundDiagnosticIter = findDiagnostic(Expected, MemBuffer);
+      auto FoundDiagnosticIter = findDiagnostic(Expected, BufferName);
       if (FoundDiagnosticIter == CapturedDiagnostics.end()) {
         Errors.push_back(std::make_pair(ExpectedStringStart,
                                         "expected diagnostic not produced"));
@@ -316,7 +309,7 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID) {
         FixIt.Text = AfterEqual.slice(0, EndLoc);
 
         // Finally, make sure the fix-it is present in the diagnostic.
-        if (!checkForFixIt(FixIt, FoundDiagnostic, MemBuffer)) {
+        if (!checkForFixIt(FixIt, FoundDiagnostic, InputFile)) {
           std::string Message;
           {
             llvm::raw_string_ostream OS(Message);
@@ -329,8 +322,8 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID) {
                 llvm::SMRange Range = ActualFixIt.getRange();
 
                 OS << " {{"
-                << getColumnNumber(MemBuffer, Range.Start) << '-'
-                << getColumnNumber(MemBuffer, Range.End) << '='
+                << getColumnNumber(InputFile, Range.Start) << '-'
+                << getColumnNumber(InputFile, Range.End) << '='
                 << ActualFixIt.getText()
                 << "}}";
               }
@@ -351,7 +344,7 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID) {
 
   // Verify that there are no diagnostics (in MemoryBuffer) left in the list.
   for (unsigned i = 0, e = CapturedDiagnostics.size(); i != e; ++i) {
-    if (CapturedDiagnostics[i].getFilename() != MemBuffer.getBufferIdentifier())
+    if (CapturedDiagnostics[i].getFilename() != BufferName)
       continue;
 
     std::string Message = "unexpected diagnostic produced: ";
@@ -368,8 +361,8 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID) {
 
   // Emit all of the queue'd up errors.
   for (auto Err : Errors)
-    SM->PrintMessage(llvm::SMLoc::getFromPointer(Err.first),
-                     llvm::SourceMgr::DK_Error, Err.second);
+    SM.getLLVMSourceMgr().PrintMessage(llvm::SMLoc::getFromPointer(Err.first),
+                                       llvm::SourceMgr::DK_Error, Err.second);
   
   return !Errors.empty();
 }
@@ -392,15 +385,16 @@ static void VerifyModeDiagnosticHook(const llvm::SMDiagnostic &Diag,
 /// enableDiagnosticVerifier - Set up the specified source manager so that
 /// diagnostics are captured instead of being printed.
 void swift::enableDiagnosticVerifier(SourceManager &SM) {
-  SM->setDiagHandler(VerifyModeDiagnosticHook, new DiagnosticVerifier(SM));
+  SM.getLLVMSourceMgr().setDiagHandler(VerifyModeDiagnosticHook,
+                                       new DiagnosticVerifier(SM));
 }
 
 /// verifyDiagnostics - Verify that captured diagnostics meet with the
 /// expectations of the source files corresponding to the specified BufferIDs
 /// and tear down our support for capturing and verifying diagnostics.
 bool swift::verifyDiagnostics(SourceManager &SM, ArrayRef<unsigned> BufferIDs) {
-  auto *Verifier = (DiagnosticVerifier*)SM->getDiagContext();
-  SM->setDiagHandler(0, 0);
+  auto *Verifier = (DiagnosticVerifier*)SM.getLLVMSourceMgr().getDiagContext();
+  SM.getLLVMSourceMgr().setDiagHandler(nullptr, nullptr);
 
   bool HadError = false;
 

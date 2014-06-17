@@ -1330,7 +1330,7 @@ StringRef SourceFile::getFilename() const  {
   if (BufferID == -1)
     return "";
   SourceManager &SM = getASTContext().SourceMgr;
-  return SM->getMemoryBuffer(BufferID)->getBufferIdentifier();
+  return SM.getIdentifierForBuffer(BufferID);
 }
 
 bool SourceFile::hasMainClass() const {

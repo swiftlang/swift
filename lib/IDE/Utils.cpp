@@ -117,8 +117,11 @@ ide::isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf) {
     
   // Use the same code that was in the REPL code to track the indent level 
   // for now. In the future we should get this from the Parser if possible.
-  const char *SourceStart = SM->getMemoryBuffer(BufferID)->getBufferStart();
-  const char *SourceEnd = SM->getMemoryBuffer(BufferID)->getBufferEnd();
+
+  CharSourceRange entireRange = SM.getRangeForBuffer(BufferID);
+  StringRef Buffer = SM.extractText(entireRange);
+  const char *SourceStart = Buffer.data();
+  const char *SourceEnd = Buffer.data() + Buffer.size();
   const char *LineStart = SourceStart;
   const char *LineSourceStart = NULL;
   uint32_t LineIndent = 0;

@@ -95,12 +95,13 @@ PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM, SourceLoc Loc,
     FixIts.push_back(getRawFixIt(SM, F));
 
   // Get the low-level diagnostic representation.
-  llvm::SMDiagnostic diag = SM->GetMessage(getRawLoc(Loc), SMKind, Text,
-                                           Ranges, FixIts);
+  const llvm::SourceMgr &rawSM = SM.getLLVMSourceMgr();
+  llvm::SMDiagnostic diag = rawSM.GetMessage(getRawLoc(Loc), SMKind, Text,
+                                             Ranges, FixIts);
 
   // Actually print it.
   ColoredStream coloredErrs{llvm::errs()};
   raw_ostream &out = ForceColors ? coloredErrs : llvm::errs();
-  SM->PrintMessage(out, diag);
+  rawSM.PrintMessage(out, diag);
 }
 

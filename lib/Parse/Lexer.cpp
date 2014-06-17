@@ -163,20 +163,20 @@ static uint32_t validateUTF8CharacterAndAdvance(const char *&Ptr,
 //===----------------------------------------------------------------------===//
 
 Lexer::Lexer(const LangOptions &Options,
-             const SourceManager &SourceMgr, DiagnosticEngine *Diags,
+             const SourceManager &SM, DiagnosticEngine *Diags,
              unsigned BufferID, bool InSILMode,
              CommentRetentionMode RetainComments)
-    : LangOpts(Options), SourceMgr(SourceMgr), Diags(Diags), BufferID(BufferID),
+    : LangOpts(Options), SourceMgr(SM), Diags(Diags), BufferID(BufferID),
       InSILMode(InSILMode), RetainComments(RetainComments) {
   // Initialize buffer pointers.
-  auto *Buffer = SourceMgr->getMemoryBuffer(BufferID);
-  BufferStart = Buffer->getBufferStart();
-  BufferEnd = Buffer->getBufferEnd();
+  StringRef contents = SM.extractText(SM.getRangeForBuffer(BufferID));
+  BufferStart = contents.data();
+  BufferEnd = contents.data() + contents.size();
   CurPtr = BufferStart;
 
   // Initialize code completion.
-  if (BufferID == SourceMgr.getCodeCompletionBufferID()) {
-    const char *Ptr = BufferStart + SourceMgr.getCodeCompletionOffset();
+  if (BufferID == SM.getCodeCompletionBufferID()) {
+    const char *Ptr = BufferStart + SM.getCodeCompletionOffset();
     if (Ptr >= BufferStart && Ptr <= BufferEnd)
       CodeCompletionPtr = Ptr;
   }
@@ -1565,10 +1565,6 @@ SourceLoc Lexer::getLocForEndOfToken(const SourceManager &SM, SourceLoc Loc) {
   if (BufferID < 0)
     return SourceLoc();
   
-  const llvm::MemoryBuffer *Buffer = SM->getMemoryBuffer(BufferID);
-  if (!Buffer)
-    return SourceLoc();
-
   // Use fake language options; language options only affect validity
   // and the exact token produced.
   LangOptions FakeLangOpts;
@@ -1641,10 +1637,8 @@ static SourceLoc getLocForStartOfTokenInBuf(SourceManager &SM,
 
 SourceLoc Lexer::getLocForStartOfToken(SourceManager &SM, unsigned BufferID,
                                        unsigned Offset) {
-  const llvm::MemoryBuffer *MemBuffer = SM->getMemoryBuffer(BufferID);
-  if (!MemBuffer)
-    return SourceLoc();
-  StringRef Buffer = MemBuffer->getBuffer();
+  CharSourceRange entireRange = SM.getRangeForBuffer(BufferID);
+  StringRef Buffer = SM.extractText(entireRange);
 
   const char *BufStart = Buffer.data();
   if (Offset > Buffer.size())

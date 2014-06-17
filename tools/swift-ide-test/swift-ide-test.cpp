@@ -411,9 +411,10 @@ public:
                          llvm::raw_ostream &OS,
                          bool TerminalOutput)
     : SM(SM), BufferID(BufferID), OS(OS), TerminalOutput(TerminalOutput) {
-    const llvm::MemoryBuffer *Buf = SM->getMemoryBuffer(BufferID);
-    BufStart = Buf->getBufferStart();
-    BufEnd = Buf->getBufferEnd();
+    CharSourceRange entireRange = SM.getRangeForBuffer(BufferID);
+    StringRef Buffer = SM.extractText(entireRange);
+    BufStart = Buffer.data();
+    BufEnd = Buffer.data() + Buffer.size();
     CurrBufPtr = BufStart;
   }
 
@@ -684,9 +685,10 @@ public:
                     llvm::raw_ostream &OS,
                     bool TerminalOutput)
     : SM(SM), BufferID(BufferID), OS(OS), TerminalOutput(TerminalOutput) {
-    const llvm::MemoryBuffer *Buf = SM->getMemoryBuffer(BufferID);
-    BufStart = Buf->getBufferStart();
-    BufEnd = Buf->getBufferEnd();
+    CharSourceRange entireRange = SM.getRangeForBuffer(BufferID);
+    StringRef Buffer = SM.extractText(entireRange);
+    BufStart = Buffer.data();
+    BufEnd = Buffer.data() + Buffer.size();
     CurrBufPtr = BufStart;
   }
 
@@ -1102,12 +1104,9 @@ public:
     SourceRange SR = E->getSourceRange();
     if (SR.isValid()) {
       unsigned BufferID = SM.findBufferContainingLoc(SR.Start);
-      auto Buffer = SM->getMemoryBuffer(BufferID);
-      SourceCode =
-          StringRef(Buffer->getBufferStart() +
-                        SM.getLocOffsetInBuffer(SR.Start, BufferID),
-                    SM.getByteDistance(
-                        SR.Start, Lexer::getLocForEndOfToken(SM, SR.End)));
+      SourceLoc EndCharLoc = Lexer::getLocForEndOfToken(SM, SR.End);
+      SourceCode = SM.extractText({ SR.Start,
+                                    SM.getByteDistance(SR.Start, EndCharLoc) });
       unsigned Column;
       std::tie(Line, Column) = SM.getLineAndColumn(SR.Start, BufferID);
     }
@@ -1165,7 +1164,7 @@ public:
 
   StringRef getBufferIdentifier(SourceLoc Loc) {
     unsigned BufferID = SM.findBufferContainingLoc(Loc);
-    return SM->getMemoryBuffer(BufferID)->getBufferIdentifier();
+    return SM.getIdentifierForBuffer(BufferID);
   }
 
   void printWithEscaping(StringRef Str) {

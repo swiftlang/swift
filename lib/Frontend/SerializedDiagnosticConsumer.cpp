@@ -436,35 +436,19 @@ emitDiagnosticMessage(SourceManager &SM,
                       StringRef Text,
                       const DiagnosticInfo &Info) {
 
-  // Determine what kind of diagnostic we're emitting.
-  llvm::SourceMgr::DiagKind SMKind;
-  switch (Kind) {
-    case DiagnosticKind::Error:
-      SMKind = llvm::SourceMgr::DK_Error;
-      break;
-    case DiagnosticKind::Warning:
-      SMKind = llvm::SourceMgr::DK_Warning;
-      break;
-    case DiagnosticKind::Note:
-      SMKind = llvm::SourceMgr::DK_Note;
-      break;
-  }
-
-  // Construct the diagnostic.
-  const llvm::SMDiagnostic &D =
-    SM->GetMessage(getRawLoc(Loc), SMKind, Text,
-                   ArrayRef<llvm::SMRange>(), ArrayRef<llvm::SMFixIt>());
-
   // Emit the diagnostic to bitcode.
   llvm::BitstreamWriter &Stream = State->Stream;
   RecordData &Record = State->Record;
   AbbreviationMap &Abbrevs = State->Abbrevs;
 
+  StringRef filename =
+    SM.getIdentifierForBuffer(SM.findBufferContainingLoc(Loc));
+
   // Emit the RECORD_DIAG record.
   Record.clear();
   Record.push_back(RECORD_DIAG);
   Record.push_back(getDiagnosticLevel(Kind));
-  addLocToRecord(Loc, SM, D.getFilename(), Record);
+  addLocToRecord(Loc, SM, filename, Record);
 
   // FIXME: Swift diagnostics currently have no category.
   Record.push_back(0);
@@ -472,25 +456,21 @@ emitDiagnosticMessage(SourceManager &SM,
   Record.push_back(0);
 
   // Emit the message.
-  Record.push_back(D.getMessage().size());
-  Stream.EmitRecordWithBlob(Abbrevs.get(RECORD_DIAG), Record,
-                            D.getMessage());
+  Record.push_back(Text.size());
+  Stream.EmitRecordWithBlob(Abbrevs.get(RECORD_DIAG), Record, Text);
 
   // If the location is invalid, do not emit source ranges or fixits.
   if (Loc.isInvalid())
     return;
 
   // Emit source ranges.
-  //
-  // SourceMgr::GetMessage() creates ranges that lose some fidelity
-  // of the original range.  Use Swift's ranges.
   auto RangeAbbrev = State->Abbrevs.get(RECORD_SOURCE_RANGE);
   for (const auto &R : Info.Ranges) {
     if (R.isInvalid())
       continue;
     State->Record.clear();
     State->Record.push_back(RECORD_SOURCE_RANGE);
-    addRangeToRecord(R, SM, D.getFilename(), State->Record);
+    addRangeToRecord(R, SM, filename, State->Record);
     State->Stream.EmitRecordWithAbbrev(RangeAbbrev, State->Record);
   }
 
@@ -500,7 +480,7 @@ emitDiagnosticMessage(SourceManager &SM,
     if (F.getRange().isValid()) {
       State->Record.clear();
       State->Record.push_back(RECORD_FIXIT);
-      addRangeToRecord(F.getRange(), SM, D.getFilename(), State->Record);
+      addRangeToRecord(F.getRange(), SM, filename, State->Record);
       State->Record.push_back(F.getText().size());
       Stream.EmitRecordWithBlob(FixItAbbrev, Record, F.getText());
     }

@@ -4017,9 +4017,7 @@ visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, SGFContext C) {
     StringRef Value = "";
     if (Loc.isValid()) {
       unsigned BufferID = Ctx.SourceMgr.findBufferContainingLoc(Loc);
-
-      Value =
-          Ctx.SourceMgr->getMemoryBuffer(BufferID)->getBufferIdentifier();
+      Value = Ctx.SourceMgr.getIdentifierForBuffer(BufferID);
     }
 
     return emitStringLiteral(E, Value, C, E->getStringEncoding());

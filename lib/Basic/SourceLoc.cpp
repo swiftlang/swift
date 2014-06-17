@@ -47,9 +47,16 @@ Optional<unsigned> SourceManager::getIDForBufferIdentifier(
   return It->second;
 }
 
-SourceLoc SourceManager::getLocForBufferStart(unsigned BufferID) const {
-  auto *Buffer = LLVMSourceMgr.getMemoryBuffer(BufferID);
-  return SourceLoc(llvm::SMLoc::getFromPointer(Buffer->getBufferStart()));
+const char *SourceManager::getIdentifierForBuffer(unsigned bufferID) const {
+  auto *buffer = LLVMSourceMgr.getMemoryBuffer(bufferID);
+  assert(buffer && "invalid buffer ID");
+  return buffer->getBufferIdentifier();
+}
+
+CharSourceRange SourceManager::getRangeForBuffer(unsigned bufferID) const {
+  auto *buffer = LLVMSourceMgr.getMemoryBuffer(bufferID);
+  SourceLoc start{llvm::SMLoc::getFromPointer(buffer->getBufferStart())};
+  return CharSourceRange(start, buffer->getBufferSize());
 }
 
 unsigned SourceManager::getLocOffsetInBuffer(SourceLoc Loc,
@@ -106,7 +113,7 @@ void SourceLoc::print(raw_ostream &OS, const SourceManager &SM,
 
   unsigned BufferID = SM.findBufferContainingLoc(*this);
   if (BufferID != LastBufferID) {
-    OS << SM->getMemoryBuffer(BufferID)->getBufferIdentifier();
+    OS << SM.getIdentifierForBuffer(BufferID);
     LastBufferID = BufferID;
   } else {
     OS << "line";

@@ -34,11 +34,9 @@ class SourceManager {
   llvm::StringMap<unsigned> BufIdentIDMap;
 
 public:
-  SourceManager() {}
-
-  llvm::SourceMgr *operator->() { return &LLVMSourceMgr; }
-  const llvm::SourceMgr *operator->() const { return &LLVMSourceMgr; }
-
+  llvm::SourceMgr &getLLVMSourceMgr() {
+    return LLVMSourceMgr;
+  }
   const llvm::SourceMgr &getLLVMSourceMgr() const {
     return LLVMSourceMgr;
   }
@@ -122,12 +120,25 @@ public:
   /// buffer identifier, or Nothing if there is no such buffer.
   Optional<unsigned> getIDForBufferIdentifier(StringRef BufIdentifier);
 
-  /// \brief Returns the SourceLoc for the beginning of the specified buffer
+  /// Returns the identifier for the buffer with the given ID.
+  ///
+  /// \p BufferID must be a valid buffer ID.
+  const char *getIdentifierForBuffer(unsigned BufferID) const;
+
+  /// \brief Returns a SourceRange covering the entire specified buffer.
+  ///
+  /// Note that the start location might not point at the first token: it
+  /// might point at whitespace or a comment.
+  CharSourceRange getRangeForBuffer(unsigned BufferID) const;
+
+  /// Returns the SourceLoc for the beginning of the specified buffer
   /// (at offset zero).
   ///
   /// Note that the resulting location might not point at the first token: it
-  /// might point at whitespace or comment.
-  SourceLoc getLocForBufferStart(unsigned BufferID) const;
+  /// might point at whitespace or a comment.
+  SourceLoc getLocForBufferStart(unsigned BufferID) const {
+    return getRangeForBuffer(BufferID).getStart();
+  }
 
   /// \brief Returns the offset in bytes for the given valid source location.
   unsigned getLocOffsetInBuffer(SourceLoc Loc, unsigned BufferID) const;

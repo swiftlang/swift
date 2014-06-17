@@ -302,10 +302,8 @@ static StringRef getStringLiteralIfNotInterpolated(Parser &P,
    return StringRef();
   }
 
-  SourceManager &SourceMgr = P.SourceMgr;
-  return StringRef(SourceMgr->getMemoryBuffer(P.BufferID)->getBufferStart() +
-              SourceMgr.getLocOffsetInBuffer(Segments.front().Loc, P.BufferID),
-              Segments.front().Length);
+  return P.SourceMgr.extractText(CharSourceRange(Segments.front().Loc,
+                                                 Segments.front().Length));
 }
 
 void Parser::setFirstObjCAttributeLocation(SourceLoc L) {

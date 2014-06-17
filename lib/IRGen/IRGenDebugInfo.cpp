@@ -239,7 +239,7 @@ Location getDeserializedLoc(Decl* D)  {
 Location getLoc(SourceManager &SM, SourceLoc Loc) {
   Location L = {};
   unsigned BufferID = SM.findBufferContainingLoc(Loc);
-  L.Filename = SM->getMemoryBuffer(BufferID)->getBufferIdentifier();
+  L.Filename = SM.getIdentifierForBuffer(BufferID);
   std::tie(L.Line, L.Col) = SM.getLineAndColumn(Loc, BufferID);
   return L;
 }

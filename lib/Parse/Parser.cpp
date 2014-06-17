@@ -162,8 +162,7 @@ void swift::performDelayedParsing(
 /// \brief Tokenizes a string literal, taking into account string interpolation.
 static void getStringPartTokens(const Token &Tok, const LangOptions &LangOpts,
                                 const SourceManager &SM,
-                                int BufID, const llvm::MemoryBuffer *Buffer,
-                                std::vector<Token> &Toks) {
+                                int BufID, std::vector<Token> &Toks) {
   assert(Tok.is(tok::string_literal));
   SmallVector<Lexer::StringSegment, 4> Segments;
   Lexer::getStringLiteralSegments(Tok, Segments, /*Diags=*/0);
@@ -183,9 +182,8 @@ static void getStringPartTokens(const Token &Tok, const LangOptions &LangOpts,
         // Include the quote.
         ++Len;
       }
-      StringRef Text(Buffer->getBufferStart() +
-                         SM.getLocOffsetInBuffer(Loc, BufID),
-                     Len);
+
+      StringRef Text = SM.extractText({ Loc, Len });
       Token NewTok;
       NewTok.setToken(tok::string_literal, Text);
       Toks.push_back(NewTok);
@@ -198,20 +196,21 @@ static void getStringPartTokens(const Token &Tok, const LangOptions &LangOpts,
 
       if (isFirst) {
         // Add a token for the quote character.
-        StringRef Text(Buffer->getBufferStart() + Offset-2, 1);
+        StringRef Text = SM.extractText({ Seg.Loc.getAdvancedLoc(-2), 1 });
         Token NewTok;
         NewTok.setToken(tok::string_literal, Text);
         Toks.push_back(NewTok);
       }
 
-      std::vector<Token> NewTokens = swift::tokenize(LangOpts, SM, BufID, Offset,
-                                                     EndOffset,
+      std::vector<Token> NewTokens = swift::tokenize(LangOpts, SM, BufID,
+                                                     Offset, EndOffset,
                                                      /*KeepComments=*/true);
       Toks.insert(Toks.end(), NewTokens.begin(), NewTokens.end());
 
       if (isLast) {
         // Add a token for the quote character.
-        StringRef Text(Buffer->getBufferStart() + EndOffset, 1);
+        StringRef Text = SM.extractText({ Seg.Loc.getAdvancedLoc(Seg.Length),
+                                          1 });
         Token NewTok;
         NewTok.setToken(tok::string_literal, Text);
         Toks.push_back(NewTok);
@@ -225,9 +224,8 @@ std::vector<Token> swift::tokenize(const LangOptions &LangOpts,
                                    unsigned Offset, unsigned EndOffset,
                                    bool KeepComments,
                                    bool TokenizeInterpolatedString) {
-  auto *Buffer = SM->getMemoryBuffer(BufferID);
   if (Offset == 0 && EndOffset == 0)
-    EndOffset = Buffer->getBufferSize();
+    EndOffset = SM.getRangeForBuffer(BufferID).getByteLength();
 
   Lexer L(LangOpts, SM, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false,
           KeepComments ? CommentRetentionMode::ReturnAsTokens
@@ -240,7 +238,7 @@ std::vector<Token> swift::tokenize(const LangOptions &LangOpts,
     if (Tokens.back().is(tok::string_literal) && TokenizeInterpolatedString) {
       Token StrTok = Tokens.back();
       Tokens.pop_back();
-      getStringPartTokens(StrTok, LangOpts, SM, BufferID, Buffer, Tokens);
+      getStringPartTokens(StrTok, LangOpts, SM, BufferID, Tokens);
     }
   } while (Tokens.back().isNot(tok::eof));
   Tokens.pop_back(); // Remove EOF.

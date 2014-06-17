@@ -236,7 +236,7 @@ void CommentToXMLConverter::visitFullComment(const FullComment *FC) {
     if (Loc.isValid()) {
       const auto &SM = D->getASTContext().SourceMgr;
       unsigned BufferID = SM.findBufferContainingLoc(Loc);
-      StringRef FileName = SM->getMemoryBuffer(BufferID)->getBufferIdentifier();
+      StringRef FileName = SM.getIdentifierForBuffer(BufferID);
       auto LineAndColumn = SM.getLineAndColumn(Loc);
       OS << " file=\"";
       appendWithXMLEscaping(OS, FileName);
