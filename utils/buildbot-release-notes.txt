@@ -7,6 +7,12 @@ Latest
 * Objective-C protocol objects such as 'NSCopying.self' can now be used as
   instances of the 'Protocol' class, such as in APIs such as XPC.
 
+* Arrays now have full value semantics: both assignment and
+  initialization create a logically-distinct object
+
+* The "sort" function and array method modify the target in-place.  A
+  new "sorted" function and array method are non-mutating, creating
+  and returning a new collection.
 
 2014-05-19
 ----------
