@@ -77,31 +77,10 @@ struct ASTContext::Implementation {
   /// The declaration of Swift.Optional<T>.None.
   EnumElementDecl *OptionalNoneDecl = nullptr;
   
-  /// Array<T> simple upcast.
-  FuncDecl *GetArrayUpCast = nullptr;
+  // Declare cached declarations for each of the known declarations.
+#define FUNC_DECL(Name, Id) FuncDecl *Get##Name = nullptr;
+#include "swift/AST/KnownDecls.def"
   
-  /// Array<T> -> Array<U> bridge conversion where T is bridged non-verbatim.
-  FuncDecl *GetArrayBridgeToObjectiveC = nullptr;
-
-  /// Array<T> -> Array<U> conditional bridge conversion where U is bridged
-  /// non-verbatim.
-  FuncDecl *GetArrayBridgeFromObjectiveCConditional = nullptr;
-
-  /// Array<T> conditional downcast conversion.
-  FuncDecl *GetArrayDownCastConditional = nullptr;
-
-  /// Dictionary<K, V> simple upcast.
-  FuncDecl *GetDictionaryUpCast = nullptr;
-
-  /// Dictionary<K, V> conditional downcast.
-  FuncDecl *GetDictionaryDownCastConditional = nullptr;
-
-  /// Dictionary<K, V> bridge to a dictionary of objects.
-  FuncDecl *GetDictionaryBridgeToObjectiveC = nullptr;
-
-  /// Dictionary<K, V> conditionally bridge from a dictionary of objects.
-  FuncDecl *GetDictionaryBridgeFromObjectiveCConditional = nullptr;
-
   /// func _doesOptionalHaveValue<T>(v : [inout] Optional<T>) -> T
   FuncDecl *DoesOptionalHaveValueDecls[NumOptionalTypeKinds] = {};
 
@@ -653,129 +632,21 @@ static bool isGenericIntrinsic(FuncDecl *fn, CanType &input, CanType &output,
   return true;
 }
 
-FuncDecl *ASTContext::getArrayUpCast(LazyResolver *resolver) const {
-  auto &cache = Impl.GetArrayUpCast;
-  if (cache) return cache;
-  
-  // Look for a generic function.
-  CanType input, output, param;
-  auto decl = findLibraryIntrinsic(*this, "_arrayUpCast", resolver);
-  if (!decl)
-    return nullptr;
-  
-  cache = decl;
-  return decl;
-}
-
-FuncDecl *ASTContext::getArrayBridgeToObjectiveC(LazyResolver *resolver) const {
-  auto &cache = Impl.GetArrayBridgeToObjectiveC;
-  if (cache) return cache;
-  
-  // Look for a generic function.
-  CanType input, output, param;
-  auto decl = findLibraryIntrinsic(*this, "_arrayBridgeToObjectiveC", resolver);
-  if (!decl)
-    return nullptr;
-  
-  cache = decl;
-  return decl;
-}
-
-FuncDecl *ASTContext::getArrayBridgeFromObjectiveCConditional(
-            LazyResolver *resolver) const {
-  auto &cache = Impl.GetArrayBridgeFromObjectiveCConditional;
+// Find library intrinsic function.
+static FuncDecl *findLibraryFunction(const ASTContext &ctx, FuncDecl *&cache, 
+                                     StringRef name, LazyResolver *resolver) {
   if (cache) return cache;
 
   // Look for a generic function.
-  CanType input, output, param;
-  auto decl = findLibraryIntrinsic(*this, 
-                                   "_arrayBridgeFromObjectiveCConditional",
-                                   resolver);
-  if (!decl)
-    return nullptr;
-
-  cache = decl;
-  return decl;
+  cache = findLibraryIntrinsic(ctx, name, resolver);
+  return cache;
 }
 
-FuncDecl *
-ASTContext::getArrayDownCastConditional(LazyResolver *resolver) const {
-  auto &cache = Impl.GetArrayDownCastConditional;
-  if (cache) return cache;
-  
-  // Look for a generic function.
-  CanType input, output, param;
-  auto decl = findLibraryIntrinsic(*this, "_arrayDownCastConditional", 
-                                   resolver);
-  if (!decl)
-    return nullptr;
-  
-  cache = decl;
-  return decl;
+#define FUNC_DECL(Name, Id)                                         \
+FuncDecl *ASTContext::get##Name(LazyResolver *resolver) const {     \
+  return findLibraryFunction(*this, Impl.Get##Name, Id, resolver);  \
 }
-
-FuncDecl *ASTContext::getDictionaryUpCast(LazyResolver *resolver) const {
-  auto &cache = Impl.GetDictionaryUpCast;
-  if (cache) return cache;
-  
-  // Look for a generic function.
-  CanType input, output, param;
-  auto decl = findLibraryIntrinsic(*this, "_dictionaryUpCast", resolver);
-  if (!decl)
-    return nullptr;
-  
-  cache = decl;
-  return decl;
-}
-
-FuncDecl *
-ASTContext::getDictionaryDownCastConditional(LazyResolver *resolver) const {
-  auto &cache = Impl.GetDictionaryDownCastConditional;
-  if (cache) return cache;
-  
-  // Look for a generic function.
-  CanType input, output, param;
-  auto decl = findLibraryIntrinsic(*this, "_dictionaryDownCastConditional", 
-                                   resolver);
-  if (!decl)
-    return nullptr;
-  
-  cache = decl;
-  return decl;
-}
-
-FuncDecl *
-ASTContext::getDictionaryBridgeToObjectiveC(LazyResolver *resolver) const {
-  auto &cache = Impl.GetDictionaryBridgeToObjectiveC;
-  if (cache) return cache;
-  
-  // Look for a generic function.
-  CanType input, output, param;
-  auto decl = findLibraryIntrinsic(*this, "_dictionaryBridgeToObjectiveC",
-                                   resolver);
-  if (!decl)
-    return nullptr;
-  
-  cache = decl;
-  return decl;
-}
-
-FuncDecl *ASTContext::getDictionaryBridgeFromObjectiveCConditional(
-            LazyResolver *resolver) const {
-  auto &cache = Impl.GetDictionaryBridgeFromObjectiveCConditional;
-  if (cache) return cache;
-  
-  // Look for a generic function.
-  CanType input, output, param;
-  auto decl = findLibraryIntrinsic(*this, 
-                                   "_dictionaryBridgeFromObjectiveCConditional",
-                                   resolver);
-  if (!decl)
-    return nullptr;
-  
-  cache = decl;
-  return decl;
-}
+#include "swift/AST/KnownDecls.def"
 
 /// Check whether the given type is Optional applied to the given
 /// type argument.

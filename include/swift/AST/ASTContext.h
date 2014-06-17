@@ -370,35 +370,10 @@ public:
   /// Retrieve the declaration of Swift.Optional<T>.None.
   EnumElementDecl *getOptionalNoneDecl() const;
   
-  /// Retrieve the simple upcast conversion function for Array<T>.
-  FuncDecl *getArrayUpCast(LazyResolver *resolver) const;
-
-  /// Retrieve the conditional downcast conversion function for Array<T>.
-  FuncDecl *getArrayDownCastConditional(LazyResolver *resolver) const;
-
-  /// Retrieve the simple bridge conversion function for Array<T>.
-  FuncDecl *getArrayBridgeToObjectiveC(LazyResolver *resolver) const;
-
-  /// Retrieve the function that bridges back from an array of objects to an
-  /// array of values.
-  FuncDecl *
-  getArrayBridgeFromObjectiveCConditional(LazyResolver *resolver) const;
-
-  /// Retrieve the simple upcast conversion function for Dictionary<K, V>.
-  FuncDecl *getDictionaryUpCast(LazyResolver *resolver) const;
-
-  /// Retrieve the conditional downcast conversion function for 
-  /// Dictionary<K, V>.
-  FuncDecl *getDictionaryDownCastConditional(LazyResolver *resolver) const;
-
-  /// Retrieve the function that bridges a Dictionary<K, V> to a dictionary of
-  /// objects.
-  FuncDecl *getDictionaryBridgeToObjectiveC(LazyResolver *resolver) const;
-
-  /// Retrieve the function that conditionally bridges a dictionary of
-  /// objects to a Dictionary<K, V>, where one of K or V is a value type.
-  FuncDecl *getDictionaryBridgeFromObjectiveCConditional(
-              LazyResolver *resolver) const;
+  // Declare accessors for the known declarations.
+#define FUNC_DECL(Name, Id) \
+  FuncDecl *get##Name(LazyResolver *resolver) const;
+#include "swift/AST/KnownDecls.def"
 
   /// Retrieve the declaration of
   /// Swift._does{,ImplicitlyUnwrapped}OptionalHaveValue.

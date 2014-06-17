@@ -1,0 +1,36 @@
+//===-- KnownDecl.def - Compiler declaration metaprogramming ----*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This file defines macros used for macro-metaprogramming with compiler-known
+// declarations.
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef FUNC_DECL
+#  define FUNC_DECL(Name, Id)
+#endif
+
+FUNC_DECL(ArrayUpCast, "_arrayUpCast")
+FUNC_DECL(ArrayBridgeToObjectiveC, "_arrayBridgeToObjectiveC")
+FUNC_DECL(ArrayDownCastConditional, "_arrayDownCastConditional")
+FUNC_DECL(ArrayBridgeFromObjectiveCConditional, 
+          "_arrayBridgeFromObjectiveCConditional")
+
+FUNC_DECL(DictionaryUpCast, "_dictionaryUpCast")
+FUNC_DECL(DictionaryBridgeToObjectiveC, "_dictionaryBridgeToObjectiveC")
+FUNC_DECL(DictionaryDownCastConditional, "_dictionaryDownCastConditional")
+FUNC_DECL(DictionaryBridgeFromObjectiveCConditional, 
+          "_dictionaryBridgeFromObjectiveCConditional")
+
+
+
+#undef FUNC_DECL
