@@ -793,6 +793,29 @@ func _arrayUpCast<Derived, Base>(a: Array<Derived>) -> Array<Base> {
   return Array(a._buffer.castToBufferOf(Base.self))
 }
 
+/// Implements the semantics of `x as Derived[]` where `x` has type
+/// `Base[]` and `Derived` is a verbatim-bridged trivial subtype of
+/// `Base`.
+func _arrayDownCast<Base, Derived>(a: Array<Base>) -> Derived[] {
+  _sanityCheck(isBridgedVerbatimToObjectiveC(Base.self))
+  _sanityCheck(isBridgedVerbatimToObjectiveC(Derived.self))
+
+  let native = a._buffer.requestNativeBuffer()
+    
+  // Fast path: a native buffer that already stores elements of the
+  // Derived type.
+  if _fastPath(native) {
+    if _fastPath(native!.storesOnlyElementsOfType(Derived.self)) {
+      return Array(a._buffer.castToBufferOf(Derived.self))
+    }
+  }
+
+  // FIXME: Make these checks deferred.
+  let result: Derived[]? = _arrayDownCastConditional(a)
+  _precondition(result, "array cannot be downcast to array of derived")
+  return result!
+}
+
 /// Implements the semantics of `x as? Derived[]` where `x` has type
 /// `Base[]` and `Derived` is a verbatim-bridged trivial subtype of
 /// `Base`.
@@ -846,6 +869,21 @@ func _arrayBridgeToObjectiveC<BridgesToDerived, Base>(
     p++.initialize(reinterpretCast(bridged!))
   }
   return Array(ArrayBuffer(buf))
+}
+
+/// Try to convert the source array of objects to an array of values
+/// produced by bridging the objects from Objective-C to \c
+/// BridgesToDerived.
+///
+/// Precondition: Base is a class type.
+/// Precondition: BridgesToDerived is bridged non-verbatim to Objective-C.
+/// O(n), because each element must be bridged separately.
+func _arrayBridgeFromObjectiveC<Base, BridgesToDerived>(source: Array<Base>)
+       -> Array<BridgesToDerived> {
+  let result: Array<BridgesToDerived>?
+    = _arrayBridgeFromObjectiveCConditional(source);
+  _precondition(result, "array cannot be bridged from Objective-C")
+  return result!
 }
 
 /// Try to convert the source array of objects to an array of values
