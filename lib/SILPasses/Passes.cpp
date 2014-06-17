@@ -129,6 +129,13 @@ void swift::runSILOptimizationPasses(SILModule &Module,
     // Remove unused SIL Functions, VTables and WitnessTables.
     performSILElimination(&Module);
 
+    // Gather instruction counts if we are asked to do so.
+    if (Options.PrintInstCounts) {
+      SILPassManager PM3(&Module, Options);
+      PM3.add(createSILInstCount());
+      PM3.runOneIteration();
+    }
+
     DEBUG(Module.verify());
 }
 

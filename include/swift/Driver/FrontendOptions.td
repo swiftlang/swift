@@ -178,6 +178,10 @@ def sil_debug_serialization : Flag<["-"], "sil-debug-serialization">,
   HelpText<"Do not eliminate functions in Mandatory Inlining/SILCombine dead "
            "functions. (for debugging only)">;
 
+def print_inst_counts : Flag<["-"], "print-inst-counts">,
+  HelpText<"Before IRGen, count all the various SIL instructions. Must be used "
+           "in conjunction with -print-stats.">;
+
 def emit_sorted_sil : Flag<["-"], "emit-sorted-sil">,
   HelpText<"When printing SIL, print out all sil entities sorted by name to "
            "ease diffing">;

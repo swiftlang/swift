@@ -79,6 +79,9 @@ public:
   /// The assert configuration controls how assertions behave.
   unsigned AssertConfig = Debug;
 
+  /// Should we print out instruction counts if -print-stats is passed in?
+  bool PrintInstCounts = false;
+
 };
 
 } // end namespace swift
