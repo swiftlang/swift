@@ -86,7 +86,7 @@ enum class LineKind {
   FieldList,
 };
 
-static bool isBullet(LineKind K) {
+static inline bool isBullet(LineKind K) {
   switch (K) {
   case LineKind::Unknown:
   case LineKind::Blank:
@@ -111,7 +111,7 @@ static bool isBullet(LineKind K) {
   }
 }
 
-static bool isEnumerated(LineKind K) {
+static inline bool isEnumerated(LineKind K) {
   switch (K) {
   case LineKind::Unknown:
   case LineKind::Blank:
