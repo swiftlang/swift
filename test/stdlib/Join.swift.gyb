@@ -427,7 +427,6 @@ JoinTestCase.test("OperatorPlus") {
     var r: Int[] = ec1 + ec2
     expectEqual([ 1, 2, 3, 4, 5, 6, 7 ], r)
   }
-  expectEqual(0, 1)
 }
 
 JoinTestCase.run()
