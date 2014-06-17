@@ -60,6 +60,10 @@ namespace {
   };
 } // end anonymous namespace
 
+llvm::SMLoc DiagnosticConsumer::getRawLoc(SourceLoc loc) {
+  return loc.Value;
+}
+
 void
 PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM, SourceLoc Loc,
                                              DiagnosticKind Kind, 
@@ -90,9 +94,13 @@ PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM, SourceLoc Loc,
   for (DiagnosticInfo::FixIt F : Info.FixIts)
     FixIts.push_back(getRawFixIt(SM, F));
 
-  // Display the diagnostic.
+  // Get the low-level diagnostic representation.
+  llvm::SMDiagnostic diag = SM->GetMessage(getRawLoc(Loc), SMKind, Text,
+                                           Ranges, FixIts);
+
+  // Actually print it.
   ColoredStream coloredErrs{llvm::errs()};
   raw_ostream &out = ForceColors ? coloredErrs : llvm::errs();
-  SM->PrintMessage(out, getRawLoc(Loc), SMKind, Text, Ranges, FixIts);
+  SM->PrintMessage(out, diag);
 }
 

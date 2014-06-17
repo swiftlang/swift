@@ -63,9 +63,7 @@ struct DiagnosticInfo {
 /// \brief Abstract interface for classes that present diagnostics to the user.
 class DiagnosticConsumer {
 protected:
-  // HACK: To use the the LLVM diagnostic substem in the DiagnosticConsumer,
-  // we need to translate swift::SourceLoc to llvm::SMLoc.
-  static llvm::SMLoc getRawLoc(SourceLoc Loc) { return Loc.Value; }
+  static llvm::SMLoc getRawLoc(SourceLoc Loc);
 
   static llvm::SMRange getRawRange(SourceManager &SM, CharSourceRange R) {
     return llvm::SMRange(getRawLoc(R.getStart()), getRawLoc(R.getEnd()));
