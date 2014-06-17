@@ -81,8 +81,8 @@ extension NSView : Reflectable {
 // Overlays for variadics.
 
 extension NSGradient {
-  convenience init(colorsAndLocations objects: (AnyObject, CGFloat)...) {
-    let colors : AnyObject[] = new AnyObject[objects.count] { objects[$0].0 }
+  convenience init(colorsAndLocations objects: (NSColor, CGFloat)...) {
+    let colors = new NSColor[objects.count] { objects[$0].0 }
     let locations = new CGFloat[objects.count] { objects[$0].1 }
     self.init(
       colors: colors, atLocations: locations._elementStorageIfContiguous,
