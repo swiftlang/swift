@@ -831,10 +831,10 @@ static bool specializeClassMethodDispatch(ApplyInst *AI) {
   ClassMethodInst *CMI = dyn_cast<ClassMethodInst>(AI->getCallee());
   assert(CMI && "Invalid class method instruction");
 
-  SILType InstanceType = CMI->getOperand().stripCasts().getType();
   SILValue ClassInstance = CMI->getOperand();
+  SILType InstanceType = ClassInstance.stripCasts().getType();
   ClassDecl *CD = InstanceType.getClassOrBoundGenericClass();
-  if (!CD || CMI->isVolatile())
+  if (!CD || CMI->isVolatile() || ClassInstance.getType() != InstanceType)
     return false;
 
   // Create a diamond shaped control flow and a checked_cast_branch
