@@ -2136,6 +2136,24 @@ func _dictionaryBridgeToObjectiveC<BridgesToKey, BridgesToValue, Key, Value>(
   return result
 }
 
+/// Implements a forced downcast from a Dictionary<BaseKey,
+/// BaseValue> to a Dictionary<DerivedKey, DerivedValue>.
+///
+/// Precondition: DerivedKey is a subtype of BaseKey, DerivedValue is
+/// a subtype of BaseValue, and all of these types are objects.
+///
+func _dictionaryDownCast<BaseKey, BaseValue, DerivedKey, DerivedValue>(
+       source: Dictionary<BaseKey, BaseValue>
+     ) -> Dictionary<DerivedKey, DerivedValue> {
+  switch source._variantStorage {
+  case .Native(let nativeOwner):
+    return Dictionary(_cocoaDictionary: reinterpretCast(nativeOwner))
+
+  case .Cocoa(let cocoaStorage):
+    return Dictionary(_cocoaDictionary: reinterpretCast(cocoaStorage))
+  }
+}
+
 /// Implements a conditional downcast from a Dictionary<BaseKey,
 /// BaseValue> to a Dictionary<DerivedKey, DerivedValue>.
 ///
@@ -2165,6 +2183,21 @@ func _dictionaryDownCastConditional<BaseKey, BaseValue, DerivedKey,
     return nil
   }
   return result
+}
+
+/// Implements a conditional downcast from a Dictionary<Key, Value> to
+/// Dictionary<BridgesToKey, BridgesToValue> that involves bridging.
+///
+/// Precondition: at least one of BridgesToKey or BridgesToValue is an
+/// object type, and at least one of Key or Value is a bridged value
+/// type.
+func _dictionaryBridgeFromObjectiveC<Key, Value, BridgesToKey, BridgesToValue>(
+       source: Dictionary<Key, Value>
+     ) -> Dictionary<BridgesToKey, BridgesToValue> {
+  let result: Dictionary<BridgesToKey, BridgesToValue>?
+    = _dictionaryBridgeFromObjectiveCConditional(source);
+  _precondition(result, "dictionary cannot be bridged from Objective-C")
+  return result!
 }
 
 /// Implements a conditional downcast from a Dictionary<Key, Value> to

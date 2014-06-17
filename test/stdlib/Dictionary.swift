@@ -3333,7 +3333,30 @@ test_DictionaryUpcastBridged()
 //===---
 // Dictionary downcasts
 //===---
-func test_DictionaryCheckedDowncastEntryPoint() {
+func test_DictionaryDowncastEntryPoint() {
+  var d = Dictionary<NSObject, AnyObject>(minimumCapacity: 32)
+  d[TestObjCKeyTy(10)] = TestObjCValueTy(1010)
+  d[TestObjCKeyTy(20)] = TestObjCValueTy(1020)
+  d[TestObjCKeyTy(30)] = TestObjCValueTy(1030)
+
+  // Successful downcast.
+  let dCC: Dictionary<TestObjCKeyTy, TestObjCValueTy> = _dictionaryDownCast(d)
+  assert(dCC.count == 3)
+  var v = dCC[TestObjCKeyTy(10)]
+  assert(v!.value == 1010)
+
+  v = dCC[TestObjCKeyTy(20)]
+  assert(v!.value == 1020)
+
+  v = dCC[TestObjCKeyTy(30)]
+  assert(v!.value == 1030)
+  println("test_DictionaryDowncastEntryPoint done")
+}
+
+test_DictionaryDowncastEntryPoint()
+// CHECK: test_DictionaryDowncastEntryPoint done
+
+func test_DictionaryDowncastConditionalEntryPoint() {
   var d = Dictionary<NSObject, AnyObject>(minimumCapacity: 32)
   d[TestObjCKeyTy(10)] = TestObjCValueTy(1010)
   d[TestObjCKeyTy(20)] = TestObjCValueTy(1020)
@@ -3362,13 +3385,13 @@ func test_DictionaryCheckedDowncastEntryPoint() {
     assert(false)
   }
 
-  println("test_DictionaryCheckedDowncastEntryPoint done")
+  println("test_DictionaryDowncastConditionalEntryPoint done")
 }
 
-test_DictionaryCheckedDowncastEntryPoint()
-// CHECK: test_DictionaryCheckedDowncastEntryPoint done
+test_DictionaryDowncastConditionalEntryPoint()
+// CHECK: test_DictionaryDowncastConditionalEntryPoint done
 
-func test_DictionaryCheckedDowncast() {
+func test_DictionaryDowncastConditional() {
   var d = Dictionary<NSObject, AnyObject>(minimumCapacity: 32)
   d[TestObjCKeyTy(10)] = TestObjCValueTy(1010)
   d[TestObjCKeyTy(20)] = TestObjCValueTy(1020)
@@ -3395,13 +3418,70 @@ func test_DictionaryCheckedDowncast() {
     assert(false)
   }
 
-  println("test_DictionaryCheckedDowncast done")
+  println("test_DictionaryDowncastConditional done")
 }
 
-test_DictionaryCheckedDowncast()
-// CHECK: test_DictionaryCheckedDowncast done
+test_DictionaryDowncastConditional()
+// CHECK: test_DictionaryDowncastConditional done
 
 func test_DictionaryBridgeFromObjectiveCEntryPoint() {
+  var d = Dictionary<NSObject, AnyObject>(minimumCapacity: 32)
+  d[TestObjCKeyTy(10)] = TestObjCValueTy(1010)
+  d[TestObjCKeyTy(20)] = TestObjCValueTy(1020)
+  d[TestObjCKeyTy(30)] = TestObjCValueTy(1030)
+
+  // Successful downcast.
+  let dCV: Dictionary<TestObjCKeyTy, TestBridgedValueTy> 
+    = _dictionaryBridgeFromObjectiveC(d)
+  if true {
+    assert(dCV.count == 3)
+    var v = dCV[TestObjCKeyTy(10)]
+    assert(v!.value == 1010)
+
+    v = dCV[TestObjCKeyTy(20)]
+    assert(v!.value == 1020)
+
+    v = dCV[TestObjCKeyTy(30)]
+    assert(v!.value == 1030)
+  }
+
+  // Successful downcast.
+  let dVC: Dictionary<TestBridgedKeyTy, TestObjCValueTy> 
+    = _dictionaryBridgeFromObjectiveC(d)
+  if true {
+    assert(dVC.count == 3)
+    var v = dVC[TestBridgedKeyTy(10)]
+    assert(v!.value == 1010)
+
+    v = dVC[TestBridgedKeyTy(20)]
+    assert(v!.value == 1020)
+
+    v = dVC[TestBridgedKeyTy(30)]
+    assert(v!.value == 1030)
+  }
+
+  // Successful downcast.
+  let dVV: Dictionary<TestBridgedKeyTy, TestBridgedValueTy> 
+        = _dictionaryBridgeFromObjectiveC(d)
+  if true {
+    assert(dVV.count == 3)
+    var v = dVV[TestBridgedKeyTy(10)]
+    assert(v!.value == 1010)
+
+    v = dVV[TestBridgedKeyTy(20)]
+    assert(v!.value == 1020)
+
+    v = dVV[TestBridgedKeyTy(30)]
+    assert(v!.value == 1030)
+  }
+
+  println("test_DictionaryBridgeFromObjectiveCEntryPoint done")
+}
+
+test_DictionaryBridgeFromObjectiveCEntryPoint()
+// CHECK: test_DictionaryBridgeFromObjectiveCEntryPoint done
+
+func test_DictionaryBridgeFromObjectiveCConditionalEntryPoint() {
   var d = Dictionary<NSObject, AnyObject>(minimumCapacity: 32)
   d[TestObjCKeyTy(10)] = TestObjCValueTy(1010)
   d[TestObjCKeyTy(20)] = TestObjCValueTy(1020)
@@ -3470,13 +3550,13 @@ func test_DictionaryBridgeFromObjectiveCEntryPoint() {
     assert(false)
   }
 
-  println("test_DictionaryBridgeFromObjectiveCEntryPoint done")
+  println("test_DictionaryBridgeFromObjectiveCConditionalEntryPoint done")
 }
 
-test_DictionaryBridgeFromObjectiveCEntryPoint()
-// CHECK: test_DictionaryBridgeFromObjectiveCEntryPoint done
+test_DictionaryBridgeFromObjectiveCConditionalEntryPoint()
+// CHECK: test_DictionaryBridgeFromObjectiveCConditionalEntryPoint done
 
-func test_DictionaryBridgeFromObjectiveC() {
+func test_DictionaryBridgeFromObjectiveCConditional() {
   var d = Dictionary<NSObject, AnyObject>(minimumCapacity: 32)
   d[TestObjCKeyTy(10)] = TestObjCValueTy(1010)
   d[TestObjCKeyTy(20)] = TestObjCValueTy(1020)
@@ -3539,11 +3619,11 @@ func test_DictionaryBridgeFromObjectiveC() {
     assert(false)
   }
 
-  println("test_DictionaryBridgeFromObjectiveC done")
+  println("test_DictionaryBridgeFromObjectiveCConditional done")
 }
 
-test_DictionaryBridgeFromObjectiveC()
-// CHECK: test_DictionaryBridgeFromObjectiveC done
+test_DictionaryBridgeFromObjectiveCConditional()
+// CHECK: test_DictionaryBridgeFromObjectiveCConditional done
 
 //===---
 // Tests for APIs implemented strictly based on public interface.  We only need

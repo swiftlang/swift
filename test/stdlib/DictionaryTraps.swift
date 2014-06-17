@@ -14,6 +14,8 @@
 // RUN: %target-run %t/a.out RemoveInvalidIndex4 2>&1 | FileCheck %s -check-prefix=CHECK
 // RUN: %target-run %t/a.out BridgedKeyIsNotNSCopyable1 2>&1 | FileCheck %s -check-prefix=CHECK-UNRECOGNIZED-SELECTOR
 // RUN: %target-run %t/a.out BridgedKeyIsNotNSCopyable2 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out Downcast1 2>&1 | FileCheck %s -check-prefix=CHECK
+// RUN: %target-run %t/a.out Downcast2 2>&1 | FileCheck %s -check-prefix=CHECK
 
 // CHECK: OK
 // CHECK: CRASHED: SIG{{ILL|TRAP|ABRT}}
@@ -150,6 +152,31 @@ class TestObjCKeyTy : NSObject {
   var value: Int
 }
 
+struct TestBridgedKeyTy : Hashable, _BridgedToObjectiveC {
+  init(_ value: Int) { self.value = value }
+
+  var hashValue: Int { return value }
+
+  static func getObjectiveCType() -> Any.Type {
+    return TestObjCKeyTy.self
+  }
+
+  func bridgeToObjectiveC() -> TestObjCKeyTy {
+    return TestObjCKeyTy(value)
+  }
+
+  static func bridgeFromObjectiveC(x: TestObjCKeyTy) -> TestBridgedKeyTy? {
+    return TestBridgedKeyTy(x.value)
+  }
+
+  var value: Int
+}
+
+func ==(x: TestBridgedKeyTy, y: TestBridgedKeyTy) -> Bool {
+  return x.value == y.value
+}
+
+
 if arg == "BridgedKeyIsNotNSCopyable1" {
   // This Dictionary is bridged in O(1).
   var d = [ TestObjCKeyTy(10): NSObject() ]
@@ -163,6 +190,27 @@ if arg == "BridgedKeyIsNotNSCopyable2" {
   var d = [ TestObjCKeyTy(10): 10 ]
   println("OK")
   var nsd: NSDictionary = d
+}
+
+if arg == "Downcast1" {
+  let d: Dictionary<NSObject, NSObject> = [ TestObjCKeyTy(10): NSObject(), 
+                                            NSObject() : NSObject() ]
+  let d2: Dictionary<TestObjCKeyTy, NSObject> = _dictionaryDownCast(d)
+  println("OK")
+  let v1 = d2[TestObjCKeyTy(10)]
+  let v2 = d2[TestObjCKeyTy(20)]
+
+  // This triggers failure.
+  for (k, v) in d2 { }
+}
+
+if arg == "Downcast2" {
+  let d: Dictionary<NSObject, NSObject> = [ TestObjCKeyTy(10): NSObject(), 
+                                            NSObject() : NSObject() ]
+  println("OK")
+  let d2: Dictionary<TestBridgedKeyTy, NSObject> 
+    = _dictionaryBridgeFromObjectiveC(d)
+  let v1 = d2[TestBridgedKeyTy(10)]
 }
 
 println("BUSTED: should have crashed already")
