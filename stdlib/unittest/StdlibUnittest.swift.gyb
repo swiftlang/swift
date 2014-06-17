@@ -1,0 +1,188 @@
+import Darwin
+
+var _anyExpectFailed = false
+
+func expectEqual<T : Equatable>(
+    expected: T, actual: T,
+    file: String = __FILE__, line: UWord = __LINE__
+) {
+  if expected != actual {
+    _anyExpectFailed = true
+    println("check failed at \(file), line \(line)")
+    println("expected: \"\(expected)\" (of type \(_stdlib_getTypeName(expected))")
+    println("actual: \"\(actual)\" (of type \(_stdlib_getTypeName(expected))")
+    println()
+  }
+}
+
+func expectNotEqual<T : Equatable>(
+    expected: T, actual: T,
+    file: String = __FILE__, line: UWord = __LINE__
+) {
+  if expected == actual {
+    _anyExpectFailed = true
+    println("check failed at \(file), line \(line)")
+    println("unexpected value: \"\(actual)\" (of type \(_stdlib_getTypeName(actual))")
+    println()
+  }
+}
+
+// Can not write a sane set of overloads using generics because of:
+// <rdar://problem/17015923> Array->NSArray implicit conversion insanity
+func expectOptionalEqual<T : Equatable>(
+    expected: T, actual: T?,
+    file: String = __FILE__, line: UWord = __LINE__
+) {
+  if !actual || expected != actual! {
+    _anyExpectFailed = true
+    println("check failed at \(file), line \(line)")
+    println("expected: \"\(expected)\" (of type \(_stdlib_getTypeName(expected))")
+    println("actual: \"\(actual)\" (of type \(_stdlib_getTypeName(actual))")
+    println()
+  }
+}
+
+// Array<T> is not Equatable if T is.  Provide additional overloads.
+// Same for Dictionary.
+%for (Generic, EquatableType) in [
+%    ('<T : Equatable>', 'ContiguousArray<T>'),
+%    ('<T : Equatable>', 'Slice<T>'),
+%    ('<T : Equatable>', 'Array<T>'),
+%    ('<T, U : Equatable>', 'Dictionary<T, U>'),
+%    ('<T : ForwardIndex>', 'T')]:
+
+func expectEqual${Generic}(
+    expected: ${EquatableType}, actual: ${EquatableType},
+    file: String = __FILE__, line: UWord = __LINE__
+) {
+  if expected != actual {
+    _anyExpectFailed = true
+    println("check failed at \(file), line \(line)")
+    println("expected: \"\(expected)\" (of type \(_stdlib_getTypeName(expected))")
+    println("actual: \"\(actual)\" (of type \(_stdlib_getTypeName(actual))")
+    println()
+  }
+}
+
+func _expectNotEqual${Generic}(
+    expected: ${EquatableType}, actual: ${EquatableType},
+    file: String = __FILE__, line: UWord = __LINE__
+) {
+  if expected == actual {
+    _anyExpectFailed = true
+    println("check failed at \(file), line \(line)")
+    println("unexpected value: \"\(actual)\" (of type \(_stdlib_getTypeName(actual))")
+    println()
+  }
+}
+
+%end
+
+%for ComparableType in ['Int']:
+
+func expectLE(
+    expected: ${ComparableType}, actual: ${ComparableType},
+    file: String = __FILE__, line: UWord = __LINE__
+) {
+  if !(expected <= actual) {
+    _anyExpectFailed = true
+    println("check failed at \(file), line \(line)")
+    println("expected: \"\(expected)\"")
+    println("actual: \"\(actual)\"")
+    println()
+  }
+}
+
+%end
+
+func expectTrue(
+    actual: Bool,
+    file: String = __FILE__, line: UWord = __LINE__
+) {
+  if !actual {
+    _anyExpectFailed = true
+    println("check failed at \(file), line \(line)")
+    println("expected: true")
+    println("actual: \(actual)")
+    println()
+  }
+}
+
+func expectFalse(
+    actual: Bool,
+    file: String = __FILE__, line: UWord = __LINE__
+) {
+  if actual {
+    _anyExpectFailed = true
+    println("check failed at \(file), line \(line)")
+    println("expected: false")
+    println("actual: \(actual)")
+    println()
+  }
+}
+
+func expectEmpty<T>(
+    value: Optional<T>,
+    file: String = __FILE__, line: UWord = __LINE__
+) {
+  if value {
+    _anyExpectFailed = true
+    println("check failed at \(file), line \(line)")
+    println("expected optional to be empty")
+    println("actual: \"\(value)\"")
+    println()
+  }
+}
+
+func expectNotEmpty<T>(
+    value: Optional<T>,
+    file: String = __FILE__, line: UWord = __LINE__
+) {
+  if !value {
+    _anyExpectFailed = true
+    println("check failed at \(file), line \(line)")
+    println("expected optional to be non-empty")
+    println()
+  }
+}
+
+struct TestCase {
+  init(_ name: String) {
+    self.name = name
+  }
+
+  mutating func test(name: String, testFunction: () -> ()) {
+    _tests.append(_Test(name: name, code: testFunction))
+  }
+
+  mutating func run() {
+    var anyTestFailed = false
+    for t in _tests {
+      var fullTestName = "\(name).\(t.name)"
+      println("[ RUN      ] \(fullTestName)")
+      _anyExpectFailed = false
+      t.code()
+      if _anyExpectFailed {
+        anyTestFailed = true
+        println("[     FAIL ] \(fullTestName)")
+      } else {
+        println("[       OK ] \(fullTestName)")
+      }
+    }
+    if anyTestFailed {
+      println("Some tests failed, aborting")
+      abort()
+    } else {
+      println("\(name): All tests passed")
+    }
+  }
+
+  struct _Test {
+    var name: String
+    var code: () -> ()
+  }
+
+  var name: String
+  var _tests: _Test[] = []
+}
+

@@ -1,195 +1,14 @@
-// RUN: rm -rf %t && mkdir -p %t && %S/../../utils/gyb %s -o %t/NSStringAPI.swift
-// RUN: %S/../../utils/line-directive %t/NSStringAPI.swift -- %target-build-swift -module-cache-path %t/clang-module-cache %t/NSStringAPI.swift -o %t/a.out
-// RUN: %target-run %t/a.out %S/Inputs/NSStringAPI_test.txt | %S/../../utils/line-directive %t/NSStringAPI.swift -- FileCheck %s
+// RUN: rm -rf %t
+// RUN: mkdir -p %t
+// RUN: %target-build-swift -module-cache-path %t/clang-module-cache %s -o %t/a.out
+// RUN: %target-run %t/a.out %S/Inputs/NSStringAPI_test.txt | FileCheck %s
 
 //
 // Tests for the NSString APIs as exposed by String
 //
 
+import StdlibUnittest
 import Foundation
-
-var _anyExpectFailed = false
-
-// Can not write a sane set of overloads using generics because of:
-// <rdar://problem/17015923> Array->NSArray implicit conversion insanity
-%for EquatableArrayType in ['ContiguousArray', 'Slice', 'Array']:
-
-func expectEqual<T : Equatable>(
-    expected: ${EquatableArrayType}<T>, actual: ${EquatableArrayType}<T>,
-    file: String = __FILE__, line: UWord = __LINE__
-) {
-  if expected != actual {
-    _anyExpectFailed = true
-    println("check failed at \(file), line \(line)")
-    println("expected: \"\(expected)\"")
-    println("actual: \"\(actual)\"")
-    println()
-  }
-}
-
-func expectNotEqual<T : Equatable>(
-    expected: ${EquatableArrayType}<T>, actual: ${EquatableArrayType}<T>,
-    file: String = __FILE__, line: UWord = __LINE__
-) {
-  if expected == actual {
-    _anyExpectFailed = true
-    println("check failed at \(file), line \(line)")
-    println("unexpected value: \"\(actual)\"")
-    println()
-  }
-}
-
-%end
-
-%for (Generic, EquatableType) in [('', 'String'), ('', 'String.Index'), ('', 'Int'), ('', 'UInt'), ('', 'NSComparisonResult'), ('<T : ForwardIndex>', 'T'), ('<T, U : Equatable>', 'Dictionary<T, U>')]:
-
-func expectEqual${Generic}(
-    expected: ${EquatableType}, actual: ${EquatableType},
-    file: String = __FILE__, line: UWord = __LINE__
-) {
-  if expected != actual {
-    _anyExpectFailed = true
-    println("check failed at \(file), line \(line)")
-    println("expected: \"\(expected)\"")
-    println("actual: \"\(actual)\"")
-    println()
-  }
-}
-
-func expectEqual${Generic}(
-    expected: ${EquatableType}, actual: ${EquatableType}?,
-    file: String = __FILE__, line: UWord = __LINE__
-) {
-  if !actual || expected != actual! {
-    _anyExpectFailed = true
-    println("check failed at \(file), line \(line)")
-    println("expected: \"\(expected)\"")
-    println("actual: \"\(actual)\"")
-    println()
-  }
-}
-
-func expectNotEqual${Generic}(
-    expected: ${EquatableType}, actual: ${EquatableType},
-    file: String = __FILE__, line: UWord = __LINE__
-) {
-  if expected == actual {
-    _anyExpectFailed = true
-    println("check failed at \(file), line \(line)")
-    println("unexpected value: \"\(actual)\"")
-    println()
-  }
-}
-
-%end
-
-%for ComparableType in ['Int']:
-
-func expectLE(
-    expected: ${ComparableType}, actual: ${ComparableType},
-    file: String = __FILE__, line: UWord = __LINE__
-) {
-  if !(expected <= actual) {
-    _anyExpectFailed = true
-    println("check failed at \(file), line \(line)")
-    println("expected: \"\(expected)\"")
-    println("actual: \"\(actual)\"")
-    println()
-  }
-}
-
-%end
-
-func expectTrue(
-    actual: Bool,
-    file: String = __FILE__, line: UWord = __LINE__
-) {
-  if !actual {
-    _anyExpectFailed = true
-    println("check failed at \(file), line \(line)")
-    println("expected: true")
-    println("actual: \(actual)")
-    println()
-  }
-}
-
-func expectFalse(
-    actual: Bool,
-    file: String = __FILE__, line: UWord = __LINE__
-) {
-  if actual {
-    _anyExpectFailed = true
-    println("check failed at \(file), line \(line)")
-    println("expected: false")
-    println("actual: \(actual)")
-    println()
-  }
-}
-
-func expectEmpty<T>(
-    value: Optional<T>,
-    file: String = __FILE__, line: UWord = __LINE__
-) {
-  if value {
-    _anyExpectFailed = true
-    println("check failed at \(file), line \(line)")
-    println("expected optional to be empty")
-    println("actual: \"\(value)\"")
-    println()
-  }
-}
-
-func expectNotEmpty<T>(
-    value: Optional<T>,
-    file: String = __FILE__, line: UWord = __LINE__
-) {
-  if !value {
-    _anyExpectFailed = true
-    println("check failed at \(file), line \(line)")
-    println("expected optional to be non-empty")
-    println()
-  }
-}
-
-struct TestCase {
-  init(_ name: String) {
-    self.name = name
-  }
-
-  mutating func test(name: String, testFunction: () -> ()) {
-    _tests.append(_Test(name: name, code: testFunction))
-  }
-
-  mutating func run() {
-    var anyTestFailed = false
-    for t in _tests {
-      var fullTestName = "\(name).\(t.name)"
-      println("[ RUN      ] \(fullTestName)")
-      _anyExpectFailed = false
-      t.code()
-      if _anyExpectFailed {
-        anyTestFailed = true
-        println("[     FAIL ] \(fullTestName)")
-      } else {
-        println("[       OK ] \(fullTestName)")
-      }
-    }
-    if anyTestFailed {
-      println("Some tests failed, aborting")
-      abort()
-    } else {
-      println("\(name): All tests passed")
-    }
-  }
-
-  struct _Test {
-    var name: String
-    var code: () -> ()
-  }
-
-  var name: String
-  var _tests: _Test[] = []
-}
 
 var NSStringAPIs = TestCase("NSStringAPIs")
 
@@ -234,7 +53,8 @@ NSStringAPIs.test("stringWithContentsOfFile(_:encoding:error:)") {
         encoding: NSASCIIStringEncoding, error: &err)
 
     expectEmpty(err)
-    expectEqual("Lorem ipsum dolor sit amet, consectetur adipisicing elit,",
+    expectOptionalEqual(
+        "Lorem ipsum dolor sit amet, consectetur adipisicing elit,",
         content?._lines[0])
   }
   if true {
@@ -256,7 +76,8 @@ NSStringAPIs.test("stringWithContentsOfFile(_:usedEncoding:error:)") {
 
     expectNotEqual(0, usedEncoding)
     expectEmpty(err)
-    expectEqual("Lorem ipsum dolor sit amet, consectetur adipisicing elit,",
+    expectOptionalEqual(
+        "Lorem ipsum dolor sit amet, consectetur adipisicing elit,",
         content?._lines[0])
   }
   if true {
@@ -280,7 +101,8 @@ NSStringAPIs.test("stringWithContentsOfURL(_:encoding:error:)") {
         encoding: NSASCIIStringEncoding, error: &err)
 
     expectEmpty(err)
-    expectEqual("Lorem ipsum dolor sit amet, consectetur adipisicing elit,",
+    expectOptionalEqual(
+        "Lorem ipsum dolor sit amet, consectetur adipisicing elit,",
         content?._lines[0])
   }
   if true {
@@ -302,7 +124,8 @@ NSStringAPIs.test("stringWithContentsOfURL(_:usedEncoding:error:)") {
 
     expectNotEqual(0, usedEncoding)
     expectEmpty(err)
-    expectEqual("Lorem ipsum dolor sit amet, consectetur adipisicing elit,",
+    expectOptionalEqual(
+        "Lorem ipsum dolor sit amet, consectetur adipisicing elit,",
         content?._lines[0])
   }
   if true {
@@ -318,7 +141,7 @@ NSStringAPIs.test("stringWithContentsOfURL(_:usedEncoding:error:)") {
 }
 
 NSStringAPIs.test("stringWithCString(_:encoding:)") {
-  expectEqual("foo, a basmati bar!",
+  expectOptionalEqual("foo, a basmati bar!",
       String.stringWithCString(
           "foo, a basmati bar!", encoding: String.defaultCStringEncoding()))
 }
@@ -331,7 +154,7 @@ NSStringAPIs.test("stringWithUTF8String(_:)") {
     up[i] = b
     i++
   }
-  expectEqual(s, String.stringWithUTF8String(CString(up)))
+  expectOptionalEqual(s, String.stringWithUTF8String(CString(up)))
   up.dealloc(100)
 }
 
@@ -778,7 +601,7 @@ NSStringAPIs.test("hash") {
 NSStringAPIs.test("stringWithBytes(_:length:encoding:)") {
   var s: String = "abc あかさた"
   var bytes: UInt8[] = Array(s.utf8)
-  expectEqual(s, String.stringWithBytes(bytes, length: bytes.count,
+  expectOptionalEqual(s, String.stringWithBytes(bytes, length: bytes.count,
       encoding: NSUTF8StringEncoding))
 
   /*
@@ -795,8 +618,9 @@ NSStringAPIs.test("stringWithBytes(_:length:encoding:)") {
 NSStringAPIs.test("stringWithBytesNoCopy(_:length:encoding:freeWhenDone:)") {
   var s: String = "abc あかさた"
   var bytes: UInt8[] = Array(s.utf8)
-  expectEqual(s, String.stringWithBytesNoCopy(&bytes, length: bytes.count,
-      encoding: NSUTF8StringEncoding, freeWhenDone: false))
+  expectOptionalEqual(s, String.stringWithBytesNoCopy(&bytes,
+      length: bytes.count, encoding: NSUTF8StringEncoding,
+      freeWhenDone: false))
 
   /*
   FIXME: Test disabled because the NSString documentation is unclear about
