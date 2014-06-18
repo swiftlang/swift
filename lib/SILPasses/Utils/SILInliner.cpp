@@ -66,7 +66,12 @@ bool SILInliner::inlineFunction(ApplyInst *AI,
     AIScope = AI->getParent()->getParent()->getDebugScope();
 
   CallSiteScope = new (F.getModule())
-    SILDebugScope(AI->getLoc(), F, AIScope, AIScope->InlineScope);
+        SILDebugScope(AI->getLoc(), F, AIScope);
+  CallSiteScope->InlinedCallSite = AIScope->InlinedCallSite;
+
+  // Increment the ref count for the inlined function, so it doesn't
+  // get deleted before we can emit abstract debug info for it.
+  F.getModule().markFunctionAsInlined(CalleeFunction);
 
   assert(CallSiteScope ||
          AI->getLoc().getKind() == SILLocation::MandatoryInlinedKind);
@@ -175,15 +180,18 @@ void SILInliner::visitDebugValueAddrInst(DebugValueAddrInst *Inst) {
 
 SILDebugScope *SILInliner::getOrCreateInlineScope(SILInstruction *Orig) {
   auto CalleeScope = Orig->getDebugScope();
+  // We need to fake a scope to add the inline info to it.
   if (!CalleeScope)
-    return nullptr;
+    CalleeScope = Orig->getParent()->getParent()->getDebugScope();
 
   auto it = InlinedScopeCache.find(CalleeScope);
   if (it != InlinedScopeCache.end())
     return it->second;
 
   auto InlineScope = new (getBuilder().getFunction().getModule())
-    SILDebugScope(CallSiteScope, CalleeScope, *CalleeFunction);
+    SILDebugScope(CallSiteScope, CalleeScope, CalleeScope->SILFn);
+  assert(CallSiteScope->Parent == InlineScope->InlinedCallSite->Parent);
+
   InlinedScopeCache.insert({CalleeScope, InlineScope});
   return InlineScope;
 }

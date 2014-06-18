@@ -245,14 +245,10 @@ SILFunction *FunctionSignatureOptCloner::initCloned(
       OldFTy->getGenericSignature(), OldFTy->getExtInfo(),
       OldFTy->getCalleeConvention(), InterfaceParams, InterfaceResult, Ctx);
 
-  // This scope needs to hash to a different value than the original scope.
-  auto OrigScope = Orig.getDebugScope();
-  auto ClonedScope = new (M) SILDebugScope(*OrigScope);
-
   // Create the new function.
   SILFunction *NewF = SILFunction::create(
       M, OptimizedLinkage, NewName, NewFTy, nullptr, Orig.getLocation(),
-      Orig.isBare(), Orig.isTransparent(), 0, ClonedScope,
+      Orig.isBare(), Orig.isTransparent(), 0, Orig.getDebugScope(),
       Orig.getDeclContext());
 
   // Return our newly created F for cloning.

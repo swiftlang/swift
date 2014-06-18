@@ -102,6 +102,9 @@ private:
   /// functions so that the destructor of \p functions is called first.
   llvm::StringMap<SILFunction *> FunctionTable;
 
+  /// List of inlined functions referenced by the module.
+  llvm::DenseSet<SILFunction *> InlinedFunctions;
+
   /// The list of SILFunctions in the module.
   FunctionListType functions;
 
@@ -335,6 +338,11 @@ public:
                                    CanSILFunctionType type,
                                    IsBare_t isBareSILFunction,
                                    IsTransparent_t isTransparent);
+
+  void markFunctionAsInlined(SILFunction *Fn) {
+    if (InlinedFunctions.insert(Fn).second)
+      Fn->incrementRefCount();
+  }
 
   /// Look up the SILWitnessTable representing the lowering of a protocol
   /// conformance, and collect the substitutions to apply to the referenced

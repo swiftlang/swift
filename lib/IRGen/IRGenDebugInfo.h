@@ -141,11 +141,13 @@ public:
   /// \param Fn The IR representation of the function.
   /// \param CC The calling convention of the function.
   /// \param Ty The signature of the function.
-  void emitFunction(SILModule &SILMod, SILDebugScope *DS, llvm::Function *Fn,
-                    AbstractCC CC, SILType Ty, DeclContext *DeclCtx = nullptr);
+  llvm::DIDescriptor emitFunction(SILModule &SILMod, SILDebugScope *DS,
+                                  llvm::Function *Fn, AbstractCC CC, SILType Ty,
+                                  DeclContext *DeclCtx = nullptr);
 
   /// Emit debug info for a given SIL function.
-  void emitFunction(SILFunction &SILFn, llvm::Function *Fn, bool Force = false);
+  llvm::DIDescriptor emitFunction(SILFunction &SILFn, llvm::Function *Fn,
+                                  bool Force = false);
 
   /// Convenience function useful for functions without any source
   /// location. Internally calls emitFunction, emits a debug
@@ -216,7 +218,7 @@ private:
   llvm::DIType getOrCreateType(DebugTypeInfo DbgTy);
   llvm::DIDescriptor getOrCreateScope(SILDebugScope *DS);
   llvm::DIScope getOrCreateContext(DeclContext *DC);
-  llvm::MDNode* createInlinedAt(SILDebugScope &Scope);
+  llvm::MDNode* createInlinedAt(SILDebugScope *Scope);
 
   StringRef getCurrentDirname();
   llvm::DIFile getOrCreateFile(const char *Filename);

@@ -67,7 +67,7 @@ private:
     if (IKind == InlineKind::MandatoryInline)
       // Transparent functions are inheriting the location of the call
       // site. No soup, err, debugging for you!
-      Cloned->setDebugScope(CallSiteScope);
+      Cloned->setDebugScope(Orig->getDebugScope());
     else
       // Create an inlined version of the scope.
       Cloned->setDebugScope(getOrCreateInlineScope(Orig));
@@ -81,7 +81,7 @@ private:
       return InLoc;
     // Inlined location wraps the call site that is being inlined, regardless
     // of the input location.
-    return Loc.hasValue() ? Loc.getValue() : InLoc;
+    return Loc.hasValue() ? Loc.getValue() : SILLocation((Decl*)nullptr);
   }
 
   InlineKind IKind;

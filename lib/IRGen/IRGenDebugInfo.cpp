@@ -340,28 +340,28 @@ static bool isAbstractClosure(const SILLocation &Loc) {
 }
 
 /// Construct an inlined-at location from a SILScope.
-llvm::MDNode* IRGenDebugInfo::createInlinedAt(SILDebugScope &InlinedScope) {
-  assert(InlinedScope.InlineScope && "not an inlined scope");
-  SILDebugScope &Scope = *InlinedScope.InlineScope;
+llvm::MDNode* IRGenDebugInfo::createInlinedAt(SILDebugScope *InlinedScope) {
+  assert(InlinedScope);
+  assert(InlinedScope->InlinedCallSite && "not an inlined scope");
+  SILDebugScope *CallSite = InlinedScope->InlinedCallSite;
 
 #ifndef NDEBUG
-  llvm::DILexicalBlock LB(getOrCreateScope(&InlinedScope));
+  llvm::DILexicalBlock LB(getOrCreateScope(InlinedScope));
   while (!LB.isSubprogram()) {
     LB = llvm::DILexicalBlock(LB.getContext());
     assert(LB && "Lexical block parent chain must contain a subprogram");
   }
 #endif
 
-  assert(Scope.Parent);
-  auto ParentScope = getOrCreateScope(Scope.Parent);
+  auto ParentScope = getOrCreateScope(CallSite->Parent);
   llvm::MDNode *InlinedAt = nullptr;
 
   // If this is itself an inlined location, recursively create the
   // inlined-at location for it.
-  if (Scope.InlineScope)
-    InlinedAt = createInlinedAt(Scope);
+  if (CallSite->InlinedCallSite)
+    InlinedAt = createInlinedAt(CallSite);
 
-  auto InlineLoc = getLocation(SM, Scope.Loc).LocForLinetable;
+  auto InlineLoc = getLocation(SM, CallSite->Loc).LocForLinetable;
   auto DL = llvm::DebugLoc::get(InlineLoc.Line, InlineLoc.Col,
                                 ParentScope, InlinedAt);
   return DL.getAsMDNode(IGM.getLLVMContext());
@@ -413,9 +413,9 @@ void IRGenDebugInfo::setCurrentLoc(IRBuilder &Builder, SILDebugScope *DS,
   LastScope = DS;
 
   llvm::MDNode *InlinedAt = nullptr;
-  if (DS && DS->InlineScope) {
+  if (DS && DS->InlinedCallSite) {
     assert(Scope && "Inlined location without a lexical scope");
-    InlinedAt = createInlinedAt(*DS);
+    InlinedAt = createInlinedAt(DS);
   }
 
   assert(((!InlinedAt) || (InlinedAt && Scope)) && "inlined w/o scope");
@@ -438,26 +438,36 @@ llvm::DIDescriptor IRGenDebugInfo::getOrCreateScope(SILDebugScope *DS) {
 
   // If this is a (inlined) function scope, the function may
   // not have been created yet.
-  //assert(DS->InlinedFunction && "non-inlined function was elided");
-  if (DS->Loc.getKind() == SILLocation::SILFileKind ||
+  if (!DS->Parent ||
+      DS->Loc.getKind() == SILLocation::SILFileKind ||
       DS->Loc.isASTNode<AbstractFunctionDecl>() ||
-      DS->Loc.isASTNode<AbstractClosureExpr>()) {
+      DS->Loc.isASTNode<AbstractClosureExpr>() ||
+      DS->Loc.isASTNode<EnumElementDecl>()) {
+
     auto FnScope = DS->SILFn->getDebugScope();
+    // FIXME: This is a bug in the SIL deserialization.
+    if (!FnScope)
+      DS->SILFn->setDebugScope(DS);
+
     auto CachedScope = ScopeCache.find(FnScope);
     if (CachedScope != ScopeCache.end())
       return llvm::DIDescriptor(cast<llvm::MDNode>(CachedScope->second));
 
-    // FIXME: This is a bug in the SIL deserialization.
-    if (!DS->SILFn->getDebugScope()) {
-      FnScope = DS;
-      DS->SILFn->setDebugScope(DS);
-    }
+    assert(DS->SILFn->getRefCount() > 0);
+
     // Force the debug info for the function to be emitted, even if it
-    // is external.
-    emitFunction(*DS->SILFn, nullptr, true);
-    return llvm::DIDescriptor(cast<llvm::MDNode>(ScopeCache[FnScope]));
+    // is external or has been inlined.
+    llvm::Function *Fn = nullptr;
+    if (!DS->SILFn->getName().empty())
+      Fn = IGM.getAddrOfSILFunction(DS->SILFn, NotForDefinition);
+    llvm::DIDescriptor SP = emitFunction(*DS->SILFn, Fn, true);
+
+    // Cache it.
+    ScopeCache[DS] = llvm::WeakVH(SP);
+    return SP;
   }
 
+  assert(DS->Parent && "lexical block must have a parent subprogram");
   Location L = getLocation(SM, DS->Loc).Loc;
   llvm::DIFile File = getOrCreateFile(L.Filename);
   llvm::DIDescriptor Parent = getOrCreateScope(DS->Parent);
@@ -658,19 +668,28 @@ static bool isAllocatingConstructor(AbstractCC CC, DeclContext *DeclCtx) {
   return CC != AbstractCC::Method && DeclCtx && isa<ConstructorDecl>(DeclCtx);
 }
 
-void IRGenDebugInfo::emitFunction(SILModule &SILMod, SILDebugScope *DS,
-                                  llvm::Function *Fn, AbstractCC CC,
-                                  SILType SILTy, DeclContext *DeclCtx) {
+llvm::DIDescriptor IRGenDebugInfo::
+emitFunction(SILModule &SILMod, SILDebugScope *DS, llvm::Function *Fn,
+             AbstractCC CC, SILType SILTy, DeclContext *DeclCtx) {
+  // Returned a previously cached entry for an abstract (inlined) function.
+  auto cached = ScopeCache.find(DS);
+  if (cached != ScopeCache.end())
+    return llvm::DIDescriptor(cast<llvm::MDNode>(cached->second));
+
   StringRef Name;
   Location L = {};
   unsigned ScopeLine = 0; // The source line used for the function prologue.
   if (DS) {
-    Name = getName(DS->Loc);
+    if (DS->Loc.getKind() == SILLocation::SILFileKind)
+      Name = DS->SILFn->getName();
+    else
+      Name = getName(DS->Loc);
+
     auto FL = getLocation(SM, DS->Loc);
     L = FL.Loc;
     ScopeLine = FL.LocForLinetable.Line;
   }
-  auto LinkageName = Fn ? Fn->getName() : "";
+  auto LinkageName = Fn ? Fn->getName() : Name;
   auto File = getOrCreateFile(L.Filename);
   auto Scope = MainModule;
   auto Line = L.Line;
@@ -734,17 +753,10 @@ void IRGenDebugInfo::emitFunction(SILModule &SILMod, SILDebugScope *DS,
     EntryPointFn->replaceAllUsesWith(SP);
 
   if (!DS)
-    return;
+    return llvm::DIDescriptor();
 
-  // Replace any forward declarations referenced by inlined versions
-  // of this function with the real thing.
-  auto fwdDecl = ScopeCache.find(DS);
-  if (fwdDecl != ScopeCache.end()) {
-    //assert(llvm::DIType(cast<llvm::MDNode>(fwdDecl->second)).isForwardDecl()
-    //       && "not a forward decl");
-    fwdDecl->second->replaceAllUsesWith(SP);
-  }
   ScopeCache[DS] = llvm::WeakVH(SP);
+  return SP;
 }
 
 /// TODO: This is no longer needed.
@@ -826,13 +838,19 @@ llvm::DIModule IRGenDebugInfo::getOrCreateModule(llvm::DIScope Parent,
   return M;
 }
 
-void IRGenDebugInfo::emitFunction(SILFunction &SILFn, llvm::Function *Fn,
-                                  bool Force) {
+llvm::DIDescriptor IRGenDebugInfo::emitFunction(SILFunction &SILFn,
+                                                llvm::Function *Fn,
+                                                bool Force) {
   if (!Force && isAvailableExternally(SILFn.getLinkage()))
-    return;
-  emitFunction(SILFn.getModule(), SILFn.getDebugScope(), Fn,
-               SILFn.getAbstractCC(), SILFn.getLoweredType(),
-               SILFn.getDeclContext());
+    return llvm::DIDescriptor();
+
+  auto DS = SILFn.getDebugScope();
+  if (DS && !DS->SILFn)
+    DS->SILFn = &SILFn;
+
+  return emitFunction(SILFn.getModule(), SILFn.getDebugScope(), Fn,
+                      SILFn.getAbstractCC(), SILFn.getLoweredType(),
+                      SILFn.getDeclContext());
 }
 
 void IRGenDebugInfo::emitArtificialFunction(SILModule &SILMod,
@@ -980,8 +998,10 @@ void IRGenDebugInfo::emitVariableDeclaration(
     IRBuilder &Builder, ArrayRef<llvm::Value *> Storage, DebugTypeInfo DbgTy,
     SILDebugScope *DS, StringRef Name, unsigned Tag, unsigned ArgNo,
     IndirectionKind Indirection, ArtificialKind Artificial) {
-  // FIXME: enable this assertion.
-  // assert(DS);
+  // FIXME: Make this an assertion.
+  if (!DS)
+    return;
+
   llvm::DIDescriptor Scope = getOrCreateScope(DS);
   Location Loc = getLoc(SM, DbgTy.getDecl());
 
@@ -1034,8 +1054,8 @@ void IRGenDebugInfo::emitVariableDeclaration(
   }
 
   // Create inlined variables.
-  if (DS && DS->InlineScope) {
-    auto InlinedAt = createInlinedAt(*DS);
+  if (DS && DS->InlinedCallSite) {
+    auto InlinedAt = createInlinedAt(DS);
     Descriptor = createInlinedVariable(Descriptor, InlinedAt, M.getContext());
   }
 
@@ -1104,9 +1124,9 @@ void IRGenDebugInfo::emitVariableDeclaration(
 
     // Set the location/scope of the intrinsic.
     llvm::MDNode *InlinedAt = nullptr;
-    if (DS && DS->InlineScope) {
+    if (DS && DS->InlinedCallSite) {
       assert(Scope && "Inlined location without a lexical scope");
-      InlinedAt = createInlinedAt(*DS);
+      InlinedAt = createInlinedAt(DS);
     }
     Call->setDebugLoc(llvm::DebugLoc::get(Line, Loc.Col, Scope, InlinedAt));
   }

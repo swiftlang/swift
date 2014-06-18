@@ -145,29 +145,56 @@ template<typename ImplClass>
 class SILClonerWithScopes : public SILCloner<ImplClass> {
   friend class SILCloner<ImplClass>;
 public:
-  SILClonerWithScopes(SILFunction &To) : SILCloner<ImplClass>(To) {}
+  SILClonerWithScopes(SILFunction &To) : SILCloner<ImplClass>(To) {
+    auto OrigScope = To.getDebugScope();
+    assert(OrigScope && "function without scope");
+    if (!OrigScope || OrigScope->SILFn == &To)
+      // Cloning into the same function, nothing to do.
+      return;
+
+    // If we are cloning the entire function, the scope of the cloned
+    // function needs to hash to a different value than the original
+    // scope, so create a copy.
+    auto ClonedScope = new (To.getModule()) SILDebugScope(*OrigScope);
+    ClonedScope->SILFn = &To;
+    To.setDebugScope(ClonedScope);
+}
 
 private:
   llvm::SmallDenseMap<SILDebugScope *, SILDebugScope *> ClonedScopeCache;
   SILDebugScope *getOrCreateClonedScope(SILDebugScope *OrigScope) {
+    auto &NewFn = SILCloner<ImplClass>::getBuilder().getFunction();
+    // Reparent top-level nodes into the new function.
+    if (!OrigScope || (!OrigScope->Parent && !OrigScope->InlinedCallSite)) {
+      assert(NewFn.getDebugScope()->SILFn == &NewFn);
+      return NewFn.getDebugScope();
+    }
+
     auto it = ClonedScopeCache.find(OrigScope);
     if (it != ClonedScopeCache.end())
       return it->second;
 
-    auto Parent = OrigScope->Parent
-      ? getOrCreateClonedScope(OrigScope->Parent) : nullptr;
-    auto &ClonedFn = SILCloner<ImplClass>::getBuilder().getFunction();
-    auto CloneScope = new (ClonedFn.getModule())
-      SILDebugScope(OrigScope->Loc, ClonedFn, Parent);
+    // Create an inline scope for the cloned instruction.
+    auto CloneScope = new (NewFn.getModule()) SILDebugScope(*OrigScope);
+
+    if (OrigScope->InlinedCallSite) {
+      // For inlined functions, we need to rewrite the inlined call site.
+      CloneScope->InlinedCallSite =
+        getOrCreateClonedScope(OrigScope->InlinedCallSite);
+    } else {
+      CloneScope->SILFn = &NewFn;
+      CloneScope->Parent = getOrCreateClonedScope(OrigScope->Parent);
+    }
+
     ClonedScopeCache.insert({OrigScope, CloneScope});
     return CloneScope;
   }
 
 protected:
-  /// Clone the SILDebugScope for the specialized function.
+  /// Clone the SILDebugScope for the cloned function.
   void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
-    if (auto OrigScope = Orig->getDebugScope())
-      Cloned->setDebugScope(getOrCreateClonedScope(OrigScope));
+    auto ClonedScope = getOrCreateClonedScope(Orig->getDebugScope());
+    Cloned->setDebugScope(ClonedScope);
     SILCloner<ImplClass>::postProcess(Orig, Cloned);
   }
 };
@@ -205,9 +232,6 @@ template<typename ImplClass>
 void
 SILCloner<ImplClass>::postProcess(SILInstruction *Orig,
                                   SILInstruction *Cloned) {
-//  SILDebugScope *DebugScope = Orig->getDebugScope();
-//  if (DebugScope && !Cloned->getDebugScope())
-//    Cloned->setDebugScope(DebugScope);
   assert((Orig->getDebugScope() ? Cloned->getDebugScope()!=nullptr : true) &&
          "cloned function without a debug scope");
   InstructionMap.insert(std::make_pair(Orig, Cloned));

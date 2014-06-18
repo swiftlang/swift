@@ -35,7 +35,7 @@ public:
   /// If this scope is inlined, this points to a special "scope" that
   /// holds only the location of the call site. The parent scope will be
   /// the scope of the inlined call site.
-  SILDebugScope *InlineScope;
+  SILDebugScope *InlinedCallSite;
   /// The SILFunction that the scope belongs to. Inlined functions may
   /// be elided, so keep track of their type here.
   /// FIXME: Storing this for every scope is wasteful.  We only need
@@ -44,22 +44,21 @@ public:
 
   SILDebugScope(SILLocation Loc,
                 SILFunction &SILFn,
-                SILDebugScope *Parent = nullptr,
-                SILDebugScope *InlineScope = nullptr)
-    : Loc(Loc), Parent(Parent), InlineScope(InlineScope),
+                SILDebugScope *Parent = nullptr)
+    : Loc(Loc), Parent(Parent), InlinedCallSite(nullptr),
       SILFn(&SILFn)
     { }
 
   /// Create a scope for an artificial function.
   SILDebugScope(SILLocation Loc)
-    : Loc(Loc), Parent(nullptr), InlineScope(nullptr), SILFn(nullptr)
+    : Loc(Loc), Parent(nullptr), InlinedCallSite(nullptr), SILFn(nullptr)
     { }
 
   /// Create an inlined version of CalleeScope.
   SILDebugScope(SILDebugScope *CallSiteScope, SILDebugScope *CalleeScope,
-                SILFunction &SILFn)
+                SILFunction *InlinedFn)
     : Loc(CalleeScope->Loc), Parent(CalleeScope->Parent),
-      InlineScope(CallSiteScope), SILFn(&SILFn) {
+      InlinedCallSite(CallSiteScope), SILFn(InlinedFn) {
     assert(CallSiteScope && CalleeScope);
   }
 

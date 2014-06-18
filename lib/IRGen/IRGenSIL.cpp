@@ -30,6 +30,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/SIL/PrettyStackTrace.h"
+#include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILLinkage.h"
 #include "swift/SIL/SILModule.h"
@@ -763,6 +764,9 @@ emitPHINodesForBBArgs(IRGenSILFunction &IGF,
     if (!silBB->empty()) {
       SILInstruction &I = *silBB->begin();
       auto DS = I.getDebugScope();
+      // FIXME: This should be an assertion.
+      if (DS && DS->SILFn != IGF.CurSILFn && !DS->InlinedCallSite)
+        DS = IGF.CurSILFn->getDebugScope();
       if (!DS) DS = IGF.CurSILFn->getDebugScope();
       IGF.IGM.DebugInfo->setCurrentLoc(IGF.Builder, DS, I.getLoc());
     }
@@ -1324,6 +1328,12 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
       }
 
       auto DS = I.getDebugScope();
+      // FIXME: This should be an assertion.
+      if (DS && DS->SILFn != CurSILFn && !DS->InlinedCallSite) {
+        DS = CurSILFn->getDebugScope();
+        assert(DS->SILFn == CurSILFn);
+      }
+
       if (!DS) DS = CurSILFn->getDebugScope();
       if (!DS)
         // Until DebugScopes are properly serialized, bare functions
@@ -2470,8 +2480,11 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
                              Decl->getType()->getLValueOrInOutObjectType(),
                              type);
     auto Name = Decl->getName().str();
+    auto DS = i->getDebugScope();
+    if (!DS) DS = CurSILFn->getDebugScope();
+    assert(DS->SILFn == CurSILFn || DS->InlinedCallSite);
     emitDebugVariableDeclaration(Builder, addr.getAddress().getAddress(),
-                                 DTI, i->getDebugScope(), Name);
+                                 DTI, DS, Name);
   }
 
   setLoweredAddress(i->getContainerResult(), addr.getContainer());

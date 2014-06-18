@@ -87,17 +87,13 @@ SILFunction *SpecializingCloner::initCloned(SILFunction *Orig,
          && "SILFunction missing DebugScope");
   assert(!Orig->isGlobalInit() && "Global initializer cannot be cloned");
 
-  // This scope needs to hash to a different value than the original scope.
-  auto OrigScope = Orig->getDebugScope();
-  auto ClonedScope = OrigScope ? new (M) SILDebugScope(*OrigScope) : nullptr;
-
   // Create a new empty function.
   SILFunction *NewF =
     SILFunction::create(M, getSpecializedLinkage(Orig->getLinkage()),
                         NewName, FTy, nullptr,
                         Orig->getLocation(), Orig->isBare(),
                         Orig->isTransparent(), 0,
-                        ClonedScope, Orig->getDeclContext());
+                        Orig->getDebugScope(), Orig->getDeclContext());
 
   NumSpecialized++;
   return NewF;
