@@ -2678,8 +2678,6 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
       ->getCanonicalType();
     CanType anyObjectMetaTy = CanExistentialMetatypeType::get(anyObjectTy,
                                                   MetatypeRepresentation::ObjC);
-    CanType optAnyObjectMetaty = OptionalType::get(anyObjectMetaTy)
-          ->getCanonicalType();
     CanType IUOptAnyObjectMetaty
       = ImplicitlyUnwrappedOptionalType::get(anyObjectMetaTy)
           ->getCanonicalType();
@@ -2704,28 +2702,21 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
                              SILType::getPrimitiveObjectType(mainClassMetaty));
     metaTy = B.createUpcast(mainClass, metaTy,
                           SILType::getPrimitiveObjectType(anyObjectMetaTy));
-    SILValue optMetaTy = B.createEnum(mainClass, metaTy,
-                          getASTContext().getOptionalSomeDecl(),
-                          SILType::getPrimitiveObjectType(optAnyObjectMetaty));
-    SILValue iuoptMetaTy = B.createStruct(mainClass,
-                          SILType::getPrimitiveObjectType(IUOptAnyObjectMetaty),
-                          optMetaTy);
+    SILValue iuoptMetaTy =
+      B.createEnum(mainClass, metaTy,
+                   getASTContext().getImplicitlyUnwrappedOptionalSomeDecl(),
+                   SILType::getPrimitiveObjectType(IUOptAnyObjectMetaty));
     SILValue iuoptName = B.createApply(mainClass,
                                NSStringFromClass,
                                NSStringFromClass->getType(),
                                SILType::getPrimitiveObjectType(IUOptNSStringTy),
                                {}, iuoptMetaTy);
-    VarDecl *IUOValueField = nullptr;
-    for (auto field : IUOptAnyObjectMetaty->getNominalOrBoundGenericNominal()
-           ->getStoredProperties()) {
-      assert(!IUOValueField && "IUO has more than one field?!");
-      IUOValueField = field;
-    }
-    assert(IUOValueField && "IUO has no fields?!");
-    
-    SILValue optName = B.createStructExtract(mainClass, iuoptName,
-                               IUOValueField,
-                               SILType::getPrimitiveObjectType(OptNSStringTy));
+    SILValue name = B.createUncheckedEnumData(mainClass, iuoptName,
+                       getASTContext().getImplicitlyUnwrappedOptionalSomeDecl(),
+                                   SILType::getPrimitiveObjectType(NSStringTy));
+    SILValue optName = B.createEnum(mainClass, name,
+                                    getASTContext().getOptionalSomeDecl(),
+                                SILType::getPrimitiveObjectType(OptNSStringTy));
     
     // Call UIApplicationMain.
     SILParameterInfo argTypes[] = {

@@ -410,21 +410,21 @@ bool TypeBase::isVoid() {
 }
 
 Type TypeBase::getOptionalObjectType() {
-  if (auto boundTy = getAs<BoundGenericType>())
+  if (auto boundTy = getAs<BoundGenericEnumType>())
     if (boundTy->getDecl()->classifyAsOptionalType() == OTK_Optional)
       return boundTy->getGenericArgs()[0];
   return Type();
 }
 
 Type TypeBase::getImplicitlyUnwrappedOptionalObjectType() {
-  if (auto boundTy = getAs<BoundGenericType>())
+  if (auto boundTy = getAs<BoundGenericEnumType>())
     if (boundTy->getDecl()->classifyAsOptionalType() == OTK_ImplicitlyUnwrappedOptional)
       return boundTy->getGenericArgs()[0];
   return Type();
 }
 
 Type TypeBase::getAnyOptionalObjectType(OptionalTypeKind &kind) {
-  if (auto boundTy = getAs<BoundGenericType>())
+  if (auto boundTy = getAs<BoundGenericEnumType>())
     if ((kind = boundTy->getDecl()->classifyAsOptionalType()))
       return boundTy->getGenericArgs()[0];
   kind = OTK_None;
@@ -432,7 +432,7 @@ Type TypeBase::getAnyOptionalObjectType(OptionalTypeKind &kind) {
 }
 
 CanType CanType::getAnyOptionalObjectTypeImpl(CanType type) {
-  if (auto boundTy = dyn_cast<BoundGenericType>(type))
+  if (auto boundTy = dyn_cast<BoundGenericEnumType>(type))
     if (boundTy->getDecl()->classifyAsOptionalType())
       return boundTy.getGenericArgs()[0];
   return CanType();

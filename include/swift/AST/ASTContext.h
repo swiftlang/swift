@@ -362,13 +362,19 @@ public:
   EnumDecl *getOptionalDecl() const;
 
   /// Retrieve the declaration of Swift.ImplicitlyUnwrappedOptional<T>.
-  StructDecl *getImplicitlyUnwrappedOptionalDecl() const;
-  
+  EnumDecl *getImplicitlyUnwrappedOptionalDecl() const;
+
   /// Retrieve the declaration of Swift.Optional<T>.Some.
   EnumElementDecl *getOptionalSomeDecl() const;
   
   /// Retrieve the declaration of Swift.Optional<T>.None.
   EnumElementDecl *getOptionalNoneDecl() const;
+
+  /// Retrieve the declaration of Swift.ImplicitlyUnwrappedOptional<T>.Some.
+  EnumElementDecl *getImplicitlyUnwrappedOptionalSomeDecl() const;
+
+  /// Retrieve the declaration of Swift.ImplicitlyUnwrappedOptional<T>.None.
+  EnumElementDecl *getImplicitlyUnwrappedOptionalNoneDecl() const;
   
   // Declare accessors for the known declarations.
 #define FUNC_DECL(Name, Id) \

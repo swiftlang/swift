@@ -980,15 +980,6 @@ namespace {
       if (TC.isAnywhereResilient(D))
         return handleAddressOnly(structType);
 
-      // Lower Self! as if it were Whatever!.
-      if (D == TC.Context.getImplicitlyUnwrappedOptionalDecl()) {
-        auto valueType = cast<BoundGenericType>(structType).getGenericArgs()[0];
-        if (auto dynamicSelf = dyn_cast<DynamicSelfType>(valueType)) {
-          return &TC.getTypeLowering(
-                      ImplicitlyUnwrappedOptionalType::get(dynamicSelf->getSelfType()));
-        }
-      }
-
       bool hasOnlyTrivialChildren = true;
       for (auto field : D->getStoredProperties()) {
         auto origFieldType = AbstractionPattern(field->getType());
@@ -1014,11 +1005,16 @@ namespace {
       if (TC.isAnywhereResilient(D))
         return handleAddressOnly(enumType);
       
-      // Lower Self? as if it were Whatever?.
-      if (D == TC.Context.getOptionalDecl()) {
-        auto valueType = cast<BoundGenericType>(enumType).getGenericArgs()[0];
-        if (auto dynamicSelf = dyn_cast<DynamicSelfType>(valueType)) {
-          return &TC.getTypeLowering(OptionalType::get(dynamicSelf->getSelfType()));
+      // Lower Self? as if it were Whatever? and Self! as if it were Whatever!.
+      if (auto genericEnum = dyn_cast<BoundGenericEnumType>(enumType)) {
+        if (auto dynamicSelf =
+              dyn_cast<DynamicSelfType>(genericEnum.getGenericArgs()[0])) {
+          CanType selfType = dynamicSelf.getSelfType();
+          if (D == TC.Context.getOptionalDecl()) {
+            return &TC.getTypeLowering(OptionalType::get(selfType));
+          } else if (D == TC.Context.getImplicitlyUnwrappedOptionalDecl()) {
+            return &TC.getTypeLowering(ImplicitlyUnwrappedOptionalType::get(selfType));
+          }
         }
       }
 

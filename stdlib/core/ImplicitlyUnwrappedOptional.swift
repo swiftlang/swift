@@ -20,37 +20,47 @@
 /// The compiler has special knowledge of the existence of
 /// ImplicitlyUnwrappedOptional<T>, but always interacts with it using the
 /// library intrinsics below.
-struct ImplicitlyUnwrappedOptional<T>
+enum ImplicitlyUnwrappedOptional<T>
   : LogicValue, Reflectable, NilLiteralConvertible {
-  // Note: explicit initialization to .None is required to break infinite
-  // recursion with the otherwise-implicitly-provided default value of
-  // `nil`.
-  var value: T? = .None
+  case None
+  case Some(T)
 
-  init() { value = .None }
-  init(_ v : T?) { value = v }
-
-  static var None : ImplicitlyUnwrappedOptional {
-    @transparent get {
-      return ImplicitlyUnwrappedOptional(.None)
+  init() { self = .None }
+  init(_ some : T) { self = .Some(some) }
+  init(_ v : T?) {
+    switch v {
+    case .Some(let some):
+      self = .Some(some)
+    case .None:
+      self = .None
     }
   }
-  
+
   // Make nil work with ImplicitlyUnwrappedOptional
   @transparent
   static func convertFromNilLiteral() -> ImplicitlyUnwrappedOptional<T> {
     return .None
   }
 
-  @transparent
-  static func Some(value: T) -> ImplicitlyUnwrappedOptional {
-    return ImplicitlyUnwrappedOptional(.Some(value))
-  }
-
   /// Allow use in a Boolean context.
   @transparent
   func getLogicValue() -> Bool {
-    return value.getLogicValue()
+    switch self {
+    case .Some:
+      return true
+    case .None:
+      return false
+    }
+  }
+
+  /// Haskell's fmap, which was mis-named
+  func map<U>(f: (T)->U) -> ImplicitlyUnwrappedOptional<U> {
+    switch self {
+    case .Some(let y):
+      return .Some(f(y))
+    case .None:
+      return .None
+    }
   }
 
   func getMirror() -> Mirror {
@@ -61,38 +71,44 @@ struct ImplicitlyUnwrappedOptional<T>
       return _OptionalMirror(self)
     }
   }
-
-  /// Haskell's fmap, which was mis-named
-  func map<U>(f: (T)->U) -> ImplicitlyUnwrappedOptional<U> {
-    return ImplicitlyUnwrappedOptional<U>(value.map(f))
-  }
 }
 
 extension ImplicitlyUnwrappedOptional : Printable {
   var description: String {
-    return value.description
+    switch self {
+    case .Some(let value):
+      return toString(value)
+    case .None:
+      return "nil"
+    }
   }
 }
 
 // Intrinsics for use by language features.
 @transparent
 func _doesImplicitlyUnwrappedOptionalHaveValue<T>(inout v: T!) -> Builtin.Int1 {
-  return _doesOptionalHaveValue(&v.value)
+  return v.getLogicValue().value
 }
 
 @transparent
 func _getImplicitlyUnwrappedOptionalValue<T>(v: T!) -> T {
-  return _getOptionalValue(v.value)
+  switch v {
+  case .Some(let x):
+    return x
+  case .None:
+    _preconditionFailure(
+      "unexpectedly found nil while unwrapping an Optional value")
+  }
 }
 
 @transparent
 func _injectValueIntoImplicitlyUnwrappedOptional<T>(v: T) -> T! {
-  return ImplicitlyUnwrappedOptional(_injectValueIntoOptional(v))
+  return .Some(v)
 }
 
 @transparent
 func _injectNothingIntoImplicitlyUnwrappedOptional<T>() -> T! {
-  return ImplicitlyUnwrappedOptional(_injectNothingIntoOptional())
+  return .None
 }
 
 extension ImplicitlyUnwrappedOptional : _ConditionallyBridgedToObjectiveC {
@@ -103,7 +119,7 @@ extension ImplicitlyUnwrappedOptional : _ConditionallyBridgedToObjectiveC {
   }
 
   func bridgeToObjectiveC() -> AnyObject {
-    switch self.value {
+    switch self {
     case .None:
       _preconditionFailure("attempt to bridge an implicitly unwrapped optional containing nil")
 

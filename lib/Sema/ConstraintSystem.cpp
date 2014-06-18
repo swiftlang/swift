@@ -1291,7 +1291,7 @@ static bool isPrivilegedAccessToImplicitlyUnwrappedOptional(DeclContext *DC,
 }
 
 Type ConstraintSystem::lookThroughImplicitlyUnwrappedOptionalType(Type type) {
-  if (auto boundTy = type->getAs<BoundGenericStructType>()) {
+  if (auto boundTy = type->getAs<BoundGenericEnumType>()) {
     auto boundDecl = boundTy->getDecl();
     if (boundDecl == TC.Context.getImplicitlyUnwrappedOptionalDecl() &&
         !isPrivilegedAccessToImplicitlyUnwrappedOptional(DC, boundDecl))

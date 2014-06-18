@@ -76,6 +76,12 @@ struct ASTContext::Implementation {
 
   /// The declaration of Swift.Optional<T>.None.
   EnumElementDecl *OptionalNoneDecl = nullptr;
+
+  /// The declaration of Swift.ImplicitlyUnwrappedOptional<T>.Some.
+  EnumElementDecl *ImplicitlyUnwrappedOptionalSomeDecl = nullptr;
+
+  /// The declaration of Swift.ImplicitlyUnwrappedOptional<T>.None.
+  EnumElementDecl *ImplicitlyUnwrappedOptionalNoneDecl = nullptr;
   
   // Declare cached declarations for each of the known declarations.
 #define FUNC_DECL(Name, Id) FuncDecl *Get##Name = nullptr;
@@ -94,7 +100,7 @@ struct ASTContext::Implementation {
   FuncDecl *InjectNothingIntoOptionalDecls[NumOptionalTypeKinds] = {};
 
   /// The declaration of Swift.ImplicitlyUnwrappedOptional<T>.
-  StructDecl *ImplicitlyUnwrappedOptionalDecl = nullptr;
+  EnumDecl *ImplicitlyUnwrappedOptionalDecl = nullptr;
 
   /// func _getBool(Builtin.Int1) -> Bool
   FuncDecl *GetBoolDecl = nullptr;
@@ -491,13 +497,27 @@ EnumElementDecl *ASTContext::getOptionalNoneDecl() const {
   return Impl.OptionalNoneDecl;
 }
 
-StructDecl *ASTContext::getImplicitlyUnwrappedOptionalDecl() const {
+EnumDecl *ASTContext::getImplicitlyUnwrappedOptionalDecl() const {
   if (!Impl.ImplicitlyUnwrappedOptionalDecl)
     Impl.ImplicitlyUnwrappedOptionalDecl
-      = dyn_cast_or_null<StructDecl>(findSyntaxSugarImpl(*this,
-                                                         "ImplicitlyUnwrappedOptional"));
+      = dyn_cast_or_null<EnumDecl>(findSyntaxSugarImpl(*this,
+                                                       "ImplicitlyUnwrappedOptional"));
 
   return Impl.ImplicitlyUnwrappedOptionalDecl;
+}
+
+EnumElementDecl *ASTContext::getImplicitlyUnwrappedOptionalSomeDecl() const {
+  if (!Impl.ImplicitlyUnwrappedOptionalSomeDecl)
+    Impl.ImplicitlyUnwrappedOptionalSomeDecl =
+      findEnumElement(getImplicitlyUnwrappedOptionalDecl(), "Some");
+  return Impl.ImplicitlyUnwrappedOptionalSomeDecl;
+}
+
+EnumElementDecl *ASTContext::getImplicitlyUnwrappedOptionalNoneDecl() const {
+  if (!Impl.ImplicitlyUnwrappedOptionalNoneDecl)
+    Impl.ImplicitlyUnwrappedOptionalNoneDecl =
+      findEnumElement(getImplicitlyUnwrappedOptionalDecl(), "None");
+  return Impl.ImplicitlyUnwrappedOptionalNoneDecl;
 }
 
 ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
