@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -target x86_64-apple-darwin10 -emit-ir %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-ir %s | FileCheck %s
 
 import Darwin
 
