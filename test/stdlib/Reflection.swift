@@ -234,7 +234,7 @@ println(reflect(x).disposition == .Class)
 
 // Test destructuring of a pure Swift class hierarchy.
 class Good {
-  let x: Int = 11
+  let x: UInt = 11
   let y: String = "222"
 }
 
