@@ -59,14 +59,23 @@ static SILValue findExtractPathBetweenValues(LoadInst *PrevLI, LoadInst *LI) {
   SILBuilder Builder(LI);
   while (!ProjectionPath.empty()) {
     auto P = ProjectionPath.pop_back_val();
-    if (auto *D = P.getDecl()) {
-      assert(P.getNominalType() != Projection::NominalType::Class &&
-             "Aggregate projections do not exist for classes.");
-      LastExtract = Builder.createStructExtract(LI->getLoc(), LastExtract,
-                                                D,
-                                                P.getType().getObjectType());
-      assert(cast<StructExtractInst>(*LastExtract).getStructDecl() &&
-             "Instruction must have a struct decl!");
+    if (ValueDecl *D = P.getDecl()) {
+      if (P.getNominalType() == Projection::NominalType::Struct) {
+        LastExtract = Builder.createStructExtract(LI->getLoc(), LastExtract,
+                                                  cast<VarDecl>(D),
+                                                  P.getType().getObjectType());
+        assert(cast<StructExtractInst>(*LastExtract).getStructDecl() &&
+               "Instruction must have a struct decl!");
+      } else {
+        assert(P.getNominalType() == Projection::NominalType::Enum &&
+               "Expected an enum decl here. Only other possibility is a "
+               "class which we do not support");
+        LastExtract = Builder.createUncheckedEnumData(
+            LI->getLoc(), LastExtract, cast<EnumElementDecl>(D),
+            P.getType().getObjectType());
+        assert(cast<UncheckedEnumDataInst>(*LastExtract).getElement() &&
+               "Instruction must have an enum element decl!");
+      }
     } else {
       LastExtract = Builder.createTupleExtract(LI->getLoc(), LastExtract,
                                                P.getIndex(),

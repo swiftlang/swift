@@ -1009,28 +1009,28 @@ bb0:
   return %2 : $Builtin.Int1
 }
 
-// CHECK-LABEL: sil @unchecked_addr_cast_formation : $@thin (@inout FakeOptional<Builtin.Int1>) -> Builtin.Int1 {
-// CHECK: bb0([[INPUT_PTR:%[0-9]+]] : $*FakeOptional<Builtin.Int1>):
-// CHECK-NEXT: [[CAST_PTR:%[0-9]+]] = unchecked_addr_cast [[INPUT_PTR]] : $*FakeOptional<Builtin.Int1> to $*Builtin.Int1
+// CHECK-LABEL: sil @unchecked_addr_cast_formation : $@thin (@inout Builtin.NativeObject) -> Builtin.Word {
+// CHECK: bb0([[INPUT_PTR:%[0-9]+]] : $*Builtin.NativeObject):
+// CHECK-NEXT: [[CAST_PTR:%[0-9]+]] = unchecked_addr_cast [[INPUT_PTR]] : $*Builtin.NativeObject to $*Builtin.Word
 // CHECK-NEXT: load [[CAST_PTR]]
 // CHECK-NEXT: return
-sil @unchecked_addr_cast_formation : $@thin (@inout FakeOptional<Builtin.Int1>) -> Builtin.Int1 {
-bb0(%0 : $*FakeOptional<Builtin.Int1>):
-  %1 = address_to_pointer %0 : $*FakeOptional<Builtin.Int1> to $Builtin.RawPointer
-  %2 = pointer_to_address %1 : $Builtin.RawPointer to $*Builtin.Int1
-  %3 = load %2 : $*Builtin.Int1
-  return %3 : $Builtin.Int1
+sil @unchecked_addr_cast_formation : $@thin (@inout Builtin.NativeObject) -> Builtin.Word {
+bb0(%0 : $*Builtin.NativeObject):
+  %1 = address_to_pointer %0 : $*Builtin.NativeObject to $Builtin.RawPointer
+  %2 = pointer_to_address %1 : $Builtin.RawPointer to $*Builtin.Word
+  %3 = load %2 : $*Builtin.Word
+  return %3 : $Builtin.Word
 }
 
-// CHECK-LABEL: sil @unchecked_addr_cast_forwarding : $@thin (@inout FakeOptional<StringData>) -> Builtin.Word {
-// CHECK: bb0([[INPUT_PTR:%[0-9]+]] : $*FakeOptional<StringData>):
-// CHECK-NEXT: [[CAST_PTR:%[0-9]+]] = unchecked_addr_cast [[INPUT_PTR]] : $*FakeOptional<StringData> to $*Builtin.Word
+// CHECK-LABEL: sil @unchecked_addr_cast_forwarding : $@thin (@inout Builtin.NativeObject) -> Builtin.Word {
+// CHECK: bb0([[INPUT_PTR:%[0-9]+]] : $*Builtin.NativeObject):
+// CHECK-NEXT: [[CAST_PTR:%[0-9]+]] = unchecked_addr_cast [[INPUT_PTR]] : $*Builtin.NativeObject to $*Builtin.Word
 // CHECK-NEXT: load [[CAST_PTR]]
 // CHECK-NEXT: return
-sil @unchecked_addr_cast_forwarding : $@thin (@inout FakeOptional<StringData>) -> Builtin.Word {
-bb0(%0 : $*FakeOptional<StringData>):
-  %1 = unchecked_addr_cast %0 : $*FakeOptional<StringData> to $*StringData
-  %2 = unchecked_addr_cast %1 : $*StringData to $*Builtin.Word
+sil @unchecked_addr_cast_forwarding : $@thin (@inout Builtin.NativeObject) -> Builtin.Word {
+bb0(%0 : $*Builtin.NativeObject):
+  %1 = unchecked_addr_cast %0 : $*Builtin.NativeObject to $*Builtin.RawPointer
+  %2 = unchecked_addr_cast %1 : $*Builtin.RawPointer to $*Builtin.Word
   %3 = load %2 : $*Builtin.Word
   return %3 : $Builtin.Word
 }
@@ -1353,4 +1353,62 @@ bb0:
   dealloc_stack %3#0 : $*@local_storage Builtin.Int32
   %9999 = tuple()
   return %9999 : $()
+}
+
+struct rs_E {
+  var ptr : Builtin.NativeObject
+  var i : Int
+}
+struct rs_F {
+  var e : rs_E
+}
+struct rs_D {
+  var i : Int
+}
+struct rs_C {
+  var d : rs_D
+}
+
+struct rs_B {
+  var ptr : Builtin.NativeObject
+}
+struct rs_A {
+  var b : rs_B
+}
+
+enum TwoStateEnum {
+  case State1(rs_A)
+  case State2(rs_C)
+}
+
+// CHECK-LABEL: sil @reinterpretcast_simplification_unchecked_addr : $@thin (@inout FakeOptional<rs_A>, @inout FakeOptional<rs_C>, @inout FakeOptional<rs_F>, @inout TwoStateEnum, @inout TwoStateEnum) -> (Builtin.NativeObject, Int, Builtin.NativeObject, Builtin.NativeObject, Int) {
+// CHECK: bb0([[INPTR_0:%[0-9]+]] : $*FakeOptional<rs_A>, [[INPTR_1:%[0-9]+]] : $*FakeOptional<rs_C>, [[INPTR_2:%[0-9]+]] : $*FakeOptional<rs_F>, [[INPTR_3:%[0-9]+]] : $*TwoStateEnum, [[INPTR_4:%[0-9]+]] : $*TwoStateEnum):
+// CHECK-NEXT: [[RS_A:%[0-9]+]] = unchecked_take_enum_data_addr [[INPTR_0]] : $*FakeOptional<rs_A>, #FakeOptional.Some!enumelt.1
+// CHECK-NEXT: [[RS_B:%[0-9]+]] = struct_element_addr [[RS_A]] : $*rs_A, #rs_A.b
+// CHECK-NEXT: struct_element_addr [[RS_B]] : $*rs_B, #rs_B.ptr
+// CHECK-NEXT: [[RS_C:%[0-9]+]] = unchecked_take_enum_data_addr [[INPTR_1]] : $*FakeOptional<rs_C>, #FakeOptional.Some!enumelt.1
+// CHECK-NEXT: [[RS_D:%[0-9]+]] = struct_element_addr [[RS_C]] : $*rs_C, #rs_C.d
+// CHECK-NEXT: struct_element_addr [[RS_D]] : $*rs_D, #rs_D.i
+// CHECK-NEXT: unchecked_addr_cast [[INPTR_2]] : $*FakeOptional<rs_F> to $*Builtin.NativeObject
+// CHECK-NEXT: [[RS_A_2:%[0-9]+]] = unchecked_take_enum_data_addr [[INPTR_3]] : $*TwoStateEnum, #TwoStateEnum.State1!enumelt.1
+// CHECK-NEXT: [[RS_B_2:%[0-9]+]] = struct_element_addr [[RS_A_2]] : $*rs_A, #rs_A.b
+// CHECK-NEXT: [[RS_PTR_2:%[0-9]+]] = struct_element_addr [[RS_B_2]] : $*rs_B, #rs_B.ptr
+// CHECK-NEXT: unchecked_addr_cast [[INPTR_4]] : $*TwoStateEnum to $*Int
+sil @reinterpretcast_simplification_unchecked_addr
+  : $@thin (@inout FakeOptional<rs_A>, @inout FakeOptional<rs_C>, @inout FakeOptional<rs_F>, @inout TwoStateEnum,
+            @inout TwoStateEnum)
+     -> (Builtin.NativeObject, Int, Builtin.NativeObject, Builtin.NativeObject, Int) {
+bb0(%0 : $*FakeOptional<rs_A>, %1 : $*FakeOptional<rs_C>, %2 : $*FakeOptional<rs_F>, %3 : $*TwoStateEnum, %4 : $*TwoStateEnum):
+  %5 = unchecked_addr_cast %0 : $*FakeOptional<rs_A> to $*Builtin.NativeObject
+  %6 = unchecked_addr_cast %1 : $*FakeOptional<rs_C> to $*Int
+  %7 = unchecked_addr_cast %2 : $*FakeOptional<rs_F> to $*Builtin.NativeObject
+  %8 = unchecked_addr_cast %3 : $*TwoStateEnum to $*Builtin.NativeObject
+  %9 = unchecked_addr_cast %4 : $*TwoStateEnum to $*Int
+  %10 = load %5 : $*Builtin.NativeObject
+  %11 = load %6 : $*Int
+  %12 = load %7 : $*Builtin.NativeObject
+  %13 = load %8 : $*Builtin.NativeObject
+  %14 = load %9 : $*Int
+  %15 = tuple(%10 : $Builtin.NativeObject, %11 : $Int, %12 : $Builtin.NativeObject, %13 : $Builtin.NativeObject, %14 : $Int)
+  return %15 : $(Builtin.NativeObject, Int, Builtin.NativeObject, Builtin.NativeObject, Int)
 }

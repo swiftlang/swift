@@ -622,13 +622,14 @@ SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
     // Ok, we have started to visit the range of instructions associated with
     // a new projection. If we have a VarDecl, create a struct_element_addr +
     // load. Make sure to update LastProj, LastNewLoad.
-    if (auto *V = Proj.getDecl()) {
+    if (ValueDecl *V = Proj.getDecl()) {
       assert(isa<StructExtractInst>(Inst) && "A projection with a VarDecl "
              "should be associated with a struct_extract.");
 
       LastProj = &Proj;
       auto *SEA =
-        Builder->createStructElementAddr(LI->getLoc(), LI->getOperand(), V,
+        Builder->createStructElementAddr(LI->getLoc(), LI->getOperand(),
+                                         cast<VarDecl>(V),
                                          Inst->getType(0).getAddressType());
       LastNewLoad = Builder->createLoad(LI->getLoc(), SEA);
       replaceInstUsesWith(*Inst, LastNewLoad, 0);
@@ -1192,6 +1193,75 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
   return nullptr;
 }
 
+static bool areLayoutCompatibleTypes(SILType Ty1, SILType Ty2, SILModule &Mod,
+                                     llvm::SmallVectorImpl<Projection> &Projs) {
+  // If Ty1 == Ty2, they must be layout compatible.
+  if (Ty1 == Ty2)
+    return true;
+
+  // We do not know the final types of generics implying we can not know if they
+  // are layout compatible.
+  if (Ty1.hasArchetype() || Ty2.hasArchetype())
+    return false;
+
+  SILType TyIter = Ty1;
+
+  while (true) {
+    // If this type is the type we are searching for (Ty2), we have succeeded,
+    // return.
+    if (TyIter == Ty2)
+      return true;
+
+    // Then if we have an enum...
+    if (EnumDecl *E = TyIter.getEnumOrBoundGenericEnum()) {
+      // Add the first payloaded field to the list. If we have no payloads,
+      // bail.
+      bool FoundResult = false;
+      for (EnumElementDecl *Elt : E->getAllElements()) {
+        if (Elt->hasArgumentType()) {
+          TyIter = TyIter.getEnumElementType(Elt, Mod);
+          Projs.push_back({TyIter, Elt});
+          FoundResult = true;
+          break;
+        }
+      }
+
+      if (FoundResult)
+        continue;
+      return false;
+    }
+
+    // Then if we have a struct address...
+    if (StructDecl *S = TyIter.getStructOrBoundGenericStruct()) {
+      // Look through its stored properties.
+      auto Range = S->getStoredProperties();
+
+      // If it has no stored properties, there is nothing we can do, bail.
+      if (Range.begin() == Range.end())
+        return false;
+
+      // Grab the first field.
+      auto Iter = Range.begin();
+      VarDecl *FirstVar = *Iter;
+      ++Iter;
+
+      // If we have more than one stored field, the struct is not able to have
+      // layout compatible relationships with any of its fields.
+      if (Iter != Range.end())
+        return false;
+
+      // Otherwise we can search into the structs fields.
+      TyIter = TyIter.getFieldType(FirstVar, Mod);
+      Projs.push_back({TyIter, FirstVar, Projection::NominalType::Struct});
+      continue;
+    }
+
+    // If we reached this point, then this type has no subrecords we are
+    // interested in. Thus we have failed. Return false.
+    return false;
+  }
+}
+
 SILInstruction *
 SILCombiner::visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI) {
   // (unchecked-addr-cast (unchecked-addr-cast x X->Y) Y->Z)
@@ -1206,6 +1276,34 @@ SILCombiner::visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI) {
       UADCI->getType().isSuperclassOf(UADCI->getOperand().getType()))
     return new (UADCI->getModule())
         UpcastInst(UADCI->getLoc(), UADCI->getOperand(), UADCI->getType());
+
+  // *NOTE* InstSimplify already handles the identity case so we don't need to
+  // worry about that problem here.
+  llvm::SmallVector<Projection, 4> Projs;
+  if (areLayoutCompatibleTypes(UADCI->getOperand().getType(),
+                               UADCI->getType(),
+                               UADCI->getModule(),
+                               Projs)) {
+    SILBuilder Builder(UADCI);
+    SILValue V = UADCI->getOperand();
+
+    for (auto &P : Projs) {
+      if (P.getNominalType() == Projection::NominalType::Struct) {
+        V = Builder.createStructElementAddr(UADCI->getLoc(),
+                                            V, cast<VarDecl>(P.getDecl()),
+                                            P.getType());
+      } else {
+        assert(P.getNominalType() == Projection::NominalType::Enum &&
+               "We only support rewriting of reinterpretCasts into enums and "
+               "structs");
+        V = Builder.createUncheckedTakeEnumDataAddr(
+            UADCI->getLoc(), V, cast<EnumElementDecl>(P.getDecl()),
+            P.getType());
+      }
+    }
+
+    return replaceInstUsesWith(*UADCI, V.getDef(), 0);
+  }
 
   return nullptr;
 }
@@ -1324,6 +1422,8 @@ SILInstruction *SILCombiner::visitStrongReleaseInst(StrongReleaseInst *SRI) {
 
   return nullptr;
 }
+
+
 
 //===----------------------------------------------------------------------===//
 //                                Entry Points

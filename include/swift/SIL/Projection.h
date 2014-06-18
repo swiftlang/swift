@@ -31,11 +31,12 @@ class Projection {
 public:
 
   /// The nominal type of the projection if representing a var decl. This allows
-  /// us to distinguish in between struct_element_addr and ref_element_addr in a
-  /// manner independent of the two.
+  /// us to distinguish in between struct_element_addr, ref_element_addr,
+  /// unchecked_take_enum_data_addr in a manner independent of the two.
   enum class NominalType : unsigned {
     Struct,
     Class,
+    Enum,
   };
 
 private:
@@ -44,16 +45,18 @@ private:
 
   /// The decl associated with this projection if the projection is representing
   /// a nominal type.
-  llvm::PointerIntPair<VarDecl *, 1> Decl;
+  llvm::PointerIntPair<ValueDecl *, 2> Decl;
 
   /// The index associated with the projection if the projection is representing
   /// a tuple type.
   unsigned Index;
 
 public:
+  Projection(SILType T, ValueDecl *D, NominalType NT)
+      : Type(T), Decl(D, unsigned(NT)), Index(-1) {}
 
-  Projection(SILType T, VarDecl *D, NominalType NT,
-             unsigned I) : Type(T), Decl(D, unsigned(NT)), Index(-1) {}
+  Projection(SILType T, EnumElementDecl *D)
+      : Type(T), Decl(D, unsigned(NominalType::Enum)), Index(0) {}
 
   Projection(SILType T, unsigned I) : Type(T), Decl(), Index(I) {}
 
@@ -69,6 +72,10 @@ public:
     : Type(REA->getType()), Decl(REA->getField(), unsigned(NominalType::Class)),
       Index(REA->getFieldNo()) { }
 
+  explicit Projection(UncheckedTakeEnumDataAddrInst *UTEDAI) :
+    Type(UTEDAI->getType()),
+    Decl(UTEDAI->getElement(), unsigned(NominalType::Enum)), Index(0) {}
+
   explicit Projection(StructExtractInst *SEI)
     : Type(SEI->getType()), Decl(SEI->getField(),
                                  unsigned(NominalType::Struct)),
@@ -78,8 +85,16 @@ public:
                                                Decl(nullptr),
                                                Index(TEI->getFieldNo()) { }
 
+  explicit Projection(UncheckedEnumDataInst *UEDAI) :
+    Type(UEDAI->getType()),
+    Decl(UEDAI->getElement(), unsigned(NominalType::Enum)), Index(0) {}
+
   SILType getType() const { return Type; }
-  VarDecl *getDecl() const { return Decl.getPointer(); }
+
+  ValueDecl *getDecl() const {
+    return Decl.getPointer();
+  }
+
   unsigned getIndex() const { return Index; }
   NominalType getNominalType() const { return NominalType(Decl.getInt()); }
 
@@ -113,6 +128,7 @@ public:
     case ValueKind::StructElementAddrInst:
     case ValueKind::TupleElementAddrInst:
     case ValueKind::RefElementAddrInst:
+    case ValueKind::UncheckedTakeEnumDataAddrInst:
       return true;
     default:
       return false;
