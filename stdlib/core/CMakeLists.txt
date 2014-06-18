@@ -28,6 +28,7 @@ set(SWIFTLIB_ESSENTIAL
   Bool.swift
   BridgeObjectiveC.swift
   Builtin.swift
+  BuiltinMath.swift.gyb
   CString.swift
   CTypes.swift
   Character.swift

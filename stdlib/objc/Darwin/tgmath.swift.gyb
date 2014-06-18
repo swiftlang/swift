@@ -48,12 +48,22 @@ def cFuncSuffix(bits):
 # Each of the following lists is ordered to match math.h
 
 # (T) -> T
-UnaryFunctions = ['acos', 'asin', 'atan', 'cos', 'sin', 'tan', 
-                  'acosh', 'asinh', 'atanh', 'cosh', 'sinh', 'tanh', 
-                  'exp', 'exp2', 'expm1',
-                  'log', 'log10', 'log2', 'log1p', 'logb', 
-                  'fabs', 'cbrt', 'sqrt', 'erf', 'erfc', 'tgamma', 
-                  'ceil', 'floor', 'nearbyint', 'rint', 'round', 'trunc', 
+# These functions do not have a corresponding LLVM intrinsic
+UnaryFunctions = ['acos', 'asin', 'atan', 'tan',
+                  'acosh', 'asinh', 'atanh', 'cosh', 'sinh', 'tanh',
+                  'expm1',
+                  'log1p', 'logb',
+                  'cbrt', 'erf', 'erfc', 'tgamma',
+                  ]
+
+# These functions have a corresponding LLVM intrinsic
+# We call this intrinsic via the Builtin method so keep this list in
+# sync with core/BuiltinMath.swift.gyb
+UnaryIntrinsicFunctions = ['cos', 'sin',
+                  'exp', 'exp2',
+                  'log', 'log10', 'log2',
+                  'fabs', 'sqrt',
+                  'ceil', 'floor', 'nearbyint', 'rint', 'round', 'trunc',
                   ]
 
 # (T, T) -> T
@@ -93,6 +103,11 @@ def TypedUnaryFunctions():
         for bits in overlayFloatBits:
             yield floatName(bits), cFloatName(bits), cFuncSuffix(bits), ufunc
 
+def TypedUnaryIntrinsicFunctions():
+    for ufunc in UnaryIntrinsicFunctions:
+        for bits in allFloatBits:
+            yield floatName(bits), ufunc
+
 def TypedBinaryFunctions():
     for bfunc in BinaryFunctions:
         for bits in overlayFloatBits:
@@ -102,11 +117,21 @@ def TypedBinaryFunctions():
 
 
 // Unary functions
-
+// Note these do not have a corresponding LLVM intrinsic
 % for T, CT, f, ufunc in TypedUnaryFunctions():
 @transparent 
 func ${ufunc}(x: ${T}) -> ${T} {
   return ${T}(${ufunc}${f}(${CT}(x)))
+}
+
+% end
+
+// Unary intrinsic functions
+// Note these have a corresponding LLVM intrinsic
+% for T, ufunc in TypedUnaryIntrinsicFunctions():
+@transparent
+func ${ufunc}(x: ${T}) -> ${T} {
+  return _${ufunc}(x)
 }
 
 % end
