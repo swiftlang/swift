@@ -149,5 +149,13 @@ var C_ARGC : CInt = CInt()
 /// through this pointer is unsafe.
 var C_ARGV : UnsafePointer<CString> = UnsafePointer<CString>()
 
-@asmname("memcpy")
-func c_memcpy(#dest: UnsafePointer<Void>, #src: UnsafePointer<Void>, #size: UInt)
+
+func c_memcpy(#dest: UnsafePointer<Void>, #src: UnsafePointer<Void>,
+              #size: UInt) {
+  let dest = dest.value
+  let src = src.value
+  let size = UInt64(size).value
+  Builtin.int_memcpy_RawPointer_RawPointer_Int64(dest, src, size,
+                                                 /*alignment*/Int32().value,
+                                                 /*volatile*/false.value)
+}

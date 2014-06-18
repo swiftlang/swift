@@ -25,11 +25,8 @@ func posix_write(fd: Int32, buf: Builtin.RawPointer, sz: Int) -> Int
 @asmname("read")
 func posix_read(fd: Int32, buf: Builtin.RawPointer, sz: Int) -> Int
 
-@asmname("llvm.ctlz.i64")
-func __llvm_ctlz(value: Builtin.Int64, isZeroUndef: Builtin.Int1) -> Builtin.Int64
-
 @transparent func countLeadingZeros(value: Int64) -> Int64 {
-    return Int64(__llvm_ctlz(value.value, false.value))
+    return Int64(Builtin.int_ctlz_Int64(value.value, false.value))
 }
 
 @transparent func _autorelease(x: AnyObject) {
