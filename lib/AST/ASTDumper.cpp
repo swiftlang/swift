@@ -1397,8 +1397,9 @@ public:
     printRec(E->getSubExpr());
     OS << ')';
   }
-  void visitCollectionDowncastExpr(CollectionDowncastExpr *E) {
-    printCommon(E, "collection_downcast_expr");
+  void visitConditionalCollectionDowncastExpr(
+         ConditionalCollectionDowncastExpr *E) {
+    printCommon(E, "conditional_collection_downcast_expr");
     if (E->bridgesFromObjC())
       OS << " bridges_from_objc";
     OS << '\n';

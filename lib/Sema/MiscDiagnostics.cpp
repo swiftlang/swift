@@ -232,7 +232,7 @@ static void diagModuleOrMetatypeValue(TypeChecker &TC, const Expr *E) {
           case ExprKind::ConditionalCheckedCast:
           case ExprKind::Isa:
           case ExprKind::Coerce:
-          case ExprKind::CollectionDowncast:
+          case ExprKind::ConditionalCollectionDowncast:
           case ExprKind::If:
           case ExprKind::Assign:
           case ExprKind::DefaultValue:

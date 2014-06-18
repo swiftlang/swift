@@ -2754,9 +2754,9 @@ namespace {
 
         toType = tc.getOptionalType(sub->getLoc(), toType);
         auto collectionConversion
-          = new (tc.Context) CollectionDowncastExpr(sub, expr->getLoc(), 
-                                                    expr->getCastTypeLoc(), 
-                                                    bridgesFromObjC);
+          = new (tc.Context) ConditionalCollectionDowncastExpr(
+                               sub, expr->getLoc(), expr->getCastTypeLoc(), 
+                               bridgesFromObjC);
         collectionConversion->setType(toType);
 
         cast = collectionConversion;
@@ -2834,7 +2834,8 @@ namespace {
       return expr;
     }
 
-    Expr *visitCollectionDowncastExpr(CollectionDowncastExpr *expr) {
+    Expr *visitConditionalCollectionDowncastExpr(
+            ConditionalCollectionDowncastExpr *expr) {
       return expr;
     }
 

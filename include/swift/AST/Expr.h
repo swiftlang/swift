@@ -33,7 +33,7 @@ namespace llvm {
 
 namespace swift {
   class ArchetypeType;
-  class CollectionDowncastExpr;
+  class ConditionalCollectionDowncastExpr;
   class ASTContext;
   class Type;
   class ValueDecl;
@@ -234,13 +234,14 @@ class alignas(8) Expr {
                   < (1 << NumCheckedCastKindBits),
                 "unable to fit a CheckedCastKind in the given number of bits");
 
-  class CollectionDowncastExprBitfields {
-    friend class CollectionDowncastExpr;
+  class ConditionalCollectionDowncastExprBitfields {
+    friend class ConditionalCollectionDowncastExpr;
     unsigned : NumExprBits;
     unsigned BridgesFromObjC : 1;
   };
-  enum { NumCollectionDowncastExprBits = NumExprBits + 1 };
-  static_assert(NumCollectionDowncastExprBits <= 32, "fits in an unsigned");
+  enum { NumConditionalCollectionDowncastExprBits = NumExprBits + 1 };
+  static_assert(NumConditionalCollectionDowncastExprBits <= 32, 
+                "fits in an unsigned");
 
   class CollectionUpcastConversionExprBitfields {
     friend class CollectionUpcastConversionExpr;
@@ -265,7 +266,8 @@ protected:
     ClosureExprBitfields ClosureExprBits;
     BindOptionalExprBitfields BindOptionalExprBits;
     CheckedCastExprBitfields CheckedCastExprBits;
-    CollectionDowncastExprBitfields CollectionDowncastExprBits;
+    ConditionalCollectionDowncastExprBitfields 
+      ConditionalCollectionDowncastExprBits;
     CollectionUpcastConversionExprBitfields CollectionUpcastConversionExprBits;
   };
 
@@ -3265,23 +3267,24 @@ public:
 /// var arr: AnyObject[] = ...
 /// if let views = arr as NSView[] { ... }
 /// \endcode
-class CollectionDowncastExpr : public ExplicitCastExpr {
+class ConditionalCollectionDowncastExpr : public ExplicitCastExpr {
 public:
-  CollectionDowncastExpr(Expr *sub, SourceLoc asLoc, TypeLoc castTy,
-                         bool bridgesFromObjC)
-    : ExplicitCastExpr(ExprKind::CollectionDowncast, sub, asLoc, castTy, Type())
+  ConditionalCollectionDowncastExpr(Expr *sub, SourceLoc asLoc, TypeLoc castTy,
+                                    bool bridgesFromObjC)
+    : ExplicitCastExpr(ExprKind::ConditionalCollectionDowncast, sub, asLoc, 
+                       castTy, Type())
   {
-    CollectionDowncastExprBits.BridgesFromObjC = bridgesFromObjC;
+    ConditionalCollectionDowncastExprBits.BridgesFromObjC = bridgesFromObjC;
   }
 
   /// Determine whether this downcast bridges "non-verbatim" from the
   /// Objective-C objects in the source array to values in the result array.
   bool bridgesFromObjC() const {
-    return CollectionDowncastExprBits.BridgesFromObjC;
+    return ConditionalCollectionDowncastExprBits.BridgesFromObjC;
   }
 
   static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::CollectionDowncast;
+    return E->getKind() == ExprKind::ConditionalCollectionDowncast;
   }
 };
   
