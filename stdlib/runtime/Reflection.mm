@@ -263,25 +263,50 @@ Any swift_MagicMirrorData_objcValue(HeapObject *owner,
 extern "C"
 void swift_MagicMirrorData_summary(const Metadata *T, String *result) {
   switch (T->getKind()) {
+    case MetadataKind::Class:
+      new (result) String("(Class)");
+      break;
+    case MetadataKind::Struct:
+      new (result) String("(Struct)");
+      break;
     case MetadataKind::Enum:
       new (result) String("(Enum Value)");
+      break;
+    case MetadataKind::Opaque:
+      new (result) String("(Opaque Value)");
+      break;
+    case MetadataKind::Tuple:
+      new (result) String("(Tuple)");
       break;
     case MetadataKind::Function:
       new (result) String("(Function)");
       break;
-    case MetadataKind::Block:
-      new (result) String("(Block)");
+    case MetadataKind::PolyFunction:
+      new (result) String("(Polymorphic Function)");
       break;
     case MetadataKind::Existential:
       new (result) String("(Existential)");
       break;
-    case MetadataKind::ExistentialMetatype:
-      new (result) String("(ExistentialMetatype)");
-      break;
     case MetadataKind::Metatype:
       new (result) String("(Metatype)");
       break;
-    default:
+    case MetadataKind::ObjCClassWrapper:
+      new (result) String("(Objective-C Class Wrapper)");
+      break;
+    case MetadataKind::ExistentialMetatype:
+      new (result) String("(ExistentialMetatype)");
+      break;
+    case MetadataKind::ForeignClass:
+      new (result) String("(Foreign Class)");
+      break;
+    case MetadataKind::Block:
+      new (result) String("(Block)");
+      break;
+    case MetadataKind::HeapLocalVariable:
+      new (result) String("(Heap Local Variable)");
+      break;
+    case MetadataKind::HeapArray:
+      new (result) String("(Heap Array)");
       break;
   }
 }
