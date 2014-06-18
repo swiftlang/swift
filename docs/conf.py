@@ -40,7 +40,7 @@ master_doc = 'contents'
 
 # General information about the project.
 project = u'Swift'
-copyright = u'2013, Apple Inc'
+copyright = u'2014, Apple Inc'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
