@@ -48,6 +48,15 @@
 /// are reserved by the Objective-C runtime.
 #define SWIFT_ABI_DEFAULT_OBJC_NUM_RESERVED_LOW_BITS 0
 
+/*********************************** i386 *************************************/
+
+// Heap objects are pointer-aligned, so the low two bits are unused.
+#define SWIFT_ABI_I386_SWIFT_SPARE_BITS_MASK 0x00000003U
+
+/*********************************** arm **************************************/
+
+// Heap objects are pointer-aligned, so the low two bits are unused.
+#define SWIFT_ABI_ARM_SWIFT_SPARE_BITS_MASK 0x00000003U
 
 /*********************************** x86-64 ***********************************/
 
