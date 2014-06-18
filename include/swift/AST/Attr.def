@@ -34,10 +34,6 @@
 #define TYPE_ATTR(X)
 #endif
 
-#ifndef IB_ATTR
-#define IB_ATTR(X) ATTR(X)
-#endif
-
 /// Virtual attributes are not necessarily spelled the same way
 /// they're written.
 #ifndef VIRTUAL_ATTR
@@ -176,7 +172,6 @@ AVAILABILITY_PLATFORM(OSXApplicationExtension)
 
 #undef AVAILABILITY_PLATFORM
 #undef VIRTUAL_ATTR
-#undef IB_ATTR
 #undef VIRTUAL_DECL_ATTR
 #undef SIMPLE_DECL_ATTR
 #undef DECL_ATTR

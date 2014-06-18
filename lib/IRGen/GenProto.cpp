@@ -3193,7 +3193,7 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM,
     // constraints are.
     requiresClass |= protocol->requiresClass();
     
-    if (protocol->getAttrs().has(DAK_unsafe_no_objc_tagged_pointer))
+    if (protocol->getAttrs().hasAttribute<UnsafeNoObjCTaggedPointerAttr>())
       allowsTaggedPointers = false;
     
     // ObjC protocols need no layout or witness table info. All dispatch is done

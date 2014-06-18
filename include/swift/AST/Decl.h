@@ -235,6 +235,16 @@ enum class UnaryOperatorKind : uint8_t {
   Postfix
 };
 
+/// Access control levels.
+enum class Accessibility : uint8_t {
+  /// Private access is limited to the current file.
+  Private,
+  /// Internal access is limited to the current module.
+  Internal,
+  /// Public access is not limited.
+  Public
+};
+
 /// Encapsulation of the overload signature of a given declaration,
 /// which is used to determine uniqueness of a declaration within a
 /// given context.

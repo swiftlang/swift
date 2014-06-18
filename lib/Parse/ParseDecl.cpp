@@ -284,8 +284,8 @@ static TypeAttrKind getTypeAttrFromString(StringRef Str) {
 /// return the kind.  Otherwise, return DAK_Count as a sentinel.
 static DeclAttrKind getDeclAttrFromString(StringRef Str) {
   return llvm::StringSwitch<DeclAttrKind>(Str)
-#define DECL_ATTR(X, ...) .Case(#X, DAK_##X)
-#define VIRTUAL_DECL_ATTR(X, ...)
+#define DECL_ATTR(X, CLASS, ...) .Case(#X, DAK_##CLASS)
+#define VIRTUAL_DECL_ATTR(...)
 #include "swift/AST/Attr.def"
   .Default(DAK_Count);
 }
@@ -340,40 +340,19 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
   case DAK_Count:
     llvm_unreachable("DAK_Count should not appear in parsing switch");
 
-#define VIRTUAL_DECL_ATTR(X, ...) case DAK_##X:
+#define VIRTUAL_DECL_ATTR(_, CLASS, ...) case DAK_##CLASS:
 #include "swift/AST/Attr.def"
     llvm_unreachable("virtual attributes should not be parsed "
                      "by attribute parsing code");
-  case DAK_IBAction:
-    if (!DiscardAttribute)
-      Attributes.add(new (Context) IBActionAttr(AtLoc, Loc));
-    break;
 
-  case DAK_IBDesignable:
-    if (!DiscardAttribute)
-      Attributes.add(new (Context) IBDesignableAttr(AtLoc, Loc));
+#define SIMPLE_DECL_ATTR(_, CLASS, ...) \
+  case DAK_##CLASS: \
+    if (!DiscardAttribute) \
+      Attributes.add(new (Context) CLASS##Attr(AtLoc, Loc)); \
     break;
+#include "swift/AST/Attr.def"
 
-  case DAK_IBInspectable:
-    if (!DiscardAttribute)
-      Attributes.add(new (Context) IBInspectableAttr(AtLoc, Loc));
-    break;
-
-  case DAK_IBOutlet:
-    if (!DiscardAttribute)
-      Attributes.add(new (Context) IBOutletAttr(AtLoc, Loc));
-    break;
-  case DAK_lazy:
-    if (!DiscardAttribute)
-      Attributes.add(new (Context) LazyAttr(AtLoc, Loc));
-    break;
-
-  case DAK_LLDBDebuggerFunction:
-    if (!DiscardAttribute)
-        Attributes.add (new (Context) LLDBDebuggerFunctionAttr(AtLoc, Loc));
-    break;
-    
-  case DAK_asmname: {
+  case DAK_Asmname: {
     if (!consumeIf(tok::l_paren)) {
       diagnose(Loc, diag::attr_expected_lparen, AttrName);
       return false;
@@ -413,11 +392,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
     break;
   }
-  case DAK_assignment:
-    if (!DiscardAttribute)
-      Attributes.add(new (Context) AssignmentAttr(AtLoc, Loc));
-    break;
-  case DAK_availability: {
+  case DAK_Availability: {
     if (!consumeIf(tok::l_paren)) {
       diagnose(Loc, diag::attr_expected_lparen, AttrName);
       return false;
@@ -515,35 +490,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     break;
   }
 
-  case DAK_class_protocol:
-    if (!DiscardAttribute)
-      Attributes.add(new (Context) ClassProtocolAttr(AtLoc, Loc));
-    break;
-  case DAK_exported:
-    if (!DiscardAttribute)
-      Attributes.add(new (Context) ExportedAttr(AtLoc, Loc));
-    break;
-  case DAK_final:
-    if (!DiscardAttribute)
-      Attributes.add(new (Context) FinalAttr(AtLoc, Loc));
-    break;
-  case DAK_NSCopying:
-    if (!DiscardAttribute)
-      Attributes.add(new (Context) NSCopyingAttr(AtLoc, Loc));
-    break;
-  case DAK_NSManaged:
-    if (!DiscardAttribute)
-      Attributes.add(new (Context) NSManagedAttr(AtLoc, Loc));
-    break;
-  case DAK_UIApplicationMain:
-    if (!DiscardAttribute)
-      Attributes.add(new (Context) UIApplicationMainAttr(AtLoc, Loc));
-    break;
-  case DAK_noreturn:
-    if (!DiscardAttribute)
-      Attributes.add(new (Context) NoReturnAttr(AtLoc, Loc));
-    break;
-  case DAK_objc: {
+  case DAK_ObjC: {
     // Unnamed @objc attribute.
     if (Tok.isNot(tok::l_paren)) {
       Attributes.add(ObjCAttr::createUnnamed(Context, AtLoc, Loc));
@@ -644,14 +591,6 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     setFirstObjCAttributeLocation(Loc);
     break;
   }
-  case DAK_unsafe_no_objc_tagged_pointer:
-    if (!DiscardAttribute)
-      Attributes.add(new (Context) UnsafeNoObjCTaggedPointerAttr(AtLoc, Loc));
-    break;
-  case DAK_required:
-    if (!DiscardAttribute)
-      Attributes.add(new (Context) RequiredAttr(AtLoc, Loc));
-    break;
   }
 
   if (DuplicateAttribute) {

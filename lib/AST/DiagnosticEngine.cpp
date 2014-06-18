@@ -269,11 +269,10 @@ static void formatDiagnosticArgument(StringRef Modifier,
     Out << Decl::getDescriptiveKindName(Arg.getAsDescriptiveDeclKind());
     break;
 
-  case DiagnosticArgumentKind::DeclAttrKind:
+  case DiagnosticArgumentKind::DeclAttribute:
     assert(Modifier.empty() &&
-           "Improper modifier for DeclAttrKind argument");
-    Out << '\''
-        << DeclAttribute::getAttrName(Arg.getAsDeclAttrKind()) << '\'';
+           "Improper modifier for DeclAttribute argument");
+    Out << '\'' << Arg.getAsDeclAttribute()->getAttrName() << '\'';
     break;
   }
 }

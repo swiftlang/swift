@@ -3862,7 +3862,7 @@ public:
       // an override, or we don't know what else to look for, try again.
       if (retried || name.isSimpleName() ||
           name.getArgumentNames().size() == 0 ||
-          !decl->getAttrs().has(DAK_override))
+          !decl->getAttrs().hasAttribute<OverrideAttr>())
         return false;
 
       // Try looking again, this time using just the base name, so that we'll

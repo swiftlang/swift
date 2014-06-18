@@ -214,9 +214,8 @@ void AttributeEarlyChecker::visitLLDBDebuggerFunctionAttr (LLDBDebuggerFunctionA
   // and it is only legal when debugger support is on.
   auto *FD = dyn_cast<FuncDecl>(D);
   if (!FD) {
-    TC.diagnose(attr->getLocation(), diag::invalid_decl_attribute,
-                attr->getKind())
-        .fixItRemove(attr->getRange());
+    TC.diagnose(attr->getLocation(), diag::invalid_decl_attribute, attr)
+      .fixItRemove(attr->getRange());
     attr->setInvalid();
     return;
   }
@@ -232,14 +231,12 @@ void AttributeEarlyChecker::visitAssignmentAttr(AssignmentAttr *attr) {
   // Only function declarations can be assignments.
   auto *FD = dyn_cast<FuncDecl>(D);
   if (!FD || !FD->isOperator())
-    return diagnoseAndRemoveAttr(attr, diag::invalid_decl_attribute,
-                                 attr->getKind());
+    return diagnoseAndRemoveAttr(attr, diag::invalid_decl_attribute, attr);
 }
 
 void AttributeEarlyChecker::visitExportedAttr(ExportedAttr *attr) {
   if (!isa<ImportDecl>(D))
-    return diagnoseAndRemoveAttr(attr, diag::invalid_decl_attribute,
-                attr->getKind());
+    return diagnoseAndRemoveAttr(attr, diag::invalid_decl_attribute, attr);
 
 }
 
@@ -514,8 +511,8 @@ void AttributeChecker::visitUnsafeNoObjCTaggedPointerAttr(
   }
   
   if (!proto->requiresClass()
-      && !proto->getAttrs().has(DAK_class_protocol)
-      && !proto->getAttrs().has(DAK_objc)) {
+      && !proto->getAttrs().hasAttribute<ClassProtocolAttr>()
+      && !proto->getAttrs().hasAttribute<ObjCAttr>()) {
     TC.diagnose(attr->getLocation(),
                 diag::no_objc_tagged_pointer_not_class_protocol);
     attr->setInvalid();    
@@ -659,8 +656,7 @@ void AttributeChecker::visitUIApplicationMainAttr(UIApplicationMainAttr *attr) {
 void AttributeChecker::visitNoReturnAttr(NoReturnAttr *attr) {
   auto *FD = dyn_cast<FuncDecl>(D);
   if (!FD) {
-    TC.diagnose(attr->getLocation(), diag::invalid_decl_attribute,
-                attr->getKind())
+    TC.diagnose(attr->getLocation(), diag::invalid_decl_attribute, attr)
         .fixItRemove(attr->getRange());
     attr->setInvalid();
     return;

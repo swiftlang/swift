@@ -42,6 +42,8 @@ namespace swift {
 
     enum class RequirementKind : uint8_t;
 
+    using DeclAttribute = const DeclAttribute *;
+
   // Declare common diagnostics objects with their appropriate types.
 #define DIAG(KIND,ID,Category,Options,Text,Signature) \
     extern detail::DiagWithArguments<void Signature>::type ID;

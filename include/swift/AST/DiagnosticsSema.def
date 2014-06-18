@@ -370,7 +370,7 @@ ERROR(no_objc_tagged_pointer_not_class_protocol,sema_tcd,none,
 ERROR(invalid_decl_attribute_simple,sema_tcd,none,
       "attribute cannot be applied to declaration", ())
 ERROR(invalid_decl_attribute,sema_tcd,none,
-      "%0 attribute cannot be applied to this declaration", (DeclAttrKind))
+      "%0 attribute cannot be applied to this declaration", (DeclAttribute))
 ERROR(attribute_does_not_apply_to_type,type_parsing,none,
       "attribute does not apply to type", ())
 ERROR(optional_attribute_non_protocol,sema_tcd,none,

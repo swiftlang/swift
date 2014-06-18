@@ -135,7 +135,7 @@ enum AttrKind {
 // there is currently a representational difference as one set of
 // attributes is migrated from one implementation to another.
 enum DeclAttrKind : unsigned {
-#define DECL_ATTR(NAME, ...) DAK_##NAME,
+#define DECL_ATTR(_, NAME, ...) DAK_##NAME,
 #include "swift/AST/Attr.def"
   DAK_Count
 };
@@ -445,8 +445,8 @@ public:
     return getOptions(DK) & AllowMultipleAttributes;
   }
 
-  /// Returns the name of the given attribute kind.
-  static StringRef getAttrName(DeclAttrKind DK);
+  /// Returns the source name of the attribute, without the @ or any arguments.
+  StringRef getAttrName() const;
 };
 
 /// Describes a "simple" declaration attribute that carries no data.
@@ -466,15 +466,15 @@ public:
 };
 
 // Declare typedefs for all of the simple declaration attributes.
-#define SIMPLE_DECL_ATTR(NAME, CLASS, ...) \
- typedef SimpleDeclAttr<DAK_##NAME> CLASS##Attr;
+#define SIMPLE_DECL_ATTR(_, CLASS, ...) \
+ typedef SimpleDeclAttr<DAK_##CLASS> CLASS##Attr;
 #include "swift/AST/Attr.def"
 
 /// Defines the @asmname attribute.
 class AsmnameAttr : public DeclAttribute {
 public:
   AsmnameAttr(StringRef Name, SourceLoc AtLoc, SourceRange Range, bool Implicit)
-    : DeclAttribute(DAK_asmname, AtLoc, Range, Implicit),
+    : DeclAttribute(DAK_Asmname, AtLoc, Range, Implicit),
       Name(Name) {}
 
   AsmnameAttr(StringRef Name, bool Implicit)
@@ -484,7 +484,7 @@ public:
   const StringRef Name;
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_asmname;
+    return DA->getKind() == DAK_Asmname;
   }
 };
 
@@ -503,7 +503,7 @@ public:
                    StringRef Message,
                    bool IsUnavailable,
                    bool Implicit)
-    : DeclAttribute(DAK_availability, AtLoc, Range, Implicit),
+    : DeclAttribute(DAK_Availability, AtLoc, Range, Implicit),
       Platform(Platform),
       Message(Message),
       IsUnvailable(IsUnavailable) {}
@@ -540,7 +540,7 @@ public:
                                                          StringRef Message);
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_availability;
+    return DA->getKind() == DAK_Availability;
   }
 };
 
@@ -552,7 +552,7 @@ class ObjCAttr : public DeclAttribute {
 
   /// Create an implicit @objc attribute with the given (optional) name.
   explicit ObjCAttr(Optional<ObjCSelector> name)
-    : DeclAttribute(DAK_objc, SourceLoc(), SourceRange(), /*Implicit=*/true),
+    : DeclAttribute(DAK_ObjC, SourceLoc(), SourceRange(), /*Implicit=*/true),
       NameData(nullptr)
   {
     ObjCAttrBits.HasTrailingLocationInfo = false;
@@ -675,7 +675,7 @@ public:
   ObjCAttr *clone(ASTContext &context) const;
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_objc;
+    return DA->getKind() == DAK_ObjC;
   }
 };
 
@@ -683,11 +683,11 @@ public:
 class OverrideAttr : public DeclAttribute {
 public:
   OverrideAttr(SourceLoc OverrideLoc)
-      : DeclAttribute(DAK_override, SourceLoc(), OverrideLoc,
+      : DeclAttribute(DAK_Override, SourceLoc(), OverrideLoc,
                       /*Implicit=*/false) {}
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_override;
+    return DA->getKind() == DAK_Override;
   }
 };
 
@@ -699,14 +699,14 @@ class RawDocCommentAttr : public DeclAttribute {
 
 public:
   RawDocCommentAttr(CharSourceRange CommentRange)
-      : DeclAttribute(DAK_raw_doc_comment, SourceLoc(), SourceRange(),
+      : DeclAttribute(DAK_RawDocComment, SourceLoc(), SourceRange(),
                       /*Implicit=*/false),
         CommentRange(CommentRange) {}
 
   CharSourceRange getCommentRange() const { return CommentRange; }
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_raw_doc_comment;
+    return DA->getKind() == DAK_RawDocComment;
   }
 };
 

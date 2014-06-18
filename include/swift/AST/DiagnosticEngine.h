@@ -84,7 +84,7 @@ namespace swift {
     PatternKind,
     StaticSpellingKind,
     DescriptiveDeclKind,
-    DeclAttrKind,
+    DeclAttribute
   };
 
   namespace diag {
@@ -108,7 +108,7 @@ namespace swift {
       PatternKind PatternKindVal;
       StaticSpellingKind StaticSpellingKindVal;
       DescriptiveDeclKind DescriptiveDeclKindVal;
-      DeclAttrKind DeclAttrKindVal;
+      const DeclAttribute *DeclAttributeVal;
     };
     
   public:
@@ -165,9 +165,9 @@ namespace swift {
         : Kind(DiagnosticArgumentKind::DescriptiveDeclKind),
           DescriptiveDeclKindVal(DDK) {}
 
-    DiagnosticArgument(DeclAttrKind DAK)
-        : Kind(DiagnosticArgumentKind::DeclAttrKind),
-          DeclAttrKindVal(DAK) {}
+    DiagnosticArgument(const DeclAttribute *attr)
+        : Kind(DiagnosticArgumentKind::DeclAttribute),
+          DeclAttributeVal(attr) {}
 
     DiagnosticArgument(diag::RequirementKind kind)
       : DiagnosticArgument(static_cast<uint8_t>(kind)) { }
@@ -224,9 +224,9 @@ namespace swift {
       return DescriptiveDeclKindVal;
     }
 
-    DeclAttrKind getAsDeclAttrKind() const {
-      assert(Kind == DiagnosticArgumentKind::DeclAttrKind);
-      return DeclAttrKindVal;
+    const DeclAttribute *getAsDeclAttribute() const {
+      assert(Kind == DiagnosticArgumentKind::DeclAttribute);
+      return DeclAttributeVal;
     }
   };
   

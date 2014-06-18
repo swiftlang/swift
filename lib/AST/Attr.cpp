@@ -104,31 +104,33 @@ void DeclAttributes::print(ASTPrinter &Printer,
 }
 
 void DeclAttribute::print(ASTPrinter &Printer) const {
+  // This switch is not using Attr.def because some simple attributes have
+  // custom behavior.
   switch (getKind()) {
   case DAK_IBAction:       Printer << "@IBAction"; break;
   case DAK_IBDesignable:   Printer << "@IBDesignable"; break;
   case DAK_IBInspectable:  Printer << "@IBInspectable"; break;
   case DAK_IBOutlet:       Printer << "@IBOutlet"; break;
-  case DAK_assignment:     Printer << "@assignment"; break;
-  case DAK_class_protocol: Printer << "@class_protocol"; break;
-  case DAK_exported:       Printer << "@exported"; break;
-  case DAK_final:          Printer << "@final"; break;
-  case DAK_noreturn:       Printer << "@noreturn"; break;
-  case DAK_unsafe_no_objc_tagged_pointer:
+  case DAK_Assignment:     Printer << "@assignment"; break;
+  case DAK_ClassProtocol:  Printer << "@class_protocol"; break;
+  case DAK_Exported:       Printer << "@exported"; break;
+  case DAK_Final:          Printer << "@final"; break;
+  case DAK_NoReturn:       Printer << "@noreturn"; break;
+  case DAK_UnsafeNoObjCTaggedPointer:
     Printer << "@unsafe_no_objc_tagged_pointer";
     break;
   case DAK_NSCopying:      Printer << "@NSCopying"; break;
   case DAK_NSManaged:      Printer << "@NSManaged"; break;
   case DAK_UIApplicationMain: Printer << "@UIApplicationMain"; break;
-  case DAK_lazy:           Printer << "@lazy"; break;
+  case DAK_Lazy:           Printer << "@lazy"; break;
   case DAK_LLDBDebuggerFunction:
     Printer << "@LLDBDebuggerFunction";
     break;
-  case DAK_asmname:
+  case DAK_Asmname:
     Printer << "@asmname(\"" << cast<AsmnameAttr>(this)->Name << "\")";
     break;
 
-  case DAK_availability: {
+  case DAK_Availability: {
     Printer << "@availability(";
     auto Attr = cast<AvailabilityAttr>(this);
     Printer << Attr->platformString() << ", unavailable";
@@ -139,7 +141,7 @@ void DeclAttribute::print(ASTPrinter &Printer) const {
     break;
   }
 
-  case DAK_objc: {
+  case DAK_ObjC: {
     Printer << "@objc";
     llvm::SmallString<32> scratch;
     if (auto Name = cast<ObjCAttr>(this)->getName()) {
@@ -147,13 +149,13 @@ void DeclAttribute::print(ASTPrinter &Printer) const {
     }
     break;
   }
-  case DAK_override:
+  case DAK_Override:
     // A virtual attribute should be handled elsewhere.
     return;
-  case DAK_raw_doc_comment:
+  case DAK_RawDocComment:
     // Not printed.
     return;
-  case DAK_required:
+  case DAK_Required:
     if (isImplicit())
       Printer << "/* @required(inferred) */";
     else
@@ -174,28 +176,37 @@ unsigned DeclAttribute::getOptions(DeclAttrKind DK) {
   switch (DK) {
   case DAK_Count:
     llvm_unreachable("getOptions needs a valid attribute");
-    break;
-#define DECL_ATTR(NAME, CLASS, OPTIONS, ...)\
-  case DAK_##NAME: return OPTIONS;
+#define DECL_ATTR(_, CLASS, OPTIONS, ...)\
+  case DAK_##CLASS: return OPTIONS;
 #include "swift/AST/Attr.def"
   }
 }
 
-StringRef DeclAttribute::getAttrName(DeclAttrKind DK) {
-  switch (DK) {
+StringRef DeclAttribute::getAttrName() const {
+  switch (getKind()) {
   case DAK_Count:
     llvm_unreachable("getAttrName needs a valid attribute");
-    break;
-#define DECL_ATTR(NAME, CLASS, OPTIONS, ...)\
-  case DAK_##NAME: return #NAME;
+#define SIMPLE_DECL_ATTR(NAME, CLASS, ...) \
+  case DAK_##CLASS: \
+    return #NAME;
+#define VIRTUAL_DECL_ATTR(NAME, CLASS, ...) \
+  case DAK_##CLASS: \
+    llvm_unreachable("cannot get the name of a virtual attribute");
 #include "swift/AST/Attr.def"
+  case DAK_Asmname:
+    return "asmname";
+  case DAK_Availability:
+    return "availability";
+  case DAK_ObjC:
+    return "objc";
   }
 }
+
 
 ObjCAttr::ObjCAttr(SourceLoc atLoc, SourceRange baseRange,
                    Optional<ObjCSelector> name, SourceRange parenRange,
                    ArrayRef<SourceLoc> nameLocs)
-  : DeclAttribute(DAK_objc, atLoc, baseRange, /*Implicit=*/false),
+  : DeclAttribute(DAK_ObjC, atLoc, baseRange, /*Implicit=*/false),
     NameData(nullptr)
 {
   if (name) {

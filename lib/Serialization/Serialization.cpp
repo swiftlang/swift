@@ -1242,8 +1242,10 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
     llvm_unreachable("cannot serialize DAK_Count");
     return;
 
-#define SIMPLE_DECL_ATTR(NAME, CLASS, ...)\
-  case DAK_##NAME: { \
+#define VIRTUAL_DECL_ATTR(_, CLASS, ...)\
+  case DAK_##CLASS: return;
+#define SIMPLE_DECL_ATTR(_, CLASS, ...)\
+  case DAK_##CLASS: { \
     auto abbrCode = DeclTypeAbbrCodes[CLASS##DeclAttrLayout::Code]; \
     CLASS##DeclAttrLayout::emitRecord(Out, ScratchRecord, abbrCode, \
                                       DA->isImplicit()); \
@@ -1251,7 +1253,7 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
   }
 #include "swift/AST/Attr.def"
 
-  case DAK_asmname: {
+  case DAK_Asmname: {
     auto *theAttr = cast<AsmnameAttr>(DA);
     auto abbrCode = DeclTypeAbbrCodes[AsmnameDeclAttrLayout::Code];
     AsmnameDeclAttrLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -1259,7 +1261,7 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
                                       theAttr->Name);
     return;
   }
-  case DAK_availability: {
+  case DAK_Availability: {
     auto *theAttr = cast<AvailabilityAttr>(DA);
     llvm::SmallString<32> blob;
     blob.append(theAttr->Message);
@@ -1273,7 +1275,7 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
         blob);
     return;
   }
-  case DAK_objc: {
+  case DAK_ObjC: {
     auto *theAttr = cast<ObjCAttr>(DA);
     SmallVector<IdentifierID, 4> pieces;
     unsigned numArgs = 0;
@@ -1288,12 +1290,6 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
                                    theAttr->isImplicit(), numArgs, pieces);
     return;
   }
-  case DAK_override:
-    // No need to serialize 'override'.
-    return;
-  case DAK_raw_doc_comment:
-    // Serialized in a separate table.
-    return;
   }
 }
 
