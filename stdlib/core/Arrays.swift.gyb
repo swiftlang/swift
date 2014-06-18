@@ -506,6 +506,10 @@ func += <
   _arrayAppendSequence(&lhs._buffer, rhs)
 }
 
+func _growArrayCapacity(capacity: Int) -> Int {
+  return capacity * 2
+}
+
 @assignment
 func += <
   A: ArrayType, C: Collection
@@ -520,7 +524,7 @@ where C.GeneratorType.Element == A._Buffer.Element
   // Ensure uniqueness, mutability, and sufficient storage.  Note that
   // for consistency, we need unique lhs even if rhs is empty.
   lhs.reserveCapacity(
-    newCount > capacity ? max(newCount, capacity * 2) : newCount)
+    newCount > capacity ? max(newCount, _growArrayCapacity(capacity)) : newCount)
   
   var p = lhs._buffer.elementStorage + oldCount
   for x in rhs {
@@ -563,7 +567,8 @@ func _demandUniqueMutableBuffer<_Buffer: ArrayBufferType>(
 
   let minimumCapacity = max(
     requiredCapacity,
-    newCount > source.capacity ? source.capacity * 2 : source.capacity)
+    newCount > source.capacity
+      ? _growArrayCapacity(source.capacity) : source.capacity)
 
   return ContiguousArrayBuffer(
     count: newCount, minimumCapacity: minimumCapacity)
@@ -725,7 +730,7 @@ func _arrayAppendSequence<
     }
     buffer.count = count
     if nextItem {
-      _arrayReserve(&buffer, capacity * 2)
+      _arrayReserve(&buffer, _growArrayCapacity(capacity))
     }
   }
 }

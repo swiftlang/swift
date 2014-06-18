@@ -315,8 +315,10 @@ func += <
     (lhs.elementStorage + oldCount).initializeFrom(rhs)
   }
   else {
-    let newLHS = ContiguousArrayBuffer<T>(count: newCount, 
-                                      minimumCapacity: lhs.capacity * 2)
+    let newLHS = ContiguousArrayBuffer<T>(
+      count: newCount, 
+      minimumCapacity: _growArrayCapacity(lhs.capacity))
+    
     if lhs._base {
       newLHS.elementStorage.moveInitializeFrom(lhs.elementStorage, 
                                                count: oldCount)
