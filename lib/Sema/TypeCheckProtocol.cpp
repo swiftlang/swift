@@ -1949,13 +1949,17 @@ existentialConformsToItself(TypeChecker &tc,
     if (!valueMember)
       continue;
 
-    // Extract the type of the member, ignoring the 'self' parameter of
-    // functions.
+    // Extract the type of the member, ignoring the 'self' parameter and return
+    // type of functions.
     auto memberTy = valueMember->getType();
     if (memberTy->is<ErrorType>())
       continue;
-    if (isa<FuncDecl>(valueMember))
+    if (isa<AbstractFunctionDecl>(valueMember)) {
+      // Drop the 'Self' parameter.
       memberTy = memberTy->castTo<AnyFunctionType>()->getResult();
+      // Drop the return type. Methods are allowed to return Self.
+      memberTy = memberTy->castTo<AnyFunctionType>()->getInput();
+    }
 
     // "Transform" the type to walk the whole type. If we find 'Self', return
     // null. Otherwise, make this the identity transform and throw away the

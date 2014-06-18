@@ -252,7 +252,20 @@ static bool checkGenericParameters(TypeChecker &tc, ArchetypeBuilder *builder,
         continue;
       }
 
-      if (tc.validateType(req.getConstraintLoc(), parentDC, None, &resolver)) {
+      // Conformance requirements are checked like inheritance clauses.
+      TypeResolutionOptions options;
+      switch (req.getKind()) {
+      case RequirementKind::Conformance:
+        options = TR_InheritanceClause;
+        break;
+      case RequirementKind::SameType:
+      case RequirementKind::WitnessMarker:
+        options = None;
+        break;
+      }
+      
+      if (tc.validateType(req.getConstraintLoc(), parentDC, options,
+                          &resolver)) {
         invalid = true;
         req.setInvalid();
         continue;

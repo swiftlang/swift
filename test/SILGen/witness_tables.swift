@@ -88,8 +88,10 @@ func <~>(x: ConformingStruct, y: ConformingStruct) {}
 // SYMBOL:      sil @_TTWV14witness_tables16ConformingStructS_11AnyProtocolFS1_12staticMethodUS1__U_S_9AssocReqt__fMQPS1_FT1xS3__T_ : $@cc(witness_method) @thin (@in ConformingStruct, @thick ConformingStruct.Type) -> ()
 // SYMBOL:      sil @_TTWV14witness_tables16ConformingStructS_11AnyProtocolFS1_oi3ltgUS1__U_S_9AssocReqt__{{.*}} : $@cc(witness_method) @thin (@in ConformingStruct, @in ConformingStruct, @thick ConformingStruct.Type) -> ()
 
+protocol AddressOnly {}
+
 struct ConformingAddressOnlyStruct : AnyProtocol {
-  var p: AnyProtocol // force address-only layout with a protocol-type field
+  var p: AddressOnly // force address-only layout with a protocol-type field
 
   typealias AssocType = SomeAssoc
   typealias AssocWithReqt = ConformingAssoc

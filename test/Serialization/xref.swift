@@ -17,4 +17,5 @@ conditional(true)
 longInt(42)
 numericArray([42])
 
-var incr: ExtraIncrementable = SpecialInt()
+func incr<T: ExtraIncrementable>(x: T) {}
+incr(SpecialInt())

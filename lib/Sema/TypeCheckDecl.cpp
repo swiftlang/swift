@@ -258,7 +258,7 @@ void TypeChecker::checkInheritanceClause(Decl *decl, DeclContext *DC,
     auto &inherited = inheritedClause[i];
 
     // Validate the type.
-    if (validateType(inherited, DC, None, resolver)) {
+    if (validateType(inherited, DC, TR_InheritanceClause, resolver)) {
       inherited.setInvalidType(Context);
       continue;
     }
@@ -777,7 +777,7 @@ static void checkGenericParamList(ArchetypeBuilder &builder,
         continue;
       }
 
-      if (TC.validateType(Req.getConstraintLoc(), DC)) {
+      if (TC.validateType(Req.getConstraintLoc(), DC, TR_InheritanceClause)) {
         Req.setInvalid();
         continue;
       }
@@ -887,7 +887,7 @@ static void finalizeGenericParamList(ArchetypeBuilder &builder,
       }
 
       revertDependentTypeLoc(Req.getConstraintLoc());
-      if (TC.validateType(Req.getConstraintLoc(), dc)) {
+      if (TC.validateType(Req.getConstraintLoc(), dc, TR_InheritanceClause)) {
         Req.setInvalid();
         continue;
       }
@@ -2521,7 +2521,15 @@ public:
     
     TC.checkDeclAttributesEarly(TAD);
     if (!IsSecondPass) {
-      if (TC.validateType(TAD->getUnderlyingTypeLoc(), TAD->getDeclContext())) {
+      TypeResolutionOptions options;
+      if (TAD->getDeclContext()->isTypeContext()) {
+        options = None;
+      } else {
+        options = TR_GlobalTypeAlias;
+      }
+      
+      if (TC.validateType(TAD->getUnderlyingTypeLoc(), TAD->getDeclContext(),
+                          options)) {
         TAD->setInvalid();
         TAD->overwriteType(ErrorType::get(TC.Context));
         TAD->getUnderlyingTypeLoc().setType(ErrorType::get(TC.Context));

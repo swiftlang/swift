@@ -14,6 +14,8 @@ enum SomeEnum {
 protocol SomeProtocol {
   typealias Foo
 }
+protocol SomeExistential {
+}
 class SomeProtocolImpl : SomeProtocol {}
 typealias SomeTypealias = Swift.Int
 var someGlobal: Int

@@ -235,12 +235,9 @@ bb0:
 // }
 
 protocol Runcible {
-  typealias U
   var free:Int { get }
-  var associated:U { get }
 
   func free_method() -> Int
-  func associated_method() -> U.Type
   class func static_method()
 }
 

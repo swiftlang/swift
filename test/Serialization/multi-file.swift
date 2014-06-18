@@ -19,7 +19,10 @@ class MyClass {
   var value: TheEnum = .A
 }
 
-let equatableGlobal: Equatable = EquatableEnum.A
+func foo<T: Equatable>(x: T) {}
+func bar() {
+  foo(EquatableEnum.A)
+}
 
 // THIS-FILE: CLASS_DECL
 // OTHER-FILE-NEG-NOT: CLASS_DECL

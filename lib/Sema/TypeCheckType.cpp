@@ -800,7 +800,8 @@ Type TypeChecker::resolveIdentifierType(DeclContext *DC,
                                         IdentTypeRepr *IdType,
                                         TypeResolutionOptions options,
                                         bool diagnoseErrors,
-                                        GenericTypeResolver *resolver) {
+                                        GenericTypeResolver *resolver,
+                                        ValueDecl *typeContext) {
   assert(resolver && "Missing generic type resolver");
 
   auto ComponentRange = IdType->getComponentRange();
@@ -825,13 +826,38 @@ Type TypeChecker::resolveIdentifierType(DeclContext *DC,
     Components.back()->setValue(ty);
     return ty;
   }
-
+  
+  // Check that this isn't an unsupported protocol type.
+  // Protocols with associated type requirements aren't allowed as types.
+  // They can however appear in inheritance clauses or as global typealiases.
+  if (!(options & TR_InheritanceClause) && !(options & TR_GlobalTypeAlias)) {
+    SmallVector<ProtocolDecl*, 2> protocols;
+    if (result.get<Type>()->isExistentialType(protocols)) {
+      for (auto *proto : protocols) {
+        if (auto known = proto->existentialConformsToSelf()) {
+          if (*known)
+            continue;
+        // We can't check if the protocol conforms to itself while still
+        // checking the protocol declaration.
+        } else if (DC == proto || DC->isChildContextOf(proto)
+                 || conformsToProtocol(proto->getDeclaredType(), proto, DC)) {
+          continue;
+        }
+        
+        diagnose(Components.back()->getIdLoc(),
+                 diag::unsupported_existential_type,
+                 proto->getName());
+      }
+    }
+  }
+  
   return result.get<Type>();
 }
 
 bool TypeChecker::validateType(TypeLoc &Loc, DeclContext *DC,
                                TypeResolutionOptions options,
-                               GenericTypeResolver *resolver) {
+                               GenericTypeResolver *resolver,
+                               ValueDecl *typeContext) {
   // FIXME: Verify that these aren't circular and infinite size.
   
   // If we've already validated this type, don't do so again.
@@ -839,7 +865,7 @@ bool TypeChecker::validateType(TypeLoc &Loc, DeclContext *DC,
     return Loc.isError();
 
   if (Loc.getType().isNull()) {
-    Loc.setType(resolveType(Loc.getTypeRepr(), DC, options, resolver),
+    Loc.setType(resolveType(Loc.getTypeRepr(), DC, options, resolver, typeContext),
                 true);
     return Loc.isError();
   }
@@ -857,11 +883,14 @@ namespace {
     ASTContext &Context;
     DeclContext *DC;
     GenericTypeResolver *Resolver;
+    ValueDecl *TypeContext;
 
   public:
     TypeResolver(TypeChecker &tc, DeclContext *DC,
-                 GenericTypeResolver *resolver)
-      : TC(tc), Context(tc.Context), DC(DC), Resolver(resolver) {
+                 GenericTypeResolver *resolver,
+                 ValueDecl *typeContext)
+      : TC(tc), Context(tc.Context), DC(DC), Resolver(resolver),
+        TypeContext(typeContext) {
       assert(resolver);
     }
 
@@ -915,7 +944,8 @@ namespace {
 
 Type TypeChecker::resolveType(TypeRepr *TyR, DeclContext *DC,
                               TypeResolutionOptions options,
-                              GenericTypeResolver *resolver) {
+                              GenericTypeResolver *resolver,
+                              ValueDecl *typeContext) {
   PrettyStackTraceTypeRepr stackTrace(Context, "resolving", TyR);
 
   // Make sure we always have a resolver to use.
@@ -923,7 +953,7 @@ Type TypeChecker::resolveType(TypeRepr *TyR, DeclContext *DC,
   if (!resolver)
     resolver = &defaultResolver;
 
-  TypeResolver typeResolver(*this, DC, resolver);
+  TypeResolver typeResolver(*this, DC, resolver, typeContext);
   return typeResolver.resolveType(TyR, options);
 }
 
@@ -942,7 +972,8 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
   case TypeReprKind::GenericIdent:
   case TypeReprKind::CompoundIdent:
     return TC.resolveIdentifierType(DC, cast<IdentTypeRepr>(repr), options,
-                                    /*diagnoseErrors*/ true, Resolver);
+                                    /*diagnoseErrors*/ true, Resolver,
+                                    TypeContext);
 
   case TypeReprKind::Function:
     if (!(options & TR_SILType))

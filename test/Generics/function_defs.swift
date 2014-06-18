@@ -34,7 +34,7 @@ func min<T : MethodLessComparable>(x: T, y: T) -> T {
 //===----------------------------------------------------------------------===//
 
 func existential<T : EqualComparable, U : EqualComparable>(t1: T, t2: T, u: U) {
-  var eqComp : EqualComparable = t1
+  var eqComp : EqualComparable = t1 // expected-error{{use of protocol 'EqualComparable' as a type is not supported because it has associated type requirements}}
   eqComp = u
   if t1.isEqual(eqComp) {} // expected-error{{'EqualComparable' is not convertible to 'T'}}
   if eqComp.isEqual(t2) {} // expected-error{{'EqualComparable' does not have a member named 'isEqual'}}
@@ -45,13 +45,13 @@ protocol OtherEqualComparable {
 }
 
 func otherExistential<T : EqualComparable>(t1: T) {
-  var otherEqComp : OtherEqualComparable = t1 // expected-error{{type 'T' does not conform to protocol 'OtherEqualComparable'}}
+  var otherEqComp : OtherEqualComparable = t1 // expected-error{{type 'T' does not conform to protocol 'OtherEqualComparable'}} expected-error{{use of protocol 'OtherEqualComparable' as a type is not supported because it has associated type requirements}}
   otherEqComp = t1 // expected-error{{type 'T' does not conform to protocol 'OtherEqualComparable'}}
 
-  var otherEqComp2 : OtherEqualComparable
+  var otherEqComp2 : OtherEqualComparable // expected-error{{use of protocol 'OtherEqualComparable' as a type is not supported because it has associated type requirements}}
   otherEqComp2 = t1 // expected-error{{type 'T' does not conform to protocol 'OtherEqualComparable'}}
 
-  var everyEq : protocol<EqualComparable, OtherEqualComparable> = t1 // expected-error{{type 'T' does not conform to protocol 'OtherEqualComparable'}}
+  var everyEq : protocol<EqualComparable, OtherEqualComparable> = t1 // expected-error{{type 'T' does not conform to protocol 'OtherEqualComparable'}} expected-error{{use of protocol 'OtherEqualComparable' as a type is not supported because it has associated type requirements}} expected-error{{use of protocol 'EqualComparable' as a type is not supported because it has associated type requirements}}
 }
 
 protocol Runcible {
@@ -59,7 +59,7 @@ protocol Runcible {
   func spoon(x: Self)
 }
 
-func testRuncible(x: Runcible) {
+func testRuncible(x: Runcible) { // expected-error{{use of protocol 'Runcible' as a type is not supported because it has associated type requirements}}
   x.runce(5)
 }
 

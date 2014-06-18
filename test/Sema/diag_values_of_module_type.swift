@@ -42,7 +42,7 @@ func goodTest1() {
   var b2 : diag_values_of_module_type_foo.SomeClass.NestedClass
   var b3 : diag_values_of_module_type_foo.SomeStruct
   var b4 : diag_values_of_module_type_foo.SomeEnum
-  var b5 : diag_values_of_module_type_foo.SomeProtocol
+  var b5 : diag_values_of_module_type_foo.SomeExistential
   var b6 : diag_values_of_module_type_foo.SomeTypealias
 
   var c1 = diag_values_of_module_type_foo.SomeClass()
@@ -53,7 +53,7 @@ func goodTest1() {
   var c6 = diag_values_of_module_type_foo.SomeStruct()
   var c7 = diag_values_of_module_type_foo.SomeEnum.Foo
   // Can not default-construct a protocol.
-  // var c8 = diag_values_of_module_type_foo.SomeProtocol()
+  // var c8 = diag_values_of_module_type_foo.SomeExistential()
   var c9 = diag_values_of_module_type_foo.SomeTypealias()
 
   var d1 = diag_values_of_module_type_foo.someGlobal

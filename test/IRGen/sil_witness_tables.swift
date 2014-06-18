@@ -18,9 +18,13 @@ protocol Q : P {
   func qMethod()
 }
 
+protocol QQ {
+  func qMethod()
+}
+
 struct AssocConformer: A {}
 
-struct Conformer: Q {
+struct Conformer: Q, QQ {
   typealias Assoc = AssocConformer
 
   static func staticMethod() {}
@@ -53,10 +57,10 @@ struct Conformer2: Q {
   func qMethod() {}
 }
 
-// CHECK-LABEL: define void @_TF18sil_witness_tables7erasureFT1cVS_9Conformer_PS_1Q_(%P18sil_witness_tables1Q_* noalias sret)
-// CHECK:         [[WITNESS_TABLE_ADDR:%.*]] = getelementptr inbounds %P18sil_witness_tables1Q_* %0, i32 0, i32 2
-// CHECK-NEXT:    store i8** getelementptr inbounds ([2 x i8*]* [[CONFORMER_Q_WITNESS_TABLE]], i32 0, i32 0), i8*** [[WITNESS_TABLE_ADDR]], align 8
-func erasure(#c: Conformer) -> Q {
+// CHECK-LABEL: define void @_TF18sil_witness_tables7erasureFT1cVS_9Conformer_PS_2QQ_(%P18sil_witness_tables2QQ_* noalias sret)
+// CHECK:         [[WITNESS_TABLE_ADDR:%.*]] = getelementptr inbounds %P18sil_witness_tables2QQ_* %0, i32 0, i32 2
+// CHECK-NEXT:    store i8** getelementptr inbounds ([1 x i8*]* [[CONFORMER_QQ_WITNESS_TABLE:@_TWP.*]], i32 0, i32 0), i8*** [[WITNESS_TABLE_ADDR]], align 8
+func erasure(#c: Conformer) -> QQ {
   return c
 }
 

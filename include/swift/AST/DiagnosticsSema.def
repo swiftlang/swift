@@ -136,6 +136,9 @@ NOTE(use_non_type_value_prev,sema_nb,none,
      "%0 declared here", (Identifier))
 ERROR(use_local_before_declaration,sema_nb,none,
       "use of local variable %0 before its declaration", (Identifier))
+ERROR(unsupported_existential_type,sema_nb,none,
+      "use of protocol %0 as a type is not supported because it has "
+      "associated type requirements", (Identifier))
 
 ERROR(no_decl_in_module,sema_nb,none,
       "no such decl in module", ())

@@ -298,8 +298,13 @@ protocol Runcible {
   var associated:U { get }
 
   func free_method() -> Int
-  mutating
-  func associated_method() -> U.Type
+  mutating func associated_method() -> U.Type
+  class func static_method()
+}
+
+protocol Mincible {
+  var free:Int { get }
+  func free_method() -> Int
   class func static_method()
 }
 
@@ -316,7 +321,7 @@ func archetype_member_ref<T : Runcible>(var x: T) {
 }
 
 // CHECK-LABEL: sil  @_TF11expressions22existential_member_ref
-func existential_member_ref(x: Runcible) {
+func existential_member_ref(x: Mincible) {
   x.free_method()
   // CHECK: project_existential
   // CHECK-NEXT: protocol_method
@@ -338,7 +343,7 @@ func existential_property_ref<T : Runcible>(x: T) -> Int {
 also archetype/existential subscripts
 */
 
-struct Spoon : Runcible {
+struct Spoon : Runcible, Mincible {
   typealias U = Float
   var free: Int { return 4 }
   var associated: Float { return 12 }
@@ -367,7 +372,7 @@ struct Hat<T> : Runcible {
 }
 
 // CHECK-LABEL: sil  @_TF11expressions7erasure
-func erasure(x: Spoon) -> Runcible {
+func erasure(x: Spoon) -> Mincible {
   return x
   // CHECK: init_existential
   // CHECK: return

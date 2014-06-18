@@ -204,7 +204,13 @@ enum TypeResolutionFlags {
   TR_FromNonInferredPattern = 0x100,
   
   /// Whether we are the variable type in a for/in statement.
-  TR_EnumerationVariable = 0x200
+  TR_EnumerationVariable = 0x200,
+  
+  /// Whether this type is being used in an inheritance clause.
+  TR_InheritanceClause = 0x400,
+  
+  /// Whether this type is the referent of a global type alias.
+  TR_GlobalTypeAlias = 0x800,
 };
 
 /// Option set describing how type resolution should work.
@@ -323,7 +329,8 @@ public:
                              IdentTypeRepr *IdType,
                              TypeResolutionOptions options,
                              bool diagnoseErrors,
-                             GenericTypeResolver *resolver);
+                             GenericTypeResolver *resolver,
+                             ValueDecl *typeContext = nullptr);
   
   /// \brief Validate the given type.
   ///
@@ -344,7 +351,8 @@ public:
   /// \returns true if type validation failed, or false otherwise.
   bool validateType(TypeLoc &Loc, DeclContext *DC,
                     TypeResolutionOptions options = None,
-                    GenericTypeResolver *resolver = nullptr);
+                    GenericTypeResolver *resolver = nullptr,
+                    ValueDecl *typeContext = nullptr);
 
   /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
   bool handleSILGenericParams(ArchetypeBuilder *builder, GenericParamList *gp,
@@ -364,10 +372,13 @@ public:
   /// \param resolver A resolver for generic types. If none is supplied, this
   /// routine will create a \c PartialGenericTypeToArchetypeResolver to use.
   ///
+  /// \param typeContext The declaration that this type applies to.
+  ///
   /// \returns a well-formed type or an ErrorType in case of an error.
   Type resolveType(TypeRepr *TyR, DeclContext *DC,
                    TypeResolutionOptions options,
-                   GenericTypeResolver *resolver = nullptr);
+                   GenericTypeResolver *resolver = nullptr,
+                   ValueDecl *typeContext = nullptr);
 
   void validateDecl(ValueDecl *D, bool resolveTypeParams = false);
   

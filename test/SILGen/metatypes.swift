@@ -3,8 +3,6 @@
 // FIXME: typeof should be available through the standard library.
 
 protocol SomeProtocol {
-  typealias SomeAssociated
-
   func method()
   func static_method()
 }
@@ -13,8 +11,6 @@ protocol Any {}
 struct SomeStruct : Any {}
 
 class SomeClass : SomeProtocol {
-  typealias SomeAssociated = SomeStruct
-
   func method() {}
   func static_method() {}
 }

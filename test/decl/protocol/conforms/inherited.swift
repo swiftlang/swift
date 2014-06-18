@@ -107,16 +107,16 @@ func ==(x: A, y: A) -> Bool { return true }
 class B : A { }
 
 func testB(b: B) {
-  var p1: P1 = b
-  var p2: P2 = b // expected-error{{type 'B' does not conform to protocol 'P2'}}
-  var p3: P3 = b // expected-error{{type 'B' does not conform to protocol 'P3'}}
-  var p4: P4 = b
+  var p1: P1 = b // expected-error{{has associated type requirements}}
+  var p2: P2 = b // expected-error{{type 'B' does not conform to protocol 'P2'}} // expected-error{{has associated type requirements}}
+  var p3: P3 = b // expected-error{{type 'B' does not conform to protocol 'P3'}} // expected-error{{has associated type requirements}}
+  var p4: P4 = b // expected-error{{has associated type requirements}}
   var p5: P5 = b // expected-error{{type 'B' does not conform to protocol 'P5'}}
   var p6: P6 = b
-  var p7: P7 = b
+  var p7: P7 = b // expected-error{{has associated type requirements}}
   var p8: P8 = b // expected-error{{type 'B' does not conform to protocol 'P8'}}
-  var p9: P9 = b
-  var p10: P10 = b // expected-error{{type 'B' does not conform to protocol 'P10'}}
+  var p9: P9 = b // expected-error{{has associated type requirements}}
+  var p10: P10 = b // expected-error{{type 'B' does not conform to protocol 'P10'}} // expected-error{{has associated type requirements}}
   var p11: P11 = b // expected-error{{type 'B' does not conform to protocol 'P11'}}
 }
 
