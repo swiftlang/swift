@@ -26,7 +26,6 @@ namespace swift {
     ModuleFile *MF;
     SILModule &SILMod;
     SerializedSILLoader::Callback *Callback;
-    SILDebugScope *DebugScope;
 
     /// The cursor used to lazily load SILFunctions.
     llvm::BitstreamCursor SILCursor;

@@ -425,10 +425,10 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
   fn->setBare(IsBare);
   if (!fn->hasLocation()) fn->setLocation(loc);
 
-  DebugScope = fn->getDebugScope();
-  if (!DebugScope) {
-    DebugScope = new (SILMod) SILDebugScope(loc, *fn);
-    fn->setDebugScope(DebugScope);
+  SILDebugScope *DS = fn->getDebugScope();
+  if (!DS) {
+    DS= new (SILMod) SILDebugScope(loc, *fn);
+    fn->setDebugScope(DS);
   }
 
   GenericParamList *contextParams = nullptr;
@@ -1511,7 +1511,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     setLocalValue(ResultVal, ++LastValueID);
 
   for (auto I : InsertedInsn)
-    I->setDebugScope(DebugScope);
+    I->setDebugScope(I->getParent()->getParent()->getDebugScope());
 
   return false;
 }
