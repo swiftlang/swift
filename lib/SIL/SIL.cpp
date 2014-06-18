@@ -122,8 +122,10 @@ findAddressProjectionPathBetweenValues(SILValue V1, SILValue V2,
       Path.push_back(Projection(SEA));
     else if (auto *TEA = dyn_cast<TupleElementAddrInst>(Iter))
       Path.push_back(Projection(TEA));
+    else if (auto *REA = dyn_cast<RefElementAddrInst>(Iter))
+      Path.push_back(Projection(REA));
     else
-      Path.push_back(Projection(cast<RefElementAddrInst>(&*Iter)));
+      Path.push_back(Projection(cast<UncheckedTakeEnumDataAddrInst>(Iter)));
     Iter = cast<SILInstruction>(*Iter).getOperand(0);
   }
 
