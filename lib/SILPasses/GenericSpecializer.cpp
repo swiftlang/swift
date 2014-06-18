@@ -35,18 +35,6 @@ static bool canSpecializeFunction(SILFunction *F) {
   return !F->isExternalDeclaration();
 }
 
-/// \brief return true if we can specialize the function type with a specific
-/// substitution list without doing partial specialization.
-static bool canSpecializeFunctionWithSubList(SILFunction *F,
-                                             TypeSubstitutionMap &SubsMap) {
-  // Check whether any of the substitutions are dependent.
-  for (auto &entry : SubsMap) {
-    if (hasUnboundGenericTypes(entry.second->getCanonicalType()))
-      return false;
-  }
-  return true;
-}
-
 namespace {
 
 class SpecializingCloner : public TypeSubstCloner<SpecializingCloner> {
@@ -306,7 +294,8 @@ GenericSpecializer::specializeApplyInstGroup(SILFunction *F, AIList &List) {
       = F->getContextGenericParams()
          ->getSubstitutionMap(Bucket[0]->getSubstitutions());
 
-    if (!canSpecializeFunctionWithSubList(F, InterfaceSubs)) {
+    // We do not support partial specialization.
+    if (hasUnboundGenericTypes(InterfaceSubs)) {
       DEBUG(llvm::dbgs() << "    Can not specialize with interface subs.\n");
       continue;
     }

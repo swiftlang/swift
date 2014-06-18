@@ -78,6 +78,9 @@ namespace swift {
   /// \returns True if the type T has unbound generic types.
   bool hasUnboundGenericTypes(CanType T);
 
+  /// \brief Return true if the substitution map contains unbound
+  /// generic types.
+  bool hasUnboundGenericTypes(TypeSubstitutionMap &SubsMap);
 } // end namespace swift
 
 #endif
