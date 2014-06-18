@@ -70,7 +70,8 @@ enum class PassKind {
   GlobalARCOpts,
   DCE,
   EnumSimplification,
-  LoopInfoPrinter
+  LoopInfoPrinter,
+  FunctionSignatureOpts,
 };
 
 enum class OptGroup {
@@ -229,6 +230,9 @@ Passes(llvm::cl::desc("Passes:"),
                         clEnumValN(PassKind::LoopInfoPrinter,
                                    "loop-info-printer",
                                    "Display loop information."),
+                        clEnumValN(PassKind::FunctionSignatureOpts,
+                                   "function-signature-opts",
+                                   "Optimize function signatures."),
                         clEnumValEnd));
 
 static llvm::cl::opt<bool>
@@ -401,6 +405,9 @@ static void runCommandLineSelectedPasses(SILModule *Module,
       break;
     case PassKind::LoopInfoPrinter:
       PM.add(createLoopInfoPrinter());
+      break;
+    case PassKind::FunctionSignatureOpts:
+      PM.add(createFunctionSignatureOpts());
       break;
     }
   }

@@ -36,4 +36,5 @@ add_swift_library(swiftSILPasses
   DeadCodeElimination.cpp
   EnumSimplification.cpp
   LoopInfoPrinter.cpp
+  FunctionSignatureOpts.cpp
   DEPENDS swiftSILPassesUtils swiftSILAnalysis)

@@ -82,6 +82,7 @@ namespace swift {
   SILTransform *createGlobalARCOpts();
   SILTransform *createDCE();
   SILTransform *createEnumSimplification();
+  SILTransform *createFunctionSignatureOpts();
 
   // Utilities
   SILTransform *createStripDebug();
