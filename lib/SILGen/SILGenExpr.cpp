@@ -980,26 +980,24 @@ visitCollectionUpcastConversionExpr(CollectionUpcastConversionExpr *E,
 /// \param conditional Whether to emit a conditional downcast; if
 /// false, this will emit a forced downcast.
 static RValue emitCollectionDowncastExpr(SILGenFunction &SGF,
-                                         ExplicitCastExpr *E, SGFContext C,
-                                         bool conditional) {
-  SILLocation loc = RegularLocation(E);
-  
+                                         Expr *source,
+                                         SILLocation loc,
+                                         Type destType,
+                                         SGFContext C,
+                                         bool conditional,
+                                         bool bridgesFromObjC) {
   // Get the sub expression argument as a managed value
-  auto mv = SGF.emitRValueAsSingleValue(E->getSubExpr());
+  auto mv = SGF.emitRValueAsSingleValue(source);
   
   // Compute substitutions for the intrinsic call.
   auto fromCollection = cast<BoundGenericStructType>(
-                          E->getSubExpr()->getType()->getCanonicalType());
+                          source->getType()->getCanonicalType());
   auto toCollection = cast<BoundGenericStructType>(
-                        E->getCastTypeLoc().getType()->getCanonicalType());
+                        destType->getCanonicalType());
 
   // Get the intrinsic function.
   auto &ctx = SGF.getASTContext();
   FuncDecl *fn = nullptr;
-  bool bridgesFromObjC
-    = isa<ForcedCollectionDowncastExpr>(E)
-       ? cast<ForcedCollectionDowncastExpr>(E)->bridgesFromObjC()
-       : cast<ConditionalCollectionDowncastExpr>(E)->bridgesFromObjC();
   if (fromCollection->getDecl() == ctx.getArrayDecl()) {
     fn = bridgesFromObjC
            ? (conditional ? ctx.getArrayBridgeFromObjectiveCConditional(nullptr)
@@ -1029,17 +1027,26 @@ static RValue emitCollectionDowncastExpr(SILGenFunction &SGF,
   
   auto emitApply = SGF.emitApplyOfLibraryIntrinsic(loc, fn, subs, {mv}, C);
   
-  return RValue(SGF, E, emitApply);
+  Type resultType = destType;
+  if (conditional)
+    resultType = OptionalType::get(resultType);
+  return RValue(SGF, loc, resultType->getCanonicalType(), emitApply);
 }
 
 RValue RValueEmitter::visitForcedCollectionDowncastExpr(
                         ForcedCollectionDowncastExpr *E, SGFContext C) {
-  return emitCollectionDowncastExpr(SGF, E, C, /*conditional=*/false);
+  return emitCollectionDowncastExpr(SGF, E->getSubExpr(), SILLocation(E), 
+                                    E->getCastTypeLoc().getType(), C, 
+                                    /*conditional=*/false, 
+                                    E->bridgesFromObjC());
 }
 
 RValue RValueEmitter::visitConditionalCollectionDowncastExpr(
                         ConditionalCollectionDowncastExpr *E, SGFContext C) {
-  return emitCollectionDowncastExpr(SGF, E, C, /*conditional=*/true);
+  return emitCollectionDowncastExpr(SGF, E->getSubExpr(), SILLocation(E), 
+                                    E->getCastTypeLoc().getType(), C, 
+                                    /*conditional=*/true,
+                                    E->bridgesFromObjC());
 }
 
 RValue RValueEmitter::visitArchetypeToSuperExpr(ArchetypeToSuperExpr *E,
@@ -5158,7 +5165,9 @@ RValue RValueEmitter::emitForceValue(SILLocation loc, Expr *E,
   //
   //   (x as? String[])!
   if (auto checked = dyn_cast<ConditionalCollectionDowncastExpr>(E)) {
-    return emitCollectionDowncastExpr(SGF, checked, C, /*conditional=*/false);
+    return emitCollectionDowncastExpr(SGF, checked->getSubExpr(), loc,
+                                      valueType, C, /*conditional=*/false,
+                                      checked->bridgesFromObjC());
   }
 
   // If the subexpression is a monadic optional operation, peephole
