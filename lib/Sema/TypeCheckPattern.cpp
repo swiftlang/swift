@@ -897,7 +897,9 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
       return nullptr;
     // Valid checks.
     case CheckedCastKind::ArrayDowncast:
+    case CheckedCastKind::ArrayDowncastBridged:
     case CheckedCastKind::DictionaryDowncast:
+    case CheckedCastKind::DictionaryDowncastBridged:
     case CheckedCastKind::Identical:
     case CheckedCastKind::Downcast:
     case CheckedCastKind::SuperToArchetype:

@@ -571,6 +571,10 @@ static CheckedCastKind getCheckedCastKind(unsigned attr) {
     return CheckedCastKind::ArchetypeToConcrete;
   case SIL_CHECKED_CAST_ARRAY_DOWNCAST:
     return CheckedCastKind::ArrayDowncast;
+  case SIL_CHECKED_CAST_ARRAY_DOWNCAST_BRIDGED:
+    return CheckedCastKind::ArrayDowncastBridged;
+  case SIL_CHECKED_CAST_DICTIONARY_DOWNCAST_BRIDGED:
+    return CheckedCastKind::DictionaryDowncastBridged;
   case SIL_CHECKED_CAST_DICTIONARY_DOWNCAST:
     return CheckedCastKind::DictionaryDowncast;
   case SIL_CHECKED_CAST_DOWNCAST:

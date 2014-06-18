@@ -2196,7 +2196,8 @@ ConstraintSystem::simplifyCheckedCastConstraint(
 
   auto kind = getCheckedCastKind(this, fromType, toType);
   switch (kind) {
-  case CheckedCastKind::ArrayDowncast: {
+  case CheckedCastKind::ArrayDowncast:
+  case CheckedCastKind::ArrayDowncastBridged: {
     auto fromBaseType = getBaseTypeForArrayType(fromType.getPointer());
     auto toBaseType = getBaseTypeForArrayType(toType.getPointer());
     
@@ -2217,7 +2218,8 @@ ConstraintSystem::simplifyCheckedCastConstraint(
                   getConstraintLocator(locator));
     return SolutionKind::Solved;
   }
-  case CheckedCastKind::DictionaryDowncast: {
+  case CheckedCastKind::DictionaryDowncast:
+  case CheckedCastKind::DictionaryDowncastBridged: {
     Type fromKeyType, fromValueType;
     std::tie(fromKeyType, fromValueType) 
       = *isDictionaryType(fromType->lookThroughAllAnyOptionalTypes());

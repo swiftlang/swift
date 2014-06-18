@@ -1454,7 +1454,9 @@ public:
     case CheckedCastKind::Unresolved:
     case CheckedCastKind::Coercion:
     case CheckedCastKind::ArrayDowncast:
+    case CheckedCastKind::ArrayDowncastBridged:
     case CheckedCastKind::DictionaryDowncast:
+    case CheckedCastKind::DictionaryDowncastBridged:
       llvm_unreachable("invalid for SIL");
     case CheckedCastKind::Identical:
     case CheckedCastKind::Downcast:

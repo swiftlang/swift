@@ -2428,7 +2428,9 @@ namespace {
         expr->setCastKind(castKind);
         break;
       case CheckedCastKind::ArrayDowncast:
+      case CheckedCastKind::ArrayDowncastBridged:
       case CheckedCastKind::DictionaryDowncast:
+      case CheckedCastKind::DictionaryDowncastBridged:
       case CheckedCastKind::Identical:
       case CheckedCastKind::Downcast:
       case CheckedCastKind::SuperToArchetype:
@@ -2646,23 +2648,6 @@ namespace {
         return result;
       }
 
-      // If we ended up with a "bare" conditional collection downcast,
-      // replace it with a forced collection downcast.
-      //
-      // This is the common case.
-      if (auto conditional
-            = dyn_cast<ConditionalCollectionDowncastExpr>(casted)) {
-        auto result = new (tc.Context) ForcedCollectionDowncastExpr(
-                                         conditional->getSubExpr(),
-                                         conditional->getLoc(),
-                                         conditional->getCastTypeLoc(),
-                                         conditional->bridgesFromObjC());
-        result->setType(toType);
-        if (conditional->isImplicit())
-          result->setImplicit();
-        return result;
-      }
-
       // Otherwise, unwrap the result.
       //
       // This happens when the conditional cast propagates optionals.
@@ -2726,7 +2711,9 @@ namespace {
 
       // Valid casts.
       case CheckedCastKind::ArrayDowncast:
+      case CheckedCastKind::ArrayDowncastBridged:
       case CheckedCastKind::DictionaryDowncast:
+      case CheckedCastKind::DictionaryDowncastBridged:
       case CheckedCastKind::Identical:
       case CheckedCastKind::Downcast:
       case CheckedCastKind::SuperToArchetype:
@@ -2740,59 +2727,13 @@ namespace {
         break;
       }
       
-      // Allow for down casts between array types. Because of its dependence on
-      // library functionality, this is handled separately from other checked
-      // cast kinds.
-      ExplicitCastExpr *cast;
-      if (castKind == CheckedCastKind::ArrayDowncast ||
-          castKind == CheckedCastKind::DictionaryDowncast) {
-        bool bridgesFromObjC;
-        if (castKind == CheckedCastKind::ArrayDowncast) {
-          auto toEltType 
-            = cs.getBaseTypeForArrayType(
-              toType->lookThroughAllAnyOptionalTypes().getPointer());
-          bridgesFromObjC = !tc.getBridgedToObjC(cs.DC, toEltType).second;
-        } else if (castKind == CheckedCastKind::DictionaryDowncast) {
-          Type fromKeyType, fromValueType;
-          std::tie(fromKeyType, fromValueType) =
-            *cs.isDictionaryType(fromType->lookThroughAllAnyOptionalTypes());
-          
-          Type toKeyType, toValueType;
-          std::tie(toKeyType, toValueType) 
-            = *cs.isDictionaryType(toType->lookThroughAllAnyOptionalTypes());
-
-          bridgesFromObjC = !(fromKeyType->isBridgeableObjectType() &&
-                              fromValueType->isBridgeableObjectType() &&
-                              toKeyType->isBridgeableObjectType() &&
-                              toValueType->isBridgeableObjectType());
-        } else {
-          llvm_unreachable("unhandled collection kind");
-        }
-
-        toType = tc.getOptionalType(sub->getLoc(), toType);
-        auto collectionConversion
-          = new (tc.Context) ConditionalCollectionDowncastExpr(
-                               sub, expr->getLoc(), expr->getCastTypeLoc(), 
-                               bridgesFromObjC);
-        collectionConversion->setType(toType);
-
-        cast = collectionConversion;
-      } else {
-        cast = expr;
-      }
-
-      // Note: after this point, "cast" is the expression we're
-      // working on and returning. Null out 'expr' so we don't
-      // accidentally rely on it below.
-      expr = nullptr;
-
       // Check whether we're casting from AnyObject to a bridged type
       // of some sort.
 
       // Allow for casts from AnyObject to a bridged type.
       auto fromValueType = fromType->lookThroughAllAnyOptionalTypes();
       auto toValueType = toType->lookThroughAllAnyOptionalTypes();
-      Type finalResultType = simplifyType(cast->getType());
+      Type finalResultType = simplifyType(expr->getType());
       Type bridgedThroughClass;
       if (castKind == CheckedCastKind::ArrayDowncast ||
           castKind == CheckedCastKind::DictionaryDowncast ||
@@ -2800,7 +2741,7 @@ namespace {
                                     cs.DC, fromValueType, toValueType))) {
         // We're not casting through a bridged type, so finish up the
         // optional bindings and we're done.
-        return handleOptionalBindings(cast, finalResultType);
+        return handleOptionalBindings(expr, finalResultType);
       }
 
       // Rebuild the class type we're bridging through with the
@@ -2818,19 +2759,19 @@ namespace {
 
       // Form a cast to the intermediate result type, which is the
       // class through which we are bridging.
-      cast->getCastTypeLoc().setType(intermediateResultType,/*validated=*/true);
+      expr->getCastTypeLoc().setType(intermediateResultType,/*validated=*/true);
       toType = OptionalType::get(intermediateResultType);
-      auto result = handleOptionalBindings(cast, toType);
+      auto result = handleOptionalBindings(expr, toType);
       if (!result)
         return nullptr;
 
       // If the cast's subexpression has the type same as we're trying
       // to cast to, drop the cast itself and perform a bridge.
       // FIXME: The AST no longer reflects the source.
-      if (cast->getSubExpr()->getType()->isEqual(intermediateResultType)) {
-        result = cast->getSubExpr();
+      if (expr->getSubExpr()->getType()->isEqual(intermediateResultType)) {
+        result = expr->getSubExpr();
         result = new (tc.Context) InjectIntoOptionalExpr(result,
-                                                         cast->getType());
+                                                         expr->getType());
       }
 
       // Bind the optional produced by the checked cast.

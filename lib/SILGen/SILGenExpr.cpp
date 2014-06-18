@@ -1662,6 +1662,22 @@ RValue RValueEmitter::visitForcedCheckedCastExpr(ForcedCheckedCastExpr *E,
 RValue RValueEmitter::
 visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *E,
                                 SGFContext C) {
+  // Handle collection downcasts directly; they have specific library
+  // entry points.
+  auto castKind = E->getCastKind();
+  if (castKind == CheckedCastKind::ArrayDowncast ||
+      castKind == CheckedCastKind::ArrayDowncastBridged ||
+      castKind == CheckedCastKind::DictionaryDowncast ||
+      castKind == CheckedCastKind::DictionaryDowncastBridged) {
+    bool bridgesFromObjC
+      = (castKind == CheckedCastKind::ArrayDowncastBridged ||
+         castKind == CheckedCastKind::DictionaryDowncastBridged);
+    return emitCollectionDowncastExpr(SGF, E->getSubExpr(), SILLocation(E), 
+                                      E->getCastTypeLoc().getType(), C,
+                                      /*conditional=*/true,
+                                      bridgesFromObjC);
+  }
+
   ManagedValue original = SGF.emitRValueAsSingleValue(E->getSubExpr());
 
   SILBasicBlock *contBB = SGF.createBasicBlock();
@@ -1683,7 +1699,7 @@ visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *E,
                                                           &castTL);
   std::tie(success, failure) = SGF.emitCheckedCastBranch(E, origVal, origAbs,
                                                          origTL, castTL,
-                                                         E->getCastKind());
+                                                         castKind);
 
   // Handle the cast success case.
   {
@@ -1739,6 +1755,20 @@ RValue RValueEmitter::emitUnconditionalCheckedCast(Expr *source,
                                                    Type destType,
                                                    CheckedCastKind castKind,
                                                    SGFContext C) {
+  // Handle collection downcasts directly; they have specific library
+  // entry points.
+  if (castKind == CheckedCastKind::ArrayDowncast ||
+      castKind == CheckedCastKind::ArrayDowncastBridged ||
+      castKind == CheckedCastKind::DictionaryDowncast ||
+      castKind == CheckedCastKind::DictionaryDowncastBridged) {
+    bool bridgesFromObjC
+      = (castKind == CheckedCastKind::ArrayDowncastBridged ||
+         castKind == CheckedCastKind::DictionaryDowncastBridged);
+    return emitCollectionDowncastExpr(SGF, source, loc, destType, C,
+                                      /*conditional=*/false,
+                                      bridgesFromObjC);
+  }
+
   ManagedValue original = SGF.emitRValueAsSingleValue(source);
 
   // Disable the original cleanup because the cast-to type is more specific and
@@ -1760,6 +1790,44 @@ RValue RValueEmitter::emitUnconditionalCheckedCast(Expr *source,
 }
 
 RValue RValueEmitter::visitIsaExpr(IsaExpr *E, SGFContext C) {
+  // Handle collection downcasts separately.
+  auto castKind = E->getCastKind();
+  if (castKind == CheckedCastKind::ArrayDowncast ||
+      castKind == CheckedCastKind::ArrayDowncastBridged ||
+      castKind == CheckedCastKind::DictionaryDowncast ||
+      castKind == CheckedCastKind::DictionaryDowncastBridged) {
+    bool bridgesFromObjC
+      = (castKind == CheckedCastKind::ArrayDowncastBridged ||
+         castKind == CheckedCastKind::DictionaryDowncastBridged);
+    SILLocation loc(E);
+    ManagedValue optValue = emitCollectionDowncastExpr(
+                              SGF, E->getSubExpr(), loc,
+                              E->getCastTypeLoc().getType(), 
+                              C, /*conditional=*/true,
+                              bridgesFromObjC)
+      .getAsSingleValue(SGF, loc);
+
+    // Materialize the input.
+    SILValue optValueTemp;
+    if (optValue.getType().isAddress()) {
+      optValueTemp = optValue.forward(SGF);
+    } else {
+      optValueTemp = SGF.emitTemporaryAllocation(loc, optValue.getType());
+      optValue.forwardInto(SGF, loc, optValueTemp);
+    }
+
+    SILValue isa = SGF.emitDoesOptionalHaveValue(E, optValueTemp);
+    
+    // Call the _getBool library intrinsic.
+    ASTContext &ctx = SGF.SGM.M.getASTContext();
+    auto result =
+      SGF.emitApplyOfLibraryIntrinsic(E, ctx.getGetBoolDecl(nullptr), {},
+                                      ManagedValue::forUnmanaged(isa),
+                                      C);
+    return RValue(SGF, E, result);
+  }
+
+
   // Cast the value using a conditional cast.
   ManagedValue original = SGF.emitRValueAsSingleValue(E->getSubExpr());
   auto &origTL = SGF.getTypeLowering(E->getSubExpr()->getType());

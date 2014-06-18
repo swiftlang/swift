@@ -2728,7 +2728,9 @@ static Address emitCheckedCast(IRGenSILFunction &IGF,
   case CheckedCastKind::Unresolved:
   case CheckedCastKind::Coercion:
   case CheckedCastKind::ArrayDowncast:
+  case CheckedCastKind::ArrayDowncastBridged:
   case CheckedCastKind::DictionaryDowncast:
+  case CheckedCastKind::DictionaryDowncastBridged:
     llvm_unreachable("invalid for sil");
   case CheckedCastKind::Identical:
   case CheckedCastKind::Downcast: {

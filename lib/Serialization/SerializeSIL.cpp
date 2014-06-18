@@ -58,8 +58,12 @@ static unsigned toStableCheckedCastKind(CheckedCastKind kind) {
     return SIL_CHECKED_CAST_ARCHETYPE_TO_CONCRETE;
   case CheckedCastKind::ArrayDowncast:
     return SIL_CHECKED_CAST_ARRAY_DOWNCAST;
+  case CheckedCastKind::ArrayDowncastBridged:
+    return SIL_CHECKED_CAST_ARRAY_DOWNCAST_BRIDGED;
   case CheckedCastKind::DictionaryDowncast:
     return SIL_CHECKED_CAST_DICTIONARY_DOWNCAST;
+  case CheckedCastKind::DictionaryDowncastBridged:
+    return SIL_CHECKED_CAST_DICTIONARY_DOWNCAST_BRIDGED;
   case CheckedCastKind::Downcast:
     return SIL_CHECKED_CAST_DOWNCAST;
     case CheckedCastKind::Identical:

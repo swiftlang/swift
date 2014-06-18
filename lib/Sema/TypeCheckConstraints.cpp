@@ -1950,11 +1950,24 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   ConstraintSystem cs(*this, dc, ConstraintSystemOptions());
   
   if (cs.isArrayType(toType) && cs.isArrayType(fromType)) {
-    return CheckedCastKind::ArrayDowncast;
+    auto toEltType 
+      = cs.getBaseTypeForArrayType(
+        toType->lookThroughAllAnyOptionalTypes().getPointer());
+    return toEltType->isBridgeableObjectType() 
+             ? CheckedCastKind::ArrayDowncast
+             : CheckedCastKind::ArrayDowncastBridged;
   }
 
-  if (cs.isDictionaryType(toType) && cs.isDictionaryType(fromType)) {
-    return CheckedCastKind::DictionaryDowncast;
+  if (auto toDict = cs.isDictionaryType(toType)) {
+    if (auto fromDict = cs.isDictionaryType(fromType)) {
+      if (toDict->first->isBridgeableObjectType() &&
+          toDict->second->isBridgeableObjectType() &&
+          fromDict->first->isBridgeableObjectType() &&
+          fromDict->second->isBridgeableObjectType())
+        return CheckedCastKind::DictionaryDowncast;
+      
+      return CheckedCastKind::DictionaryDowncastBridged;
+    }
   }
 
   // If the destination type is a subtype of the source type, we have
