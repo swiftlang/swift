@@ -17,6 +17,7 @@
 #include "swift/Strings.h"
 #include "swift/Basic/Demangle.h"
 #include "swift/Basic/QuotedString.h"
+#include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILVisitor.h"
@@ -336,12 +337,14 @@ class SILPrinter : public SILVisitor<SILPrinter> {
   llvm::formatted_raw_ostream OS;
   SILValue subjectValue;
   bool Verbose;
+  unsigned LastBufferID;
 
   llvm::DenseMap<const SILBasicBlock *, unsigned> BlocksToIDMap;
 
   llvm::DenseMap<const ValueBase*, unsigned> ValueToIDMap;
 public:
-  SILPrinter(raw_ostream &OS, bool V = false) : OS(OS), Verbose(V) {
+  SILPrinter(raw_ostream &OS, bool V = false) : OS(OS), Verbose(V),
+                                                LastBufferID(0) {
   }
 
   ID getID(const SILBasicBlock *B);
@@ -497,6 +500,18 @@ public:
             OS << " no_loc";
         }
 
+        // Print inlined-at location, if any.
+        if (auto DS = I->getDebugScope())
+          while (DS->InlinedCallSite) {
+            OS << ": perf_inlined_at ";
+            auto CallSite = DS->InlinedCallSite->Loc;
+            if (!CallSite.isNull())
+              CallSite.getSourceLoc().
+                print(OS, M.getASTContext().SourceMgr, LastBufferID);
+            else
+              OS << "?";
+            DS = DS->InlinedCallSite;
+          }
       }
     }
     
