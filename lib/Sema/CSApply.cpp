@@ -2646,6 +2646,23 @@ namespace {
         return result;
       }
 
+      // If we ended up with a "bare" conditional collection downcast,
+      // replace it with a forced collection downcast.
+      //
+      // This is the common case.
+      if (auto conditional
+            = dyn_cast<ConditionalCollectionDowncastExpr>(casted)) {
+        auto result = new (tc.Context) ForcedCollectionDowncastExpr(
+                                         conditional->getSubExpr(),
+                                         conditional->getLoc(),
+                                         conditional->getCastTypeLoc(),
+                                         conditional->bridgesFromObjC());
+        result->setType(toType);
+        if (conditional->isImplicit())
+          result->setImplicit();
+        return result;
+      }
+
       // Otherwise, unwrap the result.
       //
       // This happens when the conditional cast propagates optionals.
@@ -2831,6 +2848,11 @@ namespace {
     }
 
     Expr *visitCoerceExpr(CoerceExpr *expr) {
+      return expr;
+    }
+
+    Expr *visitForcedCollectionDowncastExpr(
+            ForcedCollectionDowncastExpr *expr) {
       return expr;
     }
 

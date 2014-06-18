@@ -2004,6 +2004,11 @@ ExplicitCastExpr *swift::findForcedDowncast(ASTContext &ctx, Expr *expr) {
     return forced;
   }
 
+  // Simple case: forced collection downcast.
+  if (auto forced = dyn_cast<ForcedCollectionDowncastExpr>(expr)) {
+    return forced;
+  }
+
   // If we have an implicit force, look through it.
   if (auto forced = dyn_cast<ForceValueExpr>(expr)) {
     if (forced->isImplicit()) {
@@ -2033,6 +2038,7 @@ ExplicitCastExpr *swift::findForcedDowncast(ASTContext &ctx, Expr *expr) {
       
       // If we have an explicit cast, we're done.
       if (isa<ForcedCheckedCastExpr>(sub) || 
+          isa<ForcedCollectionDowncastExpr>(sub) || 
           isa<ConditionalCollectionDowncastExpr>(sub) || 
           isa<ConditionalCheckedCastExpr>(sub))
         return cast<ExplicitCastExpr>(sub);
@@ -2042,6 +2048,7 @@ ExplicitCastExpr *swift::findForcedDowncast(ASTContext &ctx, Expr *expr) {
       if (auto arg = lookThroughBridgeFromObjCCall(ctx, sub)) {
         sub = skipOptionalEvalAndBinds(arg);
         if (isa<ForcedCheckedCastExpr>(sub) || 
+            isa<ForcedCollectionDowncastExpr>(sub) || 
             isa<ConditionalCollectionDowncastExpr>(sub) || 
             isa<ConditionalCheckedCastExpr>(sub))
           return cast<ExplicitCastExpr>(sub);

@@ -968,6 +968,15 @@ struct ASTNodeBase {};
       verifyCheckedBase(E);
     }
 
+    void verifyChecked(ForcedCollectionDowncastExpr *E) {
+      verifyChecked(E->getSubExpr());
+      checkSameType(E->getType(), 
+                    E->getCastTypeLoc().getType(),
+                    "forced collection downcast expression type and "
+                    "downcast type");
+      verifyCheckedBase(E);
+    }
+
     void verifyChecked(ConditionalCollectionDowncastExpr *E) {
       verifyChecked(E->getSubExpr());
       checkSameType(E->getType(), 
