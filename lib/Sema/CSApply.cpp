@@ -2792,16 +2792,6 @@ namespace {
       return expr;
     }
 
-    Expr *visitForcedCollectionDowncastExpr(
-            ForcedCollectionDowncastExpr *expr) {
-      return expr;
-    }
-
-    Expr *visitConditionalCollectionDowncastExpr(
-            ConditionalCollectionDowncastExpr *expr) {
-      return expr;
-    }
-
     Expr *visitAssignExpr(AssignExpr *expr) {
       llvm_unreachable("Handled by ExprWalker");
     }

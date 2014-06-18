@@ -1289,15 +1289,6 @@ namespace {
       llvm_unreachable("Already type-checked");
     }
 
-    Type visitForcedCollectionDowncastExpr(ForcedCollectionDowncastExpr *expr) {
-      llvm_unreachable("Already type-checked");
-    }
-
-    Type visitConditionalCollectionDowncastExpr(
-           ConditionalCollectionDowncastExpr *expr) {
-      llvm_unreachable("Already type-checked");
-    }
-
     Type visitDiscardAssignmentExpr(DiscardAssignmentExpr *expr) {
       // '_' is only allowed in assignments, so give it an AssignDest locator.
       auto locator = CS.getConstraintLocator(expr, 

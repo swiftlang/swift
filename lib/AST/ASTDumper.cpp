@@ -1397,24 +1397,6 @@ public:
     printRec(E->getSubExpr());
     OS << ')';
   }
-  void visitForcedCollectionDowncastExpr(
-         ForcedCollectionDowncastExpr *E) {
-    printCommon(E, "forced_collection_downcast_expr");
-    if (E->bridgesFromObjC())
-      OS << " bridges_from_objc";
-    OS << '\n';
-    printRec(E->getSubExpr());
-    OS << ')';
-  }
-  void visitConditionalCollectionDowncastExpr(
-         ConditionalCollectionDowncastExpr *E) {
-    printCommon(E, "conditional_collection_downcast_expr");
-    if (E->bridgesFromObjC())
-      OS << " bridges_from_objc";
-    OS << '\n';
-    printRec(E->getSubExpr());
-    OS << ')';
-  }
   void visitDerivedToBaseExpr(DerivedToBaseExpr *E) {
     printCommon(E, "derived_to_base_expr") << '\n';
     printRec(E->getSubExpr());

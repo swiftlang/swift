@@ -33,7 +33,6 @@ namespace llvm {
 
 namespace swift {
   class ArchetypeType;
-  class ConditionalCollectionDowncastExpr;
   class ASTContext;
   class Type;
   class ValueDecl;
@@ -239,24 +238,6 @@ class alignas(8) Expr {
                   < (1 << NumCheckedCastKindBits),
                 "unable to fit a CheckedCastKind in the given number of bits");
 
-  class ForcedCollectionDowncastExprBitfields {
-    friend class ForcedCollectionDowncastExpr;
-    unsigned : NumExprBits;
-    unsigned BridgesFromObjC : 1;
-  };
-  enum { NumForcedCollectionDowncastExprBits = NumExprBits + 1 };
-  static_assert(NumForcedCollectionDowncastExprBits <= 32, 
-                "fits in an unsigned");
-
-  class ConditionalCollectionDowncastExprBitfields {
-    friend class ConditionalCollectionDowncastExpr;
-    unsigned : NumExprBits;
-    unsigned BridgesFromObjC : 1;
-  };
-  enum { NumConditionalCollectionDowncastExprBits = NumExprBits + 1 };
-  static_assert(NumConditionalCollectionDowncastExprBits <= 32, 
-                "fits in an unsigned");
-
   class CollectionUpcastConversionExprBitfields {
     friend class CollectionUpcastConversionExpr;
     unsigned : NumExprBits;
@@ -280,9 +261,6 @@ protected:
     ClosureExprBitfields ClosureExprBits;
     BindOptionalExprBitfields BindOptionalExprBits;
     CheckedCastExprBitfields CheckedCastExprBits;
-    ForcedCollectionDowncastExprBitfields ForcedCollectionDowncastExprBits;
-    ConditionalCollectionDowncastExprBitfields 
-      ConditionalCollectionDowncastExprBits;
     CollectionUpcastConversionExprBitfields CollectionUpcastConversionExprBits;
   };
 
@@ -3271,69 +3249,6 @@ public:
     return E->getKind() == ExprKind::Coerce;
   }
 };
-
-/// Performs a forced downcast of a collection to a colleciton of the
-/// same kind, where the element type of the source collection is
-/// either a supertype of the element type of the destination
-/// collection or is bridged through an Objective-C class that is a
-/// supertype.
-///
-/// \code
-/// var arr: AnyObject[] = ...
-/// let views = arr as NSView[]
-/// \endcode
-class ForcedCollectionDowncastExpr : public ExplicitCastExpr {
-public:
-  ForcedCollectionDowncastExpr(Expr *sub, SourceLoc asLoc, TypeLoc castTy,
-                               bool bridgesFromObjC)
-    : ExplicitCastExpr(ExprKind::ForcedCollectionDowncast, sub, asLoc, 
-                       castTy, Type())
-  {
-    ForcedCollectionDowncastExprBits.BridgesFromObjC = bridgesFromObjC;
-  }
-
-  /// Determine whether this downcast bridges "non-verbatim" from the
-  /// Objective-C objects in the source array to values in the result array.
-  bool bridgesFromObjC() const {
-    return ForcedCollectionDowncastExprBits.BridgesFromObjC;
-  }
-
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::ForcedCollectionDowncast;
-  }
-};
-
-/// Performs a conditional downcast of a collection to a colleciton of the
-/// same kind, where the element type of the source collection is
-/// either a supertype of the element type of the destination
-/// collection or is bridged through an Objective-C class that is a
-/// supertype.
-///
-/// \code
-/// var arr: AnyObject[] = ...
-/// if let views = arr as? NSView[] { ... }
-/// \endcode
-class ConditionalCollectionDowncastExpr : public ExplicitCastExpr {
-public:
-  ConditionalCollectionDowncastExpr(Expr *sub, SourceLoc asLoc, TypeLoc castTy,
-                                    bool bridgesFromObjC)
-    : ExplicitCastExpr(ExprKind::ConditionalCollectionDowncast, sub, asLoc, 
-                       castTy, Type())
-  {
-    ConditionalCollectionDowncastExprBits.BridgesFromObjC = bridgesFromObjC;
-  }
-
-  /// Determine whether this downcast bridges "non-verbatim" from the
-  /// Objective-C objects in the source array to values in the result array.
-  bool bridgesFromObjC() const {
-    return ConditionalCollectionDowncastExprBits.BridgesFromObjC;
-  }
-
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::ConditionalCollectionDowncast;
-  }
-};
-  
 
 /// \brief Represents the rebinding of 'self' in a constructor that calls out
 /// to another constructor. The result of the subexpression is assigned to
