@@ -303,7 +303,7 @@ struct _StringCore {
     }
     else if (hasCocoaBuffer) {
       _StringCore(
-        _cocoaStringToContiguous(source: cocoaBuffer!, range: 0..count, 
+        _cocoaStringToContiguous(source: cocoaBuffer!, range: 0..<count,
                                  minimumCapacity: 0)
       ).encode(encoding, output: output)
     }

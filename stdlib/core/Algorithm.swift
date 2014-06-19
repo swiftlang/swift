@@ -160,8 +160,8 @@ func _quickSort<C: MutableCollection where C.IndexType: RandomAccessIndex>(
 
    // Partition and sort.
   let part_idx : C.IndexType = partition(&elements, range, &less)
-  _quickSort(&elements, range.startIndex..part_idx, &less);
-  _quickSort(&elements, (part_idx.succ())..range.endIndex, &less);
+  _quickSort(&elements, range.startIndex..<part_idx, &less);
+  _quickSort(&elements, (part_idx.succ())..<range.endIndex, &less);
 }
 
 struct Less<T: Comparable> {
@@ -355,8 +355,8 @@ func _quickSort<
   }
    // Partition and sort.
   let part_idx : C.IndexType = partition(&elements, range)
-  _quickSort(&elements, range.startIndex..part_idx);
-  _quickSort(&elements, (part_idx.succ())..range.endIndex);
+  _quickSort(&elements, range.startIndex..<part_idx);
+  _quickSort(&elements, (part_idx.succ())..<range.endIndex);
 }
 //// End of non-predicate sort functions.
 
@@ -443,7 +443,7 @@ func split<Seq: Sliceable, R:LogicValue>(
     if isSeparator(seq[j]) {
       if startIndex {
         var i = startIndex!
-        result.append(seq[i..j])
+        result.append(seq[i..<j])
         startIndex = .Some(j.succ())
         if ++splits >= maxSplit {
           break
@@ -462,7 +462,7 @@ func split<Seq: Sliceable, R:LogicValue>(
 
   switch startIndex {
   case .Some(var i):
-    result.append(seq[i..seq.endIndex])
+    result.append(seq[i..<seq.endIndex])
   default:
     ()
   }

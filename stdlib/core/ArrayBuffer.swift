@@ -344,7 +344,7 @@ extension ArrayBuffer {
   /// Get/set the value of the ith element
   subscript(i: Int) -> T {
     get {
-      _typeCheck(i..i)
+      _typeCheck(i..<i)
       if _fastPath(_isNative) {
         return _native[i]
       }

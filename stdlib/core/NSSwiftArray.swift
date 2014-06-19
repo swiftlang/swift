@@ -67,7 +67,7 @@ class _NSSwiftArray : HeapBufferStorageBase, _CocoaArray {
         count: range.length)
     }
     
-    for i in range.location..range.location + range.length {
+    for i in range.location..<range.location + range.length {
       dst++.initialize(reinterpretCast(buffer[i]))
     }
   }

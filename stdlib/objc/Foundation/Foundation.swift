@@ -277,16 +277,16 @@ class _NSContiguousString : NSString {
   // Implement sub-slicing without adding layers of wrapping
   // 
   override func substringFromIndex(start: Int) -> String {
-    return _NSContiguousString(value[Int(start)..Int(value.count)])
+    return _NSContiguousString(value[Int(start)..<Int(value.count)])
   }
 
   override func substringToIndex(end: Int) -> String {
-    return _NSContiguousString(value[0..Int(end)])
+    return _NSContiguousString(value[0..<Int(end)])
   }
 
   override func substringWithRange(aRange: NSRange) -> String {
     return _NSContiguousString(
-      value[Int(aRange.location)..Int(aRange.location + aRange.length)])
+      value[Int(aRange.location)..<Int(aRange.location + aRange.length)])
   }
 
   //
@@ -667,7 +667,7 @@ extension NSDictionary : DictionaryLiteralConvertible {
     var objects = new (AnyObject?)[elements.count] {elements[$0].1}
 
     // FIXME: init closures currently ignored <rdar://problem/15024561>
-    for i in 0..elements.count {
+    for i in 0..<elements.count {
       keys[i] = elements[i].0
       objects[i] = elements[i].1
     }

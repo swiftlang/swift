@@ -245,6 +245,7 @@ operator infix   ^ { associativity left precedence 140 }
 // FIXME: is this the right precedence level for "..." ?
 operator infix  ... { associativity none precedence 135 }
 operator infix  ..  { associativity none precedence 135 }
+operator infix  ..< { associativity none precedence 135 }
 
 // The cast operators 'as' and 'is' are hardcoded as if they had the
 // following attributes:

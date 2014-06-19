@@ -294,7 +294,7 @@ func == (lhs: String.Index, rhs: String.Index) -> Bool {
 extension String : Sliceable {
   subscript(subRange: Range<Index>) -> String {
     return String(
-      unicodeScalars[subRange.startIndex._base..subRange.endIndex._base]._base)
+      unicodeScalars[subRange.startIndex._base..<subRange.endIndex._base]._base)
   }
 }
 

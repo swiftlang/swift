@@ -74,7 +74,7 @@ extension String {
   /// Return a `Range<Index>` corresponding to the given `NSRange` of
   /// our UTF16 representation.
   func _range(r: NSRange) -> Range<Index> {
-    return _index(r.location).._index(r.location + r.length)
+    return _index(r.location)..<_index(r.location + r.length)
   }
 
   /// Return a `Range<Index>?` corresponding to the given `NSRange` of

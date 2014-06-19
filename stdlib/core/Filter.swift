@@ -45,7 +45,7 @@ struct FilterSequenceView<Base: Sequence> : Sequence {
 /// The `IndexType` used for subscripting a `FilterCollectionView`
 struct FilterCollectionViewIndex<Base: Collection> : ForwardIndex {
   func succ() -> FilterCollectionViewIndex {
-    for nextPos in _pos.succ().._end {
+    for nextPos in _pos.succ()..<_end {
       if _include(_base[nextPos]) {
         return FilterCollectionViewIndex(
           _pos: nextPos, _end: _end,

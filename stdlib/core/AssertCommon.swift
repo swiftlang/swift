@@ -20,27 +20,27 @@
 @transparent
 func _isDebugAssertConfiguration() -> Bool {
   // The values for the assert_configuration call are:
-  // 0 .. Debug
-  // 1 .. Release
-  // 2 .. Fast
+  // 0: Debug
+  // 1: Release
+  // 2: Fast
   return Int32(Builtin.assert_configuration()) == 0;
 }
 
 @transparent
 func _isReleaseAssertConfiguration() -> Bool {
   // The values for the assert_configuration call are:
-  // 0 .. Debug
-  // 1 .. Release
-  // 2 .. Fast
+  // 0: Debug
+  // 1: Release
+  // 2: Fast
   return Int32(Builtin.assert_configuration()) == 1;
 }
 
 @transparent
 func _isFastAssertConfiguration() -> Bool {
   // The values for the assert_configuration call are:
-  // 0 .. Debug
-  // 1 .. Release
-  // 2 .. Fast
+  // 0: Debug
+  // 1: Release
+  // 2: Fast
   return Int32(Builtin.assert_configuration()) == 2;
 }
 

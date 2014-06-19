@@ -31,7 +31,7 @@ extension String {
     self = String(_StringBuffer(capacity: s.core.count * sz, 
                                 initialSize: 0, 
                                 elementWidth: s.core.elementWidth))
-    for i in 0..sz {
+    for i in 0..<sz {
       self += s
     }
   }
@@ -66,7 +66,7 @@ extension String {
     while i != end {
       let u8 = utf8[i++]
       if u8 < 0x80 {
-        if 97..123 ~= u8   {
+        if 97..<123 ~= u8   {
           resultArray[j++] = u8 - 32
         } else {
           resultArray[j++] = u8
@@ -74,7 +74,7 @@ extension String {
       } else if u8 < 0xE0 {
         resultArray[j++] = u8
         let u8_1 = utf8[i++]
-        if u8 == 0xC3 && 0xA0..0xBF ~= Int(u8_1) && u8_1 != 0xB7 {
+        if u8 == 0xC3 && 0xA0..<0xBF ~= Int(u8_1) && u8_1 != 0xB7 {
           resultArray[j++] = u8_1 - 0x20
         } else {
           resultArray[j++] = u8_1
@@ -102,7 +102,7 @@ extension String {
     while i != end {
       let u8 = utf8[i++]
       if u8 < 0x80 {
-        if 65..91 ~= u8   {
+        if 65..<91 ~= u8   {
           resultArray[j++] = u8 + 32
         } else {
           resultArray[j++] = u8
@@ -110,7 +110,7 @@ extension String {
       } else if u8 < 0xE0 {
         resultArray[j++] = u8
         let u8_1 = utf8[i++]
-        if u8 == 0xC3 && 0x80..0x9F ~= u8_1 && u8_1 != 0x97 {
+        if u8 == 0xC3 && 0x80..<0x9F ~= u8_1 && u8_1 != 0x97 {
           resultArray[j++] = u8_1 + 0x20
         } else {
           resultArray[j++] = u8_1
@@ -295,7 +295,7 @@ extension String {
     // Since Int.min has a larger absolute value, perform addition with
     // negative numbers; detect underflows before they happen. 
     var res : Int = 0
-    for c in scalars[start..scalars.endIndex] {
+    for c in scalars[start..<scalars.endIndex] {
       if !c.isDigit() {
         // Conversion failed if a non-digit is encountered.
         return .None
@@ -331,10 +331,10 @@ extension String {
   func _substr(start: Int) -> String {
     var rng = unicodeScalars
     var startIndex = rng.startIndex
-    for i in 0..start {
+    for i in 0..<start {
       ++startIndex
     }
-    return rng[startIndex..rng.endIndex]
+    return rng[startIndex..<rng.endIndex]
   }
 
   /// Split the given string at the given delimiter character, returning 
@@ -346,7 +346,7 @@ extension String {
     var rng = unicodeScalars
     for i in indices(rng) {
       if rng[i] == delim {
-        return (rng[rng.startIndex..i], rng[i.succ()..rng.endIndex], true)
+        return (rng[rng.startIndex..<i], rng[i.succ()..<rng.endIndex], true)
       }
     }
     return (self, "", false)
@@ -362,7 +362,7 @@ extension String {
     var rng = unicodeScalars
     for i in indices(rng) {
       if pred(rng[i]) {
-        return (rng[rng.startIndex..i], rng[i], rng[i.succ()..rng.endIndex], true)
+        return (rng[rng.startIndex..<i], rng[i], rng[i.succ()..<rng.endIndex], true)
       }
     }
     return (self, "🎃", String(), false)

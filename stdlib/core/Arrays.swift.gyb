@@ -54,10 +54,10 @@ struct ${Self}<T> : MutableCollection, Sliceable {
           var newBuffer = ContiguousArrayBuffer<T>(
             count: buffer.count, minimumCapacity: buffer.count)
           let target = buffer._uninitializedCopy(
-            0..index, target: newBuffer.elementStorage)
+            0..<index, target: newBuffer.elementStorage)
           target.initialize(e)
           buffer._uninitializedCopy(
-            (index + 1)..buffer.count, target: target + 1)
+            (index + 1)..<buffer.count, target: target + 1)
           buffer = _Buffer(newBuffer)
         }(&_buffer, newValue)
       }
@@ -116,7 +116,7 @@ extension ${Self} : ArrayType {
     _buffer = _Buffer()
     reserveCapacity(count)
     var p = _buffer.elementStorage
-    for _ in 0..count {
+    for _ in 0..<count {
       p++.initialize(repeatedValue)
     }
     _buffer.count = count
@@ -165,7 +165,7 @@ extension ${Self} : ArrayType {
       var newBuffer = ContiguousArrayBuffer<T>(
         count: count, minimumCapacity: minimumCapacity)
       
-      _buffer._uninitializedCopy(0..count, target: newBuffer.elementStorage)
+      _buffer._uninitializedCopy(0..<count, target: newBuffer.elementStorage)
       _buffer = _Buffer(newBuffer)
     }
     _sanityCheck(capacity >= minimumCapacity)
@@ -196,21 +196,21 @@ extension ${Self} : ArrayType {
     _precondition(count > 0, "can't removeLast from an empty ${Self}")
     let c = count
     let result = self[c - 1]
-    self.replaceRange((c - 1)..c, with: EmptyCollection())
+    self.replaceRange((c - 1)..<c, with: EmptyCollection())
     return result
   }
   
   /// Insert an element at the given index in O(N).  Requires: atIndex
   /// <= count
   mutating func insert(newElement: T, atIndex: Int) {
-    self.replaceRange(atIndex..atIndex, with: CollectionOfOne(newElement))
+    self.replaceRange(atIndex..<atIndex, with: CollectionOfOne(newElement))
   }
 
   /// Remove the element at the given index.  Worst case complexity:
   /// O(N).  Requires: index < count
   mutating func removeAtIndex(index: Int) -> T {
     let result = self[index]
-    self.replaceRange(index..(index + 1), with: EmptyCollection())
+    self.replaceRange(index..<(index + 1), with: EmptyCollection())
     return result
   }
 
@@ -432,7 +432,7 @@ func _arrayReplace2<
         elements[j] = newValues[i++]
       }
       // Initialize the hole left by sliding the tail forward
-      for j in oldTailIndex..newTailIndex {
+      for j in oldTailIndex..<newTailIndex {
         (elements + j).initialize(newValues[i++])
       }
     }
@@ -639,9 +639,9 @@ func _arrayOutOfPlaceUpdate<
     backing.count = 0
   }
   else {
-    let newStart = source._uninitializedCopy(0..headCount, target: destStart)
+    let newStart = source._uninitializedCopy(0..<headCount, target: destStart)
     initializeNewElements.call(newStart)
-    source._uninitializedCopy(headCount + oldCount..sourceCount, 
+    source._uninitializedCopy(headCount + oldCount..<sourceCount, 
                               target: newEnd)
   }
   source = _Buffer(dest!)
