@@ -354,7 +354,7 @@ struct _Stdout : OutputStream {
     // It is important that we use stdio routines in order to correctly
     // interoperate with stdio buffering.
     string._encode(UTF8.self, output: SinkOf<UTF8.CodeUnit> {
-      c_putchar(Int32($0))
+      c_putchar(Int32($0)); return
     })
   }
 }
