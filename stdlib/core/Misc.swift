@@ -15,7 +15,7 @@
 // FIXME: Once we have an FFI interface, make these have proper function bodies
 
 @asmname("putchar")
-func c_putchar(value: Int32)
+func c_putchar(value: Int32) -> Int32
 
 // Some file stuff
 
