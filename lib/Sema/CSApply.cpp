@@ -1113,7 +1113,8 @@ namespace {
                             { }, diag::broken_bridged_to_objc_protocol);
     }
 
-    /// Bridge the given object from Objective-C to its value type.
+    /// Conditionally bridge the given object from Objective-C to its
+    /// value type.
     ///
     /// This routine should only be used for bridging value types.
     ///
@@ -1123,8 +1124,27 @@ namespace {
     /// \param valueType The value type to which we are bridging.
     ///
     /// \returns a value of type \c valueType? that stores the bridged result.
-    Expr *bridgeFromObjectiveC(Expr *object, Type valueType) {
+    Expr *bridgeFromObjectiveCConditional(Expr *object, Type valueType) {
       auto &tc = cs.getTypeChecker();
+
+      // Find the _ConditionallyBridgedToObjectiveC protocol.
+      auto conditionalBridgedProto
+        = tc.Context.getProtocol(
+            KnownProtocolKind::_ConditionallyBridgedToObjectiveC);
+
+      // Check whether the value type conforms to
+      // _ConditionallyBridgedToObjectiveC. If so, we have a specific
+      // entry point for conditional bridging.
+      ProtocolConformance *conditionalConformance = nullptr;
+      if (tc.conformsToProtocol(valueType, conditionalBridgedProto, cs.DC,
+                                &conditionalConformance)) {
+        Expr *valueMetatype = TypeExpr::createImplicit(valueType, tc.Context);
+        Expr *args[1] = { object };
+        return tc.callWitness(valueMetatype, cs.DC, conditionalBridgedProto,
+                              conditionalConformance,
+                              tc.Context.Id_bridgeFromObjectiveCConditional,
+                              args, diag::broken_bridged_to_objc_protocol);
+      }
 
       // Find the _BridgedToObjectiveC protocol.
       auto bridgedProto
@@ -2779,8 +2799,8 @@ namespace {
                                                  /*depth=*/0, 
                                                  intermediateResultType);
 
-      // Form a call to the bridgeFromObjectiveC witness.
-      result = bridgeFromObjectiveC(result, toValueType);
+      // Form a call to the bridgeFromObjectiveCConditional witness.
+      result = bridgeFromObjectiveCConditional(result, toValueType);
       if (!result)
         return nullptr;
 

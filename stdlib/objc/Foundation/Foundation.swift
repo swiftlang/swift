@@ -611,7 +611,6 @@ func _convertNSArrayToArray<T>(source: NSArray) -> T[] {
 ///
 /// to Objective-C code as a method that returns an NSArray.
 func _convertArrayToNSArray<T>(arr: T[]) -> NSArray {
-  // FIXME: Check conditional bridging here?
   return arr.bridgeToObjectiveC()
 }
 
@@ -642,6 +641,17 @@ extension Array : _ConditionallyBridgedToObjectiveC {
 
     var anyObjectArr: AnyObject[]
       = AnyObject[](ArrayBuffer(reinterpretCast(source) as _CocoaArray))
+    return _arrayBridgeFromObjectiveCConditional(anyObjectArr)
+  }
+
+  static func bridgeFromObjectiveCConditional(source: NSArray) -> Array? {
+    // Construct the result array by conditionally bridging each element.
+    var anyObjectArr 
+      = AnyObject[](ArrayBuffer(reinterpretCast(source) as _CocoaArray))
+    if isBridgedVerbatimToObjectiveC(T.self) {
+      return _arrayDownCastConditional(anyObjectArr)
+    }
+
     return _arrayBridgeFromObjectiveCConditional(anyObjectArr)
   }
 
@@ -766,6 +776,16 @@ extension Dictionary : _ConditionallyBridgedToObjectiveC {
 
   static func bridgeFromObjectiveC(x: NSDictionary) -> Dictionary? {
     return Dictionary(_cocoaDictionary: reinterpretCast(x))
+  }
+
+  static func bridgeFromObjectiveCConditional(x: NSDictionary) -> Dictionary? {
+    let anyDict = x as Dictionary<NSObject, AnyObject>
+    if isBridgedVerbatimToObjectiveC(KeyType.self) &&
+       isBridgedVerbatimToObjectiveC(ValueType.self) {
+    return Swift._dictionaryDownCastConditional(anyDict)
+    }
+
+    return Swift._dictionaryBridgeFromObjectiveCConditional(anyDict)
   }
 
   static func isBridgedToObjectiveC() -> Bool {

@@ -72,6 +72,9 @@ struct ConditionallyBridged<T>
   static func bridgeFromObjectiveC(x: C) -> ConditionallyBridged<T>? {
     _preconditionFailure("implement")
   }
+  static func bridgeFromObjectiveCConditional(x: C) -> ConditionallyBridged<T>?{
+    _preconditionFailure("implement")
+  }
   static func isBridgedToObjectiveC() -> Bool {
     return !((T.self as Any) as? String.Type)
   }

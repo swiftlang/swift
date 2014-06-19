@@ -91,6 +91,14 @@ struct ConditionallyBridgedValueType<T> : _ConditionallyBridgedToObjectiveC {
     return .None
   }
 
+  static func bridgeFromObjectiveCConditional(x: ClassA) 
+                -> ConditionallyBridgedValueType? {
+    if x.value % 2 == 0 {
+      return ConditionallyBridgedValueType(value: x.value)
+    }
+    return .None
+  }
+
   static func isBridgedToObjectiveC() -> Bool {
     return !((T.self as Any) as? String.Type)
   }

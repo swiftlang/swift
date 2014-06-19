@@ -2001,7 +2001,9 @@ static Expr *lookThroughBridgeFromObjCCall(ASTContext &ctx, Expr *expr) {
 
   auto callee = memberAccess->getCalledValue();
   if (!callee || !callee->hasName() || 
-      !callee->getFullName().matchesRef(ctx.Id_bridgeFromObjectiveC))
+      (!callee->getFullName().matchesRef(ctx.Id_bridgeFromObjectiveC) &&
+       !callee->getFullName().matchesRef(
+          ctx.Id_bridgeFromObjectiveCConditional)))
     return nullptr;
 
   return call->getArg();

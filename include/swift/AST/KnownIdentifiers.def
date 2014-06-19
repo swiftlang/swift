@@ -25,6 +25,7 @@
 
 IDENTIFIER(atIndexedSubscript)
 IDENTIFIER(bridgeFromObjectiveC)
+IDENTIFIER(bridgeFromObjectiveCConditional)
 IDENTIFIER(bridgeToObjectiveC)
 IDENTIFIER(dealloc)
 IDENTIFIER(deinit)

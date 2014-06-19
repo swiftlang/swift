@@ -67,6 +67,9 @@ struct H : _ConditionallyBridgedToObjectiveC {
   static func bridgeFromObjectiveC(x: G) -> H? {
     _preconditionFailure("implement")
   }
+  static func bridgeFromObjectiveCConditional(x: G) -> H? {
+    _preconditionFailure("implement")
+  }
   static func isBridgedToObjectiveC() -> Bool {
     return false
   }

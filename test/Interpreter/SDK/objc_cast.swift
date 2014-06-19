@@ -439,4 +439,52 @@ if let boolArr = obj as? Bool[] {
   println("Numbers-as-bools failed")
 }
 
+class Base : NSObject { 
+  override var description: String {
+    return "Base"
+  }
+}
+class Derived : Base { 
+  override var description: String {
+    return "Derived"
+  }
+}
+
+// CHECK: Array-of-base cast produces [Derived, Derived, Base]
+obj = [Derived(), Derived(), Base()]
+if let baseArr = obj as? Base[] {
+  println("Array-of-base cast produces \(baseArr)")
+} else {
+  println("Not an array of base")
+}
+
+// CHECK: Not an array of derived
+if let derivedArr = obj as? Derived[] {
+  println("Array-of-derived cast produces \(derivedArr)")
+} else {
+  println("Not an array of derived")
+}
+
+// CHECK: Dictionary-of-base-base cast produces
+obj = [Derived() : Derived(), Derived() : Base(), Derived() : Derived() ]
+if let baseDict = obj as? Dictionary<Base, Base> {
+  println("Dictionary-of-base-base cast produces \(baseDict)")
+} else {
+  println("Not a dictionary of base/base")
+}
+
+// CHECK: Dictionary-of-derived-base cast produces
+if let baseDict = obj as? Dictionary<Derived, Base> {
+  println("Dictionary-of-derived-base cast produces \(baseDict)")
+} else {
+  println("Not a dictionary of derived/base")
+}
+
+// CHECK: Not a dictionary of derived/derived
+if let dict = obj as? Dictionary<Derived, Derived> {
+  println("Dictionary-of-derived-derived cast produces \(dict)")
+} else {
+  println("Not a dictionary of derived/derived")
+}
+
 println("ok")  // CHECK: ok
