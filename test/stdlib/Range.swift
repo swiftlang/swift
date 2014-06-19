@@ -28,7 +28,13 @@ for i in 1.4...3.4 { println(i) }
 // CHECK-NEXT: 3.4
 
 
-
+// <rdar://problem/17054014> map method should exist on ranges
+for i in ((1...3).map {$0*2}) {
+  println(i)
+}
+// CHECK-NEXT: 2
+// CHECK-NEXT: 4
+// CHECK-NEXT: 6
 
 // CHECK-NEXT: done.
 println("done.")
