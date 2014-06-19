@@ -16,7 +16,7 @@ println("testing...")
 
 // Test mapping a collection
 // CHECK-NEXT: [6, 9, 12, 15, 18, 21]
-let a = Array(map(2..8) { $0 * 3 })
+let a = Array(map(2..<8) { $0 * 3 })
 println(a)
 
 // Test mapping a sequence

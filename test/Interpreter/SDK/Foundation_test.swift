@@ -115,7 +115,7 @@ assert(nsMutableDict["World"].isEqual(2))
 //===----------------------------------------------------------------------===//
 // Ranges
 //===----------------------------------------------------------------------===//
-var nsRange = NSRange(1..5)
+var nsRange = NSRange(1..<5)
 println(NSStringFromRange(nsRange))
 // CHECK: {1, 4}
 

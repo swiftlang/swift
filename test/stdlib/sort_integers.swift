@@ -11,7 +11,7 @@ func _permuteInternal(
     return
   }
 
-  for i in 0..size {
+  for i in 0..<size {
     if (visited[i]) {
       continue
     }
@@ -35,7 +35,7 @@ func randomize(size : Int, verify : (Int[]) -> ()) {
   var arr : Int[] = []
   var N = 1
   var M = 1
-  for i in 0..size {
+  for i in 0..<size {
     N = N * 19 % 1024
     M = (N + M) % size
     arr.append(N)
@@ -61,7 +61,7 @@ permute(3, printer)
 // Now, let's verify the sort.
 let sort_verifier : (Int[]) -> () = {
     var y = sorted($0)
-    for i in 0..y.count - 1 {
+    for i in 0..<y.count - 1 {
     if (y[i] > y[i+1]) {
         println("Error: \(y)")
         return
@@ -80,10 +80,10 @@ println("Test1 - Done")
 let partition_verifier : (Int[]) -> () = {
     var y = $0
     // Partition() returns the index to the pivot value.
-    let idx = partition(&y, 0..y.count)
+    let idx = partition(&y, 0..<y.count)
     // Check that all of the elements in the first partition are smaller or
     // equal to the pivot value.
-    for i in 0..idx {
+    for i in 0..<idx {
       if y[i] > y[idx]  {
         print("Error!\n")
         return
@@ -91,7 +91,7 @@ let partition_verifier : (Int[]) -> () = {
     }
     // Check that all of the elements in the second partition are greater or
     // equal to the pivot value.
-    for i in idx..y.count - 1 {
+    for i in idx..<y.count - 1 {
       if y[i] < y[idx]  {
         print("Error!\n")
         return

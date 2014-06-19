@@ -133,7 +133,7 @@ class Thunks : NSObject {
 
   @objc func produceBridgedObjCArray(numItems: Int) -> BridgedObjC[] {
     var array: BridgedObjC[] = []
-    for i in 0..numItems {
+    for i in 0..<numItems {
       array.append(BridgedObjC(i))
     }
     println("produceBridgedObjCArray(\(array))")
@@ -146,7 +146,7 @@ class Thunks : NSObject {
 
   @objc func produceBridgedSwiftArray(numItems: Int) -> BridgedSwift[] {
     var array: BridgedSwift[] = []
-    for i in 0..numItems {
+    for i in 0..<numItems {
       array.append(BridgedSwift(i))
     }
     println("produceBridgedSwiftArray(\(array))")

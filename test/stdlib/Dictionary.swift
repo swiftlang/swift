@@ -1181,8 +1181,8 @@ func testDeleteChainCollisionRandomized() {
 
   func check(d: Dictionary<TestKeyTy, TestValueTy>) {
     var keys = Array(d.keys)
-    for i in 0..keys.count {
-      for j in 0..i {
+    for i in 0..<keys.count {
+      for j in 0..<i {
         assert(keys[i] != keys[j])
       }
     }
@@ -1215,7 +1215,7 @@ func testDeleteChainCollisionRandomized() {
   }
 
   var d = Dictionary<TestKeyTy, TestValueTy>(minimumCapacity: 30)
-  for i in 1..300 {
+  for i in 1..<300 {
     let key = getKey(uniformRandom(collisionChains * chainLength))
     if uniformRandom(chainLength * 2) == 0 {
       d[key] = nil
@@ -1536,14 +1536,14 @@ func slurpFastEnumeration(
     if returnedCount == 0 {
       break
     }
-    for i in 0..returnedCount {
+    for i in 0..<returnedCount {
       let key: AnyObject = state.itemsPtr[i]!
       let value: AnyObject = d.objectForKey(key)
       pairs += ((key as TestObjCKeyTy).value, (value as TestObjCValueTy).value)
     }
   }
 
-  for i in 0..3 {
+  for i in 0..<3 {
     let returnedCount = fe.countByEnumeratingWithState(
         &state, objects: stackBuf.elementStorage,
         count: stackBufLength)
@@ -2778,13 +2778,13 @@ test_BridgedFromObjC_Verbatim_EqualityTest_Small()
 
 func test_BridgedFromObjC_Verbatim_ArrayOfDictionaries() {
   var nsa = NSMutableArray()
-  for i in 0..3 {
+  for i in 0..<3 {
     nsa.addObject(
         getAsNSDictionary([ 10: 1010 + i, 20: 1020 + i, 30: 1030 + i ]))
   }
 
   var a = nsa as AnyObject[] as Dictionary<NSObject, AnyObject>[]
-  for i in 0..3 {
+  for i in 0..<3 {
     var d = a[i]
     var gen = d.generate()
     var pairs = Array<(Int, Int)>()
@@ -2802,13 +2802,13 @@ test_BridgedFromObjC_Verbatim_ArrayOfDictionaries()
 
 func test_BridgedFromObjC_Nonverbatim_ArrayOfDictionaries() {
   var nsa = NSMutableArray()
-  for i in 0..3 {
+  for i in 0..<3 {
     nsa.addObject(
         getAsNSDictionary([ 10: 1010 + i, 20: 1020 + i, 30: 1030 + i ]))
   }
 
   var a = nsa as AnyObject[] as Dictionary<TestBridgedKeyTy, TestBridgedValueTy>[]
-  for i in 0..3 {
+  for i in 0..<3 {
     var d = a[i]
     var gen = d.generate()
     var pairs = Array<(Int, Int)>()

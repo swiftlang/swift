@@ -121,10 +121,10 @@ where T.GeneratorType.Element == T._Buffer.Element,
   let bufferId0 = bufferID(x)
 
   // Append a range of integers
-  x += 0..2
+  x += 0..<2
   let bufferId1 = checkReallocation(x, bufferId0, false)
   
-  for i in x.count..(x.capacity + 1) {
+  for i in x.count..<(x.capacity + 1) {
     let bufferId1a = checkReallocation(x, bufferId1, false)
     x += 13
   }
@@ -243,15 +243,15 @@ func testSlice() {
   // CHECK: == Slice ==
   
   // do some tests on the shared semantics
-  var b = ContiguousArray(X(0)..X(7))
+  var b = ContiguousArray(X(0)..<X(7))
 
   // Slice it
-  var bSlice = b[3..5]
+  var bSlice = b[3..<5]
   println("<\(bSlice.count)>")
   // CHECK-NEXT: <2>
   println("bSlice0: \(bSlice)")           // CHECK-NEXT: bSlice0: [3, 4]
 
-  // bSlice += X(11)..X(13)
+  // bSlice += X(11)..<X(13)
 
   // Writing into b does not change bSlice
   b[4] = 41        
@@ -265,7 +265,7 @@ func testSlice() {
   printSequence(b)                // CHECK-NEXT: [0, 1, 2, 3, 41, 5, 6]
 
   var c = b
-  b[4..b.count].qsort(<)
+  b[4..<b.count].qsort(<)
   printSequence(b)                // CHECK-NEXT: [0, 1, 2, 3, 5, 6, 41]
   printSequence(c)                // CHECK-NEXT: [0, 1, 2, 3, 41, 5, 6]
 
@@ -275,7 +275,7 @@ func testSlice() {
   
   printSequence(a)                // CHECK-NEXT: [foo, bar, baz]
   
-  var aSlice = a[1..3]           // CHECK-NEXT: [bar, baz]
+  var aSlice = a[1..<3]           // CHECK-NEXT: [bar, baz]
   printSequence(aSlice)  
 
   // Writing into aSlice works
@@ -320,11 +320,11 @@ func testReplace/*<
   }
   
   for i in indices(source) {
-    for j in i..source.count {
+    for j in i..<source.count {
 
       let oldCount = j - i
-      for newCount in 0..(2 * oldCount) {
-        let newValues = X(100)..X(100 + newCount)
+      for newCount in 0..<(2 * oldCount) {
+        let newValues = X(100)..<X(100 + newCount)
 
         func reportFailure(inout a: A, message: String) {
           print("\(message) when replacing indices \(i)...\(j) in ")
@@ -338,7 +338,7 @@ func testReplace/*<
 
         var a = make()
      
-        a.replaceRange(i..j, with: newValues)
+        a.replaceRange(i..<j, with: newValues)
         let growth = newCount - oldCount
         
         let expectedCount = source.count + growth
@@ -347,7 +347,7 @@ func testReplace/*<
             &a, "\(a.count) != expected count \(expectedCount)")
         }
         
-        for k in 0..a.count {
+        for k in 0..<a.count {
           let expectedValue = k < i ? source[k].value
           : k < j + growth ? 100 + k - i
           : source[k - growth].value
@@ -367,7 +367,7 @@ func testReplace${A}(
     var x = ${A}<X>()
     // make sure some - but not all - replacements will have to grow the buffer
     x.reserveCapacity(testWidth * 3 / 2)
-    x += X(0)..X(testWidth)
+    x += X(0)..<X(testWidth)
     return x
   }
 ) {
@@ -394,9 +394,9 @@ testReplace${A}()
 for (maxValue, label) in [(testWidth, "trailing"), (testWidth*2, "interior")] {
   println("testing subrange replacement in \(label) Sub-Slice")
   testReplaceSlice {
-    var a = ContiguousArray(X(-testWidth)..X(maxValue))
+    var a = ContiguousArray(X(-testWidth)..<X(maxValue))
     a.reserveCapacity(a.count * 3 / 2)
-    return a[testWidth..(2 * testWidth)]
+    return a[testWidth..<(2 * testWidth)]
   }
 }
 
@@ -414,7 +414,7 @@ func testSingleElementModifiers${A}() {
   println("testing ${A} single-argument modifiers")
   // CHECK-NEXT: testing ${A} single-argument modifiers
   
-  var a = ${A}(X(0)..10)
+  var a = ${A}(X(0)..<10)
   println(a.removeLast().value)     // CHECK-NEXT: 9
   printSequence(a)               // CHECK-NEXT: [0, 1, 2, 3, 4, 5, 6, 7, 8]
   

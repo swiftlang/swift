@@ -216,13 +216,13 @@ NSStringAPIs.test("compare(_:options:range:locale:)") {
 
   if true {
     let s = "abcd"
-    let r = s.startIndex.succ()..s.endIndex
+    let r = s.startIndex.succ()..<s.endIndex
     expectEqual(NSComparisonResult.OrderedSame,
         s.compare("bcd", range: r))
   }
   if true {
     let s = "абвг"
-    let r = s.startIndex.succ()..s.endIndex
+    let r = s.startIndex.succ()..<s.endIndex
     expectEqual(NSComparisonResult.OrderedSame,
         s.compare("бвг", range: r))
   }
@@ -359,7 +359,7 @@ NSStringAPIs.test("enumerateLinguisticTagsInRange(_:scheme:options:orthography:_
   var tags: String[] = []
   var tokens: String[] = []
   var sentences: String[] = []
-  s.enumerateLinguisticTagsInRange(startIndex..endIndex,
+  s.enumerateLinguisticTagsInRange(startIndex..<endIndex,
       scheme: NSLinguisticTagSchemeTokenType,
       options: NSLinguisticTaggerOptions(0),
       orthography: nil) {
@@ -377,7 +377,7 @@ NSStringAPIs.test("enumerateLinguisticTagsInRange(_:scheme:options:orthography:_
         NSLinguisticTagWord ],
       tags)
   expectEqual([ "Глокая", " ", "куздра" ], tokens)
-  let sentence = s[startIndex..endIndex]
+  let sentence = s[startIndex..<endIndex]
   expectEqual([ sentence, sentence, sentence ], sentences)
 }
 
@@ -388,7 +388,7 @@ NSStringAPIs.test("enumerateSubstringsInRange(_:options:_:)") {
   // grapheme clusters properly.
   let endIndex = advance(s.startIndex, 7)
   var substrings: String[] = []
-  s.enumerateSubstringsInRange(startIndex..endIndex,
+  s.enumerateSubstringsInRange(startIndex..<endIndex,
       options: NSStringEnumerationOptions.ByComposedCharacterSequences) {
     (substring: String, substringRange: Range<String.Index>,
      enclosingRange: Range<String.Index>, inout stop: Bool)
@@ -433,11 +433,11 @@ NSStringAPIs.test("getBytes(_:maxLength:usedLength:encoding:options:range:remain
     }
     var buffer = UInt8[](count: bufferLength, repeatedValue: 0xff)
     var usedLength = 0
-    var remainingRange = startIndex..endIndex
+    var remainingRange = startIndex..<endIndex
     var result = s.getBytes(&buffer, maxLength: 11, usedLength: &usedLength,
         encoding: NSUTF8StringEncoding,
         options: NSStringEncodingConversionOptions(0),
-        range: startIndex..endIndex, remainingRange: &remainingRange)
+        range: startIndex..<endIndex, remainingRange: &remainingRange)
     expectTrue(result)
     expectTrue(equal(expectedStr, buffer))
     expectEqual(11, usedLength)
@@ -454,11 +454,11 @@ NSStringAPIs.test("getBytes(_:maxLength:usedLength:encoding:options:range:remain
     }
     var buffer = UInt8[](count: bufferLength, repeatedValue: 0xff)
     var usedLength = 0
-    var remainingRange = startIndex..endIndex
+    var remainingRange = startIndex..<endIndex
     var result = s.getBytes(&buffer, maxLength: 11, usedLength: &usedLength,
         encoding: NSUTF8StringEncoding,
         options: NSStringEncodingConversionOptions(0),
-        range: startIndex..endIndex, remainingRange: &remainingRange)
+        range: startIndex..<endIndex, remainingRange: &remainingRange)
     expectTrue(result)
     expectTrue(equal(expectedStr, buffer))
     expectEqual(4, usedLength)
@@ -474,11 +474,11 @@ NSStringAPIs.test("getBytes(_:maxLength:usedLength:encoding:options:range:remain
     }
     var buffer = UInt8[](count: bufferLength, repeatedValue: 0xff)
     var usedLength = 0
-    var remainingRange = startIndex..endIndex
+    var remainingRange = startIndex..<endIndex
     var result = s.getBytes(&buffer, maxLength: bufferLength,
         usedLength: &usedLength, encoding: NSUTF8StringEncoding,
         options: NSStringEncodingConversionOptions(0),
-        range: startIndex..endIndex, remainingRange: &remainingRange)
+        range: startIndex..<endIndex, remainingRange: &remainingRange)
     expectTrue(result)
     expectTrue(equal(expectedStr, buffer))
     expectEqual(19, usedLength)
@@ -494,11 +494,11 @@ NSStringAPIs.test("getBytes(_:maxLength:usedLength:encoding:options:range:remain
     }
     var buffer = UInt8[](count: bufferLength, repeatedValue: 0xff)
     var usedLength = 0
-    var remainingRange = startIndex..endIndex
+    var remainingRange = startIndex..<endIndex
     var result = s.getBytes(&buffer, maxLength: bufferLength,
         usedLength: &usedLength, encoding: NSASCIIStringEncoding,
         options: NSStringEncodingConversionOptions(0),
-        range: startIndex..endIndex, remainingRange: &remainingRange)
+        range: startIndex..<endIndex, remainingRange: &remainingRange)
     expectTrue(result)
     expectTrue(equal(expectedStr, buffer))
     expectEqual(4, usedLength)
@@ -562,7 +562,7 @@ NSStringAPIs.test("getFileSystemRepresentation(_:maxLength:)") {
 
 NSStringAPIs.test("getLineStart(_:end:contentsEnd:forRange:)") {
   let s = "Глокая куздра\nштеко будланула\nбокра и кудрячит\nбокрёнка."
-  let r = advance(s.startIndex, 16)..advance(s.startIndex, 35)
+  let r = advance(s.startIndex, 16)..<advance(s.startIndex, 35)
   if true {
     var outStartIndex = s.startIndex
     var outLineEndIndex = s.startIndex
@@ -570,15 +570,15 @@ NSStringAPIs.test("getLineStart(_:end:contentsEnd:forRange:)") {
     s.getLineStart(&outStartIndex, end: &outLineEndIndex,
         contentsEnd: &outContentsEndIndex, forRange: r)
     expectEqual("штеко будланула\nбокра и кудрячит\n",
-        s[outStartIndex..outLineEndIndex])
+        s[outStartIndex..<outLineEndIndex])
     expectEqual("штеко будланула\nбокра и кудрячит",
-        s[outStartIndex..outContentsEndIndex])
+        s[outStartIndex..<outContentsEndIndex])
   }
 }
 
 NSStringAPIs.test("getParagraphStart(_:end:contentsEnd:forRange:)") {
   let s = "Глокая куздра\nштеко будланула\u2028бокра и кудрячит\u2028бокрёнка.\n Абв."
-  let r = advance(s.startIndex, 16)..advance(s.startIndex, 35)
+  let r = advance(s.startIndex, 16)..<advance(s.startIndex, 35)
   if true {
     var outStartIndex = s.startIndex
     var outEndIndex = s.startIndex
@@ -586,9 +586,9 @@ NSStringAPIs.test("getParagraphStart(_:end:contentsEnd:forRange:)") {
     s.getParagraphStart(&outStartIndex, end: &outEndIndex,
         contentsEnd: &outContentsEndIndex, forRange: r)
     expectEqual("штеко будланула\u2028бокра и кудрячит\u2028бокрёнка.\n",
-        s[outStartIndex..outEndIndex])
+        s[outStartIndex..<outEndIndex])
     expectEqual("штеко будланула\u2028бокра и кудрячит\u2028бокрёнка.",
-        s[outStartIndex..outContentsEndIndex])
+        s[outStartIndex..<outContentsEndIndex])
   }
 }
 
@@ -695,7 +695,7 @@ NSStringAPIs.test("lengthOfBytesUsingEncoding(_:)") {
 
 NSStringAPIs.test("lineRangeForRange(_:)") {
   let s = "Глокая куздра\nштеко будланула\nбокра и кудрячит\nбокрёнка."
-  let r = advance(s.startIndex, 16)..advance(s.startIndex, 35)
+  let r = advance(s.startIndex, 16)..<advance(s.startIndex, 35)
   if true {
     let result = s.lineRangeForRange(r)
     expectEqual("штеко будланула\nбокра и кудрячит\n", s[result])
@@ -707,7 +707,7 @@ NSStringAPIs.test("linguisticTagsInRange(_:scheme:options:orthography:tokenRange
   let startIndex = advance(s.startIndex, 5)
   let endIndex = advance(s.startIndex, 17)
   var tokenRanges: Range<String.Index>[] = []
-  var tags = s.linguisticTagsInRange(startIndex..endIndex,
+  var tags = s.linguisticTagsInRange(startIndex..<endIndex,
       scheme: NSLinguisticTagSchemeTokenType,
       options: NSLinguisticTaggerOptions(0),
       orthography: nil, tokenRanges: &tokenRanges)
@@ -775,7 +775,7 @@ NSStringAPIs.test("maximumLengthOfBytesUsingEncoding(_:)") {
 
 NSStringAPIs.test("paragraphRangeForRange(_:)") {
   let s = "Глокая куздра\nштеко будланула\u2028бокра и кудрячит\u2028бокрёнка.\n Абв."
-  let r = advance(s.startIndex, 16)..advance(s.startIndex, 35)
+  let r = advance(s.startIndex, 16)..<advance(s.startIndex, 35)
   if true {
     let result = s.paragraphRangeForRange(r)
     expectEqual("штеко будланула\u2028бокра и кудрячит\u2028бокрёнка.\n", s[result])
@@ -847,7 +847,7 @@ NSStringAPIs.test("rangeOfCharacterFromSet(_:options:range:)") {
     if true {
       let s = "абвклмнабв"
       let r = s.rangeOfCharacterFromSet(charset,
-          range: advance(s.startIndex, 3)..s.endIndex)!
+          range: advance(s.startIndex, 3)..<s.endIndex)!
       dump(r.startIndex._utf16Index)
       expectEqual(advance(s.startIndex, 7), r.startIndex)
       expectEqual(advance(s.startIndex, 8), r.endIndex)
@@ -892,9 +892,9 @@ NSStringAPIs.test("rangeOfComposedCharacterSequencesForRange(_:)") {
   let s = "\U0001F601abc さ\u3099し\u3099す\u3099せ\u3099そ\u3099"
 
   expectEqual("\U0001F601a", s[s.rangeOfComposedCharacterSequencesForRange(
-      s.startIndex..advance(s.startIndex, 2))])
+      s.startIndex..<advance(s.startIndex, 2))])
   expectEqual("し\u3099す\u3099", s[s.rangeOfComposedCharacterSequencesForRange(
-      advance(s.startIndex, 8)..advance(s.startIndex, 10))])
+      advance(s.startIndex, 8)..<advance(s.startIndex, 10))])
 }
 
 NSStringAPIs.test("rangeOfString(_:options:range:locale:)") {

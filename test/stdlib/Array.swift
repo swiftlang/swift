@@ -45,7 +45,7 @@ var fullButStarvingArray = Array<String>()
 for x in fullButStarvingArray { print("\(x) ") }
 
 func testArrayFromStream() {
-  var x = Array(3..7)
+  var x = Array(3..<7)
   // CHECK-NEXT: <3> <4> <5> <6> .
   for y in x { print("<\(y)> ") }
   println(".")
@@ -61,14 +61,14 @@ func testMap() {
 testMap()
 
 func testFilter() {
-  let a = Array(3..16)
+  let a = Array(3..<16)
   println(a.filter { $0 % 4 == 0 })
   // CHECK-NEXT: [4, 8, 12]
 }
 testFilter()
 
 func testReverse() {
-  let a = Array(7..12)
+  let a = Array(7..<12)
   println(a.reverse())
   // CHECK-NEXT: [11, 10, 9, 8, 7]
 }

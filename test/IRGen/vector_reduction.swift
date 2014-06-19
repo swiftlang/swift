@@ -9,8 +9,8 @@ func f() -> Int {
   var b : Int = 15
   var c : Int = 0
 
-  for _ in 0..100000 {
-    for _ in 0..1000000 {
+  for _ in 0..<100000 {
+    for _ in 0..<1000000 {
       c = a ^ b ^ c
     }
   }

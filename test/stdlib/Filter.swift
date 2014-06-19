@@ -32,7 +32,7 @@ func printlnByIndexing<C: Collection>(c: C) {
 
 // Test filtering Collections
 if true {
-  let f0 = filter(0..30) { $0 % 7 == 0 }
+  let f0 = filter(0..<30) { $0 % 7 == 0 }
   
   // CHECK-NEXT: <0, 7, 14, 21, 28>
   printlnByGenerating(f0)
@@ -41,7 +41,7 @@ if true {
 
   // Also try when the first element of the underlying sequence
   // doesn't pass the filter
-  let f1 = filter(1..30) { $0 % 7 == 0 }
+  let f1 = filter(1..<30) { $0 % 7 == 0 }
   
   // CHECK-NEXT: <7, 14, 21, 28>
   printlnByGenerating(f1)
@@ -52,14 +52,14 @@ if true {
 
 // Test filtering Sequences
 if true {
-  let f0 = filter((0..30).generate()) { $0 % 7 == 0 }
+  let f0 = filter((0..<30).generate()) { $0 % 7 == 0 }
   
   // CHECK-NEXT: <0, 7, 14, 21, 28>
   printlnByGenerating(f0)
 
   // Also try when the first element of the underlying sequence
   // doesn't pass the filter
-  let f1 = filter((1..30).generate()) { $0 % 7 == 0 }
+  let f1 = filter((1..<30).generate()) { $0 % 7 == 0 }
   
   // CHECK-NEXT: <7, 14, 21, 28>
   printlnByGenerating(f1)
