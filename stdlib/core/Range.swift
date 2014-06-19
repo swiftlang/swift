@@ -210,7 +210,7 @@ struct ReverseRange<T: BidirectionalIndex> : Sequence {
 
 
 extension Range {
-  /// Return a ${Self} containing the results of calling
+  /// Return an array containing the results of calling
   /// `transform(x)` on each element `x` of `self`.
   func map<U>(transform: (T)->U) -> U[] {
     return U[](Swift.map(self, transform))
