@@ -880,6 +880,30 @@ bb0:
   return %12 : $(Builtin.Int1, Builtin.Int32, Builtin.Int64)
 }
 
+// CHECK-LABEL: @_TF6expect3fooFSiSi
+// CHECK: bb0
+// CHECK-NEXT: cond_br %0, bb2, bb1
+sil @_TF6expect3fooFSiSi : $@thin (Builtin.Int1) -> Int {
+bb0(%0 : $Builtin.Int1):
+  %5 = integer_literal $Builtin.Int1, -1
+  %8 = builtin_function_ref "xor_Int1" : $@thin (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
+  %9 = apply %8(%0, %5) : $@thin (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
+  cond_br %9, bb1, bb2                            // id: %10
+
+bb1:                                              // Preds: bb0
+  %1 = integer_literal $Builtin.Word, 0
+  %2 = struct $Int (%1 : $Builtin.Word)          // user: %12
+  br bb3(%2 : $Int)                              // id: %12
+
+bb2:                                              // Preds: bb0
+  %3 = integer_literal $Builtin.Word, 1
+  %4 = struct $Int (%3 : $Builtin.Word)          // user: %12
+  br bb3(%4 : $Int)                              // id: %15
+
+bb3(%16 : $Int):                                  // Preds: bb1 bb2
+  return %16 : $Int                               // id: %17
+}
+
 // CHECK-LABEL: sil @enum_promotion_of_concrete_types
 // CHECK: bb0([[INT_PTR:%[0-9]+]]
 // CHECK-NEXT: [[ALLOCA1:%[0-9]+]] = alloc_stack $FakeOptional<Builtin.Int1>

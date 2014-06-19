@@ -278,6 +278,7 @@ public:
   SILInstruction *
   visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *TEDAI);
   SILInstruction *visitStrongReleaseInst(StrongReleaseInst *SRI);
+  SILInstruction *visitCondBranchInst(CondBranchInst *CBI);
 
   /// Instruction visitor helpers.
   SILInstruction *optimizeBuiltinCanBeObjCClass(ApplyInst *AI);
@@ -1420,6 +1421,24 @@ SILInstruction *SILCombiner::visitStrongReleaseInst(StrongReleaseInst *SRI) {
   if (isa<ThinToThickFunctionInst>(SRI->getOperand()))
     return eraseInstFromFunction(*SRI);
 
+  return nullptr;
+}
+
+SILInstruction *SILCombiner::visitCondBranchInst(CondBranchInst *CBI) {
+  // cond_br(xor(x, 1)), t_label, f_label -> cond_br x, f_label, t_label
+  SILValue X;
+  if (match(CBI->getCondition(), m_ApplyInst(BuiltinValueKind::Xor,
+                                             m_SILValue(X), m_One()))) {
+    SmallVector<SILValue, 4> OrigTrueArgs, OrigFalseArgs;
+    for (const auto &Op : CBI->getTrueArgs())
+      OrigTrueArgs.push_back(Op);
+    for (const auto &Op : CBI->getFalseArgs())
+      OrigFalseArgs.push_back(Op);
+    return CondBranchInst::create(CBI->getLoc(), X,
+                                  CBI->getFalseBB(), OrigFalseArgs,
+                                  CBI->getTrueBB(), OrigTrueArgs,
+                                  *CBI->getFunction());
+  }
   return nullptr;
 }
 
