@@ -49,6 +49,9 @@ struct ${Self}<T> : MutableCollection, Sliceable {
         _buffer[index] = newValue
       }
       else {
+        // Slow path is written in a closure to put it out of line and prevent
+        // performance inliner from inlining it back.
+        // FIXME: extract into a '@noretun' function.
         {
           (inout buffer: _Buffer, e: Element)->() in
           var newBuffer = ContiguousArrayBuffer<T>(
