@@ -303,9 +303,9 @@ static SILValue simplifyBuiltin(ApplyInst *AI,
       SILValue Result;
       // trunc(ext(x)) -> x
       if (match(Op, m_ApplyInst(BuiltinValueKind::ZExtOrBitCast,
-                                m_ValueBase(), m_SILValue(Result))) ||
+                                m_SILValue(Result))) ||
           match(Op, m_ApplyInst(BuiltinValueKind::SExtOrBitCast,
-                                m_ValueBase(), m_SILValue(Result)))) {
+                                m_SILValue(Result)))) {
         // Truncated back to the same bits we started with.
         if (Result->getType(0) == AI->getType())
           return Result;

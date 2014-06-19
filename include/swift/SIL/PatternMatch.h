@@ -446,7 +446,7 @@ struct Argument_match<silvalue_bind> {
     if (!Apply)
       return false;
 
-    return Val.match(Apply->getOperand(OpI));
+    return Val.match(Apply->getArgument(OpI));
   }
 };
 
