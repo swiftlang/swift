@@ -126,7 +126,7 @@ func count<I: RandomAccessIndex>(r: Range<I>) -> I.DistanceType {
 /// Forms a half open range including the minimum value but excluding the
 /// maximum value.
 @transparent
-//@availability(*, unavailable, message="half-open range operator .. has been renamed to ..<")
+@availability(*, unavailable, message="half-open range operator .. has been renamed to ..<")
 func .. <Pos : ForwardIndex> (min: Pos, max: Pos) -> Range<Pos> {
   return Range(start: min, end: max)
 }

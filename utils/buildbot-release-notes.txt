@@ -1,6 +1,10 @@
 Latest
 ------
 
+* The half-open range operator has been renamed from ".." to "..<" to reduce
+  confusion.  The ..< operator is precedented in Groovy (among other languages)
+  and makes it much more clear that it doesn't include the endpoint.
+
 * Class objects such as 'NSObject.self' can now be converted to 'AnyObject' and
   used as object values.
 
