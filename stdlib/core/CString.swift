@@ -92,7 +92,7 @@ func _strlen(arg : CString) -> Int
 @asmname("strcpy")
 func _strcpy(dest: CString, src: CString) -> CString
 @asmname("strcmp")
-func _strcmp(dest: CString, src: CString) -> Int
+func _strcmp(dest: CString, src: CString) -> CInt
 
 @transparent
 func ==(lhs: CString, rhs: CString) -> Bool {
