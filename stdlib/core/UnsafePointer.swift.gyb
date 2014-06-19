@@ -141,7 +141,7 @@ struct ${Self}<T> : BidirectionalIndex, Comparable, Hashable,
     _debugPrecondition(
       source > self || source < self - count,
       "moveAssignFrom non-following overlapping range")
-    for i in 0..count {
+    for i in 0..<count {
       self[i] = (source + i).move()
     }
   }
@@ -154,7 +154,7 @@ struct ${Self}<T> : BidirectionalIndex, Comparable, Hashable,
     _debugPrecondition(
       source >= self || source < self - count,
       "${Self}.moveInitializeFrom non-following overlapping range; use moveInitializeBackwardFrom")
-    for i in 0..count {
+    for i in 0..<count {
       (self + i).initialize((source + i).move())
     }
   }
@@ -166,7 +166,7 @@ struct ${Self}<T> : BidirectionalIndex, Comparable, Hashable,
     _debugPrecondition(
       source >= self || source < self - count,
       "${Self}.initializeFrom non-following overlapping range")
-    for i in 0..count {
+    for i in 0..<count {
       (self + i).initialize(source[i])
     }
   }
