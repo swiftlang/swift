@@ -588,10 +588,15 @@ static bool isRightBound(const char *tokEnd, bool isLeftBound) {
 void Lexer::lexOperatorIdentifier() {
   const char *TokStart = CurPtr-1;
 
-  // We only allow '.' in a series
+  // We only allow '.' in a series.
   if (*TokStart == '.') {
     while (*CurPtr == '.')
       ++CurPtr;
+    
+    // Lex ..< as an identifier.
+    if (*CurPtr == '<' && CurPtr-TokStart == 2)
+      ++CurPtr;
+    
   } else {
     CurPtr = TokStart;
     bool didStart = advanceIfValidStartOfOperator(CurPtr, BufferEnd);
@@ -1523,10 +1528,7 @@ Restart:
     return lexOperatorIdentifier();
       
   case '=': case '-': case '+': case '*': case '<': case '>':
-  case '&': case '|': case '^': case '~':
-    return lexOperatorIdentifier();
-  
-  case '.':
+  case '&': case '|': case '^': case '~': case '.':
     return lexOperatorIdentifier();
 
   case 'A': case 'B': case 'C': case 'D': case 'E': case 'F': case 'G':
