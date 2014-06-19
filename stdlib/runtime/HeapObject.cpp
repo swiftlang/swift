@@ -18,6 +18,7 @@
 #include "swift/Runtime/InstrumentsSupport.h"
 #include "swift/Runtime/Heap.h"
 #include "swift/Runtime/Metadata.h"
+#include "swift/ABI/System.h"
 #include "llvm/Support/MathExtras.h"
 #include "Private.h"
 #include "Debug.h"
@@ -528,9 +529,13 @@ void swift::_swift_abortRetainUnowned(const void *object) {
   swift::crash("attempted to retain deallocated object");
 }
 
-// Return true if object is non-nil and has exactly one strong
-// reference
-extern "C" bool _swift_isUniquelyReferenced(HeapObject *object) {
+// Given the bits of a Native swift object reference, or of a Swift
+// enum containing a Native swift object reference as a payload,
+// return true iff the object's strong reference count is 1.
+extern "C" bool _swift_isUniquelyReferenced(std::uintptr_t bits) {
+  const auto object = reinterpret_cast<HeapObject*>(
+    bits & ~heap_object_abi::SwiftSpareBitsMask);
+    
   // Sometimes we have a NULL "owner" object, e.g. because the data
   // being referenced (usually via UnsafePointer<T>) has infinite
   // lifetime, or lifetime managed outside the Swift object system.

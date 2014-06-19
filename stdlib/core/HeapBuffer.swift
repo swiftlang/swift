@@ -55,9 +55,10 @@ func c_malloc_size(heapMemory: UnsafePointer<Void>) -> Int
 }
 
 @asmname("_swift_isUniquelyReferenced")
-func _swift_isUniquelyReferenced(_: UnsafePointer<HeapObject>) -> Bool
+func _swift_isUniquelyReferenced(_: Word) -> Bool
 
-// Return true if x is the only (strong) reference to the given RawBuffer
+// Given a NativeObject or a Word-sized enum with NativeObject payload, 
+// return true if it is the only (strong) reference to the given RawBuffer
 // 
 // This is an inout function for two reasons:
 // 

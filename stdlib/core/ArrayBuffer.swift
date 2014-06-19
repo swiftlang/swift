@@ -120,18 +120,7 @@ case Indirect(IndirectArrayBuffer)
   }
 
   mutating func isUniquelyReferenced() -> Bool {
-    // Extract the buffer without increasing its refcount
-    var x = self.bufferAsWord()
-    return Swift.isUniquelyReferenced(&x)
-  }
-
-  func bufferAsWord() -> Word {
-    switch self {
-    case Direct(let x):
-      return reinterpretCast(x) as Word
-    case Indirect(let x):
-      return reinterpretCast(x) as Word
-    }
+    return Swift.isUniquelyReferenced(&self)
   }
 }
 
