@@ -78,6 +78,9 @@ namespace swift {
     /// FIXME: This is the default, and the option will eventually be
     /// removed.
     bool StrictKeywordArguments = true;
+    
+    /// Enable intrinsic pointer conversions.
+    bool EnablePointerConversions = false;
 
     /// Implicit target configuration options.  There are currently two
     ///   supported target configuration values:

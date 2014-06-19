@@ -56,6 +56,10 @@ enum class ConstraintKind : char {
   Subtype,
   /// \brief The first type is convertible to the second type.
   Conversion,
+  /// \brief The first type is the element of an argument tuple that is
+  /// convertible to the second type (which represents the corresponding
+  /// parameter type).
+  ArgumentConversion,
   /// \brief The first type is an argument type (or tuple) that is convertible
   /// to the second type (which represents the parameter type/tuple).
   ArgumentTupleConversion,
@@ -155,7 +159,12 @@ enum class ConversionRestrictionKind {
   ExistentialMetatypeToAnyObject,
   /// Protocol value metatype to Protocol class conversion.
   ProtocolMetatypeToProtocolClass,
-  /// Existential metatype to AnyObject conversion.
+  /// Inout-to-pointer conversion.
+  InoutToPointer,
+  /// Array-to-pointer conversion.
+  ArrayToPointer,
+  /// Pointer-to-pointer conversion.
+  PointerToPointer,
   /// Lvalue-to-rvalue conversion.
   LValueToRValue,
   /// Value to existential value conversion.
@@ -447,6 +456,7 @@ public:
     case ConstraintKind::Equal:
     case ConstraintKind::Subtype:
     case ConstraintKind::Conversion:
+    case ConstraintKind::ArgumentConversion:
     case ConstraintKind::ArgumentTupleConversion:
     case ConstraintKind::OperatorArgumentTupleConversion:
     case ConstraintKind::OperatorArgumentConversion:

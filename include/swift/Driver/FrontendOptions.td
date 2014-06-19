@@ -123,6 +123,9 @@ def enable_dynamic_value_type_layout :
 def enable_experimental_patterns : Flag<["-"], "enable-experimental-patterns">,
   HelpText<"Enable experimental 'switch' pattern matching features">;
 
+def enable_pointer_conversions : Flag<["-"], "enable-pointer-conversions">,
+  HelpText<"Enable intrinsic pointer conversions">;
+
 def enable_character_literals : Flag<["-"], "enable-character-literals">,
 HelpText<"Enable legacy character literals">;
 

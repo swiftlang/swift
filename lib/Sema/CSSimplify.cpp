@@ -635,7 +635,7 @@ matchCallArguments(ConstraintSystem &cs, TypeMatchKind kind,
   TypeMatchKind subKind;
   switch (kind) {
   case TypeMatchKind::ArgumentTupleConversion:
-    subKind = TypeMatchKind::Conversion;
+    subKind = TypeMatchKind::ArgumentConversion;
     break;
 
   case TypeMatchKind::OperatorArgumentTupleConversion:
@@ -644,7 +644,9 @@ matchCallArguments(ConstraintSystem &cs, TypeMatchKind kind,
 
   case TypeMatchKind::OperatorArgumentConversion:
   case TypeMatchKind::Conversion:
+  case TypeMatchKind::ArgumentConversion:
   case TypeMatchKind::BindType:
+  case TypeMatchKind::BindToPointerType:
   case TypeMatchKind::SameType:
   case TypeMatchKind::Subtype:
     llvm_unreachable("Not an call argument constraint");
@@ -820,7 +822,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   TypeMatchKind subKind;
   switch (kind) {
   case TypeMatchKind::ArgumentTupleConversion:
-    subKind = TypeMatchKind::Conversion;
+    subKind = TypeMatchKind::ArgumentConversion;
     break;
 
   case TypeMatchKind::OperatorArgumentTupleConversion:
@@ -828,11 +830,13 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
     break;
 
   case TypeMatchKind::OperatorArgumentConversion:
+  case TypeMatchKind::ArgumentConversion:
   case TypeMatchKind::Conversion:
     subKind = TypeMatchKind::Conversion;
     break;
 
   case TypeMatchKind::BindType:
+  case TypeMatchKind::BindToPointerType:
   case TypeMatchKind::SameType:
   case TypeMatchKind::Subtype:
     llvm_unreachable("Not a conversion");
@@ -1007,12 +1011,14 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   TypeMatchKind subKind;
   switch (kind) {
   case TypeMatchKind::BindType:
+  case TypeMatchKind::BindToPointerType:
   case TypeMatchKind::SameType:
     subKind = kind;
     break;
 
   case TypeMatchKind::Subtype:
   case TypeMatchKind::Conversion:
+  case TypeMatchKind::ArgumentConversion:
   case TypeMatchKind::ArgumentTupleConversion:
   case TypeMatchKind::OperatorArgumentTupleConversion:
   case TypeMatchKind::OperatorArgumentConversion:
@@ -1054,6 +1060,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
 static Failure::FailureKind getRelationalFailureKind(TypeMatchKind kind) {
   switch (kind) {
   case TypeMatchKind::BindType:
+  case TypeMatchKind::BindToPointerType:
   case TypeMatchKind::SameType:
     return Failure::TypesNotEqual;
 
@@ -1061,6 +1068,7 @@ static Failure::FailureKind getRelationalFailureKind(TypeMatchKind kind) {
     return Failure::TypesNotSubtypes;
 
   case TypeMatchKind::Conversion:
+  case TypeMatchKind::ArgumentConversion:
   case TypeMatchKind::OperatorArgumentConversion:
   case TypeMatchKind::ArgumentTupleConversion:
   case TypeMatchKind::OperatorArgumentTupleConversion:
@@ -1185,6 +1193,7 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
 static ConstraintKind getConstraintKind(TypeMatchKind kind) {
   switch (kind) {
   case TypeMatchKind::BindType:
+  case TypeMatchKind::BindToPointerType:
     return ConstraintKind::Bind;
 
   case TypeMatchKind::SameType:
@@ -1195,6 +1204,9 @@ static ConstraintKind getConstraintKind(TypeMatchKind kind) {
 
   case TypeMatchKind::Conversion:
     return ConstraintKind::Conversion;
+      
+  case TypeMatchKind::ArgumentConversion:
+    return ConstraintKind::ArgumentConversion;
 
   case TypeMatchKind::ArgumentTupleConversion:
     return ConstraintKind::ArgumentTupleConversion;
@@ -1312,6 +1324,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
   if (typeVar1 || typeVar2) {
     switch (kind) {
     case TypeMatchKind::BindType:
+    case TypeMatchKind::BindToPointerType:
     case TypeMatchKind::SameType: {
       if (typeVar1 && typeVar2) {
         auto rep1 = getRepresentative(typeVar1);
@@ -1392,6 +1405,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
 
     case TypeMatchKind::Subtype:
     case TypeMatchKind::Conversion:
+    case TypeMatchKind::ArgumentConversion:
     case TypeMatchKind::ArgumentTupleConversion:
     case TypeMatchKind::OperatorArgumentTupleConversion:
     case TypeMatchKind::OperatorArgumentConversion:
@@ -1692,6 +1706,11 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       }
     }
   }
+  
+  if (kind == TypeMatchKind::BindToPointerType) {
+    if (desugar2->isEqual(getASTContext().TheEmptyTupleType))
+      return SolutionKind::Solved;
+  }
 
   if (concrete && kind >= TypeMatchKind::Conversion) {
     // An lvalue of type T1 can be converted to a value of type T2 so long as
@@ -1706,6 +1725,78 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       if (function2->isAutoClosure())
         return matchTypes(type1, function2->getResult(), kind, subFlags,
                           locator.withPathElement(ConstraintLocator::Load));
+    }
+    
+    // Pointer arguments can be converted from pointer-compatible types.
+    if (kind >= TypeMatchKind::ArgumentConversion
+        && getASTContext().LangOpts.EnablePointerConversions) {
+      if (auto bgt2 = type2->getAs<BoundGenericType>()) {
+        if (bgt2->getDecl() == TC.getUnsafePointerDecl(DC)
+            || bgt2->getDecl() == TC.getConstUnsafePointerDecl(DC)) {
+          // UnsafePointer can be converted from an inout reference to a
+          // scalar or array.
+          if (auto inoutType1 = dyn_cast<InOutType>(desugar1)) {
+            auto inoutBaseType = inoutType1->getInOutObjectType();
+            
+            auto isWrappedArray = false;
+            
+            if (auto baseTyVar1 = dyn_cast<TypeVariableType>(inoutBaseType.
+                                                                getPointer())) {
+              TypeVariableType *tv1;
+              auto bt1 = getFixedTypeRecursive(baseTyVar1, tv1,
+                                    kind == TypeMatchKind::SameType,
+                                    isArgumentTupleConversion);
+              
+              isWrappedArray = isArrayType(bt1);
+            }
+            
+            if (isWrappedArray) {
+              conversionsOrFixes.push_back(
+                                           ConversionRestrictionKind::
+                                                                ArrayToPointer);
+            } else {
+              conversionsOrFixes.push_back(
+                                     ConversionRestrictionKind::InoutToPointer);
+            }
+          }
+          
+          auto bgt1 = type1->getAs<BoundGenericType>();
+
+          // We can potentially convert from an UnsafePointer of a different
+          // type, if we're a void pointer.
+          if (bgt1 && bgt1->getDecl() == TC.getUnsafePointerDecl(DC)) {
+            conversionsOrFixes.push_back(
+                                   ConversionRestrictionKind::PointerToPointer);
+          }
+          
+          // ConstUnsafePointer can also be converted from an array value, or
+          // a ConstUnsafePointer or AutoreleasingUnsafePointer.
+          if (bgt2->getDecl() == TC.getConstUnsafePointerDecl(DC)) {
+            if (isArrayType(type1)) {
+              conversionsOrFixes.push_back(
+                                     ConversionRestrictionKind::ArrayToPointer);
+            }
+            if (bgt1 && bgt1->getDecl() == TC.getConstUnsafePointerDecl(DC)) {
+              conversionsOrFixes.push_back(
+                                   ConversionRestrictionKind::PointerToPointer);
+            }
+            if (bgt1
+                && bgt1->getDecl() == TC.getAutoreleasingUnsafePointerDecl(DC)){
+              conversionsOrFixes.push_back(
+                                   ConversionRestrictionKind::PointerToPointer);
+            }
+          }
+          
+          // TODO: Strings
+        } else if (bgt2->getDecl() == TC.getAutoreleasingUnsafePointerDecl(DC)){
+          // AutoUnsafePointer can be converted from an inout reference to a
+          // scalar.
+          if (type1->is<InOutType>()) {
+            conversionsOrFixes.push_back(
+                                     ConversionRestrictionKind::InoutToPointer);
+          }
+        }
+      }
     }
   }
 
@@ -3010,6 +3101,8 @@ static TypeMatchKind getTypeMatchKind(ConstraintKind kind) {
   case ConstraintKind::Equal: return TypeMatchKind::SameType;
   case ConstraintKind::Subtype: return TypeMatchKind::Subtype;
   case ConstraintKind::Conversion: return TypeMatchKind::Conversion;
+  case ConstraintKind::ArgumentConversion:
+    return TypeMatchKind::ArgumentConversion;
   case ConstraintKind::ArgumentTupleConversion:
     return TypeMatchKind::ArgumentTupleConversion;
   case ConstraintKind::OperatorArgumentTupleConversion:
@@ -3065,6 +3158,15 @@ Type ConstraintSystem::getBaseTypeForArrayType(TypeBase *type) {
   llvm_unreachable("attempted to extract a base type from a non-array type");
 }
 
+static Type getBaseTypeForPointer(ConstraintSystem &cs, TypeBase *type) {
+  auto bgt = type->castTo<BoundGenericType>();
+  assert((bgt->getDecl() == cs.TC.getUnsafePointerDecl(cs.DC)
+          || bgt->getDecl() == cs.TC.getConstUnsafePointerDecl(cs.DC)
+          || bgt->getDecl() == cs.TC.getAutoreleasingUnsafePointerDecl(cs.DC))
+         && "conversion is not to a pointer type");
+  return bgt->getGenericArgs()[0];
+}
+
 /// Given that we have a conversion constraint between two types, and
 /// that the given constraint-reduction rule applies between them at
 /// the top level, apply it and generate any necessary recursive
@@ -3093,6 +3195,7 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
   }
 
   unsigned subFlags = flags | TMF_GenerateConstraints;
+
   switch (restriction) {
   // for $< in { <, <c, <oc }:
   //   T_i $< U_i ===> (T_i...) $< (U_i...)
@@ -3190,6 +3293,59 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
     // Nothing more to solve.
     addContextualScore();
     return SolutionKind::Solved;
+  }
+  
+  // T <p U ===> T[] <a UnsafePointer<U>
+  case ConversionRestrictionKind::ArrayToPointer: {
+    addContextualScore();
+    auto obj1 = type1;
+    // Unwrap an inout type.
+    if (auto inout1 = obj1->getAs<InOutType>()) {
+      obj1 = inout1->getObjectType();
+    }
+    
+    TypeVariableType *tv1;
+    obj1 = getFixedTypeRecursive(obj1, tv1, false, false);
+    
+    auto t1 = obj1->getDesugaredType();
+    auto t2 = type2->getDesugaredType();
+    
+    auto baseType1 = this->getBaseTypeForArrayType(t1);
+    auto baseType2 = getBaseTypeForPointer(*this, t2);
+
+    increaseScore(SK_ArrayPointerConversion);
+    return matchTypes(baseType1, baseType2,
+                      TypeMatchKind::BindToPointerType,
+                      subFlags, locator);
+  }
+      
+  // T <p U ===> inout T <a UnsafePointer<U>
+  case ConversionRestrictionKind::InoutToPointer: {
+    addContextualScore();
+
+    auto t2 = type2->getDesugaredType();
+    
+    auto baseType1 = type1->getInOutObjectType();
+    auto baseType2 = getBaseTypeForPointer(*this, t2);
+    
+    // Set up the disjunction for the array or scalar cases.
+
+    return matchTypes(baseType1, baseType2,
+                      TypeMatchKind::BindToPointerType,
+                      subFlags, locator);
+  }
+      
+  // T <p U ===> UnsafePointer<T> <a UnsafePointer<U>
+  case ConversionRestrictionKind::PointerToPointer: {
+    auto t1 = type1->getDesugaredType();
+    auto t2 = type2->getDesugaredType();
+    
+    Type baseType1 = getBaseTypeForPointer(*this, t1);
+    Type baseType2 = getBaseTypeForPointer(*this, t2);
+    
+    return matchTypes(baseType1, baseType2,
+                      TypeMatchKind::BindToPointerType,
+                      subFlags, locator);
   }
     
   // T < U or T is bridged to V where V < U ===> Array<T> <c Array<U>
@@ -3470,6 +3626,7 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   case ConstraintKind::Equal:
   case ConstraintKind::Subtype:
   case ConstraintKind::Conversion:
+  case ConstraintKind::ArgumentConversion:
   case ConstraintKind::ArgumentTupleConversion:
   case ConstraintKind::OperatorArgumentTupleConversion:
   case ConstraintKind::OperatorArgumentConversion: {

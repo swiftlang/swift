@@ -615,6 +615,8 @@ private:
 enum class TypeMatchKind : char {
   /// \brief Bind the types together directly.
   BindType,
+  /// \brief Binds to a pointer element type.
+  BindToPointerType,
   /// \brief Require the types to match exactly, but strips lvalueness from
   /// a type when binding to a type variable.
   SameType,
@@ -624,6 +626,10 @@ enum class TypeMatchKind : char {
   /// \brief Requires the first type to be convertible to the second type,
   /// which includes exact matches and both forms of subtyping.
   Conversion,
+  /// \brief Requires the first type to be the element of an argument tuple
+  /// that is convertible to the second type, which represents the corresponding
+  /// element of the parameter tuple.
+  ArgumentConversion,
   /// Requires the first type to be an argument type (tuple) that can be
   /// converted to the second type, which represents the parameter type (tuple).
   ArgumentTupleConversion,
@@ -668,7 +674,7 @@ struct SelectedOverload {
   Type openedType;
 };
 
-/// Describes an aspect of a solution that affects is overall score, i.e., a
+/// Describes an aspect of a solution that affects its overall score, i.e., a
 /// user-defined conversions.
 enum ScoreKind {
   // These values are used as indices into a Score value.
@@ -687,10 +693,20 @@ enum ScoreKind {
   SK_CollectionBridgedConversion,
   /// An implicit upcast conversion between collection types.
   SK_CollectionUpcastConversion,
+  /// A conversion from an array to a pointer of matching element type.
+  SK_ArrayPointerConversion,
+  /// A conversion from an inout to a pointer of matching element type.
+  SK_ScalarPointerConversion,
+  /// A conversion from an array to a void pointer.
+  SK_ArrayVoidPointerConversion,
+  /// A conversion from an inout to a void pointer.
+  SK_ScalarVoidPointerConversion,
+  
+  SK_LastScoreKind = SK_ScalarVoidPointerConversion,
 };
 
 /// The number of score kinds.
-const unsigned NumScoreKinds = 7;
+const unsigned NumScoreKinds = SK_LastScoreKind + 1;
 
 /// Describes the fixed score of a solution to the constraint system.
 struct Score {

@@ -753,6 +753,91 @@ struct ASTNodeBase {};
       verifyCheckedBase(E);
     }
     
+    void verifyChecked(ClassMetatypeToObjectExpr *E) {
+      PrettyStackTraceExpr debugStack(Ctx, "verifying ClassMetatypeToObject", E);
+      
+      auto srcTy = checkMetatypeType(E->getSubExpr()->getType(),
+                                     "source of ClassMetatypeToObject");
+      
+      if (!srcTy->mayHaveSuperclass()) {
+        Out << "ClassMetatypeToObject with non-class metatype:\n";
+        E->print(Out);
+        Out << "\n";
+        abort();
+      }
+      
+      if (!E->getType()->isEqual(
+             Ctx.getProtocol(KnownProtocolKind::AnyObject)->getDeclaredType())){
+        Out << "ClassMetatypeToObject does not produce AnyObject:\n";
+        E->print(Out);
+        Out << "\n";
+        abort();
+      }
+    }
+    
+    void verifyChecked(ExistentialMetatypeToObjectExpr *E) {
+      PrettyStackTraceExpr debugStack(Ctx,
+                                    "verifying ExistentialMetatypeToObject", E);
+      
+      auto srcTy = checkMetatypeType(E->getSubExpr()->getType(),
+                                     "source of ExistentialMetatypeToObject");
+      
+      if (!E->getSubExpr()->getType()->is<ExistentialMetatypeType>()) {
+        Out << "ExistentialMetatypeToObject with non-existential "
+               "metatype:\n";
+        E->print(Out);
+        Out << "\n";
+        abort();
+      }
+      if (!srcTy->isClassExistentialType()) {
+        Out << "ExistentialMetatypeToObject with non-class existential "
+               "metatype:\n";
+        E->print(Out);
+        Out << "\n";
+        abort();
+      }
+      
+      if (!E->getType()->isEqual(
+             Ctx.getProtocol(KnownProtocolKind::AnyObject)->getDeclaredType())){
+        Out << "ExistentialMetatypeToObject does not produce AnyObject:\n";
+        E->print(Out);
+        Out << "\n";
+        abort();
+      }
+    }
+    
+    void verifyChecked(ProtocolMetatypeToObjectExpr *E) {
+      PrettyStackTraceExpr debugStack(Ctx,
+                                    "verifying ProtocolMetatypeToObject", E);
+      
+      auto srcTy = checkMetatypeType(E->getSubExpr()->getType(),
+                                     "source of ProtocolMetatypeToObject");
+      if (E->getSubExpr()->getType()->is<ExistentialMetatypeType>()) {
+        Out << "ProtocolMetatypeToObject with existential "
+               "metatype:\n";
+        E->print(Out);
+        Out << "\n";
+        abort();
+      }
+
+      SmallVector<ProtocolDecl*, 2> protocols;
+      if (!srcTy->isExistentialType(protocols)
+          || protocols.size() != 1
+          || !protocols[0]->isObjC()) {
+        Out << "ProtocolMetatypeToObject with non-ObjC-protocol metatype:\n";
+        E->print(Out);
+        Out << "\n";
+        abort();
+      }
+
+      if (!E->getType()->getClassOrBoundGenericClass()) {
+        Out << "ProtocolMetatypeToObject does not produce class:\n";
+        E->print(Out);
+        Out << "\n";
+        abort();
+      }
+    }
+    
     void verifyChecked(CollectionUpcastConversionExpr *E) {
       verifyChecked(E->getSubExpr());
       verifyCheckedBase(E);

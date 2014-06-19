@@ -242,6 +242,10 @@ namespace {
 
     RValue visitOpaqueValueExpr(OpaqueValueExpr *E, SGFContext C);
 
+    RValue visitInOutToPointerExpr(InOutToPointerExpr *E, SGFContext C);
+    RValue visitArrayToPointerExpr(ArrayToPointerExpr *E, SGFContext C);
+    RValue visitPointerToPointerExpr(PointerToPointerExpr *E, SGFContext C);
+
     RValue emitUnconditionalCheckedCast(Expr *source,
                                         SILLocation loc,
                                         Type destType,
@@ -5305,6 +5309,16 @@ RValue RValueEmitter::visitOpaqueValueExpr(OpaqueValueExpr *E, SGFContext C) {
   // Retain the value.
   entry.second = true;
   return RValue(SGF, E, SGF.emitManagedRetain(E, entry.first));
+}
+
+RValue RValueEmitter::visitInOutToPointerExpr(InOutToPointerExpr *E, SGFContext C) {
+  llvm_unreachable("not implemented");
+}
+RValue RValueEmitter::visitArrayToPointerExpr(ArrayToPointerExpr *E, SGFContext C) {
+  llvm_unreachable("not implemented");
+}
+RValue RValueEmitter::visitPointerToPointerExpr(PointerToPointerExpr *E, SGFContext C) {
+  llvm_unreachable("not implemented");
 }
 
 RValue SILGenFunction::emitRValue(Expr *E, SGFContext C) {

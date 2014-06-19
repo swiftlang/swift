@@ -1448,6 +1448,21 @@ public:
     printRec(E->getSubExpr());
     OS << ')';
   }
+  void visitInOutToPointerExpr(InOutToPointerExpr *E) {
+    printCommon(E, "inout_to_pointer") << '\n';
+    printRec(E->getSubExpr());
+    OS << ')';
+  }
+  void visitArrayToPointerExpr(ArrayToPointerExpr *E) {
+    printCommon(E, "array_to_pointer") << '\n';
+    printRec(E->getSubExpr());
+    OS << ')';
+  }
+  void visitPointerToPointerExpr(PointerToPointerExpr *E) {
+    printCommon(E, "pointer_to_pointer") << '\n';
+    printRec(E->getSubExpr());
+    OS << ')';
+  }
 
   void visitInOutExpr(InOutExpr *E) {
     printCommon(E, "inout_expr") << '\n';

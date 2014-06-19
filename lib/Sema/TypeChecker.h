@@ -274,7 +274,11 @@ private:
   Type NSStringType;
 
   /// The \c Swift.UnsafePointer<T> declaration.
+  Optional<NominalTypeDecl *> ArrayDecl;
+  /// The \c Swift.UnsafePointer<T> declaration.
   Optional<NominalTypeDecl *> UnsafePointerDecl;
+  /// The \c Swift.ConstUnsafePointer<T> declaration.
+  Optional<NominalTypeDecl *> ConstUnsafePointerDecl;
   /// The \c Swift.CConstPointer<T> declaration.
   Optional<NominalTypeDecl *> CConstPointerDecl;
   /// The \c Swift.CMutablePointer<T> declaration.
@@ -817,6 +821,8 @@ public:
 
   /// \brief Retrieve the \c Swift.UnsafePointer<T> declaration.
   NominalTypeDecl *getUnsafePointerDecl(const DeclContext *DC);
+  /// \brief Retrieve the \c Swift.ConstUnsafePointer<T> declaration.
+  NominalTypeDecl *getConstUnsafePointerDecl(const DeclContext *DC);
   /// \brief Retrieve the \c Swift.CConstPointer<T> declaration.
   NominalTypeDecl *getCConstPointerDecl(const DeclContext *DC);
   /// \brief Retrieve the \c Swift.CMutablePointer<T> declaration.

@@ -588,6 +588,11 @@ NominalTypeDecl *TypeChecker::getUnsafePointerDecl(const DeclContext *DC) {
                              UnsafePointerDecl, "UnsafePointer");
 }
 
+NominalTypeDecl *TypeChecker::getConstUnsafePointerDecl(const DeclContext *DC) {
+  return getKnownPointerDecl(getStdlibModule(DC), Context,
+                             ConstUnsafePointerDecl, "ConstUnsafePointer");
+}
+
 NominalTypeDecl *TypeChecker::getCConstPointerDecl(const DeclContext *DC) {
   return getKnownPointerDecl(getStdlibModule(DC), Context,
                              CConstPointerDecl, "CConstPointer");

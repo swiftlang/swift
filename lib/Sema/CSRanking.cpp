@@ -63,6 +63,19 @@ void ConstraintSystem::increaseScore(ScoreKind kind) {
     case SK_CollectionBridgedConversion:
       log << "collection bridged conversion";
       break;
+        
+    case SK_ArrayPointerConversion:
+      log << "array-to-pointer conversion";
+      break;
+    case SK_ArrayVoidPointerConversion:
+      log << "array-to-void-pointer conversion";
+      break;
+    case SK_ScalarPointerConversion:
+      log << "scalar-to-pointer conversion";
+      break;
+    case SK_ScalarVoidPointerConversion:
+      log << "scalar-to-void-pointer conversion";
+      break;
     }
     log << ")\n";
   }

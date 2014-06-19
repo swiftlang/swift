@@ -1969,6 +1969,39 @@ public:
   }
 };
   
+/// Convert the address of an inout property to a pointer.
+class InOutToPointerExpr : public ImplicitConversionExpr {
+public:
+  InOutToPointerExpr(Expr *subExpr, Type ty)
+    : ImplicitConversionExpr(ExprKind::InOutToPointer, subExpr, ty) {}
+  
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::InOutToPointer;
+  }
+};
+  
+/// Convert the address of an array to a pointer.
+class ArrayToPointerExpr : public ImplicitConversionExpr {
+public:
+  ArrayToPointerExpr(Expr *subExpr, Type ty)
+    : ImplicitConversionExpr(ExprKind::ArrayToPointer, subExpr, ty) {}
+  
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::ArrayToPointer;
+  }
+};
+  
+/// Convert a pointer to a different kind of pointer.
+class PointerToPointerExpr : public ImplicitConversionExpr {
+public:
+  PointerToPointerExpr(Expr *subExpr, Type ty)
+    : ImplicitConversionExpr(ExprKind::PointerToPointer, subExpr, ty) {}
+  
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::PointerToPointer;
+  }
+};
+  
 /// TupleShuffleExpr - This represents a permutation of a tuple value to a new
 /// tuple type.  The expression's type is known to be a tuple type and the
 /// subexpression is known to have a tuple type as well.

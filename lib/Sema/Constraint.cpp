@@ -49,6 +49,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
   case ConstraintKind::Equal:
   case ConstraintKind::Subtype:
   case ConstraintKind::Conversion:
+  case ConstraintKind::ArgumentConversion:
   case ConstraintKind::ArgumentTupleConversion:
   case ConstraintKind::OperatorArgumentTupleConversion:
   case ConstraintKind::OperatorArgumentConversion:
@@ -179,6 +180,7 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
   case ConstraintKind::Equal: Out << " == "; break;
   case ConstraintKind::Subtype: Out << " < "; break;
   case ConstraintKind::Conversion: Out << " <c "; break;
+  case ConstraintKind::ArgumentConversion: Out << " <a "; break;
   case ConstraintKind::ArgumentTupleConversion: Out << " <ac "; break;
   case ConstraintKind::OperatorArgumentTupleConversion: Out << " <oac "; break;
   case ConstraintKind::OperatorArgumentConversion: Out << " <oc "; break;
@@ -304,6 +306,12 @@ StringRef swift::constraints::getName(ConversionRestrictionKind kind) {
     return "[existential-metatype-to-object]";
   case ConversionRestrictionKind::ProtocolMetatypeToProtocolClass:
     return "[protocol-metatype-to-object]";
+  case ConversionRestrictionKind::ArrayToPointer:
+    return "[array-to-pointer]";
+  case ConversionRestrictionKind::InoutToPointer:
+    return "[inout-to-pointer]";
+  case ConversionRestrictionKind::PointerToPointer:
+    return "[pointer-to-pointer]";
   case ConversionRestrictionKind::ForceUnchecked:
     return "[force-unchecked]";
   case ConversionRestrictionKind::ArrayUpcast:
@@ -404,6 +412,7 @@ gatherReferencedTypeVars(Constraint *constraint,
   case ConstraintKind::ApplicableFunction:
   case ConstraintKind::Bind:
   case ConstraintKind::Construction:
+  case ConstraintKind::ArgumentConversion:
   case ConstraintKind::Conversion:
   case ConstraintKind::ArgumentTupleConversion:
   case ConstraintKind::OperatorArgumentTupleConversion:

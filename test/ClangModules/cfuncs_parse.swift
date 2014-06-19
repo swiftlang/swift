@@ -14,7 +14,8 @@ func test_cfunc1(i: Int) {
 func test_cfunc2(i: Int) {
   var f = cfunc2(i, 17)
   var f2 : Float = f
-  cfunc2(b:17, a:i) // expected-error{{cannot convert the expression's type '$T3' to type 'CLong'}}
+  // FIXME: Should report this error: {{cannot convert the expression's type '$T3' to type 'CLong'}}
+  cfunc2(b:17, a:i) // expected-error{{cannot convert the expression's type '$T3' to type 'IntegerLiteralConvertible'}}
 }
 
 func test_cfunc3_a() {

@@ -4113,8 +4113,21 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                                                              isBridged);
     }
 
-    case ConversionRestrictionKind::User:
+    case ConversionRestrictionKind::User: {
       return coerceViaUserConversion(expr, toType, locator);
+    }
+    
+    case ConversionRestrictionKind::InoutToPointer: {
+      return new (tc.Context) InOutToPointerExpr(expr, toType);
+    }
+    
+    case ConversionRestrictionKind::ArrayToPointer: {
+      return new (tc.Context) ArrayToPointerExpr(expr, toType);
+    }
+    
+    case ConversionRestrictionKind::PointerToPointer: {
+      return new (tc.Context) PointerToPointerExpr(expr, toType);
+    }
     }
   }
 
