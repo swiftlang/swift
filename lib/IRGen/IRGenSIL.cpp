@@ -1249,18 +1249,9 @@ void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
         break;
       getLoweredArgValue(Vals, *Next, Name);
     }
-    auto Direct = DirectValue;
-
-    // ByRef capture.
-    // FIXME: Consider wrapping this in a reference_type, otherwise we
-    // loose flags such as artificial.
-    if (Arg->getType().hasReferenceSemantics() &&
-       DTI.getType()->getKind() != TypeKind::InOut)
-    Direct = IndirectValue;
-
     IGM.DebugInfo->emitArgVariableDeclaration
       (Builder, Vals, DTI, getDebugScope(), Name, N,
-       Direct, RealValue);
+       DirectValue, RealValue);
 
     DidEmitDebugInfoForArg.set(N);
   }
