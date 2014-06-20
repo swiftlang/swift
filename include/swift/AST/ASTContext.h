@@ -376,6 +376,15 @@ public:
   /// Retrieve the declaration of Swift.ImplicitlyUnwrappedOptional<T>.None.
   EnumElementDecl *getImplicitlyUnwrappedOptionalNoneDecl() const;
   
+  /// Retrieve the declaration of Swift.UnsafePointer<T>.
+  NominalTypeDecl *getUnsafePointerDecl() const;
+
+  /// Retrieve the declaration of Swift.ConstUnsafePointer<T>.
+  NominalTypeDecl *getConstUnsafePointerDecl() const;
+
+  /// Retrieve the declaration of Swift.AutoreleasingUnsafePointer<T>.
+  NominalTypeDecl *getAutoreleasingUnsafePointerDecl() const;
+  
   // Declare accessors for the known declarations.
 #define FUNC_DECL(Name, Id) \
   FuncDecl *get##Name(LazyResolver *resolver) const;

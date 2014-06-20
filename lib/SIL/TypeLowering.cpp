@@ -148,11 +148,6 @@ static NominalTypeDecl *getKnownNominalPointerType(
   });
 }
 
-NominalTypeDecl *TypeConverter::getUnsafePointerDecl() {
-  return getKnownNominalPointerType(UnsafePointerDecl, M.getASTContext(),
-                                    "Swift", "UnsafePointer");
-}
-
 NominalTypeDecl *TypeConverter::getCMutablePointerDecl() {
   return getKnownNominalPointerType(CMutablePointerDecl, M.getASTContext(),
                                     "Swift", "CMutablePointer");
@@ -161,11 +156,6 @@ NominalTypeDecl *TypeConverter::getCMutablePointerDecl() {
 NominalTypeDecl *TypeConverter::getCConstPointerDecl() {
   return getKnownNominalPointerType(CConstPointerDecl, M.getASTContext(),
                                     "Swift", "CConstPointer");
-}
-
-NominalTypeDecl *TypeConverter::getAutoreleasingUnsafePointerDecl() {
-  return getKnownNominalPointerType(AutoreleasingUnsafePointerDecl, M.getASTContext(),
-                                    "Swift", "AutoreleasingUnsafePointer");
 }
 
 CaptureKind Lowering::getDeclCaptureKind(CaptureInfo::LocalCaptureTy capture) {
@@ -2087,7 +2077,7 @@ static bool isCPointerType(TypeConverter &TC,
                            Type ty) {
   auto nom = ty->getNominalOrBoundGenericNominal();
   return nom && (nom == TC.getCMutablePointerDecl()
-    || nom == TC.getAutoreleasingUnsafePointerDecl()
+    || nom == TC.Context.getAutoreleasingUnsafePointerDecl()
     || nom == TC.getCConstPointerDecl());
 }
 
@@ -2119,7 +2109,7 @@ Type TypeConverter::getLoweredCBridgedType(Type t) {
   if (isCPointerType(*this, t)) {
     auto args = t->castTo<BoundGenericType>()->getGenericArgs();
     assert(args.size() == 1 && "pointer type has more than one arg?!");
-    return BoundGenericType::get(getUnsafePointerDecl(),
+    return BoundGenericType::get(Context.getUnsafePointerDecl(),
                                  Type(), args);
   }
 

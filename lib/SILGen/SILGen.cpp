@@ -242,11 +242,12 @@ static SILType getCMutablePointerInterfaceType(SILGenModule &SGM) {
 }
 
 static SILType getAutoreleasingUnsafePointerInterfaceType(SILGenModule &SGM) {
-  return getPointerInterfaceType(SGM.Types.getAutoreleasingUnsafePointerDecl());
+  return getPointerInterfaceType(SGM.getASTContext()
+                                   .getAutoreleasingUnsafePointerDecl());
 }
 
 static SILType getUnsafePointerInterfaceType(SILGenModule &SGM) {
-  return getPointerInterfaceType(SGM.Types.getUnsafePointerDecl());
+  return getPointerInterfaceType(SGM.getASTContext().getUnsafePointerDecl());
 }
 
 SILDeclRef SILGenModule::getCConstPointerToUnsafePointerFn() {

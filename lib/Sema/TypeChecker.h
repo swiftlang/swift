@@ -275,16 +275,10 @@ private:
 
   /// The \c Swift.UnsafePointer<T> declaration.
   Optional<NominalTypeDecl *> ArrayDecl;
-  /// The \c Swift.UnsafePointer<T> declaration.
-  Optional<NominalTypeDecl *> UnsafePointerDecl;
-  /// The \c Swift.ConstUnsafePointer<T> declaration.
-  Optional<NominalTypeDecl *> ConstUnsafePointerDecl;
   /// The \c Swift.CConstPointer<T> declaration.
   Optional<NominalTypeDecl *> CConstPointerDecl;
   /// The \c Swift.CMutablePointer<T> declaration.
   Optional<NominalTypeDecl *> CMutablePointerDecl;
-  /// The \c Swift.AutoreleasingUnsafePointer<T> declaration.
-  Optional<NominalTypeDecl *> AutoreleasingUnsafePointerDecl;
   
   /// A set of types that can be trivially mapped to Objective-C types.
   llvm::DenseSet<CanType> ObjCMappedTypes;
@@ -819,16 +813,10 @@ public:
   /// this protocol.
   Type getDefaultType(ProtocolDecl *protocol, DeclContext *dc);
 
-  /// \brief Retrieve the \c Swift.UnsafePointer<T> declaration.
-  NominalTypeDecl *getUnsafePointerDecl(const DeclContext *DC);
-  /// \brief Retrieve the \c Swift.ConstUnsafePointer<T> declaration.
-  NominalTypeDecl *getConstUnsafePointerDecl(const DeclContext *DC);
   /// \brief Retrieve the \c Swift.CConstPointer<T> declaration.
   NominalTypeDecl *getCConstPointerDecl(const DeclContext *DC);
   /// \brief Retrieve the \c Swift.CMutablePointer<T> declaration.
   NominalTypeDecl *getCMutablePointerDecl(const DeclContext *DC);
-  /// \brief Retrieve the \c Swift.AutoreleasingUnsafePointer<T> declaration.
-  NominalTypeDecl *getAutoreleasingUnsafePointerDecl(const DeclContext *DC);
   
   /// \brief Convert the given expression to the given type.
   ///

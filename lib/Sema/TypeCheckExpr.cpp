@@ -583,16 +583,6 @@ static NominalTypeDecl *getKnownPointerDecl(Module *Stdlib,
   });
 }
 
-NominalTypeDecl *TypeChecker::getUnsafePointerDecl(const DeclContext *DC) {
-  return getKnownPointerDecl(getStdlibModule(DC), Context,
-                             UnsafePointerDecl, "UnsafePointer");
-}
-
-NominalTypeDecl *TypeChecker::getConstUnsafePointerDecl(const DeclContext *DC) {
-  return getKnownPointerDecl(getStdlibModule(DC), Context,
-                             ConstUnsafePointerDecl, "ConstUnsafePointer");
-}
-
 NominalTypeDecl *TypeChecker::getCConstPointerDecl(const DeclContext *DC) {
   return getKnownPointerDecl(getStdlibModule(DC), Context,
                              CConstPointerDecl, "CConstPointer");
@@ -601,11 +591,6 @@ NominalTypeDecl *TypeChecker::getCConstPointerDecl(const DeclContext *DC) {
 NominalTypeDecl *TypeChecker::getCMutablePointerDecl(const DeclContext *DC) {
   return getKnownPointerDecl(getStdlibModule(DC), Context,
                              CMutablePointerDecl, "CMutablePointer");
-}
-
-NominalTypeDecl *TypeChecker::getAutoreleasingUnsafePointerDecl(const DeclContext *DC) {
-  return getKnownPointerDecl(getStdlibModule(DC), Context,
-                             AutoreleasingUnsafePointerDecl, "AutoreleasingUnsafePointer");
 }
 
 Expr *TypeChecker::foldSequence(SequenceExpr *expr, DeclContext *dc) {

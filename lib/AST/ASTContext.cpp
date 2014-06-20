@@ -83,6 +83,15 @@ struct ASTContext::Implementation {
   /// The declaration of Swift.ImplicitlyUnwrappedOptional<T>.None.
   EnumElementDecl *ImplicitlyUnwrappedOptionalNoneDecl = nullptr;
   
+  /// The declaration of Swift.UnsafePointer<T>.
+  NominalTypeDecl *UnsafePointerDecl = nullptr;
+  
+  /// The declaration of Swift.ConstUnsafePointer<T>.
+  NominalTypeDecl *ConstUnsafePointerDecl = nullptr;
+  
+  /// The declaration of Swift.AutoreleasingUnsafePointer<T>.
+  NominalTypeDecl *AutoreleasingUnsafePointerDecl = nullptr;
+  
   // Declare cached declarations for each of the known declarations.
 #define FUNC_DECL(Name, Id) FuncDecl *Get##Name = nullptr;
 #include "swift/AST/KnownDecls.def"
@@ -518,6 +527,29 @@ EnumElementDecl *ASTContext::getImplicitlyUnwrappedOptionalNoneDecl() const {
     Impl.ImplicitlyUnwrappedOptionalNoneDecl =
       findEnumElement(getImplicitlyUnwrappedOptionalDecl(), "None");
   return Impl.ImplicitlyUnwrappedOptionalNoneDecl;
+}
+
+NominalTypeDecl *ASTContext::getUnsafePointerDecl() const {
+  if (!Impl.UnsafePointerDecl)
+    Impl.UnsafePointerDecl = findSyntaxSugarImpl(*this, "UnsafePointer");
+  
+  return Impl.UnsafePointerDecl;
+}
+
+NominalTypeDecl *ASTContext::getConstUnsafePointerDecl() const {
+  if (!Impl.ConstUnsafePointerDecl)
+    Impl.ConstUnsafePointerDecl
+      = findSyntaxSugarImpl(*this, "ConstUnsafePointer");
+  
+  return Impl.ConstUnsafePointerDecl;
+}
+
+NominalTypeDecl *ASTContext::getAutoreleasingUnsafePointerDecl() const {
+  if (!Impl.AutoreleasingUnsafePointerDecl)
+    Impl.AutoreleasingUnsafePointerDecl
+      = findSyntaxSugarImpl(*this, "AutoreleasingUnsafePointer");
+  
+  return Impl.AutoreleasingUnsafePointerDecl;
 }
 
 ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {

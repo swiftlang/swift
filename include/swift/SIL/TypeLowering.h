@@ -474,10 +474,8 @@ class TypeConverter {
 #define BRIDGING_KNOWN_TYPE(BridgedModule,BridgedType) \
   Optional<CanType> BridgedType##Ty;
 #include "swift/SIL/BridgedTypes.def"
-  Optional<NominalTypeDecl*> UnsafePointerDecl;
   Optional<NominalTypeDecl*> CConstPointerDecl;
   Optional<NominalTypeDecl*> CMutablePointerDecl;
-  Optional<NominalTypeDecl*> AutoreleasingUnsafePointerDecl;
   
   const TypeLowering &getTypeLoweringForLoweredType(TypeKey key);
   const TypeLowering &getTypeLoweringForUncachedLoweredType(TypeKey key);
@@ -691,9 +689,7 @@ public:
   CanType get##BridgedType##Type();
 #include "swift/SIL/BridgedTypes.def"
   NominalTypeDecl *getCMutablePointerDecl();
-  NominalTypeDecl *getAutoreleasingUnsafePointerDecl();
   NominalTypeDecl *getCConstPointerDecl();
-  NominalTypeDecl *getUnsafePointerDecl();
 
 private:
   Type getLoweredCBridgedType(Type t);

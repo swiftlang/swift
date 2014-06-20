@@ -431,6 +431,17 @@ Type TypeBase::getAnyOptionalObjectType(OptionalTypeKind &kind) {
   return Type();
 }
 
+Type TypeBase::getAnyPointerElementType()  {
+  if (auto boundTy = getAs<BoundGenericType>()) {
+    auto &C = getASTContext();
+    if (boundTy->getDecl() == C.getUnsafePointerDecl()
+        || boundTy->getDecl() == C.getConstUnsafePointerDecl()
+        || boundTy->getDecl() == C.getAutoreleasingUnsafePointerDecl())
+      return boundTy->getGenericArgs()[0];
+  }
+  return Type();
+}
+
 CanType CanType::getAnyOptionalObjectTypeImpl(CanType type) {
   if (auto boundTy = dyn_cast<BoundGenericEnumType>(type))
     if (boundTy->getDecl()->classifyAsOptionalType())

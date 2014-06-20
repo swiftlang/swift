@@ -4636,14 +4636,14 @@ static bool isCPointerType(SILGenFunction &gen,
   auto nom = ty->getNominalOrBoundGenericNominal();
   
   return nom == gen.SGM.Types.getCMutablePointerDecl()
-    || nom == gen.SGM.Types.getAutoreleasingUnsafePointerDecl()
+    || nom == gen.getASTContext().getAutoreleasingUnsafePointerDecl()
     || nom == gen.SGM.Types.getCConstPointerDecl();
 }
 
 static bool isUnsafePointerType(SILGenFunction &gen,
                                 CanType ty) {
   return ty->getNominalOrBoundGenericNominal()
-    == gen.SGM.Types.getUnsafePointerDecl();
+    == gen.getASTContext().getUnsafePointerDecl();
 }
 
 namespace {
@@ -4677,7 +4677,7 @@ static ManagedValue emitBridgeCPointerToUnsafePointer(SILGenFunction &gen,
   else if (nativeNom == gen.SGM.Types.getCConstPointerDecl())
     cToUnsafePointer = gen.emitGlobalFunctionRef(loc,
                              gen.SGM.getCConstPointerToUnsafePointerFn());
-  else if (nativeNom == gen.SGM.Types.getAutoreleasingUnsafePointerDecl())
+  else if (nativeNom == gen.getASTContext().getAutoreleasingUnsafePointerDecl())
     cToUnsafePointer = gen.emitGlobalFunctionRef(loc,
                              gen.SGM.getAutoreleasingUnsafePointerToUnsafePointerFn());
   else
@@ -4687,7 +4687,7 @@ static ManagedValue emitBridgeCPointerToUnsafePointer(SILGenFunction &gen,
     ->getSubstitutions(gen.SGM.M.getSwiftModule(), nullptr);
   assert(subs.size() == 1 && "more than one substitution for pointer type?!");
   
-  auto unsafePtrTy = BoundGenericType::get(gen.SGM.Types.getUnsafePointerDecl(),
+  auto unsafePtrTy = BoundGenericType::get(gen.getASTContext().getUnsafePointerDecl(),
                                            Type(), subs[0].Replacement)
     ->getCanonicalType();
   
@@ -4801,7 +4801,7 @@ static ManagedValue emitBridgeUnsafePointerToCPointer(SILGenFunction &gen,
   else if (nativeNom == gen.SGM.Types.getCConstPointerDecl())
     unsafeToCPointer = gen.emitGlobalFunctionRef(loc,
                              gen.SGM.getUnsafePointerToCConstPointerFn());
-  else if (nativeNom == gen.SGM.Types.getAutoreleasingUnsafePointerDecl())
+  else if (nativeNom == gen.getASTContext().getAutoreleasingUnsafePointerDecl())
     unsafeToCPointer = gen.emitGlobalFunctionRef(loc,
                              gen.SGM.getUnsafePointerToAutoreleasingUnsafePointerFn());
   else

@@ -2050,7 +2050,7 @@ bool TypeChecker::isTriviallyRepresentableInObjC(const DeclContext *DC,
 
     // An UnsafePointer<T> is representable in Objective-C if T is a
     // trivially representable type.
-    if (NTD == getUnsafePointerDecl(DC)) {
+    if (NTD == Context.getUnsafePointerDecl()) {
       T = T->castTo<BoundGenericType>()->getGenericArgs()[0];
       return isTriviallyRepresentableInObjC(DC, T);
     }
@@ -2071,7 +2071,7 @@ bool TypeChecker::isTriviallyRepresentableInObjC(const DeclContext *DC,
     
     // An AutoreleasingUnsafePointer<T> is representable in ObjC if T
     // is a (potentially optional) ObjC pointer type.
-    if (NTD == getAutoreleasingUnsafePointerDecl(DC)) {
+    if (NTD == Context.getAutoreleasingUnsafePointerDecl()) {
       T = T->castTo<BoundGenericType>()->getGenericArgs()[0];
       return isUnknownObjectOrOptionalType(T);
     }
