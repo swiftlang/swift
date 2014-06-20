@@ -3969,7 +3969,7 @@ namespace {
       auto selfArchetype = ArchetypeType::getNew(Impl.SwiftContext, nullptr,
                                                  result, selfId,
                                                  Type(result->getDeclaredType()),
-                                                 Type(), /*Index=*/0);
+                                                 Type(), false, /*Index=*/0);
       selfDecl->setArchetype(selfArchetype);
 
       // Set AllArchetypes of the protocol. ObjC protocols don't have associated

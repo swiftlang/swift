@@ -54,7 +54,7 @@ static bool isArchetypeValidInFunction(ArchetypeType *A, SILFunction *F) {
   for (auto Iter : F->getContextGenericParams()->getAllNestedArchetypes())
     if (A->isEqual(&*Iter))
       return true;
-  return false;
+  return A->getIsRecursive();
 }
 
 namespace {

@@ -1563,6 +1563,7 @@ ArchetypeType *ArchetypeType::getNew(const ASTContext &Ctx,
                                      AssocTypeOrProtocolType AssocTypeOrProto,
                                      Identifier Name, ArrayRef<Type> ConformsTo,
                                      Type Superclass,
+                                     bool isRecursive,
                                      Optional<unsigned> Index) {
   // Gather the set of protocol declarations to which this archetype conforms.
   SmallVector<ProtocolDecl *, 4> ConformsToProtos;
@@ -1574,7 +1575,7 @@ ArchetypeType *ArchetypeType::getNew(const ASTContext &Ctx,
   auto arena = AllocationArena::Permanent;
   return new (Ctx, arena) ArchetypeType(Ctx, Parent, AssocTypeOrProto, Name,
                                         Ctx.AllocateCopy(ConformsToProtos),
-                                        Superclass, Index);
+                                        Superclass, Index, isRecursive);
 }
 
 ArchetypeType *
@@ -1582,14 +1583,14 @@ ArchetypeType::getNew(const ASTContext &Ctx, ArchetypeType *Parent,
                       AssocTypeOrProtocolType AssocTypeOrProto,
                       Identifier Name,
                       SmallVectorImpl<ProtocolDecl *> &ConformsTo,
-                      Type Superclass, Optional<unsigned> Index) {
+                      Type Superclass, bool isRecursive, Optional<unsigned> Index) {
   // Gather the set of protocol declarations to which this archetype conforms.
   ProtocolType::canonicalizeProtocols(ConformsTo);
 
   auto arena = AllocationArena::Permanent;
   return new (Ctx, arena) ArchetypeType(Ctx, Parent, AssocTypeOrProto, Name,
                                         Ctx.AllocateCopy(ConformsTo),
-                                        Superclass, Index);
+                                        Superclass, Index, isRecursive);
 }
 
 namespace {
@@ -1620,6 +1621,32 @@ namespace {
 ArchetypeType::NestedType ArchetypeType::getNestedType(Identifier Name) const {
   auto Pos = std::lower_bound(NestedTypes.begin(), NestedTypes.end(), Name,
                               OrderArchetypeByName());
+  if ((Pos == NestedTypes.end() || Pos->first != Name) && this->isRecursive) {
+    if (Name == this->getName()) {
+      NestedType rec = (ArchetypeType*)this;
+    
+      return rec;
+    } else {
+      auto conformances = this->getConformsTo();
+      
+      for (auto conformance : conformances) {
+        auto conformanceType = conformance->getType().getPointer();
+        
+        if (auto metatypeType = dyn_cast<MetatypeType>(conformanceType)) {
+          conformanceType = metatypeType->getInstanceType().getPointer();
+          
+          if (auto protocolType = dyn_cast<ProtocolType>(conformanceType)) {
+            conformanceType = protocolType->getDecl()->getSelf()->getArchetype();
+          }
+        }
+        
+        if (auto conformedArchetype = dyn_cast<ArchetypeType>(conformanceType)) {
+          return conformedArchetype->getNestedType(Name);
+        }
+      }
+    }
+  }
+  
   assert(Pos != NestedTypes.end() && Pos->first == Name);
   return Pos->second;
 }
@@ -2050,8 +2077,12 @@ Type Type::subst(Module *module, TypeSubstitutionMap &substitutions,
 
     // Get the associated type reference from a child archetype.
     AssociatedTypeDecl *assocType = nullptr;
-    if (auto archetype = substOrig->getAs<ArchetypeType>())
+    if (auto archetype = substOrig->getAs<ArchetypeType>()) {
       assocType = archetype->getAssocType();
+      
+//      if (archetype == substOrig)
+//        return type;
+    }
     
     if (Type r = getMemberForBaseType(module, substParent, assocType,
                                       substOrig->getName(), resolver))

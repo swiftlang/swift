@@ -435,7 +435,7 @@ getGenericParam(ASTContext &Context) {
     = ArchetypeType::getNew(Context, nullptr,
                             static_cast<AssociatedTypeDecl *>(nullptr),
                             GenericName,
-                            ArrayRef<Type>(), Type(), 0);
+                            ArrayRef<Type>(), Type(), false, 0);
   auto GenericTyDecl =
     new (Context) GenericTypeParamDecl(&M->getMainFile(FileUnitKind::Builtin),
                                        GenericName, SourceLoc(), 0, 0);

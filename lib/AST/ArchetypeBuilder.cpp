@@ -164,7 +164,7 @@ ArchetypeBuilder::PotentialArchetype::getType(ProtocolDecl *rootProtocol,
   auto arch
     = ArchetypeType::getNew(mod.getASTContext(), ParentArchetype,
                             assocTypeOrProto, Name, Protos,
-                            Superclass, Index);
+                            Superclass, this->isRecursive, Index);
 
   ArchetypeOrConcreteType = arch;
   
@@ -446,8 +446,13 @@ bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *PAT,
         }
 
         for (auto InheritedProto : superclassAndConformsTo.second) {
-          if (Proto == InheritedProto)
+          // If it's a recursive requirement, add it directly to the associated
+          // archetype.
+          if (Proto == InheritedProto) {
+            AssocPA->getRepresentative()->ConformsTo.insert(Proto);
+            AssocPA->setIsRecursive();
             continue;
+          }
           
           if (addConformanceRequirement(AssocPA, InheritedProto))
             return true;

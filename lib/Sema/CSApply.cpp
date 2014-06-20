@@ -95,6 +95,7 @@ Type Solution::computeSubstitutions(Type origType, DeclContext *dc,
                                               &conformance);
         assert((conforms ||
                 replacement->isExistentialType() ||
+                firstArchetype->getIsRecursive() ||
                 replacement->is<GenericTypeParamType>()) &&
                "Constraint system missed a conformance?");
         (void)conforms;

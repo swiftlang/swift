@@ -2081,7 +2081,7 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
       if (Conformance)
         *Conformance = Known->getPointer();
 
-      return Known->getPointer()->isComplete();
+      return !(Known->getPointer()->isInvalid());
     }
 
     // If we're just checking for conformance, we already know the answer.

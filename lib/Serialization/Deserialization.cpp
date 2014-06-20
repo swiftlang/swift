@@ -2776,7 +2776,7 @@ Type ModuleFile::getType(TypeID TID) {
 
     auto archetype = ArchetypeType::getNew(ctx, parent, assocTypeOrProto,
                                            getIdentifier(nameID), conformances,
-                                           superclass, index);
+                                           superclass, false, index);
     typeOrOffset = archetype;
     
     // Read the associated type names.

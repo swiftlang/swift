@@ -319,6 +319,9 @@ class ArchetypeBuilder::PotentialArchetype {
 
   /// \brief Recursively build the full name.
   void buildFullName(SmallVectorImpl<char> &Result) const;
+  
+  /// \brief Recursively conforms to itself.
+  bool isRecursive = false;
 
 public:
   ~PotentialArchetype();
@@ -370,6 +373,9 @@ public:
   bool isConcreteType() const {
     return ArchetypeOrConcreteType.is<Type>();
   }
+  
+  void setIsRecursive() { this->isRecursive = true; }
+  bool getIsRecursive() { return this->isRecursive; }
   
   void dump(llvm::raw_ostream &Out, unsigned Indent);
 
