@@ -844,7 +844,7 @@ ManagedValue SILGenFunction::emitLoad(SILLocation loc, SILValue addr,
     SILValue copy = getBufferForExprResult(loc, rvalueTL.getLoweredType(), C);
     emitSemanticLoadInto(loc, addr, addrTL, copy, rvalueTL,
                          isTake, IsInitialization);
-    return emitManagedRValueWithCleanup(copy, rvalueTL);
+    return manageBufferForExprResult(copy, rvalueTL, C);
   }
   
   // Load the loadable value, and retain it if we aren't taking it.

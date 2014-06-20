@@ -12,8 +12,7 @@ func opaque_archetype_to_opaque_archetype
 <T:NotClassBound, U>(t:T) -> U {
   return t as U
   // CHECK: bb0([[RET:%.*]] : $*U, {{%.*}}: $*T):
-  // CHECK:   [[DOWNCAST:%.*]] = unconditional_checked_cast archetype_to_archetype {{%.*}} : {{.*}} to $*U
-  // CHECK:   copy_addr [take] [[DOWNCAST]] to [initialization] [[RET]]
+  // CHECK:   unconditional_checked_cast_addr take_always T in {{%.*}} : $*T to U in [[RET]] : $*U
 }
 
 // CHECK-LABEL: sil  @_TF13generic_casts36opaque_archetype_is_opaque_archetype{{.*}}
@@ -41,7 +40,7 @@ func opaque_archetype_is_opaque_archetype
 func opaque_archetype_to_class_archetype
 <T:NotClassBound, U:ClassBound> (t:T) -> U {
   return t as U
-  // CHECK: [[DOWNCAST_ADDR:%.*]] = unconditional_checked_cast archetype_to_archetype {{%.*}} : {{.*}} to $*U
+  // CHECK: unconditional_checked_cast_addr take_always T in {{%.*}} : $*T to U in [[DOWNCAST_ADDR:%.*]] : $*U
   // CHECK: [[DOWNCAST:%.*]] = load [[DOWNCAST_ADDR]] : $*U
   // CHECK: return [[DOWNCAST]] : $U
 }
@@ -74,8 +73,7 @@ func opaque_archetype_to_addr_only_concrete
 <T:NotClassBound> (t:T) -> Unloadable {
   return t as Unloadable
   // CHECK: bb0([[RET:%.*]] : $*Unloadable, {{%.*}}: $*T):
-  // CHECK:   [[DOWNCAST:%.*]] = unconditional_checked_cast archetype_to_concrete {{%.*}} : {{.*}} to $*Unloadable
-  // CHECK:   copy_addr [take] [[DOWNCAST]] to [initialization] [[RET]]
+  // CHECK:   unconditional_checked_cast_addr take_always T in {{%.*}} : $*T to Unloadable in [[RET]] : $*Unloadable
 }
 
 // CHECK-LABEL: sil  @_TF13generic_casts38opaque_archetype_is_addr_only_concrete{{.*}}
@@ -89,7 +87,7 @@ func opaque_archetype_is_addr_only_concrete
 func opaque_archetype_to_loadable_concrete
 <T:NotClassBound>(t:T) -> S {
   return t as S
-  // CHECK: [[DOWNCAST_ADDR:%.*]] = unconditional_checked_cast archetype_to_concrete {{%.*}} to $*S
+  // CHECK: unconditional_checked_cast_addr take_always T in {{%.*}} : $*T to S in [[DOWNCAST_ADDR:%.*]] : $*S
   // CHECK: [[DOWNCAST:%.*]] = load [[DOWNCAST_ADDR]] : $*S
   // CHECK: return [[DOWNCAST]] : $S
 }
@@ -120,10 +118,14 @@ func class_archetype_is_class
 func opaque_existential_to_opaque_archetype
 <T:NotClassBound>(p:NotClassBound) -> T {
   return p as T
-  // CHECK: bb0([[RET:%.*]] : $*T, {{%.*}}: $*NotClassBound):
-  // CHECK:   [[DOWNCAST:%.*]] = unconditional_checked_cast existential_to_archetype [[CONTAINER:%.*]] : {{.*}} to $*T
-  // CHECK:   copy_addr [take] [[DOWNCAST]] to [initialization] [[RET]]
-  // CHECK:   deinit_existential [[CONTAINER]]
+  // CHECK: bb0([[RET:%.*]] : $*T, [[ARG:%.*]] : $*NotClassBound):
+  // CHECK:      [[TEMP:%.*]] = alloc_stack $NotClassBound
+  // CHECK-NEXT: copy_addr [[ARG]] to [initialization] [[TEMP]]#1
+  // CHECK-NEXT: unconditional_checked_cast_addr take_always NotClassBound in [[TEMP]]#1 : $*NotClassBound to T in [[RET]] : $*T
+  // CHECK-NEXT: dealloc_stack [[TEMP]]#0
+  // CHECK-NEXT: destroy_addr [[ARG]]
+  // CHECK-NEXT: [[T0:%.*]] = tuple ()
+  // CHECK-NEXT: return [[T0]]
 }
 
 // CHECK-LABEL: sil  @_TF13generic_casts38opaque_existential_is_opaque_archetype{{.*}}
@@ -137,7 +139,7 @@ func opaque_existential_is_opaque_archetype
 func opaque_existential_to_class_archetype
 <T:ClassBound>(p:NotClassBound) -> T {
   return p as T
-  // CHECK: [[DOWNCAST_ADDR:%.*]] = unconditional_checked_cast existential_to_archetype {{%.*}} to $*T
+  // CHECK: unconditional_checked_cast_addr take_always NotClassBound in {{%.*}} : $*NotClassBound to T in [[DOWNCAST_ADDR:%.*]] : $*T
   // CHECK: [[DOWNCAST:%.*]] = load [[DOWNCAST_ADDR]] : $*T
   // CHECK: return [[DOWNCAST]] : $T
 }
@@ -168,8 +170,7 @@ func class_existential_is_class_archetype
 func opaque_existential_to_addr_only_concrete(p: NotClassBound) -> Unloadable {
   return p as Unloadable
   // CHECK: bb0([[RET:%.*]] : $*Unloadable, {{%.*}}: $*NotClassBound):
-  // CHECK:   [[DOWNCAST:%.*]] = unconditional_checked_cast existential_to_concrete {{%.*}} to $*Unloadable
-  // CHECK:   copy_addr [take] [[DOWNCAST]] to [initialization] [[RET]]
+  // CHECK:   unconditional_checked_cast_addr take_always NotClassBound in {{%.*}} : $*NotClassBound to Unloadable in [[RET]] : $*Unloadable
 }
 
 // CHECK-LABEL: sil  @_TF13generic_casts40opaque_existential_is_addr_only_concrete{{.*}}
@@ -181,7 +182,7 @@ func opaque_existential_is_addr_only_concrete(p: NotClassBound) -> Bool {
 // CHECK-LABEL: sil  @_TF13generic_casts39opaque_existential_to_loadable_concrete{{.*}}
 func opaque_existential_to_loadable_concrete(p: NotClassBound) -> S {
   return p as S
-  // CHECK: [[DOWNCAST_ADDR:%.*]] = unconditional_checked_cast existential_to_concrete {{%.*}} to $*S
+  // CHECK:   unconditional_checked_cast_addr take_always NotClassBound in {{%.*}} : $*NotClassBound to S in [[DOWNCAST_ADDR]] : $*S
   // CHECK: [[DOWNCAST:%.*]] = load [[DOWNCAST_ADDR]] : $*S
   // CHECK: return [[DOWNCAST]] : $S
 }

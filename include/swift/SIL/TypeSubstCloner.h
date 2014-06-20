@@ -20,6 +20,7 @@
 
 #include "swift/AST/Type.h"
 #include "swift/SIL/SILCloner.h"
+#include "swift/SIL/DynamicCasts.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "llvm/Support/Debug.h"
 
@@ -36,6 +37,7 @@ public:
   using SILCloner<ImplClass>::getBuilder;
   using SILCloner<ImplClass>::getOpLocation;
   using SILCloner<ImplClass>::getOpValue;
+  using SILCloner<ImplClass>::getOpASTType;
   using SILCloner<ImplClass>::getOpType;
   using SILCloner<ImplClass>::getOpBasicBlock;
   using SILCloner<ImplClass>::doPostProcess;
@@ -207,66 +209,121 @@ protected:
   // runtime trap to match the semantics of the instruction.
   void
   convertArchetypeConcreteCastToConcreteCast(
-                                           UnconditionalCheckedCastInst *Inst) {
+                                           UnconditionalCheckedCastInst *inst) {
     // Grab both the from and to types.
-    SILType OpFromTy = getOpType(Inst->getOperand().getType());
-    SILType OpToTy = getOpType(Inst->getType());
-    SILLocation Loc = getOpLocation(Inst->getLoc());
-    SILBuilder &Builder = getBuilder();
+    SILType sourceType = getOpType(inst->getOperand().getType());
+    SILType targetType = getOpType(inst->getType());
+    SILLocation loc = getOpLocation(inst->getLoc());
+    SILBuilder &B = getBuilder();
 
-    // If the from/to type is the same, just propagate the operand along to all
-    // uses.
-    if (OpFromTy == OpToTy) {
-      auto Pair = std::make_pair(SILValue(Inst),
-                                 getOpValue(Inst->getOperand()));
-      ValueMap.insert(Pair);
+    // The non-addr CheckedCastInsts can currently only be used for
+    // types that don't have abstraction differences, so this is okay.
+    CanType formalSourceType = sourceType.getSwiftRValueType();
+    CanType formalTargetType = targetType.getSwiftRValueType();
+
+    SILValue operand = getOpValue(inst->getOperand());
+
+    switch (classifyDynamicCast(SwiftMod, formalSourceType, formalTargetType)) {
+    case DynamicCastFeasibility::WillSucceed: {
+      SILValue result =
+        emitSuccessfulScalarUnconditionalCast(B, SwiftMod, loc, operand,
+                                              targetType, formalSourceType,
+                                              formalTargetType);
+      ValueMap.insert({SILValue(inst), result});
       return;
     }
 
-    // Ok, we know that the types differ. See if we are performing an upcast
-    // or downcast.
-    ClassDecl *FromDecl = OpFromTy.getClassOrBoundGenericClass();
-    ClassDecl *ToDecl = OpToTy.getClassOrBoundGenericClass();
+    case DynamicCastFeasibility::MaySucceed: {
+      CheckedCastKind castKind;
+      if (isa<ArchetypeType>(formalSourceType)) {
+        if (isa<ArchetypeType>(formalTargetType)) {
+          castKind = CheckedCastKind::ArchetypeToArchetype;
+        } else {
+          castKind = CheckedCastKind::ArchetypeToConcrete;
+        }
+      } else if (formalSourceType.isExistentialType()) {
+        if (isa<ArchetypeType>(formalTargetType)) {
+          castKind = CheckedCastKind::ExistentialToArchetype;
+        } else {
+          castKind = CheckedCastKind::ExistentialToConcrete;
+        }
+      } else {
+        if (isa<ArchetypeType>(formalTargetType)) {
+          castKind = CheckedCastKind::ConcreteToArchetype;
+        } else if (formalTargetType.isExistentialType()) {
+          castKind = CheckedCastKind::ConcreteToUnrelatedExistential;
+        } else {
+          castKind = CheckedCastKind::Downcast;
+        }
+      }
 
-    // If either of the types are not classes, then we are either comparing
-    // non-classes which differ implying a runtime trap *or* a class and a
-    // non-class which yields also a runtime trap.
-    if (!FromDecl || !ToDecl) {
-      Builder.createApply(Loc, Builder.createBuiltinTrap(Loc),
-                          ArrayRef<SILValue>());
-      auto Pair = std::make_pair(SILValue(Inst),
-                                 SILValue(SILUndef::get(OpToTy,
-                                                        Inst->getModule())));
-      ValueMap.insert(Pair);
+      SILValue result =
+        B.createUnconditionalCheckedCast(loc, castKind, operand, targetType);
+      ValueMap.insert({SILValue(inst), result});
       return;
     }
 
-    // Ok, we know that we have two classes. If From is a super class of To,
-    // insert a checked downcast.
-    if (OpFromTy.isSuperclassOf(OpToTy)) {
-      SILValue OtherOp = getOpValue(Inst->getOperand());
-      auto *UCCI = Builder.createUnconditionalCheckedCast(
-          Loc, CheckedCastKind::Downcast, OtherOp, OpToTy);
-      doPostProcess(Inst, UCCI);
+    // Ok, we have an invalid cast. Insert a trap so we trap at
+    // runtime as the spec for the instruction requires and propagate
+    // undef to all uses.
+    case DynamicCastFeasibility::WillFail:
+      B.createApply(loc, B.createBuiltinTrap(loc), {});
+      ValueMap.insert({SILValue(inst),
+                       SILValue(SILUndef::get(targetType, inst->getModule()))});
+      return;
+    }
+    llvm_unreachable("bad classification");
+  }
+
+  void visitUnconditionalCheckedCastAddrInst(
+                                     UnconditionalCheckedCastAddrInst *inst) {
+    SILLocation loc = getOpLocation(inst->getLoc());
+    SILValue src = getOpValue(inst->getSrc());
+    SILValue dest = getOpValue(inst->getDest());
+    SILBuilder &B = getBuilder();
+
+    CanType sourceType = getOpASTType(inst->getSourceType());
+    CanType targetType = getOpASTType(inst->getTargetType());
+
+    switch (classifyDynamicCast(SwiftMod, sourceType, targetType)) {
+    case DynamicCastFeasibility::WillSucceed: {
+      emitSuccessfulIndirectUnconditionalCast(B, SwiftMod, loc,
+                                              inst->getConsumptionKind(),
+                                              src, sourceType,
+                                              dest, targetType);
       return;
     }
 
-    // If ToTy is a super class of FromTy, we are performing an upcast.
-    if (OpToTy.isSuperclassOf(OpFromTy)) {
-      doPostProcess(Inst, Builder.createUpcast(
-                      Loc, getOpValue(Inst->getOperand()), OpToTy));
+    case DynamicCastFeasibility::MaySucceed: {
+      // TODO: simplify?
+      auto newInst =
+        B.createUnconditionalCheckedCastAddr(loc, inst->getConsumptionKind(),
+                                             src, sourceType,
+                                             dest, targetType);
+      doPostProcess(inst, newInst);
       return;
     }
 
-    // Ok, we have an invalid cast. Insert a trap so we trap at runtime as
-    // the spec for the instruction requires and propagate undef to all
-    // uses.
-    Builder.createApply(Loc, Builder.createBuiltinTrap(Loc),
-                        ArrayRef<SILValue>());
-    auto Pair = std::make_pair(SILValue(Inst),
-                               SILValue(SILUndef::get(OpToTy,
-                                                      Inst->getModule())));
-    ValueMap.insert(Pair);
+    // Ok, we have an invalid cast. Insert a trap so we trap at
+    // runtime as the spec for the instruction requires and propagate
+    // undef to all uses.
+    case DynamicCastFeasibility::WillFail: {
+      auto newInst = B.createApply(loc, B.createBuiltinTrap(loc), {});
+      doPostProcess(inst, newInst);
+
+      // mem2reg's invariants get unhappy if we don't try to
+      // initialize a loadable result.
+      auto &resultTL = B.getModule().Types.getTypeLowering(dest.getType());
+      if (!resultTL.isAddressOnly()) {
+        auto undef = SILValue(SILUndef::get(dest.getType().getObjectType(),
+                                            B.getModule()));
+        B.createStore(loc, undef, dest);
+      }
+      return;
+    }
+
+    }
+    llvm_unreachable("bad classification");
   }
 
   void visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *Inst) {

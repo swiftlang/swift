@@ -577,6 +577,12 @@ public:
 
   /// Emit the given expression as an r-value.
   RValue emitRValue(Expr *E, SGFContext C = SGFContext());
+
+  /// Emit the given expression as an r-value that follows the
+  /// abstraction patterns of the original type.
+  ManagedValue emitRValueAsOrig(Expr *E, AbstractionPattern origPattern,
+                                const TypeLowering &origTL,
+                                SGFContext C = SGFContext());
   
   /// Emit the given expression, ignoring its result.
   void emitIgnoredExpr(Expr *E);
@@ -808,22 +814,6 @@ public:
   /// Emit a dynamic subscript.
   RValue emitDynamicSubscriptExpr(DynamicSubscriptExpr *e, SGFContext c);
 
-  /// \brief Emit an unconditional checked cast, including any necessary
-  /// abstraction difference between the original and destination types.
-  ///
-  /// \param loc          The AST location associated with the operation.
-  /// \param original     The value to cast.
-  /// \param origTy       The original AST-level type.
-  /// \param castTy       The destination type.
-  /// \param kind         The semantics of the cast.
-  ///
-  /// \returns the cast value, at its natural abstraction level.
-  SILValue emitUnconditionalCheckedCast(SILLocation loc,
-                                        SILValue original,
-                                        Type origTy,
-                                        Type castTy,
-                                        CheckedCastKind kind);
-  
   /// \brief Emits the abstraction change needed, if any, to perform casts from
   /// the type represented by \c origTL to each of the types represented by
   /// \c castTLs.

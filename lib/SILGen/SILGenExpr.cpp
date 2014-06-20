@@ -245,12 +245,6 @@ namespace {
     RValue visitInOutToPointerExpr(InOutToPointerExpr *E, SGFContext C);
     RValue visitArrayToPointerExpr(ArrayToPointerExpr *E, SGFContext C);
     RValue visitPointerToPointerExpr(PointerToPointerExpr *E, SGFContext C);
-
-    RValue emitUnconditionalCheckedCast(Expr *source,
-                                        SILLocation loc,
-                                        Type destType,
-                                        CheckedCastKind castKind,
-                                        SGFContext C);
   };
 }
 
@@ -1509,57 +1503,197 @@ namespace {
       gen.B.createDeinitExistential(l, existential);
     }
   };
+
+  class CheckedCastEmitter {
+    SILGenFunction &SGF;
+    SILLocation Loc;
+    CanType SourceType;
+    CanType TargetType;
+    CheckedCastKind CastKind;
+
+    enum class CastStrategy : uint8_t {
+      Address,
+      Scalar,
+    };
+    CastStrategy Strategy;
+
+  public:
+    CheckedCastEmitter(SILGenFunction &SGF, SILLocation loc,
+                       Type sourceType, Type targetType,
+                       CheckedCastKind castKind)
+      : SGF(SGF), Loc(loc), SourceType(sourceType->getCanonicalType()),
+        TargetType(targetType->getCanonicalType()), CastKind(castKind),
+        Strategy(getStrategy()) {
+    }
+
+    bool isOperandIndirect() const {
+      return Strategy == CastStrategy::Address;
+    }
+
+    ManagedValue emitOperand(Expr *operand) {
+      AbstractionPattern mostGeneral = SGF.SGM.Types.getMostGeneralAbstraction();
+      auto &origSourceTL = SGF.getTypeLowering(mostGeneral, SourceType);
+
+      SGFContext ctx;
+
+      std::unique_ptr<TemporaryInitialization> temporary;
+      if (isOperandIndirect()) {
+        temporary = SGF.emitTemporary(Loc, origSourceTL);
+        ctx = SGFContext(temporary.get());
+      }
+
+      auto result = SGF.emitRValueAsOrig(operand, mostGeneral,
+                                         origSourceTL, ctx);
+
+      if (isOperandIndirect()) {
+        // Force the result into the temporary if it's not already there.
+        if (!result.isInContext()) {
+          result.forwardInto(SGF, Loc, temporary->getAddress());
+          temporary->finishInitialization(SGF);
+        }
+        return temporary->getManagedAddress();
+      }
+
+      return result;
+    }
+
+    RValue emitUnconditionalCast(ManagedValue operand, SGFContext ctx) {
+      // The cast functions don't know how to work with anything but
+      // the most general possible abstraction level.
+      AbstractionPattern abstraction = SGF.SGM.Types.getMostGeneralAbstraction();
+      auto &origTargetTL = SGF.getTypeLowering(abstraction, TargetType);
+      auto &substTargetTL = SGF.getTypeLowering(TargetType);
+      bool hasAbstraction =
+        (origTargetTL.getLoweredType() != substTargetTL.getLoweredType());
+
+      // If we're using checked_cast_addr, take the operand (which
+      // should be an address) and build into the destination buffer.
+      ManagedValue abstractResult;
+      if (Strategy == CastStrategy::Address) {
+        SILValue resultBuffer =
+          createAbstractResultBuffer(hasAbstraction, origTargetTL, ctx);
+        SGF.B.createUnconditionalCheckedCastAddr(Loc,
+                                             CastConsumptionKind::TakeAlways,
+                                             operand.forward(SGF), SourceType,
+                                             resultBuffer, TargetType);
+        return finishFromResultBuffer(hasAbstraction, resultBuffer, abstraction,
+                                      origTargetTL, ctx);
+      }
+
+      SILValue resultScalar =
+        SGF.B.createUnconditionalCheckedCast(Loc, CastKind,
+                                             operand.forward(SGF),
+                                             origTargetTL.getLoweredType());
+      return finishFromResultScalar(hasAbstraction, resultScalar, abstraction,
+                                    origTargetTL, ctx);
+    }
+
+    SILValue createAbstractResultBuffer(bool hasAbstraction,
+                                        const TypeLowering &origTargetTL,
+                                        SGFContext ctx) {
+      if (!hasAbstraction) {
+        if (auto emitInto = ctx.getEmitInto()) {
+          if (SILValue addr = emitInto->getAddressOrNull()) {
+            return addr;
+          }
+        }
+      }
+
+      return SGF.emitTemporaryAllocation(Loc, origTargetTL.getLoweredType());
+    }
+
+    RValue finishFromResultBuffer(bool hasAbstraction,
+                                  SILValue buffer,
+                                  AbstractionPattern abstraction,
+                                  const TypeLowering &origTargetTL,
+                                  SGFContext ctx) {
+      if (!hasAbstraction) {
+        if (auto emitInto = ctx.getEmitInto()) {
+          if (emitInto->getAddressOrNull()) {
+            emitInto->finishInitialization(SGF);
+            return RValue(SGF, Loc, TargetType, ManagedValue::forInContext());
+          }
+        }
+      }
+
+      ManagedValue result;
+      if (!hasAbstraction && !origTargetTL.isAddressOnly()) {
+        result = SGF.emitLoad(Loc, buffer, origTargetTL, ctx, IsTake);
+      } else {
+        result = SGF.emitManagedBufferWithCleanup(buffer, origTargetTL);
+        if (hasAbstraction) {
+          result = SGF.emitOrigToSubstValue(Loc, result, abstraction,
+                                            TargetType, ctx);
+        }
+      }
+      return RValue(SGF, Loc, TargetType, result);
+    }
+
+    RValue finishFromResultScalar(bool hasAbstraction, SILValue value,
+                                  AbstractionPattern abstraction,
+                                  const TypeLowering &origTargetTL,
+                                  SGFContext ctx) {
+      ManagedValue result
+        = SGF.emitManagedRValueWithCleanup(value, origTargetTL);
+      if (hasAbstraction) {
+        result = SGF.emitOrigToSubstValue(Loc, result, abstraction,
+                                          TargetType, ctx);
+      }
+      return RValue(SGF, Loc, TargetType, result);
+    }
+
+  private:
+    CastStrategy getStrategy() const {
+      // Look through one level of optionality on the source.
+      auto sourceObjectType = SourceType;
+      if (auto type = sourceObjectType.getAnyOptionalObjectType())
+        sourceObjectType = type;
+
+      // Class-to-class casts can be scalar.  The source can be
+      // anything that embeds a class reference; the destination must
+      // be a class type, but (for now) cannot be a class existential
+      // with non-ObjC protocols.
+      if (sourceObjectType.isAnyClassReferenceType() &&
+          (TargetType->mayHaveSuperclass() ||
+           TargetType.isObjCExistentialType()))
+        return CastStrategy::Scalar;
+
+      // Metatype-to-metatype casts can also be scalar. Again, for now,
+      // require the destination to be non-existential.
+      if (isa<AnyMetatypeType>(sourceObjectType) &&
+          isa<MetatypeType>(TargetType))
+        return CastStrategy::Scalar;
+
+      // Otherwise, we need to use the general indirect-cast functions.
+      return CastStrategy::Address;
+    }
+  };
 }
 
-SILValue SILGenFunction::emitUnconditionalCheckedCast(SILLocation loc,
-                                                      SILValue original,
-                                                      Type origTy,
-                                                      Type castTy,
-                                                      CheckedCastKind kind) {
-  auto &origLowering = getTypeLowering(origTy);
-  auto &castLowering = getTypeLowering(castTy);
-
-  // Spill to a temporary if casting from loadable to address-only.
-  if (origLowering.isLoadable() && castLowering.isAddressOnly()) {
-    SILValue temp = emitTemporaryAllocation(loc, origLowering.getLoweredType());
-    B.createStore(loc, original, temp);
-    original = temp;
+static RValue emitUnconditionalCheckedCast(SILGenFunction &SGF,
+                                           SILLocation loc,
+                                           Expr *operand,
+                                           Type targetType,
+                                           CheckedCastKind castKind,
+                                           SGFContext C) {
+  // Handle collection downcasts directly; they have specific library
+  // entry points.
+  if (castKind == CheckedCastKind::ArrayDowncast ||
+      castKind == CheckedCastKind::ArrayDowncastBridged ||
+      castKind == CheckedCastKind::DictionaryDowncast ||
+      castKind == CheckedCastKind::DictionaryDowncastBridged) {
+    bool bridgesFromObjC
+      = (castKind == CheckedCastKind::ArrayDowncastBridged ||
+         castKind == CheckedCastKind::DictionaryDowncastBridged);
+    return emitCollectionDowncastExpr(SGF, operand, loc, targetType, C,
+                                      /*conditional=*/false,
+                                      bridgesFromObjC);
   }
-  // If we're casting a thin metatype, make it thick.
-  if (auto metatype = original.getType().getAs<MetatypeType>()) {
-    if (metatype->getRepresentation() == MetatypeRepresentation::Thin) {
-      auto thickTy = CanMetatypeType::get(metatype.getInstanceType(),
-                                          MetatypeRepresentation::Thick);
-      original = B.createMetatype(loc, SILType::getPrimitiveObjectType(thickTy));
-    }
-  }
-  
-  // Get the cast destination type at the least common denominator abstraction
-  // level, thickening metatypes and falling back to address-only casting if
-  // needed.
-  SILType destTy = castLowering.getLoweredType();
-  if (auto metaTy = destTy.getAs<MetatypeType>())
-    if (metaTy->getRepresentation() == MetatypeRepresentation::Thin)
-      destTy = SILType::getPrimitiveObjectType(
-                           CanMetatypeType::get(metaTy.getInstanceType(),
-                                                MetatypeRepresentation::Thick));
-  if (origLowering.isAddressOnly())
-    destTy = destTy.getAddressType();
-  
-  // Emit the cast.
-  SILValue result = B.createUnconditionalCheckedCast(loc, kind, original,
-                                                     destTy);
-  
-  // Load from the address if casting from address-only to loadable.
-  if (origLowering.isAddressOnly() && castLowering.isLoadable())
-    result = B.createLoad(loc, result);
 
-  // Thin the metatype if we can.
-  if (auto metaTy = castLowering.getLoweredType().getAs<MetatypeType>())
-    if (metaTy->getRepresentation() == MetatypeRepresentation::Thin)
-      result = B.createMetatype(loc, castLowering.getLoweredType());
-  
-  return result;
+  CheckedCastEmitter emitter(SGF, loc, operand->getType(),
+                             targetType, castKind);
+  ManagedValue operandValue = emitter.emitOperand(operand);
+  return emitter.emitUnconditionalCast(operandValue, C);
 }
 
 SILValue
@@ -1639,7 +1773,7 @@ SILGenFunction::emitCheckedCastBranch(SILLocation loc,
 
 RValue RValueEmitter::visitForcedCheckedCastExpr(ForcedCheckedCastExpr *E,
                                                  SGFContext C) {
-  return emitUnconditionalCheckedCast(E->getSubExpr(), E, E->getType(),
+  return emitUnconditionalCheckedCast(SGF, E, E->getSubExpr(), E->getType(),
                                       E->getCastKind(), C);
 }
 
@@ -1732,45 +1866,6 @@ visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *E,
   }
 
   return RValue(SGF, E, result);
-}
-
-RValue RValueEmitter::emitUnconditionalCheckedCast(Expr *source,
-                                                   SILLocation loc,
-                                                   Type destType,
-                                                   CheckedCastKind castKind,
-                                                   SGFContext C) {
-  // Handle collection downcasts directly; they have specific library
-  // entry points.
-  if (castKind == CheckedCastKind::ArrayDowncast ||
-      castKind == CheckedCastKind::ArrayDowncastBridged ||
-      castKind == CheckedCastKind::DictionaryDowncast ||
-      castKind == CheckedCastKind::DictionaryDowncastBridged) {
-    bool bridgesFromObjC
-      = (castKind == CheckedCastKind::ArrayDowncastBridged ||
-         castKind == CheckedCastKind::DictionaryDowncastBridged);
-    return emitCollectionDowncastExpr(SGF, source, loc, destType, C,
-                                      /*conditional=*/false,
-                                      bridgesFromObjC);
-  }
-
-  ManagedValue original = SGF.emitRValueAsSingleValue(source);
-
-  // Disable the original cleanup because the cast-to type is more specific and
-  // should have a more efficient cleanup.
-  SILValue originalVal = original.forward(SGF);
-  SILValue cast = SGF.emitUnconditionalCheckedCast(loc, originalVal,
-                                                   source->getType(),
-                                                   destType,
-                                                   castKind);
-
-  // If casting from an opaque existential, we'll forward the concrete value,
-  // but the existential container husk still needs cleanup.
-  if (originalVal.getType().isExistentialType()
-      && !originalVal.getType().isClassExistentialType())
-    SGF.Cleanups.pushCleanup<CleanupUsedExistentialContainer>(originalVal);
-
-  return RValue(SGF, loc, destType->getCanonicalType(),
-                SGF.emitManagedRValueWithCleanup(cast));
 }
 
 RValue RValueEmitter::visitIsaExpr(IsaExpr *E, SGFContext C) {
@@ -5196,9 +5291,8 @@ RValue RValueEmitter::emitForceValue(SILLocation loc, Expr *E,
   //
   //   (x as? Foo)!
   if (auto checkedCast = dyn_cast<ConditionalCheckedCastExpr>(E)) {
-    return emitUnconditionalCheckedCast(checkedCast->getSubExpr(),
-                                        loc, valueType,
-                                        checkedCast->getCastKind(),
+    return emitUnconditionalCheckedCast(SGF, loc, checkedCast->getSubExpr(),
+                                        valueType, checkedCast->getCastKind(),
                                         C);
   }
 
@@ -5339,5 +5433,7 @@ void SILGenFunction::emitIgnoredExpr(Expr *E) {
 /// Emit the given expression as an r-value, then (if it is a tuple), combine
 /// it together into a single ManagedValue.
 ManagedValue SILGenFunction::emitRValueAsSingleValue(Expr *E, SGFContext C) {
-  return emitRValue(E, C).getAsSingleValue(*this, E);
+  RValue &&rv = emitRValue(E, C);
+  if (rv.isUsed()) return ManagedValue::forInContext();
+  return std::move(rv).getAsSingleValue(*this, E);
 }

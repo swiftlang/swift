@@ -28,18 +28,24 @@ import gizmo
 // CHECK: define i64 @_TF13generic_casts8allToInt{{.*}}(%swift.opaque* noalias, %swift.type* %T)
 func allToInt<T>(x: T) -> Int {
   return x as Int
-  // CHECK: [[METADATA:%.*]] = bitcast %swift.type* %T to i8*{{$}}
-  // CHECK: [[CAST:%.*]] = call %swift.opaque* @swift_dynamicCastIndirectUnconditional(%swift.opaque* {{%.*}}, i8* [[METADATA]], i8* bitcast ({{.*}}@_TMdSi{{.*}}))
-  // CHECK: [[INT_RESULT_PTR:%.*]] = bitcast %swift.opaque* [[CAST]] to %Si*
-  // CHECK: [[INT_RESULT_PTR_0:%.*]] = getelementptr inbounds %Si* [[INT_RESULT_PTR]], i32 0, i32 0
-  // CHECK: [[INT_RESULT:%.*]] = load i64* [[INT_RESULT_PTR_0]], align 8
+  // CHECK: [[BUF:%.*]] = alloca [[BUFFER:.24 x i8.]],
+  // CHECK: [[INT_TEMP:%.*]] = alloca %Si,
+  // CHECK: [[TEMP:%.*]] = call %swift.opaque* {{.*}}([[BUFFER]]* [[BUF]], %swift.type* %T)
+  // CHECK: call %swift.opaque* {{%.*}}(%swift.opaque* [[TEMP]], %swift.opaque* %0, %swift.type* %T)
+  // CHECK: [[T0:%.*]] = bitcast %Si* [[INT_TEMP]] to %swift.opaque*
+  // CHECK: call i1 @swift_dynamicCast(%swift.opaque* [[T0]], %swift.opaque* [[TEMP]], %swift.type* %T, %swift.type* getelementptr inbounds ({{.*}} @_TMdSi, {{.*}}), i64 7)
+  // CHECK: [[T0:%.*]] = getelementptr inbounds %Si* [[INT_TEMP]], i32 0, i32 0
+  // CHECK: [[INT_RESULT:%.*]] = load i64* [[T0]],
   // CHECK: ret i64 [[INT_RESULT]]
 }
 
 // CHECK: define void @_TF13generic_casts8intToAll{{.*}}(%swift.opaque* noalias sret, i64, %swift.type* %T) {
 func intToAll<T>(x: Int) -> T {
-  // CHECK: [[METADATA:%.*]] = bitcast %swift.type* %T to i8*
-  // CHECK: [[CAST:%.*]] = call %swift.opaque* @swift_dynamicCastIndirectUnconditional(%swift.opaque* {{%.*}}, i8* bitcast ({{.*}} @_TMdSi, {{.*}}), i8* [[METADATA]])
+  // CHECK: [[INT_TEMP:%.*]] = alloca %Si,
+  // CHECK: [[T0:%.*]] = getelementptr inbounds %Si* [[INT_TEMP]], i32 0, i32 0
+  // CHECK: store i64 %1, i64* [[T0]],
+  // CHECK: [[T0:%.*]] = bitcast %Si* [[INT_TEMP]] to %swift.opaque*
+  // CHECK: call i1 @swift_dynamicCast(%swift.opaque* %0, %swift.opaque* [[T0]], %swift.type* getelementptr inbounds ({{.*}} @_TMdSi, {{.*}}), %swift.type* %T, i64 7)
   return x as T
 }
 
@@ -80,13 +86,8 @@ func protoCast(x: ObjCClass) -> protocol<ObjCProto1, NSRuncing> {
 func classExistentialToOpaqueArchetype<T>(var x: ObjCProto1) -> T {
   // CHECK: [[X:%.*]] = alloca %P13generic_casts10ObjCProto1_
   // CHECK: [[LOCAL:%.*]] = alloca %P13generic_casts10ObjCProto1_
-  // CHECK: [[PROTO_VALUE_ADDR:%.*]] = getelementptr inbounds %P13generic_casts10ObjCProto1_* [[LOCAL]], i32 0, i32 0
-  // CHECK: [[PROTO_VALUE_ADDR:%.*]] = getelementptr inbounds %P13generic_casts10ObjCProto1_* [[LOCAL]], i32 0, i32 0
-  // CHECK: [[PROTO_VALUE:%.*]] = load %objc_object** [[PROTO_VALUE_ADDR]], align 8
-  // CHECK: [[PROTO_TYPE:%.*]] = call %swift.type* @swift_getObjectType(%objc_object* [[PROTO_VALUE]])
-  // CHECK: [[PROTO_VALUE_OPAQUE:%.*]] = bitcast %objc_object** [[PROTO_VALUE_ADDR]] to %swift.opaque*
-  // CHECK: [[PROTO_TYPE_OPAQUE:%.*]] = bitcast %swift.type* [[PROTO_TYPE]] to i8*
-  // CHECK: [[T_OPAQUE:%.*]] = bitcast %swift.type* %T to i8*
-  // CHECK: call %swift.opaque* @swift_dynamicCastIndirectUnconditional(%swift.opaque* [[PROTO_VALUE_OPAQUE]], i8* [[PROTO_TYPE_OPAQUE]], i8* [[T_OPAQUE]])
+  // CHECK: [[LOCAL_OPAQUE:%.*]] = bitcast %P13generic_casts10ObjCProto1_* [[LOCAL]] to %swift.opaque*
+  // CHECK: [[PROTO_TYPE:%.*]] = call %swift.type* @swift_getExistentialTypeMetadata(
+  // CHECK: call i1 @swift_dynamicCast(%swift.opaque* %0, %swift.opaque* [[LOCAL_OPAQUE]], %swift.type* [[PROTO_TYPE]], %swift.type* %T, i64 7)
   return x as T
 }

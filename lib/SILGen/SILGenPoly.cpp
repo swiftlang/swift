@@ -1272,6 +1272,19 @@ SILGenFunction::emitSubstToOrigValue(SILLocation loc, ManagedValue v,
                                            substFormalType, ctxt);
 }
 
+ManagedValue
+SILGenFunction::emitRValueAsOrig(Expr *expr, AbstractionPattern origFormalType,
+                                 const TypeLowering &origTL, SGFContext ctxt) {
+  auto substFormalType = expr->getType()->getCanonicalType();
+  auto &substTL = getTypeLowering(substFormalType);
+  if (substTL.getLoweredType() == origTL.getLoweredType())
+    return emitRValueAsSingleValue(expr, ctxt);
+
+  ManagedValue temp = emitRValueAsSingleValue(expr);
+  return emitSubstToOrigValue(expr, temp, origFormalType,
+                              substFormalType, ctxt);
+}
+
 ManagedValue RValueSource::materialize(SILGenFunction &SGF,
                                        AbstractionPattern origFormalType,
                                        SILType destType) && {

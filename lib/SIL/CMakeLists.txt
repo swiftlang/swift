@@ -1,5 +1,6 @@
 add_swift_library(swiftSIL
   Dominance.cpp
+  DynamicCasts.cpp
   PrettyStackTrace.cpp
   SIL.cpp
   SILBasicBlock.cpp

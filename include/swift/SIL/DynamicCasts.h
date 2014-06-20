@@ -1,4 +1,4 @@
-//===--- Subtyping.h - SIL subtyping utilities ------------------*- C++ -*-===//
+//===--- DynamicsCasts.h - SIL dynamic-cast utilities -----------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -26,6 +26,7 @@ class SILBuilder;
 class SILLocation;
 class SILValue;
 class SILType;
+enum class CastConsumptionKind : unsigned char;
 
 enum class DynamicCastFeasibility {
   /// The cast will always succeed.
@@ -44,11 +45,17 @@ DynamicCastFeasibility classifyDynamicCast(Module *context,
                                            CanType sourceType,
                                            CanType targetType);
 
-SILValue
-swift::emitSuccessfulScalarUnconditionalCast(SILBuilder &B, Module *M,
-                                             SILLocation loc, SILValue value,
-                                             CanType formalSourceType,
-                                             CanType formalTargetType) {
+SILValue emitSuccessfulScalarUnconditionalCast(SILBuilder &B, Module *M,
+                                               SILLocation loc, SILValue value,
+                                               SILType loweredTargetType,
+                                               CanType formalSourceType,
+                                               CanType formalTargetType);
+
+void emitSuccessfulIndirectUnconditionalCast(SILBuilder &B, Module *M,
+                                             SILLocation loc,
+                                             CastConsumptionKind consumption,
+                                             SILValue src, CanType sourceType,
+                                             SILValue dest, CanType targetType);
 
 } // end namespace swift
 
