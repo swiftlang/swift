@@ -265,10 +265,16 @@ struct TestCase {
 // in tests, and stdlib does not have such facilities yet.
 
 func asHex(a: UInt8[]) -> String {
-  return "[ " + ", ".join(a.map { "0x" + String($0, radix: 16) }) + " ]"
+  // FIXME: commented out because of:
+  // <rdar://problem/17399536> SIL devirt crash: Assertion failed: (!empty())
+  // return "[ " + ", ".join(a.map { "0x" + String($0, radix: 16) }) + " ]"
+  return toString(a)
 }
 
 func asHex(a: UInt32[]) -> String {
-  return "[ " + ", ".join(a.map { "0x" + String($0, radix: 16) }) + " ]"
+  // FIXME: commented out because of:
+  // <rdar://problem/17399536> SIL devirt crash: Assertion failed: (!empty())
+  // return "[ " + ", ".join(a.map { "0x" + String($0, radix: 16) }) + " ]"
+  return toString(a)
 }
 
