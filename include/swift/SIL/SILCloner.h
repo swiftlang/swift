@@ -677,7 +677,6 @@ SILCloner<ImplClass>::visitUnconditionalCheckedCastInst(
   SILType OpType = getOpType(Inst->getType());
   doPostProcess(Inst,
          getBuilder().createUnconditionalCheckedCast(OpLoc,
-                                                     Inst->getCastKind(),
                                                      OpValue,
                                                      OpType));
 }
@@ -1204,7 +1203,7 @@ SILCloner<ImplClass>::visitCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
   SILBasicBlock *OpFailBB = getOpBasicBlock(Inst->getFailureBB());
   doPostProcess(Inst,
        getBuilder().createCheckedCastBranch(getOpLocation(Inst->getLoc()),
-                                            Inst->getCastKind(),
+                                            Inst->isExact(),
                                             getOpValue(Inst->getOperand()),
                                             getOpType(Inst->getCastType()),
                                             OpSuccBB, OpFailBB));

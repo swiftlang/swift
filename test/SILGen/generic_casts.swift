@@ -19,7 +19,7 @@ func opaque_archetype_to_opaque_archetype
 func opaque_archetype_is_opaque_archetype
 <T:NotClassBound, U>(t:T) -> Bool {
   return t is U
-  // CHECK:   checked_cast_br archetype_to_archetype [[VAL:%.*]] : {{.*}} to $*U, [[YES:bb[0-9]+]], [[NO:bb[0-9]+]]
+  // CHECK:   checked_cast_br [[VAL:%.*]] : {{.*}} to $*U, [[YES:bb[0-9]+]], [[NO:bb[0-9]+]]
   // CHECK: [[YES]]({{%.*}}):
   // CHECK:   [[Y:%.*]] = integer_literal $Builtin.Int1, -1
   // CHECK:   br [[CONT:bb[0-9]+]]([[Y]] : $Builtin.Int1)
@@ -50,14 +50,14 @@ func opaque_archetype_is_class_archetype
 <T:NotClassBound, U:ClassBound> (t:T) -> Bool {
   return t is U
   // CHECK: copy_addr {{.*}} : $*T
-  // CHECK: checked_cast_br archetype_to_archetype [[VAL:%.*]] : {{.*}} to $*U
+  // CHECK: checked_cast_br [[VAL:%.*]] : {{.*}} to $*U
 }
 
 // CHECK-LABEL: sil  @_TF13generic_casts34class_archetype_to_class_archetype{{.*}}
 func class_archetype_to_class_archetype
 <T:ClassBound, U:ClassBound>(t:T) -> U {
   return t as U
-  // CHECK: [[DOWNCAST:%.*]] = unconditional_checked_cast archetype_to_archetype {{%.*}} : {{.*}} to $U
+  // CHECK: [[DOWNCAST:%.*]] = unconditional_checked_cast {{%.*}} : {{.*}} to $U
   // CHECK: return [[DOWNCAST]] : $U
 }
 
@@ -65,7 +65,7 @@ func class_archetype_to_class_archetype
 func class_archetype_is_class_archetype
 <T:ClassBound, U:ClassBound>(t:T) -> Bool {
   return t is U
-  // CHECK: checked_cast_br archetype_to_archetype [[VAL:%.*]] : {{.*}} to $U
+  // CHECK: checked_cast_br [[VAL:%.*]] : {{.*}} to $U
 }
 
 // CHECK-LABEL: sil  @_TF13generic_casts38opaque_archetype_to_addr_only_concrete{{.*}}
@@ -80,7 +80,7 @@ func opaque_archetype_to_addr_only_concrete
 func opaque_archetype_is_addr_only_concrete
 <T:NotClassBound> (t:T) -> Bool {
   return t is Unloadable
-  // CHECK: checked_cast_br archetype_to_concrete [[VAL:%.*]] : {{.*}} to $*Unloadable
+  // CHECK: checked_cast_br [[VAL:%.*]] : {{.*}} to $*Unloadable
 }
 
 // CHECK-LABEL: sil  @_TF13generic_casts37opaque_archetype_to_loadable_concrete{{.*}}
@@ -96,14 +96,14 @@ func opaque_archetype_to_loadable_concrete
 func opaque_archetype_is_loadable_concrete
 <T:NotClassBound>(t:T) -> Bool {
   return t is S
-  // CHECK: checked_cast_br archetype_to_concrete {{%.*}} to $*S
+  // CHECK: checked_cast_br {{%.*}} to $*S
 }
 
 // CHECK-LABEL: sil  @_TF13generic_casts24class_archetype_to_class{{.*}}
 func class_archetype_to_class
 <T:ClassBound>(t:T) -> C {
   return t as C
-  // CHECK: [[DOWNCAST:%.*]] = unconditional_checked_cast archetype_to_concrete {{%.*}} to $C
+  // CHECK: [[DOWNCAST:%.*]] = unconditional_checked_cast {{%.*}} to $C
   // CHECK: return [[DOWNCAST]] : $C
 }
 
@@ -111,7 +111,7 @@ func class_archetype_to_class
 func class_archetype_is_class
 <T:ClassBound>(t:T) -> Bool {
   return t is C
-  // CHECK: checked_cast_br archetype_to_concrete {{%.*}} to $C
+  // CHECK: checked_cast_br {{%.*}} to $C
 }
 
 // CHECK-LABEL: sil  @_TF13generic_casts38opaque_existential_to_opaque_archetype{{.*}}
@@ -132,7 +132,7 @@ func opaque_existential_to_opaque_archetype
 func opaque_existential_is_opaque_archetype
 <T:NotClassBound>(p:NotClassBound) -> Bool {
   return p is T
-  // CHECK:   checked_cast_br existential_to_archetype [[CONTAINER:%.*]] : {{.*}} to $*T
+  // CHECK:   checked_cast_br [[CONTAINER:%.*]] : {{.*}} to $*T
 }
 
 // CHECK-LABEL: sil  @_TF13generic_casts37opaque_existential_to_class_archetype{{.*}}
@@ -148,14 +148,14 @@ func opaque_existential_to_class_archetype
 func opaque_existential_is_class_archetype
 <T:ClassBound>(p:NotClassBound) -> Bool {
   return p is T
-  // CHECK: checked_cast_br existential_to_archetype {{%.*}} to $*T
+  // CHECK: checked_cast_br {{%.*}} to $*T
 }
 
 // CHECK-LABEL: sil  @_TF13generic_casts36class_existential_to_class_archetype{{.*}}
 func class_existential_to_class_archetype
 <T:ClassBound>(p:ClassBound) -> T {
   return p as T
-  // CHECK: [[DOWNCAST:%.*]] = unconditional_checked_cast existential_to_archetype {{%.*}} to $T
+  // CHECK: [[DOWNCAST:%.*]] = unconditional_checked_cast {{%.*}} to $T
   // CHECK: return [[DOWNCAST]] : $T
 }
 
@@ -163,7 +163,7 @@ func class_existential_to_class_archetype
 func class_existential_is_class_archetype
 <T:ClassBound>(p:ClassBound) -> Bool {
   return p is T
-  // CHECK: checked_cast_br existential_to_archetype {{%.*}} to $T
+  // CHECK: checked_cast_br {{%.*}} to $T
 }
 
 // CHECK-LABEL: sil  @_TF13generic_casts40opaque_existential_to_addr_only_concrete{{.*}}
@@ -176,7 +176,7 @@ func opaque_existential_to_addr_only_concrete(p: NotClassBound) -> Unloadable {
 // CHECK-LABEL: sil  @_TF13generic_casts40opaque_existential_is_addr_only_concrete{{.*}}
 func opaque_existential_is_addr_only_concrete(p: NotClassBound) -> Bool {
   return p is Unloadable
-  // CHECK:   checked_cast_br existential_to_concrete {{%.*}} to $*Unloadable
+  // CHECK:   checked_cast_br {{%.*}} to $*Unloadable
 }
 
 // CHECK-LABEL: sil  @_TF13generic_casts39opaque_existential_to_loadable_concrete{{.*}}
@@ -190,24 +190,24 @@ func opaque_existential_to_loadable_concrete(p: NotClassBound) -> S {
 // CHECK-LABEL: sil  @_TF13generic_casts39opaque_existential_is_loadable_concrete{{.*}}
 func opaque_existential_is_loadable_concrete(p: NotClassBound) -> Bool {
   return p is S
-  // CHECK: checked_cast_br existential_to_concrete {{%.*}} to $*S
+  // CHECK: checked_cast_br {{%.*}} to $*S
 }
 
 // CHECK-LABEL: sil  @_TF13generic_casts26class_existential_to_class{{.*}}
 func class_existential_to_class(p: ClassBound) -> C {
   return p as C
-  // CHECK: [[DOWNCAST:%.*]] = unconditional_checked_cast existential_to_concrete {{%.*}} to $C
+  // CHECK: [[DOWNCAST:%.*]] = unconditional_checked_cast {{%.*}} to $C
   // CHECK: return [[DOWNCAST]] : $C
 }
 
 // CHECK-LABEL: sil  @_TF13generic_casts26class_existential_is_class{{.*}}
 func class_existential_is_class(p: ClassBound) -> Bool {
   return p is C
-  // CHECK: checked_cast_br existential_to_concrete {{%.*}} to $C
+  // CHECK: checked_cast_br {{%.*}} to $C
 }
 
 // CHECK-LABEL: sil @_TF13generic_casts27optional_anyobject_to_classFGSqPSs9AnyObject__GSqCS_1C_ 
-// CHECK:         checked_cast_br existential_to_concrete {{%.*}} : $AnyObject to $C
+// CHECK:         checked_cast_br {{%.*}} : $AnyObject to $C
 func optional_anyobject_to_class(p: AnyObject?) -> C? {
   return p as? C
 }

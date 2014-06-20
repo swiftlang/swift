@@ -27,7 +27,7 @@ func foo(y : A?) {
 // CHECK-NEXT: [[TMP_A:%.*]] = alloc_stack $A
 // CHECK-NEXT: apply [transparent] [[T0]]<A>([[TMP_A]]#1, [[TMP_OPTA]]#1)
 // CHECK-NEXT: [[VAL:%.*]] = load [[TMP_A]]#1
-// CHECK-NEXT: checked_cast_br downcast [[VAL]] : $A to $B, [[IS_B:bb.*]], [[NOT_B:bb[0-9]+]]
+// CHECK-NEXT: checked_cast_br [[VAL]] : $A to $B, [[IS_B:bb.*]], [[NOT_B:bb[0-9]+]]
 //   If so, materialize that and inject it into x.
 // CHECK:    [[IS_B]]([[T0:%.*]] : $B):
 // CHECK-NEXT: [[TMP_B:%.*]] = alloc_stack $B
@@ -148,7 +148,7 @@ func bar(y : A????) {
 // CHECK-NEXT: [[TMP_A:%.*]] = alloc_stack $A
 // CHECK-NEXT: apply [transparent] [[T0]]<A>([[TMP_A]]#1, [[TMP_OA]]#1)
 // CHECK-NEXT: [[VAL:%.*]] = load [[TMP_A]]#1
-// CHECK-NEXT: checked_cast_br downcast [[VAL]] : $A to $B, [[IS_B:bb.*]], [[NOT_B:bb[0-9]+]]
+// CHECK-NEXT: checked_cast_br [[VAL]] : $A to $B, [[IS_B:bb.*]], [[NOT_B:bb[0-9]+]]
 //   If so, inject it back into an optional.
 //   TODO: We're going to switch back out of this; we really should peephole it.
 // CHECK:    [[IS_B]]([[T0:%.*]] : $B):
@@ -242,4 +242,4 @@ func baz(y : AnyObject?) {
 // CHECK-NEXT: [[TMP_ANY:%.*]] = alloc_stack $AnyObject
 // CHECK-NEXT: apply [transparent] [[T0]]<AnyObject>([[TMP_ANY]]#1, [[TMP_OPTANY]]#1)
 // CHECK-NEXT: [[VAL:%.*]] = load [[TMP_ANY]]#1
-// CHECK-NEXT: checked_cast_br existential_to_concrete [[VAL]] : $AnyObject to $B, [[IS_B:bb.*]], [[NOT_B:bb[0-9]+]]
+// CHECK-NEXT: checked_cast_br [[VAL]] : $AnyObject to $B, [[IS_B:bb.*]], [[NOT_B:bb[0-9]+]]

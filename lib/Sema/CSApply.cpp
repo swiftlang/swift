@@ -2459,7 +2459,6 @@ namespace {
       case CheckedCastKind::ArrayDowncastBridged:
       case CheckedCastKind::DictionaryDowncast:
       case CheckedCastKind::DictionaryDowncastBridged:
-      case CheckedCastKind::Identical:
       case CheckedCastKind::Downcast:
       case CheckedCastKind::SuperToArchetype:
       case CheckedCastKind::ArchetypeToArchetype:
@@ -2742,7 +2741,6 @@ namespace {
       case CheckedCastKind::ArrayDowncastBridged:
       case CheckedCastKind::DictionaryDowncast:
       case CheckedCastKind::DictionaryDowncastBridged:
-      case CheckedCastKind::Identical:
       case CheckedCastKind::Downcast:
       case CheckedCastKind::SuperToArchetype:
       case CheckedCastKind::ArchetypeToArchetype:

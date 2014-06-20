@@ -2755,13 +2755,15 @@ void IRGenSILFunction::visitObjCToThickMetatypeInst(
 /// or object-ness of the cast.
 static Address emitCheckedCast(IRGenSILFunction &IGF,
                                SILValue operand,
-                               SILType destTy,
-                               CheckedCastKind kind,
+                               SILType loweredTargetType,
                                CheckedCastMode mode) {
-  if (operand.getType().is<AnyMetatypeType>()) {
+  CanType sourceType = operand.getType().getSwiftRValueType();
+  CanType targetType = loweredTargetType.getSwiftRValueType();
+
+  if (isa<AnyMetatypeType>(sourceType)) {
     // FIXME: To-existential-metatype checks require a runtime function we don't
     // have implemented yet.
-    if (destTy.is<ExistentialMetatypeType>())
+    if (isa<ExistentialMetatypeType>(targetType))
       IGF.unimplemented(operand.getLoc() ? operand.getLoc()->getSourceLoc()
                                          : SourceLoc(),
                         "downcast to existential metatype");
@@ -2781,25 +2783,13 @@ static Address emitCheckedCast(IRGenSILFunction &IGF,
       // value, which we don't need.
       fromEx.claimAll();
     }
-    llvm::Value *cast = emitMetatypeDowncast(IGF, metatypeVal,
-                                             destTy.castTo<AnyMetatypeType>(),
-                                             mode);
-    return Address(cast, Alignment(1));
+    llvm::Value *result = emitMetatypeDowncast(IGF, metatypeVal,
+                                          cast<AnyMetatypeType>(targetType),
+                                               mode);
+    return Address(result, Alignment(1));
   }
-  
-  
-  switch (kind) {
-  case CheckedCastKind::Unresolved:
-  case CheckedCastKind::Coercion:
-  case CheckedCastKind::ArrayDowncast:
-  case CheckedCastKind::ArrayDowncastBridged:
-  case CheckedCastKind::DictionaryDowncast:
-  case CheckedCastKind::DictionaryDowncastBridged:
-    llvm_unreachable("invalid for sil");
-  case CheckedCastKind::Identical:
-  case CheckedCastKind::Downcast: {
-    bool DowncastKind = kind == CheckedCastKind::Downcast;
 
+  if (sourceType->isSuperclassOf(targetType, nullptr)) {
     // If we have an address, load the value and use the
     // emitClassDowncast code to make the check. Then just bitcast
     // addr appropriately.
@@ -2809,14 +2799,9 @@ static Address emitCheckedCast(IRGenSILFunction &IGF,
     // into emitDowncastPointer or the like.
     if (operand.getType().isAddress()) {
       auto fromAddr = IGF.getLoweredAddress(operand);
-      auto toTy = IGF.getTypeInfo(destTy).getStorageType();
+      auto toTy = IGF.getTypeInfo(loweredTargetType).getStorageType();
       llvm::Value *fromValue = IGF.Builder.CreateLoad(fromAddr);
-      if (DowncastKind) {
-        emitClassDowncast(IGF, fromValue, destTy, mode);
-      } else {
-        emitClassIdenticalCast(IGF, fromValue, operand.getType(), destTy,
-                               mode);
-      }
+      emitClassDowncast(IGF, fromValue, loweredTargetType, mode);
 
       llvm::Value *cast = IGF.Builder.CreateBitCast(fromAddr.getAddress(),
                                                     toTy->getPointerTo());
@@ -2826,48 +2811,33 @@ static Address emitCheckedCast(IRGenSILFunction &IGF,
     Explosion from = IGF.getLoweredExplosion(operand);
     llvm::Value *fromValue = from.claimNext();
     llvm::Value *cast;
-    if (DowncastKind) {
-      cast = emitClassDowncast(IGF, fromValue, destTy, mode);
-    } else {
-      cast = emitClassIdenticalCast(IGF, fromValue, operand.getType(), destTy,
-                                    mode);
-    }
+    cast = emitClassDowncast(IGF, fromValue, loweredTargetType, mode);
     return Address(cast, Alignment(1));
   }
-    
-  case CheckedCastKind::SuperToArchetype: {
-    Explosion super = IGF.getLoweredExplosion(operand);
-    llvm::Value *in = super.claimNext();
-    Explosion out(ResilienceExpansion::Maximal);
-    llvm::Value *cast
-      = emitSuperToClassArchetypeConversion(IGF, in, destTy, mode);
-    return Address(cast, Alignment(1));
-  }
-      
-  case CheckedCastKind::ArchetypeToArchetype:
-  case CheckedCastKind::ArchetypeToConcrete:
-  case CheckedCastKind::ConcreteToArchetype: {
+
+  if ((isa<ArchetypeType>(sourceType) && !targetType.isExistentialType()) ||
+      (isa<ArchetypeType>(targetType) && !sourceType.isExistentialType())) {
     if (operand.getType().isAddress()) {
       Address archetype = IGF.getLoweredAddress(operand);
       return emitOpaqueArchetypeDowncast(IGF, archetype,
                                          operand.getType(),
-                                         destTy,
+                                         loweredTargetType,
                                          mode);
     } else {
       Explosion archetype = IGF.getLoweredExplosion(operand);
       llvm::Value *fromValue = archetype.claimNext();
-      llvm::Value *toValue = emitClassDowncast(IGF, fromValue, destTy, mode);
+      llvm::Value *toValue =
+        emitClassDowncast(IGF, fromValue, loweredTargetType, mode);
       return Address(toValue, Alignment(1));
     }
   }
-      
-  case CheckedCastKind::ExistentialToArchetype:
-  case CheckedCastKind::ExistentialToConcrete: {
+
+  if (sourceType.isExistentialType()) {
     if (operand.getType().isAddress()) {
       Address existential = IGF.getLoweredAddress(operand);
       return emitIndirectExistentialDowncast(IGF, existential,
                                              operand.getType(),
-                                             destTy,
+                                             loweredTargetType,
                                              mode);
     } else {
       Explosion existential = IGF.getLoweredExplosion(operand);
@@ -2875,20 +2845,29 @@ static Address emitCheckedCast(IRGenSILFunction &IGF,
         = emitClassExistentialProjection(IGF, existential,
                                          operand.getType(),
                                          CanArchetypeType());
-      
-      llvm::Value *toValue = emitClassDowncast(IGF, instance, destTy, mode);
+
+      llvm::Value *toValue;
+      if (loweredTargetType.isExistentialType()) {
+        toValue = emitObjCExistentialDowncast(IGF, instance,
+                                              operand.getType(),
+                                              loweredTargetType, mode);
+      } else {
+        toValue = emitClassDowncast(IGF, instance, loweredTargetType, mode);
+      }
       return Address(toValue, Alignment(1));
     }
   }
-  case CheckedCastKind::ConcreteToUnrelatedExistential: {
+
+  if (targetType.isExistentialType()) {
     Explosion from = IGF.getLoweredExplosion(operand);
     llvm::Value *fromValue = from.claimNext();
     llvm::Value *cast = emitObjCExistentialDowncast(IGF, fromValue,
                                                     operand.getType(),
-                                                    destTy, mode);
+                                                    loweredTargetType, mode);
     return Address(cast, Alignment(1));
   }
-  }
+
+  llvm_unreachable("unexpected cast?");
 }
 
 void IRGenSILFunction::visitUnconditionalCheckedCastInst(
@@ -2912,7 +2891,6 @@ void IRGenSILFunction::visitUnconditionalCheckedCastInst(
   }
   
   Address val = emitCheckedCast(*this, i->getOperand(), i->getType(),
-                                i->getCastKind(),
                                 CheckedCastMode::Unconditional);
   
   if (i->getType().isAddress()) {
@@ -2970,10 +2948,19 @@ void IRGenSILFunction::visitUnconditionalCheckedCastAddrInst(
 
 void IRGenSILFunction::visitCheckedCastBranchInst(
                                               swift::CheckedCastBranchInst *i) {
-  // Emit the cast operation.
-  Address val = emitCheckedCast(*this, i->getOperand(), i->getCastType(),
-                                i->getCastKind(),
-                                CheckedCastMode::Conditional);
+  Address val;
+  if (i->isExact()) {
+    auto operand = i->getOperand();
+    Explosion source = getLoweredExplosion(operand);
+    SILType destTy = i->getCastType();
+    llvm::Value *result =
+      emitClassIdenticalCast(*this, source.claimNext(), operand.getType(),
+                             destTy, CheckedCastMode::Conditional);
+    val = Address(result, Alignment(1));
+  } else {
+    val = emitCheckedCast(*this, i->getOperand(), i->getCastType(),
+                          CheckedCastMode::Conditional);
+  }
   
   // Branch on the success of the cast.
   // All cast operations currently return null on failure.

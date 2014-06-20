@@ -50,41 +50,6 @@ static unsigned toStableSILLinkage(SILLinkage linkage) {
   llvm_unreachable("bad linkage");
 }
 
-static unsigned toStableCheckedCastKind(CheckedCastKind kind) {
-  switch (kind) {
-  case CheckedCastKind::ArchetypeToArchetype:
-    return SIL_CHECKED_CAST_ARCHETYPE_TO_ARCHETYPE;
-  case CheckedCastKind::ArchetypeToConcrete:
-    return SIL_CHECKED_CAST_ARCHETYPE_TO_CONCRETE;
-  case CheckedCastKind::ArrayDowncast:
-    return SIL_CHECKED_CAST_ARRAY_DOWNCAST;
-  case CheckedCastKind::ArrayDowncastBridged:
-    return SIL_CHECKED_CAST_ARRAY_DOWNCAST_BRIDGED;
-  case CheckedCastKind::DictionaryDowncast:
-    return SIL_CHECKED_CAST_DICTIONARY_DOWNCAST;
-  case CheckedCastKind::DictionaryDowncastBridged:
-    return SIL_CHECKED_CAST_DICTIONARY_DOWNCAST_BRIDGED;
-  case CheckedCastKind::Downcast:
-    return SIL_CHECKED_CAST_DOWNCAST;
-    case CheckedCastKind::Identical:
-      return SIL_CHECKED_CAST_IDENTICAL;
-  case CheckedCastKind::ExistentialToArchetype:
-    return SIL_CHECKED_CAST_EXISTENTIAL_TO_ARCHETYPE;
-  case CheckedCastKind::ExistentialToConcrete:
-    return SIL_CHECKED_CAST_EXISTENTIAL_TO_CONCRETE;
-  case CheckedCastKind::SuperToArchetype:
-    return SIL_CHECKED_CAST_SUPER_TO_ARCHETYPE;
-  case CheckedCastKind::ConcreteToArchetype:
-    return SIL_CHECKED_CAST_CONCRETE_TO_ARCHETYPE;
-  case CheckedCastKind::ConcreteToUnrelatedExistential:
-    return SIL_CHECKED_CAST_CONCRETE_TO_UNRELATED_EXISTENTIAL;
-  case CheckedCastKind::Unresolved:
-  case CheckedCastKind::Coercion:
-    llvm_unreachable("serializing unexpected cast kind");
-  }
-  llvm_unreachable("bad checked cast kind");
-}
-
 static unsigned toStableCastConsumptionKind(CastConsumptionKind kind) {
   switch (kind) {
   case CastConsumptionKind::TakeAlways:
@@ -919,8 +884,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     auto CI = cast<UnconditionalCheckedCastInst>(&SI);
     SILInstCastLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILInstCastLayout::Code],
-        (unsigned)SI.getKind(),
-        toStableCheckedCastKind(CI->getCastKind()),
+        (unsigned)SI.getKind(), /*attr*/ 0,
         S.addTypeRef(CI->getType().getSwiftRValueType()),
         (unsigned)CI->getType().getCategory(),
         S.addTypeRef(CI->getOperand().getType().getSwiftRValueType()),
@@ -1223,7 +1187,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     // a BasicBlock ID for failure. Uses SILOneTypeValuesLayout.
     const CheckedCastBranchInst *CBI = cast<CheckedCastBranchInst>(&SI);
     SmallVector<ValueID, 8> ListOfValues;
-    ListOfValues.push_back(toStableCheckedCastKind(CBI->getCastKind()));
+    ListOfValues.push_back(CBI->isExact()),
     ListOfValues.push_back(addValueRef(CBI->getOperand()));
     ListOfValues.push_back(CBI->getOperand().getResultNumber());
     ListOfValues.push_back(

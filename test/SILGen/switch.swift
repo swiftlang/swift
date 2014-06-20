@@ -345,13 +345,13 @@ struct Z : P { func p() {} }
 // CHECK-LABEL: sil  @_TF6switch10test_isa_1FT1pPS_1P__T_
 func test_isa_1(#p: P) {
   switch p {
-  // CHECK:   checked_cast_br existential_to_concrete [[P:%.*]] : $*P to $*X, [[IS_X:bb[0-9]+]], [[IS_NOT_X:bb[0-9]+]]
+  // CHECK:   checked_cast_br [[P:%.*]] : $*P to $*X, [[IS_X:bb[0-9]+]], [[IS_NOT_X:bb[0-9]+]]
 
   // CHECK: [[IS_NOT_X]]:
-  // CHECK:   checked_cast_br existential_to_concrete [[P]] : $*P to $*Y, [[IS_Y:bb[0-9]+]], [[IS_NOT_Y:bb[0-9]+]]
+  // CHECK:   checked_cast_br [[P]] : $*P to $*Y, [[IS_Y:bb[0-9]+]], [[IS_NOT_Y:bb[0-9]+]]
 
   // CHECK: [[IS_NOT_Y]]:
-  // CHECK:   checked_cast_br existential_to_concrete [[P]] : $*P to $*Z, [[IS_Z:bb[0-9]+]], [[IS_NOT_Z:bb[0-9]+]]
+  // CHECK:   checked_cast_br [[P]] : $*P to $*Z, [[IS_Z:bb[0-9]+]], [[IS_NOT_Z:bb[0-9]+]]
 
   // CHECK: [[IS_X]]([[CAST_X:%.*]]):
   // CHECK:   br [[CASE1:bb[0-9]+]]
@@ -393,9 +393,9 @@ func test_isa_1(#p: P) {
 // CHECK-LABEL: sil  @_TF6switch10test_isa_2FT1pPS_1P__T_
 func test_isa_2(#p: P) {
   switch (p, foo()) {
-  // CHECK:   checked_cast_br existential_to_concrete [[P:%.*]] : $*P to $*X, [[IS_X:bb[0-9]+]], [[IS_NOT_X:bb[0-9]+]]
+  // CHECK:   checked_cast_br [[P:%.*]] : $*P to $*X, [[IS_X:bb[0-9]+]], [[IS_NOT_X:bb[0-9]+]]
   // CHECK: [[IS_NOT_X]]:
-  // CHECK:   checked_cast_br existential_to_concrete [[P]] : $*P to $*Y, [[IS_Y:bb[0-9]+]], [[IS_NOT_Y:bb[0-9]+]]
+  // CHECK:   checked_cast_br [[P]] : $*P to $*Y, [[IS_Y:bb[0-9]+]], [[IS_NOT_Y:bb[0-9]+]]
 
   // CHECK: [[IS_X]]([[CAST_X:%.*]]):
   // CHECK:   function_ref @_TF6switch3fooFT_Si
@@ -465,11 +465,11 @@ class E : C {}
 func test_isa_class_1(let #x: B) {
   // CHECK: strong_retain %0
   switch x {
-  // CHECK:   checked_cast_br downcast [[X:%.*]] : $B to $D1, [[IS_D1:bb[0-9]+]], [[IS_NOT_D1:bb[0-9]+]]
+  // CHECK:   checked_cast_br [[X:%.*]] : $B to $D1, [[IS_D1:bb[0-9]+]], [[IS_NOT_D1:bb[0-9]+]]
   // CHECK: [[IS_NOT_D1]]:
-  // CHECK:   checked_cast_br downcast [[X]] : $B to $E, [[IS_E:bb[0-9]+]], [[IS_NOT_E:bb[0-9]+]]
+  // CHECK:   checked_cast_br [[X]] : $B to $E, [[IS_E:bb[0-9]+]], [[IS_NOT_E:bb[0-9]+]]
   // CHECK: [[IS_NOT_E]]:
-  // CHECK:   checked_cast_br downcast [[X]] : $B to $C, [[IS_C:bb[0-9]+]], [[IS_NOT_C:bb[0-9]+]]
+  // CHECK:   checked_cast_br [[X]] : $B to $C, [[IS_C:bb[0-9]+]], [[IS_NOT_C:bb[0-9]+]]
 
   // CHECK: [[IS_D1]]([[CAST_D1:%.*]]):
   // CHECK:   function_ref @_TF6switch6runcedFT_Sb
@@ -485,7 +485,7 @@ func test_isa_class_1(let #x: B) {
     a()
 
   // CHECK: [[NO_CASE1]]:
-  // CHECK:   checked_cast_br downcast [[CAST_D1]] to $D2, [[IS_D2:bb[0-9]+]], [[IS_NOT_D2:bb[0-9]+]]
+  // CHECK:   checked_cast_br [[CAST_D1]] to $D2, [[IS_D2:bb[0-9]+]], [[IS_NOT_D2:bb[0-9]+]]
 
   // CHECK: [[IS_D2]]([[CAST_D2:%.*]]):
   // CHECK:   strong_release [[CAST_D2]]
@@ -544,11 +544,11 @@ func test_isa_class_1(let #x: B) {
 func test_isa_class_2(#x: B) -> AnyObject {
   // CHECK: strong_retain %0
   switch x {
-  // CHECK:   checked_cast_br downcast [[X:%.*]] : $B to $D1, [[IS_D1:bb[0-9]+]], [[IS_NOT_D1:bb[0-9]+]]
+  // CHECK:   checked_cast_br [[X:%.*]] : $B to $D1, [[IS_D1:bb[0-9]+]], [[IS_NOT_D1:bb[0-9]+]]
   // CHECK: [[IS_NOT_D1]]:
-  // CHECK:   checked_cast_br downcast [[X]] : $B to $E, [[IS_E:bb[0-9]+]], [[IS_NOT_E:bb[0-9]+]]
+  // CHECK:   checked_cast_br [[X]] : $B to $E, [[IS_E:bb[0-9]+]], [[IS_NOT_E:bb[0-9]+]]
   // C/HECK: [[IS_NOT_E]]:
-  // C/HECK:   checked_cast_br downcast [[X]] : $B to $C, [[IS_C:bb[0-9]+]], [[IS_NOT_C:bb[0-9]+]]
+  // C/HECK:   checked_cast_br [[X]] : $B to $C, [[IS_C:bb[0-9]+]], [[IS_NOT_C:bb[0-9]+]]
 
   // CHECK: [[IS_D1]]([[CAST_D1:%.*]]):
   // CHECK:   function_ref @_TF6switch6runcedFT_Sb
@@ -565,7 +565,7 @@ func test_isa_class_2(#x: B) -> AnyObject {
     return y
 
   // CHECK: [[NO_CASE1]]:
-  // CHECK:   checked_cast_br downcast [[CAST_D1]] to $D2, [[IS_D2:bb[0-9]+]], [[IS_NOT_D2:bb[0-9]+]]
+  // CHECK:   checked_cast_br [[CAST_D1]] to $D2, [[IS_D2:bb[0-9]+]], [[IS_NOT_D2:bb[0-9]+]]
 
   // CHECK: [[IS_D2]]([[CAST_D2:%.*]]):
   // CHECK:   br [[CASE2:bb[0-9]+]]
@@ -1157,9 +1157,9 @@ func test_class_pattern_with_isa_1(#k: ClassPatternTest) {
     a()
 
   // CHECK: [[IS_NOT_CASE1]]:
-  // CHECK:   checked_cast_br downcast [[C]] : $ClassPatternTest to $SubclassTestA, [[IS_A:bb[0-9]+]], [[IS_NOT_A:bb[0-9]+]]
+  // CHECK:   checked_cast_br [[C]] : $ClassPatternTest to $SubclassTestA, [[IS_A:bb[0-9]+]], [[IS_NOT_A:bb[0-9]+]]
   // CHECK: [[IS_NOT_A]]:
-  // CHECK:   checked_cast_br downcast [[C]] : $ClassPatternTest to $SubclassTestB, [[IS_B:bb[0-9]+]], [[IS_NOT_B:bb[0-9]+]]
+  // CHECK:   checked_cast_br [[C]] : $ClassPatternTest to $SubclassTestB, [[IS_B:bb[0-9]+]], [[IS_NOT_B:bb[0-9]+]]
 
   // CHECK: [[IS_A]]([[A:%.*]] : $SubclassTestA):
   // CHECK:   strong_release [[A]]
@@ -1236,9 +1236,9 @@ func rdar14826416<T, U>(#t: T, #u: U) {
   }
 }
 // CHECK-LABEL: sil @_TF6switch12rdar14826416U___FT1tQ_1uQ0__T_
-// CHECK:   checked_cast_br archetype_to_concrete {{%.*}} : $*T to $*Int, [[IS_INT:bb[0-9]+]], [[ISNT_INT:bb[0-9]+]]
+// CHECK:   checked_cast_br {{%.*}} : $*T to $*Int, [[IS_INT:bb[0-9]+]], [[ISNT_INT:bb[0-9]+]]
 // CHECK: [[ISNT_INT]]:
-// CHECK:   checked_cast_br archetype_to_archetype {{%.*}} : $*T to $*U, [[ISNT_INT_IS_U:bb[0-9]+]], [[ISNT_INT_ISNT_U:bb[0-9]+]]
+// CHECK:   checked_cast_br {{%.*}} : $*T to $*U, [[ISNT_INT_IS_U:bb[0-9]+]], [[ISNT_INT_ISNT_U:bb[0-9]+]]
 
 // <rdar://problem/14835992>
 class Rdar14835992 {}

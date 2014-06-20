@@ -637,7 +637,7 @@ bb0(%0 : $DerivedClassWithIVars):
   %14 = function_ref @superinit : $@cc(method) @thin (@owned RootClassWithIVars) -> @owned RootClassWithIVars
   %15 = apply %14(%13) : $@cc(method) @thin (@owned RootClassWithIVars) -> @owned RootClassWithIVars
 
-  %16 = unconditional_checked_cast downcast %15 : $RootClassWithIVars to $DerivedClassWithIVars
+  %16 = unconditional_checked_cast %15 : $RootClassWithIVars to $DerivedClassWithIVars
   assign %16 to %1#1 : $*DerivedClassWithIVars
   %18 = load %1#1 : $*DerivedClassWithIVars
   strong_retain %18 : $DerivedClassWithIVars
@@ -657,7 +657,7 @@ bb0(%0 : $DerivedClassWithIVars):
   %14 = function_ref @superinit : $@cc(method) @thin (@owned RootClassWithIVars) -> @owned RootClassWithIVars
   %15 = apply %14(%13) : $@cc(method) @thin (@owned RootClassWithIVars) -> @owned RootClassWithIVars
 
-  %16 = unconditional_checked_cast downcast %15 : $RootClassWithIVars to $DerivedClassWithIVars
+  %16 = unconditional_checked_cast %15 : $RootClassWithIVars to $DerivedClassWithIVars
   assign %16 to %1#1 : $*DerivedClassWithIVars
   %18 = load %1#1 : $*DerivedClassWithIVars
   strong_retain %18 : $DerivedClassWithIVars

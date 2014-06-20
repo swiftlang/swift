@@ -628,7 +628,7 @@ func downcast(var b: B) {
   (b as D).foo()
   // CHECK: [[B:%[0-9]+]] = load [[BADDR]]
   // CHECK: retain [[B]]
-  // CHECK: [[D:%[0-9]+]] = unconditional_checked_cast downcast [[B]] : {{.*}} to $D
+  // CHECK: [[D:%[0-9]+]] = unconditional_checked_cast [[B]] : {{.*}} to $D
   // CHECK: apply {{.*}}([[D]])
   // CHECK-NOT: release [[B]]
   // CHECK-NOT: release [[D]]

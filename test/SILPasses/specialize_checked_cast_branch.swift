@@ -59,18 +59,13 @@ ArchetypeToArchetypeCast(t1: c, t2: b)
 
 // x -> y where x is a super class of y.
 // CHECK-LABEL: sil shared @_TTSC30specialize_checked_cast_branch1C_CS_1D___TF30specialize_checked_cast_branch24ArchetypeToArchetypeCastU___FT2t1Q_2t2Q0__Q0_ : $@thin (@out D, @in C, @in D) -> () {
-// CHECK: unconditional_checked_cast downcast {{%[0-9]+}}#1 : $*C to $*D
-// CHECK: function_ref @_TTSC30specialize_checked_cast_branch1D___TFSs24_injectValueIntoOptionalU__FQ_GSqQ__ : $@thin (@out Optional<D>, @in D) -> ()
-// CHECK: cond_br {{%[0-9]+}}, bb1, bb2
-// CHECK: bb1:
+// CHECK: checked_cast_br {{%.*}} : $*C to $*D,
 ArchetypeToArchetypeCast(t1: c, t2: d)
 
 // y -> x where x is a super class of y.
 // CHECK-LABEL: sil shared @_TTSC30specialize_checked_cast_branch1D_CS_1C___TF30specialize_checked_cast_branch24ArchetypeToArchetypeCastU___FT2t1Q_2t2Q0__Q0_ : $@thin (@out C, @in D, @in C) -> () {
-// CHECK: upcast {{%[0-9]+}}#1 : $*D to $*C
-// CHECK: function_ref @_TTSC30specialize_checked_cast_branch1C___TFSs24_injectValueIntoOptionalU__FQ_GSqQ__
-// CHECK: cond_br {{%[0-9]+}}, bb1, bb2
-// CHECK: bb1:
+// FIXME: this should get specialized to an upcast
+// CHECK: checked_cast_br {{%[0-9]+}}#1 : $*D to $*C
 ArchetypeToArchetypeCast(t1: d, t2: c)
 
 // x -> y where x and y are unrelated.
@@ -115,65 +110,66 @@ func ArchetypeToConcreteCastE<T>(#t : T) -> E {
 // CHECK-LABEL: sil shared @_TTSVSs5UInt8___TF30specialize_checked_cast_branch28ArchetypeToConcreteCastUInt8U__FT1tQ__VSs5UInt8 : $@thin (@in UInt8) -> UInt8 {
 // CHECK: bb0
 // CHECK: function_ref @_TTSVSs5UInt8___TFSs24_injectValueIntoOptionalU__FQ_GSqQ__
-// CHECK-NOT: checked_cast_br archetype_to_concrete
+// CHECK-NOT: checked_cast_br
 // CHECK: bb1
 ArchetypeToConcreteCastUInt8(t: b)
 
 // CHECK-LABEL: sil shared @_TTSC30specialize_checked_cast_branch1C___TF30specialize_checked_cast_branch28ArchetypeToConcreteCastUInt8U__FT1tQ__VSs5UInt8 : $@thin (@in C) -> UInt8 {
 // CHECK: bb0
 // CHECK: function_ref @_TTSVSs5UInt8___TFSs26_injectNothingIntoOptionalU__FT_GSqQ__ : $@thin (@out Optional<UInt8>) -> ()
-// CHECK-NOT: checked_cast_br archetype_to_concrete
+// CHECK-NOT: checked_cast_br
 // CHECK: bb1
 ArchetypeToConcreteCastUInt8(t: c)
 
 // CHECK-LABEL: sil shared @_TTSVSs6UInt64___TF30specialize_checked_cast_branch28ArchetypeToConcreteCastUInt8U__FT1tQ__VSs5UInt8 : $@thin (@in UInt64) -> UInt8 {
 // CHECK: bb0
 // CHECK: function_ref @_TTSVSs5UInt8___TFSs26_injectNothingIntoOptionalU__FT_GSqQ__ : $@thin (@out Optional<UInt8>) -> ()
-// CHECK-NOT: checked_cast_br archetype_to_concrete
+// CHECK-NOT: checked_cast_br
 // CHECK: bb1
 ArchetypeToConcreteCastUInt8(t: f)
 
 // CHECK-LABEL: sil shared @_TTSC30specialize_checked_cast_branch1C___TF30specialize_checked_cast_branch24ArchetypeToConcreteCastCU__FT1tQ__CS_1C : $@thin (@in C) -> @owned C {
 // CHECK: bb0
 // CHECK: function_ref @_TTSC30specialize_checked_cast_branch1C___TFSs24_injectValueIntoOptionalU__FQ_GSqQ__
-// CHECK-NOT: checked_cast_br archetype_to_concrete
+// CHECK-NOT: checked_cast_br %
 // CHECK: bb1
 ArchetypeToConcreteCastC(t: c)
 
 // CHECK-LABEL: sil shared @_TTSVSs5UInt8___TF30specialize_checked_cast_branch24ArchetypeToConcreteCastCU__FT1tQ__CS_1C : $@thin (@in UInt8) -> @owned C {
 // CHECK: bb0
 // CHECK: function_ref @_TTSC30specialize_checked_cast_branch1C___TFSs26_injectNothingIntoOptionalU__FT_GSqQ__
-// CHECK-NOT: checked_cast_br archetype_to_concrete
+// CHECK-NOT: checked_cast_br %
 // CHECK: bb1
 ArchetypeToConcreteCastC(t: b)
 
 // CHECK-LABEL: sil shared @_TTSC30specialize_checked_cast_branch1D___TF30specialize_checked_cast_branch24ArchetypeToConcreteCastCU__FT1tQ__CS_1C : $@thin (@in D) -> @owned C {
 // CHECK: bb0
-// CHECK: upcast
+// FIXME: specialize this to upcast
+// CHECK: checked_cast_br %
 // CHECK: function_ref @_TTSC30specialize_checked_cast_branch1C___TFSs24_injectValueIntoOptionalU__FQ_GSqQ__
-// CHECK-NOT: checked_cast_br archetype_to_concrete
+// CHECK-NOT: checked_cast_br %
 // CHECK: bb1
 ArchetypeToConcreteCastC(t: d)
 
 // CHECK-LABEL: sil shared @_TTSC30specialize_checked_cast_branch1E___TF30specialize_checked_cast_branch24ArchetypeToConcreteCastCU__FT1tQ__CS_1C : $@thin (@in E) -> @owned C {
 // CHECK: bb0
 // CHECK: function_ref @_TTSC30specialize_checked_cast_branch1C___TFSs26_injectNothingIntoOptionalU__FT_GSqQ__
-// CHECK-NOT: checked_cast_br archetype_to_concrete
+// CHECK-NOT: checked_cast_br %
 // CHECK: bb1
 ArchetypeToConcreteCastC(t: e)
 
 // CHECK-LABEL: sil shared @_TTSC30specialize_checked_cast_branch1C___TF30specialize_checked_cast_branch24ArchetypeToConcreteCastEU__FT1tQ__CS_1E : $@thin (@in C) -> @owned E {
 // CHECK: bb0
 // CHECK: function_ref @_TTSC30specialize_checked_cast_branch1E___TFSs26_injectNothingIntoOptionalU__FT_GSqQ__
-// CHECK-NOT: checked_cast_br archetype_to_concrete
+// CHECK-NOT: checked_cast_br %
 // CHECK: bb1
 ArchetypeToConcreteCastE(t: c)
 
 // CHECK-LABEL: sil shared @_TTSC30specialize_checked_cast_branch1C___TF30specialize_checked_cast_branch24ArchetypeToConcreteCastDU__FT1tQ__CS_1D : $@thin (@in C) -> @owned D {
 // CHECK: bb0
-// CHECK: unconditional_checked_cast downcast
+// CHECK: checked_cast_br %
 // CHECK: function_ref @_TTSC30specialize_checked_cast_branch1D___TFSs24_injectValueIntoOptionalU__FQ_GSqQ__
-// CHECK-NOT: checked_cast_br archetype_to_concrete
+// CHECK-NOT: checked_cast_br %
 // CHECK: bb0
 ArchetypeToConcreteCastD(t: c)
 
@@ -209,36 +205,37 @@ ConcreteToArchetypeCastUInt8(t: b, t2: b)
 // CHECK-LABEL: sil shared @_TTSC30specialize_checked_cast_branch1C___TF30specialize_checked_cast_branch28ConcreteToArchetypeCastUInt8U__FT1tVSs5UInt82t2Q__Q_ : $@thin (@out C, UInt8, @in C) -> () {
 // CHECK: bb0
 // CHECK: function_ref @_TTSC30specialize_checked_cast_branch1C___TFSs26_injectNothingIntoOptionalU__FT_GSqQ__
-// CHECK-NOT: checked_cast_br concrete_to_archetype
+// CHECK-NOT: checked_cast_br %
 // CHECK: bb1
 ConcreteToArchetypeCastUInt8(t: b, t2: c)
 
 // CHECK-LABEL: sil shared @_TTSVSs6UInt64___TF30specialize_checked_cast_branch28ConcreteToArchetypeCastUInt8U__FT1tVSs5UInt82t2Q__Q_ : $@thin (@out UInt64, UInt8, @in UInt64) -> () {
 // CHECK: bb0
 // CHECK: function_ref @_TTSVSs6UInt64___TFSs26_injectNothingIntoOptionalU__FT_GSqQ__
-// CHECK-NOT: checked_cast_br concrete_to_archetype
+// CHECK-NOT: checked_cast_br %
 // CHECK: bb1
 ConcreteToArchetypeCastUInt8(t: b, t2: f)
 
 // CHECK-LABEL: sil shared @_TTSC30specialize_checked_cast_branch1C___TF30specialize_checked_cast_branch24ConcreteToArchetypeCastCU__FT1tCS_1C2t2Q__Q_ : $@thin (@out C, @owned C, @in C) -> () {
 // CHECK: bb0
 // CHECK: function_ref @_TTSC30specialize_checked_cast_branch1C___TFSs24_injectValueIntoOptionalU__FQ_GSqQ__
-// CHECK-NOT: checked_cast_br concrete_to_archetype
+// CHECK-NOT: checked_cast_br %
 // CHECK: bb1
 ConcreteToArchetypeCastC(t: c, t2: c)
 
 // CHECK-LABEL: sil shared @_TTSVSs5UInt8___TF30specialize_checked_cast_branch24ConcreteToArchetypeCastCU__FT1tCS_1C2t2Q__Q_ : $@thin (@out UInt8, @owned C, @in UInt8) -> () {
 // CHECK: bb0
 // CHECK: function_ref @_TTSVSs5UInt8___TFSs26_injectNothingIntoOptionalU__FT_GSqQ__
-// CHECK-NOT: checked_cast_br concrete_to_archetype
+// CHECK-NOT: checked_cast_br %
 // CHECK: bb1
 ConcreteToArchetypeCastC(t: c, t2: b)
 
 // CHECK-LABEL: sil shared @_TTSC30specialize_checked_cast_branch1D___TF30specialize_checked_cast_branch24ConcreteToArchetypeCastCU__FT1tCS_1C2t2Q__Q_ : $@thin (@out D, @owned C, @in D) -> () {
 // CHECK: bb0
-// CHECK: unconditional_checked_cast downcast
+// FIXME: specialize?
+// CHECK: checked_cast_br %
 // CHECK: function_ref @_TTSC30specialize_checked_cast_branch1D___TFSs24_injectValueIntoOptionalU__FQ_GSqQ__
-// CHECK-NOT: checked_cast_br concrete_to_archetype
+// CHECK-NOT: checked_cast_br %
 // CHECK: bb1
 ConcreteToArchetypeCastC(t: c, t2: d)
 
@@ -251,9 +248,10 @@ ConcreteToArchetypeCastC(t: c, t2: e)
 
 // CHECK-LABEL: sil shared @_TTSC30specialize_checked_cast_branch1C___TF30specialize_checked_cast_branch24ConcreteToArchetypeCastDU__FT1tCS_1D2t2Q__Q_ : $@thin (@out C, @owned D, @in C) -> () {
 // CHECK: bb0
-// CHECK: upcast
+// FIXME: specialize?
+// CHECK: checked_cast_br %
 // CHECK: function_ref @_TTSC30specialize_checked_cast_branch1C___TFSs24_injectValueIntoOptionalU__FQ_GSqQ__
-// CHECK-NOT: checked_cast_br concrete_to_archetype
+// CHECK-NOT: checked_cast_br %
 ConcreteToArchetypeCastD(t: d, t2: c)
 
 ////////////////////////
@@ -283,31 +281,32 @@ SuperToArchetypeCastC(c: c, t: c)
 
 // CHECK-LABEL: sil shared @_TTSC30specialize_checked_cast_branch1D___TF30specialize_checked_cast_branch21SuperToArchetypeCastCU__FT1cCS_1C1tQ__Q_ : $@thin (@out D, @owned C, @in D) -> () {
 // CHECK: bb0
-// CHECK: unconditional_checked_cast downcast
+// CHECK: checked_cast_br %
 // CHECK: function_ref @_TTSC30specialize_checked_cast_branch1D___TFSs24_injectValueIntoOptionalU__FQ_GSqQ__
-// CHECK-NOT: checked_cast_br super_to_archetype
+// CHECK-NOT: checked_cast_br %
 // CHECK: bb1
 SuperToArchetypeCastC(c: c, t: d)
 
 // CHECK-LABEL: sil shared @_TTSVSs5UInt8___TF30specialize_checked_cast_branch21SuperToArchetypeCastCU__FT1cCS_1C1tQ__Q_ : $@thin (@out UInt8, @owned C, @in UInt8) -> () {
 // CHECK: bb0
 // CHECK: function_ref @_TTSVSs5UInt8___TFSs26_injectNothingIntoOptionalU__FT_GSqQ__
-// CHECK-NOT: checked_cast_br super_to_archetype
+// CHECK-NOT: checked_cast_br %
 // CHECK: bb1
 SuperToArchetypeCastC(c: c, t: b)
 
 // CHECK-LABEL: sil shared @_TTSC30specialize_checked_cast_branch1C___TF30specialize_checked_cast_branch21SuperToArchetypeCastDU__FT1dCS_1D1tQ__Q_ : $@thin (@out C, @owned D, @in C) -> () {
 // CHECK: bb0
-// CHECK: upcast
+// FIXME: specialize
+// CHECK: checked_cast_br %
 // CHECK: function_ref @_TTSC30specialize_checked_cast_branch1C___TFSs24_injectValueIntoOptionalU__FQ_GSqQ__
-// CHECK-NOT: checked_cast_br super_to_archetype
+// CHECK-NOT: checked_cast_br %
 // CHECK: bb1
 SuperToArchetypeCastD(d: d, t: c)
 
 // CHECK-LABEL: sil shared @_TTSC30specialize_checked_cast_branch1D___TF30specialize_checked_cast_branch21SuperToArchetypeCastDU__FT1dCS_1D1tQ__Q_ : $@thin (@out D, @owned D, @in D) -> () {
 // CHECK: bb0
 // CHECK: function_ref @_TTSC30specialize_checked_cast_branch1D___TFSs24_injectValueIntoOptionalU__FQ_GSqQ__ : $@thin (@out Optional<D>, @in D) -> ()
-// CHECK-NOT: checked_cast_br super_to_archetype
+// CHECK-NOT: checked_cast_br %
 // CHECK: bb1
 SuperToArchetypeCastD(d: d, t: d)
 
@@ -324,21 +323,19 @@ func ExistentialToArchetypeCast<T>(#o : AnyObject, #t : T) -> T {
 
 // CHECK-LABEL: sil shared @_TTSC30specialize_checked_cast_branch1C___TF30specialize_checked_cast_branch26ExistentialToArchetypeCastU__FT1oPSs9AnyObject_1tQ__Q_ : $@thin (@out C, @owned AnyObject, @in C) -> () {
 // CHECK: bb0
-// CHECK: checked_cast_br existential_to_concrete
+// CHECK: checked_cast_br %
 // CHECK: bb1
 ExistentialToArchetypeCast(o: o, t: c)
 
 // CHECK-LABEL: sil shared @_TTSVSs5UInt8___TF30specialize_checked_cast_branch26ExistentialToArchetypeCastU__FT1oPSs9AnyObject_1tQ__Q_ : $@thin (@out UInt8, @owned AnyObject, @in UInt8) -> () {
 // CHECK: bb0
-// CHECK: checked_cast_br existential_to_concrete
+// CHECK: checked_cast_br %
 // CHECK: bb1
 ExistentialToArchetypeCast(o: o, t: b)
 
 // CHECK-LABEL: sil shared @_TTSPSs9AnyObject____TF30specialize_checked_cast_branch26ExistentialToArchetypeCastU__FT1oPSs9AnyObject_1tQ__Q_ : $@thin (@out AnyObject, @owned AnyObject, @in AnyObject) -> () {
 // CHECK: bb0
-// CHECK-NOT: checked_cast_br existential_to_archetype
-// CHECK-NOT: checked_cast_br existential_to_concrete
+// CHECK-NOT: checked_cast_br %
 // CHECK: function_ref @_TTSPSs9AnyObject____TFSs24_injectValueIntoOptionalU__FQ_GSqQ__ : $@thin (@out Optional<AnyObject>, @in AnyObject) -> ()
-// CHECK-NOT: checked_cast_br existential_to_archetype
-// CHECK-NOT: checked_cast_br existential_to_concrete
+// CHECK-NOT: checked_cast_br %
 ExistentialToArchetypeCast(o: o, t: o)

@@ -96,14 +96,14 @@ bb3:                                              // Preds: bb0
 class A {}
 
 //CHECK-LABEL: no_remove_mandatory_dead_args
-//CHECK: checked_cast_br existential_to_concrete {{%.*}} : $AnyObject to $A, bb1
+//CHECK: checked_cast_br {{%.*}} : $AnyObject to $A, bb1
 //CHECK-NOT: bb1
 //CHECK: bb1([[VAR:%[0-9]+]] : $A)
 //CHECK-NOT: [[VAR]]
 //CHECK: return
 sil @no_remove_mandatory_dead_args : $@thin (@owned AnyObject) -> Int {
 bb0(%0 : $AnyObject):
-  checked_cast_br existential_to_concrete %0 : $AnyObject to $A, bb1, bb2 // id: %3
+  checked_cast_br %0 : $AnyObject to $A, bb1, bb2 // id: %3
 
 bb1(%1 : $A):
   %2 = integer_literal $Builtin.Word, 1

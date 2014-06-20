@@ -209,7 +209,7 @@ func downcast(var obj: AnyObject) -> X {
   // CHECK-NEXT: store [[OBJ]] to [[OBJ_BOX]]#1 : $*AnyObject
   // CHECK-NEXT: [[OBJ:%[0-9]+]] = load [[OBJ_BOX]]#1 : $*AnyObject
   // CHECK-NEXT: strong_retain [[OBJ]] : $AnyObject
-  // CHECK-NEXT: [[X:%[0-9]+]] = unconditional_checked_cast existential_to_concrete [[OBJ]] : $AnyObject to $X
+  // CHECK-NEXT: [[X:%[0-9]+]] = unconditional_checked_cast [[OBJ]] : $AnyObject to $X
   // CHECK-NEXT: strong_release [[OBJ_BOX]]#0 : $Builtin.NativeObject
   // CHECK-NEXT: return [[X]] : $X
   return obj as X

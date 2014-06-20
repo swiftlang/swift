@@ -8,7 +8,7 @@ import Swift
 sil @archetype_metatype_cast : $@thin <T, U> () -> () {
 entry:
   %0 = metatype $@thick T.Type
-  checked_cast_br archetype_to_archetype %0 : $@thick T.Type to $@thick U.Type, yes, no
+  checked_cast_br %0 : $@thick T.Type to $@thick U.Type, yes, no
 yes(%1 : $@thick U.Type):
   br end
 
@@ -26,7 +26,7 @@ protocol P {}
 // CHECK:         %2 = icmp ne %swift.type* %1, null
 sil @existential_archetype_metatype_cast : $@thin <T> (@thick P.Type) -> () {
 entry(%0 : $@thick P.Type):
-  checked_cast_br existential_to_archetype %0 : $@thick P.Type to $@thick T.Type, yes, no
+  checked_cast_br %0 : $@thick P.Type to $@thick T.Type, yes, no
 yes(%1 : $@thick T.Type):
   br end
 

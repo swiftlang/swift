@@ -423,11 +423,10 @@ public:
   }
 
   UnconditionalCheckedCastInst *createUnconditionalCheckedCast(SILLocation loc,
-                                                           CheckedCastKind kind,
-                                                           SILValue op,
-                                                           SILType destTy) {
+                                                               SILValue op,
+                                                               SILType destTy) {
     return insert(new (F.getModule())
-                    UnconditionalCheckedCastInst(loc, kind, op, destTy));
+                    UnconditionalCheckedCastInst(loc, op, destTy));
   }
 
   UnconditionalCheckedCastAddrInst *
@@ -913,13 +912,13 @@ public:
   }
   
   CheckedCastBranchInst *createCheckedCastBranch(SILLocation loc,
-                                                 CheckedCastKind kind,
+                                                 bool isExact,
                                                  SILValue op,
                                                  SILType destTy,
                                                  SILBasicBlock *successBB,
                                                  SILBasicBlock *failureBB) {
     return insertTerminator(new (F.getModule())
-                              CheckedCastBranchInst(loc, kind, op, destTy,
+                              CheckedCastBranchInst(loc, isExact, op, destTy,
                                                     successBB, failureBB));
   }
 

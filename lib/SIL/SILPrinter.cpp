@@ -757,15 +757,14 @@ public:
 
   void visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *CI) {
     OS << "unconditional_checked_cast "
-       << getCheckedCastKindName(CI->getCastKind())
-       << ' ' << getIDAndType(CI->getOperand())
+       << getIDAndType(CI->getOperand())
        << " to " << CI->getType();
   }
   
   void visitCheckedCastBranchInst(CheckedCastBranchInst *CI) {
-    OS << "checked_cast_br "
-       << getCheckedCastKindName(CI->getCastKind()) << ' '
-       << getIDAndType(CI->getOperand())
+    OS << "checked_cast_br ";
+    if (CI->isExact()) OS << "[exact] ";
+    OS << getIDAndType(CI->getOperand())
        << " to " << CI->getCastType() << ", "
        << getID(CI->getSuccessBB()) << ", " << getID(CI->getFailureBB());
   }

@@ -1421,10 +1421,9 @@ public:
             "deinit_existential must be applied to non-class existential");
   }
 
-  void verifyCheckedCast(CheckedCastKind kind, SILType fromTy, SILType toTy) {
+  void verifyCheckedCast(bool isExact, SILType fromTy, SILType toTy) {
     // Verify common invariants.
-    require(fromTy != toTy ||
-            kind == CheckedCastKind::Identical,
+    require(fromTy != toTy || isExact,
             "can't checked cast to same type");
     require(fromTy.isAddress() == toTy.isAddress(),
             "address-ness of checked cast src and dest must match");
@@ -1449,80 +1448,25 @@ public:
       toTy = SILType::getPrimitiveObjectType(
         toMetaty.getInstanceType());
     }
-    
-    switch (kind) {
-    case CheckedCastKind::Unresolved:
-    case CheckedCastKind::Coercion:
-    case CheckedCastKind::ArrayDowncast:
-    case CheckedCastKind::ArrayDowncastBridged:
-    case CheckedCastKind::DictionaryDowncast:
-    case CheckedCastKind::DictionaryDowncastBridged:
-      llvm_unreachable("invalid for SIL");
-    case CheckedCastKind::Identical:
-    case CheckedCastKind::Downcast:
+
+    if (isExact) {
       require(fromTy.getClassOrBoundGenericClass(),
               "downcast operand must be a class type");
       require(toTy.getClassOrBoundGenericClass(),
               "downcast must convert to a class type");
       require(fromTy.isSuperclassOf(toTy),
               "downcast must convert to a subclass");
-      return;
-    case CheckedCastKind::SuperToArchetype: {
-      require(fromTy.isObject(),
-              "super_to_archetype operand must be an object");
-      require(fromTy.getClassOrBoundGenericClass(),
-              "super_to_archetype operand must be a class instance");
-      auto archetype = toTy.getAs<ArchetypeType>();
-      require(archetype, "super_to_archetype must convert to archetype type");
-      require(archetype->requiresClass(),
-              "super_to_archetype must convert to class archetype type");
-      return;
-    }
-    case CheckedCastKind::ArchetypeToConcrete: {
-      require(fromTy.getAs<ArchetypeType>(),
-              "archetype_to_concrete must convert from archetype type");
-      return;
-    }
-    case CheckedCastKind::ArchetypeToArchetype: {
-      require(fromTy.getAs<ArchetypeType>(),
-              "archetype_to_archetype must convert from archetype type");
-      require(toTy.getAs<ArchetypeType>(),
-              "archetype_to_archetype must convert to archetype type");
-      return;
-    }
-    case CheckedCastKind::ExistentialToArchetype: {
-      require(fromTy.isExistentialType(),
-              "existential_to_archetype must convert from protocol type");
-      require(toTy.getAs<ArchetypeType>(),
-              "existential_to_archetype must convert to archetype type");
-      return;
-    }
-    case CheckedCastKind::ExistentialToConcrete: {
-      require(fromTy.isExistentialType(),
-              "existential_to_concrete must convert from protocol type");
-      return;
-    }
-    case CheckedCastKind::ConcreteToArchetype: {
-      require(toTy.getAs<ArchetypeType>(),
-              "concrete_to_archetype must convert to archetype type");
-      return;
-    }
-    case CheckedCastKind::ConcreteToUnrelatedExistential: {
-      require(toTy.isExistentialType(),
-              "concrete_to_existential must convert to protocol type");
-      return;
-    }
     }
   }
 
   void checkUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *CI) {
-    verifyCheckedCast(CI->getCastKind(),
+    verifyCheckedCast(/*exact*/ false,
                       CI->getOperand().getType(),
                       CI->getType());
   }
 
   void checkCheckedCastBranchInst(CheckedCastBranchInst *CBI) {
-    verifyCheckedCast(CBI->getCastKind(),
+    verifyCheckedCast(CBI->isExact(),
                       CBI->getOperand().getType(),
                       CBI->getCastType());
 

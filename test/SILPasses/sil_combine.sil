@@ -500,7 +500,7 @@ bb0(%0 : $C):
 sil @downcast_upcast_roundtrip : $@thin <T_0_0, T_0_1> (HeapBufferStorage<T_0_0, T_0_1>) -> HeapBufferStorage<T_0_0, T_0_1> {
 bb0(%0 : $HeapBufferStorage<T_0_0, T_0_1>):
   %2 = upcast %0 : $HeapBufferStorage<T_0_0, T_0_1> to $RawBuffer // user: %3
-  %3 = unconditional_checked_cast downcast %2 : $RawBuffer to $HeapBufferStorage<T_0_0, T_0_1>
+  %3 = unconditional_checked_cast %2 : $RawBuffer to $HeapBufferStorage<T_0_0, T_0_1>
   return %3 : $HeapBufferStorage<T_0_0, T_0_1>
 }
 

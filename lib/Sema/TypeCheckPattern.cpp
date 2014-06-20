@@ -900,7 +900,6 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
     case CheckedCastKind::ArrayDowncastBridged:
     case CheckedCastKind::DictionaryDowncast:
     case CheckedCastKind::DictionaryDowncastBridged:
-    case CheckedCastKind::Identical:
     case CheckedCastKind::Downcast:
     case CheckedCastKind::SuperToArchetype:
     case CheckedCastKind::ArchetypeToArchetype:

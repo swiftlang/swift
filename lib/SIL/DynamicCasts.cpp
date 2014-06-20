@@ -143,9 +143,13 @@ namespace {
     Target() = default;
     Target(SILValue address, CanType formalType)
       : Address(address), LoweredType(address.getType()),
-        FormalType(formalType) {}
+        FormalType(formalType) {
+      assert(LoweredType.isAddress());
+    }
     Target(SILType loweredType, CanType formalType)
-      : Address(), LoweredType(loweredType), FormalType(formalType) {}
+      : Address(), LoweredType(loweredType), FormalType(formalType) {
+      assert(!loweredType.isAddress());
+    }
   };
 
   class CastEmitter {

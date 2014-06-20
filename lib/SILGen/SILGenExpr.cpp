@@ -1509,7 +1509,6 @@ namespace {
     SILLocation Loc;
     CanType SourceType;
     CanType TargetType;
-    CheckedCastKind CastKind;
 
     enum class CastStrategy : uint8_t {
       Address,
@@ -1519,10 +1518,9 @@ namespace {
 
   public:
     CheckedCastEmitter(SILGenFunction &SGF, SILLocation loc,
-                       Type sourceType, Type targetType,
-                       CheckedCastKind castKind)
+                       Type sourceType, Type targetType)
       : SGF(SGF), Loc(loc), SourceType(sourceType->getCanonicalType()),
-        TargetType(targetType->getCanonicalType()), CastKind(castKind),
+        TargetType(targetType->getCanonicalType()),
         Strategy(getStrategy()) {
     }
 
@@ -1581,8 +1579,7 @@ namespace {
       }
 
       SILValue resultScalar =
-        SGF.B.createUnconditionalCheckedCast(Loc, CastKind,
-                                             operand.forward(SGF),
+        SGF.B.createUnconditionalCheckedCast(Loc, operand.forward(SGF),
                                              origTargetTL.getLoweredType());
       return finishFromResultScalar(hasAbstraction, resultScalar, abstraction,
                                     origTargetTL, ctx);
@@ -1691,7 +1688,7 @@ static RValue emitUnconditionalCheckedCast(SILGenFunction &SGF,
   }
 
   CheckedCastEmitter emitter(SGF, loc, operand->getType(),
-                             targetType, castKind);
+                             targetType);
   ManagedValue operandValue = emitter.emitOperand(operand);
   return emitter.emitUnconditionalCast(operandValue, C);
 }
@@ -1765,7 +1762,7 @@ SILGenFunction::emitCheckedCastBranch(SILLocation loc,
   auto failure = createBasicBlock();
 
   // Emit the cast.
-  B.createCheckedCastBranch(loc, kind, original, destTy,
+  B.createCheckedCastBranch(loc, /*exact*/ false, original, destTy,
                             success, failure);
   
   return {success, failure};

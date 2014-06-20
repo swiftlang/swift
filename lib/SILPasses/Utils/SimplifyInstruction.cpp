@@ -218,11 +218,9 @@ SILValue
 InstSimplifier::
 visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *UCCI) {
   // (UCCI downcast (upcast x #type1 to #type2) #type2 to #type1) -> x
-  if (UCCI->getCastKind() == CheckedCastKind::Downcast)
-    if (auto *Upcast = dyn_cast<UpcastInst>(UCCI->getOperand()))
-      if (UCCI->getOperand().getType() == Upcast->getType() &&
-          UCCI->getType() == Upcast->getOperand().getType())
-      return Upcast->getOperand();
+  if (auto *upcast = dyn_cast<UpcastInst>(UCCI->getOperand()))
+    if (UCCI->getType() == upcast->getOperand().getType())
+      return upcast->getOperand();
 
   return SILValue();
 }

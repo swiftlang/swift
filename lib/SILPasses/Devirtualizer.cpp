@@ -850,7 +850,7 @@ static bool specializeClassMethodDispatch(ApplyInst *AI) {
   SILBuilder Builder(Entry);
   // Create the checked_cast_branch instruction that checks at runtime if the
   // class instance is identical to the SILType.
-  It = Builder.createCheckedCastBranch(AI->getLoc(), CheckedCastKind::Identical,
+  It = Builder.createCheckedCastBranch(AI->getLoc(), /*exact*/ true,
                                        ClassInstance, InstanceType, Iden, Virt);
 
   SILBuilder VirtBuilder(Virt);

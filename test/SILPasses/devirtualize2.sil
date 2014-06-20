@@ -27,7 +27,7 @@ bb0:
   %1 = alloc_ref $Foo                             // users: %5, %3, %2
   strong_retain %1 : $Foo                         // id: %2
   %3 = upcast %1 : $Foo to $Bar                   // user: %4
-  %4 = unconditional_checked_cast downcast %3 : $Bar to $Foo // user: %6
+  %4 = unconditional_checked_cast %3 : $Bar to $Foo // user: %6
   strong_release %1 : $Foo                        // id: %5
   %6 = upcast %4 : $Foo to $Bar                   // user: %7
   store %6 to %0 : $*Bar                          // id: %7

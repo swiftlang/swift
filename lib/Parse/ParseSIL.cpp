@@ -1381,28 +1381,6 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
 
   SILLocation InstLoc = SILFileLocation(OpcodeLoc);
 
-  /// Parse a checked cast kind.
-  auto parseCastKind = [&](Identifier name, SourceLoc loc) -> CheckedCastKind {
-    auto kind = llvm::StringSwitch<CheckedCastKind>(name.str())
-      .Case("identical", CheckedCastKind::Identical)
-      .Case("downcast", CheckedCastKind::Downcast)
-      .Case("super_to_archetype", CheckedCastKind::SuperToArchetype)
-      .Case("archetype_to_archetype", CheckedCastKind::ArchetypeToArchetype)
-      .Case("archetype_to_concrete", CheckedCastKind::ArchetypeToConcrete)
-      .Case("existential_to_archetype", CheckedCastKind::ExistentialToArchetype)
-      .Case("existential_to_concrete", CheckedCastKind::ExistentialToConcrete)
-      .Case("array_to_array", CheckedCastKind::ArrayDowncast)
-      .Case("array_to_array_bridged", CheckedCastKind::ArrayDowncastBridged)
-      .Case("dictionary_to_dictionary", CheckedCastKind::DictionaryDowncast)
-      .Case("dictionary_to_dictionary_bridged", 
-            CheckedCastKind::DictionaryDowncastBridged)
-      .Default(CheckedCastKind::Unresolved);
-    
-    if (kind == CheckedCastKind::Unresolved)
-      P.diagnose(loc, diag::expected_tok_in_sil_instr, "checked cast kind");
-    return kind;
-  };
-
   auto parseCastConsumptionKind = [&](Identifier name, SourceLoc loc,
                                       CastConsumptionKind &out) -> bool {
     auto kind = llvm::StringSwitch<Optional<CastConsumptionKind>>(name.str())
@@ -1808,23 +1786,20 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     SILValue destVal;
     Identifier kindToken, toToken;
     SourceLoc kindLoc, toLoc;
-    
-    if (parseSILIdentifier(kindToken, kindLoc,
-                           diag::expected_tok_in_sil_instr, "checked cast kind"))
-      return true;
 
+    bool isExact = false;
+    if (Opcode == ValueKind::CheckedCastBranchInst &&
+        parseSILOptional(isExact, *this, "exact"))
+      return true;
+    
     if (parseTypedValueRef(Val) ||
         parseVerbatim("to") ||
         parseSILType(ty))
       return true;
     
-    CheckedCastKind castKind = parseCastKind(kindToken, kindLoc);
-    if (castKind == CheckedCastKind::Unresolved)
-      return true;
-
     // An unconditional cast instruction is finished here.
     if (Opcode == ValueKind::UnconditionalCheckedCastInst) {
-      ResultVal = B.createUnconditionalCheckedCast(InstLoc, castKind, Val, ty);
+      ResultVal = B.createUnconditionalCheckedCast(InstLoc, Val, ty);
       break;
     }    
     // The conditional cast still needs its branch destinations.
@@ -1838,7 +1813,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
                               diag::expected_sil_block_name))
       return true;
 
-    ResultVal = B.createCheckedCastBranch(InstLoc, castKind, Val, ty,
+    ResultVal = B.createCheckedCastBranch(InstLoc, isExact, Val, ty,
                                 getBBForReference(successBBName, successBBLoc),
                                 getBBForReference(failureBBName, failureBBLoc));
     break;

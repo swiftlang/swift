@@ -1410,19 +1410,11 @@ class UnconditionalCheckedCastInst
   : public UnaryInstructionBase<ValueKind::UnconditionalCheckedCastInst,
                                 ConversionInst>
 {
-  CheckedCastKind CastKind;
 public:
   UnconditionalCheckedCastInst(SILLocation Loc,
-                               CheckedCastKind Kind,
                                SILValue Operand,
                                SILType DestTy)
-    : UnaryInstructionBase(Loc, Operand, DestTy), CastKind(Kind)
-  {
-    assert(CastKind >= CheckedCastKind::First_Resolved &&
-           "cannot create a SIL cast with unresolved cast kind");
-  }
-
-  CheckedCastKind getCastKind() const { return CastKind; }
+    : UnaryInstructionBase(Loc, Operand, DestTy) {}
 };
 
 /// Perform an unconditional checked cast that aborts if the cast fails.
@@ -2907,36 +2899,34 @@ public:
 /// argument.
 class CheckedCastBranchInst : public TermInst {
   SILType DestTy;
-  CheckedCastKind CastKind;
+  bool IsExact;
 
   FixedOperandList<1> Operands;
   SILSuccessor DestBBs[2];
 
 public:
   CheckedCastBranchInst(SILLocation Loc,
-                        CheckedCastKind CastKind,
+                        bool IsExact,
                         SILValue Operand,
                         SILType DestTy,
                         SILBasicBlock *SuccessBB,
                         SILBasicBlock *FailureBB)
     : TermInst(ValueKind::CheckedCastBranchInst, Loc),
-      DestTy(DestTy), CastKind(CastKind), Operands{this, Operand},
+      DestTy(DestTy), IsExact(IsExact), Operands{this, Operand},
       DestBBs{{this, SuccessBB}, {this, FailureBB}}
   {
-    assert(CastKind >= CheckedCastKind::First_Resolved
-           && "cannot create a cast instruction with an unresolved cast kind");
   }
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 
   SILValue getOperand() const { return Operands[0].get(); }
+  bool isExact() const { return IsExact; }
 
   SuccessorListTy getSuccessors() {
     return DestBBs;
   }
 
-  CheckedCastKind getCastKind() const { return CastKind; }
   SILType getCastType() const { return DestTy; }
 
   SILBasicBlock *getSuccessBB() { return DestBBs[0]; }

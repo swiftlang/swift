@@ -2369,7 +2369,6 @@ ConstraintSystem::simplifyCheckedCastConstraint(
     // FIXME: Check substitutability.
     return SolutionKind::Solved;
 
-  case CheckedCastKind::Identical:
   case CheckedCastKind::Downcast:
   case CheckedCastKind::ExistentialToConcrete: {
     // Peel off optionals metatypes from the types, because we might cast through
