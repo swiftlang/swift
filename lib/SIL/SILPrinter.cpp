@@ -803,6 +803,12 @@ public:
   void visitUncheckedAddrCastInst(UncheckedAddrCastInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand(), "unchecked_addr_cast");
   }
+  void visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *CI) {
+    printUncheckedConversionInst(CI, CI->getOperand(), "unchecked_trivial_bit_cast");
+  }
+  void visitUncheckedRefBitCastInst(UncheckedRefBitCastInst *CI) {
+    printUncheckedConversionInst(CI, CI->getOperand(), "unchecked_ref_bit_cast");
+  }
   void visitRefToRawPointerInst(RefToRawPointerInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand(), "ref_to_raw_pointer");
   }

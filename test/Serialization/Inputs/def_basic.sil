@@ -917,6 +917,20 @@ entry(%a : $@objc_metatype SomeClass.Type, %b : $@objc_metatype SomeClassProtoco
   return %z : $(AnyObject, AnyObject)
 }
 
+// CHECK-LABEL: sil public_external @bitcasts : $@thin (@owned Class1) -> @owned (Class2, Int) {
+// CHECK-NEXT:  bb0(%0 : $Class1):
+// CHECK-NEXT:    %1 = unchecked_ref_bit_cast %0 : $Class1 to $Class2
+// CHECK-NEXT:    %2 = unchecked_trivial_bit_cast %0 : $Class1 to $Int
+// CHECK-NEXT:    %3 = tuple (%1 : $Class2, %2 : $Int)
+// CHECK-NEXT:    return %3 : $(Class2, Int)
+sil @bitcasts : $@thin (@owned Class1) -> @owned (Class2, Int) {
+entry(%0 : $Class1):
+  %1 = unchecked_ref_bit_cast %0 : $Class1 to $Class2
+  %2 = unchecked_trivial_bit_cast %0 : $Class1 to $Int
+  %3 = tuple (%1 : $Class2, %2 : $Int)
+  return %3 : $(Class2, Int)
+}
+
 @objc protocol ObjCProto {}
 
 // CHECK-LABEL: sil public_external @protocol_conversion
@@ -1172,6 +1186,7 @@ bb0:
 
   %124 = function_ref @block_storage_type : $@thin Int -> @cc(cdecl) @objc_block () -> ()
   %125 = function_ref @metatype_to_object : $@thin (@objc_metatype SomeClass.Type, @objc_metatype SomeClassProtocol.Type) -> @owned (AnyObject, AnyObject)
+  %127 = function_ref @bitcasts : $@thin (@owned Class1) -> @owned (Class2, Int)
   %126 = function_ref @protocol_conversion : $@thin () -> @owned Protocol
   %120 = function_ref @test_forward_ref : $@thin (UInt8, UInt8) -> UInt8
   %121 = function_ref @partial_apply : $@thin (@thin (@out Int, Int) -> (), Int) -> Int

@@ -351,7 +351,19 @@ public:
                                                SILType Ty) {
     return insert(new (F.getModule()) UncheckedAddrCastInst(Loc, Op, Ty));
   }
-  
+
+  UncheckedTrivialBitCastInst *createUncheckedTrivialBitCast(SILLocation Loc,
+                                                             SILValue Op,
+                                                             SILType Ty) {
+    return insert(new (F.getModule()) UncheckedTrivialBitCastInst(Loc, Op, Ty));
+  }
+
+  UncheckedRefBitCastInst *createUncheckedRefBitCast(SILLocation Loc,
+                                                     SILValue Op,
+                                                     SILType Ty) {
+    return insert(new (F.getModule()) UncheckedRefBitCastInst(Loc, Op, Ty));
+  }
+
   RefToRawPointerInst *createRefToRawPointer(SILLocation Loc, SILValue Op,
                                              SILType Ty) {
     return insert(new (F.getModule()) RefToRawPointerInst(Loc, Op, Ty));

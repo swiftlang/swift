@@ -744,6 +744,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   // Conversion instructions.
   ONEOPERAND_ONETYPE_INST(UncheckedRefCast)
   ONEOPERAND_ONETYPE_INST(UncheckedAddrCast)
+  ONEOPERAND_ONETYPE_INST(UncheckedTrivialBitCast)
+  ONEOPERAND_ONETYPE_INST(UncheckedRefBitCast)
   ONEOPERAND_ONETYPE_INST(Upcast)
   ONEOPERAND_ONETYPE_INST(AddressToPointer)
   ONEOPERAND_ONETYPE_INST(PointerToAddress)

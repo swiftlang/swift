@@ -1707,6 +1707,30 @@ public:
     require(AI->getType().isAddress(),
             "unchecked_addr_cast result must be an address");
   }
+  
+  void checkUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *BI) {
+    require(BI->getOperand().getType().isObject(),
+            "unchecked_trivial_bit_cast must operate on a value");
+    require(BI->getType().isObject(),
+            "unchecked_trivial_bit_cast must produce a value");
+    require(BI->getType().isTrivial(F.getModule()),
+            "unchecked_trivial_bit_cast must produce a value of trivial type");
+  }
+
+  void checkUncheckedRefBitCastInst(UncheckedRefBitCastInst *BI) {
+    require(BI->getOperand().getType().isObject(),
+            "unchecked_ref_bit_cast must operate on a value");
+    require(BI->getType().isObject(),
+            "unchecked_ref_bit_cast must produce a value");
+    
+    // TODO: A deeper comparison of the source and destination types to ensure
+    // they're reference-counting-identical.
+    auto &M = F.getModule();
+    require(BI->getOperand().getType().isTrivial(M)
+              == BI->getType().isTrivial(M),
+            "unchecked_ref_bit_cast cannot change the reference count semantics"
+            " of the value");
+  }
 
   void checkRefToRawPointerInst(RefToRawPointerInst *AI) {
     require(AI->getOperand().getType()

@@ -657,6 +657,8 @@ public:
   void visitPointerToAddressInst(PointerToAddressInst *i);
   void visitUncheckedRefCastInst(UncheckedRefCastInst *i);
   void visitUncheckedAddrCastInst(UncheckedAddrCastInst *i);
+  void visitUncheckedRefBitCastInst(UncheckedRefBitCastInst *i);
+  void visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *i);
   void visitRefToRawPointerInst(RefToRawPointerInst *i);
   void visitRawPointerToRefInst(RawPointerToRefInst *i);
   void visitRefToUnownedInst(RefToUnownedInst *i);
@@ -2630,6 +2632,64 @@ void IRGenSILFunction::visitUncheckedAddrCastInst(
   auto &ti = getTypeInfo(i->getType());
   auto result = Builder.CreateBitCast(addr, ti.getStorageType()->getPointerTo());
   setLoweredAddress(SILValue(i, 0), result);
+}
+
+static void emitValueBitCast(IRGenFunction &IGF,
+                             SourceLoc loc,
+                             Explosion &in,
+                             const LoadableTypeInfo &inTI,
+                             Explosion &out,
+                             const LoadableTypeInfo &outTI) {
+  // Unfortunately, we can't check this invariant until we get to IRGen, since
+  // the AST and SIL don't know anything about type layout.
+  if (inTI.getFixedSize() != outTI.getFixedSize()) {
+    IGF.unimplemented(loc, "bitcast between types of different size");
+    in.claimAll();
+    for (auto schema : outTI.getSchema(out.getKind()))
+      out.add(llvm::UndefValue::get(schema.getScalarType()));
+    return;
+  }
+
+  // TODO: We could do bitcasts entirely in the value domain in some cases, but
+  // for simplicity, let's just always go through the stack for now.
+  
+  // Create the allocation.
+  auto inStorage = IGF.createAlloca(inTI.getStorageType(),
+                                  std::max(inTI.getFixedAlignment(),
+                                           outTI.getFixedAlignment()),
+                                  "bitcast");
+  
+  // Store the 'in' value.
+  inTI.initialize(IGF, in, inStorage);
+  // Load the 'out' value as the destination type.
+  auto outStorage = IGF.Builder.CreateBitCast(inStorage,
+                                              outTI.getStorageType());
+  outTI.loadAsTake(IGF, outStorage, out);
+  return;
+}
+
+void IRGenSILFunction::visitUncheckedTrivialBitCastInst(
+                                      swift::UncheckedTrivialBitCastInst *i) {
+  Explosion in = getLoweredExplosion(i->getOperand());
+  Explosion out(in.getKind());
+  
+  emitValueBitCast(*this, i->getLoc().getSourceLoc(),
+            in,  cast<LoadableTypeInfo>(getTypeInfo(i->getOperand().getType())),
+            out, cast<LoadableTypeInfo>(getTypeInfo(i->getType())));
+  
+  setLoweredExplosion(SILValue(i, 0), out);
+}
+
+void IRGenSILFunction::visitUncheckedRefBitCastInst(
+                                      swift::UncheckedRefBitCastInst *i) {
+  Explosion in = getLoweredExplosion(i->getOperand());
+  Explosion out(in.getKind());
+  
+  emitValueBitCast(*this, i->getLoc().getSourceLoc(),
+            in,  cast<LoadableTypeInfo>(getTypeInfo(i->getOperand().getType())),
+            out, cast<LoadableTypeInfo>(getTypeInfo(i->getType())));
+  
+  setLoweredExplosion(SILValue(i, 0), out);
 }
 
 void IRGenSILFunction::visitRefToRawPointerInst(

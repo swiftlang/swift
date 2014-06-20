@@ -558,6 +558,26 @@ visitUncheckedAddrCastInst(UncheckedAddrCastInst *Inst) {
 
 template<typename ImplClass>
 void
+SILCloner<ImplClass>::
+visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *Inst) {
+  doPostProcess(Inst,
+    getBuilder().createUncheckedTrivialBitCast(getOpLocation(Inst->getLoc()),
+                                               getOpValue(Inst->getOperand()),
+                                               getOpType(Inst->getType())));
+}
+
+template<typename ImplClass>
+void
+SILCloner<ImplClass>::
+visitUncheckedRefBitCastInst(UncheckedRefBitCastInst *Inst) {
+  doPostProcess(Inst,
+    getBuilder().createUncheckedRefBitCast(getOpLocation(Inst->getLoc()),
+                                           getOpValue(Inst->getOperand()),
+                                           getOpType(Inst->getType())));
+}
+
+template<typename ImplClass>
+void
 SILCloner<ImplClass>::visitRefToRawPointerInst(RefToRawPointerInst *Inst) {
   doPostProcess(Inst,
     getBuilder().createRefToRawPointer(getOpLocation(Inst->getLoc()),

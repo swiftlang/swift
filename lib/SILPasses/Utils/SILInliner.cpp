@@ -280,6 +280,8 @@ static InlineCost instructionInlineCost(SILInstruction &I,
 
     case ValueKind::UncheckedRefCastInst:
     case ValueKind::UncheckedAddrCastInst:
+    case ValueKind::UncheckedRefBitCastInst:
+    case ValueKind::UncheckedTrivialBitCastInst:
 
     case ValueKind::RawPointerToRefInst:
     case ValueKind::RefToRawPointerInst:

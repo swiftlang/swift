@@ -1233,6 +1233,29 @@ public:
     : UnaryInstructionBase(Loc, Operand, Ty) {}
 };
   
+/// Convert a value's binary representation to a trivial type of the same size.
+class UncheckedTrivialBitCastInst
+  : public UnaryInstructionBase<ValueKind::UncheckedTrivialBitCastInst,
+                                ConversionInst>
+{
+public:
+  UncheckedTrivialBitCastInst(SILLocation Loc, SILValue Operand, SILType Ty)
+    : UnaryInstructionBase(Loc, Operand, Ty) {}
+};
+  
+/// Convert a value to a layout-compatible type with equivalent
+/// "reference semantics identity", that is, a type for which retain_value and
+/// release_value have equivalent effects to retaining or releasing the original
+/// value.
+class UncheckedRefBitCastInst
+  : public UnaryInstructionBase<ValueKind::UncheckedRefBitCastInst,
+                                ConversionInst>
+{
+public:
+  UncheckedRefBitCastInst(SILLocation Loc, SILValue Operand, SILType Ty)
+    : UnaryInstructionBase(Loc, Operand, Ty) {}
+};
+  
 /// RefToRawPointer - Convert a reference type to a Builtin.RawPointer.
 class RefToRawPointerInst
   : public UnaryInstructionBase<ValueKind::RefToRawPointerInst, ConversionInst>

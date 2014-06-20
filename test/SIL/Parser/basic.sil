@@ -1097,6 +1097,20 @@ entry(%a : $@objc_metatype SomeClass.Type, %b : $@objc_metatype SomeClassProtoco
   return %z : $(AnyObject, AnyObject)
 }
 
+// CHECK-LABEL: sil @bitcasts : $@thin (@owned Class1) -> @owned (Class2, Int) {
+// CHECK-NEXT:  bb0(%0 : $Class1):
+// CHECK-NEXT:    %1 = unchecked_ref_bit_cast %0 : $Class1 to $Class2
+// CHECK-NEXT:    %2 = unchecked_trivial_bit_cast %0 : $Class1 to $Int
+// CHECK-NEXT:    %3 = tuple (%1 : $Class2, %2 : $Int)
+// CHECK-NEXT:    return %3 : $(Class2, Int)
+sil @bitcasts : $@thin (@owned Class1) -> @owned (Class2, Int) {
+entry(%0 : $Class1):
+  %1 = unchecked_ref_bit_cast %0 : $Class1 to $Class2
+  %2 = unchecked_trivial_bit_cast %0 : $Class1 to $Int
+  %3 = tuple (%1 : $Class2, %2 : $Int)
+  return %3 : $(Class2, Int)
+}
+
 // CHECK-LABEL: sil_vtable Foo {
 // CHECK: #Foo.subscript!getter.1: _TC3tmp3Foo9subscriptFT1xSi1ySi_Sig
 // CHECK: #Foo.subscript!setter.1: _TC3tmp3Foo9subscriptFT1xSi1ySi_Sis
