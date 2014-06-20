@@ -838,6 +838,71 @@ struct ASTNodeBase {};
       }
     }
     
+    void verifyChecked(PointerToPointerExpr *E) {
+      PrettyStackTraceExpr debugStack(Ctx,
+                                      "verifying PointerToPointer", E);
+
+      auto fromElement = E->getSubExpr()->getType()->getAnyPointerElementType();
+      auto toElement = E->getType()->getAnyPointerElementType();
+      
+      if (!fromElement && !toElement) {
+        Out << "PointerToPointer does not convert between pointer types:\n";
+        E->print(Out);
+        Out << "\n";
+        abort();
+      }
+    }
+    
+    void verifyChecked(InOutToPointerExpr *E) {
+      PrettyStackTraceExpr debugStack(Ctx,
+                                      "verifying InOutToPointer", E);
+      
+      auto fromElement = E->getSubExpr()->getType()->getInOutObjectType();
+      auto toElement = E->getType()->getAnyPointerElementType();
+      
+      if (!E->getSubExpr()->getType()->is<InOutType>() && !toElement) {
+        Out << "InOutToPointer does not convert from inout to pointer:\n";
+        E->print(Out);
+        Out << "\n";
+        abort();
+      }
+      
+      // Ensure we don't convert an array to a void pointer this way.
+      
+      if (fromElement->getNominalOrBoundGenericNominal() == Ctx.getArrayDecl()
+          && toElement->isEqual(Ctx.TheEmptyTupleType)) {
+        Out << "InOutToPointer is converting an array to a void pointer; "
+               "ArrayToPointer should be used instead:\n";
+        E->print(Out);
+        Out << "\n";
+        abort();
+      }
+    }
+    
+    void verifyChecked(ArrayToPointerExpr *E) {
+      PrettyStackTraceExpr debugStack(Ctx,
+                                      "verifying ArrayToPointer", E);
+
+      // The source may be optionally inout.
+      auto fromArray = E->getSubExpr()->getType()->getInOutObjectType();
+      
+      if (fromArray->getNominalOrBoundGenericNominal() != Ctx.getArrayDecl()) {
+        Out << "ArrayToPointer does not convert from array:\n";
+        E->print(Out);
+        Out << "\n";
+        abort();
+      }
+      
+      auto toElement = E->getType()->getAnyPointerElementType();
+
+      if (!toElement) {
+        Out << "ArrayToPointer does not convert to pointer:\n";
+        E->print(Out);
+        Out << "\n";
+        abort();
+      }
+    }
+    
     void verifyChecked(CollectionUpcastConversionExpr *E) {
       verifyChecked(E->getSubExpr());
       verifyCheckedBase(E);
