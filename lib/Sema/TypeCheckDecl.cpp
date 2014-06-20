@@ -2234,9 +2234,11 @@ public:
     // recovered by building a computed property with just a getter.  Diagnose
     // this and create the getter decl now.
     if (isa<ProtocolDecl>(VD->getDeclContext()) &&
-        VD->getStorageKind() == VarDecl::Stored &&
-        !VD->isLet()) {
-      TC.diagnose(VD->getLoc(), diag::protocol_property_must_be_computed);
+        VD->getStorageKind() == VarDecl::Stored) {
+      if (VD->isLet())
+        TC.diagnose(VD->getLoc(), diag::protocol_property_must_be_computed_var);
+      else
+        TC.diagnose(VD->getLoc(), diag::protocol_property_must_be_computed);
       
       convertStoredVarInProtocolToComputed(VD, TC);
     }

@@ -167,8 +167,8 @@ protocol P {
   static var v3: Int { get } // expected-error {{static properties are only allowed within structs and enums; use 'class' to declare a class property}}{{3-9=class}}
   class var v4: Int { get }
 
-  static let l1: Int // expected-error {{static properties are only allowed within structs and enums; use 'class' to declare a class property}}{{3-9=class}} expected-error {{static variables not yet supported in generic types}}
-  class let l2: Int // expected-error {{class variables not yet supported in generic types}}
+  static let l1: Int // expected-error {{static properties are only allowed within structs and enums; use 'class' to declare a class property}}{{3-9=class}} expected-error {{static variables not yet supported in generic types}} expected-error {{immutable property requirement must be declared as 'var' with a '{ get }' specifier}}
+  class let l2: Int // expected-error {{class variables not yet supported in generic types}} expected-error {{immutable property requirement must be declared as 'var' with a '{ get }' specifier}}
 }
 
 
