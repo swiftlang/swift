@@ -8,11 +8,17 @@ import Swift
 import gizmo
 
 // CHECK: [[BLOCK_ISA:@_NSConcreteStackBlock]] = external global %objc_class
-// CHECK: [[VOID_BLOCK_SIGNATURE:@.*]] = private unnamed_addr constant {{.*}} c"v8@?\00"
+// CHECK: [[VOID_BLOCK_SIGNATURE:@.*]] = private unnamed_addr constant {{.*}} c"v8@?0\00"
 // CHECK: [[TRIVIAL_BLOCK_DESCRIPTOR:@.*]] = internal constant { {{.*}} } {
 // CHECK:   i64 0,
 // CHECK:   i64 40,
 // CHECK:   i8* {{.*}} [[VOID_BLOCK_SIGNATURE]]
+// CHECK: }
+// CHECK: [[BLOCK_PARAM_BLOCK_SIGNATURE:@.*]] = private unnamed_addr constant {{.*}} c"v16@?0@?<q@?q>8\00"
+// CHECK: [[BLOCK_PARAM_BLOCK_DESCRIPTOR:@.*]] = internal constant { {{.*}} } {
+// CHECK:   i64 0,
+// CHECK:   i64 40,
+// CHECK:   i8* {{.*}} [[BLOCK_PARAM_BLOCK_SIGNATURE]]
 // CHECK: }
 // CHECK: [[NONTRIVIAL_BLOCK_DESCRIPTOR:@.*]] = internal constant { {{.*}} } {
 // CHECK:   i64 0,
@@ -21,7 +27,7 @@ import gizmo
 // CHECK:   void ({ %objc_block, %swift.refcounted* }*)* [[NONTRIVIAL_BLOCK_DISPOSE:@[A-Za-z0-9_]+]],
 // CHECK:   i8* {{.*}} [[VOID_BLOCK_SIGNATURE]]
 // CHECK: }
-// CHECK: [[NSRECT_BLOCK_SIGNATURE:@.*]] = private unnamed_addr constant {{.*}} c"{NSRect={NSPoint=dd}{NSSize=dd}}8@?\00"
+// CHECK: [[NSRECT_BLOCK_SIGNATURE:@.*]] = private unnamed_addr constant {{.*}} c"{NSRect={NSPoint=dd}{NSSize=dd}}8@?0\00"
 // CHECK: [[STRET_BLOCK_DESCRIPTOR:@.*]] = internal constant { {{.*}} } {
 // CHECK:   i64 0,
 // CHECK:   i64 40,
@@ -82,6 +88,14 @@ entry(%0 : $*@block_storage Builtin.RawPointer):
   return undef : $()
 }
 
+sil @init_block_header_trivial_block_param : $@thin (@inout @block_storage Builtin.RawPointer) -> @cc(cdecl) @objc_block (@objc_block @cc(cdecl) (Int) -> Int) -> () {
+entry(%0 : $*@block_storage Builtin.RawPointer):
+  %i = function_ref @invoke_trivial_block_param : $@thin @cc(cdecl) (@inout @block_storage Builtin.RawPointer, @objc_block @cc(cdecl) (Int) -> Int) -> ()
+  %b = init_block_storage_header %0 : $*@block_storage Builtin.RawPointer, invoke %i : $@thin @cc(cdecl) (@inout @block_storage Builtin.RawPointer, @objc_block @cc(cdecl) (Int) -> Int) -> (), type $@cc(cdecl) @objc_block (@objc_block @cc(cdecl) (Int) -> Int) -> ()
+  return %b : $@cc(cdecl) @objc_block (@objc_block @cc(cdecl) (Int) -> Int) -> ()
+}
+
+sil @invoke_trivial_block_param : $@thin @cc(cdecl) (@inout @block_storage Builtin.RawPointer, @objc_block @cc(cdecl) (Int) -> Int) -> ()
 
 // CHECK-LABEL: define i64 @invoke_trivial_with_arg(void (...)*, i64) {
 // CHECK:         ret i64 %1

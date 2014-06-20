@@ -1233,7 +1233,7 @@ irgen::getBlockTypeExtendedEncoding(IRGenModule &IGM,
   }
   
   return GetObjCEncodingForTypes(IGM, resultType, paramTypes,
-                                 "@?", IGM.getPointerSize().getValue(),
+                                 "@?0", IGM.getPointerSize().getValue(),
                                  /*extended*/ true);
 }
 

@@ -309,22 +309,70 @@ clang::CanQualType GenClangType::visitFunctionType(CanFunctionType type) {
 }
 
 clang::CanQualType GenClangType::visitSILFunctionType(CanSILFunctionType type) {
-  // We'll select (void)(^)() for function types. As long as it's a
-  // pointer type it doesn't matter exactly which for either ABI type
-  // generation or Obj-C type encoding.
-  //
-  // FIXME: This isn't strictly true because ObjC extended method encoding
-  // encodes the parameter and return types of blocks.
   auto &clangCtx = getClangASTContext();
-  auto fnTy = clangCtx.getFunctionNoProtoType(clangCtx.VoidTy);
+
+  // We can only lower block types with an ObjC-compatible calling convention.
+  switch (type->getAbstractCC()) {
+  case AbstractCC::C:
+  case AbstractCC::ObjCMethod:
+    // OK.
+    break;
+      
+  case AbstractCC::Freestanding:
+  case AbstractCC::Method:
+  case AbstractCC::WitnessMethod:
+    llvm_unreachable("not an ObjC-compatible function");
+  }
+  switch (type->getRepresentation()) {
+  case AnyFunctionType::Representation::Block:
+    // OK.
+    break;
+  
+  case AnyFunctionType::Representation::Thick:
+  case AnyFunctionType::Representation::Thin:
+    // TODO: Thin functions could be mapped to function pointer types.
+    llvm_unreachable("not an ObjC-compatible block");
+  }
+  
+  // Convert the return and parameter types.
+  auto resultType = Converter.convert(IGM,
+                type->getSemanticInterfaceResultSILType().getSwiftRValueType());
+  if (resultType.isNull())
+    return clang::CanQualType();
+  
+  SmallVector<clang::QualType, 4> paramTypes;
+  for (auto paramTy : type->getInterfaceParametersWithoutIndirectResult()) {
+    // Blocks should only take direct +0 parameters.
+    switch (paramTy.getConvention()) {
+    case ParameterConvention::Direct_Guaranteed:
+    case ParameterConvention::Direct_Unowned:
+      // OK.
+      break;
+        
+    case ParameterConvention::Direct_Owned:
+      llvm_unreachable("block takes owned parameter");
+    case ParameterConvention::Indirect_In:
+    case ParameterConvention::Indirect_Inout:
+    case ParameterConvention::Indirect_Out:
+      llvm_unreachable("block takes indirect parameter");
+    }
+    auto param = Converter.convert(IGM, paramTy.getType());
+    if (param.isNull())
+      return clang::CanQualType();
+    paramTypes.push_back(param);
+  }
+  
+  // Build the Clang function type.
+  clang::FunctionProtoType::ExtProtoInfo defaultEPI;
+  auto fnTy = clangCtx.getFunctionType(resultType, paramTypes, defaultEPI);
   auto blockTy = clangCtx.getBlockPointerType(fnTy);
   return clangCtx.getCanonicalType(blockTy);
 }
 
 clang::CanQualType GenClangType::visitSILBlockStorageType(CanSILBlockStorageType type) {
-  // We'll select (void)(^)() for function types. As long as it's a
-  // pointer type it doesn't matter exactly which for either ABI type
-  // generation or Obj-C type encoding.
+  // We'll select (void)(^)(). This isn't correct for all blocks, but block
+  // storage type should only be converted for function signature lowering,
+  // where the parameter types do not matter.
   auto &clangCtx = getClangASTContext();
   auto fnTy = clangCtx.getFunctionNoProtoType(clangCtx.VoidTy);
   auto blockTy = clangCtx.getBlockPointerType(fnTy);
