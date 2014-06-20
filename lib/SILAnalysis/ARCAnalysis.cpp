@@ -18,6 +18,7 @@
 #include "swift/SILAnalysis/AliasAnalysis.h"
 #include "swift/SILAnalysis/ValueTracking.h"
 #include "swift/SILPasses/Utils/Local.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
@@ -25,6 +26,13 @@ using namespace swift;
 //===----------------------------------------------------------------------===//
 //                             Decrement Analysis
 //===----------------------------------------------------------------------===//
+
+static bool isKnownToNotDecrementRefCount(FunctionRefInst *FRI) {
+   return llvm::StringSwitch<bool>(FRI->getReferencedFunction()->getName())
+     .Case("swift_keepAlive", true)
+     .Case("_swift_isUniquelyReferenced", true)
+     .Default(false);
+} 
 
 static bool canApplyDecrementRefCount(ApplyInst *AI, SILValue Ptr,
                                       AliasAnalysis *AA) {
@@ -42,7 +50,7 @@ static bool canApplyDecrementRefCount(ApplyInst *AI, SILValue Ptr,
 
   // swift_keepAlive can not retain values. Remove this when we get rid of that.
   if (auto *FRI = dyn_cast<FunctionRefInst>(AI->getCallee()))
-    if (FRI->getReferencedFunction()->getName().equals("swift_keepAlive"))
+    if (isKnownToNotDecrementRefCount(FRI))
       return false;
 
   // Ok, this apply *MAY* decrement ref counts. Now our strategy is to attempt
