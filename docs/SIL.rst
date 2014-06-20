@@ -3309,38 +3309,6 @@ Checked Conversions
 ~~~~~~~~~~~~~~~~~~~
 
 Some user-level cast operations can fail and thus require runtime checking.
-A special operand to checked conversion operations describes the different
-kinds of cast::
-
-  sil-checked-conversion-kind ::= 'downcast'
-  sil-checked-conversion-kind ::= 'super_to_archetype'
-  sil-checked-conversion-kind ::= 'archetype_to_archetype'
-  sil-checked-conversion-kind ::= 'archetype_to_concrete'
-  sil-checked-conversion-kind ::= 'existential_to_archetype'
-  sil-checked-conversion-kind ::= 'existential_to_concrete'
-
-- ``downcast`` represents a base-to-derived class cast, where the derived type
-  is a concrete class type. The operand type and result type of the cast
-  must both be concrete class types.
-- ``super_to_archetype`` represents a base-to-derived class cast, where the
-  derived type is an archetype with a base class constraint. The operand type
-  must be a concrete class type. The result type must be an archetype with a
-  base class constraint that relates it to the operand's type.
-- ``archetype_to_archetype`` represents a cast from one archetype type to
-  another. The operand type and result type must be both archetype values or
-  both archetype addresses. The types do not need to be statically related.
-- ``archetype_to_concrete`` represents a cast from an archetype type to
-  a concrete type. The operand type must be an archetype. The result type
-  must be a concrete type. The types must be both objects or both addresses.
-  The types do not need to be statically related.
-- ``existential_to_archetype`` represents a cast from a protocol type to
-  an archetype. The operand type must be a protocol type. The result type
-  must be an archetype. The types must be both objects or both addresses.
-  The types do not need to be statically related.
-- ``existential_to_concrete`` represents a cast from a protocol type to
-  a concrete type. The operand type must be a protocol type. The result type
-  must be a concrete type. The types must be both objects or both addresses.
-  The types do not need to be statically related.
 
 The `unconditional_checked_cast`_ instruction performs an unconditional
 checked cast; it is a runtime failure if the cast fails. The `checked_cast_br`_
@@ -3351,13 +3319,10 @@ unconditional_checked_cast
 ``````````````````````````
 ::
 
-  sil-instruction ::= 'unconditional_checked_cast' sil-checked-conversion-kind
-                        sil-operand 'to' sil-type
+  sil-instruction ::= 'unconditional_checked_cast' sil-operand 'to' sil-type
 
-  %1 = unconditional_checked_cast downcast %0 : $A to $B
-  %1 = unconditional_checked_cast archetype_to_archetype %0 : $*A to $*B
-  // %0 must be of a class type $B that is a superclass of $D
-  // $A and $B must be valid operand and result types for the cast kind
+  %1 = unconditional_checked_cast %0 : $A to $B
+  %1 = unconditional_checked_cast %0 : $*A to $*B
   // $A and $B must be both objects or both addresses
   // %1 will be of type $B or $*B
 
@@ -3626,13 +3591,14 @@ checked_cast_br
 ```````````````
 ::
 
-  sil-terminator ::= 'checked_cast_br' sil-checked-conversion-kind
+  sil-terminator ::= 'checked_cast_br' sil-checked-cast-exact?
                       sil-operand 'to' sil-type ','
                       sil-identifier ',' sil-identifier
+  sil-checked-cast-exact ::= '[' 'exact' ']'
 
   checked_cast_br %0 : $A to $B, bb1, bb2
   checked_cast_br %0 : $*A to $*B, bb1, bb2
-  // $A and $B must valid operand and result types for the cast kind
+  checked_cast_br [exact] %0 : $A to $A, bb1, bb2
   // $A and $B must be both object types or both address types
   // bb1 must take a single argument of type $B or $*B
   // bb2 must take no arguments
@@ -3641,6 +3607,10 @@ Performs a checked conversion from ``$A`` to ``$B``. If the conversion succeeds,
 control is transferred to ``bb1``, and the result of the cast is passed into
 ``bb1`` as an argument. If the conversion fails, control is transferred to
 ``bb2``.
+
+An exact cast checks whether the dynamic type is exactly the target
+type, not any possible subtype of it.  The source and target types
+must be class types.
 
 Assertion configuration
 ~~~~~~~~~~~~~~~~~~~~~~~
