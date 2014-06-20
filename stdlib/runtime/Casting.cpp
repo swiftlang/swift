@@ -257,6 +257,23 @@ _dynamicCastToExistential(const OpaqueValue *value,
   return value;
 }
 
+static bool shouldDeallocateSource(bool castSucceeded, DynamicCastFlags flags) {
+  return (castSucceeded && (flags & DynamicCastFlags::TakeOnSuccess)) ||
+        (!castSucceeded && (flags & DynamicCastFlags::DestroyOnFailure));
+}
+
+/// Given that a cast operation is complete, maybe deallocate an
+/// opaque existential value.
+static void _maybeDeallocateOpaqueExistential(OpaqueValue *srcExistential,
+                                              bool castSucceeded,
+                                              DynamicCastFlags flags) {
+  if (shouldDeallocateSource(castSucceeded, flags)) {
+    auto container =
+      reinterpret_cast<OpaqueExistentialContainer *>(srcExistential);
+    container->Type->vw_deallocateBuffer(&container->Buffer);
+  }
+}
+
 /// Given a possibly-existential value, find its dynamic type and the
 /// address of its storage.
 static void findDynamicValueAndType(OpaqueValue *value, const Metadata *type,
@@ -317,6 +334,47 @@ static void findDynamicValueAndType(OpaqueValue *value, const Metadata *type,
   _failCorruptType(type);
 }
 
+/// Given a possibly-existential value, deallocate any buffer in its storage.
+static void deallocateDynamicValue(OpaqueValue *value, const Metadata *type) {
+  switch (type->getKind()) {
+  case MetadataKind::Existential: {
+    auto existentialType = cast<ExistentialTypeMetadata>(type);
+    if (!existentialType->isClassBounded()) {
+      auto existential =
+        reinterpret_cast<OpaqueExistentialContainer*>(value);
+
+      // Handle the possibility of nested existentials.
+      OpaqueValue *existentialValue =
+        existential->Type->vw_projectBuffer(&existential->Buffer);
+      deallocateDynamicValue(existentialValue, existential->Type);
+
+      // Deallocate the buffer.
+      existential->Type->vw_deallocateBuffer(&existential->Buffer);
+    }
+    return;
+  }
+
+  // None of the rest of these require deallocation.
+  case MetadataKind::Class:
+  case MetadataKind::ForeignClass:
+  case MetadataKind::ObjCClassWrapper:
+  case MetadataKind::Metatype:
+  case MetadataKind::ExistentialMetatype:
+  case MetadataKind::Function:
+  case MetadataKind::Block:
+  case MetadataKind::HeapArray:
+  case MetadataKind::HeapLocalVariable:
+  case MetadataKind::Enum:
+  case MetadataKind::Opaque:
+  case MetadataKind::PolyFunction:
+  case MetadataKind::Struct:
+  case MetadataKind::Tuple:
+    return;
+  }
+  _failCorruptType(type);
+}
+
+
 /// Perform a dynamic cast to an existential type.
 static bool _dynamicCastToExistential(OpaqueValue *dest,
                                       OpaqueValue *src,
@@ -338,12 +396,15 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
     if (!_conformsToProtocols(srcDynamicValue, srcDynamicType,
                               targetType->Protocols,
                               destExistential->getWitnessTables()))
-      return _fail(srcDynamicValue, srcDynamicType, targetType, flags);
+      return _fail(src, srcType, targetType, flags);
 
     auto object = *(reinterpret_cast<HeapObject**>(srcDynamicValue));
     destExistential->Value = object;
     if (!(flags & DynamicCastFlags::TakeOnSuccess)) {
       swift_retain_noresult(object);
+    }
+    if (src != srcDynamicValue && shouldDeallocateSource(true, flags)) {
+      deallocateDynamicValue(src, srcType);
     }
     return true;
 
@@ -355,7 +416,7 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
     if (!_conformsToProtocols(srcDynamicValue, srcDynamicType,
                               targetType->Protocols,
                               destExistential->getWitnessTables()))
-      return _fail(srcDynamicValue, srcDynamicType, targetType, flags);
+      return _fail(src, srcType, targetType, flags);
 
     // Fill in the type and value.
     destExistential->Type = srcDynamicType;
@@ -365,6 +426,9 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
     } else {
       srcDynamicType->vw_initializeBufferWithCopy(&destExistential->Buffer,
                                                   srcDynamicValue);
+    }
+    if (src != srcDynamicValue && shouldDeallocateSource(true, flags)) {
+      deallocateDynamicValue(src, srcType);
     }
     return true;
   }
@@ -643,11 +707,16 @@ static bool _dynamicCastToUnknownClassFromExistential(OpaqueValue *dest,
     auto opaqueContainer =
       reinterpret_cast<OpaqueExistentialContainer*>(src);
     auto srcCapturedType = opaqueContainer->Type;
-    return swift_dynamicCast(dest,
-                  srcCapturedType->vw_projectBuffer(&opaqueContainer->Buffer),
-                             srcCapturedType,
-                             targetType,
-                             flags);
+    OpaqueValue *srcValue =
+      srcCapturedType->vw_projectBuffer(&opaqueContainer->Buffer);
+    bool result = swift_dynamicCast(dest,
+                                    srcValue,
+                                    srcCapturedType,
+                                    targetType,
+                                    flags);
+    if (src != srcValue)
+      _maybeDeallocateOpaqueExistential(src, result, flags);
+    return result;
   }
 }
 
@@ -660,6 +729,7 @@ static bool _dynamicCastFromExistential(OpaqueValue *dest,
                                         DynamicCastFlags flags) {
   OpaqueValue *srcValue;
   const Metadata *srcCapturedType;
+  bool isOutOfLine;
 
   if (srcType->isClassBounded()) {
     auto classContainer =
@@ -667,14 +737,19 @@ static bool _dynamicCastFromExistential(OpaqueValue *dest,
     srcValue = (OpaqueValue*) &classContainer->Value;
     void *obj = classContainer->Value;
     srcCapturedType = swift_unknownTypeOf(reinterpret_cast<HeapObject*>(obj));
+    isOutOfLine = false;
   } else {
     auto opaqueContainer = reinterpret_cast<OpaqueExistentialContainer*>(src);
     srcCapturedType = opaqueContainer->Type;
     srcValue = srcCapturedType->vw_projectBuffer(&opaqueContainer->Buffer);
+    isOutOfLine = (src != srcValue);
   }
 
-  return swift_dynamicCast(dest, srcValue, srcCapturedType,
-                           targetType, flags);
+  bool result = swift_dynamicCast(dest, srcValue, srcCapturedType,
+                                  targetType, flags);
+  if (isOutOfLine)
+    _maybeDeallocateOpaqueExistential(src, result, flags);
+  return result;
 }
 
 /// Perform a dynamic cast of a metatype to a metatype.
@@ -746,8 +821,11 @@ static bool _dynamicCastToMetatype(OpaqueValue *dest,
       auto srcExistential = (OpaqueExistentialContainer*) src;
       auto srcValueType = srcExistential->Type;
       auto srcValue = srcValueType->vw_projectBuffer(&srcExistential->Buffer);
-      return _dynamicCastToMetatype(dest, srcValue, srcValueType,
-                                    targetType, flags);
+      bool result = _dynamicCastToMetatype(dest, srcValue, srcValueType,
+                                           targetType, flags);
+      if (src != srcValue)
+        _maybeDeallocateOpaqueExistential(src, result, flags);
+      return result;
     }
   }
 
@@ -883,8 +961,11 @@ static bool _dynamicCastToExistentialMetatype(OpaqueValue *dest,
       auto srcExistential = (OpaqueExistentialContainer*) src;
       auto srcValueType = srcExistential->Type;
       auto srcValue = srcValueType->vw_projectBuffer(&srcExistential->Buffer);
-      return _dynamicCastToExistentialMetatype(dest, srcValue, srcValueType,
-                                               targetType, flags);
+      bool result = _dynamicCastToExistentialMetatype(dest, srcValue, srcValueType,
+                                                      targetType, flags);
+      if (src != srcValue)
+        _maybeDeallocateOpaqueExistential(src, result, flags);
+      return result;
     }
   }
 
