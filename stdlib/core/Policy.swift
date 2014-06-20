@@ -60,7 +60,6 @@ protocol AnyObject {}
 
 typealias AnyClass = AnyObject.Type
 
-
 func === (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
   switch (lhs, rhs) {
   case (.Some(let l), .Some(let r)):
@@ -78,28 +77,6 @@ func === (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
 func !== (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
   return !(lhs === rhs)
 }
-
-// We genuinely have no place we can use this protocol at the moment
-#if IDENTIFIABLE_IS_USABLE
-//
-// Identifiable
-//
-
-/// A protocol for types whose instances have identity.  
-protocol Identifiable {
-  /// Returns true iff lhs and rhs have the same identity.
-  /// Mutating lhs is expected to have the same effect
-  /// on rhs iff lhs == rhs
-  func === (lhs: Self, rhs: Self) -> Bool
-}
-
-/// Returns false iff lhs and rhs have the same identity.
-/// Mutating lhs is expected not to have the same effect
-/// on rhs iff lhs !== rhs
-func !== <T : Identifiable>(lhs: T, rhs: T) -> Bool {
-  return !(lhs === rhs)
-}
-#endif
 
 //
 // Equatable

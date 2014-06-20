@@ -77,7 +77,9 @@ struct ${Self}<T> : MutableCollection, Sliceable {
       return Slice(_buffer[subRange])
     }
     set(rhs) {
-      self.replaceRange(subRange, with: rhs)
+      if self[subRange] !== rhs {
+        self.replaceRange(subRange, with: rhs)
+      }
     }
   }
 
@@ -736,6 +738,22 @@ func _arrayAppendSequence<
       _arrayReserve(&buffer, _growArrayCapacity(capacity))
     }
   }
+}
+
+/// Returns true iff these arrays reference exactly the same elements.
+func ===<T: ArrayType, U: ArrayType>(lhs: T, rhs: U) -> Bool {
+  let lhsCount = lhs.count
+  if lhsCount != rhs.count {
+    return false
+  }
+
+  return lhsCount == 0 || lhs._buffer.identity == rhs._buffer.identity
+}
+
+/// Returns false iff these arrays reference exactly the same
+/// elements.
+func !==<T: ArrayType, U: ArrayType>(lhs: T, rhs: U) -> Bool {
+  return !(lhs === rhs)
 }
 
 % for Self in arrayTypes:
