@@ -1377,14 +1377,23 @@ ParserResult<Stmt> Parser::parseStmtSwitch(LabeledStmtInfo LabelInfo) {
   // If there are non-case-label statements at the start of the switch body,
   // raise an error and recover by parsing and discarding them.
   bool DiagnosedNotCoveredStmt = false;
+  bool ErrorAtNotCoveredStmt = false;
   while (!Tok.is(tok::kw_case) && !Tok.is(tok::kw_default)
          && !Tok.is(tok::r_brace) && !Tok.is(tok::eof)) {
+    if (ErrorAtNotCoveredStmt) {
+      // Error recovery.
+      consumeToken();
+      continue;
+    }
     if (!DiagnosedNotCoveredStmt) {
       diagnose(Tok, diag::stmt_in_switch_not_covered_by_case);
       DiagnosedNotCoveredStmt = true;
     }
     ASTNode NotCoveredStmt;
-    Status |= parseExprOrStmt(NotCoveredStmt);
+    ParserStatus CurrStat = parseExprOrStmt(NotCoveredStmt);
+    if (CurrStat.isError())
+      ErrorAtNotCoveredStmt = true;
+    Status |= CurrStat;
   }
   
   SmallVector<CaseStmt*, 8> cases;
