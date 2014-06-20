@@ -595,13 +595,7 @@ func _convertNSArrayToArray<T>(source: NSArray) -> T[] {
 
   var anyObjectArr: AnyObject[]
     = Array(ArrayBuffer(reinterpretCast(source) as _CocoaArray))
-  let result: T[]? = _arrayBridgeFromObjectiveCConditional(anyObjectArr)
-  if _fastPath(result) {
-    return result!
-  }
-  
-  _preconditionFailure(
-    "NSArray element failed to bridge to Array element type")
+  return _arrayBridgeFromObjectiveC(anyObjectArr)
 }
 
 /// The entry point for converting `Array` to `NSArray` in bridge
@@ -641,7 +635,7 @@ extension Array : _ConditionallyBridgedToObjectiveC {
 
     var anyObjectArr: AnyObject[]
       = AnyObject[](ArrayBuffer(reinterpretCast(source) as _CocoaArray))
-    return _arrayBridgeFromObjectiveCConditional(anyObjectArr)
+    return _arrayBridgeFromObjectiveC(anyObjectArr)
   }
 
   static func bridgeFromObjectiveCConditional(source: NSArray) -> Array? {
@@ -782,7 +776,7 @@ extension Dictionary : _ConditionallyBridgedToObjectiveC {
     let anyDict = x as Dictionary<NSObject, AnyObject>
     if isBridgedVerbatimToObjectiveC(KeyType.self) &&
        isBridgedVerbatimToObjectiveC(ValueType.self) {
-    return Swift._dictionaryDownCastConditional(anyDict)
+      return Swift._dictionaryDownCastConditional(anyDict)
     }
 
     return Swift._dictionaryBridgeFromObjectiveCConditional(anyDict)

@@ -2234,8 +2234,8 @@ func _dictionaryBridgeFromObjectiveCConditional<Key, Value, BridgesToKey,
         return nil
       }
     } else {
-      if let bridgedKey = bridgeFromObjectiveC(reinterpretCast(key), 
-                                               BridgesToKey.self) {
+      if let bridgedKey = bridgeFromObjectiveCConditional(reinterpretCast(key), 
+                                                          BridgesToKey.self) {
         resultKey = bridgedKey
       } else {
         return nil
@@ -2252,8 +2252,9 @@ func _dictionaryBridgeFromObjectiveCConditional<Key, Value, BridgesToKey,
         return nil
       }
     } else {
-      if let bridgedValue = bridgeFromObjectiveC(reinterpretCast(value), 
-                                                 BridgesToValue.self) {
+      if let bridgedValue = bridgeFromObjectiveCConditional(
+                              reinterpretCast(value), 
+                              BridgesToValue.self) {
         resultValue = bridgedValue
       } else {
         return nil

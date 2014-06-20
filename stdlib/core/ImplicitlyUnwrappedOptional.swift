@@ -129,12 +129,7 @@ extension ImplicitlyUnwrappedOptional : _ConditionallyBridgedToObjectiveC {
   }
 
   static func bridgeFromObjectiveC(x: AnyObject) -> T!? {
-    let bridged: T? = Swift.bridgeFromObjectiveC(x, T.self)
-    if let value = bridged {
-      return value
-    }
-
-    return .None
+    return Swift.bridgeFromObjectiveCUnconditional(x, T.self)
   }
 
   static func bridgeFromObjectiveCConditional(x: AnyObject) -> T!? {

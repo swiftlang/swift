@@ -487,4 +487,76 @@ if let dict = obj as? Dictionary<Derived, Derived> {
   println("Not a dictionary of derived/derived")
 }
 
+let strArray: AnyObject = ["hello", "world"]
+let intArray: AnyObject = [1, 2, 3]
+let dictArray: AnyObject = [["hello" : 1, "world" : 2], 
+                            ["swift" : 1, "speedy" : 2]]
+
+// CHECK: Dictionary<String, AnyObject> is
+obj = ["a" : strArray, "b" : intArray, "c": dictArray]
+if let dict = obj as? Dictionary<String, AnyObject[]> {
+  println("Dictionary<String, AnyObject> is \(dict)")
+} else {
+  println("Not a Dictionary<String, AnyObject>")
+}
+
+// CHECK: Not a Dictionary<String, String>
+if let dict = obj as? Dictionary<String, String[]> {
+  println("Dictionary<String, String> is \(dict)")
+} else {
+  println("Not a Dictionary<String, String>")
+}
+
+// CHECK: Not a Dictionary<String, Int>
+if let dict = obj as? Dictionary<String, Int[]> {
+  println("Dictionary<String, Int> is \(dict)")
+} else {
+  println("Not a Dictionary<String, Int>")
+}
+
+// CHECK: Dictionary<String, Int>[] is 
+obj = dictArray
+if let array = obj as? Dictionary<String, Int>[] {
+  println("Dictionary<String, Int>[] is \(array)")
+} else {
+  println("Not a Dictionary<String, Int>[]")
+}
+
+// CHECK: Not a Dictionary<String, String>[]
+if let array = obj as? Dictionary<String, String>[] {
+  println("Dictionary<String, String>[] is \(array)")
+} else {
+  println("Not a Dictionary<String, String>[]")
+}
+
+// CHECK: Dictionary<String, Dictionary<String, Int>[]> is [a: [
+obj = ["a" : dictArray]
+if let dict = obj as? Dictionary<String, Dictionary<String, Int>[]> {
+  println("Dictionary<String, Dictionary<String, Int>[]> is \(dict)")
+} else {
+  println("Not a Dictionary<String, Dictionary<String, Int>[]>")
+}
+
+// CHECK: Not a Dictionary<String, Dictionary<String, String>[]>
+if let dict = obj as? Dictionary<String, Dictionary<String, String>[]> {
+  println("Dictionary<String, Dictionary<String, String>[]> is \(dict)")
+} else {
+  println("Not a Dictionary<String, Dictionary<String, String>[]>")
+}
+
+// CHECK: Dictionary<String, Dictionary<String, Int>[]>[] is
+obj = [obj, obj, obj]
+if let array = obj as? Dictionary<String, Dictionary<String, Int>[]>[] {
+  println("Dictionary<String, Dictionary<String, Int>[]>[] is \(array)")
+} else {
+  println("Not a Dictionary<String, Dictionary<String, Int>[]>[]")
+}
+
+// CHECK: Not a Dictionary<String, Dictionary<String, String>[]>[]
+if let array = obj as? Dictionary<String, Dictionary<String, String>[]> {
+  println("Dictionary<String, Dictionary<String, String>[]>[] is \(array)")
+} else {
+  println("Not a Dictionary<String, Dictionary<String, String>[]>[]")
+}
+
 println("ok")  // CHECK: ok
